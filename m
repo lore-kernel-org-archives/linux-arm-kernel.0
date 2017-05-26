@@ -1,83 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 May 2017 22:56:25 +0200
-Subject: [stable backport PATCH v2] usercopy: Adjust tests to deal with
+Date: Fri, 26 May 2017 22:57:40 +0200
+Subject: [stable backport PATCH] usercopy: Adjust tests to deal with
  SMAP/PAN
-Message-ID: <20170526205632.1955399-1-arnd@arndb.de>
+In-Reply-To: <CAGXu5jLa2QEcg9DcKtkqxL1fCzGznhg586-ZDOoXzjF8z0FE1Q@mail.gmail.com>
+References: <20170526204040.1953914-1-arnd@arndb.de>
+ <CAGXu5jLa2QEcg9DcKtkqxL1fCzGznhg586-ZDOoXzjF8z0FE1Q@mail.gmail.com>
+Message-ID: <CAK8P3a1HSEndzLZ5a0e6DV+pGhhyD5gHCudtkC8BQ66P4_xccw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kees Cook <keescook@chromium.org>
+On Fri, May 26, 2017 at 10:53 PM, Kees Cook <keescook@chromium.org> wrote:
+>> +
+>> +       value = 0x5a;
+>
+> I don't think this "value" bit wanted, but it should be harmless.
+>
 
-Commit f5f893c57e37ca730808cb2eee3820abd05e7507 upstream.
+Right, that should not be there, it came from a different patch.
+I've sent a new version of the backport now. Thanks for taking a look.
 
-Under SMAP/PAN/etc, we cannot write directly to userspace memory, so
-this rearranges the test bytes to get written through copy_to_user().
-Additionally drops the bad copy_from_user() test that would trigger a
-memcpy() against userspace on failure.
-
-[arnd: the test module was added in 3.14, and this backported patch
-       should apply cleanly on all version from 3.14 to 4.10.
-       The original patch was in 4.11 on top of a context change
-       I saw the bug triggered with kselftest on a 4.4.y stable kernel]
-
-Signed-off-by: Kees Cook <keescook@chromium.org>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-v2: remove a line that accidentally ended up from upstream version
-    but is not part of the fix.
----
- lib/test_user_copy.c | 20 ++++++++++++++++++--
- 1 file changed, 18 insertions(+), 2 deletions(-)
-
-diff --git a/lib/test_user_copy.c b/lib/test_user_copy.c
-index 0ecef3e4690e..5e6db6b1e3bd 100644
---- a/lib/test_user_copy.c
-+++ b/lib/test_user_copy.c
-@@ -58,7 +58,9 @@ static int __init test_user_copy_init(void)
- 	usermem = (char __user *)user_addr;
- 	bad_usermem = (char *)user_addr;
- 
--	/* Legitimate usage: none of these should fail. */
-+	/*
-+	 * Legitimate usage: none of these copies should fail.
-+	 */
- 	ret |= test(copy_from_user(kmem, usermem, PAGE_SIZE),
- 		    "legitimate copy_from_user failed");
- 	ret |= test(copy_to_user(usermem, kmem, PAGE_SIZE),
-@@ -68,19 +70,33 @@ static int __init test_user_copy_init(void)
- 	ret |= test(put_user(value, (unsigned long __user *)usermem),
- 		    "legitimate put_user failed");
- 
--	/* Invalid usage: none of these should succeed. */
-+	/*
-+	 * Invalid usage: none of these copies should succeed.
-+	 */
-+
-+	/* Reject kernel-to-kernel copies through copy_from_user(). */
- 	ret |= test(!copy_from_user(kmem, (char __user *)(kmem + PAGE_SIZE),
- 				    PAGE_SIZE),
- 		    "illegal all-kernel copy_from_user passed");
-+
-+#if 0
-+	/*
-+	 * When running with SMAP/PAN/etc, this will Oops the kernel
-+	 * due to the zeroing of userspace memory on failure. This needs
-+	 * to be tested in LKDTM instead, since this test module does not
-+	 * expect to explode.
-+	 */
- 	ret |= test(!copy_from_user(bad_usermem, (char __user *)kmem,
- 				    PAGE_SIZE),
- 		    "illegal reversed copy_from_user passed");
-+#endif
- 	ret |= test(!copy_to_user((char __user *)kmem, kmem + PAGE_SIZE,
- 				  PAGE_SIZE),
- 		    "illegal all-kernel copy_to_user passed");
- 	ret |= test(!copy_to_user((char __user *)kmem, bad_usermem,
- 				  PAGE_SIZE),
- 		    "illegal reversed copy_to_user passed");
-+
- 	ret |= test(!get_user(value, (unsigned long __user *)kmem),
- 		    "illegal get_user passed");
- 	ret |= test(!put_user(value, (unsigned long __user *)kmem),
--- 
-2.9.0
+       Arnd
