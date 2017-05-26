@@ -1,101 +1,34 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 26 May 2017 17:14:28 +0300
-Subject: [PATCH v2] arm: dma-mapping: Reset the device's dma_ops
-In-Reply-To: <1495795417-15177-1-git-send-email-sricharan@codeaurora.org>
-References: <1495795417-15177-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <2754945.XA69I2mJdj@avalon>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Fri, 26 May 2017 22:31:18 +0800
+Subject: [xlnx:2017.1_video_ea 11/28] warning: (VIDEO_XILINX_HDMI_RX && ..)
+ selects PHY_XILINX_VPHY which has unmet direct dependencies (STAGING && ..)
+Message-ID: <201705262214.e2DxezbT%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sricharan,
+tree:   https://github.com/Xilinx/linux-xlnx 2017.1_video_ea
+head:   79a0e60e9f6535e89d9923e3987398318f0ed4e2
+commit: 2d6e151e6186db912023243302ba4880b00a8bad [11/28] staging: xilinx: Add xilinx hdmi drivers to staging area
+config: xtensa-allmodconfig (attached as .config)
+compiler: xtensa-linux-gcc (GCC) 4.9.0
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 2d6e151e6186db912023243302ba4880b00a8bad
+        # save the attached .config to linux build tree
+        make.cross ARCH=xtensa 
 
-Thank you for the patch.
+All warnings (new ones prefixed by >>):
 
-On Friday 26 May 2017 16:13:37 Sricharan R wrote:
-> arch_teardown_dma_ops() being the inverse of arch_setup_dma_ops()
-> ,dma_ops should be cleared in the teardown path. Currently, only the
-> device's iommu mapping structures are cleared in arch_teardown_dma_ops,
-> but not the dma_ops. So on the next reprobe, dma_ops left in place is
-> stale from the first IOMMU setup, but iommu mappings has been disposed
-> of. This is a problem when the probe of the device is deferred and
-> recalled with the IOMMU probe deferral.
-> 
-> So for fixing this, slightly refactor by moving the code from
-> __arm_iommu_detach_device to arm_iommu_detach_device and cleanup
-> the former. This takes care of resetting the dma_ops in the teardown
-> path.
-> 
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> Fixes: 09515ef5ddad ("of/acpi: Configure dma operations at probe time for
-> platform/amba/pci bus devices")
+warning: (VIDEO_XILINX_HDMI_RX && DRM_XILINX_HDMI) selects PHY_XILINX_VPHY which has unmet direct dependencies (STAGING && ARCH_ZYNQMP)
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-Could you please push this upstream along with "[PATCH] ARM: dma-mapping: 
-Don't tear third-party mappings" ?
-
-(And feel free to s/tear/tear down/ in the subject of that patch, I've only 
-noticed now that I forgot one word)
-
-> ---
->  arch/arm/mm/dma-mapping.c | 25 ++++++++++---------------
->  1 file changed, 10 insertions(+), 15 deletions(-)
-> 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index c742dfd..6e82e87 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -2311,7 +2311,14 @@ int arm_iommu_attach_device(struct device *dev,
->  }
->  EXPORT_SYMBOL_GPL(arm_iommu_attach_device);
-> 
-> -static void __arm_iommu_detach_device(struct device *dev)
-> +/**
-> + * arm_iommu_detach_device
-> + * @dev: valid struct device pointer
-> + *
-> + * Detaches the provided device from a previously attached map.
-> + * This voids the dma operations (dma_map_ops pointer)
-> + */
-> +void arm_iommu_detach_device(struct device *dev)
->  {
->  	struct dma_iommu_mapping *mapping;
-> 
-> @@ -2324,22 +2331,10 @@ static void __arm_iommu_detach_device(struct device
-> *dev) iommu_detach_device(mapping->domain, dev);
->  	kref_put(&mapping->kref, release_iommu_mapping);
->  	to_dma_iommu_mapping(dev) = NULL;
-> +	set_dma_ops(dev, NULL);
-> 
->  	pr_debug("Detached IOMMU controller from %s device.\n", 
-dev_name(dev));
->  }
-> -
-> -/**
-> - * arm_iommu_detach_device
-> - * @dev: valid struct device pointer
-> - *
-> - * Detaches the provided device from a previously attached map.
-> - * This voids the dma operations (dma_map_ops pointer)
-> - */
-> -void arm_iommu_detach_device(struct device *dev)
-> -{
-> -	__arm_iommu_detach_device(dev);
-> -	set_dma_ops(dev, NULL);
-> -}
->  EXPORT_SYMBOL_GPL(arm_iommu_detach_device);
-> 
->  static const struct dma_map_ops *arm_get_iommu_dma_map_ops(bool coherent)
-> @@ -2379,7 +2374,7 @@ static void arm_teardown_iommu_dma_ops(struct device
-> *dev) if (!mapping)
->  		return;
-> 
-> -	__arm_iommu_detach_device(dev);
-> +	arm_iommu_detach_device(dev);
->  	arm_iommu_release_mapping(mapping);
->  }
-
--- 
-Regards,
-
-Laurent Pinchart
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 47264 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170526/f7aa3eff/attachment-0001.gz>
