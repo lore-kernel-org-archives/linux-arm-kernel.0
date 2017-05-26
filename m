@@ -1,112 +1,74 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 26 May 2017 16:20:01 -0500
-Subject: [PATCH v9 2/7] PCI: Apply the new generic I/O management on PCI
- IO hosts
-In-Reply-To: <1495712248-5232-3-git-send-email-gabriele.paoloni@huawei.com>
-References: <1495712248-5232-1-git-send-email-gabriele.paoloni@huawei.com>
- <1495712248-5232-3-git-send-email-gabriele.paoloni@huawei.com>
-Message-ID: <20170526212001.GB21531@bhelgaas-glaptop.roam.corp.google.com>
+From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
+Date: Fri, 26 May 2017 23:28:20 +0200
+Subject: [PATCH 1/4] ARM: ep93xx: switch to SPARSEMEM
+In-Reply-To: <c5d6d870-48f8-f6c4-1ec9-6b540d0dca98@gmail.com>
+References: <20170221181529.6780-1-hsweeten@visionengravers.com>
+ <20170221181529.6780-2-hsweeten@visionengravers.com>
+ <440efa53-dbbf-5600-3441-87c6891c5389@gmail.com>
+ <c5d6d870-48f8-f6c4-1ec9-6b540d0dca98@gmail.com>
+Message-ID: <2e8ab3d4-21ab-44e6-1b77-4db381a55fcf@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 25, 2017 at 12:37:23PM +0100, Gabriele Paoloni wrote:
-> From: "zhichang.yuan" <yuanzhichang@hisilicon.com>
+Hello Florian,
+
+On 26/05/17 18:13, Florian Fainelli wrote:
+>>> The EP93xx has four chip selects that can be used for the SDRAM memory.
+>>> These chip selects are decoded to specify an address domain:
+>>>
+>>>   SDCS3  0x00000000-0x0fffffff with Boot Option ASDO=1
+>>>   SDCS0  0xc0000000-0xcfffffff
+>>>   SDCS1  0xd0000000-0xdfffffff
+>>>   SDCS2  0xe0000000-x0efffffff
+>>>   SDCS3  0xf0000000-0xffffffff with Boot Option ASDO=0
+>>>
+>>> Because of the row/column/bank architecture of SDRAM, the mapping of
+>>> these memories into the processor's memory space is discontiguous.
+>>>
+>>> Most ep93xx systems only use one of the chip selects. For these systems,
+>>> ARCH_HAS_HOLES_MEMORYMODEL has worked fine to handle the discontiguous
+>>> memory.
+>>>
+>>> But, some of the TS-72xx boards use multiple chip selects. The TS-7300 in
+>>> particular uses SDCS3 (with ASDO=1) and SDCS2. On that system with
+>>> ARCH_HAS_HOLES_MEMORYMODEL the SDCS2 memory does not get handled correctly
+>>> and results in the system not booting.
+>>>
+>>> Change the EP93xx to ARCH_SPARSEMEM_ENABLE. This handles the discontiguous
+>>> memory for all configurations.
+>>>
+>>> This has been tested on the following ep93xx platforms:
+>>>
+>>> EDB9307A with 64 MiB on SDCS0
+>>> Vision EP9307 with 64 MiB on SDCS0
+>>> TS-7300 with 64 MiB on SDCS3 (with ASDO=1) and 64 MiB on SDCS2
+>>> sim.one with 64 MiB on SDCS0
+>>>
+>>> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+>>> Tested-by: Linus Walleij <linus.walleij@linaro.org>
+>>> Cc: Russell King <linux@armlinux.org.uk>
+>> Tested-by: Florian Fainelli <f.fainelli@gmail.com>
+>>
+>> On a TS-3700 with 32MiB of SDRAM, thanks!
+>>
+> OK this is weird, this patch applied against v4.11 works fine on a 32MB
+> board configuration, but applied against v4.12-rc2 I now get the following:
 > 
-> After introducing the new generic I/O space management(LOGIC_IO), the
-> original PCI MMIO relevant helpers need to be updated based on the new
-> interfaces defined in LOGIC_IO.
-> This patch adapts the corresponding code to match the changes introduced
-> by LOGIC_IO.
+> Uncompressing Linux... done, booting the kernel.
+> Warning: Neither atags nor dtb found
 > 
-> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
-> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>        #earlier draft
+> as if r2 was lost somehow.
+> 
+> I will start a bisection to figure out if/when it started to break.
+> Russell do you have an idea?
 
-Not sure how you plan to merge this, but here's my ack:
+I've applied the patch to 4.12-rc2 as well (to be more precise, 1b8f2ffc of Linus's tree),
+and it boots fine on EDB9302 (32MiB one chip on SDCS3). I even ran "memtester" fine, one
+iteration.
 
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+So, from my PoV
+Tested-by: Alexander Sverdlin <alexander.sverdlin@gmail.com>
 
-If you split this as suggested below, add my ack to all three patches.
-
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index b01bd5b..c9fe12b 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
->...
-
-> -int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
-> +int pci_register_io_range(struct fwnode_handle *fwnode, phys_addr_t addr,
-> +			resource_size_t	size)
-
-It's trivial and nit-picky, but I would do the __weak removal in its
-own patch.  It's obviously fine because there's only one
-implementation, but it's unrelated to the main point of this patch.
-
-I would split the signature change (fwnode addition) to a separate
-patch, too, just to make the actual change more obvious, especially
-since that's the only part that crosses subsystems (ACPI, PCI, OF).
-
->  {
-> -	int err = 0;
-> -
-> +	int ret = 0;
->  #ifdef PCI_IOBASE
-> -	struct io_range *range;
-> -	resource_size_t allocated_size = 0;
-> -
-> -	/* check if the range hasn't been previously recorded */
-> -	spin_lock(&io_range_lock);
-> -	list_for_each_entry(range, &io_range_list, list) {
-> -		if (addr >= range->start && addr + size <= range->start + size) {
-> -			/* range already registered, bail out */
-> -			goto end_register;
-> -		}
-> -		allocated_size += range->size;
-> -	}
-> -
-> -	/* range not registed yet, check for available space */
-> -	if (allocated_size + size - 1 > IO_SPACE_LIMIT) {
-> -		/* if it's too big check if 64K space can be reserved */
-> -		if (allocated_size + SZ_64K - 1 > IO_SPACE_LIMIT) {
-> -			err = -E2BIG;
-> -			goto end_register;
-> -		}
-> -
-> -		size = SZ_64K;
-> -		pr_warn("Requested IO range too big, new size set to 64K\n");
-> -	}
-> +	struct logic_pio_hwaddr *range;
->  
-> -	/* add the range to the list */
-> -	range = kzalloc(sizeof(*range), GFP_ATOMIC);
-> -	if (!range) {
-> -		err = -ENOMEM;
-> -		goto end_register;
-> -	}
-> +	if (!size || addr + size < addr)
-> +		return -EINVAL;
->  
-> -	range->start = addr;
-> +	range = kzalloc(sizeof(*range), GFP_KERNEL);
-> +	if (!range)
-> +		return -ENOMEM;
-
-Add a blank line here.
-
-> +	range->fwnode = fwnode;
->  	range->size = size;
-> +	range->hw_start = addr;
-> +	range->flags = PIO_CPU_MMIO;
->  
-> -	list_add_tail(&range->list, &io_range_list);
-> -
-> -end_register:
-> -	spin_unlock(&io_range_lock);
-> +	ret = logic_pio_register_range(range);
-> +	if (ret)
-> +		kfree(range);
->  #endif
->  
-> -	return err;
-> +	return ret;
->  }
+--
+Regards,
+Alexander.
