@@ -1,101 +1,76 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 26 May 2017 14:28:09 +0100
-Subject: may_use_simd on aarch64, chacha20
-In-Reply-To: <4150EFDC-CD3A-4C5C-9EF7-689F63C142C2@linaro.org>
-References: <CAHmME9qH=Wu-=9YUmxi7NPrczHu1UrB7phG0y68ipB+ProQ2TA@mail.gmail.com>
- <4150EFDC-CD3A-4C5C-9EF7-689F63C142C2@linaro.org>
-Message-ID: <20170526132808.GP3559@e103592.cambridge.arm.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Fri, 26 May 2017 09:49:49 -0400
+Subject: [PATCH] drm/rockchip: Don't allow zero sized gem buffer
+In-Reply-To: <59279331.3050402@rock-chips.com>
+References: <1495521583-29151-1-git-send-email-jeffy.chen@rock-chips.com>
+ <20170525153045.7svkkmfsqbqkfacp@art_vandelay>
+ <59279331.3050402@rock-chips.com>
+Message-ID: <20170526134949.z4dp4zsgipmbgdl3@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 21, 2017 at 10:55:20PM +0200, Ard Biesheuvel wrote:
-> (+ Dave)
-
-Apologies for the slow reply -- hopefully this is still useful.
-
-> > On 21 May 2017, at 19:02, Jason A. Donenfeld <Jason@zx2c4.com> wrote:
+On Fri, May 26, 2017 at 10:30:09AM +0800, jeffy wrote:
+> Hi sean,
+> 
+> On 05/25/2017 11:30 PM, Sean Paul wrote:
+> > On Tue, May 23, 2017 at 02:39:43PM +0800, Jeffy Chen wrote:
+> > > The system would crash when trying to alloc zero sized gem buffer:
+> > > [    6.712435] Unable to handle kernel NULL pointer dereference at virtual address 00000010 <--ZERO_SIZE_PTR
+> > > ...
+> > > [    6.757502] PC is at sg_alloc_table_from_pages+0x170/0x1ec
 > > 
-> > Hi folks,
+> > It's unfortunate that you didn't include the entire stack trace. From code
+> > inspection, it seems like the 0 size comes from the fb_probe path? Is there
+> > somewhere in the helpers that you could check the mode is sane so all drivers
+> > can benefit?
+> 
+> hmm, sorry, i was testing it on chromeos 4.4 kernel, it turns out that we
+> have a custom ioctl for userspace to create gem buffer(the same as exynos
+> drm), which might get the the 0 size.
+> 
+> but on upstream kernel, it could only be called by dump_create, and the
+> drm_mode_create_dumb_ioctl already did the size check.
+
+Ah, ok. In that case, fix the custom ioctl such that it ensures we never call
+this function with size == 0, and upload it downstream with a CHROMIUM prefix.
+
+Sean
+
+
+> 
+> will resent this patch, and rewrite the commit message, thanx.
+> 
 > > 
-> > I noticed that the ARM implementation [1] of chacha20 makes a check to
-> > may_use_simd(), but the ARM64 implementation [2] does not. Question 1:
-> > is this a bug, in which case I'll submit a patch shortly, or is this
-> > intentional? In case of the latter, could somebody explain the
-> > reasoning?
-> 
-> This is intentional. arm64 supports kernel mode NEON in any context,
-> whereas ARM only supports it in process context. This is due to the way
-> lazy FP restore is implemented on ARM. However, we are about to change
-> this on arm64 to only allow non-nested kernel mode NEON, similar to
-> x86. This is necessary to support SVE.
-> 
-> > On a similar note, the only ARM64 glue code that uses
-> > may_use_simd() is sha256; everything else does not. Shall I submit a
-> > substantial patch series to fix this up everywhere?
+> > Sean
+> > 
+> > > 
+> > > Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> > > ---
+> > > 
+> > >   drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 5 +++++
+> > >   1 file changed, 5 insertions(+)
+> > > 
+> > > diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> > > index df9e570..8917922 100644
+> > > --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> > > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> > > @@ -315,6 +315,11 @@ struct rockchip_gem_object *
+> > >   	struct drm_gem_object *obj;
+> > >   	int ret;
+> > > 
+> > > +	if (!size) {
+> > > +		DRM_ERROR("gem buffer size is zero\n");
+> > > +		return ERR_PTR(-EINVAL);
+> > > +	}
+> > > +
+> > >   	size = round_up(size, PAGE_SIZE);
+> > > 
+> > >   	rk_obj = kzalloc(sizeof(*rk_obj), GFP_KERNEL);
+> > > --
+> > > 2.1.4
+> > > 
 > > 
 > 
-> Currently, may_use_simd() is only used as a hint on arm64 whether it
-> makes sense to offload crypto to process context. In the sha256 code,
-> whose arm64 neon implementation is only marginally faster than scalar
-> on some micro-architectures, it is used to prefer the scalar code in
-> interrupt context, because the NEON code preserves/restores the NEON
-> state of the interrupted context eagerly, which is costly.
-> 
-> > Secondly, I noticed that may_use_simd() is essentially aliased to
-> > !in_interrupt(), since it uses the asm-generic variety. Question 2:
-> > Isn't this overkill? Couldn't we make an arm/arm64 variant of this
-> > that only checks in_irq()?
-> > 
-> 
-> No. ARM does not support kernel mode NEON in softirq context, and
-> arm64 will soon have its own override that only allows non-nested use
-> in softirq context.
-> 
-> > Lastly, APIs like pcrypts and padata execute with bottom halves
-> > disabled, even though their actual execution environment is process
-> > context, via a workqueue. Thus, here, in_interrupt() will always be
-> > true, even though this is likely a place where we want to use simd.
-> > Question 3: is there something better that could be done?
-> 
-> I guess we should switch to in_serving_softirq() instead.
 
-For context, the arm64 kernel-mode NEON refactoring I've been working
-on [1] defines may_use_simd() to indicate whether calling
-kernel_neon_begin() is safe or not, rather then being a hint about
-whether it is desirable to do so.
-
-This changes the definition of may_use_simd() to something that is
-probably appropriate for your scenario.  From process context without
-any outer kernel_neon_begin()...kernel_neon_end(), it should return
-true.
-
-In general, callers in any context should do something like:
-
-	if (may_use_simd()) {
-		kernel_neon_begin();
-		/* SIMD implementation */
-		kernel_neon_end();
-	} else {
-		/* fallback implementation, or defer to another context */
-	}
-
-Even from task context where may_use_simd() should always return true
-and thus where the fallback path can be omitted, it may be a good idea
-to do something like
-
-	if (!may_use_simd()) {
-		WARN_ON(1);
-		return -EBUSY;
-	}
-
-... or similar.
-
-
-If the semantics or name don't feel right, I'm happy to change them.
-
-Cheers
----Dave
-
-
-[1] lists.infradead.org/pipermail/linux-arm-kernel/2017-May/508901.html
-(arm64: neon: Remove support for nested or hardirq kernel-mode NEON)
+-- 
+Sean Paul, Software Engineer, Google / Chromium OS
