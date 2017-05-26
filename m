@@ -1,46 +1,49 @@
 From: uwe@kleine-koenig.org (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 26 May 2017 20:06:09 +0200
-Subject: [PATCH RFC 5/5] ARM: dts: vf-colibri-eval: use IRQ_TYPE_* to specify
- irq flags
-In-Reply-To: <20170526180609.2699-1-uwe@kleine-koenig.org>
-References: <20170526180609.2699-1-uwe@kleine-koenig.org>
-Message-ID: <20170526180609.2699-5-uwe@kleine-koenig.org>
+Date: Fri, 26 May 2017 20:06:05 +0200
+Subject: [PATCH 1/5] dts: gpio_atmel: adapt binding doc to reality
+Message-ID: <20170526180609.2699-1-uwe@kleine-koenig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the binding documentation and the source code the
-vf610-gpio controller takes IRQ_TYPE_* as its flags values, not
-GPIO_ACTIVE_*.
-
-This patch uses the right variable type which yields the same result
-when compiled. Note that this might be wrong and actually
-IRQ_TYPE_LEVEL_LOW is intended by the dt author.
+The second cell in a gpio reference is used to pass GPIO_ACTIVE_LOW or
+GPIO_ACTIVE_HIGH. The gpio device can also be used as irq controller and
+a reference can contain the IRQ_TYPE_* values in the second cell.
 
 Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
 ---
-Hello,
+ Documentation/devicetree/bindings/gpio/gpio_atmel.txt | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
-can somebody with the hardware or it's documentation please check which
-flag is the right one?
-
-Best regards
-Uwe
-
- arch/arm/boot/dts/vf-colibri-eval-v3.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-index 091b738041a0..3e0c84d79c43 100644
---- a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-+++ b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-@@ -117,7 +117,7 @@
- 		clocks = <&clk16m>;
- 		spi-max-frequency = <10000000>;
- 		interrupt-parent = <&gpio1>;
--		interrupts = <11 GPIO_ACTIVE_LOW>;
-+		interrupts = <11 IRQ_TYPE_EDGE_RISING>;
+diff --git a/Documentation/devicetree/bindings/gpio/gpio_atmel.txt b/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
+index 85f8c0d084fa..b53fe3bce270 100644
+--- a/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
++++ b/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
+@@ -5,9 +5,16 @@ Required properties:
+ - reg: Should contain GPIO controller registers location and length
+ - interrupts: Should be the port interrupt shared by all the pins.
+ - #gpio-cells: Should be two.  The first cell is the pin number and
+-  the second cell is used to specify optional parameters (currently
+-  unused).
++  the second cell is used to specify optional parameters to declare if the GPIO
++  is active high or low. See gpio.txt.
+ - gpio-controller: Marks the device node as a GPIO controller.
++- interrupt-controller: Marks the device node as a GPIO controller.
++- #interrupt-cells: Should be two. The first cell is the pin number and the
++  second cell is used to specify irq type flags:
++      1 = low-to-high edge triggered.
++      2 = high-to-low edge triggered.
++      4 = active high level-sensitive.
++      8 = active low level-sensitive.
+ 
+ optional properties:
+ - #gpio-lines: Number of gpio if absent 32.
+@@ -21,5 +28,7 @@ Example:
+ 		#gpio-cells = <2>;
+ 		gpio-controller;
+ 		#gpio-lines = <19>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
  	};
- };
  
 -- 
 2.11.0
