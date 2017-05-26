@@ -1,150 +1,112 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 26 May 2017 15:57:44 -0500
-Subject: [PATCH v9 1/7] LIB: Introduce a generic PIO mapping method
-In-Reply-To: <1495712248-5232-2-git-send-email-gabriele.paoloni@huawei.com>
+Date: Fri, 26 May 2017 16:20:01 -0500
+Subject: [PATCH v9 2/7] PCI: Apply the new generic I/O management on PCI
+ IO hosts
+In-Reply-To: <1495712248-5232-3-git-send-email-gabriele.paoloni@huawei.com>
 References: <1495712248-5232-1-git-send-email-gabriele.paoloni@huawei.com>
- <1495712248-5232-2-git-send-email-gabriele.paoloni@huawei.com>
-Message-ID: <20170526205744.GA21531@bhelgaas-glaptop.roam.corp.google.com>
+ <1495712248-5232-3-git-send-email-gabriele.paoloni@huawei.com>
+Message-ID: <20170526212001.GB21531@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 25, 2017 at 12:37:22PM +0100, Gabriele Paoloni wrote:
+On Thu, May 25, 2017 at 12:37:23PM +0100, Gabriele Paoloni wrote:
 > From: "zhichang.yuan" <yuanzhichang@hisilicon.com>
 > 
-> In 'commit 41f8bba7f555 ("of/pci: Add pci_register_io_range() and
-> pci_pio_to_address()")' a new I/O space management was supported. With that
-> driver, the I/O ranges configured for PCI/PCIE hosts on some architectures
-> can be mapped to logical PIO, converted easily between CPU address and the
-> corresponding logicial PIO. Based on this, PCI I/O devices can be accessed
-> in a memory read/write way through the unified in/out accessors.
-> 
-> But on some archs/platforms, there are bus hosts which access I/O
-> peripherals with host-local I/O port addresses rather than memory
-> addresses after memory-mapped.
-> To support those devices, a more generic I/O mapping method is introduced
-> here. Through this patch, both the CPU addresses and the host-local port
-> can be mapped into the logical PIO space with different logical/fake PIOs.
-> After this, all the I/O accesses to either PCI MMIO devices or host-local
-> I/O peripherals can be unified into the existing I/O accessors defined in
-> asm-generic/io.h and be redirected to the right device-specific hooks
-> based on the input logical PIO.
+> After introducing the new generic I/O space management(LOGIC_IO), the
+> original PCI MMIO relevant helpers need to be updated based on the new
+> interfaces defined in LOGIC_IO.
+> This patch adapts the corresponding code to match the changes introduced
+> by LOGIC_IO.
 > 
 > Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
 > Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-> ---
->  include/asm-generic/io.h  |  50 +++++++++
->  include/linux/logic_pio.h | 110 ++++++++++++++++++
->  lib/Kconfig               |  26 +++++
->  lib/Makefile              |   2 +
->  lib/logic_pio.c           | 280 ++++++++++++++++++++++++++++++++++++++++++++++
->  5 files changed, 468 insertions(+)
->  create mode 100644 include/linux/logic_pio.h
->  create mode 100644 lib/logic_pio.c
-> 
-> diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
-> index 7ef015e..f7fbec3 100644
-> --- a/include/asm-generic/io.h
-> +++ b/include/asm-generic/io.h
-> ...  
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>        #earlier draft
 
->  #ifndef inb
-> +#ifdef CONFIG_INDIRECT_PIO
-> +#define inb logic_inb
-> +#else
->  #define inb inb
->  static inline u8 inb(unsigned long addr)
+Not sure how you plan to merge this, but here's my ack:
+
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+
+If you split this as suggested below, add my ack to all three patches.
+
+> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> index b01bd5b..c9fe12b 100644
+> --- a/drivers/pci/pci.c
+> +++ b/drivers/pci/pci.c
+>...
+
+> -int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
+> +int pci_register_io_range(struct fwnode_handle *fwnode, phys_addr_t addr,
+> +			resource_size_t	size)
+
+It's trivial and nit-picky, but I would do the __weak removal in its
+own patch.  It's obviously fine because there's only one
+implementation, but it's unrelated to the main point of this patch.
+
+I would split the signature change (fwnode addition) to a separate
+patch, too, just to make the actual change more obvious, especially
+since that's the only part that crosses subsystems (ACPI, PCI, OF).
+
 >  {
->  	return readb(PCI_IOBASE + addr);
->  }
-> +#endif /* CONFIG_INDIRECT_PIO */
+> -	int err = 0;
+> -
+> +	int ret = 0;
+>  #ifdef PCI_IOBASE
+> -	struct io_range *range;
+> -	resource_size_t allocated_size = 0;
+> -
+> -	/* check if the range hasn't been previously recorded */
+> -	spin_lock(&io_range_lock);
+> -	list_for_each_entry(range, &io_range_list, list) {
+> -		if (addr >= range->start && addr + size <= range->start + size) {
+> -			/* range already registered, bail out */
+> -			goto end_register;
+> -		}
+> -		allocated_size += range->size;
+> -	}
+> -
+> -	/* range not registed yet, check for available space */
+> -	if (allocated_size + size - 1 > IO_SPACE_LIMIT) {
+> -		/* if it's too big check if 64K space can be reserved */
+> -		if (allocated_size + SZ_64K - 1 > IO_SPACE_LIMIT) {
+> -			err = -E2BIG;
+> -			goto end_register;
+> -		}
+> -
+> -		size = SZ_64K;
+> -		pr_warn("Requested IO range too big, new size set to 64K\n");
+> -	}
+> +	struct logic_pio_hwaddr *range;
+>  
+> -	/* add the range to the list */
+> -	range = kzalloc(sizeof(*range), GFP_ATOMIC);
+> -	if (!range) {
+> -		err = -ENOMEM;
+> -		goto end_register;
+> -	}
+> +	if (!size || addr + size < addr)
+> +		return -EINVAL;
+>  
+> -	range->start = addr;
+> +	range = kzalloc(sizeof(*range), GFP_KERNEL);
+> +	if (!range)
+> +		return -ENOMEM;
+
+Add a blank line here.
+
+> +	range->fwnode = fwnode;
+>  	range->size = size;
+> +	range->hw_start = addr;
+> +	range->flags = PIO_CPU_MMIO;
+>  
+> -	list_add_tail(&range->list, &io_range_list);
+> -
+> -end_register:
+> -	spin_unlock(&io_range_lock);
+> +	ret = logic_pio_register_range(range);
+> +	if (ret)
+> +		kfree(range);
 >  #endif
 >  
->  #ifndef inw
-> +#ifdef CONFIG_INDIRECT_PIO
-> +#define inw logic_inw
-
-Cosmetic: could these ifdefs all be collected in one place, e.g.,
-
-  #ifdef CONFIG_INDIRECT_PIO
-  #define inb logic_inb
-  #define inw logic_inw
-  #define inl logic_inl
-  ...
-  #endif
-
-to avoid cluttering every one of the default definitions?  Could the
-collection be in logic_pio.h itself, next to the extern declarations?
-
-> +#else
->  #define inw inw
->  static inline u16 inw(unsigned long addr)
->  {
->  	return readw(PCI_IOBASE + addr);
+> -	return err;
+> +	return ret;
 >  }
-> +#endif /* CONFIG_INDIRECT_PIO */
->  #endif
-
->  #ifndef insb_p
-> diff --git a/include/linux/logic_pio.h b/include/linux/logic_pio.h
-> new file mode 100644
-> index 0000000..8e4dc65
-> --- /dev/null
-> +++ b/include/linux/logic_pio.h
-> ...
-
-> +extern u8 logic_inb(unsigned long addr);
-
-I think you only build the definitions for these if
-CONFIG_INDIRECT_PIO, so the declarations could be under that #idef,
-too.
-
-In PCI code, I omit the "extern" from function declarations.  This
-isn't PCI code, and I don't know if there's a real consensus on this,
-but there is some precedent: 5bd085b5fbd8 ("x86: remove "extern" from
-function prototypes in <asm/proto.h>")
-
-> +#ifdef CONFIG_LOGIC_PIO
-> +extern struct logic_pio_hwaddr
-> +*find_io_range_by_fwnode(struct fwnode_handle *fwnode);
-
-If you have to split the line (this one would fit without the
-"extern"), the "*" goes with the type, e.g.,
-
-  struct logic_pio_hwaddr *
-  find_io_range_by_fwnode(struct fwnode_handle *fwnode);
-
-More occurrences below.
-
-> diff --git a/lib/logic_pio.c b/lib/logic_pio.c
-> new file mode 100644
-> index 0000000..4a960cd
-> --- /dev/null
-> +++ b/lib/logic_pio.c
-> ...
-
-> +#if defined(CONFIG_INDIRECT_PIO) && defined(PCI_IOBASE)
-> +#define BUILD_LOGIC_PIO(bw, type)\
-> +type logic_in##bw(unsigned long addr)\
-> +{\
-> +	type ret = -1;\
-> +\
-> +	if (addr < MMIO_UPPER_LIMIT) {\
-> +		ret = read##bw(PCI_IOBASE + addr);\
-> +	} else {\
-> +		struct logic_pio_hwaddr *entry = find_io_range(addr);\
-> +\
-> +		if (entry && entry->ops)\
-> +			ret = entry->ops->pfin(entry->devpara,\
-> +					addr, sizeof(type));\
-> +		else\
-> +			WARN_ON_ONCE(1);\
-> +	}	\
-> +	return ret;\
-> +}	\
-
-I think these would be slightly easier to read if the line continuation
-backslashes were aligned at the right, as with
-ACPI_DECLARE_PROBE_ENTRY(), __atomic_op_acquire(), DECLARE_EWMA(),
-etc.
-
-Bjorn
