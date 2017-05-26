@@ -1,38 +1,32 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Fri, 26 May 2017 14:35:18 +0800
-Subject: [PATCH 6/6] arm64: defconfig: enable hi6421v530 MFD and regulator
-In-Reply-To: <20170526063518.21246-1-guodong.xu@linaro.org>
-References: <20170526063518.21246-1-guodong.xu@linaro.org>
-Message-ID: <20170526063518.21246-7-guodong.xu@linaro.org>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Fri, 26 May 2017 12:07:41 +0530
+Subject: [PATCH] iio: adc: xilinx: Handle return value of clk_prepare_enable
+Message-ID: <29dda0d20f714ce828e294f99b7f400e89f5b35a.1495780467.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable configs for hi6421v530 mfd and regulator driver
+clk_prepare_enable() can fail here and we must check its return value.
 
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
- arch/arm64/configs/defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/iio/adc/xilinx-xadc-core.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index ce07285..287e943 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -305,6 +305,7 @@ CONFIG_S3C2410_WATCHDOG=y
- CONFIG_MESON_GXBB_WATCHDOG=m
- CONFIG_MESON_WATCHDOG=m
- CONFIG_MFD_EXYNOS_LPASS=m
-+CONFIG_MFD_HI6421V530_PMIC=y
- CONFIG_MFD_MAX77620=y
- CONFIG_MFD_RK808=y
- CONFIG_MFD_SPMI_PMIC=y
-@@ -315,6 +316,7 @@ CONFIG_MFD_CROS_EC=y
- CONFIG_MFD_CROS_EC_I2C=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_GPIO=y
-+CONFIG_REGULATOR_HI6421V530=y
- CONFIG_REGULATOR_HI655X=y
- CONFIG_REGULATOR_MAX77620=y
- CONFIG_REGULATOR_PWM=y
+diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
+index 56cf590..4a60497 100644
+--- a/drivers/iio/adc/xilinx-xadc-core.c
++++ b/drivers/iio/adc/xilinx-xadc-core.c
+@@ -1204,7 +1204,10 @@ static int xadc_probe(struct platform_device *pdev)
+ 		ret = PTR_ERR(xadc->clk);
+ 		goto err_free_samplerate_trigger;
+ 	}
+-	clk_prepare_enable(xadc->clk);
++
++	ret = clk_prepare_enable(xadc->clk);
++	if (ret)
++		goto err_free_samplerate_trigger;
+ 
+ 	ret = xadc->ops->setup(pdev, indio_dev, irq);
+ 	if (ret)
 -- 
-2.10.2
+1.9.1
