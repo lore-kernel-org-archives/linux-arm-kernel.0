@@ -1,90 +1,112 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 26 May 2017 12:38:22 +0100
-Subject: [PATCH 4/6] regulator: hi6421v530: add driver for hi6421v530
- voltage regulator
-In-Reply-To: <20170526063518.21246-5-guodong.xu@linaro.org>
-References: <20170526063518.21246-1-guodong.xu@linaro.org>
- <20170526063518.21246-5-guodong.xu@linaro.org>
-Message-ID: <20170526113822.xsmk5lsrvzmqyljm@sirena.org.uk>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 26 May 2017 14:12:51 +0200
+Subject: pxa3xx-nand failing to find device on linux-next
+In-Reply-To: <e0462e8bf0ca436ab1dee6bca275e7d2@svr-chch-ex1.atlnz.lc>
+References: <b36366e358904310aee4970b77f57dba@svr-chch-ex1.atlnz.lc>
+ <2a79405e219b4c37ba00defbe4a0dfe4@svr-chch-ex1.atlnz.lc>
+ <20170524132301.12ad33d8@bbrezillon>
+ <20170524132508.420614c7@bbrezillon>
+ <ebe9d9bca4754d1ba920295f2fdd1359@svr-chch-ex1.atlnz.lc>
+ <20170525003646.276516d0@bbrezillon>
+ <69dfc0d5ca774efb8c92e9ec635f68ec@svr-chch-ex1.atlnz.lc>
+ <20170525081747.4c86164c@bbrezillon>
+ <e0462e8bf0ca436ab1dee6bca275e7d2@svr-chch-ex1.atlnz.lc>
+Message-ID: <20170526141251.6c387b4a@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 26, 2017 at 02:35:16PM +0800, Guodong Xu wrote:
+Le Thu, 25 May 2017 22:12:12 +0000,
+Chris Packham <Chris.Packham@alliedtelesis.co.nz> a ?crit :
 
-Overall this driver needs quite a lot of modernization, it's at least a
-couple of years out of date in how it's using the framework - there's
-barely any use of helpers.  It does look like it should be fairly easy
-to get it up to date though, it's mostly going to be a case of deleting
-code that's reimplementing helpers rather than anything else.
+> On 25/05/17 18:19, Boris Brezillon wrote:
+> > Le Wed, 24 May 2017 22:58:53 +0000,
+> > Chris Packham <Chris.Packham@alliedtelesis.co.nz> a ?crit :
+> >   
+> >> On 25/05/17 10:36, Boris Brezillon wrote:  
+> >>> Le Wed, 24 May 2017 22:03:52 +0000,
+> >>> Chris Packham <Chris.Packham@alliedtelesis.co.nz> a ?crit :
+> >>>      
+> >>>> On 24/05/17 23:25, Boris Brezillon wrote:  
+> >>>>> On Wed, 24 May 2017 13:23:01 +0200
+> >>>>> Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+> >>>>>         
+> >>>>>> Hi Chris,
+> >>>>>>
+> >>>>>> On Wed, 24 May 2017 09:36:56 +0000
+> >>>>>> Chris Packham <Chris.Packham@alliedtelesis.co.nz> wrote:
+> >>>>>>        
+> >>>>>>> On 23/05/17 17:27, Chris Packham wrote:  
+> >>>>>>>> Hi,
+> >>>>>>>>
+> >>>>>>>> I'm doing some testing on linux-next and I'm finding that my nand flash
+> >>>>>>>> has disappeared.
+> >>>>>>>>
+> >>>>>>>> pxa3xx-nand f10d0000.flash: This platform can't do DMA on this device
+> >>>>>>>> pxa3xx-nand f10d0000.flash: non-supported command ef
+> >>>>>>>> pxa3xx-nand f10d0000.flash: non-supported command ee
+> >>>>>>>> pxa3xx-nand f10d0000.flash: non-supported command ef
+> >>>>>>>> pxa3xx-nand f10d0000.flash: non-supported command ee
+> >>>>>>>> On-die ECC forcefully enabled, not supported
+> >>>>>>>> nand: No NAND device found
+> >>>>>>>> pxa3xx-nand f10d0000.flash: failed to scan nand at cs 0
+> >>>>>>>>
+> >>>>>>>> This was working around 4.11. I'll try to do some more digging tomorrow
+> >>>>>>>> to narrow down a failure point but I thought I'd send this out now just
+> >>>>>>>> in case it rings any bells.
+> >>>>>>>>
+> >>>>>>>> The board I'm using (DB-88F6820-AMC) is unfortunately out-of tree but it
+> >>>>>>>> should be pretty close to the armada-388-db. I can make my dts available
+> >>>>>>>> if it's helpful.  
+> >>>>>>>
+> >>>>>>> Still works on 4.12-rc2. Fails on next-20170524.
+> >>>>>>>
+> >>>>>>> This appears to be due to commit b566d9c055de ("mtd: nand: add support
+> >>>>>>> for Micron on-die ECC"). Which based on the description seems intentional.
+> >>>>>>>
+> >>>>>>> Since I have access to a hardware platform that has a micron flash with
+> >>>>>>> ECC forcefully enabled how can I help to get this implemented.  
+> >>>>>>
+> >>>>>> Can you try with this patch applied [1]?  
+> >>>>>
+> >>>>> Sorry, wrong patch. Can you try this one [1] instead?
+> >>>>>
+> >>>>> [1]http://code.bulix.org/pkfhmi-135875
+> >>>>>         
+> >>>>
+> >>>> With the patch above the chip is detected but ubifs is unhappy  
+> >>>
+> >>> Hm, weird. And if you revert my both Thomas patch and mine, what do you
+> >>> get?  
+> >>
+> >> Seems to work just fine.  
+> > 
+> > Okay. Let's try with something simpler then. Can you test the following
+> > patch?
+> >   
+> > --->8---  
+> >  From 0a0eaa39ea9b19191ae0c31ff3625c224a8a55f2 Mon Sep 17 00:00:00 2001
+> > From: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > Date: Thu, 25 May 2017 08:15:15 +0200
+> > Subject: [PATCH] mtd: nand: pxa3xx: Implement failing  
+> >   ->onfi_{set,get}_features() stubs  
+> > 
+> > Implement stubs returning -ENOTSUPP for ->onfi_{set,get}_features() so
+> > that we don't let the core think we are supporting the GET/SET FEATURES
+> > operation.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > ---  
+> 
+> Yep that seems to work.
 
-> +/*
-> + * struct hi6421c530_regulator_pdata - Hi6421V530 regulator data
-> + * of platform device.
-> + * @lock: mutex to serialize regulator enable
-> + */
-> +struct hi6421v530_regulator_pdata {
-> +	struct mutex lock;
-> +};
+Arrggg!! I hate this situation. Now I have to check all drivers
+implementing their own ->cmdfunc() to make sure they support
+NAND_CMD_SET/GET_FEATURES, and if they don't, do what I did for pxa3xx.
 
-This isn't platform data so it probably shouldn't be called pdata.  I
-also can't tell what the lock is protecting, every use seems to be a
-call to regmap_update_bits() which is atomic anyway - could we just drop
-the whole thing?
+Anyway, thanks for testing. I'll try to re-arrange my nand/next branch
+to avoid breaking bisectibility (put this patch before the on-die ECC
+one).
 
-> +static int hi6421v530_regulator_enable(struct regulator_dev *rdev)
-> +{
-> +	struct hi6421v530_regulator_pdata *pdata;
-> +	int ret = 0;
-> +
-> +	pdata = dev_get_drvdata(rdev->dev.parent);
-> +	mutex_lock(&pdata->lock);
-> +
-> +	ret = regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
-> +			rdev->desc->enable_mask,
-> +			1 << (ffs(rdev->desc->enable_mask) - 1));
-> +
-> +	mutex_unlock(&pdata->lock);
-> +	return ret;
-> +}
+Regards,
 
-This looks like it should be able to use the regmap helpers for all the
-enable operations rather than open coding.  
-
-> +static int hi6421v530_regulator_set_voltage(struct regulator_dev *rdev,
-> +						unsigned int sel)
-> +{
-> +	struct hi6421v530_regulator_pdata *pdata;
-> +	int ret = 0;
-> +
-> +	pdata = dev_get_drvdata(rdev->dev.parent);
-> +	mutex_lock(&pdata->lock);
-> +
-> +	ret = regmap_update_bits(rdev->regmap, rdev->desc->vsel_reg,
-> +				rdev->desc->vsel_mask,
-> +				sel << (ffs(rdev->desc->vsel_mask) - 1));
-
-Same for all the voltage operations :(
-
-> +	rdev->constraints->valid_modes_mask = info->mode_mask;
-> +	rdev->constraints->valid_ops_mask |=
-> +			REGULATOR_CHANGE_VOLTAGE | REGULATOR_CHANGE_MODE;
-
-The driver should *never* modify constraints, it's up to the machine
-integration to say what can be supported on a given board.
-
-> +	np = of_get_child_by_name(dev->parent->of_node, "regulators");
-> +	if (!np)
-> +		return -ENODEV;
-> +
-> +	ret = of_regulator_match(dev, np,
-> +				 hi6421v530_regulator_match,
-> +				 ARRAY_SIZE(hi6421v530_regulator_match));
-
-Don't open code this, use of_match and regulators_node.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170526/67e1dee7/attachment.sig>
+Boris
