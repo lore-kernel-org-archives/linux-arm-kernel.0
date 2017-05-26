@@ -1,36 +1,43 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 25 May 2017 16:59:58 -0700
-Subject: [GIT PULL] DaVinci fixes for v4.12
-In-Reply-To: <ded91b7c-fcd0-0891-23ac-18d9b9e4ea39@ti.com>
-References: <ded91b7c-fcd0-0891-23ac-18d9b9e4ea39@ti.com>
-Message-ID: <20170525235958.GB25387@localhost>
+Date: Thu, 25 May 2017 17:05:04 -0700
+Subject: [GIT PULL] ARM: exynos: Small update for v4.12
+In-Reply-To: <20170524160051.4597-1-krzk@kernel.org>
+References: <20170524160051.4597-1-krzk@kernel.org>
+Message-ID: <20170526000504.GA28071@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 24, 2017 at 11:44:53AM +0530, Sekhar Nori wrote:
-> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+On Wed, May 24, 2017 at 06:00:51PM +0200, Krzysztof Kozlowski wrote:
+> Hi,
 > 
->   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+> One update for current release cycle.
+> 
+> 
+> Best regards,
+> Krzysztof
+> 
+> 
+> The following changes since commit a351e9b9fc24e982ec2f0e76379a49826036da12:
+> 
+>   Linux 4.11 (2017-04-30 19:47:48 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v4.12
+>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-fixes-4.12
 > 
-> for you to fetch changes up to 95d7c1f18bf8ac03b0fc48eac1f1b11f867765b8:
+> for you to fetch changes up to 1c005f9c129201121ef90bde57c374a4403ccfa6:
 > 
->   ARM: davinci: PM: Do not free useful resources in normal path in 'davinci_pm_init' (2017-05-17 15:25:18 +0530)
-> 
-> ----------------------------------------------------------------
-> These fix issues with power management initialization code
-> on DaVinci. Some resources were getting freed prematurely.
-> And there was an issue with resources not being on error.
+>   MAINTAINERS: Remove Javier Martinez Canillas as reviewer for Exynos (2017-05-07 20:25:50 +0200)
 > 
 > ----------------------------------------------------------------
-> Christophe JAILLET (2):
->       ARM: davinci: PM: Free resources in error handling path in 'davinci_pm_init'
->       ARM: davinci: PM: Do not free useful resources in normal path in 'davinci_pm_init'
+> Update of maintainers entry for Samsung SoC.
+> 
+> ----------------------------------------------------------------
+> Javier Martinez Canillas (1):
+>       MAINTAINERS: Remove Javier Martinez Canillas as reviewer for Exynos
 
-Merged, thanks.
+Sad to see you go, Javier.
 
+Merged.
 
 -Olof
