@@ -1,67 +1,32 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Fri, 26 May 2017 16:42:33 +0530
-Subject: Query: arm64: hwbreakpoint: single stepping in case of custom
- overflow_handler
-Message-ID: <d3b1a128-b97c-7e52-b30c-56ec3990381a@redhat.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 26 May 2017 13:13:18 +0200
+Subject: [PATCH] serial: uartps: Fix kernel doc warnings
+Message-ID: <d4e9f4ba39e5cee042402f5b012a953fcca99837.1495797196.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+From: Nava kishore Manne <nava.manne@xilinx.com>
 
-When we run test from samples/hw_breakpoint/data_breakpoint.c, it triggers 
-continuous watchpoint exception handler.
+This patch fixes the kernel doc warnings in the driver.
 
-Reproducer:
-# insmod data_breakpoint.ko ksym=__sysrq_enabled
-# cat /proc/sys/kernel/sysrq
+Signed-off-by: Nava kishore Manne <navam@xilinx.com>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-So, wanted to understand that why do we not allow single stepping in case 
-overflow_handler is a customized one and not from perf infrastructure?
+ drivers/tty/serial/xilinx_uartps.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Patch [1] allows to work with a custom overflow_handler, but I am not sure if 
-that could be an acceptable choice.
-
-There are issues with samples/hw_breakpoint/data_breakpoint.c, even when using 
-patch [1],because overflow_handler  of test calls dump_stack(). I am not yet 
-sure,what happened here..my guess is that dump_stack() triggered a SW BRK 
-exception somewhere. Anyway,thats a secondary problem,I can look into if patch 
-[1] makes sense.
-
-
-~Pratyush
-
-[1]
-diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-index 749f81779420..ea8ab0656dd0 100644
---- a/arch/arm64/kernel/hw_breakpoint.c
-+++ b/arch/arm64/kernel/hw_breakpoint.c
-@@ -661,7 +661,7 @@ static int breakpoint_handler(unsigned long unused, 
-unsigned int esr,
-                 perf_bp_event(bp, regs);
-
-                 /* Do we need to handle the stepping? */
--               if (is_default_overflow_handler(bp))
-+               if (bp->overflow_handler)
-                         step = 1;
-  unlock:
-                 rcu_read_unlock();
-@@ -789,7 +789,7 @@ static int watchpoint_handler(unsigned long addr, unsigned 
-int esr,
-                 perf_bp_event(wp, regs);
-
-                 /* Do we need to handle the stepping? */
--               if (is_default_overflow_handler(wp))
-+               if (wp->overflow_handler)
-                         step = 1;
-         }
-         if (min_dist > 0 && min_dist != -1) {
-@@ -800,7 +800,7 @@ static int watchpoint_handler(unsigned long addr, unsigned 
-int esr,
-                 perf_bp_event(wp, regs);
-
-                 /* Do we need to handle the stepping? */
--               if (is_default_overflow_handler(wp))
-+               if (wp->overflow_handler)
-                         step = 1;
-         }
-         rcu_read_unlock();
+diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+index d82133d0f79a..81d1d553a5db 100644
+--- a/drivers/tty/serial/xilinx_uartps.c
++++ b/drivers/tty/serial/xilinx_uartps.c
+@@ -186,6 +186,7 @@
+  * @pclk:		APB clock
+  * @baud:		Current baud rate
+  * @clk_rate_change_nb:	Notifier block for clock changes
++ * @quirks:		Flags for RXBS support.
+  */
+ struct cdns_uart {
+ 	struct uart_port	*port;
+-- 
+1.9.1
