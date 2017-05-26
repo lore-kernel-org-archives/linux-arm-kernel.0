@@ -1,23 +1,23 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 26 May 2017 20:52:14 +0200
-Subject: [PATCH 1/5] dts: gpio_atmel: adapt binding doc to reality
-In-Reply-To: <20170526180609.2699-1-uwe@kleine-koenig.org>
-References: <20170526180609.2699-1-uwe@kleine-koenig.org>
-Message-ID: <20170526185214.GB20946@lunn.ch>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 26 May 2017 15:02:42 -0400 (EDT)
+Subject: [PATCH 0/2] Document and use eeprom-length property
+In-Reply-To: <1495755884-31341-1-git-send-email-andrew@lunn.ch>
+References: <1495755884-31341-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20170526.150242.515745885812232154.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +- interrupt-controller: Marks the device node as a GPIO controller.
+From: Andrew Lunn <andrew@lunn.ch>
+Date: Fri, 26 May 2017 01:44:42 +0200
 
-Interrupt controller, not GPIO controller.
+> The mv88e6xxx switch driver allows the size of the attached EEPROM to
+> be described in DT. This property is missing from the binding
+> documentation. Add it. And make use of it on the ZII Devel B board.
+> 
+> David, Shawn, please could you talk amongs yourself to decide who
+> takes what.
 
-> +- #interrupt-cells: Should be two. The first cell is the pin number and the
-> +  second cell is used to specify irq type flags:
-> +      1 = low-to-high edge triggered.
-> +      2 = high-to-low edge triggered.
-> +      4 = active high level-sensitive.
-> +      8 = active low level-sensitive.
+I can take this if it works for Shawn, otherwise I'm also fine if Shawn
+takes it and if so feel free to add my:
 
-Maybe just reference interrupts.txt?
-
-      Andrew
+Acked-by: David S. Miller <davem@davemloft.net>
