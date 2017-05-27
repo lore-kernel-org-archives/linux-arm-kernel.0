@@ -1,48 +1,55 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 27 May 2017 18:09:36 +0200
-Subject: [PATCH v4 11/11] drm/sun4i: Add compatible for the A10s pipeline
+Date: Sat, 27 May 2017 18:09:34 +0200
+Subject: [PATCH v4 09/11] dt-bindings: display: sun4i: Add allwinner,
+ tcon-channel property
 In-Reply-To: <cover.c61cbe60123a4aeb24f255bca7927218dda6283e.1495900658.git-series.maxime.ripard@free-electrons.com>
 References: <cover.c61cbe60123a4aeb24f255bca7927218dda6283e.1495900658.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <796b6579ca9b30820ab6e2be6e2eb52d60421ea7.1495900658.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <5a7b5fdf9590e9fb846cb90cca9a346ac09bacd6.1495900658.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A10s has a slightly different display pipeline than the A13, with an
-HDMI controller.
+The Allwinner Timings Controller has two, mutually exclusive, channels.
+When the binding has been introduced, it was assumed that there would be
+only a single user per channel in the system.
 
-Add a compatible for it.
+While this is likely for the channel 0 which only connects to LCD displays,
+it turns out that the channel 1 can be connected to multiple controllers in
+the SoC (HDMI and TV encoders for example). And while the simultaneous use
+of HDMI and TV outputs cannot be achieved, switching from one to the other
+at runtime definitely sounds plausible.
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Add an extra property, allwinner,tcon-channel, to specify for a given
+endpoint which TCON channel it is connected to, while falling back to the
+previous mechanism if that property is missing.
+
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 1 +
- drivers/gpu/drm/sun4i/sun4i_drv.c                             | 1 +
- 2 files changed, 2 insertions(+)
+ Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 11 ++++---
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index 58fa32900184..b83e6018041d 100644
+index c6ad76d7438a..58fa32900184 100644
 --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
 +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -210,6 +210,7 @@ extra node.
+@@ -86,10 +86,13 @@ Required properties:
+   Documentation/devicetree/bindings/media/video-interfaces.txt. The
+   first port should be the input endpoint, the second one the output
  
- Required properties:
-   - compatible: value must be one of:
-+    * allwinner,sun5i-a10s-display-engine
-     * allwinner,sun5i-a13-display-engine
-     * allwinner,sun6i-a31-display-engine
-     * allwinner,sun6i-a31s-display-engine
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index cfc0b2fcb0a6..f19100c91c2b 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -305,6 +305,7 @@ static int sun4i_drv_remove(struct platform_device *pdev)
- }
+-  The output should have two endpoints. The first is the block
+-  connected to the TCON channel 0 (usually a panel or a bridge), the
+-  second the block connected to the TCON channel 1 (usually the TV
+-  encoder)
++  The output may have multiple endpoints. The TCON has two channels,
++  usually with the first channel being used for the panels interfaces
++  (RGB, LVDS, etc.), and the second being used for the outputs that
++  require another controller (TV Encoder, HDMI, etc.). The endpoints
++  will take an extra property, allwinner,tcon-channel, to specify the
++  channel the endpoint is associated to. If that property is not
++  present, the endpoint number will be used as the channel number.
  
- static const struct of_device_id sun4i_drv_of_table[] = {
-+	{ .compatible = "allwinner,sun5i-a10s-display-engine" },
- 	{ .compatible = "allwinner,sun5i-a13-display-engine" },
- 	{ .compatible = "allwinner,sun6i-a31-display-engine" },
- 	{ .compatible = "allwinner,sun6i-a31s-display-engine" },
+ On SoCs other than the A33 and V3s, there is one more clock required:
+    - 'tcon-ch1': The clock driving the TCON channel 1
 -- 
 git-series 0.9.1
