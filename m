@@ -1,55 +1,56 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 27 May 2017 18:09:34 +0200
-Subject: [PATCH v4 09/11] dt-bindings: display: sun4i: Add allwinner,
- tcon-channel property
+Date: Sat, 27 May 2017 18:09:30 +0200
+Subject: [PATCH v4 05/11] drm/sun4i: tcon: Change vertical total size
+ computation inconsistency
 In-Reply-To: <cover.c61cbe60123a4aeb24f255bca7927218dda6283e.1495900658.git-series.maxime.ripard@free-electrons.com>
 References: <cover.c61cbe60123a4aeb24f255bca7927218dda6283e.1495900658.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <5a7b5fdf9590e9fb846cb90cca9a346ac09bacd6.1495900658.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <dac0200c3e29f866e2e9bfd5d0b29afdc01657c8.1495900658.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner Timings Controller has two, mutually exclusive, channels.
-When the binding has been introduced, it was assumed that there would be
-only a single user per channel in the system.
+Both TCON channels need to have the resolution doubled, since the size the
+hardware is going to use is whatever we put in the register divided by two.
 
-While this is likely for the channel 0 which only connects to LCD displays,
-it turns out that the channel 1 can be connected to multiple controllers in
-the SoC (HDMI and TV encoders for example). And while the simultaneous use
-of HDMI and TV outputs cannot be achieved, switching from one to the other
-at runtime definitely sounds plausible.
+However, we handle it differently for the two channels: in the channel 0,
+our register access macro does the multiplication of the value passed as
+paremeter, while in the channel 1, the macro doesn't do this, and we need
+to do it before calling it.
 
-Add an extra property, allwinner,tcon-channel, to specify for a given
-endpoint which TCON channel it is connected to, while falling back to the
-previous mechanism if that property is missing.
+Make this consistent by aligning the channel 0 with the channel 1
+behaviour.
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
- Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 11 ++++---
- 1 file changed, 7 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 2 +-
+ drivers/gpu/drm/sun4i/sun4i_tcon.h | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index c6ad76d7438a..58fa32900184 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -86,10 +86,13 @@ Required properties:
-   Documentation/devicetree/bindings/media/video-interfaces.txt. The
-   first port should be the input endpoint, the second one the output
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 6993ef3888dd..61e1de77831d 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -194,7 +194,7 @@ void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
  
--  The output should have two endpoints. The first is the block
--  connected to the TCON channel 0 (usually a panel or a bridge), the
--  second the block connected to the TCON channel 1 (usually the TV
--  encoder)
-+  The output may have multiple endpoints. The TCON has two channels,
-+  usually with the first channel being used for the panels interfaces
-+  (RGB, LVDS, etc.), and the second being used for the outputs that
-+  require another controller (TV Encoder, HDMI, etc.). The endpoints
-+  will take an extra property, allwinner,tcon-channel, to specify the
-+  channel the endpoint is associated to. If that property is not
-+  present, the endpoint number will be used as the channel number.
+ 	/* Set vertical display timings */
+ 	regmap_write(tcon->regs, SUN4I_TCON0_BASIC2_REG,
+-		     SUN4I_TCON0_BASIC2_V_TOTAL(mode->crtc_vtotal) |
++		     SUN4I_TCON0_BASIC2_V_TOTAL(mode->crtc_vtotal * 2) |
+ 		     SUN4I_TCON0_BASIC2_V_BACKPORCH(bp));
  
- On SoCs other than the A33 and V3s, there is one more clock required:
-    - 'tcon-ch1': The clock driving the TCON channel 1
+ 	/* Set Hsync and Vsync length */
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+index f60e0b4c6db8..e3c50ecdcd04 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+@@ -52,7 +52,7 @@
+ #define SUN4I_TCON0_BASIC1_H_BACKPORCH(bp)		(((bp) - 1) & 0xfff)
+ 
+ #define SUN4I_TCON0_BASIC2_REG			0x50
+-#define SUN4I_TCON0_BASIC2_V_TOTAL(total)		((((total) * 2) & 0x1fff) << 16)
++#define SUN4I_TCON0_BASIC2_V_TOTAL(total)		(((total) & 0x1fff) << 16)
+ #define SUN4I_TCON0_BASIC2_V_BACKPORCH(bp)		(((bp) - 1) & 0xfff)
+ 
+ #define SUN4I_TCON0_BASIC3_REG			0x54
 -- 
 git-series 0.9.1
