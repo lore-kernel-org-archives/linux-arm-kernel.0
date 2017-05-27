@@ -1,29 +1,30 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 26 May 2017 18:12:08 -0700
-Subject: [PATCH v3 1/2] remoteproc: Introduce rproc_{start,stop}()
- functions
-In-Reply-To: <1495842661-8926-1-git-send-email-spjoshi@codeaurora.org>
-References: <1495842661-8926-1-git-send-email-spjoshi@codeaurora.org>
-Message-ID: <20170527011208.GA1730@builder>
+From: drake@endlessm.com (Daniel Drake)
+Date: Fri, 26 May 2017 20:48:57 -0600
+Subject: [RFC 0/2] Add support for Meson MX "SDIO" MMC driver
+In-Reply-To: <CAFBinCDocqqo2GNLb2y1XE0ATTEG6TuqO+EZ_-h8=vuTjngr_Q@mail.gmail.com>
+References: <20170506171857.16492-1-martin.blumenstingl@googlemail.com>
+ <CAPDyKFoYPjB1bjRfFCFT3vuzKgzm6-7L2qgNjxGL392cLDe7uA@mail.gmail.com>
+ <CAFBinCDGBZAAx_61eyu1_XM57fX62Mk03TEiO3uTL+i8dfPyZA@mail.gmail.com>
+ <CAPDyKFoC-cCEY+n2383W+JgDANbBMFbsU5cyB51-kG4kbLNNcw@mail.gmail.com>
+ <CAFBinCDocqqo2GNLb2y1XE0ATTEG6TuqO+EZ_-h8=vuTjngr_Q@mail.gmail.com>
+Message-ID: <CAD8Lp46oR0ODa4ybVW-rMPki9126My+ymxigZmjGwxPm2y1L3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 26 May 16:51 PDT 2017, Sarangdhar Joshi wrote:
+On Thu, May 11, 2017 at 2:44 PM, Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+> the code-names of the older (32-bit) SoCs (at least the ones which are
+> not too old) all start with Meson X (where X is a number: Meson6,
+> Meson8, Meson8b and Meson8m2), Amlogic's vendor code sometimes calls
+> these "MX" (or Meson MX)
 
-> In the context of recovering from crash, rproc_trigger_recovery() does
-> rproc_shutdown() followed by rproc_boot(). The remoteproc resources are
-> cleaned up in rproc_shutdown() and immediately reallocated in
-> rproc_boot() which is an unnecessary overhead. Furthermore, we want the
-> memory regions to be accessible after stopping the remote processor, to
-> be able to extract the memory content for a coredump.
-> 
-> This patch factors out the code in rproc_boot() and rproc_shutdown()
-> path and introduces rproc_{start,stop}() in order to avoid resource
-> allocation overhead.
-> 
-> Signed-off-by: Sarangdhar Joshi <spjoshi@codeaurora.org>
+Just in case it helps you on any future adventures in the Amlogic
+vendor code: I think this is not quite right. I believe that MX
+specifically refers to Meson6 and no other SoC generation.
 
-Both patches applied.
+That said, if both MesonX (==Meson6) and Meson8/Meson8b all share the
+same driver code, having this driver named "mx" makes sense to me,
+especially because it helps distinguish from the GX* chips which
+indeed have something rather different.
 
-Thanks,
-Bjorn
+Daniel
