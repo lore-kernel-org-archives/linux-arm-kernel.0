@@ -1,55 +1,48 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 27 May 2017 18:09:32 +0200
-Subject: [PATCH v4 07/11] drm/sun4i: Ignore the generic connectors for
- components
+Date: Sat, 27 May 2017 18:09:36 +0200
+Subject: [PATCH v4 11/11] drm/sun4i: Add compatible for the A10s pipeline
 In-Reply-To: <cover.c61cbe60123a4aeb24f255bca7927218dda6283e.1495900658.git-series.maxime.ripard@free-electrons.com>
 References: <cover.c61cbe60123a4aeb24f255bca7927218dda6283e.1495900658.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <5b34efbc6a9453e845d60170507958df30f76f33.1495900658.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <796b6579ca9b30820ab6e2be6e2eb52d60421ea7.1495900658.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The generic connectors such as hdmi-connector doesn't have any driver in,
-so if they are added to the component list, we will be waiting forever for
-a non-existing driver to probe.
+The A10s has a slightly different display pipeline than the A13, with an
+HDMI controller.
 
-Add a list of the connectors we want to ignore when building our component
-list.
+Add a compatible for it.
 
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_drv.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 1 +
+ drivers/gpu/drm/sun4i/sun4i_drv.c                             | 1 +
+ 2 files changed, 2 insertions(+)
 
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index 58fa32900184..b83e6018041d 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -210,6 +210,7 @@ extra node.
+ 
+ Required properties:
+   - compatible: value must be one of:
++    * allwinner,sun5i-a10s-display-engine
+     * allwinner,sun5i-a13-display-engine
+     * allwinner,sun6i-a31-display-engine
+     * allwinner,sun6i-a31s-display-engine
 diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index 1dd1948025d2..cfc0b2fcb0a6 100644
+index cfc0b2fcb0a6..f19100c91c2b 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -166,6 +166,11 @@ static const struct component_master_ops sun4i_drv_master_ops = {
- 	.unbind	= sun4i_drv_unbind,
- };
+@@ -305,6 +305,7 @@ static int sun4i_drv_remove(struct platform_device *pdev)
+ }
  
-+static bool sun4i_drv_node_is_connector(struct device_node *node)
-+{
-+	return of_device_is_compatible(node, "hdmi-connector");
-+}
-+
- static bool sun4i_drv_node_is_frontend(struct device_node *node)
- {
- 	return of_device_is_compatible(node, "allwinner,sun5i-a13-display-frontend") ||
-@@ -207,6 +212,13 @@ static int sun4i_drv_add_endpoints(struct device *dev,
- 	    !of_device_is_available(node))
- 		return 0;
- 
-+	/*
-+	 * The connectors will be the last nodes in our pipeline, we
-+	 * can just bail out.
-+	 */
-+	if (sun4i_drv_node_is_connector(node))
-+		return 0;
-+
- 	if (!sun4i_drv_node_is_frontend(node)) {
- 		/* Add current component */
- 		DRM_DEBUG_DRIVER("Adding component %s\n",
+ static const struct of_device_id sun4i_drv_of_table[] = {
++	{ .compatible = "allwinner,sun5i-a10s-display-engine" },
+ 	{ .compatible = "allwinner,sun5i-a13-display-engine" },
+ 	{ .compatible = "allwinner,sun6i-a31-display-engine" },
+ 	{ .compatible = "allwinner,sun6i-a31s-display-engine" },
 -- 
 git-series 0.9.1
