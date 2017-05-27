@@ -1,41 +1,65 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Sat, 27 May 2017 19:17:40 +0530
-Subject: [PATCH v6 1/6] iommu: of: Fix check for returning EPROBE_DEFER
-Message-ID: <1495892865-9506-1-git-send-email-sricharan@codeaurora.org>
+Date: Sat, 27 May 2017 19:17:41 +0530
+Subject: [PATCH v6 2/6] iommu: of: Ignore all errors except EPROBE_DEFER
+In-Reply-To: <1495892865-9506-1-git-send-email-sricharan@codeaurora.org>
+References: <1495892865-9506-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1495892865-9506-2-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now with IOMMU probe deferral, we return -EPROBE_DEFER
-for masters that are connected to an IOMMU which is not
-probed yet, but going to get probed, so that we can attach
-the correct dma_ops. So while trying to defer the probe of
-the master, check if the of_iommu node that it is connected
-to is marked in DT as 'status=disabled', then the IOMMU is never
-is going to get probed. So simply return NULL and let the master
-work without an IOMMU.
+While deferring the probe of IOMMU masters, xlate and
+add_device callbacks called from of_iommu_configure
+can pass back error values like -ENODEV, which means
+the IOMMU cannot be connected with that master for real
+reasons. Before the IOMMU probe deferral, all such errors
+were ignored. Now all those errors are propagated back,
+killing the master's probe for such errors. Instead ignore
+all the errors except EPROBE_DEFER, which is the only one
+of concern and let the master work without IOMMU, thus
+restoring the old behavior. Also make explicit that
+of_dma_configure handles only -EPROBE_DEFER from
+of_iommu_configure.
 
 Fixes: 7b07cbefb68d ("iommu: of: Handle IOMMU lookup failure with deferred probing or error")
 Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Tested-by: Will Deacon <will.deacon@arm.com>
 Tested-by: Magnus Damn <magnus.damn@gmail.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
- drivers/iommu/of_iommu.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/iommu/of_iommu.c | 6 ++++++
+ drivers/of/device.c      | 4 ++--
+ 2 files changed, 8 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-index 9f44ee8..e6e9bec 100644
+index e6e9bec..19779b8 100644
 --- a/drivers/iommu/of_iommu.c
 +++ b/drivers/iommu/of_iommu.c
-@@ -118,6 +118,7 @@ static bool of_iommu_driver_present(struct device_node *np)
+@@ -237,6 +237,12 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
+ 			ops = ERR_PTR(err);
+ 	}
  
- 	ops = iommu_ops_from_fwnode(fwnode);
- 	if ((ops && !ops->of_xlate) ||
-+	    !of_device_is_available(iommu_spec->np) ||
- 	    (!ops && !of_iommu_driver_present(iommu_spec->np)))
- 		return NULL;
++	/* Ignore all other errors apart from EPROBE_DEFER */
++	if (IS_ERR(ops) && (PTR_ERR(ops) != -EPROBE_DEFER)) {
++		dev_dbg(dev, "Adding to IOMMU failed: %ld\n", PTR_ERR(ops));
++		ops = NULL;
++	}
++
+ 	return ops;
+ }
  
+diff --git a/drivers/of/device.c b/drivers/of/device.c
+index 9416d05..28c38c7 100644
+--- a/drivers/of/device.c
++++ b/drivers/of/device.c
+@@ -144,8 +144,8 @@ int of_dma_configure(struct device *dev, struct device_node *np)
+ 		coherent ? " " : " not ");
+ 
+ 	iommu = of_iommu_configure(dev, np);
+-	if (IS_ERR(iommu))
+-		return PTR_ERR(iommu);
++	if (IS_ERR(iommu) && PTR_ERR(iommu) == -EPROBE_DEFER)
++		return -EPROBE_DEFER;
+ 
+ 	dev_dbg(dev, "device is%sbehind an iommu\n",
+ 		iommu ? " " : " not ");
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
