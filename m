@@ -1,48 +1,49 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sat, 27 May 2017 16:25:51 +0200
-Subject: [RFC 0/2] Add support for Meson MX "SDIO" MMC driver
-In-Reply-To: <CAD8Lp46oR0ODa4ybVW-rMPki9126My+ymxigZmjGwxPm2y1L3g@mail.gmail.com>
-References: <20170506171857.16492-1-martin.blumenstingl@googlemail.com>
- <CAPDyKFoYPjB1bjRfFCFT3vuzKgzm6-7L2qgNjxGL392cLDe7uA@mail.gmail.com>
- <CAFBinCDGBZAAx_61eyu1_XM57fX62Mk03TEiO3uTL+i8dfPyZA@mail.gmail.com>
- <CAPDyKFoC-cCEY+n2383W+JgDANbBMFbsU5cyB51-kG4kbLNNcw@mail.gmail.com>
- <CAFBinCDocqqo2GNLb2y1XE0ATTEG6TuqO+EZ_-h8=vuTjngr_Q@mail.gmail.com>
- <CAD8Lp46oR0ODa4ybVW-rMPki9126My+ymxigZmjGwxPm2y1L3g@mail.gmail.com>
-Message-ID: <CAFBinCAUEgXZ7PUinrOahpRsg8=m5Um7ju518PiFpqnmPxvQqw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 27 May 2017 18:09:28 +0200
+Subject: [PATCH v4 03/11] drm/sun4i: tcon: Switch mux on only for composite
+In-Reply-To: <cover.c61cbe60123a4aeb24f255bca7927218dda6283e.1495900658.git-series.maxime.ripard@free-electrons.com>
+References: <cover.c61cbe60123a4aeb24f255bca7927218dda6283e.1495900658.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <d12b0f7bec6b806a936a146532f74726effac024.1495900658.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Even though that mux is undocumented, it seems like it needs to be set to 1
+when using composite, and 0 when using HDMI.
 
-On Sat, May 27, 2017 at 4:48 AM, Daniel Drake <drake@endlessm.com> wrote:
-> On Thu, May 11, 2017 at 2:44 PM, Martin Blumenstingl
-> <martin.blumenstingl@googlemail.com> wrote:
->> the code-names of the older (32-bit) SoCs (at least the ones which are
->> not too old) all start with Meson X (where X is a number: Meson6,
->> Meson8, Meson8b and Meson8m2), Amlogic's vendor code sometimes calls
->> these "MX" (or Meson MX)
->
-> Just in case it helps you on any future adventures in the Amlogic
-> vendor code: I think this is not quite right. I believe that MX
-> specifically refers to Meson6 and no other SoC generation.
-thanks for that hint - I guess that's due to the marketing name of the
-Meson6 SoCs then (AML8726-MX). do you know if there's any codename
-that includes the Meson6 and Meson8 (including Meson8b and Meson8m2)
-families?
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/gpu/drm/sun4i/sun4i_tcon.c |  9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-
-> That said, if both MesonX (==Meson6) and Meson8/Meson8b all share the
-> same driver code, having this driver named "mx" makes sense to me,
-> especially because it helps distinguish from the GX* chips which
-> indeed have something rather different.
-from what I could read in Amlogic's GPL kernel sources the MMC
-controller IP is also used in Meson6 SoCs (and possibly even older
-generations). that said, I don't have any Meson6 hardware, which is
-why I didn't add the "amlogic,meson6-sdio" binding.
-so I guess using the "mx" name here should be OK (nevertheless, I'll
-make sure that I don't use "MX" for anything that's
-Meson8/Meson8b/Meson8m2 specific)
-
-
-Regards,
-Martin
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 36e25f417dc3..28da61ac9bab 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -112,16 +112,23 @@ EXPORT_SYMBOL(sun4i_tcon_enable_vblank);
+ void sun4i_tcon_set_mux(struct sun4i_tcon *tcon, int channel,
+ 			struct drm_encoder *encoder)
+ {
++	u32 val;
++
+ 	if (!tcon->quirks->has_unknown_mux)
+ 		return;
+ 
+ 	if (channel != 1)
+ 		return;
+ 
++	if (encoder->encoder_type == DRM_MODE_ENCODER_TVDAC)
++		val = 1;
++	else
++		val = 0;
++
+ 	/*
+ 	 * FIXME: Undocumented bits
+ 	 */
+-	regmap_write(tcon->regs, SUN4I_TCON_MUX_CTRL_REG, 1);
++	regmap_write(tcon->regs, SUN4I_TCON_MUX_CTRL_REG, val);
+ }
+ EXPORT_SYMBOL(sun4i_tcon_set_mux);
+ 
+-- 
+git-series 0.9.1
