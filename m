@@ -1,56 +1,67 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sat, 27 May 2017 18:22:58 +0800
-Subject: [PATCH v3 00/10] Initial Allwinner R40 support
-Message-ID: <20170527102308.1988-1-icenowy@aosc.io>
+Date: Sat, 27 May 2017 18:22:59 +0800
+Subject: [PATCH v3 01/10] arm: sunxi: add support for R40 SoC
+In-Reply-To: <20170527102308.1988-1-icenowy@aosc.io>
+References: <20170527102308.1988-1-icenowy@aosc.io>
+Message-ID: <20170527102308.1988-2-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the first non-RFC version of this patchset, which added basical
-support including I2C, UART and MMC to the mainline Linux.
+Allwinner R40 is a new SoC, with Quad Core Cortex-A7 and peripherals
+like A20.
 
-The pinctrl driver of A20 is also merged into the one of A10 before
-R40 support is added into the A10 driver.
+Add support for it.
 
-Chen-Yu Tsai (2):
-  ARM: dts: sun8i: Add basic dtsi file for Allwinner R40
-  ARM: dts: sun8i: Add board dts file for Banana Pi M2 Ultra
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+Changes in v3:
+- Use V1.0 documents.
 
-Icenowy Zheng (8):
-  arm: sunxi: add support for R40 SoC
-  pinctrl: sunxi: Add SoC ID definitions for A10, A20 and R40 SoCs
-  pinctrl: sunxi: add A20 support to A10 driver
-  pinctrl: sunxi: drop dedicated A20 driver
-  dt-bindings: add compatible string for Allwinner R40 pinctrl
-  pinctrl: sunxi: add support of R40 to A10 pinctrl driver
-  dt-bindings: add compatible string for Allwinner R40 CCU
-  clk: sunxi-ng: support R40 SoC
+ Documentation/arm/sunxi/README                  | 6 ++++++
+ Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
+ arch/arm/mach-sunxi/sunxi.c                     | 1 +
+ 3 files changed, 8 insertions(+)
 
- Documentation/arm/sunxi/README                     |    6 +
- Documentation/devicetree/bindings/arm/sunxi.txt    |    1 +
- .../devicetree/bindings/clock/sunxi-ccu.txt        |    1 +
- .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |    1 +
- arch/arm/boot/dts/Makefile                         |    1 +
- arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts  |  157 +++
- arch/arm/boot/dts/sun8i-r40.dtsi                   |  408 +++++++
- arch/arm/mach-sunxi/sunxi.c                        |    1 +
- drivers/clk/sunxi-ng/Kconfig                       |   10 +
- drivers/clk/sunxi-ng/Makefile                      |    1 +
- drivers/clk/sunxi-ng/ccu-sun8i-r40.c               | 1153 ++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu-sun8i-r40.h               |   68 ++
- drivers/pinctrl/sunxi/Kconfig                      |    6 +-
- drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c          |  449 ++++++--
- drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c          | 1056 ------------------
- drivers/pinctrl/sunxi/pinctrl-sunxi.h              |    3 +
- include/dt-bindings/clock/sun8i-r40-ccu.h          |  191 ++++
- include/dt-bindings/reset/sun8i-r40-ccu.h          |  129 +++
- 18 files changed, 2497 insertions(+), 1145 deletions(-)
- create mode 100644 arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
- create mode 100644 arch/arm/boot/dts/sun8i-r40.dtsi
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-r40.c
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-r40.h
- delete mode 100644 drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c
- create mode 100644 include/dt-bindings/clock/sun8i-r40-ccu.h
- create mode 100644 include/dt-bindings/reset/sun8i-r40-ccu.h
-
+diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
+index d7b1f016bd62..af56321137e8 100644
+--- a/Documentation/arm/sunxi/README
++++ b/Documentation/arm/sunxi/README
+@@ -75,6 +75,12 @@ SunXi family
+         + Datasheet
+           http://linux-sunxi.org/File:Allwinner_V3s_Datasheet_V1.0.pdf
+ 
++      - Allwinner R40 (sun8i)
++        + Datasheet
++          https://github.com/tinalinux/docs/blob/r40-v1.y/R40_Datasheet_V1.0.pdf
++        + User Manual
++          https://github.com/tinalinux/docs/blob/r40-v1.y/Allwinner_R40_User_Manual_V1.0.pdf
++
+     * Quad ARM Cortex-A15, Quad ARM Cortex-A7 based SoCs
+       - Allwinner A80
+         + Datasheet
+diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+index d2c46449b4eb..b3ffe6cf821a 100644
+--- a/Documentation/devicetree/bindings/arm/sunxi.txt
++++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+@@ -14,6 +14,7 @@ using one of the following compatible strings:
+   allwinner,sun8i-a83t
+   allwinner,sun8i-h2-plus
+   allwinner,sun8i-h3
++  allwinner-sun8i-r40
+   allwinner,sun9i-a80
+   allwinner,sun50i-a64
+   nextthing,gr8
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index f44e3acb5c90..aea616759451 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -66,6 +66,7 @@ static const char * const sun8i_board_dt_compat[] = {
+ 	"allwinner,sun8i-h2-plus",
+ 	"allwinner,sun8i-h3",
+ 	"allwinner,sun8i-v3s",
++	"allwinner,sun8i-r40",
+ 	NULL,
+ };
+ 
 -- 
 2.12.2
