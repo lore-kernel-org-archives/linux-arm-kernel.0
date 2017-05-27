@@ -1,100 +1,144 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Sat, 27 May 2017 17:47:25 +0800
-Subject: [PATCH 4/6] regulator: hi6421v530: add driver for hi6421v530
- voltage regulator
-In-Reply-To: <20170526113822.xsmk5lsrvzmqyljm@sirena.org.uk>
-References: <20170526063518.21246-1-guodong.xu@linaro.org>
- <20170526063518.21246-5-guodong.xu@linaro.org>
- <20170526113822.xsmk5lsrvzmqyljm@sirena.org.uk>
-Message-ID: <CAFGCpxyc6YnXQQk5TFzh5b7mByQuFg5h+nYfPYyJUdjvforYHA@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Sat, 27 May 2017 11:58:42 +0200
+Subject: [PATCH 1/7] Revert "clockevents: Add a clkevt-of mechanism like
+ clksrc-of"
+Message-ID: <1495879129-28109-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 26, 2017 at 7:38 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Fri, May 26, 2017 at 02:35:16PM +0800, Guodong Xu wrote:
->
-> Overall this driver needs quite a lot of modernization, it's at least a
-> couple of years out of date in how it's using the framework - there's
-> barely any use of helpers.  It does look like it should be fairly easy
-> to get it up to date though, it's mostly going to be a case of deleting
-> code that's reimplementing helpers rather than anything else.
->
->> +/*
->> + * struct hi6421c530_regulator_pdata - Hi6421V530 regulator data
->> + * of platform device.
->> + * @lock: mutex to serialize regulator enable
->> + */
->> +struct hi6421v530_regulator_pdata {
->> +     struct mutex lock;
->> +};
->
-> This isn't platform data so it probably shouldn't be called pdata.  I
-> also can't tell what the lock is protecting, every use seems to be a
-> call to regmap_update_bits() which is atomic anyway - could we just drop
-> the whole thing?
+After discussing it, this feature is dropped as it is not considered
+adequate:
 
-In original hi6421 chip, this lock can protect from enabling multiple
-LDOs simultaneously. Because it cannot afford such surging current.
+	https://patchwork.kernel.org/patch/9639317/
 
-I will double check whether this is still the case for hi6421v530. If
-not, I will remove the whole thing.
+There is no user of this macro yet, so there is no impact on the drivers.
 
->
->> +static int hi6421v530_regulator_enable(struct regulator_dev *rdev)
->> +{
->> +     struct hi6421v530_regulator_pdata *pdata;
->> +     int ret = 0;
->> +
->> +     pdata = dev_get_drvdata(rdev->dev.parent);
->> +     mutex_lock(&pdata->lock);
->> +
->> +     ret = regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
->> +                     rdev->desc->enable_mask,
->> +                     1 << (ffs(rdev->desc->enable_mask) - 1));
->> +
->> +     mutex_unlock(&pdata->lock);
->> +     return ret;
->> +}
->
-> This looks like it should be able to use the regmap helpers for all the
-> enable operations rather than open coding.
->
+This reverts commit 376bc27150f180d9f5eddec6a14117780177589d.
 
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ drivers/clocksource/Kconfig        |  7 -----
+ drivers/clocksource/Makefile       |  1 -
+ drivers/clocksource/clkevt-probe.c | 56 --------------------------------------
+ include/linux/clockchips.h         |  9 ------
+ 4 files changed, 73 deletions(-)
+ delete mode 100644 drivers/clocksource/clkevt-probe.c
 
->> +static int hi6421v530_regulator_set_voltage(struct regulator_dev *rdev,
->> +                                             unsigned int sel)
->> +{
->> +     struct hi6421v530_regulator_pdata *pdata;
->> +     int ret = 0;
->> +
->> +     pdata = dev_get_drvdata(rdev->dev.parent);
->> +     mutex_lock(&pdata->lock);
->> +
->> +     ret = regmap_update_bits(rdev->regmap, rdev->desc->vsel_reg,
->> +                             rdev->desc->vsel_mask,
->> +                             sel << (ffs(rdev->desc->vsel_mask) - 1));
->
-> Same for all the voltage operations :(
->
->> +     rdev->constraints->valid_modes_mask = info->mode_mask;
->> +     rdev->constraints->valid_ops_mask |=
->> +                     REGULATOR_CHANGE_VOLTAGE | REGULATOR_CHANGE_MODE;
->
-> The driver should *never* modify constraints, it's up to the machine
-> integration to say what can be supported on a given board.
->
->> +     np = of_get_child_by_name(dev->parent->of_node, "regulators");
->> +     if (!np)
->> +             return -ENODEV;
->> +
->> +     ret = of_regulator_match(dev, np,
->> +                              hi6421v530_regulator_match,
->> +                              ARRAY_SIZE(hi6421v530_regulator_match));
->
-> Don't open code this, use of_match and regulators_node.
-
-I will fix that.
-
-Thanks Mark for your review.
-
--Guodong
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 1b22ade..623fcc6 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -5,10 +5,6 @@ config CLKSRC_OF
+ 	bool
+ 	select CLKSRC_PROBE
+ 
+-config CLKEVT_OF
+-	bool
+-	select CLKEVT_PROBE
+-
+ config CLKSRC_ACPI
+ 	bool
+ 	select CLKSRC_PROBE
+@@ -16,9 +12,6 @@ config CLKSRC_ACPI
+ config CLKSRC_PROBE
+ 	bool
+ 
+-config CLKEVT_PROBE
+-	bool
+-
+ config CLKSRC_I8253
+ 	bool
+ 
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index cf0c30b..cad713c 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -1,5 +1,4 @@
+ obj-$(CONFIG_CLKSRC_PROBE)	+= clksrc-probe.o
+-obj-$(CONFIG_CLKEVT_PROBE)	+= clkevt-probe.o
+ obj-$(CONFIG_ATMEL_PIT)		+= timer-atmel-pit.o
+ obj-$(CONFIG_ATMEL_ST)		+= timer-atmel-st.o
+ obj-$(CONFIG_ATMEL_TCB_CLKSRC)	+= tcb_clksrc.o
+diff --git a/drivers/clocksource/clkevt-probe.c b/drivers/clocksource/clkevt-probe.c
+deleted file mode 100644
+index 8c30fec..0000000
+--- a/drivers/clocksource/clkevt-probe.c
++++ /dev/null
+@@ -1,56 +0,0 @@
+-/*
+- * Copyright (c) 2016, Linaro Ltd.  All rights reserved.
+- * Daniel Lezcano <daniel.lezcano@linaro.org>
+- *
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms and conditions of the GNU General Public License,
+- * version 2, as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope it will be useful, but WITHOUT
+- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+- * more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
+-
+-#include <linux/init.h>
+-#include <linux/of.h>
+-#include <linux/clockchip.h>
+-
+-extern struct of_device_id __clkevt_of_table[];
+-
+-static const struct of_device_id __clkevt_of_table_sentinel
+-	__used __section(__clkevt_of_table_end);
+-
+-int __init clockevent_probe(void)
+-{
+-	struct device_node *np;
+-	const struct of_device_id *match;
+-	of_init_fn_1_ret init_func;
+-	int ret, clockevents = 0;
+-
+-	for_each_matching_node_and_match(np, __clkevt_of_table, &match) {
+-		if (!of_device_is_available(np))
+-			continue;
+-
+-		init_func = match->data;
+-
+-		ret = init_func(np);
+-		if (ret) {
+-			pr_warn("Failed to initialize '%s' (%d)\n",
+-				np->name, ret);
+-			continue;
+-		}
+-
+-		clockevents++;
+-	}
+-
+-	if (!clockevents) {
+-		pr_crit("%s: no matching clockevent found\n", __func__);
+-		return -ENODEV;
+-	}
+-
+-	return 0;
+-}
+diff --git a/include/linux/clockchips.h b/include/linux/clockchips.h
+index eef1569..a116926 100644
+--- a/include/linux/clockchips.h
++++ b/include/linux/clockchips.h
+@@ -223,13 +223,4 @@ static inline void tick_setup_hrtimer_broadcast(void) { }
+ 
+ #endif /* !CONFIG_GENERIC_CLOCKEVENTS */
+ 
+-#define CLOCKEVENT_OF_DECLARE(name, compat, fn) \
+-	OF_DECLARE_1_RET(clkevt, name, compat, fn)
+-
+-#ifdef CONFIG_CLKEVT_PROBE
+-extern int clockevent_probe(void);
+-#els
+-static inline int clockevent_probe(void) { return 0; }
+-#endif
+-
+ #endif /* _LINUX_CLOCKCHIPS_H */
+-- 
+2.7.4
