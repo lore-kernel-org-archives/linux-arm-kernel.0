@@ -1,43 +1,121 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 27 May 2017 18:09:29 +0200
-Subject: [PATCH v4 04/11] drm/sun4i: tcon: Fix tcon channel 1 backporch
- calculation
+Date: Sat, 27 May 2017 18:09:33 +0200
+Subject: [PATCH v4 08/11] dt-bindings: display: sun4i: Add HDMI display
+ bindings
 In-Reply-To: <cover.c61cbe60123a4aeb24f255bca7927218dda6283e.1495900658.git-series.maxime.ripard@free-electrons.com>
 References: <cover.c61cbe60123a4aeb24f255bca7927218dda6283e.1495900658.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <edb1cf56431966445ddd6b6948e1e77a301f1f5d.1495900658.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <c2b18044c08c73bc3333d3c5eb30b3f4c9db9a22.1495900658.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It seems like what's called a backporch in the datasheet is actually the
-backporch plus the sync period. Fix that in our driver.
+One of the possible output of the display pipeline, on the SoCs that have
+it, is the HDMI controller.
+
+Add a binding for it.
 
 Acked-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 79 +++++++-
+ 1 file changed, 79 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index 28da61ac9bab..6993ef3888dd 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -269,7 +269,7 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
- 		     SUN4I_TCON1_BASIC2_Y(mode->crtc_vdisplay));
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index 66b85a195ef2..c6ad76d7438a 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -14,6 +14,34 @@ Conversely, for the output ports of the same group, the remote endpoint
+ ID must be the index of the local hardware block. If the local backend
+ is backend 1, then the remote endpoint ID must be 1.
  
- 	/* Set horizontal display timings */
--	bp = mode->crtc_htotal - mode->crtc_hsync_end;
-+	bp = mode->crtc_htotal - mode->crtc_hsync_start;
- 	DRM_DEBUG_DRIVER("Setting horizontal total %d, backporch %d\n",
- 			 mode->htotal, bp);
- 	regmap_write(tcon->regs, SUN4I_TCON1_BASIC3_REG,
-@@ -277,7 +277,7 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
- 		     SUN4I_TCON1_BASIC3_H_BACKPORCH(bp));
++HDMI Encoder
++------------
++
++The HDMI Encoder supports the HDMI video and audio outputs, and does
++CEC. It is one end of the pipeline.
++
++Required properties:
++  - compatible: value must be one of:
++    * allwinner,sun5i-a10s-hdmi
++  - reg: base address and size of memory-mapped region
++  - interrupts: interrupt associated to this IP
++  - clocks: phandles to the clocks feeding the HDMI encoder
++    * ahb: the HDMI interface clock
++    * mod: the HDMI module clock
++    * pll-0: the first video PLL
++    * pll-1: the second video PLL
++  - clock-names: the clock names mentioned above
++  - dmas: phandles to the DMA channels used by the HDMI encoder
++    * ddc-tx: The channel for DDC transmission
++    * ddc-rx: The channel for DDC reception
++    * audio-tx: The channel used for audio transmission
++  - dma-names: the channel names mentioned above
++
++  - ports: A ports node with endpoint definitions as defined in
++    Documentation/devicetree/bindings/media/video-interfaces.txt. The
++    first port should be the input endpoint. The second should be the
++    output, usually to an HDMI connector.
++
+ TV Encoder
+ ----------
  
- 	/* Set vertical display timings */
--	bp = mode->crtc_vtotal - mode->crtc_vsync_end;
-+	bp = mode->crtc_vtotal - mode->crtc_vsync_start;
- 	DRM_DEBUG_DRIVER("Setting vertical total %d, backporch %d\n",
- 			 mode->vtotal, bp);
- 	regmap_write(tcon->regs, SUN4I_TCON1_BASIC4_REG,
+@@ -205,6 +233,57 @@ panel: panel {
+ 	};
+ };
+ 
++connector {
++	compatible = "hdmi-connector";
++	type = "a";
++
++	port {
++		hdmi_con_in: endpoint {
++			remote-endpoint = <&hdmi_out_con>;
++		};
++	};
++};
++
++hdmi: hdmi at 01c16000 {
++	compatible = "allwinner,sun5i-a10s-hdmi";
++	reg = <0x01c16000 0x1000>;
++	interrupts = <58>;
++	clocks = <&ccu CLK_AHB_HDMI>, <&ccu CLK_HDMI>,
++		 <&ccu CLK_PLL_VIDEO0_2X>,
++		 <&ccu CLK_PLL_VIDEO1_2X>;
++	clock-names = "ahb", "mod", "pll-0", "pll-1";
++	dmas = <&dma SUN4I_DMA_NORMAL 16>,
++	       <&dma SUN4I_DMA_NORMAL 16>,
++	       <&dma SUN4I_DMA_DEDICATED 24>;
++	dma-names = "ddc-tx", "ddc-rx", "audio-tx";
++	status = "disabled";
++
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		port at 0 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0>;
++
++			hdmi_in_tcon0: endpoint {
++				remote-endpoint = <&tcon0_out_hdmi>;
++			};
++		};
++
++		port at 1 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <1>;
++
++			hdmi_out_con: endpoint {
++				remote-endpoint = <&hdmi_con_in>;
++			};
++		};
++	};
++};
++
+ tve0: tv-encoder at 01c0a000 {
+ 	compatible = "allwinner,sun4i-a10-tv-encoder";
+ 	reg = <0x01c0a000 0x1000>;
 -- 
 git-series 0.9.1
