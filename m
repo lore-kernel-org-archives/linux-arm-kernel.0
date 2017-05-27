@@ -1,52 +1,41 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 27 May 2017 14:22:37 +0100
-Subject: [CFT] Always enable SMP mode on MP capable CPUs
-In-Reply-To: <20170526112210.GA3354@afzalpc>
-References: <20170518105209.GN22219@n2100.armlinux.org.uk>
- <CAOMZO5Da2R2_t2nU+MdrJiSzvcBQKS4pwYS96r4UyfGc8DtWww@mail.gmail.com>
- <CAOMZO5Dc=i7UdQH=r5RRr_4GmyZZT+rh7BTNV4WbfqKvtVDfsw@mail.gmail.com>
- <20170519171526.GW22219@n2100.armlinux.org.uk>
- <20170524153847.GY10472@atomide.com>
- <20170525144800.GV23750@n2100.armlinux.org.uk>
- <20170525151103.GC10472@atomide.com>
- <20170525180540.GW23750@n2100.armlinux.org.uk>
- <20170525221332.GE10472@atomide.com>
- <20170526112210.GA3354@afzalpc>
-Message-ID: <20170527132237.GX23750@n2100.armlinux.org.uk>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Sat, 27 May 2017 19:17:40 +0530
+Subject: [PATCH v6 1/6] iommu: of: Fix check for returning EPROBE_DEFER
+Message-ID: <1495892865-9506-1-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 26, 2017 at 04:52:10PM +0530, afzal mohammed wrote:
-> Hi,
-> 
-> On Thu, May 25, 2017 at 03:13:33PM -0700, Tony Lindgren wrote:
-> 
-> > OK so got my am437x-idk back
-> > 
-> > And as suspected it won't boot with these changes.
-> 
-> Tested here too with your additional changes included & seeing same
-> behavior here as well on AM437x.
-> 
-> As an aside, when Russell posted this patch a week back itself was
-> suspecting this. i had a certain view on AM437x w.r.t SMP issue back
-> while officially working on it & since now not officially involved
-> with the issue at hand, i was uncomfortable dealing with this. But as
-> Russell's patch was not noticed by others w.r.t AM437x, upon being
-> able to confirm it yesterday, i at least wanted to bring it to notice
-> & runaway from the scene.
+Now with IOMMU probe deferral, we return -EPROBE_DEFER
+for masters that are connected to an IOMMU which is not
+probed yet, but going to get probed, so that we can attach
+the correct dma_ops. So while trying to defer the probe of
+the master, check if the of_iommu node that it is connected
+to is marked in DT as 'status=disabled', then the IOMMU is never
+is going to get probed. So simply return NULL and let the master
+work without an IOMMU.
 
-Right, so I think the summary is: the kernel can't set the SMP bit
-correctly - it doesn't have the information at this point in time
-to know definitively whether the bit needs to be set or not.
+Fixes: 7b07cbefb68d ("iommu: of: Handle IOMMU lookup failure with deferred probing or error")
+Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Tested-by: Will Deacon <will.deacon@arm.com>
+Tested-by: Magnus Damn <magnus.damn@gmail.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+---
+ drivers/iommu/of_iommu.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-So, those who are suffering issues with their SMP cores in uniprocessor
-systems need to ensure that their boot loader correctly configures the
-CPU cores.
-
-Thanks for testing.
-
+diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+index 9f44ee8..e6e9bec 100644
+--- a/drivers/iommu/of_iommu.c
++++ b/drivers/iommu/of_iommu.c
+@@ -118,6 +118,7 @@ static bool of_iommu_driver_present(struct device_node *np)
+ 
+ 	ops = iommu_ops_from_fwnode(fwnode);
+ 	if ((ops && !ops->of_xlate) ||
++	    !of_device_is_available(iommu_spec->np) ||
+ 	    (!ops && !of_iommu_driver_present(iommu_spec->np)))
+ 		return NULL;
+ 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
