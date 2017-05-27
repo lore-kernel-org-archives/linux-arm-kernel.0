@@ -1,118 +1,41 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sat, 27 May 2017 11:58:46 +0200
-Subject: [PATCH 5/7] clocksource: Rename clksrc
+Date: Sat, 27 May 2017 11:58:48 +0200
+Subject: [PATCH 7/7] clocksource: Rename CLKSRC_ACPI
 In-Reply-To: <1495879129-28109-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1495879129-28109-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1495879129-28109-5-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1495879129-28109-7-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The table name is now renamed to 'timer' for consistency with
+The config option name is now renamed to 'CLKSRC_ACPI' for consistency with
 the CLOCKSOURCE_OF_DECLARE => TIMER_OF_DECLARE change.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/clksrc-probe.c | 18 +++++++++---------
- include/asm-generic/vmlinux.lds.h  |  6 +++---
- include/linux/clocksource.h        |  4 ++--
- 3 files changed, 14 insertions(+), 14 deletions(-)
+ drivers/clocksource/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clocksource/clksrc-probe.c b/drivers/clocksource/clksrc-probe.c
-index 5d549c2..da81e5d 100644
---- a/drivers/clocksource/clksrc-probe.c
-+++ b/drivers/clocksource/clksrc-probe.c
-@@ -19,20 +19,20 @@
- #include <linux/of.h>
- #include <linux/clocksource.h>
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 90f062e..4ba230d 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -5,7 +5,7 @@ config TIMER_OF
+ 	bool
+ 	select TIMER_PROBE
  
--extern struct of_device_id __clksrc_of_table[];
-+extern struct of_device_id __timer_of_table[];
+-config CLKSRC_ACPI
++config TIMER_ACPI
+ 	bool
+ 	select TIMER_PROBE
  
--static const struct of_device_id __clksrc_of_table_sentinel
--	__used __section(__clksrc_of_table_end);
-+static const struct of_device_id __timer_of_table_sentinel
-+	__used __section(__timer_of_table_end);
+@@ -310,7 +310,7 @@ config ARC_TIMERS_64BIT
+ config ARM_ARCH_TIMER
+ 	bool
+ 	select TIMER_OF if OF
+-	select CLKSRC_ACPI if ACPI
++	select TIMER_ACPI if ACPI
  
- void __init timer_probe(void)
- {
- 	struct device_node *np;
- 	const struct of_device_id *match;
- 	of_init_fn_1_ret init_func_ret;
--	unsigned clocksources = 0;
-+	unsigned timers = 0;
- 	int ret;
- 
--	for_each_matching_node_and_match(np, __clksrc_of_table, &match) {
-+	for_each_matching_node_and_match(np, __timer_of_table, &match) {
- 		if (!of_device_is_available(np))
- 			continue;
- 
-@@ -45,11 +45,11 @@ void __init timer_probe(void)
- 			continue;
- 		}
- 
--		clocksources++;
-+		timers++;
- 	}
- 
--	clocksources += acpi_probe_device_table(clksrc);
-+	timers += acpi_probe_device_table(timer);
- 
--	if (!clocksources)
--		pr_crit("%s: no matching clocksources found\n", __func__);
-+	if (!timers)
-+		pr_crit("%s: no matching timers found\n", __func__);
- }
-diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-index 0968d13..ca922ae 100644
---- a/include/asm-generic/vmlinux.lds.h
-+++ b/include/asm-generic/vmlinux.lds.h
-@@ -172,7 +172,7 @@
- 	KEEP(*(__##name##_of_table))					\
- 	KEEP(*(__##name##_of_table_end))
- 
--#define CLKSRC_OF_TABLES()	OF_TABLE(CONFIG_CLKSRC_OF, clksrc)
-+#define TIMER_OF_TABLES()	OF_TABLE(CONFIG_CLKSRC_OF, timer)
- #define IRQCHIP_OF_MATCH_TABLE() OF_TABLE(CONFIG_IRQCHIP, irqchip)
- #define CLK_OF_TABLES()		OF_TABLE(CONFIG_COMMON_CLK, clk)
- #define IOMMU_OF_TABLES()	OF_TABLE(CONFIG_OF_IOMMU, iommu)
-@@ -558,14 +558,14 @@
- 	MEM_DISCARD(init.rodata)					\
- 	CLK_OF_TABLES()							\
- 	RESERVEDMEM_OF_TABLES()						\
--	CLKSRC_OF_TABLES()						\
-+	TIMER_OF_TABLES()						\
- 	IOMMU_OF_TABLES()						\
- 	CPU_METHOD_OF_TABLES()						\
- 	CPUIDLE_METHOD_OF_TABLES()					\
- 	KERNEL_DTB()							\
- 	IRQCHIP_OF_MATCH_TABLE()					\
- 	ACPI_PROBE_TABLE(irqchip)					\
--	ACPI_PROBE_TABLE(clksrc)					\
-+	ACPI_PROBE_TABLE(timer)						\
- 	ACPI_PROBE_TABLE(iort)						\
- 	EARLYCON_TABLE()
- 
-diff --git a/include/linux/clocksource.h b/include/linux/clocksource.h
-index e43f37f..7cd38b2 100644
---- a/include/linux/clocksource.h
-+++ b/include/linux/clocksource.h
-@@ -250,7 +250,7 @@ extern int clocksource_mmio_init(void __iomem *, const char *,
- extern int clocksource_i8253_init(void);
- 
- #define TIMER_OF_DECLARE(name, compat, fn) \
--	OF_DECLARE_1_RET(clksrc, name, compat, fn)
-+	OF_DECLARE_1_RET(timer, name, compat, fn)
- 
- #ifdef CONFIG_CLKSRC_PROBE
- extern void timer_probe(void);
-@@ -259,6 +259,6 @@ static inline void timer_probe(void) {}
- #endif
- 
- #define TIMER_ACPI_DECLARE(name, table_id, fn)		\
--	ACPI_DECLARE_PROBE_ENTRY(clksrc, name, table_id, 0, NULL, 0, fn)
-+	ACPI_DECLARE_PROBE_ENTRY(timer, name, table_id, 0, NULL, 0, fn)
- 
- #endif /* _LINUX_CLOCKSOURCE_H */
+ config ARM_ARCH_TIMER_EVTSTREAM
+ 	bool "Enable ARM architected timer event stream generation by default"
 -- 
 2.7.4
