@@ -1,31 +1,36 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Sun, 28 May 2017 01:28:45 +0300
-Subject: [PATCH v2 1/2] drivers: pwm: core: implement pwm dead-times
-In-Reply-To: <1494317990-9131-2-git-send-email-claudiu.beznea@microchip.com>
-References: <1494317990-9131-1-git-send-email-claudiu.beznea@microchip.com>
- <1494317990-9131-2-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <CAHp75Ve=v=50UmpOyi1guY3NVuk41U0Ma+_P__5NK7_dNr6gZg@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Sat, 27 May 2017 18:42:34 -0400 (EDT)
+Subject: [PATCH 0/2] Document and use eeprom-length property
+In-Reply-To: <20170527081332.GB4528@dragon>
+References: <1495755884-31341-1-git-send-email-andrew@lunn.ch>
+ <20170526.150242.515745885812232154.davem@davemloft.net>
+ <20170527081332.GB4528@dragon>
+Message-ID: <20170527.184234.1719294969155143427.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 9, 2017 at 11:19 AM, Claudiu Beznea
-<claudiu.beznea@microchip.com> wrote:
-> Extends PWM framework to support PWM dead-times.
-> The notions introduced are rising edge dead-time
-> and falling edge dead-time. These are useful for
-> PWM controllers with channels that have more than
-> one outputs.
-> The implementation add sysfs interface for
-> configuration. It extends the pwm_state structure
-> with two new members which keeps the values for
-> dead-times.
-> There were no additions in device tree for PWM channels
-> initialized by device tree.
+From: Shawn Guo <shawnguo@kernel.org>
+Date: Sat, 27 May 2017 16:13:34 +0800
 
-AFAIU it's effectively called phase of the signal.
-It looks to me much simpler if you allow to have linked / virtual
-channels instead of creating a lot of (duplicated) properties.
+> On Fri, May 26, 2017 at 03:02:42PM -0400, David Miller wrote:
+>> From: Andrew Lunn <andrew@lunn.ch>
+>> Date: Fri, 26 May 2017 01:44:42 +0200
+>> 
+>> > The mv88e6xxx switch driver allows the size of the attached EEPROM to
+>> > be described in DT. This property is missing from the binding
+>> > documentation. Add it. And make use of it on the ZII Devel B board.
+>> > 
+>> > David, Shawn, please could you talk amongs yourself to decide who
+>> > takes what.
+>> 
+>> I can take this if it works for Shawn, otherwise I'm also fine if Shawn
+>> takes it and if so feel free to add my:
+>> 
+>> Acked-by: David S. Miller <davem@davemloft.net>
+> 
+> Hi David,
+> 
+> I see these two patches can be applied separately, so I picked up 2/2
+> and left 1/2 to you.
 
--- 
-With Best Regards,
-Andy Shevchenko
+Ok I applied 1/2, thanks.
