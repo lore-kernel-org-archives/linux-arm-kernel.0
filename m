@@ -1,29 +1,43 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 28 May 2017 21:17:09 +0200
-Subject: PROBLEM: ARM Cache policy on single armv7 processor lead to low
- DRAM performance
-In-Reply-To: <CAOEkoLwq1fdVuhkm_Z4Lf1BL0XxLyumSxLF7gDPyK_NkzUdVgQ@mail.gmail.com>
-References: <CAOEkoLwq1fdVuhkm_Z4Lf1BL0XxLyumSxLF7gDPyK_NkzUdVgQ@mail.gmail.com>
-Message-ID: <20170528191709.GC20159@xo-6d-61-c0.localdomain>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 29 May 2017 04:53:44 +0800
+Subject: [PATCH v4 9/9] arm: dts: mt7623: add dts file for Bananapi R2
+ (BPI-R2) board
+In-Reply-To: <5cc5489b38fc2723c30c8cfe0d4353f967d100f3.1495683769.git.sean.wang@mediatek.com>
+Message-ID: <201705290415.tikz1ylK%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Sean,
 
-> We met some DDR performance issue caused by armv7 cache policy, hope
-> you can help.
-> On a single armv7(Cortex-A7) processor system, the arm linux kernel,
-> without CONFIG_SMP, the cache policy is set to write-back no-allocate,
-> which lead to very low DRAM speed,
-> around 7MB/s for write, 28MB/s for read.
-> If enable CONFIG_SMP and CONFIG_SMP_ON_UP, then the cache policy is
-> changed to write-back read-write-allocate, and the DRAM speed is
-> improved a lot, around 120MB/s for write, 160MB/s for read.
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.12-rc2 next-20170526]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Just out of curiosity, is not that still 10x lower than expected? What kind of
-system is that?
-									Pavel
+url:    https://github.com/0day-ci/linux/commits/sean-wang-mediatek-com/arm-dts-extend-mt7623-support/20170525-142103
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: arm-allyesconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+All errors (new ones prefixed by >>):
+
+   Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:33.1-7 Label or path pwrap not found
+   Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:261.1-6 Label or path mmc0 not found
+   Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:266.1-6 Label or path mmc1 not found
+>> Error: arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts:31.22-23 syntax error
+   FATAL ERROR: Unable to parse input tree
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 60535 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170529/34a5ae13/attachment-0001.gz>
