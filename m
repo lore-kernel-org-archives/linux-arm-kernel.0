@@ -1,22 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 28 May 2017 15:52:49 +0200
-Subject: [PATCH 7/7] clocksource: Rename CLKSRC_ACPI
-In-Reply-To: <1495879129-28109-7-git-send-email-daniel.lezcano@linaro.org>
-References: <1495879129-28109-1-git-send-email-daniel.lezcano@linaro.org>
- <1495879129-28109-7-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <CACRpkdYWqaE_kMaP21VtqeyPUSLnLT-ExvaBs7ehcZi44ijH2Q@mail.gmail.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 28 May 2017 15:50:41 +0100
+Subject: [PATCH] iio: adc: xilinx: Handle return value of
+ clk_prepare_enable
+In-Reply-To: <29dda0d20f714ce828e294f99b7f400e89f5b35a.1495780467.git.arvind.yadav.cs@gmail.com>
+References: <29dda0d20f714ce828e294f99b7f400e89f5b35a.1495780467.git.arvind.yadav.cs@gmail.com>
+Message-ID: <20170528155041.478fc87b@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 27, 2017 at 11:58 AM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
+On Fri, 26 May 2017 12:07:41 +0530
+Arvind Yadav <arvind.yadav.cs@gmail.com> wrote:
 
-> The config option name is now renamed to 'CLKSRC_ACPI' for consistency with
-> the CLOCKSOURCE_OF_DECLARE => TIMER_OF_DECLARE change.
->
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> clk_prepare_enable() can fail here and we must check its return value.
+> 
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+Straight forward looking so I've applied this to the togreg
+branch of iio.git and pushed it out as testing for the autobuilders
+to play with it.
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+Thanks,
 
-Yours,
-Linus Walleij
+Jonathan
+> ---
+>  drivers/iio/adc/xilinx-xadc-core.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
+> index 56cf590..4a60497 100644
+> --- a/drivers/iio/adc/xilinx-xadc-core.c
+> +++ b/drivers/iio/adc/xilinx-xadc-core.c
+> @@ -1204,7 +1204,10 @@ static int xadc_probe(struct platform_device *pdev)
+>  		ret = PTR_ERR(xadc->clk);
+>  		goto err_free_samplerate_trigger;
+>  	}
+> -	clk_prepare_enable(xadc->clk);
+> +
+> +	ret = clk_prepare_enable(xadc->clk);
+> +	if (ret)
+> +		goto err_free_samplerate_trigger;
+>  
+>  	ret = xadc->ops->setup(pdev, indio_dev, irq);
+>  	if (ret)
