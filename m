@@ -1,36 +1,114 @@
-From: davem@davemloft.net (David Miller)
-Date: Sat, 27 May 2017 18:42:34 -0400 (EDT)
-Subject: [PATCH 0/2] Document and use eeprom-length property
-In-Reply-To: <20170527081332.GB4528@dragon>
-References: <1495755884-31341-1-git-send-email-andrew@lunn.ch>
- <20170526.150242.515745885812232154.davem@davemloft.net>
- <20170527081332.GB4528@dragon>
-Message-ID: <20170527.184234.1719294969155143427.davem@davemloft.net>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Sun, 28 May 2017 03:04:15 +0300
+Subject: [PATCH 6/6] tty: serial: lpuart: add a more accurate baud rate
+ calculation method
+In-Reply-To: <1494316248-24052-7-git-send-email-aisheng.dong@nxp.com>
+References: <1494316248-24052-1-git-send-email-aisheng.dong@nxp.com>
+ <1494316248-24052-7-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <CAHp75Vemc5qoD7gbc_sJBSasYTFYSYOuWZv4N-4X60arWX8aJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Guo <shawnguo@kernel.org>
-Date: Sat, 27 May 2017 16:13:34 +0800
+On Tue, May 9, 2017 at 10:50 AM, Dong Aisheng <aisheng.dong@nxp.com> wrote:
+> On new LPUART versions, the oversampling ratio for the receiver can be
+> changed from 4x (00011) to 32x (11111) which could help us get a more
+> accurate baud rate divider.
+>
+> The idea is to use the best OSR (over-sampling rate) possible.
+> Note, OSR is typically hard-set to 16 in other LPUART instantiations.
+> Loop to find the best OSR value possible, one that generates minimum
+> baud diff iterate through the rest of the supported values of OSR.
 
-> On Fri, May 26, 2017 at 03:02:42PM -0400, David Miller wrote:
->> From: Andrew Lunn <andrew@lunn.ch>
->> Date: Fri, 26 May 2017 01:44:42 +0200
->> 
->> > The mv88e6xxx switch driver allows the size of the attached EEPROM to
->> > be described in DT. This property is missing from the binding
->> > documentation. Add it. And make use of it on the ZII Devel B board.
->> > 
->> > David, Shawn, please could you talk amongs yourself to decide who
->> > takes what.
->> 
->> I can take this if it works for Shawn, otherwise I'm also fine if Shawn
->> takes it and if so feel free to add my:
->> 
->> Acked-by: David S. Miller <davem@davemloft.net>
-> 
-> Hi David,
-> 
-> I see these two patches can be applied separately, so I picked up 2/2
-> and left 1/2 to you.
+> +lpuart32_serial_setbrg(struct lpuart_port *sport, unsigned int baudrate)
+> +{
+> +       u32 sbr, osr, baud_diff, tmp_osr, tmp_sbr, tmp_diff, tmp;
+> +       u32 clk = sport->port.uartclk;
+> +
+> +       /*
+> +        * The idea is to use the best OSR (over-sampling rate) possible.
+> +        * Note, OSR is typically hard-set to 16 in other LPUART instantiations.
+> +        * Loop to find the best OSR value possible, one that generates minimum
+> +        * baud_diff iterate through the rest of the supported values of OSR.
+> +        *
+> +        * Calculation Formula:
+> +        *  Baud Rate = baud clock / ((OSR+1) ? SBR)
+> +        */
+> +       baud_diff = baudrate;
+> +       osr = 0;
+> +       sbr = 0;
+> +
 
-Ok I applied 1/2, thanks.
+> +       for (tmp_osr = 4; tmp_osr <= 32; tmp_osr++) {
+
+I _think_ you may simplify this and avoid for-loop if you reconsider approach.
+
+> +               /* calculate the temporary sbr value  */
+> +               tmp_sbr = (clk / (baudrate * tmp_osr));
+> +               if (tmp_sbr == 0)
+> +                       tmp_sbr = 1;
+> +
+> +               /*
+> +                * calculate the baud rate difference based on the temporary
+> +                * osr and sbr values
+> +                */
+
+> +               tmp_diff = clk / (tmp_osr * tmp_sbr) - baudrate;
+
+(32 - 4 + 1) times division is called...
+
+> +
+> +               /* select best values between sbr and sbr+1 */
+> +               tmp = clk / (tmp_osr * (tmp_sbr + 1));
+> +               if (tmp_diff > (baudrate - tmp)) {
+> +                       tmp_diff = baudrate - tmp;
+> +                       tmp_sbr++;
+> +               }
+> +
+> +               if (tmp_diff <= baud_diff) {
+> +                       baud_diff = tmp_diff;
+> +                       osr = tmp_osr;
+> +                       sbr = tmp_sbr;
+> +               }
+> +       }
+
+> +       /* handle buadrate outside acceptable rate */
+> +       if (baud_diff > ((baudrate / 100) * 3))
+> +               dev_warn(sport->port.dev,
+> +                        "unacceptable baud rate difference of more than 3%%\n");
+
+Shouldn't you fall back to previous setting?
+
+> +
+> +       tmp = lpuart32_read(sport->port.membase + UARTBAUD);
+> +
+
+> +       if ((osr > 3) && (osr < 8))
+
+Isn't it
+
+if (osr ^ BIT(2) < BIT(2))
+
+?
+
+> +               tmp |= UARTBAUD_BOTHEDGE;
+
+> +}
+
+> +       if (of_device_is_compatible(port->dev->of_node, "fsl,imx7ulp-lpuart")) {
+> +               lpuart32_serial_setbrg(sport, baud);
+
+> +       } else {
+> +               sbr = sport->port.uartclk / (16 * baud);
+> +               bd &= ~UARTBAUD_SBR_MASK;
+> +               bd |= sbr & UARTBAUD_SBR_MASK;
+> +               bd |= UARTBAUD_BOTHEDGE;
+> +               bd &= ~(UARTBAUD_TDMAE | UARTBAUD_RDMAE);
+> +               lpuart32_write(bd, sport->port.membase + UARTBAUD);
+> +       }
+
+Perhaps it makes sense to split this to a helper function as well (in
+a separate patch).
+
+-- 
+With Best Regards,
+Andy Shevchenko
