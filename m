@@ -1,53 +1,46 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 28 May 2017 12:59:35 +0800
-Subject: [PATCH 1/2] dt: bindings: add documentation for zx2967 family i2c
- controller
-In-Reply-To: <1495947576-11037-1-git-send-email-shawnguo@kernel.org>
-References: <1495947576-11037-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <1495947576-11037-2-git-send-email-shawnguo@kernel.org>
+Date: Sun, 28 May 2017 12:59:34 +0800
+Subject: [PATCH 0/2] Add I2C driver for ZTE ZX2967 family SoCs
+Message-ID: <1495947576-11037-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Baoyou Xie <baoyou.xie@linaro.org>
+From: Shawn Guo <shawn.guo@linaro.org>
 
-This patch adds dt-binding documentation for zx2967 family
-i2c controller.
+Hi Wolfram,
 
-Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- .../devicetree/bindings/i2c/i2c-zx2967.txt         | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+The ZX2967 I2C driver submission had gone through quite a number of
+review iterations [1], and seems close to be accepted.  But for some
+reason, the ball got dropped from there.  I'm here to pick it up and
+hopefully move it forward.
+
+This is basically a resend of the latest posting from Baoyou with
+Wolfram's comments on v7 fully addressed.
+
+Changes since v7:
+ - Rebase and test on v4.12-rc2.
+ - Drop the dev_err() and hardware reset on timeout, which is not really
+   necessary.
+ - Return -ETIMEDOUT instead of -EIO on timeout.
+ - Unify zx2967_i2c_xfer_write_bytes() and zx2967_i2c_xfer_read_bytes()
+   into one function zx2967_i2c_xfer_bytes(), and zx2967_i2c_xfer_write()
+   and zx2967_i2c_xfer_read() into zx2967_i2c_xfer_msg().
+
+Shawn
+
+[1] https://lkml.org/lkml/2017/2/22/101
+
+Baoyou Xie (2):
+  dt: bindings: add documentation for zx2967 family i2c controller
+  i2c: zx2967: add i2c controller driver for ZTE's zx2967 family
+
+ .../devicetree/bindings/i2c/i2c-zx2967.txt         |  22 +
+ drivers/i2c/busses/Kconfig                         |   9 +
+ drivers/i2c/busses/Makefile                        |   1 +
+ drivers/i2c/busses/i2c-zx2967.c                    | 610 +++++++++++++++++++++
+ 4 files changed, 642 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-zx2967.txt
+ create mode 100644 drivers/i2c/busses/i2c-zx2967.c
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-zx2967.txt b/Documentation/devicetree/bindings/i2c/i2c-zx2967.txt
-new file mode 100644
-index 000000000000..cb806d1ae4c9
---- /dev/null
-+++ b/Documentation/devicetree/bindings/i2c/i2c-zx2967.txt
-@@ -0,0 +1,22 @@
-+ZTE zx2967 I2C controller
-+
-+Required properties:
-+ - compatible: must be "zte,zx296718-i2c"
-+ - reg: physical address and length of the device registers
-+ - interrupts: a single interrupt specifier
-+ - clocks: clock for the device
-+ - #address-cells: should be <1>
-+ - #size-cells: should be <0>
-+ - clock-frequency: the desired I2C bus clock frequency.
-+
-+Examples:
-+
-+	i2c at 112000 {
-+		compatible = "zte,zx296718-i2c";
-+		reg = <0x00112000 0x1000>;
-+		interrupts = <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&osc24m>;
-+		#address-cells = <1>
-+		#size-cells = <0>;
-+		clock-frequency = <1600000>;
-+	};
 -- 
 1.9.1
