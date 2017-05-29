@@ -1,41 +1,69 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 29 May 2017 11:23:15 +0200
-Subject: [GIT PULL] ARM: at91: fixes for 4.12
-Message-ID: <20170529092315.kvlx7oioxjlv34ky@piout.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 29 May 2017 11:26:30 +0200
+Subject: [PATCH 3/3] ARM: sun8i: v3s: add backlight device node for
+ Lichee Pi Zero LCD
+In-Reply-To: <CAGb2v66X2mAiEVnsj_aE8RV7DdRa_Pe41E-O-GOPe-+cjiw4PA@mail.gmail.com>
+References: <20170524121320.4171-1-icenowy@aosc.io>
+ <20170524121320.4171-3-icenowy@aosc.io>
+ <20170529074117.x7pm2k2lbznl2n5j@flea.home>
+ <CAGb2v66X2mAiEVnsj_aE8RV7DdRa_Pe41E-O-GOPe-+cjiw4PA@mail.gmail.com>
+Message-ID: <20170529092630.z3brclkxoiyeq4ok@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On Mon, May 29, 2017 at 04:16:51PM +0800, Chen-Yu Tsai wrote:
+> On Mon, May 29, 2017 at 3:41 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi,
+> >
+> > On Wed, May 24, 2017 at 08:13:20PM +0800, Icenowy Zheng wrote:
+> >> The 40-pin LCD connector on Lichee Pi Zero has backlight pins, which is
+> >> controlled by the PWM0 controller of the V3s SoC, and the controlling
+> >> part is on the board.
+> >>
+> >> Add the PWM and backlight device nodes in the device tree file, but
+> >> leave them disabled, as they can only be useful when the LCD is
+> >> attached. The LCD device tree overlay files can enable these controllers
+> >> and make use of them.
+> >>
+> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> >> ---
+> >>  arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts | 14 ++++++++++++++
+> >>  1 file changed, 14 insertions(+)
+> >>
+> >> diff --git a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
+> >> index 387fc2aa546d..e0721bf725d1 100644
+> >> --- a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
+> >> +++ b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
+> >> @@ -52,6 +52,14 @@
+> >>               serial0 = &uart0;
+> >>       };
+> >>
+> >> +     backlight: backlight {
+> >> +             compatible = "pwm-backlight";
+> >> +             pwms = <&pwm 0 50000 0>;
+> >> +             brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
+> >
+> > This is unlikely, the perceived brightness by the human eye is not
+> > linear, and is actually much closer to a logarithmic function, which
+> > means you should have use an exponential function here in order to
+> > appear that your brightness increase is linear.
+> 
+> I think the backlight is a functional part of the panel. It probably
+> belongs in the panel's overlay.
 
-Here are two fixes for 4.12.
+Yeah, that's also true.
 
-The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
-
-  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-4.12-fixes
-
-for you to fetch changes up to cc7a938f5f308eeb6f8fe3cec28e1800aa81facb:
-
-  ARM: at91: select CONFIG_ARM_CPU_SUSPEND (2017-05-29 11:06:56 +0200)
-
-----------------------------------------------------------------
-Fixes for 4.12:
-
-Fix two compilation issues
-
-----------------------------------------------------------------
-Arnd Bergmann (2):
-      memory: atmel-ebi: mark PM ops as __maybe_unused
-      ARM: at91: select CONFIG_ARM_CPU_SUSPEND
-
- arch/arm/mach-at91/Kconfig | 1 +
- drivers/memory/atmel-ebi.c | 2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
+Maxime
 
 -- 
-Alexandre Belloni, Free Electrons
+Maxime Ripard, Free Electrons
 Embedded Linux and Kernel engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170529/f4ee98e5/attachment.sig>
