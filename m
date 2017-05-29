@@ -1,35 +1,47 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 29 May 2017 10:30:15 +0200
-Subject: [PATCH v3 1/1] ARM: dts: orange-pi-zero: add node for SPI NOR
-In-Reply-To: <20170528103026.6396-2-geomatsi@gmail.com>
-References: <20170528103026.6396-1-geomatsi@gmail.com>
- <20170528103026.6396-2-geomatsi@gmail.com>
-Message-ID: <20170529083015.64kwhnzz7wh6d36g@flea.lan>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Mon, 29 May 2017 10:32:00 +0200
+Subject: [PATCH v3 1/1] ARM64/PCI: Set root bus NUMA node on ACPI systems
+In-Reply-To: <20170524172219.5689-2-lorenzo.pieralisi@arm.com>
+References: <20170524172219.5689-1-lorenzo.pieralisi@arm.com>
+ <20170524172219.5689-2-lorenzo.pieralisi@arm.com>
+Message-ID: <20170529083200.GO16981@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 28, 2017 at 01:30:26PM +0300, Sergey Matyukevich wrote:
-> Add node for SPI NOR flash on orange-pi-zero board. Disable this node
-> by default and leave it to users to enable it if their board has
-> SPI NOR flash chip populated.
+On 24.05.17 18:22:19, Lorenzo Pieralisi wrote:
+> PCI core requires the NUMA node for the struct pci_host_bridge.dev to
+> be set by using the pcibus_to_node(struct pci_bus*) API, that on ARM64
+> systems relies on the struct pci_host_bridge->bus.dev NUMA node.
 > 
-> SPI NOR flash was optional in the first production batch in Dec 2016.
-> In later batches flash chip was pre-populated. However there should
-> be quite a few boards around which do not have flash chip.
+> The struct pci_host_bridge.dev NUMA node is then propagated through
+> the PCI device hierarchy as PCI devices (and bridges) are enumerated
+> under it.
 > 
-> Signed-off-by: Sergey Matyukevich <geomatsi@gmail.com>
+> Therefore, in order to set-up the PCI NUMA hierarchy appropriately, the
+> struct pci_host_bridge->bus.dev NUMA node must be set before core
+> code calls pcibus_to_node(struct pci_bus*) on it so that PCI core can
+> retrieve the NUMA node for the struct pci_host_bridge.dev device and can
+> propagate it through the PCI bus tree.
+> 
+> On ARM64 ACPI based systems the struct pci_host_bridge->bus.dev NUMA
+> node can be set-up in pcibios_root_bridge_prepare() by parsing the root
+> bridge ACPI device firmware binding.
+> 
+> Add code to the pcibios_root_bridge_prepare() that, when booting with
+> ACPI, parse the root bridge ACPI device companion NUMA binding and set
+> the corresponding struct pci_host_bridge->bus.dev NUMA node
+> appropriately.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
 
-Merged, thanks!
-Maxime
+Looks good.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170529/bee06885/attachment-0001.sig>
+Reviewed-by: Robert Richter <rrichter@cavium.com>
+Tested-by: Robert Richter <rrichter@cavium.com>
+
+Thanks,
+
+-Robert
