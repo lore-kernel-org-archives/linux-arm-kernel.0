@@ -1,55 +1,30 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Mon, 29 May 2017 08:49:42 +0530
-Subject: [PATCH v3 0/4] Add support for ThunderX2 pmu events using json
- files
-In-Reply-To: <1494923619-18687-1-git-send-email-ganapatrao.kulkarni@cavium.com>
-References: <1494923619-18687-1-git-send-email-ganapatrao.kulkarni@cavium.com>
-Message-ID: <CAFpQJXXRiUnGCkmbdDySEknGfSdaR40xdUY8F+hvwegeH5P5-A@mail.gmail.com>
+From: andi.shyti@samsung.com (Andi Shyti)
+Date: Mon, 29 May 2017 12:59:25 +0900
+Subject: [PATCH] spi: add null check before pointer dereference
+In-Reply-To: <20170523002507.GA16670@embeddedgus>
+References: <CGME20170523002511epcas4p3b7737552432363b089e4a9018e43f6f5@epcas4p3.samsung.com>
+ <20170523002507.GA16670@embeddedgus>
+Message-ID: <20170529035925.oibpv254lyrdzoba@gangnam.samsung>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any further review comments on this patch series?
-can it go in 4.13?
+Hi Gustavo,
 
-On Tue, May 16, 2017 at 2:03 PM, Ganapatrao Kulkarni
-<ganapatrao.kulkarni@cavium.com> wrote:
-> Extending json/jevent framework for parsing arm64 event files.
-> Adding jevents for ThunderX2 implementation defined PMU events.
->
-> v3:
->    - Addressed comments from Will Deacon and Jayachandran C.
->    - Rebased to 4.12-rc1
->
-> v2:
->    - Updated as per Mark Rutland's suggestions.
->    - Added provision for get_cpuid_str to get cpu id string
->      from associated cpus of pmu core device.
->
-> v1: Initial patchset.
->
-> Ganapatrao Kulkarni (4):
->   perf utils: passing pmu as a parameter to function get_cpuid_str
->   perf tools arm64: Add support for get_cpuid_str function.
->   perf utils: Add helper function is_pmu_core to detect PMU CORE devices
->   perf vendor events arm64: Add ThunderX2 implementation defined pmu
->     core events
->
->  tools/perf/arch/arm64/util/Build                   |  1 +
->  tools/perf/arch/arm64/util/header.c                | 59 ++++++++++++++++++++
->  tools/perf/arch/powerpc/util/header.c              |  2 +-
->  tools/perf/arch/x86/util/header.c                  |  2 +-
->  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
->  .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
->  tools/perf/util/header.h                           |  3 +-
->  tools/perf/util/pmu.c                              | 53 +++++++++++++++---
->  8 files changed, 186 insertions(+), 11 deletions(-)
->  create mode 100644 tools/perf/arch/arm64/util/header.c
->  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
->  create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
->
-> --
-> 1.8.1.4
->
+>  	desc = dmaengine_prep_slave_sg(dma->ch, sgt->sgl, sgt->nents,
+>  				       dma->direction, DMA_PREP_INTERRUPT);
+>  
+> +	if (!desc) {
+> +		dev_err(&sdd->master->dev,
+> +			"%s:dmaengine_prep_slave_sg Failed\n", __func__);
+> +		return;
+> +	}
+> +
 
-thanks
-Ganapat
+I'm sorry, I would nack this patch for now. There was a smilar I
+sent before, but, as Krzysztof said, this needs more testing and
+a proper solution.
+
+That's anyway in my todo list.
+
+Thanks,
+Andi
