@@ -1,39 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 May 2017 15:01:14 +0200
-Subject: [PATCH] xen: avoid type warning in xchg_xen_ulong
-Message-ID: <20170529130125.307182-1-arnd@arndb.de>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Mon, 29 May 2017 21:01:59 +0800
+Subject: [linux-sunxi] [PATCH 1/2] ARM: sun8i: v3s: add device nodes for
+ DE2 display pipeline
+In-Reply-To: <20170529085939.zstja3pymq77ubjq@flea.lan>
+References: <20170524111724.28431-1-icenowy@aosc.io>
+ <CAGb2v65bZ+VJYwcP24ipQ+4kuY28Babt-Cpm7uscjmWpcoeJ9g@mail.gmail.com>
+ <5FF9B3F8-01F6-4B17-958C-9A4245199716@aosc.io>
+ <CAGb2v66UG7nS=3zj=TWGY-BG62tsvSpxucKHT35g=4KGcS8kRA@mail.gmail.com>
+ <1B75138F-B045-4E60-BE92-B9AA343CBB1D@aosc.io>
+ <20170529085939.zstja3pymq77ubjq@flea.lan>
+Message-ID: <03812a93c93bbada77de864b4c5dc0af@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The improved type-checking version of container_of() triggers a warning for
-xchg_xen_ulong, pointing out that 'xen_ulong_t' is unsigned, but atomic64_t
-contains a signed value:
+? 2017-05-29 16:59?Maxime Ripard ???
+> On Thu, May 25, 2017 at 10:28:24PM +0800, Icenowy Zheng wrote:
+>> >>>> +                       compatible = "allwinner,sun8i-v3s-de2-mixer";
+>> >>>> +                       reg = <0x01100000 0x100000>;
+>> >>>
+>> >>>The display engine also has an interrupt. Please list it
+>> >>
+>> >> It's a overall interrupt for DE2, not mixer interrupt.
+>> >>
+>> >> I will add it after we have proper interrupt chaining facility
+>> >> for DE2.
+>> >>
+>> >> It cannot fit here in mixer node.
+>> >
+>> > Could you elaborate? If it is just shared, then listing it several
+>> > times is OK. If the interrupt registers are not in this address
+>> > space, then
+>> 
+>> The interrupt dealing code is still not so clear, and totally not
+>> present in BSP DE2 code (the BSP just didn't use the interrupt).
+>> 
+>> We doesn't even know where the interrupt register is, and we cannot
+>> promise it's not broken (as their is even no application of it in 
+>> BSP).
+> 
+> Whether it's broken or not is out of the question here. Adding it
+> later would either break the DT compatibility, or introduce a crippled
+> driver for users that do not have a recent enough DT. None of the two
+> are really acceptable.
+> 
+> Especially if your plan is to add support for these.
 
-drivers/xen/events/events_2l.c: In function 'evtchn_2l_handle_events':
-arch/x86/include/asm/cmpxchg.h:87:21: error: 'pending_words' is used uninitialized in this function [-Werror=uninitialized]
+I have no such plan -- even the BSP driver doesn't use the IRQ at all.
 
-This adds a cast to work around the warning
-
-Cc: Ian Abbott <abbotti@mev.co.uk>
-Fixes: 85323a991d40 ("xen: arm: mandate EABI and use generic atomic operations.")
-Fixes: daa2ac80834d ("kernel.h: handle pointers to arrays better in container_of()")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/include/asm/xen/events.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/xen/events.h b/arch/arm/include/asm/xen/events.h
-index 71e473d05fcc..620dc75362e5 100644
---- a/arch/arm/include/asm/xen/events.h
-+++ b/arch/arm/include/asm/xen/events.h
-@@ -16,7 +16,7 @@ static inline int xen_irqs_disabled(struct pt_regs *regs)
- 	return raw_irqs_disabled_flags(regs->ARM_cpsr);
- }
- 
--#define xchg_xen_ulong(ptr, val) atomic64_xchg(container_of((ptr),	\
-+#define xchg_xen_ulong(ptr, val) atomic64_xchg(container_of((long long*)(ptr),\
- 							    atomic64_t,	\
- 							    counter), (val))
- 
--- 
-2.9.0
+> 
+> Maxime
+> 
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
