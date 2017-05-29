@@ -1,10 +1,10 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 29 May 2017 18:03:27 +0200
-Subject: [PATCH 01/15] iio: adc: stm32: use devm_of_platform_populate()
-In-Reply-To: <1496072763-31209-2-git-send-email-benjamin.gaignard@linaro.org>
+Date: Mon, 29 May 2017 18:10:01 +0200
+Subject: [PATCH 02/15] iio: dac: stm32: use devm_of_platform_populate()
+In-Reply-To: <1496072763-31209-3-git-send-email-benjamin.gaignard@linaro.org>
 References: <1496072763-31209-1-git-send-email-benjamin.gaignard@linaro.org>
- <1496072763-31209-2-git-send-email-benjamin.gaignard@linaro.org>
-Message-ID: <a9f57d31-b016-d88c-ff87-6b218226b00f@st.com>
+ <1496072763-31209-3-git-send-email-benjamin.gaignard@linaro.org>
+Message-ID: <a8e43640-1edd-6e75-c382-a364f9a2e9fd@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,46 +23,37 @@ On 05/29/2017 05:45 PM, Benjamin Gaignard wrote:
 > CC: linux-arm-kernel at lists.infradead.org
 > CC: linux-kernel at vger.kernel.org
 > ---
->  drivers/iio/adc/stm32-adc-core.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
+>  drivers/iio/dac/stm32-dac-core.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 > 
-> diff --git a/drivers/iio/adc/stm32-adc-core.c b/drivers/iio/adc/stm32-adc-core.c
-> index 22b7c93..46e41dc5 100644
-> --- a/drivers/iio/adc/stm32-adc-core.c
-> +++ b/drivers/iio/adc/stm32-adc-core.c
-> @@ -186,7 +186,6 @@ static void stm32_adc_irq_remove(struct platform_device *pdev,
->  static int stm32_adc_probe(struct platform_device *pdev)
->  {
->  	struct stm32_adc_priv *priv;
-> -	struct device_node *np = pdev->dev.of_node;
->  	struct resource *res;
->  	int ret;
->  
-> @@ -249,7 +248,7 @@ static int stm32_adc_probe(struct platform_device *pdev)
+> diff --git a/drivers/iio/dac/stm32-dac-core.c b/drivers/iio/dac/stm32-dac-core.c
+> index 75e4878..9c42537 100644
+> --- a/drivers/iio/dac/stm32-dac-core.c
+> +++ b/drivers/iio/dac/stm32-dac-core.c
+> @@ -130,7 +130,7 @@ static int stm32_dac_probe(struct platform_device *pdev)
 >  
 >  	platform_set_drvdata(pdev, &priv->common);
 >  
-> -	ret = of_platform_populate(np, NULL, NULL, &pdev->dev);
+> -	ret = of_platform_populate(pdev->dev.of_node, NULL, NULL, dev);
 > +	ret = devm_of_platform_populate(&pdev->dev);
 >  	if (ret < 0) {
->  		dev_err(&pdev->dev, "failed to populate DT children\n");
->  		goto err_irq_remove;
-> @@ -274,7 +273,6 @@ static int stm32_adc_remove(struct platform_device *pdev)
->  	struct stm32_adc_common *common = platform_get_drvdata(pdev);
->  	struct stm32_adc_priv *priv = to_stm32_adc_priv(common);
+>  		dev_err(dev, "failed to populate DT children\n");
+>  		goto err_pclk;
+> @@ -151,7 +151,6 @@ static int stm32_dac_remove(struct platform_device *pdev)
+>  	struct stm32_dac_common *common = platform_get_drvdata(pdev);
+>  	struct stm32_dac_priv *priv = to_stm32_dac_priv(common);
 >  
 > -	of_platform_depopulate(&pdev->dev);
-
 Hi Benjamin,
 
-This is going to change order of sub devices removal. It may end-up with
-bellow resources being removed while sub-device still needs them.
+Same as patch 1, This is going to change order of sub devices removal.
+It may end-up with bellow resources being removed while sub-device still
+needs them.
 Not sure this is a good candidate for such a change.
 
 Best Regards,
 Fabrice
-
->  	stm32_adc_irq_remove(pdev, priv);
->  	clk_disable_unprepare(priv->aclk);
+>  	clk_disable_unprepare(priv->pclk);
 >  	regulator_disable(priv->vref);
+>  
 > 
