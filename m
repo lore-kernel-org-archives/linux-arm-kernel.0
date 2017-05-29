@@ -1,57 +1,52 @@
 From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Mon, 29 May 2017 17:45:49 +0200
-Subject: [PATCH 01/15] iio: adc: stm32: use devm_of_platform_populate()
+Date: Mon, 29 May 2017 17:45:53 +0200
+Subject: [PATCH 05/15] mfd: stm32-timers: use devm_of_platform_populate
 In-Reply-To: <1496072763-31209-1-git-send-email-benjamin.gaignard@linaro.org>
 References: <1496072763-31209-1-git-send-email-benjamin.gaignard@linaro.org>
-Message-ID: <1496072763-31209-2-git-send-email-benjamin.gaignard@linaro.org>
+Message-ID: <1496072763-31209-6-git-send-email-benjamin.gaignard@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use devm_of_platform_populate() instead of of_platform_populate and
-of_platform_depopulate to simplify driver code
+Use devm_of_platform_populate() instead of of_platform_populate()
+and suppress stm32_timers_remove() which become useless.
 
 Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
 
-CC: Jonathan Cameron <jic23@kernel.org>
-CC: Hartmut Knaack <knaack.h@gmx.de>
-CC: Lars-Peter Clausen <lars@metafoo.de>
+CC: Lee Jones <lee.jones@linaro.org>
 CC: Alexandre Torgue <alexandre.torgue@st.com>
-CC: Fabrice Gasnier <fabrice.gasnier@st.com>
-CC: linux-iio at vger.kernel.org
 CC: linux-arm-kernel at lists.infradead.org
 CC: linux-kernel at vger.kernel.org
 ---
- drivers/iio/adc/stm32-adc-core.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ drivers/mfd/stm32-timers.c | 10 +---------
+ 1 file changed, 1 insertion(+), 9 deletions(-)
 
-diff --git a/drivers/iio/adc/stm32-adc-core.c b/drivers/iio/adc/stm32-adc-core.c
-index 22b7c93..46e41dc5 100644
---- a/drivers/iio/adc/stm32-adc-core.c
-+++ b/drivers/iio/adc/stm32-adc-core.c
-@@ -186,7 +186,6 @@ static void stm32_adc_irq_remove(struct platform_device *pdev,
- static int stm32_adc_probe(struct platform_device *pdev)
- {
- 	struct stm32_adc_priv *priv;
--	struct device_node *np = pdev->dev.of_node;
- 	struct resource *res;
- 	int ret;
+diff --git a/drivers/mfd/stm32-timers.c b/drivers/mfd/stm32-timers.c
+index 2182f00..a6675a4 100644
+--- a/drivers/mfd/stm32-timers.c
++++ b/drivers/mfd/stm32-timers.c
+@@ -58,14 +58,7 @@ static int stm32_timers_probe(struct platform_device *pdev)
  
-@@ -249,7 +248,7 @@ static int stm32_adc_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, ddata);
  
- 	platform_set_drvdata(pdev, &priv->common);
- 
--	ret = of_platform_populate(np, NULL, NULL, &pdev->dev);
-+	ret = devm_of_platform_populate(&pdev->dev);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "failed to populate DT children\n");
- 		goto err_irq_remove;
-@@ -274,7 +273,6 @@ static int stm32_adc_remove(struct platform_device *pdev)
- 	struct stm32_adc_common *common = platform_get_drvdata(pdev);
- 	struct stm32_adc_priv *priv = to_stm32_adc_priv(common);
- 
+-	return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
+-}
+-
+-static int stm32_timers_remove(struct platform_device *pdev)
+-{
 -	of_platform_depopulate(&pdev->dev);
- 	stm32_adc_irq_remove(pdev, priv);
- 	clk_disable_unprepare(priv->aclk);
- 	regulator_disable(priv->vref);
+-
+-	return 0;
++	return devm_of_platform_populate(&pdev->dev);
+ }
+ 
+ static const struct of_device_id stm32_timers_of_match[] = {
+@@ -76,7 +69,6 @@ static int stm32_timers_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver stm32_timers_driver = {
+ 	.probe = stm32_timers_probe,
+-	.remove = stm32_timers_remove,
+ 	.driver	= {
+ 		.name = "stm32-timers",
+ 		.of_match_table = stm32_timers_of_match,
 -- 
 1.9.1
