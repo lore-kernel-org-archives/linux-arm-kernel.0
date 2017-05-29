@@ -1,29 +1,36 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 29 May 2017 08:51:57 +0200
-Subject: [PATCH 0/6] ARM: sunxi: Enable AXP PMIC power supplies
-In-Reply-To: <20170525073138.20907-1-wens@csie.org>
-References: <20170525073138.20907-1-wens@csie.org>
-Message-ID: <20170529065157.2p3pmo3pb4u3fpgr@flea.home>
+Date: Mon, 29 May 2017 08:59:42 +0200
+Subject: [PATCH 1/3] ARM: sun8i: v3s: add PWM device node
+In-Reply-To: <20170524121320.4171-1-icenowy@aosc.io>
+References: <20170524121320.4171-1-icenowy@aosc.io>
+Message-ID: <20170529065942.gho4kjgzsv4lfnda@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 25, 2017 at 03:31:32PM +0800, Chen-Yu Tsai wrote:
-> Hi Maxime,
-> 
-> This series enables the power supplies for the AXP PMICs on boards
-> that I currently have and am actively testing.
-> 
-> The first patch re-orders the node references for the Cubieboard 2
-> dts, to maintain alphabetical order.
-> 
-> Patches 2 through 5 enable the ACIN power supply on various boards.
-> 
-> Patch 6 ties the USB/VBUS power supply of the PMIC to the USB PHY.
-> The PHY should have all available methods of VBUS detection configured.
-> The Cubietruck already has the power supplies enabled, but the USB
-> power supply was not configured to be used for VBUS detection.
+Hi,
 
-Applied all 6, thanks!
+On Wed, May 24, 2017 at 08:13:18PM +0800, Icenowy Zheng wrote:
+> As we have already the support for the PWM controller on V3s SoC, add
+> its device node in the SoC's DTSI file.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  arch/arm/boot/dts/sun8i-v3s.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-v3s.dtsi b/arch/arm/boot/dts/sun8i-v3s.dtsi
+> index a49ebef53c91..bb080c4bd22c 100644
+> --- a/arch/arm/boot/dts/sun8i-v3s.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-v3s.dtsi
+> @@ -255,6 +255,14 @@
+>  			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
+>  		};
+>  
+> +		pwm: pwm at 1c21400 {
+> +			compatible = "allwinner,sun7i-a20-pwm";
+
+You need to have a v3s compatible here.
+
 Maxime
 
 -- 
@@ -36,4 +43,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170529/904518e0/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170529/9db4ece3/attachment.sig>
