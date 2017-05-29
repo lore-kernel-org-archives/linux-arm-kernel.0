@@ -1,29 +1,82 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 29 May 2017 11:17:09 +0200
-Subject: [PATCH 5/5] pinctrl: meson-gxl: Add Ethernet PHY LEDS pins
-In-Reply-To: <CACRpkdY6rwx=Z2YZRA=DUjvRDe6cCc7cyFrdb3JbiisHVK+kCQ@mail.gmail.com>
-References: <1495614042-2676-1-git-send-email-narmstrong@baylibre.com>
- <1495614042-2676-6-git-send-email-narmstrong@baylibre.com>
- <CACRpkdY6rwx=Z2YZRA=DUjvRDe6cCc7cyFrdb3JbiisHVK+kCQ@mail.gmail.com>
-Message-ID: <a0f0bf3e-a23c-eec2-03a0-a6c35125028f@baylibre.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Mon, 29 May 2017 18:15:45 +0900
+Subject: [PATCH 4/4] arm64: dts: uniphier: add nodes of thermal monitor and
+ thermal zone for LD20
+In-Reply-To: <1496049345-14649-1-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1496049345-14649-1-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <1496049345-14649-5-git-send-email-hayashi.kunihiko@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2017 11:01 AM, Linus Walleij wrote:
-> On Wed, May 24, 2017 at 10:20 AM, Neil Armstrong
-> <narmstrong@baylibre.com> wrote:
-> 
->> The Amlogic Meson GXL SoCs embeds an 10/100 Ethernet PHY, this patchs enables
->> the Link and Activity LEDs signals.
->>
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> 
-> Patch applied with Jerome's review tag.
-> 
-> Yours,
-> Linus Walleij
-> 
+Add nodes of thermal monitor and thermal zone for UniPhier LD20 SoC.
+The thermal monitor is included in sysctrl.
 
-Thanks Linus !
+Furthermore, since SoC installed in the reference board doesn't have a
+calibrated value of thermal monitor, this patch gives the default value
+for LD20 Reference board via device-tree property.
 
-Neil
+Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+---
+ .../arm64/boot/dts/socionext/uniphier-ld20-ref.dts | 25 ++++++++++++++++++++++
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi   |  6 ++++++
+ 2 files changed, 31 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts b/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
+index 609162a..79e1363 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
+@@ -73,6 +73,27 @@
+ 		i2c4 = &i2c4;
+ 		i2c5 = &i2c5;
+ 	};
++
++	thermal-zones {
++		cpu_thermal {
++			polling-delay-passive = <250>;	/* 250ms */
++			polling-delay = <1000>;		/* 1000ms */
++			thermal-sensors = <&pvtctl>;
++
++			trips {
++				cpu_crit: cpu_crit {
++					temperature = <95000>;	/* 95C */
++					hysteresis = <2000>;
++					type = "critical";
++				};
++				cpu_alert: cpu_alert {
++					temperature = <85000>;	/* 85C */
++					hysteresis = <2000>;
++					type = "passive";
++				};
++			};
++		};
++	};
+ };
+ 
+ &ethsc {
+@@ -86,3 +107,7 @@
+ &i2c0 {
+ 	status = "okay";
+ };
++
++&pvtctl {
++	socionext,tmod-calibration = <0x0f22 0x68ee>;
++};
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+index a6b3a70..effa2e3 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+@@ -417,6 +417,12 @@
+ 				compatible = "socionext,uniphier-ld20-reset";
+ 				#reset-cells = <1>;
+ 			};
++
++			pvtctl: pvtctl {
++				compatible = "socionext,uniphier-ld20-thermal";
++				interrupts = <0 3 1>;
++				#thermal-sensor-cells = <0>;
++			};
+ 		};
+ 	};
+ };
+-- 
+2.7.4
