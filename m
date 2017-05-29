@@ -1,53 +1,110 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 29 May 2017 17:30:26 +0200
-Subject: [PATCH v4 1/2] dt-bindings: i2c: Add Mediatek MT2701 i2c binding
-In-Reply-To: <1495784107-6711-2-git-send-email-jun.gao@mediatek.com>
-References: <1495784107-6711-1-git-send-email-jun.gao@mediatek.com>
- <1495784107-6711-2-git-send-email-jun.gao@mediatek.com>
-Message-ID: <1d073e6a-e275-24e1-7954-f1af913bd03b@gmail.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Mon, 29 May 2017 18:36:37 +0300
+Subject: [PATCH v7 00/34] i.MX Media Driver
+In-Reply-To: <dd82968a-4c0b-12a4-f43b-7e63a255812d@xs4all.nl>
+References: <1495672189-29164-1-git-send-email-steve_longerbeam@mentor.com>
+ <dd82968a-4c0b-12a4-f43b-7e63a255812d@xs4all.nl>
+Message-ID: <20170529153637.GH29527@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Hans,
 
-
-On 26/05/17 09:35, Jun Gao wrote:
-> From: Jun Gao <jun.gao@mediatek.com>
+On Mon, May 29, 2017 at 03:46:08PM +0200, Hans Verkuil wrote:
+> Hi Steve,
 > 
-> Add MT2701 i2c binding to i2c-mt6577.txt and there is no need to
-> modify i2c driver.
+> On 05/25/2017 02:29 AM, Steve Longerbeam wrote:
+> >In version 7:
+> >
+> >- video-mux: switched to Philipp's latest video-mux driver and updated
+> >   bindings docs, that makes use of the mmio-mux framework.
+> >
+> >- mmio-mux: includes Philipp's temporary patch that adds mmio-mux support
+> >   to video-mux driver, until mux framework is merged.
+> >
+> >- mmio-mux: updates to device tree from Philipp that define the i.MX6 mux
+> >   devices and modifies the video-mux device to become a consumer of the
+> >   video mmio-mux.
+> >
+> >- minor updates to Documentation/media/v4l-drivers/imx.rst.
+> >
+> >- ov5640: do nothing if entity stream count is greater than 1 in
+> >   ov5640_s_stream().
+> >
+> >- Previous versions of this driver had not tested the ability to enable
+> >   multiple independent streams, for instance enabling multiple output
+> >   pads from the imx6-mipi-csi2 subdevice, or enabling both prpenc and
+> >   prpvf outputs. Marek Vasut tested this support and reported issues
+> >   with it.
+> >
+> >   v4l2_pipeline_inherit_controls() used the media graph walk APIs, but
+> >   that walks both sink and source pads, so if there are multiple paths
+> >   enabled to video capture devices, controls would be added to the wrong
+> >   video capture device, and no controls added to the other enabled
+> >   capture devices.
+> >
+> >   These issues have been fixed. Control inheritance works correctly now
+> >   even with multiple enabled capture paths, and (for example)
+> >   simultaneous capture from prpenc and prpvf works also, and each with
+> >   independent scaling, CSC, and controls. For example prpenc can be
+> >   capturing with a 90 degree rotation, while prpvf is capturing with
+> >   vertical flip.
+> >
+> >   So the v4l2_pipeline_inherit_controls() patch has been dropped. The
+> >   new version of control inheritance could be made generically available,
+> >   but it would be more involved to incorporate it into v4l2-core.
+> >
+> >- A new function imx_media_fill_default_mbus_fields() is added to setup
+> >   colorimetry at sink pads, and these are propagated to source pads.
+> >
+> >- Ensure that the current sink and source rectangles meet alignment
+> >   restrictions before applying a new rotation control setting in
+> >   prp-enc/vf subdevices.
+> >
+> >- Chain the s_stream() subdev calls instead of implementing a custom
+> >   stream on/off function that attempts to call a fixed set of subdevices
+> >   in a pipeline in the correct order. This also simplifies imx6-mipi-csi2
+> >   subdevice, since the correct MIPI CSI-2 startup sequence can be
+> >   enforced completely in s_stream(), and s_power() is no longer
+> >   required. This also paves the way for more arbitrary OF graphs
+> >   external to the i.MX6.
+> >
+> >- Converted the v4l2_subdev and media_entity ops structures to const.
 > 
-> Signed-off-by: Jun Gao <jun.gao@mediatek.com>
-> ---
->   Documentation/devicetree/bindings/i2c/i2c-mt6577.txt | 11 ++++++-----
->   1 file changed, 6 insertions(+), 5 deletions(-)
+> What is the status as of v7?
 > 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
-> index 0ce6fa3..52f2023 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
-> @@ -4,11 +4,12 @@ The Mediatek's I2C controller is used to interface with I2C devices.
->   
->   Required properties:
->     - compatible: value should be either of the following.
-> -      (a) "mediatek,mt6577-i2c", for i2c compatible with mt6577 i2c.
-> -      (b) "mediatek,mt6589-i2c", for i2c compatible with mt6589 i2c.
-> -      (c) "mediatek,mt8127-i2c", for i2c compatible with mt8127 i2c.
-> -      (d) "mediatek,mt8135-i2c", for i2c compatible with mt8135 i2c.
-> -      (e) "mediatek,mt8173-i2c", for i2c compatible with mt8173 i2c.
-> +	"mediatek,mt2701-i2c", "mediatek,mt6577-i2c": for Mediatek MT2701
-
-I send a cleanup patch for the file, which fixes all the other SoCs.
-I can fold this one into it, a soon as I got a Signed-off from the DT 
-maintainers.
-
-Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
-
-> +	"mediatek,mt6577-i2c": for Mediatek MT6577
-> +	"mediatek,mt6589-i2c": for Mediatek MT6589
-> +	"mediatek,mt8127-i2c": for Mediatek MT8127
-> +	"mediatek,mt8135-i2c": for Mediatek MT8135
-> +	"mediatek,mt8173-i2c": for Mediatek MT8173
->     - reg: physical base address of the controller and dma base, length of memory
->       mapped region.
->     - interrupts: interrupt number to the cpu.
+> From what I can tell patch 2/34 needs an Ack from Rob Herring, patches
+> 4-14 are out of scope for the media subsystem, patches 20-25 and 27-34
+> are all staging (so fine to be merged from my point of view).
 > 
+> I'm not sure if patch 26 (defconfig) should be applied while the imx
+> driver is in staging. I would suggest that this patch is moved to the end
+> of the series.
+> 
+> That leaves patches 15-19. I replied to patch 15 with a comment, patches
+> 16-18 look good to me, although patches 17 and 18 should be combined to one
+> patch since patch 17 won't compile otherwise. Any idea when the multiplexer is
+> expected to be merged? (just curious)
+> 
+> I would really like to get this merged for 4.13, so did I miss anything?
+> From what I can tell it is really just an Ack for patch 2/34.
+
+The patchset re-initialises the control handler in the video node in its
+media device link_setup callback, among other things. I don't think that
+this as such should prevent including the driver in staging, but at the same
+time my concern is what kind of guarantees can we give in terms of V4L2
+framework support on things like this using the current API. I'd say "none".
+
+If there's a need for this (there should not be, as the controls are exposed
+to the user space through the sub-device nodes as the other drivers do), the
+framework APIs need to be extended.
+
+I think it'd be good to add a TODO file (such as the one in OMAP4ISS) as
+part of the patchset that would include a list of things left to do so
+they're not forgotten.
+
+-- 
+Regards,
+
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
