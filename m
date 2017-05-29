@@ -1,85 +1,49 @@
 From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Mon, 29 May 2017 17:45:48 +0200
-Subject: [PATCH 00/15] make more driver use devm_of_platform_populate()
-Message-ID: <1496072763-31209-1-git-send-email-benjamin.gaignard@linaro.org>
+Date: Mon, 29 May 2017 17:45:50 +0200
+Subject: [PATCH 02/15] iio: dac: stm32: use devm_of_platform_populate()
+In-Reply-To: <1496072763-31209-1-git-send-email-benjamin.gaignard@linaro.org>
+References: <1496072763-31209-1-git-send-email-benjamin.gaignard@linaro.org>
+Message-ID: <1496072763-31209-3-git-send-email-benjamin.gaignard@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Number of calls to of_platform_populate() aren't unbalanced by a call to
-of_platform_depopulate() that could generate issue will loading/unloading
-the drivers. Make those drivers use devm_of_platform_populate() fix the problem
-without need to add remove function.
+Use devm_of_platform_populate() instead of of_platform_populate and
+of_platform_depopulate to simplify driver code
 
-In some case replacing of_platform_populate() by devm_of_platform_populate()
-allow to delete driver remove function and save some lines of code.
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
 
-This series of patches based on v4.12-rc3 tag.
-
-CC: Alexandre Torgue <alexandre.torgue@st.com>
-CC: David Airlie <airlied@linux.ie>
-CC: Fabrice Gasnier <fabrice.gasnier@st.com>
-CC: Hartmut Knaack <knaack.h@gmx.de>
-CC: Jaroslav Kysela <perex@perex.cz>
-CC: Javier Martinez Canillas <javier@osg.samsung.com>
 CC: Jonathan Cameron <jic23@kernel.org>
-CC: Krzysztof Kozlowski <krzk@kernel.org>
-CC: Kukjin Kim <kgene@kernel.org>
-CC: Kyungmin Park <kyungmin.park@samsung.com>
+CC: Hartmut Knaack <knaack.h@gmx.de>
 CC: Lars-Peter Clausen <lars@metafoo.de>
-CC: Lee Jones <lee.jones@linaro.org>
-CC: Liam Girdwood <lgirdwood@gmail.com>
-CC: Mark Brown <broonie@kernel.org>
-CC: Mauro Carvalho Chehab <mchehab@kernel.org>
-CC: Olivier Moysan <olivier.moysan@st.com>
-CC: Rob Clark <robdclark@gmail.com>
-CC: Shawn Guo <shawnguo@kernel.org>
-CC: Sylwester Nawrocki <s.nawrocki@samsung.com>
-CC: Takashi Iwai <tiwai@suse.com>
-CC: Tony Lindgren <tony@atomide.com>
-
+CC: Alexandre Torgue <alexandre.torgue@st.com>
+CC: Fabrice Gasnier <fabrice.gasnier@st.com>
 CC: linux-iio at vger.kernel.org
 CC: linux-arm-kernel at lists.infradead.org
 CC: linux-kernel at vger.kernel.org
-CC: dri-devel at lists.freedesktop.org
-CC: linux-arm-msm at vger.kernel.org
-CC: freedreno at lists.freedesktop.org
-CC: linux-samsung-soc at vger.kernel.org
-CC: alsa-devel at alsa-project.org
-CC: linux-media at vger.kernel.org
+---
+ drivers/iio/dac/stm32-dac-core.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Benjamin Gaignard (15):
-  iio: adc: stm32: use devm_of_platform_populate()
-  iio: dac: stm32: use devm_of_platform_populate()
-  drm: zte: use devm_of_platform_populate()
-  drm: msm: use devm_of_platform_populate()
-  mfd: stm32-timers: use devm_of_platform_populate
-  mfd: atmel: use devm_of_platform_populate()
-  mfd: cros_ec: use devm_of_platform_populate()
-  mfd: exynos: use devm_of_platform_populate()
-  mfd: fsl-imx25: use devm_of_platform_populate()
-  mfd: motorola-cpcap: use devm_of_platform_populate()
-  mfd: palmas: use devm_of_platform_populate()
-  mfd: qcom-spmi-pmic: use devm_of_platform_populate()
-  mfd: smsc-ece: use devm_of_platform_populate()
-  sound: stm32: use devm_of_platform_populate()
-  media: exynos4-is: use devm_of_platform_populate()
-
- drivers/gpu/drm/msm/msm_drv.c               | 10 ++--------
- drivers/gpu/drm/zte/zx_drm_drv.c            |  2 +-
- drivers/iio/adc/stm32-adc-core.c            |  4 +---
- drivers/iio/dac/stm32-dac-core.c            |  3 +--
- drivers/media/platform/exynos4-is/fimc-is.c |  7 ++-----
- drivers/mfd/atmel-flexcom.c                 |  2 +-
- drivers/mfd/cros_ec.c                       |  2 +-
- drivers/mfd/exynos-lpass.c                  |  2 +-
- drivers/mfd/fsl-imx25-tsadc.c               |  5 +----
- drivers/mfd/motorola-cpcap.c                | 13 +------------
- drivers/mfd/palmas.c                        |  2 +-
- drivers/mfd/qcom-spmi-pmic.c                |  9 +--------
- drivers/mfd/smsc-ece1099.c                  |  3 +--
- drivers/mfd/stm32-timers.c                  | 10 +---------
- sound/soc/stm/stm32_sai.c                   | 11 +----------
- 15 files changed, 17 insertions(+), 68 deletions(-)
-
+diff --git a/drivers/iio/dac/stm32-dac-core.c b/drivers/iio/dac/stm32-dac-core.c
+index 75e4878..9c42537 100644
+--- a/drivers/iio/dac/stm32-dac-core.c
++++ b/drivers/iio/dac/stm32-dac-core.c
+@@ -130,7 +130,7 @@ static int stm32_dac_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, &priv->common);
+ 
+-	ret = of_platform_populate(pdev->dev.of_node, NULL, NULL, dev);
++	ret = devm_of_platform_populate(&pdev->dev);
+ 	if (ret < 0) {
+ 		dev_err(dev, "failed to populate DT children\n");
+ 		goto err_pclk;
+@@ -151,7 +151,6 @@ static int stm32_dac_remove(struct platform_device *pdev)
+ 	struct stm32_dac_common *common = platform_get_drvdata(pdev);
+ 	struct stm32_dac_priv *priv = to_stm32_dac_priv(common);
+ 
+-	of_platform_depopulate(&pdev->dev);
+ 	clk_disable_unprepare(priv->pclk);
+ 	regulator_disable(priv->vref);
+ 
 -- 
 1.9.1
