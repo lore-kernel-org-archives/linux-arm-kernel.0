@@ -1,44 +1,72 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 29 May 2017 16:42:06 +0200
-Subject: [RESEND PATCH 1/2] Documentation: rockchip-dw-mshc: add
- description for rk3328
-In-Reply-To: <1495586089-215607-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1495586089-215607-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <CAPDyKFr-oAf05ejoLTLeooSZY7QiGKVjSkVm80DAxpJQKSTdxA@mail.gmail.com>
+Date: Mon, 29 May 2017 16:42:45 +0200
+Subject: [PATCH v2] mmc: bcm2835: fix potential null pointer dereferences
+In-Reply-To: <20170525170455.GA6904@embeddedgus>
+References: <20170525114638.Horde.wq7PLKWCg8CwLM5WiWj1Obm@gator4166.hostgator.com>
+ <20170525170455.GA6904@embeddedgus>
+Message-ID: <CAPDyKFo2+YL=nk=SmTKG1gPwVPWaOTth++1WUqRXL2+meZ72pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 May 2017 at 02:34, Shawn Lin <shawn.lin@rock-chips.com> wrote:
-> Add "rockchip,rk3328-dw-mshc", "rockchip,rk3288-dw-mshc" for
-> dwmmc on rk3328 platform.
+On 25 May 2017 at 19:04, Gustavo A. R. Silva <garsilva@embeddedor.com> wrote:
+> Null check at line 1165: if (mrq->cmd), implies that mrq->cmd might
+> be NULL.
+> Add null checks before dereferencing pointer mrq->cmd in order to avoid
+> any potential NULL pointer dereference.
 >
-> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+> Addresses-Coverity-ID: 1408740
+> Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
+> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
 
 Thanks, applied for next!
-
-Patch2 is for Heiko/arm_soc.
 
 Kind regards
 Uffe
 
 > ---
+> Changes in v2:
+>  Change subject to make it clear the patch is bcm2835 related.
 >
->  Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt | 1 +
->  1 file changed, 1 insertion(+)
+>  drivers/mmc/host/bcm2835.c | 12 +++++++++---
+>  1 file changed, 9 insertions(+), 3 deletions(-)
 >
-> diff --git a/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
-> index 520d61d..18e33cb 100644
-> --- a/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
-> @@ -15,6 +15,7 @@ Required Properties:
->         - "rockchip,rk3288-dw-mshc": for Rockchip RK3288
->         - "rockchip,rv1108-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RV1108
->         - "rockchip,rk3036-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RK3036
-> +       - "rockchip,rk3328-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RK3328
->         - "rockchip,rk3368-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RK3368
->         - "rockchip,rk3399-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RK3399
->
+> diff --git a/drivers/mmc/host/bcm2835.c b/drivers/mmc/host/bcm2835.c
+> index 1f343a4..abba9a2 100644
+> --- a/drivers/mmc/host/bcm2835.c
+> +++ b/drivers/mmc/host/bcm2835.c
+> @@ -1172,7 +1172,10 @@ static void bcm2835_request(struct mmc_host *mmc, struct mmc_request *mrq)
+>         if (mrq->data && !is_power_of_2(mrq->data->blksz)) {
+>                 dev_err(dev, "unsupported block size (%d bytes)\n",
+>                         mrq->data->blksz);
+> -               mrq->cmd->error = -EINVAL;
+> +
+> +               if (mrq->cmd)
+> +                       mrq->cmd->error = -EINVAL;
+> +
+>                 mmc_request_done(mmc, mrq);
+>                 return;
+>         }
+> @@ -1194,7 +1197,10 @@ static void bcm2835_request(struct mmc_host *mmc, struct mmc_request *mrq)
+>                         readl(host->ioaddr + SDCMD) & SDCMD_CMD_MASK,
+>                         edm);
+>                 bcm2835_dumpregs(host);
+> -               mrq->cmd->error = -EILSEQ;
+> +
+> +               if (mrq->cmd)
+> +                       mrq->cmd->error = -EILSEQ;
+> +
+>                 bcm2835_finish_request(host);
+>                 mutex_unlock(&host->mutex);
+>                 return;
+> @@ -1207,7 +1213,7 @@ static void bcm2835_request(struct mmc_host *mmc, struct mmc_request *mrq)
+>                         if (!host->use_busy)
+>                                 bcm2835_finish_command(host);
+>                 }
+> -       } else if (bcm2835_send_command(host, mrq->cmd)) {
+> +       } else if (mrq->cmd && bcm2835_send_command(host, mrq->cmd)) {
+>                 if (host->data && host->dma_desc) {
+>                         /* DMA transfer starts now, PIO starts after irq */
+>                         bcm2835_start_dma(host);
 > --
-> 1.9.1
->
+> 2.5.0
 >
