@@ -1,38 +1,102 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 30 May 2017 03:02:20 +0800
-Subject: [PATCH v1 4/5] regulator: pfuze100-regulator: provide
- pm_power_off_prepare handler
-In-Reply-To: <20170529170924.25488-4-o.rempel@pengutronix.de>
-Message-ID: <201705300223.IOrAMKo4%fengguang.wu@intel.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 29 May 2017 16:00:58 -0300
+Subject: [PATCH 1/3] ARM: dts: imx7d-sdb: Adjust the regulator nodes
+Message-ID: <1496084460-20910-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oleksij,
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.12-rc3 next-20170529]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+It is not recommended to place the regulator nodes inside 'simple-bus',
+so adjust them accordingly.
 
-url:    https://github.com/0day-ci/linux/commits/Oleksij-Rempel/ARM-imx6q-provide-documentation-for-new-fsl-pmic_stby_poweroff-property/20170530-011619
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: i386-randconfig-a0-05272032 (attached as .config)
-compiler: gcc-5 (Debian 5.4.1-2) 5.4.1 20160904
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+The motivation for rearranging this is to make it easier to add new
+regulator nodes in the future.
 
-All errors (new ones prefixed by >>):
-
->> ERROR: "lookup_symbol_name" [drivers/regulator/pfuze100-regulator.ko] undefined!
->> ERROR: "pm_power_off_prepare" [drivers/regulator/pfuze100-regulator.ko] undefined!
-
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 21584 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170530/4fc18fda/attachment-0001.gz>
+ arch/arm/boot/dts/imx7d-sdb.dts | 66 +++++++++++++++++------------------------
+ 1 file changed, 28 insertions(+), 38 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+index 77c400f..38944ca 100644
+--- a/arch/arm/boot/dts/imx7d-sdb.dts
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -73,47 +73,37 @@
+ 		};
+ 	};
+ 
+-	regulators {
+-		compatible = "simple-bus";
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		reg_usb_otg1_vbus: regulator at 0 {
+-			compatible = "regulator-fixed";
+-			reg = <0>;
+-			regulator-name = "usb_otg1_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-			gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
+-			enable-active-high;
+-		};
++	reg_usb_otg1_vbus: regulator-usb-otg1-vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb_otg1_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
+ 
+-		reg_usb_otg2_vbus: regulator at 1 {
+-			compatible = "regulator-fixed";
+-			reg = <1>;
+-			regulator-name = "usb_otg2_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-			gpio = <&gpio4 7 GPIO_ACTIVE_HIGH>;
+-			enable-active-high;
+-		};
++	reg_usb_otg2_vbus: regulator-usb-otg1-vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb_otg2_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio4 7 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
+ 
+-		reg_can2_3v3: regulator at 2 {
+-			compatible = "regulator-fixed";
+-			reg = <2>;
+-			regulator-name = "can2-3v3";
+-			regulator-min-microvolt = <3300000>;
+-			regulator-max-microvolt = <3300000>;
+-			gpio = <&gpio1 7 GPIO_ACTIVE_LOW>;
+-		};
++	reg_can2_3v3: regulator-can2-3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "can2-3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio1 7 GPIO_ACTIVE_LOW>;
++	};
+ 
+-		reg_vref_1v8: regulator at 3 {
+-			compatible = "regulator-fixed";
+-			reg = <3>;
+-			regulator-name = "vref-1v8";
+-			regulator-min-microvolt = <1800000>;
+-			regulator-max-microvolt = <1800000>;
+-		};
++	reg_vref_1v8: regulator-vref-1v8 {
++		compatible = "regulator-fixed";
++		regulator-name = "vref-1v8";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
+ 	};
+ };
+ 
+-- 
+2.7.4
