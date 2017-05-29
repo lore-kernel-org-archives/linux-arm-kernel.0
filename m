@@ -1,89 +1,39 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Mon, 29 May 2017 10:36:42 +0530
-Subject: [PATCH v6 3/6] ACPI/IORT: Ignore all errors except EPROBE_DEFER
-In-Reply-To: <1564836.5iBbgoacpH@aspire.rjw.lan>
-References: <1495892865-9506-1-git-send-email-sricharan@codeaurora.org>
- <1495892865-9506-3-git-send-email-sricharan@codeaurora.org>
- <1564836.5iBbgoacpH@aspire.rjw.lan>
-Message-ID: <68bc9be5-22df-e7af-3fcd-182e935e681c@codeaurora.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 29 May 2017 08:51:57 +0200
+Subject: [PATCH 0/6] ARM: sunxi: Enable AXP PMIC power supplies
+In-Reply-To: <20170525073138.20907-1-wens@csie.org>
+References: <20170525073138.20907-1-wens@csie.org>
+Message-ID: <20170529065157.2p3pmo3pb4u3fpgr@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
-
-On 5/28/2017 12:48 AM, Rafael J. Wysocki wrote:
-> On Saturday, May 27, 2017 07:17:42 PM Sricharan R wrote:
->> While deferring the probe of IOMMU masters, xlate and
->> add_device callbacks called from iort_iommu_configure
->> can pass back error values like -ENODEV, which means
->> the IOMMU cannot be connected with that master for real
->> reasons. Before the IOMMU probe deferral, all such errors
->> were ignored. Now all those errors are propagated back,
->> killing the master's probe for such errors. Instead ignore
->> all the errors except EPROBE_DEFER, which is the only one
->> of concern and let the master work without IOMMU, thus
->> restoring the old behavior. Also make explicit that
->> acpi_dma_configure handles only -EPROBE_DEFER from
->> iort_iommu_configure.
->>
->> Fixes: 5a1bb638d567 ("drivers: acpi: Handle IOMMU lookup failure with deferred probing or error")
->> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->> ---
->>  drivers/acpi/arm64/iort.c | 6 ++++++
->>  drivers/acpi/scan.c       | 4 ++--
->>  2 files changed, 8 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
->> index c5fecf9..16e101f 100644
->> --- a/drivers/acpi/arm64/iort.c
->> +++ b/drivers/acpi/arm64/iort.c
->> @@ -782,6 +782,12 @@ const struct iommu_ops *iort_iommu_configure(struct device *dev)
->>  	if (err)
->>  		ops = ERR_PTR(err);
->>  
->> +	/* Ignore all other errors apart from EPROBE_DEFER */
->> +	if (IS_ERR(ops) && (PTR_ERR(ops) != -EPROBE_DEFER)) {
->> +		dev_dbg(dev, "Adding to IOMMU failed: %ld\n", PTR_ERR(ops));
->> +		ops = NULL;
->> +	}
->> +
->>  	return ops;
->>  }
->>  
->> diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
->> index e39ec7b..3a10d757 100644
->> --- a/drivers/acpi/scan.c
->> +++ b/drivers/acpi/scan.c
->> @@ -1371,8 +1371,8 @@ int acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
->>  	iort_set_dma_mask(dev);
->>  
->>  	iommu = iort_iommu_configure(dev);
->> -	if (IS_ERR(iommu))
->> -		return PTR_ERR(iommu);
->> +	if (IS_ERR(iommu) && PTR_ERR(iommu) == -EPROBE_DEFER)
->> +		return -EPROBE_DEFER;
->>  
->>  	size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
->>  	/*
->>
+On Thu, May 25, 2017 at 03:31:32PM +0800, Chen-Yu Tsai wrote:
+> Hi Maxime,
 > 
-> ACK for the scan.c change and I'm assuming this to go in via ARM64.
+> This series enables the power supplies for the AXP PMICs on boards
+> that I currently have and am actively testing.
 > 
-
-Thanks for the ACK, should go through the IOMMU tree, since this fixes the IOMMU probe deferral
-that got merged through it.
-
-Regards,
- Sricharan
-
-> Thanks,
-> Rafael
+> The first patch re-orders the node references for the Cubieboard 2
+> dts, to maintain alphabetical order.
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Patches 2 through 5 enable the ACIN power supply on various boards.
 > 
+> Patch 6 ties the USB/VBUS power supply of the PMIC to the USB PHY.
+> The PHY should have all available methods of VBUS detection configured.
+> The Cubietruck already has the power supplies enabled, but the USB
+> power supply was not configured to be used for VBUS detection.
+
+Applied all 6, thanks!
+Maxime
 
 -- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170529/904518e0/attachment-0001.sig>
