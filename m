@@ -1,259 +1,57 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 29 May 2017 16:59:14 +0800
-Subject: [PATCH v3 10/10] ARM: dts: sun8i: Add board dts file for Banana
- Pi M2 Ultra
-In-Reply-To: <20170527102308.1988-11-icenowy@aosc.io>
-References: <20170527102308.1988-1-icenowy@aosc.io>
- <20170527102308.1988-11-icenowy@aosc.io>
-Message-ID: <CAGb2v65-VrWbCHHvJLirCPBdQfoO6H106iQEATVSseUMfM5rQQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 29 May 2017 10:59:39 +0200
+Subject: [linux-sunxi] [PATCH 1/2] ARM: sun8i: v3s: add device nodes for
+ DE2 display pipeline
+In-Reply-To: <1B75138F-B045-4E60-BE92-B9AA343CBB1D@aosc.io>
+References: <20170524111724.28431-1-icenowy@aosc.io>
+ <CAGb2v65bZ+VJYwcP24ipQ+4kuY28Babt-Cpm7uscjmWpcoeJ9g@mail.gmail.com>
+ <5FF9B3F8-01F6-4B17-958C-9A4245199716@aosc.io>
+ <CAGb2v66UG7nS=3zj=TWGY-BG62tsvSpxucKHT35g=4KGcS8kRA@mail.gmail.com>
+ <1B75138F-B045-4E60-BE92-B9AA343CBB1D@aosc.io>
+Message-ID: <20170529085939.zstja3pymq77ubjq@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 27, 2017 at 6:23 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> From: Chen-Yu Tsai <wens@csie.org>
->
-> The Banana Pi M2 Ultra is an SBC based on the Allwinner R40 SoC. The
-> form factor and position of various connectors, leds and buttons is
-> similar to the Banana Pi M1+, Banana Pi M3, and is exactly the same
-> as the latest Banana Pi M64.
->
-> It features:
->
->   - X-Powers AXP221s PMIC connected to i2c0
->   - 2 GB DDR3 DRAM
->   - 8 GB eMMC
->   - micro SD card slot
->   - DC power jack
->   - HDMI output
->   - MIPI DSI connector
->   - 2x USB 2.0 hosts
->   - 1x USB 2.0 OTG
->   - gigabit ethernet with Realtek RTL8211E transceiver
->   - WiFi/Bluetooth with AP6212 chip, with external antenna connector
->   - SATA and power connectors for native SATA support
->   - camera sensor connector
->   - consumer IR receiver
->   - audio out headphone jack
->   - onboard microphone
->   - red, green, and blue LEDs
->   - debug UART pins
->   - Li-Po battery connector
->   - Raspberry Pi B+ compatible GPIO header
->   - power, reset, and boot control buttons
->
-> This patch adds a dts file that enables debug UART and MMC support.
->
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
-> Changes in v3:
-> - Pinmux changes.
->
->  arch/arm/boot/dts/Makefile                        |   1 +
->  arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts | 157 ++++++++++++++++++++++
->  2 files changed, 158 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index f68d6e0bc746..697c600bba28 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -910,6 +910,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
->         sun8i-h3-orangepi-plus.dtb \
->         sun8i-h3-orangepi-plus2e.dtb \
->         sun8i-r16-parrot.dtb \
-> +       sun8i-r40-bananapi-m2-ultra.dtb \
->         sun8i-v3s-licheepi-zero.dtb \
->         sun8i-v3s-licheepi-zero-dock.dtb
->  dtb-$(CONFIG_MACH_SUN9I) += \
-> diff --git a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-> new file mode 100644
-> index 000000000000..c4e69847cea1
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-> @@ -0,0 +1,157 @@
-> +/*
-> + * Copyright (C) 2017 Chen-Yu Tsai <wens@csie.org>
-> + * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.io>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include "sun8i-r40.dtsi"
-> +#include "sunxi-common-regulators.dtsi"
-> +
-> +/ {
-> +       model = "Banana Pi BPI-M2-Ultra";
-> +       compatible = "sinovoip,bpi-m2-ultra", "allwinner,sun8i-r40";
+On Thu, May 25, 2017 at 10:28:24PM +0800, Icenowy Zheng wrote:
+> >>>> +                       compatible = "allwinner,sun8i-v3s-de2-mixer";
+> >>>> +                       reg = <0x01100000 0x100000>;
+> >>>
+> >>>The display engine also has an interrupt. Please list it
+> >>
+> >> It's a overall interrupt for DE2, not mixer interrupt.
+> >>
+> >> I will add it after we have proper interrupt chaining facility
+> >> for DE2.
+> >>
+> >> It cannot fit here in mixer node.
+> >
+> > Could you elaborate? If it is just shared, then listing it several
+> > times is OK. If the interrupt registers are not in this address
+> > space, then
+> 
+> The interrupt dealing code is still not so clear, and totally not
+> present in BSP DE2 code (the BSP just didn't use the interrupt).
+> 
+> We doesn't even know where the interrupt register is, and we cannot
+> promise it's not broken (as their is even no application of it in BSP).
 
-The vendor prefix "bananapi" was merged into -next through Rob's DT tree:
+Whether it's broken or not is out of the question here. Adding it
+later would either break the DT compatibility, or introduce a crippled
+driver for users that do not have a recent enough DT. None of the two
+are really acceptable.
 
-https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git/commit/?h=dt/next&id=79d45aed23f02022607501cd0d3c404592e027f8
+Especially if your plan is to add support for these.
 
-Lets use that instead.
+Maxime
 
-> +
-> +       aliases {
-> +               serial0 = &uart0;
-> +       };
-> +
-> +       chosen {
-> +               stdout-path = "serial0:115200n8";
-> +       };
-> +
-> +       wifi_pwrseq: wifi_pwrseq {
-> +               compatible = "mmc-pwrseq-simple";
-> +               reset-gpios = <&pio 6 10 GPIO_ACTIVE_LOW>; /* PG10 WIFI_EN */
-> +       };
-> +};
-> +
-> +&i2c0 {
-> +       status = "okay";
-> +
-> +       axp22x: pmic at 68 {
-
-Address here does not match the reg property below.
-
-> +               compatible = "x-powers,axp221";
-> +               reg = <0x34>;
-> +               interrupt-parent = <&nmi_intc>;
-> +               interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-> +       };
-> +};
-> +
-> +#include "axp22x.dtsi"
-> +
-> +&reg_aldo3 {
-> +       regulator-always-on;
-> +       regulator-min-microvolt = <2700000>;
-> +       regulator-max-microvolt = <3300000>;
-> +       regulator-name = "avcc";
-> +};
-> +
-> +&reg_dcdc1 {
-> +       regulator-always-on;
-> +       regulator-min-microvolt = <3000000>;
-> +       regulator-max-microvolt = <3000000>;
-> +       regulator-name = "vcc-3v0";
-
-Board schematic says 3.3V.
-
-> +};
-> +
-> +&reg_dcdc2 {
-> +       regulator-always-on;
-> +       regulator-min-microvolt = <1000000>;
-> +       regulator-max-microvolt = <1300000>;
-> +       regulator-name = "vdd-cpu";
-> +};
-> +
-> +&reg_dcdc3 {
-> +       regulator-always-on;
-> +       regulator-min-microvolt = <1000000>;
-> +       regulator-max-microvolt = <1300000>;
-> +       regulator-name = "vdd-sys";
-> +};
-> +
-> +&reg_dcdc5 {
-> +       regulator-always-on;
-> +       regulator-min-microvolt = <1500000>;
-> +       regulator-max-microvolt = <1500000>;
-
-There is a small tolerance range: 1.425V ~ 1.575V.
-
-> +       regulator-name = "vcc-dram";
-> +};
-> +
-> +&reg_dldo1 {
-> +       regulator-min-microvolt = <1800000>;
-> +       regulator-max-microvolt = <3300000>;
-
-Recommended range on the AP6212 is 1.7V ~ 3.6V.
-
-> +       regulator-name = "vcc-wifi-io";
-> +};
-> +
-> +&reg_dldo2 {
-> +       regulator-min-microvolt = <3300000>;
-> +       regulator-max-microvolt = <3300000>;
-
-Recommended range on the AP6212 is 3.0V ~ 4.8V.
-
-Regards
-ChenYu
-
-> +       regulator-name = "vcc-wifi";
-> +};
-> +
-> +&mmc0 {
-> +       vmmc-supply = <&reg_dcdc1>;
-> +       bus-width = <4>;
-> +       cd-gpios = <&pio 7 13 GPIO_ACTIVE_HIGH>; /* PH13 */
-> +       cd-inverted;
-> +       status = "okay";
-> +};
-> +
-> +&mmc1 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&mmc1_pg_pins>;
-> +       vmmc-supply = <&reg_dldo2>;
-> +       vqmmc-supply = <&reg_dldo1>;
-> +       mmc-pwrseq = <&wifi_pwrseq>;
-> +       bus-width = <4>;
-> +       non-removable;
-> +       status = "okay";
-> +};
-> +
-> +&mmc2 {
-> +       vmmc-supply = <&reg_dcdc1>;
-> +       vqmmc-supply = <&reg_dcdc1>;
-> +       bus-width = <8>;
-> +       non-removable;
-> +       status = "okay";
-> +};
-> +
-> +&uart0 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&uart0_pb_pins>;
-> +       status = "okay";
-> +};
-> --
-> 2.12.2
->
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170529/9163d8e5/attachment.sig>
