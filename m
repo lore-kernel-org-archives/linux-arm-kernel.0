@@ -1,59 +1,38 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 29 May 2017 09:41:17 +0200
-Subject: [PATCH 3/3] ARM: sun8i: v3s: add backlight device node for
- Lichee Pi Zero LCD
-In-Reply-To: <20170524121320.4171-3-icenowy@aosc.io>
-References: <20170524121320.4171-1-icenowy@aosc.io>
- <20170524121320.4171-3-icenowy@aosc.io>
-Message-ID: <20170529074117.x7pm2k2lbznl2n5j@flea.home>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 29 May 2017 09:54:36 +0200
+Subject: [PATCH v2 0/2] clk: meson: mark clk81 as critical
+In-Reply-To: <20170524093932.5262-1-jbrunet@baylibre.com>
+References: <20170524093932.5262-1-jbrunet@baylibre.com>
+Message-ID: <a550aa57-c1b5-8849-095d-01586aaf5b50@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, May 24, 2017 at 08:13:20PM +0800, Icenowy Zheng wrote:
-> The 40-pin LCD connector on Lichee Pi Zero has backlight pins, which is
-> controlled by the PWM0 controller of the V3s SoC, and the controlling
-> part is on the board.
+On 05/24/2017 11:39 AM, Jerome Brunet wrote:
+> The GX (gxbb.c) clock controller driver already marks the clk81 clock
+> as criticial. However, the Meson8b clock controller driver does not do
+> this yet.
+> This can lead to a freeze of the whole system when clk81 is disabled
+> by the common clock framework (for example after the last child clock
+> is disabled by a driver which used that child clock).
 > 
-> Add the PWM and backlight device nodes in the device tree file, but
-> leave them disabled, as they can only be useful when the LCD is
-> attached. The LCD device tree overlay files can enable these controllers
-> and make use of them.
+> Changes since v1: [0]
+> With the clock flagged as CRITICAL, CLK_IGNORE_UNUSED is no longer
+> useful. Remove this flag from meson8b and gxbb's clk81.
 > 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
+> [0]: https://lkml.kernel.org/r/20170504183201.13175-1-martin.blumenstingl at googlemail.com
 > 
-> diff --git a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-> index 387fc2aa546d..e0721bf725d1 100644
-> --- a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-> +++ b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-> @@ -52,6 +52,14 @@
->  		serial0 = &uart0;
->  	};
->  
-> +	backlight: backlight {
-> +		compatible = "pwm-backlight";
-> +		pwms = <&pwm 0 50000 0>;
-> +		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
+> Jerome Brunet (1):
+>   clk: gxbb: remove CLK_IGNORE_UNUSED from clk81
+> 
+> Martin Blumenstingl (1):
+>   clk: meson: meson8b: mark clk81 as critical
+> 
+>  drivers/clk/meson/gxbb.c    | 2 +-
+>  drivers/clk/meson/meson8b.c | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
 
-This is unlikely, the perceived brightness by the human eye is not
-linear, and is actually much closer to a logarithmic function, which
-means you should have use an exponential function here in order to
-appear that your brightness increase is linear.
+Applied,
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170529/35e1ae47/attachment.sig>
+Thanks,
+Neil
