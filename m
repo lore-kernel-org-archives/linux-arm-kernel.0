@@ -1,97 +1,87 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 29 May 2017 11:28:19 +0200
-Subject: [PATCH v2 4/5] iio: adc: stm32: make per instance bus clock optional
+Date: Mon, 29 May 2017 11:28:16 +0200
+Subject: [PATCH v2 1/5] dt-bindings: iio: stm32-adc: add support for STM32H7
 In-Reply-To: <1496050100-25854-1-git-send-email-fabrice.gasnier@st.com>
 References: <1496050100-25854-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1496050100-25854-5-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1496050100-25854-2-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-STM32F4 requires one clock per ADC instance for register access. But,
-newer version of ADC hardware block have common bus clock for all
-instances (per instance driver isn't responsible for getting it).
-So, make it optional by default. Still, enforce it's required on STM32F4.
+Document support for STM32H7 Analog to Digital Converter.
+Main difference is regarding compatible, clock definitions and new
+features like differential channels support:
+STM32H7 ADC block has two clock inputs, common clock for all ADCs.
+One 'bus' clock for registers access, and one optional 'adc' clock
+for analog circuitry (bus clock may be used for conversions).
 
 Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 ---
- drivers/iio/adc/stm32-adc.c | 28 ++++++++++++++++++++--------
- 1 file changed, 20 insertions(+), 8 deletions(-)
+Changes in v2:
+- remarks from Rob: one compatible per line, s/unused/not present/
+- document resolutions available on stm32h7
+---
+ .../devicetree/bindings/iio/adc/st,stm32-adc.txt   | 28 ++++++++++++++++------
+ 1 file changed, 21 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
-index 50b2538..2ba9ca9 100644
---- a/drivers/iio/adc/stm32-adc.c
-+++ b/drivers/iio/adc/stm32-adc.c
-@@ -160,6 +160,7 @@ struct stm32_adc_regspec {
-  * @regs:		registers descriptions
-  * @adc_info:		per instance input channels definitions
-  * @trigs:		external trigger sources
-+ * @clk_required:	clock is required
-  * @start_conv:		routine to start conversions
-  * @stop_conv:		routine to stop conversions
-  */
-@@ -167,6 +168,7 @@ struct stm32_adc_cfg {
- 	const struct stm32_adc_regspec	*regs;
- 	const struct stm32_adc_info	*adc_info;
- 	struct stm32_adc_trig_info	*trigs;
-+	bool clk_required;
- 	void (*start_conv)(struct stm32_adc *, bool dma);
- 	void (*stop_conv)(struct stm32_adc *);
- };
-@@ -1145,14 +1147,21 @@ static int stm32_adc_probe(struct platform_device *pdev)
+diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+index e35f9f1..8310073 100644
+--- a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
++++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+@@ -21,11 +21,19 @@ own configurable sequence and trigger:
+ Contents of a stm32 adc root node:
+ -----------------------------------
+ Required properties:
+-- compatible: Should be "st,stm32f4-adc-core".
++- compatible: Should be one of:
++  "st,stm32f4-adc-core"
++  "st,stm32h7-adc-core"
+ - reg: Offset and length of the ADC block register set.
+ - interrupts: Must contain the interrupt for ADC block.
+-- clocks: Clock for the analog circuitry (common to all ADCs).
+-- clock-names: Must be "adc".
++- clocks: Core can use up to two clocks, depending on part used:
++  - "adc" clock: for the analog circuitry, common to all ADCs.
++    It's required on stm32f4.
++    It's optional on stm32h7.
++  - "bus" clock: for registers access, common to all ADCs.
++    It's not present on stm32f4.
++    It's required on stm32h7.
++- clock-names: Must be "adc" and/or "bus" depending on part used.
+ - interrupt-controller: Identifies the controller node as interrupt-parent
+ - vref-supply: Phandle to the vref input analog reference voltage.
+ - #interrupt-cells = <1>;
+@@ -42,14 +50,18 @@ An ADC block node should contain at least one subnode, representing an
+ ADC instance available on the machine.
  
- 	adc->clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(adc->clk)) {
--		dev_err(&pdev->dev, "Can't get clock\n");
--		return PTR_ERR(adc->clk);
-+		ret = PTR_ERR(adc->clk);
-+		if (ret == -ENOENT && !adc->cfg->clk_required) {
-+			adc->clk = NULL;
-+		} else {
-+			dev_err(&pdev->dev, "Can't get clock\n");
-+			return ret;
-+		}
- 	}
+ Required properties:
+-- compatible: Should be "st,stm32f4-adc".
++- compatible: Should be one of:
++  "st,stm32f4-adc"
++  "st,stm32h7-adc"
+ - reg: Offset of ADC instance in ADC block (e.g. may be 0x0, 0x100, 0x200).
+-- clocks: Input clock private to this ADC instance.
++- clocks: Input clock private to this ADC instance. It's required only on
++  stm32f4, that has per instance clock input for registers access.
+ - interrupt-parent: Phandle to the parent interrupt controller.
+ - interrupts: IRQ Line for the ADC (e.g. may be 0 for adc at 0, 1 for adc at 100 or
+   2 for adc at 200).
+ - st,adc-channels: List of single-ended channels muxed for this ADC.
+-  It can have up to 16 channels, numbered from 0 to 15 (resp. for in0..in15).
++  It can have up to 16 channels on stm32f4 or 20 channels on stm32h7, numbered
++  from 0 to 15 or 19 (resp. for in0..in15 or in0..in19).
+ - #io-channel-cells = <1>: See the IIO bindings section "IIO consumers" in
+   Documentation/devicetree/bindings/iio/iio-bindings.txt
  
--	ret = clk_prepare_enable(adc->clk);
--	if (ret < 0) {
--		dev_err(&pdev->dev, "clk enable failed\n");
--		return ret;
-+	if (adc->clk) {
-+		ret = clk_prepare_enable(adc->clk);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev, "clk enable failed\n");
-+			return ret;
-+		}
- 	}
+@@ -58,7 +70,9 @@ Optional properties:
+   See ../../dma/dma.txt for details.
+ - dma-names: Must be "rx" when dmas property is being used.
+ - assigned-resolution-bits: Resolution (bits) to use for conversions. Must
+-  match device available resolutions (e.g. can be 6, 8, 10 or 12 on stm32f4).
++  match device available resolutions:
++  * can be 6, 8, 10 or 12 on stm32f4
++  * can be 8, 10, 12, 14 or 16 on stm32h7
+   Default is maximum resolution if unset.
  
- 	ret = stm32_adc_of_get_resolution(indio_dev);
-@@ -1196,7 +1205,8 @@ static int stm32_adc_probe(struct platform_device *pdev)
- 		dma_release_channel(adc->dma_chan);
- 	}
- err_clk_disable:
--	clk_disable_unprepare(adc->clk);
-+	if (adc->clk)
-+		clk_disable_unprepare(adc->clk);
- 
- 	return ret;
- }
-@@ -1214,7 +1224,8 @@ static int stm32_adc_remove(struct platform_device *pdev)
- 				  adc->rx_buf, adc->rx_dma_buf);
- 		dma_release_channel(adc->dma_chan);
- 	}
--	clk_disable_unprepare(adc->clk);
-+	if (adc->clk)
-+		clk_disable_unprepare(adc->clk);
- 
- 	return 0;
- }
-@@ -1223,6 +1234,7 @@ static int stm32_adc_remove(struct platform_device *pdev)
- 	.regs = &stm32f4_adc_regspec,
- 	.adc_info = &stm32f4_adc_info,
- 	.trigs = stm32f4_adc_trigs,
-+	.clk_required = true,
- 	.start_conv = stm32f4_adc_start_conv,
- 	.stop_conv = stm32f4_adc_stop_conv,
- };
+ Example:
 -- 
 1.9.1
