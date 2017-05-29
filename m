@@ -1,110 +1,85 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Mon, 29 May 2017 18:36:37 +0300
-Subject: [PATCH v7 00/34] i.MX Media Driver
-In-Reply-To: <dd82968a-4c0b-12a4-f43b-7e63a255812d@xs4all.nl>
-References: <1495672189-29164-1-git-send-email-steve_longerbeam@mentor.com>
- <dd82968a-4c0b-12a4-f43b-7e63a255812d@xs4all.nl>
-Message-ID: <20170529153637.GH29527@valkosipuli.retiisi.org.uk>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Mon, 29 May 2017 17:45:48 +0200
+Subject: [PATCH 00/15] make more driver use devm_of_platform_populate()
+Message-ID: <1496072763-31209-1-git-send-email-benjamin.gaignard@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+Number of calls to of_platform_populate() aren't unbalanced by a call to
+of_platform_depopulate() that could generate issue will loading/unloading
+the drivers. Make those drivers use devm_of_platform_populate() fix the problem
+without need to add remove function.
 
-On Mon, May 29, 2017 at 03:46:08PM +0200, Hans Verkuil wrote:
-> Hi Steve,
-> 
-> On 05/25/2017 02:29 AM, Steve Longerbeam wrote:
-> >In version 7:
-> >
-> >- video-mux: switched to Philipp's latest video-mux driver and updated
-> >   bindings docs, that makes use of the mmio-mux framework.
-> >
-> >- mmio-mux: includes Philipp's temporary patch that adds mmio-mux support
-> >   to video-mux driver, until mux framework is merged.
-> >
-> >- mmio-mux: updates to device tree from Philipp that define the i.MX6 mux
-> >   devices and modifies the video-mux device to become a consumer of the
-> >   video mmio-mux.
-> >
-> >- minor updates to Documentation/media/v4l-drivers/imx.rst.
-> >
-> >- ov5640: do nothing if entity stream count is greater than 1 in
-> >   ov5640_s_stream().
-> >
-> >- Previous versions of this driver had not tested the ability to enable
-> >   multiple independent streams, for instance enabling multiple output
-> >   pads from the imx6-mipi-csi2 subdevice, or enabling both prpenc and
-> >   prpvf outputs. Marek Vasut tested this support and reported issues
-> >   with it.
-> >
-> >   v4l2_pipeline_inherit_controls() used the media graph walk APIs, but
-> >   that walks both sink and source pads, so if there are multiple paths
-> >   enabled to video capture devices, controls would be added to the wrong
-> >   video capture device, and no controls added to the other enabled
-> >   capture devices.
-> >
-> >   These issues have been fixed. Control inheritance works correctly now
-> >   even with multiple enabled capture paths, and (for example)
-> >   simultaneous capture from prpenc and prpvf works also, and each with
-> >   independent scaling, CSC, and controls. For example prpenc can be
-> >   capturing with a 90 degree rotation, while prpvf is capturing with
-> >   vertical flip.
-> >
-> >   So the v4l2_pipeline_inherit_controls() patch has been dropped. The
-> >   new version of control inheritance could be made generically available,
-> >   but it would be more involved to incorporate it into v4l2-core.
-> >
-> >- A new function imx_media_fill_default_mbus_fields() is added to setup
-> >   colorimetry at sink pads, and these are propagated to source pads.
-> >
-> >- Ensure that the current sink and source rectangles meet alignment
-> >   restrictions before applying a new rotation control setting in
-> >   prp-enc/vf subdevices.
-> >
-> >- Chain the s_stream() subdev calls instead of implementing a custom
-> >   stream on/off function that attempts to call a fixed set of subdevices
-> >   in a pipeline in the correct order. This also simplifies imx6-mipi-csi2
-> >   subdevice, since the correct MIPI CSI-2 startup sequence can be
-> >   enforced completely in s_stream(), and s_power() is no longer
-> >   required. This also paves the way for more arbitrary OF graphs
-> >   external to the i.MX6.
-> >
-> >- Converted the v4l2_subdev and media_entity ops structures to const.
-> 
-> What is the status as of v7?
-> 
-> From what I can tell patch 2/34 needs an Ack from Rob Herring, patches
-> 4-14 are out of scope for the media subsystem, patches 20-25 and 27-34
-> are all staging (so fine to be merged from my point of view).
-> 
-> I'm not sure if patch 26 (defconfig) should be applied while the imx
-> driver is in staging. I would suggest that this patch is moved to the end
-> of the series.
-> 
-> That leaves patches 15-19. I replied to patch 15 with a comment, patches
-> 16-18 look good to me, although patches 17 and 18 should be combined to one
-> patch since patch 17 won't compile otherwise. Any idea when the multiplexer is
-> expected to be merged? (just curious)
-> 
-> I would really like to get this merged for 4.13, so did I miss anything?
-> From what I can tell it is really just an Ack for patch 2/34.
+In some case replacing of_platform_populate() by devm_of_platform_populate()
+allow to delete driver remove function and save some lines of code.
 
-The patchset re-initialises the control handler in the video node in its
-media device link_setup callback, among other things. I don't think that
-this as such should prevent including the driver in staging, but at the same
-time my concern is what kind of guarantees can we give in terms of V4L2
-framework support on things like this using the current API. I'd say "none".
+This series of patches based on v4.12-rc3 tag.
 
-If there's a need for this (there should not be, as the controls are exposed
-to the user space through the sub-device nodes as the other drivers do), the
-framework APIs need to be extended.
+CC: Alexandre Torgue <alexandre.torgue@st.com>
+CC: David Airlie <airlied@linux.ie>
+CC: Fabrice Gasnier <fabrice.gasnier@st.com>
+CC: Hartmut Knaack <knaack.h@gmx.de>
+CC: Jaroslav Kysela <perex@perex.cz>
+CC: Javier Martinez Canillas <javier@osg.samsung.com>
+CC: Jonathan Cameron <jic23@kernel.org>
+CC: Krzysztof Kozlowski <krzk@kernel.org>
+CC: Kukjin Kim <kgene@kernel.org>
+CC: Kyungmin Park <kyungmin.park@samsung.com>
+CC: Lars-Peter Clausen <lars@metafoo.de>
+CC: Lee Jones <lee.jones@linaro.org>
+CC: Liam Girdwood <lgirdwood@gmail.com>
+CC: Mark Brown <broonie@kernel.org>
+CC: Mauro Carvalho Chehab <mchehab@kernel.org>
+CC: Olivier Moysan <olivier.moysan@st.com>
+CC: Rob Clark <robdclark@gmail.com>
+CC: Shawn Guo <shawnguo@kernel.org>
+CC: Sylwester Nawrocki <s.nawrocki@samsung.com>
+CC: Takashi Iwai <tiwai@suse.com>
+CC: Tony Lindgren <tony@atomide.com>
 
-I think it'd be good to add a TODO file (such as the one in OMAP4ISS) as
-part of the patchset that would include a list of things left to do so
-they're not forgotten.
+CC: linux-iio at vger.kernel.org
+CC: linux-arm-kernel at lists.infradead.org
+CC: linux-kernel at vger.kernel.org
+CC: dri-devel at lists.freedesktop.org
+CC: linux-arm-msm at vger.kernel.org
+CC: freedreno at lists.freedesktop.org
+CC: linux-samsung-soc at vger.kernel.org
+CC: alsa-devel at alsa-project.org
+CC: linux-media at vger.kernel.org
+
+Benjamin Gaignard (15):
+  iio: adc: stm32: use devm_of_platform_populate()
+  iio: dac: stm32: use devm_of_platform_populate()
+  drm: zte: use devm_of_platform_populate()
+  drm: msm: use devm_of_platform_populate()
+  mfd: stm32-timers: use devm_of_platform_populate
+  mfd: atmel: use devm_of_platform_populate()
+  mfd: cros_ec: use devm_of_platform_populate()
+  mfd: exynos: use devm_of_platform_populate()
+  mfd: fsl-imx25: use devm_of_platform_populate()
+  mfd: motorola-cpcap: use devm_of_platform_populate()
+  mfd: palmas: use devm_of_platform_populate()
+  mfd: qcom-spmi-pmic: use devm_of_platform_populate()
+  mfd: smsc-ece: use devm_of_platform_populate()
+  sound: stm32: use devm_of_platform_populate()
+  media: exynos4-is: use devm_of_platform_populate()
+
+ drivers/gpu/drm/msm/msm_drv.c               | 10 ++--------
+ drivers/gpu/drm/zte/zx_drm_drv.c            |  2 +-
+ drivers/iio/adc/stm32-adc-core.c            |  4 +---
+ drivers/iio/dac/stm32-dac-core.c            |  3 +--
+ drivers/media/platform/exynos4-is/fimc-is.c |  7 ++-----
+ drivers/mfd/atmel-flexcom.c                 |  2 +-
+ drivers/mfd/cros_ec.c                       |  2 +-
+ drivers/mfd/exynos-lpass.c                  |  2 +-
+ drivers/mfd/fsl-imx25-tsadc.c               |  5 +----
+ drivers/mfd/motorola-cpcap.c                | 13 +------------
+ drivers/mfd/palmas.c                        |  2 +-
+ drivers/mfd/qcom-spmi-pmic.c                |  9 +--------
+ drivers/mfd/smsc-ece1099.c                  |  3 +--
+ drivers/mfd/stm32-timers.c                  | 10 +---------
+ sound/soc/stm/stm32_sai.c                   | 11 +----------
+ 15 files changed, 17 insertions(+), 68 deletions(-)
 
 -- 
-Regards,
-
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+1.9.1
