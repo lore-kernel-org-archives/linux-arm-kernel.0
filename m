@@ -1,22 +1,20 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 29 May 2017 16:42:45 +0200
-Subject: [PATCH v2] mmc: bcm2835: fix potential null pointer dereferences
-In-Reply-To: <20170525170455.GA6904@embeddedgus>
-References: <20170525114638.Horde.wq7PLKWCg8CwLM5WiWj1Obm@gator4166.hostgator.com>
- <20170525170455.GA6904@embeddedgus>
-Message-ID: <CAPDyKFo2+YL=nk=SmTKG1gPwVPWaOTth++1WUqRXL2+meZ72pg@mail.gmail.com>
+Date: Mon, 29 May 2017 16:43:19 +0200
+Subject: [PATCH] mmc: mediatek: Fixed size in dma_free_coherent
+In-Reply-To: <1495612432-16669-1-git-send-email-narmstrong@baylibre.com>
+References: <1495612432-16669-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <CAPDyKFqdH=PuLiFWitYRCuz+1oWwz5ESA2KY314-eTunih0e5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 May 2017 at 19:04, Gustavo A. R. Silva <garsilva@embeddedor.com> wrote:
-> Null check at line 1165: if (mrq->cmd), implies that mrq->cmd might
-> be NULL.
-> Add null checks before dereferencing pointer mrq->cmd in order to avoid
-> any potential NULL pointer dereference.
+On 24 May 2017 at 09:53, Neil Armstrong <narmstrong@baylibre.com> wrote:
+> From: Phong LE <ple@baylibre.com>
 >
-> Addresses-Coverity-ID: 1408740
-> Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
-> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
+> The dma gpd dma_free_coherent call size in invalid.
+>
+> Fixes: 208489032bdd ("mmc: mediatek: Add Mediatek MMC driver")
+> Signed-off-by: Phong LE <ple@baylibre.com>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
 Thanks, applied for next!
 
@@ -24,49 +22,22 @@ Kind regards
 Uffe
 
 > ---
-> Changes in v2:
->  Change subject to make it clear the patch is bcm2835 related.
+>  drivers/mmc/host/mtk-sd.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
->  drivers/mmc/host/bcm2835.c | 12 +++++++++---
->  1 file changed, 9 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/mmc/host/bcm2835.c b/drivers/mmc/host/bcm2835.c
-> index 1f343a4..abba9a2 100644
-> --- a/drivers/mmc/host/bcm2835.c
-> +++ b/drivers/mmc/host/bcm2835.c
-> @@ -1172,7 +1172,10 @@ static void bcm2835_request(struct mmc_host *mmc, struct mmc_request *mrq)
->         if (mrq->data && !is_power_of_2(mrq->data->blksz)) {
->                 dev_err(dev, "unsupported block size (%d bytes)\n",
->                         mrq->data->blksz);
-> -               mrq->cmd->error = -EINVAL;
-> +
-> +               if (mrq->cmd)
-> +                       mrq->cmd->error = -EINVAL;
-> +
->                 mmc_request_done(mmc, mrq);
->                 return;
->         }
-> @@ -1194,7 +1197,10 @@ static void bcm2835_request(struct mmc_host *mmc, struct mmc_request *mrq)
->                         readl(host->ioaddr + SDCMD) & SDCMD_CMD_MASK,
->                         edm);
->                 bcm2835_dumpregs(host);
-> -               mrq->cmd->error = -EILSEQ;
-> +
-> +               if (mrq->cmd)
-> +                       mrq->cmd->error = -EILSEQ;
-> +
->                 bcm2835_finish_request(host);
->                 mutex_unlock(&host->mutex);
->                 return;
-> @@ -1207,7 +1213,7 @@ static void bcm2835_request(struct mmc_host *mmc, struct mmc_request *mrq)
->                         if (!host->use_busy)
->                                 bcm2835_finish_command(host);
->                 }
-> -       } else if (bcm2835_send_command(host, mrq->cmd)) {
-> +       } else if (mrq->cmd && bcm2835_send_command(host, mrq->cmd)) {
->                 if (host->data && host->dma_desc) {
->                         /* DMA transfer starts now, PIO starts after irq */
->                         bcm2835_start_dma(host);
+> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+> index 5c1e178..5a672a5 100644
+> --- a/drivers/mmc/host/mtk-sd.c
+> +++ b/drivers/mmc/host/mtk-sd.c
+> @@ -1774,7 +1774,7 @@ static int msdc_drv_remove(struct platform_device *pdev)
+>         pm_runtime_disable(host->dev);
+>         pm_runtime_put_noidle(host->dev);
+>         dma_free_coherent(&pdev->dev,
+> -                       sizeof(struct mt_gpdma_desc),
+> +                       2 * sizeof(struct mt_gpdma_desc),
+>                         host->dma.gpd, host->dma.gpd_addr);
+>         dma_free_coherent(&pdev->dev, MAX_BD_NUM * sizeof(struct mt_bdma_desc),
+>                         host->dma.bd, host->dma.bd_addr);
 > --
-> 2.5.0
+> 2.7.4
 >
