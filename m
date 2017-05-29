@@ -1,77 +1,76 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Mon, 29 May 2017 13:57:34 +0000
-Subject: [PATCH 1/2] staging: fsl-dpaa2/eth: Fix address translations
-In-Reply-To: <VI1PR0402MB28477848AE840A1E5C819C3E94FF0@VI1PR0402MB2847.eurprd04.prod.outlook.com>
-References: <20170524121328.16984-1-ruxandra.radulescu@nxp.com>
- <59257DB0.8010604@nxp.com>
- <VI1PR0402MB28477848AE840A1E5C819C3E94FF0@VI1PR0402MB2847.eurprd04.prod.outlook.com>
-Message-ID: <592C28CD.30604@nxp.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 29 May 2017 16:15:52 +0200
+Subject: [PATCH] drm/meson: Fix driver bind when only CVBS is available
+Message-ID: <1496067352-8733-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+While introducing HDMI support, component matching on connectors node
+were bypassed since no driver would actually bind on the DT node.
+But when only a CVBS connector is present, only a single node is found
+in the graph, but ignored and a NULL match table is given to the
+component code.
 
+This code permits bypassing the components framework by binding directly
+the DRM driver when no components needs to be loaded.
 
-On 05/25/2017 03:31 PM, Ruxandra Ioana Radulescu wrote:
->> -----Original Message-----
->> From: Laurentiu Tudor
->> Sent: Wednesday, May 24, 2017 3:34 PM
->> To: Ruxandra Ioana Radulescu <ruxandra.radulescu@nxp.com>;
->> gregkh at linuxfoundation.org
->> Cc: devel at driverdev.osuosl.org; linux-kernel at vger.kernel.org;
->> agraf at suse.de; arnd at arndb.de; linux-arm-kernel at lists.infradead.org;
->> iommu at lists.linux-foundation.org; Bogdan Purcareata
->> <bogdan.purcareata@nxp.com>; stuyoder at gmail.com; Nipun Gupta
->> <nipun.gupta@nxp.com>
->> Subject: Re: [PATCH 1/2] staging: fsl-dpaa2/eth: Fix address translations
->>
->> Hi Ioana,
->>
->> Debatable nit inline.
->>
->> On 05/24/2017 03:13 PM, Ioana Radulescu wrote:
->>> Use the correct mechanisms for translating a DMA-mapped IOVA
->>> address into a virtual one. Without this fix, once SMMU is
->>> enabled on Layerscape platforms, the Ethernet driver throws
->>> IOMMU translation faults.
->>>
->>> Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
->>> Signed-off-by: Ioana Radulescu <ruxandra.radulescu@nxp.com>
->>> ---
->>>    drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c | 25
->> +++++++++++++++++++------
->>>    drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h |  1 +
->>>    2 files changed, 20 insertions(+), 6 deletions(-)
->>>
->>> diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
->> b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
->>> index 6f9eed66c64d..3fee0d6f17e0 100644
->>> --- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
->>> +++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
->>> @@ -37,6 +37,7 @@
->>>    #include <linux/interrupt.h>
->>>    #include <linux/msi.h>
->>>    #include <linux/kthread.h>
->>> +#include <linux/iommu.h>
->>>
->>>    #include "../../fsl-mc/include/mc.h"
->>>    #include "../../fsl-mc/include/mc-sys.h"
->>> @@ -54,6 +55,16 @@ MODULE_DESCRIPTION("Freescale DPAA2 Ethernet
->> Driver");
->>>
->>>    const char dpaa2_eth_drv_version[] = "0.1";
->>>
->>> +static void *dpaa2_iova_to_virt(struct iommu_domain *domain,
->>
->> if you pass a "struct dpaa2_eth_priv *priv" instead of "iommu_domain"
->> you can move the priv->iommu_domain reference in the function and
->> slightly simplify the call sites.
->
-> Fair point, but I'd prefer keeping this function independent of the
-> Ethernet driver's private data structure. This way, if other (future)
-> DPAA2 drivers will need a similar function, we can just move it
-> to a common area instead of duplicating the code.
-
-Understood. Fine by me then.
-
+Fixes: a41e82e6c457 ("drm/meson: Add support for components")
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
-Best Regards, Laurentiu
+ drivers/gpu/drm/meson/meson_drv.c | 20 +++++++++++++++-----
+ 1 file changed, 15 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
+index 75382f5..10b227d 100644
+--- a/drivers/gpu/drm/meson/meson_drv.c
++++ b/drivers/gpu/drm/meson/meson_drv.c
+@@ -152,7 +152,7 @@ static bool meson_vpu_has_available_connectors(struct device *dev)
+ 	.max_register   = 0x1000,
+ };
+ 
+-static int meson_drv_bind(struct device *dev)
++static int meson_drv_bind_master(struct device *dev, bool has_components)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct meson_drm *priv;
+@@ -233,10 +233,12 @@ static int meson_drv_bind(struct device *dev)
+ 	if (ret)
+ 		goto free_drm;
+ 
+-	ret = component_bind_all(drm->dev, drm);
+-	if (ret) {
+-		dev_err(drm->dev, "Couldn't bind all components\n");
+-		goto free_drm;
++	if (has_components) {
++		ret = component_bind_all(drm->dev, drm);
++		if (ret) {
++			dev_err(drm->dev, "Couldn't bind all components\n");
++			goto free_drm;
++		}
+ 	}
+ 
+ 	ret = meson_plane_create(priv);
+@@ -276,6 +278,11 @@ static int meson_drv_bind(struct device *dev)
+ 	return ret;
+ }
+ 
++static int meson_drv_bind(struct device *dev)
++{
++	return meson_drv_bind_master(dev, true);
++}
++
+ static void meson_drv_unbind(struct device *dev)
+ {
+ 	struct drm_device *drm = dev_get_drvdata(dev);
+@@ -357,6 +364,9 @@ static int meson_drv_probe(struct platform_device *pdev)
+ 		count += meson_probe_remote(pdev, &match, np, remote);
+ 	}
+ 
++	if (count && !match)
++		return meson_drv_bind_master(&pdev->dev, false);
++
+ 	/* If some endpoints were found, initialize the nodes */
+ 	if (count) {
+ 		dev_info(&pdev->dev, "Queued %d outputs on vpu\n", count);
+-- 
+1.9.1
