@@ -1,272 +1,154 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 29 May 2017 21:25:44 +0800
-Subject: [PATCH v3 06/10] pinctrl: sunxi: add support of R40 to A10
- pinctrl driver
-In-Reply-To: <7dd239497298ccd8e946c08d1d2a679f@aosc.io>
-References: <20170527102308.1988-1-icenowy@aosc.io>
- <20170527102308.1988-7-icenowy@aosc.io>
- <20170529131100.a56rv3e5z3kpcxuo@wens.csie.org>
- <7dd239497298ccd8e946c08d1d2a679f@aosc.io>
-Message-ID: <CAGb2v66q0qV3XenyJn77YyiBq0bE984SbB-9S8Z8vJhx2m7SZw@mail.gmail.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Mon, 29 May 2017 15:27:51 +0200
+Subject: [PATCH] clk: meson-gxbb: Add EE 32K Clock for CEC
+In-Reply-To: <1495619025-1958-1-git-send-email-narmstrong@baylibre.com>
+References: <1495619025-1958-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1496064471.2741.0.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 29, 2017 at 9:19 PM,  <icenowy@aosc.io> wrote:
-> ? 2017-05-29 21:11?Chen-Yu Tsai ???
->>
->> On Sat, May 27, 2017 at 06:23:04PM +0800, Icenowy Zheng wrote:
->>>
->>> R40 is said to be an upgrade of A20, and its pin configuration is also
->>> similar to A20 (and thus similar to A10).
->>>
->>> Add support for R40 to the A10 pinctrl driver.
->>>
->>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->>> ---
->>>  drivers/pinctrl/sunxi/Kconfig             |   2 +-
->>>  drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c | 272
->>> +++++++++++++++++++++---------
->>>  2 files changed, 197 insertions(+), 77 deletions(-)
->>>
->>> diff --git a/drivers/pinctrl/sunxi/Kconfig
->>> b/drivers/pinctrl/sunxi/Kconfig
->>> index 624d84e6c936..9d01da3b90bd 100644
->>> --- a/drivers/pinctrl/sunxi/Kconfig
->>> +++ b/drivers/pinctrl/sunxi/Kconfig
->>> @@ -7,7 +7,7 @@ config PINCTRL_SUNXI
->>>         select GPIOLIB
->>>
->>>  config PINCTRL_SUN4I_A10
->>> -       def_bool MACH_SUN4I || MACH_SUN7I
->>> +       def_bool MACH_SUN4I || MACH_SUN7I || MACH_SUN8I
->>>         select PINCTRL_SUNXI
->>>
->>>  config PINCTRL_SUN5I
->>> diff --git a/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
->>> b/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
->>> index 159580c04b14..0f6ca8391ea7 100644
->>> --- a/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
->>> +++ b/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
->>
->>
->> [...]
->>
->>> @@ -162,14 +183,19 @@ static const struct sunxi_desc_pin sun4i_a10_pins[]
->>> = {
->>>                   SUNXI_FUNCTION(0x3, "can"),           /* RX */
->>>                   SUNXI_FUNCTION(0x4, "uart1"),         /* RING */
->>>                   SUNXI_FUNCTION_VARIANT(0x5, "gmac",   /* GNULL / ETXERR
->>> */
->>> -                                        PINCTRL_SUN7I_A20),
->>> +                                        PINCTRL_SUN7I_A20 |
->>> +                                        PINCTRL_SUN8I_R40),
->>>                   SUNXI_FUNCTION_VARIANT(0x6, "i2s1",   /* DI */
->>> -                                        PINCTRL_SUN7I_A20)),
->>> +                                        PINCTRL_SUN7I_A20 |
->>> +                                        PINCTRL_SUN8I_R40)),
->>>         /* Hole */
->>>         SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 0),
->>>                   SUNXI_FUNCTION(0x0, "gpio_in"),
->>>                   SUNXI_FUNCTION(0x1, "gpio_out"),
->>> -                 SUNXI_FUNCTION(0x2, "i2c0")),         /* SCK */
->>> +                 SUNXI_FUNCTION(0x2, "i2c0"),          /* SCK */
->>> +                 SUNXI_FUNCTION_VARIANT(0x3,
->>> +                                        "pll-lock-dbg",
->>
->>
->> Can you stick to underscores to be consistent?
->
->
-> OK...
-> This is a so strange pin name and I just picked the datasheet
-> name.
->
-> I don't care how to name it as I don't even know what this is.
->
->
->>
->>> +                                        PINCTRL_SUN8I_R40)),
->>>         SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 1),
->>>                   SUNXI_FUNCTION(0x0, "gpio_in"),
->>>                   SUNXI_FUNCTION(0x1, "gpio_out"),
->>> @@ -177,11 +203,19 @@ static const struct sunxi_desc_pin sun4i_a10_pins[]
->>> = {
->>>         SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 2),
->>>                   SUNXI_FUNCTION(0x0, "gpio_in"),
->>>                   SUNXI_FUNCTION(0x1, "gpio_out"),
->>> -                 SUNXI_FUNCTION(0x2, "pwm")),          /* PWM0 */
->>> +                 SUNXI_FUNCTION_VARIANT(0x2, "pwm",    /* PWM0 */
->>> +                                        PINCTRL_SUN4I_A10 |
->>> +                                        PINCTRL_SUN7I_A20),
->>> +                 SUNXI_FUNCTION_VARIANT(0x3, "pwm",    /* PWM0 */
->>> +                                        PINCTRL_SUN8I_R40)),
->>>         SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 3),
->>>                   SUNXI_FUNCTION(0x0, "gpio_in"),
->>>                   SUNXI_FUNCTION(0x1, "gpio_out"),
->>> -                 SUNXI_FUNCTION(0x2, "ir0"),           /* TX */
->>> +                 SUNXI_FUNCTION_VARIANT(0x2, "ir0",    /* TX */
->>> +                                        PINCTRL_SUN4I_A10 |
->>> +                                        PINCTRL_SUN7I_A20),
->>> +                 SUNXI_FUNCTION_VARIANT(0x3, "pwm0",   /* PWM1 */
->>
->>
->> The numbering is wrong. Just drop the number altogether, like all the
->> other instances.
->>
->>> +                                        PINCTRL_SUN8I_R40),
->>>                 /*
->>>                  * The SPDIF block is not referenced at all in the A10
->>> user
->>>                  * manual. However it is described in the code leaked and
->>> the
->>> @@ -205,7 +239,8 @@ static const struct sunxi_desc_pin sun4i_a10_pins[] =
->>> {
->>>                   SUNXI_FUNCTION_VARIANT(0x2, "i2s",    /* MCLK */
->>>                                          PINCTRL_SUN4I_A10),
->>>                   SUNXI_FUNCTION_VARIANT(0x2, "i2s0",   /* MCLK */
->>> -                                        PINCTRL_SUN7I_A20),
->>> +                                        PINCTRL_SUN7I_A20 |
->>> +                                        PINCTRL_SUN8I_R40),
->>
->>
->> Maybe we could use "i2s" instead, like on the A10. I don't know where
->> i2s1 is used, but it certainly isn't routed outside the SoC, and i2s2
->> looks like it's for dw-hdmi's audio path.
->
->
-> Nope, it's routed at PA bank, see pins start at PA14.
->
-> Changing this name will also break existing A20 device trees, if any of
-> them use I2S.
+On Wed, 2017-05-24 at 11:43 +0200, Neil Armstrong wrote:
+> On Amlogic GX SoCs, there is two CEC controllers :
+> - An Amlogic CEC custom in the AO domain
+> - The Synopsys HDMI-TX Controller in the EE domain
+> 
+> Each of these controllers needs a 32.768KHz clock, but there is two paths :
+> - In the EE domain, the "32k_clk" this patchs is adding
+> - In the AO domain, with a more complex dual divider more precise setup
+> 
+> The AO 32K clock support will be pushed later in the corresponding
+> gxbb-aoclk driver when the AE CEC driver is ready.
+> 
+> The EE 32k_clk must be pushed earlier since mainline support for CEC in the
+> Synopsys HDMI-TX controller is nearby.
+> 
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
-Missed that one. Sorry about the noise.
+Rebased and applied.
+Thx
 
->
->
->>
->>>                   SUNXI_FUNCTION(0x3, "ac97")),         /* MCLK */
->>>         SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 6),
->>>                   SUNXI_FUNCTION(0x0, "gpio_in"),
->>
->>
->> [...]
->>
->>> @@ -237,31 +275,41 @@ static const struct sunxi_desc_pin sun4i_a10_pins[]
->>> = {
->>>                   SUNXI_FUNCTION_VARIANT(0x2, "i2s",    /* DO1 */
->>>                                          PINCTRL_SUN4I_A10),
->>>                   SUNXI_FUNCTION_VARIANT(0x2, "i2s0",   /* DO1 */
->>> -                                        PINCTRL_SUN7I_A20)),
->>> +                                        PINCTRL_SUN7I_A20 |
->>> +                                        PINCTRL_SUN8I_R40),
->>> +                 SUNXI_FUNCTION_VARIANT(0x4, "pwm",    /* PWM6 */
->>> +                                        PINCTRL_SUN8I_R40)),
->>>         SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 10),
->>>                   SUNXI_FUNCTION(0x0, "gpio_in"),
->>>                   SUNXI_FUNCTION(0x1, "gpio_out"),
->>>                   SUNXI_FUNCTION_VARIANT(0x2, "i2s",    /* DO2 */
->>>                                          PINCTRL_SUN4I_A10),
->>>                   SUNXI_FUNCTION_VARIANT(0x2, "i2s0",   /* DO2 */
->>> -                                        PINCTRL_SUN7I_A20)),
->>> +                                        PINCTRL_SUN7I_A20 |
->>> +                                        PINCTRL_SUN8I_R40),
->>> +                 SUNXI_FUNCTION_VARIANT(0x4, "pwm",    /* PWM7 */
->>> +                                        PINCTRL_SUN8I_R40)),
->>>         SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 11),
->>>                   SUNXI_FUNCTION(0x0, "gpio_in"),
->>>                   SUNXI_FUNCTION(0x1, "gpio_out"),
->>>                   SUNXI_FUNCTION_VARIANT(0x2, "i2s",    /* DO3 */
->>>                                          PINCTRL_SUN4I_A10),
->>>                   SUNXI_FUNCTION_VARIANT(0x2, "i2s0",   /* DO3 */
->>> -                                        PINCTRL_SUN7I_A20)),
->>> +                                        PINCTRL_SUN7I_A20 |
->>> +                                        PINCTRL_SUN8I_R40)),
->>>         SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 12),
->>>                   SUNXI_FUNCTION(0x0, "gpio_in"),
->>>                   SUNXI_FUNCTION(0x1, "gpio_out"),
->>>                   SUNXI_FUNCTION_VARIANT(0x2, "i2s",    /* DI */
->>>                                          PINCTRL_SUN4I_A10),
->>>                   SUNXI_FUNCTION_VARIANT(0x2, "i2s0",   /* DI */
->>> -                                        PINCTRL_SUN7I_A20),
->>> +                                        PINCTRL_SUN7I_A20 |
->>> +                                        PINCTRL_SUN8I_R40),
->>>                   SUNXI_FUNCTION(0x3, "ac97"),          /* DI */
->>>                 /* Undocumented mux function on A10 - See SPDIF MCLK
->>> above */
->>> -                 SUNXI_FUNCTION(0x4, "spdif")),        /* SPDIF IN */
->>> +                 SUNXI_FUNCTION_VARIANT(0x4, "spdif",  /* SPDIF IN */
->>> +                                        PINCTRL_SUN4I_A10 |
->>> +                                        PINCTRL_SUN7I_A20)),
->>>         SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 13),
->>>                   SUNXI_FUNCTION(0x0, "gpio_in"),
->>>                   SUNXI_FUNCTION(0x1, "gpio_out"),
->>> @@ -308,7 +356,9 @@ static const struct sunxi_desc_pin sun4i_a10_pins[] =
->>> {
->>
->>
->> You missed PWM4 and PWM5 on pins PB20 and PB21.
->>
->>>                   SUNXI_FUNCTION(0x0, "gpio_in"),
->>>                   SUNXI_FUNCTION(0x1, "gpio_out"),
->>>                   SUNXI_FUNCTION(0x2, "uart0"),         /* TX */
->>> -                 SUNXI_FUNCTION(0x3, "ir1")),          /* TX */
->>> +                 SUNXI_FUNCTION_VARIANT(0x3, "ir1",    /* TX */
->>> +                                        PINCTRL_SUN4I_A10 |
->>> +                                        PINCTRL_SUN7I_A20)),
->>>         SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 23),
->>>                   SUNXI_FUNCTION(0x0, "gpio_in"),
->>>                   SUNXI_FUNCTION(0x1, "gpio_out"),
->>
->>
->> [...]
->>
->>> @@ -916,7 +1000,10 @@ static const struct sunxi_desc_pin sun4i_a10_pins[]
->>> = {
->>>                   SUNXI_FUNCTION_VARIANT(0x3, "pata",   /* ATAD12 */
->>>                                          PINCTRL_SUN4I_A10),
->>>                   SUNXI_FUNCTION_VARIANT(0x3, "emac",   /* ETXD1 */
->>> -                                        PINCTRL_SUN7I_A20),
->>> +                                        PINCTRL_SUN7I_A20 |
->>> +                                        PINCTRL_SUN8I_R40),
->>> +                 SUNXI_FUNCTION_VARIANT(0x5, "sim",    /* DET */
->>> +                                        PINCTRL_SUN8I_R40),
->>
->>
->> This is available on all 3 variants.
->>
->> Should we consider sending a fix for this first? The hardware backing
->> this pin is not supported, but it would be less confusing to fix it
->> first instead of introducing a function for all variants in a patch
->> supposedly for just the R40.
->
->
-> OK.
->
-> But if we do so I think I should delay this patch until the A10-A20
-> driver merge is applied...
+Jerome
 
-Since the hardware is unsupported to begin with, I think that's OK.
-You could add an extra patch just before this one in the series.
-
-
-ChenYu
-
->
->>
->>>                   SUNXI_FUNCTION(0x4, "keypad"),        /* IN6 */
->>>                   SUNXI_FUNCTION_IRQ(0x6, 16),          /* EINT16 */
->>>                   SUNXI_FUNCTION(0x7, "csi1")),         /* D16 */
->>
->>
->> [...]
->>
->> Looks good otherwise.
->>
->>
->> Regards
->> ChenYu
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> ---
+> ?drivers/clk/meson/gxbb.c | 54
+> ++++++++++++++++++++++++++++++++++++++++++++++++
+> ?drivers/clk/meson/gxbb.h |??5 ++++-
+> ?2 files changed, 58 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
+> index ad5f027..4b7d85a 100644
+> --- a/drivers/clk/meson/gxbb.c
+> +++ b/drivers/clk/meson/gxbb.c
+> @@ -951,6 +951,51 @@ struct pll_params_table gxl_gp0_params_table[] = {
+> ?	},
+> ?};
+> ?
+> +static struct clk_divider gxbb_32k_clk_div = {
+> +	.reg = (void *)HHI_32K_CLK_CNTL,
+> +	.shift = 0,
+> +	.width = 14,
+> +	.lock = &clk_lock,
+> +	.hw.init = &(struct clk_init_data){
+> +		.name = "32k_clk_div",
+> +		.ops = &clk_divider_ops,
+> +		.parent_names = (const char *[]){ "32k_clk_sel" },
+> +		.num_parents = 1,
+> +		.flags = CLK_SET_RATE_PARENT | CLK_DIVIDER_ROUND_CLOSEST,
+> +	},
+> +};
+> +
+> +static struct clk_gate gxbb_32k_clk = {
+> +	.reg = (void *)HHI_32K_CLK_CNTL,
+> +	.bit_idx = 15,
+> +	.lock = &clk_lock,
+> +	.hw.init = &(struct clk_init_data){
+> +		.name = "32k_clk",
+> +		.ops = &clk_gate_ops,
+> +		.parent_names = (const char *[]){ "32k_clk_div" },
+> +		.num_parents = 1,
+> +		.flags = CLK_SET_RATE_PARENT,
+> +	},
+> +};
+> +
+> +static const char *gxbb_32k_clk_parent_names[] = {
+> +	"xtal", "cts_slow_oscin", "fclk_div3", "fclk_div5"
+> +};
+> +
+> +static struct clk_mux gxbb_32k_clk_sel = {
+> +	.reg = (void *)HHI_32K_CLK_CNTL,
+> +	.mask = 0x3,
+> +	.shift = 16,
+> +	.lock = &clk_lock,
+> +		.hw.init = &(struct clk_init_data){
+> +		.name = "32k_clk_sel",
+> +		.ops = &clk_mux_ops,
+> +		.parent_names = gxbb_32k_clk_parent_names,
+> +		.num_parents = 4,
+> +		.flags = CLK_SET_RATE_PARENT,
+> +	},
+> +};
+> +
+> ?/* Everything Else (EE) domain gates */
+> ?static MESON_GATE(gxbb_ddr, HHI_GCLK_MPEG0, 0);
+> ?static MESON_GATE(gxbb_dos, HHI_GCLK_MPEG0, 1);
+> @@ -1158,6 +1203,9 @@ struct pll_params_table gxl_gp0_params_table[] = {
+> ?		[CLKID_CTS_MCLK_I958_SEL]???= &gxbb_cts_mclk_i958_sel.hw,
+> ?		[CLKID_CTS_MCLK_I958_DIV]???= &gxbb_cts_mclk_i958_div.hw,
+> ?		[CLKID_CTS_I958]	????= &gxbb_cts_i958.hw,
+> +		[CLKID_32K_CLK]		????= &gxbb_32k_clk.hw,
+> +		[CLKID_32K_CLK_SEL]	????= &gxbb_32k_clk_sel.hw,
+> +		[CLKID_32K_CLK_DIV]	????= &gxbb_32k_clk_div.hw,
+> ?	},
+> ?	.num = NR_CLKS,
+> ?};
+> @@ -1278,6 +1326,9 @@ struct pll_params_table gxl_gp0_params_table[] = {
+> ?		[CLKID_CTS_MCLK_I958_SEL]???= &gxbb_cts_mclk_i958_sel.hw,
+> ?		[CLKID_CTS_MCLK_I958_DIV]???= &gxbb_cts_mclk_i958_div.hw,
+> ?		[CLKID_CTS_I958]	????= &gxbb_cts_i958.hw,
+> +		[CLKID_32K_CLK]		????= &gxbb_32k_clk.hw,
+> +		[CLKID_32K_CLK_SEL]	????= &gxbb_32k_clk_sel.hw,
+> +		[CLKID_32K_CLK_DIV]	????= &gxbb_32k_clk_div.hw,
+> ?	},
+> ?	.num = NR_CLKS,
+> ?};
+> @@ -1392,6 +1443,7 @@ struct pll_params_table gxl_gp0_params_table[] = {
+> ?	&gxbb_mali_1,
+> ?	&gxbb_cts_amclk,
+> ?	&gxbb_cts_mclk_i958,
+> +	&gxbb_32k_clk,
+> ?};
+> ?
+> ?static struct clk_mux *const gxbb_clk_muxes[] = {
+> @@ -1403,6 +1455,7 @@ struct pll_params_table gxl_gp0_params_table[] = {
+> ?	&gxbb_cts_amclk_sel,
+> ?	&gxbb_cts_mclk_i958_sel,
+> ?	&gxbb_cts_i958,
+> +	&gxbb_32k_clk_sel,
+> ?};
+> ?
+> ?static struct clk_divider *const gxbb_clk_dividers[] = {
+> @@ -1411,6 +1464,7 @@ struct pll_params_table gxl_gp0_params_table[] = {
+> ?	&gxbb_mali_0_div,
+> ?	&gxbb_mali_1_div,
+> ?	&gxbb_cts_mclk_i958_div,
+> +	&gxbb_32k_clk_div,
+> ?};
+> ?
+> ?static struct meson_clk_audio_divider *const gxbb_audio_dividers[] = {
+> diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
+> index 93b8f07..de5fad0 100644
+> --- a/drivers/clk/meson/gxbb.h
+> +++ b/drivers/clk/meson/gxbb.h
+> @@ -284,8 +284,11 @@
+> ?#define CLKID_CTS_MCLK_I958_SEL	??111
+> ?#define CLKID_CTS_MCLK_I958_DIV	??112
+> ?#define CLKID_CTS_I958		??113
+> +#define CLKID_32K_CLK		??114
+> +#define CLKID_32K_CLK_SEL	??115
+> +#define CLKID_32K_CLK_DIV	??116
+> ?
+> -#define NR_CLKS			??114
+> +#define NR_CLKS			??117
+> ?
+> ?/* include the CLKIDs that have been made part of the stable DT binding */
+> ?#include <dt-bindings/clock/gxbb-clkc.h>
