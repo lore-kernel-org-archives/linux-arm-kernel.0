@@ -1,32 +1,89 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 29 May 2017 07:51:19 +0300
-Subject: [PATCH] ARM: dts: sama5d2_xplained: remove wrong memory node
-Message-ID: <04c9a65854a644958ebabf10d97359021b947cb4.1496033479.git.baruch@tkos.co.il>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Mon, 29 May 2017 10:36:42 +0530
+Subject: [PATCH v6 3/6] ACPI/IORT: Ignore all errors except EPROBE_DEFER
+In-Reply-To: <1564836.5iBbgoacpH@aspire.rjw.lan>
+References: <1495892865-9506-1-git-send-email-sricharan@codeaurora.org>
+ <1495892865-9506-3-git-send-email-sricharan@codeaurora.org>
+ <1564836.5iBbgoacpH@aspire.rjw.lan>
+Message-ID: <68bc9be5-22df-e7af-3fcd-182e935e681c@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The size field of the memory node is wrong. Rely on the default value in
-sama5d2.dtsi that happens to be correct for the SAMA5D2 Xplained board.
+Hi Rafael,
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- arch/arm/boot/dts/at91-sama5d2_xplained.dts | 4 ----
- 1 file changed, 4 deletions(-)
+On 5/28/2017 12:48 AM, Rafael J. Wysocki wrote:
+> On Saturday, May 27, 2017 07:17:42 PM Sricharan R wrote:
+>> While deferring the probe of IOMMU masters, xlate and
+>> add_device callbacks called from iort_iommu_configure
+>> can pass back error values like -ENODEV, which means
+>> the IOMMU cannot be connected with that master for real
+>> reasons. Before the IOMMU probe deferral, all such errors
+>> were ignored. Now all those errors are propagated back,
+>> killing the master's probe for such errors. Instead ignore
+>> all the errors except EPROBE_DEFER, which is the only one
+>> of concern and let the master work without IOMMU, thus
+>> restoring the old behavior. Also make explicit that
+>> acpi_dma_configure handles only -EPROBE_DEFER from
+>> iort_iommu_configure.
+>>
+>> Fixes: 5a1bb638d567 ("drivers: acpi: Handle IOMMU lookup failure with deferred probing or error")
+>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>> ---
+>>  drivers/acpi/arm64/iort.c | 6 ++++++
+>>  drivers/acpi/scan.c       | 4 ++--
+>>  2 files changed, 8 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+>> index c5fecf9..16e101f 100644
+>> --- a/drivers/acpi/arm64/iort.c
+>> +++ b/drivers/acpi/arm64/iort.c
+>> @@ -782,6 +782,12 @@ const struct iommu_ops *iort_iommu_configure(struct device *dev)
+>>  	if (err)
+>>  		ops = ERR_PTR(err);
+>>  
+>> +	/* Ignore all other errors apart from EPROBE_DEFER */
+>> +	if (IS_ERR(ops) && (PTR_ERR(ops) != -EPROBE_DEFER)) {
+>> +		dev_dbg(dev, "Adding to IOMMU failed: %ld\n", PTR_ERR(ops));
+>> +		ops = NULL;
+>> +	}
+>> +
+>>  	return ops;
+>>  }
+>>  
+>> diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+>> index e39ec7b..3a10d757 100644
+>> --- a/drivers/acpi/scan.c
+>> +++ b/drivers/acpi/scan.c
+>> @@ -1371,8 +1371,8 @@ int acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
+>>  	iort_set_dma_mask(dev);
+>>  
+>>  	iommu = iort_iommu_configure(dev);
+>> -	if (IS_ERR(iommu))
+>> -		return PTR_ERR(iommu);
+>> +	if (IS_ERR(iommu) && PTR_ERR(iommu) == -EPROBE_DEFER)
+>> +		return -EPROBE_DEFER;
+>>  
+>>  	size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
+>>  	/*
+>>
+> 
+> ACK for the scan.c change and I'm assuming this to go in via ARM64.
+> 
 
-diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-index 0bef9e0b89c6..14437d7697e6 100644
---- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-@@ -56,10 +56,6 @@
- 		stdout-path = "serial0:115200n8";
- 	};
- 
--	memory {
--		reg = <0x20000000 0x80000>;
--	};
--
- 	clocks {
- 		slow_xtal {
- 			clock-frequency = <32768>;
+Thanks for the ACK, should go through the IOMMU tree, since this fixes the IOMMU probe deferral
+that got merged through it.
+
+Regards,
+ Sricharan
+
+> Thanks,
+> Rafael
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
 -- 
-2.11.0
+"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
