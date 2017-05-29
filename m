@@ -1,89 +1,103 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Mon, 29 May 2017 11:58:18 +0200
-Subject: [PATCH v4 8/8] arm,arm64,drivers: add a prefix to drivers
- arch_topology interfaces
-In-Reply-To: <bcc2f8f1-e953-9f32-2aa2-e660b0351e0a@arm.com>
-References: <20170420144316.15632-1-juri.lelli@arm.com>
- <20170420144316.15632-9-juri.lelli@arm.com>
- <20170525131802.GE16244@kroah.com>
- <20170526101032.2t2xn5wrfenimu5w@e106622-lin>
- <20170526183610.GB16490@kroah.com>
- <bcc2f8f1-e953-9f32-2aa2-e660b0351e0a@arm.com>
-Message-ID: <20170529095818.GA9892@kroah.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 29 May 2017 12:04:48 +0200
+Subject: [RFC 1/2] dt-bindings: mmc: Document the Amlogic Meson8 and
+ Meson8b SDIO bindings
+In-Reply-To: <20170506171857.16492-2-martin.blumenstingl@googlemail.com>
+References: <20170506171857.16492-1-martin.blumenstingl@googlemail.com>
+ <20170506171857.16492-2-martin.blumenstingl@googlemail.com>
+Message-ID: <CAPDyKFp9Dhf+sebqvxwr=i1dskh_JfhWaG4FMPO-CHk_sj7pVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 29, 2017 at 11:20:24AM +0200, Dietmar Eggemann wrote:
-> Hi Greg,
-> 
-> On 05/26/2017 08:36 PM, Greg KH wrote:
-> > On Fri, May 26, 2017 at 11:10:32AM +0100, Juri Lelli wrote:
-> > > Hi,
-> > > 
-> > > On 25/05/17 15:18, Greg KH wrote:
-> > > > On Thu, Apr 20, 2017 at 03:43:16PM +0100, Juri Lelli wrote:
-> 
-> [...]
-> 
-> > > > But this is all really topology stuff, right?  Why use "capacity" at
-> > > > all:
-> > > > 	topology_normalize_cpu()
-> > > > 	topology_parse_cpu()
-> > > > 	topology_scale_cpu()
-> > > > 	topology_set_scale()
-> > > > ?
-> > > > 
-> > > > It's always best to put the "subsystem" name first, we have a bad
-> > > > history of getting this wrong in the past by putting the verb first, not
-> > > > the noun.
-> > > > 
-> > > 
-> > > topology_ works for me. However, I'd keep "capacity" in the names, as we
-> > > might need to topology_normalize_cpu_somethingelse() (etc.) in the
-> > > future?
-> > 
-> > Worry about the future, in the future.  Change the names then, _IF_ it
-> > becomes an issue.  Try to be short and simple please.
-> > 
-> > > Updated patch follows. I kept Catalin and Russell's acks as I only
-> > > renamed the functions, please shout if that's not OK.
-> > > 
-> > > Greg, if you are fine with this approach, do you still want a complete
-> > > v5 of the set or can you pick this up?
-> > 
-> > Am I the one who is supposed to take all of these arm-specific patches?
-> > If so, that's fine, but I need to have acks from the arm maintainers...
-> > 
-> > Oh, and drop "capacity" please :)
-> 
-> Once we have driver/base/arch_topology.c in, we want to enable (cpu
-> micro-architectural + max frequency (OPPmax)) invariant and frequency
-> (OPPmin..OPPmax) invariant load-tracking/accounting in the task scheduler
-> for arm and arm64.
-> 
-> The way to do this is to define the task scheduler interfaces
-> arch_scale_cpu_capacity() and arch_scale_freq_capacity() in arch specific
-> code:
-> 
-> #define arch_scale_cpu_capacity topology_scale_cpu_capacity
-> #define arch_scale_freq_capacity topology_scale_freq_capacity
-> 
-> In case an arch is not defining them, the default definitions in
-> kernel/sched/sched.h are used.
-> 
-> So topology_scale_cpu() wouldn't be correct since we scale the _capacity_ by
-> the micro-architectural differences (hence cpu) and not the cpu.
-> 
-> Likewise we will have a function topology_scale_freq_capacity indicating
-> that we scale the capacity by the frequency.
-> 
-> Or would you prefer something like topology_scale_capacity_by_cpu() and
-> topology_scale_capacity_by_freq()?
+On 6 May 2017 at 19:18, Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+> From: Carlo Caione <carlo@endlessm.com>
+>
+> This documents the devicetree bindings for the SDIO/MMC host found in
+> Amlogic Meson8 and Meson8b SoCs. It supports the SD specification v2.0
+> and the eMMC specification v4.41.
+> It has an internal "mux" which allows connecting up to three MMC devices
+> to it. The maximum supported bus-width is 4-bits.
+>
+> Amlogic's GPL kernel sources call it "SDIO" to differentiate it from the
+> other MMC controller in (at least the Meson8 and Meson8b) the SoCs (they
+> call the other one "SDHC", which supports a bus-width of up to 8-bits).
+>
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> ---
+>  .../bindings/mmc/amlogic,meson-mx-sdio.txt         | 50 ++++++++++++++++++++++
+>  1 file changed, 50 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/amlogic,meson-mx-sdio.txt
+>
+> diff --git a/Documentation/devicetree/bindings/mmc/amlogic,meson-mx-sdio.txt b/Documentation/devicetree/bindings/mmc/amlogic,meson-mx-sdio.txt
+> new file mode 100644
+> index 000000000000..991c43a602bd
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/amlogic,meson-mx-sdio.txt
+> @@ -0,0 +1,50 @@
+> +* Amlogic Meson6, Meson8 and Meson8b SDIO/MMC controller
+> +
+> +The highspeed MMC host controller on Amlogic SoCs provides an interface
+> +for MMC, SD, SDIO and SDHC types of memory cards.
+> +
+> +Supported maximum speeds are the ones of the eMMC standard 4.41 as well
+> +as the speed of SD standard 2.0.
+> +
+> +The hardware provides an internal "mux" which allows up to three slots
+> +to be controlled. Only one device can be accessed at a time.
+> +
+> +Required properties:
+> + - compatible : must be one of
+> +       - "amlogic,meson8-sdio"
+> +       - "amlogic,meson8b-sdio"
+> +       along with the generic "amlogic,meson-mx-sdio"
+> + - reg : mmc controller base registers
+> + - interrupts : mmc controller interrupt
+> + - #address-cells : must be 1
+> + - size-cells : must be 0
+> + - clocks : phandle to clock providers
+> + - clock-names : must contain "core" and "clkin"
+> +
+> +Required child nodes:
+> +A node for each slot provided by the MMC controller is required.
+> +
+> +Required properties on each child node (= slot):
+> + - reg : the slot (or "port") ID
 
-I think that if you are creating an api that the scheduler will use, you
-need to ask the scheduler maintainers/developers what they want to see
-here, as that would be up to them, not me...
+Please add also that we need a compatible = "mmc-slot", as we are
+using req for childnodes to describe SDIO func nodes and embedded
+cards.
 
-thanks,
+While doing this, could you perhaps also update the generic mmc DT
+doc, as currently the compatible is described only in
+Documentation/devicetree/bindings/mmc/cavium-mmc.txt.
 
-greg k-h
+> +
+> +Optional properties on each child node (= slot):
+> + - bus-width : must be 1 or 4 (8-bit bus is not supported)
+> + - for cd and all other additional generic mmc parameters
+> +   please refer to mmc.txt within this directory
+> +
+> +Examples:
+> +       mmc at c1108c20 {
+> +               compatible = "amlogic,meson8-sdio", "amlogic,meson-mx-sdio";
+> +               reg = <0xc1108c20 0x20>;
+> +               interrupts = <0 28 1>;
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +               clocks = <&clkc CLKID_SDIO>, <&clkc CLKID_CLK81>;
+> +               clock-names = "core", "clkin";
+> +
+> +               slot at 1 {
+> +                       reg = <1>;
+> +
+> +                       bus-width = <4>;
+> +               };
+> +       };
+> --
+> 2.12.2
+>
+
+Kind regards
+Uffe
