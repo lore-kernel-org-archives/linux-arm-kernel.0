@@ -1,543 +1,648 @@
-From: jagan@openedev.com (Jagan Teki)
-Date: Mon, 29 May 2017 19:30:28 +0000
-Subject: [PATCH 3/3] ARM: dts: sun6i-a31s: Rename sun6i-a31s-sinovoip-bpi-m2
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Tue, 30 May 2017 03:45:02 +0800
+Subject: [linux-sunxi] [PATCH 1/3] ARM: dts: sun7i-a20: Rename bananapi as
+ bananapi m1
 In-Reply-To: <1496086228-2806-1-git-send-email-jagan@openedev.com>
 References: <1496086228-2806-1-git-send-email-jagan@openedev.com>
-Message-ID: <1496086228-2806-3-git-send-email-jagan@openedev.com>
+Message-ID: <64C21281-E8B6-428E-9480-3B81BE66FC6E@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jagan Teki <jagan@amarulasolutions.com>
 
-Since Bananapi brand is owned by BIPAI KEJI(BPI),
-the previous Sinovoip no longer use the bananapi brand,
-hence rename sun6i-a31s-sinovoip-bpi-m2.dts to
-sun6i-a31s-bananapi-m2.dts
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Note: Bananapi BPI product site
-http://www.banana-pi.org/product.html
+? 2017?5?30? GMT+08:00 ??3:30:26, Jagan Teki <jagan@openedev.com> ??:
+>From: Jagan Teki <jagan@amarulasolutions.com>
+>
+>from BPI(BIPAI KEJI LIMITED) products the Bananapi board
+>is named as 'Bananapi M1' and this is the starting
+>bananapi board from M1 series.
+>
+>So rename dts and suffix 'M1' on model for the same,
+>so-that next sequence on bananapi starts like M1 Plus, M2 and so..on
+>
+>Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+>---
+>Note: Bananapi BPI product site
+>http://www.banana-pi.org/product.html
+>
+> arch/arm/boot/dts/Makefile                  |   2 +-
+>arch/arm/boot/dts/sun7i-a20-bananapi-m1.dts | 286
+>++++++++++++++++++++++++++++
+>arch/arm/boot/dts/sun7i-a20-bananapi.dts    | 286
+>----------------------------
+> 3 files changed, 287 insertions(+), 287 deletions(-)
+> create mode 100644 arch/arm/boot/dts/sun7i-a20-bananapi-m1.dts
+> delete mode 100644 arch/arm/boot/dts/sun7i-a20-bananapi.dts
+>
+>diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>index 45c6e65..1b086f0 100644
+>--- a/arch/arm/boot/dts/Makefile
+>+++ b/arch/arm/boot/dts/Makefile
+>@@ -851,7 +851,7 @@ dtb-$(CONFIG_MACH_SUN6I) += \
+> 	sun6i-a31s-sinovoip-bpi-m2.dtb \
+> 	sun6i-a31s-yones-toptech-bs1078-v2.dtb
+> dtb-$(CONFIG_MACH_SUN7I) += \
+>-	sun7i-a20-bananapi.dtb \
+>+	sun7i-a20-bananapi-m1.dtb \
+> 	sun7i-a20-bananapi-m1-plus.dtb \
+> 	sun7i-a20-bananapro.dtb \
+> 	sun7i-a20-cubieboard2.dtb \
+>diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi-m1.dts
+>b/arch/arm/boot/dts/sun7i-a20-bananapi-m1.dts
+>new file mode 100644
+>index 0000000..8b97b89
+>--- /dev/null
+>+++ b/arch/arm/boot/dts/sun7i-a20-bananapi-m1.dts
+>@@ -0,0 +1,286 @@
+>+/*
+>+ * Copyright 2014 Hans de Goede <hdegoede@redhat.com>
+>+ *
+>+ * Hans de Goede <hdegoede@redhat.com>
+>+ *
+>+ * This file is dual-licensed: you can use it either under the terms
+>+ * of the GPL or the X11 license, at your option. Note that this dual
+>+ * licensing only applies to this file, and not this project as a
+>+ * whole.
+>+ *
+>+ *  a) This file is free software; you can redistribute it and/or
+>+ *     modify it under the terms of the GNU General Public License as
+>+ *     published by the Free Software Foundation; either version 2 of
+>the
+>+ *     License, or (at your option) any later version.
+>+ *
+>+ *     This file is distributed in the hope that it will be useful,
+>+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>+ *     GNU General Public License for more details.
+>+ *
+>+ * Or, alternatively,
+>+ *
+>+ *  b) Permission is hereby granted, free of charge, to any person
+>+ *     obtaining a copy of this software and associated documentation
+>+ *     files (the "Software"), to deal in the Software without
+>+ *     restriction, including without limitation the rights to use,
+>+ *     copy, modify, merge, publish, distribute, sublicense, and/or
+>+ *     sell copies of the Software, and to permit persons to whom the
+>+ *     Software is furnished to do so, subject to the following
+>+ *     conditions:
+>+ *
+>+ *     The above copyright notice and this permission notice shall be
+>+ *     included in all copies or substantial portions of the Software.
+>+ *
+>+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+>+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>+ *     OTHER DEALINGS IN THE SOFTWARE.
+>+ */
+>+
+>+/dts-v1/;
+>+#include "sun7i-a20.dtsi"
+>+#include "sunxi-common-regulators.dtsi"
+>+
+>+#include <dt-bindings/gpio/gpio.h>
+>+#include <dt-bindings/interrupt-controller/irq.h>
+>+
+>+/ {
+>+	model = "LeMaker Banana Pi M1";
+>+	compatible = "lemaker,bananapi", "allwinner,sun7i-a20";
 
- arch/arm/boot/dts/Makefile                       |   2 +-
- arch/arm/boot/dts/sun6i-a31s-bananapi-m2.dts     | 244 +++++++++++++++++++++++
- arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts | 244 -----------------------
- 3 files changed, 245 insertions(+), 245 deletions(-)
- create mode 100644 arch/arm/boot/dts/sun6i-a31s-bananapi-m2.dts
- delete mode 100644 arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
+LeMaker never name this BPI M1.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 1b086f0..e588721 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -848,7 +848,7 @@ dtb-$(CONFIG_MACH_SUN6I) += \
- 	sun6i-a31s-inet-q972.dtb \
- 	sun6i-a31s-primo81.dtb \
- 	sun6i-a31s-sina31s.dtb \
--	sun6i-a31s-sinovoip-bpi-m2.dtb \
-+	sun6i-a31s-bananapi-m2.dtb \
- 	sun6i-a31s-yones-toptech-bs1078-v2.dtb
- dtb-$(CONFIG_MACH_SUN7I) += \
- 	sun7i-a20-bananapi-m1.dtb \
-diff --git a/arch/arm/boot/dts/sun6i-a31s-bananapi-m2.dts b/arch/arm/boot/dts/sun6i-a31s-bananapi-m2.dts
-new file mode 100644
-index 0000000..265f79d
---- /dev/null
-+++ b/arch/arm/boot/dts/sun6i-a31s-bananapi-m2.dts
-@@ -0,0 +1,244 @@
-+/*
-+ * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun6i-a31s.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	model = "Banana PI BPI-M2";
-+	compatible = "bananapi,bpi-m2", "allwinner,sun6i-a31s";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins_bpi_m2>;
-+
-+		blue {
-+			label = "bpi-m2:blue:usr";
-+			gpios = <&pio 6 11 GPIO_ACTIVE_HIGH>; /* PG11 */
-+		};
-+
-+		green {
-+			label = "bpi-m2:green:usr";
-+			gpios = <&pio 6 10 GPIO_ACTIVE_HIGH>; /* PG10 */
-+		};
-+
-+		red {
-+			label = "bpi-m2:red:usr";
-+			gpios = <&pio 6 5 GPIO_ACTIVE_HIGH>; /* PG5 */
-+		};
-+	};
-+
-+	mmc2_pwrseq: mmc2_pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&mmc2_pwrseq_pin_bpi_m2>;
-+		reset-gpios = <&r_pio 0 8 GPIO_ACTIVE_LOW>; /* PL8 WIFI_EN */
-+	};
-+};
-+
-+&cpu0 {
-+	cpu-supply = <&reg_dcdc3>;
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&gmac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&gmac_pins_rgmii_a>, <&gmac_phy_reset_pin_bpi_m2>;
-+	phy = <&phy1>;
-+	phy-mode = "rgmii";
-+	snps,reset-gpio = <&pio 0 21 GPIO_ACTIVE_HIGH>; /* PA21 */
-+	snps,reset-active-low;
-+	snps,reset-delays-us = <0 10000 30000>;
-+	status = "okay";
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+	};
-+};
-+
-+&ir {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ir_pins_a>;
-+	status = "okay";
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_bpi_m2>;
-+	vmmc-supply = <&reg_vcc3v0>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 0 4 GPIO_ACTIVE_HIGH>; /* PA4 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&mmc0_pins_a {
-+	bias-pull-up;
-+};
-+
-+&mmc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_pins_a>;
-+	vmmc-supply = <&reg_vcc3v0>;
-+	mmc-pwrseq = <&mmc2_pwrseq>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+
-+	brcmf: bcrmf at 1 {
-+		reg = <1>;
-+		compatible = "brcm,bcm4329-fmac";
-+		interrupt-parent = <&r_pio>;
-+		interrupts = <0 5 IRQ_TYPE_LEVEL_LOW>; /* PL5 */
-+		interrupt-names = "host-wake";
-+	};
-+};
-+
-+&mmc2_pins_a {
-+	bias-pull-up;
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&p2wi {
-+	status = "okay";
-+
-+	axp22x: pmic at 68 {
-+		compatible = "x-powers,axp221";
-+		reg = <0x68>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
-+
-+&pio {
-+	gmac_phy_reset_pin_bpi_m2: gmac_phy_reset_pin at 0 {
-+		pins = "PA21";
-+		function = "gpio_out";
-+	};
-+
-+	led_pins_bpi_m2: led_pins at 0 {
-+		pins = "PG5", "PG10", "PG11";
-+		function = "gpio_out";
-+	};
-+
-+	mmc0_cd_pin_bpi_m2: mmc0_cd_pin at 0 {
-+		pins = "PA4";
-+		function = "gpio_in";
-+		bias-pull-up;
-+	};
-+};
-+
-+&r_pio {
-+	mmc2_pwrseq_pin_bpi_m2: mmc2_pwrseq_pin at 0 {
-+		pins = "PL8";
-+		function = "gpio_out";
-+	};
-+};
-+
-+#include "axp22x.dtsi"
-+
-+&reg_dc5ldo {
-+	regulator-min-microvolt = <700000>;
-+	regulator-max-microvolt = <1320000>;
-+	regulator-name = "vdd-cpus";
-+};
-+
-+&reg_dcdc1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vdd-3v0";
-+};
-+
-+&reg_dcdc2 {
-+	regulator-min-microvolt = <700000>;
-+	regulator-max-microvolt = <1320000>;
-+	regulator-name = "vdd-gpu";
-+};
-+
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <700000>;
-+	regulator-max-microvolt = <1320000>;
-+	regulator-name = "vdd-cpu";
-+};
-+
-+&reg_dcdc4 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <700000>;
-+	regulator-max-microvolt = <1320000>;
-+	regulator-name = "vdd-sys-dll";
-+};
-+
-+&reg_dcdc5 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1500000>;
-+	regulator-max-microvolt = <1500000>;
-+	regulator-name = "vcc-dram";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts b/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
-deleted file mode 100644
-index 265f79d..0000000
---- a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
-+++ /dev/null
-@@ -1,244 +0,0 @@
--/*
-- * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
-- *
-- * This file is dual-licensed: you can use it either under the terms
-- * of the GPL or the X11 license, at your option. Note that this dual
-- * licensing only applies to this file, and not this project as a
-- * whole.
-- *
-- *  a) This library is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License as
-- *     published by the Free Software Foundation; either version 2 of the
-- *     License, or (at your option) any later version.
-- *
-- *     This library is distributed in the hope that it will be useful,
-- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- *     GNU General Public License for more details.
-- *
-- * Or, alternatively,
-- *
-- *  b) Permission is hereby granted, free of charge, to any person
-- *     obtaining a copy of this software and associated documentation
-- *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use,
-- *     copy, modify, merge, publish, distribute, sublicense, and/or
-- *     sell copies of the Software, and to permit persons to whom the
-- *     Software is furnished to do so, subject to the following
-- *     conditions:
-- *
-- *     The above copyright notice and this permission notice shall be
-- *     included in all copies or substantial portions of the Software.
-- *
-- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-- *     OTHER DEALINGS IN THE SOFTWARE.
-- */
--
--/dts-v1/;
--#include "sun6i-a31s.dtsi"
--#include "sunxi-common-regulators.dtsi"
--#include <dt-bindings/gpio/gpio.h>
--
--/ {
--	model = "Banana PI BPI-M2";
--	compatible = "bananapi,bpi-m2", "allwinner,sun6i-a31s";
--
--	aliases {
--		serial0 = &uart0;
--	};
--
--	chosen {
--		stdout-path = "serial0:115200n8";
--	};
--
--	leds {
--		compatible = "gpio-leds";
--		pinctrl-names = "default";
--		pinctrl-0 = <&led_pins_bpi_m2>;
--
--		blue {
--			label = "bpi-m2:blue:usr";
--			gpios = <&pio 6 11 GPIO_ACTIVE_HIGH>; /* PG11 */
--		};
--
--		green {
--			label = "bpi-m2:green:usr";
--			gpios = <&pio 6 10 GPIO_ACTIVE_HIGH>; /* PG10 */
--		};
--
--		red {
--			label = "bpi-m2:red:usr";
--			gpios = <&pio 6 5 GPIO_ACTIVE_HIGH>; /* PG5 */
--		};
--	};
--
--	mmc2_pwrseq: mmc2_pwrseq {
--		compatible = "mmc-pwrseq-simple";
--		pinctrl-names = "default";
--		pinctrl-0 = <&mmc2_pwrseq_pin_bpi_m2>;
--		reset-gpios = <&r_pio 0 8 GPIO_ACTIVE_LOW>; /* PL8 WIFI_EN */
--	};
--};
--
--&cpu0 {
--	cpu-supply = <&reg_dcdc3>;
--};
--
--&ehci0 {
--	status = "okay";
--};
--
--&gmac {
--	pinctrl-names = "default";
--	pinctrl-0 = <&gmac_pins_rgmii_a>, <&gmac_phy_reset_pin_bpi_m2>;
--	phy = <&phy1>;
--	phy-mode = "rgmii";
--	snps,reset-gpio = <&pio 0 21 GPIO_ACTIVE_HIGH>; /* PA21 */
--	snps,reset-active-low;
--	snps,reset-delays-us = <0 10000 30000>;
--	status = "okay";
--
--	phy1: ethernet-phy at 1 {
--		reg = <1>;
--	};
--};
--
--&ir {
--	pinctrl-names = "default";
--	pinctrl-0 = <&ir_pins_a>;
--	status = "okay";
--};
--
--&mmc0 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_bpi_m2>;
--	vmmc-supply = <&reg_vcc3v0>;
--	bus-width = <4>;
--	cd-gpios = <&pio 0 4 GPIO_ACTIVE_HIGH>; /* PA4 */
--	cd-inverted;
--	status = "okay";
--};
--
--&mmc0_pins_a {
--	bias-pull-up;
--};
--
--&mmc2 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&mmc2_pins_a>;
--	vmmc-supply = <&reg_vcc3v0>;
--	mmc-pwrseq = <&mmc2_pwrseq>;
--	bus-width = <4>;
--	non-removable;
--	status = "okay";
--
--	brcmf: bcrmf at 1 {
--		reg = <1>;
--		compatible = "brcm,bcm4329-fmac";
--		interrupt-parent = <&r_pio>;
--		interrupts = <0 5 IRQ_TYPE_LEVEL_LOW>; /* PL5 */
--		interrupt-names = "host-wake";
--	};
--};
--
--&mmc2_pins_a {
--	bias-pull-up;
--};
--
--&ohci0 {
--	status = "okay";
--};
--
--&p2wi {
--	status = "okay";
--
--	axp22x: pmic at 68 {
--		compatible = "x-powers,axp221";
--		reg = <0x68>;
--		interrupt-parent = <&nmi_intc>;
--		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
--	};
--};
--
--&pio {
--	gmac_phy_reset_pin_bpi_m2: gmac_phy_reset_pin at 0 {
--		pins = "PA21";
--		function = "gpio_out";
--	};
--
--	led_pins_bpi_m2: led_pins at 0 {
--		pins = "PG5", "PG10", "PG11";
--		function = "gpio_out";
--	};
--
--	mmc0_cd_pin_bpi_m2: mmc0_cd_pin at 0 {
--		pins = "PA4";
--		function = "gpio_in";
--		bias-pull-up;
--	};
--};
--
--&r_pio {
--	mmc2_pwrseq_pin_bpi_m2: mmc2_pwrseq_pin at 0 {
--		pins = "PL8";
--		function = "gpio_out";
--	};
--};
--
--#include "axp22x.dtsi"
--
--&reg_dc5ldo {
--	regulator-min-microvolt = <700000>;
--	regulator-max-microvolt = <1320000>;
--	regulator-name = "vdd-cpus";
--};
--
--&reg_dcdc1 {
--	regulator-always-on;
--	regulator-min-microvolt = <3000000>;
--	regulator-max-microvolt = <3000000>;
--	regulator-name = "vdd-3v0";
--};
--
--&reg_dcdc2 {
--	regulator-min-microvolt = <700000>;
--	regulator-max-microvolt = <1320000>;
--	regulator-name = "vdd-gpu";
--};
--
--&reg_dcdc3 {
--	regulator-always-on;
--	regulator-min-microvolt = <700000>;
--	regulator-max-microvolt = <1320000>;
--	regulator-name = "vdd-cpu";
--};
--
--&reg_dcdc4 {
--	regulator-always-on;
--	regulator-min-microvolt = <700000>;
--	regulator-max-microvolt = <1320000>;
--	regulator-name = "vdd-sys-dll";
--};
--
--&reg_dcdc5 {
--	regulator-always-on;
--	regulator-min-microvolt = <1500000>;
--	regulator-max-microvolt = <1500000>;
--	regulator-name = "vcc-dram";
--};
--
--&uart0 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&uart0_pins_a>;
--	status = "okay";
--};
--
--&usbphy {
--	status = "okay";
--};
--- 
-1.9.1
+The M1 tag is made by Sinovoip and Bipai.
+
+I suggest you just set model to "Banana Pi M1" and compatible to
+three:
+"bananapi,bpi-m1", "lemaker,bananapi" (Sinovoip BPi
+M1 is fully compatible with the original Banana Pi by LeMaker,
+so here're these compatibles) and "allwinner,sun7i-a20".
+
+>+
+>+	aliases {
+>+		serial0 = &uart0;
+>+		serial1 = &uart3;
+>+		serial2 = &uart7;
+>+	};
+>+
+>+	chosen {
+>+		stdout-path = "serial0:115200n8";
+>+	};
+>+
+>+	leds {
+>+		compatible = "gpio-leds";
+>+		pinctrl-names = "default";
+>+		pinctrl-0 = <&led_pins_bananapi>;
+>+
+>+		green {
+>+			label = "bananapi:green:usr";
+>+			gpios = <&pio 7 24 GPIO_ACTIVE_HIGH>;
+>+		};
+>+	};
+>+
+>+	reg_gmac_3v3: gmac-3v3 {
+>+		compatible = "regulator-fixed";
+>+		pinctrl-names = "default";
+>+		pinctrl-0 = <&gmac_power_pin_bananapi>;
+>+		regulator-name = "gmac-3v3";
+>+		regulator-min-microvolt = <3300000>;
+>+		regulator-max-microvolt = <3300000>;
+>+		startup-delay-us = <100000>;
+>+		enable-active-high;
+>+		gpio = <&pio 7 23 GPIO_ACTIVE_HIGH>;
+>+	};
+>+};
+>+
+>+&ahci {
+>+	status = "okay";
+>+};
+>+
+>+&codec {
+>+	status = "okay";
+>+};
+>+
+>+&cpu0 {
+>+	cpu-supply = <&reg_dcdc2>;
+>+	operating-points = <
+>+		/* kHz	  uV */
+>+		960000	1400000
+>+		912000	1400000
+>+		864000	1350000
+>+		720000	1250000
+>+		528000	1150000
+>+		312000	1100000
+>+		144000	1050000
+>+		>;
+>+};
+>+
+>+&ehci0 {
+>+	status = "okay";
+>+};
+>+
+>+&ehci1 {
+>+	status = "okay";
+>+};
+>+
+>+&gmac {
+>+	pinctrl-names = "default";
+>+	pinctrl-0 = <&gmac_pins_rgmii_a>;
+>+	phy = <&phy1>;
+>+	phy-mode = "rgmii";
+>+	phy-supply = <&reg_gmac_3v3>;
+>+	status = "okay";
+>+
+>+	phy1: ethernet-phy at 1 {
+>+		reg = <1>;
+>+	};
+>+};
+>+
+>+&i2c0 {
+>+	pinctrl-names = "default";
+>+	pinctrl-0 = <&i2c0_pins_a>;
+>+	status = "okay";
+>+
+>+	axp209: pmic at 34 {
+>+		reg = <0x34>;
+>+		interrupt-parent = <&nmi_intc>;
+>+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+>+	};
+>+};
+>+
+>+&i2c2 {
+>+	pinctrl-names = "default";
+>+	pinctrl-0 = <&i2c2_pins_a>;
+>+	status = "okay";
+>+};
+>+
+>+&ir0 {
+>+	pinctrl-names = "default";
+>+	pinctrl-0 = <&ir0_rx_pins_a>;
+>+	status = "okay";
+>+};
+>+
+>+&mmc0 {
+>+	pinctrl-names = "default";
+>+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_bananapi>;
+>+	vmmc-supply = <&reg_vcc3v3>;
+>+	bus-width = <4>;
+>+	cd-gpios = <&pio 7 10 GPIO_ACTIVE_HIGH>; /* PH10 */
+>+	cd-inverted;
+>+	status = "okay";
+>+};
+>+
+>+&ohci0 {
+>+	status = "okay";
+>+};
+>+
+>+&ohci1 {
+>+	status = "okay";
+>+};
+>+
+>+&otg_sram {
+>+	status = "okay";
+>+};
+>+
+>+&pio {
+>+	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
+>+		pins = "PH4";
+>+		function = "gpio_in";
+>+		bias-pull-up;
+>+	};
+>+
+>+	mmc0_cd_pin_bananapi: mmc0_cd_pin at 0 {
+>+		pins = "PH10";
+>+		function = "gpio_in";
+>+		bias-pull-up;
+>+	};
+>+
+>+	gmac_power_pin_bananapi: gmac_power_pin at 0 {
+>+		pins = "PH23";
+>+		function = "gpio_out";
+>+	};
+>+
+>+	led_pins_bananapi: led_pins at 0 {
+>+		pins = "PH24";
+>+		function = "gpio_out";
+>+	};
+>+};
+>+
+>+#include "axp209.dtsi"
+>+
+>+&reg_dcdc2 {
+>+	regulator-always-on;
+>+	regulator-min-microvolt = <1000000>;
+>+	regulator-max-microvolt = <1400000>;
+>+	regulator-name = "vdd-cpu";
+>+};
+>+
+>+&reg_dcdc3 {
+>+	regulator-always-on;
+>+	regulator-min-microvolt = <1000000>;
+>+	regulator-max-microvolt = <1400000>;
+>+	regulator-name = "vdd-int-dll";
+>+};
+>+
+>+&reg_ldo1 {
+>+	regulator-name = "vdd-rtc";
+>+};
+>+
+>+&reg_ldo2 {
+>+	regulator-always-on;
+>+	regulator-min-microvolt = <3000000>;
+>+	regulator-max-microvolt = <3000000>;
+>+	regulator-name = "avcc";
+>+};
+>+
+>+&reg_usb0_vbus {
+>+	status = "okay";
+>+};
+>+
+>+&reg_usb1_vbus {
+>+	status = "okay";
+>+};
+>+
+>+&reg_usb2_vbus {
+>+	status = "okay";
+>+};
+>+
+>+&spi0 {
+>+	pinctrl-names = "default";
+>+	pinctrl-0 = <&spi0_pins_a>,
+>+		    <&spi0_cs0_pins_a>,
+>+		    <&spi0_cs1_pins_a>;
+>+	status = "okay";
+>+};
+>+
+>+&uart0 {
+>+	pinctrl-names = "default";
+>+	pinctrl-0 = <&uart0_pins_a>;
+>+	status = "okay";
+>+};
+>+
+>+&uart3 {
+>+	pinctrl-names = "default";
+>+	pinctrl-0 = <&uart3_pins_b>;
+>+	status = "okay";
+>+};
+>+
+>+&uart7 {
+>+	pinctrl-names = "default";
+>+	pinctrl-0 = <&uart7_pins_a>;
+>+	status = "okay";
+>+};
+>+
+>+&usb_otg {
+>+	dr_mode = "otg";
+>+	status = "okay";
+>+};
+>+
+>+&usb_power_supply {
+>+	status = "okay";
+>+};
+>+
+>+&usbphy {
+>+	pinctrl-names = "default";
+>+	pinctrl-0 = <&usb0_id_detect_pin>;
+>+	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
+>+	usb0_vbus_power-supply = <&usb_power_supply>;
+>+	usb0_vbus-supply = <&reg_usb0_vbus>;
+>+	usb1_vbus-supply = <&reg_usb1_vbus>;
+>+	usb2_vbus-supply = <&reg_usb2_vbus>;
+>+	status = "okay";
+>+};
+>diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+>b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+>deleted file mode 100644
+>index ed2f35a..0000000
+>--- a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+>+++ /dev/null
+>@@ -1,286 +0,0 @@
+>-/*
+>- * Copyright 2014 Hans de Goede <hdegoede@redhat.com>
+>- *
+>- * Hans de Goede <hdegoede@redhat.com>
+>- *
+>- * This file is dual-licensed: you can use it either under the terms
+>- * of the GPL or the X11 license, at your option. Note that this dual
+>- * licensing only applies to this file, and not this project as a
+>- * whole.
+>- *
+>- *  a) This file is free software; you can redistribute it and/or
+>- *     modify it under the terms of the GNU General Public License as
+>- *     published by the Free Software Foundation; either version 2 of
+>the
+>- *     License, or (at your option) any later version.
+>- *
+>- *     This file is distributed in the hope that it will be useful,
+>- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>- *     GNU General Public License for more details.
+>- *
+>- * Or, alternatively,
+>- *
+>- *  b) Permission is hereby granted, free of charge, to any person
+>- *     obtaining a copy of this software and associated documentation
+>- *     files (the "Software"), to deal in the Software without
+>- *     restriction, including without limitation the rights to use,
+>- *     copy, modify, merge, publish, distribute, sublicense, and/or
+>- *     sell copies of the Software, and to permit persons to whom the
+>- *     Software is furnished to do so, subject to the following
+>- *     conditions:
+>- *
+>- *     The above copyright notice and this permission notice shall be
+>- *     included in all copies or substantial portions of the Software.
+>- *
+>- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+>- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>- *     OTHER DEALINGS IN THE SOFTWARE.
+>- */
+>-
+>-/dts-v1/;
+>-#include "sun7i-a20.dtsi"
+>-#include "sunxi-common-regulators.dtsi"
+>-
+>-#include <dt-bindings/gpio/gpio.h>
+>-#include <dt-bindings/interrupt-controller/irq.h>
+>-
+>-/ {
+>-	model = "LeMaker Banana Pi";
+>-	compatible = "lemaker,bananapi", "allwinner,sun7i-a20";
+>-
+>-	aliases {
+>-		serial0 = &uart0;
+>-		serial1 = &uart3;
+>-		serial2 = &uart7;
+>-	};
+>-
+>-	chosen {
+>-		stdout-path = "serial0:115200n8";
+>-	};
+>-
+>-	leds {
+>-		compatible = "gpio-leds";
+>-		pinctrl-names = "default";
+>-		pinctrl-0 = <&led_pins_bananapi>;
+>-
+>-		green {
+>-			label = "bananapi:green:usr";
+>-			gpios = <&pio 7 24 GPIO_ACTIVE_HIGH>;
+>-		};
+>-	};
+>-
+>-	reg_gmac_3v3: gmac-3v3 {
+>-		compatible = "regulator-fixed";
+>-		pinctrl-names = "default";
+>-		pinctrl-0 = <&gmac_power_pin_bananapi>;
+>-		regulator-name = "gmac-3v3";
+>-		regulator-min-microvolt = <3300000>;
+>-		regulator-max-microvolt = <3300000>;
+>-		startup-delay-us = <100000>;
+>-		enable-active-high;
+>-		gpio = <&pio 7 23 GPIO_ACTIVE_HIGH>;
+>-	};
+>-};
+>-
+>-&ahci {
+>-	status = "okay";
+>-};
+>-
+>-&codec {
+>-	status = "okay";
+>-};
+>-
+>-&cpu0 {
+>-	cpu-supply = <&reg_dcdc2>;
+>-	operating-points = <
+>-		/* kHz	  uV */
+>-		960000	1400000
+>-		912000	1400000
+>-		864000	1350000
+>-		720000	1250000
+>-		528000	1150000
+>-		312000	1100000
+>-		144000	1050000
+>-		>;
+>-};
+>-
+>-&ehci0 {
+>-	status = "okay";
+>-};
+>-
+>-&ehci1 {
+>-	status = "okay";
+>-};
+>-
+>-&gmac {
+>-	pinctrl-names = "default";
+>-	pinctrl-0 = <&gmac_pins_rgmii_a>;
+>-	phy = <&phy1>;
+>-	phy-mode = "rgmii";
+>-	phy-supply = <&reg_gmac_3v3>;
+>-	status = "okay";
+>-
+>-	phy1: ethernet-phy at 1 {
+>-		reg = <1>;
+>-	};
+>-};
+>-
+>-&i2c0 {
+>-	pinctrl-names = "default";
+>-	pinctrl-0 = <&i2c0_pins_a>;
+>-	status = "okay";
+>-
+>-	axp209: pmic at 34 {
+>-		reg = <0x34>;
+>-		interrupt-parent = <&nmi_intc>;
+>-		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+>-	};
+>-};
+>-
+>-&i2c2 {
+>-	pinctrl-names = "default";
+>-	pinctrl-0 = <&i2c2_pins_a>;
+>-	status = "okay";
+>-};
+>-
+>-&ir0 {
+>-	pinctrl-names = "default";
+>-	pinctrl-0 = <&ir0_rx_pins_a>;
+>-	status = "okay";
+>-};
+>-
+>-&mmc0 {
+>-	pinctrl-names = "default";
+>-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_bananapi>;
+>-	vmmc-supply = <&reg_vcc3v3>;
+>-	bus-width = <4>;
+>-	cd-gpios = <&pio 7 10 GPIO_ACTIVE_HIGH>; /* PH10 */
+>-	cd-inverted;
+>-	status = "okay";
+>-};
+>-
+>-&ohci0 {
+>-	status = "okay";
+>-};
+>-
+>-&ohci1 {
+>-	status = "okay";
+>-};
+>-
+>-&otg_sram {
+>-	status = "okay";
+>-};
+>-
+>-&pio {
+>-	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
+>-		pins = "PH4";
+>-		function = "gpio_in";
+>-		bias-pull-up;
+>-	};
+>-
+>-	mmc0_cd_pin_bananapi: mmc0_cd_pin at 0 {
+>-		pins = "PH10";
+>-		function = "gpio_in";
+>-		bias-pull-up;
+>-	};
+>-
+>-	gmac_power_pin_bananapi: gmac_power_pin at 0 {
+>-		pins = "PH23";
+>-		function = "gpio_out";
+>-	};
+>-
+>-	led_pins_bananapi: led_pins at 0 {
+>-		pins = "PH24";
+>-		function = "gpio_out";
+>-	};
+>-};
+>-
+>-#include "axp209.dtsi"
+>-
+>-&reg_dcdc2 {
+>-	regulator-always-on;
+>-	regulator-min-microvolt = <1000000>;
+>-	regulator-max-microvolt = <1400000>;
+>-	regulator-name = "vdd-cpu";
+>-};
+>-
+>-&reg_dcdc3 {
+>-	regulator-always-on;
+>-	regulator-min-microvolt = <1000000>;
+>-	regulator-max-microvolt = <1400000>;
+>-	regulator-name = "vdd-int-dll";
+>-};
+>-
+>-&reg_ldo1 {
+>-	regulator-name = "vdd-rtc";
+>-};
+>-
+>-&reg_ldo2 {
+>-	regulator-always-on;
+>-	regulator-min-microvolt = <3000000>;
+>-	regulator-max-microvolt = <3000000>;
+>-	regulator-name = "avcc";
+>-};
+>-
+>-&reg_usb0_vbus {
+>-	status = "okay";
+>-};
+>-
+>-&reg_usb1_vbus {
+>-	status = "okay";
+>-};
+>-
+>-&reg_usb2_vbus {
+>-	status = "okay";
+>-};
+>-
+>-&spi0 {
+>-	pinctrl-names = "default";
+>-	pinctrl-0 = <&spi0_pins_a>,
+>-		    <&spi0_cs0_pins_a>,
+>-		    <&spi0_cs1_pins_a>;
+>-	status = "okay";
+>-};
+>-
+>-&uart0 {
+>-	pinctrl-names = "default";
+>-	pinctrl-0 = <&uart0_pins_a>;
+>-	status = "okay";
+>-};
+>-
+>-&uart3 {
+>-	pinctrl-names = "default";
+>-	pinctrl-0 = <&uart3_pins_b>;
+>-	status = "okay";
+>-};
+>-
+>-&uart7 {
+>-	pinctrl-names = "default";
+>-	pinctrl-0 = <&uart7_pins_a>;
+>-	status = "okay";
+>-};
+>-
+>-&usb_otg {
+>-	dr_mode = "otg";
+>-	status = "okay";
+>-};
+>-
+>-&usb_power_supply {
+>-	status = "okay";
+>-};
+>-
+>-&usbphy {
+>-	pinctrl-names = "default";
+>-	pinctrl-0 = <&usb0_id_detect_pin>;
+>-	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
+>-	usb0_vbus_power-supply = <&usb_power_supply>;
+>-	usb0_vbus-supply = <&reg_usb0_vbus>;
+>-	usb1_vbus-supply = <&reg_usb1_vbus>;
+>-	usb2_vbus-supply = <&reg_usb2_vbus>;
+>-	status = "okay";
+>-};
