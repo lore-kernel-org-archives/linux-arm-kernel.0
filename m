@@ -1,115 +1,88 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Mon, 29 May 2017 08:11:00 -0700
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Explicitly restore
- CONFIG_DEBUG_FS
-In-Reply-To: <1496059116.31994.6.camel@nxp.com>
-References: <49b2579b9ad2e5ce0a7c4b163dffb5a885ac7dae.1495797565.git.leonard.crestez@nxp.com>
- <20170526154236.GY3956@linux.vnet.ibm.com>
- <1496059116.31994.6.camel@nxp.com>
-Message-ID: <20170529151100.GJ3956@linux.vnet.ibm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 29 May 2017 17:11:16 +0200
+Subject: [PATCH v2 1/4] dt-bindings: mediatek: add bindings for MediaTek
+ MT7622 SoC
+In-Reply-To: <9b4e201f8f9ad11be98f22ccc3022b4e5d76a681.1496061587.git.sean.wang@mediatek.com>
+References: <cover.1496061587.git.sean.wang@mediatek.com>
+ <9b4e201f8f9ad11be98f22ccc3022b4e5d76a681.1496061587.git.sean.wang@mediatek.com>
+Message-ID: <cf8fabea-8eb1-6a28-0e8e-cfc3087f5fb5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 29, 2017 at 02:58:36PM +0300, Leonard Crestez wrote:
-> On Fri, 2017-05-26 at 08:42 -0700, Paul E. McKenney wrote:
-> > On Fri, May 26, 2017 at 02:26:06PM +0300, Leonard Crestez wrote:
-> > > 
-> > > This option was removed by "make savedefconfig" in
-> > > commit c5054a98bce4 ("ARM: imx_v6_v7_defconfig: Select SMSC_PHY")
-> > > 
-> > > This happened because CONFIG_DEBUG_FS was implicitly selected by
-> > > CONFIG_TREE_RCU_TRACE which defaulted to true because CONFIG_RCU_TRACE
-> > > was enabled by default by commit 961518259b3b ("rcu: Enable RCU
-> > > tracepoints by default to aid in debugging")
-> > > 
-> > > Recently however CONFIG_RCU_TRACE was completely removed by
-> > > commit 6e74c237c410 ("rcu: Remove debugfs tracing")
-> 
-> > CONFIG_RCU_TRACE is still very much alive in its new home at
-> > kernel/rcu/Kconfig.debug:
-> 
-> Sorry, what was removed is the dependency on DEBUG_FS. In particular
-> this snippet:
-> 
-> diff --git a/init/Kconfig b/init/Kconfig
-> index 2aa14ff..3025383 100644
-> --
-> - a/init/Kconfig
-> +++ b/init/Kconfig
-> @@ -659,14 +659,6 @@ config
-> RCU_FAST_NO_HZ
-> ?
-> ??????????Say N if you are unsure.
-> ?
-> -config
-> TREE_RCU_TRACE
-> -???????def_bool RCU_TRACE && ( TREE_RCU || PREEMPT_RCU )
-> -???????select DEBUG_FS
 
-Ah, you are right.  RCU no longer needs DEBUG_FS, so it no longer
-selects it.
 
-> -???????help
-> -?????????This option provides
-> tracing for the TREE_RCU and
-> -?????????PREEMPT_RCU implementations,
-> permitting Makefile to
-> -?????????trivially select
-> kernel/rcutree_trace.c.
-> -
-> ?config RCU_BOOST
-> ????????bool "Enable RCU
-> priority boosting"
-> ????????depends on RT_MUTEXES && PREEMPT_RCU &&
-> RCU_EXPERT
+On 29/05/17 14:56, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
 > 
-> > config RCU_TRACE
-> > 	bool "Enable tracing for RCU"
-> > 	depends on DEBUG_KERNEL
-> > 	default y if TREE_RCU
-> > 	select TRACE_CLOCK
-> > 	help
-> > 	??This option enables additional tracepoints for ftrace-style
-> > 	??event tracing.
-> > 
-> > 	??Say Y here if you want to enable RCU tracing
-> > 	??Say N if you are unsure.
-> > 
-> > That said, I need to make it default to "y" if PREEMPT_RCU as well as
-> > the current TREE_RCU.??Would that help?
+> This adds dt-binding documentation for MediaTek MT7622 SoC
+> which currently only includes basic items such as ARM CPU,
+> MediaTek SYSIRQ and UART.
 > 
-> I don't think you can help unless you want to make RCU_TRACE depend on
-> DEBUG_FS for no reason. The proper fix is to have DEBUG_FS inside the
-> imx_v6_v7_defconfig.
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> ---
+>   Documentation/devicetree/bindings/arm/mediatek.txt                    | 4 ++++
+>   .../devicetree/bindings/interrupt-controller/mediatek,sysirq.txt      | 3 ++-
+>   Documentation/devicetree/bindings/serial/mtk-uart.txt                 | 1 +
+>   3 files changed, 7 insertions(+), 1 deletion(-)
 > 
-> My problem is just an unfortunate accident with default dependencies
-> and overzealous savedefconfig.
+> diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
+> index c860b24..fc68570 100644
+> --- a/Documentation/devicetree/bindings/arm/mediatek.txt
+> +++ b/Documentation/devicetree/bindings/arm/mediatek.txt
+> @@ -12,6 +12,7 @@ compatible: Must contain one of
+>      "mediatek,mt6592"
+>      "mediatek,mt6755"
+>      "mediatek,mt6795"
+> +   "mediatek,mt7622"
+>      "mediatek,mt7623"
+>      "mediatek,mt8127"
+>      "mediatek,mt8135"
+> @@ -38,6 +39,9 @@ Supported boards:
+>   - Evaluation board for MT6795(Helio X10):
+>       Required root node properties:
+>         - compatible = "mediatek,mt6795-evb", "mediatek,mt6795";
+> +- Reference board variant 1 for MT7622:
+> +    Required root node properties:
+> +      - compatible = "mediatek,mt7622-rfb1", "mediatek,mt7622";
+>   - Evaluation board for MT7623:
+>       Required root node properties:
+>         - compatible = "mediatek,mt7623-evb", "mediatek,mt7623";
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt b/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
+> index a89c03b..eda1183 100644
+> --- a/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
+> @@ -1,4 +1,4 @@
+> -+Mediatek 65xx/67xx/81xx sysirq
+> ++Mediatek MT65xx/MT67xx/MT762x/MT81xx sysirq
+>   
+>   Mediatek SOCs sysirq support controllable irq inverter for each GIC SPI
+>   interrupt.
+> @@ -15,6 +15,7 @@ Required properties:
+>   	"mediatek,mt6582-sysirq"
+>   	"mediatek,mt6580-sysirq"
+>   	"mediatek,mt6577-sysirq"
+> +	"mediatek,mt7622-sysirq"
+>   	"mediatek,mt2701-sysirq"
 
-Right you are!
+This file is a mess and I posted some cleanups on the mailinglist. No 
+need for you to resubmit. If the DT maintainers are fine with my 
+cleanups, I cann change the line accordingly.
 
-> As far as I understand after recent changes RCU_TRACE is now only
-> useful with tracepoints. Shouldn't it depend on TRACEPOINTS in some
-> way? It's still possible to compile with RCU_TRACE on and TRACEPOINTS
-> off, is this intentional? It seems that when this happens you're just
-> relying on tracepoint macros to expand to nothing.
-> 
-> Fr example maybe RCU_TRACE should be "default y if (TREE_RCU &&
-> TRACEPOINTS); depends on TRACEPOINTS"?
-> 
-> In theory you could also "select TRACEPOINTS" but then you would end up
-> enabling TRACEPOINTS by default in all configurations that use TREE_RCU
-> but don't explicitly disable RCU_TRACE.
-> 
-> I'd say that if $SUBSYSTEM_DEBUG depends on $MAJOR_DEBUG_FEATURE it
-> should try to avoid selecting $MAJOR_DEBUG_FEATURE by default if it's
-> not otherwise enabled. As far as I can tell this is how RCU ended up
-> indirectly pulling in DEBUG_FS and later unexpectedly removed it.
-> 
-> Or I could be completely wrong, kconfig can be very confusing.
+Regards,
+Matthias
 
-Interesting questions!  I will give them some thought.
-
-Perhaps TRACEPOINTS is accidentally being enabled for me just as
-DEBUG_FS was being accidentally enabled for you.  ;-)
-
-							Thanx, Paul
+>   - interrupt-controller : Identifies the node as an interrupt controller
+>   - #interrupt-cells : Use the same format as specified by GIC in arm,gic.txt.
+> diff --git a/Documentation/devicetree/bindings/serial/mtk-uart.txt b/Documentation/devicetree/bindings/serial/mtk-uart.txt
+> index 0015c72..daa1eef 100644
+> --- a/Documentation/devicetree/bindings/serial/mtk-uart.txt
+> +++ b/Documentation/devicetree/bindings/serial/mtk-uart.txt
+> @@ -8,6 +8,7 @@ Required properties:
+>     * "mediatek,mt6589-uart" for MT6589 compatible UARTS
+>     * "mediatek,mt6755-uart" for MT6755 compatible UARTS
+>     * "mediatek,mt6795-uart" for MT6795 compatible UARTS
+> +  * "mediatek,mt7622-uart" for MT7622 compatible UARTS
+>     * "mediatek,mt7623-uart" for MT7623 compatible UARTS
+>     * "mediatek,mt8127-uart" for MT8127 compatible UARTS
+>     * "mediatek,mt8135-uart" for MT8135 compatible UARTS
+> 
