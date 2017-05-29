@@ -1,21 +1,80 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 29 May 2017 11:00:28 +0200
-Subject: [PATCH 4/5] pinctrl: meson-gxl: Add CEC pins
-In-Reply-To: <1495614042-2676-5-git-send-email-narmstrong@baylibre.com>
-References: <1495614042-2676-1-git-send-email-narmstrong@baylibre.com>
- <1495614042-2676-5-git-send-email-narmstrong@baylibre.com>
-Message-ID: <CACRpkdatXKr514zAuN0d5FiMHFhKjnCRdN7iWKsV-a7QN7q-Ng@mail.gmail.com>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Mon, 29 May 2017 14:41:59 +0530
+Subject: [PATCH v2] iommu/arm-smmu-v3: Increase CMDQ drain timeout value
+In-Reply-To: <1493983066-28202-1-git-send-email-sunil.kovvuri@gmail.com>
+References: <1493983066-28202-1-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <CA+sq2Cc_6Wj-0wLG=5fTAS66Tyn=63=An-Ay7h=EV=mjDi2-MQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 24, 2017 at 10:20 AM, Neil Armstrong
-<narmstrong@baylibre.com> wrote:
-
-> Add the AO and EE domain CEC pins for the Amlogic Meson GXL SoCs.
+On Fri, May 5, 2017 at 4:47 PM,  <sunil.kovvuri@gmail.com> wrote:
+> From: Sunil Goutham <sgoutham@cavium.com>
 >
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> Processing queue full of TLB invalidation commands might
+> take more time on some platforms than current timeout
+> of 100us. So increased drain timeout value.
+>
+> Also now udelay time is increased exponentially for each poll.
+>
+> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+> ---
+>
+> v2
+> - Addressed Will's and Robin's comments i.e
+>   increased poll timeout only for drain case and removed spin loop
+>   whose logic anyway is screwed up.
+> - Also changed commit subject and message as this patch no longer
+>   exactly reflects what is done in SMMU driver i.e
+>   8513c8930069 iommu/arm-smmu: Poll for TLB sync completion more effectively
+>
+>  drivers/iommu/arm-smmu-v3.c | 15 +++++++++++++--
+>  1 file changed, 13 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index d412bdd..cbc8309 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -379,6 +379,8 @@
+>  #define CMDQ_SYNC_0_CS_NONE            (0UL << CMDQ_SYNC_0_CS_SHIFT)
+>  #define CMDQ_SYNC_0_CS_SEV             (2UL << CMDQ_SYNC_0_CS_SHIFT)
+>
+> +#define CMDQ_DRAIN_TIMEOUT_US          1000
+> +
+>  /* Event queue */
+>  #define EVTQ_ENT_DWORDS                        4
+>  #define EVTQ_MAX_SZ_SHIFT              7
+> @@ -737,7 +739,12 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
+>   */
+>  static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
+>  {
+> -       ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_POLL_TIMEOUT_US);
+> +       ktime_t timeout;
+> +       unsigned int delay = 1;
+> +
+> +       /* Wait longer if it's queue drain */
+> +       timeout = ktime_add_us(ktime_get(), drain ? CMDQ_DRAIN_TIMEOUT_US :
+> +                                                   ARM_SMMU_POLL_TIMEOUT_US);
+>
+>         while (queue_sync_cons(q), (drain ? !queue_empty(q) : queue_full(q))) {
+>                 if (ktime_compare(ktime_get(), timeout) > 0)
+> @@ -747,7 +754,11 @@ static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
+>                         wfe();
+>                 } else {
+>                         cpu_relax();
+> -                       udelay(1);
+> +                       udelay(delay);
+> +                       /* No point in sleeping for fixed time,
+> +                        * if cons isn't moving fast.
+> +                        */
+> +                       delay *= 2;
+>                 }
+>         }
+>
+> --
+> 2.7.4
+>
 
-Patch applied with Jerome's review tag.
+Gentle reminder for patch review.
 
-Yours,
-Linus Walleij
+Thanks,
+Sunil.
