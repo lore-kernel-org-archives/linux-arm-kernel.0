@@ -1,68 +1,58 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 29 May 2017 22:27:37 +0200
-Subject: [PATCH v2 11/12] crypto: sun4i-ss: fix large block size support
-In-Reply-To: <20170529202738.2167-1-antoine.tenart@free-electrons.com>
-References: <20170529202738.2167-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170529202738.2167-12-antoine.tenart@free-electrons.com>
+Date: Mon, 29 May 2017 22:27:26 +0200
+Subject: [PATCH v2 00/12] ARM: sun5i: cryptographic engine support
+Message-ID: <20170529202738.2167-1-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The run-time self-tests fail quite early, as soon as the input block
-size is larger than 64 bytes:
+Hello,
 
-  alg: hash: Test 4 failed for sha1-sun4i-ss
-  00000000: b9 c9 1e 52 c0 26 d8 39 81 ff f2 3c 99 b1 27 b2
-  00000010: 30 d6 c9 85
+This series adds the cryptographic engine support to sun5i SoCs. This is
+based on top of v4.12-rc1 and was tested on a CHIP. The series begins
+with fixes and improvements. The series is available at:
+https://github.com/atenart/linux v4.12-rc1/sun5i-crypto
 
-One thing to notice is the value of the last word, which is the one
-expected (it can sometime be the last two words). The datasheet isn't
-very clear about when the digest is ready to retrieve and is seems the
-bit SS_DATA_END is cleared when the digest was computed *but* that
-doesn't mean the digest is ready to retrieve in the registers.
+The 8 first patches are reworks and cosmetic improvements.
 
-A ndelay(1) is added before reading the computed digest to ensure it is
-available in the SS_MD[] registers.
+Patch 9 moves the cipher part of the sun4i-ss driver from the ablkcipher
+API to the newer skcipher API.
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
- drivers/crypto/sunxi-ss/sun4i-ss-hash.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+Patch 10 adds the CRYPTO_ALG_KERN_DRIVER_ONLY flag for ciphers exposed
+by the sun4i-ss driver.
 
-diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
-index 685de5b6ab17..a4b5ff2b72f8 100644
---- a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
-+++ b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
-@@ -358,6 +358,15 @@ static int sun4i_hash(struct ahash_request *areq)
- 		goto release_ss;
- 	}
- 
-+	/*
-+	 * The datasheet isn't very clear about when to retrieve the digest. The
-+	 * bit SS_DATA_END is cleared when the engine has processed the data and
-+	 * when the digest is computed *but* it doesn't mean the digest is
-+	 * available in the digest registers. Hence the delay to be sure we can
-+	 * read it.
-+	 */
-+	ndelay(1);
-+
- 	for (i = 0; i < crypto_ahash_digestsize(tfm) / 4; i++)
- 		op->hash[i] = readl(ss->base + SS_MD0 + i * 4);
- 
-@@ -446,6 +455,15 @@ static int sun4i_hash(struct ahash_request *areq)
- 		goto release_ss;
- 	}
- 
-+	/*
-+	 * The datasheet isn't very clear about when to retrieve the digest. The
-+	 * bit SS_DATA_END is cleared when the engine has processed the data and
-+	 * when the digest is computed *but* it doesn't mean the digest is
-+	 * available in the digest registers. Hence the delay to be sure we can
-+	 * read it.
-+	 */
-+	ndelay(1);
-+
- 	/* Get the hash from the device */
- 	if (op->mode == SS_OP_SHA1) {
- 		for (i = 0; i < 5; i++) {
+Patch 11 fixes the crypto framework selftests on the CHIP. It might fix
+other users too.
+
+Patch 12 adds a cryptographic engine node for sun5i SoCs.
+
+Thanks,
+Antoine
+
+Since v1:
+  - Fixed a typo.
+  - Made the CRYPTO_ALG_KERN_DRIVER_ONLY flag addition in a dedicated
+    patch.
+
+Antoine Tenart (12):
+  crypto: sun4i-ss: group variable definitions in sun4i_hash()
+  crypto: sun4i-ss: remove conditional checks against 0
+  crypto: sun4i-ss: use lower/upper_32_bits helpers
+  crypto: sun4i-ss: cannot use DMA is the request is 0 length
+  crypto: sun4i-ss: do not dynamically set parts of the last buffer to 0
+  crypto: sun4i-ss: simplify the pad length calculation
+  crypto: sun4i-ss: simplify the appended bit assignment
+  crypto: sun4i-ss: use GENMASK to generate masks
+  crypto: sun4i-ss: move from ablkcipher to skcipher API
+  crypto: sun4i-ss: add the CRYPTO_ALG_KERN_DRIVER_ONLY flag
+  crypto: sun4i-ss: fix large block size support
+  ARM: sun5i: add a cryptographic engine node
+
+ arch/arm/boot/dts/sun5i.dtsi              |   8 +
+ drivers/crypto/sunxi-ss/sun4i-ss-cipher.c | 213 ++++++++++++++-------------
+ drivers/crypto/sunxi-ss/sun4i-ss-core.c   | 237 +++++++++++++++---------------
+ drivers/crypto/sunxi-ss/sun4i-ss-hash.c   | 138 ++++++++---------
+ drivers/crypto/sunxi-ss/sun4i-ss.h        |  34 +++--
+ 5 files changed, 321 insertions(+), 309 deletions(-)
+
 -- 
 2.9.4
