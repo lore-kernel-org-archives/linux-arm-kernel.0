@@ -1,105 +1,97 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 29 May 2017 11:28:17 +0200
-Subject: [PATCH v2 2/5] iio: adc: stm32: make core adc clock optional by
- default
+Date: Mon, 29 May 2017 11:28:19 +0200
+Subject: [PATCH v2 4/5] iio: adc: stm32: make per instance bus clock optional
 In-Reply-To: <1496050100-25854-1-git-send-email-fabrice.gasnier@st.com>
 References: <1496050100-25854-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1496050100-25854-3-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1496050100-25854-5-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Analog clock input is mandatory on stm32f4. But newer version of
-ADC hardware block allow to select either bus clock or asynchronous
-clock, for analog circuitry.
-
-So, make it optional by default, but enforce clk presence on stm32f4.
+STM32F4 requires one clock per ADC instance for register access. But,
+newer version of ADC hardware block have common bus clock for all
+instances (per instance driver isn't responsible for getting it).
+So, make it optional by default. Still, enforce it's required on STM32F4.
 
 Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 ---
- drivers/iio/adc/stm32-adc-core.c | 38 ++++++++++++++++++++++++++------------
- 1 file changed, 26 insertions(+), 12 deletions(-)
+ drivers/iio/adc/stm32-adc.c | 28 ++++++++++++++++++++--------
+ 1 file changed, 20 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/iio/adc/stm32-adc-core.c b/drivers/iio/adc/stm32-adc-core.c
-index 22b7c93..597ab7a 100644
---- a/drivers/iio/adc/stm32-adc-core.c
-+++ b/drivers/iio/adc/stm32-adc-core.c
-@@ -85,13 +85,21 @@ static int stm32f4_adc_clk_sel(struct platform_device *pdev,
- 	u32 val;
- 	int i;
+diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
+index 50b2538..2ba9ca9 100644
+--- a/drivers/iio/adc/stm32-adc.c
++++ b/drivers/iio/adc/stm32-adc.c
+@@ -160,6 +160,7 @@ struct stm32_adc_regspec {
+  * @regs:		registers descriptions
+  * @adc_info:		per instance input channels definitions
+  * @trigs:		external trigger sources
++ * @clk_required:	clock is required
+  * @start_conv:		routine to start conversions
+  * @stop_conv:		routine to stop conversions
+  */
+@@ -167,6 +168,7 @@ struct stm32_adc_cfg {
+ 	const struct stm32_adc_regspec	*regs;
+ 	const struct stm32_adc_info	*adc_info;
+ 	struct stm32_adc_trig_info	*trigs;
++	bool clk_required;
+ 	void (*start_conv)(struct stm32_adc *, bool dma);
+ 	void (*stop_conv)(struct stm32_adc *);
+ };
+@@ -1145,14 +1147,21 @@ static int stm32_adc_probe(struct platform_device *pdev)
  
-+	/* stm32f4 has one clk input for analog (mandatory), enforce it here */
-+	if (!priv->aclk) {
-+		dev_err(&pdev->dev, "No 'adc' clock found\n");
-+		return -ENOENT;
-+	}
-+
- 	rate = clk_get_rate(priv->aclk);
- 	for (i = 0; i < ARRAY_SIZE(stm32f4_pclk_div); i++) {
- 		if ((rate / stm32f4_pclk_div[i]) <= STM32F4_ADC_MAX_CLK_RATE)
- 			break;
- 	}
--	if (i >= ARRAY_SIZE(stm32f4_pclk_div))
-+	if (i >= ARRAY_SIZE(stm32f4_pclk_div)) {
-+		dev_err(&pdev->dev, "adc clk selection failed\n");
- 		return -EINVAL;
-+	}
- 
- 	val = readl_relaxed(priv->common.base + STM32F4_ADC_CCR);
- 	val &= ~STM32F4_ADC_ADCPRE_MASK;
-@@ -227,21 +235,25 @@ static int stm32_adc_probe(struct platform_device *pdev)
- 	priv->aclk = devm_clk_get(&pdev->dev, "adc");
- 	if (IS_ERR(priv->aclk)) {
- 		ret = PTR_ERR(priv->aclk);
--		dev_err(&pdev->dev, "Can't get 'adc' clock\n");
--		goto err_regulator_disable;
-+		if (ret == -ENOENT) {
-+			priv->aclk = NULL;
+ 	adc->clk = devm_clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(adc->clk)) {
+-		dev_err(&pdev->dev, "Can't get clock\n");
+-		return PTR_ERR(adc->clk);
++		ret = PTR_ERR(adc->clk);
++		if (ret == -ENOENT && !adc->cfg->clk_required) {
++			adc->clk = NULL;
 +		} else {
-+			dev_err(&pdev->dev, "Can't get 'adc' clock\n");
-+			goto err_regulator_disable;
++			dev_err(&pdev->dev, "Can't get clock\n");
++			return ret;
 +		}
  	}
  
--	ret = clk_prepare_enable(priv->aclk);
+-	ret = clk_prepare_enable(adc->clk);
 -	if (ret < 0) {
--		dev_err(&pdev->dev, "adc clk enable failed\n");
--		goto err_regulator_disable;
-+	if (priv->aclk) {
-+		ret = clk_prepare_enable(priv->aclk);
+-		dev_err(&pdev->dev, "clk enable failed\n");
+-		return ret;
++	if (adc->clk) {
++		ret = clk_prepare_enable(adc->clk);
 +		if (ret < 0) {
-+			dev_err(&pdev->dev, "adc clk enable failed\n");
-+			goto err_regulator_disable;
++			dev_err(&pdev->dev, "clk enable failed\n");
++			return ret;
 +		}
  	}
  
- 	ret = stm32f4_adc_clk_sel(pdev, priv);
--	if (ret < 0) {
--		dev_err(&pdev->dev, "adc clk selection failed\n");
-+	if (ret < 0)
- 		goto err_clk_disable;
--	}
- 
- 	ret = stm32_adc_irq_probe(pdev, priv);
- 	if (ret < 0)
-@@ -261,7 +273,8 @@ static int stm32_adc_probe(struct platform_device *pdev)
- 	stm32_adc_irq_remove(pdev, priv);
- 
+ 	ret = stm32_adc_of_get_resolution(indio_dev);
+@@ -1196,7 +1205,8 @@ static int stm32_adc_probe(struct platform_device *pdev)
+ 		dma_release_channel(adc->dma_chan);
+ 	}
  err_clk_disable:
--	clk_disable_unprepare(priv->aclk);
-+	if (priv->aclk)
-+		clk_disable_unprepare(priv->aclk);
+-	clk_disable_unprepare(adc->clk);
++	if (adc->clk)
++		clk_disable_unprepare(adc->clk);
  
- err_regulator_disable:
- 	regulator_disable(priv->vref);
-@@ -276,7 +289,8 @@ static int stm32_adc_remove(struct platform_device *pdev)
- 
- 	of_platform_depopulate(&pdev->dev);
- 	stm32_adc_irq_remove(pdev, priv);
--	clk_disable_unprepare(priv->aclk);
-+	if (priv->aclk)
-+		clk_disable_unprepare(priv->aclk);
- 	regulator_disable(priv->vref);
+ 	return ret;
+ }
+@@ -1214,7 +1224,8 @@ static int stm32_adc_remove(struct platform_device *pdev)
+ 				  adc->rx_buf, adc->rx_dma_buf);
+ 		dma_release_channel(adc->dma_chan);
+ 	}
+-	clk_disable_unprepare(adc->clk);
++	if (adc->clk)
++		clk_disable_unprepare(adc->clk);
  
  	return 0;
+ }
+@@ -1223,6 +1234,7 @@ static int stm32_adc_remove(struct platform_device *pdev)
+ 	.regs = &stm32f4_adc_regspec,
+ 	.adc_info = &stm32f4_adc_info,
+ 	.trigs = stm32f4_adc_trigs,
++	.clk_required = true,
+ 	.start_conv = stm32f4_adc_start_conv,
+ 	.stop_conv = stm32f4_adc_stop_conv,
+ };
 -- 
 1.9.1
