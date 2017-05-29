@@ -1,108 +1,104 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Mon, 29 May 2017 12:46:47 +0200
-Subject: [PATCH v4 8/8] arm,arm64,drivers: add a prefix to drivers
- arch_topology interfaces
-In-Reply-To: <20170529095818.GA9892@kroah.com>
-References: <20170420144316.15632-1-juri.lelli@arm.com>
- <20170420144316.15632-9-juri.lelli@arm.com>
- <20170525131802.GE16244@kroah.com>
- <20170526101032.2t2xn5wrfenimu5w@e106622-lin>
- <20170526183610.GB16490@kroah.com>
- <bcc2f8f1-e953-9f32-2aa2-e660b0351e0a@arm.com>
- <20170529095818.GA9892@kroah.com>
-Message-ID: <b5071e53-f9fa-cffe-e13d-731549382d56@arm.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Mon, 29 May 2017 14:58:36 +0300
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Explicitly restore
+ CONFIG_DEBUG_FS
+In-Reply-To: <20170526154236.GY3956@linux.vnet.ibm.com>
+References: <49b2579b9ad2e5ce0a7c4b163dffb5a885ac7dae.1495797565.git.leonard.crestez@nxp.com>
+ <20170526154236.GY3956@linux.vnet.ibm.com>
+Message-ID: <1496059116.31994.6.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2017 11:58 AM, Greg KH wrote:
-> On Mon, May 29, 2017 at 11:20:24AM +0200, Dietmar Eggemann wrote:
->> Hi Greg,
->>
->> On 05/26/2017 08:36 PM, Greg KH wrote:
->>> On Fri, May 26, 2017 at 11:10:32AM +0100, Juri Lelli wrote:
->>>> Hi,
->>>>
->>>> On 25/05/17 15:18, Greg KH wrote:
->>>>> On Thu, Apr 20, 2017 at 03:43:16PM +0100, Juri Lelli wrote:
->>
->> [...]
->>
->>>>> But this is all really topology stuff, right?  Why use "capacity" at
->>>>> all:
->>>>> 	topology_normalize_cpu()
->>>>> 	topology_parse_cpu()
->>>>> 	topology_scale_cpu()
->>>>> 	topology_set_scale()
->>>>> ?
->>>>>
->>>>> It's always best to put the "subsystem" name first, we have a bad
->>>>> history of getting this wrong in the past by putting the verb first, not
->>>>> the noun.
->>>>>
->>>>
->>>> topology_ works for me. However, I'd keep "capacity" in the names, as we
->>>> might need to topology_normalize_cpu_somethingelse() (etc.) in the
->>>> future?
->>>
->>> Worry about the future, in the future.  Change the names then, _IF_ it
->>> becomes an issue.  Try to be short and simple please.
->>>
->>>> Updated patch follows. I kept Catalin and Russell's acks as I only
->>>> renamed the functions, please shout if that's not OK.
->>>>
->>>> Greg, if you are fine with this approach, do you still want a complete
->>>> v5 of the set or can you pick this up?
->>>
->>> Am I the one who is supposed to take all of these arm-specific patches?
->>> If so, that's fine, but I need to have acks from the arm maintainers...
->>>
->>> Oh, and drop "capacity" please :)
->>
->> Once we have driver/base/arch_topology.c in, we want to enable (cpu
->> micro-architectural + max frequency (OPPmax)) invariant and frequency
->> (OPPmin..OPPmax) invariant load-tracking/accounting in the task scheduler
->> for arm and arm64.
->>
->> The way to do this is to define the task scheduler interfaces
->> arch_scale_cpu_capacity() and arch_scale_freq_capacity() in arch specific
->> code:
->>
->> #define arch_scale_cpu_capacity topology_scale_cpu_capacity
->> #define arch_scale_freq_capacity topology_scale_freq_capacity
->>
->> In case an arch is not defining them, the default definitions in
->> kernel/sched/sched.h are used.
->>
->> So topology_scale_cpu() wouldn't be correct since we scale the _capacity_ by
->> the micro-architectural differences (hence cpu) and not the cpu.
->>
->> Likewise we will have a function topology_scale_freq_capacity indicating
->> that we scale the capacity by the frequency.
->>
->> Or would you prefer something like topology_scale_capacity_by_cpu() and
->> topology_scale_capacity_by_freq()?
+On Fri, 2017-05-26 at 08:42 -0700, Paul E. McKenney wrote:
+> On Fri, May 26, 2017 at 02:26:06PM +0300, Leonard Crestez wrote:
+> > 
+> > This option was removed by "make savedefconfig" in
+> > commit c5054a98bce4 ("ARM: imx_v6_v7_defconfig: Select SMSC_PHY")
+> > 
+> > This happened because CONFIG_DEBUG_FS was implicitly selected by
+> > CONFIG_TREE_RCU_TRACE which defaulted to true because CONFIG_RCU_TRACE
+> > was enabled by default by commit 961518259b3b ("rcu: Enable RCU
+> > tracepoints by default to aid in debugging")
+> > 
+> > Recently however CONFIG_RCU_TRACE was completely removed by
+> > commit 6e74c237c410 ("rcu: Remove debugfs tracing")
+
+> CONFIG_RCU_TRACE is still very much alive in its new home at
+> kernel/rcu/Kconfig.debug:
+
+Sorry, what was removed is the dependency on DEBUG_FS. In particular
+this snippet:
+
+diff --git a/init/Kconfig b/init/Kconfig
+index 2aa14ff..3025383 100644
+--
+- a/init/Kconfig
++++ b/init/Kconfig
+@@ -659,14 +659,6 @@ config
+RCU_FAST_NO_HZ
+?
+??????????Say N if you are unsure.
+?
+-config
+TREE_RCU_TRACE
+-???????def_bool RCU_TRACE && ( TREE_RCU || PREEMPT_RCU )
+-???????select DEBUG_FS
+-???????help
+-?????????This option provides
+tracing for the TREE_RCU and
+-?????????PREEMPT_RCU implementations,
+permitting Makefile to
+-?????????trivially select
+kernel/rcutree_trace.c.
+-
+?config RCU_BOOST
+????????bool "Enable RCU
+priority boosting"
+????????depends on RT_MUTEXES && PREEMPT_RCU &&
+RCU_EXPERT
+
+> config RCU_TRACE
+> 	bool "Enable tracing for RCU"
+> 	depends on DEBUG_KERNEL
+> 	default y if TREE_RCU
+> 	select TRACE_CLOCK
+> 	help
+> 	??This option enables additional tracepoints for ftrace-style
+> 	??event tracing.
 > 
-> I think that if you are creating an api that the scheduler will use, you
-> need to ask the scheduler maintainers/developers what they want to see
-> here, as that would be up to them, not me...
+> 	??Say Y here if you want to enable RCU tracing
+> 	??Say N if you are unsure.
+> 
+> That said, I need to make it default to "y" if PREEMPT_RCU as well as
+> the current TREE_RCU.??Would that help?
 
-The scheduler API exists already. It is arch_scale_cpu_capacity() and 
-arch_scale_freq_capacity() in kernel/sched/sched.h. An arch is able to 
-overwrite these two functions by defining them (since commit 
-8cd5601c5060 and dfbca41f3479):
+I don't think you can help unless you want to make RCU_TRACE depend on
+DEBUG_FS for no reason. The proper fix is to have DEBUG_FS inside the
+imx_v6_v7_defconfig.
 
-#define arch_scale_cpu_capacity 'arch implementation of capacity scaling 
-by micro-architectural + max frequency (OPPmax)'
+My problem is just an unfortunate accident with default dependencies
+and overzealous savedefconfig.
 
-#define arch_scale_freq_capacity 'arch implementation of capacity 
-scaling by 'frequency ((OPPmin..OPPmax)'
+As far as I understand after recent changes RCU_TRACE is now only
+useful with tracepoints. Shouldn't it depend on TRACEPOINTS in some
+way? It's still possible to compile with RCU_TRACE on and TRACEPOINTS
+off, is this intentional? It seems that when this happens you're just
+relying on tracepoint macros to expand to nothing.
 
-There is no naming convention from the scheduler side on these functions 
-though. They should just express what they're doing, scaling capacity by 
-something.
+Fr example maybe RCU_TRACE should be "default y if (TREE_RCU &&
+TRACEPOINTS); depends on TRACEPOINTS"?
 
-Since Juri already uses the former one in this driver, he should name it 
-  topology_scale_cpu_capacity() or topology_scale_capacity_by_cpu() or 
-something similar.
+In theory you could also "select TRACEPOINTS" but then you would end up
+enabling TRACEPOINTS by default in all configurations that use TREE_RCU
+but don't explicitly disable RCU_TRACE.
 
-[...]
+I'd say that if $SUBSYSTEM_DEBUG depends on $MAJOR_DEBUG_FEATURE it
+should try to avoid selecting $MAJOR_DEBUG_FEATURE by default if it's
+not otherwise enabled. As far as I can tell this is how RCU ended up
+indirectly pulling in DEBUG_FS and later unexpectedly removed it.
+
+Or I could be completely wrong, kconfig can be very confusing.
+
+--?
+Regards,
+Leonard
