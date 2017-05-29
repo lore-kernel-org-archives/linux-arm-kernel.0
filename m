@@ -1,28 +1,36 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 29 May 2017 09:01:27 -0300
-Subject: [PATCH RFC 0/5] *** SPI Slave mode support ***
-In-Reply-To: <59019306.2050309@mentor.com>
-References: <1492085644-4195-1-git-send-email-jiada_wang@mentor.com>
- <20170413125929.dygodgj6c35ydh5p@sirena.org.uk>
- <CAMuHMdUm=90ddNWM5KWqT+W0hqZ-QO6vPHj5OisbYquDYq1ZmA@mail.gmail.com>
- <58F06092.9080409@mentor.com>
- <CAMuHMdXa_O6RsqUciiNWQ0Zp6dniS47AUmPN9UWAWitP0csx=Q@mail.gmail.com>
- <20170425103113.lxpwoq6sbxvg3ihl@sirena.org.uk> <59019306.2050309@mentor.com>
-Message-ID: <CAOMZO5A-31iC5NrGePZCcgsNNwpvURq4LpztQai4GaWRrJXbmA@mail.gmail.com>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Mon, 29 May 2017 20:56:00 +0800
+Subject: [PATCH v2 0/4] Add Basic SoC support for MT7622
+Message-ID: <cover.1496061587.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jiada,
+From: Sean Wang <sean.wang@mediatek.com>
 
-On Thu, Apr 27, 2017 at 3:43 AM, Jiada Wang <jiada_wang@mentor.com> wrote:
+Changes since v1:
+- update SPDX-License-Identifier
+- remove next-level-cache property since cache geometry detection was removed since 4.12
 
-> BUT if you think the use case don't need to be supported from SPI core,
-> then I don't have objection either, I will only submit imx SPI slave support
-> patch,
-> after your SPI slave support patch set been applied
+This patch set adds basic SoC support for MediaTek MT7622
+SoC based on 4.12-rc1.
 
-Geert's SPI slave series has been applied.
+Sean Wang (4):
+  dt-bindings: mediatek: add bindings for MediaTek MT7622 SoC
+  arm64: dts: mt7622: add basic nodes to the mt7622.dtsi file
+  arm64: dts: mt7622: add dts file for MT7622 reference board variant 1
+  arm64: dts: mt7622: group clock DT nodes into separate DT file
 
-Do you still plan to send imx spi slave support on top of it?
+ Documentation/devicetree/bindings/arm/mediatek.txt |  4 +
+ .../interrupt-controller/mediatek,sysirq.txt       |  3 +-
+ .../devicetree/bindings/serial/mtk-uart.txt        |  1 +
+ arch/arm64/boot/dts/mediatek/Makefile              |  1 +
+ arch/arm64/boot/dts/mediatek/mt7622-clock.dtsi     | 20 +++++
+ arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts       | 27 ++++++
+ arch/arm64/boot/dts/mediatek/mt7622.dtsi           | 98 ++++++++++++++++++++++
+ 7 files changed, 153 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt7622-clock.dtsi
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt7622.dtsi
 
-Thanks
+-- 
+1.9.1
