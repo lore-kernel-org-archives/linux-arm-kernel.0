@@ -1,81 +1,29 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Mon, 29 May 2017 18:15:43 +0900
-Subject: [PATCH 2/4] dt-bindings: thermal: add binding documentation for
- UniPhier thermal monitor
-In-Reply-To: <1496049345-14649-1-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1496049345-14649-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <1496049345-14649-3-git-send-email-hayashi.kunihiko@socionext.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 29 May 2017 11:17:09 +0200
+Subject: [PATCH 5/5] pinctrl: meson-gxl: Add Ethernet PHY LEDS pins
+In-Reply-To: <CACRpkdY6rwx=Z2YZRA=DUjvRDe6cCc7cyFrdb3JbiisHVK+kCQ@mail.gmail.com>
+References: <1495614042-2676-1-git-send-email-narmstrong@baylibre.com>
+ <1495614042-2676-6-git-send-email-narmstrong@baylibre.com>
+ <CACRpkdY6rwx=Z2YZRA=DUjvRDe6cCc7cyFrdb3JbiisHVK+kCQ@mail.gmail.com>
+Message-ID: <a0f0bf3e-a23c-eec2-03a0-a6c35125028f@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add devicetree binding documentation for thermal monitor implemented on
-Socionext UniPhier SoCs.
+On 05/29/2017 11:01 AM, Linus Walleij wrote:
+> On Wed, May 24, 2017 at 10:20 AM, Neil Armstrong
+> <narmstrong@baylibre.com> wrote:
+> 
+>> The Amlogic Meson GXL SoCs embeds an 10/100 Ethernet PHY, this patchs enables
+>> the Link and Activity LEDs signals.
+>>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> 
+> Patch applied with Jerome's review tag.
+> 
+> Yours,
+> Linus Walleij
+> 
 
-Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
----
- .../bindings/thermal/uniphier-thermal.txt          | 54 ++++++++++++++++++++++
- 1 file changed, 54 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/thermal/uniphier-thermal.txt
+Thanks Linus !
 
-diff --git a/Documentation/devicetree/bindings/thermal/uniphier-thermal.txt b/Documentation/devicetree/bindings/thermal/uniphier-thermal.txt
-new file mode 100644
-index 0000000..72834e1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/thermal/uniphier-thermal.txt
-@@ -0,0 +1,54 @@
-+* UniPhier Thermal bindings
-+
-+This describes the devicetree bindings for thermal monitor supported by
-+PVT(Process, Voltage and Temperature) monitoring unit implemented on Socionext
-+UniPhier SoCs.
-+
-+Required properties:
-+- compatible :
-+  - "socionext,uniphier-pxs2-thermal" : For UniPhier PXs2 SoC
-+  - "socionext,uniphier-ld20-thermal" : For UniPhier LD20 SoC
-+- reg : Offset address of the thermal registers from sysctrl
-+- interrupts : IRQ for the temperature alarm
-+- #thermal-sensor-cells : Should be 0. See ./thermal.txt for details.
-+
-+Optional properties:
-+- socionext,tmod-calibration: A pair of calibrated values referred from PVT,
-+                              in case that the values aren't set on SoC,
-+                              like a reference board.
-+
-+Example:
-+
-+	sysctrl at 61840000 {
-+		compatible = "socionext,uniphier-ld20-sysctrl",
-+			     "simple-mfd", "syscon";
-+		reg = <0x61840000 0x10000>;
-+		...
-+		pvtctl: pvtctl {
-+			compatible = "socionext,uniphier-ld20-thermal";
-+			interrupts = <0 3 1>;
-+			#thermal-sensor-cells = <0>;
-+		};
-+		...
-+	};
-+
-+	thermal-zones {
-+		cpu_thermal {
-+			polling-delay-passive = <250>;	/* 250ms */
-+			polling-delay = <1000>;		/* 1000ms */
-+			thermal-sensors = <&pvtctl>;
-+
-+			trips {
-+				cpu_crit: cpu_crit {
-+					temperature = <95000>;	/* 95C */
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+				cpu_alert: cpu_alert {
-+					temperature = <85000>;	/* 85C */
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+			};
-+		};
-+	};
--- 
-2.7.4
+Neil
