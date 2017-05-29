@@ -1,55 +1,47 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 29 May 2017 11:15:04 +0200
-Subject: [PATCH 10/11] crypto: sun4i-ss: fix large block size support
-In-Reply-To: <20170529082931.ocoatlnpl7fvtgfu@flea.lan>
-References: <20170524190652.13278-1-antoine.tenart@free-electrons.com>
- <20170524190652.13278-11-antoine.tenart@free-electrons.com>
- <20170526145501.GA19284@Red> <20170529080944.GA3169@kwain>
- <20170529082931.ocoatlnpl7fvtgfu@flea.lan>
-Message-ID: <20170529091503.GB3169@kwain>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 29 May 2017 11:16:41 +0200
+Subject: [PATCH v4 00/11] drm: sun4i: Add support for the HDMI controller
+In-Reply-To: <cover.c61cbe60123a4aeb24f255bca7927218dda6283e.1495900658.git-series.maxime.ripard@free-electrons.com>
+References: <cover.c61cbe60123a4aeb24f255bca7927218dda6283e.1495900658.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <20170529091641.5psbm7lvgvgob26o@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-On Mon, May 29, 2017 at 10:29:31AM +0200, Maxime Ripard wrote:
-> On Mon, May 29, 2017 at 10:09:44AM +0200, Antoine Tenart wrote:
-> > > Which speed are the SS clocks ?
-> > 
-> > The AHB SS clk is running at 300 MHz and the SS clk at 150 MHz. SS clk
-> > is at the expected rate but the AHB SS clk has a higher rate that what's
-> > expected.
-> > 
-> > In the probing function only the SS clk rate is explicitly set. I tried
-> > to set the AHB clk rate as well and removed the delays. This didn't fix
-> > the framework selftests at boot time. Is there any reason the AHB SS clk
-> > rate isn't explicitly set when probing the driver? (Should it?)
+On Sat, May 27, 2017 at 06:09:25PM +0200, Maxime Ripard wrote:
+> Hi,
 > 
-> It probably shouldn't.
+> Here is an attempt at getting the HDMI controller running.
 > 
-> The AHB clock is shared by most of the drivers, some of them actually
-> using that clock to generate their signals.
+> This HDMI controller is found on a number of old Allwinner SoCs (A10, A10s,
+> A20, A31).
 > 
-> You would have to unbreak all those drivers first, which is probably
-> not needed at all. I haven't seen a case where a block had a module
-> clock and did care for its AHB clock rate.
+> This driver only supports for now the A10s because it was an easy target,
+> being very close to the A13 that is already supported by our DRM driver.
+> 
+> There's nothing out of the extraordinary there, except maybe the clock
+> setup. All the internal clocks (TMDS, DDC) have been modeled using the
+> common clock framework, the TMDS clock being the parent of the DDC one.
+> 
+> While this might sound overkill, other SoC have a different, external
+> source for the DDC clock, which will be easier to support through the clock
+> framework.
+> 
+> The IP also supports audio (through an already supported i2s controller,
+> and some missing configuration in the HDMI controller) and CEC. Both will
+> come eventually.
 
-OK, makes sense.
+Applied all the patches.
 
-I'll wait for Corentin to test the series, and I'll send a v2 only
-fixing the typos then.
-
-Thanks!
-Antoine
+Maxime
 
 -- 
-Antoine T?nart, Free Electrons
+Maxime Ripard, Free Electrons
 Embedded Linux and Kernel engineering
 http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 819 bytes
+Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170529/2b8c7fd5/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170529/6bd44169/attachment.sig>
