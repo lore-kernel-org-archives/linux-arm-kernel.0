@@ -1,65 +1,75 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 29 May 2017 10:09:44 +0200
-Subject: [PATCH 10/11] crypto: sun4i-ss: fix large block size support
-In-Reply-To: <20170526145501.GA19284@Red>
-References: <20170524190652.13278-1-antoine.tenart@free-electrons.com>
- <20170524190652.13278-11-antoine.tenart@free-electrons.com>
- <20170526145501.GA19284@Red>
-Message-ID: <20170529080944.GA3169@kwain>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 29 May 2017 10:09:55 +0200
+Subject: [PATCH] ARM64: dts: meson-gx: Add SPICC nodes
+Message-ID: <1496045395-5702-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Corentin,
+Add nodes for the SPICC controller on GX common dtsi, GXBB and
+GXL dtsi files.
 
-On Fri, May 26, 2017 at 04:55:01PM +0200, Corentin Labbe wrote:
-> On Wed, May 24, 2017 at 09:06:51PM +0200, Antoine Tenart wrote:
-> >  
-> > +	/*
-> > +	 * The datasheet isn't very clear about when to retrieve the digest. The
-> > +	 * bit SS_DATA_END is cleared when the engine has processed the data and
-> > +	 * when the digest is computed *but* it doesn't mean the digest is
-> > +	 * available in the diesgt registers. Hence the delay to be sure we can
-> 
-> Small typo here (diesgt/digest)
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi   | 9 +++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 7 +++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 7 +++++++
+ 3 files changed, 23 insertions(+)
 
-Oops. I'll fix it.
-
-> This behaviour is very strange since I didnt get it on other platform.
-> Could you give me the board name where you get it ?
-
-I used a CHIP (sun5i-r8-chip).
-
-> Does any wmb() after the writel(..SS_DATA_END..) do the trick ?
-
-Nope. I tried this and it didn't help.
-
-> Which speed are the SS clocks ?
-
-The AHB SS clk is running at 300 MHz and the SS clk at 150 MHz. SS clk
-is at the expected rate but the AHB SS clk has a higher rate that what's
-expected.
-
-In the probing function only the SS clk rate is explicitly set. I tried
-to set the AHB clk rate as well and removed the delays. This didn't fix
-the framework selftests at boot time. Is there any reason the AHB SS clk
-rate isn't explicitly set when probing the driver? (Should it?)
-
-> Anyway the whole serie seems good, I will test it just after this weekend.
-
-Let me know if your tests went well, I'll send a v2 fixing the typo
-below then (and setting the AHB SS clk rate explicitly if needed).
-
-Thanks,
-Antoine
-
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+index 436b875..613719d 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+@@ -304,6 +304,15 @@
+ 				status = "disabled";
+ 			};
+ 
++			spicc: spi at 8d80 {
++				compatible = "amlogic,meson-gx-spicc";
++				reg = <0x0 0x08d80 0x0 0x80>;
++				interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				status = "disabled";
++			};
++
+ 			spifc: spi at 8c80 {
+ 				compatible = "amlogic,meson-gx-spifc", "amlogic,meson-gxbb-spifc";
+ 				reg = <0x0 0x08c80 0x0 0x80>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 95a5d57..1734974 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -657,6 +657,13 @@
+ 	clock-names = "core", "clkin0", "clkin1";
+ };
+ 
++&spicc {
++	clocks = <&clkc CLKID_SPICC>;
++	clock-names = "core";
++	resets = <&reset RESET_PERIPHS_SPICC>;
++	num-cs = <1>;
++};
++
+ &spifc {
+ 	clocks = <&clkc CLKID_SPI>;
+ };
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+index 42d78f0..567dde4 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+@@ -584,6 +584,13 @@
+ 	clock-names = "core", "clkin0", "clkin1";
+ };
+ 
++&spicc {
++	clocks = <&clkc CLKID_SPICC>;
++	clock-names = "core";
++	resets = <&reset RESET_PERIPHS_SPICC>;
++	num-cs = <1>;
++};
++
+ &spifc {
+ 	clocks = <&clkc CLKID_SPI>;
+ };
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170529/0cc8ea33/attachment.sig>
+1.9.1
