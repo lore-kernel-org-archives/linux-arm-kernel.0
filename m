@@ -1,80 +1,55 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Mon, 29 May 2017 14:41:59 +0530
-Subject: [PATCH v2] iommu/arm-smmu-v3: Increase CMDQ drain timeout value
-In-Reply-To: <1493983066-28202-1-git-send-email-sunil.kovvuri@gmail.com>
-References: <1493983066-28202-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <CA+sq2Cc_6Wj-0wLG=5fTAS66Tyn=63=An-Ay7h=EV=mjDi2-MQ@mail.gmail.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Mon, 29 May 2017 11:15:04 +0200
+Subject: [PATCH 10/11] crypto: sun4i-ss: fix large block size support
+In-Reply-To: <20170529082931.ocoatlnpl7fvtgfu@flea.lan>
+References: <20170524190652.13278-1-antoine.tenart@free-electrons.com>
+ <20170524190652.13278-11-antoine.tenart@free-electrons.com>
+ <20170526145501.GA19284@Red> <20170529080944.GA3169@kwain>
+ <20170529082931.ocoatlnpl7fvtgfu@flea.lan>
+Message-ID: <20170529091503.GB3169@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 5, 2017 at 4:47 PM,  <sunil.kovvuri@gmail.com> wrote:
-> From: Sunil Goutham <sgoutham@cavium.com>
->
-> Processing queue full of TLB invalidation commands might
-> take more time on some platforms than current timeout
-> of 100us. So increased drain timeout value.
->
-> Also now udelay time is increased exponentially for each poll.
->
-> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
-> ---
->
-> v2
-> - Addressed Will's and Robin's comments i.e
->   increased poll timeout only for drain case and removed spin loop
->   whose logic anyway is screwed up.
-> - Also changed commit subject and message as this patch no longer
->   exactly reflects what is done in SMMU driver i.e
->   8513c8930069 iommu/arm-smmu: Poll for TLB sync completion more effectively
->
->  drivers/iommu/arm-smmu-v3.c | 15 +++++++++++++--
->  1 file changed, 13 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index d412bdd..cbc8309 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -379,6 +379,8 @@
->  #define CMDQ_SYNC_0_CS_NONE            (0UL << CMDQ_SYNC_0_CS_SHIFT)
->  #define CMDQ_SYNC_0_CS_SEV             (2UL << CMDQ_SYNC_0_CS_SHIFT)
->
-> +#define CMDQ_DRAIN_TIMEOUT_US          1000
-> +
->  /* Event queue */
->  #define EVTQ_ENT_DWORDS                        4
->  #define EVTQ_MAX_SZ_SHIFT              7
-> @@ -737,7 +739,12 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
->   */
->  static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
->  {
-> -       ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_POLL_TIMEOUT_US);
-> +       ktime_t timeout;
-> +       unsigned int delay = 1;
-> +
-> +       /* Wait longer if it's queue drain */
-> +       timeout = ktime_add_us(ktime_get(), drain ? CMDQ_DRAIN_TIMEOUT_US :
-> +                                                   ARM_SMMU_POLL_TIMEOUT_US);
->
->         while (queue_sync_cons(q), (drain ? !queue_empty(q) : queue_full(q))) {
->                 if (ktime_compare(ktime_get(), timeout) > 0)
-> @@ -747,7 +754,11 @@ static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
->                         wfe();
->                 } else {
->                         cpu_relax();
-> -                       udelay(1);
-> +                       udelay(delay);
-> +                       /* No point in sleeping for fixed time,
-> +                        * if cons isn't moving fast.
-> +                        */
-> +                       delay *= 2;
->                 }
->         }
->
-> --
-> 2.7.4
->
+Hi Maxime,
 
-Gentle reminder for patch review.
+On Mon, May 29, 2017 at 10:29:31AM +0200, Maxime Ripard wrote:
+> On Mon, May 29, 2017 at 10:09:44AM +0200, Antoine Tenart wrote:
+> > > Which speed are the SS clocks ?
+> > 
+> > The AHB SS clk is running at 300 MHz and the SS clk at 150 MHz. SS clk
+> > is at the expected rate but the AHB SS clk has a higher rate that what's
+> > expected.
+> > 
+> > In the probing function only the SS clk rate is explicitly set. I tried
+> > to set the AHB clk rate as well and removed the delays. This didn't fix
+> > the framework selftests at boot time. Is there any reason the AHB SS clk
+> > rate isn't explicitly set when probing the driver? (Should it?)
+> 
+> It probably shouldn't.
+> 
+> The AHB clock is shared by most of the drivers, some of them actually
+> using that clock to generate their signals.
+> 
+> You would have to unbreak all those drivers first, which is probably
+> not needed at all. I haven't seen a case where a block had a module
+> clock and did care for its AHB clock rate.
 
-Thanks,
-Sunil.
+OK, makes sense.
+
+I'll wait for Corentin to test the series, and I'll send a v2 only
+fixing the typos then.
+
+Thanks!
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170529/2b8c7fd5/attachment.sig>
