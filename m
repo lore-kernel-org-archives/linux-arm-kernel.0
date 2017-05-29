@@ -1,40 +1,38 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 29 May 2017 11:19:56 +0200
-Subject: [PATCH 2/3] mfd: tps65010: move header file out of I2C realm
-In-Reply-To: <20170521220212.1404-3-wsa@the-dreams.de>
-References: <20170521220212.1404-1-wsa@the-dreams.de>
- <CGME20170521220747epcas3p3faa8204fb645815ee071f0c803becd8e@epcas3p3.samsung.com>
- <20170521220212.1404-3-wsa@the-dreams.de>
-Message-ID: <1676405.bi3L9s8TD3@amdc3058>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 29 May 2017 11:28:05 +0200
+Subject: [GIT PULL] Reset controller fixes for v4.12
+Message-ID: <1496050085.17695.30.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, May 22, 2017 12:02:09 AM Wolfram Sang wrote:
-> include/linux/i2c is not for client devices. Move the header file to a
-> more appropriate location.
-> 
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+Dear arm-soc maintainers,
 
-Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+please merge this tag for v4.12, which adds a missing module license to
+the hi6220_reset driver. Without this, the driver fails to load.
 
-> ---
->  arch/arm/mach-omap1/board-h2-mmc.c      | 2 +-
->  arch/arm/mach-omap1/board-h2.c          | 2 +-
->  arch/arm/mach-omap1/board-h3-mmc.c      | 2 +-
->  arch/arm/mach-omap1/board-h3.c          | 2 +-
->  arch/arm/mach-omap1/board-osk.c         | 2 +-
->  arch/arm/mach-s3c24xx/mach-osiris-dvs.c | 2 +-
->  arch/arm/mach-s3c24xx/mach-osiris.c     | 2 +-
->  drivers/mfd/tps65010.c                  | 2 +-
->  drivers/usb/host/ohci-omap.c            | 2 +-
->  drivers/usb/phy/phy-isp1301-omap.c      | 2 +-
->  drivers/video/fbdev/omap/lcd_h3.c       | 2 +-
->  include/linux/{i2c => mfd}/tps65010.h   | 2 +-
->  12 files changed, 12 insertions(+), 12 deletions(-)
->  rename include/linux/{i2c => mfd}/tps65010.h (99%)
+regards
+Philipp
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+
+  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/pza/linux.git tags/reset-fixes-for-4.12
+
+for you to fetch changes up to 4497a224f759cd8350e07382307b55f870ef0df2:
+
+  reset: hi6220: Set module license so that it can be loaded (2017-05-24 10:53:41 +0200)
+
+----------------------------------------------------------------
+Reset controller fixes for v4.12
+
+- Set hi6220_reset driver module license to GPL v2 to fix module loading.
+
+----------------------------------------------------------------
+Jeremy Linton (1):
+      reset: hi6220: Set module license so that it can be loaded
+
+ drivers/reset/hisilicon/hi6220_reset.c | 2 ++
+ 1 file changed, 2 insertions(+)
