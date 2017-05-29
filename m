@@ -1,59 +1,26 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 29 May 2017 09:58:33 +0200
-Subject: [PATCH 3/3] ARM: sun8i: a83t: Add device node for PRCM
-In-Reply-To: <20170526080025.28532-4-wens@csie.org>
-References: <20170526080025.28532-1-wens@csie.org>
- <20170526080025.28532-4-wens@csie.org>
-Message-ID: <20170529075833.6dc4uqwa6uxtzs5y@flea.lan>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 29 May 2017 10:02:40 +0200
+Subject: [PATCH 2/9] pinctrl: dt-bindings: add documentation for AP806 pin
+ controllers
+In-Reply-To: <bfd5b618a295f98a056784d7486dbd128d36fefb.1495209664.git-series.gregory.clement@free-electrons.com>
+References: <cover.0dd8a92ae74fcec8d0470d0a7016035089e46eed.1495209664.git-series.gregory.clement@free-electrons.com>
+ <bfd5b618a295f98a056784d7486dbd128d36fefb.1495209664.git-series.gregory.clement@free-electrons.com>
+Message-ID: <CACRpkdbpMyiXxNvS6cFgzzwf8s0aTyD3-iwQiFfVCNzrx7SaQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, May 19, 2017 at 6:04 PM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
 
-On Fri, May 26, 2017 at 04:00:25PM +0800, Chen-Yu Tsai wrote:
-> The A83T's PRCM has the same set of clocks and resets as the A64.
-> However, a few dividers are different. And due to the lack of a low
-> speed 32.768 kHz oscillator, a few of the clock parents are different.
-> 
-> The PRCM also has controls for various power domains. These are not
-> supported yet, neither in software nor in the device tree binding.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  arch/arm/boot/dts/sun8i-a83t.dtsi | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> index 1dc4cfe81534..8089f36deeff 100644
-> --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> @@ -270,5 +270,14 @@
->  			#interrupt-cells = <3>;
->  			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
->  		};
-> +
-> +		r_ccu: clock at 1f01400 {
-> +			compatible = "allwinner,sun8i-a83t-r-ccu";
-> +			reg = <0x01f01400 0x400>;
-> +			clocks = <&osc24M>, <&osc16Md512>, <&osc16M>;
+> Document the device tree binding for the pin controllers found on the
+> Armada 7K and Armada 8K SoCs.
+>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-I applied patches 1 and 2, but that made me realise that the
-pll-periph0 is also a parent and should be listed there.
+This patch does not apply on my pinctrl "devel" branch.
+And I have no other patches to Marvell docs since v4.12-rc1.
 
-Can you send a patch adjusting the binding documentation so that we
-can have it in time for 4.12, and patches for the A64 / H3 DTSs ?
+Please rebase the patch set and resend.
 
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170529/ab4e8ab1/attachment-0001.sig>
+Yours,
+Linus Walleij
