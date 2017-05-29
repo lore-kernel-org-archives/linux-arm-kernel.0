@@ -1,21 +1,20 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 29 May 2017 10:10:28 +0200
-Subject: [PATCH] gpio: mvebu: Select REGMAP_MMIO now that regmap is used
-In-Reply-To: <20170524143206.9727-1-gregory.clement@free-electrons.com>
-References: <20170524143206.9727-1-gregory.clement@free-electrons.com>
-Message-ID: <CACRpkdYCbTp3YiHvxWrFsA49orywb1cMFcaDEew1AwjRG61Tpw@mail.gmail.com>
+Date: Mon, 29 May 2017 10:13:36 +0200
+Subject: [PATCH 1/2] pinctrl: meson-gxl: Add SPI pins for the SPICC
+ controller
+In-Reply-To: <1495457966-2359-2-git-send-email-narmstrong@baylibre.com>
+References: <1495457966-2359-1-git-send-email-narmstrong@baylibre.com>
+ <1495457966-2359-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <CACRpkdaaQK0jfbgcAbVcAKVvyXMUX2W0410p3T=rqR4QU_VOWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 24, 2017 at 4:32 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
+On Mon, May 22, 2017 at 2:59 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
 
-> Since the commit "gpio: mvebu: switch to regmap for register access" the
-> driver use the regmap. Explicitly select the REGMAP_MMIO symbol to fix
-> build error.
+> The SPICC controller has dedicated SPI pins, this patchs add the pins
+> definition in the GXL pinctrl driver.
 >
-> Reported-by: kbuild test robot <fengguang.wu@intel.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
 Patch applied.
 
