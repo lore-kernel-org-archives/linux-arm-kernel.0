@@ -1,43 +1,38 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 29 May 2017 04:53:44 +0800
-Subject: [PATCH v4 9/9] arm: dts: mt7623: add dts file for Bananapi R2
- (BPI-R2) board
-In-Reply-To: <5cc5489b38fc2723c30c8cfe0d4353f967d100f3.1495683769.git.sean.wang@mediatek.com>
-Message-ID: <201705290415.tikz1ylK%fengguang.wu@intel.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Mon, 29 May 2017 08:44:06 +0530
+Subject: [RESEND PATCH 0/2] Add ThunderX2 SoC Performance Monitoring Unit
+ driver
+In-Reply-To: <1495004445-2043-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+References: <1495004445-2043-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+Message-ID: <CAFpQJXVxJiiY-BgBO24+PY1qmW6PK0zDUzyanAa3XTnFSxYrsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
+Hi Mark, Will,
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.12-rc2 next-20170526]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+can you please review this patchset?
 
-url:    https://github.com/0day-ci/linux/commits/sean-wang-mediatek-com/arm-dts-extend-mt7623-support/20170525-142103
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: arm-allyesconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+On Wed, May 17, 2017 at 12:30 PM, Ganapatrao Kulkarni
+<ganapatrao.kulkarni@cavium.com> wrote:
+> This adds PMU driver for Cavium's ThunderX2 SoC UNCORE devices.
+> The SoC has PMU support in its L3 cache controller (L3C) and in the
+> DDR4 Memory Controller (DMC).
+>
+> Ganapatrao Kulkarni (2):
+>   perf: uncore: Adding documentation for ThunderX2 pmu uncore driver
+>   perf: ThunderX2: Add Cavium Thunderx2 SoC UNCORE PMU driver
+>
+>  Documentation/perf/thunderx2-pmu.txt |  60 +++
+>  drivers/perf/Kconfig                 |   9 +
+>  drivers/perf/Makefile                |   1 +
+>  drivers/perf/thunderx2_pmu.c         | 965 +++++++++++++++++++++++++++++++++++
+>  4 files changed, 1035 insertions(+)
+>  create mode 100644 Documentation/perf/thunderx2-pmu.txt
+>  create mode 100644 drivers/perf/thunderx2_pmu.c
+>
+> --
+> 1.8.1.4
+>
 
-All errors (new ones prefixed by >>):
-
-   Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:33.1-7 Label or path pwrap not found
-   Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:261.1-6 Label or path mmc0 not found
-   Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:266.1-6 Label or path mmc1 not found
->> Error: arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts:31.22-23 syntax error
-   FATAL ERROR: Unable to parse input tree
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 60535 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170529/34a5ae13/attachment-0001.gz>
+thanks
+Ganapat
