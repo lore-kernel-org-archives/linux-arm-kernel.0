@@ -1,66 +1,39 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Mon, 29 May 2017 16:47:57 +0200
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Mon, 29 May 2017 16:56:13 +0200
 Subject: [PATCH 09/11] crypto: sun4i-ss: move from ablkcipher to skcipher
  API
-In-Reply-To: <20170524190652.13278-10-antoine.tenart@free-electrons.com>
+In-Reply-To: <20170529144757.GA23017@Red>
 References: <20170524190652.13278-1-antoine.tenart@free-electrons.com>
  <20170524190652.13278-10-antoine.tenart@free-electrons.com>
-Message-ID: <20170529144757.GA23017@Red>
+ <20170529144757.GA23017@Red>
+Message-ID: <20170529145613.GA14148@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 24, 2017 at 09:06:50PM +0200, Antoine Tenart wrote:
-> Update the sun4i-ss driver to use the skcipher API instead of the old
-> ablkcipher one. It's a bit more tricky than s/ablkcipher/skcipher/, but
-> still nothing special and the driver's logic stays the same.
+Hi Corentin,
+
+On Mon, May 29, 2017 at 04:47:57PM +0200, Corentin Labbe wrote:
+> On Wed, May 24, 2017 at 09:06:50PM +0200, Antoine Tenart wrote:
+> > +			.cra_flags = CRYPTO_ALG_TYPE_SKCIPHER |
+> > +				     CRYPTO_ALG_KERN_DRIVER_ONLY,
 > 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> ---
->  drivers/crypto/sunxi-ss/sun4i-ss-cipher.c | 189 ++++++++++++-------------
->  drivers/crypto/sunxi-ss/sun4i-ss-core.c   | 227 +++++++++++++++---------------
->  drivers/crypto/sunxi-ss/sun4i-ss.h        |  34 ++---
->  3 files changed, 226 insertions(+), 224 deletions(-)
-> 
-> diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c b/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
-> index 23e549204365..5cf64746731a 100644
-> --- a/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
-> +++ b/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
-> -{       .type = CRYPTO_ALG_TYPE_ABLKCIPHER,
-> +{       .type = CRYPTO_ALG_TYPE_SKCIPHER,
->  	.alg.crypto = {
-> -		.cra_name = "cbc(aes)",
-> -		.cra_driver_name = "cbc-aes-sun4i-ss",
-> -		.cra_priority = 300,
-> -		.cra_blocksize = AES_BLOCK_SIZE,
-> -		.cra_flags = CRYPTO_ALG_TYPE_ABLKCIPHER,
-> -		.cra_ctxsize = sizeof(struct sun4i_tfm_ctx),
-> -		.cra_module = THIS_MODULE,
-> -		.cra_alignmask = 3,
-> -		.cra_type = &crypto_ablkcipher_type,
-> -		.cra_init = sun4i_ss_cipher_init,
-> -		.cra_ablkcipher = {
-> -			.min_keysize	= AES_MIN_KEY_SIZE,
-> -			.max_keysize	= AES_MAX_KEY_SIZE,
-> -			.ivsize		= AES_BLOCK_SIZE,
-> -			.setkey         = sun4i_ss_aes_setkey,
-> -			.encrypt        = sun4i_ss_cbc_aes_encrypt,
-> -			.decrypt        = sun4i_ss_cbc_aes_decrypt,
-> +		.setkey         = sun4i_ss_aes_setkey,
-> +		.encrypt        = sun4i_ss_cbc_aes_encrypt,
-> +		.decrypt        = sun4i_ss_cbc_aes_decrypt,
-> +		.min_keysize	= AES_MIN_KEY_SIZE,
-> +		.max_keysize	= AES_MAX_KEY_SIZE,
-> +		.ivsize		= AES_BLOCK_SIZE,
-> +		.base = {
-> +			.cra_name = "cbc(aes)",
-> +			.cra_driver_name = "cbc-aes-sun4i-ss",
-> +			.cra_priority = 300,
-> +			.cra_blocksize = AES_BLOCK_SIZE,
-> +			.cra_flags = CRYPTO_ALG_TYPE_SKCIPHER |
-> +				     CRYPTO_ALG_KERN_DRIVER_ONLY,
+> You add CRYPTO_ALG_KERN_DRIVER_ONLY on all flags which is unrelated to
+> the patch description.
 
-Hello
+Right, I forgot to make an extra patch for this. I'll fix this (and the
+other ones).
 
-You add CRYPTO_ALG_KERN_DRIVER_ONLY on all flags which is unrelated to the patch description.
+Thanks,
+Antoine
 
-Regards
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170529/22cbf525/attachment.sig>
