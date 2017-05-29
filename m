@@ -1,56 +1,57 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Mon, 29 May 2017 21:01:59 +0800
-Subject: [linux-sunxi] [PATCH 1/2] ARM: sun8i: v3s: add device nodes for
- DE2 display pipeline
-In-Reply-To: <20170529085939.zstja3pymq77ubjq@flea.lan>
-References: <20170524111724.28431-1-icenowy@aosc.io>
- <CAGb2v65bZ+VJYwcP24ipQ+4kuY28Babt-Cpm7uscjmWpcoeJ9g@mail.gmail.com>
- <5FF9B3F8-01F6-4B17-958C-9A4245199716@aosc.io>
- <CAGb2v66UG7nS=3zj=TWGY-BG62tsvSpxucKHT35g=4KGcS8kRA@mail.gmail.com>
- <1B75138F-B045-4E60-BE92-B9AA343CBB1D@aosc.io>
- <20170529085939.zstja3pymq77ubjq@flea.lan>
-Message-ID: <03812a93c93bbada77de864b4c5dc0af@aosc.io>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Mon, 29 May 2017 15:07:35 +0200
+Subject: [PATCH] reset: hisilicon: Fix hi6220 module license
+In-Reply-To: <1496051209.17695.36.camel@pengutronix.de>
+References: <20170525092232.27960-1-afaerber@suse.de>
+ <1496051209.17695.36.camel@pengutronix.de>
+Message-ID: <2b19a44e-67e7-1019-e54a-c543fbeafd93@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-05-29 16:59?Maxime Ripard ???
-> On Thu, May 25, 2017 at 10:28:24PM +0800, Icenowy Zheng wrote:
->> >>>> +                       compatible = "allwinner,sun8i-v3s-de2-mixer";
->> >>>> +                       reg = <0x01100000 0x100000>;
->> >>>
->> >>>The display engine also has an interrupt. Please list it
->> >>
->> >> It's a overall interrupt for DE2, not mixer interrupt.
->> >>
->> >> I will add it after we have proper interrupt chaining facility
->> >> for DE2.
->> >>
->> >> It cannot fit here in mixer node.
->> >
->> > Could you elaborate? If it is just shared, then listing it several
->> > times is OK. If the interrupt registers are not in this address
->> > space, then
->> 
->> The interrupt dealing code is still not so clear, and totally not
->> present in BSP DE2 code (the BSP just didn't use the interrupt).
->> 
->> We doesn't even know where the interrupt register is, and we cannot
->> promise it's not broken (as their is even no application of it in 
->> BSP).
-> 
-> Whether it's broken or not is out of the question here. Adding it
-> later would either break the DT compatibility, or introduce a crippled
-> driver for users that do not have a recent enough DT. None of the two
-> are really acceptable.
-> 
-> Especially if your plan is to add support for these.
+Hi Philipp,
 
-I have no such plan -- even the BSP driver doesn't use the IRQ at all.
+Am 29.05.2017 um 11:46 schrieb Philipp Zabel:
+> On Thu, 2017-05-25 at 11:22 +0200, Andreas F?rber wrote:
+>> The hi6220_reset driver fails to load:
+>>
+>>   [   10.423640] hi6220_reset: module license 'unspecified' taints kernel.
+>>   [   10.423644] Disabling lock debugging due to kernel taint
+>>   [   10.423735] hi6220_reset: Unknown symbol regmap_write (err 0)
+>>   [   10.423747] hi6220_reset: Unknown symbol devm_kmalloc (err 0)
+>>   [   10.423759] hi6220_reset: Unknown symbol syscon_node_to_regmap (err 0)
+>>   [   10.423768] hi6220_reset: Unknown symbol reset_controller_register (err 0)
+>>   [   10.423784] hi6220_reset: Unknown symbol __platform_driver_register (err 0)
+>>
+>> Add a MODULE_LICENSE() to fix this.
+>>
+>> Fixes: 70b3590f639f ("reset: hi6220: fix modular build")
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Chen Feng <puck.chen@hisilicon.com>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>> ---
+>>  drivers/reset/hisilicon/hi6220_reset.c | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/drivers/reset/hisilicon/hi6220_reset.c b/drivers/reset/hisilicon/hi6220_reset.c
+>> index 35ce53edabf9..d5e5229308f2 100644
+>> --- a/drivers/reset/hisilicon/hi6220_reset.c
+>> +++ b/drivers/reset/hisilicon/hi6220_reset.c
+>> @@ -155,3 +155,5 @@ static int __init hi6220_reset_init(void)
+>>  }
+>>  
+>>  postcore_initcall(hi6220_reset_init);
+>> +
+>> +MODULE_LICENSE("GPL v2");
+> 
+> Thank you, I have the same patch queued already.
 
-> 
-> Maxime
-> 
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+Is your tree not integrated into linux-next? If so, please send Stephen
+Rothwell an email to have that fixed.
+
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
