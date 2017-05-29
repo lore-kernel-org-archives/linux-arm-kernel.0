@@ -1,33 +1,18 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Mon, 29 May 2017 17:00:18 +0100
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Mon, 29 May 2017 18:03:27 +0200
 Subject: [PATCH 01/15] iio: adc: stm32: use devm_of_platform_populate()
 In-Reply-To: <1496072763-31209-2-git-send-email-benjamin.gaignard@linaro.org>
 References: <1496072763-31209-1-git-send-email-benjamin.gaignard@linaro.org>
  <1496072763-31209-2-git-send-email-benjamin.gaignard@linaro.org>
-Message-ID: <20170529170018.3fb2e8aa@kernel.org>
+Message-ID: <a9f57d31-b016-d88c-ff87-6b218226b00f@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 29 May 2017 17:45:49 +0200
-Benjamin Gaignard <benjamin.gaignard@linaro.org> wrote:
-
+On 05/29/2017 05:45 PM, Benjamin Gaignard wrote:
 > Use devm_of_platform_populate() instead of of_platform_populate and
 > of_platform_depopulate to simplify driver code
 > 
 > Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-My gut feeling is to dislike this particular instance.
-
-It's changing the order of removal of elements to not
-be a reverse of the order of them being set up.  That
-takes it from obviously correct to something where some thought
-is required.  For the trivial saving in lines of code I'm
-unconvinced it is a worthwhile change..
-
-Mind you, this particular driver isn't balancing the
-probe and remove order anyway (the regulator stuff)
-so I guess it's not making it much worse...
-
-Jonathan
 > 
 > CC: Jonathan Cameron <jic23@kernel.org>
 > CC: Hartmut Knaack <knaack.h@gmx.de>
@@ -67,6 +52,17 @@ Jonathan
 >  	struct stm32_adc_priv *priv = to_stm32_adc_priv(common);
 >  
 > -	of_platform_depopulate(&pdev->dev);
+
+Hi Benjamin,
+
+This is going to change order of sub devices removal. It may end-up with
+bellow resources being removed while sub-device still needs them.
+Not sure this is a good candidate for such a change.
+
+Best Regards,
+Fabrice
+
 >  	stm32_adc_irq_remove(pdev, priv);
 >  	clk_disable_unprepare(priv->aclk);
 >  	regulator_disable(priv->vref);
+> 
