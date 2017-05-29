@@ -1,108 +1,543 @@
 From: jagan@openedev.com (Jagan Teki)
-Date: Mon, 29 May 2017 19:30:27 +0000
-Subject: [PATCH 2/3] ARM: dts: sunxi: Update model and compatible for bananapi
+Date: Mon, 29 May 2017 19:30:28 +0000
+Subject: [PATCH 3/3] ARM: dts: sun6i-a31s: Rename sun6i-a31s-sinovoip-bpi-m2
 In-Reply-To: <1496086228-2806-1-git-send-email-jagan@openedev.com>
 References: <1496086228-2806-1-git-send-email-jagan@openedev.com>
-Message-ID: <1496086228-2806-2-git-send-email-jagan@openedev.com>
+Message-ID: <1496086228-2806-3-git-send-email-jagan@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jagan Teki <jagan@amarulasolutions.com>
 
-Since Bananapi brand is owned by BIPAI KEJI(BPI), the previous
-Lemaker and Sinovoip no longer use the bananapi brand, hence
-Updated the model and compatible for existing bananapi boards
-which is denoted same like in binanapi site.
-
-Example: for Bananapi M64 board as
-
-model = "Banana Pi BPI-M64";
-compatible = "bananapi,bpi-m64", "allwinner,sun50i-a64";
+Since Bananapi brand is owned by BIPAI KEJI(BPI),
+the previous Sinovoip no longer use the bananapi brand,
+hence rename sun6i-a31s-sinovoip-bpi-m2.dts to
+sun6i-a31s-bananapi-m2.dts
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
 Note: Bananapi BPI product site
 http://www.banana-pi.org/product.html
 
- arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts          | 4 ++--
- arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts          | 4 ++--
- arch/arm/boot/dts/sun7i-a20-bananapi-m1.dts               | 4 ++--
- arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts           | 2 +-
- arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 4 ++--
- 5 files changed, 9 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/Makefile                       |   2 +-
+ arch/arm/boot/dts/sun6i-a31s-bananapi-m2.dts     | 244 +++++++++++++++++++++++
+ arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts | 244 -----------------------
+ 3 files changed, 245 insertions(+), 245 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sun6i-a31s-bananapi-m2.dts
+ delete mode 100644 arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
 
-diff --git a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts b/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
-index bdfdce8..265f79d 100644
---- a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
-+++ b/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
-@@ -46,8 +46,8 @@
- #include <dt-bindings/gpio/gpio.h>
- 
- / {
--	model = "Sinovoip BPI-M2";
--	compatible = "sinovoip,bpi-m2", "allwinner,sun6i-a31s";
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 1b086f0..e588721 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -848,7 +848,7 @@ dtb-$(CONFIG_MACH_SUN6I) += \
+ 	sun6i-a31s-inet-q972.dtb \
+ 	sun6i-a31s-primo81.dtb \
+ 	sun6i-a31s-sina31s.dtb \
+-	sun6i-a31s-sinovoip-bpi-m2.dtb \
++	sun6i-a31s-bananapi-m2.dtb \
+ 	sun6i-a31s-yones-toptech-bs1078-v2.dtb
+ dtb-$(CONFIG_MACH_SUN7I) += \
+ 	sun7i-a20-bananapi-m1.dtb \
+diff --git a/arch/arm/boot/dts/sun6i-a31s-bananapi-m2.dts b/arch/arm/boot/dts/sun6i-a31s-bananapi-m2.dts
+new file mode 100644
+index 0000000..265f79d
+--- /dev/null
++++ b/arch/arm/boot/dts/sun6i-a31s-bananapi-m2.dts
+@@ -0,0 +1,244 @@
++/*
++ * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "sun6i-a31s.dtsi"
++#include "sunxi-common-regulators.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
 +	model = "Banana PI BPI-M2";
 +	compatible = "bananapi,bpi-m2", "allwinner,sun6i-a31s";
- 
- 	aliases {
- 		serial0 = &uart0;
-diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts b/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
-index 08e776a..2c87236 100644
---- a/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
-@@ -49,8 +49,8 @@
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- 
- / {
--	model = "Banana Pi BPI-M1-Plus";
--	compatible = "sinovoip,bpi-m1-plus", "allwinner,sun7i-a20";
-+	model = "Banana Pi BPI-M1+";
-+	compatible = "bananapi,bpi-m1-plus", "allwinner,sun7i-a20";
- 
- 	aliases {
- 		serial0 = &uart0;
-diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi-m1.dts b/arch/arm/boot/dts/sun7i-a20-bananapi-m1.dts
-index 8b97b89..3d2597e 100644
---- a/arch/arm/boot/dts/sun7i-a20-bananapi-m1.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-bananapi-m1.dts
-@@ -50,8 +50,8 @@
- #include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
--	model = "LeMaker Banana Pi M1";
--	compatible = "lemaker,bananapi", "allwinner,sun7i-a20";
-+	model = "Banana Pi BPI-M1";
-+	compatible = "bananapi,bpi-m1", "allwinner,sun7i-a20";
- 
- 	aliases {
- 		serial0 = &uart0;
-diff --git a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-index 52acbe1..643b8ec 100644
---- a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-@@ -49,7 +49,7 @@
- 
- / {
- 	model = "Banana Pi BPI-M2-Plus";
--	compatible = "sinovoip,bpi-m2-plus", "allwinner,sun8i-h3";
-+	compatible = "bananapi,bpi-m2-plus", "allwinner,sun8i-h3";
- 
- 	aliases {
- 		serial0 = &uart0;
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-index 6872135..949edba 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-@@ -47,8 +47,8 @@
- #include <dt-bindings/gpio/gpio.h>
- 
- / {
--	model = "BananaPi-M64";
--	compatible = "sinovoip,bananapi-m64", "allwinner,sun50i-a64";
-+	model = "Banana Pi BPI-M64";
-+	compatible = "bananapi,bpi-m64", "allwinner,sun50i-a64";
- 
- 	aliases {
- 		serial0 = &uart0;
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_pins_bpi_m2>;
++
++		blue {
++			label = "bpi-m2:blue:usr";
++			gpios = <&pio 6 11 GPIO_ACTIVE_HIGH>; /* PG11 */
++		};
++
++		green {
++			label = "bpi-m2:green:usr";
++			gpios = <&pio 6 10 GPIO_ACTIVE_HIGH>; /* PG10 */
++		};
++
++		red {
++			label = "bpi-m2:red:usr";
++			gpios = <&pio 6 5 GPIO_ACTIVE_HIGH>; /* PG5 */
++		};
++	};
++
++	mmc2_pwrseq: mmc2_pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		pinctrl-names = "default";
++		pinctrl-0 = <&mmc2_pwrseq_pin_bpi_m2>;
++		reset-gpios = <&r_pio 0 8 GPIO_ACTIVE_LOW>; /* PL8 WIFI_EN */
++	};
++};
++
++&cpu0 {
++	cpu-supply = <&reg_dcdc3>;
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&gmac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&gmac_pins_rgmii_a>, <&gmac_phy_reset_pin_bpi_m2>;
++	phy = <&phy1>;
++	phy-mode = "rgmii";
++	snps,reset-gpio = <&pio 0 21 GPIO_ACTIVE_HIGH>; /* PA21 */
++	snps,reset-active-low;
++	snps,reset-delays-us = <0 10000 30000>;
++	status = "okay";
++
++	phy1: ethernet-phy at 1 {
++		reg = <1>;
++	};
++};
++
++&ir {
++	pinctrl-names = "default";
++	pinctrl-0 = <&ir_pins_a>;
++	status = "okay";
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_bpi_m2>;
++	vmmc-supply = <&reg_vcc3v0>;
++	bus-width = <4>;
++	cd-gpios = <&pio 0 4 GPIO_ACTIVE_HIGH>; /* PA4 */
++	cd-inverted;
++	status = "okay";
++};
++
++&mmc0_pins_a {
++	bias-pull-up;
++};
++
++&mmc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc2_pins_a>;
++	vmmc-supply = <&reg_vcc3v0>;
++	mmc-pwrseq = <&mmc2_pwrseq>;
++	bus-width = <4>;
++	non-removable;
++	status = "okay";
++
++	brcmf: bcrmf at 1 {
++		reg = <1>;
++		compatible = "brcm,bcm4329-fmac";
++		interrupt-parent = <&r_pio>;
++		interrupts = <0 5 IRQ_TYPE_LEVEL_LOW>; /* PL5 */
++		interrupt-names = "host-wake";
++	};
++};
++
++&mmc2_pins_a {
++	bias-pull-up;
++};
++
++&ohci0 {
++	status = "okay";
++};
++
++&p2wi {
++	status = "okay";
++
++	axp22x: pmic at 68 {
++		compatible = "x-powers,axp221";
++		reg = <0x68>;
++		interrupt-parent = <&nmi_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++	};
++};
++
++&pio {
++	gmac_phy_reset_pin_bpi_m2: gmac_phy_reset_pin at 0 {
++		pins = "PA21";
++		function = "gpio_out";
++	};
++
++	led_pins_bpi_m2: led_pins at 0 {
++		pins = "PG5", "PG10", "PG11";
++		function = "gpio_out";
++	};
++
++	mmc0_cd_pin_bpi_m2: mmc0_cd_pin at 0 {
++		pins = "PA4";
++		function = "gpio_in";
++		bias-pull-up;
++	};
++};
++
++&r_pio {
++	mmc2_pwrseq_pin_bpi_m2: mmc2_pwrseq_pin at 0 {
++		pins = "PL8";
++		function = "gpio_out";
++	};
++};
++
++#include "axp22x.dtsi"
++
++&reg_dc5ldo {
++	regulator-min-microvolt = <700000>;
++	regulator-max-microvolt = <1320000>;
++	regulator-name = "vdd-cpus";
++};
++
++&reg_dcdc1 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vdd-3v0";
++};
++
++&reg_dcdc2 {
++	regulator-min-microvolt = <700000>;
++	regulator-max-microvolt = <1320000>;
++	regulator-name = "vdd-gpu";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <700000>;
++	regulator-max-microvolt = <1320000>;
++	regulator-name = "vdd-cpu";
++};
++
++&reg_dcdc4 {
++	regulator-always-on;
++	regulator-min-microvolt = <700000>;
++	regulator-max-microvolt = <1320000>;
++	regulator-name = "vdd-sys-dll";
++};
++
++&reg_dcdc5 {
++	regulator-always-on;
++	regulator-min-microvolt = <1500000>;
++	regulator-max-microvolt = <1500000>;
++	regulator-name = "vcc-dram";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&usbphy {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts b/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
+deleted file mode 100644
+index 265f79d..0000000
+--- a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
++++ /dev/null
+@@ -1,244 +0,0 @@
+-/*
+- * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
+- *
+- * This file is dual-licensed: you can use it either under the terms
+- * of the GPL or the X11 license, at your option. Note that this dual
+- * licensing only applies to this file, and not this project as a
+- * whole.
+- *
+- *  a) This library is free software; you can redistribute it and/or
+- *     modify it under the terms of the GNU General Public License as
+- *     published by the Free Software Foundation; either version 2 of the
+- *     License, or (at your option) any later version.
+- *
+- *     This library is distributed in the hope that it will be useful,
+- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *     GNU General Public License for more details.
+- *
+- * Or, alternatively,
+- *
+- *  b) Permission is hereby granted, free of charge, to any person
+- *     obtaining a copy of this software and associated documentation
+- *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use,
+- *     copy, modify, merge, publish, distribute, sublicense, and/or
+- *     sell copies of the Software, and to permit persons to whom the
+- *     Software is furnished to do so, subject to the following
+- *     conditions:
+- *
+- *     The above copyright notice and this permission notice shall be
+- *     included in all copies or substantial portions of the Software.
+- *
+- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+- *     OTHER DEALINGS IN THE SOFTWARE.
+- */
+-
+-/dts-v1/;
+-#include "sun6i-a31s.dtsi"
+-#include "sunxi-common-regulators.dtsi"
+-#include <dt-bindings/gpio/gpio.h>
+-
+-/ {
+-	model = "Banana PI BPI-M2";
+-	compatible = "bananapi,bpi-m2", "allwinner,sun6i-a31s";
+-
+-	aliases {
+-		serial0 = &uart0;
+-	};
+-
+-	chosen {
+-		stdout-path = "serial0:115200n8";
+-	};
+-
+-	leds {
+-		compatible = "gpio-leds";
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&led_pins_bpi_m2>;
+-
+-		blue {
+-			label = "bpi-m2:blue:usr";
+-			gpios = <&pio 6 11 GPIO_ACTIVE_HIGH>; /* PG11 */
+-		};
+-
+-		green {
+-			label = "bpi-m2:green:usr";
+-			gpios = <&pio 6 10 GPIO_ACTIVE_HIGH>; /* PG10 */
+-		};
+-
+-		red {
+-			label = "bpi-m2:red:usr";
+-			gpios = <&pio 6 5 GPIO_ACTIVE_HIGH>; /* PG5 */
+-		};
+-	};
+-
+-	mmc2_pwrseq: mmc2_pwrseq {
+-		compatible = "mmc-pwrseq-simple";
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&mmc2_pwrseq_pin_bpi_m2>;
+-		reset-gpios = <&r_pio 0 8 GPIO_ACTIVE_LOW>; /* PL8 WIFI_EN */
+-	};
+-};
+-
+-&cpu0 {
+-	cpu-supply = <&reg_dcdc3>;
+-};
+-
+-&ehci0 {
+-	status = "okay";
+-};
+-
+-&gmac {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&gmac_pins_rgmii_a>, <&gmac_phy_reset_pin_bpi_m2>;
+-	phy = <&phy1>;
+-	phy-mode = "rgmii";
+-	snps,reset-gpio = <&pio 0 21 GPIO_ACTIVE_HIGH>; /* PA21 */
+-	snps,reset-active-low;
+-	snps,reset-delays-us = <0 10000 30000>;
+-	status = "okay";
+-
+-	phy1: ethernet-phy at 1 {
+-		reg = <1>;
+-	};
+-};
+-
+-&ir {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&ir_pins_a>;
+-	status = "okay";
+-};
+-
+-&mmc0 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_bpi_m2>;
+-	vmmc-supply = <&reg_vcc3v0>;
+-	bus-width = <4>;
+-	cd-gpios = <&pio 0 4 GPIO_ACTIVE_HIGH>; /* PA4 */
+-	cd-inverted;
+-	status = "okay";
+-};
+-
+-&mmc0_pins_a {
+-	bias-pull-up;
+-};
+-
+-&mmc2 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc2_pins_a>;
+-	vmmc-supply = <&reg_vcc3v0>;
+-	mmc-pwrseq = <&mmc2_pwrseq>;
+-	bus-width = <4>;
+-	non-removable;
+-	status = "okay";
+-
+-	brcmf: bcrmf at 1 {
+-		reg = <1>;
+-		compatible = "brcm,bcm4329-fmac";
+-		interrupt-parent = <&r_pio>;
+-		interrupts = <0 5 IRQ_TYPE_LEVEL_LOW>; /* PL5 */
+-		interrupt-names = "host-wake";
+-	};
+-};
+-
+-&mmc2_pins_a {
+-	bias-pull-up;
+-};
+-
+-&ohci0 {
+-	status = "okay";
+-};
+-
+-&p2wi {
+-	status = "okay";
+-
+-	axp22x: pmic at 68 {
+-		compatible = "x-powers,axp221";
+-		reg = <0x68>;
+-		interrupt-parent = <&nmi_intc>;
+-		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+-	};
+-};
+-
+-&pio {
+-	gmac_phy_reset_pin_bpi_m2: gmac_phy_reset_pin at 0 {
+-		pins = "PA21";
+-		function = "gpio_out";
+-	};
+-
+-	led_pins_bpi_m2: led_pins at 0 {
+-		pins = "PG5", "PG10", "PG11";
+-		function = "gpio_out";
+-	};
+-
+-	mmc0_cd_pin_bpi_m2: mmc0_cd_pin at 0 {
+-		pins = "PA4";
+-		function = "gpio_in";
+-		bias-pull-up;
+-	};
+-};
+-
+-&r_pio {
+-	mmc2_pwrseq_pin_bpi_m2: mmc2_pwrseq_pin at 0 {
+-		pins = "PL8";
+-		function = "gpio_out";
+-	};
+-};
+-
+-#include "axp22x.dtsi"
+-
+-&reg_dc5ldo {
+-	regulator-min-microvolt = <700000>;
+-	regulator-max-microvolt = <1320000>;
+-	regulator-name = "vdd-cpus";
+-};
+-
+-&reg_dcdc1 {
+-	regulator-always-on;
+-	regulator-min-microvolt = <3000000>;
+-	regulator-max-microvolt = <3000000>;
+-	regulator-name = "vdd-3v0";
+-};
+-
+-&reg_dcdc2 {
+-	regulator-min-microvolt = <700000>;
+-	regulator-max-microvolt = <1320000>;
+-	regulator-name = "vdd-gpu";
+-};
+-
+-&reg_dcdc3 {
+-	regulator-always-on;
+-	regulator-min-microvolt = <700000>;
+-	regulator-max-microvolt = <1320000>;
+-	regulator-name = "vdd-cpu";
+-};
+-
+-&reg_dcdc4 {
+-	regulator-always-on;
+-	regulator-min-microvolt = <700000>;
+-	regulator-max-microvolt = <1320000>;
+-	regulator-name = "vdd-sys-dll";
+-};
+-
+-&reg_dcdc5 {
+-	regulator-always-on;
+-	regulator-min-microvolt = <1500000>;
+-	regulator-max-microvolt = <1500000>;
+-	regulator-name = "vcc-dram";
+-};
+-
+-&uart0 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&uart0_pins_a>;
+-	status = "okay";
+-};
+-
+-&usbphy {
+-	status = "okay";
+-};
 -- 
 1.9.1
