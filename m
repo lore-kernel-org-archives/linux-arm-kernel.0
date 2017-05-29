@@ -1,59 +1,35 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 29 May 2017 18:10:01 +0200
-Subject: [PATCH 02/15] iio: dac: stm32: use devm_of_platform_populate()
-In-Reply-To: <1496072763-31209-3-git-send-email-benjamin.gaignard@linaro.org>
-References: <1496072763-31209-1-git-send-email-benjamin.gaignard@linaro.org>
- <1496072763-31209-3-git-send-email-benjamin.gaignard@linaro.org>
-Message-ID: <a8e43640-1edd-6e75-c382-a364f9a2e9fd@st.com>
+From: alexandre.torgue@st.com (Alexandre TORGUE)
+Date: Mon, 29 May 2017 18:17:30 +0200
+Subject: [PATCH v2 0/3] Add fixes to STM32 pintrl
+Message-ID: <1496074653-2941-1-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2017 05:45 PM, Benjamin Gaignard wrote:
-> Use devm_of_platform_populate() instead of of_platform_populate and
-> of_platform_depopulate to simplify driver code
-> 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-> 
-> CC: Jonathan Cameron <jic23@kernel.org>
-> CC: Hartmut Knaack <knaack.h@gmx.de>
-> CC: Lars-Peter Clausen <lars@metafoo.de>
-> CC: Alexandre Torgue <alexandre.torgue@st.com>
-> CC: Fabrice Gasnier <fabrice.gasnier@st.com>
-> CC: linux-iio at vger.kernel.org
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: linux-kernel at vger.kernel.org
-> ---
->  drivers/iio/dac/stm32-dac-core.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/drivers/iio/dac/stm32-dac-core.c b/drivers/iio/dac/stm32-dac-core.c
-> index 75e4878..9c42537 100644
-> --- a/drivers/iio/dac/stm32-dac-core.c
-> +++ b/drivers/iio/dac/stm32-dac-core.c
-> @@ -130,7 +130,7 @@ static int stm32_dac_probe(struct platform_device *pdev)
->  
->  	platform_set_drvdata(pdev, &priv->common);
->  
-> -	ret = of_platform_populate(pdev->dev.of_node, NULL, NULL, dev);
-> +	ret = devm_of_platform_populate(&pdev->dev);
->  	if (ret < 0) {
->  		dev_err(dev, "failed to populate DT children\n");
->  		goto err_pclk;
-> @@ -151,7 +151,6 @@ static int stm32_dac_remove(struct platform_device *pdev)
->  	struct stm32_dac_common *common = platform_get_drvdata(pdev);
->  	struct stm32_dac_priv *priv = to_stm32_dac_priv(common);
->  
-> -	of_platform_depopulate(&pdev->dev);
-Hi Benjamin,
+This series add several fixes to STM32 pinctrl:
+ - Set input mode when PIN is used as interrupt
+ - Implement .get_direction() gpio_chip callback  
+ - In DT: set each gpio controller as a interrupt controller. User who
+   wants to use gpio as interrupt will have choice to use either "gpiolib"
+   interface or "common" interrupt interface.
 
-Same as patch 1, This is going to change order of sub devices removal.
-It may end-up with bellow resources being removed while sub-device still
-needs them.
-Not sure this is a good candidate for such a change.
+Changes since v1:
+ -rebase on 4.12-rc1
+ -Let gpiochip and irqchip orthogonal in stm32 pinctrl driver
+ -Don't use gpiolib internal define
 
-Best Regards,
-Fabrice
->  	clk_disable_unprepare(priv->pclk);
->  	regulator_disable(priv->vref);
->  
-> 
+Regards
+Alex
+
+Alexandre TORGUE (3):
+  pinctrl: stm32: set pin to gpio input when used as interrupt
+  pinctrl: stm32: Implement .get_direction gpio_chip callback
+  ARM: dts: stm32: Set gpio controller also as interrupt controller
+
+ arch/arm/boot/dts/stm32f429.dtsi      | 22 +++++++++++++
+ arch/arm/boot/dts/stm32f746.dtsi      | 22 +++++++++++++
+ drivers/pinctrl/stm32/pinctrl-stm32.c | 62 ++++++++++++++++++++++++++++-------
+ drivers/pinctrl/stm32/pinctrl-stm32.h |  5 ++-
+ 4 files changed, 98 insertions(+), 13 deletions(-)
+
+-- 
+1.9.1
