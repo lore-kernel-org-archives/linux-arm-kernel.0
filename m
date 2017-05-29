@@ -1,47 +1,46 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Mon, 29 May 2017 10:32:00 +0200
-Subject: [PATCH v3 1/1] ARM64/PCI: Set root bus NUMA node on ACPI systems
-In-Reply-To: <20170524172219.5689-2-lorenzo.pieralisi@arm.com>
-References: <20170524172219.5689-1-lorenzo.pieralisi@arm.com>
- <20170524172219.5689-2-lorenzo.pieralisi@arm.com>
-Message-ID: <20170529083200.GO16981@rric.localdomain>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 29 May 2017 10:50:35 +0200
+Subject: [PATCH V3 1/2] dt-bindings: pinctrl: add imx7ulp pinctrl binding
+ doc
+In-Reply-To: <AM3PR04MB3065626F1B45C8459E5765580FE0@AM3PR04MB306.eurprd04.prod.outlook.com>
+References: <1495539829-23345-1-git-send-email-aisheng.dong@nxp.com>
+ <20170523182321.GA13664@w540>
+ <AM3PR04MB3065626F1B45C8459E5765580FE0@AM3PR04MB306.eurprd04.prod.outlook.com>
+Message-ID: <CACRpkdaQ0xn8mm6mCemf+dEtOqYgR5eLd296+8CfOOLy9CJ4BA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24.05.17 18:22:19, Lorenzo Pieralisi wrote:
-> PCI core requires the NUMA node for the struct pci_host_bridge.dev to
-> be set by using the pcibus_to_node(struct pci_bus*) API, that on ARM64
-> systems relies on the struct pci_host_bridge->bus.dev NUMA node.
-> 
-> The struct pci_host_bridge.dev NUMA node is then propagated through
-> the PCI device hierarchy as PCI devices (and bridges) are enumerated
-> under it.
-> 
-> Therefore, in order to set-up the PCI NUMA hierarchy appropriately, the
-> struct pci_host_bridge->bus.dev NUMA node must be set before core
-> code calls pcibus_to_node(struct pci_bus*) on it so that PCI core can
-> retrieve the NUMA node for the struct pci_host_bridge.dev device and can
-> propagate it through the PCI bus tree.
-> 
-> On ARM64 ACPI based systems the struct pci_host_bridge->bus.dev NUMA
-> node can be set-up in pcibios_root_bridge_prepare() by parsing the root
-> bridge ACPI device firmware binding.
-> 
-> Add code to the pcibios_root_bridge_prepare() that, when booting with
-> ACPI, parse the root bridge ACPI device companion NUMA binding and set
-> the corresponding struct pci_host_bridge->bus.dev NUMA node
-> appropriately.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
+On Wed, May 24, 2017 at 5:10 AM, A.S. Dong <aisheng.dong@nxp.com> wrote:
 
-Looks good.
+>> > +   NOTE: i.MX7ULP PIN_FUNC_ID consists of 4 integers as it shares one
+>> mux
+>> > +   and config register as follows:
+>> > +   <mux_conf_reg input_reg mux_mode input_val>
+>>
+>> As your PIN_FUNC_ID specifies both the pin ids and their mux settings,
+>> shouldn't you use the newly documented 'pinmux' property in place of
+>> 'pins'?
+>>
+>> Please see
+>> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/
+>> ?id=8d5e7c5df0a6c442373628be5221321172b1badf
+>>
+>> The current documentation specifies pin ids and mux settings have to be
+>> assembled in one single integer, which is not your case, but that can be
+>> changed to make it accept an array of integers values if needed.
+>>
+>
+> Thanks for the info.
+> Looks good to me.
+>
+> Shawn & Linus,
+> Are you okay with this?
+>
+> If yes, I can extend the standard 'pinmux' property to support integer array
+> and renew the patch series to use it.
 
-Reviewed-by: Robert Richter <rrichter@cavium.com>
-Tested-by: Robert Richter <rrichter@cavium.com>
+After reading Jacopo's commit it seems to make a lot of sense indeed,
+so please do this.
 
-Thanks,
-
--Robert
+Yours,
+Linus Walleij
