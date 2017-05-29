@@ -1,63 +1,65 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 29 May 2017 10:08:16 +0200
-Subject: [PATCH 3/6] gpio: dt-bindings: Add documentation for gpio
- controllers on Armada 7K/8K
-In-Reply-To: <878tlnzps3.fsf@free-electrons.com>
-References: <cover.e10718b9c0f9fdd07327ae14e213be8da5b1f7ef.1495210061.git-series.gregory.clement@free-electrons.com>
- <306395ff39de3d3d3c8f55e5da4de8def29ae8d1.1495210061.git-series.gregory.clement@free-electrons.com>
- <CACRpkdY97DDcwec+J-4X1AT5a7Mbo4GnWUJmuAOYhNzOA8_HZQ@mail.gmail.com>
- <878tlnzps3.fsf@free-electrons.com>
-Message-ID: <CACRpkdbW3T5auXCMrqH_tTzcVseGbiV+y53fJ2xN5p-VbGz7rA@mail.gmail.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Mon, 29 May 2017 10:09:44 +0200
+Subject: [PATCH 10/11] crypto: sun4i-ss: fix large block size support
+In-Reply-To: <20170526145501.GA19284@Red>
+References: <20170524190652.13278-1-antoine.tenart@free-electrons.com>
+ <20170524190652.13278-11-antoine.tenart@free-electrons.com>
+ <20170526145501.GA19284@Red>
+Message-ID: <20170529080944.GA3169@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 23, 2017 at 3:06 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
->  On mar., mai 23 2017, Linus Walleij <linus.walleij@linaro.org> wrote:
+Hi Corentin,
 
->> Please rebase and resend the rest of the patches.
->
-> Actually I was wrong with my assumption that there was no dependency.
-> For the binding documentation there is dependecy accross the series I
-> sent.
->
-> This patch depends on "pinctrl: dt-bindings: add documentation for AP806
-> pin controllers" [1] and "pinctrl: dt-bindings: add documentation for
-> CP110 pin controllers" [3] from the series "Add support for the pin
-> controllers on the Marvell Armada 7K/8K".
->
-> As you are maintainer of both gpio and pinctrl subsystem it will be easy
-> to resolv.
+On Fri, May 26, 2017 at 04:55:01PM +0200, Corentin Labbe wrote:
+> On Wed, May 24, 2017 at 09:06:51PM +0200, Antoine Tenart wrote:
+> >  
+> > +	/*
+> > +	 * The datasheet isn't very clear about when to retrieve the digest. The
+> > +	 * bit SS_DATA_END is cleared when the engine has processed the data and
+> > +	 * when the digest is computed *but* it doesn't mean the digest is
+> > +	 * available in the diesgt registers. Hence the delay to be sure we can
+> 
+> Small typo here (diesgt/digest)
 
-Please send all patches in one big series in that case, so I can apply
-them all to a branch and merge that branch into both trees.
+Oops. I'll fix it.
 
-> But these last patches depend also on "clk: mvebu: ap806: introduce a
-> new binding" [3] in the clock series "Improve ap806 clk support on
-> Marvell Armada 7K/8K" and on "clk: mvebu: cp110: introduce a new
-> binding" [4] in the clock series "Improve cp110 clk support on Marvell
-> Armada 7K/8K".
+> This behaviour is very strange since I didnt get it on other platform.
+> Could you give me the board name where you get it ?
 
-That sounds messy.
+I used a CHIP (sun5i-r8-chip).
 
-> So for these particular patches, either I rebase them on the v4.12-rc2
-> and there will be a small merge conflict during the merge window for
-> v4.13, or we can ask a stable branch with only these few patches (I am
-> adding the clock maintainer to this email).
->
-> If we chose this last option I can split the clock patches to have patch
-> modifying only the binding documentation.
+> Does any wmb() after the writel(..SS_DATA_END..) do the trick ?
 
-I think you can make a patch just modifying the binding documentation
-and then apply that patch to *both* trees, just make sure the patch
-is *final* and not applied in different versions in clk and pinctrl.
+Nope. I tried this and it didn't help.
 
-I think cross-tree branches for documentation clashes is too much
-bureaucracy.
+> Which speed are the SS clocks ?
 
-Make sure your clock patch is finalized and preferably also applied
-to the clk tree then put it in the bottom of the patch set you send
-to me as well and I will proceed like above.
+The AHB SS clk is running at 300 MHz and the SS clk at 150 MHz. SS clk
+is at the expected rate but the AHB SS clk has a higher rate that what's
+expected.
 
-Yours,
-Linus Walleij
+In the probing function only the SS clk rate is explicitly set. I tried
+to set the AHB clk rate as well and removed the delays. This didn't fix
+the framework selftests at boot time. Is there any reason the AHB SS clk
+rate isn't explicitly set when probing the driver? (Should it?)
+
+> Anyway the whole serie seems good, I will test it just after this weekend.
+
+Let me know if your tests went well, I'll send a v2 fixing the typo
+below then (and setting the AHB SS clk rate explicitly if needed).
+
+Thanks,
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170529/0cc8ea33/attachment.sig>
