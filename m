@@ -1,35 +1,33 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 29 May 2017 10:07:30 +0300
-Subject: [PATCHv3 1/3] ARM: OMAP2+: hwmod: assign main clock from DT if
- available
-In-Reply-To: <20170526154416.GC3717@atomide.com>
-References: <1495127772-7486-1-git-send-email-t-kristo@ti.com>
- <1495127772-7486-2-git-send-email-t-kristo@ti.com>
- <20170526154416.GC3717@atomide.com>
-Message-ID: <5df79d6b-352d-8341-4bd0-fec4e4cc322d@ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 29 May 2017 09:22:21 +0200
+Subject: [PATCH v2] soc: zte: Restrict SOC_ZTE to ARCH_ZX or COMPILE_TEST
+Message-ID: <1496042541-2529-1-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/05/17 18:44, Tony Lindgren wrote:
-> * Tero Kristo <t-kristo@ti.com> [170518 10:19]:
->> Fix the main clock assignment to assign clkctrl clk from DT as the main
->> clock if available. If main clock is assigned via DT, the direct PRCM
->> access for module handling is not used on OMAP4+ architectures either,
->> as it is assumed the main clock will be doing this instead.
->
-> Is this still needed based on what we chatted last week?
->
-> I'd like to avoid adding the clkctrl clocks to the wrong node
-> as we then end up moving them again later on when we have support
-> for the wrapper device..
->
-> Regards,
->
-> Tony
->
+The ZTE SoC drivers are only useful when building for a ZTE ZX platform.
 
-I am investigating this currently, don't have much input yet but an 
-alternative solution seems rather plausible. If I can get it working, we 
-don't need this specific patch, but something that will replace it.
+Fixes: 4c2c2e39713b8cfb ("soc: zte: pm_domains: Prepare for supporting ARMv8 zx2967 family")
+Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Reviewed-by: Baoyou Xie <baoyou.xie@linaro.org>
+---
+v2:
+  - Add Reviewed-by.
+---
+ drivers/soc/zte/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
--Tero
+diff --git a/drivers/soc/zte/Kconfig b/drivers/soc/zte/Kconfig
+index 20bde38ce2f912f5..e9d750c510cd9c90 100644
+--- a/drivers/soc/zte/Kconfig
++++ b/drivers/soc/zte/Kconfig
+@@ -2,6 +2,7 @@
+ # ZTE SoC drivers
+ #
+ menuconfig SOC_ZTE
++	depends on ARCH_ZX || COMPILE_TEST
+ 	bool "ZTE SoC driver support"
+ 
+ if SOC_ZTE
+-- 
+2.7.4
