@@ -1,66 +1,61 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 30 May 2017 12:16:57 +0200
-Subject: [PATCH 27/31] KVM: arm64: vgic-v3: Add ICV_RPR_EL1 handler
-In-Reply-To: <20170503104606.19342-28-marc.zyngier@arm.com>
-References: <20170503104606.19342-1-marc.zyngier@arm.com>
- <20170503104606.19342-28-marc.zyngier@arm.com>
-Message-ID: <f6beb628-b277-2551-d6b4-2b0539fbbf24@redhat.com>
+From: Claudiu.Beznea@microchip.com (m18063)
+Date: Tue, 30 May 2017 13:20:26 +0300
+Subject: [PATCH v2 1/2] drivers: pwm: core: implement pwm dead-times
+In-Reply-To: <CAHp75Ve=v=50UmpOyi1guY3NVuk41U0Ma+_P__5NK7_dNr6gZg@mail.gmail.com>
+References: <1494317990-9131-1-git-send-email-claudiu.beznea@microchip.com>
+ <1494317990-9131-2-git-send-email-claudiu.beznea@microchip.com>
+ <CAHp75Ve=v=50UmpOyi1guY3NVuk41U0Ma+_P__5NK7_dNr6gZg@mail.gmail.com>
+Message-ID: <009fe3a4-1a89-90d4-0610-5162bfcfc056@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Andy,
 
-On 03/05/2017 12:46, Marc Zyngier wrote:
-> Add a handler for reading the guest's view of the ICV_RPR_EL1
-> register, returning the highest active priority.
+On 28.05.2017 01:28, Andy Shevchenko wrote:
+> On Tue, May 9, 2017 at 11:19 AM, Claudiu Beznea
+> <claudiu.beznea@microchip.com> wrote:
+>> Extends PWM framework to support PWM dead-times.
+>> The notions introduced are rising edge dead-time
+>> and falling edge dead-time. These are useful for
+>> PWM controllers with channels that have more than
+>> one outputs.
+>> The implementation add sysfs interface for
+>> configuration. It extends the pwm_state structure
+>> with two new members which keeps the values for
+>> dead-times.
+>> There were no additions in device tree for PWM channels
+>> initialized by device tree.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
+> AFAIU it's effectively called phase of the signal.
+It is actually a delay introduce by the PWM controller
+between it's outputs. As I said in cover letter, for
+PWM controllers with 2 output signals per channel
+(these signals are on different physical pins), this
+dead-time is the delay introduced b/w these two outputs.
+The term is a PWM literature specific.
+These delays are useful when PWM drives a half bridge
+converter where you need delays b/w positive edges of
+the signals which drivers the transistors to avoid
+shoot through scenarios.
 
-Eric
-> ---
->  arch/arm64/include/asm/sysreg.h |  1 +
->  virt/kvm/arm/hyp/vgic-v3-sr.c   | 10 ++++++++++
->  2 files changed, 11 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index 9971c5c435a7..c4d48e403629 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -187,6 +187,7 @@
->  #define SYS_ICC_AP0Rn_EL1(n)		sys_reg(3, 0, 12, 8, 4 | n)
->  #define SYS_ICC_AP1Rn_EL1(n)		sys_reg(3, 0, 12, 9, n)
->  #define SYS_ICC_DIR_EL1			sys_reg(3, 0, 12, 11, 1)
-> +#define SYS_ICC_RPR_EL1			sys_reg(3, 0, 12, 11, 3)
->  #define SYS_ICC_SGI1R_EL1		sys_reg(3, 0, 12, 11, 5)
->  #define SYS_ICC_IAR1_EL1		sys_reg(3, 0, 12, 12, 0)
->  #define SYS_ICC_EOIR1_EL1		sys_reg(3, 0, 12, 12, 1)
-> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> index 563dd2d16c59..3a5f54f445b9 100644
-> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> @@ -848,6 +848,13 @@ static void __hyp_text __vgic_v3_read_hppir(struct kvm_vcpu *vcpu,
->  	vcpu_set_reg(vcpu, rt, lr_val & ICH_LR_VIRTUAL_ID_MASK);
->  }
->  
-> +static void __hyp_text __vgic_v3_read_rpr(struct kvm_vcpu *vcpu,
-> +					  u32 vmcr, int rt)
-> +{
-> +	u32 val = __vgic_v3_get_highest_active_priority();
-> +	vcpu_set_reg(vcpu, rt, val);
-> +}
-> +
->  int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
->  {
->  	int rt = kvm_vcpu_sys_get_rt(vcpu);
-> @@ -935,6 +942,9 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
->  	case SYS_ICC_DIR_EL1:
->  		fn = __vgic_v3_write_dir;
->  		break;
-> +	case SYS_ICC_RPR_EL1:
-> +		fn = __vgic_v3_read_rpr;
-> +		break;
->  	default:
->  		return 0;
->  	}
+> It looks to me much simpler if you allow to have linked / virtual
+> channels instead of creating a lot of (duplicated) properties.My linked channels (the 2 outputs per PWM channel) are PWM controller
+specifics. The standard output of these linked channels is as
+follows:
+              __    __    __    __
+channel Xa __|  |__|  |__|  |__|  |__
+           __    __    __    __    __
+channel Xb   |__|  |__|  |__|  |__|
+             <--T-->
+
+This is the default output. To be able to use the controller
+in applications which needs delays b/w the fronts of this outputs
+I introduced the dead-time configuration. This allow the user
+to set it's PWM output as he needs in his setup (these dead-times,
+delays, if PWM is used e.g. in half bridge converters, depends
+on the transistors used).
+
+Thank you,
+Claudiu Beznea
+
 > 
