@@ -1,32 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 30 May 2017 11:16:18 -0700
-Subject: [PATCHv3b 0/5] ARM: OMAP2+: preparation for clk/clkctrl support
-In-Reply-To: <1496155669-1677-1-git-send-email-t-kristo@ti.com>
-References: <1496155669-1677-1-git-send-email-t-kristo@ti.com>
-Message-ID: <20170530181618.GC3730@atomide.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 30 May 2017 18:36:40 +0000
+Subject: [PATCH 0/7] ARM: efi: PE/COFF cleanup/hardening
+Message-ID: <20170530183647.28557-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [170530 07:51]:
-> Hi,
-> 
-> This is an alternative solution against v3 [1] of this series.
-> 
-> [1]?https://www.spinics.net/lists/arm-kernel/msg581965.html
-> 
-> This series is different in that it parses the hwmod data in the fly
-> and swaps the main_clk info with clkctrl implementations if those
-> are present. Patch #1 / #2 are old from v3 of the series, rest are
-> new. Patches #3 / #4 add some infrastructure support for parsing
-> the clock data, and patch #5 does the clock swapping.
-> 
-> With this series, it is not necessary to populate clkctrl clock
-> entries to DT at all, thus the transition should be smoother.
+This is the ARM counterpart of the changes now in v4.12 to clean up
+the PE/COFF header that makes the kernel zImage loadable directly from
+UEFI, and to enhance it with hardening and debug features.
 
-Yeah OK I think this is the way to go to avoid changing
-device tree multiple times. The only issues I have are
-for patches 4 and 5 that I already commented on there.
+First of all, the cleanup consists of making the header comply with the
+PE/COFF spec (#1), removing the .reloc section (#2) and replacing all
+open coded constants with #defines from linux/pe.h
 
-Regards,
+Patch #4 is a standalone patch that removes ksymtab/kcrctab sections that
+may get pulled in inadvertently when the decompressor is built with EFI
+support. Note that these sections are tiny and harmless by themselves, but
+the linker may dump them in unexpected places if they are not placed
+explicitly, which may interfere with the image layout. This is especially
+important when signing zImages for UEFI secure boot.
 
-Tony
+Patch #5 changes the description of the decompressor in memory, so that the
+UEFI firmware can apply strict ro/nx protections, resulting in a more secure
+execution environment for the UEFI stub.
+
+Patch #6 splits the decompressor .start and .text output sections, so that
+the ELF view aligns with the PE/COFF view of the binary. This is useful for
+debugging, but has no other benefits (or downsides, for that matter)
+
+Patch #7 enhances the decompressor binary with a NB10 Codeview debug entry
+referring to the path to arch/arm/boot/compressed/vmlinux on the build host.
+This is another debug feature that allows seamless source level single step
+debugging of the UEFI stub while executing in the context of the firmware.
+
+Ard Biesheuvel (7):
+  arm: efi: remove forbidden values from the PE/COFF header
+  arm: efi: remove pointless dummy .reloc section
+  arm: efi: replace open coded constants with symbolic ones
+  arm: compressed: discard ksymtab/kcrctab sections
+  arm: efi: split zImage code and data into separate PE/COFF sections
+  arm: compressed: put zImage header and EFI header in dedicated section
+  arm: efi: add PE/COFF debug table to EFI header
+
+ arch/arm/boot/compressed/Makefile      |   4 +
+ arch/arm/boot/compressed/efi-header.S  | 247 ++++++++++++--------
+ arch/arm/boot/compressed/vmlinux.lds.S |  39 +++-
+ 3 files changed, 180 insertions(+), 110 deletions(-)
+
+-- 
+2.9.3
