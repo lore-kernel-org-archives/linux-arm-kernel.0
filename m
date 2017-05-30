@@ -1,29 +1,20 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Tue, 30 May 2017 11:58:50 +0100
-Subject: [PATCH 2/7] dt-bindings: PCI: Describe ATS property for root
- complex nodes
-In-Reply-To: <20170530100153.GI2818@8bytes.org>
-References: <20170524180143.19855-1-jean-philippe.brucker@arm.com>
- <20170524180143.19855-3-jean-philippe.brucker@arm.com>
- <20170530100153.GI2818@8bytes.org>
-Message-ID: <035be7ba-e850-a5a9-08fa-802a04feb600@arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 30 May 2017 16:30:24 +0530
+Subject: [PATCH] MAINTAINERS: add device-tree files to TI DaVinci entry
+In-Reply-To: <20170525093807.21157-1-nsekhar@ti.com>
+References: <20170525093807.21157-1-nsekhar@ti.com>
+Message-ID: <3edd407a-0495-4075-7478-fa62faf07e2b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/05/17 11:01, Joerg Roedel wrote:
-> On Wed, May 24, 2017 at 07:01:38PM +0100, Jean-Philippe Brucker wrote:
->> +- ats-supported: if present, the root complex supports the Address
->> +  Translation Service (ATS). It is able to interpret the AT field in PCIe
->> +  Transaction Layer Packets, and forward Translation Completions or
->> +  Invalidation Requests to endpoints.
->> +
->> +  Device drivers should not enable ATS in endpoints unless this property
->> +  is present.
+On Thursday 25 May 2017 03:08 PM, Sekhar Nori wrote:
+> Add device-tree files relevant to TI DaVinci platform
+> to its entry so mach-davinci sub-arch maintainers get
+> copied on patches with device-tree file updates.
 > 
-> Device drivers should never enable ATS, this is the job of the IOMMU
-> driver. This should be clarified in the text.
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 
-Right, I will change this.
+Applied to fixes
 
-Thanks,
-Jean
+Thanks
+Sekhar
