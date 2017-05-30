@@ -1,57 +1,53 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 30 May 2017 14:42:26 +0100
-Subject: [PATCH 4/6] irqchip: irq-mvebu-icu: new driver for Marvell ICU
-In-Reply-To: <20170530132735.GA21646@lunn.ch>
-References: <1496135772-20694-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1496135772-20694-5-git-send-email-thomas.petazzoni@free-electrons.com>
- <20170530121907.GO22219@n2100.armlinux.org.uk>
- <20170530143350.6f8563c1@free-electrons.com>
- <20170530125643.GQ22219@n2100.armlinux.org.uk>
- <20170530132735.GA21646@lunn.ch>
-Message-ID: <20170530134226.GR22219@n2100.armlinux.org.uk>
+From: wpdster@gmail.com (Patrick Doyle)
+Date: Tue, 30 May 2017 09:51:50 -0400
+Subject: Fine grain process accounting
+Message-ID: <CAF_dkJAOS+YHs9aFAokOr0xQWA6ZqNCT8NivjFY2B6R=UwW7yA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 30, 2017 at 03:27:35PM +0200, Andrew Lunn wrote:
-> So you don't expect to every have your 500 patches merged?
+I am looking for pointers as to which kernel config options I should
+enable to support fine grain process accounting on my Cortex-AT
+(SAMA5D2x) processor.
 
-Correct.
+I know that, under normal conditions (CONFIG_TICK_CPU_ACCOUNTING),
+that user, system, and idle time are recorded with a "per jiffies
+granularity".
 
-> What might help is that you ask for help getting them merged. I know
-> of at least 4 groups of people interested in your devlink and 10G PHY
-> code.
+I would like to know if it is possible to better than this.  It seems
+like CONFIG_VIRT_CPU_ACCOUNTING_GEN and CONFIG_IRQ_TIME_ACCOUNTING
+should provide the capability that I want, but I don't see evidence of
+that in my testing.
 
-As I've repeatedly explained - and it's called phylink, not devlink -
-the SFP support is not ready due to the SFP+ stuff needing a complete
-rewrite of that code, which has been delayed because of delays on
-SolidRun's side to provide SFP+ hardware.
+Here is what I want:
+The kernel should maintain a high resolution counter (I already know
+that it does, since I can request times with sub 1ms precision via
+clock_gettime()).  When a (real time) thread blocks waiting on a
+timeout, I/O, or a mutex, the scheduler should record the time it
+spent running that thread (according to the high resolution timer) in
+the the thread accounting statistics, and schedule the next thread.
 
-Much of the changes for that happened during the last month, but are
-currently rather dirty and incomplete, but are in a working state.
-As you know, I had been pushing out the 10G PHY changes as quickly as
-netdev copes with them during the previous kernel cycle.  The rate of
-patch merging was completely insufficient to get the 10G support into
-netdev - with it taking a week or longer between patches posted and
-the merge happening.
+It seems to me, based on my admittedly pathological test case, that
+this is not true.  It seems that the CPU accounting for my thread is
+still based on the jiffies (timer tick) counter.
 
-> You are great at writing new code, but terrible at getting it
-> merged.
+My pathological test case looks a lot like a thread that does this:
 
-Yes, because I find it very very time consuming and frustrating to
-deal with other people - it's really not easy.
+while (1) {
+  compute()
+  sleep()
+}
 
-What am I working on right now - I'm trying to get the dw-hdmi CEC
-driver out there.  I've been working on that all morning so far,
-but it's taking hours, despite having a previously working patch
-set... and the latest problem I find is that iMX6 appears to silently
-fail to boot.  So, this afternoon, I'm debugging why 4.12-rc3 on
-iMX6 seems to be broken, and while I'm doing that I won't be doing
-anything _else_, probably not even looking at any email.  So this
-will probably be the last email you see from me until I have the
-dw-hdmi stuff sorted.  That means I won't be doing _anything_ else
-while I sort out a set of patches for this.
+where I can configure the amount of time spent in compute() (a for
+loop, which I have manually profiled to know used 4 cycles per
+iteration).  If I run this test case such that I use .9ms of each 1ms
+timer tick interval, I see a CPU utilization of 1 or 2% instead of
+90%.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+What else should I enable in order to see the 90% CPU utilization in
+this test case?
+
+Any thoughts?
+
+Thanks.
+
+--wpd
