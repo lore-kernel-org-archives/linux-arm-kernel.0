@@ -1,53 +1,47 @@
-From: wpdster@gmail.com (Patrick Doyle)
-Date: Tue, 30 May 2017 09:51:50 -0400
-Subject: Fine grain process accounting
-Message-ID: <CAF_dkJAOS+YHs9aFAokOr0xQWA6ZqNCT8NivjFY2B6R=UwW7yA@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 30 May 2017 13:52:18 +0000
+Subject: [PATCH v2 0/2] arm64: ftrace: fix interop issues with module PLTs
+Message-ID: <20170530135220.20759-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am looking for pointers as to which kernel config options I should
-enable to support fine grain process accounting on my Cortex-AT
-(SAMA5D2x) processor.
+The arm64 ftrace code assumes that all core kernel symbols are within the
+range of an ordinary branch instruction from anywhere in the kernel, even
+in modules. While this is usually the case, it may not be true when running
+with KASLR enabled.
 
-I know that, under normal conditions (CONFIG_TICK_CPU_ACCOUNTING),
-that user, system, and idle time are recorded with a "per jiffies
-granularity".
+This series fixes two distinct but related issues involving ftrace under
+KASLR:
 
-I would like to know if it is possible to better than this.  It seems
-like CONFIG_VIRT_CPU_ACCOUNTING_GEN and CONFIG_IRQ_TIME_ACCOUNTING
-should provide the capability that I want, but I don't see evidence of
-that in my testing.
+- the initial sweep over all _mcount() calls in newly loaded modules
+  validates those calls by comparing each to a 'bl _mcount' opcode, which
+  will fail if _mcount() [which is in the core kernel] is out of range, and
+  which will result in false negatives, given that those call sites will
+  contain a correct branch to _mcount(), but via a PLT entry (patch #1)
 
-Here is what I want:
-The kernel should maintain a high resolution counter (I already know
-that it does, since I can request times with sub 1ms precision via
-clock_gettime()).  When a (real time) thread blocks waiting on a
-timeout, I/O, or a mutex, the scheduler should record the time it
-spent running that thread (according to the high resolution timer) in
-the the thread accounting statistics, and schedule the next thread.
+- patching up those NOPs into calls to ftrace_caller() [which is the only
+  ftrace branch target that we ever use on arm64, IIUC] will fail in the
+  same way, and needs to be redirected via a trampoline as well (patch #2)
 
-It seems to me, based on my admittedly pathological test case, that
-this is not true.  It seems that the CPU accounting for my thread is
-still based on the jiffies (timer tick) counter.
+v2:
+- no changes to #1
+- don't hardcode references to ftrace_caller() (#2)
+- avoid a stack frame for the trampoline, given that it will confuse the
+  ftrace code (#2)
 
-My pathological test case looks a lot like a thread that does this:
+Ard Biesheuvel (2):
+  arm64: ftrace: don't validate branch via PLT in ftrace_make_nop()
+  arm64: ftrace: add support for far branches to dynamic ftrace
 
-while (1) {
-  compute()
-  sleep()
-}
+ arch/arm64/Kconfig              |  2 +-
+ arch/arm64/Makefile             |  3 ++
+ arch/arm64/include/asm/module.h |  3 ++
+ arch/arm64/kernel/Makefile      |  3 ++
+ arch/arm64/kernel/ftrace-mod.S  | 18 +++++++
+ arch/arm64/kernel/ftrace.c      | 57 ++++++++++++++++++--
+ arch/arm64/kernel/module-plts.c | 10 ++++
+ 7 files changed, 91 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm64/kernel/ftrace-mod.S
 
-where I can configure the amount of time spent in compute() (a for
-loop, which I have manually profiled to know used 4 cycles per
-iteration).  If I run this test case such that I use .9ms of each 1ms
-timer tick interval, I see a CPU utilization of 1 or 2% instead of
-90%.
-
-What else should I enable in order to see the 90% CPU utilization in
-this test case?
-
-Any thoughts?
-
-Thanks.
-
---wpd
+-- 
+2.9.3
