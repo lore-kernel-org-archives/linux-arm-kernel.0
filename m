@@ -1,20 +1,78 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 30 May 2017 18:13:20 -0500
-Subject: [PATCH 1/4] dt-bindings: mtk-sysirq: Correct bindings for
- supported SoCs
-In-Reply-To: <20170522094021.7837-1-matthias.bgg@gmail.com>
-References: <20170522094021.7837-1-matthias.bgg@gmail.com>
-Message-ID: <20170530231320.yi4s5ib3jpyo7xwk@rob-hp-laptop>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Wed, 31 May 2017 02:14:07 +0300
+Subject: [PATCH 2/2] net: phy: micrel: Restore led_mode and clk_sel on
+ resume
+In-Reply-To: <30fb605c-675b-8458-aff7-36532635ccc2@gmail.com>
+References: <cover.1496164448.git.leonard.crestez@nxp.com>
+ <a8d0393c977b0d6fdab5d48ad13ca4d1ca893a07.1496164448.git.leonard.crestez@nxp.com>
+ <44ddeaeb-3e23-3d88-cc5c-9ed290507648@gmail.com>
+ <1496182080.19669.11.camel@nxp.com>
+ <30fb605c-675b-8458-aff7-36532635ccc2@gmail.com>
+Message-ID: <1496186047.19669.21.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 22, 2017 at 11:40:18AM +0200, Matthias Brugger wrote:
-> All SoCs supported up to now rely on the fallback binding of mt6577.
-> Fix the binding description to reflect this.
-> 
-> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> ---
->  .../interrupt-controller/mediatek,sysirq.txt       | 24 +++++++++++-----------
->  1 file changed, 12 insertions(+), 12 deletions(-)
+On Tue, 2017-05-30 at 15:19 -0700, Florian Fainelli wrote:
+> On 05/30/2017 03:08 PM, Leonard Crestez wrote:
+> > On Tue, 2017-05-30 at 11:05 -0700, Florian Fainelli wrote:
 
-Acked-by: Rob Herring <robh@kernel.org>
+> > > Should not we actually call kszphy_config_init() in order to restore
+> > > broadcast and nand disable bits as well?
+> > 
+> > I don't know. In my case the B_CAST_OFF bit doesn't seem to be lost and
+> > NAND_TREE_ON is already off by the time it gets to linux.
+> > 
+> > The bit that get lost seem to disappear just as the phy is resumed. I
+> > added some prints and they look like this:
+> > 
+> > PM: early resume of devices complete after 6.534 msecs
+> > begin resume
+> > 0x1F=0x8190 0x16=0x202
+> > after genphy_resume 0x1F=0x8100 0x16=0x202
+> > end
+> > resume 0x1F=0x8190 0x16=0x202
+> 
+> OK, so it actually would not hurt to call config_init() again here, right?
+
+No, but if only some registers are lost then why reconfigure others? In
+particular it seems that only MII_KSZPHY_CTRL_2 is lost but not
+MII_KSZPHY_OMSO.
+
+However a few extra phy reads don't really matter. Calling config_init
+is the path of least resistance.
+
+Another problem is that the ksz9031 driver uses kszphy_resume but has a
+completely different init function. The bits I am concerned about do
+not seem to exist in hardware but it does something completely
+unrelated with parsing OF properties. Should I split this into
+ksz8021_resume and ksz9031_resume?
+
+It seems likely that more of the kszphy drivers need suspend/resume
+code but nobody got around to testing them.
+
+> > > If not, I would be more comfortable if we did create a specific function
+> > > that takes care of setting the reference clock and LED mode.
+> > 
+> > Ok, I can add a function called kszphy_config_reset() with a comment
+> > explaining it's for bits lost on reset/resume.
+> > 
+> > Or perhaps a better option would be to just save/restore the entire
+> > 0x1F register?
+> 
+> Register 0 through 15 are standardized, but those after that are not,
+> and PHYs with a gazillion of registers already need to have a specific
+> set of suspend/resume sequence due to their proprietary indirect
+> register scheme, so we cannot quite come up with a generic function that
+> would cache all 16 or 32 registers and flat out restore those.
+> 
+> Similarly, having phy_resume() systematically calling into config_init()
+> is a bit of a stretch and can be pretty inefficient.
+
+I'm not suggesting changing this at the phy core level. Just that maybe
+kszphy_resume specifically could save/restore register 0x1F instead of
+going through config logic again (which would involve extra reads and
+writes).
+
+However it seems that this has complications, for example on some
+versions the leds are written to a different register. It's not really
+worth optimizing to such an extent.
