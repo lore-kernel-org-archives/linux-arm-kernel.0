@@ -1,54 +1,139 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Tue, 30 May 2017 20:34:04 +0300
-Subject: [PATCH 2/2] net: phy: micrel: Restore led_mode and clk_sel on resume
-In-Reply-To: <cover.1496164448.git.leonard.crestez@nxp.com>
-References: <cover.1496164448.git.leonard.crestez@nxp.com>
-Message-ID: <a8d0393c977b0d6fdab5d48ad13ca4d1ca893a07.1496164448.git.leonard.crestez@nxp.com>
+From: jagan@openedev.com (Jagan Teki)
+Date: Tue, 30 May 2017 17:42:49 +0000
+Subject: [PATCH 1/2] arm64: allwinner: h5: Add initial NanoPi NEO2 support
+Message-ID: <1496166170-6593-1-git-send-email-jagan@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These bits seem to be lost after a suspend/resume cycle so just set them
-again.
+From: Jagan Teki <jagan@amarulasolutions.com>
 
-This patch fixes ethernet suspend/resume on imx6ul-14x14-evk boards.
+NanoPi M1 Plus is designed and developed by FriendlyElec
+using the Allwinner 64-bit H5 SOC.
 
-Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+NanoPi Neo2 key features
+- Allwinner H5, Quad-core 64-bit Cortex-A53
+- 512MB DDR3 RAM
+- microSD slot
+- 10/100/1000M Ethernet
+- Serial Debug Port
+- 5V 2A DC MicroUSB power-supply
+
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- drivers/net/phy/micrel.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm64/boot/dts/allwinner/Makefile             |  1 +
+ .../boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts   | 92 ++++++++++++++++++++++
+ 2 files changed, 93 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
 
-diff --git a/drivers/net/phy/micrel.c b/drivers/net/phy/micrel.c
-index 6a5fd18..c53ee17 100644
---- a/drivers/net/phy/micrel.c
-+++ b/drivers/net/phy/micrel.c
-@@ -700,6 +700,9 @@ static int kszphy_suspend(struct phy_device *phydev)
- 
- static int kszphy_resume(struct phy_device *phydev)
- {
-+	struct kszphy_priv *priv = phydev->priv;
-+	int ret;
+diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
+index c1dd6e4..8d50907 100644
+--- a/arch/arm64/boot/dts/allwinner/Makefile
++++ b/arch/arm64/boot/dts/allwinner/Makefile
+@@ -2,6 +2,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-nanopi-a64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-orangepi-win.dtb
++dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo2.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus2.dtb
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
+new file mode 100644
+index 0000000..c28779f
+--- /dev/null
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
+@@ -0,0 +1,92 @@
++/*
++ * Copyright (C) 2017 Jagan Teki <jteki@openedev.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
- 	genphy_resume(phydev);
- 
- 	/* Enable PHY Interrupts */
-@@ -709,6 +712,18 @@ static int kszphy_resume(struct phy_device *phydev)
- 			phydev->drv->config_intr(phydev);
- 	}
- 
-+	if (priv->rmii_ref_clk_sel) {
-+		ret = kszphy_rmii_clk_sel(phydev, priv->rmii_ref_clk_sel_val);
-+		if (ret) {
-+			phydev_err(phydev,
-+				   "failed to set rmii reference clock\n");
-+			return ret;
-+		}
-+	}
++/dts-v1/;
 +
-+	if (priv->led_mode >= 0)
-+		kszphy_setup_led(phydev, priv->type->led_mode_reg, priv->led_mode);
++#include "sun50i-h5.dtsi"
 +
- 	return 0;
- }
- 
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	model = "FriendlyARM NanoPi NEO2";
++	compatible = "friendlyarm,nanopi-neo2", "allwinner,sun50i-h5";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory {
++		reg = <0x40000000 0x20000000>;
++	};
++
++	soc {
++		reg_vcc3v3: vcc3v3 {
++			compatible = "regulator-fixed";
++			regulator-name = "vcc3v3";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++		};
++	};
++};
++
++&mmc0 {
++	compatible = "allwinner,sun50i-h5-mmc",
++		     "allwinner,sun50i-a64-mmc",
++		     "allwinner,sun5i-a13-mmc";
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
++	cd-inverted;
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
 -- 
-2.7.4
+1.9.1
