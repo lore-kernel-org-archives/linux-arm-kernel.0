@@ -1,54 +1,82 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 30 May 2017 09:48:45 -0700
-Subject: [PATCH] Input: s3c2410_ts - Handle return value of
- clk_prepare_enable
-In-Reply-To: <477d9b0992f4b16454ad1780eb4477433c075226.1496141406.git.arvind.yadav.cs@gmail.com>
-References: <477d9b0992f4b16454ad1780eb4477433c075226.1496141406.git.arvind.yadav.cs@gmail.com>
-Message-ID: <20170530164845.GC12922@dtor-ws>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Tue, 30 May 2017 09:49:19 -0700
+Subject: Device address specific mapping of arm,mmu-500
+In-Reply-To: <20170530151437.GC23067@arm.com>
+References: <1b79efe2-6835-7a7a-f5ad-361391a7b967@broadcom.com>
+ <20170530151437.GC23067@arm.com>
+Message-ID: <81637642-22d9-4868-156f-052f64bd042f@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 30, 2017 at 04:22:57PM +0530, Arvind Yadav wrote:
-> clk_prepare_enable() can fail here and we must check its return value.
-> 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+Hi Will,
 
-Applied, thank you.
-
-> ---
->  drivers/input/touchscreen/s3c2410_ts.c | 8 +++++++-
->  1 file changed, 7 insertions(+), 1 deletion(-)
+On 5/30/17 8:14 AM, Will Deacon wrote:
+> On Mon, May 29, 2017 at 06:18:45PM -0700, Ray Jui wrote:
+>> I'm writing to check with you to see if the latest arm-smmu.c driver in
+>> v4.12-rc Linux for smmu-500 can support mapping that is only specific to
+>> a particular physical address range while leave the rest still to be
+>> handled by the client device. I believe this can already be supported by
+>> the device tree binding of the generic IOMMU framework; however, it is
+>> not clear to me whether or not the arm-smmu.c driver can support it.
+>>
+>> To give you some background information:
+>>
+>> We have a SoC that has PCIe root complex that has a build-in logic block
+>> to forward MSI writes to ARM GICv3 ITS. Unfortunately, this logic block
+>> has a HW bug that causes the MSI writes not parsed properly and can
+>> potentially corrupt data in the internal FIFO. A workaround is to have
+>> ARM MMU-500 takes care of all inbound transactions. I found that is
+>> working after hooking up our PCIe root complex to MMU-500; however, even
+>> with this optimized arm-smmu driver in v4.12, I'm still seeing a
+>> significant Ethernet throughput drop in both the TX and RX directions.
+>> The throughput drop is very significant at around 50% (but is already
+>> much improved compared to other prior kernel versions at 70~90%).
 > 
-> diff --git a/drivers/input/touchscreen/s3c2410_ts.c b/drivers/input/touchscreen/s3c2410_ts.c
-> index 41d58e8..3b3db8c 100644
-> --- a/drivers/input/touchscreen/s3c2410_ts.c
-> +++ b/drivers/input/touchscreen/s3c2410_ts.c
-> @@ -264,7 +264,11 @@ static int s3c2410ts_probe(struct platform_device *pdev)
->  		return -ENOENT;
->  	}
->  
-> -	clk_prepare_enable(ts.clock);
-> +	ret = clk_prepare_enable(ts.clock);
-> +	if (ret) {
-> +		dev_err(dev, "Failed! to enabled clocks\n");
-> +		goto err_clk_get;
-> +	}
->  	dev_dbg(dev, "got and enabled clocks\n");
->  
->  	ts.irq_tc = ret = platform_get_irq(pdev, 0);
-> @@ -353,7 +357,9 @@ static int s3c2410ts_probe(struct platform_device *pdev)
->   err_iomap:
->  	iounmap(ts.io);
->   err_clk:
-> +	clk_disable_unprepare(ts.clock);
->  	del_timer_sync(&touch_timer);
-> + err_clk_get:
->  	clk_put(ts.clock);
->  	return ret;
->  }
-> -- 
-> 1.9.1
+> Did Robin's experiments help at all with this?
+> 
+> http://www.linux-arm.org/git?p=linux-rm.git;a=shortlog;h=refs/heads/iommu/perf
 > 
 
--- 
-Dmitry
+It looks like these are new optimizations that have not yet been merged
+in v4.12? I'm going to give it a try.
+
+>> One alternative is to only use MMU-500 for MSI writes towards
+>> GITS_TRANSLATER register in the GICv3, i.e., if I can define a specific
+>> region of physical address that I want MMU-500 to act on and leave the
+>> rest of inbound transactions to be handled directly by our PCIe
+>> controller, it can potentially work around the HW bug we have and at the
+>> same time achieve optimal throughput.
+> 
+> I don't think you can bypass the SMMU for MSIs unless you give them their
+> own StreamIDs, which is likely to break things horribly in the kernel. You
+> could try to create an identity mapping, but you'll still have the
+> translation overhead and you'd probably end up having to supply your own DMA
+> ops to manage the address space. I'm assuming that you need to prevent the
+> physical address of the ITS from being allocated as an IOVA?
+
+Will, is that a HW limitation that the SMMU cannot be used, only for MSI
+writes, in which case, the physical address range is very specific in
+our ASIC that falls in the device memory region (e.g., below 0x80000000)?
+
+In fact, what I need in this case is a static mapping from IOMMU on the
+physical address of the GITS_TRANSLATER of the GICv3 ITS, which is the
+address that MSI writes go to. This is to bypass the MSI forwarding
+logic in our PCIe controller. At the same time, I can leave the rest of
+inbound transactions to be handled by our PCIe controller without going
+through the MMU.
+
+> 
+>> Any feedback from you is greatly appreciated!
+> 
+> Fix the hardware ;)
+
+Indeed that has to happen with the next revision of the ASIC. But as you
+can see I'm getting quite desperate here trying to find an interim solution.
+
+> 
+> Will
+> 
+
+Thanks for the help!
+
+Ray
