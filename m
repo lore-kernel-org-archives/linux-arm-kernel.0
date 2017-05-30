@@ -1,87 +1,86 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 30 May 2017 11:16:07 +0200
-Subject: [PATCH 2/6] dt-bindings: interrupt-controller: add DT binding for the
- Marvell ICU
-In-Reply-To: <1496135772-20694-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1496135772-20694-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1496135772-20694-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue, 30 May 2017 11:16:05 +0200
+Subject: [PATCH 0/6] Add support for the ICU unit in Marvell Armada 7K/8K
+Message-ID: <1496135772-20694-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the Device Tree binding documentation for the Marvell
-ICU interrupt controller, which collects wired interrupts from the
-devices located into the CP110 hardware block of Marvell Armada 7K/8K,
-and converts them into SPI interrupts in the GIC located in the AP
-hardware block, using the GICP extension.
+Hello,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- .../bindings/interrupt-controller/marvell,icu.txt  | 57 ++++++++++++++++++++++
- 1 file changed, 57 insertions(+)
+The Marvell Armada 7K/8K SoCs are composed of two parts: the AP (which
+contains the CPU cores) and the CP (which contains most
+peripherals). The 7K SoCs have one CP, while the 8K SoCs have two CPs,
+doubling the number of available peripherals.
+
+In terms of interrupt handling, all devices in the CPs are connected
+through wired interrupt to a unit called ICU located in each CP. This
+unit converts the wired interrupts from the devices into memory
+transactions.
+
+Inside the AP, there is a GIC extension called GICP, which allows a
+memory write transaction to trigger a GIC SPI interrupt. The ICUs in
+each CP are therefore configured to trigger a memory write into the
+appropriate GICP register so that a wired interrupt from a CP device
+is converted into a memory write, itself converted into a regular GIC
+SPI interrupt.
+
+Until now, the configuration of the ICU was done statically by the
+firmware, and therefore the Device Tree files in Linux were specifying
+directly GIC interrupts for the interrupts of CP devices. However,
+with the growing number of devices in the CP, a static allocation
+scheme doesn't work for the long term.
+
+This patch series therefore makes Linux aware of the ICU: GIC SPI
+interrupts are dynamically allocated, and the ICU is configured
+accordingly to route a CP wired interrupt to the allocated GIC SPI
+interrupt.
+
+In detail:
+
+ - The first two patches are the Device Tree binding patches
+
+ - The third patch is a minimal driver for the GICP unit. All it does
+   is clear interrupts that may have been left pending by the
+   firmware.
+
+ - The fourth patch is the most important done, which adds the driver
+   for the ICU itself.
+
+ - The fifth patch adjust Kconfig.platforms to select the GICP and ICU
+   drivers.
+
+ - The last patch adjusts the Device Tree files of the Armada 7K/8K to
+   use the ICU.
+
+Best regards,
+
+Thomas
+
+Thomas Petazzoni (6):
+  dt-bindings: interrupt-controller: add DT binding for the Marvell GICP
+  dt-bindings: interrupt-controller: add DT binding for the Marvell ICU
+  irqchip: irq-mvebu-gicp: new driver for Marvell GICP
+  irqchip: irq-mvebu-icu: new driver for Marvell ICU
+  arm64: marvell: enable ICU and GICP drivers
+  arm64: dts: marvell: enable GICP and ICU on Armada 7K/8K
+
+ .../bindings/interrupt-controller/marvell,gicp.txt |  20 ++
+ .../bindings/interrupt-controller/marvell,icu.txt  |  57 ++++
+ arch/arm64/Kconfig.platforms                       |   2 +
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi      |   5 +
+ .../boot/dts/marvell/armada-cp110-master.dtsi      |  60 ++--
+ .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi |  54 +--
+ drivers/irqchip/Kconfig                            |   6 +
+ drivers/irqchip/Makefile                           |   2 +
+ drivers/irqchip/irq-mvebu-gicp.c                   |  53 +++
+ drivers/irqchip/irq-mvebu-icu.c                    | 373 +++++++++++++++++++++
+ .../dt-bindings/interrupt-controller/mvebu-icu.h   |  15 +
+ 11 files changed, 599 insertions(+), 48 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,gicp.txt
  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
+ create mode 100644 drivers/irqchip/irq-mvebu-gicp.c
+ create mode 100644 drivers/irqchip/irq-mvebu-icu.c
+ create mode 100644 include/dt-bindings/interrupt-controller/mvebu-icu.h
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
-new file mode 100644
-index 0000000..e0b4068
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
-@@ -0,0 +1,57 @@
-+Marvell ICU Interrupt Controller
-+--------------------------------
-+
-+The Marvell ICU (Interrupt Consolidation Unit) controller is
-+responsible for collecting all wired-interrupt sources in the CP and
-+communicating them to the GIC in the AP, the unit translates interrupt
-+requests on input wires to MSG memory mapped transactions to the GIC.
-+
-+The interrupts from the ICU to the GIC can be mapped to one of the following groups:
-+
-+- Shared Peripheral Interrupt - Non-Secured (SPI_NSR)
-+- Shared Peripheral Interrupt - Secured (SPI_SR)
-+- System Error Interrupt (SEI)
-+- RAM Error Interrupt (REI)
-+
-+Required properties:
-+
-+- compatible: Should be "marvell,icu"
-+
-+- reg: Should contain ICU registers location and length.
-+
-+- #interrupt-cells: Specifies the number of cells needed to encode an
-+  interrupt source. The type shall be a <u32> and the value shall be
-+  3.
-+
-+  The 1st cell is the group type of the ICU interrupt (SPI_NSR,
-+  SPI_SR, SEI, and REI).
-+
-+  The 2nd cell is the index of the interrupt in the ICU unit.
-+
-+  The 3rd cell is the type of the interrupt. See arm,gic.txt for
-+  details.
-+
-+- interrupt-controller: Identifies the node as an interrupt
-+  controller.
-+
-+- interrupt-parent: Indicates the node of the parent interrupt
-+  controller. Should be pointer to the GIC.
-+
-+- gicp: Should point to the GICP controller, the GIC extension that
-+  allows to trigger interrupts using MSG memory mapped transactions.
-+
-+Example:
-+
-+icu: interrupt-controller at 1e0000 {
-+	compatible = "marvell,icu";
-+	reg = <0x1e0000 0x10>;
-+	#interrupt-cells = <2>;
-+	interrupt-controller;
-+	interrupt-parent = <&gic>;
-+	gicp = <&gicp>;
-+};
-+
-+usb3h0: usb3 at 500000 {
-+	interrupt-parent = <&icu>;
-+	interrupts = <ICU_GRP_NSR 106 IRQ_TYPE_LEVEL_HIGH>;
-+};
 -- 
 2.7.4
