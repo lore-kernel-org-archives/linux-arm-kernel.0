@@ -1,97 +1,41 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Tue, 30 May 2017 09:16:32 +0800
-Subject: [PATCH v2 4/4] arm64: dts: mt7622: group clock DT nodes into
- separate DT file
-In-Reply-To: <4a57ab2f-03b0-3c68-23cd-ed8253978ed7@gmail.com>
-References: <cover.1496061587.git.sean.wang@mediatek.com>
- <f5fa4a4dd78bf92500a517b0582c745569aa8ff2.1496061587.git.sean.wang@mediatek.com>
- <4a57ab2f-03b0-3c68-23cd-ed8253978ed7@gmail.com>
-Message-ID: <1496106992.3570.15.camel@mtkswgap22>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Mon, 29 May 2017 18:18:45 -0700
+Subject: Device address specific mapping of arm,mmu-500
+Message-ID: <1b79efe2-6835-7a7a-f5ad-361391a7b967@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-05-29 at 17:09 +0200, Matthias Brugger wrote:
-> 
-> On 29/05/17 14:56, sean.wang at mediatek.com wrote:
-> > From: Sean Wang <sean.wang@mediatek.com>
-> > 
-> > For more readability and maintenance, all the clock related DT
-> > nodes for mt7622 SoC are grouped into a separate DT file. And
-> > currently mt7622-clock.dtsi only includes the fixed clock for
-> > uart0 and the oscillator which would be extended after MT7622
-> > clock driver is introduced.
-> > 
-> 
-> We've not done this for any other Mediatek SoC at the moment.
-> Do you expect the m7622 to have more clock nodes then for example mt7623?
+Hi All,
 
+I'm writing to check with you to see if the latest arm-smmu.c driver in
+v4.12-rc Linux for smmu-500 can support mapping that is only specific to
+a particular physical address range while leave the rest still to be
+handled by the client device. I believe this can already be supported by
+the device tree binding of the generic IOMMU framework; however, it is
+not clear to me whether or not the arm-smmu.c driver can support it.
 
-clocks on mt7622 has fewer nodes than mt7623
+To give you some background information:
 
-> Apart from that this clock nodes are just dummy clocks which should 
-> disappear as soon as the clock driver got merged.
-> Last point, you break bisectability if add a clock node in a patch 
-> *after* the consumer was added.
-> 
-> So please add the clock nodes to the dtsi as we did up to now. If in the 
-> future we see that mt7622 has a whole bunch of clock nodes, we can still 
-> abstract them in an external dtsi file.
-> 
+We have a SoC that has PCIe root complex that has a build-in logic block
+to forward MSI writes to ARM GICv3 ITS. Unfortunately, this logic block
+has a HW bug that causes the MSI writes not parsed properly and can
+potentially corrupt data in the internal FIFO. A workaround is to have
+ARM MMU-500 takes care of all inbound transactions. I found that is
+working after hooking up our PCIe root complex to MMU-500; however, even
+with this optimized arm-smmu driver in v4.12, I'm still seeing a
+significant Ethernet throughput drop in both the TX and RX directions.
+The throughput drop is very significant at around 50% (but is already
+much improved compared to other prior kernel versions at 70~90%).
 
-Okay, I will merge back them into the main dtsi files for those reasons
-in the next version. 
+One alternative is to only use MMU-500 for MSI writes towards
+GITS_TRANSLATER register in the GICv3, i.e., if I can define a specific
+region of physical address that I want MMU-500 to act on and leave the
+rest of inbound transactions to be handled directly by our PCIe
+controller, it can potentially work around the HW bug we have and at the
+same time achieve optimal throughput.
 
+Any feedback from you is greatly appreciated!
 
-Appreciate all your reviewing and suggestions
+Best regards,
 
-	Sean
-
-> Thanks,
-> Matthias
-> 
-> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> > ---
-> >   arch/arm64/boot/dts/mediatek/mt7622-clock.dtsi | 20 ++++++++++++++++++++
-> >   arch/arm64/boot/dts/mediatek/mt7622.dtsi       |  1 +
-> >   2 files changed, 21 insertions(+)
-> >   create mode 100644 arch/arm64/boot/dts/mediatek/mt7622-clock.dtsi
-> > 
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt7622-clock.dtsi b/arch/arm64/boot/dts/mediatek/mt7622-clock.dtsi
-> > new file mode 100644
-> > index 0000000..264421d
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/mediatek/mt7622-clock.dtsi
-> > @@ -0,0 +1,20 @@
-> > +/*
-> > + * Copyright (c) 2017 MediaTek Inc.
-> > + * Author: Sean Wang <sean.wang@mediatek.com>
-> > + *
-> > + * SPDX-License-Identifier: (GPL-2.0 OR MIT)
-> > + */
-> > +/ {
-> > +	clk25m: oscillator at 0 {
-> > +		compatible = "fixed-clock";
-> > +		#clock-cells = <0>;
-> > +		clock-frequency = <25000000>;
-> > +		clock-output-names = "clkxtal";
-> > +	};
-> > +
-> > +	uart_clk: dummy26m {
-> > +		compatible = "fixed-clock";
-> > +		#clock-cells = <0>;
-> > +		clock-frequency = <25000000>;
-> > +	};
-> > +};
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-> > index 3a729d9..3768c28 100644
-> > --- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-> > +++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-> > @@ -8,6 +8,7 @@
-> >   
-> >   #include <dt-bindings/interrupt-controller/irq.h>
-> >   #include <dt-bindings/interrupt-controller/arm-gic.h>
-> > +#include "mt7622-clock.dtsi"
-> >   
-> >   / {
-> >   	compatible = "mediatek,mt7622";
-> > 
+Ray
