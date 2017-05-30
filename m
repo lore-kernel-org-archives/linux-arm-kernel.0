@@ -1,54 +1,46 @@
-From: christopher.spinrath@rwth-aachen.de (Christopher Spinrath)
-Date: Tue, 30 May 2017 23:23:14 +0200
-Subject: [PATCH] ARM: dts: imx6q-cm-fx6: add sdio wifi/bt nodes
-In-Reply-To: <8c7aee6cf7184c1cb914c1eef530e2de@rwthex-w1-a.rwth-ad.de>
-References: <1a13681b84564bc18937eb54b8345957@rwthex-s1-b.rwth-ad.de>
- <8c7aee6cf7184c1cb914c1eef530e2de@rwthex-w1-a.rwth-ad.de>
-Message-ID: <6832964fb0644ed7a89391dc4423865f@rwthex-s1-b.rwth-ad.de>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 30 May 2017 16:38:28 -0500
+Subject: [PATCH v4 1/2] dt-bindings: i2c: Add Mediatek MT2701 i2c binding
+In-Reply-To: <1d073e6a-e275-24e1-7954-f1af913bd03b@gmail.com>
+References: <1495784107-6711-1-git-send-email-jun.gao@mediatek.com>
+ <1495784107-6711-2-git-send-email-jun.gao@mediatek.com>
+ <1d073e6a-e275-24e1-7954-f1af913bd03b@gmail.com>
+Message-ID: <20170530213828.pxmexdzfv6u5db6m@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-
-thanks for the fast reply.
-
-On 05/30/2017 10:40 PM, Fabio Estevam wrote:
-> Hi Christopher,
+On Mon, May 29, 2017 at 05:30:26PM +0200, Matthias Brugger wrote:
+g> 
 > 
-> On Tue, May 30, 2017 at 5:16 PM,  <christopher.spinrath@rwth-aachen.de> wrote:
+> On 26/05/17 09:35, Jun Gao wrote:
+> > From: Jun Gao <jun.gao@mediatek.com>
+> > 
+> > Add MT2701 i2c binding to i2c-mt6577.txt and there is no need to
+> > modify i2c driver.
+> > 
+> > Signed-off-by: Jun Gao <jun.gao@mediatek.com>
+> > ---
+> >   Documentation/devicetree/bindings/i2c/i2c-mt6577.txt | 11 ++++++-----
+> >   1 file changed, 6 insertions(+), 5 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+> > index 0ce6fa3..52f2023 100644
+> > --- a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+> > +++ b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+> > @@ -4,11 +4,12 @@ The Mediatek's I2C controller is used to interface with I2C devices.
+> >   Required properties:
+> >     - compatible: value should be either of the following.
+> > -      (a) "mediatek,mt6577-i2c", for i2c compatible with mt6577 i2c.
+> > -      (b) "mediatek,mt6589-i2c", for i2c compatible with mt6589 i2c.
+> > -      (c) "mediatek,mt8127-i2c", for i2c compatible with mt8127 i2c.
+> > -      (d) "mediatek,mt8135-i2c", for i2c compatible with mt8135 i2c.
+> > -      (e) "mediatek,mt8173-i2c", for i2c compatible with mt8173 i2c.
+> > +	"mediatek,mt2701-i2c", "mediatek,mt6577-i2c": for Mediatek MT2701
 > 
->> +       awnh387_pwrseq: pwrseq {
->> +               pinctrl-names = "default";
->> +               pinctrl-0 = <&pinctrl_pwrseq>;
->> +               compatible = "mmc-pwrseq-sd8787";
->> +               powerdown-gpios = <&gpio7 12 GPIO_ACTIVE_HIGH>;
->> +               reset-gpios = <&gpio6 16 GPIO_ACTIVE_HIGH>;
-> 
-> At least in the AW-NH387 datasheet I found it says:
-> 
-> RESETn: Reset(active low at least 10ns)
+> I send a cleanup patch for the file, which fixes all the other SoCs.
+> I can fold this one into it, a soon as I got a Signed-off from the DT
+> maintainers.
 
-The BSP device tree uses an active-low regulator called nreset, too, but 
-strangly it has a startup delay of 10ms while the powerdown-regulator 
-"starts up" immediately.
+I already acked it on the prior versions.
 
-(btw: the "regulator setup" is not able to handle resets correctly.)
-
-It seems to me that the pwrseq-sd8787 uses inverted logic: it first sets 
-the -- in our case -- active-high gpio to high, waits, and then enables 
-the powerdown-gpio.
-
-This coincides with the gpio being called "reset" in the pwrseq binding, 
-neither "nreset" nor "RESETn" (beware the missing *n*ot).
-
-> Please double check the polarity in device tree.
-> 
-
-I just double checked: high/high for powerdown/reset gpios is the only 
-of the four possible combinations that works.
-
-So, all in all, I think the polarity is correct (or either the pwrseq 
-driver or hardware invertes the polarity for some reason).
-
-Cheers,
-Christopher
+Rob
