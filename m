@@ -1,41 +1,27 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 30 May 2017 23:51:13 +0200
-Subject: [PATCH 32/58] ARM: dts: at91: sama5d3xek: use TCB0 as clocksource
-In-Reply-To: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
-References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170530215139.9983-33-alexandre.belloni@free-electrons.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 30 May 2017 14:52:18 -0700
+Subject: [PATCH v2 0/3] arm64: meson-gxm: R-Box Pro enablement
+In-Reply-To: <20170513152312.19912-1-afaerber@suse.de> ("Andreas
+ =?utf-8?Q?F=C3=A4rber=22's?=
+ message of "Sat, 13 May 2017 17:23:09 +0200")
+References: <20170513152312.19912-1-afaerber@suse.de>
+Message-ID: <m2o9uat3l9.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use tcb0 as the clocksource like previously selected in sama5_defconfig.
+Andreas F?rber <afaerber@suse.de> writes:
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/boot/dts/sama5d3xcm.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+> Hello,
+>
+> This mini-series adds initial support for the Amlogic S912 based
+> R-Box Pro TV boxes.
+>
+> v2 depends on my Meson cleanup series (amlogic.txt, Makefile) and
+> squashes the addition of a board compatible string.
+>
+> @Kingnovel: Your Acked-by would be appreciated.
 
-diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
-index b5e111b29da1..ac583c36b542 100644
---- a/arch/arm/boot/dts/sama5d3xcm.dtsi
-+++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
-@@ -34,6 +34,18 @@
- 			spi0: spi at f0004000 {
- 				cs-gpios = <&pioD 13 0>, <0>, <0>, <0>;
- 			};
-+
-+			tcb0: timer at f0010000 {
-+				timer at 0 {
-+					compatible = "atmel,tcb-timer";
-+					reg = <0>;
-+				};
-+
-+				timer at 1 {
-+					compatible = "atmel,tcb-timer";
-+					reg = <1>;
-+				};
-+			};
- 		};
- 
- 		nand0: nand at 60000000 {
--- 
-2.11.0
+Oops, I thought I had already applied these, but hadn't.  Applied now to
+v4.13/dt64.
+
+Kevin
