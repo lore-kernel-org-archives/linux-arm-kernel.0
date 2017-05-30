@@ -1,35 +1,46 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 30 May 2017 15:39:02 +0100
-Subject: [PATCH 4/6] irqchip: irq-mvebu-icu: new driver for Marvell ICU
-In-Reply-To: <20170530132735.GA21646@lunn.ch>
-References: <1496135772-20694-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1496135772-20694-5-git-send-email-thomas.petazzoni@free-electrons.com>
- <20170530121907.GO22219@n2100.armlinux.org.uk>
- <20170530143350.6f8563c1@free-electrons.com>
- <20170530125643.GQ22219@n2100.armlinux.org.uk>
- <20170530132735.GA21646@lunn.ch>
-Message-ID: <20170530143902.GU22219@n2100.armlinux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 30 May 2017 15:41:56 +0100
+Subject: [PATCH 30/31] KVM: arm64: Enable GICv3 common sysreg trapping via
+ command-line
+In-Reply-To: <1e6b1e3c-ec86-24ad-8704-59521dc0b159@redhat.com>
+References: <20170503104606.19342-1-marc.zyngier@arm.com>
+ <20170503104606.19342-31-marc.zyngier@arm.com>
+ <1e6b1e3c-ec86-24ad-8704-59521dc0b159@redhat.com>
+Message-ID: <c7d726ba-2f5b-a97e-6df1-e0d90a38f546@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 30, 2017 at 03:27:35PM +0200, Andrew Lunn wrote:
-> What might help is that you ask for help getting them merged. I know
-> of at least 4 groups of people interested in your devlink and 10G PHY
-> code. If you handed those patches over to these people, i'm sure we
-> could find somebody to post them to the list, deal with the feedback,
-> etc, to get them merged. It just needs you to say it is O.K. for
-> somebody to take patches from your git tree.
+On 30/05/17 10:56, Auger Eric wrote:
+> Hi,
+> 
+> On 03/05/2017 12:46, Marc Zyngier wrote:
+>> Now that we're able to safely handle common sysreg access, let's
+>> give the user the opportunity to enable it by passing a specific
+>> command-line option (vgic_v3.common_trap).
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> What is the rationale behind trapping those common sysreg accesses. This
+> is not enabled by default for some erratas. Is it to complete the
+> trapping modality. May be worth to explain.
 
-Is that not what I'm trying to do with these A8k changes?  What I'm
-instead getting is "your tree is private, we're not touching it".
+That's strictly for completeness. Let's assume some hypothetical HW has
+a bug on the EOI path, where the physical interrupt wouldn't get
+properly deactivated on the physical distributor. In order to deal with
+that when EOImode==1 in the guest, you'd need to trap DIR as well. Same
+thing if PMR was broken as well.
 
-Okay, so let me put it another way: please help me merge the A8k
-changes that I have in my tree.
+Also, we could implement some form of tracing of all the GICv3 accessors
+if we wanted such a functionality (trying to find something more
+gratifying than basic errata workaround here... ;-).
 
-There, I've said it.  However, I know what the answer will be, since
-it's already effectively been given in this thread: "piss off".
+> 
+> Besides
+> 
+> Reviewed-by: Eric Auger <eric.auger@redhat.com>
 
+Thanks,
+
+	M.
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Jazz is not dead. It just smells funny...
