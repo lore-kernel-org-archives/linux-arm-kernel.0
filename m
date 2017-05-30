@@ -1,25 +1,61 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 30 May 2017 19:02:21 +0100
-Subject: [RFC PATCH v3 0/4] Simplify kernel-mode NEON
-In-Reply-To: <1495736721-20985-1-git-send-email-Dave.Martin@arm.com>
-References: <1495736721-20985-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20170530180219.GR3559@e103592.cambridge.arm.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 30 May 2017 11:05:19 -0700
+Subject: [PATCH 2/2] net: phy: micrel: Restore led_mode and clk_sel on
+ resume
+In-Reply-To: <a8d0393c977b0d6fdab5d48ad13ca4d1ca893a07.1496164448.git.leonard.crestez@nxp.com>
+References: <cover.1496164448.git.leonard.crestez@nxp.com>
+ <a8d0393c977b0d6fdab5d48ad13ca4d1ca893a07.1496164448.git.leonard.crestez@nxp.com>
+Message-ID: <44ddeaeb-3e23-3d88-cc5c-9ed290507648@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 25, 2017 at 07:24:57PM +0100, Dave Martin wrote:
-> This series aims to simplify kernel-mode NEON.
+On 05/30/2017 10:34 AM, Leonard Crestez wrote:
+> These bits seem to be lost after a suspend/resume cycle so just set them
+> again.
+> 
+> This patch fixes ethernet suspend/resume on imx6ul-14x14-evk boards.
+> 
+> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+> ---
+>  drivers/net/phy/micrel.c | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+> 
+> diff --git a/drivers/net/phy/micrel.c b/drivers/net/phy/micrel.c
+> index 6a5fd18..c53ee17 100644
+> --- a/drivers/net/phy/micrel.c
+> +++ b/drivers/net/phy/micrel.c
+> @@ -700,6 +700,9 @@ static int kszphy_suspend(struct phy_device *phydev)
+>  
+>  static int kszphy_resume(struct phy_device *phydev)
+>  {
+> +	struct kszphy_priv *priv = phydev->priv;
+> +	int ret;
+> +
+>  	genphy_resume(phydev);
+>  
+>  	/* Enable PHY Interrupts */
+> @@ -709,6 +712,18 @@ static int kszphy_resume(struct phy_device *phydev)
+>  			phydev->drv->config_intr(phydev);
+>  	}
+>  
+> +	if (priv->rmii_ref_clk_sel) {
+> +		ret = kszphy_rmii_clk_sel(phydev, priv->rmii_ref_clk_sel_val);
+> +		if (ret) {
+> +			phydev_err(phydev,
+> +				   "failed to set rmii reference clock\n");
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	if (priv->led_mode >= 0)
+> +		kszphy_setup_led(phydev, priv->type->led_mode_reg, priv->led_mode);
 
-Hi Ard, do you have any further comments on this series?
+Should not we actually call kszphy_config_init() in order to restore
+broadcast and nand disable bits as well?
 
-I'd like to have it finalised as far as possible (modulo minor tweaks
-and bugfixes) so that I can port the SVE patches on top of it.
+If not, I would be more comfortable if we did create a specific function
+that takes care of setting the reference clock and LED mode.
 
-Also, how do you think we should handle merging of this change?  There's
-a flag-day issue here, since the kernel_mode_neon() API is being changed
-in an incompatible way.
-
-Cheers
----Dave
-
-[...]
+Other than that, LGTM!
+-- 
+Florian
