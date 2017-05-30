@@ -1,124 +1,74 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 30 May 2017 15:32:26 +0100
-Subject: [PATCH 17/31] KVM: arm64: vgic-v3: Enable trapping of Group-1
- system registers
-In-Reply-To: <bf094e11-1555-a1bf-5655-9093867adb90@redhat.com>
-References: <20170503104606.19342-1-marc.zyngier@arm.com>
- <20170503104606.19342-18-marc.zyngier@arm.com>
- <bf094e11-1555-a1bf-5655-9093867adb90@redhat.com>
-Message-ID: <47409634-110c-eb5c-1bbc-2ee9dea4f3d4@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 30 May 2017 15:32:57 +0100
+Subject: Tegra baseline test results for v4.12-rc3
+Message-ID: <230ce54d-0133-c85e-326c-bff3c694ac49@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/05/17 10:07, Auger Eric wrote:
-> Hi Marc,
-> 
-> On 03/05/2017 12:45, Marc Zyngier wrote:
->> In order to be able to trap Group-1 GICv3 system registers, we need to
->> set ICH_HCR_EL2.TALL1 begore entering the guest. This is conditionnaly
-> before, conditionally
->> done after having restored the guest's state, and cleared on exit.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  include/linux/irqchip/arm-gic-v3.h | 1 +
->>  virt/kvm/arm/hyp/vgic-v3-sr.c      | 7 +++++++
->>  virt/kvm/arm/vgic/vgic-v3.c        | 4 ++++
->>  3 files changed, 12 insertions(+)
->>
->> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
->> index c56d9bc2c904..a1739843343e 100644
->> --- a/include/linux/irqchip/arm-gic-v3.h
->> +++ b/include/linux/irqchip/arm-gic-v3.h
->> @@ -403,6 +403,7 @@
->>  
->>  #define ICH_HCR_EN			(1 << 0)
->>  #define ICH_HCR_UIE			(1 << 1)
->> +#define ICH_HCR_TALL1			(1 << 12)
->>  #define ICH_HCR_EOIcount_SHIFT		27
->>  #define ICH_HCR_EOIcount_MASK		(0x1f << ICH_HCR_EOIcount_SHIFT)
->>  
->> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
->> index a521e105ade1..a27671b1e9af 100644
->> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
->> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
->> @@ -257,6 +257,9 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
->>  			cpu_if->vgic_ap1r[0] = __vgic_v3_read_ap1rn(0);
->>  		}
->>  	} else {
->> +		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
->> +			write_gicreg(0, ICH_HCR_EL2);
-> Not directly related to this patch but this is not obvious to me why we
-> reset the ICH_HCR_EL2 only when used_lrs != 0.
+Tegra baseline test results for v4.12-rc3
 
-That's because if there is no interrupt to inject, then we've never
-enabled the virtual CPU interface, and we've only configured VMCR.
 
->> +
->>  		cpu_if->vgic_elrsr = 0xffff;
->>  		cpu_if->vgic_ap0r[0] = 0;
->>  		cpu_if->vgic_ap0r[1] = 0;
->> @@ -329,6 +332,10 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
->>  
->>  		for (i = 0; i < used_lrs; i++)
->>  			__gic_v3_set_lr(cpu_if->vgic_lr[i], i);
->> +	} else {
->> +		/* Always write ICH_HCR_EL2 to enable trapping */
-> "always" is a bit weird as this is conditional
+Here are some basic Tegra test results for Linux v4.12-rc3.
+Logs and other details at:
 
-Ah, true. How about:
-		/*
-                 * If we don't have any interrupt to inject, but that
-		 * trapping is enabled, write the ICH_HCR_EL2 config.
-		 */
+    https://nvtb.github.io//linux/test_v4.12-rc3/20170528173104/
 
->> +		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
->> +			write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
-> and same question here. Why don't we always restore the ICH_HCR_EL2.
-> Assuming when exiting the guest the vCPU I/F was enabled and used_lrs=0,
 
-That case doesn't exist. The only case where we enable the virtual cpuif
-is when we have something to inject (hence used_lrs != 0).
+Test summary
+------------
 
-> when restoring don't we leave the vCPU I/F disabled? I must miss
-> something but I don't find who is re-enabling the vCPU I/F in that case?
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
 
-See above. This case shouldn't exist, and is only introduced here for
-the benefit of the trapping.
+Build: Image:
+    Pass: ( 1/ 1): defconfig
 
->>  	}
->>  
->>  	/*
->> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
->> index 063526443781..547b8374fb64 100644
->> --- a/virt/kvm/arm/vgic/vgic-v3.c
->> +++ b/virt/kvm/arm/vgic/vgic-v3.c
->> @@ -21,6 +21,8 @@
->>  
->>  #include "vgic.h"
->>  
->> +static bool group1_trap;
->> +
->>  void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
->>  {
->>  	struct vgic_v3_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v3;
->> @@ -239,6 +241,8 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
->>  
->>  	/* Get the show on the road... */
->>  	vgic_v3->vgic_hcr = ICH_HCR_EN;
->> +	if (group1_trap)
-> I don't remember the rationale behind using the bool here and using
-> static_branch_unlikely in the other cases.
+Boot to userspace: defconfig:
+    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000, tegra210-smaug
 
-That's just the initial config path, before setting the static key.
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
 
-> 
-> May be good to squash the next patch to understand how group1_trap is set.
+Boot to userspace: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
 
-Sure, I'll have a look at that.
+PM: System suspend: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
 
-Thanks,
+PM: System suspend: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+
+vmlinux object size
+(delta in bytes from test_v4.12-rc2 (08332893e37af6ae779367e78e444f8f9571511d)):
+   text     data      bss    total  kernel
+   -351     +400        0      +49  defconfig
+  +1587      +72        0    +1659  multi_v7_defconfig
+  +1423       +8        0    +1431  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.12-rc2 (08332893e37af6ae779367e78e444f8f9571511d))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+
+--
+nvpublic
