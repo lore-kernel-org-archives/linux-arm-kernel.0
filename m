@@ -1,191 +1,127 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 30 May 2017 21:32:09 +0200
-Subject: [PATCH v2 3/3] pwm: sun4i: drop legacy callbacks
-In-Reply-To: <20170530193209.19247-1-alexandre.belloni@free-electrons.com>
-References: <20170530193209.19247-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170530193209.19247-4-alexandre.belloni@free-electrons.com>
+From: christopher.spinrath@rwth-aachen.de (christopher.spinrath at rwth-aachen.de)
+Date: Tue, 30 May 2017 22:16:01 +0200
+Subject: [PATCH] ARM: dts: imx6q-cm-fx6: add sdio wifi/bt nodes
+Message-ID: <1a13681b84564bc18937eb54b8345957@rwthex-s1-b.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the legacy callbacks .enable(), .disable(), .set_polarity() and
-.config().
+From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+The cm-fx6 module has an on-board AW-NH387 WiFi/BT module which is
+based on Marvell's SD8787 chip and is connected to the usdhc1
+controller.
+
+Unfortunately, the chip gets unresponsive if the Bluetooth AMP
+(Alternate Mac/Phy) function gets probed but the loaded firmware
+doesn't support it. For instance, this is the case for the most
+recent firmware in linux-firmware (Version 14.66.35.p52).
+
+Thus, just add the required nodes but leave the usdhc1 node disabled
+explicitly. Users who disabled the Bluetooth (AMP) support of their
+OS can then conveniently enable WiFi (or even plain Bluetooth) support
+with a simple device tree overlay/bootloader configuration.
+
+Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
 ---
- drivers/pwm/pwm-sun4i.c | 160 ------------------------------------------------
- 1 file changed, 160 deletions(-)
 
-diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
-index cd8737d0804f..6d23f1d1c9b7 100644
---- a/drivers/pwm/pwm-sun4i.c
-+++ b/drivers/pwm/pwm-sun4i.c
-@@ -305,167 +305,7 @@ static int sun4i_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
- 	return 0;
- }
+Hi all,
+
+some more information on the Bluetooth AMP dilemma: the vendor (CompuLab) just
+remove Bluetooth AMP support from the kernel. However, this is not an option
+here, since it would introduce a regression for its actual users.
+
+Neither is degrading the firmware a good option: recent firmare (without AMP
+support) provides WiFi that is more stable (in particular, for access points).
+
+I wrote a RFC to linux-bluetooth [1] two weeks ago about this problem and the
+only feedback I got was that Marvell has to provide information about how to
+detect whether the firmware supports AMP properly -- but this is unlikely given
+Marvell's information policy (in particular, since the sd8787 seems to be
+unsupported as of now).
+
+IMHO this patch is currently the best option, since it allows users in a
+convenient way to enable WiFi support (e.g. no pinctrl handling in overlays),
+even when they are using distribution kernels/device trees. Furthermore, the
+hardware description is entirely accurate -- we have a driver/firmware problem
+here.
+
+Thanks,
+Christopher
+
+[1] https://www.spinics.net/lists/linux-bluetooth/msg70493.html
+
+ arch/arm/boot/dts/imx6q-cm-fx6.dts | 41 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6q-cm-fx6.dts b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+index a8af382..fe6ab0a 100644
+--- a/arch/arm/boot/dts/imx6q-cm-fx6.dts
++++ b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+@@ -64,6 +64,14 @@
+ 		};
+ 	};
  
--static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
--			    int duty_ns, int period_ns)
--{
--	struct sun4i_pwm_chip *sun4i_pwm = to_sun4i_pwm_chip(chip);
--	u32 prd, dty, val, clk_gate;
--	u64 clk_rate, div = 0;
--	unsigned int prescaler = 0;
--	int err;
--
--	clk_rate = clk_get_rate(sun4i_pwm->clk);
--
--	if (sun4i_pwm->data->has_prescaler_bypass) {
--		/* First, test without any prescaler when available */
--		prescaler = PWM_PRESCAL_MASK;
--		/*
--		 * When not using any prescaler, the clock period in nanoseconds
--		 * is not an integer so round it half up instead of
--		 * truncating to get less surprising values.
--		 */
--		div = clk_rate * period_ns + NSEC_PER_SEC / 2;
--		do_div(div, NSEC_PER_SEC);
--		if (div - 1 > PWM_PRD_MASK)
--			prescaler = 0;
--	}
--
--	if (prescaler == 0) {
--		/* Go up from the first divider */
--		for (prescaler = 0; prescaler < PWM_PRESCAL_MASK; prescaler++) {
--			if (!prescaler_table[prescaler])
--				continue;
--			div = clk_rate;
--			do_div(div, prescaler_table[prescaler]);
--			div = div * period_ns;
--			do_div(div, NSEC_PER_SEC);
--			if (div - 1 <= PWM_PRD_MASK)
--				break;
--		}
--
--		if (div - 1 > PWM_PRD_MASK) {
--			dev_err(chip->dev, "period exceeds the maximum value\n");
--			return -EINVAL;
--		}
--	}
--
--	prd = div;
--	div *= duty_ns;
--	do_div(div, period_ns);
--	dty = div;
--
--	err = clk_prepare_enable(sun4i_pwm->clk);
--	if (err) {
--		dev_err(chip->dev, "failed to enable PWM clock\n");
--		return err;
--	}
--
--	spin_lock(&sun4i_pwm->ctrl_lock);
--	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
--
--	if (sun4i_pwm->data->has_rdy && (val & PWM_RDY(pwm->hwpwm))) {
--		spin_unlock(&sun4i_pwm->ctrl_lock);
--		clk_disable_unprepare(sun4i_pwm->clk);
--		return -EBUSY;
--	}
--
--	clk_gate = val & BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
--	if (clk_gate) {
--		val &= ~BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
--		sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
--	}
--
--	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
--	val &= ~BIT_CH(PWM_PRESCAL_MASK, pwm->hwpwm);
--	val |= BIT_CH(prescaler, pwm->hwpwm);
--	sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
--
--	val = (dty & PWM_DTY_MASK) | PWM_PRD(prd);
--	sun4i_pwm_writel(sun4i_pwm, val, PWM_CH_PRD(pwm->hwpwm));
--
--	if (clk_gate) {
--		val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
--		val |= clk_gate;
--		sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
--	}
--
--	spin_unlock(&sun4i_pwm->ctrl_lock);
--	clk_disable_unprepare(sun4i_pwm->clk);
--
--	return 0;
--}
--
--static int sun4i_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
--				  enum pwm_polarity polarity)
--{
--	struct sun4i_pwm_chip *sun4i_pwm = to_sun4i_pwm_chip(chip);
--	u32 val;
--	int ret;
--
--	ret = clk_prepare_enable(sun4i_pwm->clk);
--	if (ret) {
--		dev_err(chip->dev, "failed to enable PWM clock\n");
--		return ret;
--	}
--
--	spin_lock(&sun4i_pwm->ctrl_lock);
--	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
--
--	if (polarity != PWM_POLARITY_NORMAL)
--		val &= ~BIT_CH(PWM_ACT_STATE, pwm->hwpwm);
--	else
--		val |= BIT_CH(PWM_ACT_STATE, pwm->hwpwm);
--
--	sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
--
--	spin_unlock(&sun4i_pwm->ctrl_lock);
--	clk_disable_unprepare(sun4i_pwm->clk);
--
--	return 0;
--}
--
--static int sun4i_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
--{
--	struct sun4i_pwm_chip *sun4i_pwm = to_sun4i_pwm_chip(chip);
--	u32 val;
--	int ret;
--
--	ret = clk_prepare_enable(sun4i_pwm->clk);
--	if (ret) {
--		dev_err(chip->dev, "failed to enable PWM clock\n");
--		return ret;
--	}
--
--	spin_lock(&sun4i_pwm->ctrl_lock);
--	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
--	val |= BIT_CH(PWM_EN, pwm->hwpwm);
--	val |= BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
--	sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
--	spin_unlock(&sun4i_pwm->ctrl_lock);
--
--	return 0;
--}
--
--static void sun4i_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
--{
--	struct sun4i_pwm_chip *sun4i_pwm = to_sun4i_pwm_chip(chip);
--	u32 val;
--
--	spin_lock(&sun4i_pwm->ctrl_lock);
--	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
--	val &= ~BIT_CH(PWM_EN, pwm->hwpwm);
--	val &= ~BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
--	sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
--	spin_unlock(&sun4i_pwm->ctrl_lock);
--
--	clk_disable_unprepare(sun4i_pwm->clk);
--}
--
- static const struct pwm_ops sun4i_pwm_ops = {
--	.config = sun4i_pwm_config,
--	.set_polarity = sun4i_pwm_set_polarity,
--	.enable = sun4i_pwm_enable,
--	.disable = sun4i_pwm_disable,
- 	.apply = sun4i_pwm_apply,
- 	.get_state = sun4i_pwm_get_state,
- 	.owner = THIS_MODULE,
++	awnh387_pwrseq: pwrseq {
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_pwrseq>;
++		compatible = "mmc-pwrseq-sd8787";
++		powerdown-gpios = <&gpio7 12 GPIO_ACTIVE_HIGH>;
++		reset-gpios = <&gpio6 16 GPIO_ACTIVE_HIGH>;
++	};
++
+ 	reg_pcie_power_on_gpio: regulator-pcie-power-on-gpio {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "regulator-pcie-power-on-gpio";
+@@ -304,6 +312,13 @@
+ 		>;
+ 	};
+ 
++	pinctrl_pwrseq: pwrseqgrp {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_17__GPIO7_IO12		0x1b0b0
++			MX6QDL_PAD_NANDF_CS3__GPIO6_IO16	0x1b0b0
++		>;
++	};
++
+ 	pinctrl_spdif: spdifgrp {
+ 		fsl,pins = <
+ 			MX6QDL_PAD_GPIO_16__SPDIF_IN  0x1b0b0
+@@ -330,6 +345,17 @@
+ 			MX6QDL_PAD_EIM_D22__GPIO3_IO22	0x130b0
+ 		>;
+ 	};
++
++	pinctrl_usdhc1: usdhc1grp {
++		fsl,pins = <
++			MX6QDL_PAD_SD1_CMD__SD1_CMD	0x17071
++			MX6QDL_PAD_SD1_CLK__SD1_CLK	0x10071
++			MX6QDL_PAD_SD1_DAT0__SD1_DATA0	0x17071
++			MX6QDL_PAD_SD1_DAT1__SD1_DATA1	0x17071
++			MX6QDL_PAD_SD1_DAT2__SD1_DATA2	0x17071
++			MX6QDL_PAD_SD1_DAT3__SD1_DATA3	0x17071
++		>;
++	};
+ };
+ 
+ &pcie {
+@@ -382,3 +408,18 @@
+ 	dr_mode = "otg";
+ 	status = "okay";
+ };
++
++&usdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc1>;
++	mmc-pwrseq = <&awnh387_pwrseq>;
++	non-removable;
++	/*
++	 * If the OS probes the Bluetooth AMP function advertised on this bus
++	 * but the firmware in place does not support it, the WiFi/BT module
++	 * gets unresponsive.
++	 * Users who configured their OS properly can enable this node to gain
++	 * WiFi and/or plain Bluetooth support.
++	 */
++	status = "disabled";
++};
 -- 
-2.11.0
+2.10.2
