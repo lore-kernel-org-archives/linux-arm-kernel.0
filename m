@@ -1,30 +1,55 @@
-From: alexandre.torgue@st.com (Alexandre TORGUE)
-Date: Tue, 30 May 2017 16:43:04 +0200
-Subject: [PATCH] pinctrl: stm32: Fix bad function call
-Message-ID: <1496155384-30711-1-git-send-email-alexandre.torgue@st.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 30 May 2017 15:45:07 +0100
+Subject: [PATCH 26/31] KVM: arm64: vgic-v3: Add ICV_DIR_EL1 handler
+In-Reply-To: <6c34b576-a0d2-6e7d-b363-349a5319dcf6@redhat.com>
+References: <20170503104606.19342-1-marc.zyngier@arm.com>
+ <20170503104606.19342-27-marc.zyngier@arm.com>
+ <6c34b576-a0d2-6e7d-b363-349a5319dcf6@redhat.com>
+Message-ID: <8d3be8d8-87d8-8126-7855-17381eb095dc@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In stm32_pconf_parse_conf function, stm32_pmx_gpio_set_direction is
-called with wrong parameter value. Indeed, using NULL value for range
-will raise an oops.
+On 30/05/17 11:15, Auger Eric wrote:
+> Marc,
+> 
+> On 03/05/2017 12:46, Marc Zyngier wrote:
+>> Add a handler for writing the guest's view of the ICC_DIR_EL1
+>> register, performing the deactivation of an interrupt if EOImode
+>> is set ot 1.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  virt/kvm/arm/hyp/vgic-v3-sr.c | 23 +++++++++++++++++++++++
+>>  1 file changed, 23 insertions(+)
+>>
+>> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+>> index 9c639f57268b..563dd2d16c59 100644
+>> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
+>> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+>> @@ -612,6 +612,26 @@ static void __hyp_text __vgic_v3_bump_eoicount(void)
+>>  	write_gicreg(hcr, ICH_HCR_EL2);
+>>  }
+>>  
+>> +static void __hyp_text __vgic_v3_write_dir(struct kvm_vcpu *vcpu,
+>> +					   u32 vmcr, int rt)
+>> +{
+>> +	u32 vid = vcpu_get_reg(vcpu, rt);
+>> +	u64 lr_val;
+>> +	int lr;
+>> +
+>> +	/* No deactivate to be performed on an LPI */
+>> +	if (vid >= VGIC_MIN_LPI)
+>> +		return;
+> 
+> don't you need to test the EOImode first? Spec says:
+> "
+> When EOImode == ?0?. GICv3 implementations must ignore such writes. In
+> systems supporting system error generation, an implementation might
+> generate an SEI.
+> "
 
-Fixes: aceb16dc2da5 ("pinctrl: Add STM32 MCUs support")
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
+Ah, very good point! Thanks for the heads up!
 
-diff --git a/drivers/pinctrl/stm32/pinctrl-stm32.c b/drivers/pinctrl/stm32/pinctrl-stm32.c
-index d3c5f5d..222b668 100644
---- a/drivers/pinctrl/stm32/pinctrl-stm32.c
-+++ b/drivers/pinctrl/stm32/pinctrl-stm32.c
-@@ -798,7 +798,7 @@ static int stm32_pconf_parse_conf(struct pinctrl_dev *pctldev,
- 		break;
- 	case PIN_CONFIG_OUTPUT:
- 		__stm32_gpio_set(bank, offset, arg);
--		ret = stm32_pmx_gpio_set_direction(pctldev, NULL, pin, false);
-+		ret = stm32_pmx_gpio_set_direction(pctldev, range, pin, false);
- 		break;
- 	default:
- 		ret = -EINVAL;
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
