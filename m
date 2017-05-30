@@ -1,112 +1,87 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 30 May 2017 11:16:08 +0200
-Subject: [PATCH 3/6] irqchip: irq-mvebu-gicp: new driver for Marvell GICP
+Date: Tue, 30 May 2017 11:16:07 +0200
+Subject: [PATCH 2/6] dt-bindings: interrupt-controller: add DT binding for the
+ Marvell ICU
 In-Reply-To: <1496135772-20694-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1496135772-20694-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1496135772-20694-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1496135772-20694-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds a simple driver for the Marvell GICP, a hardware unit
-that converts memory writes into GIC SPI interrupts. The driver doesn't
-do anything but clear all interrupts at boot time, to avoid spurious
-interrupts left by the firmware.
-
-The GICP registers are directly written to in hardware by the ICU unit,
-which is configured in a separate driver.
+This commit adds the Device Tree binding documentation for the Marvell
+ICU interrupt controller, which collects wired interrupts from the
+devices located into the CP110 hardware block of Marvell Armada 7K/8K,
+and converts them into SPI interrupts in the GIC located in the AP
+hardware block, using the GICP extension.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/irqchip/Kconfig          |  3 +++
- drivers/irqchip/Makefile         |  1 +
- drivers/irqchip/irq-mvebu-gicp.c | 53 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 57 insertions(+)
- create mode 100644 drivers/irqchip/irq-mvebu-gicp.c
+ .../bindings/interrupt-controller/marvell,icu.txt  | 57 ++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
 
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index 478f8ac..e527ee5 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -268,6 +268,9 @@ config IRQ_MXS
- 	select IRQ_DOMAIN
- 	select STMP_DEVICE
- 
-+config MVEBU_GICP
-+	bool
-+
- config MVEBU_ODMI
- 	bool
- 	select GENERIC_MSI_IRQ_DOMAIN
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index b64c59b..11eb858 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -69,6 +69,7 @@ obj-$(CONFIG_ARCH_SA1100)		+= irq-sa11x0.o
- obj-$(CONFIG_INGENIC_IRQ)		+= irq-ingenic.o
- obj-$(CONFIG_IMX_GPCV2)			+= irq-imx-gpcv2.o
- obj-$(CONFIG_PIC32_EVIC)		+= irq-pic32-evic.o
-+obj-$(CONFIG_MVEBU_GICP)		+= irq-mvebu-gicp.o
- obj-$(CONFIG_MVEBU_ODMI)		+= irq-mvebu-odmi.o
- obj-$(CONFIG_MVEBU_PIC)			+= irq-mvebu-pic.o
- obj-$(CONFIG_LS_SCFG_MSI)		+= irq-ls-scfg-msi.o
-diff --git a/drivers/irqchip/irq-mvebu-gicp.c b/drivers/irqchip/irq-mvebu-gicp.c
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
 new file mode 100644
-index 0000000..4effed4
+index 0000000..e0b4068
 --- /dev/null
-+++ b/drivers/irqchip/irq-mvebu-gicp.c
-@@ -0,0 +1,53 @@
-+/*
-+ * Copyright (C) 2017 Marvell
-+ *
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
++++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
+@@ -0,0 +1,57 @@
++Marvell ICU Interrupt Controller
++--------------------------------
 +
-+#include <linux/io.h>
-+#include <linux/platform_device.h>
++The Marvell ICU (Interrupt Consolidation Unit) controller is
++responsible for collecting all wired-interrupt sources in the CP and
++communicating them to the GIC in the AP, the unit translates interrupt
++requests on input wires to MSG memory mapped transactions to the GIC.
 +
-+#define GICP_SETSPI_NSR_OFFSET	0x0
-+#define GICP_CLRSPI_NSR_OFFSET	0x8
++The interrupts from the ICU to the GIC can be mapped to one of the following groups:
 +
-+#define GICP_INT_COUNT		128
++- Shared Peripheral Interrupt - Non-Secured (SPI_NSR)
++- Shared Peripheral Interrupt - Secured (SPI_SR)
++- System Error Interrupt (SEI)
++- RAM Error Interrupt (REI)
 +
-+static int mvebu_gicp_probe(struct platform_device *pdev)
-+{
-+	void __iomem *regs;
-+	struct resource *res;
-+	int i;
++Required properties:
 +
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res)
-+		return -ENODEV;
++- compatible: Should be "marvell,icu"
 +
-+	regs = ioremap(res->start, resource_size(res));
-+	if (!regs)
-+		return -ENOMEM;
++- reg: Should contain ICU registers location and length.
 +
-+	for (i = 0; i < GICP_INT_COUNT; i++)
-+		writel(i, regs + GICP_CLRSPI_NSR_OFFSET);
++- #interrupt-cells: Specifies the number of cells needed to encode an
++  interrupt source. The type shall be a <u32> and the value shall be
++  3.
 +
-+	iounmap(regs);
++  The 1st cell is the group type of the ICU interrupt (SPI_NSR,
++  SPI_SR, SEI, and REI).
 +
-+	return 0;
-+}
++  The 2nd cell is the index of the interrupt in the ICU unit.
 +
-+static const struct of_device_id mvebu_gicp_of_match[] = {
-+	{ .compatible = "marvell,gicp", },
-+	{},
++  The 3rd cell is the type of the interrupt. See arm,gic.txt for
++  details.
++
++- interrupt-controller: Identifies the node as an interrupt
++  controller.
++
++- interrupt-parent: Indicates the node of the parent interrupt
++  controller. Should be pointer to the GIC.
++
++- gicp: Should point to the GICP controller, the GIC extension that
++  allows to trigger interrupts using MSG memory mapped transactions.
++
++Example:
++
++icu: interrupt-controller at 1e0000 {
++	compatible = "marvell,icu";
++	reg = <0x1e0000 0x10>;
++	#interrupt-cells = <2>;
++	interrupt-controller;
++	interrupt-parent = <&gic>;
++	gicp = <&gicp>;
 +};
 +
-+static struct platform_driver mvebu_gicp_driver = {
-+	.probe  = mvebu_gicp_probe,
-+	.driver = {
-+		.name = "mvebu-gicp",
-+		.of_match_table = mvebu_gicp_of_match,
-+	},
++usb3h0: usb3 at 500000 {
++	interrupt-parent = <&icu>;
++	interrupts = <ICU_GRP_NSR 106 IRQ_TYPE_LEVEL_HIGH>;
 +};
-+builtin_platform_driver(mvebu_gicp_driver);
 -- 
 2.7.4
