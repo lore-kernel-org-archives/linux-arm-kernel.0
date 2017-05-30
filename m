@@ -1,76 +1,44 @@
-From: ayaka@soulik.info (Randy Li)
-Date: Tue, 30 May 2017 23:52:46 +0800
-Subject: [PATCH v2] ARM: dts: rockchip: add adc button for Firefly
-Message-ID: <20170530155246.14869-1-ayaka@soulik.info>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Tue, 30 May 2017 18:57:18 +0300
+Subject: [PATCH] cpufreq: imx6q: imx6ull should use the same flow as imx6ul
+Message-ID: <30688f5aa17763362275c199b2d61841497c26a4.1496159470.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The only adc button connected to adc input is recovery button.
+From: Octavian Purdila <octavian.purdila@nxp.com>
 
-Signed-off-by: Randy Li <ayaka@soulik.info>
+This fixes an issue with imx6ull where setting the frequency to 528Mhz
+would actually set the ARM clock to 324Mhz.
+
+Signed-off-by: Octavian Purdila <octavian.purdila@nxp.com>
+Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 ---
- arch/arm/boot/dts/rk3288-firefly-reload.dts | 17 +++++++++++++++++
- arch/arm/boot/dts/rk3288-firefly.dtsi       | 13 +++++++++++++
- 2 files changed, 30 insertions(+)
+ drivers/cpufreq/imx6q-cpufreq.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3288-firefly-reload.dts b/arch/arm/boot/dts/rk3288-firefly-reload.dts
-index d0b3204a..b11a282 100644
---- a/arch/arm/boot/dts/rk3288-firefly-reload.dts
-+++ b/arch/arm/boot/dts/rk3288-firefly-reload.dts
-@@ -48,6 +48,19 @@
- 	model = "Firefly-RK3288-reload";
- 	compatible = "firefly,firefly-rk3288-reload", "rockchip,rk3288";
+diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+index 9c13f09..b6edd3c 100644
+--- a/drivers/cpufreq/imx6q-cpufreq.c
++++ b/drivers/cpufreq/imx6q-cpufreq.c
+@@ -101,7 +101,8 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+ 	 *  - Reprogram pll1_sys_clk and reparent pll1_sw_clk back to it
+ 	 *  - Disable pll2_pfd2_396m_clk
+ 	 */
+-	if (of_machine_is_compatible("fsl,imx6ul")) {
++	if (of_machine_is_compatible("fsl,imx6ul") ||
++	    of_machine_is_compatible("fsl,imx6ull")) {
+ 		/*
+ 		 * When changing pll1_sw_clk's parent to pll1_sys_clk,
+ 		 * CPU may run at higher than 528MHz, this will lead to
+@@ -215,7 +216,8 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ 		goto put_clk;
+ 	}
  
-+	adc-keys {
-+		compatible = "adc-keys";
-+		io-channels = <&saradc 1>;
-+		io-channel-names = "buttons";
-+		keyup-threshold-microvolt = <1800000>;
-+
-+		button-recovery {
-+			label = "Recovery";
-+			linux,code = <KEY_VENDOR>;
-+			press-threshold-microvolt = <0>;
-+		};
-+	};
-+
- 	gpio-keys {
- 		compatible = "gpio-keys";
- 
-@@ -246,6 +259,10 @@
- 	status = "okay";
- };
- 
-+&saradc {
-+	status = "okay";
-+};
-+
- &sdmmc {
- 	bus-width = <4>;
- 	cap-mmc-highspeed;
-diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
-index 10793ac..b4b31a1 100644
---- a/arch/arm/boot/dts/rk3288-firefly.dtsi
-+++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
-@@ -49,6 +49,19 @@
- 		reg = <0 0x80000000>;
- 	};
- 
-+	adc-keys {
-+		compatible = "adc-keys";
-+		io-channels = <&saradc 1>;
-+		io-channel-names = "buttons";
-+		keyup-threshold-microvolt = <1800000>;
-+
-+		button-recovery {
-+			label = "Recovery";
-+			linux,code = <KEY_VENDOR>;
-+			press-threshold-microvolt = <0>;
-+		};
-+	};
-+
- 	dovdd_1v8: dovdd-1v8-regulator {
- 		compatible = "regulator-fixed";
- 		regulator-name = "dovdd_1v8";
+-	if (of_machine_is_compatible("fsl,imx6ul")) {
++	if (of_machine_is_compatible("fsl,imx6ul") ||
++	    of_machine_is_compatible("fsl,imx6ull")) {
+ 		pll2_bus_clk = clk_get(cpu_dev, "pll2_bus");
+ 		secondary_sel_clk = clk_get(cpu_dev, "secondary_sel");
+ 		if (IS_ERR(pll2_bus_clk) || IS_ERR(secondary_sel_clk)) {
 -- 
-2.9.4
+2.7.4
