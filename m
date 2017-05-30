@@ -1,46 +1,33 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 30 May 2017 16:38:28 -0500
-Subject: [PATCH v4 1/2] dt-bindings: i2c: Add Mediatek MT2701 i2c binding
-In-Reply-To: <1d073e6a-e275-24e1-7954-f1af913bd03b@gmail.com>
-References: <1495784107-6711-1-git-send-email-jun.gao@mediatek.com>
- <1495784107-6711-2-git-send-email-jun.gao@mediatek.com>
- <1d073e6a-e275-24e1-7954-f1af913bd03b@gmail.com>
-Message-ID: <20170530213828.pxmexdzfv6u5db6m@rob-hp-laptop>
+Date: Tue, 30 May 2017 16:41:32 -0500
+Subject: [PATCH] dt-bindings: net: move FMan binding
+In-Reply-To: <AM5PR0402MB2691006D3DD1CEB8744EF8F4ECFF0@AM5PR0402MB2691.eurprd04.prod.outlook.com>
+References: <1494855398-26215-1-git-send-email-madalin.bucur@nxp.com>
+ <20170515.103048.248884533404807350.davem@davemloft.net>
+ <AM5PR0402MB2691006D3DD1CEB8744EF8F4ECFF0@AM5PR0402MB2691.eurprd04.prod.outlook.com>
+Message-ID: <20170530214132.cxdqh3xyobksrhvu@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 29, 2017 at 05:30:26PM +0200, Matthias Brugger wrote:
-g> 
+On Thu, May 25, 2017 at 12:57:26PM +0000, Madalin-Cristian Bucur wrote:
+> > -----Original Message-----
+> > From: David Miller [mailto:davem at davemloft.net]
+> > Sent: Monday, May 15, 2017 5:31 PM
+> > Subject: Re: [PATCH] dt-bindings: net: move FMan binding
+> > 
+> > From: Madalin Bucur <madalin.bucur@nxp.com>
+> > Date: Mon, 15 May 2017 16:36:38 +0300
+> > 
+> > > Besides the PPC SoCs, the QorIQ DPAA FMan is also present on ARM SoCs,
+> > > moving the device tree binding document into the bindings/net folder.
+> > >
+> > > Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
+> > 
+> > What tree is this targetted at for merging?
 > 
-> On 26/05/17 09:35, Jun Gao wrote:
-> > From: Jun Gao <jun.gao@mediatek.com>
-> > 
-> > Add MT2701 i2c binding to i2c-mt6577.txt and there is no need to
-> > modify i2c driver.
-> > 
-> > Signed-off-by: Jun Gao <jun.gao@mediatek.com>
-> > ---
-> >   Documentation/devicetree/bindings/i2c/i2c-mt6577.txt | 11 ++++++-----
-> >   1 file changed, 6 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
-> > index 0ce6fa3..52f2023 100644
-> > --- a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
-> > +++ b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
-> > @@ -4,11 +4,12 @@ The Mediatek's I2C controller is used to interface with I2C devices.
-> >   Required properties:
-> >     - compatible: value should be either of the following.
-> > -      (a) "mediatek,mt6577-i2c", for i2c compatible with mt6577 i2c.
-> > -      (b) "mediatek,mt6589-i2c", for i2c compatible with mt6589 i2c.
-> > -      (c) "mediatek,mt8127-i2c", for i2c compatible with mt8127 i2c.
-> > -      (d) "mediatek,mt8135-i2c", for i2c compatible with mt8135 i2c.
-> > -      (e) "mediatek,mt8173-i2c", for i2c compatible with mt8173 i2c.
-> > +	"mediatek,mt2701-i2c", "mediatek,mt6577-i2c": for Mediatek MT2701
-> 
-> I send a cleanup patch for the file, which fixes all the other SoCs.
-> I can fold this one into it, a soon as I got a Signed-off from the DT
-> maintainers.
+> I hope Rob Herring will take this into his tree, it's a device tree binding
+> change. 
 
-I already acked it on the prior versions.
+Applied.
 
 Rob
