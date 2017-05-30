@@ -1,138 +1,42 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 30 May 2017 17:29:07 -0500
-Subject: [PATCH 3/6] gpio: dt-bindings: Add documentation for gpio
- controllers on Armada 7K/8K
-In-Reply-To: <306395ff39de3d3d3c8f55e5da4de8def29ae8d1.1495210061.git-series.gregory.clement@free-electrons.com>
-References: <cover.e10718b9c0f9fdd07327ae14e213be8da5b1f7ef.1495210061.git-series.gregory.clement@free-electrons.com>
- <306395ff39de3d3d3c8f55e5da4de8def29ae8d1.1495210061.git-series.gregory.clement@free-electrons.com>
-Message-ID: <20170530222907.ysx53p3efyxudyqp@rob-hp-laptop>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 30 May 2017 17:42:46 -0500
+Subject: [PATCH v7 2/3] PCI: Add support for PCI inbound windows resources
+In-Reply-To: <1495471182-12490-3-git-send-email-oza.oza@broadcom.com>
+References: <1495471182-12490-1-git-send-email-oza.oza@broadcom.com>
+ <1495471182-12490-3-git-send-email-oza.oza@broadcom.com>
+Message-ID: <CAErSpo6MJbNEyGQC4MwFb6kPoOf1p=mxk-SHAz-+HuDFbvRkmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 19, 2017 at 06:09:22PM +0200, Gregory CLEMENT wrote:
-> Document the device tree binding for the gpio controllers found on the
-> Marvell Armada 7K and Armada 8K SoCs.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt  | 20 ++++++++++++++++++++
->  Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt | 24 +++++++++++++++++++++++-
->  Documentation/devicetree/bindings/gpio/gpio-mvebu.txt                      | 24 +++++++++++++++++-------
->  3 files changed, 60 insertions(+), 8 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-> index 4228d158fb31..0b887440e08a 100644
-> --- a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-> +++ b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-> @@ -64,6 +64,17 @@ mpp17	17	gpio
->  mpp18	18	gpio
->  mpp19	19	gpio, uart0(rxd), sdio(pw_off)
->  
-> +GPIO:
-> +-----
-> +For common binding part and usage, refer to
-> +Documentation/devicetree/bindings/gpio/gpio-mvebu.txt.
-> +
-> +Required properties:
-> +
-> +- compatible: "marvell,armada-8k-gpio"
-> +
-> +- offset: offset address inside the syscon block
-> +
->  Example:
->  ap_syscon: system-controller at 6f4000 {
->  	compatible = "syscon", "simple-mfd";
-> @@ -77,4 +88,13 @@ ap_syscon: system-controller at 6f4000 {
->  	ap_pinctrl: pinctrl {
->  		compatible = "marvell,ap806-pinctrl";
->  	};
-> +
-> +	ap_gpio: gpio {
-> +		compatible = "marvell,armada-8k-gpio";
-> +		offset = <0x1040>;
-> +		ngpios = <19>;
-> +		gpio-controller;
-> +		#gpio-cells = <2>;
-> +		gpio-ranges = <&ap_pinctrl 0 0 19>;
-> +	};
->  };
-> diff --git a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
-> index 733beac7724e..655c114ef584 100644
-> --- a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
-> +++ b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
-> @@ -149,6 +149,18 @@ mpp60	60	gpio, mss_gpio6, ptp(pulse), tdm(dtx), au(i2smclk), spi0(csn1), uart0(r
->  mpp61	61	gpio, mss_gpio5, ptp(clk), tdm(pclk), au(i2sextclk), spi0(csn2), uart0(txd), uart2(txd), sata1(present_act), ge(mdio), sdio(d3)
->  mpp62	62	gpio, mss_gpio4, synce1(clk), ptp(pclk_out), sata1(present_act), spi0(csn3), uart0(rxd), uart2(rxd), sata0(present_act), ge(mdc)
->  
-> +GPIO:
-> +-----
-> +
-> +For common binding part and usage, refer to
-> +Documentation/devicetree/bindings/gpio/gpio-mvebu.txt.
-> +
-> +Required properties:
-> +
-> +- compatible: "marvell,armada-8k-gpio"
-> +
-> +- offset: offset address inside the syscon block
-> +
->  Example:
->  
->  cpm_syscon0: system-controller at 440000 {
-> @@ -163,5 +175,15 @@ cpm_syscon0: system-controller at 440000 {
->  	cpm_pinctrl: pinctrl {
->  		compatible = "marvell,armada-8k-cpm-pinctrl";
->  	};
-> -};
->  
-> +	cpm_gpio1: gpio at 100 {
-> +		compatible = "marvell,armada-8k-gpio";
-> +		offset = <0x100>;
-> +		ngpios = <32>;
-> +		gpio-controller;
-> +		#gpio-cells = <2>;
-> +		gpio-ranges = <&cpm_pinctrl 0 0 32>;
-> +		status = "disabled";
-> +	};
-> +
-> +};
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt b/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
-> index 42c3bb2d53e8..2c5304ff467c 100644
-> --- a/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
-> +++ b/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
-> @@ -2,17 +2,27 @@
->  
->  Required properties:
->  
-> -- compatible : Should be "marvell,orion-gpio", "marvell,mv78200-gpio"
-> -  or "marvell,armadaxp-gpio". "marvell,orion-gpio" should be used for
-> -  Orion, Kirkwood, Dove, Discovery (except MV78200) and Armada
-> -  370. "marvell,mv78200-gpio" should be used for the Discovery
-> -  MV78200. "marvel,armadaxp-gpio" should be used for all Armada XP
-> -  SoCs (MV78230, MV78260, MV78460).
-> +- compatible : Should be "marvell,orion-gpio", "marvell,mv78200-gpio",
-> +  "marvell,armadaxp-gpio" or "marvell,armada-8k-gpio".
-> +
-> +    "marvell,orion-gpio" should be used for Orion, Kirkwood, Dove,
-> +    Discovery (except MV78200) and Armada 370. "marvell,mv78200-gpio"
-> +    should be used for the Discovery MV78200.
-> +
-> +    "marvel,armadaxp-gpio" should be used for all Armada XP SoCs
-> +    (MV78230, MV78260, MV78460).
-> +
-> +    "marvell,armada-8k-gpio" should be used for the Armada 7K and 8K
-> +    SoCs (either from AP or CP), see
-> +    Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
-> +    and
-> +    Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-> +    for specific details about the offset property.
->  
->  - reg: Address and length of the register set for the device. Only one
->    entry is expected, except for the "marvell,armadaxp-gpio" variant
->    for which two entries are expected: one for the general registers,
-> -  one for the per-cpu registers.
-> +  one for the per-cpu registers. Not used for marvell,armada-8k-gpio.
+On Mon, May 22, 2017 at 11:39 AM, Oza Pawandeep <oza.oza@broadcom.com> wrote:
+> This patch adds support for inbound memory window
+> for PCI RC drivers.
+>
+> It defines new function pci_create_root_bus2 which
+> takes inbound resources as an argument and fills in the
+> memory resource to PCI internal host bridge structure
+> as inbound_windows.
+>
+> Legacy RC driver could continue to use pci_create_root_bus,
+> but any RC driver who wants to reseve IOVAS for their
+> inbound memory holes, should use new API pci_create_root_bus2.
+>
+> Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
+> ...
 
-Why can't use you use reg instead of offset?
+> +struct pci_bus *pci_create_root_bus2(struct device *parent, int bus,
+> +               struct pci_ops *ops, void *sysdata, struct list_head *resources,
+> +               struct list_head *in_res)
+> +{
+> +       return pci_create_root_bus_msi(parent, bus, ops, sysdata,
+> +                                      resources, in_res, NULL);
+> +}
+> +EXPORT_SYMBOL_GPL(pci_create_root_bus2);
 
-Rob
+Based on your response to Lorenzo's "[RFC/RFT PATCH 03/18] PCI:
+Introduce pci_scan_root_bus_bridge()", I'm hoping you can avoid adding
+yet another variant of pci_create_root_bus().
+
+So I think I can wait for that to settle out and look for a v8?
+
+Bjorn
