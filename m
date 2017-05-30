@@ -1,29 +1,29 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 30 May 2017 23:51:10 +0200
-Subject: [PATCH 29/58] ARM: dts: at91: cosino: use TCB0 as clocksource
+Date: Tue, 30 May 2017 23:51:13 +0200
+Subject: [PATCH 32/58] ARM: dts: at91: sama5d3xek: use TCB0 as clocksource
 In-Reply-To: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
 References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170530215139.9983-30-alexandre.belloni@free-electrons.com>
+Message-ID: <20170530215139.9983-33-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use tcb0 as the clocksource like previously selected in at91_dt_defconfig.
+Use tcb0 as the clocksource like previously selected in sama5_defconfig.
 
-Cc: Rodolfo Giometti <giometti@linux.it>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/at91-cosino.dtsi | 12 ++++++++++++
+ arch/arm/boot/dts/sama5d3xcm.dtsi | 12 ++++++++++++
  1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91-cosino.dtsi b/arch/arm/boot/dts/at91-cosino.dtsi
-index 02d8ef43de3a..9dcee7095c06 100644
---- a/arch/arm/boot/dts/at91-cosino.dtsi
-+++ b/arch/arm/boot/dts/at91-cosino.dtsi
-@@ -37,6 +37,18 @@
- 
- 	ahb {
- 		apb {
-+			tcb0: timer at f8008000 {
+diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
+index b5e111b29da1..ac583c36b542 100644
+--- a/arch/arm/boot/dts/sama5d3xcm.dtsi
++++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
+@@ -34,6 +34,18 @@
+ 			spi0: spi at f0004000 {
+ 				cs-gpios = <&pioD 13 0>, <0>, <0>, <0>;
+ 			};
++
++			tcb0: timer at f0010000 {
 +				timer at 0 {
 +					compatible = "atmel,tcb-timer";
 +					reg = <0>;
@@ -34,9 +34,8 @@ index 02d8ef43de3a..9dcee7095c06 100644
 +					reg = <1>;
 +				};
 +			};
-+
- 			mmc0: mmc at f0008000 {
- 				pinctrl-0 = <
- 					&pinctrl_board_mmc0
+ 		};
+ 
+ 		nand0: nand at 60000000 {
 -- 
 2.11.0
