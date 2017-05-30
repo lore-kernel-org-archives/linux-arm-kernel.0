@@ -1,36 +1,83 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 30 May 2017 16:49:34 +0200
-Subject: [PATCH 4/6] irqchip: irq-mvebu-icu: new driver for Marvell ICU
-In-Reply-To: <20170530143902.GU22219@n2100.armlinux.org.uk>
-References: <1496135772-20694-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1496135772-20694-5-git-send-email-thomas.petazzoni@free-electrons.com>
- <20170530121907.GO22219@n2100.armlinux.org.uk>
- <20170530143350.6f8563c1@free-electrons.com>
- <20170530125643.GQ22219@n2100.armlinux.org.uk>
- <20170530132735.GA21646@lunn.ch>
- <20170530143902.GU22219@n2100.armlinux.org.uk>
-Message-ID: <20170530144934.GB22758@lunn.ch>
+From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
+Date: Tue, 30 May 2017 16:51:01 +0200
+Subject: [PATCH v6 1/4] gpio: mvebu: Add limited PWM support
+In-Reply-To: <87tw42tqdr.fsf@free-electrons.com>
+References: <20170414154056.32055-1-ralph.sennhauser@gmail.com>
+ <20170414154056.32055-2-ralph.sennhauser@gmail.com>
+ <CACRpkdYPp6pBemTT_a4V6a-Qbk2475qOOxWJOhfVaEz=cojOvA@mail.gmail.com>
+ <87tw42tqdr.fsf@free-electrons.com>
+Message-ID: <20170530165101.73ae0bf6@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 30, 2017 at 03:39:02PM +0100, Russell King - ARM Linux wrote:
-> On Tue, May 30, 2017 at 03:27:35PM +0200, Andrew Lunn wrote:
-> > What might help is that you ask for help getting them merged. I know
-> > of at least 4 groups of people interested in your devlink and 10G PHY
-> > code. If you handed those patches over to these people, i'm sure we
-> > could find somebody to post them to the list, deal with the feedback,
-> > etc, to get them merged. It just needs you to say it is O.K. for
-> > somebody to take patches from your git tree.
+On Tue, 30 May 2017 15:40:00 +0200
+Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+
+> Hi Ralph and Linus,
 > 
-> Is that not what I'm trying to do with these A8k changes?  What I'm
-> instead getting is "your tree is private, we're not touching it".
+> I resurrect this thread following the series post by Richard Genoud:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/509461.html
 > 
-> Okay, so let me put it another way: please help me merge the A8k
-> changes that I have in my tree.
+>  On lun., avril 24 2017, Linus Walleij <linus.walleij@linaro.org>
+> wrote:
+> 
+> > On Fri, Apr 14, 2017 at 5:40 PM, Ralph Sennhauser
+> > <ralph.sennhauser@gmail.com> wrote:
+> >  
+> >> From: Andrew Lunn <andrew@lunn.ch>
+> >>
+> >> Armada 370/XP devices can 'blink' GPIO lines with a configurable on
+> >> and off period. This can be modelled as a PWM.
+> >>
+> >> However, there are only two sets of PWM configuration registers for
+> >> all the GPIO lines. This driver simply allows a single GPIO line
+> >> per GPIO chip of 32 lines to be used as a PWM. Attempts to use
+> >> more return EBUSY.
+> >>
+> >> Due to the interleaving of registers it is not simple to separate
+> >> the PWM driver from the GPIO driver. Thus the GPIO driver has been
+> >> extended with a PWM driver.
+> >>
+> >> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> >> URL: https://patchwork.ozlabs.org/patch/427287/
+> >> URL: https://patchwork.ozlabs.org/patch/427295/
+> >> [Ralph Sennhauser:
+> >>   * Port forward
+> >>   * Merge PWM portion into gpio-mvebu.c
+> >>   * Switch to atomic PWM API
+> >>   * Add new compatible string marvell,armada-370-xp-gpio  
+> 
+> The fact that Richard managed to run the code on Armada 38x draw my
+> attention on the documentation that need to be amend.
 
-Hi Russell
+Hi Gregory
 
-So you are happy for Free-Electrons, or anybody else, to take patches
-from your tree, submit them, handle comments, resubmit them, etc?
+But does it behave as a pwm-fan? I don't have access to the 38x
+functional spec (no NDA with Marvell), the one for XP is public.
+According to Andrew the 38x doesn't have the blinking hardware and so I
+expect the pwm-fan is just an overblown gpio-fan there, additionally
+writing some random values to random registers where luck has it nothing
+goes wrong.
 
-     Andrew
+Kirkwood apparently has blinking support but only at fixed frequency of
+10Hz, so not usable for this purpose either.
+
+So to my knowledge it really is just 370 and XP.
+
+> 
+> And it makes me realized that I missed the bad naming of the
+> compatible string. We don't use family name for the compatible
+> string, but the name of the first SoC compatible with. So in this
+> case we should use "marvell,armada-370", as it is still in rc and not
+> yet deployed. What about fixing the name now?
+
+I don't mind but certainly not for me to decide at this point.
+
+> 
+> I can send a patch for it if you want and fix the dts that are still
+> in my mvebu branch.
+
+Sure, or if you prefer I can do it as well if we decide for the change.
+No preference.
+
+Ralph
