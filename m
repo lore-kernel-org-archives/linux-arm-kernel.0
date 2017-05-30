@@ -1,35 +1,23 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 30 May 2017 11:10:47 +0100
-Subject: [PATCH] arm64: fault: Print info about page table structure when
- dumping pte
-Message-ID: <1496139047-4677-1-git-send-email-will.deacon@arm.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 30 May 2017 12:13:19 +0200
+Subject: [PATCH 1/2] arm64: dts: rockchip: update common rk3399 operating
+ points
+In-Reply-To: <20170523095109.7337-1-heiko@sntech.de>
+References: <20170523095109.7337-1-heiko@sntech.de>
+Message-ID: <83138441.zQW9Y5vCCV@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Whilst debugging a remote crash, I noticed that show_pte is unhelpful
-when it comes to describing the structure of the page table being walked.
-This is easily fixed by printing out the page table (swapper vs user),
-page size and virtual address size when displaying the PGD address.
+Am Dienstag, 23. Mai 2017, 11:51:08 CEST schrieb Heiko Stuebner:
+> The rk3399 has multiple variants with different frequency ratings.
+> The operating points currently in the kernel stem from the op1 variant
+> used in Gru ChromeOS devices and may not be suitable for general rk3399
+> chips. Therefore bring it back to the official general operating points.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/mm/fault.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+applied both for 4.13 with the description in patch2 fixed and
+having the patches in reverse order, as discussed in patch2.
 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 37b95dff0b07..ee6085a922b6 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -89,7 +89,9 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
- 	if (!mm)
- 		mm = &init_mm;
- 
--	pr_alert("pgd = %p\n", mm->pgd);
-+	pr_alert("%s pgtable: %luk pages, %u-bit VAs, pgd = %p\n",
-+		 mm == &init_mm ? "swapper" : "user", PAGE_SIZE / SZ_1K,
-+		 VA_BITS, mm->pgd);
- 	pgd = pgd_offset(mm, addr);
- 	pr_alert("[%08lx] *pgd=%016llx", addr, pgd_val(*pgd));
- 
--- 
-2.1.4
+
+Heiko
