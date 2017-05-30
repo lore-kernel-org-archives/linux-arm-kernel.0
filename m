@@ -1,49 +1,56 @@
-From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Tue, 30 May 2017 17:18:53 +0200
-Subject: [PATCH 1/2] gpio: mvebu: fix blink counter register selection
-In-Reply-To: <20170530122848.2803-1-richard.genoud@gmail.com>
-References: <20170530122848.2803-1-richard.genoud@gmail.com>
-Message-ID: <20170530171853.64630ce6@gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 30 May 2017 17:25:00 +0200
+Subject: [PATCH 3/6] irqchip: irq-mvebu-gicp: new driver for Marvell GICP
+In-Reply-To: <5b882159-4de1-5a8e-5737-56542f2aee3a@arm.com>
+References: <1496135772-20694-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1496135772-20694-4-git-send-email-thomas.petazzoni@free-electrons.com>
+ <2ea42715-700b-c363-eeba-db83b0f63a70@arm.com>
+ <20170530165454.6ca24dbc@free-electrons.com>
+ <5b882159-4de1-5a8e-5737-56542f2aee3a@arm.com>
+Message-ID: <20170530172500.7bf522e1@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard
+Hello,
 
-On Tue, 30 May 2017 14:28:47 +0200
-Richard Genoud <richard.genoud@gmail.com> wrote:
+On Tue, 30 May 2017 16:17:41 +0100, Marc Zyngier wrote:
 
-> The blink counter A was always selected because 0 was forced in the
-> blink select counter register.
-> The variable 'set' was obviously there to be used as the register
-> value, selecting the B counter when id==1 and A counter when id==0.
+> > Indeed. But do we care? Can an edge interrupt be left pending from the
+> > firmware?  
 > 
-> Tested on clearfog-pro (Marvell 88F6828)
+> I cannot see why not. It is just as likely as a level interrupt.
 
-As stated in the other thread, testing on clearfog-pro is likely bogus,
-still the fix is correct.
+OK.
 
-Reviewed-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
-
-Thanks
-Ralph
-
+> > I'm not sure how to use this irq_set_irqchip_state() API. I guess it
+> > needs a virq that corresponds to the GIC SPI interrupt, and I'm not
+> > sure how to get that.  
 > 
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-> ---
->  drivers/gpio/gpio-mvebu.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
-> index 19a92efabbef..cdef2c78cb3b 100644
-> --- a/drivers/gpio/gpio-mvebu.c
-> +++ b/drivers/gpio/gpio-mvebu.c
-> @@ -747,7 +747,7 @@ static int mvebu_pwm_probe(struct platform_device
-> *pdev, set = U32_MAX;
->  	else
->  		return -EINVAL;
-> -	writel_relaxed(0,
-> mvebu_gpioreg_blink_counter_select(mvchip));
-> +	writel_relaxed(set,
-> mvebu_gpioreg_blink_counter_select(mvchip)); 
->  	mvpwm = devm_kzalloc(dev, sizeof(struct mvebu_pwm),
-> GFP_KERNEL); if (!mvpwm)
+> You do have the virtual interrupt when doing the allocation (it is
+> passed as a parameter). So you could perform the mapping (call into the
+> lower layers), and clear the pending bit using the above API.
+
+So in mvebu_icu_irq_domain_alloc(), if I do:
+
+	irq_set_irqchip_state(virq, IRQCHIP_STATE_MASKED, true);
+
+this will go all the way to the ->irq_set_irqchip_state() in the GIC? I
+thought the virq we had was referring to an irq from the ICU domain,
+not from the GIC one. But maybe I'm still getting confused by all these
+irq domains.
+
+> But maybe you don't have any edge interrupt on this SoC, and it doesn't
+> matter.
+
+We currently don't have any in the devices we support in the SoC, but
+since the ICU does support edge interrupts explicitly, it's nicer if we
+can get this right. Plus if this actually works, we don't need the
+marvell,gicp "driver" anymore.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
