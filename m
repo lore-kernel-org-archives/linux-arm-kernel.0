@@ -1,78 +1,19 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue, 30 May 2017 18:44:55 +0800
-Subject: [PATCH v13 9/9] arm64: dts: qcom: msm8916: Add debug unit
-In-Reply-To: <1495728253-30970-1-git-send-email-leo.yan@linaro.org>
-References: <1495728253-30970-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <20170530104455.GD7177@leoy-ThinkPad-T440>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 30 May 2017 16:15:22 +0530
+Subject: [PATCH] ARM: davinci_all_defconfig: Enable CPPI 4.1 USB OTG DMA
+In-Reply-To: <20170523154657.22696-1-abailon@baylibre.com>
+References: <20170523154657.22696-1-abailon@baylibre.com>
+Message-ID: <cf5943f5-ca50-dc19-bd08-782f1d61031a@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy, David,
+On Tuesday 23 May 2017 09:16 PM, Alexandre Bailon wrote:
+> CPPI 4.1 DMA is now supported on AM18xx.
+> Update the config to use it instead of PIO mode.
+> 
+> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
 
-[ + Nico ]
-
-On Fri, May 26, 2017 at 12:04:13AM +0800, Leo Yan wrote:
-> Add debug unit on Qualcomm msm8916 based platforms, including the
-> DragonBoard 410c board.
-
-Could you take a look for this patch? After get your ACK I think
-Mathieu could help pick up this patch through coresight repository.
-
-If you want me to send a separate patch to you directly, also is okay.
-Please let me know which is your preferring.
+Applied to v4.13/defconfig
 
 Thanks,
-Leo Yan
-
-> Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> ---
->  arch/arm64/boot/dts/qcom/msm8916.dtsi | 32 ++++++++++++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> index ab30939..17691ab 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> @@ -1116,6 +1116,38 @@
->  			};
->  		};
->  
-> +		debug at 850000 {
-> +			compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +			reg = <0x850000 0x1000>;
-> +			clocks = <&rpmcc RPM_QDSS_CLK>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&CPU0>;
-> +		};
-> +
-> +		debug at 852000 {
-> +			compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +			reg = <0x852000 0x1000>;
-> +			clocks = <&rpmcc RPM_QDSS_CLK>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&CPU1>;
-> +		};
-> +
-> +		debug at 854000 {
-> +			compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +			reg = <0x854000 0x1000>;
-> +			clocks = <&rpmcc RPM_QDSS_CLK>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&CPU2>;
-> +		};
-> +
-> +		debug at 856000 {
-> +			compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +			reg = <0x856000 0x1000>;
-> +			clocks = <&rpmcc RPM_QDSS_CLK>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&CPU3>;
-> +		};
-> +
->  		etm at 85c000 {
->  			compatible = "arm,coresight-etm4x", "arm,primecell";
->  			reg = <0x85c000 0x1000>;
-> -- 
-> 2.7.4
-> 
+Sekhar
