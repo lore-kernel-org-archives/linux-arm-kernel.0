@@ -1,60 +1,68 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 30 May 2017 16:03:20 +0200
-Subject: [PATCH 4/6] irqchip: irq-mvebu-icu: new driver for Marvell ICU
-In-Reply-To: <20170530134226.GR22219@n2100.armlinux.org.uk>
-References: <1496135772-20694-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1496135772-20694-5-git-send-email-thomas.petazzoni@free-electrons.com>
- <20170530121907.GO22219@n2100.armlinux.org.uk>
- <20170530143350.6f8563c1@free-electrons.com>
- <20170530125643.GQ22219@n2100.armlinux.org.uk>
- <20170530132735.GA21646@lunn.ch>
- <20170530134226.GR22219@n2100.armlinux.org.uk>
-Message-ID: <20170530140320.GA22758@lunn.ch>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Tue, 30 May 2017 16:11:35 +0200
+Subject: [PATCH v7 0/3] Cavium ThunderX2 SMMUv3 errata workarounds
+In-Reply-To: <1496145821-3411-1-git-send-email-gakula@caviumnetworks.com>
+References: <1496145821-3411-1-git-send-email-gakula@caviumnetworks.com>
+Message-ID: <20170530141135.GV16981@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1;4601;0cOn Tue, May 30, 2017 at 02:42:26PM +0100, Russell King - ARM Linux wrote:
-> On Tue, May 30, 2017 at 03:27:35PM +0200, Andrew Lunn wrote:
-> > So you don't expect to every have your 500 patches merged?
+On 30.05.17 17:33:38, Geetha sowjanya wrote:
+> Cavium ThunderX2 SMMUv3 implementation has two Silicon Erratas.
+> 1. Errata ID #74
+>    SMMU register alias Page 1 is not implemented
+> 2. Errata ID #126
+>    SMMU doesnt support unique IRQ lines and also MSI for gerror,
+>    eventq and cmdq-sync
 > 
-> Correct.
+> The following patchset does software workaround for these two erratas.
 > 
-> > What might help is that you ask for help getting them merged. I know
-> > of at least 4 groups of people interested in your devlink and 10G PHY
-> > code.
+> This series is based on patchset.
+> https://www.spinics.net/lists/arm-kernel/msg578443.html
 > 
-> As I've repeatedly explained - and it's called phylink, not devlink -
-
-Sorry, my error. To many different -link things in the network stack.
-
-> the SFP support is not ready due to the SFP+ stuff needing a complete
-> rewrite of that code, which has been delayed because of delays on
-> SolidRun's side to provide SFP+ hardware.
-
-Linux has a long history of reworking stuff in tree, when it has been
-shown to be inadequate in its first version. So long as the device
-tree binding does not need incompatible changes, this reworking is not
-an issue. My guess is, a lot of people have SFP sockets, not
-SFP+. Lets get SFP merged, and then rework it in tree to add SFP+.
-
-> Much of the changes for that happened during the last month, but are
-> currently rather dirty and incomplete, but are in a working state.
-> As you know, I had been pushing out the 10G PHY changes as quickly as
-> netdev copes with them during the previous kernel cycle.  The rate of
-> patch merging was completely insufficient to get the 10G support into
-> netdev - with it taking a week or longer between patches posted and
-> the merge happening.
-
-netdev is the fastest tree i've worked in to get stuff merged. It
-averages around 3 days. But it requires both sides to be very active,
-submitters and reviewers.
-
-> > You are great at writing new code, but terrible at getting it
-> > merged.
+> Changes since v6:
+>    - Changed device tree compatible string to vendor specific.
+>    - Rebased on Robin's latest "Update SMMU models for IORT rev. C" v2 patch.
+>      https://www.spinics.net/lists/arm-kernel/msg582809.html
 > 
-> Yes, because I find it very very time consuming and frustrating to
-> deal with other people - it's really not easy.
+> Changes since v5:
+>   - Rebased on Robin's "Update SMMU models for IORT rev. C" patch.
+>      https://www.spinics.net/lists/arm-kernel/msg580728.html
+>   - Replaced ACPI_IORT_SMMU_V3_CAVIUM_CN99XX macro with ACPI_IORT_SMMU_CAVIUM_CN99XX
+> 
+> Changes since v4:
+>  - Replaced all page1 offset macros ARM_SMMU_EVTQ/PRIQ_PROD/CONS with
+>     arm_smmu_page1_fixup(ARM_SMMU_EVTQ/PRIQ_PROD/CONS, smmu)
+> 
+> Changes since v3:
+>  - Merged patches 1, 2 and 4 of Version 3.
+>  - Modified the page1_offset_adjust() and get_irq_flags() implementation as
+>    suggested by Robin.
+> 
+> Changes since v2:
+>  - Updated "Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt" document with
+>    new SMMU option used to enable errata workaround.
+> 
+> Changes since v1:
+>  - Since the use of MIDR register is rejected and SMMU_IIDR is broken on this
+>    silicon, as suggested by Will Deacon modified the patches to use ThunderX2
+>    SMMUv3 IORT model number to enable errata workaround.
+> 
+> Geetha Sowjanya (1):
+>   iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2 erratum #126
+> 
+> Linu Cherian (2):
+>   ACPI/IORT: Fixup SMMUv3 resource size for Cavium ThunderX2 SMMUv3
+>     model
+>   iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2      erratum
+>     #74
+> 
+>  Documentation/arm64/silicon-errata.txt             |    2 +
+>  .../devicetree/bindings/iommu/arm,smmu-v3.txt      |    6 ++
+>  drivers/acpi/arm64/iort.c                          |   10 ++-
+>  drivers/iommu/arm-smmu-v3.c                        |   93 ++++++++++++++++----
+>  4 files changed, 91 insertions(+), 20 deletions(-)
 
-So as i suggested, outsource that part of the work.
+For the whole series:
 
-   Andrew
+Reviewed-by: Robert Richter <rrichter@cavium.com>
