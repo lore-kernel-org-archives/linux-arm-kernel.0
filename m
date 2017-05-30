@@ -1,41 +1,36 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 30 May 2017 23:50:47 +0200
-Subject: [PATCH 06/58] ARM: dts: at91: at91sam9260ek: use TCB0 as clocksource
+Date: Tue, 30 May 2017 23:50:55 +0200
+Subject: [PATCH 14/58] ARM: dts: at91: at91sam9261: TC blocks are also
+ simple-mfd and syscon devices
 In-Reply-To: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
 References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170530215139.9983-7-alexandre.belloni@free-electrons.com>
+Message-ID: <20170530215139.9983-15-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use tcb0 as the clocksource like previously selected in at91_dt_defconfig.
+Add simple-mfd and syscon to the TC blocks to allow to register one of the
+channels as clocksource properly at boot time. It also allows to use regmap
+instead of tclib.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/at91sam9260ek.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/at91sam9261.dtsi | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/at91sam9260ek.dts b/arch/arm/boot/dts/at91sam9260ek.dts
-index b2578feceb08..e16c706d91ef 100644
---- a/arch/arm/boot/dts/at91sam9260ek.dts
-+++ b/arch/arm/boot/dts/at91sam9260ek.dts
-@@ -69,6 +69,18 @@
+diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
+index 7e80acda8f69..d877ab19f5c5 100644
+--- a/arch/arm/boot/dts/at91sam9261.dtsi
++++ b/arch/arm/boot/dts/at91sam9261.dtsi
+@@ -114,7 +114,9 @@
+ 			ranges;
  
- 	ahb {
- 		apb {
-+			tcb0: timer at fffa0000 {
-+				timer at 0 {
-+					compatible = "atmel,tcb-timer";
-+					reg = <0>, <1>;
-+				};
-+
-+				timer at 2 {
-+					compatible = "atmel,tcb-timer";
-+					reg = <2>;
-+				};
-+			};
-+
- 			usb1: gadget at fffa4000 {
- 				atmel,vbus-gpio = <&pioC 5 GPIO_ACTIVE_HIGH>;
- 				status = "okay";
+ 			tcb0: timer at fffa0000 {
+-				compatible = "atmel,at91rm9200-tcb";
++				compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0xfffa0000 0x100>;
+ 				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 0>,
+ 					     <18 IRQ_TYPE_LEVEL_HIGH 0>,
 -- 
 2.11.0
