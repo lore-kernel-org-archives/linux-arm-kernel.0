@@ -1,118 +1,66 @@
-From: jagan@openedev.com (Jagan Teki)
-Date: Tue, 30 May 2017 17:42:50 +0000
-Subject: [PATCH 2/2] ARM: dts: sun8i: h3: Add initial NanoPi M1 Plus support
-In-Reply-To: <1496166170-6593-1-git-send-email-jagan@openedev.com>
-References: <1496166170-6593-1-git-send-email-jagan@openedev.com>
-Message-ID: <1496166170-6593-2-git-send-email-jagan@openedev.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 30 May 2017 11:15:17 -0700
+Subject: [PATCHv3b 5/5] ARM: OMAP2+: hwmod: populate clkctrl clocks for
+ hwmods if available
+In-Reply-To: <1496155669-1677-6-git-send-email-t-kristo@ti.com>
+References: <1496155669-1677-1-git-send-email-t-kristo@ti.com>
+ <1496155669-1677-6-git-send-email-t-kristo@ti.com>
+Message-ID: <20170530181516.GB3730@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jagan Teki <jagan@amarulasolutions.com>
+* Tero Kristo <t-kristo@ti.com> [170530 07:52]:
+> If clkctrl clocks are available on a device, populate these automatically
+> to replace hwmod main_clk info. First, the patch parses all "ti,clkctrl"
+> compatible nodes and maps these against existing clockdomain data. Once
+> done, individual hwmod init routines can search for a clkctrl clock
+> handle based on the clockdomain info and the created mapping.
+...
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+>  /**
+>   * _init_main_clk - get a struct clk * for the the hwmod's main functional clk
+>   * @oh: struct omap_hwmod *
+> + * @np: device node mapped to this hwmod
+>   *
+>   * Called from _init_clocks().  Populates the @oh _clk (main
+>   * functional clock pointer) if a clock matching the hwmod name is found,
+>   * or a main_clk is present.  Returns 0 on success or -EINVAL on error.
+>   */
+> -static int _init_main_clk(struct omap_hwmod *oh)
+> +static int _init_main_clk(struct omap_hwmod *oh, struct device_node *np)
+>  {
+>  	int ret = 0;
+> -	char name[MOD_CLK_MAX_NAME_LEN];
+> -	struct clk *clk;
+> -	static const char modck[] = "_mod_ck";
+> +	struct clk *clk = NULL;
+>  
+> -	if (strlen(oh->name) >= MOD_CLK_MAX_NAME_LEN - strlen(modck))
+> -		pr_warn("%s: warning: cropping name for %s\n", __func__,
+> -			oh->name);
+> -
+> -	strlcpy(name, oh->name, MOD_CLK_MAX_NAME_LEN - strlen(modck));
+> -	strlcat(name, modck, MOD_CLK_MAX_NAME_LEN);
+> +	if (np) {
+> +		clk = _lookup_clkctrl_clk(oh, np);
+> +
+> +		if (!IS_ERR_OR_NULL(clk)) {
+> +			pr_debug("%s: mapped main_clk %s for %s\n", __func__,
+> +				 __clk_get_name(clk), oh->name);
+> +			oh->main_clk = __clk_get_name(clk);
+> +			oh->_clk = clk;
+> +			soc_ops.disable_direct_prcm(oh);
+> +		}
+> +	}
 
-NanoPi M1 Plus is designed and developed by FriendlyElec
-for professionals, enterprise users, makers and hobbyists
-using the Allwinner H3 SOC.
+Shouldn't we just parse all "ti,clkctrl" matches to
+a list, then match against that list?
 
-NanoPi M1 Plus key features
-- Allwinner H3, Quad-core Cortex-A7 at 1.2GHz
-- 1GB DDR3 RAM
-- 8GB eMMC
-- microSD slot
-- 10/100/1000M Ethernet
-- Serial Debug Port
-- 5V 2A DC power-supply
+Again I'm worried that the "struct device_node *np"
+here won't really map to struct omap_hwmod but to one of
+the child devices. Or what is the np here?
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Note: Need to add mmc node for eMMC, will add it on
-next version once tested
+Regards,
 
- arch/arm/boot/dts/Makefile                    |  1 +
- arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts | 64 +++++++++++++++++++++++++++
- 2 files changed, 65 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 45c6e65..1011469 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -896,6 +896,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-h3-bananapi-m2-plus.dtb \
- 	sun8i-h3-beelink-x2.dtb \
- 	sun8i-h3-nanopi-m1.dtb	\
-+	sun8i-h3-nanopi-m1-plus.dtb \
- 	sun8i-h3-nanopi-neo.dtb \
- 	sun8i-h3-nanopi-neo-air.dtb \
- 	sun8i-h3-orangepi-2.dtb \
-diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-new file mode 100644
-index 0000000..8ddd1b2
---- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-@@ -0,0 +1,64 @@
-+/*
-+ * Copyright (C) 2017 Jagan Teki <jteki@openedev.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include "sun8i-h3-nanopi.dtsi"
-+
-+/ {
-+	model = "FriendlyArm NanoPi M1 Plus";
-+	compatible = "friendlyarm,nanopi-m1-plus", "allwinner,sun8i-h3";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&ehci2 {
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&ohci2 {
-+	status = "okay";
-+};
--- 
-1.9.1
+Tony
