@@ -1,77 +1,85 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 30 May 2017 11:13:30 +0200
-Subject: [GIT PULL] ARM: SoC fixes (and a cross-arch dt-include fix)
-In-Reply-To: <CAK8P3a2E1LtCNoGkAuzwJJdQdUTB_+8d=FM2asEGkXJprvm8oQ@mail.gmail.com>
-References: <20170519193455.GA24206@localhost>
- <CACRpkdaRdZTB39-=sAojO+OyHtP02KaFChqGcxy+fWA8qaB2bw@mail.gmail.com>
- <CAOesGMhfrWSvLtDtGRWBTJiAoeSwzGgsdUTm26j1mpoVu0ghDg@mail.gmail.com>
- <CAMuHMdUivf9cw+LTn7UMueH=MMKi6i3wcOdgM6zbZBoxmkTZGQ@mail.gmail.com>
- <CAK8P3a2E1LtCNoGkAuzwJJdQdUTB_+8d=FM2asEGkXJprvm8oQ@mail.gmail.com>
-Message-ID: <CAMuHMdWxNFUnWJjLj7ynWJFEFMAL=TPsdVSzDtohDprC=EXnaQ@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 30 May 2017 11:14:23 +0200
+Subject: [PATCH 0/5] ARM: dts: at91: Migrate to the new EBI/NAND bindings
+In-Reply-To: <1496133171-4787-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1496133171-4787-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20170530111423.46c0e69e@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Tue, 30 May 2017 10:32:45 +0200
+Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
 
-On Tue, May 23, 2017 at 4:17 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tue, May 23, 2017 at 11:49 AM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
->> On Mon, May 22, 2017 at 5:11 PM, Olof Johansson <olof@lixom.net> wrote:
->>> On Mon, May 22, 2017 at 4:44 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->>>> On Fri, May 19, 2017 at 9:34 PM, Olof Johansson <olof@lixom.net> wrote:
->>>
->>> Yeah, asking people to spread out across releases would remove
->>> dependencies a lot, but it would also slow down progress and frustrate
->>> a lot of contributors so we don't do that.
->>
->> The above works fine for new support, or for new platforms.
->>
->> There's still support being migrated from platform code to DT, which
->> requires three steps:
->>   1. New DT-aware driver support,
->>   2. DT update to use the new driver support,
->>   3. Clean up platform code after optional DTB backwards compatibility
->>      grace period,
->> To make matters worse, 1 may conflict with the existing platform code,
->> and 2 must sometimes not be done before 1. Hence you may need three kernel
->> releases.
->> So we're already planning now what to clean up for v4.15 ;-)
->>
->> Would it be acceptable to do step 2 in the same release, after the driver
->> support has entered in -rc1? I know this is more than just replacing
->> numbers by symbolic values.
->
-> I'd say it really depends on the individual case. Do you have a particular
-> platform in mind? E.g. For some of the more obsolete platforms that
-> Linus Walleij has worked on over time, we have sometimes relaxed the
-> rules about clean bisection and just merged everything in parallel, knowing
-> that nobody else was likely to run that code on a vanilla kernel anyway.
+> Hello,
+> 
+> This is the last step of the EBI/NAND bindings rework started here [1].
+> 
+> The first patch is adding missing nfc-io bindings doc to atmel-nand.txt
+> and can be applied independently.
+> 
+> Patches 2 to 4 are migrating all at91/sama5 SoCs (except the
+> at91rm9200) to the new EBI/NAND representation introduced in 4.12.
+> 
+> The last patch is showing how one can add a non-NAND device under the
+> EBI bus.
 
-This is for Renesas R-Car Gen2 SoCs, so we do care about DT backward
-compatibility (for a while), and about bisection.
+Please ignore this version: I forgot to Cc board maintainers and patch
+3 and 4 should be merged in a single patch.
 
-Last headache was "[PATCH v4 00/23] soc: renesas: Add R-Car RST driver for
-obtaining mode pin state" (https://lkml.org/lkml/2016/10/21/500). This used
-a shared immutable branch, but that caused several merge conflicts.
+I'll send a v2.
 
-Next one will be smaller, as it's not really moving functionality from
-platform code to DT, but switching to a new and better clock driver framework,
-so there's only the dependency of DT on the new driver
-"[PATCH v2 00/10] clk: renesas: rcar-gen2: Add new CPG/MSSR drivers"
-(https://lkml.org/lkml/2017/5/19/212)
-
-I'll go create an inventory of stuff in platform code for Renesas SoCs that
-still needs to be converted to DT...
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> 
+> Regards,
+> 
+> Boris
+> 
+> [1]http://lkml.iu.edu/hypermail/linux/kernel/1703.2/00124.html
+> 
+> Boris Brezillon (5):
+>   dt-bindings: mtd: atmel-nand: Document the nfc-io bindings
+>   ARM: dts: at91: Declare EBI/NAND controllers
+>   ARM: dts: at91: Update board dts to use the new EBI/NAND bindings
+>   ARM: dts: at91: Get rid of old NAND definitions
+>   ARM: dts: at91: Add the NOR flash available on sama5d3 dev kits
+> 
+>  .../devicetree/bindings/mtd/atmel-nand.txt         |  14 ++
+>  arch/arm/boot/dts/aks-cdu.dts                      |  56 ++++---
+>  arch/arm/boot/dts/animeo_ip.dts                    |  53 ++++--
+>  arch/arm/boot/dts/at91-cosino.dtsi                 |  83 ++++++----
+>  arch/arm/boot/dts/at91-kizbox.dts                  |  42 +++--
+>  arch/arm/boot/dts/at91-kizbox2.dts                 |  45 ++++--
+>  arch/arm/boot/dts/at91-kizboxmini.dts              |  52 ++++--
+>  arch/arm/boot/dts/at91-linea.dtsi                  |  25 ++-
+>  arch/arm/boot/dts/at91-qil_a9260.dts               | 103 +++++++-----
+>  arch/arm/boot/dts/at91-sama5d3_xplained.dts        |  97 ++++++-----
+>  arch/arm/boot/dts/at91-sama5d4_xplained.dts        |  83 ++++++----
+>  arch/arm/boot/dts/at91-sama5d4ek.dts               |  83 ++++++----
+>  arch/arm/boot/dts/at91-tse850-3.dts                |  70 ++++----
+>  arch/arm/boot/dts/at91sam9260.dtsi                 |  65 +++++---
+>  arch/arm/boot/dts/at91sam9261.dtsi                 |  48 ++++--
+>  arch/arm/boot/dts/at91sam9261ek.dts                |  83 ++++++----
+>  arch/arm/boot/dts/at91sam9263.dtsi                 |  89 ++++++++---
+>  arch/arm/boot/dts/at91sam9263ek.dts                | 103 +++++++-----
+>  arch/arm/boot/dts/at91sam9g20ek_common.dtsi        | 103 +++++++-----
+>  arch/arm/boot/dts/at91sam9g45.dtsi                 |  64 +++++---
+>  arch/arm/boot/dts/at91sam9m10g45ek.dts             |  49 ++++--
+>  arch/arm/boot/dts/at91sam9n12.dtsi                 |  74 ++++++---
+>  arch/arm/boot/dts/at91sam9n12ek.dts                |  26 ++-
+>  arch/arm/boot/dts/at91sam9rl.dtsi                  |  69 +++++---
+>  arch/arm/boot/dts/at91sam9rlek.dts                 |  85 ++++++----
+>  arch/arm/boot/dts/at91sam9x5.dtsi                  | 134 ++++++++++------
+>  arch/arm/boot/dts/at91sam9x5cm.dtsi                |  83 ++++++----
+>  arch/arm/boot/dts/ethernut5.dts                    |  47 ++++--
+>  arch/arm/boot/dts/ge863-pro3.dtsi                  |  41 +++--
+>  arch/arm/boot/dts/pm9g45.dts                       |  99 ++++++------
+>  arch/arm/boot/dts/sama5d2.dtsi                     |  53 ++++++
+>  arch/arm/boot/dts/sama5d3.dtsi                     | 131 ++++++++++++---
+>  arch/arm/boot/dts/sama5d3xcm.dtsi                  |  97 +++++++----
+>  arch/arm/boot/dts/sama5d3xcm_cmp.dtsi              |  77 +++++----
+>  arch/arm/boot/dts/sama5d4.dtsi                     | 177 ++++++++++++++++++---
+>  arch/arm/boot/dts/tny_a9260_common.dtsi            |  89 +++++++----
+>  arch/arm/boot/dts/tny_a9263.dts                    | 103 +++++++-----
+>  arch/arm/boot/dts/usb_a9260_common.dtsi            | 103 +++++++-----
+>  arch/arm/boot/dts/usb_a9263.dts                    | 103 +++++++-----
+>  39 files changed, 1992 insertions(+), 1009 deletions(-)
+> 
