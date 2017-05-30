@@ -1,79 +1,57 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 30 May 2017 15:40:00 +0200
-Subject: [PATCH v6 1/4] gpio: mvebu: Add limited PWM support
-In-Reply-To: <CACRpkdYPp6pBemTT_a4V6a-Qbk2475qOOxWJOhfVaEz=cojOvA@mail.gmail.com>
- (Linus Walleij's message of "Mon, 24 Apr 2017 11:18:30 +0200")
-References: <20170414154056.32055-1-ralph.sennhauser@gmail.com>
- <20170414154056.32055-2-ralph.sennhauser@gmail.com>
- <CACRpkdYPp6pBemTT_a4V6a-Qbk2475qOOxWJOhfVaEz=cojOvA@mail.gmail.com>
-Message-ID: <87tw42tqdr.fsf@free-electrons.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 30 May 2017 14:42:26 +0100
+Subject: [PATCH 4/6] irqchip: irq-mvebu-icu: new driver for Marvell ICU
+In-Reply-To: <20170530132735.GA21646@lunn.ch>
+References: <1496135772-20694-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1496135772-20694-5-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20170530121907.GO22219@n2100.armlinux.org.uk>
+ <20170530143350.6f8563c1@free-electrons.com>
+ <20170530125643.GQ22219@n2100.armlinux.org.uk>
+ <20170530132735.GA21646@lunn.ch>
+Message-ID: <20170530134226.GR22219@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ralph and Linus,
+On Tue, May 30, 2017 at 03:27:35PM +0200, Andrew Lunn wrote:
+> So you don't expect to every have your 500 patches merged?
 
-I resurrect this thread following the series post by Richard Genoud:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/509461.html
+Correct.
 
- On lun., avril 24 2017, Linus Walleij <linus.walleij@linaro.org> wrote:
+> What might help is that you ask for help getting them merged. I know
+> of at least 4 groups of people interested in your devlink and 10G PHY
+> code.
 
-> On Fri, Apr 14, 2017 at 5:40 PM, Ralph Sennhauser
-> <ralph.sennhauser@gmail.com> wrote:
->
->> From: Andrew Lunn <andrew@lunn.ch>
->>
->> Armada 370/XP devices can 'blink' GPIO lines with a configurable on
->> and off period. This can be modelled as a PWM.
->>
->> However, there are only two sets of PWM configuration registers for
->> all the GPIO lines. This driver simply allows a single GPIO line per
->> GPIO chip of 32 lines to be used as a PWM. Attempts to use more return
->> EBUSY.
->>
->> Due to the interleaving of registers it is not simple to separate the
->> PWM driver from the GPIO driver. Thus the GPIO driver has been
->> extended with a PWM driver.
->>
->> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
->> URL: https://patchwork.ozlabs.org/patch/427287/
->> URL: https://patchwork.ozlabs.org/patch/427295/
->> [Ralph Sennhauser:
->>   * Port forward
->>   * Merge PWM portion into gpio-mvebu.c
->>   * Switch to atomic PWM API
->>   * Add new compatible string marvell,armada-370-xp-gpio
+As I've repeatedly explained - and it's called phylink, not devlink -
+the SFP support is not ready due to the SFP+ stuff needing a complete
+rewrite of that code, which has been delayed because of delays on
+SolidRun's side to provide SFP+ hardware.
 
-The fact that Richard managed to run the code on Armada 38x draw my
-attention on the documentation that need to be amend.
+Much of the changes for that happened during the last month, but are
+currently rather dirty and incomplete, but are in a working state.
+As you know, I had been pushing out the 10G PHY changes as quickly as
+netdev copes with them during the previous kernel cycle.  The rate of
+patch merging was completely insufficient to get the 10G support into
+netdev - with it taking a week or longer between patches posted and
+the merge happening.
 
-And it makes me realized that I missed the bad naming of the compatible
-string. We don't use family name for the compatible string, but the name
-of the first SoC compatible with. So in this case we should use
-"marvell,armada-370", as it is still in rc and not yet deployed. What
-about fixing the name now?
+> You are great at writing new code, but terrible at getting it
+> merged.
 
-I can send a patch for it if you want and fix the dts that are still in
-my mvebu branch.
+Yes, because I find it very very time consuming and frustrating to
+deal with other people - it's really not easy.
 
-Thanks,
-
-Gregory
-
-
->>   * Update and merge documentation patch
->>   * Update MAINTAINERS]
->> Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
->> Tested-by: Andrew Lunn <andrew@lunn.ch>
->> Acked-by: Thierry Reding <thierry.reding@gmail.com>
->> Acked-by: Rob Herring <robh@kernel.org>
->
-> Patch applied.
->
-> Yours,
-> Linus Walleij
+What am I working on right now - I'm trying to get the dw-hdmi CEC
+driver out there.  I've been working on that all morning so far,
+but it's taking hours, despite having a previously working patch
+set... and the latest problem I find is that iMX6 appears to silently
+fail to boot.  So, this afternoon, I'm debugging why 4.12-rc3 on
+iMX6 seems to be broken, and while I'm doing that I won't be doing
+anything _else_, probably not even looking at any email.  So this
+will probably be the last email you see from me until I have the
+dw-hdmi stuff sorted.  That means I won't be doing _anything_ else
+while I sort out a set of patches for this.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
