@@ -1,94 +1,63 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 30 May 2017 18:27:41 +0100
-Subject: Device address specific mapping of arm,mmu-500
-In-Reply-To: <a85b2e3f-93db-7c4d-cde8-32a57e69bef9@broadcom.com>
-References: <1b79efe2-6835-7a7a-f5ad-361391a7b967@broadcom.com>
- <20170530151437.GC23067@arm.com>
- <81637642-22d9-4868-156f-052f64bd042f@broadcom.com>
- <226bcebc-3902-90d3-24e5-51f2e1f3affb@arm.com>
- <a85b2e3f-93db-7c4d-cde8-32a57e69bef9@broadcom.com>
-Message-ID: <16e5fc9d-b014-af7c-dcda-527522ac5cc9@arm.com>
+From: hotran@apm.com (Hoan Tran)
+Date: Tue, 30 May 2017 10:29:28 -0700
+Subject: [PATCH v2 0/3] perf: xgene: Add support for SoC PMU version 3
+In-Reply-To: <CAFHUOYw3WtTB+q+zKdRDBaXyCaDp+r-YfydTxHSRm5CT6sNnXQ@mail.gmail.com>
+References: <1491238077-20666-1-git-send-email-hotran@apm.com>
+ <CAFHUOYzJ1PoUV=BmcVxSHZ_8qENm6DW5_Hd3uuFHE9kdqhXCzA@mail.gmail.com>
+ <CAFHUOYw3WtTB+q+zKdRDBaXyCaDp+r-YfydTxHSRm5CT6sNnXQ@mail.gmail.com>
+Message-ID: <CAFHUOYy-KpYghL-rLdMNy39Go6WQHhx005BxggPxSOmLRRvKEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/05/17 18:16, Ray Jui wrote:
-> Hi Marc,
-> 
-> On 5/30/17 9:59 AM, Marc Zyngier wrote:
->> On 30/05/17 17:49, Ray Jui wrote:
->>> Hi Will,
->>>
->>> On 5/30/17 8:14 AM, Will Deacon wrote:
->>>> On Mon, May 29, 2017 at 06:18:45PM -0700, Ray Jui wrote:
->>>>> I'm writing to check with you to see if the latest arm-smmu.c driver in
->>>>> v4.12-rc Linux for smmu-500 can support mapping that is only specific to
->>>>> a particular physical address range while leave the rest still to be
->>>>> handled by the client device. I believe this can already be supported by
->>>>> the device tree binding of the generic IOMMU framework; however, it is
->>>>> not clear to me whether or not the arm-smmu.c driver can support it.
->>>>>
->>>>> To give you some background information:
->>>>>
->>>>> We have a SoC that has PCIe root complex that has a build-in logic block
->>>>> to forward MSI writes to ARM GICv3 ITS. Unfortunately, this logic block
->>>>> has a HW bug that causes the MSI writes not parsed properly and can
->>>>> potentially corrupt data in the internal FIFO. A workaround is to have
->>>>> ARM MMU-500 takes care of all inbound transactions. I found that is
->>>>> working after hooking up our PCIe root complex to MMU-500; however, even
->>>>> with this optimized arm-smmu driver in v4.12, I'm still seeing a
->>>>> significant Ethernet throughput drop in both the TX and RX directions.
->>>>> The throughput drop is very significant at around 50% (but is already
->>>>> much improved compared to other prior kernel versions at 70~90%).
->>>>
->>>> Did Robin's experiments help at all with this?
->>>>
->>>> http://www.linux-arm.org/git?p=linux-rm.git;a=shortlog;h=refs/heads/iommu/perf
->>>>
->>>
->>> It looks like these are new optimizations that have not yet been merged
->>> in v4.12? I'm going to give it a try.
->>>
->>>>> One alternative is to only use MMU-500 for MSI writes towards
->>>>> GITS_TRANSLATER register in the GICv3, i.e., if I can define a specific
->>>>> region of physical address that I want MMU-500 to act on and leave the
->>>>> rest of inbound transactions to be handled directly by our PCIe
->>>>> controller, it can potentially work around the HW bug we have and at the
->>>>> same time achieve optimal throughput.
->>>>
->>>> I don't think you can bypass the SMMU for MSIs unless you give them their
->>>> own StreamIDs, which is likely to break things horribly in the kernel. You
->>>> could try to create an identity mapping, but you'll still have the
->>>> translation overhead and you'd probably end up having to supply your own DMA
->>>> ops to manage the address space. I'm assuming that you need to prevent the
->>>> physical address of the ITS from being allocated as an IOVA?
->>>
->>> Will, is that a HW limitation that the SMMU cannot be used, only for MSI
->>> writes, in which case, the physical address range is very specific in
->>> our ASIC that falls in the device memory region (e.g., below 0x80000000)?
->>>
->>> In fact, what I need in this case is a static mapping from IOMMU on the
->>> physical address of the GITS_TRANSLATER of the GICv3 ITS, which is the
->>> address that MSI writes go to. This is to bypass the MSI forwarding
->>> logic in our PCIe controller. At the same time, I can leave the rest of
->>> inbound transactions to be handled by our PCIe controller without going
->>> through the MMU.
+Hi All,
+
+Ping again
+
+Thanks
+Hoan
+
+On Fri, May 5, 2017 at 8:48 AM, Hoan Tran <hotran@apm.com> wrote:
+> Ping!
+>
+> Thanks
+> Hoan
+>
+> On Thu, Apr 13, 2017 at 10:50 AM, Hoan Tran <hotran@apm.com> wrote:
+>> Hi All,
 >>
->> How is that going to work for DMA? I imagine your network interfaces do
->> have to access memory, don't they? How can the transactions be
->> terminated in the PCIe controller?
-> 
-> Sorry, I may not phrase this properly. These inbound transactions (DMA
-> write to DDR, from endpoint) do not terminate in the PCIe controller.
-> They are taken by the PCIe controller as PCIe transactions and will be
-> carried towards the designated memory on the host.
-
-So what is the StreamID used for these transactions? Is that a different
-StreamID from that of the DMAing device? If you want to avoid the SMMU
-effect on the transaction, you must make sure if doesn't match anything
-there.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>> Do you have any comments on this patch set?
+>>
+>> Thanks
+>> Hoan
+>>
+>> On Mon, Apr 3, 2017 at 9:47 AM, Hoan Tran <hotran@apm.com> wrote:
+>>>
+>>> This patch set adds support for SoC-wide (AKA uncore) Performance
+>>> Monitoring
+>>> Unit version 3.
+>>>
+>>> It can support up to
+>>>  - 2 IOB PMU instances
+>>>  - 8 L3C PMU instances
+>>>  - 2 MCB PMU instances
+>>>  - 8 MCU PMU instances
+>>>
+>>> v2:
+>>>  * Split into separate patches
+>>>  * Use the function pointers for the PMU leaf functions
+>>>  * Parse PMU subnode by the match table
+>>>  * Dont allow user change agent id by config1 for SoC PMU v3
+>>>
+>>> Hoan Tran (3):
+>>>   perf: xgene: Parse PMU subnode from the match table
+>>>   perf: xgene: Move PMU leaf functions into function pointer structure
+>>>   perf: xgene: Add support for SoC PMU version 3
+>>>
+>>>  drivers/perf/xgene_pmu.c | 695
+>>> +++++++++++++++++++++++++++++++++++++++++------
+>>>  1 file changed, 619 insertions(+), 76 deletions(-)
+>>>
+>>> --
+>>> 1.9.1
+>>>
+>>
