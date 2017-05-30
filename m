@@ -1,45 +1,22 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 30 May 2017 11:47:26 +0100
-Subject: [PATCH v3 1/1] ARM64/PCI: Set root bus NUMA node on ACPI systems
-In-Reply-To: <20170524172219.5689-2-lorenzo.pieralisi@arm.com>
-References: <20170524172219.5689-1-lorenzo.pieralisi@arm.com>
- <20170524172219.5689-2-lorenzo.pieralisi@arm.com>
-Message-ID: <20170530104725.GB32289@arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 30 May 2017 16:20:11 +0530
+Subject: [PATCH v2] ARM: dts: da850: Add interrupt-controller property to
+ gpio node
+In-Reply-To: <1495634501-3246-1-git-send-email-j-keerthy@ti.com>
+References: <1495634501-3246-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <fe594161-3adf-8cd8-df41-63daca1cfeff@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 24, 2017 at 06:22:19PM +0100, Lorenzo Pieralisi wrote:
-> PCI core requires the NUMA node for the struct pci_host_bridge.dev to
-> be set by using the pcibus_to_node(struct pci_bus*) API, that on ARM64
-> systems relies on the struct pci_host_bridge->bus.dev NUMA node.
+On Wednesday 24 May 2017 07:31 PM, Keerthy wrote:
+> The gpio node has 144 gpios. Each gpio is capable of generating
+> an interrupt. Hence add interrupt-controller property to the gpio
+> node. With this in place one can use interrupts property in device
+> tree to request for the gpio interrupts.
 > 
-> The struct pci_host_bridge.dev NUMA node is then propagated through
-> the PCI device hierarchy as PCI devices (and bridges) are enumerated
-> under it.
-> 
-> Therefore, in order to set-up the PCI NUMA hierarchy appropriately, the
-> struct pci_host_bridge->bus.dev NUMA node must be set before core
-> code calls pcibus_to_node(struct pci_bus*) on it so that PCI core can
-> retrieve the NUMA node for the struct pci_host_bridge.dev device and can
-> propagate it through the PCI bus tree.
-> 
-> On ARM64 ACPI based systems the struct pci_host_bridge->bus.dev NUMA
-> node can be set-up in pcibios_root_bridge_prepare() by parsing the root
-> bridge ACPI device firmware binding.
-> 
-> Add code to the pcibios_root_bridge_prepare() that, when booting with
-> ACPI, parse the root bridge ACPI device companion NUMA binding and set
-> the corresponding struct pci_host_bridge->bus.dev NUMA node
-> appropriately.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> ---
->  arch/arm64/kernel/pci.c | 3 +++
->  1 file changed, 3 insertions(+)
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
 
-Thanks, I'll queue this with Robert's tags.
+Applied to v4.13/dt
 
-Will
+Thanks,
+Sekhar
