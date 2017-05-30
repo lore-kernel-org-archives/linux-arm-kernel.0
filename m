@@ -1,55 +1,110 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 30 May 2017 08:51:47 +0200
-Subject: [PATCH v2 12/12] ARM: sun5i: add a cryptographic engine node
-In-Reply-To: <20170530064811.idsv66mvfyh2tyiw@flea.lan>
-References: <20170529202738.2167-1-antoine.tenart@free-electrons.com>
- <20170529202738.2167-13-antoine.tenart@free-electrons.com>
- <20170530064811.idsv66mvfyh2tyiw@flea.lan>
-Message-ID: <20170530065147.GB5802@kwain>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Tue, 30 May 2017 09:56:32 +0300
+Subject: [PATCH v7 16/34] [media] add Omnivision OV5640 sensor driver
+In-Reply-To: <c50c3c5f-71cf-fa73-f5a8-a4b5f59a87dc@gmail.com>
+References: <1495672189-29164-1-git-send-email-steve_longerbeam@mentor.com>
+ <1495672189-29164-17-git-send-email-steve_longerbeam@mentor.com>
+ <20170529155511.GI29527@valkosipuli.retiisi.org.uk>
+ <c50c3c5f-71cf-fa73-f5a8-a4b5f59a87dc@gmail.com>
+Message-ID: <20170530065632.GK29527@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi Steve,
 
-On Tue, May 30, 2017 at 08:48:11AM +0200, Maxime Ripard wrote:
-> On Mon, May 29, 2017 at 10:27:38PM +0200, Antoine Tenart wrote:
-> > Add a node for the cryptographic engine that can be found on sun5i SoCs.
-> > This cryptographic engine is compatible with the Allwinner cryptographic
-> > accelerator driver.
-> > 
-> > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> > ---
-> >  arch/arm/boot/dts/sun5i.dtsi | 8 ++++++++
-> >  1 file changed, 8 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
-> > index 5175f9cc9bed..9bfefa2c7224 100644
-> > --- a/arch/arm/boot/dts/sun5i.dtsi
-> > +++ b/arch/arm/boot/dts/sun5i.dtsi
-> > @@ -355,6 +355,14 @@
-> >  			status = "disabled";
-> >  		};
-> >  
-> > +		crypto: crypto-engine at 01c15000 {
-> > +			compatible = "allwinner,sun4i-a10-crypto";
+On Mon, May 29, 2017 at 02:50:34PM -0700, Steve Longerbeam wrote:
+> ><snip>
+> >
+> >>+
+> >>+static int ov5640_s_ctrl(struct v4l2_ctrl *ctrl)
+> >>+{
+> >>+	struct v4l2_subdev *sd = ctrl_to_sd(ctrl);
+> >>+	struct ov5640_dev *sensor = to_ov5640_dev(sd);
+> >>+	int ret = 0;
+> >>+
+> >>+	mutex_lock(&sensor->lock);
+> >Could you use the same lock for the controls as you use for the rest? Just
+> >setting handler->lock after handler init does the trick.
 > 
-> you should add a SoC-specific compatible here, just so that if we ever
-> need to fix something in there we don't have to update our DT.
+> Can you please rephrase, I don't follow. "same lock for the controls as
+> you use for the rest" - there's only one device lock owned by this driver
+> and I am already using that same lock.
 
-Sure. I'll also make patches for the other sunXi crypto nodes as they do
-no have SoC-specific compatibles either.
+There's another in the control handler. You could use your own lock for the
+control handler as well.
 
-Thanks,
-Antoine
+> 
+> 
+> ><snip>
+> >>+
+> >>+static int ov5640_s_stream(struct v4l2_subdev *sd, int enable)
+> >>+{
+> >>+	struct ov5640_dev *sensor = to_ov5640_dev(sd);
+> >>+	int ret = 0;
+> >>+
+> >>+	mutex_lock(&sensor->lock);
+> >>+
+> >>+#if defined(CONFIG_MEDIA_CONTROLLER)
+> >>+	if (sd->entity.stream_count > 1)
+> >The entity stream_count isn't connected to the number of times s_stream(sd,
+> >true) is called. Please remove the check.
+> 
+> It's incremented by media_pipeline_start(), even if the entity is already
+> a member of the given pipeline.
+> 
+> I added this check because in imx-media, the ov5640 can be streaming
+> concurrently to multiple video capture devices, and each capture device
+> calls
+> media_pipeline_start() at stream on, which increments the entity stream
+> count.
+> 
+> So if one capture device issues a stream off while others are still
+> streaming,
+> ov5640 should remain at stream on. So the entity stream count is being
+> used as a streaming usage counter. Is there a better way to do this? Should
+> I use a private stream use counter instead?
+
+Different drivers may use media_pipeline_start() in different ways. Stream
+control shouldn't depend on that count. This could cause issues in using the
+driver with other ISP / receiver drivers.
+
+I think it should be enough to move the check to the imx driver in this
+case.
+
+> 
+> 
+> 
+> ><snip>
+> >
+> >>+
+> >>+free_ctrls:
+> >>+	v4l2_ctrl_handler_free(&sensor->ctrls.handler);
+> >>+entity_cleanup:
+> >>+	mutex_destroy(&sensor->lock);
+> >>+	media_entity_cleanup(&sensor->sd.entity);
+> >>+	regulator_bulk_disable(OV5640_NUM_SUPPLIES, sensor->supplies);
+> >Should this still be here?
+> >
+> >>+	return ret;
+> >>+}
+> >>+
+> >>+static int ov5640_remove(struct i2c_client *client)
+> >>+{
+> >>+	struct v4l2_subdev *sd = i2c_get_clientdata(client);
+> >>+	struct ov5640_dev *sensor = to_ov5640_dev(sd);
+> >>+
+> >>+	regulator_bulk_disable(OV5640_NUM_SUPPLIES, sensor->supplies);
+> >Ditto.
+> 
+> I don't understand. regulator_bulk_disable() is still needed, am I missing
+> something?
+
+You still need to enable it first. I don't see that being done in probe. As
+the driver implements the s_power() op, I don't see a need for powering the
+device on at probe time (and conversely off at remove time).
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170530/0ac167d0/attachment.sig>
+Regards,
+
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
