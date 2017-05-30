@@ -1,32 +1,33 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 30 May 2017 11:32:13 +0200
-Subject: [PATCH v6 1/6] iommu: of: Fix check for returning EPROBE_DEFER
-In-Reply-To: <1495892865-9506-1-git-send-email-sricharan@codeaurora.org>
-References: <1495892865-9506-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <20170530093212.GD2818@8bytes.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 30 May 2017 11:22:13 +0200
+Subject: [PATCH 6/6] arm64: dts: marvell: enable GICP and ICU
+In-Reply-To: <1496135772-20694-8-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1496135772-20694-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1496135772-20694-8-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20170530112213.40e7bdb4@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 27, 2017 at 07:17:40PM +0530, Sricharan R wrote:
-> Now with IOMMU probe deferral, we return -EPROBE_DEFER
-> for masters that are connected to an IOMMU which is not
-> probed yet, but going to get probed, so that we can attach
-> the correct dma_ops. So while trying to defer the probe of
-> the master, check if the of_iommu node that it is connected
-> to is marked in DT as 'status=disabled', then the IOMMU is never
-> is going to get probed. So simply return NULL and let the master
-> work without an IOMMU.
-> 
-> Fixes: 7b07cbefb68d ("iommu: of: Handle IOMMU lookup failure with deferred probing or error")
-> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Tested-by: Will Deacon <will.deacon@arm.com>
-> Tested-by: Magnus Damn <magnus.damn@gmail.com>
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> ---
->  drivers/iommu/of_iommu.c | 1 +
->  1 file changed, 1 insertion(+)
+Hello,
 
-Sorry for the confusion, I meant to apply this version of the patch-set
-instead of v5.
+On Tue, 30 May 2017 11:16:12 +0200, Thomas Petazzoni wrote:
+> This commit modifies the Marvell EBU Armada 7K and 8K Device Tree files
+> to describe the ICU and GICP units, and use ICU interrupts for all
+> devices in the CP110 blocks.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+
+Please disregard this patch. I should remember all patches before using
+"git format-patch", this would avoid me sending stale versions of
+patches.
+
+Basically the other PATCH 6/6 is exactly the same, with just the title
+changed (and is the more correct one).
+
+Sorry about that,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
