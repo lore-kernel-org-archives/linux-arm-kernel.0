@@ -1,22 +1,43 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 30 May 2017 16:20:11 +0530
-Subject: [PATCH v2] ARM: dts: da850: Add interrupt-controller property to
- gpio node
-In-Reply-To: <1495634501-3246-1-git-send-email-j-keerthy@ti.com>
-References: <1495634501-3246-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <fe594161-3adf-8cd8-df41-63daca1cfeff@ti.com>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Tue, 30 May 2017 16:22:57 +0530
+Subject: [PATCH] Input: s3c2410_ts - Handle return value of clk_prepare_enable
+Message-ID: <477d9b0992f4b16454ad1780eb4477433c075226.1496141406.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 May 2017 07:31 PM, Keerthy wrote:
-> The gpio node has 144 gpios. Each gpio is capable of generating
-> an interrupt. Hence add interrupt-controller property to the gpio
-> node. With this in place one can use interrupts property in device
-> tree to request for the gpio interrupts.
-> 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
+clk_prepare_enable() can fail here and we must check its return value.
 
-Applied to v4.13/dt
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+---
+ drivers/input/touchscreen/s3c2410_ts.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-Thanks,
-Sekhar
+diff --git a/drivers/input/touchscreen/s3c2410_ts.c b/drivers/input/touchscreen/s3c2410_ts.c
+index 41d58e8..3b3db8c 100644
+--- a/drivers/input/touchscreen/s3c2410_ts.c
++++ b/drivers/input/touchscreen/s3c2410_ts.c
+@@ -264,7 +264,11 @@ static int s3c2410ts_probe(struct platform_device *pdev)
+ 		return -ENOENT;
+ 	}
+ 
+-	clk_prepare_enable(ts.clock);
++	ret = clk_prepare_enable(ts.clock);
++	if (ret) {
++		dev_err(dev, "Failed! to enabled clocks\n");
++		goto err_clk_get;
++	}
+ 	dev_dbg(dev, "got and enabled clocks\n");
+ 
+ 	ts.irq_tc = ret = platform_get_irq(pdev, 0);
+@@ -353,7 +357,9 @@ static int s3c2410ts_probe(struct platform_device *pdev)
+  err_iomap:
+ 	iounmap(ts.io);
+  err_clk:
++	clk_disable_unprepare(ts.clock);
+ 	del_timer_sync(&touch_timer);
++ err_clk_get:
+ 	clk_put(ts.clock);
+ 	return ret;
+ }
+-- 
+1.9.1
