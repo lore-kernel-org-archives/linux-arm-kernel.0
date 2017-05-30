@@ -1,21 +1,42 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 30 May 2017 16:48:00 -0500
-Subject: [PATCH 3/9] pinctrl: dt-bindings: add documentation for CP110
- pin controllers
-In-Reply-To: <4897e0c1ec5902688b17e96e56381089a31192c7.1495209664.git-series.gregory.clement@free-electrons.com>
-References: <cover.0dd8a92ae74fcec8d0470d0a7016035089e46eed.1495209664.git-series.gregory.clement@free-electrons.com>
- <4897e0c1ec5902688b17e96e56381089a31192c7.1495209664.git-series.gregory.clement@free-electrons.com>
-Message-ID: <20170530214800.5oxdccqfs3un4ekk@rob-hp-laptop>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 30 May 2017 23:50:44 +0200
+Subject: [PATCH 03/58] ARM: dts: at91: at91rm9200ek: use TCB0 as clocksource
+In-Reply-To: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
+References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20170530215139.9983-4-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 19, 2017 at 06:04:45PM +0200, Gregory CLEMENT wrote:
-> Document the device tree binding for the pin controllers found on the
-> Armada 7K and Armada 8K SoCs.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt | 101 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-----
->  1 file changed, 94 insertions(+), 7 deletions(-)
+Use tcb0 as the clocksource like previously selected in at91_dt_defconfig.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Tested-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/at91rm9200ek.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/arch/arm/boot/dts/at91rm9200ek.dts b/arch/arm/boot/dts/at91rm9200ek.dts
+index f90e1c2d3caa..a446e12cbaa8 100644
+--- a/arch/arm/boot/dts/at91rm9200ek.dts
++++ b/arch/arm/boot/dts/at91rm9200ek.dts
+@@ -32,6 +32,18 @@
+ 
+ 	ahb {
+ 		apb {
++			tcb0: timer at fffa0000 {
++				timer at 0 {
++					compatible = "atmel,tcb-timer";
++					reg = <0>, <1>;
++				};
++
++				timer at 2 {
++					compatible = "atmel,tcb-timer";
++					reg = <2>;
++				};
++			};
++
+ 			usb1: gadget at fffb0000 {
+ 				atmel,vbus-gpio = <&pioD 4 GPIO_ACTIVE_HIGH>;
+ 				atmel,pullup-gpio = <&pioD 5 GPIO_ACTIVE_HIGH>;
+-- 
+2.11.0
