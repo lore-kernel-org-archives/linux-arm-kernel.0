@@ -1,67 +1,35 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Tue, 30 May 2017 13:52:06 +0200
-Subject: [PATCH v2 00/12] ARM: sun5i: cryptographic engine support
-In-Reply-To: <20170529202738.2167-1-antoine.tenart@free-electrons.com>
-References: <20170529202738.2167-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170530115206.GB26229@Red>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Tue, 30 May 2017 14:04:03 +0200
+Subject: [PATCH 4/6] irqchip: irq-mvebu-icu: new driver for Marvell ICU
+In-Reply-To: <1496135772-20694-5-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1496135772-20694-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1496135772-20694-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20170530120403.GB25456@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 29, 2017 at 10:27:26PM +0200, Antoine Tenart wrote:
-> Hello,
-> 
-> This series adds the cryptographic engine support to sun5i SoCs. This is
-> based on top of v4.12-rc1 and was tested on a CHIP. The series begins
-> with fixes and improvements. The series is available at:
-> https://github.com/atenart/linux v4.12-rc1/sun5i-crypto
-> 
-> The 8 first patches are reworks and cosmetic improvements.
-> 
-> Patch 9 moves the cipher part of the sun4i-ss driver from the ablkcipher
-> API to the newer skcipher API.
-> 
-> Patch 10 adds the CRYPTO_ALG_KERN_DRIVER_ONLY flag for ciphers exposed
-> by the sun4i-ss driver.
-> 
-> Patch 11 fixes the crypto framework selftests on the CHIP. It might fix
-> other users too.
-> 
-> Patch 12 adds a cryptographic engine node for sun5i SoCs.
-> 
-> Thanks,
-> Antoine
-> 
-> Since v1:
->   - Fixed a typo.
->   - Made the CRYPTO_ALG_KERN_DRIVER_ONLY flag addition in a dedicated
->     patch.
-> 
-> Antoine Tenart (12):
->   crypto: sun4i-ss: group variable definitions in sun4i_hash()
->   crypto: sun4i-ss: remove conditional checks against 0
->   crypto: sun4i-ss: use lower/upper_32_bits helpers
->   crypto: sun4i-ss: cannot use DMA is the request is 0 length
->   crypto: sun4i-ss: do not dynamically set parts of the last buffer to 0
->   crypto: sun4i-ss: simplify the pad length calculation
->   crypto: sun4i-ss: simplify the appended bit assignment
->   crypto: sun4i-ss: use GENMASK to generate masks
->   crypto: sun4i-ss: move from ablkcipher to skcipher API
->   crypto: sun4i-ss: add the CRYPTO_ALG_KERN_DRIVER_ONLY flag
->   crypto: sun4i-ss: fix large block size support
->   ARM: sun5i: add a cryptographic engine node
-> 
->  arch/arm/boot/dts/sun5i.dtsi              |   8 +
->  drivers/crypto/sunxi-ss/sun4i-ss-cipher.c | 213 ++++++++++++++-------------
->  drivers/crypto/sunxi-ss/sun4i-ss-core.c   | 237 +++++++++++++++---------------
->  drivers/crypto/sunxi-ss/sun4i-ss-hash.c   | 138 ++++++++---------
->  drivers/crypto/sunxi-ss/sun4i-ss.h        |  34 +++--
->  5 files changed, 321 insertions(+), 309 deletions(-)
-> 
+Hi Thomas,
 
-Hello
+Very small comment,
 
-Thanks for the work
+On Tue, May 30, 2017 at 11:16:09AM +0200, Thomas Petazzoni wrote:
+> diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
+[...]
+> +#define ICU_INT_CFG(x)          (0x100 + 4 * x)
 
-For the whole serie:
-Tested-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-Acked-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+You should use (x) here, to be safe.
+
+Thanks!
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170530/e3e42e3c/attachment-0001.sig>
