@@ -1,78 +1,47 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Wed, 31 May 2017 01:08:00 +0300
-Subject: [PATCH 2/2] net: phy: micrel: Restore led_mode and clk_sel on
- resume
-In-Reply-To: <44ddeaeb-3e23-3d88-cc5c-9ed290507648@gmail.com>
-References: <cover.1496164448.git.leonard.crestez@nxp.com>
- <a8d0393c977b0d6fdab5d48ad13ca4d1ca893a07.1496164448.git.leonard.crestez@nxp.com>
- <44ddeaeb-3e23-3d88-cc5c-9ed290507648@gmail.com>
-Message-ID: <1496182080.19669.11.camel@nxp.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 30 May 2017 23:51:07 +0200
+Subject: [PATCH 26/58] ARM: dts: at91: at91sam9x5: TC blocks are also
+ simple-mfd and syscon devices
+In-Reply-To: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
+References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20170530215139.9983-27-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-05-30 at 11:05 -0700, Florian Fainelli wrote:
-> On 05/30/2017 10:34 AM, Leonard Crestez wrote:
-> > These bits seem to be lost after a suspend/resume cycle so just set them
-> > again.
-> > 
-> > This patch fixes ethernet suspend/resume on imx6ul-14x14-evk boards.
-> > 
-> > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-> > ---
-> >  drivers/net/phy/micrel.c | 15 +++++++++++++++
-> >  1 file changed, 15 insertions(+)
-> > 
-> > diff --git a/drivers/net/phy/micrel.c b/drivers/net/phy/micrel.c
-> > index 6a5fd18..c53ee17 100644
-> > --- a/drivers/net/phy/micrel.c
-> > +++ b/drivers/net/phy/micrel.c
-> > @@ -700,6 +700,9 @@ static int kszphy_suspend(struct phy_device *phydev)
-> >  
-> >  static int kszphy_resume(struct phy_device *phydev)
-> >  {
-> > +	struct kszphy_priv *priv = phydev->priv;
-> > +	int ret;
-> > +
-> >  	genphy_resume(phydev);
-> >  
-> >  	/* Enable PHY Interrupts */
-> > @@ -709,6 +712,18 @@ static int kszphy_resume(struct phy_device *phydev)
-> >  			phydev->drv->config_intr(phydev);
-> >  	}
-> >  
-> > +	if (priv->rmii_ref_clk_sel) {
-> > +		ret = kszphy_rmii_clk_sel(phydev, priv->rmii_ref_clk_sel_val);
-> > +		if (ret) {
-> > +			phydev_err(phydev,
-> > +				   "failed to set rmii reference clock\n");
-> > +			return ret;
-> > +		}
-> > +	}
-> > +
-> > +	if (priv->led_mode >= 0)
-> > +		kszphy_setup_led(phydev, priv->type->led_mode_reg, priv->led_mode);
-> 
-> Should not we actually call kszphy_config_init() in order to restore
-> broadcast and nand disable bits as well?
+Add simple-mfd and syscon to the TC blocks to allow to register one of the
+channels as clocksource properly at boot time. It also allows to use regmap
+instead of tclib.
 
-I don't know. In my case the B_CAST_OFF bit doesn't seem to be lost and
-NAND_TREE_ON is already off by the time it gets to linux.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/at91sam9x5.dtsi | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-The bit that get lost seem to disappear just as the phy is resumed. I
-added some prints and they look like this:
-
-PM: early resume of devices complete after 6.534 msecs
-begin resume
-0x1F=0x8190 0x16=0x202
-after genphy_resume 0x1F=0x8100 0x16=0x202
-end
-resume 0x1F=0x8190 0x16=0x202
-
-> If not, I would be more comfortable if we did create a specific function
-> that takes care of setting the reference clock and LED mode.
-
-Ok, I can add a function called kszphy_config_reset() with a comment
-explaining it's for bits lost on reset/resume.
-
-Or perhaps a better option would be to just save/restore the entire
-0x1F register?
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index f66bae925705..b27c716e9091 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -417,7 +417,9 @@
+ 			};
+ 
+ 			tcb0: timer at f8008000 {
+-				compatible = "atmel,at91sam9x5-tcb";
++				compatible = "atmel,at91sam9x5-tcb", "simple-mfd", "syscon";
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0xf8008000 0x100>;
+ 				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				clocks = <&tcb0_clk>, <&clk32k>;
+@@ -425,7 +427,9 @@
+ 			};
+ 
+ 			tcb1: timer at f800c000 {
+-				compatible = "atmel,at91sam9x5-tcb";
++				compatible = "atmel,at91sam9x5-tcb", "simple-mfd", "syscon";
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0xf800c000 0x100>;
+ 				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				clocks = <&tcb0_clk>, <&clk32k>;
+-- 
+2.11.0
