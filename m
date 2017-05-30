@@ -1,49 +1,32 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 30 May 2017 10:31:24 +0100
-Subject: [PATCH 08/15] mfd: exynos: use devm_of_platform_populate()
-In-Reply-To: <1496072763-31209-9-git-send-email-benjamin.gaignard@linaro.org>
-References: <1496072763-31209-1-git-send-email-benjamin.gaignard@linaro.org>
- <1496072763-31209-9-git-send-email-benjamin.gaignard@linaro.org>
-Message-ID: <20170530093124.7rpqudcqw4tfclsp@dell>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 30 May 2017 11:32:13 +0200
+Subject: [PATCH v6 1/6] iommu: of: Fix check for returning EPROBE_DEFER
+In-Reply-To: <1495892865-9506-1-git-send-email-sricharan@codeaurora.org>
+References: <1495892865-9506-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20170530093212.GD2818@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 29 May 2017, Benjamin Gaignard wrote:
-
-> Use devm_of_platform_populate() to be sure that of_platform_depopulate
-> is called when removing the driver.
+On Sat, May 27, 2017 at 07:17:40PM +0530, Sricharan R wrote:
+> Now with IOMMU probe deferral, we return -EPROBE_DEFER
+> for masters that are connected to an IOMMU which is not
+> probed yet, but going to get probed, so that we can attach
+> the correct dma_ops. So while trying to defer the probe of
+> the master, check if the of_iommu node that it is connected
+> to is marked in DT as 'status=disabled', then the IOMMU is never
+> is going to get probed. So simply return NULL and let the master
+> work without an IOMMU.
 > 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-> 
-> CC: Lee Jones <lee.jones@linaro.org>
-> CC: Kukjin Kim <kgene@kernel.org>
-> CC: Krzysztof Kozlowski <krzk@kernel.org>
-> CC: Javier Martinez Canillas <javier@osg.samsung.com>
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: linux-samsung-soc at vger.kernel.org
-> CC: linux-kernel at vger.kernel.org
+> Fixes: 7b07cbefb68d ("iommu: of: Handle IOMMU lookup failure with deferred probing or error")
+> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Tested-by: Will Deacon <will.deacon@arm.com>
+> Tested-by: Magnus Damn <magnus.damn@gmail.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 > ---
->  drivers/mfd/exynos-lpass.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/iommu/of_iommu.c | 1 +
+>  1 file changed, 1 insertion(+)
 
-Applied, thanks.
-
-> diff --git a/drivers/mfd/exynos-lpass.c b/drivers/mfd/exynos-lpass.c
-> index 0bf3aeb..ca829f8 100644
-> --- a/drivers/mfd/exynos-lpass.c
-> +++ b/drivers/mfd/exynos-lpass.c
-> @@ -138,7 +138,7 @@ static int exynos_lpass_probe(struct platform_device *pdev)
->  	pm_runtime_enable(dev);
->  	exynos_lpass_enable(lpass);
->  
-> -	return of_platform_populate(dev->of_node, NULL, NULL, dev);
-> +	return devm_of_platform_populate(dev);
->  }
->  
->  static int exynos_lpass_remove(struct platform_device *pdev)
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Sorry for the confusion, I meant to apply this version of the patch-set
+instead of v5.
