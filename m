@@ -1,226 +1,97 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Mon, 29 May 2017 14:50:34 -0700
-Subject: [PATCH v7 16/34] [media] add Omnivision OV5640 sensor driver
-In-Reply-To: <20170529155511.GI29527@valkosipuli.retiisi.org.uk>
-References: <1495672189-29164-1-git-send-email-steve_longerbeam@mentor.com>
- <1495672189-29164-17-git-send-email-steve_longerbeam@mentor.com>
- <20170529155511.GI29527@valkosipuli.retiisi.org.uk>
-Message-ID: <c50c3c5f-71cf-fa73-f5a8-a4b5f59a87dc@gmail.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Tue, 30 May 2017 09:16:32 +0800
+Subject: [PATCH v2 4/4] arm64: dts: mt7622: group clock DT nodes into
+ separate DT file
+In-Reply-To: <4a57ab2f-03b0-3c68-23cd-ed8253978ed7@gmail.com>
+References: <cover.1496061587.git.sean.wang@mediatek.com>
+ <f5fa4a4dd78bf92500a517b0582c745569aa8ff2.1496061587.git.sean.wang@mediatek.com>
+ <4a57ab2f-03b0-3c68-23cd-ed8253978ed7@gmail.com>
+Message-ID: <1496106992.3570.15.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sakari,
+On Mon, 2017-05-29 at 17:09 +0200, Matthias Brugger wrote:
+> 
+> On 29/05/17 14:56, sean.wang at mediatek.com wrote:
+> > From: Sean Wang <sean.wang@mediatek.com>
+> > 
+> > For more readability and maintenance, all the clock related DT
+> > nodes for mt7622 SoC are grouped into a separate DT file. And
+> > currently mt7622-clock.dtsi only includes the fixed clock for
+> > uart0 and the oscillator which would be extended after MT7622
+> > clock driver is introduced.
+> > 
+> 
+> We've not done this for any other Mediatek SoC at the moment.
+> Do you expect the m7622 to have more clock nodes then for example mt7623?
 
 
-On 05/29/2017 08:55 AM, Sakari Ailus wrote:
-> Hi Steve,
->
-> A few comments below.
->
-> On Wed, May 24, 2017 at 05:29:31PM -0700, Steve Longerbeam wrote:
->> This driver is based on ov5640_mipi.c from Freescale imx_3.10.17_1.0.0_beta
->> branch, modified heavily to bring forward to latest interfaces and code
->> cleanup.
->>
->> Signed-off-by: Steve Longerbeam<steve_longerbeam@mentor.com>
->> ---
->>   drivers/media/i2c/Kconfig  |    9 +
->>   drivers/media/i2c/Makefile |    1 +
->>   drivers/media/i2c/ov5640.c | 2224 ++++++++++++++++++++++++++++++++++++++++++++
->>   3 files changed, 2234 insertions(+)
->>   create mode 100644 drivers/media/i2c/ov5640.c
->>
->> diff --git a/drivers/media/i2c/Kconfig b/drivers/media/i2c/Kconfig
->> index fd181c9..ff082a7 100644
->> --- a/drivers/media/i2c/Kconfig
->> +++ b/drivers/media/i2c/Kconfig
->> @@ -539,6 +539,15 @@ config VIDEO_OV2659
->>   	  To compile this driver as a module, choose M here: the
->>   	  module will be called ov2659.
->>   
->> +config VIDEO_OV5640
->> +	tristate "OmniVision OV5640 sensor support"
->> +	depends on OF
->> +	depends on GPIOLIB && VIDEO_V4L2 && I2C && VIDEO_V4L2_SUBDEV_API
->> +	depends on MEDIA_CAMERA_SUPPORT
->> +	---help---
->> +	  This is a Video4Linux2 sensor-level driver for the Omnivision
->> +	  OV5640 camera sensor with a MIPI CSI-2 interface.
->> +
->>   config VIDEO_OV5645
->>   	tristate "OmniVision OV5645 sensor support"
->>   	depends on OF
->> diff --git a/drivers/media/i2c/Makefile b/drivers/media/i2c/Makefile
->> index 62323ec..dc6b0c4 100644
->> --- a/drivers/media/i2c/Makefile
->> +++ b/drivers/media/i2c/Makefile
->> @@ -58,6 +58,7 @@ obj-$(CONFIG_VIDEO_SONY_BTF_MPX) += sony-btf-mpx.o
->>   obj-$(CONFIG_VIDEO_UPD64031A) += upd64031a.o
->>   obj-$(CONFIG_VIDEO_UPD64083) += upd64083.o
->>   obj-$(CONFIG_VIDEO_OV2640) += ov2640.o
->> +obj-$(CONFIG_VIDEO_OV5640) += ov5640.o
->>   obj-$(CONFIG_VIDEO_OV5645) += ov5645.o
->>   obj-$(CONFIG_VIDEO_OV5647) += ov5647.o
->>   obj-$(CONFIG_VIDEO_OV7640) += ov7640.o
->> diff --git a/drivers/media/i2c/ov5640.c b/drivers/media/i2c/ov5640.c
->> new file mode 100644
->> index 0000000..2a032bc
->> --- /dev/null
->> +++ b/drivers/media/i2c/ov5640.c
->> @@ -0,0 +1,2224 @@
->> +/*
->> + * Copyright (C) 2011-2013 Freescale Semiconductor, Inc. All Rights Reserved.
->> + * Copyright (C) 2014-2017 Mentor Graphics Inc.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + */
->> +
->> +#include <linux/clk.h>
->> +#include <linux/clk-provider.h>
->> +#include <linux/clkdev.h>
->> +#include <linux/ctype.h>
->> +#include <linux/delay.h>
->> +#include <linux/device.h>
->> +#include <linux/i2c.h>
->> +#include <linux/init.h>
->> +#include <linux/module.h>
->> +#include <linux/of_device.h>
->> +#include <linux/slab.h>
->> +#include <linux/types.h>
->> +#include <linux/gpio/consumer.h>
->> +#include <linux/regulator/consumer.h>
->> +#include <media/v4l2-async.h>
->> +#include <media/v4l2-ctrls.h>
->> +#include <media/v4l2-device.h>
->> +#include <media/v4l2-of.h>
-> Could you rebase this on the V4L2 fwnode patchset here, please?
->
-> <URL:https://git.linuxtv.org/sailus/media_tree.git/log/?h=v4l2-acpi>
+clocks on mt7622 has fewer nodes than mt7623
 
-Once the fwnode patchset hits mediatree, then yes it can be
-converted along with all the others under media/i2c.
+> Apart from that this clock nodes are just dummy clocks which should 
+> disappear as soon as the clock driver got merged.
+> Last point, you break bisectability if add a clock node in a patch 
+> *after* the consumer was added.
+> 
+> So please add the clock nodes to the dtsi as we did up to now. If in the 
+> future we see that mt7622 has a whole bunch of clock nodes, we can still 
+> abstract them in an external dtsi file.
+> 
 
-> <snip>
->
->> +
->> +static int ov5640_write_reg16(struct ov5640_dev *sensor, u16 reg, u16 val)
->> +{
->> +	int ret;
->> +
->> +	ret = ov5640_write_reg(sensor, reg, val >> 8);
->> +	if (ret)
->> +		return ret;
->> +
->> +	return ov5640_write_reg(sensor, reg + 1, val & 0xff);
-> Does the sensor datasheet suggest doing this?
-
-Why would the datasheet suggest or not suggest such things?
-Coding details like this don't belong in the datasheet.
-
->   Making the write in two
-> transactions will make it non-atomic that could be an issue in some corner
-> cases.
-
-It's called everywhere under the same device mutex.
+Okay, I will merge back them into the main dtsi files for those reasons
+in the next version. 
 
 
-> <snip>
->> +
->> +static int ov5640_set_gain(struct ov5640_dev *sensor, int auto_gain)
->> +{
->> +	struct ov5640_ctrls *ctrls = &sensor->ctrls;
->> +
->> +	if (ctrls->auto_gain->is_new) {
->> +		ov5640_mod_reg(sensor, OV5640_REG_AEC_PK_MANUAL,
->> +			       BIT(1), ctrls->auto_gain->val ? 0 : BIT(1));
-> You're generally silently ignoring all I?C access errors. Is that
-> intentional?
+Appreciate all your reviewing and suggestions
 
-Yeah, this driver is much cleaned up from the original, but there are
-still some issues like this. The register access errors are really only
-being paid attention to during s_power() when loading the initial
-register set, which is enough at least to catch a non-existent chip
-or basic i2c bus or other hardware issues. But I should work on
-catching all access errors. This is something I did in an earlier rev
-but I used a questionable short-cut to make it easier to implement.
-I'll just have to catch every case one by one.
+	Sean
 
-
-> <snip>
->
->> +
->> +static int ov5640_s_ctrl(struct v4l2_ctrl *ctrl)
->> +{
->> +	struct v4l2_subdev *sd = ctrl_to_sd(ctrl);
->> +	struct ov5640_dev *sensor = to_ov5640_dev(sd);
->> +	int ret = 0;
->> +
->> +	mutex_lock(&sensor->lock);
-> Could you use the same lock for the controls as you use for the rest? Just
-> setting handler->lock after handler init does the trick.
-
-Can you please rephrase, I don't follow. "same lock for the controls as
-you use for the rest" - there's only one device lock owned by this driver
-and I am already using that same lock.
-
-
-> <snip>
->> +
->> +static int ov5640_s_stream(struct v4l2_subdev *sd, int enable)
->> +{
->> +	struct ov5640_dev *sensor = to_ov5640_dev(sd);
->> +	int ret = 0;
->> +
->> +	mutex_lock(&sensor->lock);
->> +
->> +#if defined(CONFIG_MEDIA_CONTROLLER)
->> +	if (sd->entity.stream_count > 1)
-> The entity stream_count isn't connected to the number of times s_stream(sd,
-> true) is called. Please remove the check.
-
-It's incremented by media_pipeline_start(), even if the entity is already
-a member of the given pipeline.
-
-I added this check because in imx-media, the ov5640 can be streaming
-concurrently to multiple video capture devices, and each capture device 
-calls
-media_pipeline_start() at stream on, which increments the entity stream 
-count.
-
-So if one capture device issues a stream off while others are still 
-streaming,
-ov5640 should remain at stream on. So the entity stream count is being
-used as a streaming usage counter. Is there a better way to do this? Should
-I use a private stream use counter instead?
-
-
-
-> <snip>
->
->> +
->> +free_ctrls:
->> +	v4l2_ctrl_handler_free(&sensor->ctrls.handler);
->> +entity_cleanup:
->> +	mutex_destroy(&sensor->lock);
->> +	media_entity_cleanup(&sensor->sd.entity);
->> +	regulator_bulk_disable(OV5640_NUM_SUPPLIES, sensor->supplies);
-> Should this still be here?
->
->> +	return ret;
->> +}
->> +
->> +static int ov5640_remove(struct i2c_client *client)
->> +{
->> +	struct v4l2_subdev *sd = i2c_get_clientdata(client);
->> +	struct ov5640_dev *sensor = to_ov5640_dev(sd);
->> +
->> +	regulator_bulk_disable(OV5640_NUM_SUPPLIES, sensor->supplies);
-> Ditto.
-
-I don't understand. regulator_bulk_disable() is still needed, am I missing
-something?
-
-Steve
+> Thanks,
+> Matthias
+> 
+> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> > ---
+> >   arch/arm64/boot/dts/mediatek/mt7622-clock.dtsi | 20 ++++++++++++++++++++
+> >   arch/arm64/boot/dts/mediatek/mt7622.dtsi       |  1 +
+> >   2 files changed, 21 insertions(+)
+> >   create mode 100644 arch/arm64/boot/dts/mediatek/mt7622-clock.dtsi
+> > 
+> > diff --git a/arch/arm64/boot/dts/mediatek/mt7622-clock.dtsi b/arch/arm64/boot/dts/mediatek/mt7622-clock.dtsi
+> > new file mode 100644
+> > index 0000000..264421d
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/mediatek/mt7622-clock.dtsi
+> > @@ -0,0 +1,20 @@
+> > +/*
+> > + * Copyright (c) 2017 MediaTek Inc.
+> > + * Author: Sean Wang <sean.wang@mediatek.com>
+> > + *
+> > + * SPDX-License-Identifier: (GPL-2.0 OR MIT)
+> > + */
+> > +/ {
+> > +	clk25m: oscillator at 0 {
+> > +		compatible = "fixed-clock";
+> > +		#clock-cells = <0>;
+> > +		clock-frequency = <25000000>;
+> > +		clock-output-names = "clkxtal";
+> > +	};
+> > +
+> > +	uart_clk: dummy26m {
+> > +		compatible = "fixed-clock";
+> > +		#clock-cells = <0>;
+> > +		clock-frequency = <25000000>;
+> > +	};
+> > +};
+> > diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> > index 3a729d9..3768c28 100644
+> > --- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> > +++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> > @@ -8,6 +8,7 @@
+> >   
+> >   #include <dt-bindings/interrupt-controller/irq.h>
+> >   #include <dt-bindings/interrupt-controller/arm-gic.h>
+> > +#include "mt7622-clock.dtsi"
+> >   
+> >   / {
+> >   	compatible = "mediatek,mt7622";
+> > 
