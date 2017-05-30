@@ -1,92 +1,214 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 30 May 2017 15:23:12 +0100
-Subject: [PATCH 2/4] drm/bridge: dw-hdmi: add cec notifier support
-In-Reply-To: <20170530142218.GS22219@n2100.armlinux.org.uk>
-References: <20170530142218.GS22219@n2100.armlinux.org.uk>
-Message-ID: <E1dFi3E-0004lh-Pu@rmk-PC.armlinux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 30 May 2017 15:24:41 +0100
+Subject: [PATCH 14/31] KVM: arm64: vgic-v3: Add ICV_EOIR1_EL1 handler
+In-Reply-To: <c3baec82-20c6-c948-9cb8-8247802cbff5@redhat.com>
+References: <20170503104606.19342-1-marc.zyngier@arm.com>
+ <20170503104606.19342-15-marc.zyngier@arm.com>
+ <c3baec82-20c6-c948-9cb8-8247802cbff5@redhat.com>
+Message-ID: <2eb7f08f-bb47-cd7b-e631-3d42c35336ee@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add CEC notifier support to the HDMI bridge driver, so that the CEC
-part of the IP can receive its physical address.
+On 30/05/17 08:48, Auger Eric wrote:
+> Hi Marc
+> 
+> On 03/05/2017 12:45, Marc Zyngier wrote:
+>> Add a handler for writing the guest's view of the ICC_EOIR1_EL1
+>> register. This involves dropping the priority of the interrupt,
+>> and deactivating it if required (EOImode == 0).
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  include/linux/irqchip/arm-gic-v3.h |   2 +
+>>  virt/kvm/arm/hyp/vgic-v3-sr.c      | 119 +++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 121 insertions(+)
+>>
+>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+>> index 7610ea4e8337..c56d9bc2c904 100644
+>> --- a/include/linux/irqchip/arm-gic-v3.h
+>> +++ b/include/linux/irqchip/arm-gic-v3.h
+>> @@ -403,6 +403,8 @@
+>>  
+>>  #define ICH_HCR_EN			(1 << 0)
+>>  #define ICH_HCR_UIE			(1 << 1)
+>> +#define ICH_HCR_EOIcount_SHIFT		27
+>> +#define ICH_HCR_EOIcount_MASK		(0x1f << ICH_HCR_EOIcount_SHIFT)
+>>  
+>>  #define ICH_VMCR_CBPR_SHIFT		4
+>>  #define ICH_VMCR_CBPR_MASK		(1 << ICH_VMCR_CBPR_SHIFT)
+>> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+>> index 49aad1de3ac8..a76351b3ad66 100644
+>> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
+>> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+>> @@ -425,6 +425,26 @@ static int __hyp_text __vgic_v3_highest_priority_lr(struct kvm_vcpu *vcpu,
+>>  	return lr;
+>>  }
+>>  
+>> +static int __hyp_text __vgic_v3_find_active_lr(struct kvm_vcpu *vcpu,
+>> +					       int intid, u64 *lr_val)
+>> +{
+>> +	unsigned int used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+>> +	int i;
+>> +
+>> +	for (i = 0; i < used_lrs; i++) {
+>> +		u64 val = __gic_v3_get_lr(i);
+>> +
+>> +		if ((val & ICH_LR_VIRTUAL_ID_MASK) == intid &&
+>> +		    (val & ICH_LR_ACTIVE_BIT)) {
+> I guess it is safe because we don't have yet virtual interrupts directly
+> mapped to phys IRQs, besides timer one?
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 22 +++++++++++++++++++++-
- 1 file changed, 21 insertions(+), 1 deletion(-)
+What would that change? I don't see how having a HW interrupt here would
+be unsafe... Am I missing something?
 
-diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-index 4e1f54a675d8..966422576c44 100644
---- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-+++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-@@ -36,7 +36,10 @@
- #include "dw-hdmi.h"
- #include "dw-hdmi-audio.h"
- 
-+#include <media/cec-notifier.h>
-+
- #define DDC_SEGMENT_ADDR	0x30
-+
- #define HDMI_EDID_LEN		512
- 
- enum hdmi_datamap {
-@@ -173,6 +176,8 @@ struct dw_hdmi {
- 
- 	unsigned int reg_shift;
- 	struct regmap *regm;
-+
-+	struct cec_notifier *cec_notifier;
- };
- 
- #define HDMI_IH_PHY_STAT0_RX_SENSE \
-@@ -1870,6 +1875,7 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
- 		hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
- 		hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
- 		drm_mode_connector_update_edid_property(connector, edid);
-+		cec_notifier_set_phys_addr_from_edid(hdmi->cec_notifier, edid);
- 		ret = drm_add_edid_modes(connector, edid);
- 		/* Store the ELD */
- 		drm_edid_to_eld(connector, edid);
-@@ -2108,11 +2114,16 @@ static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
- 	 * ask the source to re-read the EDID.
- 	 */
- 	if (intr_stat &
--	    (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_IH_PHY_STAT0_HPD))
-+	    (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_IH_PHY_STAT0_HPD)) {
- 		__dw_hdmi_setup_rx_sense(hdmi,
- 					 phy_stat & HDMI_PHY_HPD,
- 					 phy_stat & HDMI_PHY_RX_SENSE);
- 
-+		if ((phy_stat & (HDMI_PHY_RX_SENSE | HDMI_PHY_HPD)) == 0)
-+			cec_notifier_set_phys_addr(hdmi->cec_notifier,
-+						   CEC_PHYS_ADDR_INVALID);
-+	}
-+
- 	if (intr_stat & HDMI_IH_PHY_STAT0_HPD) {
- 		dev_dbg(hdmi->dev, "EVENT=%s\n",
- 			phy_int_pol & HDMI_PHY_HPD ? "plugin" : "plugout");
-@@ -2365,6 +2376,12 @@ __dw_hdmi_probe(struct platform_device *pdev,
- 	if (ret)
- 		goto err_iahb;
- 
-+	hdmi->cec_notifier = cec_notifier_get(dev);
-+	if (!hdmi->cec_notifier) {
-+		ret = -ENOMEM;
-+		goto err_iahb;
-+	}
-+
- 	/*
- 	 * To prevent overflows in HDMI_IH_FC_STAT2, set the clk regenerator
- 	 * N and cts values before enabling phy
-@@ -2437,6 +2454,9 @@ __dw_hdmi_probe(struct platform_device *pdev,
- 		hdmi->ddc = NULL;
- 	}
- 
-+	if (hdmi->cec_notifier)
-+		cec_notifier_put(hdmi->cec_notifier);
-+
- 	clk_disable_unprepare(hdmi->iahb_clk);
- err_isfr:
- 	clk_disable_unprepare(hdmi->isfr_clk);
+>> +			*lr_val = val;
+>> +			return i;
+>> +		}
+>> +	}
+>> +
+>> +	*lr_val = ICC_IAR1_EL1_SPURIOUS;
+>> +	return -1;
+>> +}
+>> +
+>>  static int __hyp_text __vgic_v3_get_highest_active_priority(void)
+>>  {
+>>  	u8 nr_pre_bits = vtr_to_nr_pre_bits(read_gicreg(ICH_VTR_EL2));
+>> @@ -490,6 +510,44 @@ static void __hyp_text __vgic_v3_set_active_priority(u8 pre)
+>>  	__vgic_v3_write_ap1rn(val | bit, apr);
+>>  }
+>>  
+>> +static int __hyp_text __vgic_v3_clear_highest_active_priority(void)
+>> +{
+>> +	u8 nr_pre_bits = vtr_to_nr_pre_bits(read_gicreg(ICH_VTR_EL2));
+>> +	u8 nr_aprs = 1 << (nr_pre_bits - 5);
+> may be worth to introduce a macro to compute the number of APRn regs.
+> This may be more understandable.
+
+Sure, will do.
+
+>> +	u32 hap = 0;
+>> +	int i;
+>> +
+>> +	for (i = 0; i < nr_aprs; i++) {
+>> +		u32 ap0, ap1;
+>> +		int c0, c1;
+>> +
+>> +		ap0 = __vgic_v3_read_ap0rn(i);
+>> +		ap1 = __vgic_v3_read_ap1rn(i);
+>> +		if (!ap0 && !ap1) {
+>> +			hap += 32;
+>> +			continue;
+>> +		}
+>> +
+>> +		c0 = ap0 ? __ffs(ap0) : 32;
+>> +		c1 = ap1 ? __ffs(ap1) : 32;
+>> +
+>> +		/* Always clear the LSB, which is the highest priority */
+>> +		if (c0 < c1) {
+>> +			ap0 &= ap0 - 1;
+>> +			__vgic_v3_write_ap0rn(ap0, i);
+>> +			hap += c0;
+>> +		} else {
+>> +			ap1 &= ap1 - 1;
+>> +			__vgic_v3_write_ap1rn(ap1, i);
+>> +			hap += c1;
+>> +		}
+>> +
+>> +		return hap << (8 - nr_pre_bits);
+>> +	}
+>> +
+>> +	return GICv3_IDLE_PRIORITY;
+>> +}
+>> +
+>>  static void __hyp_text __vgic_v3_read_iar(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
+>>  {
+>>  	u64 lr_val;
+>> @@ -526,6 +584,64 @@ static void __hyp_text __vgic_v3_read_iar(struct kvm_vcpu *vcpu, u32 vmcr, int r
+>>  	vcpu_set_reg(vcpu, rt, ICC_IAR1_EL1_SPURIOUS);
+>>  }
+>>  
+>> +static void __hyp_text __vgic_v3_clear_active_lr(int lr, u64 lr_val)
+>> +{
+>> +	lr_val &= ~ICH_LR_ACTIVE_BIT;
+>> +	if (lr_val & ICH_LR_HW) {
+>> +		u32 pid;
+> nit: insert a line
+
+OK.
+
+>> +		pid = (lr_val & ICH_LR_PHYS_ID_MASK) >> ICH_LR_PHYS_ID_SHIFT;
+>> +		gic_write_dir(pid);
+>> +	}
+>> +
+>> +	__gic_v3_set_lr(lr_val, lr);
+>> +}
+>> +
+>> +static void __hyp_text __vgic_v3_bump_eoicount(void)
+>> +{
+>> +	u32 hcr;
+>> +
+>> +	hcr = read_gicreg(ICH_HCR_EL2);
+>> +	hcr += 1 << ICH_HCR_EOIcount_SHIFT;
+>> +	write_gicreg(hcr, ICH_HCR_EL2);
+>> +}
+>> +
+>> +static void __hyp_text __vgic_v3_write_eoir(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
+>> +{
+>> +	u32 vid = vcpu_get_reg(vcpu, rt);
+>> +	u64 lr_val;
+>> +	u8 lr_prio, act_prio;
+>> +	int lr, grp;
+>> +
+>> +	grp = __vgic_v3_get_group(vcpu);
+>> +
+>> +	/* Drop priority in any case */
+>> +	act_prio = __vgic_v3_clear_highest_active_priority();
+>> +
+>> +	/* If EOIing an LPI, no deactivate to be performed */
+>> +	if (vid >= VGIC_MIN_LPI)
+>> +		return;
+>> +
+>> +	/* EOImode == 1, nothing to be done here */
+>> +	if (vmcr & ICH_VMCR_EOIM_MASK)
+>> +		return;
+>> +
+>> +	lr = __vgic_v3_find_active_lr(vcpu, vid, &lr_val);
+>> +	if (lr == -1) {
+>> +		__vgic_v3_bump_eoicount();
+>> +		return;
+>> +	}
+>> +
+>> +	lr_prio = (lr_val & ICH_LR_PRIORITY_MASK) >> ICH_LR_PRIORITY_SHIFT;
+>> +
+>> +	/* If priorities or group do not match, the guest has fscked-up. */
+>> +	if (grp != !!(lr_val & ICH_LR_GROUP) ||
+>> +	    __vgic_v3_pri_to_pre(lr_prio, vmcr, grp) != act_prio)
+>> +		return;
+>> +
+>> +	/* Let's now perform the deactivation */
+>> +	__vgic_v3_clear_active_lr(lr, lr_val);
+>> +}
+>> +
+>>  static void __hyp_text __vgic_v3_read_igrpen1(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
+>>  {
+>>  	vcpu_set_reg(vcpu, rt, !!(vmcr & ICH_VMCR_ENG1_MASK));
+>> @@ -591,6 +707,9 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
+>>  	case SYS_ICC_IAR1_EL1:
+>>  		fn = __vgic_v3_read_iar;
+>>  		break;
+>> +	case SYS_ICC_EOIR1_EL1:
+>> +		fn = __vgic_v3_write_eoir;
+>> +		break;
+>>  	case SYS_ICC_GRPEN1_EL1:
+>>  		if (is_read)
+>>  			fn = __vgic_v3_read_igrpen1;
+> 
+> Looks good to me
+> 
+> Reviewed-by: Eric Auger <eric.auger@redhat.com>
+
+Thanks!
+
+	M.
 -- 
-2.7.4
+Jazz is not dead. It just smells funny...
