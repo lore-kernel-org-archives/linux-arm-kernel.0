@@ -1,102 +1,53 @@
-From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Tue, 30 May 2017 17:14:18 +0200
-Subject: [PATCH 2/2] gpio: mvebu: fix gpio bank registration when pwm is
- used
-In-Reply-To: <CACQ1gAhy_S16YfxQ1eOJUX45rdnjrsPFckYJm_1OHGW0CThg0g@mail.gmail.com>
-References: <20170530122848.2803-1-richard.genoud@gmail.com>
- <20170530122848.2803-2-richard.genoud@gmail.com>
- <87y3tetrg4.fsf@free-electrons.com>
- <CACQ1gAhy_S16YfxQ1eOJUX45rdnjrsPFckYJm_1OHGW0CThg0g@mail.gmail.com>
-Message-ID: <20170530171418.42713515@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 30 May 2017 16:14:37 +0100
+Subject: Device address specific mapping of arm,mmu-500
+In-Reply-To: <1b79efe2-6835-7a7a-f5ad-361391a7b967@broadcom.com>
+References: <1b79efe2-6835-7a7a-f5ad-361391a7b967@broadcom.com>
+Message-ID: <20170530151437.GC23067@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard
-
-On Tue, 30 May 2017 16:45:24 +0200
-Richard Genoud <richard.genoud@gmail.com> wrote:
-
-> 2017-05-30 15:16 GMT+02:00 Gregory CLEMENT
-> <gregory.clement@free-electrons.com>:
-> > Hi Richard,  
-> Hi Greg !
+On Mon, May 29, 2017 at 06:18:45PM -0700, Ray Jui wrote:
+> I'm writing to check with you to see if the latest arm-smmu.c driver in
+> v4.12-rc Linux for smmu-500 can support mapping that is only specific to
+> a particular physical address range while leave the rest still to be
+> handled by the client device. I believe this can already be supported by
+> the device tree binding of the generic IOMMU framework; however, it is
+> not clear to me whether or not the arm-smmu.c driver can support it.
 > 
-> >
-> >  On mar., mai 30 2017, Richard Genoud <richard.genoud@gmail.com>
-> > wrote: 
-> >> If more than one gpio bank has the "pwm" property, only one will be
-> >> registered successfully, all the others will fail with:
-> >> mvebu-gpio: probe of f1018140.gpio failed with error -17
-> >>
-> >> That's because in alloc_pwms(), the chip->base (aka "int pwm"),
-> >> was not set (thus, ==0) ; and 0 is a meaningful start value in
-> >> alloc_pwm(). What was intended is chip->base = -1.
-> >> Like that, the numbering will be done auto-magically
-> >>
-> >> Tested on clearfog-pro (Marvell 88F6828)
-> >>
-> >> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-> >> ---
-> >>  drivers/gpio/gpio-mvebu.c | 1 +
-> >>  1 file changed, 1 insertion(+)
-> >>
-> >> diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
-> >> index cdef2c78cb3b..4734923e11fd 100644
-> >> --- a/drivers/gpio/gpio-mvebu.c
-> >> +++ b/drivers/gpio/gpio-mvebu.c
-> >> @@ -768,6 +768,7 @@ static int mvebu_pwm_probe(struct
-> >> platform_device *pdev, mvpwm->chip.dev = dev;
-> >>       mvpwm->chip.ops = &mvebu_pwm_ops;
-> >>       mvpwm->chip.npwm = mvchip->chip.ngpio;
-> >> +     mvpwm->chip.base = -1;  
-> >
-> > Why not using
-> > mvpwm->chip.base = id * MVEBU_MAX_GPIO_PER_BANK;
-> > as it is done in the mvebu_gpio_probe() function?  
-> Yes, that was my first move:
-> mvpwm->chip.base = mvchip->chip.base;
+> To give you some background information:
 > 
-> But after some reflexion, mvpwm->chip.base is not the GPIO base, it's
-> the PWM base,
-> (mvpwm->chip is a struct pwm_chip), so it would we weird to have
-> "holes" in the declared PWMs.
-> I'm not clear, so here's an example:
-> If, in the DTS, we have:
->             gpio0: gpio at 18100 {
->                 compatible = "marvell,armada-370-xp-gpio",
->                          "marvell,orion-gpio";
->                 reg = <0x18100 0x40>, <0x181c0 0x08>;
->                 reg-names = "gpio";  /* "pwm" missing */
-> [...]
->             gpio1: gpio at 18140 {
->                 compatible = "marvell,armada-370-xp-gpio",
->                          "marvell,orion-gpio";
->                 reg = <0x18140 0x40>, <0x181c8 0x08>;
->                 reg-names = "gpio", "pwm";
-> In this case, if gpio0 is not declared as PWM capable, the PWM
-> numbering will start at 32 if we have
-> mvpwm->chip.base = mvchip->chip.base;
-> but it will start at 0 if we have mvpwm->chip.base = -1;
-> 
-> The pros for having mvpwm->chip.base = mvchip->chip.base; is mainly
-> the stable numbering:
-> if we add the "pwm" feature to gpio0 afterwards, the pwm numbering in
-> sysfs will stay the same.
-> And if we have mvpwm->chip.base = -1; the pwm numbering will be
-> shifted.
-> 
-> Looking back at the V5 of this patch
-> https://www.spinics.net/lists/kernel/msg2484889.html
-> There was the line:
-> mvpwm->chip.base = mvchip->chip.base;
-> I guess it got lost in the v6 rebase.
-> 
-> So I could change it back, but I'm not sure which one is better.
+> We have a SoC that has PCIe root complex that has a build-in logic block
+> to forward MSI writes to ARM GICv3 ITS. Unfortunately, this logic block
+> has a HW bug that causes the MSI writes not parsed properly and can
+> potentially corrupt data in the internal FIFO. A workaround is to have
+> ARM MMU-500 takes care of all inbound transactions. I found that is
+> working after hooking up our PCIe root complex to MMU-500; however, even
+> with this optimized arm-smmu driver in v4.12, I'm still seeing a
+> significant Ethernet throughput drop in both the TX and RX directions.
+> The throughput drop is very significant at around 50% (but is already
+> much improved compared to other prior kernel versions at 70~90%).
 
-Thierry Redding pointed out that the region might already be occupied
-by another PWM chip, unlikely but not impossible. That's why it got
-changed for v6.
+Did Robin's experiments help at all with this?
 
-See https://www.spinics.net/lists/devicetree/msg173138.html
+http://www.linux-arm.org/git?p=linux-rm.git;a=shortlog;h=refs/heads/iommu/perf
 
-Ralph
+> One alternative is to only use MMU-500 for MSI writes towards
+> GITS_TRANSLATER register in the GICv3, i.e., if I can define a specific
+> region of physical address that I want MMU-500 to act on and leave the
+> rest of inbound transactions to be handled directly by our PCIe
+> controller, it can potentially work around the HW bug we have and at the
+> same time achieve optimal throughput.
+
+I don't think you can bypass the SMMU for MSIs unless you give them their
+own StreamIDs, which is likely to break things horribly in the kernel. You
+could try to create an identity mapping, but you'll still have the
+translation overhead and you'd probably end up having to supply your own DMA
+ops to manage the address space. I'm assuming that you need to prevent the
+physical address of the ITS from being allocated as an IOVA?
+
+> Any feedback from you is greatly appreciated!
+
+Fix the hardware ;)
+
+Will
