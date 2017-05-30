@@ -1,29 +1,61 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 30 May 2017 17:47:44 +0300
-Subject: [PATCHv3b 0/5] ARM: OMAP2+: preparation for clk/clkctrl support
-Message-ID: <1496155669-1677-1-git-send-email-t-kristo@ti.com>
+Date: Tue, 30 May 2017 17:47:48 +0300
+Subject: [PATCHv3b 4/5] ARM: OMAP4: cminst: add support for clkdm_xlate_address
+In-Reply-To: <1496155669-1677-1-git-send-email-t-kristo@ti.com>
+References: <1496155669-1677-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1496155669-1677-5-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This function gets the physical base address of a clockdomain.
 
-This is an alternative solution against v3 [1] of this series.
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ arch/arm/mach-omap2/cminst44xx.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-[1]?https://www.spinics.net/lists/arm-kernel/msg581965.html
-
-This series is different in that it parses the hwmod data in the fly
-and swaps the main_clk info with clkctrl implementations if those
-are present. Patch #1 / #2 are old from v3 of the series, rest are
-new. Patches #3 / #4 add some infrastructure support for parsing
-the clock data, and patch #5 does the clock swapping.
-
-With this series, it is not necessary to populate clkctrl clock
-entries to DT at all, thus the transition should be smoother.
-
-Integrated test branch for omap4 pushed here (contains 3 extra DT
-patches on top.)
-
-Tree: https://github.com/t-kristo/linux-pm.git
-Branch: 4.12-rc1-clkctrl-integ-v3b
-
--Tero
+diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
+index 2ab27ad..3df268e 100644
+--- a/arch/arm/mach-omap2/cminst44xx.c
++++ b/arch/arm/mach-omap2/cminst44xx.c
+@@ -31,6 +31,7 @@
+ #include "prm44xx.h"
+ #include "prcm_mpu44xx.h"
+ #include "prcm-common.h"
++#include "iomap.h"
+ 
+ #define OMAP4430_IDLEST_SHIFT		16
+ #define OMAP4430_IDLEST_MASK		(0x3 << 16)
+@@ -475,6 +476,14 @@ static int omap4_clkdm_clk_disable(struct clockdomain *clkdm)
+ 	return 0;
+ }
+ 
++static u32 omap4_clkdm_xlate_address(struct clockdomain *clkdm)
++{
++	u32 addr = (u32)_cm_bases[clkdm->prcm_partition] - OMAP2_L4_IO_OFFSET +
++		clkdm->cm_inst + clkdm->clkdm_offs;
++
++	return addr;
++}
++
+ struct clkdm_ops omap4_clkdm_operations = {
+ 	.clkdm_add_wkdep	= omap4_clkdm_add_wkup_sleep_dep,
+ 	.clkdm_del_wkdep	= omap4_clkdm_del_wkup_sleep_dep,
+@@ -490,6 +499,7 @@ struct clkdm_ops omap4_clkdm_operations = {
+ 	.clkdm_deny_idle	= omap4_clkdm_deny_idle,
+ 	.clkdm_clk_enable	= omap4_clkdm_clk_enable,
+ 	.clkdm_clk_disable	= omap4_clkdm_clk_disable,
++	.clkdm_xlate_address	= omap4_clkdm_xlate_address,
+ };
+ 
+ struct clkdm_ops am43xx_clkdm_operations = {
+@@ -499,6 +509,7 @@ struct clkdm_ops am43xx_clkdm_operations = {
+ 	.clkdm_deny_idle	= omap4_clkdm_deny_idle,
+ 	.clkdm_clk_enable	= omap4_clkdm_clk_enable,
+ 	.clkdm_clk_disable	= omap4_clkdm_clk_disable,
++	.clkdm_xlate_address	= omap4_clkdm_xlate_address,
+ };
+ 
+ static struct cm_ll_data omap4xxx_cm_ll_data = {
+-- 
+1.9.1
