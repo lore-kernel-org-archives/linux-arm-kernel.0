@@ -1,58 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 30 May 2017 16:17:41 +0100
-Subject: [PATCH 3/6] irqchip: irq-mvebu-gicp: new driver for Marvell GICP
-In-Reply-To: <20170530165454.6ca24dbc@free-electrons.com>
-References: <1496135772-20694-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1496135772-20694-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <2ea42715-700b-c363-eeba-db83b0f63a70@arm.com>
- <20170530165454.6ca24dbc@free-electrons.com>
-Message-ID: <5b882159-4de1-5a8e-5737-56542f2aee3a@arm.com>
+From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
+Date: Tue, 30 May 2017 17:18:53 +0200
+Subject: [PATCH 1/2] gpio: mvebu: fix blink counter register selection
+In-Reply-To: <20170530122848.2803-1-richard.genoud@gmail.com>
+References: <20170530122848.2803-1-richard.genoud@gmail.com>
+Message-ID: <20170530171853.64630ce6@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/05/17 15:54, Thomas Petazzoni wrote:
-> Hello,
-> 
-> On Tue, 30 May 2017 14:55:57 +0100, Marc Zyngier wrote:
-> 
->>> +	for (i = 0; i < GICP_INT_COUNT; i++)
->>> +		writel(i, regs + GICP_CLRSPI_NSR_OFFSET);  
->>
->> What does this do on an edge interrupt?
-> 
-> I guess nothing. What the ICU does is:
-> 
->  * For level interrupts: when the interrupt wire is asserted, write to
->    SETNSR, when the interrupt wire is deasserted, write to CLRNSR
-> 
->  * For edge interrupts: only the interrupt assertion causes a write to
->    SETNSR.
-> 
->> I bet this doesn't have any effect
-> 
-> Indeed. But do we care? Can an edge interrupt be left pending from the
-> firmware?
+Hi Richard
 
-I cannot see why not. It is just as likely as a level interrupt.
+On Tue, 30 May 2017 14:28:47 +0200
+Richard Genoud <richard.genoud@gmail.com> wrote:
+
+> The blink counter A was always selected because 0 was forced in the
+> blink select counter register.
+> The variable 'set' was obviously there to be used as the register
+> value, selecting the B counter when id==1 and A counter when id==0.
+> 
+> Tested on clearfog-pro (Marvell 88F6828)
+
+As stated in the other thread, testing on clearfog-pro is likely bogus,
+still the fix is correct.
+
+Reviewed-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
+
+Thanks
+Ralph
 
 > 
->> , so you may want to use the irq_set_irqchip_state() API to clear a
->> potential pending state instead (and you may want to wire it in the
->> ICU driver itself as well).
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> ---
+>  drivers/gpio/gpio-mvebu.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> I'm not sure how to use this irq_set_irqchip_state() API. I guess it
-> needs a virq that corresponds to the GIC SPI interrupt, and I'm not
-> sure how to get that.
-
-You do have the virtual interrupt when doing the allocation (it is
-passed as a parameter). So you could perform the mapping (call into the
-lower layers), and clear the pending bit using the above API.
-
-But maybe you don't have any edge interrupt on this SoC, and it doesn't
-matter.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
+> index 19a92efabbef..cdef2c78cb3b 100644
+> --- a/drivers/gpio/gpio-mvebu.c
+> +++ b/drivers/gpio/gpio-mvebu.c
+> @@ -747,7 +747,7 @@ static int mvebu_pwm_probe(struct platform_device
+> *pdev, set = U32_MAX;
+>  	else
+>  		return -EINVAL;
+> -	writel_relaxed(0,
+> mvebu_gpioreg_blink_counter_select(mvchip));
+> +	writel_relaxed(set,
+> mvebu_gpioreg_blink_counter_select(mvchip)); 
+>  	mvpwm = devm_kzalloc(dev, sizeof(struct mvebu_pwm),
+> GFP_KERNEL); if (!mvpwm)
