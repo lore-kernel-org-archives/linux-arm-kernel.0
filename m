@@ -1,82 +1,101 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 30 May 2017 10:06:52 +0100
-Subject: [PATCH v6 3/6] ACPI/IORT: Ignore all errors except EPROBE_DEFER
-In-Reply-To: <68bc9be5-22df-e7af-3fcd-182e935e681c@codeaurora.org>
-References: <1495892865-9506-1-git-send-email-sricharan@codeaurora.org>
- <1495892865-9506-3-git-send-email-sricharan@codeaurora.org>
- <1564836.5iBbgoacpH@aspire.rjw.lan>
- <68bc9be5-22df-e7af-3fcd-182e935e681c@codeaurora.org>
-Message-ID: <20170530090652.GA1767@red-moon>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 30 May 2017 11:07:59 +0200
+Subject: [PATCH 17/31] KVM: arm64: vgic-v3: Enable trapping of Group-1
+ system registers
+In-Reply-To: <20170503104606.19342-18-marc.zyngier@arm.com>
+References: <20170503104606.19342-1-marc.zyngier@arm.com>
+ <20170503104606.19342-18-marc.zyngier@arm.com>
+Message-ID: <bf094e11-1555-a1bf-5655-9093867adb90@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 29, 2017 at 10:36:42AM +0530, Sricharan R wrote:
-> Hi Rafael,
-> 
-> On 5/28/2017 12:48 AM, Rafael J. Wysocki wrote:
-> > On Saturday, May 27, 2017 07:17:42 PM Sricharan R wrote:
-> >> While deferring the probe of IOMMU masters, xlate and
-> >> add_device callbacks called from iort_iommu_configure
-> >> can pass back error values like -ENODEV, which means
-> >> the IOMMU cannot be connected with that master for real
-> >> reasons. Before the IOMMU probe deferral, all such errors
-> >> were ignored. Now all those errors are propagated back,
-> >> killing the master's probe for such errors. Instead ignore
-> >> all the errors except EPROBE_DEFER, which is the only one
-> >> of concern and let the master work without IOMMU, thus
-> >> restoring the old behavior. Also make explicit that
-> >> acpi_dma_configure handles only -EPROBE_DEFER from
-> >> iort_iommu_configure.
-> >>
-> >> Fixes: 5a1bb638d567 ("drivers: acpi: Handle IOMMU lookup failure with deferred probing or error")
-> >> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> >> ---
-> >>  drivers/acpi/arm64/iort.c | 6 ++++++
-> >>  drivers/acpi/scan.c       | 4 ++--
-> >>  2 files changed, 8 insertions(+), 2 deletions(-)
-> >>
-> >> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> >> index c5fecf9..16e101f 100644
-> >> --- a/drivers/acpi/arm64/iort.c
-> >> +++ b/drivers/acpi/arm64/iort.c
-> >> @@ -782,6 +782,12 @@ const struct iommu_ops *iort_iommu_configure(struct device *dev)
-> >>  	if (err)
-> >>  		ops = ERR_PTR(err);
-> >>  
-> >> +	/* Ignore all other errors apart from EPROBE_DEFER */
-> >> +	if (IS_ERR(ops) && (PTR_ERR(ops) != -EPROBE_DEFER)) {
-> >> +		dev_dbg(dev, "Adding to IOMMU failed: %ld\n", PTR_ERR(ops));
-> >> +		ops = NULL;
-> >> +	}
-> >> +
-> >>  	return ops;
-> >>  }
-> >>  
-> >> diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-> >> index e39ec7b..3a10d757 100644
-> >> --- a/drivers/acpi/scan.c
-> >> +++ b/drivers/acpi/scan.c
-> >> @@ -1371,8 +1371,8 @@ int acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
-> >>  	iort_set_dma_mask(dev);
-> >>  
-> >>  	iommu = iort_iommu_configure(dev);
-> >> -	if (IS_ERR(iommu))
-> >> -		return PTR_ERR(iommu);
-> >> +	if (IS_ERR(iommu) && PTR_ERR(iommu) == -EPROBE_DEFER)
-> >> +		return -EPROBE_DEFER;
-> >>  
-> >>  	size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
-> >>  	/*
-> >>
-> > 
-> > ACK for the scan.c change and I'm assuming this to go in via ARM64.
-> > 
-> 
-> Thanks for the ACK, should go through the IOMMU tree, since this fixes the IOMMU probe deferral
-> that got merged through it.
+Hi Marc,
 
-Yes and it would be good to get them merged for -rc4 given that there
-are bug fixes there, I agree the IOMMU tree is the way they should
-go upstream.
+On 03/05/2017 12:45, Marc Zyngier wrote:
+> In order to be able to trap Group-1 GICv3 system registers, we need to
+> set ICH_HCR_EL2.TALL1 begore entering the guest. This is conditionnaly
+before, conditionally
+> done after having restored the guest's state, and cleared on exit.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  include/linux/irqchip/arm-gic-v3.h | 1 +
+>  virt/kvm/arm/hyp/vgic-v3-sr.c      | 7 +++++++
+>  virt/kvm/arm/vgic/vgic-v3.c        | 4 ++++
+>  3 files changed, 12 insertions(+)
+> 
+> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> index c56d9bc2c904..a1739843343e 100644
+> --- a/include/linux/irqchip/arm-gic-v3.h
+> +++ b/include/linux/irqchip/arm-gic-v3.h
+> @@ -403,6 +403,7 @@
+>  
+>  #define ICH_HCR_EN			(1 << 0)
+>  #define ICH_HCR_UIE			(1 << 1)
+> +#define ICH_HCR_TALL1			(1 << 12)
+>  #define ICH_HCR_EOIcount_SHIFT		27
+>  #define ICH_HCR_EOIcount_MASK		(0x1f << ICH_HCR_EOIcount_SHIFT)
+>  
+> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> index a521e105ade1..a27671b1e9af 100644
+> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
+> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> @@ -257,6 +257,9 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+>  			cpu_if->vgic_ap1r[0] = __vgic_v3_read_ap1rn(0);
+>  		}
+>  	} else {
+> +		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
+> +			write_gicreg(0, ICH_HCR_EL2);
+Not directly related to this patch but this is not obvious to me why we
+reset the ICH_HCR_EL2 only when used_lrs != 0.
+> +
+>  		cpu_if->vgic_elrsr = 0xffff;
+>  		cpu_if->vgic_ap0r[0] = 0;
+>  		cpu_if->vgic_ap0r[1] = 0;
+> @@ -329,6 +332,10 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+>  
+>  		for (i = 0; i < used_lrs; i++)
+>  			__gic_v3_set_lr(cpu_if->vgic_lr[i], i);
+> +	} else {
+> +		/* Always write ICH_HCR_EL2 to enable trapping */
+"always" is a bit weird as this is conditional
+> +		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
+> +			write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
+and same question here. Why don't we always restore the ICH_HCR_EL2.
+Assuming when exiting the guest the vCPU I/F was enabled and used_lrs=0,
+when restoring don't we leave the vCPU I/F disabled? I must miss
+something but I don't find who is re-enabling the vCPU I/F in that case?
+>  	}
+>  
+>  	/*
+> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+> index 063526443781..547b8374fb64 100644
+> --- a/virt/kvm/arm/vgic/vgic-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+> @@ -21,6 +21,8 @@
+>  
+>  #include "vgic.h"
+>  
+> +static bool group1_trap;
+> +
+>  void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
+>  {
+>  	struct vgic_v3_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v3;
+> @@ -239,6 +241,8 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
+>  
+>  	/* Get the show on the road... */
+>  	vgic_v3->vgic_hcr = ICH_HCR_EN;
+> +	if (group1_trap)
+I don't remember the rationale behind using the bool here and using
+static_branch_unlikely in the other cases.
 
-Lorenzo
+May be good to squash the next patch to understand how group1_trap is set.
+
+Thanks
+
+Eric
+> +		vgic_v3->vgic_hcr |= ICH_HCR_TALL1;
+>  }
+>  
+>  /* check for overlapping regions and for regions crossing the end of memory */
+> 
