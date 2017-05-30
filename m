@@ -1,98 +1,70 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Tue, 30 May 2017 15:59:46 +0100
-Subject: [PATCH v4 8/8] arm,arm64,drivers: add a prefix to drivers
- arch_topology interfaces
-In-Reply-To: <b5071e53-f9fa-cffe-e13d-731549382d56@arm.com>
-References: <20170420144316.15632-1-juri.lelli@arm.com>
- <20170420144316.15632-9-juri.lelli@arm.com>
- <20170525131802.GE16244@kroah.com>
- <20170526101032.2t2xn5wrfenimu5w@e106622-lin>
- <20170526183610.GB16490@kroah.com>
- <bcc2f8f1-e953-9f32-2aa2-e660b0351e0a@arm.com>
- <20170529095818.GA9892@kroah.com>
- <b5071e53-f9fa-cffe-e13d-731549382d56@arm.com>
-Message-ID: <20170530145946.v3n44cx56flhbi5l@e106622-lin>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 30 May 2017 16:08:01 +0100
+Subject: [PATCH 4/6] irqchip: irq-mvebu-icu: new driver for Marvell ICU
+In-Reply-To: <20170530144934.GB22758@lunn.ch>
+References: <1496135772-20694-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1496135772-20694-5-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20170530121907.GO22219@n2100.armlinux.org.uk>
+ <20170530143350.6f8563c1@free-electrons.com>
+ <20170530125643.GQ22219@n2100.armlinux.org.uk>
+ <20170530132735.GA21646@lunn.ch>
+ <20170530143902.GU22219@n2100.armlinux.org.uk>
+ <20170530144934.GB22758@lunn.ch>
+Message-ID: <20170530150801.GV22219@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/05/17 12:46, Dietmar Eggemann wrote:
-> On 05/29/2017 11:58 AM, Greg KH wrote:
-> > On Mon, May 29, 2017 at 11:20:24AM +0200, Dietmar Eggemann wrote:
-> > > Hi Greg,
-> > > 
-> > > On 05/26/2017 08:36 PM, Greg KH wrote:
-> > > > On Fri, May 26, 2017 at 11:10:32AM +0100, Juri Lelli wrote:
-> > > > > Hi,
-> > > > > 
-> > > > > On 25/05/17 15:18, Greg KH wrote:
-> > > > > > On Thu, Apr 20, 2017 at 03:43:16PM +0100, Juri Lelli wrote:
-> > > 
-> > > [...]
-> > > 
-> > > > > > But this is all really topology stuff, right?  Why use "capacity" at
-> > > > > > all:
-> > > > > > 	topology_normalize_cpu()
-> > > > > > 	topology_parse_cpu()
-> > > > > > 	topology_scale_cpu()
-> > > > > > 	topology_set_scale()
-> > > > > > ?
-> > > > > > 
-> > > > > > It's always best to put the "subsystem" name first, we have a bad
-> > > > > > history of getting this wrong in the past by putting the verb first, not
-> > > > > > the noun.
-> > > > > > 
-> > > > > 
-
-[...]
-
-> > > > 
-> > > > Oh, and drop "capacity" please :)
-> > > 
-
-[...]
-
+On Tue, May 30, 2017 at 04:49:34PM +0200, Andrew Lunn wrote:
+> On Tue, May 30, 2017 at 03:39:02PM +0100, Russell King - ARM Linux wrote:
+> > On Tue, May 30, 2017 at 03:27:35PM +0200, Andrew Lunn wrote:
+> > > What might help is that you ask for help getting them merged. I know
+> > > of at least 4 groups of people interested in your devlink and 10G PHY
+> > > code. If you handed those patches over to these people, i'm sure we
+> > > could find somebody to post them to the list, deal with the feedback,
+> > > etc, to get them merged. It just needs you to say it is O.K. for
+> > > somebody to take patches from your git tree.
 > > 
-> > I think that if you are creating an api that the scheduler will use, you
-> > need to ask the scheduler maintainers/developers what they want to see
-> > here, as that would be up to them, not me...
+> > Is that not what I'm trying to do with these A8k changes?  What I'm
+> > instead getting is "your tree is private, we're not touching it".
+> > 
+> > Okay, so let me put it another way: please help me merge the A8k
+> > changes that I have in my tree.
 > 
-> The scheduler API exists already. It is arch_scale_cpu_capacity() and
-> arch_scale_freq_capacity() in kernel/sched/sched.h. An arch is able to
-> overwrite these two functions by defining them (since commit 8cd5601c5060
-> and dfbca41f3479):
+> Hi Russell
 > 
-> #define arch_scale_cpu_capacity 'arch implementation of capacity scaling by
-> micro-architectural + max frequency (OPPmax)'
-> 
-> #define arch_scale_freq_capacity 'arch implementation of capacity scaling by
-> 'frequency ((OPPmin..OPPmax)'
-> 
-> There is no naming convention from the scheduler side on these functions
-> though. They should just express what they're doing, scaling capacity by
-> something.
-> 
+> So you are happy for Free-Electrons, or anybody else, to take patches
+> from your tree, submit them, handle comments, resubmit them, etc?
 
-So, discussing this naming with Morten off-line we seemed actually to
-agree that the following might adhere even better to what the functions
-actually do:
+I am happy for the A8k changes, provided there's coordination, so we
+reasonably avoid to duplicate effort, but I think we're already at
+the point where most of my effort has already been duplicated.
 
- topology_parse_cpu_capacity() - it parses the raw capacity-dmips-mhz
- values from DT; so it seems OK to leave capacity in the name here
+If someone wants to take (eg) my ICU patches and fit what's appropriate
+on top of Thomas', then I'd welcome that effort.
 
- topology_set_cpu_scale() - it sets the per_cpu cpu_scale variable; so
- this name seems saner that the one with "_capacity"
+Obviously, the PP2x changes in my tree are no-hopers for mainline as
+the decision has been made to improve the existing PP2 driver, and
+I think the gpio/pinctrl changes are now no-hopers as that work has
+already been done independently.
 
- topology_get_cpu_scale() - dual of the previous one
+I'm not sure there's much other stuff left out of the 63 patches that
+comprise my "mvebu" branch as far as core A8k changes go.
 
- topology_normalize_cpu_scale() - it normalizes cpu_scale variables
- across the system CPUs (and calls topology_set_cpu_scale() to set the
- normalized values)
+For the mcbin changes (that come after the mvebu/phy merge), I think
+everything up to and including "arm64: dts: marvell: mcbin: add GPIO"
+is probably mainline-candidates (except for the PP2 driver obviously),
+the sdhci DTS patch has already been picked up.
 
-Greg, does this approack look saner to you as well?
-If yes, I'll send a new version of the set shortly.
+"arm64: dts: marvell: mcbin: workaround wrongly wired i2c1 bus" is
+definitely not for mainline, as that is only for early revision
+boards, and SR does not want that merged into mainline (as stated
+in its commit log.)
 
-And, as I already said on IRC, apologies for this naming fight. :)
+"arm64: dts: marvell: mcbin: add remainder of pinctrls" and
+"usb: host: xhci: mvebu: add reset on resume quirk" might also be
+candidates, I'm not sure without looking further.
 
-Thanks,
-
-- Juri
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
