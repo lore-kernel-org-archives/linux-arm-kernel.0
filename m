@@ -1,27 +1,20 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 30 May 2017 14:53:57 -0700
-Subject: [PATCH v2 0/2] arm64: meson-gxbb: NanoPi K2 enablement
-In-Reply-To: <20170521185105.23448-1-afaerber@suse.de> ("Andreas
- =?utf-8?Q?F=C3=A4rber=22's?=
- message of "Sun, 21 May 2017 20:51:03 +0200")
-References: <20170521185105.23448-1-afaerber@suse.de>
-Message-ID: <m2k24yt3ii.fsf@baylibre.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 30 May 2017 18:13:20 -0500
+Subject: [PATCH 1/4] dt-bindings: mtk-sysirq: Correct bindings for
+ supported SoCs
+In-Reply-To: <20170522094021.7837-1-matthias.bgg@gmail.com>
+References: <20170522094021.7837-1-matthias.bgg@gmail.com>
+Message-ID: <20170530231320.yi4s5ib3jpyo7xwk@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andreas F?rber <afaerber@suse.de> writes:
+On Mon, May 22, 2017 at 11:40:18AM +0200, Matthias Brugger wrote:
+> All SoCs supported up to now rely on the fallback binding of mt6577.
+> Fix the binding description to reflect this.
+> 
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> ---
+>  .../interrupt-controller/mediatek,sysirq.txt       | 24 +++++++++++-----------
+>  1 file changed, 12 insertions(+), 12 deletions(-)
 
-> Hello,
->
-> This mini-series adds initial support for the Amlogic S905 based
-> FriendlyARM NanoPi K2 SBC.
->
-> Tested with mainline U-Boot.
->
-> v2 adds USB and Wifi among others.
-
-Applied.  (branch: v4.13/dt64)
-
-Thanks,
-
-Kevin
+Acked-by: Rob Herring <robh@kernel.org>
