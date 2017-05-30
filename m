@@ -1,41 +1,22 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 30 May 2017 11:56:21 +0200
-Subject: [PATCH 31/31] KVM: arm64: vgic-v3: Log which GICv3 system
- registers are trapped
-In-Reply-To: <20170503104606.19342-32-marc.zyngier@arm.com>
-References: <20170503104606.19342-1-marc.zyngier@arm.com>
- <20170503104606.19342-32-marc.zyngier@arm.com>
-Message-ID: <956dee52-6197-eb5a-7756-b6e10bd6ff32@redhat.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 30 May 2017 12:01:53 +0200
+Subject: [PATCH 2/7] dt-bindings: PCI: Describe ATS property for root
+ complex nodes
+In-Reply-To: <20170524180143.19855-3-jean-philippe.brucker@arm.com>
+References: <20170524180143.19855-1-jean-philippe.brucker@arm.com>
+ <20170524180143.19855-3-jean-philippe.brucker@arm.com>
+Message-ID: <20170530100153.GI2818@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On 03/05/2017 12:46, Marc Zyngier wrote:
-> In order to facilitate debug, let's log which class of GICv3 system
-> registers are trapped.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
+On Wed, May 24, 2017 at 07:01:38PM +0100, Jean-Philippe Brucker wrote:
+> +- ats-supported: if present, the root complex supports the Address
+> +  Translation Service (ATS). It is able to interpret the AT field in PCIe
+> +  Transaction Layer Packets, and forward Translation Completions or
+> +  Invalidation Requests to endpoints.
+> +
+> +  Device drivers should not enable ATS in endpoints unless this property
+> +  is present.
 
-Eric
-> ---
->  virt/kvm/arm/vgic/vgic-v3.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> index 717219ab58a2..9110657b502c 100644
-> --- a/virt/kvm/arm/vgic/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> @@ -407,7 +407,10 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
->  #endif
->  
->  	if (group0_trap || group1_trap || common_trap) {
-> -		kvm_info("GICv3 sysreg trapping enabled (reduced performance)\n");
-> +		kvm_info("GICv3 sysreg trapping enabled ([%s%s%s], reduced performance)\n",
-> +			 group0_trap ? "G0" : "",
-> +			 group1_trap ? "G1" : "",
-> +			 common_trap ? "C"  : "");
->  		static_branch_enable(&vgic_v3_cpuif_trap);
->  	}
->  
-> 
+Device drivers should never enable ATS, this is the job of the IOMMU
+driver. This should be clarified in the text.
