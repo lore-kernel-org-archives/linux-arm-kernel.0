@@ -1,53 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 30 May 2017 16:14:37 +0100
-Subject: Device address specific mapping of arm,mmu-500
-In-Reply-To: <1b79efe2-6835-7a7a-f5ad-361391a7b967@broadcom.com>
-References: <1b79efe2-6835-7a7a-f5ad-361391a7b967@broadcom.com>
-Message-ID: <20170530151437.GC23067@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 30 May 2017 16:17:41 +0100
+Subject: [PATCH 3/6] irqchip: irq-mvebu-gicp: new driver for Marvell GICP
+In-Reply-To: <20170530165454.6ca24dbc@free-electrons.com>
+References: <1496135772-20694-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1496135772-20694-4-git-send-email-thomas.petazzoni@free-electrons.com>
+ <2ea42715-700b-c363-eeba-db83b0f63a70@arm.com>
+ <20170530165454.6ca24dbc@free-electrons.com>
+Message-ID: <5b882159-4de1-5a8e-5737-56542f2aee3a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 29, 2017 at 06:18:45PM -0700, Ray Jui wrote:
-> I'm writing to check with you to see if the latest arm-smmu.c driver in
-> v4.12-rc Linux for smmu-500 can support mapping that is only specific to
-> a particular physical address range while leave the rest still to be
-> handled by the client device. I believe this can already be supported by
-> the device tree binding of the generic IOMMU framework; however, it is
-> not clear to me whether or not the arm-smmu.c driver can support it.
+On 30/05/17 15:54, Thomas Petazzoni wrote:
+> Hello,
 > 
-> To give you some background information:
+> On Tue, 30 May 2017 14:55:57 +0100, Marc Zyngier wrote:
 > 
-> We have a SoC that has PCIe root complex that has a build-in logic block
-> to forward MSI writes to ARM GICv3 ITS. Unfortunately, this logic block
-> has a HW bug that causes the MSI writes not parsed properly and can
-> potentially corrupt data in the internal FIFO. A workaround is to have
-> ARM MMU-500 takes care of all inbound transactions. I found that is
-> working after hooking up our PCIe root complex to MMU-500; however, even
-> with this optimized arm-smmu driver in v4.12, I'm still seeing a
-> significant Ethernet throughput drop in both the TX and RX directions.
-> The throughput drop is very significant at around 50% (but is already
-> much improved compared to other prior kernel versions at 70~90%).
+>>> +	for (i = 0; i < GICP_INT_COUNT; i++)
+>>> +		writel(i, regs + GICP_CLRSPI_NSR_OFFSET);  
+>>
+>> What does this do on an edge interrupt?
+> 
+> I guess nothing. What the ICU does is:
+> 
+>  * For level interrupts: when the interrupt wire is asserted, write to
+>    SETNSR, when the interrupt wire is deasserted, write to CLRNSR
+> 
+>  * For edge interrupts: only the interrupt assertion causes a write to
+>    SETNSR.
+> 
+>> I bet this doesn't have any effect
+> 
+> Indeed. But do we care? Can an edge interrupt be left pending from the
+> firmware?
 
-Did Robin's experiments help at all with this?
+I cannot see why not. It is just as likely as a level interrupt.
 
-http://www.linux-arm.org/git?p=linux-rm.git;a=shortlog;h=refs/heads/iommu/perf
+> 
+>> , so you may want to use the irq_set_irqchip_state() API to clear a
+>> potential pending state instead (and you may want to wire it in the
+>> ICU driver itself as well).
+> 
+> I'm not sure how to use this irq_set_irqchip_state() API. I guess it
+> needs a virq that corresponds to the GIC SPI interrupt, and I'm not
+> sure how to get that.
 
-> One alternative is to only use MMU-500 for MSI writes towards
-> GITS_TRANSLATER register in the GICv3, i.e., if I can define a specific
-> region of physical address that I want MMU-500 to act on and leave the
-> rest of inbound transactions to be handled directly by our PCIe
-> controller, it can potentially work around the HW bug we have and at the
-> same time achieve optimal throughput.
+You do have the virtual interrupt when doing the allocation (it is
+passed as a parameter). So you could perform the mapping (call into the
+lower layers), and clear the pending bit using the above API.
 
-I don't think you can bypass the SMMU for MSIs unless you give them their
-own StreamIDs, which is likely to break things horribly in the kernel. You
-could try to create an identity mapping, but you'll still have the
-translation overhead and you'd probably end up having to supply your own DMA
-ops to manage the address space. I'm assuming that you need to prevent the
-physical address of the ITS from being allocated as an IOVA?
+But maybe you don't have any edge interrupt on this SoC, and it doesn't
+matter.
 
-> Any feedback from you is greatly appreciated!
+Thanks,
 
-Fix the hardware ;)
-
-Will
+	M.
+-- 
+Jazz is not dead. It just smells funny...
