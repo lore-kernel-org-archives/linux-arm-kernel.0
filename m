@@ -1,61 +1,52 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 30 May 2017 11:05:19 -0700
-Subject: [PATCH 2/2] net: phy: micrel: Restore led_mode and clk_sel on
- resume
-In-Reply-To: <a8d0393c977b0d6fdab5d48ad13ca4d1ca893a07.1496164448.git.leonard.crestez@nxp.com>
+Date: Tue, 30 May 2017 11:10:19 -0700
+Subject: [PATCH 1/2] ARM: dts: imx6ul-14x14-evk: Add ksz8081 phy properties
+In-Reply-To: <d31aab90fbdecaf4c5f240becb2d0b0efb23f5c3.1496164448.git.leonard.crestez@nxp.com>
 References: <cover.1496164448.git.leonard.crestez@nxp.com>
- <a8d0393c977b0d6fdab5d48ad13ca4d1ca893a07.1496164448.git.leonard.crestez@nxp.com>
-Message-ID: <44ddeaeb-3e23-3d88-cc5c-9ed290507648@gmail.com>
+ <d31aab90fbdecaf4c5f240becb2d0b0efb23f5c3.1496164448.git.leonard.crestez@nxp.com>
+Message-ID: <46bde649-c9ce-5a87-d4c4-1c1ebc5a8923@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 05/30/2017 10:34 AM, Leonard Crestez wrote:
-> These bits seem to be lost after a suspend/resume cycle so just set them
-> again.
+> Right now mach-imx6ul registers a fixup for the ksz8081 phy. The same
+> register values can be set through the micrel phy driver by using dts
+> properties.
 > 
-> This patch fixes ethernet suspend/resume on imx6ul-14x14-evk boards.
+> This seems preferable and allows cleanly fixing suspend/resume.
 > 
 > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+
+Should you have a Fixes: tag for that? Sounds like something you'd want
+to backport to stable trees as well, no?
+
 > ---
->  drivers/net/phy/micrel.c | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
+>  arch/arm/boot/dts/imx6ul-14x14-evk.dts | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> diff --git a/drivers/net/phy/micrel.c b/drivers/net/phy/micrel.c
-> index 6a5fd18..c53ee17 100644
-> --- a/drivers/net/phy/micrel.c
-> +++ b/drivers/net/phy/micrel.c
-> @@ -700,6 +700,9 @@ static int kszphy_suspend(struct phy_device *phydev)
+> diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dts b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+> index f18e1f1..d2be8aa 100644
+> --- a/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+> +++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+> @@ -120,10 +120,16 @@
 >  
->  static int kszphy_resume(struct phy_device *phydev)
->  {
-> +	struct kszphy_priv *priv = phydev->priv;
-> +	int ret;
-> +
->  	genphy_resume(phydev);
+>  		ethphy0: ethernet-phy at 2 {
+>  			reg = <2>;
+> +			micrel,led-mode = <1>;
+> +			clocks = <&clks IMX6UL_CLK_ENET_REF>;
+> +			clock-names = "rmii-ref";
+>  		};
 >  
->  	/* Enable PHY Interrupts */
-> @@ -709,6 +712,18 @@ static int kszphy_resume(struct phy_device *phydev)
->  			phydev->drv->config_intr(phydev);
->  	}
->  
-> +	if (priv->rmii_ref_clk_sel) {
-> +		ret = kszphy_rmii_clk_sel(phydev, priv->rmii_ref_clk_sel_val);
-> +		if (ret) {
-> +			phydev_err(phydev,
-> +				   "failed to set rmii reference clock\n");
-> +			return ret;
-> +		}
-> +	}
-> +
-> +	if (priv->led_mode >= 0)
-> +		kszphy_setup_led(phydev, priv->type->led_mode_reg, priv->led_mode);
+>  		ethphy1: ethernet-phy at 1 {
+>  			reg = <1>;
+> +			micrel,led-mode = <1>;
+> +			clocks = <&clks IMX6UL_CLK_ENET2_REF>;
+> +			clock-names = "rmii-ref";
+>  		};
+>  	};
+>  };
+> 
 
-Should not we actually call kszphy_config_init() in order to restore
-broadcast and nand disable bits as well?
 
-If not, I would be more comfortable if we did create a specific function
-that takes care of setting the reference clock and LED mode.
-
-Other than that, LGTM!
 -- 
 Florian
