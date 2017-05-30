@@ -1,61 +1,92 @@
-From: Claudiu.Beznea@microchip.com (m18063)
-Date: Tue, 30 May 2017 13:20:26 +0300
-Subject: [PATCH v2 1/2] drivers: pwm: core: implement pwm dead-times
-In-Reply-To: <CAHp75Ve=v=50UmpOyi1guY3NVuk41U0Ma+_P__5NK7_dNr6gZg@mail.gmail.com>
-References: <1494317990-9131-1-git-send-email-claudiu.beznea@microchip.com>
- <1494317990-9131-2-git-send-email-claudiu.beznea@microchip.com>
- <CAHp75Ve=v=50UmpOyi1guY3NVuk41U0Ma+_P__5NK7_dNr6gZg@mail.gmail.com>
-Message-ID: <009fe3a4-1a89-90d4-0610-5162bfcfc056@microchip.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 30 May 2017 12:27:30 +0200
+Subject: [PATCH 28/31] KVM: arm64: vgic-v3: Add ICV_CTLR_EL1 handler
+In-Reply-To: <20170503104606.19342-29-marc.zyngier@arm.com>
+References: <20170503104606.19342-1-marc.zyngier@arm.com>
+ <20170503104606.19342-29-marc.zyngier@arm.com>
+Message-ID: <d08e9041-4033-d70a-495b-0773ec5d0687@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+Hi,
 
-On 28.05.2017 01:28, Andy Shevchenko wrote:
-> On Tue, May 9, 2017 at 11:19 AM, Claudiu Beznea
-> <claudiu.beznea@microchip.com> wrote:
->> Extends PWM framework to support PWM dead-times.
->> The notions introduced are rising edge dead-time
->> and falling edge dead-time. These are useful for
->> PWM controllers with channels that have more than
->> one outputs.
->> The implementation add sysfs interface for
->> configuration. It extends the pwm_state structure
->> with two new members which keeps the values for
->> dead-times.
->> There were no additions in device tree for PWM channels
->> initialized by device tree.
+On 03/05/2017 12:46, Marc Zyngier wrote:
+> Add a handler for reading/writing the guest's view of the ICV_CTLR_EL1
+> register. only EOIMode and CBPR are of interest here, as all the other
+> bits directly come from ICH_VTR_EL2 and are Read-Only.
 > 
-> AFAIU it's effectively called phase of the signal.
-It is actually a delay introduce by the PWM controller
-between it's outputs. As I said in cover letter, for
-PWM controllers with 2 output signals per channel
-(these signals are on different physical pins), this
-dead-time is the delay introduced b/w these two outputs.
-The term is a PWM literature specific.
-These delays are useful when PWM drives a half bridge
-converter where you need delays b/w positive edges of
-the signals which drivers the transistors to avoid
-shoot through scenarios.
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 
-> It looks to me much simpler if you allow to have linked / virtual
-> channels instead of creating a lot of (duplicated) properties.My linked channels (the 2 outputs per PWM channel) are PWM controller
-specifics. The standard output of these linked channels is as
-follows:
-              __    __    __    __
-channel Xa __|  |__|  |__|  |__|  |__
-           __    __    __    __    __
-channel Xb   |__|  |__|  |__|  |__|
-             <--T-->
+Thanks
 
-This is the default output. To be able to use the controller
-in applications which needs delays b/w the fronts of this outputs
-I introduced the dead-time configuration. This allow the user
-to set it's PWM output as he needs in his setup (these dead-times,
-delays, if PWM is used e.g. in half bridge converters, depends
-on the transistors used).
-
-Thank you,
-Claudiu Beznea
-
+Eric
+> ---
+>  virt/kvm/arm/hyp/vgic-v3-sr.c | 46 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 46 insertions(+)
+> 
+> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> index 3a5f54f445b9..981201bf7a5e 100644
+> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
+> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> @@ -855,6 +855,46 @@ static void __hyp_text __vgic_v3_read_rpr(struct kvm_vcpu *vcpu,
+>  	vcpu_set_reg(vcpu, rt, val);
+>  }
+>  
+> +static void __hyp_text __vgic_v3_read_ctlr(struct kvm_vcpu *vcpu,
+> +					   u32 vmcr, int rt)
+> +{
+> +	u32 vtr, val;
+> +
+> +	vtr = read_gicreg(ICH_VTR_EL2);
+> +	/* PRIbits */
+> +	val = ((vtr >> 29) & 7) << ICC_CTLR_EL1_PRI_BITS_SHIFT;
+> +	/* IDbits */
+> +	val |= ((vtr >> 23) & 7) << ICC_CTLR_EL1_ID_BITS_SHIFT;
+> +	/* SEIS */
+> +	val |= ((vtr >> 22) & 1) << ICC_CTLR_EL1_SEIS_SHIFT;
+> +	/* A3V */
+> +	val |= ((vtr >> 21) & 1) << ICC_CTLR_EL1_A3V_SHIFT;
+> +	/* EOImode */
+> +	val |= ((vmcr & ICH_VMCR_EOIM_MASK) >> ICH_VMCR_EOIM_SHIFT) << ICC_CTLR_EL1_EOImode_SHIFT;
+> +	/* CBPR */
+> +	val |= (vmcr & ICH_VMCR_CBPR_MASK) >> ICH_VMCR_CBPR_SHIFT;
+> +
+> +	vcpu_set_reg(vcpu, rt, val);
+> +}
+> +
+> +static void __hyp_text __vgic_v3_write_ctlr(struct kvm_vcpu *vcpu,
+> +					    u32 vmcr, int rt)
+> +{
+> +	u32 val = vcpu_get_reg(vcpu, rt);
+> +
+> +	if (val & ICC_CTLR_EL1_CBPR_MASK)
+> +		vmcr |= ICH_VMCR_CBPR_MASK;
+> +	else
+> +		vmcr &= ~ICH_VMCR_CBPR_MASK;
+> +
+> +	if (val & ICC_CTLR_EL1_EOImode_MASK)
+> +		vmcr |= ICH_VMCR_EOIM_MASK;
+> +	else
+> +		vmcr &= ~ICH_VMCR_EOIM_MASK;
+> +
+> +	write_gicreg(vmcr, ICH_VMCR_EL2);
+> +}
+> +
+>  int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
+>  {
+>  	int rt = kvm_vcpu_sys_get_rt(vcpu);
+> @@ -945,6 +985,12 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
+>  	case SYS_ICC_RPR_EL1:
+>  		fn = __vgic_v3_read_rpr;
+>  		break;
+> +	case SYS_ICC_CTLR_EL1:
+> +		if (is_read)
+> +			fn = __vgic_v3_read_ctlr;
+> +		else
+> +			fn = __vgic_v3_write_ctlr;
+> +		break;
+>  	default:
+>  		return 0;
+>  	}
 > 
