@@ -1,255 +1,134 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 30 May 2017 23:51:26 +0200
-Subject: [PATCH 45/58] ARM: at91: add TCB registers definitions
+Date: Tue, 30 May 2017 23:51:28 +0200
+Subject: [PATCH 47/58] clocksource/drivers: timer-atmel-tcbclksrc: add
+ clockevent device
 In-Reply-To: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
 References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170530215139.9983-46-alexandre.belloni@free-electrons.com>
+Message-ID: <20170530215139.9983-48-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add registers and bits definitions for the timer counter blocks found on
-Atmel ARM SoCs.
+It is possible to compare and get interrupts on the channel that is used
+for the clocksource. Enable that to have a solution using only one TCB
+channel.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- include/soc/at91/atmel_tcb.h | 229 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 229 insertions(+)
- create mode 100644 include/soc/at91/atmel_tcb.h
+ drivers/clocksource/timer-atmel-tcbclksrc.c | 81 +++++++++++++++++++++++++++++
+ 1 file changed, 81 insertions(+)
 
-diff --git a/include/soc/at91/atmel_tcb.h b/include/soc/at91/atmel_tcb.h
-new file mode 100644
-index 000000000000..f48e60f8ab92
---- /dev/null
-+++ b/include/soc/at91/atmel_tcb.h
-@@ -0,0 +1,229 @@
-+/*
-+ * Copyright (C) 2016 Atmel
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#ifndef __SOC_ATMEL_TCB_H
-+#define __SOC_ATMEL_TCB_H
-+
-+/* Channel registers */
-+#define ATMEL_TC_COFFS(c)		((c) * 0x40)
-+#define ATMEL_TC_CCR(c)			ATMEL_TC_COFFS(c)
-+#define ATMEL_TC_CMR(c)			(ATMEL_TC_COFFS(c) + 0x4)
-+#define ATMEL_TC_SMMR(c)		(ATMEL_TC_COFFS(c) + 0x8)
-+#define ATMEL_TC_RAB(c)			(ATMEL_TC_COFFS(c) + 0xc)
-+#define ATMEL_TC_CV(c)			(ATMEL_TC_COFFS(c) + 0x10)
-+#define ATMEL_TC_RA(c)			(ATMEL_TC_COFFS(c) + 0x14)
-+#define ATMEL_TC_RB(c)			(ATMEL_TC_COFFS(c) + 0x18)
-+#define ATMEL_TC_RC(c)			(ATMEL_TC_COFFS(c) + 0x1c)
-+#define ATMEL_TC_SR(c)			(ATMEL_TC_COFFS(c) + 0x20)
-+#define ATMEL_TC_IER(c)			(ATMEL_TC_COFFS(c) + 0x24)
-+#define ATMEL_TC_IDR(c)			(ATMEL_TC_COFFS(c) + 0x28)
-+#define ATMEL_TC_IMR(c)			(ATMEL_TC_COFFS(c) + 0x2c)
-+#define ATMEL_TC_EMR(c)			(ATMEL_TC_COFFS(c) + 0x30)
-+
-+/* Block registers */
-+#define ATMEL_TC_BCR			0xc0
-+#define ATMEL_TC_BMR			0xc4
-+#define ATMEL_TC_QIER			0xc8
-+#define ATMEL_TC_QIDR			0xcc
-+#define ATMEL_TC_QIMR			0xd0
-+#define ATMEL_TC_QISR			0xd4
-+#define ATMEL_TC_FMR			0xd8
-+#define ATMEL_TC_WPMR			0xe4
-+
-+/* CCR fields */
-+#define ATMEL_TC_CCR_CLKEN		BIT(0)
-+#define ATMEL_TC_CCR_CLKDIS		BIT(1)
-+#define ATMEL_TC_CCR_SWTRG		BIT(2)
-+
-+/* Common CMR fields */
-+#define ATMEL_TC_CMR_TCLKS_MSK		GENMASK(2, 0)
-+#define ATMEL_TC_CMR_TCLK(x)		(x)
-+#define ATMEL_TC_CMR_XC(x)		((x) + 5)
-+#define ATMEL_TC_CMR_CLKI		BIT(3)
-+#define ATMEL_TC_CMR_BURST_MSK		GENMASK(5, 4)
-+#define ATMEL_TC_CMR_BURST_XC(x)	(((x) + 1) << 4)
-+#define ATMEL_TC_CMR_WAVE		BIT(15)
-+
-+/* Capture mode CMR fields */
-+#define ATMEL_TC_CMR_LDBSTOP		BIT(6)
-+#define ATMEL_TC_CMR_LDBDIS		BIT(7)
-+#define ATMEL_TC_CMR_ETRGEDG_MSK	GENMASK(9, 8)
-+#define ATMEL_TC_CMR_ETRGEDG_NONE	(0 << 8)
-+#define ATMEL_TC_CMR_ETRGEDG_RISING	(1 << 8)
-+#define ATMEL_TC_CMR_ETRGEDG_FALLING	(2 << 8)
-+#define ATMEL_TC_CMR_ETRGEDG_BOTH	(3 << 8)
-+#define ATMEL_TC_CMR_ABETRG		BIT(10)
-+#define ATMEL_TC_CMR_CPCTRG		BIT(14)
-+#define ATMEL_TC_CMR_LDRA_MSK		GENMASK(17, 16)
-+#define ATMEL_TC_CMR_LDRA_NONE		(0 << 16)
-+#define ATMEL_TC_CMR_LDRA_RISING	(1 << 16)
-+#define ATMEL_TC_CMR_LDRA_FALLING	(2 << 16)
-+#define ATMEL_TC_CMR_LDRA_BOTH		(3 << 16)
-+#define ATMEL_TC_CMR_LDRB_MSK		GENMASK(19, 18)
-+#define ATMEL_TC_CMR_LDRB_NONE		(0 << 18)
-+#define ATMEL_TC_CMR_LDRB_RISING	(1 << 18)
-+#define ATMEL_TC_CMR_LDRB_FALLING	(2 << 18)
-+#define ATMEL_TC_CMR_LDRB_BOTH		(3 << 18)
-+#define ATMEL_TC_CMR_SBSMPLR_MSK	GENMASK(22, 20)
-+#define ATMEL_TC_CMR_SBSMPLR(x)		((x) << 20)
-+
-+/* Waveform mode CMR fields */
-+#define ATMEL_TC_CMR_CPCSTOP		BIT(6)
-+#define ATMEL_TC_CMR_CPCDIS		BIT(7)
-+#define ATMEL_TC_CMR_EEVTEDG_MSK	GENMASK(9, 8)
-+#define ATMEL_TC_CMR_EEVTEDG_NONE	(0 << 8)
-+#define ATMEL_TC_CMR_EEVTEDG_RISING	(1 << 8)
-+#define ATMEL_TC_CMR_EEVTEDG_FALLING	(2 << 8)
-+#define ATMEL_TC_CMR_EEVTEDG_BOTH	(3 << 8)
-+#define ATMEL_TC_CMR_EEVT_MSK		GENMASK(11, 10)
-+#define ATMEL_TC_CMR_EEVT_XC(x)		(((x) + 1) << 10)
-+#define ATMEL_TC_CMR_ENETRG		BIT(12)
-+#define ATMEL_TC_CMR_WAVESEL_MSK	GENMASK(14, 13)
-+#define ATMEL_TC_CMR_WAVESEL_UP		(0 << 13)
-+#define ATMEL_TC_CMR_WAVESEL_UPDOWN	(1 << 13)
-+#define ATMEL_TC_CMR_WAVESEL_UPRC	(2 << 13)
-+#define ATMEL_TC_CMR_WAVESEL_UPDOWNRC	(3 << 13)
-+#define ATMEL_TC_CMR_ACPA_MSK		GENMASK(17, 16)
-+#define ATMEL_TC_CMR_ACPA(a)		(ATMEL_TC_CMR_ACTION_##a << 16)
-+#define ATMEL_TC_CMR_ACPC_MSK		GENMASK(19, 18)
-+#define ATMEL_TC_CMR_ACPC(a)		(ATMEL_TC_CMR_ACTION_##a << 18)
-+#define ATMEL_TC_CMR_AEEVT_MSK		GENMASK(21, 20)
-+#define ATMEL_TC_CMR_AEEVT(a)		(ATMEL_TC_CMR_ACTION_##a << 20)
-+#define ATMEL_TC_CMR_ASWTRG_MSK		GENMASK(23, 22)
-+#define ATMEL_TC_CMR_ASWTRG(a)		(ATMEL_TC_CMR_ACTION_##a << 22)
-+#define ATMEL_TC_CMR_BCPB_MSK		GENMASK(25, 24)
-+#define ATMEL_TC_CMR_BCPB(a)		(ATMEL_TC_CMR_ACTION_##a << 24)
-+#define ATMEL_TC_CMR_BCPC_MSK		GENMASK(27, 26)
-+#define ATMEL_TC_CMR_BCPC(a)		(ATMEL_TC_CMR_ACTION_##a << 26)
-+#define ATMEL_TC_CMR_BEEVT_MSK		GENMASK(29, 28)
-+#define ATMEL_TC_CMR_BEEVT(a)		(ATMEL_TC_CMR_ACTION_##a << 28)
-+#define ATMEL_TC_CMR_BSWTRG_MSK		GENMASK(31, 30)
-+#define ATMEL_TC_CMR_BSWTRG(a)		(ATMEL_TC_CMR_ACTION_##a << 30)
-+#define ATMEL_TC_CMR_ACTION_NONE	0
-+#define ATMEL_TC_CMR_ACTION_SET		1
-+#define ATMEL_TC_CMR_ACTION_CLEAR	2
-+#define ATMEL_TC_CMR_ACTION_TOGGLE	3
-+
-+/* SMMR fields */
-+#define ATMEL_TC_SMMR_GCEN		BIT(0)
-+#define ATMEL_TC_SMMR_DOWN		BIT(1)
-+
-+/* SR/IER/IDR/IMR fields */
-+#define ATMEL_TC_COVFS			BIT(0)
-+#define ATMEL_TC_LOVRS			BIT(1)
-+#define ATMEL_TC_CPAS			BIT(2)
-+#define ATMEL_TC_CPBS			BIT(3)
-+#define ATMEL_TC_CPCS			BIT(4)
-+#define ATMEL_TC_LDRAS			BIT(5)
-+#define ATMEL_TC_LDRBS			BIT(6)
-+#define ATMEL_TC_ETRGS			BIT(7)
-+#define ATMEL_TC_CLKSTA			BIT(16)
-+#define ATMEL_TC_MTIOA			BIT(17)
-+#define ATMEL_TC_MTIOB			BIT(18)
-+
-+/* EMR fields */
-+#define ATMEL_TC_EMR_TRIGSRCA_MSK	GENMASK(1, 0)
-+#define ATMEL_TC_EMR_TRIGSRCA_TIOA	0
-+#define ATMEL_TC_EMR_TRIGSRCA_PWMX	1
-+#define ATMEL_TC_EMR_TRIGSRCB_MSK	GENMASK(5, 4)
-+#define ATMEL_TC_EMR_TRIGSRCB_TIOB	(0 << 4)
-+#define ATMEL_TC_EMR_TRIGSRCB_PWM	(1 << 4)
-+#define ATMEL_TC_EMR_NOCLKDIV		BIT(8)
-+
-+/* BCR fields */
-+#define ATMEL_TC_BCR_SYNC		BIT(0)
-+
-+/* BMR fields */
-+#define ATMEL_TC_BMR_TCXC_MSK(c)	GENMASK(((c) * 2) + 1, (c) * 2)
-+#define ATMEL_TC_BMR_TCXC(x, c)		((x) << (2 * (c)))
-+#define ATMEL_TC_BMR_QDEN		BIT(8)
-+#define ATMEL_TC_BMR_POSEN		BIT(9)
-+#define ATMEL_TC_BMR_SPEEDEN		BIT(10)
-+#define ATMEL_TC_BMR_QDTRANS		BIT(11)
-+#define ATMEL_TC_BMR_EDGPHA		BIT(12)
-+#define ATMEL_TC_BMR_INVA		BIT(13)
-+#define ATMEL_TC_BMR_INVB		BIT(14)
-+#define ATMEL_TC_BMR_INVIDX		BIT(15)
-+#define ATMEL_TC_BMR_SWAP		BIT(16)
-+#define ATMEL_TC_BMR_IDXPHB		BIT(17)
-+#define ATMEL_TC_BMR_AUTOC		BIT(18)
-+#define ATMEL_TC_MAXFILT_MSK		GENMASK(25, 20)
-+#define ATMEL_TC_MAXFILT(x)		(((x) - 1) << 20)
-+#define ATMEL_TC_MAXCMP_MSK		GENMASK(29, 26)
-+#define ATMEL_TC_MAXCMP(x)		((x) << 26)
-+
-+/* QEDC fields */
-+#define ATMEL_TC_QEDC_IDX		BIT(0)
-+#define ATMEL_TC_QEDC_DIRCHG		BIT(1)
-+#define ATMEL_TC_QEDC_QERR		BIT(2)
-+#define ATMEL_TC_QEDC_MPE		BIT(3)
-+#define ATMEL_TC_QEDC_DIR		BIT(8)
-+
-+/* FMR fields */
-+#define ATMEL_TC_FMR_ENCF(x)		BIT(x)
-+
-+/* WPMR fields */
-+#define ATMEL_TC_WPMR_WPKEY		(0x54494d << 8)
-+#define ATMEL_TC_WPMR_WPEN		BIT(0)
-+
-+static inline struct clk *tcb_clk_get(struct device_node *node, int channel)
+diff --git a/drivers/clocksource/timer-atmel-tcbclksrc.c b/drivers/clocksource/timer-atmel-tcbclksrc.c
+index f18d177bfdea..462b04e9fed8 100644
+--- a/drivers/clocksource/timer-atmel-tcbclksrc.c
++++ b/drivers/clocksource/timer-atmel-tcbclksrc.c
+@@ -12,6 +12,7 @@
+ static struct atmel_tcb_clksrc {
+ 	char name[20];
+ 	struct clocksource clksrc;
++	struct clock_event_device clkevt;
+ 	struct regmap *regmap;
+ 	struct clk *clk[2];
+ 	int channels[2];
+@@ -24,6 +25,11 @@ static struct atmel_tcb_clksrc {
+ 		.mask		= CLOCKSOURCE_MASK(32),
+ 		.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+ 	},
++	.clkevt	= {
++		.features	= CLOCK_EVT_FEAT_ONESHOT,
++		/* Should be lower than at91rm9200's system timer */
++		.rating		= 125,
++	},
+ };
+ 
+ static u64 tc_get_cycles(struct clocksource *cs)
+@@ -58,6 +64,72 @@ static u64 notrace tc_sched_clock_read32(void)
+ 	return tc_get_cycles32(&tc.clksrc);
+ }
+ 
++static int tcb_clkevt_next_event(unsigned long delta,
++				 struct clock_event_device *d)
 +{
-+	struct clk *clk;
-+	char clk_name[] = "t0_clk";
++	u32 old, next, cur;
 +
-+	clk_name[1] += channel;
-+	clk = of_clk_get_by_name(node->parent, clk_name);
-+	if (!IS_ERR(clk))
-+		return clk;
 +
-+	return of_clk_get_by_name(node->parent, "t0_clk");
-+}
++	regmap_read(tc.regmap, ATMEL_TC_CV(tc.channels[0]), &old);
++	next = old + delta;
++	regmap_write(tc.regmap, ATMEL_TC_RC(tc.channels[0]), next);
++	regmap_read(tc.regmap, ATMEL_TC_CV(tc.channels[0]), &cur);
 +
-+static inline int tcb_irq_get(struct device_node *node, int channel)
-+{
-+	int irq;
-+
-+	irq = of_irq_get(node->parent, channel);
-+	if (irq > 0)
-+		return irq;
-+
-+	return of_irq_get(node->parent, 0);
-+}
-+
-+static const u8 atmel_tc_divisors[5] = { 2, 8, 32, 128, 0, };
-+
-+struct atmel_tcb_info {
-+	int bits;
-+};
-+
-+static const struct atmel_tcb_info atmel_tcb_infos[] = {
-+	{ .bits = 16 },
-+	{ .bits = 32 },
-+};
-+
-+static const struct of_device_id atmel_tcb_dt_ids[] = {
-+	{
-+		.compatible = "atmel,at91rm9200-tcb",
-+		.data = &atmel_tcb_infos[0],
-+	}, {
-+		.compatible = "atmel,at91sam9x5-tcb",
-+		.data = &atmel_tcb_infos[1],
-+	}, {
-+		/* sentinel */
++	/* check whether the delta elapsed while setting the register */
++	if ((next < old && cur < old && cur > next) ||
++	    (next > old && (cur < old || cur > next))) {
++		/*
++		 * Clear the CPCS bit in the status register to avoid
++		 * generating a spurious interrupt next time a valid
++		 * timer event is configured.
++		 */
++		regmap_read(tc.regmap, ATMEL_TC_SR(tc.channels[0]), &old);
++		return -ETIME;
 +	}
-+};
 +
-+#endif /* __SOC_ATMEL_TCB_H */
++	regmap_write(tc.regmap, ATMEL_TC_IER(tc.channels[0]), ATMEL_TC_CPCS);
++
++	return 0;
++}
++
++static irqreturn_t tc_clkevt_irq(int irq, void *handle)
++{
++	unsigned int sr;
++
++	regmap_read(tc.regmap, ATMEL_TC_SR(tc.channels[0]), &sr);
++	if (sr & ATMEL_TC_CPCS) {
++		tc.clkevt.event_handler(&tc.clkevt);
++		return IRQ_HANDLED;
++	}
++
++	return IRQ_NONE;
++}
++
++static int tcb_clkevt_oneshot(struct clock_event_device *dev)
++{
++	if (clockevent_state_oneshot(dev))
++		return 0;
++
++	/*
++	 * Because both clockevent devices may share the same IRQ, we don't want
++	 * the less likely one to stay requested
++	 */
++	return request_irq(tc.irq, tc_clkevt_irq, IRQF_TIMER | IRQF_SHARED,
++			   tc.name, &tc);
++}
++
++static int tcb_clkevt_shutdown(struct clock_event_device *dev)
++{
++	regmap_write(tc.regmap, ATMEL_TC_IDR(tc.channels[0]), 0xff);
++	if (tc.bits == 16)
++		regmap_write(tc.regmap, ATMEL_TC_IDR(tc.channels[1]), 0xff);
++
++	if (!clockevent_state_detached(dev))
++		free_irq(tc.irq, &tc);
++
++	return 0;
++}
++
+ static void __init tcb_setup_dual_chan(struct atmel_tcb_clksrc *tc,
+ 				       int mck_divisor_idx)
+ {
+@@ -188,6 +260,15 @@ static int __init tcb_clksrc_register(struct device_node *node,
+ 
+ 	tc.registered = true;
+ 
++	/* Set up and register clockevents */
++	tc.clkevt.name = tc.name;
++	tc.clkevt.cpumask = cpumask_of(0);
++	tc.clkevt.set_next_event = tcb_clkevt_next_event;
++	tc.clkevt.set_state_oneshot = tcb_clkevt_oneshot;
++	tc.clkevt.set_state_shutdown = tcb_clkevt_shutdown;
++	clockevents_config_and_register(&tc.clkevt, divided_rate, 1,
++					BIT(tc.bits) - 1);
++
+ 	return 0;
+ 
+ err_disable_t1:
 -- 
 2.11.0
