@@ -1,43 +1,35 @@
 From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Tue, 30 May 2017 20:34:03 +0300
-Subject: [PATCH 1/2] ARM: dts: imx6ul-14x14-evk: Add ksz8081 phy properties
-In-Reply-To: <cover.1496164448.git.leonard.crestez@nxp.com>
-References: <cover.1496164448.git.leonard.crestez@nxp.com>
-Message-ID: <d31aab90fbdecaf4c5f240becb2d0b0efb23f5c3.1496164448.git.leonard.crestez@nxp.com>
+Date: Tue, 30 May 2017 20:34:02 +0300
+Subject: [PATCH 0/2] ARM: imx6ul-14x14-evk: Fix suspend over nfs by phy cleanup
+Message-ID: <cover.1496164448.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Right now mach-imx6ul registers a fixup for the ksz8081 phy. The same
-register values can be set through the micrel phy driver by using dts
-properties.
+Right now attempting doing suspend/resume while root is mounted over NFS hangs
+on imx6ul-14x14-evk. This is happening because ksz8081 phy fixups are lost on
+resume.
 
-This seems preferable and allows cleanly fixing suspend/resume.
+Fix this by using equivalent devicetree properties instead of a phy fixup and
+handling those properties on resume in the micrel driver.
 
-Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
----
- arch/arm/boot/dts/imx6ul-14x14-evk.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
+Other solutions would be possible such as having a way to run phy fixups again
+on resume. This alternative is precisely targeted.
 
-diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dts b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-index f18e1f1..d2be8aa 100644
---- a/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-+++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-@@ -120,10 +120,16 @@
- 
- 		ethphy0: ethernet-phy at 2 {
- 			reg = <2>;
-+			micrel,led-mode = <1>;
-+			clocks = <&clks IMX6UL_CLK_ENET_REF>;
-+			clock-names = "rmii-ref";
- 		};
- 
- 		ethphy1: ethernet-phy at 1 {
- 			reg = <1>;
-+			micrel,led-mode = <1>;
-+			clocks = <&clks IMX6UL_CLK_ENET2_REF>;
-+			clock-names = "rmii-ref";
- 		};
- 	};
- };
+In theory it might now be possible to remove the phy fixup from mach-imx6ul
+entirely but it is possible that this would break other imx6ul boards which use
+the same phy. The solution would be to patch their dts but it's not clear how
+to identify affected boards.
+
+This code is shared with imx6ull-14x14-evk but 6ull suspend needs an unrelated
+patch: https://lkml.org/lkml/2017/5/30/584
+
+Leonard Crestez (2):
+  ARM: dts: imx6ul-14x14-evk: Add ksz8081 phy properties
+  net: phy: micrel: Restore led_mode and clk_sel on resume
+
+ arch/arm/boot/dts/imx6ul-14x14-evk.dts |  6 ++++++
+ drivers/net/phy/micrel.c               | 15 +++++++++++++++
+ 2 files changed, 21 insertions(+)
+
 -- 
 2.7.4
