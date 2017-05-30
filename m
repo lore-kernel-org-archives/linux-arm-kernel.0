@@ -1,93 +1,24 @@
-From: Claudiu.Beznea@microchip.com (m18063)
-Date: Tue, 30 May 2017 12:49:39 +0300
-Subject: [PATCH 1/2] drivers: pwm: core: implement pwm mode
-In-Reply-To: <CAHp75VdSGLwryheu2RFg8N7U6qbEf--HmRFG5pa5CzFwJqWdfA@mail.gmail.com>
-References: <1494332153-14534-1-git-send-email-claudiu.beznea@microchip.com>
- <1494332153-14534-2-git-send-email-claudiu.beznea@microchip.com>
- <CAHp75VdSGLwryheu2RFg8N7U6qbEf--HmRFG5pa5CzFwJqWdfA@mail.gmail.com>
-Message-ID: <f94c08aa-08ec-d956-468b-0c6a8e8dd546@microchip.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 30 May 2017 12:07:23 +0200
+Subject: [PATCH 1/3] arm64: dts: rockchip: bring rk3399-firefly power-tree
+ in line
+In-Reply-To: <20170523095427.7421-1-heiko@sntech.de>
+References: <20170523095427.7421-1-heiko@sntech.de>
+Message-ID: <2924720.omGovoX6XK@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+Am Dienstag, 23. Mai 2017, 11:54:25 CEST schrieb Heiko Stuebner:
+> The power-tree on the rk3399-firefly did not completely match the
+> documentation and vendor devicetree. It was also missing some
+> supply-hirarchy information and some regulator-gpio names did not
+> match the schematics. Fix this for the existing regulators before
+> introducing new things.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-On 28.05.2017 01:11, Andy Shevchenko wrote:
-> On Tue, May 9, 2017 at 3:15 PM, Claudiu Beznea
-> <claudiu.beznea@microchip.com> wrote:
->> Extends PWM framework to support PWM modes. The currently
->> implemented PWM modes were called PWM complementary mode
->> and PWM push-pull mode. For devices that have more than one
->> output per PWM channel:
->> - PWM complementary mode is standard working mode; in PWM
->> complementary mode the rising and falling edges of the
->> channels outputs have opposite levels, same duration and
->> same starting time.
->> - in PWM push-pull mode the channles outputs has same levels,
->> same duration and the rising edges are delayed until the
->> beginning of the next period.
->> A new member was added in pwm_state structure in order to
->> keep the new PWM argument.
-> 
-> To me it sound over-engineered.
-> 
-> It looks like polarity type
-Could you, please, give me more details on this? I don't understand
-your point. The PWM controller I worked with has more than one
-physical output per PWM channel (e.g. a linux PWM channel has 2
-output pins, as you said below, one with polarity P, the other one with
-polarity !P). Different controllers could be configured to generate
-different kind of signals. PWM push-pull signal type is one of these
-and is a common characteristic. This kind of signal could be used, e.g.,
-in half-bridge converter applications where you need delays between
-positive fronts of PWM signals which drives the transistors.
-It is a common characteristic of PWM controllers which is the
-reason I tried to implement it.
-The push-pull signal type looks like this in case of a controller
-with 2 outputs per PWM channel:
-              __          __
-channel Xa __|  |________|  |________
-                    __          __
-channel Xb ________|  |________|  |__
-             <--T--> 
+applied all 3 for 4.13, with the ethernet alias changed to ethernet0
+as suggested
 
-> 
-> I dunno if PWM supports linked / virtual channels, but it would be like that
-> 
-> channel X  (polarity P) effectively is
-> 
-> channel Xa (polarity P) / channel Xb (polarity !P)> 
-> and vise versa.
-The controller I worked for, the Atmel one, support 4 linux channels, but
-every channel has 2 physical outputs, 2 pins which outputs, by default,
-a signal with polarity P and a signal with polarity !P, exactly how you said.
-I called this in my patch the "complementary" mode. Signals looks like this:
-              __    __    __    __
-channel Xa __|  |__|  |__|  |__|  |__
-           __    __    __    __    __
-channel Xb   |__|  |__|  |__|  |__|
-             <--T-->
 
-> 
-> Moreover, mode in your case doesn't fit to GPIO style of output which
-> would be emulated or native mode for PWM
-For the PWM controller I worked for, one linux PWM channel outputs on
-2 physical pins. Those 2 pins are requested from pin controller
-to be used by PWM controller. The PWM controller is the one which generate
-the signal form on those pins. Could you please give more details on
-what what are you saying above?
-
- (we have already a use case
-> and one driver implements that).
-Could you, please, give me the driver name you are talking about?
-On PWM drivers I found only one driver which is started in push-pull,
-the drivers/pwm/pwm-bcm-kona.c one.
-The idea with the patches I send was to have a chip which could be
-user configurable to let the user choose how the chip to work.
-
-Thank you,
-Claudiu Beznea
-> 
-> GPIO type of output is, obviously, duty=100% in case of emulation,
-> though separate state for HW assisted kind of that.
-
-> 
+Heiko
