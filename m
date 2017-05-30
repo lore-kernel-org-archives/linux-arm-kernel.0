@@ -1,69 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 30 May 2017 12:35:49 +0100
-Subject: [PATCH] ARM64/ACPI: Fix BAD_MADT_GICC_ENTRY() macro implementation
-In-Reply-To: <20170526164002.30103-1-lorenzo.pieralisi@arm.com>
-References: <20170526164002.30103-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170530113548.GG32289@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 30 May 2017 13:41:55 +0200
+Subject: [PATCH 2/6] dt-bindings: interrupt-controller: add DT binding
+ for the Marvell ICU
+In-Reply-To: <97989700-2c97-892e-b470-a84af6dfd77b@arm.com>
+References: <1496135772-20694-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1496135772-20694-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <97989700-2c97-892e-b470-a84af6dfd77b@arm.com>
+Message-ID: <20170530134155.4996efdb@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 26, 2017 at 05:40:02PM +0100, Lorenzo Pieralisi wrote:
-> The BAD_MADT_GICC_ENTRY() macro checks if a GICC MADT entry passes
-> muster from an ACPI specification standpoint. Current macro detects the
-> MADT GICC entry length through ACPI firmware version (it changed from 76
-> to 80 bytes in the transition from ACPI 5.1 to ACPI 6.0 specification)
-> but always uses (erroneously) the ACPICA (latest) struct (ie struct
-> acpi_madt_generic_interrupt - that is 80-bytes long) length to check if
-> the current GICC entry memory record exceeds the MADT table end in
-> memory as defined by the MADT table header itself, which may result in
-> false negatives depending on the ACPI firmware version and how the MADT
-> entries are laid out in memory (ie on ACPI 5.1 firmware MADT GICC
-> entries are 76 bytes long, so by adding 80 to a GICC entry start address
-> in memory the resulting address may well be past the actual MADT end,
-> triggering a false negative).
+Hello,
+
+Thanks for the quick review!
+
+On Tue, 30 May 2017 11:37:10 +0100, Marc Zyngier wrote:
+
+> > +  The 1st cell is the group type of the ICU interrupt (SPI_NSR,
+> > +  SPI_SR, SEI, and REI).  
 > 
-> Fix the BAD_MADT_GICC_ENTRY() macro by reshuffling the condition checks
-> and update them to always use the firmware version specific MADT GICC
-> entry length in order to carry out boundary checks.
+> Is it worth documenting what these are?
+
+Sure, will do.
+
+> > +icu: interrupt-controller at 1e0000 {
+> > +	compatible = "marvell,icu";
+> > +	reg = <0x1e0000 0x10>;
+> > +	#interrupt-cells = <2>;  
 > 
-> Fixes: b6cfb277378e ("ACPI / ARM64: add BAD_MADT_GICC_ENTRY() macro")
-> Reported-by: Julien Grall <julien.grall@arm.com>
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Julien Grall <julien.grall@arm.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Al Stone <ahs3@redhat.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/include/asm/acpi.h | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+> Oh wait...
 
-Oh, nasty:
+Gaah, I did spot this mistake, but then forgot to fix it. Will do.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-I'm assuming Catalin will pick this up as a fix.
-
-Will
-
-> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> index 0e99978..59cca1d 100644
-> --- a/arch/arm64/include/asm/acpi.h
-> +++ b/arch/arm64/include/asm/acpi.h
-> @@ -23,9 +23,9 @@
->  #define ACPI_MADT_GICC_LENGTH	\
->  	(acpi_gbl_FADT.header.revision < 6 ? 76 : 80)
->  
-> -#define BAD_MADT_GICC_ENTRY(entry, end)						\
-> -	(!(entry) || (unsigned long)(entry) + sizeof(*(entry)) > (end) ||	\
-> -	 (entry)->header.length != ACPI_MADT_GICC_LENGTH)
-> +#define BAD_MADT_GICC_ENTRY(entry, end)					\
-> +	(!(entry) || (entry)->header.length != ACPI_MADT_GICC_LENGTH ||	\
-> +	(unsigned long)(entry) + ACPI_MADT_GICC_LENGTH > (end))
->  
->  /* Basic configuration for ACPI */
->  #ifdef	CONFIG_ACPI
-> -- 
-> 2.10.0
+> > +	interrupt-controller;
+> > +	interrupt-parent = <&gic>;
+> > +	gicp = <&gicp>;  
 > 
+> Should this be prefixed with a vendor specific identifier, just in case?
+
+Would marvell,gicp be preferable?
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
