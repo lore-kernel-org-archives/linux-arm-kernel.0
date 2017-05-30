@@ -1,193 +1,156 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 30 May 2017 08:36:06 +0100
-Subject: [PATCH 3/6] mfd: hi6421v530: add support for HiSilicon Hi6421v530
-In-Reply-To: <20170526063518.21246-4-guodong.xu@linaro.org>
-References: <20170526063518.21246-1-guodong.xu@linaro.org>
- <20170526063518.21246-4-guodong.xu@linaro.org>
-Message-ID: <20170530073606.tm4gacph4yj47ntx@dell>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 30 May 2017 09:48:24 +0200
+Subject: [PATCH 15/31] KVM: arm64: vgic-v3: Add ICV_AP1Rn_EL1 handler
+In-Reply-To: <20170503104606.19342-16-marc.zyngier@arm.com>
+References: <20170503104606.19342-1-marc.zyngier@arm.com>
+ <20170503104606.19342-16-marc.zyngier@arm.com>
+Message-ID: <b672d790-738b-df50-06fc-8b72c7692abe@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 26 May 2017, Guodong Xu wrote:
+H Marc,
 
-> Add support for HiSilicon Hi6421v530 PMIC. Hi6421v530 communicates with
-> main SoC via memory-mapped I/O.
+On 03/05/2017 12:45, Marc Zyngier wrote:
+> Add a handler for reading/writing the guest's view of the ICV_AP1Rn_EL1
+> registers. We just map them to the corresponding ICH_AP1Rn_EL2 registers.
 > 
-> Hi6421v530 and Hi6421 are PMIC chips from the same vendor, HiSilicon, but
-> at different revisions. They share the same memory-mapped I/O design. They
-> differ in regulator details, eg. LDO voltage points.
-> 
-> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
-> Signed-off-by: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  drivers/mfd/Kconfig           |  9 +++++
->  drivers/mfd/Makefile          |  1 +
->  drivers/mfd/hi6421v530-pmic.c | 92 +++++++++++++++++++++++++++++++++++++++++++
-
-As previously discussed, this support should be added to the existing
-driver.
-
->  3 files changed, 102 insertions(+)
->  create mode 100644 drivers/mfd/hi6421v530-pmic.c
+>  arch/arm64/include/asm/sysreg.h |  1 +
+>  virt/kvm/arm/hyp/vgic-v3-sr.c   | 94 +++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 95 insertions(+)
 > 
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index 3eb5c93..bdc8304 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -388,6 +388,15 @@ config MFD_HI6421_PMIC
->  	  menus in order to enable them.
->  	  We communicate with the Hi6421 via memory-mapped I/O.
+> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+> index 15c142ce991c..aad46b8eea5e 100644
+> --- a/arch/arm64/include/asm/sysreg.h
+> +++ b/arch/arm64/include/asm/sysreg.h
+> @@ -180,6 +180,7 @@
 >  
-> +config MFD_HI6421V530_PMIC
-> +	tristate "HiSilicon Hi6421v530 PMU/Codec IC"
-> +	depends on OF
-> +	select MFD_CORE
-> +	select REGMAP_MMIO
-> +	help
-> +	  Add support for HiSilicon Hi6421v530 PMIC. Hi6421v530 communicates
-> +	  with main SoC via memory-mapped I/O.
-> +
->  config MFD_HI655X_PMIC
->  	tristate "HiSilicon Hi655X series PMU/Codec IC"
->  	depends on ARCH_HISI || COMPILE_TEST
-> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-> index c16bf1e..cde62fc 100644
-> --- a/drivers/mfd/Makefile
-> +++ b/drivers/mfd/Makefile
-> @@ -206,6 +206,7 @@ obj-$(CONFIG_MFD_STW481X)	+= stw481x.o
->  obj-$(CONFIG_MFD_IPAQ_MICRO)	+= ipaq-micro.o
->  obj-$(CONFIG_MFD_MENF21BMC)	+= menf21bmc.o
->  obj-$(CONFIG_MFD_HI6421_PMIC)	+= hi6421-pmic-core.o
-> +obj-$(CONFIG_MFD_HI6421V530_PMIC)	+= hi6421v530-pmic.o
->  obj-$(CONFIG_MFD_HI655X_PMIC)   += hi655x-pmic.o
->  obj-$(CONFIG_MFD_DLN2)		+= dln2.o
->  obj-$(CONFIG_MFD_RT5033)	+= rt5033.o
-> diff --git a/drivers/mfd/hi6421v530-pmic.c b/drivers/mfd/hi6421v530-pmic.c
-> new file mode 100644
-> index 0000000..651659a
-> --- /dev/null
-> +++ b/drivers/mfd/hi6421v530-pmic.c
-> @@ -0,0 +1,92 @@
-> +/*
-> + * Device driver for Hi6421 IC
-> + *
-> + * Copyright (c) <2017> HiSilicon Technologies Co., Ltd.
-> + *              http://www.hisilicon.com
-> + * Copyright (c) <2017> Linaro Ltd.
-> + *              http://www.linaro.org
-> + *
-> + * Author: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
-> + *         Guodong Xu <guodong.xu@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-Can you use the shorter licence script?
-
-> + */
-> +
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/mfd/core.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/regmap.h>
-> +#include <linux/mfd/hi6421-pmic.h>
-
-Alphabetical.
-
-> +static const struct mfd_cell hi6421v530_devs[] = {
-> +	{ .name = "hi6421v530-regulator", },
-> +};
-
-Chen Feng promised me that he would add other devices to the original
-driver nearly 18 months ago.  Until more devices are added, these are
-not MFD drivers.  When will you add the remaining devices?
-
-> +static int hi6421v530_pmic_probe(struct platform_device *pdev)
+>  #define SYS_VBAR_EL1			sys_reg(3, 0, 12, 0, 0)
+>  
+> +#define SYS_ICC_AP1Rn_EL1(n)		sys_reg(3, 0, 12, 9, n)
+>  #define SYS_ICC_DIR_EL1			sys_reg(3, 0, 12, 11, 1)
+>  #define SYS_ICC_SGI1R_EL1		sys_reg(3, 0, 12, 11, 5)
+>  #define SYS_ICC_IAR1_EL1		sys_reg(3, 0, 12, 12, 0)
+> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> index a76351b3ad66..b6803989da1f 100644
+> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
+> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> @@ -684,6 +684,76 @@ static void __hyp_text __vgic_v3_write_bpr1(struct kvm_vcpu *vcpu, u32 vmcr, int
+>  	__vgic_v3_write_vmcr(vmcr);
+>  }
+>  
+> +static void __hyp_text __vgic_v3_read_apxrn(struct kvm_vcpu *vcpu, int rt, int n)
+Shouldn't you test somewhere that n is correct given the number of
+implemented priority bits
 > +{
-> +	struct hi6421_pmic *pmic;
-> +	struct resource *res;
-> +	void __iomem *base;
-> +	int ret;
+> +	u32 val;
 > +
-> +	pmic = devm_kzalloc(&pdev->dev, sizeof(*pmic), GFP_KERNEL);
-> +	if (!pmic)
-> +		return -ENOMEM;
+> +	if (!__vgic_v3_get_group(vcpu))
+I don't really get how an access to AP1Rn can end up in AP0Rn. I am not
+able to find any related description in the spec?
+
+Thanks
+
+Eric
+> +		val = __vgic_v3_read_ap0rn(n);
+
+> +	else
+> +		val = __vgic_v3_read_ap1rn(n);
 > +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(base))
-> +		return PTR_ERR(base);
-> +
-> +	pmic->regmap = devm_regmap_init_mmio_clk(&pdev->dev, NULL, base,
-> +						 &hi6421_regmap_config);
-> +	if (IS_ERR(pmic->regmap)) {
-> +		dev_err(&pdev->dev,
-> +			"regmap init failed: %ld\n", PTR_ERR(pmic->regmap));
-
-"Failed to initialise Regmap"
-
-> +		return PTR_ERR(pmic->regmap);
-> +	}
-> +
-> +	platform_set_drvdata(pdev, pmic);
-> +
-> +	ret = devm_mfd_add_devices(&pdev->dev, 0, hi6421v530_devs,
-
-Use the #defines provided instead of '0'.
-
-> +				   ARRAY_SIZE(hi6421v530_devs), NULL, 0, NULL);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "add mfd devices failed: %d\n", ret);
-
-"Failed to add child devices"
-
-> +		return ret;
-> +	}
-> +
-> +	return 0;
+> +	vcpu_set_reg(vcpu, rt, val);
 > +}
 > +
-> +static const struct of_device_id of_hi6421v530_pmic_match_tbl[] = {
-> +	{ .compatible = "hisilicon,hi6421v530-pmic", },
-> +	{ },
-> +};
-> +MODULE_DEVICE_TABLE(of, of_hi6421v530_pmic_match_tbl);
-
-Drop the "_tbl" part, it's implied and superfluous.
-
-> +static struct platform_driver hi6421v530_pmic_driver = {
-> +	.driver = {
-> +		.name	= "hi6421v530_pmic",
-
-One space please.
-
-> +		.of_match_table = of_hi6421v530_pmic_match_tbl,
-> +	},
-> +	.probe	= hi6421v530_pmic_probe,
-> +};
-> +module_platform_driver(hi6421v530_pmic_driver);
+> +static void __hyp_text __vgic_v3_write_apxrn(struct kvm_vcpu *vcpu, int rt, int n)
+> +{
+> +	u32 val = vcpu_get_reg(vcpu, rt);
 > +
-> +MODULE_AUTHOR("Guodong Xu <guodong.xu@linaro.org>");
-> +MODULE_DESCRIPTION("Hi6421v530 PMIC driver");
-> +MODULE_LICENSE("GPL v2");
-
-This does not match the header comment.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> +	if (!__vgic_v3_get_group(vcpu))
+> +		__vgic_v3_write_ap0rn(val, n);
+> +	else
+> +		__vgic_v3_write_ap1rn(val, n);
+> +}
+> +
+> +static void __hyp_text __vgic_v3_read_apxr0(struct kvm_vcpu *vcpu,
+> +					    u32 vmcr, int rt)
+> +{
+> +	__vgic_v3_read_apxrn(vcpu, rt, 0);
+> +}
+> +
+> +static void __hyp_text __vgic_v3_read_apxr1(struct kvm_vcpu *vcpu,
+> +					    u32 vmcr, int rt)
+> +{
+> +	__vgic_v3_read_apxrn(vcpu, rt, 1);
+> +}
+> +
+> +static void __hyp_text __vgic_v3_read_apxr2(struct kvm_vcpu *vcpu,
+> +					    u32 vmcr, int rt)
+> +{
+> +	__vgic_v3_read_apxrn(vcpu, rt, 2);
+> +}
+> +
+> +static void __hyp_text __vgic_v3_read_apxr3(struct kvm_vcpu *vcpu,
+> +					    u32 vmcr, int rt)
+> +{
+> +	__vgic_v3_read_apxrn(vcpu, rt, 3);
+> +}
+> +
+> +static void __hyp_text __vgic_v3_write_apxr0(struct kvm_vcpu *vcpu,
+> +					     u32 vmcr, int rt)
+> +{
+> +	__vgic_v3_write_apxrn(vcpu, rt, 0);
+> +}
+> +
+> +static void __hyp_text __vgic_v3_write_apxr1(struct kvm_vcpu *vcpu,
+> +					     u32 vmcr, int rt)
+> +{
+> +	__vgic_v3_write_apxrn(vcpu, rt, 1);
+> +}
+> +
+> +static void __hyp_text __vgic_v3_write_apxr2(struct kvm_vcpu *vcpu,
+> +					     u32 vmcr, int rt)
+> +{
+> +	__vgic_v3_write_apxrn(vcpu, rt, 2);
+> +}
+> +
+> +static void __hyp_text __vgic_v3_write_apxr3(struct kvm_vcpu *vcpu,
+> +					     u32 vmcr, int rt)
+> +{
+> +	__vgic_v3_write_apxrn(vcpu, rt, 3);
+> +}
+> +
+>  int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
+>  {
+>  	int rt = kvm_vcpu_sys_get_rt(vcpu);
+> @@ -722,6 +792,30 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
+>  		else
+>  			fn = __vgic_v3_write_bpr1;
+>  		break;
+> +	case SYS_ICC_AP1Rn_EL1(0):
+> +		if (is_read)
+> +			fn = __vgic_v3_read_apxr0;
+> +		else
+> +			fn = __vgic_v3_write_apxr0;
+> +		break;
+> +	case SYS_ICC_AP1Rn_EL1(1):
+> +		if (is_read)
+> +			fn = __vgic_v3_read_apxr1;
+> +		else
+> +			fn = __vgic_v3_write_apxr1;
+> +		break;
+> +	case SYS_ICC_AP1Rn_EL1(2):
+> +		if (is_read)
+> +			fn = __vgic_v3_read_apxr2;
+> +		else
+> +			fn = __vgic_v3_write_apxr2;
+> +		break;
+> +	case SYS_ICC_AP1Rn_EL1(3):
+> +		if (is_read)
+> +			fn = __vgic_v3_read_apxr3;
+> +		else
+> +			fn = __vgic_v3_write_apxr3;
+> +		break;
+>  	default:
+>  		return 0;
+>  	}
+> 
