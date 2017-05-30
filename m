@@ -1,23 +1,25 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Tue, 30 May 2017 18:39:05 +0800
-Subject: [PATCH v13 8/9] arm64: dts: hi6220: register debug module
-In-Reply-To: <1495727836-30094-9-git-send-email-leo.yan@linaro.org>
-References: <1495727836-30094-1-git-send-email-leo.yan@linaro.org>
- <1495727836-30094-9-git-send-email-leo.yan@linaro.org>
-Message-ID: <20170530103905.GC7177@leoy-ThinkPad-T440>
+Date: Tue, 30 May 2017 18:44:55 +0800
+Subject: [PATCH v13 9/9] arm64: dts: qcom: msm8916: Add debug unit
+In-Reply-To: <1495728253-30970-1-git-send-email-leo.yan@linaro.org>
+References: <1495728253-30970-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <20170530104455.GD7177@leoy-ThinkPad-T440>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wei,
+Hi Andy, David,
 
-On Thu, May 25, 2017 at 11:57:15PM +0800, Leo Yan wrote:
-> Bind debug module driver for Hi6220.
+[ + Nico ]
 
-Could you ACK this patch? From Mathieu's previous suggestion, after
-your confirmation he could pick up this patch.
+On Fri, May 26, 2017 at 12:04:13AM +0800, Leo Yan wrote:
+> Add debug unit on Qualcomm msm8916 based platforms, including the
+> DragonBoard 410c board.
+
+Could you take a look for this patch? After get your ACK I think
+Mathieu could help pick up this patch through coresight repository.
 
 If you want me to send a separate patch to you directly, also is okay.
-Please let me know which is preferring.
+Please let me know which is your preferring.
 
 Thanks,
 Leo Yan
@@ -25,83 +27,52 @@ Leo Yan
 > Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 > Signed-off-by: Leo Yan <leo.yan@linaro.org>
 > ---
->  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 64 +++++++++++++++++++++++++++++++
->  1 file changed, 64 insertions(+)
+>  arch/arm64/boot/dts/qcom/msm8916.dtsi | 32 ++++++++++++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
 > 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> index 1e5129b..21805b9 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> @@ -916,5 +916,69 @@
->  				};
+> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> index ab30939..17691ab 100644
+> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> @@ -1116,6 +1116,38 @@
 >  			};
 >  		};
-> +
-> +		debug at f6590000 {
+>  
+> +		debug at 850000 {
 > +			compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +			reg = <0 0xf6590000 0 0x1000>;
-> +			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
+> +			reg = <0x850000 0x1000>;
+> +			clocks = <&rpmcc RPM_QDSS_CLK>;
 > +			clock-names = "apb_pclk";
-> +			cpu = <&cpu0>;
+> +			cpu = <&CPU0>;
 > +		};
 > +
-> +		debug at f6592000 {
+> +		debug at 852000 {
 > +			compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +			reg = <0 0xf6592000 0 0x1000>;
-> +			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
+> +			reg = <0x852000 0x1000>;
+> +			clocks = <&rpmcc RPM_QDSS_CLK>;
 > +			clock-names = "apb_pclk";
-> +			cpu = <&cpu1>;
+> +			cpu = <&CPU1>;
 > +		};
 > +
-> +		debug at f6594000 {
+> +		debug at 854000 {
 > +			compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +			reg = <0 0xf6594000 0 0x1000>;
-> +			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
+> +			reg = <0x854000 0x1000>;
+> +			clocks = <&rpmcc RPM_QDSS_CLK>;
 > +			clock-names = "apb_pclk";
-> +			cpu = <&cpu2>;
+> +			cpu = <&CPU2>;
 > +		};
 > +
-> +		debug at f6596000 {
+> +		debug at 856000 {
 > +			compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +			reg = <0 0xf6596000 0 0x1000>;
-> +			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
+> +			reg = <0x856000 0x1000>;
+> +			clocks = <&rpmcc RPM_QDSS_CLK>;
 > +			clock-names = "apb_pclk";
-> +			cpu = <&cpu3>;
+> +			cpu = <&CPU3>;
 > +		};
 > +
-> +		debug at f65d0000 {
-> +			compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +			reg = <0 0xf65d0000 0 0x1000>;
-> +			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu4>;
-> +		};
-> +
-> +		debug at f65d2000 {
-> +			compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +			reg = <0 0xf65d2000 0 0x1000>;
-> +			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu5>;
-> +		};
-> +
-> +		debug at f65d4000 {
-> +			compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +			reg = <0 0xf65d4000 0 0x1000>;
-> +			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu6>;
-> +		};
-> +
-> +		debug at f65d6000 {
-> +			compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +			reg = <0 0xf65d6000 0 0x1000>;
-> +			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu7>;
-> +		};
->  	};
->  };
+>  		etm at 85c000 {
+>  			compatible = "arm,coresight-etm4x", "arm,primecell";
+>  			reg = <0x85c000 0x1000>;
 > -- 
 > 2.7.4
 > 
