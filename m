@@ -1,78 +1,87 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 30 May 2017 17:59:54 +0100
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Tue, 30 May 2017 10:16:34 -0700
 Subject: Device address specific mapping of arm,mmu-500
-In-Reply-To: <81637642-22d9-4868-156f-052f64bd042f@broadcom.com>
+In-Reply-To: <226bcebc-3902-90d3-24e5-51f2e1f3affb@arm.com>
 References: <1b79efe2-6835-7a7a-f5ad-361391a7b967@broadcom.com>
  <20170530151437.GC23067@arm.com>
  <81637642-22d9-4868-156f-052f64bd042f@broadcom.com>
-Message-ID: <226bcebc-3902-90d3-24e5-51f2e1f3affb@arm.com>
+ <226bcebc-3902-90d3-24e5-51f2e1f3affb@arm.com>
+Message-ID: <a85b2e3f-93db-7c4d-cde8-32a57e69bef9@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/05/17 17:49, Ray Jui wrote:
-> Hi Will,
-> 
-> On 5/30/17 8:14 AM, Will Deacon wrote:
->> On Mon, May 29, 2017 at 06:18:45PM -0700, Ray Jui wrote:
->>> I'm writing to check with you to see if the latest arm-smmu.c driver in
->>> v4.12-rc Linux for smmu-500 can support mapping that is only specific to
->>> a particular physical address range while leave the rest still to be
->>> handled by the client device. I believe this can already be supported by
->>> the device tree binding of the generic IOMMU framework; however, it is
->>> not clear to me whether or not the arm-smmu.c driver can support it.
+Hi Marc,
+
+On 5/30/17 9:59 AM, Marc Zyngier wrote:
+> On 30/05/17 17:49, Ray Jui wrote:
+>> Hi Will,
+>>
+>> On 5/30/17 8:14 AM, Will Deacon wrote:
+>>> On Mon, May 29, 2017 at 06:18:45PM -0700, Ray Jui wrote:
+>>>> I'm writing to check with you to see if the latest arm-smmu.c driver in
+>>>> v4.12-rc Linux for smmu-500 can support mapping that is only specific to
+>>>> a particular physical address range while leave the rest still to be
+>>>> handled by the client device. I believe this can already be supported by
+>>>> the device tree binding of the generic IOMMU framework; however, it is
+>>>> not clear to me whether or not the arm-smmu.c driver can support it.
+>>>>
+>>>> To give you some background information:
+>>>>
+>>>> We have a SoC that has PCIe root complex that has a build-in logic block
+>>>> to forward MSI writes to ARM GICv3 ITS. Unfortunately, this logic block
+>>>> has a HW bug that causes the MSI writes not parsed properly and can
+>>>> potentially corrupt data in the internal FIFO. A workaround is to have
+>>>> ARM MMU-500 takes care of all inbound transactions. I found that is
+>>>> working after hooking up our PCIe root complex to MMU-500; however, even
+>>>> with this optimized arm-smmu driver in v4.12, I'm still seeing a
+>>>> significant Ethernet throughput drop in both the TX and RX directions.
+>>>> The throughput drop is very significant at around 50% (but is already
+>>>> much improved compared to other prior kernel versions at 70~90%).
 >>>
->>> To give you some background information:
+>>> Did Robin's experiments help at all with this?
 >>>
->>> We have a SoC that has PCIe root complex that has a build-in logic block
->>> to forward MSI writes to ARM GICv3 ITS. Unfortunately, this logic block
->>> has a HW bug that causes the MSI writes not parsed properly and can
->>> potentially corrupt data in the internal FIFO. A workaround is to have
->>> ARM MMU-500 takes care of all inbound transactions. I found that is
->>> working after hooking up our PCIe root complex to MMU-500; however, even
->>> with this optimized arm-smmu driver in v4.12, I'm still seeing a
->>> significant Ethernet throughput drop in both the TX and RX directions.
->>> The throughput drop is very significant at around 50% (but is already
->>> much improved compared to other prior kernel versions at 70~90%).
+>>> http://www.linux-arm.org/git?p=linux-rm.git;a=shortlog;h=refs/heads/iommu/perf
+>>>
 >>
->> Did Robin's experiments help at all with this?
+>> It looks like these are new optimizations that have not yet been merged
+>> in v4.12? I'm going to give it a try.
 >>
->> http://www.linux-arm.org/git?p=linux-rm.git;a=shortlog;h=refs/heads/iommu/perf
+>>>> One alternative is to only use MMU-500 for MSI writes towards
+>>>> GITS_TRANSLATER register in the GICv3, i.e., if I can define a specific
+>>>> region of physical address that I want MMU-500 to act on and leave the
+>>>> rest of inbound transactions to be handled directly by our PCIe
+>>>> controller, it can potentially work around the HW bug we have and at the
+>>>> same time achieve optimal throughput.
+>>>
+>>> I don't think you can bypass the SMMU for MSIs unless you give them their
+>>> own StreamIDs, which is likely to break things horribly in the kernel. You
+>>> could try to create an identity mapping, but you'll still have the
+>>> translation overhead and you'd probably end up having to supply your own DMA
+>>> ops to manage the address space. I'm assuming that you need to prevent the
+>>> physical address of the ITS from being allocated as an IOVA?
 >>
-> 
-> It looks like these are new optimizations that have not yet been merged
-> in v4.12? I'm going to give it a try.
-> 
->>> One alternative is to only use MMU-500 for MSI writes towards
->>> GITS_TRANSLATER register in the GICv3, i.e., if I can define a specific
->>> region of physical address that I want MMU-500 to act on and leave the
->>> rest of inbound transactions to be handled directly by our PCIe
->>> controller, it can potentially work around the HW bug we have and at the
->>> same time achieve optimal throughput.
+>> Will, is that a HW limitation that the SMMU cannot be used, only for MSI
+>> writes, in which case, the physical address range is very specific in
+>> our ASIC that falls in the device memory region (e.g., below 0x80000000)?
 >>
->> I don't think you can bypass the SMMU for MSIs unless you give them their
->> own StreamIDs, which is likely to break things horribly in the kernel. You
->> could try to create an identity mapping, but you'll still have the
->> translation overhead and you'd probably end up having to supply your own DMA
->> ops to manage the address space. I'm assuming that you need to prevent the
->> physical address of the ITS from being allocated as an IOVA?
+>> In fact, what I need in this case is a static mapping from IOMMU on the
+>> physical address of the GITS_TRANSLATER of the GICv3 ITS, which is the
+>> address that MSI writes go to. This is to bypass the MSI forwarding
+>> logic in our PCIe controller. At the same time, I can leave the rest of
+>> inbound transactions to be handled by our PCIe controller without going
+>> through the MMU.
 > 
-> Will, is that a HW limitation that the SMMU cannot be used, only for MSI
-> writes, in which case, the physical address range is very specific in
-> our ASIC that falls in the device memory region (e.g., below 0x80000000)?
-> 
-> In fact, what I need in this case is a static mapping from IOMMU on the
-> physical address of the GITS_TRANSLATER of the GICv3 ITS, which is the
-> address that MSI writes go to. This is to bypass the MSI forwarding
-> logic in our PCIe controller. At the same time, I can leave the rest of
-> inbound transactions to be handled by our PCIe controller without going
-> through the MMU.
+> How is that going to work for DMA? I imagine your network interfaces do
+> have to access memory, don't they? How can the transactions be
+> terminated in the PCIe controller?
 
-How is that going to work for DMA? I imagine your network interfaces do
-have to access memory, don't they? How can the transactions be
-terminated in the PCIe controller?
+Sorry, I may not phrase this properly. These inbound transactions (DMA
+write to DDR, from endpoint) do not terminate in the PCIe controller.
+They are taken by the PCIe controller as PCIe transactions and will be
+carried towards the designated memory on the host.
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> 
+> Thanks,
+> 
+> 	M.
+> 
