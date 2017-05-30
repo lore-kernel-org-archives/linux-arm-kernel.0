@@ -1,50 +1,80 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 30 May 2017 11:20:51 +0200
-Subject: [PATCH v2 1/4] dt-bindings: mtd: atmel-nand: Document the nfc-io
- bindings
-In-Reply-To: <1496136054-12390-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1496136054-12390-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1496136054-12390-2-git-send-email-boris.brezillon@free-electrons.com>
+Date: Tue, 30 May 2017 11:20:50 +0200
+Subject: [PATCH v2 0/4] ARM: dts: at91: Migrate to the new EBI/NAND bindings
+Message-ID: <1496136054-12390-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SAMA5 SoCs embed an advanced NAND controller logic to automate READ/WRITE
-page accesses. This advanced logic is exposed through a separate I/O mem
-range and is thus represented in a different node with its own compatible.
+Hello,
 
-Document the bindings of this nfc-io block.
+This is the last step of the EBI/NAND bindings rework started here [1].
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- Documentation/devicetree/bindings/mtd/atmel-nand.txt | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+The first patch is adding missing nfc-io bindings doc to atmel-nand.txt
+and can be applied independently.
 
-diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-index f6bee57e453a..9bb66e476672 100644
---- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-+++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-@@ -59,8 +59,22 @@ Required properties:
- - reg: should contain 2 register ranges. The first one is pointing to the PMECC
-        block, and the second one to the PMECC_ERRLOC block.
- 
-+* SAMA5 NFC I/O bindings:
-+
-+SAMA5 SoCs embed an advanced NAND controller logic to automate READ/WRITE page
-+operations. This interface to this logic is placed in a separate I/O range and
-+should thus have its own DT node.
-+
-+- compatible: should be "atmel,sama5d3-nfc-io", "syscon".
-+- reg: should contain the I/O range used to interact with the NFC logic.
-+
- Example:
- 
-+	nfc_io: nfc-io at 70000000 {
-+		compatible = "atmel,sama5d3-nfc-io", "syscon";
-+		reg = <0x70000000 0x8000000>;
-+	};
-+
- 	pmecc: ecc-engine at ffffc070 {
- 		compatible = "atmel,at91sam9g45-pmecc";
-                 reg = <0xffffc070 0x490>,
+Patches 2 and 3 are migrating all at91/sama5 SoCs (except the
+at91rm9200) to the new EBI/NAND representation introduced in 4.12.
+
+The last patch is showing how one can add a non-NAND device under the
+EBI bus.
+
+Regards,
+
+Boris
+
+[1]http://lkml.iu.edu/hypermail/linux/kernel/1703.2/00124.html
+
+Changes since v1:
+- Cc board maintainers
+- merge patches 3 and 4 into a single patch doing all board
+  modifications
+
+Boris Brezillon (4):
+  dt-bindings: mtd: atmel-nand: Document the nfc-io bindings
+  ARM: dts: at91: Declare EBI/NAND controllers
+  ARM: dts: at91: Switch to the new NAND bindings
+  ARM: dts: at91: Add the NOR flash available on sama5d3 dev kits
+
+ .../devicetree/bindings/mtd/atmel-nand.txt         |  14 ++
+ arch/arm/boot/dts/aks-cdu.dts                      |  56 ++++---
+ arch/arm/boot/dts/animeo_ip.dts                    |  53 ++++--
+ arch/arm/boot/dts/at91-cosino.dtsi                 |  83 ++++++----
+ arch/arm/boot/dts/at91-kizbox.dts                  |  42 +++--
+ arch/arm/boot/dts/at91-kizbox2.dts                 |  45 ++++--
+ arch/arm/boot/dts/at91-kizboxmini.dts              |  52 ++++--
+ arch/arm/boot/dts/at91-linea.dtsi                  |  25 ++-
+ arch/arm/boot/dts/at91-qil_a9260.dts               | 103 +++++++-----
+ arch/arm/boot/dts/at91-sama5d3_xplained.dts        |  97 ++++++-----
+ arch/arm/boot/dts/at91-sama5d4_xplained.dts        |  83 ++++++----
+ arch/arm/boot/dts/at91-sama5d4ek.dts               |  83 ++++++----
+ arch/arm/boot/dts/at91-tse850-3.dts                |  70 ++++----
+ arch/arm/boot/dts/at91sam9260.dtsi                 |  65 +++++---
+ arch/arm/boot/dts/at91sam9261.dtsi                 |  48 ++++--
+ arch/arm/boot/dts/at91sam9261ek.dts                |  83 ++++++----
+ arch/arm/boot/dts/at91sam9263.dtsi                 |  89 ++++++++---
+ arch/arm/boot/dts/at91sam9263ek.dts                | 103 +++++++-----
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi        | 103 +++++++-----
+ arch/arm/boot/dts/at91sam9g45.dtsi                 |  64 +++++---
+ arch/arm/boot/dts/at91sam9m10g45ek.dts             |  49 ++++--
+ arch/arm/boot/dts/at91sam9n12.dtsi                 |  74 ++++++---
+ arch/arm/boot/dts/at91sam9n12ek.dts                |  26 ++-
+ arch/arm/boot/dts/at91sam9rl.dtsi                  |  69 +++++---
+ arch/arm/boot/dts/at91sam9rlek.dts                 |  85 ++++++----
+ arch/arm/boot/dts/at91sam9x5.dtsi                  | 134 ++++++++++------
+ arch/arm/boot/dts/at91sam9x5cm.dtsi                |  83 ++++++----
+ arch/arm/boot/dts/ethernut5.dts                    |  47 ++++--
+ arch/arm/boot/dts/ge863-pro3.dtsi                  |  41 +++--
+ arch/arm/boot/dts/pm9g45.dts                       |  99 ++++++------
+ arch/arm/boot/dts/sama5d2.dtsi                     |  53 ++++++
+ arch/arm/boot/dts/sama5d3.dtsi                     | 131 ++++++++++++---
+ arch/arm/boot/dts/sama5d3xcm.dtsi                  |  97 +++++++----
+ arch/arm/boot/dts/sama5d3xcm_cmp.dtsi              |  77 +++++----
+ arch/arm/boot/dts/sama5d4.dtsi                     | 177 ++++++++++++++++++---
+ arch/arm/boot/dts/tny_a9260_common.dtsi            |  89 +++++++----
+ arch/arm/boot/dts/tny_a9263.dts                    | 103 +++++++-----
+ arch/arm/boot/dts/usb_a9260_common.dtsi            | 103 +++++++-----
+ arch/arm/boot/dts/usb_a9263.dts                    | 103 +++++++-----
+ 39 files changed, 1992 insertions(+), 1009 deletions(-)
+
 -- 
 2.7.4
