@@ -1,66 +1,89 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Tue, 30 May 2017 19:11:19 +0300
-Subject: [PATCH] ARM: imx6ull: Make suspend/resume work like on 6ul
-Message-ID: <c63fd9031493cefed47d59c9918c0ecb76ffaf85.1496160320.git.leonard.crestez@nxp.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 30 May 2017 17:17:01 +0100
+Subject: [PATCH 07/31] KVM: arm/arm64: vgic-v3: Add accessors for the
+ ICH_APxRn_EL2 registers
+In-Reply-To: <3b9ed468-71ac-786c-b587-27968c3f3af9@arm.com>
+References: <20170503104606.19342-1-marc.zyngier@arm.com>
+ <20170503104606.19342-8-marc.zyngier@arm.com>
+ <20170503153201.GC4951@leverpostej>
+ <3b9ed468-71ac-786c-b587-27968c3f3af9@arm.com>
+Message-ID: <dcf371d4-f3d7-be1c-789a-22eb5509a729@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suspend and resume on imx6ull is currenty not working because of some
-missed checks where behavior should match imx6ul.
+On 03/05/17 16:58, Marc Zyngier wrote:
+> On 03/05/17 16:32, Mark Rutland wrote:
+>> On Wed, May 03, 2017 at 11:45:42AM +0100, Marc Zyngier wrote:
+>>> As we're about to access the Active Priority registers a lot more,
+>>> let's define accessors that take the register number as a parameter.
+>>>
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> ---
+>>>  virt/kvm/arm/hyp/vgic-v3-sr.c | 116 ++++++++++++++++++++++++++++++++++++------
+>>>  1 file changed, 100 insertions(+), 16 deletions(-)
+>>>
+>>> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+>>> index 32c3295929b0..990d9d1e85d0 100644
+>>> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
+>>> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+>>> @@ -118,6 +118,90 @@ static void __hyp_text __gic_v3_set_lr(u64 val, int lr)
+>>>  	}
+>>>  }
+>>>  
+>>> +static void __hyp_text __vgic_v3_write_ap0rn(u32 val, int n)
+>>> +{
+>>> +	switch (n) {
+>>> +	case 0:
+>>> +		write_gicreg(val, ICH_AP0R0_EL2);
+>>> +		break;
+>>> +	case 1:
+>>> +		write_gicreg(val, ICH_AP0R1_EL2);
+>>> +		break;
+>>> +	case 2:
+>>> +		write_gicreg(val, ICH_AP0R2_EL2);
+>>> +		break;
+>>> +	case 3:
+>>> +		write_gicreg(val, ICH_AP0R3_EL2);
+>>> +		break;
+>>> +	}
+>>
+>> Is there any way we can get a build or runtime failure for an
+>> out-of-bounds n value?
+> 
+> I'd rather avoid runtime failure on this path, because that's pretty
+> terminal. Build-time is a possibility, to some extent.
+> 
+>>
+>>> +}
+>>
+>> Given this is used with a constant n, you could make this:
+>>
+>> #define __vgic_v3_write_ap0rn(v, n) \
+>> 	write_gicreg(v, ICH_AP0R##n##_EL2)
+>>
+>> ... which should also give you a warning for an out-of-bounds n.
+>>
+>> Similar could apply for the other helpers here.
+>>
+>> That would require some function -> macro conversion in later patches
+>> though, so I can understand if you're not keen on that.
+> 
+> I don't mind reworking this if that makes it safer. But the real problem
+> is that the register number and the group are not necessarily constants
+> (see how this is used in __vgic_v3_get_highest_active_priority).
+> 
+> I'll have a look at how I can make that look a bit better.
 
-Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
----
- arch/arm/mach-imx/mxc.h     | 6 ++++++
- arch/arm/mach-imx/pm-imx6.c | 6 ++++--
- 2 files changed, 10 insertions(+), 2 deletions(-)
+So I had another look at that, and I'm not sure there is any way to make
+it really nicer, other than expanding all of the apxrn accessors to deal
+with non constant x and n (which makes the code look really awful).
 
-diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
-index 34f2ff6..e00d626 100644
---- a/arch/arm/mach-imx/mxc.h
-+++ b/arch/arm/mach-imx/mxc.h
-@@ -39,6 +39,7 @@
- #define MXC_CPU_IMX6SX		0x62
- #define MXC_CPU_IMX6Q		0x63
- #define MXC_CPU_IMX6UL		0x64
-+#define MXC_CPU_IMX6ULL		0x65
- #define MXC_CPU_IMX7D		0x72
- 
- #define IMX_DDR_TYPE_LPDDR2		1
-@@ -73,6 +74,11 @@ static inline bool cpu_is_imx6ul(void)
- 	return __mxc_cpu_type == MXC_CPU_IMX6UL;
- }
- 
-+static inline bool cpu_is_imx6ull(void)
-+{
-+	return __mxc_cpu_type == MXC_CPU_IMX6ULL;
-+}
-+
- static inline bool cpu_is_imx6q(void)
- {
- 	return __mxc_cpu_type == MXC_CPU_IMX6Q;
-diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
-index e61b1d1..ecdf071 100644
---- a/arch/arm/mach-imx/pm-imx6.c
-+++ b/arch/arm/mach-imx/pm-imx6.c
-@@ -295,7 +295,8 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode)
- 		val &= ~BM_CLPCR_SBYOS;
- 		if (cpu_is_imx6sl())
- 			val |= BM_CLPCR_BYPASS_PMIC_READY;
--		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul())
-+		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul() ||
-+		    cpu_is_imx6ull())
- 			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
- 		else
- 			val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
-@@ -312,7 +313,8 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode)
- 		val |= BM_CLPCR_SBYOS;
- 		if (cpu_is_imx6sl() || cpu_is_imx6sx())
- 			val |= BM_CLPCR_BYPASS_PMIC_READY;
--		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul())
-+		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul() ||
-+		    cpu_is_imx6ull())
- 			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
- 		else
- 			val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
+I'm pretty confident that it is nigh impossible to get x or n out of
+bounds so unless someone shouts, I plan on keeping this code mostly
+unchanged for the next repost.
+
+Thanks,
+
+	M.
 -- 
-2.7.4
+Jazz is not dead. It just smells funny...
