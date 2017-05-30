@@ -1,43 +1,29 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Tue, 30 May 2017 16:22:57 +0530
-Subject: [PATCH] Input: s3c2410_ts - Handle return value of clk_prepare_enable
-Message-ID: <477d9b0992f4b16454ad1780eb4477433c075226.1496141406.git.arvind.yadav.cs@gmail.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Tue, 30 May 2017 11:58:41 +0100
+Subject: [PATCH 6/7] iommu/arm-smmu-v3: Add support for PCI ATS
+In-Reply-To: <20170530102831.GJ2818@8bytes.org>
+References: <20170524180143.19855-1-jean-philippe.brucker@arm.com>
+ <20170524180143.19855-7-jean-philippe.brucker@arm.com>
+ <20170530102831.GJ2818@8bytes.org>
+Message-ID: <e162ad57-0fab-b65c-49b1-d083fcbf61d7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_prepare_enable() can fail here and we must check its return value.
+On 30/05/17 11:28, Joerg Roedel wrote:
+> On Wed, May 24, 2017 at 07:01:42PM +0100, Jean-Philippe Brucker wrote:
+>> * TLB invalidation by range is batched and committed with a single sync.
+>>   Batching ATC invalidation is inconvenient, endpoints limit the number of
+>>   inflight invalidations. We'd have to count the number of invalidations
+>>   queued and send a sync periodically. In addition, I suspect we always
+>>   need a sync between TLB and ATC invalidation for the same page.
+> 
+> This sounds like the number of outstanding ATS invalidations is not
+> managed by the SMMU hardware, is that right?
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
----
- drivers/input/touchscreen/s3c2410_ts.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+Yes, the hardware doesn't know about ATS queue depth, it simply forwards
+invalidations to the root complex. Doing a sync on the SMMU command queue
+waits for all completions of outstanding ATS invalidations, but it is up
+to the driver to limit ATS invalidations according to queue depth.
 
-diff --git a/drivers/input/touchscreen/s3c2410_ts.c b/drivers/input/touchscreen/s3c2410_ts.c
-index 41d58e8..3b3db8c 100644
---- a/drivers/input/touchscreen/s3c2410_ts.c
-+++ b/drivers/input/touchscreen/s3c2410_ts.c
-@@ -264,7 +264,11 @@ static int s3c2410ts_probe(struct platform_device *pdev)
- 		return -ENOENT;
- 	}
- 
--	clk_prepare_enable(ts.clock);
-+	ret = clk_prepare_enable(ts.clock);
-+	if (ret) {
-+		dev_err(dev, "Failed! to enabled clocks\n");
-+		goto err_clk_get;
-+	}
- 	dev_dbg(dev, "got and enabled clocks\n");
- 
- 	ts.irq_tc = ret = platform_get_irq(pdev, 0);
-@@ -353,7 +357,9 @@ static int s3c2410ts_probe(struct platform_device *pdev)
-  err_iomap:
- 	iounmap(ts.io);
-  err_clk:
-+	clk_disable_unprepare(ts.clock);
- 	del_timer_sync(&touch_timer);
-+ err_clk_get:
- 	clk_put(ts.clock);
- 	return ret;
- }
--- 
-1.9.1
+Thanks,
+Jean
