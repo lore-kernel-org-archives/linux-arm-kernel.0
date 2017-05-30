@@ -1,25 +1,27 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 30 May 2017 23:51:16 +0200
-Subject: [PATCH 35/58] ARM: dts: at91: sama5d3xek_cmp: use TCB0 as clocksource
+Date: Tue, 30 May 2017 23:51:14 +0200
+Subject: [PATCH 33/58] ARM: dts: at91: sama5d3 Xplained: use TCB0 as
+ clocksource
 In-Reply-To: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
 References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170530215139.9983-36-alexandre.belloni@free-electrons.com>
+Message-ID: <20170530215139.9983-34-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use tcb0 as the clocksource like previously selected in sama5_defconfig.
 
+Tested-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/sama5d3xcm_cmp.dtsi | 12 ++++++++++++
+ arch/arm/boot/dts/at91-sama5d3_xplained.dts | 12 ++++++++++++
  1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sama5d3xcm_cmp.dtsi b/arch/arm/boot/dts/sama5d3xcm_cmp.dtsi
-index dc7572bc7ff0..2908879e84cf 100644
---- a/arch/arm/boot/dts/sama5d3xcm_cmp.dtsi
-+++ b/arch/arm/boot/dts/sama5d3xcm_cmp.dtsi
-@@ -69,6 +69,18 @@
- 				cs-gpios = <&pioD 13 0>, <0>, <0>, <0>;
+diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+index 5a53fcf542ab..33bec1e9f22e 100644
+--- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+@@ -65,6 +65,18 @@
+ 				status = "okay";
  			};
  
 +			tcb0: timer at f0010000 {
@@ -34,8 +36,8 @@ index dc7572bc7ff0..2908879e84cf 100644
 +				};
 +			};
 +
- 			macb0: ethernet at f0028000 {
- 				phy-mode = "rgmii";
- 				#address-cells = <1>;
+ 			i2c0: i2c at f0014000 {
+ 				pinctrl-0 = <&pinctrl_i2c0_pu>;
+ 				status = "okay";
 -- 
 2.11.0
