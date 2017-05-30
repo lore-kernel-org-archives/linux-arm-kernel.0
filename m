@@ -1,44 +1,66 @@
 From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Tue, 30 May 2017 18:57:18 +0300
-Subject: [PATCH] cpufreq: imx6q: imx6ull should use the same flow as imx6ul
-Message-ID: <30688f5aa17763362275c199b2d61841497c26a4.1496159470.git.leonard.crestez@nxp.com>
+Date: Tue, 30 May 2017 19:11:19 +0300
+Subject: [PATCH] ARM: imx6ull: Make suspend/resume work like on 6ul
+Message-ID: <c63fd9031493cefed47d59c9918c0ecb76ffaf85.1496160320.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Octavian Purdila <octavian.purdila@nxp.com>
+Suspend and resume on imx6ull is currenty not working because of some
+missed checks where behavior should match imx6ul.
 
-This fixes an issue with imx6ull where setting the frequency to 528Mhz
-would actually set the ARM clock to 324Mhz.
-
-Signed-off-by: Octavian Purdila <octavian.purdila@nxp.com>
 Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 ---
- drivers/cpufreq/imx6q-cpufreq.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/mach-imx/mxc.h     | 6 ++++++
+ arch/arm/mach-imx/pm-imx6.c | 6 ++++--
+ 2 files changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-index 9c13f09..b6edd3c 100644
---- a/drivers/cpufreq/imx6q-cpufreq.c
-+++ b/drivers/cpufreq/imx6q-cpufreq.c
-@@ -101,7 +101,8 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
- 	 *  - Reprogram pll1_sys_clk and reparent pll1_sw_clk back to it
- 	 *  - Disable pll2_pfd2_396m_clk
- 	 */
--	if (of_machine_is_compatible("fsl,imx6ul")) {
-+	if (of_machine_is_compatible("fsl,imx6ul") ||
-+	    of_machine_is_compatible("fsl,imx6ull")) {
- 		/*
- 		 * When changing pll1_sw_clk's parent to pll1_sys_clk,
- 		 * CPU may run at higher than 528MHz, this will lead to
-@@ -215,7 +216,8 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
- 		goto put_clk;
- 	}
+diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
+index 34f2ff6..e00d626 100644
+--- a/arch/arm/mach-imx/mxc.h
++++ b/arch/arm/mach-imx/mxc.h
+@@ -39,6 +39,7 @@
+ #define MXC_CPU_IMX6SX		0x62
+ #define MXC_CPU_IMX6Q		0x63
+ #define MXC_CPU_IMX6UL		0x64
++#define MXC_CPU_IMX6ULL		0x65
+ #define MXC_CPU_IMX7D		0x72
  
--	if (of_machine_is_compatible("fsl,imx6ul")) {
-+	if (of_machine_is_compatible("fsl,imx6ul") ||
-+	    of_machine_is_compatible("fsl,imx6ull")) {
- 		pll2_bus_clk = clk_get(cpu_dev, "pll2_bus");
- 		secondary_sel_clk = clk_get(cpu_dev, "secondary_sel");
- 		if (IS_ERR(pll2_bus_clk) || IS_ERR(secondary_sel_clk)) {
+ #define IMX_DDR_TYPE_LPDDR2		1
+@@ -73,6 +74,11 @@ static inline bool cpu_is_imx6ul(void)
+ 	return __mxc_cpu_type == MXC_CPU_IMX6UL;
+ }
+ 
++static inline bool cpu_is_imx6ull(void)
++{
++	return __mxc_cpu_type == MXC_CPU_IMX6ULL;
++}
++
+ static inline bool cpu_is_imx6q(void)
+ {
+ 	return __mxc_cpu_type == MXC_CPU_IMX6Q;
+diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
+index e61b1d1..ecdf071 100644
+--- a/arch/arm/mach-imx/pm-imx6.c
++++ b/arch/arm/mach-imx/pm-imx6.c
+@@ -295,7 +295,8 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode)
+ 		val &= ~BM_CLPCR_SBYOS;
+ 		if (cpu_is_imx6sl())
+ 			val |= BM_CLPCR_BYPASS_PMIC_READY;
+-		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul())
++		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul() ||
++		    cpu_is_imx6ull())
+ 			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
+ 		else
+ 			val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
+@@ -312,7 +313,8 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode)
+ 		val |= BM_CLPCR_SBYOS;
+ 		if (cpu_is_imx6sl() || cpu_is_imx6sx())
+ 			val |= BM_CLPCR_BYPASS_PMIC_READY;
+-		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul())
++		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul() ||
++		    cpu_is_imx6ull())
+ 			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
+ 		else
+ 			val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
 -- 
 2.7.4
