@@ -1,68 +1,67 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Tue, 30 May 2017 16:11:35 +0200
-Subject: [PATCH v7 0/3] Cavium ThunderX2 SMMUv3 errata workarounds
-In-Reply-To: <1496145821-3411-1-git-send-email-gakula@caviumnetworks.com>
-References: <1496145821-3411-1-git-send-email-gakula@caviumnetworks.com>
-Message-ID: <20170530141135.GV16981@rric.localdomain>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 30 May 2017 15:15:54 +0100
+Subject: [PATCH 0/6] Add support for the ICU unit in Marvell Armada 7K/8K
+In-Reply-To: <1496135772-20694-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1496135772-20694-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <cc93efea-84ea-970d-914a-141241b8cace@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.05.17 17:33:38, Geetha sowjanya wrote:
-> Cavium ThunderX2 SMMUv3 implementation has two Silicon Erratas.
-> 1. Errata ID #74
->    SMMU register alias Page 1 is not implemented
-> 2. Errata ID #126
->    SMMU doesnt support unique IRQ lines and also MSI for gerror,
->    eventq and cmdq-sync
-> 
-> The following patchset does software workaround for these two erratas.
-> 
-> This series is based on patchset.
-> https://www.spinics.net/lists/arm-kernel/msg578443.html
-> 
-> Changes since v6:
->    - Changed device tree compatible string to vendor specific.
->    - Rebased on Robin's latest "Update SMMU models for IORT rev. C" v2 patch.
->      https://www.spinics.net/lists/arm-kernel/msg582809.html
-> 
-> Changes since v5:
->   - Rebased on Robin's "Update SMMU models for IORT rev. C" patch.
->      https://www.spinics.net/lists/arm-kernel/msg580728.html
->   - Replaced ACPI_IORT_SMMU_V3_CAVIUM_CN99XX macro with ACPI_IORT_SMMU_CAVIUM_CN99XX
-> 
-> Changes since v4:
->  - Replaced all page1 offset macros ARM_SMMU_EVTQ/PRIQ_PROD/CONS with
->     arm_smmu_page1_fixup(ARM_SMMU_EVTQ/PRIQ_PROD/CONS, smmu)
-> 
-> Changes since v3:
->  - Merged patches 1, 2 and 4 of Version 3.
->  - Modified the page1_offset_adjust() and get_irq_flags() implementation as
->    suggested by Robin.
-> 
-> Changes since v2:
->  - Updated "Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt" document with
->    new SMMU option used to enable errata workaround.
-> 
-> Changes since v1:
->  - Since the use of MIDR register is rejected and SMMU_IIDR is broken on this
->    silicon, as suggested by Will Deacon modified the patches to use ThunderX2
->    SMMUv3 IORT model number to enable errata workaround.
-> 
-> Geetha Sowjanya (1):
->   iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2 erratum #126
-> 
-> Linu Cherian (2):
->   ACPI/IORT: Fixup SMMUv3 resource size for Cavium ThunderX2 SMMUv3
->     model
->   iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2      erratum
->     #74
-> 
->  Documentation/arm64/silicon-errata.txt             |    2 +
->  .../devicetree/bindings/iommu/arm,smmu-v3.txt      |    6 ++
->  drivers/acpi/arm64/iort.c                          |   10 ++-
->  drivers/iommu/arm-smmu-v3.c                        |   93 ++++++++++++++++----
->  4 files changed, 91 insertions(+), 20 deletions(-)
+Hi Thomas,
 
-For the whole series:
+On 30/05/17 10:16, Thomas Petazzoni wrote:
+> Hello,
+> 
+> The Marvell Armada 7K/8K SoCs are composed of two parts: the AP (which
+> contains the CPU cores) and the CP (which contains most
+> peripherals). The 7K SoCs have one CP, while the 8K SoCs have two CPs,
+> doubling the number of available peripherals.
+> 
+> In terms of interrupt handling, all devices in the CPs are connected
+> through wired interrupt to a unit called ICU located in each CP. This
+> unit converts the wired interrupts from the devices into memory
+> transactions.
+> 
+> Inside the AP, there is a GIC extension called GICP, which allows a
+> memory write transaction to trigger a GIC SPI interrupt. The ICUs in
+> each CP are therefore configured to trigger a memory write into the
+> appropriate GICP register so that a wired interrupt from a CP device
+> is converted into a memory write, itself converted into a regular GIC
+> SPI interrupt.
+> 
+> Until now, the configuration of the ICU was done statically by the
+> firmware, and therefore the Device Tree files in Linux were specifying
+> directly GIC interrupts for the interrupts of CP devices. However,
+> with the growing number of devices in the CP, a static allocation
+> scheme doesn't work for the long term.
+> 
+> This patch series therefore makes Linux aware of the ICU: GIC SPI
+> interrupts are dynamically allocated, and the ICU is configured
+> accordingly to route a CP wired interrupt to the allocated GIC SPI
+> interrupt.
+> 
+> In detail:
+> 
+>  - The first two patches are the Device Tree binding patches
+> 
+>  - The third patch is a minimal driver for the GICP unit. All it does
+>    is clear interrupts that may have been left pending by the
+>    firmware.
+> 
+>  - The fourth patch is the most important done, which adds the driver
+>    for the ICU itself.
+> 
+>  - The fifth patch adjust Kconfig.platforms to select the GICP and ICU
+>    drivers.
+> 
+>  - The last patch adjusts the Device Tree files of the Armada 7K/8K to
+>    use the ICU.
 
-Reviewed-by: Robert Richter <rrichter@cavium.com>
+For a first drop, this looks quite good, and the few comments I've had
+should be pretty easy to address. Looking forward to reviewing v2.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
