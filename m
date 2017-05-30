@@ -1,167 +1,82 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Tue, 30 May 2017 11:05:07 +0200
-Subject: [PATCH v4 2/2] hwmon: (scpi) Fix the scale of SCP sensor readings
-In-Reply-To: <20170530090507.16611-1-carlo@caione.org>
-References: <20170530090507.16611-1-carlo@caione.org>
-Message-ID: <20170530090507.16611-3-carlo@caione.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 30 May 2017 10:06:52 +0100
+Subject: [PATCH v6 3/6] ACPI/IORT: Ignore all errors except EPROBE_DEFER
+In-Reply-To: <68bc9be5-22df-e7af-3fcd-182e935e681c@codeaurora.org>
+References: <1495892865-9506-1-git-send-email-sricharan@codeaurora.org>
+ <1495892865-9506-3-git-send-email-sricharan@codeaurora.org>
+ <1564836.5iBbgoacpH@aspire.rjw.lan>
+ <68bc9be5-22df-e7af-3fcd-182e935e681c@codeaurora.org>
+Message-ID: <20170530090652.GA1767@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Carlo Caione <carlo@endlessm.com>
+On Mon, May 29, 2017 at 10:36:42AM +0530, Sricharan R wrote:
+> Hi Rafael,
+> 
+> On 5/28/2017 12:48 AM, Rafael J. Wysocki wrote:
+> > On Saturday, May 27, 2017 07:17:42 PM Sricharan R wrote:
+> >> While deferring the probe of IOMMU masters, xlate and
+> >> add_device callbacks called from iort_iommu_configure
+> >> can pass back error values like -ENODEV, which means
+> >> the IOMMU cannot be connected with that master for real
+> >> reasons. Before the IOMMU probe deferral, all such errors
+> >> were ignored. Now all those errors are propagated back,
+> >> killing the master's probe for such errors. Instead ignore
+> >> all the errors except EPROBE_DEFER, which is the only one
+> >> of concern and let the master work without IOMMU, thus
+> >> restoring the old behavior. Also make explicit that
+> >> acpi_dma_configure handles only -EPROBE_DEFER from
+> >> iort_iommu_configure.
+> >>
+> >> Fixes: 5a1bb638d567 ("drivers: acpi: Handle IOMMU lookup failure with deferred probing or error")
+> >> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> >> ---
+> >>  drivers/acpi/arm64/iort.c | 6 ++++++
+> >>  drivers/acpi/scan.c       | 4 ++--
+> >>  2 files changed, 8 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> >> index c5fecf9..16e101f 100644
+> >> --- a/drivers/acpi/arm64/iort.c
+> >> +++ b/drivers/acpi/arm64/iort.c
+> >> @@ -782,6 +782,12 @@ const struct iommu_ops *iort_iommu_configure(struct device *dev)
+> >>  	if (err)
+> >>  		ops = ERR_PTR(err);
+> >>  
+> >> +	/* Ignore all other errors apart from EPROBE_DEFER */
+> >> +	if (IS_ERR(ops) && (PTR_ERR(ops) != -EPROBE_DEFER)) {
+> >> +		dev_dbg(dev, "Adding to IOMMU failed: %ld\n", PTR_ERR(ops));
+> >> +		ops = NULL;
+> >> +	}
+> >> +
+> >>  	return ops;
+> >>  }
+> >>  
+> >> diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+> >> index e39ec7b..3a10d757 100644
+> >> --- a/drivers/acpi/scan.c
+> >> +++ b/drivers/acpi/scan.c
+> >> @@ -1371,8 +1371,8 @@ int acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
+> >>  	iort_set_dma_mask(dev);
+> >>  
+> >>  	iommu = iort_iommu_configure(dev);
+> >> -	if (IS_ERR(iommu))
+> >> -		return PTR_ERR(iommu);
+> >> +	if (IS_ERR(iommu) && PTR_ERR(iommu) == -EPROBE_DEFER)
+> >> +		return -EPROBE_DEFER;
+> >>  
+> >>  	size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
+> >>  	/*
+> >>
+> > 
+> > ACK for the scan.c change and I'm assuming this to go in via ARM64.
+> > 
+> 
+> Thanks for the ACK, should go through the IOMMU tree, since this fixes the IOMMU probe deferral
+> that got merged through it.
 
-The implementation details for SCPI seems to suggest that the sensor
-readings must be reported by SCP using a well defined scale
-(millidegree Celsius for temperature, millivolts for voltage,
-milliamperes for current, microwatts for power and microjoules for
-energy).
+Yes and it would be good to get them merged for -rc4 given that there
+are bug fixes there, I agree the IOMMU tree is the way they should
+go upstream.
 
-This is also important for the interaction with other subsystems: for
-example both the thermal sub-system and the hwmon sysfs interface expect
-the temperature expressed in millidegree Celsius.
-
-Unfortunately since this behaviour is dependent on the firmware
-implementation there are cases where the sensor readings are reported
-using a different scale. For example in the Amlogic SoCs the
-temperature is reported in degree and not millidegree Celsius.
-
-To take into account this discrepancy and fixup the values reported by
-SCP a new compatible 'amlogic,meson-gxbb-scpi-sensors' is introduced and
-used in this patch by the scpi-hwmon driver to convert the sensor
-readings to the expected scale.
-
-Signed-off-by: Carlo Caione <carlo@endlessm.com>
----
- drivers/hwmon/scpi-hwmon.c | 54 ++++++++++++++++++++++++++++++++++++++++------
- 1 file changed, 48 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/hwmon/scpi-hwmon.c b/drivers/hwmon/scpi-hwmon.c
-index 094f948..a586480 100644
---- a/drivers/hwmon/scpi-hwmon.c
-+++ b/drivers/hwmon/scpi-hwmon.c
-@@ -16,6 +16,7 @@
- 
- #include <linux/hwmon.h>
- #include <linux/module.h>
-+#include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/scpi_protocol.h>
- #include <linux/slab.h>
-@@ -23,6 +24,7 @@
- #include <linux/thermal.h>
- 
- struct sensor_data {
-+	unsigned int scale;
- 	struct scpi_sensor_info info;
- 	struct device_attribute dev_attr_input;
- 	struct device_attribute dev_attr_label;
-@@ -44,6 +46,30 @@ struct scpi_sensors {
- 	const struct attribute_group *groups[2];
- };
- 
-+static const u32 gxbb_scpi_scale[] = {
-+	[TEMPERATURE]	= 1,		/* (celsius)		*/
-+	[VOLTAGE]	= 1000,		/* (millivolts)		*/
-+	[CURRENT]	= 1000,		/* (milliamperes)	*/
-+	[POWER]		= 1000000,	/* (microwatts)		*/
-+	[ENERGY]	= 1000000,	/* (microjoules)	*/
-+};
-+
-+static const u32 scpi_scale[] = {
-+	[TEMPERATURE]	= 1000,		/* (millicelsius)	*/
-+	[VOLTAGE]	= 1000,		/* (millivolts)		*/
-+	[CURRENT]	= 1000,		/* (milliamperes)	*/
-+	[POWER]		= 1000000,	/* (microwatts)		*/
-+	[ENERGY]	= 1000000,	/* (microjoules)	*/
-+};
-+
-+static void scpi_scale_reading(u64 *value, struct sensor_data *sensor)
-+{
-+	if (scpi_scale[sensor->info.class] != sensor->scale) {
-+		*value *= scpi_scale[sensor->info.class];
-+		do_div(*value, sensor->scale);
-+	}
-+}
-+
- static int scpi_read_temp(void *dev, int *temp)
- {
- 	struct scpi_thermal_zone *zone = dev;
-@@ -57,6 +83,8 @@ static int scpi_read_temp(void *dev, int *temp)
- 	if (ret)
- 		return ret;
- 
-+	scpi_scale_reading(&value, sensor);
-+
- 	*temp = value;
- 	return 0;
- }
-@@ -77,6 +105,8 @@ scpi_show_sensor(struct device *dev, struct device_attribute *attr, char *buf)
- 	if (ret)
- 		return ret;
- 
-+	scpi_scale_reading(&value, sensor);
-+
- 	return sprintf(buf, "%llu\n", value);
- }
- 
-@@ -94,14 +124,23 @@ static struct thermal_zone_of_device_ops scpi_sensor_ops = {
- 	.get_temp = scpi_read_temp,
- };
- 
-+static const struct of_device_id scpi_of_match[] = {
-+	{.compatible = "arm,scpi-sensors", .data = &scpi_scale},
-+	{.compatible = "amlogic,meson-gxbb-scpi-sensors", .data = &gxbb_scpi_scale},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, scpi_of_match);
-+
- static int scpi_hwmon_probe(struct platform_device *pdev)
- {
- 	u16 nr_sensors, i;
-+	const u32 *scale;
- 	int num_temp = 0, num_volt = 0, num_current = 0, num_power = 0;
- 	int num_energy = 0;
- 	struct scpi_ops *scpi_ops;
- 	struct device *hwdev, *dev = &pdev->dev;
- 	struct scpi_sensors *scpi_sensors;
-+	const struct of_device_id *of_id;
- 	int idx, ret;
- 
- 	scpi_ops = get_scpi_ops();
-@@ -131,6 +170,13 @@ static int scpi_hwmon_probe(struct platform_device *pdev)
- 
- 	scpi_sensors->scpi_ops = scpi_ops;
- 
-+	of_id = of_match_device(scpi_of_match, &pdev->dev);
-+	if (!of_id) {
-+		dev_err(&pdev->dev, "Unable to initialize scpi-hwmon data\n");
-+		return -ENODEV;
-+	}
-+	scale = of_id->data;
-+
- 	for (i = 0, idx = 0; i < nr_sensors; i++) {
- 		struct sensor_data *sensor = &scpi_sensors->data[idx];
- 
-@@ -178,6 +224,8 @@ static int scpi_hwmon_probe(struct platform_device *pdev)
- 			continue;
- 		}
- 
-+		sensor->scale = scale[sensor->info.class];
-+
- 		sensor->dev_attr_input.attr.mode = S_IRUGO;
- 		sensor->dev_attr_input.show = scpi_show_sensor;
- 		sensor->dev_attr_input.attr.name = sensor->input;
-@@ -247,12 +295,6 @@ static int scpi_hwmon_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static const struct of_device_id scpi_of_match[] = {
--	{.compatible = "arm,scpi-sensors"},
--	{},
--};
--MODULE_DEVICE_TABLE(of, scpi_of_match);
--
- static struct platform_driver scpi_hwmon_platdrv = {
- 	.driver = {
- 		.name	= "scpi-hwmon",
--- 
-2.9.3
+Lorenzo
