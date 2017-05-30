@@ -1,74 +1,72 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 30 May 2017 15:32:57 +0100
-Subject: Tegra baseline test results for v4.12-rc3
-Message-ID: <230ce54d-0133-c85e-326c-bff3c694ac49@nvidia.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 30 May 2017 15:36:29 +0100
+Subject: [PATCH 4/6] irqchip: irq-mvebu-icu: new driver for Marvell ICU
+In-Reply-To: <20170530140320.GA22758@lunn.ch>
+References: <1496135772-20694-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1496135772-20694-5-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20170530121907.GO22219@n2100.armlinux.org.uk>
+ <20170530143350.6f8563c1@free-electrons.com>
+ <20170530125643.GQ22219@n2100.armlinux.org.uk>
+ <20170530132735.GA21646@lunn.ch>
+ <20170530134226.GR22219@n2100.armlinux.org.uk>
+ <20170530140320.GA22758@lunn.ch>
+Message-ID: <20170530143629.GT22219@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tegra baseline test results for v4.12-rc3
+On Tue, May 30, 2017 at 04:03:20PM +0200, Andrew Lunn wrote:
+> Linux has a long history of reworking stuff in tree, when it has been
+> shown to be inadequate in its first version. So long as the device
+> tree binding does not need incompatible changes, this reworking is not
+> an issue. My guess is, a lot of people have SFP sockets, not
+> SFP+. Lets get SFP merged, and then rework it in tree to add SFP+.
 
+Unfortunately, it _does_ require an incompatible DT change, and an
+incompatible change with the MAC drivers.
 
-Here are some basic Tegra test results for Linux v4.12-rc3.
-Logs and other details at:
+The DT change is needed because the current DT model (modelled from
+DSA) connects the SFP cage to the MAC device using (eg):
 
-    https://nvtb.github.io//linux/test_v4.12-rc3/20170528173104/
+	sfp {
+		...
+		sfp,ethernet = <&eth2>;
+	};
 
+This completely breaks when you have SFP connected to a PHY, as is
+the case with SFP+.  So the current binding is unusable for this
+case.
 
-Test summary
-------------
+Instead, what I have (and what I will propose) is to get rid of that
+property entirely, replacing it with a property in the upstream device
+(being a MAC or PHY), eg:
 
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+&eth2 {
+	sfp = <&sfp>;
+};
 
-Build: Image:
-    Pass: ( 1/ 1): defconfig
+        p1_phy: ethernet-phy at 8 {
+                sfp = <&sfp_eth1>;
+        };
 
-Boot to userspace: defconfig:
-    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000, tegra210-smaug
+The code changes behind this would make maintaining support for the
+previous binding rather difficult, as the way the SFP code finds the
+netdevice changes completely - I now have a separate "sfp-bus", which
+both phylink and SFP sockets register into, and which is responsible
+for connecting the two together.
 
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+This change would not be possible had SFP support already been merged.
+The old binding was just wrong.
 
-Boot to userspace: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+I pushed out some updates to the SFP support last week, and now that
+I have dw-hdmi out of the way, I'm about to merge these incompatible
+changes into the SFP branch, and as the branch is currently at 24
+patches, I'm probably going to squash a lot of the patches in there
+together at the same time - which'll make me feel a bit sorry for
+anyone who's making use of the existing code, because they won't be
+able to see what the changes have been.  However, that's the only way
+to stop the patch set going over 30...
 
-PM: System suspend: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v4.12-rc2 (08332893e37af6ae779367e78e444f8f9571511d)):
-   text     data      bss    total  kernel
-   -351     +400        0      +49  defconfig
-  +1587      +72        0    +1659  multi_v7_defconfig
-  +1423       +8        0    +1431  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.12-rc2 (08332893e37af6ae779367e78e444f8f9571511d))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
-        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
-        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
-        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
-
---
-nvpublic
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
