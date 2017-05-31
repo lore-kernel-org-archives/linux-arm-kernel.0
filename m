@@ -1,47 +1,38 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed, 31 May 2017 09:18:35 +0200
-Subject: [PATCH v6 04/21] dt-bindings: syscon: Add DT bindings documentation
- for Allwinner syscon
+Date: Wed, 31 May 2017 09:18:32 +0200
+Subject: [PATCH v6 01/21] net-next: stmmac: export
+ stmmac_set_mac_addr/stmmac_get_mac_addr
 In-Reply-To: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
 References: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170531071852.12422-5-clabbe.montjoie@gmail.com>
+Message-ID: <20170531071852.12422-2-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation for Device-Tree bindings for the
-syscon present in allwinner devices.
+Thoses symbol will be needed for the dwmac-sun8i ethernet driver.
+For letting it to be build as module, they need to be exported.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/misc/allwinner,syscon.txt     | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/misc/allwinner,syscon.txt
+ drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/misc/allwinner,syscon.txt b/Documentation/devicetree/bindings/misc/allwinner,syscon.txt
-new file mode 100644
-index 000000000000..cb5769137c6c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/misc/allwinner,syscon.txt
-@@ -0,0 +1,19 @@
-+* Allwinner sun8i system controller
-+
-+This file describes the bindings for the system controller present in
-+Allwinner SoC H3, A83T and A64.
-+The principal function of this syscon is to control EMAC PHY choice and
-+config.
-+
-+Required properties for the system controller:
-+- reg: address and length of the register for the device.
-+- compatible: should be "syscon" and one of the following string:
-+		"allwinner,sun8i-h3-system-controller"
-+		"allwinner,sun50i-a64-system-controller"
-+		"allwinner,sun8i-a83t-system-controller"
-+
-+Example:
-+syscon: syscon at 1c00000 {
-+	compatible = "allwinner,sun8i-h3-system-controller", "syscon";
-+	reg = <0x01c00000 0x1000>;
-+};
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c b/drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c
+index 38f94305aab5..67af0bdd7f10 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c
+@@ -248,6 +248,7 @@ void stmmac_set_mac_addr(void __iomem *ioaddr, u8 addr[6],
+ 	data = (addr[3] << 24) | (addr[2] << 16) | (addr[1] << 8) | addr[0];
+ 	writel(data, ioaddr + low);
+ }
++EXPORT_SYMBOL_GPL(stmmac_set_mac_addr);
+ 
+ /* Enable disable MAC RX/TX */
+ void stmmac_set_mac(void __iomem *ioaddr, bool enable)
+@@ -279,4 +280,4 @@ void stmmac_get_mac_addr(void __iomem *ioaddr, unsigned char *addr,
+ 	addr[4] = hi_addr & 0xff;
+ 	addr[5] = (hi_addr >> 8) & 0xff;
+ }
+-
++EXPORT_SYMBOL_GPL(stmmac_get_mac_addr);
 -- 
 2.13.0
