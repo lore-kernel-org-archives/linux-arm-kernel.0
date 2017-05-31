@@ -1,82 +1,78 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 31 May 2017 12:57:01 +0000
-Subject: [PATCH] asm-generic: simd: allow SIMD in process context with BH
- disabled
-Message-ID: <20170531125701.20717-1-ard.biesheuvel@linaro.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 31 May 2017 15:04:06 +0200
+Subject: [PATCH v9 3/4] arm: dts: mt2701: Add node for Mediatek JPEG
+ Decoder
+In-Reply-To: <492cfa38-aff0-f7c9-72f9-94e53adc198c@gmail.com>
+References: <1481702690-10476-1-git-send-email-rick.chang@mediatek.com>
+ <1481702690-10476-4-git-send-email-rick.chang@mediatek.com>
+ <492cfa38-aff0-f7c9-72f9-94e53adc198c@gmail.com>
+Message-ID: <35da3376-cc23-b588-c026-b3d300f6ecfa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-asm-generic supplies a header asm/simd.h which exports a single function
-may_use_simd(), which conveys whether the current context allows the SIMD
-register file or instructions to be used.
 
-This header is included by crypto code shared between x86 and ARM/arm64,
-and which offloads SIMD processing to process context if required. The
-generic asm/simd.h is shared between ARM and arm64 at the moment, while
-x86 has its own implementation.
 
-On arm64, we currently mostly ignore may_use_simd(), because arm64 allows
-kernel mode NEON in any context. However, this is due to change shortly
-when support for SVE is merged, at which point we will introduce an arm64
-specific implementation of asm/simd.h as well.
+On 10/05/17 13:02, Matthias Brugger wrote:
+> 
+> 
+> On 14/12/16 09:04, Rick Chang wrote:
+>> Signed-off-by: Rick Chang <rick.chang@mediatek.com>
+>> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+>> ---
+>> This patch depends on:
+>>    CCF "Add clock support for Mediatek MT2701"[1]
+>>    iommu and smi "Add the dtsi node of iommu and smi for mt2701"[2]
+>>
+>> [1] 
+>> http://lists.infradead.org/pipermail/linux-mediatek/2016-October/007271.html 
+>>
+>> [2] https://patchwork.kernel.org/patch/9164013/
+> 
+> Now queued for v4.12-next/dts32
+> 
+> Thanks and sorry for the delay.
+> Matthias
+> 
 
-That leaves ARM, which only allows kernel mode NEON in process context,
-which makes the current generic implementation of may_use_simd() seem
-appropriate. However, given that in_interrupt() will return true when
-running in process context with bottom halves disabled, we may end up
-falling back to less optimized code unnecessarily, given that kernel
-mode NEON is perfectly usable in that case.
+I realized that a long time ago I made a mistake when taking:
+f3cba0f49c7c ("ARM: dts: mt2701: add iommu/smi dtsi node for mt2701")
 
-So redefine may_use_simd() to disallow SIMD only when running in hardirq
-or softirq context.
+as I forgot to include dt-bindings/memory/mt2701-larb-port.h
 
-While we're at it, add some missing header file decorations such as
-a license header and include guards.
+I fixed this now in v4.12-next/dts32
 
-Reported-by: "Jason A. Donenfeld" <Jason@zx2c4.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- include/asm-generic/simd.h | 23 ++++++++++++++++++++---
- 1 file changed, 20 insertions(+), 3 deletions(-)
+Sorry for that.
 
-diff --git a/include/asm-generic/simd.h b/include/asm-generic/simd.h
-index f57eb7b5c23b..a3e5ebe6b2b2 100644
---- a/include/asm-generic/simd.h
-+++ b/include/asm-generic/simd.h
-@@ -1,14 +1,31 @@
-+/*
-+ * Copyright (C) 2013 - 2017 Linaro Ltd. <ard.biesheuvel@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published
-+ * by the Free Software Foundation.
-+ */
- 
--#include <linux/hardirq.h>
-+#ifndef __ASM_SIMD_H
-+#define __ASM_SIMD_H
-+
-+#include <linux/types.h>
-+#include <linux/preempt.h>
- 
- /*
-  * may_use_simd - whether it is allowable at this time to issue SIMD
-  *                instructions or access the SIMD register file
-  *
-  * As architectures typically don't preserve the SIMD register file when
-- * taking an interrupt, !in_interrupt() should be a reasonable default.
-+ * taking an interrupt, it is reasonable to define the default behavior
-+ * of 'may_use_simd()' to be 'SIMD is only allowed when not handling an
-+ * IRQ or softIRQ'. Since 'in_interrupt()' will also return true when
-+ * running in process context with bottom halves disabled, we have to
-+ * spell out that condition as shown.
-  */
- static __must_check inline bool may_use_simd(void)
- {
--	return !in_interrupt();
-+	return !in_irq() && !in_serving_softirq();
- }
-+
-+#endif
--- 
-2.9.3
+Regards,
+Matthias
+
+>> ---
+>>   arch/arm/boot/dts/mt2701.dtsi | 14 ++++++++++++++
+>>   1 file changed, 14 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/mt2701.dtsi 
+>> b/arch/arm/boot/dts/mt2701.dtsi
+>> index 8f13c70..4dd5048 100644
+>> --- a/arch/arm/boot/dts/mt2701.dtsi
+>> +++ b/arch/arm/boot/dts/mt2701.dtsi
+>> @@ -298,6 +298,20 @@
+>>           power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
+>>       };
+>> +    jpegdec: jpegdec at 15004000 {
+>> +        compatible = "mediatek,mt2701-jpgdec";
+>> +        reg = <0 0x15004000 0 0x1000>;
+>> +        interrupts = <GIC_SPI 143 IRQ_TYPE_LEVEL_LOW>;
+>> +        clocks =  <&imgsys CLK_IMG_JPGDEC_SMI>,
+>> +              <&imgsys CLK_IMG_JPGDEC>;
+>> +        clock-names = "jpgdec-smi",
+>> +                  "jpgdec";
+>> +        power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
+>> +        mediatek,larb = <&larb2>;
+>> +        iommus = <&iommu MT2701_M4U_PORT_JPGDEC_WDMA>,
+>> +             <&iommu MT2701_M4U_PORT_JPGDEC_BSDMA>;
+>> +    };
+>> +
+>>       vdecsys: syscon at 16000000 {
+>>           compatible = "mediatek,mt2701-vdecsys", "syscon";
+>>           reg = <0 0x16000000 0 0x1000>;
+>>
