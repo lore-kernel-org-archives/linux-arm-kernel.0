@@ -1,100 +1,83 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Wed, 31 May 2017 13:29:30 +0300
-Subject: [PATCH v2 net 2/2] net: phy: micrel: Restore led_mode and clk_sel on
- resume
-In-Reply-To: <cover.1496224930.git.leonard.crestez@nxp.com>
-References: <cover.1496224930.git.leonard.crestez@nxp.com>
-Message-ID: <1460beebce4ba23722cfb185b0f9f884cca3b9e9.1496224930.git.leonard.crestez@nxp.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Wed, 31 May 2017 19:43:40 +0900
+Subject: [PATCH 3/6] gpio: dt-bindings: Add documentation for gpio
+ controllers on Armada 7K/8K
+In-Reply-To: <20170530222358.abta3srv5emz7wtp@rob-hp-laptop>
+References: <cover.e10718b9c0f9fdd07327ae14e213be8da5b1f7ef.1495210061.git-series.gregory.clement@free-electrons.com>
+ <306395ff39de3d3d3c8f55e5da4de8def29ae8d1.1495210061.git-series.gregory.clement@free-electrons.com>
+ <CACRpkdY97DDcwec+J-4X1AT5a7Mbo4GnWUJmuAOYhNzOA8_HZQ@mail.gmail.com>
+ <878tlnzps3.fsf@free-electrons.com>
+ <CACRpkdbW3T5auXCMrqH_tTzcVseGbiV+y53fJ2xN5p-VbGz7rA@mail.gmail.com>
+ <20170530222358.abta3srv5emz7wtp@rob-hp-laptop>
+Message-ID: <149622742055.34003.14963361587324682626@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These bits seem to be lost after a suspend/resume cycle so just set them
-again. Do this by splitting the handling of these bits into a function
-that is also called on resume.
+Quoting Rob Herring (2017-05-31 07:23:58)
+> On Mon, May 29, 2017 at 10:08:16AM +0200, Linus Walleij wrote:
+> > On Tue, May 23, 2017 at 3:06 PM, Gregory CLEMENT
+> > <gregory.clement@free-electrons.com> wrote:
+> > >  On mar., mai 23 2017, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > 
+> > >> Please rebase and resend the rest of the patches.
+> > >
+> > > Actually I was wrong with my assumption that there was no dependency.
+> > > For the binding documentation there is dependecy accross the series I
+> > > sent.
+> > >
+> > > This patch depends on "pinctrl: dt-bindings: add documentation for AP806
+> > > pin controllers" [1] and "pinctrl: dt-bindings: add documentation for
+> > > CP110 pin controllers" [3] from the series "Add support for the pin
+> > > controllers on the Marvell Armada 7K/8K".
+> > >
+> > > As you are maintainer of both gpio and pinctrl subsystem it will be easy
+> > > to resolv.
+> > 
+> > Please send all patches in one big series in that case, so I can apply
+> > them all to a branch and merge that branch into both trees.
+> > 
+> > > But these last patches depend also on "clk: mvebu: ap806: introduce a
+> > > new binding" [3] in the clock series "Improve ap806 clk support on
+> > > Marvell Armada 7K/8K" and on "clk: mvebu: cp110: introduce a new
+> > > binding" [4] in the clock series "Improve cp110 clk support on Marvell
+> > > Armada 7K/8K".
+> > 
+> > That sounds messy.
+> > 
+> > > So for these particular patches, either I rebase them on the v4.12-rc2
+> > > and there will be a small merge conflict during the merge window for
+> > > v4.13, or we can ask a stable branch with only these few patches (I am
+> > > adding the clock maintainer to this email).
+> > >
+> > > If we chose this last option I can split the clock patches to have patch
+> > > modifying only the binding documentation.
+> > 
+> > I think you can make a patch just modifying the binding documentation
+> > and then apply that patch to *both* trees, just make sure the patch
+> > is *final* and not applied in different versions in clk and pinctrl.
+> 
+> I thought we try to avoid doing that.
+> 
+> > I think cross-tree branches for documentation clashes is too much
+> > bureaucracy.
+> 
+> I can just take all the doc patches separately. Or you can take the 
+> clock one too.
 
-This patch fixes ethernet suspend/resume on imx6ul-14x14-evk boards.
+Stephen and I have started making a -dt branch for each new clk driver
+which. This stable branch has only the dt bindings/headers in it (no
+driver code).
 
-Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
----
- drivers/net/phy/micrel.c | 42 ++++++++++++++++++++++++++++--------------
- 1 file changed, 28 insertions(+), 14 deletions(-)
+I'll make such a branch for ap806 this week and everyone can merge that
+in as a dep.
 
-diff --git a/drivers/net/phy/micrel.c b/drivers/net/phy/micrel.c
-index 6a5fd18..b9252b8d8 100644
---- a/drivers/net/phy/micrel.c
-+++ b/drivers/net/phy/micrel.c
-@@ -268,23 +268,12 @@ static int kszphy_nand_tree_disable(struct phy_device *phydev)
- 	return ret;
- }
- 
--static int kszphy_config_init(struct phy_device *phydev)
-+/* Some config bits need to be set again on resume, handle them here. */
-+static int kszphy_config_reset(struct phy_device *phydev)
- {
- 	struct kszphy_priv *priv = phydev->priv;
--	const struct kszphy_type *type;
- 	int ret;
- 
--	if (!priv)
--		return 0;
--
--	type = priv->type;
--
--	if (type->has_broadcast_disable)
--		kszphy_broadcast_disable(phydev);
--
--	if (type->has_nand_tree_disable)
--		kszphy_nand_tree_disable(phydev);
--
- 	if (priv->rmii_ref_clk_sel) {
- 		ret = kszphy_rmii_clk_sel(phydev, priv->rmii_ref_clk_sel_val);
- 		if (ret) {
-@@ -295,11 +284,30 @@ static int kszphy_config_init(struct phy_device *phydev)
- 	}
- 
- 	if (priv->led_mode >= 0)
--		kszphy_setup_led(phydev, type->led_mode_reg, priv->led_mode);
-+		kszphy_setup_led(phydev, priv->type->led_mode_reg, priv->led_mode);
- 
- 	return 0;
- }
- 
-+static int kszphy_config_init(struct phy_device *phydev)
-+{
-+	struct kszphy_priv *priv = phydev->priv;
-+	const struct kszphy_type *type;
-+
-+	if (!priv)
-+		return 0;
-+
-+	type = priv->type;
-+
-+	if (type->has_broadcast_disable)
-+		kszphy_broadcast_disable(phydev);
-+
-+	if (type->has_nand_tree_disable)
-+		kszphy_nand_tree_disable(phydev);
-+
-+	return kszphy_config_reset(phydev);
-+}
-+
- static int ksz8041_config_init(struct phy_device *phydev)
- {
- 	struct device_node *of_node = phydev->mdio.dev.of_node;
-@@ -700,8 +708,14 @@ static int kszphy_suspend(struct phy_device *phydev)
- 
- static int kszphy_resume(struct phy_device *phydev)
- {
-+	int ret;
-+
- 	genphy_resume(phydev);
- 
-+	ret = kszphy_config_reset(phydev);
-+	if (ret)
-+		return ret;
-+
- 	/* Enable PHY Interrupts */
- 	if (phy_interrupt_is_valid(phydev)) {
- 		phydev->interrupts = PHY_INTERRUPT_ENABLED;
--- 
-2.7.4
+Regards,
+Mike
+
+> 
+> > Make sure your clock patch is finalized and preferably also applied
+> > to the clk tree then put it in the bottom of the patch set you send
+> > to me as well and I will proceed like above.
+> > 
+> > Yours,
+> > Linus Walleij
