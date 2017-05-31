@@ -1,37 +1,78 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Thu, 1 Jun 2017 01:28:58 +0800
-Subject: [PATCH v3 0/4] Add Basic SoC support for MT7622
-Message-ID: <cover.1496250798.git.sean.wang@mediatek.com>
+Date: Thu, 1 Jun 2017 01:28:59 +0800
+Subject: [PATCH v3 1/3] dt-bindings: mediatek: add bindings for MediaTek
+ MT7622 SoC
+In-Reply-To: <cover.1496250798.git.sean.wang@mediatek.com>
+References: <cover.1496250798.git.sean.wang@mediatek.com>
+Message-ID: <1b9dd0df077a59aea5a15e3cb7775f80224b0b06.1496250798.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Changes since v2:
-- merge back required basic clock nodes into the .dtsi file
-- update the property of interrupts in timer nodes with 2 CPUs
+This adds dt-binding documentation for MediaTek MT7622 SoC
+which currently only includes basic items such as ARM CPU,
+MediaTek SYSIRQ and UART.
 
-Changes since v1:
-- update SPDX-License-Identifier
-- remove next-level-cache property since cache geometry detection was removed since 4.12
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+---
+ Documentation/devicetree/bindings/arm/mediatek.txt                    | 4 ++++
+ .../devicetree/bindings/interrupt-controller/mediatek,sysirq.txt      | 3 ++-
+ Documentation/devicetree/bindings/serial/mtk-uart.txt                 | 1 +
+ 3 files changed, 7 insertions(+), 1 deletion(-)
 
-This patch set adds basic SoC support for MediaTek MT7622
-SoC based on 4.12-rc1.
-
-Sean Wang (3):
-  dt-bindings: mediatek: add bindings for MediaTek MT7622 SoC
-  arm64: dts: mt7622: add basic nodes to the mt7622.dtsi file
-  arm64: dts: mt7622: add dts file for MT7622 reference board variant 1
-
- Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
- .../interrupt-controller/mediatek,sysirq.txt       |   3 +-
- .../devicetree/bindings/serial/mtk-uart.txt        |   1 +
- arch/arm64/boot/dts/mediatek/Makefile              |   1 +
- arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts       |  27 ++++++
- arch/arm64/boot/dts/mediatek/mt7622.dtsi           | 103 +++++++++++++++++++++
- 6 files changed, 138 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
- create mode 100644 arch/arm64/boot/dts/mediatek/mt7622.dtsi
-
+diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
+index c860b24..fc68570 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek.txt
+@@ -12,6 +12,7 @@ compatible: Must contain one of
+    "mediatek,mt6592"
+    "mediatek,mt6755"
+    "mediatek,mt6795"
++   "mediatek,mt7622"
+    "mediatek,mt7623"
+    "mediatek,mt8127"
+    "mediatek,mt8135"
+@@ -38,6 +39,9 @@ Supported boards:
+ - Evaluation board for MT6795(Helio X10):
+     Required root node properties:
+       - compatible = "mediatek,mt6795-evb", "mediatek,mt6795";
++- Reference board variant 1 for MT7622:
++    Required root node properties:
++      - compatible = "mediatek,mt7622-rfb1", "mediatek,mt7622";
+ - Evaluation board for MT7623:
+     Required root node properties:
+       - compatible = "mediatek,mt7623-evb", "mediatek,mt7623";
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt b/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
+index a89c03b..eda1183 100644
+--- a/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
++++ b/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
+@@ -1,4 +1,4 @@
+-+Mediatek 65xx/67xx/81xx sysirq
+++Mediatek MT65xx/MT67xx/MT762x/MT81xx sysirq
+ 
+ Mediatek SOCs sysirq support controllable irq inverter for each GIC SPI
+ interrupt.
+@@ -15,6 +15,7 @@ Required properties:
+ 	"mediatek,mt6582-sysirq"
+ 	"mediatek,mt6580-sysirq"
+ 	"mediatek,mt6577-sysirq"
++	"mediatek,mt7622-sysirq"
+ 	"mediatek,mt2701-sysirq"
+ - interrupt-controller : Identifies the node as an interrupt controller
+ - #interrupt-cells : Use the same format as specified by GIC in arm,gic.txt.
+diff --git a/Documentation/devicetree/bindings/serial/mtk-uart.txt b/Documentation/devicetree/bindings/serial/mtk-uart.txt
+index 0015c72..daa1eef 100644
+--- a/Documentation/devicetree/bindings/serial/mtk-uart.txt
++++ b/Documentation/devicetree/bindings/serial/mtk-uart.txt
+@@ -8,6 +8,7 @@ Required properties:
+   * "mediatek,mt6589-uart" for MT6589 compatible UARTS
+   * "mediatek,mt6755-uart" for MT6755 compatible UARTS
+   * "mediatek,mt6795-uart" for MT6795 compatible UARTS
++  * "mediatek,mt7622-uart" for MT7622 compatible UARTS
+   * "mediatek,mt7623-uart" for MT7623 compatible UARTS
+   * "mediatek,mt8127-uart" for MT8127 compatible UARTS
+   * "mediatek,mt8135-uart" for MT8135 compatible UARTS
 -- 
 1.9.1
