@@ -1,87 +1,107 @@
-From: nwatters@codeaurora.org (Nate Watterson)
-Date: Wed, 31 May 2017 11:27:57 -0400
-Subject: [PATCH 0/7] Add PCI ATS support to SMMUv3
-In-Reply-To: <20170524180143.19855-1-jean-philippe.brucker@arm.com>
-References: <20170524180143.19855-1-jean-philippe.brucker@arm.com>
-Message-ID: <2ae88519-7dbb-97ee-1ef9-8a92c31472d5@codeaurora.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 31 May 2017 16:32:32 +0100
+Subject: [PATCH] asm-generic: simd: allow SIMD in process context with BH
+ disabled
+In-Reply-To: <20170531125701.20717-1-ard.biesheuvel@linaro.org>
+References: <20170531125701.20717-1-ard.biesheuvel@linaro.org>
+Message-ID: <20170531153231.GC30160@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Philippe,
+On Wed, May 31, 2017 at 12:57:01PM +0000, Ard Biesheuvel wrote:
+> asm-generic supplies a header asm/simd.h which exports a single function
+> may_use_simd(), which conveys whether the current context allows the SIMD
+> register file or instructions to be used.
+> 
+> This header is included by crypto code shared between x86 and ARM/arm64,
+> and which offloads SIMD processing to process context if required. The
+> generic asm/simd.h is shared between ARM and arm64 at the moment, while
+> x86 has its own implementation.
+> 
+> On arm64, we currently mostly ignore may_use_simd(), because arm64 allows
+> kernel mode NEON in any context. However, this is due to change shortly
+> when support for SVE is merged, at which point we will introduce an arm64
+> specific implementation of asm/simd.h as well.
+> 
+> That leaves ARM, which only allows kernel mode NEON in process context,
+> which makes the current generic implementation of may_use_simd() seem
+> appropriate. However, given that in_interrupt() will return true when
+> running in process context with bottom halves disabled, we may end up
+> falling back to less optimized code unnecessarily, given that kernel
+> mode NEON is perfectly usable in that case.
+> 
+> So redefine may_use_simd() to disallow SIMD only when running in hardirq
+> or softirq context.
+> 
+> While we're at it, add some missing header file decorations such as
+> a license header and include guards.
+> 
+> Reported-by: "Jason A. Donenfeld" <Jason@zx2c4.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  include/asm-generic/simd.h | 23 ++++++++++++++++++++---
+>  1 file changed, 20 insertions(+), 3 deletions(-)
+> 
+> diff --git a/include/asm-generic/simd.h b/include/asm-generic/simd.h
+> index f57eb7b5c23b..a3e5ebe6b2b2 100644
+> --- a/include/asm-generic/simd.h
+> +++ b/include/asm-generic/simd.h
+> @@ -1,14 +1,31 @@
+> +/*
+> + * Copyright (C) 2013 - 2017 Linaro Ltd. <ard.biesheuvel@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms of the GNU General Public License version 2 as published
+> + * by the Free Software Foundation.
+> + */
+>  
+> -#include <linux/hardirq.h>
+> +#ifndef __ASM_SIMD_H
+> +#define __ASM_SIMD_H
+> +
+> +#include <linux/types.h>
+> +#include <linux/preempt.h>
+>  
+>  /*
+>   * may_use_simd - whether it is allowable at this time to issue SIMD
+>   *                instructions or access the SIMD register file
+>   *
+>   * As architectures typically don't preserve the SIMD register file when
+> - * taking an interrupt, !in_interrupt() should be a reasonable default.
+> + * taking an interrupt, it is reasonable to define the default behavior
+> + * of 'may_use_simd()' to be 'SIMD is only allowed when not handling an
+> + * IRQ or softIRQ'. Since 'in_interrupt()' will also return true when
+> + * running in process context with bottom halves disabled, we have to
+> + * spell out that condition as shown.
 
-On 5/24/2017 2:01 PM, Jean-Philippe Brucker wrote:
-> PCIe devices can implement their own TLB, named Address Translation Cache
-> (ATC). In order to support Address Translation Service (ATS), the
-> following changes are needed in software:
-> 
-> * Enable ATS on endpoints when the system supports it. Both PCI root
->    complex and associated SMMU must implement the ATS protocol.
-> 
-> * When unmapping an IOVA, send an ATC invalidate request to the endpoint
->    in addition to the usual SMMU IOTLB invalidations.
-> 
-> I previously sent this as part of a lengthy RFC [1] adding SVM (ATS +
-> PASID + PRI) support to SMMUv3. The next PASID/PRI version is almost
-> ready, but isn't likely to get merged because it needs hardware testing,
-> so I will send it later. PRI depends on ATS, but ATS should be useful on
-> its own.
-> 
-> Without PASID and PRI, ATS is used for accelerating transactions. Instead
-> of having all memory accesses go through SMMU translation, the endpoint
-> can translate IOVA->PA once, store the result in its ATC, then issue
-> subsequent transactions using the PA, partially bypassing the SMMU. So in
-> theory it should be faster while keeping the advantages of an IOMMU,
-> namely scatter-gather and access control.
-> 
-> The ATS patches can now be tested on some hardware, even though the lack
-> of compatible PCI endpoints makes it difficult to assess what performance
-> optimizations we need. That's why the ATS implementation is a bit rough at
-> the moment, and we will work on optimizing things like invalidation ranges
-> later.
+Minor nit: do we need the comment about in_interrupt() here?
 
-Sinan and I have tested this series on a QDF2400 development platform
-using a PCIe exerciser card as the ATS capable endpoint. We were able
-to verify that ATS requests complete with a valid translated address
-and that DMA transactions using the pre-translated address "bypass"
-the SMMU. Testing ATC invalidations was a bit more difficult as we
-could not figure out how to get the exerciser card to automatically
-send the completion message. We ended up having to write a debugger
-script that would monitor the CMDQ and tell the exerciser to send
-the completion when a hanging CMD_SYNC following a CMD_ATC_INV was
-detected. Hopefully we'll get some real ATS capable endpoints to
-test with soon.
+It makes more sense to explain the change in the commit message (which
+you do) than to explain in-line the behaviour of a function that the
+code doesn't use.
 
-> 
-> Since the RFC [1]:
-> * added DT and ACPI patches,
-> * added invalidate-all on domain detach,
-> * removed smmu_group again,
-> * removed invalidation print from the fast path,
-> * disabled tagged pointers for good,
-> * some style changes.
-> 
-> These patches are based on Linux v4.12-rc2
-> 
-> [1] https://www.spinics.net/lists/linux-pci/msg58650.html
-> 
-> Jean-Philippe Brucker (7):
->    PCI: Move ATS declarations outside of CONFIG_PCI
->    dt-bindings: PCI: Describe ATS property for root complex nodes
->    iommu/of: Check ATS capability in root complex nodes
->    ACPI/IORT: Check ATS capability in root complex nodes
->    iommu/arm-smmu-v3: Link domains and devices
->    iommu/arm-smmu-v3: Add support for PCI ATS
->    iommu/arm-smmu-v3: Disable tagged pointers
-> 
->   .../devicetree/bindings/pci/pci-iommu.txt          |   8 +
->   drivers/acpi/arm64/iort.c                          |  10 +
->   drivers/iommu/arm-smmu-v3.c                        | 258 ++++++++++++++++++++-
->   drivers/iommu/of_iommu.c                           |   8 +
->   include/linux/iommu.h                              |   4 +
->   include/linux/pci.h                                |  26 +--
->   6 files changed, 293 insertions(+), 21 deletions(-)
-> 
+<linux/preempt.h> already hints at the caveats of in_interrupt().
 
--- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+
+For this comment block, it may be more helpful to note that SIMD is
+permitted in task context even if bottom halves are enabled.
+
+>   */
+>  static __must_check inline bool may_use_simd(void)
+>  {
+> -	return !in_interrupt();
+> +	return !in_irq() && !in_serving_softirq();
+
+Previously, in_nmi() implied !may_use_simd().
+
+Now, may_use_simd() can return true if in_nmi().
+
+Code in NMI context probably shouldn't be touching this interface at
+all, but we may want to close this hole by adding && !in_nmi()
+explicitly.  I did that in my kernel-mode-neon simplification series,
+but couldn't decide whether it was superfluous.
+
+Any thoughts?
+
+Cheers
+---Dave
