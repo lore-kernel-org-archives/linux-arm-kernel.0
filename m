@@ -1,156 +1,128 @@
-From: jeffy.chen@rock-chips.com (jeffy)
-Date: Wed, 31 May 2017 10:05:23 +0800
-Subject: drm/rockchip: Correct vop out_mode configure
-In-Reply-To: <1495885416-22216-1-git-send-email-mark.yao@rock-chips.com>
-References: <1495885416-22216-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <592E24E3.3070001@rock-chips.com>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Wed, 31 May 2017 10:13:38 +0800
+Subject: [Qemu-devel] [PATCH v3 1/4] ACPI: Add APEI GHES Table Generation
+ support
+In-Reply-To: <3a791060-170d-9eb7-b2c4-f1cdbb55501f@redhat.com>
+References: <0184EA26B2509940AA629AE1405DD7F2014105CD@DGGEMA503-MBS.china.huawei.com>
+ <3a791060-170d-9eb7-b2c4-f1cdbb55501f@redhat.com>
+Message-ID: <80b71fec-cd6d-fed7-1a86-195deffcdbb0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Laszlo,
+   very sorry for that, it was my mistake that missing your name.
+when I reply mail, I copy the "CC" list to the mail reply list, but forget to copy the "To" list.
+I will check your comments in detailed later and reply you. thanks again.
 
-Reviewed-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 
-On 05/27/2017 07:43 PM, yao mark wrote:
-> Force vop output mode on encoder driver seem not a good idea,
->
-> EDP, HDMI, DisplayPort all have 10bit input on rk3399,
-> On non-10bit vop, vop 8bit output bit[0-7] connect to the
-> encoder high 8bit [2-9].
->
-> So force RGB10 to RGB888 on vop driver would be better.
->
-> And another problem, EDP check crtc id on atomic_check,
-> but encoder maybe NULL, so out_mode configure would fail,
-> it cause edp no display.
->
-> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-> ---
->   drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 12 ------------
->   drivers/gpu/drm/rockchip/cdn-dp-core.c          |  9 ++-------
->   drivers/gpu/drm/rockchip/rockchip_drm_vop.c     |  8 ++++++++
->   drivers/gpu/drm/rockchip/rockchip_drm_vop.h     |  3 +++
->   drivers/gpu/drm/rockchip/rockchip_vop_reg.c     |  2 ++
->   5 files changed, 15 insertions(+), 19 deletions(-)
->
-> diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-> index 1bccd82..9606121 100644
-> --- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-> +++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-> @@ -237,8 +237,6 @@ rockchip_dp_drm_encoder_atomic_check(struct drm_encoder *encoder,
->   				      struct drm_connector_state *conn_state)
->   {
->   	struct rockchip_crtc_state *s = to_rockchip_crtc_state(crtc_state);
-> -	struct rockchip_dp_device *dp = to_dp(encoder);
-> -	int ret;
->
->   	/*
->   	 * The hardware IC designed that VOP must output the RGB10 video
-> @@ -250,16 +248,6 @@ rockchip_dp_drm_encoder_atomic_check(struct drm_encoder *encoder,
->
->   	s->output_mode = ROCKCHIP_OUT_MODE_AAAA;
->   	s->output_type = DRM_MODE_CONNECTOR_eDP;
-> -	if (dp->data->chip_type == RK3399_EDP) {
-> -		/*
-> -		 * For RK3399, VOP Lit must code the out mode to RGB888,
-> -		 * VOP Big must code the out mode to RGB10.
-> -		 */
-> -		ret = drm_of_encoder_active_endpoint_id(dp->dev->of_node,
-> -							encoder);
-> -		if (ret > 0)
-> -			s->output_mode = ROCKCHIP_OUT_MODE_P888;
-> -	}
->
->   	return 0;
->   }
-> diff --git a/drivers/gpu/drm/rockchip/cdn-dp-core.c b/drivers/gpu/drm/rockchip/cdn-dp-core.c
-> index a2169dd..14fa1f8 100644
-> --- a/drivers/gpu/drm/rockchip/cdn-dp-core.c
-> +++ b/drivers/gpu/drm/rockchip/cdn-dp-core.c
-> @@ -615,7 +615,6 @@ static void cdn_dp_encoder_enable(struct drm_encoder *encoder)
->   {
->   	struct cdn_dp_device *dp = encoder_to_dp(encoder);
->   	int ret, val;
-> -	struct rockchip_crtc_state *state;
->
->   	ret = drm_of_encoder_active_endpoint_id(dp->dev->of_node, encoder);
->   	if (ret < 0) {
-> @@ -625,14 +624,10 @@ static void cdn_dp_encoder_enable(struct drm_encoder *encoder)
->
->   	DRM_DEV_DEBUG_KMS(dp->dev, "vop %s output to cdn-dp\n",
->   			  (ret) ? "LIT" : "BIG");
-> -	state = to_rockchip_crtc_state(encoder->crtc->state);
-> -	if (ret) {
-> +	if (ret)
->   		val = DP_SEL_VOP_LIT | (DP_SEL_VOP_LIT << 16);
-> -		state->output_mode = ROCKCHIP_OUT_MODE_P888;
-> -	} else {
-> +	else
->   		val = DP_SEL_VOP_LIT << 16;
-> -		state->output_mode = ROCKCHIP_OUT_MODE_AAAA;
-> -	}
->
->   	ret = cdn_dp_grf_write(dp, GRF_SOC_CON9, val);
->   	if (ret)
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> index 40a5e6e..c83f481 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> @@ -874,6 +874,7 @@ static bool vop_crtc_mode_fixup(struct drm_crtc *crtc,
->   static void vop_crtc_enable(struct drm_crtc *crtc)
->   {
->   	struct vop *vop = to_vop(crtc);
-> +	const struct vop_data *vop_data = vop->data;
->   	struct rockchip_crtc_state *s = to_rockchip_crtc_state(crtc->state);
->   	struct drm_display_mode *adjusted_mode = &crtc->state->adjusted_mode;
->   	u16 hsync_len = adjusted_mode->hsync_end - adjusted_mode->hsync_start;
-> @@ -966,6 +967,13 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
->   		DRM_DEV_ERROR(vop->dev, "unsupported connector_type [%d]\n",
->   			      s->output_type);
->   	}
-> +
-> +	/*
-> +	 * if vop is not support RGB10 output, need force RGB10 to RGB888.
-> +	 */
-> +	if (s->output_mode == ROCKCHIP_OUT_MODE_AAAA &&
-> +	    !(vop_data->feature & VOP_FEATURE_OUTPUT_RGB10))
-> +		s->output_mode = ROCKCHIP_OUT_MODE_P888;
->   	VOP_CTRL_SET(vop, out_mode, s->output_mode);
->
->   	VOP_CTRL_SET(vop, htotal_pw, (htotal << 16) | hsync_len);
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-> index 5a4faa85..9979fd0 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-> @@ -142,6 +142,9 @@ struct vop_data {
->   	const struct vop_intr *intr;
->   	const struct vop_win_data *win;
->   	unsigned int win_size;
-> +
-> +#define VOP_FEATURE_OUTPUT_RGB10	BIT(0)
-> +	u64 feature;
->   };
->
->   /* interrupt define */
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-> index 0da4444..bafd698 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-> @@ -275,6 +275,7 @@ static const struct vop_intr rk3288_vop_intr = {
->   static const struct vop_data rk3288_vop = {
->   	.init_table = rk3288_init_reg_table,
->   	.table_size = ARRAY_SIZE(rk3288_init_reg_table),
-> +	.feature = VOP_FEATURE_OUTPUT_RGB10,
->   	.intr = &rk3288_vop_intr,
->   	.ctrl = &rk3288_ctrl_data,
->   	.win = rk3288_vop_win_data,
-> @@ -343,6 +344,7 @@ static const struct vop_reg_data rk3399_init_reg_table[] = {
->   static const struct vop_data rk3399_vop_big = {
->   	.init_table = rk3399_init_reg_table,
->   	.table_size = ARRAY_SIZE(rk3399_init_reg_table),
-> +	.feature = VOP_FEATURE_OUTPUT_RGB10,
->   	.intr = &rk3399_vop_intr,
->   	.ctrl = &rk3399_ctrl_data,
->   	/*
->
->
+
+On 2017/5/30 0:03, Laszlo Ersek wrote:
+> Hi,
+> 
+> did you remove me from the To: / Cc: list intentionally, or was that an
+> oversight? I caught your message in my list folders only by luck.
+> 
+> Some followup below:
+> 
+> On 05/29/17 17:27, gengdongjiu wrote:
+> 
+>>> (46) What is "physical_addr" good for? Below I can only see an 
+>>> assignment to it, in ghes_update_guest(). Where is the field read?
+> 
+>> this "physical_addr" address is the physical error address in the
+>> CPER. such as the physical address that happen hwpoison, this address
+>> is delivered by the KVM and QEMU transfer this address to physical.
+> I understand that in the ghes_update_guest() function, you accept a
+> parameter called "physical_address", and you pass it on to
+> ghes_generate_cper_record(). That makes sense, yes.
+> 
+> However, you also assign the same value to "ges.physical_addr". And that
+> structure field is never read. So my point is that the
+> "GhesErrorState.physical_addr" field is superfluous and should be removed.
+> 
+> I checked the other three patches in the series and they don't seem to
+> read that structure member either. Correct me if I'm wrong.
+> 
+>>> (55) What happens if you run out of the preallocated memory?
+> 
+>> if it run out of the preallocated memory. it will overwrite other 
+>> error source. every block's size is fixed. so it does not easy
+>> dynamically extend the size if it is overflow. Anyway I will add a
+>> error report if it happens overwrite.
+> I understand (and agree) that dynamic allocation is not possible here.
+> 
+> But that doesn't justify overwriting the error status data block that
+> belongs to a different data source. (Worse, if this happens with the
+> last error status data block, for error source 10, you could overwrite
+> memory that belongs to the OS.)
+> 
+> If an error status data block becomes full, then we should either wrap
+> back to the start of the same data block, or else stop forwarding errors
+> for that error source.
+> 
+> Does the ACPI spec say anything about this? I.e., about the case when
+> the system runs out of the memory that was reserved for recording
+> hardware errors?
+> 
+>>>>> +
+>>>>> +    mem_err = (struct cper_sec_mem_err *) (gdata + 1);
+>>>>> +
+>>>>> +    /* In order to simplify simulation, hardcode the CPER section to memory
+>>>>> +     * section.
+>>>>> +     */
+>>>>> +    mem_err->validation_bits |= CPER_MEM_VALID_ERROR_TYPE;
+>>>>> +    mem_err->error_type = 3;
+>>>
+>>> (58) Is this supposed to stand for "Multi-bit ECC" (from "N.2.5 Memory 
+>>> Error Section" in UEFI 2.6)? Should we have a macro for that?
+> 
+>> Yes, it is. What do you mean a macro?
+> 
+> A #define for the integer value 3.
+> 
+>> For all the errors that happen in the guest OS, in order to simulate
+>> easy, I abstract all the error section to memory section, even though
+>> the error section is processor or other section.
+> Why is that a valid thing to do? (I'm not doubting it is valid, I'm just
+> asking.) Will that not confuse the ACPI subsystem of the guest OS?
+> 
+>> I do not know whether do you have some suggestion for that.
+> Well I would have thought (without any expertise on the subject) that
+> hardware errors from the host side should be mapped to the guest more or
+> less "type correct". IOW, it looks strange that, say, a CPU error is
+> reported as a memory error. But this is just an uneducated guess.
+> 
+>>>>> +    mem_err->validation_bits |= CPER_MEM_VALID_CARD | CPER_MEM_VALID_MODULE |
+>>>>> +            CPER_MEM_VALID_BANK | CPER_MEM_VALID_ROW |
+>>>>> +            CPER_MEM_VALID_COLUMN | CPER_MEM_VALID_BIT_POSITION;
+>>>>> +    mem_err->card = 1;
+>>>>> +    mem_err->module = 2;
+>>>>> +    mem_err->bank = 3;
+>>>>> +    mem_err->row = 1;
+>>>>> +    mem_err->column = 2;
+>>>>> +    mem_err->bit_pos = 5;
+>>>
+>>> (60) I have no idea where these values come from.
+> 
+>> For all the errors that happen in the guest OS, in order to simulate
+>> easy, I abstract all the error section to memory section, and hard
+>> code the memory section error value as above.
+> Sure, but why is that safe? Will the guest OS not want to do something
+> about these error details? If we are feeding the guest OS invalid error
+> details, will that not lead to confusion?
+> 
+>>> (64) What does "reqr" stand for?
+>> It stand for the request size.
+> Can you please call it "req_size" or something similar? The English
+> expression
+> 
+>   request size
+> 
+> contains only one "r" letter, so it's hard to understand where the
+> second "r" in "reqr" comes from.
+> 
+> Thanks,
+> Laszlo
+> 
+> .
+> 
