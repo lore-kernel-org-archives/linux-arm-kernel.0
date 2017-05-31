@@ -1,40 +1,52 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed, 31 May 2017 09:18:37 +0200
-Subject: [PATCH v6 06/21] arm: sun8i: sunxi-h3-h5: Add dt node for the syscon
- control module
+Date: Wed, 31 May 2017 09:18:49 +0200
+Subject: [PATCH v6 18/21] arm64: allwinner: bananapi-m64: Enable dwmac-sun8i
 In-Reply-To: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
 References: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170531071852.12422-7-clabbe.montjoie@gmail.com>
+Message-ID: <20170531071852.12422-19-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the dt node for the syscon register present on the
-Allwinner H3/H5
-
-Only two register are present in this syscon and the only one useful is
-the one dedicated to EMAC clock..
+The dwmac-sun8i  hardware is present on the BananaPi M64.
+It uses an external PHY rtl8211e via RGMII.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm/boot/dts/sunxi-h3-h5.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-index d0067fec99de..3a28be5ab641 100644
---- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-+++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-@@ -83,6 +83,12 @@
- 		#size-cells = <1>;
- 		ranges;
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+index 6872135d7f84..0d1f026d831a 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+@@ -67,6 +67,14 @@
+ 	};
+ };
  
-+		syscon: syscon at 1c00000 {
-+			compatible = "allwinner,sun8i-h3-system-controller",
-+				"syscon";
-+			reg = <0x01c00000 0x1000>;
-+		};
++&emac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&rgmii_pins>;
++	phy-mode = "rgmii";
++	phy-handle = <&ext_rgmii_phy>;
++	status = "okay";
++};
 +
- 		dma: dma-controller at 01c02000 {
- 			compatible = "allwinner,sun8i-h3-dma";
- 			reg = <0x01c02000 0x1000>;
+ &i2c1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c1_pins>;
+@@ -77,6 +85,13 @@
+ 	bias-pull-up;
+ };
+ 
++&mdio {
++	ext_rgmii_phy: ethernet-phy at 1 {
++		compatible = "ethernet-phy-ieee802.3-c22";
++		reg = <1>;
++	};
++};
++
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins>;
 -- 
 2.13.0
