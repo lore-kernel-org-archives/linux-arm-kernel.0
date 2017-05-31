@@ -1,9 +1,7 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 31 May 2017 11:49:15 +0200
-Subject: [PATCH 2/2] power: reset: at91-sama5d2_shdwc: fix clobber list
-In-Reply-To: <20170531094915.3469-1-alexandre.belloni@free-electrons.com>
-References: <20170531094915.3469-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170531094915.3469-2-alexandre.belloni@free-electrons.com>
+Date: Wed, 31 May 2017 11:49:14 +0200
+Subject: [PATCH 1/2] power: reset: at91-poweroff: fix clobber list
+Message-ID: <20170531094915.3469-1-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,21 +10,21 @@ Assembly in at91_lpddr_poweroff has r0 in the clobber list but uses r6.
 Reported-by: Ben Hutchings <ben.hutchings@codethink.co.uk>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/power/reset/at91-sama5d2_shdwc.c | 2 +-
+ drivers/power/reset/at91-poweroff.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/power/reset/at91-sama5d2_shdwc.c b/drivers/power/reset/at91-sama5d2_shdwc.c
-index 90b0b5a70ce5..55fce8b75245 100644
---- a/drivers/power/reset/at91-sama5d2_shdwc.c
-+++ b/drivers/power/reset/at91-sama5d2_shdwc.c
-@@ -132,7 +132,7 @@ static void at91_lpddr_poweroff(void)
+diff --git a/drivers/power/reset/at91-poweroff.c b/drivers/power/reset/at91-poweroff.c
+index c6c3beea72f9..c30c40193aaa 100644
+--- a/drivers/power/reset/at91-poweroff.c
++++ b/drivers/power/reset/at91-poweroff.c
+@@ -97,7 +97,7 @@ static void at91_lpddr_poweroff(void)
  		  "r" cpu_to_le32(AT91_DDRSDRC_LPDDR2_PWOFF),
- 		  "r" (at91_shdwc->at91_shdwc_base),
+ 		  "r" (at91_shdwc_base),
  		  "r" cpu_to_le32(AT91_SHDW_KEY | AT91_SHDW_SHDW)
 -		: "r0");
 +		: "r6");
  }
  
- static u32 at91_shdwc_debouncer_value(struct platform_device *pdev,
+ static int at91_poweroff_get_wakeup_mode(struct device_node *np)
 -- 
 2.11.0
