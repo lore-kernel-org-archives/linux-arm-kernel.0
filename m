@@ -1,65 +1,117 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Wed, 31 May 2017 15:47:37 +0800
-Subject: [V2, 2/6] tty: serial: lpuart: add little endian 32 bit register
- support
-In-Reply-To: <CAHp75VdL=rGHuupGmgmAVonEQgpyPRgoMQrZK0yQiaM=1Vac-g@mail.gmail.com>
-References: <1494834539-17523-3-git-send-email-aisheng.dong@nxp.com>
- <fb9fe0cd-5ca7-74e6-33dc-7638e205b2e3@cogentembedded.com>
- <20170517033927.GC9913@b29396-OptiPlex-7040>
- <8f4cf45e-45ab-e6e6-d95c-f3d4243697f4@cogentembedded.com>
- <20170517054356.GE9913@b29396-OptiPlex-7040>
- <CAHp75VdL=rGHuupGmgmAVonEQgpyPRgoMQrZK0yQiaM=1Vac-g@mail.gmail.com>
-Message-ID: <20170531074737.GC16812@b29396-OptiPlex-7040>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 31 May 2017 08:54:05 +0100
+Subject: [PATCH 14/31] KVM: arm64: vgic-v3: Add ICV_EOIR1_EL1 handler
+In-Reply-To: <4353fb2e-cd0c-bd13-6bdd-7f9eeda99f7c@redhat.com>
+References: <20170503104606.19342-1-marc.zyngier@arm.com>
+ <20170503104606.19342-15-marc.zyngier@arm.com>
+ <c3baec82-20c6-c948-9cb8-8247802cbff5@redhat.com>
+ <2eb7f08f-bb47-cd7b-e631-3d42c35336ee@arm.com>
+ <0dabccc1-ffa2-0ee1-71a4-71390791f056@redhat.com>
+ <20170531074634.588aa76e@why.wild-wind.fr.eu.org>
+ <4353fb2e-cd0c-bd13-6bdd-7f9eeda99f7c@redhat.com>
+Message-ID: <47795987-f898-db69-4533-5c20743108ed@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
-
-On Wed, May 17, 2017 at 12:55:59PM +0300, Andy Shevchenko wrote:
-> On Wed, May 17, 2017 at 8:43 AM, Dong Aisheng <dongas86@gmail.com> wrote:
-> > On Wed, May 17, 2017 at 08:37:41AM +0300, Nikita Yushchenko wrote:
-> >>
-> >>
-> >> 17.05.2017 06:39, Dong Aisheng wrote:
-> >> > On Tue, May 16, 2017 at 02:15:08PM +0300, Nikita Yushchenko wrote:
-> >> >>>  static u32 lpuart32_read(void __iomem *addr)
-> >> >>>  {
-> >> >>> - return ioread32be(addr);
-> >> >>> + return lpuart_is_be ? ioread32be(addr) : readl(addr);
-> >> >>>  }
-> >> >>>
-> >> >>>  static void lpuart32_write(u32 val, void __iomem *addr)
-> >> >>>  {
-> >> >>> - iowrite32be(val, addr);
-> >> >>> + if (lpuart_is_be)
-> >> >>> +         iowrite32be(val, addr);
-> >> >>> + else
-> >> >>> +         writel(val, addr);
-> >> >>>  }
-> >> >>
-> >> >> What if this is ever executed on big endian system?
-> >> >>
-> >> >
-> >> > Sorry, not catching the point...
-> >> >
-> >> > What issues will meet?
-> >>
-> >> Isn't writel() in host endian?
-> >
-> > On big endian systems, it is supposed to run iowrite32be.
+On 31/05/17 08:26, Auger Eric wrote:
+> Hi Marc,
 > 
-> It looks like you substituting *bus* side with CPU *side* of communication.
+> On 31/05/2017 08:46, Marc Zyngier wrote:
+>> On Wed, 31 May 2017 08:33:05 +0200
+>> Auger Eric <eric.auger@redhat.com> wrote:
+>>
+>>> Hi Marc,
+>>>
+>>> On 30/05/2017 16:24, Marc Zyngier wrote:
+>>>> On 30/05/17 08:48, Auger Eric wrote:  
+>>>>> Hi Marc
+>>>>>
+>>>>> On 03/05/2017 12:45, Marc Zyngier wrote:  
+>>>>>> Add a handler for writing the guest's view of the ICC_EOIR1_EL1
+>>>>>> register. This involves dropping the priority of the interrupt,
+>>>>>> and deactivating it if required (EOImode == 0).
+>>>>>>
+>>>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>>>> ---
+>>>>>>  include/linux/irqchip/arm-gic-v3.h |   2 +
+>>>>>>  virt/kvm/arm/hyp/vgic-v3-sr.c      | 119 +++++++++++++++++++++++++++++++++++++
+>>>>>>  2 files changed, 121 insertions(+)
+>>>>>>
+>>>>>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+>>>>>> index 7610ea4e8337..c56d9bc2c904 100644
+>>>>>> --- a/include/linux/irqchip/arm-gic-v3.h
+>>>>>> +++ b/include/linux/irqchip/arm-gic-v3.h
+>>>>>> @@ -403,6 +403,8 @@
+>>>>>>  
+>>>>>>  #define ICH_HCR_EN			(1 << 0)
+>>>>>>  #define ICH_HCR_UIE			(1 << 1)
+>>>>>> +#define ICH_HCR_EOIcount_SHIFT		27
+>>>>>> +#define ICH_HCR_EOIcount_MASK		(0x1f << ICH_HCR_EOIcount_SHIFT)
+>>>>>>  
+>>>>>>  #define ICH_VMCR_CBPR_SHIFT		4
+>>>>>>  #define ICH_VMCR_CBPR_MASK		(1 << ICH_VMCR_CBPR_SHIFT)
+>>>>>> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+>>>>>> index 49aad1de3ac8..a76351b3ad66 100644
+>>>>>> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
+>>>>>> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+>>>>>> @@ -425,6 +425,26 @@ static int __hyp_text __vgic_v3_highest_priority_lr(struct kvm_vcpu *vcpu,
+>>>>>>  	return lr;
+>>>>>>  }
+>>>>>>  
+>>>>>> +static int __hyp_text __vgic_v3_find_active_lr(struct kvm_vcpu *vcpu,
+>>>>>> +					       int intid, u64 *lr_val)
+>>>>>> +{
+>>>>>> +	unsigned int used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+>>>>>> +	int i;
+>>>>>> +
+>>>>>> +	for (i = 0; i < used_lrs; i++) {
+>>>>>> +		u64 val = __gic_v3_get_lr(i);
+>>>>>> +
+>>>>>> +		if ((val & ICH_LR_VIRTUAL_ID_MASK) == intid &&
+>>>>>> +		    (val & ICH_LR_ACTIVE_BIT)) {  
+>>>>> I guess it is safe because we don't have yet virtual interrupts directly
+>>>>> mapped to phys IRQs, besides timer one?  
+>>>>
+>>>> What would that change? I don't see how having a HW interrupt here would
+>>>> be unsafe... Am I missing something?  
+>>> I was thinking about the case of an HW mapped interrupt whose active
+>>> state must be observed at distributor level - as I understood the spec -
+>>> and not at LR level.
+>>
+>> What part of the spec are you referring to?
+>>
+>> A virtual interrupt, even backed by a HW interrupt, does have an active
+>> state (unless it is an LPI). The only state we cannot observe in the LR
+>> when the HW bit is set is the Active+Pending state because the pending
+>> bit is then at the physical distributor level.
+>>
+>> For all intent and purposes, the active state in the LR behaves the
+>> same, irrespective of the HW state, until the guest issues a
+>> deactivation (either using EOI or DIR, depending on EOImode).
 > 
-> If you are talking about CPU side
-> __raw_readl() / __raw_writel() will do the trick.
+> Hum OK. I was referring to the note in table 5-9 of IHI0048B2 but
+> effectively I added a "s" where there is none :-(
 > 
+> "
+> For hardware interrupts, the pending and active state is held in the
+> physical Distributor rather than the virtual
+> CPU interface. A hypervisor must only use the pending and active state
+> for software originated interrupts
+> associated with virtual devices, or SGIs.
+> "
+> 
+> Sorry for the noise.
 
-Yes, you're right.
-To be more accurate, for bus side, if it's BE lpuart it should use
-ioread32be/iowrite32be. If it's LE lpuart, it should use readl/writel.
+No worries. I've pestered against this verbiage multiple times because
+it is incredibly misleading for non native speakers (I misinterpreted
+this "pending and active state" a couple of times myself). This is why I
+wrote Active+Pending above, because it is less ambiguous.
 
-And for CPU side, endian is transparent to driver users as they're
-hided in io accessors implementation.
+The GICv3 spec contains the same subtlety in multiple places. Man, how I
+hate this thing, it is unbelievable.
 
-Regards
-Dong Aisheng
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
