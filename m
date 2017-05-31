@@ -1,30 +1,44 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 31 May 2017 11:49:14 +0200
-Subject: [PATCH 1/2] power: reset: at91-poweroff: fix clobber list
-Message-ID: <20170531094915.3469-1-alexandre.belloni@free-electrons.com>
+Date: Wed, 31 May 2017 11:52:35 +0200
+Subject: [PATCH RFC 3/5] ARM: dts: at91-sama5d4: use IRQ_TYPE_* to
+ specify irq flags
+In-Reply-To: <8bbb5802-518b-6ae1-6ea2-642b1f0b3d2e@denx.de>
+References: <20170526180609.2699-1-uwe@kleine-koenig.org>
+ <20170526180609.2699-3-uwe@kleine-koenig.org>
+ <8bbb5802-518b-6ae1-6ea2-642b1f0b3d2e@denx.de>
+Message-ID: <20170531095235.nzkce75ffekkr65e@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Assembly in at91_lpddr_poweroff has r0 in the clobber list but uses r6.
+On 26/05/2017 at 21:17:37 +0200, Marek Vasut wrote:
+> On 05/26/2017 08:06 PM, Uwe Kleine-K?nig wrote:
+> > According to the binding documentation and the source code the atmel-gpio
+> > controller takes IRQ_TYPE_* as its flags values, not GPIO_ACTIVE_*.
+> > 
+> > This patch uses the right variable type which yields the same result
+> > when compiled. Note that this might be wrong and actually
+> > IRQ_TYPE_LEVEL_LOW is intended by the dt author.
+> > 
+> > Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+> > ---
+> > Hello,
+> > 
+> > can somebody with the hardware or it's documentation please check which
+> > flag is the right one?
+> 
+> It's correct, I tested the CAN, so:
+> 
+> Acked-by: Marek Vasut <marex@denx.de>
+> 
+> > Best regards
+> > Uwe
+> > 
+> >  arch/arm/boot/dts/at91-sama5d4_ma5d4.dtsi | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+Applied, thanks.
 
-Reported-by: Ben Hutchings <ben.hutchings@codethink.co.uk>
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/power/reset/at91-poweroff.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/power/reset/at91-poweroff.c b/drivers/power/reset/at91-poweroff.c
-index c6c3beea72f9..c30c40193aaa 100644
---- a/drivers/power/reset/at91-poweroff.c
-+++ b/drivers/power/reset/at91-poweroff.c
-@@ -97,7 +97,7 @@ static void at91_lpddr_poweroff(void)
- 		  "r" cpu_to_le32(AT91_DDRSDRC_LPDDR2_PWOFF),
- 		  "r" (at91_shdwc_base),
- 		  "r" cpu_to_le32(AT91_SHDW_KEY | AT91_SHDW_SHDW)
--		: "r0");
-+		: "r6");
- }
- 
- static int at91_poweroff_get_wakeup_mode(struct device_node *np)
 -- 
-2.11.0
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
