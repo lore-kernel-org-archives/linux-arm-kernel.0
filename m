@@ -1,47 +1,63 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Wed, 31 May 2017 06:43:40 -0600
-Subject: [PATCH] PCI/PM: Set D3 power state only if the end device
- supports it.
-In-Reply-To: <1496230412-19028-1-git-send-email-gakula@caviumnetworks.com>
-References: <1496230412-19028-1-git-send-email-gakula@caviumnetworks.com>
-Message-ID: <20170531064340.0dcec477@w520.home>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 31 May 2017 13:44:19 +0100
+Subject: Device address specific mapping of arm,mmu-500
+In-Reply-To: <7bd03bf8-71d5-a974-bea2-a38b4349c547@broadcom.com>
+References: <1b79efe2-6835-7a7a-f5ad-361391a7b967@broadcom.com>
+ <20170530151437.GC23067@arm.com>
+ <81637642-22d9-4868-156f-052f64bd042f@broadcom.com>
+ <226bcebc-3902-90d3-24e5-51f2e1f3affb@arm.com>
+ <a85b2e3f-93db-7c4d-cde8-32a57e69bef9@broadcom.com>
+ <16e5fc9d-b014-af7c-dcda-527522ac5cc9@arm.com>
+ <b47a379e-4a1b-42ff-8604-01b5becd685c@broadcom.com>
+ <7bd03bf8-71d5-a974-bea2-a38b4349c547@broadcom.com>
+Message-ID: <20170531124418.GE9723@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 31 May 2017 17:03:32 +0530
-Geetha sowjanya <gakula@caviumnetworks.com> wrote:
-
-> Pci driver doesn't check if the device supports D3hot/D3cold power states 
-> while setting these power states. The device that doesn't support these 
-> states will fail when a driver like vfio try to do D0->D3 power transition.
-
-
-That's because support for D0 and D3 device states is REQUIRED by the
-PCIe spec (Rev 3.1a, 7.6).  Is this yet more non-spec compliance?
-Thanks,
-
-Alex
-
- 
-> This patch adds a check that allows to set D3 power state only
-> for the supported devices.
+On Tue, May 30, 2017 at 11:13:36PM -0700, Ray Jui wrote:
+> I did a little more digging myself and I think I now understand what you
+> meant by identity mapping, i.e., configuring the MMU-500 with 1:1 mapping
+> between the DMA address and the IOVA address.
 > 
-> Signed-off-by: Geetha sowjanya <gakula@caviumnetworks.com>
-> ---
->  drivers/pci/pci.c |    3 ++-
->  1 files changed, 2 insertions(+), 1 deletions(-)
+> I think that should work. In the end, due to this MSI write parsing issue in
+> our PCIe controller, the reason to use IOMMU is to allow the cache
+> attributes (AxCACHE) of the MSI writes towards GICv3 ITS to be modified by
+> the IOMMU to be device type, while leaving the rest of inbound reads/writes
+> from/to DDR with more optimized cache attributes setting, to allow I/O
+> coherency to be still enabled for the PCIe controller. In fact, the PCIe
+> controller itself is fully capable of DMA to/from the full address space of
+> our SoC including both DDR and any device memory.
 > 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index 563901c..cadd046 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -661,7 +661,8 @@ static int pci_raw_set_power_state(struct pci_dev *dev, pci_power_t state)
->  
->  	/* check if this device supports the desired state */
->  	if ((state == PCI_D1 && !dev->d1_support)
-> -	   || (state == PCI_D2 && !dev->d2_support))
-> +	   || (state == PCI_D2 && !dev->d2_support)
-> +	   || (state == PCI_D3hot && !pci_pme_capable(dev, state)))
->  		return -EIO;
->  
->  	pci_read_config_word(dev, dev->pm_cap + PCI_PM_CTRL, &pmcsr);
+> The 1:1 mapping will still pose some translation overhead like you
+> suggested; however, the overhead of allocating page tables and locking will
+> be gone. This sounds like the best possible option I have currently.
+
+It might end up being pretty invasive to work around a hardware bug, so
+we'll have to see what it looks like. Ideally, we could just use the SMMU
+for everything as-is and work on clawing back the lost performance (it
+should be possible to get ~95% of the perf if we sort out the locking, which
+we *are* working on).
+
+> May I ask, how do I start to try to get this identity mapping to work as an
+> experiment and proof of concept? Any pointer or advise is highly appreciated
+> as you can see I'm not very experienced with this. I found Will recently
+> added the IOMMU_DOMAIN_IDENTITY support to the arm-smmu driver. But I
+> suppose that is to bypass the SMMU completely, instead of still going
+> through the MMU with 1:1 translation. Is my understanding correct?
+
+Yes, I don't think IOMMU_DOMAIN_IDENTITY is what you need because you
+actally need per-page control of memory attributes.
+
+Robin might have a better idea, but I think you'll have to hack dma-iommu.c
+so that you can have a version of the DMA ops that:
+
+  * Initialises the identity map (I guess as normal WB cacheable?)
+  * Reserves and maps the MSI region appropriately
+  * Just returns the physical address for the dma address for map requests
+    (return error for the MSI region)
+  * Does nothing for unmap requests
+
+But my strong preference would be to fix the locking overhead from the
+SMMU so that the perf hit is acceptable.
+
+Will
