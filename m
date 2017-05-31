@@ -1,114 +1,78 @@
-From: william.wu@rock-chips.com (William Wu)
-Date: Wed, 31 May 2017 09:21:24 +0800
-Subject: [PATCH 2/2] ARM: dts: rockchip: enable usb for rk3229 evb board
-In-Reply-To: <1496193684-30449-1-git-send-email-william.wu@rock-chips.com>
-References: <1496193684-30449-1-git-send-email-william.wu@rock-chips.com>
-Message-ID: <1496193684-30449-3-git-send-email-william.wu@rock-chips.com>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Wed, 31 May 2017 09:45:38 +0800
+Subject: [Resend PATCH 1/2] clk: hi6220: add acpu clock
+Message-ID: <1496195139-16687-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rockchip's rk3229 evaluation board has one usb otg controller
-and three usb host controllers. Each usb controller connect
-with one usb2 phy port through UTMI+ interface. And the three
-usb host interfaces use the same GPIO VBUS drive. Let's enable
-them to support usb on rk3229 evb board.
+Add acpu clock, including sft clock controlling hi6220 coresight module
 
-Signed-off-by: William Wu <william.wu@rock-chips.com>
+Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm/boot/dts/rk3229-evb.dts | 74 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 74 insertions(+)
+Verified on clk-next, v.12-rc1
 
-diff --git a/arch/arm/boot/dts/rk3229-evb.dts b/arch/arm/boot/dts/rk3229-evb.dts
-index 275092a..1b55192 100644
---- a/arch/arm/boot/dts/rk3229-evb.dts
-+++ b/arch/arm/boot/dts/rk3229-evb.dts
-@@ -58,6 +58,17 @@
- 		#clock-cells = <0>;
- 	};
+.../devicetree/bindings/clock/hi6220-clock.txt     |  1 +
+ drivers/clk/hisilicon/clk-hi6220.c                 | 23 ++++++++++++++++++++++
+ include/dt-bindings/clock/hi6220-clock.h           |  4 ++++
+ 3 files changed, 28 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/clock/hi6220-clock.txt b/Documentation/devicetree/bindings/clock/hi6220-clock.txt
+index e4d5fea..ef3deb7 100644
+--- a/Documentation/devicetree/bindings/clock/hi6220-clock.txt
++++ b/Documentation/devicetree/bindings/clock/hi6220-clock.txt
+@@ -11,6 +11,7 @@ Required Properties:
+ - compatible: the compatible should be one of the following strings to
+ 	indicate the clock controller functionality.
  
-+	vcc_host: vcc-host-regulator {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio3 RK_PC4 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&host_vbus_drv>;
-+		regulator-name = "vcc_host";
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
++	- "hisilicon,hi6220-acpu-sctrl"
+ 	- "hisilicon,hi6220-aoctrl"
+ 	- "hisilicon,hi6220-sysctrl"
+ 	- "hisilicon,hi6220-mediactrl"
+diff --git a/drivers/clk/hisilicon/clk-hi6220.c b/drivers/clk/hisilicon/clk-hi6220.c
+index 2ae151c..fc8813f 100644
+--- a/drivers/clk/hisilicon/clk-hi6220.c
++++ b/drivers/clk/hisilicon/clk-hi6220.c
+@@ -285,3 +285,26 @@ static void __init hi6220_clk_power_init(struct device_node *np)
+ 				ARRAY_SIZE(hi6220_div_clks_power), clk_data);
+ }
+ CLK_OF_DECLARE(hi6220_clk_power, "hisilicon,hi6220-pmctrl", hi6220_clk_power_init);
 +
- 	vcc_phy: vcc-phy-regulator {
- 		compatible = "regulator-fixed";
- 		enable-active-high;
-@@ -85,6 +96,69 @@
- 	status = "okay";
- };
++
++/* clocks in acpu */
++static const struct hisi_gate_clock hi6220_acpu_sc_gate_sep_clks[] = {
++	{ HI6220_ACPU_SFT_AT_S, "sft_at_s", "cs_atb",
++	  CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED, 0xc, 11, 0, },
++};
++
++static void __init hi6220_clk_acpu_init(struct device_node *np)
++{
++	struct hisi_clock_data *clk_data;
++	int nr = ARRAY_SIZE(hi6220_acpu_sc_gate_sep_clks);
++
++	clk_data = hisi_clk_init(np, nr);
++	if (!clk_data)
++		return;
++
++	hisi_clk_register_gate_sep(hi6220_acpu_sc_gate_sep_clks,
++				   ARRAY_SIZE(hi6220_acpu_sc_gate_sep_clks),
++				   clk_data);
++}
++
++CLK_OF_DECLARE(hi6220_clk_acpu, "hisilicon,hi6220-acpu-sctrl", hi6220_clk_acpu_init);
+diff --git a/include/dt-bindings/clock/hi6220-clock.h b/include/dt-bindings/clock/hi6220-clock.h
+index b8ba665..409cc02 100644
+--- a/include/dt-bindings/clock/hi6220-clock.h
++++ b/include/dt-bindings/clock/hi6220-clock.h
+@@ -174,4 +174,8 @@
+ #define HI6220_DDRC_AXI1	7
  
-+&pinctrl {
-+	usb {
-+		host_vbus_drv: host-vbus-drv {
-+			rockchip,pins = <3 RK_PC4 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+};
+ #define HI6220_POWER_NR_CLKS	8
 +
- &uart2 {
- 	status = "okay";
- };
++/* clk in Hi6220 acpu sctrl */
++#define HI6220_ACPU_SFT_AT_S		0
 +
-+&u2phy0 {
-+	status = "okay";
-+
-+	u2phy0_otg: otg-port {
-+		status = "okay";
-+	};
-+
-+	u2phy0_host: host-port {
-+		phy-supply = <&vcc_host>;
-+		status = "okay";
-+	};
-+};
-+
-+&u2phy1 {
-+	status = "okay";
-+
-+	u2phy1_otg: otg-port {
-+		phy-supply = <&vcc_host>;
-+		status = "okay";
-+	};
-+
-+	u2phy1_host: host-port {
-+		phy-supply = <&vcc_host>;
-+		status = "okay";
-+	};
-+};
-+
-+&usb_host0_ehci {
-+	status = "okay";
-+};
-+
-+&usb_host0_ohci {
-+	status = "okay";
-+};
-+
-+&usb_host1_ehci {
-+	status = "okay";
-+};
-+
-+&usb_host1_ohci {
-+	status = "okay";
-+};
-+
-+&usb_host2_ehci {
-+	status = "okay";
-+};
-+
-+&usb_host2_ohci {
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	status = "okay";
-+};
+ #endif
 -- 
-2.0.0
+2.7.4
