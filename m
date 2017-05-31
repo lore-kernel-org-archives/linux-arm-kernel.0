@@ -1,38 +1,33 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 31 May 2017 11:56:06 -0500
-Subject: [linux-sunxi] [PATCH v3 3/9] ASoC: sun8i-codec-analog: add
- support for V3s SoC
-In-Reply-To: <CAGb2v673VPeF+KOZskWnHppWSMvZSfLS5JXxxSjM9diDF7NGeg@mail.gmail.com>
+Date: Wed, 31 May 2017 11:56:51 -0500
+Subject: [PATCH v3 4/9] ASoC: sun4i-codec: Add support for V3s codec
+In-Reply-To: <20170524100607.29790-5-icenowy@aosc.io>
 References: <20170524100607.29790-1-icenowy@aosc.io>
- <20170524100607.29790-4-icenowy@aosc.io>
- <CAGb2v673VPeF+KOZskWnHppWSMvZSfLS5JXxxSjM9diDF7NGeg@mail.gmail.com>
-Message-ID: <20170531165606.onip7m5m2u56vp6m@rob-hp-laptop>
+ <20170524100607.29790-5-icenowy@aosc.io>
+Message-ID: <20170531165651.4bcmgskmspetw7cx@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 25, 2017 at 11:58:37AM +0800, Chen-Yu Tsai wrote:
-> On Wed, May 24, 2017 at 6:06 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> > From: Icenowy Zheng <icenowy@aosc.xyz>
-> >
-> > The V3s SoC features an analog codec with headphone support but without
-> > mic2 and linein.
-> >
-> > Add support for it.
-> >
-> > Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+On Wed, May 24, 2017 at 06:06:02PM +0800, Icenowy Zheng wrote:
+> From: Icenowy Zheng <icenowy@aosc.xyz>
 > 
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> The codec in the V3s is similar to the one found on the A31. One key
+> difference is the analog path controls are routed through the PRCM
+> block. This is supported by the sun8i-codec-analog driver, and tied
+> into this codec driver with the audio card's aux_dev.
 > 
-> Mark, please hold off on applying this patch until the comments from the
-> previous patch have been addressed. They should be applied in order.
+> In addition, the V3s does not have LINEIN, LINEOUT, MBIAS and MIC2,
+> MIC3, and the FIFO related registers are like H3.
 > 
-> > ---
-> >  Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt | 1 +
-> >  sound/soc/sunxi/sun8i-codec-analog.c                           | 9 +++++++++
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
+> Changes in v3:
+> - Change regmap max register.
+> - Add a note for further DAP support.
 > 
-> Also, is there a preference for splitting out device tree binding
-> changes from driver changes?
+>  .../devicetree/bindings/sound/sun4i-codec.txt      | 11 ++--
 
-Yes, but not necessary for a 1 line change.
+Acked-by: Rob Herring <robh@kernel.org>
 
-Rob
+>  sound/soc/sunxi/sun4i-codec.c                      | 63 ++++++++++++++++++++++
+>  2 files changed, 70 insertions(+), 4 deletions(-)
