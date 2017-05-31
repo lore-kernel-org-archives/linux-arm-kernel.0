@@ -1,67 +1,82 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 31 May 2017 13:44:30 +0100
-Subject: [PATCHv2 1/2] arm64:vdso: Rewrite gettimeofday into C.
-In-Reply-To: <1496190860-5116-1-git-send-email-apinski@cavium.com>
-Message-ID: <20170531124430.GG9723@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 31 May 2017 12:57:01 +0000
+Subject: [PATCH] asm-generic: simd: allow SIMD in process context with BH
+ disabled
+Message-ID: <20170531125701.20717-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+asm-generic supplies a header asm/simd.h which exports a single function
+may_use_simd(), which conveys whether the current context allows the SIMD
+register file or instructions to be used.
 
-Thanks for posting this, but please try to cc the maintainers in future -- I
-almost missed it!
+This header is included by crypto code shared between x86 and ARM/arm64,
+and which offloads SIMD processing to process context if required. The
+generic asm/simd.h is shared between ARM and arm64 at the moment, while
+x86 has its own implementation.
 
-On Tue, May 30, 2017 at 05:34:19PM -0700, Andrew Pinski wrote:
-> This allows the compiler to optimize the divide by 1000.
-> And remove the other divide.
-> 
-> On ThunderX, gettimeofday improves by 32%.  On ThunderX 2,
-> gettimeofday improves by 18%.
-> 
-> Note I noticed a bug in the old implementation of __kernel_clock_getres;
-> it was checking only the lower 32bits of the pointer; this would work
-> for most cases but could fail in a few.
-> 
-> Changes from v1:
-> * Fixed bug in __kernel_clock_getres for checking the pointer argument.
-> * Fix comments to refer to functions in arm64.
+On arm64, we currently mostly ignore may_use_simd(), because arm64 allows
+kernel mode NEON in any context. However, this is due to change shortly
+when support for SVE is merged, at which point we will introduce an arm64
+specific implementation of asm/simd.h as well.
 
-I tested this patch on a few platforms I have access to and didn't see the
-perf regressions I saw when I looked at this in the past with an older
-toolchain (it was mostly about the same, with a couple of improvements).
+That leaves ARM, which only allows kernel mode NEON in process context,
+which makes the current generic implementation of may_use_simd() seem
+appropriate. However, given that in_interrupt() will return true when
+running in process context with bottom halves disabled, we may end up
+falling back to less optimized code unnecessarily, given that kernel
+mode NEON is perfectly usable in that case.
 
-So, in principle, I'm not opposed to moving this into C. However, we're
-currently close to a "vDSO-explosion" on arm64 with people wanting a compat
-variant and also an ILP32 variant. When Kevin posted his compat variant
-(also in C):
+So redefine may_use_simd() to disallow SIMD only when running in hardirq
+or softirq context.
 
-  http://lkml.kernel.org/r/20161206160353.14581-1-kevin.brodsky at arm.com
+While we're at it, add some missing header file decorations such as
+a license header and include guards.
 
-Nathan (who apparently needs to set his mail host address ;) was concerned
-about duplication between arm and arm64:
+Reported-by: "Jason A. Donenfeld" <Jason@zx2c4.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ include/asm-generic/simd.h | 23 ++++++++++++++++++++---
+ 1 file changed, 20 insertions(+), 3 deletions(-)
 
-  http://lkml.kernel.org/r/87r35jmv3e.fsf at wedge.i-did-not-set--mail-host-address--so-tickle-me
-
-I'm firmly of the opinion that we should try to write an arch-agnostic vDSO
-implementation in core code (lib/vdso or something) where the arch header
-provides things like:
-
-  * The mechanism to read the counter
-  * The mechanism to issue a syscall
-  * A function to determine whether or not the current clocksource is
-    suitable
-
-I think the datapage format could be defined in core code and it would be
-worth looking to see how much the virtual mapping code can be consolidated
-too.
-
-If we can get something that works for arm native, arm64 native, arm64
-compat and arm64 ilp32 then it's probably going to be useful for other
-architectures too, even if we need to add more customisation points in
-future.
-
-I've spoken to Kevin about this, but I'm not sure whether he's had a chance
-to look at knocking up a prototype. A first stab could just unconditionally
-fallback to the system call.
-
-Will
+diff --git a/include/asm-generic/simd.h b/include/asm-generic/simd.h
+index f57eb7b5c23b..a3e5ebe6b2b2 100644
+--- a/include/asm-generic/simd.h
++++ b/include/asm-generic/simd.h
+@@ -1,14 +1,31 @@
++/*
++ * Copyright (C) 2013 - 2017 Linaro Ltd. <ard.biesheuvel@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published
++ * by the Free Software Foundation.
++ */
+ 
+-#include <linux/hardirq.h>
++#ifndef __ASM_SIMD_H
++#define __ASM_SIMD_H
++
++#include <linux/types.h>
++#include <linux/preempt.h>
+ 
+ /*
+  * may_use_simd - whether it is allowable at this time to issue SIMD
+  *                instructions or access the SIMD register file
+  *
+  * As architectures typically don't preserve the SIMD register file when
+- * taking an interrupt, !in_interrupt() should be a reasonable default.
++ * taking an interrupt, it is reasonable to define the default behavior
++ * of 'may_use_simd()' to be 'SIMD is only allowed when not handling an
++ * IRQ or softIRQ'. Since 'in_interrupt()' will also return true when
++ * running in process context with bottom halves disabled, we have to
++ * spell out that condition as shown.
+  */
+ static __must_check inline bool may_use_simd(void)
+ {
+-	return !in_interrupt();
++	return !in_irq() && !in_serving_softirq();
+ }
++
++#endif
+-- 
+2.9.3
