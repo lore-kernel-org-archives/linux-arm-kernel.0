@@ -1,31 +1,31 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed, 31 May 2017 09:18:52 +0200
-Subject: [PATCH v6 21/21] arm64: defconfig: Enable dwmac-sun8i driver on
- defconfig
+Date: Wed, 31 May 2017 09:18:51 +0200
+Subject: [PATCH v6 20/21] arm: multi_v7: Enable dwmac-sun8i driver on
+ multi_v7_defconfig
 In-Reply-To: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
 References: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170531071852.12422-22-clabbe.montjoie@gmail.com>
+Message-ID: <20170531071852.12422-21-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the dwmac-sun8i ethernet driver as a module in the ARM64 defconfig.
+Enable the dwmac-sun8i driver in the multi_v7 default configuration
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm64/configs/defconfig | 1 +
+ arch/arm/configs/multi_v7_defconfig | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 000de61802a1..fd7d22b8480c 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -191,6 +191,7 @@ CONFIG_RAVB=y
- CONFIG_SMC91X=y
- CONFIG_SMSC911X=y
- CONFIG_STMMAC_ETH=m
-+CONFIG_DWMAC_SUN8I=m
- CONFIG_MDIO_BUS_MUX_MMIOREG=y
- CONFIG_MESON_GXL_PHY=m
- CONFIG_MICREL_PHY=y
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 705d908e004a..60c0c01002c2 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -257,6 +257,7 @@ CONFIG_SMSC911X=y
+ CONFIG_STMMAC_ETH=y
+ CONFIG_STMMAC_PLATFORM=y
+ CONFIG_DWMAC_DWC_QOS_ETH=y
++CONFIG_DWMAC_SUN8I=y
+ CONFIG_TI_CPSW=y
+ CONFIG_XILINX_EMACLITE=y
+ CONFIG_AT803X_PHY=y
 -- 
 2.13.0
