@@ -1,40 +1,35 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed, 31 May 2017 09:18:45 +0200
-Subject: [PATCH v6 14/21] arm64: allwinner: sun50i-a64: Add dt node for the
- syscon control module
+Date: Wed, 31 May 2017 09:18:44 +0200
+Subject: [PATCH v6 13/21] arm: sun8i: nanopi-neo: Enable dwmac-sun8i
 In-Reply-To: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
 References: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170531071852.12422-15-clabbe.montjoie@gmail.com>
+Message-ID: <20170531071852.12422-14-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the dt node for the syscon register present on the
-Allwinner A64.
-
-Only two register are present in this syscon and the only one useful is
-the one dedicated to EMAC clock.
+The dwmac-sun8i hardware is present on the NanoPi Neo.
+It uses the internal PHY.
+This patch create the needed emac node.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 90dc4ec79485..2eeba0d44074 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -129,6 +129,12 @@
- 		#size-cells = <1>;
- 		ranges;
- 
-+		syscon: syscon at 1c00000 {
-+			compatible = "allwinner,sun50i-a64-system-controller",
-+				"syscon";
-+			reg = <0x01c00000 0x1000>;
-+		};
+diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts
+index 8d2cc6e9a03f..78f6c24952dd 100644
+--- a/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts
++++ b/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts
+@@ -46,3 +46,10 @@
+ 	model = "FriendlyARM NanoPi NEO";
+ 	compatible = "friendlyarm,nanopi-neo", "allwinner,sun8i-h3";
+ };
 +
- 		mmc0: mmc at 1c0f000 {
- 			compatible = "allwinner,sun50i-a64-mmc";
- 			reg = <0x01c0f000 0x1000>;
++&emac {
++	phy-handle = <&int_mii_phy>;
++	phy-mode = "mii";
++	allwinner,leds-active-low;
++	status = "okay";
++};
 -- 
 2.13.0
