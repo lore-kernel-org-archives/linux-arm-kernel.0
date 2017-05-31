@@ -1,25 +1,27 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 31 May 2017 13:38:26 +0100
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 31 May 2017 14:42:20 +0200
 Subject: [PATCH v2 2/2] arm64: dts: Add Mediatek SoC MT2712 and evaluation
  board dts and Makefile
 In-Reply-To: <1496230773-22633-3-git-send-email-yt.shen@mediatek.com>
 References: <1496230773-22633-1-git-send-email-yt.shen@mediatek.com>
  <1496230773-22633-3-git-send-email-yt.shen@mediatek.com>
-Message-ID: <d1be42ad-0b79-8487-1590-711b0e86d2ca@arm.com>
+Message-ID: <92e438b3-4e9c-421b-5398-5aad2541524c@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/05/17 12:39, YT Shen wrote:
+
+
+On 31/05/17 13:39, YT Shen wrote:
 > This adds basic chip support for Mediatek 2712
 > 
 > Signed-off-by: YT Shen <yt.shen@mediatek.com>
 > ---
->  arch/arm64/boot/dts/mediatek/Makefile       |   1 +
->  arch/arm64/boot/dts/mediatek/mt2712-evb.dts |  39 +++++++
->  arch/arm64/boot/dts/mediatek/mt2712e.dtsi   | 166 ++++++++++++++++++++++++++++
->  3 files changed, 206 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/mediatek/mt2712-evb.dts
->  create mode 100644 arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+>   arch/arm64/boot/dts/mediatek/Makefile       |   1 +
+>   arch/arm64/boot/dts/mediatek/mt2712-evb.dts |  39 +++++++
+>   arch/arm64/boot/dts/mediatek/mt2712e.dtsi   | 166 ++++++++++++++++++++++++++++
+>   3 files changed, 206 insertions(+)
+>   create mode 100644 arch/arm64/boot/dts/mediatek/mt2712-evb.dts
+>   create mode 100644 arch/arm64/boot/dts/mediatek/mt2712e.dtsi
 > 
 > diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
 > index 9fbfd32..fcc0604 100644
@@ -27,9 +29,9 @@ On 31/05/17 12:39, YT Shen wrote:
 > +++ b/arch/arm64/boot/dts/mediatek/Makefile
 > @@ -1,3 +1,4 @@
 > +dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
->  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
->  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
->  dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
+>   dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
+>   dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
+>   dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
 > diff --git a/arch/arm64/boot/dts/mediatek/mt2712-evb.dts b/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
 > new file mode 100644
 > index 0000000..e526c0f
@@ -58,6 +60,9 @@ On 31/05/17 12:39, YT Shen wrote:
 > +		serial4 = &uart4;
 > +		serial5 = &uart5;
 > +	};
+
+Just declare serial0 here, as you don't use the others.
+
 > +
 > +	memory at 40000000 {
 > +		device_type = "memory";
@@ -68,6 +73,10 @@ On 31/05/17 12:39, YT Shen wrote:
 > +		stdout-path = "serial0:921600n8";
 > +		linux,initrd-start = <0x45000000>;
 > +		linux,initrd-end   = <0x4a000000>;
+
+initrd-start and end should be dynamically set by the bootloader and not 
+via a chosen node. Is your bootloader not able to do that?
+
 > +	};
 > +};
 > +
@@ -121,12 +130,21 @@ On 31/05/17 12:39, YT Shen wrote:
 > +		cpu0: cpu at 0 {
 > +			device_type = "cpu";
 > +			compatible = "arm,cortex-a35";
+
+do you mean cortex-a53?
+
 > +			reg = <0x000>;
 > +		};
 > +
 > +		cpu1: cpu at 1 {
 > +			device_type = "cpu";
 > +			compatible = "arm,cortex-a35";
+
+same here.
+
+Regards,
+Matthias
+
 > +			reg = <0x001>;
 > +			enable-method = "psci";
 > +		};
@@ -155,9 +173,6 @@ On 31/05/17 12:39, YT Shen wrote:
 > +		interrupt-parent = <&gic>;
 > +		interrupts = <GIC_PPI 13
 > +			      (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
-
-Why 6? I only count 3 cores...
-
 > +			     <GIC_PPI 14
 > +			      (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
 > +			     <GIC_PPI 11
@@ -197,24 +212,10 @@ Why 6? I only count 3 cores...
 > +			interrupt-controller;
 > +			reg = <0 0x10510000 0 0x1000>,
 > +			      <0 0x10520000 0 0x1000>,
-
-If that's truly a GIC400, then the above is wrong (the CPU interface is
-spread over 8kB).
-
-I also suspect that the first 4kB are aliased over
-0x10520000:0x1052f000, and the second over 0x10530000:0x1053f000 (in the
-true SBSA tradition). If that's the case, then the size is actually 128kB.
-
 > +			      <0 0x10540000 0 0x2000>,
 > +			      <0 0x10560000 0 0x2000>;
-
-Please check GICV as well, which probably behaves the same way.
-
 > +			interrupts = <GIC_PPI 9
 > +				(GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_HIGH)>;
-
-Same thing here with 6 CPUs.
-
 > +		};
 > +
 > +		uart0: serial at 11002000 {
@@ -265,11 +266,3 @@ Same thing here with 6 CPUs.
 > +};
 > +
 > 
-
-No PMU wired on this system?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
