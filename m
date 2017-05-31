@@ -1,29 +1,58 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Wed, 31 May 2017 08:34:00 +0200
-Subject: [PATCH 00/58] ARM: at91: rework Atmel TCB drivers
-In-Reply-To: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
-References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
-Message-ID: <da7069d4-e5b3-f10f-0816-ff973195aff6@axentia.se>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Wed, 31 May 2017 14:34:16 +0800
+Subject: [PATCH 2/2] timer: imx-tpm: add imx tpm timer support
+In-Reply-To: <CAK8P3a1JEzZFn4FXi2tb2jOFtV-3MRD-7O3gPBiZDM4qc3BTnA@mail.gmail.com>
+References: <1494660575-30465-1-git-send-email-aisheng.dong@nxp.com>
+ <1494660575-30465-2-git-send-email-aisheng.dong@nxp.com>
+ <CAK8P3a1JEzZFn4FXi2tb2jOFtV-3MRD-7O3gPBiZDM4qc3BTnA@mail.gmail.com>
+Message-ID: <20170531063416.GA16812@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-05-30 23:50, Alexandre Belloni wrote:
-> Hi,
+Hi Arnd,
+
+On Thu, May 25, 2017 at 11:02:22PM +0200, Arnd Bergmann wrote:
+> On Sat, May 13, 2017 at 9:29 AM, Dong Aisheng <aisheng.dong@nxp.com> wrote:
 > 
-> This series reworks the Atmel Timer counter Block drivers. Those blocks
-> each have 3 counters with 2 channels each and can be used for
-> multiple functions:
->  - timers
->  - PWMs
->  - Quadrature decoders
->  - Stepper motor counters
+> > diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> > index 3356ab8..03dfd6a 100644
+> > --- a/drivers/clocksource/Kconfig
+> > +++ b/drivers/clocksource/Kconfig
+> > @@ -590,6 +590,11 @@ config CLKSRC_IMX_GPT
+> >         depends on ARM && CLKDEV_LOOKUP
+> >         select CLKSRC_MMIO
+> >
+> > +config CLKSRC_IMX_TPM
+> > +       bool "Clocksource using i.MX TPM" if COMPILE_TEST
+> > +       depends on ARM && CLKDEV_LOOKUP && GENERIC_CLOCKEVENTS
+> > +       select CLKSRC_MMIO
+> > +
+> 
+> This needs a help text
+> 
 
-I'd like to test this, but I have a hard time doing that since all I got
-was this cover letter and a single DT-only patch.
+Got it
 
-I understand that you were reluctant to spam too many people with
-dozens of patches, but perhaps the series can be fetched from
-somewhere?
+> 
+> > +static inline void tpm_timer_disable(void)
+> > +{
+> > +       unsigned int val;
+> > +
+> > +       /* channel disable */
+> > +       val = __raw_readl(timer_base + TPM_C0SC);
+> > +       val &= ~(TPM_C0SC_MODE_MASK | TPM_C0SC_CHIE);
+> > +       __raw_writel(val, timer_base + TPM_C0SC);
+> > +}
+> 
+> __raw_readl/__raw_writel is broken on big-endian kernels, please
+> use readl/writel instead.
+> 
 
-Cheers,
-peda
+That's true.
+
+Thanks for the kind reminder.
+
+Regards
+Dong Aisheng
+
+>         Arnd
