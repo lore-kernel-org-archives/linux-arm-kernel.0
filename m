@@ -1,53 +1,53 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 31 May 2017 09:35:16 +0200
-Subject: [PATCH v2 1/3] pwm: sun4i: improve hardware read out
-In-Reply-To: <CAGb2v65sznGc9Tp6RSGpQ6KND4BxRFkfHZag5AFrKLBoZJ-r8w@mail.gmail.com>
-References: <20170530193209.19247-1-alexandre.belloni@free-electrons.com>
- <20170530193209.19247-2-alexandre.belloni@free-electrons.com>
- <CAGb2v65sznGc9Tp6RSGpQ6KND4BxRFkfHZag5AFrKLBoZJ-r8w@mail.gmail.com>
-Message-ID: <20170531073516.jrpgtu7nlkuizvfx@piout.net>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Wed, 31 May 2017 09:18:47 +0200
+Subject: [PATCH v6 16/21] arm64: allwinner: pine64: Enable dwmac-sun8i
+In-Reply-To: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
+References: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
+Message-ID: <20170531071852.12422-17-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/05/2017 at 11:34:43 +0800, Chen-Yu Tsai wrote:
-> On Wed, May 31, 2017 at 3:32 AM, Alexandre Belloni
-> <alexandre.belloni@free-electrons.com> wrote:
-> > +static void sun4i_pwm_get_state(struct pwm_chip *chip,
-> > +                               struct pwm_device *pwm,
-> > +                               struct pwm_state *state)
-> > +{
-> > +       struct sun4i_pwm_chip *sun4i_pwm = to_sun4i_pwm_chip(chip);
-> > +       u64 clk_rate, tmp;
-> > +       u32 val;
-> > +       unsigned int prescaler;
-> > +
-> > +       clk_rate = clk_get_rate(sun4i_pwm->clk);
-> > +
-> > +       val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
-> > +
-> > +       if ((val == PWM_PRESCAL_MASK) && sun4i_pwm->data->has_prescaler_bypass)
-> > +               prescaler = 1;
-> > +       else
-> > +               prescaler = prescaler_table[PWM_REG_PRESCAL(val, pwm->hwpwm)];
-> > +
-> > +       if (prescaler == 0)
-> > +               return;
-> 
-> This looks like an invalid state. How does the PWM core handle it?
-> Or rather, how does the driver signal an invalid state?
-> 
+The dwmac-sun8i hardware is present on the pine64
+It uses an external PHY via RMII.
 
-It doesn't and it doesn't really matter, if the IP is in an invalid
-state, this bails out without modifying the know state so the core will
-behave as if there was no hardware read out and everything will be
-synchronized on the first ->apply() call.
+Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+---
+ arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-> Otherwise,
-> 
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> 
-
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+index 7c533b6d4ba9..08cda24ea194 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+@@ -78,6 +78,15 @@
+ 	status = "okay";
+ };
+ 
++&emac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&rmii_pins>;
++	phy-mode = "rmii";
++	phy-handle = <&ext_rmii_phy1>;
++	status = "okay";
++
++};
++
+ &i2c1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c1_pins>;
+@@ -88,6 +97,13 @@
+ 	bias-pull-up;
+ };
+ 
++&mdio {
++	ext_rmii_phy1: ethernet-phy at 1 {
++		compatible = "ethernet-phy-ieee802.3-c22";
++		reg = <1>;
++	};
++};
++
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins>;
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.13.0
