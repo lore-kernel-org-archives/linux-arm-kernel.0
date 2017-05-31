@@ -1,37 +1,54 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 31 May 2017 15:20:22 -0700
-Subject: [PATCHv4 0/6] ARM: OMAP2+: preparation for clk/clkctrl support
-In-Reply-To: <20170531195339.GL3730@atomide.com>
-References: <1496242803-6101-1-git-send-email-t-kristo@ti.com>
- <20170531195339.GL3730@atomide.com>
-Message-ID: <20170531222021.GM3730@atomide.com>
+Date: Wed, 31 May 2017 15:51:28 -0700
+Subject: [PATCH 00/11] Remove unused omap legacy code
+Message-ID: <20170531225139.30723-1-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [170531 12:57]:
-> * Tero Kristo <t-kristo@ti.com> [170531 08:03]:
-> > Hi,
-> > 
-> > This series is evolution of the v3b of the same series:
-> > https://www.spinics.net/lists/arm-kernel/msg584344.html
-> > 
-> > Changes compared to v3b:
-> > 
-> > - Added patch #3 which stores the physical address for PRCM instances
-> >   in addition to the virtual addresses
-> > - Fixed patch #5 to use physical base address for xlate instead of
-> >   the OMAP2_L4_IO_ADDRESS hack
-> > - Dropped unnecessary device node passing from patch #6 which makes
-> >   the code slightly more readable also
-> 
-> I gave this series a quick test with no other changes and
-> noticed that n8x0 stopped booting. Other than that looks
-> pretty good to me.
+Hi all,
 
-Sorry that was a false alert, n8x0 is booting just fine.
-It's the loading of kernel over USB that's flakey for me
-again..
+We can now remove quite a bit of clutter with legacy booting
+gone. Basically anything with of_have_populated_dt() not set
+can now go.
 
 Regards,
 
 Tony
+
+Tony Lindgren (11):
+  ARM: OMAP2+: Remove unused legacy code for opp
+  ARM: OMAP2+: Remove unused legacy code for timer
+  ARM: OMAP2+: Remove unused legacy code for PMU
+  ARM: OMAP2+: Remove unused legacy code for device init
+  ARM: OMAP2+: Remove unused legacy code for McBSP
+  ARM: OMAP2+: Remove unused legacy code for io.c
+  ARM: OMAP2+: Remove unused legacy code for DMA
+  ARM: OMAP2+: Remove unused legacy code for PRM
+  ARM: OMAP2+: Remove unused legacy code for interconnects
+  ARM: OMAP2+: Remove unused legacy code for watchdog
+  ARM: OMAP2+: Remove unused legacy code for n8x0
+
+ arch/arm/mach-omap2/Makefile               |   4 -
+ arch/arm/mach-omap2/board-n8x0.c           |  14 +--
+ arch/arm/mach-omap2/devices.c              | 163 ---------------------------
+ arch/arm/mach-omap2/dma.c                  |  30 +----
+ arch/arm/mach-omap2/io.c                   |  59 +++-------
+ arch/arm/mach-omap2/mcbsp.c                |  70 ------------
+ arch/arm/mach-omap2/omap_device.c          |   5 +-
+ arch/arm/mach-omap2/omap_hwmod.c           |  23 ++--
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   3 +-
+ arch/arm/mach-omap2/opp.c                  | 104 -----------------
+ arch/arm/mach-omap2/opp3xxx_data.c         |  86 ---------------
+ arch/arm/mach-omap2/opp4xxx_data.c         |  79 -------------
+ arch/arm/mach-omap2/pmu.c                  |  97 ----------------
+ arch/arm/mach-omap2/prm3xxx.c              |  17 ++-
+ arch/arm/mach-omap2/prm44xx.c              |  59 ----------
+ arch/arm/mach-omap2/prm_common.c           |   9 +-
+ arch/arm/mach-omap2/timer.c                | 172 ++++-------------------------
+ arch/arm/mach-omap2/wd_timer.c             |  28 -----
+ 18 files changed, 63 insertions(+), 959 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/opp.c
+ delete mode 100644 arch/arm/mach-omap2/pmu.c
+
+-- 
+2.13.0
