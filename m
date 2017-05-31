@@ -1,133 +1,67 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Thu, 1 Jun 2017 01:29:00 +0800
-Subject: [PATCH v3 2/3] arm64: dts: mt7622: add basic nodes to the mt7622.dtsi
- file
-In-Reply-To: <cover.1496250798.git.sean.wang@mediatek.com>
-References: <cover.1496250798.git.sean.wang@mediatek.com>
-Message-ID: <60640937c793184ce12f88e5c66f3f316e97cefa.1496250798.git.sean.wang@mediatek.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 1 Jun 2017 02:31:19 +0800
+Subject: [PATCH v2 2/2] perf: ThunderX2: Add Cavium Thunderx2 SoC UNCORE
+ PMU driver
+In-Reply-To: <1496224663-13819-3-git-send-email-ganapatrao.kulkarni@cavium.com>
+Message-ID: <201706010245.AKqnQgAP%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+Hi Ganapatrao,
 
-add basic nodes into the mt7622.dtsi for the system
-bring-up which includes ARM CPU, GIC, timer, MediaTek
-UART, SYSIRQ and one reserved memory region for ATF.
+[auto build test WARNING on linus/master]
+[also build test WARNING on v4.12-rc3 next-20170531]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+url:    https://github.com/0day-ci/linux/commits/Ganapatrao-Kulkarni/perf-uncore-Adding-documentation-for-ThunderX2-pmu-uncore-driver/20170531-204518
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
+
+All warnings (new ones prefixed by >>):
+
+   drivers/perf/thunderx2_pmu.c: In function 'thunderx2_uncore_update':
+>> drivers/perf/thunderx2_pmu.c:499:18: warning: left shift count >= width of type [-Wshift-count-overflow]
+      delta = (((1UL << 32) - prev) + new);
+                     ^~
+
+vim +499 drivers/perf/thunderx2_pmu.c
+
+   483		u64 delta;
+   484		struct hw_perf_event *hwc = &event->hw;
+   485		struct thunderx2_pmu_uncore_channel *pmu_uncore;
+   486		enum thunderx2_uncore_type type;
+   487	
+   488		pmu_uncore = pmu_to_thunderx2_pmu_uncore(event->pmu);
+   489		type = pmu_uncore->uncore_dev->type;
+   490	
+   491		if (pmu_uncore->uncore_dev->select_channel)
+   492			pmu_uncore->uncore_dev->select_channel(event);
+   493	
+   494		new = reg_readl(hwc->event_base);
+   495		prev = local64_xchg(&hwc->prev_count, new);
+   496	
+   497		/* handle rollover of counters */
+   498		if (new < prev)
+ > 499			delta = (((1UL << 32) - prev) + new);
+   500		else
+   501			delta = new - prev;
+   502	
+   503		local64_add(delta, &event->count);
+   504	}
+   505	
+   506	enum thunderx2_uncore_type get_uncore_device_type(struct acpi_device *adev)
+   507	{
+
 ---
- arch/arm64/boot/dts/mediatek/mt7622.dtsi | 103 +++++++++++++++++++++++++++++++
- 1 file changed, 103 insertions(+)
- create mode 100644 arch/arm64/boot/dts/mediatek/mt7622.dtsi
-
-diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-new file mode 100644
-index 0000000..2031b73
---- /dev/null
-+++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-@@ -0,0 +1,103 @@
-+/*
-+ * Copyright (c) 2017 MediaTek Inc.
-+ * Author: Ming Huang <ming.huang@mediatek.com>
-+ *	   Sean Wang <sean.wang@mediatek.com>
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+ */
-+
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	compatible = "mediatek,mt7622";
-+	interrupt-parent = <&sysirq>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	cpus {
-+		#address-cells = <2>;
-+		#size-cells = <0>;
-+
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x0>;
-+			enable-method = "psci";
-+			clock-frequency = <1300000000>;
-+		};
-+
-+		cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x1>;
-+			enable-method = "psci";
-+			clock-frequency = <1300000000>;
-+		};
-+	};
-+
-+	uart_clk: dummy26m {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <25000000>;
-+	};
-+
-+	psci {
-+		compatible  = "arm,psci-0.2";
-+		method      = "smc";
-+	};
-+
-+	reserved-memory {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		/* 192 KiB reserved for ARM Trusted Firmware (BL31) */
-+		secmon_reserved: secmon at 43000000 {
-+			reg = <0 0x43000000 0 0x30000>;
-+			no-map;
-+		};
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupt-parent = <&gic>;
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
-+			      IRQ_TYPE_LEVEL_HIGH)>,
-+			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) |
-+			      IRQ_TYPE_LEVEL_HIGH)>,
-+			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) |
-+			      IRQ_TYPE_LEVEL_HIGH)>,
-+			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) |
-+			      IRQ_TYPE_LEVEL_HIGH)>;
-+	};
-+
-+	sysirq: interrupt-controller at 10200620 {
-+		compatible = "mediatek,mt7622-sysirq",
-+			     "mediatek,mt6577-sysirq";
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+		interrupt-parent = <&gic>;
-+		reg = <0 0x10200620 0 0x20>;
-+	};
-+
-+	gic: interrupt-controller at 10300000 {
-+		compatible = "arm,gic-400";
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+		interrupt-parent = <&gic>;
-+		reg = <0 0x10310000 0 0x1000>,
-+		      <0 0x10320000 0 0x1000>,
-+		      <0 0x10340000 0 0x2000>,
-+		      <0 0x10360000 0 0x2000>;
-+	};
-+
-+	uart0: serial at 11002000 {
-+		compatible = "mediatek,mt7622-uart",
-+			     "mediatek,mt6577-uart";
-+		reg = <0 0x11002000 0 0x400>;
-+		interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&uart_clk>;
-+		status = "disabled";
-+	};
-+};
--- 
-1.9.1
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 60135 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170601/e71a0951/attachment-0001.gz>
