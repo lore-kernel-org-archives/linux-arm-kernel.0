@@ -1,59 +1,61 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Wed, 31 May 2017 11:31:44 +0000
-Subject: [PATCH v4 10/10] staging: fsl-mc: move bus driver out of staging
-In-Reply-To: <87e4071b-22f5-1edc-e102-742b7eaf6553@arm.com>
-References: <20170531105852.22304-1-laurentiu.tudor@nxp.com>
- <20170531105852.22304-11-laurentiu.tudor@nxp.com>
- <87e4071b-22f5-1edc-e102-742b7eaf6553@arm.com>
-Message-ID: <592EA9A0.1010607@nxp.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 31 May 2017 12:33:05 +0100
+Subject: [RFC PATCH v3 0/4] Simplify kernel-mode NEON
+In-Reply-To: <CAKv+Gu_V41O67etpYErj_xX1JG+RcSxkq25WpFwTvyBNDETa8w@mail.gmail.com>
+References: <1495736721-20985-1-git-send-email-Dave.Martin@arm.com>
+ <20170530180219.GR3559@e103592.cambridge.arm.com>
+ <CAKv+Gu-FxRLKxTvC68Wu0_o1zjSfjWDtdA7hdK79ZTNWNXPj=Q@mail.gmail.com>
+ <20170531100758.GA30160@e103592.cambridge.arm.com>
+ <CAKv+Gu_V41O67etpYErj_xX1JG+RcSxkq25WpFwTvyBNDETa8w@mail.gmail.com>
+Message-ID: <20170531113305.GB30160@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Wed, May 31, 2017 at 11:07:56AM +0000, Ard Biesheuvel wrote:
+> On 31 May 2017 at 10:08, Dave Martin <Dave.Martin@arm.com> wrote:
+> > On Wed, May 31, 2017 at 08:41:01AM +0000, Ard Biesheuvel wrote:
 
-On 05/31/2017 02:15 PM, Marc Zyngier wrote:
-> On 31/05/17 11:58, laurentiu.tudor at nxp.com wrote:
->> From: Stuart Yoder <stuart.yoder@nxp.com>
->>
->> Move the source files out of staging into their final locations:
->>    -include files in drivers/staging/fsl-mc/include go to include/linux/fsl
->>    -irq-gic-v3-its-fsl-mc-msi.c goes to drivers/irqchip
->>    -source in drivers/staging/fsl-mc/bus goes to drivers/bus/fsl-mc
->>    -README.txt, providing and overview of DPAA goes to
->>     Documentation/dpaa2/overview.txt
->>
->> Update or delete other remaining staging files-- Makefile, Kconfig, TODO.
->> Update dpaa2_eth and dpio staging drivers.
->>
->> Signed-off-by: Stuart Yoder <stuyoder@gmail.com>
->> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
->> [Laurentiu: rebased, add dpaa2_eth and dpio #include updates]
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: Jason Cooper <jason@lakedaemon.net>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>
->> Notes:
->>      -no changes since v4
->>      -v4
->>        -rebased
->>        -update existing dpaa2 drivers to work with the bus out of staging
->>      -v3
->>        -no changes
->>      -v2
->>        -updated MAINTAINERS with new location
->>
->>   .../README.txt => Documentation/dpaa2/overview.txt    |  0
->
-> I thought you had agreed to drop all references to the userspace
-> interface (restool and co) which is completely absent from this code?
-> I'm certainly not going to ack this until this is done.
+[...]
 
-That's in patch 08/10 [1] but i guess you didn't get to see it because, 
-as you mention, i forgot to Cc you on the whole series.
-My bad, sorry about it. :-(
+> > Something like [1] below?  Either way, it probably makes sense for that
+> > stub function to be added by your series.
+> >
+> 
+> Pretty much, yeah. But don't forget to remove simd.h from
+> arch/arm64/include/asm/Kbuild
 
-[1] https://patchwork.kernel.org/patch/9756659/
+Oh wow, I thought that was done by magic.
 
----
-Best Regards, Laurentiu
+> >> BTW I got my ZD1211 working on my MacchiatioBin board. The performance
+> >> is terrible, but that should not matter: if I can saturate a CPU doing
+> >
+> > Do you mean that my series causes a performance regression here, or is
+> > the performance terrible anyway?
+> >
+> 
+> No, the performance is terrible, which shouldn't matter per se, but it
+> would be nice if the load induced by the mac80211 were visible in
+> 'top' as wait, sys or whatever-it-is-called time. Currently, the 3
+> Mbit/s throughput combined with the 2.2 cycles per byte performance of
+> the AES-CCM code makes the code unnoticeable.
+> 
+> >> NEON from userland and/or kernel process context, the softirq
+> >> interruptions by the mac80211 code should exercise the updated code
+> >> paths. I haven't tried that yet: let me get the code changes out
+> >> today, so you can put your stuff on top. Then we can give it a good
+> >> spin.
+> >
+> > That would be great, thanks.
+> >
+> 
+> I have updated my branch here:
+> https://git.kernel.org/pub/scm/linux/kernel/git/ardb/linux.git/log/?h=kernel-mode-neon
+
+Looks good.
+
+> I removed all kernel_neon_begin_partial() invocations as well.
+
+OK, I will drop that from my series.
+
+Cheers
+---Dave
