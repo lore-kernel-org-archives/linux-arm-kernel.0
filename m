@@ -1,68 +1,37 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Thu, 1 Jun 2017 01:29:01 +0800
-Subject: [PATCH v3 3/3] arm64: dts: mt7622: add dts file for MT7622 reference
- board variant 1
-In-Reply-To: <cover.1496250798.git.sean.wang@mediatek.com>
-References: <cover.1496250798.git.sean.wang@mediatek.com>
-Message-ID: <ca25972aafe7788c98de8fa161922b691c20f109.1496250798.git.sean.wang@mediatek.com>
+Date: Thu, 1 Jun 2017 01:28:58 +0800
+Subject: [PATCH v3 0/4] Add Basic SoC support for MT7622
+Message-ID: <cover.1496250798.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Add the support for the MT7622 reference board variant 1 from
-MediaTek.
+Changes since v2:
+- merge back required basic clock nodes into the .dtsi file
+- update the property of interrupts in timer nodes with 2 CPUs
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/Makefile        |  1 +
- arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts | 27 +++++++++++++++++++++++++++
- 2 files changed, 28 insertions(+)
+Changes since v1:
+- update SPDX-License-Identifier
+- remove next-level-cache property since cache geometry detection was removed since 4.12
+
+This patch set adds basic SoC support for MediaTek MT7622
+SoC based on 4.12-rc1.
+
+Sean Wang (3):
+  dt-bindings: mediatek: add bindings for MediaTek MT7622 SoC
+  arm64: dts: mt7622: add basic nodes to the mt7622.dtsi file
+  arm64: dts: mt7622: add dts file for MT7622 reference board variant 1
+
+ Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
+ .../interrupt-controller/mediatek,sysirq.txt       |   3 +-
+ .../devicetree/bindings/serial/mtk-uart.txt        |   1 +
+ arch/arm64/boot/dts/mediatek/Makefile              |   1 +
+ arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts       |  27 ++++++
+ arch/arm64/boot/dts/mediatek/mt7622.dtsi           | 103 +++++++++++++++++++++
+ 6 files changed, 138 insertions(+), 1 deletion(-)
  create mode 100644 arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt7622.dtsi
 
-diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
-index 9fbfd32..e71456a2 100644
---- a/arch/arm64/boot/dts/mediatek/Makefile
-+++ b/arch/arm64/boot/dts/mediatek/Makefile
-@@ -1,5 +1,6 @@
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
-+dtb-$(CONFIG_ARCH_MEDIATEK) += mt7622-rfb1.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
- 
- always		:= $(dtb-y)
-diff --git a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-new file mode 100644
-index 0000000..c08309d
---- /dev/null
-+++ b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-@@ -0,0 +1,27 @@
-+/*
-+ * Copyright (c) 2017 MediaTek Inc.
-+ * Author: Ming Huang <ming.huang@mediatek.com>
-+ *	   Sean Wang <sean.wang@mediatek.com>
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+ */
-+
-+/dts-v1/;
-+#include "mt7622.dtsi"
-+
-+/ {
-+	model = "MediaTek MT7622 RFB1 board";
-+	compatible = "mediatek,mt7622-rfb1", "mediatek,mt7622";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200n1";
-+	};
-+
-+	memory {
-+		reg = <0 0x40000000 0 0x3F000000>;
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
 -- 
 1.9.1
