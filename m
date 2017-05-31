@@ -1,60 +1,33 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 31 May 2017 15:41:50 +0200
-Subject: [PATCH v2 06/11] dt-bindings: cp110: introduce a new binding
+Date: Wed, 31 May 2017 15:41:52 +0200
+Subject: [PATCH v2 08/11] dt-bindings: cp110: add sdio clock to cp-110 system
+ controller
 In-Reply-To: <cover.d3a417499f4e5f039deaa27832bf6eccdd090a6f.1496237893.git-series.gregory.clement@free-electrons.com>
 References: <cover.d3a417499f4e5f039deaa27832bf6eccdd090a6f.1496237893.git-series.gregory.clement@free-electrons.com>
-Message-ID: <c61078390c9454808d7b734ccea105d8fb9b8d41.1496237893.git-series.gregory.clement@free-electrons.com>
+Message-ID: <8c3f2dcae7622825722982c0ea45707586a73244.1496237893.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This patch updates the documentation according to the change made in the
-patch "pinctrl: dt-bindings: cp110: introduce a new binding".
+patch "clk: mvebu: cp110: add sdio clock to cp-110 system controller"
 
 Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt | 18 ++++++++++++++----
- 1 file changed, 14 insertions(+), 4 deletions(-)
+ Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
-index 47f1cf800e25..139e46cc6786 100644
+index 139e46cc6786..e0b9ef5d3dde 100644
 --- a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
 +++ b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
-@@ -7,6 +7,13 @@ Controller 0 and System Controller 1. This Device Tree binding allows
- to describe the first system controller, which provides registers to
- configure various aspects of the SoC.
- 
-+For the top level node:
-+ - compatible: must be: "syscon", "simple-mfd";
-+ - reg: register area of the CP110 system controller 0
-+
-+Clocks:
-+-------
-+
- The Device Tree node representing this System Controller 0 provides a
- number of clocks:
- 
-@@ -56,14 +63,17 @@ The following clocks are available:
- Required properties:
- 
-  - compatible: must be:
--     "marvell,cp110-system-controller0", "syscon";
-- - reg: register area of the CP110 system controller 0
-+     "marvell,cp110-clock"
-  - #clock-cells: must be set to 2
- 
- Example:
- 
- 	cpm_syscon0: system-controller at 440000 {
--		compatible = "marvell,cp110-system-controller0", "syscon";
-+		compatible = "syscon", "simple-mfd";
- 		reg = <0x440000 0x1000>;
--		#clock-cells = <2>;
-+
-+		cpm_clk: clock {
-+			compatible = "marvell,cp110-clock";
-+			#clock-cells = <2>;
-+		};
- 	};
+@@ -34,6 +34,7 @@ The following clocks are available:
+    - 0 2	EIP
+    - 0 3	Core
+    - 0 4	NAND core
++   - 0 5	SDIO core
+  - Gatable clocks
+    - 1 0	Audio
+    - 1 1	Comm Unit
 -- 
 git-series 0.9.1
