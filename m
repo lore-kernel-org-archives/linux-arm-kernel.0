@@ -1,88 +1,45 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 31 May 2017 21:58:21 +0200
-Subject: [PATCH v7 16/34] [media] add Omnivision OV5640 sensor driver
-In-Reply-To: <1495672189-29164-17-git-send-email-steve_longerbeam@mentor.com>
-References: <1495672189-29164-1-git-send-email-steve_longerbeam@mentor.com>
- <1495672189-29164-17-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <20170531195821.GA16962@amd>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 31 May 2017 20:58:49 +0100
+Subject: [PATCH] ARM: s3c64xx: don't select ARM_AMBA from S3C64XX_PL080
+In-Reply-To: <20170524155845.1778223-1-arnd@arndb.de>
+References: <20170524155845.1778223-1-arnd@arndb.de>
+Message-ID: <20170531195849.GD27796@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Wed, May 24, 2017 at 05:58:34PM +0200, Arnd Bergmann wrote:
+> While trying a fix a build warning unrelated to s3c64xx, I ran into
+> a circular dependency:
+> 
+> drivers/i2c/Kconfig:7: symbol I2C is selected by FB_DDC
+> drivers/video/fbdev/Kconfig:63: symbol FB_DDC is selected by FB_CYBER2000_DDC
+> drivers/video/fbdev/Kconfig:381: symbol FB_CYBER2000_DDC depends on FB_CYBER2000
+> drivers/video/fbdev/Kconfig:369: symbol FB_CYBER2000 depends on FB
+> drivers/video/fbdev/Kconfig:5: symbol FB is selected by DRM_KMS_FB_HELPER
+> drivers/gpu/drm/Kconfig:72: symbol DRM_KMS_FB_HELPER is selected by DRM_KMS_CMA_HELPER
+> drivers/gpu/drm/Kconfig:137: symbol DRM_KMS_CMA_HELPER is selected by DRM_PL111
+> drivers/gpu/drm/pl111/Kconfig:1: symbol DRM_PL111 depends on ARM_AMBA
+> drivers/amba/Kconfig:1: symbol ARM_AMBA is selected by S3C64XX_PL080
+> arch/arm/mach-s3c64xx/Kconfig:42: symbol S3C64XX_PL080 default value contains DMADEVICES
+> drivers/dma/Kconfig:5: symbol DMADEVICES is selected by SND_SOC_SH4_SIU
+> sound/soc/sh/Kconfig:29: symbol SND_SOC_SH4_SIU is selected by SND_SIU_MIGOR
+> sound/soc/sh/Kconfig:59: symbol SND_SIU_MIGOR depends on I2C
+> 
+> The I2C and FB dependencies are hard to untangle, but I notice that
+> S3C64XX_PL080 selecting ARM_AMBA is one piece of the puzzle that
+> can easily be avoided, as ARCH_S3C64XX already select ARM_AMBA.
+> Removing the redundant 'select' now can help us in the future if we
+> run into a variation of the same dependency.
 
-> +/* min/typical/max system clock (xclk) frequencies */
-> +#define OV5640_XCLK_MIN  6000000
-> +#define OV5640_XCLK_MAX 24000000
-> +
-> +/*
-> + * FIXME: there is no subdev API to set the MIPI CSI-2
-> + * virtual channel yet, so this is hardcoded for now.
-> + */
-> +#define OV5640_MIPI_VC	1
+Yes, selecting ARM_AMBA from drivers is definitely not right; this
+symbol should be selected only by platforms that want AMBA primecell
+bus support, not by drivers, precisely because of these dependency
+issues.
 
-Can the FIXME be fixed?
+There's another case where ARM_AMBA is selected that probably needs
+fixing - the coresight hwtracing code.
 
-> +/*
-> + * image size under 1280 * 960 are SUBSAMPLING
-
--> Image
-
-> + * image size upper 1280 * 960 are SCALING
-
-above?
-
-> +/*
-> + * FIXME: all of these register tables are likely filled with
-> + * entries that set the register to their power-on default values,
-> + * and which are otherwise not touched by this driver. Those entries
-> + * should be identified and removed to speed register load time
-> + * over i2c.
-> + */
-
-load->loading? Can the FIXME be fixed?
-
-> +	/* Auto/manual exposure */
-> +	ctrls->auto_exp = v4l2_ctrl_new_std_menu(hdl, ops,
-> +						 V4L2_CID_EXPOSURE_AUTO,
-> +						 V4L2_EXPOSURE_MANUAL, 0,
-> +						 V4L2_EXPOSURE_AUTO);
-> +	ctrls->exposure = v4l2_ctrl_new_std(hdl, ops,
-> +					    V4L2_CID_EXPOSURE_ABSOLUTE,
-> +					    0, 65535, 1, 0);
-
-Is exposure_absolute supposed to be in microseconds...?
-
-
-> +	/* Auto/manual gain */
-> +	ctrls->auto_gain = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_AUTOGAIN,
-> +					     0, 1, 1, 1);
-> +	ctrls->gain = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_GAIN,
-> +					0, 1023, 1, 0);
-> +
-> +	ctrls->saturation = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_SATURATION,
-> +					      0, 255, 1, 64);
-> +	ctrls->hue = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_HUE,
-> +				       0, 359, 1, 0);
-> +	ctrls->contrast = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_CONTRAST,
-> +					    0, 255, 1, 0);
-> +	ctrls->test_pattern =
-> +		v4l2_ctrl_new_std_menu_items(hdl, ops, V4L2_CID_TEST_PATTERN,
-> +					     ARRAY_SIZE(test_pattern_menu) - 1,
-> +					     0, 0, test_pattern_menu);
-> +
-
-It is good to see sensor that has autogain/etc. I'm emulating them in
-v4l-utils, and hardware that supports it is a good argument. 
-
-Best regards,
-									Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170531/4a85ce8e/attachment.sig>
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
