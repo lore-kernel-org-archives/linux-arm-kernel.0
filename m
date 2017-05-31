@@ -1,35 +1,35 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed, 31 May 2017 09:18:42 +0200
-Subject: [PATCH v6 11/21] arm: sun8i: orangepi-2: Enable dwmac-sun8i
+Date: Wed, 31 May 2017 09:18:41 +0200
+Subject: [PATCH v6 10/21] arm: sun8i: orangepi-one: Enable dwmac-sun8i
 In-Reply-To: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
 References: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170531071852.12422-12-clabbe.montjoie@gmail.com>
+Message-ID: <20170531071852.12422-11-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dwmac-sun8i hardware is present on the Orange PI 2.
+The dwmac-sun8i hardware is present on the Orange PI One.
 It uses the internal PHY.
 
 This patch create the needed emac node.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-2.dts | 8 ++++++++
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts | 8 ++++++++
  1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-index 8ff71b1bb45b..17cdeae19c6f 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-@@ -54,6 +54,7 @@
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+index 5fea430e0eb1..6880268e8b87 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+@@ -52,6 +52,7 @@
+ 	compatible = "xunlong,orangepi-one", "allwinner,sun8i-h3";
+ 
  	aliases {
- 		serial0 = &uart0;
- 		/* ethernet0 is the H3 emac, defined in sun8i-h3.dtsi */
 +		ethernet0 = &emac;
- 		ethernet1 = &rtl8189;
+ 		serial0 = &uart0;
  	};
  
-@@ -117,6 +118,13 @@
+@@ -97,6 +98,13 @@
  	status = "okay";
  };
  
@@ -40,8 +40,8 @@ index 8ff71b1bb45b..17cdeae19c6f 100644
 +	status = "okay";
 +};
 +
- &ir {
+ &mmc0 {
  	pinctrl-names = "default";
- 	pinctrl-0 = <&ir_pins_a>;
+ 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
 -- 
 2.13.0
