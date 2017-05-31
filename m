@@ -1,34 +1,32 @@
-From: yinbo.zhu@nxp.com (yinbo.zhu)
-Date: Wed, 31 May 2017 17:32:47 +0800
-Subject: [PATCH] arm64: dts: ls208xa: disable SD UHS-I modes by default on RDB
-Message-ID: <1496223167-33840-1-git-send-email-yinbo.zhu@nxp.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 31 May 2017 11:49:15 +0200
+Subject: [PATCH 2/2] power: reset: at91-sama5d2_shdwc: fix clobber list
+In-Reply-To: <20170531094915.3469-1-alexandre.belloni@free-electrons.com>
+References: <20170531094915.3469-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20170531094915.3469-2-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently SD UHS-I modes were enabled by default on LS208xARDB boards,
-but the new LS2088ARDB RevF board didn't support them any more since SDHC
-circuit had been reworked. This patch is to disable SD UHS-I modes by default
-in case of any issue on LS2088ARDB RevF
+Assembly in at91_lpddr_poweroff has r0 in the clobber list but uses r6.
 
-Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
+Reported-by: Ben Hutchings <ben.hutchings@codethink.co.uk>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi | 4 ----
- 1 file changed, 4 deletions(-)
+ drivers/power/reset/at91-sama5d2_shdwc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi
-index 3a944bb..f06b7f5 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi
-@@ -45,10 +45,6 @@
-  */
+diff --git a/drivers/power/reset/at91-sama5d2_shdwc.c b/drivers/power/reset/at91-sama5d2_shdwc.c
+index 90b0b5a70ce5..55fce8b75245 100644
+--- a/drivers/power/reset/at91-sama5d2_shdwc.c
++++ b/drivers/power/reset/at91-sama5d2_shdwc.c
+@@ -132,7 +132,7 @@ static void at91_lpddr_poweroff(void)
+ 		  "r" cpu_to_le32(AT91_DDRSDRC_LPDDR2_PWOFF),
+ 		  "r" (at91_shdwc->at91_shdwc_base),
+ 		  "r" cpu_to_le32(AT91_SHDW_KEY | AT91_SHDW_SHDW)
+-		: "r0");
++		: "r6");
+ }
  
- &esdhc {
--	sd-uhs-sdr104;
--	sd-uhs-sdr50;
--	sd-uhs-sdr25;
--	sd-uhs-sdr12;
- 	status = "okay";
- };
- 
+ static u32 at91_shdwc_debouncer_value(struct platform_device *pdev,
 -- 
-2.1.0.27.g96db324
+2.11.0
