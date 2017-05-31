@@ -1,24 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 31 May 2017 02:27:17 +0200
-Subject: [PATCH] pinctrl: stm32: Fix bad function call
-In-Reply-To: <1496155384-30711-1-git-send-email-alexandre.torgue@st.com>
-References: <1496155384-30711-1-git-send-email-alexandre.torgue@st.com>
-Message-ID: <CACRpkdbsZ3hh=7cdwhVg6r2d1xCRd1QHNAwOk-8JBURAUMP8jQ@mail.gmail.com>
+From: apinski@cavium.com (Andrew Pinski)
+Date: Tue, 30 May 2017 17:34:20 -0700
+Subject: [PATCH 2/2] arm64:vdso: Remove ISB from gettimeofday.
+In-Reply-To: <1496190860-5116-1-git-send-email-apinski@cavium.com>
+References: <1496190860-5116-1-git-send-email-apinski@cavium.com>
+Message-ID: <1496190860-5116-2-git-send-email-apinski@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 30, 2017 at 4:43 PM, Alexandre TORGUE
-<alexandre.torgue@st.com> wrote:
+ISB is normally required before mrs CNTVCT if we want the
+mrs to completed after the loads. In this case it is not.
+As we are taking the difference and if that difference
+was going to be negative, we just use the last counter value
+instead.
 
-> In stm32_pconf_parse_conf function, stm32_pmx_gpio_set_direction is
-> called with wrong parameter value. Indeed, using NULL value for range
-> will raise an oops.
->
-> Fixes: aceb16dc2da5 ("pinctrl: Add STM32 MCUs support")
-> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
+Signed-off-by: Andrew Pinski <apinski@cavium.com>
+---
+ arch/arm64/kernel/vdso/gettimeofday.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
-Patch applied for fixes.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm64/kernel/vdso/gettimeofday.c b/arch/arm64/kernel/vdso/gettimeofday.c
+index 1293786..49edd35 100644
+--- a/arch/arm64/kernel/vdso/gettimeofday.c
++++ b/arch/arm64/kernel/vdso/gettimeofday.c
+@@ -117,10 +117,20 @@ static notrace u64 get_clock_shifted_nsec(u64 cycle_last, u64 mult)
+ 	u64 res;
+ 
+ 	/* Read the virtual counter. */
+-	isb();
++	/*
++	 * This normally requires an ISB but since we know the
++	 * read of the last cycle will always be after the
++	 * read of the values are valid word.
++	 */
+ 	asm volatile("mrs %0, cntvct_el0" : "=r" (res) :: "memory");
+ 
+-	res = res - cycle_last;
++	/*
++	 * If the current cycle is greater than the last,
++	 *  then get the difference.
++	 */
++	if (res > cycle_last)
++		res = res - cycle_last;
++
+ 	/* We can only guarantee 56 bits of precision. */
+ 	res &= ~(0xff00ull<<48);
+ 	return res * mult;
+-- 
+2.7.4
