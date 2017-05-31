@@ -1,40 +1,52 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 31 May 2017 15:58:24 +0800
-Subject: [PATCH v2 6/6] arm64: allwinner: a64: Add PLL_PERIPH0 clock to the
- R_CCU
+Date: Wed, 31 May 2017 15:58:23 +0800
+Subject: [PATCH v2 5/6] clk: sunxi-ng: a64: Export PLL_PERIPH0 clock for the
+ PRCM
 In-Reply-To: <20170531075824.657-1-wens@csie.org>
 References: <20170531075824.657-1-wens@csie.org>
-Message-ID: <20170531075824.657-7-wens@csie.org>
+Message-ID: <20170531075824.657-6-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AR100 clock within the R_CCU (PRCM) has the PLL_PERIPH0 as one of
-its parents.
+The PRCM takes PLL_PERIPH0 as one of its parents for the AR100 clock.
+As such we need to be able to describe this relationship in the device
+tree.
 
-This adds the reference in the device tree describing this relationship.
-This patch uses a raw number for the clock index to ease merging by
-avoiding cross tree dependencies.
+Export the PLL_PERIPH0 clock so we can reference it in the PRCM node.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/clk/sunxi-ng/ccu-sun50i-a64.h      | 4 +++-
+ include/dt-bindings/clock/sun50i-a64-ccu.h | 2 ++
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 90dc4ec79485..4eb2f3ca602a 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -448,8 +448,9 @@
- 		r_ccu: clock at 1f01400 {
- 			compatible = "allwinner,sun50i-a64-r-ccu";
- 			reg = <0x01f01400 0x100>;
--			clocks = <&osc24M>, <&osc32k>, <&iosc>;
--			clock-names = "hosc", "losc", "iosc";
-+			clocks = <&osc24M>, <&osc32k>, <&iosc>,
-+				 <&ccu 11>;
-+			clock-names = "hosc", "losc", "iosc", "pll-periph";
- 			#clock-cells = <1>;
- 			#reset-cells = <1>;
- 		};
+diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.h b/drivers/clk/sunxi-ng/ccu-sun50i-a64.h
+index 9b3cd24b78d2..061b6fbb4f95 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun50i-a64.h
++++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.h
+@@ -31,7 +31,9 @@
+ #define CLK_PLL_VIDEO0_2X		8
+ #define CLK_PLL_VE			9
+ #define CLK_PLL_DDR0			10
+-#define CLK_PLL_PERIPH0			11
++
++/* PLL_PERIPH0 exported for PRCM */
++
+ #define CLK_PLL_PERIPH0_2X		12
+ #define CLK_PLL_PERIPH1			13
+ #define CLK_PLL_PERIPH1_2X		14
+diff --git a/include/dt-bindings/clock/sun50i-a64-ccu.h b/include/dt-bindings/clock/sun50i-a64-ccu.h
+index 370c0a0473fc..d66432c6e675 100644
+--- a/include/dt-bindings/clock/sun50i-a64-ccu.h
++++ b/include/dt-bindings/clock/sun50i-a64-ccu.h
+@@ -43,6 +43,8 @@
+ #ifndef _DT_BINDINGS_CLK_SUN50I_A64_H_
+ #define _DT_BINDINGS_CLK_SUN50I_A64_H_
+ 
++#define CLK_PLL_PERIPH0		11
++
+ #define CLK_BUS_MIPI_DSI	28
+ #define CLK_BUS_CE		29
+ #define CLK_BUS_DMA		30
 -- 
 2.11.0
