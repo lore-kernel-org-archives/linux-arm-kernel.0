@@ -1,61 +1,50 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 31 May 2017 20:36:11 +0200
-Subject: [PATCH 8/8] arm64: dts: hikey: Fix WiFi support
-In-Reply-To: <CALAqxLX4HwbVm8G4Ch2uYKAy6C9vYAZEcRUdCLDePT55oGz6hw@mail.gmail.com>
-References: <1494260477-25163-1-git-send-email-ulf.hansson@linaro.org>
- <1494260477-25163-9-git-send-email-ulf.hansson@linaro.org>
- <CALAqxLX4HwbVm8G4Ch2uYKAy6C9vYAZEcRUdCLDePT55oGz6hw@mail.gmail.com>
-Message-ID: <d7988293-853f-fb3a-ae29-d1dff4e4d732@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 31 May 2017 19:40:02 +0100
+Subject: [PATCH v5 2/7] arm: fix return value of parse_cpu_capacity
+In-Reply-To: <20170531165931.6945-3-juri.lelli@arm.com>
+References: <20170531165931.6945-1-juri.lelli@arm.com>
+ <20170531165931.6945-3-juri.lelli@arm.com>
+Message-ID: <20170531184002.GC27796@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/05/2017 20:14, John Stultz wrote:
-> On Mon, May 8, 2017 at 9:21 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> The description of the connection between the dwmmc (SDIO) controller and
->> the Wifi chip, which is attached to the SDIO bus is wrong. Currently the
->> SDIO card can't be detected and thus the Wifi doesn't work.
->>
->> Let's fix this by assigning the correct vmmc supply, which is the always on
->> regulator VDD_3V3 and remove the WLAN enable regulator altogether. Then to
->> properly deal with the power on/off sequence, add a mmc-pwrseq node to
->> describe the resources needed to detect the SDIO card.
->>
->> Except for the WLAN enable GPIO and its corresponding assert/de-assert
->> delays, the mmc-pwrseq node also contains a handle to a clock provided by
->> the hi655x pmic. This clock is also needed to be able to turn on the WiFi
->> chip.
->>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+On Wed, May 31, 2017 at 05:59:26PM +0100, Juri Lelli wrote:
+> parse_cpu_capacity() has to return 0 on failure, but it currently returns
+> 1 instead if raw_capacity kcalloc failed.
 > 
+> Fix it (by directly returning 0).
 > 
-> Ulf,
->   So oddly, this patch seems to have broken wifi on HiKey when it
-> landed in 4.12-rc3. I checked my config and CONFIG_PWRSEQ_SIMPLE is
-> enabled.
+> Cc: Russell King <linux@arm.linux.org.uk>
 
-Hi John,
+You can drop these Cc's now.  Thanks.
 
-how is it possible the WiFi stops working with this series? This series
-provides the missing bits to enable the WiFi with a vanilla kernel.
-
-May be the WiFi is reset with this kernel and when it starts again the
-firmware fails to load because it is not up-to-date?
-
-Can you check in dmesg if there is a firmware error message?
-
-
-
-
-> Reverting this patch seems to get things working again for me.
+> Reported-by: Morten Rasmussen <morten.rasmussen@arm.com>
+> Fixes: 06073ee26775 ('ARM: 8621/3: parse cpu capacity-dmips-mhz from DT')
+> Signed-off-by: Juri Lelli <juri.lelli@arm.com>
+> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+> Acked-by: Vincent Guittot <vincent.guittot@linaor.org>
+> ---
+>  arch/arm/kernel/topology.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> thanks
-> -john
+> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+> index f8a3ab82e77f..1b8ec3054642 100644
+> --- a/arch/arm/kernel/topology.c
+> +++ b/arch/arm/kernel/topology.c
+> @@ -166,7 +166,7 @@ static int __init parse_cpu_capacity(struct device_node *cpu_node, int cpu)
+>  			if (!raw_capacity) {
+>  				pr_err("cpu_capacity: failed to allocate memory for raw capacities\n");
+>  				cap_parsing_failed = true;
+> -				return !ret;
+> +				return 0;
+>  			}
+>  		}
+>  		capacity_scale = max(cpu_capacity, capacity_scale);
+> -- 
+> 2.11.0
 > 
-
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
