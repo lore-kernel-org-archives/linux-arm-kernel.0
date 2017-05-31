@@ -1,38 +1,77 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed, 31 May 2017 09:18:32 +0200
-Subject: [PATCH v6 01/21] net-next: stmmac: export
- stmmac_set_mac_addr/stmmac_get_mac_addr
+Date: Wed, 31 May 2017 09:18:46 +0200
+Subject: [PATCH v6 15/21] arm64: allwinner: sun50i-a64: add dwmac-sun8i
+ Ethernet driver
 In-Reply-To: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
 References: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170531071852.12422-2-clabbe.montjoie@gmail.com>
+Message-ID: <20170531071852.12422-16-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thoses symbol will be needed for the dwmac-sun8i ethernet driver.
-For letting it to be build as module, they need to be exported.
+The dwmac-sun8i is an Ethernet MAC that supports 10/100/1000 Mbit
+connections. It is very similar to the device found in the Allwinner
+H3, but lacks the internal 100 Mbit PHY and its associated control
+bits.
+This adds the necessary bits to the Allwinner A64 SoC .dtsi, but keeps
+it disabled at this level.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 35 +++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c b/drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c
-index 38f94305aab5..67af0bdd7f10 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c
-@@ -248,6 +248,7 @@ void stmmac_set_mac_addr(void __iomem *ioaddr, u8 addr[6],
- 	data = (addr[3] << 24) | (addr[2] << 16) | (addr[1] << 8) | addr[0];
- 	writel(data, ioaddr + low);
- }
-+EXPORT_SYMBOL_GPL(stmmac_set_mac_addr);
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 2eeba0d44074..7a07353ac1f6 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -309,6 +309,21 @@
+ 				bias-pull-up;
+ 			};
  
- /* Enable disable MAC RX/TX */
- void stmmac_set_mac(void __iomem *ioaddr, bool enable)
-@@ -279,4 +280,4 @@ void stmmac_get_mac_addr(void __iomem *ioaddr, unsigned char *addr,
- 	addr[4] = hi_addr & 0xff;
- 	addr[5] = (hi_addr >> 8) & 0xff;
- }
--
-+EXPORT_SYMBOL_GPL(stmmac_get_mac_addr);
++			rmii_pins: rmii_pins {
++				pins = "PD10", "PD11", "PD13", "PD14", "PD17",
++				       "PD18", "PD19", "PD20", "PD22", "PD23";
++				function = "emac";
++				drive-strength = <40>;
++			};
++
++			rgmii_pins: rgmii_pins {
++				pins = "PD8", "PD9", "PD10", "PD11", "PD12",
++				       "PD13", "PD15", "PD16", "PD17", "PD18",
++				       "PD19", "PD20", "PD21", "PD22", "PD23";
++				function = "emac";
++				drive-strength = <40>;
++			};
++
+ 			uart0_pins_a: uart0 at 0 {
+ 				pins = "PB8", "PB9";
+ 				function = "uart0";
+@@ -433,6 +448,26 @@
+ 			#size-cells = <0>;
+ 		};
+ 
++		emac: ethernet at 1c30000 {
++			compatible = "allwinner,sun50i-a64-emac";
++			syscon = <&syscon>;
++			reg = <0x01c30000 0x100>;
++			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "macirq";
++			resets = <&ccu RST_BUS_EMAC>;
++			reset-names = "stmmaceth";
++			clocks = <&ccu CLK_BUS_EMAC>;
++			clock-names = "stmmaceth";
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			mdio: mdio {
++				#address-cells = <1>;
++				#size-cells = <0>;
++			};
++		};
++
+ 		gic: interrupt-controller at 1c81000 {
+ 			compatible = "arm,gic-400";
+ 			reg = <0x01c81000 0x1000>,
 -- 
 2.13.0
