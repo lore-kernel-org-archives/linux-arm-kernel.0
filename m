@@ -1,37 +1,47 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed, 31 May 2017 09:18:43 +0200
-Subject: [PATCH v6 12/21] arm: sun8i: orangepi-pc-plus: Set EMAC activity LEDs
- to active high
+Date: Wed, 31 May 2017 09:18:39 +0200
+Subject: [PATCH v6 08/21] arm: sun8i: orangepi-pc: Enable dwmac-sun8i
 In-Reply-To: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
 References: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170531071852.12422-13-clabbe.montjoie@gmail.com>
+Message-ID: <20170531071852.12422-9-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the Orange Pi PC Plus, the polarity of the LEDs on the RJ45 Ethernet
-port were changed from active low to active high.
+The dwmac-sun8i hardware is present on the Orange PI PC.
+It uses the internal PHY.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+This patch create the needed emac node.
+
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts
-index 8b93f5c781a7..a10281b455f5 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts
-@@ -53,6 +53,11 @@
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+index 1a044b17d6c6..998b60f8d295 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+@@ -52,6 +52,7 @@
+ 	compatible = "xunlong,orangepi-pc", "allwinner,sun8i-h3";
+ 
+ 	aliases {
++		ethernet0 = &emac;
+ 		serial0 = &uart0;
  	};
+ 
+@@ -113,6 +114,13 @@
+ 	status = "okay";
  };
  
 +&emac {
-+	/* LEDs changed to active high on the plus */
-+	/delete-property/ allwinner,leds-active-low;
++	phy-handle = <&int_mii_phy>;
++	phy-mode = "mii";
++	allwinner,leds-active-low;
++	status = "okay";
 +};
 +
- &mmc1 {
+ &ir {
  	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc1_pins_a>;
+ 	pinctrl-0 = <&ir_pins_a>;
 -- 
 2.13.0
