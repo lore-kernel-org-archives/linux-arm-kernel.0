@@ -1,83 +1,157 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Wed, 31 May 2017 19:43:40 +0900
-Subject: [PATCH 3/6] gpio: dt-bindings: Add documentation for gpio
- controllers on Armada 7K/8K
-In-Reply-To: <20170530222358.abta3srv5emz7wtp@rob-hp-laptop>
-References: <cover.e10718b9c0f9fdd07327ae14e213be8da5b1f7ef.1495210061.git-series.gregory.clement@free-electrons.com>
- <306395ff39de3d3d3c8f55e5da4de8def29ae8d1.1495210061.git-series.gregory.clement@free-electrons.com>
- <CACRpkdY97DDcwec+J-4X1AT5a7Mbo4GnWUJmuAOYhNzOA8_HZQ@mail.gmail.com>
- <878tlnzps3.fsf@free-electrons.com>
- <CACRpkdbW3T5auXCMrqH_tTzcVseGbiV+y53fJ2xN5p-VbGz7rA@mail.gmail.com>
- <20170530222358.abta3srv5emz7wtp@rob-hp-laptop>
-Message-ID: <149622742055.34003.14963361587324682626@resonance>
+From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
+Date: Wed, 31 May 2017 13:58:42 +0300
+Subject: [PATCH v6 00/10] staging: fsl-mc: move bus driver out of staging
+Message-ID: <20170531105852.22304-1-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Rob Herring (2017-05-31 07:23:58)
-> On Mon, May 29, 2017 at 10:08:16AM +0200, Linus Walleij wrote:
-> > On Tue, May 23, 2017 at 3:06 PM, Gregory CLEMENT
-> > <gregory.clement@free-electrons.com> wrote:
-> > >  On mar., mai 23 2017, Linus Walleij <linus.walleij@linaro.org> wrote:
-> > 
-> > >> Please rebase and resend the rest of the patches.
-> > >
-> > > Actually I was wrong with my assumption that there was no dependency.
-> > > For the binding documentation there is dependecy accross the series I
-> > > sent.
-> > >
-> > > This patch depends on "pinctrl: dt-bindings: add documentation for AP806
-> > > pin controllers" [1] and "pinctrl: dt-bindings: add documentation for
-> > > CP110 pin controllers" [3] from the series "Add support for the pin
-> > > controllers on the Marvell Armada 7K/8K".
-> > >
-> > > As you are maintainer of both gpio and pinctrl subsystem it will be easy
-> > > to resolv.
-> > 
-> > Please send all patches in one big series in that case, so I can apply
-> > them all to a branch and merge that branch into both trees.
-> > 
-> > > But these last patches depend also on "clk: mvebu: ap806: introduce a
-> > > new binding" [3] in the clock series "Improve ap806 clk support on
-> > > Marvell Armada 7K/8K" and on "clk: mvebu: cp110: introduce a new
-> > > binding" [4] in the clock series "Improve cp110 clk support on Marvell
-> > > Armada 7K/8K".
-> > 
-> > That sounds messy.
-> > 
-> > > So for these particular patches, either I rebase them on the v4.12-rc2
-> > > and there will be a small merge conflict during the merge window for
-> > > v4.13, or we can ask a stable branch with only these few patches (I am
-> > > adding the clock maintainer to this email).
-> > >
-> > > If we chose this last option I can split the clock patches to have patch
-> > > modifying only the binding documentation.
-> > 
-> > I think you can make a patch just modifying the binding documentation
-> > and then apply that patch to *both* trees, just make sure the patch
-> > is *final* and not applied in different versions in clk and pinctrl.
-> 
-> I thought we try to avoid doing that.
-> 
-> > I think cross-tree branches for documentation clashes is too much
-> > bureaucracy.
-> 
-> I can just take all the doc patches separately. Or you can take the 
-> clock one too.
+From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-Stephen and I have started making a -dt branch for each new clk driver
-which. This stable branch has only the dt bindings/headers in it (no
-driver code).
+Now that there is a functional ethernet driver probed on the
+mc bus this patch series requests that the fsl-mc bus driver
+be moved out of staging.
 
-I'll make such a branch for ap806 this week and everyone can merge that
-in as a dep.
+The proposed destination for the bus driver is drivers/bus.
+Proposed location for global header files for fsl-mc and dpaa2
+is the already existing include/linux/fsl.
 
-Regards,
-Mike
+First couple of patches fix several checkpatch.pl and README issues
+and the last patch moves the bus out of staging, updating all
+the users (e.g. #include paths).
 
-> 
-> > Make sure your clock patch is finalized and preferably also applied
-> > to the clk tree then put it in the bottom of the patch set you send
-> > to me as well and I will proceed like above.
-> > 
-> > Yours,
-> > Linus Walleij
+Based on:
+git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/staging.git, staging-next
+
+Link to previous version:
+https://lkml.org/lkml/2017/5/22/327
+
+Link to last round of driver model fixes & cleanups:
+https://lkml.org/lkml/2017/2/1/235
+
+version 6 changes
+ - split patch containing multiple checkpatch.pl fixes into distinct patches (GregKH)
+ - fix couple submission issues (GregKH)
+   - reverted version bump on patches that weren't actually changed
+   - fix version prefix
+
+version 5 changes
+ - drop restool utility reference from README (Marc Zyngier)
+ - add binding path in README (Marc Zyngier)
+
+version 4 changes
+ - rebased on latest staging-next
+ - dpio was submitted separately so dropped from the series
+ - several checkpatch.pl --strict fixes (first 2 patches)
+ - update existing dpaa2 drivers to match the new fsl-mc bus location
+
+version 3 changes
+   -zero memory allocated for a dpio store
+   -replace hardcoded dequeue token with a #define and look for
+    that token when checking for a new result
+
+version 2 changes (mostly feedback from Ioana Radulescu)
+   -removed unused structs and defines in dpio command definitions
+   -added setter/getter for the FD ctrl field
+   -corrected comment for SG format_offset field description
+   -added support for short length field in FD
+   -fix bug in buffer release command, by setting bpid field
+   -handle error (NULL) return value from qbman_swp_mc_complete()
+   -fix bug in sending management commands where the verb was
+    properly initialized
+   -use service_select_by_cpu() for re-arming DPIO interrupts
+   -replace use of NR_CPUS with num_possible_cpus()
+   -handle error case where number of DPIOs exceeds number of possible
+    CPUs
+   -error message cleanup
+   -updated MAINTAINERS file with proper location for both fsl-mc bus
+    driver and dpio driver
+Laurentiu Tudor (9):
+  staging: fsl-mc: enclose macro params in parens
+  staging: fsl-mc: fix macros with possible side effects
+  staging: fsl-mc: simplify couple of deallocations
+  staging: fsl-mc: drop a few useless #includes
+  staging: fsl-mc: remove extra blank line
+  staging: fsl-mc: drop unused forward declaration
+  staging: fsl-mc: add binding path to MAINTAINERS
+  staging: fsl-mc: drop reference to restool
+  staging: fsl-mc: add reference to mc-bus DT binding
+
+Stuart Yoder (1):
+  staging: fsl-mc: move bus driver out of staging
+
+ .../README.txt => Documentation/dpaa2/overview.txt    |  6 +++---
+ MAINTAINERS                                           |  3 ++-
+ drivers/bus/Kconfig                                   |  2 ++
+ drivers/bus/Makefile                                  |  3 +++
+ drivers/bus/fsl-mc/Kconfig                            | 17 +++++++++++++++++
+ drivers/bus/fsl-mc/Makefile                           | 19 +++++++++++++++++++
+ drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpbp-cmd.h |  2 +-
+ drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpbp.c     |  6 +++---
+ .../{staging/fsl-mc/bus => bus/fsl-mc}/dpmcp-cmd.h    |  2 +-
+ drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpmcp.c    |  4 ++--
+ drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpmcp.h    |  0
+ .../{staging/fsl-mc/bus => bus/fsl-mc}/dpmng-cmd.h    |  2 +-
+ drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpmng.c    |  6 +++---
+ drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dprc-cmd.h |  2 +-
+ .../{staging/fsl-mc/bus => bus/fsl-mc}/dprc-driver.c  | 14 +++++++++-----
+ drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dprc.c     |  6 +++---
+ .../fsl-mc/bus => bus/fsl-mc}/fsl-mc-allocator.c      | 17 ++++++++++-------
+ .../{staging/fsl-mc/bus => bus/fsl-mc}/fsl-mc-bus.c   | 18 ++++++------------
+ .../{staging/fsl-mc/bus => bus/fsl-mc}/fsl-mc-msi.c   |  4 +++-
+ .../fsl-mc/bus => bus/fsl-mc}/fsl-mc-private.h        |  3 +--
+ drivers/{staging/fsl-mc/bus => bus/fsl-mc}/mc-io.c    |  5 +++--
+ drivers/{staging/fsl-mc/bus => bus/fsl-mc}/mc-sys.c   |  6 +++---
+ drivers/irqchip/Makefile                              |  1 +
+ .../bus => irqchip}/irq-gic-v3-its-fsl-mc-msi.c       |  3 +--
+ drivers/staging/fsl-dpaa2/ethernet/README             |  2 +-
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c        |  4 ++--
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h        |  2 +-
+ drivers/staging/fsl-dpaa2/ethernet/dpni.c             |  4 ++--
+ drivers/staging/fsl-mc/TODO                           | 18 ------------------
+ drivers/staging/fsl-mc/bus/Kconfig                    | 10 ----------
+ drivers/staging/fsl-mc/bus/Makefile                   | 15 +--------------
+ drivers/staging/fsl-mc/bus/dpcon.c                    |  8 ++++----
+ drivers/staging/fsl-mc/bus/dpio/dpio-driver.c         |  2 +-
+ drivers/staging/fsl-mc/bus/dpio/dpio-service.c        |  2 +-
+ drivers/staging/fsl-mc/bus/dpio/dpio.c                |  4 ++--
+ .../fsl-mc/include => include/linux/fsl}/dpbp.h       |  0
+ .../fsl-mc/bus => include/linux/fsl}/dpcon-cmd.h      |  0
+ .../fsl-mc/include => include/linux/fsl}/dpmng.h      |  0
+ .../fsl-mc/include => include/linux/fsl}/dprc.h       |  4 ----
+ .../fsl-mc/include => include/linux/fsl}/mc-bus.h     |  2 +-
+ .../fsl-mc/include => include/linux/fsl}/mc-cmd.h     |  0
+ .../fsl-mc/include => include/linux/fsl}/mc-sys.h     |  1 -
+ .../staging/fsl-mc/include => include/linux/fsl}/mc.h |  2 +-
+ 43 files changed, 115 insertions(+), 116 deletions(-)
+ rename drivers/staging/fsl-mc/README.txt => Documentation/dpaa2/overview.txt (99%)
+ create mode 100644 drivers/bus/fsl-mc/Kconfig
+ create mode 100644 drivers/bus/fsl-mc/Makefile
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpbp-cmd.h (97%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpbp.c (98%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpmcp-cmd.h (96%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpmcp.c (98%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpmcp.h (100%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpmng-cmd.h (96%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpmng.c (96%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dprc-cmd.h (99%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dprc-driver.c (98%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dprc.c (99%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/fsl-mc-allocator.c (98%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/fsl-mc-bus.c (98%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/fsl-mc-msi.c (99%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/fsl-mc-private.h (96%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/mc-io.c (99%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/mc-sys.c (99%)
+ rename drivers/{staging/fsl-mc/bus => irqchip}/irq-gic-v3-its-fsl-mc-msi.c (98%)
+ delete mode 100644 drivers/staging/fsl-mc/TODO
+ rename {drivers/staging/fsl-mc/include => include/linux/fsl}/dpbp.h (100%)
+ rename {drivers/staging/fsl-mc/bus => include/linux/fsl}/dpcon-cmd.h (100%)
+ rename {drivers/staging/fsl-mc/include => include/linux/fsl}/dpmng.h (100%)
+ rename {drivers/staging/fsl-mc/include => include/linux/fsl}/dprc.h (99%)
+ rename {drivers/staging/fsl-mc/include => include/linux/fsl}/mc-bus.h (99%)
+ rename {drivers/staging/fsl-mc/include => include/linux/fsl}/mc-cmd.h (100%)
+ rename {drivers/staging/fsl-mc/include => include/linux/fsl}/mc-sys.h (99%)
+ rename {drivers/staging/fsl-mc/include => include/linux/fsl}/mc.h (99%)
+
+-- 
+2.9.4
