@@ -1,37 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 31 May 2017 22:25:02 +0200
-Subject: [PATCH] ARM: s3c64xx: don't select ARM_AMBA from S3C64XX_PL080
-In-Reply-To: <20170531195849.GD27796@n2100.armlinux.org.uk>
-References: <20170524155845.1778223-1-arnd@arndb.de>
- <20170531195849.GD27796@n2100.armlinux.org.uk>
-Message-ID: <CAK8P3a3gxrkn1TOLWXzW4-s8H8uJWvC1vC3_fjxm-tXXkooxUA@mail.gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 31 May 2017 13:54:04 -0700
+Subject: [PATCH v2 3/6] kernel/reboot.c: export pm_power_off_prepare
+In-Reply-To: <20170531061457.23744-4-o.rempel@pengutronix.de>
+References: <20170531061457.23744-1-o.rempel@pengutronix.de>
+ <20170531061457.23744-4-o.rempel@pengutronix.de>
+Message-ID: <20170531135404.9110be8a08fbcf83ee9e7939@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 31, 2017 at 9:58 PM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Wed, May 24, 2017 at 05:58:34PM +0200, Arnd Bergmann wrote:
-> Yes, selecting ARM_AMBA from drivers is definitely not right; this
-> symbol should be selected only by platforms that want AMBA primecell
-> bus support, not by drivers, precisely because of these dependency
-> issues.
->
-> There's another case where ARM_AMBA is selected that probably needs
-> fixing - the coresight hwtracing code.
+On Wed, 31 May 2017 08:14:54 +0200 Oleksij Rempel <o.rempel@pengutronix.de> wrote:
 
-[Adding Mathieu to cc]
+> we need it to preconfigure PMIC to properly power off the system.
 
-Mathieu,
+Who is "we", what is a "PMIC", what architecture is affected and where
+is this code which references pm_power_off_prepare?
 
-do you remember how we ended up with this?
-
-menuconfig CORESIGHT
-       bool "CoreSight Tracing Support"
-       select ARM_AMBA
-
-As Russell says, probably shouldn't select that symbol, most likely
-we want either the individual drivers that register an amba_driver to have
-a 'depends on ARM_AMBA' or alternatively replace the 'select' with 'depends
-on' for the entire subsystem.
-
-        Arnd
+> --- a/kernel/reboot.c
+> +++ b/kernel/reboot.c
+> @@ -49,6 +49,7 @@ int reboot_force;
+>   */
+>  
+>  void (*pm_power_off_prepare)(void);
+> +EXPORT_SYMBOL(pm_power_off_prepare);
+>  
+>  /**
+>   *	emergency_restart - reboot the system
+> -- 
+> 2.11.0
