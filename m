@@ -1,35 +1,63 @@
-From: yegorslists@googlemail.com (Yegor Yefremov)
-Date: Wed, 31 May 2017 19:22:22 +0200
-Subject: [PATCH RFC 2/5] ARM: dts: am335x-baltos: use IRQ_TYPE_* to
- specify irq flags
-In-Reply-To: <20170531171932.GH3730@atomide.com>
-References: <20170526180609.2699-1-uwe@kleine-koenig.org>
- <20170526180609.2699-2-uwe@kleine-koenig.org>
- <20170531171932.GH3730@atomide.com>
-Message-ID: <CAGm1_ktJp+3t9ExuFJhKTmbM63yt-82PGP26KkEHGqK-tnfWRg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 31 May 2017 12:23:20 -0500
+Subject: [PATCH 2/7] dt-bindings: PCI: Describe ATS property for root
+ complex nodes
+In-Reply-To: <20170524180143.19855-3-jean-philippe.brucker@arm.com>
+References: <20170524180143.19855-1-jean-philippe.brucker@arm.com>
+ <20170524180143.19855-3-jean-philippe.brucker@arm.com>
+Message-ID: <20170531172320.3u6bdctv44aqighy@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe, Tony,
+On Wed, May 24, 2017 at 07:01:38PM +0100, Jean-Philippe Brucker wrote:
+> Address Translation Service (ATS) is an extension to PCIe allowing
+> endpoints to manage their own IOTLB, called Address Translation Cache
+> (ATC). Instead of having every memory transaction processed by the IOMMU,
+> the endpoint can first send an Address Translation Requests for an IOVA,
+> obtain the corresponding Physical Address from the IOMMU and store it in
+> its ATC. Subsequent transactions to this memory region can be performed on
+> the PA, in which case they are marked 'translated' and (partially) bypass
+> the IOMMU.
+> 
+> Since the extension uses fields that were previously reserved in the
+> PCIe Translation Layer Packet, it seems ill-advised to enabled it on a
+> system that doesn't fully support ATS.
+> 
+> To "old" root complexes that simply ignored the new AT field, an Address
+> Translation Request will look exactly like a Memory Read Request, so the
+> root bridge will forward a memory read to the IOMMU instead of a
+> translation request. If the access succeeds, the RC will send a Read
+> Completion, which looks like a Translation Completion, back to the
+> endpoint. As a result the endpoint might end up storing the content of
+> memory instead of a physical address in its ATC. In reality, it's more
+> likely that the size fields will be invalid and either end will detect the
+> error, but in any case, it is undesirable.
+> 
+> Add a way for firmware to tell the OS that ATS is supported by the PCI
+> root complex.
 
-On Wed, May 31, 2017 at 7:19 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Uwe Kleine-K?nig <uwe@kleine-koenig.org> [170526 11:09]:
->> According to the binding documentation and the source code the omap-gpio
->> controller takes IRQ_TYPE_* as its flags values, not GPIO_ACTIVE_*.
->>
->> This patch uses the right variable type which yields the same result
->> when compiled. Note that this might be wrong and actually
->> IRQ_TYPE_LEVEL_LOW is intended by the dt author.
->>
->> Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
->> ---
->> Hello,
->>
->> can somebody with the hardware or it's documentation please check which
->> flag is the right one?
->
-> I'll wait on this one until we have somebody test it.
+Can't firmware have already enabled ATS? Often for things like this, not 
+present means "use firmware setting".
 
-I'll look at it this week.
+> 
+> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+> ---
+>  Documentation/devicetree/bindings/pci/pci-iommu.txt | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/pci-iommu.txt b/Documentation/devicetree/bindings/pci/pci-iommu.txt
+> index 0def586fdcdf..f21a68ec471a 100644
+> --- a/Documentation/devicetree/bindings/pci/pci-iommu.txt
+> +++ b/Documentation/devicetree/bindings/pci/pci-iommu.txt
+> @@ -44,6 +44,14 @@ Optional properties
+>  - iommu-map-mask: A mask to be applied to each Requester ID prior to being
+>    mapped to an IOMMU specifier per the iommu-map property.
+>  
+> +- ats-supported: if present, the root complex supports the Address
+> +  Translation Service (ATS). It is able to interpret the AT field in PCIe
+> +  Transaction Layer Packets, and forward Translation Completions or
+> +  Invalidation Requests to endpoints.
 
-Yegor
+Why can't this be based on the compatible strings?
+
+Rob
