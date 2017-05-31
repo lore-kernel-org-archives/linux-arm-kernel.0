@@ -1,52 +1,63 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 31 May 2017 15:58:23 +0800
-Subject: [PATCH v2 5/6] clk: sunxi-ng: a64: Export PLL_PERIPH0 clock for the
- PRCM
-In-Reply-To: <20170531075824.657-1-wens@csie.org>
-References: <20170531075824.657-1-wens@csie.org>
-Message-ID: <20170531075824.657-6-wens@csie.org>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Wed, 31 May 2017 09:59:40 +0200
+Subject: [PATCH v5] arm64: dts: r8a7795: h3ulcb: Add support for R-Car H3 ES2.0
+Message-ID: <1496217580-5628-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PRCM takes PLL_PERIPH0 as one of its parents for the AR100 clock.
-As such we need to be able to describe this relationship in the device
-tree.
+Split off support for H3ULCB boards with the ES1.x revision of the R-Car
+H3 SoC into a separate file.  The main r8a7795-h3ulcb.dts file now
+corresponds to H3ULCB with R-Car H3 ES2.0 or later.
 
-Export the PLL_PERIPH0 clock so we can reference it in the PRCM node.
-
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- drivers/clk/sunxi-ng/ccu-sun50i-a64.h      | 4 +++-
- include/dt-bindings/clock/sun50i-a64-ccu.h | 2 ++
- 2 files changed, 5 insertions(+), 1 deletion(-)
+v5:
+  - Now also tested on H3ULCB with H3 ES2.0, so please apply.  Thanks!
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.h b/drivers/clk/sunxi-ng/ccu-sun50i-a64.h
-index 9b3cd24b78d2..061b6fbb4f95 100644
---- a/drivers/clk/sunxi-ng/ccu-sun50i-a64.h
-+++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.h
-@@ -31,7 +31,9 @@
- #define CLK_PLL_VIDEO0_2X		8
- #define CLK_PLL_VE			9
- #define CLK_PLL_DDR0			10
--#define CLK_PLL_PERIPH0			11
-+
-+/* PLL_PERIPH0 exported for PRCM */
-+
- #define CLK_PLL_PERIPH0_2X		12
- #define CLK_PLL_PERIPH1			13
- #define CLK_PLL_PERIPH1_2X		14
-diff --git a/include/dt-bindings/clock/sun50i-a64-ccu.h b/include/dt-bindings/clock/sun50i-a64-ccu.h
-index 370c0a0473fc..d66432c6e675 100644
---- a/include/dt-bindings/clock/sun50i-a64-ccu.h
-+++ b/include/dt-bindings/clock/sun50i-a64-ccu.h
-@@ -43,6 +43,8 @@
- #ifndef _DT_BINDINGS_CLK_SUN50I_A64_H_
- #define _DT_BINDINGS_CLK_SUN50I_A64_H_
+v4:
+  - No changes,
+
+v3:
+  - New.
+---
+ arch/arm64/boot/dts/renesas/Makefile                                  | 2 +-
+ .../boot/dts/renesas/{r8a7795-h3ulcb.dts => r8a7795-es1-h3ulcb.dts}   | 0
+ arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts                        | 4 ++--
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+ copy arch/arm64/boot/dts/renesas/{r8a7795-h3ulcb.dts => r8a7795-es1-h3ulcb.dts} (100%)
+
+diff --git a/arch/arm64/boot/dts/renesas/Makefile b/arch/arm64/boot/dts/renesas/Makefile
+index b6c723d8f6875f2d..d5451015950e3dfc 100644
+--- a/arch/arm64/boot/dts/renesas/Makefile
++++ b/arch/arm64/boot/dts/renesas/Makefile
+@@ -1,5 +1,5 @@
+ dtb-$(CONFIG_ARCH_R8A7795) += r8a7795-salvator-x.dtb r8a7795-h3ulcb.dtb
+-dtb-$(CONFIG_ARCH_R8A7795) += r8a7795-es1-salvator-x.dtb
++dtb-$(CONFIG_ARCH_R8A7795) += r8a7795-es1-salvator-x.dtb r8a7795-es1-h3ulcb.dtb
+ dtb-$(CONFIG_ARCH_R8A7796) += r8a7796-salvator-x.dtb r8a7796-m3ulcb.dtb
  
-+#define CLK_PLL_PERIPH0		11
-+
- #define CLK_BUS_MIPI_DSI	28
- #define CLK_BUS_CE		29
- #define CLK_BUS_DMA		30
+ always		:= $(dtb-y)
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dts
+similarity index 100%
+copy from arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+copy to arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dts
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+index 95fe207cb6a3fd2f..0426f41765f0bc68 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+@@ -12,11 +12,11 @@
+ #define CPG_AUDIO_CLK_I		R8A7795_CLK_S0D4
+ 
+ /dts-v1/;
+-#include "r8a7795-es1.dtsi"
++#include "r8a7795.dtsi"
+ #include "ulcb.dtsi"
+ 
+ / {
+-	model = "Renesas H3ULCB board based on r8a7795 ES1.x";
++	model = "Renesas H3ULCB board based on r8a7795 ES2.0+";
+ 	compatible = "renesas,h3ulcb", "renesas,r8a7795";
+ 
+ 	memory at 48000000 {
 -- 
-2.11.0
+2.7.4
