@@ -1,54 +1,62 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 31 May 2017 10:10:07 -0400
-Subject: [RFC,20/30] iommu/arm-smmu-v3: Enable PCI PASID in masters
-In-Reply-To: <20170227195441.5170-21-jean-philippe.brucker@arm.com>
-References: <20170227195441.5170-21-jean-philippe.brucker@arm.com>
-Message-ID: <f18163da-30a6-a7d4-0a2c-bca4fc1b0fff@codeaurora.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 31 May 2017 22:13:55 +0800
+Subject: [PATCH v2 1/3] pwm: sun4i: improve hardware read out
+In-Reply-To: <20170531073516.jrpgtu7nlkuizvfx@piout.net>
+References: <20170530193209.19247-1-alexandre.belloni@free-electrons.com>
+ <20170530193209.19247-2-alexandre.belloni@free-electrons.com>
+ <CAGb2v65sznGc9Tp6RSGpQ6KND4BxRFkfHZag5AFrKLBoZJ-r8w@mail.gmail.com>
+ <20170531073516.jrpgtu7nlkuizvfx@piout.net>
+Message-ID: <CAGb2v64Vhr_s0LuwtN7pFZ0eknTcdE=2pHdDKZpXXF4xUKowfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Philippe,
+On Wed, May 31, 2017 at 3:35 PM, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
+> On 31/05/2017 at 11:34:43 +0800, Chen-Yu Tsai wrote:
+>> On Wed, May 31, 2017 at 3:32 AM, Alexandre Belloni
+>> <alexandre.belloni@free-electrons.com> wrote:
+>> > +static void sun4i_pwm_get_state(struct pwm_chip *chip,
+>> > +                               struct pwm_device *pwm,
+>> > +                               struct pwm_state *state)
+>> > +{
+>> > +       struct sun4i_pwm_chip *sun4i_pwm = to_sun4i_pwm_chip(chip);
+>> > +       u64 clk_rate, tmp;
+>> > +       u32 val;
+>> > +       unsigned int prescaler;
+>> > +
+>> > +       clk_rate = clk_get_rate(sun4i_pwm->clk);
+>> > +
+>> > +       val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
+>> > +
+>> > +       if ((val == PWM_PRESCAL_MASK) && sun4i_pwm->data->has_prescaler_bypass)
+>> > +               prescaler = 1;
+>> > +       else
+>> > +               prescaler = prescaler_table[PWM_REG_PRESCAL(val, pwm->hwpwm)];
+>> > +
+>> > +       if (prescaler == 0)
+>> > +               return;
+>>
+>> This looks like an invalid state. How does the PWM core handle it?
+>> Or rather, how does the driver signal an invalid state?
+>>
+>
+> It doesn't and it doesn't really matter, if the IP is in an invalid
+> state, this bails out without modifying the know state so the core will
+> behave as if there was no hardware read out and everything will be
+> synchronized on the first ->apply() call.
 
-On 2/27/2017 2:54 PM, Jean-Philippe Brucker wrote:
-> Enable PASID for PCI devices that support it.
-> 
-> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-> ---
->  drivers/iommu/arm-smmu-v3.c | 66 ++++++++++++++++++++++++++++++++++++++++++---
->  1 file changed, 63 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 499dc1cd07eb..37fd061405e9 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -730,6 +730,8 @@ struct arm_smmu_master_data {
->  
->  	struct arm_smmu_stream		*streams;
->  	struct rb_root			contexts;
-> +
-> +	u32				avail_contexts;
->  };
->  
+Cool.
 
-I know that you are doing some code restructuring. As I was looking at the amdkfd
-driver, I realized that there is quite a bit of PASID, ATS and PRI work here that
-can be plumbed into the framework you are building. 
+Thanks
+ChenYu
 
-https://github.com/torvalds/linux/tree/master/drivers/gpu/drm/amd/amdkfd
-
-I wanted to share this with if you were aware of this or not. Functions of interest
-are:
-
-amd_iommu_init_device
-amd_iommu_free_device
-amd_iommu_bind_pasid
-amd_iommu_set_invalid_ppr_cb
-amd_iommu_unbind_pasid
-amd_iommu_device_info
-
-Sinan
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+>
+>> Otherwise,
+>>
+>> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+>>
+>
+> --
+> Alexandre Belloni, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
