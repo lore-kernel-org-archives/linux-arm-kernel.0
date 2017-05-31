@@ -1,45 +1,21 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 31 May 2017 20:58:49 +0100
-Subject: [PATCH] ARM: s3c64xx: don't select ARM_AMBA from S3C64XX_PL080
-In-Reply-To: <20170524155845.1778223-1-arnd@arndb.de>
-References: <20170524155845.1778223-1-arnd@arndb.de>
-Message-ID: <20170531195849.GD27796@n2100.armlinux.org.uk>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 31 May 2017 22:04:10 +0200
+Subject: [PATCH v5] arm64: dts: r8a7795: h3ulcb: Add support for R-Car H3
+ ES2.0
+In-Reply-To: <1496217580-5628-1-git-send-email-geert+renesas@glider.be>
+References: <1496217580-5628-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20170531200410.GH22266@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 24, 2017 at 05:58:34PM +0200, Arnd Bergmann wrote:
-> While trying a fix a build warning unrelated to s3c64xx, I ran into
-> a circular dependency:
+On Wed, May 31, 2017 at 09:59:40AM +0200, Geert Uytterhoeven wrote:
+> Split off support for H3ULCB boards with the ES1.x revision of the R-Car
+> H3 SoC into a separate file.  The main r8a7795-h3ulcb.dts file now
+> corresponds to H3ULCB with R-Car H3 ES2.0 or later.
 > 
-> drivers/i2c/Kconfig:7: symbol I2C is selected by FB_DDC
-> drivers/video/fbdev/Kconfig:63: symbol FB_DDC is selected by FB_CYBER2000_DDC
-> drivers/video/fbdev/Kconfig:381: symbol FB_CYBER2000_DDC depends on FB_CYBER2000
-> drivers/video/fbdev/Kconfig:369: symbol FB_CYBER2000 depends on FB
-> drivers/video/fbdev/Kconfig:5: symbol FB is selected by DRM_KMS_FB_HELPER
-> drivers/gpu/drm/Kconfig:72: symbol DRM_KMS_FB_HELPER is selected by DRM_KMS_CMA_HELPER
-> drivers/gpu/drm/Kconfig:137: symbol DRM_KMS_CMA_HELPER is selected by DRM_PL111
-> drivers/gpu/drm/pl111/Kconfig:1: symbol DRM_PL111 depends on ARM_AMBA
-> drivers/amba/Kconfig:1: symbol ARM_AMBA is selected by S3C64XX_PL080
-> arch/arm/mach-s3c64xx/Kconfig:42: symbol S3C64XX_PL080 default value contains DMADEVICES
-> drivers/dma/Kconfig:5: symbol DMADEVICES is selected by SND_SOC_SH4_SIU
-> sound/soc/sh/Kconfig:29: symbol SND_SOC_SH4_SIU is selected by SND_SIU_MIGOR
-> sound/soc/sh/Kconfig:59: symbol SND_SIU_MIGOR depends on I2C
-> 
-> The I2C and FB dependencies are hard to untangle, but I notice that
-> S3C64XX_PL080 selecting ARM_AMBA is one piece of the puzzle that
-> can easily be avoided, as ARCH_S3C64XX already select ARM_AMBA.
-> Removing the redundant 'select' now can help us in the future if we
-> run into a variation of the same dependency.
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> v5:
+>   - Now also tested on H3ULCB with H3 ES2.0, so please apply.  Thanks!
 
-Yes, selecting ARM_AMBA from drivers is definitely not right; this
-symbol should be selected only by platforms that want AMBA primecell
-bus support, not by drivers, precisely because of these dependency
-issues.
-
-There's another case where ARM_AMBA is selected that probably needs
-fixing - the coresight hwtracing code.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks, applied.
