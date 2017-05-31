@@ -1,65 +1,87 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 31 May 2017 08:07:53 -0700
-Subject: [CFT] Always enable SMP mode on MP capable CPUs
-In-Reply-To: <20170531145924.GY23750@n2100.armlinux.org.uk>
-References: <20170519171526.GW22219@n2100.armlinux.org.uk>
- <20170524153847.GY10472@atomide.com>
- <20170525144800.GV23750@n2100.armlinux.org.uk>
- <20170525151103.GC10472@atomide.com>
- <20170525180540.GW23750@n2100.armlinux.org.uk>
- <20170525221332.GE10472@atomide.com>
- <20170526112210.GA3354@afzalpc>
- <20170527132237.GX23750@n2100.armlinux.org.uk>
- <20170531143914.GD3730@atomide.com>
- <20170531145924.GY23750@n2100.armlinux.org.uk>
-Message-ID: <20170531150752.GE3730@atomide.com>
+From: nwatters@codeaurora.org (Nate Watterson)
+Date: Wed, 31 May 2017 11:27:57 -0400
+Subject: [PATCH 0/7] Add PCI ATS support to SMMUv3
+In-Reply-To: <20170524180143.19855-1-jean-philippe.brucker@arm.com>
+References: <20170524180143.19855-1-jean-philippe.brucker@arm.com>
+Message-ID: <2ae88519-7dbb-97ee-1ef9-8a92c31472d5@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@armlinux.org.uk> [170531 08:03]:
-> On Wed, May 31, 2017 at 07:39:15AM -0700, Tony Lindgren wrote:
-> > * Russell King - ARM Linux <linux@armlinux.org.uk> [170527 06:26]:
-> > > On Fri, May 26, 2017 at 04:52:10PM +0530, afzal mohammed wrote:
-> > > > Hi,
-> > > > 
-> > > > On Thu, May 25, 2017 at 03:13:33PM -0700, Tony Lindgren wrote:
-> > > > 
-> > > > > OK so got my am437x-idk back
-> > > > > 
-> > > > > And as suspected it won't boot with these changes.
-> > > > 
-> > > > Tested here too with your additional changes included & seeing same
-> > > > behavior here as well on AM437x.
-> > > > 
-> > > > As an aside, when Russell posted this patch a week back itself was
-> > > > suspecting this. i had a certain view on AM437x w.r.t SMP issue back
-> > > > while officially working on it & since now not officially involved
-> > > > with the issue at hand, i was uncomfortable dealing with this. But as
-> > > > Russell's patch was not noticed by others w.r.t AM437x, upon being
-> > > > able to confirm it yesterday, i at least wanted to bring it to notice
-> > > > & runaway from the scene.
-> > > 
-> > > Right, so I think the summary is: the kernel can't set the SMP bit
-> > > correctly - it doesn't have the information at this point in time
-> > > to know definitively whether the bit needs to be set or not.
-> > > 
-> > > So, those who are suffering issues with their SMP cores in uniprocessor
-> > > systems need to ensure that their boot loader correctly configures the
-> > > CPU cores.
-> > 
-> > Russell, current Linux next still has commit e7cf836e9757 ("ARM:
-> > always enable SMP mode on SMP cores"). You're planning to drop
-> > it, right?
-> 
-> Please have some patience.
-> 
-> Correct, it should be gone from tonight's linux-next.
-> 
-> The UK has two holidays in May, one of them was this Monday.  I dropped
-> the patch yesterday, which is the first opportunity since sending that
-> mail, but due to other pressures yesterday, my tree was in no state to
-> be pushed out for linux-next's grab last night.
+Hi Jean-Philippe,
 
-OK thanks for confirming!
+On 5/24/2017 2:01 PM, Jean-Philippe Brucker wrote:
+> PCIe devices can implement their own TLB, named Address Translation Cache
+> (ATC). In order to support Address Translation Service (ATS), the
+> following changes are needed in software:
+> 
+> * Enable ATS on endpoints when the system supports it. Both PCI root
+>    complex and associated SMMU must implement the ATS protocol.
+> 
+> * When unmapping an IOVA, send an ATC invalidate request to the endpoint
+>    in addition to the usual SMMU IOTLB invalidations.
+> 
+> I previously sent this as part of a lengthy RFC [1] adding SVM (ATS +
+> PASID + PRI) support to SMMUv3. The next PASID/PRI version is almost
+> ready, but isn't likely to get merged because it needs hardware testing,
+> so I will send it later. PRI depends on ATS, but ATS should be useful on
+> its own.
+> 
+> Without PASID and PRI, ATS is used for accelerating transactions. Instead
+> of having all memory accesses go through SMMU translation, the endpoint
+> can translate IOVA->PA once, store the result in its ATC, then issue
+> subsequent transactions using the PA, partially bypassing the SMMU. So in
+> theory it should be faster while keeping the advantages of an IOMMU,
+> namely scatter-gather and access control.
+> 
+> The ATS patches can now be tested on some hardware, even though the lack
+> of compatible PCI endpoints makes it difficult to assess what performance
+> optimizations we need. That's why the ATS implementation is a bit rough at
+> the moment, and we will work on optimizing things like invalidation ranges
+> later.
 
-Tony
+Sinan and I have tested this series on a QDF2400 development platform
+using a PCIe exerciser card as the ATS capable endpoint. We were able
+to verify that ATS requests complete with a valid translated address
+and that DMA transactions using the pre-translated address "bypass"
+the SMMU. Testing ATC invalidations was a bit more difficult as we
+could not figure out how to get the exerciser card to automatically
+send the completion message. We ended up having to write a debugger
+script that would monitor the CMDQ and tell the exerciser to send
+the completion when a hanging CMD_SYNC following a CMD_ATC_INV was
+detected. Hopefully we'll get some real ATS capable endpoints to
+test with soon.
+
+> 
+> Since the RFC [1]:
+> * added DT and ACPI patches,
+> * added invalidate-all on domain detach,
+> * removed smmu_group again,
+> * removed invalidation print from the fast path,
+> * disabled tagged pointers for good,
+> * some style changes.
+> 
+> These patches are based on Linux v4.12-rc2
+> 
+> [1] https://www.spinics.net/lists/linux-pci/msg58650.html
+> 
+> Jean-Philippe Brucker (7):
+>    PCI: Move ATS declarations outside of CONFIG_PCI
+>    dt-bindings: PCI: Describe ATS property for root complex nodes
+>    iommu/of: Check ATS capability in root complex nodes
+>    ACPI/IORT: Check ATS capability in root complex nodes
+>    iommu/arm-smmu-v3: Link domains and devices
+>    iommu/arm-smmu-v3: Add support for PCI ATS
+>    iommu/arm-smmu-v3: Disable tagged pointers
+> 
+>   .../devicetree/bindings/pci/pci-iommu.txt          |   8 +
+>   drivers/acpi/arm64/iort.c                          |  10 +
+>   drivers/iommu/arm-smmu-v3.c                        | 258 ++++++++++++++++++++-
+>   drivers/iommu/of_iommu.c                           |   8 +
+>   include/linux/iommu.h                              |   4 +
+>   include/linux/pci.h                                |  26 +--
+>   6 files changed, 293 insertions(+), 21 deletions(-)
+> 
+
+-- 
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
