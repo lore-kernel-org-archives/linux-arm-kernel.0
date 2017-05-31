@@ -1,35 +1,39 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Thu, 1 Jun 2017 02:44:13 +0800
-Subject: [PATCH 1/4] dt-bindings: rng: add generic bindings for MediaTek SoCs
+Date: Thu, 1 Jun 2017 02:44:16 +0800
+Subject: [PATCH 4/4] MAINTAINERS: add entry for MediaTek Random Number
+ Generator
 In-Reply-To: <cover.1496255334.git.sean.wang@mediatek.com>
 References: <cover.1496255334.git.sean.wang@mediatek.com>
-Message-ID: <1d9c981e1b45bf2f04732a02d90e6857cc203ce5.1496255334.git.sean.wang@mediatek.com>
+Message-ID: <896100e7f54d7bf1e1c4926ec5b63b27b99e4890.1496255334.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Add the generic binding for allowing the support of RNG on MediaTek SoCs
-such as MT7622.
+I work for MediaTek on maintaining the MediaTek RNG driver
+for the existing SoCs and adding support for the following
+SoCs.
 
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
- Documentation/devicetree/bindings/rng/mtk-rng.txt | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ MAINTAINERS | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/rng/mtk-rng.txt b/Documentation/devicetree/bindings/rng/mtk-rng.txt
-index a6d62a2..0772913 100644
---- a/Documentation/devicetree/bindings/rng/mtk-rng.txt
-+++ b/Documentation/devicetree/bindings/rng/mtk-rng.txt
-@@ -2,7 +2,8 @@ Device-Tree bindings for Mediatek random number generator
- found in Mediatek SoC family
+diff --git a/MAINTAINERS b/MAINTAINERS
+index cf86519..da473d0 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -8262,6 +8262,11 @@ L:	linux-wireless at vger.kernel.org
+ S:	Maintained
+ F:	drivers/net/wireless/mediatek/mt7601u/
  
- Required properties:
--- compatible	    : Should be "mediatek,mt7623-rng"
-+- compatible	    : Should be "mediatek,generic-rng" or
-+				"mediatek,mt7623-rng".
- - clocks	    : list of clock specifiers, corresponding to
- 		      entries in clock-names property;
- - clock-names	    : Should contain "rng" entries;
++MEDIATEK RANDOM NUMBER GENERATOR SUPPORT
++M:      Sean Wang <sean.wang@mediatek.com>
++S:      Maintained
++F:      drivers/char/hw_random/mtk-rng.c
++
+ MEGACHIPS STDPXXXX-GE-B850V3-FW LVDS/DP++ BRIDGES
+ M:	Peter Senna Tschudin <peter.senna@collabora.com>
+ M:	Martin Donnelly <martin.donnelly@ge.com>
 -- 
 1.9.1
