@@ -1,39 +1,52 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 31 May 2017 15:58:22 +0800
-Subject: [PATCH v2 4/6] ARM: sunxi: h3-h5: Add PLL_PERIPH0 clock to the R_CCU
+Date: Wed, 31 May 2017 15:58:21 +0800
+Subject: [PATCH v2 3/6] clk: sunxi-ng: h3: Export PLL_PERIPH0 clock for the
+ PRCM
 In-Reply-To: <20170531075824.657-1-wens@csie.org>
 References: <20170531075824.657-1-wens@csie.org>
-Message-ID: <20170531075824.657-5-wens@csie.org>
+Message-ID: <20170531075824.657-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AR100 clock within the R_CCU (PRCM) has the PLL_PERIPH0 as one of
-its parents.
+The PRCM takes PLL_PERIPH0 as one of its parents for the AR100 clock.
+As such we need to be able to describe this relationship in the device
+tree.
 
-This adds the reference in the device tree describing this relationship.
-This patch uses a raw number for the clock index to ease merging by
-avoiding cross tree dependencies.
+Export the PLL_PERIPH0 clock so we can reference it in the PRCM node.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sunxi-h3-h5.dtsi | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.h      | 4 +++-
+ include/dt-bindings/clock/sun8i-h3-ccu.h | 2 ++
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-index d0067fec99de..d4f600dbb7eb 100644
---- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-+++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-@@ -560,8 +560,9 @@
- 		r_ccu: clock at 1f01400 {
- 			compatible = "allwinner,sun8i-h3-r-ccu";
- 			reg = <0x01f01400 0x100>;
--			clocks = <&osc24M>, <&osc32k>, <&iosc>;
--			clock-names = "hosc", "losc", "iosc";
-+			clocks = <&osc24M>, <&osc32k>, <&iosc>,
-+				 <&ccu 9>;
-+			clock-names = "hosc", "losc", "iosc", "pll-periph";
- 			#clock-cells = <1>;
- 			#reset-cells = <1>;
- 		};
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.h b/drivers/clk/sunxi-ng/ccu-sun8i-h3.h
+index 85973d1e8165..1b4baea37d81 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.h
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.h
+@@ -29,7 +29,9 @@
+ #define CLK_PLL_VIDEO		6
+ #define CLK_PLL_VE		7
+ #define CLK_PLL_DDR		8
+-#define CLK_PLL_PERIPH0		9
++
++/* PLL_PERIPH0 exported for PRCM */
++
+ #define CLK_PLL_PERIPH0_2X	10
+ #define CLK_PLL_GPU		11
+ #define CLK_PLL_PERIPH1		12
+diff --git a/include/dt-bindings/clock/sun8i-h3-ccu.h b/include/dt-bindings/clock/sun8i-h3-ccu.h
+index c2afc41d6964..e139fe5c62ec 100644
+--- a/include/dt-bindings/clock/sun8i-h3-ccu.h
++++ b/include/dt-bindings/clock/sun8i-h3-ccu.h
+@@ -43,6 +43,8 @@
+ #ifndef _DT_BINDINGS_CLK_SUN8I_H3_H_
+ #define _DT_BINDINGS_CLK_SUN8I_H3_H_
+ 
++#define CLK_PLL_PERIPH0		9
++
+ #define CLK_CPUX		14
+ 
+ #define CLK_BUS_CE		20
 -- 
 2.11.0
