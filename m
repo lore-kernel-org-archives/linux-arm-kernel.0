@@ -1,46 +1,35 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 31 May 2017 19:20:46 +0200 (CEST)
-Subject: [GIT PULL] bcm2835 DT fixes for 4.12
-In-Reply-To: <d16bf00b-d058-08d1-ed6a-2f369d1fd611@gmail.com>
-References: <20170516221931.31292-1-eric@anholt.net>
- <d16bf00b-d058-08d1-ed6a-2f369d1fd611@gmail.com>
-Message-ID: <1791886363.81865.1496251246175@email.1und1.de>
+From: yegorslists@googlemail.com (Yegor Yefremov)
+Date: Wed, 31 May 2017 19:22:22 +0200
+Subject: [PATCH RFC 2/5] ARM: dts: am335x-baltos: use IRQ_TYPE_* to
+ specify irq flags
+In-Reply-To: <20170531171932.GH3730@atomide.com>
+References: <20170526180609.2699-1-uwe@kleine-koenig.org>
+ <20170526180609.2699-2-uwe@kleine-koenig.org>
+ <20170531171932.GH3730@atomide.com>
+Message-ID: <CAGm1_ktJp+3t9ExuFJhKTmbM63yt-82PGP26KkEHGqK-tnfWRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+Hi Uwe, Tony,
 
-> Florian Fainelli <f.fainelli@gmail.com> hat am 19. Mai 2017 um 20:17 geschrieben:
-> 
-> 
-> On 05/16/2017 03:19 PM, Eric Anholt wrote:
-> > Hi Florian,
-> > 
-> > The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
-> > 
-> >   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://github.com/anholt/linux tags/bcm2835-dt-fixes-2017-05-16
-> > 
-> > for you to fetch changes up to b0804ed0cadd7e38d94d2f15cdcc0d9695818856:
-> > 
-> >   ARM: dts: bcm283x: Reserve first page for firmware (2017-05-15 15:05:29 -0700)
-> > 
-> > ----------------------------------------------------------------
-> > This pull request brings in a fix for booting on SMP Raspberry Pis,
-> > particularly with maxcpus=1
-> > 
-> > ----------------------------------------------------------------
-> 
-> Merged, thanks Eric
+On Wed, May 31, 2017 at 7:19 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Uwe Kleine-K?nig <uwe@kleine-koenig.org> [170526 11:09]:
+>> According to the binding documentation and the source code the omap-gpio
+>> controller takes IRQ_TYPE_* as its flags values, not GPIO_ACTIVE_*.
+>>
+>> This patch uses the right variable type which yields the same result
+>> when compiled. Note that this might be wrong and actually
+>> IRQ_TYPE_LEVEL_LOW is intended by the dt author.
+>>
+>> Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+>> ---
+>> Hello,
+>>
+>> can somebody with the hardware or it's documentation please check which
+>> flag is the right one?
+>
+> I'll wait on this one until we have somebody test it.
 
-when it's planned to send this fix to Olof?
+I'll look at it this week.
 
-Thanks
-Stefan
-
-> -- 
-> -- 
-> Florian
+Yegor
