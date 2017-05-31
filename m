@@ -1,43 +1,25 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 31 May 2017 13:07:55 -0500
-Subject: [PATCH 1/6] dt-bindings: mfd: Add hi6421v530 bindings
-In-Reply-To: <20170526063518.21246-2-guodong.xu@linaro.org>
-References: <20170526063518.21246-1-guodong.xu@linaro.org>
- <20170526063518.21246-2-guodong.xu@linaro.org>
-Message-ID: <20170531180755.on4jcgwxpnli3mly@rob-hp-laptop>
+Date: Wed, 31 May 2017 13:09:44 -0500
+Subject: [PATCH 1/3] dt-bindings: clock: sunxi-ccu: Add compatible string
+ for A83T PRCM
+In-Reply-To: <20170526080025.28532-2-wens@csie.org>
+References: <20170526080025.28532-1-wens@csie.org>
+ <20170526080025.28532-2-wens@csie.org>
+Message-ID: <20170531180944.dbg4adt33jcgbbjc@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 26, 2017 at 02:35:13PM +0800, Guodong Xu wrote:
-> DT bindings for hisilicon HI655x PMIC chip.
+On Fri, May 26, 2017 at 04:00:23PM +0800, Chen-Yu Tsai wrote:
+> The A83T's PRCM has the same set of clocks and resets as the A64.
+> However, a few dividers are different. And due to the lack of a low
+> speed 32.768 kHz oscillator, a few of the clock parents are different.
 > 
-> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+> The PRCM also has controls for various power domains. These are not
+> supported yet.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
->  .../bindings/mfd/hisilicon,hi6421v530.txt          | 25 ++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/hisilicon,hi6421v530.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/hisilicon,hi6421v530.txt b/Documentation/devicetree/bindings/mfd/hisilicon,hi6421v530.txt
-> new file mode 100644
-> index 0000000..6ffe6f6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/hisilicon,hi6421v530.txt
-> @@ -0,0 +1,25 @@
-> +Hisilicon Hi6421v530 Power Management Integrated Circuit (PMIC)
-> +
-> +The hardware layout for access PMIC Hi6421v530 from AP SoC Hi3660.
-> +Between PMIC Hi6421v530 and Hi3660, the physical signal channel is SSI.
-> +We can use memory-mapped I/O to communicate.
-> +
-> ++----------------+             +-------------+
-> +|                |             |             |
-> +|    Hi3660      |   SSI bus   |  Hi6421v530 |
-> +|                |-------------|             |
-> +|                |(REGMAP_MMIO)|             |
-> ++----------------+             +-------------+
+>  Documentation/devicetree/bindings/clock/sunxi-ccu.txt | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 
-regmap is a Linuxism and should not be part of the binding.
-
-So there some sort of controller that generates SSI packets? based on 
-MMIO addresses? That should be more fully described here. For example, 
-the PMIC should probably be a child of the controller.
+Acked-by: Rob Herring <robh@kernel.org>
