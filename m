@@ -1,56 +1,23 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 31 May 2017 13:59:42 -0700
-Subject: [PATCH v2 5/6] regulator: pfuze100-regulator: provide
- pm_power_off_prepare handler
-In-Reply-To: <20170531061457.23744-6-o.rempel@pengutronix.de>
-References: <20170531061457.23744-1-o.rempel@pengutronix.de>
- <20170531061457.23744-6-o.rempel@pengutronix.de>
-Message-ID: <20170531135942.20a72fe106667791e874fb20@linux-foundation.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 31 May 2017 14:52:26 -0700
+Subject: [PATCH v2 net 2/2] net: phy: micrel: Restore led_mode and clk_sel
+ on resume
+In-Reply-To: <1460beebce4ba23722cfb185b0f9f884cca3b9e9.1496224930.git.leonard.crestez@nxp.com>
+References: <cover.1496224930.git.leonard.crestez@nxp.com>
+ <1460beebce4ba23722cfb185b0f9f884cca3b9e9.1496224930.git.leonard.crestez@nxp.com>
+Message-ID: <49f66bd1-80f4-ca41-d2a6-eecb189bdebb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 31 May 2017 08:14:56 +0200 Oleksij Rempel <o.rempel@pengutronix.de> wrote:
-
-> On some boards the SoC can use one pin "PMIC_STBY_REQ" to notify th PMIC
-> about state changes. In this case internal state of PMIC must be
-> preconfigured for upcomming state change.
-> It works fine with the current regulator framework, except with the
-> power-off case.
+On 05/31/2017 03:29 AM, Leonard Crestez wrote:
+> These bits seem to be lost after a suspend/resume cycle so just set them
+> again. Do this by splitting the handling of these bits into a function
+> that is also called on resume.
 > 
-> This patch is providing an optional pm_power_off_prepare handler
-> which will configure the PMIC_StandBy state to disable all power lines.
+> This patch fixes ethernet suspend/resume on imx6ul-14x14-evk boards.
 > 
-> In my power consumption test on RIoTBoard, I got the following results:
-> poweroff without this patch:	320 mA
-> poweroff with this patch:	2   mA
-> suspend to ram:			40  mA
-> 
-> ...
->
-> +static int pfuze_poweroff_pre_init(struct pfuze_chip *pfuze_chip)
-> +{
-> +	if (pfuze_chip->chip_id != PFUZE100) {
-> +		dev_warn(pfuze_chip->dev, "Requested pm_power_off_prepare handler for not supoorted chip\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	if (pm_power_off_prepare) {
-> +		dev_warn(pfuze_chip->dev, "pm_power_off_prepare is already registred.\n");
-> +		return -EBUSY;
-> +	}
-> +
-> +	syspm_pfuze_chip = pfuze_chip;
-> +	pm_power_off_prepare = pfuze_poweroff_pre;
-> +
-> +	return 0;
-> +}
-> +
+> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 
-Ah, there it is.
-
-This looks a bit dodgy.  What happens after someone does rmmod on this
-driver?
-
-(typo in comment: "supoorted")
-
-(I wish we could get "poweroff" and "power_off" consistent)
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+-- 
+Florian
