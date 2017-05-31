@@ -1,47 +1,32 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 31 May 2017 11:56:45 +0200
-Subject: [PATCH v2 0/4] ARM: dts: at91: Migrate to the new EBI/NAND
- bindings
-In-Reply-To: <1496136054-12390-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1496136054-12390-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20170531095645.7jwews2fbofhntjk@piout.net>
+From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
+Date: Wed, 31 May 2017 15:27:41 +0530
+Subject: [PATCH v2 0/2] Add ThunderX2 SoC Performance Monitoring Unit driver
+Message-ID: <1496224663-13819-1-git-send-email-ganapatrao.kulkarni@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/05/2017 at 11:20:50 +0200, Boris Brezillon wrote:
-> Hello,
-> 
-> This is the last step of the EBI/NAND bindings rework started here [1].
-> 
-> The first patch is adding missing nfc-io bindings doc to atmel-nand.txt
-> and can be applied independently.
-> 
-> Patches 2 and 3 are migrating all at91/sama5 SoCs (except the
-> at91rm9200) to the new EBI/NAND representation introduced in 4.12.
-> 
-> The last patch is showing how one can add a non-NAND device under the
-> EBI bus.
-> 
-> Regards,
-> 
-> Boris
-> 
-> [1]http://lkml.iu.edu/hypermail/linux/kernel/1703.2/00124.html
-> 
-> Changes since v1:
-> - Cc board maintainers
-> - merge patches 3 and 4 into a single patch doing all board
->   modifications
-> 
-> Boris Brezillon (4):
->   dt-bindings: mtd: atmel-nand: Document the nfc-io bindings
->   ARM: dts: at91: Declare EBI/NAND controllers
->   ARM: dts: at91: Switch to the new NAND bindings
->   ARM: dts: at91: Add the NOR flash available on sama5d3 dev kits
-> 
-Applied, thanks.
+This patchset adds PMU driver for Cavium's ThunderX2 SoC UNCORE devices.
+The SoC has PMU support in its L3 cache controller (L3C) and in the
+DDR4 Memory Controller (DMC).
+
+v2:
+     - rebased to 4.12-rc1
+     - Removed Arch VULCAN dependency
+     - update SMC call parameters as per latest firmware.
+
+v1: Initial patch
+
+Ganapatrao Kulkarni (2):
+  perf: uncore: Adding documentation for ThunderX2 pmu uncore driver
+  perf: ThunderX2: Add Cavium Thunderx2 SoC UNCORE PMU driver
+
+ Documentation/perf/thunderx2-pmu.txt |  60 +++
+ drivers/perf/Kconfig                 |   9 +
+ drivers/perf/Makefile                |   1 +
+ drivers/perf/thunderx2_pmu.c         | 968 +++++++++++++++++++++++++++++++++++
+ 4 files changed, 1038 insertions(+)
+ create mode 100644 Documentation/perf/thunderx2-pmu.txt
+ create mode 100644 drivers/perf/thunderx2_pmu.c
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.8.1.4
