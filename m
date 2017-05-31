@@ -1,125 +1,106 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed, 31 May 2017 09:18:31 +0200
-Subject: [PATCH v6 00/21] net-next: stmmac: add dwmac-sun8i ethernet driver
-Message-ID: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
+Date: Wed, 31 May 2017 09:18:34 +0200
+Subject: [PATCH v6 03/21] dt-bindings: net-next: Add DT bindings documentation
+ for Allwinner dwmac-sun8i
+In-Reply-To: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
+References: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
+Message-ID: <20170531071852.12422-4-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
+This patch adds documentation for Device-Tree bindings for the
+Allwinner dwmac-sun8i driver.
 
-This patch series add the driver for dwmac-sun8i which handle the Ethernet MAC
-present on Allwinner H3/H5/A83T/A64 SoCs.
-
-This driver is the continuation of the sun8i-emac driver.
-During the development, it appeared that in fact the hardware was a modified
-version of some dwmac.
-So the driver is now written as a glue driver for stmmac.
-
-It supports 10/100/1000 Mbit/s speed with half/full duplex.
-It can use an internal PHY (MII 10/100) or an external PHY
-via RGMII/RMII.
-
-This patch series enable the driver only for the H3/A64/H5 SoC since A83T
-doesn't have the necessary clocks present in mainline.
-
-The driver have been tested on the following boards:
-- H3 Orange PI PC, BananaPI-M2+
-- A64 Pine64, BananaPi-M64
-- A83T BananaPI-M3
-
-The first two patchs are some mandatory changes for letting dwmac-sun8i be used.
-The following three patchs add the driver and its documentation.
-The remaining are DT patch enabling it.
-
-Regards
-Corentin Labbe
-
-Changes since v5:
-- Added DT patch for NanoPi neo
-- Use the new adjust_link variables (speedxxx/speedmask)
-- Made the timeout of readl_poll_timeout from 10 to 100ms
-- Fix sun8i_unpower_phy that could be called twice
-- Replace phy by phy-handle in doc/dwmac-sun8i.txt
-
-Changes since v4:
-- Re-ordered by alphabetical order some DT nodes
-- Simplified power/unpower_phy functions by testing the use of internal_phy
-- Added a patch for adding dwmac-sun8i to arm64 defconfig
-- Fix a typo in sun50i-a64-system-controller (wrongly used sun8i)
-- Reworked uc/mc filter address setting
-
-Changes since v3:
-- Renamed tx-delay/rx-delay to tx-delay-ps/rx-delay-ps
-- fix syscon compatible example
-- Changed parameter type for setup() function
-- Dropped some DT patchs for boards which I could not test further
-
-Changes since v2:
-- corrected order of syscon compatible
-- added compatible = "ethernet-phy-ieee802.3-c22 to PHY
-- added set_mac function
-
-Changes since v1:
-- added TX/RX delay units
-- splitted syscon documentation in its own patch
-- regulator is now disabled after clk_prepare_enable(gmac->tx_clk) error
-- Fixed a memory leak on mac_device_info
-- Use now generic pin config for all DT stuff
-- CONFIG_DWMAC_SUN8I is now set to y in defconfigs
-
-Corentin Labbe (21):
-  net-next: stmmac: export stmmac_set_mac_addr/stmmac_get_mac_addr
-  net-next: stmmac: add optional setup function
-  dt-bindings: net-next: Add DT bindings documentation for Allwinner
-    dwmac-sun8i
-  dt-bindings: syscon: Add DT bindings documentation for Allwinner
-    syscon
-  net-next: stmmac: Add dwmac-sun8i
-  arm: sun8i: sunxi-h3-h5: Add dt node for the syscon control module
-  arm: sun8i: sunxi-h3-h5: add dwmac-sun8i ethernet driver
-  arm: sun8i: orangepi-pc: Enable dwmac-sun8i
-  arm: sun8i: orangepi-zero: Enable dwmac-sun8i
-  arm: sun8i: orangepi-one: Enable dwmac-sun8i
-  arm: sun8i: orangepi-2: Enable dwmac-sun8i
-  arm: sun8i: orangepi-pc-plus: Set EMAC activity LEDs to active high
-  arm: sun8i: nanopi-neo: Enable dwmac-sun8i
-  arm64: allwinner: sun50i-a64: Add dt node for the syscon control
-    module
-  arm64: allwinner: sun50i-a64: add dwmac-sun8i Ethernet driver
-  arm64: allwinner: pine64: Enable dwmac-sun8i
-  arm64: allwinner: pine64-plus: Enable dwmac-sun8i
-  arm64: allwinner: bananapi-m64: Enable dwmac-sun8i
-  arm: sunxi: Enable dwmac-sun8i driver on sunxi_defconfig
-  arm: multi_v7: Enable dwmac-sun8i driver on multi_v7_defconfig
-  arm64: defconfig: Enable dwmac-sun8i driver on defconfig
-
- .../devicetree/bindings/misc/allwinner,syscon.txt  |  19 +
- .../devicetree/bindings/net/dwmac-sun8i.txt        |  78 ++
- arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts  |   8 +
- arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts          |   7 +
- arch/arm/boot/dts/sun8i-h3-orangepi-2.dts          |   8 +
- arch/arm/boot/dts/sun8i-h3-orangepi-one.dts        |   8 +
- arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts    |   5 +
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |   8 +
- arch/arm/boot/dts/sunxi-h3-h5.dtsi                 |  40 +
- arch/arm/configs/multi_v7_defconfig                |   1 +
- arch/arm/configs/sunxi_defconfig                   |   1 +
- .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts |  15 +
- .../boot/dts/allwinner/sun50i-a64-pine64-plus.dts  |  17 +-
- .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts |  16 +
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      |  41 +
- arch/arm64/configs/defconfig                       |   1 +
- drivers/net/ethernet/stmicro/stmmac/Kconfig        |  11 +
- drivers/net/ethernet/stmicro/stmmac/Makefile       |   1 +
- drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c  | 990 +++++++++++++++++++++
- drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c    |   3 +-
- drivers/net/ethernet/stmicro/stmmac/stmmac_main.c  |  19 +-
- .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |   9 +-
- include/linux/stmmac.h                             |   2 +
- 23 files changed, 1303 insertions(+), 5 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/misc/allwinner,syscon.txt
+Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ .../devicetree/bindings/net/dwmac-sun8i.txt        | 78 ++++++++++++++++++++++
+ 1 file changed, 78 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/net/dwmac-sun8i.txt
- create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
 
+diff --git a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+new file mode 100644
+index 000000000000..08e708c73193
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+@@ -0,0 +1,78 @@
++* Allwinner sun8i GMAC ethernet controller
++
++This device is a platform glue layer for stmmac.
++Please see stmmac.txt for the other unchanged properties.
++
++Required properties:
++- compatible: should be one of the following string:
++		"allwinner,sun8i-a83t-emac"
++		"allwinner,sun8i-h3-emac"
++		"allwinner,sun50i-a64-emac"
++- reg: address and length of the register for the device.
++- interrupts: interrupt for the device
++- interrupt-names: should be "macirq"
++- clocks: A phandle to the reference clock for this device
++- clock-names: should be "stmmaceth"
++- resets: A phandle to the reset control for this device
++- reset-names: should be "stmmaceth"
++- phy-mode: See ethernet.txt
++- phy-handle: See ethernet.txt
++- #address-cells: shall be 1
++- #size-cells: shall be 0
++- syscon: A phandle to the syscon of the SoC with one of the following
++ compatible string:
++  - allwinner,sun8i-h3-system-controller
++  - allwinner,sun50i-a64-system-controller
++  - allwinner,sun8i-a83t-system-controller
++
++Optional properties:
++- allwinner,tx-delay-ps: TX clock delay chain value in ps. Range value is 0-700. Default is 0)
++- allwinner,rx-delay-ps: RX clock delay chain value in ps. Range value is 0-3100. Default is 0)
++Both delay properties need to be a multiple of 100. They control the delay for
++external PHY.
++
++Optional properties for "allwinner,sun8i-h3-emac":
++- allwinner,leds-active-low: EPHY LEDs are active low
++
++Required child node of emac:
++- mdio bus node: should be named mdio
++
++Required properties of the mdio node:
++- #address-cells: shall be 1
++- #size-cells: shall be 0
++
++The device node referenced by "phy" or "phy-handle" should be a child node
++of the mdio node. See phy.txt for the generic PHY bindings.
++
++Required properties of the phy node with "allwinner,sun8i-h3-emac":
++- clocks: a phandle to the reference clock for the EPHY
++- resets: a phandle to the reset control for the EPHY
++
++Example:
++
++emac: ethernet at 1c0b000 {
++	compatible = "allwinner,sun8i-h3-emac";
++	syscon = <&syscon>;
++	reg = <0x01c0b000 0x104>;
++	interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
++	interrupt-names = "macirq";
++	resets = <&ccu RST_BUS_EMAC>;
++	reset-names = "stmmaceth";
++	clocks = <&ccu CLK_BUS_EMAC>;
++	clock-names = "stmmaceth";
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	phy-handle = <&int_mii_phy>;
++	phy-mode = "mii";
++	allwinner,leds-active-low;
++	mdio: mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		int_mii_phy: ethernet-phy at 1 {
++			reg = <1>;
++			clocks = <&ccu CLK_BUS_EPHY>;
++			resets = <&ccu RST_BUS_EPHY>;
++		};
++	};
++};
 -- 
 2.13.0
