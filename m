@@ -1,63 +1,67 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 31 May 2017 13:44:19 +0100
-Subject: Device address specific mapping of arm,mmu-500
-In-Reply-To: <7bd03bf8-71d5-a974-bea2-a38b4349c547@broadcom.com>
-References: <1b79efe2-6835-7a7a-f5ad-361391a7b967@broadcom.com>
- <20170530151437.GC23067@arm.com>
- <81637642-22d9-4868-156f-052f64bd042f@broadcom.com>
- <226bcebc-3902-90d3-24e5-51f2e1f3affb@arm.com>
- <a85b2e3f-93db-7c4d-cde8-32a57e69bef9@broadcom.com>
- <16e5fc9d-b014-af7c-dcda-527522ac5cc9@arm.com>
- <b47a379e-4a1b-42ff-8604-01b5becd685c@broadcom.com>
- <7bd03bf8-71d5-a974-bea2-a38b4349c547@broadcom.com>
-Message-ID: <20170531124418.GE9723@arm.com>
+Date: Wed, 31 May 2017 13:44:30 +0100
+Subject: [PATCHv2 1/2] arm64:vdso: Rewrite gettimeofday into C.
+In-Reply-To: <1496190860-5116-1-git-send-email-apinski@cavium.com>
+Message-ID: <20170531124430.GG9723@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 30, 2017 at 11:13:36PM -0700, Ray Jui wrote:
-> I did a little more digging myself and I think I now understand what you
-> meant by identity mapping, i.e., configuring the MMU-500 with 1:1 mapping
-> between the DMA address and the IOVA address.
+Hi Andrew,
+
+Thanks for posting this, but please try to cc the maintainers in future -- I
+almost missed it!
+
+On Tue, May 30, 2017 at 05:34:19PM -0700, Andrew Pinski wrote:
+> This allows the compiler to optimize the divide by 1000.
+> And remove the other divide.
 > 
-> I think that should work. In the end, due to this MSI write parsing issue in
-> our PCIe controller, the reason to use IOMMU is to allow the cache
-> attributes (AxCACHE) of the MSI writes towards GICv3 ITS to be modified by
-> the IOMMU to be device type, while leaving the rest of inbound reads/writes
-> from/to DDR with more optimized cache attributes setting, to allow I/O
-> coherency to be still enabled for the PCIe controller. In fact, the PCIe
-> controller itself is fully capable of DMA to/from the full address space of
-> our SoC including both DDR and any device memory.
+> On ThunderX, gettimeofday improves by 32%.  On ThunderX 2,
+> gettimeofday improves by 18%.
 > 
-> The 1:1 mapping will still pose some translation overhead like you
-> suggested; however, the overhead of allocating page tables and locking will
-> be gone. This sounds like the best possible option I have currently.
+> Note I noticed a bug in the old implementation of __kernel_clock_getres;
+> it was checking only the lower 32bits of the pointer; this would work
+> for most cases but could fail in a few.
+> 
+> Changes from v1:
+> * Fixed bug in __kernel_clock_getres for checking the pointer argument.
+> * Fix comments to refer to functions in arm64.
 
-It might end up being pretty invasive to work around a hardware bug, so
-we'll have to see what it looks like. Ideally, we could just use the SMMU
-for everything as-is and work on clawing back the lost performance (it
-should be possible to get ~95% of the perf if we sort out the locking, which
-we *are* working on).
+I tested this patch on a few platforms I have access to and didn't see the
+perf regressions I saw when I looked at this in the past with an older
+toolchain (it was mostly about the same, with a couple of improvements).
 
-> May I ask, how do I start to try to get this identity mapping to work as an
-> experiment and proof of concept? Any pointer or advise is highly appreciated
-> as you can see I'm not very experienced with this. I found Will recently
-> added the IOMMU_DOMAIN_IDENTITY support to the arm-smmu driver. But I
-> suppose that is to bypass the SMMU completely, instead of still going
-> through the MMU with 1:1 translation. Is my understanding correct?
+So, in principle, I'm not opposed to moving this into C. However, we're
+currently close to a "vDSO-explosion" on arm64 with people wanting a compat
+variant and also an ILP32 variant. When Kevin posted his compat variant
+(also in C):
 
-Yes, I don't think IOMMU_DOMAIN_IDENTITY is what you need because you
-actally need per-page control of memory attributes.
+  http://lkml.kernel.org/r/20161206160353.14581-1-kevin.brodsky at arm.com
 
-Robin might have a better idea, but I think you'll have to hack dma-iommu.c
-so that you can have a version of the DMA ops that:
+Nathan (who apparently needs to set his mail host address ;) was concerned
+about duplication between arm and arm64:
 
-  * Initialises the identity map (I guess as normal WB cacheable?)
-  * Reserves and maps the MSI region appropriately
-  * Just returns the physical address for the dma address for map requests
-    (return error for the MSI region)
-  * Does nothing for unmap requests
+  http://lkml.kernel.org/r/87r35jmv3e.fsf at wedge.i-did-not-set--mail-host-address--so-tickle-me
 
-But my strong preference would be to fix the locking overhead from the
-SMMU so that the perf hit is acceptable.
+I'm firmly of the opinion that we should try to write an arch-agnostic vDSO
+implementation in core code (lib/vdso or something) where the arch header
+provides things like:
+
+  * The mechanism to read the counter
+  * The mechanism to issue a syscall
+  * A function to determine whether or not the current clocksource is
+    suitable
+
+I think the datapage format could be defined in core code and it would be
+worth looking to see how much the virtual mapping code can be consolidated
+too.
+
+If we can get something that works for arm native, arm64 native, arm64
+compat and arm64 ilp32 then it's probably going to be useful for other
+architectures too, even if we need to add more customisation points in
+future.
+
+I've spoken to Kevin about this, but I'm not sure whether he's had a chance
+to look at knocking up a prototype. A first stab could just unconditionally
+fallback to the system call.
 
 Will
