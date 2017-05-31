@@ -1,31 +1,64 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 31 May 2017 12:54:39 -0500
-Subject: [PATCH v4 1/9] dt-bindings: arm: mediatek: update for MT7623n
- SoC and relevant boards
-In-Reply-To: <ec281bfc67e633873bb519e607aca67213454b6d.1495683769.git.sean.wang@mediatek.com>
-References: <cover.1495683769.git.sean.wang@mediatek.com>
- <ec281bfc67e633873bb519e607aca67213454b6d.1495683769.git.sean.wang@mediatek.com>
-Message-ID: <20170531175439.bclgr4atbxrmgpna@rob-hp-laptop>
+Date: Wed, 31 May 2017 12:59:18 -0500
+Subject: [PATCH v3 2/4] Documentation: dt: iio: at91-sama5d2_adc: add
+ adtrg trigger binding
+In-Reply-To: <1495711034-28410-3-git-send-email-eugen.hristev@microchip.com>
+References: <1495711034-28410-1-git-send-email-eugen.hristev@microchip.com>
+ <1495711034-28410-3-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <20170531175918.3fne7ijavvrw4sf6@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 25, 2017 at 12:02:39PM +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
+On Thu, May 25, 2017 at 02:17:12PM +0300, Eugen Hristev wrote:
+> Add node information for ADTRG hardware pin and the three possible
+> edge nodes that are available for the driver
 > 
-> Because there are two versions of MT7623 SoC that is MT7623a and MT7623n
-> respectively. So update the part of MT7623n bindings to allow that people
-> tend to differentiate which MT7623 SoC the boards applies.
-> 
-> And "mediatek,mt7623-evb" can be safely changed to
-> "mediatek,mt7623n-rfb-nand" because mt7623-evb is a kind of debug board
-> internally in Mediatek which real users can't get. So instead we should
-> indicate which variants it belongs to with more specific postfix as the
-> adding here to let people easily know what board they use.
-> 
-> Signed-off-by: John Crispin <john@phrozen.org>
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
 > ---
->  Documentation/devicetree/bindings/arm/mediatek.txt | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
+>  .../devicetree/bindings/iio/adc/at91-sama5d2_adc.txt    | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt b/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
+> index 3223684..e30ede3 100644
+> --- a/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
+> +++ b/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
+> @@ -11,6 +11,13 @@ Required properties:
+>    - atmel,min-sample-rate-hz: Minimum sampling rate, it depends on SoC.
+>    - atmel,max-sample-rate-hz: Maximum sampling rate, it depends on SoC.
+>    - atmel,startup-time-ms: Startup time expressed in ms, it depends on SoC.
+> +  - atmel,trigger-edge-type: phandle to one of the adtrg possible edge types
+> +
+> +Required adtrg node:
+> +  - Required edge nodes:
+> +	For each possible edge type for the ADTRG hardware trigger pin,
+> +	 a specific sub node. The driver recognises only the three possible
+> +	 edge types: external_rising, external_falling, external_any.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Why is this not just a simple property? Having 4 nodes just for this is 
+pointless.
+
+>  
+>  Example:
+>  
+> @@ -25,4 +32,14 @@ adc: adc at fc030000 {
+>  	atmel,startup-time-ms = <4>;
+>  	vddana-supply = <&vdd_3v3_lp_reg>;
+>  	vref-supply = <&vdd_3v3_lp_reg>;
+> +	atmel,trigger-edge-type = <&external_rising>;
+> +
+> +	adtrg: adtrg {
+> +		external_rising: external_rising {
+> +		};
+> +		external_falling: external_falling {
+> +		};
+> +		external_any: external_any {
+> +		};
+> +	};
+>  }
+> -- 
+> 2.7.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
