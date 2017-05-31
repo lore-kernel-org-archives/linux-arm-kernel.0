@@ -1,42 +1,54 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 31 May 2017 16:07:23 +0200
-Subject: [PATCH v2 2/7] dt-bindings: ap806: do not depend anymore of the
- *-clock-output-names
-In-Reply-To: <cover.21754b3184e2122d1c83a664477ed26ec562b3e9.1496239589.git-series.gregory.clement@free-electrons.com>
-References: <cover.21754b3184e2122d1c83a664477ed26ec562b3e9.1496239589.git-series.gregory.clement@free-electrons.com>
-Message-ID: <d502b5abc68cbb5739ce72ba8be27528f9042a28.1496239589.git-series.gregory.clement@free-electrons.com>
+Date: Wed, 31 May 2017 16:07:21 +0200
+Subject: [PATCH v2 0/7] Improve ap806 clk support on Marvell Armada 7K/8K
+Message-ID: <cover.21754b3184e2122d1c83a664477ed26ec562b3e9.1496239589.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the documentation according to the change made in the
-patch "clk: mvebu: ap806: do not depend anymore of the
-*-clock-output-names": the clock names are no more part of the binding.
+Hi,
 
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt | 4 ----
- 1 file changed, 4 deletions(-)
+This series modifies the device tree binding of the clock of the AP806
+part that we find in the Marvell Armada 7K/8K SoCs.
 
-diff --git a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-index 8968371d84e2..3faab71dff9f 100644
---- a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-+++ b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-@@ -21,15 +21,11 @@ Required properties:
-      "marvell,ap806-system-controller", "syscon"
-  - reg: register area of the AP806 system controller
-  - #clock-cells: must be set to 1
-- - clock-output-names: must be defined to:
--    "ap-cpu-cluster-0", "ap-cpu-cluster-1", "ap-fixed", "ap-mss"
- 
- Example:
- 
- 	syscon: system-controller at 6f4000 {
- 		compatible = "marvell,ap806-system-controller", "syscon";
- 		#clock-cells = <1>;
--		clock-output-names = "ap-cpu-cluster-0", "ap-cpu-cluster-1",
--				     "ap-fixed", "ap-mss";
- 		reg = <0x6f4000 0x1000>;
- 	};
+As for the previsous series the only change in this second version is
+about the binding documentation: all the documentation related changes
+are now move in their own patches. It allows to provide a stable -dt
+branch for theses changes. I also added the acked-by from Rob Herring.
+
+Here again the last two patches modifying the device tree _must_ be
+merged through the mvebu tree to avoid future conflict.
+
+For the record:
+As for the CP110, we want to be able to ease the integration of new
+clocks without breaking the backward compatibility. It is done in
+patch 3.
+
+We also want to ease the integration of the pinctrl node in the device
+tree. It is the purpose of the patch 5.
+
+In this series (as in the previous one for CP110), even if there is
+some change in the device tree binding we paid attention to the
+backward compatibility, and the driver can still work with the old
+device tree.
+
+Thanks,
+
+Gregory
+
+Gregory CLEMENT (7):
+  clk: mvebu: ap806: cosmetic improvement
+  dt-bindings: ap806: do not depend anymore of the *-clock-output-names
+  clk: mvebu: ap806: do not depend anymore of the *-clock-output-names
+  dt-bindings: ap806: introduce a new binding
+  clk: mvebu: ap806: introduce a new binding
+  arm64: dts: marvell: remove clock-output-names on ap806
+  arm64: dts: marvell: use new binding for the system controller on ap806
+
+ Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt |  24 ++++++++++------
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi                             |  23 +++++++--------
+ drivers/clk/mvebu/ap806-system-controller.c                               | 107 +++++++++++++++++++++++++++++++++++++++++++++++-------------------------
+ 3 files changed, 97 insertions(+), 57 deletions(-)
+
+base-commit: 4139fcd6c66df1c3d3fa0a0a7cf7f8a8c601a16c
 -- 
 git-series 0.9.1
