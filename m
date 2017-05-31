@@ -1,32 +1,31 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 31 May 2017 12:17:48 -0500
-Subject: [PATCH 2/7] dt-bindings: PCI: Describe ATS property for root
- complex nodes
-In-Reply-To: <035be7ba-e850-a5a9-08fa-802a04feb600@arm.com>
-References: <20170524180143.19855-1-jean-philippe.brucker@arm.com>
- <20170524180143.19855-3-jean-philippe.brucker@arm.com>
- <20170530100153.GI2818@8bytes.org>
- <035be7ba-e850-a5a9-08fa-802a04feb600@arm.com>
-Message-ID: <20170531171748.rcrwpkgqgx7lin23@rob-hp-laptop>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 31 May 2017 10:19:32 -0700
+Subject: [PATCH RFC 2/5] ARM: dts: am335x-baltos: use IRQ_TYPE_* to
+ specify irq flags
+In-Reply-To: <20170526180609.2699-2-uwe@kleine-koenig.org>
+References: <20170526180609.2699-1-uwe@kleine-koenig.org>
+ <20170526180609.2699-2-uwe@kleine-koenig.org>
+Message-ID: <20170531171932.GH3730@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 30, 2017 at 11:58:50AM +0100, Jean-Philippe Brucker wrote:
-> On 30/05/17 11:01, Joerg Roedel wrote:
-> > On Wed, May 24, 2017 at 07:01:38PM +0100, Jean-Philippe Brucker wrote:
-> >> +- ats-supported: if present, the root complex supports the Address
-> >> +  Translation Service (ATS). It is able to interpret the AT field in PCIe
-> >> +  Transaction Layer Packets, and forward Translation Completions or
-> >> +  Invalidation Requests to endpoints.
-> >> +
-> >> +  Device drivers should not enable ATS in endpoints unless this property
-> >> +  is present.
-> > 
-> > Device drivers should never enable ATS, this is the job of the IOMMU
-> > driver. This should be clarified in the text.
+* Uwe Kleine-K?nig <uwe@kleine-koenig.org> [170526 11:09]:
+> According to the binding documentation and the source code the omap-gpio
+> controller takes IRQ_TYPE_* as its flags values, not GPIO_ACTIVE_*.
 > 
-> Right, I will change this.
+> This patch uses the right variable type which yields the same result
+> when compiled. Note that this might be wrong and actually
+> IRQ_TYPE_LEVEL_LOW is intended by the dt author.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+> ---
+> Hello,
+> 
+> can somebody with the hardware or it's documentation please check which
+> flag is the right one?
 
-Driver details should not be in DT to begin with.
+I'll wait on this one until we have somebody test it.
 
-Rob
+Regards,
+
+Tony
