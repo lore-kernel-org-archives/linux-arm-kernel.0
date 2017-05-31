@@ -1,41 +1,25 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 31 May 2017 11:15:43 +0200
-Subject: [PATCH 0/9] Add support for the pin controllers on the Marvell
- Armada 7K/8K
-In-Reply-To: <cover.0dd8a92ae74fcec8d0470d0a7016035089e46eed.1495209664.git-series.gregory.clement@free-electrons.com>
-References: <cover.0dd8a92ae74fcec8d0470d0a7016035089e46eed.1495209664.git-series.gregory.clement@free-electrons.com>
-Message-ID: <20170531111543.7c753308@free-electrons.com>
+Date: Wed, 31 May 2017 11:16:45 +0200
+Subject: [PATCH 0/6] Extend mvebu gpio driver to support the controllers
+ of the Marvell Armada 7K/8K
+In-Reply-To: <cover.e10718b9c0f9fdd07327ae14e213be8da5b1f7ef.1495210061.git-series.gregory.clement@free-electrons.com>
+References: <cover.e10718b9c0f9fdd07327ae14e213be8da5b1f7ef.1495210061.git-series.gregory.clement@free-electrons.com>
+Message-ID: <20170531111645.6530911a@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-On Fri, 19 May 2017 18:04:42 +0200, Gregory CLEMENT wrote:
+On Fri, 19 May 2017 18:09:19 +0200, Gregory CLEMENT wrote:
 
-> Gregory CLEMENT (6):
->   MAINTAINERS: extend mvebu SoC entry with pinctrl drivers
->   pinctrl: dt-bindings: add documentation for AP806 pin controllers
->   pinctrl: dt-bindings: add documentation for CP110 pin controllers
->   pinctrl: mvebu: remove the offset property for regmap
->   arm64: marvell: enable the Armada 7K/8K pinctrl driver
->   arm64: dts: marvell: add pinctrl support for Armada 7K/8K
-> 
-> Hanna Hawa (2):
->   pinctrl: mvebu: add driver for Armada AP806 pinctrl
->   pinctrl: mvebu: add driver for Armada CP110 pinctrl
-> 
-> Russell King (1):
->   pinctrl: avoid PLAT_ORION dependency
+> Not that currently I didn't manage to fully test the gpio, indeed I
+> only have a 7040 DB board which lack of test point for this kind of
+> test. So any tested-by would be welcome.
 
-I have tested the combination of your four series (touching clock,
-pinmux and gpio) on Armada 8K MacchiatoBin, and I was able to validate
-that the CP110 pinmuxing works as expected.
+I have tested GPIOs on the master CP110 of the Armada 8K on a
+MacchiatoBin board, and they worked for me, so you can add my:
 
-I used MPP37 and MPP38, which I was able to configure as GPIO or I2C0,
-and validate that they are working as GPIOs and as I2C0.
-
-I was however unable to test the AP MPPs due to the lack of access to
-such pins.
+Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
 Best regards,
 
