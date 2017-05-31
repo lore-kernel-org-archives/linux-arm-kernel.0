@@ -1,136 +1,50 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 31 May 2017 11:34:43 +0800
-Subject: [PATCH v2 1/3] pwm: sun4i: improve hardware read out
-In-Reply-To: <20170530193209.19247-2-alexandre.belloni@free-electrons.com>
-References: <20170530193209.19247-1-alexandre.belloni@free-electrons.com>
- <20170530193209.19247-2-alexandre.belloni@free-electrons.com>
-Message-ID: <CAGb2v65sznGc9Tp6RSGpQ6KND4BxRFkfHZag5AFrKLBoZJ-r8w@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 31 May 2017 09:30:13 +0530
+Subject: [PATCH] cpufreq: imx6q: imx6ull should use the same flow as imx6ul
+In-Reply-To: <30688f5aa17763362275c199b2d61841497c26a4.1496159470.git.leonard.crestez@nxp.com>
+References: <30688f5aa17763362275c199b2d61841497c26a4.1496159470.git.leonard.crestez@nxp.com>
+Message-ID: <20170531040013.GA4284@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 31, 2017 at 3:32 AM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> Implement .get_state instead of only reading the polarity at probe time.
-> This allows to get the proper state, period and duty cycle.
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On 30-05-17, 18:57, Leonard Crestez wrote:
+> From: Octavian Purdila <octavian.purdila@nxp.com>
+> 
+> This fixes an issue with imx6ull where setting the frequency to 528Mhz
+> would actually set the ARM clock to 324Mhz.
+> 
+> Signed-off-by: Octavian Purdila <octavian.purdila@nxp.com>
+> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 > ---
->  drivers/pwm/pwm-sun4i.c | 65 ++++++++++++++++++++++++++++++++++---------------
->  1 file changed, 46 insertions(+), 19 deletions(-)
->
-> diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
-> index 1284ffa05921..175a69245a8a 100644
-> --- a/drivers/pwm/pwm-sun4i.c
-> +++ b/drivers/pwm/pwm-sun4i.c
-> @@ -44,6 +44,10 @@
->
->  #define PWM_DTY_MASK           GENMASK(15, 0)
->
-> +#define PWM_REG_PRD(reg)       ((((reg) >> 16) & PWM_PRD_MASK) + 1)
-> +#define PWM_REG_DTY(reg)       ((reg) & PWM_DTY_MASK)
-> +#define PWM_REG_PRESCAL(reg, chan)     (((reg) >> ((chan) * PWMCH_OFFSET)) & PWM_PRESCAL_MASK)
-> +
->  #define BIT_CH(bit, chan)      ((bit) << ((chan) * PWMCH_OFFSET))
->
->  static const u32 prescaler_table[] = {
-> @@ -96,6 +100,46 @@ static inline void sun4i_pwm_writel(struct sun4i_pwm_chip *chip,
->         writel(val, chip->base + offset);
->  }
->
-> +static void sun4i_pwm_get_state(struct pwm_chip *chip,
-> +                               struct pwm_device *pwm,
-> +                               struct pwm_state *state)
-> +{
-> +       struct sun4i_pwm_chip *sun4i_pwm = to_sun4i_pwm_chip(chip);
-> +       u64 clk_rate, tmp;
-> +       u32 val;
-> +       unsigned int prescaler;
-> +
-> +       clk_rate = clk_get_rate(sun4i_pwm->clk);
-> +
-> +       val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
-> +
-> +       if ((val == PWM_PRESCAL_MASK) && sun4i_pwm->data->has_prescaler_bypass)
-> +               prescaler = 1;
-> +       else
-> +               prescaler = prescaler_table[PWM_REG_PRESCAL(val, pwm->hwpwm)];
-> +
-> +       if (prescaler == 0)
-> +               return;
+>  drivers/cpufreq/imx6q-cpufreq.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+> index 9c13f09..b6edd3c 100644
+> --- a/drivers/cpufreq/imx6q-cpufreq.c
+> +++ b/drivers/cpufreq/imx6q-cpufreq.c
+> @@ -101,7 +101,8 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+>  	 *  - Reprogram pll1_sys_clk and reparent pll1_sw_clk back to it
+>  	 *  - Disable pll2_pfd2_396m_clk
+>  	 */
+> -	if (of_machine_is_compatible("fsl,imx6ul")) {
+> +	if (of_machine_is_compatible("fsl,imx6ul") ||
+> +	    of_machine_is_compatible("fsl,imx6ull")) {
+>  		/*
+>  		 * When changing pll1_sw_clk's parent to pll1_sys_clk,
+>  		 * CPU may run at higher than 528MHz, this will lead to
+> @@ -215,7 +216,8 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+>  		goto put_clk;
+>  	}
+>  
+> -	if (of_machine_is_compatible("fsl,imx6ul")) {
+> +	if (of_machine_is_compatible("fsl,imx6ul") ||
+> +	    of_machine_is_compatible("fsl,imx6ull")) {
+>  		pll2_bus_clk = clk_get(cpu_dev, "pll2_bus");
+>  		secondary_sel_clk = clk_get(cpu_dev, "secondary_sel");
+>  		if (IS_ERR(pll2_bus_clk) || IS_ERR(secondary_sel_clk)) {
 
-This looks like an invalid state. How does the PWM core handle it?
-Or rather, how does the driver signal an invalid state?
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Otherwise,
-
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-
-> +
-> +       if (val & BIT_CH(PWM_ACT_STATE, pwm->hwpwm))
-> +               state->polarity = PWM_POLARITY_NORMAL;
-> +       else
-> +               state->polarity = PWM_POLARITY_INVERSED;
-> +
-> +       if (val & BIT_CH(PWM_CLK_GATING | PWM_EN, pwm->hwpwm))
-> +               state->enabled = true;
-> +       else
-> +               state->enabled = false;
-> +
-> +       val = sun4i_pwm_readl(sun4i_pwm, PWM_CH_PRD(pwm->hwpwm));
-> +
-> +       tmp = prescaler * NSEC_PER_SEC * PWM_REG_DTY(val);
-> +       state->duty_cycle = DIV_ROUND_CLOSEST_ULL(tmp, clk_rate);
-> +
-> +       tmp = prescaler * NSEC_PER_SEC * PWM_REG_PRD(val);
-> +       state->period = DIV_ROUND_CLOSEST_ULL(tmp, clk_rate);
-> +}
-> +
->  static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
->                             int duty_ns, int period_ns)
->  {
-> @@ -257,6 +301,7 @@ static const struct pwm_ops sun4i_pwm_ops = {
->         .set_polarity = sun4i_pwm_set_polarity,
->         .enable = sun4i_pwm_enable,
->         .disable = sun4i_pwm_disable,
-> +       .get_state = sun4i_pwm_get_state,
->         .owner = THIS_MODULE,
->  };
->
-> @@ -316,8 +361,7 @@ static int sun4i_pwm_probe(struct platform_device *pdev)
->  {
->         struct sun4i_pwm_chip *pwm;
->         struct resource *res;
-> -       u32 val;
-> -       int i, ret;
-> +       int ret;
->         const struct of_device_id *match;
->
->         match = of_match_device(sun4i_pwm_dt_ids, &pdev->dev);
-> @@ -353,24 +397,7 @@ static int sun4i_pwm_probe(struct platform_device *pdev)
->
->         platform_set_drvdata(pdev, pwm);
->
-> -       ret = clk_prepare_enable(pwm->clk);
-> -       if (ret) {
-> -               dev_err(&pdev->dev, "failed to enable PWM clock\n");
-> -               goto clk_error;
-> -       }
-> -
-> -       val = sun4i_pwm_readl(pwm, PWM_CTRL_REG);
-> -       for (i = 0; i < pwm->chip.npwm; i++)
-> -               if (!(val & BIT_CH(PWM_ACT_STATE, i)))
-> -                       pwm_set_polarity(&pwm->chip.pwms[i],
-> -                                        PWM_POLARITY_INVERSED);
-> -       clk_disable_unprepare(pwm->clk);
-> -
->         return 0;
-> -
-> -clk_error:
-> -       pwmchip_remove(&pwm->chip);
-> -       return ret;
->  }
->
->  static int sun4i_pwm_remove(struct platform_device *pdev)
-> --
-> 2.11.0
->
+-- 
+viresh
