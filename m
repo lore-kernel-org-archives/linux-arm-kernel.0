@@ -1,64 +1,37 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Wed, 31 May 2017 20:50:05 +0200
-Subject: [linux-sunxi] [PATCH v2 1/6] dt-bindings: clock: sunxi-ccu: Add
- pll-periph to PRCM's needed clocks
-In-Reply-To: <20170531075824.657-2-wens@csie.org>
-References: <20170531075824.657-1-wens@csie.org>
- <20170531075824.657-2-wens@csie.org>
-Message-ID: <20248930.d7orRrYxWW@jernej-laptop>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 31 May 2017 14:00:37 -0500
+Subject: [PATCH v4 1/2] PCI: Add tango MSI controller support
+In-Reply-To: <4885137f-7c1c-5742-4f66-f48c32ce7abb@free.fr>
+References: <8e56647d-3b2d-9bfc-b59e-79a2efaa7826@sigmadesigns.com>
+ <20170523170319.GB24431@bhelgaas-glaptop.roam.corp.google.com>
+ <b6541fd2-200f-35be-208e-931bb0b5ba49@free.fr>
+ <ef36137c-f0d1-23b9-8b91-a6ed87239578@arm.com>
+ <aec89b9a-8377-ff39-547c-9e6eaf254fab@free.fr>
+ <f1a57255-be75-e8c4-6b8d-0254f4365d61@arm.com>
+ <c78b1e79-59e5-0097-989e-1f1e8cd93fc4@arm.com>
+ <b10a211d-1f4a-1cc1-7139-9b48a90dd1c6@free.fr>
+ <20170531173414.GB4496@bhelgaas-glaptop.roam.corp.google.com>
+ <4885137f-7c1c-5742-4f66-f48c32ce7abb@free.fr>
+Message-ID: <20170531190037.GA18084@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Wed, May 31, 2017 at 08:49:04PM +0200, Mason wrote:
+> On 31/05/2017 19:34, Bjorn Helgaas wrote:
+> ...
 
-Dne sreda, 31. maj 2017 ob 09:58:19 CEST je Chen-Yu Tsai napisal(a):
-> The AR100 clock in the PRCM has parents, one of which is pll-periph from
-> the main CCU.
+> > This would be more an IRQ patch than a PCI patch, but if I were
+> > reviewing it, I would look for assurance that *all* the no-op
+> > .irq_set_affinity callbacks were cleaned up, not just those in
+> > drivers/pci/host.
 > 
-> Add it to the list of required clocks for the PRCM CCU.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  Documentation/devicetree/bindings/clock/sunxi-ccu.txt | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
-> b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt index
-> 095a5807d874..966345972d83 100644
-> --- a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
-> +++ b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
-> @@ -25,7 +25,8 @@ Required properties :
->  - #clock-cells : must contain 1
->  - #reset-cells : must contain 1
-> 
-> -For the PRCM CCUs on A83T/H3/A64, one more clock is needed:
-> +For the PRCM CCUs on A83T/H3/A64, two more clock is needed:
+> Are you saying the patch is *wrong* if not all "do-nothing"
+> callbacks are cleaned up?
 
-nit: s/clock is/clocks are/
+I'm saying that (1) this probably wouldn't be applied via the PCI
+tree, and (2) if it *were* applied via PCI, I would ask that all the
+no-op callbacks were cleaned up at the same time.
 
-Best regards,
-Jernej
+Huh, that sounds a lot like what I wrote above.  Was I unclear?
 
-> +- "pll-periph": the SoC's peripheral PLL from the main CCU
->  - "iosc": the SoC's internal frequency oscillator
-> 
->  Example for generic CCU:
-> @@ -42,8 +43,8 @@ Example for PRCM CCU:
->  r_ccu: clock at 01f01400 {
->  	compatible = "allwinner,sun50i-a64-r-ccu";
->  	reg = <0x01f01400 0x100>;
-> -	clocks = <&osc24M>, <&osc32k>, <&iosc>;
-> -	clock-names = "hosc", "losc", "iosc";
-> +	clocks = <&osc24M>, <&osc32k>, <&iosc>, <&ccu CLK_PLL_PERIPH0>;
-> +	clock-names = "hosc", "losc", "iosc", "pll-periph";
->  	#clock-cells = <1>;
->  	#reset-cells = <1>;
->  };
-> --
-> 2.11.0
-> 
-> --
-> You received this message because you are subscribed to the Google Groups
-> "linux-sunxi" group. To unsubscribe from this group and stop receiving
-> emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+Bjorn
