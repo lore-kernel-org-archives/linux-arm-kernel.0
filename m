@@ -1,41 +1,32 @@
-From: spengel@de.adit-jv.com (Steffen Pengel)
-Date: Wed, 31 May 2017 13:25:30 +0200
-Subject: [PATCH] kgdb,
- arm: Correct the macro used to define GDB register byte size
-Message-ID: <1496229930-13696-1-git-send-email-spengel@de.adit-jv.com>
+From: jtoppins@redhat.com (Jonathan Toppins)
+Date: Wed, 31 May 2017 07:29:15 -0400
+Subject: [PATCH v2 pci] PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI
+ boot for X-Gene v1
+In-Reply-To: <1493340847-25720-1-git-send-email-kdinh@apm.com>
+References: <1493340847-25720-1-git-send-email-kdinh@apm.com>
+Message-ID: <a33cec72-e4ab-60cb-7173-41043f4a9120@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jimmy Durand Wesolowski <jwesolowski@de.adit-jv.com>
+On 04/27/2017 08:54 PM, Khuong Dinh wrote:
+> From: Khuong Dinh <kdinh@apm.com>
+> 
+> This patch makes pci-xgene-msi driver ACPI-aware and provides
+> MSI capability for X-Gene v1 PCIe controllers in ACPI boot mode.
+> 
+> Signed-off-by: Khuong Dinh <kdinh@apm.com>
+> Signed-off-by: Duc Dang <dhdang@apm.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+> v2:
+>  - Verify with BIOS version 3.06.25 and 3.07.09
+> v1:
+>  - Initial version
 
-This patch corrects an issue introduced in the
-commit 834b2964b7ab ("kgdb,arm: fix register dump"). The definition of
-'NUMREGBYTES' was based on the number of the debug register number
-('DBG_MAX_REG_NUM') instead of the memory space used to store them
-('GDB_MAX_REGS').
 
-The result was a kernel SIGSEGV signal when debugging with KGDB, with
-'CONFIG_KGDB_KDB' disabled. When accessing the 23rd register of gdb_regs,
-'dbg_get_reg' overwrote 'delayacct_cache' with '0's, leading later to the
-crash.
+Hoping I just missed it, but was a follow-up (v3) ever provided for
+this? It seems this thread ended with the expectation that a v3 would be
+provided to address the sequencing issue.
 
-Signed-off-by: Jimmy Durand Wesolowski <jwesolowski@de.adit-jv.com>
----
- arch/arm/include/asm/kgdb.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/kgdb.h b/arch/arm/include/asm/kgdb.h
-index 0a9d5dd..6949c7d 100644
---- a/arch/arm/include/asm/kgdb.h
-+++ b/arch/arm/include/asm/kgdb.h
-@@ -76,7 +76,7 @@ extern int kgdb_fault_expected;
- 
- #define KGDB_MAX_NO_CPUS	1
- #define BUFMAX			400
--#define NUMREGBYTES		(DBG_MAX_REG_NUM << 2)
-+#define NUMREGBYTES		(GDB_MAX_REGS << 2)
- #define NUMCRITREGBYTES		(32 << 2)
- 
- #define _R0			0
--- 
-2.7.4
+Regards,
+-Jon
