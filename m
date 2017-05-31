@@ -1,55 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 31 May 2017 12:15:44 +0100
-Subject: [PATCH v4 10/10] staging: fsl-mc: move bus driver out of staging
-In-Reply-To: <20170531105852.22304-11-laurentiu.tudor@nxp.com>
-References: <20170531105852.22304-1-laurentiu.tudor@nxp.com>
- <20170531105852.22304-11-laurentiu.tudor@nxp.com>
-Message-ID: <87e4071b-22f5-1edc-e102-742b7eaf6553@arm.com>
+From: spengel@de.adit-jv.com (Steffen Pengel)
+Date: Wed, 31 May 2017 13:25:30 +0200
+Subject: [PATCH] kgdb,
+ arm: Correct the macro used to define GDB register byte size
+Message-ID: <1496229930-13696-1-git-send-email-spengel@de.adit-jv.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/05/17 11:58, laurentiu.tudor at nxp.com wrote:
-> From: Stuart Yoder <stuart.yoder@nxp.com>
-> 
-> Move the source files out of staging into their final locations:
->   -include files in drivers/staging/fsl-mc/include go to include/linux/fsl
->   -irq-gic-v3-its-fsl-mc-msi.c goes to drivers/irqchip
->   -source in drivers/staging/fsl-mc/bus goes to drivers/bus/fsl-mc
->   -README.txt, providing and overview of DPAA goes to
->    Documentation/dpaa2/overview.txt
-> 
-> Update or delete other remaining staging files-- Makefile, Kconfig, TODO.
-> Update dpaa2_eth and dpio staging drivers.
-> 
-> Signed-off-by: Stuart Yoder <stuyoder@gmail.com>
-> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
-> [Laurentiu: rebased, add dpaa2_eth and dpio #include updates]
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> ---
-> 
-> Notes:
->     -no changes since v4
->     -v4
->       -rebased
->       -update existing dpaa2 drivers to work with the bus out of staging
->     -v3
->       -no changes
->     -v2
->       -updated MAINTAINERS with new location
-> 
->  .../README.txt => Documentation/dpaa2/overview.txt    |  0
+From: Jimmy Durand Wesolowski <jwesolowski@de.adit-jv.com>
 
-I thought you had agreed to drop all references to the userspace
-interface (restool and co) which is completely absent from this code?
-I'm certainly not going to ack this until this is done.
+This patch corrects an issue introduced in the
+commit 834b2964b7ab ("kgdb,arm: fix register dump"). The definition of
+'NUMREGBYTES' was based on the number of the debug register number
+('DBG_MAX_REG_NUM') instead of the memory space used to store them
+('GDB_MAX_REGS').
 
-Also, please CC me on the whole series, as I'd really like to see things
-in context, and not a patch that just moves things around.
+The result was a kernel SIGSEGV signal when debugging with KGDB, with
+'CONFIG_KGDB_KDB' disabled. When accessing the 23rd register of gdb_regs,
+'dbg_get_reg' overwrote 'delayacct_cache' with '0's, leading later to the
+crash.
 
-Thanks,
+Signed-off-by: Jimmy Durand Wesolowski <jwesolowski@de.adit-jv.com>
+---
+ arch/arm/include/asm/kgdb.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-	M.
+diff --git a/arch/arm/include/asm/kgdb.h b/arch/arm/include/asm/kgdb.h
+index 0a9d5dd..6949c7d 100644
+--- a/arch/arm/include/asm/kgdb.h
++++ b/arch/arm/include/asm/kgdb.h
+@@ -76,7 +76,7 @@ extern int kgdb_fault_expected;
+ 
+ #define KGDB_MAX_NO_CPUS	1
+ #define BUFMAX			400
+-#define NUMREGBYTES		(DBG_MAX_REG_NUM << 2)
++#define NUMREGBYTES		(GDB_MAX_REGS << 2)
+ #define NUMCRITREGBYTES		(32 << 2)
+ 
+ #define _R0			0
 -- 
-Jazz is not dead. It just smells funny...
+2.7.4
