@@ -1,75 +1,103 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 31 May 2017 03:06:19 +0200
-Subject: [PATCH v3 1/6] ARM: at91: Documentation: add samx7 families
+Date: Wed, 31 May 2017 03:06:21 +0200
+Subject: [PATCH v3 3/6] ARM: at91: Add armv7m support
 In-Reply-To: <20170531010624.32552-1-alexandre.belloni@free-electrons.com>
 References: <20170531010624.32552-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170531010624.32552-2-alexandre.belloni@free-electrons.com>
+Message-ID: <20170531010624.32552-4-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Atmel sams70, samv70 and samv71 are Cortex-M7 based MCUs that can run
-Linux (without MMU).
+From: Szemz? Andr?s <sza@esh.hu>
 
+Add Atmel SAME70/SAMS70/SAMV71 SoC support and detection.
+
+Signed-off-by: Szemz? Andr?s <sza@esh.hu>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- Documentation/arm/Atmel/README | 38 +++++++++++++++++++++++++++++++++++++-
- 1 file changed, 37 insertions(+), 1 deletion(-)
+ arch/arm/mach-at91/Kconfig       |  9 ++++++++-
+ arch/arm/mach-at91/Makefile      |  1 +
+ arch/arm/mach-at91/Makefile.boot |  3 +++
+ arch/arm/mach-at91/samx7.c       | 25 +++++++++++++++++++++++++
+ 4 files changed, 37 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-at91/Makefile.boot
+ create mode 100644 arch/arm/mach-at91/samx7.c
 
-diff --git a/Documentation/arm/Atmel/README b/Documentation/arm/Atmel/README
-index 6ca78f818dbf..afb13c15389d 100644
---- a/Documentation/arm/Atmel/README
-+++ b/Documentation/arm/Atmel/README
-@@ -16,7 +16,7 @@ git branches/tags and email subject always contain this "at91" sub-string.
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 841e924143f9..bade64e0cb49 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -1,12 +1,19 @@
+ menuconfig ARCH_AT91
+ 	bool "Atmel SoCs"
+-	depends on ARCH_MULTI_V4T || ARCH_MULTI_V5 || ARCH_MULTI_V7
++	depends on ARCH_MULTI_V4T || ARCH_MULTI_V5 || ARCH_MULTI_V7 || ARM_SINGLE_ARMV7M
+ 	select COMMON_CLK_AT91
+ 	select GPIOLIB
+ 	select PINCTRL
+ 	select SOC_BUS
  
- AT91 SoCs
- ---------
--Documentation and detailled datasheet for each product are available on
-+Documentation and detailed datasheet for each product are available on
- the Atmel website: http://www.atmel.com.
- 
-   Flavors:
-@@ -101,6 +101,42 @@ the Atmel website: http://www.atmel.com.
-         + Datasheet
-           http://www.atmel.com/Images/Atmel-11267-32-bit-Cortex-A5-Microcontroller-SAMA5D2_Datasheet.pdf
- 
-+    * ARM Cortex-M7 MCUs
-+      - sams70 family
-+        - sams70j19
-+        - sams70j20
-+        - sams70j21
-+        - sams70n19
-+        - sams70n20
-+        - sams70n21
-+        - sams70q19
-+        - sams70q20
-+        - sams70q21
-+        + Datasheet
-+          http://www.atmel.com/Images/Atmel-11242-32-bit-Cortex-M7-Microcontroller-SAM-S70Q-SAM-S70N-SAM-S70J_Datasheet.pdf
+ if ARCH_AT91
++config SOC_SAMX7
++	bool "SAM Cortex-M7 family" if ARM_SINGLE_ARMV7M
++	select COMMON_CLK_AT91
++	select PINCTRL_AT91
++	help
++	  Select this if you are using one of Atmel's SAMx7 family SoC.
 +
-+      - samv70 family
-+        - samv70j19
-+        - samv70j20
-+        - samv70n19
-+        - samv70n20
-+        - samv70q19
-+        - samv70q20
-+        + Datasheet
-+          http://www.atmel.com/Images/Atmel-11297-32-bit-Cortex-M7-Microcontroller-SAM-V70Q-SAM-V70N-SAM-V70J_Datasheet.pdf
-+
-+      - samv71 family
-+        - samv71j19
-+        - samv71j20
-+        - samv71j21
-+        - samv71n19
-+        - samv71n20
-+        - samv71n21
-+        - samv71q19
-+        - samv71q20
-+        - samv71q21
-+        + Datasheet
-+          http://www.atmel.com/Images/Atmel-44003-32-bit-Cortex-M7-Microcontroller-SAM-V71Q-SAM-V71N-SAM-V71J_Datasheet.pdf
+ config SOC_SAMA5D2
+ 	bool "SAMA5D2 family"
+ 	depends on ARCH_MULTI_V7
+diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+index cfd8f60a9268..55a88c104e5d 100644
+--- a/arch/arm/mach-at91/Makefile
++++ b/arch/arm/mach-at91/Makefile
+@@ -6,6 +6,7 @@
+ obj-$(CONFIG_SOC_AT91RM9200)	+= at91rm9200.o
+ obj-$(CONFIG_SOC_AT91SAM9)	+= at91sam9.o
+ obj-$(CONFIG_SOC_SAMA5)		+= sama5.o
++obj-$(CONFIG_SOC_SAMX7)		+= samx7.o
  
- Linux kernel information
- ------------------------
+ # Power Management
+ obj-$(CONFIG_PM)		+= pm.o
+diff --git a/arch/arm/mach-at91/Makefile.boot b/arch/arm/mach-at91/Makefile.boot
+new file mode 100644
+index 000000000000..eacfc3f5c33e
+--- /dev/null
++++ b/arch/arm/mach-at91/Makefile.boot
+@@ -0,0 +1,3 @@
++# Empty file waiting for deletion once Makefile.boot isn't needed any more.
++# Patch waits for application at
++# http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7889/1 .
+diff --git a/arch/arm/mach-at91/samx7.c b/arch/arm/mach-at91/samx7.c
+new file mode 100644
+index 000000000000..e2e7d153a7b9
+--- /dev/null
++++ b/arch/arm/mach-at91/samx7.c
+@@ -0,0 +1,25 @@
++/*
++ *  Setup code for SAMx7
++ *
++ *  Copyright (C) 2013 Atmel,
++ *                2016 Andras Szemzo <szemzo.andras@gmail.com>
++ *
++ * Licensed under GPLv2 or later.
++ */
++#include <linux/of.h>
++#include <linux/of_platform.h>
++#include <linux/of_address.h>
++#include <linux/slab.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++#include <asm/system_misc.h>
++#include "generic.h"
++
++static const char *const samx7_dt_board_compat[] __initconst = {
++	"atmel,samx7",
++	NULL
++};
++
++DT_MACHINE_START(samx7_dt, "Atmel SAMx7")
++	.dt_compat	= samx7_dt_board_compat,
++MACHINE_END
 -- 
 2.11.0
