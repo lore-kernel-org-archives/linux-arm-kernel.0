@@ -1,116 +1,84 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 31 May 2017 16:07:24 +0200
-Subject: [PATCH v2 3/7] clk: mvebu: ap806: do not depend anymore of the
- *-clock-output-names
+Date: Wed, 31 May 2017 16:07:22 +0200
+Subject: [PATCH v2 1/7] clk: mvebu: ap806: cosmetic improvement
 In-Reply-To: <cover.21754b3184e2122d1c83a664477ed26ec562b3e9.1496239589.git-series.gregory.clement@free-electrons.com>
 References: <cover.21754b3184e2122d1c83a664477ed26ec562b3e9.1496239589.git-series.gregory.clement@free-electrons.com>
-Message-ID: <e66cdd54d36c6bef78460a51e577f171b6ccb031.1496239589.git-series.gregory.clement@free-electrons.com>
+Message-ID: <5a55e081d96fc6d2a28331b59df90f56d32a9f24.1496239589.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As it was done for the cp110, this patch modifies the way the clock names
-are created. The name of each clock is now created by using its physical
-address as a prefix (as it was done for the platform device
-names). Thanks to this we have an automatic way to compute a unique name.
+Instead of using &pdev->dev all over the place, introduce a pointer
+variable for it.
 
-Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/clk/mvebu/ap806-system-controller.c | 46 +++++++++++-----------
- 1 file changed, 24 insertions(+), 22 deletions(-)
+ drivers/clk/mvebu/ap806-system-controller.c | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/clk/mvebu/ap806-system-controller.c b/drivers/clk/mvebu/ap806-system-controller.c
-index b2666b5c944f..95ae16e203ea 100644
+index 8155baccc98e..b2666b5c944f 100644
 --- a/drivers/clk/mvebu/ap806-system-controller.c
 +++ b/drivers/clk/mvebu/ap806-system-controller.c
-@@ -32,6 +32,18 @@ static struct clk_onecell_data ap806_clk_data = {
- 	.clk_num = AP806_CLK_NUM,
- };
- 
-+static char *ap806_unique_name(struct device *dev, struct device_node *np,
-+			       char *name)
-+{
-+	const __be32 *reg;
-+	u64 addr;
-+
-+	reg = of_get_property(np, "reg", NULL);
-+	addr = of_translate_address(np, reg);
-+	return devm_kasprintf(dev, GFP_KERNEL, "%llx-%s",
-+			(unsigned long long)addr, name);
-+}
-+
- static int ap806_syscon_clk_probe(struct platform_device *pdev)
+@@ -36,20 +36,21 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
  {
  	unsigned int freq_mode, cpuclk_freq;
-@@ -98,8 +110,7 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
- 	cpuclk_freq *= 1000 * 1000;
+ 	const char *name, *fixedclk_name;
+-	struct device_node *np = pdev->dev.of_node;
++	struct device *dev = &pdev->dev;
++	struct device_node *np = dev->of_node;
+ 	struct regmap *regmap;
+ 	u32 reg;
+ 	int ret;
  
+ 	regmap = syscon_node_to_regmap(np);
+ 	if (IS_ERR(regmap)) {
+-		dev_err(&pdev->dev, "cannot get regmap\n");
++		dev_err(dev, "cannot get regmap\n");
+ 		return PTR_ERR(regmap);
+ 	}
+ 
+ 	ret = regmap_read(regmap, AP806_SAR_REG, &reg);
+ 	if (ret) {
+-		dev_err(&pdev->dev, "cannot read from regmap\n");
++		dev_err(dev, "cannot read from regmap\n");
+ 		return ret;
+ 	}
+ 
+@@ -89,7 +90,7 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
+ 		cpuclk_freq = 600;
+ 		break;
+ 	default:
+-		dev_err(&pdev->dev, "invalid SAR value\n");
++		dev_err(dev, "invalid SAR value\n");
+ 		return -EINVAL;
+ 	}
+ 
+@@ -99,7 +100,7 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
  	/* CPU clocks depend on the Sample At Reset configuration */
--	of_property_read_string_index(np, "clock-output-names",
--				      0, &name);
-+	name = ap806_unique_name(dev, np, "cpu-cluster-0");
- 	ap806_clks[0] = clk_register_fixed_rate(dev, name, NULL,
+ 	of_property_read_string_index(np, "clock-output-names",
+ 				      0, &name);
+-	ap806_clks[0] = clk_register_fixed_rate(&pdev->dev, name, NULL,
++	ap806_clks[0] = clk_register_fixed_rate(dev, name, NULL,
  						0, cpuclk_freq);
  	if (IS_ERR(ap806_clks[0])) {
-@@ -107,8 +118,7 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
- 		goto fail0;
- 	}
+ 		ret = PTR_ERR(ap806_clks[0]);
+@@ -108,7 +109,7 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
  
--	of_property_read_string_index(np, "clock-output-names",
--				      1, &name);
-+	name = ap806_unique_name(dev, np, "cpu-cluster-1");
- 	ap806_clks[1] = clk_register_fixed_rate(dev, name, NULL, 0,
+ 	of_property_read_string_index(np, "clock-output-names",
+ 				      1, &name);
+-	ap806_clks[1] = clk_register_fixed_rate(&pdev->dev, name, NULL, 0,
++	ap806_clks[1] = clk_register_fixed_rate(dev, name, NULL, 0,
  						cpuclk_freq);
  	if (IS_ERR(ap806_clks[1])) {
-@@ -117,8 +127,7 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
- 	}
- 
+ 		ret = PTR_ERR(ap806_clks[1]);
+@@ -118,7 +119,7 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
  	/* Fixed clock is always 1200 Mhz */
--	of_property_read_string_index(np, "clock-output-names",
--				      2, &fixedclk_name);
-+	fixedclk_name = ap806_unique_name(dev, np, "fixed");
- 	ap806_clks[2] = clk_register_fixed_rate(dev, fixedclk_name, NULL,
+ 	of_property_read_string_index(np, "clock-output-names",
+ 				      2, &fixedclk_name);
+-	ap806_clks[2] = clk_register_fixed_rate(&pdev->dev, fixedclk_name, NULL,
++	ap806_clks[2] = clk_register_fixed_rate(dev, fixedclk_name, NULL,
  						0, 1200 * 1000 * 1000);
  	if (IS_ERR(ap806_clks[2])) {
-@@ -127,8 +136,7 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
- 	}
- 
- 	/* MSS Clock is fixed clock divided by 6 */
--	of_property_read_string_index(np, "clock-output-names",
--				      3, &name);
-+	name = ap806_unique_name(dev, np, "mss");
- 	ap806_clks[3] = clk_register_fixed_factor(NULL, name, fixedclk_name,
- 						  0, 1, 6);
- 	if (IS_ERR(ap806_clks[3])) {
-@@ -136,20 +144,14 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
- 		goto fail3;
- 	}
- 
--	/* eMMC Clock is fixed clock divided by 3 */
--	if (of_property_read_string_index(np, "clock-output-names",
--					  4, &name)) {
--		ap806_clk_data.clk_num--;
--		dev_warn(&pdev->dev,
--			 "eMMC clock missing: update the device tree!\n");
--	} else {
--		ap806_clks[4] = clk_register_fixed_factor(NULL, name,
--							  fixedclk_name,
--							  0, 1, 3);
--		if (IS_ERR(ap806_clks[4])) {
--			ret = PTR_ERR(ap806_clks[4]);
--			goto fail4;
--		}
-+	/* SDIO(/eMMC) Clock is fixed clock divided by 3 */
-+	name = ap806_unique_name(dev, np, "sdio");
-+	ap806_clks[4] = clk_register_fixed_factor(NULL, name,
-+						  fixedclk_name,
-+						  0, 1, 3);
-+	if (IS_ERR(ap806_clks[4])) {
-+		ret = PTR_ERR(ap806_clks[4]);
-+		goto fail4;
- 	}
- 
- 	of_clk_add_provider(np, of_clk_src_onecell_get, &ap806_clk_data);
+ 		ret = PTR_ERR(ap806_clks[2]);
 -- 
 git-series 0.9.1
