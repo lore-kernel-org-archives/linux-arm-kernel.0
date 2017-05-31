@@ -1,30 +1,31 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 31 May 2017 11:16:45 +0200
-Subject: [PATCH 0/6] Extend mvebu gpio driver to support the controllers
- of the Marvell Armada 7K/8K
-In-Reply-To: <cover.e10718b9c0f9fdd07327ae14e213be8da5b1f7ef.1495210061.git-series.gregory.clement@free-electrons.com>
-References: <cover.e10718b9c0f9fdd07327ae14e213be8da5b1f7ef.1495210061.git-series.gregory.clement@free-electrons.com>
-Message-ID: <20170531111645.6530911a@free-electrons.com>
+From: jiada_wang@mentor.com (jiada_wang at mentor.com)
+Date: Wed, 31 May 2017 02:19:55 -0700
+Subject: [PATCH v2 linux-next 0/3] i.MX ECSPI controller slave mode support
+Message-ID: <1496222398-3192-1-git-send-email-jiada_wang@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Jiada Wang <jiada_wang@mentor.com>
 
-On Fri, 19 May 2017 18:09:19 +0200, Gregory CLEMENT wrote:
 
-> Not that currently I didn't manage to fully test the gpio, indeed I
-> only have a 7040 DB board which lack of test point for this kind of
-> test. So any tested-by would be welcome.
+Changes in v2:
+re-workd i.MX ECSPI controller slave mode support based on Geert's work
 
-I have tested GPIOs on the master CP110 of the Armada 8K on a
-MacchiatoBin board, and they worked for me, so you can add my:
+Jiada Wang (3):
+  spi: imx: add selection for iMX53 and iMX6 controller
+  ARM: dts: imx: change compatiblity for SPI controllers on imx53 later
+    soc
+  spi: imx: Add support for SPI Slave mode
 
-Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+ .../devicetree/bindings/spi/fsl-imx-cspi.txt       |   1 +
+ arch/arm/boot/dts/imx53.dtsi                       |   4 +-
+ arch/arm/boot/dts/imx6q.dtsi                       |   2 +-
+ arch/arm/boot/dts/imx6qdl.dtsi                     |   8 +-
+ arch/arm/boot/dts/imx6sl.dtsi                      |   8 +-
+ arch/arm/boot/dts/imx6sx.dtsi                      |   8 +-
+ arch/arm/boot/dts/imx6ul.dtsi                      |   8 +-
+ drivers/spi/spi-imx.c                              | 273 ++++++++++++++++++---
+ 8 files changed, 257 insertions(+), 55 deletions(-)
 
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.7.4
