@@ -1,39 +1,37 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 31 May 2017 22:11:07 +0200
-Subject: [PATCH v7 00/34] i.MX Media Driver
-In-Reply-To: <08dcd6f6-e0ef-a6a0-cfc3-4fcd55624169@gmail.com>
-References: <1495672189-29164-1-git-send-email-steve_longerbeam@mentor.com>
- <dd82968a-4c0b-12a4-f43b-7e63a255812d@xs4all.nl>
- <20170529153637.GH29527@valkosipuli.retiisi.org.uk>
- <08dcd6f6-e0ef-a6a0-cfc3-4fcd55624169@gmail.com>
-Message-ID: <20170531201107.GB16962@amd>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 31 May 2017 22:25:02 +0200
+Subject: [PATCH] ARM: s3c64xx: don't select ARM_AMBA from S3C64XX_PL080
+In-Reply-To: <20170531195849.GD27796@n2100.armlinux.org.uk>
+References: <20170524155845.1778223-1-arnd@arndb.de>
+ <20170531195849.GD27796@n2100.armlinux.org.uk>
+Message-ID: <CAK8P3a3gxrkn1TOLWXzW4-s8H8uJWvC1vC3_fjxm-tXXkooxUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Wed, May 31, 2017 at 9:58 PM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Wed, May 24, 2017 at 05:58:34PM +0200, Arnd Bergmann wrote:
+> Yes, selecting ARM_AMBA from drivers is definitely not right; this
+> symbol should be selected only by platforms that want AMBA primecell
+> bus support, not by drivers, precisely because of these dependency
+> issues.
+>
+> There's another case where ARM_AMBA is selected that probably needs
+> fixing - the coresight hwtracing code.
 
-> >If there's a need for this (there should not be, as the controls are exposed
-> >to the user space through the sub-device nodes as the other drivers do), the
-> >framework APIs need to be extended.
-> 
-> Right, this gets back to the media framework usability arguments. At least
-> myself, Philipp, and Russell feel that automatic inheritance of a configured
-> pipeline's controls to a video device adds to the usability.
+[Adding Mathieu to cc]
 
-For the record, usability can be pretty much fixed in v4l-utils... I
-have patches that try ioctls on a list of fd's. Now we need a way to
-find out which /dev/video* files belong to single camera. I believe
-kernel already has required APIs, we just need to apply v4l-utils
-patch to use them...
+Mathieu,
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170531/70aa8570/attachment.sig>
+do you remember how we ended up with this?
+
+menuconfig CORESIGHT
+       bool "CoreSight Tracing Support"
+       select ARM_AMBA
+
+As Russell says, probably shouldn't select that symbol, most likely
+we want either the individual drivers that register an amba_driver to have
+a 'depends on ARM_AMBA' or alternatively replace the 'select' with 'depends
+on' for the entire subsystem.
+
+        Arnd
