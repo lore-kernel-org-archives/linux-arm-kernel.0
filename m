@@ -1,29 +1,42 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 31 May 2017 11:57:26 -0500
-Subject: [PATCH v3 6/9] dmaengine: sun6i: support V3s SoC variant
-In-Reply-To: <20170524100607.29790-7-icenowy@aosc.io>
-References: <20170524100607.29790-1-icenowy@aosc.io>
- <20170524100607.29790-7-icenowy@aosc.io>
-Message-ID: <20170531165726.zmrzawjlnetw2nyd@rob-hp-laptop>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Wed, 31 May 2017 17:59:25 +0100
+Subject: [PATCH v5 1/7] Documentation: arm: fix wrong reference number in DT
+ definition
+In-Reply-To: <20170531165931.6945-1-juri.lelli@arm.com>
+References: <20170531165931.6945-1-juri.lelli@arm.com>
+Message-ID: <20170531165931.6945-2-juri.lelli@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 24, 2017 at 06:06:04PM +0800, Icenowy Zheng wrote:
-> From: Icenowy Zheng <icenowy@aosc.xyz>
-> 
-> Allwinner V3s has a DMA engine similar to the ones from A31, but with
-> fewer channels and DRQs.
-> 
-> Add support for it.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> Changes in v3:
-> - Added Chen-Yu's ACK.
-> 
->  Documentation/devicetree/bindings/dma/sun6i-dma.txt |  1 +
->  drivers/dma/sun6i-dma.c                             | 13 +++++++++++++
->  2 files changed, 14 insertions(+)
+Reference to cpu capacity binding has a wrong number. Fix it.
 
+Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Juri Lelli <juri.lelli@arm.com>
 Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ Documentation/devicetree/bindings/arm/cpus.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index 1030f5f50207..2713aadb7411 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -249,7 +249,7 @@ nodes to be present and contain the properties described below.
+ 		Usage: Optional
+ 		Value type: <u32>
+ 		Definition:
+-			# u32 value representing CPU capacity [3] in
++			# u32 value representing CPU capacity [4] in
+ 			  DMIPS/MHz, relative to highest capacity-dmips-mhz
+ 			  in the system.
+ 
+@@ -476,5 +476,5 @@ cpus {
+ [2] arm/msm/qcom,kpss-acc.txt
+ [3] ARM Linux kernel documentation - idle states bindings
+     Documentation/devicetree/bindings/arm/idle-states.txt
+-[3] ARM Linux kernel documentation - cpu capacity bindings
++[4] ARM Linux kernel documentation - cpu capacity bindings
+     Documentation/devicetree/bindings/arm/cpu-capacity.txt
+-- 
+2.11.0
