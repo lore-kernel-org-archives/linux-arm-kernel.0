@@ -1,166 +1,42 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Wed, 31 May 2017 14:53:32 -0500
-Subject: [PATCH 3/4] Documentation: dt: Add bindings for Davinci DSP
- processors
-In-Reply-To: <20170531192211.xszanmzvj34ohblk@rob-hp-laptop>
-References: <20170526202140.10472-1-s-anna@ti.com>
- <20170526202140.10472-4-s-anna@ti.com>
- <20170531192211.xszanmzvj34ohblk@rob-hp-laptop>
-Message-ID: <993f3035-cf3a-40bf-44af-24e5f98d76bf@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 31 May 2017 21:58:27 +0200
+Subject: [PATCH v2 0/6] clk: sunxi-ng: Add support for A83T's PRCM
+In-Reply-To: <20170531075824.657-1-wens@csie.org>
+References: <20170531075824.657-1-wens@csie.org>
+Message-ID: <20170531195827.kcbkwf5k2mh4q4re@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Wed, May 31, 2017 at 03:58:18PM +0800, Chen-Yu Tsai wrote:
+> Hi everyone,
+> 
+> This is the remaining parts of my A83T PRCM support series, along with
+> changes requested by Maxime.
+> 
+> Patch 1 updates the device tree bindings for the PRCM, adding pll-periph
+> to the list of required clocks
+> 
+> Patch 2 adds a device node for the PRCM on the A83T SoC, updated from v1
+> to include the pll-periph clock.
+> 
+> Patch 3 exports the PLL_PERIPH0 clock from the CCU on the H3/H5, for
+> consumption by the PRCM.
+> 
+> Patch 4 adds the pll-periph clock to the PRCM device node on the H3/H5.
+> 
+> Patch 5 / 6 are the same as 3 / 4, but for the A64.
 
-On 05/31/2017 02:22 PM, Rob Herring wrote:
-> On Fri, May 26, 2017 at 03:21:39PM -0500, Suman Anna wrote:
->> Add the device tree bindings document for the DSP processor
->> subsystem devices on TI Davinci DA8xx/OMAP-L13x SoCs.
-> 
-> "dt-bindings: remoteproc:  ..." for the subject.
+Applied, thanks!
+Maxime
 
-Ok, will fix this on v2
-
-> 
->>
->> Signed-off-by: Suman Anna <s-anna@ti.com>
->> ---
->>  .../bindings/remoteproc/ti,davinci-rproc.txt       | 92 ++++++++++++++++++++++
->>  1 file changed, 92 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/remoteproc/ti,davinci-rproc.txt
->>
->> diff --git a/Documentation/devicetree/bindings/remoteproc/ti,davinci-rproc.txt b/Documentation/devicetree/bindings/remoteproc/ti,davinci-rproc.txt
->> new file mode 100644
->> index 000000000000..e53572e22002
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/remoteproc/ti,davinci-rproc.txt
->> @@ -0,0 +1,92 @@
->> +TI Davinci DSP devices
->> +=======================
->> +
->> +Binding status: Unstable - Subject to changes for DT clocks and resets
-> 
-> Sorry, understandable if you didn't have documentation, but you work for 
-> TI, figure out what the clocks and resets are.
-
-Well, what I meant here is that the clocks and resets do not have a DT
-representation yet on these SoCs. And when they do have a DT
-representation, I would need to add the additional _required_ clocks and
-resets properties, hence the marking.
-
-> 
->> +
->> +The TI Davinci family of SoCs usually contains a TI DSP Core sub-system that
->> +is used to offload some of the processor-intensive tasks or algorithms, for
->> +achieving various system level goals.
->> +
->> +The processor cores in the sub-system usually contain additional sub-modules
->> +like L1 and/or L2 caches/SRAMs, an Interrupt Controller, an external memory
->> +controller, a dedicated local power/sleep controller etc. The DSP processor
->> +core used in Davinci SoCs is usually a C674x DSP CPU.
-> 
-> I'm wondering if your compatible string is specific enough with this 
-> statement.
-
-We always have integration aspects around these IPs into different SoCs,
-so the compatible is following the SoC name. Also note that the C674x is
-just the DSP core - one part of the DSP subsystem.
-
-> 
->> +
->> +DSP Device Node:
->> +================
->> +Each DSP Core sub-system is represented as a single DT node.
->> +
->> +Required properties:
->> +--------------------
->> +The following are the mandatory properties:
->> +
->> +- compatible:		Should be one of the following,
->> +			    "ti,da850-dsp" for DSPs on OMAP-L138 SoCs
->> +
->> +- reg:			Should contain an entry for each value in 'reg-names'.
->> +			Each entry should have the memory region's start address
->> +			and the size of the region, the representation matching
->> +			the parent node's '#address-cells' and '#size-cells' values.
->> +
->> +- reg-names:		Should contain strings with the following names, each
->> +			representing a specific internal memory region or a
->> +			specific register space,
->> +			     "l2sram", "l1pram", "l1dram", "host1cfg", "chipsig_base"
->> +
->> +- interrupts: 		Should contain the interrupt number used to receive the
->> +			interrupts from the DSP. The value should follow the
->> +			interrupt-specifier format as dictated by the
->> +			'interrupt-parent' node.
->> +
->> +- memory-region:	phandle to the reserved memory node to be associated
->> +			with the remoteproc device. The reserved memory node
->> +			can be a CMA memory node, and should be defined as
->> +			per the bindings in
->> +			Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
->> +
->> +Optional properties:
->> +--------------------
->> +- interrupt-parent:	phandle to the interrupt controller node. This property
->> +			is needed if the device node hierarchy doesn't have an
->> +			interrupt controller.
->> +
->> +
->> +Example:
->> +--------
->> +
->> +	/* DA850 DTS file */
-> 
-> Don't show the dts split in examples.
-> 
->> +	{
->> +		dsp: dsp at 11800000 {
->> +			compatible = "ti,da850-dsp";
->> +			reg = <0x11800000 0x40000>,
->> +			      <0x11e00000 0x8000>,
->> +			      <0x11f00000 0x8000>,
->> +			      <0x01c14044 0x4>,
->> +			      <0x01c14174 0x8>;
->> +			reg-names = "l2sram", "l1pram", "l1dram", "host1cfg",
->> +				    "chipsig";
->> +			interrupt-parent = <&intc>;
->> +			interrupts = <28>;
->> +			status = "disabled";
-> 
-> Don't show status in examples.
-> 
->> +		};
->> +
->> +	};
->> +
->> +	/* OMAP-L138 LCDK Board file */
->> +	reserved-memory {
->> +		#address-cells = <1>;
->> +		#size-cells = <1>;
->> +		ranges;
->> +
->> +		dsp_cma_pool: dsp_cma at c3000000 {
-> 
-> cma is a linuxism. dsp-memory at ...
-
-OK will fix up all these comments as well.
-
-regards
-Suman
-
-> 
->> +                        compatible = "shared-dma-pool";
->> +                        reg = <0xc3000000 0x1000000>;
->> +                        reusable;
->> +                        status = "okay";
->> +                };
->> +	};
->> +
->> +	&dsp {
->> +		status = "okay";
->> +		memory-region = <&dsp_cma_pool>;
->> +	};
->> -- 
->> 2.12.0
->>
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170531/c6714919/attachment.sig>
