@@ -1,37 +1,56 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Wed, 31 May 2017 11:14:22 -0700
-Subject: [PATCH 8/8] arm64: dts: hikey: Fix WiFi support
-In-Reply-To: <1494260477-25163-9-git-send-email-ulf.hansson@linaro.org>
-References: <1494260477-25163-1-git-send-email-ulf.hansson@linaro.org>
- <1494260477-25163-9-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CALAqxLX4HwbVm8G4Ch2uYKAy6C9vYAZEcRUdCLDePT55oGz6hw@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 31 May 2017 20:19:37 +0200 (CEST)
+Subject: [GIT PULL] bcm2835 DT fixes for 4.12
+In-Reply-To: <98834BF8-FEC0-4DCB-B2C1-C2B1838AF5B6@gmail.com>
+References: <20170516221931.31292-1-eric@anholt.net>
+ <d16bf00b-d058-08d1-ed6a-2f369d1fd611@gmail.com>
+ <1791886363.81865.1496251246175@email.1und1.de>
+ <98834BF8-FEC0-4DCB-B2C1-C2B1838AF5B6@gmail.com>
+Message-ID: <89540641.83197.1496254777407@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 8, 2017 at 9:21 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> The description of the connection between the dwmmc (SDIO) controller and
-> the Wifi chip, which is attached to the SDIO bus is wrong. Currently the
-> SDIO card can't be detected and thus the Wifi doesn't work.
->
-> Let's fix this by assigning the correct vmmc supply, which is the always on
-> regulator VDD_3V3 and remove the WLAN enable regulator altogether. Then to
-> properly deal with the power on/off sequence, add a mmc-pwrseq node to
-> describe the resources needed to detect the SDIO card.
->
-> Except for the WLAN enable GPIO and its corresponding assert/de-assert
-> delays, the mmc-pwrseq node also contains a handle to a clock provided by
-> the hi655x pmic. This clock is also needed to be able to turn on the WiFi
-> chip.
->
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
+> Florian Fainelli <f.fainelli@gmail.com> hat am 31. Mai 2017 um 19:44 geschrieben:
+> 
+> 
+> On May 31, 2017 10:20:46 AM PDT, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> >Hi Florian,
+> >
+> >> Florian Fainelli <f.fainelli@gmail.com> hat am 19. Mai 2017 um 20:17
+> >geschrieben:
+> >> 
+> >> 
+> >> On 05/16/2017 03:19 PM, Eric Anholt wrote:
+> >> > Hi Florian,
+> >> > 
+> >> > The following changes since commit
+> >2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+> >> > 
+> >> >   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+> >> > 
+> >> > are available in the git repository at:
+> >> > 
+> >> >   git://github.com/anholt/linux tags/bcm2835-dt-fixes-2017-05-16
+> >> > 
+> >> > for you to fetch changes up to
+> >b0804ed0cadd7e38d94d2f15cdcc0d9695818856:
+> >> > 
+> >> >   ARM: dts: bcm283x: Reserve first page for firmware (2017-05-15
+> >15:05:29 -0700)
+> >> > 
+> >> > ----------------------------------------------------------------
+> >> > This pull request brings in a fix for booting on SMP Raspberry Pis,
+> >> > particularly with maxcpus=1
+> >> > 
+> >> > ----------------------------------------------------------------
+> >> 
+> >> Merged, thanks Eric
+> >
+> >when it's planned to send this fix to Olof?
+> 
+> It's been sent and merged already but I realized lakml was not copied:
+> 
+> https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git/log/?h=fixes
 
-Ulf,
-  So oddly, this patch seems to have broken wifi on HiKey when it
-landed in 4.12-rc3. I checked my config and CONFIG_PWRSEQ_SIMPLE is
-enabled.
-
-Reverting this patch seems to get things working again for me.
-
-thanks
--john
+Thanks
