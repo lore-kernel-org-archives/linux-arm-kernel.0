@@ -1,33 +1,29 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 31 May 2017 11:56:51 -0500
-Subject: [PATCH v3 4/9] ASoC: sun4i-codec: Add support for V3s codec
-In-Reply-To: <20170524100607.29790-5-icenowy@aosc.io>
+Date: Wed, 31 May 2017 11:57:26 -0500
+Subject: [PATCH v3 6/9] dmaengine: sun6i: support V3s SoC variant
+In-Reply-To: <20170524100607.29790-7-icenowy@aosc.io>
 References: <20170524100607.29790-1-icenowy@aosc.io>
- <20170524100607.29790-5-icenowy@aosc.io>
-Message-ID: <20170531165651.4bcmgskmspetw7cx@rob-hp-laptop>
+ <20170524100607.29790-7-icenowy@aosc.io>
+Message-ID: <20170531165726.zmrzawjlnetw2nyd@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 24, 2017 at 06:06:02PM +0800, Icenowy Zheng wrote:
+On Wed, May 24, 2017 at 06:06:04PM +0800, Icenowy Zheng wrote:
 > From: Icenowy Zheng <icenowy@aosc.xyz>
 > 
-> The codec in the V3s is similar to the one found on the A31. One key
-> difference is the analog path controls are routed through the PRCM
-> block. This is supported by the sun8i-codec-analog driver, and tied
-> into this codec driver with the audio card's aux_dev.
+> Allwinner V3s has a DMA engine similar to the ones from A31, but with
+> fewer channels and DRQs.
 > 
-> In addition, the V3s does not have LINEIN, LINEOUT, MBIAS and MIC2,
-> MIC3, and the FIFO related registers are like H3.
+> Add support for it.
 > 
 > Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
 > ---
 > Changes in v3:
-> - Change regmap max register.
-> - Add a note for further DAP support.
+> - Added Chen-Yu's ACK.
 > 
->  .../devicetree/bindings/sound/sun4i-codec.txt      | 11 ++--
+>  Documentation/devicetree/bindings/dma/sun6i-dma.txt |  1 +
+>  drivers/dma/sun6i-dma.c                             | 13 +++++++++++++
+>  2 files changed, 14 insertions(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
-
->  sound/soc/sunxi/sun4i-codec.c                      | 63 ++++++++++++++++++++++
->  2 files changed, 70 insertions(+), 4 deletions(-)
