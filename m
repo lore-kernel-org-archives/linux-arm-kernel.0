@@ -1,42 +1,34 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Wed, 31 May 2017 11:25:40 +0200
-Subject: [RESEND PATCH] tee: optee: fix uninitialized symbol 'parg'
-Message-ID: <1496222740-11217-1-git-send-email-jens.wiklander@linaro.org>
+From: yinbo.zhu@nxp.com (yinbo.zhu)
+Date: Wed, 31 May 2017 17:32:47 +0800
+Subject: [PATCH] arm64: dts: ls208xa: disable SD UHS-I modes by default on RDB
+Message-ID: <1496223167-33840-1-git-send-email-yinbo.zhu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes the static checker warning in optee_release().
-error: uninitialized symbol 'parg'.
+Currently SD UHS-I modes were enabled by default on LS208xARDB boards,
+but the new LS2088ARDB RevF board didn't support them any more since SDHC
+circuit had been reworked. This patch is to disable SD UHS-I modes by default
+in case of any issue on LS2088ARDB RevF
 
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
 ---
- drivers/tee/optee/core.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+ arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
-index 58169e519422..857141e29e80 100644
---- a/drivers/tee/optee/core.c
-+++ b/drivers/tee/optee/core.c
-@@ -224,13 +224,14 @@ static void optee_release(struct tee_context *ctx)
- 	if (!IS_ERR(shm)) {
- 		arg = tee_shm_get_va(shm, 0);
- 		/*
--		 * If va2pa fails for some reason, we can't call
--		 * optee_close_session(), only free the memory. Secure OS
--		 * will leak sessions and finally refuse more sessions, but
--		 * we will at least let normal world reclaim its memory.
-+		 * If va2pa fails for some reason, we can't call into
-+		 * secure world, only free the memory. Secure OS will leak
-+		 * sessions and finally refuse more sessions, but we will
-+		 * at least let normal world reclaim its memory.
- 		 */
- 		if (!IS_ERR(arg))
--			tee_shm_va2pa(shm, arg, &parg);
-+			if (tee_shm_va2pa(shm, arg, &parg))
-+				arg = NULL; /* prevent usage of parg below */
- 	}
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi
+index 3a944bb..f06b7f5 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi
+@@ -45,10 +45,6 @@
+  */
  
- 	list_for_each_entry_safe(sess, sess_tmp, &ctxdata->sess_list,
+ &esdhc {
+-	sd-uhs-sdr104;
+-	sd-uhs-sdr50;
+-	sd-uhs-sdr25;
+-	sd-uhs-sdr12;
+ 	status = "okay";
+ };
+ 
 -- 
-2.7.4
+2.1.0.27.g96db324
