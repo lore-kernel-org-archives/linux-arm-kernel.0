@@ -1,77 +1,40 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed, 31 May 2017 09:18:46 +0200
-Subject: [PATCH v6 15/21] arm64: allwinner: sun50i-a64: add dwmac-sun8i
- Ethernet driver
+Date: Wed, 31 May 2017 09:18:37 +0200
+Subject: [PATCH v6 06/21] arm: sun8i: sunxi-h3-h5: Add dt node for the syscon
+ control module
 In-Reply-To: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
 References: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170531071852.12422-16-clabbe.montjoie@gmail.com>
+Message-ID: <20170531071852.12422-7-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dwmac-sun8i is an Ethernet MAC that supports 10/100/1000 Mbit
-connections. It is very similar to the device found in the Allwinner
-H3, but lacks the internal 100 Mbit PHY and its associated control
-bits.
-This adds the necessary bits to the Allwinner A64 SoC .dtsi, but keeps
-it disabled at this level.
+This patch add the dt node for the syscon register present on the
+Allwinner H3/H5
+
+Only two register are present in this syscon and the only one useful is
+the one dedicated to EMAC clock..
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 35 +++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 2eeba0d44074..7a07353ac1f6 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -309,6 +309,21 @@
- 				bias-pull-up;
- 			};
+diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+index d0067fec99de..3a28be5ab641 100644
+--- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
++++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+@@ -83,6 +83,12 @@
+ 		#size-cells = <1>;
+ 		ranges;
  
-+			rmii_pins: rmii_pins {
-+				pins = "PD10", "PD11", "PD13", "PD14", "PD17",
-+				       "PD18", "PD19", "PD20", "PD22", "PD23";
-+				function = "emac";
-+				drive-strength = <40>;
-+			};
-+
-+			rgmii_pins: rgmii_pins {
-+				pins = "PD8", "PD9", "PD10", "PD11", "PD12",
-+				       "PD13", "PD15", "PD16", "PD17", "PD18",
-+				       "PD19", "PD20", "PD21", "PD22", "PD23";
-+				function = "emac";
-+				drive-strength = <40>;
-+			};
-+
- 			uart0_pins_a: uart0 at 0 {
- 				pins = "PB8", "PB9";
- 				function = "uart0";
-@@ -433,6 +448,26 @@
- 			#size-cells = <0>;
- 		};
- 
-+		emac: ethernet at 1c30000 {
-+			compatible = "allwinner,sun50i-a64-emac";
-+			syscon = <&syscon>;
-+			reg = <0x01c30000 0x100>;
-+			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "macirq";
-+			resets = <&ccu RST_BUS_EMAC>;
-+			reset-names = "stmmaceth";
-+			clocks = <&ccu CLK_BUS_EMAC>;
-+			clock-names = "stmmaceth";
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			mdio: mdio {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
++		syscon: syscon at 1c00000 {
++			compatible = "allwinner,sun8i-h3-system-controller",
++				"syscon";
++			reg = <0x01c00000 0x1000>;
 +		};
 +
- 		gic: interrupt-controller at 1c81000 {
- 			compatible = "arm,gic-400";
- 			reg = <0x01c81000 0x1000>,
+ 		dma: dma-controller at 01c02000 {
+ 			compatible = "allwinner,sun8i-h3-dma";
+ 			reg = <0x01c02000 0x1000>;
 -- 
 2.13.0
