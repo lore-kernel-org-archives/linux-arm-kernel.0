@@ -1,52 +1,31 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 31 May 2017 10:44:05 -0700
-Subject: [GIT PULL] bcm2835 DT fixes for 4.12
-In-Reply-To: <1791886363.81865.1496251246175@email.1und1.de>
-References: <20170516221931.31292-1-eric@anholt.net>
- <d16bf00b-d058-08d1-ed6a-2f369d1fd611@gmail.com>
- <1791886363.81865.1496251246175@email.1und1.de>
-Message-ID: <98834BF8-FEC0-4DCB-B2C1-C2B1838AF5B6@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 31 May 2017 12:54:39 -0500
+Subject: [PATCH v4 1/9] dt-bindings: arm: mediatek: update for MT7623n
+ SoC and relevant boards
+In-Reply-To: <ec281bfc67e633873bb519e607aca67213454b6d.1495683769.git.sean.wang@mediatek.com>
+References: <cover.1495683769.git.sean.wang@mediatek.com>
+ <ec281bfc67e633873bb519e607aca67213454b6d.1495683769.git.sean.wang@mediatek.com>
+Message-ID: <20170531175439.bclgr4atbxrmgpna@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On May 31, 2017 10:20:46 AM PDT, Stefan Wahren <stefan.wahren@i2se.com> wrote:
->Hi Florian,
->
->> Florian Fainelli <f.fainelli@gmail.com> hat am 19. Mai 2017 um 20:17
->geschrieben:
->> 
->> 
->> On 05/16/2017 03:19 PM, Eric Anholt wrote:
->> > Hi Florian,
->> > 
->> > The following changes since commit
->2ea659a9ef488125eb46da6eb571de5eae5c43f6:
->> > 
->> >   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
->> > 
->> > are available in the git repository at:
->> > 
->> >   git://github.com/anholt/linux tags/bcm2835-dt-fixes-2017-05-16
->> > 
->> > for you to fetch changes up to
->b0804ed0cadd7e38d94d2f15cdcc0d9695818856:
->> > 
->> >   ARM: dts: bcm283x: Reserve first page for firmware (2017-05-15
->15:05:29 -0700)
->> > 
->> > ----------------------------------------------------------------
->> > This pull request brings in a fix for booting on SMP Raspberry Pis,
->> > particularly with maxcpus=1
->> > 
->> > ----------------------------------------------------------------
->> 
->> Merged, thanks Eric
->
->when it's planned to send this fix to Olof?
+On Thu, May 25, 2017 at 12:02:39PM +0800, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
+> 
+> Because there are two versions of MT7623 SoC that is MT7623a and MT7623n
+> respectively. So update the part of MT7623n bindings to allow that people
+> tend to differentiate which MT7623 SoC the boards applies.
+> 
+> And "mediatek,mt7623-evb" can be safely changed to
+> "mediatek,mt7623n-rfb-nand" because mt7623-evb is a kind of debug board
+> internally in Mediatek which real users can't get. So instead we should
+> indicate which variants it belongs to with more specific postfix as the
+> adding here to let people easily know what board they use.
+> 
+> Signed-off-by: John Crispin <john@phrozen.org>
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> ---
+>  Documentation/devicetree/bindings/arm/mediatek.txt | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
 
-It's been sent and merged already but I realized lakml was not copied:
-
-https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git/log/?h=fixes
-Hi,
--- 
-Florian
+Acked-by: Rob Herring <robh@kernel.org>
