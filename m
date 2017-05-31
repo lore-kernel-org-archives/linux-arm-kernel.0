@@ -1,90 +1,39 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 31 May 2017 07:46:34 +0100
-Subject: [PATCH 14/31] KVM: arm64: vgic-v3: Add ICV_EOIR1_EL1 handler
-In-Reply-To: <0dabccc1-ffa2-0ee1-71a4-71390791f056@redhat.com>
-References: <20170503104606.19342-1-marc.zyngier@arm.com>
- <20170503104606.19342-15-marc.zyngier@arm.com>
- <c3baec82-20c6-c948-9cb8-8247802cbff5@redhat.com>
- <2eb7f08f-bb47-cd7b-e631-3d42c35336ee@arm.com>
- <0dabccc1-ffa2-0ee1-71a4-71390791f056@redhat.com>
-Message-ID: <20170531074634.588aa76e@why.wild-wind.fr.eu.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 31 May 2017 09:21:15 +0200
+Subject: [PATCH 00/58] ARM: at91: rework Atmel TCB drivers
+In-Reply-To: <da7069d4-e5b3-f10f-0816-ff973195aff6@axentia.se>
+References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
+ <da7069d4-e5b3-f10f-0816-ff973195aff6@axentia.se>
+Message-ID: <20170531072115.apeyzsqmfxa2qnd6@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 31 May 2017 08:33:05 +0200
-Auger Eric <eric.auger@redhat.com> wrote:
+Hi,
 
-> Hi Marc,
-> 
-> On 30/05/2017 16:24, Marc Zyngier wrote:
-> > On 30/05/17 08:48, Auger Eric wrote:  
-> >> Hi Marc
-> >>
-> >> On 03/05/2017 12:45, Marc Zyngier wrote:  
-> >>> Add a handler for writing the guest's view of the ICC_EOIR1_EL1
-> >>> register. This involves dropping the priority of the interrupt,
-> >>> and deactivating it if required (EOImode == 0).
-> >>>
-> >>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >>> ---
-> >>>  include/linux/irqchip/arm-gic-v3.h |   2 +
-> >>>  virt/kvm/arm/hyp/vgic-v3-sr.c      | 119 +++++++++++++++++++++++++++++++++++++
-> >>>  2 files changed, 121 insertions(+)
-> >>>
-> >>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> >>> index 7610ea4e8337..c56d9bc2c904 100644
-> >>> --- a/include/linux/irqchip/arm-gic-v3.h
-> >>> +++ b/include/linux/irqchip/arm-gic-v3.h
-> >>> @@ -403,6 +403,8 @@
-> >>>  
-> >>>  #define ICH_HCR_EN			(1 << 0)
-> >>>  #define ICH_HCR_UIE			(1 << 1)
-> >>> +#define ICH_HCR_EOIcount_SHIFT		27
-> >>> +#define ICH_HCR_EOIcount_MASK		(0x1f << ICH_HCR_EOIcount_SHIFT)
-> >>>  
-> >>>  #define ICH_VMCR_CBPR_SHIFT		4
-> >>>  #define ICH_VMCR_CBPR_MASK		(1 << ICH_VMCR_CBPR_SHIFT)
-> >>> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> >>> index 49aad1de3ac8..a76351b3ad66 100644
-> >>> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-> >>> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> >>> @@ -425,6 +425,26 @@ static int __hyp_text __vgic_v3_highest_priority_lr(struct kvm_vcpu *vcpu,
-> >>>  	return lr;
-> >>>  }
-> >>>  
-> >>> +static int __hyp_text __vgic_v3_find_active_lr(struct kvm_vcpu *vcpu,
-> >>> +					       int intid, u64 *lr_val)
-> >>> +{
-> >>> +	unsigned int used_lrs = vcpu->arch.vgic_cpu.used_lrs;
-> >>> +	int i;
-> >>> +
-> >>> +	for (i = 0; i < used_lrs; i++) {
-> >>> +		u64 val = __gic_v3_get_lr(i);
-> >>> +
-> >>> +		if ((val & ICH_LR_VIRTUAL_ID_MASK) == intid &&
-> >>> +		    (val & ICH_LR_ACTIVE_BIT)) {  
-> >> I guess it is safe because we don't have yet virtual interrupts directly
-> >> mapped to phys IRQs, besides timer one?  
+On 31/05/2017 at 08:34:00 +0200, Peter Rosin wrote:
+> On 2017-05-30 23:50, Alexandre Belloni wrote:
+> > Hi,
 > > 
-> > What would that change? I don't see how having a HW interrupt here would
-> > be unsafe... Am I missing something?  
-> I was thinking about the case of an HW mapped interrupt whose active
-> state must be observed at distributor level - as I understood the spec -
-> and not at LR level.
+> > This series reworks the Atmel Timer counter Block drivers. Those blocks
+> > each have 3 counters with 2 channels each and can be used for
+> > multiple functions:
+> >  - timers
+> >  - PWMs
+> >  - Quadrature decoders
+> >  - Stepper motor counters
+> 
+> I'd like to test this, but I have a hard time doing that since all I got
+> was this cover letter and a single DT-only patch.
+> 
+> I understand that you were reluctant to spam too many people with
+> dozens of patches, but perhaps the series can be fetched from
+> somewhere?
+> 
 
-What part of the spec are you referring to?
+Sure, I've pushed the branch here:
+https://github.com/alexandrebelloni/linux/tree/at91-tcb-v3
 
-A virtual interrupt, even backed by a HW interrupt, does have an active
-state (unless it is an LPI). The only state we cannot observe in the LR
-when the HW bit is set is the Active+Pending state because the pending
-bit is then at the physical distributor level.
-
-For all intent and purposes, the active state in the LR behaves the
-same, irrespective of the HW state, until the guest issues a
-deactivation (either using EOI or DIR, depending on EOImode).
-
-Thanks,
-
-	M.
 -- 
-Without deviation from the norm, progress is not possible.
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
