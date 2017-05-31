@@ -1,75 +1,152 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 31 May 2017 11:07:56 +0000
-Subject: [RFC PATCH v3 0/4] Simplify kernel-mode NEON
-In-Reply-To: <20170531100758.GA30160@e103592.cambridge.arm.com>
-References: <1495736721-20985-1-git-send-email-Dave.Martin@arm.com>
- <20170530180219.GR3559@e103592.cambridge.arm.com>
- <CAKv+Gu-FxRLKxTvC68Wu0_o1zjSfjWDtdA7hdK79ZTNWNXPj=Q@mail.gmail.com>
- <20170531100758.GA30160@e103592.cambridge.arm.com>
-Message-ID: <CAKv+Gu_V41O67etpYErj_xX1JG+RcSxkq25WpFwTvyBNDETa8w@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 31 May 2017 12:13:34 +0100
+Subject: [RFC/RFT PATCH 03/18] PCI: Introduce pci_scan_root_bus_bridge()
+In-Reply-To: <20170525205643.GA9474@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
+ <20170426111809.19922-4-lorenzo.pieralisi@arm.com>
+ <CAK8P3a0HmrrYBP5em1s4VOY4Tb6=bwOrDDN6K8rPp8OEXtpMtA@mail.gmail.com>
+ <20170502171501.GA5545@red-moon>
+ <20170525205643.GA9474@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20170531111334.GA25840@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 May 2017 at 10:08, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Wed, May 31, 2017 at 08:41:01AM +0000, Ard Biesheuvel wrote:
->> On 30 May 2017 at 18:02, Dave Martin <Dave.Martin@arm.com> wrote:
->> > On Thu, May 25, 2017 at 07:24:57PM +0100, Dave Martin wrote:
->> >> This series aims to simplify kernel-mode NEON.
->> >
->> > Hi Ard, do you have any further comments on this series?
->> >
->> > I'd like to have it finalised as far as possible (modulo minor tweaks
->> > and bugfixes) so that I can port the SVE patches on top of it.
->> >
->> > Also, how do you think we should handle merging of this change?  There's
->> > a flag-day issue here, since the kernel_mode_neon() API is being changed
->> > in an incompatible way.
->> >
->>
->> I think the patches look fine now. The best way to merge these imo is
->> to start with the changes in the clients, i.e., add an arm64 specific
->> asm/simd.h that defines may_use_simd() as { return true; }, update all
->> the crypto code with the fallbacks, and put this stuff on top of that.
->
-> Yes, that sounds feasible.
->
-> Something like [1] below?  Either way, it probably makes sense for that
-> stub function to be added by your series.
->
+On Thu, May 25, 2017 at 03:56:43PM -0500, Bjorn Helgaas wrote:
+> [+cc Ray, Scott, Jon]
+> 
+> On Tue, May 02, 2017 at 06:15:01PM +0100, Lorenzo Pieralisi wrote:
+> > On Fri, Apr 28, 2017 at 02:28:38PM +0200, Arnd Bergmann wrote:
+> > > On Wed, Apr 26, 2017 at 1:17 PM, Lorenzo Pieralisi
+> > > <lorenzo.pieralisi@arm.com> wrote:
+> > > > Current pci_scan_root_bus() interface is made up of two main
+> > > > code paths:
+> > > >
+> > > > - pci_create_root_bus()
+> > > > - pci_scan_child_bus()
+> > > >
+> > > > pci_create_root_bus() is a wrapper function that allows to create
+> > > > a struct pci_host_bridge structure, initialize it with the passed
+> > > > parameters and register it with the kernel.
+> > > >
+> > > > As the struct pci_host_bridge require additional struct members,
+> > > > pci_create_root_bus() parameters list has grown in time, making
+> > > > it unwieldy to add further parameters to it in case the struct
+> > > > pci_host_bridge gains more members fields to augment its functionality.
+> > > >
+> > > > Since PCI core code provides functions to allocate struct
+> > > > pci_host_bridge, instead of forcing the pci_create_root_bus() interface
+> > > > to add new parameters to cater for new struct pci_host_bridge
+> > > > functionality, it is more suitable to add an interface in PCI
+> > > > core code to scan a PCI bus straight from a struct pci_host_bridge
+> > > > created and customized by each specific PCI host controller driver.
+> > > >
+> > > > Add a pci_scan_root_bus_bridge() function to allow PCI host controller
+> > > > drivers to create and initialize struct pci_host_bridge and scan
+> > > > the resulting bus.
+> > > >
+> > > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > > > Cc: Arnd Bergmann <arnd@arndb.de>
+> > > > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > > 
+> > > Good idea, yes. To avoid growing the number of interfaces too
+> > > much, should we change the existing users of pci_register_host_bridge
+> > > in host drivers over to this entry point, and make the other one
+> > > local to probe.c then?
+> > 
+> > Yes, the problem is that there are drivers (ie pcie-iproc.c) that
+> > require the struct pci_bus (created by pci_register_host_bridge())
+> > to fiddle with it to check link status and THEN scan the bus (so
+> > the pci_register_host_bridge() call can't be embedded in the scan
+> > interface - the driver requires struct pci_bus for pci_ops to work
+> > before scanning the bus itself).
+> 
+> I think code like iproc_pcie_check_link() that requires a struct
+> pci_bus before we even scan the bus is lame.  I think the driver
+> should be able to bring up the link before telling the PCI core about
+> the bridge.  Aardvark uses a typical pattern:
+> 
+>   advk_pcie_probe
+>     advk_pcie_setup_hw
+>       advk_pcie_wait_for_link
+>     pci_scan_root_bus
+> 
+> I would rather see iproc restructured along that line than add a
+> callback.
+> 
+> That would require replacing the pci_bus_read_config uses in
+> iproc_pcie_check_link() with something different, maybe iproc-internal 
+> accessors.  Slightly messy, but I think doable.
 
-Pretty much, yeah. But don't forget to remove simd.h from
-arch/arm64/include/asm/Kbuild
+And now I have noticed pci-ftpci100.c requires the same patching for the
+same reason.
 
->> That way, there is a small window where the 'hint' is interpreted
->> differently in the sha256 code, but apart from that, we should be
->> bisection proof without a flag day AFAICT.
->>
->> BTW I got my ZD1211 working on my MacchiatioBin board. The performance
->> is terrible, but that should not matter: if I can saturate a CPU doing
->
-> Do you mean that my series causes a performance regression here, or is
-> the performance terrible anyway?
->
+I hope I will get this series merged before other DT PCI host
+controller drivers are because it is honestly becoming unmanageable
+for me to patch them all - it is time to consolidate them, copy and
+paste is doing damage here and will soon become impossible to fix.
 
-No, the performance is terrible, which shouldn't matter per se, but it
-would be nice if the load induced by the mac80211 were visible in
-'top' as wait, sys or whatever-it-is-called time. Currently, the 3
-Mbit/s throughput combined with the 2.2 cycles per byte performance of
-the AES-CCM code makes the code unnoticeable.
+Thanks,
+Lorenzo
 
->> NEON from userland and/or kernel process context, the softirq
->> interruptions by the mac80211 code should exercise the updated code
->> paths. I haven't tried that yet: let me get the code changes out
->> today, so you can put your stuff on top. Then we can give it a good
->> spin.
->
-> That would be great, thanks.
->
-
-I have updated my branch here:
-https://git.kernel.org/pub/scm/linux/kernel/git/ardb/linux.git/log/?h=kernel-mode-neon
-
-I removed all kernel_neon_begin_partial() invocations as well.
-
--- 
-Ard.
+> > I will see how I can accommodate this change because you definitely
+> > have a point.
+> > 
+> > > > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> > > > index 7e4ffc4..c7a7f72 100644
+> > > > --- a/drivers/pci/probe.c
+> > > > +++ b/drivers/pci/probe.c
+> > > > @@ -2412,6 +2412,44 @@ void pci_bus_release_busn_res(struct pci_bus *b)
+> > > >                         res, ret ? "can not be" : "is");
+> > > >  }
+> > > >
+> > > > +int pci_scan_root_bus_bridge(struct pci_host_bridge *bridge)
+> > > > +{
+> > > > +       struct resource_entry *window;
+> > > > +       bool found = false;
+> > > > +       struct pci_bus *b;
+> > > > +       int max, bus, ret;
+> > > > +
+> > > > +       if (!bridge)
+> > > > +               return -EINVAL;
+> > > > +
+> > > > +       resource_list_for_each_entry(window, &bridge->windows)
+> > > > +               if (window->res->flags & IORESOURCE_BUS) {
+> > > > +                       found = true;
+> > > > +                       break;
+> > > > +               }
+> > > > +
+> > > > +       ret = pci_register_host_bridge(bridge);
+> > > > +       if (ret < 0)
+> > > > +               return ret;
+> > > > +
+> > > > +       b = bridge->bus;
+> > > > +       bus = bridge->busnr;
+> > > > +
+> > > > +       if (!found) {
+> > > > +               dev_info(&b->dev,
+> > > > +                "No busn resource found for root bus, will use [bus %02x-ff]\n",
+> > > > +                       bus);
+> > > > +               pci_bus_insert_busn_res(b, bus, 255);
+> > > > +       }
+> > > > +
+> > > > +       max = pci_scan_child_bus(b);
+> > > > +
+> > > > +       if (!found)
+> > > > +               pci_bus_update_busn_res_end(b, max);
+> > > > +
+> > > > +       return 0;
+> > > > +}
+> > > > +
+> > > 
+> > > We probably want an EXPORT_SYMBOL() here as well.
+> > 
+> > Yep, sure.
+> > 
+> > Thanks for having a look !
+> > 
+> > Lorenzo
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
