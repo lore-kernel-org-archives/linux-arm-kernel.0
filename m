@@ -1,84 +1,87 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 31 May 2017 16:07:22 +0200
-Subject: [PATCH v2 1/7] clk: mvebu: ap806: cosmetic improvement
+Date: Wed, 31 May 2017 16:07:28 +0200
+Subject: [PATCH v2 7/7] arm64: dts: marvell: use new binding for the system
+ controller on ap806
 In-Reply-To: <cover.21754b3184e2122d1c83a664477ed26ec562b3e9.1496239589.git-series.gregory.clement@free-electrons.com>
 References: <cover.21754b3184e2122d1c83a664477ed26ec562b3e9.1496239589.git-series.gregory.clement@free-electrons.com>
-Message-ID: <5a55e081d96fc6d2a28331b59df90f56d32a9f24.1496239589.git-series.gregory.clement@free-electrons.com>
+Message-ID: <e12e9b027462646e16cb51783d6e14660a019ba6.1496239589.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of using &pdev->dev all over the place, introduce a pointer
-variable for it.
+The new binding for the system controller on ap806 moved the clock into a
+subnode. This preliminary step will allow to add gpio and pinctrl
+subnodes
 
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/clk/mvebu/ap806-system-controller.c | 15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 19 +++++++++++--------
+ 1 file changed, 11 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/clk/mvebu/ap806-system-controller.c b/drivers/clk/mvebu/ap806-system-controller.c
-index 8155baccc98e..b2666b5c944f 100644
---- a/drivers/clk/mvebu/ap806-system-controller.c
-+++ b/drivers/clk/mvebu/ap806-system-controller.c
-@@ -36,20 +36,21 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
- {
- 	unsigned int freq_mode, cpuclk_freq;
- 	const char *name, *fixedclk_name;
--	struct device_node *np = pdev->dev.of_node;
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
- 	struct regmap *regmap;
- 	u32 reg;
- 	int ret;
+diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+index 0c25ec62a2a3..205037e3e7dc 100644
+--- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+@@ -193,7 +193,7 @@
+ 				#size-cells = <0>;
+ 				cell-index = <0>;
+ 				interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
+-				clocks = <&ap_syscon 3>;
++				clocks = <&ap_clk 3>;
+ 				status = "disabled";
+ 			};
  
- 	regmap = syscon_node_to_regmap(np);
- 	if (IS_ERR(regmap)) {
--		dev_err(&pdev->dev, "cannot get regmap\n");
-+		dev_err(dev, "cannot get regmap\n");
- 		return PTR_ERR(regmap);
- 	}
+@@ -204,7 +204,7 @@
+ 				#size-cells = <0>;
+ 				interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
+ 				timeout-ms = <1000>;
+-				clocks = <&ap_syscon 3>;
++				clocks = <&ap_clk 3>;
+ 				status = "disabled";
+ 			};
  
- 	ret = regmap_read(regmap, AP806_SAR_REG, &reg);
- 	if (ret) {
--		dev_err(&pdev->dev, "cannot read from regmap\n");
-+		dev_err(dev, "cannot read from regmap\n");
- 		return ret;
- 	}
+@@ -214,7 +214,7 @@
+ 				reg-shift = <2>;
+ 				interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
+ 				reg-io-width = <1>;
+-				clocks = <&ap_syscon 3>;
++				clocks = <&ap_clk 3>;
+ 				status = "disabled";
+ 			};
  
-@@ -89,7 +90,7 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
- 		cpuclk_freq = 600;
- 		break;
- 	default:
--		dev_err(&pdev->dev, "invalid SAR value\n");
-+		dev_err(dev, "invalid SAR value\n");
- 		return -EINVAL;
- 	}
+@@ -224,7 +224,7 @@
+ 				reg-shift = <2>;
+ 				interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
+ 				reg-io-width = <1>;
+-				clocks = <&ap_syscon 3>;
++				clocks = <&ap_clk 3>;
+ 				status = "disabled";
  
-@@ -99,7 +100,7 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
- 	/* CPU clocks depend on the Sample At Reset configuration */
- 	of_property_read_string_index(np, "clock-output-names",
- 				      0, &name);
--	ap806_clks[0] = clk_register_fixed_rate(&pdev->dev, name, NULL,
-+	ap806_clks[0] = clk_register_fixed_rate(dev, name, NULL,
- 						0, cpuclk_freq);
- 	if (IS_ERR(ap806_clks[0])) {
- 		ret = PTR_ERR(ap806_clks[0]);
-@@ -108,7 +109,7 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
+ 			};
+@@ -234,17 +234,20 @@
+ 				reg = <0x6e0000 0x300>;
+ 				interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
+ 				clock-names = "core";
+-				clocks = <&ap_syscon 4>;
++				clocks = <&ap_clk 4>;
+ 				dma-coherent;
+ 				marvell,xenon-phy-slow-mode;
+ 				status = "disabled";
+ 			};
  
- 	of_property_read_string_index(np, "clock-output-names",
- 				      1, &name);
--	ap806_clks[1] = clk_register_fixed_rate(&pdev->dev, name, NULL, 0,
-+	ap806_clks[1] = clk_register_fixed_rate(dev, name, NULL, 0,
- 						cpuclk_freq);
- 	if (IS_ERR(ap806_clks[1])) {
- 		ret = PTR_ERR(ap806_clks[1]);
-@@ -118,7 +119,7 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
- 	/* Fixed clock is always 1200 Mhz */
- 	of_property_read_string_index(np, "clock-output-names",
- 				      2, &fixedclk_name);
--	ap806_clks[2] = clk_register_fixed_rate(&pdev->dev, fixedclk_name, NULL,
-+	ap806_clks[2] = clk_register_fixed_rate(dev, fixedclk_name, NULL,
- 						0, 1200 * 1000 * 1000);
- 	if (IS_ERR(ap806_clks[2])) {
- 		ret = PTR_ERR(ap806_clks[2]);
+ 			ap_syscon: system-controller at 6f4000 {
+-				compatible = "marvell,ap806-system-controller",
+-					     "syscon";
+-				#clock-cells = <1>;
++				compatible = "syscon", "simple-mfd";
+ 				reg = <0x6f4000 0x1000>;
++
++				ap_clk: clock {
++					compatible = "marvell,ap806-clock";
++					#clock-cells = <1>;
++				};
+ 			};
+ 		};
+ 	};
 -- 
 git-series 0.9.1
