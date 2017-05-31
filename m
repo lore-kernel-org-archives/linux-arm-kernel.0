@@ -1,45 +1,65 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 31 May 2017 15:56:27 +0100
-Subject: [PATCH v2 4/6] regulator: pfuze100: add fsl,pmic_stby_poweroff
- property
-In-Reply-To: <20170531061457.23744-5-o.rempel@pengutronix.de>
-References: <20170531061457.23744-1-o.rempel@pengutronix.de>
- <20170531061457.23744-5-o.rempel@pengutronix.de>
-Message-ID: <20170531145627.GE10351@leverpostej>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 31 May 2017 15:59:25 +0100
+Subject: [CFT] Always enable SMP mode on MP capable CPUs
+In-Reply-To: <20170531143914.GD3730@atomide.com>
+References: <CAOMZO5Dc=i7UdQH=r5RRr_4GmyZZT+rh7BTNV4WbfqKvtVDfsw@mail.gmail.com>
+ <20170519171526.GW22219@n2100.armlinux.org.uk>
+ <20170524153847.GY10472@atomide.com>
+ <20170525144800.GV23750@n2100.armlinux.org.uk>
+ <20170525151103.GC10472@atomide.com>
+ <20170525180540.GW23750@n2100.armlinux.org.uk>
+ <20170525221332.GE10472@atomide.com>
+ <20170526112210.GA3354@afzalpc>
+ <20170527132237.GX23750@n2100.armlinux.org.uk>
+ <20170531143914.GD3730@atomide.com>
+Message-ID: <20170531145924.GY23750@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 31, 2017 at 08:14:55AM +0200, Oleksij Rempel wrote:
-> Document the new optional "fsl,pmic_stby_poweroff" property.
+On Wed, May 31, 2017 at 07:39:15AM -0700, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@armlinux.org.uk> [170527 06:26]:
+> > On Fri, May 26, 2017 at 04:52:10PM +0530, afzal mohammed wrote:
+> > > Hi,
+> > > 
+> > > On Thu, May 25, 2017 at 03:13:33PM -0700, Tony Lindgren wrote:
+> > > 
+> > > > OK so got my am437x-idk back
+> > > > 
+> > > > And as suspected it won't boot with these changes.
+> > > 
+> > > Tested here too with your additional changes included & seeing same
+> > > behavior here as well on AM437x.
+> > > 
+> > > As an aside, when Russell posted this patch a week back itself was
+> > > suspecting this. i had a certain view on AM437x w.r.t SMP issue back
+> > > while officially working on it & since now not officially involved
+> > > with the issue at hand, i was uncomfortable dealing with this. But as
+> > > Russell's patch was not noticed by others w.r.t AM437x, upon being
+> > > able to confirm it yesterday, i at least wanted to bring it to notice
+> > > & runaway from the scene.
+> > 
+> > Right, so I think the summary is: the kernel can't set the SMP bit
+> > correctly - it doesn't have the information at this point in time
+> > to know definitively whether the bit needs to be set or not.
+> > 
+> > So, those who are suffering issues with their SMP cores in uniprocessor
+> > systems need to ensure that their boot loader correctly configures the
+> > CPU cores.
 > 
-> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> Cc: kernel at pengutronix.de
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Liam Girdwood <lgirdwood@gmail.com>
-> Cc: Mark Brown <broonie@kernel.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: linux-kernel at vger.kernel.org
-> Cc: devicetree at vger.kernel.org
-> ---
->  Documentation/devicetree/bindings/regulator/pfuze100.txt | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/regulator/pfuze100.txt b/Documentation/devicetree/bindings/regulator/pfuze100.txt
-> index 444c47831a40..216519c4a50d 100644
-> --- a/Documentation/devicetree/bindings/regulator/pfuze100.txt
-> +++ b/Documentation/devicetree/bindings/regulator/pfuze100.txt
-> @@ -4,6 +4,10 @@ Required properties:
->  - compatible: "fsl,pfuze100", "fsl,pfuze200", "fsl,pfuze3000"
->  - reg: I2C slave address
->  
-> +Optional properties:
-> +- fsl,pmic_stby_poweroff: if present, configure the PMIC to shutdown all
-> +  power rails when PMIC_STBY_REQ line is asserted during the power off sequence.
+> Russell, current Linux next still has commit e7cf836e9757 ("ARM:
+> always enable SMP mode on SMP cores"). You're planning to drop
+> it, right?
 
-As with patch 1, s/_/-/ please.
+Please have some patience.
 
-Please also explain why/why this is needed.
+Correct, it should be gone from tonight's linux-next.
 
-Thanks,
-Mark.
+The UK has two holidays in May, one of them was this Monday.  I dropped
+the patch yesterday, which is the first opportunity since sending that
+mail, but due to other pressures yesterday, my tree was in no state to
+be pushed out for linux-next's grab last night.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
