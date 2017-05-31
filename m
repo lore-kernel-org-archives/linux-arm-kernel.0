@@ -1,39 +1,52 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 31 May 2017 19:42:44 +0200
-Subject: [PATCH] pinctrl: samsung: Fix missing object for S5Pv210
-Message-ID: <20170531174244.31861-1-krzk@kernel.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 31 May 2017 10:44:05 -0700
+Subject: [GIT PULL] bcm2835 DT fixes for 4.12
+In-Reply-To: <1791886363.81865.1496251246175@email.1und1.de>
+References: <20170516221931.31292-1-eric@anholt.net>
+ <d16bf00b-d058-08d1-ed6a-2f369d1fd611@gmail.com>
+ <1791886363.81865.1496251246175@email.1und1.de>
+Message-ID: <98834BF8-FEC0-4DCB-B2C1-C2B1838AF5B6@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While splitting Samsung pinctrl drivers per ARMv7 and ARMv8
-architectures, the necessary CONFIG_PINCTRL_EXYNOS_ARM is not selected
-when building for S5Pv210 family of SoCs thus pinctrl was missing there
-entirely.
+On May 31, 2017 10:20:46 AM PDT, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+>Hi Florian,
+>
+>> Florian Fainelli <f.fainelli@gmail.com> hat am 19. Mai 2017 um 20:17
+>geschrieben:
+>> 
+>> 
+>> On 05/16/2017 03:19 PM, Eric Anholt wrote:
+>> > Hi Florian,
+>> > 
+>> > The following changes since commit
+>2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+>> > 
+>> >   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+>> > 
+>> > are available in the git repository at:
+>> > 
+>> >   git://github.com/anholt/linux tags/bcm2835-dt-fixes-2017-05-16
+>> > 
+>> > for you to fetch changes up to
+>b0804ed0cadd7e38d94d2f15cdcc0d9695818856:
+>> > 
+>> >   ARM: dts: bcm283x: Reserve first page for firmware (2017-05-15
+>15:05:29 -0700)
+>> > 
+>> > ----------------------------------------------------------------
+>> > This pull request brings in a fix for booting on SMP Raspberry Pis,
+>> > particularly with maxcpus=1
+>> > 
+>> > ----------------------------------------------------------------
+>> 
+>> Merged, thanks Eric
+>
+>when it's planned to send this fix to Olof?
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+It's been sent and merged already but I realized lakml was not copied:
 
----
-
-Fixes: 16340fd6dbc1 ("pinctrl: samsung: Split Exynos drivers per ARMv7 and ARMv8")
-
-Fixed commit is in my tree but already applied and sitting in next for
-some time. This should be squashed though.
----
- drivers/pinctrl/samsung/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/pinctrl/samsung/Kconfig b/drivers/pinctrl/samsung/Kconfig
-index c33ee6293c30..0357f9701eb9 100644
---- a/drivers/pinctrl/samsung/Kconfig
-+++ b/drivers/pinctrl/samsung/Kconfig
-@@ -10,7 +10,7 @@ config PINCTRL_EXYNOS
- 	bool "Pinctrl driver data for Samsung EXYNOS SoCs other than 5440"
- 	depends on OF && GPIOLIB && (ARCH_EXYNOS || ARCH_S5PV210)
- 	select PINCTRL_SAMSUNG
--	select PINCTRL_EXYNOS_ARM if ARM && ARCH_EXYNOS
-+	select PINCTRL_EXYNOS_ARM if ARM && (ARCH_EXYNOS || ARCH_S5PV210)
- 	select PINCTRL_EXYNOS_ARM64 if ARM64 && ARCH_EXYNOS
- 
- config PINCTRL_EXYNOS_ARM
+https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git/log/?h=fixes
+Hi,
 -- 
-2.9.3
+Florian
