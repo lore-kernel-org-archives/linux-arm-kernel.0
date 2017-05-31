@@ -1,71 +1,31 @@
-From: Claudiu.Beznea@microchip.com (m18063)
-Date: Wed, 31 May 2017 12:02:04 +0300
-Subject: [PATCH v2] ARM: dts: at91: sama5d2_xplained: add pwm controller
-In-Reply-To: <20170531085018.tmbwqrqiiwitnm5u@piout.net>
-References: <1487839757-14040-1-git-send-email-claudiu.beznea@microchip.com>
- <20170531085018.tmbwqrqiiwitnm5u@piout.net>
-Message-ID: <11d288df-db08-6e14-98a8-1ce6d669c31b@microchip.com>
+From: alexandre.torgue@st.com (Alexandre TORGUE)
+Date: Wed, 31 May 2017 11:10:43 +0200
+Subject: [PATCH] pinctrl: stm32: remove useless check
+Message-ID: <1496221843-10697-1-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+There is no link between the number of elements of tab which contains all
+pin desc (located in each pinctrl-stm32xxxx.c files) and the pin number
+(defined in the tab).
 
+Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
-On 31.05.2017 11:50, Alexandre Belloni wrote:
-> Hi,
-> 
-> On 23/02/2017 at 10:49:17 +0200, Claudiu Beznea wrote:
->> Add pwm controller bindings for sam5d2_xplained
->> and enable it.
->>
->> Changes since v1:
->> - Correct the typo in patch subject.
->>
->> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
->> ---
->>  arch/arm/boot/dts/at91-sama5d2_xplained_common.dtsi | 4 ++++
->>  arch/arm/boot/dts/sama5d2.dtsi                      | 8 ++++++++
->>  2 files changed, 12 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained_common.dtsi b/arch/arm/boot/dts/at91-sama5d2_xplained_common.dtsi
->> index 9fc270f..493ea29 100644
->> --- a/arch/arm/boot/dts/at91-sama5d2_xplained_common.dtsi
->> +++ b/arch/arm/boot/dts/at91-sama5d2_xplained_common.dtsi
->> @@ -318,6 +318,10 @@
->>  				};
->>  			};
->>  
->> +			pwm0: pwm at f802c000 {
->> +				status = "okay";
->> +			};
->> +
->>  			flx0: flexcom at f8034000 {
->>  				atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_USART>;
->>  				status = "disabled"; /* conflict with ISC_D2 & ISC_D3 data pins */
-> 
-> 
-> This doesn't apply on v4.12-rc1, this file doesn't exist.
-Sorry, I will resend it.
-> 
->> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
->> index cd459e8..e88785e 100644
->> --- a/arch/arm/boot/dts/sama5d2.dtsi
->> +++ b/arch/arm/boot/dts/sama5d2.dtsi
->> @@ -1098,6 +1098,14 @@
->>  				status = "disabled";
->>  			};
->>  
->> +			pwm0: pwm at f802c000 {
->> +				compatible = "atmel,sama5d2-pwm";
->> +				reg = <0xf802c000 0x4000>;
->> +				interrupts = <38 IRQ_TYPE_LEVEL_HIGH 7>;
->> +				#pwm-cells = <3>;
->> +				clocks = <&pwm_clk>;
->> +			};
->> +
->>  			sfr: sfr at f8030000 {
->>  				compatible = "atmel,sama5d2-sfr", "syscon";
->>  				reg = <0xf8030000 0x98>;
->> -- 
->> 2.7.4
->>
-> 
+diff --git a/drivers/pinctrl/stm32/pinctrl-stm32.c b/drivers/pinctrl/stm32/pinctrl-stm32.c
+index d3c5f5d..8be7ebd 100644
+--- a/drivers/pinctrl/stm32/pinctrl-stm32.c
++++ b/drivers/pinctrl/stm32/pinctrl-stm32.c
+@@ -411,11 +411,6 @@ static int stm32_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
+ 		pin = STM32_GET_PIN_NO(pinfunc);
+ 		func = STM32_GET_PIN_FUNC(pinfunc);
+ 
+-		if (pin >= pctl->match_data->npins) {
+-			dev_err(pctl->dev, "invalid pin number.\n");
+-			return -EINVAL;
+-		}
+-
+ 		if (!stm32_pctrl_is_function_valid(pctl, pin, func)) {
+ 			dev_err(pctl->dev, "invalid function.\n");
+ 			return -EINVAL;
+-- 
+1.9.1
