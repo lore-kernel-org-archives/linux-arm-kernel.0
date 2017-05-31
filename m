@@ -1,53 +1,79 @@
-From: jun.gao@mediatek.com (Jun Gao)
-Date: Wed, 31 May 2017 10:24:29 +0800
-Subject: [PATCH v4 1/2] dt-bindings: i2c: Add Mediatek MT2701 i2c binding
-In-Reply-To: <20170530213828.pxmexdzfv6u5db6m@rob-hp-laptop>
-References: <1495784107-6711-1-git-send-email-jun.gao@mediatek.com>
- <1495784107-6711-2-git-send-email-jun.gao@mediatek.com>
- <1d073e6a-e275-24e1-7954-f1af913bd03b@gmail.com>
- <20170530213828.pxmexdzfv6u5db6m@rob-hp-laptop>
-Message-ID: <1496197469.930.17.camel@mhfsdcap03>
+From: eddie.cai.linux@gmail.com (Eddie Cai)
+Date: Wed, 31 May 2017 10:28:29 +0800
+Subject: [PATCH V2] ARM: dts: rockchip:add sd card support for firefly
+ reload board
+In-Reply-To: <951b3bad-eae7-f870-2bc1-8e230bfa4904@arm.com>
+References: <1495782439-27142-1-git-send-email-eddie.cai.linux@gmail.com>
+ <951b3bad-eae7-f870-2bc1-8e230bfa4904@arm.com>
+Message-ID: <CAJrj+DM7YDC1CPWLne-O6u1iRJxxK_+CMq9pa=hvkzZuKqFEMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-05-30 at 16:38 -0500, Rob Herring wrote:
-> On Mon, May 29, 2017 at 05:30:26PM +0200, Matthias Brugger wrote:
-> g> 
-> > 
-> > On 26/05/17 09:35, Jun Gao wrote:
-> > > From: Jun Gao <jun.gao@mediatek.com>
-> > > 
-> > > Add MT2701 i2c binding to i2c-mt6577.txt and there is no need to
-> > > modify i2c driver.
-> > > 
-> > > Signed-off-by: Jun Gao <jun.gao@mediatek.com>
-> > > ---
-> > >   Documentation/devicetree/bindings/i2c/i2c-mt6577.txt | 11 ++++++-----
-> > >   1 file changed, 6 insertions(+), 5 deletions(-)
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
-> > > index 0ce6fa3..52f2023 100644
-> > > --- a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
-> > > +++ b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
-> > > @@ -4,11 +4,12 @@ The Mediatek's I2C controller is used to interface with I2C devices.
-> > >   Required properties:
-> > >     - compatible: value should be either of the following.
-> > > -      (a) "mediatek,mt6577-i2c", for i2c compatible with mt6577 i2c.
-> > > -      (b) "mediatek,mt6589-i2c", for i2c compatible with mt6589 i2c.
-> > > -      (c) "mediatek,mt8127-i2c", for i2c compatible with mt8127 i2c.
-> > > -      (d) "mediatek,mt8135-i2c", for i2c compatible with mt8135 i2c.
-> > > -      (e) "mediatek,mt8173-i2c", for i2c compatible with mt8173 i2c.
-> > > +	"mediatek,mt2701-i2c", "mediatek,mt6577-i2c": for Mediatek MT2701
-> > 
-> > I send a cleanup patch for the file, which fixes all the other SoCs.
-> > I can fold this one into it, a soon as I got a Signed-off from the DT
-> > maintainers.
-> 
-> I already acked it on the prior versions.
-> 
-> Rob
-
-Hi Matthias,
-
-Which patch should I use now? Or you help to modify dt-binding, I only
-send dtsi file patch ?  Thanks!
+2017-05-26 19:31 GMT+08:00 Robin Murphy <robin.murphy@arm.com>:
+> On 26/05/17 08:07, Eddie Cai wrote:
+>> firefly reload board not support sd card yet. so support it.
+>
+> I'm confused... According to pictures and the schematic the microSD
+> socket and vcc_sd supply are on the baseboard, not the core module, and
+> these nodes already exist in rk3288-firefly-reload.dts :/
+agree, please ignore this patch
+>
+> Robin.
+>
+>> Signed-off-by: Eddie Cai <eddie.cai.linux@gmail.com>
+>> Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
+>> ---
+>>  arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi | 31 +++++++++++++++++++++++
+>>  1 file changed, 31 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+>> index 413b61f..2f41209 100644
+>> --- a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+>> +++ b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+>> @@ -57,6 +57,17 @@
+>>               clock-output-names = "ext_gmac";
+>>       };
+>>
+>> +     vcc_sd: sdmmc-regulator {
+>> +             compatible = "regulator-fixed";
+>> +             gpio = <&gpio7 RK_PB3 GPIO_ACTIVE_LOW>;
+>> +             pinctrl-names = "default";
+>> +             pinctrl-0 = <&sdmmc_pwr>;
+>> +             regulator-name = "vcc_sd";
+>> +             regulator-min-microvolt = <3300000>;
+>> +             regulator-max-microvolt = <3300000>;
+>> +             startup-delay-us = <100000>;
+>> +             vin-supply = <&vcc_io>;
+>> +     };
+>>
+>>       vcc_flash: flash-regulator {
+>>               compatible = "regulator-fixed";
+>> @@ -281,6 +292,26 @@
+>>                       rockchip,pins = <4 8 RK_FUNC_GPIO &pcfg_output_high>;
+>>               };
+>>       };
+>> +
+>> +     sdmmc {
+>> +             sdmmc_pwr: sdmmc-pwr {
+>> +                     rockchip,pins = <7 11 RK_FUNC_GPIO &pcfg_pull_none>;
+>> +             };
+>> +     };
+>> +};
+>> +
+>> +&sdmmc {
+>> +     bus-width = <4>;
+>> +     cap-mmc-highspeed;
+>> +     cap-sd-highspeed;
+>> +     card-detect-delay = <200>;
+>> +     disable-wp;
+>> +     num-slots = <1>;
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&sdmmc_clk>, <&sdmmc_cmd>, <&sdmmc_cd>, <&sdmmc_bus4>;
+>> +     vmmc-supply = <&vcc_sd>;
+>> +     vqmmc-supply = <&vccio_sd>;
+>> +     status = "okay";
+>>  };
+>>
+>>  &tsadc {
+>>
+>
