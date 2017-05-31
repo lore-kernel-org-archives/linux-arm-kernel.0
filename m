@@ -1,54 +1,190 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 31 May 2017 15:04:24 -0500
-Subject: [PATCH v4 1/2] PCI: Add tango MSI controller support
-In-Reply-To: <74d6d867-313a-2304-9753-9739ad4703a8@free.fr>
-References: <ef36137c-f0d1-23b9-8b91-a6ed87239578@arm.com>
- <aec89b9a-8377-ff39-547c-9e6eaf254fab@free.fr>
- <f1a57255-be75-e8c4-6b8d-0254f4365d61@arm.com>
- <c78b1e79-59e5-0097-989e-1f1e8cd93fc4@arm.com>
- <b10a211d-1f4a-1cc1-7139-9b48a90dd1c6@free.fr>
- <20170531173414.GB4496@bhelgaas-glaptop.roam.corp.google.com>
- <4885137f-7c1c-5742-4f66-f48c32ce7abb@free.fr>
- <20170531190037.GA18084@bhelgaas-glaptop.roam.corp.google.com>
- <20170531191258.GA18454@bhelgaas-glaptop.roam.corp.google.com>
- <74d6d867-313a-2304-9753-9739ad4703a8@free.fr>
-Message-ID: <20170531200424.GA23171@bhelgaas-glaptop.roam.corp.google.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Wed, 31 May 2017 15:05:59 -0500
+Subject: [PATCH 1/3] Documentation: DT: add Keystone DSP remoteproc binding
+In-Reply-To: <20170531191231.5qt2lfv73p572gmd@rob-hp-laptop>
+References: <20170526165317.23164-1-s-anna@ti.com>
+ <20170526165317.23164-2-s-anna@ti.com>
+ <20170531191231.5qt2lfv73p572gmd@rob-hp-laptop>
+Message-ID: <884f5585-eac2-57b2-a2be-879bf23f2e00@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 31, 2017 at 09:27:50PM +0200, Mason wrote:
-> On 31/05/2017 21:12, Bjorn Helgaas wrote:
-> > On Wed, May 31, 2017 at 02:00:37PM -0500, Bjorn Helgaas wrote:
-> >> On Wed, May 31, 2017 at 08:49:04PM +0200, Mason wrote:
-> >>> On 31/05/2017 19:34, Bjorn Helgaas wrote:
-> >>> ...
-> >>
-> >>>> This would be more an IRQ patch than a PCI patch, but if I were
-> >>>> reviewing it, I would look for assurance that *all* the no-op
-> >>>> .irq_set_affinity callbacks were cleaned up, not just those in
-> >>>> drivers/pci/host.
-> >>>
-> >>> Are you saying the patch is *wrong* if not all "do-nothing"
-> >>> callbacks are cleaned up?
-> >>
-> >> I'm saying that (1) this probably wouldn't be applied via the PCI
-> >> tree, and (2) if it *were* applied via PCI, I would ask that all the
-> >> no-op callbacks were cleaned up at the same time.
-> >>
-> >> Huh, that sounds a lot like what I wrote above.  Was I unclear?
-> > 
-> > I'm afraid this sounded snarky, which isn't my intention.  It seems
-> > like there's a useful patch here, and I didn't want to see it get
-> > ignored for lack of following the usual process.  If this is all
-> > obvious to you, my apologies and please ignore my suggestion.
-> 
-> Thanks for clearing things up. I had indeed assumed from
-> your first reply that the patch was pointless.
-> 
-> Writing a script locating all candidates will be an
-> interesting exercise.
+Hi Rob,
 
-Cscope only sees 94 definitions of irq_set_affinity.  I know *I* could
-never write a script faster than looking at them manually.  While
-doing that, I noticed irq_chip_set_affinity_parent(), which is used in
-14 cases and appears similar to your patch.
+On 05/31/2017 02:12 PM, Rob Herring wrote:
+> On Fri, May 26, 2017 at 11:53:15AM -0500, Suman Anna wrote:
+>> Add the device tree bindings document for the Texas Instrument's
+>> Keystone 2 DSP remoteproc devices.
+>>
+>> Signed-off-by: Suman Anna <s-anna@ti.com>
+>> Signed-off-by: Sam Nelson <sam.nelson@ti.com>
+>> ---
+>>  .../bindings/remoteproc/ti,keystone-rproc.txt      | 132 +++++++++++++++++++++
+>>  1 file changed, 132 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/remoteproc/ti,keystone-rproc.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/remoteproc/ti,keystone-rproc.txt b/Documentation/devicetree/bindings/remoteproc/ti,keystone-rproc.txt
+>> new file mode 100644
+>> index 000000000000..f1ba88edd00d
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/remoteproc/ti,keystone-rproc.txt
+>> @@ -0,0 +1,132 @@
+>> +TI Keystone DSP devices
+>> +=======================
+>> +
+>> +Binding status: Unstable - Subject to changes for using multiple memory regions
+> 
+> I don't really see what would be unstable here. memory-region is easily 
+> extended to multiple entries.
+
+OK will drop this line.
+
+> 
+>> +
+>> +The TI Keystone 2 family of SoCs usually have one or more (upto 8) TI DSP Core
+>> +sub-systems that are used to offload some of the processor-intensive tasks or
+>> +algorithms, for achieving various system level goals.
+>> +
+>> +These processor sub-systems usually contain additional sub-modules like L1
+>> +and/or L2 caches/SRAMs, an Interrupt Controller, an external memory controller,
+>> +a dedicated local power/sleep controller etc. The DSP processor core in
+>> +Keystone 2 SoCs is usually a TMS320C66x CorePac processor.
+>> +
+>> +DSP Device Node:
+>> +================
+>> +Each DSP Core sub-system is represented as a single DT node. Each node has a
+>> +number of required or optional properties that enable the OS running on the
+>> +host processor (ARM CorePac) to perform the device management of the remote
+>> +processor and to communicate with the remote processor.
+>> +
+>> +Required properties:
+>> +--------------------
+>> +The following are the mandatory properties:
+>> +
+>> +- compatible:		Should be one of the following,
+>> +			    "ti,k2hk-dsp" for DSPs on Keystone 2 66AK2H/K SoCs
+>> +			    "ti,k2l-dsp" for DSPs on Keystone 2 66AK2L SoCs
+>> +			    "ti,k2e-dsp" for DSPs on Keystone 2 66AK2E SoCs
+>> +
+>> +- reg:			Should contain an entry for each value in 'reg-names'.
+>> +			Each entry should have the memory region's start address
+>> +			and the size of the region, the representation matching
+>> +			the parent node's '#address-cells' and '#size-cells' values.
+>> +
+>> +- reg-names:		Should contain strings with the following names, each
+>> +			representing a specific internal memory region, and
+>> +			should be defined in this order,
+>> +			     "l2sram", "l1pram", "l1dram"
+>> +
+>> +- label:		Should contain a string identifying the DSP instance
+>> +			within the SoC. Should be the string "dsp" followed by
+>> +			the instance number. Eg: "dsp0", "dsp1",..."dsp7" etc
+> 
+> Why does a user need to know or care?
+
+This is used to distinguish the exact DSP instance from others since the
+DT node name is a generic "dsp". One of the uses is to be able to
+construct a firmware name within the driver using this label.
+
+> 
+>> +
+>> +- clocks: 		Should contain the device's input clock, and should be
+>> +			defined as per the bindings in,
+>> +			Documentation/devicetree/bindings/clock/keystone-gate.txt
+>> +
+>> +- ti,syscon-dev:	Should be a pair of the phandle to the Keystone Device
+>> +			State Control node, and the register offset of the DSP
+>> +			boot address register within that node's address space.
+>> +
+>> +- resets:		Should contain the phandle to the reset controller node
+>> +			managing the resets for this device, and a reset
+>> +			specifier. Please refer to the following reset bindings
+>> +			for the reset argument specifier as per SoC,
+>> +			Documentation/devicetree/bindings/reset/ti-syscon-reset.txt
+>> +			    for 66AK2HK/66AK2L/66AK2E SoCs
+>> +
+>> +- interrupt-parent:	Should contain a phandle to the Keystone 2 IRQ controller
+>> +			IP node that is used by the ARM CorePac processor to
+>> +			receive interrupts from the DSP remote processors. See
+>> +			Documentation/devicetree/bindings/interrupt-controller/ti,keystone-irq.txt
+>> +			for details.
+>> +
+>> +- interrupts: 		Should contain an entry for each value in 'interrupt-names'.
+>> +			Each entry should have the interrupt source number used by
+>> +			the remote processor to the host processor. The values should
+>> +			follow the interrupt-specifier format as dictated by the
+>> +			'interrupt-parent' node. The purpose of each is as per the
+>> +			description in the 'interrupt-names' property.
+>> +
+>> +- interrupt-names:	Should contain strings with the following names, each
+>> +			representing a specific interrupt,
+>> +			    "vring" - interrupt for virtio based IPC
+>> +			    "exception" - interrupt for exception notification
+>> +
+>> +- kick-gpio: 		Should specify the gpio device needed for the virtio IPC
+> 
+> -gpios
+
+Will fix.
+
+> 
+>> +			stack. This will be used to interrupt the remote processor.
+>> +			The gpio device to be used is as per the bindings in,
+>> +			Documentation/devicetree/bindings/gpio/gpio-dsp-keystone.txt
+>> +
+>> +Optional properties:
+>> +--------------------
+>> +
+>> +- memory-region:	phandle to the reserved memory node to be associated
+>> +			with the remoteproc device. The reserved memory node
+>> +			can be a CMA memory node, and should be defined as
+>> +			per the bindings in
+>> +			Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+>> +
+>> +
+>> +Example:
+>> +--------
+>> +
+>> +	/* 66AK2H/K DSP node in SoC DTS file */
+>> +	soc {
+>> +		dsp0: dsp at 10800000 {
+>> +			compatible = "ti,k2hk-dsp";
+>> +			reg = <0x10800000 0x00100000>,
+>> +			      <0x10e00000 0x00008000>,
+>> +			      <0x10f00000 0x00008000>;
+>> +			reg-names = "l2sram", "l1pram", "l1dram";
+>> +			label = "dsp0";
+>> +			clocks = <&clkgem0>;
+>> +			ti,syscon-dev = <&devctrl 0x40>;
+>> +			resets = <&pscrst 0>;
+>> +			interrupt-parent = <&kirq0>;
+>> +			interrupts = <0 8>;
+>> +			interrupt-names = "vring", "exception";
+>> +			kick-gpio = <&dspgpio0 27 0>;
+>> +		};
+>> +
+>> +	};
+>> +
+>> +	/* K2HK EVM Board file */
+>> +	reserved-memory {
+>> +		#address-cells = <2>;
+>> +		#size-cells = <2>;
+>> +		ranges;
+>> +
+>> +		dsp_common_cma_pool: dsp_common_cma_pool at 81f800000 {
+>> +			compatible = "shared-dma-pool";
+>> +			reg = <0x00000008 0x1f800000 0x00000000 0x800000>;
+>> +			reusable;
+>> +			status = "okay";
+>> +		};
+>> +	};
+>> +
+>> +	&dsp0 {
+>> +		memory-region = <&dsp_common_cma_pool>;
+>> +	};
+
+Will also fix this up based on your comments on the Davinci remoteproc
+driver binding.
+
+regards
+Suman
