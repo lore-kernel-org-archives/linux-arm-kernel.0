@@ -1,31 +1,46 @@
-From: alexandre.torgue@st.com (Alexandre TORGUE)
-Date: Wed, 31 May 2017 11:10:43 +0200
-Subject: [PATCH] pinctrl: stm32: remove useless check
-Message-ID: <1496221843-10697-1-git-send-email-alexandre.torgue@st.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 31 May 2017 11:15:43 +0200
+Subject: [PATCH 0/9] Add support for the pin controllers on the Marvell
+ Armada 7K/8K
+In-Reply-To: <cover.0dd8a92ae74fcec8d0470d0a7016035089e46eed.1495209664.git-series.gregory.clement@free-electrons.com>
+References: <cover.0dd8a92ae74fcec8d0470d0a7016035089e46eed.1495209664.git-series.gregory.clement@free-electrons.com>
+Message-ID: <20170531111543.7c753308@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no link between the number of elements of tab which contains all
-pin desc (located in each pinctrl-stm32xxxx.c files) and the pin number
-(defined in the tab).
+Hello,
 
-Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
+On Fri, 19 May 2017 18:04:42 +0200, Gregory CLEMENT wrote:
 
-diff --git a/drivers/pinctrl/stm32/pinctrl-stm32.c b/drivers/pinctrl/stm32/pinctrl-stm32.c
-index d3c5f5d..8be7ebd 100644
---- a/drivers/pinctrl/stm32/pinctrl-stm32.c
-+++ b/drivers/pinctrl/stm32/pinctrl-stm32.c
-@@ -411,11 +411,6 @@ static int stm32_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
- 		pin = STM32_GET_PIN_NO(pinfunc);
- 		func = STM32_GET_PIN_FUNC(pinfunc);
- 
--		if (pin >= pctl->match_data->npins) {
--			dev_err(pctl->dev, "invalid pin number.\n");
--			return -EINVAL;
--		}
--
- 		if (!stm32_pctrl_is_function_valid(pctl, pin, func)) {
- 			dev_err(pctl->dev, "invalid function.\n");
- 			return -EINVAL;
+> Gregory CLEMENT (6):
+>   MAINTAINERS: extend mvebu SoC entry with pinctrl drivers
+>   pinctrl: dt-bindings: add documentation for AP806 pin controllers
+>   pinctrl: dt-bindings: add documentation for CP110 pin controllers
+>   pinctrl: mvebu: remove the offset property for regmap
+>   arm64: marvell: enable the Armada 7K/8K pinctrl driver
+>   arm64: dts: marvell: add pinctrl support for Armada 7K/8K
+> 
+> Hanna Hawa (2):
+>   pinctrl: mvebu: add driver for Armada AP806 pinctrl
+>   pinctrl: mvebu: add driver for Armada CP110 pinctrl
+> 
+> Russell King (1):
+>   pinctrl: avoid PLAT_ORION dependency
+
+I have tested the combination of your four series (touching clock,
+pinmux and gpio) on Armada 8K MacchiatoBin, and I was able to validate
+that the CP110 pinmuxing works as expected.
+
+I used MPP37 and MPP38, which I was able to configure as GPIO or I2C0,
+and validate that they are working as GPIOs and as I2C0.
+
+I was however unable to test the AP MPPs due to the lack of access to
+such pins.
+
+Best regards,
+
+Thomas
 -- 
-1.9.1
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
