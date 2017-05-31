@@ -1,58 +1,42 @@
-From: claudiu.beznea@microchip.com (Claudiu Beznea)
-Date: Wed, 31 May 2017 12:23:12 +0300
-Subject: [PATCH v3] ARM: dts: at91: sama5d2_xplained: add pwm controller
-Message-ID: <1496222592-19375-1-git-send-email-claudiu.beznea@microchip.com>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Wed, 31 May 2017 11:25:40 +0200
+Subject: [RESEND PATCH] tee: optee: fix uninitialized symbol 'parg'
+Message-ID: <1496222740-11217-1-git-send-email-jens.wiklander@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pwm controller bindings for sama5d2_xplained
-and enable it.
+Fixes the static checker warning in optee_release().
+error: uninitialized symbol 'parg'.
 
-Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
 ---
-Changes in v3:
-- enable pwm in at91-sama5d2_xplained.dts file
+ drivers/tee/optee/core.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-Changes in v2:
-- Correct the typo in patch subject.
-
- arch/arm/boot/dts/at91-sama5d2_xplained.dts | 4 ++++
- arch/arm/boot/dts/sama5d2.dtsi              | 8 ++++++++
- 2 files changed, 12 insertions(+)
-
-diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-index 0bef9e0..558b0af 100644
---- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-@@ -227,6 +227,10 @@
- 				};
- 			};
+diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
+index 58169e519422..857141e29e80 100644
+--- a/drivers/tee/optee/core.c
++++ b/drivers/tee/optee/core.c
+@@ -224,13 +224,14 @@ static void optee_release(struct tee_context *ctx)
+ 	if (!IS_ERR(shm)) {
+ 		arg = tee_shm_get_va(shm, 0);
+ 		/*
+-		 * If va2pa fails for some reason, we can't call
+-		 * optee_close_session(), only free the memory. Secure OS
+-		 * will leak sessions and finally refuse more sessions, but
+-		 * we will at least let normal world reclaim its memory.
++		 * If va2pa fails for some reason, we can't call into
++		 * secure world, only free the memory. Secure OS will leak
++		 * sessions and finally refuse more sessions, but we will
++		 * at least let normal world reclaim its memory.
+ 		 */
+ 		if (!IS_ERR(arg))
+-			tee_shm_va2pa(shm, arg, &parg);
++			if (tee_shm_va2pa(shm, arg, &parg))
++				arg = NULL; /* prevent usage of parg below */
+ 	}
  
-+			pwm0: pwm at f802c000 {
-+				status = "okay";
-+			};
-+
- 			flx0: flexcom at f8034000 {
- 				atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_USART>;
- 				status = "disabled"; /* conflict with ISC_D2 & ISC_D3 data pins */
-diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-index 8067c71..bf21b63 100644
---- a/arch/arm/boot/dts/sama5d2.dtsi
-+++ b/arch/arm/boot/dts/sama5d2.dtsi
-@@ -1065,6 +1065,14 @@
- 				status = "disabled";
- 			};
- 
-+			pwm0: pwm at f802c000 {
-+				compatible = "atmel,sama5d2-pwm";
-+				reg = <0xf802c000 0x4000>;
-+				interrupts = <38 IRQ_TYPE_LEVEL_HIGH 7>;
-+				#pwm-cells = <3>;
-+				clocks = <&pwm_clk>;
-+			};
-+
- 			sfr: sfr at f8030000 {
- 				compatible = "atmel,sama5d2-sfr", "syscon";
- 				reg = <0xf8030000 0x98>;
+ 	list_for_each_entry_safe(sess, sess_tmp, &ctxdata->sess_list,
 -- 
 2.7.4
