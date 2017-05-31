@@ -1,26 +1,25 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 30 May 2017 16:27:50 -0700
-Subject: [PATCH] ARM64: dts: meson-gx: Add SPICC nodes
-In-Reply-To: <m27f0yt2cv.fsf@baylibre.com> (Kevin Hilman's message of "Tue, 30
- May 2017 15:18:56 -0700")
-References: <1496045395-5702-1-git-send-email-narmstrong@baylibre.com>
- <m27f0yt2cv.fsf@baylibre.com>
-Message-ID: <m237bmsz61.fsf@baylibre.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 31 May 2017 02:05:12 +0200
+Subject: [PATCH v2 1/3] pinctrl: stm32: set pin to gpio input when used as
+ interrupt
+In-Reply-To: <1496074653-2941-2-git-send-email-alexandre.torgue@st.com>
+References: <1496074653-2941-1-git-send-email-alexandre.torgue@st.com>
+ <1496074653-2941-2-git-send-email-alexandre.torgue@st.com>
+Message-ID: <CACRpkdbp1tbBhhd+ttBYApB0dOKx_N3U42cEb6r7wgVLJdRoyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman <khilman@baylibre.com> writes:
+On Mon, May 29, 2017 at 6:17 PM, Alexandre TORGUE
+<alexandre.torgue@st.com> wrote:
 
-> Neil Armstrong <narmstrong@baylibre.com> writes:
+> This patch ensures that pin is correctly set as gpio input when it is used
+> as an interrupt.
 >
->> Add nodes for the SPICC controller on GX common dtsi, GXBB and
->> GXL dtsi files.
->>
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->
-> Applied to v4.13/dt64,
+> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
-Oops, this one will have to wait until we have an immutable branch in
-the clk tree.
+Nice!
 
-Kevin
+Patch applied.
+
+Yours,
+Linus Walleij
