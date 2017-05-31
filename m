@@ -1,59 +1,47 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 31 May 2017 03:06:20 +0200
-Subject: [PATCH v3 2/6] ARM: at91: Document samx7 compatibles
-In-Reply-To: <20170531010624.32552-1-alexandre.belloni@free-electrons.com>
-References: <20170531010624.32552-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170531010624.32552-3-alexandre.belloni@free-electrons.com>
+Date: Wed, 31 May 2017 03:06:18 +0200
+Subject: [PATCH v3 0/6] ARM: at91: initial samx7 support
+Message-ID: <20170531010624.32552-1-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce necessary compatibles to describe the samx7 family
+Hi,
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- .../devicetree/bindings/arm/atmel-at91.txt         | 30 ++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+This series adds initial support for Atmel armv7m SoCs.
 
-diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-index 799af90dd75b..38923cc0fab4 100644
---- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
-+++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-@@ -41,6 +41,36 @@ compatible: must be one of:
-        - "atmel,sama5d43"
-        - "atmel,sama5d44"
- 
-+ * "atmel,samx7" for MCUs using a Cortex-M7, shall be extended with the specific
-+   SoC family:
-+    o "atmel,sams70" shall be extended with the specific MCU compatible:
-+       - "atmel,sams70j19"
-+       - "atmel,sams70j20"
-+       - "atmel,sams70j21"
-+       - "atmel,sams70n19"
-+       - "atmel,sams70n20"
-+       - "atmel,sams70n21"
-+       - "atmel,sams70q19"
-+       - "atmel,sams70q20"
-+       - "atmel,sams70q21"
-+    o "atmel,samv70" shall be extended with the specific MCU compatible:
-+       - "atmel,samv70j19"
-+       - "atmel,samv70j20"
-+       - "atmel,samv70n19"
-+       - "atmel,samv70n20"
-+       - "atmel,samv70q19"
-+       - "atmel,samv70q20"
-+    o "atmel,samv71" shall be extended with the specific MCU compatible:
-+       - "atmel,samv71j19"
-+       - "atmel,samv71j20"
-+       - "atmel,samv71j21"
-+       - "atmel,samv71n19"
-+       - "atmel,samv71n20"
-+       - "atmel,samv71n21"
-+       - "atmel,samv71q19"
-+       - "atmel,samv71q20"
-+       - "atmel,samv71q21"
-+
- Chipid required properties:
- - compatible: Should be "atmel,sama5d2-chipid"
- - reg : Should contain registers location and length
+Changes in v3:
+ - dropped most of the changes in Atmel/README
+ - rebased on v4.12-rc1
+ - removed the dtsi until the tcb series is taken
+
+Changes in v2:
+ - fixed checkpatch issues
+ - Added documentation
+ - removed Ethernet from the dtsi until the driver change is taken
+
+
+Alexandre Belloni (3):
+  ARM: at91: Documentation: add samx7 families
+  ARM: at91: Document samx7 compatibles
+  ARM: at91: handle CONFIG_PM for armv7m configurations
+
+Szemz? Andr?s (3):
+  ARM: at91: Add armv7m support
+  ARM: at91: add SAMx7 SoC detection
+  ARM: at91: debug: add samx7 support
+
+ Documentation/arm/Atmel/README                     | 38 +++++++++++++++++++++-
+ .../devicetree/bindings/arm/atmel-at91.txt         | 30 +++++++++++++++++
+ arch/arm/Kconfig.debug                             | 10 ++++++
+ arch/arm/mach-at91/Kconfig                         | 15 ++++++++-
+ arch/arm/mach-at91/Makefile                        |  4 +--
+ arch/arm/mach-at91/Makefile.boot                   |  3 ++
+ arch/arm/mach-at91/samx7.c                         | 34 +++++++++++++++++++
+ drivers/soc/atmel/soc.c                            | 24 ++++++++++++++
+ drivers/soc/atmel/soc.h                            | 26 +++++++++++++++
+ 9 files changed, 180 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/mach-at91/Makefile.boot
+ create mode 100644 arch/arm/mach-at91/samx7.c
+
 -- 
 2.11.0
