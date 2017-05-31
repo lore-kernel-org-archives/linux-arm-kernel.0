@@ -1,86 +1,151 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Wed, 31 May 2017 10:32:21 -0700
-Subject: Device address specific mapping of arm,mmu-500
-In-Reply-To: <20170531124418.GE9723@arm.com>
-References: <1b79efe2-6835-7a7a-f5ad-361391a7b967@broadcom.com>
- <20170530151437.GC23067@arm.com>
- <81637642-22d9-4868-156f-052f64bd042f@broadcom.com>
- <226bcebc-3902-90d3-24e5-51f2e1f3affb@arm.com>
- <a85b2e3f-93db-7c4d-cde8-32a57e69bef9@broadcom.com>
- <16e5fc9d-b014-af7c-dcda-527522ac5cc9@arm.com>
- <b47a379e-4a1b-42ff-8604-01b5becd685c@broadcom.com>
- <7bd03bf8-71d5-a974-bea2-a38b4349c547@broadcom.com>
- <20170531124418.GE9723@arm.com>
-Message-ID: <ee5bffb3-3aca-8214-1445-98f1f2d4ba09@broadcom.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 31 May 2017 12:34:14 -0500
+Subject: [PATCH v4 1/2] PCI: Add tango MSI controller support
+In-Reply-To: <b10a211d-1f4a-1cc1-7139-9b48a90dd1c6@free.fr>
+References: <d054300a-5891-0a25-8726-2be6b1beff6c@sigmadesigns.com>
+ <1f6b50c7-4887-838e-8c7d-c014d82b6d8e@sigmadesigns.com>
+ <8e56647d-3b2d-9bfc-b59e-79a2efaa7826@sigmadesigns.com>
+ <20170523170319.GB24431@bhelgaas-glaptop.roam.corp.google.com>
+ <b6541fd2-200f-35be-208e-931bb0b5ba49@free.fr>
+ <ef36137c-f0d1-23b9-8b91-a6ed87239578@arm.com>
+ <aec89b9a-8377-ff39-547c-9e6eaf254fab@free.fr>
+ <f1a57255-be75-e8c4-6b8d-0254f4365d61@arm.com>
+ <c78b1e79-59e5-0097-989e-1f1e8cd93fc4@arm.com>
+ <b10a211d-1f4a-1cc1-7139-9b48a90dd1c6@free.fr>
+Message-ID: <20170531173414.GB4496@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On 5/31/17 5:44 AM, Will Deacon wrote:
-> On Tue, May 30, 2017 at 11:13:36PM -0700, Ray Jui wrote:
->> I did a little more digging myself and I think I now understand what you
->> meant by identity mapping, i.e., configuring the MMU-500 with 1:1 mapping
->> between the DMA address and the IOVA address.
->>
->> I think that should work. In the end, due to this MSI write parsing issue in
->> our PCIe controller, the reason to use IOMMU is to allow the cache
->> attributes (AxCACHE) of the MSI writes towards GICv3 ITS to be modified by
->> the IOMMU to be device type, while leaving the rest of inbound reads/writes
->> from/to DDR with more optimized cache attributes setting, to allow I/O
->> coherency to be still enabled for the PCIe controller. In fact, the PCIe
->> controller itself is fully capable of DMA to/from the full address space of
->> our SoC including both DDR and any device memory.
->>
->> The 1:1 mapping will still pose some translation overhead like you
->> suggested; however, the overhead of allocating page tables and locking will
->> be gone. This sounds like the best possible option I have currently.
+On Wed, May 31, 2017 at 04:18:44PM +0200, Mason wrote:
+> On 24/05/2017 12:22, Marc Zyngier wrote:
+> > On 24/05/17 11:00, Robin Murphy wrote:
+> >> On 23/05/17 20:15, Mason wrote:
+> >>> On 23/05/2017 20:03, Robin Murphy wrote:
+> >>>> On 23/05/17 18:54, Mason wrote:
+> >>>>> On 23/05/2017 19:03, Bjorn Helgaas wrote:
+> >>>>>> On Wed, May 17, 2017 at 04:56:08PM +0200, Marc Gonzalez wrote:
+> >>>>>>> On 20/04/2017 16:28, Marc Gonzalez wrote:
+> >>>>>>>
+> >>>>>>>> +static int tango_set_affinity(struct irq_data *data,
+> >>>>>>>> +		const struct cpumask *mask, bool force)
+> >>>>>>>> +{
+> >>>>>>>> +	return -EINVAL;
+> >>>>>>>> +}
+> >>>>>>>> +
+> >>>>>>>> +static struct irq_chip tango_chip = {
+> >>>>>>>> +	.irq_ack		= tango_ack,
+> >>>>>>>> +	.irq_mask		= tango_mask,
+> >>>>>>>> +	.irq_unmask		= tango_unmask,
+> >>>>>>>> +	.irq_set_affinity	= tango_set_affinity,
+> >>>>>>>> +	.irq_compose_msi_msg	= tango_compose_msi_msg,
+> >>>>>>>> +};
+> >>>>>>>
+> >>>>>>> Hmmm... I'm wondering why .irq_set_affinity is required.
+> >>>>>>>
+> >>>>>>> static int setup_affinity(struct irq_desc *desc, struct cpumask *mask)
+> >>>>>>> first calls __irq_can_set_affinity() to check whether
+> >>>>>>> desc->irq_data.chip->irq_set_affinity) exists.
+> >>>>>>>
+> >>>>>>> then calls irq_do_set_affinity(&desc->irq_data, mask, false);
+> >>>>>>> which calls chip->irq_set_affinity(data, mask, force);
+> >>>>>>> = msi_domain_set_affinity()
+> >>>>>>> which calls parent->chip->irq_set_affinity() unconditionally.
+> >>>>>>>
+> >>>>>>> Would it make sense to test that the callback is implemented
+> >>>>>>> before calling it?
+> >>>>>>>
+> >>>>>>>
+> >>>>>>> [    0.723895] Unable to handle kernel NULL pointer dereference at virtual address 00000000
+> >>>>>>
+> >>>>>> I'm not sure what you're asking.
+> >>>>>>
+> >>>>>> Is this a bug report for the v4 tango driver?
+> >>>>>
+> >>>>> No.
+> >>>>>
+> >>>>>> Or are you asking whether msi_domain_set_affinity() should be changed
+> >>>>>> to check whether parent->chip->irq_set_affinity is implemented?
+> >>>>>
+> >>>>> Yes. The way things are implemented now, drivers are forced
+> >>>>> to define an irq_set_affinity callback, even if it just returns
+> >>>>> an error, otherwise, the kernel crashes, because of the
+> >>>>> unconditional function pointer deref. 
+> >>>>>
+> >>>>>> msi_domain_set_affinity() has called parent->chip->irq_set_affinity()
+> >>>>>> without checking since it was added in 2014 by f3cf8bb0d6c3 ("genirq: Add
+> >>>>>> generic msi irq domain support"), so if there's a problem here, it's most
+> >>>>>> likely in the tango code.
+> >>>>>
+> >>>>> The issue is having to define an "empty" function.
+> >>>>> (Unnecessary code bloat and maintenance.)
+> >>>>
+> >>>> AFAICS, only one driver (other than this one) implements a "do nothing"
+> >>>> set_affinity callback - everyone else who doesn't do anything hardware
+> >>>> specific just passes it along via irq_chip_set_affinity_parent().
+> >>>
+> >>> I counted 4. Where did I mess up?
+> >>>
+> >>> advk_msi_set_affinity
+> >>> altera_msi_set_affinity
+> >>> nwl_msi_set_affinity
+> >>> vmd_irq_set_affinity
+> >>> tango_set_affinity
+> >>
+> >> Fair point - I went through drivers/irqchip and the various
+> >> arch-specific instances and found ls_scfg_msi_set_affinity(), but
+> >> somehow skipped over drivers/pci. Anyway, I think the question stands of
+> >> why are these handful of drivers *not* using irq_chip_set_affinity_parent()?
+> > 
+> > Probably because they don't have a parent, in the hierarchical sense.
+> > All they have is a chained interrupt (*puke*). Which implies that
+> > changing the affinity of one MSI would affect all of them, completely
+> > confusing unsuspecting userspace such as irqbalance.
+> > 
+> >> As an outsider, it naively seems logical that the affinity of an MSI
+> >> which just gets translated to a wired interrupt should propagate through
+> >> to the affinity of that wired interrupt, but maybe there are reasons not
+> >> to; I really don't know.
+> > 
+> > See above. The main issue is that HW folks haven't understood the actual
+> > use of MSIs, and persist in implementing them as an afterthought, based
+> > on some cascading interrupt controller design.
+> > 
+> > Sad. So sad.
 > 
-> It might end up being pretty invasive to work around a hardware bug, so
-> we'll have to see what it looks like. Ideally, we could just use the SMMU
-> for everything as-is and work on clawing back the lost performance (it
-> should be possible to get ~95% of the perf if we sort out the locking, which
-> we *are* working on).
+> For the record, below is the patch I had in mind:
 > 
-
-If 95% of performance can be achieved by fixing the locking in the
-driver, then that's great news.
-
-If you have anything that you want me to help test, feel free to send it
-out. I will be more than happy to help testing it and let you know about
-the performance numbers, :)
-
->> May I ask, how do I start to try to get this identity mapping to work as an
->> experiment and proof of concept? Any pointer or advise is highly appreciated
->> as you can see I'm not very experienced with this. I found Will recently
->> added the IOMMU_DOMAIN_IDENTITY support to the arm-smmu driver. But I
->> suppose that is to bypass the SMMU completely, instead of still going
->> through the MMU with 1:1 translation. Is my understanding correct?
+> diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
+> index 8a3e872798f3..edfc95575a37 100644
+> --- a/kernel/irq/msi.c
+> +++ b/kernel/irq/msi.c
+> @@ -91,9 +91,11 @@ int msi_domain_set_affinity(struct irq_data *irq_data,
+>  {
+>         struct irq_data *parent = irq_data->parent_data;
+>         struct msi_msg msg;
+> -       int ret;
+> +       int ret = -EINVAL;
+> +
+> +       if (parent->chip->irq_set_affinity)
+> +               ret = parent->chip->irq_set_affinity(parent, mask, force);
+>  
+> -       ret = parent->chip->irq_set_affinity(parent, mask, force);
+>         if (ret >= 0 && ret != IRQ_SET_MASK_OK_DONE) {
+>                 BUG_ON(irq_chip_compose_msi_msg(irq_data, &msg));
+>                 irq_chip_write_msi_msg(irq_data, &msg);
 > 
-> Yes, I don't think IOMMU_DOMAIN_IDENTITY is what you need because you
-> actally need per-page control of memory attributes.
 > 
-> Robin might have a better idea, but I think you'll have to hack dma-iommu.c
-> so that you can have a version of the DMA ops that:
 > 
->   * Initialises the identity map (I guess as normal WB cacheable?)
->   * Reserves and maps the MSI region appropriately
->   * Just returns the physical address for the dma address for map requests
->     (return error for the MSI region)
->   * Does nothing for unmap requests
-> 
-> But my strong preference would be to fix the locking overhead from the
-> SMMU so that the perf hit is acceptable.
+> Then, it would be safe to remove "do-nothing" .irq_set_affinity
+> callbacks in drivers/pci/host
 
-Yes, I agree, we want to be able to use the SMMU the intended way. Do
-you have a timeline on when the locking issue may be fixed (or
-improved)? Depending on the timeline, on our side, we may still need to
-go for identity mapping as a temporary solution until the fix.
+I assume it's obvious that nobody else is going to take this and run
+with it, so nothing will happen with this unless you finish it up by
+doing the cleanup (removing the "do-nothing" callbacks) and adding a
+changelog and signed-off-by.
 
-> 
-> Will
-> 
+This would be more an IRQ patch than a PCI patch, but if I were
+reviewing it, I would look for assurance that *all* the no-op
+.irq_set_affinity callbacks were cleaned up, not just those in
+drivers/pci/host.
 
-Thanks,
-
-Ray
+Bjorn
