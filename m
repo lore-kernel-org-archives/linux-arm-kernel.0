@@ -1,16 +1,36 @@
 From: davem@davemloft.net (David Miller)
-Date: Thu, 01 Jun 2017 14:58:19 -0400 (EDT)
-Subject: [PATCH v6 00/21] net-next: stmmac: add dwmac-sun8i ethernet driver
-In-Reply-To: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
-References: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170601.145819.789604139072328057.davem@davemloft.net>
+Date: Thu, 01 Jun 2017 15:03:20 -0400 (EDT)
+Subject: [PATCH v2 0/2] ARM: imx6ul-14x14-evk: Fix suspend over nfs by phy
+In-Reply-To: <cover.1496224930.git.leonard.crestez@nxp.com>
+References: <cover.1496224930.git.leonard.crestez@nxp.com>
+Message-ID: <20170601.150320.128443002523337995.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Corentin Labbe <clabbe.montjoie@gmail.com>
-Date: Wed, 31 May 2017 09:18:31 +0200
+From: Leonard Crestez <leonard.crestez@nxp.com>
+Date: Wed, 31 May 2017 13:29:28 +0300
 
-> This patch series add the driver for dwmac-sun8i which handle the Ethernet MAC
-> present on Allwinner H3/H5/A83T/A64 SoCs.
+> Right now attempting doing suspend/resume while root is mounted over NFS
+> hangs on imx6ul-14x14-evk. This is happening because ksz8081 phy fixups are
+> lost on resume.
+> 
+> Fix this by using equivalent devicetree properties instead of a phy fixup
+> and handling those properties on resume in the micrel driver.
+> 
+> In theory it might now be possible to remove the phy fixup from mach-imx6ul
+> entirely but it is possible that this would break other imx6ul boards which
+> use the same phy. The solution would be to patch their dts but it's not
+> clear how to identify affected boards.
+> 
+> This code is shared with imx6ull-14x14-evk but 6ull suspend needs an
+> unrelated patch: https://lkml.org/lkml/2017/5/30/584
+> 
+> This is something of a corner case so there is no CC: stable.
+> 
+> Changes since v1: https://lkml.org/lkml/2017/5/30/672 
+>  * Split a kszphy_config_reset function for stuff shared between
+> config_init and resume. Calling config_init directly could be an option but
+> on some HW variants it does extra stuff like parsing devicetree options.
+> That would not be appropriate for resume code.
 
-Series applied, but wow that's a lot of DT file changes :-(
+Series applied.
