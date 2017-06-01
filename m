@@ -1,31 +1,48 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 1 Jun 2017 11:17:12 -0700
-Subject: [PATCH 2/2 v2] clk: qoriq: Separate root input clock for core
- PLLs on ls1012a
-In-Reply-To: <HE1PR0402MB282824858F29C431E97DBF07F3F60@HE1PR0402MB2828.eurprd04.prod.outlook.com>
-References: <1489977443-33582-1-git-send-email-andy.tang@nxp.com>
- <1489977443-33582-2-git-send-email-andy.tang@nxp.com>
- <20170601082804.GE20170@codeaurora.org>
- <HE1PR0402MB282824858F29C431E97DBF07F3F60@HE1PR0402MB2828.eurprd04.prod.outlook.com>
-Message-ID: <20170601181712.GI20170@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 1 Jun 2017 19:20:44 +0100
+Subject: [PATCH v2] arm64: kernel: restrict /dev/mem read() calls to
+ linear region
+In-Reply-To: <20170519154200.14158-1-ard.biesheuvel@linaro.org>
+References: <20170519154200.14158-1-ard.biesheuvel@linaro.org>
+Message-ID: <20170601182044.GF16599@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01, Andy Tang wrote:
-> Hi Stephen,
-> 
-> Thanks for your applying.
-> 
-> There are other two patches sent on April 6, 2017:
-> https://patchwork.kernel.org/patch/9665973/
-> https://patchwork.kernel.org/patch/9665977/
-> 
-> Hope they are in your review queue. Please give it a review.
-> 
+Hi Ard,
 
-Yep they're there. I need to go update patchwork so the queue can
-be known outside my local inbox.
+On Fri, May 19, 2017 at 04:42:00PM +0100, Ard Biesheuvel wrote:
+> When running lscpu on an AArch64 system that has SMBIOS version 2.0
+> tables, it will segfault in the following way:
+> 
+>   Unable to handle kernel paging request at virtual address ffff8000bfff0000
+>   pgd = ffff8000f9615000
+>   [ffff8000bfff0000] *pgd=0000000000000000
+>   Internal error: Oops: 96000007 [#1] PREEMPT SMP
+>   Modules linked in:
+>   CPU: 0 PID: 1284 Comm: lscpu Not tainted 4.11.0-rc3+ #103
+>   Hardware name: QEMU QEMU Virtual Machine, BIOS 0.0.0 02/06/2015
+>   task: ffff8000fa78e800 task.stack: ffff8000f9780000
+>   PC is at __arch_copy_to_user+0x90/0x220
+>   LR is at read_mem+0xcc/0x140
+> 
+> This is caused by the fact that lspci issues a read() on /dev/mem at the
+> offset where it expects to find the SMBIOS structure array. However, this
+> region is classified as EFI_RUNTIME_SERVICE_DATA (as per the UEFI spec),
+> and so it is omitted from the linear mapping.
+> 
+> So let's restrict /dev/mem read/write access to those areas that are
+> covered by the linear region.
+> 
+> Reported-by: Alexander Graf <agraf@suse.de>
+> Fixes: 4dffbfc48d65 ("arm64/efi: mark UEFI reserved regions as MEMBLOCK_NOMAP")
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> v2: check whether the entire region is covered by the same memblock that has
+>     the MEMBLOCK_NOMAP attribute cleared
+> 
+>  arch/arm64/mm/mmap.c | 19 +++++++++++++------
+>  1 file changed, 13 insertions(+), 6 deletions(-)
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks. I'll stick this into -next and see how we do.
+
+Will
