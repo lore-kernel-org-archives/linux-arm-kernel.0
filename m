@@ -1,75 +1,51 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu,  1 Jun 2017 21:38:53 +0200
-Subject: [PATCH v3 01/13] crypto: sun4i-ss: group variable definitions in
- sun4i_hash()
+Date: Thu,  1 Jun 2017 21:38:55 +0200
+Subject: [PATCH v3 03/13] crypto: sun4i-ss: use lower/upper_32_bits helpers
 In-Reply-To: <20170601193905.28829-1-antoine.tenart@free-electrons.com>
 References: <20170601193905.28829-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170601193905.28829-2-antoine.tenart@free-electrons.com>
+Message-ID: <20170601193905.28829-4-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cosmetic change to avoid having a full screen a variable definitions. It
-also helps to see which variables share the same type.
+Replace custom bit shifts and masks with lower/upper_32_bits helpers.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 Tested-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 Acked-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- drivers/crypto/sunxi-ss/sun4i-ss-hash.c | 31 +++++++++++--------------------
- 1 file changed, 11 insertions(+), 20 deletions(-)
+ drivers/crypto/sunxi-ss/sun4i-ss-hash.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
-index 0de2f62d51ff..855325338844 100644
+index 39f0abe5ee25..e53c3127b743 100644
 --- a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
 +++ b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
-@@ -167,37 +167,28 @@ int sun4i_hash_import_sha1(struct ahash_request *areq, const void *in)
-  */
- static int sun4i_hash(struct ahash_request *areq)
- {
--	u32 v, ivmode = 0;
--	unsigned int i = 0;
- 	/*
- 	 * i is the total bytes read from SGs, to be compared to areq->nbytes
- 	 * i is important because we cannot rely on SG length since the sum of
- 	 * SG->length could be greater than areq->nbytes
-+	 *
-+	 * end is the position when we need to stop writing to the device,
-+	 * to be compared to i
-+	 *
-+	 * in_i: advancement in the current SG
- 	 */
--
-+	unsigned int i = 0, end, index, padlen, nwait, nbw = 0, j = 0, todo;
-+	unsigned int in_i = 0;
-+	u32 spaces, rx_cnt = SS_RX_DEFAULT, bf[32], wb = 0, v, ivmode = 0;
- 	struct sun4i_req_ctx *op = ahash_request_ctx(areq);
- 	struct crypto_ahash *tfm = crypto_ahash_reqtfm(areq);
- 	struct sun4i_tfm_ctx *tfmctx = crypto_ahash_ctx(tfm);
- 	struct sun4i_ss_ctx *ss = tfmctx->ss;
--	unsigned int in_i = 0; /* advancement in the current SG */
--	unsigned int end;
--	/*
--	 * end is the position when we need to stop writing to the device,
--	 * to be compared to i
--	 */
--	int in_r, err = 0;
--	unsigned int todo;
--	u32 spaces, rx_cnt = SS_RX_DEFAULT;
--	size_t copied = 0;
-+	struct scatterlist *in_sg = areq->src;
+@@ -188,7 +188,6 @@ static int sun4i_hash(struct ahash_request *areq)
  	struct sg_mapping_iter mi;
--	unsigned int j = 0;
--	int zeros;
--	unsigned int index, padlen;
-+	int in_r, err = 0, zeros;
-+	size_t copied = 0;
- 	__be64 bits;
--	u32 bf[32];
--	u32 wb = 0;
--	unsigned int nwait, nbw = 0;
--	struct scatterlist *in_sg = areq->src;
+ 	int in_r, err = 0, zeros;
+ 	size_t copied = 0;
+-	__be64 bits;
  
  	dev_dbg(ss->dev, "%s %s bc=%llu len=%u mode=%x wl=%u h0=%0x",
  		__func__, crypto_tfm_alg_name(areq->base.tfm),
+@@ -423,12 +422,13 @@ static int sun4i_hash(struct ahash_request *areq)
+ 
+ 	/* write the length of data */
+ 	if (op->mode == SS_OP_SHA1) {
+-		bits = cpu_to_be64(op->byte_count << 3);
+-		bf[j++] = bits & 0xffffffff;
+-		bf[j++] = (bits >> 32) & 0xffffffff;
++		__be64 bits = cpu_to_be64(op->byte_count << 3);
++		bf[j++] = lower_32_bits(bits);
++		bf[j++] = upper_32_bits(bits);
+ 	} else {
+-		bf[j++] = (op->byte_count << 3) & 0xffffffff;
+-		bf[j++] = (op->byte_count >> 29) & 0xffffffff;
++		__le64 bits = op->byte_count << 3;
++		bf[j++] = lower_32_bits(bits);
++		bf[j++] = upper_32_bits(bits);
+ 	}
+ 	writesl(ss->base + SS_RXFIFO, bf, j);
+ 
 -- 
 2.9.4
