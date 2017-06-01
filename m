@@ -1,65 +1,47 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  1 Jun 2017 11:21:08 +0100
-Subject: [PATCH v2 16/25] KVM: arm64: vgic-v3: Enable trapping of Group-0
- system registers
-In-Reply-To: <20170601102117.17750-1-marc.zyngier@arm.com>
-References: <20170601102117.17750-1-marc.zyngier@arm.com>
-Message-ID: <20170601102117.17750-17-marc.zyngier@arm.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Thu,  1 Jun 2017 12:34:29 +0200
+Subject: [PATCH] ARM: shmobile: Update R-Car Gen3 ULCB board part numbers
+Message-ID: <1496313269-27795-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to be able to trap Group-0 GICv3 system registers, we need to
-set ICH_HCR_EL2.TALL0 begore entering the guest. This is conditionnaly
-done after having restored the guest's state, and cleared on exit.
+The board part numbers for the R-Car H3 and M3 ULCB boards corresponded
+to versions predating mass production.  Update them for mass production.
 
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Note that the H3 ULCB board can be equipped with either revision ES1.1
+or ES2.0 of the R-Car H3 SoC.  While these have different board part
+numbers, no new compatible values are needed, as the revision can be
+detected at runtime using the PRR register.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- include/linux/irqchip/arm-gic-v3.h | 1 +
- virt/kvm/arm/vgic/vgic-v3.c        | 5 ++++-
- 2 files changed, 5 insertions(+), 1 deletion(-)
+See also http://elinux.org/index.php?title=R-Car/Boards/H3SK
 
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 03b5a28bb2d0..46a1e0943cf8 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -417,6 +417,7 @@
- 
- #define ICH_HCR_EN			(1 << 0)
- #define ICH_HCR_UIE			(1 << 1)
-+#define ICH_HCR_TALL0			(1 << 11)
- #define ICH_HCR_TALL1			(1 << 12)
- #define ICH_HCR_EOIcount_SHIFT		27
- #define ICH_HCR_EOIcount_MASK		(0x1f << ICH_HCR_EOIcount_SHIFT)
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index a16769276efd..7525216ef988 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -21,6 +21,7 @@
- 
- #include "vgic.h"
- 
-+static bool group0_trap;
- static bool group1_trap;
- 
- void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
-@@ -241,6 +242,8 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
- 
- 	/* Get the show on the road... */
- 	vgic_v3->vgic_hcr = ICH_HCR_EN;
-+	if (group0_trap)
-+		vgic_v3->vgic_hcr |= ICH_HCR_TALL0;
- 	if (group1_trap)
- 		vgic_v3->vgic_hcr |= ICH_HCR_TALL1;
- }
-@@ -473,7 +476,7 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
- 	if (kvm_vgic_global_state.vcpu_base == 0)
- 		kvm_info("disabling GICv2 emulation\n");
- 
--	if (group1_trap) {
-+	if (group0_trap || group1_trap) {
- 		kvm_info("GICv3 sysreg trapping enabled (reduced performance)\n");
- 		static_branch_enable(&vgic_v3_cpuif_trap);
- 	}
+ Documentation/devicetree/bindings/arm/shmobile.txt | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+index 4b60ce21f4f3af5f..c80a0fd05d753a90 100644
+--- a/Documentation/devicetree/bindings/arm/shmobile.txt
++++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -59,7 +59,8 @@ Boards:
+     compatible = "renesas,gr-peach", "renesas,r7s72100"
+   - Gose (RTP0RC7793SEB00010S)
+     compatible = "renesas,gose", "renesas,r8a7793"
+-  - H3ULCB (R-Car Starter Kit Premier, RTP0RC7795SKB00010S)
++  - H3ULCB (R-Car Starter Kit Premier, RTP0RC7795SKBX0010SA00 (H3 ES1.1))
++    H3ULCB (R-Car Starter Kit Premier, RTP0RC77951SKBX010SA00 (H3 ES2.0))
+     compatible = "renesas,h3ulcb", "renesas,r8a7795";
+   - Henninger
+     compatible = "renesas,henninger", "renesas,r8a7791"
+@@ -71,7 +72,7 @@ Boards:
+     compatible = "renesas,kzm9g", "renesas,sh73a0"
+   - Lager (RTP0RC7790SEB00010S)
+     compatible = "renesas,lager", "renesas,r8a7790"
+-  - M3ULCB (R-Car Starter Kit Pro, RTP0RC7796SKB00010S)
++  - M3ULCB (R-Car Starter Kit Pro, RTP0RC7796SKBX0010SA09 (M3 ES1.0))
+     compatible = "renesas,m3ulcb", "renesas,r8a7796";
+   - Marzen (R0P7779A00010S)
+     compatible = "renesas,marzen", "renesas,r8a7779"
 -- 
-2.11.0
+2.7.4
