@@ -1,26 +1,35 @@
 From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Thu, 1 Jun 2017 22:46:28 +0200
-Subject: [PATCH 0/5] ARM-OMAP1: Adjustments for three function implementations
-Message-ID: <85e2ec7f-f650-28a2-6cc5-0b4b52e44183@users.sourceforge.net>
+Date: Thu, 1 Jun 2017 22:48:00 +0200
+Subject: [PATCH 1/5] ARM: OMAP1: DMA: Improve a size determination in
+ omap1_system_dma_init()
+In-Reply-To: <85e2ec7f-f650-28a2-6cc5-0b4b52e44183@users.sourceforge.net>
+References: <85e2ec7f-f650-28a2-6cc5-0b4b52e44183@users.sourceforge.net>
+Message-ID: <9765c4ce-fe2b-dee7-b79a-b6393fb79594@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Thu, 1 Jun 2017 22:40:04 +0200
+Date: Thu, 1 Jun 2017 21:48:11 +0200
 
-A few update suggestions were taken into account
-from static source code analysis.
+Replace the specification of a data structure by a pointer dereference
+as the parameter for the operator "sizeof" to make the corresponding size
+determination a bit safer according to the Linux coding style convention.
 
-Markus Elfring (5):
-  Improve a size determination in omap1_system_dma_init()
-  Delete an error message for a failed memory allocation in omap1_system_dma_init()
-  Delete an unnecessary return statement in omap1_show_dma_caps()
-  Delete an error message for a failed memory allocation in omap1_dm_timer_init()
-  Fix a typo in a comment line
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ arch/arm/mach-omap1/dma.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- arch/arm/mach-omap1/dma.c   | 5 +----
- arch/arm/mach-omap1/timer.c | 4 +---
- 2 files changed, 2 insertions(+), 7 deletions(-)
-
+diff --git a/arch/arm/mach-omap1/dma.c b/arch/arm/mach-omap1/dma.c
+index c821c1d5610e..823dba3dc033 100644
+--- a/arch/arm/mach-omap1/dma.c
++++ b/arch/arm/mach-omap1/dma.c
+@@ -339,5 +339,5 @@ static int __init omap1_system_dma_init(void)
+ 		goto exit_iounmap;
+ 	}
+ 
+-	d = kzalloc(sizeof(struct omap_dma_dev_attr), GFP_KERNEL);
++	d = kzalloc(sizeof(*d), GFP_KERNEL);
+ 	if (!d) {
 -- 
 2.13.0
