@@ -1,30 +1,29 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu, 01 Jun 2017 11:59:53 +0200
-Subject: [PATCH] ARM64: dts: meson-gx: Add SPICC nodes
-In-Reply-To: <m237bmsz61.fsf@baylibre.com>
-References: <1496045395-5702-1-git-send-email-narmstrong@baylibre.com>
- <m27f0yt2cv.fsf@baylibre.com> <m237bmsz61.fsf@baylibre.com>
-Message-ID: <1496311193.3552.3.camel@baylibre.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 1 Jun 2017 15:35:35 +0530
+Subject: [GIT PULL] DaVinci fixes v4.12 (part 2)
+Message-ID: <f7958956-504d-a8b1-90e1-709a845312da@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-05-30 at 16:27 -0700, Kevin Hilman wrote:
-> Kevin Hilman <khilman@baylibre.com> writes:
-> 
-> > Neil Armstrong <narmstrong@baylibre.com> writes:
-> > 
-> > > Add nodes for the SPICC controller on GX common dtsi, GXBB and
-> > > GXL dtsi files.
-> > > 
-> > > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> > 
-> > Applied to v4.13/dt64,
-> 
-> Oops, this one will have to wait until we have an immutable branch in
-> the clk tree.
+The following changes since commit 95d7c1f18bf8ac03b0fc48eac1f1b11f867765b8:
 
-Now available : meson-clk-headers-for-4.13
+  ARM: davinci: PM: Do not free useful resources in normal path in 'davinci_pm_init' (2017-05-17 15:25:18 +0530)
 
-> 
-> Kevin
-> 
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v4.12-p2
+
+for you to fetch changes up to f434b1c4aba5cc4e5bae4399a965b5fd14011d69:
+
+  MAINTAINERS: add device-tree files to TI DaVinci entry (2017-05-30 16:29:57 +0530)
+
+----------------------------------------------------------------
+A fix to MAINTAINERS file adding relevant device-tree
+files to mach-davinci entry.
+
+----------------------------------------------------------------
+Sekhar Nori (1):
+      MAINTAINERS: add device-tree files to TI DaVinci entry
+
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
