@@ -1,81 +1,134 @@
-From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Thu,  1 Jun 2017 22:10:30 +0200
-Subject: [PATCH] ARM: dts: mvebu: Add PWM properties for armada-38x
-Message-ID: <20170601201030.22525-1-ralph.sennhauser@gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 01 Jun 2017 22:18:02 +0200
+Subject: [PATCH 4/4] phy: rockchip-inno-usb2: add support of usb2-phy for
+ rk322x SoCs
+In-Reply-To: <1495078982-2555-5-git-send-email-frank.wang@rock-chips.com>
+References: <1495078982-2555-1-git-send-email-frank.wang@rock-chips.com>
+ <1495078982-2555-5-git-send-email-frank.wang@rock-chips.com>
+Message-ID: <2655472.BTSNDfobEl@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the required properties to the GPIO nodes for them to be used as PWM
-lines.
+Hi Frank,
 
-Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
+Am Donnerstag, 18. Mai 2017, 11:43:02 CEST schrieb Frank Wang:
+> This adds support usb2-phy for rk322x SoCs and amend phy Documentation.
+> 
+> Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
 
----
+this adds a devicetree binding, so you should include devicetree people in
+the recipient list:
 
-Hi everyone,
+Rob Herring <robh+dt@kernel.org>
+Mark Rutland <mark.rutland@arm.com>
+devicetree at vger.kernel.org
 
-this patch uses "marvell,armada-370-gpio" for the compatible property
-and as such depends on the rename of the property to still make it in in
-time for 4.12 ("gpio: mvebu: change compatible string for PWM support").
-Otherwise the compatible string will need to be amended to
-"marvell,armada-370-xp-gpio".
+as they should Ack such binding additions.
 
-Checked the functional spec and the register ranges and offsets are the
-same as for armada-xp. Likely the same holds true for the armada-39x
-family, though I neither have access to the spec nor any such hardware.
 
-Ralph
----
- arch/arm/boot/dts/armada-38x.dtsi | 16 ++++++++++++----
- 1 file changed, 12 insertions(+), 4 deletions(-)
+> ---
+>  .../bindings/phy/phy-rockchip-inno-usb2.txt        |  1 +
+>  drivers/phy/phy-rockchip-inno-usb2.c               | 60 ++++++++++++++++++++++
+>  2 files changed, 61 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
+> index e71a8d2..b4ce12e 100644
+> --- a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
+> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
+> @@ -2,6 +2,7 @@ ROCKCHIP USB2.0 PHY WITH INNO IP BLOCK
+>  
+>  Required properties (phy (parent) node):
+>   - compatible : should be one of the listed compatibles:
+> +	* "rockchip,rk322x-usb2phy"
 
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index 8b165c3..af31f5d 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -312,31 +312,39 @@
- 			};
- 
- 			gpio0: gpio at 18100 {
--				compatible = "marvell,orion-gpio";
--				reg = <0x18100 0x40>;
-+				compatible = "marvell,armada-370-gpio",
-+					     "marvell,orion-gpio";
-+				reg = <0x18100 0x40>, <0x181c0 0x08>;
-+				reg-names = "gpio", "pwm";
- 				ngpios = <32>;
- 				gpio-controller;
- 				#gpio-cells = <2>;
-+				#pwm-cells = <2>;
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
- 				interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&coreclk 0>;
- 			};
- 
- 			gpio1: gpio at 18140 {
--				compatible = "marvell,orion-gpio";
--				reg = <0x18140 0x40>;
-+				compatible = "marvell,armada-370-gpio",
-+					     "marvell,orion-gpio";
-+				reg = <0x18140 0x40>, <0x181c8 0x08>;
-+				reg-names = "gpio", "pwm";
- 				ngpios = <28>;
- 				gpio-controller;
- 				#gpio-cells = <2>;
-+				#pwm-cells = <2>;
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
- 				interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&coreclk 0>;
- 			};
- 
- 			systemc: system-controller at 18200 {
--- 
-2.10.2
+devicetree compatibles should not contain wildcards, so please name that
+"rockchip,rk3228-usb2phy"
+
+here and in the driver as well.
+
+
+Heiko
+
+
+>  	* "rockchip,rk3328-usb2phy"
+>  	* "rockchip,rk3366-usb2phy"
+>  	* "rockchip,rk3399-usb2phy"
+> diff --git a/drivers/phy/phy-rockchip-inno-usb2.c b/drivers/phy/phy-rockchip-inno-usb2.c
+> index d026b4cf..b9d4e23 100644
+> --- a/drivers/phy/phy-rockchip-inno-usb2.c
+> +++ b/drivers/phy/phy-rockchip-inno-usb2.c
+> @@ -1144,6 +1144,65 @@ static int rockchip_usb2phy_probe(struct platform_device *pdev)
+>  	return ret;
+>  }
+>  
+> +static const struct rockchip_usb2phy_cfg rk322x_phy_cfgs[] = {
+> +	{
+> +		.reg = 0x760,
+> +		.num_ports	= 2,
+> +		.clkout_ctl	= { 0x0768, 4, 4, 1, 0 },
+> +		.port_cfgs	= {
+> +			[USB2PHY_PORT_OTG] = {
+> +				.phy_sus	= { 0x0760, 15, 0, 0, 0x1d1 },
+> +				.bvalid_det_en	= { 0x0680, 3, 3, 0, 1 },
+> +				.bvalid_det_st	= { 0x0690, 3, 3, 0, 1 },
+> +				.bvalid_det_clr	= { 0x06a0, 3, 3, 0, 1 },
+> +				.ls_det_en	= { 0x0680, 2, 2, 0, 1 },
+> +				.ls_det_st	= { 0x0690, 2, 2, 0, 1 },
+> +				.ls_det_clr	= { 0x06a0, 2, 2, 0, 1 },
+> +				.utmi_bvalid	= { 0x0480, 4, 4, 0, 1 },
+> +				.utmi_ls	= { 0x0480, 3, 2, 0, 1 },
+> +			},
+> +			[USB2PHY_PORT_HOST] = {
+> +				.phy_sus	= { 0x0764, 15, 0, 0, 0x1d1 },
+> +				.ls_det_en	= { 0x0680, 4, 4, 0, 1 },
+> +				.ls_det_st	= { 0x0690, 4, 4, 0, 1 },
+> +				.ls_det_clr	= { 0x06a0, 4, 4, 0, 1 }
+> +			}
+> +		},
+> +		.chg_det = {
+> +			.opmode		= { 0x0760, 3, 0, 5, 1 },
+> +			.cp_det		= { 0x0884, 4, 4, 0, 1 },
+> +			.dcp_det	= { 0x0884, 3, 3, 0, 1 },
+> +			.dp_det		= { 0x0884, 5, 5, 0, 1 },
+> +			.idm_sink_en	= { 0x0768, 8, 8, 0, 1 },
+> +			.idp_sink_en	= { 0x0768, 7, 7, 0, 1 },
+> +			.idp_src_en	= { 0x0768, 9, 9, 0, 1 },
+> +			.rdm_pdwn_en	= { 0x0768, 10, 10, 0, 1 },
+> +			.vdm_src_en	= { 0x0768, 12, 12, 0, 1 },
+> +			.vdp_src_en	= { 0x0768, 11, 11, 0, 1 },
+> +		},
+> +	},
+> +	{
+> +		.reg = 0x800,
+> +		.num_ports	= 2,
+> +		.clkout_ctl	= { 0x0808, 4, 4, 1, 0 },
+> +		.port_cfgs	= {
+> +			[USB2PHY_PORT_OTG] = {
+> +				.phy_sus	= { 0x800, 15, 0, 0, 0x1d1 },
+> +				.ls_det_en	= { 0x0684, 0, 0, 0, 1 },
+> +				.ls_det_st	= { 0x0694, 0, 0, 0, 1 },
+> +				.ls_det_clr	= { 0x06a4, 0, 0, 0, 1 }
+> +			},
+> +			[USB2PHY_PORT_HOST] = {
+> +				.phy_sus	= { 0x804, 15, 0, 0, 0x1d1 },
+> +				.ls_det_en	= { 0x0684, 1, 1, 0, 1 },
+> +				.ls_det_st	= { 0x0694, 1, 1, 0, 1 },
+> +				.ls_det_clr	= { 0x06a4, 1, 1, 0, 1 }
+> +			}
+> +		},
+> +	},
+> +	{ /* sentinel */ }
+> +};
+> +
+>  static const struct rockchip_usb2phy_cfg rk3328_phy_cfgs[] = {
+>  	{
+>  		.reg = 0x100,
+> @@ -1269,6 +1328,7 @@ static const struct rockchip_usb2phy_cfg rk3399_phy_cfgs[] = {
+>  };
+>  
+>  static const struct of_device_id rockchip_usb2phy_dt_match[] = {
+> +	{ .compatible = "rockchip,rk322x-usb2phy", .data = &rk322x_phy_cfgs },
+>  	{ .compatible = "rockchip,rk3328-usb2phy", .data = &rk3328_phy_cfgs },
+>  	{ .compatible = "rockchip,rk3366-usb2phy", .data = &rk3366_phy_cfgs },
+>  	{ .compatible = "rockchip,rk3399-usb2phy", .data = &rk3399_phy_cfgs },
+> 
