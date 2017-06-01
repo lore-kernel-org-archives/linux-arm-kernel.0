@@ -1,86 +1,77 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu,  1 Jun 2017 21:38:58 +0200
-Subject: [PATCH v3 06/13] crypto: sun4i-ss: simplify the pad length calculation
+Date: Thu,  1 Jun 2017 21:39:02 +0200
+Subject: [PATCH v3 10/13] crypto: sun4i-ss: add the
+ CRYPTO_ALG_KERN_DRIVER_ONLY flag
 In-Reply-To: <20170601193905.28829-1-antoine.tenart@free-electrons.com>
 References: <20170601193905.28829-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170601193905.28829-7-antoine.tenart@free-electrons.com>
+Message-ID: <20170601193905.28829-11-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When sending the last block of data to the engine, it should be padded
-so that the total length of the request can be given to the engine as
-the last 2 words of the last 64 bytes block.
-
-Simplify the calculation of this pad offset.
+The CRYPTO_ALG_KERN_DRIVER_ONLY flag is set for hardware accelerated
+ciphers accessible through a kernel driver only. This is the case for
+ciphers exposed by the sun4i-ss driver. This patch sets this flag.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 Tested-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 Acked-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- drivers/crypto/sunxi-ss/sun4i-ss-hash.c | 29 ++++++++++++-----------------
- 1 file changed, 12 insertions(+), 17 deletions(-)
+ drivers/crypto/sunxi-ss/sun4i-ss-core.c | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
-index 518bc7a7df6a..59d9b4412aca 100644
---- a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
-+++ b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
-@@ -177,7 +177,7 @@ static int sun4i_hash(struct ahash_request *areq)
- 	 *
- 	 * in_i: advancement in the current SG
- 	 */
--	unsigned int i = 0, end, index, padlen, nwait, nbw = 0, j = 0, todo;
-+	unsigned int i = 0, end, fill, min_fill, nwait, nbw = 0, j = 0, todo;
- 	unsigned int in_i = 0;
- 	u32 spaces, rx_cnt = SS_RX_DEFAULT, bf[32] = {0}, wb = 0, v, ivmode = 0;
- 	struct sun4i_req_ctx *op = ahash_request_ctx(areq);
-@@ -186,7 +186,7 @@ static int sun4i_hash(struct ahash_request *areq)
- 	struct sun4i_ss_ctx *ss = tfmctx->ss;
- 	struct scatterlist *in_sg = areq->src;
- 	struct sg_mapping_iter mi;
--	int in_r, err = 0, zeros;
-+	int in_r, err = 0;
- 	size_t copied = 0;
- 
- 	dev_dbg(ss->dev, "%s %s bc=%llu len=%u mode=%x wl=%u h0=%0x",
-@@ -387,6 +387,8 @@ static int sun4i_hash(struct ahash_request *areq)
- 		nbw = op->len - 4 * nwait;
- 		wb = *(u32 *)(op->buf + nwait * 4);
- 		wb &= (0xFFFFFFFF >> (4 - nbw) * 8);
-+
-+		op->byte_count += nbw;
- 	}
- 
- 	/* write the remaining bytes of the nbw buffer */
-@@ -402,22 +404,15 @@ static int sun4i_hash(struct ahash_request *areq)
- 	 * I take the operations from other MD5/SHA1 implementations
- 	 */
- 
--	/* we have already send 4 more byte of which nbw data */
--	if (op->mode == SS_OP_MD5) {
--		index = (op->byte_count + 4) & 0x3f;
--		op->byte_count += nbw;
--		if (index > 56)
--			zeros = (120 - index) / 4;
--		else
--			zeros = (56 - index) / 4;
--	} else {
--		op->byte_count += nbw;
--		index = op->byte_count & 0x3f;
--		padlen = (index < 56) ? (56 - index) : ((64 + 56) - index);
--		zeros = (padlen - 1) / 4;
--	}
-+	/* last block size */
-+	fill = 64 - (op->byte_count % 64);
-+	min_fill = 2 * sizeof(u32) + (nbw ? 0 : sizeof(u32));
-+
-+	/* if we can't fill all data, jump to the next 64 block */
-+	if (fill < min_fill)
-+		fill += 64;
- 
--	j += zeros;
-+	j += (fill - min_fill) / sizeof(u32);
- 
- 	/* write the length of data */
- 	if (op->mode == SS_OP_SHA1) {
+diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-core.c b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
+index f7b99974d1bb..02ad8256e900 100644
+--- a/drivers/crypto/sunxi-ss/sun4i-ss-core.c
++++ b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
+@@ -96,7 +96,8 @@ static struct sun4i_ss_alg_template ss_algs[] = {
+ 			.cra_driver_name = "cbc-aes-sun4i-ss",
+ 			.cra_priority = 300,
+ 			.cra_blocksize = AES_BLOCK_SIZE,
+-			.cra_flags = CRYPTO_ALG_TYPE_SKCIPHER,
++			.cra_flags = CRYPTO_ALG_TYPE_SKCIPHER |
++				     CRYPTO_ALG_KERN_DRIVER_ONLY,
+ 			.cra_ctxsize = sizeof(struct sun4i_tfm_ctx),
+ 			.cra_module = THIS_MODULE,
+ 			.cra_alignmask = 3,
+@@ -117,7 +118,8 @@ static struct sun4i_ss_alg_template ss_algs[] = {
+ 			.cra_driver_name = "ecb-aes-sun4i-ss",
+ 			.cra_priority = 300,
+ 			.cra_blocksize = AES_BLOCK_SIZE,
+-			.cra_flags = CRYPTO_ALG_TYPE_SKCIPHER,
++			.cra_flags = CRYPTO_ALG_TYPE_SKCIPHER |
++				     CRYPTO_ALG_KERN_DRIVER_ONLY,
+ 			.cra_ctxsize = sizeof(struct sun4i_tfm_ctx),
+ 			.cra_module = THIS_MODULE,
+ 			.cra_alignmask = 3,
+@@ -138,7 +140,8 @@ static struct sun4i_ss_alg_template ss_algs[] = {
+ 			.cra_driver_name = "cbc-des-sun4i-ss",
+ 			.cra_priority = 300,
+ 			.cra_blocksize = DES_BLOCK_SIZE,
+-			.cra_flags = CRYPTO_ALG_TYPE_SKCIPHER,
++			.cra_flags = CRYPTO_ALG_TYPE_SKCIPHER |
++				     CRYPTO_ALG_KERN_DRIVER_ONLY,
+ 			.cra_ctxsize = sizeof(struct sun4i_req_ctx),
+ 			.cra_module = THIS_MODULE,
+ 			.cra_alignmask = 3,
+@@ -158,7 +161,8 @@ static struct sun4i_ss_alg_template ss_algs[] = {
+ 			.cra_driver_name = "ecb-des-sun4i-ss",
+ 			.cra_priority = 300,
+ 			.cra_blocksize = DES_BLOCK_SIZE,
+-			.cra_flags = CRYPTO_ALG_TYPE_SKCIPHER,
++			.cra_flags = CRYPTO_ALG_TYPE_SKCIPHER |
++				     CRYPTO_ALG_KERN_DRIVER_ONLY,
+ 			.cra_ctxsize = sizeof(struct sun4i_req_ctx),
+ 			.cra_module = THIS_MODULE,
+ 			.cra_alignmask = 3,
+@@ -179,7 +183,8 @@ static struct sun4i_ss_alg_template ss_algs[] = {
+ 			.cra_driver_name = "cbc-des3-sun4i-ss",
+ 			.cra_priority = 300,
+ 			.cra_blocksize = DES3_EDE_BLOCK_SIZE,
+-			.cra_flags = CRYPTO_ALG_TYPE_SKCIPHER,
++			.cra_flags = CRYPTO_ALG_TYPE_SKCIPHER |
++				     CRYPTO_ALG_KERN_DRIVER_ONLY,
+ 			.cra_ctxsize = sizeof(struct sun4i_req_ctx),
+ 			.cra_module = THIS_MODULE,
+ 			.cra_alignmask = 3,
 -- 
 2.9.4
