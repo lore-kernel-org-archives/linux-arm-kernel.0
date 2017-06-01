@@ -1,232 +1,509 @@
-From: zhongjiang@huawei.com (zhong jiang)
-Date: Thu, 1 Jun 2017 21:39:52 +0800
-Subject: [PATCH v5] arm64: fix the overlap between the kernel image and
- vmalloc address
-In-Reply-To: <1496323611-53377-1-git-send-email-zhongjiang@huawei.com>
-References: <1496323611-53377-1-git-send-email-zhongjiang@huawei.com>
-Message-ID: <59301928.9030707@huawei.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 1 Jun 2017 15:47:42 +0200
+Subject: [PATCH 4/4] drm/bridge: dw-hdmi: add cec driver
+In-Reply-To: <E1dFi3P-0004lv-2K@rmk-PC.armlinux.org.uk>
+References: <20170530142218.GS22219@n2100.armlinux.org.uk>
+ <E1dFi3P-0004lv-2K@rmk-PC.armlinux.org.uk>
+Message-ID: <b8bcdc78-12a1-9c3d-58ac-b53fe829dd80@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI, Ard
-
-The issue is important for us. I need a formal version to further debugging. please
-give me some feedback and suggestions. Thanks
-
-Regards
-zhongjiang
-On 2017/6/1 21:26, zhongjiang wrote:
-> Recently, xiaojun report the following issue.
->
-> [ 4544.984139] Unable to handle kernel paging request at virtual address ffff804392800000
-> [ 4544.991995] pgd = ffff80096745f000
-> [ 4544.995369] [ffff804392800000] *pgd=0000000000000000
-> [ 4545.000297] Internal error: Oops: 96000005 [#1] PREEMPT SMP
-> [ 4545.005815] Modules linked in:
-> [ 4545.008843] CPU: 1 PID: 8976 Comm: cat Not tainted 4.11.0-rc6 #1
-> [ 4545.014790] Hardware name: ARM Juno development board (r1) (DT)
-> [ 4545.020653] task: ffff8009753fdb00 task.stack: ffff80097533c000
-> [ 4545.026520] PC is at __memcpy+0x100/0x180
-> [ 4545.030491] LR is at vread+0x144/0x280
-> [ 4545.034202] pc : [<ffff0000083a1000>] lr : [<ffff0000081c126c>] pstate: 20000145
-> [ 4545.041530] sp : ffff80097533fcb0
-> [ 4545.044811] x29: ffff80097533fcb0 x28: ffff800962d24000
-> [ 4545.050074] x27: 0000000000001000 x26: ffff8009753fdb00
-> [ 4545.055337] x25: ffff000008200000 x24: ffff800977801380
-> [ 4545.060600] x23: ffff8009753fdb00 x22: ffff800962d24000
-> [ 4545.065863] x21: 0000000000001000 x20: ffff000008200000
-> [ 4545.071125] x19: 0000000000001000 x18: 0000ffffefa323c0
-> [ 4545.076387] x17: 0000ffffa9c87440 x16: ffff0000081fdfd0
-> [ 4545.081649] x15: 0000ffffa9d01588 x14: 72a77346b2407be7
-> [ 4545.086911] x13: 5299400690000000 x12: b0000001f9001a79
-> [ 4545.092173] x11: 97fc098d91042260 x10: 0000000000000000
-> [ 4545.097435] x9 : 0000000000000000 x8 : 9110626091260021
-> [ 4545.102698] x7 : 0000000000001000 x6 : ffff800962d24000
-> [ 4545.107960] x5 : ffff8009778013b0 x4 : 0000000000000000
-> [ 4545.113222] x3 : 0400000000000001 x2 : 0000000000000f80
-> [ 4545.118484] x1 : ffff804392800000 x0 : ffff800962d24000
-> [ 4545.123745]
-> [ 4545.125220] Process cat (pid: 8976, stack limit = 0xffff80097533c000)
-> [ 4545.131598] Stack: (0xffff80097533fcb0 to 0xffff800975340000)
-> [ 4545.137289] fca0:                                   ffff80097533fd30 ffff000008270f64
-> [ 4545.145049] fcc0: 000000000000e000 000000003956f000 ffff000008f950d0 ffff80097533feb8
-> [ 4545.152809] fce0: 0000000000002000 ffff8009753fdb00 ffff800962d24000 ffff000008e8d3d8
-> [ 4545.160568] fd00: 0000000000001000 ffff000008200000 0000000000001000 ffff800962d24000
-> [ 4545.168327] fd20: 0000000000001000 ffff000008e884a0 ffff80097533fdb0 ffff00000826340c
-> [ 4545.176086] fd40: ffff800976bf2800 fffffffffffffffb 000000003956d000 ffff80097533feb8
-> [ 4545.183846] fd60: 0000000060000000 0000000000000015 0000000000000124 000000000000003f
-> [ 4545.191605] fd80: ffff000008962000 ffff8009753fdb00 ffff8009753fdb00 ffff8009753fdb00
-> [ 4545.199364] fda0: 0000000300000124 0000000000002000 ffff80097533fdd0 ffff0000081fb83c
-> [ 4545.207123] fdc0: 0000000000010000 ffff80097514f900 ffff80097533fe50 ffff0000081fcb28
-> [ 4545.214883] fde0: 0000000000010000 ffff80097514f900 0000000000000000 0000000000000000
-> [ 4545.222642] fe00: ffff80097533fe30 ffff0000081fca1c ffff80097514f900 0000000000000000
-> [ 4545.230401] fe20: 000000003956d000 ffff80097533feb8 ffff80097533fe50 ffff0000081fcb04
-> [ 4545.238160] fe40: 0000000000010000 ffff80097514f900 ffff80097533fe80 ffff0000081fe014
-> [ 4545.245919] fe60: ffff80097514f900 ffff80097514f900 000000003956d000 0000000000010000
-> [ 4545.253678] fe80: 0000000000000000 ffff000008082f30 0000000000000000 0000800977146000
-> [ 4545.261438] fea0: ffffffffffffffff 0000ffffa9c8745c 0000000000000124 0000000008202000
-> [ 4545.269197] fec0: 0000000000000003 000000003956d000 0000000000010000 0000000000000000
-> [ 4545.276956] fee0: 0000000000011011 0000000000000001 0000000000000011 0000000000000002
-> [ 4545.284715] ff00: 000000000000003f 1f3c201f7372686b 00000000ffffffff 0000000000000030
-> [ 4545.292474] ff20: 0000000000000038 0000000000000000 0000ffffa9bcca94 0000ffffa9d01588
-> [ 4545.300233] ff40: 0000000000000000 0000ffffa9c87440 0000ffffefa323c0 0000000000010000
-> [ 4545.307993] ff60: 000000000041a310 000000003956d000 0000000000000003 000000007fffe000
-> [ 4545.315751] ff80: 00000000004088d0 0000000000010000 0000000000000000 0000000000000000
-> [ 4545.323511] ffa0: 0000000000010000 0000ffffefa32690 0000000000404dcc 0000ffffefa32690
-> [ 4545.331270] ffc0: 0000ffffa9c8745c 0000000060000000 0000000000000003 000000000000003f
-> [ 4545.339029] ffe0: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
-> [ 4545.346786] Call trace:
-> [ 4545.349207] Exception stack(0xffff80097533fae0 to 0xffff80097533fc10)
-> [ 4545.355586] fae0: 0000000000001000 0001000000000000 ffff80097533fcb0 ffff0000083a1000
-> [ 4545.363345] fb00: 000000003957c000 ffff80097533fc00 0000000020000145 0000000000000025
-> [ 4545.371105] fb20: ffff800962d24000 ffff000008e8d3d8 0000000000001000 ffff8009753fdb00
-> [ 4545.378864] fb40: 0000000000000000 0000000000000002 ffff80097533fd30 ffff000008082604
-> [ 4545.386623] fb60: 0000000000001000 0001000000000000 ffff80097533fd30 ffff0000083a0a90
-> [ 4545.394382] fb80: ffff800962d24000 ffff804392800000 0000000000000f80 0400000000000001
-> [ 4545.402140] fba0: 0000000000000000 ffff8009778013b0 ffff800962d24000 0000000000001000
-> [ 4545.409899] fbc0: 9110626091260021 0000000000000000 0000000000000000 97fc098d91042260
-> [ 4545.417658] fbe0: b0000001f9001a79 5299400690000000 72a77346b2407be7 0000ffffa9d01588
-> [ 4545.425416] fc00: ffff0000081fdfd0 0000ffffa9c87440
-> [ 4545.430248] [<ffff0000083a1000>] __memcpy+0x100/0x180
-> [ 4545.435253] [<ffff000008270f64>] read_kcore+0x21c/0x3b0
-> [ 4545.440429] [<ffff00000826340c>] proc_reg_read+0x64/0x90
-> [ 4545.445691] [<ffff0000081fb83c>] __vfs_read+0x1c/0x108
-> [ 4545.450779] [<ffff0000081fcb28>] vfs_read+0x80/0x130
-> [ 4545.455696] [<ffff0000081fe014>] SyS_read+0x44/0xa0
-> [ 4545.460528] [<ffff000008082f30>] el0_svc_naked+0x24/0x28
-> [ 4545.465790] Code: d503201f d503201f d503201f d503201f (a8c12027)
-> [ 4545.471852] ---[ end trace 4d1897f94759f461 ]---
-> [ 4545.476435] note: cat[8976] exited with preempt_count 2
->
-> I find the issue is introduced when applying commit f9040773b7bb
-> ("arm64: move kernel image to base of vmalloc area"). This patch
-> make the kernel image overlap with vmalloc area. It will result in
-> vmalloc area have the huge page table. but the vmalloc_to_page is
-> not realize the change. and the function is public to any arch.
->
-> I fix it by adding the another kernel image condition in vmalloc_to_page
-> to make it keep the accordance with previous vmalloc mapping.
->
-> Fixes: f9040773b7bb ("arm64: move kernel image to base of vmalloc area")
-> Reported-by: tan xiaojun <tanxiaojun@huawei.com>
-> Reviewed-by: Laura Abbott <labbott@redhat.com>
-> Signed-off-by: zhongjiang <zhongjiang@huawei.com>
+On 05/30/2017 04:23 PM, Russell King wrote:
+> Add a CEC driver for the dw-hdmi hardware.
+> 
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 > ---
->  arch/arm64/mm/mmu.c     |  2 +-
->  include/linux/vmalloc.h |  1 +
->  mm/vmalloc.c            | 31 ++++++++++++++++++++++++-------
->  3 files changed, 26 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 0c429ec..2265c39 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -509,7 +509,7 @@ static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
->  	vma->addr	= va_start;
->  	vma->phys_addr	= pa_start;
->  	vma->size	= size;
-> -	vma->flags	= VM_MAP;
-> +	vma->flags	= VM_KERNEL;
->  	vma->caller	= __builtin_return_address(0);
->  
->  	vm_area_add_early(vma);
-> diff --git a/include/linux/vmalloc.h b/include/linux/vmalloc.h
-> index 0328ce0..c9245af 100644
-> --- a/include/linux/vmalloc.h
-> +++ b/include/linux/vmalloc.h
-> @@ -17,6 +17,7 @@
->  #define VM_ALLOC		0x00000002	/* vmalloc() */
->  #define VM_MAP			0x00000004	/* vmap()ed pages */
->  #define VM_USERMAP		0x00000008	/* suitable for remap_vmalloc_range */
-> +#define VM_KERNEL		0x00000010	/* kernel pages */
->  #define VM_UNINITIALIZED	0x00000020	/* vm_struct is not fully initialized */
->  #define VM_NO_GUARD		0x00000040      /* don't add guard page */
->  #define VM_KASAN		0x00000080      /* has allocated kasan shadow memory */
-> diff --git a/mm/vmalloc.c b/mm/vmalloc.c
-> index 1dda6d8..104fc70 100644
-> --- a/mm/vmalloc.c
-> +++ b/mm/vmalloc.c
-> @@ -1966,12 +1966,25 @@ void *vmalloc_32_user(unsigned long size)
->  }
->  EXPORT_SYMBOL(vmalloc_32_user);
->  
-> +static inline struct page *vmalloc_image_to_page(char *addr,
-> +						struct vm_struct *vm)
+>  drivers/gpu/drm/bridge/synopsys/Kconfig       |   8 +
+>  drivers/gpu/drm/bridge/synopsys/Makefile      |   1 +
+>  drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.c | 320 ++++++++++++++++++++++++++
+>  drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.h |  19 ++
+>  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c     |  40 +++-
+>  5 files changed, 387 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.c
+>  create mode 100644 drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.h
+> 
+> diff --git a/drivers/gpu/drm/bridge/synopsys/Kconfig b/drivers/gpu/drm/bridge/synopsys/Kconfig
+> index 40d2827a6d19..bd30a0a07272 100644
+> --- a/drivers/gpu/drm/bridge/synopsys/Kconfig
+> +++ b/drivers/gpu/drm/bridge/synopsys/Kconfig
+> @@ -21,3 +21,11 @@ config DRM_DW_HDMI_I2S_AUDIO
+>  	help
+>  	  Support the I2S Audio interface which is part of the Synopsys
+>  	  Designware HDMI block.
+> +
+> +config DRM_DW_HDMI_CEC
+> +	tristate "Synopsis Designware CEC interface"
+> +	depends on DRM_DW_HDMI && MEDIA_CEC_SUPPORT
+> +	select MEDIA_CEC_NOTIFIER
+> +	help
+> +	  Support the CE interface which is part of the Synopsis
+> +	  Designware HDMI block.
+> diff --git a/drivers/gpu/drm/bridge/synopsys/Makefile b/drivers/gpu/drm/bridge/synopsys/Makefile
+> index 17aa7a65b57e..6fe415903668 100644
+> --- a/drivers/gpu/drm/bridge/synopsys/Makefile
+> +++ b/drivers/gpu/drm/bridge/synopsys/Makefile
+> @@ -3,3 +3,4 @@
+>  obj-$(CONFIG_DRM_DW_HDMI) += dw-hdmi.o
+>  obj-$(CONFIG_DRM_DW_HDMI_AHB_AUDIO) += dw-hdmi-ahb-audio.o
+>  obj-$(CONFIG_DRM_DW_HDMI_I2S_AUDIO) += dw-hdmi-i2s-audio.o
+> +obj-$(CONFIG_DRM_DW_HDMI_CEC) += dw-hdmi-cec.o
+> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.c
+> new file mode 100644
+> index 000000000000..761ef5ae687d
+> --- /dev/null
+> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.c
+> @@ -0,0 +1,320 @@
+> +/*
+> + * Designware HDMI CEC driver
+> + *
+> + * Copyright (C) 2015-2017 Russell King.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +#include <linux/interrupt.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/sched.h>
+> +#include <linux/slab.h>
+> +
+> +#include <drm/drm_edid.h>
+> +
+> +#include <media/cec.h>
+> +#include <media/cec-notifier.h>
+> +
+> +#include "dw-hdmi-cec.h"
+> +
+> +enum {
+> +	HDMI_IH_CEC_STAT0	= 0x0106,
+> +	HDMI_IH_MUTE_CEC_STAT0	= 0x0186,
+> +
+> +	HDMI_CEC_CTRL		= 0x7d00,
+> +	CEC_CTRL_START		= BIT(0),
+> +	CEC_CTRL_NORMAL		= 1 << 1,
+> +
+> +	HDMI_CEC_STAT		= 0x7d01,
+> +	CEC_STAT_DONE		= BIT(0),
+> +	CEC_STAT_EOM		= BIT(1),
+> +	CEC_STAT_NACK		= BIT(2),
+> +	CEC_STAT_ARBLOST	= BIT(3),
+> +	CEC_STAT_ERROR_INIT	= BIT(4),
+> +	CEC_STAT_ERROR_FOLL	= BIT(5),
+> +	CEC_STAT_WAKEUP		= BIT(6),
+> +
+> +	HDMI_CEC_MASK		= 0x7d02,
+> +	HDMI_CEC_POLARITY	= 0x7d03,
+> +	HDMI_CEC_INT		= 0x7d04,
+> +	HDMI_CEC_ADDR_L		= 0x7d05,
+> +	HDMI_CEC_ADDR_H		= 0x7d06,
+> +	HDMI_CEC_TX_CNT		= 0x7d07,
+> +	HDMI_CEC_RX_CNT		= 0x7d08,
+> +	HDMI_CEC_TX_DATA0	= 0x7d10,
+> +	HDMI_CEC_RX_DATA0	= 0x7d20,
+> +	HDMI_CEC_LOCK		= 0x7d30,
+> +	HDMI_CEC_WKUPCTRL	= 0x7d31,
+> +};
+> +
+> +struct dw_hdmi_cec {
+> +	struct dw_hdmi *hdmi;
+> +	const struct dw_hdmi_cec_ops *ops;
+> +	u32 addresses;
+> +	struct cec_adapter *adap;
+> +	struct cec_msg rx_msg;
+> +	unsigned int tx_status;
+> +	bool tx_done;
+> +	bool rx_done;
+> +	struct cec_notifier *notify;
+> +	int retries;
+> +	int irq;
+> +};
+> +
+> +static void dw_hdmi_write(struct dw_hdmi_cec *cec, u8 val, int offset)
 > +{
-> +	struct page *p = NULL;
-> +
-> +	if (vm->flags & VM_KERNEL)
-> +		p = virt_to_page(lm_alias(addr));
-> +	else
-> +		p = vmalloc_to_page(addr);
-> +
-> +	return p;
+> +	cec->ops->write(cec->hdmi, val, offset);
 > +}
 > +
->  /*
->   * small helper routine , copy contents to buf from addr.
->   * If the page is not present, fill zero.
->   */
-> -
-> -static int aligned_vread(char *buf, char *addr, unsigned long count)
-> +static int aligned_vread(char *buf, char *addr, unsigned long count,
-> +					struct vm_struct *vm)
->  {
->  	struct page *p;
->  	int copied = 0;
-> @@ -1983,7 +1996,7 @@ static int aligned_vread(char *buf, char *addr, unsigned long count)
->  		length = PAGE_SIZE - offset;
->  		if (length > count)
->  			length = count;
-> -		p = vmalloc_to_page(addr);
-> +		p = vmalloc_image_to_page(addr, vm);
->  		/*
->  		 * To do safe access to this _mapped_ area, we need
->  		 * lock. But adding lock here means that we need to add
-> @@ -2010,7 +2023,8 @@ static int aligned_vread(char *buf, char *addr, unsigned long count)
->  	return copied;
+> +static u8 dw_hdmi_read(struct dw_hdmi_cec *cec, int offset)
+> +{
+> +	return cec->ops->read(cec->hdmi, offset);
+> +}
+> +
+> +static int dw_hdmi_cec_log_addr(struct cec_adapter *adap, u8 logical_addr)
+> +{
+> +	struct dw_hdmi_cec *cec = adap->priv;
+> +	u32 addresses;
+> +
+> +	if (logical_addr == CEC_LOG_ADDR_INVALID)
+> +		addresses = cec->addresses = 0;
+> +	else
+> +		addresses = cec->addresses |= BIT(logical_addr) | BIT(15);
+> +
+> +	dw_hdmi_write(cec, addresses & 255, HDMI_CEC_ADDR_L);
+> +	dw_hdmi_write(cec, addresses >> 8, HDMI_CEC_ADDR_H);
+> +
+> +	return 0;
+> +}
+> +
+> +static int dw_hdmi_cec_transmit(struct cec_adapter *adap, u8 attempts,
+> +				u32 signal_free_time, struct cec_msg *msg)
+> +{
+> +	struct dw_hdmi_cec *cec = adap->priv;
+> +	unsigned i;
+> +
+> +	cec->retries = attempts;
+> +
+> +	for (i = 0; i < msg->len; i++)
+> +		dw_hdmi_write(cec, msg->msg[i], HDMI_CEC_TX_DATA0 + i);
+> +
+> +	dw_hdmi_write(cec, msg->len, HDMI_CEC_TX_CNT);
+> +	dw_hdmi_write(cec, CEC_CTRL_NORMAL | CEC_CTRL_START, HDMI_CEC_CTRL);
+> +
+> +	return 0;
+> +}
+> +
+> +static irqreturn_t dw_hdmi_cec_hardirq(int irq, void *data)
+> +{
+> +	struct cec_adapter *adap = data;
+> +	struct dw_hdmi_cec *cec = adap->priv;
+> +	unsigned stat = dw_hdmi_read(cec, HDMI_IH_CEC_STAT0);
+> +	irqreturn_t ret = IRQ_HANDLED;
+> +
+> +	if (stat == 0)
+> +		return IRQ_NONE;
+> +
+> +	dw_hdmi_write(cec, stat, HDMI_IH_CEC_STAT0);
+> +
+> +	if (stat & CEC_STAT_ERROR_INIT) {
+> +		if (cec->retries) {
+> +			unsigned v = dw_hdmi_read(cec, HDMI_CEC_CTRL);
+> +			dw_hdmi_write(cec, v | CEC_CTRL_START, HDMI_CEC_CTRL);
+> +			cec->retries -= 1;
+> +		} else {
+> +			cec->tx_status = CEC_TX_STATUS_MAX_RETRIES;
+> +			cec->tx_done = true;
+> +			ret = IRQ_WAKE_THREAD;
+> +		}
+> +	} else if (stat & CEC_STAT_DONE) {
+> +		cec->tx_status = CEC_TX_STATUS_OK;
+> +		cec->tx_done = true;
+> +		ret = IRQ_WAKE_THREAD;
+> +	} else if (stat & CEC_STAT_NACK) {
+> +		cec->tx_status = CEC_TX_STATUS_NACK;
+> +		cec->tx_done = true;
+> +		ret = IRQ_WAKE_THREAD;
+> +	}
+> +
+> +	if (stat & CEC_STAT_EOM) {
+> +		unsigned len, i;
+> +
+> +		len = dw_hdmi_read(cec, HDMI_CEC_RX_CNT);
+> +		if (len > sizeof(cec->rx_msg.msg))
+> +			len = sizeof(cec->rx_msg.msg);
+> +
+> +		for (i = 0; i < len; i++)
+> +			cec->rx_msg.msg[i] =
+> +				dw_hdmi_read(cec, HDMI_CEC_RX_DATA0 + i);
+> +
+> +		dw_hdmi_write(cec, 0, HDMI_CEC_LOCK);
+> +
+> +		cec->rx_msg.len = len;
+> +		smp_wmb();
+> +		cec->rx_done = true;
+> +
+> +		ret = IRQ_WAKE_THREAD;
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +static irqreturn_t dw_hdmi_cec_thread(int irq, void *data)
+> +{
+> +	struct cec_adapter *adap = data;
+> +	struct dw_hdmi_cec *cec = adap->priv;
+> +
+> +	if (cec->tx_done) {
+> +		cec->tx_done = false;
+> +		cec_transmit_done(adap, cec->tx_status, 0, 0, 0, 0);
+> +	}
+> +	if (cec->rx_done) {
+> +		cec->rx_done = false;
+> +		smp_rmb();
+> +		cec_received_msg(adap, &cec->rx_msg);
+> +	}
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static int dw_hdmi_cec_enable(struct cec_adapter *adap, bool enable)
+> +{
+> +	struct dw_hdmi_cec *cec = adap->priv;
+> +
+> +	if (!enable) {
+> +		dw_hdmi_write(cec, ~0, HDMI_CEC_MASK);
+> +		dw_hdmi_write(cec, ~0, HDMI_IH_MUTE_CEC_STAT0);
+> +		dw_hdmi_write(cec, 0, HDMI_CEC_POLARITY);
+> +
+> +		cec->ops->disable(cec->hdmi);
+> +	} else {
+> +		unsigned irqs;
+> +
+> +		dw_hdmi_write(cec, 0, HDMI_CEC_CTRL);
+> +		dw_hdmi_write(cec, ~0, HDMI_IH_CEC_STAT0);
+> +		dw_hdmi_write(cec, 0, HDMI_CEC_LOCK);
+> +
+> +		dw_hdmi_cec_log_addr(cec->adap, CEC_LOG_ADDR_INVALID);
+> +
+> +		cec->ops->enable(cec->hdmi);
+> +
+> +		irqs = CEC_STAT_ERROR_INIT | CEC_STAT_NACK | CEC_STAT_EOM |
+> +		       CEC_STAT_DONE;
+> +		dw_hdmi_write(cec, irqs, HDMI_CEC_POLARITY);
+> +		dw_hdmi_write(cec, ~irqs, HDMI_CEC_MASK);
+> +		dw_hdmi_write(cec, ~irqs, HDMI_IH_MUTE_CEC_STAT0);
+> +	}
+> +	return 0;
+> +}
+> +
+> +static const struct cec_adap_ops dw_hdmi_cec_ops = {
+> +	.adap_enable = dw_hdmi_cec_enable,
+> +	.adap_log_addr = dw_hdmi_cec_log_addr,
+> +	.adap_transmit = dw_hdmi_cec_transmit,
+> +};
+> +
+> +static void dw_hdmi_cec_del(void *data)
+> +{
+> +	struct dw_hdmi_cec *cec = data;
+> +
+> +	cec_delete_adapter(cec->adap);
+> +}
+> +
+> +static int dw_hdmi_cec_probe(struct platform_device *pdev)
+> +{
+> +	struct dw_hdmi_cec_data *data = dev_get_platdata(&pdev->dev);
+> +	struct dw_hdmi_cec *cec;
+> +	int ret;
+> +
+> +	if (!data)
+> +		return -ENXIO;
+> +
+> +	/*
+> +	 * Our device is just a convenience - we want to link to the real
+> +	 * hardware device here, so that userspace can see the association
+> +	 * between the HDMI hardware and its associated CEC chardev.
+> +	 */
+> +	cec = devm_kzalloc(&pdev->dev, sizeof(*cec), GFP_KERNEL);
+> +	if (!cec)
+> +		return -ENOMEM;
+> +
+> +	cec->irq = data->irq;
+> +	cec->ops = data->ops;
+> +	cec->hdmi = data->hdmi;
+> +
+> +	platform_set_drvdata(pdev, cec);
+> +
+> +	dw_hdmi_write(cec, 0, HDMI_CEC_TX_CNT);
+> +	dw_hdmi_write(cec, ~0, HDMI_CEC_MASK);
+> +	dw_hdmi_write(cec, ~0, HDMI_IH_MUTE_CEC_STAT0);
+> +	dw_hdmi_write(cec, 0, HDMI_CEC_POLARITY);
+> +
+> +	cec->adap = cec_allocate_adapter(&dw_hdmi_cec_ops, cec, "dw_hdmi",
+> +					 CEC_CAP_LOG_ADDRS | CEC_CAP_TRANSMIT |
+> +					 CEC_CAP_RC, CEC_MAX_LOG_ADDRS);
+> +	if (IS_ERR(cec->adap))
+> +		return PTR_ERR(cec->adap);
+> +
+> +	/* override the module pointer */
+> +	cec->adap->owner = THIS_MODULE;
+> +
+> +	ret = devm_add_action(&pdev->dev, dw_hdmi_cec_del, cec);
+> +	if (ret) {
+> +		cec_delete_adapter(cec->adap);
+> +		return ret;
+> +	}
+> +
+> +	ret = devm_request_threaded_irq(&pdev->dev, cec->irq,
+> +					dw_hdmi_cec_hardirq,
+> +					dw_hdmi_cec_thread, IRQF_SHARED,
+> +					"dw-hdmi-cec", cec->adap);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	cec->notify = cec_notifier_get(pdev->dev.parent);
+> +	if (!cec->notify)
+> +		return -ENOMEM;
+> +
+> +	ret = cec_register_adapter(cec->adap, pdev->dev.parent);
+> +	if (ret < 0) {
+> +		cec_notifier_put(cec->notify);
+> +		return ret;
+> +	}
+> +
+> +	/*
+> +	 * CEC documentation says we must not call cec_delete_adapter
+> +	 * after a successful call to cec_register_adapter().
+> +	 */
+> +	devm_remove_action(&pdev->dev, dw_hdmi_cec_del, cec);
+> +
+> +	cec_register_cec_notifier(cec->adap, cec->notify);
+> +
+> +	return 0;
+> +}
+> +
+> +static int dw_hdmi_cec_remove(struct platform_device *pdev)
+> +{
+> +	struct dw_hdmi_cec *cec = platform_get_drvdata(pdev);
+> +
+> +	cec_unregister_adapter(cec->adap);
+> +	cec_notifier_put(cec->notify);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver dw_hdmi_cec_driver = {
+> +	.probe	= dw_hdmi_cec_probe,
+> +	.remove	= dw_hdmi_cec_remove,
+> +	.driver = {
+> +		.name = "dw-hdmi-cec",
+> +	},
+> +};
+> +module_platform_driver(dw_hdmi_cec_driver);
+> +
+> +MODULE_AUTHOR("Russell King <rmk+kernel@armlinux.org.uk>");
+> +MODULE_DESCRIPTION("Synopsis Designware HDMI CEC driver for i.MX");
+> +MODULE_LICENSE("GPL");
+> +MODULE_ALIAS(PLATFORM_MODULE_PREFIX "dw-hdmi-cec");
+> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.h b/drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.h
+> new file mode 100644
+> index 000000000000..cf4dc121a2c4
+> --- /dev/null
+> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.h
+> @@ -0,0 +1,19 @@
+> +#ifndef DW_HDMI_CEC_H
+> +#define DW_HDMI_CEC_H
+> +
+> +struct dw_hdmi;
+> +
+> +struct dw_hdmi_cec_ops {
+> +	void (*write)(struct dw_hdmi *hdmi, u8 val, int offset);
+> +	u8 (*read)(struct dw_hdmi *hdmi, int offset);
+> +	void (*enable)(struct dw_hdmi *hdmi);
+> +	void (*disable)(struct dw_hdmi *hdmi);
+> +};
+> +
+> +struct dw_hdmi_cec_data {
+> +	struct dw_hdmi *hdmi;
+> +	const struct dw_hdmi_cec_ops *ops;
+> +	int irq;
+> +};
+> +
+> +#endif
+> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> index 58781d4c1034..5a389f1f58d9 100644
+> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> @@ -35,6 +35,7 @@
+>  
+>  #include "dw-hdmi.h"
+>  #include "dw-hdmi-audio.h"
+> +#include "dw-hdmi-cec.h"
+>  
+>  #include <media/cec-notifier.h>
+>  
+> @@ -133,6 +134,7 @@ struct dw_hdmi {
+>  	unsigned int version;
+>  
+>  	struct platform_device *audio;
+> +	struct platform_device *cec;
+>  	struct device *dev;
+>  	struct clk *isfr_clk;
+>  	struct clk *iahb_clk;
+> @@ -1766,7 +1768,6 @@ static void initialize_hdmi_ih_mutes(struct dw_hdmi *hdmi)
+>  	hdmi_writeb(hdmi, 0xff, HDMI_AUD_HBR_MASK);
+>  	hdmi_writeb(hdmi, 0xff, HDMI_GP_MASK);
+>  	hdmi_writeb(hdmi, 0xff, HDMI_A_APIINTMSK);
+> -	hdmi_writeb(hdmi, 0xff, HDMI_CEC_MASK);
+>  	hdmi_writeb(hdmi, 0xff, HDMI_I2CM_INT);
+>  	hdmi_writeb(hdmi, 0xff, HDMI_I2CM_CTLINT);
+>  
+> @@ -2223,6 +2224,29 @@ static int dw_hdmi_detect_phy(struct dw_hdmi *hdmi)
+>  	return -ENODEV;
 >  }
 >  
-> -static int aligned_vwrite(char *buf, char *addr, unsigned long count)
-> +static int aligned_vwrite(char *buf, char *addr, unsigned long count,
-> +					struct vm_struct *vm)
->  {
->  	struct page *p;
->  	int copied = 0;
-> @@ -2022,7 +2036,7 @@ static int aligned_vwrite(char *buf, char *addr, unsigned long count)
->  		length = PAGE_SIZE - offset;
->  		if (length > count)
->  			length = count;
-> -		p = vmalloc_to_page(addr);
-> +		p = vmalloc_image_to_page(addr, vm);
->  		/*
->  		 * To do safe access to this _mapped_ area, we need
->  		 * lock. But adding lock here means that we need to add
-> @@ -2109,7 +2123,7 @@ long vread(char *buf, char *addr, unsigned long count)
->  		if (n > count)
->  			n = count;
->  		if (!(vm->flags & VM_IOREMAP))
-> -			aligned_vread(buf, addr, n);
-> +			aligned_vread(buf, addr, n, vm);
->  		else /* IOREMAP area is treated as memory hole */
->  			memset(buf, 0, n);
->  		buf += n;
-> @@ -2190,7 +2204,7 @@ long vwrite(char *buf, char *addr, unsigned long count)
->  		if (n > count)
->  			n = count;
->  		if (!(vm->flags & VM_IOREMAP)) {
-> -			aligned_vwrite(buf, addr, n);
-> +			aligned_vwrite(buf, addr, n, vm);
->  			copied++;
->  		}
->  		buf += n;
-> @@ -2710,6 +2724,9 @@ static int s_show(struct seq_file *m, void *p)
->  	if (v->flags & VM_USERMAP)
->  		seq_puts(m, " user");
->  
-> +	if (v->flags & VM_KERNEL)
-> +		seq_puts(m, " kernel");
+> +static void dw_hdmi_cec_enable(struct dw_hdmi *hdmi)
+> +{
+> +	mutex_lock(&hdmi->mutex);
+> +	hdmi->mc_clkdis &= ~HDMI_MC_CLKDIS_CECCLK_DISABLE;
+> +	hdmi_writeb(hdmi, hdmi->mc_clkdis, HDMI_MC_CLKDIS);
+> +	mutex_unlock(&hdmi->mutex);
+> +}
 > +
->  	if (is_vmalloc_addr(v->pages))
->  		seq_puts(m, " vpages");
+> +static void dw_hdmi_cec_disable(struct dw_hdmi *hdmi)
+> +{
+> +	mutex_lock(&hdmi->mutex);
+> +	hdmi->mc_clkdis |= HDMI_MC_CLKDIS_CECCLK_DISABLE;
+> +	hdmi_writeb(hdmi, hdmi->mc_clkdis, HDMI_MC_CLKDIS);
+> +	mutex_unlock(&hdmi->mutex);
+> +}
+> +
+> +static const struct dw_hdmi_cec_ops dw_hdmi_cec_ops = {
+> +	.write = hdmi_writeb,
+> +	.read = hdmi_readb,
+> +	.enable = dw_hdmi_cec_enable,
+> +	.disable = dw_hdmi_cec_disable,
+> +};
+> +
+>  static const struct regmap_config hdmi_regmap_8bit_config = {
+>  	.reg_bits	= 32,
+>  	.val_bits	= 8,
+> @@ -2245,6 +2269,7 @@ __dw_hdmi_probe(struct platform_device *pdev,
+>  	struct device_node *np = dev->of_node;
+>  	struct platform_device_info pdevinfo;
+>  	struct device_node *ddc_node;
+> +	struct dw_hdmi_cec_data cec;
+>  	struct dw_hdmi *hdmi;
+>  	struct resource *iores = NULL;
+>  	int irq;
+> @@ -2445,6 +2470,17 @@ __dw_hdmi_probe(struct platform_device *pdev,
+>  		hdmi->audio = platform_device_register_full(&pdevinfo);
+>  	}
 >  
+> +	cec.hdmi = hdmi;
+> +	cec.ops = &dw_hdmi_cec_ops;
+> +	cec.irq = irq;
+> +
+> +	pdevinfo.name = "dw-hdmi-cec";
+> +	pdevinfo.data = &cec;
+> +	pdevinfo.size_data = sizeof(cec);
+> +	pdevinfo.dma_mask = 0;
+> +
+> +	hdmi->cec = platform_device_register_full(&pdevinfo);
+
+Maybe you should check the config bit before enabling CEC :
+
+ /* CONFIG0_ID field values */
+ +	HDMI_CONFIG0_CEC = 0x2,
+
+if (config0 & HDMI_CONFIG0_CEC) {
+}
+
+> +
+>  	/* Reset HDMI DDC I2C master controller and mute I2CM interrupts */
+>  	if (hdmi->i2c)
+>  		dw_hdmi_i2c_init(hdmi);
+> @@ -2475,6 +2511,8 @@ static void __dw_hdmi_remove(struct dw_hdmi *hdmi)
+>  {
+>  	if (hdmi->audio && !IS_ERR(hdmi->audio))
+>  		platform_device_unregister(hdmi->audio);
+> +	if (!IS_ERR(hdmi->cec))
+> +		platform_device_unregister(hdmi->cec);
+>  
+>  	/* Disable all interrupts */
+>  	hdmi_writeb(hdmi, ~0, HDMI_IH_MUTE_PHY_STAT0);
+> 
+
+Apart from that and the s/Synopsis/Synopsys/ typos:
+
+Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+
+Neil
