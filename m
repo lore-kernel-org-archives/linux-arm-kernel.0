@@ -1,106 +1,130 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 01 Jun 2017 19:33:27 +0200
-Subject: [PATCH 3/6] gpio: dt-bindings: Add documentation for gpio
- controllers on Armada 7K/8K
-In-Reply-To: <87fufltk76.fsf@free-electrons.com> (Gregory CLEMENT's message of
- "Wed, 31 May 2017 12:05:49 +0200")
-References: <cover.e10718b9c0f9fdd07327ae14e213be8da5b1f7ef.1495210061.git-series.gregory.clement@free-electrons.com>
- <306395ff39de3d3d3c8f55e5da4de8def29ae8d1.1495210061.git-series.gregory.clement@free-electrons.com>
- <20170530222907.ysx53p3efyxudyqp@rob-hp-laptop>
- <87fufltk76.fsf@free-electrons.com>
-Message-ID: <87zidrr4t4.fsf@free-electrons.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 1 Jun 2017 18:38:57 +0100
+Subject: [PATCH 0/2] arm64: acpi/pci: allow the firmware BAR
+ configuration to be preserved
+In-Reply-To: <CAKv+Gu9FyLuQk3hkauoRzGME1FxHPgusWQe0v8eSJaKfaX7LMA@mail.gmail.com>
+References: <20170517215611.GJ31462@bhelgaas-glaptop.roam.corp.google.com>
+ <CAKv+Gu9T7vH_LbKfS_40JUbLNK4PYrMi++eKbCq_MzBsuQxUDQ@mail.gmail.com>
+ <20170518140553.GA22106@bhelgaas-glaptop.roam.corp.google.com>
+ <CAKv+Gu_cug6cVrWP-zkptvNn3LxYk7b4Gd=iTzHHe3us3KwL3Q@mail.gmail.com>
+ <20170518154708.GA30182@red-moon>
+ <CAKv+Gu-NDR1PYUfOs4z-T9WoeBrYvFTTBt3XMiMg+AU76MbYBg@mail.gmail.com>
+ <20170518174612.GA31373@red-moon>
+ <CAKv+Gu8hVhpNrXG+JUQu8XYZtQE86d0O66J8AORWDC6Ttcp3iA@mail.gmail.com>
+ <20170601161511.GB19003@red-moon>
+ <CAKv+Gu9FyLuQk3hkauoRzGME1FxHPgusWQe0v8eSJaKfaX7LMA@mail.gmail.com>
+Message-ID: <20170601173857.GA19494@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
- 
- On mer., mai 31 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+On Thu, Jun 01, 2017 at 04:18:54PM +0000, Ard Biesheuvel wrote:
+> On 1 June 2017 at 16:15, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> > On Thu, Jun 01, 2017 at 03:04:09PM +0000, Ard Biesheuvel wrote:
+> >> On 18 May 2017 at 18:46, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> >> > On Thu, May 18, 2017 at 05:51:44PM +0100, Ard Biesheuvel wrote:
+> >> >> On 18 May 2017 at 16:47, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> >> >> > On Thu, May 18, 2017 at 04:10:28PM +0100, Ard Biesheuvel wrote:
+> >> >> >
+> >> >> > [...]
+> >> >> >
+> >> >> >> >> Re _DSM: I think it makes sense to honour it, because it puts the
+> >> >> >> >> allocation under the control of the firmware, which completely removes
+> >> >> >> >> the burden of having to reason about a policy in the kernel. That
+> >> >> >> >> leaves the question which will be the default, but that is of minor
+> >> >> >> >> importance IMO.
+> >> >> >> >
+> >> >> >> > I agree; we should try to follow the spec unless we have a good reason
+> >> >> >> > not to, which argues for honoring the _DSM, so I think it's worth a
+> >> >> >> > try.  Booting with "pci=realloc" could override the _DSM and taint the
+> >> >> >> > kernel (because we don't know the effect of reassigning something the
+> >> >> >> > firmware told us not to touch).
+> >> >> >> >
+> >> >> >>
+> >> >> >> I'd like to hear Lorenzo's view on this first, but I can certainly
+> >> >> >> respin my _DSM patch to take pci=realloc into account, and move the
+> >> >> >> handling to generic code as well.
+> >> >> >
+> >> >> > I agree with both of you on _DSM implementation and interpretation.
+> >> >> >
+> >> >> > Now, if we use it correctly (ie by the FW standard) on ARM64 systems we
+> >> >> > are going to trigger regressions, that's certain (ie we can then boot
+> >> >> > with pci=realloc - still, we are breaking systems), that's the reason
+> >> >> > why for patch(2) I'd like to create a branch and send a CFT for ARM64
+> >> >> > ACPI testing before queuing it (either I can set-up a testing branch
+> >> >> > or we ask Bjorn to do it - as you guys prefer - as long as we have
+> >> >> > a branch for people to test patch(2) on ARM64 ACPI systems).
+> >> >> >
+> >> >> > You still need to assign resources that could not be claimed though
+> >> >> > so patch(2) still needs updating:
+> >> >> >
+> >> >> > PCI FW spec 3.1 - 4.6.5
+> >> >> >
+> >> >> > "...However, the operating system is free to configure the devices in this
+> >> >> > hierarchy that have not been configured by the firmware."
+> >> >> >
+> >> >> > Which in kernel-speak it means that you have to assign resources that
+> >> >> > could not be claimed.
+> >> >> >
+> >> >>
+> >> >> Right. AFAICT this is the part that is typically handled by
+> >> >> pcibios_resource_survey() et al, whose default __weak implementations
+> >> >> are empty functions. Shall I override those for arm64 to host this
+> >> >> logic?
+> >> >
+> >> > I think it makes sense yes unless Bjorn spots something wrong with that
+> >> > but you should also call it in ARM64 pci_acpi_scan_root() since it is
+> >> > not called by PCI core on non-hot-added bridges, I reckon you figured
+> >> > that out already though.
+> >> >
+> >>
+> >> Another data point for this discussion: currently, when booting arm64
+> >> via DT, we set PCI_REASSIGN_ALL_RSRC | PCI_REASSIGN_ALL_BUS (unless
+> >> PCI_PROBE_ONLY is requested), which forces not only resource
+> >> allocations but also the bus numbering to be reconfigured from
+> >> scratch.
+> >>
+> >> On arm64/ACPI, we never set those flags, which will cause
+> >> pci_scan_bridge() to preserve the secondary and subordinate bridge
+> >> numbers if they are non-zero. This actually prevents log messages like
+> >>
+> >> pci_bus 0000:02: busn_res: can not insert [bus 02-ff] under [bus
+> >> 00-7f] (conflicts with (null) [bus 00-7f])
+> >>
+> >> which I see on AMD Seattle as well as QEMU when booting via DT (and I
+> >> suspect on any DT PCI root whose bus range != {0x0 0xff>). However, it
+> >> also means that we already have different behavior between ACPI and DT
+> >> boot on arm64, which makes it ambiguous what the behavior should be if
+> >> _DSM indicates that the configuration should not be preserved. IOW,
+> >> 'reconfigure everything' currently means different things between DT
+> >> and ACPI boot.
+> >
+> > IMO they should mean the same thing which implies setting those flags
+> > (ie PCI_REASSIGN_ALL_RSRC has no effect though on ARM64) on ARM64
+> > ACPI systems as a starting point and then changes in this thread can
+> > be applied on top.
+> >
+> 
+> OK
+> 
+> > Having said that, I am not sure the message you get above is really
+> > effective (not sure I undestand the net effect of that resource
+> > conflict) so I should look into this.
+> >
+> 
+> It appears to be behavior that is known to be incorrect but is
+> preserved for historical reasons.
+> 
+> Please refer to
+> 12d8706963f0 Revert "PCI: Make sure bus number resources stay within
+> their parents bounds"
+> 1820ffdccb9b PCI: Make sure bus number resources stay within their
+> parents bounds
 
-> Hi Rob,
->  
->  On mer., mai 31 2017, Rob Herring <robh@kernel.org> wrote:
->>>  
->>>  Required properties:
->>>  
->>> -- compatible : Should be "marvell,orion-gpio", "marvell,mv78200-gpio"
->>> -  or "marvell,armadaxp-gpio". "marvell,orion-gpio" should be used for
->>> -  Orion, Kirkwood, Dove, Discovery (except MV78200) and Armada
->>> -  370. "marvell,mv78200-gpio" should be used for the Discovery
->>> -  MV78200. "marvel,armadaxp-gpio" should be used for all Armada XP
->>> -  SoCs (MV78230, MV78260, MV78460).
->>> +- compatible : Should be "marvell,orion-gpio", "marvell,mv78200-gpio",
->>> +  "marvell,armadaxp-gpio" or "marvell,armada-8k-gpio".
->>> +
->>> +    "marvell,orion-gpio" should be used for Orion, Kirkwood, Dove,
->>> +    Discovery (except MV78200) and Armada 370. "marvell,mv78200-gpio"
->>> +    should be used for the Discovery MV78200.
->>> +
->>> +    "marvel,armadaxp-gpio" should be used for all Armada XP SoCs
->>> +    (MV78230, MV78260, MV78460).
->>> +
->>> +    "marvell,armada-8k-gpio" should be used for the Armada 7K and 8K
->>> +    SoCs (either from AP or CP), see
->>> +    Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
->>> +    and
->>> +    Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
->>> +    for specific details about the offset property.
->>>  
->>>  - reg: Address and length of the register set for the device. Only one
->>>    entry is expected, except for the "marvell,armadaxp-gpio" variant
->>>    for which two entries are expected: one for the general registers,
->>> -  one for the per-cpu registers.
->>> +  one for the per-cpu registers. Not used for marvell,armada-8k-gpio.
->>
->> Why can't use you use reg instead of offset?
->
-> I looked for how the other syscon user did, and I found the offset
-> usage. So I assumed it was the way to do it. But if you wan I can use a
-> reg property.
+I am not sure the call to:
 
-I had a closer looked to the binding when syscon is used with several
-subnodes. And actually the reg usage is very uncommon, I only find it in
-drivers/regulator/pbias-regulator.c but for legacy.
+pci_bus_insert_busn_res(child, max+1, 0xff);
 
-I am not sure that we have any benefit with this reg property: we won't
-use the length of the register and we need to add a range property in
-the parent node.
+is there to do anything useful given that the bus range resource is
+claimed later but I need to debug it to prove my point.
 
-An other way to pass this information is to have a different compatible
-string which will match the different offset available. In this case the
-reg property won't be used in a syscon node. However, while it makes
-sens for the difference between AP806 and CP110, it would be strange to
-have a different compatible string for gpio bank 1 and gpio bank 2.
-
-So, in the end I would prefer to use the offset. From my point of view
-it is better to not use the reg property for two different purposes:
-mmio address vs offset in a syscon.
-
-But if you think that from the point of view of the device tree
-compliance we have to use the reg property, of course I will change it.
-
-Thanks,
-
-Gregory
-
->
-> Gregory
->
->>
->> Rob
->
-> -- 
-> Gregory Clement, Free Electrons
-> Kernel, drivers, real-time and embedded Linux
-> development, consulting, training and support.
-> http://free-electrons.com
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Lorenzo
