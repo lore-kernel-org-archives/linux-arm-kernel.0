@@ -1,59 +1,35 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Thu,  1 Jun 2017 12:20:43 -0700
-Subject: [PATCH v3 1/2] ARM: dts: imx7: add GPMI NAND
-In-Reply-To: <20170601192044.6548-1-stefan@agner.ch>
-References: <20170601192044.6548-1-stefan@agner.ch>
-Message-ID: <20170601192044.6548-2-stefan@agner.ch>
+Date: Thu,  1 Jun 2017 12:20:42 -0700
+Subject: [PATCH v3 0/2] ARM: dts: imx7: add NAND support
+Message-ID: <20170601192044.6548-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add i.MX 7 GPMI NAND module.
+This are the missing device tree parts to add NAND support for i.MX 7.
+See previous patchset:
+https://lkml.org/lkml/2017/4/21/832
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- arch/arm/boot/dts/imx7s.dtsi | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+The previous version also included driver changes, which are already
+merged.
 
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index c4f12fd2e044..89011b7dc7a0 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -995,5 +995,36 @@
- 				status = "disabled";
- 			};
- 		};
-+
-+		dma_apbh: dma-apbh at 33000000 {
-+			compatible = "fsl,imx7d-dma-apbh", "fsl,imx28-dma-apbh";
-+			reg = <0x33000000 0x2000>;
-+			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "gpmi0", "gpmi1", "gpmi2", "gpmi3";
-+			#dma-cells = <1>;
-+			dma-channels = <4>;
-+			clocks = <&clks IMX7D_NAND_USDHC_BUS_ROOT_CLK>,
-+				<&clks IMX7D_NAND_ROOT_CLK>;
-+			clock-names = "dma_apbh_bch", "dma_apbh_io";
-+		};
-+
-+		gpmi: gpmi-nand at 33002000{
-+			compatible = "fsl,imx7d-gpmi-nand";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x33002000 0x2000>, <0x33004000 0x4000>;
-+			reg-names = "gpmi-nand", "bch";
-+			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "bch";
-+			clocks = <&clks IMX7D_NAND_ROOT_CLK>,
-+				<&clks IMX7D_NAND_USDHC_BUS_ROOT_CLK>;
-+			clock-names = "gpmi_io", "gpmi_bch_apb";
-+			dmas = <&dma_apbh 0>;
-+			dma-names = "rx-tx";
-+			status = "disabled";
-+		};
- 	};
- };
+--
+Stefan
+
+Changes since v2:
+- Only specify IMX7D_NAND_USDHC_BUS_ROOT_CLK which seems to be sufficent
+- Dropped driver changes, alreay merged
+
+Changes since v1:
+- Make clks_count const
+- Introduce IS_IMX7D for i.MX 7 SoC's and make it part of GPMI_IS_MX6
+
+Stefan Agner (2):
+  ARM: dts: imx7: add GPMI NAND
+  ARM: dts: imx7-colibri: add NAND support
+
+ arch/arm/boot/dts/imx7-colibri.dtsi |  9 +++++++++
+ arch/arm/boot/dts/imx7s.dtsi        | 31 +++++++++++++++++++++++++++++++
+ 2 files changed, 40 insertions(+)
+
 -- 
 2.13.0
