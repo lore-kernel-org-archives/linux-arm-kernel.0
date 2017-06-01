@@ -1,59 +1,159 @@
-From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
-Date: Thu,  1 Jun 2017 19:35:37 +0530
-Subject: [PATCH] acpi/iort, numa: Add numa node mapping for smmuv3 devices
-Message-ID: <1496325937-21113-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Thu, 01 Jun 2017 22:11:14 +0800
+Subject: [linux-sunxi] Re: [RFC PATCH 07/11] drm: sun4i: add support for
+ the TV encoder in H3 SoC
+In-Reply-To: <20170531184306.hzu2em35vr4qi4un@flea.lan>
+References: <20170517164354.16399-1-icenowy@aosc.io>
+ <1958057.WDKm0nQKgW@jernej-laptop>
+ <CAGb2v66aD=G+V75N-_nYo=dGqhxpKhadM84h9G-B34=dnDwCbg@mail.gmail.com>
+ <3164416.5xR36OcyjH@jernej-laptop>
+ <20170523125321.t7y7yfrrfokpkzgd@flea.home>
+ <98c3572beee0a81755994b4bdc508b18@aosc.io>
+ <20170524073019.bl6rojc2srrigalp@flea.home>
+ <98558BA2-BC99-4D0A-A045-571C643875C5@aosc.io>
+ <20170531184306.hzu2em35vr4qi4un@flea.lan>
+Message-ID: <715e6ab52d8aa0032c9759393ace20dc@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM IORT specification has provision to define Proximity domain
-in SMMUv3 IORT table. Adding required code to parse Proximity domain of
-SMMUv3 IORT table. Parsed Proximity domain is used to set numa_node
-of SMMUv3 platform devices.
+? 2017-06-01 02:43?Maxime Ripard ???
+> On Wed, May 24, 2017 at 04:25:46PM +0800, Icenowy Zheng wrote:
+>> 
+>> 
+>> ? 2017?5?24? GMT+08:00 ??3:30:19, Maxime Ripard 
+>> <maxime.ripard@free-electrons.com> ??:
+>> >On Tue, May 23, 2017 at 09:00:59PM +0800, icenowy at aosc.io wrote:
+>> >> ? 2017-05-23 20:53?Maxime Ripard ???
+>> >> > On Mon, May 22, 2017 at 07:55:56PM +0200, Jernej ?krabec wrote:
+>> >> > > Hi,
+>> >> > >
+>> >> > > Dne sobota, 20. maj 2017 ob 03:37:53 CEST je Chen-Yu Tsai
+>> >napisal(a):
+>> >> > > > On Sat, May 20, 2017 at 2:23 AM, Jernej ?krabec
+>> ><jernej.skrabec@siol.net>
+>> >> > > wrote:
+>> >> > > > > Hi,
+>> >> > > > >
+>> >> > > > > Dne petek, 19. maj 2017 ob 20:08:18 CEST je Icenowy Zheng
+>> >napisal(a):
+>> >> > > > >> ? 2017?5?20? GMT+08:00 ??2:03:30, Maxime Ripard
+>> ><maxime.ripard@free-
+>> >> > > > >
+>> >> > > > > electrons.com> ??:
+>> >> > > > >> >On Thu, May 18, 2017 at 12:43:50AM +0800, Icenowy Zheng
+>> >wrote:
+>> >> > > > >> >> Allwinner H3 features a TV encoder similar to the one in
+>> >earlier
+>> >> > > > >> >
+>> >> > > > >> >SoCs,
+>> >> > > > >> >
+>> >> > > > >> >> but with some different points about clocks:
+>> >> > > > >> >> - It has a mod clock and a bus clock.
+>> >> > > > >> >> - The mod clock must be at a fixed rate to generate
+>> >signal.
+>> >> > > > >> >
+>> >> > > > >> >Why?
+>> >> > > > >>
+>> >> > > > >> It's experiment result by Jernej.
+>> >> > > > >>
+>> >> > > > >> The clock rates in BSP kernel is also specially designed
+>> >> > > > >> (PLL_DE at 432MHz) in order to be able to feed the TVE.
+>> >> > > > >
+>> >> > > > > My experiments and search through BSP code showed that TVE
+>> >seems to have
+>> >> > > > > additional fixed predivider 8. So if you want to generate 27
+>> >MHz clock,
+>> >> > > > > unit has to be feed with 216 MHz.
+>> >> > > > >
+>> >> > > > > TVE has only one PLL source PLL_DE. And since 216 MHz is a
+>> >bit low for
+>> >> > > > > DE2,
+>> >> > > > > BSP defaults to 432 MHz for PLL_DE and use divider 2 to
+>> >generate 216 MHz.
+>> >> > > > > This clock is then divided by 8 internaly to get final 27
+>> >MHz.
+>> >> > > > >
+>> >> > > > > Please note that I don't have any hard evidence to support
+>> >that, only
+>> >> > > > > experimental data. However, only that explanation make sense
+>> >to me.
+>> >> > > > >
+>> >> > > > > BTW, BSP H3/H5 TV driver supports only PAL and NTSC which
+>> >both use 27 MHz
+>> >> > > > > base clock. Further experiments are needed to check if there
+>> >is any
+>> >> > > > > possibility to have other resolutions by manipulating clocks
+>> >and give
+>> >> > > > > other proper settings. I plan to do that, but not in very
+>> >near future.
+>> >> > > >
+>> >> > > > You only have composite video output, and those are the only 2
+>> >standard
+>> >> > > > resolutions that make any sense.
+>> >> > >
+>> >> > > Right, other resolutions are for VGA.
+>> >> > >
+>> >> > > Anyway, I did some more digging in A10 and R40 datasheets. I
+>> >think
+>> >> > > that H3 TVE
+>> >> > > unit is something in between. R40 TVE has a setting to select "up
+>> >> > > sample".
+>> >> >
+>> >> > That might be just another translation of oversampling :)
+>> >> >
+>> >> > I didn't know it could be applied to composite signals though, but
+>> >I
+>> >> > guess this is just another analog signal after all.
+>> >> >
+>> >> > > Possible settings are 27 MHz, 54 MHz, 108 MHz and 216 MHz. BSP
+>> >> > > driver on R40
+>> >> > > has this setting enabled only for PAL and NTSC and it is always
+>> >216
+>> >> > > MHz. I
+>> >> > > think that H3 may have this hardwired to 216 MHz and this would
+>> >be
+>> >> > > the reason
+>> >> > > why 216 MHz is needed.
+>> >> > >
+>> >> > > Has anyone else any better explanation?
+>> >> >
+>> >> > That's already a pretty good one.
+>> >> >
+>> >> > Either way, wether this is upsampling, oversampling or just a
+>> >> > pre-divider, this can and should be dealt with in the mode_set
+>> >> > callback, and not in the probe.
+>> >>
+>> >> I got a better idea -- let TVE driver have the CLK_TVE as an
+>> >> input and create a subclock output with divider 16, and feed this
+>> >> subclock to TCON lcd-ch1.
+>> >>
+>> >> This is a model of the real hardware -- the clock divider is in
+>> >> TVE, not TCON.
+>> >
+>> >That's definitely not a good representation of the hardware. There's
+>> >one clock, it goes to the TCON, period.
+>> 
+>> No, I still think it goes to the TVE as:
+>> 
+>> 1. it's named TVE in datasheet.
+> 
+> Feel free to come up with a better, more sensible explanation?
+> 
+>> 2. Generating signal with such a low resolution but such
+>> a high dotclock is not a good situation.
+> 
+> What? What do you mean? The pixel clock is 27MHz, I'm pretty sure we
+> agree on that.
 
-Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
----
- drivers/iommu/arm-smmu-v3.c | 6 ++++++
- include/acpi/actbl2.h       | 4 ++++
- 2 files changed, 10 insertions(+)
+Yes, so I don't think the TCON code should set the clock to any value
+rather than 27MHz.
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 69d8506..98c2319 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -2667,6 +2667,12 @@ static int arm_smmu_device_acpi_probe(struct platform_device *pdev,
- 	if (iort_smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE)
- 		smmu->features |= ARM_SMMU_FEAT_COHERENCY;
- 
-+	/* set numa proximity domain for smmv3 device */
-+	if (iort_smmu->flags & ACPI_IORT_SMMU_V3_PXM) {
-+		set_dev_node(dev, acpi_map_pxm_to_node(iort_smmu->pxm));
-+		dev_info(dev, "on NUMA node %d\n", dev_to_node(dev));
-+	}
-+
- 	return 0;
- }
- #else
-diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
-index 4b306a6..c16ced8 100644
---- a/include/acpi/actbl2.h
-+++ b/include/acpi/actbl2.h
-@@ -805,6 +805,9 @@ struct acpi_iort_smmu_v3 {
- 	u32 pri_gsiv;
- 	u32 gerr_gsiv;
- 	u32 sync_gsiv;
-+	u8 pxm;
-+	u8 reserved1;
-+	u16 reserved2;
- };
- 
- /* Values for Model field above */
-@@ -817,6 +820,7 @@ struct acpi_iort_smmu_v3 {
- 
- #define ACPI_IORT_SMMU_V3_COHACC_OVERRIDE   (1)
- #define ACPI_IORT_SMMU_V3_HTTU_OVERRIDE     (1<<1)
-+#define ACPI_IORT_SMMU_V3_PXM               (1<<3)
- 
- /*******************************************************************************
-  *
--- 
-1.8.1.4
+So we should create a clock with divider in TVE, and feed it to TCON.
+
+> 
+> Maxime
+> 
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
