@@ -1,104 +1,236 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Thu, 1 Jun 2017 14:00:21 -0700
-Subject: [PATCH v2 00/25] arm64: KVM: Mediate access to GICv3 sysregs at
- EL2
-In-Reply-To: <20170601102117.17750-1-marc.zyngier@arm.com>
-References: <20170601102117.17750-1-marc.zyngier@arm.com>
-Message-ID: <7dd609ce-6f7b-2a12-fa06-4ce1c6ba6ebe@caviumnetworks.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Thu,  1 Jun 2017 16:05:35 -0500
+Subject: [for 4.12] net: qcom/emac: do not use hardware mdio automatic polling
+Message-ID: <1496351135-6074-1-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2017 03:20 AM, Marc Zyngier wrote:
-> Some systems have less than perfect GICv3 implementations, leading to
-> all kind of ugly issues (guest hanging, host dying). In order to allow
-> some level of diagnostic, and in some cases implement workarounds,
-> this series enables the trapping of both Group-0, Group-1 and Common
-> sysregs. Mediating the access at EL2 allows some form of sanity
-> checking that the HW is sometimes sorely lacking.
-> 
-> Instead of fully emulating a GICv3 CPU interface, we still use the
-> existing HW (list registers, AP registers, VMCR...), which allows the
-> code to be independent from the rest of the KVM code, and to cope with
-> partial trapping.
-> 
-> Of course, trapping has a cost, which is why this must be either
-> enabled on the command line, or selected by another cpu capability
-> (see Cavium erratum 30115). A quick test on an A57-based platform
-> shows a 25% hit when repeatedly banging on the trapped registers,
-> while normal workloads do not seem to suffer noticeably from such
-> trapping (hackbench variance is in the usual noise, despite being very
-> IPI happy).
-> 
-> This has been tested on a dual socket Thundex-X and a Freescale LS-2085a.
-> 
-> I've taken the liberty to rebase David Daney's initial Cavium erratum
-> 30115 workaround on top of this series, and included it here as a
-> typical use case.
+Use software polling (PHY_POLL) to check for link state changes instead
+of relying on the EMAC's hardware polling feature.  Some PHY drivers
+are unable to get a functioning link because the HW polling is not
+robust enough.
 
-I pulled this from:
+The EMAC is able to poll the PHY on the MDIO bus looking for link state
+changes (via the Link Status bit in the Status Register at address 0x1).
+When the link state changes, the EMAC triggers an interrupt and tells the
+driver what the new state is.  The feature eliminates the need for
+software to poll the MDIO bus.
 
+Unfortunately, this feature is incompatible with phylib, because it
+ignores everything that the PHY core and PHY drivers are trying to do.
+In particular:
+
+1. It assumes a compatible register set, so PHYs with different registers
+   may not work.
+
+2. It doesn't allow for hardware errata that have work-arounds implemented
+   in the PHY driver.
+
+3. It doesn't support multiple register pages. If the PHY core switches
+   the register set to another page, the EMAC won't know the page has
+   changed and will still attempt to read the same PHY register.
+
+4. It only checks the copper side of the link, not the SGMII side.  Some
+   PHY drivers (e.g. at803x) may also check the SGMII side, and
+   report the link as not ready during autonegotiation if the SGMII link
+   is still down.  Phylib then waits for another interrupt to query
+   the PHY again, but the EMAC won't send another interrupt because it
+   thinks the link is up.
+
+Cc: stable at vger.kernel.org # 4.11.x
+Tested-by: Manoj Iyer <manoj.iyer@canonical.com>
+Signed-off-by: Timur Tabi <timur@codeaurora.org>
+---
+ drivers/net/ethernet/qualcomm/emac/emac-mac.c |  2 +-
+ drivers/net/ethernet/qualcomm/emac/emac-phy.c | 75 ++-------------------------
+ drivers/net/ethernet/qualcomm/emac/emac.c     | 22 +-------
+ 3 files changed, 6 insertions(+), 93 deletions(-)
+
+diff --git a/drivers/net/ethernet/qualcomm/emac/emac-mac.c b/drivers/net/ethernet/qualcomm/emac/emac-mac.c
+index e635605..1c0dbaa 100644
+--- a/drivers/net/ethernet/qualcomm/emac/emac-mac.c
++++ b/drivers/net/ethernet/qualcomm/emac/emac-mac.c
+@@ -932,7 +932,7 @@ int emac_mac_up(struct emac_adapter *adpt)
+ 	emac_mac_config(adpt);
+ 	emac_mac_rx_descs_refill(adpt, &adpt->rx_q);
  
-https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/log/?h=kvm-arm64/gicv3-cpuif-mediated-access
-
-this morning at commit	58c1763c5aa6223ab3d04e0c183a31eb0aef832e
-
-Entire series tested by and
-
-Acked-by: David Daney <david.daney@cavium.com>
-
-Thanks again.
-
-> 
-> - From v1:
->    * Fix bug in DIR handling which would have performed a deactivation even
->      when EOImode==0
->    * Some minor cleanups and clarifications.
->    * All the initial fixes have already been merged.
->    * Rebased on 4.12-rc3.
-> 
-> David Daney (2):
->    arm64: Add MIDR values for Cavium cn83XX SoCs
->    arm64: Add workaround for Cavium Thunder erratum 30115
-> 
-> Marc Zyngier (23):
->    arm64: Add a facility to turn an ESR syndrome into a sysreg encoding
->    KVM: arm/arm64: vgic-v3: Add accessors for the ICH_APxRn_EL2 registers
->    KVM: arm64: Make kvm_condition_valid32() accessible from EL2
->    KVM: arm64: vgic-v3: Add hook to handle guest GICv3 sysreg accesses at
->      EL2
->    KVM: arm64: vgic-v3: Add ICV_BPR1_EL1 handler
->    KVM: arm64: vgic-v3: Add ICV_IGRPEN1_EL1 handler
->    KVM: arm64: vgic-v3: Add ICV_IAR1_EL1 handler
->    KVM: arm64: vgic-v3: Add ICV_EOIR1_EL1 handler
->    KVM: arm64: vgic-v3: Add ICV_AP1Rn_EL1 handler
->    KVM: arm64: vgic-v3: Add ICV_HPPIR1_EL1 handler
->    KVM: arm64: vgic-v3: Enable trapping of Group-1 system registers
->    KVM: arm64: Enable GICv3 Group-1 sysreg trapping via command-line
->    KVM: arm64: vgic-v3: Add ICV_BPR0_EL1 handler
->    KVM: arm64: vgic-v3: Add ICV_IGNREN0_EL1 handler
->    KVM: arm64: vgic-v3: Add misc Group-0 handlers
->    KVM: arm64: vgic-v3: Enable trapping of Group-0 system registers
->    KVM: arm64: Enable GICv3 Group-0 sysreg trapping via command-line
->    KVM: arm64: vgic-v3: Add ICV_DIR_EL1 handler
->    KVM: arm64: vgic-v3: Add ICV_RPR_EL1 handler
->    KVM: arm64: vgic-v3: Add ICV_CTLR_EL1 handler
->    KVM: arm64: vgic-v3: Add ICV_PMR_EL1 handler
->    KVM: arm64: Enable GICv3 common sysreg trapping via command-line
->    KVM: arm64: vgic-v3: Log which GICv3 system registers are trapped
-> 
->   Documentation/arm64/silicon-errata.txt |   1 +
->   arch/arm64/Kconfig                     |  11 +
->   arch/arm64/include/asm/cpucaps.h       |   3 +-
->   arch/arm64/include/asm/cputype.h       |   2 +
->   arch/arm64/include/asm/esr.h           |  24 +
->   arch/arm64/include/asm/kvm_hyp.h       |   1 +
->   arch/arm64/include/asm/sysreg.h        |   9 +
->   arch/arm64/kernel/cpu_errata.c         |  21 +
->   arch/arm64/kvm/hyp/switch.c            |  14 +
->   include/kvm/arm_vgic.h                 |   1 +
->   include/linux/irqchip/arm-gic-v3.h     |   6 +
->   virt/kvm/arm/aarch32.c                 |   2 +-
->   virt/kvm/arm/hyp/vgic-v3-sr.c          | 803 ++++++++++++++++++++++++++++++++-
->   virt/kvm/arm/vgic/vgic-v3.c            |  45 ++
->   14 files changed, 925 insertions(+), 18 deletions(-)
-> 
+-	adpt->phydev->irq = PHY_IGNORE_INTERRUPT;
++	adpt->phydev->irq = PHY_POLL;
+ 	ret = phy_connect_direct(netdev, adpt->phydev, emac_adjust_link,
+ 				 PHY_INTERFACE_MODE_SGMII);
+ 	if (ret) {
+diff --git a/drivers/net/ethernet/qualcomm/emac/emac-phy.c b/drivers/net/ethernet/qualcomm/emac/emac-phy.c
+index 441c1936..18461fc 100644
+--- a/drivers/net/ethernet/qualcomm/emac/emac-phy.c
++++ b/drivers/net/ethernet/qualcomm/emac/emac-phy.c
+@@ -13,15 +13,11 @@
+ /* Qualcomm Technologies, Inc. EMAC PHY Controller driver.
+  */
+ 
+-#include <linux/module.h>
+-#include <linux/of.h>
+-#include <linux/of_net.h>
+ #include <linux/of_mdio.h>
+ #include <linux/phy.h>
+ #include <linux/iopoll.h>
+ #include <linux/acpi.h>
+ #include "emac.h"
+-#include "emac-mac.h"
+ 
+ /* EMAC base register offsets */
+ #define EMAC_MDIO_CTRL                                        0x001414
+@@ -52,62 +48,10 @@
+ 
+ #define MDIO_WAIT_TIMES                                           1000
+ 
+-#define EMAC_LINK_SPEED_DEFAULT (\
+-		EMAC_LINK_SPEED_10_HALF  |\
+-		EMAC_LINK_SPEED_10_FULL  |\
+-		EMAC_LINK_SPEED_100_HALF |\
+-		EMAC_LINK_SPEED_100_FULL |\
+-		EMAC_LINK_SPEED_1GB_FULL)
+-
+-/**
+- * emac_phy_mdio_autopoll_disable() - disable mdio autopoll
+- * @adpt: the emac adapter
+- *
+- * The autopoll feature takes over the MDIO bus.  In order for
+- * the PHY driver to be able to talk to the PHY over the MDIO
+- * bus, we need to temporarily disable the autopoll feature.
+- */
+-static int emac_phy_mdio_autopoll_disable(struct emac_adapter *adpt)
+-{
+-	u32 val;
+-
+-	/* disable autopoll */
+-	emac_reg_update32(adpt->base + EMAC_MDIO_CTRL, MDIO_AP_EN, 0);
+-
+-	/* wait for any mdio polling to complete */
+-	if (!readl_poll_timeout(adpt->base + EMAC_MDIO_CTRL, val,
+-				!(val & MDIO_BUSY), 100, MDIO_WAIT_TIMES * 100))
+-		return 0;
+-
+-	/* failed to disable; ensure it is enabled before returning */
+-	emac_reg_update32(adpt->base + EMAC_MDIO_CTRL, 0, MDIO_AP_EN);
+-
+-	return -EBUSY;
+-}
+-
+-/**
+- * emac_phy_mdio_autopoll_disable() - disable mdio autopoll
+- * @adpt: the emac adapter
+- *
+- * The EMAC has the ability to poll the external PHY on the MDIO
+- * bus for link state changes.  This eliminates the need for the
+- * driver to poll the phy.  If if the link state does change,
+- * the EMAC issues an interrupt on behalf of the PHY.
+- */
+-static void emac_phy_mdio_autopoll_enable(struct emac_adapter *adpt)
+-{
+-	emac_reg_update32(adpt->base + EMAC_MDIO_CTRL, 0, MDIO_AP_EN);
+-}
+-
+ static int emac_mdio_read(struct mii_bus *bus, int addr, int regnum)
+ {
+ 	struct emac_adapter *adpt = bus->priv;
+ 	u32 reg;
+-	int ret;
+-
+-	ret = emac_phy_mdio_autopoll_disable(adpt);
+-	if (ret)
+-		return ret;
+ 
+ 	emac_reg_update32(adpt->base + EMAC_PHY_STS, PHY_ADDR_BMSK,
+ 			  (addr << PHY_ADDR_SHFT));
+@@ -122,24 +66,15 @@ static int emac_mdio_read(struct mii_bus *bus, int addr, int regnum)
+ 	if (readl_poll_timeout(adpt->base + EMAC_MDIO_CTRL, reg,
+ 			       !(reg & (MDIO_START | MDIO_BUSY)),
+ 			       100, MDIO_WAIT_TIMES * 100))
+-		ret = -EIO;
+-	else
+-		ret = (reg >> MDIO_DATA_SHFT) & MDIO_DATA_BMSK;
++		return -EIO;
+ 
+-	emac_phy_mdio_autopoll_enable(adpt);
+-
+-	return ret;
++	return (reg >> MDIO_DATA_SHFT) & MDIO_DATA_BMSK;
+ }
+ 
+ static int emac_mdio_write(struct mii_bus *bus, int addr, int regnum, u16 val)
+ {
+ 	struct emac_adapter *adpt = bus->priv;
+ 	u32 reg;
+-	int ret;
+-
+-	ret = emac_phy_mdio_autopoll_disable(adpt);
+-	if (ret)
+-		return ret;
+ 
+ 	emac_reg_update32(adpt->base + EMAC_PHY_STS, PHY_ADDR_BMSK,
+ 			  (addr << PHY_ADDR_SHFT));
+@@ -155,11 +90,9 @@ static int emac_mdio_write(struct mii_bus *bus, int addr, int regnum, u16 val)
+ 	if (readl_poll_timeout(adpt->base + EMAC_MDIO_CTRL, reg,
+ 			       !(reg & (MDIO_START | MDIO_BUSY)), 100,
+ 			       MDIO_WAIT_TIMES * 100))
+-		ret = -EIO;
++		return -EIO;
+ 
+-	emac_phy_mdio_autopoll_enable(adpt);
+-
+-	return ret;
++	return 0;
+ }
+ 
+ /* Configure the MDIO bus and connect the external PHY */
+diff --git a/drivers/net/ethernet/qualcomm/emac/emac.c b/drivers/net/ethernet/qualcomm/emac/emac.c
+index 28a8cdc..98a326f 100644
+--- a/drivers/net/ethernet/qualcomm/emac/emac.c
++++ b/drivers/net/ethernet/qualcomm/emac/emac.c
+@@ -50,19 +50,7 @@
+ #define DMAR_DLY_CNT_DEF				    15
+ #define DMAW_DLY_CNT_DEF				     4
+ 
+-#define IMR_NORMAL_MASK         (\
+-		ISR_ERROR       |\
+-		ISR_GPHY_LINK   |\
+-		ISR_TX_PKT      |\
+-		GPHY_WAKEUP_INT)
+-
+-#define IMR_EXTENDED_MASK       (\
+-		SW_MAN_INT      |\
+-		ISR_OVER        |\
+-		ISR_ERROR       |\
+-		ISR_GPHY_LINK   |\
+-		ISR_TX_PKT      |\
+-		GPHY_WAKEUP_INT)
++#define IMR_NORMAL_MASK		(ISR_ERROR | ISR_OVER | ISR_TX_PKT)
+ 
+ #define ISR_TX_PKT      (\
+ 	TX_PKT_INT      |\
+@@ -70,10 +58,6 @@
+ 	TX_PKT_INT2     |\
+ 	TX_PKT_INT3)
+ 
+-#define ISR_GPHY_LINK        (\
+-	GPHY_LINK_UP_INT     |\
+-	GPHY_LINK_DOWN_INT)
+-
+ #define ISR_OVER        (\
+ 	RFD0_UR_INT     |\
+ 	RFD1_UR_INT     |\
+@@ -187,10 +171,6 @@ irqreturn_t emac_isr(int _irq, void *data)
+ 	if (status & ISR_OVER)
+ 		net_warn_ratelimited("warning: TX/RX overflow\n");
+ 
+-	/* link event */
+-	if (status & ISR_GPHY_LINK)
+-		phy_mac_interrupt(adpt->phydev, !!(status & GPHY_LINK_UP_INT));
+-
+ exit:
+ 	/* enable the interrupt */
+ 	writel(irq->mask, adpt->base + EMAC_INT_MASK);
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
