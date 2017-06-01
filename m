@@ -1,152 +1,52 @@
 From: erin.lo@mediatek.com (Erin Lo)
-Date: Thu, 1 Jun 2017 14:08:44 +0800
-Subject: [PATCH 3/3] arm: dts: mt2701: Add display subsystem related nodes for
- MT2701
+Date: Thu, 1 Jun 2017 14:08:42 +0800
+Subject: [PATCH 1/3] arm: dts: mt2701: Add ethernet device node
 In-Reply-To: <1496297324-21091-1-git-send-email-erin.lo@mediatek.com>
 References: <1496297324-21091-1-git-send-email-erin.lo@mediatek.com>
-Message-ID: <1496297324-21091-4-git-send-email-erin.lo@mediatek.com>
+Message-ID: <1496297324-21091-2-git-send-email-erin.lo@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: YT Shen <yt.shen@mediatek.com>
+From: Sean Wang <sean.wang@mediatek.com>
 
-This patch adds the device nodes for the DISP function blocks for MT2701
+Add ethernet device node for MT2701
 
-Signed-off-by: YT Shen <yt.shen@mediatek.com>
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 Signed-off-by: Erin Lo <erin.lo@mediatek.com>
 ---
- arch/arm/boot/dts/mt2701.dtsi | 84 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 84 insertions(+)
+ arch/arm/boot/dts/mt2701.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
 diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index 4f110d5..e20b65c 100644
+index 8037210..de88bd7 100644
 --- a/arch/arm/boot/dts/mt2701.dtsi
 +++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -17,6 +17,7 @@
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/reset/mt2701-resets.h>
-+#include <dt-bindings/memory/mt2701-larb-port.h>
- #include "skeleton64.dtsi"
- #include "mt2701-pinfunc.h"
- 
-@@ -24,6 +25,11 @@
- 	compatible = "mediatek,mt2701";
- 	interrupt-parent = <&sysirq>;
- 
-+	aliases {
-+		rdma0 = &rdma0;
-+		rdma1 = &rdma1;
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -201,6 +207,16 @@
- 		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
- 	};
- 
-+	mipi_tx0: mipi-dphy at 10010000 {
-+		compatible = "mediatek,mt2701-mipi-tx";
-+		reg = <0 0x10010000 0 0x90>;
-+		clocks = <&clk26m>;
-+		clock-output-names = "mipi_tx0_pll";
-+		#clock-cells = <0>;
-+		#phy-cells = <0>;
-+		status = "disabled";
-+	};
-+
- 	sysirq: interrupt-controller at 10200100 {
- 		compatible = "mediatek,mt2701-sysirq",
- 			     "mediatek,mt6577-sysirq";
-@@ -366,6 +382,39 @@
+@@ -420,6 +420,26 @@
  		#clock-cells = <1>;
  	};
  
-+	display_components: dispsys at 14000000 {
-+		compatible = "mediatek,mt2701-mmsys";
-+		reg = <0 0x14000000 0 0x1000>;
-+		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
-+	};
-+
-+	ovl at 14007000 {
-+		compatible = "mediatek,mt2701-disp-ovl";
-+		reg = <0 0x14007000 0 0x1000>;
-+		interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_OVL>;
-+		iommus = <&iommu MT2701_M4U_PORT_DISP_OVL_0>;
-+		mediatek,larb = <&larb0>;
-+	};
-+
-+	rdma0: rdma at 14008000 {
-+		compatible = "mediatek,mt2701-disp-rdma";
-+		reg = <0 0x14008000 0 0x1000>;
-+		interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_RDMA>;
-+		iommus = <&iommu MT2701_M4U_PORT_DISP_RDMA>;
-+		mediatek,larb = <&larb0>;
-+	};
-+
-+	wdma at 14009000 {
-+		compatible = "mediatek,mt2701-disp-wdma";
-+		reg = <0 0x14009000 0 0x1000>;
-+		interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_WDMA>;
-+		iommus = <&iommu MT2701_M4U_PORT_DISP_WDMA>;
-+		mediatek,larb = <&larb0>;
-+	};
-+
- 	bls: bls at 1400a000 {
- 		compatible = "mediatek,mt2701-disp-pwm";
- 		reg = <0 0x1400a000 0 0x1000>;
-@@ -375,6 +424,32 @@
- 		status = "disabled";
- 	};
- 
-+	color at 1400b000 {
-+		compatible = "mediatek,mt2701-disp-color";
-+		reg = <0 0x1400b000 0 0x1000>;
-+		interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_COLOR>;
-+	};
-+
-+	dsi: dsi at 1400c000 {
-+		compatible = "mediatek,mt2701-dsi";
-+		reg = <0 0x1400c000 0 0x1000>;
-+		interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DSI_ENGINE>, <&mmsys CLK_MM_DSI_DIG>,
-+			 <&mipi_tx0>;
-+		clock-names = "engine", "digital", "hs";
-+		phys = <&mipi_tx0>;
-+		phy-names = "dphy";
++	eth: ethernet at 1b100000 {
++		compatible = "mediatek,mt2701-eth", "syscon";
++		reg = <0 0x1b100000 0 0x20000>;
++		interrupts = <GIC_SPI 200 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_SPI 199 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_SPI 198 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&topckgen CLK_TOP_ETHIF_SEL>,
++			 <&ethsys CLK_ETHSYS_ESW>,
++			 <&ethsys CLK_ETHSYS_GP1>,
++			 <&ethsys CLK_ETHSYS_GP2>,
++			 <&apmixedsys CLK_APMIXED_TRGPLL>;
++		clock-names = "ethif", "esw", "gp1", "gp2", "trgpll";
++		power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
++		mediatek,ethsys = <&ethsys>;
++		mediatek,pctl = <&syscfg_pctl_a>;
++		#address-cells = <1>;
++		#size-cells = <0>;
 +		status = "disabled";
 +	};
 +
-+	mutex: mutex at 1400e000 {
-+		compatible = "mediatek,mt2701-disp-mutex";
-+		reg = <0 0x1400e000 0 0x1000>;
-+		interrupts = <GIC_SPI 161 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_MUTEX_32K>;
-+	};
-+
- 	larb0: larb at 14010000 {
- 		compatible = "mediatek,mt2701-smi-larb";
- 		reg = <0 0x14010000 0 0x1000>;
-@@ -385,6 +460,15 @@
- 		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
- 	};
- 
-+	rdma1: rdma at 14012000 {
-+		compatible = "mediatek,mt2701-disp-rdma";
-+		reg = <0 0x14012000 0 0x1000>;
-+		interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_RDMA1>;
-+		iommus = <&iommu MT2701_M4U_PORT_DISP_RDMA1>;
-+		mediatek,larb = <&larb0>;
-+	};
-+
- 	imgsys: syscon at 15000000 {
- 		compatible = "mediatek,mt2701-imgsys", "syscon";
- 		reg = <0 0x15000000 0 0x1000>;
+ 	bdpsys: syscon at 1c000000 {
+ 		compatible = "mediatek,mt2701-bdpsys", "syscon";
+ 		reg = <0 0x1c000000 0 0x1000>;
 -- 
 1.9.1
