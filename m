@@ -1,21 +1,16 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Thu, 1 Jun 2017 20:52:01 +0200
-Subject: [PATCH 36/58] ARM: dts: at91: linea/tse850-3: use TCB0 as
- clocksource
-In-Reply-To: <20170530215139.9983-37-alexandre.belloni@free-electrons.com>
-References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
- <20170530215139.9983-37-alexandre.belloni@free-electrons.com>
-Message-ID: <85dea2b2-9538-0cd2-17dd-3c4f3285ae9d@axentia.se>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 01 Jun 2017 14:58:19 -0400 (EDT)
+Subject: [PATCH v6 00/21] net-next: stmmac: add dwmac-sun8i ethernet driver
+In-Reply-To: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
+References: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
+Message-ID: <20170601.145819.789604139072328057.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-05-30 23:51, Alexandre Belloni wrote:
-> Use tcb0 as the clocksource like previously selected in sama5_defconfig.
-> 
-> Cc: Peter Rosin <peda@axentia.se>
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+From: Corentin Labbe <clabbe.montjoie@gmail.com>
+Date: Wed, 31 May 2017 09:18:31 +0200
 
-Tested-by: Peter Rosin <peda@axentia.se>
+> This patch series add the driver for dwmac-sun8i which handle the Ethernet MAC
+> present on Allwinner H3/H5/A83T/A64 SoCs.
 
-Cheers,
-peda
+Series applied, but wow that's a lot of DT file changes :-(
