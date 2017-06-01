@@ -1,92 +1,101 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu,  1 Jun 2017 22:06:00 +0200
-Subject: [PATCH v4 5/6] ARM: at91: add armv7m SoC detection
-In-Reply-To: <20170601200601.11035-1-alexandre.belloni@free-electrons.com>
-References: <20170601200601.11035-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170601200601.11035-6-alexandre.belloni@free-electrons.com>
+From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
+Date: Thu,  1 Jun 2017 22:08:20 +0200
+Subject: [PATCH] gpio: mvebu: change compatible string for PWM support
+Message-ID: <20170601200820.22396-1-ralph.sennhauser@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Szemz? Andr?s <sza@esh.hu>
+As it turns out more than just Armada 370 and XP support using GPIO
+lines as PWM lines. For example the Armada 38x family has the same
+hardware support. As such "marvell,armada-370-xp-gpio" for the
+compatible string is a misnomer.
 
-Add SAME70/V71/S70/V70 chip-ids to SoC detection.
+Change the compatible string to "marvell,armada-370-gpio" before the
+driver makes it out of the -rc stage. This also follows the practice of
+using only the first device family supported as part of the name.
 
-Signed-off-by: Szemz? Andr?s <sza@esh.hu>
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Also update the documentation and comments in the code accordingly.
+
+Fixes: 757642f9a584 ("gpio: mvebu: Add limited PWM support")
+Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
+
 ---
- drivers/soc/atmel/soc.c | 24 ++++++++++++++++++++++++
- drivers/soc/atmel/soc.h | 26 ++++++++++++++++++++++++++
- 2 files changed, 50 insertions(+)
 
-diff --git a/drivers/soc/atmel/soc.c b/drivers/soc/atmel/soc.c
-index 4790094b498e..c1363c83c352 100644
---- a/drivers/soc/atmel/soc.c
-+++ b/drivers/soc/atmel/soc.c
-@@ -107,6 +107,30 @@ static const struct at91_soc __initconst socs[] = {
- 	AT91_SOC(SAMA5D4_CIDR_MATCH, SAMA5D44_EXID_MATCH,
- 		 "sama5d44", "sama5d4"),
- #endif
-+#ifdef CONFIG_SOC_SAMV7
-+	AT91_SOC(SAME70Q21_CIDR_MATCH, SAME70Q21_EXID_MATCH,
-+		 "same70q21", "same7"),
-+	AT91_SOC(SAME70Q20_CIDR_MATCH, SAME70Q20_EXID_MATCH,
-+		 "same70q20", "same7"),
-+	AT91_SOC(SAME70Q19_CIDR_MATCH, SAME70Q19_EXID_MATCH,
-+		 "same70q19", "same7"),
-+	AT91_SOC(SAMS70Q21_CIDR_MATCH, SAMS70Q21_EXID_MATCH,
-+		 "sams70q21", "sams7"),
-+	AT91_SOC(SAMS70Q20_CIDR_MATCH, SAMS70Q20_EXID_MATCH,
-+		 "sams70q20", "sams7"),
-+	AT91_SOC(SAMS70Q19_CIDR_MATCH, SAMS70Q19_EXID_MATCH,
-+		 "sams70q19", "sams7"),
-+	AT91_SOC(SAMV71Q21_CIDR_MATCH, SAMV71Q21_EXID_MATCH,
-+		 "samv71q21", "samv7"),
-+	AT91_SOC(SAMV71Q20_CIDR_MATCH, SAMV71Q20_EXID_MATCH,
-+		 "samv71q20", "samv7"),
-+	AT91_SOC(SAMV71Q19_CIDR_MATCH, SAMV71Q19_EXID_MATCH,
-+		 "samv71q19", "samv7"),
-+	AT91_SOC(SAMV70Q20_CIDR_MATCH, SAMV70Q20_EXID_MATCH,
-+		 "samv70q20", "samv7"),
-+	AT91_SOC(SAMV70Q19_CIDR_MATCH, SAMV70Q19_EXID_MATCH,
-+		 "samv70q19", "samv7"),
-+#endif
- 	{ /* sentinel */ },
- };
+Hi everyone,
+
+The suggestion to change the compatible string last minute comes from
+Gregory CLEMENT after we realized the bad choice of name due to Richard
+Genoud reporting an issue when he used the driver with an Armada-388.
+
+Rob Herring just requested to use a separate compatible string but not
+what it should look like. So I assume he is fine with the new one as
+well. The rest of this patch is rather minor.
+
+Nothing in tree is using this driver so far, first consumers will be
+added with 4.13.
+
+Ralph
+
+---
+ Documentation/devicetree/bindings/gpio/gpio-mvebu.txt | 6 +++---
+ drivers/gpio/gpio-mvebu.c                             | 6 +++---
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt b/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
+index 42c3bb2..01e331a 100644
+--- a/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
++++ b/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
+@@ -41,9 +41,9 @@ Required properties:
+ Optional properties:
  
-diff --git a/drivers/soc/atmel/soc.h b/drivers/soc/atmel/soc.h
-index 228efded5085..a90bd5b0ef8f 100644
---- a/drivers/soc/atmel/soc.h
-+++ b/drivers/soc/atmel/soc.h
-@@ -88,4 +88,30 @@ at91_soc_init(const struct at91_soc *socs);
- #define SAMA5D43_EXID_MATCH		0x00000003
- #define SAMA5D44_EXID_MATCH		0x00000004
+ In order to use the GPIO lines in PWM mode, some additional optional
+-properties are required. Only Armada 370 and XP support these properties.
++properties are required.
  
-+#define SAME70Q21_CIDR_MATCH		0x21020e00
-+#define SAME70Q21_EXID_MATCH		0x00000002
-+#define SAME70Q20_CIDR_MATCH		0x21020c00
-+#define SAME70Q20_EXID_MATCH		0x00000002
-+#define SAME70Q19_CIDR_MATCH		0x210d0a00
-+#define SAME70Q19_EXID_MATCH		0x00000002
-+
-+#define SAMS70Q21_CIDR_MATCH		0x21120e00
-+#define SAMS70Q21_EXID_MATCH		0x00000002
-+#define SAMS70Q20_CIDR_MATCH		0x21120c00
-+#define SAMS70Q20_EXID_MATCH		0x00000002
-+#define SAMS70Q19_CIDR_MATCH		0x211d0a00
-+#define SAMS70Q19_EXID_MATCH		0x00000002
-+
-+#define SAMV71Q21_CIDR_MATCH		0x21220e00
-+#define SAMV71Q21_EXID_MATCH		0x00000002
-+#define SAMV71Q20_CIDR_MATCH		0x21220c00
-+#define SAMV71Q20_EXID_MATCH		0x00000002
-+#define SAMV71Q19_CIDR_MATCH		0x212d0a00
-+#define SAMV71Q19_EXID_MATCH		0x00000002
-+
-+#define SAMV70Q20_CIDR_MATCH		0x21320c00
-+#define SAMV70Q20_EXID_MATCH		0x00000002
-+#define SAMV70Q19_CIDR_MATCH		0x213d0a00
-+#define SAMV70Q19_EXID_MATCH		0x00000002
-+
- #endif /* __AT91_SOC_H */
+-- compatible: Must contain "marvell,armada-370-xp-gpio"
++- compatible: Must contain "marvell,armada-370-gpio"
+ 
+ - reg: an additional register set is needed, for the GPIO Blink
+   Counter on/off registers.
+@@ -71,7 +71,7 @@ Example:
+ 		};
+ 
+ 		gpio1: gpio at 18140 {
+-			compatible = "marvell,armada-370-xp-gpio";
++			compatible = "marvell,armada-370-gpio";
+ 			reg = <0x18140 0x40>, <0x181c8 0x08>;
+ 			reg-names = "gpio", "pwm";
+ 			ngpios = <17>;
+diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
+index 19a92ef..f94fd47 100644
+--- a/drivers/gpio/gpio-mvebu.c
++++ b/drivers/gpio/gpio-mvebu.c
+@@ -721,7 +721,7 @@ static int mvebu_pwm_probe(struct platform_device *pdev,
+ 	u32 set;
+ 
+ 	if (!of_device_is_compatible(mvchip->chip.of_node,
+-				     "marvell,armada-370-xp-gpio"))
++				     "marvell,armada-370-gpio"))
+ 		return 0;
+ 
+ 	if (IS_ERR(mvchip->clk))
+@@ -845,7 +845,7 @@ static const struct of_device_id mvebu_gpio_of_match[] = {
+ 		.data	    = (void *) MVEBU_GPIO_SOC_VARIANT_ARMADAXP,
+ 	},
+ 	{
+-		.compatible = "marvell,armada-370-xp-gpio",
++		.compatible = "marvell,armada-370-gpio",
+ 		.data	    = (void *) MVEBU_GPIO_SOC_VARIANT_ORION,
+ 	},
+ 	{
+@@ -1121,7 +1121,7 @@ static int mvebu_gpio_probe(struct platform_device *pdev)
+ 						 mvchip);
+ 	}
+ 
+-	/* Armada 370/XP has simple PWM support for GPIO lines */
++	/* Some MVEBU SoCs have simple PWM support for GPIO lines */
+ 	if (IS_ENABLED(CONFIG_PWM))
+ 		return mvebu_pwm_probe(pdev, mvchip, id);
+ 
 -- 
-2.11.0
+2.10.2
