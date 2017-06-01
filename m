@@ -1,82 +1,89 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  1 Jun 2017 11:21:03 +0100
-Subject: [PATCH v2 11/25] KVM: arm64: vgic-v3: Enable trapping of Group-1
- system registers
+Date: Thu,  1 Jun 2017 11:20:57 +0100
+Subject: [PATCH v2 05/25] KVM: arm64: vgic-v3: Add ICV_BPR1_EL1 handler
 In-Reply-To: <20170601102117.17750-1-marc.zyngier@arm.com>
 References: <20170601102117.17750-1-marc.zyngier@arm.com>
-Message-ID: <20170601102117.17750-12-marc.zyngier@arm.com>
+Message-ID: <20170601102117.17750-6-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to be able to trap Group-1 GICv3 system registers, we need to
-set ICH_HCR_EL2.TALL1 before entering the guest. This is conditionally
-done after having restored the guest's state, and cleared on exit.
+Add a handler for reading/writing the guest's view of the ICC_BPR1_EL1
+register, which is located in the ICH_VMCR_EL2.BPR1 field.
 
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/linux/irqchip/arm-gic-v3.h | 1 +
- virt/kvm/arm/hyp/vgic-v3-sr.c      | 7 +++++++
- virt/kvm/arm/vgic/vgic-v3.c        | 4 ++++
- 3 files changed, 12 insertions(+)
+ virt/kvm/arm/hyp/vgic-v3-sr.c | 51 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
 
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index e50ce5d416a3..03b5a28bb2d0 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -417,6 +417,7 @@
- 
- #define ICH_HCR_EN			(1 << 0)
- #define ICH_HCR_UIE			(1 << 1)
-+#define ICH_HCR_TALL1			(1 << 12)
- #define ICH_HCR_EOIcount_SHIFT		27
- #define ICH_HCR_EOIcount_MASK		(0x1f << ICH_HCR_EOIcount_SHIFT)
- 
 diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index f0bc711db258..8973bad35748 100644
+index 943bf11252d9..6254eaf72a77 100644
 --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
 +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -258,6 +258,9 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 			cpu_if->vgic_ap1r[0] = __vgic_v3_read_ap1rn(0);
- 		}
- 	} else {
-+		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
-+			write_gicreg(0, ICH_HCR_EL2);
-+
- 		cpu_if->vgic_elrsr = 0xffff;
- 		cpu_if->vgic_ap0r[0] = 0;
- 		cpu_if->vgic_ap0r[1] = 0;
-@@ -330,6 +333,10 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+@@ -375,6 +375,51 @@ void __hyp_text __vgic_v3_write_vmcr(u32 vmcr)
  
- 		for (i = 0; i < used_lrs; i++)
- 			__gic_v3_set_lr(cpu_if->vgic_lr[i], i);
+ #ifdef CONFIG_ARM64
+ 
++static unsigned int __hyp_text __vgic_v3_get_bpr0(u32 vmcr)
++{
++	return (vmcr & ICH_VMCR_BPR0_MASK) >> ICH_VMCR_BPR0_SHIFT;
++}
++
++static unsigned int __hyp_text __vgic_v3_get_bpr1(u32 vmcr)
++{
++	unsigned int bpr;
++
++	if (vmcr & ICH_VMCR_CBPR_MASK) {
++		bpr = __vgic_v3_get_bpr0(vmcr);
++		if (bpr < 7)
++			bpr++;
 +	} else {
-+		/* Always write ICH_HCR_EL2 to enable trapping */
-+		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
-+			write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
- 	}
- 
- 	/*
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 88d9bd9bf468..fbd678bc046d 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -21,6 +21,8 @@
- 
- #include "vgic.h"
- 
-+static bool group1_trap;
++		bpr = (vmcr & ICH_VMCR_BPR1_MASK) >> ICH_VMCR_BPR1_SHIFT;
++	}
 +
- void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
++	return bpr;
++}
++
++static void __hyp_text __vgic_v3_read_bpr1(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
++{
++	vcpu_set_reg(vcpu, rt, __vgic_v3_get_bpr1(vmcr));
++}
++
++static void __hyp_text __vgic_v3_write_bpr1(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
++{
++	u64 val = vcpu_get_reg(vcpu, rt);
++	u8 bpr_min = 8 - vtr_to_nr_pre_bits(read_gicreg(ICH_VTR_EL2));
++
++	if (vmcr & ICH_VMCR_CBPR_MASK)
++		return;
++
++	/* Enforce BPR limiting */
++	if (val < bpr_min)
++		val = bpr_min;
++
++	val <<= ICH_VMCR_BPR1_SHIFT;
++	val &= ICH_VMCR_BPR1_MASK;
++	vmcr &= ~ICH_VMCR_BPR1_MASK;
++	vmcr |= val;
++
++	__vgic_v3_write_vmcr(vmcr);
++}
++
+ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
  {
- 	struct vgic_v3_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v3;
-@@ -239,6 +241,8 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
+ 	int rt;
+@@ -397,6 +442,12 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
+ 	is_read = (esr & ESR_ELx_SYS64_ISS_DIR_MASK) == ESR_ELx_SYS64_ISS_DIR_READ;
  
- 	/* Get the show on the road... */
- 	vgic_v3->vgic_hcr = ICH_HCR_EN;
-+	if (group1_trap)
-+		vgic_v3->vgic_hcr |= ICH_HCR_TALL1;
- }
- 
- int vgic_v3_lpi_sync_pending_status(struct kvm *kvm, struct vgic_irq *irq)
+ 	switch (sysreg) {
++	case SYS_ICC_BPR1_EL1:
++		if (is_read)
++			fn = __vgic_v3_read_bpr1;
++		else
++			fn = __vgic_v3_write_bpr1;
++		break;
+ 	default:
+ 		return 0;
+ 	}
 -- 
 2.11.0
