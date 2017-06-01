@@ -1,171 +1,92 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 1 Jun 2017 10:52:13 +0000
-Subject: [PATCH v2] efi: arm: enable DMI/SMBIOS
-In-Reply-To: <20170601104554.21267-1-ard.biesheuvel@linaro.org>
-References: <20170601104554.21267-1-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu-OK=0HSG5KmsZ+Zs0Xu2ox5Cva+Nbtgz0DXigk3e3aiA@mail.gmail.com>
+From: liu.h.jason@gmail.com (Jason Liu)
+Date: Thu, 1 Jun 2017 18:52:43 +0800
+Subject: Unhandled level 2 translation fault on A72 board.
+In-Reply-To: <56A7720B.3020505@huawei.com>
+References: <56A72246.4050105@huawei.com>
+ <20160126110358.GA23579@localhost.localdomain>
+ <56A7597D.6020609@huawei.com> <20160126114445.GD23579@localhost.localdomain>
+ <56A7720B.3020505@huawei.com>
+Message-ID: <CAB4PhKeBc=-1ikZje24kPA5B3RFDqRsP97RqOE9FHtfsDBExTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(add Russell to To: field)
+2016-01-26 21:18 GMT+08:00 Ding Tianhong <dingtianhong@huawei.com>:
+> On 2016/1/26 19:44, Catalin Marinas wrote:
+>> On Tue, Jan 26, 2016 at 07:33:17PM +0800, Ding Tianhong wrote:
+>>> On 2016/1/26 19:03, Catalin Marinas wrote:
+>>>> On Tue, Jan 26, 2016 at 03:37:42PM +0800, Ding Tianhong wrote:
+>>>>> I met this problem when running the hackbench test on A72 chip board:
+>>>>>
+>>>>> sh[4779]: unhandled level 2 translation fault (11) at 0x7f96be0c80, esr 0x83000006
+>>>>> pgd = ffffffc01a1f0000
+>>>>> [7f96be0c80] *pgd=0000000084a20003, *pud=0000000084a20003, *pmd=0000000000000000
+>> [...]
+>>>> I can't tell for sure it's a TLB issue. The kernel page table dump shows
+>>>> *pmd being 0, so the fault is correctly called "level 2 translation
+>>>> fault". It also seems that there is no vma at this address, hence the
+>>>> kernel reports it as unhandled. It looks like data corruption which
+>>>> could be caused by cache or TLB incoherence. Just make sure the
+>>>> interconnect linking the two clusters is configured correctly by
+>>>> _firmware_ before Linux starts.
+>>>
+>>> Thanks for the apply, I have try to apply this patch to test:
+>>>
+>>> --- arch/arm64/kernel/process.c | 9 +++++++++
+>>> 1 file changed, 9 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+>>> index 6391485..d7d8439 100644
+>>> --- a/arch/arm64/kernel/process.c
+>>> +++ b/arch/arm64/kernel/process.c
+>>> @@ -283,6 +283,13 @@ static void tls_thread_switch(struct task_struct *next)
+>>> : : "r" (tpidr), "r" (tpidrro));
+>>> }
+>>> +static void tlb_flush_thread(struct task_struct *prev)
+>>> +{
+>>> +/* Flush the prev task&apos;s TLB entries */
+>>> +if (prev->mm)
+>>> +flush_tlb_mm(prev->mm);
+>>> +}
+>>> +
+>>> /*
+>>>   * Thread switching.
+>>>   */
+>>> @@ -296,6 +303,8 @@ struct task_struct *__switch_to(struct task_struct *prev,
+>>> hw_breakpoint_thread_switch(next);
+>>> contextidr_thread_switch(next);
+>>> +tlb_flush_thread(prev);
+>>> +
+>>> /*
+>>> * Complete any pending TLB or cache maintenance on this CPU in case
+>>> * the thread migrates to a different CPU.
+>>>
+>>> The hackbench would work fine after this patch, so I guess that the old thread tlb may not be
+>>> invalidate as soon as possible, but I don't know why, everything is fine on A57,
+>>> Does I miss something?
+>>
+>> It looks like the TLB invalidation messages may not get across the CCI
+>> between clusters. I don't have the TRMs at hand but make sure all the
+>> relevant bits in the CPUs and CCI are enabled.
+>>
+> Indeed check them several times, and need more information, check it again.
 
-On 1 June 2017 at 10:45, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> Wire up the existing support for SMBIOS tables (aka DMI), by moving the
-> arm64 init code to drivers/firmware/efi/arm-runtime.c (which is shared
-> between ARM and arm64), and adding a asm/dmi.h header to ARM that defines
-> the mapping routines for the firmware tables.
->
-> This allows userspace to access these tables to discover system information
-> exposed by the firmware. It also sets the hardware name used in crash
-> dumps, e.g.,
->
->   Unable to handle kernel NULL pointer dereference at virtual address 00000000
->   pgd = ed3c0000
->   [00000000] *pgd=bf1f3835
->   Internal error: Oops: 817 [#1] SMP THUMB2
->   Modules linked in:
->   CPU: 0 PID: 759 Comm: bash Not tainted 4.10.0-09601-g0e8f38792120-dirty #112
->   Hardware name: QEMU KVM Virtual Machine, BIOS 0.0.0 02/06/2015
->   ^^^
->
-> NOTE: This does *NOT* enable or encourage the use of DMI quirks, i.e., the
->       the practice of identifying the platform via DMI to decide whether
->       certain workarounds for buggy hardware and/or firmware need to be
->       enabled. This would require the DMI subsystem to be enabled much
->       earlier than we do on ARM, which is non-trivial.
->
-> Cc: Matt Fleming <matt@codeblueprint.co.uk>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-Russell, if you have no objections to this patch, may we have your ack
-please? I will take it via the EFI tree then.
-
-Thanks,
-Ard.
+How this issue is resolved finally? I search the mail-list and find this old
+email thread. Any response will be appreciated.
 
 
-> ---
-> v2: add missing include of <linux/dmi.h>
->     rebase onto v4.12-rc3
+Jason Liu
 >
->  arch/arm/Kconfig                   | 11 +++++++++++
->  arch/arm/include/asm/dmi.h         | 19 +++++++++++++++++++
->  arch/arm64/kernel/efi.c            | 15 ---------------
->  drivers/firmware/efi/arm-runtime.c | 16 ++++++++++++++++
->  4 files changed, 46 insertions(+), 15 deletions(-)
 >
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 4c1a35f15838..268f46bfc4d9 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -2061,6 +2061,17 @@ config EFI
->           is only useful for kernels that may run on systems that have
->           UEFI firmware.
+>> BTW, which kernel version are you running? Is the firmware your own or
+>> built around ARM Trusted Firmware?
+> I use 4.1 kernel version, and the firmware is our own.
 >
-> +config DMI
-> +       bool "Enable support for SMBIOS (DMI) tables"
-> +       depends on EFI
-> +       default y
-> +       help
-> +         This enables SMBIOS/DMI feature for systems.
-> +
-> +         This option is only useful on systems that have UEFI firmware.
-> +         However, even with this option, the resultant kernel should
-> +         continue to boot on existing non-UEFI platforms.
-> +
->  endmenu
+> Ding
 >
->  menu "CPU Power Management"
-> diff --git a/arch/arm/include/asm/dmi.h b/arch/arm/include/asm/dmi.h
-> new file mode 100644
-> index 000000000000..df2d2ff06f5b
-> --- /dev/null
-> +++ b/arch/arm/include/asm/dmi.h
-> @@ -0,0 +1,19 @@
-> +/*
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __ASM_DMI_H
-> +#define __ASM_DMI_H
-> +
-> +#include <linux/io.h>
-> +#include <linux/slab.h>
-> +
-> +#define dmi_early_remap(x, l)          memremap(x, l, MEMREMAP_WB)
-> +#define dmi_early_unmap(x, l)          memunmap(x)
-> +#define dmi_remap(x, l)                        memremap(x, l, MEMREMAP_WB)
-> +#define dmi_unmap(x)                   memunmap(x)
-> +#define dmi_alloc(l)                   kzalloc(l, GFP_KERNEL)
-> +
-> +#endif
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index 5d17f377d905..82cd07592519 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -11,7 +11,6 @@
->   *
->   */
 >
-> -#include <linux/dmi.h>
->  #include <linux/efi.h>
->  #include <linux/init.h>
 >
-> @@ -117,20 +116,6 @@ int __init efi_set_mapping_permissions(struct mm_struct *mm,
->                                    set_permissions, md);
->  }
 >
-> -static int __init arm64_dmi_init(void)
-> -{
-> -       /*
-> -        * On arm64, DMI depends on UEFI, and dmi_scan_machine() needs to
-> -        * be called early because dmi_id_init(), which is an arch_initcall
-> -        * itself, depends on dmi_scan_machine() having been called already.
-> -        */
-> -       dmi_scan_machine();
-> -       if (dmi_available)
-> -               dmi_set_dump_stack_arch_desc();
-> -       return 0;
-> -}
-> -core_initcall(arm64_dmi_init);
-> -
->  /*
->   * UpdateCapsule() depends on the system being shutdown via
->   * ResetSystem().
-> diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
-> index 974c5a31a005..1cc41c3d6315 100644
-> --- a/drivers/firmware/efi/arm-runtime.c
-> +++ b/drivers/firmware/efi/arm-runtime.c
-> @@ -11,6 +11,7 @@
->   *
->   */
->
-> +#include <linux/dmi.h>
->  #include <linux/efi.h>
->  #include <linux/io.h>
->  #include <linux/memblock.h>
-> @@ -166,3 +167,18 @@ void efi_virtmap_unload(void)
->         efi_set_pgd(current->active_mm);
->         preempt_enable();
->  }
-> +
-> +
-> +static int __init arm_dmi_init(void)
-> +{
-> +       /*
-> +        * On arm64/ARM, DMI depends on UEFI, and dmi_scan_machine() needs to
-> +        * be called early because dmi_id_init(), which is an arch_initcall
-> +        * itself, depends on dmi_scan_machine() having been called already.
-> +        */
-> +       dmi_scan_machine();
-> +       if (dmi_available)
-> +               dmi_set_dump_stack_arch_desc();
-> +       return 0;
-> +}
-> +core_initcall(arm_dmi_init);
-> --
-> 2.9.3
->
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
