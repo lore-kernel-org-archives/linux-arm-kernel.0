@@ -1,69 +1,46 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 1 Jun 2017 17:21:42 +0100
-Subject: [PATCH] acpi/iort, numa: Add numa node mapping for smmuv3 devices
-In-Reply-To: <1496325937-21113-1-git-send-email-ganapatrao.kulkarni@cavium.com>
-References: <1496325937-21113-1-git-send-email-ganapatrao.kulkarni@cavium.com>
-Message-ID: <20170601162142.GC19003@red-moon>
+From: aryabinin@virtuozzo.com (Andrey Ryabinin)
+Date: Thu, 1 Jun 2017 19:23:37 +0300
+Subject: [PATCH 3/4] arm64/kasan: don't allocate extra shadow memory
+In-Reply-To: <20170601162338.23540-1-aryabinin@virtuozzo.com>
+References: <20170601162338.23540-1-aryabinin@virtuozzo.com>
+Message-ID: <20170601162338.23540-3-aryabinin@virtuozzo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 01, 2017 at 07:35:37PM +0530, Ganapatrao Kulkarni wrote:
-> ARM IORT specification has provision to define Proximity domain
-> in SMMUv3 IORT table. Adding required code to parse Proximity domain of
-> SMMUv3 IORT table. Parsed Proximity domain is used to set numa_node
-> of SMMUv3 platform devices.
-> 
-> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> ---
->  drivers/iommu/arm-smmu-v3.c | 6 ++++++
->  include/acpi/actbl2.h       | 4 ++++
->  2 files changed, 10 insertions(+)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 69d8506..98c2319 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -2667,6 +2667,12 @@ static int arm_smmu_device_acpi_probe(struct platform_device *pdev,
->  	if (iort_smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE)
->  		smmu->features |= ARM_SMMU_FEAT_COHERENCY;
->  
-> +	/* set numa proximity domain for smmv3 device */
-> +	if (iort_smmu->flags & ACPI_IORT_SMMU_V3_PXM) {
-> +		set_dev_node(dev, acpi_map_pxm_to_node(iort_smmu->pxm));
-> +		dev_info(dev, "on NUMA node %d\n", dev_to_node(dev));
+We used to read several bytes of the shadow memory in advance.
+Therefore additional shadow memory mapped to prevent crash if
+speculative load would happen near the end of the mapped shadow memory.
 
-It should be done in acpi/arm64/iort.c at device creation time.
+Now we don't have such speculative loads, so we no longer need to map
+additional shadow memory.
 
-Thanks,
-Lorenzo
+Signed-off-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm64/mm/kasan_init.c | 8 +-------
+ 1 file changed, 1 insertion(+), 7 deletions(-)
 
-> +	}
-> +
->  	return 0;
->  }
->  #else
-> diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
-> index 4b306a6..c16ced8 100644
-> --- a/include/acpi/actbl2.h
-> +++ b/include/acpi/actbl2.h
-> @@ -805,6 +805,9 @@ struct acpi_iort_smmu_v3 {
->  	u32 pri_gsiv;
->  	u32 gerr_gsiv;
->  	u32 sync_gsiv;
-> +	u8 pxm;
-> +	u8 reserved1;
-> +	u16 reserved2;
->  };
->  
->  /* Values for Model field above */
-> @@ -817,6 +820,7 @@ struct acpi_iort_smmu_v3 {
->  
->  #define ACPI_IORT_SMMU_V3_COHACC_OVERRIDE   (1)
->  #define ACPI_IORT_SMMU_V3_HTTU_OVERRIDE     (1<<1)
-> +#define ACPI_IORT_SMMU_V3_PXM               (1<<3)
->  
->  /*******************************************************************************
->   *
-> -- 
-> 1.8.1.4
-> 
+diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
+index 687a358a3733..81f03959a4ab 100644
+--- a/arch/arm64/mm/kasan_init.c
++++ b/arch/arm64/mm/kasan_init.c
+@@ -191,14 +191,8 @@ void __init kasan_init(void)
+ 		if (start >= end)
+ 			break;
+ 
+-		/*
+-		 * end + 1 here is intentional. We check several shadow bytes in
+-		 * advance to slightly speed up fastpath. In some rare cases
+-		 * we could cross boundary of mapped shadow, so we just map
+-		 * some more here.
+-		 */
+ 		vmemmap_populate((unsigned long)kasan_mem_to_shadow(start),
+-				(unsigned long)kasan_mem_to_shadow(end) + 1,
++				(unsigned long)kasan_mem_to_shadow(end),
+ 				pfn_to_nid(virt_to_pfn(start)));
+ 	}
+ 
+-- 
+2.13.0
