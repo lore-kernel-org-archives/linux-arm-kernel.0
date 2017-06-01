@@ -1,159 +1,129 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Thu, 01 Jun 2017 22:11:14 +0800
-Subject: [linux-sunxi] Re: [RFC PATCH 07/11] drm: sun4i: add support for
- the TV encoder in H3 SoC
-In-Reply-To: <20170531184306.hzu2em35vr4qi4un@flea.lan>
-References: <20170517164354.16399-1-icenowy@aosc.io>
- <1958057.WDKm0nQKgW@jernej-laptop>
- <CAGb2v66aD=G+V75N-_nYo=dGqhxpKhadM84h9G-B34=dnDwCbg@mail.gmail.com>
- <3164416.5xR36OcyjH@jernej-laptop>
- <20170523125321.t7y7yfrrfokpkzgd@flea.home>
- <98c3572beee0a81755994b4bdc508b18@aosc.io>
- <20170524073019.bl6rojc2srrigalp@flea.home>
- <98558BA2-BC99-4D0A-A045-571C643875C5@aosc.io>
- <20170531184306.hzu2em35vr4qi4un@flea.lan>
-Message-ID: <715e6ab52d8aa0032c9759393ace20dc@aosc.io>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 1 Jun 2017 20:03:55 +0530
+Subject: [PATCH 1/7] ARM: dts: dra72-evm-common: Correct vmmc-supply for mmc2
+In-Reply-To: <20170601143401.16852-1-kishon@ti.com>
+References: <20170601143401.16852-1-kishon@ti.com>
+Message-ID: <20170601143401.16852-2-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-06-01 02:43?Maxime Ripard ???
-> On Wed, May 24, 2017 at 04:25:46PM +0800, Icenowy Zheng wrote:
->> 
->> 
->> ? 2017?5?24? GMT+08:00 ??3:30:19, Maxime Ripard 
->> <maxime.ripard@free-electrons.com> ??:
->> >On Tue, May 23, 2017 at 09:00:59PM +0800, icenowy at aosc.io wrote:
->> >> ? 2017-05-23 20:53?Maxime Ripard ???
->> >> > On Mon, May 22, 2017 at 07:55:56PM +0200, Jernej ?krabec wrote:
->> >> > > Hi,
->> >> > >
->> >> > > Dne sobota, 20. maj 2017 ob 03:37:53 CEST je Chen-Yu Tsai
->> >napisal(a):
->> >> > > > On Sat, May 20, 2017 at 2:23 AM, Jernej ?krabec
->> ><jernej.skrabec@siol.net>
->> >> > > wrote:
->> >> > > > > Hi,
->> >> > > > >
->> >> > > > > Dne petek, 19. maj 2017 ob 20:08:18 CEST je Icenowy Zheng
->> >napisal(a):
->> >> > > > >> ? 2017?5?20? GMT+08:00 ??2:03:30, Maxime Ripard
->> ><maxime.ripard@free-
->> >> > > > >
->> >> > > > > electrons.com> ??:
->> >> > > > >> >On Thu, May 18, 2017 at 12:43:50AM +0800, Icenowy Zheng
->> >wrote:
->> >> > > > >> >> Allwinner H3 features a TV encoder similar to the one in
->> >earlier
->> >> > > > >> >
->> >> > > > >> >SoCs,
->> >> > > > >> >
->> >> > > > >> >> but with some different points about clocks:
->> >> > > > >> >> - It has a mod clock and a bus clock.
->> >> > > > >> >> - The mod clock must be at a fixed rate to generate
->> >signal.
->> >> > > > >> >
->> >> > > > >> >Why?
->> >> > > > >>
->> >> > > > >> It's experiment result by Jernej.
->> >> > > > >>
->> >> > > > >> The clock rates in BSP kernel is also specially designed
->> >> > > > >> (PLL_DE at 432MHz) in order to be able to feed the TVE.
->> >> > > > >
->> >> > > > > My experiments and search through BSP code showed that TVE
->> >seems to have
->> >> > > > > additional fixed predivider 8. So if you want to generate 27
->> >MHz clock,
->> >> > > > > unit has to be feed with 216 MHz.
->> >> > > > >
->> >> > > > > TVE has only one PLL source PLL_DE. And since 216 MHz is a
->> >bit low for
->> >> > > > > DE2,
->> >> > > > > BSP defaults to 432 MHz for PLL_DE and use divider 2 to
->> >generate 216 MHz.
->> >> > > > > This clock is then divided by 8 internaly to get final 27
->> >MHz.
->> >> > > > >
->> >> > > > > Please note that I don't have any hard evidence to support
->> >that, only
->> >> > > > > experimental data. However, only that explanation make sense
->> >to me.
->> >> > > > >
->> >> > > > > BTW, BSP H3/H5 TV driver supports only PAL and NTSC which
->> >both use 27 MHz
->> >> > > > > base clock. Further experiments are needed to check if there
->> >is any
->> >> > > > > possibility to have other resolutions by manipulating clocks
->> >and give
->> >> > > > > other proper settings. I plan to do that, but not in very
->> >near future.
->> >> > > >
->> >> > > > You only have composite video output, and those are the only 2
->> >standard
->> >> > > > resolutions that make any sense.
->> >> > >
->> >> > > Right, other resolutions are for VGA.
->> >> > >
->> >> > > Anyway, I did some more digging in A10 and R40 datasheets. I
->> >think
->> >> > > that H3 TVE
->> >> > > unit is something in between. R40 TVE has a setting to select "up
->> >> > > sample".
->> >> >
->> >> > That might be just another translation of oversampling :)
->> >> >
->> >> > I didn't know it could be applied to composite signals though, but
->> >I
->> >> > guess this is just another analog signal after all.
->> >> >
->> >> > > Possible settings are 27 MHz, 54 MHz, 108 MHz and 216 MHz. BSP
->> >> > > driver on R40
->> >> > > has this setting enabled only for PAL and NTSC and it is always
->> >216
->> >> > > MHz. I
->> >> > > think that H3 may have this hardwired to 216 MHz and this would
->> >be
->> >> > > the reason
->> >> > > why 216 MHz is needed.
->> >> > >
->> >> > > Has anyone else any better explanation?
->> >> >
->> >> > That's already a pretty good one.
->> >> >
->> >> > Either way, wether this is upsampling, oversampling or just a
->> >> > pre-divider, this can and should be dealt with in the mode_set
->> >> > callback, and not in the probe.
->> >>
->> >> I got a better idea -- let TVE driver have the CLK_TVE as an
->> >> input and create a subclock output with divider 16, and feed this
->> >> subclock to TCON lcd-ch1.
->> >>
->> >> This is a model of the real hardware -- the clock divider is in
->> >> TVE, not TCON.
->> >
->> >That's definitely not a good representation of the hardware. There's
->> >one clock, it goes to the TCON, period.
->> 
->> No, I still think it goes to the TVE as:
->> 
->> 1. it's named TVE in datasheet.
-> 
-> Feel free to come up with a better, more sensible explanation?
-> 
->> 2. Generating signal with such a low resolution but such
->> a high dotclock is not a good situation.
-> 
-> What? What do you mean? The pixel clock is 27MHz, I'm pretty sure we
-> agree on that.
+On dra72/dra71 evms, mmc2 vdd/ios are connected to a common 1.8V supply
+not 3.3V. Also the regulator that supplies 1.8V is different on dra71-evm
+so move the supply property from common dtsi to evm specific dts files.
 
-Yes, so I don't think the TCON code should set the clock to any value
-rather than 27MHz.
+Fixes: a4240d3af677 ("ARM: dts: Add support for dra72-evm rev C (SR2.0)")
+Signed-off-by: Ravikumar Kattekola <rk@ti.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/boot/dts/dra71-evm.dts         | 14 ++++++++++++++
+ arch/arm/boot/dts/dra72-evm-common.dtsi |  2 --
+ arch/arm/boot/dts/dra72-evm-revc.dts    | 14 ++++++++++++++
+ arch/arm/boot/dts/dra72-evm.dts         | 14 ++++++++++++++
+ 4 files changed, 42 insertions(+), 2 deletions(-)
 
-So we should create a clock with divider in TVE, and feed it to TCON.
-
-> 
-> Maxime
-> 
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+diff --git a/arch/arm/boot/dts/dra71-evm.dts b/arch/arm/boot/dts/dra71-evm.dts
+index 4d57a55473af..c7a56b6263a6 100644
+--- a/arch/arm/boot/dts/dra71-evm.dts
++++ b/arch/arm/boot/dts/dra71-evm.dts
+@@ -32,6 +32,16 @@
+ 			  3000000 0x1>;
+ 	};
+ 
++	evm_1v8_sw: fixedregulator-evm_1v8 {
++		compatible = "regulator-fixed";
++		regulator-name = "evm_1v8";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		vin-supply = <&lp8732_buck0_reg>;
++		regulator-always-on;
++		regulator-boot-on;
++	};
++
+ 	poweroff: gpio-poweroff {
+ 		compatible = "gpio-poweroff";
+ 		gpios = <&gpio7 30 GPIO_ACTIVE_HIGH>;
+@@ -165,6 +175,10 @@
+ 	vmmc_aux-supply = <&vpo_sd_1v8_3v3>;
+ };
+ 
++&mmc2 {
++	vmmc-supply = <&evm_1v8_sw>;
++};
++
+ &mac {
+ 	mode-gpios = <&pcf_gpio_21 4 GPIO_ACTIVE_LOW>,
+ 		     <&pcf_hdmi 9 GPIO_ACTIVE_LOW>,	/* P11 */
+diff --git a/arch/arm/boot/dts/dra72-evm-common.dtsi b/arch/arm/boot/dts/dra72-evm-common.dtsi
+index ad24544adf0f..d97370217eff 100644
+--- a/arch/arm/boot/dts/dra72-evm-common.dtsi
++++ b/arch/arm/boot/dts/dra72-evm-common.dtsi
+@@ -418,8 +418,6 @@
+ 	status = "okay";
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc2_pins_default>;
+-
+-	vmmc-supply = <&evm_3v3_sw>;
+ 	bus-width = <8>;
+ 	ti,non-removable;
+ 	max-frequency = <192000000>;
+diff --git a/arch/arm/boot/dts/dra72-evm-revc.dts b/arch/arm/boot/dts/dra72-evm-revc.dts
+index 3ecac56bf504..47dcd527ec58 100644
+--- a/arch/arm/boot/dts/dra72-evm-revc.dts
++++ b/arch/arm/boot/dts/dra72-evm-revc.dts
+@@ -15,6 +15,16 @@
+ 		device_type = "memory";
+ 		reg = <0x0 0x80000000 0x0 0x80000000>; /* 2GB */
+ 	};
++
++	evm_1v8_sw: fixedregulator-evm_1v8 {
++		compatible = "regulator-fixed";
++		regulator-name = "evm_1v8";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		vin-supply = <&smps4_reg>;
++		regulator-always-on;
++		regulator-boot-on;
++	};
+ };
+ 
+ &i2c1 {
+@@ -82,3 +92,7 @@
+ 		interrupts = <16 IRQ_TYPE_EDGE_FALLING>;
+ 	};
+ };
++
++&mmc2 {
++	vmmc-supply = <&evm_1v8_sw>;
++};
+diff --git a/arch/arm/boot/dts/dra72-evm.dts b/arch/arm/boot/dts/dra72-evm.dts
+index cd9c4ff12654..adbcc570eba9 100644
+--- a/arch/arm/boot/dts/dra72-evm.dts
++++ b/arch/arm/boot/dts/dra72-evm.dts
+@@ -13,6 +13,16 @@
+ 		device_type = "memory";
+ 		reg = <0x0 0x80000000 0x0 0x40000000>; /* 1024 MB */
+ 	};
++
++	evm_1v8_sw: fixedregulator-evm_1v8 {
++		compatible = "regulator-fixed";
++		regulator-name = "evm_1v8";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		vin-supply = <&smps4_reg>;
++		regulator-always-on;
++		regulator-boot-on;
++	};
+ };
+ 
+ &i2c1 {
+@@ -43,3 +53,7 @@
+ 	phy_id = <&davinci_mdio>, <3>;
+ 	phy-mode = "rgmii";
+ };
++
++&mmc2 {
++	vmmc-supply = <&evm_1v8_sw>;
++};
+-- 
+2.11.0
