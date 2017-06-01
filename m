@@ -1,82 +1,50 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Thu, 1 Jun 2017 10:30:21 +0800
-Subject: [PATCH v1 1/2] crypto: mediatek - remove redundant clock setting
-In-Reply-To: <1496284222-12560-1-git-send-email-ryder.lee@mediatek.com>
-References: <1496284222-12560-1-git-send-email-ryder.lee@mediatek.com>
-Message-ID: <1496284222-12560-2-git-send-email-ryder.lee@mediatek.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Thu, 01 Jun 2017 13:43:36 +0900
+Subject: [PATCH] ARM: dts: rk1108: change to "max-frequency" from
+ "clock-freq-min-max"
+References: <CGME20170601044338epcas5p3c202667dad66dabd4f2ad866e8ad870e@epcas5p3.samsung.com>
+Message-ID: <20170601044336.5745-1-jh80.chung@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes redundant clock setting for 'clk_ethif', which is
-the parent of 'clk_cryp'. Hence, we just need to handle its child.
+"clock-freq-min-max" was deprecated. There is only using in rk1108.dtsi.
+Use the "max-frequency" for removiing "clock-freq-min-max" in future.
 
-Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
 ---
- drivers/crypto/mediatek/mtk-platform.c | 10 +---------
- drivers/crypto/mediatek/mtk-platform.h |  2 --
- 2 files changed, 1 insertion(+), 11 deletions(-)
+ arch/arm/boot/dts/rk1108.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/crypto/mediatek/mtk-platform.c b/drivers/crypto/mediatek/mtk-platform.c
-index b6ecc28..9b4437c 100644
---- a/drivers/crypto/mediatek/mtk-platform.c
-+++ b/drivers/crypto/mediatek/mtk-platform.c
-@@ -504,19 +504,14 @@ static int mtk_crypto_probe(struct platform_device *pdev)
- 		}
- 	}
+diff --git a/arch/arm/boot/dts/rk1108.dtsi b/arch/arm/boot/dts/rk1108.dtsi
+index 1297924..a9b5293 100644
+--- a/arch/arm/boot/dts/rk1108.dtsi
++++ b/arch/arm/boot/dts/rk1108.dtsi
+@@ -174,7 +174,7 @@
  
--	cryp->clk_ethif = devm_clk_get(&pdev->dev, "ethif");
- 	cryp->clk_cryp = devm_clk_get(&pdev->dev, "cryp");
--	if (IS_ERR(cryp->clk_ethif) || IS_ERR(cryp->clk_cryp))
-+	if (IS_ERR(cryp->clk_cryp))
- 		return -EPROBE_DEFER;
+ 	emmc: dwmmc at 30110000 {
+ 		compatible = "rockchip,rk1108-dw-mshc", "rockchip,rk3288-dw-mshc";
+-		clock-freq-min-max = <400000 150000000>;
++		max-frequency = <150000000>;
+ 		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>,
+ 			 <&cru SCLK_EMMC_DRV>, <&cru SCLK_EMMC_SAMPLE>;
+ 		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+@@ -186,7 +186,7 @@
  
- 	cryp->dev = &pdev->dev;
- 	pm_runtime_enable(cryp->dev);
- 	pm_runtime_get_sync(cryp->dev);
+ 	sdio: dwmmc at 30120000 {
+ 		compatible = "rockchip,rk1108-dw-mshc", "rockchip,rk3288-dw-mshc";
+-		clock-freq-min-max = <400000 150000000>;
++		max-frequency = <150000000>;
+ 		clocks = <&cru HCLK_SDIO>, <&cru SCLK_SDIO>,
+ 			 <&cru SCLK_SDIO_DRV>, <&cru SCLK_SDIO_SAMPLE>;
+ 		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+@@ -198,7 +198,7 @@
  
--	err = clk_prepare_enable(cryp->clk_ethif);
--	if (err)
--		goto err_clk_ethif;
--
- 	err = clk_prepare_enable(cryp->clk_cryp);
- 	if (err)
- 		goto err_clk_cryp;
-@@ -559,8 +554,6 @@ static int mtk_crypto_probe(struct platform_device *pdev)
- err_resource:
- 	clk_disable_unprepare(cryp->clk_cryp);
- err_clk_cryp:
--	clk_disable_unprepare(cryp->clk_ethif);
--err_clk_ethif:
- 	pm_runtime_put_sync(cryp->dev);
- 	pm_runtime_disable(cryp->dev);
- 
-@@ -576,7 +569,6 @@ static int mtk_crypto_remove(struct platform_device *pdev)
- 	mtk_desc_dma_free(cryp);
- 
- 	clk_disable_unprepare(cryp->clk_cryp);
--	clk_disable_unprepare(cryp->clk_ethif);
- 
- 	pm_runtime_put_sync(cryp->dev);
- 	pm_runtime_disable(cryp->dev);
-diff --git a/drivers/crypto/mediatek/mtk-platform.h b/drivers/crypto/mediatek/mtk-platform.h
-index 303c152..f0831f1 100644
---- a/drivers/crypto/mediatek/mtk-platform.h
-+++ b/drivers/crypto/mediatek/mtk-platform.h
-@@ -200,7 +200,6 @@ struct mtk_sha_rec {
-  * struct mtk_cryp - Cryptographic device
-  * @base:	pointer to mapped register I/O base
-  * @dev:	pointer to device
-- * @clk_ethif:	pointer to ethif clock
-  * @clk_cryp:	pointer to crypto clock
-  * @irq:	global system and rings IRQ
-  * @ring:	pointer to descriptor rings
-@@ -215,7 +214,6 @@ struct mtk_sha_rec {
- struct mtk_cryp {
- 	void __iomem *base;
- 	struct device *dev;
--	struct clk *clk_ethif;
- 	struct clk *clk_cryp;
- 	int irq[MTK_IRQ_NUM];
- 
+ 	sdmmc: dwmmc at 30130000 {
+ 		compatible = "rockchip,rk1108-dw-mshc", "rockchip,rk3288-dw-mshc";
+-		clock-freq-min-max = <400000 100000000>;
++		max-frequency = <100000000>;
+ 		clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>,
+ 			 <&cru SCLK_SDMMC_DRV>, <&cru SCLK_SDMMC_SAMPLE>;
+ 		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
 -- 
-1.9.1
+2.10.2
