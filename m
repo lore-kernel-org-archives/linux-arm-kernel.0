@@ -1,9 +1,10 @@
 From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Thu, 1 Jun 2017 11:00:42 +0200
-Subject: [PATCH 1/2] power: reset: at91-poweroff: fix clobber list
-In-Reply-To: <20170531094915.3469-1-alexandre.belloni@free-electrons.com>
+Date: Thu, 1 Jun 2017 11:00:56 +0200
+Subject: [PATCH 2/2] power: reset: at91-sama5d2_shdwc: fix clobber list
+In-Reply-To: <20170531094915.3469-2-alexandre.belloni@free-electrons.com>
 References: <20170531094915.3469-1-alexandre.belloni@free-electrons.com>
-Message-ID: <67ae4003-bcfb-c875-c4b7-0d1dc840d3f0@microchip.com>
+ <20170531094915.3469-2-alexandre.belloni@free-electrons.com>
+Message-ID: <83a8441d-e07c-c1a8-faa5-28521ea9ab39@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,22 +17,22 @@ Le 31/05/2017 ? 11:49, Alexandre Belloni a ?crit :
 Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 
 > ---
->  drivers/power/reset/at91-poweroff.c | 2 +-
+>  drivers/power/reset/at91-sama5d2_shdwc.c | 2 +-
 >  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/power/reset/at91-poweroff.c b/drivers/power/reset/at91-poweroff.c
-> index c6c3beea72f9..c30c40193aaa 100644
-> --- a/drivers/power/reset/at91-poweroff.c
-> +++ b/drivers/power/reset/at91-poweroff.c
-> @@ -97,7 +97,7 @@ static void at91_lpddr_poweroff(void)
+> diff --git a/drivers/power/reset/at91-sama5d2_shdwc.c b/drivers/power/reset/at91-sama5d2_shdwc.c
+> index 90b0b5a70ce5..55fce8b75245 100644
+> --- a/drivers/power/reset/at91-sama5d2_shdwc.c
+> +++ b/drivers/power/reset/at91-sama5d2_shdwc.c
+> @@ -132,7 +132,7 @@ static void at91_lpddr_poweroff(void)
 >  		  "r" cpu_to_le32(AT91_DDRSDRC_LPDDR2_PWOFF),
->  		  "r" (at91_shdwc_base),
+>  		  "r" (at91_shdwc->at91_shdwc_base),
 >  		  "r" cpu_to_le32(AT91_SHDW_KEY | AT91_SHDW_SHDW)
 > -		: "r0");
 > +		: "r6");
 >  }
 >  
->  static int at91_poweroff_get_wakeup_mode(struct device_node *np)
+>  static u32 at91_shdwc_debouncer_value(struct platform_device *pdev,
 > 
 
 
