@@ -1,134 +1,196 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 01 Jun 2017 22:18:02 +0200
-Subject: [PATCH 4/4] phy: rockchip-inno-usb2: add support of usb2-phy for
- rk322x SoCs
-In-Reply-To: <1495078982-2555-5-git-send-email-frank.wang@rock-chips.com>
-References: <1495078982-2555-1-git-send-email-frank.wang@rock-chips.com>
- <1495078982-2555-5-git-send-email-frank.wang@rock-chips.com>
-Message-ID: <2655472.BTSNDfobEl@phil>
+Date: Thu, 01 Jun 2017 22:22:17 +0200
+Subject: [PATCH 1/2] ARM: dts: rockchip: add usb nodes on rk322x
+In-Reply-To: <1496193684-30449-2-git-send-email-william.wu@rock-chips.com>
+References: <1496193684-30449-1-git-send-email-william.wu@rock-chips.com>
+ <1496193684-30449-2-git-send-email-william.wu@rock-chips.com>
+Message-ID: <1657625.AqxPQItbmB@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Frank,
+Hi William,
 
-Am Donnerstag, 18. Mai 2017, 11:43:02 CEST schrieb Frank Wang:
-> This adds support usb2-phy for rk322x SoCs and amend phy Documentation.
+Am Mittwoch, 31. Mai 2017, 09:21:23 CEST schrieb William Wu:
+> This patch adds usb otg/host controllers and phys nodes on rk322x.
 > 
-> Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
-
-this adds a devicetree binding, so you should include devicetree people in
-the recipient list:
-
-Rob Herring <robh+dt@kernel.org>
-Mark Rutland <mark.rutland@arm.com>
-devicetree at vger.kernel.org
-
-as they should Ack such binding additions.
-
-
+> Signed-off-by: William Wu <william.wu@rock-chips.com>
 > ---
->  .../bindings/phy/phy-rockchip-inno-usb2.txt        |  1 +
->  drivers/phy/phy-rockchip-inno-usb2.c               | 60 ++++++++++++++++++++++
->  2 files changed, 61 insertions(+)
+>  arch/arm/boot/dts/rk322x.dtsi | 138 +++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 137 insertions(+), 1 deletion(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
-> index e71a8d2..b4ce12e 100644
-> --- a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
-> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
-> @@ -2,6 +2,7 @@ ROCKCHIP USB2.0 PHY WITH INNO IP BLOCK
+> diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
+> index df57413..d4bfd3c 100644
+> --- a/arch/arm/boot/dts/rk322x.dtsi
+> +++ b/arch/arm/boot/dts/rk322x.dtsi
+> @@ -210,8 +210,61 @@
+>  	};
 >  
->  Required properties (phy (parent) node):
->   - compatible : should be one of the listed compatibles:
-> +	* "rockchip,rk322x-usb2phy"
+>  	grf: syscon at 11000000 {
+> -		compatible = "syscon";
+> +		compatible = "syscon", "simple-mfd";
+>  		reg = <0x11000000 0x1000>;
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +
+> +		u2phy0: usb2-phy at 760 {
+> +			compatible = "rockchip,rk322x-usb2phy";
 
-devicetree compatibles should not contain wildcards, so please name that
-"rockchip,rk3228-usb2phy"
+as commented on the driver-side some moments ago, compatibles should not
+contain wildcards, so please make this
+	"rockchip,rk3228-usb2phy"
+instead.
 
-here and in the driver as well.
+Same below and also for the dwc2 node.
 
 
+Thanks
 Heiko
 
-
->  	* "rockchip,rk3328-usb2phy"
->  	* "rockchip,rk3366-usb2phy"
->  	* "rockchip,rk3399-usb2phy"
-> diff --git a/drivers/phy/phy-rockchip-inno-usb2.c b/drivers/phy/phy-rockchip-inno-usb2.c
-> index d026b4cf..b9d4e23 100644
-> --- a/drivers/phy/phy-rockchip-inno-usb2.c
-> +++ b/drivers/phy/phy-rockchip-inno-usb2.c
-> @@ -1144,6 +1144,65 @@ static int rockchip_usb2phy_probe(struct platform_device *pdev)
->  	return ret;
->  }
->  
-> +static const struct rockchip_usb2phy_cfg rk322x_phy_cfgs[] = {
-> +	{
-> +		.reg = 0x760,
-> +		.num_ports	= 2,
-> +		.clkout_ctl	= { 0x0768, 4, 4, 1, 0 },
-> +		.port_cfgs	= {
-> +			[USB2PHY_PORT_OTG] = {
-> +				.phy_sus	= { 0x0760, 15, 0, 0, 0x1d1 },
-> +				.bvalid_det_en	= { 0x0680, 3, 3, 0, 1 },
-> +				.bvalid_det_st	= { 0x0690, 3, 3, 0, 1 },
-> +				.bvalid_det_clr	= { 0x06a0, 3, 3, 0, 1 },
-> +				.ls_det_en	= { 0x0680, 2, 2, 0, 1 },
-> +				.ls_det_st	= { 0x0690, 2, 2, 0, 1 },
-> +				.ls_det_clr	= { 0x06a0, 2, 2, 0, 1 },
-> +				.utmi_bvalid	= { 0x0480, 4, 4, 0, 1 },
-> +				.utmi_ls	= { 0x0480, 3, 2, 0, 1 },
-> +			},
-> +			[USB2PHY_PORT_HOST] = {
-> +				.phy_sus	= { 0x0764, 15, 0, 0, 0x1d1 },
-> +				.ls_det_en	= { 0x0680, 4, 4, 0, 1 },
-> +				.ls_det_st	= { 0x0690, 4, 4, 0, 1 },
-> +				.ls_det_clr	= { 0x06a0, 4, 4, 0, 1 }
-> +			}
-> +		},
-> +		.chg_det = {
-> +			.opmode		= { 0x0760, 3, 0, 5, 1 },
-> +			.cp_det		= { 0x0884, 4, 4, 0, 1 },
-> +			.dcp_det	= { 0x0884, 3, 3, 0, 1 },
-> +			.dp_det		= { 0x0884, 5, 5, 0, 1 },
-> +			.idm_sink_en	= { 0x0768, 8, 8, 0, 1 },
-> +			.idp_sink_en	= { 0x0768, 7, 7, 0, 1 },
-> +			.idp_src_en	= { 0x0768, 9, 9, 0, 1 },
-> +			.rdm_pdwn_en	= { 0x0768, 10, 10, 0, 1 },
-> +			.vdm_src_en	= { 0x0768, 12, 12, 0, 1 },
-> +			.vdp_src_en	= { 0x0768, 11, 11, 0, 1 },
-> +		},
-> +	},
-> +	{
-> +		.reg = 0x800,
-> +		.num_ports	= 2,
-> +		.clkout_ctl	= { 0x0808, 4, 4, 1, 0 },
-> +		.port_cfgs	= {
-> +			[USB2PHY_PORT_OTG] = {
-> +				.phy_sus	= { 0x800, 15, 0, 0, 0x1d1 },
-> +				.ls_det_en	= { 0x0684, 0, 0, 0, 1 },
-> +				.ls_det_st	= { 0x0694, 0, 0, 0, 1 },
-> +				.ls_det_clr	= { 0x06a4, 0, 0, 0, 1 }
-> +			},
-> +			[USB2PHY_PORT_HOST] = {
-> +				.phy_sus	= { 0x804, 15, 0, 0, 0x1d1 },
-> +				.ls_det_en	= { 0x0684, 1, 1, 0, 1 },
-> +				.ls_det_st	= { 0x0694, 1, 1, 0, 1 },
-> +				.ls_det_clr	= { 0x06a4, 1, 1, 0, 1 }
-> +			}
-> +		},
-> +	},
-> +	{ /* sentinel */ }
-> +};
+> +			reg = <0x0760 0x0c>;
+> +			clocks = <&cru SCLK_OTGPHY0>;
+> +			clock-names = "phyclk";
+> +			#clock-cells = <0>;
+> +			clock-output-names = "usb480m_phy0";
+> +			status = "disabled";
 > +
->  static const struct rockchip_usb2phy_cfg rk3328_phy_cfgs[] = {
->  	{
->  		.reg = 0x100,
-> @@ -1269,6 +1328,7 @@ static const struct rockchip_usb2phy_cfg rk3399_phy_cfgs[] = {
->  };
+> +			u2phy0_otg: otg-port {
+> +				#phy-cells = <0>;
+> +				interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
+> +				interrupt-names = "otg-bvalid", "otg-id",
+> +						  "linestate";
+> +				status = "disabled";
+> +			};
+> +
+> +			u2phy0_host: host-port {
+> +				#phy-cells = <0>;
+> +				interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
+> +				interrupt-names = "linestate";
+> +				status = "disabled";
+> +			};
+> +		};
+> +
+> +		u2phy1: usb2-phy at 800 {
+> +			compatible = "rockchip,rk322x-usb2phy";
+
+rockchip,rk3228-usb2phy
+
+> +			reg = <0x0800 0x0c>;
+> +			clocks = <&cru SCLK_OTGPHY1>;
+> +			clock-names = "phyclk";
+> +			#clock-cells = <0>;
+> +			clock-output-names = "usb480m_phy1";
+> +			status = "disabled";
+> +
+> +			u2phy1_otg: otg-port {
+> +				#phy-cells = <0>;
+> +				interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
+> +				interrupt-names = "linestate";
+> +				status = "disabled";
+> +			};
+> +
+> +			u2phy1_host: host-port {
+> +				#phy-cells = <0>;
+> +				interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
+> +				interrupt-names = "linestate";
+> +				status = "disabled";
+> +			};
+> +		};
+>  	};
 >  
->  static const struct of_device_id rockchip_usb2phy_dt_match[] = {
-> +	{ .compatible = "rockchip,rk322x-usb2phy", .data = &rk322x_phy_cfgs },
->  	{ .compatible = "rockchip,rk3328-usb2phy", .data = &rk3328_phy_cfgs },
->  	{ .compatible = "rockchip,rk3366-usb2phy", .data = &rk3366_phy_cfgs },
->  	{ .compatible = "rockchip,rk3399-usb2phy", .data = &rk3399_phy_cfgs },
+>  	uart0: serial at 11010000 {
+> @@ -467,6 +520,89 @@
+>  		status = "disabled";
+>  	};
+>  
+> +	usb_otg: usb at 30040000 {
+> +		compatible = "rockchip,rk322x-usb", "rockchip,rk3066-usb",
+
+rockchip,rk3228-usb
+
+> +			     "snps,dwc2";
+> +		reg = <0x30040000 0x40000>;
+> +		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&cru HCLK_OTG>;
+> +		clock-names = "otg";
+> +		dr_mode = "otg";
+> +		g-np-tx-fifo-size = <16>;
+> +		g-rx-fifo-size = <280>;
+> +		g-tx-fifo-size = <256 128 128 64 32 16>;
+> +		g-use-dma;
+> +		phys = <&u2phy0_otg>;
+> +		phy-names = "usb2-phy";
+> +		status = "disabled";
+> +	};
+> +
+> +	usb_host0_ehci: usb at 30080000 {
+> +		compatible = "generic-ehci";
+> +		reg = <0x30080000 0x20000>;
+> +		interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&cru HCLK_HOST0>, <&u2phy0>;
+> +		clock-names = "usbhost", "utmi";
+> +		phys = <&u2phy0_host>;
+> +		phy-names = "usb";
+> +		status = "disabled";
+> +	};
+> +
+> +	usb_host0_ohci: usb at 300a0000 {
+> +		compatible = "generic-ohci";
+> +		reg = <0x300a0000 0x20000>;
+> +		interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&cru HCLK_HOST0>, <&u2phy0>;
+> +		clock-names = "usbhost", "utmi";
+> +		phys = <&u2phy0_host>;
+> +		phy-names = "usb";
+> +		status = "disabled";
+> +	};
+> +
+> +	usb_host1_ehci: usb at 300c0000 {
+> +		compatible = "generic-ehci";
+> +		reg = <0x300c0000 0x20000>;
+> +		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&cru HCLK_HOST1>, <&u2phy1>;
+> +		clock-names = "usbhost", "utmi";
+> +		phys = <&u2phy1_otg>;
+> +		phy-names = "usb";
+> +		status = "disabled";
+> +	};
+> +
+> +	usb_host1_ohci: usb at 300e0000 {
+> +		compatible = "generic-ohci";
+> +		reg = <0x300e0000 0x20000>;
+> +		interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&cru HCLK_HOST1>, <&u2phy1>;
+> +		clock-names = "usbhost", "utmi";
+> +		phys = <&u2phy1_otg>;
+> +		phy-names = "usb";
+> +		status = "disabled";
+> +	};
+> +
+> +	usb_host2_ehci: usb at 30100000 {
+> +		compatible = "generic-ehci";
+> +		reg = <0x30100000 0x20000>;
+> +		interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&cru HCLK_HOST2>, <&u2phy1>;
+> +		phys = <&u2phy1_host>;
+> +		phy-names = "usb";
+> +		clock-names = "usbhost", "utmi";
+> +		status = "disabled";
+> +	};
+> +
+> +	usb_host2_ohci: usb at 30120000 {
+> +		compatible = "generic-ohci";
+> +		reg = <0x30120000 0x20000>;
+> +		interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&cru HCLK_HOST2>, <&u2phy1>;
+> +		clock-names = "usbhost", "utmi";
+> +		phys = <&u2phy1_host>;
+> +		phy-names = "usb";
+> +		status = "disabled";
+> +	};
+> +
+>  	gmac: ethernet at 30200000 {
+>  		compatible = "rockchip,rk3228-gmac";
+>  		reg = <0x30200000 0x10000>;
 > 
