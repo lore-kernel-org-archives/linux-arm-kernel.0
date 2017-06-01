@@ -1,210 +1,78 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 1 Jun 2017 10:46:33 +0100
-Subject: [PATCH 4/4] drm/bridge: dw-hdmi: add cec driver
-In-Reply-To: <db1f1785-930b-0f32-d71a-79ae8e053b2c@xs4all.nl>
-References: <20170530142218.GS22219@n2100.armlinux.org.uk>
- <E1dFi3P-0004lv-2K@rmk-PC.armlinux.org.uk>
- <db1f1785-930b-0f32-d71a-79ae8e053b2c@xs4all.nl>
-Message-ID: <20170601094633.GE27796@n2100.armlinux.org.uk>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Thu, 01 Jun 2017 18:50:36 +0900
+Subject: [PATCH v2 0/7] Improve ap806 clk support on Marvell Armada 7K/8K
+In-Reply-To: <cover.21754b3184e2122d1c83a664477ed26ec562b3e9.1496239589.git-series.gregory.clement@free-electrons.com>
+References: <cover.21754b3184e2122d1c83a664477ed26ec562b3e9.1496239589.git-series.gregory.clement@free-electrons.com>
+Message-ID: <149631063623.33065.5881396919137461999@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 01, 2017 at 10:31:10AM +0200, Hans Verkuil wrote:
-> Hi Russell,
+Hi Gregory,
+
+Quoting Gregory CLEMENT (2017-05-31 23:07:21)
+> Hi,
 > 
-> First a few top-level questions:
-
-Hi Hans,
-
-> 1) What was the reason for using the cec-notifier here? Isn't this
->    tightly integrated into the main dw-hdmi block? For the tda driver
->    it is clearly required, but for tightly coupled HDMI & CEC HW I
->    just create the adapter from the HDMI driver. As a small bonus it
->    avoids adding the cec-notifier code and the control flow is a bit
->    easier to trace.
-
-It's to avoid complex dependencies.  If it's all built in to the HDMI
-driver, then the HDMI driver needs to depend on all the media stuff
-being non-modular.  For a video output device, this is sub-optimal,
-because you want the video output device to work during boot.
-
-I feel strongly about this point, especially as we have had many years
-of users being able to use dw-hdmi without needing CEC enabled.
-
-> 2) I may have asked this before, apologies if I repeat myself: does
->    this CEC implementation support CEC monitoring (aka snooping)? If
->    it does, then I recommend that it is implemented since it is very
->    useful.
-
-It does not.
-
-> 3) Is the CEC still active if there is no hotplug signal? Or is it
->    powered off in that case? Ideally it should still be possible to
->    send CEC messages even if there is no hotplug. This is explicitly
->    allowed by the CEC 2.0 spec to wake up displays that turn off the
->    HPD, but that still have a working CEC controller.
-
-This is not specified in the documentation, so I don't think we know
-without experimentation.  This would be a future enhancement to the
-patch set.
-
-> > diff --git a/drivers/gpu/drm/bridge/synopsys/Kconfig b/drivers/gpu/drm/bridge/synopsys/Kconfig
-> > index 40d2827a6d19..bd30a0a07272 100644
-> > --- a/drivers/gpu/drm/bridge/synopsys/Kconfig
-> > +++ b/drivers/gpu/drm/bridge/synopsys/Kconfig
-> > @@ -21,3 +21,11 @@ config DRM_DW_HDMI_I2S_AUDIO
-> >  	help
-> >  	  Support the I2S Audio interface which is part of the Synopsys
-> >  	  Designware HDMI block.
-> > +
-> > +config DRM_DW_HDMI_CEC
-> > +	tristate "Synopsis Designware CEC interface"
-> > +	depends on DRM_DW_HDMI && MEDIA_CEC_SUPPORT
-> > +	select MEDIA_CEC_NOTIFIER
-> > +	help
-> > +	  Support the CE interface which is part of the Synopsis
-> > +	  Designware HDMI block.
+> This series modifies the device tree binding of the clock of the AP806
+> part that we find in the Marvell Armada 7K/8K SoCs.
 > 
-> This will change. Patches to fix the config handling are pending for 4.12.
+> As for the previsous series the only change in this second version is
+> about the binding documentation: all the documentation related changes
+> are now move in their own patches. It allows to provide a stable -dt
+> branch for theses changes. I also added the acked-by from Rob Herring.
 > 
-> Here you can see the pending patches:
-> https://git.linuxtv.org/hverkuil/media_tree.git/log/?h=drm-cec
+> Here again the last two patches modifying the device tree _must_ be
+> merged through the mvebu tree to avoid future conflict.
+
+The approach (and the patches) look good to me. I took the DT binding
+description changes (patches 2 & 4) into clk-ap806-dt stable branch:
+
+https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git/log/?h=clk-ap806-dt
+
+Anyone can merge the above branch if they need it as a dep.
+
+The driver changes (patches 1, 3 & 5) are merged on into clk-ap806,
+which is based on top of clk-ap806-dt:
+
+https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git/log/?h=clk-ap806
+
+Everything has been merged into clk-next. I did not touch the .dts files
+at all.
+
+Regards,
+Mike
+
 > 
-> The patches from 'cec-notifier.h: handle unreachable CONFIG_CEC_CORE' to
-> 'cec: drop MEDIA_CEC_DEBUG' should all be merged in 4.12.
+> For the record:
+> As for the CP110, we want to be able to ease the integration of new
+> clocks without breaking the backward compatibility. It is done in
+> patch 3.
 > 
-> That means that this config becomes:
+> We also want to ease the integration of the pinctrl node in the device
+> tree. It is the purpose of the patch 5.
 > 
-> +
-> +config DRM_DW_HDMI_CEC
-> +	tristate "Synopsis Designware CEC interface"
-> +	depends on DRM_DW_HDMI
-> +	select CEC_CORE
-> +	select CEC_NOTIFIER
-> +	help
-> +	  Support the CE interface which is part of the Synopsis
-> +	  Designware HDMI block.
-
-You will also need to select MEDIA_SUPPORT to avoid dependency issues.
-CEC_CORE and CEC_NOTIFIER are both lumped under an "if MEDIA_SUPPORT"
-block in drivers/media/Kconfig, so they depend on this symbol.  Asking
-Kconfig to select these two symbols without MEDIA_SUPPORT creates an
-invalid configuration - unless CEC has been moved out from being under
-MEDIA_SUPPORT.  (I haven't looked at your tree yet.)
-
-> > +static int dw_hdmi_cec_log_addr(struct cec_adapter *adap, u8 logical_addr)
-> > +{
-> > +	struct dw_hdmi_cec *cec = adap->priv;
-> > +	u32 addresses;
-> > +
-> > +	if (logical_addr == CEC_LOG_ADDR_INVALID)
-> > +		addresses = cec->addresses = 0;
-> > +	else
-> > +		addresses = cec->addresses |= BIT(logical_addr) | BIT(15);
-> > +
-> > +	dw_hdmi_write(cec, addresses & 255, HDMI_CEC_ADDR_L);
-> > +	dw_hdmi_write(cec, addresses >> 8, HDMI_CEC_ADDR_H);
+> In this series (as in the previous one for CP110), even if there is
+> some change in the device tree binding we paid attention to the
+> backward compatibility, and the driver can still work with the old
+> device tree.
 > 
-> The addresses local variable doesn't really seem needed.
-
-Ok.
-
-> > +static int dw_hdmi_cec_transmit(struct cec_adapter *adap, u8 attempts,
-> > +				u32 signal_free_time, struct cec_msg *msg)
-> > +{
-> > +	struct dw_hdmi_cec *cec = adap->priv;
-> > +	unsigned i;
-> > +
-> > +	cec->retries = attempts;
+> Thanks,
 > 
-> Should probably be 'cec->retries = attempts - 1;'
-> Since 2 attempts == 1 retry.
-
-Probably correct, but rather moot given your comment below.
-
-> > +static irqreturn_t dw_hdmi_cec_hardirq(int irq, void *data)
-> > +{
-> > +	struct cec_adapter *adap = data;
-> > +	struct dw_hdmi_cec *cec = adap->priv;
-> > +	unsigned stat = dw_hdmi_read(cec, HDMI_IH_CEC_STAT0);
-> > +	irqreturn_t ret = IRQ_HANDLED;
-> > +
-> > +	if (stat == 0)
-> > +		return IRQ_NONE;
-> > +
-> > +	dw_hdmi_write(cec, stat, HDMI_IH_CEC_STAT0);
-> > +
-> > +	if (stat & CEC_STAT_ERROR_INIT) {
-> > +		if (cec->retries) {
-> > +			unsigned v = dw_hdmi_read(cec, HDMI_CEC_CTRL);
-> > +			dw_hdmi_write(cec, v | CEC_CTRL_START, HDMI_CEC_CTRL);
-> > +			cec->retries -= 1;
+> Gregory
 > 
-> Why handle retries here at all? Just mark this as CEC_TX_STATUS_ERROR and set
-> tx_done to true. The CEC core will just call dw_hdmi_cec_transmit again if
-> it needs to make another attempt. I suggest that the whole retry code is
-> dropped.
-
-Probably comes from a previous iteration of your CEC core which required
-the driver to do retries, so it can probably be fixed up in the way you
-describe.
-
-However, presumably this needs a different status other than
-"CEC_TX_STATUS_MAX_RETRIES"?  I don't see a way to report this error to
-the CEC core in a way that it will retry.
-
-> > +static irqreturn_t dw_hdmi_cec_thread(int irq, void *data)
-> > +{
-> > +	struct cec_adapter *adap = data;
-> > +	struct dw_hdmi_cec *cec = adap->priv;
-> > +
-> > +	if (cec->tx_done) {
-> > +		cec->tx_done = false;
-> > +		cec_transmit_done(adap, cec->tx_status, 0, 0, 0, 0);
+> Gregory CLEMENT (7):
+>   clk: mvebu: ap806: cosmetic improvement
+>   dt-bindings: ap806: do not depend anymore of the *-clock-output-names
+>   clk: mvebu: ap806: do not depend anymore of the *-clock-output-names
+>   dt-bindings: ap806: introduce a new binding
+>   clk: mvebu: ap806: introduce a new binding
+>   arm64: dts: marvell: remove clock-output-names on ap806
+>   arm64: dts: marvell: use new binding for the system controller on ap806
 > 
-> I think I will make a patch for a new helper function where you can just call:
+>  Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt |  24 ++++++++++------
+>  arch/arm64/boot/dts/marvell/armada-ap806.dtsi                             |  23 +++++++--------
+>  drivers/clk/mvebu/ap806-system-controller.c                               | 107 +++++++++++++++++++++++++++++++++++++++++++++++-------------------------
+>  3 files changed, 97 insertions(+), 57 deletions(-)
 > 
-> cec_transmit_attempt_done(adap, cec->tx_status);
-> 
-> and that will call cec_transmit_done filling in the other arguments
-> based on the status.
-> 
-> Most CEC HW doesn't do retries so only make one attempt. In that case
-> only one of the remaining count arguments is 1 and that's based on the
-> status.
-> 
-> Having correct error counts is useful for debugging problems.
-
-It hasn't been clear to me which counts should be non-zero, and it seems
-like entirely redundant information given that the status argument
-indicates what happened to the message.
-
-> > +static void dw_hdmi_cec_disable(struct dw_hdmi *hdmi)
-> > +{
-> > +	mutex_lock(&hdmi->mutex);
-> > +	hdmi->mc_clkdis |= HDMI_MC_CLKDIS_CECCLK_DISABLE;
-> > +	hdmi_writeb(hdmi, hdmi->mc_clkdis, HDMI_MC_CLKDIS);
-> > +	mutex_unlock(&hdmi->mutex);
-> > +}
-> > +
-> > +static const struct dw_hdmi_cec_ops dw_hdmi_cec_ops = {
-> > +	.write = hdmi_writeb,
-> > +	.read = hdmi_readb,
-> > +	.enable = dw_hdmi_cec_enable,
-> > +	.disable = dw_hdmi_cec_disable,
-> > +};
-> > +
-> 
-> This feels over-engineered and I suspect it is simplified if you just
-> add a cec_adapter pointer to struct dw_hdmi and link dw-hdmi-cec.c
-> together with dw-hdmi.c.
-
-As I mention above, to do so would mean that dw-hdmi has to be modular
-if you want CEC to be modular, and I don't think that is reasonable
-for a video output device, which may be the source of kernel boot
-messages.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> base-commit: 4139fcd6c66df1c3d3fa0a0a7cf7f8a8c601a16c
+> -- 
+> git-series 0.9.1
