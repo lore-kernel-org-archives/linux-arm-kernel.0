@@ -1,49 +1,43 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu,  1 Jun 2017 21:39:05 +0200
-Subject: [PATCH v3 13/13] ARM: dts: sunxi: add SoC specific compatibles for
- the crypto nodes
+Date: Thu,  1 Jun 2017 21:39:00 +0200
+Subject: [PATCH v3 08/13] crypto: sun4i-ss: use GENMASK to generate masks
 In-Reply-To: <20170601193905.28829-1-antoine.tenart@free-electrons.com>
 References: <20170601193905.28829-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170601193905.28829-14-antoine.tenart@free-electrons.com>
+Message-ID: <20170601193905.28829-9-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SoC specific compatibles for all sunXi crypto nodes, in addition to
-the one already used (allwinner,sun4i-a10-crypto).
+Use the GENMASK helper instead of custom calculations to generate masks,
+It also helps the readability.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Tested-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+Acked-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm/boot/dts/sun6i-a31.dtsi | 3 ++-
- arch/arm/boot/dts/sun7i-a20.dtsi | 3 ++-
- 2 files changed, 4 insertions(+), 2 deletions(-)
+ drivers/crypto/sunxi-ss/sun4i-ss-hash.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index 9c999d3788f6..e3e2a2f5a97b 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -780,7 +780,8 @@
- 		};
+diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
+index 0c2efc88bc0a..685de5b6ab17 100644
+--- a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
++++ b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
+@@ -384,11 +384,14 @@ static int sun4i_hash(struct ahash_request *areq)
+ 			writesl(ss->base + SS_RXFIFO, op->buf, nwait);
+ 			op->byte_count += 4 * nwait;
+ 		}
++
+ 		nbw = op->len - 4 * nwait;
+-		wb = *(u32 *)(op->buf + nwait * 4);
+-		wb &= (0xFFFFFFFF >> (4 - nbw) * 8);
++		if (nbw) {
++			wb = *(u32 *)(op->buf + nwait * 4);
++			wb &= GENMASK((nbw * 8) - 1, 0);
  
- 		crypto: crypto-engine at 01c15000 {
--			compatible = "allwinner,sun4i-a10-crypto";
-+			compatible = "allwinner,sun6i-a31-crypto",
-+				     "allwinner,sun4i-a10-crypto";
- 			reg = <0x01c15000 0x1000>;
- 			interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&ccu CLK_AHB1_SS>, <&ccu CLK_SS>;
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 93aa55970bd7..bd2ef3371c40 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -1019,7 +1019,8 @@
- 		};
+-		op->byte_count += nbw;
++			op->byte_count += nbw;
++		}
+ 	}
  
- 		crypto: crypto-engine at 01c15000 {
--			compatible = "allwinner,sun4i-a10-crypto";
-+			compatible = "allwinner,sun7i-a20-crypto",
-+				     "allwinner,sun4i-a10-crypto";
- 			reg = <0x01c15000 0x1000>;
- 			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&ahb_gates 5>, <&ss_clk>;
+ 	/* write the remaining bytes of the nbw buffer */
 -- 
 2.9.4
