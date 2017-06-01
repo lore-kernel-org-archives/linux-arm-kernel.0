@@ -1,101 +1,56 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 1 Jun 2017 17:48:46 +0100
-Subject: [PATCH v2] asm-generic: simd: allow SIMD in process context with
- BH disabled
-In-Reply-To: <20170601095532.16632-1-ard.biesheuvel@linaro.org>
-References: <20170601095532.16632-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170601164839.GE30160@e103592.cambridge.arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 1 Jun 2017 16:51:05 +0000
+Subject: [PATCH v2] efi: arm: enable DMI/SMBIOS
+In-Reply-To: <20170601163614.GC22219@n2100.armlinux.org.uk>
+References: <20170601104554.21267-1-ard.biesheuvel@linaro.org>
+ <CAKv+Gu-OK=0HSG5KmsZ+Zs0Xu2ox5Cva+Nbtgz0DXigk3e3aiA@mail.gmail.com>
+ <20170601163614.GC22219@n2100.armlinux.org.uk>
+Message-ID: <CAKv+Gu9czLm=i852=GAnx=pmGDDNahTTVpVxWzAfNgzmOWdsaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 01, 2017 at 09:55:32AM +0000, Ard Biesheuvel wrote:
-> asm-generic supplies a header asm/simd.h which exports a single function
-> may_use_simd(), which conveys whether the current context allows the SIMD
-> register file or instructions to be used.
-> 
-> This header is included by crypto code shared between x86 and ARM/arm64,
-> and which offloads SIMD processing to process context if required. The
-> generic asm/simd.h is shared between ARM and arm64 at the moment, while
-> x86 has its own implementation.
-> 
-> On arm64, we currently mostly ignore may_use_simd(), because arm64 allows
-> kernel mode NEON in any context. However, this is due to change shortly
-> when support for SVE is merged, at which point we will introduce an arm64
-> specific implementation of asm/simd.h as well.
-> 
-> That leaves ARM, which only allows kernel mode NEON in process context,
-> which makes the current generic implementation of may_use_simd() seem
-> appropriate. However, given that in_interrupt() will return true when
-> running in process context with bottom halves disabled, we may end up
-> falling back to less optimized code unnecessarily, given that kernel
-> mode NEON is perfectly usable in that case.
-> 
-> So redefine may_use_simd() to disallow SIMD only when running in NMI,
-> hardirq or softirq context.
-> 
-> While we're at it, add some missing header file decorations such as
-> a license header and include guards.
-> 
-> Reported-by: "Jason A. Donenfeld" <Jason@zx2c4.com>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On 1 June 2017 at 16:36, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+> On Thu, Jun 01, 2017 at 10:52:13AM +0000, Ard Biesheuvel wrote:
+>> (add Russell to To: field)
+>
+> Thanks.
+>
+>> On 1 June 2017 at 10:45, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> > Wire up the existing support for SMBIOS tables (aka DMI), by moving the
+>> > arm64 init code to drivers/firmware/efi/arm-runtime.c (which is shared
+>> > between ARM and arm64), and adding a asm/dmi.h header to ARM that defines
+>> > the mapping routines for the firmware tables.
+>> >
+>> > This allows userspace to access these tables to discover system information
+>> > exposed by the firmware. It also sets the hardware name used in crash
+>> > dumps, e.g.,
+>> >
+>> >   Unable to handle kernel NULL pointer dereference at virtual address 00000000
+>> >   pgd = ed3c0000
+>> >   [00000000] *pgd=bf1f3835
+>> >   Internal error: Oops: 817 [#1] SMP THUMB2
+>> >   Modules linked in:
+>> >   CPU: 0 PID: 759 Comm: bash Not tainted 4.10.0-09601-g0e8f38792120-dirty #112
+>> >   Hardware name: QEMU KVM Virtual Machine, BIOS 0.0.0 02/06/2015
+>> >   ^^^
+>> >
+>> > NOTE: This does *NOT* enable or encourage the use of DMI quirks, i.e., the
+>> >       the practice of identifying the platform via DMI to decide whether
+>> >       certain workarounds for buggy hardware and/or firmware need to be
+>> >       enabled. This would require the DMI subsystem to be enabled much
+>> >       earlier than we do on ARM, which is non-trivial.
+>
+> I think that needs to be documented somewhere else other than the commit
+> message, although I'm not sure where.
+>
+>> > Cc: Matt Fleming <matt@codeblueprint.co.uk>
+>> > Cc: Russell King <linux@armlinux.org.uk>
+>> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>
+>> Russell, if you have no objections to this patch, may we have your ack
+>> please? I will take it via the EFI tree then.
+>
+> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+>
 
-Acked-by: Dave Martin <Dave.Martin@arm.com>
-(for SVE interactions)
-
-Cheers
----Dave
-
-> ---
-> v2: add !in_nmi() to may_use_simd() condition
->     include <linux/compiler.h> for __must_check
->     remove too elaborate comment
-> 
->  include/asm-generic/simd.h | 22 +++++++++++++++++---
->  1 file changed, 19 insertions(+), 3 deletions(-)
-> 
-> diff --git a/include/asm-generic/simd.h b/include/asm-generic/simd.h
-> index f57eb7b5c23b..ded4156421ff 100644
-> --- a/include/asm-generic/simd.h
-> +++ b/include/asm-generic/simd.h
-> @@ -1,14 +1,30 @@
-> +/*
-> + * Copyright (C) 2013 - 2017 Linaro Ltd. <ard.biesheuvel@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms of the GNU General Public License version 2 as published
-> + * by the Free Software Foundation.
-> + */
->  
-> -#include <linux/hardirq.h>
-> +#ifndef __ASM_SIMD_H
-> +#define __ASM_SIMD_H
-> +
-> +#include <linux/compiler.h>
-> +#include <linux/preempt.h>
-> +#include <linux/types.h>
->  
->  /*
->   * may_use_simd - whether it is allowable at this time to issue SIMD
->   *                instructions or access the SIMD register file
->   *
->   * As architectures typically don't preserve the SIMD register file when
-> - * taking an interrupt, !in_interrupt() should be a reasonable default.
-> + * taking an interrupt, it is reasonable to define the default behavior
-> + * of 'may_use_simd()' to be 'SIMD is only allowed when not handling any
-> + * kind of interrupt'.
->   */
->  static __must_check inline bool may_use_simd(void)
->  {
-> -	return !in_interrupt();
-> +	return !in_nmi() && !in_irq() && !in_serving_softirq();
->  }
-> +
-> +#endif
-> -- 
-> 2.9.3
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks. I will copy the NOTE to the Kconfig help text
