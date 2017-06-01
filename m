@@ -1,26 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 1 Jun 2017 16:55:44 -0700
-Subject: [PATCH 1/1] MAINTAINERS: remove kernel@stlinux.com obsolete
- mailing list
-In-Reply-To: <1496071074-29552-1-git-send-email-patrice.chotard@st.com>
-References: <1496071074-29552-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <20170601235544.GE13314@localhost>
+Date: Thu, 1 Jun 2017 16:59:33 -0700
+Subject: [GIT PULL] ARM: mvebu: fixes-non-critical for v4.12 (#1)
+In-Reply-To: <87bmq7sq5r.fsf@free-electrons.com>
+References: <87bmq7sq5r.fsf@free-electrons.com>
+Message-ID: <20170601235933.GG13314@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 29, 2017 at 05:17:54PM +0200, patrice.chotard at st.com wrote:
-> From: Patrice Chotard <patrice.chotard@st.com>
+On Thu, Jun 01, 2017 at 05:06:56PM +0200, Gregory CLEMENT wrote:
+> Hi,
 > 
-> The STMicroelectronics dedicated mailing list kernel at stlinux.com
-> is no more available, remove it to avoid bouncing mails.
-> 
-> Several request to create a new mailing list has been send by Benjamin
-> Gaignard and me but without any answers.
-> 
-> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
-> ---
+> Here is the first pull request for fixes-non-critical for mvebu for v4.12.
 
-Applied, thanks.
+Not sure where the typo is here -- either this is a fix for v4.12, or it's
+a non-critical fix for v4.13.
+
+Normally we'd add maintainers entries in the fixes stream (at least early on),
+but we probably wouldn't do the sorting of entries. Either way, I've applied
+this to fixes for v4.12 now.
+
+
+Thanks,
 
 
 -Olof
