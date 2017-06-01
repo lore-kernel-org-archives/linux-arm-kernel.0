@@ -1,54 +1,33 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 1 Jun 2017 17:36:15 +0100
-Subject: [PATCH v2] efi: arm: enable DMI/SMBIOS
-In-Reply-To: <CAKv+Gu-OK=0HSG5KmsZ+Zs0Xu2ox5Cva+Nbtgz0DXigk3e3aiA@mail.gmail.com>
-References: <20170601104554.21267-1-ard.biesheuvel@linaro.org>
- <CAKv+Gu-OK=0HSG5KmsZ+Zs0Xu2ox5Cva+Nbtgz0DXigk3e3aiA@mail.gmail.com>
-Message-ID: <20170601163614.GC22219@n2100.armlinux.org.uk>
+Date: Thu, 1 Jun 2017 17:42:09 +0100
+Subject: how can KAsan support arm32?
+In-Reply-To: <e7d99272-bff0-59b9-f4ca-8b4482ef9bf4@virtuozzo.com>
+References: <d202a49e-ee0f-4864-b24b-b185255c7f11@googlegroups.com>
+ <CACT4Y+aEW+CNH40mwY_i-mzL3cRYHc8EdMyhQj6dAiS+=0TpXg@mail.gmail.com>
+ <20170601112424.GA8718@leverpostej>
+ <CACT4Y+b5OiNrQqK-A2qHquZo266eXykWROLP=qj_BW__S2Wi5w@mail.gmail.com>
+ <ba9fb499-98c5-4cfe-b68e-48a8df8d4ca9@googlegroups.com>
+ <e7d99272-bff0-59b9-f4ca-8b4482ef9bf4@virtuozzo.com>
+Message-ID: <20170601164209.GD22219@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 01, 2017 at 10:52:13AM +0000, Ard Biesheuvel wrote:
-> (add Russell to To: field)
+On Thu, Jun 01, 2017 at 07:37:26PM +0300, Andrey Ryabinin wrote:
+> kasan needs at least 1/8 of the total memory, so it will be 32MB in
+> your case.
 
-Thanks.
+Is that really the case?  It is if we want to account for every byte,
+but I don't think that's necessary.
 
-> On 1 June 2017 at 10:45, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > Wire up the existing support for SMBIOS tables (aka DMI), by moving the
-> > arm64 init code to drivers/firmware/efi/arm-runtime.c (which is shared
-> > between ARM and arm64), and adding a asm/dmi.h header to ARM that defines
-> > the mapping routines for the firmware tables.
-> >
-> > This allows userspace to access these tables to discover system information
-> > exposed by the firmware. It also sets the hardware name used in crash
-> > dumps, e.g.,
-> >
-> >   Unable to handle kernel NULL pointer dereference at virtual address 00000000
-> >   pgd = ed3c0000
-> >   [00000000] *pgd=bf1f3835
-> >   Internal error: Oops: 817 [#1] SMP THUMB2
-> >   Modules linked in:
-> >   CPU: 0 PID: 759 Comm: bash Not tainted 4.10.0-09601-g0e8f38792120-dirty #112
-> >   Hardware name: QEMU KVM Virtual Machine, BIOS 0.0.0 02/06/2015
-> >   ^^^
-> >
-> > NOTE: This does *NOT* enable or encourage the use of DMI quirks, i.e., the
-> >       the practice of identifying the platform via DMI to decide whether
-> >       certain workarounds for buggy hardware and/or firmware need to be
-> >       enabled. This would require the DMI subsystem to be enabled much
-> >       earlier than we do on ARM, which is non-trivial.
+Memory is allocated not on a per-byte basis, but on a larger granule,
+mainly determined by L1_CACHE_BYTES / ARCH_SLAB_MINALIGN etc.  While
+it means that we would lose the ability to capture accesses that
+happen strictly over the size requested from kmalloc() etc, if we
+implemented this, it would at least allow the more seriously wrong
+accesses to be trapped, while being cheaper.
 
-I think that needs to be documented somewhere else other than the commit
-message, although I'm not sure where.
-
-> > Cc: Matt Fleming <matt@codeblueprint.co.uk>
-> > Cc: Russell King <linux@armlinux.org.uk>
-> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> 
-> Russell, if you have no objections to this patch, may we have your ack
-> please? I will take it via the EFI tree then.
-
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+So, for 1GB of kernel virtual space, we'd only need 4MB for the bitmap
+for a 32-byte cache line system, which is much less of a problem.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
