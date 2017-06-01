@@ -1,65 +1,73 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  1 Jun 2017 11:21:12 +0100
-Subject: [PATCH v2 20/25] KVM: arm64: vgic-v3: Add ICV_DIR_EL1 handler
-In-Reply-To: <20170601102117.17750-1-marc.zyngier@arm.com>
-References: <20170601102117.17750-1-marc.zyngier@arm.com>
-Message-ID: <20170601102117.17750-21-marc.zyngier@arm.com>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Thu,  1 Jun 2017 15:51:45 +0530
+Subject: [PATCH] PCI: rockchip: Handle return value of clk_prepare_enable
+Message-ID: <4ebfc69644f9d6e9e5ff0cfc82e9efa5c476be0e.1496312348.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a handler for writing the guest's view of the ICC_DIR_EL1
-register, performing the deactivation of an interrupt if EOImode
-is set ot 1.
+clk_prepare_enable() can fail here and we must check its return value.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
- virt/kvm/arm/hyp/vgic-v3-sr.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ drivers/pci/host/pcie-rockchip.c | 34 ++++++++++++++++++++++++++++------
+ 1 file changed, 28 insertions(+), 6 deletions(-)
 
-diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index 5ff788d308ee..b86a0776c407 100644
---- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -634,6 +634,30 @@ static void __hyp_text __vgic_v3_bump_eoicount(void)
- 	write_gicreg(hcr, ICH_HCR_EL2);
+diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
+index 0e020b6..0a248cd 100644
+--- a/drivers/pci/host/pcie-rockchip.c
++++ b/drivers/pci/host/pcie-rockchip.c
+@@ -1259,24 +1259,46 @@ static int __maybe_unused rockchip_pcie_resume_noirq(struct device *dev)
+ 	struct rockchip_pcie *rockchip = dev_get_drvdata(dev);
+ 	int err;
+ 
+-	clk_prepare_enable(rockchip->clk_pcie_pm);
+-	clk_prepare_enable(rockchip->hclk_pcie);
+-	clk_prepare_enable(rockchip->aclk_perf_pcie);
+-	clk_prepare_enable(rockchip->aclk_pcie);
++	err = clk_prepare_enable(rockchip->clk_pcie_pm);
++	if (err)
++		goto err_pcie_pm;
++
++	err = clk_prepare_enable(rockchip->hclk_pcie);
++	if (err)
++		goto err_hclk_pcie;
++
++	err = clk_prepare_enable(rockchip->aclk_perf_pcie);
++	if (err)
++		goto err_aclk_perf_pcie;
++
++	err = clk_prepare_enable(rockchip->aclk_pcie);
++	if (err)
++		goto err_aclk_pcie;
+ 
+ 	err = rockchip_pcie_init_port(rockchip);
+ 	if (err)
+-		return err;
++		goto err_pcie_resume;
+ 
+ 	err = rockchip_cfg_atu(rockchip);
+ 	if (err)
+-		return err;
++		goto err_pcie_resume;
+ 
+ 	/* Need this to enter L1 again */
+ 	rockchip_pcie_update_txcredit_mui(rockchip);
+ 	rockchip_pcie_enable_interrupts(rockchip);
+ 
+ 	return 0;
++
++err_pcie_resume:
++	clk_disable_unprepare(rockchip->aclk_pcie);
++err_aclk_pcie:
++	clk_disable_unprepare(rockchip->aclk_perf_pcie);
++err_aclk_perf_pcie:
++	clk_disable_unprepare(rockchip->hclk_pcie);
++err_hclk_pcie:
++	clk_disable_unprepare(rockchip->clk_pcie_pm);
++err_pcie_pm:
++	return err;
  }
  
-+static void __hyp_text __vgic_v3_write_dir(struct kvm_vcpu *vcpu,
-+					   u32 vmcr, int rt)
-+{
-+	u32 vid = vcpu_get_reg(vcpu, rt);
-+	u64 lr_val;
-+	int lr;
-+
-+	/* EOImode == 0, nothing to be done here */
-+	if (!(vmcr & ICH_VMCR_EOIM_MASK))
-+		return;
-+
-+	/* No deactivate to be performed on an LPI */
-+	if (vid >= VGIC_MIN_LPI)
-+		return;
-+
-+	lr = __vgic_v3_find_active_lr(vcpu, vid, &lr_val);
-+	if (lr == -1) {
-+		__vgic_v3_bump_eoicount();
-+		return;
-+	}
-+
-+	__vgic_v3_clear_active_lr(lr, lr_val);
-+}
-+
- static void __hyp_text __vgic_v3_write_eoir(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
- {
- 	u32 vid = vcpu_get_reg(vcpu, rt);
-@@ -936,6 +960,9 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
- 		else
- 			fn = __vgic_v3_write_bpr0;
- 		break;
-+	case SYS_ICC_DIR_EL1:
-+		fn = __vgic_v3_write_dir;
-+		break;
- 	default:
- 		return 0;
- 	}
+ static int rockchip_pcie_probe(struct platform_device *pdev)
 -- 
-2.11.0
+1.9.1
