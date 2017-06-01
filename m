@@ -1,31 +1,37 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Thu, 01 Jun 2017 13:30:49 +0100
-Subject: [RFC,20/30] iommu/arm-smmu-v3: Enable PCI PASID in masters
-In-Reply-To: <a5428875-6ff9-820a-498d-ae2602e8cc53@arm.com>
-References: <20170227195441.5170-21-jean-philippe.brucker@arm.com>
- <f18163da-30a6-a7d4-0a2c-bca4fc1b0fff@codeaurora.org>
- <a5428875-6ff9-820a-498d-ae2602e8cc53@arm.com>
-Message-ID: <1496320249.6254.35.camel@infradead.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 1 Jun 2017 13:37:50 +0100
+Subject: [PATCH 2/2] arm64: mm: don't print out page table entries on EL0
+ faults
+In-Reply-To: <59b82477-b937-0ffb-6cf1-d86e9b0488ba@arm.com>
+References: <1495453554-9412-1-git-send-email-kristina.martsenko@arm.com>
+ <1495453554-9412-2-git-send-email-kristina.martsenko@arm.com>
+ <20170522122115.GF1107@arm.com>
+ <59b82477-b937-0ffb-6cf1-d86e9b0488ba@arm.com>
+Message-ID: <20170601123750.GG12832@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-06-01 at 13:30 +0100, Jean-Philippe Brucker wrote:
+On Wed, May 31, 2017 at 08:38:00PM +0100, Kristina Martsenko wrote:
+> On 22/05/17 13:21, Will Deacon wrote:
+> > On Mon, May 22, 2017 at 12:45:54PM +0100, Kristina Martsenko wrote:
+> >> When we take a fault from EL0 that can't be handled, we print out the
+> >> page table entries associated with the faulting address. This allows
+> >> userspace to print out any current page table entries, including kernel
+> >> (TTBR1) entries.  Exposing kernel mappings like this could pose a
+> >> security risk, so don't print out page table information on EL0 faults.
+> >> (But still print it out for EL1 faults.)
+> >>
+> >> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
+> > 
+> > It might be worth mentioning that this follows the same behaviour as x86.
 > 
-> Yes, the current plan is to create a PASID (SSID) allocator that could be
-> used by AMD, Intel, ARM, and other IOMMUs. Currently the kfd driver
-> allocates PASIDs, but this will be done by the IOMMU subsystem in the
-> future. Writing the generic allocator isn't on my schedule for the next
-> few months, though.
+> Yep.
 > 
-> I'm trying to implement the next version of SMMU SVM with the following
-> principles in mind, and Intel are reworking their PASID allocator similarly.
+> > In fact, they print the name of the faulting VMA using print_vma_addr,
+> > which might be useful too.
+> 
+> Looks useful, should I add that in a separate patch in v2?
 
-Note that the Intel allocator is designed to work that way and to be
-easily made generic (that is, easily used from elsewhere).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 4938 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170601/1cffb17d/attachment.bin>
+Sure, works for me.
+
+Will
