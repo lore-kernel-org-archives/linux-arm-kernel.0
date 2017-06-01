@@ -1,99 +1,38 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 1 Jun 2017 15:04:09 +0000
-Subject: [PATCH 0/2] arm64: acpi/pci: allow the firmware BAR configuration
- to be preserved
-In-Reply-To: <20170518174612.GA31373@red-moon>
-References: <20170411163313.18577-1-ard.biesheuvel@linaro.org>
- <20170517215611.GJ31462@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu9T7vH_LbKfS_40JUbLNK4PYrMi++eKbCq_MzBsuQxUDQ@mail.gmail.com>
- <20170518140553.GA22106@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu_cug6cVrWP-zkptvNn3LxYk7b4Gd=iTzHHe3us3KwL3Q@mail.gmail.com>
- <20170518154708.GA30182@red-moon>
- <CAKv+Gu-NDR1PYUfOs4z-T9WoeBrYvFTTBt3XMiMg+AU76MbYBg@mail.gmail.com>
- <20170518174612.GA31373@red-moon>
-Message-ID: <CAKv+Gu8hVhpNrXG+JUQu8XYZtQE86d0O66J8AORWDC6Ttcp3iA@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 01 Jun 2017 17:06:35 +0200
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.12 (#1)
+Message-ID: <87d1ansq6c.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 May 2017 at 18:46, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> On Thu, May 18, 2017 at 05:51:44PM +0100, Ard Biesheuvel wrote:
->> On 18 May 2017 at 16:47, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
->> > On Thu, May 18, 2017 at 04:10:28PM +0100, Ard Biesheuvel wrote:
->> >
->> > [...]
->> >
->> >> >> Re _DSM: I think it makes sense to honour it, because it puts the
->> >> >> allocation under the control of the firmware, which completely removes
->> >> >> the burden of having to reason about a policy in the kernel. That
->> >> >> leaves the question which will be the default, but that is of minor
->> >> >> importance IMO.
->> >> >
->> >> > I agree; we should try to follow the spec unless we have a good reason
->> >> > not to, which argues for honoring the _DSM, so I think it's worth a
->> >> > try.  Booting with "pci=realloc" could override the _DSM and taint the
->> >> > kernel (because we don't know the effect of reassigning something the
->> >> > firmware told us not to touch).
->> >> >
->> >>
->> >> I'd like to hear Lorenzo's view on this first, but I can certainly
->> >> respin my _DSM patch to take pci=realloc into account, and move the
->> >> handling to generic code as well.
->> >
->> > I agree with both of you on _DSM implementation and interpretation.
->> >
->> > Now, if we use it correctly (ie by the FW standard) on ARM64 systems we
->> > are going to trigger regressions, that's certain (ie we can then boot
->> > with pci=realloc - still, we are breaking systems), that's the reason
->> > why for patch(2) I'd like to create a branch and send a CFT for ARM64
->> > ACPI testing before queuing it (either I can set-up a testing branch
->> > or we ask Bjorn to do it - as you guys prefer - as long as we have
->> > a branch for people to test patch(2) on ARM64 ACPI systems).
->> >
->> > You still need to assign resources that could not be claimed though
->> > so patch(2) still needs updating:
->> >
->> > PCI FW spec 3.1 - 4.6.5
->> >
->> > "...However, the operating system is free to configure the devices in this
->> > hierarchy that have not been configured by the firmware."
->> >
->> > Which in kernel-speak it means that you have to assign resources that
->> > could not be claimed.
->> >
->>
->> Right. AFAICT this is the part that is typically handled by
->> pcibios_resource_survey() et al, whose default __weak implementations
->> are empty functions. Shall I override those for arm64 to host this
->> logic?
->
-> I think it makes sense yes unless Bjorn spots something wrong with that
-> but you should also call it in ARM64 pci_acpi_scan_root() since it is
-> not called by PCI core on non-hot-added bridges, I reckon you figured
-> that out already though.
->
+Hi,
 
-Another data point for this discussion: currently, when booting arm64
-via DT, we set PCI_REASSIGN_ALL_RSRC | PCI_REASSIGN_ALL_BUS (unless
-PCI_PROBE_ONLY is requested), which forces not only resource
-allocations but also the bus numbering to be reconfigured from
-scratch.
+Here is the first pull request for fixes for mvebu for v4.12.
 
-On arm64/ACPI, we never set those flags, which will cause
-pci_scan_bridge() to preserve the secondary and subordinate bridge
-numbers if they are non-zero. This actually prevents log messages like
+Gregory
 
-pci_bus 0000:02: busn_res: can not insert [bus 02-ff] under [bus
-00-7f] (conflicts with (null) [bus 00-7f])
+The following changes since commit 08332893e37af6ae779367e78e444f8f9571511d:
 
-which I see on AMD Seattle as well as QEMU when booting via DT (and I
-suspect on any DT PCI root whose bus range != {0x0 0xff>). However, it
-also means that we already have different behavior between ACPI and DT
-boot on arm64, which makes it ambiguous what the behavior should be if
-_DSM indicates that the configuration should not be preserved. IOW,
-'reconfigure everything' currently means different things between DT
-and ACPI boot.
+  Linux 4.12-rc2 (2017-05-21 19:30:23 -0700)
 
-Thoughts?
+are available in the git repository at:
 
--- 
-Ard.
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.12-1
+
+for you to fetch changes up to 44f73dc42c11398d7b84e94365a485ebd6420798:
+
+  arm64: marvell: dts: fix interrupts in 7k/8k crypto nodes (2017-05-24 17:12:59 +0200)
+
+----------------------------------------------------------------
+mvebu fixes for 4.12
+
+Fix the interrupt description of the crypto node for device tree of
+the Armada 7K/8K SoCs
+
+----------------------------------------------------------------
+Antoine Tenart (1):
+      arm64: marvell: dts: fix interrupts in 7k/8k crypto nodes
+
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 3 +--
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 3 +--
+ 2 files changed, 2 insertions(+), 4 deletions(-)
