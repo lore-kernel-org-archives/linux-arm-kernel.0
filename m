@@ -1,75 +1,92 @@
-From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Thu, 1 Jun 2017 08:19:39 +0200
-Subject: [PATCH v2 5/6] regulator: pfuze100-regulator: provide
- pm_power_off_prepare handler
-In-Reply-To: <20170531135942.20a72fe106667791e874fb20@linux-foundation.org>
-References: <20170531061457.23744-1-o.rempel@pengutronix.de>
- <20170531061457.23744-6-o.rempel@pengutronix.de>
- <20170531135942.20a72fe106667791e874fb20@linux-foundation.org>
-Message-ID: <c8457655-2e8b-7362-5e39-bebddbe5c502@rempel-privat.de>
+From: Andrew.Pinski@cavium.com (Pinski, Andrew)
+Date: Thu, 1 Jun 2017 06:10:37 +0000
+Subject: [PATCHv2 1/2] arm64:vdso: Rewrite gettimeofday into C.
+In-Reply-To: <20170531124430.GG9723@arm.com>
+References: <1496190860-5116-1-git-send-email-apinski@cavium.com>
+ <20170531124430.GG9723@arm.com>
+Message-ID: <CY4PR07MB3415C02575DAF2E649EB31AC93F60@CY4PR07MB3415.namprd07.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 31.05.2017 um 22:59 schrieb Andrew Morton:
-> On Wed, 31 May 2017 08:14:56 +0200 Oleksij Rempel <o.rempel@pengutronix.de> wrote:
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon at arm.com]
+> Sent: Wednesday, May 31, 2017 5:45 AM
+> To: Pinski, Andrew <Andrew.Pinski@cavium.com>
+> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> Norov, Yuri <Yuri.Norov@cavium.com>; catalin.marinas at arm.com;
+> nathan_lynch at mentor.com; kevin.brodsky at arm.com; dave.martin at arm.com;
+> john.stultz at linaro.org; arnd at arndb.de
+> Subject: Re: [PATCHv2 1/2] arm64:vdso: Rewrite gettimeofday into C.
 > 
->> On some boards the SoC can use one pin "PMIC_STBY_REQ" to notify th PMIC
->> about state changes. In this case internal state of PMIC must be
->> preconfigured for upcomming state change.
->> It works fine with the current regulator framework, except with the
->> power-off case.
->>
->> This patch is providing an optional pm_power_off_prepare handler
->> which will configure the PMIC_StandBy state to disable all power lines.
->>
->> In my power consumption test on RIoTBoard, I got the following results:
->> poweroff without this patch:	320 mA
->> poweroff with this patch:	2   mA
->> suspend to ram:			40  mA
->>
->> ...
->>
->> +static int pfuze_poweroff_pre_init(struct pfuze_chip *pfuze_chip)
->> +{
->> +	if (pfuze_chip->chip_id != PFUZE100) {
->> +		dev_warn(pfuze_chip->dev, "Requested pm_power_off_prepare handler for not supoorted chip\n");
->> +		return -ENODEV;
->> +	}
->> +
->> +	if (pm_power_off_prepare) {
->> +		dev_warn(pfuze_chip->dev, "pm_power_off_prepare is already registred.\n");
->> +		return -EBUSY;
->> +	}
->> +
->> +	syspm_pfuze_chip = pfuze_chip;
->> +	pm_power_off_prepare = pfuze_poweroff_pre;
->> +
->> +	return 0;
->> +}
->> +
+> Hi Andrew,
 > 
-> Ah, there it is.
+> Thanks for posting this, but please try to cc the maintainers in future --
+> I almost missed it!
+
+Oh sorry; I didn't know when I am supposed to CC the maintainers or not.  Different project, different rules.
+
 > 
-> This looks a bit dodgy.  What happens after someone does rmmod on this
-> driver?
-
-ok, got it.
-
-> (typo in comment: "supoorted")
+> On Tue, May 30, 2017 at 05:34:19PM -0700, Andrew Pinski wrote:
+> > This allows the compiler to optimize the divide by 1000.
+> > And remove the other divide.
+> >
+> > On ThunderX, gettimeofday improves by 32%.  On ThunderX 2,
+> > gettimeofday improves by 18%.
+> >
+> > Note I noticed a bug in the old implementation of
+> > __kernel_clock_getres; it was checking only the lower 32bits of the
+> > pointer; this would work for most cases but could fail in a few.
+> >
+> > Changes from v1:
+> > * Fixed bug in __kernel_clock_getres for checking the pointer argument.
+> > * Fix comments to refer to functions in arm64.
 > 
-> (I wish we could get "poweroff" and "power_off" consistent)
+> I tested this patch on a few platforms I have access to and didn't see the
+> perf regressions I saw when I looked at this in the past with an older
+> toolchain (it was mostly about the same, with a couple of improvements).
+> 
+> So, in principle, I'm not opposed to moving this into C. However, we're
+> currently close to a "vDSO-explosion" on arm64 with people wanting a compat
+> variant and also an ILP32 variant. When Kevin posted his compat variant
+> (also in C):
+> 
+>   http://lkml.kernel.org/r/20161206160353.14581-1-kevin.brodsky at arm.com
+> 
+> Nathan (who apparently needs to set his mail host address ;) was concerned
+> about duplication between arm and arm64:
+> 
+>   http://lkml.kernel.org/r/87r35jmv3e.fsf at wedge.i-did-not-set--mail-host-
+> address--so-tickle-me
+> 
+> I'm firmly of the opinion that we should try to write an arch-agnostic vDSO
+> implementation in core code (lib/vdso or something) where the arch header
+> provides things like:
+> 
+>   * The mechanism to read the counter
+>   * The mechanism to issue a syscall
+>   * A function to determine whether or not the current clocksource is
+>     suitable
 
-Hm.. only in this case or in DT bindings too? Which variant should be
-used? Driver: *_power_off_*; DT: *-power-off-* ?
+> 
+> I think the datapage format could be defined in core code and it would be
+> worth looking to see how much the virtual mapping code can be consolidated
+> too.
+> 
+> If we can get something that works for arm native, arm64 native, arm64
+> compat and arm64 ilp32 then it's probably going to be useful for other
+> architectures too, even if we need to add more customisation points in
+> future.
 
--- 
-Regards,
-Oleksij
+To share code between the three vdso is a good goal and shouldn't be a hard to expand my patch to handle the arm compat vdso.  To expand it to the arm native code shouldn't be too hard.  The main thing is add a few #ifdef/#define in a header.
+I will try to do that but I don't know when I will be able to finish it.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 213 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170601/1159d77d/attachment.sig>
+Thanks,
+Andrew
+
+
+> 
+> I've spoken to Kevin about this, but I'm not sure whether he's had a chance
+> to look at knocking up a prototype. A first stab could just unconditionally
+> fallback to the system call.
+> 
+> Will
