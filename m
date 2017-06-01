@@ -1,36 +1,59 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 01 Jun 2017 15:03:20 -0400 (EDT)
-Subject: [PATCH v2 0/2] ARM: imx6ul-14x14-evk: Fix suspend over nfs by phy
-In-Reply-To: <cover.1496224930.git.leonard.crestez@nxp.com>
-References: <cover.1496224930.git.leonard.crestez@nxp.com>
-Message-ID: <20170601.150320.128443002523337995.davem@davemloft.net>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu,  1 Jun 2017 12:20:43 -0700
+Subject: [PATCH v3 1/2] ARM: dts: imx7: add GPMI NAND
+In-Reply-To: <20170601192044.6548-1-stefan@agner.ch>
+References: <20170601192044.6548-1-stefan@agner.ch>
+Message-ID: <20170601192044.6548-2-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Leonard Crestez <leonard.crestez@nxp.com>
-Date: Wed, 31 May 2017 13:29:28 +0300
+Add i.MX 7 GPMI NAND module.
 
-> Right now attempting doing suspend/resume while root is mounted over NFS
-> hangs on imx6ul-14x14-evk. This is happening because ksz8081 phy fixups are
-> lost on resume.
-> 
-> Fix this by using equivalent devicetree properties instead of a phy fixup
-> and handling those properties on resume in the micrel driver.
-> 
-> In theory it might now be possible to remove the phy fixup from mach-imx6ul
-> entirely but it is possible that this would break other imx6ul boards which
-> use the same phy. The solution would be to patch their dts but it's not
-> clear how to identify affected boards.
-> 
-> This code is shared with imx6ull-14x14-evk but 6ull suspend needs an
-> unrelated patch: https://lkml.org/lkml/2017/5/30/584
-> 
-> This is something of a corner case so there is no CC: stable.
-> 
-> Changes since v1: https://lkml.org/lkml/2017/5/30/672 
->  * Split a kszphy_config_reset function for stuff shared between
-> config_init and resume. Calling config_init directly could be an option but
-> on some HW variants it does extra stuff like parsing devicetree options.
-> That would not be appropriate for resume code.
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ arch/arm/boot/dts/imx7s.dtsi | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-Series applied.
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index c4f12fd2e044..89011b7dc7a0 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -995,5 +995,36 @@
+ 				status = "disabled";
+ 			};
+ 		};
++
++		dma_apbh: dma-apbh at 33000000 {
++			compatible = "fsl,imx7d-dma-apbh", "fsl,imx28-dma-apbh";
++			reg = <0x33000000 0x2000>;
++			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "gpmi0", "gpmi1", "gpmi2", "gpmi3";
++			#dma-cells = <1>;
++			dma-channels = <4>;
++			clocks = <&clks IMX7D_NAND_USDHC_BUS_ROOT_CLK>,
++				<&clks IMX7D_NAND_ROOT_CLK>;
++			clock-names = "dma_apbh_bch", "dma_apbh_io";
++		};
++
++		gpmi: gpmi-nand at 33002000{
++			compatible = "fsl,imx7d-gpmi-nand";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x33002000 0x2000>, <0x33004000 0x4000>;
++			reg-names = "gpmi-nand", "bch";
++			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "bch";
++			clocks = <&clks IMX7D_NAND_ROOT_CLK>,
++				<&clks IMX7D_NAND_USDHC_BUS_ROOT_CLK>;
++			clock-names = "gpmi_io", "gpmi_bch_apb";
++			dmas = <&dma_apbh 0>;
++			dma-names = "rx-tx";
++			status = "disabled";
++		};
+ 	};
+ };
+-- 
+2.13.0
