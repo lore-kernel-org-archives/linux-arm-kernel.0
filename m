@@ -1,13 +1,13 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 01 Jun 2017 17:06:35 +0200
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.12 (#1)
-Message-ID: <87d1ansq6c.fsf@free-electrons.com>
+Date: Thu, 01 Jun 2017 17:06:56 +0200
+Subject: [GIT PULL] ARM: mvebu: fixes-non-critical for v4.12 (#1)
+Message-ID: <87bmq7sq5r.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Here is the first pull request for fixes for mvebu for v4.12.
+Here is the first pull request for fixes-non-critical for mvebu for v4.12.
 
 Gregory
 
@@ -17,22 +17,21 @@ The following changes since commit 08332893e37af6ae779367e78e444f8f9571511d:
 
 are available in the git repository at:
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.12-1
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-non-critical-4.12-1
 
-for you to fetch changes up to 44f73dc42c11398d7b84e94365a485ebd6420798:
+for you to fetch changes up to 1cb0b57fec06a616d98deaeda1924f8e45e1e4de:
 
-  arm64: marvell: dts: fix interrupts in 7k/8k crypto nodes (2017-05-24 17:12:59 +0200)
-
-----------------------------------------------------------------
-mvebu fixes for 4.12
-
-Fix the interrupt description of the crypto node for device tree of
-the Armada 7K/8K SoCs
+  MAINTAINERS: add irqchip related drivers to Marvell EBU maintainers (2017-05-23 16:29:22 +0200)
 
 ----------------------------------------------------------------
-Antoine Tenart (1):
-      arm64: marvell: dts: fix interrupts in 7k/8k crypto nodes
+mvebu non critical fixes for 4.12
 
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 3 +--
- arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 3 +--
- 2 files changed, 2 insertions(+), 4 deletions(-)
+Update MAINTAINER file for irqchip related drivers to Marvell EBU
+
+----------------------------------------------------------------
+Thomas Petazzoni (2):
+      MAINTAINERS: sort F entries for Marvell EBU maintainers
+      MAINTAINERS: add irqchip related drivers to Marvell EBU maintainers
+
+ MAINTAINERS | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
