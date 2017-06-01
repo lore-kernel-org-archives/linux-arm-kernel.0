@@ -1,39 +1,34 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu,  1 Jun 2017 12:20:44 -0700
-Subject: [PATCH v3 2/2] ARM: dts: imx7-colibri: add NAND support
-In-Reply-To: <20170601192044.6548-1-stefan@agner.ch>
-References: <20170601192044.6548-1-stefan@agner.ch>
-Message-ID: <20170601192044.6548-3-stefan@agner.ch>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Thu,  1 Jun 2017 21:38:56 +0200
+Subject: [PATCH v3 04/13] crypto: sun4i-ss: cannot use DMA is the request is 0
+ length
+In-Reply-To: <20170601193905.28829-1-antoine.tenart@free-electrons.com>
+References: <20170601193905.28829-1-antoine.tenart@free-electrons.com>
+Message-ID: <20170601193905.28829-5-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Colibri iMX7 modules come with 512MB on-module SLC NAND flash
-populated. Make use of it by enabling the GPMI controller.
+Do not use DMA is the request is 0 length.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Tested-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+Acked-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm/boot/dts/imx7-colibri.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/crypto/sunxi-ss/sun4i-ss-hash.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx7-colibri.dtsi b/arch/arm/boot/dts/imx7-colibri.dtsi
-index 2d87489f9105..ad4ce19d455b 100644
---- a/arch/arm/boot/dts/imx7-colibri.dtsi
-+++ b/arch/arm/boot/dts/imx7-colibri.dtsi
-@@ -106,6 +106,15 @@
- 	fsl,magic-packet;
- };
+diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
+index e53c3127b743..bc3cbde07219 100644
+--- a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
++++ b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
+@@ -250,7 +250,7 @@ static int sun4i_hash(struct ahash_request *areq)
+ 			i = 0;
+ 		in_sg = sg_next(in_sg);
+ 	}
+-	if (i == 1 && !op->len)
++	if (i == 1 && !op->len && areq->nbytes)
+ 		dev_dbg(ss->dev, "We can DMA\n");
  
-+&gpmi {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_gpmi_nand>;
-+	fsl,use-minimum-ecc;
-+	nand-on-flash-bbt;
-+	nand-ecc-mode = "hw";
-+	status = "okay";
-+};
-+
- &i2c1 {
- 	clock-frequency = <100000>;
- 	pinctrl-names = "default";
+ 	i = 0;
 -- 
-2.13.0
+2.9.4
