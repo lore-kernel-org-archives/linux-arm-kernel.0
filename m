@@ -1,7 +1,7 @@
 From: timur@codeaurora.org (Timur Tabi)
-Date: Thu,  1 Jun 2017 16:05:35 -0500
+Date: Thu,  1 Jun 2017 16:08:13 -0500
 Subject: [for 4.12] net: qcom/emac: do not use hardware mdio automatic polling
-Message-ID: <1496351135-6074-1-git-send-email-timur@codeaurora.org>
+Message-ID: <1496351293-6846-1-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
