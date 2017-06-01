@@ -1,71 +1,48 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 01 Jun 2017 16:57:47 +0200
-Subject: [PATCHv2 2/2] gpio: mvebu: fix gpio bank registration when pwm is
- used
-In-Reply-To: <20170601121826.14685-3-richard.genoud@gmail.com> (Richard
- Genoud's message of "Thu, 1 Jun 2017 14:18:26 +0200")
-References: <20170601121826.14685-1-richard.genoud@gmail.com>
- <20170601121826.14685-3-richard.genoud@gmail.com>
-Message-ID: <87h8zzsql0.fsf@free-electrons.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Thu, 1 Jun 2017 18:00:53 +0200
+Subject: [PATCH 2/3] ARM: dmabounce: Delete an error message for a failed
+ memory allocation in two functions
+In-Reply-To: <697e7810-d280-08f3-2a24-026ff41e15a3@users.sourceforge.net>
+References: <697e7810-d280-08f3-2a24-026ff41e15a3@users.sourceforge.net>
+Message-ID: <f03717c9-9cc8-d339-0e04-b6888a4ce90b@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Thu, 1 Jun 2017 17:10:39 +0200
+
+Omit an extra message for a memory allocation failure in these functions.
+
+This issue was detected by using the Coccinelle software.
+
+Link: http://events.linuxfoundation.org/sites/events/files/slides/LCJ16-Refactor_Strings-WSang_0.pdf
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ arch/arm/common/dmabounce.c | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/common/dmabounce.c b/arch/arm/common/dmabounce.c
+index fcdecb2de242..9ef7ab64b3d8 100644
+--- a/arch/arm/common/dmabounce.c
++++ b/arch/arm/common/dmabounce.c
+@@ -127,7 +127,5 @@ alloc_safe_buffer(struct dmabounce_device_info *device_info, void *ptr,
+-	if (buf == NULL) {
+-		dev_warn(dev, "%s: kmalloc failed\n", __func__);
++	if (!buf)
+ 		return NULL;
+-	}
  
- On jeu., juin 01 2017, Richard Genoud <richard.genoud@gmail.com> wrote:
-
-> If more than one gpio bank has the "pwm" property, only one will be
-> registered successfully, all the others will fail with:
-> mvebu-gpio: probe of f1018140.gpio failed with error -17
->
-> That's because in alloc_pwms(), the chip->base (aka "int pwm"), was not
-> set (thus, ==0) ; and 0 is a meaningful start value in alloc_pwm().
-> What was intended is mvpwm->chip->base = -1.
-> Like that, the numbering will be done auto-magically
->
-> Moreover, as the region might be already occupied by another pwm, we
-> shouldn't force:
-> mvpwm->chip->base = 0
-> nor
-> mvpwm->chip->base = id * MVEBU_MAX_GPIO_PER_BANK;
->
-> Tested on clearfog-pro (Marvell 88F6828)
->
-> Fixes: 757642f9a584 ("gpio: mvebu: Add limited PWM support")
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Thanks,
-
-Gregory
-
-
-> ---
->  drivers/gpio/gpio-mvebu.c | 7 +++++++
->  1 file changed, 7 insertions(+)
->
-> diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
-> index cdef2c78cb3b..5104b6398139 100644
-> --- a/drivers/gpio/gpio-mvebu.c
-> +++ b/drivers/gpio/gpio-mvebu.c
-> @@ -768,6 +768,13 @@ static int mvebu_pwm_probe(struct platform_device *pdev,
->  	mvpwm->chip.dev = dev;
->  	mvpwm->chip.ops = &mvebu_pwm_ops;
->  	mvpwm->chip.npwm = mvchip->chip.ngpio;
-> +	/*
-> +	 * There may already be some PWM allocated, so we can't force
-> +	 * mvpwm->chip.base to a fixed point like mvchip->chip.base.
-> +	 * So, we let pwmchip_add() do the numbering and take the next free
-> +	 * region.
-> +	 */
-> +	mvpwm->chip.base = -1;
->  
->  	spin_lock_init(&mvpwm->lock);
->  
-
+ 	buf->ptr = ptr;
+ 	buf->size = size;
+@@ -491,8 +489,5 @@ int dmabounce_register_dev(struct device *dev, unsigned long small_buffer_size,
+-	if (!device_info) {
+-		dev_err(dev,
+-			"Could not allocated dmabounce_device_info\n");
++	if (!device_info)
+ 		return -ENOMEM;
+-	}
+ 
+ 	ret = dmabounce_init_pool(&device_info->small, dev,
+ 				  "small_dmabounce_pool", small_buffer_size);
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.13.0
