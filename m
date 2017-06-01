@@ -1,36 +1,27 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 1 Jun 2017 10:07:19 +0200
-Subject: [PATCH v5 00/20] eeprom: at24: Add OF device ID table
-In-Reply-To: <20170523133448.4794-1-javier@dowhile0.org>
-References: <20170523133448.4794-1-javier@dowhile0.org>
-Message-ID: <CABxcv=kC0Bfxsm73x9AY6OiQCEZOafidMT+kv=qUqpqnaMAMaA@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 1 Jun 2017 01:27:17 -0700
+Subject: [PATCH 1/2 v2] dt-bindings: qoriq-clock: Add coreclk
+In-Reply-To: <1489977443-33582-1-git-send-email-andy.tang@nxp.com>
+References: <1489977443-33582-1-git-send-email-andy.tang@nxp.com>
+Message-ID: <20170601082717.GC20170@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Wolfram,
+On 03/20, Yuantian Tang wrote:
+> From: Scott Wood <oss@buserror.net>
+> 
+> ls1012a has separate input root clocks for core PLLs versus the platform
+> PLL, with the latter described as sysclk in the hw docs.
+> Update the qoriq-clock binding to allow a second input clock, named
+> "coreclk".  If present, this clock will be used for the core PLLs.
+> 
+> Signed-off-by: Scott Wood <oss@buserror.net>
+> Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
 
-On Tue, May 23, 2017 at 3:34 PM, Javier Martinez Canillas
-<javier@dowhile0.org> wrote:
->
-> This series is a follow-up to patch [0] that added an OF device ID table
-> to the at24 EEPROM driver. As you suggested [1], this version instead of
-> adding entries for every used <vendor,device> tuple, only adds a single
-> entry for each chip type using the "atmel" vendor as a generic fallback.
->
-> The first patch documents in the DT binding what's the correct vendor to
-> use and what are the ones that are being deprecated. The second one adds
-> the OF device ID table for the at24 driver and the next patches use this
-> vendor in the compatible string to each DTS that defines a compatible I2C
-> EEPROM device node.
->
-> Patches can be applied independently since the DTS changes without driver
-> changes are no-op and the OF table won't be used without the DTS changes.
->
-> [0]: https://lkml.org/lkml/2017/3/14/589
-> [1]: https://lkml.org/lkml/2017/3/15/99
->
+Applied to clk-next
 
-Any comments on this series?
-
-Best regards,
-Javier
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
