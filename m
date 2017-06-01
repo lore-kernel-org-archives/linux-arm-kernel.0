@@ -1,38 +1,38 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 1 Jun 2017 20:03:58 +0530
-Subject: [PATCH 4/7] ARM: dts: am57xx-beagle-x15-revb1: Fix supply name used
- for MMC1 IO lines
-In-Reply-To: <20170601143401.16852-1-kishon@ti.com>
-References: <20170601143401.16852-1-kishon@ti.com>
-Message-ID: <20170601143401.16852-5-kishon@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 1 Jun 2017 15:35:35 +0100
+Subject: [PATCH v3 3/9] mfd: tmio.h: support partition parser types
+In-Reply-To: <1496270458-6479-4-git-send-email-andrea.adami@gmail.com>
+References: <1496270458-6479-1-git-send-email-andrea.adami@gmail.com>
+ <1496270458-6479-4-git-send-email-andrea.adami@gmail.com>
+Message-ID: <20170601143535.s6ovk5ts3cbehw3f@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dt binding documentation of omap-hsmmc recommends using
-"vmmc_aux" for IO supply lines. However
-commit 0af28cc92690d8c ("ARM: dts: am57xx-beagle-x15: Add support
-for rev B1") added it as "vmmc-aux". Fix it here.
+On Thu, 01 Jun 2017, Andrea Adami wrote:
 
-Fixes: commit 0af28cc92690d8c ("ARM: dts: am57xx-beagle-x15: Add
-support for rev B1")
+> Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
+> ---
+>  include/linux/mfd/tmio.h | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/include/linux/mfd/tmio.h b/include/linux/mfd/tmio.h
+> index a1520d8..23bb069 100644
+> --- a/include/linux/mfd/tmio.h
+> +++ b/include/linux/mfd/tmio.h
+> @@ -139,6 +139,7 @@ struct tmio_nand_data {
+>  	struct nand_bbt_descr	*badblock_pattern;
+>  	struct mtd_partition	*partition;
+>  	unsigned int		num_partitions;
+> +	const char *const	*types;	/* names of parsers to use if any */
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Please use kerneldoc instead.
 
-diff --git a/arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts b/arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts
-index 39a92aff0a0d..6ae94ab52b7b 100644
---- a/arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts
-+++ b/arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts
-@@ -20,7 +20,7 @@
- 
- &mmc1 {
- 	vmmc-supply = <&vdd_3v3>;
--	vmmc-aux-supply = <&ldo1_reg>;
-+	vmmc_aux-supply = <&ldo1_reg>;
- };
- 
- /* errata i880 "Ethernet RGMII2 Limited to 10/100 Mbps" */
+>  };
+>  
+>  #define FBIO_TMIO_ACC_WRITE	0x7C639300
+
 -- 
-2.11.0
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
