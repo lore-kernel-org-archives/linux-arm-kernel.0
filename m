@@ -1,41 +1,79 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Thu, 1 Jun 2017 19:55:06 +0200
-Subject: [PATCH] ARM: lpc32xx: Delete an error message for a failed memory
- allocation in lpc32xx_pm_enter()
-Message-ID: <fc803eb9-32fa-cfcd-7a8e-4847434dfb7d@users.sourceforge.net>
+From: oza.oza@broadcom.com (Oza Oza)
+Date: Thu, 1 Jun 2017 23:36:17 +0530
+Subject: [PATCH v7 2/3] PCI: Add support for PCI inbound windows resources
+In-Reply-To: <CAErSpo58xJbQG_UK76pW55phs32Bqeyv=_wtJTS2jvf6JQ2MAA@mail.gmail.com>
+References: <1495471182-12490-1-git-send-email-oza.oza@broadcom.com>
+ <1495471182-12490-3-git-send-email-oza.oza@broadcom.com>
+ <CAErSpo6MJbNEyGQC4MwFb6kPoOf1p=mxk-SHAz-+HuDFbvRkmw@mail.gmail.com>
+ <CAMSpPPdXbCteC7scb99CMKqdif0q9ngZnzJMhGa6xZt7BM0yKg@mail.gmail.com>
+ <CAErSpo58xJbQG_UK76pW55phs32Bqeyv=_wtJTS2jvf6JQ2MAA@mail.gmail.com>
+Message-ID: <CAMSpPPezWVzU2pevgoZPFwT+oDv+-BySn46WAjY3KFx4ffEV8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Thu, 1 Jun 2017 19:50:32 +0200
+On Thu, Jun 1, 2017 at 10:38 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> On Wed, May 31, 2017 at 11:17 AM, Oza Oza <oza.oza@broadcom.com> wrote:
+>> On Wed, May 31, 2017 at 4:12 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+>>> On Mon, May 22, 2017 at 11:39 AM, Oza Pawandeep <oza.oza@broadcom.com> wrote:
+>>>> This patch adds support for inbound memory window
+>>>> for PCI RC drivers.
+>>>>
+>>>> It defines new function pci_create_root_bus2 which
+>>>> takes inbound resources as an argument and fills in the
+>>>> memory resource to PCI internal host bridge structure
+>>>> as inbound_windows.
+>>>>
+>>>> Legacy RC driver could continue to use pci_create_root_bus,
+>>>> but any RC driver who wants to reseve IOVAS for their
+>>>> inbound memory holes, should use new API pci_create_root_bus2.
+>>>>
+>>>> Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
+>>>> ...
+>>>
+>>>> +struct pci_bus *pci_create_root_bus2(struct device *parent, int bus,
+>>>> +               struct pci_ops *ops, void *sysdata, struct list_head *resources,
+>>>> +               struct list_head *in_res)
+>>>> +{
+>>>> +       return pci_create_root_bus_msi(parent, bus, ops, sysdata,
+>>>> +                                      resources, in_res, NULL);
+>>>> +}
+>>>> +EXPORT_SYMBOL_GPL(pci_create_root_bus2);
+>>>
+>>> Based on your response to Lorenzo's "[RFC/RFT PATCH 03/18] PCI:
+>>> Introduce pci_scan_root_bus_bridge()", I'm hoping you can avoid adding
+>>> yet another variant of pci_create_root_bus().
+>>>
+>>> So I think I can wait for that to settle out and look for a v8?
+>>>
+>>> Bjorn
+>>
+>> Sure Bjorn, please wait for v8.
+>>
+>> But there is one more associated patch
+>> [PATCH v7 1/3] OF/PCI: Export inbound memory interface to PCI RC
+>> which basically aims to provide an interface to RC drivers for their
+>> inbound resources.
+>> RC driver already get their outbound resources from
+>> of_pci_get_host_bridge_resources,
+>> similar attempt for inbound dma-ranges.
+>
+> Not sure I understand.  Patch 1/3 adds of_pci_get_dma_ranges(), but
+> none of the patches adds a caller, so I don't see the point of it yet.
+>
+> In general, if I'm expecting another revision of one patch in a
+> series, I expect the next revision to include *all* the patches in the
+> series.  I normally don't pick out and apply individual patches from
+> the series.
+>
+> Bjorn
 
-Omit an extra message for a memory allocation failure in this function.
+Yes, it does not get called by anybody, because it is supposed to be called
+by RC drivers who want to reserve IOVAs, not all the PCI host bridge driver
+might call it, but certainly iproc based PCI driver has to call it.
 
-This issue was detected by using the Coccinelle software.
+Then I will have PATCH v8, and with that, I will include PCI RC driver
+patch calling it as well.
+Thanks for the Review.
 
-Link: http://events.linuxfoundation.org/sites/events/files/slides/LCJ16-Refactor_Strings-WSang_0.pdf
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- arch/arm/mach-lpc32xx/pm.c | 6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
-
-diff --git a/arch/arm/mach-lpc32xx/pm.c b/arch/arm/mach-lpc32xx/pm.c
-index 62471570d586..5a4d31488d11 100644
---- a/arch/arm/mach-lpc32xx/pm.c
-+++ b/arch/arm/mach-lpc32xx/pm.c
-@@ -87,12 +87,8 @@ static int lpc32xx_pm_enter(suspend_state_t state)
- 
- 	/* Allocate some space for temporary IRAM storage */
- 	iram_swap_area = kmalloc(lpc32xx_sys_suspend_sz, GFP_KERNEL);
--	if (!iram_swap_area) {
--		printk(KERN_ERR
--		       "PM Suspend: cannot allocate memory to save portion "
--			"of SRAM\n");
-+	if (!iram_swap_area)
- 		return -ENOMEM;
--	}
- 
- 	/* Backup a small area of IRAM used for the suspend code */
- 	memcpy(iram_swap_area, (void *) TEMP_IRAM_AREA,
--- 
-2.13.0
+Regards,
+Oza.
