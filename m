@@ -1,37 +1,29 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 01 Jun 2017 17:06:56 +0200
-Subject: [GIT PULL] ARM: mvebu: fixes-non-critical for v4.12 (#1)
-Message-ID: <87bmq7sq5r.fsf@free-electrons.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu,  1 Jun 2017 17:16:20 +0200
+Subject: [PATCH] ARM64: defconfig: enable meson SPICC as module
+Message-ID: <1496330180-6339-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch enable the SPI Communications Controller driver as module for the
+Amlogic platform.
 
-Here is the first pull request for fixes-non-critical for mvebu for v4.12.
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Gregory
-
-The following changes since commit 08332893e37af6ae779367e78e444f8f9571511d:
-
-  Linux 4.12-rc2 (2017-05-21 19:30:23 -0700)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-non-critical-4.12-1
-
-for you to fetch changes up to 1cb0b57fec06a616d98deaeda1924f8e45e1e4de:
-
-  MAINTAINERS: add irqchip related drivers to Marvell EBU maintainers (2017-05-23 16:29:22 +0200)
-
-----------------------------------------------------------------
-mvebu non critical fixes for 4.12
-
-Update MAINTAINER file for irqchip related drivers to Marvell EBU
-
-----------------------------------------------------------------
-Thomas Petazzoni (2):
-      MAINTAINERS: sort F entries for Marvell EBU maintainers
-      MAINTAINERS: add irqchip related drivers to Marvell EBU maintainers
-
- MAINTAINERS | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 65cdd87..606e489 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -259,6 +259,7 @@ CONFIG_I2C_CROS_EC_TUNNEL=y
+ CONFIG_SPI=y
+ CONFIG_SPI_BCM2835=m
+ CONFIG_SPI_BCM2835AUX=m
++CONFIG_SPI_MESON_SPICC=m
+ CONFIG_SPI_MESON_SPIFC=m
+ CONFIG_SPI_ORION=y
+ CONFIG_SPI_PL022=y
+-- 
+1.9.1
