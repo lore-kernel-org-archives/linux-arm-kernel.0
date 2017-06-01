@@ -1,92 +1,91 @@
-From: Andrew.Pinski@cavium.com (Pinski, Andrew)
-Date: Thu, 1 Jun 2017 06:10:37 +0000
-Subject: [PATCHv2 1/2] arm64:vdso: Rewrite gettimeofday into C.
-In-Reply-To: <20170531124430.GG9723@arm.com>
-References: <1496190860-5116-1-git-send-email-apinski@cavium.com>
- <20170531124430.GG9723@arm.com>
-Message-ID: <CY4PR07MB3415C02575DAF2E649EB31AC93F60@CY4PR07MB3415.namprd07.prod.outlook.com>
+From: linux@rempel-privat.de (Oleksij Rempel)
+Date: Thu, 1 Jun 2017 08:50:35 +0200
+Subject: [PATCH v2 1/6] ARM: imx6q: provide documentation for new
+ fsl,pmic_stby_poweroff property
+In-Reply-To: <20170531145255.GC10351@leverpostej>
+References: <20170531061457.23744-1-o.rempel@pengutronix.de>
+ <20170531061457.23744-2-o.rempel@pengutronix.de>
+ <20170531145255.GC10351@leverpostej>
+Message-ID: <b9ba2cce-5383-636e-8e2c-4d85b2a92cb6@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Will Deacon [mailto:will.deacon at arm.com]
-> Sent: Wednesday, May 31, 2017 5:45 AM
-> To: Pinski, Andrew <Andrew.Pinski@cavium.com>
-> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> Norov, Yuri <Yuri.Norov@cavium.com>; catalin.marinas at arm.com;
-> nathan_lynch at mentor.com; kevin.brodsky at arm.com; dave.martin at arm.com;
-> john.stultz at linaro.org; arnd at arndb.de
-> Subject: Re: [PATCHv2 1/2] arm64:vdso: Rewrite gettimeofday into C.
+Am 31.05.2017 um 16:52 schrieb Mark Rutland:
+> On Wed, May 31, 2017 at 08:14:52AM +0200, Oleksij Rempel wrote:
+>> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+>> Cc: kernel at pengutronix.de
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: Michael Turquette <mturquette@baylibre.com>
+>> Cc: Stephen Boyd <sboyd@codeaurora.org>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: linux-clk at vger.kernel.org
+>> Cc: devicetree at vger.kernel.org
+>> Cc: linux-kernel at vger.kernel.org
+>> ---
+>>  Documentation/devicetree/bindings/clock/imx6q-clock.txt | 4 ++++
+>>  1 file changed, 4 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+>> index 9252912a5b0e..214cb5f461c7 100644
+>> --- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+>> +++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+>> @@ -6,6 +6,10 @@ Required properties:
+>>  - interrupts: Should contain CCM interrupt
+>>  - #clock-cells: Should be <1>
+>>  
+>> +Optional properties:
+>> +- fsl,pmic_stby_poweroff: Configure CCM to assert PMIC_STBY_REQ signal
+>> +  on power off.
 > 
-> Hi Andrew,
-> 
-> Thanks for posting this, but please try to cc the maintainers in future --
-> I almost missed it!
+> s/_/-/ in property names, please.
 
-Oh sorry; I didn't know when I am supposed to CC the maintainers or not.  Different project, different rules.
+ok.
 
-> 
-> On Tue, May 30, 2017 at 05:34:19PM -0700, Andrew Pinski wrote:
-> > This allows the compiler to optimize the divide by 1000.
-> > And remove the other divide.
-> >
-> > On ThunderX, gettimeofday improves by 32%.  On ThunderX 2,
-> > gettimeofday improves by 18%.
-> >
-> > Note I noticed a bug in the old implementation of
-> > __kernel_clock_getres; it was checking only the lower 32bits of the
-> > pointer; this would work for most cases but could fail in a few.
-> >
-> > Changes from v1:
-> > * Fixed bug in __kernel_clock_getres for checking the pointer argument.
-> > * Fix comments to refer to functions in arm64.
-> 
-> I tested this patch on a few platforms I have access to and didn't see the
-> perf regressions I saw when I looked at this in the past with an older
-> toolchain (it was mostly about the same, with a couple of improvements).
-> 
-> So, in principle, I'm not opposed to moving this into C. However, we're
-> currently close to a "vDSO-explosion" on arm64 with people wanting a compat
-> variant and also an ILP32 variant. When Kevin posted his compat variant
-> (also in C):
-> 
->   http://lkml.kernel.org/r/20161206160353.14581-1-kevin.brodsky at arm.com
-> 
-> Nathan (who apparently needs to set his mail host address ;) was concerned
-> about duplication between arm and arm64:
-> 
->   http://lkml.kernel.org/r/87r35jmv3e.fsf at wedge.i-did-not-set--mail-host-
-> address--so-tickle-me
-> 
-> I'm firmly of the opinion that we should try to write an arch-agnostic vDSO
-> implementation in core code (lib/vdso or something) where the arch header
-> provides things like:
-> 
->   * The mechanism to read the counter
->   * The mechanism to issue a syscall
->   * A function to determine whether or not the current clocksource is
->     suitable
+I have now some more questions:
+what naming schema should be actually used?
+fsl,pmic-stby-poweroff
+or
+fsl,pmic-stby-power-off
 
-> 
-> I think the datapage format could be defined in core code and it would be
-> worth looking to see how much the virtual mapping code can be consolidated
-> too.
-> 
-> If we can get something that works for arm native, arm64 native, arm64
-> compat and arm64 ilp32 then it's probably going to be useful for other
-> architectures too, even if we need to add more customisation points in
-> future.
+i found some existing case:
+sound/rt5660.txt:- realtek,poweroff-in-suspend
+so in my case it will be:
+fsl,standby-in-poweroff
+or
+fsl,standby-in-power-off
 
-To share code between the three vdso is a good goal and shouldn't be a hard to expand my patch to handle the arm compat vdso.  To expand it to the arm native code shouldn't be too hard.  The main thing is add a few #ifdef/#define in a header.
-I will try to do that but I don't know when I will be able to finish it.
-
-Thanks,
-Andrew
+can we have generic name for this use case?
+should I use same binding for PMIC and the SoC or they should be more like:
+for SoC "standby-in-power-off"
+and for PMIC "power-off-in-standby"
 
 
+
+> When/why is this needed?
 > 
-> I've spoken to Kevin about this, but I'm not sure whether he's had a chance
-> to look at knocking up a prototype. A first stab could just unconditionally
-> fallback to the system call.
+> Why should a DT author (not) set this?
 > 
-> Will
+> Thanks,
+> Mark.
+> 
+>> +
+>>  The clock consumer should specify the desired clock by having the clock
+>>  ID in its "clocks" phandle cell.  See include/dt-bindings/clock/imx6qdl-clock.h
+>>  for the full list of i.MX6 Quad and DualLite clock IDs.
+>> -- 
+>> 2.11.0
+>>
+
+
+-- 
+Regards,
+Oleksij
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170601/8b5a51cc/attachment.sig>
