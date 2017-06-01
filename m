@@ -1,66 +1,39 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 1 Jun 2017 12:08:59 -0500
-Subject: [PATCH v7 2/3] PCI: Add support for PCI inbound windows resources
-In-Reply-To: <CAMSpPPdXbCteC7scb99CMKqdif0q9ngZnzJMhGa6xZt7BM0yKg@mail.gmail.com>
-References: <1495471182-12490-1-git-send-email-oza.oza@broadcom.com>
- <1495471182-12490-3-git-send-email-oza.oza@broadcom.com>
- <CAErSpo6MJbNEyGQC4MwFb6kPoOf1p=mxk-SHAz-+HuDFbvRkmw@mail.gmail.com>
- <CAMSpPPdXbCteC7scb99CMKqdif0q9ngZnzJMhGa6xZt7BM0yKg@mail.gmail.com>
-Message-ID: <CAErSpo58xJbQG_UK76pW55phs32Bqeyv=_wtJTS2jvf6JQ2MAA@mail.gmail.com>
+From: dvyukov@google.com (Dmitry Vyukov)
+Date: Thu, 1 Jun 2017 19:14:29 +0200
+Subject: how can KAsan support arm32?
+In-Reply-To: <20170601164209.GD22219@n2100.armlinux.org.uk>
+References: <d202a49e-ee0f-4864-b24b-b185255c7f11@googlegroups.com>
+ <CACT4Y+aEW+CNH40mwY_i-mzL3cRYHc8EdMyhQj6dAiS+=0TpXg@mail.gmail.com>
+ <20170601112424.GA8718@leverpostej>
+ <CACT4Y+b5OiNrQqK-A2qHquZo266eXykWROLP=qj_BW__S2Wi5w@mail.gmail.com>
+ <ba9fb499-98c5-4cfe-b68e-48a8df8d4ca9@googlegroups.com>
+ <e7d99272-bff0-59b9-f4ca-8b4482ef9bf4@virtuozzo.com>
+ <20170601164209.GD22219@n2100.armlinux.org.uk>
+Message-ID: <CACT4Y+YK60tYjb0hgVtDv9xcF4Ou+7FtpttY-n-zobLaOJG-ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 31, 2017 at 11:17 AM, Oza Oza <oza.oza@broadcom.com> wrote:
-> On Wed, May 31, 2017 at 4:12 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
->> On Mon, May 22, 2017 at 11:39 AM, Oza Pawandeep <oza.oza@broadcom.com> wrote:
->>> This patch adds support for inbound memory window
->>> for PCI RC drivers.
->>>
->>> It defines new function pci_create_root_bus2 which
->>> takes inbound resources as an argument and fills in the
->>> memory resource to PCI internal host bridge structure
->>> as inbound_windows.
->>>
->>> Legacy RC driver could continue to use pci_create_root_bus,
->>> but any RC driver who wants to reseve IOVAS for their
->>> inbound memory holes, should use new API pci_create_root_bus2.
->>>
->>> Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
->>> ...
->>
->>> +struct pci_bus *pci_create_root_bus2(struct device *parent, int bus,
->>> +               struct pci_ops *ops, void *sysdata, struct list_head *resources,
->>> +               struct list_head *in_res)
->>> +{
->>> +       return pci_create_root_bus_msi(parent, bus, ops, sysdata,
->>> +                                      resources, in_res, NULL);
->>> +}
->>> +EXPORT_SYMBOL_GPL(pci_create_root_bus2);
->>
->> Based on your response to Lorenzo's "[RFC/RFT PATCH 03/18] PCI:
->> Introduce pci_scan_root_bus_bridge()", I'm hoping you can avoid adding
->> yet another variant of pci_create_root_bus().
->>
->> So I think I can wait for that to settle out and look for a v8?
->>
->> Bjorn
+On Thu, Jun 1, 2017 at 6:42 PM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Thu, Jun 01, 2017 at 07:37:26PM +0300, Andrey Ryabinin wrote:
+>> kasan needs at least 1/8 of the total memory, so it will be 32MB in
+>> your case.
 >
-> Sure Bjorn, please wait for v8.
+> Is that really the case?  It is if we want to account for every byte,
+> but I don't think that's necessary.
 >
-> But there is one more associated patch
-> [PATCH v7 1/3] OF/PCI: Export inbound memory interface to PCI RC
-> which basically aims to provide an interface to RC drivers for their
-> inbound resources.
-> RC driver already get their outbound resources from
-> of_pci_get_host_bridge_resources,
-> similar attempt for inbound dma-ranges.
+> Memory is allocated not on a per-byte basis, but on a larger granule,
+> mainly determined by L1_CACHE_BYTES / ARCH_SLAB_MINALIGN etc.  While
+> it means that we would lose the ability to capture accesses that
+> happen strictly over the size requested from kmalloc() etc, if we
+> implemented this, it would at least allow the more seriously wrong
+> accesses to be trapped, while being cheaper.
+>
+> So, for 1GB of kernel virtual space, we'd only need 4MB for the bitmap
+> for a 32-byte cache line system, which is much less of a problem.
 
-Not sure I understand.  Patch 1/3 adds of_pci_get_dma_ranges(), but
-none of the patches adds a caller, so I don't see the point of it yet.
 
-In general, if I'm expecting another revision of one patch in a
-series, I expect the next revision to include *all* the patches in the
-series.  I normally don't pick out and apply individual patches from
-the series.
-
-Bjorn
+KASAN shadow is not bit-per-byte, it's more elaborate. We can increase
+shadow scale from 1:8 to 1:32 without loss of precision. This was
+recently discussed here:
+https://groups.google.com/d/msg/kasan-dev/JKYk2uUBriY/s5aH0bCaAwAJ
