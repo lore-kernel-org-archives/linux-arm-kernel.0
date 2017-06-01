@@ -1,49 +1,60 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 1 Jun 2017 08:47:00 -0600
-Subject: [PATCH] ARM: s3c64xx: don't select ARM_AMBA from S3C64XX_PL080
-In-Reply-To: <CAK8P3a3gxrkn1TOLWXzW4-s8H8uJWvC1vC3_fjxm-tXXkooxUA@mail.gmail.com>
-References: <20170524155845.1778223-1-arnd@arndb.de>
- <20170531195849.GD27796@n2100.armlinux.org.uk>
- <CAK8P3a3gxrkn1TOLWXzW4-s8H8uJWvC1vC3_fjxm-tXXkooxUA@mail.gmail.com>
-Message-ID: <CANLsYkyWcewDY33ffb0BZ7d=_CS8CYiG0EjLN0JgDUp2pDVzcQ@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu,  1 Jun 2017 16:55:37 +0200
+Subject: [PATCH v3 4/9] dt-bindings: cp110: introduce a new binding
+In-Reply-To: <cover.6bb422e6a233460049bb63792b32a5ba851dcddd.1496328934.git-series.gregory.clement@free-electrons.com>
+References: <cover.6bb422e6a233460049bb63792b32a5ba851dcddd.1496328934.git-series.gregory.clement@free-electrons.com>
+Message-ID: <b27495e10fb4f4d8a7fd1a760d49402bbae83b58.1496328934.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 May 2017 at 14:25, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wed, May 31, 2017 at 9:58 PM, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
->> On Wed, May 24, 2017 at 05:58:34PM +0200, Arnd Bergmann wrote:
->> Yes, selecting ARM_AMBA from drivers is definitely not right; this
->> symbol should be selected only by platforms that want AMBA primecell
->> bus support, not by drivers, precisely because of these dependency
->> issues.
->>
->> There's another case where ARM_AMBA is selected that probably needs
->> fixing - the coresight hwtracing code.
->
-> [Adding Mathieu to cc]
->
-> Mathieu,
->
-> do you remember how we ended up with this?
+This patch updates the documentation according to the change made in the
+patch "pinctrl: dt-bindings: cp110: introduce a new binding".
 
-That was part of the initial driver submission that happened a couple
-of years ago.  The driver depended on AMBA and as such I added the
-"select", not knowing it was preferable to have a "depends".
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt | 18 ++++++++++++++----
+ 1 file changed, 14 insertions(+), 4 deletions(-)
 
->
-> menuconfig CORESIGHT
->        bool "CoreSight Tracing Support"
->        select ARM_AMBA
->
-> As Russell says, probably shouldn't select that symbol, most likely
-> we want either the individual drivers that register an amba_driver to have
-> a 'depends on ARM_AMBA' or alternatively replace the 'select' with 'depends
-> on' for the entire subsystem.
-
-I'm good with that.
-
-Mathieu
-
->
->         Arnd
+diff --git a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
+index dbd0a38ca580..e97cc2d73e2e 100644
+--- a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
++++ b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
+@@ -7,6 +7,13 @@ Controller 0 and System Controller 1. This Device Tree binding allows
+ to describe the first system controller, which provides registers to
+ configure various aspects of the SoC.
+ 
++For the top level node:
++ - compatible: must be: "syscon", "simple-mfd";
++ - reg: register area of the CP110 system controller 0
++
++Clocks:
++-------
++
+ The Device Tree node representing this System Controller 0 provides a
+ number of clocks:
+ 
+@@ -56,14 +63,17 @@ The following clocks are available:
+ Required properties:
+ 
+  - compatible: must be:
+-     "marvell,cp110-system-controller0", "syscon";
+- - reg: register area of the CP110 system controller 0
++     "marvell,cp110-clock"
+  - #clock-cells: must be set to 2
+ 
+ Example:
+ 
+ 	cpm_syscon0: system-controller at 440000 {
+-		compatible = "marvell,cp110-system-controller0", "syscon";
++		compatible = "syscon", "simple-mfd";
+ 		reg = <0x440000 0x1000>;
+-		#clock-cells = <2>;
++
++		cpm_clk: clock {
++			compatible = "marvell,cp110-clock";
++			#clock-cells = <2>;
++		};
+ 	};
+-- 
+git-series 0.9.1
