@@ -1,197 +1,49 @@
-From: bsd@redhat.com (Bandan Das)
-Date: Thu, 01 Jun 2017 16:05:49 -0400
-Subject: [RFC 07/55] KVM: arm/arm64: Add virtual EL2 state emulation
- framework
-In-Reply-To: <1483943091-1364-8-git-send-email-jintack@cs.columbia.edu>
- (Jintack Lim's message of "Mon, 9 Jan 2017 01:24:03 -0500")
-References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
- <1483943091-1364-8-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <jpg37bj1nj6.fsf@linux.bootlegged.copy>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu,  1 Jun 2017 22:06:01 +0200
+Subject: [PATCH v4 6/6] ARM: at91: debug: add samv7x support
+In-Reply-To: <20170601200601.11035-1-alexandre.belloni@free-electrons.com>
+References: <20170601200601.11035-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20170601200601.11035-7-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jintack Lim <jintack@cs.columbia.edu> writes:
-...
-> +/**
-> + * kvm_arm_setup_shadow_state -- prepare shadow state based on emulated mode
-> + * @vcpu: The VCPU pointer
-> + */
-> +void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
-> +{
-> +	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
-> +
-> +	ctxt->hw_pstate = *vcpu_cpsr(vcpu);
-> +	ctxt->hw_sys_regs = ctxt->sys_regs;
-> +	ctxt->hw_sp_el1 = ctxt->gp_regs.sp_el1;
-> +}
-> +
-> +/**
-> + * kvm_arm_restore_shadow_state -- write back shadow state from guest
-> + * @vcpu: The VCPU pointer
-> + */
-> +void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu)
-> +{
-> +	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
-> +
-> +	*vcpu_cpsr(vcpu) = ctxt->hw_pstate;
-> +	ctxt->gp_regs.sp_el1 = ctxt->hw_sp_el1;
-> +}
-> +
-> +void kvm_arm_init_cpu_context(kvm_cpu_context_t *cpu_ctxt)
-> +{
-> +	cpu_ctxt->hw_sys_regs = &cpu_ctxt->sys_regs[0];
-> +}
+From: Szemz? Andr?s <sza@esh.hu>
 
+Add support for low level debugging on Atmel samv7x.
 
-IIUC, the *_shadow_state() functions will set hw_* pointers to
-either point to the "real" state or the shadow state to manage L2 ?
-Maybe, it might make sense to make these function names a little more
-generic since they are not dealing with setting the shadow state
-alone.
+Signed-off-by: Szemz? Andr?s <sza@esh.hu>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/Kconfig.debug | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-> index 9341376..f2a1b32 100644
-> --- a/arch/arm64/kvm/hyp/sysreg-sr.c
-> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-> @@ -19,6 +19,7 @@
->  #include <linux/kvm_host.h>
->  
->  #include <asm/kvm_asm.h>
-> +#include <asm/kvm_emulate.h>
->  #include <asm/kvm_hyp.h>
->  
->  /* Yes, this does nothing, on purpose */
-> @@ -33,37 +34,41 @@ static void __hyp_text __sysreg_do_nothing(struct kvm_cpu_context *ctxt) { }
->  
->  static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
->  {
-> -	ctxt->sys_regs[ACTLR_EL1]	= read_sysreg(actlr_el1);
-> -	ctxt->sys_regs[TPIDR_EL0]	= read_sysreg(tpidr_el0);
-> -	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
-> -	ctxt->sys_regs[TPIDR_EL1]	= read_sysreg(tpidr_el1);
-> -	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
-> +	u64 *sys_regs = kern_hyp_va(ctxt->hw_sys_regs);
-> +
-> +	sys_regs[ACTLR_EL1]	= read_sysreg(actlr_el1);
-> +	sys_regs[TPIDR_EL0]	= read_sysreg(tpidr_el0);
-> +	sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
-> +	sys_regs[TPIDR_EL1]	= read_sysreg(tpidr_el1);
-> +	sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
->  	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
->  	ctxt->gp_regs.regs.pc		= read_sysreg_el2(elr);
-> -	ctxt->gp_regs.regs.pstate	= read_sysreg_el2(spsr);
-> +	ctxt->hw_pstate			= read_sysreg_el2(spsr);
->  }
->  
->  static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
->  {
-> -	ctxt->sys_regs[MPIDR_EL1]	= read_sysreg(vmpidr_el2);
-> -	ctxt->sys_regs[CSSELR_EL1]	= read_sysreg(csselr_el1);
-> -	ctxt->sys_regs[SCTLR_EL1]	= read_sysreg_el1(sctlr);
-> -	ctxt->sys_regs[CPACR_EL1]	= read_sysreg_el1(cpacr);
-> -	ctxt->sys_regs[TTBR0_EL1]	= read_sysreg_el1(ttbr0);
-> -	ctxt->sys_regs[TTBR1_EL1]	= read_sysreg_el1(ttbr1);
-> -	ctxt->sys_regs[TCR_EL1]		= read_sysreg_el1(tcr);
-> -	ctxt->sys_regs[ESR_EL1]		= read_sysreg_el1(esr);
-> -	ctxt->sys_regs[AFSR0_EL1]	= read_sysreg_el1(afsr0);
-> -	ctxt->sys_regs[AFSR1_EL1]	= read_sysreg_el1(afsr1);
-> -	ctxt->sys_regs[FAR_EL1]		= read_sysreg_el1(far);
-> -	ctxt->sys_regs[MAIR_EL1]	= read_sysreg_el1(mair);
-> -	ctxt->sys_regs[VBAR_EL1]	= read_sysreg_el1(vbar);
-> -	ctxt->sys_regs[CONTEXTIDR_EL1]	= read_sysreg_el1(contextidr);
-> -	ctxt->sys_regs[AMAIR_EL1]	= read_sysreg_el1(amair);
-> -	ctxt->sys_regs[CNTKCTL_EL1]	= read_sysreg_el1(cntkctl);
-> -	ctxt->sys_regs[PAR_EL1]		= read_sysreg(par_el1);
-> -
-> -	ctxt->gp_regs.sp_el1		= read_sysreg(sp_el1);
-> +	u64 *sys_regs = kern_hyp_va(ctxt->hw_sys_regs);
-> +
-> +	sys_regs[MPIDR_EL1]	= read_sysreg(vmpidr_el2);
-> +	sys_regs[CSSELR_EL1]	= read_sysreg(csselr_el1);
-> +	sys_regs[SCTLR_EL1]	= read_sysreg_el1(sctlr);
-> +	sys_regs[CPACR_EL1]	= read_sysreg_el1(cpacr);
-> +	sys_regs[TTBR0_EL1]	= read_sysreg_el1(ttbr0);
-> +	sys_regs[TTBR1_EL1]	= read_sysreg_el1(ttbr1);
-> +	sys_regs[TCR_EL1]	= read_sysreg_el1(tcr);
-> +	sys_regs[ESR_EL1]	= read_sysreg_el1(esr);
-> +	sys_regs[AFSR0_EL1]	= read_sysreg_el1(afsr0);
-> +	sys_regs[AFSR1_EL1]	= read_sysreg_el1(afsr1);
-> +	sys_regs[FAR_EL1]	= read_sysreg_el1(far);
-> +	sys_regs[MAIR_EL1]	= read_sysreg_el1(mair);
-> +	sys_regs[VBAR_EL1]	= read_sysreg_el1(vbar);
-> +	sys_regs[CONTEXTIDR_EL1]	= read_sysreg_el1(contextidr);
-> +	sys_regs[AMAIR_EL1]	= read_sysreg_el1(amair);
-> +	sys_regs[CNTKCTL_EL1]	= read_sysreg_el1(cntkctl);
-> +	sys_regs[PAR_EL1]		= read_sysreg(par_el1);
-> +
-> +	ctxt->hw_sp_el1			= read_sysreg(sp_el1);
->  	ctxt->gp_regs.elr_el1		= read_sysreg_el1(elr);
->  	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg_el1(spsr);
->  }
-> @@ -86,37 +91,41 @@ void __hyp_text __sysreg_save_guest_state(struct kvm_cpu_context *ctxt)
->  
->  static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctxt)
->  {
-> -	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  actlr_el1);
-> -	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  tpidr_el0);
-> -	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], tpidrro_el0);
-> -	write_sysreg(ctxt->sys_regs[TPIDR_EL1],	  tpidr_el1);
-> -	write_sysreg(ctxt->sys_regs[MDSCR_EL1],	  mdscr_el1);
-> +	u64 *sys_regs = kern_hyp_va(ctxt->hw_sys_regs);
-> +
-> +	write_sysreg(sys_regs[ACTLR_EL1],	  actlr_el1);
-> +	write_sysreg(sys_regs[TPIDR_EL0],	  tpidr_el0);
-> +	write_sysreg(sys_regs[TPIDRRO_EL0],	tpidrro_el0);
-> +	write_sysreg(sys_regs[TPIDR_EL1],	  tpidr_el1);
-> +	write_sysreg(sys_regs[MDSCR_EL1],	  mdscr_el1);
->  	write_sysreg(ctxt->gp_regs.regs.sp,	  sp_el0);
->  	write_sysreg_el2(ctxt->gp_regs.regs.pc,	  elr);
-> -	write_sysreg_el2(ctxt->gp_regs.regs.pstate, spsr);
-> +	write_sysreg_el2(ctxt->hw_pstate,	  spsr);
->  }
->  
->  static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
->  {
-> -	write_sysreg(ctxt->sys_regs[MPIDR_EL1],		vmpidr_el2);
-> -	write_sysreg(ctxt->sys_regs[CSSELR_EL1],	csselr_el1);
-> -	write_sysreg_el1(ctxt->sys_regs[SCTLR_EL1],	sctlr);
-> -	write_sysreg_el1(ctxt->sys_regs[CPACR_EL1],	cpacr);
-> -	write_sysreg_el1(ctxt->sys_regs[TTBR0_EL1],	ttbr0);
-> -	write_sysreg_el1(ctxt->sys_regs[TTBR1_EL1],	ttbr1);
-> -	write_sysreg_el1(ctxt->sys_regs[TCR_EL1],	tcr);
-> -	write_sysreg_el1(ctxt->sys_regs[ESR_EL1],	esr);
-> -	write_sysreg_el1(ctxt->sys_regs[AFSR0_EL1],	afsr0);
-> -	write_sysreg_el1(ctxt->sys_regs[AFSR1_EL1],	afsr1);
-> -	write_sysreg_el1(ctxt->sys_regs[FAR_EL1],	far);
-> -	write_sysreg_el1(ctxt->sys_regs[MAIR_EL1],	mair);
-> -	write_sysreg_el1(ctxt->sys_regs[VBAR_EL1],	vbar);
-> -	write_sysreg_el1(ctxt->sys_regs[CONTEXTIDR_EL1],contextidr);
-> -	write_sysreg_el1(ctxt->sys_regs[AMAIR_EL1],	amair);
-> -	write_sysreg_el1(ctxt->sys_regs[CNTKCTL_EL1], 	cntkctl);
-> -	write_sysreg(ctxt->sys_regs[PAR_EL1],		par_el1);
-> -
-> -	write_sysreg(ctxt->gp_regs.sp_el1,		sp_el1);
-> +	u64 *sys_regs = kern_hyp_va(ctxt->hw_sys_regs);
-> +
-> +	write_sysreg(sys_regs[MPIDR_EL1],	vmpidr_el2);
-> +	write_sysreg(sys_regs[CSSELR_EL1],	csselr_el1);
-> +	write_sysreg_el1(sys_regs[SCTLR_EL1],	sctlr);
-> +	write_sysreg_el1(sys_regs[CPACR_EL1],	cpacr);
-> +	write_sysreg_el1(sys_regs[TTBR0_EL1],	ttbr0);
-> +	write_sysreg_el1(sys_regs[TTBR1_EL1],	ttbr1);
-> +	write_sysreg_el1(sys_regs[TCR_EL1],	tcr);
-> +	write_sysreg_el1(sys_regs[ESR_EL1],	esr);
-> +	write_sysreg_el1(sys_regs[AFSR0_EL1],	afsr0);
-> +	write_sysreg_el1(sys_regs[AFSR1_EL1],	afsr1);
-> +	write_sysreg_el1(sys_regs[FAR_EL1],	far);
-> +	write_sysreg_el1(sys_regs[MAIR_EL1],	mair);
-> +	write_sysreg_el1(sys_regs[VBAR_EL1],	vbar);
-> +	write_sysreg_el1(sys_regs[CONTEXTIDR_EL1], contextidr);
-> +	write_sysreg_el1(sys_regs[AMAIR_EL1],	amair);
-> +	write_sysreg_el1(sys_regs[CNTKCTL_EL1], cntkctl);
-> +	write_sysreg(sys_regs[PAR_EL1],		par_el1);
-> +
-> +	write_sysreg(ctxt->hw_sp_el1,			sp_el1);
->  	write_sysreg_el1(ctxt->gp_regs.elr_el1,		elr);
->  	write_sysreg_el1(ctxt->gp_regs.spsr[KVM_SPSR_EL1],spsr);
->  }
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 426d2716f55d..e10fb1842b1d 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -145,6 +145,15 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on the USART3 port of sama5d4.
+ 
++	config DEBUG_AT91_SAMV7_USART1
++		bool "Kernel low-level debugging via SAMV7 USART1"
++		select DEBUG_AT91_UART
++		depends on SOC_SAMV7
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to the USART1 port on SAMV7 based
++		  machines.
++
+ 	config DEBUG_BCM2835
+ 		bool "Kernel low-level debugging on BCM2835 PL011 UART"
+ 		depends on ARCH_BCM2835 && ARCH_MULTI_V6
+@@ -1481,6 +1490,7 @@ config DEBUG_UART_PHYS
+ 	default 0x3f201000 if DEBUG_BCM2836
+ 	default 0x3e000000 if DEBUG_BCM_KONA_UART
+ 	default 0x4000e400 if DEBUG_LL_UART_EFM32
++	default 0x40028000 if DEBUG_AT91_SAMV7_USART1
+ 	default 0x40081000 if DEBUG_LPC18XX_UART0
+ 	default 0x40090000 if DEBUG_LPC32XX
+ 	default 0x40100000 if DEBUG_PXA_UART1
+-- 
+2.11.0
