@@ -1,51 +1,71 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Thu, 1 Jun 2017 18:02:15 +0200
-Subject: [PATCH 3/3] ARM: dmabounce: Combine substrings for two messages
-In-Reply-To: <697e7810-d280-08f3-2a24-026ff41e15a3@users.sourceforge.net>
-References: <697e7810-d280-08f3-2a24-026ff41e15a3@users.sourceforge.net>
-Message-ID: <f31af146-5988-6834-8a38-a274da70cf95@users.sourceforge.net>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 01 Jun 2017 16:57:47 +0200
+Subject: [PATCHv2 2/2] gpio: mvebu: fix gpio bank registration when pwm is
+ used
+In-Reply-To: <20170601121826.14685-3-richard.genoud@gmail.com> (Richard
+ Genoud's message of "Thu, 1 Jun 2017 14:18:26 +0200")
+References: <20170601121826.14685-1-richard.genoud@gmail.com>
+ <20170601121826.14685-3-richard.genoud@gmail.com>
+Message-ID: <87h8zzsql0.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Thu, 1 Jun 2017 17:23:52 +0200
-
-The script "checkpatch.pl" pointed information out like the following.
-
-WARNING: quoted string split across lines
-
-Thus fix the affected source code places.
-
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- arch/arm/common/dmabounce.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/common/dmabounce.c b/arch/arm/common/dmabounce.c
-index 9ef7ab64b3d8..e2fbdab41810 100644
---- a/arch/arm/common/dmabounce.c
-+++ b/arch/arm/common/dmabounce.c
-@@ -227,8 +227,9 @@ static int needs_bounce(struct device *dev, dma_addr_t dma_addr, size_t size)
+Hi Richard,
  
- 		limit = (mask + 1) & ~mask;
- 		if (limit && size > limit) {
--			dev_err(dev, "DMA mapping too big (requested %#x "
--				"mask %#Lx)\n", size, *dev->dma_mask);
-+			dev_err(dev,
-+				"DMA mapping too big (requested %#x mask %#Lx)\n",
-+				size, *dev->dma_mask);
- 			return -E2BIG;
- 		}
- 
-@@ -546,8 +547,7 @@ void dmabounce_unregister_dev(struct device *dev)
- 
- 	if (!device_info) {
- 		dev_warn(dev,
--			 "Never registered with dmabounce but attempting"
--			 "to unregister!\n");
-+			 "Never registered with dmabounce but attempting to unregister!\n");
- 		return;
- 	}
- 
+ On jeu., juin 01 2017, Richard Genoud <richard.genoud@gmail.com> wrote:
+
+> If more than one gpio bank has the "pwm" property, only one will be
+> registered successfully, all the others will fail with:
+> mvebu-gpio: probe of f1018140.gpio failed with error -17
+>
+> That's because in alloc_pwms(), the chip->base (aka "int pwm"), was not
+> set (thus, ==0) ; and 0 is a meaningful start value in alloc_pwm().
+> What was intended is mvpwm->chip->base = -1.
+> Like that, the numbering will be done auto-magically
+>
+> Moreover, as the region might be already occupied by another pwm, we
+> shouldn't force:
+> mvpwm->chip->base = 0
+> nor
+> mvpwm->chip->base = id * MVEBU_MAX_GPIO_PER_BANK;
+>
+> Tested on clearfog-pro (Marvell 88F6828)
+>
+> Fixes: 757642f9a584 ("gpio: mvebu: Add limited PWM support")
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+
+Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+Thanks,
+
+Gregory
+
+
+> ---
+>  drivers/gpio/gpio-mvebu.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
+>
+> diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
+> index cdef2c78cb3b..5104b6398139 100644
+> --- a/drivers/gpio/gpio-mvebu.c
+> +++ b/drivers/gpio/gpio-mvebu.c
+> @@ -768,6 +768,13 @@ static int mvebu_pwm_probe(struct platform_device *pdev,
+>  	mvpwm->chip.dev = dev;
+>  	mvpwm->chip.ops = &mvebu_pwm_ops;
+>  	mvpwm->chip.npwm = mvchip->chip.ngpio;
+> +	/*
+> +	 * There may already be some PWM allocated, so we can't force
+> +	 * mvpwm->chip.base to a fixed point like mvchip->chip.base.
+> +	 * So, we let pwmchip_add() do the numbering and take the next free
+> +	 * region.
+> +	 */
+> +	mvpwm->chip.base = -1;
+>  
+>  	spin_lock_init(&mvpwm->lock);
+>  
+
 -- 
-2.13.0
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
