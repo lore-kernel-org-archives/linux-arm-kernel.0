@@ -1,51 +1,43 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu,  1 Jun 2017 21:38:55 +0200
-Subject: [PATCH v3 03/13] crypto: sun4i-ss: use lower/upper_32_bits helpers
+Date: Thu,  1 Jun 2017 21:38:57 +0200
+Subject: [PATCH v3 05/13] crypto: sun4i-ss: do not dynamically set parts of
+ the last buffer to 0
 In-Reply-To: <20170601193905.28829-1-antoine.tenart@free-electrons.com>
 References: <20170601193905.28829-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170601193905.28829-4-antoine.tenart@free-electrons.com>
+Message-ID: <20170601193905.28829-6-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace custom bit shifts and masks with lower/upper_32_bits helpers.
+Parts of the bf buffer were dynamically set to 0. Change this to set the
+whole buffer to 0 by default to avoid any mistake.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 Tested-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 Acked-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- drivers/crypto/sunxi-ss/sun4i-ss-hash.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ drivers/crypto/sunxi-ss/sun4i-ss-hash.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
 diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
-index 39f0abe5ee25..e53c3127b743 100644
+index bc3cbde07219..518bc7a7df6a 100644
 --- a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
 +++ b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
-@@ -188,7 +188,6 @@ static int sun4i_hash(struct ahash_request *areq)
- 	struct sg_mapping_iter mi;
- 	int in_r, err = 0, zeros;
- 	size_t copied = 0;
--	__be64 bits;
+@@ -179,7 +179,7 @@ static int sun4i_hash(struct ahash_request *areq)
+ 	 */
+ 	unsigned int i = 0, end, index, padlen, nwait, nbw = 0, j = 0, todo;
+ 	unsigned int in_i = 0;
+-	u32 spaces, rx_cnt = SS_RX_DEFAULT, bf[32], wb = 0, v, ivmode = 0;
++	u32 spaces, rx_cnt = SS_RX_DEFAULT, bf[32] = {0}, wb = 0, v, ivmode = 0;
+ 	struct sun4i_req_ctx *op = ahash_request_ctx(areq);
+ 	struct crypto_ahash *tfm = crypto_ahash_reqtfm(areq);
+ 	struct sun4i_tfm_ctx *tfmctx = crypto_ahash_ctx(tfm);
+@@ -417,7 +417,6 @@ static int sun4i_hash(struct ahash_request *areq)
+ 		zeros = (padlen - 1) / 4;
+ 	}
  
- 	dev_dbg(ss->dev, "%s %s bc=%llu len=%u mode=%x wl=%u h0=%0x",
- 		__func__, crypto_tfm_alg_name(areq->base.tfm),
-@@ -423,12 +422,13 @@ static int sun4i_hash(struct ahash_request *areq)
+-	memset(bf + j, 0, 4 * zeros);
+ 	j += zeros;
  
  	/* write the length of data */
- 	if (op->mode == SS_OP_SHA1) {
--		bits = cpu_to_be64(op->byte_count << 3);
--		bf[j++] = bits & 0xffffffff;
--		bf[j++] = (bits >> 32) & 0xffffffff;
-+		__be64 bits = cpu_to_be64(op->byte_count << 3);
-+		bf[j++] = lower_32_bits(bits);
-+		bf[j++] = upper_32_bits(bits);
- 	} else {
--		bf[j++] = (op->byte_count << 3) & 0xffffffff;
--		bf[j++] = (op->byte_count >> 29) & 0xffffffff;
-+		__le64 bits = op->byte_count << 3;
-+		bf[j++] = lower_32_bits(bits);
-+		bf[j++] = upper_32_bits(bits);
- 	}
- 	writesl(ss->base + SS_RXFIFO, bf, j);
- 
 -- 
 2.9.4
