@@ -1,130 +1,63 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 1 Jun 2017 18:38:57 +0100
-Subject: [PATCH 0/2] arm64: acpi/pci: allow the firmware BAR
- configuration to be preserved
-In-Reply-To: <CAKv+Gu9FyLuQk3hkauoRzGME1FxHPgusWQe0v8eSJaKfaX7LMA@mail.gmail.com>
-References: <20170517215611.GJ31462@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu9T7vH_LbKfS_40JUbLNK4PYrMi++eKbCq_MzBsuQxUDQ@mail.gmail.com>
- <20170518140553.GA22106@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu_cug6cVrWP-zkptvNn3LxYk7b4Gd=iTzHHe3us3KwL3Q@mail.gmail.com>
- <20170518154708.GA30182@red-moon>
- <CAKv+Gu-NDR1PYUfOs4z-T9WoeBrYvFTTBt3XMiMg+AU76MbYBg@mail.gmail.com>
- <20170518174612.GA31373@red-moon>
- <CAKv+Gu8hVhpNrXG+JUQu8XYZtQE86d0O66J8AORWDC6Ttcp3iA@mail.gmail.com>
- <20170601161511.GB19003@red-moon>
- <CAKv+Gu9FyLuQk3hkauoRzGME1FxHPgusWQe0v8eSJaKfaX7LMA@mail.gmail.com>
-Message-ID: <20170601173857.GA19494@red-moon>
+From: dvyukov@google.com (Dmitry Vyukov)
+Date: Thu, 1 Jun 2017 19:38:56 +0200
+Subject: [PATCH 3/4] arm64/kasan: don't allocate extra shadow memory
+In-Reply-To: <CACT4Y+Z02Un5DEjmhow4bSLOBygoC2mg7t_KKGn64WnWXQw0qw@mail.gmail.com>
+References: <20170601162338.23540-1-aryabinin@virtuozzo.com>
+ <20170601162338.23540-3-aryabinin@virtuozzo.com>
+ <20170601163442.GC17711@leverpostej>
+ <CACT4Y+aCKDF95mK2-nuiV0+XineHha3y+6PCW0-EorOaY=TFng@mail.gmail.com>
+ <20170601165205.GA8191@leverpostej>
+ <75ea368f-9268-44fd-f3f6-2a48dc8d2fe8@virtuozzo.com>
+ <31a41822-35e1-1b4a-09f7-0a99571ee89a@virtuozzo.com>
+ <CACT4Y+Z02Un5DEjmhow4bSLOBygoC2mg7t_KKGn64WnWXQw0qw@mail.gmail.com>
+Message-ID: <CACT4Y+a7BE25V=dyPCaaO3Tg2kwD04Fq2=U8qgFWDuQGvo_kcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 01, 2017 at 04:18:54PM +0000, Ard Biesheuvel wrote:
-> On 1 June 2017 at 16:15, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> > On Thu, Jun 01, 2017 at 03:04:09PM +0000, Ard Biesheuvel wrote:
-> >> On 18 May 2017 at 18:46, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> >> > On Thu, May 18, 2017 at 05:51:44PM +0100, Ard Biesheuvel wrote:
-> >> >> On 18 May 2017 at 16:47, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> >> >> > On Thu, May 18, 2017 at 04:10:28PM +0100, Ard Biesheuvel wrote:
-> >> >> >
-> >> >> > [...]
-> >> >> >
-> >> >> >> >> Re _DSM: I think it makes sense to honour it, because it puts the
-> >> >> >> >> allocation under the control of the firmware, which completely removes
-> >> >> >> >> the burden of having to reason about a policy in the kernel. That
-> >> >> >> >> leaves the question which will be the default, but that is of minor
-> >> >> >> >> importance IMO.
-> >> >> >> >
-> >> >> >> > I agree; we should try to follow the spec unless we have a good reason
-> >> >> >> > not to, which argues for honoring the _DSM, so I think it's worth a
-> >> >> >> > try.  Booting with "pci=realloc" could override the _DSM and taint the
-> >> >> >> > kernel (because we don't know the effect of reassigning something the
-> >> >> >> > firmware told us not to touch).
-> >> >> >> >
-> >> >> >>
-> >> >> >> I'd like to hear Lorenzo's view on this first, but I can certainly
-> >> >> >> respin my _DSM patch to take pci=realloc into account, and move the
-> >> >> >> handling to generic code as well.
-> >> >> >
-> >> >> > I agree with both of you on _DSM implementation and interpretation.
-> >> >> >
-> >> >> > Now, if we use it correctly (ie by the FW standard) on ARM64 systems we
-> >> >> > are going to trigger regressions, that's certain (ie we can then boot
-> >> >> > with pci=realloc - still, we are breaking systems), that's the reason
-> >> >> > why for patch(2) I'd like to create a branch and send a CFT for ARM64
-> >> >> > ACPI testing before queuing it (either I can set-up a testing branch
-> >> >> > or we ask Bjorn to do it - as you guys prefer - as long as we have
-> >> >> > a branch for people to test patch(2) on ARM64 ACPI systems).
-> >> >> >
-> >> >> > You still need to assign resources that could not be claimed though
-> >> >> > so patch(2) still needs updating:
-> >> >> >
-> >> >> > PCI FW spec 3.1 - 4.6.5
-> >> >> >
-> >> >> > "...However, the operating system is free to configure the devices in this
-> >> >> > hierarchy that have not been configured by the firmware."
-> >> >> >
-> >> >> > Which in kernel-speak it means that you have to assign resources that
-> >> >> > could not be claimed.
-> >> >> >
-> >> >>
-> >> >> Right. AFAICT this is the part that is typically handled by
-> >> >> pcibios_resource_survey() et al, whose default __weak implementations
-> >> >> are empty functions. Shall I override those for arm64 to host this
-> >> >> logic?
-> >> >
-> >> > I think it makes sense yes unless Bjorn spots something wrong with that
-> >> > but you should also call it in ARM64 pci_acpi_scan_root() since it is
-> >> > not called by PCI core on non-hot-added bridges, I reckon you figured
-> >> > that out already though.
-> >> >
-> >>
-> >> Another data point for this discussion: currently, when booting arm64
-> >> via DT, we set PCI_REASSIGN_ALL_RSRC | PCI_REASSIGN_ALL_BUS (unless
-> >> PCI_PROBE_ONLY is requested), which forces not only resource
-> >> allocations but also the bus numbering to be reconfigured from
-> >> scratch.
-> >>
-> >> On arm64/ACPI, we never set those flags, which will cause
-> >> pci_scan_bridge() to preserve the secondary and subordinate bridge
-> >> numbers if they are non-zero. This actually prevents log messages like
-> >>
-> >> pci_bus 0000:02: busn_res: can not insert [bus 02-ff] under [bus
-> >> 00-7f] (conflicts with (null) [bus 00-7f])
-> >>
-> >> which I see on AMD Seattle as well as QEMU when booting via DT (and I
-> >> suspect on any DT PCI root whose bus range != {0x0 0xff>). However, it
-> >> also means that we already have different behavior between ACPI and DT
-> >> boot on arm64, which makes it ambiguous what the behavior should be if
-> >> _DSM indicates that the configuration should not be preserved. IOW,
-> >> 'reconfigure everything' currently means different things between DT
-> >> and ACPI boot.
-> >
-> > IMO they should mean the same thing which implies setting those flags
-> > (ie PCI_REASSIGN_ALL_RSRC has no effect though on ARM64) on ARM64
-> > ACPI systems as a starting point and then changes in this thread can
-> > be applied on top.
-> >
-> 
-> OK
-> 
-> > Having said that, I am not sure the message you get above is really
-> > effective (not sure I undestand the net effect of that resource
-> > conflict) so I should look into this.
-> >
-> 
-> It appears to be behavior that is known to be incorrect but is
-> preserved for historical reasons.
-> 
-> Please refer to
-> 12d8706963f0 Revert "PCI: Make sure bus number resources stay within
-> their parents bounds"
-> 1820ffdccb9b PCI: Make sure bus number resources stay within their
-> parents bounds
+On Thu, Jun 1, 2017 at 7:05 PM, Dmitry Vyukov <dvyukov@google.com> wrote:
+>>>>>>> We used to read several bytes of the shadow memory in advance.
+>>>>>>> Therefore additional shadow memory mapped to prevent crash if
+>>>>>>> speculative load would happen near the end of the mapped shadow memory.
+>>>>>>>
+>>>>>>> Now we don't have such speculative loads, so we no longer need to map
+>>>>>>> additional shadow memory.
+>>>>>>
+>>>>>> I see that patch 1 fixed up the Linux helpers for outline
+>>>>>> instrumentation.
+>>>>>>
+>>>>>> Just to check, is it also true that the inline instrumentation never
+>>>>>> performs unaligned accesses to the shadow memory?
+>>>>>
+>>>
+>>> Correct, inline instrumentation assumes that all accesses are properly aligned as it
+>>> required by C standard. I knew that the kernel violates this rule in many places,
+>>> therefore I decided to add checks for unaligned accesses in outline case.
+>>>
+>>>
+>>>>> Inline instrumentation generally accesses only a single byte.
+>>>>
+>>>> Sorry to be a little pedantic, but does that mean we'll never access the
+>>>> additional shadow, or does that mean it's very unlikely that we will?
+>>>>
+>>>> I'm guessing/hoping it's the former!
+>>>>
+>>>
+>>> Outline will never access additional shadow byte: https://github.com/google/sanitizers/wiki/AddressSanitizerAlgorithm#unaligned-accesses
+>>
+>> s/Outline/inline  of course.
+>
+>
+> I suspect that actual implementations have diverged from that
+> description. Trying to follow asan_expand_check_ifn in:
+> https://gcc.gnu.org/viewcvs/gcc/trunk/gcc/asan.c?revision=246703&view=markup
+> but it's not trivial.
+>
+> +Yuri, maybe you know off the top of your head if asan instrumentation
+> in gcc ever accesses off-by-one shadow byte (i.e. 1 byte after actual
+> object end)?
 
-I am not sure the call to:
-
-pci_bus_insert_busn_res(child, max+1, 0xff);
-
-is there to do anything useful given that the bus range resource is
-claimed later but I need to debug it to prove my point.
-
-Lorenzo
+Thinking of this more. There is at least 1 case in user-space asan
+where off-by-one shadow access would lead to similar crashes: for
+mmap-ed regions we don't have redzones and map shadow only for the
+region itself, so any off-by-one access would lead to crashes. So I
+guess we are safe here. Or at least any crash would be gcc bug.
