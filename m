@@ -1,196 +1,85 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 01 Jun 2017 22:22:17 +0200
-Subject: [PATCH 1/2] ARM: dts: rockchip: add usb nodes on rk322x
-In-Reply-To: <1496193684-30449-2-git-send-email-william.wu@rock-chips.com>
-References: <1496193684-30449-1-git-send-email-william.wu@rock-chips.com>
- <1496193684-30449-2-git-send-email-william.wu@rock-chips.com>
-Message-ID: <1657625.AqxPQItbmB@phil>
+From: bsd@redhat.com (Bandan Das)
+Date: Thu, 01 Jun 2017 16:22:17 -0400
+Subject: [RFC 08/55] KVM: arm64: Set virtual EL2 context depending on the
+ guest exception level
+In-Reply-To: <1483943091-1364-9-git-send-email-jintack@cs.columbia.edu>
+ (Jintack Lim's message of "Mon, 9 Jan 2017 01:24:04 -0500")
+References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
+ <1483943091-1364-9-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <jpgtw3zzcee.fsf@linux.bootlegged.copy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi William,
+Jintack Lim <jintack@cs.columbia.edu> writes:
 
-Am Mittwoch, 31. Mai 2017, 09:21:23 CEST schrieb William Wu:
-> This patch adds usb otg/host controllers and phys nodes on rk322x.
-> 
-> Signed-off-by: William Wu <william.wu@rock-chips.com>
+> From: Christoffer Dall <christoffer.dall@linaro.org>
+>
+> Set up virutal EL2 context to hardware if the guest exception level is
+> EL2.
+>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 > ---
->  arch/arm/boot/dts/rk322x.dtsi | 138 +++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 137 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
-> index df57413..d4bfd3c 100644
-> --- a/arch/arm/boot/dts/rk322x.dtsi
-> +++ b/arch/arm/boot/dts/rk322x.dtsi
-> @@ -210,8 +210,61 @@
->  	};
+>  arch/arm64/kvm/context.c | 32 ++++++++++++++++++++++++++------
+>  1 file changed, 26 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm64/kvm/context.c b/arch/arm64/kvm/context.c
+> index 320afc6..acb4b1e 100644
+> --- a/arch/arm64/kvm/context.c
+> +++ b/arch/arm64/kvm/context.c
+> @@ -25,10 +25,25 @@
+>  void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
+>  {
+>  	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
+> +	if (unlikely(vcpu_mode_el2(vcpu))) {
+> +		ctxt->hw_pstate = *vcpu_cpsr(vcpu) & ~PSR_MODE_MASK;
 >  
->  	grf: syscon at 11000000 {
-> -		compatible = "syscon";
-> +		compatible = "syscon", "simple-mfd";
->  		reg = <0x11000000 0x1000>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
+> -	ctxt->hw_pstate = *vcpu_cpsr(vcpu);
+> -	ctxt->hw_sys_regs = ctxt->sys_regs;
+> -	ctxt->hw_sp_el1 = ctxt->gp_regs.sp_el1;
+> +		/*
+> +		 * We emulate virtual EL2 mode in hardware EL1 mode using the
+> +		 * same stack pointer mode as the guest expects.
+> +		 */
+> +		if ((*vcpu_cpsr(vcpu) & PSR_MODE_MASK) == PSR_MODE_EL2h)
+> +			ctxt->hw_pstate |= PSR_MODE_EL1h;
+> +		else
+> +			ctxt->hw_pstate |= PSR_MODE_EL1t;
 > +
-> +		u2phy0: usb2-phy at 760 {
-> +			compatible = "rockchip,rk322x-usb2phy";
 
-as commented on the driver-side some moments ago, compatibles should not
-contain wildcards, so please make this
-	"rockchip,rk3228-usb2phy"
-instead.
+I see vcpu_mode(el2) does
+return mode == PSR_MODE_EL2h || mode == PSR_MODE_EL2t;
 
-Same below and also for the dwc2 node.
+I can't seem to find this, what's the difference between
+the modes: PSR_MODE_EL2h/EL2t ?
 
+Bandan
 
-Thanks
-Heiko
-
-> +			reg = <0x0760 0x0c>;
-> +			clocks = <&cru SCLK_OTGPHY0>;
-> +			clock-names = "phyclk";
-> +			#clock-cells = <0>;
-> +			clock-output-names = "usb480m_phy0";
-> +			status = "disabled";
-> +
-> +			u2phy0_otg: otg-port {
-> +				#phy-cells = <0>;
-> +				interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
-> +					     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
-> +					     <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
-> +				interrupt-names = "otg-bvalid", "otg-id",
-> +						  "linestate";
-> +				status = "disabled";
-> +			};
-> +
-> +			u2phy0_host: host-port {
-> +				#phy-cells = <0>;
-> +				interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
-> +				interrupt-names = "linestate";
-> +				status = "disabled";
-> +			};
-> +		};
-> +
-> +		u2phy1: usb2-phy at 800 {
-> +			compatible = "rockchip,rk322x-usb2phy";
-
-rockchip,rk3228-usb2phy
-
-> +			reg = <0x0800 0x0c>;
-> +			clocks = <&cru SCLK_OTGPHY1>;
-> +			clock-names = "phyclk";
-> +			#clock-cells = <0>;
-> +			clock-output-names = "usb480m_phy1";
-> +			status = "disabled";
-> +
-> +			u2phy1_otg: otg-port {
-> +				#phy-cells = <0>;
-> +				interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
-> +				interrupt-names = "linestate";
-> +				status = "disabled";
-> +			};
-> +
-> +			u2phy1_host: host-port {
-> +				#phy-cells = <0>;
-> +				interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
-> +				interrupt-names = "linestate";
-> +				status = "disabled";
-> +			};
-> +		};
->  	};
+> +		ctxt->hw_sys_regs = ctxt->shadow_sys_regs;
+> +		ctxt->hw_sp_el1 = ctxt->el2_regs[SP_EL2];
+> +	} else {
+> +		ctxt->hw_pstate = *vcpu_cpsr(vcpu);
+> +		ctxt->hw_sys_regs = ctxt->sys_regs;
+> +		ctxt->hw_sp_el1 = ctxt->gp_regs.sp_el1;
+> +	}
+>  }
 >  
->  	uart0: serial at 11010000 {
-> @@ -467,6 +520,89 @@
->  		status = "disabled";
->  	};
+>  /**
+> @@ -38,9 +53,14 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
+>  void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu)
+>  {
+>  	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
+> -
+> -	*vcpu_cpsr(vcpu) = ctxt->hw_pstate;
+> -	ctxt->gp_regs.sp_el1 = ctxt->hw_sp_el1;
+> +	if (unlikely(vcpu_mode_el2(vcpu))) {
+> +		*vcpu_cpsr(vcpu) &= PSR_MODE_MASK;
+> +		*vcpu_cpsr(vcpu) |= ctxt->hw_pstate & ~PSR_MODE_MASK;
+> +		ctxt->el2_regs[SP_EL2] = ctxt->hw_sp_el1;
+> +	} else {
+> +		*vcpu_cpsr(vcpu) = ctxt->hw_pstate;
+> +		ctxt->gp_regs.sp_el1 = ctxt->hw_sp_el1;
+> +	}
+>  }
 >  
-> +	usb_otg: usb at 30040000 {
-> +		compatible = "rockchip,rk322x-usb", "rockchip,rk3066-usb",
-
-rockchip,rk3228-usb
-
-> +			     "snps,dwc2";
-> +		reg = <0x30040000 0x40000>;
-> +		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&cru HCLK_OTG>;
-> +		clock-names = "otg";
-> +		dr_mode = "otg";
-> +		g-np-tx-fifo-size = <16>;
-> +		g-rx-fifo-size = <280>;
-> +		g-tx-fifo-size = <256 128 128 64 32 16>;
-> +		g-use-dma;
-> +		phys = <&u2phy0_otg>;
-> +		phy-names = "usb2-phy";
-> +		status = "disabled";
-> +	};
-> +
-> +	usb_host0_ehci: usb at 30080000 {
-> +		compatible = "generic-ehci";
-> +		reg = <0x30080000 0x20000>;
-> +		interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&cru HCLK_HOST0>, <&u2phy0>;
-> +		clock-names = "usbhost", "utmi";
-> +		phys = <&u2phy0_host>;
-> +		phy-names = "usb";
-> +		status = "disabled";
-> +	};
-> +
-> +	usb_host0_ohci: usb at 300a0000 {
-> +		compatible = "generic-ohci";
-> +		reg = <0x300a0000 0x20000>;
-> +		interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&cru HCLK_HOST0>, <&u2phy0>;
-> +		clock-names = "usbhost", "utmi";
-> +		phys = <&u2phy0_host>;
-> +		phy-names = "usb";
-> +		status = "disabled";
-> +	};
-> +
-> +	usb_host1_ehci: usb at 300c0000 {
-> +		compatible = "generic-ehci";
-> +		reg = <0x300c0000 0x20000>;
-> +		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&cru HCLK_HOST1>, <&u2phy1>;
-> +		clock-names = "usbhost", "utmi";
-> +		phys = <&u2phy1_otg>;
-> +		phy-names = "usb";
-> +		status = "disabled";
-> +	};
-> +
-> +	usb_host1_ohci: usb at 300e0000 {
-> +		compatible = "generic-ohci";
-> +		reg = <0x300e0000 0x20000>;
-> +		interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&cru HCLK_HOST1>, <&u2phy1>;
-> +		clock-names = "usbhost", "utmi";
-> +		phys = <&u2phy1_otg>;
-> +		phy-names = "usb";
-> +		status = "disabled";
-> +	};
-> +
-> +	usb_host2_ehci: usb at 30100000 {
-> +		compatible = "generic-ehci";
-> +		reg = <0x30100000 0x20000>;
-> +		interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&cru HCLK_HOST2>, <&u2phy1>;
-> +		phys = <&u2phy1_host>;
-> +		phy-names = "usb";
-> +		clock-names = "usbhost", "utmi";
-> +		status = "disabled";
-> +	};
-> +
-> +	usb_host2_ohci: usb at 30120000 {
-> +		compatible = "generic-ohci";
-> +		reg = <0x30120000 0x20000>;
-> +		interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&cru HCLK_HOST2>, <&u2phy1>;
-> +		clock-names = "usbhost", "utmi";
-> +		phys = <&u2phy1_host>;
-> +		phy-names = "usb";
-> +		status = "disabled";
-> +	};
-> +
->  	gmac: ethernet at 30200000 {
->  		compatible = "rockchip,rk3228-gmac";
->  		reg = <0x30200000 0x10000>;
-> 
+>  void kvm_arm_init_cpu_context(kvm_cpu_context_t *cpu_ctxt)
