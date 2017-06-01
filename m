@@ -1,40 +1,41 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu,  1 Jun 2017 21:39:04 +0200
-Subject: [PATCH v3 12/13] ARM: sun5i: add a cryptographic engine node
+Date: Thu,  1 Jun 2017 21:38:59 +0200
+Subject: [PATCH v3 07/13] crypto: sun4i-ss: simplify the appended bit
+ assignment
 In-Reply-To: <20170601193905.28829-1-antoine.tenart@free-electrons.com>
 References: <20170601193905.28829-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170601193905.28829-13-antoine.tenart@free-electrons.com>
+Message-ID: <20170601193905.28829-8-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a node for the cryptographic engine that can be found on sun5i SoCs.
-This cryptographic engine is compatible with the Allwinner cryptographic
-accelerator driver.
+A bit is appended at the end of the input buffer for sha1. Simplify the
+code assigning it.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Tested-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+Acked-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm/boot/dts/sun5i.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/crypto/sunxi-ss/sun4i-ss-hash.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
-index 5175f9cc9bed..294b864d6dce 100644
---- a/arch/arm/boot/dts/sun5i.dtsi
-+++ b/arch/arm/boot/dts/sun5i.dtsi
-@@ -355,6 +355,15 @@
- 			status = "disabled";
- 		};
+diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
+index 59d9b4412aca..0c2efc88bc0a 100644
+--- a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
++++ b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
+@@ -392,12 +392,8 @@ static int sun4i_hash(struct ahash_request *areq)
+ 	}
  
-+		crypto: crypto-engine at 01c15000 {
-+			compatible = "allwinner,sun5i-a13-crypto",
-+				     "allwinner,sun4i-a10-crypto";
-+			reg = <0x01c15000 0x1000>;
-+			interrupts = <54>;
-+			clocks = <&ccu CLK_AHB_SS>, <&ccu CLK_SS>;
-+			clock-names = "ahb", "mod";
-+		};
-+
- 		spi2: spi at 01c17000 {
- 			compatible = "allwinner,sun4i-a10-spi";
- 			reg = <0x01c17000 0x1000>;
+ 	/* write the remaining bytes of the nbw buffer */
+-	if (nbw) {
+-		wb |= ((1 << 7) << (nbw * 8));
+-		bf[j++] = wb;
+-	} else {
+-		bf[j++] = 1 << 7;
+-	}
++	wb |= ((1 << 7) << (nbw * 8));
++	bf[j++] = wb;
+ 
+ 	/*
+ 	 * number of space to pad to obtain 64o minus 8(size) minus 4 (final 1)
 -- 
 2.9.4
