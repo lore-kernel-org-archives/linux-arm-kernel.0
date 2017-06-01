@@ -1,65 +1,66 @@
-From: dvyukov@google.com (Dmitry Vyukov)
-Date: Thu, 1 Jun 2017 19:05:54 +0200
-Subject: [PATCH 3/4] arm64/kasan: don't allocate extra shadow memory
-In-Reply-To: <31a41822-35e1-1b4a-09f7-0a99571ee89a@virtuozzo.com>
-References: <20170601162338.23540-1-aryabinin@virtuozzo.com>
- <20170601162338.23540-3-aryabinin@virtuozzo.com>
- <20170601163442.GC17711@leverpostej>
- <CACT4Y+aCKDF95mK2-nuiV0+XineHha3y+6PCW0-EorOaY=TFng@mail.gmail.com>
- <20170601165205.GA8191@leverpostej>
- <75ea368f-9268-44fd-f3f6-2a48dc8d2fe8@virtuozzo.com>
- <31a41822-35e1-1b4a-09f7-0a99571ee89a@virtuozzo.com>
-Message-ID: <CACT4Y+Z02Un5DEjmhow4bSLOBygoC2mg7t_KKGn64WnWXQw0qw@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 1 Jun 2017 12:08:59 -0500
+Subject: [PATCH v7 2/3] PCI: Add support for PCI inbound windows resources
+In-Reply-To: <CAMSpPPdXbCteC7scb99CMKqdif0q9ngZnzJMhGa6xZt7BM0yKg@mail.gmail.com>
+References: <1495471182-12490-1-git-send-email-oza.oza@broadcom.com>
+ <1495471182-12490-3-git-send-email-oza.oza@broadcom.com>
+ <CAErSpo6MJbNEyGQC4MwFb6kPoOf1p=mxk-SHAz-+HuDFbvRkmw@mail.gmail.com>
+ <CAMSpPPdXbCteC7scb99CMKqdif0q9ngZnzJMhGa6xZt7BM0yKg@mail.gmail.com>
+Message-ID: <CAErSpo58xJbQG_UK76pW55phs32Bqeyv=_wtJTS2jvf6JQ2MAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 1, 2017 at 7:00 PM, Andrey Ryabinin <aryabinin@virtuozzo.com> wrote:
->
->
-> On 06/01/2017 07:59 PM, Andrey Ryabinin wrote:
->>
->>
->> On 06/01/2017 07:52 PM, Mark Rutland wrote:
->>> On Thu, Jun 01, 2017 at 06:45:32PM +0200, Dmitry Vyukov wrote:
->>>> On Thu, Jun 1, 2017 at 6:34 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->>>>> On Thu, Jun 01, 2017 at 07:23:37PM +0300, Andrey Ryabinin wrote:
->>>>>> We used to read several bytes of the shadow memory in advance.
->>>>>> Therefore additional shadow memory mapped to prevent crash if
->>>>>> speculative load would happen near the end of the mapped shadow memory.
->>>>>>
->>>>>> Now we don't have such speculative loads, so we no longer need to map
->>>>>> additional shadow memory.
->>>>>
->>>>> I see that patch 1 fixed up the Linux helpers for outline
->>>>> instrumentation.
->>>>>
->>>>> Just to check, is it also true that the inline instrumentation never
->>>>> performs unaligned accesses to the shadow memory?
->>>>
->>
->> Correct, inline instrumentation assumes that all accesses are properly aligned as it
->> required by C standard. I knew that the kernel violates this rule in many places,
->> therefore I decided to add checks for unaligned accesses in outline case.
->>
->>
->>>> Inline instrumentation generally accesses only a single byte.
+On Wed, May 31, 2017 at 11:17 AM, Oza Oza <oza.oza@broadcom.com> wrote:
+> On Wed, May 31, 2017 at 4:12 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+>> On Mon, May 22, 2017 at 11:39 AM, Oza Pawandeep <oza.oza@broadcom.com> wrote:
+>>> This patch adds support for inbound memory window
+>>> for PCI RC drivers.
 >>>
->>> Sorry to be a little pedantic, but does that mean we'll never access the
->>> additional shadow, or does that mean it's very unlikely that we will?
+>>> It defines new function pci_create_root_bus2 which
+>>> takes inbound resources as an argument and fills in the
+>>> memory resource to PCI internal host bridge structure
+>>> as inbound_windows.
 >>>
->>> I'm guessing/hoping it's the former!
+>>> Legacy RC driver could continue to use pci_create_root_bus,
+>>> but any RC driver who wants to reseve IOVAS for their
+>>> inbound memory holes, should use new API pci_create_root_bus2.
 >>>
+>>> Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
+>>> ...
 >>
->> Outline will never access additional shadow byte: https://github.com/google/sanitizers/wiki/AddressSanitizerAlgorithm#unaligned-accesses
+>>> +struct pci_bus *pci_create_root_bus2(struct device *parent, int bus,
+>>> +               struct pci_ops *ops, void *sysdata, struct list_head *resources,
+>>> +               struct list_head *in_res)
+>>> +{
+>>> +       return pci_create_root_bus_msi(parent, bus, ops, sysdata,
+>>> +                                      resources, in_res, NULL);
+>>> +}
+>>> +EXPORT_SYMBOL_GPL(pci_create_root_bus2);
+>>
+>> Based on your response to Lorenzo's "[RFC/RFT PATCH 03/18] PCI:
+>> Introduce pci_scan_root_bus_bridge()", I'm hoping you can avoid adding
+>> yet another variant of pci_create_root_bus().
+>>
+>> So I think I can wait for that to settle out and look for a v8?
+>>
+>> Bjorn
 >
-> s/Outline/inline  of course.
+> Sure Bjorn, please wait for v8.
+>
+> But there is one more associated patch
+> [PATCH v7 1/3] OF/PCI: Export inbound memory interface to PCI RC
+> which basically aims to provide an interface to RC drivers for their
+> inbound resources.
+> RC driver already get their outbound resources from
+> of_pci_get_host_bridge_resources,
+> similar attempt for inbound dma-ranges.
 
+Not sure I understand.  Patch 1/3 adds of_pci_get_dma_ranges(), but
+none of the patches adds a caller, so I don't see the point of it yet.
 
-I suspect that actual implementations have diverged from that
-description. Trying to follow asan_expand_check_ifn in:
-https://gcc.gnu.org/viewcvs/gcc/trunk/gcc/asan.c?revision=246703&view=markup
-but it's not trivial.
+In general, if I'm expecting another revision of one patch in a
+series, I expect the next revision to include *all* the patches in the
+series.  I normally don't pick out and apply individual patches from
+the series.
 
-+Yuri, maybe you know off the top of your head if asan instrumentation
-in gcc ever accesses off-by-one shadow byte (i.e. 1 byte after actual
-object end)?
+Bjorn
