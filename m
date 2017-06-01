@@ -1,101 +1,229 @@
 From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Thu,  1 Jun 2017 22:08:20 +0200
-Subject: [PATCH] gpio: mvebu: change compatible string for PWM support
-Message-ID: <20170601200820.22396-1-ralph.sennhauser@gmail.com>
+Date: Thu,  1 Jun 2017 22:09:26 +0200
+Subject: [PATCH] ARM: dts: mvebu: Add PWM properties to .dtsi files
+Message-ID: <20170601200926.22453-1-ralph.sennhauser@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As it turns out more than just Armada 370 and XP support using GPIO
-lines as PWM lines. For example the Armada 38x family has the same
-hardware support. As such "marvell,armada-370-xp-gpio" for the
-compatible string is a misnomer.
+From: Andrew Lunn <andrew@lunn.ch>
 
-Change the compatible string to "marvell,armada-370-gpio" before the
-driver makes it out of the -rc stage. This also follows the practice of
-using only the first device family supported as part of the name.
+Add properties to the GPIO nodes for Armada 370/XP to allow them to be
+also used as PWM lines.
 
-Also update the documentation and comments in the code accordingly.
-
-Fixes: 757642f9a584 ("gpio: mvebu: Add limited PWM support")
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+URL: https://patchwork.ozlabs.org/patch/427294/
+[Ralph Sennhauser: Add new compatible string marvell,armada-370-gpio]
 Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
+Tested-by: Andrew Lunn <andrew@lunn.ch>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
 ---
 
-Hi everyone,
+Hi Gregory,
 
-The suggestion to change the compatible string last minute comes from
-Gregory CLEMENT after we realized the bad choice of name due to Richard
-Genoud reporting an issue when he used the driver with an Armada-388.
+I took the commit which is already in next, updated the compatible
+string to "marvell,armada-370-gpio" and ammended the commit message
+accordingly.
 
-Rob Herring just requested to use a separate compatible string but not
-what it should look like. So I assume he is fine with the new one as
-well. The rest of this patch is rather minor.
-
-Nothing in tree is using this driver so far, first consumers will be
-added with 4.13.
+This one is intended to replace the one in next if/when the the change
+to the compatible string from "marvell,armada-370-xp-gpio" to
+"marvell,armada-370-gpio" is accepted. ("gpio: mvebu: change compatible
+string for PWM support")
 
 Ralph
-
 ---
- Documentation/devicetree/bindings/gpio/gpio-mvebu.txt | 6 +++---
- drivers/gpio/gpio-mvebu.c                             | 6 +++---
- 2 files changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/armada-370.dtsi        | 19 ++++++++++++++-----
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi | 16 ++++++++++++----
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi | 19 ++++++++++++++-----
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi | 19 ++++++++++++++-----
+ 4 files changed, 54 insertions(+), 19 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt b/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
-index 42c3bb2..01e331a 100644
---- a/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
-+++ b/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
-@@ -41,9 +41,9 @@ Required properties:
- Optional properties:
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index cc011c8..f9cf127 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -137,29 +137,38 @@
+ 			};
  
- In order to use the GPIO lines in PWM mode, some additional optional
--properties are required. Only Armada 370 and XP support these properties.
-+properties are required.
+ 			gpio0: gpio at 18100 {
+-				compatible = "marvell,orion-gpio";
+-				reg = <0x18100 0x40>;
++				compatible = "marvell,armada-370-gpio",
++					     "marvell,orion-gpio";
++				reg = <0x18100 0x40>, <0x181c0 0x08>;
++				reg-names = "gpio", "pwm";
+ 				ngpios = <32>;
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
++				#pwm-cells = <2>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
+ 				interrupts = <82>, <83>, <84>, <85>;
++				clocks = <&coreclk 0>;
+ 			};
  
--- compatible: Must contain "marvell,armada-370-xp-gpio"
-+- compatible: Must contain "marvell,armada-370-gpio"
+ 			gpio1: gpio at 18140 {
+-				compatible = "marvell,orion-gpio";
+-				reg = <0x18140 0x40>;
++				compatible = "marvell,armada-370-gpio",
++					     "marvell,orion-gpio";
++				reg = <0x18140 0x40>, <0x181c8 0x08>;
++				reg-names = "gpio", "pwm";
+ 				ngpios = <32>;
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
++				#pwm-cells = <2>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
+ 				interrupts = <87>, <88>, <89>, <90>;
++				clocks = <&coreclk 0>;
+ 			};
  
- - reg: an additional register set is needed, for the GPIO Blink
-   Counter on/off registers.
-@@ -71,7 +71,7 @@ Example:
+ 			gpio2: gpio at 18180 {
+-				compatible = "marvell,orion-gpio";
++				compatible = "marvell,armada-370-gpio",
++					     "marvell,orion-gpio";
+ 				reg = <0x18180 0x40>;
+ 				ngpios = <2>;
+ 				gpio-controller;
+diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+index 07c5090..9f25814 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+@@ -202,25 +202,33 @@
+ 
+ 		internal-regs {
+ 			gpio0: gpio at 18100 {
+-				compatible = "marvell,orion-gpio";
+-				reg = <0x18100 0x40>;
++				compatible = "marvell,armada-370-gpio",
++					     "marvell,orion-gpio";
++				reg = <0x18100 0x40>, <0x181c0 0x08>;
++				reg-names = "gpio", "pwm";
+ 				ngpios = <32>;
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
++				#pwm-cells = <2>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
+ 				interrupts = <82>, <83>, <84>, <85>;
++				clocks = <&coreclk 0>;
+ 			};
+ 
+ 			gpio1: gpio at 18140 {
+-				compatible = "marvell,orion-gpio";
+-				reg = <0x18140 0x40>;
++				compatible = "marvell,armada-370-gpio",
++					     "marvell,orion-gpio";
++				reg = <0x18140 0x40>, <0x181c8 0x08>;
++				reg-names = "gpio", "pwm";
+ 				ngpios = <17>;
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
++				#pwm-cells = <2>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
+ 				interrupts = <87>, <88>, <89>;
++				clocks = <&coreclk 0>;
+ 			};
  		};
+ 	};
+diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+index 64e936a..2bfe07a 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+@@ -285,29 +285,38 @@
  
- 		gpio1: gpio at 18140 {
--			compatible = "marvell,armada-370-xp-gpio";
-+			compatible = "marvell,armada-370-gpio";
- 			reg = <0x18140 0x40>, <0x181c8 0x08>;
- 			reg-names = "gpio", "pwm";
- 			ngpios = <17>;
-diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
-index 19a92ef..f94fd47 100644
---- a/drivers/gpio/gpio-mvebu.c
-+++ b/drivers/gpio/gpio-mvebu.c
-@@ -721,7 +721,7 @@ static int mvebu_pwm_probe(struct platform_device *pdev,
- 	u32 set;
+ 		internal-regs {
+ 			gpio0: gpio at 18100 {
+-				compatible = "marvell,orion-gpio";
+-				reg = <0x18100 0x40>;
++				compatible = "marvell,armada-370-gpio",
++					     "marvell,orion-gpio";
++				reg = <0x18100 0x40>, <0x181c0 0x08>;
++				reg-names = "gpio", "pwm";
+ 				ngpios = <32>;
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
++				#pwm-cells = <2>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
+ 				interrupts = <82>, <83>, <84>, <85>;
++				clocks = <&coreclk 0>;
+ 			};
  
- 	if (!of_device_is_compatible(mvchip->chip.of_node,
--				     "marvell,armada-370-xp-gpio"))
-+				     "marvell,armada-370-gpio"))
- 		return 0;
+ 			gpio1: gpio at 18140 {
+-				compatible = "marvell,orion-gpio";
+-				reg = <0x18140 0x40>;
++				compatible = "marvell,armada-370-gpio",
++					     "marvell,orion-gpio";
++				reg = <0x18140 0x40>, <0x181c8 0x08>;
++				reg-names = "gpio", "pwm";
+ 				ngpios = <32>;
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
++				#pwm-cells = <2>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
+ 				interrupts = <87>, <88>, <89>, <90>;
++				clocks = <&coreclk 0>;
+ 			};
  
- 	if (IS_ERR(mvchip->clk))
-@@ -845,7 +845,7 @@ static const struct of_device_id mvebu_gpio_of_match[] = {
- 		.data	    = (void *) MVEBU_GPIO_SOC_VARIANT_ARMADAXP,
- 	},
- 	{
--		.compatible = "marvell,armada-370-xp-gpio",
-+		.compatible = "marvell,armada-370-gpio",
- 		.data	    = (void *) MVEBU_GPIO_SOC_VARIANT_ORION,
- 	},
- 	{
-@@ -1121,7 +1121,7 @@ static int mvebu_gpio_probe(struct platform_device *pdev)
- 						 mvchip);
- 	}
+ 			gpio2: gpio at 18180 {
+-				compatible = "marvell,orion-gpio";
++				compatible = "marvell,armada-370-gpio",
++					     "marvell,orion-gpio";
+ 				reg = <0x18180 0x40>;
+ 				ngpios = <3>;
+ 				gpio-controller;
+diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+index d1383dd..6c33935 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+@@ -323,29 +323,38 @@
  
--	/* Armada 370/XP has simple PWM support for GPIO lines */
-+	/* Some MVEBU SoCs have simple PWM support for GPIO lines */
- 	if (IS_ENABLED(CONFIG_PWM))
- 		return mvebu_pwm_probe(pdev, mvchip, id);
+ 		internal-regs {
+ 			gpio0: gpio at 18100 {
+-				compatible = "marvell,orion-gpio";
+-				reg = <0x18100 0x40>;
++				compatible = "marvell,armada-370-gpio",
++					     "marvell,orion-gpio";
++				reg = <0x18100 0x40>, <0x181c0 0x08>;
++				reg-names = "gpio", "pwm";
+ 				ngpios = <32>;
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
++				#pwm-cells = <2>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
+ 				interrupts = <82>, <83>, <84>, <85>;
++				clocks = <&coreclk 0>;
+ 			};
  
+ 			gpio1: gpio at 18140 {
+-				compatible = "marvell,orion-gpio";
+-				reg = <0x18140 0x40>;
++				compatible = "marvell,armada-370-gpio",
++					     "marvell,orion-gpio";
++				reg = <0x18140 0x40>, <0x181c8 0x08>;
++				reg-names = "gpio", "pwm";
+ 				ngpios = <32>;
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
++				#pwm-cells = <2>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
+ 				interrupts = <87>, <88>, <89>, <90>;
++				clocks = <&coreclk 0>;
+ 			};
+ 
+ 			gpio2: gpio at 18180 {
+-				compatible = "marvell,orion-gpio";
++				compatible = "marvell,armada-370-gpio",
++					     "marvell,orion-gpio";
+ 				reg = <0x18180 0x40>;
+ 				ngpios = <3>;
+ 				gpio-controller;
 -- 
 2.10.2
