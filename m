@@ -1,236 +1,42 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu,  1 Jun 2017 16:08:13 -0500
-Subject: [for 4.12] net: qcom/emac: do not use hardware mdio automatic polling
-Message-ID: <1496351293-6846-1-git-send-email-timur@codeaurora.org>
+From: han.xu@nxp.com (Han Xu)
+Date: Thu, 1 Jun 2017 21:14:57 +0000
+Subject: [PATCH v3 0/2] ARM: dts: imx7: add NAND support
+In-Reply-To: <20170601192044.6548-1-stefan@agner.ch>
+References: <20170601192044.6548-1-stefan@agner.ch>
+Message-ID: <3c086d95-96e5-71ec-b44f-12ed41903fcf@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use software polling (PHY_POLL) to check for link state changes instead
-of relying on the EMAC's hardware polling feature.  Some PHY drivers
-are unable to get a functioning link because the HW polling is not
-robust enough.
 
-The EMAC is able to poll the PHY on the MDIO bus looking for link state
-changes (via the Link Status bit in the Status Register at address 0x1).
-When the link state changes, the EMAC triggers an interrupt and tells the
-driver what the new state is.  The feature eliminates the need for
-software to poll the MDIO bus.
 
-Unfortunately, this feature is incompatible with phylib, because it
-ignores everything that the PHY core and PHY drivers are trying to do.
-In particular:
-
-1. It assumes a compatible register set, so PHYs with different registers
-   may not work.
-
-2. It doesn't allow for hardware errata that have work-arounds implemented
-   in the PHY driver.
-
-3. It doesn't support multiple register pages. If the PHY core switches
-   the register set to another page, the EMAC won't know the page has
-   changed and will still attempt to read the same PHY register.
-
-4. It only checks the copper side of the link, not the SGMII side.  Some
-   PHY drivers (e.g. at803x) may also check the SGMII side, and
-   report the link as not ready during autonegotiation if the SGMII link
-   is still down.  Phylib then waits for another interrupt to query
-   the PHY again, but the EMAC won't send another interrupt because it
-   thinks the link is up.
-
-Cc: stable at vger.kernel.org # 4.11.x
-Tested-by: Manoj Iyer <manoj.iyer@canonical.com>
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
----
- drivers/net/ethernet/qualcomm/emac/emac-mac.c |  2 +-
- drivers/net/ethernet/qualcomm/emac/emac-phy.c | 75 ++-------------------------
- drivers/net/ethernet/qualcomm/emac/emac.c     | 22 +-------
- 3 files changed, 6 insertions(+), 93 deletions(-)
-
-diff --git a/drivers/net/ethernet/qualcomm/emac/emac-mac.c b/drivers/net/ethernet/qualcomm/emac/emac-mac.c
-index e635605..1c0dbaa 100644
---- a/drivers/net/ethernet/qualcomm/emac/emac-mac.c
-+++ b/drivers/net/ethernet/qualcomm/emac/emac-mac.c
-@@ -932,7 +932,7 @@ int emac_mac_up(struct emac_adapter *adpt)
- 	emac_mac_config(adpt);
- 	emac_mac_rx_descs_refill(adpt, &adpt->rx_q);
- 
--	adpt->phydev->irq = PHY_IGNORE_INTERRUPT;
-+	adpt->phydev->irq = PHY_POLL;
- 	ret = phy_connect_direct(netdev, adpt->phydev, emac_adjust_link,
- 				 PHY_INTERFACE_MODE_SGMII);
- 	if (ret) {
-diff --git a/drivers/net/ethernet/qualcomm/emac/emac-phy.c b/drivers/net/ethernet/qualcomm/emac/emac-phy.c
-index 441c1936..18461fc 100644
---- a/drivers/net/ethernet/qualcomm/emac/emac-phy.c
-+++ b/drivers/net/ethernet/qualcomm/emac/emac-phy.c
-@@ -13,15 +13,11 @@
- /* Qualcomm Technologies, Inc. EMAC PHY Controller driver.
-  */
- 
--#include <linux/module.h>
--#include <linux/of.h>
--#include <linux/of_net.h>
- #include <linux/of_mdio.h>
- #include <linux/phy.h>
- #include <linux/iopoll.h>
- #include <linux/acpi.h>
- #include "emac.h"
--#include "emac-mac.h"
- 
- /* EMAC base register offsets */
- #define EMAC_MDIO_CTRL                                        0x001414
-@@ -52,62 +48,10 @@
- 
- #define MDIO_WAIT_TIMES                                           1000
- 
--#define EMAC_LINK_SPEED_DEFAULT (\
--		EMAC_LINK_SPEED_10_HALF  |\
--		EMAC_LINK_SPEED_10_FULL  |\
--		EMAC_LINK_SPEED_100_HALF |\
--		EMAC_LINK_SPEED_100_FULL |\
--		EMAC_LINK_SPEED_1GB_FULL)
--
--/**
-- * emac_phy_mdio_autopoll_disable() - disable mdio autopoll
-- * @adpt: the emac adapter
-- *
-- * The autopoll feature takes over the MDIO bus.  In order for
-- * the PHY driver to be able to talk to the PHY over the MDIO
-- * bus, we need to temporarily disable the autopoll feature.
-- */
--static int emac_phy_mdio_autopoll_disable(struct emac_adapter *adpt)
--{
--	u32 val;
--
--	/* disable autopoll */
--	emac_reg_update32(adpt->base + EMAC_MDIO_CTRL, MDIO_AP_EN, 0);
--
--	/* wait for any mdio polling to complete */
--	if (!readl_poll_timeout(adpt->base + EMAC_MDIO_CTRL, val,
--				!(val & MDIO_BUSY), 100, MDIO_WAIT_TIMES * 100))
--		return 0;
--
--	/* failed to disable; ensure it is enabled before returning */
--	emac_reg_update32(adpt->base + EMAC_MDIO_CTRL, 0, MDIO_AP_EN);
--
--	return -EBUSY;
--}
--
--/**
-- * emac_phy_mdio_autopoll_disable() - disable mdio autopoll
-- * @adpt: the emac adapter
-- *
-- * The EMAC has the ability to poll the external PHY on the MDIO
-- * bus for link state changes.  This eliminates the need for the
-- * driver to poll the phy.  If if the link state does change,
-- * the EMAC issues an interrupt on behalf of the PHY.
-- */
--static void emac_phy_mdio_autopoll_enable(struct emac_adapter *adpt)
--{
--	emac_reg_update32(adpt->base + EMAC_MDIO_CTRL, 0, MDIO_AP_EN);
--}
--
- static int emac_mdio_read(struct mii_bus *bus, int addr, int regnum)
- {
- 	struct emac_adapter *adpt = bus->priv;
- 	u32 reg;
--	int ret;
--
--	ret = emac_phy_mdio_autopoll_disable(adpt);
--	if (ret)
--		return ret;
- 
- 	emac_reg_update32(adpt->base + EMAC_PHY_STS, PHY_ADDR_BMSK,
- 			  (addr << PHY_ADDR_SHFT));
-@@ -122,24 +66,15 @@ static int emac_mdio_read(struct mii_bus *bus, int addr, int regnum)
- 	if (readl_poll_timeout(adpt->base + EMAC_MDIO_CTRL, reg,
- 			       !(reg & (MDIO_START | MDIO_BUSY)),
- 			       100, MDIO_WAIT_TIMES * 100))
--		ret = -EIO;
--	else
--		ret = (reg >> MDIO_DATA_SHFT) & MDIO_DATA_BMSK;
-+		return -EIO;
- 
--	emac_phy_mdio_autopoll_enable(adpt);
--
--	return ret;
-+	return (reg >> MDIO_DATA_SHFT) & MDIO_DATA_BMSK;
- }
- 
- static int emac_mdio_write(struct mii_bus *bus, int addr, int regnum, u16 val)
- {
- 	struct emac_adapter *adpt = bus->priv;
- 	u32 reg;
--	int ret;
--
--	ret = emac_phy_mdio_autopoll_disable(adpt);
--	if (ret)
--		return ret;
- 
- 	emac_reg_update32(adpt->base + EMAC_PHY_STS, PHY_ADDR_BMSK,
- 			  (addr << PHY_ADDR_SHFT));
-@@ -155,11 +90,9 @@ static int emac_mdio_write(struct mii_bus *bus, int addr, int regnum, u16 val)
- 	if (readl_poll_timeout(adpt->base + EMAC_MDIO_CTRL, reg,
- 			       !(reg & (MDIO_START | MDIO_BUSY)), 100,
- 			       MDIO_WAIT_TIMES * 100))
--		ret = -EIO;
-+		return -EIO;
- 
--	emac_phy_mdio_autopoll_enable(adpt);
--
--	return ret;
-+	return 0;
- }
- 
- /* Configure the MDIO bus and connect the external PHY */
-diff --git a/drivers/net/ethernet/qualcomm/emac/emac.c b/drivers/net/ethernet/qualcomm/emac/emac.c
-index 28a8cdc..98a326f 100644
---- a/drivers/net/ethernet/qualcomm/emac/emac.c
-+++ b/drivers/net/ethernet/qualcomm/emac/emac.c
-@@ -50,19 +50,7 @@
- #define DMAR_DLY_CNT_DEF				    15
- #define DMAW_DLY_CNT_DEF				     4
- 
--#define IMR_NORMAL_MASK         (\
--		ISR_ERROR       |\
--		ISR_GPHY_LINK   |\
--		ISR_TX_PKT      |\
--		GPHY_WAKEUP_INT)
--
--#define IMR_EXTENDED_MASK       (\
--		SW_MAN_INT      |\
--		ISR_OVER        |\
--		ISR_ERROR       |\
--		ISR_GPHY_LINK   |\
--		ISR_TX_PKT      |\
--		GPHY_WAKEUP_INT)
-+#define IMR_NORMAL_MASK		(ISR_ERROR | ISR_OVER | ISR_TX_PKT)
- 
- #define ISR_TX_PKT      (\
- 	TX_PKT_INT      |\
-@@ -70,10 +58,6 @@
- 	TX_PKT_INT2     |\
- 	TX_PKT_INT3)
- 
--#define ISR_GPHY_LINK        (\
--	GPHY_LINK_UP_INT     |\
--	GPHY_LINK_DOWN_INT)
--
- #define ISR_OVER        (\
- 	RFD0_UR_INT     |\
- 	RFD1_UR_INT     |\
-@@ -187,10 +171,6 @@ irqreturn_t emac_isr(int _irq, void *data)
- 	if (status & ISR_OVER)
- 		net_warn_ratelimited("warning: TX/RX overflow\n");
- 
--	/* link event */
--	if (status & ISR_GPHY_LINK)
--		phy_mac_interrupt(adpt->phydev, !!(status & GPHY_LINK_UP_INT));
--
- exit:
- 	/* enable the interrupt */
- 	writel(irq->mask, adpt->base + EMAC_INT_MASK);
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+On 06/01/2017 02:20 PM, Stefan Agner wrote:
+> This are the missing device tree parts to add NAND support for i.MX 7.
+> See previous patchset:
+> https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Flkml.org%2Flkml%2F2017%2F4%2F21%2F832&data=01%7C01%7Chan.xu%40nxp.com%7C3b9081a68c94476c4a2108d4a9235512%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0&sdata=mQ2aq5rW%2B9uADY5mSzFxk8P6bAVq%2BosPJQAi0PL9SQg%3D&reserved=0
+>
+> The previous version also included driver changes, which are already
+> merged.
+>
+> --
+> Stefan
+>
+> Changes since v2:
+> - Only specify IMX7D_NAND_USDHC_BUS_ROOT_CLK which seems to be sufficent
+Hi Stefan, sorry I didn't reply your last patch. I was unable to fully 
+test on i.MX7 since the work bandwidth, but the quick test shows DMA 
+cannot work WITHOUT IMX7D_NAND_ROOT_CLK on my side, I will fully check 
+it tomorrow morning and let you know the result.
+> - Dropped driver changes, alreay merged
+>
+> Changes since v1:
+> - Make clks_count const
+> - Introduce IS_IMX7D for i.MX 7 SoC's and make it part of GPMI_IS_MX6
+>
+> Stefan Agner (2):
+>    ARM: dts: imx7: add GPMI NAND
+>    ARM: dts: imx7-colibri: add NAND support
+>
+>   arch/arm/boot/dts/imx7-colibri.dtsi |  9 +++++++++
+>   arch/arm/boot/dts/imx7s.dtsi        | 31 +++++++++++++++++++++++++++++++
+>   2 files changed, 40 insertions(+)
+>
