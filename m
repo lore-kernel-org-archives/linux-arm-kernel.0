@@ -1,90 +1,75 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  1 Jun 2017 11:21:07 +0100
-Subject: [PATCH v2 15/25] KVM: arm64: vgic-v3: Add misc Group-0 handlers
+Date: Thu,  1 Jun 2017 11:21:02 +0100
+Subject: [PATCH v2 10/25] KVM: arm64: vgic-v3: Add ICV_HPPIR1_EL1 handler
 In-Reply-To: <20170601102117.17750-1-marc.zyngier@arm.com>
 References: <20170601102117.17750-1-marc.zyngier@arm.com>
-Message-ID: <20170601102117.17750-16-marc.zyngier@arm.com>
+Message-ID: <20170601102117.17750-11-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A number of Group-0 registers can be handled by the same accessors
-as that of Group-1, so let's add the required system register encodings
-and catch them in the dispatching function.
+Add a handler for reading the guest's view of the ICV_HPPIR1_EL1
+register. This is a simple parsing of the available LRs, extracting the
+highest available interrupt.
 
 Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/sysreg.h | 4 ++++
- virt/kvm/arm/hyp/vgic-v3-sr.c   | 7 +++++++
- 2 files changed, 11 insertions(+)
+ arch/arm64/include/asm/sysreg.h |  1 +
+ virt/kvm/arm/hyp/vgic-v3-sr.c   | 23 +++++++++++++++++++++++
+ 2 files changed, 24 insertions(+)
 
 diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index ba93bc7ac8e4..9971c5c435a7 100644
+index aad46b8eea5e..bd000686194a 100644
 --- a/arch/arm64/include/asm/sysreg.h
 +++ b/arch/arm64/include/asm/sysreg.h
-@@ -180,7 +180,11 @@
- 
- #define SYS_VBAR_EL1			sys_reg(3, 0, 12, 0, 0)
- 
-+#define SYS_ICC_IAR0_EL1		sys_reg(3, 0, 12, 8, 0)
-+#define SYS_ICC_EOIR0_EL1		sys_reg(3, 0, 12, 8, 1)
-+#define SYS_ICC_HPPIR0_EL1		sys_reg(3, 0, 12, 8, 2)
- #define SYS_ICC_BPR0_EL1		sys_reg(3, 0, 12, 8, 3)
-+#define SYS_ICC_AP0Rn_EL1(n)		sys_reg(3, 0, 12, 8, 4 | n)
- #define SYS_ICC_AP1Rn_EL1(n)		sys_reg(3, 0, 12, 9, n)
- #define SYS_ICC_DIR_EL1			sys_reg(3, 0, 12, 11, 1)
+@@ -185,6 +185,7 @@
  #define SYS_ICC_SGI1R_EL1		sys_reg(3, 0, 12, 11, 5)
+ #define SYS_ICC_IAR1_EL1		sys_reg(3, 0, 12, 12, 0)
+ #define SYS_ICC_EOIR1_EL1		sys_reg(3, 0, 12, 12, 1)
++#define SYS_ICC_HPPIR1_EL1		sys_reg(3, 0, 12, 12, 2)
+ #define SYS_ICC_BPR1_EL1		sys_reg(3, 0, 12, 12, 3)
+ #define SYS_ICC_CTLR_EL1		sys_reg(3, 0, 12, 12, 4)
+ #define SYS_ICC_SRE_EL1			sys_reg(3, 0, 12, 12, 5)
 diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index b1b9129da045..5ff788d308ee 100644
+index d4f07f84602d..f0bc711db258 100644
 --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
 +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -872,9 +872,11 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
- 	is_read = (esr & ESR_ELx_SYS64_ISS_DIR_MASK) == ESR_ELx_SYS64_ISS_DIR_READ;
+@@ -772,6 +772,26 @@ static void __hyp_text __vgic_v3_write_apxr3(struct kvm_vcpu *vcpu,
+ 	__vgic_v3_write_apxrn(vcpu, rt, 3);
+ }
  
- 	switch (sysreg) {
-+	case SYS_ICC_IAR0_EL1:
- 	case SYS_ICC_IAR1_EL1:
- 		fn = __vgic_v3_read_iar;
- 		break;
-+	case SYS_ICC_EOIR0_EL1:
- 	case SYS_ICC_EOIR1_EL1:
- 		fn = __vgic_v3_write_eoir;
- 		break;
-@@ -890,30 +892,35 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
- 		else
- 			fn = __vgic_v3_write_bpr1;
- 		break;
-+	case SYS_ICC_AP0Rn_EL1(0):
- 	case SYS_ICC_AP1Rn_EL1(0):
- 		if (is_read)
- 			fn = __vgic_v3_read_apxr0;
- 		else
- 			fn = __vgic_v3_write_apxr0;
- 		break;
-+	case SYS_ICC_AP0Rn_EL1(1):
- 	case SYS_ICC_AP1Rn_EL1(1):
- 		if (is_read)
- 			fn = __vgic_v3_read_apxr1;
- 		else
- 			fn = __vgic_v3_write_apxr1;
- 		break;
-+	case SYS_ICC_AP0Rn_EL1(2):
- 	case SYS_ICC_AP1Rn_EL1(2):
- 		if (is_read)
- 			fn = __vgic_v3_read_apxr2;
- 		else
- 			fn = __vgic_v3_write_apxr2;
- 		break;
-+	case SYS_ICC_AP0Rn_EL1(3):
- 	case SYS_ICC_AP1Rn_EL1(3):
- 		if (is_read)
- 			fn = __vgic_v3_read_apxr3;
++static void __hyp_text __vgic_v3_read_hppir(struct kvm_vcpu *vcpu,
++					    u32 vmcr, int rt)
++{
++	u64 lr_val;
++	int lr, lr_grp, grp;
++
++	grp = __vgic_v3_get_group(vcpu);
++
++	lr = __vgic_v3_highest_priority_lr(vcpu, vmcr, &lr_val);
++	if (lr == -1)
++		goto spurious;
++
++	lr_grp = !!(lr_val & ICH_LR_GROUP);
++	if (lr_grp != grp)
++		lr_val = ICC_IAR1_EL1_SPURIOUS;
++
++spurious:
++	vcpu_set_reg(vcpu, rt, lr_val & ICH_LR_VIRTUAL_ID_MASK);
++}
++
+ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
+ {
+ 	int rt;
+@@ -836,6 +856,9 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
  		else
  			fn = __vgic_v3_write_apxr3;
  		break;
-+	case SYS_ICC_HPPIR0_EL1:
- 	case SYS_ICC_HPPIR1_EL1:
- 		fn = __vgic_v3_read_hppir;
- 		break;
++	case SYS_ICC_HPPIR1_EL1:
++		fn = __vgic_v3_read_hppir;
++		break;
+ 	default:
+ 		return 0;
+ 	}
 -- 
 2.11.0
