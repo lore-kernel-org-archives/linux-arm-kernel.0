@@ -1,57 +1,92 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  1 Jun 2017 16:55:33 +0200
-Subject: [PATCH v3 0/9] Improve cp110 clk support on Marvell Armada 7K/8K
-Message-ID: <cover.6bb422e6a233460049bb63792b32a5ba851dcddd.1496328934.git-series.gregory.clement@free-electrons.com>
+Date: Thu,  1 Jun 2017 16:55:34 +0200
+Subject: [PATCH v3 1/9] clk: mvebu: cp110: make failure labels more meaningful
+In-Reply-To: <cover.6bb422e6a233460049bb63792b32a5ba851dcddd.1496328934.git-series.gregory.clement@free-electrons.com>
+References: <cover.6bb422e6a233460049bb63792b32a5ba851dcddd.1496328934.git-series.gregory.clement@free-electrons.com>
+Message-ID: <29e6beb5a55fe79c94e0f746d0de7bd851cd3618.1496328934.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+In preparation to the addition of a new clock, rename the goto labels
+used to handle the failure cases using a name related to the failure
+cause. This will allow to insert additional failing cases without
+renaming all the labels.
 
-We got more information about the clock controllers and the clock tree
-of the CP110 part that we find in the Marvell Armada 7K/8K SoCs.
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/clk/mvebu/cp110-system-controller.c | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
-In this 3rd version I removed the GOP changes because the clock is
-actually shared between GOP and SD/eMMC.
-
-The last two patches modifying the device tree _must_ be merged
-through the mvebu tree to avoid future conflict (especially with the
-recent ICU series sent by Thomas Petazzoni).
-
-Changelog:
-v2 -> v3
- - removed the GOP changed
-cover letter for v2:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/509816.html
-
-v1 -> v2
- - split the patch to have separate patch for the binding documentation
- - added the acked-by from Rob Herring
-cover letter for v2:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/507381.html
-
-Thanks,
-
-Gregory
-
-Gregory CLEMENT (8):
-  clk: mvebu: cp110: make failure labels more meaningful
-  dt-bindings: cp110: do not depend anymore of the *-clock-output-names
-  clk: mvebu: cp110: do not depend anymore of the *-clock-output-names
-  dt-bindings: cp110: introduce a new binding
-  clk: mvebu: cp110: introduce a new binding
-  dt-bindings: cp110: add sdio clock to cp-110 system controller
-  arm64: dts: marvell: remove *-clock-output-names on cp110
-  arm64: dts: marvell: use new binding for the system controller on cp110
-
-Konstantin Porotchkin (1):
-  clk: mvebu: cp110: add sdio clock to cp-110 system controller
-
- Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt |  33 +++++-------
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi                       |  54 +++++++------------
- arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi                        |  48 ++++++-----------
- drivers/clk/mvebu/cp110-system-controller.c                                | 200 +++++++++++++++++++++++++++++++++++++++++++++++++-----------------------
- 4 files changed, 194 insertions(+), 141 deletions(-)
-
-base-commit: 2ea659a9ef488125eb46da6eb571de5eae5c43f6
+diff --git a/drivers/clk/mvebu/cp110-system-controller.c b/drivers/clk/mvebu/cp110-system-controller.c
+index 6b11d7b3e0e0..3b27a6056c73 100644
+--- a/drivers/clk/mvebu/cp110-system-controller.c
++++ b/drivers/clk/mvebu/cp110-system-controller.c
+@@ -221,7 +221,7 @@ static int cp110_syscon_clk_probe(struct platform_device *pdev)
+ 					1000 * 1000 * 1000);
+ 	if (IS_ERR(hw)) {
+ 		ret = PTR_ERR(hw);
+-		goto fail0;
++		goto fail_apll;
+ 	}
+ 
+ 	cp110_clks[CP110_CORE_APLL] = hw;
+@@ -232,7 +232,7 @@ static int cp110_syscon_clk_probe(struct platform_device *pdev)
+ 	hw = clk_hw_register_fixed_factor(NULL, ppv2_name, apll_name, 0, 1, 3);
+ 	if (IS_ERR(hw)) {
+ 		ret = PTR_ERR(hw);
+-		goto fail1;
++		goto fail_ppv2;
+ 	}
+ 
+ 	cp110_clks[CP110_CORE_PPV2] = hw;
+@@ -243,7 +243,7 @@ static int cp110_syscon_clk_probe(struct platform_device *pdev)
+ 	hw = clk_hw_register_fixed_factor(NULL, eip_name, apll_name, 0, 1, 2);
+ 	if (IS_ERR(hw)) {
+ 		ret = PTR_ERR(hw);
+-		goto fail2;
++		goto fail_eip;
+ 	}
+ 
+ 	cp110_clks[CP110_CORE_EIP] = hw;
+@@ -254,7 +254,7 @@ static int cp110_syscon_clk_probe(struct platform_device *pdev)
+ 	hw = clk_hw_register_fixed_factor(NULL, core_name, eip_name, 0, 1, 2);
+ 	if (IS_ERR(hw)) {
+ 		ret = PTR_ERR(hw);
+-		goto fail3;
++		goto fail_core;
+ 	}
+ 
+ 	cp110_clks[CP110_CORE_CORE] = hw;
+@@ -270,7 +270,7 @@ static int cp110_syscon_clk_probe(struct platform_device *pdev)
+ 						   core_name, 0, 1, 1);
+ 	if (IS_ERR(hw)) {
+ 		ret = PTR_ERR(hw);
+-		goto fail4;
++		goto fail_nand;
+ 	}
+ 
+ 	cp110_clks[CP110_CORE_NAND] = hw;
+@@ -365,15 +365,15 @@ static int cp110_syscon_clk_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	clk_hw_unregister_fixed_factor(cp110_clks[CP110_CORE_NAND]);
+-fail4:
++fail_nand:
+ 	clk_hw_unregister_fixed_factor(cp110_clks[CP110_CORE_CORE]);
+-fail3:
++fail_core:
+ 	clk_hw_unregister_fixed_factor(cp110_clks[CP110_CORE_EIP]);
+-fail2:
++fail_eip:
+ 	clk_hw_unregister_fixed_factor(cp110_clks[CP110_CORE_PPV2]);
+-fail1:
++fail_ppv2:
+ 	clk_hw_unregister_fixed_rate(cp110_clks[CP110_CORE_APLL]);
+-fail0:
++fail_apll:
+ 	return ret;
+ }
+ 
 -- 
 git-series 0.9.1
