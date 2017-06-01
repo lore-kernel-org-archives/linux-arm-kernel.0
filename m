@@ -1,65 +1,52 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  1 Jun 2017 11:21:15 +0100
-Subject: [PATCH v2 23/25] KVM: arm64: vgic-v3: Add ICV_PMR_EL1 handler
-In-Reply-To: <20170601102117.17750-1-marc.zyngier@arm.com>
-References: <20170601102117.17750-1-marc.zyngier@arm.com>
-Message-ID: <20170601102117.17750-24-marc.zyngier@arm.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Thu,  1 Jun 2017 12:27:00 +0200
+Subject: [PATCH v2] ARM: dts: armadillo800eva: Split LCD mux and gpio
+Message-ID: <1496312820-27237-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a handler for reading/writing the guest's view of the ICC_PMR_EL1
-register, which is located in the ICH_VMCR_EL2.VPMR field.
+Configuration of the lcd0 pinmux group and GPIO hog for the external
+GPIO mux are done using a single device node, causing the "output-high"
+property to be applied to both.  This will fail for the pinmux group,
+but doesn't cause any harm, as the failure is ignored silently.
 
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+However, after "pinctrl: sh-pfc: propagate errors on group config", the
+failure will become fatal, leading to a broken display:
+
+    sh-pfc e6050000.pin-controller: pin_config_group_set op failed for group 102
+    sh-pfc e6050000.pin-controller: Error applying setting, reverse things back
+    sh-pfc e6050000.pin-controller: failed to select default state
+
+Move the GPIO hog to its own node to fix this.
+
+Fixes: ffd2f9a5afb730b9 ("ARM: shmobile: armadillo800eva dts: Add pinctrl and gpio-hog for lcdc0")
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- virt/kvm/arm/hyp/vgic-v3-sr.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+This is a hard dependency for "pinctrl: sh-pfc: propagate errors on
+group config" (https://patchwork.kernel.org/patch/9186713/).
 
-diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index 3a5749e6c797..3c6b7d46754a 100644
---- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -874,6 +874,27 @@ static void __hyp_text __vgic_v3_read_hppir(struct kvm_vcpu *vcpu,
- 	vcpu_set_reg(vcpu, rt, lr_val & ICH_LR_VIRTUAL_ID_MASK);
- }
+v2:
+  - Keep the GPIO hog, but move it to its own node, instead of using
+    another level of subnodes.  As the GPIO hog node is not referenced from
+    a pinctrl-0 property, pinconf doesn't fail with "No pin or group
+    provided in DT node".
+---
+ arch/arm/boot/dts/r8a7740-armadillo800eva.dts | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
+index 297b1f10f7346a9f..8c85d3ee5f5e7bfd 100644
+--- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
++++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
+@@ -273,7 +273,9 @@
+ 	lcd0_pins: lcd0 {
+ 		groups = "lcd0_data24_0", "lcd0_lclk_1", "lcd0_sync";
+ 		function = "lcd0";
++	};
  
-+static void __hyp_text __vgic_v3_read_pmr(struct kvm_vcpu *vcpu,
-+					  u32 vmcr, int rt)
-+{
-+	vmcr &= ICH_VMCR_PMR_MASK;
-+	vmcr >>= ICH_VMCR_PMR_SHIFT;
-+	vcpu_set_reg(vcpu, rt, vmcr);
-+}
-+
-+static void __hyp_text __vgic_v3_write_pmr(struct kvm_vcpu *vcpu,
-+					   u32 vmcr, int rt)
-+{
-+	u32 val = vcpu_get_reg(vcpu, rt);
-+
-+	val <<= ICH_VMCR_PMR_SHIFT;
-+	val &= ICH_VMCR_PMR_MASK;
-+	vmcr &= ~ICH_VMCR_PMR_MASK;
-+	vmcr |= val;
-+
-+	write_gicreg(vmcr, ICH_VMCR_EL2);
-+}
-+
- static void __hyp_text __vgic_v3_read_rpr(struct kvm_vcpu *vcpu,
- 					  u32 vmcr, int rt)
- {
-@@ -1019,6 +1040,12 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
- 		else
- 			fn = __vgic_v3_write_ctlr;
- 		break;
-+	case SYS_ICC_PMR_EL1:
-+		if (is_read)
-+			fn = __vgic_v3_read_pmr;
-+		else
-+			fn = __vgic_v3_write_pmr;
-+		break;
- 	default:
- 		return 0;
- 	}
++	lcd0_mux {
+ 		/* DBGMD/LCDC0/FSIA MUX */
+ 		gpio-hog;
+ 		gpios = <176 0>;
 -- 
-2.11.0
+2.7.4
