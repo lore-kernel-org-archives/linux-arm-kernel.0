@@ -1,49 +1,92 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu,  1 Jun 2017 22:06:01 +0200
-Subject: [PATCH v4 6/6] ARM: at91: debug: add samv7x support
+Date: Thu,  1 Jun 2017 22:06:00 +0200
+Subject: [PATCH v4 5/6] ARM: at91: add armv7m SoC detection
 In-Reply-To: <20170601200601.11035-1-alexandre.belloni@free-electrons.com>
 References: <20170601200601.11035-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170601200601.11035-7-alexandre.belloni@free-electrons.com>
+Message-ID: <20170601200601.11035-6-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Szemz? Andr?s <sza@esh.hu>
 
-Add support for low level debugging on Atmel samv7x.
+Add SAME70/V71/S70/V70 chip-ids to SoC detection.
 
 Signed-off-by: Szemz? Andr?s <sza@esh.hu>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/Kconfig.debug | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/soc/atmel/soc.c | 24 ++++++++++++++++++++++++
+ drivers/soc/atmel/soc.h | 26 ++++++++++++++++++++++++++
+ 2 files changed, 50 insertions(+)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 426d2716f55d..e10fb1842b1d 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -145,6 +145,15 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  on the USART3 port of sama5d4.
+diff --git a/drivers/soc/atmel/soc.c b/drivers/soc/atmel/soc.c
+index 4790094b498e..c1363c83c352 100644
+--- a/drivers/soc/atmel/soc.c
++++ b/drivers/soc/atmel/soc.c
+@@ -107,6 +107,30 @@ static const struct at91_soc __initconst socs[] = {
+ 	AT91_SOC(SAMA5D4_CIDR_MATCH, SAMA5D44_EXID_MATCH,
+ 		 "sama5d44", "sama5d4"),
+ #endif
++#ifdef CONFIG_SOC_SAMV7
++	AT91_SOC(SAME70Q21_CIDR_MATCH, SAME70Q21_EXID_MATCH,
++		 "same70q21", "same7"),
++	AT91_SOC(SAME70Q20_CIDR_MATCH, SAME70Q20_EXID_MATCH,
++		 "same70q20", "same7"),
++	AT91_SOC(SAME70Q19_CIDR_MATCH, SAME70Q19_EXID_MATCH,
++		 "same70q19", "same7"),
++	AT91_SOC(SAMS70Q21_CIDR_MATCH, SAMS70Q21_EXID_MATCH,
++		 "sams70q21", "sams7"),
++	AT91_SOC(SAMS70Q20_CIDR_MATCH, SAMS70Q20_EXID_MATCH,
++		 "sams70q20", "sams7"),
++	AT91_SOC(SAMS70Q19_CIDR_MATCH, SAMS70Q19_EXID_MATCH,
++		 "sams70q19", "sams7"),
++	AT91_SOC(SAMV71Q21_CIDR_MATCH, SAMV71Q21_EXID_MATCH,
++		 "samv71q21", "samv7"),
++	AT91_SOC(SAMV71Q20_CIDR_MATCH, SAMV71Q20_EXID_MATCH,
++		 "samv71q20", "samv7"),
++	AT91_SOC(SAMV71Q19_CIDR_MATCH, SAMV71Q19_EXID_MATCH,
++		 "samv71q19", "samv7"),
++	AT91_SOC(SAMV70Q20_CIDR_MATCH, SAMV70Q20_EXID_MATCH,
++		 "samv70q20", "samv7"),
++	AT91_SOC(SAMV70Q19_CIDR_MATCH, SAMV70Q19_EXID_MATCH,
++		 "samv70q19", "samv7"),
++#endif
+ 	{ /* sentinel */ },
+ };
  
-+	config DEBUG_AT91_SAMV7_USART1
-+		bool "Kernel low-level debugging via SAMV7 USART1"
-+		select DEBUG_AT91_UART
-+		depends on SOC_SAMV7
-+		help
-+		  Say Y here if you want the debug print routines to direct
-+		  their output to the USART1 port on SAMV7 based
-+		  machines.
+diff --git a/drivers/soc/atmel/soc.h b/drivers/soc/atmel/soc.h
+index 228efded5085..a90bd5b0ef8f 100644
+--- a/drivers/soc/atmel/soc.h
++++ b/drivers/soc/atmel/soc.h
+@@ -88,4 +88,30 @@ at91_soc_init(const struct at91_soc *socs);
+ #define SAMA5D43_EXID_MATCH		0x00000003
+ #define SAMA5D44_EXID_MATCH		0x00000004
+ 
++#define SAME70Q21_CIDR_MATCH		0x21020e00
++#define SAME70Q21_EXID_MATCH		0x00000002
++#define SAME70Q20_CIDR_MATCH		0x21020c00
++#define SAME70Q20_EXID_MATCH		0x00000002
++#define SAME70Q19_CIDR_MATCH		0x210d0a00
++#define SAME70Q19_EXID_MATCH		0x00000002
 +
- 	config DEBUG_BCM2835
- 		bool "Kernel low-level debugging on BCM2835 PL011 UART"
- 		depends on ARCH_BCM2835 && ARCH_MULTI_V6
-@@ -1481,6 +1490,7 @@ config DEBUG_UART_PHYS
- 	default 0x3f201000 if DEBUG_BCM2836
- 	default 0x3e000000 if DEBUG_BCM_KONA_UART
- 	default 0x4000e400 if DEBUG_LL_UART_EFM32
-+	default 0x40028000 if DEBUG_AT91_SAMV7_USART1
- 	default 0x40081000 if DEBUG_LPC18XX_UART0
- 	default 0x40090000 if DEBUG_LPC32XX
- 	default 0x40100000 if DEBUG_PXA_UART1
++#define SAMS70Q21_CIDR_MATCH		0x21120e00
++#define SAMS70Q21_EXID_MATCH		0x00000002
++#define SAMS70Q20_CIDR_MATCH		0x21120c00
++#define SAMS70Q20_EXID_MATCH		0x00000002
++#define SAMS70Q19_CIDR_MATCH		0x211d0a00
++#define SAMS70Q19_EXID_MATCH		0x00000002
++
++#define SAMV71Q21_CIDR_MATCH		0x21220e00
++#define SAMV71Q21_EXID_MATCH		0x00000002
++#define SAMV71Q20_CIDR_MATCH		0x21220c00
++#define SAMV71Q20_EXID_MATCH		0x00000002
++#define SAMV71Q19_CIDR_MATCH		0x212d0a00
++#define SAMV71Q19_EXID_MATCH		0x00000002
++
++#define SAMV70Q20_CIDR_MATCH		0x21320c00
++#define SAMV70Q20_EXID_MATCH		0x00000002
++#define SAMV70Q19_CIDR_MATCH		0x213d0a00
++#define SAMV70Q19_EXID_MATCH		0x00000002
++
+ #endif /* __AT91_SOC_H */
 -- 
 2.11.0
