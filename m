@@ -1,38 +1,58 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 1 Jun 2017 16:52:51 -0700
-Subject: [PATCH] ARM: dts: versatile: use #include "..." to include local
- DT
-In-Reply-To: <1495602610-18667-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1495602610-18667-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20170601235251.GB13314@localhost>
+Date: Thu, 1 Jun 2017 16:52:06 -0700
+Subject: [pull request][v3] soc/fsl/qbman: Enable QBMan on ARM Platforms
+In-Reply-To: <AM5PR0402MB2691C73822FA33F05AF9C678ECFC0@AM5PR0402MB2691.eurprd04.prod.outlook.com>
+References: <1495462842-14402-1-git-send-email-madalin.bucur@nxp.com>
+ <AM5PR0402MB2691C73822FA33F05AF9C678ECFC0@AM5PR0402MB2691.eurprd04.prod.outlook.com>
+Message-ID: <20170601235206.GA13314@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 24, 2017 at 02:10:10PM +0900, Masahiro Yamada wrote:
-> Most of DT files in ARM use #include "..." to make pre-processor
-> include DT in the same directory, but this is one of the exceptional
-> files that use #include <...> for that.
-> 
-> Fix it to remove -I$(srctree)/arch/$(SRCARCH)/boot/dts path from
-> dtc_cpp_flags.
-> 
-> ARM: dts: versatile: use #include "..." to include DT in the same directory
-> 
-> Most of DT files in ARM use #include "..." to make pre-processor
-> include DT in the same directory, but we have 3 exceptional files
-> that use #include <...> for that.
-> 
-> They must be fixed to remove -I$(srctree)/arch/$(SRCARCH)/boot/dts
-> path from dtc_cpp_flags.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
-> 
-> Arnd, Olof,
-> I could not find a sub-arch maintainer for versatile.
-> If nobody picks up this, could you take care of this?
+Hi,
 
-Applied to fixes. Thanks!
+On Fri, May 26, 2017 at 12:31:15PM +0000, Madalin-Cristian Bucur wrote:
+> Adding linux-arm-kernel at lists.infradead.org
+> 
+> > -----Original Message-----
+> > From: Madalin Bucur [mailto:madalin.bucur at nxp.com]
+> > Sent: Monday, May 22, 2017 5:21 PM
+> > To: arm at kernel.org
+> > Cc: Roy Pledge <roy.pledge@nxp.com>; oss at buserror.net;
+> > catalin.marinas at arm.com; Madalin-Cristian Bucur <madalin.bucur@nxp.com>
+> > Subject: [pull request][v3] soc/fsl/qbman: Enable QBMan on ARM Platforms
+> > 
+> > Hi,
+> > 
+> > This patch series enables DPAA1 QBMan devices for ARM and
+> > ARM64 architectures. This allows the LS1043A and LS1046A to use
+> > QBMan functionality.
+> > 
+> > Changes since v2:
+> > Fixed some misspellings
+> > Added 'no-map' constraint to device tree bindings
+> > Described ordering contraint on regions in the device tree
+> > Removed confusing comment regarding non-shareable mappings
+> > Added warning if old reserved-memory technique is used on ARM
+> > 
+> > Changes since v1:
+> > Reworked private memory allocations to use shared-dma-pool on ARM
+> > platforms
+> > 
+> > Thanks,
+> > Madalin
 
+So, here's a pull request for something called 'qbman' that obviously
+is related to Freescale SoCs, but there's no motivation at all as to why
+it's needed, what it does, and why we would be interested in merging it. DPAA1
+is also completely unexplained. A few words to give someone an idea what this
+is would be a good idea.
+
+Also, we normally ask that these pull requests come in through the
+maintainer maintainer, which for Freescale platform drivers is Scott
+Wood, or if preferred it can also come in through the overall Freescale
+ARM maintainers (Shawn Guo, Fabio Estavam or Sascha Hauer).
+
+
+Thanks,
 
 -Olof
