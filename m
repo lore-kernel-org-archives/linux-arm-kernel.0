@@ -1,326 +1,99 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  1 Jun 2017 16:55:42 +0200
-Subject: [PATCH v3 9/9] arm64: dts: marvell: use new binding for the system
- controller on cp110
-In-Reply-To: <cover.6bb422e6a233460049bb63792b32a5ba851dcddd.1496328934.git-series.gregory.clement@free-electrons.com>
-References: <cover.6bb422e6a233460049bb63792b32a5ba851dcddd.1496328934.git-series.gregory.clement@free-electrons.com>
-Message-ID: <9c5807cafb03413f4318f6c95a2e093bd9cdcdcf.1496328934.git-series.gregory.clement@free-electrons.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 1 Jun 2017 15:04:09 +0000
+Subject: [PATCH 0/2] arm64: acpi/pci: allow the firmware BAR configuration
+ to be preserved
+In-Reply-To: <20170518174612.GA31373@red-moon>
+References: <20170411163313.18577-1-ard.biesheuvel@linaro.org>
+ <20170517215611.GJ31462@bhelgaas-glaptop.roam.corp.google.com>
+ <CAKv+Gu9T7vH_LbKfS_40JUbLNK4PYrMi++eKbCq_MzBsuQxUDQ@mail.gmail.com>
+ <20170518140553.GA22106@bhelgaas-glaptop.roam.corp.google.com>
+ <CAKv+Gu_cug6cVrWP-zkptvNn3LxYk7b4Gd=iTzHHe3us3KwL3Q@mail.gmail.com>
+ <20170518154708.GA30182@red-moon>
+ <CAKv+Gu-NDR1PYUfOs4z-T9WoeBrYvFTTBt3XMiMg+AU76MbYBg@mail.gmail.com>
+ <20170518174612.GA31373@red-moon>
+Message-ID: <CAKv+Gu8hVhpNrXG+JUQu8XYZtQE86d0O66J8AORWDC6Ttcp3iA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new binding for the system controller on cp110 moved the clock
-controller into a subnode. This preliminary step will allow to add gpio
-and pinctrl subnodes.
+On 18 May 2017 at 18:46, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> On Thu, May 18, 2017 at 05:51:44PM +0100, Ard Biesheuvel wrote:
+>> On 18 May 2017 at 16:47, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+>> > On Thu, May 18, 2017 at 04:10:28PM +0100, Ard Biesheuvel wrote:
+>> >
+>> > [...]
+>> >
+>> >> >> Re _DSM: I think it makes sense to honour it, because it puts the
+>> >> >> allocation under the control of the firmware, which completely removes
+>> >> >> the burden of having to reason about a policy in the kernel. That
+>> >> >> leaves the question which will be the default, but that is of minor
+>> >> >> importance IMO.
+>> >> >
+>> >> > I agree; we should try to follow the spec unless we have a good reason
+>> >> > not to, which argues for honoring the _DSM, so I think it's worth a
+>> >> > try.  Booting with "pci=realloc" could override the _DSM and taint the
+>> >> > kernel (because we don't know the effect of reassigning something the
+>> >> > firmware told us not to touch).
+>> >> >
+>> >>
+>> >> I'd like to hear Lorenzo's view on this first, but I can certainly
+>> >> respin my _DSM patch to take pci=realloc into account, and move the
+>> >> handling to generic code as well.
+>> >
+>> > I agree with both of you on _DSM implementation and interpretation.
+>> >
+>> > Now, if we use it correctly (ie by the FW standard) on ARM64 systems we
+>> > are going to trigger regressions, that's certain (ie we can then boot
+>> > with pci=realloc - still, we are breaking systems), that's the reason
+>> > why for patch(2) I'd like to create a branch and send a CFT for ARM64
+>> > ACPI testing before queuing it (either I can set-up a testing branch
+>> > or we ask Bjorn to do it - as you guys prefer - as long as we have
+>> > a branch for people to test patch(2) on ARM64 ACPI systems).
+>> >
+>> > You still need to assign resources that could not be claimed though
+>> > so patch(2) still needs updating:
+>> >
+>> > PCI FW spec 3.1 - 4.6.5
+>> >
+>> > "...However, the operating system is free to configure the devices in this
+>> > hierarchy that have not been configured by the firmware."
+>> >
+>> > Which in kernel-speak it means that you have to assign resources that
+>> > could not be claimed.
+>> >
+>>
+>> Right. AFAICT this is the part that is typically handled by
+>> pcibios_resource_survey() et al, whose default __weak implementations
+>> are empty functions. Shall I override those for arm64 to host this
+>> logic?
+>
+> I think it makes sense yes unless Bjorn spots something wrong with that
+> but you should also call it in ARM64 pci_acpi_scan_root() since it is
+> not called by PCI core on non-hot-added bridges, I reckon you figured
+> that out already though.
+>
 
-Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 41 ++++++-------
- arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 35 +++++------
- 2 files changed, 41 insertions(+), 35 deletions(-)
+Another data point for this discussion: currently, when booting arm64
+via DT, we set PCI_REASSIGN_ALL_RSRC | PCI_REASSIGN_ALL_BUS (unless
+PCI_PROBE_ONLY is requested), which forces not only resource
+allocations but also the bus numbering to be reconfigured from
+scratch.
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-index a0f57a8e5dcb..96a4ff75b3b0 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-@@ -62,7 +62,7 @@
- 			cpm_ethernet: ethernet at 0 {
- 				compatible = "marvell,armada-7k-pp22";
- 				reg = <0x0 0x100000>, <0x129000 0xb000>;
--				clocks = <&cpm_syscon0 1 3>, <&cpm_syscon0 1 9>, <&cpm_syscon0 1 5>;
-+				clocks = <&cpm_clk 1 3>, <&cpm_clk 1 9>, <&cpm_clk 1 5>;
- 				clock-names = "pp_clk", "gop_clk", "mg_clk";
- 				status = "disabled";
- 				dma-coherent;
-@@ -97,10 +97,13 @@
- 			};
- 
- 			cpm_syscon0: system-controller at 440000 {
--				compatible = "marvell,cp110-system-controller0",
--					     "syscon";
-+				compatible = "syscon", "simple-mfd";
- 				reg = <0x440000 0x1000>;
--				#clock-cells = <2>;
-+
-+				cpm_clk: clock {
-+					compatible = "marvell,cp110-clock";
-+					#clock-cells = <2>;
-+				};
- 			};
- 
- 			cpm_rtc: rtc at 284000 {
-@@ -115,7 +118,7 @@
- 					     "generic-ahci";
- 				reg = <0x540000 0x30000>;
- 				interrupts = <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
--				clocks = <&cpm_syscon0 1 15>;
-+				clocks = <&cpm_clk 1 15>;
- 				status = "disabled";
- 			};
- 
-@@ -125,7 +128,7 @@
- 				reg = <0x500000 0x4000>;
- 				dma-coherent;
- 				interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
--				clocks = <&cpm_syscon0 1 22>;
-+				clocks = <&cpm_clk 1 22>;
- 				status = "disabled";
- 			};
- 
-@@ -135,7 +138,7 @@
- 				reg = <0x510000 0x4000>;
- 				dma-coherent;
- 				interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
--				clocks = <&cpm_syscon0 1 23>;
-+				clocks = <&cpm_clk 1 23>;
- 				status = "disabled";
- 			};
- 
-@@ -145,7 +148,7 @@
- 				      <0x6b0000 0x1000>;
- 				dma-coherent;
- 				msi-parent = <&gic_v2m0>;
--				clocks = <&cpm_syscon0 1 8>;
-+				clocks = <&cpm_clk 1 8>;
- 			};
- 
- 			cpm_xor1: xor at 6c0000 {
-@@ -154,7 +157,7 @@
- 				      <0x6d0000 0x1000>;
- 				dma-coherent;
- 				msi-parent = <&gic_v2m0>;
--				clocks = <&cpm_syscon0 1 7>;
-+				clocks = <&cpm_clk 1 7>;
- 			};
- 
- 			cpm_spi0: spi at 700600 {
-@@ -163,7 +166,7 @@
- 				#address-cells = <0x1>;
- 				#size-cells = <0x0>;
- 				cell-index = <1>;
--				clocks = <&cpm_syscon0 1 21>;
-+				clocks = <&cpm_clk 1 21>;
- 				status = "disabled";
- 			};
- 
-@@ -173,7 +176,7 @@
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				cell-index = <2>;
--				clocks = <&cpm_syscon0 1 21>;
-+				clocks = <&cpm_clk 1 21>;
- 				status = "disabled";
- 			};
- 
-@@ -183,7 +186,7 @@
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
--				clocks = <&cpm_syscon0 1 21>;
-+				clocks = <&cpm_clk 1 21>;
- 				status = "disabled";
- 			};
- 
-@@ -193,7 +196,7 @@
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
--				clocks = <&cpm_syscon0 1 21>;
-+				clocks = <&cpm_clk 1 21>;
- 				status = "disabled";
- 			};
- 
-@@ -201,7 +204,7 @@
- 				compatible = "marvell,armada-8k-rng", "inside-secure,safexcel-eip76";
- 				reg = <0x760000 0x7d>;
- 				interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
--				clocks = <&cpm_syscon0 1 25>;
-+				clocks = <&cpm_clk 1 25>;
- 				status = "okay";
- 			};
- 
-@@ -210,7 +213,7 @@
- 				reg = <0x780000 0x300>;
- 				interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
- 				clock-names = "core";
--				clocks = <&cpm_syscon0 1 4>;
-+				clocks = <&cpm_clk 1 4>;
- 				dma-coherent;
- 				status = "disabled";
- 			};
-@@ -227,7 +230,7 @@
- 					     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
- 				interrupt-names = "mem", "ring0", "ring1",
- 				"ring2", "ring3", "eip";
--				clocks = <&cpm_syscon0 1 26>;
-+				clocks = <&cpm_clk 1 26>;
- 				status = "disabled";
- 			};
- 		};
-@@ -254,7 +257,7 @@
- 			interrupt-map = <0 0 0 0 &gic 0 GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
- 			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
- 			num-lanes = <1>;
--			clocks = <&cpm_syscon0 1 13>;
-+			clocks = <&cpm_clk 1 13>;
- 			status = "disabled";
- 		};
- 
-@@ -281,7 +284,7 @@
- 			interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
- 
- 			num-lanes = <1>;
--			clocks = <&cpm_syscon0 1 11>;
-+			clocks = <&cpm_clk 1 11>;
- 			status = "disabled";
- 		};
- 
-@@ -308,7 +311,7 @@
- 			interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
- 
- 			num-lanes = <1>;
--			clocks = <&cpm_syscon0 1 12>;
-+			clocks = <&cpm_clk 1 12>;
- 			status = "disabled";
- 		};
- 	};
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-index 9584bc8d8b3f..48a658aa5b32 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-@@ -104,10 +104,13 @@
- 			};
- 
- 			cps_syscon0: system-controller at 440000 {
--				compatible = "marvell,cp110-system-controller0",
--					     "syscon";
-+				compatible = "syscon", "simple-mfd";
- 				reg = <0x440000 0x1000>;
--				#clock-cells = <2>;
-+
-+				cps_clk: clock {
-+					compatible = "marvell,cp110-clock";
-+					#clock-cells = <2>;
-+				};
- 			};
- 
- 			cps_sata0: sata at 540000 {
-@@ -115,7 +118,7 @@
- 					     "generic-ahci";
- 				reg = <0x540000 0x30000>;
- 				interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>;
--				clocks = <&cps_syscon0 1 15>;
-+				clocks = <&cps_clk 1 15>;
- 				status = "disabled";
- 			};
- 
-@@ -125,7 +128,7 @@
- 				reg = <0x500000 0x4000>;
- 				dma-coherent;
- 				interrupts = <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>;
--				clocks = <&cps_syscon0 1 22>;
-+				clocks = <&cps_clk 1 22>;
- 				status = "disabled";
- 			};
- 
-@@ -135,7 +138,7 @@
- 				reg = <0x510000 0x4000>;
- 				dma-coherent;
- 				interrupts = <GIC_SPI 285 IRQ_TYPE_LEVEL_HIGH>;
--				clocks = <&cps_syscon0 1 23>;
-+				clocks = <&cps_clk 1 23>;
- 				status = "disabled";
- 			};
- 
-@@ -145,7 +148,7 @@
- 				      <0x6b0000 0x1000>;
- 				dma-coherent;
- 				msi-parent = <&gic_v2m0>;
--				clocks = <&cps_syscon0 1 8>;
-+				clocks = <&cps_clk 1 8>;
- 			};
- 
- 			cps_xor1: xor at 6c0000 {
-@@ -154,7 +157,7 @@
- 				      <0x6d0000 0x1000>;
- 				dma-coherent;
- 				msi-parent = <&gic_v2m0>;
--				clocks = <&cps_syscon0 1 7>;
-+				clocks = <&cps_clk 1 7>;
- 			};
- 
- 			cps_spi0: spi at 700600 {
-@@ -163,7 +166,7 @@
- 				#address-cells = <0x1>;
- 				#size-cells = <0x0>;
- 				cell-index = <3>;
--				clocks = <&cps_syscon0 1 21>;
-+				clocks = <&cps_clk 1 21>;
- 				status = "disabled";
- 			};
- 
-@@ -173,7 +176,7 @@
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				cell-index = <4>;
--				clocks = <&cps_syscon0 1 21>;
-+				clocks = <&cps_clk 1 21>;
- 				status = "disabled";
- 			};
- 
-@@ -183,7 +186,7 @@
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				interrupts = <GIC_SPI 310 IRQ_TYPE_LEVEL_HIGH>;
--				clocks = <&cps_syscon0 1 21>;
-+				clocks = <&cps_clk 1 21>;
- 				status = "disabled";
- 			};
- 
-@@ -193,7 +196,7 @@
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				interrupts = <GIC_SPI 311 IRQ_TYPE_LEVEL_HIGH>;
--				clocks = <&cps_syscon0 1 21>;
-+				clocks = <&cps_clk 1 21>;
- 				status = "disabled";
- 			};
- 
-@@ -201,7 +204,7 @@
- 				compatible = "marvell,armada-8k-rng", "inside-secure,safexcel-eip76";
- 				reg = <0x760000 0x7d>;
- 				interrupts = <GIC_SPI 312 IRQ_TYPE_LEVEL_HIGH>;
--				clocks = <&cps_syscon0 1 25>;
-+				clocks = <&cps_clk 1 25>;
- 				status = "okay";
- 			};
- 
-@@ -244,7 +247,7 @@
- 			interrupt-map = <0 0 0 0 &gic 0 GIC_SPI 256 IRQ_TYPE_LEVEL_HIGH>;
- 			interrupts = <GIC_SPI 256 IRQ_TYPE_LEVEL_HIGH>;
- 			num-lanes = <1>;
--			clocks = <&cps_syscon0 1 13>;
-+			clocks = <&cps_clk 1 13>;
- 			status = "disabled";
- 		};
- 
-@@ -271,7 +274,7 @@
- 			interrupts = <GIC_SPI 258 IRQ_TYPE_LEVEL_HIGH>;
- 
- 			num-lanes = <1>;
--			clocks = <&cps_syscon0 1 11>;
-+			clocks = <&cps_clk 1 11>;
- 			status = "disabled";
- 		};
- 
-@@ -298,7 +301,7 @@
- 			interrupts = <GIC_SPI 257 IRQ_TYPE_LEVEL_HIGH>;
- 
- 			num-lanes = <1>;
--			clocks = <&cps_syscon0 1 12>;
-+			clocks = <&cps_clk 1 12>;
- 			status = "disabled";
- 		};
- 	};
+On arm64/ACPI, we never set those flags, which will cause
+pci_scan_bridge() to preserve the secondary and subordinate bridge
+numbers if they are non-zero. This actually prevents log messages like
+
+pci_bus 0000:02: busn_res: can not insert [bus 02-ff] under [bus
+00-7f] (conflicts with (null) [bus 00-7f])
+
+which I see on AMD Seattle as well as QEMU when booting via DT (and I
+suspect on any DT PCI root whose bus range != {0x0 0xff>). However, it
+also means that we already have different behavior between ACPI and DT
+boot on arm64, which makes it ambiguous what the behavior should be if
+_DSM indicates that the configuration should not be preserved. IOW,
+'reconfigure everything' currently means different things between DT
+and ACPI boot.
+
+Thoughts?
+
 -- 
-git-series 0.9.1
+Ard.
