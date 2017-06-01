@@ -1,20 +1,22 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 1 Jun 2017 13:06:41 +0800
-Subject: [PATCH 0/5] crypto: arm - enable module autoloading
-In-Reply-To: <1495362220-30044-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1495362220-30044-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20170601050641.GA12973@gondor.apana.org.au>
+From: erin.lo@mediatek.com (Erin Lo)
+Date: Thu, 1 Jun 2017 14:08:41 +0800
+Subject: [PATCH 0/3] Add some DT nodes for Mediatek MT2701
+Message-ID: <1496297324-21091-1-git-send-email-erin.lo@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 21, 2017 at 10:23:35AM +0000, Ard Biesheuvel wrote:
-> Now that the prerequisite changes are in place, we can modify the
-> various accelerated crypto modules that use special instructions to
-> expose the CPU feature they depend on. This allows udev to autoload
-> the module at boot.
+This patch series based on v4.12-rc1, include MT2701 ethernet/disp bls/display function DT nodes.
 
-All applied.  Thanks.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Sean Wang (1):
+  arm: dts: mt2701: Add ethernet device node
+
+YT Shen (2):
+  arm: dts: mt2701: Add display bls related nodes for MT2701
+  arm: dts: mt2701: Add display subsystem related nodes for MT2701
+
+ arch/arm/boot/dts/mt2701-evb.dts |  29 ++++++++++
+ arch/arm/boot/dts/mt2701.dtsi    | 113 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 142 insertions(+)
+
+--
+1.9.1
