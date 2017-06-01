@@ -1,52 +1,65 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu,  1 Jun 2017 12:27:00 +0200
-Subject: [PATCH v2] ARM: dts: armadillo800eva: Split LCD mux and gpio
-Message-ID: <1496312820-27237-1-git-send-email-geert+renesas@glider.be>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu,  1 Jun 2017 11:21:08 +0100
+Subject: [PATCH v2 16/25] KVM: arm64: vgic-v3: Enable trapping of Group-0
+ system registers
+In-Reply-To: <20170601102117.17750-1-marc.zyngier@arm.com>
+References: <20170601102117.17750-1-marc.zyngier@arm.com>
+Message-ID: <20170601102117.17750-17-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Configuration of the lcd0 pinmux group and GPIO hog for the external
-GPIO mux are done using a single device node, causing the "output-high"
-property to be applied to both.  This will fail for the pinmux group,
-but doesn't cause any harm, as the failure is ignored silently.
+In order to be able to trap Group-0 GICv3 system registers, we need to
+set ICH_HCR_EL2.TALL0 begore entering the guest. This is conditionnaly
+done after having restored the guest's state, and cleared on exit.
 
-However, after "pinctrl: sh-pfc: propagate errors on group config", the
-failure will become fatal, leading to a broken display:
-
-    sh-pfc e6050000.pin-controller: pin_config_group_set op failed for group 102
-    sh-pfc e6050000.pin-controller: Error applying setting, reverse things back
-    sh-pfc e6050000.pin-controller: failed to select default state
-
-Move the GPIO hog to its own node to fix this.
-
-Fixes: ffd2f9a5afb730b9 ("ARM: shmobile: armadillo800eva dts: Add pinctrl and gpio-hog for lcdc0")
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
-This is a hard dependency for "pinctrl: sh-pfc: propagate errors on
-group config" (https://patchwork.kernel.org/patch/9186713/).
+ include/linux/irqchip/arm-gic-v3.h | 1 +
+ virt/kvm/arm/vgic/vgic-v3.c        | 5 ++++-
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-v2:
-  - Keep the GPIO hog, but move it to its own node, instead of using
-    another level of subnodes.  As the GPIO hog node is not referenced from
-    a pinctrl-0 property, pinconf doesn't fail with "No pin or group
-    provided in DT node".
----
- arch/arm/boot/dts/r8a7740-armadillo800eva.dts | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-index 297b1f10f7346a9f..8c85d3ee5f5e7bfd 100644
---- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-+++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-@@ -273,7 +273,9 @@
- 	lcd0_pins: lcd0 {
- 		groups = "lcd0_data24_0", "lcd0_lclk_1", "lcd0_sync";
- 		function = "lcd0";
-+	};
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 03b5a28bb2d0..46a1e0943cf8 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -417,6 +417,7 @@
  
-+	lcd0_mux {
- 		/* DBGMD/LCDC0/FSIA MUX */
- 		gpio-hog;
- 		gpios = <176 0>;
+ #define ICH_HCR_EN			(1 << 0)
+ #define ICH_HCR_UIE			(1 << 1)
++#define ICH_HCR_TALL0			(1 << 11)
+ #define ICH_HCR_TALL1			(1 << 12)
+ #define ICH_HCR_EOIcount_SHIFT		27
+ #define ICH_HCR_EOIcount_MASK		(0x1f << ICH_HCR_EOIcount_SHIFT)
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index a16769276efd..7525216ef988 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -21,6 +21,7 @@
+ 
+ #include "vgic.h"
+ 
++static bool group0_trap;
+ static bool group1_trap;
+ 
+ void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
+@@ -241,6 +242,8 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
+ 
+ 	/* Get the show on the road... */
+ 	vgic_v3->vgic_hcr = ICH_HCR_EN;
++	if (group0_trap)
++		vgic_v3->vgic_hcr |= ICH_HCR_TALL0;
+ 	if (group1_trap)
+ 		vgic_v3->vgic_hcr |= ICH_HCR_TALL1;
+ }
+@@ -473,7 +476,7 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
+ 	if (kvm_vgic_global_state.vcpu_base == 0)
+ 		kvm_info("disabling GICv2 emulation\n");
+ 
+-	if (group1_trap) {
++	if (group0_trap || group1_trap) {
+ 		kvm_info("GICv3 sysreg trapping enabled (reduced performance)\n");
+ 		static_branch_enable(&vgic_v3_cpuif_trap);
+ 	}
 -- 
-2.7.4
+2.11.0
