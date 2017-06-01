@@ -1,73 +1,65 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Thu,  1 Jun 2017 15:51:45 +0530
-Subject: [PATCH] PCI: rockchip: Handle return value of clk_prepare_enable
-Message-ID: <4ebfc69644f9d6e9e5ff0cfc82e9efa5c476be0e.1496312348.git.arvind.yadav.cs@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu,  1 Jun 2017 11:21:15 +0100
+Subject: [PATCH v2 23/25] KVM: arm64: vgic-v3: Add ICV_PMR_EL1 handler
+In-Reply-To: <20170601102117.17750-1-marc.zyngier@arm.com>
+References: <20170601102117.17750-1-marc.zyngier@arm.com>
+Message-ID: <20170601102117.17750-24-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_prepare_enable() can fail here and we must check its return value.
+Add a handler for reading/writing the guest's view of the ICC_PMR_EL1
+register, which is located in the ICH_VMCR_EL2.VPMR field.
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/pci/host/pcie-rockchip.c | 34 ++++++++++++++++++++++++++++------
- 1 file changed, 28 insertions(+), 6 deletions(-)
+ virt/kvm/arm/hyp/vgic-v3-sr.c | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
-index 0e020b6..0a248cd 100644
---- a/drivers/pci/host/pcie-rockchip.c
-+++ b/drivers/pci/host/pcie-rockchip.c
-@@ -1259,24 +1259,46 @@ static int __maybe_unused rockchip_pcie_resume_noirq(struct device *dev)
- 	struct rockchip_pcie *rockchip = dev_get_drvdata(dev);
- 	int err;
- 
--	clk_prepare_enable(rockchip->clk_pcie_pm);
--	clk_prepare_enable(rockchip->hclk_pcie);
--	clk_prepare_enable(rockchip->aclk_perf_pcie);
--	clk_prepare_enable(rockchip->aclk_pcie);
-+	err = clk_prepare_enable(rockchip->clk_pcie_pm);
-+	if (err)
-+		goto err_pcie_pm;
-+
-+	err = clk_prepare_enable(rockchip->hclk_pcie);
-+	if (err)
-+		goto err_hclk_pcie;
-+
-+	err = clk_prepare_enable(rockchip->aclk_perf_pcie);
-+	if (err)
-+		goto err_aclk_perf_pcie;
-+
-+	err = clk_prepare_enable(rockchip->aclk_pcie);
-+	if (err)
-+		goto err_aclk_pcie;
- 
- 	err = rockchip_pcie_init_port(rockchip);
- 	if (err)
--		return err;
-+		goto err_pcie_resume;
- 
- 	err = rockchip_cfg_atu(rockchip);
- 	if (err)
--		return err;
-+		goto err_pcie_resume;
- 
- 	/* Need this to enter L1 again */
- 	rockchip_pcie_update_txcredit_mui(rockchip);
- 	rockchip_pcie_enable_interrupts(rockchip);
- 
- 	return 0;
-+
-+err_pcie_resume:
-+	clk_disable_unprepare(rockchip->aclk_pcie);
-+err_aclk_pcie:
-+	clk_disable_unprepare(rockchip->aclk_perf_pcie);
-+err_aclk_perf_pcie:
-+	clk_disable_unprepare(rockchip->hclk_pcie);
-+err_hclk_pcie:
-+	clk_disable_unprepare(rockchip->clk_pcie_pm);
-+err_pcie_pm:
-+	return err;
+diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+index 3a5749e6c797..3c6b7d46754a 100644
+--- a/virt/kvm/arm/hyp/vgic-v3-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+@@ -874,6 +874,27 @@ static void __hyp_text __vgic_v3_read_hppir(struct kvm_vcpu *vcpu,
+ 	vcpu_set_reg(vcpu, rt, lr_val & ICH_LR_VIRTUAL_ID_MASK);
  }
  
- static int rockchip_pcie_probe(struct platform_device *pdev)
++static void __hyp_text __vgic_v3_read_pmr(struct kvm_vcpu *vcpu,
++					  u32 vmcr, int rt)
++{
++	vmcr &= ICH_VMCR_PMR_MASK;
++	vmcr >>= ICH_VMCR_PMR_SHIFT;
++	vcpu_set_reg(vcpu, rt, vmcr);
++}
++
++static void __hyp_text __vgic_v3_write_pmr(struct kvm_vcpu *vcpu,
++					   u32 vmcr, int rt)
++{
++	u32 val = vcpu_get_reg(vcpu, rt);
++
++	val <<= ICH_VMCR_PMR_SHIFT;
++	val &= ICH_VMCR_PMR_MASK;
++	vmcr &= ~ICH_VMCR_PMR_MASK;
++	vmcr |= val;
++
++	write_gicreg(vmcr, ICH_VMCR_EL2);
++}
++
+ static void __hyp_text __vgic_v3_read_rpr(struct kvm_vcpu *vcpu,
+ 					  u32 vmcr, int rt)
+ {
+@@ -1019,6 +1040,12 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
+ 		else
+ 			fn = __vgic_v3_write_ctlr;
+ 		break;
++	case SYS_ICC_PMR_EL1:
++		if (is_read)
++			fn = __vgic_v3_read_pmr;
++		else
++			fn = __vgic_v3_write_pmr;
++		break;
+ 	default:
+ 		return 0;
+ 	}
 -- 
-1.9.1
+2.11.0
