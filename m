@@ -1,115 +1,115 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri,  2 Jun 2017 18:10:07 +0800
-Subject: [PATCH 02/19] drm/sun4i: add components in two passes with encoders
- added in second pass
+Date: Fri,  2 Jun 2017 18:10:09 +0800
+Subject: [PATCH 04/19] drm/sun4i: hdmi: Disable clks in bind function error
+ path and unbind function
 In-Reply-To: <20170602101024.18940-1-wens@csie.org>
 References: <20170602101024.18940-1-wens@csie.org>
-Message-ID: <20170602101024.18940-3-wens@csie.org>
+Message-ID: <20170602101024.18940-5-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The encoder drivers use drm_of_find_possible_crtcs to get upstream
-crtcs from the device tree using of_graph. For the results to be
-correct, encoders must be probed/bound after _all_ crtcs have been
-created. The existing code uses a depth first recursive traversal
-of the of_graph, which means the encoders downstream of the TCON
-get add right after the first TCON. The second TCON or CRTC will
-never be properly associated with encoders connected to it.
+The HDMI driver enables the bus and mod clocks in the bind function, but
+does not disable them if it then bails our due to any errors. Neither
+does it disable the clocks in the unbind function.
 
-Other platforms, such as Rockchip, deal with this by probing all
-crtcs first, then all subsequent components. This is easy to do
-since the crtcs correspond to just one device node, and are the
-first nodes in the pipeline.
+Fix this by adding a proper error path to the bind function, and
+clk_disable_unprepare calls to the unbind function.
 
-However with Allwinner SoCs, the function of the CRTC is split between
-the display backend (DE 1.0) or mixer (DE 2.0), which does scan-out
-and compositing, and the TCON, which generating the display timing
-signals. Further complicating the process, there may be a Dynamic Range
-Controller between the backend and the TCON. Also, the backend is
-preceded by the frontend, with a Display Enhancement Unit possibly
-in between.
-
-One solution would be, instead of a depth first traversal of the
-component of_graph, we do a breadth first traversal, so that components
-at the same depth are grouped together. This however requires us to
-implement extra code for a queue structure that is only used here.
-
-Instead, since we can identify TCON device nodes, and since the
-component system can gracefully deal with duplicate entries, we can add
-components in two passes, using the existing recursive depth code. The
-first pass stops right after the TCON is added. The second pass will
-re-add all components up to the TCON, but these will be skipped since
-they will have already been bound with the entries from the first pass.
-The encoders added in the second pass will be the last entries in the
-list.
+Also rename the err_cleanup_connector label to err_cleanup_encoder,
+since it is the encoder that gets cleaned up.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_drv.c | 24 ++++++++++++++++++++----
- 1 file changed, 20 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c | 25 +++++++++++++++++--------
+ 1 file changed, 17 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index ed75a779ae4b..bc13dcf06783 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -198,7 +198,8 @@ static int compare_of(struct device *dev, void *data)
+diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+index d3398f6250ef..457614073501 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
++++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+@@ -350,26 +350,29 @@ static int sun4i_hdmi_bind(struct device *dev, struct device *master,
+ 	hdmi->mod_clk = devm_clk_get(dev, "mod");
+ 	if (IS_ERR(hdmi->mod_clk)) {
+ 		dev_err(dev, "Couldn't get the HDMI mod clock\n");
+-		return PTR_ERR(hdmi->mod_clk);
++		ret = PTR_ERR(hdmi->mod_clk);
++		goto err_disable_bus_clk;
+ 	}
+ 	clk_prepare_enable(hdmi->mod_clk);
  
- static int sun4i_drv_add_endpoints(struct device *dev,
- 				   struct component_match **match,
--				   struct device_node *node)
-+				   struct device_node *node,
-+				   bool add_encoders)
- {
- 	struct device_node *port, *ep, *remote;
- 	int count = 0;
-@@ -227,13 +228,16 @@ static int sun4i_drv_add_endpoints(struct device *dev,
- 		count++;
+ 	hdmi->pll0_clk = devm_clk_get(dev, "pll-0");
+ 	if (IS_ERR(hdmi->pll0_clk)) {
+ 		dev_err(dev, "Couldn't get the HDMI PLL 0 clock\n");
+-		return PTR_ERR(hdmi->pll0_clk);
++		ret = PTR_ERR(hdmi->pll0_clk);
++		goto err_disable_mod_clk;
  	}
  
-+	/* Skip downstream encoders during the first pass */
-+	if (sun4i_drv_node_is_tcon(node) && !add_encoders)
-+		return count;
-+
- 	/* Inputs are listed first, then outputs */
- 	port = of_graph_get_port_by_id(node, 1);
- 	if (!port) {
- 		DRM_DEBUG_DRIVER("No output to bind\n");
- 		return count;
+ 	hdmi->pll1_clk = devm_clk_get(dev, "pll-1");
+ 	if (IS_ERR(hdmi->pll1_clk)) {
+ 		dev_err(dev, "Couldn't get the HDMI PLL 1 clock\n");
+-		return PTR_ERR(hdmi->pll1_clk);
++		ret = PTR_ERR(hdmi->pll1_clk);
++		goto err_disable_mod_clk;
  	}
--
- 	for_each_available_child_of_node(port, ep) {
- 		remote = of_graph_get_remote_port_parent(ep);
- 		if (!remote) {
-@@ -262,7 +266,8 @@ static int sun4i_drv_add_endpoints(struct device *dev,
- 		}
  
- 		/* Walk down our tree */
--		count += sun4i_drv_add_endpoints(dev, match, remote);
-+		count += sun4i_drv_add_endpoints(dev, match, remote,
-+						 add_encoders);
- 
- 		of_node_put(remote);
+ 	ret = sun4i_tmds_create(hdmi);
+ 	if (ret) {
+ 		dev_err(dev, "Couldn't create the TMDS clock\n");
+-		return ret;
++		goto err_disable_mod_clk;
  	}
-@@ -283,8 +288,19 @@ static int sun4i_drv_probe(struct platform_device *pdev)
- 		if (!pipeline)
- 			break;
  
-+		sun4i_drv_add_endpoints(&pdev->dev, &match, pipeline, false);
-+		of_node_put(pipeline);
-+	}
-+
-+	for (i = 0;; i++) {
-+		struct device_node *pipeline = of_parse_phandle(np,
-+								"allwinner,pipelines",
-+								i);
-+		if (!pipeline)
-+			break;
-+
- 		count += sun4i_drv_add_endpoints(&pdev->dev, &match,
--						pipeline);
-+						 pipeline, true);
- 		of_node_put(pipeline);
+ 	writel(SUN4I_HDMI_CTRL_ENABLE, hdmi->base + SUN4I_HDMI_CTRL_REG);
+@@ -410,7 +413,7 @@ static int sun4i_hdmi_bind(struct device *dev, struct device *master,
+ 	ret = sun4i_ddc_create(hdmi, hdmi->tmds_clk);
+ 	if (ret) {
+ 		dev_err(dev, "Couldn't create the DDC clock\n");
+-		return ret;
++		goto err_disable_mod_clk;
+ 	}
  
- 		DRM_DEBUG_DRIVER("Queued %d outputs on pipeline %d\n",
+ 	drm_encoder_helper_add(&hdmi->encoder,
+@@ -428,7 +431,7 @@ static int sun4i_hdmi_bind(struct device *dev, struct device *master,
+ 	hdmi->encoder.possible_crtcs = drm_of_find_possible_crtcs(drm,
+ 								  dev->of_node);
+ 	if (!hdmi->encoder.possible_crtcs)
+-		return -EPROBE_DEFER;
++		goto err_disable_mod_clk;
+ 
+ 	drm_connector_helper_add(&hdmi->connector,
+ 				 &sun4i_hdmi_connector_helper_funcs);
+@@ -438,7 +441,7 @@ static int sun4i_hdmi_bind(struct device *dev, struct device *master,
+ 	if (ret) {
+ 		dev_err(dev,
+ 			"Couldn't initialise the HDMI connector\n");
+-		goto err_cleanup_connector;
++		goto err_cleanup_encoder;
+ 	}
+ 
+ 	/* There is no HPD interrupt, so we need to poll the controller */
+@@ -449,8 +452,12 @@ static int sun4i_hdmi_bind(struct device *dev, struct device *master,
+ 
+ 	return 0;
+ 
+-err_cleanup_connector:
++err_cleanup_encoder:
+ 	drm_encoder_cleanup(&hdmi->encoder);
++err_disable_mod_clk:
++	clk_disable_unprepare(hdmi->mod_clk);
++err_disable_bus_clk:
++	clk_disable_unprepare(hdmi->bus_clk);
+ 	return ret;
+ }
+ 
+@@ -461,6 +468,8 @@ static void sun4i_hdmi_unbind(struct device *dev, struct device *master,
+ 
+ 	drm_connector_cleanup(&hdmi->connector);
+ 	drm_encoder_cleanup(&hdmi->encoder);
++	clk_disable_unprepare(hdmi->mod_clk);
++	clk_disable_unprepare(hdmi->bus_clk);
+ }
+ 
+ static const struct component_ops sun4i_hdmi_ops = {
 -- 
 2.11.0
