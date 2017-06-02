@@ -1,110 +1,65 @@
-From: frank.wang@rock-chips.com (Frank Wang)
-Date: Fri,  2 Jun 2017 11:20:26 +0800
-Subject: [PATCH v2 4/4] phy: rockchip-inno-usb2: add support of usb2-phy for
- rk3228 SoCs
-In-Reply-To: <1496373626-27856-1-git-send-email-frank.wang@rock-chips.com>
-References: <1496373626-27856-1-git-send-email-frank.wang@rock-chips.com>
-Message-ID: <1496373626-27856-5-git-send-email-frank.wang@rock-chips.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Fri, 2 Jun 2017 11:50:29 +0800
+Subject: [PATCH] acpi/iort, numa: Add numa node mapping for smmuv3 devices
+In-Reply-To: <20170601162142.GC19003@red-moon>
+References: <1496325937-21113-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <20170601162142.GC19003@red-moon>
+Message-ID: <5930E085.8000404@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support usb2-phy for rk3228 SoCs and amend phy Documentation.
+[+Cc Lv Zheng]
 
-Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
----
- .../bindings/phy/phy-rockchip-inno-usb2.txt        |  1 +
- drivers/phy/phy-rockchip-inno-usb2.c               | 60 ++++++++++++++++++++++
- 2 files changed, 61 insertions(+)
+On 2017/6/2 0:21, Lorenzo Pieralisi wrote:
+> On Thu, Jun 01, 2017 at 07:35:37PM +0530, Ganapatrao Kulkarni wrote:
+>> ARM IORT specification has provision to define Proximity domain
+>> in SMMUv3 IORT table. Adding required code to parse Proximity domain of
+>> SMMUv3 IORT table. Parsed Proximity domain is used to set numa_node
+>> of SMMUv3 platform devices.
+>>
+>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>> ---
+>>  drivers/iommu/arm-smmu-v3.c | 6 ++++++
+>>  include/acpi/actbl2.h       | 4 ++++
+>>  2 files changed, 10 insertions(+)
+>>
+>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>> index 69d8506..98c2319 100644
+>> --- a/drivers/iommu/arm-smmu-v3.c
+>> +++ b/drivers/iommu/arm-smmu-v3.c
+>> @@ -2667,6 +2667,12 @@ static int arm_smmu_device_acpi_probe(struct platform_device *pdev,
+>>  	if (iort_smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE)
+>>  		smmu->features |= ARM_SMMU_FEAT_COHERENCY;
+>>  
+>> +	/* set numa proximity domain for smmv3 device */
+>> +	if (iort_smmu->flags & ACPI_IORT_SMMU_V3_PXM) {
+>> +		set_dev_node(dev, acpi_map_pxm_to_node(iort_smmu->pxm));
+>> +		dev_info(dev, "on NUMA node %d\n", dev_to_node(dev));
+> It should be done in acpi/arm64/iort.c at device creation time.
 
-diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
-index e71a8d2..84d59b0 100644
---- a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
-+++ b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
-@@ -2,6 +2,7 @@ ROCKCHIP USB2.0 PHY WITH INNO IP BLOCK
- 
- Required properties (phy (parent) node):
-  - compatible : should be one of the listed compatibles:
-+	* "rockchip,rk3228-usb2phy"
- 	* "rockchip,rk3328-usb2phy"
- 	* "rockchip,rk3366-usb2phy"
- 	* "rockchip,rk3399-usb2phy"
-diff --git a/drivers/phy/phy-rockchip-inno-usb2.c b/drivers/phy/phy-rockchip-inno-usb2.c
-index d026b4cf..626883d 100644
---- a/drivers/phy/phy-rockchip-inno-usb2.c
-+++ b/drivers/phy/phy-rockchip-inno-usb2.c
-@@ -1144,6 +1144,65 @@ static int rockchip_usb2phy_probe(struct platform_device *pdev)
- 	return ret;
- }
- 
-+static const struct rockchip_usb2phy_cfg rk3228_phy_cfgs[] = {
-+	{
-+		.reg = 0x760,
-+		.num_ports	= 2,
-+		.clkout_ctl	= { 0x0768, 4, 4, 1, 0 },
-+		.port_cfgs	= {
-+			[USB2PHY_PORT_OTG] = {
-+				.phy_sus	= { 0x0760, 15, 0, 0, 0x1d1 },
-+				.bvalid_det_en	= { 0x0680, 3, 3, 0, 1 },
-+				.bvalid_det_st	= { 0x0690, 3, 3, 0, 1 },
-+				.bvalid_det_clr	= { 0x06a0, 3, 3, 0, 1 },
-+				.ls_det_en	= { 0x0680, 2, 2, 0, 1 },
-+				.ls_det_st	= { 0x0690, 2, 2, 0, 1 },
-+				.ls_det_clr	= { 0x06a0, 2, 2, 0, 1 },
-+				.utmi_bvalid	= { 0x0480, 4, 4, 0, 1 },
-+				.utmi_ls	= { 0x0480, 3, 2, 0, 1 },
-+			},
-+			[USB2PHY_PORT_HOST] = {
-+				.phy_sus	= { 0x0764, 15, 0, 0, 0x1d1 },
-+				.ls_det_en	= { 0x0680, 4, 4, 0, 1 },
-+				.ls_det_st	= { 0x0690, 4, 4, 0, 1 },
-+				.ls_det_clr	= { 0x06a0, 4, 4, 0, 1 }
-+			}
-+		},
-+		.chg_det = {
-+			.opmode		= { 0x0760, 3, 0, 5, 1 },
-+			.cp_det		= { 0x0884, 4, 4, 0, 1 },
-+			.dcp_det	= { 0x0884, 3, 3, 0, 1 },
-+			.dp_det		= { 0x0884, 5, 5, 0, 1 },
-+			.idm_sink_en	= { 0x0768, 8, 8, 0, 1 },
-+			.idp_sink_en	= { 0x0768, 7, 7, 0, 1 },
-+			.idp_src_en	= { 0x0768, 9, 9, 0, 1 },
-+			.rdm_pdwn_en	= { 0x0768, 10, 10, 0, 1 },
-+			.vdm_src_en	= { 0x0768, 12, 12, 0, 1 },
-+			.vdp_src_en	= { 0x0768, 11, 11, 0, 1 },
-+		},
-+	},
-+	{
-+		.reg = 0x800,
-+		.num_ports	= 2,
-+		.clkout_ctl	= { 0x0808, 4, 4, 1, 0 },
-+		.port_cfgs	= {
-+			[USB2PHY_PORT_OTG] = {
-+				.phy_sus	= { 0x800, 15, 0, 0, 0x1d1 },
-+				.ls_det_en	= { 0x0684, 0, 0, 0, 1 },
-+				.ls_det_st	= { 0x0694, 0, 0, 0, 1 },
-+				.ls_det_clr	= { 0x06a4, 0, 0, 0, 1 }
-+			},
-+			[USB2PHY_PORT_HOST] = {
-+				.phy_sus	= { 0x804, 15, 0, 0, 0x1d1 },
-+				.ls_det_en	= { 0x0684, 1, 1, 0, 1 },
-+				.ls_det_st	= { 0x0694, 1, 1, 0, 1 },
-+				.ls_det_clr	= { 0x06a4, 1, 1, 0, 1 }
-+			}
-+		},
-+	},
-+	{ /* sentinel */ }
-+};
-+
- static const struct rockchip_usb2phy_cfg rk3328_phy_cfgs[] = {
- 	{
- 		.reg = 0x100,
-@@ -1269,6 +1328,7 @@ static const struct rockchip_usb2phy_cfg rk3399_phy_cfgs[] = {
- };
- 
- static const struct of_device_id rockchip_usb2phy_dt_match[] = {
-+	{ .compatible = "rockchip,rk3228-usb2phy", .data = &rk3228_phy_cfgs },
- 	{ .compatible = "rockchip,rk3328-usb2phy", .data = &rk3328_phy_cfgs },
- 	{ .compatible = "rockchip,rk3366-usb2phy", .data = &rk3366_phy_cfgs },
- 	{ .compatible = "rockchip,rk3399-usb2phy", .data = &rk3399_phy_cfgs },
--- 
-2.0.0
+Agreed.
+
+>
+>> +	}
+>> +
+>>  	return 0;
+>>  }
+>>  #else
+>> diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
+>> index 4b306a6..c16ced8 100644
+>> --- a/include/acpi/actbl2.h
+>> +++ b/include/acpi/actbl2.h
+>> @@ -805,6 +805,9 @@ struct acpi_iort_smmu_v3 {
+>>  	u32 pri_gsiv;
+>>  	u32 gerr_gsiv;
+>>  	u32 sync_gsiv;
+>> +	u8 pxm;
+>> +	u8 reserved1;
+>> +	u16 reserved2;
+
+I think changes to actbl2.h need to be split as a new patch
+which go via ACPICA updates,  Lv, could you share
+your comments here?
+
+Thanks
+Hanjun
