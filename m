@@ -1,66 +1,96 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 3 Jun 2017 00:10:40 +0200
-Subject: [linux-sunxi] [PATCH 1/2] ARM: sun8i: v3s: add device nodes for
- DE2 display pipeline
-In-Reply-To: <03812a93c93bbada77de864b4c5dc0af@aosc.io>
-References: <20170524111724.28431-1-icenowy@aosc.io>
- <CAGb2v65bZ+VJYwcP24ipQ+4kuY28Babt-Cpm7uscjmWpcoeJ9g@mail.gmail.com>
- <5FF9B3F8-01F6-4B17-958C-9A4245199716@aosc.io>
- <CAGb2v66UG7nS=3zj=TWGY-BG62tsvSpxucKHT35g=4KGcS8kRA@mail.gmail.com>
- <1B75138F-B045-4E60-BE92-B9AA343CBB1D@aosc.io>
- <20170529085939.zstja3pymq77ubjq@flea.lan>
- <03812a93c93bbada77de864b4c5dc0af@aosc.io>
-Message-ID: <20170602221040.zrzaigevbqgvkjy4@flea.lan>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 2 Jun 2017 15:10:52 -0700
+Subject: [PATCH v6 03/11] clk: bcm: Add clocks for Stingray SOC
+In-Reply-To: <1496385275-6899-4-git-send-email-anup.patel@broadcom.com>
+References: <1496385275-6899-1-git-send-email-anup.patel@broadcom.com>
+ <1496385275-6899-4-git-send-email-anup.patel@broadcom.com>
+Message-ID: <20170602221052.GT20170@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 29, 2017 at 09:01:59PM +0800, icenowy at aosc.io wrote:
-> ? 2017-05-29 16:59?Maxime Ripard ???
-> > On Thu, May 25, 2017 at 10:28:24PM +0800, Icenowy Zheng wrote:
-> > > >>>> +                       compatible = "allwinner,sun8i-v3s-de2-mixer";
-> > > >>>> +                       reg = <0x01100000 0x100000>;
-> > > >>>
-> > > >>>The display engine also has an interrupt. Please list it
-> > > >>
-> > > >> It's a overall interrupt for DE2, not mixer interrupt.
-> > > >>
-> > > >> I will add it after we have proper interrupt chaining facility
-> > > >> for DE2.
-> > > >>
-> > > >> It cannot fit here in mixer node.
-> > > >
-> > > > Could you elaborate? If it is just shared, then listing it several
-> > > > times is OK. If the interrupt registers are not in this address
-> > > > space, then
-> > > 
-> > > The interrupt dealing code is still not so clear, and totally not
-> > > present in BSP DE2 code (the BSP just didn't use the interrupt).
-> > > 
-> > > We doesn't even know where the interrupt register is, and we cannot
-> > > promise it's not broken (as their is even no application of it in
-> > > BSP).
-> > 
-> > Whether it's broken or not is out of the question here. Adding it
-> > later would either break the DT compatibility, or introduce a crippled
-> > driver for users that do not have a recent enough DT. None of the two
-> > are really acceptable.
-> > 
-> > Especially if your plan is to add support for these.
-> 
-> I have no such plan -- even the BSP driver doesn't use the IRQ at all.
+On 06/02, Anup Patel wrote:
+> diff --git a/drivers/clk/bcm/clk-sr.c b/drivers/clk/bcm/clk-sr.c
+> new file mode 100644
+> index 0000000..342f702
+> --- /dev/null
+> +++ b/drivers/clk/bcm/clk-sr.c
+> @@ -0,0 +1,320 @@
+> +
+> +static const struct iproc_clk_ctrl lcpll_pcie_clk[] = {
+> +	[BCM_SR_LCPLL_PCIE_PHY_REF_CLK] = {
+> +		.channel = BCM_SR_LCPLL_PCIE_PHY_REF_CLK,
+> +		.flags = IPROC_CLK_AON,
+> +		.enable = ENABLE_VAL(0x0, 7, 1, 13),
+> +		.mdiv = REG_VAL(0x14, 0, 9),
+> +	},
+> +};
+> +
+> +static void __init sr_lcpll_pcie_clk_init(struct device_node *node)
 
-We'll see how it turns out.. I applied that patch.
+Drop __init usage throughout this patch please.
 
-Maxime
+> +{
+> +	iproc_pll_clk_setup(node, &lcpll_pcie, NULL, 0, lcpll_pcie_clk,
+> +		ARRAY_SIZE(lcpll_pcie_clk));
+> +}
+> +
+> +static const struct of_device_id sr_clk_dt_ids[] = {
+> +{ .compatible = "brcm,sr-genpll0", .data = sr_genpll0_clk_init, },
+> +{ .compatible = "brcm,sr-genpll4", .data = sr_genpll4_clk_init, },
+> +{ .compatible = "brcm,sr-genpll5", .data = sr_genpll5_clk_init, },
+> +{ .compatible = "brcm,sr-lcpll0", .data = sr_lcpll0_clk_init, },
+> +{ .compatible = "brcm,sr-lcpll1", .data = sr_lcpll1_clk_init, },
+> +{ .compatible = "brcm,sr-lcpll-pcie", .data = sr_lcpll_pcie_clk_init, },
+> +{ /* sentinel */ }
+
+Please tab these out properly And also leave off the , after the
+init function.
+
+> +};
+> +
+> +static int sr_clk_probe(struct platform_device *pdev)
+> +{
+> +	const struct of_device_id *device;
+> +	void (*init_func)(struct device_node *);
+
+Let's keep this taking the platform device pointer. That way in
+the future devm could be used as well as other platform device
+APIs without having to change all init signatures.
+
+> +
+> +	device = of_match_device(sr_clk_dt_ids, &pdev->dev);
+> +	if (!device)
+> +		return -ENODEV;
+> +	init_func = device->data;
+
+Can use of_device_get_match_data() instead
+
+> +
+> +	init_func(pdev->dev.of_node);
+> +
+> +	return 0;
+> +}
+
+It would be pretty nice if we could have some platform driver
+common function for this where we want to call different probe
+functions for different compatible ids and put them all in the
+same driver file. Like platform_driver_of_probe() or something
+that then calls a int (*init_func)(struct platform_device *pdev)
+directly from the of match table for you.
+
+> +
+> +static struct platform_driver sr_clk_driver = {
+
+iproc_sr_* throughout this file?
+
+> +	.driver = {
+> +		.name = "sr-clk",
+> +		.of_match_table = sr_clk_dt_ids,
+> +	},
+> +	.probe = sr_clk_probe,
+> +};
+> +builtin_platform_driver(sr_clk_driver);
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170603/5423ddac/attachment.sig>
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
