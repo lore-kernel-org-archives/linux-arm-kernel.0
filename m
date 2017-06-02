@@ -1,33 +1,41 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Fri, 2 Jun 2017 09:50:03 -0400
-Subject: [PATCH] ahci: qoriq: add ls1088a platforms support
-In-Reply-To: <1496388183-11534-1-git-send-email-andy.tang@nxp.com>
-References: <1496388183-11534-1-git-send-email-andy.tang@nxp.com>
-Message-ID: <20170602135003.GA18930@htj.duckdns.org>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 2 Jun 2017 08:50:08 -0500
+Subject: Need help booting allmodconfig on arm64
+In-Reply-To: <20170602083615.GA28299@leverpostej>
+References: <CAOZdJXUr6wAE5CZBzmADOAVBGL692FVzaaGwaC7hzJ7GtJmxtA@mail.gmail.com>
+ <20170601225012.GI22219@n2100.armlinux.org.uk>
+ <031b1119-6366-c41f-bf65-01561583ef41@codeaurora.org>
+ <20170602083615.GA28299@leverpostej>
+Message-ID: <0dd92218-037d-3d1f-7b3c-10adbc3bc832@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 02, 2017 at 03:23:03PM +0800, Yuantian Tang wrote:
-> Ls1088a is new introduced arm-based soc with sata support with
-> following features:
-> 
-> * Complies with the serial ATA 3.0 specification
->   and the AHCI 1.3.1 specification
-> * Contains a high-speed descriptor-based DMA controller
-> * Supports the following:
-> * Speeds of 1.5 Gb/s (first-generation SATA),
->   3 Gb/s (second-generation SATA), and 6 Gb/s (third-generation SATA)
-> * FIS-based switching
-> * Native command queuing (NCQ) commands
-> * Port multiplier operation
-> * Asynchronous notification
-> * SATA Vendor BIST mode
-> 
-> Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
+On 6/2/17 3:36 AM, Mark Rutland wrote:
+> CONFIG_SATA_AHCI=m
+> CONFIG_SATA_AHCI_PLATFORM=m
 
-Applied to libata/for-4.13.
+Ah, I had to set CONFIG_ATA=y for those two lines to take. 
+Unfortunately, even with this fix, there still aren't any /dev/sdX 
+entries.
 
-Thanks.
+I pasted by /dev tree to https://pastebin.com/3najnguB and my dmesg to 
+https://pastebin.com/EvFEJJth.
+
+You can see the SATA driver loading and probing, isn't that enough to 
+create the /dev entries?
+
+When my /init script runs, I think it's trying to mount the SATA drive:
+
+Begin: Waiting for root file system ... Begin: Running 
+/scripts/local-block ... done.
+Begin: Running /scripts/local-block ... done.
+Begin: Running /scripts/local-block ... done.
+Begin: Running /scripts/local-block ... done.
+Begin: Running /scripts/local-block ... done.
+
+(this repeats for another minute).
 
 -- 
-tejun
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
