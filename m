@@ -1,53 +1,109 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri,  2 Jun 2017 18:10:06 +0800
-Subject: [PATCH 01/19] drm/sun4i: call drm_vblank_init with correct number of
- crtcs
+Date: Fri,  2 Jun 2017 18:10:08 +0800
+Subject: [PATCH 03/19] drm/sun4i: tcon: Add support for demuxing TCON output
+ on A31
 In-Reply-To: <20170602101024.18940-1-wens@csie.org>
 References: <20170602101024.18940-1-wens@csie.org>
-Message-ID: <20170602101024.18940-2-wens@csie.org>
+Message-ID: <20170602101024.18940-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we want to have vblank on both pipelines at the same time, we need
-to call drm_vblank_init with num_crtcs = 2.
+On systems with 2 TCONs such as the A31, it is possible to demux the
+output of the TCONs to one encoder.
 
-Instead, since the crtc init calls correctly set mode_config.num_crtc,
-we can move the drm_vblank_init call to after the crtc init code is
-called, which is the component bind part. Then we can just pass
-mode_config.num_crtc in.
+Add support for this for the A31.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_drv.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 61 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 61 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index f19100c91c2b..ed75a779ae4b 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -100,11 +100,6 @@ static int sun4i_drv_bind(struct device *dev)
- 		goto free_drm;
- 	}
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index d9791292553e..21bd7fab7aaa 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -14,9 +14,12 @@
+ #include <drm/drm_atomic_helper.h>
+ #include <drm/drm_crtc.h>
+ #include <drm/drm_crtc_helper.h>
++#include <drm/drm_encoder.h>
+ #include <drm/drm_modes.h>
+ #include <drm/drm_of.h>
  
--	/* drm_vblank_init calls kcalloc, which can fail */
--	ret = drm_vblank_init(drm, 1);
--	if (ret)
--		goto free_mem_region;
--
- 	drm_mode_config_init(drm);
- 
- 	ret = component_bind_all(drm->dev, drm);
-@@ -113,6 +108,11 @@ static int sun4i_drv_bind(struct device *dev)
- 		goto cleanup_mode_config;
- 	}
- 
-+	/* drm_vblank_init calls kcalloc, which can fail */
-+	ret = drm_vblank_init(drm, drm->mode_config.num_crtc);
-+	if (ret)
-+		goto free_mem_region;
++#include <uapi/drm/drm_mode.h>
 +
- 	drm->irq_enabled = true;
+ #include <linux/component.h>
+ #include <linux/ioport.h>
+ #include <linux/of_address.h>
+@@ -109,11 +112,69 @@ void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable)
+ }
+ EXPORT_SYMBOL(sun4i_tcon_enable_vblank);
  
- 	/* Remove early framebuffers (ie. simplefb) */
++static struct sun4i_tcon *sun4i_get_first_tcon(struct drm_device *drm)
++{
++	struct sun4i_drv *drv = drm->dev_private;
++	struct sun4i_tcon *tcon;
++
++	list_for_each_entry(tcon, &drv->tcon_list, list)
++		if (tcon->id == 0)
++			return tcon;
++
++	dev_warn(drm->dev,
++		 "TCON0 not found, display output muxing may not work\n");
++
++	return tcon;
++}
++
++static int _sun6i_tcon_set_mux(struct drm_encoder *encoder)
++{
++	struct sun4i_tcon *tcon = sun4i_get_first_tcon(encoder->dev);
++	int tcon_id = drm_crtc_to_sun4i_crtc(encoder->crtc)->tcon->id;
++	u32 shift;
++
++	DRM_DEBUG_DRIVER("Muxing encoder %s to CRTC %s (TCON %d)\n",
++			 encoder->name, encoder->crtc->name, tcon_id);
++
++	/* Only 2 TCONs */
++	if (tcon_id >= 2)
++		return -EINVAL;
++
++	switch (encoder->encoder_type) {
++	case DRM_MODE_ENCODER_TMDS:
++		/* HDMI */
++		shift = 8;
++		break;
++	case DRM_MODE_ENCODER_DSI:
++		/* No MIPI DSI on A31s */
++		if (of_device_is_compatible(tcon->dev->of_node,
++					    "allwinner,sun6i-a31s-tcon"))
++			return -EINVAL;
++		shift = 0;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	regmap_update_bits(tcon->regs, SUN4I_TCON_MUX_CTRL_REG,
++			   0x3 << shift, tcon_id << shift);
++
++	return 0;
++}
++
+ void sun4i_tcon_set_mux(struct sun4i_tcon *tcon, int channel,
+ 			struct drm_encoder *encoder)
+ {
++	/* Get the device node of the display engine */
++	struct device_node *node = encoder->dev->dev->of_node;
+ 	u32 val;
+ 
++	if (of_device_is_compatible(node, "allwinner,sun6i-a31-display-engine") ||
++	    of_device_is_compatible(node, "allwinner,sun6i-a31s-display-engine")) {
++		_sun6i_tcon_set_mux(encoder);
++		return;
++	}
++
+ 	if (!tcon->quirks->has_unknown_mux)
+ 		return;
+ 
 -- 
 2.11.0
