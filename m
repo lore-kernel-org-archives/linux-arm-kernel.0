@@ -1,31 +1,40 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 2 Jun 2017 15:21:24 +0200
-Subject: [PATCH v3 12/13] ARM: sun5i: add a cryptographic engine node
-In-Reply-To: <20170601193905.28829-13-antoine.tenart@free-electrons.com>
-References: <20170601193905.28829-1-antoine.tenart@free-electrons.com>
- <20170601193905.28829-13-antoine.tenart@free-electrons.com>
-Message-ID: <20170602132124.z6wnz4n7id5zx6ya@flea.lan>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 2 Jun 2017 14:26:43 +0100
+Subject: [PATCH v4 1/2] Documentation: bindings: add
+ amlogic,meson-gxbb-scpi-sensors compatible
+In-Reply-To: <8d0c867e-2b78-63fa-f422-709e515012ca@roeck-us.net>
+References: <20170530090507.16611-1-carlo@caione.org>
+ <20170530090507.16611-2-carlo@caione.org>
+ <8d0c867e-2b78-63fa-f422-709e515012ca@roeck-us.net>
+Message-ID: <e915f000-66a3-f36b-b0cb-09f2d7a91a6b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 01, 2017 at 09:39:04PM +0200, Antoine Tenart wrote:
-> Add a node for the cryptographic engine that can be found on sun5i SoCs.
-> This cryptographic engine is compatible with the Allwinner cryptographic
-> accelerator driver.
-> 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 
-Applied, thanks!
-Maxime
+
+On 02/06/17 14:14, Guenter Roeck wrote:
+> On 05/30/2017 02:05 AM, Carlo Caione wrote:
+>> From: Carlo Caione <carlo@endlessm.com>
+>>
+>> Introduce a new Amlogic specific compatible to handle how Amlogic reports
+>> the sensor readings from SCPI using a different scale.
+>>
+>> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> 
+> Formally waiting for DT approval. However, I don't see any problems with
+> it,
+> so
+> 
+> Acked-by: Guenter Roeck <linux@roeck-us.net>
+> 
+> Not sure what branch this is supposed to go through. For now I assume it
+> will be arm/arm64.
+> 
+
+Initially I submitted it via arm-soc. But I think you can take it along
+with the driver change in your tree as I don't see any other patch
+touching arm,scpi.txt in time around.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170602/710df678/attachment.sig>
+Regards,
+Sudeep
