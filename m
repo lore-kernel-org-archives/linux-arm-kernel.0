@@ -1,29 +1,67 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 2 Jun 2017 22:15:02 +0200
-Subject: [PATCH] i2c: designware: do not show SDA hold time warning when
- not needed
-In-Reply-To: <7b011e1e-8fa3-07c4-6688-5e258fd64dbd@linux.intel.com>
-References: <1492203192-28025-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1492502087.24567.47.camel@linux.intel.com>
- <20170418095939.68788787@free-electrons.com>
- <7b011e1e-8fa3-07c4-6688-5e258fd64dbd@linux.intel.com>
-Message-ID: <20170602201502.yobk7f7sdp34ez3d@ninjato>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 2 Jun 2017 13:27:25 -0700
+Subject: [PATCH] ARM: dts: da850-evm: fix tca6416 for use with GPIO hogs
+In-Reply-To: <230e0aa5-6545-e546-6822-77ef53c07b3b@ti.com>
+References: <20170531012125.12258-1-khilman@baylibre.com>
+ <230e0aa5-6545-e546-6822-77ef53c07b3b@ti.com>
+Message-ID: <CAOi56cXvsA7b8QFqTpPNeHFFZbMsB4-VVoErMouZk=T-3ZiR9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jun 1, 2017 at 11:01 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+> Hi Kevin,
+>
+> On Wednesday 31 May 2017 06:51 AM, Kevin Hilman wrote:
+>> In order GPIOS from this controller to be used with the "gpio-hogs"
+>> property, the tca6416 node has to properly labeled as a gpio-controller,
+>> and use #gpio-cells.
+>>
+>> With that, the SEL_A, SEL_B, SEL_C lines that are used to select VPIF
+>> input can be configured using GPIO hogs.
+>>
+>> As an example, example, the configuration below selects the analog video
+>> input on the da850-evm UI board:
+>>
+>> &tca6416 {
+>>        status = "okay";
+>>
+>>        sel_a {
+>>               gpio-hog;
+>>               gpios = <7 GPIO_ACTIVE_HIGH>;
+>>               output-high;
+>>               line-name = "ADC_ENn";
+>>        };
+>>        sel_b {
+>>               gpio-hog;
+>>               gpios = <6 GPIO_ACTIVE_HIGH>;
+>>               output-high;
+>>               line-name = "CAMERA_ENn";
+>>        };
+>>        sel_c {
+>>               gpio-hog;
+>>               gpios = <5 GPIO_ACTIVE_HIGH>;
+>>               output-low;
+>>               line-name = "VIDEO_IN_ENn";
+>>        };
+>> };
+>>
+>> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+>
+> This patch looks good to me. On the topic of using gpio hogs for this
+> sort of thing, in the past I felt using enable-gpios property is better.
+>
+> My reasoning given to Bartosz is here:
+> https://patchwork.kernel.org/patch/9578031/
 
-> hardware that doesn't support SDA hold time. But needless spamming have
-> negative value so this is worth to fix. (I would do this as a single liner
-> by else if ()).
-> 
-> Acked-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
+Sure, that's fine when they are used for a specific functionality, but
+using gpio-hog is very useful for testing/debugging, so this patch
+just aims at fixing the basics.
 
-I agree with Jarkko on everything, including the 'else if' fix.
+That being said, I'm still not convinced what the best place for this
+is because they're not really part of the VPIF either (e.g. they
+control the character LCD which has nothing to do with the VPIF.)
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170602/93213df3/attachment.sig>
+In any case, I'm not trying to solve that problem in this patch, so
+thanks for the review.
+
+Kevin
