@@ -1,20 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 1 Jun 2017 17:19:02 -0700
-Subject: [PATCH 0/2] ARCH_VULCAN removal
-In-Reply-To: <1495438565-82495-1-git-send-email-jnair@caviumnetworks.com>
-References: <1495438565-82495-1-git-send-email-jnair@caviumnetworks.com>
-Message-ID: <20170602001902.GJ13314@localhost>
+Date: Thu, 1 Jun 2017 17:27:47 -0700
+Subject: [PATCH] ARM: dts: augment Moxa and Aspeed DTS for FTTMR010
+In-Reply-To: <20170524090748.27345-1-linus.walleij@linaro.org>
+References: <20170524090748.27345-1-linus.walleij@linaro.org>
+Message-ID: <20170602002747.GN13314@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 22, 2017 at 07:36:03AM +0000, Jayachandran C wrote:
-> Another couple of patches to remove more of ARCH_VULCAN platform.
+On Wed, May 24, 2017 at 11:07:48AM +0200, Linus Walleij wrote:
+> This augments the Moxa Art and Aspeed device trees to:
 > 
-> There is still a reference in drivers/gpio/Kconfig for ARCH_VULCAN.
-> I am sending a patch to remove that, and after that we can completely
-> remove ARCH_VULCAN.
+> - Explicitly name the clock "PCLK" as the Faraday FTTMR010
+>   names it.
+> - List the Moxa timer as compatible with the Faradat FTTMR010
+>   vanilla version.
+> - Add a comment that the Aspeed driver is a Faraday
+>   FTTMR010 derivative.
+> - Pass all IRQs to the timer from Aspeed: they are all there
+>   so they should be in the device tree, we only use the
+>   first one anyways.
 > 
+> Tested-by: Joel Stanley <joel@jms.id.au>
+> Tested-by: Jonas Jensen <jonas.jensen@gmail.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ARM SoC maintainers: this is the DTS changes needt to generalize
+> the Faraday timer. Please merge this into some suitable ARM SoC
+> DTS branch.
+> Clocksource maintainers: I will ask the ARM SoC people to merge
+> this patch orthogonally, it is only included in this series
+> for reference and for testing.
 
-Applied to next/arm64 for v4.13.
+Merged into next/dt for v4.13. Thanks!
+
 
 -Olof
