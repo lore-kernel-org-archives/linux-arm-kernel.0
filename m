@@ -1,125 +1,92 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+From: heiko@sntech.de (Heiko Stuebner)
 Date: Fri, 02 Jun 2017 11:24:38 +0200
-Subject: [PATCH] gpio: mvebu: change compatible string for PWM support
-In-Reply-To: <20170601200820.22396-1-ralph.sennhauser@gmail.com> (Ralph
- Sennhauser's message of "Thu, 1 Jun 2017 22:08:20 +0200")
-References: <20170601200820.22396-1-ralph.sennhauser@gmail.com>
-Message-ID: <874lvyrbc9.fsf@free-electrons.com>
+Subject: [PATCH v4 2/3] dt-bindings: add bindings for rk3128 clock
+ controller
+In-Reply-To: <1496368045-17746-3-git-send-email-zhangqing@rock-chips.com>
+References: <1496368045-17746-1-git-send-email-zhangqing@rock-chips.com>
+ <1496368045-17746-3-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <5144625.YTyQlHCbiT@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ralph,
- 
- On jeu., juin 01 2017, Ralph Sennhauser <ralph.sennhauser@gmail.com> wrote:
+Am Freitag, 2. Juni 2017, 09:47:24 CEST schrieb Elaine Zhang:
+> Add devicetree bindings for Rockchip cru which found on
+> Rockchip SoCs.
+> 
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 
-> As it turns out more than just Armada 370 and XP support using GPIO
-> lines as PWM lines. For example the Armada 38x family has the same
-> hardware support. As such "marvell,armada-370-xp-gpio" for the
-> compatible string is a misnomer.
->
-> Change the compatible string to "marvell,armada-370-gpio" before the
-> driver makes it out of the -rc stage. This also follows the practice of
-> using only the first device family supported as part of the name.
->
-> Also update the documentation and comments in the code accordingly.
->
+the binding + binding header did receive an
 
-As I suggested it obviously:
+	Acked-by: Rob Herring <robh@kernel.org>
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+in v1 already. Please carry these over when sending new versions.
+[no need to do that for your v4 now though :-) ]
 
-Thanks,
-
-Gregory
-
-
-> Fixes: 757642f9a584 ("gpio: mvebu: Add limited PWM support")
-> Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
->
 > ---
->
-> Hi everyone,
->
-> The suggestion to change the compatible string last minute comes from
-> Gregory CLEMENT after we realized the bad choice of name due to Richard
-> Genoud reporting an issue when he used the driver with an Armada-388.
->
-> Rob Herring just requested to use a separate compatible string but not
-> what it should look like. So I assume he is fine with the new one as
-> well. The rest of this patch is rather minor.
->
-> Nothing in tree is using this driver so far, first consumers will be
-> added with 4.13.
->
-> Ralph
->
-> ---
->  Documentation/devicetree/bindings/gpio/gpio-mvebu.txt | 6 +++---
->  drivers/gpio/gpio-mvebu.c                             | 6 +++---
->  2 files changed, 6 insertions(+), 6 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt b/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
-> index 42c3bb2..01e331a 100644
-> --- a/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
-> +++ b/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
-> @@ -41,9 +41,9 @@ Required properties:
->  Optional properties:
->  
->  In order to use the GPIO lines in PWM mode, some additional optional
-> -properties are required. Only Armada 370 and XP support these properties.
-> +properties are required.
->  
-> -- compatible: Must contain "marvell,armada-370-xp-gpio"
-> +- compatible: Must contain "marvell,armada-370-gpio"
->  
->  - reg: an additional register set is needed, for the GPIO Blink
->    Counter on/off registers.
-> @@ -71,7 +71,7 @@ Example:
->  		};
->  
->  		gpio1: gpio at 18140 {
-> -			compatible = "marvell,armada-370-xp-gpio";
-> +			compatible = "marvell,armada-370-gpio";
->  			reg = <0x18140 0x40>, <0x181c8 0x08>;
->  			reg-names = "gpio", "pwm";
->  			ngpios = <17>;
-> diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
-> index 19a92ef..f94fd47 100644
-> --- a/drivers/gpio/gpio-mvebu.c
-> +++ b/drivers/gpio/gpio-mvebu.c
-> @@ -721,7 +721,7 @@ static int mvebu_pwm_probe(struct platform_device *pdev,
->  	u32 set;
->  
->  	if (!of_device_is_compatible(mvchip->chip.of_node,
-> -				     "marvell,armada-370-xp-gpio"))
-> +				     "marvell,armada-370-gpio"))
->  		return 0;
->  
->  	if (IS_ERR(mvchip->clk))
-> @@ -845,7 +845,7 @@ static const struct of_device_id mvebu_gpio_of_match[] = {
->  		.data	    = (void *) MVEBU_GPIO_SOC_VARIANT_ARMADAXP,
->  	},
->  	{
-> -		.compatible = "marvell,armada-370-xp-gpio",
-> +		.compatible = "marvell,armada-370-gpio",
->  		.data	    = (void *) MVEBU_GPIO_SOC_VARIANT_ORION,
->  	},
->  	{
-> @@ -1121,7 +1121,7 @@ static int mvebu_gpio_probe(struct platform_device *pdev)
->  						 mvchip);
->  	}
->  
-> -	/* Armada 370/XP has simple PWM support for GPIO lines */
-> +	/* Some MVEBU SoCs have simple PWM support for GPIO lines */
->  	if (IS_ENABLED(CONFIG_PWM))
->  		return mvebu_pwm_probe(pdev, mvchip, id);
->  
-> -- 
-> 2.10.2
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+>  .../bindings/clock/rockchip,rk3128-cru.txt         | 56 ++++++++++++++++++++++
+>  1 file changed, 56 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3128-cru.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3128-cru.txt b/Documentation/devicetree/bindings/clock/rockchip,rk3128-cru.txt
+> new file mode 100644
+> index 000000000000..455a9a00a623
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/rockchip,rk3128-cru.txt
+> @@ -0,0 +1,56 @@
+> +* Rockchip RK3128 Clock and Reset Unit
+> +
+> +The RK3128 clock controller generates and supplies clock to various
+> +controllers within the SoC and also implements a reset controller for SoC
+> +peripherals.
+> +
+> +Required Properties:
+> +
+> +- compatible: should be "rockchip,rk3128-cru"
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +- #clock-cells: should be 1.
+> +- #reset-cells: should be 1.
+> +
+> +Optional Properties:
+> +
+> +- rockchip,grf: phandle to the syscon managing the "general register files"
+> +  If missing pll rates are not changeable, due to the missing pll lock status.
+> +
+> +Each clock is assigned an identifier and client nodes can use this identifier
+> +to specify the clock which they consume. All available clocks are defined as
+> +preprocessor macros in the dt-bindings/clock/rk3128-cru.h headers and can be
+> +used in device tree sources. Similar macros exist for the reset sources in
+> +these files.
+> +
+> +External clocks:
+> +
+> +There are several clocks that are generated outside the SoC. It is expected
+> +that they are defined using standard clock bindings with following
+> +clock-output-names:
+> + - "xin24m" - crystal input - required,
+> + - "ext_i2s" - external I2S clock - optional,
+> + - "gmac_clkin" - external GMAC clock - optional
+> +
+> +Example: Clock controller node:
+> +
+> +	cru: cru at 20000000 {
+> +		compatible = "rockchip,rk3128-cru";
+> +		reg = <0x20000000 0x1000>;
+> +		rockchip,grf = <&grf>;
+> +
+> +		#clock-cells = <1>;
+> +		#reset-cells = <1>;
+> +	};
+> +
+> +Example: UART controller node that consumes the clock generated by the clock
+> +  controller:
+> +
+> +	uart2: serial at 20068000 {
+> +		compatible = "rockchip,serial";
+> +		reg = <0x20068000 0x100>;
+> +		interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
+> +		clock-frequency = <24000000>;
+> +		clocks = <&cru SCLK_UART2>, <&cru PCLK_UART2>;
+> +		clock-names = "sclk_uart", "pclk_uart";
+> +	};
+> 
