@@ -1,61 +1,80 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Fri, 2 Jun 2017 09:29:14 +0200
-Subject: [PATCH v4 0/6] ARM: at91: initial samx7 support
-In-Reply-To: <20170601200601.11035-1-alexandre.belloni@free-electrons.com>
-References: <20170601200601.11035-1-alexandre.belloni@free-electrons.com>
-Message-ID: <19e8c642-50c8-85c3-7edc-52218a83288f@microchip.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Fri, 2 Jun 2017 15:28:51 +0800
+Subject: [PATCH] PCI: rockchip: Handle return value of clk_prepare_enable
+In-Reply-To: <4ebfc69644f9d6e9e5ff0cfc82e9efa5c476be0e.1496312348.git.arvind.yadav.cs@gmail.com>
+References: <4ebfc69644f9d6e9e5ff0cfc82e9efa5c476be0e.1496312348.git.arvind.yadav.cs@gmail.com>
+Message-ID: <f8e91d5f-77ea-6836-87b4-53b99544074d@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 01/06/2017 ? 22:05, Alexandre Belloni a ?crit :
-> This series adds initial support for Atmel armv7m SoCs.
+Hi,
 
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-To the whole series.
+? 2017/6/1 18:21, Arvind Yadav ??:
+> clk_prepare_enable() can fail here and we must check its return value.
+> 
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 
-Thanks Szemz? and Alexandre for having taken care of this support!
+Acked-by: Shawn Lin <shawn.lin@rock-chips.com>
 
-Best regards,
-
-> Changes in v4:
->  - rename the family samv7 as the internal name is samv7x and it may conflict
->    with future SoCs.
+> ---
+>   drivers/pci/host/pcie-rockchip.c | 34 ++++++++++++++++++++++++++++------
+>   1 file changed, 28 insertions(+), 6 deletions(-)
 > 
-> Changes in v3:
->  - dropped most of the changes in Atmel/README
->  - rebased on v4.12-rc1
->  - removed the dtsi until the tcb series is taken
+> diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
+> index 0e020b6..0a248cd 100644
+> --- a/drivers/pci/host/pcie-rockchip.c
+> +++ b/drivers/pci/host/pcie-rockchip.c
+> @@ -1259,24 +1259,46 @@ static int __maybe_unused rockchip_pcie_resume_noirq(struct device *dev)
+>   	struct rockchip_pcie *rockchip = dev_get_drvdata(dev);
+>   	int err;
+>   
+> -	clk_prepare_enable(rockchip->clk_pcie_pm);
+> -	clk_prepare_enable(rockchip->hclk_pcie);
+> -	clk_prepare_enable(rockchip->aclk_perf_pcie);
+> -	clk_prepare_enable(rockchip->aclk_pcie);
+> +	err = clk_prepare_enable(rockchip->clk_pcie_pm);
+> +	if (err)
+> +		goto err_pcie_pm;
+> +
+> +	err = clk_prepare_enable(rockchip->hclk_pcie);
+> +	if (err)
+> +		goto err_hclk_pcie;
+> +
+> +	err = clk_prepare_enable(rockchip->aclk_perf_pcie);
+> +	if (err)
+> +		goto err_aclk_perf_pcie;
+> +
+> +	err = clk_prepare_enable(rockchip->aclk_pcie);
+> +	if (err)
+> +		goto err_aclk_pcie;
+>   
+>   	err = rockchip_pcie_init_port(rockchip);
+>   	if (err)
+> -		return err;
+> +		goto err_pcie_resume;
+>   
+>   	err = rockchip_cfg_atu(rockchip);
+>   	if (err)
+> -		return err;
+> +		goto err_pcie_resume;
+>   
+>   	/* Need this to enter L1 again */
+>   	rockchip_pcie_update_txcredit_mui(rockchip);
+>   	rockchip_pcie_enable_interrupts(rockchip);
+>   
+>   	return 0;
+> +
+> +err_pcie_resume:
+> +	clk_disable_unprepare(rockchip->aclk_pcie);
+> +err_aclk_pcie:
+> +	clk_disable_unprepare(rockchip->aclk_perf_pcie);
+> +err_aclk_perf_pcie:
+> +	clk_disable_unprepare(rockchip->hclk_pcie);
+> +err_hclk_pcie:
+> +	clk_disable_unprepare(rockchip->clk_pcie_pm);
+> +err_pcie_pm:
+> +	return err;
+>   }
+>   
+>   static int rockchip_pcie_probe(struct platform_device *pdev)
 > 
-> Changes in v2:
->  - fixed checkpatch issues
->  - Added documentation
->  - removed Ethernet from the dtsi until the driver change is taken
-> 
-> 
-> Alexandre Belloni (3):
->   ARM: at91: Documentation: add armv7m families
->   ARM: at91: Document armv7m compatibles
->   ARM: at91: handle CONFIG_PM for armv7m configurations
-> 
-> Szemz? Andr?s (3):
->   ARM: at91: Add armv7m support
->   ARM: at91: add armv7m SoC detection
->   ARM: at91: debug: add samv7x support
-> 
->  Documentation/arm/Atmel/README                     | 38 +++++++++++++++++++++-
->  .../devicetree/bindings/arm/atmel-at91.txt         | 30 +++++++++++++++++
->  arch/arm/Kconfig.debug                             | 10 ++++++
->  arch/arm/mach-at91/Kconfig                         | 16 ++++++++-
->  arch/arm/mach-at91/Makefile                        |  4 +--
->  arch/arm/mach-at91/Makefile.boot                   |  3 ++
->  arch/arm/mach-at91/samv7.c                         | 34 +++++++++++++++++++
->  drivers/soc/atmel/soc.c                            | 24 ++++++++++++++
->  drivers/soc/atmel/soc.h                            | 26 +++++++++++++++
->  9 files changed, 181 insertions(+), 4 deletions(-)
->  create mode 100644 arch/arm/mach-at91/Makefile.boot
->  create mode 100644 arch/arm/mach-at91/samv7.c
-> 
-
-
--- 
-Nicolas Ferre
