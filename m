@@ -1,32 +1,57 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Fri, 2 Jun 2017 20:02:25 +0530
-Subject: [PATCH v3 0/2] kexec-tools: arm64: Enable D-cache in purgatory
-In-Reply-To: <CAKv+Gu-0p6iWnY9fr67YrYUgiLwArwkNUKio-7XjT0uMafcQ-w@mail.gmail.com>
-References: <cover.1495514291.git.panand@redhat.com> <59312080.1090906@arm.com>
- <CAKv+Gu--N4Pef6z=G4ePTgF3CcKhmmSfrvJBY-5p0CLL_PZ=3Q@mail.gmail.com>
- <CAFTCetS17w0-BJJzTfi8uNS67xos4MwJz3R=qdz2Oe7+fcXk3g@mail.gmail.com>
- <CAKv+Gu86EEFzVzG4h0f6sBk=ar4Ffv_KuNhyKNi_Zf7k3KvWcg@mail.gmail.com>
- <CAKv+Gu-0p6iWnY9fr67YrYUgiLwArwkNUKio-7XjT0uMafcQ-w@mail.gmail.com>
-Message-ID: <2b80fca3-b462-a1b5-36db-e8b8b8fdc126@redhat.com>
+From: philippe.cornu@st.com (Philippe CORNU)
+Date: Fri, 2 Jun 2017 16:37:11 +0200
+Subject: [PATCH v3 2/6] dt-bindings: display: Add Synopsys DW MIPI DSI DRM
+ bridge driver
+In-Reply-To: <1496414235-20098-1-git-send-email-philippe.cornu@st.com>
+References: <1496414235-20098-1-git-send-email-philippe.cornu@st.com>
+Message-ID: <1496414235-20098-3-git-send-email-philippe.cornu@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+This patch adds documentation of device tree bindings for the
+Synopsys DesignWare MIPI DSI host DRM bridge driver.
 
-Thanks for all the inputs.
+Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
+---
+ .../bindings/display/bridge/dw_mipi_dsi.txt        | 30 ++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
 
-On Friday 02 June 2017 05:14 PM, Ard Biesheuvel wrote:
->> Alternatively, a SHA-256 implementation that uses movz/movk sequences
->> instead of ldr instructions to load the round constants would already
->> be 5x faster, given that we don't need page tables to enable the
->> I-cache.
-> Actually, looking at the C code and the objdump of the kernel's
-> sha256_generic driver, it is likely that it is already doing this, and
-> none of the points I made actually make a lot of sense ...
->
-> Pratyush: I assume you are already enabling the I-cache in the purgatory?
-
-It's not enabled yet. But, I had tried first with enabling only I-cache, but 
-that did not make much difference in execution time.
-
-~Pratyush
+diff --git a/Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt b/Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
+new file mode 100644
+index 0000000..1d7c438
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
+@@ -0,0 +1,30 @@
++Synopsys DesignWare MIPI DSI host controller
++============================================
++
++This document defines device tree properties for the Synopsys DesignWare MIPI
++DSI host controller. It doesn't constitue a device tree binding specification
++by itself but is meant to be referenced by platform-specific device tree
++bindings.
++
++When referenced from platform device tree bindings the properties defined in
++this document are defined as follows. The platform device tree bindings are
++responsible for defining whether each property is required or optional.
++
++- reg: Memory mapped base address and length of the DWC MIPI DSI
++  registers. (mandatory)
++
++- clocks: References to all the clocks specified in the clock-names property
++  as specified in [1]. (mandatory)
++
++- clock-names: "pclk" is peripheral clock for either AHB and APB. (mandatory)
++
++- resets: References to all the resets specified in the reset-names property
++  as specified in [2]. (optional)
++
++- reset-names: string reset name, must be "apb" if used. (optional)
++
++- panel or bridge node: see [3]. (mandatory)
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++[2] Documentation/devicetree/bindings/reset/reset.txt
++[3] Documentation/devicetree/bindings/display/mipi-dsi-bus.txt
+-- 
+1.9.1
