@@ -1,40 +1,39 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Fri,  2 Jun 2017 18:51:56 +0800
-Subject: [PATCH v3 6/6] arm64: defconfig: enable support hi6421v530 PMIC
-In-Reply-To: <20170602105156.11351-1-guodong.xu@linaro.org>
-References: <20170602105156.11351-1-guodong.xu@linaro.org>
-Message-ID: <20170602105156.11351-7-guodong.xu@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri,  2 Jun 2017 12:02:20 +0100
+Subject: [PATCH] arm64/kvm: fix misleading kconfig text for 16K pages
+Message-ID: <1496401340-24802-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable configs for hi6421v530 mfd and regulator driver
- + CONFIG_MFD_HI6421_PMIC=y
- + CONFIG_REGULATOR_HI6421V530=y
+We've supported KVM with 16K pages since commit:
 
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+  02e0b7600f835007 ("arm64: kvm: Add support for 16K pages")
+
+... yet the kconfig text says this combination is not supported.
+
+Let's fix that by deleting the misleading text.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+Cc: kvmarm at lists.cs.columbia.edu
 ---
- arch/arm64/configs/defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/kvm/Kconfig | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index ce07285..867d68c 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -305,6 +305,7 @@ CONFIG_S3C2410_WATCHDOG=y
- CONFIG_MESON_GXBB_WATCHDOG=m
- CONFIG_MESON_WATCHDOG=m
- CONFIG_MFD_EXYNOS_LPASS=m
-+CONFIG_MFD_HI6421_PMIC=y
- CONFIG_MFD_MAX77620=y
- CONFIG_MFD_RK808=y
- CONFIG_MFD_SPMI_PMIC=y
-@@ -315,6 +316,7 @@ CONFIG_MFD_CROS_EC=y
- CONFIG_MFD_CROS_EC_I2C=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_GPIO=y
-+CONFIG_REGULATOR_HI6421V530=y
- CONFIG_REGULATOR_HI655X=y
- CONFIG_REGULATOR_MAX77620=y
- CONFIG_REGULATOR_PWM=y
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+index 52cb7ad..6e4e461 100644
+--- a/arch/arm64/kvm/Kconfig
++++ b/arch/arm64/kvm/Kconfig
+@@ -37,8 +37,6 @@ config KVM
+ 	select HAVE_KVM_IRQ_ROUTING
+ 	---help---
+ 	  Support hosting virtualized guest machines.
+-	  We don't support KVM with 16K page tables yet, due to the multiple
+-	  levels of fake page tables.
+ 
+ 	  If unsure, say N.
+ 
 -- 
-2.10.2
+1.9.1
