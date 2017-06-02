@@ -1,204 +1,71 @@
-From: wulf@rock-chips.com (wlf)
-Date: Fri, 2 Jun 2017 09:44:51 +0800
-Subject: [PATCH 1/2] ARM: dts: rockchip: add usb nodes on rk322x
-In-Reply-To: <1657625.AqxPQItbmB@phil>
-References: <1496193684-30449-1-git-send-email-william.wu@rock-chips.com>
- <1496193684-30449-2-git-send-email-william.wu@rock-chips.com>
- <1657625.AqxPQItbmB@phil>
-Message-ID: <2584cf1a-7ffb-b5ba-3324-fca3f4fd402e@rock-chips.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 01 Jun 2017 18:48:30 -0700
+Subject: [PATCH v3 0/2] ARM: dts: imx7: add NAND support
+In-Reply-To: <3c086d95-96e5-71ec-b44f-12ed41903fcf@nxp.com>
+References: <20170601192044.6548-1-stefan@agner.ch>
+ <3c086d95-96e5-71ec-b44f-12ed41903fcf@nxp.com>
+Message-ID: <e57ba49dc2b91b70b5848875e28b17ae@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Heiko,
+Hi Han,
 
-? 2017?06?02? 04:22, Heiko Stuebner ??:
-> Hi William,
->
-> Am Mittwoch, 31. Mai 2017, 09:21:23 CEST schrieb William Wu:
->> This patch adds usb otg/host controllers and phys nodes on rk322x.
+On 2017-06-01 14:14, Han Xu wrote:
+> On 06/01/2017 02:20 PM, Stefan Agner wrote:
+>> This are the missing device tree parts to add NAND support for i.MX 7.
+>> See previous patchset:
+>> https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Flkml.org%2Flkml%2F2017%2F4%2F21%2F832&data=01%7C01%7Chan.xu%40nxp.com%7C3b9081a68c94476c4a2108d4a9235512%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0&sdata=mQ2aq5rW%2B9uADY5mSzFxk8P6bAVq%2BosPJQAi0PL9SQg%3D&reserved=0
 >>
->> Signed-off-by: William Wu <william.wu@rock-chips.com>
->> ---
->>   arch/arm/boot/dts/rk322x.dtsi | 138 +++++++++++++++++++++++++++++++++++++++++-
->>   1 file changed, 137 insertions(+), 1 deletion(-)
+>> The previous version also included driver changes, which are already
+>> merged.
 >>
->> diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
->> index df57413..d4bfd3c 100644
->> --- a/arch/arm/boot/dts/rk322x.dtsi
->> +++ b/arch/arm/boot/dts/rk322x.dtsi
->> @@ -210,8 +210,61 @@
->>   	};
->>   
->>   	grf: syscon at 11000000 {
->> -		compatible = "syscon";
->> +		compatible = "syscon", "simple-mfd";
->>   		reg = <0x11000000 0x1000>;
->> +		#address-cells = <1>;
->> +		#size-cells = <1>;
->> +
->> +		u2phy0: usb2-phy at 760 {
->> +			compatible = "rockchip,rk322x-usb2phy";
-> as commented on the driver-side some moments ago, compatibles should not
-> contain wildcards, so please make this
-> 	"rockchip,rk3228-usb2phy"
-> instead.
->
-> Same below and also for the dwc2 node.
-Thanks, I'll fix it immediately.
->
->
-> Thanks
-> Heiko
->
->> +			reg = <0x0760 0x0c>;
->> +			clocks = <&cru SCLK_OTGPHY0>;
->> +			clock-names = "phyclk";
->> +			#clock-cells = <0>;
->> +			clock-output-names = "usb480m_phy0";
->> +			status = "disabled";
->> +
->> +			u2phy0_otg: otg-port {
->> +				#phy-cells = <0>;
->> +				interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
->> +					     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
->> +					     <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
->> +				interrupt-names = "otg-bvalid", "otg-id",
->> +						  "linestate";
->> +				status = "disabled";
->> +			};
->> +
->> +			u2phy0_host: host-port {
->> +				#phy-cells = <0>;
->> +				interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
->> +				interrupt-names = "linestate";
->> +				status = "disabled";
->> +			};
->> +		};
->> +
->> +		u2phy1: usb2-phy at 800 {
->> +			compatible = "rockchip,rk322x-usb2phy";
-> rockchip,rk3228-usb2phy
-OK, I'll fix it immediately.
->
->> +			reg = <0x0800 0x0c>;
->> +			clocks = <&cru SCLK_OTGPHY1>;
->> +			clock-names = "phyclk";
->> +			#clock-cells = <0>;
->> +			clock-output-names = "usb480m_phy1";
->> +			status = "disabled";
->> +
->> +			u2phy1_otg: otg-port {
->> +				#phy-cells = <0>;
->> +				interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
->> +				interrupt-names = "linestate";
->> +				status = "disabled";
->> +			};
->> +
->> +			u2phy1_host: host-port {
->> +				#phy-cells = <0>;
->> +				interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
->> +				interrupt-names = "linestate";
->> +				status = "disabled";
->> +			};
->> +		};
->>   	};
->>   
->>   	uart0: serial at 11010000 {
->> @@ -467,6 +520,89 @@
->>   		status = "disabled";
->>   	};
->>   
->> +	usb_otg: usb at 30040000 {
->> +		compatible = "rockchip,rk322x-usb", "rockchip,rk3066-usb",
-> rockchip,rk3228-usb
-OK, I'll fix it immediately.:-)
->
->> +			     "snps,dwc2";
->> +		reg = <0x30040000 0x40000>;
->> +		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
->> +		clocks = <&cru HCLK_OTG>;
->> +		clock-names = "otg";
->> +		dr_mode = "otg";
->> +		g-np-tx-fifo-size = <16>;
->> +		g-rx-fifo-size = <280>;
->> +		g-tx-fifo-size = <256 128 128 64 32 16>;
->> +		g-use-dma;
->> +		phys = <&u2phy0_otg>;
->> +		phy-names = "usb2-phy";
->> +		status = "disabled";
->> +	};
->> +
->> +	usb_host0_ehci: usb at 30080000 {
->> +		compatible = "generic-ehci";
->> +		reg = <0x30080000 0x20000>;
->> +		interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
->> +		clocks = <&cru HCLK_HOST0>, <&u2phy0>;
->> +		clock-names = "usbhost", "utmi";
->> +		phys = <&u2phy0_host>;
->> +		phy-names = "usb";
->> +		status = "disabled";
->> +	};
->> +
->> +	usb_host0_ohci: usb at 300a0000 {
->> +		compatible = "generic-ohci";
->> +		reg = <0x300a0000 0x20000>;
->> +		interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
->> +		clocks = <&cru HCLK_HOST0>, <&u2phy0>;
->> +		clock-names = "usbhost", "utmi";
->> +		phys = <&u2phy0_host>;
->> +		phy-names = "usb";
->> +		status = "disabled";
->> +	};
->> +
->> +	usb_host1_ehci: usb at 300c0000 {
->> +		compatible = "generic-ehci";
->> +		reg = <0x300c0000 0x20000>;
->> +		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
->> +		clocks = <&cru HCLK_HOST1>, <&u2phy1>;
->> +		clock-names = "usbhost", "utmi";
->> +		phys = <&u2phy1_otg>;
->> +		phy-names = "usb";
->> +		status = "disabled";
->> +	};
->> +
->> +	usb_host1_ohci: usb at 300e0000 {
->> +		compatible = "generic-ohci";
->> +		reg = <0x300e0000 0x20000>;
->> +		interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
->> +		clocks = <&cru HCLK_HOST1>, <&u2phy1>;
->> +		clock-names = "usbhost", "utmi";
->> +		phys = <&u2phy1_otg>;
->> +		phy-names = "usb";
->> +		status = "disabled";
->> +	};
->> +
->> +	usb_host2_ehci: usb at 30100000 {
->> +		compatible = "generic-ehci";
->> +		reg = <0x30100000 0x20000>;
->> +		interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
->> +		clocks = <&cru HCLK_HOST2>, <&u2phy1>;
->> +		phys = <&u2phy1_host>;
->> +		phy-names = "usb";
->> +		clock-names = "usbhost", "utmi";
->> +		status = "disabled";
->> +	};
->> +
->> +	usb_host2_ohci: usb at 30120000 {
->> +		compatible = "generic-ohci";
->> +		reg = <0x30120000 0x20000>;
->> +		interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
->> +		clocks = <&cru HCLK_HOST2>, <&u2phy1>;
->> +		clock-names = "usbhost", "utmi";
->> +		phys = <&u2phy1_host>;
->> +		phy-names = "usb";
->> +		status = "disabled";
->> +	};
->> +
->>   	gmac: ethernet at 30200000 {
->>   		compatible = "rockchip,rk3228-gmac";
->>   		reg = <0x30200000 0x10000>;
+>> --
+>> Stefan
 >>
->
->
->
->
+>> Changes since v2:
+>> - Only specify IMX7D_NAND_USDHC_BUS_ROOT_CLK which seems to be sufficent
+> Hi Stefan, sorry I didn't reply your last patch. I was unable to fully 
+> test on i.MX7 since the work bandwidth, but the quick test shows DMA 
+> cannot work WITHOUT IMX7D_NAND_ROOT_CLK on my side, I will fully check 
+> it tomorrow morning and let you know the result.
+
+How did you test that?
+
+Since DMA can only use NAND in i.MX 7, testing is somewhat hard.
+
+Fact is, I can access DMA registers using just NAND_USDHC_BUS_CLK_ROOT
+
+mw.l 0x30388980 0x11000000 # Enable NAND_USDHC_BUS_CLK_ROOT
+mw.l 0x3038aa00 0x00000000 # Enable NAND_CLK_ROOT
+
+md.l 0x33000100 0 # Access APBH_CH0_CURCMDAR
+
+This works for me.
+
+I can *boot* from a UBIFS using this driver and Linux 4.12-rc1 with my
+patchset applied...
+
+Monitoring clocks in /sys/kernel/debug/clk/clk_summary show that
+NAND_ROOT_CLK gets turned off and back on if NAND access happens, the
+system seems stable.
+
+All that said, this patchset v3 actually does not remove the
+NAND_ROOT_CLK as intended to. Will send a v4.
+
+--
+Stefan
+
+>> - Dropped driver changes, alreay merged
+>>
+>> Changes since v1:
+>> - Make clks_count const
+>> - Introduce IS_IMX7D for i.MX 7 SoC's and make it part of GPMI_IS_MX6
+>>
+>> Stefan Agner (2):
+>>    ARM: dts: imx7: add GPMI NAND
+>>    ARM: dts: imx7-colibri: add NAND support
+>>
+>>   arch/arm/boot/dts/imx7-colibri.dtsi |  9 +++++++++
+>>   arch/arm/boot/dts/imx7s.dtsi        | 31 +++++++++++++++++++++++++++++++
+>>   2 files changed, 40 insertions(+)
+>>
