@@ -1,67 +1,100 @@
-From: dave.hansen@intel.com (Dave Hansen)
-Date: Fri, 2 Jun 2017 11:18:28 -0700
-Subject: [PATCH] mm: vmalloc: make vmalloc_to_page() deal with PMD/PUD
- mappings
-In-Reply-To: <CAKv+Gu_0cQDyRP0urZEF6OAn7cOEVH3WXL2UpDgg6wKUrWcRYA@mail.gmail.com>
-References: <20170602112720.28948-1-ard.biesheuvel@linaro.org>
- <e98368d8-b1bc-5804-2115-370ec7109e9b@intel.com>
- <CAKv+Gu964bDsV52gZ7QCJf26kXVaWgmuwXZSm0qWxa-34Eqttw@mail.gmail.com>
- <747b71d8-86a7-3b96-cf90-60d6c2ce0171@intel.com>
- <CAKv+Gu_0cQDyRP0urZEF6OAn7cOEVH3WXL2UpDgg6wKUrWcRYA@mail.gmail.com>
-Message-ID: <97a535d8-f9d5-57b2-4b9c-23a0e6df7cc8@intel.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Fri, 2 Jun 2017 21:06:22 +0200
+Subject: [RFC 07/55] KVM: arm/arm64: Add virtual EL2 state emulation
+ framework
+In-Reply-To: <jpg8tlal2aw.fsf@linux.bootlegged.copy>
+References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
+ <1483943091-1364-8-git-send-email-jintack@cs.columbia.edu>
+ <jpg37bj1nj6.fsf@linux.bootlegged.copy> <20170602115140.GB397@cbox>
+ <jpg8tlal2aw.fsf@linux.bootlegged.copy>
+Message-ID: <20170602190622.GF397@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/2017 09:21 AM, Ard Biesheuvel wrote:
->> First of all, this math isn't guaranteed to work.  We don't guarantee
->> virtual contiguity for all mem_map[]s.  I think you need to go to a pfn
->> or paddr first, add the pud offset, then convert to a 'struct page'.
+On Fri, Jun 02, 2017 at 01:36:23PM -0400, Bandan Das wrote:
+> Christoffer Dall <cdall@linaro.org> writes:
 > 
-> OK, so you are saying the slice of the struct page array covering the
-> range could be discontiguous even though the physical range it
-> describes is contiguous? (which is guaranteed due to the nature of a
-> PMD mapping IIUC) In that case,
-
-Yes.
-
->> But, what *is* the right thing to return here?  Do the users here want
->> the head page or the tail page?
+> > On Thu, Jun 01, 2017 at 04:05:49PM -0400, Bandan Das wrote:
+> >> Jintack Lim <jintack@cs.columbia.edu> writes:
+> >> ...
+> >> > +/**
+> >> > + * kvm_arm_setup_shadow_state -- prepare shadow state based on emulated mode
+> >> > + * @vcpu: The VCPU pointer
+> >> > + */
+> >> > +void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
+> >> > +{
+> >> > +	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
+> >> > +
+> >> > +	ctxt->hw_pstate = *vcpu_cpsr(vcpu);
+> >> > +	ctxt->hw_sys_regs = ctxt->sys_regs;
+> >> > +	ctxt->hw_sp_el1 = ctxt->gp_regs.sp_el1;
+> >> > +}
+> >> > +
+> >> > +/**
+> >> > + * kvm_arm_restore_shadow_state -- write back shadow state from guest
+> >> > + * @vcpu: The VCPU pointer
+> >> > + */
+> >> > +void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu)
+> >> > +{
+> >> > +	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
+> >> > +
+> >> > +	*vcpu_cpsr(vcpu) = ctxt->hw_pstate;
+> >> > +	ctxt->gp_regs.sp_el1 = ctxt->hw_sp_el1;
+> >> > +}
+> >> > +
+> >> > +void kvm_arm_init_cpu_context(kvm_cpu_context_t *cpu_ctxt)
+> >> > +{
+> >> > +	cpu_ctxt->hw_sys_regs = &cpu_ctxt->sys_regs[0];
+> >> > +}
+> >> 
+> >> 
+> >> IIUC, the *_shadow_state() functions will set hw_* pointers to
+> >> either point to the "real" state or the shadow state to manage L2 ?
+> >> Maybe, it might make sense to make these function names a little more
+> >> generic since they are not dealing with setting the shadow state
+> >> alone.
+> >> 
+> >
+> > The notion of 'shadow state' is borrowed from shadow page tables, in
+> > which you always load some 'shadow copy' of the 'real value' into the
+> > hardware, so the shadow state is the one that's used for execution by
+> > the hardware.
+> >
+> > The shadow state may be the same as the VCPU's EL1 state, for example,
+> > or it may be a modified version of the VCPU's EL2 state, for example.
 > 
-> Hmm, I see what you mean. The vread() code that I am trying to fix
-> simply kmaps the returned page, copies from it and unmaps it, so it is
-> after the tail page. But I guess code that is aware of compound pages
-> is after the head page instead.
+> Yes, it can be the same. Although, as you said above, "shadow" conventionally
+> refers to the latter.
 
-Yeah, and some operations happen on tail pages while others get
-redirected to the head page.
+That's not what I said.  I said shadow is the thing you use in the
+hardware, which may be the same, and may be something different.  The
+important point being, that it is what gets used by the hardware, and
+that it's decoupled, not necessarily different, from the virtual
+state.
 
->> BTW, _are_ your huge vmalloc pages compound?
+> When it's pointing to EL1 state, it's not really
+> shadow state anymore.
 > 
-> Not in the case that I am trying to solve, no. They are simply VM_MAP
-> mappings of sequences of pages that are occupied by the kernel itself,
-> and not allocated by the page allocator.
 
-Huh, so what are they?  Are they system RAM that was bootmem allocated
-or something?
+You can argue it both ways, in the end, all that's important is whether
+or not it's clear what the functions do.
 
->>>>> +#else
->>>>> +     VIRTUAL_BUG_ON(1);
->>>>> +#endif
->>>>> +     return page;
->>>>> +}
->>>> So if somebody manages to call this function on a huge page table entry,
->>>> but doesn't have hugetlbfs configured on, we kill the machine?
->>> Yes. But only if you have CONFIG_DEBUG_VIRTUAL defined, in which case
->>> it seems appropriate to signal a failure rather than proceed with
->>> dereferencing the huge PMD entry as if it were a table entry.
->>
->> Why kill the machine rather than just warning and returning NULL?
+> > If you have better suggestions for naming, we're open to that though.
+> >
 > 
-> I know this is generally a bad thing, but in this case, when a debug
-> option has been enabled exactly for this purpose, I think it is not
-> inappropriate to BUG() when encountering such a mapping. But I am
-> happy to relax it to a WARN() and return NULL instead, but in that
-> case, it should be unconditional imo and not based on
-> CONFIG_DEBUG_VIRTUAL or the likes.
+> Oh nothing specifically, I just felt like "shadow" in the function name
+> could be confusing. Borrowing from kvm_arm_init_cpu_context(), 
+> how about kvm_arm_setup/restore_cpu_context()  ?
 
-Sounds sane to me.
+I have no objection to these names.
+
+> 
+> BTW, on a separate note, we might as well get away with the typedef and
+> call struct kvm_cpu_context directly.
+> 
+I don't think it's worth changing the code just for that, but if you
+feel it's a significant cleanup, you can send a patch with a good
+argument for why it's worth changing in the commit message.
+
+Thanks,
+-Christoffer
