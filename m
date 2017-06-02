@@ -1,155 +1,59 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 2 Jun 2017 10:18:20 +0100
-Subject: [PATCH 4/4] drm/bridge: dw-hdmi: add cec driver
-In-Reply-To: <44245d0c-8b88-dc9f-9431-07c0f7f6be4a@xs4all.nl>
-References: <20170530142218.GS22219@n2100.armlinux.org.uk>
- <E1dFi3P-0004lv-2K@rmk-PC.armlinux.org.uk>
- <b8bcdc78-12a1-9c3d-58ac-b53fe829dd80@baylibre.com>
- <a1aef75d-74f2-d45a-c5ac-57fc13c6be9e@xs4all.nl>
- <6efcce7c-d447-3ce1-93f7-3f97b5fd414d@synopsys.com>
- <44245d0c-8b88-dc9f-9431-07c0f7f6be4a@xs4all.nl>
-Message-ID: <20170602091820.GK22219@n2100.armlinux.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 02 Jun 2017 11:18:44 +0200
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.12 (#1)
+In-Reply-To: <20170601235745.GF13314@localhost> (Olof Johansson's message of
+ "Thu, 1 Jun 2017 16:57:45 -0700")
+References: <87d1ansq6c.fsf@free-electrons.com>
+ <20170601235745.GF13314@localhost>
+Message-ID: <878tlarbm3.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 02, 2017 at 11:06:24AM +0200, Hans Verkuil wrote:
-> On 06/02/17 08:43, Jose Abreu wrote:
-> > Hi Hans,
-> > 
-> > 
-> > On 02-06-2017 07:31, Hans Verkuil wrote:
-> >> On 06/01/2017 03:47 PM, Neil Armstrong wrote:
-> >>> On 05/30/2017 04:23 PM, Russell King wrote:
-> >>>> Add a CEC driver for the dw-hdmi hardware.
-> >>>>
-> >>>> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> >>>> ---
-> >>>>   drivers/gpu/drm/bridge/synopsys/Kconfig       |   8 +
-> >>>>   drivers/gpu/drm/bridge/synopsys/Makefile      |   1 +
-> >>>>   drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.c | 320
-> >>>> ++++++++++++++++++++++++++
-> >>>>   drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.h |  19 ++
-> >>>>   drivers/gpu/drm/bridge/synopsys/dw-hdmi.c     |  40 +++-
-> >>>>   5 files changed, 387 insertions(+), 1 deletion(-)
-> >>>>   create mode 100644
-> >>>> drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.c
-> >>>>   create mode 100644
-> >>>> drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.h
-> >>>>
-> >>>> diff --git a/drivers/gpu/drm/bridge/synopsys/Kconfig
-> >>>> b/drivers/gpu/drm/bridge/synopsys/Kconfig
-> >>>> index 40d2827a6d19..bd30a0a07272 100644
-> >>>> --- a/drivers/gpu/drm/bridge/synopsys/Kconfig
-> >>>> +++ b/drivers/gpu/drm/bridge/synopsys/Kconfig
-> >>>> @@ -21,3 +21,11 @@ config DRM_DW_HDMI_I2S_AUDIO
-> >>>>       help
-> >>>>         Support the I2S Audio interface which is part of the
-> >>>> Synopsys
-> >>>>         Designware HDMI block.
-> >>>> +
-> >>>> +config DRM_DW_HDMI_CEC
-> >>>> +    tristate "Synopsis Designware CEC interface"
-> >>>> +    depends on DRM_DW_HDMI && MEDIA_CEC_SUPPORT
-> >>>> +    select MEDIA_CEC_NOTIFIER
-> >>>> +    help
-> >>>> +      Support the CE interface which is part of the Synopsis
-> >>>> +      Designware HDMI block.
-> >>>> diff --git a/drivers/gpu/drm/bridge/synopsys/Makefile
-> >>>> b/drivers/gpu/drm/bridge/synopsys/Makefile
-> >>>> index 17aa7a65b57e..6fe415903668 100644
-> >>>> --- a/drivers/gpu/drm/bridge/synopsys/Makefile
-> >>>> +++ b/drivers/gpu/drm/bridge/synopsys/Makefile
-> >>>> @@ -3,3 +3,4 @@
-> >>>>   obj-$(CONFIG_DRM_DW_HDMI) += dw-hdmi.o
-> >>>>   obj-$(CONFIG_DRM_DW_HDMI_AHB_AUDIO) += dw-hdmi-ahb-audio.o
-> >>>>   obj-$(CONFIG_DRM_DW_HDMI_I2S_AUDIO) += dw-hdmi-i2s-audio.o
-> >>>> +obj-$(CONFIG_DRM_DW_HDMI_CEC) += dw-hdmi-cec.o
-> >>>> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.c
-> >>>> b/drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.c
-> >>>> new file mode 100644
-> >>>> index 000000000000..761ef5ae687d
-> >>>> --- /dev/null
-> >>>> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.c
-> >>>> @@ -0,0 +1,320 @@
-> >>>> +/*
-> >>>> + * Designware HDMI CEC driver
-> >>>> + *
-> >>>> + * Copyright (C) 2015-2017 Russell King.
-> >>>> + *
-> >>>> + * This program is free software; you can redistribute it
-> >>>> and/or modify
-> >>>> + * it under the terms of the GNU General Public License
-> >>>> version 2 as
-> >>>> + * published by the Free Software Foundation.
-> >>>> + */
-> >>>> +#include <linux/interrupt.h>
-> >>>> +#include <linux/io.h>
-> >>>> +#include <linux/module.h>
-> >>>> +#include <linux/platform_device.h>
-> >>>> +#include <linux/sched.h>
-> >>>> +#include <linux/slab.h>
-> >>>> +
-> >>>> +#include <drm/drm_edid.h>
-> >>>> +
-> >>>> +#include <media/cec.h>
-> >>>> +#include <media/cec-notifier.h>
-> >>>> +
-> >>>> +#include "dw-hdmi-cec.h"
-> >>>> +
-> >>>> +enum {
-> >>>> +    HDMI_IH_CEC_STAT0    = 0x0106,
-> >>>> +    HDMI_IH_MUTE_CEC_STAT0    = 0x0186,
-> >>>> +
-> >>>> +    HDMI_CEC_CTRL        = 0x7d00,
-> >>>> +    CEC_CTRL_START        = BIT(0),
-> >>>> +    CEC_CTRL_NORMAL        = 1 << 1,
-> >>>> +
-> >>>> +    HDMI_CEC_STAT        = 0x7d01,
-> >>>> +    CEC_STAT_DONE        = BIT(0),
-> >>>> +    CEC_STAT_EOM        = BIT(1),
-> >>>> +    CEC_STAT_NACK        = BIT(2),
-> >>>> +    CEC_STAT_ARBLOST    = BIT(3),
-> >>>> +    CEC_STAT_ERROR_INIT    = BIT(4),
-> >>>> +    CEC_STAT_ERROR_FOLL    = BIT(5),
-> >>>> +    CEC_STAT_WAKEUP        = BIT(6),
-> >>
-> >> I hadn't realized until Jose Abreu's latest reply, but you need
-> >> to check the
-> >> ARBLOST status and set the TX state to CEC_TX_STATUS_ARB_LOST.
-> >>
-> >> I think CEC_STAT_ERROR_FOLL might equal
-> >> CEC_TX_STATUS_LOW_DRIVE, but without
-> >> documentation I can't be sure.
-> >>
-> >> My experience is that this low drive condition tends to be
-> >> poorly reported by
-> >> hardware. Either that or poorly documented. This is why I added a
-> >> CEC_TX_STATUS_ERROR status as a catch-all error status when it
-> >> is unclear from
-> >> the hardware/documentation what error occurred.
-> >>
-> >> Jose, do you know which status bit is used to report a follower
-> >> pulling the
-> >> CEC line low for a long time (approx. 3.6 ms) to signal a CEC
-> >> error?
-> > 
-> > Bit 5 for follower error, bit 4 for initiator error.
-> 
-> I gathered that from the define names :-)
-> 
-> But what does it mean? What sort of error is reported here?
+Hi Olof,
+ 
+ On ven., juin 02 2017, Olof Johansson <olof@lixom.net> wrote:
 
-I think the problem is that no one really knows, the documentation is
-quite poor:
+> On Thu, Jun 01, 2017 at 05:06:35PM +0200, Gregory CLEMENT wrote:
+>> Hi,
+>> 
+>> Here is the first pull request for fixes for mvebu for v4.12.
+>> 
+>> Gregory
+>> 
+>> The following changes since commit 08332893e37af6ae779367e78e444f8f9571511d:
+>> 
+>>   Linux 4.12-rc2 (2017-05-21 19:30:23 -0700)
+>> 
+>> are available in the git repository at:
+>> 
+>>   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.12-1
+>
+> So, it's really appreciated from our side if you take a look at our tree to see
+> what the base for our own fixes branch is, and pick the same or older base for
+> your contents.
+>
+> In this case, we're still at -rc1 and you're on -rc2, so this included
+> a backmerge of -rc2 into our branch. It's nice to avoid if we can, but it's
+> also not a huge deal.
 
-     5       An error is notified by a follower. Abnormal logic data
- ERROR_FOLL  bit error (for follower).
-     4       An error is detected on cec line (for initiator only).
- ERROR_INIT
+I used the rc2 as a base because some mvebu related patches I sent close
+to the opening of the 4.12 merge windows were merged in 4.12-rc2.
 
-It is so vague that you can read anything into that description.
+I wanted to avoid future potential conflict on hte fixes branch.
+
+Thanks,
+
+Gregory
+
+>
+>
+> Merged to fixes.
+>
+>
+> -Olof
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
