@@ -1,73 +1,65 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Fri, 2 Jun 2017 09:24:44 -0700
-Subject: [PATCH v2 00/25] arm64: KVM: Mediate access to GICv3 sysregs at
- EL2
-In-Reply-To: <941a29e4-9652-ee40-1d46-a5f06288cc7b@arm.com>
-References: <20170601102117.17750-1-marc.zyngier@arm.com>
- <7dd609ce-6f7b-2a12-fa06-4ce1c6ba6ebe@caviumnetworks.com>
- <941a29e4-9652-ee40-1d46-a5f06288cc7b@arm.com>
-Message-ID: <c01045ac-10ce-811c-4c60-650db30ef3c8@caviumnetworks.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Fri, 2 Jun 2017 18:30:12 +0200
+Subject: [PATCH v11 4/6] ARM: dts: imx6q-evi: support altera-ps-spi
+In-Reply-To: <20170525172911.11467-5-stillcompiling@gmail.com>
+References: <20170525172911.11467-1-stillcompiling@gmail.com>
+ <20170525172911.11467-5-stillcompiling@gmail.com>
+Message-ID: <a4d0815c-593f-57a9-41fc-ab636ca9b9e5@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/2017 02:11 AM, Marc Zyngier wrote:
-> On 01/06/17 22:00, David Daney wrote:
->> On 06/01/2017 03:20 AM, Marc Zyngier wrote:
->>> Some systems have less than perfect GICv3 implementations, leading to
->>> all kind of ugly issues (guest hanging, host dying). In order to allow
->>> some level of diagnostic, and in some cases implement workarounds,
->>> this series enables the trapping of both Group-0, Group-1 and Common
->>> sysregs. Mediating the access at EL2 allows some form of sanity
->>> checking that the HW is sometimes sorely lacking.
->>>
->>> Instead of fully emulating a GICv3 CPU interface, we still use the
->>> existing HW (list registers, AP registers, VMCR...), which allows the
->>> code to be independent from the rest of the KVM code, and to cope with
->>> partial trapping.
->>>
->>> Of course, trapping has a cost, which is why this must be either
->>> enabled on the command line, or selected by another cpu capability
->>> (see Cavium erratum 30115). A quick test on an A57-based platform
->>> shows a 25% hit when repeatedly banging on the trapped registers,
->>> while normal workloads do not seem to suffer noticeably from such
->>> trapping (hackbench variance is in the usual noise, despite being very
->>> IPI happy).
->>>
->>> This has been tested on a dual socket Thundex-X and a Freescale LS-2085a.
->>>
->>> I've taken the liberty to rebase David Daney's initial Cavium erratum
->>> 30115 workaround on top of this series, and included it here as a
->>> typical use case.
->>
->> I pulled this from:
->>
->>   
->> https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/log/?h=kvm-arm64/gicv3-cpuif-mediated-access
->>
->> this morning at commit	58c1763c5aa6223ab3d04e0c183a31eb0aef832e
->>
->> Entire series tested by and
->>
->> Acked-by: David Daney <david.daney@cavium.com>
+Hi,
+
+Am 25.05.2017 um 19:29 schrieb Joshua Clayton:
+> Add support for Altera V FPGA connected to an spi port
+
+Did you mean "Altera Cyclone V"?
+
+> to the evi devicetree file
 > 
-> Thanks David. May I ask what particular system this was tested on (just
-> so that I have a additional reference point)?
-
-Sure, Unfortunatly I think it doesn't really increase your testing coverage.
-
-I tested on a 2-node NUMA Cavium cn8890 (ThunderX).  This chassis is 
-known as CRB-2S.  Running Ubuntu 16.04.2 userspace.
-
-First I verified that a kernel built from clean v4.12-rc3 would fail 
-with symptoms of no interrupts being processed while running a heavy KVM 
-start/stop workload.  It does, we get a failure in under 5 minutes.
-
-Then I applied your 25 patch set, and retested.  With the patch set 
-applied, no failures were observed after more than 4 hours.
-
-
+> Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
+> ---
+>  arch/arm/boot/dts/imx6q-evi.dts | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
 > 
-> Cheers,
-> 
-> 	M.
-> 
+> diff --git a/arch/arm/boot/dts/imx6q-evi.dts b/arch/arm/boot/dts/imx6q-evi.dts
+> index 24fe093a66db..a0cbb2d84803 100644
+> --- a/arch/arm/boot/dts/imx6q-evi.dts
+> +++ b/arch/arm/boot/dts/imx6q-evi.dts
+> @@ -82,6 +82,15 @@
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_ecspi1 &pinctrl_ecspi1cs>;
+>  	status = "okay";
+> +
+> +	fpga_spi: cyclonespi at 0 {
+
+"cyclonespi" does not strike me as the best node name.
+
+I am guessing this is a sub-node of a SPI controller node, so no need to
+repeat "spi", and Cyclone seems more or less implied by "altr,fpga-".
+
+Note that the example in the bindings doc uses "evi-fpga-spi". Nodes
+don't need to be (shouldn't be?) prefixed with the board. Note that
+bindings examples tend to get copied a lot.
+
+Any reason not to just use "fpga at 0" in both places for simplicity?
+
+> +		compatible = "altr,fpga-passive-serial";
+> +		spi-max-frequency = <20000000>;
+> +		reg = <0>;
+> +		pinctrl-0 = <&pinctrl_fpgaspi>;
+> +		nconfig-gpios = <&gpio4 9 GPIO_ACTIVE_LOW>;
+> +		nstat-gpios = <&gpio4 11 GPIO_ACTIVE_LOW>;
+> +	};
+>  };
+>  
+>  &ecspi3 {
+[snip]
+
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
