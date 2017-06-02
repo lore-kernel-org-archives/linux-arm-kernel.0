@@ -1,112 +1,134 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri,  2 Jun 2017 16:23:07 +0200
-Subject: [PATCH v2 00/11] Add support for the pin and gpio controllers on the
- Marvell Armada 7K/8K
-Message-ID: <cover.8fe5f7c62a787452878ca071fa00b953e96988ef.1496413293.git-series.gregory.clement@free-electrons.com>
+Date: Fri,  2 Jun 2017 16:23:09 +0200
+Subject: [PATCH v2 02/11] pinctrl: dt-bindings: add documentation for CP110
+ pin controllers
+In-Reply-To: <cover.8fe5f7c62a787452878ca071fa00b953e96988ef.1496413293.git-series.gregory.clement@free-electrons.com>
+References: <cover.8fe5f7c62a787452878ca071fa00b953e96988ef.1496413293.git-series.gregory.clement@free-electrons.com>
+Message-ID: <b2f6f394bf4d62b41c63a63163803bfc5e7169cd.1496413293.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Document the device tree binding for the pin controllers found on the
+Armada 7K and Armada 8K SoCs.
 
-As requested by Linus Walleij this series is a merge between the series
-"Add support for the pin controllers on the Marvell Armada 7K/8K" [1]
-and "Extend mvebu gpio driver to support the controllers of the
-Marvell Armada 7K/8K" [2].
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt | 101 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 94 insertions(+), 7 deletions(-)
 
-The first part of the series is adding the support for the pin
-controllers found on the Marvell Armada 7K/8K.
-
-These controllers are compatible with the ones found on the ARM32
-mvebu SoCs. However, the pinctrl node in the device tree of theses
-SoCs are child of a syscon. So for them we will reuse the regmap
-support introduced by Russell King.
-
-Each component of the Armada 7K and 8K comes with their own pin
-controller, that's why we have 2 new drivers: one for the CP110 and
-one for the AP806.
-
-The second part of the series extends the mvebu gpio driver to support
-the gpio controllers found on the Marvell Armada 7K/8K SoCs.
-
-The gpio controllers used on the Marvell Armada 7K/8K SoCs are the
-same that the ones used on the ARM32 mvebu SoCs. However, the pinctrl
-node in the device tree of theses SoCs are child of a syscon.
-
-The patch modifying the documentation still depend on the ones of the
-clk series. For the ap806 a first stable branch is already available:
-https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git/log/?h=clk-ap806
-
-Also note that the dts patch have to be merged through the mvebu tree
-to avoid merge conflict expected with the ICU series sent a few days
-ago.
-
-Thanks,
-
-Gregory
-
-Changelog:
-v1 -> v2:
-
-- Merged of the pinctrl and gpio series.
-
-- Rebased on next-20170531 (which contains gpio and pinctrl commit
-  already applied).
-
-- Removed already applied patches.
-
-- Remove the modular support of the drivers, suggested by Paul
-  Gortmaker.
-
-- Added tested-by from Thomas Petazzoni.
-
-- Added acked-by from Rob Herring.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/507396.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/507405.html
-
-Gregory CLEMENT (8):
-  pinctrl: dt-bindings: add documentation for AP806 pin controllers
-  pinctrl: dt-bindings: add documentation for CP110 pin controllers
-  pinctrl: mvebu: remove the offset property for regmap
-  arm64: marvell: enable the Armada 7K/8K pinctrl driver
-  arm64: dts: marvell: add pinctrl support for Armada 7K/8K
-  gpio: dt-bindings: Add documentation for gpio controllers on Armada 7K/8K
-  gpio: mvebu: Add support for the Armada 7K/8K SoCs
-  arm64: dts: marvell: add gpio support for Armada 7K/8K
-
-Hanna Hawa (2):
-  pinctrl: mvebu: add driver for Armada AP806 pinctrl
-  pinctrl: mvebu: add driver for Armada CP110 pinctrl
-
-Russell King (1):
-  pinctrl: avoid PLAT_ORION dependency
-
- Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt  |  73 +++++++-
- Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt | 123 ++++++++++++-
- Documentation/devicetree/bindings/gpio/gpio-mvebu.txt                      |  24 ++-
- arch/arm64/Kconfig.platforms                                               |   2 +-
- arch/arm64/boot/dts/marvell/armada-7020.dtsi                               |   2 +-
- arch/arm64/boot/dts/marvell/armada-7040.dtsi                               |   2 +-
- arch/arm64/boot/dts/marvell/armada-70x0.dtsi                               |  68 +++++++-
- arch/arm64/boot/dts/marvell/armada-8020.dtsi                               |   3 +-
- arch/arm64/boot/dts/marvell/armada-8040.dtsi                               |   3 +-
- arch/arm64/boot/dts/marvell/armada-80x0.dtsi                               |  76 ++++++++-
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi                              |  14 +-
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi                       |  21 ++-
- arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi                        |  22 ++-
- drivers/gpio/gpio-mvebu.c                                                  | 212 ++++++++++++++--------
- drivers/pinctrl/mvebu/Kconfig                                              |  12 +-
- drivers/pinctrl/mvebu/Makefile                                             |   2 +-
- drivers/pinctrl/mvebu/pinctrl-armada-ap806.c                               | 140 +++++++++++++++-
- drivers/pinctrl/mvebu/pinctrl-armada-cp110.c                               | 687 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
- drivers/pinctrl/mvebu/pinctrl-mvebu.c                                      |   6 +-
- drivers/pinctrl/mvebu/pinctrl-mvebu.h                                      |   2 +-
- 20 files changed, 1386 insertions(+), 108 deletions(-)
- create mode 100644 arch/arm64/boot/dts/marvell/armada-70x0.dtsi
- create mode 100644 arch/arm64/boot/dts/marvell/armada-80x0.dtsi
- create mode 100644 drivers/pinctrl/mvebu/pinctrl-armada-ap806.c
- create mode 100644 drivers/pinctrl/mvebu/pinctrl-armada-cp110.c
-
-base-commit: 342db02d4f2e08aed46ecae7c1572582049685d6
+diff --git a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
+index e0b9ef5d3dde..733beac7724e 100644
+--- a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
++++ b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
+@@ -67,14 +67,101 @@ Required properties:
+      "marvell,cp110-clock"
+  - #clock-cells: must be set to 2
+ 
++Pinctrl:
++--------
++
++For common binding part and usage, refer to the file
++Documentation/devicetree/bindings/pinctrl/marvell,mvebu-pinctrl.txt.
++
++Required properties:
++
++- compatible: "marvell,armada-7k-pinctrl",
++  "marvell,armada-8k-cpm-pinctrl" or "marvell,armada-8k-cps-pinctrl"
++  depending on the specific variant of the SoC being used.
++
++Available mpp pins/groups and functions:
++Note: brackets (x) are not part of the mpp name for marvell,function and given
++only for more detailed description in this document.
++
++name	pins	functions
++================================================================================
++mpp0	0	gpio, dev(ale1), au(i2smclk), ge0(rxd3), tdm(pclk), ptp(pulse), mss_i2c(sda), uart0(rxd), sata0(present_act), ge(mdio)
++mpp1	1	gpio, dev(ale0), au(i2sdo_spdifo), ge0(rxd2), tdm(drx), ptp(clk), mss_i2c(sck), uart0(txd), sata1(present_act), ge(mdc)
++mpp2	2	gpio, dev(ad15), au(i2sextclk), ge0(rxd1), tdm(dtx), mss_uart(rxd), ptp(pclk_out), i2c1(sck), uart1(rxd), sata0(present_act), xg(mdc)
++mpp3	3	gpio, dev(ad14), au(i2slrclk), ge0(rxd0), tdm(fsync), mss_uart(txd), pcie(rstoutn), i2c1(sda), uart1(txd), sata1(present_act), xg(mdio)
++mpp4	4	gpio, dev(ad13), au(i2sbclk), ge0(rxctl), tdm(rstn), mss_uart(rxd), uart1(cts), pcie0(clkreq), uart3(rxd), ge(mdc)
++mpp5	5	gpio, dev(ad12), au(i2sdi), ge0(rxclk), tdm(intn), mss_uart(txd), uart1(rts), pcie1(clkreq), uart3(txd), ge(mdio)
++mpp6	6	gpio, dev(ad11), ge0(txd3), spi0(csn2), au(i2sextclk), sata1(present_act), pcie2(clkreq), uart0(rxd), ptp(pulse)
++mpp7	7	gpio, dev(ad10), ge0(txd2), spi0(csn1), spi1(csn1), sata0(present_act), led(data), uart0(txd), ptp(clk)
++mpp8	8	gpio, dev(ad9), ge0(txd1), spi0(csn0), spi1(csn0), uart0(cts), led(stb), uart2(rxd), ptp(pclk_out), synce1(clk)
++mpp9	9	gpio, dev(ad8), ge0(txd0), spi0(mosi), spi1(mosi), pcie(rstoutn), synce2(clk)
++mpp10	10	gpio, dev(readyn), ge0(txctl), spi0(miso), spi1(miso), uart0(cts), sata1(present_act)
++mpp11	11	gpio, dev(wen1), ge0(txclkout), spi0(clk), spi1(clk), uart0(rts), led(clk), uart2(txd), sata0(present_act)
++mpp12	12	gpio, dev(clk_out), nf(rbn1), spi1(csn1), ge0(rxclk)
++mpp13	13	gpio, dev(burstn), nf(rbn0), spi1(miso), ge0(rxctl), mss_spi(miso)
++mpp14	14	gpio, dev(bootcsn), dev(csn0), spi1(csn0), spi0(csn3), au(i2sextclk), spi0(miso), sata0(present_act), mss_spi(csn)
++mpp15	15	gpio, dev(ad7), spi1(mosi), spi0(mosi), mss_spi(mosi), ptp(pulse_cp2cp)
++mpp16	16	gpio, dev(ad6), spi1(clk), mss_spi(clk)
++mpp17	17	gpio, dev(ad5), ge0(txd3)
++mpp18	18	gpio, dev(ad4), ge0(txd2), ptp(clk_cp2cp)
++mpp19	19	gpio, dev(ad3), ge0(txd1), wakeup(out_cp2cp)
++mpp20	20	gpio, dev(ad2), ge0(txd0)
++mpp21	21	gpio, dev(ad1), ge0(txctl), sei(in_cp2cp)
++mpp22	22	gpio, dev(ad0), ge0(txclkout), wakeup(in_cp2cp)
++mpp23	23	gpio, dev(a1), au(i2smclk), link(rd_in_cp2cp)
++mpp24	24	gpio, dev(a0), au(i2slrclk)
++mpp25	25	gpio, dev(oen), au(i2sdo_spdifo)
++mpp26	26	gpio, dev(wen0), au(i2sbclk)
++mpp27	27	gpio, dev(csn0), spi1(miso), mss_gpio4, ge0(rxd3), spi0(csn4), ge(mdio), sata0(present_act), uart0(rts), rei(in_cp2cp)
++mpp28	28	gpio, dev(csn1), spi1(csn0), mss_gpio5, ge0(rxd2), spi0(csn5), pcie2(clkreq), ptp(pulse), ge(mdc), sata1(present_act), uart0(cts), led(data)
++mpp29	29	gpio, dev(csn2), spi1(mosi), mss_gpio6, ge0(rxd1), spi0(csn6), pcie1(clkreq), ptp(clk), mss_i2c(sda), sata0(present_act), uart0(rxd), led(stb)
++mpp30	30	gpio, dev(csn3), spi1(clk), mss_gpio7, ge0(rxd0), spi0(csn7), pcie0(clkreq), ptp(pclk_out), mss_i2c(sck), sata1(present_act), uart0(txd), led(clk)
++mpp31	31	gpio, dev(a2), mss_gpio4, pcie(rstoutn), ge(mdc)
++mpp32	32	gpio, mii(col), mii(txerr), mss_spi(miso), tdm(drx), au(i2sextclk), au(i2sdi), ge(mdio), sdio(v18_en), pcie1(clkreq), mss_gpio0
++mpp33	33	gpio, mii(txclk), sdio(pwr10), mss_spi(csn), tdm(fsync), au(i2smclk), sdio(bus_pwr), xg(mdio), pcie2(clkreq), mss_gpio1
++mpp34	34	gpio, mii(rxerr), sdio(pwr11), mss_spi(mosi), tdm(dtx), au(i2slrclk), sdio(wr_protect), ge(mdc), pcie0(clkreq), mss_gpio2
++mpp35	35	gpio, sata1(present_act), i2c1(sda), mss_spi(clk), tdm(pclk), au(i2sdo_spdifo), sdio(card_detect), xg(mdio), ge(mdio), pcie(rstoutn), mss_gpio3
++mpp36	36	gpio, synce2(clk), i2c1(sck), ptp(clk), synce1(clk), au(i2sbclk), sata0(present_act), xg(mdc), ge(mdc), pcie2(clkreq), mss_gpio5
++mpp37	37	gpio, uart2(rxd), i2c0(sck), ptp(pclk_out), tdm(intn), mss_i2c(sck), sata1(present_act), ge(mdc), xg(mdc), pcie1(clkreq), mss_gpio6, link(rd_out_cp2cp)
++mpp38	38	gpio, uart2(txd), i2c0(sda), ptp(pulse), tdm(rstn), mss_i2c(sda), sata0(present_act), ge(mdio), xg(mdio), au(i2sextclk), mss_gpio7, ptp(pulse_cp2cp)
++mpp39	39	gpio, sdio(wr_protect), au(i2sbclk), ptp(clk), spi0(csn1), sata1(present_act), mss_gpio0
++mpp40	40	gpio, sdio(pwr11), synce1(clk), mss_i2c(sda), au(i2sdo_spdifo), ptp(pclk_out), spi0(clk), uart1(txd), ge(mdio), sata0(present_act), mss_gpio1
++mpp41	41	gpio, sdio(pwr10), sdio(bus_pwr), mss_i2c(sck), au(i2slrclk), ptp(pulse), spi0(mosi), uart1(rxd), ge(mdc), sata1(present_act), mss_gpio2, rei(out_cp2cp)
++mpp42	42	gpio, sdio(v18_en), sdio(wr_protect), synce2(clk), au(i2smclk), mss_uart(txd), spi0(miso), uart1(cts), xg(mdc), sata0(present_act), mss_gpio4
++mpp43	43	gpio, sdio(card_detect), synce1(clk), au(i2sextclk), mss_uart(rxd), spi0(csn0), uart1(rts), xg(mdio), sata1(present_act), mss_gpio5, wakeup(out_cp2cp)
++mpp44	44	gpio, ge1(txd2), uart0(rts), ptp(clk_cp2cp)
++mpp45	45	gpio, ge1(txd3), uart0(txd), pcie(rstoutn)
++mpp46	46	gpio, ge1(txd1), uart1(rts)
++mpp47	47	gpio, ge1(txd0), spi1(clk), uart1(txd), ge(mdc)
++mpp48	48	gpio, ge1(txctl_txen), spi1(mosi), xg(mdc), wakeup(in_cp2cp)
++mpp49	49	gpio, ge1(txclkout), mii(crs), spi1(miso), uart1(rxd), ge(mdio), pcie0(clkreq), sdio(v18_en), sei(out_cp2cp)
++mpp50	50	gpio, ge1(rxclk), mss_i2c(sda), spi1(csn0), uart2(txd), uart0(rxd), xg(mdio), sdio(pwr11)
++mpp51	51	gpio, ge1(rxd0), mss_i2c(sck), spi1(csn1), uart2(rxd), uart0(cts), sdio(pwr10)
++mpp52	52	gpio, ge1(rxd1), synce1(clk), synce2(clk), spi1(csn2), uart1(cts), led(clk), pcie(rstoutn), pcie0(clkreq)
++mpp53	53	gpio, ge1(rxd2), ptp(clk), spi1(csn3), uart1(rxd), led(stb), sdio(led)
++mpp54	54	gpio, ge1(rxd3), synce2(clk), ptp(pclk_out), synce1(clk), led(data), sdio(hw_rst), sdio(wr_protect)
++mpp55	55	gpio, ge1(rxctl_rxdv), ptp(pulse), sdio(led), sdio(card_detect)
++mpp56	56	gpio, tdm(drx), au(i2sdo_spdifo), spi0(clk), uart1(rxd), sata1(present_act), sdio(clk)
++mpp57	57	gpio, mss_i2c(sda), ptp(pclk_out), tdm(intn), au(i2sbclk), spi0(mosi), uart1(txd), sata0(present_act), sdio(cmd)
++mpp58	58	gpio, mss_i2c(sck), ptp(clk), tdm(rstn), au(i2sdi), spi0(miso), uart1(cts), led(clk), sdio(d0)
++mpp59	59	gpio, mss_gpio7, synce2(clk), tdm(fsync), au(i2slrclk), spi0(csn0), uart0(cts), led(stb), uart1(txd), sdio(d1)
++mpp60	60	gpio, mss_gpio6, ptp(pulse), tdm(dtx), au(i2smclk), spi0(csn1), uart0(rts), led(data), uart1(rxd), sdio(d2)
++mpp61	61	gpio, mss_gpio5, ptp(clk), tdm(pclk), au(i2sextclk), spi0(csn2), uart0(txd), uart2(txd), sata1(present_act), ge(mdio), sdio(d3)
++mpp62	62	gpio, mss_gpio4, synce1(clk), ptp(pclk_out), sata1(present_act), spi0(csn3), uart0(rxd), uart2(rxd), sata0(present_act), ge(mdc)
++
+ Example:
+ 
+-	cpm_syscon0: system-controller at 440000 {
+-		compatible = "syscon", "simple-mfd";
+-		reg = <0x440000 0x1000>;
++cpm_syscon0: system-controller at 440000 {
++	compatible = "syscon", "simple-mfd";
++	reg = <0x440000 0x1000>;
+ 
+-		cpm_clk: clock {
+-			compatible = "marvell,cp110-clock";
+-			#clock-cells = <2>;
+-		};
++	cpm_clk: clock {
++		compatible = "marvell,cp110-clock";
++		#clock-cells = <2>;
+ 	};
++
++	cpm_pinctrl: pinctrl {
++		compatible = "marvell,armada-8k-cpm-pinctrl";
++	};
++};
++
 -- 
 git-series 0.9.1
