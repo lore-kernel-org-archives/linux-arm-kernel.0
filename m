@@ -1,83 +1,49 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Fri, 2 Jun 2017 20:11:24 +0300
-Subject: [PATCH 6/6] tty: serial: lpuart: add a more accurate baud rate
- calculation method
-In-Reply-To: <AM3PR04MB3062F7BCE82860C377C214E80F10@AM3PR04MB306.eurprd04.prod.outlook.com>
-References: <1494316248-24052-1-git-send-email-aisheng.dong@nxp.com>
- <1494316248-24052-7-git-send-email-aisheng.dong@nxp.com>
- <CAHp75Vemc5qoD7gbc_sJBSasYTFYSYOuWZv4N-4X60arWX8aJg@mail.gmail.com>
- <AM3PR04MB3062F7BCE82860C377C214E80F10@AM3PR04MB306.eurprd04.prod.outlook.com>
-Message-ID: <CAHp75VcH0j3ddaZ3iStNO4QcAwJKZ7BAMwUTthum2no1ucs2ww@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 2 Jun 2017 18:18:22 +0100
+Subject: [GIT PULL] arm64 fixes for 4.12-rc4
+Message-ID: <20170602171819.GA20872@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 31, 2017 at 5:18 PM, A.S. Dong <aisheng.dong@nxp.com> wrote:
->> On Tue, May 9, 2017 at 10:50 AM, Dong Aisheng <aisheng.dong@nxp.com> wrote:
+Hi Linus,
 
-By some reason my previous message went privately.
-It didn't have anything major anyway and here I'm suggesting
-optimization of finding factors of the formula in use. See below.
+Please pull the arm64 fixes below. Thanks.
 
->> > +       u32 sbr, osr, baud_diff, tmp_osr, tmp_sbr, tmp_diff, tmp;
->> > +       u32 clk = sport->port.uartclk;
->> > +
->> > +       /*
->> > +        * The idea is to use the best OSR (over-sampling rate) possible.
->> > +        * Note, OSR is typically hard-set to 16 in other LPUART
->> instantiations.
->> > +        * Loop to find the best OSR value possible, one that generates
->> minimum
->> > +        * baud_diff iterate through the rest of the supported values of
->> OSR.
->> > +        *
->> > +        * Calculation Formula:
->> > +        *  Baud Rate = baud clock / ((OSR+1) ? SBR)
->> > +        */
->> > +       baud_diff = baudrate;
->> > +       osr = 0;
->> > +       sbr = 0;
->> > +
->>
->> > +       for (tmp_osr = 4; tmp_osr <= 32; tmp_osr++) {
+The following changes since commit 63a1e1c95e60e798fa09ab3c536fb555aa5bbf2b:
 
-I missed one thing, what happened by default to OSR? What is the value in use?
+  arm64/cpufeature: don't use mutex in bringup path (2017-05-17 17:00:29 +0100)
 
->> I _think_ you may simplify this and avoid for-loop if you reconsider
->> approach.
+are available in the git repository at:
 
-> But there is indeed a optimization way, see below.
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
 
-> To optimize the looping, we probably could do:
-> If (!baud_diff)
->         Break;
+for you to fetch changes up to cb7cf772d83d2d4e6995c5bb9e0fb59aea8f7080:
 
-It's a small one, we may have more interesting approach.
+  ARM64/ACPI: Fix BAD_MADT_GICC_ENTRY() macro implementation (2017-06-02 15:13:52 +0100)
 
-So, the algo is the following:
+----------------------------------------------------------------
+ACPI-related fixes for arm64:
 
-Assume the ranges like this:
-OSR = [4 ... 32]
-SBR = [2 ... 8192]
+- GICC MADT entry validity check fix
 
-Then:
+- Skip IRQ registration with pmu=off in an ACPI guest
 
-1. Get ratio factor as
-      ratio = CLK / desired baud rate
-2. If ratio < 8192 * 9 / 2, just use (ratio / 4, 4) as (OSR, SBR)
-setting. (Needs clarification on OSR < 4)
-3. if ratio >= 8192 * 31, just use those two numbers (8192, 31). You
-can't do anything better there.
-4. Otherwise, get a minimum required factor of OSR
-      osr_min = ratio / 8192
-5. Start your loop from osr_min + 1 to 31.
+- struct acpi_pci_root_ops freeing on error path
 
-6 (optional). Of course you may not consider baud_diff > osr_min, it's
-I suppose obvious
+----------------------------------------------------------------
+Lorenzo Pieralisi (1):
+      ARM64/ACPI: Fix BAD_MADT_GICC_ENTRY() macro implementation
 
-P.S. Note, all divisions by 2^n are just simple right shifts. Diffs
-are calculated as multiplication of OSR and SBR in comparison to
-ratio. One division so far.
+Timmy Li (1):
+      ARM64: PCI: Fix struct acpi_pci_root_ops allocation failure path
+
+Wei Huang (1):
+      drivers/perf: arm_pmu_acpi: avoid perf IRQ init when guest PMU is off
+
+ arch/arm64/include/asm/acpi.h |  6 +++---
+ arch/arm64/kernel/pci.c       |  4 +++-
+ drivers/perf/arm_pmu_acpi.c   | 11 +++++++++++
+ 3 files changed, 17 insertions(+), 4 deletions(-)
 
 -- 
-With Best Regards,
-Andy Shevchenko
+Catalin
