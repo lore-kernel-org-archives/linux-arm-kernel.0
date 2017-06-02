@@ -1,85 +1,157 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 2 Jun 2017 12:33:02 -0700
-Subject: [GIT PULL] ARM: realtek: arm64 for v4.12
-In-Reply-To: <CAK8P3a2_RGZ14csNEhitsSoqFbj7UJjGbPELbpMdjpYJm4vrpQ@mail.gmail.com>
-References: <20170525120404.32034-1-afaerber@suse.de>
- <20170602002831.GO13314@localhost>
- <45e8f92d-0680-2983-067f-39adecf7503f@suse.de>
- <CAK8P3a2_RGZ14csNEhitsSoqFbj7UJjGbPELbpMdjpYJm4vrpQ@mail.gmail.com>
-Message-ID: <CAOesGMiAKw+g_Q5B4gkTiyuEeUJ3n+wn4UgDA75_q=q7vrCu7A@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 2 Jun 2017 21:38:27 +0200
+Subject: [PATCH 13/19] drm/sun4i: hdmi: Add support for controller
+ hardware variants
+In-Reply-To: <20170602101024.18940-14-wens@csie.org>
+References: <20170602101024.18940-1-wens@csie.org>
+ <20170602101024.18940-14-wens@csie.org>
+Message-ID: <20170602193827.rnjum6x5ra4x5wef@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[again in plain text. Grr gmail.]
+On Fri, Jun 02, 2017 at 06:10:18PM +0800, Chen-Yu Tsai wrote:
+> The HDMI controller found in earlier Allwinner SoCs have slight
+> differences:
+> 
+>   - Need different initial values for the PLL related registers
+> 
+>   - Different behavior of the DDC and TMDS clocks
+> 
+>   - Different register layout for the DDC portion
+> 
+>   - Separate DDC parent clock on the A31
+> 
+>   - Explicit reset control
+> 
+> The clock variants are supported within their implementations,
+> which only expose a create function for each variant.
+> 
+> The different layout of the DDC registers necessitates a separate
+> version of struct drm_connector_helper_funcs.
+> 
+> A new variant data structure is created to store pointers to the
+> above functions, structures, and the different initial values.
+> Another flag notates whether there is a separate DDC parent clock.
+> If not, the TMDS clock is passed to the DDC clock create function,
+> as before.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  drivers/clk/sunxi-ng/ccu-sun6i-a31.c   |   2 +-
+>  drivers/gpu/drm/sun4i/sun4i_hdmi.h     |   8 +++
+>  drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c | 114 ++++++++++++++++++++++++++-------
+>  3 files changed, 100 insertions(+), 24 deletions(-)
+> 
+> diff --git a/drivers/clk/sunxi-ng/ccu-sun6i-a31.c b/drivers/clk/sunxi-ng/ccu-sun6i-a31.c
+> index 4d6078fca9ac..e48186985a51 100644
+> --- a/drivers/clk/sunxi-ng/ccu-sun6i-a31.c
+> +++ b/drivers/clk/sunxi-ng/ccu-sun6i-a31.c
+> @@ -610,7 +610,7 @@ static SUNXI_CCU_M_WITH_MUX_GATE(hdmi_clk, "hdmi", lcd_ch1_parents,
+>  
+>  static SUNXI_CCU_GATE(hdmi_ddc_clk, "hdmi-ddc", "osc24M", 0x150, BIT(30), 0);
+>  
+> -static SUNXI_CCU_GATE(ps_clk, "ps", "lcd1-ch1", 0x140, BIT(31), 0);
+> +static SUNXI_CCU_GATE(ps_clk, "ps", "lcd1-ch1", 0x154, BIT(31), 0);
+
+Unrelated change?
+
+>  
+>  static const char * const mbus_parents[] = { "osc24M", "pll-periph",
+>  					     "pll-ddr" };
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi.h b/drivers/gpu/drm/sun4i/sun4i_hdmi.h
+> index c39c2a245339..c63d0bd95963 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_hdmi.h
+> +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi.h
+> @@ -155,6 +155,8 @@ enum sun4i_hdmi_pkt_type {
+>  	SUN4I_HDMI_PKT_END = 15,
+>  };
+>  
+> +struct sun4i_hdmi_variant;
+> +
+>  struct sun4i_hdmi {
+>  	struct drm_connector	connector;
+>  	struct drm_encoder	encoder;
+> @@ -162,9 +164,13 @@ struct sun4i_hdmi {
+>  
+>  	void __iomem		*base;
+>  
+> +	/* Reset control */
+> +	struct reset_control	*reset;
+> +
+>  	/* Parent clocks */
+>  	struct clk		*bus_clk;
+>  	struct clk		*mod_clk;
+> +	struct clk		*ddc_parent_clk;
+>  	struct clk		*pll0_clk;
+>  	struct clk		*pll1_clk;
+>  
+> @@ -175,6 +181,8 @@ struct sun4i_hdmi {
+>  	struct sun4i_drv	*drv;
+>  
+>  	bool			hdmi_monitor;
+> +
+> +	const struct sun4i_hdmi_variant	*variant;
+>  };
+>  
+>  int sun4i_ddc_create(struct sun4i_hdmi *hdmi, struct clk *clk);
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+> index 457614073501..9ded40aaed32 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+> @@ -20,8 +20,10 @@
+>  #include <linux/clk.h>
+>  #include <linux/component.h>
+>  #include <linux/iopoll.h>
+> +#include <linux/of_device.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/pm_runtime.h>
+> +#include <linux/reset.h>
+>  
+>  #include "sun4i_backend.h"
+>  #include "sun4i_crtc.h"
+> @@ -315,6 +317,56 @@ static const struct drm_connector_funcs sun4i_hdmi_connector_funcs = {
+>  	.atomic_destroy_state	= drm_atomic_helper_connector_destroy_state,
+>  };
+>  
+> +struct sun4i_hdmi_variant {
+> +	const struct drm_connector_helper_funcs *connector_helpers;
+> +	int (*ddc_create)(struct sun4i_hdmi *hdmi, struct clk *clk);
+> +	int (*tmds_create)(struct sun4i_hdmi *hdmi);
+> +	bool has_ddc_parent_clk;
+> +	bool has_reset_control;
+> +
+> +	u32 pad_ctrl0_init_val;
+> +	u32 pad_ctrl1_init_val;
+> +	u32 pll_ctrl_init_val;
+> +};
+> +
+> +#define SUN4I_HDMI_PAD_CTRL1_MASK	(GENMASK(24, 7) | GENMASK(5, 0))
+> +#define SUN4I_HDMI_PLL_CTRL_MASK	(GENMASK(31, 8) | GENMASK(3, 0))
+> +
+> +static const struct sun4i_hdmi_variant sun5i_variant = {
+> +	.connector_helpers	= &sun4i_hdmi_connector_helper_funcs,
+> +	.ddc_create		= sun4i_ddc_create,
+> +	.tmds_create		= sun4i_tmds_create,
+
+If we store the variants info for those clocks in that structure, we
+don't need those functions anymore. This would be cleaner imho.
+
+> +	.has_ddc_parent_clk	= false,
+> +	.has_reset_control	= false,
+
+Those two are the default values
 
 
-On Fri, Jun 2, 2017 at 6:07 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Fri, Jun 2, 2017 at 2:32 PM, Andreas F?rber <afaerber@suse.de> wrote:
->> Hi Olof,
->>
->> Am 02.06.2017 um 02:28 schrieb Olof Johansson:
->>> On Thu, May 25, 2017 at 02:04:03PM +0200, Andreas F??rber wrote:
->>>> Hi Arnd and Olof,
->>>>
->>>> This is the initial arm64 pull for Realtek.
->>>>
->>>> Regards,
->>>> Andreas
->>>>
->>>> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
->>>>
->>>>   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
->>>>
->>>> are available in the git repository at:
->>>>
->>>>   git://github.com/afaerber/linux.git tags/realtek-arm64-soc-for-4.12
->>>
->>> This is v4.13 material at this point, so I've merged it into next/arm64 for
->>> the next merge window (v4.13). Thanks!
->>
->> Arnd had told me to rebase onto v4.12-rc1 (from v4.11-rc1) but to not
->> wait for the 4.13 merge window. Therefore I submitted it for 4.12.
->> Miscommunication? Either way works for me.
->
-> To clarify: by "4.13 merge window", I meant the time when we send pull
-> requests to Linus, i.e. the two weeks between the 4.12 release and
-> 4.13-rc1.
->
-> Since you want the pull request to be part of 4.13, you need to send it
-> between 4.12-rc1 and 4.13 (ideally early during that time frame), and
-> have it based on 4.12-rc1. The patches were based on 4.11-rc before,
-> so I recommended rebasing to reduce the gap between the base
-> and the merge commit.
->
-> Does it make sense now?
+Maxime
 
-And just to clarify: You did exactly what we want our platform
-maintainers to do, Andreas -- the only disconnect seems to be that it
-was 4.13 material instead of 4.12 by now.
-
-I.e. timing for sending this is great -- please do it as early as you
-can during -rc series, and try to get amount of submissions down to
-mostly a trickle towards -rc6 and later, i.e. only smaller incremental
-stuff with the bulk landing early.
-
-If you can. :)
-
->
-> > Now that you have merged ARCH_REALTEK here, should we update the arm64
-> > defconfig to enable it? I just verified on arm-soc.git for-next that's
-> > it's disabled by default; the only other disabled ones are ARCH_BRCMSTB
-> > and to-be-dropped ARCH_VULCAN. Question is, should it be useful to users
-> > before we do so, or is build-testing enough of a reason?
->
-> I'd leave that up to you. Send a patch or pull request when you think it should
-> be enabled. I'd tend to having it only enabled when it at least boots on some
-> hardware, but we haven't had strong rules about that so far.
-
-
-Agreed. We can enable now or later, no big deal.
-
-Getting build coverage early doesn't hurt but if it doesn't really
-boot anywhere there's not much other use in enabling.
-
-
--Olof
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170602/50d6faf0/attachment.sig>
