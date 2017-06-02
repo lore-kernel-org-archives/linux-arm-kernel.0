@@ -1,49 +1,45 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 2 Jun 2017 18:18:22 +0100
-Subject: [GIT PULL] arm64 fixes for 4.12-rc4
-Message-ID: <20170602171819.GA20872@e104818-lin.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 2 Jun 2017 18:23:56 +0100
+Subject: [PATCH v2 1/3] perf: xgene: Parse PMU subnode from the match table
+In-Reply-To: <CAFHUOYwYU4TTLWODX0=15uwDGusdydcX_s8G_Ji81N0c+Bkdqg@mail.gmail.com>
+References: <1491238077-20666-1-git-send-email-hotran@apm.com>
+ <1491238077-20666-2-git-send-email-hotran@apm.com>
+ <20170602145934.GK28299@leverpostej>
+ <CAFHUOYwYU4TTLWODX0=15uwDGusdydcX_s8G_Ji81N0c+Bkdqg@mail.gmail.com>
+Message-ID: <20170602172355.GO28299@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Fri, Jun 02, 2017 at 09:54:32AM -0700, Hoan Tran wrote:
+> On Fri, Jun 2, 2017 at 7:59 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Mon, Apr 03, 2017 at 09:47:55AM -0700, Hoan Tran wrote:
+> >> +static const struct acpi_device_id *xgene_pmu_acpi_match_type(
+> >> +                                     const struct acpi_device_id *ids,
+> >> +                                     struct acpi_device *adev)
+> >> +{
+> >> +     const struct acpi_device_id *match_id = NULL;
+> >> +     const struct acpi_device_id *id;
+> >> +
+> >> +     for (id = ids; id->id[0] || id->cls; id++) {
+> >> +             if (!acpi_match_device_ids(adev, id))
+> >> +                     match_id = id;
+> >> +             else if (match_id)
+> >> +                     break;
+> >> +     }
+> >> +
+> >> +     return match_id;
+> >> +}
+> >
+> > I don't believe this look is necessary. AFAICT, acpi_match_device_ids()
+> > already iterates over the id table it is given.
+> 
+> The acpi_match_device_ids() function just returns if a device ID is
+> available on the given list. It does not return the first matching ID.
+> That's the reason I created this function to find the first matching ID.
 
-Please pull the arm64 fixes below. Thanks.
+Ah, I see. Thanks for correcting me!
 
-The following changes since commit 63a1e1c95e60e798fa09ab3c536fb555aa5bbf2b:
+Can we use acpi_match_device(ids, &adev->dev), or is that the wrong dev?
 
-  arm64/cpufeature: don't use mutex in bringup path (2017-05-17 17:00:29 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
-
-for you to fetch changes up to cb7cf772d83d2d4e6995c5bb9e0fb59aea8f7080:
-
-  ARM64/ACPI: Fix BAD_MADT_GICC_ENTRY() macro implementation (2017-06-02 15:13:52 +0100)
-
-----------------------------------------------------------------
-ACPI-related fixes for arm64:
-
-- GICC MADT entry validity check fix
-
-- Skip IRQ registration with pmu=off in an ACPI guest
-
-- struct acpi_pci_root_ops freeing on error path
-
-----------------------------------------------------------------
-Lorenzo Pieralisi (1):
-      ARM64/ACPI: Fix BAD_MADT_GICC_ENTRY() macro implementation
-
-Timmy Li (1):
-      ARM64: PCI: Fix struct acpi_pci_root_ops allocation failure path
-
-Wei Huang (1):
-      drivers/perf: arm_pmu_acpi: avoid perf IRQ init when guest PMU is off
-
- arch/arm64/include/asm/acpi.h |  6 +++---
- arch/arm64/kernel/pci.c       |  4 +++-
- drivers/perf/arm_pmu_acpi.c   | 11 +++++++++++
- 3 files changed, 17 insertions(+), 4 deletions(-)
-
--- 
-Catalin
+Thanks,
+Mark.
