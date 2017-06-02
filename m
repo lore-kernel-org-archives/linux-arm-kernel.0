@@ -1,64 +1,66 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 2 Jun 2017 12:50:16 +0200
-Subject: [PATCH 0/7] dra7: Fixes for MMC devicetree node
-In-Reply-To: <20170601143401.16852-1-kishon@ti.com>
-References: <20170601143401.16852-1-kishon@ti.com>
-Message-ID: <CAPDyKFqHHjZQnnaGLP=xDj3eYgzADDYoomzBuXRviBgh-n2QFw@mail.gmail.com>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Fri,  2 Jun 2017 18:51:50 +0800
+Subject: [PATCH v3 0/6] MFD: add driver for HiSilicon Hi6421v530 PMIC
+Message-ID: <20170602105156.11351-1-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 June 2017 at 16:33, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> There are the set of fixes that were sent initially as part
-> of [1].
->
-> These are mostly fixes w.r.t populating regulators in
-> mmc dt node. It was working before because the regulators
-> connecting to the IO lines are always on regulators. This will
-> break once we add UHS support where voltage has to be changed
-> dynamically.
->
-> Performed enumeration testing on dra72-evm-revc, dra72-evm,
-> dra7-evm, am572x-evm, am571x-idk and am572x-idk.
->
-> This is a preparation series for adding UHS mode support in
-> the above mentioned platforms.
->
-> [1] -> https://lkml.org/lkml/2017/5/19/196
->
-> Kishon Vijay Abraham I (5):
->   ARM: dts: dra72-evm-common: Correct vmmc-supply for mmc2
->   ARM: dts: dra72-evm: Add vmmc_aux supply to mmc1
->   ARM: dts: dra72-evm-revc: Add vmmc_aux supply to mmc1
->   ARM: dts: am57xx-beagle-x15-revb1: Fix supply name used for MMC1 IO
->     lines
->   ARM: dts: dra7: Add "max-frequency" property to MMC dt nodes
->
-> Ravikumar Kattekola (1):
->   ARM: dts: dra7-evm: Correct the vmmc-supply for mmc2
->
-> Sekhar Nori (1):
->   ARM: OMAP2+: Add pdata-quirks for MMC/SD on DRA74x EVM
->
->  arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts |  2 +-
->  arch/arm/boot/dts/dra7-evm.dts                | 10 ++++++++-
->  arch/arm/boot/dts/dra7.dtsi                   |  5 +++++
->  arch/arm/boot/dts/dra71-evm.dts               | 14 ++++++++++++
->  arch/arm/boot/dts/dra72-evm-common.dtsi       |  2 --
->  arch/arm/boot/dts/dra72-evm-revc.dts          | 18 ++++++++++++++++
->  arch/arm/boot/dts/dra72-evm.dts               | 18 ++++++++++++++++
->  arch/arm/mach-omap2/pdata-quirks.c            | 31 +++++++++++++++++++++++++++
->  include/linux/platform_data/hsmmc-omap.h      |  3 +++
->  9 files changed, 99 insertions(+), 4 deletions(-)
+This patchset adds driver for HiSilicon Hi6421v530 PMIC.
 
-This series add a bunch of new vmmc_aux regulators for the mmc
-controller nodes. I would rather see that omap_hsmmc also converts to
-use the generic mmc binding for this regulator, which is "vqmmc".
+Mainline kernel already has driver support to a similar chip, Hi6421.
+Hi6421 and Hi6421v530 are both from the same vendor, HiSilicon, but
+they are at different revisions. They both use the same Memory-mapped
+I/O method to communicate with Main SoC. However, they differ quite a
+lot in their regulator designs. Eg. they have completely different LDO
+voltage points.
 
-To accomplish that, omap_hsmmc needs to convert to use
-mmc_regulator_get_supply(). If the "vqmmc" regulator isn't found, it
-should fallback to try the "vmmc_aux".
+Patch 1 and 2 extends hi6421-pmic-core.c to support Hi6421v530 revision.
+Patch 3 add hi6421v530-regulator.c driver for LDO regulators.
+Patch 4 fixes an issue for hi6421 regulator, which is not related to v530
+         but it's found in this review.
+Patch 5 is dts change, it depends and can be applied on hi3660/hikey960
+        patchset [1].
+Patch 6 enables the relevant config items.
 
-Can you do that?
+[1], http://www.spinics.net/lists/devicetree/msg178303.html
 
-Kind regards
-Uffe
+Major changes in v3:
+ - in hi6421-pmic-core.c
+    * use shorter license script.
+    * arrange #include in alphabetical order.
+    * using recommended error log messages from Lee Jones.
+ - in hi6421v530-regulator.c
+    * remove unused #include files
+    * arrange remaining ones in alphabetical order.
+
+Major changes in v2:
+ - instead of writing a new driver, extend hi6421-pmic-core.c
+     to support its v530 revision
+ - update hi6421v530-regulator.c to use modern regulator driver
+     design logics.
+
+
+Guodong Xu (4):
+  dt-bindings: mfd: hi6421: Add hi6421v530 compatible string
+  mfd: hi6421-pmic: add support for HiSilicon Hi6421v530
+  regulator: hi6421: Describe consumed platform device
+  arm64: defconfig: enable support hi6421v530 PMIC
+
+Wang Xiaoyin (2):
+  regulator: hi6421v530: add driver for hi6421v530 voltage regulator
+  arm64: dts: hikey960: add device node for pmic and regulators
+
+ Documentation/devicetree/bindings/mfd/hi6421.txt  |   4 +-
+ arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts |  46 +++++
+ arch/arm64/configs/defconfig                      |   2 +
+ drivers/mfd/hi6421-pmic-core.c                    |  85 +++++----
+ drivers/regulator/Kconfig                         |  10 ++
+ drivers/regulator/Makefile                        |   1 +
+ drivers/regulator/hi6421-regulator.c              |   7 +
+ drivers/regulator/hi6421v530-regulator.c          | 207 ++++++++++++++++++++++
+ include/linux/mfd/hi6421-pmic.h                   |   5 +
+ 9 files changed, 334 insertions(+), 33 deletions(-)
+ create mode 100644 drivers/regulator/hi6421v530-regulator.c
+
+-- 
+2.10.2
