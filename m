@@ -1,27 +1,79 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 2 Jun 2017 12:08:16 +0100
-Subject: [PATCH] arm64/kvm: fix misleading kconfig text for 16K pages
-In-Reply-To: <1496401340-24802-1-git-send-email-mark.rutland@arm.com>
-References: <1496401340-24802-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <56353731-e2ee-3784-8f22-6c300e6fa26c@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 2 Jun 2017 11:11:01 +0000
+Subject: [PATCH v5] arm64: fix the overlap between the kernel image and
+ vmalloc address
+In-Reply-To: <59310F0A.1010804@huawei.com>
+References: <1496323611-53377-1-git-send-email-zhongjiang@huawei.com>
+ <CAKv+Gu-WL33LHKzwmNaw8-QDVEh6VjwhFohLUrOZH41CLUHG_w@mail.gmail.com>
+ <59310F0A.1010804@huawei.com>
+Message-ID: <CAKv+Gu8Q5E40Cf0aCKofopOcL+zSJUFfzTPx5mGAYxmBCqx-2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/17 12:02, Mark Rutland wrote:
-> We've supported KVM with 16K pages since commit:
+On 2 June 2017 at 07:08, zhong jiang <zhongjiang@huawei.com> wrote:
+> Hi, Ard
 >
->   02e0b7600f835007 ("arm64: kvm: Add support for 16K pages")
->
-> ... yet the kconfig text says this combination is not supported.
->
-> Let's fix that by deleting the misleading text.
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Cc: kvmarm at lists.cs.columbia.edu
+> Thank you for reply.
+> On 2017/6/2 1:40, Ard Biesheuvel wrote:
+>> Hi all,
+>>
+>> On 1 June 2017 at 13:26, zhongjiang <zhongjiang@huawei.com> wrote:
+>>> Recently, xiaojun report the following issue.
+>>>
+>>> [ 4544.984139] Unable to handle kernel paging request at virtual address ffff804392800000
+>> This is not a vmalloc address ^^^
+>  The mappings is not at a page granularity. but kernel image maaping use sections.
+>  and this try a bogus walk to the pte level. so it will acess a abnormal address,
+>  not in a vmalloc range.
 
-Thanks for fixing that up
+Ah ok. It looks like you are crashing in __memcpy(), but it is
+actually the __memcpy() call inside vread(), not the one in
+read_kcore(). I missed that.
 
-Acked-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> [...]
+>>> I find the issue is introduced when applying commit f9040773b7bb
+>>> ("arm64: move kernel image to base of vmalloc area"). This patch
+>>> make the kernel image overlap with vmalloc area. It will result in
+>>> vmalloc area have the huge page table. but the vmalloc_to_page is
+>>> not realize the change. and the function is public to any arch.
+>>>
+>>> I fix it by adding the another kernel image condition in vmalloc_to_page
+>>> to make it keep the accordance with previous vmalloc mapping.
+>>>
+>> ... so while I agree that there is probably an issue to be solved
+>> here, I don't see how this patch fixes the problem. This particular
+>> crash may be caused by an assumption on the part of the kcore code
+>> that there are no holes in the linear region.
+>>
+>>> Fixes: f9040773b7bb ("arm64: move kernel image to base of vmalloc area")
+>>> Reported-by: tan xiaojun <tanxiaojun@huawei.com>
+>>> Reviewed-by: Laura Abbott <labbott@redhat.com>
+>>> Signed-off-by: zhongjiang <zhongjiang@huawei.com>
+>> So while I think we all agree that the kcore code is likely to get
+>> confused due to the overlap between vmlinux and the vmalloc region, I
+>> would like to better understand how it breaks things, and whether we'd
+>> be better off simply teaching vread/vwrite how to interpret block
+>> mappings.
+>  I think the root reason is clear. and I test the patch, after applying the patch,
+>  the issue will go away.
+>> Could you check whether CONFIG_DEBUG_PAGEALLOC makes the issue go away
+>> (once you have really managed to reproduce it?)
+> Today, I enable the config and test it in newest kernel version. the issue still exist.
+>
+> [  396.495450] [<ffff00000839c400>] __memcpy+0x100/0x180
+> [  396.501056] [<ffff00000826ae14>] read_kcore+0x21c/0x3a0
+> [  396.506729] [<ffff00000825d37c>] proc_reg_read+0x64/0x90
+> [  396.512706] [<ffff0000081f668c>] __vfs_read+0x1c/0xf8
+> [  396.518188] [<ffff0000081f792c>] vfs_read+0x84/0x140
+> [  396.523653] [<ffff0000081f8df4>] SyS_read+0x44/0xa0
+> [  396.529205] [<ffff000008082f30>] el0_svc_naked+0x24/0x28
+> [  396.535036] Code: d503201f d503201f d503201f d503201f (a8c12027)
+>
+
+Yeah, another bit of useless advice, sorry. DEBUG_PAGEALLOC does not
+affect the granularity of the vmlinux segment mappings anymore.
+
+Anyway, given that the vmalloc routines already contain partial
+support for block mappings (i.e., vunmap() supports them), I think it
+is reasonable to add support for them in vmalloc() as well. I will
+send out a patch shortly, could you please try it?
