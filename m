@@ -1,33 +1,36 @@
 From: biju.das@bp.renesas.com (Biju Das)
-Date: Fri,  2 Jun 2017 17:21:59 +0100
-Subject: [PATCH  0/4] ARM: dts: Add iWave RZ/G1M board support
-Message-ID: <1496420523-23506-1-git-send-email-biju.das@bp.renesas.com>
+Date: Fri,  2 Jun 2017 17:22:01 +0100
+Subject: [PATCH 2/4] ARM: shmobile: document iW-RainboW-G20D-Qseven-RZG1M board
+In-Reply-To: <1496420523-23506-1-git-send-email-biju.das@bp.renesas.com>
+References: <1496420523-23506-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <1496420523-23506-3-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Document the iW-RainboW-G20D-Qseven-RZG1M device tree bindings,
+listing it as a supported board.
 
-This series aims to add iWave RZ/G1M R8A7743 based Qseven SOM and RainboW-G20D- Qseven board support. 
+This allows to use checkpatch.pl to validate .dts files referring to the
+iW-RainboW-G20D-Qseven-RZG1M board.
 
-This series has been tested against linux-next tag next-20170602.
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+---
+ Documentation/devicetree/bindings/arm/shmobile.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Regards,
-
-Biju Das (4):
-  of: Add vendor prefix for iWave Systems Technologies Pvt. Ltd
-  ARM: shmobile: document iW-RainboW-G20D-Qseven-RZG1M board
-  ARM: dts: iwg20m: Add iWave RZG1M Qseven SOM
-  ARM: dts: iwg20d-q7: Add support for iWave G20D-Q7 board based on
-    RZ/G1M
-
- Documentation/devicetree/bindings/arm/shmobile.txt |  2 ++
- .../devicetree/bindings/vendor-prefixes.txt        |  1 +
- arch/arm/boot/dts/Makefile                         |  1 +
- arch/arm/boot/dts/r8a7743-iwg20d-q7.dts            | 25 ++++++++++++++++++++
- arch/arm/boot/dts/r8a7743-iwg20m.dtsi              | 27 ++++++++++++++++++++++
- 5 files changed, 56 insertions(+)
- create mode 100644 arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
- create mode 100644 arch/arm/boot/dts/r8a7743-iwg20m.dtsi
-
+diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+index 4b60ce2..13fbfe0 100644
+--- a/Documentation/devicetree/bindings/arm/shmobile.txt
++++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -69,6 +69,8 @@ Boards:
+     compatible = "renesas,kzm9d", "renesas,emev2"
+   - Kyoto Microcomputer Co. KZM-A9-GT
+     compatible = "renesas,kzm9g", "renesas,sh73a0"
++  - iWave Systems RZ/G1M Qseven Development Platform (iW-RainboW-G20D-Qseven)
++    compatible = "iwave,g20d", "renesas,r8a7743"
+   - Lager (RTP0RC7790SEB00010S)
+     compatible = "renesas,lager", "renesas,r8a7790"
+   - M3ULCB (R-Car Starter Kit Pro, RTP0RC7796SKB00010S)
 -- 
 1.9.1
