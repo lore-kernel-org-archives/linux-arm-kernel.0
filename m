@@ -1,157 +1,76 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 2 Jun 2017 21:38:27 +0200
-Subject: [PATCH 13/19] drm/sun4i: hdmi: Add support for controller
- hardware variants
-In-Reply-To: <20170602101024.18940-14-wens@csie.org>
-References: <20170602101024.18940-1-wens@csie.org>
- <20170602101024.18940-14-wens@csie.org>
-Message-ID: <20170602193827.rnjum6x5ra4x5wef@flea.lan>
+From: stillcompiling@gmail.com (stillcompiling at gmail.com)
+Date: Fri, 02 Jun 2017 12:39:27 -0700
+Subject: [PATCH v11 4/6] ARM: dts: imx6q-evi: support altera-ps-spi
+In-Reply-To: <a4d0815c-593f-57a9-41fc-ab636ca9b9e5@suse.de>
+References: <20170525172911.11467-1-stillcompiling@gmail.com>
+ <20170525172911.11467-5-stillcompiling@gmail.com>
+ <a4d0815c-593f-57a9-41fc-ab636ca9b9e5@suse.de>
+Message-ID: <6513199.IxvCuS6eYj@jclayton-pc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 02, 2017 at 06:10:18PM +0800, Chen-Yu Tsai wrote:
-> The HDMI controller found in earlier Allwinner SoCs have slight
-> differences:
+On Friday, June 2, 2017 6:30:12 PM PDT Andreas F?rber wrote:
+> Hi,
 > 
->   - Need different initial values for the PLL related registers
+> Am 25.05.2017 um 19:29 schrieb Joshua Clayton:
+> > Add support for Altera V FPGA connected to an spi port
 > 
->   - Different behavior of the DDC and TMDS clocks
+> Did you mean "Altera Cyclone V"?
+I meant to shorten it from Altera Cyclone V to Altera FPGA.
+Didn't quite make it.  Will fix and resubmit today.
 > 
->   - Different register layout for the DDC portion
+> > to the evi devicetree file
+> > 
+> > Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
+> > ---
+> > 
+> >  arch/arm/boot/dts/imx6q-evi.dts | 16 ++++++++++++++++
+> >  1 file changed, 16 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx6q-evi.dts
+> > b/arch/arm/boot/dts/imx6q-evi.dts index 24fe093a66db..a0cbb2d84803 100644
+> > --- a/arch/arm/boot/dts/imx6q-evi.dts
+> > +++ b/arch/arm/boot/dts/imx6q-evi.dts
+> > @@ -82,6 +82,15 @@
+> > 
+> >  	pinctrl-names = "default";
+> >  	pinctrl-0 = <&pinctrl_ecspi1 &pinctrl_ecspi1cs>;
+> >  	status = "okay";
+> > 
+> > +
+> > +	fpga_spi: cyclonespi at 0 {
 > 
->   - Separate DDC parent clock on the A31
+> "cyclonespi" does not strike me as the best node name.
 > 
->   - Explicit reset control
+> I am guessing this is a sub-node of a SPI controller node, so no need to
+> repeat "spi", and Cyclone seems more or less implied by "altr,fpga-".
+True.
 > 
-> The clock variants are supported within their implementations,
-> which only expose a create function for each variant.
+> Note that the example in the bindings doc uses "evi-fpga-spi". Nodes
+> don't need to be (shouldn't be?) prefixed with the board. Note that
+> bindings examples tend to get copied a lot.
 > 
-> The different layout of the DDC registers necessitates a separate
-> version of struct drm_connector_helper_funcs.
+> Any reason not to just use "fpga at 0" in both places for simplicity?
+Sure. fpga: fpga at 0 is probably better.
+I'll change it in both the dts and the binding doc.
 > 
-> A new variant data structure is created to store pointers to the
-> above functions, structures, and the different initial values.
-> Another flag notates whether there is a separate DDC parent clock.
-> If not, the TMDS clock is passed to the DDC clock create function,
-> as before.
+> > +		compatible = "altr,fpga-passive-serial";
+> > +		spi-max-frequency = <20000000>;
+> > +		reg = <0>;
+> > +		pinctrl-0 = <&pinctrl_fpgaspi>;
+> > +		nconfig-gpios = <&gpio4 9 GPIO_ACTIVE_LOW>;
+> > +		nstat-gpios = <&gpio4 11 GPIO_ACTIVE_LOW>;
+> > +	};
+> > 
+> >  };
+> >  
+> >  &ecspi3 {
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  drivers/clk/sunxi-ng/ccu-sun6i-a31.c   |   2 +-
->  drivers/gpu/drm/sun4i/sun4i_hdmi.h     |   8 +++
->  drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c | 114 ++++++++++++++++++++++++++-------
->  3 files changed, 100 insertions(+), 24 deletions(-)
+> [snip]
 > 
-> diff --git a/drivers/clk/sunxi-ng/ccu-sun6i-a31.c b/drivers/clk/sunxi-ng/ccu-sun6i-a31.c
-> index 4d6078fca9ac..e48186985a51 100644
-> --- a/drivers/clk/sunxi-ng/ccu-sun6i-a31.c
-> +++ b/drivers/clk/sunxi-ng/ccu-sun6i-a31.c
-> @@ -610,7 +610,7 @@ static SUNXI_CCU_M_WITH_MUX_GATE(hdmi_clk, "hdmi", lcd_ch1_parents,
->  
->  static SUNXI_CCU_GATE(hdmi_ddc_clk, "hdmi-ddc", "osc24M", 0x150, BIT(30), 0);
->  
-> -static SUNXI_CCU_GATE(ps_clk, "ps", "lcd1-ch1", 0x140, BIT(31), 0);
-> +static SUNXI_CCU_GATE(ps_clk, "ps", "lcd1-ch1", 0x154, BIT(31), 0);
+> Regards,
+> Andreas
 
-Unrelated change?
-
->  
->  static const char * const mbus_parents[] = { "osc24M", "pll-periph",
->  					     "pll-ddr" };
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi.h b/drivers/gpu/drm/sun4i/sun4i_hdmi.h
-> index c39c2a245339..c63d0bd95963 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_hdmi.h
-> +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi.h
-> @@ -155,6 +155,8 @@ enum sun4i_hdmi_pkt_type {
->  	SUN4I_HDMI_PKT_END = 15,
->  };
->  
-> +struct sun4i_hdmi_variant;
-> +
->  struct sun4i_hdmi {
->  	struct drm_connector	connector;
->  	struct drm_encoder	encoder;
-> @@ -162,9 +164,13 @@ struct sun4i_hdmi {
->  
->  	void __iomem		*base;
->  
-> +	/* Reset control */
-> +	struct reset_control	*reset;
-> +
->  	/* Parent clocks */
->  	struct clk		*bus_clk;
->  	struct clk		*mod_clk;
-> +	struct clk		*ddc_parent_clk;
->  	struct clk		*pll0_clk;
->  	struct clk		*pll1_clk;
->  
-> @@ -175,6 +181,8 @@ struct sun4i_hdmi {
->  	struct sun4i_drv	*drv;
->  
->  	bool			hdmi_monitor;
-> +
-> +	const struct sun4i_hdmi_variant	*variant;
->  };
->  
->  int sun4i_ddc_create(struct sun4i_hdmi *hdmi, struct clk *clk);
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
-> index 457614073501..9ded40aaed32 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
-> @@ -20,8 +20,10 @@
->  #include <linux/clk.h>
->  #include <linux/component.h>
->  #include <linux/iopoll.h>
-> +#include <linux/of_device.h>
->  #include <linux/platform_device.h>
->  #include <linux/pm_runtime.h>
-> +#include <linux/reset.h>
->  
->  #include "sun4i_backend.h"
->  #include "sun4i_crtc.h"
-> @@ -315,6 +317,56 @@ static const struct drm_connector_funcs sun4i_hdmi_connector_funcs = {
->  	.atomic_destroy_state	= drm_atomic_helper_connector_destroy_state,
->  };
->  
-> +struct sun4i_hdmi_variant {
-> +	const struct drm_connector_helper_funcs *connector_helpers;
-> +	int (*ddc_create)(struct sun4i_hdmi *hdmi, struct clk *clk);
-> +	int (*tmds_create)(struct sun4i_hdmi *hdmi);
-> +	bool has_ddc_parent_clk;
-> +	bool has_reset_control;
-> +
-> +	u32 pad_ctrl0_init_val;
-> +	u32 pad_ctrl1_init_val;
-> +	u32 pll_ctrl_init_val;
-> +};
-> +
-> +#define SUN4I_HDMI_PAD_CTRL1_MASK	(GENMASK(24, 7) | GENMASK(5, 0))
-> +#define SUN4I_HDMI_PLL_CTRL_MASK	(GENMASK(31, 8) | GENMASK(3, 0))
-> +
-> +static const struct sun4i_hdmi_variant sun5i_variant = {
-> +	.connector_helpers	= &sun4i_hdmi_connector_helper_funcs,
-> +	.ddc_create		= sun4i_ddc_create,
-> +	.tmds_create		= sun4i_tmds_create,
-
-If we store the variants info for those clocks in that structure, we
-don't need those functions anymore. This would be cleaner imho.
-
-> +	.has_ddc_parent_clk	= false,
-> +	.has_reset_control	= false,
-
-Those two are the default values
-
-
-Maxime
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170602/50d6faf0/attachment.sig>
+~Joshua A Clayton
