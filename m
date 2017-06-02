@@ -1,67 +1,54 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 2 Jun 2017 13:27:25 -0700
-Subject: [PATCH] ARM: dts: da850-evm: fix tca6416 for use with GPIO hogs
-In-Reply-To: <230e0aa5-6545-e546-6822-77ef53c07b3b@ti.com>
-References: <20170531012125.12258-1-khilman@baylibre.com>
- <230e0aa5-6545-e546-6822-77ef53c07b3b@ti.com>
-Message-ID: <CAOi56cXvsA7b8QFqTpPNeHFFZbMsB4-VVoErMouZk=T-3ZiR9Q@mail.gmail.com>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Fri,  2 Jun 2017 13:30:47 -0700
+Subject: [PATCH v12 1/6] fpga: Add flag to indicate SPI bitstream is
+ bit-reversed
+In-Reply-To: <20170525172911.11467-1-stillcompiling@gmail.com>
+References: <20170525172911.11467-1-stillcompiling@gmail.com>
+Message-ID: <684ea151ba9aa2c6555a299daf56552ddc11f596.1496434383.git.stillcompiling@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 1, 2017 at 11:01 PM, Sekhar Nori <nsekhar@ti.com> wrote:
-> Hi Kevin,
->
-> On Wednesday 31 May 2017 06:51 AM, Kevin Hilman wrote:
->> In order GPIOS from this controller to be used with the "gpio-hogs"
->> property, the tca6416 node has to properly labeled as a gpio-controller,
->> and use #gpio-cells.
->>
->> With that, the SEL_A, SEL_B, SEL_C lines that are used to select VPIF
->> input can be configured using GPIO hogs.
->>
->> As an example, example, the configuration below selects the analog video
->> input on the da850-evm UI board:
->>
->> &tca6416 {
->>        status = "okay";
->>
->>        sel_a {
->>               gpio-hog;
->>               gpios = <7 GPIO_ACTIVE_HIGH>;
->>               output-high;
->>               line-name = "ADC_ENn";
->>        };
->>        sel_b {
->>               gpio-hog;
->>               gpios = <6 GPIO_ACTIVE_HIGH>;
->>               output-high;
->>               line-name = "CAMERA_ENn";
->>        };
->>        sel_c {
->>               gpio-hog;
->>               gpios = <5 GPIO_ACTIVE_HIGH>;
->>               output-low;
->>               line-name = "VIDEO_IN_ENn";
->>        };
->> };
->>
->> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
->
-> This patch looks good to me. On the topic of using gpio hogs for this
-> sort of thing, in the past I felt using enable-gpios property is better.
->
-> My reasoning given to Bartosz is here:
-> https://patchwork.kernel.org/patch/9578031/
+From: Anatolij Gustschin <agust@denx.de>
 
-Sure, that's fine when they are used for a specific functionality, but
-using gpio-hog is very useful for testing/debugging, so this patch
-just aims at fixing the basics.
+Add a flag that is passed to the write_init() callback,
+indicating that the SPI bitstream starts with LSB first.
+SPI controllers usually send data with MSB first. If an
+FPGA expects bitstream data as LSB first, the data must
+be reversed either by the SPI controller or by the driver.
 
-That being said, I'm still not convinced what the best place for this
-is because they're not really part of the VPIF either (e.g. they
-control the character LCD which has nothing to do with the VPIF.)
+Alternatively the bitstream could be prepared as bit-reversed
+to avoid the bit-swapping while sending. This flag indicates
+such bit-reversed SPI bitstream. The low-level driver will
+deal with the flag and perform bit-reversing if needed.
 
-In any case, I'm not trying to solve that problem in this patch, so
-thanks for the review.
+Signed-off-by: Anatolij Gustschin <agust@denx.de>
+Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
+---
 
-Kevin
+Changes from v11 (all in patch 4/4)
+- Change "Altera V FPGA" to simply "Altera FPGA"
+- Change the devicetree name to a generic "fpga: fpga at 0"
+  from "fpga_spi: cyclonespi at 0"
+
+ include/linux/fpga/fpga-mgr.h | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/include/linux/fpga/fpga-mgr.h b/include/linux/fpga/fpga-mgr.h
+index b4ac24c4411d..01c348ca38b7 100644
+--- a/include/linux/fpga/fpga-mgr.h
++++ b/include/linux/fpga/fpga-mgr.h
+@@ -67,10 +67,12 @@ enum fpga_mgr_states {
+  * FPGA Manager flags
+  * FPGA_MGR_PARTIAL_RECONFIG: do partial reconfiguration if supported
+  * FPGA_MGR_EXTERNAL_CONFIG: FPGA has been configured prior to Linux booting
++ * FPGA_MGR_BITSTREAM_LSB_FIRST: SPI bitstream bit order is LSB first
+  */
+ #define FPGA_MGR_PARTIAL_RECONFIG	BIT(0)
+ #define FPGA_MGR_EXTERNAL_CONFIG	BIT(1)
+ #define FPGA_MGR_ENCRYPTED_BITSTREAM	BIT(2)
++#define FPGA_MGR_BITSTREAM_LSB_FIRST	BIT(3)
+ 
+ /**
+  * struct fpga_image_info - information specific to a FPGA image
+-- 
+2.11.0
