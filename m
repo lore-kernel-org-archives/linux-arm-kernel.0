@@ -1,40 +1,29 @@
-From: cosardindar@gmail.com (Cosar Dindar)
-Date: Fri,  2 Jun 2017 17:27:07 +0300
-Subject: [PATCH v4] dt-bindings : Fix binding properties
-Message-ID: <640b6a7409ed85ea07c19bac6fea707ed80b47c0.1496413070.git.cosardindar@gmail.com>
+From: rafalo@cadence.com (Rafal Ozieblo)
+Date: Fri, 2 Jun 2017 15:27:09 +0100
+Subject: [PATCH v2 2/4] net: macb: Add tsu_clk to device tree
+In-Reply-To: <1496413439-12900-1-git-send-email-rafalo@cadence.com>
+References: <1496413439-12900-1-git-send-email-rafalo@cadence.com>
+Message-ID: <1496413629-19909-1-git-send-email-rafalo@cadence.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Binding properties explanation has been updated.
-
-Signed-off-by: Cosar Dindar <cosardindar@gmail.com>
+Signed-off-by: Rafal Ozieblo <rafalo@cadence.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/crypto/st,stm32-crc.txt | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/net/macb.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/crypto/st,stm32-crc.txt b/Documentation/devicetree/bindings/crypto/st,stm32-crc.txt
-index 7b30f1e..1e9af69 100644
---- a/Documentation/devicetree/bindings/crypto/st,stm32-crc.txt
-+++ b/Documentation/devicetree/bindings/crypto/st,stm32-crc.txt
-@@ -1,7 +1,9 @@
- * STMicroelectronics STM32 CRC
+diff --git a/Documentation/devicetree/bindings/net/macb.txt b/Documentation/devicetree/bindings/net/macb.txt
+index 1506e94..27966ae 100644
+--- a/Documentation/devicetree/bindings/net/macb.txt
++++ b/Documentation/devicetree/bindings/net/macb.txt
+@@ -22,6 +22,7 @@ Required properties:
+ 	Required elements: 'pclk', 'hclk'
+ 	Optional elements: 'tx_clk'
+ 	Optional elements: 'rx_clk' applies to cdns,zynqmp-gem
++	Optional elements: 'tsu_clk'
+ - clocks: Phandles to input clocks.
  
- Required properties:
--- compatible: Can be either "st,stm32f7-crc" or "st,srm32f4-crc".
-+- compatible: Should be one of the following string.
-+	      "st,stm32f7-crc"
-+	      "st,stm32f4-crc"
- - reg: The address and length of the peripheral registers space
- - clocks: The input clock of the CRC instance
- 
-@@ -10,7 +12,7 @@ Optional properties: none
- Example:
- 
- crc: crc at 40023000 {
--	compatible = "st,stm32f7-crc", "st,stm32f4-crc";
-+	compatible = "st,stm32f7-crc";
- 	reg = <0x40023000 0x400>;
- 	clocks = <&rcc 0 12>;
- };
+ Optional properties for PHY child node:
 -- 
-2.7.4
+2.4.5
