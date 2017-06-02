@@ -1,25 +1,31 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Fri, 2 Jun 2017 15:18:30 +0200
-Subject: [PATCH] arm64/kvm: fix misleading kconfig text for 16K pages
-In-Reply-To: <1496401340-24802-1-git-send-email-mark.rutland@arm.com>
-References: <1496401340-24802-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20170602131830.GC397@cbox>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 2 Jun 2017 15:21:14 +0200
+Subject: [PATCH v3 13/13] ARM: dts: sunxi: add SoC specific compatibles
+ for the crypto nodes
+In-Reply-To: <20170601193905.28829-14-antoine.tenart@free-electrons.com>
+References: <20170601193905.28829-1-antoine.tenart@free-electrons.com>
+ <20170601193905.28829-14-antoine.tenart@free-electrons.com>
+Message-ID: <20170602132114.qbueyl6oj45z4v65@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 02, 2017 at 12:02:20PM +0100, Mark Rutland wrote:
-> We've supported KVM with 16K pages since commit:
+On Thu, Jun 01, 2017 at 09:39:05PM +0200, Antoine Tenart wrote:
+> Add SoC specific compatibles for all sunXi crypto nodes, in addition to
+> the one already used (allwinner,sun4i-a10-crypto).
 > 
->   02e0b7600f835007 ("arm64: kvm: Add support for 16K pages")
-> 
-> ... yet the kconfig text says this combination is not supported.
-> 
-> Let's fix that by deleting the misleading text.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Cc: kvmarm at lists.cs.columbia.edu
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 
-Acked-by: Christoffer Dall <cdall@linaro.org>
+Applied, thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170602/dd8ec429/attachment.sig>
