@@ -1,22 +1,28 @@
-From: agust@denx.de (Anatolij Gustschin)
-Date: Fri, 2 Jun 2017 17:49:47 +0200
-Subject: [PATCH v11 0/6] FPGA Manager support for altera passive serial
-In-Reply-To: <20170525172911.11467-1-stillcompiling@gmail.com>
-References: <20170525172911.11467-1-stillcompiling@gmail.com>
-Message-ID: <20170602174947.5673f8f2@crub>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 2 Jun 2017 08:53:19 -0700
+Subject: [PATCH v7 0/3] Support for USB DRD Phy driver for NS2
+In-Reply-To: <1496408439-30431-1-git-send-email-raviteja.garimella@broadcom.com>
+References: <1496408439-30431-1-git-send-email-raviteja.garimella@broadcom.com>
+Message-ID: <4824c415-ea31-f252-7e94-ed3e3b2c064c@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
 
-On Thu, 25 May 2017 10:29:05 -0700
-Joshua Clayton stillcompiling at gmail.com wrote:
 
->FPGA Manager passive serial can now support Stratix, Cyclone and Arria
->FPGAs.
+On 06/02/2017 06:00 AM, Raviteja Garimella wrote:
+> 
+> Raviteja Garimella (3):
+>   dt-bindings:phy:Add DT bindings documentation for NS2 USB DRD phy
+>   phy:phy-bcm-ns2-usbdrd:Broadcom USB DRD Phy driver for Northstar2
+>   arm64: dts: NS2: Add USB DRD PHY device tree node
 
-can this series be queued for merging in v4.13 or are there any
-issues with it?
+For future submission can you be consistent in how you create your
+subjects and how PHY vs. Phy or phy is used? For instance this would be
+much better:
 
-Thanks,
-Anatolij
+dt-bindings: phy: Add DT bindings documentation for NS2 USB DRD PHY
+phy: phy-bcm-ns2-usbdrd: Broadcom USB DRD PHY driver for Northstar 2
+
+Thank you
+-- 
+Florian
