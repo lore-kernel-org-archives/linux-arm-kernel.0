@@ -1,246 +1,80 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri,  2 Jun 2017 15:30:06 -0700
-Subject: [PATCH] clk: sunxi-ng: Move all clock types to a library
-In-Reply-To: <20170602121532.glfjkxp333ynvcwm@flea.lan>
-Message-ID: <20170602223006.1653-1-sboyd@codeaurora.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 3 Jun 2017 06:31:53 +0800
+Subject: [PATCH v2] mm: vmalloc: make vmalloc_to_page() deal with PMD/PUD
+ mappings
+In-Reply-To: <20170602155416.32706-1-ard.biesheuvel@linaro.org>
+Message-ID: <201706030608.koMVDa7j%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We've run into kconfig missing dependency errors in the sunxi-ng
-code a couple times now. Each time the fix is to find the missing
-select statement and add it to the Kconfig entry for a particular
-SoC driver. Given that all this code is builtin (non-modular) we
-don't need to do this complicated dependency tracking in Kconfig.
-Instead we can move all the "library"ish code to be compiled as
-lib-y instead of obj-y, let the linker throw away unused code in
-the resulting vmlinux, and drop all the Kconfig stuff we use to
-track clock types.
+Hi Ard,
 
-Suggested-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+[auto build test ERROR on mmotm/master]
+[also build test ERROR on v4.12-rc3 next-20170602]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Ard-Biesheuvel/mm-vmalloc-make-vmalloc_to_page-deal-with-PMD-PUD-mappings/20170603-021745
+base:   git://git.cmpxchg.org/linux-mmotm.git master
+config: parisc-allmodconfig (attached as .config)
+compiler: hppa-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=parisc 
+
+All error/warnings (new ones prefixed by >>):
+
+   In file included from arch/parisc/include/asm/pgtable.h:4:0,
+                    from include/linux/mm.h:70,
+                    from mm/vmalloc.c:12:
+   mm/vmalloc.c: In function 'vmalloc_to_page':
+>> include/asm-generic/4level-fixup.h:26:25: error: implicit declaration of function 'pgd_page' [-Werror=implicit-function-declaration]
+    #define pud_page(pud)   pgd_page(pud)
+                            ^
+>> mm/vmalloc.c:295:10: note: in expansion of macro 'pud_page'
+      return pud_page(*pud) + ((addr & ~PUD_MASK) >> PAGE_SHIFT);
+             ^~~~~~~~
+>> mm/vmalloc.c:295:25: warning: return makes pointer from integer without a cast [-Wint-conversion]
+      return pud_page(*pud) + ((addr & ~PUD_MASK) >> PAGE_SHIFT);
+                             
+   cc1: some warnings being treated as errors
+
+vim +/pud_page +295 mm/vmalloc.c
+
+   279		/*
+   280		 * XXX we might need to change this if we add VIRTUAL_BUG_ON for
+   281		 * architectures that do not vmalloc module space
+   282		 */
+   283		VIRTUAL_BUG_ON(!is_vmalloc_or_module_addr(vmalloc_addr));
+   284	
+   285		if (pgd_none(*pgd))
+   286			return NULL;
+   287		p4d = p4d_offset(pgd, addr);
+   288		if (p4d_none(*p4d))
+   289			return NULL;
+   290		pud = pud_offset(p4d, addr);
+   291		if (pud_none(*pud))
+   292			return NULL;
+   293		if (pud_huge(*pud)) {
+   294			VM_BUG_ON(!IS_ENABLED(CONFIG_HAVE_ARCH_HUGE_VMAP));
+ > 295			return pud_page(*pud) + ((addr & ~PUD_MASK) >> PAGE_SHIFT);
+   296		}
+   297		pmd = pmd_offset(pud, addr);
+   298		if (pmd_none(*pmd))
+   299			return NULL;
+   300		if (pmd_huge(*pmd)) {
+   301			VM_BUG_ON(!IS_ENABLED(CONFIG_HAVE_ARCH_HUGE_VMAP));
+   302			return pmd_page(*pmd) + ((addr & ~PMD_MASK) >> PAGE_SHIFT);
+   303		}
+
 ---
-
-Based on linux-next-20170602.
-
- drivers/clk/sunxi-ng/Kconfig  | 117 ------------------------------------------
- drivers/clk/sunxi-ng/Makefile |  26 +++++-----
- 2 files changed, 13 insertions(+), 130 deletions(-)
-
-diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
-index 67acef3d2494..dd15f9f9e1ef 100644
---- a/drivers/clk/sunxi-ng/Kconfig
-+++ b/drivers/clk/sunxi-ng/Kconfig
-@@ -6,149 +6,42 @@ config SUNXI_CCU
- 
- if SUNXI_CCU
- 
--# Base clock types
--
--config SUNXI_CCU_DIV
--	bool
--	select SUNXI_CCU_MUX
--
--config SUNXI_CCU_FRAC
--	bool
--
--config SUNXI_CCU_GATE
--	def_bool y
--
--config SUNXI_CCU_MUX
--	bool
--
--config SUNXI_CCU_MULT
--	bool
--	select SUNXI_CCU_MUX
--
--config SUNXI_CCU_PHASE
--	bool
--
--# Multi-factor clocks
--
--config SUNXI_CCU_NK
--	bool
--	select SUNXI_CCU_GATE
--
--config SUNXI_CCU_NKM
--	bool
--	select SUNXI_CCU_GATE
--
--config SUNXI_CCU_NKMP
--	bool
--	select SUNXI_CCU_GATE
--
--config SUNXI_CCU_NM
--	bool
--	select SUNXI_CCU_FRAC
--	select SUNXI_CCU_GATE
--
--config SUNXI_CCU_MP
--	bool
--	select SUNXI_CCU_GATE
--	select SUNXI_CCU_MUX
--
--# SoC Drivers
--
- config SUN50I_A64_CCU
- 	bool "Support for the Allwinner A64 CCU"
--	select SUNXI_CCU_DIV
--	select SUNXI_CCU_NK
--	select SUNXI_CCU_NKM
--	select SUNXI_CCU_NKMP
--	select SUNXI_CCU_NM
--	select SUNXI_CCU_MP
--	select SUNXI_CCU_PHASE
- 	default ARM64 && ARCH_SUNXI
- 	depends on (ARM64 && ARCH_SUNXI) || COMPILE_TEST
- 
- config SUN5I_CCU
- 	bool "Support for the Allwinner sun5i family CCM"
--	select SUNXI_CCU_DIV
--	select SUNXI_CCU_MULT
--	select SUNXI_CCU_NK
--	select SUNXI_CCU_NKM
--	select SUNXI_CCU_NM
--	select SUNXI_CCU_MP
--	select SUNXI_CCU_PHASE
- 	default MACH_SUN5I
- 	depends on MACH_SUN5I || COMPILE_TEST
- 
- config SUN6I_A31_CCU
- 	bool "Support for the Allwinner A31/A31s CCU"
--	select SUNXI_CCU_DIV
--	select SUNXI_CCU_NK
--	select SUNXI_CCU_NKM
--	select SUNXI_CCU_NKMP
--	select SUNXI_CCU_NM
--	select SUNXI_CCU_MP
--	select SUNXI_CCU_PHASE
- 	default MACH_SUN6I
- 	depends on MACH_SUN6I || COMPILE_TEST
- 
- config SUN8I_A23_CCU
- 	bool "Support for the Allwinner A23 CCU"
--	select SUNXI_CCU_DIV
--	select SUNXI_CCU_MULT
--	select SUNXI_CCU_NK
--	select SUNXI_CCU_NKM
--	select SUNXI_CCU_NKMP
--	select SUNXI_CCU_NM
--	select SUNXI_CCU_MP
--	select SUNXI_CCU_PHASE
- 	default MACH_SUN8I
- 	depends on MACH_SUN8I || COMPILE_TEST
- 
- config SUN8I_A33_CCU
- 	bool "Support for the Allwinner A33 CCU"
--	select SUNXI_CCU_DIV
--	select SUNXI_CCU_MULT
--	select SUNXI_CCU_NK
--	select SUNXI_CCU_NKM
--	select SUNXI_CCU_NKMP
--	select SUNXI_CCU_NM
--	select SUNXI_CCU_MP
--	select SUNXI_CCU_PHASE
- 	default MACH_SUN8I
- 	depends on MACH_SUN8I || COMPILE_TEST
- 
- config SUN8I_A83T_CCU
- 	bool "Support for the Allwinner A83T CCU"
--	select SUNXI_CCU_DIV
--	select SUNXI_CCU_GATE
--	select SUNXI_CCU_MP
--	select SUNXI_CCU_MULT
--	select SUNXI_CCU_MUX
--	select SUNXI_CCU_NKMP
--	select SUNXI_CCU_NM
--	select SUNXI_CCU_PHASE
- 	default MACH_SUN8I
- 
- config SUN8I_H3_CCU
- 	bool "Support for the Allwinner H3 CCU"
--	select SUNXI_CCU_DIV
--	select SUNXI_CCU_NK
--	select SUNXI_CCU_NKM
--	select SUNXI_CCU_NKMP
--	select SUNXI_CCU_NM
--	select SUNXI_CCU_MP
--	select SUNXI_CCU_PHASE
- 	default MACH_SUN8I || (ARM64 && ARCH_SUNXI)
- 	depends on MACH_SUN8I || (ARM64 && ARCH_SUNXI) || COMPILE_TEST
- 
- config SUN8I_V3S_CCU
- 	bool "Support for the Allwinner V3s CCU"
--	select SUNXI_CCU_DIV
--	select SUNXI_CCU_NK
--	select SUNXI_CCU_NKM
--	select SUNXI_CCU_NKMP
--	select SUNXI_CCU_NM
--	select SUNXI_CCU_MP
--	select SUNXI_CCU_PHASE
- 	default MACH_SUN8I
- 	depends on MACH_SUN8I || COMPILE_TEST
- 
-@@ -159,21 +52,11 @@ config SUN8I_DE2_CCU
- 
- config SUN9I_A80_CCU
- 	bool "Support for the Allwinner A80 CCU"
--	select SUNXI_CCU_DIV
--	select SUNXI_CCU_MULT
--	select SUNXI_CCU_GATE
--	select SUNXI_CCU_NKMP
--	select SUNXI_CCU_NM
--	select SUNXI_CCU_MP
--	select SUNXI_CCU_PHASE
- 	default MACH_SUN9I
- 	depends on MACH_SUN9I || COMPILE_TEST
- 
- config SUN8I_R_CCU
- 	bool "Support for Allwinner SoCs' PRCM CCUs"
--	select SUNXI_CCU_DIV
--	select SUNXI_CCU_GATE
--	select SUNXI_CCU_MP
- 	default MACH_SUN8I || (ARCH_SUNXI && ARM64)
- 
- endif
-diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-index 0185c6ffadcb..cbc8cb4f70e3 100644
---- a/drivers/clk/sunxi-ng/Makefile
-+++ b/drivers/clk/sunxi-ng/Makefile
-@@ -1,21 +1,21 @@
- # Common objects
--obj-$(CONFIG_SUNXI_CCU)		+= ccu_common.o
--obj-$(CONFIG_SUNXI_CCU)		+= ccu_reset.o
-+lib-$(CONFIG_SUNXI_CCU)		+= ccu_common.o
-+lib-$(CONFIG_SUNXI_CCU)		+= ccu_reset.o
- 
- # Base clock types
--obj-$(CONFIG_SUNXI_CCU_DIV)	+= ccu_div.o
--obj-$(CONFIG_SUNXI_CCU_FRAC)	+= ccu_frac.o
--obj-$(CONFIG_SUNXI_CCU_GATE)	+= ccu_gate.o
--obj-$(CONFIG_SUNXI_CCU_MUX)	+= ccu_mux.o
--obj-$(CONFIG_SUNXI_CCU_MULT)	+= ccu_mult.o
--obj-$(CONFIG_SUNXI_CCU_PHASE)	+= ccu_phase.o
-+lib-$(CONFIG_SUNXI_CCU)		+= ccu_div.o
-+lib-$(CONFIG_SUNXI_CCU)		+= ccu_frac.o
-+lib-$(CONFIG_SUNXI_CCU)		+= ccu_gate.o
-+lib-$(CONFIG_SUNXI_CCU)		+= ccu_mux.o
-+lib-$(CONFIG_SUNXI_CCU)		+= ccu_mult.o
-+lib-$(CONFIG_SUNXI_CCU)		+= ccu_phase.o
- 
- # Multi-factor clocks
--obj-$(CONFIG_SUNXI_CCU_NK)	+= ccu_nk.o
--obj-$(CONFIG_SUNXI_CCU_NKM)	+= ccu_nkm.o
--obj-$(CONFIG_SUNXI_CCU_NKMP)	+= ccu_nkmp.o
--obj-$(CONFIG_SUNXI_CCU_NM)	+= ccu_nm.o
--obj-$(CONFIG_SUNXI_CCU_MP)	+= ccu_mp.o
-+lib-$(CONFIG_SUNXI_CCU)		+= ccu_nk.o
-+lib-$(CONFIG_SUNXI_CCU)		+= ccu_nkm.o
-+lib-$(CONFIG_SUNXI_CCU)		+= ccu_nkmp.o
-+lib-$(CONFIG_SUNXI_CCU)		+= ccu_nm.o
-+lib-$(CONFIG_SUNXI_CCU)		+= ccu_mp.o
- 
- # SoC support
- obj-$(CONFIG_SUN50I_A64_CCU)	+= ccu-sun50i-a64.o
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 50008 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170603/92e31e12/attachment-0001.gz>
