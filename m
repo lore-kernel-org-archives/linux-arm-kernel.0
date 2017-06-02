@@ -1,20 +1,15 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 2 Jun 2017 15:39:46 -0700
-Subject: [PATCH V3 1/3] clk: add clk_bulk_get accessories
-In-Reply-To: <1495201746-31841-2-git-send-email-aisheng.dong@nxp.com>
+Date: Fri, 2 Jun 2017 15:39:55 -0700
+Subject: [PATCH V3 2/3] clk: add managed version of clk_bulk_get
+In-Reply-To: <1495201746-31841-3-git-send-email-aisheng.dong@nxp.com>
 References: <1495201746-31841-1-git-send-email-aisheng.dong@nxp.com>
- <1495201746-31841-2-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20170602223946.GV20170@codeaurora.org>
+ <1495201746-31841-3-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20170602223955.GW20170@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 05/19, Dong Aisheng wrote:
-> These helper function allows drivers to get several clk consumers in
-> one operation. If any of the clk cannot be acquired then any clks
-> that were got will be put before returning to the caller.
-> 
-> This can relieve the driver owners' life who needs to handle many clocks,
-> as well as each clock error reporting.
+> This patch introduces the managed version of clk_bulk_get.
 > 
 > Cc: Michael Turquette <mturquette@baylibre.com>
 > Cc: Stephen Boyd <sboyd@codeaurora.org>
@@ -34,7 +29,7 @@ On 05/19, Dong Aisheng wrote:
 > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 > ---
 
-Applied to clk-bulk-get and merged into clk-next
+Applied to clk-bulk-get and merged into clk-next.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
