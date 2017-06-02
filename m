@@ -1,217 +1,378 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Fri,  2 Jun 2017 12:04:26 +0530
-Subject: [PATCH v6 02/11] dt-bindings: clk: Extend binding doc for Stingray SOC
+Date: Fri,  2 Jun 2017 12:04:27 +0530
+Subject: [PATCH v6 03/11] clk: bcm: Add clocks for Stingray SOC
 In-Reply-To: <1496385275-6899-1-git-send-email-anup.patel@broadcom.com>
 References: <1496385275-6899-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1496385275-6899-3-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1496385275-6899-4-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sandeep Tripathy <sandeep.tripathy@broadcom.com>
 
-Update iproc clock dt-binding documentation with
-Stingray pll and clock details.
+This patch adds support for Stingray clocks in iproc
+ccf. The Stingray SOC has various plls based on iproc
+pll architecture.
 
 Signed-off-by: Sandeep Tripathy <sandeep.tripathy@broadcom.com>
 Reviewed-by: Ray Jui <ray.jui@broadcom.com>
 Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../bindings/clock/brcm,iproc-clocks.txt           |  76 ++++++++++++++++
- include/dt-bindings/clock/bcm-sr.h                 | 101 +++++++++++++++++++++
- 2 files changed, 177 insertions(+)
- create mode 100644 include/dt-bindings/clock/bcm-sr.h
+ drivers/clk/bcm/Kconfig  |   8 ++
+ drivers/clk/bcm/Makefile |   1 +
+ drivers/clk/bcm/clk-sr.c | 320 +++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 329 insertions(+)
+ create mode 100644 drivers/clk/bcm/clk-sr.c
 
-diff --git a/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt b/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
-index 6f66e9a..f2c5f0e4a 100644
---- a/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
-+++ b/Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
-@@ -219,3 +219,79 @@ BCM63138
- --------
- PLL and leaf clock compatible strings for BCM63138 are:
-     "brcm,bcm63138-armpll"
+diff --git a/drivers/clk/bcm/Kconfig b/drivers/clk/bcm/Kconfig
+index b5ae531..1d9187d 100644
+--- a/drivers/clk/bcm/Kconfig
++++ b/drivers/clk/bcm/Kconfig
+@@ -46,3 +46,11 @@ config CLK_BCM_NS2
+ 	default ARCH_BCM_IPROC
+ 	help
+ 	  Enable common clock framework support for the Broadcom Northstar 2 SoC
 +
-+Stingray
-+-----------
-+PLL and leaf clock compatible strings for Stingray are:
-+    "brcm,sr-genpll0"
-+    "brcm,sr-genpll1"
-+    "brcm,sr-genpll2"
-+    "brcm,sr-genpll3"
-+    "brcm,sr-genpll4"
-+    "brcm,sr-genpll5"
-+    "brcm,sr-genpll6"
-+
-+    "brcm,sr-lcpll0"
-+    "brcm,sr-lcpll1"
-+    "brcm,sr-lcpll-pcie"
-+
-+
-+The following table defines the set of PLL/clock index and ID for Stingray.
-+These clock IDs are defined in:
-+    "include/dt-bindings/clock/bcm-sr.h"
-+
-+    Clock		Source		Index	ID
-+    ---			-----		-----	---------
-+    crystal		N/A		N/A	N/A
-+    crmu_ref25m		crystal		N/A	N/A
-+
-+    genpll0		crystal		0	BCM_SR_GENPLL0
-+    clk_125m		genpll0		1	BCM_SR_GENPLL0_125M_CLK
-+    clk_scr		genpll0		2	BCM_SR_GENPLL0_SCR_CLK
-+    clk_250		genpll0		3	BCM_SR_GENPLL0_250M_CLK
-+    clk_pcie_axi	genpll0		4	BCM_SR_GENPLL0_PCIE_AXI_CLK
-+    clk_paxc_axi_x2	genpll0		5	BCM_SR_GENPLL0_PAXC_AXI_X2_CLK
-+    clk_paxc_axi	genpll0		6	BCM_SR_GENPLL0_PAXC_AXI_CLK
-+
-+    genpll1		crystal		0	BCM_SR_GENPLL1
-+    clk_pcie_tl		genpll1		1	BCM_SR_GENPLL1_PCIE_TL_CLK
-+    clk_mhb_apb		genpll1		2	BCM_SR_GENPLL1_MHB_APB_CLK
-+
-+    genpll2		crystal		0	BCM_SR_GENPLL2
-+    clk_nic		genpll2		1	BCM_SR_GENPLL2_NIC_CLK
-+    clk_ts_500_ref	genpll2		2	BCM_SR_GENPLL2_TS_500_REF_CLK
-+    clk_125_nitro	genpll2		3	BCM_SR_GENPLL2_125_NITRO_CLK
-+    clk_chimp		genpll2		4	BCM_SR_GENPLL2_CHIMP_CLK
-+    clk_nic_flash	genpll2		5	BCM_SR_GENPLL2_NIC_FLASH
-+
-+    genpll3		crystal		0	BCM_SR_GENPLL3
-+    clk_hsls		genpll3		1	BCM_SR_GENPLL3_HSLS_CLK
-+    clk_sdio		genpll3		2	BCM_SR_GENPLL3_SDIO_CLK
-+
-+    genpll4		crystal		0	BCM_SR_GENPLL4
-+    ccn			genpll4		1	BCM_SR_GENPLL4_CCN_CLK
-+    clk_tpiu_pll	genpll4		2	BCM_SR_GENPLL4_TPIU_PLL_CLK
-+    noc_clk		genpll4		3	BCM_SR_GENPLL4_NOC_CLK
-+    clk_chclk_fs4	genpll4		4	BCM_SR_GENPLL4_CHCLK_FS4_CLK
-+    clk_bridge_fscpu	genpll4		5	BCM_SR_GENPLL4_BRIDGE_FSCPU_CLK
-+
-+
-+    genpll5		crystal		0	BCM_SR_GENPLL5
-+    fs4_hf_clk		genpll5		1	BCM_SR_GENPLL5_FS4_HF_CLK
-+    crypto_ae_clk	genpll5		2	BCM_SR_GENPLL5_CRYPTO_AE_CLK
-+    raid_ae_clk		genpll5		3	BCM_SR_GENPLL5_RAID_AE_CLK
-+
-+    genpll6		crystal		0	BCM_SR_GENPLL6
-+    48_usb		genpll6		1	BCM_SR_GENPLL6_48_USB_CLK
-+
-+    lcpll0		crystal		0	BCM_SR_LCPLL0
-+    clk_sata_refp 	lcpll0		1	BCM_SR_LCPLL0_SATA_REFP_CLK
-+    clk_sata_refn	lcpll0		2	BCM_SR_LCPLL0_SATA_REFN_CLK
-+    clk_usb_ref		lcpll0		3	BCM_SR_LCPLL0_USB_REF_CLK
-+    sata_refpn		lcpll0		3	BCM_SR_LCPLL0_SATA_REFPN_CLK
-+
-+    lcpll1		crystal		0	BCM_SR_LCPLL1
-+    wan 		lcpll1		1	BCM_SR_LCPLL0_WAN_CLK
-+
-+    lcpll_pcie		crystal		0	BCM_SR_LCPLL_PCIE
-+    pcie_phy_ref 	lcpll1		1	BCM_SR_LCPLL_PCIE_PHY_REF_CLK
-diff --git a/include/dt-bindings/clock/bcm-sr.h b/include/dt-bindings/clock/bcm-sr.h
++config CLK_BCM_SR
++	bool "Broadcom Stingray clock support"
++	depends on ARCH_BCM_IPROC || COMPILE_TEST
++	select COMMON_CLK_IPROC
++	default ARCH_BCM_IPROC
++	help
++	  Enable common clock framework support for the Broadcom Stingray SoC
+diff --git a/drivers/clk/bcm/Makefile b/drivers/clk/bcm/Makefile
+index d9dc848..a0c14fa 100644
+--- a/drivers/clk/bcm/Makefile
++++ b/drivers/clk/bcm/Makefile
+@@ -10,3 +10,4 @@ obj-$(CONFIG_ARCH_BCM_53573)	+= clk-bcm53573-ilp.o
+ obj-$(CONFIG_CLK_BCM_CYGNUS)	+= clk-cygnus.o
+ obj-$(CONFIG_CLK_BCM_NSP)	+= clk-nsp.o
+ obj-$(CONFIG_CLK_BCM_NS2)	+= clk-ns2.o
++obj-$(CONFIG_CLK_BCM_SR)	+= clk-sr.o
+diff --git a/drivers/clk/bcm/clk-sr.c b/drivers/clk/bcm/clk-sr.c
 new file mode 100644
-index 0000000..cff6c6f
+index 0000000..342f702
 --- /dev/null
-+++ b/include/dt-bindings/clock/bcm-sr.h
-@@ -0,0 +1,101 @@
++++ b/drivers/clk/bcm/clk-sr.c
+@@ -0,0 +1,320 @@
 +/*
-+ *  BSD LICENSE
++ * Copyright 2017 Broadcom
 + *
-+ *  Copyright(c) 2017 Broadcom. All rights reserved.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation (the "GPL").
 + *
-+ *  Redistribution and use in source and binary forms, with or without
-+ *  modification, are permitted provided that the following conditions
-+ *  are met:
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License version 2 (GPLv2) for more details.
 + *
-+ *    * Redistributions of source code must retain the above copyright
-+ *      notice, this list of conditions and the following disclaimer.
-+ *    * Redistributions in binary form must reproduce the above copyright
-+ *      notice, this list of conditions and the following disclaimer in
-+ *      the documentation and/or other materials provided with the
-+ *      distribution.
-+ *    * Neither the name of Broadcom Corporation nor the names of its
-+ *      contributors may be used to endorse or promote products derived
-+ *      from this software without specific prior written permission.
-+ *
-+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-+ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-+ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-+ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-+ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-+ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-+ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-+ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-+ *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ * You should have received a copy of the GNU General Public License
++ * version 2 (GPLv2) along with this source code.
 + */
 +
-+#ifndef _CLOCK_BCM_SR_H
-+#define _CLOCK_BCM_SR_H
++#include <linux/err.h>
++#include <linux/clk-provider.h>
++#include <linux/of_device.h>
++#include <linux/platform_device.h>
 +
-+/* GENPLL 0 clock channel ID SCR HSLS FS PCIE */
-+#define BCM_SR_GENPLL0			0
-+#define BCM_SR_GENPLL0_SATA_CLK		1
-+#define BCM_SR_GENPLL0_SCR_CLK		2
-+#define BCM_SR_GENPLL0_250M_CLK		3
-+#define BCM_SR_GENPLL0_PCIE_AXI_CLK	4
-+#define BCM_SR_GENPLL0_PAXC_AXI_X2_CLK	5
-+#define BCM_SR_GENPLL0_PAXC_AXI_CLK	6
++#include <dt-bindings/clock/bcm-sr.h>
++#include "clk-iproc.h"
 +
-+/* GENPLL 1 clock channel ID MHB PCIE NITRO */
-+#define BCM_SR_GENPLL1			0
-+#define BCM_SR_GENPLL1_PCIE_TL_CLK	1
-+#define BCM_SR_GENPLL1_MHB_APB_CLK	2
++#define REG_VAL(o, s, w) { .offset = o, .shift = s, .width = w, }
 +
-+/* GENPLL 2 clock channel ID NITRO MHB*/
-+#define BCM_SR_GENPLL2			0
-+#define BCM_SR_GENPLL2_NIC_CLK		1
-+#define BCM_SR_GENPLL2_250_NITRO_CLK	2
-+#define BCM_SR_GENPLL2_125_NITRO_CLK	3
-+#define BCM_SR_GENPLL2_CHIMP_CLK	4
++#define AON_VAL(o, pw, ps, is) { .offset = o, .pwr_width = pw, \
++	.pwr_shift = ps, .iso_shift = is }
 +
-+/* GENPLL 3 HSLS clock channel ID */
-+#define BCM_SR_GENPLL3			0
-+#define BCM_SR_GENPLL3_HSLS_CLK		1
-+#define BCM_SR_GENPLL3_SDIO_CLK		2
++#define SW_CTRL_VAL(o, s) { .offset = o, .shift = s, }
 +
-+/* GENPLL 4 SCR clock channel ID */
-+#define BCM_SR_GENPLL4			0
-+#define BCM_SR_GENPLL4_CCN_CLK		1
++#define RESET_VAL(o, rs, prs) { .offset = o, .reset_shift = rs, \
++	.p_reset_shift = prs }
 +
-+/* GENPLL 5 FS4 clock channel ID */
-+#define BCM_SR_GENPLL5			0
-+#define BCM_SR_GENPLL5_FS_CLK		1
-+#define BCM_SR_GENPLL5_SPU_CLK		2
++#define DF_VAL(o, kis, kiw, kps, kpw, kas, kaw) { .offset = o, \
++	.ki_shift = kis, .ki_width = kiw, .kp_shift = kps, .kp_width = kpw, \
++	.ka_shift = kas, .ka_width = kaw }
 +
-+/* GENPLL 6 NITRO clock channel ID */
-+#define BCM_SR_GENPLL6			0
-+#define BCM_SR_GENPLL6_48_USB_CLK	1
++#define VCO_CTRL_VAL(uo, lo) { .u_offset = uo, .l_offset = lo }
 +
-+/* LCPLL0  clock channel ID */
-+#define BCM_SR_LCPLL0			0
-+#define BCM_SR_LCPLL0_SATA_REF_CLK	1
-+#define BCM_SR_LCPLL0_USB_REF_CLK	2
-+#define BCM_SR_LCPLL0_SATA_REFPN_CLK	3
++#define ENABLE_VAL(o, es, hs, bs) { .offset = o, .enable_shift = es, \
++	.hold_shift = hs, .bypass_shift = bs }
 +
-+/* LCPLL1  clock channel ID */
-+#define BCM_SR_LCPLL1			0
-+#define BCM_SR_LCPLL1_WAN_CLK		1
 +
-+/* LCPLL PCIE  clock channel ID */
-+#define BCM_SR_LCPLL_PCIE		0
-+#define BCM_SR_LCPLL_PCIE_PHY_REF_CLK	1
++static const struct iproc_pll_ctrl genpll0 = {
++	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_HAS_NDIV_FRAC |
++		IPROC_CLK_PLL_NEEDS_SW_CFG,
++	.aon = AON_VAL(0x0, 5, 1, 0),
++	.reset = RESET_VAL(0x0, 12, 11),
++	.dig_filter = DF_VAL(0x0, 4, 3, 0, 4, 7, 3),
++	.sw_ctrl = SW_CTRL_VAL(0x10, 31),
++	.ndiv_int = REG_VAL(0x10, 20, 10),
++	.ndiv_frac = REG_VAL(0x10, 0, 20),
++	.pdiv = REG_VAL(0x14, 0, 4),
++	.status = REG_VAL(0x30, 12, 1),
++};
 +
-+/* GENPLL EMEM0 clock channel ID */
-+#define BCM_SR_EMEMPLL0			0
-+#define BCM_SR_EMEMPLL0_EMEM_CLK	1
++static const struct iproc_clk_ctrl genpll0_clk[] = {
++	[BCM_SR_GENPLL0_SATA_CLK] = {
++		.channel = BCM_SR_GENPLL0_SATA_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x4, 6, 0, 12),
++		.mdiv = REG_VAL(0x18, 0, 9),
++	},
++	[BCM_SR_GENPLL0_SCR_CLK] = {
++		.channel = BCM_SR_GENPLL0_SCR_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x4, 7, 1, 13),
++		.mdiv = REG_VAL(0x18, 10, 9),
++	},
++	[BCM_SR_GENPLL0_250M_CLK] = {
++		.channel = BCM_SR_GENPLL0_250M_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x4, 8, 2, 14),
++		.mdiv = REG_VAL(0x18, 20, 9),
++	},
++	[BCM_SR_GENPLL0_PCIE_AXI_CLK] = {
++		.channel = BCM_SR_GENPLL0_PCIE_AXI_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x4, 9, 3, 15),
++		.mdiv = REG_VAL(0x1c, 0, 9),
++	},
++	[BCM_SR_GENPLL0_PAXC_AXI_X2_CLK] = {
++		.channel = BCM_SR_GENPLL0_PAXC_AXI_X2_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x4, 10, 4, 16),
++		.mdiv = REG_VAL(0x1c, 10, 9),
++	},
++	[BCM_SR_GENPLL0_PAXC_AXI_CLK] = {
++		.channel = BCM_SR_GENPLL0_PAXC_AXI_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x4, 11, 5, 17),
++		.mdiv = REG_VAL(0x1c, 20, 9),
++	},
++};
 +
-+/* GENPLL EMEM0 clock channel ID */
-+#define BCM_SR_EMEMPLL1			0
-+#define BCM_SR_EMEMPLL1_EMEM_CLK	1
++static void __init sr_genpll0_clk_init(struct device_node *node)
++{
++	iproc_pll_clk_setup(node, &genpll0, NULL, 0, genpll0_clk,
++				ARRAY_SIZE(genpll0_clk));
++}
 +
-+/* GENPLL EMEM0 clock channel ID */
-+#define BCM_SR_EMEMPLL2			0
-+#define BCM_SR_EMEMPLL2_EMEM_CLK	1
++static const struct iproc_pll_ctrl genpll3 = {
++	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_HAS_NDIV_FRAC |
++		IPROC_CLK_PLL_NEEDS_SW_CFG,
++	.aon = AON_VAL(0x0, 1, 19, 18),
++	.reset = RESET_VAL(0x0, 12, 11),
++	.dig_filter = DF_VAL(0x0, 4, 3, 0, 4, 7, 3),
++	.sw_ctrl = SW_CTRL_VAL(0x10, 31),
++	.ndiv_int = REG_VAL(0x10, 20, 10),
++	.ndiv_frac = REG_VAL(0x10, 0, 20),
++	.pdiv = REG_VAL(0x14, 0, 4),
++	.status = REG_VAL(0x30, 12, 1),
++};
 +
-+#endif /* _CLOCK_BCM_SR_H */
++static const struct iproc_clk_ctrl genpll3_clk[] = {
++	[BCM_SR_GENPLL3_HSLS_CLK] = {
++		.channel = BCM_SR_GENPLL3_HSLS_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x4, 6, 0, 12),
++		.mdiv = REG_VAL(0x18, 0, 9),
++	},
++	[BCM_SR_GENPLL3_SDIO_CLK] = {
++		.channel = BCM_SR_GENPLL3_SDIO_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x4, 7, 1, 13),
++		.mdiv = REG_VAL(0x18, 10, 9),
++	},
++};
++
++static void __init sr_genpll3_clk_init(struct device_node *node)
++{
++	iproc_pll_clk_setup(node, &genpll3, NULL, 0, genpll3_clk,
++				ARRAY_SIZE(genpll3_clk));
++}
++CLK_OF_DECLARE(sr_genpll3_clk, "brcm,sr-genpll3",
++			sr_genpll3_clk_init);
++
++static const struct iproc_pll_ctrl genpll4 = {
++	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_HAS_NDIV_FRAC |
++		IPROC_CLK_PLL_NEEDS_SW_CFG,
++	.aon = AON_VAL(0x0, 1, 25, 24),
++	.reset = RESET_VAL(0x0, 12, 11),
++	.dig_filter = DF_VAL(0x0, 4, 3, 0, 4, 7, 3),
++	.sw_ctrl = SW_CTRL_VAL(0x10, 31),
++	.ndiv_int = REG_VAL(0x10, 20, 10),
++	.ndiv_frac = REG_VAL(0x10, 0, 20),
++	.pdiv = REG_VAL(0x14, 0, 4),
++	.status = REG_VAL(0x30, 12, 1),
++};
++
++static const struct iproc_clk_ctrl genpll4_clk[] = {
++	[BCM_SR_GENPLL4_CCN_CLK] = {
++		.channel = BCM_SR_GENPLL4_CCN_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x4, 6, 0, 12),
++		.mdiv = REG_VAL(0x18, 0, 9),
++	},
++};
++
++static void __init sr_genpll4_clk_init(struct device_node *node)
++{
++	iproc_pll_clk_setup(node, &genpll4, NULL, 0, genpll4_clk,
++				ARRAY_SIZE(genpll4_clk));
++}
++
++static const struct iproc_pll_ctrl genpll5 = {
++	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_HAS_NDIV_FRAC |
++		IPROC_CLK_PLL_NEEDS_SW_CFG,
++	.aon = AON_VAL(0x0, 1, 1, 0),
++	.reset = RESET_VAL(0x0, 12, 11),
++	.dig_filter = DF_VAL(0x0, 4, 3, 0, 4, 7, 3),
++	.sw_ctrl = SW_CTRL_VAL(0x10, 31),
++	.ndiv_int = REG_VAL(0x10, 20, 10),
++	.ndiv_frac = REG_VAL(0x10, 0, 20),
++	.pdiv = REG_VAL(0x14, 0, 4),
++	.status = REG_VAL(0x30, 12, 1),
++};
++
++static const struct iproc_clk_ctrl genpll5_clk[] = {
++	[BCM_SR_GENPLL5_FS_CLK] = {
++		.channel = BCM_SR_GENPLL5_FS_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x4, 6, 0, 12),
++		.mdiv = REG_VAL(0x18, 0, 9),
++	},
++	[BCM_SR_GENPLL5_SPU_CLK] = {
++		.channel = BCM_SR_GENPLL5_SPU_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x4, 6, 0, 12),
++		.mdiv = REG_VAL(0x18, 10, 9),
++	},
++};
++
++static void __init sr_genpll5_clk_init(struct device_node *node)
++{
++	iproc_pll_clk_setup(node, &genpll5, NULL, 0, genpll5_clk,
++				ARRAY_SIZE(genpll5_clk));
++}
++
++static const struct iproc_pll_ctrl lcpll0 = {
++	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_NEEDS_SW_CFG,
++	.aon = AON_VAL(0x0, 2, 19, 18),
++	.reset = RESET_VAL(0x0, 31, 30),
++	.sw_ctrl = SW_CTRL_VAL(0x4, 31),
++	.ndiv_int = REG_VAL(0x4, 16, 10),
++	.pdiv = REG_VAL(0x4, 26, 4),
++	.status = REG_VAL(0x38, 12, 1),
++};
++
++static const struct iproc_clk_ctrl lcpll0_clk[] = {
++	[BCM_SR_LCPLL0_SATA_REF_CLK] = {
++		.channel = BCM_SR_LCPLL0_SATA_REF_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 7, 1, 13),
++		.mdiv = REG_VAL(0x14, 0, 9),
++	},
++	[BCM_SR_LCPLL0_USB_REF_CLK] = {
++		.channel = BCM_SR_LCPLL0_USB_REF_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 8, 2, 14),
++		.mdiv = REG_VAL(0x14, 10, 9),
++	},
++	[BCM_SR_LCPLL0_SATA_REFPN_CLK] = {
++		.channel = BCM_SR_LCPLL0_SATA_REFPN_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 9, 3, 15),
++		.mdiv = REG_VAL(0x14, 20, 9),
++	},
++};
++
++static void __init sr_lcpll0_clk_init(struct device_node *node)
++{
++	iproc_pll_clk_setup(node, &lcpll0, NULL, 0, lcpll0_clk,
++				ARRAY_SIZE(lcpll0_clk));
++}
++
++static const struct iproc_pll_ctrl lcpll1 = {
++	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_NEEDS_SW_CFG,
++	.aon = AON_VAL(0x0, 2, 22, 21),
++	.reset = RESET_VAL(0x0, 31, 30),
++	.sw_ctrl = SW_CTRL_VAL(0x4, 31),
++	.ndiv_int = REG_VAL(0x4, 16, 10),
++	.pdiv = REG_VAL(0x4, 26, 4),
++	.status = REG_VAL(0x38, 12, 1),
++};
++
++static const struct iproc_clk_ctrl lcpll1_clk[] = {
++	[BCM_SR_LCPLL1_WAN_CLK] = {
++		.channel = BCM_SR_LCPLL1_WAN_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 7, 1, 13),
++		.mdiv = REG_VAL(0x14, 0, 9),
++	},
++};
++
++static void __init sr_lcpll1_clk_init(struct device_node *node)
++{
++	iproc_pll_clk_setup(node, &lcpll1, NULL, 0, lcpll1_clk,
++				ARRAY_SIZE(lcpll1_clk));
++}
++
++static const struct iproc_pll_ctrl lcpll_pcie = {
++	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_NEEDS_SW_CFG,
++	.aon = AON_VAL(0x0, 2, 25, 24),
++	.reset = RESET_VAL(0x0, 31, 30),
++	.sw_ctrl = SW_CTRL_VAL(0x4, 31),
++	.ndiv_int = REG_VAL(0x4, 16, 10),
++	.pdiv = REG_VAL(0x4, 26, 4),
++	.status = REG_VAL(0x38, 12, 1),
++};
++
++static const struct iproc_clk_ctrl lcpll_pcie_clk[] = {
++	[BCM_SR_LCPLL_PCIE_PHY_REF_CLK] = {
++		.channel = BCM_SR_LCPLL_PCIE_PHY_REF_CLK,
++		.flags = IPROC_CLK_AON,
++		.enable = ENABLE_VAL(0x0, 7, 1, 13),
++		.mdiv = REG_VAL(0x14, 0, 9),
++	},
++};
++
++static void __init sr_lcpll_pcie_clk_init(struct device_node *node)
++{
++	iproc_pll_clk_setup(node, &lcpll_pcie, NULL, 0, lcpll_pcie_clk,
++		ARRAY_SIZE(lcpll_pcie_clk));
++}
++
++static const struct of_device_id sr_clk_dt_ids[] = {
++{ .compatible = "brcm,sr-genpll0", .data = sr_genpll0_clk_init, },
++{ .compatible = "brcm,sr-genpll4", .data = sr_genpll4_clk_init, },
++{ .compatible = "brcm,sr-genpll5", .data = sr_genpll5_clk_init, },
++{ .compatible = "brcm,sr-lcpll0", .data = sr_lcpll0_clk_init, },
++{ .compatible = "brcm,sr-lcpll1", .data = sr_lcpll1_clk_init, },
++{ .compatible = "brcm,sr-lcpll-pcie", .data = sr_lcpll_pcie_clk_init, },
++{ /* sentinel */ }
++};
++
++static int sr_clk_probe(struct platform_device *pdev)
++{
++	const struct of_device_id *device;
++	void (*init_func)(struct device_node *);
++
++	device = of_match_device(sr_clk_dt_ids, &pdev->dev);
++	if (!device)
++		return -ENODEV;
++	init_func = device->data;
++
++	init_func(pdev->dev.of_node);
++
++	return 0;
++}
++
++static struct platform_driver sr_clk_driver = {
++	.driver = {
++		.name = "sr-clk",
++		.of_match_table = sr_clk_dt_ids,
++	},
++	.probe = sr_clk_probe,
++};
++builtin_platform_driver(sr_clk_driver);
 -- 
 2.7.4
