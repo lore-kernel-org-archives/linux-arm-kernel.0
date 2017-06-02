@@ -1,137 +1,229 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri,  2 Jun 2017 16:23:16 +0200
-Subject: [PATCH v2 09/11] gpio: dt-bindings: Add documentation for gpio
- controllers on Armada 7K/8K
+Date: Fri,  2 Jun 2017 16:23:15 +0200
+Subject: [PATCH v2 08/11] arm64: dts: marvell: add pinctrl support for Armada
+ 7K/8K
 In-Reply-To: <cover.8fe5f7c62a787452878ca071fa00b953e96988ef.1496413293.git-series.gregory.clement@free-electrons.com>
 References: <cover.8fe5f7c62a787452878ca071fa00b953e96988ef.1496413293.git-series.gregory.clement@free-electrons.com>
-Message-ID: <7b92aabfb7309eb0b138c149cc3fc61e8f64cd61.1496413293.git-series.gregory.clement@free-electrons.com>
+Message-ID: <98e232650971a8f7166a59455540a8f2449e9ea8.1496413293.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the device tree binding for the gpio controllers found on the
-Marvell Armada 7K and Armada 8K SoCs.
+Enable pinctrl support for CP and AP on the Armada 7K/8K SoCs.
+
+The CP master being different between Armada 7k and Armada 8k. This
+commit introduces the intermediates files armada-70x0.dtsi and
+armada-80x0.dtsi.
+
+These new files will provide different compatible strings depending of
+the SoC family. They will also be the location for the pinmux
+configuration at the SoC level.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt  | 20 ++++++++++++++++++++
- Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt | 24 +++++++++++++++++++++++-
- Documentation/devicetree/bindings/gpio/gpio-mvebu.txt                      | 24 +++++++++++++++++-------
- 3 files changed, 60 insertions(+), 8 deletions(-)
+ arch/arm64/boot/dts/marvell/armada-7020.dtsi  |  2 +-
+ arch/arm64/boot/dts/marvell/armada-7040.dtsi  |  2 +-
+ arch/arm64/boot/dts/marvell/armada-70x0.dtsi  | 53 ++++++++++++++++++-
+ arch/arm64/boot/dts/marvell/armada-8020.dtsi  |  3 +-
+ arch/arm64/boot/dts/marvell/armada-8040.dtsi  |  3 +-
+ arch/arm64/boot/dts/marvell/armada-80x0.dtsi  | 60 ++++++++++++++++++++-
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi |  4 +-
+ 7 files changed, 121 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-70x0.dtsi
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-80x0.dtsi
 
-diff --git a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-index 4228d158fb31..0b887440e08a 100644
---- a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-+++ b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-@@ -64,6 +64,17 @@ mpp17	17	gpio
- mpp18	18	gpio
- mpp19	19	gpio, uart0(rxd), sdio(pw_off)
+diff --git a/arch/arm64/boot/dts/marvell/armada-7020.dtsi b/arch/arm64/boot/dts/marvell/armada-7020.dtsi
+index 975e73302753..4ab012991d9d 100644
+--- a/arch/arm64/boot/dts/marvell/armada-7020.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-7020.dtsi
+@@ -46,7 +46,7 @@
+  */
  
-+GPIO:
-+-----
-+For common binding part and usage, refer to
-+Documentation/devicetree/bindings/gpio/gpio-mvebu.txt.
+ #include "armada-ap806-dual.dtsi"
+-#include "armada-cp110-master.dtsi"
++#include "armada-70x0.dtsi"
+ 
+ / {
+ 	model = "Marvell Armada 7020";
+diff --git a/arch/arm64/boot/dts/marvell/armada-7040.dtsi b/arch/arm64/boot/dts/marvell/armada-7040.dtsi
+index 78d995d62707..cbe460b8fc00 100644
+--- a/arch/arm64/boot/dts/marvell/armada-7040.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-7040.dtsi
+@@ -46,7 +46,7 @@
+  */
+ 
+ #include "armada-ap806-quad.dtsi"
+-#include "armada-cp110-master.dtsi"
++#include "armada-70x0.dtsi"
+ 
+ / {
+ 	model = "Marvell Armada 7040";
+diff --git a/arch/arm64/boot/dts/marvell/armada-70x0.dtsi b/arch/arm64/boot/dts/marvell/armada-70x0.dtsi
+new file mode 100644
+index 000000000000..f6c22665d091
+--- /dev/null
++++ b/arch/arm64/boot/dts/marvell/armada-70x0.dtsi
+@@ -0,0 +1,53 @@
++/*
++ * Copyright (C) 2017 Marvell Technology Group Ltd.
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPLv2 or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-+Required properties:
++/*
++ * Device Tree file for the Armada 70x0 SoC
++ */
 +
-+- compatible: "marvell,armada-8k-gpio"
++#include "armada-cp110-master.dtsi"
 +
-+- offset: offset address inside the syscon block
-+
- Example:
- ap_syscon: system-controller at 6f4000 {
- 	compatible = "syscon", "simple-mfd";
-@@ -77,4 +88,13 @@ ap_syscon: system-controller at 6f4000 {
- 	ap_pinctrl: pinctrl {
- 		compatible = "marvell,ap806-pinctrl";
- 	};
-+
-+	ap_gpio: gpio {
-+		compatible = "marvell,armada-8k-gpio";
-+		offset = <0x1040>;
-+		ngpios = <19>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		gpio-ranges = <&ap_pinctrl 0 0 19>;
++&cpm_syscon0 {
++	cpm_pinctrl: pinctrl {
++		compatible = "marvell,armada-7k-pinctrl";
 +	};
- };
-diff --git a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
-index 733beac7724e..655c114ef584 100644
---- a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
-+++ b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
-@@ -149,6 +149,18 @@ mpp60	60	gpio, mss_gpio6, ptp(pulse), tdm(dtx), au(i2smclk), spi0(csn1), uart0(r
- mpp61	61	gpio, mss_gpio5, ptp(clk), tdm(pclk), au(i2sextclk), spi0(csn2), uart0(txd), uart2(txd), sata1(present_act), ge(mdio), sdio(d3)
- mpp62	62	gpio, mss_gpio4, synce1(clk), ptp(pclk_out), sata1(present_act), spi0(csn3), uart0(rxd), uart2(rxd), sata0(present_act), ge(mdc)
- 
-+GPIO:
-+-----
-+
-+For common binding part and usage, refer to
-+Documentation/devicetree/bindings/gpio/gpio-mvebu.txt.
-+
-+Required properties:
-+
-+- compatible: "marvell,armada-8k-gpio"
-+
-+- offset: offset address inside the syscon block
-+
- Example:
- 
- cpm_syscon0: system-controller at 440000 {
-@@ -163,5 +175,15 @@ cpm_syscon0: system-controller at 440000 {
- 	cpm_pinctrl: pinctrl {
- 		compatible = "marvell,armada-8k-cpm-pinctrl";
- 	};
--};
- 
-+	cpm_gpio1: gpio at 100 {
-+		compatible = "marvell,armada-8k-gpio";
-+		offset = <0x100>;
-+		ngpios = <32>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		gpio-ranges = <&cpm_pinctrl 0 0 32>;
-+		status = "disabled";
-+	};
-+
 +};
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt b/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
-index 42c3bb2d53e8..2c5304ff467c 100644
---- a/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
-+++ b/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
-@@ -2,17 +2,27 @@
+diff --git a/arch/arm64/boot/dts/marvell/armada-8020.dtsi b/arch/arm64/boot/dts/marvell/armada-8020.dtsi
+index 7c08f1f28d9e..0ba0bc942598 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8020.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-8020.dtsi
+@@ -46,8 +46,7 @@
+  */
  
- Required properties:
+ #include "armada-ap806-dual.dtsi"
+-#include "armada-cp110-master.dtsi"
+-#include "armada-cp110-slave.dtsi"
++#include "armada-80x0.dtsi"
  
--- compatible : Should be "marvell,orion-gpio", "marvell,mv78200-gpio"
--  or "marvell,armadaxp-gpio". "marvell,orion-gpio" should be used for
--  Orion, Kirkwood, Dove, Discovery (except MV78200) and Armada
--  370. "marvell,mv78200-gpio" should be used for the Discovery
--  MV78200. "marvel,armadaxp-gpio" should be used for all Armada XP
--  SoCs (MV78230, MV78260, MV78460).
-+- compatible : Should be "marvell,orion-gpio", "marvell,mv78200-gpio",
-+  "marvell,armadaxp-gpio" or "marvell,armada-8k-gpio".
+ / {
+ 	model = "Marvell Armada 8020";
+diff --git a/arch/arm64/boot/dts/marvell/armada-8040.dtsi b/arch/arm64/boot/dts/marvell/armada-8040.dtsi
+index 33813a75bc30..60fe84f5cbcc 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8040.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-8040.dtsi
+@@ -46,8 +46,7 @@
+  */
+ 
+ #include "armada-ap806-quad.dtsi"
+-#include "armada-cp110-master.dtsi"
+-#include "armada-cp110-slave.dtsi"
++#include "armada-80x0.dtsi"
+ 
+ / {
+ 	model = "Marvell Armada 8040";
+diff --git a/arch/arm64/boot/dts/marvell/armada-80x0.dtsi b/arch/arm64/boot/dts/marvell/armada-80x0.dtsi
+new file mode 100644
+index 000000000000..93d1de03b39a
+--- /dev/null
++++ b/arch/arm64/boot/dts/marvell/armada-80x0.dtsi
+@@ -0,0 +1,60 @@
++/*
++ * Copyright (C) 2017 Marvell Technology Group Ltd.
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPLv2 or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-+    "marvell,orion-gpio" should be used for Orion, Kirkwood, Dove,
-+    Discovery (except MV78200) and Armada 370. "marvell,mv78200-gpio"
-+    should be used for the Discovery MV78200.
++/*
++ * Device Tree file for the Armada 80x0 SoC family
++ */
 +
-+    "marvel,armadaxp-gpio" should be used for all Armada XP SoCs
-+    (MV78230, MV78260, MV78460).
++#include "armada-cp110-master.dtsi"
++#include "armada-cp110-slave.dtsi"
 +
-+    "marvell,armada-8k-gpio" should be used for the Armada 7K and 8K
-+    SoCs (either from AP or CP), see
-+    Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
-+    and
-+    Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-+    for specific details about the offset property.
- 
- - reg: Address and length of the register set for the device. Only one
-   entry is expected, except for the "marvell,armadaxp-gpio" variant
-   for which two entries are expected: one for the general registers,
--  one for the per-cpu registers.
-+  one for the per-cpu registers. Not used for marvell,armada-8k-gpio.
- 
- - interrupts: The list of interrupts that are used for all the pins
-   managed by this GPIO bank. There can be more than one interrupt
++&cpm_syscon0 {
++	cpm_pinctrl: pinctrl {
++		compatible = "marvell,armada-8k-cpm-pinctrl";
++	};
++};
++
++&cps_syscon0 {
++	cps_pinctrl: pinctrl {
++		compatible = "marvell,armada-8k-cps-pinctrl";
++	};
++};
+diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+index ff1964d314de..c6c30143eb29 100644
+--- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+@@ -252,6 +252,10 @@
+ 					compatible = "marvell,ap806-clock";
+ 					#clock-cells = <1>;
+ 				};
++
++				ap_pinctrl: pinctrl {
++					compatible = "marvell,ap806-pinctrl";
++				};
+ 			};
+ 		};
+ 	};
 -- 
 git-series 0.9.1
