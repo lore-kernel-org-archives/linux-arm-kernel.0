@@ -1,31 +1,20 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 1 Jun 2017 17:24:33 -0700
-Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.13
-In-Reply-To: <cover.1495455272.git.horms+renesas@verge.net.au>
-References: <cover.1495455272.git.horms+renesas@verge.net.au>
-Message-ID: <20170602002433.GK13314@localhost>
+Date: Thu, 1 Jun 2017 17:19:02 -0700
+Subject: [PATCH 0/2] ARCH_VULCAN removal
+In-Reply-To: <1495438565-82495-1-git-send-email-jnair@caviumnetworks.com>
+References: <1495438565-82495-1-git-send-email-jnair@caviumnetworks.com>
+Message-ID: <20170602001902.GJ13314@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 22, 2017 at 02:30:18PM +0200, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Mon, May 22, 2017 at 07:36:03AM +0000, Jayachandran C wrote:
+> Another couple of patches to remove more of ARCH_VULCAN platform.
 > 
-> Please consider these Renesas ARM based SoC DT updates for v4.13.
+> There is still a reference in drivers/gpio/Kconfig for ARCH_VULCAN.
+> I am sending a patch to remove that, and after that we can completely
+> remove ARCH_VULCAN.
 > 
-> This pull request is based on "Renesas ARM Based SoC DT Bindings Updates
-> for v4.13", dt-bindings-for-v4.13, which I have also sent a pull-request
-> for.
-> 
-> 
-> The following changes since commit 40c9bbea140e64a4257b794969e759c2c481c399:
-> 
->   ARM: dts: r7s72100: add USB bit definitions (2017-05-15 09:02:37 +0200)
-> 
-> are available in the git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-for-v4.13
 
-Merged into next/dt.
-
+Applied to next/arm64 for v4.13.
 
 -Olof
