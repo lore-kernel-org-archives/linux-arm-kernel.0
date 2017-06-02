@@ -1,80 +1,74 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Fri, 2 Jun 2017 15:28:51 +0800
-Subject: [PATCH] PCI: rockchip: Handle return value of clk_prepare_enable
-In-Reply-To: <4ebfc69644f9d6e9e5ff0cfc82e9efa5c476be0e.1496312348.git.arvind.yadav.cs@gmail.com>
-References: <4ebfc69644f9d6e9e5ff0cfc82e9efa5c476be0e.1496312348.git.arvind.yadav.cs@gmail.com>
-Message-ID: <f8e91d5f-77ea-6836-87b4-53b99544074d@rock-chips.com>
+From: andy.tang@nxp.com (Yuantian Tang)
+Date: Fri, 2 Jun 2017 15:23:03 +0800
+Subject: [PATCH] ahci: qoriq: add ls1088a platforms support
+Message-ID: <1496388183-11534-1-git-send-email-andy.tang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Ls1088a is new introduced arm-based soc with sata support with
+following features:
 
-? 2017/6/1 18:21, Arvind Yadav ??:
-> clk_prepare_enable() can fail here and we must check its return value.
-> 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+* Complies with the serial ATA 3.0 specification
+  and the AHCI 1.3.1 specification
+* Contains a high-speed descriptor-based DMA controller
+* Supports the following:
+* Speeds of 1.5 Gb/s (first-generation SATA),
+  3 Gb/s (second-generation SATA), and 6 Gb/s (third-generation SATA)
+* FIS-based switching
+* Native command queuing (NCQ) commands
+* Port multiplier operation
+* Asynchronous notification
+* SATA Vendor BIST mode
 
-Acked-by: Shawn Lin <shawn.lin@rock-chips.com>
+Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
+---
+ drivers/ata/ahci_qoriq.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-> ---
->   drivers/pci/host/pcie-rockchip.c | 34 ++++++++++++++++++++++++++++------
->   1 file changed, 28 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
-> index 0e020b6..0a248cd 100644
-> --- a/drivers/pci/host/pcie-rockchip.c
-> +++ b/drivers/pci/host/pcie-rockchip.c
-> @@ -1259,24 +1259,46 @@ static int __maybe_unused rockchip_pcie_resume_noirq(struct device *dev)
->   	struct rockchip_pcie *rockchip = dev_get_drvdata(dev);
->   	int err;
->   
-> -	clk_prepare_enable(rockchip->clk_pcie_pm);
-> -	clk_prepare_enable(rockchip->hclk_pcie);
-> -	clk_prepare_enable(rockchip->aclk_perf_pcie);
-> -	clk_prepare_enable(rockchip->aclk_pcie);
-> +	err = clk_prepare_enable(rockchip->clk_pcie_pm);
-> +	if (err)
-> +		goto err_pcie_pm;
-> +
-> +	err = clk_prepare_enable(rockchip->hclk_pcie);
-> +	if (err)
-> +		goto err_hclk_pcie;
-> +
-> +	err = clk_prepare_enable(rockchip->aclk_perf_pcie);
-> +	if (err)
-> +		goto err_aclk_perf_pcie;
-> +
-> +	err = clk_prepare_enable(rockchip->aclk_pcie);
-> +	if (err)
-> +		goto err_aclk_pcie;
->   
->   	err = rockchip_pcie_init_port(rockchip);
->   	if (err)
-> -		return err;
-> +		goto err_pcie_resume;
->   
->   	err = rockchip_cfg_atu(rockchip);
->   	if (err)
-> -		return err;
-> +		goto err_pcie_resume;
->   
->   	/* Need this to enter L1 again */
->   	rockchip_pcie_update_txcredit_mui(rockchip);
->   	rockchip_pcie_enable_interrupts(rockchip);
->   
->   	return 0;
-> +
-> +err_pcie_resume:
-> +	clk_disable_unprepare(rockchip->aclk_pcie);
-> +err_aclk_pcie:
-> +	clk_disable_unprepare(rockchip->aclk_perf_pcie);
-> +err_aclk_perf_pcie:
-> +	clk_disable_unprepare(rockchip->hclk_pcie);
-> +err_hclk_pcie:
-> +	clk_disable_unprepare(rockchip->clk_pcie_pm);
-> +err_pcie_pm:
-> +	return err;
->   }
->   
->   static int rockchip_pcie_probe(struct platform_device *pdev)
-> 
+diff --git a/drivers/ata/ahci_qoriq.c b/drivers/ata/ahci_qoriq.c
+index 4c96f3a..b6b0bf7 100644
+--- a/drivers/ata/ahci_qoriq.c
++++ b/drivers/ata/ahci_qoriq.c
+@@ -47,12 +47,14 @@
+ 
+ #define SATA_ECC_DISABLE	0x00020000
+ #define ECC_DIS_ARMV8_CH2	0x80000000
++#define ECC_DIS_LS1088A		0x40000000
+ 
+ enum ahci_qoriq_type {
+ 	AHCI_LS1021A,
+ 	AHCI_LS1043A,
+ 	AHCI_LS2080A,
+ 	AHCI_LS1046A,
++	AHCI_LS1088A,
+ 	AHCI_LS2088A,
+ };
+ 
+@@ -68,6 +70,7 @@ static const struct of_device_id ahci_qoriq_of_match[] = {
+ 	{ .compatible = "fsl,ls1043a-ahci", .data = (void *)AHCI_LS1043A},
+ 	{ .compatible = "fsl,ls2080a-ahci", .data = (void *)AHCI_LS2080A},
+ 	{ .compatible = "fsl,ls1046a-ahci", .data = (void *)AHCI_LS1046A},
++	{ .compatible = "fsl,ls1088a-ahci", .data = (void *)AHCI_LS1088A},
+ 	{ .compatible = "fsl,ls2088a-ahci", .data = (void *)AHCI_LS2088A},
+ 	{},
+ };
+@@ -203,6 +206,17 @@ static int ahci_qoriq_phy_init(struct ahci_host_priv *hpriv)
+ 			writel(AHCI_PORT_AXICC_CFG, reg_base + PORT_AXICC);
+ 		break;
+ 
++	case AHCI_LS1088A:
++		if (!qpriv->ecc_addr)
++			return -EINVAL;
++		writel(readl(qpriv->ecc_addr) | ECC_DIS_LS1088A,
++		       qpriv->ecc_addr);
++		writel(AHCI_PORT_PHY_1_CFG, reg_base + PORT_PHY1);
++		writel(AHCI_PORT_TRANS_CFG, reg_base + PORT_TRANS);
++		if (qpriv->is_dmacoherent)
++			writel(AHCI_PORT_AXICC_CFG, reg_base + PORT_AXICC);
++		break;
++
+ 	case AHCI_LS2088A:
+ 		writel(AHCI_PORT_PHY_1_CFG, reg_base + PORT_PHY1);
+ 		writel(AHCI_PORT_TRANS_CFG, reg_base + PORT_TRANS);
+-- 
+2.1.0.27.g96db324
