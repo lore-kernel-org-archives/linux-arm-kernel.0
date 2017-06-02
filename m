@@ -1,61 +1,75 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 2 Jun 2017 15:07:48 +0200
-Subject: [GIT PULL] ARM: realtek: arm64 for v4.12
-In-Reply-To: <45e8f92d-0680-2983-067f-39adecf7503f@suse.de>
-References: <20170525120404.32034-1-afaerber@suse.de>
- <20170602002831.GO13314@localhost>
- <45e8f92d-0680-2983-067f-39adecf7503f@suse.de>
-Message-ID: <CAK8P3a2_RGZ14csNEhitsSoqFbj7UJjGbPELbpMdjpYJm4vrpQ@mail.gmail.com>
+Date: Fri, 2 Jun 2017 15:12:48 +0200
+Subject: [RFC/RFT PATCH 08/18] PCI: designware: Convert PCI scan API to
+ pci_scan_root_bus_bridge()
+In-Reply-To: <20170602114956.GA20004@red-moon>
+References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
+ <20170426111809.19922-9-lorenzo.pieralisi@arm.com>
+ <CAK8P3a1ULYxkopxJ8-vZpFs_uPP2gu5TsRWjCKUOW+0QRombLw@mail.gmail.com>
+ <20170602114956.GA20004@red-moon>
+Message-ID: <CAK8P3a0DRFxz_yjCeFZJ8Zukuy8gi9hPbWEfp29TaF2TMjrnTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 2, 2017 at 2:32 PM, Andreas F?rber <afaerber@suse.de> wrote:
-> Hi Olof,
->
-> Am 02.06.2017 um 02:28 schrieb Olof Johansson:
->> On Thu, May 25, 2017 at 02:04:03PM +0200, Andreas F??rber wrote:
->>> Hi Arnd and Olof,
->>>
->>> This is the initial arm64 pull for Realtek.
->>>
->>> Regards,
->>> Andreas
->>>
->>> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
->>>
->>>   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
->>>
->>> are available in the git repository at:
->>>
->>>   git://github.com/afaerber/linux.git tags/realtek-arm64-soc-for-4.12
+On Fri, Jun 2, 2017 at 1:49 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Fri, Apr 28, 2017 at 03:13:04PM +0200, Arnd Bergmann wrote:
+>> On Wed, Apr 26, 2017 at 1:17 PM, Lorenzo Pieralisi
+>> <lorenzo.pieralisi@arm.com> wrote:
+>> > The introduction of pci_scan_root_bus_bridge() provides a PCI core
+>> > API to scan a PCI root bus backed by an already initialized
+>> > struct pci_host_bridge object, which simplifies the bus scan
+>> > interface and makes the PCI scan root bus interface easier to
+>> > generalize as members are added to the struct pci_host_bridge().
+>> >
+>> > Convert PCI designware host code to pci_scan_root_bus_bridge() to
+>> > improve the PCI root bus scanning interface.
+>> >
+>> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> > Cc: Jingoo Han <jingoohan1@gmail.com>
+>> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+>> > Cc: Joao Pinto <Joao.Pinto@synopsys.com>
+>> > ---
+>> >  drivers/pci/dwc/pcie-designware-host.c | 36 +++++++++++++++++++++-------------
+>> >  1 file changed, 22 insertions(+), 14 deletions(-)
+>> >
+>> > diff --git a/drivers/pci/dwc/pcie-designware-host.c b/drivers/pci/dwc/pcie-designware-host.c
+>> > index 5ba3349..e43c21a 100644
+>> > --- a/drivers/pci/dwc/pcie-designware-host.c
+>> > +++ b/drivers/pci/dwc/pcie-designware-host.c
+>> > @@ -294,16 +294,21 @@ int dw_pcie_host_init(struct pcie_port *pp)
+>> >                 dev_err(dev, "missing *config* reg space\n");
+>> >         }
+>> >
+>> > -       ret = of_pci_get_host_bridge_resources(np, 0, 0xff, &res, &pp->io_base);
+>> > +       bridge = pci_alloc_host_bridge(0);
+>> > +       if (!bridge)
+>> > +               return  -ENOMEM;
+>> > +
 >>
->> This is v4.13 material at this point, so I've merged it into next/arm64 for
->> the next merge window (v4.13). Thanks!
+>> I think here we warn to have the pci_alloc_host_bridge() called in the
+>> individual
+>> drivers, to have them allocate the dw_pcie structure as part of the host
+>> bridge allocation, before calling hisi_add_pcie_port().
 >
-> Arnd had told me to rebase onto v4.12-rc1 (from v4.11-rc1) but to not
-> wait for the 4.13 merge window. Therefore I submitted it for 4.12.
-> Miscommunication? Either way works for me.
+> I am almost done refactoring this series and this is the last review to
+> address. What you suggest above makes sense but:
+>
+> 1) it means patching ALL dw_pcie_host_init() callers and allocate the
+>    host bridge there, not sure it simplifies, certainly it complicates
+>    the error handling path (given that the host bridge memory is
+>    probably the only memory that is allocated with kzalloc instead of
+>    devm interface so it needs unwinding)
+>
+> 2) I noticed that allocating the host bridge in the caller complicates
+>    error handling, in particular code in the mainline (ie tegra and
+>    ftpci100) using pci_alloc_host_bridge() needs already patching since it
+>    may leak memory if PCI host bridge drivers probing fails.
+>
+> I can implement (1) and (2) but I wanted to ask first to understand if
+> that's the direction we want to take.
 
-To clarify: by "4.13 merge window", I meant the time when we send pull
-requests to Linus, i.e. the two weeks between the 4.12 release and
-4.13-rc1.
+Good question. Maybe we should add a devm_pci_alloc_host_bridge()
+instead? Would that solve these problems without creating bigger ones?
 
-Since you want the pull request to be part of 4.13, you need to send it
-between 4.12-rc1 and 4.13 (ideally early during that time frame), and
-have it based on 4.12-rc1. The patches were based on 4.11-rc before,
-so I recommended rebasing to reduce the gap between the base
-and the merge commit.
-
-Does it make sense now?
-
-> Now that you have merged ARCH_REALTEK here, should we update the arm64
-> defconfig to enable it? I just verified on arm-soc.git for-next that's
-> it's disabled by default; the only other disabled ones are ARCH_BRCMSTB
-> and to-be-dropped ARCH_VULCAN. Question is, should it be useful to users
-> before we do so, or is build-testing enough of a reason?
-
-I'd leave that up to you. Send a patch or pull request when you think it should
-be enabled. I'd tend to having it only enabled when it at least boots on some
-hardware, but we haven't had strong rules about that so far.
-
-      Arnd
+        Arnd
