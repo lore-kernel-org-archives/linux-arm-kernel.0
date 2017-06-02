@@ -1,55 +1,53 @@
 From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Fri,  2 Jun 2017 13:30:48 -0700
-Subject: [PATCH v12 2/6] doc: dt: document altera-passive-serial binding
+Date: Fri,  2 Jun 2017 13:30:50 -0700
+Subject: [PATCH v12 4/6] ARM: dts: imx6q-evi: support altera-ps-spi
 In-Reply-To: <684ea151ba9aa2c6555a299daf56552ddc11f596.1496434383.git.stillcompiling@gmail.com>
 References: <684ea151ba9aa2c6555a299daf56552ddc11f596.1496434383.git.stillcompiling@gmail.com>
-Message-ID: <4945d90535e701e4e0207c08a7543a7623b94aeb.1496434383.git.stillcompiling@gmail.com>
+Message-ID: <8253d3ad7de8ba991de9f23fd68b8f9502c1ffe0.1496434383.git.stillcompiling@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe an altera-passive-serial devicetree entry, required features
+Add support for Altera FPGA connected to an spi port
+to the evi devicetree file
 
 Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../bindings/fpga/altera-passive-serial.txt        | 29 ++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/fpga/altera-passive-serial.txt
+ arch/arm/boot/dts/imx6q-evi.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/fpga/altera-passive-serial.txt b/Documentation/devicetree/bindings/fpga/altera-passive-serial.txt
-new file mode 100644
-index 000000000000..48478bc07e29
---- /dev/null
-+++ b/Documentation/devicetree/bindings/fpga/altera-passive-serial.txt
-@@ -0,0 +1,29 @@
-+Altera Passive Serial SPI FPGA Manager
+diff --git a/arch/arm/boot/dts/imx6q-evi.dts b/arch/arm/boot/dts/imx6q-evi.dts
+index 24fe093a66db..59aebbc95671 100644
+--- a/arch/arm/boot/dts/imx6q-evi.dts
++++ b/arch/arm/boot/dts/imx6q-evi.dts
+@@ -82,6 +82,15 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_ecspi1 &pinctrl_ecspi1cs>;
+ 	status = "okay";
 +
-+Altera FPGAs support a method of loading the bitstream over what is
-+referred to as "passive serial".
-+The passive serial link is not technically SPI, and might require extra
-+circuits in order to play nicely with other SPI slaves on the same bus.
-+
-+See https://www.altera.com/literature/hb/cyc/cyc_c51013.pdf
-+
-+Required properties:
-+- compatible: Must be one of the following:
-+	"altr,fpga-passive-serial",
-+	"altr,fpga-arria10-passive-serial"
-+- reg: SPI chip select of the FPGA
-+- nconfig-gpios: config pin (referred to as nCONFIG in the manual)
-+- nstat-gpios: status pin (referred to as nSTATUS in the manual)
-+
-+Optional properties:
-+- confd-gpios: confd pin (referred to as CONF_DONE in the manual)
-+
-+Example:
 +	fpga: fpga at 0 {
 +		compatible = "altr,fpga-passive-serial";
 +		spi-max-frequency = <20000000>;
 +		reg = <0>;
++		pinctrl-0 = <&pinctrl_fpgaspi>;
 +		nconfig-gpios = <&gpio4 9 GPIO_ACTIVE_LOW>;
 +		nstat-gpios = <&gpio4 11 GPIO_ACTIVE_LOW>;
-+		confd-gpios = <&gpio4 12 GPIO_ACTIVE_LOW>;
 +	};
+ };
+ 
+ &ecspi3 {
+@@ -313,6 +322,13 @@
+ 		>;
+ 	};
+ 
++	pinctrl_fpgaspi: fpgaspigrp {
++		fsl,pins = <
++			MX6QDL_PAD_KEY_ROW1__GPIO4_IO09 0x1b0b0
++			MX6QDL_PAD_KEY_ROW2__GPIO4_IO11 0x1b0b0
++		>;
++	};
++
+ 	pinctrl_gpminand: gpminandgrp {
+ 		fsl,pins = <
+ 			MX6QDL_PAD_NANDF_CLE__NAND_CLE 0xb0b1
 -- 
 2.11.0
