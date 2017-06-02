@@ -1,250 +1,146 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  2 Jun 2017 12:06:54 +0200
-Subject: [PATCH v2 3/6] irqchip: irq-mvebu-gicp: new driver for Marvell GICP
-In-Reply-To: <1496398017-6487-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1496398017-6487-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1496398017-6487-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Fri,  2 Jun 2017 12:06:51 +0200
+Subject: [PATCH v2 0/6] Add support for the ICU unit in Marvell Armada 7K/8K
+Message-ID: <1496398017-6487-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds a simple driver for the Marvell GICP, a hardware unit
-that converts memory writes into GIC SPI interrupts. The driver provides
-a number of functions to the ICU driver to allocate GICP interrupts, and
-get the physical addresses that the ICUs should write to to set/clear
-interrupts.
+Hello,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/irqchip/Kconfig          |   3 +
- drivers/irqchip/Makefile         |   1 +
- drivers/irqchip/irq-mvebu-gicp.c | 170 +++++++++++++++++++++++++++++++++++++++
- drivers/irqchip/irq-mvebu-gicp.h |  15 ++++
- 4 files changed, 189 insertions(+)
+The Marvell Armada 7K/8K SoCs are composed of two parts: the AP (which
+contains the CPU cores) and the CP (which contains most
+peripherals). The 7K SoCs have one CP, while the 8K SoCs have two CPs,
+doubling the number of available peripherals.
+
+In terms of interrupt handling, all devices in the CPs are connected
+through wired interrupt to a unit called ICU located in each CP. This
+unit converts the wired interrupts from the devices into memory
+transactions.
+
+Inside the AP, there is a GIC extension called GICP, which allows a
+memory write transaction to trigger a GIC SPI interrupt. The ICUs in
+each CP are therefore configured to trigger a memory write into the
+appropriate GICP register so that a wired interrupt from a CP device
+is converted into a memory write, itself converted into a regular GIC
+SPI interrupt.
+
+Until now, the configuration of the ICU was done statically by the
+firmware, and therefore the Device Tree files in Linux were specifying
+directly GIC interrupts for the interrupts of CP devices. However,
+with the growing number of devices in the CP, a static allocation
+scheme doesn't work for the long term.
+
+This patch series therefore makes Linux aware of the ICU: GIC SPI
+interrupts are dynamically allocated, and the ICU is configured
+accordingly to route a CP wired interrupt to the allocated GIC SPI
+interrupt.
+
+In detail:
+
+ - The first two patches are the Device Tree binding patches
+
+ - The third patch is a minimal driver for the GICP unit, which simply
+   allows to allocate GICP interrupts.
+
+ - The fourth patch is the most important done, which adds the driver
+   for the ICU itself.
+
+ - The fifth patch adjust Kconfig.platforms to select the GICP and ICU
+   drivers.
+
+ - The last patch adjusts the Device Tree files of the Armada 7K/8K to
+   use the ICU.
+
+Changes since v1:
+
+ - Fix the #interrupt-cells value in the ICU DT binding
+   example. Pointed by Marc Zyngier.
+
+ - Add details about the possible group types in the ICU DT binding
+   documentation, as requested by Marc Zyngier. This allowed to
+   discover that the list of types listed was not matching the macros
+   provided in <dt-bindings/interrupt-controller/mvebu-icu.h>, so this
+   was fixed as well.
+
+ - Changed the "gicp" property of the ICU to "marvell,gicp", as
+   suggested by Marc Zyngier.
+
+ - Add a marvell,spi-ranges property to the gicp node, which defines
+   which ranges of GIC SPI interrupts are available for us by the
+   GICP.
+
+ - Move more GICP logic into the gicp driver. Indeed, it was confusing
+   to have in the ICU driver some global logic mixed with per-ICU
+   logic: there is only one GICP per system, but one ICU per CP (so in
+   an Armada 8K we have one GICP but two ICUs). So it makes more sense
+   to handle the GICP aspects in one driver (which has only one
+   device) and the ICU aspects in another driver (which has one device
+   per ICU).
+
+ - Use writel_relaxed() as suggested by Marc Zyngier.
+
+ - Use irq_set_irqchip_state() in the ICU driver to clear any pending
+   interrupt when allocating an interrupt. This ensures we don't get
+   bothered by an interrupt left pending by the firmware. This
+   replaces a more manual pending interrupt clearing done in the GICP
+   driver, which wasn't suitable for edge triggered
+   interrupts. Suggested by Marc Zyngier.
+
+ - Use devm_kstrdup() instead of kstrdup() to fix a potential memory
+   leak in the error path of ICU's ->probe() function. Noticed by Marc
+   Zyngier.
+
+ - Change compatible strings from "marvell,gicp" to
+   "marvell,ap806-gicp" and "marvell,icu" to "marvell,cp110-icu", as
+   future versions of those IP blocks may be different. Suggested by
+   Yehuda Yitschak.
+
+ - Use a shorter name for the irqchip domain, suggested by Gr?gory
+   Clement.
+
+ - Rename ICU_{SATA0,SATA1}_IRQ_INT to ICU_{SATA0,SATA1}_ICU_ID to
+   clarify we're talking about ICU identifiers and not interrupt
+   numbers. Suggested by Yehuda Yitschak.
+
+ - Fix bogus message when checking the ICU group type, make sure the
+   message says "wrong ICU group type" and not "wrong ICU
+   type". Suggested by Yehuda Yitschak.
+
+ - Add a check that the ICU identifier used in the DT is not higher
+   than ICU_MAX_IRQS. Suggested by Yehuda Yitschak.
+
+Best regards,
+
+Thomas
+
+
+Thomas Petazzoni (6):
+  dt-bindings: interrupt-controller: add DT binding for the Marvell GICP
+  dt-bindings: interrupt-controller: add DT binding for the Marvell ICU
+  irqchip: irq-mvebu-gicp: new driver for Marvell GICP
+  irqchip: irq-mvebu-icu: new driver for Marvell ICU
+  arm64: marvell: enable ICU and GICP drivers
+  arm64: dts: marvell: enable GICP and ICU on Armada 7K/8K
+
+ .../bindings/interrupt-controller/marvell,gicp.txt |  24 ++
+ .../bindings/interrupt-controller/marvell,icu.txt  |  54 ++++
+ arch/arm64/Kconfig.platforms                       |   2 +
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi      |   6 +
+ .../boot/dts/marvell/armada-cp110-master.dtsi      |  60 ++--
+ .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi |  54 ++--
+ drivers/irqchip/Kconfig                            |   6 +
+ drivers/irqchip/Makefile                           |   2 +
+ drivers/irqchip/irq-mvebu-gicp.c                   | 170 ++++++++++
+ drivers/irqchip/irq-mvebu-gicp.h                   |  15 +
+ drivers/irqchip/irq-mvebu-icu.c                    | 346 +++++++++++++++++++++
+ .../dt-bindings/interrupt-controller/mvebu-icu.h   |  15 +
+ 12 files changed, 706 insertions(+), 48 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,gicp.txt
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
  create mode 100644 drivers/irqchip/irq-mvebu-gicp.c
  create mode 100644 drivers/irqchip/irq-mvebu-gicp.h
+ create mode 100644 drivers/irqchip/irq-mvebu-icu.c
+ create mode 100644 include/dt-bindings/interrupt-controller/mvebu-icu.h
 
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index 478f8ac..e527ee5 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -268,6 +268,9 @@ config IRQ_MXS
- 	select IRQ_DOMAIN
- 	select STMP_DEVICE
- 
-+config MVEBU_GICP
-+	bool
-+
- config MVEBU_ODMI
- 	bool
- 	select GENERIC_MSI_IRQ_DOMAIN
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index b64c59b..11eb858 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -69,6 +69,7 @@ obj-$(CONFIG_ARCH_SA1100)		+= irq-sa11x0.o
- obj-$(CONFIG_INGENIC_IRQ)		+= irq-ingenic.o
- obj-$(CONFIG_IMX_GPCV2)			+= irq-imx-gpcv2.o
- obj-$(CONFIG_PIC32_EVIC)		+= irq-pic32-evic.o
-+obj-$(CONFIG_MVEBU_GICP)		+= irq-mvebu-gicp.o
- obj-$(CONFIG_MVEBU_ODMI)		+= irq-mvebu-odmi.o
- obj-$(CONFIG_MVEBU_PIC)			+= irq-mvebu-pic.o
- obj-$(CONFIG_LS_SCFG_MSI)		+= irq-ls-scfg-msi.o
-diff --git a/drivers/irqchip/irq-mvebu-gicp.c b/drivers/irqchip/irq-mvebu-gicp.c
-new file mode 100644
-index 0000000..73c0117
---- /dev/null
-+++ b/drivers/irqchip/irq-mvebu-gicp.c
-@@ -0,0 +1,170 @@
-+/*
-+ * Copyright (C) 2017 Marvell
-+ *
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+
-+#include "irq-mvebu-gicp.h"
-+
-+#define GICP_SETSPI_NSR_OFFSET	0x0
-+#define GICP_CLRSPI_NSR_OFFSET	0x8
-+
-+struct mvebu_gicp_spi_range {
-+	unsigned int start;
-+	unsigned int count;
-+};
-+
-+struct mvebu_gicp {
-+	struct mvebu_gicp_spi_range *spi_ranges;
-+	unsigned int spi_ranges_cnt;
-+	unsigned int spi_cnt;
-+	unsigned long *spi_bitmap;
-+	spinlock_t spi_lock;
-+	struct resource *res;
-+};
-+
-+int mvebu_gicp_alloc(struct mvebu_gicp *gicp)
-+{
-+	int idx;
-+
-+	spin_lock(&gicp->spi_lock);
-+	idx = find_first_zero_bit(gicp->spi_bitmap, gicp->spi_cnt);
-+	if (idx == gicp->spi_cnt) {
-+		spin_unlock(&gicp->spi_lock);
-+		return -ENOSPC;
-+	}
-+	set_bit(idx, gicp->spi_bitmap);
-+	spin_unlock(&gicp->spi_lock);
-+
-+	return idx;
-+}
-+
-+void mvebu_gicp_free(struct mvebu_gicp *gicp, int idx)
-+{
-+	spin_lock(&gicp->spi_lock);
-+	clear_bit(idx, gicp->spi_bitmap);
-+	spin_unlock(&gicp->spi_lock);
-+}
-+
-+int mvebu_gicp_idx_to_spi(struct mvebu_gicp *gicp, int idx)
-+{
-+	int i;
-+
-+	for (i = 0; i < gicp->spi_ranges_cnt; i++) {
-+		struct mvebu_gicp_spi_range *r = &gicp->spi_ranges[i];
-+
-+		if (idx < r->count)
-+			return r->start + idx;
-+
-+		idx -= r->count;
-+	}
-+
-+	return -EINVAL;
-+}
-+
-+int mvebu_gicp_spi_to_idx(struct mvebu_gicp *gicp, int spi)
-+{
-+	int i;
-+	int idx = 0;
-+
-+	for (i = 0; i < gicp->spi_ranges_cnt; i++) {
-+		struct mvebu_gicp_spi_range *r = &gicp->spi_ranges[i];
-+
-+		if (spi >= r->start && spi < (r->start + r->count))
-+			return idx + (spi - r->start);
-+
-+		idx += r->count;
-+	}
-+
-+	return -EINVAL;
-+}
-+
-+int mvebu_gicp_spi_count(struct mvebu_gicp *gicp)
-+{
-+	return gicp->spi_cnt;
-+}
-+
-+phys_addr_t mvebu_gicp_setspi_phys_addr(struct mvebu_gicp *gicp)
-+{
-+	return gicp->res->start + GICP_SETSPI_NSR_OFFSET;
-+}
-+
-+phys_addr_t mvebu_gicp_clrspi_phys_addr(struct mvebu_gicp *gicp)
-+{
-+	return gicp->res->start + GICP_CLRSPI_NSR_OFFSET;
-+}
-+
-+static int mvebu_gicp_probe(struct platform_device *pdev)
-+{
-+	struct mvebu_gicp *gicp;
-+	int ret, i;
-+
-+	gicp = devm_kzalloc(&pdev->dev, sizeof(*gicp), GFP_KERNEL);
-+	if (!gicp)
-+		return -ENOMEM;
-+
-+	gicp->res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!gicp->res)
-+		return -ENODEV;
-+
-+	ret = of_property_count_u32_elems(pdev->dev.of_node,
-+					  "marvell,spi-ranges");
-+	if (ret < 0)
-+		return ret;
-+
-+	gicp->spi_ranges_cnt = ret / 2;
-+
-+	gicp->spi_ranges =
-+		devm_kzalloc(&pdev->dev,
-+			     gicp->spi_ranges_cnt *
-+			     sizeof(struct mvebu_gicp_spi_range),
-+			     GFP_KERNEL);
-+	if (!gicp->spi_ranges)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < gicp->spi_ranges_cnt; i++) {
-+		of_property_read_u32_index(pdev->dev.of_node,
-+					   "marvell,spi-ranges",
-+					   i * 2,
-+					   &gicp->spi_ranges[i].start);
-+
-+		of_property_read_u32_index(pdev->dev.of_node,
-+					   "marvell,spi-ranges",
-+					   i * 2 + 1,
-+					   &gicp->spi_ranges[i].count);
-+
-+		gicp->spi_cnt += gicp->spi_ranges[i].count;
-+	}
-+
-+	gicp->spi_bitmap = devm_kzalloc(&pdev->dev,
-+					BITS_TO_LONGS(gicp->spi_cnt),
-+					GFP_KERNEL);
-+	if (!gicp->spi_bitmap)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, gicp);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id mvebu_gicp_of_match[] = {
-+	{ .compatible = "marvell,ap806-gicp", },
-+	{},
-+};
-+
-+static struct platform_driver mvebu_gicp_driver = {
-+	.probe  = mvebu_gicp_probe,
-+	.driver = {
-+		.name = "mvebu-gicp",
-+		.of_match_table = mvebu_gicp_of_match,
-+	},
-+};
-+builtin_platform_driver(mvebu_gicp_driver);
-diff --git a/drivers/irqchip/irq-mvebu-gicp.h b/drivers/irqchip/irq-mvebu-gicp.h
-new file mode 100644
-index 0000000..7290166
---- /dev/null
-+++ b/drivers/irqchip/irq-mvebu-gicp.h
-@@ -0,0 +1,15 @@
-+#ifndef __MVEBU_GICP_H__
-+#define __MVEBU_GICP_H__
-+
-+struct mvebu_gicp;
-+
-+int mvebu_gicp_alloc(struct mvebu_gicp *gicp);
-+void mvebu_gicp_free(struct mvebu_gicp *gicp, int idx);
-+int mvebu_gicp_idx_to_spi(struct mvebu_gicp *gicp, int idx);
-+int mvebu_gicp_spi_to_idx(struct mvebu_gicp *gicp, int spi);
-+phys_addr_t mvebu_gicp_setspi_phys_addr(struct mvebu_gicp *gicp);
-+phys_addr_t mvebu_gicp_clrspi_phys_addr(struct mvebu_gicp *gicp);
-+int mvebu_gicp_spi_count(struct mvebu_gicp *gicp);
-+
-+#endif /* __MVEBU_GICP_H__ */
-+
 -- 
 2.7.4
