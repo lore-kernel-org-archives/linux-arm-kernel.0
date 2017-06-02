@@ -1,96 +1,35 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 2 Jun 2017 15:10:52 -0700
-Subject: [PATCH v6 03/11] clk: bcm: Add clocks for Stingray SOC
-In-Reply-To: <1496385275-6899-4-git-send-email-anup.patel@broadcom.com>
-References: <1496385275-6899-1-git-send-email-anup.patel@broadcom.com>
- <1496385275-6899-4-git-send-email-anup.patel@broadcom.com>
-Message-ID: <20170602221052.GT20170@codeaurora.org>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 2 Jun 2017 16:16:59 -0600
+Subject: Vexpress TC2 no longer booting on v4.12-rc1
+Message-ID: <CANLsYkz3dcVArStN2GJguYfJbWc_4dC4vvTE1KVtYpVWipEYjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02, Anup Patel wrote:
-> diff --git a/drivers/clk/bcm/clk-sr.c b/drivers/clk/bcm/clk-sr.c
-> new file mode 100644
-> index 0000000..342f702
-> --- /dev/null
-> +++ b/drivers/clk/bcm/clk-sr.c
-> @@ -0,0 +1,320 @@
-> +
-> +static const struct iproc_clk_ctrl lcpll_pcie_clk[] = {
-> +	[BCM_SR_LCPLL_PCIE_PHY_REF_CLK] = {
-> +		.channel = BCM_SR_LCPLL_PCIE_PHY_REF_CLK,
-> +		.flags = IPROC_CLK_AON,
-> +		.enable = ENABLE_VAL(0x0, 7, 1, 13),
-> +		.mdiv = REG_VAL(0x14, 0, 9),
-> +	},
-> +};
-> +
-> +static void __init sr_lcpll_pcie_clk_init(struct device_node *node)
+Good afternoon Russell and friends,
 
-Drop __init usage throughout this patch please.
+I noticed that my vexpress-TC2 platform stopped booting when moving to
+kernel v4.12-rc1 (same with -rc2 and 3).  The last time things worked
+properly was on v4.11.  I did a bisect between v4.11 and v4.12-rc1 and
+ended up on [1], hence this email.
 
-> +{
-> +	iproc_pll_clk_setup(node, &lcpll_pcie, NULL, 0, lcpll_pcie_clk,
-> +		ARRAY_SIZE(lcpll_pcie_clk));
-> +}
-> +
-> +static const struct of_device_id sr_clk_dt_ids[] = {
-> +{ .compatible = "brcm,sr-genpll0", .data = sr_genpll0_clk_init, },
-> +{ .compatible = "brcm,sr-genpll4", .data = sr_genpll4_clk_init, },
-> +{ .compatible = "brcm,sr-genpll5", .data = sr_genpll5_clk_init, },
-> +{ .compatible = "brcm,sr-lcpll0", .data = sr_lcpll0_clk_init, },
-> +{ .compatible = "brcm,sr-lcpll1", .data = sr_lcpll1_clk_init, },
-> +{ .compatible = "brcm,sr-lcpll-pcie", .data = sr_lcpll_pcie_clk_init, },
-> +{ /* sentinel */ }
+Since CONFIG_ARM_VIRT_EXT is selected by  default I removed the
+"#ifdef CONFIG_ARM_VIRT_EXT" section in the last hunk of the patch and
+the system sprung up to life again.
 
-Please tab these out properly And also leave off the , after the
-init function.
+Compiler: arm-linux-gnueabi-gcc (Ubuntu/Linaro 5.4.0-6ubuntu1~16.04.4)
+5.4.0 20160609
+Kernel command line: console=ttyAMA0,38400 loglevel=8 root=/dev/sda2 rootwait
+U-boot:
+ ## Flattened Device Tree blob at 82000000
+   Booting using the fdt blob at 0x82000000
+   Loading Ramdisk to 9fcea000, end 9feea6d1 ... OK
+   Loading Device Tree to 9fce2000, end 9fce9ad8 ... OK
 
-> +};
-> +
-> +static int sr_clk_probe(struct platform_device *pdev)
-> +{
-> +	const struct of_device_id *device;
-> +	void (*init_func)(struct device_node *);
+I'm not sure what else you need at this time - simply get back to me
+with what I'm missing and I'll be happy to provided.  I'm also
+offering to test patches.
 
-Let's keep this taking the platform device pointer. That way in
-the future devm could be used as well as other platform device
-APIs without having to change all init signatures.
+Many thanks,
+Mathieu
 
-> +
-> +	device = of_match_device(sr_clk_dt_ids, &pdev->dev);
-> +	if (!device)
-> +		return -ENODEV;
-> +	init_func = device->data;
-
-Can use of_device_get_match_data() instead
-
-> +
-> +	init_func(pdev->dev.of_node);
-> +
-> +	return 0;
-> +}
-
-It would be pretty nice if we could have some platform driver
-common function for this where we want to call different probe
-functions for different compatible ids and put them all in the
-same driver file. Like platform_driver_of_probe() or something
-that then calls a int (*init_func)(struct platform_device *pdev)
-directly from the of match table for you.
-
-> +
-> +static struct platform_driver sr_clk_driver = {
-
-iproc_sr_* throughout this file?
-
-> +	.driver = {
-> +		.name = "sr-clk",
-> +		.of_match_table = sr_clk_dt_ids,
-> +	},
-> +	.probe = sr_clk_probe,
-> +};
-> +builtin_platform_driver(sr_clk_driver);
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+[1]. 9da5ac236de6 ARM: soft-reboot into same mode that we entered the kernel
