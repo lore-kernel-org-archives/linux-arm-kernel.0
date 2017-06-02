@@ -1,41 +1,49 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri,  2 Jun 2017 16:12:09 -0700
-Subject: [PATCH 1/2] ARM: davinci: pdata-quirks: fix const warnings
+Date: Fri,  2 Jun 2017 16:12:10 -0700
+Subject: [PATCH 2/2] ARM: dts: da850-evm: drop VPIF endpoints
 In-Reply-To: <20170602231210.19553-1-khilman@baylibre.com>
 References: <20170602231210.19553-1-khilman@baylibre.com>
-Message-ID: <20170602231210.19553-2-khilman@baylibre.com>
+Message-ID: <20170602231210.19553-3-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After VPIF was converted to enable getting subdevs from DT, the
-pdata is no longer const, so remove these to avoid compiler warnings.
+Drop the unused endpoints.  They should only be used when there is
+an actual remote-endpoint connected.
 
 Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 ---
- arch/arm/mach-davinci/pdata-quirks.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/da850-evm.dts | 21 ---------------------
+ 1 file changed, 21 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/pdata-quirks.c b/arch/arm/mach-davinci/pdata-quirks.c
-index 329f5402ad1d..4858b1cdf31b 100644
---- a/arch/arm/mach-davinci/pdata-quirks.c
-+++ b/arch/arm/mach-davinci/pdata-quirks.c
-@@ -33,7 +33,7 @@ static struct tvp514x_platform_data tvp5146_pdata = {
- 
- #define TVP514X_STD_ALL (V4L2_STD_NTSC | V4L2_STD_PAL)
- 
--static const struct vpif_input da850_ch0_inputs[] = {
-+static struct vpif_input da850_ch0_inputs[] = {
- 	{
- 		.input = {
- 			.index = 0,
-@@ -48,7 +48,7 @@ static const struct vpif_input da850_ch0_inputs[] = {
- 	},
+diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+index a423e8ebfb37..67e72bc72e80 100644
+--- a/arch/arm/boot/dts/da850-evm.dts
++++ b/arch/arm/boot/dts/da850-evm.dts
+@@ -301,25 +301,4 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&vpif_capture_pins>, <&vpif_display_pins>;
+ 	status = "okay";
+-
+-	/* VPIF capture port */
+-	port at 0 {
+-		vpif_input_ch0: endpoint at 0 {
+-			reg = <0>;
+-			bus-width = <8>;
+-		};
+-
+-		vpif_input_ch1: endpoint at 1 {
+-			reg = <1>;
+-			bus-width = <8>;
+-			data-shift = <8>;
+-		};
+-	};
+-
+-	/* VPIF display port */
+-	port at 1 {
+-		vpif_output_ch0: endpoint {
+-			bus-width = <8>;
+-		};
+-	};
  };
- 
--static const struct vpif_input da850_ch1_inputs[] = {
-+static struct vpif_input da850_ch1_inputs[] = {
- 	{
- 		.input = {
- 			.index = 0,
 -- 
 2.9.3
