@@ -1,61 +1,93 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 2 Jun 2017 16:44:26 +0200
-Subject: [RFC/RFT PATCH 08/18] PCI: designware: Convert PCI scan API to
- pci_scan_root_bus_bridge()
-In-Reply-To: <20170602135619.GA10491@red-moon>
-References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
- <20170426111809.19922-9-lorenzo.pieralisi@arm.com>
- <CAK8P3a1ULYxkopxJ8-vZpFs_uPP2gu5TsRWjCKUOW+0QRombLw@mail.gmail.com>
- <20170602114956.GA20004@red-moon>
- <CAK8P3a0DRFxz_yjCeFZJ8Zukuy8gi9hPbWEfp29TaF2TMjrnTQ@mail.gmail.com>
- <20170602135619.GA10491@red-moon>
-Message-ID: <CAK8P3a3Qf_DDU09XVXBm+Y3d+n5He-2cnqqYTtg6_yiKE07jkw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 2 Jun 2017 15:59:34 +0100
+Subject: [PATCH v2 1/3] perf: xgene: Parse PMU subnode from the match table
+In-Reply-To: <1491238077-20666-2-git-send-email-hotran@apm.com>
+References: <1491238077-20666-1-git-send-email-hotran@apm.com>
+ <1491238077-20666-2-git-send-email-hotran@apm.com>
+Message-ID: <20170602145934.GK28299@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 2, 2017 at 3:56 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Fri, Jun 02, 2017 at 03:12:48PM +0200, Arnd Bergmann wrote:
->> > I am almost done refactoring this series and this is the last review to
->> > address. What you suggest above makes sense but:
->> >
->> > 1) it means patching ALL dw_pcie_host_init() callers and allocate the
->> >    host bridge there, not sure it simplifies, certainly it complicates
->> >    the error handling path (given that the host bridge memory is
->> >    probably the only memory that is allocated with kzalloc instead of
->> >    devm interface so it needs unwinding)
->> >
->> > 2) I noticed that allocating the host bridge in the caller complicates
->> >    error handling, in particular code in the mainline (ie tegra and
->> >    ftpci100) using pci_alloc_host_bridge() needs already patching since it
->> >    may leak memory if PCI host bridge drivers probing fails.
->> >
->> > I can implement (1) and (2) but I wanted to ask first to understand if
->> > that's the direction we want to take.
->>
->> Good question. Maybe we should add a devm_pci_alloc_host_bridge()
->> instead? Would that solve these problems without creating bigger ones?
->
-> It would be yet another PCI core call (ie unfortunately we still need
-> pci_alloc_host_bridge() for bridges with no parent device eg bios32) but
-> I think that's the only option we have if we do not want to clutter the
-> host bridges error paths with host bridge free calls.
->
-> Implementing it should be relatively simple by reshuffling functions.
->
-> Thoughts ?
+Hi Hoan,
 
-I think adding this one would be fairly harmless because it has a clear
-purpose and can easily be mixed with the rest of the API.
+Apologies for the last reply.
 
-In one of the earlier drafts, we discussed just letting the user call an
-initialization function to set the members and otherwise using kmalloc()
-themselves. We decided on this one to save an extra function call in
-each driver, but in retrospect, it would have saved us the discussion
-now.
+On Mon, Apr 03, 2017 at 09:47:55AM -0700, Hoan Tran wrote:
+> +static const struct acpi_device_id xgene_pmu_acpi_type_match[] = {
+> +	{"APMC0D5D", PMU_TYPE_L3C},
+> +	{"APMC0D5E", PMU_TYPE_IOB},
+> +	{"APMC0D5F", PMU_TYPE_MCB},
+> +	{"APMC0D60", PMU_TYPE_MC},
+> +	{},
+> +};
+> +
+> +static const struct acpi_device_id *xgene_pmu_acpi_match_type(
+> +					const struct acpi_device_id *ids,
+> +					struct acpi_device *adev)
+> +{
+> +	const struct acpi_device_id *match_id = NULL;
+> +	const struct acpi_device_id *id;
+> +
+> +	for (id = ids; id->id[0] || id->cls; id++) {
+> +		if (!acpi_match_device_ids(adev, id))
+> +			match_id = id;
+> +		else if (match_id)
+> +			break;
+> +	}
+> +
+> +	return match_id;
+> +}
 
-If we end up adding a devm_pci_alloc_host_bridge (or maybe
-pcim_alloc_host_bridge), we also need to decide what part of the
-cleanup would happen during the unwinding, besides the kfree().
+I don't believe this look is necessary. AFAICT, acpi_match_device_ids()
+already iterates over the id table it is given.
 
-        Arnd
+> +
+>  static acpi_status acpi_pmu_dev_add(acpi_handle handle, u32 level,
+>  				    void *data, void **return_value)
+>  {
+> +	const struct acpi_device_id *acpi_id;
+>  	struct xgene_pmu *xgene_pmu = data;
+>  	struct xgene_pmu_dev_ctx *ctx;
+>  	struct acpi_device *adev;
+> @@ -1059,17 +1085,11 @@ static acpi_status acpi_pmu_dev_add(acpi_handle handle, u32 level,
+>  	if (acpi_bus_get_status(adev) || !adev->status.present)
+>  		return AE_OK;
+>  
+> -	if (!strcmp(acpi_device_hid(adev), "APMC0D5D"))
+> -		ctx = acpi_get_pmu_hw_inf(xgene_pmu, adev, PMU_TYPE_L3C);
+> -	else if (!strcmp(acpi_device_hid(adev), "APMC0D5E"))
+> -		ctx = acpi_get_pmu_hw_inf(xgene_pmu, adev, PMU_TYPE_IOB);
+> -	else if (!strcmp(acpi_device_hid(adev), "APMC0D5F"))
+> -		ctx = acpi_get_pmu_hw_inf(xgene_pmu, adev, PMU_TYPE_MCB);
+> -	else if (!strcmp(acpi_device_hid(adev), "APMC0D60"))
+> -		ctx = acpi_get_pmu_hw_inf(xgene_pmu, adev, PMU_TYPE_MC);
+> -	else
+> -		ctx = NULL;
+> +	acpi_id = xgene_pmu_acpi_match_type(xgene_pmu_acpi_type_match, adev);
+> +	if (!acpi_id)
+> +		return AE_OK;
+
+As above, and as I covered in my reply to v1, I think the above should
+be:
+
+	acpi_id = acpi_match_device_ids(adev, xgene_pmu_acpi_type_match);
+	if (!acpi_id)
+		return AE_OK;
+
+... or am I missing something?
+
+With that change:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
+
+>  
+> +	ctx = acpi_get_pmu_hw_inf(xgene_pmu, adev, (u32)acpi_id->driver_data);
+>  	if (!ctx)
+>  		return AE_OK;
+>  
+> -- 
+> 1.9.1
+> 
