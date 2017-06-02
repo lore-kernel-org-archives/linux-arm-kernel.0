@@ -1,106 +1,86 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 02 Jun 2017 15:52:48 +0200
-Subject: [PATCH v2 0/7] Improve ap806 clk support on Marvell Armada 7K/8K
-In-Reply-To: <149631063623.33065.5881396919137461999@resonance> (Michael
- Turquette's message of "Thu, 01 Jun 2017 18:50:36 +0900")
-References: <cover.21754b3184e2122d1c83a664477ed26ec562b3e9.1496239589.git-series.gregory.clement@free-electrons.com>
- <149631063623.33065.5881396919137461999@resonance>
-Message-ID: <87mv9qpkcv.fsf@free-electrons.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 2 Jun 2017 14:56:19 +0100
+Subject: [RFC/RFT PATCH 08/18] PCI: designware: Convert PCI scan API to
+ pci_scan_root_bus_bridge()
+In-Reply-To: <CAK8P3a0DRFxz_yjCeFZJ8Zukuy8gi9hPbWEfp29TaF2TMjrnTQ@mail.gmail.com>
+References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
+ <20170426111809.19922-9-lorenzo.pieralisi@arm.com>
+ <CAK8P3a1ULYxkopxJ8-vZpFs_uPP2gu5TsRWjCKUOW+0QRombLw@mail.gmail.com>
+ <20170602114956.GA20004@red-moon>
+ <CAK8P3a0DRFxz_yjCeFZJ8Zukuy8gi9hPbWEfp29TaF2TMjrnTQ@mail.gmail.com>
+Message-ID: <20170602135619.GA10491@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michael,
- 
- On jeu., juin 01 2017, Michael Turquette <mturquette@baylibre.com> wrote:
+On Fri, Jun 02, 2017 at 03:12:48PM +0200, Arnd Bergmann wrote:
+> On Fri, Jun 2, 2017 at 1:49 PM, Lorenzo Pieralisi
+> <lorenzo.pieralisi@arm.com> wrote:
+> > On Fri, Apr 28, 2017 at 03:13:04PM +0200, Arnd Bergmann wrote:
+> >> On Wed, Apr 26, 2017 at 1:17 PM, Lorenzo Pieralisi
+> >> <lorenzo.pieralisi@arm.com> wrote:
+> >> > The introduction of pci_scan_root_bus_bridge() provides a PCI core
+> >> > API to scan a PCI root bus backed by an already initialized
+> >> > struct pci_host_bridge object, which simplifies the bus scan
+> >> > interface and makes the PCI scan root bus interface easier to
+> >> > generalize as members are added to the struct pci_host_bridge().
+> >> >
+> >> > Convert PCI designware host code to pci_scan_root_bus_bridge() to
+> >> > improve the PCI root bus scanning interface.
+> >> >
+> >> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >> > Cc: Jingoo Han <jingoohan1@gmail.com>
+> >> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> >> > Cc: Joao Pinto <Joao.Pinto@synopsys.com>
+> >> > ---
+> >> >  drivers/pci/dwc/pcie-designware-host.c | 36 +++++++++++++++++++++-------------
+> >> >  1 file changed, 22 insertions(+), 14 deletions(-)
+> >> >
+> >> > diff --git a/drivers/pci/dwc/pcie-designware-host.c b/drivers/pci/dwc/pcie-designware-host.c
+> >> > index 5ba3349..e43c21a 100644
+> >> > --- a/drivers/pci/dwc/pcie-designware-host.c
+> >> > +++ b/drivers/pci/dwc/pcie-designware-host.c
+> >> > @@ -294,16 +294,21 @@ int dw_pcie_host_init(struct pcie_port *pp)
+> >> >                 dev_err(dev, "missing *config* reg space\n");
+> >> >         }
+> >> >
+> >> > -       ret = of_pci_get_host_bridge_resources(np, 0, 0xff, &res, &pp->io_base);
+> >> > +       bridge = pci_alloc_host_bridge(0);
+> >> > +       if (!bridge)
+> >> > +               return  -ENOMEM;
+> >> > +
+> >>
+> >> I think here we warn to have the pci_alloc_host_bridge() called in the
+> >> individual
+> >> drivers, to have them allocate the dw_pcie structure as part of the host
+> >> bridge allocation, before calling hisi_add_pcie_port().
+> >
+> > I am almost done refactoring this series and this is the last review to
+> > address. What you suggest above makes sense but:
+> >
+> > 1) it means patching ALL dw_pcie_host_init() callers and allocate the
+> >    host bridge there, not sure it simplifies, certainly it complicates
+> >    the error handling path (given that the host bridge memory is
+> >    probably the only memory that is allocated with kzalloc instead of
+> >    devm interface so it needs unwinding)
+> >
+> > 2) I noticed that allocating the host bridge in the caller complicates
+> >    error handling, in particular code in the mainline (ie tegra and
+> >    ftpci100) using pci_alloc_host_bridge() needs already patching since it
+> >    may leak memory if PCI host bridge drivers probing fails.
+> >
+> > I can implement (1) and (2) but I wanted to ask first to understand if
+> > that's the direction we want to take.
+> 
+> Good question. Maybe we should add a devm_pci_alloc_host_bridge()
+> instead? Would that solve these problems without creating bigger ones?
 
-> Hi Gregory,
->
-> Quoting Gregory CLEMENT (2017-05-31 23:07:21)
->> Hi,
->> 
->> This series modifies the device tree binding of the clock of the AP806
->> part that we find in the Marvell Armada 7K/8K SoCs.
->> 
->> As for the previsous series the only change in this second version is
->> about the binding documentation: all the documentation related changes
->> are now move in their own patches. It allows to provide a stable -dt
->> branch for theses changes. I also added the acked-by from Rob Herring.
->> 
->> Here again the last two patches modifying the device tree _must_ be
->> merged through the mvebu tree to avoid future conflict.
->
-> The approach (and the patches) look good to me. I took the DT binding
-> description changes (patches 2 & 4) into clk-ap806-dt stable branch:
->
-> https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git/log/?h=clk-ap806-dt
->
-> Anyone can merge the above branch if they need it as a dep.
->
-> The driver changes (patches 1, 3 & 5) are merged on into clk-ap806,
-> which is based on top of clk-ap806-dt:
->
-> https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git/log/?h=clk-ap806
->
-> Everything has been merged into clk-next. I did not touch the .dts files
-> at all.
->
+It would be yet another PCI core call (ie unfortunately we still need
+pci_alloc_host_bridge() for bridges with no parent device eg bios32) but
+I think that's the only option we have if we do not want to clutter the
+host bridges error paths with host bridge free calls.
 
-Perfect I will take care of the dts patch.
+Implementing it should be relatively simple by reshuffling functions.
 
-What about the other series on cp110?
-a clk_cp110-dt branch will be needed too for the pinctrl series.
+Thoughts ?
 
-Thanks,
-
-Gregory
-
-
-> Regards,
-> Mike
->
->> 
->> For the record:
->> As for the CP110, we want to be able to ease the integration of new
->> clocks without breaking the backward compatibility. It is done in
->> patch 3.
->> 
->> We also want to ease the integration of the pinctrl node in the device
->> tree. It is the purpose of the patch 5.
->> 
->> In this series (as in the previous one for CP110), even if there is
->> some change in the device tree binding we paid attention to the
->> backward compatibility, and the driver can still work with the old
->> device tree.
->> 
->> Thanks,
->> 
->> Gregory
->> 
->> Gregory CLEMENT (7):
->>   clk: mvebu: ap806: cosmetic improvement
->>   dt-bindings: ap806: do not depend anymore of the *-clock-output-names
->>   clk: mvebu: ap806: do not depend anymore of the *-clock-output-names
->>   dt-bindings: ap806: introduce a new binding
->>   clk: mvebu: ap806: introduce a new binding
->>   arm64: dts: marvell: remove clock-output-names on ap806
->>   arm64: dts: marvell: use new binding for the system controller on ap806
->> 
->>  Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt |  24 ++++++++++------
->>  arch/arm64/boot/dts/marvell/armada-ap806.dtsi                             |  23 +++++++--------
->>  drivers/clk/mvebu/ap806-system-controller.c                               | 107 +++++++++++++++++++++++++++++++++++++++++++++++-------------------------
->>  3 files changed, 97 insertions(+), 57 deletions(-)
->> 
->> base-commit: 4139fcd6c66df1c3d3fa0a0a7cf7f8a8c601a16c
->> -- 
->> git-series 0.9.1
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Lorenzo
