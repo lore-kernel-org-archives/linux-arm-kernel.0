@@ -1,39 +1,72 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri,  2 Jun 2017 12:02:20 +0100
-Subject: [PATCH] arm64/kvm: fix misleading kconfig text for 16K pages
-Message-ID: <1496401340-24802-1-git-send-email-mark.rutland@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri,  2 Jun 2017 18:10:23 +0800
+Subject: [PATCH 18/19] ARM: sun6i: a31s: Enable HDMI display output on the
+ Sinlinx SinA31s
+In-Reply-To: <20170602101024.18940-1-wens@csie.org>
+References: <20170602101024.18940-1-wens@csie.org>
+Message-ID: <20170602101024.18940-19-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We've supported KVM with 16K pages since commit:
+The Sinlinx SinA31s has an HDMI connector wired to the HDMI pins
+from the SoC.
 
-  02e0b7600f835007 ("arm64: kvm: Add support for 16K pages")
+Enable the display pipeline and the HDMI output.
 
-... yet the kconfig text says this combination is not supported.
-
-Let's fix that by deleting the misleading text.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-Cc: kvmarm at lists.cs.columbia.edu
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm64/kvm/Kconfig | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm/boot/dts/sun6i-a31s-sina31s.dts | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index 52cb7ad..6e4e461 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -37,8 +37,6 @@ config KVM
- 	select HAVE_KVM_IRQ_ROUTING
- 	---help---
- 	  Support hosting virtualized guest machines.
--	  We don't support KVM with 16K page tables yet, due to the multiple
--	  levels of fake page tables.
+diff --git a/arch/arm/boot/dts/sun6i-a31s-sina31s.dts b/arch/arm/boot/dts/sun6i-a31s-sina31s.dts
+index b3d98222bd81..298476485bb4 100644
+--- a/arch/arm/boot/dts/sun6i-a31s-sina31s.dts
++++ b/arch/arm/boot/dts/sun6i-a31s-sina31s.dts
+@@ -53,6 +53,17 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
  
- 	  If unsure, say N.
++	hdmi-connector {
++		compatible = "hdmi-connector";
++		type = "a";
++
++		port {
++			hdmi_con_in: endpoint {
++				remote-endpoint = <&hdmi_out_con>;
++			};
++		};
++	};
++
+ 	leds {
+ 		compatible = "gpio-leds";
+ 		pinctrl-names = "default";
+@@ -90,6 +101,10 @@
+ 	status = "okay";
+ };
  
++&de {
++	status = "okay";
++};
++
+ &ehci0 {
+ 	/* USB 2.0 4 port hub IC */
+ 	status = "okay";
+@@ -112,6 +127,16 @@
+ 	};
+ };
+ 
++&hdmi {
++	status = "okay";
++};
++
++&hdmi_out {
++	hdmi_out_con: endpoint {
++		remote-endpoint = <&hdmi_con_in>;
++	};
++};
++
+ &ir {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&ir_pins_a>;
 -- 
-1.9.1
+2.11.0
