@@ -1,80 +1,35 @@
-From: bsd@redhat.com (Bandan Das)
-Date: Fri, 02 Jun 2017 13:36:23 -0400
-Subject: [RFC 07/55] KVM: arm/arm64: Add virtual EL2 state emulation
- framework
-In-Reply-To: <20170602115140.GB397@cbox> (Christoffer Dall's message of "Fri,
- 2 Jun 2017 13:51:40 +0200")
-References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
- <1483943091-1364-8-git-send-email-jintack@cs.columbia.edu>
- <jpg37bj1nj6.fsf@linux.bootlegged.copy> <20170602115140.GB397@cbox>
-Message-ID: <jpg8tlal2aw.fsf@linux.bootlegged.copy>
+From: alcooperx@gmail.com (Al Cooper)
+Date: Fri,  2 Jun 2017 14:01:49 -0400
+Subject: [PATCH 0/3] Add Broadcom STB USB phy driver
+Message-ID: <1496426512-10590-1-git-send-email-alcooperx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Christoffer Dall <cdall@linaro.org> writes:
+Add a new USB Phy driver for Broadcom STB SoCs. This driver
+supports Broadcom STB ARM and MIPS SoCs. This driver in
+combination with the Broadcom STB ohci, ehci and xhci
+drivers will enable USB1.1, USB2.0 and USB3.0 support.
+This Phy driver also supports the Broadcom UDC gadget
+driver.
 
-> On Thu, Jun 01, 2017 at 04:05:49PM -0400, Bandan Das wrote:
->> Jintack Lim <jintack@cs.columbia.edu> writes:
->> ...
->> > +/**
->> > + * kvm_arm_setup_shadow_state -- prepare shadow state based on emulated mode
->> > + * @vcpu: The VCPU pointer
->> > + */
->> > +void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
->> > +{
->> > +	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
->> > +
->> > +	ctxt->hw_pstate = *vcpu_cpsr(vcpu);
->> > +	ctxt->hw_sys_regs = ctxt->sys_regs;
->> > +	ctxt->hw_sp_el1 = ctxt->gp_regs.sp_el1;
->> > +}
->> > +
->> > +/**
->> > + * kvm_arm_restore_shadow_state -- write back shadow state from guest
->> > + * @vcpu: The VCPU pointer
->> > + */
->> > +void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu)
->> > +{
->> > +	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
->> > +
->> > +	*vcpu_cpsr(vcpu) = ctxt->hw_pstate;
->> > +	ctxt->gp_regs.sp_el1 = ctxt->hw_sp_el1;
->> > +}
->> > +
->> > +void kvm_arm_init_cpu_context(kvm_cpu_context_t *cpu_ctxt)
->> > +{
->> > +	cpu_ctxt->hw_sys_regs = &cpu_ctxt->sys_regs[0];
->> > +}
->> 
->> 
->> IIUC, the *_shadow_state() functions will set hw_* pointers to
->> either point to the "real" state or the shadow state to manage L2 ?
->> Maybe, it might make sense to make these function names a little more
->> generic since they are not dealing with setting the shadow state
->> alone.
->> 
->
-> The notion of 'shadow state' is borrowed from shadow page tables, in
-> which you always load some 'shadow copy' of the 'real value' into the
-> hardware, so the shadow state is the one that's used for execution by
-> the hardware.
->
-> The shadow state may be the same as the VCPU's EL1 state, for example,
-> or it may be a modified version of the VCPU's EL2 state, for example.
+Al Cooper (3):
+  soc: brcmstb: Add Product ID and Family ID helper functions
+  dt-bindings: Add Broadcom STB USB PHY binding document
+  phy: usb: phy-brcm-usb: Add Broadcom STB USB phy driver
 
-Yes, it can be the same. Although, as you said above, "shadow" conventionally
-refers to the latter. When it's pointing to EL1 state, it's not really
-shadow state anymore.
+ .../bindings/phy/brcm,brcmstb-usb-phy.txt          |   37 +
+ MAINTAINERS                                        |    7 +
+ drivers/phy/Makefile                               |    4 +
+ drivers/phy/phy-brcm-usb-init.c                    | 1111 ++++++++++++++++++++
+ drivers/phy/phy-brcm-usb-init.h                    |  110 ++
+ drivers/phy/phy-brcm-usb.c                         |  487 +++++++++
+ drivers/soc/bcm/brcmstb/common.c                   |   12 +
+ include/linux/soc/brcmstb/brcmstb.h                |   10 +
+ 8 files changed, 1778 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/brcm,brcmstb-usb-phy.txt
+ create mode 100644 drivers/phy/phy-brcm-usb-init.c
+ create mode 100644 drivers/phy/phy-brcm-usb-init.h
+ create mode 100644 drivers/phy/phy-brcm-usb.c
 
-> If you have better suggestions for naming, we're open to that though.
->
-
-Oh nothing specifically, I just felt like "shadow" in the function name
-could be confusing. Borrowing from kvm_arm_init_cpu_context(), 
-how about kvm_arm_setup/restore_cpu_context()  ?
-
-BTW, on a separate note, we might as well get away with the typedef and
-call struct kvm_cpu_context directly.
-
-> Thanks,
-> -Christoffer
+-- 
+1.9.0.138.g2de3478
