@@ -1,68 +1,62 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 1 Jun 2017 22:37:47 -0700
-Subject: [PATCH v5 04/11] arm64: dts: Initial DTS files for Broadcom
- Stingray SOC
-In-Reply-To: <1495790704-2438-5-git-send-email-anup.patel@broadcom.com>
-References: <1495790704-2438-1-git-send-email-anup.patel@broadcom.com>
- <1495790704-2438-5-git-send-email-anup.patel@broadcom.com>
-Message-ID: <abeca9ac-487c-b6dc-1397-4134b0442909@gmail.com>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Fri,  2 Jun 2017 11:09:02 +0530
+Subject: [PATCH v2] misc: atmel-ssc: Handle return value of clk_prepare_enable
+ and clk_prepare
+Message-ID: <3a6a9ccd68fe298ab33009eaaace85c5af73e1ea.1496381884.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+clk_prepare_enable() and clk_prepare() can fail here and
+we must check its return value.
 
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+---
+ drivers/misc/atmel-ssc.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-On 05/26/2017 02:24 AM, Anup Patel wrote:
-> The Broadcom Stingray SoC is a new member in Broadcom iProc
-> SoC family.
-> 
-> This patch adds initial DTS files for Broadcom Stingray SoC
-> and two of its reference boards (bcm958742k and bcm958742t).
-> 
-> We have lot of reference boards and large number of devices
-> in Broadcom Stingray SoC so eventually we will have quite
-> a few DTS files for Stingray. To tackle, we have added a
-> separate directory for Stingray DTS files.
-
-So I was going to apply this, but...
-
-
-> +	scr {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges = <0x0 0x0 0x61000000 0x05000000>;
-
-So you corrected the ranges property here...
-
-> +
-> +		gic: interrupt-controller at 63c00000 {
-
-but you kept the original unit address here, which does not match the
-reg property, could you fix that through your entire submission?
-
-> +			compatible = "arm,gic-v3";
-> +			#interrupt-cells = <3>;
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-> +			interrupt-controller;
-> +			reg = <0x02c00000 0x010000>, /* GICD */
-> +			      <0x02e00000 0x600000>; /* GICR */
-
-> +	hsls {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges = <0x0 0x0 0x68900000 0x17700000>;
-
-Same here.
-
-> +
-> +		uart0: uart at 68a00000 {
-> +			device_type = "serial";
-> +			compatible = "snps,dw-apb-uart";
-> +			reg = <0x00100000 0x1000>;
-
-and here and all other sub nodes
+diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
+index b2a0340..df34b81 100644
+--- a/drivers/misc/atmel-ssc.c
++++ b/drivers/misc/atmel-ssc.c
+@@ -30,6 +30,7 @@ struct ssc_device *ssc_request(unsigned int ssc_num)
+ {
+ 	int ssc_valid = 0;
+ 	struct ssc_device *ssc;
++	int ret;
+ 
+ 	spin_lock(&user_lock);
+ 	list_for_each_entry(ssc, &ssc_list, list) {
+@@ -60,7 +61,11 @@ struct ssc_device *ssc_request(unsigned int ssc_num)
+ 	ssc->user++;
+ 	spin_unlock(&user_lock);
+ 
+-	clk_prepare(ssc->clk);
++	ret = clk_prepare(ssc->clk);
++	if (ret) {
++		pr_err("Failed to prepare clock\n");
++		return ERR_PTR(ret);
++	}
+ 
+ 	return ssc;
+ }
+@@ -195,6 +200,7 @@ static int ssc_probe(struct platform_device *pdev)
+ 	struct resource *regs;
+ 	struct ssc_device *ssc;
+ 	const struct atmel_ssc_platform_data *plat_dat;
++	int ret;
+ 
+ 	ssc = devm_kzalloc(&pdev->dev, sizeof(struct ssc_device), GFP_KERNEL);
+ 	if (!ssc) {
+@@ -229,7 +235,9 @@ static int ssc_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/* disable all interrupts */
+-	clk_prepare_enable(ssc->clk);
++	ret = clk_prepare_enable(ssc->clk);
++	if (ret)
++		return ret;
+ 	ssc_writel(ssc->regs, IDR, -1);
+ 	ssc_readl(ssc->regs, SR);
+ 	clk_disable_unprepare(ssc->clk);
 -- 
-Florian
+1.9.1
