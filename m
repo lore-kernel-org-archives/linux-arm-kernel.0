@@ -1,59 +1,44 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 2 Jun 2017 15:11:17 +0000
-Subject: [PATCH] mm: vmalloc: make vmalloc_to_page() deal with PMD/PUD
- mappings
-In-Reply-To: <e98368d8-b1bc-5804-2115-370ec7109e9b@intel.com>
-References: <20170602112720.28948-1-ard.biesheuvel@linaro.org>
- <e98368d8-b1bc-5804-2115-370ec7109e9b@intel.com>
-Message-ID: <CAKv+Gu964bDsV52gZ7QCJf26kXVaWgmuwXZSm0qWxa-34Eqttw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 2 Jun 2017 16:24:41 +0100
+Subject: arm64: segfaults on next-20170602 with LTP tests
+In-Reply-To: <20170602144204.uyvbby5vauxpt6yr@yury-thinkpad>
+References: <20170602111151.r2x3364zqabmshzo@yury-thinkpad>
+ <20170602121917.GG6371@arm.com>
+ <20170602123751.3jzdkjwntbce2e6e@yury-thinkpad>
+ <20170602144204.uyvbby5vauxpt6yr@yury-thinkpad>
+Message-ID: <20170602152440.GQ6371@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 June 2017 at 14:29, Dave Hansen <dave.hansen@intel.com> wrote:
-> On 06/02/2017 04:27 AM, Ard Biesheuvel wrote:
->> +static struct page *vmalloc_to_pud_page(unsigned long addr, pud_t *pud)
->> +{
->> +     struct page *page = NULL;
->> +#ifdef CONFIG_HUGETLB_PAGE
->
-> Do we really want this based on hugetlbfs?  Won't this be dead code on x86?
->
+On Fri, Jun 02, 2017 at 05:42:04PM +0300, Yury Norov wrote:
+> On Fri, Jun 02, 2017 at 03:37:51PM +0300, Yury Norov wrote:
+> > On Fri, Jun 02, 2017 at 01:19:18PM +0100, Will Deacon wrote:
+> > > Hi Yury,
+> > > 
+> > > [adding Steve and Punit]
+> > > 
+> > > On Fri, Jun 02, 2017 at 02:11:51PM +0300, Yury Norov wrote:
+> > > > I see that latest and yesterday's linux-next segfaults with tests pth_str01,
+> > > > pth_str03, rwtest04. Rwtest04 hangs sometimes. Crashes are not always
+> > > > reproducible. About week ago everything was fine. Kernel log and config file
+> > > > are attached. The testing is performed on qemu.
+> > > 
+> > > It's weird that these haven't cropped up in our nightly tests, especially
+> > > given that defconfig is very similar to the one you're using. That said,
+> > > I see huge pmds cropping up in the traces below and there have been some
+> > > recent changes from Punit and Steve in that area, in particular things
+> > > like 55f379263bcc ("mm, gup: ensure real head page is ref-counted when using
+> > > hugepages").
+> > > 
+> > > Are you in a position to bisect this, or is it too fiddly to reproduce?
+> 
+> I have bisected the bug to exactly this patch. If I revert it, the
+> pth_str01/03 are passed.
 
-I don't see why one would follow from the other, but perhaps it is
-better to make this depend on CONFIG_HAVE_ARCH_HUGE_VMAP instead,
-which is already meant to imply that huge mappings may exist in the
-vmalloc region.
+Thanks for doing that: I had my suspicion ;) I can also reproduce the
+failure locally on my Juno.
 
-> Also, don't we discourage #ifdefs in .c files?
->
+Punit -- please can you investigate this? Otherwise I think we have to
+revert this for now and bring it back after some better testing.
 
-Yes. But the alternative is to define a dummy huge_ptep_get(), which
-is undefined otherwise. I am not sure that is better in this case. I
-will try to address this more elegantly though, perhaps by folding the
-huge_ptep_get() into the VIRTUAL_BUG_ON().
-
->> +     pte_t pte = huge_ptep_get((pte_t *)pud);
->> +
->> +     if (pte_present(pte))
->> +             page = pud_page(*pud) + ((addr & ~PUD_MASK) >> PAGE_SHIFT);
->
-> x86 has pmd/pud_page().  Seems a bit silly to open-code it here.
->
-
-So I should replace pud_page() with what exactly?
-
->> +#else
->> +     VIRTUAL_BUG_ON(1);
->> +#endif
->> +     return page;
->> +}
->
-> So if somebody manages to call this function on a huge page table entry,
-> but doesn't have hugetlbfs configured on, we kill the machine?
-
-Yes. But only if you have CONFIG_DEBUG_VIRTUAL defined, in which case
-it seems appropriate to signal a failure rather than proceed with
-dereferencing the huge PMD entry as if it were a table entry.
-
--- 
-Ard.
+Will
