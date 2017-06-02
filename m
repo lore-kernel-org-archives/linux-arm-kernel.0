@@ -1,20 +1,33 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 02 Jun 2017 15:39:10 +0200
-Subject: [PATCH v4 0/3] clk: rockchip: support clk controller for RK3128
- SoC
-In-Reply-To: <1496368045-17746-1-git-send-email-zhangqing@rock-chips.com>
-References: <1496368045-17746-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <2140102.d4ITpdkcYn@phil>
+From: tj@kernel.org (Tejun Heo)
+Date: Fri, 2 Jun 2017 09:50:03 -0400
+Subject: [PATCH] ahci: qoriq: add ls1088a platforms support
+In-Reply-To: <1496388183-11534-1-git-send-email-andy.tang@nxp.com>
+References: <1496388183-11534-1-git-send-email-andy.tang@nxp.com>
+Message-ID: <20170602135003.GA18930@htj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Elaine,
+On Fri, Jun 02, 2017 at 03:23:03PM +0800, Yuantian Tang wrote:
+> Ls1088a is new introduced arm-based soc with sata support with
+> following features:
+> 
+> * Complies with the serial ATA 3.0 specification
+>   and the AHCI 1.3.1 specification
+> * Contains a high-speed descriptor-based DMA controller
+> * Supports the following:
+> * Speeds of 1.5 Gb/s (first-generation SATA),
+>   3 Gb/s (second-generation SATA), and 6 Gb/s (third-generation SATA)
+> * FIS-based switching
+> * Native command queuing (NCQ) commands
+> * Port multiplier operation
+> * Asynchronous notification
+> * SATA Vendor BIST mode
+> 
+> Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
 
-Am Freitag, 2. Juni 2017, 09:47:22 CEST schrieb Elaine Zhang:
-> The driver and clk ID\SRST ID it's also applies to the RK3126 SoC.
+Applied to libata/for-4.13.
 
-applied all 3 for 4.13 (taking Rob's Ack from v1 for the first 2 patches)
+Thanks.
 
-
-Thanks
-Heiko
+-- 
+tejun
