@@ -1,82 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 2 Jun 2017 17:27:17 +0200
-Subject: [GIT PULL] ARM: SoC fixes (and a cross-arch dt-include fix)
-In-Reply-To: <CAMuHMdWxNFUnWJjLj7ynWJFEFMAL=TPsdVSzDtohDprC=EXnaQ@mail.gmail.com>
-References: <20170519193455.GA24206@localhost>
- <CACRpkdaRdZTB39-=sAojO+OyHtP02KaFChqGcxy+fWA8qaB2bw@mail.gmail.com>
- <CAOesGMhfrWSvLtDtGRWBTJiAoeSwzGgsdUTm26j1mpoVu0ghDg@mail.gmail.com>
- <CAMuHMdUivf9cw+LTn7UMueH=MMKi6i3wcOdgM6zbZBoxmkTZGQ@mail.gmail.com>
- <CAK8P3a2E1LtCNoGkAuzwJJdQdUTB_+8d=FM2asEGkXJprvm8oQ@mail.gmail.com>
- <CAMuHMdWxNFUnWJjLj7ynWJFEFMAL=TPsdVSzDtohDprC=EXnaQ@mail.gmail.com>
-Message-ID: <CAK8P3a2_V8hs7CRRJNjpkeAaqpRwztHhPpUQz8vB5K3GwJRaGQ@mail.gmail.com>
+From: agust@denx.de (Anatolij Gustschin)
+Date: Fri, 2 Jun 2017 17:49:47 +0200
+Subject: [PATCH v11 0/6] FPGA Manager support for altera passive serial
+In-Reply-To: <20170525172911.11467-1-stillcompiling@gmail.com>
+References: <20170525172911.11467-1-stillcompiling@gmail.com>
+Message-ID: <20170602174947.5673f8f2@crub>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 30, 2017 at 11:13 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> Hi Arnd,
->
-> On Tue, May 23, 2017 at 4:17 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Tue, May 23, 2017 at 11:49 AM, Geert Uytterhoeven
->> <geert@linux-m68k.org> wrote:
->>> On Mon, May 22, 2017 at 5:11 PM, Olof Johansson <olof@lixom.net> wrote:
->>>> On Mon, May 22, 2017 at 4:44 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->>>>> On Fri, May 19, 2017 at 9:34 PM, Olof Johansson <olof@lixom.net> wrote:
->>>>
->>>> Yeah, asking people to spread out across releases would remove
->>>> dependencies a lot, but it would also slow down progress and frustrate
->>>> a lot of contributors so we don't do that.
->>>
->>> The above works fine for new support, or for new platforms.
->>>
->>> There's still support being migrated from platform code to DT, which
->>> requires three steps:
->>>   1. New DT-aware driver support,
->>>   2. DT update to use the new driver support,
->>>   3. Clean up platform code after optional DTB backwards compatibility
->>>      grace period,
->>> To make matters worse, 1 may conflict with the existing platform code,
->>> and 2 must sometimes not be done before 1. Hence you may need three kernel
->>> releases.
->>> So we're already planning now what to clean up for v4.15 ;-)
->>>
->>> Would it be acceptable to do step 2 in the same release, after the driver
->>> support has entered in -rc1? I know this is more than just replacing
->>> numbers by symbolic values.
->>
->> I'd say it really depends on the individual case. Do you have a particular
->> platform in mind? E.g. For some of the more obsolete platforms that
->> Linus Walleij has worked on over time, we have sometimes relaxed the
->> rules about clean bisection and just merged everything in parallel, knowing
->> that nobody else was likely to run that code on a vanilla kernel anyway.
->
-> This is for Renesas R-Car Gen2 SoCs, so we do care about DT backward
-> compatibility (for a while), and about bisection.
+Hi Alan,
 
-Ok, I see.
+On Thu, 25 May 2017 10:29:05 -0700
+Joshua Clayton stillcompiling at gmail.com wrote:
 
-> Last headache was "[PATCH v4 00/23] soc: renesas: Add R-Car RST driver for
-> obtaining mode pin state" (https://lkml.org/lkml/2016/10/21/500). This used
-> a shared immutable branch, but that caused several merge conflicts.
->
-> Next one will be smaller, as it's not really moving functionality from
-> platform code to DT, but switching to a new and better clock driver framework,
-> so there's only the dependency of DT on the new driver
-> "[PATCH v2 00/10] clk: renesas: rcar-gen2: Add new CPG/MSSR drivers"
-> (https://lkml.org/lkml/2017/5/19/212)
+>FPGA Manager passive serial can now support Stratix, Cyclone and Arria
+>FPGAs.
 
-Ok, so there is already a working driver for these chips, but you want
-to move to a better driver and binding. That's all fine, but I'm not sure
-about why you want to do this faster at all. Presumably you want to use
-the new driver quickly so you can add new platforms not using the old
-driver, but then you'd have a couple of years of grace period before
-removing the old driver for customers with existing out of tree dts files,
-so I would assume that waiting another release or two before moving
-the DT files over is not adding a huge burden.
+can this series be queued for merging in v4.13 or are there any
+issues with it?
 
-> I'll go create an inventory of stuff in platform code for Renesas SoCs that
-> still needs to be converted to DT...
-
-That would certainly be helpful, yes.
-
-       Arnd
+Thanks,
+Anatolij
