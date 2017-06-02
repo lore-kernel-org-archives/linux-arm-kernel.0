@@ -1,127 +1,61 @@
-From: leilk.liu@mediatek.com (Leilk Liu)
-Date: Fri, 2 Jun 2017 15:18:42 +0800
-Subject: [PATCH 2/3] spi: mediatek: support adjust register define
-In-Reply-To: <1496387923-31674-1-git-send-email-leilk.liu@mediatek.com>
-References: <1496387923-31674-1-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <1496387923-31674-3-git-send-email-leilk.liu@mediatek.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Fri, 2 Jun 2017 09:29:14 +0200
+Subject: [PATCH v4 0/6] ARM: at91: initial samx7 support
+In-Reply-To: <20170601200601.11035-1-alexandre.belloni@free-electrons.com>
+References: <20170601200601.11035-1-alexandre.belloni@free-electrons.com>
+Message-ID: <19e8c642-50c8-85c3-7edc-52218a83288f@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this patch adds support for adjust register design.
+Le 01/06/2017 ? 22:05, Alexandre Belloni a ?crit :
+> This series adds initial support for Atmel armv7m SoCs.
 
-Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
----
- drivers/spi/spi-mt65xx.c                 |   45 ++++++++++++++++++++++++++----
- include/linux/platform_data/spi-mt65xx.h |    2 ++
- 2 files changed, 42 insertions(+), 5 deletions(-)
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+To the whole series.
 
-diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
-index 278867a..3d7cd2d 100644
---- a/drivers/spi/spi-mt65xx.c
-+++ b/drivers/spi/spi-mt65xx.c
-@@ -35,11 +35,15 @@
- #define SPI_CMD_REG                       0x0018
- #define SPI_STATUS0_REG                   0x001c
- #define SPI_PAD_SEL_REG                   0x0024
-+#define SPI_CFG2_REG                      0x0028
- 
- #define SPI_CFG0_SCK_HIGH_OFFSET          0
- #define SPI_CFG0_SCK_LOW_OFFSET           8
- #define SPI_CFG0_CS_HOLD_OFFSET           16
- #define SPI_CFG0_CS_SETUP_OFFSET          24
-+#define SPI_ADJUST_CFG0_SCK_LOW_OFFSET    16
-+#define SPI_ADJUST_CFG0_CS_HOLD_OFFSET    0
-+#define SPI_ADJUST_CFG0_CS_SETUP_OFFSET   16
- 
- #define SPI_CFG1_CS_IDLE_OFFSET           0
- #define SPI_CFG1_PACKET_LOOP_OFFSET       8
-@@ -55,6 +59,8 @@
- #define SPI_CMD_RST                  BIT(2)
- #define SPI_CMD_PAUSE_EN             BIT(4)
- #define SPI_CMD_DEASSERT             BIT(5)
-+#define SPI_CMD_SAMPLE_SEL           BIT(6)
-+#define SPI_CMD_CS_POL               BIT(7)
- #define SPI_CMD_CPHA                 BIT(8)
- #define SPI_CMD_CPOL                 BIT(9)
- #define SPI_CMD_RX_DMA               BIT(10)
-@@ -80,6 +86,8 @@ struct mtk_spi_compatible {
- 	bool need_pad_sel;
- 	/* Must explicitly send dummy Tx bytes to do Rx only transfer */
- 	bool must_tx;
-+	/* some IC design adjust register define */
-+	bool adjust_reg;
- };
- 
- struct mtk_spi {
-@@ -108,6 +116,8 @@ struct mtk_spi {
- static const struct mtk_chip_config mtk_default_chip_info = {
- 	.rx_mlsb = 1,
- 	.tx_mlsb = 1,
-+	.cs_pol = 0,
-+	.sample_sel = 0,
- };
- 
- static const struct of_device_id mtk_spi_of_match[] = {
-@@ -182,6 +192,17 @@ static int mtk_spi_prepare_message(struct spi_master *master,
- 	reg_val |= SPI_CMD_RX_ENDIAN;
- #endif
- 
-+	if (mdata->dev_comp->adjust_reg) {
-+		if (chip_config->cs_pol)
-+			reg_val |= SPI_CMD_CS_POL;
-+		else
-+			reg_val &= ~SPI_CMD_CS_POL;
-+		if (chip_config->sample_sel)
-+			reg_val |= SPI_CMD_SAMPLE_SEL;
-+		else
-+			reg_val &= ~SPI_CMD_SAMPLE_SEL;
-+	}
-+
- 	/* set finish and pause interrupt always enable */
- 	reg_val |= SPI_CMD_FINISH_IE | SPI_CMD_PAUSE_IE;
- 
-@@ -233,11 +254,25 @@ static void mtk_spi_prepare_transfer(struct spi_master *master,
- 	sck_time = (div + 1) / 2;
- 	cs_time = sck_time * 2;
- 
--	reg_val |= (((sck_time - 1) & 0xff) << SPI_CFG0_SCK_HIGH_OFFSET);
--	reg_val |= (((sck_time - 1) & 0xff) << SPI_CFG0_SCK_LOW_OFFSET);
--	reg_val |= (((cs_time - 1) & 0xff) << SPI_CFG0_CS_HOLD_OFFSET);
--	reg_val |= (((cs_time - 1) & 0xff) << SPI_CFG0_CS_SETUP_OFFSET);
--	writel(reg_val, mdata->base + SPI_CFG0_REG);
-+	if (mdata->dev_comp->adjust_reg) {
-+		reg_val |= (((sck_time - 1) & 0xffff)
-+			   << SPI_CFG0_SCK_HIGH_OFFSET);
-+		reg_val |= (((sck_time - 1) & 0xffff)
-+			   << SPI_ADJUST_CFG0_SCK_LOW_OFFSET);
-+		writel(reg_val, mdata->base + SPI_CFG2_REG);
-+		reg_val |= (((cs_time - 1) & 0xffff)
-+			   << SPI_ADJUST_CFG0_CS_HOLD_OFFSET);
-+		reg_val |= (((cs_time - 1) & 0xffff)
-+			   << SPI_ADJUST_CFG0_CS_SETUP_OFFSET);
-+		writel(reg_val, mdata->base + SPI_CFG0_REG);
-+	} else {
-+		reg_val |= (((sck_time - 1) & 0xff)
-+			   << SPI_CFG0_SCK_HIGH_OFFSET);
-+		reg_val |= (((sck_time - 1) & 0xff) << SPI_CFG0_SCK_LOW_OFFSET);
-+		reg_val |= (((cs_time - 1) & 0xff) << SPI_CFG0_CS_HOLD_OFFSET);
-+		reg_val |= (((cs_time - 1) & 0xff) << SPI_CFG0_CS_SETUP_OFFSET);
-+		writel(reg_val, mdata->base + SPI_CFG0_REG);
-+	}
- 
- 	reg_val = readl(mdata->base + SPI_CFG1_REG);
- 	reg_val &= ~SPI_CFG1_CS_IDLE_MASK;
-diff --git a/include/linux/platform_data/spi-mt65xx.h b/include/linux/platform_data/spi-mt65xx.h
-index 54b0448..ba4e4bb 100644
---- a/include/linux/platform_data/spi-mt65xx.h
-+++ b/include/linux/platform_data/spi-mt65xx.h
-@@ -16,5 +16,7 @@
- struct mtk_chip_config {
- 	u32 tx_mlsb;
- 	u32 rx_mlsb;
-+	u32 cs_pol;
-+	u32 sample_sel;
- };
- #endif
+Thanks Szemz? and Alexandre for having taken care of this support!
+
+Best regards,
+
+> Changes in v4:
+>  - rename the family samv7 as the internal name is samv7x and it may conflict
+>    with future SoCs.
+> 
+> Changes in v3:
+>  - dropped most of the changes in Atmel/README
+>  - rebased on v4.12-rc1
+>  - removed the dtsi until the tcb series is taken
+> 
+> Changes in v2:
+>  - fixed checkpatch issues
+>  - Added documentation
+>  - removed Ethernet from the dtsi until the driver change is taken
+> 
+> 
+> Alexandre Belloni (3):
+>   ARM: at91: Documentation: add armv7m families
+>   ARM: at91: Document armv7m compatibles
+>   ARM: at91: handle CONFIG_PM for armv7m configurations
+> 
+> Szemz? Andr?s (3):
+>   ARM: at91: Add armv7m support
+>   ARM: at91: add armv7m SoC detection
+>   ARM: at91: debug: add samv7x support
+> 
+>  Documentation/arm/Atmel/README                     | 38 +++++++++++++++++++++-
+>  .../devicetree/bindings/arm/atmel-at91.txt         | 30 +++++++++++++++++
+>  arch/arm/Kconfig.debug                             | 10 ++++++
+>  arch/arm/mach-at91/Kconfig                         | 16 ++++++++-
+>  arch/arm/mach-at91/Makefile                        |  4 +--
+>  arch/arm/mach-at91/Makefile.boot                   |  3 ++
+>  arch/arm/mach-at91/samv7.c                         | 34 +++++++++++++++++++
+>  drivers/soc/atmel/soc.c                            | 24 ++++++++++++++
+>  drivers/soc/atmel/soc.h                            | 26 +++++++++++++++
+>  9 files changed, 181 insertions(+), 4 deletions(-)
+>  create mode 100644 arch/arm/mach-at91/Makefile.boot
+>  create mode 100644 arch/arm/mach-at91/samv7.c
+> 
+
+
 -- 
-1.7.9.5
+Nicolas Ferre
