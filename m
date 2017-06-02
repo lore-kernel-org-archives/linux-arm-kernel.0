@@ -1,29 +1,29 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 02 Jun 2017 16:10:19 +0200
-Subject: [PATCH v3 0/4] make some special clk as critical_clocks
-In-Reply-To: <1493710446-7203-1-git-send-email-zhangqing@rock-chips.com>
-References: <1493710446-7203-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <2347847.YaA7RMd5sr@phil>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 2 Jun 2017 15:13:39 +0100
+Subject: [PATCH V17 02/11] ras: acpi/apei: cper: add support for generic
+ data v3 structure
+In-Reply-To: <1495225933-4410-3-git-send-email-tbaicar@codeaurora.org>
+References: <1495225933-4410-1-git-send-email-tbaicar@codeaurora.org>
+ <1495225933-4410-3-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <20170602141338.GJ6371@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 2. Mai 2017, 15:34:02 CEST schrieb Elaine Zhang:
-> change in V3:
-> reword the commit message,explain why the specific clocks are need to be critical.
+On Fri, May 19, 2017 at 02:32:04PM -0600, Tyler Baicar wrote:
+> The ACPI 6.1 spec adds a new revision of the generic error data
+> entry structure. Add support to handle the new structure as well
+> as properly verify and iterate through the generic data entries.
 > 
-> change in v2:
-> fix up some clks which have their own driver, not need to set as critical clocks
-> 
-> Elaine Zhang (4):
->   clk: rockchip: rk3036: make pclk_ddrupctl as critical_clock
->   clk: rockchip: rk3228: make noc and some special clk as
->     critical_clocks
->   clk: rockchip: rk3288: make noc and some special clk as
->     critical_clocks
->   clk: rockchip: rk3368: make some special clk as critical_clocks
+> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+> CC: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+> ---
+>  drivers/acpi/apei/ghes.c    | 11 +++++------
+>  drivers/firmware/efi/cper.c | 37 ++++++++++++++++++++++---------------
+>  include/acpi/ghes.h         | 36 ++++++++++++++++++++++++++++++++++++
+>  3 files changed, 63 insertions(+), 21 deletions(-)
 
-applied all 4 for 4.13
+Given that Boris and Rafael are ok with this series, it makes sense to
+take this via arm64, but I need an ack from Ard or Matt on the EFI changes
+in this patch and the subsequent one.
 
-
-Thanks
-Heiko
+Will
