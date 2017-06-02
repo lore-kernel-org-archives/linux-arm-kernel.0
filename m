@@ -1,110 +1,51 @@
-From: bsd@redhat.com (Bandan Das)
-Date: Fri, 02 Jun 2017 15:25:26 -0400
-Subject: [RFC 07/55] KVM: arm/arm64: Add virtual EL2 state emulation
- framework
-In-Reply-To: <20170602190622.GF397@cbox> (Christoffer Dall's message of "Fri,
- 2 Jun 2017 21:06:22 +0200")
-References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
- <1483943091-1364-8-git-send-email-jintack@cs.columbia.edu>
- <jpg37bj1nj6.fsf@linux.bootlegged.copy> <20170602115140.GB397@cbox>
- <jpg8tlal2aw.fsf@linux.bootlegged.copy> <20170602190622.GF397@cbox>
-Message-ID: <jpgr2z2dwex.fsf@linux.bootlegged.copy>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 2 Jun 2017 21:30:12 +0200
+Subject: [PATCH 10/19] drm/sun4i: hdmi: Rename internal DDC clock to
+ avoid name collision
+In-Reply-To: <20170602101024.18940-11-wens@csie.org>
+References: <20170602101024.18940-1-wens@csie.org>
+ <20170602101024.18940-11-wens@csie.org>
+Message-ID: <20170602193012.xwuziggyx6evmusz@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Christoffer Dall <cdall@linaro.org> writes:
+On Fri, Jun 02, 2017 at 06:10:15PM +0800, Chen-Yu Tsai wrote:
+> The DDC parent clock on the A31 SoC is also conveniently named
+> "hdmi-ddc", which results in a name collision when the hdmi driver
+> registers its internal DDC divider clock.
+> 
+> Rename the internal clock to "hdmi-ddc-divider".
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c
+> index e1071838f487..9a6b6243e977 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c
+> @@ -125,7 +125,7 @@ static int _sun4i_ddc_create(struct sun4i_hdmi *hdmi, struct clk *parent,
+>  	if (!ddc)
+>  		return -ENOMEM;
+>  
+> -	init.name = "hdmi-ddc";
+> +	init.name = "hdmi-ddc-divider";
 
-> On Fri, Jun 02, 2017 at 01:36:23PM -0400, Bandan Das wrote:
->> Christoffer Dall <cdall@linaro.org> writes:
->> 
->> > On Thu, Jun 01, 2017 at 04:05:49PM -0400, Bandan Das wrote:
->> >> Jintack Lim <jintack@cs.columbia.edu> writes:
->> >> ...
->> >> > +/**
->> >> > + * kvm_arm_setup_shadow_state -- prepare shadow state based on emulated mode
->> >> > + * @vcpu: The VCPU pointer
->> >> > + */
->> >> > +void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
->> >> > +{
->> >> > +	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
->> >> > +
->> >> > +	ctxt->hw_pstate = *vcpu_cpsr(vcpu);
->> >> > +	ctxt->hw_sys_regs = ctxt->sys_regs;
->> >> > +	ctxt->hw_sp_el1 = ctxt->gp_regs.sp_el1;
->> >> > +}
->> >> > +
->> >> > +/**
->> >> > + * kvm_arm_restore_shadow_state -- write back shadow state from guest
->> >> > + * @vcpu: The VCPU pointer
->> >> > + */
->> >> > +void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu)
->> >> > +{
->> >> > +	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
->> >> > +
->> >> > +	*vcpu_cpsr(vcpu) = ctxt->hw_pstate;
->> >> > +	ctxt->gp_regs.sp_el1 = ctxt->hw_sp_el1;
->> >> > +}
->> >> > +
->> >> > +void kvm_arm_init_cpu_context(kvm_cpu_context_t *cpu_ctxt)
->> >> > +{
->> >> > +	cpu_ctxt->hw_sys_regs = &cpu_ctxt->sys_regs[0];
->> >> > +}
->> >> 
->> >> 
->> >> IIUC, the *_shadow_state() functions will set hw_* pointers to
->> >> either point to the "real" state or the shadow state to manage L2 ?
->> >> Maybe, it might make sense to make these function names a little more
->> >> generic since they are not dealing with setting the shadow state
->> >> alone.
->> >> 
->> >
->> > The notion of 'shadow state' is borrowed from shadow page tables, in
->> > which you always load some 'shadow copy' of the 'real value' into the
->> > hardware, so the shadow state is the one that's used for execution by
->> > the hardware.
->> >
->> > The shadow state may be the same as the VCPU's EL1 state, for example,
->> > or it may be a modified version of the VCPU's EL2 state, for example.
->> 
->> Yes, it can be the same. Although, as you said above, "shadow" conventionally
->> refers to the latter.
->
-> That's not what I said.  I said shadow is the thing you use in the
-> hardware, which may be the same, and may be something different.  The
-> important point being, that it is what gets used by the hardware, and
-> that it's decoupled, not necessarily different, from the virtual
-> state.
+Can't we rename the CCU clock instead? Having the clock called
+hdmi-ddc being the actual clock output on the DDC bus feels more
+natural.
 
-I was referring to your first paragraph. And conventionally, in the context of
-shadow page tables, it is always different.
+Maxime
 
->> When it's pointing to EL1 state, it's not really
->> shadow state anymore.
->> 
->
-> You can argue it both ways, in the end, all that's important is whether
-> or not it's clear what the functions do.
->
->> > If you have better suggestions for naming, we're open to that though.
->> >
->> 
->> Oh nothing specifically, I just felt like "shadow" in the function name
->> could be confusing. Borrowing from kvm_arm_init_cpu_context(), 
->> how about kvm_arm_setup/restore_cpu_context()  ?
->
-> I have no objection to these names.
->
->> 
->> BTW, on a separate note, we might as well get away with the typedef and
->> call struct kvm_cpu_context directly.
->> 
-> I don't think it's worth changing the code just for that, but if you
-> feel it's a significant cleanup, you can send a patch with a good
-> argument for why it's worth changing in the commit message.
-
-Sure! The cleanup is not part of the series but sticking to either one
-of them in this patch is. As for the argument, typedefs for structs are
-discouraged as part of the coding style.
-
-> Thanks,
-> -Christoffer
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170602/632695be/attachment-0001.sig>
