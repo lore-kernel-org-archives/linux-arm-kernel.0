@@ -1,108 +1,83 @@
-From: hotran@apm.com (Hoan Tran)
-Date: Fri, 2 Jun 2017 09:54:32 -0700
-Subject: [PATCH v2 1/3] perf: xgene: Parse PMU subnode from the match table
-In-Reply-To: <20170602145934.GK28299@leverpostej>
-References: <1491238077-20666-1-git-send-email-hotran@apm.com>
- <1491238077-20666-2-git-send-email-hotran@apm.com>
- <20170602145934.GK28299@leverpostej>
-Message-ID: <CAFHUOYwYU4TTLWODX0=15uwDGusdydcX_s8G_Ji81N0c+Bkdqg@mail.gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Fri, 2 Jun 2017 20:11:24 +0300
+Subject: [PATCH 6/6] tty: serial: lpuart: add a more accurate baud rate
+ calculation method
+In-Reply-To: <AM3PR04MB3062F7BCE82860C377C214E80F10@AM3PR04MB306.eurprd04.prod.outlook.com>
+References: <1494316248-24052-1-git-send-email-aisheng.dong@nxp.com>
+ <1494316248-24052-7-git-send-email-aisheng.dong@nxp.com>
+ <CAHp75Vemc5qoD7gbc_sJBSasYTFYSYOuWZv4N-4X60arWX8aJg@mail.gmail.com>
+ <AM3PR04MB3062F7BCE82860C377C214E80F10@AM3PR04MB306.eurprd04.prod.outlook.com>
+Message-ID: <CAHp75VcH0j3ddaZ3iStNO4QcAwJKZ7BAMwUTthum2no1ucs2ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark
+On Wed, May 31, 2017 at 5:18 PM, A.S. Dong <aisheng.dong@nxp.com> wrote:
+>> On Tue, May 9, 2017 at 10:50 AM, Dong Aisheng <aisheng.dong@nxp.com> wrote:
 
-On Fri, Jun 2, 2017 at 7:59 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi Hoan,
->
-> Apologies for the last reply.
->
-> On Mon, Apr 03, 2017 at 09:47:55AM -0700, Hoan Tran wrote:
->> +static const struct acpi_device_id xgene_pmu_acpi_type_match[] = {
->> +     {"APMC0D5D", PMU_TYPE_L3C},
->> +     {"APMC0D5E", PMU_TYPE_IOB},
->> +     {"APMC0D5F", PMU_TYPE_MCB},
->> +     {"APMC0D60", PMU_TYPE_MC},
->> +     {},
->> +};
->> +
->> +static const struct acpi_device_id *xgene_pmu_acpi_match_type(
->> +                                     const struct acpi_device_id *ids,
->> +                                     struct acpi_device *adev)
->> +{
->> +     const struct acpi_device_id *match_id = NULL;
->> +     const struct acpi_device_id *id;
->> +
->> +     for (id = ids; id->id[0] || id->cls; id++) {
->> +             if (!acpi_match_device_ids(adev, id))
->> +                     match_id = id;
->> +             else if (match_id)
->> +                     break;
->> +     }
->> +
->> +     return match_id;
->> +}
->
-> I don't believe this look is necessary. AFAICT, acpi_match_device_ids()
-> already iterates over the id table it is given.
+By some reason my previous message went privately.
+It didn't have anything major anyway and here I'm suggesting
+optimization of finding factors of the formula in use. See below.
 
-The acpi_match_device_ids() function just returns if a device ID is
-available on the given list. It does not return the first matching ID.
-That's the reason I created this function to find the first matching ID.
-
->
->> +
->>  static acpi_status acpi_pmu_dev_add(acpi_handle handle, u32 level,
->>                                   void *data, void **return_value)
->>  {
->> +     const struct acpi_device_id *acpi_id;
->>       struct xgene_pmu *xgene_pmu = data;
->>       struct xgene_pmu_dev_ctx *ctx;
->>       struct acpi_device *adev;
->> @@ -1059,17 +1085,11 @@ static acpi_status acpi_pmu_dev_add(acpi_handle handle, u32 level,
->>       if (acpi_bus_get_status(adev) || !adev->status.present)
->>               return AE_OK;
+>> > +       u32 sbr, osr, baud_diff, tmp_osr, tmp_sbr, tmp_diff, tmp;
+>> > +       u32 clk = sport->port.uartclk;
+>> > +
+>> > +       /*
+>> > +        * The idea is to use the best OSR (over-sampling rate) possible.
+>> > +        * Note, OSR is typically hard-set to 16 in other LPUART
+>> instantiations.
+>> > +        * Loop to find the best OSR value possible, one that generates
+>> minimum
+>> > +        * baud_diff iterate through the rest of the supported values of
+>> OSR.
+>> > +        *
+>> > +        * Calculation Formula:
+>> > +        *  Baud Rate = baud clock / ((OSR+1) ? SBR)
+>> > +        */
+>> > +       baud_diff = baudrate;
+>> > +       osr = 0;
+>> > +       sbr = 0;
+>> > +
 >>
->> -     if (!strcmp(acpi_device_hid(adev), "APMC0D5D"))
->> -             ctx = acpi_get_pmu_hw_inf(xgene_pmu, adev, PMU_TYPE_L3C);
->> -     else if (!strcmp(acpi_device_hid(adev), "APMC0D5E"))
->> -             ctx = acpi_get_pmu_hw_inf(xgene_pmu, adev, PMU_TYPE_IOB);
->> -     else if (!strcmp(acpi_device_hid(adev), "APMC0D5F"))
->> -             ctx = acpi_get_pmu_hw_inf(xgene_pmu, adev, PMU_TYPE_MCB);
->> -     else if (!strcmp(acpi_device_hid(adev), "APMC0D60"))
->> -             ctx = acpi_get_pmu_hw_inf(xgene_pmu, adev, PMU_TYPE_MC);
->> -     else
->> -             ctx = NULL;
->> +     acpi_id = xgene_pmu_acpi_match_type(xgene_pmu_acpi_type_match, adev);
->> +     if (!acpi_id)
->> +             return AE_OK;
->
-> As above, and as I covered in my reply to v1, I think the above should
-> be:
->
->         acpi_id = acpi_match_device_ids(adev, xgene_pmu_acpi_type_match);
->         if (!acpi_id)
->                 return AE_OK;
->
-> ... or am I missing something?
+>> > +       for (tmp_osr = 4; tmp_osr <= 32; tmp_osr++) {
 
-The same above.
+I missed one thing, what happened by default to OSR? What is the value in use?
 
-Thanks
-Hoan
+>> I _think_ you may simplify this and avoid for-loop if you reconsider
+>> approach.
 
->
-> With that change:
->
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
->
-> Thanks,
-> Mark.
->
->>
->> +     ctx = acpi_get_pmu_hw_inf(xgene_pmu, adev, (u32)acpi_id->driver_data);
->>       if (!ctx)
->>               return AE_OK;
->>
->> --
->> 1.9.1
->>
+> But there is indeed a optimization way, see below.
+
+> To optimize the looping, we probably could do:
+> If (!baud_diff)
+>         Break;
+
+It's a small one, we may have more interesting approach.
+
+So, the algo is the following:
+
+Assume the ranges like this:
+OSR = [4 ... 32]
+SBR = [2 ... 8192]
+
+Then:
+
+1. Get ratio factor as
+      ratio = CLK / desired baud rate
+2. If ratio < 8192 * 9 / 2, just use (ratio / 4, 4) as (OSR, SBR)
+setting. (Needs clarification on OSR < 4)
+3. if ratio >= 8192 * 31, just use those two numbers (8192, 31). You
+can't do anything better there.
+4. Otherwise, get a minimum required factor of OSR
+      osr_min = ratio / 8192
+5. Start your loop from osr_min + 1 to 31.
+
+6 (optional). Of course you may not consider baud_diff > osr_min, it's
+I suppose obvious
+
+P.S. Note, all divisions by 2^n are just simple right shifts. Diffs
+are calculated as multiplication of OSR and SBR in comparison to
+ratio. One division so far.
+
+-- 
+With Best Regards,
+Andy Shevchenko
