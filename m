@@ -1,34 +1,31 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 1 Jun 2017 17:29:44 -0700
-Subject: [GIT PULL] DaVinci fixes v4.12 (part 2)
-In-Reply-To: <f7958956-504d-a8b1-90e1-709a845312da@ti.com>
-References: <f7958956-504d-a8b1-90e1-709a845312da@ti.com>
-Message-ID: <20170602002944.GQ13314@localhost>
+Date: Thu, 1 Jun 2017 17:29:11 -0700
+Subject: [GIT PULL] ARM: realtek: dt64 for v4.12
+In-Reply-To: <20170525120404.32034-2-afaerber@suse.de>
+References: <20170525120404.32034-1-afaerber@suse.de>
+ <20170525120404.32034-2-afaerber@suse.de>
+Message-ID: <20170602002911.GP13314@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 01, 2017 at 03:35:35PM +0530, Sekhar Nori wrote:
-> The following changes since commit 95d7c1f18bf8ac03b0fc48eac1f1b11f867765b8:
+On Thu, May 25, 2017 at 02:04:04PM +0200, Andreas F??rber wrote:
+> Hi Arnd and Olof,
 > 
->   ARM: davinci: PM: Do not free useful resources in normal path in 'davinci_pm_init' (2017-05-17 15:25:18 +0530)
+> This is the initial dt64 pull for Realtek.
+> The Kconfig symbol is introduced in the arm64 pull.
+> 
+> Regards,
+> Andreas
+> 
+> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+> 
+>   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v4.12-p2
-> 
-> for you to fetch changes up to f434b1c4aba5cc4e5bae4399a965b5fd14011d69:
-> 
->   MAINTAINERS: add device-tree files to TI DaVinci entry (2017-05-30 16:29:57 +0530)
-> 
-> ----------------------------------------------------------------
-> A fix to MAINTAINERS file adding relevant device-tree
-> files to mach-davinci entry.
-> 
-> ----------------------------------------------------------------
-> Sekhar Nori (1):
->       MAINTAINERS: add device-tree files to TI DaVinci entry
+>   git://github.com/afaerber/linux.git tags/realtek-arm64-dt-for-4.12
 
-Merged, thanks.
+Merged into next/dt64 for v4.13. Thanks!
 
 
 -Olof
