@@ -1,102 +1,67 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri,  2 Jun 2017 18:10:21 +0800
-Subject: [PATCH 16/19] ARM: sun6i: a31: Add device node for HDMI controller
-In-Reply-To: <20170602101024.18940-1-wens@csie.org>
-References: <20170602101024.18940-1-wens@csie.org>
-Message-ID: <20170602101024.18940-17-wens@csie.org>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 02 Jun 2017 11:16:10 +0100
+Subject: [PATCH v2] KVM: arm/arm64: Signal SIGBUS when stage2 discovers
+ hwpoison memory
+In-Reply-To: <20170601222235.GN20919@cbox>
+References: <20170524163250.29281-1-james.morse@arm.com>
+ <20170601222235.GN20919@cbox>
+Message-ID: <59313AEA.2060705@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we support the HDMI controller on the A31 SoC, we can add it
-to the device tree.
+Hi Christoffer,
 
-This adds a device node for the HDMI controller, and the of_graph nodes
-connecting it to the 2 TCONs.
+On 01/06/17 23:22, Christoffer Dall wrote:
+> On Wed, May 24, 2017 at 05:32:50PM +0100, James Morse wrote:
+>> Once we enable ARCH_SUPPORTS_MEMORY_FAILURE on arm64, notifications for
+>> broken memory can call memory_failure() in mm/memory-failure.c to deliver
+>> SIGBUS to any user space process using the page, and notify all the
+>> in-kernel users.
+>>
+>> If the page corresponded with guest memory, KVM will unmap this page
+>> from its stage2 page tables. The user space process that allocated
+>> this memory may have never touched this page in which case it may not
+>> be mapped meaning SIGBUS won't be delivered.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun6i-a31.dtsi | 55 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
+> Sorry, I don't remember, what is the scenario where KVM can have a
+> mapping in stage 2 without there being a corresponding mapping for user
+> space?
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index d0cede5aaeb5..36bfb6ad6578 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -284,6 +284,12 @@
- 					#address-cells = <1>;
- 					#size-cells = <0>;
- 					reg = <1>;
-+
-+					tcon0_out_hdmi: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&hdmi_in_tcon0>;
-+						allwinner,tcon-channel = <1>;
-+					};
- 				};
- 			};
- 		};
-@@ -321,6 +327,12 @@
- 					#address-cells = <1>;
- 					#size-cells = <0>;
- 					reg = <1>;
-+
-+					tcon1_out_hdmi: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&hdmi_in_tcon1>;
-+						allwinner,tcon-channel = <1>;
-+					};
- 				};
- 			};
- 		};
-@@ -401,6 +413,49 @@
- 			#size-cells = <0>;
- 		};
- 
-+		hdmi: hdmi at 01c16000 {
-+			compatible = "allwinner,sun6i-a31-hdmi";
-+			reg = <0x01c16000 0x1000>;
-+			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_AHB1_HDMI>, <&ccu CLK_HDMI>,
-+				 <&ccu CLK_HDMI_DDC>,
-+				 <&ccu CLK_PLL_VIDEO0_2X>,
-+				 <&ccu CLK_PLL_VIDEO1_2X>;
-+			clock-names = "ahb", "mod", "ddc", "pll-0", "pll-1";
-+			resets = <&ccu RST_AHB1_HDMI>;
-+			reset-names = "ahb";
-+			dma-names = "ddc-tx", "ddc-rx", "audio-tx";
-+			dmas = <&dma 13>, <&dma 13>, <&dma 14>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				hdmi_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					hdmi_in_tcon0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&tcon0_out_hdmi>;
-+					};
-+
-+					hdmi_in_tcon1: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&tcon1_out_hdmi>;
-+					};
-+				};
-+
-+				hdmi_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+				};
-+			};
-+		};
-+
- 		usb_otg: usb at 01c19000 {
- 			compatible = "allwinner,sun6i-a31-musb";
- 			reg = <0x01c19000 0x0400>;
--- 
-2.11.0
+(looks like I mean more than one thing by mapping... oops.)
+
+Mapping in that there is a physical page for this user-space address, but when
+qemu first touches it, it will be faulted in as its not been touched before.
+
+(rambling on:)
+When mm/memory_failure.c:memory_failure() walks the rmap for the poisoned page
+it doesn't find qemu, so no user-space processes gets signalled.
+
+If qemu were to touch the page, fixup_user_fault() will return -EHWPOISON and we
+deliver sigbus to qemu.
+
+This doesn't happen when the guest touches the page as kvm's core code maps
+-EHWPOISON to KVM_PFN_ERR_HWPOISON, which the arm/arm64 kvm code ignores and
+drops -EFAULT on userspace instead.
+
+
+>> This works well until a guest accesses that page, and KVM discovers
+>> pfn == KVM_PFN_ERR_HWPOISON when it comes to process the stage2 fault.
+>>
+>> Do as x86 does, and deliver the SIGBUS when we discover
+>> KVM_PFN_ERR_HWPOISON. Use the stage2 mapping size as the si_addr_lsb
+> 
+> But this part about the stage 2 mapping size is not what the code does.
+> It uses the granularity of the mmap region, if I'm not mistaken.
+
+Yes. This is what I got wrong last time, Punit put me right, but I forgot to
+update the commit message.
+
+I will change this 'Use the'... sentence in v3 to:
+> Use the hugepage size as si_addr_lsb if this vma was allocated as a hugepage.
+> Transparent hugepages will be split by memory_failure() before we see them
+> here.
+
+
+Thanks,
+
+James
