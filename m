@@ -1,43 +1,46 @@
 From: leoyang.li@nxp.com (Li Yang)
-Date: Fri, 2 Jun 2017 18:20:22 -0500
-Subject: [PATCH 1/2] MAINTAINERS: update entry for Freescale SoC drivers
-Message-ID: <1496445623-22390-1-git-send-email-leoyang.li@nxp.com>
+Date: Fri, 2 Jun 2017 18:20:23 -0500
+Subject: [PATCH 2/2] MAINTAINERS: update my email address from freescale to nxp
+In-Reply-To: <1496445623-22390-1-git-send-email-leoyang.li@nxp.com>
+References: <1496445623-22390-1-git-send-email-leoyang.li@nxp.com>
+Message-ID: <1496445623-22390-2-git-send-email-leoyang.li@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add myself as the maintainer for drivers/fsl/soc/ and fix the scope for
-device tree bindings.
-
 Signed-off-by: Li Yang <leoyang.li@nxp.com>
 ---
- MAINTAINERS | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ MAINTAINERS | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index d24240b..1807d3f 100644
+index 1807d3f..5a39d4a 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -5357,11 +5357,11 @@ S:	Maintained
- F:	drivers/net/ethernet/freescale/dpaa
+@@ -5285,7 +5285,7 @@ S:	Maintained
+ F:	drivers/video/fbdev/fsl-diu-fb.*
  
- FREESCALE SOC DRIVERS
--M:	Scott Wood <oss@buserror.net>
+ FREESCALE DMA DRIVER
+-M:	Li Yang <leoli@freescale.com>
 +M:	Li Yang <leoyang.li@nxp.com>
+ M:	Zhang Wei <zw@zh-kernel.org>
  L:	linuxppc-dev at lists.ozlabs.org
- L:	linux-arm-kernel at lists.infradead.org
  S:	Maintained
--F:	Documentation/devicetree/bindings/powerpc/fsl/
-+F:	Documentation/devicetree/bindings/soc/fsl/
- F:	drivers/soc/fsl/
- F:	include/linux/fsl/
+@@ -5374,14 +5374,14 @@ F:	include/soc/fsl/*qe*.h
+ F:	include/soc/fsl/*ucc*.h
  
-@@ -7695,6 +7695,7 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/scottwood/linux.git
- S:	Maintained
- F:	arch/powerpc/platforms/83xx/
- F:	arch/powerpc/platforms/85xx/
-+F:	Documentation/devicetree/bindings/powerpc/fsl/
- 
- LINUX FOR POWERPC PA SEMI PWRFICIENT
+ FREESCALE USB PERIPHERAL DRIVERS
+-M:	Li Yang <leoli@freescale.com>
++M:	Li Yang <leoyang.li@nxp.com>
+ L:	linux-usb at vger.kernel.org
  L:	linuxppc-dev at lists.ozlabs.org
+ S:	Maintained
+ F:	drivers/usb/gadget/udc/fsl*
+ 
+ FREESCALE QUICC ENGINE UCC ETHERNET DRIVER
+-M:	Li Yang <leoli@freescale.com>
++M:	Li Yang <leoyang.li@nxp.com>
+ L:	netdev at vger.kernel.org
+ L:	linuxppc-dev at lists.ozlabs.org
+ S:	Maintained
 -- 
 1.9.0
