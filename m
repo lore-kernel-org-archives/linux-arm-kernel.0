@@ -1,80 +1,41 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 3 Jun 2017 06:31:53 +0800
-Subject: [PATCH v2] mm: vmalloc: make vmalloc_to_page() deal with PMD/PUD
- mappings
-In-Reply-To: <20170602155416.32706-1-ard.biesheuvel@linaro.org>
-Message-ID: <201706030608.koMVDa7j%fengguang.wu@intel.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 2 Jun 2017 15:39:46 -0700
+Subject: [PATCH V3 1/3] clk: add clk_bulk_get accessories
+In-Reply-To: <1495201746-31841-2-git-send-email-aisheng.dong@nxp.com>
+References: <1495201746-31841-1-git-send-email-aisheng.dong@nxp.com>
+ <1495201746-31841-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20170602223946.GV20170@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On 05/19, Dong Aisheng wrote:
+> These helper function allows drivers to get several clk consumers in
+> one operation. If any of the clk cannot be acquired then any clks
+> that were got will be put before returning to the caller.
+> 
+> This can relieve the driver owners' life who needs to handle many clocks,
+> as well as each clock error reporting.
+> 
+> Cc: Michael Turquette <mturquette@baylibre.com>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> Cc: Mark Brown <broonie@kernel.org>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Anson Huang <anson.huang@nxp.com>
+> Cc: Robin Gong <yibin.gong@nxp.com>
+> Cc: Bai Ping <ping.bai@nxp.com>
+> Cc: Leonard Crestez <leonard.crestez@nxp.com>
+> Cc: Octavian Purdila <octavian.purdila@nxp.com>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
 
-[auto build test ERROR on mmotm/master]
-[also build test ERROR on v4.12-rc3 next-20170602]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Applied to clk-bulk-get and merged into clk-next
 
-url:    https://github.com/0day-ci/linux/commits/Ard-Biesheuvel/mm-vmalloc-make-vmalloc_to_page-deal-with-PMD-PUD-mappings/20170603-021745
-base:   git://git.cmpxchg.org/linux-mmotm.git master
-config: parisc-allmodconfig (attached as .config)
-compiler: hppa-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=parisc 
-
-All error/warnings (new ones prefixed by >>):
-
-   In file included from arch/parisc/include/asm/pgtable.h:4:0,
-                    from include/linux/mm.h:70,
-                    from mm/vmalloc.c:12:
-   mm/vmalloc.c: In function 'vmalloc_to_page':
->> include/asm-generic/4level-fixup.h:26:25: error: implicit declaration of function 'pgd_page' [-Werror=implicit-function-declaration]
-    #define pud_page(pud)   pgd_page(pud)
-                            ^
->> mm/vmalloc.c:295:10: note: in expansion of macro 'pud_page'
-      return pud_page(*pud) + ((addr & ~PUD_MASK) >> PAGE_SHIFT);
-             ^~~~~~~~
->> mm/vmalloc.c:295:25: warning: return makes pointer from integer without a cast [-Wint-conversion]
-      return pud_page(*pud) + ((addr & ~PUD_MASK) >> PAGE_SHIFT);
-                             
-   cc1: some warnings being treated as errors
-
-vim +/pud_page +295 mm/vmalloc.c
-
-   279		/*
-   280		 * XXX we might need to change this if we add VIRTUAL_BUG_ON for
-   281		 * architectures that do not vmalloc module space
-   282		 */
-   283		VIRTUAL_BUG_ON(!is_vmalloc_or_module_addr(vmalloc_addr));
-   284	
-   285		if (pgd_none(*pgd))
-   286			return NULL;
-   287		p4d = p4d_offset(pgd, addr);
-   288		if (p4d_none(*p4d))
-   289			return NULL;
-   290		pud = pud_offset(p4d, addr);
-   291		if (pud_none(*pud))
-   292			return NULL;
-   293		if (pud_huge(*pud)) {
-   294			VM_BUG_ON(!IS_ENABLED(CONFIG_HAVE_ARCH_HUGE_VMAP));
- > 295			return pud_page(*pud) + ((addr & ~PUD_MASK) >> PAGE_SHIFT);
-   296		}
-   297		pmd = pmd_offset(pud, addr);
-   298		if (pmd_none(*pmd))
-   299			return NULL;
-   300		if (pmd_huge(*pmd)) {
-   301			VM_BUG_ON(!IS_ENABLED(CONFIG_HAVE_ARCH_HUGE_VMAP));
-   302			return pmd_page(*pmd) + ((addr & ~PMD_MASK) >> PAGE_SHIFT);
-   303		}
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 50008 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170603/92e31e12/attachment-0001.gz>
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
