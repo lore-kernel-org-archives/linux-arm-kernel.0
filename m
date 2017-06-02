@@ -1,39 +1,46 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu,  1 Jun 2017 19:11:10 -0700
-Subject: [PATCH v4 2/2] ARM: dts: imx7-colibri: add NAND support
-In-Reply-To: <cover.9cbefd91387aefe2522dbb3e6338e4e4efdb5e41.1496369342.git-series.stefan@agner.ch>
-References: <cover.9cbefd91387aefe2522dbb3e6338e4e4efdb5e41.1496369342.git-series.stefan@agner.ch>
-Message-ID: <415320ef413f5eb5dcba236aa69a0b644d7e7469.1496369342.git-series.stefan@agner.ch>
+From: ran.wang_1@nxp.com (Ran Wang)
+Date: Fri, 2 Jun 2017 10:30:00 +0800
+Subject: [PATCH] arm64: dts: ls1046a: Add dis_rxdet_inp3_quirk property to
+ USB3 node
+Message-ID: <1496370600-31442-1-git-send-email-ran.wang_1@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Colibri iMX7 modules come with 512MB on-module SLC NAND flash
-populated. Make use of it by enabling the GPMI controller.
+Add "dis_rxdet_inp3_quirk" boolean property to USB3 node. This property
+is used to disable rx detection in P3 PHY mode.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
+Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
 ---
- arch/arm/boot/dts/imx7-colibri.dtsi |  9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx7-colibri.dtsi b/arch/arm/boot/dts/imx7-colibri.dtsi
-index 2d87489..ad4ce19 100644
---- a/arch/arm/boot/dts/imx7-colibri.dtsi
-+++ b/arch/arm/boot/dts/imx7-colibri.dtsi
-@@ -106,6 +106,15 @@
- 	fsl,magic-packet;
- };
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+index f4b8b7e..9137280 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+@@ -567,6 +567,7 @@
+ 			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
+ 			dr_mode = "host";
+ 			snps,quirk-frame-length-adjustment = <0x20>;
++			snps,dis_rxdet_inp3_quirk;
+ 		};
  
-+&gpmi {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_gpmi_nand>;
-+	fsl,use-minimum-ecc;
-+	nand-on-flash-bbt;
-+	nand-ecc-mode = "hw";
-+	status = "okay";
-+};
-+
- &i2c1 {
- 	clock-frequency = <100000>;
- 	pinctrl-names = "default";
+ 		usb1: usb at 3000000 {
+@@ -575,6 +576,7 @@
+ 			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
+ 			dr_mode = "host";
+ 			snps,quirk-frame-length-adjustment = <0x20>;
++			snps,dis_rxdet_inp3_quirk;
+ 		};
+ 
+ 		usb2: usb at 3100000 {
+@@ -583,6 +585,7 @@
+ 			interrupts = <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
+ 			dr_mode = "host";
+ 			snps,quirk-frame-length-adjustment = <0x20>;
++			snps,dis_rxdet_inp3_quirk;
+ 		};
+ 
+ 		sata: sata at 3200000 {
 -- 
-git-series 0.9.1
+2.1.0.27.g96db324
