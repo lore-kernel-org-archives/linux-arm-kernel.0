@@ -1,465 +1,84 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 2 Jun 2017 14:11:51 +0300
-Subject: arm64: segfaults on next-20170602 with LTP tests
-Message-ID: <20170602111151.r2x3364zqabmshzo@yury-thinkpad>
+From: bhupesh.linux@gmail.com (Bhupesh SHARMA)
+Date: Fri, 2 Jun 2017 16:45:23 +0530
+Subject: [PATCH v3 0/2] kexec-tools: arm64: Enable D-cache in purgatory
+In-Reply-To: <CAKv+Gu--N4Pef6z=G4ePTgF3CcKhmmSfrvJBY-5p0CLL_PZ=3Q@mail.gmail.com>
+References: <cover.1495514291.git.panand@redhat.com> <59312080.1090906@arm.com>
+ <CAKv+Gu--N4Pef6z=G4ePTgF3CcKhmmSfrvJBY-5p0CLL_PZ=3Q@mail.gmail.com>
+Message-ID: <CAFTCetS17w0-BJJzTfi8uNS67xos4MwJz3R=qdz2Oe7+fcXk3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all, 
+Hi Ard, James
 
-I see that latest and yesterday's linux-next segfaults with tests pth_str01,
-pth_str03, rwtest04. Rwtest04 hangs sometimes. Crashes are not always
-reproducible. About week ago everything was fine. Kernel log and config file
-are attached. The testing is performed on qemu.
+On Fri, Jun 2, 2017 at 3:25 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 2 June 2017 at 08:23, James Morse <james.morse@arm.com> wrote:
+>> Hi Pratyush,
+>>
+>> On 23/05/17 06:02, Pratyush Anand wrote:
+>>> It takes more that 2 minutes to verify SHA in purgatory when vmlinuz image
+>>> is around 13MB and initramfs is around 30MB. It takes more than 20 second
+>>> even when we have -O2 optimization enabled. However, if dcache is enabled
+>>> during purgatory execution then, it takes just a second in SHA
+>>> verification.
+>>>
+>>> Therefore, these patches adds support for dcache enabling facility during
+>>> purgatory execution.
+>>
+>> I'm still not convinced we need this. Moving the SHA verification to happen
+>> before the dcache+mmu are disabled would also solve the delay problem, and we
+>> can print an error message or fail the syscall.
+>>
+>> For kexec we don't expect memory corruption, what are we testing for?
+>
+> This is a very good question. SHA-256 is quite a heavy hammer if all
+> you need is CRC style error detection. Note that SHA-256 uses 256
+> bytes of round keys, which means that in the absence of a cache, each
+> 64 byte chunk of data processed involves (re)reading 320 bytes from
+> DRAM. That also means you could write a SHA-256 implementation for
+> AArch64 that keeps the round keys in NEON registers instead, and it
+> would probably be a lot faster.
 
-Yury
+AFAICR the sha-256 implementation was proposed to boot a signed
+kexec/kdump kernel to circumvent kexec from violating UEFI secure boot
+restrictions (see [1]).
 
- { 1761.256620] pth_str01[8779]: unhandled level 2 translation fault (11) at 0x00000018, esr 0x92000006
- [ 1761.256845] pgd = ffff8000180ba000
- [ 1761.256948] [00000018] *pgd=000000007d2c9003, *pud=0000000048eff003, *pmd=0000000000000000
- [ 1761.257146] CPU: 0 PID: 8779 Comm: pth_str01 Tainted: G S              4.12.0-rc3-next-20170602 #754
- [ 1761.257324] Hardware name: linux,dummy-virt (DT)
- [ 1761.257434] task: ffff800009036800 task.stack: ffff800008fa4000
- [ 1761.257542] PC is at 0xffffb7fb6f98
- [ 1761.257613] LR is at 0xffffb7fb471c
- [ 1761.257678] pc : [<0000ffffb7fb6f98>] lr : [<0000ffffb7fb471c>] pstate: 60000000
- [ 1761.257791] sp : 0000ffff847fe830
- [ 1761.257855] x29: 0000ffff847fe830 x28: 0000000000413820 
- [ 1761.257955] x27: 0000ffff847fe8ac x26: 0000000000000012 
- [ 1761.258054] x25: 00000000004137ef x24: 0000000000000000 
- [ 1761.258171] x23: 0000000000000000 x22: 0000000000000000 
- [ 1761.258279] x21: 0000ffff847fe950 x20: 00000000004137f0 
- [ 1761.258439] x19: 0000000000000000 x18: 0000000000000000 
- [ 1761.258587] x17: 0000ffffb7fb44c0 x16: 0000000000410630 
- [ 1761.258755] x15: 00001cf2d8000000 x14: 0016f040e005f519 
- [ 1761.258922] x13: 00000001f4000000 x12: 0000000000000017 
- [ 1761.259074] x11: 00000000000bcd6a x10: 0000000059313575 
- [ 1761.259193] x9 : 001dcd6500000000 x8 : 0000000000000062 
- [ 1761.259335] x7 : 0000000000000000 x6 : 0000000000000001 
- [ 1761.259461] x5 : 0000000000000000 x4 : 0000000000000042 
- [ 1761.259627] x3 : 0000000000000002 x2 : 0000000000000051 
- [ 1761.259733] x1 : 0000000000000000 x0 : 0000000000000000 
- [ 1761.419675] BUG: Bad page state in process pth_str02  pfn:57600
- [ 1761.420027] page:ffff7e00005d8000 count:-1 mapcount:0 mapping:          (null) index:0x0
- [ 1761.420304] flags: 0xfffc00000000000()
- [ 1761.420588] raw: 0fffc00000000000 0000000000000000 0000000000000000 ffffffffffffffff
- [ 1761.420810] raw: dead000000000100 dead000000000200 0000000000000000 0000000000000000
- [ 1761.421017] page dumped because: nonzero _count
- [ 1761.421166] Modules linked in:
- [ 1761.421348] CPU: 3 PID: 9151 Comm: pth_str02 Tainted: G S              4.12.0-rc3-next-20170602 #754
- [ 1761.421570] Hardware name: linux,dummy-virt (DT)
- [ 1761.421782] Call trace:
- [ 1761.422114] [<ffff000008088eb8>] dump_backtrace+0x0/0x238
- [ 1761.422374] [<ffff0000080891bc>] show_stack+0x14/0x20
- [ 1761.422548] [<ffff0000083b2220>] dump_stack+0x9c/0xbc
- [ 1761.422717] [<ffff000008181aa0>] bad_page+0xe8/0x150
- [ 1761.422883] [<ffff000008181c14>] check_new_page_bad+0x64/0xa0
- [ 1761.423096] [<ffff00000818568c>] get_page_from_freelist+0x834/0xa88
- [ 1761.423294] [<ffff000008185ed8>] __alloc_pages_nodemask+0xd8/0xbe0
- [ 1761.423491] [<ffff0000080c0350>] copy_process.isra.2+0x1a8/0x15c8
- [ 1761.423687] [<ffff0000080c18a4>] _do_fork+0x6c/0x2e8
- [ 1761.423879] [<ffff0000080c1be8>] SyS_clone+0x18/0x20
- [ 1761.424045] [<ffff000008083730>] el0_svc_naked+0x24/0x28
- [ 1761.424280] Disabling lock debugging due to kernel taint
- [ 1761.426043] BUG: Bad rss-counter state mm:ffff800039a19180 idx:0 val:-1536
- [ 1761.426248] BUG: Bad rss-counter state mm:ffff800039a19180 idx:1 val:1536
- [ 1761.426430] BUG: non-zero nr_ptes on freeing mm: 3
- [ 1761.580610] BUG: Bad page state in process pth_str02  pfn:41600
- [ 1761.580827] page:ffff7e0000058000 count:-1 mapcount:0 mapping:          (null) index:0x0
- [ 1761.581051] flags: 0xfffc00000000000()
- [ 1761.581170] raw: 0fffc00000000000 0000000000000000 0000000000000000 ffffffffffffffff
- [ 1761.581330] raw: dead000000000100 dead000000000200 0000000000000000 0000000000000000
- [ 1761.581451] page dumped because: nonzero _count
- [ 1761.581531] Modules linked in:
- [ 1761.581612] CPU: 1 PID: 9708 Comm: pth_str02 Tainted: G S  B           4.12.0-rc3-next-20170602 #754
- [ 1761.581756] Hardware name: linux,dummy-virt (DT)
- [ 1761.581839] Call trace:
- [ 1761.581909] [<ffff000008088eb8>] dump_backtrace+0x0/0x238
- [ 1761.582008] [<ffff0000080891bc>] show_stack+0x14/0x20
- [ 1761.582102] [<ffff0000083b2220>] dump_stack+0x9c/0xbc
- [ 1761.582196] [<ffff000008181aa0>] bad_page+0xe8/0x150
- [ 1761.582289] [<ffff000008181c14>] check_new_page_bad+0x64/0xa0
- [ 1761.582391] [<ffff00000818568c>] get_page_from_freelist+0x834/0xa88
- [ 1761.582499] [<ffff000008185ed8>] __alloc_pages_nodemask+0xd8/0xbe0
- [ 1761.582605] [<ffff0000080c0350>] copy_process.isra.2+0x1a8/0x15c8
- [ 1761.582715] [<ffff0000080c18a4>] _do_fork+0x6c/0x2e8
- [ 1761.582810] [<ffff0000080c1be8>] SyS_clone+0x18/0x20
- [ 1761.582905] [<ffff000008083730>] el0_svc_naked+0x24/0x28
- [ 1761.942602] BUG: Bad page state in process pth_str03  pfn:57e00
- [ 1761.943049] page:ffff7e00005f8000 count:-1 mapcount:0 mapping:          (null) index:0x1
- [ 1761.943283] flags: 0xfffc00000000000()
- [ 1761.943412] raw: 0fffc00000000000 0000000000000000 0000000000000001 ffffffffffffffff
- [ 1761.943627] raw: dead000000000100 dead000000000200 0000000000000000 0000000000000000
- [ 1761.944168] page dumped because: nonzero _count
- [ 1761.944322] Modules linked in:
- [ 1761.944461] CPU: 3 PID: 9823 Comm: pth_str03 Tainted: G S  B           4.12.0-rc3-next-20170602 #754
- [ 1761.944746] Hardware name: linux,dummy-virt (DT)
- [ 1761.944905] Call trace:
- [ 1761.945015] [<ffff000008088eb8>] dump_backtrace+0x0/0x238
- [ 1761.945205] [<ffff0000080891bc>] show_stack+0x14/0x20
- [ 1761.945383] [<ffff0000083b2220>] dump_stack+0x9c/0xbc
- [ 1761.945559] [<ffff000008181aa0>] bad_page+0xe8/0x150
- [ 1761.945733] [<ffff000008181c14>] check_new_page_bad+0x64/0xa0
- [ 1761.945928] [<ffff00000818568c>] get_page_from_freelist+0x834/0xa88
- [ 1761.946138] [<ffff000008185ed8>] __alloc_pages_nodemask+0xd8/0xbe0
- [ 1761.946347] [<ffff0000081d742c>] alloc_pages_vma+0x1bc/0x208
- [ 1761.946540] [<ffff0000081ea260>] do_huge_pmd_anonymous_page+0xe8/0x6f0
- [ 1761.946758] [<ffff0000081b34e8>] __handle_mm_fault+0xbd8/0x1010
- [ 1761.946958] [<ffff0000081b3a4c>] handle_mm_fault+0x12c/0x200
- [ 1761.947173] [<ffff0000080982e4>] do_page_fault+0x13c/0x380
- [ 1761.947359] [<ffff000008098564>] do_translation_fault+0x3c/0x48
- [ 1761.947560] [<ffff0000080812c8>] do_mem_abort+0x40/0x98
- [ 1761.947982] Exception stack(0xffff80003d0b7e20 to 0xffff80003d0b7f50)
- [ 1761.948256] 7e20: 0000000000000000 0000800036172000 ffffffffffffffff 0000ffffb7fae9a4
- [ 1761.948513] 7e40: ffff80003d0b7eb0 ffff000008088be0 0000000000000000 0000800036172000
- [ 1761.948769] 7e60: ffffffffffffffff 0000ffffb7f324a4 0000000060000000 0000ffffb7fb1efc
- [ 1761.949014] 7e80: 0000000000000124 00000000000000de 0000000000000000 ffff000008083618
- [ 1761.949162] 7ea0: 0000000000000000 000080003618a000 0000000000000000 ffff000008083730
- [ 1761.949365] 7ec0: 0000ffff91fff8f0 0000000000800000 0000000000000003 0000000000020022
- [ 1761.949656] 7ee0: ffffffffffffffff 0000000000000000 0000ffff91800000 0000ffffb7fd2000
- [ 1761.949921] 7f00: 00000000000000de 0000ffffb7fcd000 0000ffffb7fd2000 676e697461657263
- [ 1761.950176] 7f20: 63202c7364696b20 0a333d6874706564 000000000000003a 0000000000000000
- [ 1761.950402] 7f40: 0000ffffb7fce130 0000ffffb7f32490
- [ 1761.950599] [<ffff000008083374>] el0_da+0x20/0x24
- [ 1761.950787] BUG: Bad page state in process pth_str03  pfn:41a00
- [ 1761.950975] page:ffff7e0000068000 count:-2 mapcount:0 mapping:          (null) index:0x1
- [ 1761.951215] flags: 0xfffc00000000000()
- [ 1761.951334] raw: 0fffc00000000000 0000000000000000 0000000000000001 fffffffeffffffff
- [ 1761.951535] raw: dead000000000100 dead000000000200 0000000000000000 0000000000000000
- [ 1761.951671] page dumped because: nonzero _count
- [ 1761.951762] Modules linked in:
- [ 1761.952043] CPU: 3 PID: 9823 Comm: pth_str03 Tainted: G S  B           4.12.0-rc3-next-20170602 #754
- [ 1761.952206] Hardware name: linux,dummy-virt (DT)
- [ 1761.952302] Call trace:
- [ 1761.952371] [<ffff000008088eb8>] dump_backtrace+0x0/0x238
- [ 1761.952480] [<ffff0000080891bc>] show_stack+0x14/0x20
- [ 1761.952589] [<ffff0000083b2220>] dump_stack+0x9c/0xbc
- [ 1761.952689] [<ffff000008181aa0>] bad_page+0xe8/0x150
- [ 1761.952788] [<ffff000008181c14>] check_new_page_bad+0x64/0xa0
- [ 1761.952943] [<ffff00000818568c>] get_page_from_freelist+0x834/0xa88
- [ 1761.953109] [<ffff000008185ed8>] __alloc_pages_nodemask+0xd8/0xbe0
- [ 1761.953272] [<ffff0000081d742c>] alloc_pages_vma+0x1bc/0x208
- [ 1761.953417] [<ffff0000081ea260>] do_huge_pmd_anonymous_page+0xe8/0x6f0
- [ 1761.953547] [<ffff0000081b34e8>] __handle_mm_fault+0xbd8/0x1010
- [ 1761.953705] [<ffff0000081b3a4c>] handle_mm_fault+0x12c/0x200
- [ 1761.953870] [<ffff0000080982e4>] do_page_fault+0x13c/0x380
- [ 1761.954042] [<ffff000008098564>] do_translation_fault+0x3c/0x48
- [ 1761.954241] [<ffff0000080812c8>] do_mem_abort+0x40/0x98
- [ 1761.954416] Exception stack(0xffff80003d0b7e20 to 0xffff80003d0b7f50)
- [ 1761.954651] 7e20: 0000000000000000 0000800036172000 ffffffffffffffff 0000ffffb7fae9a4
- [ 1761.954818] 7e40: ffff80003d0b7eb0 ffff000008088be0 0000000000000000 0000800036172000
- [ 1761.954972] 7e60: ffffffffffffffff 0000ffffb7f324a4 0000000060000000 0000ffffb7fb1efc
- [ 1761.955147] 7e80: 0000000000000124 00000000000000de 0000000000000000 ffff000008083618
- [ 1761.955277] 7ea0: 0000000000000000 000080003618a000 0000000000000000 ffff000008083730
- [ 1761.955385] 7ec0: 0000ffff91fff8f0 0000000000800000 0000000000000003 0000000000020022
- [ 1761.955490] 7ee0: ffffffffffffffff 0000000000000000 0000ffff91800000 0000ffffb7fd2000
- [ 1761.955627] 7f00: 00000000000000de 0000ffffb7fcd000 0000ffffb7fd2000 676e697461657263
- [ 1761.955739] 7f20: 63202c7364696b20 0a333d6874706564 000000000000003a 0000000000000000
- [ 1761.956063] 7f40: 0000ffffb7fce130 0000ffffb7f32490
- [ 1761.956175] [<ffff000008083374>] el0_da+0x20/0x24
- [ 1761.956276] BUG: Bad page state in process pth_str03  pfn:42c00
- [ 1761.956394] page:ffff7e00000b0000 count:-1 mapcount:0 mapping:          (null) index:0x1
- [ 1761.956554] flags: 0xfffc00000000000()
- [ 1761.956644] raw: 0fffc00000000000 0000000000000000 0000000000000001 ffffffffffffffff
- [ 1761.956794] raw: dead000000000100 dead000000000200 0000000000000000 0000000000000000
- [ 1761.956930] page dumped because: nonzero _count
- [ 1761.957014] Modules linked in:
- [ 1761.957096] CPU: 3 PID: 9823 Comm: pth_str03 Tainted: G S  B           4.12.0-rc3-next-20170602 #754
- [ 1761.957255] Hardware name: linux,dummy-virt (DT)
- [ 1761.957346] Call trace:
- [ 1761.957413] [<ffff000008088eb8>] dump_backtrace+0x0/0x238
- [ 1761.957524] [<ffff0000080891bc>] show_stack+0x14/0x20
- [ 1761.957632] [<ffff0000083b2220>] dump_stack+0x9c/0xbc
- [ 1761.957732] [<ffff000008181aa0>] bad_page+0xe8/0x150
- [ 1761.957836] [<ffff000008181c14>] check_new_page_bad+0x64/0xa0
- [ 1761.957949] [<ffff00000818568c>] get_page_from_freelist+0x834/0xa88
- [ 1761.958066] [<ffff000008185ed8>] __alloc_pages_nodemask+0xd8/0xbe0
- [ 1761.958192] [<ffff0000081d742c>] alloc_pages_vma+0x1bc/0x208
- [ 1761.958309] [<ffff0000081ea260>] do_huge_pmd_anonymous_page+0xe8/0x6f0
- [ 1761.958432] [<ffff0000081b34e8>] __handle_mm_fault+0xbd8/0x1010
- [ 1761.958544] [<ffff0000081b3a4c>] handle_mm_fault+0x12c/0x200
- [ 1761.958652] [<ffff0000080982e4>] do_page_fault+0x13c/0x380
- [ 1761.958766] [<ffff000008098564>] do_translation_fault+0x3c/0x48
- [ 1761.958879] [<ffff0000080812c8>] do_mem_abort+0x40/0x98
- [ 1761.959014] Exception stack(0xffff80003d0b7e20 to 0xffff80003d0b7f50)
- [ 1761.959142] 7e20: 0000000000000000 0000800036172000 ffffffffffffffff 0000ffffb7fae9a4
- [ 1761.959283] 7e40: ffff80003d0b7eb0 ffff000008088be0 0000000000000000 0000800036172000
- [ 1761.959429] 7e60: ffffffffffffffff 0000ffffb7f324a4 0000000060000000 0000ffffb7fb1efc
- [ 1761.959566] 7e80: 0000000000000124 00000000000000de 0000000000000000 ffff000008083618
- [ 1761.959709] 7ea0: 0000000000000000 000080003618a000 0000000000000000 ffff000008083730
- [ 1761.959974] 7ec0: 0000ffff91fff8f0 0000000000800000 0000000000000003 0000000000020022
- [ 1761.960124] 7ee0: ffffffffffffffff 0000000000000000 0000ffff91800000 0000ffffb7fd2000
- [ 1761.960267] 7f00: 00000000000000de 0000ffffb7fcd000 0000ffffb7fd2000 676e697461657263
- [ 1761.960413] 7f20: 63202c7364696b20 0a333d6874706564 000000000000003a 0000000000000000
- [ 1761.960552] 7f40: 0000ffffb7fce130 0000ffffb7f32490
- [ 1761.960655] [<ffff000008083374>] el0_da+0x20/0x24
- [ 1762.128759] pth_str03[9867]: unhandled level 2 translation fault (11) at 0x00000018, esr 0x92000006
- [ 1762.128994] pgd = ffff80001766c000
- [ 1762.129073] [00000018] *pgd=000000005807f003, *pud=000000005814a003, *pmd=0000000000000000
- [ 1762.129263] CPU: 2 PID: 9867 Comm: pth_str03 Tainted: G S  B           4.12.0-rc3-next-20170602 #754
- [ 1762.129417] Hardware name: linux,dummy-virt (DT)
- [ 1762.129507] task: ffff8000017cce00 task.stack: ffff800001380000
- [ 1762.129624] PC is at 0xffffb7fb6f98
- [ 1762.129695] LR is at 0xffffb7fb471c
- [ 1762.129775] pc : [<0000ffffb7fb6f98>] lr : [<0000ffffb7fb471c>] pstate: 60000000
- [ 1762.129912] sp : 0000ffff66ffe830
- [ 1762.129984] x29: 0000ffff66ffe830 x28: 0000000000413820 
- [ 1762.130097] x27: 0000ffff66ffe8ac x26: 0000000000000012 
- [ 1762.130210] x25: 00000000004137ef x24: 0000000000000000 
- [ 1762.130320] x23: 0000000000000000 x22: 0000000000000000 
- [ 1762.130425] x21: 0000ffff66ffe950 x20: 00000000004137f0 
- [ 1762.130531] x19: 0000000000000000 x18: 0000000000000000 
- [ 1762.130638] x17: 0000ffffb7fb44c0 x16: 0000000000410630 
- [ 1762.130756] x15: 0000199598000000 x14: 0012a59ee005f519 
- [ 1762.130865] x13: 00000001f4000000 x12: 0000000000000017 
- [ 1762.131031] x11: 0000000000099931 x10: 0000000059313576 
- [ 1762.131158] x9 : 001dcd6500000000 x8 : 0000000000000062 
- [ 1762.131266] x7 : 0000000000000000 x6 : 0000000000000001 
- [ 1762.131376] x5 : 0000000000000000 x4 : 0000000000000042 
- [ 1762.131486] x3 : 0000000000000002 x2 : 0000000000000051 
- [ 1762.131598] x1 : 0000000000000000 x0 : 0000000000000000 
- [ 1764.208112] BUG: Bad rss-counter state mm:ffff800039889180 idx:0 val:-2048
- [ 1764.208394] BUG: Bad rss-counter state mm:ffff800039889180 idx:1 val:2048
- [ 1764.208589] BUG: non-zero nr_ptes on freeing mm: 4
- [ 1816.968805] BUG: Bad page state in process growfiles  pfn:42600
- [ 1816.969012] page:ffff7e0000098000 count:-1 mapcount:0 mapping:          (null) index:0x1
- [ 1816.969181] flags: 0xfffc00000000000()
- [ 1816.969247] raw: 0fffc00000000000 0000000000000000 0000000000000001 ffffffffffffffff
- [ 1816.969344] raw: dead000000000100 dead000000000200 0000000000000000 0000000000000000
- [ 1816.969439] page dumped because: nonzero _count
- [ 1816.969498] Modules linked in:
- [ 1816.969587] CPU: 1 PID: 9922 Comm: growfiles Tainted: G S  B           4.12.0-rc3-next-20170602 #754
- [ 1816.969732] Hardware name: linux,dummy-virt (DT)
- [ 1816.969814] Call trace:
- [ 1816.969882] [<ffff000008088eb8>] dump_backtrace+0x0/0x238
- [ 1816.969975] [<ffff0000080891bc>] show_stack+0x14/0x20
- [ 1816.970064] [<ffff0000083b2220>] dump_stack+0x9c/0xbc
- [ 1816.970151] [<ffff000008181aa0>] bad_page+0xe8/0x150
- [ 1816.970240] [<ffff000008181c14>] check_new_page_bad+0x64/0xa0
- [ 1816.970336] [<ffff000008185694>] get_page_from_freelist+0x83c/0xa88
- [ 1816.970434] [<ffff000008185ed8>] __alloc_pages_nodemask+0xd8/0xbe0
- [ 1816.970534] [<ffff0000081d5ad4>] alloc_pages_current+0x7c/0x128
- [ 1816.970636] [<ffff00000817b218>] __page_cache_alloc+0x98/0xb8
- [ 1816.970731] [<ffff00000817be08>] pagecache_get_page+0xa8/0x280
- [ 1816.970827] [<ffff00000817d01c>] grab_cache_page_write_begin+0x24/0x40
- [ 1816.970934] [<ffff0000082a30c0>] ext4_da_write_begin+0xb8/0x3b0
- [ 1816.971098] [<ffff00000817d1a8>] generic_perform_write+0x90/0x180
- [ 1816.971220] [<ffff00000817dde0>] __generic_file_write_iter+0x100/0x1c8
- [ 1816.971328] [<ffff000008291240>] ext4_file_write_iter+0xf0/0x388
- [ 1816.971431] [<ffff0000082001b8>] __vfs_write+0xa8/0x100
- [ 1816.971524] [<ffff00000820137c>] vfs_write+0x9c/0x1a8
- [ 1816.971611] [<ffff000008202970>] SyS_write+0x48/0xb0
- [ 1816.971699] [<ffff000008083730>] el0_svc_naked+0x24/0x28
- [ 1817.157532] BUG: Bad page state in process growfiles  pfn:44000
- [ 1817.157649] page:ffff7e0000100000 count:-1 mapcount:0 mapping:          (null) index:0x1
- [ 1817.157762] flags: 0xfffc00000000000()
- [ 1817.157897] raw: 0fffc00000000000 0000000000000000 0000000000000001 ffffffffffffffff
- [ 1817.158050] raw: dead000000000100 dead000000000200 0000000000000000 0000000000000000
- [ 1817.158158] page dumped because: nonzero _count
- [ 1817.158229] Modules linked in:
- [ 1817.158300] CPU: 1 PID: 9922 Comm: growfiles Tainted: G S  B           4.12.0-rc3-next-20170602 #754
- [ 1817.158426] Hardware name: linux,dummy-virt (DT)
- [ 1817.158499] Call trace:
- [ 1817.158560] [<ffff000008088eb8>] dump_backtrace+0x0/0x238
- [ 1817.158646] [<ffff0000080891bc>] show_stack+0x14/0x20
- [ 1817.158729] [<ffff0000083b2220>] dump_stack+0x9c/0xbc
- [ 1817.158813] [<ffff000008181aa0>] bad_page+0xe8/0x150
- [ 1817.158892] [<ffff000008181c14>] check_new_page_bad+0x64/0xa0
- [ 1817.159008] [<ffff000008185694>] get_page_from_freelist+0x83c/0xa88
- [ 1817.159103] [<ffff000008185ed8>] __alloc_pages_nodemask+0xd8/0xbe0
- [ 1817.159199] [<ffff0000081d5ad4>] alloc_pages_current+0x7c/0x128
- [ 1817.159291] [<ffff00000817b218>] __page_cache_alloc+0x98/0xb8
- [ 1817.159384] [<ffff00000817be08>] pagecache_get_page+0xa8/0x280
- [ 1817.159475] [<ffff00000817d01c>] grab_cache_page_write_begin+0x24/0x40
- [ 1817.159570] [<ffff0000082a30c0>] ext4_da_write_begin+0xb8/0x3b0
- [ 1817.159663] [<ffff00000817d1a8>] generic_perform_write+0x90/0x180
- [ 1817.159758] [<ffff00000817dde0>] __generic_file_write_iter+0x100/0x1c8
- [ 1817.159891] [<ffff000008291240>] ext4_file_write_iter+0xf0/0x388
- [ 1817.160004] [<ffff0000082017a0>] __do_readv_writev+0x318/0x3f8
- [ 1817.160112] [<ffff0000082018e8>] do_readv_writev+0x68/0x90
- [ 1817.160218] [<ffff000008201b48>] vfs_writev+0x30/0x48
- [ 1817.160318] [<ffff000008201bb0>] do_writev+0x50/0xd8
- [ 1817.160415] [<ffff000008202e98>] SyS_writev+0x10/0x18
- [ 1817.160510] [<ffff000008083730>] el0_svc_naked+0x24/0x28
- [ 1817.341130] BUG: Bad page state in process growfiles  pfn:46400
- [ 1817.341269] page:ffff7e0000190000 count:-2 mapcount:0 mapping:          (null) index:0x1
- [ 1817.341395] flags: 0xfffc00000000000()
- [ 1817.341468] raw: 0fffc00000000000 0000000000000000 0000000000000001 fffffffeffffffff
- [ 1817.341582] raw: dead000000000100 dead000000000200 0000000000000000 0000000000000000
- [ 1817.341690] page dumped because: nonzero _count
- [ 1817.341761] Modules linked in:
- [ 1817.341832] CPU: 1 PID: 9922 Comm: growfiles Tainted: G S  B           4.12.0-rc3-next-20170602 #754
- [ 1817.341958] Hardware name: linux,dummy-virt (DT)
- [ 1817.342034] Call trace:
- [ 1817.342107] [<ffff000008088eb8>] dump_backtrace+0x0/0x238
- [ 1817.342198] [<ffff0000080891bc>] show_stack+0x14/0x20
- [ 1817.342283] [<ffff0000083b2220>] dump_stack+0x9c/0xbc
- [ 1817.342381] [<ffff000008181aa0>] bad_page+0xe8/0x150
- [ 1817.342462] [<ffff000008181c14>] check_new_page_bad+0x64/0xa0
- [ 1817.342555] [<ffff000008185694>] get_page_from_freelist+0x83c/0xa88
- [ 1817.342652] [<ffff000008185ed8>] __alloc_pages_nodemask+0xd8/0xbe0
- [ 1817.342754] [<ffff0000081d5ad4>] alloc_pages_current+0x7c/0x128
- [ 1817.342850] [<ffff00000817b218>] __page_cache_alloc+0x98/0xb8
- [ 1817.342946] [<ffff00000817be08>] pagecache_get_page+0xa8/0x280
- [ 1817.343075] [<ffff00000817d01c>] grab_cache_page_write_begin+0x24/0x40
- [ 1817.343176] [<ffff0000082a30c0>] ext4_da_write_begin+0xb8/0x3b0
- [ 1817.343269] [<ffff00000817d1a8>] generic_perform_write+0x90/0x180
- [ 1817.343369] [<ffff00000817dde0>] __generic_file_write_iter+0x100/0x1c8
- [ 1817.343475] [<ffff000008291240>] ext4_file_write_iter+0xf0/0x388
- [ 1817.343579] [<ffff0000082001b8>] __vfs_write+0xa8/0x100
- [ 1817.343664] [<ffff00000820137c>] vfs_write+0x9c/0x1a8
- [ 1817.343749] [<ffff000008202970>] SyS_write+0x48/0xb0
- [ 1817.343865] [<ffff000008083730>] el0_svc_naked+0x24/0x28
- [ 1817.520304] BUG: Bad page state in process growfiles  pfn:44800
- [ 1817.520497] page:ffff7e0000120000 count:-1 mapcount:0 mapping:          (null) index:0x1
- [ 1817.520637] flags: 0xfffc00000000000()
- [ 1817.520702] raw: 0fffc00000000000 0000000000000000 0000000000000001 ffffffffffffffff
- [ 1817.520915] raw: dead000000000100 dead000000000200 0000000000000000 0000000000000000
- [ 1817.521079] page dumped because: nonzero _count
- [ 1817.521158] Modules linked in:
- [ 1817.521233] CPU: 1 PID: 9922 Comm: growfiles Tainted: G S  B           4.12.0-rc3-next-20170602 #754
- [ 1817.521366] Hardware name: linux,dummy-virt (DT)
- [ 1817.521449] Call trace:
- [ 1817.521513] [<ffff000008088eb8>] dump_backtrace+0x0/0x238
- [ 1817.521605] [<ffff0000080891bc>] show_stack+0x14/0x20
- [ 1817.521721] [<ffff0000083b2220>] dump_stack+0x9c/0xbc
- [ 1817.521863] [<ffff000008181aa0>] bad_page+0xe8/0x150
- [ 1817.522017] [<ffff000008181c14>] check_new_page_bad+0x64/0xa0
- [ 1817.522116] [<ffff000008185694>] get_page_from_freelist+0x83c/0xa88
- [ 1817.522218] [<ffff000008185ed8>] __alloc_pages_nodemask+0xd8/0xbe0
- [ 1817.522317] [<ffff0000081d5ad4>] alloc_pages_current+0x7c/0x128
- [ 1817.522416] [<ffff00000817b218>] __page_cache_alloc+0x98/0xb8
- [ 1817.522509] [<ffff00000817be08>] pagecache_get_page+0xa8/0x280
- [ 1817.522609] [<ffff00000817d01c>] grab_cache_page_write_begin+0x24/0x40
- [ 1817.522718] [<ffff0000082a30c0>] ext4_da_write_begin+0xb8/0x3b0
- [ 1817.522819] [<ffff00000817d1a8>] generic_perform_write+0x90/0x180
- [ 1817.522917] [<ffff00000817dde0>] __generic_file_write_iter+0x100/0x1c8
- [ 1817.523067] [<ffff000008291240>] ext4_file_write_iter+0xf0/0x388
- [ 1817.523177] [<ffff0000082001b8>] __vfs_write+0xa8/0x100
- [ 1817.523269] [<ffff00000820137c>] vfs_write+0x9c/0x1a8
- [ 1817.523356] [<ffff000008202b04>] SyS_pwrite64+0x74/0xb8
- [ 1817.523443] [<ffff000008083730>] el0_svc_naked+0x24/0x28
- [ 1817.710100] BUG: Bad page state in process growfiles  pfn:45000
- [ 1817.710290] page:ffff7e0000140000 count:-1 mapcount:0 mapping:          (null) index:0x1
- [ 1817.710420] flags: 0xfffc00000000000()
- [ 1817.710496] raw: 0fffc00000000000 0000000000000000 0000000000000001 ffffffffffffffff
- [ 1817.710614] raw: dead000000000100 dead000000000200 0000000000000000 0000000000000000
- [ 1817.710723] page dumped because: nonzero _count
- [ 1817.710786] Modules linked in:
- [ 1817.710861] CPU: 1 PID: 9922 Comm: growfiles Tainted: G S  B           4.12.0-rc3-next-20170602 #754
- [ 1817.711028] Hardware name: linux,dummy-virt (DT)
- [ 1817.711109] Call trace:
- [ 1817.711175] [<ffff000008088eb8>] dump_backtrace+0x0/0x238
- [ 1817.711268] [<ffff0000080891bc>] show_stack+0x14/0x20
- [ 1817.711358] [<ffff0000083b2220>] dump_stack+0x9c/0xbc
- [ 1817.711446] [<ffff000008181aa0>] bad_page+0xe8/0x150
- [ 1817.711532] [<ffff000008181c14>] check_new_page_bad+0x64/0xa0
- [ 1817.711627] [<ffff000008185694>] get_page_from_freelist+0x83c/0xa88
- [ 1817.711729] [<ffff000008185ed8>] __alloc_pages_nodemask+0xd8/0xbe0
- [ 1817.712019] [<ffff0000081d5ad4>] alloc_pages_current+0x7c/0x128
- [ 1817.712205] [<ffff00000817b218>] __page_cache_alloc+0x98/0xb8
- [ 1817.712381] [<ffff00000817be08>] pagecache_get_page+0xa8/0x280
- [ 1817.712550] [<ffff00000817d01c>] grab_cache_page_write_begin+0x24/0x40
- [ 1817.712735] [<ffff0000082a30c0>] ext4_da_write_begin+0xb8/0x3b0
- [ 1817.712903] [<ffff00000817d1a8>] generic_perform_write+0x90/0x180
- [ 1817.713079] [<ffff00000817dde0>] __generic_file_write_iter+0x100/0x1c8
- [ 1817.713263] [<ffff000008291240>] ext4_file_write_iter+0xf0/0x388
- [ 1817.713439] [<ffff0000082017a0>] __do_readv_writev+0x318/0x3f8
- [ 1817.713610] [<ffff0000082018e8>] do_readv_writev+0x68/0x90
- [ 1817.713773] [<ffff000008201b48>] vfs_writev+0x30/0x48
- [ 1817.713919] [<ffff000008201bb0>] do_writev+0x50/0xd8
- [ 1817.714068] [<ffff000008202e98>] SyS_writev+0x10/0x18
- [ 1817.714220] [<ffff000008083730>] el0_svc_naked+0x24/0x28
- [ 1818.758902] BUG: Bad page state in process growfiles  pfn:43200
- [ 1818.759078] page:ffff7e00000c8000 count:-1 mapcount:0 mapping:          (null) index:0x1
- [ 1818.759228] flags: 0xfffc00000000000()
- [ 1818.759293] raw: 0fffc00000000000 0000000000000000 0000000000000001 ffffffffffffffff
- [ 1818.759439] raw: dead000000000100 dead000000000200 0000000000000000 0000000000000000
- [ 1818.759552] page dumped because: nonzero _count
- [ 1818.759628] Modules linked in:
- [ 1818.759734] CPU: 1 PID: 9922 Comm: growfiles Tainted: G S  B           4.12.0-rc3-next-20170602 #754
- [ 1818.760058] Hardware name: linux,dummy-virt (DT)
- [ 1818.760166] Call trace:
- [ 1818.760256] [<ffff000008088eb8>] dump_backtrace+0x0/0x238
- [ 1818.760394] [<ffff0000080891bc>] show_stack+0x14/0x20
- [ 1818.760525] [<ffff0000083b2220>] dump_stack+0x9c/0xbc
- [ 1818.760657] [<ffff000008181aa0>] bad_page+0xe8/0x150
- [ 1818.760784] [<ffff000008181c14>] check_new_page_bad+0x64/0xa0
- [ 1818.760924] [<ffff000008185694>] get_page_from_freelist+0x83c/0xa88
- [ 1818.761045] [<ffff000008185ed8>] __alloc_pages_nodemask+0xd8/0xbe0
- [ 1818.761168] [<ffff0000081d5ad4>] alloc_pages_current+0x7c/0x128
- [ 1818.761282] [<ffff00000817b218>] __page_cache_alloc+0x98/0xb8
- [ 1818.761390] [<ffff00000817be08>] pagecache_get_page+0xa8/0x280
- [ 1818.761501] [<ffff00000817d01c>] grab_cache_page_write_begin+0x24/0x40
- [ 1818.761626] [<ffff0000082a30c0>] ext4_da_write_begin+0xb8/0x3b0
- [ 1818.761736] [<ffff00000817d1a8>] generic_perform_write+0x90/0x180
- [ 1818.761852] [<ffff00000817dde0>] __generic_file_write_iter+0x100/0x1c8
- [ 1818.761978] [<ffff000008291240>] ext4_file_write_iter+0xf0/0x388
- [ 1818.762093] [<ffff0000082001b8>] __vfs_write+0xa8/0x100
- [ 1818.762199] [<ffff00000820137c>] vfs_write+0x9c/0x1a8
- [ 1818.762305] [<ffff000008202970>] SyS_write+0x48/0xb0
- [ 1818.762404] [<ffff000008083730>] el0_svc_naked+0x24/0x28
- [ 2624.641574] ---[ end trace a2e8a86ee57402dd ]---
- [ 2624.644644] note: doio[10027] exited with preempt_count 1
- [ 2652.175951] NMI watchdog: BUG: soft lockup - CPU#2 stuck for 23s! [doio:10028]
- [ 2652.176181] Modules linked in:
- [ 2652.176309] CPU: 2 PID: 10028 Comm: doio Tainted: G S  B D         4.12.0-rc3-next-20170602 #754
- [ 2652.176525] Hardware name: linux,dummy-virt (DT)
- [ 2652.176654] task: ffff80003d320d00 task.stack: ffff800008fd4000
- [ 2652.176820] PC is at _raw_spin_lock+0x34/0x48
- [ 2652.176957] LR is at alloc_set_pte+0x1cc/0x580
- [ 2652.177069] pc : [<ffff000008960a64>] lr : [<ffff0000081b0d84>] pstate: 40000145
- [ 2652.177240] sp : ffff800008fd7c50
- [ 2652.177331] x29: ffff800008fd7c50 x28: ffff80003d320d00 
- [ 2652.177473] x27: 0000000000000002 x26: ffff800039a1b868 
- [ 2652.177614] x25: 0000000000000000 x24: 0000000000000055 
- [ 2652.177754] x23: 0000000000000001 x22: ffff800039e98730 
- [ 2652.177894] x21: ffff7e0000477980 x20: ffff800008fd7d18 
- [ 2652.178036] x19: ffff800017665190 x18: 0000ffffb7e58618 
- [ 2652.178170] x17: 0000ffffb7ecfdd0 x16: 000000000041b240 
- [ 2652.178299] x15: 0000026318d0edc0 x14: 0000026318d1ac20 
- [ 2652.178445] x13: 0000000000000000 x12: 0000000000000001 
- [ 2652.178581] x11: 0000000000000000 x10: 0000000000000001 
- [ 2652.178729] x9 : 0000000000000228 x8 : 0000000000000011 
- [ 2652.178875] x7 : 0000000000010000 x6 : ffff80003d7906d8 
- [ 2652.179033] x5 : 0000000000000000 x4 : ffff80003d320d00 
- [ 2652.179183] x3 : 0000000000000001 x2 : 0000000000000003 
- [ 2652.179332] x1 : 0000000000020001 x0 : ffff7e00005d9970 
- [ 2652.179504] Call trace:
- [ 2652.179597] Exception stack(0xffff800008fd7b20 to 0xffff800008fd7c50)
- [ 2652.179772] 7b20: ffff7e00005d9970 0000000000020001 0000000000000003 0000000000000001
- [ 2652.179971] 7b40: ffff80003d320d00 0000000000000000 ffff80003d7906d8 0000000000010000
- [ 2652.180171] 7b60: 0000000000000011 0000000000000228 0000000000000001 0000000000000000
- [ 2652.180374] 7b80: 0000000000000001 0000000000000000 0000026318d1ac20 0000026318d0edc0
- [ 2652.180588] 7ba0: 000000000041b240 0000ffffb7ecfdd0 0000ffffb7e58618 ffff800017665190
- [ 2652.180764] 7bc0: ffff800008fd7d18 ffff7e0000477980 ffff800039e98730 0000000000000001
- [ 2652.180902] 7be0: 0000000000000055 0000000000000000 ffff800039a1b868 0000000000000002
- [ 2652.181112] 7c00: ffff80003d320d00 ffff800008fd7c50 ffff0000081b0d84 ffff800008fd7c50
- [ 2652.181353] 7c20: ffff000008960a64 0000000040000145 ffff800008fd7d18 ffff800008fd7d18
- [ 2652.181542] 7c40: 0001000000000000 ffff7e0000477980
- [ 2652.181734] [<ffff000008960a64>] _raw_spin_lock+0x34/0x48
- [ 2652.181881] [<ffff0000081b116c>] finish_fault+0x34/0x60
- [ 2652.182019] [<ffff0000081b3340>] __handle_mm_fault+0xa30/0x1010
- [ 2652.182173] [<ffff0000081b3a4c>] handle_mm_fault+0x12c/0x200
- [ 2652.182325] [<ffff0000080982e4>] do_page_fault+0x13c/0x380
- [ 2652.182417] [<ffff0000080812c8>] do_mem_abort+0x40/0x98
- [ 2652.182557] Exception stack(0xffff800008fd7e20 to 0xffff800008fd7f50)
- [ 2652.182729] 7e20: 0000000000000000 0000800036172000 ffffffffffffffff 0000ffffb7ecfee8
- [ 2652.182866] 7e40: ffff800008fd7eb0 ffff000008088be0 0000000000000000 0000800036172000
- [ 2652.183094] 7e60: ffffffffffffffff 0000ffffb7f1b4a4 0000000020000000 0000000000000015
- [ 2652.183290] 7e80: 0000000000000124 00000000000000de 000000000c428cc0 00000000593138d5
- [ 2652.183483] 7ea0: 000000000c428cc0 00000000593138bc 0000000000000000 ffff000008083730
- [ 2652.183677] 7ec0: 0000ffffb7a31220 000000000043c342 0000000000000168 0000ffffb7a31fe0
- [ 2652.183871] 7ee0: 000000000043c4fa 0000ffffb7a321d8 6f643a74736f686c 3030313a5a2a6f69
- [ 2652.184065] 7f00: 3a74736f686c6163 313a5a2a6f696f64 636f6c3a38323030 643a74736f686c61
- [ 2652.184259] 7f20: 30313a5a2a6f696f 61636f6c3a383230 0000000000000000 0000000000000000
- [ 2652.184451] 7f40: 000000000041b240 0000ffffb7ecfdd0
- [ 2652.184582] [<ffff000008083374>] el0_da+0x20/0x24
+As Matthew Garret rightly noted (see[2]), secure Boot, if enabled, is
+explicitly designed to stop you booting modified kernels unless you've
+added your own keys.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: config.gz
-Type: application/gzip
-Size: 34380 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170602/e2471587/attachment-0001.gz>
+But if you boot a signed Linux distribution with kexec enabled without
+using the SHA like feature in the purgatory (like, say, Ubuntu) then
+you're able to boot a modified Windows kernel that will still believe
+it was booted securely.
+
+So, CRC wouldn't possibly fulfil the functionality we are trying to
+achieve with SHA-256 in the purgatory.
+
+However, having seen the power of using the inbuilt CRC instructions
+from the ARM64 ISA on a SoC which supports it, I can vouch that the
+native ISA implementations are much faster than other approaches.
+
+However, using the SHA-256 implementation (as you rightly noted) would
+employ NEON registers and can be faster, however I remember some SoC
+vendors disabling co-processor extensions in their ARM implementations
+in the past, so I am not sure we can assume that NEON extensions would
+be available in all ARMv8 implementations by default.
+
+[1] https://lwn.net/Articles/603116/
+[2] http://mjg59.dreamwidth.org/28746.html
+
+Regards,
+Bhupesh
+
+>> I can see the use for kdump, but the kdump-kernel is unmapped so the kernel
+>> can't accidentally write over it.
+>>
+>> (we discussed all this last time, but it fizzled-out. If you and the
+>>  kexec-tools maintainer think its necessary, fine by me!)
+>>
+>
+> _______________________________________________
+> kexec mailing list
+> kexec at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/kexec
