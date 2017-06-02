@@ -1,86 +1,65 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Fri, 2 Jun 2017 21:14:37 +0200
-Subject: [PATCH v2 0/2] Meson8 USB PHY support
-In-Reply-To: <02656f9a-33d8-c009-7785-a6bd7d4b2617@ti.com>
-References: <20170506173625.19501-1-martin.blumenstingl@googlemail.com>
- <20170520141250.27388-1-martin.blumenstingl@googlemail.com>
- <02656f9a-33d8-c009-7785-a6bd7d4b2617@ti.com>
-Message-ID: <CAFBinCCvxw413cQLkniUKD_fXQ-eSfNoGcc4VdWXK-0NiXhRYg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 2 Jun 2017 21:18:47 +0200
+Subject: [PATCH 02/19] drm/sun4i: add components in two passes with
+ encoders added in second pass
+In-Reply-To: <20170602101024.18940-3-wens@csie.org>
+References: <20170602101024.18940-1-wens@csie.org>
+ <20170602101024.18940-3-wens@csie.org>
+Message-ID: <20170602191847.6wuz2pthqtc44xxb@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+On Fri, Jun 02, 2017 at 06:10:07PM +0800, Chen-Yu Tsai wrote:
+> The encoder drivers use drm_of_find_possible_crtcs to get upstream
+> crtcs from the device tree using of_graph. For the results to be
+> correct, encoders must be probed/bound after _all_ crtcs have been
+> created. The existing code uses a depth first recursive traversal
+> of the of_graph, which means the encoders downstream of the TCON
+> get add right after the first TCON. The second TCON or CRTC will
+> never be properly associated with encoders connected to it.
+> 
+> Other platforms, such as Rockchip, deal with this by probing all
+> crtcs first, then all subsequent components. This is easy to do
+> since the crtcs correspond to just one device node, and are the
+> first nodes in the pipeline.
+> 
+> However with Allwinner SoCs, the function of the CRTC is split between
+> the display backend (DE 1.0) or mixer (DE 2.0), which does scan-out
+> and compositing, and the TCON, which generating the display timing
+> signals. Further complicating the process, there may be a Dynamic Range
+> Controller between the backend and the TCON. Also, the backend is
+> preceded by the frontend, with a Display Enhancement Unit possibly
+> in between.
+> 
+> One solution would be, instead of a depth first traversal of the
+> component of_graph, we do a breadth first traversal, so that components
+> at the same depth are grouped together. This however requires us to
+> implement extra code for a queue structure that is only used here.
+> 
+> Instead, since we can identify TCON device nodes, and since the
+> component system can gracefully deal with duplicate entries, we can add
+> components in two passes, using the existing recursive depth code. The
+> first pass stops right after the TCON is added. The second pass will
+> re-add all components up to the TCON, but these will be skipped since
+> they will have already been bound with the entries from the first pass.
+> The encoders added in the second pass will be the last entries in the
+> list.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-On Thu, Jun 1, 2017 at 3:12 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->
->
-> On Saturday 20 May 2017 07:42 PM, Martin Blumenstingl wrote:
->> The USB2 PHY in the Meson8 SoCs is identical to the one in the Meson8b
->> and GXBB SoCs.
->> This series adds a new compatible string for Meson8 and adjusts the
->> Kconfig and MODULE_DESCRIPTION documentation as well as the dt-bindings
->> accordingly.
->>
->> With some additional work the same driver could be used to add USB2
->> support to Meson6 SoCs as well. However, due to lack of a clock
->> controller driver for Meson6 and the lack of a board Meson6 support
->> is not part of this series (Meson6 uses internal mux and divider clocks
->> which are provided by the USB2 PHY registers, while the newer SoCs seem
->> to use an alternative clock called "clk_32k_altsel")
->
-> merged, thanks.
-thank you!
+This commit log is great. So great actually that it should be a
+comment in the code ;)
 
-I have one question though:
-you merged two of my patches, both from different series though!
-currently part of your tree are:
-- "Documentation: dt-bindings: Add documentation for the Meson GXL USB2 PHY" [0]
-- "phy: meson8b-usb2: add support for the USB PHY on Meson8 SoCs" [1]
+Maxime
 
-the dt-bindings patch is for a new driver, while the meson8b-usb2
-patch updates an existing driver.
-still missing are the following two patches:
-- "phy: meson: add USB2 PHY support for Meson GXL and GXM" [2] (the
-actual driver for the dt-bindings from patch [0])
-- "dt-bindings: phy: meson8b-usb2-phy: add support for the Meson8
-SoCs" [3] (the dt-bindings update related to meson8b-usb2 driver / the
-patch from [1])
-
-taking the dt-bindings patch for the meson8b-usb2-phy driver should be trivial.
-you also reviewed the new GXL and GXM PHY driver and gave your "OK" on
-v3 (I linked v4 below because that one is rebased so it applies after
-the phy driver restructuring), see [4]
-
-> -Kishon
->>
->>
->> Changes since v1:
->> - split the dt-bindings and the driver changes into separate patches
->> - rebased to apply on top of my other series "Meson GXL USB2 PHY driver"
->>   (from [0]) which means that this also applies on top of "phy: Group
->>   vendor specific phy drivers"
->> - also update the Kconfig option name (instead of just the description)
->>
->>
->> [0] http://lists.infradead.org/pipermail/linux-amlogic/2017-May/003664.html
->>
->>
->> Martin Blumenstingl (2):
->>   phy: meson8b-usb2: add support for the USB PHY on Meson8 SoCs
->>   dt-bindings: phy: meson8b-usb2-phy: add support for the Meson8 SoCs
->>
->>  Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt | 3 ++-
->>  drivers/phy/amlogic/Kconfig                                | 6 +++---
->>  drivers/phy/amlogic/phy-meson8b-usb2.c                     | 5 +++--
->>  3 files changed, 8 insertions(+), 6 deletions(-)
->>
-
-
-Regards,
-Martin
-
-[0] https://patchwork.kernel.org/patch/9738625/
-[1] https://patchwork.kernel.org/patch/9738635/
-[2] https://patchwork.kernel.org/patch/9738631/
-[3] https://patchwork.kernel.org/patch/9738637/
-[4] http://lists.infradead.org/pipermail/linux-amlogic/2017-May/003500.html
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170602/7654653d/attachment.sig>
