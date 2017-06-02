@@ -1,65 +1,56 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 2 Jun 2017 09:48:43 +0100
-Subject: [RFC 08/55] KVM: arm64: Set virtual EL2 context depending on the
- guest exception level
-In-Reply-To: <jpgtw3zzcee.fsf@linux.bootlegged.copy>
-References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
- <1483943091-1364-9-git-send-email-jintack@cs.columbia.edu>
- <jpgtw3zzcee.fsf@linux.bootlegged.copy>
-Message-ID: <178e3aaf-dd25-9590-35d7-c1f2705a5c06@arm.com>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Fri,  2 Jun 2017 16:51:11 +0800
+Subject: [PATCH v2 0/6] MFD: add driver for HiSilicon Hi6421v530 PMIC
+Message-ID: <20170602085117.27474-1-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/06/17 21:22, Bandan Das wrote:
-> Jintack Lim <jintack@cs.columbia.edu> writes:
-> 
->> From: Christoffer Dall <christoffer.dall@linaro.org>
->>
->> Set up virutal EL2 context to hardware if the guest exception level is
->> EL2.
->>
->> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
->> ---
->>  arch/arm64/kvm/context.c | 32 ++++++++++++++++++++++++++------
->>  1 file changed, 26 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm64/kvm/context.c b/arch/arm64/kvm/context.c
->> index 320afc6..acb4b1e 100644
->> --- a/arch/arm64/kvm/context.c
->> +++ b/arch/arm64/kvm/context.c
->> @@ -25,10 +25,25 @@
->>  void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
->>  {
->>  	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
->> +	if (unlikely(vcpu_mode_el2(vcpu))) {
->> +		ctxt->hw_pstate = *vcpu_cpsr(vcpu) & ~PSR_MODE_MASK;
->>  
->> -	ctxt->hw_pstate = *vcpu_cpsr(vcpu);
->> -	ctxt->hw_sys_regs = ctxt->sys_regs;
->> -	ctxt->hw_sp_el1 = ctxt->gp_regs.sp_el1;
->> +		/*
->> +		 * We emulate virtual EL2 mode in hardware EL1 mode using the
->> +		 * same stack pointer mode as the guest expects.
->> +		 */
->> +		if ((*vcpu_cpsr(vcpu) & PSR_MODE_MASK) == PSR_MODE_EL2h)
->> +			ctxt->hw_pstate |= PSR_MODE_EL1h;
->> +		else
->> +			ctxt->hw_pstate |= PSR_MODE_EL1t;
->> +
-> 
-> I see vcpu_mode(el2) does
-> return mode == PSR_MODE_EL2h || mode == PSR_MODE_EL2t;
-> 
-> I can't seem to find this, what's the difference between
-> the modes: PSR_MODE_EL2h/EL2t ?
+This patchset adds driver for HiSilicon Hi6421v530 PMIC.
 
-The difference is the stack pointer that is getting used. When the CPU
-is at ELxh, it uses SPx at ELx. When at ELxt, it uses SP0 (the userspace
-stack pointer). See the definition of SPSR_EL2 in the ARMv8 ARM.
+Mainline kernel already has driver support to a similar chip, Hi6421.
+Hi6421 and Hi6421v530 are both from the same vendor, HiSilicon, but
+they are at different revisions. They both use the same Memory-mapped
+I/O method to communicate with Main SoC. However, they differ quite a
+lot in their regulator designs. Eg. they have completely different LDO
+voltage points.
 
-Thanks,
+Patch 1 and 2 extends hi6421-pmic-core.c to support Hi6421v530 revision.
+Patch 3 add hi6421v530-regulator.c driver for LDO regulators.
+Patch 4 fixes an issue for hi6421 regulator, which is not related to v530
+         but it's found in this review.
+Patch 5 is dts change, it depends and can be applied on hi3660/hikey960
+        patchset [1].
+Patch 6 enables the relevant config items.
 
-	M.
+[1], http://www.spinics.net/lists/devicetree/msg178303.html
+
+Major changes in v2:
+ - instead of writing a new driver, extend hi6421-pmic-core.c
+     to support its v530 revision
+ - update hi6421v530-regulator.c to use modern regulator driver
+     design logics.
+
+Guodong Xu (4):
+  dt-bindings: mfd: hi6421: Add hi6421v530 compatible string
+  mfd: hi6421-pmic: add support for HiSilicon Hi6421v530
+  regulator: hi6421: Describe consumed platform device
+  arm64: defconfig: enable support hi6421v530 PMIC
+
+Wang Xiaoyin (2):
+  regulator: hi6421v530: add driver for hi6421v530 voltage regulator
+  arm64: dts: hikey960: add device node for pmic and regulators
+
+ Documentation/devicetree/bindings/mfd/hi6421.txt  |   4 +-
+ arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts |  46 +++++
+ arch/arm64/configs/defconfig                      |   2 +
+ drivers/mfd/hi6421-pmic-core.c                    |  56 ++++--
+ drivers/regulator/Kconfig                         |  10 ++
+ drivers/regulator/Makefile                        |   1 +
+ drivers/regulator/hi6421-regulator.c              |   7 +
+ drivers/regulator/hi6421v530-regulator.c          | 209 ++++++++++++++++++++++
+ include/linux/mfd/hi6421-pmic.h                   |   5 +
+ 9 files changed, 326 insertions(+), 14 deletions(-)
+ create mode 100644 drivers/regulator/hi6421v530-regulator.c
+
 -- 
-Jazz is not dead. It just smells funny...
+2.10.2
