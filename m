@@ -1,165 +1,269 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri, 02 Jun 2017 13:41:34 -0700
-Subject: [PATCH v3 1/6] drm/stm: ltdc: Add panel-bridge support
-In-Reply-To: <1496414235-20098-2-git-send-email-philippe.cornu@st.com>
-References: <1496414235-20098-1-git-send-email-philippe.cornu@st.com>
- <1496414235-20098-2-git-send-email-philippe.cornu@st.com>
-Message-ID: <87y3ta86m9.fsf@eliezer.anholt.net>
+From: hotran@apm.com (Hoan Tran)
+Date: Fri, 2 Jun 2017 14:02:57 -0700
+Subject: [PATCH v2 3/3] perf: xgene: Add support for SoC PMU version 3
+In-Reply-To: <20170602160436.GL28299@leverpostej>
+References: <1491238077-20666-1-git-send-email-hotran@apm.com>
+ <1491238077-20666-4-git-send-email-hotran@apm.com>
+ <20170602160436.GL28299@leverpostej>
+Message-ID: <CAFHUOYwzscOYjn5Gy8eGpAwvTGdkw2dj1kRZQY=3+ngyn78KbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Philippe CORNU <philippe.cornu@st.com> writes:
+Hi Mark,
 
-> Add the panel-bridge support for both panels & bridges (used by DSI host &
-> HDMI/LVDS bridges).
+On Fri, Jun 2, 2017 at 9:04 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi Hoan,
+>
+> Apologies for the delay in getting to this.
+>
+> On Mon, Apr 03, 2017 at 09:47:57AM -0700, Hoan Tran wrote:
+>> This patch adds support for SoC-wide (AKA uncore) Performance Monitoring
+>> Unit version 3.
+>>
+>> It can support up to
+>>  - 2 IOB PMU instances
+>>  - 8 L3C PMU instances
+>>  - 2 MCB PMU instances
+>>  - 8 MCU PMU instances
+>
+> Please elaborate on the differences compared with prior versions.
+>
+> I see that counters are 64-bit. Are there any other important details to
+> be aware of?
 
-This looks like a great cleanup.  Just a couple of things I noticed, and
-hopefully once the DT is reviewed we can merge it.  I've also
-resubmitted the panel-bridge patch so that hopefully we can land it
-soon.
+Yes, let me add 64 bit counter into the patch description. Beside of
+that, I don't think anything else besides more PMU instances compared
+with the previous version.
 
-> -static struct drm_encoder *ltdc_rgb_encoder_create(struct drm_device *ddev)
-> +static int ltdc_encoder_init(struct drm_device *ddev)
->  {
-> +	struct ltdc_device *ldev = ddev->dev_private;
->  	struct drm_encoder *encoder;
-> +	int ret;
->  
->  	encoder = devm_kzalloc(ddev->dev, sizeof(*encoder), GFP_KERNEL);
->  	if (!encoder)
-> -		return NULL;
-> +		return -ENOMEM;
->  
->  	encoder->possible_crtcs = CRTC_MASK;
->  	encoder->possible_clones = 0; /* No cloning support */
->  
-> -	drm_encoder_init(ddev, encoder, &ltdc_rgb_encoder_funcs,
-> +	drm_encoder_init(ddev, encoder, &ltdc_encoder_funcs,
->  			 DRM_MODE_ENCODER_DPI, NULL);
->  
-> -	drm_encoder_helper_add(encoder, &ltdc_rgb_encoder_helper_funcs);
-> -
-> -	DRM_DEBUG_DRIVER("RGB encoder:%d created\n", encoder->base.id);
-> -
-> -	return encoder;
-> -}
-> -
-> -/*
-> - * DRM_CONNECTOR
-> - */
-> -
-> -static int ltdc_rgb_connector_get_modes(struct drm_connector *connector)
-> -{
-> -	struct drm_device *ddev = connector->dev;
-> -	struct ltdc_device *ldev = ddev->dev_private;
-> -	int ret = 0;
-> -
-> -	DRM_DEBUG_DRIVER("\n");
-> -
-> -	if (ldev->panel)
-> -		ret = drm_panel_get_modes(ldev->panel);
-> -
-> -	return ret < 0 ? 0 : ret;
-> -}
-> -
-> -static struct drm_connector_helper_funcs ltdc_rgb_connector_helper_funcs = {
-> -	.get_modes = ltdc_rgb_connector_get_modes,
-> -};
-> -
-> -static enum drm_connector_status
-> -ltdc_rgb_connector_detect(struct drm_connector *connector, bool force)
-> -{
-> -	struct ltdc_device *ldev = connector_to_ltdc(connector);
-> -
-> -	return ldev->panel ? connector_status_connected :
-> -	       connector_status_disconnected;
-> -}
-> -
-> -static void ltdc_rgb_connector_destroy(struct drm_connector *connector)
-> -{
-> -	DRM_DEBUG_DRIVER("\n");
-> -
-> -	drm_connector_unregister(connector);
-> -	drm_connector_cleanup(connector);
-> -}
-> -
-> -static const struct drm_connector_funcs ltdc_rgb_connector_funcs = {
-> -	.dpms = drm_atomic_helper_connector_dpms,
-> -	.fill_modes = drm_helper_probe_single_connector_modes,
-> -	.detect = ltdc_rgb_connector_detect,
-> -	.destroy = ltdc_rgb_connector_destroy,
-> -	.reset = drm_atomic_helper_connector_reset,
-> -	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
-> -	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
-> -};
-> -
-> -struct drm_connector *ltdc_rgb_connector_create(struct drm_device *ddev)
-> -{
-> -	struct drm_connector *connector;
-> -	int err;
-> -
-> -	connector = devm_kzalloc(ddev->dev, sizeof(*connector), GFP_KERNEL);
-> -	if (!connector) {
-> -		DRM_ERROR("Failed to allocate connector\n");
-> -		return NULL;
-> -	}
-> -
-> -	connector->polled = DRM_CONNECTOR_POLL_HPD;
-> +	drm_encoder_helper_add(encoder, NULL);
+>
+> [...]
+>
+>> +static struct attribute *l3c_pmu_v3_events_attrs[] = {
+>
+>> +     XGENE_PMU_EVENT_ATTR(read-hit,                          0x01),
+>> +     XGENE_PMU_EVENT_ATTR(read-miss,                         0x02),
+>
+>> +     XGENE_PMU_EVENT_ATTR(reads,                             0x08),
+>> +     XGENE_PMU_EVENT_ATTR(writes,                            0x09),
+>
+>> +};
+>
+> Some of these are singular (e.g. "read-hit", "read-miss"), while others
+> are plural (e.g. "reads", "writes").
+>
+> The existing driver use the singular form. Please remain consistent with
+> that. e.g. turn "reads" into "read".
 
-I think the funcs table should be NULL by default, so you can just drop
-this line.
+Will fix it.
 
->  
-> -	err = drm_connector_init(ddev, connector, &ltdc_rgb_connector_funcs,
-> -				 DRM_MODE_CONNECTOR_DPI);
-> -	if (err) {
-> -		DRM_ERROR("Failed to initialize connector\n");
-> -		return NULL;
-> +	ret = drm_bridge_attach(encoder, ldev->bridge, NULL);
-> +	if (ret) {
-> +		drm_encoder_cleanup(encoder);
-> +		return -EINVAL;
->  	}
->  
-> -	drm_connector_helper_add(connector, &ltdc_rgb_connector_helper_funcs);
-> -
-> -	DRM_DEBUG_DRIVER("RGB connector:%d created\n", connector->base.id);
-> +	DRM_DEBUG_DRIVER("Bridge encoder:%d created\n", encoder->base.id);
->  
-> -	return connector;
-> +	return 0;
->  }
+>
+>> +     XGENE_PMU_EVENT_ATTR(PA-req-buf-alloc-all,              0x01),
+>
+> Likewise, please consistently use lower case.
 
+Yes
 
+>
+>> +     XGENE_PMU_EVENT_ATTR(pmu-act-sent,                      0x01),
+>
+> Surely we don't need "pmu" in the event names?
 
-> @@ -1129,9 +988,9 @@ int ltdc_load(struct drm_device *ddev)
->  	ddev->irq_enabled = 1;
->  
->  	return 0;
-> +
->  err:
-> -	if (ldev->panel)
-> -		drm_panel_detach(ldev->panel);
-> +	drm_panel_bridge_remove(bridge);
->  
->  	clk_disable_unprepare(ldev->pixel_clk);
->  
-> @@ -1146,8 +1005,7 @@ void ltdc_unload(struct drm_device *ddev)
->  
->  	drm_vblank_cleanup(ddev);
->  
-> -	if (ldev->panel)
-> -		drm_panel_detach(ldev->panel);
-> +	drm_panel_bridge_remove(ldev->bridge);
+Yes, will remove "pmu".
 
-If you had no panel, this would try to kfree some other module's bridge
-structure.  I guess you could track ldev->is_panel_bridge (like I did
-for vc4) and conditionally drm_panel_bridge_remove().
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170602/8f14e37a/attachment.sig>
+>
+> [...]
+>
+>>  static inline u64 xgene_pmu_read_counter32(struct xgene_pmu_dev *pmu_dev,
+>>                                          int idx)
+>>  {
+>>       return (u64)readl(pmu_dev->inf->csr + PMU_PMEVCNTR0 + (4 * idx));
+>>  }
+>
+> I don't think the cast is necessary. Please remove it.
+>
+>>  static inline void
+>> +xgene_pmu_write_counter64(struct xgene_pmu_dev *pmu_dev, int idx, u64 val)
+>> +{
+>> +     u32 cnt_lo, cnt_hi;
+>> +
+>> +     cnt_lo = val & 0xFFFFFFFF;
+>> +     cnt_hi = val >> 32;
+>
+>         cnt_hi = upper_32_bits(val);
+>         cnt_lo = lower_32_bits(val);
+>
+> (both are in <linux/kernel.h>)
+>
+>> +
+>> +     /* v3 has 64-bit counter registers composed by 2 32-bit registers */
+>> +     xgene_pmu_write_counter32(pmu_dev, 2 * idx, val);
+>> +     xgene_pmu_write_counter32(pmu_dev, 2 * idx + 1, val >> 32);
+>
+> Please use cnt_hi and cnt_lo for the writes.
+>
+> [...]
+>
+>> @@ -621,7 +989,7 @@ static void xgene_perf_event_set_period(struct perf_event *event)
+>>       struct xgene_pmu *xgene_pmu = pmu_dev->parent;
+>>       struct hw_perf_event *hw = &event->hw;
+>>       /*
+>> -      * The X-Gene PMU counters have a period of 2^32. To account for the
+>> +      * The X-Gene PMU counters have a period of 2^32 or more. To account for the
+>>        * possiblity of extreme interrupt latency we program for a period of
+>>        * half that. Hopefully we can handle the interrupt before another 2^31
+>>        * events occur and the counter overtakes its previous value.
+>
+> This comment is now a little out-of-date, as we don't start 64-bit
+> counters at half their period.
+>
+> I guess we don't expect a 64-bit counter to overflow, so can we state
+> that in the comment?
+
+How about this one.
+
+        /*
+         * For 32 bit counter, it has a period of 2^32. To account for the
+         * possibility of extreme interrupt latency we program for a period of
+         * half that. Hopefully, we can handle the interrupt before another 2^31
+         * events occur and the counter overtakes its previous value.
+         * For 64 bit counter, we don't expect it overflow.
+         */
+
+>
+> [...]
+>
+>> -static int acpi_pmu_probe_active_mcb_mcu(struct xgene_pmu *xgene_pmu,
+>> +static int acpi_pmu_probe_active_mcb_mcu_l3c(struct xgene_pmu *xgene_pmu,
+>>                                        struct platform_device *pdev)
+>>  {
+>>       void __iomem *csw_csr, *mcba_csr, *mcbb_csr;
+>>       struct resource *res;
+>>       unsigned int reg;
+>> +     u32 mcb0routing;
+>> +     u32 mcb1routing;
+>>
+>>       res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+>>       csw_csr = devm_ioremap_resource(&pdev->dev, res);
+>> @@ -899,41 +1309,72 @@ static int acpi_pmu_probe_active_mcb_mcu(struct xgene_pmu *xgene_pmu,
+>>               return PTR_ERR(csw_csr);
+>>       }
+>>
+>> -     res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+>> -     mcba_csr = devm_ioremap_resource(&pdev->dev, res);
+>> -     if (IS_ERR(mcba_csr)) {
+>> -             dev_err(&pdev->dev, "ioremap failed for MCBA CSR resource\n");
+>> -             return PTR_ERR(mcba_csr);
+>> -     }
+>> -
+>> -     res = platform_get_resource(pdev, IORESOURCE_MEM, 3);
+>> -     mcbb_csr = devm_ioremap_resource(&pdev->dev, res);
+>> -     if (IS_ERR(mcbb_csr)) {
+>> -             dev_err(&pdev->dev, "ioremap failed for MCBB CSR resource\n");
+>> -             return PTR_ERR(mcbb_csr);
+>> -     }
+>> -
+>>       reg = readl(csw_csr + CSW_CSWCR);
+>> -     if (reg & CSW_CSWCR_DUALMCB_MASK) {
+>> -             /* Dual MCB active */
+>> -             xgene_pmu->mcb_active_mask = 0x3;
+>> -             /* Probe all active MC(s) */
+>> -             reg = readl(mcbb_csr + CSW_CSWCR);
+>> -             xgene_pmu->mc_active_mask =
+>> -                     (reg & MCBADDRMR_DUALMCU_MODE_MASK) ? 0xF : 0x5;
+>> +     if (xgene_pmu->version == PCP_PMU_V3) {
+>> +             mcb0routing = CSW_CSWCR_MCB0_ROUTING(reg);
+>> +             mcb1routing = CSW_CSWCR_MCB0_ROUTING(reg);
+>> +             if (reg & CSW_CSWCR_DUALMCB_MASK) {
+>> +                     /* Dual MCB active */
+>> +                     xgene_pmu->mcb_active_mask = 0x3;
+>> +                     /* Probe all active L3C(s), maximum is 8 */
+>> +                     xgene_pmu->l3c_active_mask = 0xFF;
+>> +                     /* Probe all active MC(s), maximum is 8 */
+>> +                     if ((mcb0routing == 0x2) && (mcb1routing == 0x2))
+>> +                             xgene_pmu->mc_active_mask = 0xFF;
+>> +                     else if ((mcb0routing == 0x1) && (mcb1routing == 0x1))
+>> +                             xgene_pmu->mc_active_mask =  0x33;
+>> +                     else
+>> +                             xgene_pmu->mc_active_mask =  0x11;
+>> +
+>> +             } else {
+>> +                     /* Single MCB active */
+>> +                     xgene_pmu->mcb_active_mask = 0x1;
+>> +                     /* Probe all active L3C(s), maximum is 4 */
+>> +                     xgene_pmu->l3c_active_mask = 0x0F;
+>> +                     /* Probe all active MC(s), maximum is 4 */
+>> +                     if ((mcb0routing == 0x2) && (mcb1routing == 0x0))
+>> +                             xgene_pmu->mc_active_mask = 0x0F;
+>> +                     else if ((mcb0routing == 0x1) && (mcb1routing == 0x0))
+>> +                             xgene_pmu->mc_active_mask =  0x03;
+>> +                     else
+>> +                             xgene_pmu->mc_active_mask =  0x01;
+>> +             }
+>>       } else {
+>> -             /* Single MCB active */
+>> -             xgene_pmu->mcb_active_mask = 0x1;
+>> -             /* Probe all active MC(s) */
+>> -             reg = readl(mcba_csr + CSW_CSWCR);
+>> -             xgene_pmu->mc_active_mask =
+>> -                     (reg & MCBADDRMR_DUALMCU_MODE_MASK) ? 0x3 : 0x1;
+>> -     }
+>> +             res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+>> +             mcba_csr = devm_ioremap_resource(&pdev->dev, res);
+>> +             if (IS_ERR(mcba_csr)) {
+>> +                     dev_err(&pdev->dev, "ioremap failed for MCBA CSR resource\n");
+>> +                     return PTR_ERR(mcba_csr);
+>> +             }
+>> +
+>> +             res = platform_get_resource(pdev, IORESOURCE_MEM, 3);
+>> +             mcbb_csr = devm_ioremap_resource(&pdev->dev, res);
+>> +             if (IS_ERR(mcbb_csr)) {
+>> +                     dev_err(&pdev->dev, "ioremap failed for MCBB CSR resource\n");
+>> +                     return PTR_ERR(mcbb_csr);
+>> +             }
+>>
+>> +             xgene_pmu->l3c_active_mask = 0x1;
+>> +             if (reg & CSW_CSWCR_DUALMCB_MASK) {
+>> +                     /* Dual MCB active */
+>> +                     xgene_pmu->mcb_active_mask = 0x3;
+>> +                     /* Probe all active MC(s) */
+>> +                     reg = readl(mcbb_csr + CSW_CSWCR);
+>> +                     xgene_pmu->mc_active_mask =
+>> +                             (reg & MCBADDRMR_DUALMCU_MODE_MASK) ? 0xF : 0x5;
+>> +             } else {
+>> +                     /* Single MCB active */
+>> +                     xgene_pmu->mcb_active_mask = 0x1;
+>> +                     /* Probe all active MC(s) */
+>> +                     reg = readl(mcba_csr + CSW_CSWCR);
+>> +                     xgene_pmu->mc_active_mask =
+>> +                             (reg & MCBADDRMR_DUALMCU_MODE_MASK) ? 0x3 : 0x1;
+>> +             }
+>> +     }
+>>       return 0;
+>>  }
+>
+> Please split these into separate functions. e.g. have
+> acpi_pmu_probe_active_mcb_mcu_v1_2() and
+> acpi_pmu_probe_active_mcb_mcu_v3().
+>
+
+Yes, I can do it.
+
+>>  static char *xgene_pmu_dev_name(struct device *dev, u32 type, int id)
+>> @@ -997,6 +1439,8 @@ static char *xgene_pmu_dev_name(struct device *dev, u32 type, int id)
+>>               return devm_kasprintf(dev, GFP_KERNEL, "l3c%d", id);
+>>       case PMU_TYPE_IOB:
+>>               return devm_kasprintf(dev, GFP_KERNEL, "iob%d", id);
+>> +     case PMU_TYPE_IOB_SLOW:
+>> +             return devm_kasprintf(dev, GFP_KERNEL, "iob-slow%d", id);
+>
+> What is IOB slow? How does it relate to the existing IOB?
+
+IOB SLOW PMU is another PMU, it's not related to IOB PMU. They are
+sitting in 2 different clock domains.
+
+Thanks
+Hoan
+
+>
+> Thanks,
+> Mark.
