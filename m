@@ -1,46 +1,44 @@
-From: leoyang.li@nxp.com (Li Yang)
-Date: Fri, 2 Jun 2017 18:20:23 -0500
-Subject: [PATCH 2/2] MAINTAINERS: update my email address from freescale to nxp
-In-Reply-To: <1496445623-22390-1-git-send-email-leoyang.li@nxp.com>
-References: <1496445623-22390-1-git-send-email-leoyang.li@nxp.com>
-Message-ID: <1496445623-22390-2-git-send-email-leoyang.li@nxp.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri,  2 Jun 2017 16:43:58 -0700
+Subject: [PATCH/RFT 0/3] ARM: davinci: da850-evm: camera capture
+Message-ID: <20170602234401.24721-1-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Li Yang <leoyang.li@nxp.com>
----
- MAINTAINERS | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+This series is the final step to demonstrate VPIF capture via an
+external camera sensor.  It is only FYI and for testing/validation
+purposes, and not intended for upstream merge.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 1807d3f..5a39d4a 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -5285,7 +5285,7 @@ S:	Maintained
- F:	drivers/video/fbdev/fsl-diu-fb.*
- 
- FREESCALE DMA DRIVER
--M:	Li Yang <leoli@freescale.com>
-+M:	Li Yang <leoyang.li@nxp.com>
- M:	Zhang Wei <zw@zh-kernel.org>
- L:	linuxppc-dev at lists.ozlabs.org
- S:	Maintained
-@@ -5374,14 +5374,14 @@ F:	include/soc/fsl/*qe*.h
- F:	include/soc/fsl/*ucc*.h
- 
- FREESCALE USB PERIPHERAL DRIVERS
--M:	Li Yang <leoli@freescale.com>
-+M:	Li Yang <leoyang.li@nxp.com>
- L:	linux-usb at vger.kernel.org
- L:	linuxppc-dev at lists.ozlabs.org
- S:	Maintained
- F:	drivers/usb/gadget/udc/fsl*
- 
- FREESCALE QUICC ENGINE UCC ETHERNET DRIVER
--M:	Li Yang <leoli@freescale.com>
-+M:	Li Yang <leoyang.li@nxp.com>
- L:	netdev at vger.kernel.org
- L:	linuxppc-dev at lists.ozlabs.org
- S:	Maintained
+Tested on a da850-evm with UI board.
+
+With only the first patch (GPIO hogs) patch applied, VPIF capture
+works for composite input, but still relies on pdata-quirks for the
+tvp514x input/output routing.
+
+With the rest of the series applied, it works for camera input with
+VPIF in DT mode (no more pdata-quirks needed.)  
+
+Tested with da850-evm + UI board + On-Semi camera board using
+aptina,mt9v032 sensor:
+  http://www.mouser.com/search/ProductDetail.aspx?R=0virtualkey0virtualkeyMT9V032C12STCH-GEVB
+
+Dependencies:
+- VPIF driver changes
+  https://marc.info/?l=linux-arm-kernel&m=149643932427173
+- davinci platform updates
+  https://marc.info/?l=linux-arm-kernel&m=149644517728393
+
+Kevin Hilman (3):
+  ARM: dts: da850-evm: VPIF input selction via GPIO hogs
+  ARM: dts: da850-evm.dts: add mt9v032 camera sensor
+  HACK: ARM: davinci: add cdce913 clock controller
+
+ arch/arm/boot/dts/da850-evm.dts      |  76 ++++++++++++++++
+ arch/arm/mach-davinci/Makefile       |   2 +-
+ arch/arm/mach-davinci/cdce913.c      | 164 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-davinci/pdata-quirks.c |   8 +-
+ 4 files changed, 247 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/mach-davinci/cdce913.c
+
 -- 
-1.9.0
+2.9.3
