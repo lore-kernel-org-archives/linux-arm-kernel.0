@@ -1,181 +1,34 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri,  2 Jun 2017 16:23:18 +0200
-Subject: [PATCH v2 11/11] arm64: dts: marvell: add gpio support for Armada
- 7K/8K
+Date: Fri,  2 Jun 2017 16:23:12 +0200
+Subject: [PATCH v2 05/11] arm64: marvell: enable the Armada 7K/8K pinctrl
+ driver
 In-Reply-To: <cover.8fe5f7c62a787452878ca071fa00b953e96988ef.1496413293.git-series.gregory.clement@free-electrons.com>
 References: <cover.8fe5f7c62a787452878ca071fa00b953e96988ef.1496413293.git-series.gregory.clement@free-electrons.com>
-Message-ID: <705e5d8fc9f660ad3adc50cf2f5d3fd088770f60.1496413293.git-series.gregory.clement@free-electrons.com>
+Message-ID: <c8bde2360c423649abfbb63eb418ba2b58ad3c2b.1496413293.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable gpio support for CP and AP on the Marvell Armada 7K/8K SoCs.
+This commit makes sure the drivers for the Armada 7K/8K pin controllers
+are enabled.
 
-The Armada 8K has two CP110 blocks, each having two GPIO controllers.
-However, in each CP110 block, one of the GPIO controller cannot be
-used: in the master CP110, only the second GPIO controller can be used,
-while on the slave CP110, only the first GPIO controller can be used.
-
-On the other side, the Armada 7K has only one CP110, but both its GPIO
-controllers can be used.
-
-For this reason, the GPIO controllers are marked as "disabled" in the
-armada-cp110-master.dtsi and armada-cp110-slave.dtsi files, and only
-enabled in the per-SoC dtsi files.
-
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm64/boot/dts/marvell/armada-70x0.dtsi         | 15 +++++++++-
- arch/arm64/boot/dts/marvell/armada-80x0.dtsi         | 16 +++++++++-
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi        | 10 ++++++-
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 21 ++++++++++++-
- arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 22 +++++++++++++-
- 5 files changed, 84 insertions(+)
+ arch/arm64/Kconfig.platforms | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-70x0.dtsi b/arch/arm64/boot/dts/marvell/armada-70x0.dtsi
-index f6c22665d091..860b6ae9dcc5 100644
---- a/arch/arm64/boot/dts/marvell/armada-70x0.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-70x0.dtsi
-@@ -46,6 +46,21 @@
- 
- #include "armada-cp110-master.dtsi"
- 
-+/ {
-+	aliases {
-+		gpio1 = &cpm_gpio1;
-+		gpio2 = &cpm_gpio2;
-+	};
-+};
-+
-+&cpm_gpio1 {
-+	status = "okay";
-+};
-+
-+&cpm_gpio2 {
-+	status = "okay";
-+};
-+
- &cpm_syscon0 {
- 	cpm_pinctrl: pinctrl {
- 		compatible = "marvell,armada-7k-pinctrl";
-diff --git a/arch/arm64/boot/dts/marvell/armada-80x0.dtsi b/arch/arm64/boot/dts/marvell/armada-80x0.dtsi
-index 93d1de03b39a..666ebe96ba0d 100644
---- a/arch/arm64/boot/dts/marvell/armada-80x0.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-80x0.dtsi
-@@ -47,6 +47,22 @@
- #include "armada-cp110-master.dtsi"
- #include "armada-cp110-slave.dtsi"
- 
-+/ {
-+	aliases {
-+		gpio1 = &cps_gpio1;
-+		gpio2 = &cpm_gpio2;
-+	};
-+};
-+
-+/* The 80x0 has two CP blocks, but uses only one block from each. */
-+&cps_gpio1 {
-+	status = "okay";
-+};
-+
-+&cpm_gpio2 {
-+	status = "okay";
-+};
-+
- &cpm_syscon0 {
- 	cpm_pinctrl: pinctrl {
- 		compatible = "marvell,armada-8k-cpm-pinctrl";
-diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-index c6c30143eb29..f19d5077ba8d 100644
---- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-@@ -57,6 +57,7 @@
- 	aliases {
- 		serial0 = &uart0;
- 		serial1 = &uart1;
-+		gpio0 = &ap_gpio;
- 	};
- 
- 	psci {
-@@ -256,6 +257,15 @@
- 				ap_pinctrl: pinctrl {
- 					compatible = "marvell,ap806-pinctrl";
- 				};
-+
-+				ap_gpio: gpio {
-+					compatible = "marvell,armada-8k-gpio";
-+					offset = <0x1040>;
-+					ngpios = <19>;
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					gpio-ranges = <&ap_pinctrl 0 0 19>;
-+				};
- 			};
- 		};
- 	};
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-index 4788a87fc43c..1bcd549228db 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-@@ -104,6 +104,27 @@
- 					compatible = "marvell,cp110-clock";
- 					#clock-cells = <2>;
- 				};
-+
-+				cpm_gpio1: gpio at 100 {
-+					compatible = "marvell,armada-8k-gpio";
-+					offset = <0x100>;
-+					ngpios = <32>;
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					gpio-ranges = <&cpm_pinctrl 0 0 32>;
-+					status = "disabled";
-+
-+				};
-+
-+				cpm_gpio2: gpio at 140 {
-+					compatible = "marvell,armada-8k-gpio";
-+					offset = <0x140>;
-+					ngpios = <31>;
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					gpio-ranges = <&cpm_pinctrl 0 32 31>;
-+					status = "disabled";
-+				};
- 			};
- 
- 			cpm_rtc: rtc at 284000 {
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-index e21cdbdbe37b..b46a208c72f2 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-@@ -111,6 +111,28 @@
- 					compatible = "marvell,cp110-clock";
- 					#clock-cells = <2>;
- 				};
-+
-+				cps_gpio1: gpio at 100 {
-+					compatible = "marvell,armada-8k-gpio";
-+					offset = <0x100>;
-+					ngpios = <32>;
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					gpio-ranges = <&cps_pinctrl 0 0 32>;
-+					status = "disabled";
-+
-+				};
-+
-+				cps_gpio2: gpio at 140 {
-+					compatible = "marvell,armada-8k-gpio";
-+					offset = <0x140>;
-+					ngpios = <31>;
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					gpio-ranges = <&cps_pinctrl 0 32 31>;
-+					status = "disabled";
-+				};
-+
- 			};
- 
- 			cps_sata0: sata at 540000 {
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index b4e919ac73f6..c8fc2e7f0152 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -113,6 +113,8 @@ config ARCH_MVEBU
+ 	select OF_GPIO
+ 	select PINCTRL
+ 	select PINCTRL_ARMADA_37XX
++	select PINCTRL_ARMADA_AP806
++	select PINCTRL_ARMADA_CP110
+ 	help
+ 	  This enables support for Marvell EBU familly, including:
+ 	   - Armada 3700 SoC Family
 -- 
 git-series 0.9.1
