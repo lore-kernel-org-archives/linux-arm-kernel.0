@@ -1,61 +1,37 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 2 Jun 2017 15:52:31 -0700
-Subject: [PATCH v3 3/5] clk: qcom: ipq8074: Add Global Clock Controller
- support
-In-Reply-To: <1496316482-25468-4-git-send-email-varada@codeaurora.org>
-References: <1496316482-25468-1-git-send-email-varada@codeaurora.org>
- <1496316482-25468-4-git-send-email-varada@codeaurora.org>
-Message-ID: <20170602225231.GD20170@codeaurora.org>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 2 Jun 2017 18:01:55 -0500
+Subject: Need help booting allmodconfig on arm64
+In-Reply-To: <20170602200150.GA4902@n2100.armlinux.org.uk>
+References: <CAOZdJXUr6wAE5CZBzmADOAVBGL692FVzaaGwaC7hzJ7GtJmxtA@mail.gmail.com>
+ <20170601225012.GI22219@n2100.armlinux.org.uk>
+ <031b1119-6366-c41f-bf65-01561583ef41@codeaurora.org>
+ <20170602083615.GA28299@leverpostej>
+ <0dd92218-037d-3d1f-7b3c-10adbc3bc832@codeaurora.org>
+ <20170602200150.GA4902@n2100.armlinux.org.uk>
+Message-ID: <8fca2513-759d-3747-63f1-cd7d11b34ec2@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01, Varadarajan Narayanan wrote:
-> From: Abhishek Sahu <absahu@codeaurora.org>
-> 
-> This patch adds support for the global clock controller found on
-> the IPQ8074 based devices. This includes UART, I2C, SPI etc.
-> 
-> Signed-off-by: Abhishek Sahu <absahu@codeaurora.org>
-> Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
-> ---
->  .../devicetree/bindings/clock/qcom,gcc.txt         |    1 +
->  drivers/clk/qcom/Kconfig                           |    9 +
->  drivers/clk/qcom/Makefile                          |    1 +
->  drivers/clk/qcom/gcc-ipq8074.c                     | 1009 ++++++++++++++++++++
->  include/dt-bindings/clock/qcom,gcc-ipq8074.h       |  152 +++
+On 06/02/2017 03:01 PM, Russell King - ARM Linux wrote:
+> ATA devices appear via the SCSI layer, which means you need the SCSI disk
+> driver, CONFIG_BLK_DEV_SD, for ATA disks to be visible as block devices.
 
-The new world order is to split these includes from the driver
-changes. Then someone (clk or arm-soc related maintainers) can
-merge that #define change somewhere stable and then apply the
-driver code on top or the dts file on top.
+Great, that fixed that problem.
 
-So can you please split the header file off into it's own patch
-before this one and resend?
+I also had to set CONFIG_UNIX=y and CONFIG_AUTOFS4_FS=y so that udev 
+would start, but it's still not quite 100% there.  lsmod still shows no 
+drivers being loaded.  All of the modules were copied on the initramfs, 
+why aren't they being loaded?
 
-> diff --git a/drivers/clk/qcom/gcc-ipq8074.c b/drivers/clk/qcom/gcc-ipq8074.c
-> new file mode 100644
-> index 0000000..b62db77
-> --- /dev/null
-> +++ b/drivers/clk/qcom/gcc-ipq8074.c
-> +
-> +static int gcc_ipq8074_probe(struct platform_device *pdev)
-> +{
-> +	int ret, i;
-> +
-> +	for (i = 0; i < ARRAY_SIZE(gcc_ipq8074_hws); i++) {
-> +		ret = devm_clk_hw_register(&pdev->dev, gcc_ipq8074_hws[i]);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
-> +	ret = qcom_cc_probe(pdev, &gcc_ipq8074_desc);
-> +
-> +	return ret;
+A couple boot log messages stand out:
 
-Just return qcom_cc_probe() please.
+[ TIME ] Timed out waiting for device 
+dev-disk-by\x2duuid-AB6C\x2d1CCA.device.
+[DEPEND] Dependency failed for /boot/efi.
+[DEPEND] Dependency failed for Local File Systems.
 
-> +}
-> +
+
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
