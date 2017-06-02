@@ -1,40 +1,40 @@
-From: rafalo@cadence.com (Rafal Ozieblo)
-Date: Fri, 2 Jun 2017 15:23:59 +0100
-Subject: [PATCH v2 0/4] PTP support for macb driver
-Message-ID: <1496413439-12900-1-git-send-email-rafalo@cadence.com>
+From: cosardindar@gmail.com (Cosar Dindar)
+Date: Fri,  2 Jun 2017 17:27:07 +0300
+Subject: [PATCH v4] dt-bindings : Fix binding properties
+Message-ID: <640b6a7409ed85ea07c19bac6fea707ed80b47c0.1496413070.git.cosardindar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds support for PTP synchronization protocol
-in Cadence GEM driver based on PHC.
+Binding properties explanation has been updated.
 
-v2 changes:
-* removed alarm's support
-* removed external time stamp support
-* removed PTP event interrupt handling
-* removed ptp_hw_support flag
-* removed all extra sanity checks
-* removed unnecessary #ifdef
-* fixed coding style and alligment issues
-* renamed macb.c to macb_main.c
+Signed-off-by: Cosar Dindar <cosardindar@gmail.com>
+---
+ Documentation/devicetree/bindings/crypto/st,stm32-crc.txt | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-Rafal Ozieblo (4):
-  net: macb: Add support for PTP timestamps in DMA descriptors
-  net: macb: Add tsu_clk to device tree
-  net: macb: macb.c changed to macb_main.c
-  net: macb: Add hardware PTP support
-
- Documentation/devicetree/bindings/net/macb.txt |    1 +
- drivers/net/ethernet/cadence/Kconfig           |   10 +-
- drivers/net/ethernet/cadence/Makefile          |    5 +
- drivers/net/ethernet/cadence/macb.c            | 3509 -----------------------
- drivers/net/ethernet/cadence/macb.h            |  158 +-
- drivers/net/ethernet/cadence/macb_main.c       | 3647 ++++++++++++++++++++++++
- drivers/net/ethernet/cadence/macb_ptp.c        |  512 ++++
- 7 files changed, 4325 insertions(+), 3517 deletions(-)
- delete mode 100644 drivers/net/ethernet/cadence/macb.c
- create mode 100644 drivers/net/ethernet/cadence/macb_main.c
- create mode 100755 drivers/net/ethernet/cadence/macb_ptp.c
-
+diff --git a/Documentation/devicetree/bindings/crypto/st,stm32-crc.txt b/Documentation/devicetree/bindings/crypto/st,stm32-crc.txt
+index 7b30f1e..1e9af69 100644
+--- a/Documentation/devicetree/bindings/crypto/st,stm32-crc.txt
++++ b/Documentation/devicetree/bindings/crypto/st,stm32-crc.txt
+@@ -1,7 +1,9 @@
+ * STMicroelectronics STM32 CRC
+ 
+ Required properties:
+-- compatible: Can be either "st,stm32f7-crc" or "st,srm32f4-crc".
++- compatible: Should be one of the following string.
++	      "st,stm32f7-crc"
++	      "st,stm32f4-crc"
+ - reg: The address and length of the peripheral registers space
+ - clocks: The input clock of the CRC instance
+ 
+@@ -10,7 +12,7 @@ Optional properties: none
+ Example:
+ 
+ crc: crc at 40023000 {
+-	compatible = "st,stm32f7-crc", "st,stm32f4-crc";
++	compatible = "st,stm32f7-crc";
+ 	reg = <0x40023000 0x400>;
+ 	clocks = <&rcc 0 12>;
+ };
 -- 
-2.4.5
+2.7.4
