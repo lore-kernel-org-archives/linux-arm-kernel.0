@@ -1,126 +1,102 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri,  2 Jun 2017 18:10:12 +0800
-Subject: [PATCH 07/19] drm/sun4i: hdmi: Support different variants of the TMDS
- clock
+Date: Fri,  2 Jun 2017 18:10:21 +0800
+Subject: [PATCH 16/19] ARM: sun6i: a31: Add device node for HDMI controller
 In-Reply-To: <20170602101024.18940-1-wens@csie.org>
 References: <20170602101024.18940-1-wens@csie.org>
-Message-ID: <20170602101024.18940-8-wens@csie.org>
+Message-ID: <20170602101024.18940-17-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the A31, the HDMI TMDS clock has a different value offset for the
-divider.
+Now that we support the HDMI controller on the A31 SoC, we can add it
+to the device tree.
 
-This patch adds support for custom offsets to the TMDS clock.
+This adds a device node for the HDMI controller, and the of_graph nodes
+connecting it to the 2 TCONs.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c | 26 +++++++++++++++++++-------
- 1 file changed, 19 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/sun6i-a31.dtsi | 55 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
-index 5692e41833ae..3c304e1fbe3b 100644
---- a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
-@@ -18,6 +18,8 @@
- struct sun4i_tmds {
- 	struct clk_hw		hw;
- 	struct sun4i_hdmi	*hdmi;
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index d0cede5aaeb5..36bfb6ad6578 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -284,6 +284,12 @@
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+ 					reg = <1>;
 +
-+	u8			div_offset;
- };
- 
- static inline struct sun4i_tmds *hw_to_tmds(struct clk_hw *hw)
-@@ -28,6 +30,7 @@ static inline struct sun4i_tmds *hw_to_tmds(struct clk_hw *hw)
- 
- static unsigned long sun4i_tmds_calc_divider(unsigned long rate,
- 					     unsigned long parent_rate,
-+					     u8 div_offset,
- 					     u8 *div,
- 					     bool *half)
- {
-@@ -35,7 +38,7 @@ static unsigned long sun4i_tmds_calc_divider(unsigned long rate,
- 	u8 best_m = 0, m;
- 	bool is_double;
- 
--	for (m = 1; m < 16; m++) {
-+	for (m = div_offset ?: 1; m < (16 + div_offset); m++) {
- 		u8 d;
- 
- 		for (d = 1; d < 3; d++) {
-@@ -67,7 +70,8 @@ static unsigned long sun4i_tmds_calc_divider(unsigned long rate,
- static int sun4i_tmds_determine_rate(struct clk_hw *hw,
- 				     struct clk_rate_request *req)
- {
--	struct clk_hw *parent;
-+	struct sun4i_tmds *tmds = hw_to_tmds(hw);
-+	struct clk_hw *parent = NULL;
- 	unsigned long best_parent = 0;
- 	unsigned long rate = req->rate;
- 	int best_div = 1, best_half = 1;
-@@ -85,7 +89,8 @@ static int sun4i_tmds_determine_rate(struct clk_hw *hw,
- 			continue;
- 
- 		for (i = 1; i < 3; i++) {
--			for (j = 1; j < 16; j++) {
-+			for (j = tmds->div_offset ?: 1;
-+			     j < (16 + tmds->div_offset); j++) {
- 				unsigned long ideal = rate * i * j;
- 				unsigned long rounded;
- 
-@@ -129,7 +134,7 @@ static unsigned long sun4i_tmds_recalc_rate(struct clk_hw *hw,
- 		parent_rate /= 2;
- 
- 	reg = readl(tmds->hdmi->base + SUN4I_HDMI_PLL_CTRL_REG);
--	reg = (reg >> 4) & 0xf;
-+	reg = ((reg >> 4) & 0xf) + tmds->div_offset;
- 	if (!reg)
- 		reg = 1;
- 
-@@ -144,7 +149,8 @@ static int sun4i_tmds_set_rate(struct clk_hw *hw, unsigned long rate,
- 	u32 reg;
- 	u8 div;
- 
--	sun4i_tmds_calc_divider(rate, parent_rate, &div, &half);
-+	sun4i_tmds_calc_divider(rate, parent_rate, tmds->div_offset,
-+				&div, &half);
- 
- 	reg = readl(tmds->hdmi->base + SUN4I_HDMI_PAD_CTRL1_REG);
- 	reg &= ~SUN4I_HDMI_PAD_CTRL1_HALVE_CLK;
-@@ -154,7 +160,7 @@ static int sun4i_tmds_set_rate(struct clk_hw *hw, unsigned long rate,
- 
- 	reg = readl(tmds->hdmi->base + SUN4I_HDMI_PLL_CTRL_REG);
- 	reg &= ~SUN4I_HDMI_PLL_CTRL_DIV_MASK;
--	writel(reg | SUN4I_HDMI_PLL_CTRL_DIV(div),
-+	writel(reg | SUN4I_HDMI_PLL_CTRL_DIV(div - tmds->div_offset),
- 	       tmds->hdmi->base + SUN4I_HDMI_PLL_CTRL_REG);
- 
- 	return 0;
-@@ -195,7 +201,7 @@ static const struct clk_ops sun4i_tmds_ops = {
- 	.set_parent	= sun4i_tmds_set_parent,
- };
- 
--int sun4i_tmds_create(struct sun4i_hdmi *hdmi)
-+static int _sun4i_tmds_create(struct sun4i_hdmi *hdmi, u8 div_offset)
- {
- 	struct clk_init_data init;
- 	struct sun4i_tmds *tmds;
-@@ -221,6 +227,7 @@ int sun4i_tmds_create(struct sun4i_hdmi *hdmi)
- 
- 	tmds->hdmi = hdmi;
- 	tmds->hw.init = &init;
-+	tmds->div_offset = div_offset;
- 
- 	hdmi->tmds_clk = devm_clk_register(hdmi->dev, &tmds->hw);
- 	if (IS_ERR(hdmi->tmds_clk))
-@@ -228,3 +235,8 @@ int sun4i_tmds_create(struct sun4i_hdmi *hdmi)
- 
- 	return 0;
- }
++					tcon0_out_hdmi: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&hdmi_in_tcon0>;
++						allwinner,tcon-channel = <1>;
++					};
+ 				};
+ 			};
+ 		};
+@@ -321,6 +327,12 @@
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+ 					reg = <1>;
 +
-+int sun4i_tmds_create(struct sun4i_hdmi *hdmi)
-+{
-+	return _sun4i_tmds_create(hdmi, 0);
-+}
++					tcon1_out_hdmi: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&hdmi_in_tcon1>;
++						allwinner,tcon-channel = <1>;
++					};
+ 				};
+ 			};
+ 		};
+@@ -401,6 +413,49 @@
+ 			#size-cells = <0>;
+ 		};
+ 
++		hdmi: hdmi at 01c16000 {
++			compatible = "allwinner,sun6i-a31-hdmi";
++			reg = <0x01c16000 0x1000>;
++			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_AHB1_HDMI>, <&ccu CLK_HDMI>,
++				 <&ccu CLK_HDMI_DDC>,
++				 <&ccu CLK_PLL_VIDEO0_2X>,
++				 <&ccu CLK_PLL_VIDEO1_2X>;
++			clock-names = "ahb", "mod", "ddc", "pll-0", "pll-1";
++			resets = <&ccu RST_AHB1_HDMI>;
++			reset-names = "ahb";
++			dma-names = "ddc-tx", "ddc-rx", "audio-tx";
++			dmas = <&dma 13>, <&dma 13>, <&dma 14>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				hdmi_in: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					hdmi_in_tcon0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&tcon0_out_hdmi>;
++					};
++
++					hdmi_in_tcon1: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&tcon1_out_hdmi>;
++					};
++				};
++
++				hdmi_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++				};
++			};
++		};
++
+ 		usb_otg: usb at 01c19000 {
+ 			compatible = "allwinner,sun6i-a31-musb";
+ 			reg = <0x01c19000 0x0400>;
 -- 
 2.11.0
