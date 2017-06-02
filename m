@@ -1,65 +1,76 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 02 Jun 2017 14:48:02 +0200
-Subject: [PATCH 42/58] ARM: dts: at91: vinco: use TCB2 as clocksource
-In-Reply-To: <20170530215139.9983-43-alexandre.belloni@free-electrons.com>
- (Alexandre Belloni's message of "Tue, 30 May 2017 23:51:23 +0200")
-References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
- <20170530215139.9983-43-alexandre.belloni@free-electrons.com>
-Message-ID: <87r2z2pnct.fsf@free-electrons.com>
+From: raviteja.garimella@broadcom.com (Raviteja Garimella)
+Date: Fri,  2 Jun 2017 18:30:36 +0530
+Subject: [PATCH v7 0/3] Support for USB DRD Phy driver for NS2 
+Message-ID: <1496408439-30431-1-git-send-email-raviteja.garimella@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
- 
- On mar., mai 30 2017, Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+Changes in v7:
+=============
+Cleaned up unused variables in phy private data structure that's
+missed out in v6.
+Setting of phy mode to device/host is removed from phy power on.
+routine.
 
-> As TCB2 doesn't have any output pins, use it as a clocksource.
->
+Changes in v6:
+=============
+Removed spin locks which are not required as the references
+to phy_ops in the same driver were removed in v5.
 
-In case you have not already applied it:
+Removed host/device 'notify' routines which are registered
+using 'extcon_register_notifier'. The irq handler is sufficient
+to deal with the change in extcon events within the same driver.
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Changes in v5:
+=============
+Removed references to phy_ops in the same driver by connect_work
+event handler to change the phy modes.
 
-Thanks,
+To support dynamically changing the mode of the phy, it does
+not require doing a phy reset/programming of PHY PLL. Changes
+are made to the connect_work routine to just program the required
+register bits to achieve this purpose.
 
-Gregory
+Changes in v4:
+=============
+Remove references to edev->name in debug prints.
 
+Changes in v3:
+=============
+Remove unnecessary checks for poweron as suggested in review.
 
-> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  arch/arm/boot/dts/at91-vinco.dts | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/at91-vinco.dts b/arch/arm/boot/dts/at91-vinco.dts
-> index e0c0b2897a49..d495a5e2aeac 100644
-> --- a/arch/arm/boot/dts/at91-vinco.dts
-> +++ b/arch/arm/boot/dts/at91-vinco.dts
-> @@ -151,6 +151,18 @@
->  				status = "okay";
->  			};
->  
-> +			tcb2: timer at fc024000 {
-> +				timer at 0 {
-> +					compatible = "atmel,tcb-timer";
-> +					reg = <0>;
-> +				};
-> +
-> +				timer at 1 {
-> +					compatible = "atmel,tcb-timer";
-> +					reg = <1>;
-> +				};
-> +			};
-> +
->  			macb1: ethernet at fc028000 {
->  				phy-mode = "rmii";
->  				status = "okay";
-> -- 
-> 2.11.0
->
+Changes in v2:
+=============
+1. Initialize file operations .owner field with THIS_MODULE.
+2. Remove unnecessary gpio example in DT bindings documentation.
+   This is previously acked by Rob Herring <robh@kernel.org>
+
+Introduction for PATCH v1:
+
+This patch adds support for USB Dual Role Device Phy for Broadcom
+Northstar2 SoC. Apart from the new phy driver, this patchset contains
+changes to Kconfig, Makefile, and Device tree files.
+
+This patchset is tested on Broadcom NS2 BCM958712K reference board.
+
+Repo: https://github.com/Broadcom/arm64-linux.git
+Branch: ns2_drdphy_v7
+
+*** BLURB HERE ***
+
+Raviteja Garimella (3):
+  dt-bindings:phy:Add DT bindings documentation for NS2 USB DRD phy
+  phy:phy-bcm-ns2-usbdrd:Broadcom USB DRD Phy driver for Northstar2
+  arm64: dts: NS2: Add USB DRD PHY device tree node
+
+ .../devicetree/bindings/phy/brcm,ns2-drd-phy.txt   |  30 ++
+ arch/arm64/boot/dts/broadcom/ns2.dtsi              |  14 +
+ drivers/phy/Kconfig                                |  13 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-bcm-ns2-usbdrd.c                   | 450 +++++++++++++++++++++
+ 5 files changed, 508 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/brcm,ns2-drd-phy.txt
+ create mode 100644 drivers/phy/phy-bcm-ns2-usbdrd.c
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.1.0
