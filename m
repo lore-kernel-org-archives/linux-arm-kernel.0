@@ -1,86 +1,64 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri,  2 Jun 2017 16:23:08 +0200
-Subject: [PATCH v2 01/11] pinctrl: dt-bindings: add documentation for AP806
- pin controllers
+Date: Fri,  2 Jun 2017 16:23:10 +0200
+Subject: [PATCH v2 03/11] pinctrl: mvebu: remove the offset property for regmap
 In-Reply-To: <cover.8fe5f7c62a787452878ca071fa00b953e96988ef.1496413293.git-series.gregory.clement@free-electrons.com>
 References: <cover.8fe5f7c62a787452878ca071fa00b953e96988ef.1496413293.git-series.gregory.clement@free-electrons.com>
-Message-ID: <2d89fbc10d07c890336eabbd362e55cb2e5055b5.1496413293.git-series.gregory.clement@free-electrons.com>
+Message-ID: <f171b34fb075c67215da2224265e470ef9376528.1496413293.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the device tree binding for the pin controllers found on the
-Armada 7K and Armada 8K SoCs.
+The offset property of the pinctrl node, when a regmap is used in the
+device tree, was never used nor documented in the binding. Moreover, the
+compatible string is enough to let the driver know which offset using.
 
-Acked-by: Rob Herring <robh@kernel.org>
+So this patch removes the property and move the information at the driver
+level.
+
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt | 53 ++++++++++++++++++++++++++++++++++++++++++++++-------
- 1 file changed, 46 insertions(+), 7 deletions(-)
+ drivers/pinctrl/mvebu/pinctrl-mvebu.c | 6 +-----
+ drivers/pinctrl/mvebu/pinctrl-mvebu.h | 2 +-
+ 2 files changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-index 888c50e0d64f..4228d158fb31 100644
---- a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-+++ b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-@@ -28,14 +28,53 @@ Required properties:
-  - compatible: must be: "marvell,ap806-clock"
-  - #clock-cells: must be set to 1
+diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.c b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+index e4dda12d371a..163d4614b0f8 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-mvebu.c
++++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+@@ -810,21 +810,17 @@ int mvebu_regmap_mpp_ctrl_set(struct mvebu_mpp_ctrl_data *data,
+ }
  
-+Pinctrl:
-+--------
-+
-+For common binding part and usage, refer to
-+Documentation/devicetree/bindings/pinctrl/marvell,mvebu-pinctrl.txt.
-+
-+Required properties:
-+- compatible must be "marvell,ap806-pinctrl",
-+
-+Available mpp pins/groups and functions:
-+Note: brackets (x) are not part of the mpp name for marvell,function and given
-+only for more detailed description in this document.
-+
-+name	pins	functions
-+================================================================================
-+mpp0	0	gpio, sdio(clk), spi0(clk)
-+mpp1	1	gpio, sdio(cmd), spi0(miso)
-+mpp2	2	gpio, sdio(d0), spi0(mosi)
-+mpp3	3	gpio, sdio(d1), spi0(cs0n)
-+mpp4	4	gpio, sdio(d2), i2c0(sda)
-+mpp5	5	gpio, sdio(d3), i2c0(sdk)
-+mpp6	6	gpio, sdio(ds)
-+mpp7	7	gpio, sdio(d4), uart1(rxd)
-+mpp8	8	gpio, sdio(d5), uart1(txd)
-+mpp9	9	gpio, sdio(d6), spi0(cs1n)
-+mpp10	10	gpio, sdio(d7)
-+mpp11	11	gpio, uart0(txd)
-+mpp12	12	gpio, sdio(pw_off), sdio(hw_rst)
-+mpp13	13	gpio
-+mpp14	14	gpio
-+mpp15	15	gpio
-+mpp16	16	gpio
-+mpp17	17	gpio
-+mpp18	18	gpio
-+mpp19	19	gpio, uart0(rxd), sdio(pw_off)
-+
- Example:
-+ap_syscon: system-controller at 6f4000 {
-+	compatible = "syscon", "simple-mfd";
-+	reg = <0x6f4000 0x1000>;
+ int mvebu_pinctrl_simple_regmap_probe(struct platform_device *pdev,
+-				      struct device *syscon_dev)
++				      struct device *syscon_dev, u32 offset)
+ {
+ 	struct mvebu_pinctrl_soc_info *soc = dev_get_platdata(&pdev->dev);
+ 	struct mvebu_mpp_ctrl_data *mpp_data;
+ 	struct regmap *regmap;
+-	u32 offset;
+ 	int i;
  
--	syscon: system-controller at 6f4000 {
--		compatible = "syscon", "simple-mfd";
--		reg = <0x6f4000 0x1000>;
-+	ap_clk: clock {
-+		compatible = "marvell,ap806-clock";
-+		#clock-cells = <1>;
-+	};
+ 	regmap = syscon_node_to_regmap(syscon_dev->of_node);
+ 	if (IS_ERR(regmap))
+ 		return PTR_ERR(regmap);
  
--		ap_clk: clock {
--			compatible = "marvell,ap806-clock";
--			#clock-cells = <1>;
--		};
-+	ap_pinctrl: pinctrl {
-+		compatible = "marvell,ap806-pinctrl";
- 	};
-+};
+-	if (of_property_read_u32(pdev->dev.of_node, "offset", &offset))
+-		return -EINVAL;
+-
+ 	mpp_data = devm_kcalloc(&pdev->dev, soc->ncontrols, sizeof(*mpp_data),
+ 				GFP_KERNEL);
+ 	if (!mpp_data)
+diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.h b/drivers/pinctrl/mvebu/pinctrl-mvebu.h
+index c90704e74884..75bba436bf59 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-mvebu.h
++++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.h
+@@ -210,6 +210,6 @@ int mvebu_regmap_mpp_ctrl_set(struct mvebu_mpp_ctrl_data *data, unsigned pid,
+ int mvebu_pinctrl_probe(struct platform_device *pdev);
+ int mvebu_pinctrl_simple_mmio_probe(struct platform_device *pdev);
+ int mvebu_pinctrl_simple_regmap_probe(struct platform_device *pdev,
+-				      struct device *syscon_dev);
++				      struct device *syscon_dev, u32 offset);
+ 
+ #endif
 -- 
 git-series 0.9.1
