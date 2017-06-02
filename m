@@ -1,74 +1,33 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Fri, 2 Jun 2017 15:58:06 +0200
-Subject: exynos drm build failure due to cec_* symbols
-Message-ID: <2d6226cf-4023-2a97-0791-42d3e8dcbdd3@suse.de>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 02 Jun 2017 10:08:01 -0400 (EDT)
+Subject: [PATCH v6 00/21] net-next: stmmac: add dwmac-sun8i ethernet driver
+In-Reply-To: <20170602063752.aqyvwcykvepiyt4y@flea.lan>
+References: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
+ <20170601.145819.789604139072328057.davem@davemloft.net>
+ <20170602063752.aqyvwcykvepiyt4y@flea.lan>
+Message-ID: <20170602.100801.2029534530888525251.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Maxime Ripard <maxime.ripard@free-electrons.com>
+Date: Fri, 2 Jun 2017 08:37:52 +0200
 
-We're observing the following build failure with v4.12-rc3, latest
-linux.git and linux-next.git:
+> On Thu, Jun 01, 2017 at 02:58:19PM -0400, David Miller wrote:
+>> From: Corentin Labbe <clabbe.montjoie@gmail.com>
+>> Date: Wed, 31 May 2017 09:18:31 +0200
+>> 
+>> > This patch series add the driver for dwmac-sun8i which handle the Ethernet MAC
+>> > present on Allwinner H3/H5/A83T/A64 SoCs.
+>> 
+>> Series applied, but wow that's a lot of DT file changes :-(
+> 
+> The DT patches should not go through your tree, but arm-soc, so I
+> guess this is not an issue for you?
 
-[ 9825s]   LD      vmlinux.o
-[ 9904s]   MODPOST vmlinux.o
-[ 9915s] drivers/built-in.o: In function `hdmi_get_modes':
-[ 9915s]
-/home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:866:
-undefined reference to `cec_notifier_set_phys_addr_from_edid'
-[ 9915s] drivers/built-in.o: In function `hdmi_remove':
-[ 9915s]
-/home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1923:
-undefined reference to `cec_notifier_set_phys_addr'
-[ 9915s]
-/home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1927:
-undefined reference to `cec_notifier_put'
-[ 9915s] drivers/built-in.o: In function `hdmi_probe':
-[ 9915s]
-/home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1889:
-undefined reference to `cec_notifier_get'
-[ 9915s]
-/home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1904:
-undefined reference to `cec_notifier_put'
-[ 9915s] drivers/built-in.o: In function `hdmi_disable':
-[ 9915s]
-/home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1509:
-undefined reference to `cec_notifier_set_phys_addr'
-[ 9915s] drivers/built-in.o: In function `hdmi_detect':
-[ 9915s]
-/home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:827:
-undefined reference to `cec_notifier_set_phys_addr'
-[ 9931s] make[2]: ***
-[/home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/Makefile:997:
-vmlinux] Error 1
-[ 9931s] make[1]: *** [Makefile:152: sub-make] Error 2
-[ 9931s] make: *** [Makefile:24: __sub-make] Error 2
+I already applied them, so if that is the intention, too late.
 
-My guess is the symbols used by the exynos drm module are not exported:
+This needs to be explicitly stated in the header posting.  Otherwise
+I assume the entire series is meant to go into my tree.
 
-cec_notifier_set_phys_addr_from_edid
-cec_notifier_set_phys_addr
-cec_notifier_put
-cec_notifier_get
-
-Can you please look into fixing this?
-
-Configs for reproducing are available here:
-
-v4.12-rc3:
-http://kernel.opensuse.org/cgit/kernel-source/tree/config/armv7hl/default
-http://kernel.opensuse.org/cgit/kernel-source/tree/config/armv7hl/lpae
-
-linux.git:
-http://kernel.opensuse.org/cgit/kernel-source/tree/config/armv7hl/vanilla?h=vanilla
-
-linux-next.git:
-http://kernel.opensuse.org/cgit/kernel-source/tree/config/armv7hl/vanilla?h=linux-next
-
-Thanks,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Also, saying "net-next" in the patch subjects means it's targetting my
+tree.
