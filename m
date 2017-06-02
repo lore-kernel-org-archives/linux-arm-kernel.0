@@ -1,43 +1,66 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 2 Jun 2017 15:02:23 -0700
-Subject: [PATCH 1/2] ARM: dts: add GSBI8 defines to the MSM8660 family
-In-Reply-To: <20170515075012.3696-1-linus.walleij@linaro.org>
-References: <20170515075012.3696-1-linus.walleij@linaro.org>
-Message-ID: <20170602220223.GR20170@codeaurora.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 3 Jun 2017 00:10:40 +0200
+Subject: [linux-sunxi] [PATCH 1/2] ARM: sun8i: v3s: add device nodes for
+ DE2 display pipeline
+In-Reply-To: <03812a93c93bbada77de864b4c5dc0af@aosc.io>
+References: <20170524111724.28431-1-icenowy@aosc.io>
+ <CAGb2v65bZ+VJYwcP24ipQ+4kuY28Babt-Cpm7uscjmWpcoeJ9g@mail.gmail.com>
+ <5FF9B3F8-01F6-4B17-958C-9A4245199716@aosc.io>
+ <CAGb2v66UG7nS=3zj=TWGY-BG62tsvSpxucKHT35g=4KGcS8kRA@mail.gmail.com>
+ <1B75138F-B045-4E60-BE92-B9AA343CBB1D@aosc.io>
+ <20170529085939.zstja3pymq77ubjq@flea.lan>
+ <03812a93c93bbada77de864b4c5dc0af@aosc.io>
+Message-ID: <20170602221040.zrzaigevbqgvkjy4@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15, Linus Walleij wrote:
-> diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
-> index 747669a62aa8..a53c0f9970bd 100644
-> --- a/arch/arm/boot/dts/qcom-msm8660.dtsi
-> +++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
-> @@ -107,6 +107,31 @@
->  			reg = <0x900000 0x4000>;
->  		};
->  
-> +
-> +		gsbi8: gsbi at 19800000 {
-> +			compatible = "qcom,gsbi-v1.0.0";
-> +			cell-index = <12>;
-> +			reg = <0x19800000 0x100>;
-> +			clocks = <&gcc GSBI8_H_CLK>;
-> +			clock-names = "iface";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-> +
-> +			syscon-tcsr = <&tcsr>;
-> +
-> +			gsbi8_i2c: i2c at 19880000 {
-> +				compatible = "qcom,i2c-qup-v1.1.1";
-> +				reg = <0x19880000 0x1000>;
-> +				interrupts = <0 161 IRQ_TYPE_NONE>;
+On Mon, May 29, 2017 at 09:01:59PM +0800, icenowy at aosc.io wrote:
+> ? 2017-05-29 16:59?Maxime Ripard ???
+> > On Thu, May 25, 2017 at 10:28:24PM +0800, Icenowy Zheng wrote:
+> > > >>>> +                       compatible = "allwinner,sun8i-v3s-de2-mixer";
+> > > >>>> +                       reg = <0x01100000 0x100000>;
+> > > >>>
+> > > >>>The display engine also has an interrupt. Please list it
+> > > >>
+> > > >> It's a overall interrupt for DE2, not mixer interrupt.
+> > > >>
+> > > >> I will add it after we have proper interrupt chaining facility
+> > > >> for DE2.
+> > > >>
+> > > >> It cannot fit here in mixer node.
+> > > >
+> > > > Could you elaborate? If it is just shared, then listing it several
+> > > > times is OK. If the interrupt registers are not in this address
+> > > > space, then
+> > > 
+> > > The interrupt dealing code is still not so clear, and totally not
+> > > present in BSP DE2 code (the BSP just didn't use the interrupt).
+> > > 
+> > > We doesn't even know where the interrupt register is, and we cannot
+> > > promise it's not broken (as their is even no application of it in
+> > > BSP).
+> > 
+> > Whether it's broken or not is out of the question here. Adding it
+> > later would either break the DT compatibility, or introduce a crippled
+> > driver for users that do not have a recent enough DT. None of the two
+> > are really acceptable.
+> > 
+> > Especially if your plan is to add support for these.
+> 
+> I have no such plan -- even the BSP driver doesn't use the IRQ at all.
 
-				interrupts = <GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>?
+We'll see how it turns out.. I applied that patch.
 
-> +				clocks = <&gcc GSBI8_QUP_CLK>, <&gcc GSBI8_H_CLK>;
+Maxime
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170603/5423ddac/attachment.sig>
