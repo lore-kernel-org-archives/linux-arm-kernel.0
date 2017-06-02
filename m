@@ -1,37 +1,25 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 1 Jun 2017 16:57:45 -0700
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.12 (#1)
-In-Reply-To: <87d1ansq6c.fsf@free-electrons.com>
-References: <87d1ansq6c.fsf@free-electrons.com>
-Message-ID: <20170601235745.GF13314@localhost>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Thu, 1 Jun 2017 19:23:58 -0500
+Subject: Need help booting allmodconfig on arm64
+In-Reply-To: <54dae699-cc9d-2c3c-fb81-5e250a51c7f4@gmail.com>
+References: <CAOZdJXUr6wAE5CZBzmADOAVBGL692FVzaaGwaC7hzJ7GtJmxtA@mail.gmail.com>
+ <20170601225012.GI22219@n2100.armlinux.org.uk>
+ <031b1119-6366-c41f-bf65-01561583ef41@codeaurora.org>
+ <54dae699-cc9d-2c3c-fb81-5e250a51c7f4@gmail.com>
+Message-ID: <e4e2a740-ac0d-fe30-feae-438948954085@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 01, 2017 at 05:06:35PM +0200, Gregory CLEMENT wrote:
-> Hi,
-> 
-> Here is the first pull request for fixes for mvebu for v4.12.
-> 
-> Gregory
-> 
-> The following changes since commit 08332893e37af6ae779367e78e444f8f9571511d:
-> 
->   Linux 4.12-rc2 (2017-05-21 19:30:23 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.12-1
+On 6/1/17 6:54 PM, Florian Fainelli wrote:
+>> Now I don't have any /dev/sdX entries, so I can't mount my SATA drive.
+>> I'm trying to parse the initramfs disks, but I don't know what to look
+>> for.  How do the /dev/sdX entries normally appear?
 
-So, it's really appreciated from our side if you take a look at our tree to see
-what the base for our own fixes branch is, and pick the same or older base for
-your contents.
+> What happens when you enable CONFIG_DEVTMPFS and CONFIG_DEVTMPFS_MOUNT?
 
-In this case, we're still at -rc1 and you're on -rc2, so this included
-a backmerge of -rc2 into our branch. It's nice to avoid if we can, but it's
-also not a huge deal.
+They are already set to =y.
 
-
-Merged to fixes.
-
-
--Olof
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
