@@ -1,29 +1,42 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 2 Jun 2017 10:36:51 +0100
-Subject: [PATCH 4/4] drm/bridge: dw-hdmi: add cec driver
-In-Reply-To: <2b63fe63-0ffd-34f8-1966-3f3c803d640a@xs4all.nl>
-References: <20170530142218.GS22219@n2100.armlinux.org.uk>
- <E1dFi3P-0004lv-2K@rmk-PC.armlinux.org.uk>
- <e254fcf9-79bc-4ffc-284f-e52c80069fe3@synopsys.com>
- <20170601223054.GH22219@n2100.armlinux.org.uk>
- <b1540ab1-8343-81c6-689f-fa85831680a8@synopsys.com>
- <20170602091528.GJ22219@n2100.armlinux.org.uk>
- <2b63fe63-0ffd-34f8-1966-3f3c803d640a@xs4all.nl>
-Message-ID: <20170602093651.GL22219@n2100.armlinux.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 2 Jun 2017 09:55:07 +0000
+Subject: [PATCH v3 0/2] kexec-tools: arm64: Enable D-cache in purgatory
+In-Reply-To: <59312080.1090906@arm.com>
+References: <cover.1495514291.git.panand@redhat.com> <59312080.1090906@arm.com>
+Message-ID: <CAKv+Gu--N4Pef6z=G4ePTgF3CcKhmmSfrvJBY-5p0CLL_PZ=3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 02, 2017 at 11:28:08AM +0200, Hans Verkuil wrote:
-> The 'signal_free_time' argument of adap_transmit will have the recommended
-> signal free time. You can test against the CEC_SIGNAL_FREE_TIME_* defines
-> from media/cec.h. You probably saw this already, but just in case you missed
-> this...
+On 2 June 2017 at 08:23, James Morse <james.morse@arm.com> wrote:
+> Hi Pratyush,
+>
+> On 23/05/17 06:02, Pratyush Anand wrote:
+>> It takes more that 2 minutes to verify SHA in purgatory when vmlinuz image
+>> is around 13MB and initramfs is around 30MB. It takes more than 20 second
+>> even when we have -O2 optimization enabled. However, if dcache is enabled
+>> during purgatory execution then, it takes just a second in SHA
+>> verification.
+>>
+>> Therefore, these patches adds support for dcache enabling facility during
+>> purgatory execution.
+>
+> I'm still not convinced we need this. Moving the SHA verification to happen
+> before the dcache+mmu are disabled would also solve the delay problem, and we
+> can print an error message or fail the syscall.
+>
+> For kexec we don't expect memory corruption, what are we testing for?
 
-Yes, it's a recent addition to the CEC core, which I've added support
-for, but it doesn't make too much sense until the retrying stuff is
-sorted out.
+This is a very good question. SHA-256 is quite a heavy hammer if all
+you need is CRC style error detection. Note that SHA-256 uses 256
+bytes of round keys, which means that in the absence of a cache, each
+64 byte chunk of data processed involves (re)reading 320 bytes from
+DRAM. That also means you could write a SHA-256 implementation for
+AArch64 that keeps the round keys in NEON registers instead, and it
+would probably be a lot faster.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> I can see the use for kdump, but the kdump-kernel is unmapped so the kernel
+> can't accidentally write over it.
+>
+> (we discussed all this last time, but it fizzled-out. If you and the
+>  kexec-tools maintainer think its necessary, fine by me!)
+>
