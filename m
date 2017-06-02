@@ -1,59 +1,34 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Fri, 2 Jun 2017 21:54:22 +0200
-Subject: [PATCH v11 4/6] ARM: dts: imx6q-evi: support altera-ps-spi
-In-Reply-To: <6513199.IxvCuS6eYj@jclayton-pc>
-References: <20170525172911.11467-1-stillcompiling@gmail.com>
- <20170525172911.11467-5-stillcompiling@gmail.com>
- <a4d0815c-593f-57a9-41fc-ab636ca9b9e5@suse.de>
- <6513199.IxvCuS6eYj@jclayton-pc>
-Message-ID: <b944db11-bdd2-5b5f-2aa8-01f4135918be@suse.de>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 2 Jun 2017 21:01:50 +0100
+Subject: Need help booting allmodconfig on arm64
+In-Reply-To: <0dd92218-037d-3d1f-7b3c-10adbc3bc832@codeaurora.org>
+References: <CAOZdJXUr6wAE5CZBzmADOAVBGL692FVzaaGwaC7hzJ7GtJmxtA@mail.gmail.com>
+ <20170601225012.GI22219@n2100.armlinux.org.uk>
+ <031b1119-6366-c41f-bf65-01561583ef41@codeaurora.org>
+ <20170602083615.GA28299@leverpostej>
+ <0dd92218-037d-3d1f-7b3c-10adbc3bc832@codeaurora.org>
+Message-ID: <20170602200150.GA4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 02.06.2017 um 21:39 schrieb stillcompiling at gmail.com:
-> On Friday, June 2, 2017 6:30:12 PM PDT Andreas F?rber wrote:
->> Am 25.05.2017 um 19:29 schrieb Joshua Clayton:
->>> diff --git a/arch/arm/boot/dts/imx6q-evi.dts
->>> b/arch/arm/boot/dts/imx6q-evi.dts index 24fe093a66db..a0cbb2d84803 100644
->>> --- a/arch/arm/boot/dts/imx6q-evi.dts
->>> +++ b/arch/arm/boot/dts/imx6q-evi.dts
->>> @@ -82,6 +82,15 @@
->>>
->>>  	pinctrl-names = "default";
->>>  	pinctrl-0 = <&pinctrl_ecspi1 &pinctrl_ecspi1cs>;
->>>  	status = "okay";
->>>
->>> +
->>> +	fpga_spi: cyclonespi at 0 {
->>
->> "cyclonespi" does not strike me as the best node name.
->>
->> I am guessing this is a sub-node of a SPI controller node, so no need to
->> repeat "spi", and Cyclone seems more or less implied by "altr,fpga-".
-> True.
->>
->> Note that the example in the bindings doc uses "evi-fpga-spi". Nodes
->> don't need to be (shouldn't be?) prefixed with the board. Note that
->> bindings examples tend to get copied a lot.
->>
->> Any reason not to just use "fpga at 0" in both places for simplicity?
-> Sure. fpga: fpga at 0 is probably better.
+On Fri, Jun 02, 2017 at 08:50:08AM -0500, Timur Tabi wrote:
+> On 6/2/17 3:36 AM, Mark Rutland wrote:
+> >CONFIG_SATA_AHCI=m
+> >CONFIG_SATA_AHCI_PLATFORM=m
+> 
+> Ah, I had to set CONFIG_ATA=y for those two lines to take. Unfortunately,
+> even with this fix, there still aren't any /dev/sdX entries.
+> 
+> I pasted by /dev tree to https://pastebin.com/3najnguB and my dmesg to
+> https://pastebin.com/EvFEJJth.
+> 
+> You can see the SATA driver loading and probing, isn't that enough to create
+> the /dev entries?
 
-Note that I was only commenting on the node name, the latter part.
-
-I'm not aware of any rules for the label, so that could remain unchanged
-or adopt cyclone_spi from the old node name or whatever is unique and
-syntactically valid.
-
-> I'll change it in both the dts and the binding doc.
-
-Thanks. Maybe double-check if there's any conventions Xilinx/Lattice DTs
-are using.
-
-Cheers,
-Andreas
+ATA devices appear via the SCSI layer, which means you need the SCSI disk
+driver, CONFIG_BLK_DEV_SD, for ATA disks to be visible as block devices.
 
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
