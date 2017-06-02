@@ -1,27 +1,45 @@
 From: leilk.liu@mediatek.com (Leilk Liu)
-Date: Fri, 2 Jun 2017 15:18:40 +0800
-Subject: [PATCH 0/3] add mt7622 spi support 
-Message-ID: <1496387923-31674-1-git-send-email-leilk.liu@mediatek.com>
+Date: Fri, 2 Jun 2017 15:18:43 +0800
+Subject: [PATCH 3/3] spi: mediatek: add compatible support for mt7622 IC
+In-Reply-To: <1496387923-31674-1-git-send-email-leilk.liu@mediatek.com>
+References: <1496387923-31674-1-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <1496387923-31674-4-git-send-email-leilk.liu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series are based on 4.12-rc1 and provide 4 patches to support mt7622 IC.
+this patch add compatible support for mt7622 IC.
 
-Change in this series:
-1. update document to add mt7622;
-2. add adjust register define support;
-3. add mt7622_compat.
+Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+---
+ drivers/spi/spi-mt65xx.c |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Leilk Liu (3):
-  dt-bindings: spi: mediatek: Add bindings for mediatek MT7622 soc
-    platform
-  spi: mediatek: support adjust register define
-  spi: mediatek: add spi support for mt7622 IC
-
- .../devicetree/bindings/spi/spi-mt65xx.txt         |    1 +
- drivers/spi/spi-mt65xx.c                           |   54 ++++++++++++++++++--
- include/linux/platform_data/spi-mt65xx.h           |    2 +
- 3 files changed, 52 insertions(+), 5 deletions(-)
-
---
+diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
+index 3d7cd2d..ebc4b1a 100644
+--- a/drivers/spi/spi-mt65xx.c
++++ b/drivers/spi/spi-mt65xx.c
+@@ -104,6 +104,12 @@ struct mtk_spi {
+ };
+ 
+ static const struct mtk_spi_compatible mtk_common_compat;
++
++static const struct mtk_spi_compatible mt7622_compat = {
++	.must_tx = true,
++	.adjust_reg = true,
++};
++
+ static const struct mtk_spi_compatible mt8173_compat = {
+ 	.need_pad_sel = true,
+ 	.must_tx = true,
+@@ -127,6 +133,9 @@ struct mtk_spi {
+ 	{ .compatible = "mediatek,mt6589-spi",
+ 		.data = (void *)&mtk_common_compat,
+ 	},
++	{ .compatible = "mediatek,mt7622-spi",
++		.data = (void *)&mt7622_compat,
++	},
+ 	{ .compatible = "mediatek,mt8135-spi",
+ 		.data = (void *)&mtk_common_compat,
+ 	},
+-- 
 1.7.9.5
