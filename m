@@ -1,65 +1,154 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri,  2 Jun 2017 11:11:24 +0200
-Subject: [PATCH 2/4] ARM: dts: sun8i-a83t: add dwmac-sun8i ethernet driver
+Date: Fri,  2 Jun 2017 11:11:25 +0200
+Subject: [PATCH 3/4 DONOTMERGE] ARM: sun8i: a83t: Add device tree for Sinovoip
+ Bananapi BPI-M3
 In-Reply-To: <20170602091126.14476-1-clabbe.montjoie@gmail.com>
 References: <20170602091126.14476-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170602091126.14476-2-clabbe.montjoie@gmail.com>
+Message-ID: <20170602091126.14476-3-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dwmac-sun8i is an ethernet MAC hardware that support 10/100/1000 speed.
-This patch enable the dwmac-sun8i on the Allwinner a83t SoC Device-tree.
+From: Chen-Yu Tsai <wens@csie.org>
 
+The BPI-M3 is an Allwinner A83T based SBC in the Bananapi/Bpi family.
+It is roughly the same form factor as the BPI-M1+, with roughly the
+same peripherals and connectors:
+
+  - 2GB LPDDR3 DRAM
+  - 8GB eMMC
+  - Micro-SD card slot
+  - HDMI output
+  - Headset (stereo + mic) jack
+  - Onboard mic
+  - Gigabit Ethernet with RTL8211E transceiver
+  - Ampak AP6212 WiFi + BT
+  - USB OTG connector
+  - USB-to-SATA bridge connected through a USB 2.0 hub
+  - Consumer IR receiver
+  - MIPI DSI LCD panel connector
+  - Camera interface (parallel and MIPI CSI) connector
+  - 3 LEDs (Red, Green, Blue), of which 2 are controllable (GB)
+  - Raspberry Pi 2 compatible GPIO header
+
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-a83t.dtsi | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ arch/arm/boot/dts/Makefile                   |  1 +
+ arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts | 94 ++++++++++++++++++++++++++++
+ 2 files changed, 95 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index a570dac9ba35..0459c95d5f83 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -200,6 +200,14 @@
- 			#interrupt-cells = <3>;
- 			#gpio-cells = <3>;
- 
-+			emac_rgmii_pins: emac0-pins {
-+				pins = "PD2", "PD3", "PD4", "PD5", "PD6", "PD7",
-+				       "PD11", "PD12", "PD13", "PD14", "PD18",
-+				       "PD19", "PD21", "PD22", "PD23";
-+				function = "gmac";
-+				drive-strength = <40>;
-+			};
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 3bd29feb8298..4cb203deb118 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -897,6 +897,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+ 	sun8i-a33-sinlinx-sina33.dtb \
+ 	sun8i-a83t-allwinner-h8homlet-v2.dtb \
+ 	sun8i-a83t-cubietruck-plus.dtb \
++	sun8i-a83t-bananapi-m3.dtb \
+ 	sun8i-h2-plus-orangepi-zero.dtb \
+ 	sun8i-h3-bananapi-m2-plus.dtb \
+ 	sun8i-h3-beelink-x2.dtb \
+diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+new file mode 100644
+index 000000000000..bb23904847d5
+--- /dev/null
++++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+@@ -0,0 +1,94 @@
++/*
++ * Copyright 2017 Chen-Yu Tsai
++ *
++ * Chen-Yu Tsai <wens@csie.org>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
- 			mmc0_pins: mmc0-pins {
- 				pins = "PF0", "PF1", "PF2",
- 				       "PF3", "PF4", "PF5";
-@@ -266,6 +274,26 @@
- 			status = "disabled";
- 		};
- 
-+		emac: ethernet at 1c30000 {
-+			compatible = "allwinner,sun8i-a83t-emac";
-+			syscon = <&syscon>;
-+			reg = <0x01c30000 0x104>;
-+			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "macirq";
-+			resets = <&ccu 13>;
-+			reset-names = "stmmaceth";
-+			clocks = <&ccu 27>;
-+			clock-names = "stmmaceth";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
++/dts-v1/;
++#include "sun8i-a83t.dtsi"
 +
-+			mdio: mdio {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+		};
++#include <dt-bindings/gpio/gpio.h>
 +
- 		gic: interrupt-controller at 1c81000 {
- 			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
- 			reg = <0x01c81000 0x1000>,
++/ {
++	model = "Banana Pi BPI-M3";
++	compatible = "sinovoip,bpi-m3", "allwinner,sun8i-a83t";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	reg_vcc3v3: vcc3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
++	cd-inverted;
++	status = "okay";
++};
++
++&mmc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc2_8bit_emmc_pins>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <8>;
++	non-removable;
++	cap-mmc-hw-reset;
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pb_pins>;
++	status = "okay";
++};
 -- 
 2.13.0
