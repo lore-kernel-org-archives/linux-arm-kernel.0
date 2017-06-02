@@ -1,55 +1,180 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 2 Jun 2017 13:02:12 +0100
-Subject: [PATCH net-next] bpf, arm64: implement jiting of BPF_XADD
-In-Reply-To: <47ce6fc238596120f02fb6c7116f05b30be2f377.1493599299.git.daniel@iogearbox.net>
-References: <47ce6fc238596120f02fb6c7116f05b30be2f377.1493599299.git.daniel@iogearbox.net>
-Message-ID: <20170602120212.GF6371@arm.com>
+From: raviteja.garimella@broadcom.com (Raviteja Garimella)
+Date: Fri, 2 Jun 2017 17:36:56 +0530
+Subject: [PATCH v6 2/3] phy:phy-bcm-ns2-usbdrd:Broadcom USB DRD Phy driver
+ for Northstar2
+In-Reply-To: <c72092cd-5501-56e5-26b6-f6f073cce74b@ti.com>
+References: <1496225523-22035-1-git-send-email-raviteja.garimella@broadcom.com>
+ <1496225523-22035-3-git-send-email-raviteja.garimella@broadcom.com>
+ <f90cd885-be89-5c66-c5d8-224173825f0c@ti.com>
+ <CAEHZuqMJyxCdNmv2RZ9ZOc=FuWRQesfJ9-QMQCKW+XHUQru6wg@mail.gmail.com>
+ <CAEHZuqMVV_TmTqZk=w-y2naeU0PAO4=vO5R_oHZwgwe5KzDHtw@mail.gmail.com>
+ <c72092cd-5501-56e5-26b6-f6f073cce74b@ti.com>
+Message-ID: <CAEHZuqMVE+c-AWMK5wfJhJrYVwYT-Yi8=9q5WqcvySDJRb9eHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Hi,
 
-[sorry, only just noticed that was queued]
+On Fri, Jun 2, 2017 at 5:26 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> Hi,
+>
+> On Friday 02 June 2017 05:21 PM, Raviteja Garimella wrote:
+>> Hi,
+>>
+>> On Fri, Jun 2, 2017 at 5:18 PM, Raviteja Garimella
+>> <raviteja.garimella@broadcom.com> wrote:
+>>> Hi Kishon,
+>>>
+>>> On Fri, Jun 2, 2017 at 3:59 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>>> Hi,
+>>>>
+>>>> On Wednesday 31 May 2017 03:42 PM, Raviteja Garimella wrote:
+>>>>> This is driver for USB DRD Phy used in Broadcom's Northstar2
+>>>>> SoC. The phy can be configured to be in Device mode or Host
+>>>>> mode based on the type of cable connected to the port. The
+>>>>> driver registers to  extcon framework to get appropriate
+>>>>> connect events for Host/Device cables connect/disconnect
+>>>>> states based on VBUS and ID interrupts.
+>>>>>
+>>>>> Signed-off-by: Raviteja Garimella <raviteja.garimella@broadcom.com>
+>>>>> ---
+>>>>>  drivers/phy/Kconfig              |  13 ++
+>>>>>  drivers/phy/Makefile             |   1 +
+>>>>>  drivers/phy/phy-bcm-ns2-usbdrd.c | 466 +++++++++++++++++++++++++++++++++++++++
+>>>>>  3 files changed, 480 insertions(+)
+>>>>>  create mode 100644 drivers/phy/phy-bcm-ns2-usbdrd.c
+>>>>>
+>>>>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+>>>>> index afaf7b6..8028da7 100644
+>>>>> --- a/drivers/phy/Kconfig
+>>>>> +++ b/drivers/phy/Kconfig
+>>>>> @@ -507,6 +507,19 @@ config PHY_CYGNUS_PCIE
+>>>>>         Enable this to support the Broadcom Cygnus PCIe PHY.
+>>>>>         If unsure, say N.
+>>>>>
+>>>>> +config PHY_NS2_USB_DRD
+>>>>> +     tristate "Broadcom Northstar2 USB DRD PHY support"
+>>>>> +     depends on OF && (ARCH_BCM_IPROC || COMPILE_TEST)
+>>>>> +     select GENERIC_PHY
+>>>>> +     select EXTCON
+>>>>> +     default ARCH_BCM_IPROC
+>>>>> +     help
+>>>>> +       Enable this to support the Broadcom Northstar2 USB DRD PHY.
+>>>>> +       This driver initializes the PHY in either HOST or DEVICE mode.
+>>>>> +       The host or device configuration is read from device tree.
+>>>>> +
+>>>>> +       If unsure, say N.
+>>>>> +
+>>>>>  source "drivers/phy/tegra/Kconfig"
+>>>>>
+>>>>>  config PHY_NS2_PCIE
+>>>>> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+>>>>> index f8047b4..e5fbb0e 100644
+>>>>> --- a/drivers/phy/Makefile
+>>>>> +++ b/drivers/phy/Makefile
+>>>>> @@ -61,6 +61,7 @@ obj-$(CONFIG_PHY_TUSB1210)          += phy-tusb1210.o
+>>>>>  obj-$(CONFIG_PHY_BRCM_SATA)          += phy-brcm-sata.o
+>>>>>  obj-$(CONFIG_PHY_PISTACHIO_USB)              += phy-pistachio-usb.o
+>>>>>  obj-$(CONFIG_PHY_CYGNUS_PCIE)                += phy-bcm-cygnus-pcie.o
+>>>>> +obj-$(CONFIG_PHY_NS2_USB_DRD)                += phy-bcm-ns2-usbdrd.o
+>>>>>  obj-$(CONFIG_ARCH_TEGRA) += tegra/
+>>>>>  obj-$(CONFIG_PHY_NS2_PCIE)           += phy-bcm-ns2-pcie.o
+>>>>>  obj-$(CONFIG_PHY_MESON8B_USB2)               += phy-meson8b-usb2.o
+>>>>> diff --git a/drivers/phy/phy-bcm-ns2-usbdrd.c b/drivers/phy/phy-bcm-ns2-usbdrd.c
+>>>>> new file mode 100644
+>>>>> index 0000000..8e05c70
+>>>>> --- /dev/null
+>>>>> +++ b/drivers/phy/phy-bcm-ns2-usbdrd.c
+>>>>> @@ -0,0 +1,466 @@
+>>>>> +/*
+>>>>> + * Copyright (C) 2017 Broadcom
+>>>>> + *
+>>>>> + * This program is free software; you can redistribute it and/or
+>>>>> + * modify it under the terms of the GNU General Public License as
+>>>>> + * published by the Free Software Foundation version 2.
+>>>>> + *
+>>>>> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+>>>>> + * kind, whether express or implied; without even the implied warranty
+>>>>> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>>>> + * GNU General Public License for more details.
+>>>>> + */
+>>>>> +
+>>>>> +#include <linux/delay.h>
+>>>>> +#include <linux/extcon.h>
+>>>>> +#include <linux/gpio.h>
+>>>>> +#include <linux/gpio/consumer.h>
+>>>>> +#include <linux/init.h>
+>>>>> +#include <linux/interrupt.h>
+>>>>> +#include <linux/io.h>
+>>>>> +#include <linux/irq.h>
+>>>>> +#include <linux/mfd/syscon.h>
+>>>>> +#include <linux/module.h>
+>>>>> +#include <linux/of.h>
+>>>>> +#include <linux/of_address.h>
+>>>>> +#include <linux/phy/phy.h>
+>>>>> +#include <linux/platform_device.h>
+>>>>> +#include <linux/regmap.h>
+>>>>> +#include <linux/slab.h>
+>>>>> +#include <linux/workqueue.h>
+>>>>> +
+>>>>> +#define ICFG_DRD_AFE         0x0
+>>>>> +#define ICFG_MISC_STAT               0x18
+>>>>> +#define ICFG_DRD_P0CTL               0x1C
+>>>>> +#define ICFG_STRAP_CTRL              0x20
+>>>>> +#define ICFG_FSM_CTRL                0x24
+>>>>> +
+>>>>> +#define ICFG_DEV_BIT         BIT(2)
+>>>>> +#define IDM_RST_BIT          BIT(0)
+>>>>> +#define AFE_CORERDY_VDDC     BIT(18)
+>>>>> +#define PHY_PLL_RESETB               BIT(15)
+>>>>> +#define PHY_RESETB           BIT(14)
+>>>>> +#define PHY_PLL_LOCK         BIT(0)
+>>>>> +
+>>>>> +#define DRD_DEV_MODE         BIT(20)
+>>>>> +#define OHCI_OVRCUR_POL              BIT(11)
+>>>>> +#define ICFG_OFF_MODE                BIT(6)
+>>>>> +#define PLL_LOCK_RETRY               1000
+>>>>> +
+>>>>> +#define EVT_DEVICE           0
+>>>>> +#define EVT_HOST             1
+>>>>> +
+>>>>> +#define DRD_HOST_MODE                (BIT(2) | BIT(3))
+>>>>> +#define DRD_DEVICE_MODE              (BIT(4) | BIT(5))
+>>>>> +#define DRD_HOST_VAL         0x803
+>>>>> +#define DRD_DEV_VAL          0x807
+>>>>> +#define GPIO_DELAY           20
+>>>>> +
+>>>>> +struct ns2_phy_data;
+>>>>> +struct ns2_phy_driver {
+>>>>> +     void __iomem *icfgdrd_regs;
+>>>>> +     void __iomem *idmdrd_rst_ctrl;
+>>>>> +     void __iomem *crmu_usb2_ctrl;
+>>>>> +     void __iomem *usb2h_strap_reg;
+>>>>> +     struct ns2_phy_data *data;
+>>>>> +     struct extcon_specific_cable_nb extcon_dev;
+>>>>> +     struct extcon_specific_cable_nb extcon_host;
+>>>>
+>>>> The above two members are not used in the driver.
+>>>
+>>> Missed out to remove them. Will do.
+>>>
+>>>>> +     struct extcon_dev *edev;
+>>>>
+>>>> Does USB DRD driver waits for extcon events? If not using extcon here is bogus.
+>>>
+>>> DRD driver uses extcon events to disconnect/connect gadget driver runtime.
+>>
+>> I meant USB Device controller driver. It's not capable of DRD.
+>
+> all right. Btw which USB controller driver uses this?
 
-On Mon, May 01, 2017 at 02:57:20AM +0200, Daniel Borkmann wrote:
-> This work adds BPF_XADD for BPF_W/BPF_DW to the arm64 JIT and therefore
-> completes JITing of all BPF instructions, meaning we can thus also remove
-> the 'notyet' label and do not need to fall back to the interpreter when
-> BPF_XADD is used in a program!
-> 
-> This now also brings arm64 JIT in line with x86_64, s390x, ppc64, sparc64,
-> where all current eBPF features are supported.
-> 
-> BPF_W example from test_bpf:
-> 
->   .u.insns_int = {
->     BPF_ALU32_IMM(BPF_MOV, R0, 0x12),
->     BPF_ST_MEM(BPF_W, R10, -40, 0x10),
->     BPF_STX_XADD(BPF_W, R10, R0, -40),
->     BPF_LDX_MEM(BPF_W, R0, R10, -40),
->     BPF_EXIT_INSN(),
->   },
-> 
->   [...]
->   00000020:  52800247  mov w7, #0x12 // #18
->   00000024:  928004eb  mov x11, #0xffffffffffffffd8 // #-40
->   00000028:  d280020a  mov x10, #0x10 // #16
->   0000002c:  b82b6b2a  str w10, [x25,x11]
->   // start of xadd mapping:
->   00000030:  928004ea  mov x10, #0xffffffffffffffd8 // #-40
->   00000034:  8b19014a  add x10, x10, x25
->   00000038:  f9800151  prfm pstl1strm, [x10]
->   0000003c:  885f7d4b  ldxr w11, [x10]
->   00000040:  0b07016b  add w11, w11, w7
->   00000044:  880b7d4b  stxr w11, w11, [x10]
+Synopsys UDC driver currently in drivers/usb/gadget/amd5536udc.c and
+drivers/usb/gadget/amd556udc_pci.c
+As of 4.12.rc1 first patch (out of 6) that splits the old driver
+that's PCI based is applied by the maintainer.
+Rest of the patches that includes renaming the driver based on
+synopsys IP and platform driver support
+are to be merged yet.
 
-This form of STXR (where s == t) is CONSTRAINED UNPREDICTABLE per the
-architecture; you need to use separate registers for the data and the
-status flag. You might also be interested in the atomic instructions
-introduced in ARMv8.1, which includes the LDADD instruction. You can
-check elf_hwcap & HWCAP_ATOMICS to see if it's supported.
-
-Also, did we get a conclusion on the barrier semantics for this? Currently
-you don't have any here: is that ok?
-
-Will
+>
+> -Kishon
