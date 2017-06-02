@@ -1,61 +1,153 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 2 Jun 2017 10:15:28 +0100
+Date: Fri, 2 Jun 2017 10:18:20 +0100
 Subject: [PATCH 4/4] drm/bridge: dw-hdmi: add cec driver
-In-Reply-To: <b1540ab1-8343-81c6-689f-fa85831680a8@synopsys.com>
+In-Reply-To: <44245d0c-8b88-dc9f-9431-07c0f7f6be4a@xs4all.nl>
 References: <20170530142218.GS22219@n2100.armlinux.org.uk>
  <E1dFi3P-0004lv-2K@rmk-PC.armlinux.org.uk>
- <e254fcf9-79bc-4ffc-284f-e52c80069fe3@synopsys.com>
- <20170601223054.GH22219@n2100.armlinux.org.uk>
- <b1540ab1-8343-81c6-689f-fa85831680a8@synopsys.com>
-Message-ID: <20170602091528.GJ22219@n2100.armlinux.org.uk>
+ <b8bcdc78-12a1-9c3d-58ac-b53fe829dd80@baylibre.com>
+ <a1aef75d-74f2-d45a-c5ac-57fc13c6be9e@xs4all.nl>
+ <6efcce7c-d447-3ce1-93f7-3f97b5fd414d@synopsys.com>
+ <44245d0c-8b88-dc9f-9431-07c0f7f6be4a@xs4all.nl>
+Message-ID: <20170602091820.GK22219@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 02, 2017 at 06:02:28AM +0100, Jose Abreu wrote:
-> You should check that CEC is: not in standy, acknowledges
-> broadcast messages, signal free time is 5bit period, and not lost
-> arbitration, which basically means CEC_CTRL must be 0x2 and
-> IH_CEC_STAT0 must not have ARB_LOST set.
+On Fri, Jun 02, 2017 at 11:06:24AM +0200, Hans Verkuil wrote:
+> On 06/02/17 08:43, Jose Abreu wrote:
+> > Hi Hans,
+> > 
+> > 
+> > On 02-06-2017 07:31, Hans Verkuil wrote:
+> >> On 06/01/2017 03:47 PM, Neil Armstrong wrote:
+> >>> On 05/30/2017 04:23 PM, Russell King wrote:
+> >>>> Add a CEC driver for the dw-hdmi hardware.
+> >>>>
+> >>>> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> >>>> ---
+> >>>>   drivers/gpu/drm/bridge/synopsys/Kconfig       |   8 +
+> >>>>   drivers/gpu/drm/bridge/synopsys/Makefile      |   1 +
+> >>>>   drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.c | 320
+> >>>> ++++++++++++++++++++++++++
+> >>>>   drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.h |  19 ++
+> >>>>   drivers/gpu/drm/bridge/synopsys/dw-hdmi.c     |  40 +++-
+> >>>>   5 files changed, 387 insertions(+), 1 deletion(-)
+> >>>>   create mode 100644
+> >>>> drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.c
+> >>>>   create mode 100644
+> >>>> drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.h
+> >>>>
+> >>>> diff --git a/drivers/gpu/drm/bridge/synopsys/Kconfig
+> >>>> b/drivers/gpu/drm/bridge/synopsys/Kconfig
+> >>>> index 40d2827a6d19..bd30a0a07272 100644
+> >>>> --- a/drivers/gpu/drm/bridge/synopsys/Kconfig
+> >>>> +++ b/drivers/gpu/drm/bridge/synopsys/Kconfig
+> >>>> @@ -21,3 +21,11 @@ config DRM_DW_HDMI_I2S_AUDIO
+> >>>>       help
+> >>>>         Support the I2S Audio interface which is part of the
+> >>>> Synopsys
+> >>>>         Designware HDMI block.
+> >>>> +
+> >>>> +config DRM_DW_HDMI_CEC
+> >>>> +    tristate "Synopsis Designware CEC interface"
+> >>>> +    depends on DRM_DW_HDMI && MEDIA_CEC_SUPPORT
+> >>>> +    select MEDIA_CEC_NOTIFIER
+> >>>> +    help
+> >>>> +      Support the CE interface which is part of the Synopsis
+> >>>> +      Designware HDMI block.
+> >>>> diff --git a/drivers/gpu/drm/bridge/synopsys/Makefile
+> >>>> b/drivers/gpu/drm/bridge/synopsys/Makefile
+> >>>> index 17aa7a65b57e..6fe415903668 100644
+> >>>> --- a/drivers/gpu/drm/bridge/synopsys/Makefile
+> >>>> +++ b/drivers/gpu/drm/bridge/synopsys/Makefile
+> >>>> @@ -3,3 +3,4 @@
+> >>>>   obj-$(CONFIG_DRM_DW_HDMI) += dw-hdmi.o
+> >>>>   obj-$(CONFIG_DRM_DW_HDMI_AHB_AUDIO) += dw-hdmi-ahb-audio.o
+> >>>>   obj-$(CONFIG_DRM_DW_HDMI_I2S_AUDIO) += dw-hdmi-i2s-audio.o
+> >>>> +obj-$(CONFIG_DRM_DW_HDMI_CEC) += dw-hdmi-cec.o
+> >>>> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.c
+> >>>> b/drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.c
+> >>>> new file mode 100644
+> >>>> index 000000000000..761ef5ae687d
+> >>>> --- /dev/null
+> >>>> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.c
+> >>>> @@ -0,0 +1,320 @@
+> >>>> +/*
+> >>>> + * Designware HDMI CEC driver
+> >>>> + *
+> >>>> + * Copyright (C) 2015-2017 Russell King.
+> >>>> + *
+> >>>> + * This program is free software; you can redistribute it
+> >>>> and/or modify
+> >>>> + * it under the terms of the GNU General Public License
+> >>>> version 2 as
+> >>>> + * published by the Free Software Foundation.
+> >>>> + */
+> >>>> +#include <linux/interrupt.h>
+> >>>> +#include <linux/io.h>
+> >>>> +#include <linux/module.h>
+> >>>> +#include <linux/platform_device.h>
+> >>>> +#include <linux/sched.h>
+> >>>> +#include <linux/slab.h>
+> >>>> +
+> >>>> +#include <drm/drm_edid.h>
+> >>>> +
+> >>>> +#include <media/cec.h>
+> >>>> +#include <media/cec-notifier.h>
+> >>>> +
+> >>>> +#include "dw-hdmi-cec.h"
+> >>>> +
+> >>>> +enum {
+> >>>> +    HDMI_IH_CEC_STAT0    = 0x0106,
+> >>>> +    HDMI_IH_MUTE_CEC_STAT0    = 0x0186,
+> >>>> +
+> >>>> +    HDMI_CEC_CTRL        = 0x7d00,
+> >>>> +    CEC_CTRL_START        = BIT(0),
+> >>>> +    CEC_CTRL_NORMAL        = 1 << 1,
+> >>>> +
+> >>>> +    HDMI_CEC_STAT        = 0x7d01,
+> >>>> +    CEC_STAT_DONE        = BIT(0),
+> >>>> +    CEC_STAT_EOM        = BIT(1),
+> >>>> +    CEC_STAT_NACK        = BIT(2),
+> >>>> +    CEC_STAT_ARBLOST    = BIT(3),
+> >>>> +    CEC_STAT_ERROR_INIT    = BIT(4),
+> >>>> +    CEC_STAT_ERROR_FOLL    = BIT(5),
+> >>>> +    CEC_STAT_WAKEUP        = BIT(6),
+> >>
+> >> I hadn't realized until Jose Abreu's latest reply, but you need
+> >> to check the
+> >> ARBLOST status and set the TX state to CEC_TX_STATUS_ARB_LOST.
+> >>
+> >> I think CEC_STAT_ERROR_FOLL might equal
+> >> CEC_TX_STATUS_LOW_DRIVE, but without
+> >> documentation I can't be sure.
+> >>
+> >> My experience is that this low drive condition tends to be
+> >> poorly reported by
+> >> hardware. Either that or poorly documented. This is why I added a
+> >> CEC_TX_STATUS_ERROR status as a catch-all error status when it
+> >> is unclear from
+> >> the hardware/documentation what error occurred.
+> >>
+> >> Jose, do you know which status bit is used to report a follower
+> >> pulling the
+> >> CEC line low for a long time (approx. 3.6 ms) to signal a CEC
+> >> error?
+> > 
+> > Bit 5 for follower error, bit 4 for initiator error.
+> 
+> I gathered that from the define names :-)
+> 
+> But what does it mean? What sort of error is reported here?
 
-If ARB_LOST is set, that will trigger an interrupt, and the interrupt
-handler will clear the bit.  So all the time that the interrupt handler
-is present, ARB_LOST should be clear whenever we try to send a message.
+I think the problem is that no one really knows, the documentation is
+quite poor:
 
-When we enable the CEC interface, we zero the CEC_CTRL register, which
-takes the controller out of standby, and initialises the command
-register.
+     5       An error is notified by a follower. Abnormal logic data
+ ERROR_FOLL  bit error (for follower).
+     4       An error is detected on cec line (for initiator only).
+ ERROR_INIT
 
-Bits 2:1 select the signal free time, and there's no requirement
-specified to require them to be set to '01' before writing the
-message - in fact, it's legal for them to be set to other values,
-particularly when retrying, which is something I've missed.
-
-     2-1             Frame Type bit
-  FRAME_TYP
-                     00    Signal Free Time = 3-bit periods. Previous
-			   attempt to send frame is unsuccessful.
-                     01    Signal Free Time = 5-bit periods. New initiator
-			   wants to send a frame.
-                     10    Signal Free Time = 7-bit periods. Present
-			   initiator wants to send another frame
-			   immediately after its previous frame. (spec
-			   CEC 9.1)
-                     11    Illegal value. If software write this value,
-			   hardware will set the value to the default 2'b01.
-
-Clearly from that, there are times when we want to transmit a message
-without a 5-bit signal free time period, particularly when we're
-retrying or wanting to send another frame, so I don't believe that
-there's a requirement for the control register to always be set to
-0x02.  I suspect that where that value is coming from is an application
-note describing how to send a brand new message each time, and not
-covering the other cases.
-
-It could be that we need to set the frame type before loading the
-message - that I'll buy, but not that it must always be set to 0x02.
-
-Provided that the standby and BC_NACK bits are both cleared should
-be sufficient.
+It is so vague that you can read anything into that description.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
