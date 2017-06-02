@@ -1,33 +1,51 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 1 Jun 2017 17:17:11 -0700
-Subject: [PATCH 0/2] ARCH_VULCAN removal
-In-Reply-To: <20170522074102.tjhkx62fmjlb3lzf@pengutronix.de>
-References: <1495438565-82495-1-git-send-email-jnair@caviumnetworks.com>
- <20170522074102.tjhkx62fmjlb3lzf@pengutronix.de>
-Message-ID: <20170602001711.GI13314@localhost>
+Date: Thu, 1 Jun 2017 17:27:03 -0700
+Subject: [GIT PULL] Gemini DTS updates, take one
+In-Reply-To: <CACRpkdYVqQ4qyraofQO3sLUV=NjBn48a9sX-k+O9ASSaBY7pyA@mail.gmail.com>
+References: <CACRpkdYVqQ4qyraofQO3sLUV=NjBn48a9sX-k+O9ASSaBY7pyA@mail.gmail.com>
+Message-ID: <20170602002703.GM13314@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 22, 2017 at 09:41:02AM +0200, Uwe Kleine-K?nig wrote:
-> On Mon, May 22, 2017 at 07:36:03AM +0000, Jayachandran C wrote:
-> > Another couple of patches to remove more of ARCH_VULCAN platform.
-> > 
-> > There is still a reference in drivers/gpio/Kconfig for ARCH_VULCAN.
-> > I am sending a patch to remove that, and after that we can completely
-> > remove ARCH_VULCAN.
+On Wed, May 24, 2017 at 11:03:14AM +0200, Linus Walleij wrote:
+> Hi ARM SoC folks,
 > 
-> What happens if ARCH_VULCAN and drivers/gpio/Kconfig still references
-> it? I expected it's just assumed to be 'n' then?
+> this is a first pull request of DTS updates to the Gemini architecture.
+> 
+> It tries to follow the merge strategy to merge DTS files with numeral
+> and then patch in macros after -rc1.
 
-Are you talking about this line?
+Appreciated!
 
-depends on OF_GPIO && (CPU_XLP || ARCH_VULCAN || ARCH_THUNDER2 || COMPILE_TEST)
+> The combines clock+reset DT bindings are part of the pull request,
+> but the macros and drivers are merged by the subsystem maintainers
+> for clock and reset respectively.
+> 
+> I will likely submit more Gemini DTS pulls based on this one as drivers
+> trickle in: ATA/SATA, DMA and maybe Hans' USB work come to mind.
+> But let's create a firm base for it all first.
 
-It will continue to work as long as you enabel ARCH_THUNDER2, which is the "new
-name" for Vulcan.
+Cool.
 
-(Yes, renames like these are really annoying. We normally don't do them but
-it's a small one in this case).
+> Please pull it into ARM SoC!
+> 
+> Yours,
+> Linus Walleij
+> 
+> 
+> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+> 
+>   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
+> tags/gemini-v4.13-dts-1
+> 
+> for you to fetch changes up to 664ed4e283926d753e876a1347b7729135a3f6b8:
+> 
+>   ARM: dts: Add clocks to the Gemini SoC (2017-05-24 10:50:22 +0200)
 
+Merged into next/dt for v4.13. Thanks!
 
 -Olof
