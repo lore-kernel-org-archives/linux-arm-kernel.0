@@ -1,58 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 2 Jun 2017 10:11:56 +0100
-Subject: [PATCH v2 00/25] arm64: KVM: Mediate access to GICv3 sysregs at
- EL2
-In-Reply-To: <7dd609ce-6f7b-2a12-fa06-4ce1c6ba6ebe@caviumnetworks.com>
-References: <20170601102117.17750-1-marc.zyngier@arm.com>
- <7dd609ce-6f7b-2a12-fa06-4ce1c6ba6ebe@caviumnetworks.com>
-Message-ID: <941a29e4-9652-ee40-1d46-a5f06288cc7b@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 2 Jun 2017 11:13:20 +0200
+Subject: [PATCH v6 00/21] net-next: stmmac: add dwmac-sun8i ethernet driver
+In-Reply-To: <20170602063752.aqyvwcykvepiyt4y@flea.lan>
+References: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
+ <20170601.145819.789604139072328057.davem@davemloft.net>
+ <20170602063752.aqyvwcykvepiyt4y@flea.lan>
+Message-ID: <20170602091320.lyfxsanxrypfpozb@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/06/17 22:00, David Daney wrote:
-> On 06/01/2017 03:20 AM, Marc Zyngier wrote:
->> Some systems have less than perfect GICv3 implementations, leading to
->> all kind of ugly issues (guest hanging, host dying). In order to allow
->> some level of diagnostic, and in some cases implement workarounds,
->> this series enables the trapping of both Group-0, Group-1 and Common
->> sysregs. Mediating the access at EL2 allows some form of sanity
->> checking that the HW is sometimes sorely lacking.
->>
->> Instead of fully emulating a GICv3 CPU interface, we still use the
->> existing HW (list registers, AP registers, VMCR...), which allows the
->> code to be independent from the rest of the KVM code, and to cope with
->> partial trapping.
->>
->> Of course, trapping has a cost, which is why this must be either
->> enabled on the command line, or selected by another cpu capability
->> (see Cavium erratum 30115). A quick test on an A57-based platform
->> shows a 25% hit when repeatedly banging on the trapped registers,
->> while normal workloads do not seem to suffer noticeably from such
->> trapping (hackbench variance is in the usual noise, despite being very
->> IPI happy).
->>
->> This has been tested on a dual socket Thundex-X and a Freescale LS-2085a.
->>
->> I've taken the liberty to rebase David Daney's initial Cavium erratum
->> 30115 workaround on top of this series, and included it here as a
->> typical use case.
+On Fri, Jun 02, 2017 at 08:37:52AM +0200, Maxime Ripard wrote:
+> On Thu, Jun 01, 2017 at 02:58:19PM -0400, David Miller wrote:
+> > From: Corentin Labbe <clabbe.montjoie@gmail.com>
+> > Date: Wed, 31 May 2017 09:18:31 +0200
+> > 
+> > > This patch series add the driver for dwmac-sun8i which handle the Ethernet MAC
+> > > present on Allwinner H3/H5/A83T/A64 SoCs.
+> > 
+> > Series applied, but wow that's a lot of DT file changes :-(
 > 
-> I pulled this from:
-> 
->  
-> https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/log/?h=kvm-arm64/gicv3-cpuif-mediated-access
-> 
-> this morning at commit	58c1763c5aa6223ab3d04e0c183a31eb0aef832e
-> 
-> Entire series tested by and
-> 
-> Acked-by: David Daney <david.daney@cavium.com>
+> The DT patches should not go through your tree, but arm-soc, so I
+> guess this is not an issue for you?
 
-Thanks David. May I ask what particular system this was tested on (just
-so that I have a additional reference point)?
+Ok, so I saw that you actually merged them. Can you revert or drop
+that merge for the DT part?
 
-Cheers,
+This will generate a lot of conflicts with our tree, and I'm not sure
+this would be efficient to make you take all the entirely unrelated to
+next patches.
 
-	M.
+Maxime
+
 -- 
-Jazz is not dead. It just smells funny...
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170602/ce408b1a/attachment.sig>
