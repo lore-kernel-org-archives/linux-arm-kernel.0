@@ -1,29 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 2 Jun 2017 15:13:39 +0100
-Subject: [PATCH V17 02/11] ras: acpi/apei: cper: add support for generic
- data v3 structure
-In-Reply-To: <1495225933-4410-3-git-send-email-tbaicar@codeaurora.org>
-References: <1495225933-4410-1-git-send-email-tbaicar@codeaurora.org>
- <1495225933-4410-3-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <20170602141338.GJ6371@arm.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 02 Jun 2017 10:22:05 -0400 (EDT)
+Subject: [PATCH v6 00/21] net-next: stmmac: add dwmac-sun8i ethernet driver
+In-Reply-To: <20170602091320.lyfxsanxrypfpozb@flea.lan>
+References: <20170601.145819.789604139072328057.davem@davemloft.net>
+ <20170602063752.aqyvwcykvepiyt4y@flea.lan>
+ <20170602091320.lyfxsanxrypfpozb@flea.lan>
+Message-ID: <20170602.102205.701672574727845689.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 19, 2017 at 02:32:04PM -0600, Tyler Baicar wrote:
-> The ACPI 6.1 spec adds a new revision of the generic error data
-> entry structure. Add support to handle the new structure as well
-> as properly verify and iterate through the generic data entries.
+From: Maxime Ripard <maxime.ripard@free-electrons.com>
+Date: Fri, 2 Jun 2017 11:13:20 +0200
+
+> On Fri, Jun 02, 2017 at 08:37:52AM +0200, Maxime Ripard wrote:
+>> On Thu, Jun 01, 2017 at 02:58:19PM -0400, David Miller wrote:
+>> > From: Corentin Labbe <clabbe.montjoie@gmail.com>
+>> > Date: Wed, 31 May 2017 09:18:31 +0200
+>> > 
+>> > > This patch series add the driver for dwmac-sun8i which handle the Ethernet MAC
+>> > > present on Allwinner H3/H5/A83T/A64 SoCs.
+>> > 
+>> > Series applied, but wow that's a lot of DT file changes :-(
+>> 
+>> The DT patches should not go through your tree, but arm-soc, so I
+>> guess this is not an issue for you?
 > 
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> CC: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> ---
->  drivers/acpi/apei/ghes.c    | 11 +++++------
->  drivers/firmware/efi/cper.c | 37 ++++++++++++++++++++++---------------
->  include/acpi/ghes.h         | 36 ++++++++++++++++++++++++++++++++++++
->  3 files changed, 63 insertions(+), 21 deletions(-)
+> Ok, so I saw that you actually merged them. Can you revert or drop
+> that merge for the DT part?
+> 
+> This will generate a lot of conflicts with our tree, and I'm not sure
+> this would be efficient to make you take all the entirely unrelated to
+> next patches.
 
-Given that Boris and Rafael are ok with this series, it makes sense to
-take this via arm64, but I need an ack from Ard or Matt on the EFI changes
-in this patch and the subsequent one.
+Please tell me which specific changes to revert.
 
-Will
+Thank you.
