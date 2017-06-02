@@ -1,33 +1,29 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 02 Jun 2017 10:08:01 -0400 (EDT)
-Subject: [PATCH v6 00/21] net-next: stmmac: add dwmac-sun8i ethernet driver
-In-Reply-To: <20170602063752.aqyvwcykvepiyt4y@flea.lan>
-References: <20170531071852.12422-1-clabbe.montjoie@gmail.com>
- <20170601.145819.789604139072328057.davem@davemloft.net>
- <20170602063752.aqyvwcykvepiyt4y@flea.lan>
-Message-ID: <20170602.100801.2029534530888525251.davem@davemloft.net>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 02 Jun 2017 16:10:19 +0200
+Subject: [PATCH v3 0/4] make some special clk as critical_clocks
+In-Reply-To: <1493710446-7203-1-git-send-email-zhangqing@rock-chips.com>
+References: <1493710446-7203-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <2347847.YaA7RMd5sr@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maxime Ripard <maxime.ripard@free-electrons.com>
-Date: Fri, 2 Jun 2017 08:37:52 +0200
-
-> On Thu, Jun 01, 2017 at 02:58:19PM -0400, David Miller wrote:
->> From: Corentin Labbe <clabbe.montjoie@gmail.com>
->> Date: Wed, 31 May 2017 09:18:31 +0200
->> 
->> > This patch series add the driver for dwmac-sun8i which handle the Ethernet MAC
->> > present on Allwinner H3/H5/A83T/A64 SoCs.
->> 
->> Series applied, but wow that's a lot of DT file changes :-(
+Am Dienstag, 2. Mai 2017, 15:34:02 CEST schrieb Elaine Zhang:
+> change in V3:
+> reword the commit message,explain why the specific clocks are need to be critical.
 > 
-> The DT patches should not go through your tree, but arm-soc, so I
-> guess this is not an issue for you?
+> change in v2:
+> fix up some clks which have their own driver, not need to set as critical clocks
+> 
+> Elaine Zhang (4):
+>   clk: rockchip: rk3036: make pclk_ddrupctl as critical_clock
+>   clk: rockchip: rk3228: make noc and some special clk as
+>     critical_clocks
+>   clk: rockchip: rk3288: make noc and some special clk as
+>     critical_clocks
+>   clk: rockchip: rk3368: make some special clk as critical_clocks
 
-I already applied them, so if that is the intention, too late.
+applied all 4 for 4.13
 
-This needs to be explicitly stated in the header posting.  Otherwise
-I assume the entire series is meant to go into my tree.
 
-Also, saying "net-next" in the patch subjects means it's targetting my
-tree.
+Thanks
+Heiko
