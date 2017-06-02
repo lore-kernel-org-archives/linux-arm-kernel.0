@@ -1,30 +1,25 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 2 Jun 2017 14:08:17 +0200
-Subject: [PATCH] pinctrl: sunxi: constify irq_domain_ops
-In-Reply-To: <20170602112958.3882-1-tklauser@distanz.ch>
-References: <20170602112958.3882-1-tklauser@distanz.ch>
-Message-ID: <20170602120817.cekrag2imtbcnbqk@flea.lan>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 02 Jun 2017 14:14:45 +0200
+Subject: [PATCH v2 0/2] Add usb nodes on rk322x SoCs and enable usb on
+ rk3229 evb
+In-Reply-To: <1496387065-21073-1-git-send-email-william.wu@rock-chips.com>
+References: <1496387065-21073-1-git-send-email-william.wu@rock-chips.com>
+Message-ID: <1678079.AVLeaivyut@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 02, 2017 at 01:29:58PM +0200, Tobias Klauser wrote:
-> struct irq_domain_ops is not modified, so it can be made const.
+Am Freitag, 2. Juni 2017, 15:04:23 CEST schrieb William Wu:
+> This series adds support for usb on rk322x SoCs.
 > 
-> Suggested-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
+> William Wu (2):
+>   ARM: dts: rockchip: add usb nodes on rk322x
+>   ARM: dts: rockchip: enable usb for rk3229 evb board
+> 
+> Tested on rk3229 evb board, and depended on the following
+> patches and config.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+applied both for 4.13 (with some minor reordering in patch1)
 
-Maxime
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170602/34c22eb3/attachment.sig>
+Thanks
+Heiko
