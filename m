@@ -1,41 +1,106 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Fri, 2 Jun 2017 08:50:08 -0500
-Subject: Need help booting allmodconfig on arm64
-In-Reply-To: <20170602083615.GA28299@leverpostej>
-References: <CAOZdJXUr6wAE5CZBzmADOAVBGL692FVzaaGwaC7hzJ7GtJmxtA@mail.gmail.com>
- <20170601225012.GI22219@n2100.armlinux.org.uk>
- <031b1119-6366-c41f-bf65-01561583ef41@codeaurora.org>
- <20170602083615.GA28299@leverpostej>
-Message-ID: <0dd92218-037d-3d1f-7b3c-10adbc3bc832@codeaurora.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 02 Jun 2017 15:52:48 +0200
+Subject: [PATCH v2 0/7] Improve ap806 clk support on Marvell Armada 7K/8K
+In-Reply-To: <149631063623.33065.5881396919137461999@resonance> (Michael
+ Turquette's message of "Thu, 01 Jun 2017 18:50:36 +0900")
+References: <cover.21754b3184e2122d1c83a664477ed26ec562b3e9.1496239589.git-series.gregory.clement@free-electrons.com>
+ <149631063623.33065.5881396919137461999@resonance>
+Message-ID: <87mv9qpkcv.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/2/17 3:36 AM, Mark Rutland wrote:
-> CONFIG_SATA_AHCI=m
-> CONFIG_SATA_AHCI_PLATFORM=m
+Hi Michael,
+ 
+ On jeu., juin 01 2017, Michael Turquette <mturquette@baylibre.com> wrote:
 
-Ah, I had to set CONFIG_ATA=y for those two lines to take. 
-Unfortunately, even with this fix, there still aren't any /dev/sdX 
-entries.
+> Hi Gregory,
+>
+> Quoting Gregory CLEMENT (2017-05-31 23:07:21)
+>> Hi,
+>> 
+>> This series modifies the device tree binding of the clock of the AP806
+>> part that we find in the Marvell Armada 7K/8K SoCs.
+>> 
+>> As for the previsous series the only change in this second version is
+>> about the binding documentation: all the documentation related changes
+>> are now move in their own patches. It allows to provide a stable -dt
+>> branch for theses changes. I also added the acked-by from Rob Herring.
+>> 
+>> Here again the last two patches modifying the device tree _must_ be
+>> merged through the mvebu tree to avoid future conflict.
+>
+> The approach (and the patches) look good to me. I took the DT binding
+> description changes (patches 2 & 4) into clk-ap806-dt stable branch:
+>
+> https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git/log/?h=clk-ap806-dt
+>
+> Anyone can merge the above branch if they need it as a dep.
+>
+> The driver changes (patches 1, 3 & 5) are merged on into clk-ap806,
+> which is based on top of clk-ap806-dt:
+>
+> https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git/log/?h=clk-ap806
+>
+> Everything has been merged into clk-next. I did not touch the .dts files
+> at all.
+>
 
-I pasted by /dev tree to https://pastebin.com/3najnguB and my dmesg to 
-https://pastebin.com/EvFEJJth.
+Perfect I will take care of the dts patch.
 
-You can see the SATA driver loading and probing, isn't that enough to 
-create the /dev entries?
+What about the other series on cp110?
+a clk_cp110-dt branch will be needed too for the pinctrl series.
 
-When my /init script runs, I think it's trying to mount the SATA drive:
+Thanks,
 
-Begin: Waiting for root file system ... Begin: Running 
-/scripts/local-block ... done.
-Begin: Running /scripts/local-block ... done.
-Begin: Running /scripts/local-block ... done.
-Begin: Running /scripts/local-block ... done.
-Begin: Running /scripts/local-block ... done.
+Gregory
 
-(this repeats for another minute).
+
+> Regards,
+> Mike
+>
+>> 
+>> For the record:
+>> As for the CP110, we want to be able to ease the integration of new
+>> clocks without breaking the backward compatibility. It is done in
+>> patch 3.
+>> 
+>> We also want to ease the integration of the pinctrl node in the device
+>> tree. It is the purpose of the patch 5.
+>> 
+>> In this series (as in the previous one for CP110), even if there is
+>> some change in the device tree binding we paid attention to the
+>> backward compatibility, and the driver can still work with the old
+>> device tree.
+>> 
+>> Thanks,
+>> 
+>> Gregory
+>> 
+>> Gregory CLEMENT (7):
+>>   clk: mvebu: ap806: cosmetic improvement
+>>   dt-bindings: ap806: do not depend anymore of the *-clock-output-names
+>>   clk: mvebu: ap806: do not depend anymore of the *-clock-output-names
+>>   dt-bindings: ap806: introduce a new binding
+>>   clk: mvebu: ap806: introduce a new binding
+>>   arm64: dts: marvell: remove clock-output-names on ap806
+>>   arm64: dts: marvell: use new binding for the system controller on ap806
+>> 
+>>  Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt |  24 ++++++++++------
+>>  arch/arm64/boot/dts/marvell/armada-ap806.dtsi                             |  23 +++++++--------
+>>  drivers/clk/mvebu/ap806-system-controller.c                               | 107 +++++++++++++++++++++++++++++++++++++++++++++++-------------------------
+>>  3 files changed, 97 insertions(+), 57 deletions(-)
+>> 
+>> base-commit: 4139fcd6c66df1c3d3fa0a0a7cf7f8a8c601a16c
+>> -- 
+>> git-series 0.9.1
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, hosted by The Linux Foundation.
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
