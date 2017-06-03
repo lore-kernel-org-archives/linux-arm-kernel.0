@@ -1,51 +1,24 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 3 Jun 2017 21:51:39 +0200
-Subject: [PATCH v7 16/34] [media] add Omnivision OV5640 sensor driver
-In-Reply-To: <755909bf-d1de-e0f3-1569-0d4b16e26817@gmail.com>
-References: <1495672189-29164-1-git-send-email-steve_longerbeam@mentor.com>
- <1495672189-29164-17-git-send-email-steve_longerbeam@mentor.com>
- <20170531195821.GA16962@amd>
- <20170601082659.GJ1019@valkosipuli.retiisi.org.uk>
- <755909bf-d1de-e0f3-1569-0d4b16e26817@gmail.com>
-Message-ID: <20170603195139.GA3062@amd>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Sat, 3 Jun 2017 22:07:49 +0200
+Subject: [PATCH 0/3] ARM-pxa: Adjustments for two function implementations
+Message-ID: <f50bf224-7fdc-f9ba-b73b-0b3c11df50dc@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Sat, 3 Jun 2017 22:02:34 +0200
 
-> >>>+	/* Auto/manual exposure */
-> >>>+	ctrls->auto_exp = v4l2_ctrl_new_std_menu(hdl, ops,
-> >>>+						 V4L2_CID_EXPOSURE_AUTO,
-> >>>+						 V4L2_EXPOSURE_MANUAL, 0,
-> >>>+						 V4L2_EXPOSURE_AUTO);
-> >>>+	ctrls->exposure = v4l2_ctrl_new_std(hdl, ops,
-> >>>+					    V4L2_CID_EXPOSURE_ABSOLUTE,
-> >>>+					    0, 65535, 1, 0);
-> >>
-> >>Is exposure_absolute supposed to be in microseconds...?
-> >
-> >Yes.
-> 
-> According to the docs V4L2_CID_EXPOSURE_ABSOLUTE is in 100 usec units.
-> 
->  OTOH V4L2_CID_EXPOSURE has no defined unit, so it's a better fit IMO.
-> >Way more drivers appear to be using EXPOSURE than EXPOSURE_ABSOLUTE, too.
-> 
-> Done, switched to V4L2_CID_EXPOSURE. It's true, this control is not
-> taking 100 usec units, so unit-less is better.
+Three update suggestions were taken into account
+from static source code analysis.
 
-Thanks. If you know the units, it would be of course better to use
-right units...
+Markus Elfring (3):
+  Delete an error message for a failed memory allocation in pxa_pm_init()
+  Improve a size determination in pxa3xx_u2d_probe()
+  Delete an error message for a failed memory allocation in pxa3xx_u2d_probe()
 
-Best regards,
-									Pavel
+ arch/arm/mach-pxa/pm.c          | 4 +---
+ arch/arm/mach-pxa/pxa3xx-ulpi.c | 6 ++----
+ 2 files changed, 3 insertions(+), 7 deletions(-)
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170603/64113cea/attachment.sig>
+2.13.0
