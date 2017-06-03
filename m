@@ -1,22 +1,26 @@
 From: gregkh@linuxfoundation.org (Greg KH)
-Date: Sat, 3 Jun 2017 17:40:27 +0900
-Subject: [PATCH v4 10/10] staging: fsl-mc: move bus driver out of staging
-In-Reply-To: <20170531105852.22304-11-laurentiu.tudor@nxp.com>
+Date: Sat, 3 Jun 2017 17:41:26 +0900
+Subject: [PATCH 01/10] staging: fsl-mc: enclose macro params in parens
+In-Reply-To: <20170531105852.22304-2-laurentiu.tudor@nxp.com>
 References: <20170531105852.22304-1-laurentiu.tudor@nxp.com>
- <20170531105852.22304-11-laurentiu.tudor@nxp.com>
-Message-ID: <20170603084027.GA10784@kroah.com>
+ <20170531105852.22304-2-laurentiu.tudor@nxp.com>
+Message-ID: <20170603084126.GB10784@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 31, 2017 at 01:58:52PM +0300, laurentiu.tudor at nxp.com wrote:
-> From: Stuart Yoder <stuart.yoder@nxp.com>
+On Wed, May 31, 2017 at 01:58:43PM +0300, laurentiu.tudor at nxp.com wrote:
+> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+> 
+> Several macros didn't had macro params enclosed
+> in parens. Fix them to avoid precedence issues.
+> 
+> Found with checkpatch.pl who was issuing this
+> message:
+>   "Macro argument 'id' may be better as '(id)'
+>    to avoid precedence issues"
 
-Your subject says 'v4' yet the other patches here in the series do not,
-they say nothing, or 'v2', and the 0/10 patch says 'v6'!
-
-Please fix up and do this correctly.  The _whole_ patch series is
-versioned, otherwise how can I sort them to apply them in the correct
-order?
+Why are you line-wrapping at such a small number?  Please use 72 columns
+like git asks you to...
 
 thanks,
 
