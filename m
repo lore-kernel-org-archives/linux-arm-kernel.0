@@ -1,180 +1,47 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Sat, 3 Jun 2017 17:25:28 -0400
-Subject: [PATCH v7 00/23] FSI device driver implementation
-In-Reply-To: <20170603100510.GA24053@kroah.com>
-References: <20170511210101.78409-1-cbostic@linux.vnet.ibm.com>
- <305bc7b6-30eb-a44d-28da-f90f9a973acf@linux.vnet.ibm.com>
- <20170603100510.GA24053@kroah.com>
-Message-ID: <20170603172528.113ffe11@vmware.local.home>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sat, 3 Jun 2017 23:25:53 +0200
+Subject: [PATCH] i2c: designware: do not show SDA hold time warning when
+ not needed
+In-Reply-To: <20170603151821.736e6236@free-electrons.com>
+References: <1492203192-28025-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1492502087.24567.47.camel@linux.intel.com>
+ <20170418095939.68788787@free-electrons.com>
+ <7b011e1e-8fa3-07c4-6688-5e258fd64dbd@linux.intel.com>
+ <20170602201502.yobk7f7sdp34ez3d@ninjato>
+ <20170603151821.736e6236@free-electrons.com>
+Message-ID: <20170603212553.GA1532@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 3 Jun 2017 19:05:10 +0900
-Greg KH <gregkh@linuxfoundation.org> wrote:
+Hi Thomas,
 
-> On Wed, May 31, 2017 at 12:17:05PM -0500, Christopher Bostic wrote:
-> > Hi Greg,
+On Sat, Jun 03, 2017 at 03:18:21PM +0200, Thomas Petazzoni wrote:
+> Hello,
+> 
+> On Fri, 2 Jun 2017 22:15:02 +0200, Wolfram Sang wrote:
+> > > hardware that doesn't support SDA hold time. But needless spamming have
+> > > negative value so this is worth to fix. (I would do this as a single liner
+> > > by else if ()).
+> > > 
+> > > Acked-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>  
 > > 
-> > Are there any further changes you require for this patch set? This has been
-> > extensively tested internally and all is working as expected.   Would it be
-> > possible to move forward with integration in the near future?   Any input
-> > would be appreciated.  
+> > I agree with Jarkko on everything, including the 'else if' fix.
 > 
-> Sorry for the delay.  I just tried applying this to my tree, but got the
-> following build warnings, and then errors:
-> 
-> In file included from ./include/trace/define_trace.h:95:0,
->                  from ./include/trace/events/fsi.h:127,
->                  from drivers/fsi/fsi-core.c:27:
-> ./include/trace/events/fsi.h: In function ?trace_raw_output_fsi_master_write?:
-> ./include/trace/events/fsi.h:58:12: warning: field width specifier ?*? expects argument of type ?int?, but argument 8 has type ?size_t {aka long unsigned int}? [-Wformat=]
->   TP_printk("fsi%d:%02d:%02d %08x[%zd] <= {%*ph}",
+> I am not sure to understand what Jarkko suggested to fix, besides using
+> "else if" in one line. Could you be more specific about the changes you
+> expect me to do?
 
->From patch 16/23:
+I agree with Jarkko that needless spamming is worth fixing. Yet, it
+should be done as a single line using "else if". So, basically the
+paragraph I quoted from him. More clear now?
 
-+TRACE_EVENT(fsi_master_write,
-+	TP_PROTO(const struct fsi_master *master, int link, int id,
-+			uint32_t addr, size_t size, const void *data),
-+	TP_ARGS(master, link, id, addr, size, data),
-+	TP_STRUCT__entry(
-+		__field(int,	master_idx)
-+		__field(int,	link)
-+		__field(int,	id)
-+		__field(__u32,	addr)
-+		__field(size_t,	size)
-+		__field(__u32,	data)
-+	),
-+	TP_fast_assign(
-+		__entry->master_idx = master->idx;
-+		__entry->link = link;
-+		__entry->id = id;
-+		__entry->addr = addr;
-+		__entry->size = size;
-+		__entry->data = 0;
-+		memcpy(&__entry->data, data, size);
-+	),
-+	TP_printk("fsi%d:%02d:%02d %08x[%zd] <= {%*ph}",
-+		__entry->master_idx,
-+		__entry->link,
-+		__entry->id,
-+		__entry->addr,
-+		__entry->size,
-+		__entry->size, &__entry->data
-+	)
-+);
+Regards,
 
-Looks like the second __entry->size, probably needs a type cast.
-
-Would something like:
-
-	__entry->size,
-	(int)__entry->size, &__entry->data
-
-work?
-
-I haven't looked at the others, but I'm guessing they are probably
-similar issues.
-
--- Steve
-
->             ^
-> ./include/trace/trace_events.h:343:22: note: in definition of macro ?DECLARE_EVENT_CLASS?
->   trace_seq_printf(s, print);     \
->                       ^~~~~
-> ./include/trace/trace_events.h:65:9: note: in expansion of macro ?PARAMS?
->          PARAMS(print));         \
->          ^~~~~~
-> ./include/trace/events/fsi.h:37:1: note: in expansion of macro ?TRACE_EVENT?
->  TRACE_EVENT(fsi_master_write,
->  ^~~~~~~~~~~
-> ./include/trace/events/fsi.h:58:2: note: in expansion of macro ?TP_printk?
->   TP_printk("fsi%d:%02d:%02d %08x[%zd] <= {%*ph}",
->   ^~~~~~~~~
-> In file included from ./include/trace/trace_events.h:377:0,
->                  from ./include/trace/define_trace.h:95,
->                  from ./include/trace/events/fsi.h:127,
->                  from drivers/fsi/fsi-core.c:27:
-> ./include/trace/events/fsi.h:58:44: note: format string is defined here
->   TP_printk("fsi%d:%02d:%02d %08x[%zd] <= {%*ph}",
->                                            ~^~
-> In file included from ./include/trace/define_trace.h:95:0,
->                  from ./include/trace/events/fsi.h:127,
->                  from drivers/fsi/fsi-core.c:27:
-> ./include/trace/events/fsi.h: In function ?trace_raw_output_fsi_master_rw_resul
-> ?:
-> ./include/trace/events/fsi.h:95:12: warning: field width specifier ?*? expects argument of type ?int?, but argument 9 has type ?size_t {aka long unsigned int}? [-Wformat=]
->   TP_printk("fsi%d:%02d:%02d %08x[%zd] %s {%*ph} ret %d",
->             ^
-> ./include/trace/trace_events.h:343:22: note: in definition of macro ?DECLARE_EVENT_CLASS?
->   trace_seq_printf(s, print);     \
->                       ^~~~~
-> ./include/trace/trace_events.h:65:9: note: in expansion of macro ?PARAMS?
->          PARAMS(print));         \
->          ^~~~~~
-> ./include/trace/events/fsi.h:68:1: note: in expansion of macro ?TRACE_EVENT?
->  TRACE_EVENT(fsi_master_rw_result,
->  ^~~~~~~~~~~
-> ./include/trace/events/fsi.h:95:2: note: in expansion of macro ?TP_printk?
->   TP_printk("fsi%d:%02d:%02d %08x[%zd] %s {%*ph} ret %d",
->   ^~~~~~~~~
-> In file included from ./include/trace/trace_events.h:377:0,
->                  from ./include/trace/define_trace.h:95,
->                  from ./include/trace/events/fsi.h:127,
->                  from drivers/fsi/fsi-core.c:27:
-> ./include/trace/events/fsi.h:95:44: note: format string is defined here
->   TP_printk("fsi%d:%02d:%02d %08x[%zd] %s {%*ph} ret %d",
->                                            ~^~
->   CHK     include/generated/uapi/linux/version.h
->   GEN     .version
->   CHK     include/generated/compile.h
->   UPD     include/generated/compile.h
->   CC      init/version.o
->   LD      init/built-in.o
->   LD      vmlinux.o
->   MODPOST vmlinux.o
->   KSYM    .tmp_kallsyms1.o
->   KSYM    .tmp_kallsyms2.o
->   LD      vmlinux
->   SORTEX  vmlinux
->   SYSMAP  System.map
->   CC      arch/x86/boot/version.o
->   Building modules, stage 2.
->   VOFFSET arch/x86/boot/compressed/../voffset.h
->   OBJCOPY arch/x86/boot/compressed/vmlinux.bin
->   RELOCS  arch/x86/boot/compressed/vmlinux.relocs
->   CC      arch/x86/boot/compressed/kaslr.o
->   GZIP    arch/x86/boot/compressed/vmlinux.bin.gz
->   CC      arch/x86/boot/compressed/misc.o
->   MODPOST 476 modules
-> WARNING: modpost: missing MODULE_LICENSE() in drivers/fsi/fsi-core.o
-> see include/linux/module.h for more information
->   MKPIGGY arch/x86/boot/compressed/piggy.S
->   AS      arch/x86/boot/compressed/piggy.o
->   DATAREL arch/x86/boot/compressed/vmlinux
->   LD      arch/x86/boot/compressed/vmlinux
->   ZOFFSET arch/x86/boot/zoffset.h
->   OBJCOPY arch/x86/boot/vmlinux.bin
->   AS      arch/x86/boot/header.o
->   LD      arch/x86/boot/setup.elf
->   OBJCOPY arch/x86/boot/setup.bin
->   BUILD   arch/x86/boot/bzImage
-> Setup is 17532 bytes (padded to 17920 bytes).
-> System is 5445 kB
-> CRC 56d8089d
-> Kernel: arch/x86/boot/bzImage is ready  (#387)
-> ERROR: "fsi_slave_claim_range" [drivers/fsi/fsi-master-hub.ko] undefined!
-> ERROR: "fsi_slave_read" [drivers/fsi/fsi-master-hub.ko] undefined!
-> ERROR: "fsi_slave_write" [drivers/fsi/fsi-master-hub.ko] undefined!
-> ERROR: "fsi_slave_release_range" [drivers/fsi/fsi-master-hub.ko] undefined!
-> make[1]: *** [scripts/Makefile.modpost:91: __modpost] Error 1
-> make: *** [Makefile:1214: modules] Error 2
-> 
-> 
-> Note, I'm using gcc 7.1.1, which might be what is showing the build warnings,
-> but that doesn't explain the build errors.
-> 
-> So obviously, I can't take this as is :(
-> 
-> thanks,
-> 
-> greg k-h
+   Wolfram
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170603/96a6744b/attachment.sig>
