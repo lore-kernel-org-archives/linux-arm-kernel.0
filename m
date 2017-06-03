@@ -1,58 +1,86 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 4 Jun 2017 00:17:41 +0200
-Subject: [PATCH v7 16/34] [media] add Omnivision OV5640 sensor driver
-In-Reply-To: <20170603215709.GU1019@valkosipuli.retiisi.org.uk>
-References: <1495672189-29164-1-git-send-email-steve_longerbeam@mentor.com>
- <1495672189-29164-17-git-send-email-steve_longerbeam@mentor.com>
- <20170531195821.GA16962@amd>
- <20170601082659.GJ1019@valkosipuli.retiisi.org.uk>
- <755909bf-d1de-e0f3-1569-0d4b16e26817@gmail.com>
- <20170603195139.GA3062@amd>
- <20170603215709.GU1019@valkosipuli.retiisi.org.uk>
-Message-ID: <20170603221741.GA2379@amd>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sun, 4 Jun 2017 00:17:53 +0200
+Subject: [PATCH v2] misc: atmel-ssc: Handle return value of
+ clk_prepare_enable and clk_prepare
+In-Reply-To: <3a6a9ccd68fe298ab33009eaaace85c5af73e1ea.1496381884.git.arvind.yadav.cs@gmail.com>
+References: <3a6a9ccd68fe298ab33009eaaace85c5af73e1ea.1496381884.git.arvind.yadav.cs@gmail.com>
+Message-ID: <20170603221753.lfiqthuc7dxy3dmc@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi,
 
-> > > According to the docs V4L2_CID_EXPOSURE_ABSOLUTE is in 100 usec units.
-> > > 
-> > >  OTOH V4L2_CID_EXPOSURE has no defined unit, so it's a better fit IMO.
-> > > >Way more drivers appear to be using EXPOSURE than EXPOSURE_ABSOLUTE, too.
-> > > 
-> > > Done, switched to V4L2_CID_EXPOSURE. It's true, this control is not
-> > > taking 100 usec units, so unit-less is better.
-> > 
-> > Thanks. If you know the units, it would be of course better to use
-> > right units...
+It is getting tiring to get patches that are nor even compile tested
+resulting from whatever static analysis tool you used.
+
+This patch has almost no value and v1 was clearly wrong.
+
+Do you realize clk_prepare and clk_prepare_enable will never fail for
+the SSC?
+
+On 02/06/2017 at 11:09:02 +0530, Arvind Yadav wrote:
+> clk_prepare_enable() and clk_prepare() can fail here and
+> we must check its return value.
 > 
-> Steve: what's the unit in this case? Is it lines or something else?
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+> ---
+>  drivers/misc/atmel-ssc.c | 12 ++++++++++--
+>  1 file changed, 10 insertions(+), 2 deletions(-)
 > 
-> Pavel: we do need to make sure the user space will be able to know the unit,
-> too. It's rather a case with a number of controls: the unit is known but
-> there's no API to convey it to the user.
+> diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
+> index b2a0340..df34b81 100644
+> --- a/drivers/misc/atmel-ssc.c
+> +++ b/drivers/misc/atmel-ssc.c
+> @@ -30,6 +30,7 @@ struct ssc_device *ssc_request(unsigned int ssc_num)
+>  {
+>  	int ssc_valid = 0;
+>  	struct ssc_device *ssc;
+> +	int ret;
+>  
+>  	spin_lock(&user_lock);
+>  	list_for_each_entry(ssc, &ssc_list, list) {
+> @@ -60,7 +61,11 @@ struct ssc_device *ssc_request(unsigned int ssc_num)
+>  	ssc->user++;
+>  	spin_unlock(&user_lock);
+>  
+> -	clk_prepare(ssc->clk);
+> +	ret = clk_prepare(ssc->clk);
+> +	if (ret) {
+> +		pr_err("Failed to prepare clock\n");
+> +		return ERR_PTR(ret);
+> +	}
+>  
+>  	return ssc;
+>  }
+> @@ -195,6 +200,7 @@ static int ssc_probe(struct platform_device *pdev)
+>  	struct resource *regs;
+>  	struct ssc_device *ssc;
+>  	const struct atmel_ssc_platform_data *plat_dat;
+> +	int ret;
+>  
+>  	ssc = devm_kzalloc(&pdev->dev, sizeof(struct ssc_device), GFP_KERNEL);
+>  	if (!ssc) {
+> @@ -229,7 +235,9 @@ static int ssc_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	/* disable all interrupts */
+> -	clk_prepare_enable(ssc->clk);
+> +	ret = clk_prepare_enable(ssc->clk);
+> +	if (ret)
+> +		return ret;
+>  	ssc_writel(ssc->regs, IDR, -1);
+>  	ssc_readl(ssc->regs, SR);
+>  	clk_disable_unprepare(ssc->clk);
+> -- 
+> 1.9.1
 > 
-> The exposure is a bit special, too: granularity matters a lot on small
-> values. On most other controls it does not.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Yeah. Basically problem with exposure is that the control is
-logarithmic; by using linear scale we got too much resolution at long
-times and too little resolution at short times.
-
-(Plus, 100 usec ... n900 can do times _way_ shorter than that.)
-
-Anyway, even u32 gives us enough range, but I so the linear/log
-confusion does not matter. But it would be nicer if values were in 10
-usec or usec, not 100 usec... 
-
-								Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170604/6f0aa838/attachment-0001.sig>
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
