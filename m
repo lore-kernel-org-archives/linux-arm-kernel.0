@@ -1,103 +1,95 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sat, 3 Jun 2017 05:47:03 +0200
-Subject: [GIT PULL] ARM: realtek: arm64 for v4.12
-In-Reply-To: <CAOesGMiAKw+g_Q5B4gkTiyuEeUJ3n+wn4UgDA75_q=q7vrCu7A@mail.gmail.com>
-References: <20170525120404.32034-1-afaerber@suse.de>
- <20170602002831.GO13314@localhost>
- <45e8f92d-0680-2983-067f-39adecf7503f@suse.de>
- <CAK8P3a2_RGZ14csNEhitsSoqFbj7UJjGbPELbpMdjpYJm4vrpQ@mail.gmail.com>
- <CAOesGMiAKw+g_Q5B4gkTiyuEeUJ3n+wn4UgDA75_q=q7vrCu7A@mail.gmail.com>
-Message-ID: <b9cb28fe-5e00-260e-cb0e-0b52db802920@suse.de>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Sat, 3 Jun 2017 12:04:07 +0800
+Subject: [PATCH v2 3/3] net/cxgb4: Use new PCI_DEV_FLAGS_NO_RELAXED_ORDERING
+ flag
+In-Reply-To: <1496462647-7632-1-git-send-email-dingtianhong@huawei.com>
+References: <1496462647-7632-1-git-send-email-dingtianhong@huawei.com>
+Message-ID: <1496462647-7632-4-git-send-email-dingtianhong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 02.06.2017 um 21:33 schrieb Olof Johansson:
-> On Fri, Jun 2, 2017 at 6:07 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Fri, Jun 2, 2017 at 2:32 PM, Andreas F?rber <afaerber@suse.de> wrote:
->>> Am 02.06.2017 um 02:28 schrieb Olof Johansson:
->>>> On Thu, May 25, 2017 at 02:04:03PM +0200, Andreas F??rber wrote:
->>>>> Hi Arnd and Olof,
->>>>>
->>>>> This is the initial arm64 pull for Realtek.
->>>>>
->>>>> Regards,
->>>>> Andreas
->>>>>
->>>>> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
->>>>>
->>>>>   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
->>>>>
->>>>> are available in the git repository at:
->>>>>
->>>>>   git://github.com/afaerber/linux.git tags/realtek-arm64-soc-for-4.12
->>>>
->>>> This is v4.13 material at this point, so I've merged it into next/arm64 for
->>>> the next merge window (v4.13). Thanks!
->>>
->>> Arnd had told me to rebase onto v4.12-rc1 (from v4.11-rc1) but to not
->>> wait for the 4.13 merge window. Therefore I submitted it for 4.12.
->>> Miscommunication? Either way works for me.
->>
->> To clarify: by "4.13 merge window", I meant the time when we send pull
->> requests to Linus, i.e. the two weeks between the 4.12 release and
->> 4.13-rc1.
->>
->> Since you want the pull request to be part of 4.13, you need to send it
->> between 4.12-rc1 and 4.13 (ideally early during that time frame), and
->> have it based on 4.12-rc1. The patches were based on 4.11-rc before,
->> so I recommended rebasing to reduce the gap between the base
->> and the merge commit.
->>
->> Does it make sense now?
+From: Casey Leedom <leedom@chelsio.com>
 
-Yeah, so it was indeed a miscommunication. With 4.13 merge window I had
-mainly meant what to name my branches. I have now renamed them from
-realtek/v4.12/foo to realtek/v4.13/foo. Similarly, my tags that you
-pulled had the 4.12 version (I could've fixed that in a v2).
+cxgb4 Ethernet driver now queries Root Complex Port to determine if it can
+send TLPs to it with the Relaxed Ordering Attribute set.
 
-> And just to clarify: You did exactly what we want our platform
-> maintainers to do, Andreas -- the only disconnect seems to be that it
-> was 4.13 material instead of 4.12 by now.
-> 
-> I.e. timing for sending this is great -- please do it as early as you
-> can during -rc series, and try to get amount of submissions down to
-> mostly a trickle towards -rc6 and later, i.e. only smaller incremental
-> stuff with the bulk landing early.
-> 
-> If you can. :)
+Signed-off-by: Casey Leedom <leedom@chelsio.com>
+Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+---
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4.h      |  1 +
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c | 17 +++++++++++++++++
+ drivers/net/ethernet/chelsio/cxgb4/sge.c        |  5 +++--
+ 3 files changed, 21 insertions(+), 2 deletions(-)
 
-Well, whatever we can sort out with Realtek as example will make the
-next ones easier. :)
-
-Actions Semi will need twice the amount of branches and has dependencies
-between dt and dt64 bindings, as well as actual C code for mach-actions,
-plus tty, clocksource and power domain driver dependencies.
-
->>> Now that you have merged ARCH_REALTEK here, should we update the arm64
->>> defconfig to enable it? I just verified on arm-soc.git for-next that's
->>> it's disabled by default; the only other disabled ones are ARCH_BRCMSTB
->>> and to-be-dropped ARCH_VULCAN. Question is, should it be useful to users
->>> before we do so, or is build-testing enough of a reason?
->>
->> I'd leave that up to you. Send a patch or pull request when you think it should
->> be enabled. I'd tend to having it only enabled when it at least boots on some
->> hardware, but we haven't had strong rules about that so far.
-> 
-> Agreed. We can enable now or later, no big deal.
-> 
-> Getting build coverage early doesn't hurt but if it doesn't really
-> boot anywhere there's not much other use in enabling.
-
-Let's wait until we have more than DTs then.
-
-Arnd's QNAP link has code for the "Realtek,rtk-irq-mux" node needed for
-serial interrupts in arch/arm/mach-rtk119x/rtk_irq_mux.c - will look
-into forward-porting that, for non-earlycon serial output without hacks.
-
-Thanks,
-Andreas
-
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+index e88c180..478f25a 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+@@ -521,6 +521,7 @@ enum {                                 /* adapter flags */
+ 	USING_SOFT_PARAMS  = (1 << 6),
+ 	MASTER_PF          = (1 << 7),
+ 	FW_OFLD_CONN       = (1 << 9),
++	ROOT_NO_RELAXED_ORDERING = (1 << 10),
+ };
+ 
+ enum {
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+index 38a5c67..fbfe341 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+@@ -4628,6 +4628,7 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+ #ifdef CONFIG_PCI_IOV
+ 	u32 v, port_vec;
+ #endif
++	struct pci_dev *root;
+ 
+ 	printk_once(KERN_INFO "%s - version %s\n", DRV_DESC, DRV_VERSION);
+ 
+@@ -4726,6 +4727,22 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 	adapter->msg_enable = DFLT_MSG_ENABLE;
+ 	memset(adapter->chan_map, 0xff, sizeof(adapter->chan_map));
+ 
++	/* If possible, we use PCIe Relaxed Ordering Attribute to deliver
++	 * Ingress Packet Data to Free List Buffers in order to allow for
++	 * chipset performance optimizations between the Root Complex and
++	 * Memory Controllers.  (Messages to the associated Ingress Queue
++	 * notifying new Packet Placement in the Free Lists Buffers will be
++	 * send without the Relaxed Ordering Attribute thus guaranteing that
++	 * all preceding PCIe Transaction Layer Packets will be processed
++	 * first.)  But some Root Complexes have various issues with Upstream
++	 * Transaction Layer Packets with the Relaxed Ordering Attribute set.
++	 * So we check our Root Complex to see if it's flaged with advice
++	 * against using Relaxed Ordering.
++	 */
++	root = pci_find_pcie_root_port(adapter->pdev);
++	if (pcie_get_relaxed_ordering(root))
++		adapter->flags |= ROOT_NO_RELAXED_ORDERING;
++
+ 	spin_lock_init(&adapter->stats_lock);
+ 	spin_lock_init(&adapter->tid_release_lock);
+ 	spin_lock_init(&adapter->win0_lock);
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/sge.c b/drivers/net/ethernet/chelsio/cxgb4/sge.c
+index f05f0d4..ac229a3 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/sge.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/sge.c
+@@ -2571,6 +2571,7 @@ int t4_sge_alloc_rxq(struct adapter *adap, struct sge_rspq *iq, bool fwevtq,
+ 	struct fw_iq_cmd c;
+ 	struct sge *s = &adap->sge;
+ 	struct port_info *pi = netdev_priv(dev);
++	int relaxed = !(adap->flags & ROOT_NO_RELAXED_ORDERING);
+ 
+ 	/* Size needs to be multiple of 16, including status entry. */
+ 	iq->size = roundup(iq->size, 16);
+@@ -2624,8 +2625,8 @@ int t4_sge_alloc_rxq(struct adapter *adap, struct sge_rspq *iq, bool fwevtq,
+ 
+ 		flsz = fl->size / 8 + s->stat_len / sizeof(struct tx_desc);
+ 		c.iqns_to_fl0congen |= htonl(FW_IQ_CMD_FL0PACKEN_F |
+-					     FW_IQ_CMD_FL0FETCHRO_F |
+-					     FW_IQ_CMD_FL0DATARO_F |
++					     FW_IQ_CMD_FL0FETCHRO_V(relaxed) |
++					     FW_IQ_CMD_FL0DATARO_V(relaxed) |
+ 					     FW_IQ_CMD_FL0PADEN_F);
+ 		if (cong >= 0)
+ 			c.iqns_to_fl0congen |=
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+1.9.0
