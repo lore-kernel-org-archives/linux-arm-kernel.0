@@ -1,42 +1,46 @@
-From: varada@codeaurora.org (Varadarajan Narayanan)
-Date: Sat,  3 Jun 2017 12:57:55 +0530
-Subject: [PATCH v4 6/6] arm64: defconfig: Enable qcom ipq8074 clock and pinctrl
-In-Reply-To: <1496474875-7190-1-git-send-email-varada@codeaurora.org>
-References: <1496474875-7190-1-git-send-email-varada@codeaurora.org>
-Message-ID: <1496474875-7190-7-git-send-email-varada@codeaurora.org>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 3 Jun 2017 09:30:19 +0100
+Subject: [PATCH] iio:adc:lpc32xx Handle return value of clk_prepare_enable
+In-Reply-To: <e54764708d74134ef1f5b3566b2d4d3ab4187b45.1496045161.git.arvind.yadav.cs@gmail.com>
+References: <e54764708d74134ef1f5b3566b2d4d3ab4187b45.1496045161.git.arvind.yadav.cs@gmail.com>
+Message-ID: <20170603093019.3cfa04b5@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Abhishek Sahu <absahu@codeaurora.org>
+On Tue, 30 May 2017 16:35:27 +0530
+Arvind Yadav <arvind.yadav.cs@gmail.com> wrote:
 
-These configs are required for booting kernel in qcom
-ipq8074 boards.
+> clk_prepare_enable() can fail here and we must check its return value.
+> 
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+Applied to the togreg branch of iio.git and pushed out as testing
+for the autobuilders to play with it.
 
-Signed-off-by: Abhishek Sahu <absahu@codeaurora.org>
-Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
----
- arch/arm64/configs/defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+Thanks,
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 65cdd87..c20328e 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -267,6 +267,7 @@ CONFIG_SPI_S3C64XX=y
- CONFIG_SPI_SPIDEV=m
- CONFIG_SPMI=y
- CONFIG_PINCTRL_SINGLE=y
-+CONFIG_PINCTRL_IPQ8074=y
- CONFIG_PINCTRL_MAX77620=y
- CONFIG_PINCTRL_MSM8916=y
- CONFIG_PINCTRL_MSM8994=y
-@@ -450,6 +451,7 @@ CONFIG_CLK_QORIQ=y
- CONFIG_COMMON_CLK_PWM=y
- CONFIG_COMMON_CLK_QCOM=y
- CONFIG_QCOM_CLK_SMD_RPM=y
-+CONFIG_IPQ_GCC_8074=y
- CONFIG_MSM_GCC_8916=y
- CONFIG_MSM_GCC_8994=y
- CONFIG_MSM_MMCC_8996=y
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Jonathan
+> ---
+>  drivers/iio/adc/lpc32xx_adc.c | 8 ++++++--
+>  1 file changed, 6 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/lpc32xx_adc.c b/drivers/iio/adc/lpc32xx_adc.c
+> index 0de709b..6a5b9a9 100644
+> --- a/drivers/iio/adc/lpc32xx_adc.c
+> +++ b/drivers/iio/adc/lpc32xx_adc.c
+> @@ -76,10 +76,14 @@ static int lpc32xx_read_raw(struct iio_dev *indio_dev,
+>  			    long mask)
+>  {
+>  	struct lpc32xx_adc_state *st = iio_priv(indio_dev);
+> -
+> +	int ret;
+>  	if (mask == IIO_CHAN_INFO_RAW) {
+>  		mutex_lock(&indio_dev->mlock);
+> -		clk_prepare_enable(st->clk);
+> +		ret = clk_prepare_enable(st->clk);
+> +		if (ret) {
+> +			mutex_unlock(&indio_dev->mlock);
+> +			return ret;
+> +		}
+>  		/* Measurement setup */
+>  		__raw_writel(LPC32XXAD_INTERNAL | (chan->address) |
+>  			     LPC32XXAD_REFp | LPC32XXAD_REFm,
