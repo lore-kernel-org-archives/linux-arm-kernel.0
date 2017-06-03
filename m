@@ -1,49 +1,53 @@
-From: andrea.adami@gmail.com (Andrea Adami)
-Date: Sat, 3 Jun 2017 23:40:39 +0200
-Subject: [PATCH v3 3/9] mfd: tmio.h: support partition parser types
-In-Reply-To: <20170601143535.s6ovk5ts3cbehw3f@dell>
-References: <1496270458-6479-1-git-send-email-andrea.adami@gmail.com>
- <1496270458-6479-4-git-send-email-andrea.adami@gmail.com>
- <20170601143535.s6ovk5ts3cbehw3f@dell>
-Message-ID: <CAAQYJAs_EMHUUBObbhOQ6gk4rh=MsO4d2qi9KpDdhMiHMrsyTA@mail.gmail.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Sun, 4 Jun 2017 00:57:09 +0300
+Subject: [PATCH v7 16/34] [media] add Omnivision OV5640 sensor driver
+In-Reply-To: <20170603195139.GA3062@amd>
+References: <1495672189-29164-1-git-send-email-steve_longerbeam@mentor.com>
+ <1495672189-29164-17-git-send-email-steve_longerbeam@mentor.com>
+ <20170531195821.GA16962@amd>
+ <20170601082659.GJ1019@valkosipuli.retiisi.org.uk>
+ <755909bf-d1de-e0f3-1569-0d4b16e26817@gmail.com>
+ <20170603195139.GA3062@amd>
+Message-ID: <20170603215709.GU1019@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 1, 2017 at 4:35 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Thu, 01 Jun 2017, Andrea Adami wrote:
->
->> Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
->> ---
->>  include/linux/mfd/tmio.h | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/include/linux/mfd/tmio.h b/include/linux/mfd/tmio.h
->> index a1520d8..23bb069 100644
->> --- a/include/linux/mfd/tmio.h
->> +++ b/include/linux/mfd/tmio.h
->> @@ -139,6 +139,7 @@ struct tmio_nand_data {
->>       struct nand_bbt_descr   *badblock_pattern;
->>       struct mtd_partition    *partition;
->>       unsigned int            num_partitions;
->> +     const char *const       *types; /* names of parsers to use if any */
->
-> Please use kerneldoc instead.
->
-Thanks for the review.
+On Sat, Jun 03, 2017 at 09:51:39PM +0200, Pavel Machek wrote:
+> Hi!
+> 
+> > >>>+	/* Auto/manual exposure */
+> > >>>+	ctrls->auto_exp = v4l2_ctrl_new_std_menu(hdl, ops,
+> > >>>+						 V4L2_CID_EXPOSURE_AUTO,
+> > >>>+						 V4L2_EXPOSURE_MANUAL, 0,
+> > >>>+						 V4L2_EXPOSURE_AUTO);
+> > >>>+	ctrls->exposure = v4l2_ctrl_new_std(hdl, ops,
+> > >>>+					    V4L2_CID_EXPOSURE_ABSOLUTE,
+> > >>>+					    0, 65535, 1, 0);
+> > >>
+> > >>Is exposure_absolute supposed to be in microseconds...?
+> > >
+> > >Yes.
+> > 
+> > According to the docs V4L2_CID_EXPOSURE_ABSOLUTE is in 100 usec units.
+> > 
+> >  OTOH V4L2_CID_EXPOSURE has no defined unit, so it's a better fit IMO.
+> > >Way more drivers appear to be using EXPOSURE than EXPOSURE_ABSOLUTE, too.
+> > 
+> > Done, switched to V4L2_CID_EXPOSURE. It's true, this control is not
+> > taking 100 usec units, so unit-less is better.
+> 
+> Thanks. If you know the units, it would be of course better to use
+> right units...
 
-tmio.h is not consistent and uses inline comments so I did not change the style.
-Another round of patches will be necessary to sanitize the comments,
-out of the scope of this little patchset.
+Steve: what's the unit in this case? Is it lines or something else?
 
-Cheers
-Andrea
+Pavel: we do need to make sure the user space will be able to know the unit,
+too. It's rather a case with a number of controls: the unit is known but
+there's no API to convey it to the user.
 
->>  };
->>
->>  #define FBIO_TMIO_ACC_WRITE  0x7C639300
->
-> --
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+The exposure is a bit special, too: granularity matters a lot on small
+values. On most other controls it does not.
+
+-- 
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
