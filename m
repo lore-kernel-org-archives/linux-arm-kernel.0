@@ -1,95 +1,54 @@
 From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Sat, 3 Jun 2017 12:04:07 +0800
-Subject: [PATCH v2 3/3] net/cxgb4: Use new PCI_DEV_FLAGS_NO_RELAXED_ORDERING
- flag
-In-Reply-To: <1496462647-7632-1-git-send-email-dingtianhong@huawei.com>
-References: <1496462647-7632-1-git-send-email-dingtianhong@huawei.com>
-Message-ID: <1496462647-7632-4-git-send-email-dingtianhong@huawei.com>
+Date: Sat, 3 Jun 2017 12:04:04 +0800
+Subject: [PATCH v2 0/3] Add new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
+Message-ID: <1496462647-7632-1-git-send-email-dingtianhong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Casey Leedom <leedom@chelsio.com>
+Some devices have problems with Transaction Layer Packets with the Relaxed
+Ordering Attribute set.  This patch set adds a new PCIe Device Flag,
+PCI_DEV_FLAGS_NO_RELAXED_ORDERING, a set of PCI Quirks to catch some known
+devices with Relaxed Ordering issues, and a use of this new flag by the
+cxgb4 driver to avoid using Relaxed Ordering with problematic Root Complex
+Ports.
 
-cxgb4 Ethernet driver now queries Root Complex Port to determine if it can
-send TLPs to it with the Relaxed Ordering Attribute set.
+It's been years since I've submitted kernel.org patches, I appolgise for the
+almost certain submission errors.
 
-Signed-off-by: Casey Leedom <leedom@chelsio.com>
-Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
----
+v2: Alexander point out that the v1 was only a part of the whole solution,
+    some platform which has some issues could use the new flag to indicate
+    that it is not safe to enable relaxed ordering attribute, then we need
+    to clear the relaxed ordering enable bits in the PCI configuration when
+    initializing the device. So add a new second patch to modify the PCI
+    initialization code to clear the relaxed ordering enable bit in the
+    event that the root complex doesn't want relaxed ordering enabled.
+
+    The third patch was base on the v1's second patch and only be changed
+    to query the relaxed ordering enable bit in the PCI configuration space
+    to allow the Chelsio NIC to send TLPs with the relaxed ordering attributes
+    set.
+
+    This version didn't plan to drop the defines for Intel Drivers to use the
+    new checking way to enable relaxed ordering because it is not the hardest
+    part of the moment, we could fix it in next patchset when this patches
+    reach the goal.  
+
+Casey Leedom (2):
+  PCI: Add new PCIe Fabric End Node flag,
+    PCI_DEV_FLAGS_NO_RELAXED_ORDERING
+  net/cxgb4: Use new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
+
+Ding Tianhong (1):
+  PCI: Enable PCIe Relaxed Ordering if supported
+
  drivers/net/ethernet/chelsio/cxgb4/cxgb4.h      |  1 +
- drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c | 17 +++++++++++++++++
- drivers/net/ethernet/chelsio/cxgb4/sge.c        |  5 +++--
- 3 files changed, 21 insertions(+), 2 deletions(-)
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c | 17 ++++++++++
+ drivers/net/ethernet/chelsio/cxgb4/sge.c        |  5 +--
+ drivers/pci/pci.c                               | 42 +++++++++++++++++++++++++
+ drivers/pci/probe.c                             | 11 +++++++
+ drivers/pci/quirks.c                            | 38 ++++++++++++++++++++++
+ include/linux/pci.h                             |  5 +++
+ 7 files changed, 117 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
-index e88c180..478f25a 100644
---- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
-+++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
-@@ -521,6 +521,7 @@ enum {                                 /* adapter flags */
- 	USING_SOFT_PARAMS  = (1 << 6),
- 	MASTER_PF          = (1 << 7),
- 	FW_OFLD_CONN       = (1 << 9),
-+	ROOT_NO_RELAXED_ORDERING = (1 << 10),
- };
- 
- enum {
-diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-index 38a5c67..fbfe341 100644
---- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-+++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-@@ -4628,6 +4628,7 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
- #ifdef CONFIG_PCI_IOV
- 	u32 v, port_vec;
- #endif
-+	struct pci_dev *root;
- 
- 	printk_once(KERN_INFO "%s - version %s\n", DRV_DESC, DRV_VERSION);
- 
-@@ -4726,6 +4727,22 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
- 	adapter->msg_enable = DFLT_MSG_ENABLE;
- 	memset(adapter->chan_map, 0xff, sizeof(adapter->chan_map));
- 
-+	/* If possible, we use PCIe Relaxed Ordering Attribute to deliver
-+	 * Ingress Packet Data to Free List Buffers in order to allow for
-+	 * chipset performance optimizations between the Root Complex and
-+	 * Memory Controllers.  (Messages to the associated Ingress Queue
-+	 * notifying new Packet Placement in the Free Lists Buffers will be
-+	 * send without the Relaxed Ordering Attribute thus guaranteing that
-+	 * all preceding PCIe Transaction Layer Packets will be processed
-+	 * first.)  But some Root Complexes have various issues with Upstream
-+	 * Transaction Layer Packets with the Relaxed Ordering Attribute set.
-+	 * So we check our Root Complex to see if it's flaged with advice
-+	 * against using Relaxed Ordering.
-+	 */
-+	root = pci_find_pcie_root_port(adapter->pdev);
-+	if (pcie_get_relaxed_ordering(root))
-+		adapter->flags |= ROOT_NO_RELAXED_ORDERING;
-+
- 	spin_lock_init(&adapter->stats_lock);
- 	spin_lock_init(&adapter->tid_release_lock);
- 	spin_lock_init(&adapter->win0_lock);
-diff --git a/drivers/net/ethernet/chelsio/cxgb4/sge.c b/drivers/net/ethernet/chelsio/cxgb4/sge.c
-index f05f0d4..ac229a3 100644
---- a/drivers/net/ethernet/chelsio/cxgb4/sge.c
-+++ b/drivers/net/ethernet/chelsio/cxgb4/sge.c
-@@ -2571,6 +2571,7 @@ int t4_sge_alloc_rxq(struct adapter *adap, struct sge_rspq *iq, bool fwevtq,
- 	struct fw_iq_cmd c;
- 	struct sge *s = &adap->sge;
- 	struct port_info *pi = netdev_priv(dev);
-+	int relaxed = !(adap->flags & ROOT_NO_RELAXED_ORDERING);
- 
- 	/* Size needs to be multiple of 16, including status entry. */
- 	iq->size = roundup(iq->size, 16);
-@@ -2624,8 +2625,8 @@ int t4_sge_alloc_rxq(struct adapter *adap, struct sge_rspq *iq, bool fwevtq,
- 
- 		flsz = fl->size / 8 + s->stat_len / sizeof(struct tx_desc);
- 		c.iqns_to_fl0congen |= htonl(FW_IQ_CMD_FL0PACKEN_F |
--					     FW_IQ_CMD_FL0FETCHRO_F |
--					     FW_IQ_CMD_FL0DATARO_F |
-+					     FW_IQ_CMD_FL0FETCHRO_V(relaxed) |
-+					     FW_IQ_CMD_FL0DATARO_V(relaxed) |
- 					     FW_IQ_CMD_FL0PADEN_F);
- 		if (cong >= 0)
- 			c.iqns_to_fl0congen |=
 -- 
 1.9.0
