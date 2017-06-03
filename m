@@ -1,101 +1,108 @@
-From: chunkeey@googlemail.com (Christian Lamparter)
-Date: Sat, 03 Jun 2017 20:55:23 +0200
-Subject: [PATCH v4 1/6] pinctrl: qcom: Add ipq8074 pinctrl driver
-In-Reply-To: <1496474875-7190-2-git-send-email-varada@codeaurora.org>
-References: <1496474875-7190-1-git-send-email-varada@codeaurora.org>
- <1496474875-7190-2-git-send-email-varada@codeaurora.org>
-Message-ID: <2668868.v3IoKk0Lz9@debian64>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Sat, 3 Jun 2017 12:38:01 -0700
+Subject: [PATCH v7 16/34] [media] add Omnivision OV5640 sensor driver
+In-Reply-To: <20170601082659.GJ1019@valkosipuli.retiisi.org.uk>
+References: <1495672189-29164-1-git-send-email-steve_longerbeam@mentor.com>
+ <1495672189-29164-17-git-send-email-steve_longerbeam@mentor.com>
+ <20170531195821.GA16962@amd>
+ <20170601082659.GJ1019@valkosipuli.retiisi.org.uk>
+Message-ID: <755909bf-d1de-e0f3-1569-0d4b16e26817@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, June 3, 2017 12:57:50 PM CEST Varadarajan Narayanan wrote:
-> Add initial pinctrl driver to support pin configuration with
-> pinctrl framework for ipq8074.
+
+
+On 06/01/2017 01:26 AM, Sakari Ailus wrote:
+> Hi Pavel,
 > 
-> Signed-off-by: Manoharan Vijaya Raghavan <mraghava@codeaurora.org>
-> Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
-> ---
-> +- bias-disable:
-> +	Usage: optional
-> +	Value type: <none>
-> +	Definition: The specified pins should be configued as no pull.
-> +
-> +- bias-pull-down:
-> +	Usage: optional
-> +	Value type: <none>
-> +	Definition: The specified pins should be configued as pull down.
-> +
-> +- bias-pull-up:
-> +	Usage: optional
-> +	Value type: <none>
-> +	Definition: The specified pins should be configued as pull up.
-> +
-> +#define REG_SIZE 0x1000
-> +#define PINGROUP(id, f1, f2, f3, f4, f5, f6, f7, f8, f9)	\
-> +	{					        \
-> +		.name = "gpio" #id,			\
-> +		.pins = gpio##id##_pins,		\
-> +		.npins = (unsigned int)ARRAY_SIZE(gpio##id##_pins),	\
-> +		.funcs = (int[]){			\
-> +			msm_mux_gpio, /* gpio mode */	\
-> +			msm_mux_##f1,			\
-> +			msm_mux_##f2,			\
-> +			msm_mux_##f3,			\
-> +			msm_mux_##f4,			\
-> +			msm_mux_##f5,			\
-> +			msm_mux_##f6,			\
-> +			msm_mux_##f7,			\
-> +			msm_mux_##f8,			\
-> +			msm_mux_##f9			\
-> +		},				        \
-> +		.nfuncs = 10,				\
-> +		.ctl_reg = REG_SIZE * id,		\
-> +		.io_reg = 0x4 + REG_SIZE * id,		\
-> +		.intr_cfg_reg = 0x8 + REG_SIZE * id,		\
-> +		.intr_status_reg = 0xc + REG_SIZE * id,	\
-> +		.intr_target_reg = 0x8 + REG_SIZE * id,	\
-> +		.mux_bit = 2,			\
-> +		.pull_bit = 0,			\
-> +		.drv_bit = 6,			\
-> +		.oe_bit = 9,			\
-> +		.in_bit = 0,			\
-> +		.out_bit = 1,			\
-> +		.intr_enable_bit = 0,		\
-> +		.intr_status_bit = 0,		\
-> +		.intr_target_bit = 5,		\
-> +		.intr_raw_status_bit = 4,	\
-> +		.intr_polarity_bit = 1,		\
-> +		.intr_detection_bit = 2,	\
-> +		.intr_detection_width = 2,	\
-> +	}
-> +
-Hello,
+> On Wed, May 31, 2017 at 09:58:21PM +0200, Pavel Machek wrote:
+>> Hi!
+>>
+>>> +/* min/typical/max system clock (xclk) frequencies */
+>>> +#define OV5640_XCLK_MIN  6000000
+>>> +#define OV5640_XCLK_MAX 24000000
+>>> +
+>>> +/*
+>>> + * FIXME: there is no subdev API to set the MIPI CSI-2
+>>> + * virtual channel yet, so this is hardcoded for now.
+>>> + */
+>>> +#define OV5640_MIPI_VC	1
+>>
+>> Can the FIXME be fixed?
+> 
+> Yes, but it's quite a bit of work. It makes sense to use a static virtual
+> channel for now. A patchset which is however incomplete can be found here:
+> 
+> <URL:https://git.linuxtv.org/sailus/media_tree.git/log/?h=vc>
+> 
+> For what it's worth, all other devices use virtual channel zero for image
+> data and so should this one.
 
-Back in May, Ram Chandra Jangir posted a rather interesting patch on
-the LEDE Mailing-List:
-<https://www.mail-archive.com/lede-dev@lists.infradead.org/msg07691.html>
-|GPIO_PULL bits configurations in TLMM_GPIO_CFG register
-|differs for IPQ40xx from rest of the other qcom SoC's.
-|This change add support to configure the msm_gpio_pull
-|bits for ipq40xx, It is required to fix the proper
-|configurations of gpio-pull bits for nand pins mux.
-|
-|IPQ40xx SoC:
-|2'b10: Internal pull up enable.
-|2'b11: Unsupport
-|
-|For other SoC's:
-|2'b10: Keeper
-|2'b11: Pull-Up
 
-This information wasn't mentioned anywhere. In fact, the special pull-up
-configuration was only discovered due to an issue with the qpic NAND on
-the Cisco Meraki MR33. So I wonder what does the gpio-pull look like for
-the IPQ8074? Is it the same as the IPQ40XX or does it follow the older 
-SoCs?
+Actually no. The CSI2IPU gasket in i.MX6 quad sends virtual channel 0
+streams to IPU1-CSI0. But input to IPU1-CSI0 is also muxed with parallel
+bus cameras. So if vc0 were chosen instead, platforms that support
+parallel cameras to IPU1-CSI0 (SabreLite, SabreSD) would not be able
+to use them concurrently with a MIPI CSI-2 source to IPU1-CSI1. So I
+prefer to use static channel 1 to support those platforms.
 
-I'm asking this because I'm preparing a modified version of this patch
-that will be posted once the IPQ8074 is ready.
+I could convert this to a module parameter however, until a virtual
+channel selection subdev API becomes available, at which point that
+would have to be stripped.
 
-Regards,
-Christian
+
+> 
+>>
+>>> +/*
+>>> + * image size under 1280 * 960 are SUBSAMPLING
+>>
+>> -> Image
+>>
+>>> + * image size upper 1280 * 960 are SCALING
+>>
+>> above?
+>>
+
+
+done.
+
+>>> +/*
+>>> + * FIXME: all of these register tables are likely filled with
+>>> + * entries that set the register to their power-on default values,
+>>> + * and which are otherwise not touched by this driver. Those entries
+>>> + * should be identified and removed to speed register load time
+>>> + * over i2c.
+>>> + */
+>>
+>> load->loading? Can the FIXME be fixed?
+
+That's a lot of work, and risky work at that. If someone could take
+this on (strip out power-on default values from the tables), I'd
+be grateful, but I don't have the time. For now at least, these
+registers sets work fine.
+
+
+>>
+>>> +	/* Auto/manual exposure */
+>>> +	ctrls->auto_exp = v4l2_ctrl_new_std_menu(hdl, ops,
+>>> +						 V4L2_CID_EXPOSURE_AUTO,
+>>> +						 V4L2_EXPOSURE_MANUAL, 0,
+>>> +						 V4L2_EXPOSURE_AUTO);
+>>> +	ctrls->exposure = v4l2_ctrl_new_std(hdl, ops,
+>>> +					    V4L2_CID_EXPOSURE_ABSOLUTE,
+>>> +					    0, 65535, 1, 0);
+>>
+>> Is exposure_absolute supposed to be in microseconds...?
+> 
+> Yes.
+
+According to the docs V4L2_CID_EXPOSURE_ABSOLUTE is in 100 usec units.
+
+  OTOH V4L2_CID_EXPOSURE has no defined unit, so it's a better fit IMO.
+> Way more drivers appear to be using EXPOSURE than EXPOSURE_ABSOLUTE, too.
+
+Done, switched to V4L2_CID_EXPOSURE. It's true, this control is not
+taking 100 usec units, so unit-less is better.
+
+
+Steve
