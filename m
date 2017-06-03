@@ -1,46 +1,66 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 3 Jun 2017 09:30:19 +0100
-Subject: [PATCH] iio:adc:lpc32xx Handle return value of clk_prepare_enable
-In-Reply-To: <e54764708d74134ef1f5b3566b2d4d3ab4187b45.1496045161.git.arvind.yadav.cs@gmail.com>
-References: <e54764708d74134ef1f5b3566b2d4d3ab4187b45.1496045161.git.arvind.yadav.cs@gmail.com>
-Message-ID: <20170603093019.3cfa04b5@kernel.org>
+Date: Sat, 3 Jun 2017 10:14:53 +0100
+Subject: [PATCH v4 0/5] iio: ADC driver for EP93xx SoC
+In-Reply-To: <5921F894.90809@gmail.com>
+References: <20170517171352.20369-1-alexander.sverdlin@gmail.com>
+ <df337513-23c7-06b8-50e4-94560e75650c@kernel.org>
+ <5921F894.90809@gmail.com>
+Message-ID: <20170603101453.6b44b85a@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 30 May 2017 16:35:27 +0530
-Arvind Yadav <arvind.yadav.cs@gmail.com> wrote:
+On Mon, 22 May 2017 06:29:08 +1000
+Ryan Mallon <rmallon@gmail.com> wrote:
 
-> clk_prepare_enable() can fail here and we must check its return value.
+> On 22/05/17 00:03, Jonathan Cameron wrote:
+> > On 17/05/17 18:13, Alexander Sverdlin wrote:  
+> >> This series prepares the necessary infrastructure for ADC platform
+> >> device on
+> >> Cirrus Logic EP93xx family of SoCs and adds the driver for ADC device
+> >> using
+> >> IIO subsystem.  
+> > Hartley, Ryan,
+> > 
+> > How do you want to handle taking this series forward.
+> > Clearly we have a few arch specific bits and then the driver which
+> > is dependent on some of them.  
 > 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-Applied to the togreg branch of iio.git and pushed out as testing
-for the autobuilders to play with it.
+> I no longer maintain an ep93xx tree because the architecture gets very
+> few patches now. Patches should go via the arm-soc tree, which is
+> maintained by (I believe) Arnd and Olaf.
+> 
+> > 
+> > I'm happy to take the lot through the IIO tree, but will be wanting
+> > a few acks.  
+> 
+> Sure, the series looks fine to me. For the ep93xx specific bits:
+> 
+> Acked-by: Ryan Mallon <rmallon@gmail.com>
+> 
+> > I'm interested to note how few implementations there are of clk_get_parent
+> > in tree.  Any comments on that little bit of the code would be
+> > particularly welcome.  
+> 
+> The ep93xx architecture is old and obsolete. Because of this, and the
+> relatively few number of people developing for it and with hardware to
+> test, it hasn't gotten upgraded to some of the more modern kernel apis
+> like the common clock framework.
+> 
+> It probably isn't too difficult to move ep93xx to the common clock
+> framework, but it is a separate change and I don't think Alexander
+> should have to do it as a prerequisite to getting this adc support merged.
+Agreed entirely!
+
+Alexander, would you mind reposting the whole series, with
+the linux-arm-kernel at lists.infrared.org cc'd.
+
+I've cc'd it to this email to provide a bit of background to
+the maintainers, but please add a note to the cover letter
+highlighting what Ryan has covered here.
 
 Thanks,
 
 Jonathan
-> ---
->  drivers/iio/adc/lpc32xx_adc.c | 8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
+
 > 
-> diff --git a/drivers/iio/adc/lpc32xx_adc.c b/drivers/iio/adc/lpc32xx_adc.c
-> index 0de709b..6a5b9a9 100644
-> --- a/drivers/iio/adc/lpc32xx_adc.c
-> +++ b/drivers/iio/adc/lpc32xx_adc.c
-> @@ -76,10 +76,14 @@ static int lpc32xx_read_raw(struct iio_dev *indio_dev,
->  			    long mask)
->  {
->  	struct lpc32xx_adc_state *st = iio_priv(indio_dev);
-> -
-> +	int ret;
->  	if (mask == IIO_CHAN_INFO_RAW) {
->  		mutex_lock(&indio_dev->mlock);
-> -		clk_prepare_enable(st->clk);
-> +		ret = clk_prepare_enable(st->clk);
-> +		if (ret) {
-> +			mutex_unlock(&indio_dev->mlock);
-> +			return ret;
-> +		}
->  		/* Measurement setup */
->  		__raw_writel(LPC32XXAD_INTERNAL | (chan->address) |
->  			     LPC32XXAD_REFp | LPC32XXAD_REFm,
+> ~Ryan
