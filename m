@@ -1,66 +1,113 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 3 Jun 2017 10:14:53 +0100
-Subject: [PATCH v4 0/5] iio: ADC driver for EP93xx SoC
-In-Reply-To: <5921F894.90809@gmail.com>
-References: <20170517171352.20369-1-alexander.sverdlin@gmail.com>
- <df337513-23c7-06b8-50e4-94560e75650c@kernel.org>
- <5921F894.90809@gmail.com>
-Message-ID: <20170603101453.6b44b85a@kernel.org>
+Date: Sat, 3 Jun 2017 10:28:25 +0100
+Subject: [PATCH v2 2/5] iio: adc: stm32: make core adc clock optional by
+ default
+In-Reply-To: <1496050100-25854-3-git-send-email-fabrice.gasnier@st.com>
+References: <1496050100-25854-1-git-send-email-fabrice.gasnier@st.com>
+ <1496050100-25854-3-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20170603102825.00a0d229@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 May 2017 06:29:08 +1000
-Ryan Mallon <rmallon@gmail.com> wrote:
+On Mon, 29 May 2017 11:28:17 +0200
+Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
 
-> On 22/05/17 00:03, Jonathan Cameron wrote:
-> > On 17/05/17 18:13, Alexander Sverdlin wrote:  
-> >> This series prepares the necessary infrastructure for ADC platform
-> >> device on
-> >> Cirrus Logic EP93xx family of SoCs and adds the driver for ADC device
-> >> using
-> >> IIO subsystem.  
-> > Hartley, Ryan,
-> > 
-> > How do you want to handle taking this series forward.
-> > Clearly we have a few arch specific bits and then the driver which
-> > is dependent on some of them.  
+> Analog clock input is mandatory on stm32f4. But newer version of
+> ADC hardware block allow to select either bus clock or asynchronous
+> clock, for analog circuitry.
 > 
-> I no longer maintain an ep93xx tree because the architecture gets very
-> few patches now. Patches should go via the arm-soc tree, which is
-> maintained by (I believe) Arnd and Olaf.
+> So, make it optional by default, but enforce clk presence on stm32f4.
 > 
-> > 
-> > I'm happy to take the lot through the IIO tree, but will be wanting
-> > a few acks.  
-> 
-> Sure, the series looks fine to me. For the ep93xx specific bits:
-> 
-> Acked-by: Ryan Mallon <rmallon@gmail.com>
-> 
-> > I'm interested to note how few implementations there are of clk_get_parent
-> > in tree.  Any comments on that little bit of the code would be
-> > particularly welcome.  
-> 
-> The ep93xx architecture is old and obsolete. Because of this, and the
-> relatively few number of people developing for it and with hardware to
-> test, it hasn't gotten upgraded to some of the more modern kernel apis
-> like the common clock framework.
-> 
-> It probably isn't too difficult to move ep93xx to the common clock
-> framework, but it is a separate change and I don't think Alexander
-> should have to do it as a prerequisite to getting this adc support merged.
-Agreed entirely!
-
-Alexander, would you mind reposting the whole series, with
-the linux-arm-kernel at lists.infrared.org cc'd.
-
-I've cc'd it to this email to provide a bit of background to
-the maintainers, but please add a note to the cover letter
-highlighting what Ryan has covered here.
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Applied to the togreg branch of iio.git and pushed out as testing
+for the autobuilders to play with it.
 
 Thanks,
 
 Jonathan
-
+> ---
+>  drivers/iio/adc/stm32-adc-core.c | 38 ++++++++++++++++++++++++++------------
+>  1 file changed, 26 insertions(+), 12 deletions(-)
 > 
-> ~Ryan
+> diff --git a/drivers/iio/adc/stm32-adc-core.c b/drivers/iio/adc/stm32-adc-core.c
+> index 22b7c93..597ab7a 100644
+> --- a/drivers/iio/adc/stm32-adc-core.c
+> +++ b/drivers/iio/adc/stm32-adc-core.c
+> @@ -85,13 +85,21 @@ static int stm32f4_adc_clk_sel(struct platform_device *pdev,
+>  	u32 val;
+>  	int i;
+>  
+> +	/* stm32f4 has one clk input for analog (mandatory), enforce it here */
+> +	if (!priv->aclk) {
+> +		dev_err(&pdev->dev, "No 'adc' clock found\n");
+> +		return -ENOENT;
+> +	}
+> +
+>  	rate = clk_get_rate(priv->aclk);
+>  	for (i = 0; i < ARRAY_SIZE(stm32f4_pclk_div); i++) {
+>  		if ((rate / stm32f4_pclk_div[i]) <= STM32F4_ADC_MAX_CLK_RATE)
+>  			break;
+>  	}
+> -	if (i >= ARRAY_SIZE(stm32f4_pclk_div))
+> +	if (i >= ARRAY_SIZE(stm32f4_pclk_div)) {
+> +		dev_err(&pdev->dev, "adc clk selection failed\n");
+>  		return -EINVAL;
+> +	}
+>  
+>  	val = readl_relaxed(priv->common.base + STM32F4_ADC_CCR);
+>  	val &= ~STM32F4_ADC_ADCPRE_MASK;
+> @@ -227,21 +235,25 @@ static int stm32_adc_probe(struct platform_device *pdev)
+>  	priv->aclk = devm_clk_get(&pdev->dev, "adc");
+>  	if (IS_ERR(priv->aclk)) {
+>  		ret = PTR_ERR(priv->aclk);
+> -		dev_err(&pdev->dev, "Can't get 'adc' clock\n");
+> -		goto err_regulator_disable;
+> +		if (ret == -ENOENT) {
+> +			priv->aclk = NULL;
+> +		} else {
+> +			dev_err(&pdev->dev, "Can't get 'adc' clock\n");
+> +			goto err_regulator_disable;
+> +		}
+>  	}
+>  
+> -	ret = clk_prepare_enable(priv->aclk);
+> -	if (ret < 0) {
+> -		dev_err(&pdev->dev, "adc clk enable failed\n");
+> -		goto err_regulator_disable;
+> +	if (priv->aclk) {
+> +		ret = clk_prepare_enable(priv->aclk);
+> +		if (ret < 0) {
+> +			dev_err(&pdev->dev, "adc clk enable failed\n");
+> +			goto err_regulator_disable;
+> +		}
+>  	}
+>  
+>  	ret = stm32f4_adc_clk_sel(pdev, priv);
+> -	if (ret < 0) {
+> -		dev_err(&pdev->dev, "adc clk selection failed\n");
+> +	if (ret < 0)
+>  		goto err_clk_disable;
+> -	}
+>  
+>  	ret = stm32_adc_irq_probe(pdev, priv);
+>  	if (ret < 0)
+> @@ -261,7 +273,8 @@ static int stm32_adc_probe(struct platform_device *pdev)
+>  	stm32_adc_irq_remove(pdev, priv);
+>  
+>  err_clk_disable:
+> -	clk_disable_unprepare(priv->aclk);
+> +	if (priv->aclk)
+> +		clk_disable_unprepare(priv->aclk);
+>  
+>  err_regulator_disable:
+>  	regulator_disable(priv->vref);
+> @@ -276,7 +289,8 @@ static int stm32_adc_remove(struct platform_device *pdev)
+>  
+>  	of_platform_depopulate(&pdev->dev);
+>  	stm32_adc_irq_remove(pdev, priv);
+> -	clk_disable_unprepare(priv->aclk);
+> +	if (priv->aclk)
+> +		clk_disable_unprepare(priv->aclk);
+>  	regulator_disable(priv->vref);
+>  
+>  	return 0;
