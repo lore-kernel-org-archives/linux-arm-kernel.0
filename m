@@ -1,34 +1,55 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Sat, 3 Jun 2017 20:20:28 +0200
-Subject: [PATCH 0/9] ARM: OMAP2+: Adjustments for seven function
- implementations
-Message-ID: <e9d44aa5-9208-9ff3-46ec-cd58ac3f4696@users.sourceforge.net>
+From: slash.tmp@free.fr (Mason)
+Date: Sat, 3 Jun 2017 20:20:33 +0200
+Subject: Design of interrupt controller driver
+In-Reply-To: <8bce8bdd-5801-f0c3-ada3-e1c68acc8913@free.fr>
+References: <8bce8bdd-5801-f0c3-ada3-e1c68acc8913@free.fr>
+Message-ID: <6f8f3b96-ba86-51a8-1789-4c7d75c92079@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Sat, 3 Jun 2017 20:12:34 +0200
+On 03/06/2017 18:49, Mason wrote:
 
-Some update suggestions were taken into account
-from static source code analysis.
+> 1) The interrupt router has 128 inputs and 24 outputs.
+> Therefore, several devices have to share an output line.
+> I believe they *must* be of the same interrupt type?
+> In the limit, we could use
+> - 1 output line for level high
+> - 1 output line for level low
+> - 1 output line for edge rising
+> - 1 output line for edge falling
+> Is that correct?
+>
+> 2) Assume a device that signals an interrupt by pulsing
+> its interrupt line, i.e. the signal rises and then falls
+> a few cycles later. Assume we have grouped several such
+> devices on a single output line. When an interrupt triggers,
+> I see no way to determine which device requested attention
+> from the processor.
+> Does this mean that edge interrupts cannot be grouped
+> on a single output line for such a controller?
 
-Markus Elfring (9):
-  Delete an error message for a failed memory allocation in omap_mcspi_init()
-  Delete an error message for a failed memory allocation in two functions
-  Delete an unnecessary variable initialisation in omap_init_mcbsp()
-  Improve a size determination in omap_init_mcbsp()
-  Delete an error message for a failed memory allocation in omap_init_mcbsp()
-  Improve a size determination in sr_dev_init()
-  Use kcalloc() in sr_set_nvalues()
-  SmartReflex: Delete an error message for a failed memory allocation in two functions
-  Delete an error message for a failed memory allocation in omap_timer_init()
+A year ago, maz wrote:
 
- arch/arm/mach-omap2/devices.c   |  4 +---
- arch/arm/mach-omap2/hsmmc.c     |  5 +----
- arch/arm/mach-omap2/mcbsp.c     |  8 +++-----
- arch/arm/mach-omap2/sr_device.c | 15 ++++-----------
- arch/arm/mach-omap2/timer.c     |  4 +---
- 5 files changed, 10 insertions(+), 26 deletions(-)
+> OK, so this is definitely a pure router, and the lack of latch makes 
+> it completely unsuitable for a a cascaded interrupt controller. At 
+> least, we've managed to establish that this thing will never be able 
+> to handle more than 24 devices in a sane way. So let's forget about 
+> Mason's idea of cascading everything to a single output line, and 
+> let's focus on your initial idea of having something similar to TI's 
+> crossbar, which is a much saner approach.
+Then later added:
 
--- 
-2.13.0
+> Unless you limit your mux [to] level interrupts only, I cannot see how
+> you could deal with cascaded interrupts. By the time you receive an
+> edge, the line will have dropped, and you won't be able to identify
+> the source interrupt.
+To recap:
+Sharing level interrupts would be OK.
+Sharing "pulse" (rapid high/low) interrupts is impossible.
+Sharing the DMA interrupts should be OK.
+
+AFAIK, there are no devices using "pulses" in the system.
+
+Will carefully re-read the July patch RFC.
+
+Regards.
