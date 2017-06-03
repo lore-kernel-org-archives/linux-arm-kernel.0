@@ -1,86 +1,49 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sun, 4 Jun 2017 00:17:53 +0200
-Subject: [PATCH v2] misc: atmel-ssc: Handle return value of
- clk_prepare_enable and clk_prepare
-In-Reply-To: <3a6a9ccd68fe298ab33009eaaace85c5af73e1ea.1496381884.git.arvind.yadav.cs@gmail.com>
-References: <3a6a9ccd68fe298ab33009eaaace85c5af73e1ea.1496381884.git.arvind.yadav.cs@gmail.com>
-Message-ID: <20170603221753.lfiqthuc7dxy3dmc@piout.net>
+From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
+Date: Sun,  4 Jun 2017 01:26:47 +0200
+Subject: [PATCH v5 0/5] iio: ADC driver for EP93xx SoC
+Message-ID: <20170603232652.21401-1-alexander.sverdlin@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This series prepares the necessary infrastructure for ADC platform device on
+Cirrus Logic EP93xx family of SoCs and adds the driver for ADC device using
+IIO subsystem.
 
-It is getting tiring to get patches that are nor even compile tested
-resulting from whatever static analysis tool you used.
+Changelog
+v5:
+  Rebased to ea094f3c830a
+  Added Ryan's ack
+v4:
+  Spelling improvements
+  sign_extend32() usage
+v3:
+  Rebased to the current master
+  sizeof(struct foo) -> sizeof(*bar)
+v2:
+  Added Documentation/iio/ep93xx_adc.txt
+  Removed extend_name
+  Added timeout to the status polling loop
+  Used iio_device_register() instead of devm_iio_device_register()
 
-This patch has almost no value and v1 was clearly wrong.
+Alexander Sverdlin (5):
+  clk: ep93xx: Implement clk_get_parent()
+  clk: ep93xx: Add ADC clock
+  ep93xx: Add ADC platform device support to core
+  edb93xx: Add ADC platform device
+  iio: adc: New driver for Cirrus Logic EP93xx ADC
 
-Do you realize clk_prepare and clk_prepare_enable will never fail for
-the SSC?
-
-On 02/06/2017 at 11:09:02 +0530, Arvind Yadav wrote:
-> clk_prepare_enable() and clk_prepare() can fail here and
-> we must check its return value.
-> 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-> ---
->  drivers/misc/atmel-ssc.c | 12 ++++++++++--
->  1 file changed, 10 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
-> index b2a0340..df34b81 100644
-> --- a/drivers/misc/atmel-ssc.c
-> +++ b/drivers/misc/atmel-ssc.c
-> @@ -30,6 +30,7 @@ struct ssc_device *ssc_request(unsigned int ssc_num)
->  {
->  	int ssc_valid = 0;
->  	struct ssc_device *ssc;
-> +	int ret;
->  
->  	spin_lock(&user_lock);
->  	list_for_each_entry(ssc, &ssc_list, list) {
-> @@ -60,7 +61,11 @@ struct ssc_device *ssc_request(unsigned int ssc_num)
->  	ssc->user++;
->  	spin_unlock(&user_lock);
->  
-> -	clk_prepare(ssc->clk);
-> +	ret = clk_prepare(ssc->clk);
-> +	if (ret) {
-> +		pr_err("Failed to prepare clock\n");
-> +		return ERR_PTR(ret);
-> +	}
->  
->  	return ssc;
->  }
-> @@ -195,6 +200,7 @@ static int ssc_probe(struct platform_device *pdev)
->  	struct resource *regs;
->  	struct ssc_device *ssc;
->  	const struct atmel_ssc_platform_data *plat_dat;
-> +	int ret;
->  
->  	ssc = devm_kzalloc(&pdev->dev, sizeof(struct ssc_device), GFP_KERNEL);
->  	if (!ssc) {
-> @@ -229,7 +235,9 @@ static int ssc_probe(struct platform_device *pdev)
->  	}
->  
->  	/* disable all interrupts */
-> -	clk_prepare_enable(ssc->clk);
-> +	ret = clk_prepare_enable(ssc->clk);
-> +	if (ret)
-> +		return ret;
->  	ssc_writel(ssc->regs, IDR, -1);
->  	ssc_readl(ssc->regs, SR);
->  	clk_disable_unprepare(ssc->clk);
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ Documentation/iio/ep93xx_adc.txt             |  29 +++
+ arch/arm/mach-ep93xx/clock.c                 |  14 ++
+ arch/arm/mach-ep93xx/core.c                  |  24 +++
+ arch/arm/mach-ep93xx/edb93xx.c               |   1 +
+ arch/arm/mach-ep93xx/include/mach/platform.h |   1 +
+ arch/arm/mach-ep93xx/soc.h                   |   1 +
+ drivers/iio/adc/Kconfig                      |  11 ++
+ drivers/iio/adc/Makefile                     |   1 +
+ drivers/iio/adc/ep93xx_adc.c                 | 255 +++++++++++++++++++++++++++
+ 9 files changed, 337 insertions(+)
+ create mode 100644 Documentation/iio/ep93xx_adc.txt
+ create mode 100644 drivers/iio/adc/ep93xx_adc.c
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.12.2
