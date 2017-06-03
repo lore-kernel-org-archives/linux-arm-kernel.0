@@ -1,38 +1,101 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Sat, 3 Jun 2017 20:36:10 +0200
-Subject: [PATCH 9/9] ARM: OMAP2+: Delete an error message for a failed memory
- allocation in omap_timer_init()
-In-Reply-To: <e9d44aa5-9208-9ff3-46ec-cd58ac3f4696@users.sourceforge.net>
-References: <e9d44aa5-9208-9ff3-46ec-cd58ac3f4696@users.sourceforge.net>
-Message-ID: <a673b257-4750-2135-2c4e-bc0e5937f4b0@users.sourceforge.net>
+From: chunkeey@googlemail.com (Christian Lamparter)
+Date: Sat, 03 Jun 2017 20:55:23 +0200
+Subject: [PATCH v4 1/6] pinctrl: qcom: Add ipq8074 pinctrl driver
+In-Reply-To: <1496474875-7190-2-git-send-email-varada@codeaurora.org>
+References: <1496474875-7190-1-git-send-email-varada@codeaurora.org>
+ <1496474875-7190-2-git-send-email-varada@codeaurora.org>
+Message-ID: <2668868.v3IoKk0Lz9@debian64>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Sat, 3 Jun 2017 19:23:59 +0200
+On Saturday, June 3, 2017 12:57:50 PM CEST Varadarajan Narayanan wrote:
+> Add initial pinctrl driver to support pin configuration with
+> pinctrl framework for ipq8074.
+> 
+> Signed-off-by: Manoharan Vijaya Raghavan <mraghava@codeaurora.org>
+> Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
+> ---
+> +- bias-disable:
+> +	Usage: optional
+> +	Value type: <none>
+> +	Definition: The specified pins should be configued as no pull.
+> +
+> +- bias-pull-down:
+> +	Usage: optional
+> +	Value type: <none>
+> +	Definition: The specified pins should be configued as pull down.
+> +
+> +- bias-pull-up:
+> +	Usage: optional
+> +	Value type: <none>
+> +	Definition: The specified pins should be configued as pull up.
+> +
+> +#define REG_SIZE 0x1000
+> +#define PINGROUP(id, f1, f2, f3, f4, f5, f6, f7, f8, f9)	\
+> +	{					        \
+> +		.name = "gpio" #id,			\
+> +		.pins = gpio##id##_pins,		\
+> +		.npins = (unsigned int)ARRAY_SIZE(gpio##id##_pins),	\
+> +		.funcs = (int[]){			\
+> +			msm_mux_gpio, /* gpio mode */	\
+> +			msm_mux_##f1,			\
+> +			msm_mux_##f2,			\
+> +			msm_mux_##f3,			\
+> +			msm_mux_##f4,			\
+> +			msm_mux_##f5,			\
+> +			msm_mux_##f6,			\
+> +			msm_mux_##f7,			\
+> +			msm_mux_##f8,			\
+> +			msm_mux_##f9			\
+> +		},				        \
+> +		.nfuncs = 10,				\
+> +		.ctl_reg = REG_SIZE * id,		\
+> +		.io_reg = 0x4 + REG_SIZE * id,		\
+> +		.intr_cfg_reg = 0x8 + REG_SIZE * id,		\
+> +		.intr_status_reg = 0xc + REG_SIZE * id,	\
+> +		.intr_target_reg = 0x8 + REG_SIZE * id,	\
+> +		.mux_bit = 2,			\
+> +		.pull_bit = 0,			\
+> +		.drv_bit = 6,			\
+> +		.oe_bit = 9,			\
+> +		.in_bit = 0,			\
+> +		.out_bit = 1,			\
+> +		.intr_enable_bit = 0,		\
+> +		.intr_status_bit = 0,		\
+> +		.intr_target_bit = 5,		\
+> +		.intr_raw_status_bit = 4,	\
+> +		.intr_polarity_bit = 1,		\
+> +		.intr_detection_bit = 2,	\
+> +		.intr_detection_width = 2,	\
+> +	}
+> +
+Hello,
 
-Omit an extra message for a memory allocation failure in this function.
+Back in May, Ram Chandra Jangir posted a rather interesting patch on
+the LEDE Mailing-List:
+<https://www.mail-archive.com/lede-dev@lists.infradead.org/msg07691.html>
+|GPIO_PULL bits configurations in TLMM_GPIO_CFG register
+|differs for IPQ40xx from rest of the other qcom SoC's.
+|This change add support to configure the msm_gpio_pull
+|bits for ipq40xx, It is required to fix the proper
+|configurations of gpio-pull bits for nand pins mux.
+|
+|IPQ40xx SoC:
+|2'b10: Internal pull up enable.
+|2'b11: Unsupport
+|
+|For other SoC's:
+|2'b10: Keeper
+|2'b11: Pull-Up
 
-This issue was detected by using the Coccinelle software.
+This information wasn't mentioned anywhere. In fact, the special pull-up
+configuration was only discovered due to an issue with the qpic NAND on
+the Cisco Meraki MR33. So I wonder what does the gpio-pull look like for
+the IPQ8074? Is it the same as the IPQ40XX or does it follow the older 
+SoCs?
 
-Link: http://events.linuxfoundation.org/sites/events/files/slides/LCJ16-Refactor_Strings-WSang_0.pdf
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- arch/arm/mach-omap2/timer.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+I'm asking this because I'm preparing a modified version of this patch
+that will be posted once the IPQ8074 is ready.
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 07dd692c4737..f6b5ccfe4653 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -693,7 +693,5 @@ static int __init omap_timer_init(struct omap_hwmod *oh, void *unused)
--	if (!pdata) {
--		pr_err("%s: No memory for [%s]\n", __func__, oh->name);
-+	if (!pdata)
- 		return -ENOMEM;
--	}
- 
- 	/*
- 	 * Extract the IDs from name field in hwmod database
--- 
-2.13.0
+Regards,
+Christian
