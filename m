@@ -1,48 +1,33 @@
 From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
-Date: Sun,  4 Jun 2017 01:26:49 +0200
-Subject: [PATCH v5 2/5] clk: ep93xx: Add ADC clock
+Date: Sun,  4 Jun 2017 01:26:51 +0200
+Subject: [PATCH v5 4/5] edb93xx: Add ADC platform device
 In-Reply-To: <20170603232652.21401-1-alexander.sverdlin@gmail.com>
 References: <20170603232652.21401-1-alexander.sverdlin@gmail.com>
-Message-ID: <20170603232652.21401-3-alexander.sverdlin@gmail.com>
+Message-ID: <20170603232652.21401-5-alexander.sverdlin@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexander Sverdlin <alexander.sverdlin@gmx.de>
-
-ADC and keypad controller clocks share the same control register, so use the
-existing infrastructure to add ADC clock support for Cirrus Logic EP93xx SoCs.
+This enables the creation of ADC platform device on EDB93xx series of Cirrus
+Logic evaluation boards. The driver for this device must be enabled separately,
+either as built-in, or a module.
 
 Signed-off-by: Alexander Sverdlin <alexander.sverdlin@gmail.com>
 Acked-by: Ryan Mallon <rmallon@gmail.com>
 ---
- arch/arm/mach-ep93xx/clock.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/mach-ep93xx/edb93xx.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-ep93xx/clock.c b/arch/arm/mach-ep93xx/clock.c
-index b9cd9d7da14d..425342637e47 100644
---- a/arch/arm/mach-ep93xx/clock.c
-+++ b/arch/arm/mach-ep93xx/clock.c
-@@ -98,6 +98,13 @@ static struct clk clk_keypad = {
- 	.enable_mask	= EP93XX_SYSCON_KEYTCHCLKDIV_KEN,
- 	.set_rate	= set_keytchclk_rate,
- };
-+static struct clk clk_adc = {
-+	.parent		= &clk_xtali,
-+	.sw_locked	= 1,
-+	.enable_reg	= EP93XX_SYSCON_KEYTCHCLKDIV,
-+	.enable_mask	= EP93XX_SYSCON_KEYTCHCLKDIV_TSEN,
-+	.set_rate	= set_keytchclk_rate,
-+};
- static struct clk clk_spi = {
- 	.parent		= &clk_xtali,
- 	.rate		= EP93XX_EXT_CLK_RATE,
-@@ -214,6 +221,7 @@ static struct clk_lookup clocks[] = {
- 	INIT_CK(NULL,			"pll2",		&clk_pll2),
- 	INIT_CK("ohci-platform",	NULL,		&clk_usb_host),
- 	INIT_CK("ep93xx-keypad",	NULL,		&clk_keypad),
-+	INIT_CK("ep93xx-adc",		NULL,		&clk_adc),
- 	INIT_CK("ep93xx-fb",		NULL,		&clk_video),
- 	INIT_CK("ep93xx-spi.0",		NULL,		&clk_spi),
- 	INIT_CK("ep93xx-i2s",		"mclk",		&clk_i2s_mclk),
+diff --git a/arch/arm/mach-ep93xx/edb93xx.c b/arch/arm/mach-ep93xx/edb93xx.c
+index 0ac176386789..7a7f280b07d7 100644
+--- a/arch/arm/mach-ep93xx/edb93xx.c
++++ b/arch/arm/mach-ep93xx/edb93xx.c
+@@ -245,6 +245,7 @@ static void __init edb93xx_init_machine(void)
+ 	edb93xx_register_pwm();
+ 	edb93xx_register_fb();
+ 	edb93xx_register_ide();
++	ep93xx_register_adc();
+ }
+ 
+ 
 -- 
 2.12.2
