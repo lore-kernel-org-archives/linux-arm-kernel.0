@@ -1,147 +1,58 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 4 Jun 2017 16:59:05 +0200
-Subject: [PATCH v2 04/25] KVM: arm64: vgic-v3: Add hook to handle guest
- GICv3 sysreg accesses at EL2
-In-Reply-To: <20170601102117.17750-5-marc.zyngier@arm.com>
-References: <20170601102117.17750-1-marc.zyngier@arm.com>
- <20170601102117.17750-5-marc.zyngier@arm.com>
-Message-ID: <20170604145905.GG9464@cbox>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Mon,  5 Jun 2017 00:01:38 +0800
+Subject: [PATCH v2 00/11] Support for H3 Composite Output support
+Message-ID: <20170604160149.30230-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 01, 2017 at 11:20:56AM +0100, Marc Zyngier wrote:
-> In order to start handling guest access to GICv3 system registers,
-> let's add a hook that will get called when we trap a system register
-> access. This is gated by a new static key (vgic_v3_cpuif_trap).
-> 
-> Reviewed-by: Eric Auger <eric.auger@redhat.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Allwinner H3 SoC features a TV Encoder like the one in Allwinner A13,
+which can only output TV Composite signal.
 
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
+The display pipeline of H3 is also special -- it has two mixers and
+two TCONs, of which the connection can be swapped. The TCONs do not
+have channel 0 (as they are all connected to internal bridges, TVE
+and HDMI TX).
 
-> ---
->  arch/arm64/include/asm/kvm_hyp.h |  1 +
->  arch/arm64/kvm/hyp/switch.c      | 14 ++++++++++++++
->  include/kvm/arm_vgic.h           |  1 +
->  virt/kvm/arm/hyp/vgic-v3-sr.c    | 38 ++++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic-v3.c      |  2 ++
->  5 files changed, 56 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
-> index b18e852d27e8..4572a9b560fa 100644
-> --- a/arch/arm64/include/asm/kvm_hyp.h
-> +++ b/arch/arm64/include/asm/kvm_hyp.h
-> @@ -127,6 +127,7 @@ int __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu);
->  
->  void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
->  void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
-> +int __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu);
->  
->  void __timer_save_state(struct kvm_vcpu *vcpu);
->  void __timer_restore_state(struct kvm_vcpu *vcpu);
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index aede1658aeda..dfd8ca16601b 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -350,6 +350,20 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
->  		}
->  	}
->  
-> +	if (static_branch_unlikely(&vgic_v3_cpuif_trap) &&
-> +	    exit_code == ARM_EXCEPTION_TRAP &&
-> +	    (kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_SYS64 ||
-> +	     kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_CP15_32)) {
-> +		int ret = __vgic_v3_perform_cpuif_access(vcpu);
-> +
-> +		if (ret == 1) {
-> +			__skip_instr(vcpu);
-> +			goto again;
-> +		}
-> +
-> +		/* 0 falls through to be handled out of EL2 */
-> +	}
-> +
->  	fp_enabled = __fpsimd_enabled();
->  
->  	__sysreg_save_guest_state(guest_ctxt);
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index ef718586321c..39b9fc4dc65d 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -285,6 +285,7 @@ struct vgic_cpu {
->  };
->  
->  extern struct static_key_false vgic_v2_cpuif_trap;
-> +extern struct static_key_false vgic_v3_cpuif_trap;
->  
->  int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
->  void kvm_vgic_early_init(struct kvm *kvm);
-> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> index 990d9d1e85d0..943bf11252d9 100644
-> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> @@ -19,6 +19,7 @@
->  #include <linux/irqchip/arm-gic-v3.h>
->  #include <linux/kvm_host.h>
->  
-> +#include <asm/kvm_emulate.h>
->  #include <asm/kvm_hyp.h>
->  
->  #define vtr_to_max_lr_idx(v)		((v) & 0xf)
-> @@ -371,3 +372,40 @@ void __hyp_text __vgic_v3_write_vmcr(u32 vmcr)
->  {
->  	write_gicreg(vmcr, ICH_VMCR_EL2);
->  }
-> +
-> +#ifdef CONFIG_ARM64
-> +
-> +int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
-> +{
-> +	int rt;
-> +	u32 esr;
-> +	u32 vmcr;
-> +	void (*fn)(struct kvm_vcpu *, u32, int);
-> +	bool is_read;
-> +	u32 sysreg;
-> +
-> +	esr = kvm_vcpu_get_hsr(vcpu);
-> +	if (vcpu_mode_is_32bit(vcpu)) {
-> +		if (!kvm_condition_valid(vcpu))
-> +			return 1;
-> +
-> +		sysreg = esr_cp15_to_sysreg(esr);
-> +	} else {
-> +		sysreg = esr_sys64_to_sysreg(esr);
-> +	}
-> +
-> +	is_read = (esr & ESR_ELx_SYS64_ISS_DIR_MASK) == ESR_ELx_SYS64_ISS_DIR_READ;
-> +
-> +	switch (sysreg) {
-> +	default:
-> +		return 0;
-> +	}
-> +
-> +	vmcr = __vgic_v3_read_vmcr();
-> +	rt = kvm_vcpu_sys_get_rt(vcpu);
-> +	fn(vcpu, vmcr, rt);
-> +
-> +	return 1;
-> +}
-> +
-> +#endif
-> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> index 6fe3f003636a..88d9bd9bf468 100644
-> --- a/virt/kvm/arm/vgic/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> @@ -410,6 +410,8 @@ int vgic_v3_map_resources(struct kvm *kvm)
->  	return ret;
->  }
->  
-> +DEFINE_STATIC_KEY_FALSE(vgic_v3_cpuif_trap);
-> +
->  /**
->   * vgic_v3_probe - probe for a GICv3 compatible interrupt controller in DT
->   * @node:	pointer to the DT node
-> -- 
-> 2.11.0
-> 
+Add support for the display pipeline and the TVE in H3, in order to
+make it possible to display something with mainline kernel with H3.
+
+The image quality of TVE is bad, so HDMI is a better output -- this
+patchset also prepared the mixers and TCONs for HDMI output, and
+the HDMI controller driver is already done by Jernej Skrabec.
+
+So if possible, please apply PATCH 1~5 and 8,9 as soon as possible,
+so that Jernej can submit his HDMI patches.
+
+Currently the jack detection feature of the TVE is still not so
+clear -- so it's not implemented in this version. Thus the TV
+output shouldn't be defaultly enabled now.
+
+Icenowy Zheng (11):
+  dt-bindings: update the binding for Allwinner H3 TVE support
+  drm: sun4i: add support for H3 mixers
+  drm: sun4i: ignore swapped mixer<->tcon connection for DE2
+  drm: sun4i: add support for H3's TCON0/1
+  drm: sun4i: add compatible for H3 display engine
+  drm: sun4i: add color space correction support for DE2 mixer
+  drm: sun4i: add support for the TV encoder in H3 SoC
+  clk: sunxi-ng: allow CLK_DE to set CLK_PLL_DE for H3
+  clk: sunxi-ng: export CLK_PLL_DE for H3
+  ARM: sun8i: h3: add display engine pipeline for TVE
+  [DO NOT MERGE] ARM: sun8i: h3: enable TV output on Orange Pi PC
+
+ .../bindings/display/sunxi/sun4i-drm.txt           |  37 +++-
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |  12 ++
+ arch/arm/boot/dts/sun8i-h3.dtsi                    | 186 +++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.c                |   2 +-
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.h                |   3 +-
+ drivers/gpu/drm/sun4i/sun4i_drv.c                  |  46 +++++
+ drivers/gpu/drm/sun4i/sun4i_tcon.c                 | 113 ++++++++++---
+ drivers/gpu/drm/sun4i/sun4i_tcon.h                 |   3 +
+ drivers/gpu/drm/sun4i/sun4i_tv.c                   |  35 +++-
+ drivers/gpu/drm/sun4i/sun8i_mixer.c                |  53 ++++++
+ drivers/gpu/drm/sun4i/sun8i_mixer.h                |   6 +-
+ include/dt-bindings/clock/sun8i-h3-ccu.h           |   2 +
+ 12 files changed, 463 insertions(+), 35 deletions(-)
+
+-- 
+2.12.2
