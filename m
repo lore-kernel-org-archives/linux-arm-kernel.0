@@ -1,32 +1,98 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Sun,  4 Jun 2017 15:00:04 +0300
-Subject: [PATCH 15/20] arm64: signal: share lp64 signal routines to ilp32
+Date: Sun,  4 Jun 2017 15:00:06 +0300
+Subject: [PATCH 17/20] arm64: ilp32: introduce ilp32-specific handlers for
+ sigframe and ucontext
 In-Reply-To: <20170604120009.342-1-ynorov@caviumnetworks.com>
 References: <20170604120009.342-1-ynorov@caviumnetworks.com>
-Message-ID: <20170604120009.342-16-ynorov@caviumnetworks.com>
+Message-ID: <20170604120009.342-18-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After that, it will be possible to reuse it in ilp32.
+From: Andrew Pinski <apinski@cavium.com>
 
+ILP32 uses AARCH32 compat structures and syscall handlers for signals.
+But ILP32 struct rt_sigframe  and ucontext differs from both LP64 and
+AARCH32. So some specific mechanism is needed to take care of it.
+
+Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@linaro.org>
 ---
- arch/arm64/include/asm/signal_common.h | 33 ++++++++++++
- arch/arm64/kernel/signal.c             | 93 +++++++++++++++++++++-------------
- 2 files changed, 92 insertions(+), 34 deletions(-)
- create mode 100644 arch/arm64/include/asm/signal_common.h
+ arch/arm64/include/asm/signal_ilp32.h |  38 ++++++++
+ arch/arm64/kernel/Makefile            |   3 +-
+ arch/arm64/kernel/entry_ilp32.S       |  22 +++++
+ arch/arm64/kernel/signal.c            |   3 +
+ arch/arm64/kernel/signal_ilp32.c      | 170 ++++++++++++++++++++++++++++++++++
+ 5 files changed, 235 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/include/asm/signal_ilp32.h
+ create mode 100644 arch/arm64/kernel/entry_ilp32.S
+ create mode 100644 arch/arm64/kernel/signal_ilp32.c
 
-diff --git a/arch/arm64/include/asm/signal_common.h b/arch/arm64/include/asm/signal_common.h
+diff --git a/arch/arm64/include/asm/signal_ilp32.h b/arch/arm64/include/asm/signal_ilp32.h
 new file mode 100644
-index 000000000000..f68238160940
+index 000000000000..3c6d737c07c0
 --- /dev/null
-+++ b/arch/arm64/include/asm/signal_common.h
-@@ -0,0 +1,33 @@
++++ b/arch/arm64/include/asm/signal_ilp32.h
+@@ -0,0 +1,38 @@
 +/*
-+ * Copyright (C) 1995-2009 Russell King
-+ * Copyright (C) 2012 ARM Ltd.
-+ * Copyright (C) 2017 Cavium Networks.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <asm/signal32_common.h>
++#include <asm/signal_common.h>
++
++#ifndef __ASM_SIGNAL_ILP32_H
++#define __ASM_SIGNAL_ILP32_H
++
++#ifdef CONFIG_ARM64_ILP32
++
++#include <linux/compat.h>
++
++int ilp32_setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
++			  struct pt_regs *regs);
++
++#else
++
++static inline int ilp32_setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
++			  struct pt_regs *regs)
++{
++	return -ENOSYS;
++}
++
++#endif /* CONFIG_ARM64_ILP32 */
++
++#endif /* __ASM_SIGNAL_ILP32_H */
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 1dd659907f34..f3bf1b74bb4a 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -29,7 +29,8 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
+ 
+ arm64-obj-$(CONFIG_AARCH32_EL0)		+= sys32.o kuser32.o signal32.o 	\
+ 					   sys_compat.o entry32.o binfmt_elf32.o
+-arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o sys_ilp32.o
++arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o sys_ilp32.o 		\
++					   signal_ilp32.o entry_ilp32.o
+ arm64-obj-$(CONFIG_COMPAT)		+= entry32_common.o signal32_common.o
+ arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
+ arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
+diff --git a/arch/arm64/kernel/entry_ilp32.S b/arch/arm64/kernel/entry_ilp32.S
+new file mode 100644
+index 000000000000..a8bb94b3901b
+--- /dev/null
++++ b/arch/arm64/kernel/entry_ilp32.S
+@@ -0,0 +1,22 @@
++/*
++ * ILP32 system call wrappers
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -41,205 +107,208 @@ index 000000000000..f68238160940
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#ifndef __ASM_SIGNAL_COMMON_H
-+#define __ASM_SIGNAL_COMMON_H
++#include <linux/linkage.h>
 +
-+#include <linux/uaccess.h>
-+#include <asm/ucontext.h>
-+#include <asm/fpsimd.h>
-+
-+int preserve_fpsimd_context(struct fpsimd_context __user *ctx);
-+int restore_fpsimd_context(struct fpsimd_context __user *ctx);
-+int setup_sigcontext(struct sigcontext __user *uc_mcontext, struct pt_regs *regs);
-+int restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sf);
-+void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
-+			void __user *frame, off_t sigframe_off, int usig);
-+
-+#endif /* __ASM_SIGNAL_COMMON_H */
++ENTRY(ilp32_sys_rt_sigreturn_wrapper)
++	mov	x0, sp
++	b	ilp32_sys_rt_sigreturn
++ENDPROC(ilp32_sys_rt_sigreturn_wrapper)
 diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 5fa1b401c5d6..9f2ea60b9fac 100644
+index 9f2ea60b9fac..b78f4c255636 100644
 --- a/arch/arm64/kernel/signal.c
 +++ b/arch/arm64/kernel/signal.c
-@@ -34,18 +34,26 @@
- #include <asm/fpsimd.h>
+@@ -35,6 +35,7 @@
  #include <asm/signal32.h>
  #include <asm/vdso.h>
-+#include <asm/signal_common.h>
+ #include <asm/signal_common.h>
++#include <asm/signal_ilp32.h>
+ 
+ #define RT_SIGFRAME_FP_POS (offsetof(struct rt_sigframe, sig)	\
+ 			+ offsetof(struct sigframe, fp))
+@@ -325,6 +326,8 @@ static void handle_signal(struct ksignal *ksig, struct pt_regs *regs)
+ 			ret = compat_setup_rt_frame(usig, ksig, oldset, regs);
+ 		else
+ 			ret = compat_setup_frame(usig, ksig, oldset, regs);
++	} else if (is_ilp32_compat_task()) {
++		ret = ilp32_setup_rt_frame(usig, ksig, oldset, regs);
+ 	} else {
+ 		ret = setup_rt_frame(usig, ksig, oldset, regs);
+ 	}
+diff --git a/arch/arm64/kernel/signal_ilp32.c b/arch/arm64/kernel/signal_ilp32.c
+new file mode 100644
+index 000000000000..b9a3372b0142
+--- /dev/null
++++ b/arch/arm64/kernel/signal_ilp32.c
+@@ -0,0 +1,170 @@
++/*
++ * Based on arch/arm/kernel/signal.c
++ *
++ * Copyright (C) 1995-2009 Russell King
++ * Copyright (C) 2012 ARM Ltd.
++ * Copyright (C) 2017 Cavium Networks.
++ * Yury Norov <ynorov@caviumnetworks.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
-+#define RT_SIGFRAME_FP_POS (offsetof(struct rt_sigframe, sig)	\
-+			+ offsetof(struct sigframe, fp))
++#include <linux/compat.h>
++#include <linux/signal.h>
++#include <linux/syscalls.h>
++#include <linux/ratelimit.h>
 +
-+struct sigframe {
-+	struct ucontext uc;
++#include <asm/esr.h>
++#include <asm/fpsimd.h>
++#include <asm/signal_ilp32.h>
++#include <asm/uaccess.h>
++#include <asm/unistd.h>
++#include <asm/ucontext.h>
++
++
++#define ILP32_RT_SIGFRAME_FP_POS (offsetof(struct ilp32_rt_sigframe, sig)	\
++			+ offsetof(struct ilp32_sigframe, fp))
++
++struct ilp32_ucontext {
++        u32		uc_flags;
++        u32		uc_link;
++        compat_stack_t  uc_stack;
++        compat_sigset_t uc_sigmask;
++        /* glibc uses a 1024-bit sigset_t */
++        __u8            __unused[1024 / 8 - sizeof(compat_sigset_t)];
++        /* last for future expansion */
++        struct sigcontext uc_mcontext;
++};
++
++struct ilp32_sigframe {
++	struct ilp32_ucontext uc;
 +	u64 fp;
 +	u64 lr;
 +};
- 
- /*
-  * Do a signal return; undo the signal stack. These are aligned to 128-bit.
-  */
- struct rt_sigframe {
- 	struct siginfo info;
--	struct ucontext uc;
--	u64 fp;
--	u64 lr;
-+	struct sigframe sig;
- };
- 
--static int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
-+int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
- {
- 	struct fpsimd_state *fpsimd = &current->thread.fpsimd_state;
- 	int err;
-@@ -65,7 +73,7 @@ static int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
- 	return err ? -EFAULT : 0;
- }
- 
--static int restore_fpsimd_context(struct fpsimd_context __user *ctx)
-+int restore_fpsimd_context(struct fpsimd_context __user *ctx)
- {
- 	struct fpsimd_state fpsimd;
- 	__u32 magic, size;
-@@ -93,22 +101,30 @@ static int restore_fpsimd_context(struct fpsimd_context __user *ctx)
- }
- 
- static int restore_sigframe(struct pt_regs *regs,
--			    struct rt_sigframe __user *sf)
-+			    struct sigframe __user *sf)
- {
- 	sigset_t set;
--	int i, err;
--	void *aux = sf->uc.uc_mcontext.__reserved;
--
++
++struct ilp32_rt_sigframe {
++	struct compat_siginfo info;
++	struct ilp32_sigframe sig;
++};
++
++static int restore_ilp32_sigframe(struct pt_regs *regs,
++                            struct ilp32_sigframe __user *sf)
++{
++	sigset_t set;
 +	int err;
- 	err = __copy_from_user(&set, &sf->uc.uc_sigmask, sizeof(set));
- 	if (err == 0)
- 		set_current_blocked(&set);
- 
++	err = get_sigset_t(&set, &sf->uc.uc_sigmask);
++	if (err == 0)
++		set_current_blocked(&set);
 +	err |= restore_sigcontext(regs, &sf->uc.uc_mcontext);
 +	return err;
 +}
 +
-+
-+int restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *uc_mcontext)
++static int setup_ilp32_sigframe(struct ilp32_sigframe __user *sf,
++                          struct pt_regs *regs, sigset_t *set)
 +{
-+	int i, err = 0;
-+	void *aux = uc_mcontext->__reserved;
-+
- 	for (i = 0; i < 31; i++)
--		__get_user_error(regs->regs[i], &sf->uc.uc_mcontext.regs[i],
-+		__get_user_error(regs->regs[i], &uc_mcontext->regs[i],
- 				 err);
--	__get_user_error(regs->sp, &sf->uc.uc_mcontext.sp, err);
--	__get_user_error(regs->pc, &sf->uc.uc_mcontext.pc, err);
--	__get_user_error(regs->pstate, &sf->uc.uc_mcontext.pstate, err);
-+	__get_user_error(regs->sp, &uc_mcontext->sp, err);
-+	__get_user_error(regs->pc, &uc_mcontext->pc, err);
-+	__get_user_error(regs->pstate, &uc_mcontext->pstate, err);
- 
- 	/*
- 	 * Avoid sys_rt_sigreturn() restarting.
-@@ -145,10 +161,10 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
- 	if (!access_ok(VERIFY_READ, frame, sizeof (*frame)))
- 		goto badframe;
- 
--	if (restore_sigframe(regs, frame))
-+	if (restore_sigframe(regs, &frame->sig))
- 		goto badframe;
- 
--	if (restore_altstack(&frame->uc.uc_stack))
-+	if (restore_altstack(&frame->sig.uc.uc_stack))
- 		goto badframe;
- 
- 	return regs->regs[0];
-@@ -162,27 +178,36 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
- 	return 0;
- }
- 
--static int setup_sigframe(struct rt_sigframe __user *sf,
-+static int setup_sigframe(struct sigframe __user *sf,
- 			  struct pt_regs *regs, sigset_t *set)
- {
--	int i, err = 0;
--	void *aux = sf->uc.uc_mcontext.__reserved;
--	struct _aarch64_ctx *end;
 +	int err = 0;
- 
- 	/* set up the stack frame for unwinding */
- 	__put_user_error(regs->regs[29], &sf->fp, err);
- 	__put_user_error(regs->regs[30], &sf->lr, err);
-+	err |= __copy_to_user(&sf->uc.uc_sigmask, set, sizeof(*set));
-+	err |= setup_sigcontext(&sf->uc.uc_mcontext, regs);
++	/* set up the stack frame for unwinding */
++	__put_user_error(regs->regs[29], &sf->fp, err);
++	__put_user_error(regs->regs[30], &sf->lr, err);
 +
++	err |= put_sigset_t(&sf->uc.uc_sigmask, set);
++	err |= setup_sigcontext(&sf->uc.uc_mcontext, regs);
 +	return err;
 +}
 +
-+int setup_sigcontext(struct sigcontext __user *uc_mcontext,
-+			struct pt_regs *regs)
++asmlinkage long ilp32_sys_rt_sigreturn(struct pt_regs *regs)
 +{
-+	void *aux = uc_mcontext->__reserved;
-+	struct _aarch64_ctx *end;
-+	int i, err = 0;
- 
- 	for (i = 0; i < 31; i++)
--		__put_user_error(regs->regs[i], &sf->uc.uc_mcontext.regs[i],
-+		__put_user_error(regs->regs[i], &uc_mcontext->regs[i],
- 				 err);
--	__put_user_error(regs->sp, &sf->uc.uc_mcontext.sp, err);
--	__put_user_error(regs->pc, &sf->uc.uc_mcontext.pc, err);
--	__put_user_error(regs->pstate, &sf->uc.uc_mcontext.pstate, err);
- 
--	__put_user_error(current->thread.fault_address, &sf->uc.uc_mcontext.fault_address, err);
-+	__put_user_error(regs->sp, &uc_mcontext->sp, err);
-+	__put_user_error(regs->pc, &uc_mcontext->pc, err);
-+	__put_user_error(regs->pstate, &uc_mcontext->pstate, err);
- 
--	err |= __copy_to_user(&sf->uc.uc_sigmask, set, sizeof(*set));
-+	__put_user_error(current->thread.fault_address, &uc_mcontext->fault_address, err);
- 
- 	if (err == 0) {
- 		struct fpsimd_context *fpsimd_ctx =
-@@ -229,14 +254,14 @@ static struct rt_sigframe __user *get_sigframe(struct ksignal *ksig,
- 	return frame;
- }
- 
--static void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
--			 void __user *frame, int usig)
-+void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
-+			 void __user *frame, off_t fp_pos, int usig)
- {
- 	__sigrestore_t sigtramp;
- 
- 	regs->regs[0] = usig;
- 	regs->sp = (unsigned long)frame;
--	regs->regs[29] = regs->sp + offsetof(struct rt_sigframe, fp);
-+	regs->regs[29] = regs->sp + fp_pos;
- 	regs->pc = (unsigned long)ka->sa.sa_handler;
- 
- 	if (ka->sa.sa_flags & SA_RESTORER)
-@@ -257,17 +282,17 @@ static int setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
- 	if (!frame)
- 		return 1;
- 
--	__put_user_error(0, &frame->uc.uc_flags, err);
--	__put_user_error(NULL, &frame->uc.uc_link, err);
++	struct ilp32_rt_sigframe __user *frame;
++
++	/* Always make any pending restarted system calls return -EINTR */
++	current->restart_block.fn = do_no_restart_syscall;
++
++	/*
++	 * Since we stacked the signal on a 128-bit boundary,
++	 * then 'sp' should be word aligned here.  If it's
++	 * not, then the user is trying to mess with us.
++	 */
++	if (regs->sp & 15)
++		goto badframe;
++
++	frame = (struct ilp32_rt_sigframe __user *)regs->sp;
++
++	if (!access_ok(VERIFY_READ, frame, sizeof (*frame)))
++		goto badframe;
++
++	if (restore_ilp32_sigframe(regs, &frame->sig))
++		goto badframe;
++
++	if (compat_restore_altstack(&frame->sig.uc.uc_stack))
++		goto badframe;
++
++	return regs->regs[0];
++
++badframe:
++	if (show_unhandled_signals)
++		pr_info_ratelimited("%s[%d]: bad frame in %s: pc=%08llx sp=%08llx\n",
++				    current->comm, task_pid_nr(current), __func__,
++				    regs->pc, regs->sp);
++	force_sig(SIGSEGV, current);
++	return 0;
++}
++
++static struct ilp32_rt_sigframe __user *ilp32_get_sigframe(struct ksignal *ksig,
++					       struct pt_regs *regs)
++{
++	unsigned long sp, sp_top;
++	struct ilp32_rt_sigframe __user *frame;
++
++	sp = sp_top = sigsp(regs->sp, ksig);
++
++	sp = (sp - sizeof(struct ilp32_rt_sigframe)) & ~15;
++	frame = (struct ilp32_rt_sigframe __user *)sp;
++
++	/*
++	 * Check that we can actually write to the signal frame.
++	 */
++	if (!access_ok(VERIFY_WRITE, frame, sp_top - sp))
++		frame = NULL;
++
++	return frame;
++}
++
++/*
++ * ILP32 signal handling routines called from signal.c
++ */
++int ilp32_setup_rt_frame(int usig, struct ksignal *ksig,
++			  sigset_t *set, struct pt_regs *regs)
++{
++	struct ilp32_rt_sigframe __user *frame;
++	int err = 0;
++
++	frame = ilp32_get_sigframe(ksig, regs);
++
++	if (!frame)
++		return 1;
++
++	err |= copy_siginfo_to_user32(&frame->info, &ksig->info);
++
 +	__put_user_error(0, &frame->sig.uc.uc_flags, err);
-+	__put_user_error(NULL, &frame->sig.uc.uc_link, err);
- 
--	err |= __save_altstack(&frame->uc.uc_stack, regs->sp);
--	err |= setup_sigframe(frame, regs, set);
-+	err |= __save_altstack(&frame->sig.uc.uc_stack, regs->sp);
-+	err |= setup_sigframe(&frame->sig, regs, set);
- 	if (err == 0) {
--		setup_return(regs, &ksig->ka, frame, usig);
-+		setup_return(regs, &ksig->ka, frame, RT_SIGFRAME_FP_POS, usig);
- 		if (ksig->ka.sa.sa_flags & SA_SIGINFO) {
- 			err |= copy_siginfo_to_user(&frame->info, &ksig->info);
- 			regs->regs[1] = (unsigned long)&frame->info;
--			regs->regs[2] = (unsigned long)&frame->uc;
-+			regs->regs[2] = (unsigned long)&frame->sig.uc;
- 		}
- 	}
- 
++	__put_user_error(0, &frame->sig.uc.uc_link, err);
++
++	err |= __compat_save_altstack(&frame->sig.uc.uc_stack, regs->sp);
++	err |= setup_ilp32_sigframe(&frame->sig, regs, set);
++	if (err == 0) {
++		setup_return(regs, &ksig->ka, frame, ILP32_RT_SIGFRAME_FP_POS, usig);
++		regs->regs[1] = (unsigned long)&frame->info;
++		regs->regs[2] = (unsigned long)&frame->sig.uc;
++	}
++
++	return err;
++}
 -- 
 2.11.0
