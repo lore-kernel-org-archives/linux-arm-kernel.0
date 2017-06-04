@@ -1,199 +1,217 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 4 Jun 2017 13:57:37 +0200
-Subject: [PATCH v2 3/3] KVM: arm/arm64: Simplify active_change_prepare
- and plug race
-In-Reply-To: <20170604081557.rhda3xp34mgkf7ow@hawk.localdomain>
-References: <20170516100431.4101-1-cdall@linaro.org>
- <20170516100431.4101-4-cdall@linaro.org>
- <9a412ed2-70ea-b651-dd75-18d723ee8b71@arm.com>
- <20170523084329.GC6319@cbox>
- <20170604081557.rhda3xp34mgkf7ow@hawk.localdomain>
-Message-ID: <20170604115737.GA9464@cbox>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Sun,  4 Jun 2017 14:59:49 +0300
+Subject: No subject
+Message-ID: <20170604120009.342-1-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 04, 2017 at 10:15:57AM +0200, Andrew Jones wrote:
-> On Tue, May 23, 2017 at 10:43:29AM +0200, Christoffer Dall wrote:
-> > On Mon, May 22, 2017 at 04:30:22PM +0100, Marc Zyngier wrote:
-> > > On 16/05/17 11:04, Christoffer Dall wrote:
-> > > > We don't need to stop a specific VCPU when changing the active state,
-> > > > because private IRQs can only be modified by a running VCPU for the
-> > > > VCPU itself and it is therefore already stopped.
-> > > > 
-> > > > However, it is also possible for two VCPUs to be modifying the active
-> > > > state of SPIs at the same time, which can cause the thread being stuck
-> > > > in the loop that checks other VCPU threads for a potentially very long
-> > > > time, or to modify the active state of a running VCPU.  Fix this by
-> > > > serializing all accesses to setting and clearing the active state of
-> > > > interrupts using the KVM mutex.
-> > > > 
-> > > > Reported-by: Andrew Jones <drjones@redhat.com>
-> > > > Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> > > > ---
-> > > >  arch/arm/include/asm/kvm_host.h   |  2 --
-> > > >  arch/arm64/include/asm/kvm_host.h |  2 --
-> > > >  virt/kvm/arm/arm.c                | 20 ++++----------------
-> > > >  virt/kvm/arm/vgic/vgic-mmio.c     | 18 ++++++++++--------
-> > > >  virt/kvm/arm/vgic/vgic.c          | 11 ++++++-----
-> > > >  5 files changed, 20 insertions(+), 33 deletions(-)
-> > > > 
-> > > > diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> > > > index f0e6657..12274d4 100644
-> > > > --- a/arch/arm/include/asm/kvm_host.h
-> > > > +++ b/arch/arm/include/asm/kvm_host.h
-> > > > @@ -233,8 +233,6 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
-> > > >  struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
-> > > >  void kvm_arm_halt_guest(struct kvm *kvm);
-> > > >  void kvm_arm_resume_guest(struct kvm *kvm);
-> > > > -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu);
-> > > > -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu);
-> > > >  
-> > > >  int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices);
-> > > >  unsigned long kvm_arm_num_coproc_regs(struct kvm_vcpu *vcpu);
-> > > > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> > > > index 5e19165..32cbe8a 100644
-> > > > --- a/arch/arm64/include/asm/kvm_host.h
-> > > > +++ b/arch/arm64/include/asm/kvm_host.h
-> > > > @@ -333,8 +333,6 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
-> > > >  struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
-> > > >  void kvm_arm_halt_guest(struct kvm *kvm);
-> > > >  void kvm_arm_resume_guest(struct kvm *kvm);
-> > > > -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu);
-> > > > -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu);
-> > > >  
-> > > >  u64 __kvm_call_hyp(void *hypfn, ...);
-> > > >  #define kvm_call_hyp(f, ...) __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__)
-> > > > diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> > > > index 3417e18..3c387fd 100644
-> > > > --- a/virt/kvm/arm/arm.c
-> > > > +++ b/virt/kvm/arm/arm.c
-> > > > @@ -539,27 +539,15 @@ void kvm_arm_halt_guest(struct kvm *kvm)
-> > > >  	kvm_make_all_cpus_request(kvm, KVM_REQ_VCPU_EXIT);
-> > > >  }
-> > > >  
-> > > > -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu)
-> > > > -{
-> > > > -	vcpu->arch.pause = true;
-> > > > -	kvm_vcpu_kick(vcpu);
-> > > > -}
-> > > > -
-> > > > -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu)
-> > > > -{
-> > > > -	struct swait_queue_head *wq = kvm_arch_vcpu_wq(vcpu);
-> > > > -
-> > > > -	vcpu->arch.pause = false;
-> > > > -	swake_up(wq);
-> > > > -}
-> > > > -
-> > > >  void kvm_arm_resume_guest(struct kvm *kvm)
-> > > >  {
-> > > >  	int i;
-> > > >  	struct kvm_vcpu *vcpu;
-> > > >  
-> > > > -	kvm_for_each_vcpu(i, vcpu, kvm)
-> > > > -		kvm_arm_resume_vcpu(vcpu);
-> > > > +	kvm_for_each_vcpu(i, vcpu, kvm) {
-> > > > +		vcpu->arch.pause = false;
-> > > > +		swake_up(kvm_arch_vcpu_wq(vcpu));
-> > > > +	}
-> > > >  }
-> > > >  
-> > > >  static void vcpu_sleep(struct kvm_vcpu *vcpu)
-> > > > diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-> > > > index 64cbcb4..c1e4bdd 100644
-> > > > --- a/virt/kvm/arm/vgic/vgic-mmio.c
-> > > > +++ b/virt/kvm/arm/vgic/vgic-mmio.c
-> > > > @@ -231,23 +231,21 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
-> > > >   * be migrated while we don't hold the IRQ locks and we don't want to be
-> > > >   * chasing moving targets.
-> > > >   *
-> > > > - * For private interrupts, we only have to make sure the single and only VCPU
-> > > > - * that can potentially queue the IRQ is stopped.
-> > > > + * For private interrupts we don't have to do anything because userspace
-> > > > + * accesses to the VGIC state already require all VCPUs to be stopped, and
-> > > > + * only the VCPU itself can modify its private interrupts active state, which
-> > > > + * guarantees that the VCPU is not running.
-> > > >   */
-> > > >  static void vgic_change_active_prepare(struct kvm_vcpu *vcpu, u32 intid)
-> > > >  {
-> > > > -	if (intid < VGIC_NR_PRIVATE_IRQS)
-> > > > -		kvm_arm_halt_vcpu(vcpu);
-> > > > -	else
-> > > > +	if (intid > VGIC_NR_PRIVATE_IRQS)
-> > > >  		kvm_arm_halt_guest(vcpu->kvm);
-> > > >  }
-> > > >  
-> > > >  /* See vgic_change_active_prepare */
-> > > >  static void vgic_change_active_finish(struct kvm_vcpu *vcpu, u32 intid)
-> > > >  {
-> > > > -	if (intid < VGIC_NR_PRIVATE_IRQS)
-> > > > -		kvm_arm_resume_vcpu(vcpu);
-> > > > -	else
-> > > > +	if (intid > VGIC_NR_PRIVATE_IRQS)
-> > > >  		kvm_arm_resume_guest(vcpu->kvm);
-> > > >  }
-> > > >  
-> > > > @@ -271,11 +269,13 @@ void vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
-> > > >  {
-> > > >  	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
-> > > >  
-> > > > +	mutex_lock(&vcpu->kvm->lock);
-> > > >  	vgic_change_active_prepare(vcpu, intid);
-> > > >  
-> > > >  	__vgic_mmio_write_cactive(vcpu, addr, len, val);
-> > > >  
-> > > >  	vgic_change_active_finish(vcpu, intid);
-> > > > +	mutex_unlock(&vcpu->kvm->lock);
-> > > 
-> > > Any reason not to move the lock/unlock calls to prepare/finish? Also, do
-> > > we need to take that mutex if intid is a PPI?
-> > 
-> > I guess we strictly don't need to take the mutex if it's a PPI, no.
-> > 
-> > But I actually preferred this symmetry because you can easily tell we
-> > don't have a bug (famous last words) by locking and unlocking the mutex
-> > in the same function.
-> > 
-> > I don't feel strongly about it though, so I can move it if you prefer
-> > it.
-> 
-> Actually we must move the locking into the prepare/finish functions, in
-> order to tuck them into the VGIC_NR_PRIVATE_IRQS conditions. Otherwise,
-> with gicv3, when userspace accesses ISACTIVER0/ICACTIVER0, which are
-> SGI_base offsets, then the vgic_v3_sgibase_registers table is used. That
-> table doesn't provide the uaccess functions, so we try to lock twice
-> again.
-> 
+Subject: [PATCH v7 resend 2 00/20] ILP32 for ARM64
 
-Nice find.
+Hi Catalin,
+ 
+Here is a rebase of latest kernel patchset against next-20170602. There's almost
+no changes, but there are some conflicts that are not trivial, and I'd like to
+refresh the submission therefore.
 
-How about we always use the uaccess functions or uaccesses instead? :
+How are your experiments with testing and benchmarking of ILP32 are going? In
+my current tests I see 0 failures on LTP. Benchmarking on SPEC CPU2006 and
+LMBench shows no difference for LP64 and expected performance boost for ILP32
+(compared to LP64 results).
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-index 23c0d564..e25567a 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-@@ -528,12 +528,14 @@ static const struct vgic_register_region vgic_v3_sgibase_registers[] = {
- 		vgic_mmio_read_pending, vgic_mmio_write_cpending,
- 		vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
- 		VGIC_ACCESS_32bit),
--	REGISTER_DESC_WITH_LENGTH(GICR_ISACTIVER0,
--		vgic_mmio_read_active, vgic_mmio_write_sactive, 4,
--		VGIC_ACCESS_32bit),
--	REGISTER_DESC_WITH_LENGTH(GICR_ICACTIVER0,
--		vgic_mmio_read_active, vgic_mmio_write_cactive, 4,
--		VGIC_ACCESS_32bit),
-+	REGISTER_DESC_WITH_LENGTH_UACCESS(GICR_ISACTIVER0,
-+		vgic_mmio_read_active, vgic_mmio_write_sactive,
-+		NULL, vgic_mmio_uaccess_write_sactive,
-+		4, VGIC_ACCESS_32bit),
-+	REGISTER_DESC_WITH_LENGTH_UACCESS(GICR_ICACTIVER0,
-+		vgic_mmio_read_active, vgic_mmio_write_cactive,
-+		NULL, vgic_mmio_uaccess_write_cactive,
-+		4, VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_LENGTH(GICR_IPRIORITYR0,
- 		vgic_mmio_read_priority, vgic_mmio_write_priority, 32,
- 		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
+Steve Ellcey is handling upstream submission of Glibc patches. The patches are
+ready and have been reviewed and reworked per community?s comments. There are
+no outstanding userspace ABI issues from Glibc. Glibc submission is now waiting
+on ILP32 kernel submission.
 
-Thanks,
--Christoffer
+Catalin, regarding rootfs, is OpenSuSe?s build sufficient for your experiments?
+I?ve also seen Wookey merging patches for ILP32 triplet to binutils and pushing
+them to Debian.
+
+One last thing I wanted to check with you about is ILP32 PCS - does, in your
+view, ARM Ltd. needs to publish any additional docs for ABI to become official?
+
+Below is the regular description.
+
+Thanks.
+Yury
+
+--------
+
+This series enables aarch64 with ilp32 mode.
+
+As supporting work, it introduces ARCH_32BIT_OFF_T configuration
+option that is enabled for existing 32-bit architectures but disabled
+for new arches (so 64-bit off_t is is used by new userspace). Also it
+deprecates getrlimit and setrlimit syscalls prior to prlimit64.
+
+This version is based on linux-next from 2017-03-01. It works with
+glibc-2.25, and tested with LTP, glibc testsuite, trinity, lmbench,
+CPUSpec.
+
+Patches 1, 2, 3 and 8 are general, and may be applied separately.
+
+This is the rebase of v7 - still no major changes has been made.
+
+Kernel and GLIBC trees:
+https://github.com/norov/linux/tree/ilp32-20170602
+https://github.com/norov/glibc/tree/dev9
+
+(GLIBC patches are managed by Steve Ellcey, so my tree is only for
+reference.)
+
+Changes:
+v3: https://lkml.org/lkml/2014/9/3/704
+v4: https://lkml.org/lkml/2015/4/13/691
+v5: https://lkml.org/lkml/2015/9/29/911
+v6: https://lkml.org/lkml/2016/5/23/661
+v7: RFC nowrap:  https://lkml.org/lkml/2016/6/17/990
+v7: RFC2 nowrap: https://lkml.org/lkml/2016/8/17/245
+v7: RFC3 nowrap: https://lkml.org/lkml/2016/10/21/883
+v7: https://lkml.org/lkml/2017/1/9/213
+v7: Resend: http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/490801.html
+v7: Resend 2:
+    - vdso-ilp32 Makefile synced with lp64 Makefile (patch 19);
+    - rebased on next-20170602.
+
+Andrew Pinski (6):
+  arm64: rename COMPAT to AARCH32_EL0 in Kconfig
+  arm64: ensure the kernel is compiled for LP64
+  arm64:uapi: set __BITS_PER_LONG correctly for ILP32 and LP64
+  arm64: ilp32: add sys_ilp32.c and a separate table (in entry.S) to use
+    it
+  arm64: ilp32: introduce ilp32-specific handlers for sigframe and
+    ucontext
+  arm64:ilp32: add ARM64_ILP32 to Kconfig
+
+Philipp Tomsich (1):
+  arm64:ilp32: add vdso-ilp32 and use for signal return
+
+Yury Norov (13):
+  compat ABI: use non-compat openat and open_by_handle_at variants
+  32-bit ABI: introduce ARCH_32BIT_OFF_T config option
+  asm-generic: Drop getrlimit and setrlimit syscalls from default list
+  arm64: ilp32: add documentation on the ILP32 ABI for ARM64
+  thread: move thread bits accessors to separated file
+  arm64: introduce is_a32_task and is_a32_thread (for AArch32 compat)
+  arm64: ilp32: add is_ilp32_compat_{task,thread} and TIF_32BIT_AARCH64
+  arm64: introduce binfmt_elf32.c
+  arm64: ilp32: introduce binfmt_ilp32.c
+  arm64: ilp32: share aarch32 syscall handlers
+  arm64: signal: share lp64 signal routines to ilp32
+  arm64: signal32: move ilp32 and aarch32 common code to separated file
+  arm64: ptrace: handle ptrace_request differently for aarch32 and ilp32
+
+ Documentation/arm64/ilp32.txt                 |  45 +++++++
+ arch/Kconfig                                  |   4 +
+ arch/arc/Kconfig                              |   1 +
+ arch/arc/include/uapi/asm/unistd.h            |   1 +
+ arch/arm/Kconfig                              |   1 +
+ arch/arm64/Kconfig                            |  19 ++-
+ arch/arm64/Makefile                           |   8 ++
+ arch/arm64/include/asm/compat.h               |  19 +--
+ arch/arm64/include/asm/elf.h                  |  37 ++----
+ arch/arm64/include/asm/fpsimd.h               |   2 +-
+ arch/arm64/include/asm/ftrace.h               |   2 +-
+ arch/arm64/include/asm/hwcap.h                |   6 +-
+ arch/arm64/include/asm/is_compat.h            |  90 ++++++++++++++
+ arch/arm64/include/asm/memory.h               |   5 +-
+ arch/arm64/include/asm/processor.h            |  11 +-
+ arch/arm64/include/asm/ptrace.h               |   2 +-
+ arch/arm64/include/asm/seccomp.h              |   2 +-
+ arch/arm64/include/asm/signal32.h             |   9 +-
+ arch/arm64/include/asm/signal32_common.h      |  27 ++++
+ arch/arm64/include/asm/signal_common.h        |  33 +++++
+ arch/arm64/include/asm/signal_ilp32.h         |  38 ++++++
+ arch/arm64/include/asm/syscall.h              |   2 +-
+ arch/arm64/include/asm/thread_info.h          |   4 +-
+ arch/arm64/include/asm/unistd.h               |   6 +-
+ arch/arm64/include/asm/vdso.h                 |   6 +
+ arch/arm64/include/uapi/asm/bitsperlong.h     |   9 +-
+ arch/arm64/include/uapi/asm/unistd.h          |  13 ++
+ arch/arm64/kernel/Makefile                    |   8 +-
+ arch/arm64/kernel/asm-offsets.c               |   9 +-
+ arch/arm64/kernel/binfmt_elf32.c              |  38 ++++++
+ arch/arm64/kernel/binfmt_ilp32.c              |  85 +++++++++++++
+ arch/arm64/kernel/cpufeature.c                |   8 +-
+ arch/arm64/kernel/cpuinfo.c                   |  20 +--
+ arch/arm64/kernel/entry.S                     |  34 +++++-
+ arch/arm64/kernel/entry32.S                   |  80 ------------
+ arch/arm64/kernel/entry32_common.S            | 107 ++++++++++++++++
+ arch/arm64/kernel/entry_ilp32.S               |  22 ++++
+ arch/arm64/kernel/head.S                      |   2 +-
+ arch/arm64/kernel/hw_breakpoint.c             |   8 +-
+ arch/arm64/kernel/perf_regs.c                 |   2 +-
+ arch/arm64/kernel/process.c                   |   7 +-
+ arch/arm64/kernel/ptrace.c                    |  80 ++++++++++--
+ arch/arm64/kernel/signal.c                    | 102 ++++++++++------
+ arch/arm64/kernel/signal32.c                  | 107 ----------------
+ arch/arm64/kernel/signal32_common.c           | 135 ++++++++++++++++++++
+ arch/arm64/kernel/signal_ilp32.c              | 170 ++++++++++++++++++++++++++
+ arch/arm64/kernel/sys_ilp32.c                 | 100 +++++++++++++++
+ arch/arm64/kernel/traps.c                     |   5 +-
+ arch/arm64/kernel/vdso-ilp32/.gitignore       |   2 +
+ arch/arm64/kernel/vdso-ilp32/Makefile         |  80 ++++++++++++
+ arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S     |  33 +++++
+ arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S |  95 ++++++++++++++
+ arch/arm64/kernel/vdso.c                      |  69 +++++++++--
+ arch/arm64/kernel/vdso/gettimeofday.S         |  20 ++-
+ arch/arm64/kernel/vdso/vdso.S                 |   6 +-
+ arch/blackfin/Kconfig                         |   1 +
+ arch/c6x/include/uapi/asm/unistd.h            |   1 +
+ arch/cris/Kconfig                             |   1 +
+ arch/frv/Kconfig                              |   1 +
+ arch/h8300/Kconfig                            |   1 +
+ arch/h8300/include/uapi/asm/unistd.h          |   1 +
+ arch/hexagon/Kconfig                          |   1 +
+ arch/hexagon/include/uapi/asm/unistd.h        |   1 +
+ arch/m32r/Kconfig                             |   1 +
+ arch/m68k/Kconfig                             |   1 +
+ arch/metag/Kconfig                            |   1 +
+ arch/metag/include/uapi/asm/unistd.h          |   1 +
+ arch/microblaze/Kconfig                       |   1 +
+ arch/mips/Kconfig                             |   1 +
+ arch/mn10300/Kconfig                          |   1 +
+ arch/nios2/Kconfig                            |   1 +
+ arch/nios2/include/uapi/asm/unistd.h          |   1 +
+ arch/openrisc/Kconfig                         |   1 +
+ arch/openrisc/include/uapi/asm/unistd.h       |   1 +
+ arch/parisc/Kconfig                           |   1 +
+ arch/powerpc/Kconfig                          |   1 +
+ arch/score/Kconfig                            |   1 +
+ arch/score/include/uapi/asm/unistd.h          |   1 +
+ arch/sh/Kconfig                               |   1 +
+ arch/sparc/Kconfig                            |   1 +
+ arch/tile/Kconfig                             |   1 +
+ arch/tile/include/uapi/asm/unistd.h           |   1 +
+ arch/tile/kernel/compat.c                     |   3 +
+ arch/unicore32/Kconfig                        |   1 +
+ arch/unicore32/include/uapi/asm/unistd.h      |   1 +
+ arch/x86/Kconfig                              |   1 +
+ arch/x86/um/Kconfig                           |   1 +
+ arch/xtensa/Kconfig                           |   1 +
+ drivers/clocksource/arm_arch_timer.c          |   2 +-
+ include/linux/fcntl.h                         |   2 +-
+ include/linux/thread_bits.h                   |  63 ++++++++++
+ include/linux/thread_info.h                   |  66 ++--------
+ include/uapi/asm-generic/unistd.h             |  10 +-
+ 93 files changed, 1601 insertions(+), 413 deletions(-)
+ create mode 100644 Documentation/arm64/ilp32.txt
+ create mode 100644 arch/arm64/include/asm/is_compat.h
+ create mode 100644 arch/arm64/include/asm/signal32_common.h
+ create mode 100644 arch/arm64/include/asm/signal_common.h
+ create mode 100644 arch/arm64/include/asm/signal_ilp32.h
+ create mode 100644 arch/arm64/kernel/binfmt_elf32.c
+ create mode 100644 arch/arm64/kernel/binfmt_ilp32.c
+ create mode 100644 arch/arm64/kernel/entry32_common.S
+ create mode 100644 arch/arm64/kernel/entry_ilp32.S
+ create mode 100644 arch/arm64/kernel/signal32_common.c
+ create mode 100644 arch/arm64/kernel/signal_ilp32.c
+ create mode 100644 arch/arm64/kernel/sys_ilp32.c
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/.gitignore
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/Makefile
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
+ create mode 100644 include/linux/thread_bits.h
+
+-- 
+2.11.0
