@@ -1,190 +1,29 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Sun, 4 Jun 2017 11:07:43 +0800
-Subject: [PATCH v2 2/3] PCI: Enable PCIe Relaxed Ordering if supported
-In-Reply-To: <CAKgT0UfKPLy7=swnZYiYOrLS8znhjxeXNZv=+CK5XS3Z1fkMbw@mail.gmail.com>
-References: <1496462647-7632-1-git-send-email-dingtianhong@huawei.com>
- <1496462647-7632-3-git-send-email-dingtianhong@huawei.com>
- <CAKgT0UfKPLy7=swnZYiYOrLS8znhjxeXNZv=+CK5XS3Z1fkMbw@mail.gmail.com>
-Message-ID: <55b08eae-dbe4-48da-329e-a617be28fd21@huawei.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 4 Jun 2017 11:42:11 +0800
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Explicitly restore
+ CONFIG_DEBUG_FS
+In-Reply-To: <49b2579b9ad2e5ce0a7c4b163dffb5a885ac7dae.1495797565.git.leonard.crestez@nxp.com>
+References: <49b2579b9ad2e5ce0a7c4b163dffb5a885ac7dae.1495797565.git.leonard.crestez@nxp.com>
+Message-ID: <20170604034210.GB4094@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2017/6/4 2:19, Alexander Duyck wrote:
-> On Fri, Jun 2, 2017 at 9:04 PM, Ding Tianhong <dingtianhong@huawei.com> wrote:
->> The PCIe Device Control Register use the bit 4 to indicate that
->> whether the device is permitted to enable relaxed ordering or not.
->> But relaxed ordering is not safe for some platform which could only
->> use strong write ordering, so devices are allowed (but not required)
->> to enable relaxed ordering bit by default.
->>
->> If a platform support relaxed ordering but does not enable it by
->> default, enable it in the PCIe configuration. This allows some device
->> to send TLPs with the relaxed ordering attributes set, which may
->> improve the performance.
->>
->> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
->> ---
->>  drivers/pci/pci.c   | 42 ++++++++++++++++++++++++++++++++++++++++++
->>  drivers/pci/probe.c | 11 +++++++++++
->>  include/linux/pci.h |  3 +++
->>  3 files changed, 56 insertions(+)
->>
->> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
->> index b01bd5b..f57a374 100644
->> --- a/drivers/pci/pci.c
->> +++ b/drivers/pci/pci.c
->> @@ -4878,6 +4878,48 @@ int pcie_set_mps(struct pci_dev *dev, int mps)
->>  EXPORT_SYMBOL(pcie_set_mps);
->>
->>  /**
->> + * pcie_set_relaxed_ordering - set PCI Express relexed ordering bit
->> + * @dev: PCI device to query
->> + *
->> + * If possible sets relaxed ordering
->> + */
->> +int pcie_set_relaxed_ordering(struct pci_dev *dev)
->> +{
->> +       return pcie_capability_set_word(dev, PCI_EXP_DEVCTL, PCI_EXP_DEVCTL_RELAX_EN);
->> +}
->> +EXPORT_SYMBOL(pcie_set_relaxed_ordering);
->> +
->> +/**
->> + * pcie_clear_relaxed_ordering - clear PCI Express relexed ordering bit
->> + * @dev: PCI device to query
->> + *
->> + * If possible clear relaxed ordering
->> + */
->> +int pcie_clear_relaxed_ordering(struct pci_dev *dev)
->> +{
->> +       return pcie_capability_clear_word(dev, PCI_EXP_DEVCTL, PCI_EXP_DEVCTL_RELAX_EN);
->> +}
->> +EXPORT_SYMBOL(pcie_clear_relaxed_ordering);
->> +
->> +/**
->> + * pcie_get_relaxed_ordering - check PCI Express relexed ordering bit
->> + * @dev: PCI device to query
->> + *
->> + * Returns true if relaxed ordering is been set
->> + */
->> +int pcie_get_relaxed_ordering(struct pci_dev *dev)
->> +{
->> +       u16 v;
->> +
->> +       pcie_capability_read_word(dev, PCI_EXP_DEVCTL, &v);
->> +
->> +       return (v & PCI_EXP_DEVCTL_RELAX_EN) >> 4;
->> +}
->> +EXPORT_SYMBOL(pcie_get_relaxed_ordering);
->> +
->> +/**
->> + * pcie_set_mps - set PCI Express maximum payload size
->> +/**
->>   * pcie_get_minimum_link - determine minimum link settings of a PCI device
->>   * @dev: PCI device to query
->>   * @speed: storage for minimum speed
->> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
->> index 19c8950..aeb22b5 100644
->> --- a/drivers/pci/probe.c
->> +++ b/drivers/pci/probe.c
->> @@ -1701,6 +1701,16 @@ static void pci_configure_extended_tags(struct pci_dev *dev)
->>                                          PCI_EXP_DEVCTL_EXT_TAG);
->>  }
->>
->> +static void pci_configure_relaxed_ordering(struct pci_dev *dev)
->> +{
->> +       int ret;
->> +
->> +       if (dev && (dev->dev_flags & PCI_DEV_FLAGS_NO_RELAXED_ORDERING))
+On Fri, May 26, 2017 at 02:26:06PM +0300, Leonard Crestez wrote:
+> This option was removed by "make savedefconfig" in
+> commit c5054a98bce4 ("ARM: imx_v6_v7_defconfig: Select SMSC_PHY")
 > 
-> So there is a minor issue here. The problem is this is only trying to
-> modify relaxed ordering for the device itself. That isn't what we
-> want. What we want is to modify it on all of the upstream port
-> interfaces where there is something the path to the root complex that
-> has an issue. So if the root complex has to set the
-> NO_RELAXED_ORDERING flag on a root port, all of the interfaces below
-> it that would be pushing traffic toward it should not have the relaxed
-> ordering bit set.
+> This happened because CONFIG_DEBUG_FS was implicitly selected by
+> CONFIG_TREE_RCU_TRACE which defaulted to true because CONFIG_RCU_TRACE
+> was enabled by default by commit 961518259b3b ("rcu: Enable RCU
+> tracepoints by default to aid in debugging")
 > 
-> Also I am pretty sure this is a PCIe capability, not a PCI capability.
-> You probably need to make sure you code is making this distinction
-> which I don't know if it currently is. If you need an example of the
-> kind of checks I am suggesting just take a look at
-> pcie_configure_mps(). It is verifying the function is PCIe before
-> attempting to make any updates. In your case you will probably also
-> need to make sure there is a bus for you to walk up the chain of.
-> Otherwise this shouldn't apply.
+> Recently however CONFIG_RCU_TRACE was completely removed by
+> commit 6e74c237c410 ("rcu: Remove debugfs tracing")
 > 
-
-Yes, I miss the upstream ports and the pcie/pci capability, will check
-the pcie_configure_mps() again and fix it, thanks.
-
+> The result is that imx_v6_v7_defconfig no longer includes DEBUG_FS on
+> linux-next since next-20170517. This is bad, DEBUG_FS is extremely
+> useful for kernel introspection and testing.
 > 
->> +               pcie_set_relaxed_ordering(dev);
->> +       else
->> +               pcie_clear_relaxed_ordering(dev);
->> +}
-> 
-> Also I am not a fan of the way this is handled currently. If you don't
-> have relaxed ordering set then you don't need to do anything else, if
-> you do have it set but there is no bus to walk up you shouldn't change
-> it, and if there is a bus to walk up and you find that the root
-> complex on that bus has the NO_RELAXED_ORDERING set you should clear
-> it. Right now this code seems to be enabling relaxed ordering if the
-> NO_RELAXED_ORDERING flag is set.
-> 
+> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 
-I'm not very clear about this, I check the PCIe Standard, it said that:
-
-Enable Relaxed Ordering ? If this bit is set, the device is
-permitted to set the Relaxed Ordering bit in the Attributes field of
-transactions it initiates that do not require strong write ordering
-(see Sections 2.2.6.4 and 2.4).
-Default value of this bit is 1.
-This bit may be hardwired to 0 if a device never sets the
-Relaxed Ordering attribute in transactions it initiates as a
-requester.
-
-Is that means some platform may set the bit to 0 default but it didn't mean the hardware
-couldn't support Relaxed Ordering ? if so, I need to set the bit enable if  relaxed
-ordering flag is set.
-
-If I didn't understand it correctly, I will fix it follow your opinion, thanks.
-
-Ding
-
-
->> +
->>  static void pci_configure_device(struct pci_dev *dev)
->>  {
->>         struct hotplug_params hpp;
->> @@ -1708,6 +1718,7 @@ static void pci_configure_device(struct pci_dev *dev)
->>
->>         pci_configure_mps(dev);
->>         pci_configure_extended_tags(dev);
->> +       pci_configure_relaxed_ordering(dev);
->>
->>         memset(&hpp, 0, sizeof(hpp));
->>         ret = pci_get_hp_params(dev, &hpp);
->> diff --git a/include/linux/pci.h b/include/linux/pci.h
->> index e1e8428..84bd6af 100644
->> --- a/include/linux/pci.h
->> +++ b/include/linux/pci.h
->> @@ -1105,6 +1105,9 @@ int __pci_enable_wake(struct pci_dev *dev, pci_power_t state,
->>  void pci_pme_wakeup_bus(struct pci_bus *bus);
->>  void pci_d3cold_enable(struct pci_dev *dev);
->>  void pci_d3cold_disable(struct pci_dev *dev);
->> +int pcie_set_relaxed_ordering(struct pci_dev *dev);
->> +int pcie_clear_relaxed_ordering(struct pci_dev *dev);
->> +int pcie_get_relaxed_ordering(struct pci_dev *dev);
->>
->>  static inline int pci_enable_wake(struct pci_dev *dev, pci_power_t state,
->>                                   bool enable)
->> --
->> 1.9.0
->>
->>
-> 
-> .
-> 
+Applied, thanks.
