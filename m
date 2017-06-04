@@ -1,191 +1,100 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Sun, 04 Jun 2017 20:46:24 +0200
-Subject: [PATCH v2 04/11] drm: sun4i: add support for H3's TCON0/1
-In-Reply-To: <20170604160149.30230-5-icenowy@aosc.io>
-References: <20170604160149.30230-1-icenowy@aosc.io>
- <20170604160149.30230-5-icenowy@aosc.io>
-Message-ID: <3642057.oKT9kIlu8M@jernej-laptop>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 5 Jun 2017 02:45:25 +0800
+Subject: [PATCH] net/phy: Make phy_ethtool_ksettings_get return void
+In-Reply-To: <20170604171428.4012-1-yuval.shaia@oracle.com>
+Message-ID: <201706050222.9nQpHVcL%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Yuval,
 
-Dne nedelja, 04. junij 2017 ob 18:01:42 CEST je Icenowy Zheng napisal(a):
-> From: Icenowy Zheng <icenowy@aosc.xyz>
-> 
-> Allwinner H3 has two special TCONs, both come without channel0. And the
-> TCON1 of H3 has no special clocks even for the channel1.
-> 
-> Add support for these kinds of TCON.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
-> Changes in v2:
-> - Merged TCON0 and TCON1 quirks and compatibles.
-> 
->  drivers/gpu/drm/sun4i/sun4i_tcon.c | 52
-> +++++++++++++++++++++++++------------- drivers/gpu/drm/sun4i/sun4i_tcon.h |
->  1 +
->  2 files changed, 36 insertions(+), 17 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> b/drivers/gpu/drm/sun4i/sun4i_tcon.c index 568cea0e5f8f..62ba4fc19f18
-> 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> @@ -59,6 +59,7 @@ void sun4i_tcon_channel_disable(struct sun4i_tcon *tcon,
-> int channel)
-> 
->  	/* Disable the TCON's channel */
->  	if (channel == 0) {
-> +		WARN_ON(!tcon->quirks->has_channel_0);
->  		regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
->  				   SUN4I_TCON0_CTL_TCON_ENABLE, 0);
->  		clk_disable_unprepare(tcon->dclk);
-> @@ -78,6 +79,7 @@ void sun4i_tcon_channel_enable(struct sun4i_tcon *tcon,
-> int channel)
-> 
->  	/* Enable the TCON's channel */
->  	if (channel == 0) {
-> +		WARN_ON(!tcon->quirks->has_channel_0);
->  		regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
->  				   SUN4I_TCON0_CTL_TCON_ENABLE,
->  				   SUN4I_TCON0_CTL_TCON_ENABLE);
-> @@ -159,6 +161,7 @@ void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
-> 
->  	/* Configure the dot clock */
->  	clk_set_rate(tcon->dclk, mode->crtc_clock * 1000);
-> +	WARN_ON(!tcon->quirks->has_channel_0);
-> 
->  	/* Adjust clock delay */
->  	clk_delay = sun4i_tcon_get_clk_delay(mode, 0);
-> @@ -366,10 +369,12 @@ static int sun4i_tcon_init_clocks(struct device *dev,
->  	}
->  	clk_prepare_enable(tcon->clk);
-> 
-> -	tcon->sclk0 = devm_clk_get(dev, "tcon-ch0");
-> -	if (IS_ERR(tcon->sclk0)) {
-> -		dev_err(dev, "Couldn't get the TCON channel 0 clock\n");
-> -		return PTR_ERR(tcon->sclk0);
-> +	if (tcon->quirks->has_channel_0) {
-> +		tcon->sclk0 = devm_clk_get(dev, "tcon-ch0");
-> +		if (IS_ERR(tcon->sclk0)) {
-> +			dev_err(dev, "Couldn't get the TCON channel 0 clock\n");
-> +			return PTR_ERR(tcon->sclk0);
-> +		}
->  	}
-> 
->  	if (tcon->quirks->has_channel_1) {
-> @@ -594,10 +599,12 @@ static int sun4i_tcon_bind(struct device *dev, struct
-> device *master, goto err_free_clocks;
->  	}
-> 
-> -	ret = sun4i_dclk_create(dev, tcon);
-> -	if (ret) {
-> -		dev_err(dev, "Couldn't create our TCON dot clock\n");
-> -		goto err_free_clocks;
-> +	if (tcon->quirks->has_channel_0) {
-> +		ret = sun4i_dclk_create(dev, tcon);
-> +		if (ret) {
-> +			dev_err(dev, "Couldn't create our TCON dot clock\n");
-> +			goto err_free_clocks;
-> +		}
->  	}
-> 
->  	ret = sun4i_tcon_init_irq(dev, tcon);
-> @@ -622,7 +629,8 @@ static int sun4i_tcon_bind(struct device *dev, struct
-> device *master, return 0;
-> 
->  err_free_dotclock:
-> -	sun4i_dclk_free(tcon);
-> +	if (tcon->quirks->has_channel_0)
-> +		sun4i_dclk_free(tcon);
->  err_free_clocks:
->  	sun4i_tcon_free_clocks(tcon);
->  err_assert_reset:
-> @@ -636,7 +644,9 @@ static void sun4i_tcon_unbind(struct device *dev, struct
-> device *master, struct sun4i_tcon *tcon = dev_get_drvdata(dev);
-> 
->  	list_del(&tcon->list);
-> -	sun4i_dclk_free(tcon);
-> +
-> +	if (tcon->quirks->has_channel_0)
-> +		sun4i_dclk_free(tcon);
->  	sun4i_tcon_free_clocks(tcon);
->  }
-> 
-> @@ -667,24 +677,32 @@ static int sun4i_tcon_remove(struct platform_device
-> *pdev) }
-> 
->  static const struct sun4i_tcon_quirks sun5i_a13_quirks = {
-> -	.has_unknown_mux = true,
-> -	.has_channel_1	= true,
-> +	.has_unknown_mux	= true,
-> +	.has_channel_0		= true,
-> +	.has_channel_1		= true,
->  };
-> 
->  static const struct sun4i_tcon_quirks sun6i_a31_quirks = {
-> -	.has_channel_1	= true,
-> +	.has_channel_0		= true,
-> +	.has_channel_1		= true,
->  };
-> 
->  static const struct sun4i_tcon_quirks sun6i_a31s_quirks = {
-> -	.has_channel_1	= true,
-> +	.has_channel_0		= true,
-> +	.has_channel_1		= true,
->  };
-> 
->  static const struct sun4i_tcon_quirks sun8i_a33_quirks = {
-> -	/* nothing is supported */
-> +	.has_channel_0	= true,
->  };
-> 
->  static const struct sun4i_tcon_quirks sun8i_v3s_quirks = {
-> -	/* nothing is supported */
-> +	.has_channel_0	= true,
-> +};
-> +
-> +static const struct sun4i_tcon_quirks sun8i_h3_quirks = {
-> +	.has_channel_1		= true,
-> +	.swappable_input	= true,
->  };
-> 
->  static const struct of_device_id sun4i_tcon_of_table[] = {
-> @@ -693,7 +711,7 @@ static const struct of_device_id sun4i_tcon_of_table[] =
-> { { .compatible = "allwinner,sun6i-a31s-tcon", .data = &sun6i_a31s_quirks
-> }, { .compatible = "allwinner,sun8i-a33-tcon", .data = &sun8i_a33_quirks },
-> { .compatible = "allwinner,sun8i-v3s-tcon", .data = &sun8i_v3s_quirks },
-> -	{ }
-> +	{ .compatible = "allwinner,sun8i-h3-tcon", .data = &sun8i_h3_quirks },
+[auto build test ERROR on net-next/master]
+[also build test ERROR on v4.12-rc3 next-20170602]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-I think you need to leave empty entry as a sentinel.
+url:    https://github.com/0day-ci/linux/commits/Yuval-Shaia/net-phy-Make-phy_ethtool_ksettings_get-return-void/20170605-012813
+config: ia64-allmodconfig (attached as .config)
+compiler: ia64-linux-gcc (GCC) 6.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=ia64 
 
->  };
->  MODULE_DEVICE_TABLE(of, sun4i_tcon_of_table);
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h
-> b/drivers/gpu/drm/sun4i/sun4i_tcon.h index c3e01c06e9a0..9c706a0bd478
-> 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
-> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-> @@ -145,6 +145,7 @@
-> 
->  struct sun4i_tcon_quirks {
->  	bool	has_unknown_mux; /* sun5i has undocumented mux */
-> +	bool	has_channel_0;	/* some A83T+ TCONs don't have channel 0*/
->  	bool	has_channel_1;	/* a33 does not have channel 1 */
->  	/* Some DE2 can swap the mixer<->TCON connection */
->  	bool	swappable_input;
-> --
-> 2.12.2
+All error/warnings (new ones prefixed by >>):
 
-You missed sun4i_rgb_init() function which should also be guarded with "if 
-(tcon->quirks->has_channel_0)".
+   drivers/net//ethernet/renesas/sh_eth.c: In function 'sh_eth_get_link_ksettings':
+>> drivers/net//ethernet/renesas/sh_eth.c:1924:6: error: void value not ignored as it ought to be
+     ret = phy_ethtool_ksettings_get(ndev->phydev, cmd);
+         ^
+--
+   drivers/net//ethernet/renesas/ravb_main.c: In function 'ravb_get_link_ksettings':
+>> drivers/net//ethernet/renesas/ravb_main.c:1084:9: error: void value not ignored as it ought to be
+      error = phy_ethtool_ksettings_get(ndev->phydev, cmd);
+            ^
+--
+   drivers/net//ethernet/apm/xgene/xgene_enet_ethtool.c: In function 'xgene_get_link_ksettings':
+>> drivers/net//ethernet/apm/xgene/xgene_enet_ethtool.c:134:10: error: void value not ignored as it ought to be
+      return phy_ethtool_ksettings_get(phydev, cmd);
+             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   drivers/net//ethernet/apm/xgene/xgene_enet_ethtool.c:140:11: error: void value not ignored as it ought to be
+       return phy_ethtool_ksettings_get(phydev, cmd);
+              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+   drivers/net//ethernet/apm/xgene-v2/ethtool.c: In function 'xge_get_link_ksettings':
+>> drivers/net//ethernet/apm/xgene-v2/ethtool.c:160:9: error: void value not ignored as it ought to be
+     return phy_ethtool_ksettings_get(phydev, cmd);
+            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+>> drivers/net//ethernet/apm/xgene-v2/ethtool.c:161:1: warning: control reaches end of non-void function [-Wreturn-type]
+    }
+    ^
+--
+   drivers/net//ethernet/stmicro/stmmac/stmmac_ethtool.c: In function 'stmmac_ethtool_get_link_ksettings':
+>> drivers/net//ethernet/stmicro/stmmac/stmmac_ethtool.c:367:5: error: void value not ignored as it ought to be
+     rc = phy_ethtool_ksettings_get(phy, cmd);
+        ^
 
-You should also expand function sun4i_drv_node_is_tcon() at sun4i_drv.c with 
-new entries, but I'm not sure if this fits in this patch.
+vim +1924 drivers/net//ethernet/renesas/sh_eth.c
 
-Best regards,
-Jernej
+9fd0375ad drivers/net/ethernet/renesas/sh_eth.c Philippe Reynes   2016-08-10  1908  	phy_start(ndev->phydev);
+86a74ff21 drivers/net/sh_eth.c                  Nobuhiro Iwamatsu 2008-06-09  1909  
+86a74ff21 drivers/net/sh_eth.c                  Nobuhiro Iwamatsu 2008-06-09  1910  	return 0;
+86a74ff21 drivers/net/sh_eth.c                  Nobuhiro Iwamatsu 2008-06-09  1911  }
+86a74ff21 drivers/net/sh_eth.c                  Nobuhiro Iwamatsu 2008-06-09  1912  
+f08aff444 drivers/net/ethernet/renesas/sh_eth.c Philippe Reynes   2016-08-10  1913  static int sh_eth_get_link_ksettings(struct net_device *ndev,
+f08aff444 drivers/net/ethernet/renesas/sh_eth.c Philippe Reynes   2016-08-10  1914  				     struct ethtool_link_ksettings *cmd)
+dc19e4e5e drivers/net/sh_eth.c                  Nobuhiro Iwamatsu 2011-02-15  1915  {
+dc19e4e5e drivers/net/sh_eth.c                  Nobuhiro Iwamatsu 2011-02-15  1916  	struct sh_eth_private *mdp = netdev_priv(ndev);
+dc19e4e5e drivers/net/sh_eth.c                  Nobuhiro Iwamatsu 2011-02-15  1917  	unsigned long flags;
+dc19e4e5e drivers/net/sh_eth.c                  Nobuhiro Iwamatsu 2011-02-15  1918  	int ret;
+dc19e4e5e drivers/net/sh_eth.c                  Nobuhiro Iwamatsu 2011-02-15  1919  
+9fd0375ad drivers/net/ethernet/renesas/sh_eth.c Philippe Reynes   2016-08-10  1920  	if (!ndev->phydev)
+4f9dce230 drivers/net/ethernet/renesas/sh_eth.c Ben Hutchings     2015-01-16  1921  		return -ENODEV;
+4f9dce230 drivers/net/ethernet/renesas/sh_eth.c Ben Hutchings     2015-01-16  1922  
+dc19e4e5e drivers/net/sh_eth.c                  Nobuhiro Iwamatsu 2011-02-15  1923  	spin_lock_irqsave(&mdp->lock, flags);
+f08aff444 drivers/net/ethernet/renesas/sh_eth.c Philippe Reynes   2016-08-10 @1924  	ret = phy_ethtool_ksettings_get(ndev->phydev, cmd);
+dc19e4e5e drivers/net/sh_eth.c                  Nobuhiro Iwamatsu 2011-02-15  1925  	spin_unlock_irqrestore(&mdp->lock, flags);
+dc19e4e5e drivers/net/sh_eth.c                  Nobuhiro Iwamatsu 2011-02-15  1926  
+dc19e4e5e drivers/net/sh_eth.c                  Nobuhiro Iwamatsu 2011-02-15  1927  	return ret;
+dc19e4e5e drivers/net/sh_eth.c                  Nobuhiro Iwamatsu 2011-02-15  1928  }
+dc19e4e5e drivers/net/sh_eth.c                  Nobuhiro Iwamatsu 2011-02-15  1929  
+f08aff444 drivers/net/ethernet/renesas/sh_eth.c Philippe Reynes   2016-08-10  1930  static int sh_eth_set_link_ksettings(struct net_device *ndev,
+f08aff444 drivers/net/ethernet/renesas/sh_eth.c Philippe Reynes   2016-08-10  1931  				     const struct ethtool_link_ksettings *cmd)
+dc19e4e5e drivers/net/sh_eth.c                  Nobuhiro Iwamatsu 2011-02-15  1932  {
+
+:::::: The code at line 1924 was first introduced by commit
+:::::: f08aff444ae0004c9ae6df3241fc313a5024d375 net: ethernet: renesas: sh_eth: use new api ethtool_{get|set}_link_ksettings
+
+:::::: TO: Philippe Reynes <tremyfr@gmail.com>
+:::::: CC: David S. Miller <davem@davemloft.net>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 47761 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170605/ddb8011e/attachment-0001.gz>
