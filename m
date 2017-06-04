@@ -1,35 +1,138 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Sun, 4 Jun 2017 23:05:35 +0200
-Subject: [PATCH 1/3] arm/xen: Improve a size determination in
- __set_phys_to_machine_multi()
-In-Reply-To: <9b9230f4-0f00-e019-75b4-571e29b52998@users.sourceforge.net>
-References: <9b9230f4-0f00-e019-75b4-571e29b52998@users.sourceforge.net>
-Message-ID: <7f2ec975-9a2b-132d-77f0-559fd7eadc30@users.sourceforge.net>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Mon, 5 Jun 2017 00:13:50 +0200
+Subject: [PATCH 3/3] ARM: dts: meson8: add and use the real clock
+ controller
+In-Reply-To: <1496607638.3552.20.camel@baylibre.com>
+References: <20170604183341.21417-1-martin.blumenstingl@googlemail.com>
+ <20170604183341.21417-4-martin.blumenstingl@googlemail.com>
+ <1496607638.3552.20.camel@baylibre.com>
+Message-ID: <CAFBinCBi4TrX58XoSkiCLiUECWQhsETdC-PeW1xR7+fMr=U3kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Sun, 4 Jun 2017 20:50:55 +0200
+Hi Jerome,
 
-Replace the specification of a data structure by a pointer dereference
-as the parameter for the operator "sizeof" to make the corresponding size
-determination a bit safer according to the Linux coding style convention.
+On Sun, Jun 4, 2017 at 10:20 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
+> On Sun, 2017-06-04 at 20:33 +0200, Martin Blumenstingl wrote:
+>> This removes the dummy clk81 gate and replaces it with the actual clock
+>> controller's CLKID_CLK81. This will also allow us to pass the real clock
+>> IDs to all devices where the clock is controlled by clkc in the future.
+>>
+>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>
+> This is going in the right direction and at least align meson8 and meson8b.
+>
+> Acked-by: Jerome Brunet <jbrunet@baylibre.com>
+that was quick, thanks!
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- arch/arm/xen/p2m.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> Later on, I'm wondering if some of these clock assignments should be moved to
+> meson.dtsi ? meson8.dtsi and meson8b.dtsi look very similar
+actually I think that the Meson6/MX/<however it is called> clock
+controller is different (based on a quick look).
+so we may end up with a similar situation that we have on
+GXBB/GXL/GXM: the clock controller will stay in the corresponding
+.dtsi and we have to "duplicate" the clock assignments for each SoC
 
-diff --git a/arch/arm/xen/p2m.c b/arch/arm/xen/p2m.c
-index 0ed01f2d5ee4..11e78432b663 100644
---- a/arch/arm/xen/p2m.c
-+++ b/arch/arm/xen/p2m.c
-@@ -144,5 +144,5 @@ bool __set_phys_to_machine_multi(unsigned long pfn,
- 		return true;
- 	}
- 
--	p2m_entry = kzalloc(sizeof(struct xen_p2m_entry), GFP_NOWAIT);
-+	p2m_entry = kzalloc(sizeof(*p2m_entry), GFP_NOWAIT);
- 	if (!p2m_entry) {
--- 
-2.13.0
+however, I guess at some point we can create a .dtsi with all the bits
+that are shared between Meson8 and Meson8b (during my experiments
+meson8m2.dtsi just inherits meson8.dtsi and overrides a bunch of
+compatibles). we can discuss whether we want to move the clock
+controller to that shared/common .dtsi as well once we start
+generalizing this
+
+>> ---
+>>  arch/arm/boot/dts/meson8.dtsi | 32 ++++++++++++++++----------------
+>>  1 file changed, 16 insertions(+), 16 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/meson8.dtsi b/arch/arm/boot/dts/meson8.dtsi
+>> index 6993077331c7..9b0b3ddbb17e 100644
+>> --- a/arch/arm/boot/dts/meson8.dtsi
+>> +++ b/arch/arm/boot/dts/meson8.dtsi
+>> @@ -43,6 +43,7 @@
+>>   *     OTHER DEALINGS IN THE SOFTWARE.
+>>   */
+>>
+>> +#include <dt-bindings/clock/meson8b-clkc.h>
+>>  #include <dt-bindings/gpio/meson8-gpio.h>
+>>  /include/ "meson.dtsi"
+>>
+>> @@ -82,13 +83,6 @@
+>>                       reg = <0x203>;
+>>               };
+>>       };
+>> -
+>> -     clk81: clk at 0 {
+>> -             #clock-cells = <0>;
+>> -             compatible = "fixed-clock";
+>> -             clock-frequency = <141666666>;
+>> -     };
+>> -
+>>  }; /* end of / */
+>>
+>>  &aobus {
+>> @@ -126,6 +120,12 @@
+>>  };
+>>
+>>  &cbus {
+>> +     clkc: clock-controller at 4000 {
+>> +             #clock-cells = <1>;
+>> +             compatible = "amlogic,meson8-clkc";
+>> +             reg = <0x8000 0x4>, <0x4000 0x460>;
+>> +     };
+>> +
+>>       pinctrl_cbus: pinctrl at 9880 {
+>>               compatible = "amlogic,meson8-cbus-pinctrl";
+>>               reg = <0x9880 0x10>;
+>> @@ -172,20 +172,20 @@
+>>  };
+>>
+>>  &ethmac {
+>> -     clocks = <&clk81>;
+>> +     clocks = <&clkc CLKID_CLK81>;
+>>       clock-names = "stmmaceth";
+>>  };
+>>
+>>  &i2c_AO {
+>> -     clocks = <&clk81>;
+>> +     clocks = <&clkc CLKID_CLK81>;
+>>  };
+>>
+>>  &i2c_A {
+>> -     clocks = <&clk81>;
+>> +     clocks = <&clkc CLKID_CLK81>;
+>>  };
+>>
+>>  &i2c_B {
+>> -     clocks = <&clk81>;
+>> +     clocks = <&clkc CLKID_CLK81>;
+>>  };
+>>
+>>  &L2 {
+>> @@ -195,21 +195,21 @@
+>>  };
+>>
+>>  &spifc {
+>> -     clocks = <&clk81>;
+>> +     clocks = <&clkc CLKID_CLK81>;
+>>  };
+>>
+>>  &uart_AO {
+>> -     clocks = <&clk81>;
+>> +     clocks = <&clkc CLKID_CLK81>;
+>>  };
+>>
+>>  &uart_A {
+>> -     clocks = <&clk81>;
+>> +     clocks = <&clkc CLKID_CLK81>;
+>>  };
+>>
+>>  &uart_B {
+>> -     clocks = <&clk81>;
+>> +     clocks = <&clkc CLKID_CLK81>;
+>>  };
+>>
+>>  &uart_C {
+>> -     clocks = <&clk81>;
+>> +     clocks = <&clkc CLKID_CLK81>;
+>>  };
+>
