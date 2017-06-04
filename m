@@ -1,149 +1,120 @@
 From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Sun, 04 Jun 2017 22:19:46 +0800
-Subject: [RFC PATCH 03/11] drm: sun4i: ignore swapped mixer<->tcon
- connection for DE2
-In-Reply-To: <20170524081440.cbtjvvmj5okrri6z@flea.home>
+Date: Sun, 04 Jun 2017 22:29:29 +0800
+Subject: [linux-sunxi] Re: [RFC PATCH 07/11] drm: sun4i: add support for
+ the TV encoder in H3 SoC
+In-Reply-To: <20170524073019.bl6rojc2srrigalp@flea.home>
 References: <20170517164354.16399-1-icenowy@aosc.io>
- <20170517164354.16399-4-icenowy@aosc.io>
- <20170519175753.sygqnwopk7tuv35n@flea.home>
- <ECF29F56-DF18-4E3C-9C85-B29F89BD4228@aosc.io>
- <20170524081440.cbtjvvmj5okrri6z@flea.home>
-Message-ID: <e5602515955fd2e90196d48138191f77@aosc.io>
+ <1958057.WDKm0nQKgW@jernej-laptop>
+ <CAGb2v66aD=G+V75N-_nYo=dGqhxpKhadM84h9G-B34=dnDwCbg@mail.gmail.com>
+ <3164416.5xR36OcyjH@jernej-laptop>
+ <20170523125321.t7y7yfrrfokpkzgd@flea.home>
+ <98c3572beee0a81755994b4bdc508b18@aosc.io>
+ <20170524073019.bl6rojc2srrigalp@flea.home>
+Message-ID: <861ead704cc7d1bc0983d0f01138f190@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-05-24 16:14?Maxime Ripard ???
-> On Sat, May 20, 2017 at 02:00:22AM +0800, Icenowy Zheng wrote:
->> 
->> 
->> ? 2017?5?20? GMT+08:00 ??1:57:53, Maxime Ripard 
->> <maxime.ripard@free-electrons.com> ??:
->> >On Thu, May 18, 2017 at 12:43:46AM +0800, Icenowy Zheng wrote:
->> >> Some SoC's DE2 has two mixers. Defaultly the mixer0 is connected to
->> >> tcon0 and mixer1 is connected to tcon1; however by setting a bit
->> >> the connection can be swapped.
->> >>
->> >> As we now hardcode the default connection, ignore the bonus endpoint
->> >for
->> >> the mixer's output and the TCON's input, as they stands for the
->> >swapped
->> >> connection.
->> >>
->> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> >> ---
->> >>  drivers/gpu/drm/sun4i/sun4i_drv.c  | 27 ++++++++++++++++++++++++++
->> >>  drivers/gpu/drm/sun4i/sun4i_tcon.c | 39
->> >+++++++++++++++++++++++++++++---------
->> >>  drivers/gpu/drm/sun4i/sun4i_tcon.h |  2 ++
->> >>  3 files changed, 59 insertions(+), 9 deletions(-)
->> >>
->> >> diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c
->> >b/drivers/gpu/drm/sun4i/sun4i_drv.c
->> >> index 1dd1948025d2..29bf1325ded6 100644
->> >> --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
->> >> +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
->> >> @@ -173,6 +173,13 @@ static bool sun4i_drv_node_is_frontend(struct
->> >device_node *node)
->> >>  		of_device_is_compatible(node,
->> >"allwinner,sun8i-a33-display-frontend");
->> >>  }
->> >>
->> >> +static bool sun4i_drv_node_is_swappable_de2_mixer(struct device_node
->> >*node)
->> >> +{
->> >> +	/* The V3s has only one mixer-tcon pair, so it's not listed here.
->> >*/
->> >> +	return of_device_is_compatible(node,
->> >"allwinner,sun8i-h3-de2-mixer0") ||
->> >> +		of_device_is_compatible(node, "allwinner,sun8i-h3-de2-mixer1");
->> >> +}
->> >> +
->> >>  static bool sun4i_drv_node_is_tcon(struct device_node *node)
->> >>  {
->> >>  	return of_device_is_compatible(node, "allwinner,sun5i-a13-tcon") ||
->> >> @@ -249,6 +256,26 @@ static int sun4i_drv_add_endpoints(struct device
->> >*dev,
->> >>  			}
->> >>  		}
->> >>
->> >> +		/*
->> >> +		 * The second endpoint of the output of a swappable DE2 mixer
->> >> +		 * is the TCON after connection swapping.
->> >> +		 * Ignore it now, as we now hardcode mixer0->tcon0,
->> >> +		 * mixer1->tcon1 connection.
->> >> +		 */
->> >> +		if (sun4i_drv_node_is_swappable_de2_mixer(node)) {
->> >> +			struct of_endpoint endpoint;
->> >> +
->> >> +			if (of_graph_parse_endpoint(ep, &endpoint)) {
->> >> +				DRM_DEBUG_DRIVER("Couldn't parse endpoint\n");
->> >> +				continue;
->> >> +			}
->> >> +
->> >> +			if (endpoint.id) {
->> >> +				DRM_DEBUG_DRIVER("Endpoint is an unused connection for DE2
->> >mixer... skipping\n");
->> >> +				continue;
->> >> +			}
->> >> +		}
->> >> +
->> >>  		/* Walk down our tree */
->> >>  		count += sun4i_drv_add_endpoints(dev, match, remote);
->> >>
->> >> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
->> >b/drivers/gpu/drm/sun4i/sun4i_tcon.c
->> >> index f44a37a5993d..89a215ff2370 100644
->> >> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
->> >> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
->> >> @@ -425,7 +425,8 @@ static int sun4i_tcon_init_regmap(struct device
->> >*dev,
->> >>   * requested via the get_id function of the engine.
->> >>   */
->> >>  static struct sunxi_engine *sun4i_tcon_find_engine(struct sun4i_drv
->> >*drv,
->> >> -						   struct device_node *node)
->> >> +						   struct device_node *node,
->> >> +						   bool skip_bonus_ep)
->> >>  {
->> >>  	struct device_node *port, *ep, *remote;
->> >>  	struct sunxi_engine *engine;
->> >> @@ -439,6 +440,20 @@ static struct sunxi_engine
->> >*sun4i_tcon_find_engine(struct sun4i_drv *drv,
->> >>  		if (!remote)
->> >>  			continue;
->> >>
->> >> +		if (skip_bonus_ep) {
->> >> +			struct of_endpoint endpoint;
->> >> +
->> >> +			if (of_graph_parse_endpoint(ep, &endpoint)) {
->> >> +				DRM_DEBUG_DRIVER("Couldn't parse endpoint\n");
->> >> +				continue;
->> >> +			}
->> >> +
->> >> +			if (endpoint.id) {
->> >> +				DRM_DEBUG_DRIVER("Skipping bonus mixer->TCON connection when
->> >searching engine\n");
->> >> +				continue;
->> >> +			}
->> >> +		}
->> >> +
+? 2017-05-24 15:30?Maxime Ripard ???
+> On Tue, May 23, 2017 at 09:00:59PM +0800, icenowy at aosc.io wrote:
+>> ? 2017-05-23 20:53?Maxime Ripard ???
+>> > On Mon, May 22, 2017 at 07:55:56PM +0200, Jernej ?krabec wrote:
+>> > > Hi,
+>> > >
+>> > > Dne sobota, 20. maj 2017 ob 03:37:53 CEST je Chen-Yu Tsai napisal(a):
+>> > > > On Sat, May 20, 2017 at 2:23 AM, Jernej ?krabec <jernej.skrabec@siol.net>
+>> > > wrote:
+>> > > > > Hi,
+>> > > > >
+>> > > > > Dne petek, 19. maj 2017 ob 20:08:18 CEST je Icenowy Zheng napisal(a):
+>> > > > >> ? 2017?5?20? GMT+08:00 ??2:03:30, Maxime Ripard <maxime.ripard@free-
+>> > > > >
+>> > > > > electrons.com> ??:
+>> > > > >> >On Thu, May 18, 2017 at 12:43:50AM +0800, Icenowy Zheng wrote:
+>> > > > >> >> Allwinner H3 features a TV encoder similar to the one in earlier
+>> > > > >> >
+>> > > > >> >SoCs,
+>> > > > >> >
+>> > > > >> >> but with some different points about clocks:
+>> > > > >> >> - It has a mod clock and a bus clock.
+>> > > > >> >> - The mod clock must be at a fixed rate to generate signal.
+>> > > > >> >
+>> > > > >> >Why?
+>> > > > >>
+>> > > > >> It's experiment result by Jernej.
+>> > > > >>
+>> > > > >> The clock rates in BSP kernel is also specially designed
+>> > > > >> (PLL_DE at 432MHz) in order to be able to feed the TVE.
+>> > > > >
+>> > > > > My experiments and search through BSP code showed that TVE seems to have
+>> > > > > additional fixed predivider 8. So if you want to generate 27 MHz clock,
+>> > > > > unit has to be feed with 216 MHz.
+>> > > > >
+>> > > > > TVE has only one PLL source PLL_DE. And since 216 MHz is a bit low for
+>> > > > > DE2,
+>> > > > > BSP defaults to 432 MHz for PLL_DE and use divider 2 to generate 216 MHz.
+>> > > > > This clock is then divided by 8 internaly to get final 27 MHz.
+>> > > > >
+>> > > > > Please note that I don't have any hard evidence to support that, only
+>> > > > > experimental data. However, only that explanation make sense to me.
+>> > > > >
+>> > > > > BTW, BSP H3/H5 TV driver supports only PAL and NTSC which both use 27 MHz
+>> > > > > base clock. Further experiments are needed to check if there is any
+>> > > > > possibility to have other resolutions by manipulating clocks and give
+>> > > > > other proper settings. I plan to do that, but not in very near future.
+>> > > >
+>> > > > You only have composite video output, and those are the only 2 standard
+>> > > > resolutions that make any sense.
+>> > >
+>> > > Right, other resolutions are for VGA.
+>> > >
+>> > > Anyway, I did some more digging in A10 and R40 datasheets. I think
+>> > > that H3 TVE
+>> > > unit is something in between. R40 TVE has a setting to select "up
+>> > > sample".
 >> >
->> >You don't list the mixers in the tcon's output, why do you need that
->> >exactly?
+>> > That might be just another translation of oversampling :)
+>> >
+>> > I didn't know it could be applied to composite signals though, but I
+>> > guess this is just another analog signal after all.
+>> >
+>> > > Possible settings are 27 MHz, 54 MHz, 108 MHz and 216 MHz. BSP
+>> > > driver on R40
+>> > > has this setting enabled only for PAL and NTSC and it is always 216
+>> > > MHz. I
+>> > > think that H3 may have this hardwired to 216 MHz and this would be
+>> > > the reason
+>> > > why 216 MHz is needed.
+>> > >
+>> > > Has anyone else any better explanation?
+>> >
+>> > That's already a pretty good one.
+>> >
+>> > Either way, wether this is upsampling, oversampling or just a
+>> > pre-divider, this can and should be dealt with in the mode_set
+>> > callback, and not in the probe.
 >> 
->> Mixers are TCONs' input, not output...
+>> I got a better idea -- let TVE driver have the CLK_TVE as an
+>> input and create a subclock output with divider 16, and feed this
+>> subclock to TCON lcd-ch1.
+>> 
+>> This is a model of the real hardware -- the clock divider is in
+>> TVE, not TCON.
 > 
-> Then why are they even parsed? The whole parsing logic in the driver
-> only searches for output nodes.
+> That's definitely not a good representation of the hardware. There's
+> one clock, it goes to the TCON, period.
+> 
+> However, the TV encoder has a constraint on that clock rate. This can
+> be easily implemented using a custom encoder state where you'd set the
+> multiplier to set on that clock, and the TCON will use it.
 
-Here it's really parsing the input node, for searching for a connected
-engine.
+P.S. how to do such a custom state?
 
-In the situation of DE1 TCON has only one input endpoint and it must be
-the connected backend.
-
-But in the situation of DE2 it has now two input endpoints, and it's
-now needed to figure out which connection is used.
+Should I do the multiplying in sun4i_tv_mode_to_drm_mode?
 
 > 
 > Maxime
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
