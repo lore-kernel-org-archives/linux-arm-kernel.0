@@ -1,55 +1,46 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Sun, 4 Jun 2017 11:00:14 -0700
-Subject: [PATCH v7 16/34] [media] add Omnivision OV5640 sensor driver
-In-Reply-To: <ab04379b-d005-1251-343b-5e490ee6e72d@gmail.com>
-References: <1495672189-29164-1-git-send-email-steve_longerbeam@mentor.com>
- <1495672189-29164-17-git-send-email-steve_longerbeam@mentor.com>
- <20170529155511.GI29527@valkosipuli.retiisi.org.uk>
- <c50c3c5f-71cf-fa73-f5a8-a4b5f59a87dc@gmail.com>
- <20170530065632.GK29527@valkosipuli.retiisi.org.uk>
- <ab04379b-d005-1251-343b-5e490ee6e72d@gmail.com>
-Message-ID: <3e953953-7bf4-912f-73f7-db568d5df504@gmail.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sun,  4 Jun 2017 20:33:38 +0200
+Subject: [PATCH 0/3] use the Meson8b clock controller driver on Meson8 SoCs
+Message-ID: <20170604183341.21417-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Based on the code from Amlogic's GPL kernel sources the clock controller
+in the Meson8 (S802), Meson8b (S805) and Meson8m2 (S812) SoCs is very
+similar.
+
+a more detailed list of differences between the clock controller on each SoC
+can be found in the description of the first patch.
+
+This series adds new of_device_ids / compatibles for the Meson8 and Meson8m2
+SoCs to the existing Meson8b clock controller driver (and updates the
+documentation, Kconfig help and comments accordingly).
+It also enables CONFIG_COMMON_CLK_MESON8B for MACH_MESON8.
+Finally it adds the clock controller to meson8.dtsi and replaces the
+static clk81 instance with the clk81 provided by the clock controller.
+
+This is also the first preparation step for Meson8m2 SoC support by making
+the clock controller available.
+I am planning to post several follow-up series which will:
+- add lots of missing devices to meson8.dtsi and meson8b.dtsi such as (but
+  not limited to) PWM, USB controllers and PHYs, SAR ADC, HW random number
+  generator and the SCU (Snoop Control Unit)
+- add Meson8m2 SoC support
+- once it's ready: the SDIO driver (allows connecting the SD card, SDIO wifi
+  and eMMC flash)
 
 
-On 06/03/2017 11:02 AM, Steve Longerbeam wrote:
-> Hi Sakari,
-> 
-> 
-> On 05/29/2017 11:56 PM, Sakari Ailus wrote:
->> Hi Steve,
->>
->> On Mon, May 29, 2017 at 02:50:34PM -0700, Steve Longerbeam wrote:
->>>> <snip>
->>>>
->>>>> +
->>>>> +static int ov5640_s_ctrl(struct v4l2_ctrl *ctrl)
->>>>> +{
->>>>> +    struct v4l2_subdev *sd = ctrl_to_sd(ctrl);
->>>>> +    struct ov5640_dev *sensor = to_ov5640_dev(sd);
->>>>> +    int ret = 0;
->>>>> +
->>>>> +    mutex_lock(&sensor->lock);
->>>> Could you use the same lock for the controls as you use for the 
->>>> rest? Just
->>>> setting handler->lock after handler init does the trick.
->>>
->>> Can you please rephrase, I don't follow. "same lock for the controls as
->>> you use for the rest" - there's only one device lock owned by this 
->>> driver
->>> and I am already using that same lock.
->>
->> There's another in the control handler. You could use your own lock 
->> for the
->> control handler as well.
-> 
-> I still don't understand.
-> 
+Martin Blumenstingl (3):
+  clk: meson: meson8b: add compatibles for Meson8 and Meson8m2
+  arm: meson: select the clock controller for Meson8
+  ARM: dts: meson8: add and use the real clock controller
 
-Hi Sakari, sorry I see what you are referring to now. The lock
-in 'struct v4l2_ctrl_handler' can be overridden by a caller's own
-lock. Yes that's a good idea, I'll do that.
+ .../bindings/clock/amlogic,meson8b-clkc.txt        |  5 +++-
+ arch/arm/boot/dts/meson8.dtsi                      | 32 +++++++++++-----------
+ arch/arm/mach-meson/Kconfig                        |  1 +
+ drivers/clk/meson/Kconfig                          |  6 ++--
+ drivers/clk/meson/meson8b.c                        |  5 +++-
+ 5 files changed, 28 insertions(+), 21 deletions(-)
 
-Steve
+-- 
+2.13.0
