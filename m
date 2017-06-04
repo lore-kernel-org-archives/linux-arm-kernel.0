@@ -1,67 +1,47 @@
-From: slash.tmp@free.fr (Mason)
-Date: Mon, 5 Jun 2017 01:40:49 +0200
-Subject: Design of interrupt controller driver
-In-Reply-To: <alpine.DEB.2.20.1706042208080.3517@nanos>
-References: <8bce8bdd-5801-f0c3-ada3-e1c68acc8913@free.fr>
- <alpine.DEB.2.20.1706041551530.2813@nanos>
- <025780ef-06e6-1e85-58da-4ce8f6c93536@free.fr>
- <alpine.DEB.2.20.1706042208080.3517@nanos>
-Message-ID: <6e4da485-42cc-9b70-1b4a-9729f646e014@free.fr>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 5 Jun 2017 09:48:03 +1000
+Subject: linux-next: manual merge of the at91 tree with the arm-soc tree
+Message-ID: <20170605094803.466a6132@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/2017 22:13, Thomas Gleixner wrote:
-> On Sun, 4 Jun 2017, Mason wrote:
->> On 04/06/2017 15:55, Thomas Gleixner wrote:
->>>> As for the DMA interrupt, the HW designers consider it
->>>> a level interrupt. When the engine is busy processing
->>>> a command, the interrupt signal is low; when the engine's
->>>> command queue is empty, the interrupt signal is high.
->>>> Thus, there is no risk of "missing a pulse". But maz
->>>> has stated twice that the relevant *event* is the
->>>> transition from "busy" to "idle", which makes this
->>>> an edge (rising) interrupt. However, it doesn't have
->>>> the problem described in 2)  The interrupt signal
->>>> will remain high, so there is no risk of "missing"
->>>> a pulse. So they can be grouped. Is that correct?
->>>
->>> That depends on the DMA controller. If you can disable the interrupt line
->>> at the DMA device level, then you can use that scheme. If not, you'll get
->>> an interrupt storm as long as the DMA engine is idle.
->>
->> I don't follow.
-> 
-> Sorry, hit send too early. Let me rephrase:
-> 
-> When you configure the interrupt as edge then you cannot share it. No
-> matter whether it stays high or not.
+Hi Nicolas,
 
-Could you explain why? (I must be missing something.)
+Today's linux-next merge of the at91 tree got a conflict in:
 
-If the signal is low when the controller is busy,
-and high when the controller is idle, then the
-transition from busy to idle is a rising edge,
-which will trigger an interrupt. The intc driver
-will look up the status of all devices, see that
-the DMA engine interrupt request line is high,
-and thus call the DMA engine's ISR.
+  arch/arm/mach-at91/Kconfig
 
-I have that setup right now, sharing TX and RX
-interrupts, and the device using the DMA engine
-(a NAND Flash controller) works well.
+between commit:
 
-Is there a problem if several shared edge interrupts
-fire at the same time (or very close to one another).
-I don't see the problem, as long as the line stays
-high until software does something with the device.
+  cc7a938f5f30 ("ARM: at91: select CONFIG_ARM_CPU_SUSPEND")
 
-> The only way to share it is, to configure it as level interrupt. But that
-> requires that you can disable the interrupt at the DMA device level once it
-> triggered. Otherwise you get an interrupt storm.
+from the arm-soc tree and commit:
 
-I'm not sure what you mean with "disable the interrupt at the
-DMA device level". The interrupt can be masked at the system
-interrupt controller (i.e. before sharing the interrupt
-signal). The DMA engine just outputs 0 when busy, 1 when idle.
+  81c0bb0b6ad1 ("ARM: at91: Add armv7m support")
 
-Regards.
+from the at91 tree.
+
+I fixed it up (see below) and can carry the fix as necessary. This
+is now fixed as far as linux-next is concerned, but any non trivial
+conflicts should be mentioned to your upstream maintainer when your tree
+is submitted for merging.  You may also want to consider cooperating
+with the maintainer of the conflicting tree to minimise any particularly
+complex conflicts.
+
+-- 
+Cheers,
+Stephen Rothwell
+
+diff --cc arch/arm/mach-at91/Kconfig
+index cbd959b73654,7497a28a79d1..000000000000
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@@ -1,7 -1,6 +1,7 @@@
+  menuconfig ARCH_AT91
+  	bool "Atmel SoCs"
+- 	depends on ARCH_MULTI_V4T || ARCH_MULTI_V5 || ARCH_MULTI_V7
++ 	depends on ARCH_MULTI_V4T || ARCH_MULTI_V5 || ARCH_MULTI_V7 || ARM_SINGLE_ARMV7M
+ +	select ARM_CPU_SUSPEND if PM
+  	select COMMON_CLK_AT91
+  	select GPIOLIB
+  	select PINCTRL
