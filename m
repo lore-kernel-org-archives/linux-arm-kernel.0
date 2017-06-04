@@ -1,143 +1,43 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Sun, 4 Jun 2017 07:51:45 +0800
-Subject: [clk:clk-next 3/7] drivers/clk/at91/clk-generated.c:273:20: error:
- invalid storage class for function 'of_sama5d2_clk_generated_setup'
-Message-ID: <201706040742.DbZJp6sd%fengguang.wu@intel.com>
+From: chunkeey@googlemail.com (Christian Lamparter)
+Date: Sun, 04 Jun 2017 02:33:50 +0200
+Subject: [PATCH v4 1/6] pinctrl: qcom: Add ipq8074 pinctrl driver
+In-Reply-To: <1496474875-7190-2-git-send-email-varada@codeaurora.org>
+References: <1496474875-7190-1-git-send-email-varada@codeaurora.org>
+ <1496474875-7190-2-git-send-email-varada@codeaurora.org>
+Message-ID: <3316949.YG4fliAlpW@debian64>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-head:   ee177c5d6369f8e5d3e4793dce501cf4431313a1
-commit: 8e56133e5c7b7a7a97f6a92d92f664d5ecd30745 [3/7] clk: at91: fix clk-generated parenting
-config: arm-multi_v7_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 8e56133e5c7b7a7a97f6a92d92f664d5ecd30745
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+On Saturday, June 3, 2017 12:57:50 PM CEST Varadarajan Narayanan wrote:
+> +- function:
+> +       Usage: required
+> +       Value type: <string>
+> +       Definition: Specify the alternative function to be configured for the
+> +                   specified pins. Functions are only valid for gpio pins.
+> +                   Valid values are:
+> +                   atest_char, atest_char0, atest_char1, atest_char2,
+> +                   atest_char3, audio_rxbclk, audio_rxd, audio_rxfsync,
+> +                   audio_rxmclk, audio_txbclk, audio_txd, audio_txfsync,
+> +                   audio_txmclk, blsp0_i2c, blsp0_spi, blsp0_uart, blsp1_i2c,
+> +                   blsp1_spi, blsp1_uart, blsp2_i2c, blsp2_spi, blsp2_uart,
+> +                   blsp3_i2c, blsp3_spi, blsp3_spi0, blsp3_spi1, blsp3_spi2,
+> +                   blsp3_spi3, blsp3_uart, blsp4_i2c0, blsp4_i2c1, blsp4_spi0,
+> +                   blsp4_spi1, blsp4_uart0, blsp4_uart1, blsp5_i2c, blsp5_spi,
+> +                   blsp5_uart, burn0, burn1, cri_trng, cri_trng0, cri_trng1,
+> +                   cxc0, cxc1, dbg_out, gcc_plltest, gcc_tlmm, gpio, ldo_en,
+> +                   ldo_update, led0, led1, led2, mac0_sa0, mac0_sa1, mac1_sa0,
+> +                   mac1_sa1, mac1_sa2, mac1_sa3, mac2_sa0, mac2_sa1, mdc,
+> +                   mdio, NA, pcie0_clk, pcie0_rst, pcie0_wake, pcie1_clk,
+> +                   pcie1_rst, pcie1_wake, pcm_drx, pcm_dtx, pcm_fsync,
+> +                   pcm_pclk, pcm_zsi0, pcm_zsi1, prng_rosc, pta1_0, pta1_1,
+> +                   pta1_2, pta2_0, pta2_1, pta2_2, pwm0, pwm1, pwm2, pwm3,
+> +                   qdss_cti_trig_in_a0, qdss_cti_trig_in_a1,
+> +                   qdss_cti_trig_in_b0, qdss_cti_trig_in_b1,
+> +                   qdss_cti_trig_out_a0, qdss_cti_trig_out_a1,
+> +                   qdss_cti_trig_out_b0, qdss_cti_trig_out_b1,
+> +                   qdss_traceclk_a, qdss_traceclk_b, qdss_tracectl_a,
+> +                   qdss_tracectl_b, qdss_tracedata_a, qdss_tracedata_b,
+> +                   qpic, rx0, rx1, rx2, sd_card, sd_write, tsens_max, wci2a,
+> +                   wci2b, wci2c, wci2d, NA
 
-All errors (new ones prefixed by >>):
-
-   drivers/clk/at91/clk-generated.c: In function 'at91_clk_register_generated':
->> drivers/clk/at91/clk-generated.c:273:20: error: invalid storage class for function 'of_sama5d2_clk_generated_setup'
-    static void __init of_sama5d2_clk_generated_setup(struct device_node *np)
-                       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   drivers/clk/at91/clk-generated.c:273:1: warning: ISO C90 forbids mixed declarations and code [-Wdeclaration-after-statement]
-    static void __init of_sama5d2_clk_generated_setup(struct device_node *np)
-    ^~~~~~
-   In file included from include/linux/clk-provider.h:15:0,
-                    from drivers/clk/at91/clk-generated.c:14:
->> include/linux/of.h:1132:16: error: initializer element is not constant
-           .data = (fn == (fn_type)NULL) ? fn : fn  }
-                   ^
-   include/linux/of.h:1146:3: note: in expansion of macro '_OF_DECLARE'
-      _OF_DECLARE(table, name, compat, fn, of_init_fn_1)
-      ^~~~~~~~~~~
-   include/linux/clk-provider.h:781:42: note: in expansion of macro 'OF_DECLARE_1'
-    #define CLK_OF_DECLARE(name, compat, fn) OF_DECLARE_1(clk, name, compat, fn)
-                                             ^~~~~~~~~~~~
-   drivers/clk/at91/clk-generated.c:321:1: note: in expansion of macro 'CLK_OF_DECLARE'
-    CLK_OF_DECLARE(of_sama5d2_clk_generated_setup, "atmel,sama5d2-clk-generated",
-    ^~~~~~~~~~~~~~
-   include/linux/of.h:1132:16: note: (near initialization for '__of_table_of_sama5d2_clk_generated_setup.data')
-           .data = (fn == (fn_type)NULL) ? fn : fn  }
-                   ^
-   include/linux/of.h:1146:3: note: in expansion of macro '_OF_DECLARE'
-      _OF_DECLARE(table, name, compat, fn, of_init_fn_1)
-      ^~~~~~~~~~~
-   include/linux/clk-provider.h:781:42: note: in expansion of macro 'OF_DECLARE_1'
-    #define CLK_OF_DECLARE(name, compat, fn) OF_DECLARE_1(clk, name, compat, fn)
-                                             ^~~~~~~~~~~~
-   drivers/clk/at91/clk-generated.c:321:1: note: in expansion of macro 'CLK_OF_DECLARE'
-    CLK_OF_DECLARE(of_sama5d2_clk_generated_setup, "atmel,sama5d2-clk-generated",
-    ^~~~~~~~~~~~~~
->> include/linux/of.h:1129:22: error: expected declaration or statement at end of input
-     static const struct of_device_id __of_table_##name  \
-                         ^
-   include/linux/of.h:1146:3: note: in expansion of macro '_OF_DECLARE'
-      _OF_DECLARE(table, name, compat, fn, of_init_fn_1)
-      ^~~~~~~~~~~
-   include/linux/clk-provider.h:781:42: note: in expansion of macro 'OF_DECLARE_1'
-    #define CLK_OF_DECLARE(name, compat, fn) OF_DECLARE_1(clk, name, compat, fn)
-                                             ^~~~~~~~~~~~
-   drivers/clk/at91/clk-generated.c:321:1: note: in expansion of macro 'CLK_OF_DECLARE'
-    CLK_OF_DECLARE(of_sama5d2_clk_generated_setup, "atmel,sama5d2-clk-generated",
-    ^~~~~~~~~~~~~~
---
-   drivers/clk//at91/clk-generated.c: In function 'at91_clk_register_generated':
-   drivers/clk//at91/clk-generated.c:273:20: error: invalid storage class for function 'of_sama5d2_clk_generated_setup'
-    static void __init of_sama5d2_clk_generated_setup(struct device_node *np)
-                       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   drivers/clk//at91/clk-generated.c:273:1: warning: ISO C90 forbids mixed declarations and code [-Wdeclaration-after-statement]
-    static void __init of_sama5d2_clk_generated_setup(struct device_node *np)
-    ^~~~~~
-   In file included from include/linux/clk-provider.h:15:0,
-                    from drivers/clk//at91/clk-generated.c:14:
->> include/linux/of.h:1132:16: error: initializer element is not constant
-           .data = (fn == (fn_type)NULL) ? fn : fn  }
-                   ^
-   include/linux/of.h:1146:3: note: in expansion of macro '_OF_DECLARE'
-      _OF_DECLARE(table, name, compat, fn, of_init_fn_1)
-      ^~~~~~~~~~~
-   include/linux/clk-provider.h:781:42: note: in expansion of macro 'OF_DECLARE_1'
-    #define CLK_OF_DECLARE(name, compat, fn) OF_DECLARE_1(clk, name, compat, fn)
-                                             ^~~~~~~~~~~~
-   drivers/clk//at91/clk-generated.c:321:1: note: in expansion of macro 'CLK_OF_DECLARE'
-    CLK_OF_DECLARE(of_sama5d2_clk_generated_setup, "atmel,sama5d2-clk-generated",
-    ^~~~~~~~~~~~~~
-   include/linux/of.h:1132:16: note: (near initialization for '__of_table_of_sama5d2_clk_generated_setup.data')
-           .data = (fn == (fn_type)NULL) ? fn : fn  }
-                   ^
-   include/linux/of.h:1146:3: note: in expansion of macro '_OF_DECLARE'
-      _OF_DECLARE(table, name, compat, fn, of_init_fn_1)
-      ^~~~~~~~~~~
-   include/linux/clk-provider.h:781:42: note: in expansion of macro 'OF_DECLARE_1'
-    #define CLK_OF_DECLARE(name, compat, fn) OF_DECLARE_1(clk, name, compat, fn)
-                                             ^~~~~~~~~~~~
-   drivers/clk//at91/clk-generated.c:321:1: note: in expansion of macro 'CLK_OF_DECLARE'
-    CLK_OF_DECLARE(of_sama5d2_clk_generated_setup, "atmel,sama5d2-clk-generated",
-    ^~~~~~~~~~~~~~
->> include/linux/of.h:1129:22: error: expected declaration or statement at end of input
-     static const struct of_device_id __of_table_##name  \
-                         ^
-   include/linux/of.h:1146:3: note: in expansion of macro '_OF_DECLARE'
-      _OF_DECLARE(table, name, compat, fn, of_init_fn_1)
-      ^~~~~~~~~~~
-   include/linux/clk-provider.h:781:42: note: in expansion of macro 'OF_DECLARE_1'
-    #define CLK_OF_DECLARE(name, compat, fn) OF_DECLARE_1(clk, name, compat, fn)
-                                             ^~~~~~~~~~~~
-   drivers/clk//at91/clk-generated.c:321:1: note: in expansion of macro 'CLK_OF_DECLARE'
-    CLK_OF_DECLARE(of_sama5d2_clk_generated_setup, "atmel,sama5d2-clk-generated",
-    ^~~~~~~~~~~~~~
-
-vim +/of_sama5d2_clk_generated_setup +273 drivers/clk/at91/clk-generated.c
-
-df70aeef Nicolas Ferre 2015-07-31  267  		kfree(gck);
-f5644f10 Stephen Boyd  2016-06-01  268  		hw = ERR_PTR(ret);
-df70aeef Nicolas Ferre 2015-07-31  269  
-f5644f10 Stephen Boyd  2016-06-01  270  	return hw;
-df70aeef Nicolas Ferre 2015-07-31  271  }
-df70aeef Nicolas Ferre 2015-07-31  272  
-14755549 Ben Dooks     2016-06-07 @273  static void __init of_sama5d2_clk_generated_setup(struct device_node *np)
-df70aeef Nicolas Ferre 2015-07-31  274  {
-df70aeef Nicolas Ferre 2015-07-31  275  	int num;
-df70aeef Nicolas Ferre 2015-07-31  276  	u32 id;
-
-:::::: The code at line 273 was first introduced by commit
-:::::: 14755549c7db6e26d04b208047f44538aa325802 clk: at91: make of_sama5d2_clk_generated_setup() static
-
-:::::: TO: Ben Dooks <ben.dooks@codethink.co.uk>
-:::::: CC: Stephen Boyd <sboyd@codeaurora.org>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 41294 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170604/91fdad5a/attachment-0001.gz>
+The "NA" function is listed twice. It should be there at all.
