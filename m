@@ -1,54 +1,107 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon,  5 Jun 2017 00:01:49 +0800
-Subject: [PATCH v2 11/11] [DO NOT MERGE] ARM: sun8i: h3: enable TV output on
- Orange Pi PC
+Date: Mon,  5 Jun 2017 00:01:44 +0800
+Subject: [PATCH v2 06/11] drm: sun4i: add color space correction support for
+ DE2 mixer
 In-Reply-To: <20170604160149.30230-1-icenowy@aosc.io>
 References: <20170604160149.30230-1-icenowy@aosc.io>
-Message-ID: <20170604160149.30230-12-icenowy@aosc.io>
+Message-ID: <20170604160149.30230-7-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Orange Pi PC features a 3.5mm jack with TV output in it.
+The DE2 mixer can do color space correction needed by TV Encoder with
+its DCSC sub-engine.
 
-Enable the TV output.
-
-As it currently do not have jack detection feature, do not merge this
-patch.
+Add support for it.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ drivers/gpu/drm/sun4i/sun8i_mixer.c | 35 +++++++++++++++++++++++++++++++++++
+ drivers/gpu/drm/sun4i/sun8i_mixer.h |  6 +++++-
+ 2 files changed, 40 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-index 998b60f8d295..a81d25e722e9 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-@@ -98,6 +98,10 @@
- 	status = "okay";
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+index d658a3a8159a..65f86641eca3 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+@@ -29,6 +29,14 @@
+ #include "sun8i_layer.h"
+ #include "sunxi_engine.h"
+ 
++static const u32 sun8i_rgb2yuv_coef[12] = {
++	0x00000107, 0x00000204, 0x00000064, 0x00004200,
++	0x00001f68, 0x00001ed6, 0x000001c2, 0x00020200,
++	0x000001c2, 0x00001e87, 0x00001fb7, 0x00020200,
++};
++
++static const u32 sun8i_rgb2yuv_dcsc_alpha = 0x00020200;
++
+ static void sun8i_mixer_commit(struct sunxi_engine *engine)
+ {
+ 	DRM_DEBUG_DRIVER("Committing changes\n");
+@@ -37,6 +45,31 @@ static void sun8i_mixer_commit(struct sunxi_engine *engine)
+ 		     SUN8I_MIXER_GLOBAL_DBUFF_ENABLE);
+ }
+ 
++static void sun8i_mixer_apply_color_correction(struct sunxi_engine *engine)
++{
++	int i;
++
++	DRM_DEBUG_DRIVER("Applying RGB to YUV color correction\n");
++
++	/* Set color correction */
++	regmap_write(engine->regs, SUN8I_MIXER_DCSC_EN, 1);
++
++	for (i = 0; i < 12; i++)
++		regmap_write(engine->regs, SUN8I_MIXER_DCSC_COEF_REG(i),
++			     sun8i_rgb2yuv_coef[i]);
++
++	regmap_write(engine->regs, SUN8I_MIXER_DCSC_COEF_ALPHA,
++		     sun8i_rgb2yuv_dcsc_alpha);
++}
++
++static void sun8i_mixer_disable_color_correction(struct sunxi_engine *engine)
++{
++	DRM_DEBUG_DRIVER("Disabling color correction\n");
++
++	/* Disable color correction */
++	regmap_write(engine->regs, SUN8I_MIXER_DCSC_EN, 0);
++}
++
+ void sun8i_mixer_layer_enable(struct sun8i_mixer *mixer,
+ 				int layer, bool enable)
+ {
+@@ -229,6 +262,8 @@ int sun8i_mixer_update_layer_buffer(struct sun8i_mixer *mixer,
+ static const struct sunxi_engine_ops sun8i_engine_ops = {
+ 	.commit		= sun8i_mixer_commit,
+ 	.layers_init	= sun8i_layers_init,
++	.apply_color_correction		= sun8i_mixer_apply_color_correction,
++	.disable_color_correction	= sun8i_mixer_disable_color_correction,
  };
  
-+&de {
-+	status = "okay";
-+};
-+
- &ehci0 {
- 	status = "okay";
- };
-@@ -177,6 +181,14 @@
- 	status = "okay";
- };
+ static struct regmap_config sun8i_mixer_regmap_config = {
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.h b/drivers/gpu/drm/sun4i/sun8i_mixer.h
+index 4785ac090b8c..d7f7513898b6 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.h
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.h
+@@ -88,6 +88,11 @@
+ #define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_RGB888	(8 << 8)
+ #define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_DEF	(0xff << 24)
  
-+&tcon1 {
-+	status = "okay";
-+};
++/* The DCSC sub-engine is used to do color space conversation */
++#define SUN8I_MIXER_DCSC_EN			0xb0000
++#define SUN8I_MIXER_DCSC_COEF_REG(x)		(0xb0010 + 0x4 * x)
++#define SUN8I_MIXER_DCSC_COEF_ALPHA		0xb0040
 +
-+&tve0 {
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
+ /*
+  * These sub-engines are still unknown now, the EN registers are here only to
+  * be used to disable these sub-engines.
+@@ -102,7 +107,6 @@
+ #define SUN8I_MIXER_PEAK_EN			0xa6000
+ #define SUN8I_MIXER_ASE_EN			0xa8000
+ #define SUN8I_MIXER_FCC_EN			0xaa000
+-#define SUN8I_MIXER_DCSC_EN			0xb0000
+ 
+ struct sun8i_mixer_cfg {
+ 	int		vi_num;
 -- 
 2.12.2
