@@ -1,71 +1,52 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Sun,  4 Jun 2017 14:59:53 +0300
-Subject: [PATCH 04/20] arm64: ilp32: add documentation on the ILP32 ABI for
- ARM64
+Date: Sun,  4 Jun 2017 14:59:55 +0300
+Subject: [PATCH 06/20] arm64: ensure the kernel is compiled for LP64
 In-Reply-To: <20170604120009.342-1-ynorov@caviumnetworks.com>
 References: <20170604120009.342-1-ynorov@caviumnetworks.com>
-Message-ID: <20170604120009.342-5-ynorov@caviumnetworks.com>
+Message-ID: <20170604120009.342-7-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on Andrew Pinski's patch-series.
+From: Andrew Pinski <apinski@cavium.com>
 
+The kernel needs to be compiled as a LP64 binary for ARM64, even when
+using a compiler that defaults to code-generation for the ILP32 ABI.
+Consequently, we need to explicitly pass '-mabi=lp64' (supported on
+gcc-4.9 and newer).
+
+Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
+Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+Reviewed-by: David Daney <ddaney@caviumnetworks.com>
 ---
- Documentation/arm64/ilp32.txt | 45 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
- create mode 100644 Documentation/arm64/ilp32.txt
+ arch/arm64/Makefile | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/arm64/ilp32.txt b/Documentation/arm64/ilp32.txt
-new file mode 100644
-index 000000000000..08935a34e7e9
---- /dev/null
-+++ b/Documentation/arm64/ilp32.txt
-@@ -0,0 +1,45 @@
-+ILP32 AARCH64 SYSCALL ABI
-+=========================
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index f839ecd919f9..5ddfb3140f7a 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -50,15 +50,20 @@ KBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables
+ KBUILD_CFLAGS	+= $(call cc-option, -mpc-relative-literal-loads)
+ KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
+ 
++KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
++KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
 +
-+This document describes the ILP32 syscall ABI and where it differs
-+from the generic compat linux syscall interface.
-+
-+AARCH64/ILP32 userspace can pass garbage in the top halve of w0-w7 registers
-+(syscall arguments). So top 32 bits are zeroed for them.
-+
-+Comparing to AARCH32, AARCH64/ILP32 has 64-bit length of following types:
-+ino_t       is u64 type.
-+off_t       is s64 type.
-+blkcnt_t    is s64 type.
-+fsblkcnt_t  is u64 type.
-+fsfilcnt_t  is u64 type.
-+rlim_t      is u64 type.
-+
-+AARCH64/ILP32 ABI uses standard syscall table which can be found at
-+include/uapi/asm-generic/unistd.h, with the exceptions listed below.
-+
-+Syscalls which pass 64-bit values are handled by the code shared from
-+AARCH32 and pass that value as a pair. Next syscalls are affected:
-+fadvise64_64()
-+fallocate()
-+ftruncate64()
-+pread64()
-+pwrite64()
-+readahead()
-+sync_file_range()
-+truncate64()
-+
-+ptrace() syscall is handled by compat version.
-+
-+shmat() syscall is handled by non-compat handler as aarch64/ilp32 has no
-+limitation on 4-pages alignement for shared memory.
-+
-+statfs() and fstatfs() take the size of struct statfs as an argument.
-+It is calculated differently in kernel and user spaces. So AARCH32 handlers
-+are taken to handle it.
-+
-+struct rt_sigframe is redefined and contains struct compat_siginfo,
-+as compat syscalls expects, and struct ilp32_sigframe, to handle
-+AARCH64 register set and 32-bit userspace register representation.
-+
-+elf_gregset_t is taken from lp64 to handle registers properly.
+ ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
+ KBUILD_CPPFLAGS	+= -mbig-endian
+ AS		+= -EB
+ LD		+= -EB
++LDFLAGS		+= -maarch64linuxb
+ UTS_MACHINE	:= aarch64_be
+ else
+ KBUILD_CPPFLAGS	+= -mlittle-endian
+ AS		+= -EL
+ LD		+= -EL
++LDFLAGS		+= -maarch64linux
+ UTS_MACHINE	:= aarch64
+ endif
+ 
 -- 
 2.11.0
