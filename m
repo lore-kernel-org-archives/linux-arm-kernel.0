@@ -1,166 +1,98 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Sun, 4 Jun 2017 10:15:57 +0200
-Subject: [PATCH v2 3/3] KVM: arm/arm64: Simplify active_change_prepare
- and plug race
-In-Reply-To: <20170523084329.GC6319@cbox>
-References: <20170516100431.4101-1-cdall@linaro.org>
- <20170516100431.4101-4-cdall@linaro.org>
- <9a412ed2-70ea-b651-dd75-18d723ee8b71@arm.com>
- <20170523084329.GC6319@cbox>
-Message-ID: <20170604081557.rhda3xp34mgkf7ow@hawk.localdomain>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 4 Jun 2017 10:39:07 +0200
+Subject: [PATCH 3/4 v3] ata: Add driver for Faraday Technology FTIDE010
+In-Reply-To: <1937268.BD9NpZS46X@amdc3058>
+References: <20170530113402.20450-1-linus.walleij@linaro.org>
+ <CGME20170530113419epcas3p262d14182b61d8a3853ef0f962f6a1fb2@epcas3p2.samsung.com>
+ <20170530113402.20450-3-linus.walleij@linaro.org>
+ <1937268.BD9NpZS46X@amdc3058>
+Message-ID: <CACRpkdb1WNDk-zavUfLZvDMXFsnyqZOuzCsqM1C1S7DOL0kQKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 23, 2017 at 10:43:29AM +0200, Christoffer Dall wrote:
-> On Mon, May 22, 2017 at 04:30:22PM +0100, Marc Zyngier wrote:
-> > On 16/05/17 11:04, Christoffer Dall wrote:
-> > > We don't need to stop a specific VCPU when changing the active state,
-> > > because private IRQs can only be modified by a running VCPU for the
-> > > VCPU itself and it is therefore already stopped.
-> > > 
-> > > However, it is also possible for two VCPUs to be modifying the active
-> > > state of SPIs at the same time, which can cause the thread being stuck
-> > > in the loop that checks other VCPU threads for a potentially very long
-> > > time, or to modify the active state of a running VCPU.  Fix this by
-> > > serializing all accesses to setting and clearing the active state of
-> > > interrupts using the KVM mutex.
-> > > 
-> > > Reported-by: Andrew Jones <drjones@redhat.com>
-> > > Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> > > ---
-> > >  arch/arm/include/asm/kvm_host.h   |  2 --
-> > >  arch/arm64/include/asm/kvm_host.h |  2 --
-> > >  virt/kvm/arm/arm.c                | 20 ++++----------------
-> > >  virt/kvm/arm/vgic/vgic-mmio.c     | 18 ++++++++++--------
-> > >  virt/kvm/arm/vgic/vgic.c          | 11 ++++++-----
-> > >  5 files changed, 20 insertions(+), 33 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> > > index f0e6657..12274d4 100644
-> > > --- a/arch/arm/include/asm/kvm_host.h
-> > > +++ b/arch/arm/include/asm/kvm_host.h
-> > > @@ -233,8 +233,6 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
-> > >  struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
-> > >  void kvm_arm_halt_guest(struct kvm *kvm);
-> > >  void kvm_arm_resume_guest(struct kvm *kvm);
-> > > -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu);
-> > > -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu);
-> > >  
-> > >  int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices);
-> > >  unsigned long kvm_arm_num_coproc_regs(struct kvm_vcpu *vcpu);
-> > > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> > > index 5e19165..32cbe8a 100644
-> > > --- a/arch/arm64/include/asm/kvm_host.h
-> > > +++ b/arch/arm64/include/asm/kvm_host.h
-> > > @@ -333,8 +333,6 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
-> > >  struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
-> > >  void kvm_arm_halt_guest(struct kvm *kvm);
-> > >  void kvm_arm_resume_guest(struct kvm *kvm);
-> > > -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu);
-> > > -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu);
-> > >  
-> > >  u64 __kvm_call_hyp(void *hypfn, ...);
-> > >  #define kvm_call_hyp(f, ...) __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__)
-> > > diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> > > index 3417e18..3c387fd 100644
-> > > --- a/virt/kvm/arm/arm.c
-> > > +++ b/virt/kvm/arm/arm.c
-> > > @@ -539,27 +539,15 @@ void kvm_arm_halt_guest(struct kvm *kvm)
-> > >  	kvm_make_all_cpus_request(kvm, KVM_REQ_VCPU_EXIT);
-> > >  }
-> > >  
-> > > -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu)
-> > > -{
-> > > -	vcpu->arch.pause = true;
-> > > -	kvm_vcpu_kick(vcpu);
-> > > -}
-> > > -
-> > > -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu)
-> > > -{
-> > > -	struct swait_queue_head *wq = kvm_arch_vcpu_wq(vcpu);
-> > > -
-> > > -	vcpu->arch.pause = false;
-> > > -	swake_up(wq);
-> > > -}
-> > > -
-> > >  void kvm_arm_resume_guest(struct kvm *kvm)
-> > >  {
-> > >  	int i;
-> > >  	struct kvm_vcpu *vcpu;
-> > >  
-> > > -	kvm_for_each_vcpu(i, vcpu, kvm)
-> > > -		kvm_arm_resume_vcpu(vcpu);
-> > > +	kvm_for_each_vcpu(i, vcpu, kvm) {
-> > > +		vcpu->arch.pause = false;
-> > > +		swake_up(kvm_arch_vcpu_wq(vcpu));
-> > > +	}
-> > >  }
-> > >  
-> > >  static void vcpu_sleep(struct kvm_vcpu *vcpu)
-> > > diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-> > > index 64cbcb4..c1e4bdd 100644
-> > > --- a/virt/kvm/arm/vgic/vgic-mmio.c
-> > > +++ b/virt/kvm/arm/vgic/vgic-mmio.c
-> > > @@ -231,23 +231,21 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
-> > >   * be migrated while we don't hold the IRQ locks and we don't want to be
-> > >   * chasing moving targets.
-> > >   *
-> > > - * For private interrupts, we only have to make sure the single and only VCPU
-> > > - * that can potentially queue the IRQ is stopped.
-> > > + * For private interrupts we don't have to do anything because userspace
-> > > + * accesses to the VGIC state already require all VCPUs to be stopped, and
-> > > + * only the VCPU itself can modify its private interrupts active state, which
-> > > + * guarantees that the VCPU is not running.
-> > >   */
-> > >  static void vgic_change_active_prepare(struct kvm_vcpu *vcpu, u32 intid)
-> > >  {
-> > > -	if (intid < VGIC_NR_PRIVATE_IRQS)
-> > > -		kvm_arm_halt_vcpu(vcpu);
-> > > -	else
-> > > +	if (intid > VGIC_NR_PRIVATE_IRQS)
-> > >  		kvm_arm_halt_guest(vcpu->kvm);
-> > >  }
-> > >  
-> > >  /* See vgic_change_active_prepare */
-> > >  static void vgic_change_active_finish(struct kvm_vcpu *vcpu, u32 intid)
-> > >  {
-> > > -	if (intid < VGIC_NR_PRIVATE_IRQS)
-> > > -		kvm_arm_resume_vcpu(vcpu);
-> > > -	else
-> > > +	if (intid > VGIC_NR_PRIVATE_IRQS)
-> > >  		kvm_arm_resume_guest(vcpu->kvm);
-> > >  }
-> > >  
-> > > @@ -271,11 +269,13 @@ void vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
-> > >  {
-> > >  	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
-> > >  
-> > > +	mutex_lock(&vcpu->kvm->lock);
-> > >  	vgic_change_active_prepare(vcpu, intid);
-> > >  
-> > >  	__vgic_mmio_write_cactive(vcpu, addr, len, val);
-> > >  
-> > >  	vgic_change_active_finish(vcpu, intid);
-> > > +	mutex_unlock(&vcpu->kvm->lock);
-> > 
-> > Any reason not to move the lock/unlock calls to prepare/finish? Also, do
-> > we need to take that mutex if intid is a PPI?
-> 
-> I guess we strictly don't need to take the mutex if it's a PPI, no.
-> 
-> But I actually preferred this symmetry because you can easily tell we
-> don't have a bug (famous last words) by locking and unlocking the mutex
-> in the same function.
-> 
-> I don't feel strongly about it though, so I can move it if you prefer
-> it.
+Hi Barlomiej,
 
-Actually we must move the locking into the prepare/finish functions, in
-order to tuck them into the VGIC_NR_PRIVATE_IRQS conditions. Otherwise,
-with gicv3, when userspace accesses ISACTIVER0/ICACTIVER0, which are
-SGI_base offsets, then the vgic_v3_sgibase_registers table is used. That
-table doesn't provide the uaccess functions, so we try to lock twice
-again.
+thanks a *lot* for detailed review and for showing me some really
+tricky corners of ATA support!
 
-Thanks,
-drew
+Most things I just fixed, will send v4 soon.
+
+On Tue, May 30, 2017 at 4:31 PM, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+
+>> +static const bool set_mdma_66_mhz[] = { true, true, true, true };
+>
+> 50 MHz MWDMA timings are never used by the driver and can be removed..
+
+I think it's nice to keep around as documentation really, and someone may want
+to patch it in and experiment with 50MHz mode if things are not
+working for them.
+
+> CLK_MOD_REG is shared between master and slave so the driver needs to
+> make sure that right clock is used if master and slave devices require
+> different clocks (i.e. master is using UDMA5 and slave is using UDMA6).
+(...)
+> Moreover MWDMA_TIMING_REG is also shared between devices.
+(...)
+> ->qc_issue method can be used to program the right tuning values, i.e.
+
+Wow thanks a lot for clearing this up!
+
+I was a bit confused about how to deal with this. Now it makes a
+lot more sense!
+
+> static unsigned int ftide010_qc_issue(struct ata_queued_cmd *qc)
+> {
+>         struct ata_port *ap = qc->ap;
+>         struct ata_device *adev = qc->dev;
+>
+>         if (adev != ap->private_data && ata_dma_enabled(adev))
+>                 ftide010_set_dmamode(ap, adev);
+>
+>         return ata_bmdma_qc_issue(qc);
+> }
+>
+> [ set ap->private_data to adev at the end of ftide010_set_dmamode() ]
+
+I implemented this exactly as above, with some extra comments
+so it's clear what is going on.
+
+>> +static int pata_ftide010_gemini_cable_detect(struct ata_port *ap)
+>> +{
+>> +     struct ftide010 *ftide = ap->host->private_data;
+>> +
+>> +     /*
+>> +      * Return the master cable, I have no clue how to return a different
+>> +      * cable for the slave than for the master.
+>> +      */
+>
+> Seems like ->cable_detect needs to operate on ata_device * now?
+>
+> Tejun?
+
+Yeah... it looks like something libata is not really made to handle.
+
+This platform has one IRQ for each port bridge anyways.
+
+>> +             case GEMINI_MUXMODE_3:
+>> +                     ftide->master_cbl = ATA_CBL_PATA40;
+>> +                     ftide->slave_cbl = ATA_CBL_PATA40;
+>> +                     break;
+>> +             }
+>
+> It seems that for PATA devices 80-wires cable will be never
+> used, is this correct?
+
+That is a simplification. I haven't seen any systems using the
+PATA interface at all.
+
+I have put in some comments that we assume the
+40-wire interface, and if something else like 80-wire is in use
+then that needs to be specified in the device tree since the
+SoC and driver cannot detect it without special hardware.
+
+I guess I could add DT properties for it but it seems a bit
+speculative since I can't test it.
+
+Yours,
+Linus Walleij
