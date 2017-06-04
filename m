@@ -1,23 +1,37 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Sun, 4 Jun 2017 23:04:16 +0200
-Subject: [PATCH 0/3] ARM-XEN: Adjustments for __set_phys_to_machine_multi()
-Message-ID: <9b9230f4-0f00-e019-75b4-571e29b52998@users.sourceforge.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 4 Jun 2017 18:06:07 -0300
+Subject: [PATCH] ARM: dts: imx: Fix Ethernet PHY reset polarity
+In-Reply-To: <20170604184937.GA10273@lunn.ch>
+References: <1496597475-1361-1-git-send-email-festevam@gmail.com>
+ <20170604184937.GA10273@lunn.ch>
+Message-ID: <CAOMZO5AP3nNob79G++uDAUBPpzu0dc2gaZnA_wtqbk1vmyFNUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Sun, 4 Jun 2017 22:45:54 +0200
+Hi Andrew,
 
-Three update suggestions were taken into account
-from static source code analysis.
+On Sun, Jun 4, 2017 at 3:49 PM, Andrew Lunn <andrew@lunn.ch> wrote:
 
-Markus Elfring (3):
-  Improve a size determination
-  Delete an error message for a failed memory allocation
-  Adjust one function call together with a variable assignment
+> Hi Fabio
+>
+> Device tree bindings are supposed to be stable. So we can never fix
 
- arch/arm/xen/p2m.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+Correct and this patch does not cause device tree to be unstable.
 
--- 
-2.13.0
+> the FEC to respect the flag. This change to 'GPIO_ACTIVE_LOW' makes
+> the suggestion the flag is used, and can be set to GPIO_ACTIVE_HIGH.
+> If i were to change the value, i would set it to 42, or something new
+> like GPIO_FLAGS_BROKEN.
+
+GPIO_ACTIVE_LOW reflects the real polarity of the pin, so the dts
+should reflect the reality.
+
+All the users of FEC in mainline are active low, so better fix the dts
+description.
+
+It is true that the FEC driver ignores the GPIO polarity and assume
+active-low by default, unless ''phy-reset-active-high' is passed.
+
+However device tree should properly describe the hardware,
+independently of the kernel driver details and this is what this patch
+does.
