@@ -1,44 +1,55 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon,  5 Jun 2017 01:53:23 +0800
-Subject: [PATCH] net-next: stmmac: dwmac-sun8i: ensure the EPHY is properly
- reseted
-Message-ID: <20170604175323.62124-1-icenowy@aosc.io>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Sun, 4 Jun 2017 11:00:14 -0700
+Subject: [PATCH v7 16/34] [media] add Omnivision OV5640 sensor driver
+In-Reply-To: <ab04379b-d005-1251-343b-5e490ee6e72d@gmail.com>
+References: <1495672189-29164-1-git-send-email-steve_longerbeam@mentor.com>
+ <1495672189-29164-17-git-send-email-steve_longerbeam@mentor.com>
+ <20170529155511.GI29527@valkosipuli.retiisi.org.uk>
+ <c50c3c5f-71cf-fa73-f5a8-a4b5f59a87dc@gmail.com>
+ <20170530065632.GK29527@valkosipuli.retiisi.org.uk>
+ <ab04379b-d005-1251-343b-5e490ee6e72d@gmail.com>
+Message-ID: <3e953953-7bf4-912f-73f7-db568d5df504@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The EPHY may be already enabled by bootloaders which have Ethernet
-capability (e.g. current U-Boot). Thus it should be reseted properly
-before doing the enabling sequence in the dwmac-sun8i driver, otherwise
-the EMAC reset process may fail if no cable is plugged, and then fail
-the dwmac-sun8i probing.
 
-Tested on Orange Pi PC, One and Zero. All the boards fail to have
-dwmac-sun8i probed with "EMAC reset timeout" without cable plugged
-before, and with this fix they're now all able to successfully probe the
-EMAC without cable plugged and then use the connection after a cable is
-hot-plugged in.
 
-Fixes: 9f93ac8d408 ("net-next: stmmac: Add dwmac-sun8i")
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 5 +++++
- 1 file changed, 5 insertions(+)
+On 06/03/2017 11:02 AM, Steve Longerbeam wrote:
+> Hi Sakari,
+> 
+> 
+> On 05/29/2017 11:56 PM, Sakari Ailus wrote:
+>> Hi Steve,
+>>
+>> On Mon, May 29, 2017 at 02:50:34PM -0700, Steve Longerbeam wrote:
+>>>> <snip>
+>>>>
+>>>>> +
+>>>>> +static int ov5640_s_ctrl(struct v4l2_ctrl *ctrl)
+>>>>> +{
+>>>>> +    struct v4l2_subdev *sd = ctrl_to_sd(ctrl);
+>>>>> +    struct ov5640_dev *sensor = to_ov5640_dev(sd);
+>>>>> +    int ret = 0;
+>>>>> +
+>>>>> +    mutex_lock(&sensor->lock);
+>>>> Could you use the same lock for the controls as you use for the 
+>>>> rest? Just
+>>>> setting handler->lock after handler init does the trick.
+>>>
+>>> Can you please rephrase, I don't follow. "same lock for the controls as
+>>> you use for the rest" - there's only one device lock owned by this 
+>>> driver
+>>> and I am already using that same lock.
+>>
+>> There's another in the control handler. You could use your own lock 
+>> for the
+>> control handler as well.
+> 
+> I still don't understand.
+> 
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-index 1a6bfe6c958f..54f93ee53ef7 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-@@ -750,6 +750,11 @@ static int sun8i_dwmac_power_internal_phy(struct stmmac_priv *priv)
- 		return ret;
- 	}
- 
-+	/* Make sure the EPHY is properly reseted, as U-Boot may leave
-+	 * it at deasserted state, and thus it may fail to reset EMAC.
-+	 */
-+	reset_control_assert(gmac->rst_ephy);
-+
- 	ret = reset_control_deassert(gmac->rst_ephy);
- 	if (ret) {
- 		dev_err(priv->device, "Cannot deassert ephy\n");
--- 
-2.12.2
+Hi Sakari, sorry I see what you are referring to now. The lock
+in 'struct v4l2_ctrl_handler' can be overridden by a caller's own
+lock. Yes that's a good idea, I'll do that.
+
+Steve
