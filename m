@@ -1,120 +1,181 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Sun, 04 Jun 2017 22:29:29 +0800
-Subject: [linux-sunxi] Re: [RFC PATCH 07/11] drm: sun4i: add support for
- the TV encoder in H3 SoC
-In-Reply-To: <20170524073019.bl6rojc2srrigalp@flea.home>
-References: <20170517164354.16399-1-icenowy@aosc.io>
- <1958057.WDKm0nQKgW@jernej-laptop>
- <CAGb2v66aD=G+V75N-_nYo=dGqhxpKhadM84h9G-B34=dnDwCbg@mail.gmail.com>
- <3164416.5xR36OcyjH@jernej-laptop>
- <20170523125321.t7y7yfrrfokpkzgd@flea.home>
- <98c3572beee0a81755994b4bdc508b18@aosc.io>
- <20170524073019.bl6rojc2srrigalp@flea.home>
-Message-ID: <861ead704cc7d1bc0983d0f01138f190@aosc.io>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Sun, 4 Jun 2017 16:45:55 +0200
+Subject: [PATCH v2 3/3] KVM: arm/arm64: Simplify active_change_prepare
+ and plug race
+In-Reply-To: <20170604124113.uupopprn3myy4zqh@kamzik.brq.redhat.com>
+References: <20170516100431.4101-1-cdall@linaro.org>
+ <20170516100431.4101-4-cdall@linaro.org>
+ <9a412ed2-70ea-b651-dd75-18d723ee8b71@arm.com>
+ <20170523084329.GC6319@cbox>
+ <20170604081557.rhda3xp34mgkf7ow@hawk.localdomain>
+ <20170604115737.GA9464@cbox>
+ <20170604124113.uupopprn3myy4zqh@kamzik.brq.redhat.com>
+Message-ID: <20170604144555.GC9464@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-05-24 15:30?Maxime Ripard ???
-> On Tue, May 23, 2017 at 09:00:59PM +0800, icenowy at aosc.io wrote:
->> ? 2017-05-23 20:53?Maxime Ripard ???
->> > On Mon, May 22, 2017 at 07:55:56PM +0200, Jernej ?krabec wrote:
->> > > Hi,
->> > >
->> > > Dne sobota, 20. maj 2017 ob 03:37:53 CEST je Chen-Yu Tsai napisal(a):
->> > > > On Sat, May 20, 2017 at 2:23 AM, Jernej ?krabec <jernej.skrabec@siol.net>
->> > > wrote:
->> > > > > Hi,
->> > > > >
->> > > > > Dne petek, 19. maj 2017 ob 20:08:18 CEST je Icenowy Zheng napisal(a):
->> > > > >> ? 2017?5?20? GMT+08:00 ??2:03:30, Maxime Ripard <maxime.ripard@free-
->> > > > >
->> > > > > electrons.com> ??:
->> > > > >> >On Thu, May 18, 2017 at 12:43:50AM +0800, Icenowy Zheng wrote:
->> > > > >> >> Allwinner H3 features a TV encoder similar to the one in earlier
->> > > > >> >
->> > > > >> >SoCs,
->> > > > >> >
->> > > > >> >> but with some different points about clocks:
->> > > > >> >> - It has a mod clock and a bus clock.
->> > > > >> >> - The mod clock must be at a fixed rate to generate signal.
->> > > > >> >
->> > > > >> >Why?
->> > > > >>
->> > > > >> It's experiment result by Jernej.
->> > > > >>
->> > > > >> The clock rates in BSP kernel is also specially designed
->> > > > >> (PLL_DE at 432MHz) in order to be able to feed the TVE.
->> > > > >
->> > > > > My experiments and search through BSP code showed that TVE seems to have
->> > > > > additional fixed predivider 8. So if you want to generate 27 MHz clock,
->> > > > > unit has to be feed with 216 MHz.
->> > > > >
->> > > > > TVE has only one PLL source PLL_DE. And since 216 MHz is a bit low for
->> > > > > DE2,
->> > > > > BSP defaults to 432 MHz for PLL_DE and use divider 2 to generate 216 MHz.
->> > > > > This clock is then divided by 8 internaly to get final 27 MHz.
->> > > > >
->> > > > > Please note that I don't have any hard evidence to support that, only
->> > > > > experimental data. However, only that explanation make sense to me.
->> > > > >
->> > > > > BTW, BSP H3/H5 TV driver supports only PAL and NTSC which both use 27 MHz
->> > > > > base clock. Further experiments are needed to check if there is any
->> > > > > possibility to have other resolutions by manipulating clocks and give
->> > > > > other proper settings. I plan to do that, but not in very near future.
->> > > >
->> > > > You only have composite video output, and those are the only 2 standard
->> > > > resolutions that make any sense.
->> > >
->> > > Right, other resolutions are for VGA.
->> > >
->> > > Anyway, I did some more digging in A10 and R40 datasheets. I think
->> > > that H3 TVE
->> > > unit is something in between. R40 TVE has a setting to select "up
->> > > sample".
->> >
->> > That might be just another translation of oversampling :)
->> >
->> > I didn't know it could be applied to composite signals though, but I
->> > guess this is just another analog signal after all.
->> >
->> > > Possible settings are 27 MHz, 54 MHz, 108 MHz and 216 MHz. BSP
->> > > driver on R40
->> > > has this setting enabled only for PAL and NTSC and it is always 216
->> > > MHz. I
->> > > think that H3 may have this hardwired to 216 MHz and this would be
->> > > the reason
->> > > why 216 MHz is needed.
->> > >
->> > > Has anyone else any better explanation?
->> >
->> > That's already a pretty good one.
->> >
->> > Either way, wether this is upsampling, oversampling or just a
->> > pre-divider, this can and should be dealt with in the mode_set
->> > callback, and not in the probe.
->> 
->> I got a better idea -- let TVE driver have the CLK_TVE as an
->> input and create a subclock output with divider 16, and feed this
->> subclock to TCON lcd-ch1.
->> 
->> This is a model of the real hardware -- the clock divider is in
->> TVE, not TCON.
+On Sun, Jun 04, 2017 at 02:41:13PM +0200, Andrew Jones wrote:
+> On Sun, Jun 04, 2017 at 01:57:37PM +0200, Christoffer Dall wrote:
+> > On Sun, Jun 04, 2017 at 10:15:57AM +0200, Andrew Jones wrote:
+> > > On Tue, May 23, 2017 at 10:43:29AM +0200, Christoffer Dall wrote:
+> > > > On Mon, May 22, 2017 at 04:30:22PM +0100, Marc Zyngier wrote:
+> > > > > On 16/05/17 11:04, Christoffer Dall wrote:
+> > > > > > We don't need to stop a specific VCPU when changing the active state,
+> > > > > > because private IRQs can only be modified by a running VCPU for the
+> > > > > > VCPU itself and it is therefore already stopped.
+> > > > > > 
+> > > > > > However, it is also possible for two VCPUs to be modifying the active
+> > > > > > state of SPIs at the same time, which can cause the thread being stuck
+> > > > > > in the loop that checks other VCPU threads for a potentially very long
+> > > > > > time, or to modify the active state of a running VCPU.  Fix this by
+> > > > > > serializing all accesses to setting and clearing the active state of
+> > > > > > interrupts using the KVM mutex.
+> > > > > > 
+> > > > > > Reported-by: Andrew Jones <drjones@redhat.com>
+> > > > > > Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> > > > > > ---
+> > > > > >  arch/arm/include/asm/kvm_host.h   |  2 --
+> > > > > >  arch/arm64/include/asm/kvm_host.h |  2 --
+> > > > > >  virt/kvm/arm/arm.c                | 20 ++++----------------
+> > > > > >  virt/kvm/arm/vgic/vgic-mmio.c     | 18 ++++++++++--------
+> > > > > >  virt/kvm/arm/vgic/vgic.c          | 11 ++++++-----
+> > > > > >  5 files changed, 20 insertions(+), 33 deletions(-)
+> > > > > > 
+> > > > > > diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> > > > > > index f0e6657..12274d4 100644
+> > > > > > --- a/arch/arm/include/asm/kvm_host.h
+> > > > > > +++ b/arch/arm/include/asm/kvm_host.h
+> > > > > > @@ -233,8 +233,6 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
+> > > > > >  struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
+> > > > > >  void kvm_arm_halt_guest(struct kvm *kvm);
+> > > > > >  void kvm_arm_resume_guest(struct kvm *kvm);
+> > > > > > -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu);
+> > > > > > -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu);
+> > > > > >  
+> > > > > >  int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices);
+> > > > > >  unsigned long kvm_arm_num_coproc_regs(struct kvm_vcpu *vcpu);
+> > > > > > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> > > > > > index 5e19165..32cbe8a 100644
+> > > > > > --- a/arch/arm64/include/asm/kvm_host.h
+> > > > > > +++ b/arch/arm64/include/asm/kvm_host.h
+> > > > > > @@ -333,8 +333,6 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
+> > > > > >  struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
+> > > > > >  void kvm_arm_halt_guest(struct kvm *kvm);
+> > > > > >  void kvm_arm_resume_guest(struct kvm *kvm);
+> > > > > > -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu);
+> > > > > > -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu);
+> > > > > >  
+> > > > > >  u64 __kvm_call_hyp(void *hypfn, ...);
+> > > > > >  #define kvm_call_hyp(f, ...) __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__)
+> > > > > > diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> > > > > > index 3417e18..3c387fd 100644
+> > > > > > --- a/virt/kvm/arm/arm.c
+> > > > > > +++ b/virt/kvm/arm/arm.c
+> > > > > > @@ -539,27 +539,15 @@ void kvm_arm_halt_guest(struct kvm *kvm)
+> > > > > >  	kvm_make_all_cpus_request(kvm, KVM_REQ_VCPU_EXIT);
+> > > > > >  }
+> > > > > >  
+> > > > > > -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu)
+> > > > > > -{
+> > > > > > -	vcpu->arch.pause = true;
+> > > > > > -	kvm_vcpu_kick(vcpu);
+> > > > > > -}
+> > > > > > -
+> > > > > > -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu)
+> > > > > > -{
+> > > > > > -	struct swait_queue_head *wq = kvm_arch_vcpu_wq(vcpu);
+> > > > > > -
+> > > > > > -	vcpu->arch.pause = false;
+> > > > > > -	swake_up(wq);
+> > > > > > -}
+> > > > > > -
+> > > > > >  void kvm_arm_resume_guest(struct kvm *kvm)
+> > > > > >  {
+> > > > > >  	int i;
+> > > > > >  	struct kvm_vcpu *vcpu;
+> > > > > >  
+> > > > > > -	kvm_for_each_vcpu(i, vcpu, kvm)
+> > > > > > -		kvm_arm_resume_vcpu(vcpu);
+> > > > > > +	kvm_for_each_vcpu(i, vcpu, kvm) {
+> > > > > > +		vcpu->arch.pause = false;
+> > > > > > +		swake_up(kvm_arch_vcpu_wq(vcpu));
+> > > > > > +	}
+> > > > > >  }
+> > > > > >  
+> > > > > >  static void vcpu_sleep(struct kvm_vcpu *vcpu)
+> > > > > > diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+> > > > > > index 64cbcb4..c1e4bdd 100644
+> > > > > > --- a/virt/kvm/arm/vgic/vgic-mmio.c
+> > > > > > +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+> > > > > > @@ -231,23 +231,21 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+> > > > > >   * be migrated while we don't hold the IRQ locks and we don't want to be
+> > > > > >   * chasing moving targets.
+> > > > > >   *
+> > > > > > - * For private interrupts, we only have to make sure the single and only VCPU
+> > > > > > - * that can potentially queue the IRQ is stopped.
+> > > > > > + * For private interrupts we don't have to do anything because userspace
+> > > > > > + * accesses to the VGIC state already require all VCPUs to be stopped, and
+> > > > > > + * only the VCPU itself can modify its private interrupts active state, which
+> > > > > > + * guarantees that the VCPU is not running.
+> > > > > >   */
+> > > > > >  static void vgic_change_active_prepare(struct kvm_vcpu *vcpu, u32 intid)
+> > > > > >  {
+> > > > > > -	if (intid < VGIC_NR_PRIVATE_IRQS)
+> > > > > > -		kvm_arm_halt_vcpu(vcpu);
+> > > > > > -	else
+> > > > > > +	if (intid > VGIC_NR_PRIVATE_IRQS)
+> > > > > >  		kvm_arm_halt_guest(vcpu->kvm);
+> > > > > >  }
+> > > > > >  
+> > > > > >  /* See vgic_change_active_prepare */
+> > > > > >  static void vgic_change_active_finish(struct kvm_vcpu *vcpu, u32 intid)
+> > > > > >  {
+> > > > > > -	if (intid < VGIC_NR_PRIVATE_IRQS)
+> > > > > > -		kvm_arm_resume_vcpu(vcpu);
+> > > > > > -	else
+> > > > > > +	if (intid > VGIC_NR_PRIVATE_IRQS)
+> > > > > >  		kvm_arm_resume_guest(vcpu->kvm);
+> > > > > >  }
+> > > > > >  
+> > > > > > @@ -271,11 +269,13 @@ void vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
+> > > > > >  {
+> > > > > >  	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
+> > > > > >  
+> > > > > > +	mutex_lock(&vcpu->kvm->lock);
+> > > > > >  	vgic_change_active_prepare(vcpu, intid);
+> > > > > >  
+> > > > > >  	__vgic_mmio_write_cactive(vcpu, addr, len, val);
+> > > > > >  
+> > > > > >  	vgic_change_active_finish(vcpu, intid);
+> > > > > > +	mutex_unlock(&vcpu->kvm->lock);
+> > > > > 
+> > > > > Any reason not to move the lock/unlock calls to prepare/finish? Also, do
+> > > > > we need to take that mutex if intid is a PPI?
+> > > > 
+> > > > I guess we strictly don't need to take the mutex if it's a PPI, no.
+> > > > 
+> > > > But I actually preferred this symmetry because you can easily tell we
+> > > > don't have a bug (famous last words) by locking and unlocking the mutex
+> > > > in the same function.
+> > > > 
+> > > > I don't feel strongly about it though, so I can move it if you prefer
+> > > > it.
+> > > 
+> > > Actually we must move the locking into the prepare/finish functions, in
+> > > order to tuck them into the VGIC_NR_PRIVATE_IRQS conditions. Otherwise,
+> > > with gicv3, when userspace accesses ISACTIVER0/ICACTIVER0, which are
+> > > SGI_base offsets, then the vgic_v3_sgibase_registers table is used. That
+> > > table doesn't provide the uaccess functions, so we try to lock twice
+> > > again.
+> > > 
+> > 
+> > Nice find.
+> > 
+> > How about we always use the uaccess functions or uaccesses instead? :
 > 
-> That's definitely not a good representation of the hardware. There's
-> one clock, it goes to the TCON, period.
+> Yeah, that's a better suggestion. u-access, i-access, we-all-access :-)
 > 
-> However, the TV encoder has a constraint on that clock rate. This can
-> be easily implemented using a custom encoder state where you'd set the
-> multiplier to set on that clock, and the TCON will use it.
+cool.  I've put it in kvmarm/queue.
 
-P.S. how to do such a custom state?
-
-Should I do the multiplying in sun4i_tv_mode_to_drm_mode?
-
-> 
-> Maxime
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks,
+-Christoffer
