@@ -1,37 +1,39 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 4 Jun 2017 18:06:07 -0300
-Subject: [PATCH] ARM: dts: imx: Fix Ethernet PHY reset polarity
-In-Reply-To: <20170604184937.GA10273@lunn.ch>
-References: <1496597475-1361-1-git-send-email-festevam@gmail.com>
- <20170604184937.GA10273@lunn.ch>
-Message-ID: <CAOMZO5AP3nNob79G++uDAUBPpzu0dc2gaZnA_wtqbk1vmyFNUQ@mail.gmail.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Sun, 4 Jun 2017 23:06:29 +0200
+Subject: [PATCH 2/3] arm/xen: Delete an error message for a failed memory
+ allocation in __set_phys_to_machine_multi()
+In-Reply-To: <9b9230f4-0f00-e019-75b4-571e29b52998@users.sourceforge.net>
+References: <9b9230f4-0f00-e019-75b4-571e29b52998@users.sourceforge.net>
+Message-ID: <004250a0-d94b-7587-ae5d-524ba2911a16@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Sun, 4 Jun 2017 21:12:36 +0200
 
-On Sun, Jun 4, 2017 at 3:49 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+Omit an extra message for a memory allocation failure in this function.
 
-> Hi Fabio
->
-> Device tree bindings are supposed to be stable. So we can never fix
+This issue was detected by using the Coccinelle software.
 
-Correct and this patch does not cause device tree to be unstable.
+Link: http://events.linuxfoundation.org/sites/events/files/slides/LCJ16-Refactor_Strings-WSang_0.pdf
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ arch/arm/xen/p2m.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-> the FEC to respect the flag. This change to 'GPIO_ACTIVE_LOW' makes
-> the suggestion the flag is used, and can be set to GPIO_ACTIVE_HIGH.
-> If i were to change the value, i would set it to 42, or something new
-> like GPIO_FLAGS_BROKEN.
-
-GPIO_ACTIVE_LOW reflects the real polarity of the pin, so the dts
-should reflect the reality.
-
-All the users of FEC in mainline are active low, so better fix the dts
-description.
-
-It is true that the FEC driver ignores the GPIO polarity and assume
-active-low by default, unless ''phy-reset-active-high' is passed.
-
-However device tree should properly describe the hardware,
-independently of the kernel driver details and this is what this patch
-does.
+diff --git a/arch/arm/xen/p2m.c b/arch/arm/xen/p2m.c
+index 11e78432b663..f5f74ac637b9 100644
+--- a/arch/arm/xen/p2m.c
++++ b/arch/arm/xen/p2m.c
+@@ -148,7 +148,6 @@ bool __set_phys_to_machine_multi(unsigned long pfn,
+-	if (!p2m_entry) {
+-		pr_warn("cannot allocate xen_p2m_entry\n");
++	if (!p2m_entry)
+ 		return false;
+-	}
++
+ 	p2m_entry->pfn = pfn;
+ 	p2m_entry->nr_pages = nr_pages;
+ 	p2m_entry->mfn = mfn;
+-- 
+2.13.0
