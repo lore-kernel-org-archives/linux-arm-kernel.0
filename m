@@ -1,39 +1,50 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 5 Jun 2017 06:43:04 +0800
-Subject: [PATCH v2 04/11] drm: sun4i: add support for H3's TCON0/1
-In-Reply-To: <20170604160149.30230-5-icenowy@aosc.io>
-Message-ID: <201706050602.JiActQ4S%fengguang.wu@intel.com>
+From: davem@davemloft.net (David Miller)
+Date: Sun, 04 Jun 2017 19:34:06 -0400 (EDT)
+Subject: [for 4.12] net: qcom/emac: do not use hardware mdio automatic
+ polling
+In-Reply-To: <1496351293-6846-1-git-send-email-timur@codeaurora.org>
+References: <1496351293-6846-1-git-send-email-timur@codeaurora.org>
+Message-ID: <20170604.193406.673386422592182208.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Icenowy,
+From: Timur Tabi <timur@codeaurora.org>
+Date: Thu,  1 Jun 2017 16:08:13 -0500
 
-[auto build test ERROR on next-20170602]
-[cannot apply to mripard/sunxi/for-next robh/for-next clk/clk-next v4.9-rc8 v4.9-rc7 v4.9-rc6 v4.12-rc3]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> Use software polling (PHY_POLL) to check for link state changes instead
+> of relying on the EMAC's hardware polling feature.  Some PHY drivers
+> are unable to get a functioning link because the HW polling is not
+> robust enough.
+> 
+> The EMAC is able to poll the PHY on the MDIO bus looking for link state
+> changes (via the Link Status bit in the Status Register at address 0x1).
+> When the link state changes, the EMAC triggers an interrupt and tells the
+> driver what the new state is.  The feature eliminates the need for
+> software to poll the MDIO bus.
+> 
+> Unfortunately, this feature is incompatible with phylib, because it
+> ignores everything that the PHY core and PHY drivers are trying to do.
+> In particular:
+> 
+> 1. It assumes a compatible register set, so PHYs with different registers
+>    may not work.
+> 
+> 2. It doesn't allow for hardware errata that have work-arounds implemented
+>    in the PHY driver.
+> 
+> 3. It doesn't support multiple register pages. If the PHY core switches
+>    the register set to another page, the EMAC won't know the page has
+>    changed and will still attempt to read the same PHY register.
+> 
+> 4. It only checks the copper side of the link, not the SGMII side.  Some
+>    PHY drivers (e.g. at803x) may also check the SGMII side, and
+>    report the link as not ready during autonegotiation if the SGMII link
+>    is still down.  Phylib then waits for another interrupt to query
+>    the PHY again, but the EMAC won't send another interrupt because it
+>    thinks the link is up.
+> 
+> Cc: stable at vger.kernel.org # 4.11.x
+> Tested-by: Manoj Iyer <manoj.iyer@canonical.com>
+> Signed-off-by: Timur Tabi <timur@codeaurora.org>
 
-url:    https://github.com/0day-ci/linux/commits/Icenowy-Zheng/Support-for-H3-Composite-Output-support/20170605-003002
-config: arm-multi_v7_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
-
-All errors (new ones prefixed by >>):
-
-   drivers/gpu/drm/sun4i/sun4i-tcon: struct of_device_id is 196 bytes.  The last of 6 is:
-   0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x61 0x6c 0x6c 0x77 0x69 0x6e 0x6e 0x65 0x72 0x2c 0x73 0x75 0x6e 0x38 0x69 0x2d 0x68 0x33 0x2d 0x74 0x63 0x6f 0x6e 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0xa0 0x04 0x00 0x00 
->> FATAL: drivers/gpu/drm/sun4i/sun4i-tcon: struct of_device_id is not terminated with a NULL entry!
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 41415 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170605/7373243c/attachment-0001.gz>
+Applied, thanks.
