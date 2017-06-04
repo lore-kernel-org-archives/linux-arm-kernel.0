@@ -1,47 +1,236 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Sun,  4 Jun 2017 14:59:56 +0300
-Subject: [PATCH 07/20] arm64:uapi: set __BITS_PER_LONG correctly for ILP32 and
- LP64
+Date: Sun,  4 Jun 2017 15:00:02 +0300
+Subject: [PATCH 13/20] arm64: ilp32: share aarch32 syscall handlers
 In-Reply-To: <20170604120009.342-1-ynorov@caviumnetworks.com>
 References: <20170604120009.342-1-ynorov@caviumnetworks.com>
-Message-ID: <20170604120009.342-8-ynorov@caviumnetworks.com>
+Message-ID: <20170604120009.342-14-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Pinski <apinski@cavium.com>
+off_t is  passed in register pair just like in aarch32.
+In this patch corresponding aarch32 handlers are shared to
+ilp32 code.
 
-Define __BITS_PER_LONG depending on the ABI used (i.e. check whether
-__ILP32__ or __LP64__ is defined).  This is necessary for glibc to
-determine the appropriate type definitions for the system call interface.
-
-Signed-off-by: Andrew Pinski <apinski@cavium.com>
-Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-Reviewed-by: David Daney <ddaney@caviumnetworks.com>
 ---
- arch/arm64/include/uapi/asm/bitsperlong.h | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/Makefile         |   1 +
+ arch/arm64/kernel/entry32.S        |  80 ---------------------------
+ arch/arm64/kernel/entry32_common.S | 107 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 108 insertions(+), 80 deletions(-)
+ create mode 100644 arch/arm64/kernel/entry32_common.S
 
-diff --git a/arch/arm64/include/uapi/asm/bitsperlong.h b/arch/arm64/include/uapi/asm/bitsperlong.h
-index fce9c2924fa3..4265243e326f 100644
---- a/arch/arm64/include/uapi/asm/bitsperlong.h
-+++ b/arch/arm64/include/uapi/asm/bitsperlong.h
-@@ -16,7 +16,14 @@
- #ifndef __ASM_BITSPERLONG_H
- #define __ASM_BITSPERLONG_H
- 
--#define __BITS_PER_LONG 64
-+#if defined(__LP64__)
-+/* Assuming __LP64__ will be defined for native ELF64's and not for ILP32. */
-+#  define __BITS_PER_LONG 64
-+#elif defined(__ILP32__)
-+#  define __BITS_PER_LONG 32
-+#else
-+#  error "Neither LP64 nor ILP32: unsupported ABI in asm/bitsperlong.h"
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 5ba41095c466..f6f12e2e5010 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -30,6 +30,7 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
+ arm64-obj-$(CONFIG_AARCH32_EL0)		+= sys32.o kuser32.o signal32.o 	\
+ 					   sys_compat.o entry32.o binfmt_elf32.o
+ arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o
++arm64-obj-$(CONFIG_COMPAT)		+= entry32_common.o
+ arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
+ arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
+ arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
+diff --git a/arch/arm64/kernel/entry32.S b/arch/arm64/kernel/entry32.S
+index f332d5d1f6b4..4bede0324440 100644
+--- a/arch/arm64/kernel/entry32.S
++++ b/arch/arm64/kernel/entry32.S
+@@ -39,83 +39,3 @@ ENTRY(compat_sys_rt_sigreturn_wrapper)
+ 	mov	x0, sp
+ 	b	compat_sys_rt_sigreturn
+ ENDPROC(compat_sys_rt_sigreturn_wrapper)
+-
+-ENTRY(compat_sys_statfs64_wrapper)
+-	mov	w3, #84
+-	cmp	w1, #88
+-	csel	w1, w3, w1, eq
+-	b	compat_sys_statfs64
+-ENDPROC(compat_sys_statfs64_wrapper)
+-
+-ENTRY(compat_sys_fstatfs64_wrapper)
+-	mov	w3, #84
+-	cmp	w1, #88
+-	csel	w1, w3, w1, eq
+-	b	compat_sys_fstatfs64
+-ENDPROC(compat_sys_fstatfs64_wrapper)
+-
+-/*
+- * Note: off_4k (w5) is always in units of 4K. If we can't do the
+- * requested offset because it is not page-aligned, we return -EINVAL.
+- */
+-ENTRY(compat_sys_mmap2_wrapper)
+-#if PAGE_SHIFT > 12
+-	tst	w5, #~PAGE_MASK >> 12
+-	b.ne	1f
+-	lsr	w5, w5, #PAGE_SHIFT - 12
+-#endif
+-	b	sys_mmap_pgoff
+-1:	mov	x0, #-EINVAL
+-	ret
+-ENDPROC(compat_sys_mmap2_wrapper)
+-
+-/*
+- * Wrappers for AArch32 syscalls that either take 64-bit parameters
+- * in registers or that take 32-bit parameters which require sign
+- * extension.
+- */
+-ENTRY(compat_sys_pread64_wrapper)
+-	regs_to_64	x3, x4, x5
+-	b	sys_pread64
+-ENDPROC(compat_sys_pread64_wrapper)
+-
+-ENTRY(compat_sys_pwrite64_wrapper)
+-	regs_to_64	x3, x4, x5
+-	b	sys_pwrite64
+-ENDPROC(compat_sys_pwrite64_wrapper)
+-
+-ENTRY(compat_sys_truncate64_wrapper)
+-	regs_to_64	x1, x2, x3
+-	b	sys_truncate
+-ENDPROC(compat_sys_truncate64_wrapper)
+-
+-ENTRY(compat_sys_ftruncate64_wrapper)
+-	regs_to_64	x1, x2, x3
+-	b	sys_ftruncate
+-ENDPROC(compat_sys_ftruncate64_wrapper)
+-
+-ENTRY(compat_sys_readahead_wrapper)
+-	regs_to_64	x1, x2, x3
+-	mov	w2, w4
+-	b	sys_readahead
+-ENDPROC(compat_sys_readahead_wrapper)
+-
+-ENTRY(compat_sys_fadvise64_64_wrapper)
+-	mov	w6, w1
+-	regs_to_64	x1, x2, x3
+-	regs_to_64	x2, x4, x5
+-	mov	w3, w6
+-	b	sys_fadvise64_64
+-ENDPROC(compat_sys_fadvise64_64_wrapper)
+-
+-ENTRY(compat_sys_sync_file_range2_wrapper)
+-	regs_to_64	x2, x2, x3
+-	regs_to_64	x3, x4, x5
+-	b	sys_sync_file_range2
+-ENDPROC(compat_sys_sync_file_range2_wrapper)
+-
+-ENTRY(compat_sys_fallocate_wrapper)
+-	regs_to_64	x2, x2, x3
+-	regs_to_64	x3, x4, x5
+-	b	sys_fallocate
+-ENDPROC(compat_sys_fallocate_wrapper)
+diff --git a/arch/arm64/kernel/entry32_common.S b/arch/arm64/kernel/entry32_common.S
+new file mode 100644
+index 000000000000..f4a5e4de6201
+--- /dev/null
++++ b/arch/arm64/kernel/entry32_common.S
+@@ -0,0 +1,107 @@
++/*
++ * Compat system call wrappers
++ *
++ * Copyright (C) 2012 ARM Ltd.
++ * Authors: Will Deacon <will.deacon@arm.com>
++ *	    Catalin Marinas <catalin.marinas@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/linkage.h>
++#include <linux/const.h>
++
++#include <asm/assembler.h>
++#include <asm/asm-offsets.h>
++#include <asm/errno.h>
++#include <asm/page.h>
++
++/*
++ * Note: off_4k (w5) is always in units of 4K. If we can't do the
++ * requested offset because it is not page-aligned, we return -EINVAL.
++ */
++ENTRY(compat_sys_mmap2_wrapper)
++#if PAGE_SHIFT > 12
++	tst	w5, #~PAGE_MASK >> 12
++	b.ne	1f
++	lsr	w5, w5, #PAGE_SHIFT - 12
 +#endif
- 
- #include <asm-generic/bitsperlong.h>
- 
++	b	sys_mmap_pgoff
++1:	mov	x0, #-EINVAL
++	ret
++ENDPROC(compat_sys_mmap2_wrapper)
++
++/*
++ * Wrappers for AArch32 syscalls that either take 64-bit parameters
++ * in registers or that take 32-bit parameters which require sign
++ * extension.
++ */
++ENTRY(compat_sys_pread64_wrapper)
++	regs_to_64	x3, x4, x5
++	b	sys_pread64
++ENDPROC(compat_sys_pread64_wrapper)
++
++ENTRY(compat_sys_pwrite64_wrapper)
++	regs_to_64	x3, x4, x5
++	b	sys_pwrite64
++ENDPROC(compat_sys_pwrite64_wrapper)
++
++ENTRY(compat_sys_truncate64_wrapper)
++	regs_to_64	x1, x2, x3
++	b	sys_truncate
++ENDPROC(compat_sys_truncate64_wrapper)
++
++ENTRY(compat_sys_ftruncate64_wrapper)
++	regs_to_64	x1, x2, x3
++	b	sys_ftruncate
++ENDPROC(compat_sys_ftruncate64_wrapper)
++
++ENTRY(compat_sys_readahead_wrapper)
++	regs_to_64	x1, x2, x3
++	mov	w2, w4
++	b	sys_readahead
++ENDPROC(compat_sys_readahead_wrapper)
++
++ENTRY(compat_sys_fadvise64_64_wrapper)
++	mov	w6, w1
++	regs_to_64	x1, x2, x3
++	regs_to_64	x2, x4, x5
++	mov	w3, w6
++	b	sys_fadvise64_64
++ENDPROC(compat_sys_fadvise64_64_wrapper)
++
++ENTRY(compat_sys_sync_file_range2_wrapper)
++	regs_to_64	x2, x2, x3
++	regs_to_64	x3, x4, x5
++	b	sys_sync_file_range2
++ENDPROC(compat_sys_sync_file_range2_wrapper)
++
++ENTRY(compat_sys_fallocate_wrapper)
++	regs_to_64	x2, x2, x3
++	regs_to_64	x3, x4, x5
++	b	sys_fallocate
++ENDPROC(compat_sys_fallocate_wrapper)
++
++ENTRY(compat_sys_statfs64_wrapper)
++	mov	w3, #84
++	cmp	w1, #88
++	csel	w1, w3, w1, eq
++	b	compat_sys_statfs64
++ENDPROC(compat_sys_statfs64_wrapper)
++
++ENTRY(compat_sys_fstatfs64_wrapper)
++	mov	w3, #84
++	cmp	w1, #88
++	csel	w1, w3, w1, eq
++	b	compat_sys_fstatfs64
++ENDPROC(compat_sys_fstatfs64_wrapper)
 -- 
 2.11.0
