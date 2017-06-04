@@ -1,254 +1,62 @@
-From: yuval.shaia@oracle.com (Yuval Shaia)
-Date: Sun,  4 Jun 2017 20:14:28 +0300
-Subject: [PATCH] net/phy: Make phy_ethtool_ksettings_get return void
-Message-ID: <20170604171428.4012-1-yuval.shaia@oracle.com>
+From: slash.tmp@free.fr (Mason)
+Date: Sun, 4 Jun 2017 19:18:59 +0200
+Subject: Design of interrupt controller driver
+In-Reply-To: <alpine.DEB.2.20.1706041551530.2813@nanos>
+References: <8bce8bdd-5801-f0c3-ada3-e1c68acc8913@free.fr>
+ <alpine.DEB.2.20.1706041551530.2813@nanos>
+Message-ID: <025780ef-06e6-1e85-58da-4ce8f6c93536@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make return value void since function never return meaningfull value
+On 04/06/2017 15:55, Thomas Gleixner wrote:
 
-Signed-off-by: Yuval Shaia <yuval.shaia@oracle.com>
----
- drivers/net/ethernet/broadcom/b44.c                |  3 ++-
- drivers/net/ethernet/broadcom/bcm63xx_enet.c       |  3 ++-
- drivers/net/ethernet/broadcom/genet/bcmgenet.c     |  4 +++-
- drivers/net/ethernet/broadcom/tg3.c                |  4 +++-
- drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c |  6 ++----
- drivers/net/ethernet/freescale/ucc_geth_ethtool.c  |  4 +++-
- drivers/net/ethernet/marvell/mv643xx_eth.c         |  5 ++---
- drivers/net/ethernet/ti/cpsw.c                     |  9 +++++----
- drivers/net/phy/phy.c                              | 10 +++++-----
- drivers/net/usb/lan78xx.c                          |  2 +-
- include/linux/phy.h                                |  4 ++--
- net/dsa/slave.c                                    |  9 +++++----
- 12 files changed, 35 insertions(+), 28 deletions(-)
+> On Sat, 3 Jun 2017, Mason wrote:
+>
+>> 1) The interrupt router has 128 inputs and 24 outputs.
+>> Therefore, several devices have to share an output line.
+>> I believe they *must* be of the same interrupt type?
+>> In the limit, we could use
+>> - 1 output line for level high
+>> - 1 output line for level low
+>> - 1 output line for edge rising
+>> - 1 output line for edge falling
+>> Is that correct?
+> 
+> No. You CANNOT share edge type interrupts, simply because it might be
+> impossible to figure out which device fired the interrupt.
 
-diff --git a/drivers/net/ethernet/broadcom/b44.c b/drivers/net/ethernet/broadcom/b44.c
-index 5b95bb4..9873d2d 100644
---- a/drivers/net/ethernet/broadcom/b44.c
-+++ b/drivers/net/ethernet/broadcom/b44.c
-@@ -1836,7 +1836,8 @@ static int b44_get_link_ksettings(struct net_device *dev,
- 
- 	if (bp->flags & B44_FLAG_EXTERNAL_PHY) {
- 		BUG_ON(!dev->phydev);
--		return phy_ethtool_ksettings_get(dev->phydev, cmd);
-+		phy_ethtool_ksettings_get(dev->phydev, cmd);
-+		return 0;
- 	}
- 
- 	supported = (SUPPORTED_Autoneg);
-diff --git a/drivers/net/ethernet/broadcom/bcm63xx_enet.c b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-index 50d88d3..34ebb40 100644
---- a/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-+++ b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-@@ -1453,7 +1453,8 @@ static int bcm_enet_get_link_ksettings(struct net_device *dev,
- 	if (priv->has_phy) {
- 		if (!dev->phydev)
- 			return -ENODEV;
--		return phy_ethtool_ksettings_get(dev->phydev, cmd);
-+		phy_ethtool_ksettings_get(dev->phydev, cmd);
-+		return 0;
- 	} else {
- 		cmd->base.autoneg = 0;
- 		cmd->base.speed = (priv->force_speed_100) ?
-diff --git a/drivers/net/ethernet/broadcom/genet/bcmgenet.c b/drivers/net/ethernet/broadcom/genet/bcmgenet.c
-index a205a9f..daca1c9 100644
---- a/drivers/net/ethernet/broadcom/genet/bcmgenet.c
-+++ b/drivers/net/ethernet/broadcom/genet/bcmgenet.c
-@@ -477,7 +477,9 @@ static int bcmgenet_get_link_ksettings(struct net_device *dev,
- 	if (!priv->phydev)
- 		return -ENODEV;
- 
--	return phy_ethtool_ksettings_get(priv->phydev, cmd);
-+	phy_ethtool_ksettings_get(priv->phydev, cmd);
-+
-+	return 0;
- }
- 
- static int bcmgenet_set_link_ksettings(struct net_device *dev,
-diff --git a/drivers/net/ethernet/broadcom/tg3.c b/drivers/net/ethernet/broadcom/tg3.c
-index 537d571..d600c41 100644
---- a/drivers/net/ethernet/broadcom/tg3.c
-+++ b/drivers/net/ethernet/broadcom/tg3.c
-@@ -12097,7 +12097,9 @@ static int tg3_get_link_ksettings(struct net_device *dev,
- 		if (!(tp->phy_flags & TG3_PHYFLG_IS_CONNECTED))
- 			return -EAGAIN;
- 		phydev = mdiobus_get_phy(tp->mdio_bus, tp->phy_addr);
--		return phy_ethtool_ksettings_get(phydev, cmd);
-+		phy_ethtool_ksettings_get(phydev, cmd);
-+
-+		return 0;
- 	}
- 
- 	supported = (SUPPORTED_Autoneg);
-diff --git a/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c b/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
-index 15571e2..aad825088 100644
---- a/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
-+++ b/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
-@@ -75,16 +75,14 @@ static char dpaa_stats_global[][ETH_GSTRING_LEN] = {
- static int dpaa_get_link_ksettings(struct net_device *net_dev,
- 				   struct ethtool_link_ksettings *cmd)
- {
--	int err;
--
- 	if (!net_dev->phydev) {
- 		netdev_dbg(net_dev, "phy device not initialized\n");
- 		return 0;
- 	}
- 
--	err = phy_ethtool_ksettings_get(net_dev->phydev, cmd);
-+	phy_ethtool_ksettings_get(net_dev->phydev, cmd);
- 
--	return err;
-+	return 0;
- }
- 
- static int dpaa_set_link_ksettings(struct net_device *net_dev,
-diff --git a/drivers/net/ethernet/freescale/ucc_geth_ethtool.c b/drivers/net/ethernet/freescale/ucc_geth_ethtool.c
-index b642990..4df282e 100644
---- a/drivers/net/ethernet/freescale/ucc_geth_ethtool.c
-+++ b/drivers/net/ethernet/freescale/ucc_geth_ethtool.c
-@@ -113,7 +113,9 @@ uec_get_ksettings(struct net_device *netdev, struct ethtool_link_ksettings *cmd)
- 	if (!phydev)
- 		return -ENODEV;
- 
--	return phy_ethtool_ksettings_get(phydev, cmd);
-+	phy_ethtool_ksettings_get(phydev, cmd);
-+
-+	return 0;
- }
- 
- static int
-diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
-index 25642de..5794d98 100644
---- a/drivers/net/ethernet/marvell/mv643xx_eth.c
-+++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
-@@ -1501,10 +1501,9 @@ mv643xx_eth_get_link_ksettings_phy(struct mv643xx_eth_private *mp,
- 				   struct ethtool_link_ksettings *cmd)
- {
- 	struct net_device *dev = mp->dev;
--	int err;
- 	u32 supported, advertising;
- 
--	err = phy_ethtool_ksettings_get(dev->phydev, cmd);
-+	phy_ethtool_ksettings_get(dev->phydev, cmd);
- 
- 	/*
- 	 * The MAC does not support 1000baseT_Half.
-@@ -1520,7 +1519,7 @@ mv643xx_eth_get_link_ksettings_phy(struct mv643xx_eth_private *mp,
- 	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
- 						advertising);
- 
--	return err;
-+	return 0;
- }
- 
- static int
-diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-index f4d7aec..03707ee 100644
---- a/drivers/net/ethernet/ti/cpsw.c
-+++ b/drivers/net/ethernet/ti/cpsw.c
-@@ -2165,11 +2165,12 @@ static int cpsw_get_link_ksettings(struct net_device *ndev,
- 	struct cpsw_common *cpsw = priv->cpsw;
- 	int slave_no = cpsw_slave_index(cpsw, priv);
- 
--	if (cpsw->slaves[slave_no].phy)
--		return phy_ethtool_ksettings_get(cpsw->slaves[slave_no].phy,
--						 ecmd);
--	else
-+	if (cpsw->slaves[slave_no].phy) {
-+		phy_ethtool_ksettings_get(cpsw->slaves[slave_no].phy, ecmd);
-+		return 0;
-+	} else {
- 		return -EOPNOTSUPP;
-+	}
- }
- 
- static int cpsw_set_link_ksettings(struct net_device *ndev,
-diff --git a/drivers/net/phy/phy.c b/drivers/net/phy/phy.c
-index 82ab8fb..9c372bf 100644
---- a/drivers/net/phy/phy.c
-+++ b/drivers/net/phy/phy.c
-@@ -508,8 +508,8 @@ int phy_ethtool_gset(struct phy_device *phydev, struct ethtool_cmd *cmd)
- }
- EXPORT_SYMBOL(phy_ethtool_gset);
- 
--int phy_ethtool_ksettings_get(struct phy_device *phydev,
--			      struct ethtool_link_ksettings *cmd)
-+void phy_ethtool_ksettings_get(struct phy_device *phydev,
-+			       struct ethtool_link_ksettings *cmd)
- {
- 	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
- 						phydev->supported);
-@@ -531,8 +531,6 @@ int phy_ethtool_ksettings_get(struct phy_device *phydev,
- 	cmd->base.autoneg = phydev->autoneg;
- 	cmd->base.eth_tp_mdix_ctrl = phydev->mdix_ctrl;
- 	cmd->base.eth_tp_mdix = phydev->mdix;
--
--	return 0;
- }
- EXPORT_SYMBOL(phy_ethtool_ksettings_get);
- 
-@@ -1448,7 +1446,9 @@ int phy_ethtool_get_link_ksettings(struct net_device *ndev,
- 	if (!phydev)
- 		return -ENODEV;
- 
--	return phy_ethtool_ksettings_get(phydev, cmd);
-+	phy_ethtool_ksettings_get(phydev, cmd);
-+
-+	return 0;
- }
- EXPORT_SYMBOL(phy_ethtool_get_link_ksettings);
- 
-diff --git a/drivers/net/usb/lan78xx.c b/drivers/net/usb/lan78xx.c
-index 9eff97a..5833f7e 100644
---- a/drivers/net/usb/lan78xx.c
-+++ b/drivers/net/usb/lan78xx.c
-@@ -1490,7 +1490,7 @@ static int lan78xx_get_link_ksettings(struct net_device *net,
- 	if (ret < 0)
- 		return ret;
- 
--	ret = phy_ethtool_ksettings_get(phydev, cmd);
-+	phy_ethtool_ksettings_get(phydev, cmd);
- 
- 	usb_autopm_put_interface(dev->intf);
- 
-diff --git a/include/linux/phy.h b/include/linux/phy.h
-index e76e4ad..4ec07a6 100644
---- a/include/linux/phy.h
-+++ b/include/linux/phy.h
-@@ -844,8 +844,8 @@ void phy_stop_machine(struct phy_device *phydev);
- void phy_trigger_machine(struct phy_device *phydev, bool sync);
- int phy_ethtool_sset(struct phy_device *phydev, struct ethtool_cmd *cmd);
- int phy_ethtool_gset(struct phy_device *phydev, struct ethtool_cmd *cmd);
--int phy_ethtool_ksettings_get(struct phy_device *phydev,
--			      struct ethtool_link_ksettings *cmd);
-+void phy_ethtool_ksettings_get(struct phy_device *phydev,
-+			       struct ethtool_link_ksettings *cmd);
- int phy_ethtool_ksettings_set(struct phy_device *phydev,
- 			      const struct ethtool_link_ksettings *cmd);
- int phy_mii_ioctl(struct phy_device *phydev, struct ifreq *ifr, int cmd);
-diff --git a/net/dsa/slave.c b/net/dsa/slave.c
-index 7693182..ba9f78b 100644
---- a/net/dsa/slave.c
-+++ b/net/dsa/slave.c
-@@ -689,12 +689,13 @@ dsa_slave_get_link_ksettings(struct net_device *dev,
- 			     struct ethtool_link_ksettings *cmd)
- {
- 	struct dsa_slave_priv *p = netdev_priv(dev);
--	int err = -EOPNOTSUPP;
- 
--	if (p->phy != NULL)
--		err = phy_ethtool_ksettings_get(p->phy, cmd);
-+	if (!p->phy)
-+		return -EOPNOTSUPP;
- 
--	return err;
-+	phy_ethtool_ksettings_get(p->phy, cmd);
-+
-+	return 0;
- }
- 
- static int
--- 
-2.9.4
+I understand that now.
+It dawned on me in point 2.
+
+The interrupt controller's designers consider that
+"pulse" interrupt requests are "broken by design",
+because they can be missed if the edge detector is
+sampling at too low a frequency.
+
+>> As for the DMA interrupt, the HW designers consider it
+>> a level interrupt. When the engine is busy processing
+>> a command, the interrupt signal is low; when the engine's
+>> command queue is empty, the interrupt signal is high.
+>> Thus, there is no risk of "missing a pulse". But maz
+>> has stated twice that the relevant *event* is the
+>> transition from "busy" to "idle", which makes this
+>> an edge (rising) interrupt. However, it doesn't have
+>> the problem described in 2)  The interrupt signal
+>> will remain high, so there is no risk of "missing"
+>> a pulse. So they can be grouped. Is that correct?
+> 
+> That depends on the DMA controller. If you can disable the interrupt line
+> at the DMA device level, then you can use that scheme. If not, you'll get
+> an interrupt storm as long as the DMA engine is idle.
+
+I don't follow. If the interrupt is configured
+as rising edge, only transitions from busy to
+idle will trigger an interrupt. The interrupt
+storm would be if the interrupt is configured
+level high. Right?
+
+I'm using a DMA driver right now which expects
+the ISR to be invoked on rising edges, and
+everything works as expected.
+
+Regards, and have a nice weekend.
