@@ -1,42 +1,149 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sun, 4 Jun 2017 15:55:46 +0200 (CEST)
-Subject: Design of interrupt controller driver
-In-Reply-To: <8bce8bdd-5801-f0c3-ada3-e1c68acc8913@free.fr>
-References: <8bce8bdd-5801-f0c3-ada3-e1c68acc8913@free.fr>
-Message-ID: <alpine.DEB.2.20.1706041551530.2813@nanos>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Sun, 04 Jun 2017 22:19:46 +0800
+Subject: [RFC PATCH 03/11] drm: sun4i: ignore swapped mixer<->tcon
+ connection for DE2
+In-Reply-To: <20170524081440.cbtjvvmj5okrri6z@flea.home>
+References: <20170517164354.16399-1-icenowy@aosc.io>
+ <20170517164354.16399-4-icenowy@aosc.io>
+ <20170519175753.sygqnwopk7tuv35n@flea.home>
+ <ECF29F56-DF18-4E3C-9C85-B29F89BD4228@aosc.io>
+ <20170524081440.cbtjvvmj5okrri6z@flea.home>
+Message-ID: <e5602515955fd2e90196d48138191f77@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 3 Jun 2017, Mason wrote:
-> 1) The interrupt router has 128 inputs and 24 outputs.
-> Therefore, several devices have to share an output line.
-> I believe they *must* be of the same interrupt type?
-> In the limit, we could use
-> - 1 output line for level high
-> - 1 output line for level low
-> - 1 output line for edge rising
-> - 1 output line for edge falling
-> Is that correct?
+? 2017-05-24 16:14?Maxime Ripard ???
+> On Sat, May 20, 2017 at 02:00:22AM +0800, Icenowy Zheng wrote:
+>> 
+>> 
+>> ? 2017?5?20? GMT+08:00 ??1:57:53, Maxime Ripard 
+>> <maxime.ripard@free-electrons.com> ??:
+>> >On Thu, May 18, 2017 at 12:43:46AM +0800, Icenowy Zheng wrote:
+>> >> Some SoC's DE2 has two mixers. Defaultly the mixer0 is connected to
+>> >> tcon0 and mixer1 is connected to tcon1; however by setting a bit
+>> >> the connection can be swapped.
+>> >>
+>> >> As we now hardcode the default connection, ignore the bonus endpoint
+>> >for
+>> >> the mixer's output and the TCON's input, as they stands for the
+>> >swapped
+>> >> connection.
+>> >>
+>> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> >> ---
+>> >>  drivers/gpu/drm/sun4i/sun4i_drv.c  | 27 ++++++++++++++++++++++++++
+>> >>  drivers/gpu/drm/sun4i/sun4i_tcon.c | 39
+>> >+++++++++++++++++++++++++++++---------
+>> >>  drivers/gpu/drm/sun4i/sun4i_tcon.h |  2 ++
+>> >>  3 files changed, 59 insertions(+), 9 deletions(-)
+>> >>
+>> >> diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c
+>> >b/drivers/gpu/drm/sun4i/sun4i_drv.c
+>> >> index 1dd1948025d2..29bf1325ded6 100644
+>> >> --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
+>> >> +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+>> >> @@ -173,6 +173,13 @@ static bool sun4i_drv_node_is_frontend(struct
+>> >device_node *node)
+>> >>  		of_device_is_compatible(node,
+>> >"allwinner,sun8i-a33-display-frontend");
+>> >>  }
+>> >>
+>> >> +static bool sun4i_drv_node_is_swappable_de2_mixer(struct device_node
+>> >*node)
+>> >> +{
+>> >> +	/* The V3s has only one mixer-tcon pair, so it's not listed here.
+>> >*/
+>> >> +	return of_device_is_compatible(node,
+>> >"allwinner,sun8i-h3-de2-mixer0") ||
+>> >> +		of_device_is_compatible(node, "allwinner,sun8i-h3-de2-mixer1");
+>> >> +}
+>> >> +
+>> >>  static bool sun4i_drv_node_is_tcon(struct device_node *node)
+>> >>  {
+>> >>  	return of_device_is_compatible(node, "allwinner,sun5i-a13-tcon") ||
+>> >> @@ -249,6 +256,26 @@ static int sun4i_drv_add_endpoints(struct device
+>> >*dev,
+>> >>  			}
+>> >>  		}
+>> >>
+>> >> +		/*
+>> >> +		 * The second endpoint of the output of a swappable DE2 mixer
+>> >> +		 * is the TCON after connection swapping.
+>> >> +		 * Ignore it now, as we now hardcode mixer0->tcon0,
+>> >> +		 * mixer1->tcon1 connection.
+>> >> +		 */
+>> >> +		if (sun4i_drv_node_is_swappable_de2_mixer(node)) {
+>> >> +			struct of_endpoint endpoint;
+>> >> +
+>> >> +			if (of_graph_parse_endpoint(ep, &endpoint)) {
+>> >> +				DRM_DEBUG_DRIVER("Couldn't parse endpoint\n");
+>> >> +				continue;
+>> >> +			}
+>> >> +
+>> >> +			if (endpoint.id) {
+>> >> +				DRM_DEBUG_DRIVER("Endpoint is an unused connection for DE2
+>> >mixer... skipping\n");
+>> >> +				continue;
+>> >> +			}
+>> >> +		}
+>> >> +
+>> >>  		/* Walk down our tree */
+>> >>  		count += sun4i_drv_add_endpoints(dev, match, remote);
+>> >>
+>> >> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>> >b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>> >> index f44a37a5993d..89a215ff2370 100644
+>> >> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>> >> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>> >> @@ -425,7 +425,8 @@ static int sun4i_tcon_init_regmap(struct device
+>> >*dev,
+>> >>   * requested via the get_id function of the engine.
+>> >>   */
+>> >>  static struct sunxi_engine *sun4i_tcon_find_engine(struct sun4i_drv
+>> >*drv,
+>> >> -						   struct device_node *node)
+>> >> +						   struct device_node *node,
+>> >> +						   bool skip_bonus_ep)
+>> >>  {
+>> >>  	struct device_node *port, *ep, *remote;
+>> >>  	struct sunxi_engine *engine;
+>> >> @@ -439,6 +440,20 @@ static struct sunxi_engine
+>> >*sun4i_tcon_find_engine(struct sun4i_drv *drv,
+>> >>  		if (!remote)
+>> >>  			continue;
+>> >>
+>> >> +		if (skip_bonus_ep) {
+>> >> +			struct of_endpoint endpoint;
+>> >> +
+>> >> +			if (of_graph_parse_endpoint(ep, &endpoint)) {
+>> >> +				DRM_DEBUG_DRIVER("Couldn't parse endpoint\n");
+>> >> +				continue;
+>> >> +			}
+>> >> +
+>> >> +			if (endpoint.id) {
+>> >> +				DRM_DEBUG_DRIVER("Skipping bonus mixer->TCON connection when
+>> >searching engine\n");
+>> >> +				continue;
+>> >> +			}
+>> >> +		}
+>> >> +
+>> >
+>> >You don't list the mixers in the tcon's output, why do you need that
+>> >exactly?
+>> 
+>> Mixers are TCONs' input, not output...
+> 
+> Then why are they even parsed? The whole parsing logic in the driver
+> only searches for output nodes.
 
-No. You CANNOT share edge type interrupts, simply because it might be
-impossible to figure out which device fired the interrupt.
+Here it's really parsing the input node, for searching for a connected
+engine.
 
-> As for the DMA interrupt, the HW designers consider it
-> a level interrupt. When the engine is busy processing
-> a command, the interrupt signal is low; when the engine's
-> command queue is empty, the interrupt signal is high.
-> Thus, there is no risk of "missing a pulse". But maz
-> has stated twice that the relevant *event* is the
-> transition from "busy" to "idle", which makes this
-> an edge (rising) interrupt. However, it doesn't have
-> the problem described in 2)  The interrupt signal
-> will remain high, so there is no risk of "missing"
-> a pulse. So they can be grouped. Is that correct?
+In the situation of DE1 TCON has only one input endpoint and it must be
+the connected backend.
 
-That depends on the DMA controller. If you can disable the interrupt line
-at the DMA device level, then you can use that scheme. If not, you'll get
-an interrupt storm as long as the DAM engine is idle.
+But in the situation of DE2 it has now two input endpoints, and it's
+now needed to figure out which connection is used.
 
-Thanks,
-
-	tglx
+> 
+> Maxime
