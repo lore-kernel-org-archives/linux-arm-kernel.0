@@ -1,39 +1,23 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Sun, 4 Jun 2017 22:55:16 +0200
-Subject: [PATCH v2 4/4] net: macb: Add hardware PTP support
-In-Reply-To: <1496413690-22826-1-git-send-email-rafalo@cadence.com>
-References: <1496413439-12900-1-git-send-email-rafalo@cadence.com>
- <1496413690-22826-1-git-send-email-rafalo@cadence.com>
-Message-ID: <20170604205516.GA7848@localhost.localdomain>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Sun, 4 Jun 2017 23:04:16 +0200
+Subject: [PATCH 0/3] ARM-XEN: Adjustments for __set_phys_to_machine_multi()
+Message-ID: <9b9230f4-0f00-e019-75b4-571e29b52998@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 02, 2017 at 03:28:10PM +0100, Rafal Ozieblo wrote:
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Sun, 4 Jun 2017 22:45:54 +0200
 
-> +int gem_get_hwtst(struct net_device *dev, struct ifreq *rq)
-> +{
-> +	struct macb *bp = netdev_priv(dev);
-> +	struct hwtstamp_config *tstamp_config = &bp->tstamp_config;
-> +
-> +	if ((bp->hw_dma_cap & HW_DMA_CAP_PTP) == 0)
-> +		return -EFAULT;
+Three update suggestions were taken into account
+from static source code analysis.
 
-Segmentation fault?  Really?
+Markus Elfring (3):
+  Improve a size determination
+  Delete an error message for a failed memory allocation
+  Adjust one function call together with a variable assignment
 
-...
+ arch/arm/xen/p2m.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-> +int gem_set_hwtst(struct net_device *dev, struct ifreq *ifr, int cmd)
-> +{
-> +	struct macb *bp = netdev_priv(dev);
-> +	struct hwtstamp_config *tstamp_config = &bp->tstamp_config;
-> +	enum macb_bd_control tx_bd_control = TSTAMP_DISABLED;
-> +	enum macb_bd_control rx_bd_control = TSTAMP_DISABLED;
-> +	u32 regval;
-> +
-> +	if ((bp->hw_dma_cap & HW_DMA_CAP_PTP) == 0)
-> +		return -EFAULT;
-
-here again
-
-Thanks,
-Richard
+-- 
+2.13.0
