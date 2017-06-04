@@ -1,640 +1,476 @@
-From: yuval.shaia@oracle.com (Yuval Shaia)
-Date: Sun,  4 Jun 2017 20:22:00 +0300
-Subject: [PATCH] net/{mii,
- smsc}: Make mii_ethtool_get_link_ksettings and smc_netdev_get_ecmd
- return void
-Message-ID: <20170604172200.4177-1-yuval.shaia@oracle.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun,  4 Jun 2017 14:31:15 -0300
+Subject: [PATCH] ARM: dts: imx: Fix Ethernet PHY reset polarity
+Message-ID: <1496597475-1361-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make return value void since functions never returns meaningfull value.
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Signed-off-by: Yuval Shaia <yuval.shaia@oracle.com>
+The FEC driver ignores the GPIO polarity from 'phy-reset-gpios' and
+considers that the Ethernet PHY is active low, unless the
+property 'phy-reset-active-high' is present.
+
+Fix the device tree description by explicitly passing the 
+'GPIO_ACTIVE_LOW' flag to the 'phy-reset-gpios' property.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- drivers/net/cris/eth_v10.c                              |  5 ++---
- drivers/net/ethernet/3com/3c59x.c                       |  4 +++-
- drivers/net/ethernet/amd/pcnet32.c                      |  5 +----
- drivers/net/ethernet/cirrus/ep93xx_eth.c                |  5 ++++-
- drivers/net/ethernet/dec/tulip/winbond-840.c            |  5 ++---
- drivers/net/ethernet/faraday/ftmac100.c                 |  5 ++++-
- drivers/net/ethernet/fealnx.c                           |  5 ++---
- drivers/net/ethernet/intel/e100.c                       |  5 ++++-
- drivers/net/ethernet/jme.c                              |  5 ++---
- drivers/net/ethernet/korina.c                           |  5 ++---
- drivers/net/ethernet/micrel/ks8851.c                    |  5 ++++-
- drivers/net/ethernet/micrel/ks8851_mll.c                |  5 ++++-
- drivers/net/ethernet/nuvoton/w90p910_ether.c            |  5 ++++-
- drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_ethtool.c |  6 +++---
- drivers/net/ethernet/realtek/8139cp.c                   |  5 ++---
- drivers/net/ethernet/realtek/r8169.c                    |  4 +++-
- drivers/net/ethernet/sgi/ioc3-eth.c                     |  5 ++---
- drivers/net/ethernet/sis/sis190.c                       |  4 +++-
- drivers/net/ethernet/smsc/epic100.c                     |  5 ++---
- drivers/net/ethernet/smsc/smc911x.c                     |  7 +++----
- drivers/net/ethernet/smsc/smc91c92_cs.c                 | 13 +++++--------
- drivers/net/ethernet/smsc/smc91x.c                      |  7 ++-----
- drivers/net/ethernet/tundra/tsi108_eth.c                |  5 ++---
- drivers/net/ethernet/via/via-rhine.c                    |  5 ++---
- drivers/net/mii.c                                       |  8 ++------
- drivers/net/usb/ax88179_178a.c                          |  5 ++++-
- drivers/net/usb/r8152.c                                 |  2 +-
- drivers/net/usb/usbnet.c                                |  4 +++-
- include/linux/mii.h                                     |  2 +-
- 29 files changed, 78 insertions(+), 73 deletions(-)
+ arch/arm/boot/dts/imx25-karo-tx25.dts          | 2 +-
+ arch/arm/boot/dts/imx25-pdk.dts                | 2 +-
+ arch/arm/boot/dts/imx25.dtsi                   | 1 +
+ arch/arm/boot/dts/imx28-cfa10037.dts           | 2 +-
+ arch/arm/boot/dts/imx28-cfa10049.dts           | 2 +-
+ arch/arm/boot/dts/imx28-cfa10057.dts           | 2 +-
+ arch/arm/boot/dts/imx28-cfa10058.dts           | 2 +-
+ arch/arm/boot/dts/imx28-eukrea-mbmx287lc.dts   | 2 +-
+ arch/arm/boot/dts/imx28-evk.dts                | 2 +-
+ arch/arm/boot/dts/imx28-m28cu3.dts             | 2 +-
+ arch/arm/boot/dts/imx50-evk.dts                | 2 +-
+ arch/arm/boot/dts/imx50.dtsi                   | 1 +
+ arch/arm/boot/dts/imx51-apf51.dts              | 2 +-
+ arch/arm/boot/dts/imx53-mba53.dts              | 2 +-
+ arch/arm/boot/dts/imx53-qsb-common.dtsi        | 2 +-
+ arch/arm/boot/dts/imx53-smd.dts                | 2 +-
+ arch/arm/boot/dts/imx53-tx53.dtsi              | 2 +-
+ arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi    | 2 +-
+ arch/arm/boot/dts/imx6dl-riotboard.dts         | 2 +-
+ arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts        | 2 +-
+ arch/arm/boot/dts/imx6q-evi.dts                | 2 +-
+ arch/arm/boot/dts/imx6q-gw5400-a.dts           | 2 +-
+ arch/arm/boot/dts/imx6q-novena.dts             | 2 +-
+ arch/arm/boot/dts/imx6qdl-aristainetos.dtsi    | 2 +-
+ arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi   | 2 +-
+ arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi | 2 +-
+ arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi      | 2 +-
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi         | 2 +-
+ arch/arm/boot/dts/imx6qdl-tx6.dtsi             | 2 +-
+ arch/arm/boot/dts/imx6qdl-wandboard.dtsi       | 2 +-
+ arch/arm/boot/dts/imx6ul-tx6ul-mainboard.dts   | 2 +-
+ arch/arm/boot/dts/imx6ul-tx6ul.dtsi            | 4 ++--
+ 32 files changed, 33 insertions(+), 31 deletions(-)
 
-diff --git a/drivers/net/cris/eth_v10.c b/drivers/net/cris/eth_v10.c
-index da02041..017f48c 100644
---- a/drivers/net/cris/eth_v10.c
-+++ b/drivers/net/cris/eth_v10.c
-@@ -1417,10 +1417,9 @@ static int e100_get_link_ksettings(struct net_device *dev,
- {
- 	struct net_local *np = netdev_priv(dev);
- 	u32 supported;
--	int err;
+diff --git a/arch/arm/boot/dts/imx25-karo-tx25.dts b/arch/arm/boot/dts/imx25-karo-tx25.dts
+index 9b31faa..30a62d4 100644
+--- a/arch/arm/boot/dts/imx25-karo-tx25.dts
++++ b/arch/arm/boot/dts/imx25-karo-tx25.dts
+@@ -97,7 +97,7 @@
+ &fec {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_fec>;
+-	phy-reset-gpios = <&gpio3 7 0>;
++	phy-reset-gpios = <&gpio3 7 GPIO_ACTIVE_LOW>;
+ 	phy-mode = "rmii";
+ 	phy-supply = <&reg_fec_phy>;
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/imx25-pdk.dts b/arch/arm/boot/dts/imx25-pdk.dts
+index d921dd2..c526928 100644
+--- a/arch/arm/boot/dts/imx25-pdk.dts
++++ b/arch/arm/boot/dts/imx25-pdk.dts
+@@ -125,7 +125,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_fec>;
+ 	phy-supply = <&reg_fec_3v3>;
+-	phy-reset-gpios = <&gpio4 8 0>;
++	phy-reset-gpios = <&gpio4 8 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
  
- 	spin_lock_irq(&np->lock);
--	err = mii_ethtool_get_link_ksettings(&np->mii_if, cmd);
-+	mii_ethtool_get_link_ksettings(&np->mii_if, cmd);
- 	spin_unlock_irq(&np->lock);
- 
- 	/* The PHY may support 1000baseT, but the Etrax100 does not.  */
-@@ -1432,7 +1431,7 @@ static int e100_get_link_ksettings(struct net_device *dev,
- 	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
- 						supported);
- 
--	return err;
-+	return 0;
- }
- 
- static int e100_set_link_ksettings(struct net_device *dev,
-diff --git a/drivers/net/ethernet/3com/3c59x.c b/drivers/net/ethernet/3com/3c59x.c
-index e41245a..14cff60 100644
---- a/drivers/net/ethernet/3com/3c59x.c
-+++ b/drivers/net/ethernet/3com/3c59x.c
-@@ -2912,7 +2912,9 @@ static int vortex_get_link_ksettings(struct net_device *dev,
- {
- 	struct vortex_private *vp = netdev_priv(dev);
- 
--	return mii_ethtool_get_link_ksettings(&vp->mii, cmd);
-+	mii_ethtool_get_link_ksettings(&vp->mii, cmd);
-+
-+	return 0;
- }
- 
- static int vortex_set_link_ksettings(struct net_device *dev,
-diff --git a/drivers/net/ethernet/amd/pcnet32.c b/drivers/net/ethernet/amd/pcnet32.c
-index 86369d7..7f60d17 100644
---- a/drivers/net/ethernet/amd/pcnet32.c
-+++ b/drivers/net/ethernet/amd/pcnet32.c
-@@ -731,12 +731,10 @@ static int pcnet32_get_link_ksettings(struct net_device *dev,
- {
- 	struct pcnet32_private *lp = netdev_priv(dev);
- 	unsigned long flags;
--	int r = -EOPNOTSUPP;
- 
- 	spin_lock_irqsave(&lp->lock, flags);
- 	if (lp->mii) {
- 		mii_ethtool_get_link_ksettings(&lp->mii_if, cmd);
--		r = 0;
- 	} else if (lp->chip_version == PCNET32_79C970A) {
- 		if (lp->autoneg) {
- 			cmd->base.autoneg = AUTONEG_ENABLE;
-@@ -753,10 +751,9 @@ static int pcnet32_get_link_ksettings(struct net_device *dev,
- 		ethtool_convert_legacy_u32_to_link_mode(
- 						cmd->link_modes.supported,
- 						SUPPORTED_TP | SUPPORTED_AUI);
--		r = 0;
- 	}
- 	spin_unlock_irqrestore(&lp->lock, flags);
--	return r;
-+	return 0;
- }
- 
- static int pcnet32_set_link_ksettings(struct net_device *dev,
-diff --git a/drivers/net/ethernet/cirrus/ep93xx_eth.c b/drivers/net/ethernet/cirrus/ep93xx_eth.c
-index 7a7c02f..e2a7029 100644
---- a/drivers/net/ethernet/cirrus/ep93xx_eth.c
-+++ b/drivers/net/ethernet/cirrus/ep93xx_eth.c
-@@ -702,7 +702,10 @@ static int ep93xx_get_link_ksettings(struct net_device *dev,
- 				     struct ethtool_link_ksettings *cmd)
- {
- 	struct ep93xx_priv *ep = netdev_priv(dev);
--	return mii_ethtool_get_link_ksettings(&ep->mii, cmd);
-+
-+	mii_ethtool_get_link_ksettings(&ep->mii, cmd);
-+
-+	return 0;
- }
- 
- static int ep93xx_set_link_ksettings(struct net_device *dev,
-diff --git a/drivers/net/ethernet/dec/tulip/winbond-840.c b/drivers/net/ethernet/dec/tulip/winbond-840.c
-index d1f2f3c..32d7229 100644
---- a/drivers/net/ethernet/dec/tulip/winbond-840.c
-+++ b/drivers/net/ethernet/dec/tulip/winbond-840.c
-@@ -1395,13 +1395,12 @@ static int netdev_get_link_ksettings(struct net_device *dev,
- 				     struct ethtool_link_ksettings *cmd)
- {
- 	struct netdev_private *np = netdev_priv(dev);
--	int rc;
- 
- 	spin_lock_irq(&np->lock);
--	rc = mii_ethtool_get_link_ksettings(&np->mii_if, cmd);
-+	mii_ethtool_get_link_ksettings(&np->mii_if, cmd);
- 	spin_unlock_irq(&np->lock);
- 
--	return rc;
-+	return 0;
- }
- 
- static int netdev_set_link_ksettings(struct net_device *dev,
-diff --git a/drivers/net/ethernet/faraday/ftmac100.c b/drivers/net/ethernet/faraday/ftmac100.c
-index 1536356..66928a9 100644
---- a/drivers/net/ethernet/faraday/ftmac100.c
-+++ b/drivers/net/ethernet/faraday/ftmac100.c
-@@ -829,7 +829,10 @@ static int ftmac100_get_link_ksettings(struct net_device *netdev,
- 				       struct ethtool_link_ksettings *cmd)
- {
- 	struct ftmac100 *priv = netdev_priv(netdev);
--	return mii_ethtool_get_link_ksettings(&priv->mii, cmd);
-+
-+	mii_ethtool_get_link_ksettings(&priv->mii, cmd);
-+
-+	return 0;
- }
- 
- static int ftmac100_set_link_ksettings(struct net_device *netdev,
-diff --git a/drivers/net/ethernet/fealnx.c b/drivers/net/ethernet/fealnx.c
-index 766636a..610f9c0 100644
---- a/drivers/net/ethernet/fealnx.c
-+++ b/drivers/net/ethernet/fealnx.c
-@@ -1821,13 +1821,12 @@ static int netdev_get_link_ksettings(struct net_device *dev,
- 				     struct ethtool_link_ksettings *cmd)
- {
- 	struct netdev_private *np = netdev_priv(dev);
--	int rc;
- 
- 	spin_lock_irq(&np->lock);
--	rc = mii_ethtool_get_link_ksettings(&np->mii, cmd);
-+	mii_ethtool_get_link_ksettings(&np->mii, cmd);
- 	spin_unlock_irq(&np->lock);
- 
--	return rc;
-+	return 0;
- }
- 
- static int netdev_set_link_ksettings(struct net_device *dev,
-diff --git a/drivers/net/ethernet/intel/e100.c b/drivers/net/ethernet/intel/e100.c
-index 2b7323d..4d10270 100644
---- a/drivers/net/ethernet/intel/e100.c
-+++ b/drivers/net/ethernet/intel/e100.c
-@@ -2430,7 +2430,10 @@ static int e100_get_link_ksettings(struct net_device *netdev,
- 				   struct ethtool_link_ksettings *cmd)
- {
- 	struct nic *nic = netdev_priv(netdev);
--	return mii_ethtool_get_link_ksettings(&nic->mii, cmd);
-+
-+	mii_ethtool_get_link_ksettings(&nic->mii, cmd);
-+
-+	return 0;
- }
- 
- static int e100_set_link_ksettings(struct net_device *netdev,
-diff --git a/drivers/net/ethernet/jme.c b/drivers/net/ethernet/jme.c
-index f580b49..a70440b 100644
---- a/drivers/net/ethernet/jme.c
-+++ b/drivers/net/ethernet/jme.c
-@@ -2652,12 +2652,11 @@ jme_get_link_ksettings(struct net_device *netdev,
- 		       struct ethtool_link_ksettings *cmd)
- {
- 	struct jme_adapter *jme = netdev_priv(netdev);
--	int rc;
- 
- 	spin_lock_bh(&jme->phy_lock);
--	rc = mii_ethtool_get_link_ksettings(&jme->mii_if, cmd);
-+	mii_ethtool_get_link_ksettings(&jme->mii_if, cmd);
- 	spin_unlock_bh(&jme->phy_lock);
--	return rc;
-+	return 0;
- }
- 
- static int
-diff --git a/drivers/net/ethernet/korina.c b/drivers/net/ethernet/korina.c
-index 9fae98c..3c0a645 100644
---- a/drivers/net/ethernet/korina.c
-+++ b/drivers/net/ethernet/korina.c
-@@ -699,13 +699,12 @@ static int netdev_get_link_ksettings(struct net_device *dev,
- 				     struct ethtool_link_ksettings *cmd)
- {
- 	struct korina_private *lp = netdev_priv(dev);
--	int rc;
- 
- 	spin_lock_irq(&lp->lock);
--	rc = mii_ethtool_get_link_ksettings(&lp->mii_if, cmd);
-+	mii_ethtool_get_link_ksettings(&lp->mii_if, cmd);
- 	spin_unlock_irq(&lp->lock);
- 
--	return rc;
-+	return 0;
- }
- 
- static int netdev_set_link_ksettings(struct net_device *dev,
-diff --git a/drivers/net/ethernet/micrel/ks8851.c b/drivers/net/ethernet/micrel/ks8851.c
-index 20358f8..2fe96f1 100644
---- a/drivers/net/ethernet/micrel/ks8851.c
-+++ b/drivers/net/ethernet/micrel/ks8851.c
-@@ -1071,7 +1071,10 @@ static int ks8851_get_link_ksettings(struct net_device *dev,
- 				     struct ethtool_link_ksettings *cmd)
- {
- 	struct ks8851_net *ks = netdev_priv(dev);
--	return mii_ethtool_get_link_ksettings(&ks->mii, cmd);
-+
-+	mii_ethtool_get_link_ksettings(&ks->mii, cmd);
-+
-+	return 0;
- }
- 
- static int ks8851_set_link_ksettings(struct net_device *dev,
-diff --git a/drivers/net/ethernet/micrel/ks8851_mll.c b/drivers/net/ethernet/micrel/ks8851_mll.c
-index 7647f7b..f3e9dd4 100644
---- a/drivers/net/ethernet/micrel/ks8851_mll.c
-+++ b/drivers/net/ethernet/micrel/ks8851_mll.c
-@@ -1315,7 +1315,10 @@ static int ks_get_link_ksettings(struct net_device *netdev,
- 				 struct ethtool_link_ksettings *cmd)
- {
- 	struct ks_net *ks = netdev_priv(netdev);
--	return mii_ethtool_get_link_ksettings(&ks->mii, cmd);
-+
-+	mii_ethtool_get_link_ksettings(&ks->mii, cmd);
-+
-+	return 0;
- }
- 
- static int ks_set_link_ksettings(struct net_device *netdev,
-diff --git a/drivers/net/ethernet/nuvoton/w90p910_ether.c b/drivers/net/ethernet/nuvoton/w90p910_ether.c
-index 159564d..89ab786 100644
---- a/drivers/net/ethernet/nuvoton/w90p910_ether.c
-+++ b/drivers/net/ethernet/nuvoton/w90p910_ether.c
-@@ -868,7 +868,10 @@ static int w90p910_get_link_ksettings(struct net_device *dev,
- 				      struct ethtool_link_ksettings *cmd)
- {
- 	struct w90p910_ether *ether = netdev_priv(dev);
--	return mii_ethtool_get_link_ksettings(&ether->mii, cmd);
-+
-+	mii_ethtool_get_link_ksettings(&ether->mii, cmd);
-+
-+	return 0;
- }
- 
- static int w90p910_set_link_ksettings(struct net_device *dev,
-diff --git a/drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_ethtool.c b/drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_ethtool.c
-index 2109327..731ce1e 100644
---- a/drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_ethtool.c
-+++ b/drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_ethtool.c
-@@ -85,9 +85,8 @@ static int pch_gbe_get_link_ksettings(struct net_device *netdev,
- {
- 	struct pch_gbe_adapter *adapter = netdev_priv(netdev);
- 	u32 supported, advertising;
--	int ret;
- 
--	ret = mii_ethtool_get_link_ksettings(&adapter->mii, ecmd);
-+	mii_ethtool_get_link_ksettings(&adapter->mii, ecmd);
- 
- 	ethtool_convert_link_mode_to_legacy_u32(&supported,
- 						ecmd->link_modes.supported);
-@@ -104,7 +103,8 @@ static int pch_gbe_get_link_ksettings(struct net_device *netdev,
- 
- 	if (!netif_carrier_ok(adapter->netdev))
- 		ecmd->base.speed = SPEED_UNKNOWN;
--	return ret;
-+
-+	return 0;
- }
- 
- /**
-diff --git a/drivers/net/ethernet/realtek/8139cp.c b/drivers/net/ethernet/realtek/8139cp.c
-index 72233ab..e7ab23e 100644
---- a/drivers/net/ethernet/realtek/8139cp.c
-+++ b/drivers/net/ethernet/realtek/8139cp.c
-@@ -1410,14 +1410,13 @@ static int cp_get_link_ksettings(struct net_device *dev,
- 				 struct ethtool_link_ksettings *cmd)
- {
- 	struct cp_private *cp = netdev_priv(dev);
--	int rc;
- 	unsigned long flags;
- 
- 	spin_lock_irqsave(&cp->lock, flags);
--	rc = mii_ethtool_get_link_ksettings(&cp->mii_if, cmd);
-+	mii_ethtool_get_link_ksettings(&cp->mii_if, cmd);
- 	spin_unlock_irqrestore(&cp->lock, flags);
- 
--	return rc;
-+	return 0;
- }
- 
- static int cp_set_link_ksettings(struct net_device *dev,
-diff --git a/drivers/net/ethernet/realtek/r8169.c b/drivers/net/ethernet/realtek/r8169.c
-index 0a8f281..bd07a15 100644
---- a/drivers/net/ethernet/realtek/r8169.c
-+++ b/drivers/net/ethernet/realtek/r8169.c
-@@ -2148,7 +2148,9 @@ static int rtl8169_get_link_ksettings_xmii(struct net_device *dev,
- {
- 	struct rtl8169_private *tp = netdev_priv(dev);
- 
--	return mii_ethtool_get_link_ksettings(&tp->mii, cmd);
-+	mii_ethtool_get_link_ksettings(&tp->mii, cmd);
-+
-+	return 0;
- }
- 
- static int rtl8169_get_link_ksettings(struct net_device *dev,
-diff --git a/drivers/net/ethernet/sgi/ioc3-eth.c b/drivers/net/ethernet/sgi/ioc3-eth.c
-index 52ead55..b607936 100644
---- a/drivers/net/ethernet/sgi/ioc3-eth.c
-+++ b/drivers/net/ethernet/sgi/ioc3-eth.c
-@@ -1562,13 +1562,12 @@ static int ioc3_get_link_ksettings(struct net_device *dev,
- 				   struct ethtool_link_ksettings *cmd)
- {
- 	struct ioc3_private *ip = netdev_priv(dev);
--	int rc;
- 
- 	spin_lock_irq(&ip->ioc3_lock);
--	rc = mii_ethtool_get_link_ksettings(&ip->mii, cmd);
-+	mii_ethtool_get_link_ksettings(&ip->mii, cmd);
- 	spin_unlock_irq(&ip->ioc3_lock);
- 
--	return rc;
-+	return 0;
- }
- 
- static int ioc3_set_link_ksettings(struct net_device *dev,
-diff --git a/drivers/net/ethernet/sis/sis190.c b/drivers/net/ethernet/sis/sis190.c
-index 02da106..445109b 100644
---- a/drivers/net/ethernet/sis/sis190.c
-+++ b/drivers/net/ethernet/sis/sis190.c
-@@ -1739,7 +1739,9 @@ static int sis190_get_link_ksettings(struct net_device *dev,
- {
- 	struct sis190_private *tp = netdev_priv(dev);
- 
--	return mii_ethtool_get_link_ksettings(&tp->mii_if, cmd);
-+	mii_ethtool_get_link_ksettings(&tp->mii_if, cmd);
-+
-+	return 0;
- }
- 
- static int sis190_set_link_ksettings(struct net_device *dev,
-diff --git a/drivers/net/ethernet/smsc/epic100.c b/drivers/net/ethernet/smsc/epic100.c
-index db6dcb0..6a0e1d4 100644
---- a/drivers/net/ethernet/smsc/epic100.c
-+++ b/drivers/net/ethernet/smsc/epic100.c
-@@ -1391,13 +1391,12 @@ static int netdev_get_link_ksettings(struct net_device *dev,
- 				     struct ethtool_link_ksettings *cmd)
- {
- 	struct epic_private *np = netdev_priv(dev);
--	int rc;
- 
- 	spin_lock_irq(&np->lock);
--	rc = mii_ethtool_get_link_ksettings(&np->mii, cmd);
-+	mii_ethtool_get_link_ksettings(&np->mii, cmd);
- 	spin_unlock_irq(&np->lock);
- 
--	return rc;
-+	return 0;
- }
- 
- static int netdev_set_link_ksettings(struct net_device *dev,
-diff --git a/drivers/net/ethernet/smsc/smc911x.c b/drivers/net/ethernet/smsc/smc911x.c
-index 36307d3..0515744 100644
---- a/drivers/net/ethernet/smsc/smc911x.c
-+++ b/drivers/net/ethernet/smsc/smc911x.c
-@@ -1450,7 +1450,7 @@ smc911x_ethtool_get_link_ksettings(struct net_device *dev,
- 				   struct ethtool_link_ksettings *cmd)
- {
- 	struct smc911x_local *lp = netdev_priv(dev);
--	int ret, status;
-+	int status;
- 	unsigned long flags;
- 	u32 supported;
- 
-@@ -1458,7 +1458,7 @@ smc911x_ethtool_get_link_ksettings(struct net_device *dev,
- 
- 	if (lp->phy_type != 0) {
- 		spin_lock_irqsave(&lp->lock, flags);
--		ret = mii_ethtool_get_link_ksettings(&lp->mii, cmd);
-+		mii_ethtool_get_link_ksettings(&lp->mii, cmd);
- 		spin_unlock_irqrestore(&lp->lock, flags);
- 	} else {
- 		supported = SUPPORTED_10baseT_Half |
-@@ -1480,10 +1480,9 @@ smc911x_ethtool_get_link_ksettings(struct net_device *dev,
- 		ethtool_convert_legacy_u32_to_link_mode(
- 			cmd->link_modes.supported, supported);
- 
--		ret = 0;
- 	}
- 
--	return ret;
-+	return 0;
- }
- 
- static int
-diff --git a/drivers/net/ethernet/smsc/smc91c92_cs.c b/drivers/net/ethernet/smsc/smc91c92_cs.c
-index 976aa87..92c927a 100644
---- a/drivers/net/ethernet/smsc/smc91c92_cs.c
-+++ b/drivers/net/ethernet/smsc/smc91c92_cs.c
-@@ -1843,8 +1843,8 @@ static int smc_link_ok(struct net_device *dev)
-     }
- }
- 
--static int smc_netdev_get_ecmd(struct net_device *dev,
--			       struct ethtool_link_ksettings *ecmd)
-+static void smc_netdev_get_ecmd(struct net_device *dev,
-+				struct ethtool_link_ksettings *ecmd)
- {
- 	u16 tmp;
- 	unsigned int ioaddr = dev->base_addr;
-@@ -1865,8 +1865,6 @@ static int smc_netdev_get_ecmd(struct net_device *dev,
- 
- 	ethtool_convert_legacy_u32_to_link_mode(ecmd->link_modes.supported,
- 						supported);
--
--	return 0;
- }
- 
- static int smc_netdev_set_ecmd(struct net_device *dev,
-@@ -1918,18 +1916,17 @@ static int smc_get_link_ksettings(struct net_device *dev,
- 	struct smc_private *smc = netdev_priv(dev);
- 	unsigned int ioaddr = dev->base_addr;
- 	u16 saved_bank = inw(ioaddr + BANK_SELECT);
--	int ret;
- 	unsigned long flags;
- 
- 	spin_lock_irqsave(&smc->lock, flags);
- 	SMC_SELECT_BANK(3);
- 	if (smc->cfg & CFG_MII_SELECT)
--		ret = mii_ethtool_get_link_ksettings(&smc->mii_if, ecmd);
-+		mii_ethtool_get_link_ksettings(&smc->mii_if, ecmd);
- 	else
--		ret = smc_netdev_get_ecmd(dev, ecmd);
-+		smc_netdev_get_ecmd(dev, ecmd);
- 	SMC_SELECT_BANK(saved_bank);
- 	spin_unlock_irqrestore(&smc->lock, flags);
--	return ret;
-+	return 0;
- }
- 
- static int smc_set_link_ksettings(struct net_device *dev,
-diff --git a/drivers/net/ethernet/smsc/smc91x.c b/drivers/net/ethernet/smsc/smc91x.c
-index 91e9bd7..0d230b1 100644
---- a/drivers/net/ethernet/smsc/smc91x.c
-+++ b/drivers/net/ethernet/smsc/smc91x.c
-@@ -1539,11 +1539,10 @@ smc_ethtool_get_link_ksettings(struct net_device *dev,
- 			       struct ethtool_link_ksettings *cmd)
- {
- 	struct smc_local *lp = netdev_priv(dev);
--	int ret;
- 
- 	if (lp->phy_type != 0) {
- 		spin_lock_irq(&lp->lock);
--		ret = mii_ethtool_get_link_ksettings(&lp->mii, cmd);
-+		mii_ethtool_get_link_ksettings(&lp->mii, cmd);
- 		spin_unlock_irq(&lp->lock);
- 	} else {
- 		u32 supported = SUPPORTED_10baseT_Half |
-@@ -1562,11 +1561,9 @@ smc_ethtool_get_link_ksettings(struct net_device *dev,
- 
- 		ethtool_convert_legacy_u32_to_link_mode(
- 			cmd->link_modes.supported, supported);
--
--		ret = 0;
- 	}
- 
--	return ret;
-+	return 0;
- }
- 
- static int
-diff --git a/drivers/net/ethernet/tundra/tsi108_eth.c b/drivers/net/ethernet/tundra/tsi108_eth.c
-index 5ac6eaa..c2d15d9 100644
---- a/drivers/net/ethernet/tundra/tsi108_eth.c
-+++ b/drivers/net/ethernet/tundra/tsi108_eth.c
-@@ -1504,13 +1504,12 @@ static int tsi108_get_link_ksettings(struct net_device *dev,
- {
- 	struct tsi108_prv_data *data = netdev_priv(dev);
- 	unsigned long flags;
--	int rc;
- 
- 	spin_lock_irqsave(&data->txlock, flags);
--	rc = mii_ethtool_get_link_ksettings(&data->mii_if, cmd);
-+	mii_ethtool_get_link_ksettings(&data->mii_if, cmd);
- 	spin_unlock_irqrestore(&data->txlock, flags);
- 
--	return rc;
-+	return 0;
- }
- 
- static int tsi108_set_link_ksettings(struct net_device *dev,
-diff --git a/drivers/net/ethernet/via/via-rhine.c b/drivers/net/ethernet/via/via-rhine.c
-index 4cf41f7..acd29d6 100644
---- a/drivers/net/ethernet/via/via-rhine.c
-+++ b/drivers/net/ethernet/via/via-rhine.c
-@@ -2307,13 +2307,12 @@ static int netdev_get_link_ksettings(struct net_device *dev,
- 				     struct ethtool_link_ksettings *cmd)
- {
- 	struct rhine_private *rp = netdev_priv(dev);
--	int rc;
- 
- 	mutex_lock(&rp->task_lock);
--	rc = mii_ethtool_get_link_ksettings(&rp->mii_if, cmd);
-+	mii_ethtool_get_link_ksettings(&rp->mii_if, cmd);
- 	mutex_unlock(&rp->task_lock);
- 
--	return rc;
-+	return 0;
- }
- 
- static int netdev_set_link_ksettings(struct net_device *dev,
-diff --git a/drivers/net/mii.c b/drivers/net/mii.c
-index 6d953c5..44612122 100644
---- a/drivers/net/mii.c
-+++ b/drivers/net/mii.c
-@@ -141,11 +141,9 @@ int mii_ethtool_gset(struct mii_if_info *mii, struct ethtool_cmd *ecmd)
-  *
-  * The @cmd parameter is expected to have been cleared before calling
-  * mii_ethtool_get_link_ksettings().
-- *
-- * Returns 0 for success, negative on error.
+diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+index 0cdf333..dfcc8e0 100644
+--- a/arch/arm/boot/dts/imx25.dtsi
++++ b/arch/arm/boot/dts/imx25.dtsi
+@@ -9,6 +9,7 @@
+  * http://www.gnu.org/copyleft/gpl.html
   */
--int mii_ethtool_get_link_ksettings(struct mii_if_info *mii,
--				   struct ethtool_link_ksettings *cmd)
-+void mii_ethtool_get_link_ksettings(struct mii_if_info *mii,
-+				    struct ethtool_link_ksettings *cmd)
- {
- 	struct net_device *dev = mii->dev;
- 	u16 bmcr, bmsr, ctrl1000 = 0, stat1000 = 0;
-@@ -227,8 +225,6 @@ int mii_ethtool_get_link_ksettings(struct mii_if_info *mii,
- 						lp_advertising);
  
- 	/* ignore maxtxpkt, maxrxpkt for now */
--
--	return 0;
- }
++#include <dt-bindings/gpio/gpio.h>
+ #include "imx25-pinfunc.h"
  
- /**
-diff --git a/drivers/net/usb/ax88179_178a.c b/drivers/net/usb/ax88179_178a.c
-index 51cf600..793ce90 100644
---- a/drivers/net/usb/ax88179_178a.c
-+++ b/drivers/net/usb/ax88179_178a.c
-@@ -624,7 +624,10 @@ static int ax88179_get_link_ksettings(struct net_device *net,
- 				      struct ethtool_link_ksettings *cmd)
- {
- 	struct usbnet *dev = netdev_priv(net);
--	return mii_ethtool_get_link_ksettings(&dev->mii, cmd);
-+
-+	mii_ethtool_get_link_ksettings(&dev->mii, cmd);
-+
-+	return 0;
- }
+ / {
+diff --git a/arch/arm/boot/dts/imx28-cfa10037.dts b/arch/arm/boot/dts/imx28-cfa10037.dts
+index e5beaa5..3d13b32 100644
+--- a/arch/arm/boot/dts/imx28-cfa10037.dts
++++ b/arch/arm/boot/dts/imx28-cfa10037.dts
+@@ -64,7 +64,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&mac0_pins_a
+ 				&mac0_pins_cfa10037>;
+-			phy-reset-gpios = <&gpio2 21 0>;
++			phy-reset-gpios = <&gpio2 21 GPIO_ACTIVE_LOW>;
+ 			phy-reset-duration = <100>;
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
+index a9c347e..4cd52d5 100644
+--- a/arch/arm/boot/dts/imx28-cfa10049.dts
++++ b/arch/arm/boot/dts/imx28-cfa10049.dts
+@@ -327,7 +327,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&mac0_pins_a
+ 				&mac0_pins_cfa10049>;
+-			phy-reset-gpios = <&gpio2 21 0>;
++			phy-reset-gpios = <&gpio2 21 GPIO_ACTIVE_LOW>;
+ 			phy-reset-duration = <100>;
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/imx28-cfa10057.dts b/arch/arm/boot/dts/imx28-cfa10057.dts
+index 7a80bd6..c606791 100644
+--- a/arch/arm/boot/dts/imx28-cfa10057.dts
++++ b/arch/arm/boot/dts/imx28-cfa10057.dts
+@@ -162,7 +162,7 @@
+ 			phy-mode = "rmii";
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&mac0_pins_a>;
+-			phy-reset-gpios = <&gpio2 21 0>;
++			phy-reset-gpios = <&gpio2 21 GPIO_ACTIVE_LOW>;
+ 			phy-reset-duration = <100>;
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/imx28-cfa10058.dts b/arch/arm/boot/dts/imx28-cfa10058.dts
+index f5c6dce..70c7bb4 100644
+--- a/arch/arm/boot/dts/imx28-cfa10058.dts
++++ b/arch/arm/boot/dts/imx28-cfa10058.dts
+@@ -129,7 +129,7 @@
+ 			phy-mode = "rmii";
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&mac0_pins_a>;
+-			phy-reset-gpios = <&gpio2 21 0>;
++			phy-reset-gpios = <&gpio2 21 GPIO_ACTIVE_LOW>;
+ 			phy-reset-duration = <100>;
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/imx28-eukrea-mbmx287lc.dts b/arch/arm/boot/dts/imx28-eukrea-mbmx287lc.dts
+index e773144..b61fd61 100644
+--- a/arch/arm/boot/dts/imx28-eukrea-mbmx287lc.dts
++++ b/arch/arm/boot/dts/imx28-eukrea-mbmx287lc.dts
+@@ -31,7 +31,7 @@
+ 	phy-mode = "rmii";
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mac1_pins_a>;
+-	phy-reset-gpios = <&gpio3 27 GPIO_ACTIVE_HIGH>;
++	phy-reset-gpios = <&gpio3 27 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
  
- static int ax88179_set_link_ksettings(struct net_device *net,
-diff --git a/drivers/net/usb/r8152.c b/drivers/net/usb/r8152.c
-index ddc62cb..effa7a22 100644
---- a/drivers/net/usb/r8152.c
-+++ b/drivers/net/usb/r8152.c
-@@ -3841,7 +3841,7 @@ int rtl8152_get_link_ksettings(struct net_device *netdev,
+diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
+index a5ba669..a894cb8 100644
+--- a/arch/arm/boot/dts/imx28-evk.dts
++++ b/arch/arm/boot/dts/imx28-evk.dts
+@@ -262,7 +262,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&mac0_pins_a>;
+ 			phy-supply = <&reg_fec_3v3>;
+-			phy-reset-gpios = <&gpio4 13 0>;
++			phy-reset-gpios = <&gpio4 13 GPIO_ACTIVE_LOW>;
+ 			phy-reset-duration = <100>;
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/imx28-m28cu3.dts b/arch/arm/boot/dts/imx28-m28cu3.dts
+index bb53294..9d6c8fe 100644
+--- a/arch/arm/boot/dts/imx28-m28cu3.dts
++++ b/arch/arm/boot/dts/imx28-m28cu3.dts
+@@ -188,7 +188,7 @@
+ 			phy-mode = "rmii";
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&mac0_pins_a>;
+-			phy-reset-gpios = <&gpio4 13 0>;
++			phy-reset-gpios = <&gpio4 13 GPIO_ACTIVE_LOW>;
+ 			phy-reset-duration = <100>;
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/imx50-evk.dts b/arch/arm/boot/dts/imx50-evk.dts
+index dba2d95..98b5faa 100644
+--- a/arch/arm/boot/dts/imx50-evk.dts
++++ b/arch/arm/boot/dts/imx50-evk.dts
+@@ -53,7 +53,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_fec>;
+ 	phy-mode = "rmii";
+-	phy-reset-gpios = <&gpio4 12 0>;
++	phy-reset-gpios = <&gpio4 12 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
  
- 	mutex_lock(&tp->control);
+diff --git a/arch/arm/boot/dts/imx50.dtsi b/arch/arm/boot/dts/imx50.dtsi
+index 2a98afc..3747d80 100644
+--- a/arch/arm/boot/dts/imx50.dtsi
++++ b/arch/arm/boot/dts/imx50.dtsi
+@@ -12,6 +12,7 @@
+  */
  
--	ret = mii_ethtool_get_link_ksettings(&tp->mii, cmd);
-+	mii_ethtool_get_link_ksettings(&tp->mii, cmd);
+ #include "imx50-pinfunc.h"
++#include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/clock/imx5-clock.h>
  
- 	mutex_unlock(&tp->control);
+ / {
+diff --git a/arch/arm/boot/dts/imx51-apf51.dts b/arch/arm/boot/dts/imx51-apf51.dts
+index e88b2a6..c83ac16 100644
+--- a/arch/arm/boot/dts/imx51-apf51.dts
++++ b/arch/arm/boot/dts/imx51-apf51.dts
+@@ -36,7 +36,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_fec>;
+ 	phy-mode = "mii";
+-	phy-reset-gpios = <&gpio3 0 GPIO_ACTIVE_HIGH>;
++	phy-reset-gpios = <&gpio3 0 GPIO_ACTIVE_LOW>;
+ 	phy-reset-duration = <1>;
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/imx53-mba53.dts b/arch/arm/boot/dts/imx53-mba53.dts
+index 2e44d2a..df705ba 100644
+--- a/arch/arm/boot/dts/imx53-mba53.dts
++++ b/arch/arm/boot/dts/imx53-mba53.dts
+@@ -195,7 +195,7 @@
+ };
  
-diff --git a/drivers/net/usb/usbnet.c b/drivers/net/usb/usbnet.c
-index 79048e7..6510e5c 100644
---- a/drivers/net/usb/usbnet.c
-+++ b/drivers/net/usb/usbnet.c
-@@ -956,7 +956,9 @@ int usbnet_get_link_ksettings(struct net_device *net,
- 	if (!dev->mii.mdio_read)
- 		return -EOPNOTSUPP;
+ &fec {
+-	phy-reset-gpios = <&gpio7 6 0>;
++	phy-reset-gpios = <&gpio7 6 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
  
--	return mii_ethtool_get_link_ksettings(&dev->mii, cmd);
-+	mii_ethtool_get_link_ksettings(&dev->mii, cmd);
-+
-+	return 0;
- }
- EXPORT_SYMBOL_GPL(usbnet_get_link_ksettings);
+diff --git a/arch/arm/boot/dts/imx53-qsb-common.dtsi b/arch/arm/boot/dts/imx53-qsb-common.dtsi
+index 40b3e31..683dcbe 100644
+--- a/arch/arm/boot/dts/imx53-qsb-common.dtsi
++++ b/arch/arm/boot/dts/imx53-qsb-common.dtsi
+@@ -344,7 +344,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_fec>;
+ 	phy-mode = "rmii";
+-	phy-reset-gpios = <&gpio7 6 0>;
++	phy-reset-gpios = <&gpio7 6 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
  
-diff --git a/include/linux/mii.h b/include/linux/mii.h
-index 1629a0c..e870bfa 100644
---- a/include/linux/mii.h
-+++ b/include/linux/mii.h
-@@ -31,7 +31,7 @@ struct mii_if_info {
- extern int mii_link_ok (struct mii_if_info *mii);
- extern int mii_nway_restart (struct mii_if_info *mii);
- extern int mii_ethtool_gset(struct mii_if_info *mii, struct ethtool_cmd *ecmd);
--extern int mii_ethtool_get_link_ksettings(
-+extern void mii_ethtool_get_link_ksettings(
- 	struct mii_if_info *mii, struct ethtool_link_ksettings *cmd);
- extern int mii_ethtool_sset(struct mii_if_info *mii, struct ethtool_cmd *ecmd);
- extern int mii_ethtool_set_link_ksettings(
+diff --git a/arch/arm/boot/dts/imx53-smd.dts b/arch/arm/boot/dts/imx53-smd.dts
+index 472f6f0..33cb64f 100644
+--- a/arch/arm/boot/dts/imx53-smd.dts
++++ b/arch/arm/boot/dts/imx53-smd.dts
+@@ -273,6 +273,6 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_fec>;
+ 	phy-mode = "rmii";
+-	phy-reset-gpios = <&gpio7 6 0>;
++	phy-reset-gpios = <&gpio7 6 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/imx53-tx53.dtsi b/arch/arm/boot/dts/imx53-tx53.dtsi
+index 3a32201..7807c1f 100644
+--- a/arch/arm/boot/dts/imx53-tx53.dtsi
++++ b/arch/arm/boot/dts/imx53-tx53.dtsi
+@@ -201,7 +201,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_fec>;
+ 	phy-mode = "rmii";
+-	phy-reset-gpios = <&gpio7 6 GPIO_ACTIVE_HIGH>;
++	phy-reset-gpios = <&gpio7 6 GPIO_ACTIVE_LOW>;
+ 	phy-handle = <&phy0>;
+ 	mac-address = [000000000000]; /* placeholder; will be overwritten by bootloader */
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi b/arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi
+index 524192c..df8dafe 100644
+--- a/arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi
++++ b/arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi
+@@ -137,7 +137,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_fec>;
+ 	phy-mode = "rmii";
+-	phy-reset-gpios = <&gpio4 2 0>;
++	phy-reset-gpios = <&gpio4 2 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6dl-riotboard.dts b/arch/arm/boot/dts/imx6dl-riotboard.dts
+index 2cb7282..29b45f2 100644
+--- a/arch/arm/boot/dts/imx6dl-riotboard.dts
++++ b/arch/arm/boot/dts/imx6dl-riotboard.dts
+@@ -94,7 +94,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet>;
+ 	phy-mode = "rgmii";
+-	phy-reset-gpios = <&gpio3 31 0>;
++	phy-reset-gpios = <&gpio3 31 GPIO_ACTIVE_LOW>;
+ 	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
+ 			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
+ 	fsl,err006687-workaround-present;
+diff --git a/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts b/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts
+index f28883b..0c5b2c3 100644
+--- a/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts
++++ b/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts
+@@ -118,7 +118,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet>;
+ 	phy-mode = "rgmii";
+-	phy-reset-gpios = <&gpio1 25 0>;
++	phy-reset-gpios = <&gpio1 25 GPIO_ACTIVE_LOW>;
+ 	phy-supply = <&vgen2_1v2_eth>;
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/imx6q-evi.dts b/arch/arm/boot/dts/imx6q-evi.dts
+index fd2220a..1f0f950 100644
+--- a/arch/arm/boot/dts/imx6q-evi.dts
++++ b/arch/arm/boot/dts/imx6q-evi.dts
+@@ -135,7 +135,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet>;
+ 	phy-mode = "rgmii";
+-	phy-reset-gpios = <&gpio1 25 0>;
++	phy-reset-gpios = <&gpio1 25 GPIO_ACTIVE_LOW>;
+ 	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
+ 			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
+ 	fsl,err006687-workaround-present;
+diff --git a/arch/arm/boot/dts/imx6q-gw5400-a.dts b/arch/arm/boot/dts/imx6q-gw5400-a.dts
+index 687ab91..9dbeea0 100644
+--- a/arch/arm/boot/dts/imx6q-gw5400-a.dts
++++ b/arch/arm/boot/dts/imx6q-gw5400-a.dts
+@@ -153,7 +153,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet>;
+ 	phy-mode = "rgmii-id";
+-	phy-reset-gpios = <&gpio1 30 GPIO_ACTIVE_HIGH>;
++	phy-reset-gpios = <&gpio1 30 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6q-novena.dts b/arch/arm/boot/dts/imx6q-novena.dts
+index 0fa32b2..c21db67 100644
+--- a/arch/arm/boot/dts/imx6q-novena.dts
++++ b/arch/arm/boot/dts/imx6q-novena.dts
+@@ -217,7 +217,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet_novena>;
+ 	phy-mode = "rgmii";
+-	phy-reset-gpios = <&gpio3 23 GPIO_ACTIVE_HIGH>;
++	phy-reset-gpios = <&gpio3 23 GPIO_ACTIVE_LOW>;
+ 	rxc-skew-ps = <3000>;
+ 	rxdv-skew-ps = <0>;
+ 	txc-skew-ps = <3000>;
+diff --git a/arch/arm/boot/dts/imx6qdl-aristainetos.dtsi b/arch/arm/boot/dts/imx6qdl-aristainetos.dtsi
+index b2debc0..7d64075 100644
+--- a/arch/arm/boot/dts/imx6qdl-aristainetos.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-aristainetos.dtsi
+@@ -118,7 +118,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet>;
+ 	phy-mode = "rmii";
+-	phy-reset-gpios = <&gpio3 29 GPIO_ACTIVE_HIGH>;
++	phy-reset-gpios = <&gpio3 29 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi b/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi
+index ec68f1c..ed6a89f 100644
+--- a/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi
+@@ -320,7 +320,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet>;
+ 	phy-mode = "rgmii";
+-	phy-reset-gpios = <&gpio7 18 GPIO_ACTIVE_HIGH>;
++	phy-reset-gpios = <&gpio7 18 GPIO_ACTIVE_LOW>;
+ 	txd0-skew-ps = <0>;
+ 	txd1-skew-ps = <0>;
+ 	txd2-skew-ps = <0>;
+diff --git a/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi b/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
+index a9b2077..900e8c7 100644
+--- a/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
+@@ -46,7 +46,7 @@
+ 	pinctrl-0 = <&pinctrl_microsom_enet_ar8035>;
+ 	phy-mode = "rgmii";
+ 	phy-reset-duration = <2>;
+-	phy-reset-gpios = <&gpio4 15 0>;
++	phy-reset-gpios = <&gpio4 15 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+index 70772eb..f22e587 100644
+--- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+@@ -271,7 +271,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet>;
+ 	phy-mode = "rgmii";
+-	phy-reset-gpios = <&gpio1 27 0>;
++	phy-reset-gpios = <&gpio1 27 GPIO_ACTIVE_LOW>;
+ 	txen-skew-ps = <0>;
+ 	txc-skew-ps = <3000>;
+ 	rxdv-skew-ps = <0>;
+diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+index 58055ce..db705f1 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -178,7 +178,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet>;
+ 	phy-mode = "rgmii";
+-	phy-reset-gpios = <&gpio1 25 0>;
++	phy-reset-gpios = <&gpio1 25 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-tx6.dtsi b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
+index 1691714..32ad581 100644
+--- a/arch/arm/boot/dts/imx6qdl-tx6.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
+@@ -249,7 +249,7 @@
+ 		 <&clks IMX6QDL_CLK_ENET_REF>;
+ 	clock-names = "ipg", "ahb", "ptp", "enet_out";
+ 	phy-mode = "rmii";
+-	phy-reset-gpios = <&gpio7 6 GPIO_ACTIVE_HIGH>;
++	phy-reset-gpios = <&gpio7 6 GPIO_ACTIVE_LOW>;
+ 	phy-handle = <&etnphy>;
+ 	phy-supply = <&reg_3v3_etn>;
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+index 850cead..b4fa7f1 100644
+--- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+@@ -209,7 +209,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet>;
+ 	phy-mode = "rgmii";
+-	phy-reset-gpios = <&gpio3 29 0>;
++	phy-reset-gpios = <&gpio3 29 GPIO_ACTIVE_LOW>;
+ 	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
+ 			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
+ 	fsl,err006687-workaround-present;
+diff --git a/arch/arm/boot/dts/imx6ul-tx6ul-mainboard.dts b/arch/arm/boot/dts/imx6ul-tx6ul-mainboard.dts
+index 7c5dd1b..28d055e 100644
+--- a/arch/arm/boot/dts/imx6ul-tx6ul-mainboard.dts
++++ b/arch/arm/boot/dts/imx6ul-tx6ul-mainboard.dts
+@@ -78,7 +78,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet2 &pinctrl_enet2_mdio &pinctrl_etnphy1_rst>;
+ 	phy-mode = "rmii";
+-	phy-reset-gpios = <&gpio4 28 GPIO_ACTIVE_HIGH>;
++	phy-reset-gpios = <&gpio4 28 GPIO_ACTIVE_LOW>;
+ 	phy-supply = <&reg_3v3_etn>;
+ 	phy-handle = <&etnphy1>;
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/imx6ul-tx6ul.dtsi b/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
+index c784a0b..1c6e09b 100644
+--- a/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
++++ b/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
+@@ -308,7 +308,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet1 &pinctrl_enet1_mdio &pinctrl_etnphy0_rst>;
+ 	phy-mode = "rmii";
+-	phy-reset-gpios = <&gpio5 6 GPIO_ACTIVE_HIGH>;
++	phy-reset-gpios = <&gpio5 6 GPIO_ACTIVE_LOW>;
+ 	phy-supply = <&reg_3v3_etn>;
+ 	phy-handle = <&etnphy0>;
+ 	status = "okay";
+@@ -343,7 +343,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet2 &pinctrl_etnphy1_rst>;
+ 	phy-mode = "rmii";
+-	phy-reset-gpios = <&gpio4 28 GPIO_ACTIVE_HIGH>;
++	phy-reset-gpios = <&gpio4 28 GPIO_ACTIVE_LOW>;
+ 	phy-supply = <&reg_3v3_etn>;
+ 	phy-handle = <&etnphy1>;
+ 	status = "disabled";
 -- 
-2.9.4
+2.7.4
