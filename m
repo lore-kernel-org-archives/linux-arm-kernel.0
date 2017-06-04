@@ -1,43 +1,120 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sun, 4 Jun 2017 22:13:09 +0200 (CEST)
-Subject: Design of interrupt controller driver
-In-Reply-To: <025780ef-06e6-1e85-58da-4ce8f6c93536@free.fr>
-References: <8bce8bdd-5801-f0c3-ada3-e1c68acc8913@free.fr>
- <alpine.DEB.2.20.1706041551530.2813@nanos>
- <025780ef-06e6-1e85-58da-4ce8f6c93536@free.fr>
-Message-ID: <alpine.DEB.2.20.1706042208080.3517@nanos>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Sun, 04 Jun 2017 22:20:38 +0200
+Subject: [PATCH 3/3] ARM: dts: meson8: add and use the real clock
+ controller
+In-Reply-To: <20170604183341.21417-4-martin.blumenstingl@googlemail.com>
+References: <20170604183341.21417-1-martin.blumenstingl@googlemail.com>
+ <20170604183341.21417-4-martin.blumenstingl@googlemail.com>
+Message-ID: <1496607638.3552.20.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 4 Jun 2017, Mason wrote:
-> On 04/06/2017 15:55, Thomas Gleixner wrote:
-> >> As for the DMA interrupt, the HW designers consider it
-> >> a level interrupt. When the engine is busy processing
-> >> a command, the interrupt signal is low; when the engine's
-> >> command queue is empty, the interrupt signal is high.
-> >> Thus, there is no risk of "missing a pulse". But maz
-> >> has stated twice that the relevant *event* is the
-> >> transition from "busy" to "idle", which makes this
-> >> an edge (rising) interrupt. However, it doesn't have
-> >> the problem described in 2)  The interrupt signal
-> >> will remain high, so there is no risk of "missing"
-> >> a pulse. So they can be grouped. Is that correct?
-> > 
-> > That depends on the DMA controller. If you can disable the interrupt line
-> > at the DMA device level, then you can use that scheme. If not, you'll get
-> > an interrupt storm as long as the DMA engine is idle.
+On Sun, 2017-06-04 at 20:33 +0200, Martin Blumenstingl wrote:
+> This removes the dummy clk81 gate and replaces it with the actual clock
+> controller's CLKID_CLK81. This will also allow us to pass the real clock
+> IDs to all devices where the clock is controlled by clkc in the future.
 > 
-> I don't follow.
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 
-Sorry, hit send too early. Let me rephrase:
+This is going in the right direction and at least align meson8 and meson8b.
 
-When you configure the interrupt as edge then you cannot share it. No
-matter whether it stays high or not.
+Acked-by: Jerome Brunet <jbrunet@baylibre.com>
 
-The only way to share it is, to configure it as level interrupt. But that
-requires that you can disable the interrupt at the DMA device level once it
-triggered. Otherwise you get an interrupt storm.
+Later on, I'm wondering if some of these clock assignments should be moved to
+meson.dtsi ? meson8.dtsi and meson8b.dtsi look very similar 
 
-Thanks,
-
-	tglx
+> ---
+> ?arch/arm/boot/dts/meson8.dtsi | 32 ++++++++++++++++----------------
+> ?1 file changed, 16 insertions(+), 16 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/meson8.dtsi b/arch/arm/boot/dts/meson8.dtsi
+> index 6993077331c7..9b0b3ddbb17e 100644
+> --- a/arch/arm/boot/dts/meson8.dtsi
+> +++ b/arch/arm/boot/dts/meson8.dtsi
+> @@ -43,6 +43,7 @@
+> ? *?????OTHER DEALINGS IN THE SOFTWARE.
+> ? */
+> ?
+> +#include <dt-bindings/clock/meson8b-clkc.h>
+> ?#include <dt-bindings/gpio/meson8-gpio.h>
+> ?/include/ "meson.dtsi"
+> ?
+> @@ -82,13 +83,6 @@
+> ?			reg = <0x203>;
+> ?		};
+> ?	};
+> -
+> -	clk81: clk at 0 {
+> -		#clock-cells = <0>;
+> -		compatible = "fixed-clock";
+> -		clock-frequency = <141666666>;
+> -	};
+> -
+> ?}; /* end of / */
+> ?
+> ?&aobus {
+> @@ -126,6 +120,12 @@
+> ?};
+> ?
+> ?&cbus {
+> +	clkc: clock-controller at 4000 {
+> +		#clock-cells = <1>;
+> +		compatible = "amlogic,meson8-clkc";
+> +		reg = <0x8000 0x4>, <0x4000 0x460>;
+> +	};
+> +
+> ?	pinctrl_cbus: pinctrl at 9880 {
+> ?		compatible = "amlogic,meson8-cbus-pinctrl";
+> ?		reg = <0x9880 0x10>;
+> @@ -172,20 +172,20 @@
+> ?};
+> ?
+> ?&ethmac {
+> -	clocks = <&clk81>;
+> +	clocks = <&clkc CLKID_CLK81>;
+> ?	clock-names = "stmmaceth";
+> ?};
+> ?
+> ?&i2c_AO {
+> -	clocks = <&clk81>;
+> +	clocks = <&clkc CLKID_CLK81>;
+> ?};
+> ?
+> ?&i2c_A {
+> -	clocks = <&clk81>;
+> +	clocks = <&clkc CLKID_CLK81>;
+> ?};
+> ?
+> ?&i2c_B {
+> -	clocks = <&clk81>;
+> +	clocks = <&clkc CLKID_CLK81>;
+> ?};
+> ?
+> ?&L2 {
+> @@ -195,21 +195,21 @@
+> ?};
+> ?
+> ?&spifc {
+> -	clocks = <&clk81>;
+> +	clocks = <&clkc CLKID_CLK81>;
+> ?};
+> ?
+> ?&uart_AO {
+> -	clocks = <&clk81>;
+> +	clocks = <&clkc CLKID_CLK81>;
+> ?};
+> ?
+> ?&uart_A {
+> -	clocks = <&clk81>;
+> +	clocks = <&clkc CLKID_CLK81>;
+> ?};
+> ?
+> ?&uart_B {
+> -	clocks = <&clk81>;
+> +	clocks = <&clkc CLKID_CLK81>;
+> ?};
+> ?
+> ?&uart_C {
+> -	clocks = <&clk81>;
+> +	clocks = <&clkc CLKID_CLK81>;
+> ?};
