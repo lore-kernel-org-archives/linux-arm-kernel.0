@@ -1,58 +1,57 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon,  5 Jun 2017 00:01:38 +0800
-Subject: [PATCH v2 00/11] Support for H3 Composite Output support
-Message-ID: <20170604160149.30230-1-icenowy@aosc.io>
+Date: Mon,  5 Jun 2017 00:01:40 +0800
+Subject: [PATCH v2 02/11] drm: sun4i: add support for H3 mixers
+In-Reply-To: <20170604160149.30230-1-icenowy@aosc.io>
+References: <20170604160149.30230-1-icenowy@aosc.io>
+Message-ID: <20170604160149.30230-3-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner H3 SoC features a TV Encoder like the one in Allwinner A13,
-which can only output TV Composite signal.
+From: Icenowy Zheng <icenowy@aosc.xyz>
 
-The display pipeline of H3 is also special -- it has two mixers and
-two TCONs, of which the connection can be swapped. The TCONs do not
-have channel 0 (as they are all connected to internal bridges, TVE
-and HDMI TX).
+Allwinner H3 SoC has two mixers, one has 1 VI channel and 3 UI channels,
+and the other has 1 VI and 1 UI.
 
-Add support for the display pipeline and the TVE in H3, in order to
-make it possible to display something with mainline kernel with H3.
+Add support for these two variants.
 
-The image quality of TVE is bad, so HDMI is a better output -- this
-patchset also prepared the mixers and TCONs for HDMI output, and
-the HDMI controller driver is already done by Jernej Skrabec.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
+ drivers/gpu/drm/sun4i/sun8i_mixer.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-So if possible, please apply PATCH 1~5 and 8,9 as soon as possible,
-so that Jernej can submit his HDMI patches.
-
-Currently the jack detection feature of the TVE is still not so
-clear -- so it's not implemented in this version. Thus the TV
-output shouldn't be defaultly enabled now.
-
-Icenowy Zheng (11):
-  dt-bindings: update the binding for Allwinner H3 TVE support
-  drm: sun4i: add support for H3 mixers
-  drm: sun4i: ignore swapped mixer<->tcon connection for DE2
-  drm: sun4i: add support for H3's TCON0/1
-  drm: sun4i: add compatible for H3 display engine
-  drm: sun4i: add color space correction support for DE2 mixer
-  drm: sun4i: add support for the TV encoder in H3 SoC
-  clk: sunxi-ng: allow CLK_DE to set CLK_PLL_DE for H3
-  clk: sunxi-ng: export CLK_PLL_DE for H3
-  ARM: sun8i: h3: add display engine pipeline for TVE
-  [DO NOT MERGE] ARM: sun8i: h3: enable TV output on Orange Pi PC
-
- .../bindings/display/sunxi/sun4i-drm.txt           |  37 +++-
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |  12 ++
- arch/arm/boot/dts/sun8i-h3.dtsi                    | 186 +++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu-sun8i-h3.c                |   2 +-
- drivers/clk/sunxi-ng/ccu-sun8i-h3.h                |   3 +-
- drivers/gpu/drm/sun4i/sun4i_drv.c                  |  46 +++++
- drivers/gpu/drm/sun4i/sun4i_tcon.c                 | 113 ++++++++++---
- drivers/gpu/drm/sun4i/sun4i_tcon.h                 |   3 +
- drivers/gpu/drm/sun4i/sun4i_tv.c                   |  35 +++-
- drivers/gpu/drm/sun4i/sun8i_mixer.c                |  53 ++++++
- drivers/gpu/drm/sun4i/sun8i_mixer.h                |   6 +-
- include/dt-bindings/clock/sun8i-h3-ccu.h           |   2 +
- 12 files changed, 463 insertions(+), 35 deletions(-)
-
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+index cb193c5f1686..d658a3a8159a 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+@@ -390,11 +390,29 @@ static const struct sun8i_mixer_cfg sun8i_v3s_mixer_cfg = {
+ 	.ui_num = 1,
+ };
+ 
++static const struct sun8i_mixer_cfg sun8i_h3_mixer0_cfg = {
++	.vi_num = 1,
++	.ui_num = 3,
++};
++
++static const struct sun8i_mixer_cfg sun8i_h3_mixer1_cfg = {
++	.vi_num = 1,
++	.ui_num = 1,
++};
++
+ static const struct of_device_id sun8i_mixer_of_table[] = {
+ 	{
+ 		.compatible = "allwinner,sun8i-v3s-de2-mixer",
+ 		.data = &sun8i_v3s_mixer_cfg,
+ 	},
++	{
++		.compatible = "allwinner,sun8i-h3-de2-mixer0",
++		.data = &sun8i_h3_mixer0_cfg
++	},
++	{
++		.compatible = "allwinner,sun8i-h3-de2-mixer1",
++		.data = &sun8i_h3_mixer1_cfg
++	},
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(of, sun8i_mixer_of_table);
 -- 
 2.12.2
