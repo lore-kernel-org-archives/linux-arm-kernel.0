@@ -1,460 +1,206 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Sun,  4 Jun 2017 14:59:58 +0300
-Subject: [PATCH 09/20] arm64: introduce is_a32_task and is_a32_thread (for
- AArch32 compat)
-In-Reply-To: <20170604120009.342-1-ynorov@caviumnetworks.com>
-References: <20170604120009.342-1-ynorov@caviumnetworks.com>
-Message-ID: <20170604120009.342-10-ynorov@caviumnetworks.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Sun, 4 Jun 2017 14:41:13 +0200
+Subject: [PATCH v2 3/3] KVM: arm/arm64: Simplify active_change_prepare
+ and plug race
+In-Reply-To: <20170604115737.GA9464@cbox>
+References: <20170516100431.4101-1-cdall@linaro.org>
+ <20170516100431.4101-4-cdall@linaro.org>
+ <9a412ed2-70ea-b651-dd75-18d723ee8b71@arm.com>
+ <20170523084329.GC6319@cbox>
+ <20170604081557.rhda3xp34mgkf7ow@hawk.localdomain>
+ <20170604115737.GA9464@cbox>
+Message-ID: <20170604124113.uupopprn3myy4zqh@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on patch of Andrew Pinski.
+On Sun, Jun 04, 2017 at 01:57:37PM +0200, Christoffer Dall wrote:
+> On Sun, Jun 04, 2017 at 10:15:57AM +0200, Andrew Jones wrote:
+> > On Tue, May 23, 2017 at 10:43:29AM +0200, Christoffer Dall wrote:
+> > > On Mon, May 22, 2017 at 04:30:22PM +0100, Marc Zyngier wrote:
+> > > > On 16/05/17 11:04, Christoffer Dall wrote:
+> > > > > We don't need to stop a specific VCPU when changing the active state,
+> > > > > because private IRQs can only be modified by a running VCPU for the
+> > > > > VCPU itself and it is therefore already stopped.
+> > > > > 
+> > > > > However, it is also possible for two VCPUs to be modifying the active
+> > > > > state of SPIs at the same time, which can cause the thread being stuck
+> > > > > in the loop that checks other VCPU threads for a potentially very long
+> > > > > time, or to modify the active state of a running VCPU.  Fix this by
+> > > > > serializing all accesses to setting and clearing the active state of
+> > > > > interrupts using the KVM mutex.
+> > > > > 
+> > > > > Reported-by: Andrew Jones <drjones@redhat.com>
+> > > > > Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> > > > > ---
+> > > > >  arch/arm/include/asm/kvm_host.h   |  2 --
+> > > > >  arch/arm64/include/asm/kvm_host.h |  2 --
+> > > > >  virt/kvm/arm/arm.c                | 20 ++++----------------
+> > > > >  virt/kvm/arm/vgic/vgic-mmio.c     | 18 ++++++++++--------
+> > > > >  virt/kvm/arm/vgic/vgic.c          | 11 ++++++-----
+> > > > >  5 files changed, 20 insertions(+), 33 deletions(-)
+> > > > > 
+> > > > > diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> > > > > index f0e6657..12274d4 100644
+> > > > > --- a/arch/arm/include/asm/kvm_host.h
+> > > > > +++ b/arch/arm/include/asm/kvm_host.h
+> > > > > @@ -233,8 +233,6 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
+> > > > >  struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
+> > > > >  void kvm_arm_halt_guest(struct kvm *kvm);
+> > > > >  void kvm_arm_resume_guest(struct kvm *kvm);
+> > > > > -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu);
+> > > > > -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu);
+> > > > >  
+> > > > >  int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices);
+> > > > >  unsigned long kvm_arm_num_coproc_regs(struct kvm_vcpu *vcpu);
+> > > > > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> > > > > index 5e19165..32cbe8a 100644
+> > > > > --- a/arch/arm64/include/asm/kvm_host.h
+> > > > > +++ b/arch/arm64/include/asm/kvm_host.h
+> > > > > @@ -333,8 +333,6 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
+> > > > >  struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
+> > > > >  void kvm_arm_halt_guest(struct kvm *kvm);
+> > > > >  void kvm_arm_resume_guest(struct kvm *kvm);
+> > > > > -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu);
+> > > > > -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu);
+> > > > >  
+> > > > >  u64 __kvm_call_hyp(void *hypfn, ...);
+> > > > >  #define kvm_call_hyp(f, ...) __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__)
+> > > > > diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> > > > > index 3417e18..3c387fd 100644
+> > > > > --- a/virt/kvm/arm/arm.c
+> > > > > +++ b/virt/kvm/arm/arm.c
+> > > > > @@ -539,27 +539,15 @@ void kvm_arm_halt_guest(struct kvm *kvm)
+> > > > >  	kvm_make_all_cpus_request(kvm, KVM_REQ_VCPU_EXIT);
+> > > > >  }
+> > > > >  
+> > > > > -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu)
+> > > > > -{
+> > > > > -	vcpu->arch.pause = true;
+> > > > > -	kvm_vcpu_kick(vcpu);
+> > > > > -}
+> > > > > -
+> > > > > -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu)
+> > > > > -{
+> > > > > -	struct swait_queue_head *wq = kvm_arch_vcpu_wq(vcpu);
+> > > > > -
+> > > > > -	vcpu->arch.pause = false;
+> > > > > -	swake_up(wq);
+> > > > > -}
+> > > > > -
+> > > > >  void kvm_arm_resume_guest(struct kvm *kvm)
+> > > > >  {
+> > > > >  	int i;
+> > > > >  	struct kvm_vcpu *vcpu;
+> > > > >  
+> > > > > -	kvm_for_each_vcpu(i, vcpu, kvm)
+> > > > > -		kvm_arm_resume_vcpu(vcpu);
+> > > > > +	kvm_for_each_vcpu(i, vcpu, kvm) {
+> > > > > +		vcpu->arch.pause = false;
+> > > > > +		swake_up(kvm_arch_vcpu_wq(vcpu));
+> > > > > +	}
+> > > > >  }
+> > > > >  
+> > > > >  static void vcpu_sleep(struct kvm_vcpu *vcpu)
+> > > > > diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+> > > > > index 64cbcb4..c1e4bdd 100644
+> > > > > --- a/virt/kvm/arm/vgic/vgic-mmio.c
+> > > > > +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+> > > > > @@ -231,23 +231,21 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+> > > > >   * be migrated while we don't hold the IRQ locks and we don't want to be
+> > > > >   * chasing moving targets.
+> > > > >   *
+> > > > > - * For private interrupts, we only have to make sure the single and only VCPU
+> > > > > - * that can potentially queue the IRQ is stopped.
+> > > > > + * For private interrupts we don't have to do anything because userspace
+> > > > > + * accesses to the VGIC state already require all VCPUs to be stopped, and
+> > > > > + * only the VCPU itself can modify its private interrupts active state, which
+> > > > > + * guarantees that the VCPU is not running.
+> > > > >   */
+> > > > >  static void vgic_change_active_prepare(struct kvm_vcpu *vcpu, u32 intid)
+> > > > >  {
+> > > > > -	if (intid < VGIC_NR_PRIVATE_IRQS)
+> > > > > -		kvm_arm_halt_vcpu(vcpu);
+> > > > > -	else
+> > > > > +	if (intid > VGIC_NR_PRIVATE_IRQS)
+> > > > >  		kvm_arm_halt_guest(vcpu->kvm);
+> > > > >  }
+> > > > >  
+> > > > >  /* See vgic_change_active_prepare */
+> > > > >  static void vgic_change_active_finish(struct kvm_vcpu *vcpu, u32 intid)
+> > > > >  {
+> > > > > -	if (intid < VGIC_NR_PRIVATE_IRQS)
+> > > > > -		kvm_arm_resume_vcpu(vcpu);
+> > > > > -	else
+> > > > > +	if (intid > VGIC_NR_PRIVATE_IRQS)
+> > > > >  		kvm_arm_resume_guest(vcpu->kvm);
+> > > > >  }
+> > > > >  
+> > > > > @@ -271,11 +269,13 @@ void vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
+> > > > >  {
+> > > > >  	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
+> > > > >  
+> > > > > +	mutex_lock(&vcpu->kvm->lock);
+> > > > >  	vgic_change_active_prepare(vcpu, intid);
+> > > > >  
+> > > > >  	__vgic_mmio_write_cactive(vcpu, addr, len, val);
+> > > > >  
+> > > > >  	vgic_change_active_finish(vcpu, intid);
+> > > > > +	mutex_unlock(&vcpu->kvm->lock);
+> > > > 
+> > > > Any reason not to move the lock/unlock calls to prepare/finish? Also, do
+> > > > we need to take that mutex if intid is a PPI?
+> > > 
+> > > I guess we strictly don't need to take the mutex if it's a PPI, no.
+> > > 
+> > > But I actually preferred this symmetry because you can easily tell we
+> > > don't have a bug (famous last words) by locking and unlocking the mutex
+> > > in the same function.
+> > > 
+> > > I don't feel strongly about it though, so I can move it if you prefer
+> > > it.
+> > 
+> > Actually we must move the locking into the prepare/finish functions, in
+> > order to tuck them into the VGIC_NR_PRIVATE_IRQS conditions. Otherwise,
+> > with gicv3, when userspace accesses ISACTIVER0/ICACTIVER0, which are
+> > SGI_base offsets, then the vgic_v3_sgibase_registers table is used. That
+> > table doesn't provide the uaccess functions, so we try to lock twice
+> > again.
+> > 
+> 
+> Nice find.
+> 
+> How about we always use the uaccess functions or uaccesses instead? :
 
-This patch introduces is_a32_compat_task and is_a32_thread so it is
-easier to say this is a a32 specific thread or a generic compat thread/task.
-Corresponding functions are located in <asm/is_compat.h> to avoid mess in
-headers.
+Yeah, that's a better suggestion. u-access, i-access, we-all-access :-)
 
-Some files include both <linux/compat.h> and <asm/compat.h>,
-and this is wrong because <linux/compat.h> has <asm/compat.h> already
-included. It was fixed too.
+drew
 
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
-Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@linaro.org>
----
- arch/arm64/include/asm/compat.h      | 19 ++---------
- arch/arm64/include/asm/elf.h         | 10 +++---
- arch/arm64/include/asm/ftrace.h      |  2 +-
- arch/arm64/include/asm/is_compat.h   | 64 ++++++++++++++++++++++++++++++++++++
- arch/arm64/include/asm/memory.h      |  5 +--
- arch/arm64/include/asm/processor.h   |  5 +--
- arch/arm64/include/asm/syscall.h     |  2 +-
- arch/arm64/include/asm/thread_info.h |  2 +-
- arch/arm64/kernel/hw_breakpoint.c    |  8 ++---
- arch/arm64/kernel/perf_regs.c        |  2 +-
- arch/arm64/kernel/process.c          |  7 ++--
- arch/arm64/kernel/ptrace.c           | 11 +++----
- arch/arm64/kernel/signal.c           |  4 +--
- arch/arm64/kernel/traps.c            |  3 +-
- 14 files changed, 97 insertions(+), 47 deletions(-)
- create mode 100644 arch/arm64/include/asm/is_compat.h
-
-diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
-index e39d487bf724..463533b1ae32 100644
---- a/arch/arm64/include/asm/compat.h
-+++ b/arch/arm64/include/asm/compat.h
-@@ -25,6 +25,8 @@
- #include <linux/sched.h>
- #include <linux/sched/task_stack.h>
- 
-+#include <asm/is_compat.h>
-+
- #define COMPAT_USER_HZ		100
- #ifdef __AARCH64EB__
- #define COMPAT_UTS_MACHINE	"armv8b\0\0"
-@@ -299,23 +301,6 @@ struct compat_shmid64_ds {
- 	compat_ulong_t __unused5;
- };
- 
--static inline int is_compat_task(void)
--{
--	return test_thread_flag(TIF_32BIT);
--}
--
--static inline int is_compat_thread(struct thread_info *thread)
--{
--	return test_ti_thread_flag(thread, TIF_32BIT);
--}
--
--#else /* !CONFIG_COMPAT */
--
--static inline int is_compat_thread(struct thread_info *thread)
--{
--	return 0;
--}
--
- #endif /* CONFIG_COMPAT */
- #endif /* __KERNEL__ */
- #endif /* __ASM_COMPAT_H */
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index ac3fb7441510..6a37b6facc69 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -16,6 +16,10 @@
- #ifndef __ASM_ELF_H
- #define __ASM_ELF_H
- 
-+#ifndef __ASSEMBLY__
-+#include <linux/compat.h>
-+#endif
-+
- #include <asm/hwcap.h>
- 
- /*
-@@ -158,13 +162,9 @@ extern int arch_setup_additional_pages(struct linux_binprm *bprm,
- 				       int uses_interp);
- 
- /* 1GB of VA */
--#ifdef CONFIG_COMPAT
--#define STACK_RND_MASK			(test_thread_flag(TIF_32BIT) ? \
-+#define STACK_RND_MASK			(is_compat_task() ? \
- 						0x7ff >> (PAGE_SHIFT - 12) : \
- 						0x3ffff >> (PAGE_SHIFT - 12))
--#else
--#define STACK_RND_MASK			(0x3ffff >> (PAGE_SHIFT - 12))
--#endif
- 
- #ifdef __AARCH64EB__
- #define COMPAT_ELF_PLATFORM		("v8b")
-diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
-index caa955f10e19..0feb28ad10dd 100644
---- a/arch/arm64/include/asm/ftrace.h
-+++ b/arch/arm64/include/asm/ftrace.h
-@@ -54,7 +54,7 @@ static inline unsigned long ftrace_call_adjust(unsigned long addr)
- #define ARCH_TRACE_IGNORE_COMPAT_SYSCALLS
- static inline bool arch_trace_is_compat_syscall(struct pt_regs *regs)
- {
--	return is_compat_task();
-+	return is_a32_compat_task();
- }
- #endif /* ifndef __ASSEMBLY__ */
- 
-diff --git a/arch/arm64/include/asm/is_compat.h b/arch/arm64/include/asm/is_compat.h
-new file mode 100644
-index 000000000000..8dba5caaf5d1
---- /dev/null
-+++ b/arch/arm64/include/asm/is_compat.h
-@@ -0,0 +1,64 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#ifndef __ASM_IS_COMPAT_H
-+#define __ASM_IS_COMPAT_H
-+#ifndef __ASSEMBLY__
-+
-+#include <linux/thread_bits.h>
-+
-+#ifdef CONFIG_AARCH32_EL0
-+
-+static inline int is_a32_compat_task(void)
-+{
-+	return test_thread_flag(TIF_32BIT);
-+}
-+
-+static inline int is_a32_compat_thread(struct thread_info *thread)
-+{
-+	return test_ti_thread_flag(thread, TIF_32BIT);
-+}
-+
-+#else
-+
-+static inline int is_a32_compat_task(void)
-+
-+{
-+	return 0;
-+}
-+
-+static inline int is_a32_compat_thread(struct thread_info *thread)
-+{
-+	return 0;
-+}
-+
-+#endif /* CONFIG_AARCH32_EL0 */
-+
-+#ifdef CONFIG_COMPAT
-+
-+static inline int is_compat_task(void)
-+{
-+	return is_a32_compat_task();
-+}
-+
-+#endif /* CONFIG_COMPAT */
-+
-+static inline int is_compat_thread(struct thread_info *thread)
-+{
-+	return is_a32_compat_thread(thread);
-+}
-+
-+
-+#endif /* !__ASSEMBLY__ */
-+#endif /* __ASM_IS_COMPAT_H */
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 32f82723338a..9b1835ca808f 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -26,6 +26,7 @@
- #include <linux/types.h>
- #include <asm/bug.h>
- #include <asm/sizes.h>
-+#include <asm/is_compat.h>
- 
- /*
-  * Allow for constants defined here to be used from assembly code
-@@ -78,9 +79,9 @@
- 
- #ifdef CONFIG_COMPAT
- #define TASK_SIZE_32		UL(0x100000000)
--#define TASK_SIZE		(test_thread_flag(TIF_32BIT) ? \
-+#define TASK_SIZE		(is_compat_task() ?		\
- 				TASK_SIZE_32 : TASK_SIZE_64)
--#define TASK_SIZE_OF(tsk)	(test_tsk_thread_flag(tsk, TIF_32BIT) ? \
-+#define TASK_SIZE_OF(tsk)	(is_compat_thread(tsk) ? \
- 				TASK_SIZE_32 : TASK_SIZE_64)
- #else
- #define TASK_SIZE		TASK_SIZE_64
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 2bbbd33549c0..0136a1af677d 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -30,6 +30,7 @@
- #include <linux/string.h>
- 
- #include <asm/alternative.h>
-+#include <asm/is_compat.h>
- #include <asm/fpsimd.h>
- #include <asm/hw_breakpoint.h>
- #include <asm/lse.h>
-@@ -40,7 +41,7 @@
- #define STACK_TOP_MAX		TASK_SIZE_64
- #ifdef CONFIG_COMPAT
- #define AARCH32_VECTORS_BASE	0xffff0000
--#define STACK_TOP		(test_thread_flag(TIF_32BIT) ? \
-+#define STACK_TOP		(is_compat_task() ? \
- 				AARCH32_VECTORS_BASE : STACK_TOP_MAX)
- #else
- #define STACK_TOP		STACK_TOP_MAX
-@@ -94,7 +95,7 @@ struct thread_struct {
- #define task_user_tls(t)						\
- ({									\
- 	unsigned long *__tls;						\
--	if (is_compat_thread(task_thread_info(t)))			\
-+	if (is_a32_compat_thread(task_thread_info(t)))			\
- 		__tls = &(t)->thread.tp2_value;				\
- 	else								\
- 		__tls = &(t)->thread.tp_value;				\
-diff --git a/arch/arm64/include/asm/syscall.h b/arch/arm64/include/asm/syscall.h
-index 709a574468f0..ce09641f888d 100644
---- a/arch/arm64/include/asm/syscall.h
-+++ b/arch/arm64/include/asm/syscall.h
-@@ -113,7 +113,7 @@ static inline void syscall_set_arguments(struct task_struct *task,
-  */
- static inline int syscall_get_arch(void)
- {
--	if (is_compat_task())
-+	if (is_a32_compat_task())
- 		return AUDIT_ARCH_ARM;
- 
- 	return AUDIT_ARCH_AARCH64;
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index 46c3b93cf865..a7ffea24d94d 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -95,7 +95,7 @@ struct thread_info {
- #define TIF_FREEZE		19
- #define TIF_RESTORE_SIGMASK	20
- #define TIF_SINGLESTEP		21
--#define TIF_32BIT		22	/* 32bit process */
-+#define TIF_32BIT		22	/* AARCH32 process */
- 
- #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
- #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
-diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-index 749f81779420..49b9a29915c0 100644
---- a/arch/arm64/kernel/hw_breakpoint.c
-+++ b/arch/arm64/kernel/hw_breakpoint.c
-@@ -169,7 +169,7 @@ enum hw_breakpoint_ops {
- 	HW_BREAKPOINT_RESTORE
- };
- 
--static int is_compat_bp(struct perf_event *bp)
-+static int is_a32_compat_bp(struct perf_event *bp)
- {
- 	struct task_struct *tsk = bp->hw.target;
- 
-@@ -180,7 +180,7 @@ static int is_compat_bp(struct perf_event *bp)
- 	 * deprecated behaviour if we use unaligned watchpoints in
- 	 * AArch64 state.
- 	 */
--	return tsk && is_compat_thread(task_thread_info(tsk));
-+	return tsk && is_a32_compat_thread(task_thread_info(tsk));
- }
- 
- /**
-@@ -480,7 +480,7 @@ static int arch_build_bp_info(struct perf_event *bp)
- 	 * Watchpoints can be of length 1, 2, 4 or 8 bytes.
- 	 */
- 	if (info->ctrl.type == ARM_BREAKPOINT_EXECUTE) {
--		if (is_compat_bp(bp)) {
-+		if (is_a32_compat_bp(bp)) {
- 			if (info->ctrl.len != ARM_BREAKPOINT_LEN_2 &&
- 			    info->ctrl.len != ARM_BREAKPOINT_LEN_4)
- 				return -EINVAL;
-@@ -537,7 +537,7 @@ int arch_validate_hwbkpt_settings(struct perf_event *bp)
- 	 * AArch32 tasks expect some simple alignment fixups, so emulate
- 	 * that here.
- 	 */
--	if (is_compat_bp(bp)) {
-+	if (is_a32_compat_bp(bp)) {
- 		if (info->ctrl.len == ARM_BREAKPOINT_LEN_8)
- 			alignment_mask = 0x7;
- 		else
-diff --git a/arch/arm64/kernel/perf_regs.c b/arch/arm64/kernel/perf_regs.c
-index bd1b74c2436f..443e42001108 100644
---- a/arch/arm64/kernel/perf_regs.c
-+++ b/arch/arm64/kernel/perf_regs.c
-@@ -46,7 +46,7 @@ int perf_reg_validate(u64 mask)
- 
- u64 perf_reg_abi(struct task_struct *task)
- {
--	if (is_compat_thread(task_thread_info(task)))
-+	if (is_a32_compat_thread(task_thread_info(task)))
- 		return PERF_SAMPLE_REGS_ABI_32;
- 	else
- 		return PERF_SAMPLE_REGS_ABI_64;
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index af1ea258c212..0fbbe7c96f69 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -51,7 +51,6 @@
- #include <linux/percpu.h>
- 
- #include <asm/alternative.h>
--#include <asm/compat.h>
- #include <asm/cacheflush.h>
- #include <asm/exec.h>
- #include <asm/fpsimd.h>
-@@ -217,7 +216,7 @@ static void tls_thread_flush(void)
- {
- 	write_sysreg(0, tpidr_el0);
- 
--	if (is_compat_task()) {
-+	if (is_a32_compat_task()) {
- 		current->thread.tp_value = 0;
- 
- 		/*
-@@ -269,7 +268,7 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
- 		*task_user_tls(p) = read_sysreg(tpidr_el0);
- 
- 		if (stack_start) {
--			if (is_compat_thread(task_thread_info(p)))
-+			if (is_a32_compat_thread(task_thread_info(p)))
- 				childregs->compat_sp = stack_start;
- 			else
- 				childregs->sp = stack_start;
-@@ -306,7 +305,7 @@ static void tls_thread_switch(struct task_struct *next)
- 	*task_user_tls(current) = tpidr;
- 
- 	tpidr = *task_user_tls(next);
--	tpidrro = is_compat_thread(task_thread_info(next)) ?
-+	tpidrro = is_a32_compat_thread(task_thread_info(next)) ?
- 		  next->thread.tp_value : 0;
- 
- 	write_sysreg(tpidr, tpidr_el0);
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index da908f9a1e05..e2b7c040bf84 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -39,7 +39,6 @@
- #include <linux/tracehook.h>
- #include <linux/elf.h>
- 
--#include <asm/compat.h>
- #include <asm/debug-monitors.h>
- #include <asm/pgtable.h>
- #include <asm/syscall.h>
-@@ -187,7 +186,7 @@ static void ptrace_hbptriggered(struct perf_event *bp,
- #ifdef CONFIG_AARCH32_EL0
- 	int i;
- 
--	if (!is_compat_task())
-+	if (!is_a32_compat_task())
- 		goto send_sig;
- 
- 	for (i = 0; i < ARM_MAX_BRP; ++i) {
-@@ -1312,9 +1311,9 @@ const struct user_regset_view *task_user_regset_view(struct task_struct *task)
- 	 * 32-bit children use an extended user_aarch32_ptrace_view to allow
- 	 * access to the TLS register.
- 	 */
--	if (is_compat_task())
-+	if (is_a32_compat_task())
- 		return &user_aarch32_view;
--	else if (is_compat_thread(task_thread_info(task)))
-+	else if (is_a32_compat_thread(task_thread_info(task)))
- 		return &user_aarch32_ptrace_view;
- #endif
- 	return &user_aarch64_view;
-@@ -1341,7 +1340,7 @@ static void tracehook_report_syscall(struct pt_regs *regs,
- 	 * A scratch register (ip(r12) on AArch32, x7 on AArch64) is
- 	 * used to denote syscall entry/exit:
- 	 */
--	regno = (is_compat_task() ? 12 : 7);
-+	regno = (is_a32_compat_task() ? 12 : 7);
- 	saved_reg = regs->regs[regno];
- 	regs->regs[regno] = dir;
- 
-@@ -1452,7 +1451,7 @@ int valid_user_regs(struct user_pt_regs *regs, struct task_struct *task)
- 	if (!test_tsk_thread_flag(task, TIF_SINGLESTEP))
- 		regs->pstate &= ~DBG_SPSR_SS;
- 
--	if (is_compat_thread(task_thread_info(task)))
-+	if (is_a32_compat_thread(task_thread_info(task)))
- 		return valid_compat_regs(regs);
- 	else
- 		return valid_native_regs(regs);
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index c7b6de62f9d3..5fa1b401c5d6 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -276,7 +276,7 @@ static int setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
- 
- static void setup_restart_syscall(struct pt_regs *regs)
- {
--	if (is_compat_task())
-+	if (is_a32_compat_task())
- 		compat_setup_restart_syscall(regs);
- 	else
- 		regs->regs[8] = __NR_restart_syscall;
-@@ -295,7 +295,7 @@ static void handle_signal(struct ksignal *ksig, struct pt_regs *regs)
- 	/*
- 	 * Set up the stack frame
- 	 */
--	if (is_compat_task()) {
-+	if (is_a32_compat_task()) {
- 		if (ksig->ka.sa.sa_flags & SA_SIGINFO)
- 			ret = compat_setup_rt_frame(usig, ksig, oldset, regs);
- 		else
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 287a21ee39b3..d1e40129afe0 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -18,6 +18,7 @@
-  */
- 
- #include <linux/bug.h>
-+#include <linux/compat.h>
- #include <linux/signal.h>
- #include <linux/personality.h>
- #include <linux/kallsyms.h>
-@@ -578,7 +579,7 @@ asmlinkage long do_ni_syscall(struct pt_regs *regs)
- {
- #ifdef CONFIG_AARCH32_EL0
- 	long ret;
--	if (is_compat_task()) {
-+	if (is_a32_compat_task()) {
- 		ret = compat_arm_syscall(regs);
- 		if (ret != -ENOSYS)
- 			return ret;
--- 
-2.11.0
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> index 23c0d564..e25567a 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> @@ -528,12 +528,14 @@ static const struct vgic_register_region vgic_v3_sgibase_registers[] = {
+>  		vgic_mmio_read_pending, vgic_mmio_write_cpending,
+>  		vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
+>  		VGIC_ACCESS_32bit),
+> -	REGISTER_DESC_WITH_LENGTH(GICR_ISACTIVER0,
+> -		vgic_mmio_read_active, vgic_mmio_write_sactive, 4,
+> -		VGIC_ACCESS_32bit),
+> -	REGISTER_DESC_WITH_LENGTH(GICR_ICACTIVER0,
+> -		vgic_mmio_read_active, vgic_mmio_write_cactive, 4,
+> -		VGIC_ACCESS_32bit),
+> +	REGISTER_DESC_WITH_LENGTH_UACCESS(GICR_ISACTIVER0,
+> +		vgic_mmio_read_active, vgic_mmio_write_sactive,
+> +		NULL, vgic_mmio_uaccess_write_sactive,
+> +		4, VGIC_ACCESS_32bit),
+> +	REGISTER_DESC_WITH_LENGTH_UACCESS(GICR_ICACTIVER0,
+> +		vgic_mmio_read_active, vgic_mmio_write_cactive,
+> +		NULL, vgic_mmio_uaccess_write_cactive,
+> +		4, VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_LENGTH(GICR_IPRIORITYR0,
+>  		vgic_mmio_read_priority, vgic_mmio_write_priority, 32,
+>  		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
+> 
+> Thanks,
+> -Christoffer
