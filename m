@@ -1,181 +1,147 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 4 Jun 2017 16:45:55 +0200
-Subject: [PATCH v2 3/3] KVM: arm/arm64: Simplify active_change_prepare
- and plug race
-In-Reply-To: <20170604124113.uupopprn3myy4zqh@kamzik.brq.redhat.com>
-References: <20170516100431.4101-1-cdall@linaro.org>
- <20170516100431.4101-4-cdall@linaro.org>
- <9a412ed2-70ea-b651-dd75-18d723ee8b71@arm.com>
- <20170523084329.GC6319@cbox>
- <20170604081557.rhda3xp34mgkf7ow@hawk.localdomain>
- <20170604115737.GA9464@cbox>
- <20170604124113.uupopprn3myy4zqh@kamzik.brq.redhat.com>
-Message-ID: <20170604144555.GC9464@cbox>
+Date: Sun, 4 Jun 2017 16:59:05 +0200
+Subject: [PATCH v2 04/25] KVM: arm64: vgic-v3: Add hook to handle guest
+ GICv3 sysreg accesses at EL2
+In-Reply-To: <20170601102117.17750-5-marc.zyngier@arm.com>
+References: <20170601102117.17750-1-marc.zyngier@arm.com>
+ <20170601102117.17750-5-marc.zyngier@arm.com>
+Message-ID: <20170604145905.GG9464@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 04, 2017 at 02:41:13PM +0200, Andrew Jones wrote:
-> On Sun, Jun 04, 2017 at 01:57:37PM +0200, Christoffer Dall wrote:
-> > On Sun, Jun 04, 2017 at 10:15:57AM +0200, Andrew Jones wrote:
-> > > On Tue, May 23, 2017 at 10:43:29AM +0200, Christoffer Dall wrote:
-> > > > On Mon, May 22, 2017 at 04:30:22PM +0100, Marc Zyngier wrote:
-> > > > > On 16/05/17 11:04, Christoffer Dall wrote:
-> > > > > > We don't need to stop a specific VCPU when changing the active state,
-> > > > > > because private IRQs can only be modified by a running VCPU for the
-> > > > > > VCPU itself and it is therefore already stopped.
-> > > > > > 
-> > > > > > However, it is also possible for two VCPUs to be modifying the active
-> > > > > > state of SPIs at the same time, which can cause the thread being stuck
-> > > > > > in the loop that checks other VCPU threads for a potentially very long
-> > > > > > time, or to modify the active state of a running VCPU.  Fix this by
-> > > > > > serializing all accesses to setting and clearing the active state of
-> > > > > > interrupts using the KVM mutex.
-> > > > > > 
-> > > > > > Reported-by: Andrew Jones <drjones@redhat.com>
-> > > > > > Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> > > > > > ---
-> > > > > >  arch/arm/include/asm/kvm_host.h   |  2 --
-> > > > > >  arch/arm64/include/asm/kvm_host.h |  2 --
-> > > > > >  virt/kvm/arm/arm.c                | 20 ++++----------------
-> > > > > >  virt/kvm/arm/vgic/vgic-mmio.c     | 18 ++++++++++--------
-> > > > > >  virt/kvm/arm/vgic/vgic.c          | 11 ++++++-----
-> > > > > >  5 files changed, 20 insertions(+), 33 deletions(-)
-> > > > > > 
-> > > > > > diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> > > > > > index f0e6657..12274d4 100644
-> > > > > > --- a/arch/arm/include/asm/kvm_host.h
-> > > > > > +++ b/arch/arm/include/asm/kvm_host.h
-> > > > > > @@ -233,8 +233,6 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
-> > > > > >  struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
-> > > > > >  void kvm_arm_halt_guest(struct kvm *kvm);
-> > > > > >  void kvm_arm_resume_guest(struct kvm *kvm);
-> > > > > > -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu);
-> > > > > > -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu);
-> > > > > >  
-> > > > > >  int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices);
-> > > > > >  unsigned long kvm_arm_num_coproc_regs(struct kvm_vcpu *vcpu);
-> > > > > > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> > > > > > index 5e19165..32cbe8a 100644
-> > > > > > --- a/arch/arm64/include/asm/kvm_host.h
-> > > > > > +++ b/arch/arm64/include/asm/kvm_host.h
-> > > > > > @@ -333,8 +333,6 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
-> > > > > >  struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
-> > > > > >  void kvm_arm_halt_guest(struct kvm *kvm);
-> > > > > >  void kvm_arm_resume_guest(struct kvm *kvm);
-> > > > > > -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu);
-> > > > > > -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu);
-> > > > > >  
-> > > > > >  u64 __kvm_call_hyp(void *hypfn, ...);
-> > > > > >  #define kvm_call_hyp(f, ...) __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__)
-> > > > > > diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> > > > > > index 3417e18..3c387fd 100644
-> > > > > > --- a/virt/kvm/arm/arm.c
-> > > > > > +++ b/virt/kvm/arm/arm.c
-> > > > > > @@ -539,27 +539,15 @@ void kvm_arm_halt_guest(struct kvm *kvm)
-> > > > > >  	kvm_make_all_cpus_request(kvm, KVM_REQ_VCPU_EXIT);
-> > > > > >  }
-> > > > > >  
-> > > > > > -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu)
-> > > > > > -{
-> > > > > > -	vcpu->arch.pause = true;
-> > > > > > -	kvm_vcpu_kick(vcpu);
-> > > > > > -}
-> > > > > > -
-> > > > > > -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu)
-> > > > > > -{
-> > > > > > -	struct swait_queue_head *wq = kvm_arch_vcpu_wq(vcpu);
-> > > > > > -
-> > > > > > -	vcpu->arch.pause = false;
-> > > > > > -	swake_up(wq);
-> > > > > > -}
-> > > > > > -
-> > > > > >  void kvm_arm_resume_guest(struct kvm *kvm)
-> > > > > >  {
-> > > > > >  	int i;
-> > > > > >  	struct kvm_vcpu *vcpu;
-> > > > > >  
-> > > > > > -	kvm_for_each_vcpu(i, vcpu, kvm)
-> > > > > > -		kvm_arm_resume_vcpu(vcpu);
-> > > > > > +	kvm_for_each_vcpu(i, vcpu, kvm) {
-> > > > > > +		vcpu->arch.pause = false;
-> > > > > > +		swake_up(kvm_arch_vcpu_wq(vcpu));
-> > > > > > +	}
-> > > > > >  }
-> > > > > >  
-> > > > > >  static void vcpu_sleep(struct kvm_vcpu *vcpu)
-> > > > > > diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-> > > > > > index 64cbcb4..c1e4bdd 100644
-> > > > > > --- a/virt/kvm/arm/vgic/vgic-mmio.c
-> > > > > > +++ b/virt/kvm/arm/vgic/vgic-mmio.c
-> > > > > > @@ -231,23 +231,21 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
-> > > > > >   * be migrated while we don't hold the IRQ locks and we don't want to be
-> > > > > >   * chasing moving targets.
-> > > > > >   *
-> > > > > > - * For private interrupts, we only have to make sure the single and only VCPU
-> > > > > > - * that can potentially queue the IRQ is stopped.
-> > > > > > + * For private interrupts we don't have to do anything because userspace
-> > > > > > + * accesses to the VGIC state already require all VCPUs to be stopped, and
-> > > > > > + * only the VCPU itself can modify its private interrupts active state, which
-> > > > > > + * guarantees that the VCPU is not running.
-> > > > > >   */
-> > > > > >  static void vgic_change_active_prepare(struct kvm_vcpu *vcpu, u32 intid)
-> > > > > >  {
-> > > > > > -	if (intid < VGIC_NR_PRIVATE_IRQS)
-> > > > > > -		kvm_arm_halt_vcpu(vcpu);
-> > > > > > -	else
-> > > > > > +	if (intid > VGIC_NR_PRIVATE_IRQS)
-> > > > > >  		kvm_arm_halt_guest(vcpu->kvm);
-> > > > > >  }
-> > > > > >  
-> > > > > >  /* See vgic_change_active_prepare */
-> > > > > >  static void vgic_change_active_finish(struct kvm_vcpu *vcpu, u32 intid)
-> > > > > >  {
-> > > > > > -	if (intid < VGIC_NR_PRIVATE_IRQS)
-> > > > > > -		kvm_arm_resume_vcpu(vcpu);
-> > > > > > -	else
-> > > > > > +	if (intid > VGIC_NR_PRIVATE_IRQS)
-> > > > > >  		kvm_arm_resume_guest(vcpu->kvm);
-> > > > > >  }
-> > > > > >  
-> > > > > > @@ -271,11 +269,13 @@ void vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
-> > > > > >  {
-> > > > > >  	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
-> > > > > >  
-> > > > > > +	mutex_lock(&vcpu->kvm->lock);
-> > > > > >  	vgic_change_active_prepare(vcpu, intid);
-> > > > > >  
-> > > > > >  	__vgic_mmio_write_cactive(vcpu, addr, len, val);
-> > > > > >  
-> > > > > >  	vgic_change_active_finish(vcpu, intid);
-> > > > > > +	mutex_unlock(&vcpu->kvm->lock);
-> > > > > 
-> > > > > Any reason not to move the lock/unlock calls to prepare/finish? Also, do
-> > > > > we need to take that mutex if intid is a PPI?
-> > > > 
-> > > > I guess we strictly don't need to take the mutex if it's a PPI, no.
-> > > > 
-> > > > But I actually preferred this symmetry because you can easily tell we
-> > > > don't have a bug (famous last words) by locking and unlocking the mutex
-> > > > in the same function.
-> > > > 
-> > > > I don't feel strongly about it though, so I can move it if you prefer
-> > > > it.
-> > > 
-> > > Actually we must move the locking into the prepare/finish functions, in
-> > > order to tuck them into the VGIC_NR_PRIVATE_IRQS conditions. Otherwise,
-> > > with gicv3, when userspace accesses ISACTIVER0/ICACTIVER0, which are
-> > > SGI_base offsets, then the vgic_v3_sgibase_registers table is used. That
-> > > table doesn't provide the uaccess functions, so we try to lock twice
-> > > again.
-> > > 
-> > 
-> > Nice find.
-> > 
-> > How about we always use the uaccess functions or uaccesses instead? :
+On Thu, Jun 01, 2017 at 11:20:56AM +0100, Marc Zyngier wrote:
+> In order to start handling guest access to GICv3 system registers,
+> let's add a hook that will get called when we trap a system register
+> access. This is gated by a new static key (vgic_v3_cpuif_trap).
 > 
-> Yeah, that's a better suggestion. u-access, i-access, we-all-access :-)
-> 
-cool.  I've put it in kvmarm/queue.
+> Reviewed-by: Eric Auger <eric.auger@redhat.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Thanks,
--Christoffer
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
+
+> ---
+>  arch/arm64/include/asm/kvm_hyp.h |  1 +
+>  arch/arm64/kvm/hyp/switch.c      | 14 ++++++++++++++
+>  include/kvm/arm_vgic.h           |  1 +
+>  virt/kvm/arm/hyp/vgic-v3-sr.c    | 38 ++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic-v3.c      |  2 ++
+>  5 files changed, 56 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+> index b18e852d27e8..4572a9b560fa 100644
+> --- a/arch/arm64/include/asm/kvm_hyp.h
+> +++ b/arch/arm64/include/asm/kvm_hyp.h
+> @@ -127,6 +127,7 @@ int __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu);
+>  
+>  void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
+>  void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
+> +int __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu);
+>  
+>  void __timer_save_state(struct kvm_vcpu *vcpu);
+>  void __timer_restore_state(struct kvm_vcpu *vcpu);
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index aede1658aeda..dfd8ca16601b 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -350,6 +350,20 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+>  		}
+>  	}
+>  
+> +	if (static_branch_unlikely(&vgic_v3_cpuif_trap) &&
+> +	    exit_code == ARM_EXCEPTION_TRAP &&
+> +	    (kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_SYS64 ||
+> +	     kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_CP15_32)) {
+> +		int ret = __vgic_v3_perform_cpuif_access(vcpu);
+> +
+> +		if (ret == 1) {
+> +			__skip_instr(vcpu);
+> +			goto again;
+> +		}
+> +
+> +		/* 0 falls through to be handled out of EL2 */
+> +	}
+> +
+>  	fp_enabled = __fpsimd_enabled();
+>  
+>  	__sysreg_save_guest_state(guest_ctxt);
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index ef718586321c..39b9fc4dc65d 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -285,6 +285,7 @@ struct vgic_cpu {
+>  };
+>  
+>  extern struct static_key_false vgic_v2_cpuif_trap;
+> +extern struct static_key_false vgic_v3_cpuif_trap;
+>  
+>  int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
+>  void kvm_vgic_early_init(struct kvm *kvm);
+> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> index 990d9d1e85d0..943bf11252d9 100644
+> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
+> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/irqchip/arm-gic-v3.h>
+>  #include <linux/kvm_host.h>
+>  
+> +#include <asm/kvm_emulate.h>
+>  #include <asm/kvm_hyp.h>
+>  
+>  #define vtr_to_max_lr_idx(v)		((v) & 0xf)
+> @@ -371,3 +372,40 @@ void __hyp_text __vgic_v3_write_vmcr(u32 vmcr)
+>  {
+>  	write_gicreg(vmcr, ICH_VMCR_EL2);
+>  }
+> +
+> +#ifdef CONFIG_ARM64
+> +
+> +int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
+> +{
+> +	int rt;
+> +	u32 esr;
+> +	u32 vmcr;
+> +	void (*fn)(struct kvm_vcpu *, u32, int);
+> +	bool is_read;
+> +	u32 sysreg;
+> +
+> +	esr = kvm_vcpu_get_hsr(vcpu);
+> +	if (vcpu_mode_is_32bit(vcpu)) {
+> +		if (!kvm_condition_valid(vcpu))
+> +			return 1;
+> +
+> +		sysreg = esr_cp15_to_sysreg(esr);
+> +	} else {
+> +		sysreg = esr_sys64_to_sysreg(esr);
+> +	}
+> +
+> +	is_read = (esr & ESR_ELx_SYS64_ISS_DIR_MASK) == ESR_ELx_SYS64_ISS_DIR_READ;
+> +
+> +	switch (sysreg) {
+> +	default:
+> +		return 0;
+> +	}
+> +
+> +	vmcr = __vgic_v3_read_vmcr();
+> +	rt = kvm_vcpu_sys_get_rt(vcpu);
+> +	fn(vcpu, vmcr, rt);
+> +
+> +	return 1;
+> +}
+> +
+> +#endif
+> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+> index 6fe3f003636a..88d9bd9bf468 100644
+> --- a/virt/kvm/arm/vgic/vgic-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+> @@ -410,6 +410,8 @@ int vgic_v3_map_resources(struct kvm *kvm)
+>  	return ret;
+>  }
+>  
+> +DEFINE_STATIC_KEY_FALSE(vgic_v3_cpuif_trap);
+> +
+>  /**
+>   * vgic_v3_probe - probe for a GICv3 compatible interrupt controller in DT
+>   * @node:	pointer to the DT node
+> -- 
+> 2.11.0
+> 
