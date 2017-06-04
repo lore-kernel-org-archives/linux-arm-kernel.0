@@ -1,129 +1,207 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon,  5 Jun 2017 00:01:39 +0800
-Subject: [PATCH v2 01/11] dt-bindings: update the binding for Allwinner H3 TVE
- support
+Date: Mon,  5 Jun 2017 00:01:41 +0800
+Subject: [PATCH v2 03/11] drm: sun4i: ignore swapped mixer<->tcon connection
+ for DE2
 In-Reply-To: <20170604160149.30230-1-icenowy@aosc.io>
 References: <20170604160149.30230-1-icenowy@aosc.io>
-Message-ID: <20170604160149.30230-2-icenowy@aosc.io>
+Message-ID: <20170604160149.30230-4-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner H3 features a "DE2.0" and a TV Encoder.
+Some SoC's DE2 has two mixers. Defaultly the mixer0 is connected to
+tcon0 and mixer1 is connected to tcon1; however by setting a bit
+the connection can be swapped.
 
-Add device tree bindings for the following parts:
-- H3 TCONs
-- H3 Mixers
-- The connection between H3 TCONs and H3 Mixers
-- H3 TV Encoder
-- H3 Display engine
+As we now hardcode the default connection, ignore the bonus endpoint for
+the mixer's output and the TCON's input, as they stands for the swapped
+connection.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
 Changes in v2:
-- Changed endpoint reg definition on TCONs and Mixers. Now the endpoint
-  id is just the component id.
-- Changed TVE and TCON1 binding -- now CLK_TVE is passed as TCON1 lcd-ch1.
+- Change to use new endpoint reg definition.
 
- .../bindings/display/sunxi/sun4i-drm.txt           | 37 +++++++++++++++++++---
- 1 file changed, 33 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_drv.c  | 45 ++++++++++++++++++++++++++++
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 61 ++++++++++++++++++++++++++++++++------
+ drivers/gpu/drm/sun4i/sun4i_tcon.h |  2 ++
+ 3 files changed, 99 insertions(+), 9 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index b83e6018041d..7ad164cb7dcb 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -49,7 +49,9 @@ The TV Encoder supports the composite and VGA output. It is one end of
- the pipeline.
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index f19100c91c2b..775eee82d8a9 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -178,6 +178,13 @@ static bool sun4i_drv_node_is_frontend(struct device_node *node)
+ 		of_device_is_compatible(node, "allwinner,sun8i-a33-display-frontend");
+ }
  
- Required properties:
-- - compatible: value should be "allwinner,sun4i-a10-tv-encoder".
-+ - compatible: value must be either:
-+    * allwinner,sun4i-a10-tv-encoder
-+    * allwinner,sun8i-h3-tv-encoder
-  - reg: base address and size of memory-mapped region
-  - clocks: the clocks driving the TV encoder
-  - resets: phandle to the reset controller driving the encoder
-@@ -69,23 +71,27 @@ Required properties:
-    * allwinner,sun6i-a31-tcon
-    * allwinner,sun6i-a31s-tcon
-    * allwinner,sun8i-a33-tcon
-+   * allwinner,sun8i-h3-tcon
-    * allwinner,sun8i-v3s-tcon
-  - reg: base address and size of memory-mapped region
-  - interrupts: interrupt associated to this IP
-  - clocks: phandles to the clocks feeding the TCON. Three are needed:
-    - 'ahb': the interface clocks
--   - 'tcon-ch0': The clock driving the TCON channel 0
-  - resets: phandles to the reset controllers driving the encoder
-    - "lcd": the reset line for the TCON channel 0
- 
-  - clock-names: the clock names mentioned above
-  - reset-names: the reset names mentioned above
-- - clock-output-names: Name of the pixel clock created
- 
- - ports: A ports node with endpoint definitions as defined in
-   Documentation/devicetree/bindings/media/video-interfaces.txt. The
-   first port should be the input endpoint, the second one the output
- 
-+  In the situation of Display Engine 2.0 that the connection between
-+  the mixer and the TCON can be swapped, the input should have two
-+  endpoints. The first input endpoint should be connected to mixer0
-+  and the second should be connected to mixer1.
++static bool sun4i_drv_node_is_swappable_de2_mixer(struct device_node *node)
++{
++	/* The V3s has only one mixer-tcon pair, so it's not listed here. */
++	return of_device_is_compatible(node, "allwinner,sun8i-h3-de2-mixer0") ||
++		of_device_is_compatible(node, "allwinner,sun8i-h3-de2-mixer1");
++}
 +
-   The output may have multiple endpoints. The TCON has two channels,
-   usually with the first channel being used for the panels interfaces
-   (RGB, LVDS, etc.), and the second being used for the outputs that
-@@ -94,7 +100,23 @@ Required properties:
-   channel the endpoint is associated to. If that property is not
-   present, the endpoint number will be used as the channel number.
+ static bool sun4i_drv_node_is_tcon(struct device_node *node)
+ {
+ 	return of_device_is_compatible(node, "allwinner,sun5i-a13-tcon") ||
+@@ -261,6 +268,44 @@ static int sun4i_drv_add_endpoints(struct device *dev,
+ 			}
+ 		}
  
--On SoCs other than the A33 and V3s, there is one more clock required:
-+For the following compatibles:
-+   * allwinner,sun5i-a13-tcon
-+   * allwinner,sun6i-a31-tcon
-+   * allwinner,sun6i-a31s-tcon
-+   * allwinner,sun8i-a33-tcon
-+   * allwinner,sun8i-v3s-tcon
-+there is one more clock and one more property required:
-+ - clocks:
-+   - 'tcon-ch0': The clock driving the TCON channel 0
-+ - clock-output-names: Name of the pixel clock created
++		/*
++		 * The second endpoint of the output of a swappable DE2 mixer
++		 * is the TCON after connection swapping.
++		 * Ignore it now, as we now hardcode mixer0->tcon0,
++		 * mixer1->tcon1 connection.
++		 */
++		if (sun4i_drv_node_is_swappable_de2_mixer(node)) {
++			struct device_node *remote_ep_node;
++			struct of_endpoint local_endpoint, remote_endpoint;
 +
-+For the following compatibles:
-+   * allwinner,sun5i-a13-tcon
-+   * allwinner,sun6i-a31-tcon
-+   * allwinner,sun6i-a31s-tcon
-+   * allwinner,sun8i-h3-tcon
-+there is one more clock required:
-    - 'tcon-ch1': The clock driving the TCON channel 1
++			remote_ep_node = of_graph_get_remote_endpoint(ep);
++			if (!remote_ep_node) {
++				DRM_DEBUG_DRIVER("Couldn't get remote endpoint\n");
++				continue;
++			}
++
++			if (of_graph_parse_endpoint(ep, &local_endpoint)) {
++				DRM_DEBUG_DRIVER("Couldn't parse local endpoint\n");
++				of_node_put(remote_ep_node);
++				continue;
++			}
++
++			if (of_graph_parse_endpoint(remote_ep_node,
++						    &remote_endpoint)) {
++				DRM_DEBUG_DRIVER("Couldn't parse remote endpoint\n");
++				of_node_put(remote_ep_node);
++				continue;
++			}
++
++			if (local_endpoint.id != remote_endpoint.id) {
++				DRM_DEBUG_DRIVER("Endpoint is an unused connection for DE2 mixer... skipping\n");
++				of_node_put(remote_ep_node);
++				continue;
++			}
++
++			of_node_put(remote_ep_node);
++		}
++
+ 		/* Walk down our tree */
+ 		count += sun4i_drv_add_endpoints(dev, match, remote);
  
- DRC
-@@ -189,6 +211,8 @@ supported.
- Required properties:
-   - compatible: value must be one of:
-     * allwinner,sun8i-v3s-de2-mixer
-+    * allwinner,sun8i-h3-de2-mixer0
-+    * allwinner,sun8i-h3-de2-mixer1
-   - reg: base address and size of the memory-mapped region.
-   - clocks: phandles to the clocks feeding the mixer
-     * bus: the mixer interface clock
-@@ -200,6 +224,10 @@ Required properties:
-   Documentation/devicetree/bindings/media/video-interfaces.txt. The
-   first port should be the input endpoints, the second one the output
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index d9791292553e..568cea0e5f8f 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -464,7 +464,8 @@ static int sun4i_tcon_init_regmap(struct device *dev,
+  * requested via the get_id function of the engine.
+  */
+ static struct sunxi_engine *sun4i_tcon_find_engine(struct sun4i_drv *drv,
+-						   struct device_node *node)
++						   struct device_node *node,
++						   bool skip_bonus_ep)
+ {
+ 	struct device_node *port, *ep, *remote;
+ 	struct sunxi_engine *engine;
+@@ -478,6 +479,42 @@ static struct sunxi_engine *sun4i_tcon_find_engine(struct sun4i_drv *drv,
+ 		if (!remote)
+ 			continue;
  
-+  In the situation of Display Engine 2.0 that the connection between
-+  the mixer and the TCON can be swapped, the output should have two
-+  endpoints. The first should be connected to TCON0 and the second
-+  should be connected to TCON1.
++		if (skip_bonus_ep) {
++			struct device_node *remote_ep_node;
++			struct of_endpoint local_endpoint, remote_endpoint;
++
++			remote_ep_node = of_graph_get_remote_endpoint(ep);
++			if (!remote_ep_node) {
++				DRM_DEBUG_DRIVER("Couldn't get remote endpoint\n");
++				of_node_put(remote);
++				continue;
++			}
++
++			if (of_graph_parse_endpoint(ep, &local_endpoint)) {
++				DRM_DEBUG_DRIVER("Couldn't parse local endpoint\n");
++				of_node_put(remote);
++				of_node_put(remote_ep_node);
++				continue;
++			}
++
++			if (of_graph_parse_endpoint(remote_ep_node,
++						    &remote_endpoint)) {
++				DRM_DEBUG_DRIVER("Couldn't parse remote endpoint\n");
++				of_node_put(remote);
++				of_node_put(remote_ep_node);
++				continue;
++			}
++
++			if (local_endpoint.id != remote_endpoint.id) {
++				DRM_DEBUG_DRIVER("Skipping bonus mixer->TCON connection when searching engine\n");
++				of_node_put(remote);
++				of_node_put(remote_ep_node);
++				continue;
++			}
++
++			of_node_put(remote_ep_node);
++		}
++
+ 		/* does this node match any registered engines? */
+ 		list_for_each_entry(engine, &drv->engine_list, list) {
+ 			if (remote == engine->node) {
+@@ -488,7 +525,7 @@ static struct sunxi_engine *sun4i_tcon_find_engine(struct sun4i_drv *drv,
+ 		}
  
- Display Engine Pipeline
- -----------------------
-@@ -215,6 +243,7 @@ Required properties:
-     * allwinner,sun6i-a31-display-engine
-     * allwinner,sun6i-a31s-display-engine
-     * allwinner,sun8i-a33-display-engine
-+    * allwinner,sun8i-h3-display-engine
-     * allwinner,sun8i-v3s-display-engine
+ 		/* keep looking through upstream ports */
+-		engine = sun4i_tcon_find_engine(drv, remote);
++		engine = sun4i_tcon_find_engine(drv, remote, skip_bonus_ep);
+ 		if (!IS_ERR(engine)) {
+ 			of_node_put(remote);
+ 			of_node_put(port);
+@@ -508,21 +545,27 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+ 	struct sun4i_tcon *tcon;
+ 	int ret;
  
-   - allwinner,pipelines: list of phandle to the display engine
+-	engine = sun4i_tcon_find_engine(drv, dev->of_node);
+-	if (IS_ERR(engine)) {
+-		dev_err(dev, "Couldn't find matching engine\n");
+-		return -EPROBE_DEFER;
+-	}
+-
+ 	tcon = devm_kzalloc(dev, sizeof(*tcon), GFP_KERNEL);
+ 	if (!tcon)
+ 		return -ENOMEM;
+ 	dev_set_drvdata(dev, tcon);
+ 	tcon->drm = drm;
+ 	tcon->dev = dev;
+-	tcon->id = engine->id;
+ 	tcon->quirks = of_device_get_match_data(dev);
+ 
++	/*
++	 * As we keep the connection between DE2 mixer and TCON not swapped,
++	 * skip the bonus endpoints (which stand for swapped connection)
++	 * when finding the correspoing engine.
++	 */
++	engine = sun4i_tcon_find_engine(drv, dev->of_node,
++					tcon->quirks->swappable_input);
++	if (IS_ERR(engine)) {
++		dev_err(dev, "Couldn't find matching engine\n");
++		return -EPROBE_DEFER;
++	}
++	tcon->id = engine->id;
++
+ 	tcon->lcd_rst = devm_reset_control_get(dev, "lcd");
+ 	if (IS_ERR(tcon->lcd_rst)) {
+ 		dev_err(dev, "Couldn't get our reset line\n");
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+index e3c50ecdcd04..c3e01c06e9a0 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+@@ -146,6 +146,8 @@
+ struct sun4i_tcon_quirks {
+ 	bool	has_unknown_mux; /* sun5i has undocumented mux */
+ 	bool	has_channel_1;	/* a33 does not have channel 1 */
++	/* Some DE2 can swap the mixer<->TCON connection */
++	bool	swappable_input;
+ };
+ 
+ struct sun4i_tcon {
 -- 
 2.12.2
