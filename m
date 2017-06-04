@@ -1,50 +1,38 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon,  5 Jun 2017 00:01:47 +0800
-Subject: [PATCH v2 09/11] clk: sunxi-ng: export CLK_PLL_DE for H3
+Date: Mon,  5 Jun 2017 00:01:46 +0800
+Subject: [PATCH v2 08/11] clk: sunxi-ng: allow CLK_DE to set CLK_PLL_DE for H3
 In-Reply-To: <20170604160149.30230-1-icenowy@aosc.io>
 References: <20170604160149.30230-1-icenowy@aosc.io>
-Message-ID: <20170604160149.30230-10-icenowy@aosc.io>
+Message-ID: <20170604160149.30230-9-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CLK_PLL_DE is needed to be referenced in device tree for H3, for
-both forcing the parent of PLL_DE.
+Allwinner H3 features a PLL named CLK_PLL_DE, and a mod clock for the
+"Display Engine 2.0" named CLK_DE. As the name indicated, the CLK_PLL_DE
+is a PLL for CLK_DE.
 
-So export it to the device tree binding header.
+Only CLK_DE and CLK_TVE have a parent of CLK_PLL_DE, and CLK_TVE is also
+one part of the display clocks.
+
+So allow CLK_DE to set CLK_PLL_DE (add CLK_SET_RATE_PARENT to it).
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- drivers/clk/sunxi-ng/ccu-sun8i-h3.h      | 3 +--
- include/dt-bindings/clock/sun8i-h3-ccu.h | 2 ++
- 2 files changed, 3 insertions(+), 2 deletions(-)
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.h b/drivers/clk/sunxi-ng/ccu-sun8i-h3.h
-index 1b4baea37d81..add3a7c18212 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.h
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.h
-@@ -35,9 +35,8 @@
- #define CLK_PLL_PERIPH0_2X	10
- #define CLK_PLL_GPU		11
- #define CLK_PLL_PERIPH1		12
--#define CLK_PLL_DE		13
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+index 62e4f0d2b2fc..b6a1636c2f6b 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+@@ -439,7 +439,7 @@ static SUNXI_CCU_GATE(dram_ts_clk,	"dram-ts",	"dram",
  
--/* The CPUX clock is exported */
-+/* The PLL_DE and CPUX clocks is exported */
+ static const char * const de_parents[] = { "pll-periph0-2x", "pll-de" };
+ static SUNXI_CCU_M_WITH_MUX_GATE(de_clk, "de", de_parents,
+-				 0x104, 0, 4, 24, 3, BIT(31), 0);
++				 0x104, 0, 4, 24, 3, BIT(31), CLK_SET_RATE_PARENT);
  
- #define CLK_AXI			15
- #define CLK_AHB1		16
-diff --git a/include/dt-bindings/clock/sun8i-h3-ccu.h b/include/dt-bindings/clock/sun8i-h3-ccu.h
-index e139fe5c62ec..5345957a8c2e 100644
---- a/include/dt-bindings/clock/sun8i-h3-ccu.h
-+++ b/include/dt-bindings/clock/sun8i-h3-ccu.h
-@@ -45,6 +45,8 @@
- 
- #define CLK_PLL_PERIPH0		9
- 
-+#define CLK_PLL_DE		13
-+
- #define CLK_CPUX		14
- 
- #define CLK_BUS_CE		20
+ static const char * const tcon_parents[] = { "pll-video" };
+ static SUNXI_CCU_M_WITH_MUX_GATE(tcon_clk, "tcon", tcon_parents,
 -- 
 2.12.2
