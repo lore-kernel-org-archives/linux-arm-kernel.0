@@ -1,29 +1,54 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 4 Jun 2017 11:42:11 +0800
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Explicitly restore
- CONFIG_DEBUG_FS
-In-Reply-To: <49b2579b9ad2e5ce0a7c4b163dffb5a885ac7dae.1495797565.git.leonard.crestez@nxp.com>
-References: <49b2579b9ad2e5ce0a7c4b163dffb5a885ac7dae.1495797565.git.leonard.crestez@nxp.com>
-Message-ID: <20170604034210.GB4094@dragon>
+Date: Sun, 4 Jun 2017 11:49:03 +0800
+Subject: [PATCH RFC 5/5] ARM: dts: vf-colibri-eval: use IRQ_TYPE_* to
+ specify irq flags
+In-Reply-To: <20170526180609.2699-5-uwe@kleine-koenig.org>
+References: <20170526180609.2699-1-uwe@kleine-koenig.org>
+ <20170526180609.2699-5-uwe@kleine-koenig.org>
+Message-ID: <20170604034902.GC4094@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 26, 2017 at 02:26:06PM +0300, Leonard Crestez wrote:
-> This option was removed by "make savedefconfig" in
-> commit c5054a98bce4 ("ARM: imx_v6_v7_defconfig: Select SMSC_PHY")
+On Fri, May 26, 2017 at 08:06:09PM +0200, Uwe Kleine-K?nig wrote:
+> According to the binding documentation and the source code the
+> vf610-gpio controller takes IRQ_TYPE_* as its flags values, not
+> GPIO_ACTIVE_*.
 > 
-> This happened because CONFIG_DEBUG_FS was implicitly selected by
-> CONFIG_TREE_RCU_TRACE which defaulted to true because CONFIG_RCU_TRACE
-> was enabled by default by commit 961518259b3b ("rcu: Enable RCU
-> tracepoints by default to aid in debugging")
+> This patch uses the right variable type which yields the same result
+> when compiled. Note that this might be wrong and actually
+> IRQ_TYPE_LEVEL_LOW is intended by the dt author.
 > 
-> Recently however CONFIG_RCU_TRACE was completely removed by
-> commit 6e74c237c410 ("rcu: Remove debugfs tracing")
+> Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+> ---
+> Hello,
 > 
-> The result is that imx_v6_v7_defconfig no longer includes DEBUG_FS on
-> linux-next since next-20170517. This is bad, DEBUG_FS is extremely
-> useful for kernel introspection and testing.
-> 
-> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+> can somebody with the hardware or it's documentation please check which
+> flag is the right one?
 
-Applied, thanks.
+@Stefan, can you help to confirm?
+
+Shawn
+
+> 
+> Best regards
+> Uwe
+> 
+>  arch/arm/boot/dts/vf-colibri-eval-v3.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+> index 091b738041a0..3e0c84d79c43 100644
+> --- a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+> +++ b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+> @@ -117,7 +117,7 @@
+>  		clocks = <&clk16m>;
+>  		spi-max-frequency = <10000000>;
+>  		interrupt-parent = <&gpio1>;
+> -		interrupts = <11 GPIO_ACTIVE_LOW>;
+> +		interrupts = <11 IRQ_TYPE_EDGE_RISING>;
+>  	};
+>  };
+>  
+> -- 
+> 2.11.0
+> 
