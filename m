@@ -1,170 +1,39 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Mon, 5 Jun 2017 00:27:53 +0200
-Subject: [PATCH 1/3] clk: meson: meson8b: add compatibles for Meson8 and
- Meson8m2
-In-Reply-To: <1496606325.3552.16.camel@baylibre.com>
-References: <20170604183341.21417-1-martin.blumenstingl@googlemail.com>
- <20170604183341.21417-2-martin.blumenstingl@googlemail.com>
- <1496606325.3552.16.camel@baylibre.com>
-Message-ID: <CAFBinCCLL5ZqiZzWi-RsfZ-5_h20O5LRRY3+K7dt=U4qrveQ_w@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 5 Jun 2017 06:43:04 +0800
+Subject: [PATCH v2 04/11] drm: sun4i: add support for H3's TCON0/1
+In-Reply-To: <20170604160149.30230-5-icenowy@aosc.io>
+Message-ID: <201706050602.JiActQ4S%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 4, 2017 at 9:58 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
-> On Sun, 2017-06-04 at 20:33 +0200, Martin Blumenstingl wrote:
->> The clock controller on Meson8, Meson8b and Meson8m2 is very similar
->> based on the code from the Amlogic GPL kernel sources. Add separate
->> compatibles for each SoC to make sure that we can easily implement
->> all the small differences for each SoC later on.
->>
->> In general the Meson8 and Meson8m2 seem to be almost identical as they
->> even share the same mach-meson8 directory in Amlogic's GPL kernel
->> sources.
->> The main clocks on Meson8, Meson8b and Meson8m2 are very similar,
->> because they are all using the same PLL values, 90% of the clock gates
->> are the same (the actual diffstat of the mach-meson8/clock.c and
->> mach-meson8b/clock.c files is around 30 to 40 lines, when excluding
->> all commented out code).
->> The difference between the Meson8 and Meson8b clock gates seem to be:
->> - Meson8 has AIU_PCLK, HDMI_RX, VCLK2_ENCT, VCLK2_ENCL, UART3,
->>   CSI_DIG_CLKIN gates which don't seem to be available on Meson8b
->> - the gate on Meson8 for bit 7 seems to be named "_1200XXX" instead
->>   of "PERIPHS_TOP" (on Meson8b)
->> - Meson8b has a SANA gate which doesn't seem to exist on Meson8 (or
->>   on Meson8 the same bit is used by the UART3 gate in Amlogic's GPL
->>   kernel sources)
->> None of these gates is added for now, since it's unclear whether these
->> definitions are actually correct (the VCLK2_ENCT gate for example is
->> defined, but only used in some commented block).
->>
->> The main difference between all three SoCs seem to be the video (VPU)
->> clocks. Apart from different supported clock rates (according to vpu.c
->> in mach-meson8 and mach-meson8b from Amlogic's GPL kernel sources) the
->> most notable difference is that Meson8m2 has a GP_PLL clock and a mux
->> (probably the same as on the Meson GX SoCs) to support glitch-free
->> (clock rate) switching.
->> None of these VPU clocks are not supported by our mainline meson8b
->> clock driver yet though.
->>
->> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->> ---
->>  .../devicetree/bindings/clock/amlogic,meson8b-clkc.txt        | 11 +++++++---
->
-> I think you should split the binding documentation and clk changes into separate
-> patches.
-OK, from what I know is that for "trivial" changes the driver and
-dt-binding changes can go through one patch.
-this patch started as a four-line patch which added two lines of
-documentation and two lines of driver code.
-however, with all the Kconfig/comment/etc updates I think that you are
-right and it's worth splitting this into two patches (one for the
-clock driver and one for the dt-binding changes)
+Hi Icenowy,
 
->> -
->>  drivers/clk/meson/Kconfig                                     |  6 +++---
->>  drivers/clk/meson/meson8b.c                                   |  5 ++++-
->
-> The change being more platform than clock related, I'd prefer if Kevin or Carlo
-> ack it before we apply it.
-yes, especially since Carlo wrote the clock driver (and has worked for
-his company with Meson8b SoCs)
+[auto build test ERROR on next-20170602]
+[cannot apply to mripard/sunxi/for-next robh/for-next clk/clk-next v4.9-rc8 v4.9-rc7 v4.9-rc6 v4.12-rc3]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-> Apart from this, the change looks good to me. Nice to see people taking interest
->  in these SoCs. Would you mind telling us a bit more about the board you have
-> used for this task and the tests you have done ? It would maybe allow other
-> people to help you.
-Oleg has already asked if he could help testing: [0]
-he confirmed that the clock controller (and my work-in-progress MMC
-driver) works fine on his "Tronsmart MXIII Plus" (Meson8m2 aka S812).
-I personally have a Akaso M8S (Meson8m2 aka S812, 2GiB RAM, Fast
-Ethernet, 8GB NAND flash and a Realtek RTL8723BS SDIO wifi/bluetooth
-chip)
+url:    https://github.com/0day-ci/linux/commits/Icenowy-Zheng/Support-for-H3-Composite-Output-support/20170605-003002
+config: arm-multi_v7_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-on my own device I could even get the RTL8723BS driver to load the
-firmware (I don't get any results when scanning, but I blame the
-strange driver for now). this means that PWM works fine as well (so
-the period and duty cycle are calculated correctly - or in other
-words: it seems that the input clocks are correct and lead to a 32.768
-kHz PWM clock output)
+All errors (new ones prefixed by >>):
 
-USB is working fine for me, whereas Oleg gets an error on his device
-in the PHY driver ("USB ID detect failed!") -> this also seems to
-happen on some GXBB boards, so it's unrelated to the gates (..I
-guess).
+   drivers/gpu/drm/sun4i/sun4i-tcon: struct of_device_id is 196 bytes.  The last of 6 is:
+   0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x61 0x6c 0x6c 0x77 0x69 0x6e 0x6e 0x65 0x72 0x2c 0x73 0x75 0x6e 0x38 0x69 0x2d 0x68 0x33 0x2d 0x74 0x63 0x6f 0x6e 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0xa0 0x04 0x00 0x00 
+>> FATAL: drivers/gpu/drm/sun4i/sun4i-tcon: struct of_device_id is not terminated with a NULL entry!
 
-> Cheers
-> Jerome
->
->>  3 files changed, 14 insertions(+), 8 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt
->> b/Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt
->> index 2b7b3fa588d7..606da38c0959 100644
->> --- a/Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt
->> +++ b/Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt
->> @@ -1,11 +1,14 @@
->> -* Amlogic Meson8b Clock and Reset Unit
->> +* Amlogic Meson8, Meson8b and Meson8m2 Clock and Reset Unit
->>
->> -The Amlogic Meson8b clock controller generates and supplies clock to various
->> -controllers within the SoC.
->> +The Amlogic Meson8 / Meson8b / Meson8m2 clock controller generates and
->> +supplies clock to various controllers within the SoC.
->>
->>  Required Properties:
->>
->> -- compatible: should be "amlogic,meson8b-clkc"
->> +- compatible: must be one of:
->> +     - "amlogic,meson8-clkc" for Meson8 (S802) SoCs
->> +     - "amlogic,meson8b-clkc" for Meson8 (S805) SoCs
->> +     - "amlogic,meson8m2-clkc" for Meson8m2 (S812) SoCs
->>  - reg: it must be composed by two tuples:
->>       0) physical base address of the xtal register and length of memory
->>          mapped region.
->> diff --git a/drivers/clk/meson/Kconfig b/drivers/clk/meson/Kconfig
->> index 19480bcc7046..4a806203b73c 100644
->> --- a/drivers/clk/meson/Kconfig
->> +++ b/drivers/clk/meson/Kconfig
->> @@ -7,9 +7,9 @@ config COMMON_CLK_MESON8B
->>       bool
->>       depends on COMMON_CLK_AMLOGIC
->>       help
->> -       Support for the clock controller on AmLogic S805 devices, aka
->> -       meson8b. Say Y if you want peripherals and CPU frequency scaling to
->> -       work.
->> +       Support for the clock controller on AmLogic S802 (Meson8),
->> +       S805 (Meson8b) and S812 (Meson8m2) devices. Say Y if you
->> +       want peripherals and CPU frequency scaling to work.
->>
->>  config COMMON_CLK_GXBB
->>       bool
->> diff --git a/drivers/clk/meson/meson8b.c b/drivers/clk/meson/meson8b.c
->> index bfd1690724de..94c55e79cdde 100644
->> --- a/drivers/clk/meson/meson8b.c
->> +++ b/drivers/clk/meson/meson8b.c
->> @@ -1,5 +1,6 @@
->>  /*
->> - * AmLogic S805 / Meson8b Clock Controller Driver
->> + * AmLogic S802 (Meson8) / S805 (Meson8b) / S812 (Meson8m2) Clock Controller
->> + * Driver
->>   *
->>   * Copyright (c) 2015 Endless Mobile, Inc.
->>   * Author: Carlo Caione <carlo@endlessm.com>
->> @@ -777,7 +778,9 @@ static int meson8b_clkc_probe(struct platform_device
->> *pdev)
->>  }
->>
->>  static const struct of_device_id meson8b_clkc_match_table[] = {
->> +     { .compatible = "amlogic,meson8-clkc" },
->>       { .compatible = "amlogic,meson8b-clkc" },
->> +     { .compatible = "amlogic,meson8m2-clkc" },
->>       { }
->>  };
->>
->
-
-Regards,
-Martin
-
-[0] http://lists.infradead.org/pipermail/linux-amlogic/2017-May/003601.html
-[1] http://www.akaso.net/akaso-m8s-tv-box4kandroidamlogic-s812quad-core-2gb-ram-8gb-flashkodihdmiwifibluetooth-4-0-media-player/
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 41415 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170605/7373243c/attachment-0001.gz>
