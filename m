@@ -1,171 +1,190 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun,  4 Jun 2017 10:43:45 +0800
-Subject: [PATCH 2/2] arm64: allwinner: a64: add device tree for SoPine with
- baseboard
-In-Reply-To: <20170604024345.23021-1-icenowy@aosc.io>
-References: <20170604024345.23021-1-icenowy@aosc.io>
-Message-ID: <20170604024345.23021-2-icenowy@aosc.io>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Sun, 4 Jun 2017 11:07:43 +0800
+Subject: [PATCH v2 2/3] PCI: Enable PCIe Relaxed Ordering if supported
+In-Reply-To: <CAKgT0UfKPLy7=swnZYiYOrLS8znhjxeXNZv=+CK5XS3Z1fkMbw@mail.gmail.com>
+References: <1496462647-7632-1-git-send-email-dingtianhong@huawei.com>
+ <1496462647-7632-3-git-send-email-dingtianhong@huawei.com>
+ <CAKgT0UfKPLy7=swnZYiYOrLS8znhjxeXNZv=+CK5XS3Z1fkMbw@mail.gmail.com>
+Message-ID: <55b08eae-dbe4-48da-329e-a617be28fd21@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Icenowy Zheng <icenowy@aosc.xyz>
 
-Pine64 have made an official baseboard when SoPine SoM is out.
 
-The official baseboard is like the original Pine64 -- but with SD card
-slot replaced with Pine64's eMMC module slot.
+On 2017/6/4 2:19, Alexander Duyck wrote:
+> On Fri, Jun 2, 2017 at 9:04 PM, Ding Tianhong <dingtianhong@huawei.com> wrote:
+>> The PCIe Device Control Register use the bit 4 to indicate that
+>> whether the device is permitted to enable relaxed ordering or not.
+>> But relaxed ordering is not safe for some platform which could only
+>> use strong write ordering, so devices are allowed (but not required)
+>> to enable relaxed ordering bit by default.
+>>
+>> If a platform support relaxed ordering but does not enable it by
+>> default, enable it in the PCIe configuration. This allows some device
+>> to send TLPs with the relaxed ordering attributes set, which may
+>> improve the performance.
+>>
+>> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+>> ---
+>>  drivers/pci/pci.c   | 42 ++++++++++++++++++++++++++++++++++++++++++
+>>  drivers/pci/probe.c | 11 +++++++++++
+>>  include/linux/pci.h |  3 +++
+>>  3 files changed, 56 insertions(+)
+>>
+>> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+>> index b01bd5b..f57a374 100644
+>> --- a/drivers/pci/pci.c
+>> +++ b/drivers/pci/pci.c
+>> @@ -4878,6 +4878,48 @@ int pcie_set_mps(struct pci_dev *dev, int mps)
+>>  EXPORT_SYMBOL(pcie_set_mps);
+>>
+>>  /**
+>> + * pcie_set_relaxed_ordering - set PCI Express relexed ordering bit
+>> + * @dev: PCI device to query
+>> + *
+>> + * If possible sets relaxed ordering
+>> + */
+>> +int pcie_set_relaxed_ordering(struct pci_dev *dev)
+>> +{
+>> +       return pcie_capability_set_word(dev, PCI_EXP_DEVCTL, PCI_EXP_DEVCTL_RELAX_EN);
+>> +}
+>> +EXPORT_SYMBOL(pcie_set_relaxed_ordering);
+>> +
+>> +/**
+>> + * pcie_clear_relaxed_ordering - clear PCI Express relexed ordering bit
+>> + * @dev: PCI device to query
+>> + *
+>> + * If possible clear relaxed ordering
+>> + */
+>> +int pcie_clear_relaxed_ordering(struct pci_dev *dev)
+>> +{
+>> +       return pcie_capability_clear_word(dev, PCI_EXP_DEVCTL, PCI_EXP_DEVCTL_RELAX_EN);
+>> +}
+>> +EXPORT_SYMBOL(pcie_clear_relaxed_ordering);
+>> +
+>> +/**
+>> + * pcie_get_relaxed_ordering - check PCI Express relexed ordering bit
+>> + * @dev: PCI device to query
+>> + *
+>> + * Returns true if relaxed ordering is been set
+>> + */
+>> +int pcie_get_relaxed_ordering(struct pci_dev *dev)
+>> +{
+>> +       u16 v;
+>> +
+>> +       pcie_capability_read_word(dev, PCI_EXP_DEVCTL, &v);
+>> +
+>> +       return (v & PCI_EXP_DEVCTL_RELAX_EN) >> 4;
+>> +}
+>> +EXPORT_SYMBOL(pcie_get_relaxed_ordering);
+>> +
+>> +/**
+>> + * pcie_set_mps - set PCI Express maximum payload size
+>> +/**
+>>   * pcie_get_minimum_link - determine minimum link settings of a PCI device
+>>   * @dev: PCI device to query
+>>   * @speed: storage for minimum speed
+>> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+>> index 19c8950..aeb22b5 100644
+>> --- a/drivers/pci/probe.c
+>> +++ b/drivers/pci/probe.c
+>> @@ -1701,6 +1701,16 @@ static void pci_configure_extended_tags(struct pci_dev *dev)
+>>                                          PCI_EXP_DEVCTL_EXT_TAG);
+>>  }
+>>
+>> +static void pci_configure_relaxed_ordering(struct pci_dev *dev)
+>> +{
+>> +       int ret;
+>> +
+>> +       if (dev && (dev->dev_flags & PCI_DEV_FLAGS_NO_RELAXED_ORDERING))
+> 
+> So there is a minor issue here. The problem is this is only trying to
+> modify relaxed ordering for the device itself. That isn't what we
+> want. What we want is to modify it on all of the upstream port
+> interfaces where there is something the path to the root complex that
+> has an issue. So if the root complex has to set the
+> NO_RELAXED_ORDERING flag on a root port, all of the interfaces below
+> it that would be pushing traffic toward it should not have the relaxed
+> ordering bit set.
+> 
+> Also I am pretty sure this is a PCIe capability, not a PCI capability.
+> You probably need to make sure you code is making this distinction
+> which I don't know if it currently is. If you need an example of the
+> kind of checks I am suggesting just take a look at
+> pcie_configure_mps(). It is verifying the function is PCIe before
+> attempting to make any updates. In your case you will probably also
+> need to make sure there is a bus for you to walk up the chain of.
+> Otherwise this shouldn't apply.
+> 
 
-Add a device tree for SoPine with the baseboard.
+Yes, I miss the upstream ports and the pcie/pci capability, will check
+the pcie_configure_mps() again and fix it, thanks.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
- arch/arm64/boot/dts/allwinner/Makefile             |   1 +
- .../dts/allwinner/sun50i-a64-sopine-baseboard.dts  | 126 +++++++++++++++++++++
- 2 files changed, 127 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
+> 
+>> +               pcie_set_relaxed_ordering(dev);
+>> +       else
+>> +               pcie_clear_relaxed_ordering(dev);
+>> +}
+> 
+> Also I am not a fan of the way this is handled currently. If you don't
+> have relaxed ordering set then you don't need to do anything else, if
+> you do have it set but there is no bus to walk up you shouldn't change
+> it, and if there is a bus to walk up and you find that the root
+> complex on that bus has the NO_RELAXED_ORDERING set you should clear
+> it. Right now this code seems to be enabling relaxed ordering if the
+> NO_RELAXED_ORDERING flag is set.
+> 
 
-diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-index 546720096aef..e7d54906453e 100644
---- a/arch/arm64/boot/dts/allwinner/Makefile
-+++ b/arch/arm64/boot/dts/allwinner/Makefile
-@@ -1,5 +1,6 @@
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo2.dtb
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-new file mode 100644
-index 000000000000..17eb1cc5bf6b
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-@@ -0,0 +1,126 @@
-+/*
-+ * Copyright (c) 2017 Icenowy Zheng <icenowy@aosc.xyz>
-+ *
-+ * Based on sun50i-a64-pine64.dts, which is:
-+ *   Copyright (c) 2016 ARM Ltd.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "sun50i-a64-sopine.dtsi"
-+
-+/ {
-+	model = "SoPine with baseboard";
-+	compatible = "pine64,sopine-baseboard", "pine64,sopine",
-+		     "allwinner,sun50i-a64";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	reg_vcc1v8: vcc1v8 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc1v8";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+	};
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&emac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&rgmii_pins>;
-+	phy-mode = "rgmii";
-+	phy-handle = <&ext_rgmii_phy>;
-+	status = "okay";
-+};
-+
-+&mdio {
-+	ext_rgmii_phy: ethernet-phy at 1 {
-+		compatible = "ethernet-phy-ieee802.3-c22";
-+		reg = <1>;
-+	};
-+};
-+
-+&mmc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_pins>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	vqmmc-supply = <&reg_vcc1v8>;
-+	bus-width = <8>;
-+	non-removable;
-+	cap-mmc-hw-reset;
-+	status = "okay";
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	dr_mode = "host";
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	status = "okay";
-+};
--- 
-2.12.2
+I'm not very clear about this, I check the PCIe Standard, it said that:
+
+Enable Relaxed Ordering ? If this bit is set, the device is
+permitted to set the Relaxed Ordering bit in the Attributes field of
+transactions it initiates that do not require strong write ordering
+(see Sections 2.2.6.4 and 2.4).
+Default value of this bit is 1.
+This bit may be hardwired to 0 if a device never sets the
+Relaxed Ordering attribute in transactions it initiates as a
+requester.
+
+Is that means some platform may set the bit to 0 default but it didn't mean the hardware
+couldn't support Relaxed Ordering ? if so, I need to set the bit enable if  relaxed
+ordering flag is set.
+
+If I didn't understand it correctly, I will fix it follow your opinion, thanks.
+
+Ding
+
+
+>> +
+>>  static void pci_configure_device(struct pci_dev *dev)
+>>  {
+>>         struct hotplug_params hpp;
+>> @@ -1708,6 +1718,7 @@ static void pci_configure_device(struct pci_dev *dev)
+>>
+>>         pci_configure_mps(dev);
+>>         pci_configure_extended_tags(dev);
+>> +       pci_configure_relaxed_ordering(dev);
+>>
+>>         memset(&hpp, 0, sizeof(hpp));
+>>         ret = pci_get_hp_params(dev, &hpp);
+>> diff --git a/include/linux/pci.h b/include/linux/pci.h
+>> index e1e8428..84bd6af 100644
+>> --- a/include/linux/pci.h
+>> +++ b/include/linux/pci.h
+>> @@ -1105,6 +1105,9 @@ int __pci_enable_wake(struct pci_dev *dev, pci_power_t state,
+>>  void pci_pme_wakeup_bus(struct pci_bus *bus);
+>>  void pci_d3cold_enable(struct pci_dev *dev);
+>>  void pci_d3cold_disable(struct pci_dev *dev);
+>> +int pcie_set_relaxed_ordering(struct pci_dev *dev);
+>> +int pcie_clear_relaxed_ordering(struct pci_dev *dev);
+>> +int pcie_get_relaxed_ordering(struct pci_dev *dev);
+>>
+>>  static inline int pci_enable_wake(struct pci_dev *dev, pci_power_t state,
+>>                                   bool enable)
+>> --
+>> 1.9.0
+>>
+>>
+> 
+> .
+> 
