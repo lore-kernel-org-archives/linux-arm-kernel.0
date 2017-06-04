@@ -1,107 +1,254 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon,  5 Jun 2017 00:01:44 +0800
-Subject: [PATCH v2 06/11] drm: sun4i: add color space correction support for
- DE2 mixer
-In-Reply-To: <20170604160149.30230-1-icenowy@aosc.io>
-References: <20170604160149.30230-1-icenowy@aosc.io>
-Message-ID: <20170604160149.30230-7-icenowy@aosc.io>
+From: yuval.shaia@oracle.com (Yuval Shaia)
+Date: Sun,  4 Jun 2017 20:14:28 +0300
+Subject: [PATCH] net/phy: Make phy_ethtool_ksettings_get return void
+Message-ID: <20170604171428.4012-1-yuval.shaia@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DE2 mixer can do color space correction needed by TV Encoder with
-its DCSC sub-engine.
+Make return value void since function never return meaningfull value
 
-Add support for it.
-
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Signed-off-by: Yuval Shaia <yuval.shaia@oracle.com>
 ---
- drivers/gpu/drm/sun4i/sun8i_mixer.c | 35 +++++++++++++++++++++++++++++++++++
- drivers/gpu/drm/sun4i/sun8i_mixer.h |  6 +++++-
- 2 files changed, 40 insertions(+), 1 deletion(-)
+ drivers/net/ethernet/broadcom/b44.c                |  3 ++-
+ drivers/net/ethernet/broadcom/bcm63xx_enet.c       |  3 ++-
+ drivers/net/ethernet/broadcom/genet/bcmgenet.c     |  4 +++-
+ drivers/net/ethernet/broadcom/tg3.c                |  4 +++-
+ drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c |  6 ++----
+ drivers/net/ethernet/freescale/ucc_geth_ethtool.c  |  4 +++-
+ drivers/net/ethernet/marvell/mv643xx_eth.c         |  5 ++---
+ drivers/net/ethernet/ti/cpsw.c                     |  9 +++++----
+ drivers/net/phy/phy.c                              | 10 +++++-----
+ drivers/net/usb/lan78xx.c                          |  2 +-
+ include/linux/phy.h                                |  4 ++--
+ net/dsa/slave.c                                    |  9 +++++----
+ 12 files changed, 35 insertions(+), 28 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-index d658a3a8159a..65f86641eca3 100644
---- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-@@ -29,6 +29,14 @@
- #include "sun8i_layer.h"
- #include "sunxi_engine.h"
+diff --git a/drivers/net/ethernet/broadcom/b44.c b/drivers/net/ethernet/broadcom/b44.c
+index 5b95bb4..9873d2d 100644
+--- a/drivers/net/ethernet/broadcom/b44.c
++++ b/drivers/net/ethernet/broadcom/b44.c
+@@ -1836,7 +1836,8 @@ static int b44_get_link_ksettings(struct net_device *dev,
  
-+static const u32 sun8i_rgb2yuv_coef[12] = {
-+	0x00000107, 0x00000204, 0x00000064, 0x00004200,
-+	0x00001f68, 0x00001ed6, 0x000001c2, 0x00020200,
-+	0x000001c2, 0x00001e87, 0x00001fb7, 0x00020200,
-+};
+ 	if (bp->flags & B44_FLAG_EXTERNAL_PHY) {
+ 		BUG_ON(!dev->phydev);
+-		return phy_ethtool_ksettings_get(dev->phydev, cmd);
++		phy_ethtool_ksettings_get(dev->phydev, cmd);
++		return 0;
+ 	}
+ 
+ 	supported = (SUPPORTED_Autoneg);
+diff --git a/drivers/net/ethernet/broadcom/bcm63xx_enet.c b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
+index 50d88d3..34ebb40 100644
+--- a/drivers/net/ethernet/broadcom/bcm63xx_enet.c
++++ b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
+@@ -1453,7 +1453,8 @@ static int bcm_enet_get_link_ksettings(struct net_device *dev,
+ 	if (priv->has_phy) {
+ 		if (!dev->phydev)
+ 			return -ENODEV;
+-		return phy_ethtool_ksettings_get(dev->phydev, cmd);
++		phy_ethtool_ksettings_get(dev->phydev, cmd);
++		return 0;
+ 	} else {
+ 		cmd->base.autoneg = 0;
+ 		cmd->base.speed = (priv->force_speed_100) ?
+diff --git a/drivers/net/ethernet/broadcom/genet/bcmgenet.c b/drivers/net/ethernet/broadcom/genet/bcmgenet.c
+index a205a9f..daca1c9 100644
+--- a/drivers/net/ethernet/broadcom/genet/bcmgenet.c
++++ b/drivers/net/ethernet/broadcom/genet/bcmgenet.c
+@@ -477,7 +477,9 @@ static int bcmgenet_get_link_ksettings(struct net_device *dev,
+ 	if (!priv->phydev)
+ 		return -ENODEV;
+ 
+-	return phy_ethtool_ksettings_get(priv->phydev, cmd);
++	phy_ethtool_ksettings_get(priv->phydev, cmd);
 +
-+static const u32 sun8i_rgb2yuv_dcsc_alpha = 0x00020200;
-+
- static void sun8i_mixer_commit(struct sunxi_engine *engine)
- {
- 	DRM_DEBUG_DRIVER("Committing changes\n");
-@@ -37,6 +45,31 @@ static void sun8i_mixer_commit(struct sunxi_engine *engine)
- 		     SUN8I_MIXER_GLOBAL_DBUFF_ENABLE);
++	return 0;
  }
  
-+static void sun8i_mixer_apply_color_correction(struct sunxi_engine *engine)
-+{
-+	int i;
+ static int bcmgenet_set_link_ksettings(struct net_device *dev,
+diff --git a/drivers/net/ethernet/broadcom/tg3.c b/drivers/net/ethernet/broadcom/tg3.c
+index 537d571..d600c41 100644
+--- a/drivers/net/ethernet/broadcom/tg3.c
++++ b/drivers/net/ethernet/broadcom/tg3.c
+@@ -12097,7 +12097,9 @@ static int tg3_get_link_ksettings(struct net_device *dev,
+ 		if (!(tp->phy_flags & TG3_PHYFLG_IS_CONNECTED))
+ 			return -EAGAIN;
+ 		phydev = mdiobus_get_phy(tp->mdio_bus, tp->phy_addr);
+-		return phy_ethtool_ksettings_get(phydev, cmd);
++		phy_ethtool_ksettings_get(phydev, cmd);
 +
-+	DRM_DEBUG_DRIVER("Applying RGB to YUV color correction\n");
-+
-+	/* Set color correction */
-+	regmap_write(engine->regs, SUN8I_MIXER_DCSC_EN, 1);
-+
-+	for (i = 0; i < 12; i++)
-+		regmap_write(engine->regs, SUN8I_MIXER_DCSC_COEF_REG(i),
-+			     sun8i_rgb2yuv_coef[i]);
-+
-+	regmap_write(engine->regs, SUN8I_MIXER_DCSC_COEF_ALPHA,
-+		     sun8i_rgb2yuv_dcsc_alpha);
-+}
-+
-+static void sun8i_mixer_disable_color_correction(struct sunxi_engine *engine)
-+{
-+	DRM_DEBUG_DRIVER("Disabling color correction\n");
-+
-+	/* Disable color correction */
-+	regmap_write(engine->regs, SUN8I_MIXER_DCSC_EN, 0);
-+}
-+
- void sun8i_mixer_layer_enable(struct sun8i_mixer *mixer,
- 				int layer, bool enable)
++		return 0;
+ 	}
+ 
+ 	supported = (SUPPORTED_Autoneg);
+diff --git a/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c b/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
+index 15571e2..aad825088 100644
+--- a/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
++++ b/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
+@@ -75,16 +75,14 @@ static char dpaa_stats_global[][ETH_GSTRING_LEN] = {
+ static int dpaa_get_link_ksettings(struct net_device *net_dev,
+ 				   struct ethtool_link_ksettings *cmd)
  {
-@@ -229,6 +262,8 @@ int sun8i_mixer_update_layer_buffer(struct sun8i_mixer *mixer,
- static const struct sunxi_engine_ops sun8i_engine_ops = {
- 	.commit		= sun8i_mixer_commit,
- 	.layers_init	= sun8i_layers_init,
-+	.apply_color_correction		= sun8i_mixer_apply_color_correction,
-+	.disable_color_correction	= sun8i_mixer_disable_color_correction,
- };
+-	int err;
+-
+ 	if (!net_dev->phydev) {
+ 		netdev_dbg(net_dev, "phy device not initialized\n");
+ 		return 0;
+ 	}
  
- static struct regmap_config sun8i_mixer_regmap_config = {
-diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.h b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-index 4785ac090b8c..d7f7513898b6 100644
---- a/drivers/gpu/drm/sun4i/sun8i_mixer.h
-+++ b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-@@ -88,6 +88,11 @@
- #define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_RGB888	(8 << 8)
- #define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_DEF	(0xff << 24)
+-	err = phy_ethtool_ksettings_get(net_dev->phydev, cmd);
++	phy_ethtool_ksettings_get(net_dev->phydev, cmd);
  
-+/* The DCSC sub-engine is used to do color space conversation */
-+#define SUN8I_MIXER_DCSC_EN			0xb0000
-+#define SUN8I_MIXER_DCSC_COEF_REG(x)		(0xb0010 + 0x4 * x)
-+#define SUN8I_MIXER_DCSC_COEF_ALPHA		0xb0040
+-	return err;
++	return 0;
+ }
+ 
+ static int dpaa_set_link_ksettings(struct net_device *net_dev,
+diff --git a/drivers/net/ethernet/freescale/ucc_geth_ethtool.c b/drivers/net/ethernet/freescale/ucc_geth_ethtool.c
+index b642990..4df282e 100644
+--- a/drivers/net/ethernet/freescale/ucc_geth_ethtool.c
++++ b/drivers/net/ethernet/freescale/ucc_geth_ethtool.c
+@@ -113,7 +113,9 @@ uec_get_ksettings(struct net_device *netdev, struct ethtool_link_ksettings *cmd)
+ 	if (!phydev)
+ 		return -ENODEV;
+ 
+-	return phy_ethtool_ksettings_get(phydev, cmd);
++	phy_ethtool_ksettings_get(phydev, cmd);
 +
- /*
-  * These sub-engines are still unknown now, the EN registers are here only to
-  * be used to disable these sub-engines.
-@@ -102,7 +107,6 @@
- #define SUN8I_MIXER_PEAK_EN			0xa6000
- #define SUN8I_MIXER_ASE_EN			0xa8000
- #define SUN8I_MIXER_FCC_EN			0xaa000
--#define SUN8I_MIXER_DCSC_EN			0xb0000
++	return 0;
+ }
  
- struct sun8i_mixer_cfg {
- 	int		vi_num;
+ static int
+diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
+index 25642de..5794d98 100644
+--- a/drivers/net/ethernet/marvell/mv643xx_eth.c
++++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
+@@ -1501,10 +1501,9 @@ mv643xx_eth_get_link_ksettings_phy(struct mv643xx_eth_private *mp,
+ 				   struct ethtool_link_ksettings *cmd)
+ {
+ 	struct net_device *dev = mp->dev;
+-	int err;
+ 	u32 supported, advertising;
+ 
+-	err = phy_ethtool_ksettings_get(dev->phydev, cmd);
++	phy_ethtool_ksettings_get(dev->phydev, cmd);
+ 
+ 	/*
+ 	 * The MAC does not support 1000baseT_Half.
+@@ -1520,7 +1519,7 @@ mv643xx_eth_get_link_ksettings_phy(struct mv643xx_eth_private *mp,
+ 	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
+ 						advertising);
+ 
+-	return err;
++	return 0;
+ }
+ 
+ static int
+diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+index f4d7aec..03707ee 100644
+--- a/drivers/net/ethernet/ti/cpsw.c
++++ b/drivers/net/ethernet/ti/cpsw.c
+@@ -2165,11 +2165,12 @@ static int cpsw_get_link_ksettings(struct net_device *ndev,
+ 	struct cpsw_common *cpsw = priv->cpsw;
+ 	int slave_no = cpsw_slave_index(cpsw, priv);
+ 
+-	if (cpsw->slaves[slave_no].phy)
+-		return phy_ethtool_ksettings_get(cpsw->slaves[slave_no].phy,
+-						 ecmd);
+-	else
++	if (cpsw->slaves[slave_no].phy) {
++		phy_ethtool_ksettings_get(cpsw->slaves[slave_no].phy, ecmd);
++		return 0;
++	} else {
+ 		return -EOPNOTSUPP;
++	}
+ }
+ 
+ static int cpsw_set_link_ksettings(struct net_device *ndev,
+diff --git a/drivers/net/phy/phy.c b/drivers/net/phy/phy.c
+index 82ab8fb..9c372bf 100644
+--- a/drivers/net/phy/phy.c
++++ b/drivers/net/phy/phy.c
+@@ -508,8 +508,8 @@ int phy_ethtool_gset(struct phy_device *phydev, struct ethtool_cmd *cmd)
+ }
+ EXPORT_SYMBOL(phy_ethtool_gset);
+ 
+-int phy_ethtool_ksettings_get(struct phy_device *phydev,
+-			      struct ethtool_link_ksettings *cmd)
++void phy_ethtool_ksettings_get(struct phy_device *phydev,
++			       struct ethtool_link_ksettings *cmd)
+ {
+ 	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
+ 						phydev->supported);
+@@ -531,8 +531,6 @@ int phy_ethtool_ksettings_get(struct phy_device *phydev,
+ 	cmd->base.autoneg = phydev->autoneg;
+ 	cmd->base.eth_tp_mdix_ctrl = phydev->mdix_ctrl;
+ 	cmd->base.eth_tp_mdix = phydev->mdix;
+-
+-	return 0;
+ }
+ EXPORT_SYMBOL(phy_ethtool_ksettings_get);
+ 
+@@ -1448,7 +1446,9 @@ int phy_ethtool_get_link_ksettings(struct net_device *ndev,
+ 	if (!phydev)
+ 		return -ENODEV;
+ 
+-	return phy_ethtool_ksettings_get(phydev, cmd);
++	phy_ethtool_ksettings_get(phydev, cmd);
++
++	return 0;
+ }
+ EXPORT_SYMBOL(phy_ethtool_get_link_ksettings);
+ 
+diff --git a/drivers/net/usb/lan78xx.c b/drivers/net/usb/lan78xx.c
+index 9eff97a..5833f7e 100644
+--- a/drivers/net/usb/lan78xx.c
++++ b/drivers/net/usb/lan78xx.c
+@@ -1490,7 +1490,7 @@ static int lan78xx_get_link_ksettings(struct net_device *net,
+ 	if (ret < 0)
+ 		return ret;
+ 
+-	ret = phy_ethtool_ksettings_get(phydev, cmd);
++	phy_ethtool_ksettings_get(phydev, cmd);
+ 
+ 	usb_autopm_put_interface(dev->intf);
+ 
+diff --git a/include/linux/phy.h b/include/linux/phy.h
+index e76e4ad..4ec07a6 100644
+--- a/include/linux/phy.h
++++ b/include/linux/phy.h
+@@ -844,8 +844,8 @@ void phy_stop_machine(struct phy_device *phydev);
+ void phy_trigger_machine(struct phy_device *phydev, bool sync);
+ int phy_ethtool_sset(struct phy_device *phydev, struct ethtool_cmd *cmd);
+ int phy_ethtool_gset(struct phy_device *phydev, struct ethtool_cmd *cmd);
+-int phy_ethtool_ksettings_get(struct phy_device *phydev,
+-			      struct ethtool_link_ksettings *cmd);
++void phy_ethtool_ksettings_get(struct phy_device *phydev,
++			       struct ethtool_link_ksettings *cmd);
+ int phy_ethtool_ksettings_set(struct phy_device *phydev,
+ 			      const struct ethtool_link_ksettings *cmd);
+ int phy_mii_ioctl(struct phy_device *phydev, struct ifreq *ifr, int cmd);
+diff --git a/net/dsa/slave.c b/net/dsa/slave.c
+index 7693182..ba9f78b 100644
+--- a/net/dsa/slave.c
++++ b/net/dsa/slave.c
+@@ -689,12 +689,13 @@ dsa_slave_get_link_ksettings(struct net_device *dev,
+ 			     struct ethtool_link_ksettings *cmd)
+ {
+ 	struct dsa_slave_priv *p = netdev_priv(dev);
+-	int err = -EOPNOTSUPP;
+ 
+-	if (p->phy != NULL)
+-		err = phy_ethtool_ksettings_get(p->phy, cmd);
++	if (!p->phy)
++		return -EOPNOTSUPP;
+ 
+-	return err;
++	phy_ethtool_ksettings_get(p->phy, cmd);
++
++	return 0;
+ }
+ 
+ static int
 -- 
-2.12.2
+2.9.4
