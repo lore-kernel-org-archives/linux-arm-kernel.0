@@ -1,33 +1,35 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 05 Jun 2017 10:23:28 +0200
-Subject: [PATCH 1/3] clk: meson: meson8b: add compatibles for Meson8 and
- Meson8m2
-In-Reply-To: <CAFBinCCLL5ZqiZzWi-RsfZ-5_h20O5LRRY3+K7dt=U4qrveQ_w@mail.gmail.com>
-References: <20170604183341.21417-1-martin.blumenstingl@googlemail.com>
- <20170604183341.21417-2-martin.blumenstingl@googlemail.com>
- <1496606325.3552.16.camel@baylibre.com>
- <CAFBinCCLL5ZqiZzWi-RsfZ-5_h20O5LRRY3+K7dt=U4qrveQ_w@mail.gmail.com>
-Message-ID: <1496651008.3552.24.camel@baylibre.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Mon, 5 Jun 2017 10:23:21 +0200
+Subject: [PATCH v2 03/25] KVM: arm64: Make kvm_condition_valid32()
+ accessible from EL2
+In-Reply-To: <394ef6fd-1123-0a1f-f462-ed5cb52e24da@arm.com>
+References: <20170601102117.17750-1-marc.zyngier@arm.com>
+ <20170601102117.17750-4-marc.zyngier@arm.com>
+ <20170604121129.GB9464@cbox>
+ <394ef6fd-1123-0a1f-f462-ed5cb52e24da@arm.com>
+Message-ID: <20170605082321.GA8984@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-06-05 at 00:27 +0200, Martin Blumenstingl wrote:
-> > I think you should split the binding documentation and clk changes into
-> > separate
-> > patches.
+On Mon, Jun 05, 2017 at 09:13:53AM +0100, Marc Zyngier wrote:
+> On 04/06/17 13:11, Christoffer Dall wrote:
+> > On Thu, Jun 01, 2017 at 11:20:55AM +0100, Marc Zyngier wrote:
+> >> As we're about to trap CP15 accesses and handle them at EL2, we
+> >> need to evaluate whether or not the condition flags are valid,
+> >> as an implementation is allowed to trap despite the condition
+> >> not being met.
+> >>
+> >> Tagging the function as __hyp_text allows this.
+> > 
+> > is the cc_map also guaranteed to work (by simple reference) in EL2 then?
 > 
-> OK, from what I know is that for "trivial" changes the driver and
-> dt-binding changes can go through one patch.
-> this patch started as a four-line patch which added two lines of
-> documentation and two lines of driver code.
+> Yes. By virtue of being const, this ends up in the read-only part of the
+> kernel, which we always map at EL2.
+> 
 
-I'm not aware of such tolerance but if you've have seen that the DT maintainers
-are OK with it, feel free to point me to it.
+And why don't we have to do any address-translation-to-hyp tricks on the
+address?  Are we guaranteed that it's a relative address and everything
+is relocated with the same offset, or how was that again?
 
-Last time I heard about it, DT guys were using filter-branch on the kernel tree
-to create a separate tree, so I was thinking that this "documentation as a
-separate patch" was a hard rule ... but I may be wrong
-
-> however, with all the Kconfig/comment/etc updates I think that you are
-> right and it's worth splitting this into two patches (one for the
-> clock driver and one for the dt-binding changes)
+Thanks,
+-Christoffer
