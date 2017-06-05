@@ -1,81 +1,115 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 5 Jun 2017 13:37:23 +0800
-Subject: [PATCH] ARM: imx6ull: Make suspend/resume work like on 6ul
-In-Reply-To: <c63fd9031493cefed47d59c9918c0ecb76ffaf85.1496160320.git.leonard.crestez@nxp.com>
-References: <c63fd9031493cefed47d59c9918c0ecb76ffaf85.1496160320.git.leonard.crestez@nxp.com>
-Message-ID: <20170605053722.GI4094@dragon>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 5 Jun 2017 13:57:45 +0800
+Subject: [linux-sunxi] Re: [PATCH v6 2/9] irqchip/sunxi-nmi: add support
+ for the NMI in A64 R_INTC
+In-Reply-To: <CAGb2v66NY49OL0J3C64CKzngri5-Na6uPBizj-BNJW3vNkFUQw@mail.gmail.com>
+References: <20170518071653.36561-1-icenowy@aosc.io>
+ <20170518071653.36561-3-icenowy@aosc.io>
+ <ed99d87b-86eb-cf8a-8614-51d59fa00c8c@arm.com>
+ <98014597-29BA-4D02-8137-4E399955F4FD@aosc.io>
+ <CAGb2v66NY49OL0J3C64CKzngri5-Na6uPBizj-BNJW3vNkFUQw@mail.gmail.com>
+Message-ID: <CAGb2v64b80fZ81rC_dWzes9VzMKfVA4HYC7yJ779tb=4r2jeSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 30, 2017 at 07:11:19PM +0300, Leonard Crestez wrote:
-> Suspend and resume on imx6ull is currenty not working because of some
-> missed checks where behavior should match imx6ul.
-> 
-> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-> ---
->  arch/arm/mach-imx/mxc.h     | 6 ++++++
->  arch/arm/mach-imx/pm-imx6.c | 6 ++++--
->  2 files changed, 10 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
-> index 34f2ff6..e00d626 100644
-> --- a/arch/arm/mach-imx/mxc.h
-> +++ b/arch/arm/mach-imx/mxc.h
-> @@ -39,6 +39,7 @@
->  #define MXC_CPU_IMX6SX		0x62
->  #define MXC_CPU_IMX6Q		0x63
->  #define MXC_CPU_IMX6UL		0x64
-> +#define MXC_CPU_IMX6ULL		0x65
+Hi Marc,
 
-Since you are adding a new CPU type, you should probably patch
-imx_soc_device_init() for it as well.
+On Mon, May 22, 2017 at 10:25 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> On Mon, May 22, 2017 at 5:41 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+>>
+>>
+>> ? 2017?5?22? GMT+08:00 ??5:39:22, Marc Zyngier <marc.zyngier@arm.com> ??:
+>>>On 18/05/17 08:16, Icenowy Zheng wrote:
+>>>> Add support for the newly imported compatible for the A64 R_INTC in
+>>>> irq-sunxi-nmi driver.
+>>>>
+>>>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>>>> ---
+>>>> Changes in v5:
+>>>> - Fix A64 R_INTC compatible.
+>>>>
+>>>>  drivers/irqchip/irq-sunxi-nmi.c | 13 +++++++++++++
+>>>>  1 file changed, 13 insertions(+)
+>>>>
+>>>> diff --git a/drivers/irqchip/irq-sunxi-nmi.c
+>>>b/drivers/irqchip/irq-sunxi-nmi.c
+>>>> index 668730c5cb66..5559c1d593bf 100644
+>>>> --- a/drivers/irqchip/irq-sunxi-nmi.c
+>>>> +++ b/drivers/irqchip/irq-sunxi-nmi.c
+>>>> @@ -56,6 +56,12 @@ static struct sunxi_sc_nmi_reg_offs sun9i_reg_offs
+>>>= {
+>>>>      .enable = 0x04,
+>>>>  };
+>>>>
+>>>> +static struct sunxi_sc_nmi_reg_offs sun50i_reg_offs = {
+>>>> +    .ctrl   = 0x0c,
+>>>> +    .pend   = 0x10,
+>>>> +    .enable = 0x40,
+>>>> +};
+>>>> +
+>>>
+>>>Magic values? Even if no #define is provided, a pointer to the
+>>>corresponding documentation would be appreciated (assuming
+>>>documentation
+>>>exists).
+>>
+>> No documents is available for A64 R_INTC.
+>
+> No code either. In Allwinner's BSP, the interrupts for the PMICs go
+> through the (closed source) OpenRISC firmware, so there's no driver
+> for it in the kernel.
+>
+> The registers line up with the old interrupt controller from the A10,
+> but it seems only the NMI interrupt is wired up.
 
-Shawn
+Is this OK? Or do you want Icenowy to respin a version with defines?
 
->  #define MXC_CPU_IMX7D		0x72
->  
->  #define IMX_DDR_TYPE_LPDDR2		1
-> @@ -73,6 +74,11 @@ static inline bool cpu_is_imx6ul(void)
->  	return __mxc_cpu_type == MXC_CPU_IMX6UL;
->  }
->  
-> +static inline bool cpu_is_imx6ull(void)
-> +{
-> +	return __mxc_cpu_type == MXC_CPU_IMX6ULL;
-> +}
-> +
->  static inline bool cpu_is_imx6q(void)
->  {
->  	return __mxc_cpu_type == MXC_CPU_IMX6Q;
-> diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
-> index e61b1d1..ecdf071 100644
-> --- a/arch/arm/mach-imx/pm-imx6.c
-> +++ b/arch/arm/mach-imx/pm-imx6.c
-> @@ -295,7 +295,8 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode)
->  		val &= ~BM_CLPCR_SBYOS;
->  		if (cpu_is_imx6sl())
->  			val |= BM_CLPCR_BYPASS_PMIC_READY;
-> -		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul())
-> +		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul() ||
-> +		    cpu_is_imx6ull())
->  			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
->  		else
->  			val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
-> @@ -312,7 +313,8 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode)
->  		val |= BM_CLPCR_SBYOS;
->  		if (cpu_is_imx6sl() || cpu_is_imx6sx())
->  			val |= BM_CLPCR_BYPASS_PMIC_READY;
-> -		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul())
-> +		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul() ||
-> +		    cpu_is_imx6ull())
->  			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
->  		else
->  			val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
-> -- 
-> 2.7.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>
+>>>>  static inline void sunxi_sc_nmi_write(struct irq_chip_generic *gc,
+>>>u32 off,
+>>>>                                    u32 val)
+>>>>  {
+>>>> @@ -220,3 +226,10 @@ static int __init sun9i_nmi_irq_init(struct
+>>>device_node *node,
+>>>>      return sunxi_sc_nmi_irq_init(node, &sun9i_reg_offs);
+>>>>  }
+>>>>  IRQCHIP_DECLARE(sun9i_nmi, "allwinner,sun9i-a80-nmi",
+>>>sun9i_nmi_irq_init);
+>>>> +
+>>>> +static int __init sun50i_nmi_irq_init(struct device_node *node,
+>>>> +                                 struct device_node *parent)
+>>>> +{
+>>>> +    return sunxi_sc_nmi_irq_init(node, &sun50i_reg_offs);
+>>>> +}
+>>>> +IRQCHIP_DECLARE(sun50i_nmi, "allwinner,sun50i-a64-r-intc",
+>>>sun50i_nmi_irq_init);
+>>>>
+>>>
+>>>Apart from the above:
+>>>
+>>>Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>
+>>>Let me know how you want this to be merged.
+
+This, and the previous dt bindings patch, can be merged through whatever
+tree irqchip drivers are merged through. Is that Jason's irqchip tree?
+
+We're mostly waiting on this before merging the remaining device tree
+changes.
+
+
+Thanks
+ChenYu
+
+>>
+>> I think it can just go via IRQ subsystem.
+>>
+>>>
+>>>Thanks,
+>>>
+>>>       M.
+>>
+>> --
+>> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+>> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+>> For more options, visit https://groups.google.com/d/optout.
