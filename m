@@ -1,52 +1,33 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 5 Jun 2017 08:59:07 +0100
-Subject: [PATCH v3 3/9] mfd: tmio.h: support partition parser types
-In-Reply-To: <CAAQYJAs_EMHUUBObbhOQ6gk4rh=MsO4d2qi9KpDdhMiHMrsyTA@mail.gmail.com>
-References: <1496270458-6479-1-git-send-email-andrea.adami@gmail.com>
- <1496270458-6479-4-git-send-email-andrea.adami@gmail.com>
- <20170601143535.s6ovk5ts3cbehw3f@dell>
- <CAAQYJAs_EMHUUBObbhOQ6gk4rh=MsO4d2qi9KpDdhMiHMrsyTA@mail.gmail.com>
-Message-ID: <20170605075906.2rdf74lzemys77to@dell>
+From: andy.tang@nxp.com (Yuantian Tang)
+Date: Mon, 5 Jun 2017 15:45:52 +0800
+Subject: [PATCH] arm64: dts: ls1088a: update sata node
+Message-ID: <1496648752-27627-1-git-send-email-andy.tang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 03 Jun 2017, Andrea Adami wrote:
+1. Remove ls1043a compatible string from node
+2. Fix the sata ecc register address error
 
-> On Thu, Jun 1, 2017 at 4:35 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Thu, 01 Jun 2017, Andrea Adami wrote:
-> >
-> >> Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
-> >> ---
-> >>  include/linux/mfd/tmio.h | 1 +
-> >>  1 file changed, 1 insertion(+)
-> >>
-> >> diff --git a/include/linux/mfd/tmio.h b/include/linux/mfd/tmio.h
-> >> index a1520d8..23bb069 100644
-> >> --- a/include/linux/mfd/tmio.h
-> >> +++ b/include/linux/mfd/tmio.h
-> >> @@ -139,6 +139,7 @@ struct tmio_nand_data {
-> >>       struct nand_bbt_descr   *badblock_pattern;
-> >>       struct mtd_partition    *partition;
-> >>       unsigned int            num_partitions;
-> >> +     const char *const       *types; /* names of parsers to use if any */
-> >
-> > Please use kerneldoc instead.
-> >
-> Thanks for the review.
-> 
-> tmio.h is not consistent and uses inline comments so I did not change the style.
-> Another round of patches will be necessary to sanitize the comments,
-> out of the scope of this little patchset.
+Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
+---
+ arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Will you do the work?
-
-> >>  };
-> >>
-> >>  #define FBIO_TMIO_ACC_WRITE  0x7C639300
-> >
-
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+index df16284..c144d06 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+@@ -360,9 +360,9 @@
+ 		};
+ 
+ 		sata: sata at 3200000 {
+-			compatible = "fsl,ls1088a-ahci", "fsl,ls1043a-ahci";
++			compatible = "fsl,ls1088a-ahci";
+ 			reg = <0x0 0x3200000 0x0 0x10000>,
+-				<0x0 0x20140520 0x0 0x4>;
++				<0x7 0x100520 0x0 0x4>;
+ 			reg-names = "ahci", "sata-ecc";
+ 			interrupts = <0 133 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&clockgen 4 3>;
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.1.0.27.g96db324
