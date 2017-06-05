@@ -1,66 +1,96 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon,  5 Jun 2017 14:15:18 -0600
-Subject: [PATCH 17/17] arm64: dts: qcom: msm8916: Add debug unit
+Date: Mon,  5 Jun 2017 14:15:17 -0600
+Subject: [PATCH 16/17] arm64: dts: hi6220: register debug module
 In-Reply-To: <1496693718-9191-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1496693718-9191-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1496693718-9191-18-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1496693718-9191-17-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Leo Yan <leo.yan@linaro.org>
 
-Add debug unit on Qualcomm msm8916 based platforms, including the
-DragonBoard 410c board.
+Bind debug module driver for Hi6220.
 
 Signed-off-by: Leo Yan <leo.yan@linaro.org>
 Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Acked-by: Andy Gross <andy.gross@linaro.org>
+Acked-by: Wei Xu <xuwei5@hisilicon.com>
 ---
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 64 +++++++++++++++++++++++++++++++
+ 1 file changed, 64 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index ab3093995ded..17691abea608 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -1116,6 +1116,38 @@
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+index 1e5129b19280..21805b9786c7 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+@@ -916,5 +916,69 @@
+ 				};
  			};
  		};
- 
-+		debug at 850000 {
++
++		debug at f6590000 {
 +			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0x850000 0x1000>;
-+			clocks = <&rpmcc RPM_QDSS_CLK>;
++			reg = <0 0xf6590000 0 0x1000>;
++			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
 +			clock-names = "apb_pclk";
-+			cpu = <&CPU0>;
++			cpu = <&cpu0>;
 +		};
 +
-+		debug at 852000 {
++		debug at f6592000 {
 +			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0x852000 0x1000>;
-+			clocks = <&rpmcc RPM_QDSS_CLK>;
++			reg = <0 0xf6592000 0 0x1000>;
++			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
 +			clock-names = "apb_pclk";
-+			cpu = <&CPU1>;
++			cpu = <&cpu1>;
 +		};
 +
-+		debug at 854000 {
++		debug at f6594000 {
 +			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0x854000 0x1000>;
-+			clocks = <&rpmcc RPM_QDSS_CLK>;
++			reg = <0 0xf6594000 0 0x1000>;
++			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
 +			clock-names = "apb_pclk";
-+			cpu = <&CPU2>;
++			cpu = <&cpu2>;
 +		};
 +
-+		debug at 856000 {
++		debug at f6596000 {
 +			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0x856000 0x1000>;
-+			clocks = <&rpmcc RPM_QDSS_CLK>;
++			reg = <0 0xf6596000 0 0x1000>;
++			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
 +			clock-names = "apb_pclk";
-+			cpu = <&CPU3>;
++			cpu = <&cpu3>;
 +		};
 +
- 		etm at 85c000 {
- 			compatible = "arm,coresight-etm4x", "arm,primecell";
- 			reg = <0x85c000 0x1000>;
++		debug at f65d0000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0 0xf65d0000 0 0x1000>;
++			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu4>;
++		};
++
++		debug at f65d2000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0 0xf65d2000 0 0x1000>;
++			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu5>;
++		};
++
++		debug at f65d4000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0 0xf65d4000 0 0x1000>;
++			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu6>;
++		};
++
++		debug at f65d6000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0 0xf65d6000 0 0x1000>;
++			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu7>;
++		};
+ 	};
+ };
 -- 
 2.7.4
