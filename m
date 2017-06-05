@@ -1,70 +1,100 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon,  5 Jun 2017 20:33:48 +0800
-Subject: [PATCH 2/2] dmaengine: sun6i: support V3s SoC variant
-In-Reply-To: <20170605123348.26137-1-icenowy@aosc.io>
-References: <20170605123348.26137-1-icenowy@aosc.io>
-Message-ID: <20170605123348.26137-3-icenowy@aosc.io>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 5 Jun 2017 12:35:35 +0000
+Subject: [PATCH] mm: vmalloc: make vmalloc_to_page() deal with PMD/PUD
+ mappings
+In-Reply-To: <97a535d8-f9d5-57b2-4b9c-23a0e6df7cc8@intel.com>
+References: <20170602112720.28948-1-ard.biesheuvel@linaro.org>
+ <e98368d8-b1bc-5804-2115-370ec7109e9b@intel.com>
+ <CAKv+Gu964bDsV52gZ7QCJf26kXVaWgmuwXZSm0qWxa-34Eqttw@mail.gmail.com>
+ <747b71d8-86a7-3b96-cf90-60d6c2ce0171@intel.com>
+ <CAKv+Gu_0cQDyRP0urZEF6OAn7cOEVH3WXL2UpDgg6wKUrWcRYA@mail.gmail.com>
+ <97a535d8-f9d5-57b2-4b9c-23a0e6df7cc8@intel.com>
+Message-ID: <CAKv+Gu9CR3N4C6Xuc9aTtSbgSgMHXtPEKeEnkxssk3NmffqgTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Icenowy Zheng <icenowy@aosc.xyz>
+On 2 June 2017 at 18:18, Dave Hansen <dave.hansen@intel.com> wrote:
+> On 06/02/2017 09:21 AM, Ard Biesheuvel wrote:
+>>> First of all, this math isn't guaranteed to work.  We don't guarantee
+>>> virtual contiguity for all mem_map[]s.  I think you need to go to a pfn
+>>> or paddr first, add the pud offset, then convert to a 'struct page'.
+>>
+>> OK, so you are saying the slice of the struct page array covering the
+>> range could be discontiguous even though the physical range it
+>> describes is contiguous? (which is guaranteed due to the nature of a
+>> PMD mapping IIUC) In that case,
+>
+> Yes.
+>
+>>> But, what *is* the right thing to return here?  Do the users here want
+>>> the head page or the tail page?
+>>
+>> Hmm, I see what you mean. The vread() code that I am trying to fix
+>> simply kmaps the returned page, copies from it and unmaps it, so it is
+>> after the tail page. But I guess code that is aware of compound pages
+>> is after the head page instead.
+>
+> Yeah, and some operations happen on tail pages while others get
+> redirected to the head page.
+>
 
-Allwinner V3s has a DMA engine similar to the ones from A31, but with
-fewer channels and DRQs.
+OK. So given that vmalloc() never allocates compound pages, and vmap()
+does not deal with them at all, we should be able to safely assume
+that vmalloc_to_page() callers are interested in the tail page only.
 
-Add support for it.
+>>> BTW, _are_ your huge vmalloc pages compound?
+>>
+>> Not in the case that I am trying to solve, no. They are simply VM_MAP
+>> mappings of sequences of pages that are occupied by the kernel itself,
+>> and not allocated by the page allocator.
+>
+> Huh, so what are they?  Are they system RAM that was bootmem allocated
+> or something?
+>
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Rob Herring <robh@kernel.org>
----
-Changes since the original codec patchset v3:
-- Added Rob's ACK.
+They are static mappings of vmlinux segments. I.e., on my system I have
 
- Documentation/devicetree/bindings/dma/sun6i-dma.txt |  1 +
- drivers/dma/sun6i-dma.c                             | 13 +++++++++++++
- 2 files changed, 14 insertions(+)
+vmalloc : 0xffff000008000000 - 0xffff7dffbfff0000   (129022 GB)
+  .text : 0xffff2125f4ce0000 - 0xffff2125f5670000   (  9792 KB)
+.rodata : 0xffff2125f5670000 - 0xffff2125f5a30000   (  3840 KB)
+  .init : 0xffff2125f5a30000 - 0xffff2125f5e50000   (  4224 KB)
+  .data : 0xffff2125f5e50000 - 0xffff2125f5f8ba00   (  1263 KB)
+   .bss : 0xffff2125f5f8ba00 - 0xffff2125f609692c   (  1068 KB)
 
-diff --git a/Documentation/devicetree/bindings/dma/sun6i-dma.txt b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
-index 6b267045f522..98fbe1a5c6dd 100644
---- a/Documentation/devicetree/bindings/dma/sun6i-dma.txt
-+++ b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
-@@ -9,6 +9,7 @@ Required properties:
- 		  "allwinner,sun8i-a23-dma"
- 		  "allwinner,sun8i-a83t-dma"
- 		  "allwinner,sun8i-h3-dma"
-+		  "allwinner,sun8i-v3s-dma"
- - reg:		Should contain the registers base address and length
- - interrupts:	Should contain a reference to the interrupt used by this device
- - clocks:	Should contain a reference to the parent AHB clock
-diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index 252b59c1d1d5..bcd496edc70f 100644
---- a/drivers/dma/sun6i-dma.c
-+++ b/drivers/dma/sun6i-dma.c
-@@ -1040,11 +1040,24 @@ static struct sun6i_dma_config sun8i_h3_dma_cfg = {
- 	.nr_max_vchans   = 34,
- };
- 
-+/*
-+ * The V3s have only 8 physical channels, a maximum DRQ port id of 23,
-+ * and a total of 24 usable source and destination endpoints.
-+ */
-+
-+static struct sun6i_dma_config sun8i_v3s_dma_cfg = {
-+	.nr_max_channels = 8,
-+	.nr_max_requests = 23,
-+	.nr_max_vchans   = 24,
-+	.gate_needed	 = true,
-+};
-+
- static const struct of_device_id sun6i_dma_match[] = {
- 	{ .compatible = "allwinner,sun6i-a31-dma", .data = &sun6i_a31_dma_cfg },
- 	{ .compatible = "allwinner,sun8i-a23-dma", .data = &sun8i_a23_dma_cfg },
- 	{ .compatible = "allwinner,sun8i-a83t-dma", .data = &sun8i_a83t_dma_cfg },
- 	{ .compatible = "allwinner,sun8i-h3-dma", .data = &sun8i_h3_dma_cfg },
-+	{ .compatible = "allwinner,sun8i-v3s-dma", .data = &sun8i_v3s_dma_cfg },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, sun6i_dma_match);
+where KASLR may place these segments anywhere in the VMALLOC region.
+Mark has suggested that these regions should not intersect, but in my
+opinion, given that the VMALLOC region already contains executable
+code and associated data (for kernel modules), and may already contain
+huge mappings (for HUGE_VMAP), it is reasonable to expect shared code
+to at least tolerate such mappings.
+
+As Mark pointed out, pmd_huge()/pud_huge() may not work as expected
+depending on the kernel configuration, so I will respin the patch to
+take HUGE_VMAP into account for those definitions as well.
+
 -- 
-2.12.2
+Ard.
+
+
+
+>>>>>> +#else
+>>>>>> +     VIRTUAL_BUG_ON(1);
+>>>>>> +#endif
+>>>>>> +     return page;
+>>>>>> +}
+>>>>> So if somebody manages to call this function on a huge page table entry,
+>>>>> but doesn't have hugetlbfs configured on, we kill the machine?
+>>>> Yes. But only if you have CONFIG_DEBUG_VIRTUAL defined, in which case
+>>>> it seems appropriate to signal a failure rather than proceed with
+>>>> dereferencing the huge PMD entry as if it were a table entry.
+>>>
+>>> Why kill the machine rather than just warning and returning NULL?
+>>
+>> I know this is generally a bad thing, but in this case, when a debug
+>> option has been enabled exactly for this purpose, I think it is not
+>> inappropriate to BUG() when encountering such a mapping. But I am
+>> happy to relax it to a WARN() and return NULL instead, but in that
+>> case, it should be unconditional imo and not based on
+>> CONFIG_DEBUG_VIRTUAL or the likes.
+>
+> Sounds sane to me.
