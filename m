@@ -1,133 +1,74 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon,  5 Jun 2017 17:00:33 +0800
-Subject: [PATCH v2 2/2] arm64: allwinner: a64: Convert CCU raw number
- references to macros
-In-Reply-To: <20170605090033.31663-1-wens@csie.org>
-References: <20170605090033.31663-1-wens@csie.org>
-Message-ID: <20170605090033.31663-3-wens@csie.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 5 Jun 2017 09:59:07 +0100
+Subject: exynos drm build failure due to cec_* symbols
+In-Reply-To: <5934B4FE.6060606@samsung.com>
+References: <CGME20170602135819epcas1p2302294dec8c40b69a19e0b220806eacb@epcas1p2.samsung.com>
+ <2d6226cf-4023-2a97-0791-42d3e8dcbdd3@suse.de>
+ <5934B4FE.6060606@samsung.com>
+Message-ID: <20170605085907.GD4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A64 device tree file has some remnants of raw number references
-to the CCU node, likely from when the CCU bindings and device tree
-changes were first merged.
+On Mon, Jun 05, 2017 at 10:33:50AM +0900, Inki Dae wrote:
+> 2017? 06? 02? 22:58? Andreas F?rber ?(?) ? ?:
+> > Hello,
+> > 
+> > We're observing the following build failure with v4.12-rc3, latest
+> > linux.git and linux-next.git:
+> > 
+> > [ 9825s]   LD      vmlinux.o
+> > [ 9904s]   MODPOST vmlinux.o
+> > [ 9915s] drivers/built-in.o: In function `hdmi_get_modes':
+> > [ 9915s]
+> > /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:866:
+> > undefined reference to `cec_notifier_set_phys_addr_from_edid'
+> > [ 9915s] drivers/built-in.o: In function `hdmi_remove':
+> > [ 9915s]
+> > /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1923:
+> > undefined reference to `cec_notifier_set_phys_addr'
+> > [ 9915s]
+> > /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1927:
+> > undefined reference to `cec_notifier_put'
+> > [ 9915s] drivers/built-in.o: In function `hdmi_probe':
+> > [ 9915s]
+> > /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1889:
+> > undefined reference to `cec_notifier_get'
+> > [ 9915s]
+> > /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1904:
+> > undefined reference to `cec_notifier_put'
+> > [ 9915s] drivers/built-in.o: In function `hdmi_disable':
+> > [ 9915s]
+> > /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1509:
+> > undefined reference to `cec_notifier_set_phys_addr'
+> > [ 9915s] drivers/built-in.o: In function `hdmi_detect':
+> > [ 9915s]
+> > /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:827:
+> > undefined reference to `cec_notifier_set_phys_addr'
+> > [ 9931s] make[2]: ***
+> > [/home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/Makefile:997:
+> > vmlinux] Error 1
+> > [ 9931s] make[1]: *** [Makefile:152: sub-make] Error 2
+> > [ 9931s] make: *** [Makefile:24: __sub-make] Error 2
+> > 
+> > My guess is the symbols used by the exynos drm module are not exported:
+> > 
+> > cec_notifier_set_phys_addr_from_edid
+> > cec_notifier_set_phys_addr
+> > cec_notifier_put
+> > cec_notifier_get
+> > 
+> > Can you please look into fixing this?
+> 
+> Thanks for reporting.
+> 
+> Will check and fix it.
 
-Convert these, and the R_CCU ones, to use the proper defined macros
-from their respective device tree binding header files.
+Please look at Hans' update to the way CEC's dependencies are handled.
+https://git.linuxtv.org/hverkuil/media_tree.git/log/?h=drm-cec
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 35 ++++++++++++++-------------
- 1 file changed, 18 insertions(+), 17 deletions(-)
+These are apparently scheduled for -rc, but Mauro is busy.
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 166c9ef884dc..23a531c80308 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -43,6 +43,7 @@
-  */
- 
- #include <dt-bindings/clock/sun50i-a64-ccu.h>
-+#include <dt-bindings/clock/sun8i-r-ccu.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/reset/sun50i-a64-ccu.h>
- 
-@@ -303,8 +304,8 @@
- 			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&ccu 67>;
--			resets = <&ccu 46>;
-+			clocks = <&ccu CLK_BUS_UART0>;
-+			resets = <&ccu RST_BUS_UART0>;
- 			status = "disabled";
- 		};
- 
-@@ -314,8 +315,8 @@
- 			interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&ccu 68>;
--			resets = <&ccu 47>;
-+			clocks = <&ccu CLK_BUS_UART1>;
-+			resets = <&ccu RST_BUS_UART1>;
- 			status = "disabled";
- 		};
- 
-@@ -325,8 +326,8 @@
- 			interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&ccu 69>;
--			resets = <&ccu 48>;
-+			clocks = <&ccu CLK_BUS_UART2>;
-+			resets = <&ccu RST_BUS_UART2>;
- 			status = "disabled";
- 		};
- 
-@@ -336,8 +337,8 @@
- 			interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&ccu 70>;
--			resets = <&ccu 49>;
-+			clocks = <&ccu CLK_BUS_UART3>;
-+			resets = <&ccu RST_BUS_UART3>;
- 			status = "disabled";
- 		};
- 
-@@ -347,8 +348,8 @@
- 			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&ccu 71>;
--			resets = <&ccu 50>;
-+			clocks = <&ccu CLK_BUS_UART4>;
-+			resets = <&ccu RST_BUS_UART4>;
- 			status = "disabled";
- 		};
- 
-@@ -356,8 +357,8 @@
- 			compatible = "allwinner,sun6i-a31-i2c";
- 			reg = <0x01c2ac00 0x400>;
- 			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&ccu 63>;
--			resets = <&ccu 42>;
-+			clocks = <&ccu CLK_BUS_I2C0>;
-+			resets = <&ccu RST_BUS_I2C0>;
- 			status = "disabled";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -367,8 +368,8 @@
- 			compatible = "allwinner,sun6i-a31-i2c";
- 			reg = <0x01c2b000 0x400>;
- 			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&ccu 64>;
--			resets = <&ccu 43>;
-+			clocks = <&ccu CLK_BUS_I2C1>;
-+			resets = <&ccu RST_BUS_I2C1>;
- 			status = "disabled";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -378,8 +379,8 @@
- 			compatible = "allwinner,sun6i-a31-i2c";
- 			reg = <0x01c2b400 0x400>;
- 			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&ccu 65>;
--			resets = <&ccu 44>;
-+			clocks = <&ccu CLK_BUS_I2C2>;
-+			resets = <&ccu RST_BUS_I2C2>;
- 			status = "disabled";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -417,7 +418,7 @@
- 			compatible = "allwinner,sun50i-a64-r-pinctrl";
- 			reg = <0x01f02c00 0x400>;
- 			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&r_ccu 3>, <&osc24M>, <&osc32k>;
-+			clocks = <&r_ccu CLK_APB0_PIO>, <&osc24M>, <&osc32k>;
- 			clock-names = "apb", "hosc", "losc";
- 			gpio-controller;
- 			#gpio-cells = <3>;
 -- 
-2.11.0
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
