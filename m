@@ -1,32 +1,29 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 5 Jun 2017 17:29:25 +0100
-Subject: [PATCH v3 1/4] arm64: kgdb: fix single stepping
-In-Reply-To: <20170523043058.5463-2-takahiro.akashi@linaro.org>
-References: <20170523043058.5463-1-takahiro.akashi@linaro.org>
- <20170523043058.5463-2-takahiro.akashi@linaro.org>
-Message-ID: <20170605162925.GO21944@arm.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 5 Jun 2017 09:47:31 -0700
+Subject: [PATCH v3 2/2] ARM: dts: Add the ethernet and ethernet PHY to the
+ cygnus core DT.
+In-Reply-To: <20170428222204.7103-2-eric@anholt.net>
+References: <20170428222204.7103-1-eric@anholt.net>
+ <20170428222204.7103-2-eric@anholt.net>
+Message-ID: <8d6084ac-869b-6ac6-418a-4be843c27ef3@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 23, 2017 at 01:30:55PM +0900, AKASHI Takahiro wrote:
-> After entering kgdb mode, the first 'stepi' can succeed, but the following
-> 'stepi' never executes the next instruction.
+On 04/28/2017 03:22 PM, Eric Anholt wrote:
+> Cygnus has a single amac controller connected to the B53 switch with 2
+> PHYs.  On the BCM911360_EP platform, those two PHYs are connected to
+> the external ethernet jacks.
 > 
-> This is because a software step cannot get enabled as the software step
-> bit(SS) in SPSR, which is cleared by the first single stepping, will not
-> be set again for the following 's' commands.
+> v2: Call the node "switch", just call the ports "port" (suggestions by
+>     Florian), drop max-speed on the phys (suggestion by Andrew Lunn),
+>     call the other nodes "ethernet" and "ethernet-phy" (suggestions by
+>     Sergei Shtylyov)
+> v3: Drop another max-speed (Andrew), keep mdio disabled in the shared
+>     dtsi (Florian)
+> 
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 
-For userspace, we have user_rewind_single_step to re-arm the state machine
-on an unhandled step exception. It sounds like we need the kernel version of
-that?
-
-> Please note that this bit, as well as the software step control bit(SS)
-> in MDSCR, must be set before resuming the execution.
-> kernel_active_single_step() called by kgdb_arch_handle_exception() checks
-> only for the bit in MDSCR, and so kgdb_enable_single_step() will never be
-> called.
-
-MDSCR.SS shouldn't get cleared by the hardware, so I don't understand your
-point here.
-
-Will
+Applied, thanks Eric!
+-- 
+Florian
