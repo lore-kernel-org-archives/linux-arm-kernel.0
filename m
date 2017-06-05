@@ -1,49 +1,68 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Mon, 5 Jun 2017 17:03:55 +0800
-Subject: [PATCH v3 1/6] dt-bindings: mfd: hi6421: Add hi6421v530
- compatible string
-In-Reply-To: <20170605081451.d7pd6r7aeza54pgv@dell>
-References: <20170602105156.11351-1-guodong.xu@linaro.org>
- <20170602105156.11351-2-guodong.xu@linaro.org>
- <20170605081451.d7pd6r7aeza54pgv@dell>
-Message-ID: <CAFGCpxywcinia_eD4wFGrswt6vPoVYAbiTwpUj9mWv0XbmCZNA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 5 Jun 2017 10:08:47 +0100
+Subject: [PATCH] efi: arm: Don't mark ACPI reclaim memory as MEMBLOCK_NOMAP
+In-Reply-To: <20170605080435.2498-1-ard.biesheuvel@linaro.org>
+References: <20170605080435.2498-1-ard.biesheuvel@linaro.org>
+Message-ID: <20170605090847.GC4650@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 5, 2017 at 4:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Fri, 02 Jun 2017, Guodong Xu wrote:
->
->> Add compatible string for HiSilicon Hi6421v530 PMIC.
->>
->> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
->> ---
->>  Documentation/devicetree/bindings/mfd/hi6421.txt | 4 +++-
->>  1 file changed, 3 insertions(+), 1 deletion(-)
->
-> For my own reference:
->   Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
->
+On Mon, Jun 05, 2017 at 08:04:35AM +0000, Ard Biesheuvel wrote:
+> On ARM, regions of memory that are described by UEFI as having special
+> significance to the firmware itself are omitted from the linear mapping.
+> This is necessary since we cannot guarantee that alternate mappings of
+> the same physical region will use attributes that are compatible with
+> the ones we use for the linear mapping, and aliases with mismatched
+> attributes are prohibited by the architecture.
+> 
+> The above does not apply to ACPI reclaim regions: such regions have no
+> special significance to the firmware, and it is up to the OS to decide
+> whether or not to preserve them after it has consumed their contents,
+> and for how long, after which time the OS can use the memory in any way
+> it likes. In the Linux case, such regions are preserved indefinitely,
+> and are simply treated the same way as other 'reserved' memory types.
+> 
+> Punching holes into the linear mapping causes page table fragmentation,
+> which increases TLB pressure, and so we should avoid doing so if we can.
+> So add a special case for regions of type EFI_ACPI_RECLAIM_MEMORY, and
+> memblock_reserve() them instead of marking them MEMBLOCK_NOMAP.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Thanks Lee.
+Sounds sane to me. FWIW:
 
->> diff --git a/Documentation/devicetree/bindings/mfd/hi6421.txt b/Documentation/devicetree/bindings/mfd/hi6421.txt
->> index 0d5a446..22da96d 100644
->> --- a/Documentation/devicetree/bindings/mfd/hi6421.txt
->> +++ b/Documentation/devicetree/bindings/mfd/hi6421.txt
->> @@ -1,7 +1,9 @@
->>  * HI6421 Multi-Functional Device (MFD), by HiSilicon Ltd.
->>
->>  Required parent device properties:
->> -- compatible : contains "hisilicon,hi6421-pmic";
->> +- compatible    : One of the following chip-specific strings:
->> +     "hisilicon,hi6421-pmic";
->> +     "hisilicon,hi6421v530-pmic";
->>  - reg                : register range space of hi6421;
->>
->>  Supported Hi6421 sub-devices include:
->
-> --
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
+
+> ---
+>  drivers/firmware/efi/arm-init.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
+> index 1027d7b44358..0aa4ce7b4fbb 100644
+> --- a/drivers/firmware/efi/arm-init.c
+> +++ b/drivers/firmware/efi/arm-init.c
+> @@ -159,6 +159,7 @@ static __init int is_usable_memory(efi_memory_desc_t *md)
+>  	switch (md->type) {
+>  	case EFI_LOADER_CODE:
+>  	case EFI_LOADER_DATA:
+> +	case EFI_ACPI_RECLAIM_MEMORY:
+>  	case EFI_BOOT_SERVICES_CODE:
+>  	case EFI_BOOT_SERVICES_DATA:
+>  	case EFI_CONVENTIONAL_MEMORY:
+> @@ -211,6 +212,10 @@ static __init void reserve_regions(void)
+>  
+>  			if (!is_usable_memory(md))
+>  				memblock_mark_nomap(paddr, size);
+> +
+> +			/* keep ACPI reclaim memory intact for kexec etc. */
+> +			if (md->type == EFI_ACPI_RECLAIM_MEMORY)
+> +				memblock_reserve(paddr, size);
+>  		}
+>  	}
+>  }
+> -- 
+> 2.9.3
+> 
