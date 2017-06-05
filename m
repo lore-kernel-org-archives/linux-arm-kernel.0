@@ -1,21 +1,47 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 5 Jun 2017 23:22:44 +0800
-Subject: [PATCH v2] arm64: dts: ls1012a: Add coreclk
-In-Reply-To: <1496633302-2795-1-git-send-email-andy.tang@nxp.com>
-References: <1496633302-2795-1-git-send-email-andy.tang@nxp.com>
-Message-ID: <20170605152243.GM4094@dragon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon,  5 Jun 2017 16:22:57 +0100
+Subject: [PATCH v4 5/5] dt-bindings: Document devicetree binding for ARM SPE
+In-Reply-To: <1496676177-29356-1-git-send-email-will.deacon@arm.com>
+References: <1496676177-29356-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1496676177-29356-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 05, 2017 at 11:28:22AM +0800, Yuantian Tang wrote:
-> From: Scott Wood <oss@buserror.net>
-> 
-> ls1012a has separate input root clocks for core PLLs versus the platform
-> PLL, with the latter described as sysclk in the hw docs.
-> Accordingly, update the clock-frequency in sysclk to 125M as platform
-> input clock.
-> 
-> Signed-off-by: Scott Wood <oss@buserror.net>
-> Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
+This patch documents the devicetree binding in use for ARM SPE.
 
-Applied, thanks.
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Rob Herring <robh@kernel.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ Documentation/devicetree/bindings/arm/spe-pmu.txt | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/spe-pmu.txt
+
+diff --git a/Documentation/devicetree/bindings/arm/spe-pmu.txt b/Documentation/devicetree/bindings/arm/spe-pmu.txt
+new file mode 100644
+index 000000000000..93372f2a7df9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/spe-pmu.txt
+@@ -0,0 +1,20 @@
++* ARMv8.2 Statistical Profiling Extension (SPE) Performance Monitor Units (PMU)
++
++ARMv8.2 introduces the optional Statistical Profiling Extension for collecting
++performance sample data using an in-memory trace buffer.
++
++** SPE Required properties:
++
++- compatible : should be one of:
++	       "arm,statistical-profiling-extension-v1"
++
++- interrupts : Exactly 1 PPI must be listed. For heterogeneous systems where
++               SPE is only supported on a subset of the CPUs, please consult
++	       the arm,gic-v3 binding for details on describing a PPI partition.
++
++** Example:
++
++spe-pmu {
++        compatible = "arm,statistical-profiling-extension-v1";
++        interrupts = <GIC_PPI 05 IRQ_TYPE_LEVEL_HIGH &part1>;
++};
+-- 
+2.1.4
