@@ -1,43 +1,111 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Mon,  5 Jun 2017 17:18:46 +0930
-Subject: [PATCH] arm: aspeed: Add clock-names property to timer node
-Message-ID: <20170605074846.30925-1-andrew@aj.id.au>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 5 Jun 2017 08:53:50 +0100
+Subject: [linux-sunxi] Re: [PATCH v6 2/9] irqchip/sunxi-nmi: add support
+ for the NMI in A64 R_INTC
+In-Reply-To: <CAGb2v64b80fZ81rC_dWzes9VzMKfVA4HYC7yJ779tb=4r2jeSw@mail.gmail.com>
+References: <20170518071653.36561-1-icenowy@aosc.io>
+ <20170518071653.36561-3-icenowy@aosc.io>
+ <ed99d87b-86eb-cf8a-8614-51d59fa00c8c@arm.com>
+ <98014597-29BA-4D02-8137-4E399955F4FD@aosc.io>
+ <CAGb2v66NY49OL0J3C64CKzngri5-Na6uPBizj-BNJW3vNkFUQw@mail.gmail.com>
+ <CAGb2v64b80fZ81rC_dWzes9VzMKfVA4HYC7yJ779tb=4r2jeSw@mail.gmail.com>
+Message-ID: <854343de-2415-c310-cc5e-0b5abbd71af5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The merging of a number of clocksource drivers into fttmr010 means we
-require clock-names to be specified in the Aspeed timer node, else the
-clocksource fails to probe and boot hangs.
+On 05/06/17 06:57, Chen-Yu Tsai wrote:
+> Hi Marc,
+> 
+> On Mon, May 22, 2017 at 10:25 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+>> On Mon, May 22, 2017 at 5:41 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+>>>
+>>>
+>>> ? 2017?5?22? GMT+08:00 ??5:39:22, Marc Zyngier <marc.zyngier@arm.com> ??:
+>>>> On 18/05/17 08:16, Icenowy Zheng wrote:
+>>>>> Add support for the newly imported compatible for the A64 R_INTC in
+>>>>> irq-sunxi-nmi driver.
+>>>>>
+>>>>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>>>>> ---
+>>>>> Changes in v5:
+>>>>> - Fix A64 R_INTC compatible.
+>>>>>
+>>>>>  drivers/irqchip/irq-sunxi-nmi.c | 13 +++++++++++++
+>>>>>  1 file changed, 13 insertions(+)
+>>>>>
+>>>>> diff --git a/drivers/irqchip/irq-sunxi-nmi.c
+>>>> b/drivers/irqchip/irq-sunxi-nmi.c
+>>>>> index 668730c5cb66..5559c1d593bf 100644
+>>>>> --- a/drivers/irqchip/irq-sunxi-nmi.c
+>>>>> +++ b/drivers/irqchip/irq-sunxi-nmi.c
+>>>>> @@ -56,6 +56,12 @@ static struct sunxi_sc_nmi_reg_offs sun9i_reg_offs
+>>>> = {
+>>>>>      .enable = 0x04,
+>>>>>  };
+>>>>>
+>>>>> +static struct sunxi_sc_nmi_reg_offs sun50i_reg_offs = {
+>>>>> +    .ctrl   = 0x0c,
+>>>>> +    .pend   = 0x10,
+>>>>> +    .enable = 0x40,
+>>>>> +};
+>>>>> +
+>>>>
+>>>> Magic values? Even if no #define is provided, a pointer to the
+>>>> corresponding documentation would be appreciated (assuming
+>>>> documentation
+>>>> exists).
+>>>
+>>> No documents is available for A64 R_INTC.
+>>
+>> No code either. In Allwinner's BSP, the interrupts for the PMICs go
+>> through the (closed source) OpenRISC firmware, so there's no driver
+>> for it in the kernel.
+>>
+>> The registers line up with the old interrupt controller from the A10,
+>> but it seems only the NMI interrupt is wired up.
+> 
+> Is this OK? Or do you want Icenowy to respin a version with defines?
 
-Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
----
- arch/arm/boot/dts/aspeed-g4.dtsi | 1 +
- arch/arm/boot/dts/aspeed-g5.dtsi | 1 +
- 2 files changed, 2 insertions(+)
+Ideally, I'd like to see some #defines, but given that the rest of the
+file is already littered with hard-coded constants, you might as well do
+the whole thing in a subsequent patch that I would merge with these two
+patches.
 
-diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index 8c6bc29eb7f6..3e74929d3289 100644
---- a/arch/arm/boot/dts/aspeed-g4.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -893,6 +893,7 @@
- 				//interrupts = <16 17 18 35 36 37 38 39>;
- 				interrupts = <16>;
- 				clocks = <&clk_apb>;
-+				clock-names = "PCLK";
- 			};
- 
- 			wdt1: wdt at 1e785000 {
-diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index a0bea4a6ec77..1e6c701da853 100644
---- a/arch/arm/boot/dts/aspeed-g5.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -1000,6 +1000,7 @@
- 				//interrupts = <16 17 18 35 36 37 38 39>;
- 				interrupts = <16>;
- 				clocks = <&clk_apb>;
-+				clock-names = "PCLK";
- 			};
- 
- 
+>>>>
+>>>>>  static inline void sunxi_sc_nmi_write(struct irq_chip_generic *gc,
+>>>> u32 off,
+>>>>>                                    u32 val)
+>>>>>  {
+>>>>> @@ -220,3 +226,10 @@ static int __init sun9i_nmi_irq_init(struct
+>>>> device_node *node,
+>>>>>      return sunxi_sc_nmi_irq_init(node, &sun9i_reg_offs);
+>>>>>  }
+>>>>>  IRQCHIP_DECLARE(sun9i_nmi, "allwinner,sun9i-a80-nmi",
+>>>> sun9i_nmi_irq_init);
+>>>>> +
+>>>>> +static int __init sun50i_nmi_irq_init(struct device_node *node,
+>>>>> +                                 struct device_node *parent)
+>>>>> +{
+>>>>> +    return sunxi_sc_nmi_irq_init(node, &sun50i_reg_offs);
+>>>>> +}
+>>>>> +IRQCHIP_DECLARE(sun50i_nmi, "allwinner,sun50i-a64-r-intc",
+>>>> sun50i_nmi_irq_init);
+>>>>>
+>>>>
+>>>> Apart from the above:
+>>>>
+>>>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>>
+>>>> Let me know how you want this to be merged.
+> 
+> This, and the previous dt bindings patch, can be merged through whatever
+> tree irqchip drivers are merged through. Is that Jason's irqchip tree?
+
+I'll probably start pushing a branch with all the irqchip patches I've
+collected at some point this week, for Thomas to take into 4.13.
+
+Thanks,
+
+	M.
 -- 
-2.11.0
+Jazz is not dead. It just smells funny...
