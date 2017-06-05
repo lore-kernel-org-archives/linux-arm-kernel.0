@@ -1,63 +1,107 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Sun, 04 Jun 2017 19:17:40 -0700
-Subject: [PATCH RFC 5/5] ARM: dts: vf-colibri-eval: use IRQ_TYPE_* to
- specify irq flags
-In-Reply-To: <20170604034902.GC4094@dragon>
-References: <20170526180609.2699-1-uwe@kleine-koenig.org>
- <20170526180609.2699-5-uwe@kleine-koenig.org> <20170604034902.GC4094@dragon>
-Message-ID: <72c4505c4f11f97fbb9837b9ec47a6df@agner.ch>
+From: jiada_wang@mentor.com (Jiada Wang)
+Date: Mon, 5 Jun 2017 12:38:07 +0900
+Subject: [PATCH linux-next v3 2/4] spi: imx: add selection for iMX53 and iMX6
+ controller
+In-Reply-To: <20170605033809.13726-1-jiada_wang@mentor.com>
+References: <20170605033809.13726-1-jiada_wang@mentor.com>
+Message-ID: <20170605033809.13726-3-jiada_wang@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-06-03 20:49, Shawn Guo wrote:
-> On Fri, May 26, 2017 at 08:06:09PM +0200, Uwe Kleine-K?nig wrote:
->> According to the binding documentation and the source code the
->> vf610-gpio controller takes IRQ_TYPE_* as its flags values, not
->> GPIO_ACTIVE_*.
->>
->> This patch uses the right variable type which yields the same result
->> when compiled. Note that this might be wrong and actually
->> IRQ_TYPE_LEVEL_LOW is intended by the dt author.
->>
->> Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
->> ---
->> Hello,
->>
->> can somebody with the hardware or it's documentation please check which
->> flag is the right one?
-> 
-> @Stefan, can you help to confirm?
-> 
+ECSPI contorller for iMX53 and iMX6 has few hardware issues
+comparing to iMX51.
+The change add possibility to detect which controller is used
+to apply possible workaround and limitations.
 
-Thanks for spotting! According to the data sheet it is a low active
-signal, so I guess IRQ_TYPE_LEVEL_LOW is correct. But the driver
-actually explicitly requests IRQF_TRIGGER_FALLING, that has been the
-case since its inception. IMHO LEVEL_LOW should be more rigid since it
-helps for missed interrupt edges...
+Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
+---
+ .../devicetree/bindings/spi/fsl-imx-cspi.txt       |  1 +
+ drivers/spi/spi-imx.c                              | 26 ++++++++++++++++++++--
+ 2 files changed, 25 insertions(+), 2 deletions(-)
 
---
-Stefan
-
->>
->> Best regards
->> Uwe
->>
->>  arch/arm/boot/dts/vf-colibri-eval-v3.dtsi | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
->> index 091b738041a0..3e0c84d79c43 100644
->> --- a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
->> +++ b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
->> @@ -117,7 +117,7 @@
->>  		clocks = <&clk16m>;
->>  		spi-max-frequency = <10000000>;
->>  		interrupt-parent = <&gpio1>;
->> -		interrupts = <11 GPIO_ACTIVE_LOW>;
->> +		interrupts = <11 IRQ_TYPE_EDGE_RISING>;
->>  	};
->>  };
->>
->> --
->> 2.11.0
->>
+diff --git a/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt b/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
+index 31b5b21..5bf1396 100644
+--- a/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
++++ b/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
+@@ -9,6 +9,7 @@ Required properties:
+   - "fsl,imx31-cspi" for SPI compatible with the one integrated on i.MX31
+   - "fsl,imx35-cspi" for SPI compatible with the one integrated on i.MX35
+   - "fsl,imx51-ecspi" for SPI compatible with the one integrated on i.MX51
++  - "fsl,imx53-ecspi" for SPI compatible with the one integrated on i.MX53 and later Soc
+ - reg : Offset and length of the register set for the device
+ - interrupts : Should contain CSPI/eCSPI interrupt
+ - cs-gpios : Specifies the gpio pins to be used for chipselects.
+diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+index e48989a..5034f89 100644
+--- a/drivers/spi/spi-imx.c
++++ b/drivers/spi/spi-imx.c
+@@ -67,7 +67,8 @@ enum spi_imx_devtype {
+ 	IMX27_CSPI,
+ 	IMX31_CSPI,
+ 	IMX35_CSPI,	/* CSPI on all i.mx except above */
+-	IMX51_ECSPI,	/* ECSPI on i.mx51 and later */
++	IMX51_ECSPI,	/* ECSPI on i.mx51 */
++	IMX53_ECSPI,	/* ECSPI on i.mx53 and later */
+ };
+ 
+ struct spi_imx_data;
+@@ -130,6 +131,11 @@ static inline int is_imx51_ecspi(struct spi_imx_data *d)
+ 	return d->devtype_data->devtype == IMX51_ECSPI;
+ }
+ 
++static inline int is_imx53_ecspi(struct spi_imx_data *d)
++{
++	return d->devtype_data->devtype == IMX53_ECSPI;
++}
++
+ #define MXC_SPI_BUF_RX(type)						\
+ static void spi_imx_buf_rx_##type(struct spi_imx_data *spi_imx)		\
+ {									\
+@@ -763,6 +769,17 @@ static struct spi_imx_devtype_data imx51_ecspi_devtype_data = {
+ 	.devtype = IMX51_ECSPI,
+ };
+ 
++static struct spi_imx_devtype_data imx53_ecspi_devtype_data = {
++	.intctrl = mx51_ecspi_intctrl,
++	.config = mx51_ecspi_config,
++	.trigger = mx51_ecspi_trigger,
++	.rx_available = mx51_ecspi_rx_available,
++	.reset = mx51_ecspi_reset,
++	.fifo_size = 64,
++	.has_dmamode = true,
++	.devtype = IMX53_ECSPI,
++};
++
+ static const struct platform_device_id spi_imx_devtype[] = {
+ 	{
+ 		.name = "imx1-cspi",
+@@ -783,6 +800,9 @@ static const struct platform_device_id spi_imx_devtype[] = {
+ 		.name = "imx51-ecspi",
+ 		.driver_data = (kernel_ulong_t) &imx51_ecspi_devtype_data,
+ 	}, {
++		.name = "imx53-ecspi",
++		.driver_data = (kernel_ulong_t) &imx53_ecspi_devtype_data,
++	}, {
+ 		/* sentinel */
+ 	}
+ };
+@@ -794,6 +814,7 @@ static const struct of_device_id spi_imx_dt_ids[] = {
+ 	{ .compatible = "fsl,imx31-cspi", .data = &imx31_cspi_devtype_data, },
+ 	{ .compatible = "fsl,imx35-cspi", .data = &imx35_cspi_devtype_data, },
+ 	{ .compatible = "fsl,imx51-ecspi", .data = &imx51_ecspi_devtype_data, },
++	{ .compatible = "fsl,imx53-ecspi", .data = &imx53_ecspi_devtype_data, },
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, spi_imx_dt_ids);
+@@ -1238,7 +1259,8 @@ static int spi_imx_probe(struct platform_device *pdev)
+ 	spi_imx->bitbang.master->prepare_message = spi_imx_prepare_message;
+ 	spi_imx->bitbang.master->unprepare_message = spi_imx_unprepare_message;
+ 	spi_imx->bitbang.master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
+-	if (is_imx35_cspi(spi_imx) || is_imx51_ecspi(spi_imx))
++	if (is_imx35_cspi(spi_imx) || is_imx51_ecspi(spi_imx) ||
++	    is_imx53_ecspi(spi_imx))
+ 		spi_imx->bitbang.master->mode_bits |= SPI_LOOP | SPI_READY;
+ 
+ 	spi_imx->spi_drctl = spi_drctl;
+-- 
+2.9.3
