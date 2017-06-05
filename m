@@ -1,104 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  5 Jun 2017 14:20:01 +0100
-Subject: [PATCH 2/2] arm64/kvm: vgic: use SYS_DESC()
-In-Reply-To: <1496668801-16064-1-git-send-email-mark.rutland@arm.com>
-References: <1496668801-16064-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1496668801-16064-3-git-send-email-mark.rutland@arm.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Mon, 5 Jun 2017 21:24:59 +0800
+Subject: [arm:drm-dwhdmi-devel 4/4]
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.c:109:10: error:
+ 'CEC_CTRL_IMMED' undeclared
+Message-ID: <201706052154.KUcy5u0F%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Almost all of the arm64 KVM code uses the sysreg mnemonics for AArch64
-register descriptions. Move the last straggler over.
+tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git drm-dwhdmi-devel
+head:   5e86b869a302f6c55ce6dea98cbe3281ece3e360
+commit: 5e86b869a302f6c55ce6dea98cbe3281ece3e360 [4/4] drm/bridge: dw-hdmi: add cec driver
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        git checkout 5e86b869a302f6c55ce6dea98cbe3281ece3e360
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-To match what we do for SYS_ICH_AP*R*_EL2, the SYS_ICC_AP*R*_EL1
-mnemonics are expanded in <asm/sysreg.h>.
+All errors (new ones prefixed by >>):
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: kvmarm at lists.cs.columbia.edu
+   drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.c: In function 'dw_hdmi_cec_transmit':
+>> drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.c:109:10: error: 'CEC_CTRL_IMMED' undeclared (first use in this function)
+      ctrl = CEC_CTRL_IMMED;
+             ^~~~~~~~~~~~~~
+   drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.c:109:10: note: each undeclared identifier is reported only once for each function it appears in
+
+vim +/CEC_CTRL_IMMED +109 drivers/gpu/drm/bridge/synopsys/dw-hdmi-cec.c
+
+   103			break;
+   104		case CEC_SIGNAL_FREE_TIME_NEW_INITIATOR:
+   105		default:
+   106			ctrl = CEC_CTRL_NORMAL;
+   107			break;
+   108		case CEC_SIGNAL_FREE_TIME_NEXT_XFER:
+ > 109			ctrl = CEC_CTRL_IMMED;
+   110			break;
+   111		}
+   112	
+
 ---
- arch/arm64/include/asm/sysreg.h  |  8 +++++++
- arch/arm64/kvm/vgic-sys-reg-v3.c | 45 ++++++++++++++--------------------------
- 2 files changed, 23 insertions(+), 30 deletions(-)
-
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index b9e88ac..932029d 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -185,7 +185,15 @@
- #define SYS_ICC_HPPIR0_EL1		sys_reg(3, 0, 12, 8, 2)
- #define SYS_ICC_BPR0_EL1		sys_reg(3, 0, 12, 8, 3)
- #define SYS_ICC_AP0Rn_EL1(n)		sys_reg(3, 0, 12, 8, 4 | n)
-+#define SYS_ICC_AP0R0_EL1		SYS_ICC_AP0Rn_EL1(0)
-+#define SYS_ICC_AP0R1_EL1		SYS_ICC_AP0Rn_EL1(1)
-+#define SYS_ICC_AP0R2_EL1		SYS_ICC_AP0Rn_EL1(2)
-+#define SYS_ICC_AP0R3_EL1		SYS_ICC_AP0Rn_EL1(3)
- #define SYS_ICC_AP1Rn_EL1(n)		sys_reg(3, 0, 12, 9, n)
-+#define SYS_ICC_AP1R0_EL1		SYS_ICC_AP1Rn_EL1(0)
-+#define SYS_ICC_AP1R1_EL1		SYS_ICC_AP1Rn_EL1(1)
-+#define SYS_ICC_AP1R2_EL1		SYS_ICC_AP1Rn_EL1(2)
-+#define SYS_ICC_AP1R3_EL1		SYS_ICC_AP1Rn_EL1(3)
- #define SYS_ICC_DIR_EL1			sys_reg(3, 0, 12, 11, 1)
- #define SYS_ICC_RPR_EL1			sys_reg(3, 0, 12, 11, 3)
- #define SYS_ICC_SGI1R_EL1		sys_reg(3, 0, 12, 11, 5)
-diff --git a/arch/arm64/kvm/vgic-sys-reg-v3.c b/arch/arm64/kvm/vgic-sys-reg-v3.c
-index 8daa883..158da1f 100644
---- a/arch/arm64/kvm/vgic-sys-reg-v3.c
-+++ b/arch/arm64/kvm/vgic-sys-reg-v3.c
-@@ -268,36 +268,21 @@ static bool access_gic_sre(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	return true;
- }
- static const struct sys_reg_desc gic_v3_icc_reg_descs[] = {
--	/* ICC_PMR_EL1 */
--	{ Op0(3), Op1(0), CRn(4), CRm(6), Op2(0), access_gic_pmr },
--	/* ICC_BPR0_EL1 */
--	{ Op0(3), Op1(0), CRn(12), CRm(8), Op2(3), access_gic_bpr0 },
--	/* ICC_AP0R0_EL1 */
--	{ Op0(3), Op1(0), CRn(12), CRm(8), Op2(4), access_gic_ap0r },
--	/* ICC_AP0R1_EL1 */
--	{ Op0(3), Op1(0), CRn(12), CRm(8), Op2(5), access_gic_ap0r },
--	/* ICC_AP0R2_EL1 */
--	{ Op0(3), Op1(0), CRn(12), CRm(8), Op2(6), access_gic_ap0r },
--	/* ICC_AP0R3_EL1 */
--	{ Op0(3), Op1(0), CRn(12), CRm(8), Op2(7), access_gic_ap0r },
--	/* ICC_AP1R0_EL1 */
--	{ Op0(3), Op1(0), CRn(12), CRm(9), Op2(0), access_gic_ap1r },
--	/* ICC_AP1R1_EL1 */
--	{ Op0(3), Op1(0), CRn(12), CRm(9), Op2(1), access_gic_ap1r },
--	/* ICC_AP1R2_EL1 */
--	{ Op0(3), Op1(0), CRn(12), CRm(9), Op2(2), access_gic_ap1r },
--	/* ICC_AP1R3_EL1 */
--	{ Op0(3), Op1(0), CRn(12), CRm(9), Op2(3), access_gic_ap1r },
--	/* ICC_BPR1_EL1 */
--	{ Op0(3), Op1(0), CRn(12), CRm(12), Op2(3), access_gic_bpr1 },
--	/* ICC_CTLR_EL1 */
--	{ Op0(3), Op1(0), CRn(12), CRm(12), Op2(4), access_gic_ctlr },
--	/* ICC_SRE_EL1 */
--	{ Op0(3), Op1(0), CRn(12), CRm(12), Op2(5), access_gic_sre },
--	/* ICC_IGRPEN0_EL1 */
--	{ Op0(3), Op1(0), CRn(12), CRm(12), Op2(6), access_gic_grpen0 },
--	/* ICC_IGRPEN1_EL1 */
--	{ Op0(3), Op1(0), CRn(12), CRm(12), Op2(7), access_gic_grpen1 },
-+	{ SYS_DESC(SYS_ICC_PMR_EL1), access_gic_pmr },
-+	{ SYS_DESC(SYS_ICC_BPR0_EL1), access_gic_bpr0 },
-+	{ SYS_DESC(SYS_ICC_AP0R0_EL1), access_gic_ap0r },
-+	{ SYS_DESC(SYS_ICC_AP0R1_EL1), access_gic_ap0r },
-+	{ SYS_DESC(SYS_ICC_AP0R2_EL1), access_gic_ap0r },
-+	{ SYS_DESC(SYS_ICC_AP0R3_EL1), access_gic_ap0r },
-+	{ SYS_DESC(SYS_ICC_AP1R0_EL1), access_gic_ap1r },
-+	{ SYS_DESC(SYS_ICC_AP1R1_EL1), access_gic_ap1r },
-+	{ SYS_DESC(SYS_ICC_AP1R2_EL1), access_gic_ap1r },
-+	{ SYS_DESC(SYS_ICC_AP1R3_EL1), access_gic_ap1r },
-+	{ SYS_DESC(SYS_ICC_BPR1_EL1), access_gic_bpr1 },
-+	{ SYS_DESC(SYS_ICC_CTLR_EL1), access_gic_ctlr },
-+	{ SYS_DESC(SYS_ICC_SRE_EL1), access_gic_sre },
-+	{ SYS_DESC(SYS_ICC_IGRPEN0_EL1), access_gic_grpen0 },
-+	{ SYS_DESC(SYS_ICC_IGRPEN1_EL1), access_gic_grpen1 },
- };
- 
- int vgic_v3_has_cpu_sysregs_attr(struct kvm_vcpu *vcpu, bool is_write, u64 id,
--- 
-1.9.1
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 60107 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170605/e9c33b94/attachment-0001.gz>
