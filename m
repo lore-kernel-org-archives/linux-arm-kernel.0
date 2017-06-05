@@ -1,115 +1,113 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 5 Jun 2017 13:57:45 +0800
-Subject: [linux-sunxi] Re: [PATCH v6 2/9] irqchip/sunxi-nmi: add support
- for the NMI in A64 R_INTC
-In-Reply-To: <CAGb2v66NY49OL0J3C64CKzngri5-Na6uPBizj-BNJW3vNkFUQw@mail.gmail.com>
-References: <20170518071653.36561-1-icenowy@aosc.io>
- <20170518071653.36561-3-icenowy@aosc.io>
- <ed99d87b-86eb-cf8a-8614-51d59fa00c8c@arm.com>
- <98014597-29BA-4D02-8137-4E399955F4FD@aosc.io>
- <CAGb2v66NY49OL0J3C64CKzngri5-Na6uPBizj-BNJW3vNkFUQw@mail.gmail.com>
-Message-ID: <CAGb2v64b80fZ81rC_dWzes9VzMKfVA4HYC7yJ779tb=4r2jeSw@mail.gmail.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Mon, 5 Jun 2017 11:53:56 +0530
+Subject: [PATCH v4 1/6] pinctrl: qcom: Add ipq8074 pinctrl driver
+In-Reply-To: <2668868.v3IoKk0Lz9@debian64>
+References: <1496474875-7190-1-git-send-email-varada@codeaurora.org>
+ <1496474875-7190-2-git-send-email-varada@codeaurora.org>
+ <2668868.v3IoKk0Lz9@debian64>
+Message-ID: <35ae1e44-1397-db2c-cbfc-6b72136bb230@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi,
 
-On Mon, May 22, 2017 at 10:25 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Mon, May 22, 2017 at 5:41 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+On 6/4/2017 12:25 AM, Christian Lamparter wrote:
+> On Saturday, June 3, 2017 12:57:50 PM CEST Varadarajan Narayanan wrote:
+>> Add initial pinctrl driver to support pin configuration with
+>> pinctrl framework for ipq8074.
 >>
->>
->> ? 2017?5?22? GMT+08:00 ??5:39:22, Marc Zyngier <marc.zyngier@arm.com> ??:
->>>On 18/05/17 08:16, Icenowy Zheng wrote:
->>>> Add support for the newly imported compatible for the A64 R_INTC in
->>>> irq-sunxi-nmi driver.
->>>>
->>>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->>>> ---
->>>> Changes in v5:
->>>> - Fix A64 R_INTC compatible.
->>>>
->>>>  drivers/irqchip/irq-sunxi-nmi.c | 13 +++++++++++++
->>>>  1 file changed, 13 insertions(+)
->>>>
->>>> diff --git a/drivers/irqchip/irq-sunxi-nmi.c
->>>b/drivers/irqchip/irq-sunxi-nmi.c
->>>> index 668730c5cb66..5559c1d593bf 100644
->>>> --- a/drivers/irqchip/irq-sunxi-nmi.c
->>>> +++ b/drivers/irqchip/irq-sunxi-nmi.c
->>>> @@ -56,6 +56,12 @@ static struct sunxi_sc_nmi_reg_offs sun9i_reg_offs
->>>= {
->>>>      .enable = 0x04,
->>>>  };
->>>>
->>>> +static struct sunxi_sc_nmi_reg_offs sun50i_reg_offs = {
->>>> +    .ctrl   = 0x0c,
->>>> +    .pend   = 0x10,
->>>> +    .enable = 0x40,
->>>> +};
->>>> +
->>>
->>>Magic values? Even if no #define is provided, a pointer to the
->>>corresponding documentation would be appreciated (assuming
->>>documentation
->>>exists).
->>
->> No documents is available for A64 R_INTC.
->
-> No code either. In Allwinner's BSP, the interrupts for the PMICs go
-> through the (closed source) OpenRISC firmware, so there's no driver
-> for it in the kernel.
->
-> The registers line up with the old interrupt controller from the A10,
-> but it seems only the NMI interrupt is wired up.
+>> Signed-off-by: Manoharan Vijaya Raghavan <mraghava@codeaurora.org>
+>> Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
+>> ---
+>> +- bias-disable:
+>> +	Usage: optional
+>> +	Value type: <none>
+>> +	Definition: The specified pins should be configued as no pull.
+>> +
+>> +- bias-pull-down:
+>> +	Usage: optional
+>> +	Value type: <none>
+>> +	Definition: The specified pins should be configued as pull down.
+>> +
+>> +- bias-pull-up:
+>> +	Usage: optional
+>> +	Value type: <none>
+>> +	Definition: The specified pins should be configued as pull up.
+>> +
+>> +#define REG_SIZE 0x1000
+>> +#define PINGROUP(id, f1, f2, f3, f4, f5, f6, f7, f8, f9)	\
+>> +	{					        \
+>> +		.name = "gpio" #id,			\
+>> +		.pins = gpio##id##_pins,		\
+>> +		.npins = (unsigned int)ARRAY_SIZE(gpio##id##_pins),	\
+>> +		.funcs = (int[]){			\
+>> +			msm_mux_gpio, /* gpio mode */	\
+>> +			msm_mux_##f1,			\
+>> +			msm_mux_##f2,			\
+>> +			msm_mux_##f3,			\
+>> +			msm_mux_##f4,			\
+>> +			msm_mux_##f5,			\
+>> +			msm_mux_##f6,			\
+>> +			msm_mux_##f7,			\
+>> +			msm_mux_##f8,			\
+>> +			msm_mux_##f9			\
+>> +		},				        \
+>> +		.nfuncs = 10,				\
+>> +		.ctl_reg = REG_SIZE * id,		\
+>> +		.io_reg = 0x4 + REG_SIZE * id,		\
+>> +		.intr_cfg_reg = 0x8 + REG_SIZE * id,		\
+>> +		.intr_status_reg = 0xc + REG_SIZE * id,	\
+>> +		.intr_target_reg = 0x8 + REG_SIZE * id,	\
+>> +		.mux_bit = 2,			\
+>> +		.pull_bit = 0,			\
+>> +		.drv_bit = 6,			\
+>> +		.oe_bit = 9,			\
+>> +		.in_bit = 0,			\
+>> +		.out_bit = 1,			\
+>> +		.intr_enable_bit = 0,		\
+>> +		.intr_status_bit = 0,		\
+>> +		.intr_target_bit = 5,		\
+>> +		.intr_raw_status_bit = 4,	\
+>> +		.intr_polarity_bit = 1,		\
+>> +		.intr_detection_bit = 2,	\
+>> +		.intr_detection_width = 2,	\
+>> +	}
+>> +
+> Hello,
+> 
+> Back in May, Ram Chandra Jangir posted a rather interesting patch on
+> the LEDE Mailing-List:
+> <https://www.mail-archive.com/lede-dev@lists.infradead.org/msg07691.html>
+> |GPIO_PULL bits configurations in TLMM_GPIO_CFG register
+> |differs for IPQ40xx from rest of the other qcom SoC's.
+> |This change add support to configure the msm_gpio_pull
+> |bits for ipq40xx, It is required to fix the proper
+> |configurations of gpio-pull bits for nand pins mux.
+> |
+> |IPQ40xx SoC:
+> |2'b10: Internal pull up enable.
+> |2'b11: Unsupport
+> |
+> |For other SoC's:
+> |2'b10: Keeper
+> |2'b11: Pull-Up
+> 
+> This information wasn't mentioned anywhere. In fact, the special pull-up
+> configuration was only discovered due to an issue with the qpic NAND on
+> the Cisco Meraki MR33. So I wonder what does the gpio-pull look like for
+> the IPQ8074? Is it the same as the IPQ40XX or does it follow the older 
+> SoCs?
+> 
+> I'm asking this because I'm preparing a modified version of this patch
+> that will be posted once the IPQ8074 is ready.
+> 
 
-Is this OK? Or do you want Icenowy to respin a version with defines?
+IPQ8074 pull configuration bits are same as the older Socs. So IPQ40XX looks to
+be the only exception. Having said that, the patch that you pointed out should
+be posted on the lists for the kernel then.
 
->>>
->>>>  static inline void sunxi_sc_nmi_write(struct irq_chip_generic *gc,
->>>u32 off,
->>>>                                    u32 val)
->>>>  {
->>>> @@ -220,3 +226,10 @@ static int __init sun9i_nmi_irq_init(struct
->>>device_node *node,
->>>>      return sunxi_sc_nmi_irq_init(node, &sun9i_reg_offs);
->>>>  }
->>>>  IRQCHIP_DECLARE(sun9i_nmi, "allwinner,sun9i-a80-nmi",
->>>sun9i_nmi_irq_init);
->>>> +
->>>> +static int __init sun50i_nmi_irq_init(struct device_node *node,
->>>> +                                 struct device_node *parent)
->>>> +{
->>>> +    return sunxi_sc_nmi_irq_init(node, &sun50i_reg_offs);
->>>> +}
->>>> +IRQCHIP_DECLARE(sun50i_nmi, "allwinner,sun50i-a64-r-intc",
->>>sun50i_nmi_irq_init);
->>>>
->>>
->>>Apart from the above:
->>>
->>>Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->>>
->>>Let me know how you want this to be merged.
+Regards,
+ Sricharan
 
-This, and the previous dt bindings patch, can be merged through whatever
-tree irqchip drivers are merged through. Is that Jason's irqchip tree?
-
-We're mostly waiting on this before merging the remaining device tree
-changes.
-
-
-Thanks
-ChenYu
-
->>
->> I think it can just go via IRQ subsystem.
->>
->>>
->>>Thanks,
->>>
->>>       M.
->>
->> --
->> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
->> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
->> For more options, visit https://groups.google.com/d/optout.
+-- 
+"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
