@@ -1,33 +1,56 @@
-From: andy.tang@nxp.com (Yuantian Tang)
-Date: Mon, 5 Jun 2017 15:45:52 +0800
-Subject: [PATCH] arm64: dts: ls1088a: update sata node
-Message-ID: <1496648752-27627-1-git-send-email-andy.tang@nxp.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon,  5 Jun 2017 08:04:35 +0000
+Subject: [PATCH] efi: arm: Don't mark ACPI reclaim memory as MEMBLOCK_NOMAP
+Message-ID: <20170605080435.2498-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1. Remove ls1043a compatible string from node
-2. Fix the sata ecc register address error
+On ARM, regions of memory that are described by UEFI as having special
+significance to the firmware itself are omitted from the linear mapping.
+This is necessary since we cannot guarantee that alternate mappings of
+the same physical region will use attributes that are compatible with
+the ones we use for the linear mapping, and aliases with mismatched
+attributes are prohibited by the architecture.
 
-Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
+The above does not apply to ACPI reclaim regions: such regions have no
+special significance to the firmware, and it is up to the OS to decide
+whether or not to preserve them after it has consumed their contents,
+and for how long, after which time the OS can use the memory in any way
+it likes. In the Linux case, such regions are preserved indefinitely,
+and are simply treated the same way as other 'reserved' memory types.
+
+Punching holes into the linear mapping causes page table fragmentation,
+which increases TLB pressure, and so we should avoid doing so if we can.
+So add a special case for regions of type EFI_ACPI_RECLAIM_MEMORY, and
+memblock_reserve() them instead of marking them MEMBLOCK_NOMAP.
+
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/firmware/efi/arm-init.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-index df16284..c144d06 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-@@ -360,9 +360,9 @@
- 		};
+diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
+index 1027d7b44358..0aa4ce7b4fbb 100644
+--- a/drivers/firmware/efi/arm-init.c
++++ b/drivers/firmware/efi/arm-init.c
+@@ -159,6 +159,7 @@ static __init int is_usable_memory(efi_memory_desc_t *md)
+ 	switch (md->type) {
+ 	case EFI_LOADER_CODE:
+ 	case EFI_LOADER_DATA:
++	case EFI_ACPI_RECLAIM_MEMORY:
+ 	case EFI_BOOT_SERVICES_CODE:
+ 	case EFI_BOOT_SERVICES_DATA:
+ 	case EFI_CONVENTIONAL_MEMORY:
+@@ -211,6 +212,10 @@ static __init void reserve_regions(void)
  
- 		sata: sata at 3200000 {
--			compatible = "fsl,ls1088a-ahci", "fsl,ls1043a-ahci";
-+			compatible = "fsl,ls1088a-ahci";
- 			reg = <0x0 0x3200000 0x0 0x10000>,
--				<0x0 0x20140520 0x0 0x4>;
-+				<0x7 0x100520 0x0 0x4>;
- 			reg-names = "ahci", "sata-ecc";
- 			interrupts = <0 133 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&clockgen 4 3>;
+ 			if (!is_usable_memory(md))
+ 				memblock_mark_nomap(paddr, size);
++
++			/* keep ACPI reclaim memory intact for kexec etc. */
++			if (md->type == EFI_ACPI_RECLAIM_MEMORY)
++				memblock_reserve(paddr, size);
+ 		}
+ 	}
+ }
 -- 
-2.1.0.27.g96db324
+2.9.3
