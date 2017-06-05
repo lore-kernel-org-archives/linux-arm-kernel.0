@@ -1,103 +1,72 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon,  5 Jun 2017 14:15:04 -0600
-Subject: [PATCH 03/17] coresight: etm_perf: Fix using uninitialised work
+Date: Mon,  5 Jun 2017 14:15:03 -0600
+Subject: [PATCH 02/17] coresight: Fix reference count for software sources
 In-Reply-To: <1496693718-9191-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1496693718-9191-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1496693718-9191-4-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1496693718-9191-3-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-With 4.11-rc4, the following command triggers a WARN_ON,
-when a sink is not enabled.
+For software sources (i.e STM), there could be multiple agents
+generating the trace data, unlike the ETMs. So we need to
+properly do the accounting for the active number of users
+to disable the device when the last user goes away. Right
+now, the reference counting is broken for sources as we skip
+the actions when we detect that the source is enabled.
 
- perf record -e cs_etm/@20010000.etf/
-
- [88286.547741] ------------[ cut here ]------------
- [88286.552332] WARNING: CPU: 3 PID: 2156 at kernel/workqueue.c:1442 __queue_work+0x29c/0x3b8
- [88286.560427] Modules linked in:
- [88286.563451]
- [88286.564928] CPU: 3 PID: 2156 Comm: perf_v4.11 Not tainted 4.11.0-rc4 #217
- [88286.573453] Hardware name: ARM LTD ARM Juno Development Platform/ARM Juno Development Platform, BIOS EDK II Aug 15
-  2016
- [88286.584128] task: ffff80097597c200 task.stack: ffff8009768b0000
- [88286.589990] PC is at __queue_work+0x29c/0x3b8
- [88286.594303] LR is at __queue_work+0x104/0x3b8
- [88286.598614] pc : [<ffff0000080d8c7c>] lr : [<ffff0000080d8ae4>] pstate: a00001c5
- [88286.605934] sp : ffff8009768b3aa0
- [88286.609212] x29: ffff8009768b3aa0 x28: ffff80097ff3da00
- [88286.614477] x27: ffff80097ff89c00 x26: ffff8009751b0e00
- [88286.619741] x25: ffff000008c9f000 x24: 0000000000000003
- [88286.625004] x23: 0000000000000040 x22: ffff000008d3dab8
- [88286.630268] x21: ffff800977804400 x20: 0000000000000007
- [88286.635532] x19: ffff000008c54000 x18: 0000fffff9185160
- [88286.640795] x17: 0000ffffb33d9a38 x16: ffff000008088270
- [88286.646059] x15: 0000ffffb345b590 x14: 0000000000000000
- [88286.651322] x13: 0000000000000004 x12: 0000000000000040
- [88286.656586] x11: 0000000000000068 x10: 0000000000000000
- [88286.661849] x9 : ffff800977400028 x8 : 0000000000000000
- [88286.667113] x7 : 0000000000000000 x6 : ffff0000080d8ae4
- [88286.672376] x5 : 0000000000000000 x4 : 0000000000000080
- [88286.677639] x3 : 0000000000000000 x2 : 0000000000000000
- [88286.682903] x1 : 0000000000000000 x0 : ffff8009751b0e08
- [88286.688166]
- [88286.689638] ---[ end trace 31633f18fd33d4cb ]---
- [88286.694206] Call trace:
- [88286.696627] Exception stack(0xffff8009768b38d0 to 0xffff8009768b3a00)
- [88286.703004] 38c0:                                   ffff000008c54000 0001000000000000
- [88286.710757] 38e0: ffff8009768b3aa0 ffff0000080d8c7c ffff8009768b3b50 ffff80097ff8a5b0
- [88286.718511] 3900: 0000800977325000 0000000000000000 0000000000000040 ffff80097ffc6180
- [88286.726264] 3920: ffff8009768b3940 ffff0000088a8694 ffff80097ffc5800 0000000000000000
- [88286.734017] 3940: ffff8009768b3960 ffff0000081919c0 ffff80097ffc5280 0000000000000001
- [88286.741771] 3960: ffff8009768b3a50 ffff00000819206c ffff8009751b0e08 0000000000000000
- [88286.749523] 3980: 0000000000000000 0000000000000000 0000000000000080 0000000000000000
- [88286.757277] 39a0: ffff0000080d8ae4 0000000000000000 0000000000000000 ffff800977400028
- [88286.765029] 39c0: 0000000000000000 0000000000000068 0000000000000040 0000000000000004
- [88286.772783] 39e0: 0000000000000000 0000ffffb345b590 ffff000008088270 0000ffffb33d9a38
- [88286.780537] [<ffff0000080d8c7c>] __queue_work+0x29c/0x3b8
- [88286.785883] [<ffff0000080d8df8>] queue_work_on+0x60/0x78
- [88286.791146] [<ffff000008764c68>] etm_setup_aux+0x178/0x238
- [88286.796578] [<ffff000008183600>] rb_alloc_aux+0x228/0x310
- [88286.801925] [<ffff00000817e564>] perf_mmap+0x404/0x5a8
- [88286.807015] [<ffff0000081c60cc>] mmap_region+0x394/0x5c0
- [88286.812276] [<ffff0000081c654c>] do_mmap+0x254/0x388
- [88286.817191] [<ffff0000081a989c>] vm_mmap_pgoff+0xbc/0xe0
- [88286.822452] [<ffff0000081c3ffc>] SyS_mmap_pgoff+0xac/0x228
- [88286.827884] [<ffff000008088288>] sys_mmap+0x18/0x28
- [88286.832714] [<ffff000008082f30>] el0_svc_naked+0x24/0x28
-
-The patch makes sure that the event_data->work is initialised
-properly before we could possibly use it.
+This patch fixes the problem by adding the refcounting for
+software sources, even when they are enabled.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Reported-by: Robert Walker <robert.walker@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Tested-by: Mike Leach <mike.leach@linaro.org>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm-perf.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/hwtracing/coresight/coresight.c | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-index 288a423c1b27..8f546f59a3fd 100644
---- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-+++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-@@ -201,6 +201,7 @@ static void *etm_setup_aux(int event_cpu, void **pages,
- 	event_data = alloc_event_data(event_cpu);
- 	if (!event_data)
- 		return NULL;
-+	INIT_WORK(&event_data->work, free_event_data);
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index 532a2acfa8cc..6a0202b7384f 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -558,6 +558,9 @@ int coresight_enable(struct coresight_device *csdev)
+ 	int cpu, ret = 0;
+ 	struct coresight_device *sink;
+ 	struct list_head *path;
++	enum coresight_dev_subtype_source subtype;
++
++	subtype = csdev->subtype.source_subtype;
+ 
+ 	mutex_lock(&coresight_mutex);
+ 
+@@ -565,8 +568,16 @@ int coresight_enable(struct coresight_device *csdev)
+ 	if (ret)
+ 		goto out;
+ 
+-	if (csdev->enable)
++	if (csdev->enable) {
++		/*
++		 * There could be multiple applications driving the software
++		 * source. So keep the refcount for each such user when the
++		 * source is already enabled.
++		 */
++		if (subtype == CORESIGHT_DEV_SUBTYPE_SOURCE_SOFTWARE)
++			atomic_inc(csdev->refcnt);
+ 		goto out;
++	}
  
  	/*
- 	 * In theory nothing prevent tracers in a trace session from being
-@@ -217,8 +218,6 @@ static void *etm_setup_aux(int event_cpu, void **pages,
- 	if (!sink)
- 		goto err;
+ 	 * Search for a valid sink for this session but don't reset the
+@@ -593,7 +604,7 @@ int coresight_enable(struct coresight_device *csdev)
+ 	if (ret)
+ 		goto err_source;
  
--	INIT_WORK(&event_data->work, free_event_data);
--
- 	mask = &event_data->mask;
- 
- 	/* Setup the path for each CPU in a trace session */
+-	switch (csdev->subtype.source_subtype) {
++	switch (subtype) {
+ 	case CORESIGHT_DEV_SUBTYPE_SOURCE_PROC:
+ 		/*
+ 		 * When working from sysFS it is important to keep track
 -- 
 2.7.4
