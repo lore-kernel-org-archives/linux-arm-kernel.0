@@ -1,62 +1,63 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 5 Jun 2017 10:13:27 +0800
-Subject: [PATCH v1 5/5] ARM: dts: imx6: RIoTboard provide Standby to
- PowerOff option
-In-Reply-To: <20170605015027.GE4094@dragon>
-References: <20170529170924.25488-1-o.rempel@pengutronix.de>
- <20170529170924.25488-5-o.rempel@pengutronix.de>
- <20170605015027.GE4094@dragon>
-Message-ID: <20170605021326.GA18669@dragon>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sun, 04 Jun 2017 19:17:40 -0700
+Subject: [PATCH RFC 5/5] ARM: dts: vf-colibri-eval: use IRQ_TYPE_* to
+ specify irq flags
+In-Reply-To: <20170604034902.GC4094@dragon>
+References: <20170526180609.2699-1-uwe@kleine-koenig.org>
+ <20170526180609.2699-5-uwe@kleine-koenig.org> <20170604034902.GC4094@dragon>
+Message-ID: <72c4505c4f11f97fbb9837b9ec47a6df@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 05, 2017 at 09:50:29AM +0800, Shawn Guo wrote:
-> On Mon, May 29, 2017 at 07:09:24PM +0200, Oleksij Rempel wrote:
-> > This board, as well as some other boards with i.MX6 and a PMIC, uses a
-> > "MPIC_STBY_REQ" line to notify the PMIC about a state change.
-> > The PMIC is programmed for a specific state change before triggering the
-> > line.
-> > In this case, PMIC_STBY_REQ can be used for Stand by, Sleep
-> > and Power off modes.
-> > 
-> > Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> > Cc: kernel at pengutronix.de
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Russell King <linux@armlinux.org.uk>
-> > Cc: devicetree at vger.kernel.org
-> > Cc: linux-kernel at vger.kernel.org
-> > ---
-> >  arch/arm/boot/dts/imx6dl-riotboard.dts | 5 +++++
-> >  1 file changed, 5 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx6dl-riotboard.dts b/arch/arm/boot/dts/imx6dl-riotboard.dts
-> > index 2cb72824e800..b5f25fe7b809 100644
-> > --- a/arch/arm/boot/dts/imx6dl-riotboard.dts
-> > +++ b/arch/arm/boot/dts/imx6dl-riotboard.dts
-> > @@ -90,6 +90,10 @@
-> >  	status = "okay";
-> >  };
-> >  
-> > +&clks {
-> > +	fsl,pmic_stby_poweroff;
-> > +};
-> > +
-> >  &fec {
-> >  	pinctrl-names = "default";
-> >  	pinctrl-0 = <&pinctrl_enet>;
-> > @@ -125,6 +129,7 @@
-> >  		reg = <0x08>;
-> >  		interrupt-parent = <&gpio5>;
-> >  		interrupts = <16 8>;
-> > +		fsl,pmic_stby_poweroff;
+On 2017-06-03 20:49, Shawn Guo wrote:
+> On Fri, May 26, 2017 at 08:06:09PM +0200, Uwe Kleine-K?nig wrote:
+>> According to the binding documentation and the source code the
+>> vf610-gpio controller takes IRQ_TYPE_* as its flags values, not
+>> GPIO_ACTIVE_*.
+>>
+>> This patch uses the right variable type which yields the same result
+>> when compiled. Note that this might be wrong and actually
+>> IRQ_TYPE_LEVEL_LOW is intended by the dt author.
+>>
+>> Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+>> ---
+>> Hello,
+>>
+>> can somebody with the hardware or it's documentation please check which
+>> flag is the right one?
 > 
-> Is this property supported by upstream kernel?
+> @Stefan, can you help to confirm?
+> 
 
-Okay, just noticed that it's the last patch of series adding
-fsl,pmic_stby_poweroff support.
+Thanks for spotting! According to the data sheet it is a low active
+signal, so I guess IRQ_TYPE_LEVEL_LOW is correct. But the driver
+actually explicitly requests IRQF_TRIGGER_FALLING, that has been the
+case since its inception. IMHO LEVEL_LOW should be more rigid since it
+helps for missed interrupt edges...
 
-Shawn
+--
+Stefan
+
+>>
+>> Best regards
+>> Uwe
+>>
+>>  arch/arm/boot/dts/vf-colibri-eval-v3.dtsi | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+>> index 091b738041a0..3e0c84d79c43 100644
+>> --- a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+>> +++ b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+>> @@ -117,7 +117,7 @@
+>>  		clocks = <&clk16m>;
+>>  		spi-max-frequency = <10000000>;
+>>  		interrupt-parent = <&gpio1>;
+>> -		interrupts = <11 GPIO_ACTIVE_LOW>;
+>> +		interrupts = <11 IRQ_TYPE_EDGE_RISING>;
+>>  	};
+>>  };
+>>
+>> --
+>> 2.11.0
+>>
