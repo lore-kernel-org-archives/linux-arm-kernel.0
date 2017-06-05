@@ -1,132 +1,139 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 5 Jun 2017 14:10:33 -0500
-Subject: [PATCH 1/3] Documentation: DT: add Keystone DSP remoteproc binding
-In-Reply-To: <39a18ffb-cd33-29a7-c3e9-f8e2e6d3432b@ti.com>
-References: <20170526165317.23164-1-s-anna@ti.com>
- <20170526165317.23164-2-s-anna@ti.com>
- <20170531191231.5qt2lfv73p572gmd@rob-hp-laptop>
- <884f5585-eac2-57b2-a2be-879bf23f2e00@ti.com>
- <20170605172648.6xonnkvbwmd3cehg@rob-hp-laptop>
- <39a18ffb-cd33-29a7-c3e9-f8e2e6d3432b@ti.com>
-Message-ID: <CAL_Jsq+85CSNRC0JzVHrJQM9wUfeQk9kBrT8jEFRBPE9OX95Qg@mail.gmail.com>
+From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
+Date: Mon, 5 Jun 2017 14:20:42 -0500
+Subject: [PATCH v7 00/23] FSI device driver implementation
+In-Reply-To: <20170603100510.GA24053@kroah.com>
+References: <20170511210101.78409-1-cbostic@linux.vnet.ibm.com>
+ <305bc7b6-30eb-a44d-28da-f90f9a973acf@linux.vnet.ibm.com>
+ <20170603100510.GA24053@kroah.com>
+Message-ID: <c8e01894-1842-9bdf-158b-3d336cb0b7a7@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 5, 2017 at 1:21 PM, Suman Anna <s-anna@ti.com> wrote:
-> Hi Rob,
->
->>>
->>> On 05/31/2017 02:12 PM, Rob Herring wrote:
->>>> On Fri, May 26, 2017 at 11:53:15AM -0500, Suman Anna wrote:
->>>>> Add the device tree bindings document for the Texas Instrument's
->>>>> Keystone 2 DSP remoteproc devices.
->>>>>
->>>>> Signed-off-by: Suman Anna <s-anna@ti.com>
->>>>> Signed-off-by: Sam Nelson <sam.nelson@ti.com>
->>>>> ---
->>>>>  .../bindings/remoteproc/ti,keystone-rproc.txt      | 132 +++++++++++++++++++++
->>>>>  1 file changed, 132 insertions(+)
->>>>>  create mode 100644 Documentation/devicetree/bindings/remoteproc/ti,keystone-rproc.txt
->>>>>
->>>>> diff --git a/Documentation/devicetree/bindings/remoteproc/ti,keystone-rproc.txt b/Documentation/devicetree/bindings/remoteproc/ti,keystone-rproc.txt
->>>>> new file mode 100644
->>>>> index 000000000000..f1ba88edd00d
->>>>> --- /dev/null
->>>>> +++ b/Documentation/devicetree/bindings/remoteproc/ti,keystone-rproc.txt
->>>>> @@ -0,0 +1,132 @@
->>>>> +TI Keystone DSP devices
->>>>> +=======================
->>>>> +
->>>>> +Binding status: Unstable - Subject to changes for using multiple memory regions
->>>>
->>>> I don't really see what would be unstable here. memory-region is easily
->>>> extended to multiple entries.
->>>
->>> OK will drop this line.
->>>
->>>>
->>>>> +
->>>>> +The TI Keystone 2 family of SoCs usually have one or more (upto 8) TI DSP Core
->>>>> +sub-systems that are used to offload some of the processor-intensive tasks or
->>>>> +algorithms, for achieving various system level goals.
->>>>> +
->>>>> +These processor sub-systems usually contain additional sub-modules like L1
->>>>> +and/or L2 caches/SRAMs, an Interrupt Controller, an external memory controller,
->>>>> +a dedicated local power/sleep controller etc. The DSP processor core in
->>>>> +Keystone 2 SoCs is usually a TMS320C66x CorePac processor.
->>>>> +
->>>>> +DSP Device Node:
->>>>> +================
->>>>> +Each DSP Core sub-system is represented as a single DT node. Each node has a
->>>>> +number of required or optional properties that enable the OS running on the
->>>>> +host processor (ARM CorePac) to perform the device management of the remote
->>>>> +processor and to communicate with the remote processor.
->>>>> +
->>>>> +Required properties:
->>>>> +--------------------
->>>>> +The following are the mandatory properties:
->>>>> +
->>>>> +- compatible:             Should be one of the following,
->>>>> +                      "ti,k2hk-dsp" for DSPs on Keystone 2 66AK2H/K SoCs
->>>>> +                      "ti,k2l-dsp" for DSPs on Keystone 2 66AK2L SoCs
->>>>> +                      "ti,k2e-dsp" for DSPs on Keystone 2 66AK2E SoCs
->>>>> +
->>>>> +- reg:                    Should contain an entry for each value in 'reg-names'.
->>>>> +                  Each entry should have the memory region's start address
->>>>> +                  and the size of the region, the representation matching
->>>>> +                  the parent node's '#address-cells' and '#size-cells' values.
->>>>> +
->>>>> +- reg-names:              Should contain strings with the following names, each
->>>>> +                  representing a specific internal memory region, and
->>>>> +                  should be defined in this order,
->>>>> +                       "l2sram", "l1pram", "l1dram"
->>>>> +
->>>>> +- label:          Should contain a string identifying the DSP instance
->>>>> +                  within the SoC. Should be the string "dsp" followed by
->>>>> +                  the instance number. Eg: "dsp0", "dsp1",..."dsp7" etc
->>>>
->>>> Why does a user need to know or care?
->>>
->>> This is used to distinguish the exact DSP instance from others since the
->>> DT node name is a generic "dsp". One of the uses is to be able to
->>> construct a firmware name within the driver using this label.
+
+
+On 6/3/17 5:05 AM, Greg KH wrote:
+> On Wed, May 31, 2017 at 12:17:05PM -0500, Christopher Bostic wrote:
+>> Hi Greg,
 >>
->> firmware-name doesn't work for you?
+>> Are there any further changes you require for this patch set? This has been
+>> extensively tested internally and all is working as expected.   Would it be
+>> possible to move forward with integration in the near future?   Any input
+>> would be appreciated.
+> Sorry for the delay.  I just tried applying this to my tree, but got the
+> following build warnings, and then errors:
 >
-> Has the stance changed w.r.t coding up the firmware-name in DT now? My
-> understanding was that this has to be coded up in the driver from a
-> previous related discussion on this [1]. I am more than happy to move
-> the firmware name into DT for all remoteprocs if that is an accepted
-> solution now.
+> In file included from ./include/trace/define_trace.h:95:0,
+>                   from ./include/trace/events/fsi.h:127,
+>                   from drivers/fsi/fsi-core.c:27:
+> ./include/trace/events/fsi.h: In function ?trace_raw_output_fsi_master_write?:
+> ./include/trace/events/fsi.h:58:12: warning: field width specifier ?*? expects argument of type ?int?, but argument 8 has type ?size_t {aka long unsigned int}? [-Wformat=]
+>    TP_printk("fsi%d:%02d:%02d %08x[%zd] <= {%*ph}",
+>              ^
+> ./include/trace/trace_events.h:343:22: note: in definition of macro ?DECLARE_EVENT_CLASS?
+>    trace_seq_printf(s, print);     \
+>                        ^~~~~
+> ./include/trace/trace_events.h:65:9: note: in expansion of macro ?PARAMS?
+>           PARAMS(print));         \
+>           ^~~~~~
+> ./include/trace/events/fsi.h:37:1: note: in expansion of macro ?TRACE_EVENT?
+>   TRACE_EVENT(fsi_master_write,
+>   ^~~~~~~~~~~
+> ./include/trace/events/fsi.h:58:2: note: in expansion of macro ?TP_printk?
+>    TP_printk("fsi%d:%02d:%02d %08x[%zd] <= {%*ph}",
+>    ^~~~~~~~~
+> In file included from ./include/trace/trace_events.h:377:0,
+>                   from ./include/trace/define_trace.h:95,
+>                   from ./include/trace/events/fsi.h:127,
+>                   from drivers/fsi/fsi-core.c:27:
+> ./include/trace/events/fsi.h:58:44: note: format string is defined here
+>    TP_printk("fsi%d:%02d:%02d %08x[%zd] <= {%*ph}",
+>                                             ~^~
+> In file included from ./include/trace/define_trace.h:95:0,
+>                   from ./include/trace/events/fsi.h:127,
+>                   from drivers/fsi/fsi-core.c:27:
+> ./include/trace/events/fsi.h: In function ?trace_raw_output_fsi_master_rw_resul
+> ?:
+> ./include/trace/events/fsi.h:95:12: warning: field width specifier ?*? expects argument of type ?int?, but argument 9 has type ?size_t {aka long unsigned int}? [-Wformat=]
+>    TP_printk("fsi%d:%02d:%02d %08x[%zd] %s {%*ph} ret %d",
+>              ^
+> ./include/trace/trace_events.h:343:22: note: in definition of macro ?DECLARE_EVENT_CLASS?
+>    trace_seq_printf(s, print);     \
+>                        ^~~~~
+> ./include/trace/trace_events.h:65:9: note: in expansion of macro ?PARAMS?
+>           PARAMS(print));         \
+>           ^~~~~~
+> ./include/trace/events/fsi.h:68:1: note: in expansion of macro ?TRACE_EVENT?
+>   TRACE_EVENT(fsi_master_rw_result,
+>   ^~~~~~~~~~~
+> ./include/trace/events/fsi.h:95:2: note: in expansion of macro ?TP_printk?
+>    TP_printk("fsi%d:%02d:%02d %08x[%zd] %s {%*ph} ret %d",
+>    ^~~~~~~~~
+> In file included from ./include/trace/trace_events.h:377:0,
+>                   from ./include/trace/define_trace.h:95,
+>                   from ./include/trace/events/fsi.h:127,
+>                   from drivers/fsi/fsi-core.c:27:
+> ./include/trace/events/fsi.h:95:44: note: format string is defined here
+>    TP_printk("fsi%d:%02d:%02d %08x[%zd] %s {%*ph} ret %d",
+>                                             ~^~
+>    CHK     include/generated/uapi/linux/version.h
+>    GEN     .version
+>    CHK     include/generated/compile.h
+>    UPD     include/generated/compile.h
+>    CC      init/version.o
+>    LD      init/built-in.o
+>    LD      vmlinux.o
+>    MODPOST vmlinux.o
+>    KSYM    .tmp_kallsyms1.o
+>    KSYM    .tmp_kallsyms2.o
+>    LD      vmlinux
+>    SORTEX  vmlinux
+>    SYSMAP  System.map
+>    CC      arch/x86/boot/version.o
+>    Building modules, stage 2.
+>    VOFFSET arch/x86/boot/compressed/../voffset.h
+>    OBJCOPY arch/x86/boot/compressed/vmlinux.bin
+>    RELOCS  arch/x86/boot/compressed/vmlinux.relocs
+>    CC      arch/x86/boot/compressed/kaslr.o
+>    GZIP    arch/x86/boot/compressed/vmlinux.bin.gz
+>    CC      arch/x86/boot/compressed/misc.o
+>    MODPOST 476 modules
+> WARNING: modpost: missing MODULE_LICENSE() in drivers/fsi/fsi-core.o
+> see include/linux/module.h for more information
+>    MKPIGGY arch/x86/boot/compressed/piggy.S
+>    AS      arch/x86/boot/compressed/piggy.o
+>    DATAREL arch/x86/boot/compressed/vmlinux
+>    LD      arch/x86/boot/compressed/vmlinux
+>    ZOFFSET arch/x86/boot/zoffset.h
+>    OBJCOPY arch/x86/boot/vmlinux.bin
+>    AS      arch/x86/boot/header.o
+>    LD      arch/x86/boot/setup.elf
+>    OBJCOPY arch/x86/boot/setup.bin
+>    BUILD   arch/x86/boot/bzImage
+> Setup is 17532 bytes (padded to 17920 bytes).
+> System is 5445 kB
+> CRC 56d8089d
+> Kernel: arch/x86/boot/bzImage is ready  (#387)
+> ERROR: "fsi_slave_claim_range" [drivers/fsi/fsi-master-hub.ko] undefined!
+> ERROR: "fsi_slave_read" [drivers/fsi/fsi-master-hub.ko] undefined!
+> ERROR: "fsi_slave_write" [drivers/fsi/fsi-master-hub.ko] undefined!
+> ERROR: "fsi_slave_release_range" [drivers/fsi/fsi-master-hub.ko] undefined!
+> make[1]: *** [scripts/Makefile.modpost:91: __modpost] Error 1
+> make: *** [Makefile:1214: modules] Error 2
+Hi Greg,
 
-There's not a hard and fast rule. For FPGAs at least it made sense to
-use firmware-name.
+Was missing a few export symbols for module mode...  Sorry about that.
+Will correct the trace warnings as well and get v8 sent out ASAP.
 
->> It was obvious that you are using this to number instances. Why do you
->> care which instance is which? For example, I want dsp0 because it has X
->> or runs at XXMHz, etc. If each instance is different (i.e. not a pool of
->> DSPs), then you should describe the difference some way.
+Thanks for the input.
+Chris
+
 >
-> Well, I am not exactly using the label to number the instance, it is a
-> possibility outside of using it to encode the firmware name. The
-> partitioning is really upto the application/SoC s/w system integration
-> aspects.  Most of the times, you are not running identical software on
-> these DSPs or other remote processors. For example, you might have one
-> DSP running an OpenCL stack, another DSP dedicated for audio
-> post-processing etc.
+> Note, I'm using gcc 7.1.1, which might be what is showing the build warnings,
+> but that doesn't explain the build errors.
 >
-> That said, I do have a need for numbering the instances. This is needed
-> usually for constructing a destination address to encode the processor
-> when using a common Inter-Processor Communication API across all
-> processors (Linux or otherwise). Pre-DT, I have used the platform device
-> id for this on Linux behaving as the master processor. For DT, my
-> preferred solution for that is an alias. If an alias is not acceptable,
-> then I still have to provide an equivalent functionality through a
-> driver-specific scheme.
-
-I would prefer aliases over labels here. It may make sense to just
-have a property for the desitination address (or some offset). Or
-perhaps a list of IPC targets and the index to that list is the
-instance.
-
-Rob
+> So obviously, I can't take this as is :(
+>
+> thanks,
+>
+> greg k-h
+>
