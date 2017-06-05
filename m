@@ -1,59 +1,56 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Mon, 5 Jun 2017 18:29:53 +0930
-Subject: [PATCH] arm: aspeed: Add clock-names property to timer node
-In-Reply-To: <20170605074846.30925-1-andrew@aj.id.au>
-References: <20170605074846.30925-1-andrew@aj.id.au>
-Message-ID: <CACPK8XeM6fBztHwfrPUD+ewpMf==tBqgfj61B-k=SwT3ABTiZw@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon,  5 Jun 2017 17:00:32 +0800
+Subject: [PATCH v2 1/2] ARM: sunxi: h3-h5: Convert R_CCU raw numbers to macros
+In-Reply-To: <20170605090033.31663-1-wens@csie.org>
+References: <20170605090033.31663-1-wens@csie.org>
+Message-ID: <20170605090033.31663-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 5, 2017 at 5:18 PM, Andrew Jeffery <andrew@aj.id.au> wrote:
-> The merging of a number of clocksource drivers into fttmr010 means we
-> require clock-names to be specified in the Aspeed timer node, else the
-> clocksource fails to probe and boot hangs.
+Now that the R_CCU device tree binding headers have been merged, we
+can convert the raw number references in the device trees to use the
+defined macros.
 
-Arnd,
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-Linus' reworked timer driver will go into 4.13.
-
-Can we get this patch merged into 4.12 as a fix so we don't end up
-with a broken boot at any stage?
-
-Cheers,
-
-Joel
-
->
-> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
-> ---
->  arch/arm/boot/dts/aspeed-g4.dtsi | 1 +
->  arch/arm/boot/dts/aspeed-g5.dtsi | 1 +
->  2 files changed, 2 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-> index 8c6bc29eb7f6..3e74929d3289 100644
-> --- a/arch/arm/boot/dts/aspeed-g4.dtsi
-> +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-> @@ -893,6 +893,7 @@
->                                 //interrupts = <16 17 18 35 36 37 38 39>;
->                                 interrupts = <16>;
->                                 clocks = <&clk_apb>;
-> +                               clock-names = "PCLK";
->                         };
->
->                         wdt1: wdt at 1e785000 {
-> diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-> index a0bea4a6ec77..1e6c701da853 100644
-> --- a/arch/arm/boot/dts/aspeed-g5.dtsi
-> +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-> @@ -1000,6 +1000,7 @@
->                                 //interrupts = <16 17 18 35 36 37 38 39>;
->                                 interrupts = <16>;
->                                 clocks = <&clk_apb>;
-> +                               clock-names = "PCLK";
->                         };
->
->
-> --
-> 2.11.0
->
+diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+index d4f600dbb7eb..5a3ce6bcf895 100644
+--- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
++++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+@@ -41,8 +41,10 @@
+  */
+ 
+ #include <dt-bindings/clock/sun8i-h3-ccu.h>
++#include <dt-bindings/clock/sun8i-r-ccu.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/reset/sun8i-h3-ccu.h>
++#include <dt-bindings/reset/sun8i-r-ccu.h>
+ 
+ / {
+ 	interrupt-parent = <&gic>;
+@@ -574,9 +576,9 @@
+ 
+ 		ir: ir at 01f02000 {
+ 			compatible = "allwinner,sun5i-a13-ir";
+-			clocks = <&r_ccu 4>, <&r_ccu 11>;
++			clocks = <&r_ccu CLK_APB0_IR>, <&r_ccu CLK_IR>;
+ 			clock-names = "apb", "ir";
+-			resets = <&r_ccu 0>;
++			resets = <&r_ccu RST_APB0_IR>;
+ 			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg = <0x01f02000 0x40>;
+ 			status = "disabled";
+@@ -586,7 +588,7 @@
+ 			compatible = "allwinner,sun8i-h3-r-pinctrl";
+ 			reg = <0x01f02c00 0x400>;
+ 			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&r_ccu 3>, <&osc24M>, <&osc32k>;
++			clocks = <&r_ccu CLK_APB0_PIO>, <&osc24M>, <&osc32k>;
+ 			clock-names = "apb", "hosc", "losc";
+ 			gpio-controller;
+ 			#gpio-cells = <3>;
+-- 
+2.11.0
