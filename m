@@ -1,59 +1,37 @@
-From: hoeun.ryu@gmail.com (Hoeun Ryu)
-Date: Mon, 5 Jun 2017 20:06:47 +0900
-Subject: [PATCHv2] arm: LPAE: kexec: clear TTBCR.T1SZ explicitly when
- PHYS_OFFSET > PAGE_OFFSET
-In-Reply-To: <bb00a038-b6b8-2da9-7b16-0c2ea96a44b5@arm.com>
-References: <1496657199-29589-1-git-send-email-hoeun.ryu@gmail.com>
- <bb00a038-b6b8-2da9-7b16-0c2ea96a44b5@arm.com>
-Message-ID: <E0350890-B097-4816-9B8A-CD07A7F11B6D@gmail.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Mon, 5 Jun 2017 13:10:19 +0200
+Subject: [linux-sunxi] [PATCH] net-next: stmmac: dwmac-sun8i: ensure the
+ EPHY is properly reseted
+In-Reply-To: <20170604175323.62124-1-icenowy@aosc.io>
+References: <20170604175323.62124-1-icenowy@aosc.io>
+Message-ID: <20170605111019.GA29657@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
->> On Jun 5, 2017, at 7:30 PM, Robin Murphy <robin.murphy@arm.com> wrote:
->> 
->> On 05/06/17 11:06, Hoeun Ryu wrote:
->> Clearing TTBCR.T1SZ explicitly when kernel runs on a configuration of
->> PHYS_OFFSET > PAGE_OFFSET.
->> Reading TTBCR in early boot stage might returns the value of the
->> previous kernel's configuration, especially in case of kexec. For
->> example, if normal kernel (first kernel) had run on a configuration
->> of PHYS_OFFSET <= PAGE_OFFSET and crash kernel (second kernel) is
->> running on a configuration PHYS_OFFSET > PAGE_OFFSET, which can happen
->> because it depends on the reserved area for crash kernel, reading
->> TTBCR and using the value without clearing TTBCR.T1SZ might risky
->> because the value doesn't have a reset value for TTBCR.T1SZ.
+On Mon, Jun 05, 2017 at 01:53:23AM +0800, Icenowy Zheng wrote:
+> The EPHY may be already enabled by bootloaders which have Ethernet
+> capability (e.g. current U-Boot). Thus it should be reseted properly
+> before doing the enabling sequence in the dwmac-sun8i driver, otherwise
+> the EMAC reset process may fail if no cable is plugged, and then fail
+> the dwmac-sun8i probing.
 > 
-> Hmm, but isn't that also strictly true of all the other fields we're
-> ORing TTB_FLAGS_* into? Given that this is initial setup, I wonder
-> whether we need to care about the previous TTBCR value at all - is there
-> any reason for not simply building up the value we want from scratch?
-
-Your idea seems better.
-I'll send a new patch to build TTBCR from scratch without reading it for the initial value.
-
-Russell, do you have any opinion ?
-
-Thank toy for the review.
-
+> Tested on Orange Pi PC, One and Zero. All the boards fail to have
+> dwmac-sun8i probed with "EMAC reset timeout" without cable plugged
+> before, and with this fix they're now all able to successfully probe the
+> EMAC without cable plugged and then use the connection after a cable is
+> hot-plugged in.
 > 
-> Robin.
-> 
->> Signed-off-by: Hoeun Ryu <hoeun.ryu@gmail.com>
->> ---
->> arch/arm/mm/proc-v7-3level.S | 1 +
->> 1 file changed, 1 insertion(+)
->> 
->> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
->> index 5e5720e..81404b8 100644
->> --- a/arch/arm/mm/proc-v7-3level.S
->> +++ b/arch/arm/mm/proc-v7-3level.S
->> @@ -140,6 +140,7 @@ ENDPROC(cpu_v7_set_pte_ext)
->>    * otherwise booting secondary CPUs would end up using TTBR1 for the
->>    * identity mapping set up in TTBR0.
->>    */
->> +    bichi    \tmp, \tmp, #(7 << 16)                @ clear TTBCR.T1SZ
->>   orrls    \tmp, \tmp, #TTBR1_SIZE                @ TTBCR.T1SZ
->>   mcr    p15, 0, \tmp, c2, c0, 2                @ TTBCR
->>   mov    \tmp, \ttbr1, lsr #20
-> 
+> Fixes: 9f93ac8d408 ("net-next: stmmac: Add dwmac-sun8i")
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+
+Thanks for the fix.
+Tested-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+
+Since I am the writter of the file, does I have the right to:
+Acked-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+or
+Reviewed-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+?
+
+Perhaps I need to set myself as reviewer for this file in MAINTAINERS ?
+Regards
