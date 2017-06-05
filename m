@@ -1,34 +1,52 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 5 Jun 2017 15:52:43 +0200
-Subject: [PATCH v2 0/2] ARM/arm64: sunxi: convert CCU raw numbers to macros
-In-Reply-To: <20170605090033.31663-1-wens@csie.org>
-References: <20170605090033.31663-1-wens@csie.org>
-Message-ID: <20170605135243.6mznky5jiri7wd2x@flea.lan>
+Date: Mon, 5 Jun 2017 16:00:12 +0200
+Subject: [PATCH 10/19] drm/sun4i: hdmi: Rename internal DDC clock to
+ avoid name collision
+In-Reply-To: <CAGb2v64Vgdjm1MAwn+L0PVc0CA0QOCn=0RONKoGDWLpzVBzvmQ@mail.gmail.com>
+References: <20170602101024.18940-1-wens@csie.org>
+ <20170602101024.18940-11-wens@csie.org>
+ <20170602193012.xwuziggyx6evmusz@flea.lan>
+ <CAGb2v64Vgdjm1MAwn+L0PVc0CA0QOCn=0RONKoGDWLpzVBzvmQ@mail.gmail.com>
+Message-ID: <20170605140012.rlx7rm7xhriwqaza@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 05, 2017 at 05:00:31PM +0800, Chen-Yu Tsai wrote:
-> Hi Maxime,
+On Sat, Jun 03, 2017 at 10:33:25PM +0800, Chen-Yu Tsai wrote:
+> On Sat, Jun 3, 2017 at 3:30 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Fri, Jun 02, 2017 at 06:10:15PM +0800, Chen-Yu Tsai wrote:
+> >> The DDC parent clock on the A31 SoC is also conveniently named
+> >> "hdmi-ddc", which results in a name collision when the hdmi driver
+> >> registers its internal DDC divider clock.
+> >>
+> >> Rename the internal clock to "hdmi-ddc-divider".
+> >>
+> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> ---
+> >>  drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c | 2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c
+> >> index e1071838f487..9a6b6243e977 100644
+> >> --- a/drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c
+> >> +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c
+> >> @@ -125,7 +125,7 @@ static int _sun4i_ddc_create(struct sun4i_hdmi *hdmi, struct clk *parent,
+> >>       if (!ddc)
+> >>               return -ENOMEM;
+> >>
+> >> -     init.name = "hdmi-ddc";
+> >> +     init.name = "hdmi-ddc-divider";
+> >
+> > Can't we rename the CCU clock instead? Having the clock called
+> > hdmi-ddc being the actual clock output on the DDC bus feels more
+> > natural.
 > 
-> This is a fixed version of my "convert CCU raw numbers to macros" series.
-> Please take these instead.
-> 
-> Changes since v1:
-> 
->   - Fixed incorrect macro name for IR reset control phandle
-> 
->   - Fixed header filename typo
-> 
-> These are some clean up patches for 4.12. They convert raw number
-> references for the CCU and R_CCU nodes, from when the CCU/R_CCU stuff
-> was first added, to the defined macros in the device tree header files.
-> 
-> These affect the A64 and H3/H5.
-> 
-> These are based on our sunxi/fixes-for-4.12 branch. Once these are merged,
-> I think it's time to send off pull requests for our fixes branches.
+> Do you have any suggestions? The manual labels the conflicting one
+> in the CCU as "HDMI_DDC"...
 
-Applied both, thanks!
+DDC as the main CCU clock, and hdmi-ddc as the one actually generated
+by the HDMI controller?
+
 Maxime
 
 -- 
@@ -41,4 +59,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170605/ba374f62/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170605/296353ad/attachment.sig>
