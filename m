@@ -1,30 +1,37 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 5 Jun 2017 09:13:53 +0100
-Subject: [PATCH v2 03/25] KVM: arm64: Make kvm_condition_valid32()
- accessible from EL2
-In-Reply-To: <20170604121129.GB9464@cbox>
-References: <20170601102117.17750-1-marc.zyngier@arm.com>
- <20170601102117.17750-4-marc.zyngier@arm.com> <20170604121129.GB9464@cbox>
-Message-ID: <394ef6fd-1123-0a1f-f462-ed5cb52e24da@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 5 Jun 2017 10:14:23 +0200
+Subject: [PATCH 0/2] ARM/arm64: sunxi: convert CCU raw numbers to macros
+In-Reply-To: <20170605043224.20687-1-wens@csie.org>
+References: <20170605043224.20687-1-wens@csie.org>
+Message-ID: <20170605081423.sx7qqjq73646enlm@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/17 13:11, Christoffer Dall wrote:
-> On Thu, Jun 01, 2017 at 11:20:55AM +0100, Marc Zyngier wrote:
->> As we're about to trap CP15 accesses and handle them at EL2, we
->> need to evaluate whether or not the condition flags are valid,
->> as an implementation is allowed to trap despite the condition
->> not being met.
->>
->> Tagging the function as __hyp_text allows this.
+On Mon, Jun 05, 2017 at 12:32:22PM +0800, Chen-Yu Tsai wrote:
+> Hi Maxime,
 > 
-> is the cc_map also guaranteed to work (by simple reference) in EL2 then?
+> These are some clean up patches for 4.12. They convert raw number
+> references for the CCU and R_CCU nodes, from when the CCU/R_CCU stuff
+> was first added, to the defined macros in the device tree header files.
+> 
+> These affect the A64 and H3/H5.
+> 
+> These are based on our sunxi/fixes-for-4.12 branch. Once these are merged,
+> I think it's time to send off pull requests for our fixes branches.
+> 
+> ChenYu
 
-Yes. By virtue of being const, this ends up in the read-only part of the
-kernel, which we always map at EL2.
+Applied both, thanks!
+Maxime
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170605/8ff9da64/attachment.sig>
