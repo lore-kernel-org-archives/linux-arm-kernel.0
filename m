@@ -1,109 +1,57 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Mon, 5 Jun 2017 09:33:53 +0100
-Subject: [PATCH v13 8/9] arm64: dts: hi6220: register debug module
-In-Reply-To: <1495727836-30094-9-git-send-email-leo.yan@linaro.org>
-References: <1495727836-30094-1-git-send-email-leo.yan@linaro.org>
- <1495727836-30094-9-git-send-email-leo.yan@linaro.org>
-Message-ID: <59351771.5080807@hisilicon.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 5 Jun 2017 17:42:28 +0900
+Subject: [PATCH 1/4] thermal: uniphier: add UniPhier thermal driver
+In-Reply-To: <20170530182141.6865.4A936039@socionext.com>
+References: <1496049345-14649-2-git-send-email-hayashi.kunihiko@socionext.com>
+ <20170529164816.GA14822@localhost.localdomain>
+ <20170530182141.6865.4A936039@socionext.com>
+Message-ID: <CAK7LNARtQfhx+854FHZenymX4Em4LYWSWUsH2iPp4fb9D7xXHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leo,
+2017-05-30 18:21 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
 
-On 2017/5/25 16:57, Leo Yan wrote:
-> Bind debug module driver for Hi6220.
-> 
-> Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+>> > +static const struct uniphier_tm_soc_data uniphier_pxs2_tm_data = {
+>> > +   .map_base        = 0xe000,
+>> > +   .block_base      = 0xe000,
+>> > +   .tmod_setup_addr = 0xe904,
+>> > +};
+>> > +
+>> > +static const struct uniphier_tm_soc_data uniphier_ld20_tm_data = {
+>> > +   .map_base        = 0xe000,
+>> > +   .block_base      = 0xe800,
+>> > +   .tmod_setup_addr = 0xe938,
+>>
+>> Shouldn't these be in your device tree using the register properties?
+>> I see at least the map base as possible to be done in DT.
 
-Thanks!
-Fine to me.
-Acked-by: Wei Xu <xuwei5@hisilicon.com>
+True for simple-bus.
 
-Hi Mathieu,
+However, the combination of "simple-mfd" and "syscon"
+seems a well established strategy when
+registers are mixed/interleaved in a syscon block.
 
-Can you help to pick up this patch as well?
-Thanks!
+(For example, chip-control at ea0000 node of
+arch/arm/boot/dts/berlin2.dtsi)
 
-Best Regards,
-Wei
 
-> ---
->  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 64 +++++++++++++++++++++++++++++++
->  1 file changed, 64 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> index 1e5129b..21805b9 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> @@ -916,5 +916,69 @@
->  				};
->  			};
->  		};
-> +
-> +		debug at f6590000 {
-> +			compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +			reg = <0 0xf6590000 0 0x1000>;
-> +			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu0>;
-> +		};
-> +
-> +		debug at f6592000 {
-> +			compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +			reg = <0 0xf6592000 0 0x1000>;
-> +			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu1>;
-> +		};
-> +
-> +		debug at f6594000 {
-> +			compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +			reg = <0 0xf6594000 0 0x1000>;
-> +			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu2>;
-> +		};
-> +
-> +		debug at f6596000 {
-> +			compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +			reg = <0 0xf6596000 0 0x1000>;
-> +			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu3>;
-> +		};
-> +
-> +		debug at f65d0000 {
-> +			compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +			reg = <0 0xf65d0000 0 0x1000>;
-> +			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu4>;
-> +		};
-> +
-> +		debug at f65d2000 {
-> +			compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +			reg = <0 0xf65d2000 0 0x1000>;
-> +			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu5>;
-> +		};
-> +
-> +		debug at f65d4000 {
-> +			compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +			reg = <0 0xf65d4000 0 0x1000>;
-> +			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu6>;
-> +		};
-> +
-> +		debug at f65d6000 {
-> +			compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +			reg = <0 0xf65d6000 0 0x1000>;
-> +			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu7>;
-> +		};
->  	};
->  };
-> 
+> I think so.
+> However, the iomap of this device are included in sysctrl(simple-mfd),
+> and I can't find the method to express offset from base-address of sysctrl
+> on DT, instead of map_base, in resonable way.
+>
+> I think that mfd node has register property then the lower node of mfd,
+> that is the thermal node, can't have register property.
+>
+> If the driver gets offset address from DT, I'll define new property
+> like 'socionext,reg_offset' in the thermal node. But I'm not sure that.
+
+socionext,uniphier-{pxs2,ld20}-thermal is an SoC-specific compatible string.
+The internal-offset is included
+in the HW-spec associated with the compatible.
+I believe 'socionext,reg_offset' is pointless.
+
+
+-- 
+Best Regards
+Masahiro Yamada
