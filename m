@@ -1,47 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 5 Jun 2017 10:10:23 +0100
-Subject: [PATCH v2 03/25] KVM: arm64: Make kvm_condition_valid32()
- accessible from EL2
-In-Reply-To: <20170605082321.GA8984@cbox>
-References: <20170601102117.17750-1-marc.zyngier@arm.com>
- <20170601102117.17750-4-marc.zyngier@arm.com> <20170604121129.GB9464@cbox>
- <394ef6fd-1123-0a1f-f462-ed5cb52e24da@arm.com> <20170605082321.GA8984@cbox>
-Message-ID: <2ab26ba3-26b7-4072-00ca-eefd2bdf269b@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 5 Jun 2017 10:18:21 +0100
+Subject: Vexpress TC2 no longer booting on v4.12-rc1
+In-Reply-To: <CANLsYkz3dcVArStN2GJguYfJbWc_4dC4vvTE1KVtYpVWipEYjg@mail.gmail.com>
+References: <CANLsYkz3dcVArStN2GJguYfJbWc_4dC4vvTE1KVtYpVWipEYjg@mail.gmail.com>
+Message-ID: <a8b9336e-661a-841a-ca93-45ebe1b55994@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/17 09:23, Christoffer Dall wrote:
-> On Mon, Jun 05, 2017 at 09:13:53AM +0100, Marc Zyngier wrote:
->> On 04/06/17 13:11, Christoffer Dall wrote:
->>> On Thu, Jun 01, 2017 at 11:20:55AM +0100, Marc Zyngier wrote:
->>>> As we're about to trap CP15 accesses and handle them at EL2, we
->>>> need to evaluate whether or not the condition flags are valid,
->>>> as an implementation is allowed to trap despite the condition
->>>> not being met.
->>>>
->>>> Tagging the function as __hyp_text allows this.
->>>
->>> is the cc_map also guaranteed to work (by simple reference) in EL2 then?
->>
->> Yes. By virtue of being const, this ends up in the read-only part of the
->> kernel, which we always map at EL2.
->>
+
+
+On 02/06/17 23:16, Mathieu Poirier wrote:
+> Good afternoon Russell and friends,
 > 
-> And why don't we have to do any address-translation-to-hyp tricks on the
-> address?  Are we guaranteed that it's a relative address and everything
-> is relocated with the same offset, or how was that again?
+> I noticed that my vexpress-TC2 platform stopped booting when moving to
+> kernel v4.12-rc1 (same with -rc2 and 3).  The last time things worked
+> properly was on v4.11.  I did a bisect between v4.11 and v4.12-rc1 and
+> ended up on [1], hence this email.
+> 
+> Since CONFIG_ARM_VIRT_EXT is selected by  default I removed the
+> "#ifdef CONFIG_ARM_VIRT_EXT" section in the last hunk of the patch and
+> the system sprung up to life again.
+> 
+> Compiler: arm-linux-gnueabi-gcc (Ubuntu/Linaro 5.4.0-6ubuntu1~16.04.4)
+> 5.4.0 20160609
+> Kernel command line: console=ttyAMA0,38400 loglevel=8 root=/dev/sda2 rootwait
+> U-boot:
+>  ## Flattened Device Tree blob at 82000000
+>    Booting using the fdt blob at 0x82000000
+>    Loading Ramdisk to 9fcea000, end 9feea6d1 ... OK
+>    Loading Device Tree to 9fce2000, end 9fce9ad8 ... OK
+> 
+> I'm not sure what else you need at this time - simply get back to me
+> with what I'm missing and I'll be happy to provided.  I'm also
+> offering to test patches.
+> 
 
-Arghh, I completely missed this. Yeah, it works because this is a single
-compilation unit, that the array is static, used only once, and that the
-compiler is using relative addressing and not playing any dirty tricks
-on us.
+Fixed[1] and must be queued in rmk's tree[2].
 
-We could make the whole thing private to kvm_condition_valid32, but
-that's not more of a guarantee that things won't break if the compiler
-decides to generate absolute addresses.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Regards,
+Sudeep
+
+[1] https://www.spinics.net/lists/arm-kernel/msg581877.html
+[2] http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8675
