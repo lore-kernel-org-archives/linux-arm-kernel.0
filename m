@@ -1,65 +1,74 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon,  5 Jun 2017 14:15:01 -0600
-Subject: [PATCH 00/17] coresight: next v4.12-rc4 
-Message-ID: <1496693718-9191-1-git-send-email-mathieu.poirier@linaro.org>
+Date: Mon,  5 Jun 2017 14:15:02 -0600
+Subject: [PATCH 01/17] coresight: Disable the path only when the source is
+ disabled
+In-Reply-To: <1496693718-9191-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1496693718-9191-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1496693718-9191-2-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Please consider for inclusion in the 4.13 cycle.  Of particular interest is
-patch 15/17, which adds a new driver under the CoreSight umbrella.
-Everything applies cleanly on today's char-misc-next branch (73726380a26f).
+With a coresight tracing session, the components along the path
+from the source to sink are disabled after the source is disabled.
+However, if the source was not actually disabled due to active
+users, we should not disable the components in the path.
 
-Regards,
-Mathieu
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight.c | 19 +++++++++++++------
+ 1 file changed, 13 insertions(+), 6 deletions(-)
 
-Leo Yan (10):
-  coresight: tmc: minor fix for output log
-  coresight: use const for device_node structures
-  coresight: bindings for CPU debug module
-  doc: Add documentation for Coresight CPU debug
-  doc: Add coresight_cpu_debug.enable to kernel-parameters.txt
-  MAINTAINERS: update file entries for Coresight subsystem
-  coresight: refactor with function of_coresight_get_cpu
-  coresight: add support for CPU debug module
-  arm64: dts: hi6220: register debug module
-  arm64: dts: qcom: msm8916: Add debug unit
-
-Markus Elfring (2):
-  coresight: etb10: Delete an error message for a failed memory
-    allocation in etb_probe()
-  coresight: etb10: Fix a typo in a comment line
-
-Robin Murphy (1):
-  coresight: tmc: Configure DMA mask appropriately
-
-Suzuki K Poulose (4):
-  coresight: Disable the path only when the source is disabled
-  coresight: Fix reference count for software sources
-  coresight: etm_perf: Fix using uninitialised work
-  coresight: of_get_coresight_platform_data: Add missing of_node_put
-
- Documentation/admin-guide/kernel-parameters.txt    |   7 +
- .../bindings/arm/coresight-cpu-debug.txt           |  49 ++
- Documentation/trace/coresight-cpu-debug.txt        | 175 ++++++
- MAINTAINERS                                        |   2 +
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  64 ++
- arch/arm64/boot/dts/qcom/msm8916.dtsi              |  32 +
- drivers/hwtracing/coresight/Kconfig                |  14 +
- drivers/hwtracing/coresight/Makefile               |   1 +
- drivers/hwtracing/coresight/coresight-cpu-debug.c  | 700 +++++++++++++++++++++
- drivers/hwtracing/coresight/coresight-etb10.c      |   7 +-
- drivers/hwtracing/coresight/coresight-etm-perf.c   |   3 +-
- drivers/hwtracing/coresight/coresight-tmc-etf.c    |  25 +-
- drivers/hwtracing/coresight/coresight-tmc.c        |   7 +
- drivers/hwtracing/coresight/coresight.c            |  34 +-
- drivers/hwtracing/coresight/of_coresight.c         |  47 +-
- include/linux/coresight.h                          |  10 +-
- 16 files changed, 1136 insertions(+), 41 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/coresight-cpu-debug.txt
- create mode 100644 Documentation/trace/coresight-cpu-debug.txt
- create mode 100644 drivers/hwtracing/coresight/coresight-cpu-debug.c
-
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index 0c37356e417c..532a2acfa8cc 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -253,14 +253,22 @@ static int coresight_enable_source(struct coresight_device *csdev, u32 mode)
+ 	return 0;
+ }
+ 
+-static void coresight_disable_source(struct coresight_device *csdev)
++/**
++ *  coresight_disable_source - Drop the reference count by 1 and disable
++ *  the device if there are no users left.
++ *
++ *  @csdev - The coresight device to disable
++ *
++ *  Returns true if the device has been disabled.
++ */
++static bool coresight_disable_source(struct coresight_device *csdev)
+ {
+ 	if (atomic_dec_return(csdev->refcnt) == 0) {
+-		if (source_ops(csdev)->disable) {
++		if (source_ops(csdev)->disable)
+ 			source_ops(csdev)->disable(csdev, NULL);
+-			csdev->enable = false;
+-		}
++		csdev->enable = false;
+ 	}
++	return !csdev->enable;
+ }
+ 
+ void coresight_disable_path(struct list_head *path)
+@@ -629,7 +637,7 @@ void coresight_disable(struct coresight_device *csdev)
+ 	if (ret)
+ 		goto out;
+ 
+-	if (!csdev->enable)
++	if (!csdev->enable || !coresight_disable_source(csdev))
+ 		goto out;
+ 
+ 	switch (csdev->subtype.source_subtype) {
+@@ -647,7 +655,6 @@ void coresight_disable(struct coresight_device *csdev)
+ 		break;
+ 	}
+ 
+-	coresight_disable_source(csdev);
+ 	coresight_disable_path(path);
+ 	coresight_release_path(path);
+ 
 -- 
 2.7.4
