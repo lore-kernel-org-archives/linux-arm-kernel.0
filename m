@@ -1,42 +1,63 @@
-From: hoeun.ryu@gmail.com (Hoeun Ryu)
-Date: Mon, 5 Jun 2017 19:05:40 +0900
-Subject: [PATCH] arm: LPAE: kexec: clear TTBCR.T1SZ explicitly when
- PHYS_OFFSET > PAGE_OFFSET
-In-Reply-To: <20170605093429.GE4902@n2100.armlinux.org.uk>
-References: <1496654569-4749-1-git-send-email-hoeun.ryu@gmail.com>
- <20170605093429.GE4902@n2100.armlinux.org.uk>
-Message-ID: <CABeRdtoEi+21mzz0h0s9qfYGtnAr4N4AK3PHNcNxv_4A89s=Bw@mail.gmail.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Mon, 5 Jun 2017 18:10:30 +0800
+Subject: [PATCH v1 2/4] coresight: add and remove panic callback for sink
+In-Reply-To: <ed729e35-f5aa-cd03-410b-a6ad366b4170@arm.com>
+References: <1496500976-18362-1-git-send-email-leo.yan@linaro.org>
+ <1496500976-18362-3-git-send-email-leo.yan@linaro.org>
+ <ed729e35-f5aa-cd03-410b-a6ad366b4170@arm.com>
+Message-ID: <20170605101029.GC8682@leoy-ThinkPad-T440>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 5, 2017 at 6:34 PM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Mon, Jun 05, 2017 at 06:22:20PM +0900, Hoeun Ryu wrote:
->> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
->> index 5e5720e..9ac2bec 100644
->> --- a/arch/arm/mm/proc-v7-3level.S
->> +++ b/arch/arm/mm/proc-v7-3level.S
->> @@ -140,6 +140,7 @@ ENDPROC(cpu_v7_set_pte_ext)
->>        * otherwise booting secondary CPUs would end up using TTBR1 for the
->>        * identity mapping set up in TTBR0.
->>        */
->> +     bichi   \tmp, \tmp, #(1 << 16)                          @ clear TTBCR.T1SZ
->
-> This looks insufficient.  There's two bits here:
->
->  * TTBR0/TTBR1 split (PAGE_OFFSET):
->  *   0x40000000: T0SZ = 2, T1SZ = 0 (not used)
->  *   0x80000000: T0SZ = 0, T1SZ = 1
->  *   0xc0000000: T0SZ = 0, T1SZ = 2
->
-> but you seem to only be clearing one bit.
+On Mon, Jun 05, 2017 at 10:24:41AM +0100, Suzuki K Poulose wrote:
+> On 03/06/17 15:42, Leo Yan wrote:
+> >If the sink device has panic callback function, add the panic callback
+> >node for coresight panic dump list when the sink device is enabled;
+> >also cleanup the node when the sink device is disabled.
+> >
+> >Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> >---
+> > drivers/hwtracing/coresight/coresight.c | 11 +++++++++++
+> > 1 file changed, 11 insertions(+)
+> >
+> >diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+> >index 0c37356..5928886 100644
+> >--- a/drivers/hwtracing/coresight/coresight.c
+> >+++ b/drivers/hwtracing/coresight/coresight.c
+> >@@ -138,6 +138,13 @@ static int coresight_enable_sink(struct coresight_device *csdev, u32 mode)
+> > 			if (ret)
+> > 				return ret;
+> > 		}
+> >+
+> >+		/* Add kernel panic callback */
+> >+		if (sink_ops(csdev)->panic_cb) {
+> >+			ret = coresight_add_panic_cb(csdev);
+> >+			if (ret)
+> >+				return ret;
+> >+		}
+> > 		csdev->enable = true;
+> > 	}
+> >
+> >@@ -149,6 +156,10 @@ static int coresight_enable_sink(struct coresight_device *csdev, u32 mode)
+> > static void coresight_disable_sink(struct coresight_device *csdev)
+> > {
+> > 	if (atomic_dec_return(csdev->refcnt) == 0) {
+> >+		/* Remove kernel panic callback */
+> >+		if (sink_ops(csdev)->panic_cb)
+> >+			coresight_del_panic_cb(csdev);
+> >+
+> > 		if (sink_ops(csdev)->disable) {
+> > 			sink_ops(csdev)->disable(csdev);
+> > 			csdev->enable = false;
+> >
+> 
+> Just a thought, instead of adding/deleting every time the sink is enabled,
+> could we add/del the device once for-ever and let the panic_cb decide to dump
+> it based on whether the device was active or not ?
 
-Oh, I'm sorry for the mistake, I'll fix this like #(7 << 16) in v2.
-(There're 3 bits in TxSZ)
-Thank you for the review.
+Yeah, we can check 'if (drvdata->mode == CS_MODE_DISABLED)' and
+directly bail out if the module is disabled for panic dumping. Will
+fix with this way.
 
->
-> --
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+Thanks,
+Leo Yan
