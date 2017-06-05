@@ -1,62 +1,115 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 5 Jun 2017 16:00:12 +0200
-Subject: [PATCH 10/19] drm/sun4i: hdmi: Rename internal DDC clock to
- avoid name collision
-In-Reply-To: <CAGb2v64Vgdjm1MAwn+L0PVc0CA0QOCn=0RONKoGDWLpzVBzvmQ@mail.gmail.com>
-References: <20170602101024.18940-1-wens@csie.org>
- <20170602101024.18940-11-wens@csie.org>
- <20170602193012.xwuziggyx6evmusz@flea.lan>
- <CAGb2v64Vgdjm1MAwn+L0PVc0CA0QOCn=0RONKoGDWLpzVBzvmQ@mail.gmail.com>
-Message-ID: <20170605140012.rlx7rm7xhriwqaza@flea.lan>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 5 Jun 2017 08:17:23 -0600
+Subject: [PATCH v13 8/9] arm64: dts: hi6220: register debug module
+In-Reply-To: <59351771.5080807@hisilicon.com>
+References: <1495727836-30094-1-git-send-email-leo.yan@linaro.org>
+ <1495727836-30094-9-git-send-email-leo.yan@linaro.org>
+ <59351771.5080807@hisilicon.com>
+Message-ID: <CANLsYkyGK7xwVczYEqP=bKuE1kOd7-ghCRX8L1t5BN4Am6SSiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 03, 2017 at 10:33:25PM +0800, Chen-Yu Tsai wrote:
-> On Sat, Jun 3, 2017 at 3:30 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Fri, Jun 02, 2017 at 06:10:15PM +0800, Chen-Yu Tsai wrote:
-> >> The DDC parent clock on the A31 SoC is also conveniently named
-> >> "hdmi-ddc", which results in a name collision when the hdmi driver
-> >> registers its internal DDC divider clock.
-> >>
-> >> Rename the internal clock to "hdmi-ddc-divider".
-> >>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> ---
-> >>  drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c
-> >> index e1071838f487..9a6b6243e977 100644
-> >> --- a/drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c
-> >> +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c
-> >> @@ -125,7 +125,7 @@ static int _sun4i_ddc_create(struct sun4i_hdmi *hdmi, struct clk *parent,
-> >>       if (!ddc)
-> >>               return -ENOMEM;
-> >>
-> >> -     init.name = "hdmi-ddc";
-> >> +     init.name = "hdmi-ddc-divider";
-> >
-> > Can't we rename the CCU clock instead? Having the clock called
-> > hdmi-ddc being the actual clock output on the DDC bus feels more
-> > natural.
-> 
-> Do you have any suggestions? The manual labels the conflicting one
-> in the CCU as "HDMI_DDC"...
+On 5 June 2017 at 02:33, Wei Xu <xuwei5@hisilicon.com> wrote:
+> Hi Leo,
+>
+> On 2017/5/25 16:57, Leo Yan wrote:
+>> Bind debug module driver for Hi6220.
+>>
+>> Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+>
+> Thanks!
+> Fine to me.
+> Acked-by: Wei Xu <xuwei5@hisilicon.com>
+>
+> Hi Mathieu,
+>
+> Can you help to pick up this patch as well?
+> Thanks!
 
-DDC as the main CCU clock, and hdmi-ddc as the one actually generated
-by the HDMI controller?
+Sure - I'll add this to my tree.
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170605/296353ad/attachment.sig>
+>
+> Best Regards,
+> Wei
+>
+>> ---
+>>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 64 +++++++++++++++++++++++++++++++
+>>  1 file changed, 64 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+>> index 1e5129b..21805b9 100644
+>> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+>> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+>> @@ -916,5 +916,69 @@
+>>                               };
+>>                       };
+>>               };
+>> +
+>> +             debug at f6590000 {
+>> +                     compatible = "arm,coresight-cpu-debug","arm,primecell";
+>> +                     reg = <0 0xf6590000 0 0x1000>;
+>> +                     clocks = <&sys_ctrl HI6220_DAPB_CLK>;
+>> +                     clock-names = "apb_pclk";
+>> +                     cpu = <&cpu0>;
+>> +             };
+>> +
+>> +             debug at f6592000 {
+>> +                     compatible = "arm,coresight-cpu-debug","arm,primecell";
+>> +                     reg = <0 0xf6592000 0 0x1000>;
+>> +                     clocks = <&sys_ctrl HI6220_DAPB_CLK>;
+>> +                     clock-names = "apb_pclk";
+>> +                     cpu = <&cpu1>;
+>> +             };
+>> +
+>> +             debug at f6594000 {
+>> +                     compatible = "arm,coresight-cpu-debug","arm,primecell";
+>> +                     reg = <0 0xf6594000 0 0x1000>;
+>> +                     clocks = <&sys_ctrl HI6220_DAPB_CLK>;
+>> +                     clock-names = "apb_pclk";
+>> +                     cpu = <&cpu2>;
+>> +             };
+>> +
+>> +             debug at f6596000 {
+>> +                     compatible = "arm,coresight-cpu-debug","arm,primecell";
+>> +                     reg = <0 0xf6596000 0 0x1000>;
+>> +                     clocks = <&sys_ctrl HI6220_DAPB_CLK>;
+>> +                     clock-names = "apb_pclk";
+>> +                     cpu = <&cpu3>;
+>> +             };
+>> +
+>> +             debug at f65d0000 {
+>> +                     compatible = "arm,coresight-cpu-debug","arm,primecell";
+>> +                     reg = <0 0xf65d0000 0 0x1000>;
+>> +                     clocks = <&sys_ctrl HI6220_DAPB_CLK>;
+>> +                     clock-names = "apb_pclk";
+>> +                     cpu = <&cpu4>;
+>> +             };
+>> +
+>> +             debug at f65d2000 {
+>> +                     compatible = "arm,coresight-cpu-debug","arm,primecell";
+>> +                     reg = <0 0xf65d2000 0 0x1000>;
+>> +                     clocks = <&sys_ctrl HI6220_DAPB_CLK>;
+>> +                     clock-names = "apb_pclk";
+>> +                     cpu = <&cpu5>;
+>> +             };
+>> +
+>> +             debug at f65d4000 {
+>> +                     compatible = "arm,coresight-cpu-debug","arm,primecell";
+>> +                     reg = <0 0xf65d4000 0 0x1000>;
+>> +                     clocks = <&sys_ctrl HI6220_DAPB_CLK>;
+>> +                     clock-names = "apb_pclk";
+>> +                     cpu = <&cpu6>;
+>> +             };
+>> +
+>> +             debug at f65d6000 {
+>> +                     compatible = "arm,coresight-cpu-debug","arm,primecell";
+>> +                     reg = <0 0xf65d6000 0 0x1000>;
+>> +                     clocks = <&sys_ctrl HI6220_DAPB_CLK>;
+>> +                     clock-names = "apb_pclk";
+>> +                     cpu = <&cpu7>;
+>> +             };
+>>       };
+>>  };
+>>
+>
