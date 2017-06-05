@@ -1,74 +1,49 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 5 Jun 2017 09:59:07 +0100
-Subject: exynos drm build failure due to cec_* symbols
-In-Reply-To: <5934B4FE.6060606@samsung.com>
-References: <CGME20170602135819epcas1p2302294dec8c40b69a19e0b220806eacb@epcas1p2.samsung.com>
- <2d6226cf-4023-2a97-0791-42d3e8dcbdd3@suse.de>
- <5934B4FE.6060606@samsung.com>
-Message-ID: <20170605085907.GD4902@n2100.armlinux.org.uk>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Mon, 5 Jun 2017 17:03:55 +0800
+Subject: [PATCH v3 1/6] dt-bindings: mfd: hi6421: Add hi6421v530
+ compatible string
+In-Reply-To: <20170605081451.d7pd6r7aeza54pgv@dell>
+References: <20170602105156.11351-1-guodong.xu@linaro.org>
+ <20170602105156.11351-2-guodong.xu@linaro.org>
+ <20170605081451.d7pd6r7aeza54pgv@dell>
+Message-ID: <CAFGCpxywcinia_eD4wFGrswt6vPoVYAbiTwpUj9mWv0XbmCZNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 05, 2017 at 10:33:50AM +0900, Inki Dae wrote:
-> 2017? 06? 02? 22:58? Andreas F?rber ?(?) ? ?:
-> > Hello,
-> > 
-> > We're observing the following build failure with v4.12-rc3, latest
-> > linux.git and linux-next.git:
-> > 
-> > [ 9825s]   LD      vmlinux.o
-> > [ 9904s]   MODPOST vmlinux.o
-> > [ 9915s] drivers/built-in.o: In function `hdmi_get_modes':
-> > [ 9915s]
-> > /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:866:
-> > undefined reference to `cec_notifier_set_phys_addr_from_edid'
-> > [ 9915s] drivers/built-in.o: In function `hdmi_remove':
-> > [ 9915s]
-> > /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1923:
-> > undefined reference to `cec_notifier_set_phys_addr'
-> > [ 9915s]
-> > /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1927:
-> > undefined reference to `cec_notifier_put'
-> > [ 9915s] drivers/built-in.o: In function `hdmi_probe':
-> > [ 9915s]
-> > /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1889:
-> > undefined reference to `cec_notifier_get'
-> > [ 9915s]
-> > /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1904:
-> > undefined reference to `cec_notifier_put'
-> > [ 9915s] drivers/built-in.o: In function `hdmi_disable':
-> > [ 9915s]
-> > /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1509:
-> > undefined reference to `cec_notifier_set_phys_addr'
-> > [ 9915s] drivers/built-in.o: In function `hdmi_detect':
-> > [ 9915s]
-> > /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:827:
-> > undefined reference to `cec_notifier_set_phys_addr'
-> > [ 9931s] make[2]: ***
-> > [/home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/Makefile:997:
-> > vmlinux] Error 1
-> > [ 9931s] make[1]: *** [Makefile:152: sub-make] Error 2
-> > [ 9931s] make: *** [Makefile:24: __sub-make] Error 2
-> > 
-> > My guess is the symbols used by the exynos drm module are not exported:
-> > 
-> > cec_notifier_set_phys_addr_from_edid
-> > cec_notifier_set_phys_addr
-> > cec_notifier_put
-> > cec_notifier_get
-> > 
-> > Can you please look into fixing this?
-> 
-> Thanks for reporting.
-> 
-> Will check and fix it.
+On Mon, Jun 5, 2017 at 4:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Fri, 02 Jun 2017, Guodong Xu wrote:
+>
+>> Add compatible string for HiSilicon Hi6421v530 PMIC.
+>>
+>> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+>> ---
+>>  Documentation/devicetree/bindings/mfd/hi6421.txt | 4 +++-
+>>  1 file changed, 3 insertions(+), 1 deletion(-)
+>
+> For my own reference:
+>   Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+>
 
-Please look at Hans' update to the way CEC's dependencies are handled.
-https://git.linuxtv.org/hverkuil/media_tree.git/log/?h=drm-cec
+Thanks Lee.
 
-These are apparently scheduled for -rc, but Mauro is busy.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>> diff --git a/Documentation/devicetree/bindings/mfd/hi6421.txt b/Documentation/devicetree/bindings/mfd/hi6421.txt
+>> index 0d5a446..22da96d 100644
+>> --- a/Documentation/devicetree/bindings/mfd/hi6421.txt
+>> +++ b/Documentation/devicetree/bindings/mfd/hi6421.txt
+>> @@ -1,7 +1,9 @@
+>>  * HI6421 Multi-Functional Device (MFD), by HiSilicon Ltd.
+>>
+>>  Required parent device properties:
+>> -- compatible : contains "hisilicon,hi6421-pmic";
+>> +- compatible    : One of the following chip-specific strings:
+>> +     "hisilicon,hi6421-pmic";
+>> +     "hisilicon,hi6421v530-pmic";
+>>  - reg                : register range space of hi6421;
+>>
+>>  Supported Hi6421 sub-devices include:
+>
+> --
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
