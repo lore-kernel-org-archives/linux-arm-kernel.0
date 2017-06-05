@@ -1,39 +1,187 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 5 Jun 2017 15:02:50 +0800
-Subject: [PATCH 1/2] ARM: sunxi: h3-h5: Convert R_CCU raw numbers to macros
-In-Reply-To: <20170605043224.20687-2-wens@csie.org>
-Message-ID: <201706051420.fEN02Zi4%fengguang.wu@intel.com>
+From: bo.zhang@nxp.com (Zhang Bo)
+Date: Mon,  5 Jun 2017 15:36:31 +0800
+Subject: [[PATCH]] drivers: leds/trigger: system cannot enter suspend
+Message-ID: <1496648191-134355-1-git-send-email-bo.zhang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
+System cannot enter suspend mode because of heartbeat led trigger.
+Heartbeat_pm_notifier is called when system prepare to enter suspend
+mode, then call led_trigger_unregister to change the trigger of led device
+to none. It will send uevent message and the wakeup source count changed.
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.12-rc4 next-20170602]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Add suspend/resume ops to the struct led_trigger, implement these two ops
+for ledtrig-heartbeat. Add led_trigger_suspend/led_trigger_resume funcitons
+to iterate through all LED class devices registered on given trigger and
+call their suspend/resume ops and disable/enable sysfs at the same time.
 
-url:    https://github.com/0day-ci/linux/commits/Chen-Yu-Tsai/ARM-arm64-sunxi-convert-CCU-raw-numbers-to-macros/20170605-124326
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: arm-hisi_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Call led_trigger_suspend{resuem} API in pm_notifier function to
+suspend/resume all led devices listed in given trigger.
 
-All errors (new ones prefixed by >>):
-
->> Error: arch/arm/boot/dts/sunxi-h3-h5.dtsi:580.21-22 syntax error
-   FATAL ERROR: Unable to parse input tree
-
+Signed-off-by: Zhang Bo <bo.zhang@nxp.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 18421 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170605/435ade8c/attachment-0001.gz>
+ drivers/leds/led-triggers.c              | 34 +++++++++++++++++++++++++++++++
+ drivers/leds/trigger/ledtrig-heartbeat.c | 35 ++++++++++++++++++++++++++------
+ include/linux/leds.h                     |  6 ++++++
+ 3 files changed, 69 insertions(+), 6 deletions(-)
+ mode change 100644 => 100755 drivers/leds/led-triggers.c
+ mode change 100644 => 100755 drivers/leds/trigger/ledtrig-heartbeat.c
+ mode change 100644 => 100755 include/linux/leds.h
+
+diff --git a/drivers/leds/led-triggers.c b/drivers/leds/led-triggers.c
+old mode 100644
+new mode 100755
+index 431123b..1cb1674
+--- a/drivers/leds/led-triggers.c
++++ b/drivers/leds/led-triggers.c
+@@ -333,6 +333,40 @@ void led_trigger_blink_oneshot(struct led_trigger *trig,
+ }
+ EXPORT_SYMBOL_GPL(led_trigger_blink_oneshot);
+ 
++void led_trigger_suspend(struct led_trigger *trig)
++{
++	struct led_classdev *led_cdev;
++
++	if (!trig)
++		return;
++
++	read_lock(&trig->leddev_list_lock);
++	list_for_each_entry(led_cdev, &trig->led_cdevs, trig_list) {
++		if (led_cdev->trigger->suspend)
++			led_cdev->trigger->suspend(led_cdev);
++		led_sysfs_disable(led_cdev);
++	}
++	read_unlock(&trig->leddev_list_lock);
++}
++EXPORT_SYMBOL_GPL(led_trigger_suspend);
++
++void led_trigger_resume(struct led_trigger *trig)
++{
++	struct led_classdev *led_cdev;
++
++	if (!trig)
++		return;
++
++	read_lock(&trig->leddev_list_lock);
++	list_for_each_entry(led_cdev, &trig->led_cdevs, trig_list) {
++		if (led_cdev->trigger->resume)
++			led_cdev->trigger->resume(led_cdev);
++		led_sysfs_enable(led_cdev);
++	}
++	read_unlock(&trig->leddev_list_lock);
++}
++EXPORT_SYMBOL_GPL(led_trigger_resume);
++
+ void led_trigger_register_simple(const char *name, struct led_trigger **tp)
+ {
+ 	struct led_trigger *trig;
+diff --git a/drivers/leds/trigger/ledtrig-heartbeat.c b/drivers/leds/trigger/ledtrig-heartbeat.c
+old mode 100644
+new mode 100755
+index afa3b40..8f779dd
+--- a/drivers/leds/trigger/ledtrig-heartbeat.c
++++ b/drivers/leds/trigger/ledtrig-heartbeat.c
+@@ -142,6 +142,7 @@ static void heartbeat_trig_activate(struct led_classdev *led_cdev)
+ 	led_heartbeat_function(heartbeat_data->timer.data);
+ 	set_bit(LED_BLINK_SW, &led_cdev->work_flags);
+ 	led_cdev->activated = true;
++	led_cdev->suspended = false;
+ }
+ 
+ static void heartbeat_trig_deactivate(struct led_classdev *led_cdev)
+@@ -154,6 +155,30 @@ static void heartbeat_trig_deactivate(struct led_classdev *led_cdev)
+ 		kfree(heartbeat_data);
+ 		clear_bit(LED_BLINK_SW, &led_cdev->work_flags);
+ 		led_cdev->activated = false;
++		led_cdev->suspended = false;
++	}
++}
++
++static void heartbeat_trig_resume(struct led_classdev *led_cdev)
++{
++	struct heartbeat_trig_data *heartbeat_data = led_cdev->trigger_data;
++
++	if (led_cdev->suspended) {
++		setup_timer(&heartbeat_data->timer,
++			    led_heartbeat_function, (unsigned long) led_cdev);
++		heartbeat_data->phase = 0;
++		led_heartbeat_function(heartbeat_data->timer.data);
++		led_cdev->suspended = false;
++	}
++}
++
++static void heartbeat_trig_suspend(struct led_classdev *led_cdev)
++{
++	struct heartbeat_trig_data *heartbeat_data = led_cdev->trigger_data;
++
++	if (led_cdev->activated && !led_cdev->suspended) {
++		del_timer_sync(&heartbeat_data->timer);
++		led_cdev->suspended = true;
+ 	}
+ }
+ 
+@@ -161,25 +186,23 @@ static void heartbeat_trig_deactivate(struct led_classdev *led_cdev)
+ 	.name     = "heartbeat",
+ 	.activate = heartbeat_trig_activate,
+ 	.deactivate = heartbeat_trig_deactivate,
++	.suspend = heartbeat_trig_suspend,
++	.resume = heartbeat_trig_resume,
+ };
+ 
+ static int heartbeat_pm_notifier(struct notifier_block *nb,
+ 				 unsigned long pm_event, void *unused)
+ {
+-	int rc;
+-
+ 	switch (pm_event) {
+ 	case PM_SUSPEND_PREPARE:
+ 	case PM_HIBERNATION_PREPARE:
+ 	case PM_RESTORE_PREPARE:
+-		led_trigger_unregister(&heartbeat_led_trigger);
++		led_trigger_suspend(&heartbeat_led_trigger);
+ 		break;
+ 	case PM_POST_SUSPEND:
+ 	case PM_POST_HIBERNATION:
+ 	case PM_POST_RESTORE:
+-		rc = led_trigger_register(&heartbeat_led_trigger);
+-		if (rc)
+-			pr_err("could not re-register heartbeat trigger\n");
++		led_trigger_resume(&heartbeat_led_trigger);
+ 		break;
+ 	default:
+ 		break;
+diff --git a/include/linux/leds.h b/include/linux/leds.h
+old mode 100644
+new mode 100755
+index 64c56d4..b792950
+--- a/include/linux/leds.h
++++ b/include/linux/leds.h
+@@ -111,6 +111,7 @@ struct led_classdev {
+ 	void			*trigger_data;
+ 	/* true if activated - deactivate routine uses it to do cleanup */
+ 	bool			activated;
++	bool			suspended;
+ #endif
+ 
+ #ifdef CONFIG_LEDS_BRIGHTNESS_HW_CHANGED
+@@ -254,6 +255,8 @@ struct led_trigger {
+ 	const char	 *name;
+ 	void		(*activate)(struct led_classdev *led_cdev);
+ 	void		(*deactivate)(struct led_classdev *led_cdev);
++	void		(*suspend)(struct led_classdev *led_cdev);
++	void		(*resume)(struct led_classdev *led_cdev);
+ 
+ 	/* LEDs under control by this trigger (for simple triggers) */
+ 	rwlock_t	  leddev_list_lock;
+@@ -291,6 +294,9 @@ extern void led_trigger_set(struct led_classdev *led_cdev,
+ 			struct led_trigger *trigger);
+ extern void led_trigger_remove(struct led_classdev *led_cdev);
+ 
++extern void led_trigger_suspend(struct led_trigger *trig);
++extern void led_trigger_resume(struct led_trigger *trig);
++
+ static inline void *led_get_trigger_data(struct led_classdev *led_cdev)
+ {
+ 	return led_cdev->trigger_data;
+-- 
+1.9.1
