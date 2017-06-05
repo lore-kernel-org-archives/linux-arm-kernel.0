@@ -1,60 +1,226 @@
-From: frank.wang@rock-chips.com (Frank Wang)
-Date: Mon, 5 Jun 2017 11:51:00 +0800
-Subject: [PATCH] nvmem: rockchip-efuse: add support for rk322x-efuse
-In-Reply-To: <1494557060-105230-1-git-send-email-finley.xiao@rock-chips.com>
-References: <1494557060-105230-1-git-send-email-finley.xiao@rock-chips.com>
-Message-ID: <ea1652a0-d249-6e33-a3ba-828a1ebdb860@rock-chips.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon,  5 Jun 2017 12:57:59 +0900
+Subject: [PATCH 2/2] arm64: dts: uniphier: use SPDX-License-Identifier
+In-Reply-To: <1496635079-22037-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1496635079-22037-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1496635079-22037-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Finley,
+Follow the recent trend for the license description, and fix the wrongly
+stated X11 to MIT.
 
-On 2017/5/12 10:44, Finley Xiao wrote:
-> This adds the necessary data for handling eFuse on the rk322x.
->
-> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
-> ---
->   Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt | 1 +
->   drivers/nvmem/rockchip-efuse.c                             | 4 ++++
->   2 files changed, 5 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt b/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
-> index 94aeeea..194926f 100644
-> --- a/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
-> +++ b/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
-> @@ -4,6 +4,7 @@ Required properties:
->   - compatible: Should be one of the following.
->     - "rockchip,rk3066a-efuse" - for RK3066a SoCs.
->     - "rockchip,rk3188-efuse" - for RK3188 SoCs.
-> +  - "rockchip,rk322x-efuse" - for RK322x SoCs.
+The X11 license text [1] is explicitly for the X Consortium and has a
+couple of extra clauses.  The MIT license text [2] is actually what the
+current DT files claim.
 
-As the comments from Heiko in other patches, compatibles should not 
-contain wildcards, so could you please make this
-     "rockchip,rk3228-efuse"
-instead?
+[1] https://spdx.org/licenses/X11.html
+[2] https://spdx.org/licenses/MIT.html
 
->     - "rockchip,rk3288-efuse" - for RK3288 SoCs.
->     - "rockchip,rk3399-efuse" - for RK3399 SoCs.
->   - reg: Should contain the registers location and exact eFuse size
-> diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
-> index 423907b..a0d4ede 100644
-> --- a/drivers/nvmem/rockchip-efuse.c
-> +++ b/drivers/nvmem/rockchip-efuse.c
-> @@ -170,6 +170,10 @@ static const struct of_device_id rockchip_efuse_match[] = {
->   		.data = (void *)&rockchip_rk3288_efuse_read,
->   	},
->   	{
-> +		.compatible = "rockchip,rk322x-efuse",
-> +		.data = (void *)&rockchip_rk3288_efuse_read,
-> +	},
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-The same as above.
+ .../arm64/boot/dts/socionext/uniphier-ld11-ref.dts | 38 +---------------------
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi   | 38 +---------------------
+ .../arm64/boot/dts/socionext/uniphier-ld20-ref.dts | 38 +---------------------
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi   | 38 +---------------------
+ 4 files changed, 4 insertions(+), 148 deletions(-)
 
-
-BR.
-Frank
-
-> +	{
->   		.compatible = "rockchip,rk3288-efuse",
->   		.data = (void *)&rockchip_rk3288_efuse_read,
->   	},
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts b/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts
+index 0173e93ab141..cc8ebe34c27c 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts
+@@ -4,43 +4,7 @@
+  * Copyright (C) 2016 Socionext Inc.
+  *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
+  *
+- * This file is dual-licensed: you can use it either under the terms
+- * of the GPL or the X11 license, at your option. Note that this dual
+- * licensing only applies to this file, and not this project as a
+- * whole.
+- *
+- *  a) This file is free software; you can redistribute it and/or
+- *     modify it under the terms of the GNU General Public License as
+- *     published by the Free Software Foundation; either version 2 of the
+- *     License, or (at your option) any later version.
+- *
+- *     This file is distributed in the hope that it will be useful,
+- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *     GNU General Public License for more details.
+- *
+- * Or, alternatively,
+- *
+- *  b) Permission is hereby granted, free of charge, to any person
+- *     obtaining a copy of this software and associated documentation
+- *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use,
+- *     copy, modify, merge, publish, distribute, sublicense, and/or
+- *     sell copies of the Software, and to permit persons to whom the
+- *     Software is furnished to do so, subject to the following
+- *     conditions:
+- *
+- *     The above copyright notice and this permission notice shall be
+- *     included in all copies or substantial portions of the Software.
+- *
+- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+- *     OTHER DEALINGS IN THE SOFTWARE.
++ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+  */
+ 
+ /dts-v1/;
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+index 25a525c7a472..4c01b6cbc206 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+@@ -4,43 +4,7 @@
+  * Copyright (C) 2016 Socionext Inc.
+  *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
+  *
+- * This file is dual-licensed: you can use it either under the terms
+- * of the GPL or the X11 license, at your option. Note that this dual
+- * licensing only applies to this file, and not this project as a
+- * whole.
+- *
+- *  a) This file is free software; you can redistribute it and/or
+- *     modify it under the terms of the GNU General Public License as
+- *     published by the Free Software Foundation; either version 2 of the
+- *     License, or (at your option) any later version.
+- *
+- *     This file is distributed in the hope that it will be useful,
+- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *     GNU General Public License for more details.
+- *
+- * Or, alternatively,
+- *
+- *  b) Permission is hereby granted, free of charge, to any person
+- *     obtaining a copy of this software and associated documentation
+- *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use,
+- *     copy, modify, merge, publish, distribute, sublicense, and/or
+- *     sell copies of the Software, and to permit persons to whom the
+- *     Software is furnished to do so, subject to the following
+- *     conditions:
+- *
+- *     The above copyright notice and this permission notice shall be
+- *     included in all copies or substantial portions of the Software.
+- *
+- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+- *     OTHER DEALINGS IN THE SOFTWARE.
++ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+  */
+ 
+ /memreserve/ 0x80000000 0x00080000;
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts b/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
+index fca4c479b469..494166aee24c 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
+@@ -4,43 +4,7 @@
+  * Copyright (C) 2015-2016 Socionext Inc.
+  *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
+  *
+- * This file is dual-licensed: you can use it either under the terms
+- * of the GPL or the X11 license, at your option. Note that this dual
+- * licensing only applies to this file, and not this project as a
+- * whole.
+- *
+- *  a) This file is free software; you can redistribute it and/or
+- *     modify it under the terms of the GNU General Public License as
+- *     published by the Free Software Foundation; either version 2 of the
+- *     License, or (at your option) any later version.
+- *
+- *     This file is distributed in the hope that it will be useful,
+- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *     GNU General Public License for more details.
+- *
+- * Or, alternatively,
+- *
+- *  b) Permission is hereby granted, free of charge, to any person
+- *     obtaining a copy of this software and associated documentation
+- *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use,
+- *     copy, modify, merge, publish, distribute, sublicense, and/or
+- *     sell copies of the Software, and to permit persons to whom the
+- *     Software is furnished to do so, subject to the following
+- *     conditions:
+- *
+- *     The above copyright notice and this permission notice shall be
+- *     included in all copies or substantial portions of the Software.
+- *
+- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+- *     OTHER DEALINGS IN THE SOFTWARE.
++ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+  */
+ 
+ /dts-v1/;
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+index c85e6e246533..99a0d9815c02 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+@@ -4,43 +4,7 @@
+  * Copyright (C) 2015-2016 Socionext Inc.
+  *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
+  *
+- * This file is dual-licensed: you can use it either under the terms
+- * of the GPL or the X11 license, at your option. Note that this dual
+- * licensing only applies to this file, and not this project as a
+- * whole.
+- *
+- *  a) This file is free software; you can redistribute it and/or
+- *     modify it under the terms of the GNU General Public License as
+- *     published by the Free Software Foundation; either version 2 of the
+- *     License, or (at your option) any later version.
+- *
+- *     This file is distributed in the hope that it will be useful,
+- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *     GNU General Public License for more details.
+- *
+- * Or, alternatively,
+- *
+- *  b) Permission is hereby granted, free of charge, to any person
+- *     obtaining a copy of this software and associated documentation
+- *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use,
+- *     copy, modify, merge, publish, distribute, sublicense, and/or
+- *     sell copies of the Software, and to permit persons to whom the
+- *     Software is furnished to do so, subject to the following
+- *     conditions:
+- *
+- *     The above copyright notice and this permission notice shall be
+- *     included in all copies or substantial portions of the Software.
+- *
+- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+- *     OTHER DEALINGS IN THE SOFTWARE.
++ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+  */
+ 
+ /memreserve/ 0x80000000 0x00080000;
+-- 
+2.7.4
