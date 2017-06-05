@@ -1,82 +1,120 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 5 Jun 2017 17:11:37 +0100
-Subject: [PATCH v4 4/5] drivers/perf: Add support for ARMv8.2 Statistical
- Profiling Extension
-In-Reply-To: <20170605105516.b09400781b2bde1621a44205@arm.com>
-References: <1496676177-29356-1-git-send-email-will.deacon@arm.com>
- <1496676177-29356-5-git-send-email-will.deacon@arm.com>
- <20170605105516.b09400781b2bde1621a44205@arm.com>
-Message-ID: <20170605161137.GM21944@arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon,  5 Jun 2017 13:22:20 -0300
+Subject: [PATCH] ARM: dts: imx6: Fix PCI GPIO reset polarity
+Message-ID: <1496679740-1426-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 05, 2017 at 10:55:16AM -0500, Kim Phillips wrote:
-> On Mon, 5 Jun 2017 16:22:56 +0100
-> Will Deacon <will.deacon@arm.com> wrote:
-> 
-> > +/* Perf callbacks */
-> > +static int arm_spe_pmu_event_init(struct perf_event *event)
-> > +{
-> > +	u64 reg;
-> > +	struct perf_event_attr *attr = &event->attr;
-> > +	struct arm_spe_pmu *spe_pmu = to_spe_pmu(event->pmu);
-> > +
-> > +	/* This is, of course, deeply driver-specific */
-> > +	if (attr->type != event->pmu->type)
-> > +		return -ENOENT;
-> > +
-> > +	if (event->cpu >= 0 &&
-> > +	    !cpumask_test_cpu(event->cpu, &spe_pmu->supported_cpus))
-> > +		return -ENOENT;
-> > +
-> > +	if (arm_spe_event_to_pmsevfr(event) & PMSEVFR_EL1_RES0)
-> > +		return -EOPNOTSUPP;
-> > +
-> > +	if (event->hw.sample_period < spe_pmu->min_period ||
-> > +	    event->hw.sample_period & PMSIRR_EL1_IVAL_MASK)
-> > +		return -EOPNOTSUPP;
-> > +
-> > +	if (attr->exclude_idle)
-> > +		return -EOPNOTSUPP;
-> > +
-> > +	/*
-> > +	 * Feedback-directed frequency throttling doesn't work when we
-> > +	 * have a buffer of samples. We'd need to manually count the
-> > +	 * samples in the buffer when it fills up and adjust the event
-> > +	 * count to reflect that. Instead, force the user to specify a
-> > +	 * sample period instead.
-> > +	 */
-> > +	if (attr->freq)
-> > +		return -EINVAL;
-> > +
-> > +	reg = arm_spe_event_to_pmsfcr(event);
-> > +	if ((reg & BIT(PMSFCR_EL1_FE_SHIFT)) &&
-> > +	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_EVT))
-> > +		return -EOPNOTSUPP;
-> > +
-> > +	if ((reg & BIT(PMSFCR_EL1_FT_SHIFT)) &&
-> > +	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_TYP))
-> > +		return -EOPNOTSUPP;
-> > +
-> > +	if ((reg & BIT(PMSFCR_EL1_FL_SHIFT)) &&
-> > +	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_LAT))
-> > +		return -EOPNOTSUPP;
-> > +
-> > +	return 0;
-> > +}
-> 
-> AFAICT, my comments from the last submission have still not been fully
-> addressed:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/508027.html
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-To be frank, I really don't plan to address them and, even if I did, I would
-trust Mark to NAK the change. If you're desperate for pr_debug, I'll add it
-to keep you happy, but anything more than that needs to come in the form of
-a separate patch submission addressing the wider problem of error reporting
-from PMU drivers back to userspace. Patches welcome, but I suspect you're
-still busy working on the tools code.
+The imx6 PCI driver ignores the GPIO polarity from 'reset-gpio' and
+considers that the PCI reset is active low, unless the
+property 'reset-gpio-active-high' is present.
 
-Do you have any constructive comments on the patch?
+Fix the device tree description by explicitly passing the 
+'GPIO_ACTIVE_LOW' flag to the 'reset-gpio' property.
 
-Will
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/imx6q-ba16.dtsi            | 2 +-
+ arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts      | 2 +-
+ arch/arm/boot/dts/imx6q-novena.dts           | 2 +-
+ arch/arm/boot/dts/imx6qdl-apf6dev.dtsi       | 2 +-
+ arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi | 2 +-
+ arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi | 2 +-
+ arch/arm/boot/dts/imx6sx-nitrogen6sx.dts     | 2 +-
+ 7 files changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6q-ba16.dtsi b/arch/arm/boot/dts/imx6q-ba16.dtsi
+index 14fa6b2..5fcb037 100644
+--- a/arch/arm/boot/dts/imx6q-ba16.dtsi
++++ b/arch/arm/boot/dts/imx6q-ba16.dtsi
+@@ -321,7 +321,7 @@
+ &pcie {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pcie>;
+-	reset-gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
++	reset-gpio = <&gpio7 12 GPIO_ACTIVE_LOW>;
+ 	fsl,tx-swing-full = <103>;
+ 	fsl,tx-swing-low = <103>;
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts b/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts
+index 0c5b2c3..33eb7f1 100644
+--- a/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts
++++ b/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts
+@@ -435,7 +435,7 @@
+ &pcie {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pcie>;
+-	reset-gpio = <&gpio4 8 0>;
++	reset-gpio = <&gpio4 8 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6q-novena.dts b/arch/arm/boot/dts/imx6q-novena.dts
+index c21db67..d83cfb6 100644
+--- a/arch/arm/boot/dts/imx6q-novena.dts
++++ b/arch/arm/boot/dts/imx6q-novena.dts
+@@ -446,7 +446,7 @@
+ &pcie {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pcie_novena>;
+-	reset-gpio = <&gpio3 29 GPIO_ACTIVE_HIGH>;
++	reset-gpio = <&gpio3 29 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-apf6dev.dtsi b/arch/arm/boot/dts/imx6qdl-apf6dev.dtsi
+index 550e100..9cd2a74 100644
+--- a/arch/arm/boot/dts/imx6qdl-apf6dev.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-apf6dev.dtsi
+@@ -232,7 +232,7 @@
+ &pcie {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pcie>;
+-	reset-gpio = <&gpio6 2 GPIO_ACTIVE_HIGH>;
++	reset-gpio = <&gpio6 2 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi b/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi
+index ed6a89f..1b18728 100644
+--- a/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi
+@@ -335,7 +335,7 @@
+ };
+ 
+ &pcie {
+-	reset-gpio = <&gpio2 16 GPIO_ACTIVE_HIGH>;
++	reset-gpio = <&gpio2 16 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+index 6e5cb6a..d81b007 100644
+--- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+@@ -374,7 +374,7 @@
+ &pcie {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pcie>;
+-	reset-gpio = <&gpio4 17 0>;
++	reset-gpio = <&gpio4 17 GPIO_ACTIVE_LOW>;
+ 	status = "disabled";
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6sx-nitrogen6sx.dts b/arch/arm/boot/dts/imx6sx-nitrogen6sx.dts
+index ac1989e..c5578d1 100644
+--- a/arch/arm/boot/dts/imx6sx-nitrogen6sx.dts
++++ b/arch/arm/boot/dts/imx6sx-nitrogen6sx.dts
+@@ -296,7 +296,7 @@
+ &pcie {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pcie>;
+-	reset-gpio = <&gpio4 10 GPIO_ACTIVE_HIGH>;
++	reset-gpio = <&gpio4 10 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+ 
+-- 
+2.7.4
