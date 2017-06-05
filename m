@@ -1,65 +1,207 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Mon,  5 Jun 2017 21:21:30 +0200
-Subject: [PATCH 5/5] ARM: sun8i: a83t: add dwmac-sun8i ethernet driver
-In-Reply-To: <20170605192130.25320-1-clabbe.montjoie@gmail.com>
-References: <20170605192130.25320-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170605192130.25320-6-clabbe.montjoie@gmail.com>
+From: jacek.anaszewski@gmail.com (Jacek Anaszewski)
+Date: Mon, 5 Jun 2017 21:27:18 +0200
+Subject: [[PATCH]] drivers: leds/trigger: system cannot enter suspend
+In-Reply-To: <1496648191-134355-1-git-send-email-bo.zhang@nxp.com>
+References: <1496648191-134355-1-git-send-email-bo.zhang@nxp.com>
+Message-ID: <9d1f4e47-0713-043a-4359-db8f856e0b0e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dwmac-sun8i is an ethernet MAC hardware that support 10/100/1000 speed.
-This patch enable the dwmac-sun8i on the Allwinner a83t SoC Device-tree.
+Hi Zhang,
 
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
----
- arch/arm/boot/dts/sun8i-a83t.dtsi | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+Thanks for the patch. It seems to be almost ready to merge.
+Just two issues below.
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index ae559dc42caa..304a966c8048 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -200,6 +200,14 @@
- 			#interrupt-cells = <3>;
- 			#gpio-cells = <3>;
- 
-+			emac_rgmii_pins: emac0-pins {
-+				pins = "PD2", "PD3", "PD4", "PD5", "PD6", "PD7",
-+				       "PD11", "PD12", "PD13", "PD14", "PD18",
-+				       "PD19", "PD21", "PD22", "PD23";
-+				function = "gmac";
-+				drive-strength = <40>;
-+			};
-+
- 			mmc0_pins: mmc0-pins {
- 				pins = "PF0", "PF1", "PF2",
- 				       "PF3", "PF4", "PF5";
-@@ -266,6 +274,26 @@
- 			status = "disabled";
- 		};
- 
-+		emac: ethernet at 1c30000 {
-+			compatible = "allwinner,sun8i-a83t-emac";
-+			syscon = <&syscon>;
-+			reg = <0x01c30000 0x104>;
-+			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "macirq";
-+			resets = <&ccu 13>;
-+			reset-names = "stmmaceth";
-+			clocks = <&ccu 27>;
-+			clock-names = "stmmaceth";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+
-+			mdio: mdio {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+		};
-+
- 		gic: interrupt-controller at 1c81000 {
- 			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
- 			reg = <0x01c81000 0x1000>,
+Please also always cc linux-leds at vger.kernel.org when modifying
+LED subsystem.
+
+On 06/05/2017 09:36 AM, Zhang Bo wrote:
+> System cannot enter suspend mode because of heartbeat led trigger.
+> Heartbeat_pm_notifier is called when system prepare to enter suspend
+> mode, then call led_trigger_unregister to change the trigger of led device
+> to none. It will send uevent message and the wakeup source count changed.
+> 
+> Add suspend/resume ops to the struct led_trigger, implement these two ops
+> for ledtrig-heartbeat. Add led_trigger_suspend/led_trigger_resume funcitons
+> to iterate through all LED class devices registered on given trigger and
+> call their suspend/resume ops and disable/enable sysfs at the same time.
+> 
+> Call led_trigger_suspend{resuem} API in pm_notifier function to
+> suspend/resume all led devices listed in given trigger.
+> 
+> Signed-off-by: Zhang Bo <bo.zhang@nxp.com>
+> ---
+>  drivers/leds/led-triggers.c              | 34 +++++++++++++++++++++++++++++++
+>  drivers/leds/trigger/ledtrig-heartbeat.c | 35 ++++++++++++++++++++++++++------
+>  include/linux/leds.h                     |  6 ++++++
+>  3 files changed, 69 insertions(+), 6 deletions(-)
+>  mode change 100644 => 100755 drivers/leds/led-triggers.c
+>  mode change 100644 => 100755 drivers/leds/trigger/ledtrig-heartbeat.c
+>  mode change 100644 => 100755 include/linux/leds.h
+
+You accidentally changed file permissions.
+
+> diff --git a/drivers/leds/led-triggers.c b/drivers/leds/led-triggers.c
+> old mode 100644
+> new mode 100755
+> index 431123b..1cb1674
+> --- a/drivers/leds/led-triggers.c
+> +++ b/drivers/leds/led-triggers.c
+> @@ -333,6 +333,40 @@ void led_trigger_blink_oneshot(struct led_trigger *trig,
+>  }
+>  EXPORT_SYMBOL_GPL(led_trigger_blink_oneshot);
+>  
+> +void led_trigger_suspend(struct led_trigger *trig)
+> +{
+> +	struct led_classdev *led_cdev;
+> +
+> +	if (!trig)
+> +		return;
+> +
+> +	read_lock(&trig->leddev_list_lock);
+> +	list_for_each_entry(led_cdev, &trig->led_cdevs, trig_list) {
+> +		if (led_cdev->trigger->suspend)
+> +			led_cdev->trigger->suspend(led_cdev);
+> +		led_sysfs_disable(led_cdev);
+
+Could you share what kind of problem this call to led_syfs_disable()
+solves? Did you come across one?
+
+> +	}
+> +	read_unlock(&trig->leddev_list_lock);
+> +}
+> +EXPORT_SYMBOL_GPL(led_trigger_suspend);
+> +
+> +void led_trigger_resume(struct led_trigger *trig)
+> +{
+> +	struct led_classdev *led_cdev;
+> +
+> +	if (!trig)
+> +		return;
+> +
+> +	read_lock(&trig->leddev_list_lock);
+> +	list_for_each_entry(led_cdev, &trig->led_cdevs, trig_list) {
+> +		if (led_cdev->trigger->resume)
+> +			led_cdev->trigger->resume(led_cdev);
+> +		led_sysfs_enable(led_cdev);
+> +	}
+> +	read_unlock(&trig->leddev_list_lock);
+> +}
+> +EXPORT_SYMBOL_GPL(led_trigger_resume);
+> +
+>  void led_trigger_register_simple(const char *name, struct led_trigger **tp)
+>  {
+>  	struct led_trigger *trig;
+> diff --git a/drivers/leds/trigger/ledtrig-heartbeat.c b/drivers/leds/trigger/ledtrig-heartbeat.c
+> old mode 100644
+> new mode 100755
+> index afa3b40..8f779dd
+> --- a/drivers/leds/trigger/ledtrig-heartbeat.c
+> +++ b/drivers/leds/trigger/ledtrig-heartbeat.c
+> @@ -142,6 +142,7 @@ static void heartbeat_trig_activate(struct led_classdev *led_cdev)
+>  	led_heartbeat_function(heartbeat_data->timer.data);
+>  	set_bit(LED_BLINK_SW, &led_cdev->work_flags);
+>  	led_cdev->activated = true;
+> +	led_cdev->suspended = false;
+>  }
+>  
+>  static void heartbeat_trig_deactivate(struct led_classdev *led_cdev)
+> @@ -154,6 +155,30 @@ static void heartbeat_trig_deactivate(struct led_classdev *led_cdev)
+>  		kfree(heartbeat_data);
+>  		clear_bit(LED_BLINK_SW, &led_cdev->work_flags);
+>  		led_cdev->activated = false;
+> +		led_cdev->suspended = false;
+> +	}
+> +}
+> +
+> +static void heartbeat_trig_resume(struct led_classdev *led_cdev)
+> +{
+> +	struct heartbeat_trig_data *heartbeat_data = led_cdev->trigger_data;
+> +
+> +	if (led_cdev->suspended) {
+> +		setup_timer(&heartbeat_data->timer,
+> +			    led_heartbeat_function, (unsigned long) led_cdev);
+> +		heartbeat_data->phase = 0;
+> +		led_heartbeat_function(heartbeat_data->timer.data);
+> +		led_cdev->suspended = false;
+> +	}
+> +}
+> +
+> +static void heartbeat_trig_suspend(struct led_classdev *led_cdev)
+> +{
+> +	struct heartbeat_trig_data *heartbeat_data = led_cdev->trigger_data;
+> +
+> +	if (led_cdev->activated && !led_cdev->suspended) {
+> +		del_timer_sync(&heartbeat_data->timer);
+> +		led_cdev->suspended = true;
+>  	}
+>  }
+>  
+> @@ -161,25 +186,23 @@ static void heartbeat_trig_deactivate(struct led_classdev *led_cdev)
+>  	.name     = "heartbeat",
+>  	.activate = heartbeat_trig_activate,
+>  	.deactivate = heartbeat_trig_deactivate,
+> +	.suspend = heartbeat_trig_suspend,
+> +	.resume = heartbeat_trig_resume,
+>  };
+>  
+>  static int heartbeat_pm_notifier(struct notifier_block *nb,
+>  				 unsigned long pm_event, void *unused)
+>  {
+> -	int rc;
+> -
+>  	switch (pm_event) {
+>  	case PM_SUSPEND_PREPARE:
+>  	case PM_HIBERNATION_PREPARE:
+>  	case PM_RESTORE_PREPARE:
+> -		led_trigger_unregister(&heartbeat_led_trigger);
+> +		led_trigger_suspend(&heartbeat_led_trigger);
+>  		break;
+>  	case PM_POST_SUSPEND:
+>  	case PM_POST_HIBERNATION:
+>  	case PM_POST_RESTORE:
+> -		rc = led_trigger_register(&heartbeat_led_trigger);
+> -		if (rc)
+> -			pr_err("could not re-register heartbeat trigger\n");
+> +		led_trigger_resume(&heartbeat_led_trigger);
+>  		break;
+>  	default:
+>  		break;
+> diff --git a/include/linux/leds.h b/include/linux/leds.h
+> old mode 100644
+> new mode 100755
+> index 64c56d4..b792950
+> --- a/include/linux/leds.h
+> +++ b/include/linux/leds.h
+> @@ -111,6 +111,7 @@ struct led_classdev {
+>  	void			*trigger_data;
+>  	/* true if activated - deactivate routine uses it to do cleanup */
+>  	bool			activated;
+> +	bool			suspended;
+>  #endif
+>  
+>  #ifdef CONFIG_LEDS_BRIGHTNESS_HW_CHANGED
+> @@ -254,6 +255,8 @@ struct led_trigger {
+>  	const char	 *name;
+>  	void		(*activate)(struct led_classdev *led_cdev);
+>  	void		(*deactivate)(struct led_classdev *led_cdev);
+> +	void		(*suspend)(struct led_classdev *led_cdev);
+> +	void		(*resume)(struct led_classdev *led_cdev);
+>  
+>  	/* LEDs under control by this trigger (for simple triggers) */
+>  	rwlock_t	  leddev_list_lock;
+> @@ -291,6 +294,9 @@ extern void led_trigger_set(struct led_classdev *led_cdev,
+>  			struct led_trigger *trigger);
+>  extern void led_trigger_remove(struct led_classdev *led_cdev);
+>  
+> +extern void led_trigger_suspend(struct led_trigger *trig);
+> +extern void led_trigger_resume(struct led_trigger *trig);
+> +
+>  static inline void *led_get_trigger_data(struct led_classdev *led_cdev)
+>  {
+>  	return led_cdev->trigger_data;
+> 
+
 -- 
-2.13.0
+Best regards,
+Jacek Anaszewski
