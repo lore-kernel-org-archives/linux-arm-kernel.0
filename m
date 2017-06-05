@@ -1,78 +1,60 @@
 From: atull@kernel.org (Alan Tull)
-Date: Mon, 5 Jun 2017 10:10:05 -0500
-Subject: [PATCH v11 4/6] ARM: dts: imx6q-evi: support altera-ps-spi
-In-Reply-To: <14677930.o4g43KgmZP@jclayton-pc>
+Date: Mon, 5 Jun 2017 10:11:00 -0500
+Subject: [PATCH v12 1/6] fpga: Add flag to indicate SPI bitstream is
+ bit-reversed
+In-Reply-To: <684ea151ba9aa2c6555a299daf56552ddc11f596.1496434383.git.stillcompiling@gmail.com>
 References: <20170525172911.11467-1-stillcompiling@gmail.com>
- <6513199.IxvCuS6eYj@jclayton-pc>
- <b944db11-bdd2-5b5f-2aa8-01f4135918be@suse.de>
- <14677930.o4g43KgmZP@jclayton-pc>
-Message-ID: <CANk1AXR1Bt3k7GLudRAVkmQXxaAFmrCKFFpxTFF9k=N7Yn5VZA@mail.gmail.com>
+ <684ea151ba9aa2c6555a299daf56552ddc11f596.1496434383.git.stillcompiling@gmail.com>
+Message-ID: <CANk1AXT7aws86D2DbtoQseihxBdcQAYf22oLKA7D7K1uqRJdiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 2, 2017 at 4:10 PM,  <stillcompiling@gmail.com> wrote:
-> On Friday, June 2, 2017 9:54:22 PM PDT Andreas F?rber wrote:
->> Am 02.06.2017 um 21:39 schrieb stillcompiling at gmail.com:
->> > On Friday, June 2, 2017 6:30:12 PM PDT Andreas F?rber wrote:
->> >> Am 25.05.2017 um 19:29 schrieb Joshua Clayton:
->> >>> diff --git a/arch/arm/boot/dts/imx6q-evi.dts
->> >>> b/arch/arm/boot/dts/imx6q-evi.dts index 24fe093a66db..a0cbb2d84803
->> >>> 100644
->> >>> --- a/arch/arm/boot/dts/imx6q-evi.dts
->> >>> +++ b/arch/arm/boot/dts/imx6q-evi.dts
->> >>> @@ -82,6 +82,15 @@
->> >>>
->> >>>   pinctrl-names = "default";
->> >>>   pinctrl-0 = <&pinctrl_ecspi1 &pinctrl_ecspi1cs>;
->> >>>   status = "okay";
->> >>>
->> >>> +
->> >>> + fpga_spi: cyclonespi at 0 {
->> >>
->> >> "cyclonespi" does not strike me as the best node name.
->> >>
->> >> I am guessing this is a sub-node of a SPI controller node, so no need to
->> >> repeat "spi", and Cyclone seems more or less implied by "altr,fpga-".
->> >
->> > True.
->> >
->> >> Note that the example in the bindings doc uses "evi-fpga-spi". Nodes
->> >> don't need to be (shouldn't be?) prefixed with the board. Note that
->> >> bindings examples tend to get copied a lot.
->> >>
->> >> Any reason not to just use "fpga at 0" in both places for simplicity?
->> >
->> > Sure. fpga: fpga at 0 is probably better.
->>
->> Note that I was only commenting on the node name, the latter part.
->>
->> I'm not aware of any rules for the label, so that could remain unchanged
->> or adopt cyclone_spi from the old node name or whatever is unique and
->> syntactically valid.
-> Too late! Patches posted.
-> Oh, well, I'm not changing it back.
-
-It's fine as it is in v12.
-
-fpga_mgr: fpga-mgr at 0 is what I've been using most recently.  It
-distinguishes the one block that is used to program the fpga from the
-fpga and hardware in the fpga.  But no need to respin this.
-
-Alan
-
->>
->> > I'll change it in both the dts and the binding doc.
->>
->> Thanks. Maybe double-check if there's any conventions Xilinx/Lattice DTs
->> are using.
->>
-> Of the conventions I found, fpga seemed the most "hardware descriptive"
-> for a plain FPGA.
-> The other one several binding doc examples are using is "fpga-mgr".
+On Fri, Jun 2, 2017 at 3:30 PM, Joshua Clayton <stillcompiling@gmail.com> wrote:
+> From: Anatolij Gustschin <agust@denx.de>
 >
->> Cheers,
->> Andreas
+> Add a flag that is passed to the write_init() callback,
+> indicating that the SPI bitstream starts with LSB first.
+> SPI controllers usually send data with MSB first. If an
+> FPGA expects bitstream data as LSB first, the data must
+> be reversed either by the SPI controller or by the driver.
 >
+> Alternatively the bitstream could be prepared as bit-reversed
+> to avoid the bit-swapping while sending. This flag indicates
+> such bit-reversed SPI bitstream. The low-level driver will
+> deal with the flag and perform bit-reversing if needed.
 >
+> Signed-off-by: Anatolij Gustschin <agust@denx.de>
+> Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
+
+Signed-off-by: Alan Tull <atull@kernel.org>
+
+> ---
+>
+> Changes from v11 (all in patch 4/4)
+> - Change "Altera V FPGA" to simply "Altera FPGA"
+> - Change the devicetree name to a generic "fpga: fpga at 0"
+>   from "fpga_spi: cyclonespi at 0"
+>
+>  include/linux/fpga/fpga-mgr.h | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/include/linux/fpga/fpga-mgr.h b/include/linux/fpga/fpga-mgr.h
+> index b4ac24c4411d..01c348ca38b7 100644
+> --- a/include/linux/fpga/fpga-mgr.h
+> +++ b/include/linux/fpga/fpga-mgr.h
+> @@ -67,10 +67,12 @@ enum fpga_mgr_states {
+>   * FPGA Manager flags
+>   * FPGA_MGR_PARTIAL_RECONFIG: do partial reconfiguration if supported
+>   * FPGA_MGR_EXTERNAL_CONFIG: FPGA has been configured prior to Linux booting
+> + * FPGA_MGR_BITSTREAM_LSB_FIRST: SPI bitstream bit order is LSB first
+>   */
+>  #define FPGA_MGR_PARTIAL_RECONFIG      BIT(0)
+>  #define FPGA_MGR_EXTERNAL_CONFIG       BIT(1)
+>  #define FPGA_MGR_ENCRYPTED_BITSTREAM   BIT(2)
+> +#define FPGA_MGR_BITSTREAM_LSB_FIRST   BIT(3)
+>
+>  /**
+>   * struct fpga_image_info - information specific to a FPGA image
 > --
-> ~Joshua A Clayton
+> 2.11.0
+>
