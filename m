@@ -1,136 +1,210 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Mon, 5 Jun 2017 16:00:47 -0600
-Subject: [PATCH] PCI/PM: Set D3 power state only if the end device
- supports it.
-In-Reply-To: <CANHdaiYhosBfcUdtQT5pJN2bc93eqRJeaFSYHBmLjsFPHzLfvw@mail.gmail.com>
-References: <1496230412-19028-1-git-send-email-gakula@caviumnetworks.com>
- <20170531064340.0dcec477@w520.home>
- <CANHdaiYhosBfcUdtQT5pJN2bc93eqRJeaFSYHBmLjsFPHzLfvw@mail.gmail.com>
-Message-ID: <20170605160047.2d000cce@t450s.home>
+From: jingoohan1@gmail.com (Jingoo Han)
+Date: Mon, 5 Jun 2017 18:30:54 -0400
+Subject: [PATCH] PCI: dwc: Constify dw_pcie_host_ops structures
+In-Reply-To: <20170605085346.3732-1-jszhang@marvell.com>
+References: <20170605085346.3732-1-jszhang@marvell.com>
+Message-ID: <000001d2de4b$65f2f360$31d8da20$@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2 Jun 2017 11:14:27 +0530
-Geetha Akula <geethasowjanya.akula@gmail.com> wrote:
+On Monday, June 5, 2017 4:54 AM, Jisheng Zhang wrote:
+> 
+> The dw_pcie_host_ops structures are never modified. Constify these
+> structures such that these can be write-protected.
+> 
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 
-> On Wed, May 31, 2017 at 6:13 PM, Alex Williamson
-> <alex.williamson@redhat.com> wrote:
-> > On Wed, 31 May 2017 17:03:32 +0530
-> > Geetha sowjanya <gakula@caviumnetworks.com> wrote:
-> >  
-> >> Pci driver doesn't check if the device supports D3hot/D3cold power states
-> >> while setting these power states. The device that doesn't support these
-> >> states will fail when a driver like vfio try to do D0->D3 power transition.  
-> >
-> >
-> > That's because support for D0 and D3 device states is REQUIRED by the
-> > PCIe spec (Rev 3.1a, 7.6).  Is this yet more non-spec compliance?
-> > Thanks,  
-> 
-> Hi Alex,
-> 
-> The issue is seen with the LSI sata cards SAS3008 SAS-3 and SAS-2
->  (vendor id: 1000 device id: 0087/0097). Both cards only support D1, D2
-> power state. This device fails when vfio driver tries to set the power
-> state to D3hot. The issue is seen across platforms.
-> 
-> Do you recommend to implement quirk for these devices?
+Acked-by: Jingoo Han <jingoohan1@gmail.com>
 
-As I understand the original proposal, the test for whether a device
-supports D3hot is whether the device can issue a PME# from the D3hot
-state.  Even on the laptop I'm using right now I see a number of
-devices that report that they cannot issue a PME# from D3hot.  That's
-really an orthogonal capability to D3hot support.  Disabling D3hot for
-those devices is likely to have negative side effects with power
-consumption.  We already have quirks to avoid D3 by setting
-PCI_DEV_FLAGS_NO_D3, I'd suggest we use it.  Thanks,
+Best regards,
+Jingoo Han
 
-Alex
-
-> Kernel crash when LSI card attached to vfio driver.
+> ---
+>  drivers/pci/dwc/pci-dra7xx.c           | 2 +-
+>  drivers/pci/dwc/pci-exynos.c           | 2 +-
+>  drivers/pci/dwc/pci-imx6.c             | 2 +-
+>  drivers/pci/dwc/pci-keystone.c         | 2 +-
+>  drivers/pci/dwc/pci-layerscape.c       | 6 +++---
+>  drivers/pci/dwc/pcie-armada8k.c        | 2 +-
+>  drivers/pci/dwc/pcie-artpec6.c         | 2 +-
+>  drivers/pci/dwc/pcie-designware-plat.c | 2 +-
+>  drivers/pci/dwc/pcie-designware.h      | 2 +-
+>  drivers/pci/dwc/pcie-qcom.c            | 2 +-
+>  drivers/pci/dwc/pcie-spear13xx.c       | 2 +-
+>  11 files changed, 13 insertions(+), 13 deletions(-)
 > 
-> [74259.180968] Unhandled fault: synchronous external abort
-> (0x96000610) at 0x0000000033a80008
-> [74259.189223] Internal error: : 96000610 [#1] SMP
-> [74259.193740] Modules linked in: vfio_pci irqbypass vfio_virqfd
-> vfio_iommu_type1 vfio
-> [74259.201389] CPU: 104 PID: 2714 Comm: bash Not tainted 4.11.0+ #1
-> [74259.207382] Hardware name: www.cavium.com Cavium CN99XX/CN99XX,
-> BIOS 00:03:23 May 30 2017
-> [74259.215545] task: ffff800ec6680000 task.stack: ffff800ec0e00000
-> [74259.221454] PC is at pci_generic_config_read+0xa0/0xf0
-> [74259.226579] LR is at pci_generic_config_read+0x48/0xf0
-> [74259.231704] pc : [<ffff0000085a5a60>] lr : [<ffff0000085a5a08>]
-> pstate: 604001c9
-> [74259.239084] sp : ffff800ec0e03900
-> [74259.242386] x29: ffff800ec0e03900 x28: ffff800ec6680000
-> [74259.247685] x27: 0000000000001000 x26: 0000000000000097
-> [74259.252984] x25: 0000000000000140 x24: ffff000009466000
-> [74259.258283] x23: 0000000000000054 x22: 0000000000000000
-> [74259.263581] x21: ffff800ec0e03994 x20: 0000000000000002
-> [74259.268880] x19: ffff800f4c913800 x18: ffff0000091d3c10
-> [74259.274179] x17: 0000fffee43373d0 x16: ffff000008289c68
-> [74259.279477] x15: ffff800ec56b991c x14: 0000000000000000
-> [74259.284776] x13: 0000000000000040 x12: 0000000000000000
-> [74259.290074] x11: 0000000000000220 x10: 00000000000009b0
-> [74259.295373] x9 : ffff800ec0e03800 x8 : ffff800ec6680a10
-> [74259.300671] x7 : 0000000000000002 x6 : 0000000000000000
-> [74259.305970] x5 : 0000000000000013 x4 : ffff800f4c920500
-> [74259.311269] x3 : 0000000001300054 x2 : 0000000000000014
-> [74259.316567] x1 : ffff000010000000 x0 : ffff000011300054
-> [74259.321866] [.......]
+> diff --git a/drivers/pci/dwc/pci-dra7xx.c b/drivers/pci/dwc/pci-dra7xx.c
+> index 8decf46cf525..e4166032b3c6 100644
+> --- a/drivers/pci/dwc/pci-dra7xx.c
+> +++ b/drivers/pci/dwc/pci-dra7xx.c
+> @@ -208,7 +208,7 @@ static void dra7xx_pcie_host_init(struct pcie_port
+*pp)
+>  	dra7xx_pcie_enable_interrupts(dra7xx);
+>  }
 > 
-> [74259.860266] [<ffff0000085a5a60>] pci_generic_config_read+0xa0/0xf0
-> [74259.866434] [<ffff0000085a583c>] pci_bus_read_config_word+0xb4/0xd8
-> [74259.872688] [<ffff0000085ad048>] pci_raw_set_power_state+0x108/0x250
-> [74259.879028] [<ffff0000085b02ec>] pci_set_power_state+0xc4/0x160
-> [74259.884939] [<ffff000000dc0e88>] vfio_pci_probe+0xf0/0x1c8 [vfio_pci]
-> [74259.891367] [<ffff0000085b42f4>] local_pci_probe+0x44/0xb0
-> [74259.896839] [<ffff0000085b50c0>] pci_device_probe+0x140/0x170
-> [74259.902574] [<ffff0000086f0dac>] driver_probe_device+0x2bc/0x450
-> [74259.908568] [<ffff0000086f1064>] __driver_attach+0x124/0x128
-> [74259.914214] [<ffff0000086ee610>] bus_for_each_dev+0x88/0xe8
-> [74259.919773] [<ffff0000086f0500>] driver_attach+0x30/0x40
-> [74259.925072] [<ffff0000085b3af0>] pci_add_dynid+0xa8/0xd0
-> [74259.930370] [<ffff0000085b472c>] store_new_id+0x144/0x198
-> [74259.935756] [<ffff0000086ee0a8>] drv_attr_store+0x40/0x58
-> [74259.941143] [<ffff000008310ea4>] sysfs_kf_write+0x5c/0x78
-> [74259.946528] [<ffff000008310094>] kernfs_fop_write+0xbc/0x1e8
-> [74259.952176] [<ffff0000082877d8>] __vfs_write+0x60/0x168
-> [74259.957387] [<ffff000008288b20>] vfs_write+0xa8/0x1b8
-> [74259.962426] [<ffff000008289cd4>] SyS_write+0x6c/0xd8
-> [74259.967378] [<ffff0000080833b0>] el0_svc_naked+0x24/0x28
-> [74259.972677] Code: a9425bf5 f9401bf7 a8c47bfd d65f03c0 (79400000)
-> [74259.978794] ---[ end trace e0cfdf3c1d94e7aa ]---
+> -static struct dw_pcie_host_ops dra7xx_pcie_host_ops = {
+> +static const struct dw_pcie_host_ops dra7xx_pcie_host_ops = {
+>  	.host_init = dra7xx_pcie_host_init,
+>  };
 > 
+> diff --git a/drivers/pci/dwc/pci-exynos.c b/drivers/pci/dwc/pci-exynos.c
+> index 546082ad5a3f..c78c06552590 100644
+> --- a/drivers/pci/dwc/pci-exynos.c
+> +++ b/drivers/pci/dwc/pci-exynos.c
+> @@ -590,7 +590,7 @@ static void exynos_pcie_host_init(struct pcie_port
+*pp)
+>  	exynos_pcie_enable_interrupts(ep);
+>  }
 > 
-> Thank you,
-> Geetha.
+> -static struct dw_pcie_host_ops exynos_pcie_host_ops = {
+> +static const struct dw_pcie_host_ops exynos_pcie_host_ops = {
+>  	.rd_own_conf = exynos_pcie_rd_own_conf,
+>  	.wr_own_conf = exynos_pcie_wr_own_conf,
+>  	.host_init = exynos_pcie_host_init,
+> diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
+> index a98cba55c7f0..fb4816088a7a 100644
+> --- a/drivers/pci/dwc/pci-imx6.c
+> +++ b/drivers/pci/dwc/pci-imx6.c
+> @@ -602,7 +602,7 @@ static int imx6_pcie_link_up(struct dw_pcie *pci)
+>  			PCIE_PHY_DEBUG_R1_XMLH_LINK_UP;
+>  }
 > 
-> >
-> > Alex
-> >
-> >  
-> >> This patch adds a check that allows to set D3 power state only
-> >> for the supported devices.
-> >>
-> >> Signed-off-by: Geetha sowjanya <gakula@caviumnetworks.com>
-> >> ---
-> >>  drivers/pci/pci.c |    3 ++-
-> >>  1 files changed, 2 insertions(+), 1 deletions(-)
-> >>
-> >> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> >> index 563901c..cadd046 100644
-> >> --- a/drivers/pci/pci.c
-> >> +++ b/drivers/pci/pci.c
-> >> @@ -661,7 +661,8 @@ static int pci_raw_set_power_state(struct pci_dev *dev, pci_power_t state)
-> >>
-> >>       /* check if this device supports the desired state */
-> >>       if ((state == PCI_D1 && !dev->d1_support)
-> >> -        || (state == PCI_D2 && !dev->d2_support))
-> >> +        || (state == PCI_D2 && !dev->d2_support)
-> >> +        || (state == PCI_D3hot && !pci_pme_capable(dev, state)))
-> >>               return -EIO;
-> >>
-> >>       pci_read_config_word(dev, dev->pm_cap + PCI_PM_CTRL, &pmcsr);  
-> >  
+> -static struct dw_pcie_host_ops imx6_pcie_host_ops = {
+> +static const struct dw_pcie_host_ops imx6_pcie_host_ops = {
+>  	.host_init = imx6_pcie_host_init,
+>  };
+> 
+> diff --git a/drivers/pci/dwc/pci-keystone.c b/drivers/pci/dwc/pci-
+> keystone.c
+> index fcc9723bad6e..4783cec1f78d 100644
+> --- a/drivers/pci/dwc/pci-keystone.c
+> +++ b/drivers/pci/dwc/pci-keystone.c
+> @@ -291,7 +291,7 @@ static void __init ks_pcie_host_init(struct pcie_port
+> *pp)
+>  			"Asynchronous external abort");
+>  }
+> 
+> -static struct dw_pcie_host_ops keystone_pcie_host_ops = {
+> +static const struct dw_pcie_host_ops keystone_pcie_host_ops = {
+>  	.rd_other_conf = ks_dw_pcie_rd_other_conf,
+>  	.wr_other_conf = ks_dw_pcie_wr_other_conf,
+>  	.host_init = ks_pcie_host_init,
+> diff --git a/drivers/pci/dwc/pci-layerscape.c b/drivers/pci/dwc/pci-
+> layerscape.c
+> index 27d638c4e134..fd861289ad8b 100644
+> --- a/drivers/pci/dwc/pci-layerscape.c
+> +++ b/drivers/pci/dwc/pci-layerscape.c
+> @@ -39,7 +39,7 @@ struct ls_pcie_drvdata {
+>  	u32 lut_offset;
+>  	u32 ltssm_shift;
+>  	u32 lut_dbg;
+> -	struct dw_pcie_host_ops *ops;
+> +	const struct dw_pcie_host_ops *ops;
+>  	const struct dw_pcie_ops *dw_pcie_ops;
+>  };
+> 
+> @@ -185,12 +185,12 @@ static int ls_pcie_msi_host_init(struct pcie_port
+> *pp,
+>  	return 0;
+>  }
+> 
+> -static struct dw_pcie_host_ops ls1021_pcie_host_ops = {
+> +static const struct dw_pcie_host_ops ls1021_pcie_host_ops = {
+>  	.host_init = ls1021_pcie_host_init,
+>  	.msi_host_init = ls_pcie_msi_host_init,
+>  };
+> 
+> -static struct dw_pcie_host_ops ls_pcie_host_ops = {
+> +static const struct dw_pcie_host_ops ls_pcie_host_ops = {
+>  	.host_init = ls_pcie_host_init,
+>  	.msi_host_init = ls_pcie_msi_host_init,
+>  };
+> diff --git a/drivers/pci/dwc/pcie-armada8k.c b/drivers/pci/dwc/pcie-
+> armada8k.c
+> index 495b023042b3..ea8f34af6a85 100644
+> --- a/drivers/pci/dwc/pcie-armada8k.c
+> +++ b/drivers/pci/dwc/pcie-armada8k.c
+> @@ -160,7 +160,7 @@ static irqreturn_t armada8k_pcie_irq_handler(int irq,
+> void *arg)
+>  	return IRQ_HANDLED;
+>  }
+> 
+> -static struct dw_pcie_host_ops armada8k_pcie_host_ops = {
+> +static const struct dw_pcie_host_ops armada8k_pcie_host_ops = {
+>  	.host_init = armada8k_pcie_host_init,
+>  };
+> 
+> diff --git a/drivers/pci/dwc/pcie-artpec6.c b/drivers/pci/dwc/pcie-
+> artpec6.c
+> index 82a04acc42fd..01c6f7823672 100644
+> --- a/drivers/pci/dwc/pcie-artpec6.c
+> +++ b/drivers/pci/dwc/pcie-artpec6.c
+> @@ -184,7 +184,7 @@ static void artpec6_pcie_host_init(struct pcie_port
+> *pp)
+>  	artpec6_pcie_enable_interrupts(artpec6_pcie);
+>  }
+> 
+> -static struct dw_pcie_host_ops artpec6_pcie_host_ops = {
+> +static const struct dw_pcie_host_ops artpec6_pcie_host_ops = {
+>  	.host_init = artpec6_pcie_host_init,
+>  };
+> 
+> diff --git a/drivers/pci/dwc/pcie-designware-plat.c
+> b/drivers/pci/dwc/pcie-designware-plat.c
+> index a9865d91b43c..091b4e7ad059 100644
+> --- a/drivers/pci/dwc/pcie-designware-plat.c
+> +++ b/drivers/pci/dwc/pcie-designware-plat.c
+> @@ -46,7 +46,7 @@ static void dw_plat_pcie_host_init(struct pcie_port *pp)
+>  		dw_pcie_msi_init(pp);
+>  }
+> 
+> -static struct dw_pcie_host_ops dw_plat_pcie_host_ops = {
+> +static const struct dw_pcie_host_ops dw_plat_pcie_host_ops = {
+>  	.host_init = dw_plat_pcie_host_init,
+>  };
+> 
+> diff --git a/drivers/pci/dwc/pcie-designware.h b/drivers/pci/dwc/pcie-
+> designware.h
+> index c6a840575796..b4d2a89f8e58 100644
+> --- a/drivers/pci/dwc/pcie-designware.h
+> +++ b/drivers/pci/dwc/pcie-designware.h
+> @@ -162,7 +162,7 @@ struct pcie_port {
+>  	struct resource		*mem;
+>  	struct resource		*busn;
+>  	int			irq;
+> -	struct dw_pcie_host_ops	*ops;
+> +	const struct dw_pcie_host_ops *ops;
+>  	int			msi_irq;
+>  	struct irq_domain	*irq_domain;
+>  	unsigned long		msi_data;
+> diff --git a/drivers/pci/dwc/pcie-qcom.c b/drivers/pci/dwc/pcie-qcom.c
+> index 96ee527c1ed2..39e8c0095715 100644
+> --- a/drivers/pci/dwc/pcie-qcom.c
+> +++ b/drivers/pci/dwc/pcie-qcom.c
+> @@ -634,7 +634,7 @@ static int qcom_pcie_rd_own_conf(struct pcie_port *pp,
+> int where, int size,
+>  	return dw_pcie_read(pci->dbi_base + where, size, val);
+>  }
+> 
+> -static struct dw_pcie_host_ops qcom_pcie_dw_ops = {
+> +static const struct dw_pcie_host_ops qcom_pcie_dw_ops = {
+>  	.host_init = qcom_pcie_host_init,
+>  	.rd_own_conf = qcom_pcie_rd_own_conf,
+>  };
+> diff --git a/drivers/pci/dwc/pcie-spear13xx.c b/drivers/pci/dwc/pcie-
+> spear13xx.c
+> index 8ff36b3dbbdf..80897291e0fb 100644
+> --- a/drivers/pci/dwc/pcie-spear13xx.c
+> +++ b/drivers/pci/dwc/pcie-spear13xx.c
+> @@ -186,7 +186,7 @@ static void spear13xx_pcie_host_init(struct pcie_port
+> *pp)
+>  	spear13xx_pcie_enable_interrupts(spear13xx_pcie);
+>  }
+> 
+> -static struct dw_pcie_host_ops spear13xx_pcie_host_ops = {
+> +static const struct dw_pcie_host_ops spear13xx_pcie_host_ops = {
+>  	.host_init = spear13xx_pcie_host_init,
+>  };
+> 
+> --
+> 2.11.0
