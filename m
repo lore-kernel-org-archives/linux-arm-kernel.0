@@ -1,57 +1,109 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 5 Jun 2017 16:31:22 +0800
-Subject: [PATCH 2/2] arm64: allwinner: a64: Convert CCU raw number
- references to macros
-In-Reply-To: <20170605043224.20687-3-wens@csie.org>
-Message-ID: <201706051615.6ow32cIq%fengguang.wu@intel.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Mon, 5 Jun 2017 09:33:53 +0100
+Subject: [PATCH v13 8/9] arm64: dts: hi6220: register debug module
+In-Reply-To: <1495727836-30094-9-git-send-email-leo.yan@linaro.org>
+References: <1495727836-30094-1-git-send-email-leo.yan@linaro.org>
+ <1495727836-30094-9-git-send-email-leo.yan@linaro.org>
+Message-ID: <59351771.5080807@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
+Hi Leo,
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.12-rc4 next-20170602]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+On 2017/5/25 16:57, Leo Yan wrote:
+> Bind debug module driver for Hi6220.
+> 
+> Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
 
-url:    https://github.com/0day-ci/linux/commits/Chen-Yu-Tsai/ARM-arm64-sunxi-convert-CCU-raw-numbers-to-macros/20170605-124326
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+Thanks!
+Fine to me.
+Acked-by: Wei Xu <xuwei5@hisilicon.com>
 
-All errors (new ones prefixed by >>):
+Hi Mathieu,
 
-   In file included from arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts:45:0,
-                    from arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts:43:
->> arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi:46:42: fatal error: dt-bindings/clock/sun8-r-ccu.h: No such file or directory
-    #include <dt-bindings/clock/sun8-r-ccu.h>
-                                             ^
-   compilation terminated.
+Can you help to pick up this patch as well?
+Thanks!
 
-vim +46 arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+Best Regards,
+Wei
 
-    40	 *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-    41	 *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-    42	 *     OTHER DEALINGS IN THE SOFTWARE.
-    43	 */
-    44	
-    45	#include <dt-bindings/clock/sun50i-a64-ccu.h>
-  > 46	#include <dt-bindings/clock/sun8-r-ccu.h>
-    47	#include <dt-bindings/interrupt-controller/arm-gic.h>
-    48	#include <dt-bindings/reset/sun50i-a64-ccu.h>
-    49	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 35196 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170605/86fef3f0/attachment-0001.gz>
+> ---
+>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 64 +++++++++++++++++++++++++++++++
+>  1 file changed, 64 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> index 1e5129b..21805b9 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> @@ -916,5 +916,69 @@
+>  				};
+>  			};
+>  		};
+> +
+> +		debug at f6590000 {
+> +			compatible = "arm,coresight-cpu-debug","arm,primecell";
+> +			reg = <0 0xf6590000 0 0x1000>;
+> +			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
+> +			clock-names = "apb_pclk";
+> +			cpu = <&cpu0>;
+> +		};
+> +
+> +		debug at f6592000 {
+> +			compatible = "arm,coresight-cpu-debug","arm,primecell";
+> +			reg = <0 0xf6592000 0 0x1000>;
+> +			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
+> +			clock-names = "apb_pclk";
+> +			cpu = <&cpu1>;
+> +		};
+> +
+> +		debug at f6594000 {
+> +			compatible = "arm,coresight-cpu-debug","arm,primecell";
+> +			reg = <0 0xf6594000 0 0x1000>;
+> +			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
+> +			clock-names = "apb_pclk";
+> +			cpu = <&cpu2>;
+> +		};
+> +
+> +		debug at f6596000 {
+> +			compatible = "arm,coresight-cpu-debug","arm,primecell";
+> +			reg = <0 0xf6596000 0 0x1000>;
+> +			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
+> +			clock-names = "apb_pclk";
+> +			cpu = <&cpu3>;
+> +		};
+> +
+> +		debug at f65d0000 {
+> +			compatible = "arm,coresight-cpu-debug","arm,primecell";
+> +			reg = <0 0xf65d0000 0 0x1000>;
+> +			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
+> +			clock-names = "apb_pclk";
+> +			cpu = <&cpu4>;
+> +		};
+> +
+> +		debug at f65d2000 {
+> +			compatible = "arm,coresight-cpu-debug","arm,primecell";
+> +			reg = <0 0xf65d2000 0 0x1000>;
+> +			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
+> +			clock-names = "apb_pclk";
+> +			cpu = <&cpu5>;
+> +		};
+> +
+> +		debug at f65d4000 {
+> +			compatible = "arm,coresight-cpu-debug","arm,primecell";
+> +			reg = <0 0xf65d4000 0 0x1000>;
+> +			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
+> +			clock-names = "apb_pclk";
+> +			cpu = <&cpu6>;
+> +		};
+> +
+> +		debug at f65d6000 {
+> +			compatible = "arm,coresight-cpu-debug","arm,primecell";
+> +			reg = <0 0xf65d6000 0 0x1000>;
+> +			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
+> +			clock-names = "apb_pclk";
+> +			cpu = <&cpu7>;
+> +		};
+>  	};
+>  };
+> 
