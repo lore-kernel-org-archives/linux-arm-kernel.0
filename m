@@ -1,57 +1,81 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 5 Jun 2017 14:13:42 +0900
-Subject: [PATCH v5 12/20] ARM: dts: uniphier: Add generic compatible
- string for I2C EEPROM
-In-Reply-To: <20170523133448.4794-13-javier@dowhile0.org>
-References: <20170523133448.4794-1-javier@dowhile0.org>
- <20170523133448.4794-13-javier@dowhile0.org>
-Message-ID: <CAK7LNATDvesYLKimY=aKfT6kAiidq6Ufd=kCWGQcCZ_Xy-27tw@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 5 Jun 2017 13:37:23 +0800
+Subject: [PATCH] ARM: imx6ull: Make suspend/resume work like on 6ul
+In-Reply-To: <c63fd9031493cefed47d59c9918c0ecb76ffaf85.1496160320.git.leonard.crestez@nxp.com>
+References: <c63fd9031493cefed47d59c9918c0ecb76ffaf85.1496160320.git.leonard.crestez@nxp.com>
+Message-ID: <20170605053722.GI4094@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
-
-2017-05-23 22:34 GMT+09:00 Javier Martinez Canillas <javier@dowhile0.org>:
-> The at24 driver allows to register I2C EEPROM chips using different vendor
-> and devices, but the I2C subsystem does not take the vendor into account
-> when matching using the I2C table since it only has device entries.
->
-> But when matching using an OF table, both the vendor and device has to be
-> taken into account so the driver defines only a set of compatible strings
-> using the "atmel" vendor as a generic fallback for compatible I2C devices.
->
-> So add this generic fallback to the device node compatible string to make
-> the device to match the driver using the OF device ID table.
->
-> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
->
+On Tue, May 30, 2017 at 07:11:19PM +0300, Leonard Crestez wrote:
+> Suspend and resume on imx6ull is currenty not working because of some
+> missed checks where behavior should match imx6ul.
+> 
+> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 > ---
->
-> Changes in v5:
-> - Only replace atmel variant but keep other EEPROM vendors (Geert Uytterhoeven).
->
-> Changes in v4:
-> - Only use the atmel manufacturer in the compatible string instead of
->   keeping the deprecated ones (Rob Herring).
->
-> Changes in v3: None
-> Changes in v2: None
->
->  arch/arm/boot/dts/uniphier-pro4-ace.dts    | 2 +-
->  arch/arm/boot/dts/uniphier-pro4-sanji.dts  | 2 +-
->  arch/arm/boot/dts/uniphier-pxs2-gentil.dts | 2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
+>  arch/arm/mach-imx/mxc.h     | 6 ++++++
+>  arch/arm/mach-imx/pm-imx6.c | 6 ++++--
+>  2 files changed, 10 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
+> index 34f2ff6..e00d626 100644
+> --- a/arch/arm/mach-imx/mxc.h
+> +++ b/arch/arm/mach-imx/mxc.h
+> @@ -39,6 +39,7 @@
+>  #define MXC_CPU_IMX6SX		0x62
+>  #define MXC_CPU_IMX6Q		0x63
+>  #define MXC_CPU_IMX6UL		0x64
+> +#define MXC_CPU_IMX6ULL		0x65
 
+Since you are adding a new CPU type, you should probably patch
+imx_soc_device_init() for it as well.
 
-Why didn't you touch
-arch/arm/boot/dts/uniphier-ref-daughter.dtsi ?
+Shawn
 
-
-
-BTW, has the driver change merged?
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+>  #define MXC_CPU_IMX7D		0x72
+>  
+>  #define IMX_DDR_TYPE_LPDDR2		1
+> @@ -73,6 +74,11 @@ static inline bool cpu_is_imx6ul(void)
+>  	return __mxc_cpu_type == MXC_CPU_IMX6UL;
+>  }
+>  
+> +static inline bool cpu_is_imx6ull(void)
+> +{
+> +	return __mxc_cpu_type == MXC_CPU_IMX6ULL;
+> +}
+> +
+>  static inline bool cpu_is_imx6q(void)
+>  {
+>  	return __mxc_cpu_type == MXC_CPU_IMX6Q;
+> diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
+> index e61b1d1..ecdf071 100644
+> --- a/arch/arm/mach-imx/pm-imx6.c
+> +++ b/arch/arm/mach-imx/pm-imx6.c
+> @@ -295,7 +295,8 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode)
+>  		val &= ~BM_CLPCR_SBYOS;
+>  		if (cpu_is_imx6sl())
+>  			val |= BM_CLPCR_BYPASS_PMIC_READY;
+> -		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul())
+> +		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul() ||
+> +		    cpu_is_imx6ull())
+>  			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
+>  		else
+>  			val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
+> @@ -312,7 +313,8 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode)
+>  		val |= BM_CLPCR_SBYOS;
+>  		if (cpu_is_imx6sl() || cpu_is_imx6sx())
+>  			val |= BM_CLPCR_BYPASS_PMIC_READY;
+> -		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul())
+> +		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul() ||
+> +		    cpu_is_imx6ull())
+>  			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
+>  		else
+>  			val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
+> -- 
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
