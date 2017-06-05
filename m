@@ -1,37 +1,65 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 5 Jun 2017 22:05:31 +0200
-Subject: [[PATCH]] drivers: leds/trigger: system cannot enter suspend
-In-Reply-To: <1496648191-134355-1-git-send-email-bo.zhang@nxp.com>
-References: <1496648191-134355-1-git-send-email-bo.zhang@nxp.com>
-Message-ID: <20170605200531.GA24496@amd>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon,  5 Jun 2017 14:15:01 -0600
+Subject: [PATCH 00/17] coresight: next v4.12-rc4 
+Message-ID: <1496693718-9191-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2017-06-05 15:36:31, Zhang Bo wrote:
-> System cannot enter suspend mode because of heartbeat led trigger.
+Hi Greg,
 
-Can you tell us _why_ the heartbeat trigger prevents suspend/resume?
+Please consider for inclusion in the 4.13 cycle.  Of particular interest is
+patch 15/17, which adds a new driver under the CoreSight umbrella.
+Everything applies cleanly on today's char-misc-next branch (73726380a26f).
 
-Because it does not:
+Regards,
+Mathieu
 
-# echo heartbeat > /sys/class/leds/tpacpi\:\:standby/trigger
-# echo mem > /sys/power/state
-(system suspends, as expected).
-#
+Leo Yan (10):
+  coresight: tmc: minor fix for output log
+  coresight: use const for device_node structures
+  coresight: bindings for CPU debug module
+  doc: Add documentation for Coresight CPU debug
+  doc: Add coresight_cpu_debug.enable to kernel-parameters.txt
+  MAINTAINERS: update file entries for Coresight subsystem
+  coresight: refactor with function of_coresight_get_cpu
+  coresight: add support for CPU debug module
+  arm64: dts: hi6220: register debug module
+  arm64: dts: qcom: msm8916: Add debug unit
 
-Linux amd 4.12.0-rc2+ #400 SMP Mon May 22 22:44:02 CEST 2017 i686...
+Markus Elfring (2):
+  coresight: etb10: Delete an error message for a failed memory
+    allocation in etb_probe()
+  coresight: etb10: Fix a typo in a comment line
 
-If it does for you, you may want to find out why, then fix that.
+Robin Murphy (1):
+  coresight: tmc: Configure DMA mask appropriately
 
-Thanks,
-									Pavel
+Suzuki K Poulose (4):
+  coresight: Disable the path only when the source is disabled
+  coresight: Fix reference count for software sources
+  coresight: etm_perf: Fix using uninitialised work
+  coresight: of_get_coresight_platform_data: Add missing of_node_put
+
+ Documentation/admin-guide/kernel-parameters.txt    |   7 +
+ .../bindings/arm/coresight-cpu-debug.txt           |  49 ++
+ Documentation/trace/coresight-cpu-debug.txt        | 175 ++++++
+ MAINTAINERS                                        |   2 +
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  64 ++
+ arch/arm64/boot/dts/qcom/msm8916.dtsi              |  32 +
+ drivers/hwtracing/coresight/Kconfig                |  14 +
+ drivers/hwtracing/coresight/Makefile               |   1 +
+ drivers/hwtracing/coresight/coresight-cpu-debug.c  | 700 +++++++++++++++++++++
+ drivers/hwtracing/coresight/coresight-etb10.c      |   7 +-
+ drivers/hwtracing/coresight/coresight-etm-perf.c   |   3 +-
+ drivers/hwtracing/coresight/coresight-tmc-etf.c    |  25 +-
+ drivers/hwtracing/coresight/coresight-tmc.c        |   7 +
+ drivers/hwtracing/coresight/coresight.c            |  34 +-
+ drivers/hwtracing/coresight/of_coresight.c         |  47 +-
+ include/linux/coresight.h                          |  10 +-
+ 16 files changed, 1136 insertions(+), 41 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/coresight-cpu-debug.txt
+ create mode 100644 Documentation/trace/coresight-cpu-debug.txt
+ create mode 100644 drivers/hwtracing/coresight/coresight-cpu-debug.c
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170605/2886f31f/attachment.sig>
+2.7.4
