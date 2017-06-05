@@ -1,41 +1,64 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Sun, 4 Jun 2017 19:47:15 -0600
-Subject: Vexpress TC2 no longer booting on v4.12-rc1
-In-Reply-To: <20170602222449.GB4902@n2100.armlinux.org.uk>
-References: <CANLsYkz3dcVArStN2GJguYfJbWc_4dC4vvTE1KVtYpVWipEYjg@mail.gmail.com>
- <20170602222449.GB4902@n2100.armlinux.org.uk>
-Message-ID: <CANLsYkxmnfnCCCqowFjFDSryRkg=TKiTyjKL=VQnJYCyNJ5SgQ@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 5 Jun 2017 09:50:29 +0800
+Subject: [PATCH v1 5/5] ARM: dts: imx6: RIoTboard provide Standby to
+ PowerOff option
+In-Reply-To: <20170529170924.25488-5-o.rempel@pengutronix.de>
+References: <20170529170924.25488-1-o.rempel@pengutronix.de>
+ <20170529170924.25488-5-o.rempel@pengutronix.de>
+Message-ID: <20170605015027.GE4094@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 June 2017 at 16:24, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
-> On Fri, Jun 02, 2017 at 04:16:59PM -0600, Mathieu Poirier wrote:
->> Good afternoon Russell and friends,
->>
->> I noticed that my vexpress-TC2 platform stopped booting when moving to
->> kernel v4.12-rc1 (same with -rc2 and 3).  The last time things worked
->> properly was on v4.11.  I did a bisect between v4.11 and v4.12-rc1 and
->> ended up on [1], hence this email.
->>
->> Since CONFIG_ARM_VIRT_EXT is selected by  default I removed the
->> "#ifdef CONFIG_ARM_VIRT_EXT" section in the last hunk of the patch and
->> the system sprung up to life again.
->
-> Hmm, this doesn't make much sense.  The code in last hunk of the patch
-> you refer to should only get run during system shutdown, not during
-> system boot, so I think something else is going on...
->
-> Please could you test again, this time rather than removing the #ifdef,
-> add two "mov r0, r0" there?  (So replacing the two instructions that
-> removing the ifdef would have exposed.)
+On Mon, May 29, 2017 at 07:09:24PM +0200, Oleksij Rempel wrote:
+> This board, as well as some other boards with i.MX6 and a PMIC, uses a
+> "MPIC_STBY_REQ" line to notify the PMIC about a state change.
+> The PMIC is programmed for a specific state change before triggering the
+> line.
+> In this case, PMIC_STBY_REQ can be used for Stand by, Sleep
+> and Power off modes.
+> 
+> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+> Cc: kernel at pengutronix.de
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm/boot/dts/imx6dl-riotboard.dts | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6dl-riotboard.dts b/arch/arm/boot/dts/imx6dl-riotboard.dts
+> index 2cb72824e800..b5f25fe7b809 100644
+> --- a/arch/arm/boot/dts/imx6dl-riotboard.dts
+> +++ b/arch/arm/boot/dts/imx6dl-riotboard.dts
+> @@ -90,6 +90,10 @@
+>  	status = "okay";
+>  };
+>  
+> +&clks {
+> +	fsl,pmic_stby_poweroff;
+> +};
+> +
+>  &fec {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_enet>;
+> @@ -125,6 +129,7 @@
+>  		reg = <0x08>;
+>  		interrupt-parent = <&gpio5>;
+>  		interrupts = <16 8>;
+> +		fsl,pmic_stby_poweroff;
 
-That works - by replacing the original code with a couple of "mov r0,
-r0" the system is able to boot again.
+Is this property supported by upstream kernel?
 
->
-> Thanks.
->
-> --
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+Shawn
+
+>  
+>  		regulators {
+>  			reg_vddcore: sw1ab {				/* VDDARM_IN */
+> -- 
+> 2.11.0
+> 
