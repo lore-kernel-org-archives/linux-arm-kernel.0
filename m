@@ -1,53 +1,111 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 5 Jun 2017 14:44:19 +0200
-Subject: [linux-sunxi] [PATCH] net-next: stmmac: dwmac-sun8i: ensure the
- EPHY is properly reseted
-In-Reply-To: <20170605111019.GA29657@Red>
-References: <20170604175323.62124-1-icenowy@aosc.io>
- <20170605111019.GA29657@Red>
-Message-ID: <20170605124419.GF28734@lunn.ch>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Mon,  5 Jun 2017 13:51:12 +0100
+Subject: [PATCH v4.1 4/8] mm,
+ gup: Ensure real head page is ref-counted when using hugepages
+In-Reply-To: <20170524115409.31309-5-punit.agrawal@arm.com>
+References: <20170524115409.31309-5-punit.agrawal@arm.com>
+Message-ID: <20170605125112.19530-1-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 05, 2017 at 01:10:19PM +0200, Corentin Labbe wrote:
-> On Mon, Jun 05, 2017 at 01:53:23AM +0800, Icenowy Zheng wrote:
-> > The EPHY may be already enabled by bootloaders which have Ethernet
-> > capability (e.g. current U-Boot). Thus it should be reseted properly
-> > before doing the enabling sequence in the dwmac-sun8i driver, otherwise
-> > the EMAC reset process may fail if no cable is plugged, and then fail
-> > the dwmac-sun8i probing.
-> > 
-> > Tested on Orange Pi PC, One and Zero. All the boards fail to have
-> > dwmac-sun8i probed with "EMAC reset timeout" without cable plugged
-> > before, and with this fix they're now all able to successfully probe the
-> > EMAC without cable plugged and then use the connection after a cable is
-> > hot-plugged in.
-> > 
-> > Fixes: 9f93ac8d408 ("net-next: stmmac: Add dwmac-sun8i")
-> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> 
-> Thanks for the fix.
-> Tested-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> 
-> Since I am the writter of the file, does I have the right to:
-> Acked-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> or
-> Reviewed-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+When speculatively taking references to a hugepage using
+page_cache_add_speculative() in gup_huge_pmd(), it is assumed that the
+page returned by pmd_page() is the head page. Although normally true,
+this assumption doesn't hold when the hugepage comprises of successive
+page table entries such as when using contiguous bit on arm64 at PTE or
+PMD levels.
 
-Documentation/process/submitting-patches.rst says:
+This can be addressed by ensuring that the page passed to
+page_cache_add_speculative() is the real head or by de-referencing the
+head page within the function.
 
-If a person was not directly involved in the preparation or handling of a
-patch but wishes to signify and record their approval of it then they can
-ask to have an Acked-by: line added to the patch's changelog.
+We take the first approach to keep the usage pattern aligned with
+page_cache_get_speculative() where users already pass the appropriate
+page, i.e., the de-referenced head.
 
-Acked-by: is not as formal as Signed-off-by:.  It is a record that the acker
-has at least reviewed the patch and has indicated acceptance.
+Apply the same logic to fix gup_huge_[pud|pgd]() as well.
 
-Nothing limits who can give an Acked-by, you just need to of done the
-necessary work.
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Cc: Steve Capper <steve.capper@arm.com>
+Cc: Michal Hocko <mhocko@suse.com>
+Cc: "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>
+Cc: Aneesh Kumar K.V <aneesh.kumar@linux.vnet.ibm.com>
+---
 
-Reviewed-by: is similar.
+Hi Andrew,
 
-So feel free to have either.
+Please update the patch in your queue with this version.
 
-   Andrew
+It fixes the ltp failures reported by Yury[0]. The original patch led
+to incorrect ref-count on certain pages due to taking a referencing on
+the following page in some instances. Should be fixed with this
+version.
+
+Thanks,
+Punit
+
+[0] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-June/510318.html
+
+ mm/gup.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/mm/gup.c b/mm/gup.c
+index e74e0b5a0c7c..6bd39264d0e7 100644
+--- a/mm/gup.c
++++ b/mm/gup.c
+@@ -1354,8 +1354,7 @@ static int gup_huge_pmd(pmd_t orig, pmd_t *pmdp, unsigned long addr,
+ 		return __gup_device_huge_pmd(orig, addr, end, pages, nr);
+ 
+ 	refs = 0;
+-	head = pmd_page(orig);
+-	page = head + ((addr & ~PMD_MASK) >> PAGE_SHIFT);
++	page = pmd_page(orig) + ((addr & ~PMD_MASK) >> PAGE_SHIFT);
+ 	do {
+ 		pages[*nr] = page;
+ 		(*nr)++;
+@@ -1363,6 +1362,7 @@ static int gup_huge_pmd(pmd_t orig, pmd_t *pmdp, unsigned long addr,
+ 		refs++;
+ 	} while (addr += PAGE_SIZE, addr != end);
+ 
++	head = compound_head(pmd_page(orig));
+ 	if (!page_cache_add_speculative(head, refs)) {
+ 		*nr -= refs;
+ 		return 0;
+@@ -1392,8 +1392,7 @@ static int gup_huge_pud(pud_t orig, pud_t *pudp, unsigned long addr,
+ 		return __gup_device_huge_pud(orig, addr, end, pages, nr);
+ 
+ 	refs = 0;
+-	head = pud_page(orig);
+-	page = head + ((addr & ~PUD_MASK) >> PAGE_SHIFT);
++	page = pud_page(orig) + ((addr & ~PUD_MASK) >> PAGE_SHIFT);
+ 	do {
+ 		pages[*nr] = page;
+ 		(*nr)++;
+@@ -1401,6 +1400,7 @@ static int gup_huge_pud(pud_t orig, pud_t *pudp, unsigned long addr,
+ 		refs++;
+ 	} while (addr += PAGE_SIZE, addr != end);
+ 
++	head = compound_head(pud_page(orig));
+ 	if (!page_cache_add_speculative(head, refs)) {
+ 		*nr -= refs;
+ 		return 0;
+@@ -1429,8 +1429,7 @@ static int gup_huge_pgd(pgd_t orig, pgd_t *pgdp, unsigned long addr,
+ 
+ 	BUILD_BUG_ON(pgd_devmap(orig));
+ 	refs = 0;
+-	head = pgd_page(orig);
+-	page = head + ((addr & ~PGDIR_MASK) >> PAGE_SHIFT);
++	page = pgd_page(orig) + ((addr & ~PGDIR_MASK) >> PAGE_SHIFT);
+ 	do {
+ 		pages[*nr] = page;
+ 		(*nr)++;
+@@ -1438,6 +1437,7 @@ static int gup_huge_pgd(pgd_t orig, pgd_t *pgdp, unsigned long addr,
+ 		refs++;
+ 	} while (addr += PAGE_SIZE, addr != end);
+ 
++	head = compound_head(pgd_page(orig));
+ 	if (!page_cache_add_speculative(head, refs)) {
+ 		*nr -= refs;
+ 		return 0;
+-- 
+2.11.0
