@@ -1,29 +1,60 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 05 Jun 2017 11:23:37 -0400 (EDT)
-Subject: [PATCH] net-next: stmmac: dwmac-sun8i: ensure the EPHY is
- properly reseted
-In-Reply-To: <20170604175323.62124-1-icenowy@aosc.io>
-References: <20170604175323.62124-1-icenowy@aosc.io>
-Message-ID: <20170605.112337.1925463603967545555.davem@davemloft.net>
+From: atull@kernel.org (Alan Tull)
+Date: Mon, 5 Jun 2017 10:12:14 -0500
+Subject: [PATCH v12 4/6] ARM: dts: imx6q-evi: support altera-ps-spi
+In-Reply-To: <8253d3ad7de8ba991de9f23fd68b8f9502c1ffe0.1496434383.git.stillcompiling@gmail.com>
+References: <20170525172911.11467-1-stillcompiling@gmail.com>
+ <684ea151ba9aa2c6555a299daf56552ddc11f596.1496434383.git.stillcompiling@gmail.com>
+ <8253d3ad7de8ba991de9f23fd68b8f9502c1ffe0.1496434383.git.stillcompiling@gmail.com>
+Message-ID: <CANk1AXQ3i-mmQRBKUpi7_6fYtLGtgKni5qKGLmvncWpkmw+tRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Icenowy Zheng <icenowy@aosc.io>
-Date: Mon,  5 Jun 2017 01:53:23 +0800
+On Fri, Jun 2, 2017 at 3:30 PM, Joshua Clayton <stillcompiling@gmail.com> wrote:
+> Add support for Altera FPGA connected to an spi port
+> to the evi devicetree file
+>
+> Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
 
-> The EPHY may be already enabled by bootloaders which have Ethernet
-> capability (e.g. current U-Boot). Thus it should be reseted properly
-> before doing the enabling sequence in the dwmac-sun8i driver, otherwise
-> the EMAC reset process may fail if no cable is plugged, and then fail
-> the dwmac-sun8i probing.
-> 
-> Tested on Orange Pi PC, One and Zero. All the boards fail to have
-> dwmac-sun8i probed with "EMAC reset timeout" without cable plugged
-> before, and with this fix they're now all able to successfully probe the
-> EMAC without cable plugged and then use the connection after a cable is
-> hot-plugged in.
-> 
-> Fixes: 9f93ac8d408 ("net-next: stmmac: Add dwmac-sun8i")
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Signed-off-by: Alan Tull <atull@kernel.org>
 
-Applied, thanks.
+> ---
+>  arch/arm/boot/dts/imx6q-evi.dts | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/imx6q-evi.dts b/arch/arm/boot/dts/imx6q-evi.dts
+> index 24fe093a66db..59aebbc95671 100644
+> --- a/arch/arm/boot/dts/imx6q-evi.dts
+> +++ b/arch/arm/boot/dts/imx6q-evi.dts
+> @@ -82,6 +82,15 @@
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&pinctrl_ecspi1 &pinctrl_ecspi1cs>;
+>         status = "okay";
+> +
+> +       fpga: fpga at 0 {
+> +               compatible = "altr,fpga-passive-serial";
+> +               spi-max-frequency = <20000000>;
+> +               reg = <0>;
+> +               pinctrl-0 = <&pinctrl_fpgaspi>;
+> +               nconfig-gpios = <&gpio4 9 GPIO_ACTIVE_LOW>;
+> +               nstat-gpios = <&gpio4 11 GPIO_ACTIVE_LOW>;
+> +       };
+>  };
+>
+>  &ecspi3 {
+> @@ -313,6 +322,13 @@
+>                 >;
+>         };
+>
+> +       pinctrl_fpgaspi: fpgaspigrp {
+> +               fsl,pins = <
+> +                       MX6QDL_PAD_KEY_ROW1__GPIO4_IO09 0x1b0b0
+> +                       MX6QDL_PAD_KEY_ROW2__GPIO4_IO11 0x1b0b0
+> +               >;
+> +       };
+> +
+>         pinctrl_gpminand: gpminandgrp {
+>                 fsl,pins = <
+>                         MX6QDL_PAD_NANDF_CLE__NAND_CLE 0xb0b1
+> --
+> 2.11.0
+>
