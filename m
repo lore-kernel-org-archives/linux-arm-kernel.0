@@ -1,54 +1,47 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 5 Jun 2017 11:27:12 +0100
-Subject: [PATCH v2 05/25] KVM: arm64: vgic-v3: Add ICV_BPR1_EL1 handler
-In-Reply-To: <20170605101609.GA12884@cbox>
-References: <20170601102117.17750-1-marc.zyngier@arm.com>
- <20170601102117.17750-6-marc.zyngier@arm.com>
- <20170604202528.GH9464@cbox> <5b8acdaf-e5a5-25fd-fffe-5ff42d501ee0@arm.com>
- <20170605101609.GA12884@cbox>
-Message-ID: <CAFEAcA8VEU+wxnNV9OS7B41=QkH1gTGLOfbvXxRi6P8jE3v=zw@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 5 Jun 2017 11:30:17 +0100
+Subject: [PATCHv2] arm: LPAE: kexec: clear TTBCR.T1SZ explicitly when
+ PHYS_OFFSET > PAGE_OFFSET
+In-Reply-To: <1496657199-29589-1-git-send-email-hoeun.ryu@gmail.com>
+References: <1496657199-29589-1-git-send-email-hoeun.ryu@gmail.com>
+Message-ID: <bb00a038-b6b8-2da9-7b16-0c2ea96a44b5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 June 2017 at 11:16, Christoffer Dall <cdall@linaro.org> wrote:
-> On Mon, Jun 05, 2017 at 10:58:57AM +0100, Marc Zyngier wrote:
->> From the ICC_BPR0_EL1 documentation:
->>
->> "An attempt to program the binary point field to a value less than the
->> minimum value sets the field to the minimum value."
->>
->> That's the only way you can find out about the minimum value (and the
->> kernel also uses this functionality to be in a known state, even if it
->> doesn't use preemption yet).
->>
->
-> Hmm, the ICV_BPR0_EL1 says:
->   "An attempt to program the binary point field to a value less than the
->   minimum value sets the field to the minimum value. On a reset, the
->   binary point field is set to the minimum supported value."
->
-> But then the ICV_BPR1_EL1 says:
->   "An attempt to program the binary point field to a value less than the
->   reset value sets the field to the reset value."
->
->   and
->
->   "Writing 0 to this field will set this field to its reset value, which
->   is IMPLEMENTATION DEFINED and non-zero."
+On 05/06/17 11:06, Hoeun Ryu wrote:
+>  Clearing TTBCR.T1SZ explicitly when kernel runs on a configuration of
+> PHYS_OFFSET > PAGE_OFFSET.
+>  Reading TTBCR in early boot stage might returns the value of the
+> previous kernel's configuration, especially in case of kexec. For
+> example, if normal kernel (first kernel) had run on a configuration
+> of PHYS_OFFSET <= PAGE_OFFSET and crash kernel (second kernel) is
+> running on a configuration PHYS_OFFSET > PAGE_OFFSET, which can happen
+> because it depends on the reserved area for crash kernel, reading
+> TTBCR and using the value without clearing TTBCR.T1SZ might risky
+> because the value doesn't have a reset value for TTBCR.T1SZ.
 
-It also later says that the ICV_BPR1_EL1 IMPDEF reset value is always
-the ICV_BPR0_EL1 reset value plus one.
+Hmm, but isn't that also strictly true of all the other fields we're
+ORing TTB_FLAGS_* into? Given that this is initial setup, I wonder
+whether we need to care about the previous TTBCR value at all - is there
+any reason for not simply building up the value we want from scratch?
 
-> So it seems like the spec is making some distinction between minimum or
-> reset value and between the two registers, but I'm not sure if the spec
-> is just having its fun with us, or if there's something important to be
-> aware of here.
+Robin.
 
-I think the plus-one is the only interesting difference and the
-rest is just accidental difference of wording.
-
-There is a difference between ICV_BPR* and ICC_BPR*, which is that
-the latter reset to an UNKNOWN value, not necessarily the minimum.
-
-thanks
--- PMM
+> Signed-off-by: Hoeun Ryu <hoeun.ryu@gmail.com>
+> ---
+>  arch/arm/mm/proc-v7-3level.S | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+> index 5e5720e..81404b8 100644
+> --- a/arch/arm/mm/proc-v7-3level.S
+> +++ b/arch/arm/mm/proc-v7-3level.S
+> @@ -140,6 +140,7 @@ ENDPROC(cpu_v7_set_pte_ext)
+>  	 * otherwise booting secondary CPUs would end up using TTBR1 for the
+>  	 * identity mapping set up in TTBR0.
+>  	 */
+> +	bichi	\tmp, \tmp, #(7 << 16)				@ clear TTBCR.T1SZ
+>  	orrls	\tmp, \tmp, #TTBR1_SIZE				@ TTBCR.T1SZ
+>  	mcr	p15, 0, \tmp, c2, c0, 2				@ TTBCR
+>  	mov	\tmp, \ttbr1, lsr #20
+> 
