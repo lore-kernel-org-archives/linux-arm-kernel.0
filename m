@@ -1,68 +1,47 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 5 Jun 2017 10:08:47 +0100
-Subject: [PATCH] efi: arm: Don't mark ACPI reclaim memory as MEMBLOCK_NOMAP
-In-Reply-To: <20170605080435.2498-1-ard.biesheuvel@linaro.org>
-References: <20170605080435.2498-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170605090847.GC4650@leverpostej>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 5 Jun 2017 10:10:23 +0100
+Subject: [PATCH v2 03/25] KVM: arm64: Make kvm_condition_valid32()
+ accessible from EL2
+In-Reply-To: <20170605082321.GA8984@cbox>
+References: <20170601102117.17750-1-marc.zyngier@arm.com>
+ <20170601102117.17750-4-marc.zyngier@arm.com> <20170604121129.GB9464@cbox>
+ <394ef6fd-1123-0a1f-f462-ed5cb52e24da@arm.com> <20170605082321.GA8984@cbox>
+Message-ID: <2ab26ba3-26b7-4072-00ca-eefd2bdf269b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 05, 2017 at 08:04:35AM +0000, Ard Biesheuvel wrote:
-> On ARM, regions of memory that are described by UEFI as having special
-> significance to the firmware itself are omitted from the linear mapping.
-> This is necessary since we cannot guarantee that alternate mappings of
-> the same physical region will use attributes that are compatible with
-> the ones we use for the linear mapping, and aliases with mismatched
-> attributes are prohibited by the architecture.
+On 05/06/17 09:23, Christoffer Dall wrote:
+> On Mon, Jun 05, 2017 at 09:13:53AM +0100, Marc Zyngier wrote:
+>> On 04/06/17 13:11, Christoffer Dall wrote:
+>>> On Thu, Jun 01, 2017 at 11:20:55AM +0100, Marc Zyngier wrote:
+>>>> As we're about to trap CP15 accesses and handle them at EL2, we
+>>>> need to evaluate whether or not the condition flags are valid,
+>>>> as an implementation is allowed to trap despite the condition
+>>>> not being met.
+>>>>
+>>>> Tagging the function as __hyp_text allows this.
+>>>
+>>> is the cc_map also guaranteed to work (by simple reference) in EL2 then?
+>>
+>> Yes. By virtue of being const, this ends up in the read-only part of the
+>> kernel, which we always map at EL2.
+>>
 > 
-> The above does not apply to ACPI reclaim regions: such regions have no
-> special significance to the firmware, and it is up to the OS to decide
-> whether or not to preserve them after it has consumed their contents,
-> and for how long, after which time the OS can use the memory in any way
-> it likes. In the Linux case, such regions are preserved indefinitely,
-> and are simply treated the same way as other 'reserved' memory types.
-> 
-> Punching holes into the linear mapping causes page table fragmentation,
-> which increases TLB pressure, and so we should avoid doing so if we can.
-> So add a special case for regions of type EFI_ACPI_RECLAIM_MEMORY, and
-> memblock_reserve() them instead of marking them MEMBLOCK_NOMAP.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> And why don't we have to do any address-translation-to-hyp tricks on the
+> address?  Are we guaranteed that it's a relative address and everything
+> is relocated with the same offset, or how was that again?
 
-Sounds sane to me. FWIW:
+Arghh, I completely missed this. Yeah, it works because this is a single
+compilation unit, that the array is static, used only once, and that the
+compiler is using relative addressing and not playing any dirty tricks
+on us.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+We could make the whole thing private to kvm_condition_valid32, but
+that's not more of a guarantee that things won't break if the compiler
+decides to generate absolute addresses.
 
 Thanks,
-Mark.
 
-> ---
->  drivers/firmware/efi/arm-init.c | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
-> index 1027d7b44358..0aa4ce7b4fbb 100644
-> --- a/drivers/firmware/efi/arm-init.c
-> +++ b/drivers/firmware/efi/arm-init.c
-> @@ -159,6 +159,7 @@ static __init int is_usable_memory(efi_memory_desc_t *md)
->  	switch (md->type) {
->  	case EFI_LOADER_CODE:
->  	case EFI_LOADER_DATA:
-> +	case EFI_ACPI_RECLAIM_MEMORY:
->  	case EFI_BOOT_SERVICES_CODE:
->  	case EFI_BOOT_SERVICES_DATA:
->  	case EFI_CONVENTIONAL_MEMORY:
-> @@ -211,6 +212,10 @@ static __init void reserve_regions(void)
->  
->  			if (!is_usable_memory(md))
->  				memblock_mark_nomap(paddr, size);
-> +
-> +			/* keep ACPI reclaim memory intact for kexec etc. */
-> +			if (md->type == EFI_ACPI_RECLAIM_MEMORY)
-> +				memblock_reserve(paddr, size);
->  		}
->  	}
->  }
-> -- 
-> 2.9.3
-> 
+	M.
+-- 
+Jazz is not dead. It just smells funny...
