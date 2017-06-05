@@ -1,105 +1,91 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Mon,  5 Jun 2017 08:17:47 -0300
-Subject: [PATCH v2 1/3] ARM: dts: imx7d-sdb: Adjust the regulator nodes
-Message-ID: <1496661469-15735-1-git-send-email-festevam@gmail.com>
+Date: Mon,  5 Jun 2017 08:17:48 -0300
+Subject: [PATCH v2 2/3] ARM: dts: imx7d-sdb: Add Wifi support
+In-Reply-To: <1496661469-15735-1-git-send-email-festevam@gmail.com>
+References: <1496661469-15735-1-git-send-email-festevam@gmail.com>
+Message-ID: <1496661469-15735-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@nxp.com>
 
-It is not recommended to place the regulator nodes inside 'simple-bus',
-so adjust them accordingly.
+imx7d-sdb has a BCM4339 Wifi chip connected to USDHC2.
 
-The motivation for rearranging this is to make it easier to add new
-regulator nodes in the future.
+Add support for it.
+
+While at it, move the WL_REG_ON pin to the correct pinctrl node.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
 Changes since v1:
-- None
+- Use 'wakeup-source'
 
- arch/arm/boot/dts/imx7d-sdb.dts | 66 +++++++++++++++++------------------------
- 1 file changed, 28 insertions(+), 38 deletions(-)
+ arch/arm/boot/dts/imx7d-sdb.dts | 32 +++++++++++++++++++++++++++++++-
+ 1 file changed, 31 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
-index 77c400f..38944ca 100644
+index 38944ca..fc7e0b0 100644
 --- a/arch/arm/boot/dts/imx7d-sdb.dts
 +++ b/arch/arm/boot/dts/imx7d-sdb.dts
-@@ -73,47 +73,37 @@
- 		};
+@@ -105,6 +105,18 @@
+ 		regulator-min-microvolt = <1800000>;
+ 		regulator-max-microvolt = <1800000>;
  	};
- 
--	regulators {
--		compatible = "simple-bus";
--		#address-cells = <1>;
--		#size-cells = <0>;
--
--		reg_usb_otg1_vbus: regulator at 0 {
--			compatible = "regulator-fixed";
--			reg = <0>;
--			regulator-name = "usb_otg1_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
--			enable-active-high;
--		};
-+	reg_usb_otg1_vbus: regulator-usb-otg1-vbus {
++
++	reg_brcm: regulator-brcm {
 +		compatible = "regulator-fixed";
-+		regulator-name = "usb_otg1_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
++		gpio = <&gpio4 21 GPIO_ACTIVE_HIGH>;
 +		enable-active-high;
-+	};
- 
--		reg_usb_otg2_vbus: regulator at 1 {
--			compatible = "regulator-fixed";
--			reg = <1>;
--			regulator-name = "usb_otg2_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			gpio = <&gpio4 7 GPIO_ACTIVE_HIGH>;
--			enable-active-high;
--		};
-+	reg_usb_otg2_vbus: regulator-usb-otg1-vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_otg2_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio4 7 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
- 
--		reg_can2_3v3: regulator at 2 {
--			compatible = "regulator-fixed";
--			reg = <2>;
--			regulator-name = "can2-3v3";
--			regulator-min-microvolt = <3300000>;
--			regulator-max-microvolt = <3300000>;
--			gpio = <&gpio1 7 GPIO_ACTIVE_LOW>;
--		};
-+	reg_can2_3v3: regulator-can2-3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "can2-3v3";
++		regulator-name = "brcm_reg";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_brcm_reg>;
 +		regulator-min-microvolt = <3300000>;
 +		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio1 7 GPIO_ACTIVE_LOW>;
++		startup-delay-us = <200000>;
 +	};
- 
--		reg_vref_1v8: regulator at 3 {
--			compatible = "regulator-fixed";
--			reg = <3>;
--			regulator-name = "vref-1v8";
--			regulator-min-microvolt = <1800000>;
--			regulator-max-microvolt = <1800000>;
--		};
-+	reg_vref_1v8: regulator-vref-1v8 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vref-1v8";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
- 	};
  };
+ 
+ &adc1 {
+@@ -379,6 +391,19 @@
+ 	status = "okay";
+ };
+ 
++&usdhc2 {
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
++	pinctrl-0 = <&pinctrl_usdhc2>;
++	pinctrl-1 = <&pinctrl_usdhc2_100mhz>;
++	pinctrl-2 = <&pinctrl_usdhc2_200mhz>;
++	wakeup-source;
++	keep-power-in-suspend;
++	non-removable;
++	vmmc-supply = <&reg_brcm>;
++	fsl,tuning-step = <2>;
++	status = "okay";
++};
++
+ &usdhc3 {
+ 	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+ 	pinctrl-0 = <&pinctrl_usdhc3>;
+@@ -403,6 +428,12 @@
+ 	pinctrl-0 = <&pinctrl_hog>;
+ 
+ 	imx7d-sdb {
++		pinctrl_brcm_reg: brcmreggrp {
++			fsl,pins = <
++				MX7D_PAD_ECSPI2_MOSI__GPIO4_IO21	0x14
++			>;
++		};
++
+ 		pinctrl_ecspi3: ecspi3grp {
+ 			fsl,pins = <
+ 				MX7D_PAD_SAI2_TX_SYNC__ECSPI3_MISO	0x2
+@@ -570,7 +601,6 @@
+ 				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x59
+ 				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x59
+ 				MX7D_PAD_SD2_DATA3__SD2_DATA3		0x59
+-				MX7D_PAD_ECSPI2_MOSI__GPIO4_IO21	0x59 /* WL_REG_ON */
+ 			>;
+ 		};
  
 -- 
 2.7.4
