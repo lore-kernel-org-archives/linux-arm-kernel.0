@@ -1,70 +1,47 @@
-From: atull@kernel.org (Alan Tull)
-Date: Mon, 5 Jun 2017 10:12:30 -0500
-Subject: [PATCH v12 5/6] lib: add bitrev8x4()
-In-Reply-To: <7108de698ffdeaa3c61a23997bc0877120bf114e.1496434383.git.stillcompiling@gmail.com>
-References: <20170525172911.11467-1-stillcompiling@gmail.com>
- <684ea151ba9aa2c6555a299daf56552ddc11f596.1496434383.git.stillcompiling@gmail.com>
- <7108de698ffdeaa3c61a23997bc0877120bf114e.1496434383.git.stillcompiling@gmail.com>
-Message-ID: <CANk1AXQbyaRAn7dzz3P4gneOqYbnhU1GNS5dwSbnUt3_Z-903g@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 5 Jun 2017 23:14:43 +0800
+Subject: [PATCH] arm64: dts: ls1088a: update sata node
+In-Reply-To: <1496648752-27627-1-git-send-email-andy.tang@nxp.com>
+References: <1496648752-27627-1-git-send-email-andy.tang@nxp.com>
+Message-ID: <20170605151441.GL4094@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 2, 2017 at 3:30 PM, Joshua Clayton <stillcompiling@gmail.com> wrote:
-> Add a function to reverse bytes within a 32 bit word.
-> Operate on a u32 rather than individual bytes.
->
-> Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
+On Mon, Jun 05, 2017 at 03:45:52PM +0800, Yuantian Tang wrote:
+> 1. Remove ls1043a compatible string from node
 
-Signed-off-by: Alan Tull <atull@kernel.org>
+Can you explain a bit why the compatible string needs to be dropped?
 
+Shawn
+
+> 2. Fix the sata ecc register address error
+> 
+> Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
 > ---
->  include/linux/bitrev.h | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
->
-> diff --git a/include/linux/bitrev.h b/include/linux/bitrev.h
-> index fb790b8449c1..b97be27e5a85 100644
-> --- a/include/linux/bitrev.h
-> +++ b/include/linux/bitrev.h
-> @@ -29,6 +29,8 @@ static inline u32 __bitrev32(u32 x)
->
->  #endif /* CONFIG_HAVE_ARCH_BITREVERSE */
->
-> +#define __bitrev8x4(x) (__bitrev32(swab32(x)))
-> +
->  #define __constant_bitrev32(x) \
->  ({                                     \
->         u32 __x = x;                    \
-> @@ -50,6 +52,15 @@ static inline u32 __bitrev32(u32 x)
->         __x;                                                            \
->  })
->
-> +#define __constant_bitrev8x4(x) \
-> +({                     \
-> +       u32 __x = x;    \
-> +       __x = ((__x & (u32)0xF0F0F0F0UL) >> 4) | ((__x & (u32)0x0F0F0F0FUL) << 4);      \
-> +       __x = ((__x & (u32)0xCCCCCCCCUL) >> 2) | ((__x & (u32)0x33333333UL) << 2);      \
-> +       __x = ((__x & (u32)0xAAAAAAAAUL) >> 1) | ((__x & (u32)0x55555555UL) << 1);      \
-> +       __x;                                                            \
-> +})
-> +
->  #define __constant_bitrev8(x)  \
->  ({                                     \
->         u8 __x = x;                     \
-> @@ -75,6 +86,14 @@ static inline u32 __bitrev32(u32 x)
->         __bitrev16(__x);                                \
->   })
->
-> +#define bitrev8x4(x) \
-> +({                     \
-> +       u32 __x = x;    \
-> +       __builtin_constant_p(__x) ?     \
-> +       __constant_bitrev8x4(__x) :                     \
-> +       __bitrev8x4(__x);                               \
-> + })
-> +
->  #define bitrev8(x) \
->  ({                     \
->         u8 __x = x;     \
-> --
-> 2.11.0
->
+>  arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> index df16284..c144d06 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> @@ -360,9 +360,9 @@
+>  		};
+>  
+>  		sata: sata at 3200000 {
+> -			compatible = "fsl,ls1088a-ahci", "fsl,ls1043a-ahci";
+> +			compatible = "fsl,ls1088a-ahci";
+>  			reg = <0x0 0x3200000 0x0 0x10000>,
+> -				<0x0 0x20140520 0x0 0x4>;
+> +				<0x7 0x100520 0x0 0x4>;
+>  			reg-names = "ahci", "sata-ecc";
+>  			interrupts = <0 133 IRQ_TYPE_LEVEL_HIGH>;
+>  			clocks = <&clockgen 4 3>;
+> -- 
+> 2.1.0.27.g96db324
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
