@@ -1,97 +1,56 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 5 Jun 2017 12:20:25 -0500
-Subject: [PATCH 2/7] dt-bindings: PCI: Describe ATS property for root
- complex nodes
-In-Reply-To: <cd63a2dc-8259-482d-19e9-9db60be866f7@arm.com>
-References: <20170524180143.19855-1-jean-philippe.brucker@arm.com>
- <20170524180143.19855-3-jean-philippe.brucker@arm.com>
- <20170531172320.3u6bdctv44aqighy@rob-hp-laptop>
- <cd63a2dc-8259-482d-19e9-9db60be866f7@arm.com>
-Message-ID: <20170605172025.qgnocl5ytexnklue@rob-hp-laptop>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 5 Jun 2017 17:26:05 +0000
+Subject: [PATCH v2 1/2] arm64: ftrace: don't validate branch via PLT in
+ ftrace_make_nop()
+In-Reply-To: <20170605171552.GQ21944@arm.com>
+References: <20170530135220.20759-1-ard.biesheuvel@linaro.org>
+ <20170530135220.20759-2-ard.biesheuvel@linaro.org>
+ <20170605171552.GQ21944@arm.com>
+Message-ID: <CAKv+Gu9bTCQTO5SvuMz8VNQW4bT-OsS3UqqiifeuRAVE5Lburg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 01, 2017 at 01:28:01PM +0100, Jean-Philippe Brucker wrote:
-> On 31/05/17 18:23, Rob Herring wrote:
-> > On Wed, May 24, 2017 at 07:01:38PM +0100, Jean-Philippe Brucker wrote:
-> >> Address Translation Service (ATS) is an extension to PCIe allowing
-> >> endpoints to manage their own IOTLB, called Address Translation Cache
-> >> (ATC). Instead of having every memory transaction processed by the IOMMU,
-> >> the endpoint can first send an Address Translation Requests for an IOVA,
-> >> obtain the corresponding Physical Address from the IOMMU and store it in
-> >> its ATC. Subsequent transactions to this memory region can be performed on
-> >> the PA, in which case they are marked 'translated' and (partially) bypass
-> >> the IOMMU.
-> >>
-> >> Since the extension uses fields that were previously reserved in the
-> >> PCIe Translation Layer Packet, it seems ill-advised to enabled it on a
-> >> system that doesn't fully support ATS.
-> >>
-> >> To "old" root complexes that simply ignored the new AT field, an Address
-> >> Translation Request will look exactly like a Memory Read Request, so the
-> >> root bridge will forward a memory read to the IOMMU instead of a
-> >> translation request. If the access succeeds, the RC will send a Read
-> >> Completion, which looks like a Translation Completion, back to the
-> >> endpoint. As a result the endpoint might end up storing the content of
-> >> memory instead of a physical address in its ATC. In reality, it's more
-> >> likely that the size fields will be invalid and either end will detect the
-> >> error, but in any case, it is undesirable.
-> >>
-> >> Add a way for firmware to tell the OS that ATS is supported by the PCI
-> >> root complex.
-> > 
-> > Can't firmware have already enabled ATS? Often for things like this, not 
-> > present means "use firmware setting".
-> 
-> I don't think it's up to firmware to enable ATS in endpoints, because it
-> depends on IOMMU properties (e.g. configured page size). It must also be
-> enabled after the PASID capability, which the OS may or may not want to
-> enable.
-> 
-> While endpoints have ATS capability and config register, there is no
-> architected mechanism in root complexes as far as I know. So firmware may
-> have a mechanism outside the OS scope to toggle ATS in the root complex.
-> If there is a bug and firmware cannot enable ATS, then the OS must be made
-> aware of it, so that it doesn't enable ATS in endpoints, or else we might
-> end up with silent memory corruption as described above. (Lack of ATS may
-> slow the system down but shouldn't be fatal.)
-> 
-> If the SMMU supports ATS, then the root complex attached to it will most
-> likely supports ATS. The switch in this patch simply allows firmware to
-> confirm that.
-> 
-> >> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-> >> ---
-> >>  Documentation/devicetree/bindings/pci/pci-iommu.txt | 8 ++++++++
-> >>  1 file changed, 8 insertions(+)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/pci/pci-iommu.txt b/Documentation/devicetree/bindings/pci/pci-iommu.txt
-> >> index 0def586fdcdf..f21a68ec471a 100644
-> >> --- a/Documentation/devicetree/bindings/pci/pci-iommu.txt
-> >> +++ b/Documentation/devicetree/bindings/pci/pci-iommu.txt
-> >> @@ -44,6 +44,14 @@ Optional properties
-> >>  - iommu-map-mask: A mask to be applied to each Requester ID prior to being
-> >>    mapped to an IOMMU specifier per the iommu-map property.
-> >>  
-> >> +- ats-supported: if present, the root complex supports the Address
-> >> +  Translation Service (ATS). It is able to interpret the AT field in PCIe
-> >> +  Transaction Layer Packets, and forward Translation Completions or
-> >> +  Invalidation Requests to endpoints.
-> > 
-> > Why can't this be based on the compatible strings?
-> 
-> Host controllers like the generic ECAM one should be able to advertise
-> ATS, if for instance the virtual IOMMU in Qemu offers a channel for ATS
-> invalidation. In that case we would have pci-host-{e,}cam-generic{-ats,}
-> compatible strings and double the number of compatible strings each time
-> we add a similar capability.
+On 5 June 2017 at 17:15, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, May 30, 2017 at 01:52:19PM +0000, Ard Biesheuvel wrote:
+>> When turning branch instructions into NOPs, we attempt to validate the
+>> action by comparing the old value at the call site with the opcode of
+>> a direct relative branch instruction pointing at the old target.
+>>
+>> However, these call sites are statically initialized to call _mcount(),
+>> and may be redirected via a PLT entry if the module is loaded far away
+>> from the kernel text, leading to false negatives and spurious errors.
+>>
+>> So skip the validation if CONFIG_ARM64_MODULE_PLTS is configured.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm64/kernel/ftrace.c | 9 ++++++---
+>>  1 file changed, 6 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
+>> index 40ad08ac569a..a8db6857cad6 100644
+>> --- a/arch/arm64/kernel/ftrace.c
+>> +++ b/arch/arm64/kernel/ftrace.c
+>> @@ -84,12 +84,15 @@ int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
+>>                   unsigned long addr)
+>>  {
+>>       unsigned long pc = rec->ip;
+>> -     u32 old, new;
+>> +     u32 old = 0, new;
+>>
+>> -     old = aarch64_insn_gen_branch_imm(pc, addr, AARCH64_INSN_BRANCH_LINK);
+>> +     if (!IS_ENABLED(CONFIG_ARM64_MODULE_PLTS))
+>> +             old = aarch64_insn_gen_branch_imm(pc, addr,
+>> +                                               AARCH64_INSN_BRANCH_LINK);
+>>       new = aarch64_insn_gen_nop();
+>>
+>> -     return ftrace_modify_code(pc, old, new, true);
+>> +     return ftrace_modify_code(pc, old, new,
+>> +                               !IS_ENABLED(CONFIG_ARM64_MODULE_PLTS));
+>
+> Even in the case of PLTs, the instruction is still a branch instruction,
+> so could we validate the basic opcode fields rather than disable the check
+> altogether?
+>
 
-It would not double the compatibles. A given SoC will either support ATS 
-or not, right? A given compatible will imply whether ATS is supported or 
-not.
-
-pci-host-{e,}cam-generic is a special case. I'm okay with having a 
-property for that I suppose. We should not require this property though 
-and allow for it to be implied by the SoC specific compatible as well.
-
-Rob
+That shouldn't be too hard.
