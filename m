@@ -1,92 +1,56 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Mon, 5 Jun 2017 14:53:30 +0530
-Subject: [PATCH v2] misc: atmel-ssc: Handle return value of
- clk_prepare_enable and clk_prepare
-In-Reply-To: <20170603221753.lfiqthuc7dxy3dmc@piout.net>
-References: <3a6a9ccd68fe298ab33009eaaace85c5af73e1ea.1496381884.git.arvind.yadav.cs@gmail.com>
- <20170603221753.lfiqthuc7dxy3dmc@piout.net>
-Message-ID: <aa38479b-0597-17ca-ab2b-1092ece77d11@gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 5 Jun 2017 10:24:41 +0100
+Subject: [PATCH v1 2/4] coresight: add and remove panic callback for sink
+In-Reply-To: <1496500976-18362-3-git-send-email-leo.yan@linaro.org>
+References: <1496500976-18362-1-git-send-email-leo.yan@linaro.org>
+ <1496500976-18362-3-git-send-email-leo.yan@linaro.org>
+Message-ID: <ed729e35-f5aa-cd03-410b-a6ad366b4170@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 03/06/17 15:42, Leo Yan wrote:
+> If the sink device has panic callback function, add the panic callback
+> node for coresight panic dump list when the sink device is enabled;
+> also cleanup the node when the sink device is disabled.
+>
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> ---
+>  drivers/hwtracing/coresight/coresight.c | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+> index 0c37356..5928886 100644
+> --- a/drivers/hwtracing/coresight/coresight.c
+> +++ b/drivers/hwtracing/coresight/coresight.c
+> @@ -138,6 +138,13 @@ static int coresight_enable_sink(struct coresight_device *csdev, u32 mode)
+>  			if (ret)
+>  				return ret;
+>  		}
+> +
+> +		/* Add kernel panic callback */
+> +		if (sink_ops(csdev)->panic_cb) {
+> +			ret = coresight_add_panic_cb(csdev);
+> +			if (ret)
+> +				return ret;
+> +		}
+>  		csdev->enable = true;
+>  	}
+>
+> @@ -149,6 +156,10 @@ static int coresight_enable_sink(struct coresight_device *csdev, u32 mode)
+>  static void coresight_disable_sink(struct coresight_device *csdev)
+>  {
+>  	if (atomic_dec_return(csdev->refcnt) == 0) {
+> +		/* Remove kernel panic callback */
+> +		if (sink_ops(csdev)->panic_cb)
+> +			coresight_del_panic_cb(csdev);
+> +
+>  		if (sink_ops(csdev)->disable) {
+>  			sink_ops(csdev)->disable(csdev);
+>  			csdev->enable = false;
+>
 
-Yes, Patch v1 was wrong that's why i have push v2.
-clk_prepare and clk_prepare_enable can fail. There
-is not harm to check it's return value. It'll not impact present
-functionality.
+Just a thought, instead of adding/deleting every time the sink is enabled,
+could we add/del the device once for-ever and let the panic_cb decide to dump
+it based on whether the device was active or not ?
 
--arvind
-
-On Sunday 04 June 2017 03:47 AM, Alexandre Belloni wrote:
-> Hi,
->
-> It is getting tiring to get patches that are nor even compile tested
-> resulting from whatever static analysis tool you used.
->
-> This patch has almost no value and v1 was clearly wrong.
->
-> Do you realize clk_prepare and clk_prepare_enable will never fail for
-> the SSC?
->
-> On 02/06/2017 at 11:09:02 +0530, Arvind Yadav wrote:
->> clk_prepare_enable() and clk_prepare() can fail here and
->> we must check its return value.
->>
->> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
->> ---
->>   drivers/misc/atmel-ssc.c | 12 ++++++++++--
->>   1 file changed, 10 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
->> index b2a0340..df34b81 100644
->> --- a/drivers/misc/atmel-ssc.c
->> +++ b/drivers/misc/atmel-ssc.c
->> @@ -30,6 +30,7 @@ struct ssc_device *ssc_request(unsigned int ssc_num)
->>   {
->>   	int ssc_valid = 0;
->>   	struct ssc_device *ssc;
->> +	int ret;
->>   
->>   	spin_lock(&user_lock);
->>   	list_for_each_entry(ssc, &ssc_list, list) {
->> @@ -60,7 +61,11 @@ struct ssc_device *ssc_request(unsigned int ssc_num)
->>   	ssc->user++;
->>   	spin_unlock(&user_lock);
->>   
->> -	clk_prepare(ssc->clk);
->> +	ret = clk_prepare(ssc->clk);
->> +	if (ret) {
->> +		pr_err("Failed to prepare clock\n");
->> +		return ERR_PTR(ret);
->> +	}
->>   
->>   	return ssc;
->>   }
->> @@ -195,6 +200,7 @@ static int ssc_probe(struct platform_device *pdev)
->>   	struct resource *regs;
->>   	struct ssc_device *ssc;
->>   	const struct atmel_ssc_platform_data *plat_dat;
->> +	int ret;
->>   
->>   	ssc = devm_kzalloc(&pdev->dev, sizeof(struct ssc_device), GFP_KERNEL);
->>   	if (!ssc) {
->> @@ -229,7 +235,9 @@ static int ssc_probe(struct platform_device *pdev)
->>   	}
->>   
->>   	/* disable all interrupts */
->> -	clk_prepare_enable(ssc->clk);
->> +	ret = clk_prepare_enable(ssc->clk);
->> +	if (ret)
->> +		return ret;
->>   	ssc_writel(ssc->regs, IDR, -1);
->>   	ssc_readl(ssc->regs, SR);
->>   	clk_disable_unprepare(ssc->clk);
->> -- 
->> 1.9.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Suzuki
