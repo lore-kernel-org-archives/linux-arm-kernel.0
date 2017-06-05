@@ -1,94 +1,32 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 5 Jun 2017 17:29:19 +0100
-Subject: [PATCH v3 2/4] arm64: kgdb: disable interrupts while a software
- step is enabled
-In-Reply-To: <20170523043058.5463-3-takahiro.akashi@linaro.org>
+Date: Mon, 5 Jun 2017 17:29:25 +0100
+Subject: [PATCH v3 1/4] arm64: kgdb: fix single stepping
+In-Reply-To: <20170523043058.5463-2-takahiro.akashi@linaro.org>
 References: <20170523043058.5463-1-takahiro.akashi@linaro.org>
- <20170523043058.5463-3-takahiro.akashi@linaro.org>
-Message-ID: <20170605162919.GN21944@arm.com>
+ <20170523043058.5463-2-takahiro.akashi@linaro.org>
+Message-ID: <20170605162925.GO21944@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 23, 2017 at 01:30:56PM +0900, AKASHI Takahiro wrote:
-> After entering kgdb mode, 'stepi' may unexpectedly breaks the execution
-> somewhere in el1_irq.
+On Tue, May 23, 2017 at 01:30:55PM +0900, AKASHI Takahiro wrote:
+> After entering kgdb mode, the first 'stepi' can succeed, but the following
+> 'stepi' never executes the next instruction.
 > 
-> This happens because a debug exception is always enabled in el1_irq
-> due to the following commit merged in v3.16:
->   commit 2a2830703a23 ("arm64: debug: avoid accessing mdscr_el1 on fault
-> 			paths where possible")
-> A pending interrupt can be taken after kgdb has enabled a software step,
-> but before a debug exception is actually taken.
-> 
-> This patch enforces interrupts to be masked while single stepping.
+> This is because a software step cannot get enabled as the software step
+> bit(SS) in SPSR, which is cleared by the first single stepping, will not
+> be set again for the following 's' commands.
 
-The desired behaviour here boils down to whether or not KGDB expects to step
-into or over interrupts in response a stepi instruction. What do other
-architectures do? What happens if the instruction being stepped faults?
+For userspace, we have user_rewind_single_step to re-arm the state machine
+on an unhandled step exception. It sounds like we need the kernel version of
+that?
+
+> Please note that this bit, as well as the software step control bit(SS)
+> in MDSCR, must be set before resuming the execution.
+> kernel_active_single_step() called by kgdb_arch_handle_exception() checks
+> only for the bit in MDSCR, and so kgdb_enable_single_step() will never be
+> called.
+
+MDSCR.SS shouldn't get cleared by the hardware, so I don't understand your
+point here.
 
 Will
-
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Jason Wessel <jason.wessel@windriver.com>
-> ---
->  arch/arm64/kernel/kgdb.c | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
-> index b9176b324e5a..fddbc6be3780 100644
-> --- a/arch/arm64/kernel/kgdb.c
-> +++ b/arch/arm64/kernel/kgdb.c
-> @@ -28,6 +28,7 @@
->  
->  #include <asm/debug-monitors.h>
->  #include <asm/insn.h>
-> +#include <asm/ptrace.h>
->  #include <asm/traps.h>
->  
->  struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] = {
-> @@ -111,6 +112,8 @@ struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] = {
->  	{ "fpcr", 4, -1 },
->  };
->  
-> +static DEFINE_PER_CPU(unsigned int, kgdb_pstate);
-> +
->  char *dbg_get_reg(int regno, void *mem, struct pt_regs *regs)
->  {
->  	if (regno >= DBG_MAX_REG_NUM || regno < 0)
-> @@ -200,6 +203,10 @@ int kgdb_arch_handle_exception(int exception_vector, int signo,
->  		err = 0;
->  		break;
->  	case 's':
-> +		/* mask interrupts while single stepping */
-> +		__this_cpu_write(kgdb_pstate, linux_regs->pstate);
-> +		linux_regs->pstate |= PSR_I_BIT;
-> +
->  		/*
->  		 * Update step address value with address passed
->  		 * with step packet.
-> @@ -242,11 +249,20 @@ NOKPROBE_SYMBOL(kgdb_compiled_brk_fn);
->  
->  static int kgdb_step_brk_fn(struct pt_regs *regs, unsigned int esr)
->  {
-> +	unsigned int pstate;
-> +
->  	if (!kgdb_single_step)
->  		return DBG_HOOK_ERROR;
->  
->  	kernel_disable_single_step();
->  
-> +	/* restore interrupt mask status */
-> +	pstate = __this_cpu_read(kgdb_pstate);
-> +	if (pstate & PSR_I_BIT)
-> +		regs->pstate |= PSR_I_BIT;
-> +	else
-> +		regs->pstate &= ~PSR_I_BIT;
-> +
->  	kgdb_handle_exception(1, SIGTRAP, 0, regs);
->  	return 0;
->  }
-> -- 
-> 2.11.1
-> 
