@@ -1,44 +1,35 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 5 Jun 2017 09:14:51 +0100
-Subject: [PATCH v3 1/6] dt-bindings: mfd: hi6421: Add hi6421v530
- compatible string
-In-Reply-To: <20170602105156.11351-2-guodong.xu@linaro.org>
-References: <20170602105156.11351-1-guodong.xu@linaro.org>
- <20170602105156.11351-2-guodong.xu@linaro.org>
-Message-ID: <20170605081451.d7pd6r7aeza54pgv@dell>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 5 Jun 2017 16:17:06 +0800
+Subject: [PATCH 0/2] ARM/arm64: sunxi: convert CCU raw numbers to macros
+In-Reply-To: <20170605081423.sx7qqjq73646enlm@flea.lan>
+References: <20170605043224.20687-1-wens@csie.org>
+ <20170605081423.sx7qqjq73646enlm@flea.lan>
+Message-ID: <CAGb2v66eV4cX-w1ZBNRGrkJ8HNv0HY0ei2bZ7T+=zwTHhVkRew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 02 Jun 2017, Guodong Xu wrote:
+On Mon, Jun 5, 2017 at 4:14 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Mon, Jun 05, 2017 at 12:32:22PM +0800, Chen-Yu Tsai wrote:
+>> Hi Maxime,
+>>
+>> These are some clean up patches for 4.12. They convert raw number
+>> references for the CCU and R_CCU nodes, from when the CCU/R_CCU stuff
+>> was first added, to the defined macros in the device tree header files.
+>>
+>> These affect the A64 and H3/H5.
+>>
+>> These are based on our sunxi/fixes-for-4.12 branch. Once these are merged,
+>> I think it's time to send off pull requests for our fixes branches.
+>>
+>> ChenYu
+>
+> Applied both, thanks!
+> Maxime
 
-> Add compatible string for HiSilicon Hi6421v530 PMIC.
-> 
-> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
-> ---
->  Documentation/devicetree/bindings/mfd/hi6421.txt | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+Argh... Could you fix the build break on patch 1? It's simply
 
-For my own reference:
-  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
-  
-> diff --git a/Documentation/devicetree/bindings/mfd/hi6421.txt b/Documentation/devicetree/bindings/mfd/hi6421.txt
-> index 0d5a446..22da96d 100644
-> --- a/Documentation/devicetree/bindings/mfd/hi6421.txt
-> +++ b/Documentation/devicetree/bindings/mfd/hi6421.txt
-> @@ -1,7 +1,9 @@
->  * HI6421 Multi-Functional Device (MFD), by HiSilicon Ltd.
->  
->  Required parent device properties:
-> -- compatible	: contains "hisilicon,hi6421-pmic";
-> +- compatible    : One of the following chip-specific strings:
-> +	"hisilicon,hi6421-pmic";
-> +	"hisilicon,hi6421v530-pmic";
->  - reg		: register range space of hi6421;
->  
->  Supported Hi6421 sub-devices include:
+    sed -i -e 's/RST_IR/RST_APB0_IR/' arch/arm/boot/dts/sunxi-h3-h5.dtsi
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks
+ChenYu
