@@ -1,29 +1,51 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 5 Jun 2017 12:58:12 -0700
-Subject: [PATCH 2/2 v4] clk: Add Gemini SoC clock controller
-In-Reply-To: <CACRpkdZv8MzXVecEXVdJ+P0MxVscYSy=MxC-yQAR0S4yQ6-rwQ@mail.gmail.com>
-References: <20170524082044.8473-1-linus.walleij@linaro.org>
- <20170601070208.GO20170@codeaurora.org>
- <CACRpkdZv8MzXVecEXVdJ+P0MxVscYSy=MxC-yQAR0S4yQ6-rwQ@mail.gmail.com>
-Message-ID: <20170605195812.GH20170@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon,  5 Jun 2017 21:01:07 +0100
+Subject: [PATCH] arm64: dts: marvell: 8040-mcbin: Enable 1GB Ethernet
+Message-ID: <20170605200107.7692-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05, Linus Walleij wrote:
-> On Thu, Jun 1, 2017 at 9:02 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> 
-> >> +CLK_OF_DECLARE_DRIVER(gemini_cc, "cortina,gemini-syscon", gemini_cc_init);
-> >
-> > Is there a reason why this isn't a platform driver?
-> 
-> I can't get the platform to boot if I try, I guess because the console
-> UART needs the clock like super-early.
-> 
-> I fixed all the other issues, resending soon.
-> 
+Enable the 1GB Ethernet interface that lives on the slave CP110,
+with its corresponding phy (that oddly lives on the master CP110).
 
-Does the console uart driver support probe defer?
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
+diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+index f7bb0cc03147..1eb3cd5332c1 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
++++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+@@ -100,6 +100,12 @@
+ 	status = "okay";
+ };
+ 
++&cpm_mdio {
++	phy0: ethernet-phy at 0 {
++		reg = <0>;
++	};
++};
++
+ &cpm_sata0 {
+ 	/* CPM Lane 0 - U29 */
+ 	status = "okay";
+@@ -115,6 +121,16 @@
+ 	status = "okay";
+ };
+ 
++&cps_ethernet {
++	status = "okay";
++};
++
++&cps_eth1 {
++	status = "okay";
++	phy = <&phy0>;
++	phy-mode = "sgmii";
++};
++
+ &cps_sata0 {
+ 	/* CPS Lane 1 - U32 */
+ 	/* CPS Lane 3 - U31 */
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.11.0
