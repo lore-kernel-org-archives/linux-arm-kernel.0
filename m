@@ -1,59 +1,38 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  5 Jun 2017 16:22:54 +0100
-Subject: [PATCH v4 2/5] perf/core: Export AUX buffer helpers to modules
+Date: Mon,  5 Jun 2017 16:22:53 +0100
+Subject: [PATCH v4 1/5] genirq: export irq_get_percpu_devid_partition to
+ modules
 In-Reply-To: <1496676177-29356-1-git-send-email-will.deacon@arm.com>
 References: <1496676177-29356-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1496676177-29356-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1496676177-29356-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Perf PMU drivers using AUX buffers cannot be built as modules unless
-the AUX helpers are exported.
+Any modular driver using cluster-affine PPIs needs to be able to call
+irq_get_percpu_devid_partition so that it can enable the IRQ on the
+correct subset of CPUs.
 
-This patch exports perf_aux_output_{begin,end,skip} and perf_get_aux to
-modules.
+This patch exports the symbol so that it can be called from within a
+module.
 
-Cc: Peter Zijlstra <peterz@infradead.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- kernel/events/ring_buffer.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ kernel/irq/irqdesc.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/kernel/events/ring_buffer.c b/kernel/events/ring_buffer.c
-index 2831480c63a2..cd5e902a27ac 100644
---- a/kernel/events/ring_buffer.c
-+++ b/kernel/events/ring_buffer.c
-@@ -411,6 +411,7 @@ void *perf_aux_output_begin(struct perf_output_handle *handle,
- 
- 	return NULL;
- }
-+EXPORT_SYMBOL_GPL(perf_aux_output_begin);
- 
- /*
-  * Commit the data written by hardware into the ring buffer by adjusting
-@@ -470,6 +471,7 @@ void perf_aux_output_end(struct perf_output_handle *handle, unsigned long size)
- 	rb_free_aux(rb);
- 	ring_buffer_put(rb);
- }
-+EXPORT_SYMBOL_GPL(perf_aux_output_end);
- 
- /*
-  * Skip over a given number of bytes in the AUX buffer, due to, for example,
-@@ -498,6 +500,7 @@ int perf_aux_output_skip(struct perf_output_handle *handle, unsigned long size)
+diff --git a/kernel/irq/irqdesc.c b/kernel/irq/irqdesc.c
+index 00bb0aeea1d0..1e6ae73eae59 100644
+--- a/kernel/irq/irqdesc.c
++++ b/kernel/irq/irqdesc.c
+@@ -856,6 +856,7 @@ int irq_get_percpu_devid_partition(unsigned int irq, struct cpumask *affinity)
  
  	return 0;
  }
-+EXPORT_SYMBOL_GPL(perf_aux_output_skip);
++EXPORT_SYMBOL_GPL(irq_get_percpu_devid_partition);
  
- void *perf_get_aux(struct perf_output_handle *handle)
+ void kstat_incr_irq_this_cpu(unsigned int irq)
  {
-@@ -507,6 +510,7 @@ void *perf_get_aux(struct perf_output_handle *handle)
- 
- 	return handle->rb->aux_priv;
- }
-+EXPORT_SYMBOL_GPL(perf_get_aux);
- 
- #define PERF_AUX_GFP	(GFP_KERNEL | __GFP_ZERO | __GFP_NOWARN | __GFP_NORETRY)
- 
 -- 
 2.1.4
