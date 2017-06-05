@@ -1,84 +1,41 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Mon, 05 Jun 2017 10:33:50 +0900
-Subject: exynos drm build failure due to cec_* symbols
-In-Reply-To: <2d6226cf-4023-2a97-0791-42d3e8dcbdd3@suse.de>
-References: <CGME20170602135819epcas1p2302294dec8c40b69a19e0b220806eacb@epcas1p2.samsung.com>
- <2d6226cf-4023-2a97-0791-42d3e8dcbdd3@suse.de>
-Message-ID: <5934B4FE.6060606@samsung.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Sun, 4 Jun 2017 19:47:15 -0600
+Subject: Vexpress TC2 no longer booting on v4.12-rc1
+In-Reply-To: <20170602222449.GB4902@n2100.armlinux.org.uk>
+References: <CANLsYkz3dcVArStN2GJguYfJbWc_4dC4vvTE1KVtYpVWipEYjg@mail.gmail.com>
+ <20170602222449.GB4902@n2100.armlinux.org.uk>
+Message-ID: <CANLsYkxmnfnCCCqowFjFDSryRkg=TKiTyjKL=VQnJYCyNJ5SgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2 June 2017 at 16:24, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+> On Fri, Jun 02, 2017 at 04:16:59PM -0600, Mathieu Poirier wrote:
+>> Good afternoon Russell and friends,
+>>
+>> I noticed that my vexpress-TC2 platform stopped booting when moving to
+>> kernel v4.12-rc1 (same with -rc2 and 3).  The last time things worked
+>> properly was on v4.11.  I did a bisect between v4.11 and v4.12-rc1 and
+>> ended up on [1], hence this email.
+>>
+>> Since CONFIG_ARM_VIRT_EXT is selected by  default I removed the
+>> "#ifdef CONFIG_ARM_VIRT_EXT" section in the last hunk of the patch and
+>> the system sprung up to life again.
+>
+> Hmm, this doesn't make much sense.  The code in last hunk of the patch
+> you refer to should only get run during system shutdown, not during
+> system boot, so I think something else is going on...
+>
+> Please could you test again, this time rather than removing the #ifdef,
+> add two "mov r0, r0" there?  (So replacing the two instructions that
+> removing the ifdef would have exposed.)
 
+That works - by replacing the original code with a couple of "mov r0,
+r0" the system is able to boot again.
 
-2017? 06? 02? 22:58? Andreas F?rber ?(?) ? ?:
-> Hello,
-> 
-> We're observing the following build failure with v4.12-rc3, latest
-> linux.git and linux-next.git:
-> 
-> [ 9825s]   LD      vmlinux.o
-> [ 9904s]   MODPOST vmlinux.o
-> [ 9915s] drivers/built-in.o: In function `hdmi_get_modes':
-> [ 9915s]
-> /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:866:
-> undefined reference to `cec_notifier_set_phys_addr_from_edid'
-> [ 9915s] drivers/built-in.o: In function `hdmi_remove':
-> [ 9915s]
-> /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1923:
-> undefined reference to `cec_notifier_set_phys_addr'
-> [ 9915s]
-> /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1927:
-> undefined reference to `cec_notifier_put'
-> [ 9915s] drivers/built-in.o: In function `hdmi_probe':
-> [ 9915s]
-> /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1889:
-> undefined reference to `cec_notifier_get'
-> [ 9915s]
-> /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1904:
-> undefined reference to `cec_notifier_put'
-> [ 9915s] drivers/built-in.o: In function `hdmi_disable':
-> [ 9915s]
-> /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1509:
-> undefined reference to `cec_notifier_set_phys_addr'
-> [ 9915s] drivers/built-in.o: In function `hdmi_detect':
-> [ 9915s]
-> /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:827:
-> undefined reference to `cec_notifier_set_phys_addr'
-> [ 9931s] make[2]: ***
-> [/home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/Makefile:997:
-> vmlinux] Error 1
-> [ 9931s] make[1]: *** [Makefile:152: sub-make] Error 2
-> [ 9931s] make: *** [Makefile:24: __sub-make] Error 2
-> 
-> My guess is the symbols used by the exynos drm module are not exported:
-> 
-> cec_notifier_set_phys_addr_from_edid
-> cec_notifier_set_phys_addr
-> cec_notifier_put
-> cec_notifier_get
-> 
-> Can you please look into fixing this?
-
-Thanks for reporting.
-
-Will check and fix it.
-
-Thanks,
-Inki Dae
-
-> 
-> Configs for reproducing are available here:
-> 
-> v4.12-rc3:
-> http://kernel.opensuse.org/cgit/kernel-source/tree/config/armv7hl/default
-> http://kernel.opensuse.org/cgit/kernel-source/tree/config/armv7hl/lpae
-> 
-> linux.git:
-> http://kernel.opensuse.org/cgit/kernel-source/tree/config/armv7hl/vanilla?h=vanilla
-> 
-> linux-next.git:
-> http://kernel.opensuse.org/cgit/kernel-source/tree/config/armv7hl/vanilla?h=linux-next
-> 
-> Thanks,
-> Andreas
-> 
+>
+> Thanks.
+>
+> --
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
