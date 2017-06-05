@@ -1,45 +1,30 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 5 Jun 2017 14:17:03 +0100
-Subject: [PATCH] KVM: arm/arm64: vgic-v3: Fix nr_pre_bits bitfield
- extraction
-In-Reply-To: <20170604202028.13719-1-cdall@linaro.org>
-References: <20170604202028.13719-1-cdall@linaro.org>
-Message-ID: <f843587c-06ad-fd2f-b223-fef26ba11239@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon,  5 Jun 2017 14:19:59 +0100
+Subject: [PATCH 0/2] arm64/kvm: use SYS_REG_DESC() for VGIC-v3
+Message-ID: <1496668801-16064-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/17 21:20, Christoffer Dall wrote:
-> We used to extract PRIbits from the ICH_VT_EL2 which was the upper field
-> in the register word, so a mask wasn't necessary, but as we switched to
-> looking at PREbits, which is bits 26 through 28 with the PRIbits field
-> being potentially non-zero, we really need to mask off the field value,
-> otherwise fun things may happen.
-> 
-> Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> ---
->  virt/kvm/arm/hyp/vgic-v3-sr.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> index 32c3295..8794036 100644
-> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> @@ -22,7 +22,7 @@
->  #include <asm/kvm_hyp.h>
->  
->  #define vtr_to_max_lr_idx(v)		((v) & 0xf)
-> -#define vtr_to_nr_pre_bits(v)		(((u32)(v) >> 26) + 1)
-> +#define vtr_to_nr_pre_bits(v)		((((u32)(v) >> 26) & 7) + 1)
->  
->  static u64 __hyp_text __gic_v3_get_lr(unsigned int lr)
->  {
-> 
+While looking around, I spotted that the VGIC-v3 code still uses open-coded SYS
+encodings. These patches migrate said code to use common <asm/sysreg.h>
+mnemonics, as we do for the rest of the AArch64 sysregs.
 
-Oops... I wonder why that didn't result in any other issues in my
-code... :-(.
+This is based on Marc's kvm-arm64/gicv3-cpuif-mediated-access branch [1].
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Thanks,
+Mark.
 
-	M.
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/gicv3-cpuif-mediated-access
+
+Mark Rutland (2):
+  arm64/kvm: sysreg: fix typo'd SYS_ICC_IGRPEN*_EL1
+  arm64/kvm: vgic: use SYS_DESC()
+
+ arch/arm64/include/asm/arch_gicv3.h |  2 +-
+ arch/arm64/include/asm/sysreg.h     | 12 ++++++++--
+ arch/arm64/kvm/vgic-sys-reg-v3.c    | 45 +++++++++++++------------------------
+ virt/kvm/arm/hyp/vgic-v3-sr.c       |  4 ++--
+ 4 files changed, 28 insertions(+), 35 deletions(-)
+
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
