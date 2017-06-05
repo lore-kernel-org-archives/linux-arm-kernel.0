@@ -1,47 +1,217 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 5 Jun 2017 11:30:17 +0100
-Subject: [PATCHv2] arm: LPAE: kexec: clear TTBCR.T1SZ explicitly when
- PHYS_OFFSET > PAGE_OFFSET
-In-Reply-To: <1496657199-29589-1-git-send-email-hoeun.ryu@gmail.com>
-References: <1496657199-29589-1-git-send-email-hoeun.ryu@gmail.com>
-Message-ID: <bb00a038-b6b8-2da9-7b16-0c2ea96a44b5@arm.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Mon, 5 Jun 2017 12:32:23 +0200
+Subject: [PATCH v2 08/25] KVM: arm64: vgic-v3: Add ICV_EOIR1_EL1 handler
+In-Reply-To: <20170601102117.17750-9-marc.zyngier@arm.com>
+References: <20170601102117.17750-1-marc.zyngier@arm.com>
+ <20170601102117.17750-9-marc.zyngier@arm.com>
+Message-ID: <20170605103223.GJ9464@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/17 11:06, Hoeun Ryu wrote:
->  Clearing TTBCR.T1SZ explicitly when kernel runs on a configuration of
-> PHYS_OFFSET > PAGE_OFFSET.
->  Reading TTBCR in early boot stage might returns the value of the
-> previous kernel's configuration, especially in case of kexec. For
-> example, if normal kernel (first kernel) had run on a configuration
-> of PHYS_OFFSET <= PAGE_OFFSET and crash kernel (second kernel) is
-> running on a configuration PHYS_OFFSET > PAGE_OFFSET, which can happen
-> because it depends on the reserved area for crash kernel, reading
-> TTBCR and using the value without clearing TTBCR.T1SZ might risky
-> because the value doesn't have a reset value for TTBCR.T1SZ.
-
-Hmm, but isn't that also strictly true of all the other fields we're
-ORing TTB_FLAGS_* into? Given that this is initial setup, I wonder
-whether we need to care about the previous TTBCR value at all - is there
-any reason for not simply building up the value we want from scratch?
-
-Robin.
-
-> Signed-off-by: Hoeun Ryu <hoeun.ryu@gmail.com>
+On Thu, Jun 01, 2017 at 11:21:00AM +0100, Marc Zyngier wrote:
+> Add a handler for writing the guest's view of the ICC_EOIR1_EL1
+> register. This involves dropping the priority of the interrupt,
+> and deactivating it if required (EOImode == 0).
+> 
+> Reviewed-by: Eric Auger <eric.auger@redhat.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm/mm/proc-v7-3level.S | 1 +
->  1 file changed, 1 insertion(+)
+>  include/linux/irqchip/arm-gic-v3.h |   2 +
+>  virt/kvm/arm/hyp/vgic-v3-sr.c      | 121 +++++++++++++++++++++++++++++++++++++
+>  2 files changed, 123 insertions(+)
 > 
-> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
-> index 5e5720e..81404b8 100644
-> --- a/arch/arm/mm/proc-v7-3level.S
-> +++ b/arch/arm/mm/proc-v7-3level.S
-> @@ -140,6 +140,7 @@ ENDPROC(cpu_v7_set_pte_ext)
->  	 * otherwise booting secondary CPUs would end up using TTBR1 for the
->  	 * identity mapping set up in TTBR0.
->  	 */
-> +	bichi	\tmp, \tmp, #(7 << 16)				@ clear TTBCR.T1SZ
->  	orrls	\tmp, \tmp, #TTBR1_SIZE				@ TTBCR.T1SZ
->  	mcr	p15, 0, \tmp, c2, c0, 2				@ TTBCR
->  	mov	\tmp, \ttbr1, lsr #20
+> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> index 401db585a534..e50ce5d416a3 100644
+> --- a/include/linux/irqchip/arm-gic-v3.h
+> +++ b/include/linux/irqchip/arm-gic-v3.h
+> @@ -417,6 +417,8 @@
+>  
+>  #define ICH_HCR_EN			(1 << 0)
+>  #define ICH_HCR_UIE			(1 << 1)
+> +#define ICH_HCR_EOIcount_SHIFT		27
+> +#define ICH_HCR_EOIcount_MASK		(0x1f << ICH_HCR_EOIcount_SHIFT)
+>  
+>  #define ICH_VMCR_CBPR_SHIFT		4
+>  #define ICH_VMCR_CBPR_MASK		(1 << ICH_VMCR_CBPR_SHIFT)
+> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> index 16a2eadc7a5c..3f04122a5d4d 100644
+> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
+> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> @@ -426,6 +426,26 @@ static int __hyp_text __vgic_v3_highest_priority_lr(struct kvm_vcpu *vcpu,
+>  	return lr;
+>  }
+>  
+> +static int __hyp_text __vgic_v3_find_active_lr(struct kvm_vcpu *vcpu,
+> +					       int intid, u64 *lr_val)
+> +{
+> +	unsigned int used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+> +	int i;
+> +
+> +	for (i = 0; i < used_lrs; i++) {
+> +		u64 val = __gic_v3_get_lr(i);
+> +
+> +		if ((val & ICH_LR_VIRTUAL_ID_MASK) == intid &&
+> +		    (val & ICH_LR_ACTIVE_BIT)) {
+> +			*lr_val = val;
+> +			return i;
+> +		}
+> +	}
+> +
+> +	*lr_val = ICC_IAR1_EL1_SPURIOUS;
+> +	return -1;
+> +}
+> +
+>  static int __hyp_text __vgic_v3_get_highest_active_priority(void)
+>  {
+>  	u8 nr_pre_bits = vtr_to_nr_pre_bits(read_gicreg(ICH_VTR_EL2));
+> @@ -506,6 +526,45 @@ static void __hyp_text __vgic_v3_set_active_priority(u8 pri, u32 vmcr, int grp)
+>  	__vgic_v3_write_ap1rn(val | BIT(ap % 32), apr);
+>  }
+>  
+> +static int __hyp_text __vgic_v3_clear_highest_active_priority(void)
+> +{
+> +	u8 nr_pre_bits = vtr_to_nr_pre_bits(read_gicreg(ICH_VTR_EL2));
+> +	u8 nr_apr_regs = vtr_to_nr_apr_regs(read_gicreg(ICH_VTR_EL2));
+> +	u32 hap = 0;
+> +	int i;
+> +
+> +	for (i = 0; i < nr_apr_regs; i++) {
+> +		u32 ap0, ap1;
+> +		int c0, c1;
+> +
+> +		ap0 = __vgic_v3_read_ap0rn(i);
+> +		ap1 = __vgic_v3_read_ap1rn(i);
+
+so reading a group 1 interrupt from the IAR and writing that value back
+to the EOIR1_EL1 register can somehow clear the priority of a group 0
+interrupt?
+
+Or did you just want a generic function that does what it's supposed to
+regardless of which register was written to etc.?
+
+> +		if (!ap0 && !ap1) {
+> +			hap += 32;
+> +			continue;
+> +		}
+> +
+> +		c0 = ap0 ? __ffs(ap0) : 32;
+> +		c1 = ap1 ? __ffs(ap1) : 32;
+> +
+> +		/* Always clear the LSB, which is the highest priority */
+> +		if (c0 < c1) {
+> +			ap0 &= ~BIT(c0);
+> +			__vgic_v3_write_ap0rn(ap0, i);
+> +			hap += c0;
+> +		} else {
+> +			ap1 &= ~BIT(c1);
+> +			__vgic_v3_write_ap1rn(ap1, i);
+> +			hap += c1;
+
+Can we ever have a situation where c0 == c1?  And in that case, should
+you prioritize clearing the group 1 apr ?
+
+> +		}
+> +
+> +		/* Rescale to 8 bits of priority */
+> +		return hap << (8 - nr_pre_bits);
+> +	}
+> +
+> +	return GICv3_IDLE_PRIORITY;
+> +}
+> +
+>  static void __hyp_text __vgic_v3_read_iar(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
+>  {
+>  	u64 lr_val;
+> @@ -542,6 +601,65 @@ static void __hyp_text __vgic_v3_read_iar(struct kvm_vcpu *vcpu, u32 vmcr, int r
+>  	vcpu_set_reg(vcpu, rt, ICC_IAR1_EL1_SPURIOUS);
+>  }
+>  
+> +static void __hyp_text __vgic_v3_clear_active_lr(int lr, u64 lr_val)
+> +{
+> +	lr_val &= ~ICH_LR_ACTIVE_BIT;
+> +	if (lr_val & ICH_LR_HW) {
+> +		u32 pid;
+> +
+> +		pid = (lr_val & ICH_LR_PHYS_ID_MASK) >> ICH_LR_PHYS_ID_SHIFT;
+> +		gic_write_dir(pid);
+
+Yikes, scary.  I can't think of this breaking anything.  But, scary.
+
+
+> +	}
+> +
+> +	__gic_v3_set_lr(lr_val, lr);
+> +}
+> +
+> +static void __hyp_text __vgic_v3_bump_eoicount(void)
+> +{
+> +	u32 hcr;
+> +
+> +	hcr = read_gicreg(ICH_HCR_EL2);
+> +	hcr += 1 << ICH_HCR_EOIcount_SHIFT;
+> +	write_gicreg(hcr, ICH_HCR_EL2);
+> +}
+> +
+> +static void __hyp_text __vgic_v3_write_eoir(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
+> +{
+> +	u32 vid = vcpu_get_reg(vcpu, rt);
+> +	u64 lr_val;
+> +	u8 lr_prio, act_prio;
+> +	int lr, grp;
+> +
+> +	grp = __vgic_v3_get_group(vcpu);
+> +
+> +	/* Drop priority in any case */
+> +	act_prio = __vgic_v3_clear_highest_active_priority();
+> +
+> +	/* If EOIing an LPI, no deactivate to be performed */
+> +	if (vid >= VGIC_MIN_LPI)
+> +		return;
+> +
+> +	/* EOImode == 1, nothing to be done here */
+> +	if (vmcr & ICH_VMCR_EOIM_MASK)
+> +		return;
+> +
+> +	lr = __vgic_v3_find_active_lr(vcpu, vid, &lr_val);
+> +	if (lr == -1) {
+> +		__vgic_v3_bump_eoicount();
+> +		return;
+> +	}
+> +
+> +	lr_prio = (lr_val & ICH_LR_PRIORITY_MASK) >> ICH_LR_PRIORITY_SHIFT;
+> +
+> +	/* If priorities or group do not match, the guest has fscked-up. */
+> +	if (grp != !!(lr_val & ICH_LR_GROUP) ||
+> +	    __vgic_v3_pri_to_pre(lr_prio, vmcr, grp) != act_prio)
+> +		return;
+
+Since we've cleared the highest priority above, is there any way for the
+guest to recover from this, or do this particular (v)GIC implementation
+have the implementation defined behavior of a write with something else
+than the last valid read from the IAR of the same group to the EOIR
+means that the system is toast?
+
+> +
+> +	/* Let's now perform the deactivation */
+> +	__vgic_v3_clear_active_lr(lr, lr_val);
+> +}
+> +
+>  static void __hyp_text __vgic_v3_read_igrpen1(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
+>  {
+>  	vcpu_set_reg(vcpu, rt, !!(vmcr & ICH_VMCR_ENG1_MASK));
+> @@ -609,6 +727,9 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
+>  	case SYS_ICC_IAR1_EL1:
+>  		fn = __vgic_v3_read_iar;
+>  		break;
+> +	case SYS_ICC_EOIR1_EL1:
+> +		fn = __vgic_v3_write_eoir;
+> +		break;
+>  	case SYS_ICC_GRPEN1_EL1:
+>  		if (is_read)
+>  			fn = __vgic_v3_read_igrpen1;
+> -- 
+> 2.11.0
 > 
+
+Thanks,
+-Christoffer
