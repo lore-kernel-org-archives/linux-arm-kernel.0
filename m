@@ -1,53 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 5 Jun 2017 18:15:52 +0100
-Subject: [PATCH v2 1/2] arm64: ftrace: don't validate branch via PLT in
- ftrace_make_nop()
-In-Reply-To: <20170530135220.20759-2-ard.biesheuvel@linaro.org>
-References: <20170530135220.20759-1-ard.biesheuvel@linaro.org>
- <20170530135220.20759-2-ard.biesheuvel@linaro.org>
-Message-ID: <20170605171552.GQ21944@arm.com>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Mon, 5 Jun 2017 10:16:46 -0700 (PDT)
+Subject: [PATCH 1/3] arm/xen: Improve a size determination in
+ __set_phys_to_machine_multi()
+In-Reply-To: <7f2ec975-9a2b-132d-77f0-559fd7eadc30@users.sourceforge.net>
+References: <9b9230f4-0f00-e019-75b4-571e29b52998@users.sourceforge.net>
+ <7f2ec975-9a2b-132d-77f0-559fd7eadc30@users.sourceforge.net>
+Message-ID: <alpine.DEB.2.10.1706051016310.2941@sstabellini-ThinkPad-X260>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 30, 2017 at 01:52:19PM +0000, Ard Biesheuvel wrote:
-> When turning branch instructions into NOPs, we attempt to validate the
-> action by comparing the old value at the call site with the opcode of
-> a direct relative branch instruction pointing at the old target.
+On Sun, 4 Jun 2017, SF Markus Elfring wrote:
+> From: Markus Elfring <elfring@users.sourceforge.net>
+> Date: Sun, 4 Jun 2017 20:50:55 +0200
 > 
-> However, these call sites are statically initialized to call _mcount(),
-> and may be redirected via a PLT entry if the module is loaded far away
-> from the kernel text, leading to false negatives and spurious errors.
+> Replace the specification of a data structure by a pointer dereference
+> as the parameter for the operator "sizeof" to make the corresponding size
+> determination a bit safer according to the Linux coding style convention.
 > 
-> So skip the validation if CONFIG_ARM64_MODULE_PLTS is configured.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+
+Reviewed-by: Stefano Stabellini <sstabellini@kernel.org>
+
+
 > ---
->  arch/arm64/kernel/ftrace.c | 9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
+>  arch/arm/xen/p2m.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
-> index 40ad08ac569a..a8db6857cad6 100644
-> --- a/arch/arm64/kernel/ftrace.c
-> +++ b/arch/arm64/kernel/ftrace.c
-> @@ -84,12 +84,15 @@ int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
->  		    unsigned long addr)
->  {
->  	unsigned long pc = rec->ip;
-> -	u32 old, new;
-> +	u32 old = 0, new;
+> diff --git a/arch/arm/xen/p2m.c b/arch/arm/xen/p2m.c
+> index 0ed01f2d5ee4..11e78432b663 100644
+> --- a/arch/arm/xen/p2m.c
+> +++ b/arch/arm/xen/p2m.c
+> @@ -144,5 +144,5 @@ bool __set_phys_to_machine_multi(unsigned long pfn,
+>  		return true;
+>  	}
 >  
-> -	old = aarch64_insn_gen_branch_imm(pc, addr, AARCH64_INSN_BRANCH_LINK);
-> +	if (!IS_ENABLED(CONFIG_ARM64_MODULE_PLTS))
-> +		old = aarch64_insn_gen_branch_imm(pc, addr,
-> +						  AARCH64_INSN_BRANCH_LINK);
->  	new = aarch64_insn_gen_nop();
->  
-> -	return ftrace_modify_code(pc, old, new, true);
-> +	return ftrace_modify_code(pc, old, new,
-> +				  !IS_ENABLED(CONFIG_ARM64_MODULE_PLTS));
-
-Even in the case of PLTs, the instruction is still a branch instruction,
-so could we validate the basic opcode fields rather than disable the check
-altogether?
-
-Will
+> -	p2m_entry = kzalloc(sizeof(struct xen_p2m_entry), GFP_NOWAIT);
+> +	p2m_entry = kzalloc(sizeof(*p2m_entry), GFP_NOWAIT);
+>  	if (!p2m_entry) {
+> -- 
+> 2.13.0
+> 
