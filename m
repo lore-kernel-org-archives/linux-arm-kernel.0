@@ -1,111 +1,66 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon,  5 Jun 2017 13:51:12 +0100
-Subject: [PATCH v4.1 4/8] mm,
- gup: Ensure real head page is ref-counted when using hugepages
-In-Reply-To: <20170524115409.31309-5-punit.agrawal@arm.com>
-References: <20170524115409.31309-5-punit.agrawal@arm.com>
-Message-ID: <20170605125112.19530-1-punit.agrawal@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 5 Jun 2017 15:13:19 +0200
+Subject: [PATCH v2] misc: atmel-ssc: Handle return value of
+ clk_prepare_enable and clk_prepare
+In-Reply-To: <20170605120515.GB6867@kroah.com>
+References: <3a6a9ccd68fe298ab33009eaaace85c5af73e1ea.1496381884.git.arvind.yadav.cs@gmail.com>
+ <20170603221753.lfiqthuc7dxy3dmc@piout.net>
+ <aa38479b-0597-17ca-ab2b-1092ece77d11@gmail.com>
+ <20170605093652.4dpeb2ovjehfsxwl@piout.net>
+ <20170605120515.GB6867@kroah.com>
+Message-ID: <20170605131319.l3a7aw4xvgwls2ry@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When speculatively taking references to a hugepage using
-page_cache_add_speculative() in gup_huge_pmd(), it is assumed that the
-page returned by pmd_page() is the head page. Although normally true,
-this assumption doesn't hold when the hugepage comprises of successive
-page table entries such as when using contiguous bit on arm64 at PTE or
-PMD levels.
+On 05/06/2017 at 14:05:15 +0200, Greg KH wrote:
+> On Mon, Jun 05, 2017 at 11:36:52AM +0200, Alexandre Belloni wrote:
+> > On 05/06/2017 at 14:53:30 +0530, Arvind Yadav wrote:
+> > > Hi,
+> > > 
+> > > Yes, Patch v1 was wrong that's why i have push v2.
+> > > clk_prepare and clk_prepare_enable can fail. There
+> > 
+> > No this is not true, they will never fail for the SSC.
+> 
+> How is anyone supposed to know this?  Just check the functions correctly
+> and move on, if they can never fail, wonderful, that's a code path that
+> is not going to be run.
+> 
 
-This can be addressed by ensuring that the page passed to
-page_cache_add_speculative() is the real head or by de-referencing the
-head page within the function.
+Anyone able (and taking the time) to read code can know that.
 
-We take the first approach to keep the usage pattern aligned with
-page_cache_get_speculative() where users already pass the appropriate
-page, i.e., the de-referenced head.
+I'm really not okay with having useless code paths. Many people are
+already complaining (rightfully) that the kernel is bloated, let's try
+to not make the situation worse and keep in mind that Linux can run on
+tiny SoCs.
 
-Apply the same logic to fix gup_huge_[pud|pgd]() as well.
+> > > is not harm to check it's return value. It'll not impact present
+> > > functionality.
+> > > 
+> > 
+> > It does impact boot time, this patch adds 112 bytes to a compressed
+> > kernel for no reason.
+> 
+> It solves the issue that if someone copy/paste from this code, they will
+> implement something incorrectly.  You can spare the 112 bytes (which
+> really, seems very large for just 2 error cases, are you sure that's
+> right?  Just drop the string if you care about size here.
+> 
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Steve Capper <steve.capper@arm.com>
-Cc: Michal Hocko <mhocko@suse.com>
-Cc: "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>
-Cc: Aneesh Kumar K.V <aneesh.kumar@linux.vnet.ibm.com>
----
+I'm sure about the size, I've measured it on top of v4.12-rc1 before
+replying.
 
-Hi Andrew,
+I don't think anyone will copy/paste from this code but if that happen
+and is missed by the maintainer, I'm pretty sure someone will be quick
+to run his preferred static analysis tool and send a patch (hopefully,
+testing it really compiles first).
 
-Please update the patch in your queue with this version.
 
-It fixes the ltp failures reported by Yury[0]. The original patch led
-to incorrect ref-count on certain pages due to taking a referencing on
-the following page in some instances. Should be fixed with this
-version.
+> thanks,
+> 
+> greg k-h
 
-Thanks,
-Punit
-
-[0] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-June/510318.html
-
- mm/gup.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/mm/gup.c b/mm/gup.c
-index e74e0b5a0c7c..6bd39264d0e7 100644
---- a/mm/gup.c
-+++ b/mm/gup.c
-@@ -1354,8 +1354,7 @@ static int gup_huge_pmd(pmd_t orig, pmd_t *pmdp, unsigned long addr,
- 		return __gup_device_huge_pmd(orig, addr, end, pages, nr);
- 
- 	refs = 0;
--	head = pmd_page(orig);
--	page = head + ((addr & ~PMD_MASK) >> PAGE_SHIFT);
-+	page = pmd_page(orig) + ((addr & ~PMD_MASK) >> PAGE_SHIFT);
- 	do {
- 		pages[*nr] = page;
- 		(*nr)++;
-@@ -1363,6 +1362,7 @@ static int gup_huge_pmd(pmd_t orig, pmd_t *pmdp, unsigned long addr,
- 		refs++;
- 	} while (addr += PAGE_SIZE, addr != end);
- 
-+	head = compound_head(pmd_page(orig));
- 	if (!page_cache_add_speculative(head, refs)) {
- 		*nr -= refs;
- 		return 0;
-@@ -1392,8 +1392,7 @@ static int gup_huge_pud(pud_t orig, pud_t *pudp, unsigned long addr,
- 		return __gup_device_huge_pud(orig, addr, end, pages, nr);
- 
- 	refs = 0;
--	head = pud_page(orig);
--	page = head + ((addr & ~PUD_MASK) >> PAGE_SHIFT);
-+	page = pud_page(orig) + ((addr & ~PUD_MASK) >> PAGE_SHIFT);
- 	do {
- 		pages[*nr] = page;
- 		(*nr)++;
-@@ -1401,6 +1400,7 @@ static int gup_huge_pud(pud_t orig, pud_t *pudp, unsigned long addr,
- 		refs++;
- 	} while (addr += PAGE_SIZE, addr != end);
- 
-+	head = compound_head(pud_page(orig));
- 	if (!page_cache_add_speculative(head, refs)) {
- 		*nr -= refs;
- 		return 0;
-@@ -1429,8 +1429,7 @@ static int gup_huge_pgd(pgd_t orig, pgd_t *pgdp, unsigned long addr,
- 
- 	BUILD_BUG_ON(pgd_devmap(orig));
- 	refs = 0;
--	head = pgd_page(orig);
--	page = head + ((addr & ~PGDIR_MASK) >> PAGE_SHIFT);
-+	page = pgd_page(orig) + ((addr & ~PGDIR_MASK) >> PAGE_SHIFT);
- 	do {
- 		pages[*nr] = page;
- 		(*nr)++;
-@@ -1438,6 +1437,7 @@ static int gup_huge_pgd(pgd_t orig, pgd_t *pgdp, unsigned long addr,
- 		refs++;
- 	} while (addr += PAGE_SIZE, addr != end);
- 
-+	head = compound_head(pgd_page(orig));
- 	if (!page_cache_add_speculative(head, refs)) {
- 		*nr -= refs;
- 		return 0;
 -- 
-2.11.0
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
