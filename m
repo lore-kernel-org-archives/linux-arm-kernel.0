@@ -1,47 +1,84 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 5 Jun 2017 09:48:03 +1000
-Subject: linux-next: manual merge of the at91 tree with the arm-soc tree
-Message-ID: <20170605094803.466a6132@canb.auug.org.au>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Mon, 05 Jun 2017 10:33:50 +0900
+Subject: exynos drm build failure due to cec_* symbols
+In-Reply-To: <2d6226cf-4023-2a97-0791-42d3e8dcbdd3@suse.de>
+References: <CGME20170602135819epcas1p2302294dec8c40b69a19e0b220806eacb@epcas1p2.samsung.com>
+ <2d6226cf-4023-2a97-0791-42d3e8dcbdd3@suse.de>
+Message-ID: <5934B4FE.6060606@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
 
-Today's linux-next merge of the at91 tree got a conflict in:
 
-  arch/arm/mach-at91/Kconfig
+2017? 06? 02? 22:58? Andreas F?rber ?(?) ? ?:
+> Hello,
+> 
+> We're observing the following build failure with v4.12-rc3, latest
+> linux.git and linux-next.git:
+> 
+> [ 9825s]   LD      vmlinux.o
+> [ 9904s]   MODPOST vmlinux.o
+> [ 9915s] drivers/built-in.o: In function `hdmi_get_modes':
+> [ 9915s]
+> /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:866:
+> undefined reference to `cec_notifier_set_phys_addr_from_edid'
+> [ 9915s] drivers/built-in.o: In function `hdmi_remove':
+> [ 9915s]
+> /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1923:
+> undefined reference to `cec_notifier_set_phys_addr'
+> [ 9915s]
+> /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1927:
+> undefined reference to `cec_notifier_put'
+> [ 9915s] drivers/built-in.o: In function `hdmi_probe':
+> [ 9915s]
+> /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1889:
+> undefined reference to `cec_notifier_get'
+> [ 9915s]
+> /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1904:
+> undefined reference to `cec_notifier_put'
+> [ 9915s] drivers/built-in.o: In function `hdmi_disable':
+> [ 9915s]
+> /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1509:
+> undefined reference to `cec_notifier_set_phys_addr'
+> [ 9915s] drivers/built-in.o: In function `hdmi_detect':
+> [ 9915s]
+> /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:827:
+> undefined reference to `cec_notifier_set_phys_addr'
+> [ 9931s] make[2]: ***
+> [/home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/Makefile:997:
+> vmlinux] Error 1
+> [ 9931s] make[1]: *** [Makefile:152: sub-make] Error 2
+> [ 9931s] make: *** [Makefile:24: __sub-make] Error 2
+> 
+> My guess is the symbols used by the exynos drm module are not exported:
+> 
+> cec_notifier_set_phys_addr_from_edid
+> cec_notifier_set_phys_addr
+> cec_notifier_put
+> cec_notifier_get
+> 
+> Can you please look into fixing this?
 
-between commit:
+Thanks for reporting.
 
-  cc7a938f5f30 ("ARM: at91: select CONFIG_ARM_CPU_SUSPEND")
+Will check and fix it.
 
-from the arm-soc tree and commit:
+Thanks,
+Inki Dae
 
-  81c0bb0b6ad1 ("ARM: at91: Add armv7m support")
-
-from the at91 tree.
-
-I fixed it up (see below) and can carry the fix as necessary. This
-is now fixed as far as linux-next is concerned, but any non trivial
-conflicts should be mentioned to your upstream maintainer when your tree
-is submitted for merging.  You may also want to consider cooperating
-with the maintainer of the conflicting tree to minimise any particularly
-complex conflicts.
-
--- 
-Cheers,
-Stephen Rothwell
-
-diff --cc arch/arm/mach-at91/Kconfig
-index cbd959b73654,7497a28a79d1..000000000000
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@@ -1,7 -1,6 +1,7 @@@
-  menuconfig ARCH_AT91
-  	bool "Atmel SoCs"
-- 	depends on ARCH_MULTI_V4T || ARCH_MULTI_V5 || ARCH_MULTI_V7
-+ 	depends on ARCH_MULTI_V4T || ARCH_MULTI_V5 || ARCH_MULTI_V7 || ARM_SINGLE_ARMV7M
- +	select ARM_CPU_SUSPEND if PM
-  	select COMMON_CLK_AT91
-  	select GPIOLIB
-  	select PINCTRL
+> 
+> Configs for reproducing are available here:
+> 
+> v4.12-rc3:
+> http://kernel.opensuse.org/cgit/kernel-source/tree/config/armv7hl/default
+> http://kernel.opensuse.org/cgit/kernel-source/tree/config/armv7hl/lpae
+> 
+> linux.git:
+> http://kernel.opensuse.org/cgit/kernel-source/tree/config/armv7hl/vanilla?h=vanilla
+> 
+> linux-next.git:
+> http://kernel.opensuse.org/cgit/kernel-source/tree/config/armv7hl/vanilla?h=linux-next
+> 
+> Thanks,
+> Andreas
+> 
