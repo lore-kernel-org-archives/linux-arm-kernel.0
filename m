@@ -1,100 +1,66 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 6 Jun 2017 19:31:03 +0900
-Subject: [PATCH 1/2] arm64: dts: uniphier: add support for LD11 Global
- board
-In-Reply-To: <1495678755-13218-2-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1495678755-13218-1-git-send-email-hayashi.kunihiko@socionext.com>
- <1495678755-13218-2-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <CAK7LNAQPUr2hrB797tbm-u3i-PKFch_GNGmZtrppk-GAx_VTuQ@mail.gmail.com>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Tue, 6 Jun 2017 10:31:38 +0000
+Subject: [PATCH 3/4] ARM: dts: iwg20m: Add iWave RZG1M Qseven SOM
+In-Reply-To: <CAMuHMdV8Ugz_kvHLbV7sii-2v1WdHTSFm3meM8faVtx3jBpC+Q@mail.gmail.com>
+References: <1496420523-23506-1-git-send-email-biju.das@bp.renesas.com>
+ <1496420523-23506-4-git-send-email-biju.das@bp.renesas.com>
+ <CAMuHMdV8Ugz_kvHLbV7sii-2v1WdHTSFm3meM8faVtx3jBpC+Q@mail.gmail.com>
+Message-ID: <KL1PR06MB17024AD50F89CF891E16A367B8CB0@KL1PR06MB1702.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-05-25 11:19 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
-> Add initial device tree support for LD11 Global board.
+
+> On Fri, Jun 2, 2017 at 6:22 PM, Biju Das <biju.das@bp.renesas.com> wrote:
+> > Add support for iWave RZG1M Qseven System On Module.
+> > http://www.iwavesystems.com/rz-g1m-qseven-module.html
 >
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> ---
->  arch/arm64/boot/dts/socionext/Makefile             |   1 +
->  .../boot/dts/socionext/uniphier-ld11-global.dts    | 105 +++++++++++++++++++++
->  2 files changed, 106 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts
+> Thanks for your patch!
 >
-> diff --git a/arch/arm64/boot/dts/socionext/Makefile b/arch/arm64/boot/dts/socionext/Makefile
-> index 5538598b302c..8d07ee33e66f 100644
-> --- a/arch/arm64/boot/dts/socionext/Makefile
-> +++ b/arch/arm64/boot/dts/socionext/Makefile
-> @@ -1,4 +1,5 @@
->  dtb-$(CONFIG_ARCH_UNIPHIER) += \
-> +       uniphier-ld11-global.dtb \
->         uniphier-ld11-ref.dtb \
->         uniphier-ld20-ref.dtb
+> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> > Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
 >
-> diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts b/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts
-> new file mode 100644
-> index 000000000000..754195aa5a1a
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts
-> @@ -0,0 +1,105 @@
-> +/*
-> + * Device Tree Source for UniPhier LD11 Global Board
-> + *
-> + * Copyright (C) 2016-2017 Socionext Inc.
-> + *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
-> + *           Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
+> > @@ -0,0 +1,27 @@
+> > +/*
+> > + * Device Tree Source for the iWave-RZG1M-20M Qseven SOM
+> > + *
+> > + * Copyright (C) 2017 Renesas Electronics Corp.
+> > + *
+> > + * This file is licensed under the terms of the GNU General Public
+> > +License
+> > + * version 2.  This program is licensed "as is" without any warranty
+> > +of any
+> > + * kind, whether express or implied.
+> > + */
+> > +
+> > +#include "r8a7743.dtsi"
+> > +
+> > +/ {
+>
+> Given this is a sub-board with many other components, I think it should have
+> its own (documented) compatible value, e.g.
+>
+>     compatible = "iwave,g20m", "renesas,r8a7743";
 
-Can I ask v2?
+Thanks for the input. I will document this system on module and apply the above change.
 
-Please use SPDX License Identifier.
+> > +       memory at 40000000 {
+> > +               device_type = "memory";
+> > +               reg = <0 0x40000000 0 0x20000000>;
+> > +       };
+> > +
+> > +       memory at 200000000 {
+> > +               device_type = "memory";
+> > +               reg = <2 0x00000000 0 0x20000000>;
+> > +       };
+> > +};
+>
 
-If you see in ML, you will notice Rob is asking
-to use SPDX for new DT files.
+[>]
+Regards,
+Biju
 
 
-I switched existing DT files over to it.
 
-https://patchwork.kernel.org/patch/9765437/
-https://patchwork.kernel.org/patch/9765435/
-
-
--- 
-Best Regards
-Masahiro Yamada
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
