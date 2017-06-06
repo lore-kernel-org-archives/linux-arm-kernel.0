@@ -1,58 +1,49 @@
-From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
-Date: Tue,  6 Jun 2017 16:17:45 +0530
-Subject: [PATCH v2 2/2] acpi/iort: numa: Add numa node mapping for smmuv3
- devices
-In-Reply-To: <1496746065-11082-1-git-send-email-ganapatrao.kulkarni@cavium.com>
-References: <1496746065-11082-1-git-send-email-ganapatrao.kulkarni@cavium.com>
-Message-ID: <1496746065-11082-3-git-send-email-ganapatrao.kulkarni@cavium.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 6 Jun 2017 03:51:31 -0700
+Subject: [PATCH 0/7] dra7: Fixes for MMC devicetree node
+In-Reply-To: <1d15c9e9-f257-fd97-a9a2-055ee90d7e84@ti.com>
+References: <20170601143401.16852-1-kishon@ti.com>
+ <CAPDyKFqHHjZQnnaGLP=xDj3eYgzADDYoomzBuXRviBgh-n2QFw@mail.gmail.com>
+ <f78dd61c-6689-4dbc-d1db-128f92be8e51@ti.com>
+ <1d15c9e9-f257-fd97-a9a2-055ee90d7e84@ti.com>
+Message-ID: <20170606105131.GZ3730@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add code to parse proximity domain in SMMUv3 IORT table to
-set numa node mapping for smmuv3 devices.
+* Kishon Vijay Abraham I <kishon@ti.com> [170606 03:40]:
+> omap3-overo-base.dtsi has the following dt node for mmc.
+> /* optional on board WiFi */
+> &mmc2 {
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&mmc2_pins>;
+>         vmmc-supply = <&w3cbw003c_npoweron>;
+>         vqmmc-supply = <&w3cbw003c_bt_nreset>;
+>         vmmc_aux-supply = <&w3cbw003c_wifi_nreset>;
+>         bus-width = <4>;
+>         cap-sdio-irq;
+>         non-removable;
+> };
+> 
+> It has both "vqmmc-supply" and "vmmc_aux-supply". However omap-hsmmc driver has
+> never parsed vqmmc so far. So I'd assume bt was never functional and it's used
+> only for wifi.
 
-Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
----
- drivers/acpi/arm64/iort.c | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+Hmm yeah the vqmmc-supply probably got copied from some
+other SoC for w3cbw003c.
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index bba2b59..b4f328f 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -882,6 +882,23 @@ static bool __init arm_smmu_v3_is_coherent(struct acpi_iort_node *node)
- 	return smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE;
- }
- 
-+/*
-+ * set numa proximity domain for smmv3 device
-+ */
-+static void  __init iort_set_proximity(struct acpi_iort_node *node,
-+		struct device *dev)
-+{
-+	struct acpi_iort_smmu_v3 *smmu;
-+
-+	smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
-+	if (smmu->flags & ACPI_IORT_SMMU_V3_PXM_VALID) {
-+		set_dev_node(dev, acpi_map_pxm_to_node(smmu->pxm));
-+		pr_info("SMMUV3[%llx] Mapped to Proximity domain %d\n",
-+			smmu->base_address,
-+			smmu->pxm);
-+	}
-+}
-+
- static int __init arm_smmu_count_resources(struct acpi_iort_node *node)
- {
- 	struct acpi_iort_smmu *smmu;
-@@ -1002,6 +1019,9 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
- 	if (!pdev)
- 		return -ENOMEM;
- 
-+	if (node->type == ACPI_IORT_NODE_SMMU_V3)
-+		iort_set_proximity(node, &pdev->dev);
-+
- 	count = ops->iommu_count_resources(node);
- 
- 	r = kcalloc(count, sizeof(*r), GFP_KERNEL);
--- 
-1.8.1.4
+> So for the change suggested by Ulf, Can I do something like below, so that we
+> can keep wifi functional (ignoring bt since that was never functional)?
+> -       vqmmc-supply = <&w3cbw003c_bt_nreset>;
+> -       vmmc_aux-supply = <&w3cbw003c_wifi_nreset>;
+> +       vqmmc-supply = <&w3cbw003c_wifi_nreset>;
+
+Optional sdio pins 4 - 8 need separate power and that's
+why we have the vmmc_aux supply to start with. But here
+there are only four pins, so my guess is that only one
+regulator is needed and the the other two are gpio pins
+for wland and bt that nowadays should be handled by the
+mmc power sequence driver.
+
+Regards,
+
+Tony
