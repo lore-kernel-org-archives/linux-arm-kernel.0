@@ -1,87 +1,91 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 6 Jun 2017 15:08:19 -0700
-Subject: [PATCH] clk: sunxi-ng: Move all clock types to a library
-In-Reply-To: <CAK8P3a1Qvt4nvM5HeK-n87tsi2D5GBOmZo0rZv_Lp==CC=34Uw@mail.gmail.com>
-References: <20170602223006.1653-1-sboyd@codeaurora.org>
- <201706031243.qNvuUbQX%fengguang.wu@intel.com>
- <20170605144546.b6oh5sygrza22hbe@flea.lan>
- <CAK8P3a1Qvt4nvM5HeK-n87tsi2D5GBOmZo0rZv_Lp==CC=34Uw@mail.gmail.com>
-Message-ID: <20170606220819.GK20170@codeaurora.org>
+Date: Tue, 6 Jun 2017 15:30:27 -0700
+Subject: [PATCH v6 00/11] Broadcom Stingray SOC Initial Support
+In-Reply-To: <c26e95e1-4bfa-0d24-33cc-8d5ae3102864@gmail.com>
+References: <1496385275-6899-1-git-send-email-anup.patel@broadcom.com>
+ <4c15213f-4ac6-a0a7-f2b8-cde2b4cee891@gmail.com>
+ <c26e95e1-4bfa-0d24-33cc-8d5ae3102864@gmail.com>
+Message-ID: <20170606223027.GL20170@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06, Arnd Bergmann wrote:
-> On Mon, Jun 5, 2017 at 4:45 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi,
-> >
-> > On Sat, Jun 03, 2017 at 12:22:32PM +0800, kbuild test robot wrote:
-> >> Hi Stephen,
+On 06/05, Florian Fainelli wrote:
+> 
+> 
+> On 06/05/2017 09:51 AM, Florian Fainelli wrote:
+> > On 06/01/2017 11:34 PM, Anup Patel wrote:
+> >> This patchset adds initial support of Broadcom Stingray SOC
+> >> by reusing existing Broadcom iProc device drivers.
 > >>
-> >> [auto build test ERROR on sunxi/sunxi/for-next]
-> >> [also build test ERROR on next-20170602]
-> >> [cannot apply to clk/clk-next v4.12-rc3]
-> >> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> >> Most of the patches in this patchset are DT patches except
+> >> the Stingray clock tree support which just one patch.
 > >>
-> >>    sunxi_sid.c:(.data+0x1da8c): undefined reference to `ccu_gate_ops'
-> >>    sunxi_sid.c:(.data+0x1dac8): undefined reference to `ccu_gate_ops'
-> >>    sunxi_sid.c:(.data+0x1db20): undefined reference to `ccu_mux_ops'
-> >>    sunxi_sid.c:(.data+0x1db74): undefined reference to `ccu_mux_ops'
-> >>    sunxi_sid.c:(.data+0x1dbec): undefined reference to `ccu_mp_ops'
-> >>    sunxi_sid.c:(.data+0x1dc64): undefined reference to `ccu_mp_ops'
-> >
-> > It seems like even though the lib.a file is compiled properly, it is
-> > never linked in. It looks like we would be supposed to add
-> > drivers/clk/sunxi-ng/ to libs-y, but that doesn't seem to work for
-> > Makefiles in drivers/*
+> >> This patchset is based on Linux-4.12-rc3 and it is also available
+> >> at stingray-v6 branch of https://github.com/Broadcom/arm64-linux.git
+> >>
+> >> Changes since v5:
+> >>  - Rebased patches for Linux-4.12-rc3
+> >>  - Update DT node names to match register offset
+> >>
+> >> Changes since v4:
+> >>  - Reduce number of include headers in Stingray clk driver
+> >>
+> >> Changes since v3:
+> >>  - Rebased patches for Linux-4.12-rc1
+> >>  - Updated PATCH3 to have all clocks except genpll3 to be
+> >>    registered via platform driver probe
+> >>
+> >> Changes since v2:
+> >>  - Remove default bootargs from chosen DT node
+> >>  - Remove "linux" prefix from stdout DT attribute of chosen DT node
+> >>  - Remove use of GIC_CPU_MASK_xxx() for PPIs
+> >>
+> >> Changes since v1:
+> >>  - Rebased patches for Linux-4.12-rc1
+> >>  - Removed unwanted /memreserve/ from bcm958742-base.dtsi
+> >>  - Use ranges DT property to clear view of memory-layout
+> >>  - Make bcm-sr.h part of clock DT bindings patch
+> >>
+> >> Anup Patel (3):
+> >>   dt-bindings: bcm: Add Broadcom Stingray bindings document
+> >>   arm64: dts: Initial DTS files for Broadcom Stingray SOC
+> >>   arm64: dts: Add PL022, PL330 and SP805 DT nodes for Stingray
+> >>
+> >> Oza Pawandeep (1):
+> >>   arm64: dts: Add I2C DT nodes for Stingray SoC
+> >>
+> >> Pramod Kumar (3):
+> >>   arm64: dts: Add NAND DT nodes for Stingray SOC
+> >>   arm64: dts: Add pinctrl DT nodes for Stingray SOC
+> >>   arm64: dts: Add GPIO DT nodes for Stingray SOC
+> >>
+> >> Sandeep Tripathy (3):
+> >>   dt-bindings: clk: Extend binding doc for Stingray SOC
+> >>   clk: bcm: Add clocks for Stingray SOC
+> >>   arm64: dts: Add clock DT nodes for Stingray SOC
+> >>
+> >> Srinath Mannam (1):
+> >>   arm64: dts: Add PWM and SDHCI DT nodes for Stingray SOC
+> > 
+> > Applied patches 1, 4-11 to devicetree-arm64/next, thanks!
 > 
-> Ah, too bad. I see that only one directory under drivers/ uses something
-> with lib.a, in drivers/firmware/efi/libstub/Makefile, but that seems to
-> rely on being special-cased as well.
+> Also took patch 2, to make sure everything builds properly, Stephen, let
+> me know if you want me to take patch #3 as well.
 > 
-> However, this patch seems to fix it:
-> 
-> diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-> index cbc8cb4f70e3..321d3da7cc6a 100644
-> --- a/drivers/clk/sunxi-ng/Makefile
-> +++ b/drivers/clk/sunxi-ng/Makefile
-> @@ -18,16 +18,16 @@ lib-$(CONFIG_SUNXI_CCU) += ccu_nm.o
->  lib-$(CONFIG_SUNXI_CCU) += ccu_mp.o
-> 
->  # SoC support
-> -obj-$(CONFIG_SUN50I_A64_CCU) += ccu-sun50i-a64.o
-> -obj-$(CONFIG_SUN5I_CCU) += ccu-sun5i.o
-> -obj-$(CONFIG_SUN6I_A31_CCU) += ccu-sun6i-a31.o
-> -obj-$(CONFIG_SUN8I_A23_CCU) += ccu-sun8i-a23.o
-> -obj-$(CONFIG_SUN8I_A33_CCU) += ccu-sun8i-a33.o
-> -obj-$(CONFIG_SUN8I_A83T_CCU) += ccu-sun8i-a83t.o
-> -obj-$(CONFIG_SUN8I_H3_CCU) += ccu-sun8i-h3.o
-> -obj-$(CONFIG_SUN8I_V3S_CCU) += ccu-sun8i-v3s.o
-> -obj-$(CONFIG_SUN8I_DE2_CCU) += ccu-sun8i-de2.o
-> -obj-$(CONFIG_SUN8I_R_CCU) += ccu-sun8i-r.o
-> -obj-$(CONFIG_SUN9I_A80_CCU) += ccu-sun9i-a80.o
-> -obj-$(CONFIG_SUN9I_A80_CCU) += ccu-sun9i-a80-de.o
-> -obj-$(CONFIG_SUN9I_A80_CCU) += ccu-sun9i-a80-usb.o
-> +obj-$(CONFIG_SUN50I_A64_CCU) += ccu-sun50i-a64.o lib.a
-> +obj-$(CONFIG_SUN5I_CCU) += ccu-sun5i.o lib.a
-> +obj-$(CONFIG_SUN6I_A31_CCU) += ccu-sun6i-a31.o lib.a
-> +obj-$(CONFIG_SUN8I_A23_CCU) += ccu-sun8i-a23.o lib.a
-> +obj-$(CONFIG_SUN8I_A33_CCU) += ccu-sun8i-a33.o lib.a
-> +obj-$(CONFIG_SUN8I_A83T_CCU) += ccu-sun8i-a83t.o lib.a
-> +obj-$(CONFIG_SUN8I_H3_CCU) += ccu-sun8i-h3.o lib.a
-> +obj-$(CONFIG_SUN8I_V3S_CCU) += ccu-sun8i-v3s.o lib.a
-> +obj-$(CONFIG_SUN8I_DE2_CCU) += ccu-sun8i-de2.o lib.a
-> +obj-$(CONFIG_SUN8I_R_CCU) += ccu-sun8i-r.o lib.a
-> +obj-$(CONFIG_SUN9I_A80_CCU) += ccu-sun9i-a80.o lib.a
-> +obj-$(CONFIG_SUN9I_A80_CCU) += ccu-sun9i-a80-de.o lib.a
-> +obj-$(CONFIG_SUN9I_A80_CCU) += ccu-sun9i-a80-usb.o lib.a
-> 
-> It's not documented behavior, but I think it's still good enough,
-> and improves the current version, unless there is another bug
-> after we add this to your patch.
 
-We should add a comment above this so we know what the lib.a is
-all about. As you say, it's not documented.
+Usually clk tree takes includes and hosts that in a stable branch
+for arm-soc maintainers to take. It seems that now arm-soc
+maintainers are asking that dts files use plain numbers and then
+switch to defines later after -rc1.
+
+Should I go apply patch 2 myself so I can apply patch 3 to the
+clk tree? Personally, I think this is fine because git doesn't
+care about duplicate commits anyway and this is just #defines
+we're talking about. Alternatively, you can host patch 2 in a
+stable branch on v4.12-rc1 that I can pull into clk tree and then
+apply patch 3 on top of and merge up into clk-next. Or you can
+send me a PR for this clk driver and I can merge it into clk-next
+where patch 2 is the parent of the clk driver change.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
