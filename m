@@ -1,30 +1,29 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 6 Jun 2017 17:34:52 +0200
-Subject: [PATCH v2 4/5] ARM: dts: iwg20m: Add iWave RZG1M Qseven SOM
-In-Reply-To: <1496761818-62126-5-git-send-email-biju.das@bp.renesas.com>
-References: <1496420523-23506-4-git-send-email-biju.das@bp.renesas.com>
- <1496761818-62126-1-git-send-email-biju.das@bp.renesas.com>
- <1496761818-62126-5-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <CAMuHMdUMfgO2ZORREL8vFpHheM=3fGxn8AUzZSt6YYiY6MJufg@mail.gmail.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Tue, 6 Jun 2017 16:45:38 +0100
+Subject: [PATCH] arm64: dts: juno: Enable some SMMUs
+In-Reply-To: <eeb81dbbd7ddfbbccb961c0f20c5cb90f120e89f.1495110010.git.robin.murphy@arm.com>
+References: <eeb81dbbd7ddfbbccb961c0f20c5cb90f120e89f.1495110010.git.robin.murphy@arm.com>
+Message-ID: <5e24adfa-3342-f331-1ed3-ed32ebf164cb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 6, 2017 at 5:10 PM, Biju Das <biju.das@bp.renesas.com> wrote:
-> Add support for iWave RZG1M Qseven System On Module.
-> http://www.iwavesystems.com/rz-g1m-qseven-module.html
->
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+Hello,
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+On 18/05/17 13:23, Robin Murphy wrote:
+> The IOMMU-backed DMA API support has now been in place for a while and
+> proven stable, so there's no real need to keep most of Juno's SMMUs
+> disabled. The USB, HDLCDs, and CoreSight ETR all just need to map RAM
+> buffers for DMA - enabling their SMMUs obviates CPU bounce buffering for
+> USB's streaming DMA to the upper memory bank, and lets the other two
+> allocate their relatively large coherent buffers without pressuring CMA.
+> 
+> Some more software work is still needed for the DMA-330 and PCIe before
+> those can accommodate SMMU translation correctly in all cases, so we
+> leave those alone for now.
 
-Gr{oetje,eeting}s,
+Out of curiosity, what is missing for DMA-330? I can use dmatest over SMMU
+on my juno-r1 by enabling the node, but I don't have any complex workload
+yet. Guest pass-through is really unreliable and I'm trying to figure out why.
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+Jean
