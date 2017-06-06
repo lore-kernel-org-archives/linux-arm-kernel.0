@@ -1,116 +1,33 @@
 From: ruxandra.radulescu@nxp.com (Ioana Radulescu)
-Date: Tue, 6 Jun 2017 10:00:28 -0500
-Subject: [PATCH 05/18] staging: fsl-dpaa2/eth: Add error message newlines
+Date: Tue, 6 Jun 2017 10:00:26 -0500
+Subject: [PATCH 03/18] staging: fsl-dpaa2/eth: Fix return type of
+ ndo_start_xmit
 In-Reply-To: <20170606150041.10955-1-ruxandra.radulescu@nxp.com>
 References: <20170606150041.10955-1-ruxandra.radulescu@nxp.com>
-Message-ID: <20170606150041.10955-6-ruxandra.radulescu@nxp.com>
+Message-ID: <20170606150041.10955-4-ruxandra.radulescu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A few error/warning messages lacked a newline at the end
-of the text. Add it for improved consistency and cosmetics.
+ndo_start_xmit() returns a value of type netdev_tx_t. Update
+our ndo function to use the correct type.
 
 Signed-off-by: Ioana Radulescu <ruxandra.radulescu@nxp.com>
 ---
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c     | 14 +++++++-------
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c |  6 +++---
- 2 files changed, 10 insertions(+), 10 deletions(-)
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-index f63054e071b3..c4252f47d57d 100644
+index f0ef3a7c0f73..a9e245df2488 100644
 --- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
 +++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-@@ -975,7 +975,7 @@ static int link_state_update(struct dpaa2_eth_priv *priv)
- 		netif_carrier_off(priv->net_dev);
- 	}
- 
--	netdev_info(priv->net_dev, "Link Event: state %s",
-+	netdev_info(priv->net_dev, "Link Event: state %s\n",
- 		    state.up ? "up" : "down");
- 
- 	return 0;
-@@ -1806,7 +1806,7 @@ static int setup_dpni(struct fsl_mc_device *ls_dev)
- 	}
- 
- 	if ((priv->tx_data_offset % 64) != 0)
--		dev_warn(dev, "Tx data offset (%d) not a multiple of 64B",
-+		dev_warn(dev, "Tx data offset (%d) not a multiple of 64B\n",
- 			 priv->tx_data_offset);
- 
- 	/* Accommodate software annotation space (SWA) */
-@@ -2002,7 +2002,7 @@ static int dpaa2_eth_set_hash(struct net_device *net_dev, u64 flags)
- 
- 	err = dpni_prepare_key_cfg(&cls_cfg, dma_mem);
- 	if (err) {
--		dev_err(dev, "dpni_prepare_key_cfg error %d", err);
-+		dev_err(dev, "dpni_prepare_key_cfg error %d\n", err);
- 		goto err_prep_key;
- 	}
- 
-@@ -2261,7 +2261,7 @@ static irqreturn_t dpni_irq0_handler_thread(int irq_num, void *arg)
- 	err = dpni_get_irq_status(dpni_dev->mc_io, 0, dpni_dev->mc_handle,
- 				  DPNI_IRQ_INDEX, &status);
- 	if (unlikely(err)) {
--		netdev_err(net_dev, "Can't get irq status (err %d)", err);
-+		netdev_err(net_dev, "Can't get irq status (err %d)\n", err);
- 		clear = 0xffffffff;
- 		goto out;
- 	}
-@@ -2295,21 +2295,21 @@ static int setup_irqs(struct fsl_mc_device *ls_dev)
- 					IRQF_NO_SUSPEND | IRQF_ONESHOT,
- 					dev_name(&ls_dev->dev), &ls_dev->dev);
- 	if (err < 0) {
--		dev_err(&ls_dev->dev, "devm_request_threaded_irq(): %d", err);
-+		dev_err(&ls_dev->dev, "devm_request_threaded_irq(): %d\n", err);
- 		goto free_mc_irq;
- 	}
- 
- 	err = dpni_set_irq_mask(ls_dev->mc_io, 0, ls_dev->mc_handle,
- 				DPNI_IRQ_INDEX, DPNI_IRQ_EVENT_LINK_CHANGED);
- 	if (err < 0) {
--		dev_err(&ls_dev->dev, "dpni_set_irq_mask(): %d", err);
-+		dev_err(&ls_dev->dev, "dpni_set_irq_mask(): %d\n", err);
- 		goto free_irq;
- 	}
- 
- 	err = dpni_set_irq_enable(ls_dev->mc_io, 0, ls_dev->mc_handle,
- 				  DPNI_IRQ_INDEX, 1);
- 	if (err < 0) {
--		dev_err(&ls_dev->dev, "dpni_set_irq_enable(): %d", err);
-+		dev_err(&ls_dev->dev, "dpni_set_irq_enable(): %d\n", err);
- 		goto free_irq;
- 	}
- 
-diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
-index 89888b6115bf..6a331c74e542 100644
---- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
-+++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
-@@ -94,7 +94,7 @@ dpaa2_eth_get_link_ksettings(struct net_device *net_dev,
- 
- 	err = dpni_get_link_state(priv->mc_io, 0, priv->mc_token, &state);
- 	if (err) {
--		netdev_err(net_dev, "ERROR %d getting link state", err);
-+		netdev_err(net_dev, "ERROR %d getting link state\n", err);
- 		goto out;
- 	}
- 
-@@ -147,7 +147,7 @@ dpaa2_eth_set_link_ksettings(struct net_device *net_dev,
- 		/* ethtool will be loud enough if we return an error; no point
- 		 * in putting our own error message on the console by default
- 		 */
--		netdev_dbg(net_dev, "ERROR %d setting link cfg", err);
-+		netdev_dbg(net_dev, "ERROR %d setting link cfg\n", err);
- 
- 	return err;
+@@ -551,7 +551,7 @@ static void free_tx_fd(const struct dpaa2_eth_priv *priv,
+ 	dev_kfree_skb(skb);
  }
-@@ -206,7 +206,7 @@ static void dpaa2_eth_get_ethtool_stats(struct net_device *net_dev,
- 		err = dpni_get_statistics(priv->mc_io, 0, priv->mc_token,
- 					  j, &dpni_stats);
- 		if (err != 0)
--			netdev_warn(net_dev, "dpni_get_stats(%d) failed", j);
-+			netdev_warn(net_dev, "dpni_get_stats(%d) failed\n", j);
- 		switch (j) {
- 		case 0:
- 			num_cnt = sizeof(dpni_stats.page_0) / sizeof(u64);
+ 
+-static int dpaa2_eth_tx(struct sk_buff *skb, struct net_device *net_dev)
++static netdev_tx_t dpaa2_eth_tx(struct sk_buff *skb, struct net_device *net_dev)
+ {
+ 	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
+ 	struct dpaa2_fd fd;
 -- 
 2.11.0
