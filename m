@@ -1,386 +1,340 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Tue,  6 Jun 2017 09:53:58 +0530
-Subject: [PATCH v7 1/1] clk: bcm: Add clocks for Stingray SOC
-In-Reply-To: <1496723038-4693-1-git-send-email-anup.patel@broadcom.com>
-References: <1496723038-4693-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1496723038-4693-2-git-send-email-anup.patel@broadcom.com>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Tue,  6 Jun 2017 02:54:21 +0200
+Subject: [PATCH v4 23/28] soc: actions: Add Owl SPS
+In-Reply-To: <20170606005426.26446-1-afaerber@suse.de>
+References: <20170606005426.26446-1-afaerber@suse.de>
+Message-ID: <20170606005426.26446-24-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sandeep Tripathy <sandeep.tripathy@broadcom.com>
+Implement S500 Smart Power System power-gating.
+For now flag PD_CPU2 and PD_CPU3 as always-on.
 
-This patch adds support for Stingray clocks in iproc
-ccf. The Stingray SOC has various plls based on iproc
-pll architecture.
+Based on LeMaker linux-actions tree.
 
-Signed-off-by: Sandeep Tripathy <sandeep.tripathy@broadcom.com>
-Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- drivers/clk/bcm/Kconfig  |   8 ++
- drivers/clk/bcm/Makefile |   1 +
- drivers/clk/bcm/clk-sr.c | 327 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 336 insertions(+)
- create mode 100644 drivers/clk/bcm/clk-sr.c
+ v3 -> v4:
+ * Added genpd_flags field and set GENPD_FLAG_ALWAYS_ON for CPU2/CPU3
+ * Added debug output
+ 
+ v3: new
+ 
+ drivers/soc/Kconfig           |   1 +
+ drivers/soc/Makefile          |   1 +
+ drivers/soc/actions/Kconfig   |  12 ++
+ drivers/soc/actions/Makefile  |   1 +
+ drivers/soc/actions/owl-sps.c | 252 ++++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 267 insertions(+)
+ create mode 100644 drivers/soc/actions/Kconfig
+ create mode 100644 drivers/soc/actions/Makefile
+ create mode 100644 drivers/soc/actions/owl-sps.c
 
-diff --git a/drivers/clk/bcm/Kconfig b/drivers/clk/bcm/Kconfig
-index b5ae531..1d9187d 100644
---- a/drivers/clk/bcm/Kconfig
-+++ b/drivers/clk/bcm/Kconfig
-@@ -46,3 +46,11 @@ config CLK_BCM_NS2
- 	default ARCH_BCM_IPROC
- 	help
- 	  Enable common clock framework support for the Broadcom Northstar 2 SoC
-+
-+config CLK_BCM_SR
-+	bool "Broadcom Stingray clock support"
-+	depends on ARCH_BCM_IPROC || COMPILE_TEST
-+	select COMMON_CLK_IPROC
-+	default ARCH_BCM_IPROC
-+	help
-+	  Enable common clock framework support for the Broadcom Stingray SoC
-diff --git a/drivers/clk/bcm/Makefile b/drivers/clk/bcm/Makefile
-index d9dc848..a0c14fa 100644
---- a/drivers/clk/bcm/Makefile
-+++ b/drivers/clk/bcm/Makefile
-@@ -10,3 +10,4 @@ obj-$(CONFIG_ARCH_BCM_53573)	+= clk-bcm53573-ilp.o
- obj-$(CONFIG_CLK_BCM_CYGNUS)	+= clk-cygnus.o
- obj-$(CONFIG_CLK_BCM_NSP)	+= clk-nsp.o
- obj-$(CONFIG_CLK_BCM_NS2)	+= clk-ns2.o
-+obj-$(CONFIG_CLK_BCM_SR)	+= clk-sr.o
-diff --git a/drivers/clk/bcm/clk-sr.c b/drivers/clk/bcm/clk-sr.c
+diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
+index 309643fe35f9..a63eb0ffba98 100644
+--- a/drivers/soc/Kconfig
++++ b/drivers/soc/Kconfig
+@@ -1,5 +1,6 @@
+ menu "SOC (System On Chip) specific Drivers"
+ 
++source "drivers/soc/actions/Kconfig"
+ source "drivers/soc/atmel/Kconfig"
+ source "drivers/soc/bcm/Kconfig"
+ source "drivers/soc/fsl/Kconfig"
+diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
+index 824b44281efa..a3b27a33c309 100644
+--- a/drivers/soc/Makefile
++++ b/drivers/soc/Makefile
+@@ -2,6 +2,7 @@
+ # Makefile for the Linux Kernel SOC specific device drivers.
+ #
+ 
++obj-$(CONFIG_ARCH_ACTIONS)	+= actions/
+ obj-$(CONFIG_ARCH_AT91)		+= atmel/
+ obj-y				+= bcm/
+ obj-$(CONFIG_ARCH_DOVE)		+= dove/
+diff --git a/drivers/soc/actions/Kconfig b/drivers/soc/actions/Kconfig
 new file mode 100644
-index 0000000..adc74f4
+index 000000000000..bdf827d5ce78
 --- /dev/null
-+++ b/drivers/clk/bcm/clk-sr.c
-@@ -0,0 +1,327 @@
++++ b/drivers/soc/actions/Kconfig
+@@ -0,0 +1,12 @@
++if ARCH_ACTIONS || COMPILE_TEST
++
++config OWL_PM_DOMAINS
++	bool "Actions Semi SPS power domains"
++	depends on PM
++	select PM_GENERIC_DOMAINS
++	help
++	  Say 'y' here to enable support for Smart Power System (SPS)
++	  power-gating on Actions Semiconductor S500 SoC.
++	  If unsure, say 'n'.
++
++endif
+diff --git a/drivers/soc/actions/Makefile b/drivers/soc/actions/Makefile
+new file mode 100644
+index 000000000000..720c34ed16e4
+--- /dev/null
++++ b/drivers/soc/actions/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_OWL_PM_DOMAINS) += owl-sps.o
+diff --git a/drivers/soc/actions/owl-sps.c b/drivers/soc/actions/owl-sps.c
+new file mode 100644
+index 000000000000..d9160579b542
+--- /dev/null
++++ b/drivers/soc/actions/owl-sps.c
+@@ -0,0 +1,252 @@
 +/*
-+ * Copyright 2017 Broadcom
++ * Actions Semi Owl Smart Power System (SPS)
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, version 2, as
-+ * published by the Free Software Foundation (the "GPL").
++ * Copyright 2012 Actions Semi Inc.
++ * Author: Actions Semi, Inc.
 + *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License version 2 (GPLv2) for more details.
++ * Copyright (c) 2017 Andreas F?rber
 + *
-+ * You should have received a copy of the GNU General Public License
-+ * version 2 (GPLv2) along with this source code.
++ * This program is free software; you can redistribute  it and/or modify it
++ * under  the terms of  the GNU General  Public License as published by the
++ * Free Software Foundation;  either version 2 of the  License, or (at your
++ * option) any later version.
 + */
 +
-+#include <linux/err.h>
-+#include <linux/clk-provider.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/of_address.h>
++#include <linux/of_platform.h>
++#include <linux/pm_domain.h>
++#include <dt-bindings/power/s500-powergate.h>
 +
-+#include <dt-bindings/clock/bcm-sr.h>
-+#include "clk-iproc.h"
++#define OWL_SPS_PG_CTL	0x0
 +
-+#define REG_VAL(o, s, w) { .offset = o, .shift = s, .width = w, }
-+
-+#define AON_VAL(o, pw, ps, is) { .offset = o, .pwr_width = pw, \
-+	.pwr_shift = ps, .iso_shift = is }
-+
-+#define SW_CTRL_VAL(o, s) { .offset = o, .shift = s, }
-+
-+#define RESET_VAL(o, rs, prs) { .offset = o, .reset_shift = rs, \
-+	.p_reset_shift = prs }
-+
-+#define DF_VAL(o, kis, kiw, kps, kpw, kas, kaw) { .offset = o, \
-+	.ki_shift = kis, .ki_width = kiw, .kp_shift = kps, .kp_width = kpw, \
-+	.ka_shift = kas, .ka_width = kaw }
-+
-+#define VCO_CTRL_VAL(uo, lo) { .u_offset = uo, .l_offset = lo }
-+
-+#define ENABLE_VAL(o, es, hs, bs) { .offset = o, .enable_shift = es, \
-+	.hold_shift = hs, .bypass_shift = bs }
-+
-+
-+static const struct iproc_pll_ctrl sr_genpll0 = {
-+	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_HAS_NDIV_FRAC |
-+		IPROC_CLK_PLL_NEEDS_SW_CFG,
-+	.aon = AON_VAL(0x0, 5, 1, 0),
-+	.reset = RESET_VAL(0x0, 12, 11),
-+	.dig_filter = DF_VAL(0x0, 4, 3, 0, 4, 7, 3),
-+	.sw_ctrl = SW_CTRL_VAL(0x10, 31),
-+	.ndiv_int = REG_VAL(0x10, 20, 10),
-+	.ndiv_frac = REG_VAL(0x10, 0, 20),
-+	.pdiv = REG_VAL(0x14, 0, 4),
-+	.status = REG_VAL(0x30, 12, 1),
++struct owl_sps_domain_info {
++	const char *name;
++	int pwr_bit;
++	int ack_bit;
++	unsigned int genpd_flags;
 +};
 +
-+static const struct iproc_clk_ctrl sr_genpll0_clk[] = {
-+	[BCM_SR_GENPLL0_SATA_CLK] = {
-+		.channel = BCM_SR_GENPLL0_SATA_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 6, 0, 12),
-+		.mdiv = REG_VAL(0x18, 0, 9),
-+	},
-+	[BCM_SR_GENPLL0_SCR_CLK] = {
-+		.channel = BCM_SR_GENPLL0_SCR_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 7, 1, 13),
-+		.mdiv = REG_VAL(0x18, 10, 9),
-+	},
-+	[BCM_SR_GENPLL0_250M_CLK] = {
-+		.channel = BCM_SR_GENPLL0_250M_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 8, 2, 14),
-+		.mdiv = REG_VAL(0x18, 20, 9),
-+	},
-+	[BCM_SR_GENPLL0_PCIE_AXI_CLK] = {
-+		.channel = BCM_SR_GENPLL0_PCIE_AXI_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 9, 3, 15),
-+		.mdiv = REG_VAL(0x1c, 0, 9),
-+	},
-+	[BCM_SR_GENPLL0_PAXC_AXI_X2_CLK] = {
-+		.channel = BCM_SR_GENPLL0_PAXC_AXI_X2_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 10, 4, 16),
-+		.mdiv = REG_VAL(0x1c, 10, 9),
-+	},
-+	[BCM_SR_GENPLL0_PAXC_AXI_CLK] = {
-+		.channel = BCM_SR_GENPLL0_PAXC_AXI_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 11, 5, 17),
-+		.mdiv = REG_VAL(0x1c, 20, 9),
-+	},
++struct owl_sps_info {
++	unsigned num_domains;
++	const struct owl_sps_domain_info *domains;
 +};
 +
-+static int sr_genpll0_clk_init(struct platform_device *pdev)
++struct owl_sps {
++	struct device *dev;
++	const struct owl_sps_info *info;
++	void __iomem *base;
++	struct genpd_onecell_data genpd_data;
++	struct generic_pm_domain *domains[];
++};
++
++#define to_owl_pd(gpd) container_of(gpd, struct owl_sps_domain, genpd)
++
++struct owl_sps_domain {
++	struct generic_pm_domain genpd;
++	const struct owl_sps_domain_info *info;
++	struct owl_sps *sps;
++};
++
++static int owl_sps_set_power(struct owl_sps_domain *pd, bool enable)
 +{
-+	iproc_pll_clk_setup(pdev->dev.of_node,
-+			    &sr_genpll0, NULL, 0, sr_genpll0_clk,
-+			    ARRAY_SIZE(sr_genpll0_clk));
++	u32 val, pwr_mask, ack_mask;
++	int timeout;
++	bool ack;
++
++	ack_mask = BIT(pd->info->ack_bit);
++	pwr_mask = BIT(pd->info->pwr_bit);
++	val = readl(pd->sps->base + OWL_SPS_PG_CTL);
++	ack = val & ack_mask;
++
++	if (ack == enable)
++		return 0;
++
++	if (enable)
++		val |= pwr_mask;
++	else
++		val &= ~pwr_mask;
++
++	writel(val, pd->sps->base + OWL_SPS_PG_CTL);
++
++	for (timeout = 5000; timeout > 0; timeout -= 50) {
++		val = readl(pd->sps->base + OWL_SPS_PG_CTL);
++		if ((val & ack_mask) == (enable ? ack_mask : 0))
++			break;
++		udelay(50);
++	}
++	if (timeout <= 0)
++		return -ETIMEDOUT;
++
++	udelay(10);
++
 +	return 0;
 +}
 +
-+static const struct iproc_pll_ctrl sr_genpll3 = {
-+	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_HAS_NDIV_FRAC |
-+		IPROC_CLK_PLL_NEEDS_SW_CFG,
-+	.aon = AON_VAL(0x0, 1, 19, 18),
-+	.reset = RESET_VAL(0x0, 12, 11),
-+	.dig_filter = DF_VAL(0x0, 4, 3, 0, 4, 7, 3),
-+	.sw_ctrl = SW_CTRL_VAL(0x10, 31),
-+	.ndiv_int = REG_VAL(0x10, 20, 10),
-+	.ndiv_frac = REG_VAL(0x10, 0, 20),
-+	.pdiv = REG_VAL(0x14, 0, 4),
-+	.status = REG_VAL(0x30, 12, 1),
-+};
-+
-+static const struct iproc_clk_ctrl sr_genpll3_clk[] = {
-+	[BCM_SR_GENPLL3_HSLS_CLK] = {
-+		.channel = BCM_SR_GENPLL3_HSLS_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 6, 0, 12),
-+		.mdiv = REG_VAL(0x18, 0, 9),
-+	},
-+	[BCM_SR_GENPLL3_SDIO_CLK] = {
-+		.channel = BCM_SR_GENPLL3_SDIO_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 7, 1, 13),
-+		.mdiv = REG_VAL(0x18, 10, 9),
-+	},
-+};
-+
-+static void sr_genpll3_clk_init(struct device_node *node)
++static int owl_sps_power_on(struct generic_pm_domain *domain)
 +{
-+	iproc_pll_clk_setup(node, &sr_genpll3, NULL, 0, sr_genpll3_clk,
-+			    ARRAY_SIZE(sr_genpll3_clk));
++	struct owl_sps_domain *pd = to_owl_pd(domain);
++
++	dev_dbg(pd->sps->dev, "%s power on", pd->info->name);
++
++	return owl_sps_set_power(pd, true);
 +}
-+CLK_OF_DECLARE(sr_genpll3_clk, "brcm,sr-genpll3", sr_genpll3_clk_init);
 +
-+static const struct iproc_pll_ctrl sr_genpll4 = {
-+	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_HAS_NDIV_FRAC |
-+		IPROC_CLK_PLL_NEEDS_SW_CFG,
-+	.aon = AON_VAL(0x0, 1, 25, 24),
-+	.reset = RESET_VAL(0x0, 12, 11),
-+	.dig_filter = DF_VAL(0x0, 4, 3, 0, 4, 7, 3),
-+	.sw_ctrl = SW_CTRL_VAL(0x10, 31),
-+	.ndiv_int = REG_VAL(0x10, 20, 10),
-+	.ndiv_frac = REG_VAL(0x10, 0, 20),
-+	.pdiv = REG_VAL(0x14, 0, 4),
-+	.status = REG_VAL(0x30, 12, 1),
-+};
-+
-+static const struct iproc_clk_ctrl sr_genpll4_clk[] = {
-+	[BCM_SR_GENPLL4_CCN_CLK] = {
-+		.channel = BCM_SR_GENPLL4_CCN_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 6, 0, 12),
-+		.mdiv = REG_VAL(0x18, 0, 9),
-+	},
-+};
-+
-+static int sr_genpll4_clk_init(struct platform_device *pdev)
++static int owl_sps_power_off(struct generic_pm_domain *domain)
 +{
-+	iproc_pll_clk_setup(pdev->dev.of_node,
-+			    &sr_genpll4, NULL, 0, sr_genpll4_clk,
-+			    ARRAY_SIZE(sr_genpll4_clk));
++	struct owl_sps_domain *pd = to_owl_pd(domain);
++
++	dev_dbg(pd->sps->dev, "%s power off", pd->info->name);
++
++	return owl_sps_set_power(pd, false);
++}
++
++static int owl_sps_init_domain(struct owl_sps *sps, int index)
++{
++	struct owl_sps_domain *pd;
++
++	pd = devm_kzalloc(sps->dev, sizeof(*pd), GFP_KERNEL);
++	if (!pd)
++		return -ENOMEM;
++
++	pd->info = &sps->info->domains[index];
++	pd->sps = sps;
++
++	pd->genpd.name = pd->info->name;
++	pd->genpd.power_on = owl_sps_power_on;
++	pd->genpd.power_off = owl_sps_power_off;
++	pd->genpd.flags = pd->info->genpd_flags;
++	pm_genpd_init(&pd->genpd, NULL, false);
++
++	sps->genpd_data.domains[index] = &pd->genpd;
++
 +	return 0;
 +}
 +
-+static const struct iproc_pll_ctrl sr_genpll5 = {
-+	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_HAS_NDIV_FRAC |
-+		IPROC_CLK_PLL_NEEDS_SW_CFG,
-+	.aon = AON_VAL(0x0, 1, 1, 0),
-+	.reset = RESET_VAL(0x0, 12, 11),
-+	.dig_filter = DF_VAL(0x0, 4, 3, 0, 4, 7, 3),
-+	.sw_ctrl = SW_CTRL_VAL(0x10, 31),
-+	.ndiv_int = REG_VAL(0x10, 20, 10),
-+	.ndiv_frac = REG_VAL(0x10, 0, 20),
-+	.pdiv = REG_VAL(0x14, 0, 4),
-+	.status = REG_VAL(0x30, 12, 1),
-+};
-+
-+static const struct iproc_clk_ctrl sr_genpll5_clk[] = {
-+	[BCM_SR_GENPLL5_FS_CLK] = {
-+		.channel = BCM_SR_GENPLL5_FS_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 6, 0, 12),
-+		.mdiv = REG_VAL(0x18, 0, 9),
-+	},
-+	[BCM_SR_GENPLL5_SPU_CLK] = {
-+		.channel = BCM_SR_GENPLL5_SPU_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 6, 0, 12),
-+		.mdiv = REG_VAL(0x18, 10, 9),
-+	},
-+};
-+
-+static int sr_genpll5_clk_init(struct platform_device *pdev)
++static int owl_sps_probe(struct platform_device *pdev)
 +{
-+	iproc_pll_clk_setup(pdev->dev.of_node,
-+			    &sr_genpll5, NULL, 0, sr_genpll5_clk,
-+			    ARRAY_SIZE(sr_genpll5_clk));
-+	return 0;
-+}
++	const struct of_device_id *match;
++	const struct owl_sps_info *sps_info;
++	struct owl_sps *sps;
++	int i, ret;
 +
-+static const struct iproc_pll_ctrl sr_lcpll0 = {
-+	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_NEEDS_SW_CFG,
-+	.aon = AON_VAL(0x0, 2, 19, 18),
-+	.reset = RESET_VAL(0x0, 31, 30),
-+	.sw_ctrl = SW_CTRL_VAL(0x4, 31),
-+	.ndiv_int = REG_VAL(0x4, 16, 10),
-+	.pdiv = REG_VAL(0x4, 26, 4),
-+	.status = REG_VAL(0x38, 12, 1),
-+};
-+
-+static const struct iproc_clk_ctrl sr_lcpll0_clk[] = {
-+	[BCM_SR_LCPLL0_SATA_REF_CLK] = {
-+		.channel = BCM_SR_LCPLL0_SATA_REF_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 7, 1, 13),
-+		.mdiv = REG_VAL(0x14, 0, 9),
-+	},
-+	[BCM_SR_LCPLL0_USB_REF_CLK] = {
-+		.channel = BCM_SR_LCPLL0_USB_REF_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 8, 2, 14),
-+		.mdiv = REG_VAL(0x14, 10, 9),
-+	},
-+	[BCM_SR_LCPLL0_SATA_REFPN_CLK] = {
-+		.channel = BCM_SR_LCPLL0_SATA_REFPN_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 9, 3, 15),
-+		.mdiv = REG_VAL(0x14, 20, 9),
-+	},
-+};
-+
-+static int sr_lcpll0_clk_init(struct platform_device *pdev)
-+{
-+	iproc_pll_clk_setup(pdev->dev.of_node,
-+			    &sr_lcpll0, NULL, 0, sr_lcpll0_clk,
-+			    ARRAY_SIZE(sr_lcpll0_clk));
-+	return 0;
-+}
-+
-+static const struct iproc_pll_ctrl sr_lcpll1 = {
-+	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_NEEDS_SW_CFG,
-+	.aon = AON_VAL(0x0, 2, 22, 21),
-+	.reset = RESET_VAL(0x0, 31, 30),
-+	.sw_ctrl = SW_CTRL_VAL(0x4, 31),
-+	.ndiv_int = REG_VAL(0x4, 16, 10),
-+	.pdiv = REG_VAL(0x4, 26, 4),
-+	.status = REG_VAL(0x38, 12, 1),
-+};
-+
-+static const struct iproc_clk_ctrl sr_lcpll1_clk[] = {
-+	[BCM_SR_LCPLL1_WAN_CLK] = {
-+		.channel = BCM_SR_LCPLL1_WAN_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 7, 1, 13),
-+		.mdiv = REG_VAL(0x14, 0, 9),
-+	},
-+};
-+
-+static int sr_lcpll1_clk_init(struct platform_device *pdev)
-+{
-+	iproc_pll_clk_setup(pdev->dev.of_node,
-+			    &sr_lcpll1, NULL, 0, sr_lcpll1_clk,
-+			    ARRAY_SIZE(sr_lcpll1_clk));
-+	return 0;
-+}
-+
-+static const struct iproc_pll_ctrl sr_lcpll_pcie = {
-+	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_NEEDS_SW_CFG,
-+	.aon = AON_VAL(0x0, 2, 25, 24),
-+	.reset = RESET_VAL(0x0, 31, 30),
-+	.sw_ctrl = SW_CTRL_VAL(0x4, 31),
-+	.ndiv_int = REG_VAL(0x4, 16, 10),
-+	.pdiv = REG_VAL(0x4, 26, 4),
-+	.status = REG_VAL(0x38, 12, 1),
-+};
-+
-+static const struct iproc_clk_ctrl sr_lcpll_pcie_clk[] = {
-+	[BCM_SR_LCPLL_PCIE_PHY_REF_CLK] = {
-+		.channel = BCM_SR_LCPLL_PCIE_PHY_REF_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 7, 1, 13),
-+		.mdiv = REG_VAL(0x14, 0, 9),
-+	},
-+};
-+
-+static int sr_lcpll_pcie_clk_init(struct platform_device *pdev)
-+{
-+	iproc_pll_clk_setup(pdev->dev.of_node,
-+			    &sr_lcpll_pcie, NULL, 0, sr_lcpll_pcie_clk,
-+			    ARRAY_SIZE(sr_lcpll_pcie_clk));
-+	return 0;
-+}
-+
-+static const struct of_device_id sr_clk_dt_ids[] = {
-+	{ .compatible = "brcm,sr-genpll0", .data = sr_genpll0_clk_init },
-+	{ .compatible = "brcm,sr-genpll4", .data = sr_genpll4_clk_init },
-+	{ .compatible = "brcm,sr-genpll5", .data = sr_genpll5_clk_init },
-+	{ .compatible = "brcm,sr-lcpll0", .data = sr_lcpll0_clk_init },
-+	{ .compatible = "brcm,sr-lcpll1", .data = sr_lcpll1_clk_init },
-+	{ .compatible = "brcm,sr-lcpll-pcie", .data = sr_lcpll_pcie_clk_init },
-+	{ /* sentinel */ }
-+};
-+
-+static int sr_clk_probe(struct platform_device *pdev)
-+{
-+	int (*probe_func)(struct platform_device *);
-+
-+	probe_func = of_device_get_match_data(&pdev->dev);
-+	if (!probe_func)
++	if (!pdev->dev.of_node) {
++		dev_err(&pdev->dev, "no device node\n");
 +		return -ENODEV;
++	}
 +
-+	return probe_func(pdev);
++	match = of_match_device(pdev->dev.driver->of_match_table, &pdev->dev);
++	if (!match || !match->data) {
++		dev_err(&pdev->dev, "unknown compatible or missing data\n");
++		return -EINVAL;
++	}
++
++	sps_info = match->data;
++
++	sps = devm_kzalloc(&pdev->dev, sizeof(*sps) +
++			   sps_info->num_domains * sizeof(sps->domains[0]),
++			   GFP_KERNEL);
++	if (!sps)
++		return -ENOMEM;
++
++	sps->base = of_io_request_and_map(pdev->dev.of_node, 0, "owl-sps");
++	if (IS_ERR(sps->base)) {
++		dev_err(&pdev->dev, "failed to map sps registers\n");
++		return PTR_ERR(sps->base);
++	}
++
++	sps->dev = &pdev->dev;
++	sps->info = sps_info;
++	sps->genpd_data.domains = sps->domains;
++	sps->genpd_data.num_domains = sps_info->num_domains;
++
++	for (i = 0; i < sps_info->num_domains; i++) {
++		ret = owl_sps_init_domain(sps, i);
++		if (ret)
++			return ret;
++	}
++
++	ret = of_genpd_add_provider_onecell(pdev->dev.of_node, &sps->genpd_data);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to add provider (%d)", ret);
++		return ret;
++	}
++
++	return 0;
 +}
 +
-+static struct platform_driver sr_clk_driver = {
-+	.driver = {
-+		.name = "sr-clk",
-+		.of_match_table = sr_clk_dt_ids,
++static const struct owl_sps_domain_info s500_sps_domains[] = {
++	[S500_PD_VDE] = {
++		.name = "VDE",
++		.pwr_bit = 0,
++		.ack_bit = 16,
 +	},
-+	.probe = sr_clk_probe,
++	[S500_PD_VCE_SI] = {
++		.name = "VCE_SI",
++		.pwr_bit = 1,
++		.ack_bit = 17,
++	},
++	[S500_PD_USB2_1] = {
++		.name = "USB2_1",
++		.pwr_bit = 2,
++		.ack_bit = 18,
++	},
++	[S500_PD_CPU2] = {
++		.name = "CPU2",
++		.pwr_bit = 5,
++		.ack_bit = 21,
++		.genpd_flags = GENPD_FLAG_ALWAYS_ON,
++	},
++	[S500_PD_CPU3] = {
++		.name = "CPU3",
++		.pwr_bit = 6,
++		.ack_bit = 22,
++		.genpd_flags = GENPD_FLAG_ALWAYS_ON,
++	},
++	[S500_PD_DMA] = {
++		.name = "DMA",
++		.pwr_bit = 8,
++		.ack_bit = 12,
++	},
++	[S500_PD_DS] = {
++		.name = "DS",
++		.pwr_bit = 9,
++		.ack_bit = 13,
++	},
++	[S500_PD_USB3] = {
++		.name = "USB3",
++		.pwr_bit = 10,
++		.ack_bit = 14,
++	},
++	[S500_PD_USB2_0] = {
++		.name = "USB2_0",
++		.pwr_bit = 11,
++		.ack_bit = 15,
++	},
 +};
-+builtin_platform_driver(sr_clk_driver);
++
++static const struct owl_sps_info s500_sps_info = {
++	.num_domains = ARRAY_SIZE(s500_sps_domains),
++	.domains = s500_sps_domains,
++};
++
++static const struct of_device_id owl_sps_of_matches[] = {
++	{ .compatible = "actions,s500-sps", .data = &s500_sps_info },
++	{ }
++};
++
++static struct platform_driver owl_sps_platform_driver = {
++	.probe = owl_sps_probe,
++	.driver = {
++		.name = "owl-sps",
++		.of_match_table = owl_sps_of_matches,
++		.suppress_bind_attrs = true,
++	},
++};
++
++static int __init owl_sps_init(void)
++{
++	return platform_driver_register(&owl_sps_platform_driver);
++}
++postcore_initcall(owl_sps_init);
 -- 
-2.7.4
+2.12.3
