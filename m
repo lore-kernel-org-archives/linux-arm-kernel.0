@@ -1,213 +1,71 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 6 Jun 2017 21:27:44 +0200
-Subject: [PATCH 14/19] drm/sun4i: hdmi: Add support for A31's HDMI
- controller
-In-Reply-To: <CAGb2v65eFAmAybmHkQcKjF+ZKxh+_G6q9i2GPzMs5854X8bQug@mail.gmail.com>
-References: <20170602101024.18940-1-wens@csie.org>
- <20170602101024.18940-15-wens@csie.org>
- <20170602194110.goale2ssyg5vuqiv@flea.lan>
- <CAGb2v65eFAmAybmHkQcKjF+ZKxh+_G6q9i2GPzMs5854X8bQug@mail.gmail.com>
-Message-ID: <20170606192744.sktuiwm3udn623gt@flea.lan>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 6 Jun 2017 12:45:17 -0700
+Subject: [PATCH 4/4] ARM: multi_v7_defconfig: Switch AXP20x driver from
+ module to built-in
+In-Reply-To: <20170522074414.3qz2wpw4cs2btkhv@flea.lan>
+References: <937914a68e4e7d6db2d12540cc6253b200978e2d.1486590875.git.rask@formelder.dk>
+ <49ad3e66452bd78da7b9e581129f76633c56e609.1486590875.git.rask@formelder.dk>
+ <20170210084213.uzf25soh7bl73a6g@lukather>
+ <CAOi56cV=UBEFQ6V4LLNrHDaDJgb33mrCA6Z+vj_3VziOpkRcvQ@mail.gmail.com>
+ <CAOi56cXLo5LaT8CgfwB991gq+gCv4OY3VNkGWviooq43=6Wayg@mail.gmail.com>
+ <20170522074414.3qz2wpw4cs2btkhv@flea.lan>
+Message-ID: <CAOi56cW8jimRGkFMAf3daL_SLBGr=TmxFnE-MKCnogci7Kr=oQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 03, 2017 at 11:19:09PM +0800, Chen-Yu Tsai wrote:
-> On Sat, Jun 3, 2017 at 3:41 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Fri, Jun 02, 2017 at 06:10:19PM +0800, Chen-Yu Tsai wrote:
-> >> The HDMI controller found in the A31 SoCs is slightly different
-> >> from the one already supported, which is found in the A10s:
-> >>
-> >>   - Need different initial values for the PLL related registers
-> >>
-> >>   - Different behavior of the DDC and TMDS clocks
-> >>
-> >>   - Different register layout for the DDC portion
-> >>
-> >>   - Separate DDC parent clock
-> >>
-> >> This patch adds support for it.
-> >>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> ---
-> >>  drivers/gpu/drm/sun4i/sun4i_hdmi.h     |   3 +
-> >>  drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c | 141 +++++++++++++++++++++++++++++++++
-> >>  2 files changed, 144 insertions(+)
-> >>
-> >> diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi.h b/drivers/gpu/drm/sun4i/sun4i_hdmi.h
-> >> index c63d0bd95963..2589bc92be59 100644
-> >> --- a/drivers/gpu/drm/sun4i/sun4i_hdmi.h
-> >> +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi.h
-> >> @@ -56,10 +56,13 @@
-> >>  #define SUN4I_HDMI_PAD_CTRL0_TXEN            BIT(23)
-> >>
-> >>  #define SUN4I_HDMI_PAD_CTRL1_REG     0x204
-> >> +#define SUN4I_HDMI_PAD_CTRL1_UNKNOWN         BIT(24) /* set on A31 */
-> >>  #define SUN4I_HDMI_PAD_CTRL1_AMP_OPT         BIT(23)
-> >>  #define SUN4I_HDMI_PAD_CTRL1_AMPCK_OPT               BIT(22)
-> >>  #define SUN4I_HDMI_PAD_CTRL1_EMP_OPT         BIT(20)
-> >>  #define SUN4I_HDMI_PAD_CTRL1_EMPCK_OPT               BIT(19)
-> >> +#define SUN4I_HDMI_PAD_CTRL1_PWSCK           BIT(18)
-> >> +#define SUN4I_HDMI_PAD_CTRL1_PWSDT           BIT(17)
-> >>  #define SUN4I_HDMI_PAD_CTRL1_REG_DEN         BIT(15)
-> >>  #define SUN4I_HDMI_PAD_CTRL1_REG_DENCK               BIT(14)
-> >>  #define SUN4I_HDMI_PAD_CTRL1_REG_EMP(n)              (((n) & 7) << 10)
-> >> diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
-> >> index 9ded40aaed32..e9abf93eb41c 100644
-> >> --- a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
-> >> +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
-> >> @@ -293,6 +293,109 @@ static const struct drm_connector_helper_funcs sun4i_hdmi_connector_helper_funcs
-> >>       .get_modes      = sun4i_hdmi_get_modes,
-> >>  };
-> >>
-> >> +static int sun6i_hdmi_read_sub_block(struct sun4i_hdmi *hdmi,
-> >> +                                  unsigned int blk, unsigned int offset,
-> >> +                                  u8 *buf, unsigned int count)
-> >> +{
-> >> +     unsigned long reg;
-> >> +     int i;
-> >> +
-> >> +     reg = readl(hdmi->base + SUN6I_HDMI_DDC_FIFO_CTRL_REG);
-> >> +     writel(reg | SUN6I_HDMI_DDC_FIFO_CTRL_CLEAR,
-> >> +            hdmi->base + SUN6I_HDMI_DDC_FIFO_CTRL_REG);
-> >> +     writel(SUN6I_HDMI_DDC_ADDR_SEGMENT(offset >> 8) |
-> >> +            SUN6I_HDMI_DDC_ADDR_EDDC(DDC_SEGMENT_ADDR << 1) |
-> >> +            SUN6I_HDMI_DDC_ADDR_OFFSET(offset) |
-> >> +            SUN6I_HDMI_DDC_ADDR_SLAVE(DDC_ADDR),
-> >> +            hdmi->base + SUN6I_HDMI_DDC_ADDR_REG);
-> >> +
-> >> +     writel(SUN6I_HDMI_DDC_CMD_EXPLICIT_EDDC_READ |
-> >> +            SUN6I_HDMI_DDC_CMD_BYTE_COUNT(count),
-> >> +            hdmi->base + SUN6I_HDMI_DDC_CMD_REG);
-> >> +
-> >> +     reg = readl(hdmi->base + SUN6I_HDMI_DDC_CTRL_REG);
-> >> +     writel(reg | SUN6I_HDMI_DDC_CTRL_START_CMD,
-> >> +            hdmi->base + SUN6I_HDMI_DDC_CTRL_REG);
-> >> +
-> >> +     if (readl_poll_timeout(hdmi->base + SUN6I_HDMI_DDC_CTRL_REG, reg,
-> >> +                            !(reg & SUN6I_HDMI_DDC_CTRL_START_CMD),
-> >> +                            100, 100000))
-> >> +             return -EIO;
-> >> +
-> >> +     for (i = 0; i < count; i++)
-> >> +             buf[i] = readb(hdmi->base + SUN6I_HDMI_DDC_FIFO_DATA_REG);
-> >> +
-> >> +     return 0;
-> >> +}
-> >> +
-> >> +static int sun6i_hdmi_read_edid_block(void *data, u8 *buf, unsigned int blk,
-> >> +                                   size_t length)
-> >> +{
-> >> +     struct sun4i_hdmi *hdmi = data;
-> >> +     int retry = 2, i;
-> >> +
-> >> +     do {
-> >> +             for (i = 0; i < length; i += SUN4I_HDMI_DDC_FIFO_SIZE) {
-> >> +                     unsigned char offset = blk * EDID_LENGTH + i;
-> >> +                     unsigned int count = min((unsigned int)SUN4I_HDMI_DDC_FIFO_SIZE,
-> >> +                                              length - i);
-> >> +                     int ret;
-> >> +
-> >> +                     ret = sun6i_hdmi_read_sub_block(hdmi, blk, offset,
-> >> +                                                     buf + i, count);
-> >> +                     if (ret)
-> >> +                             return ret;
-> >> +             }
-> >> +     } while (!drm_edid_block_valid(buf, blk, true, NULL) && (retry--));
-> >> +
-> >> +     return 0;
-> >> +}
-> >> +
-> >> +static int sun6i_hdmi_get_modes(struct drm_connector *connector)
-> >> +{
-> >> +     struct sun4i_hdmi *hdmi = drm_connector_to_sun4i_hdmi(connector);
-> >> +     u32 reg;
-> >> +     struct edid *edid;
-> >> +     int ret;
-> >> +
-> >> +     clk_set_rate(hdmi->ddc_clk, 100000);
-> >> +     clk_prepare_enable(hdmi->ddc_clk);
-> >> +
-> >> +     /* Reset i2c controller */
-> >> +     writel(SUN6I_HDMI_DDC_CTRL_ENABLE | SUN6I_HDMI_DDC_CTRL_RESET |
-> >> +            SUN6I_HDMI_DDC_CTRL_SDA_ENABLE |
-> >> +            SUN6I_HDMI_DDC_CTRL_SCL_ENABLE,
-> >> +            hdmi->base + SUN6I_HDMI_DDC_CTRL_REG);
-> >> +     if (readl_poll_timeout(hdmi->base + SUN6I_HDMI_DDC_CTRL_REG, reg,
-> >> +                            !(reg & SUN6I_HDMI_DDC_CTRL_RESET),
-> >> +                            100, 2000)) {
-> >> +             dev_err(hdmi->dev, "DDC reset timeout: %08x\n", reg);
-> >> +             clk_disable_unprepare(hdmi->ddc_clk);
-> >> +             return -EIO;
-> >> +     }
-> >> +
-> >> +     edid = drm_do_get_edid(connector, sun6i_hdmi_read_edid_block, hdmi);
-> >> +
-> >> +     clk_disable_unprepare(hdmi->ddc_clk);
-> >> +
-> >> +     if (!edid)
-> >> +             return 0;
-> >> +
-> >> +     hdmi->hdmi_monitor = drm_detect_hdmi_monitor(edid);
-> >> +     DRM_DEBUG_DRIVER("Monitor is %s monitor\n",
-> >> +                      hdmi->hdmi_monitor ? "an HDMI" : "a DVI");
-> >> +
-> >> +     drm_mode_connector_update_edid_property(connector, edid);
-> >> +     ret = drm_add_edid_modes(connector, edid);
-> >> +     kfree(edid);
-> >> +
-> >> +     return ret;
-> >> +}
-> >> +
-> >> +static const struct drm_connector_helper_funcs sun6i_hdmi_connector_helper_funcs = {
-> >> +     .get_modes      = sun6i_hdmi_get_modes,
-> >> +};
-> >> +
-> >
-> > Every thing here can be handled through regfield without having to
-> > duplicate the logic.
-> 
-> Hmm... You're right. Does that mean we should convert the entire driver to
-> using regmap? Or just the DDC bits here, since they won't conflict with
-> any other access patterns in the whole HDMI driver?
+On Mon, May 22, 2017 at 12:44 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Kevin,
+>
+> On Thu, May 18, 2017 at 11:59:50AM -0700, Kevin Hilman wrote:
+>> On Fri, Mar 17, 2017 at 10:39 AM, Kevin Hilman <khilman@baylibre.com> wrote:
+>> > On Fri, Feb 10, 2017 at 12:42 AM, Maxime Ripard
+>> > <maxime.ripard@free-electrons.com> wrote:
+>> >> On Wed, Feb 08, 2017 at 11:09:31PM +0100, Rask Ingemann Lambertsen wrote:
+>> >>> The AXP20X regulator support is currently built as a module, which means
+>> >>> it's not available until the root fs has been mounted, but the boot loader
+>> >>> might not have enabled the required regulators, so build their drivers
+>> >>> into the kernel.
+>> >>>
+>> >>> Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
+>> >>
+>> >> Queued for 4.12.
+>> >
+>> > Hello, kernelci.org is reporting boot failures on sun5i-r8-chip in
+>> > linux-next[1]  for a few days and with a variety of defconfigs. I
+>> > bisected it[2] down to this patch.
+>> >
+>> > I verified that reverting this patch on top of next-20170310 makes my
+>> > chip board boot again.
+>>
+>> FYI... this board is still broken in linux-next (and now in mainline),
+>> and reverting $SUBJECT patch still makes it work.
+>>
+>> Is nobody else using mainline on this board?
+>
+> I thought about that during the weekend, and it might just be a
+> symptom.
+>
+> The CHIP has brown out issues, especially when you enable the WiFi
+> chip, which should happen around the time of the failure when the PMIC
+> regulator support is compiled as a module.
+>
+> We mitigate that in upstream's U-Boot by enabling the two regulators
+> for the WiFi chip in U-boot, which levels a bit the current over the
+> boot.
+>
+> You have a few ways to prevent that from happening. Having a better
+> power supply / cable will help, I'm not sure how reasonable that is.
+>
+> Another thing that can work is, if your USB plugs can take it, to
+> increase the overcurrent trigger in the PMIC, ideally in U-Boot.
+>
+> The last, and probably cleaner one, would be to just power it through
+> the 5v input on its header, and not the USB. There's not current
+> limitation there, so it shouldn't cause any problems anymore.
 
-I guess we could just convert everything (and I wish I would have done
-it before...)
+I'm now powering the board via the header (5V to the CHG-IN pin) and
+it doesn't change anything.  Still fails in the same way, and
+reverting $SUBJECT defconfig patch makes it work again.
 
-> >>  static enum drm_connector_status
-> >>  sun4i_hdmi_connector_detect(struct drm_connector *connector, bool force)
-> >>  {
-> >> @@ -367,6 +470,43 @@ static const struct sun4i_hdmi_variant sun5i_variant = {
-> >>                                 SUN4I_HDMI_PLL_CTRL_PLL_EN,
-> >>  };
-> >>
-> >> +static const struct sun4i_hdmi_variant sun6i_variant = {
-> >> +     .connector_helpers      = &sun6i_hdmi_connector_helper_funcs,
-> >> +     .ddc_create             = sun6i_ddc_create,
-> >> +     .tmds_create            = sun6i_tmds_create,
-> >> +     .has_ddc_parent_clk     = true,
-> >> +     .has_reset_control      = true,
-> >> +     .pad_ctrl0_init_val     = 0xff |
-> >
-> > What is this 0xff for?
-> 
-> Unknown. It is set in the mainline U-boot driver.
-> 
-> Looking at an old 3.3 kernel from the BSP, it seems the higher 4 bits
-> control the transmitter. But the lower 4 bits are still unknown.
-
-Can you add a comment for that?
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170606/54a794d9/attachment.sig>
+Kevin
