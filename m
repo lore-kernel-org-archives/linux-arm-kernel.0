@@ -1,84 +1,30 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Tue, 6 Jun 2017 10:37:40 +0000
-Subject: [PATCH 4/4] ARM: dts: iwg20d-q7: Add support for iWave G20D-Q7
- board based on RZ/G1M
-In-Reply-To: <CAMuHMdUWJL-oH7wWzjs5O=WrOshdL_AxijBJe66HrYBx7x8F9w@mail.gmail.com>
-References: <1496420523-23506-1-git-send-email-biju.das@bp.renesas.com>
- <1496420523-23506-5-git-send-email-biju.das@bp.renesas.com>
- <CAMuHMdUWJL-oH7wWzjs5O=WrOshdL_AxijBJe66HrYBx7x8F9w@mail.gmail.com>
-Message-ID: <KL1PR06MB1702A62F3ECB628FC9FC1D43B8CB0@KL1PR06MB1702.apcprd06.prod.outlook.com>
+From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
+Date: Tue,  6 Jun 2017 16:17:43 +0530
+Subject: [PATCH v2 0/2] acpi/iort,
+ numa: Add numa node mapping for smmuv3 devices
+Message-ID: <1496746065-11082-1-git-send-email-ganapatrao.kulkarni@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Fri, Jun 2, 2017 at 6:22 PM, Biju Das <biju.das@bp.renesas.com> wrote:
-> > Add support for iWave RainboW-G20D-Qseven board based on RZ/G1M.
->
-> Thanks for your patch!
->
-> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> > Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
->
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
->
-> > --- a/arch/arm/boot/dts/Makefile
-> > +++ b/arch/arm/boot/dts/Makefile
-> > @@ -711,6 +711,7 @@ dtb-$(CONFIG_ARCH_RENESAS) += \
-> >         r8a73a4-ape6evm.dtb \
-> >         r8a7740-armadillo800eva.dtb \
-> >         r8a7743-sk-rzg1m.dtb \
-> > +       r8a7743-iwg20d-q7.dtb \
->
-> Please preserve sort order.
->
-> >         r8a7745-sk-rzg1e.dtb \
-> >         r8a7778-bockw.dtb \
-> >         r8a7779-marzen.dtb \
->
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-> > @@ -0,0 +1,25 @@
-> > +/*
-> > + * Device Tree Source for the iWave-RZG1M Qseven carrier board
-> > + *
-> > + * Copyright (C) 2017 Renesas Electronics Corp.
-> > + *
-> > + * This file is licensed under the terms of the GNU General Public
-> > +License
-> > + * version 2.  This program is licensed "as is" without any warranty
-> > +of any
-> > + * kind, whether express or implied.
-> > + */
-> > +
-> > +/dts-v1/;
-> > +#include "r8a7743-iwg20m.dtsi"
-> > +
-> > +/ {
-> > +       model = "iWave Systems RainboW-G20D-Qseven board based on
-> RZ/G1M";
-> > +       compatible = "iwave,g20d", "renesas,r8a7743";
->
-> With my comment on patch [3/4], this should become:
->
-> compatible = "iwave,g20d", "iwave,g20m", "renesas,r8a7743";
->
+ARM IORT specification(rev. C) has added  provision to define proximity
+domain in SMMUv3 IORT table. Adding required code to parse Proximity
+domain and set numa_node of smmv3 platform devices.
 
-Agreed. I will do this change.
+Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 
-> > +
-> > +       aliases {
-> > +               serial0 = &scif0;
-> > +       };
-> > +};
-> > +
-> > +&scif0 {
-> > +       status = "okay";
-> > +};
->
+v2:
+  - Changed as per Lorenzo Pieralisi and Hanjun Guo suggestions.
 
+v1:
+  - Initial patch
 
-Regards,
-Biju
+Ganapatrao Kulkarni (2):
+  acpica: iort: Update SMMUv3 header for proximity domain mapping
+  acpi/iort, numa: Add numa node mapping for smmuv3 devices
 
+ drivers/acpi/arm64/iort.c | 20 ++++++++++++++++++++
+ include/acpi/actbl2.h     |  4 ++++
+ 2 files changed, 24 insertions(+)
 
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+-- 
+1.8.1.4
