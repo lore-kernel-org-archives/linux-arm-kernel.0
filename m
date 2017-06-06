@@ -1,35 +1,32 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 6 Jun 2017 11:19:34 +0200
-Subject: [PATCH] arm64: dts: marvell: 8040-mcbin: Enable 1GB Ethernet
-In-Reply-To: <87lgp5jx2f.fsf@arm.com>
-References: <20170605200107.7692-1-marc.zyngier@arm.com>
- <20170606110234.239d2c4a@free-electrons.com>
- <87lgp5jx2f.fsf@arm.com>
-Message-ID: <20170606111934.79c84a0b@free-electrons.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 6 Jun 2017 09:22:15 +0000
+Subject: [PATCH V17 02/11] ras: acpi/apei: cper: add support for generic
+ data v3 structure
+In-Reply-To: <20170602141338.GJ6371@arm.com>
+References: <1495225933-4410-1-git-send-email-tbaicar@codeaurora.org>
+ <1495225933-4410-3-git-send-email-tbaicar@codeaurora.org>
+ <20170602141338.GJ6371@arm.com>
+Message-ID: <CAKv+Gu-JVeR7DJa-tMhNXtfv2tQGB67H+m=raqBj5X48n9oKPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 2 June 2017 at 14:13, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, May 19, 2017 at 02:32:04PM -0600, Tyler Baicar wrote:
+>> The ACPI 6.1 spec adds a new revision of the generic error data
+>> entry structure. Add support to handle the new structure as well
+>> as properly verify and iterate through the generic data entries.
+>>
+>> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+>> CC: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+>> ---
+>>  drivers/acpi/apei/ghes.c    | 11 +++++------
+>>  drivers/firmware/efi/cper.c | 37 ++++++++++++++++++++++---------------
+>>  include/acpi/ghes.h         | 36 ++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 63 insertions(+), 21 deletions(-)
+>
+> Given that Boris and Rafael are ok with this series, it makes sense to
+> take this via arm64, but I need an ack from Ard or Matt on the EFI changes
+> in this patch and the subsequent one.
+>
 
-On Tue, 06 Jun 2017 10:16:08 +0100, Marc Zyngier wrote:
-
-> > This patch is somewhat redundant with
-> > https://patchwork.kernel.org/patch/9728207/, which despite the flaming
-> > discussion that followed, does the same thing (and more).  
-> 
-> It's great that there is a patch for that already. How far is that from
-> being merged (given how much controversy seem to surround this)?
-
-As I said in my second reply, I believe a v2 of your patch would in
-fact be better.
-
-Marcin's patch is no longer applicable, and was doing too many things
-at once. So let's merge your patch instead.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
