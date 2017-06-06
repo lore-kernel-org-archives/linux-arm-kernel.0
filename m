@@ -1,203 +1,130 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 6 Jun 2017 15:10:19 +0100
-Subject: [RFCv2 1/2] acpi:iort: Add new helper function to retrieve ITS
- base addr from dev IORT node
-In-Reply-To: <20170531143213.82100-2-shameerali.kolothum.thodi@huawei.com>
-References: <20170531143213.82100-1-shameerali.kolothum.thodi@huawei.com>
- <20170531143213.82100-2-shameerali.kolothum.thodi@huawei.com>
-Message-ID: <20170606141019.GC20126@red-moon>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 6 Jun 2017 16:13:01 +0200
+Subject: [PATCH 8/8] arm64: dts: hikey: Fix WiFi support
+In-Reply-To: <CAPDyKFrAwntQsK_Rxs0Hzthv6TkbofE7LwgVimo60zVKruJHBA@mail.gmail.com>
+References: <1494260477-25163-1-git-send-email-ulf.hansson@linaro.org>
+ <1494260477-25163-9-git-send-email-ulf.hansson@linaro.org>
+ <CALAqxLX4HwbVm8G4Ch2uYKAy6C9vYAZEcRUdCLDePT55oGz6hw@mail.gmail.com>
+ <d7988293-853f-fb3a-ae29-d1dff4e4d732@linaro.org>
+ <CALAqxLU2zz17sHMFKOe4p248Bu4fRiU_dKoBBPbY38gDrpb_mw@mail.gmail.com>
+ <CAPDyKFrtE1nKrc1Zk_n=rZTrMVT=Vb=cpk-7AEFWZRmVhFi+4w@mail.gmail.com>
+ <CALAqxLWEsQK4g_AM7cPzJSrF_jiTSZpxvLPy_D4HUgdrgf=KuA@mail.gmail.com>
+ <CABGGisxWS2uT6xCATaZbeaDxsEfPz_BSW7Cr=52OwkdFdrV=_Q@mail.gmail.com>
+ <CAPDyKFrAwntQsK_Rxs0Hzthv6TkbofE7LwgVimo60zVKruJHBA@mail.gmail.com>
+Message-ID: <CAPDyKFp6m=JWu6NWhjy+8h100FQNCbMMBTaY9FdoXysDYzFKkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 31, 2017 at 03:32:12PM +0100, shameer wrote:
-> This provides a helper function to find and retrieve the ITS
-> base address from the ID mappings array reference of a device
-> IORT node(if any).
-> 
-> This is used in the subsequent patch to retrieve the ITS base 
-> address associated with a pci dev IORT node.
+On 6 June 2017 at 12:08, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> [...]
+>
+>>>>
+>>>> John, thanks for the report!
+>>>>
+>>>> After a some investigation, I realized that the mmc pwrseq_simple
+>>>> driver returns -EPROBE_DEFER as it's not able to get the "ext" clock.
+>>>> Hence the SDIO card will not be detected.
+>>>>
+>>>> To fix the problem, you need to enable CONFIG_COMMON_CLK_HI655X in the
+>>>> kernel config. This is actually also the case when using the arm64
+>>>> defconfig for a plain 4.12 rc3 and later. We should probably make this
+>>>> driver enabled per default when building the arm64 defconfig.
+>>>>
+>>>> Can you run a re-test at your side with the CONFIG_COMMON_CLK_HI655X
+>>>> set? Just to make sure it works also with those boot binaries you are
+>>>> using...
+>>>
+>>> So unfortunately, now I'm seeing a side-effect from enabling
+>>> CONFIG_COMMON_CLK_HI655X.
+>>>
+>>> Using the serial-dev driver for the TI bluetooth, it seems I'm seeing
+>>> failures when CONFIG_COMMON_CLK_HI655X is enabled, but configuring it
+>>> out, bluetooth works (and wifi then fails).
+>>>
+>>> Looking through the dmesg logs, the bluetooth driver seems to
+>>> initialize up properly and load the firmware, but with CLK_HI655X
+>>> enabled, we see:
+>>>
+>>> Bluetooth: hci0 command 0xff05 tx timeout
+>>> Bluetooth: hci0: send command failed\x0a
+>>> Bluetooth: hci0 command 0xff36 tx timeout
+>>> Bluetooth: hci0 command 0x1003 tx timeout
+>>> Bluetooth: hci0 command 0x1001 tx timeout
+>>> Bluetooth: hci0 command 0x1009 tx timeout
+>>> ...
+>
+> As Rob said below, this is because the blue-tooth driver doesn't
+> properly deal with the power on/off sequence.
+>
+> I guess it works for you because your versions of the boot binaries
+> turns all needed resources on. That isn't the case for me, blue-tooth
+> is neither working before or after this change, but wifi is.
+>
+>>>
+>>> This effectively seems to make bluetooth an wifi functionality
+>>> exclusive.  So I don't think this is a sufficient solution (over
+>>> reverting the original patch that changes the dts - which allows both
+>>> to function).
+>
+> Since the issues you are reporting about is depending on the
+> boot-binaries and not a really bugs in the kernel, may I suggest that
+> we invest our efforts in fixing the blue-tooth driver instead, as it's
+> there the real problem is!?
+>
+>>
+>> If the clock to the TI chip is described in DT for WiFi, then the BT
+>> side needs it as well (as does the driver) for proper refcounting. The
+>> same would apply to regulators as well. I looked at the regulators for
+>> HiKey and the 2 supplies (Vbat and i/o) appear to both be always on.
+>>
+>> Rob
+>
+> Correct.
+>
+> I am working on patch, I keep you on cc.
 
-"Add an IORT helper function to retrieve the ITS data through IORT
-device<->ITS mappings".
+Rob, John,
 
-> Signed-off-by: shameer <shameerali.kolothum.thodi@huawei.com>
-> ---
->  drivers/acpi/arm64/iort.c        | 47 +++++++++++++++++++++++++++++++++++++---
->  drivers/irqchip/irq-gic-v3-its.c |  3 ++-
->  include/linux/acpi_iort.h        |  8 ++++++-
->  3 files changed, 53 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index c5fecf9..12d7347 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -34,6 +34,7 @@
->  struct iort_its_msi_chip {
->  	struct list_head	list;
->  	struct fwnode_handle	*fw_node;
-> +	u64			base_addr;
+I have now looked into this a bit more. So I have some local patches,
+which in principle adds the external clock to the bluetooth node for
+the hikey dts, and adapts the uart bluetooth driver
+(drivers/bluetooth/hci_ll.c) to also take the ext clock into
+consideration while powering on/off the chip. I am working on a
+vanilla kernel, thus not John's tree.
 
-phys_addr_t
+However, I can't get the uart1 amba device to be added because of this
+error during boot:
+"OF: amba_device_add() failed (-19) for /soc/uart at f7111000"
 
->  	u32			translation_id;
->  };
->  
-> @@ -132,13 +133,14 @@ typedef acpi_status (*iort_find_node_callback)
->  
->  /**
->   * iort_register_domain_token() - register domain token and related ITS ID
-> - * to the list from where we can get it back later on.
-> + * and base address to the list from where we can get it back later on.
->   * @trans_id: ITS ID.
+The reason why it fails is because amba_device_try_add() fails to read
+the amba periphid of the uart1 device. I haven't yet been able to
+figure out why.
 
-Missing something here
+Is this problem something you have seen before? I tried out v4.11,
+v4.12-rc3 and John's tree (dev/hikey-mainline-WIP which is based upon
+4.12.rc3), they all suffer from the same problem, not being able to
+add the uart1 device.
 
->   * @fw_node: Domain token.
->   *
->   * Returns: 0 on success, -ENOMEM if no memory when allocating list element
->   */
-> -int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
-> +int iort_register_domain_token(int trans_id, u64 base,
+The consequence then becomes that the bluetooth node (which is a child
+node for the uart1 node), added in the below commit by Rob, never gets
+parsed and thus the device don't become added. In other words, I
+haven't been able to test my changes since I can't even get the
+bluetooth device to be added.
 
-phys_addr_t
+John, are you using the pcm bluetooth interface or the uart?
 
-> +			       struct fwnode_handle *fw_node)
->  {
->  	struct iort_its_msi_chip *its_msi_chip;
->  
-> @@ -148,6 +150,7 @@ int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
->  
->  	its_msi_chip->fw_node = fw_node;
->  	its_msi_chip->translation_id = trans_id;
-> +	its_msi_chip->base_addr = base;
->  
->  	spin_lock(&iort_msi_chip_lock);
->  	list_add(&its_msi_chip->list, &iort_msi_chip_list);
-> @@ -370,7 +373,6 @@ static struct acpi_iort_node *iort_node_map_id(struct acpi_iort_node *node,
->  
->  		if (!node->mapping_offset || !node->mapping_count)
->  			goto fail_map;
-> -
+commit 019aa56b7df8a796b2c01a56269a370ad3442ec7
+Author: Rob Herring <robh@kernel.org>
+Date:   Thu Apr 13 10:03:53 2017 -0500
 
-Unrelated change.
+    arm64: dts: hikey: add WL1835 Bluetooth device node
 
->  		map = ACPI_ADD_PTR(struct acpi_iort_id_mapping, node,
->  				   node->mapping_offset);
->  
-> @@ -491,6 +493,45 @@ int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id)
->  	return -ENODEV;
->  }
->  
-> +int iort_dev_find_its_base(struct device *dev, u32 req_id,
-> +			   unsigned int idx, u64 *its_base)
-> +{
-> +	struct acpi_iort_its_group *its;
-> +	struct acpi_iort_node *node;
-> +	struct iort_its_msi_chip *its_msi_chip;
-> +	u32  trans_id;
-> +
-> +	node = iort_find_dev_node(dev);
-> +	if (!node)
-> +		return -ENXIO;
+    This adds the serial slave device for the WL1835 Bluetooth interface.
 
--ENODEV, throughout
+    Signed-off-by: Rob Herring <robh@kernel.org>
+    Cc: Wei Xu <xuwei5@hisilicon.com>
+    Cc: Mark Rutland <mark.rutland@arm.com>
+    Signed-off-by: Marcel Holtmann <marcel@holtmann.org>
 
-> +
-> +	node = iort_node_map_id(node, req_id, NULL, IORT_MSI_TYPE);
-> +	if (!node)
-> +		return -ENXIO;
-> +
-> +	/* Move to ITS specific data */
-> +	its = (struct acpi_iort_its_group *)node->node_data;
-> +	if (idx > its->its_count) {
-> +		dev_err(dev, "requested ITS ID index [%d] is greater than available [%d]\n",
-> +			idx, its->its_count);
-> +		return -ENXIO;
-> +	}
-> +
-> +	trans_id = its->identifiers[idx];
-> +
-> +	spin_lock(&iort_msi_chip_lock);
-> +	list_for_each_entry(its_msi_chip, &iort_msi_chip_list, list) {
-> +		if (its_msi_chip->translation_id == trans_id) {
-> +			*its_base = its_msi_chip->base_addr;
-> +			spin_unlock(&iort_msi_chip_lock);
-> +			return 0;
-> +		}
-> +	}
-> +	spin_unlock(&iort_msi_chip_lock);
-> +
-> +	return -ENXIO;
-
-Cosmetics:
-
-	bool match = false;
-
-	[...]
-
-	spin_lock(&iort_msi_chip_lock);
-	list_for_each_entry(its_msi_chip, &iort_msi_chip_list, list) {
-		if (its_msi_chip->translation_id == trans_id) {
-			*its_base = its_msi_chip->base_addr;
-			match = true;
-			break;
-		}
-	}
-	spin_unlock(&iort_msi_chip_lock);
-
-	return match ? 0 : -ENODEV;
-
-}
-
->  /**
->   * iort_dev_find_its_id() - Find the ITS identifier for a device
->   * @dev: The device.
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 45ea1933..c45a2ad 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -1854,7 +1854,8 @@ static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
->  		return -ENOMEM;
->  	}
->  
-> -	err = iort_register_domain_token(its_entry->translation_id, dom_handle);
-> +	err = iort_register_domain_token(its_entry->translation_id, res.start,
-> +					 dom_handle);
->  	if (err) {
->  		pr_err("ITS@%pa: Unable to register GICv3 ITS domain token (ITS ID %d) to IORT\n",
->  		       &res.start, its_entry->translation_id);
-> diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
-> index 3ff9ace..bf7b53d 100644
-> --- a/include/linux/acpi_iort.h
-> +++ b/include/linux/acpi_iort.h
-> @@ -26,7 +26,8 @@
->  #define IORT_IRQ_MASK(irq)		(irq & 0xffffffffULL)
->  #define IORT_IRQ_TRIGGER_MASK(irq)	((irq >> 32) & 0xffffffffULL)
->  
-> -int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node);
-> +int iort_register_domain_token(int trans_id, u64 base,
-> +			       struct fwnode_handle *fw_node);
->  void iort_deregister_domain_token(int trans_id);
->  struct fwnode_handle *iort_find_domain_token(int trans_id);
->  #ifdef CONFIG_ACPI_IORT
-> @@ -36,6 +37,8 @@
->  struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
->  void acpi_configure_pmsi_domain(struct device *dev);
->  int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id);
-> +int iort_dev_find_its_base(struct device *dev, u32 req_id,
-> +			   unsigned int idx, u64 *its_base);
->  /* IOMMU interface */
->  void iort_set_dma_mask(struct device *dev);
->  const struct iommu_ops *iort_iommu_configure(struct device *dev);
-> @@ -48,6 +51,9 @@ static inline struct irq_domain *iort_get_device_domain(struct device *dev,
->  							u32 req_id)
->  { return NULL; }
->  static inline void acpi_configure_pmsi_domain(struct device *dev) { }
-> +int iort_dev_find_its_base(struct device *dev, u32 req_id,
-> +			   unsigned int idx, u64 *its_base)
-> +{ return -ENOSYS; }
-
--ENODEV
-
-Thanks,
-Lorenzo
+Kind regards
+Uffe
