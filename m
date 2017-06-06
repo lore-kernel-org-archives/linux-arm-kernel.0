@@ -1,78 +1,32 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 6 Jun 2017 15:52:08 +0530
-Subject: [PATCH] ARM: dts: da850-evm: fix tca6416 for use with GPIO hogs
-In-Reply-To: <CAOi56cXvsA7b8QFqTpPNeHFFZbMsB4-VVoErMouZk=T-3ZiR9Q@mail.gmail.com>
-References: <20170531012125.12258-1-khilman@baylibre.com>
- <230e0aa5-6545-e546-6822-77ef53c07b3b@ti.com>
- <CAOi56cXvsA7b8QFqTpPNeHFFZbMsB4-VVoErMouZk=T-3ZiR9Q@mail.gmail.com>
-Message-ID: <f4fa2ddb-6b31-fb2b-05e0-a9a0add438a4@ti.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Tue,  6 Jun 2017 12:23:42 +0200
+Subject: [PATCH v2] ARM64: dts: meson-gx: Fix sensors reporting from SCP
+Message-ID: <20170606102342.32166-1-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 03 June 2017 01:57 AM, Kevin Hilman wrote:
-> On Thu, Jun 1, 2017 at 11:01 PM, Sekhar Nori <nsekhar@ti.com> wrote:
->> Hi Kevin,
->>
->> On Wednesday 31 May 2017 06:51 AM, Kevin Hilman wrote:
->>> In order GPIOS from this controller to be used with the "gpio-hogs"
->>> property, the tca6416 node has to properly labeled as a gpio-controller,
->>> and use #gpio-cells.
->>>
->>> With that, the SEL_A, SEL_B, SEL_C lines that are used to select VPIF
->>> input can be configured using GPIO hogs.
->>>
->>> As an example, example, the configuration below selects the analog video
->>> input on the da850-evm UI board:
->>>
->>> &tca6416 {
->>>        status = "okay";
->>>
->>>        sel_a {
->>>               gpio-hog;
->>>               gpios = <7 GPIO_ACTIVE_HIGH>;
->>>               output-high;
->>>               line-name = "ADC_ENn";
->>>        };
->>>        sel_b {
->>>               gpio-hog;
->>>               gpios = <6 GPIO_ACTIVE_HIGH>;
->>>               output-high;
->>>               line-name = "CAMERA_ENn";
->>>        };
->>>        sel_c {
->>>               gpio-hog;
->>>               gpios = <5 GPIO_ACTIVE_HIGH>;
->>>               output-low;
->>>               line-name = "VIDEO_IN_ENn";
->>>        };
->>> };
->>>
->>> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
->>
->> This patch looks good to me. On the topic of using gpio hogs for this
->> sort of thing, in the past I felt using enable-gpios property is better.
->>
->> My reasoning given to Bartosz is here:
->> https://patchwork.kernel.org/patch/9578031/
-> 
-> Sure, that's fine when they are used for a specific functionality, but
-> using gpio-hog is very useful for testing/debugging, so this patch
-> just aims at fixing the basics.
+From: Carlo Caione <carlo@endlessm.com>
 
-Agreed.
+Switch to use the new compatible for the SCPI sensors so that the
+sensor readings are reported using the correct scale.
 
-> That being said, I'm still not convinced what the best place for this
-> is because they're not really part of the VPIF either (e.g. they
-> control the character LCD which has nothing to do with the VPIF.)
+Signed-off-by: Carlo Caione <carlo@endlessm.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Agreed too. And this reminds me that this was discussed earlier.
-
-https://patchwork.kernel.org/patch/9586853/
-
-> In any case, I'm not trying to solve that problem in this patch, so
-> thanks for the review.
-
-I have now applied the patch to my v4.13/dt branch.
-
-Thanks,
-Sekhar
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+index 436b875..603491d 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+@@ -200,7 +200,7 @@
+ 		};
+ 
+ 		scpi_sensors: sensors {
+-			compatible = "arm,scpi-sensors";
++			compatible = "amlogic,meson-gxbb-scpi-sensors", "arm,scpi-sensors";
+ 			#thermal-sensor-cells = <1>;
+ 		};
+ 	};
+-- 
+2.9.3
