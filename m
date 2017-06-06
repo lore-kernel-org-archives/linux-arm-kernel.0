@@ -1,91 +1,44 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 6 Jun 2017 11:35:48 +0200
-Subject: Design of interrupt controller driver
-In-Reply-To: <alpine.DEB.2.20.1706060922220.1885@nanos>
-References: <8bce8bdd-5801-f0c3-ada3-e1c68acc8913@free.fr>
- <alpine.DEB.2.20.1706041551530.2813@nanos>
- <025780ef-06e6-1e85-58da-4ce8f6c93536@free.fr>
- <alpine.DEB.2.20.1706042208080.3517@nanos>
- <6e4da485-42cc-9b70-1b4a-9729f646e014@free.fr>
- <alpine.DEB.2.20.1706051007050.3517@nanos>
- <77a6e423-5c6a-9e5a-d679-c2576074fe6d@free.fr>
- <alpine.DEB.2.20.1706060922220.1885@nanos>
-Message-ID: <e0380463-f13f-2ca2-b941-7a40b3b8fc36@free.fr>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 6 Jun 2017 11:36:26 +0200
+Subject: [PATCH] arm64: dts: marvell: 8040-mcbin: Enable 1GB Ethernet
+In-Reply-To: <87h8ztjwz0.fsf@arm.com>
+References: <20170605200107.7692-1-marc.zyngier@arm.com>
+ <20170606110234.239d2c4a@free-electrons.com>
+ <20170606110603.2dafb7ed@free-electrons.com>
+ <87h8ztjwz0.fsf@arm.com>
+Message-ID: <20170606113626.197efbf7@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2017 09:39, Thomas Gleixner wrote:
+Hello,
 
-> On Mon, 5 Jun 2017, Mason wrote:
->
->> Is it possible to call the interrupt controller's mask callback
->> from the DMA engine driver ISR, or is that reserved for the IRQ
->> framework? Because that's what the HW designers had in mind,
->> thus they didn't provide a way to mask the interrupt in the
->> device. It just outputs the signal to the interrupt router.
-> 
-> No, it's not and we are not going to provide an interface for that because
-> that violates any form of layering and abstractions. The DMA device driver
-> has to be oblivious of the underlying interrupt handling machinery.
+On Tue, 06 Jun 2017 10:18:11 +0100, Marc Zyngier wrote:
 
-Sorry, I didn't mean *explicitly* calling the mask callback,
-but rather void mask_irq(struct irq_desc *desc);
-I note that mask_irq() is *not* exported, which means modules
-cannot to use it. In-tree drivers are probably not supposed
-to use it either? Same thing for irq_disable?
+> > So perhaps we should indeed keep Marc's patch, enabling just the 1GB
+> > Ethernet interface.  
+> 
+> Whichever patch we merge, Andrew's comment remains. Should we stick with
+> "phy", or switch to "phy-handle" everywhere?
 
-What about disable_irq(virq);
-That function /is/ exported API, and eventually calls mask_irq.
+Since the binding says to use phy-handle, we should use phy-handle for
+your patch. Of course, progressively, we should migrate all our
+bindings to this new property name, but I don't think this should be a
+prerequisite for your patch to go in.
 
-disable_irq -> __disable_irq_nosync -> __disable_irq -> irq_disable -> mask_irq
+Side note: I don't understand this change from "phy" to "phy-handle".
+It really doesn't make sense to me to encode the type of the property
+in the name of the property. Are we going to use:
 
->> So their proposed setup is as follows:
->>
->> Start the system with the DMA interrupt masked in the intc.
->> When SW needs to perform a DMA op, the DMA driver starts
->> the op (thus the interrupt signal goes low), then unmasks
->> the interrupt in the intc. Interrupt triggers when signal
->> goes high (level high). Driver masks interrupt in ISR,
->> until next op is available.
->>
->> Is that possible in the Linux framework?
-> 
-> You can do that, but not for shared interrupts:
-> 
-> isr()
-> {
-> 	disable_irq_nosync();
-> 	.....
-> }
-> 
-> submit()
-> {
-> 	....
-> 	enable_irq();
-> }
-> 
-> init()
-> {
-> 	irq_set_status_flags(irq, IRQ_NOAUTOEN);
-> 	request_irq(irq, ....);
-> }
-> 
-> This affects the whole interrupt line, so if you share that interrupt at
-> the CPU interrupt controller level this wont work.
-> 
-> If your 'router' IP has a mechanism to mask input lines individually, then
-> you can do something about this.
-> 
-> Each group of inputs which shares an output becomes it's own demultiplexing
-> interrupt domain with it's own interrupt chip which controls the input
-> lines. The output is handled by a chained interrupt handler which checks
-> the status of the input lines and invokes the handlers for the devices with
-> an active input.
-> 
-> Then the above example will disable the interrupt at the 'router' level
-> which will not affect the other device which shares the underlying output
-> to the GIC (or whatever interrupt controller your CPU has).
+  phy-mode-string = "sgmii";
+  pinctrl-0-handle = <&foo>;
+  reg-u32s = <0xdeadbeef 0xbadcafe>;
 
-I will have to re-read this a few times to digest it.
+is there a pointer to the reasoning for this change?
 
-Regards.
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
