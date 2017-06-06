@@ -1,137 +1,133 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 6 Jun 2017 16:18:15 +0100
-Subject: [PATCH v2 19/25] arm64: Add workaround for Cavium Thunder erratum
- 30115
-In-Reply-To: <20170606124851.GQ9464@cbox>
-References: <20170601102117.17750-1-marc.zyngier@arm.com>
- <20170601102117.17750-20-marc.zyngier@arm.com> <20170606124851.GQ9464@cbox>
-Message-ID: <c0429f56-a973-9307-5933-4449cec0ce45@arm.com>
+From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
+Date: Tue, 6 Jun 2017 15:17:20 +0000
+Subject: [RFCv2 1/2] acpi:iort: Add new helper function to retrieve ITS
+ base addr from dev IORT node
+In-Reply-To: <20170606141019.GC20126@red-moon>
+References: <20170531143213.82100-1-shameerali.kolothum.thodi@huawei.com>
+ <20170531143213.82100-2-shameerali.kolothum.thodi@huawei.com>
+ <20170606141019.GC20126@red-moon>
+Message-ID: <5FC3163CFD30C246ABAA99954A238FA838362112@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/17 13:48, Christoffer Dall wrote:
-> On Thu, Jun 01, 2017 at 11:21:11AM +0100, Marc Zyngier wrote:
->> From: David Daney <david.daney@cavium.com>
->>
->> Some Cavium Thunder CPUs suffer a problem where a KVM guest may
->> inadvertently cause the host kernel to quit receiving interrupts.
->>
->> Use the Group-0/1 trapping in order to deal with it.
->>
->> [maz]: Adapted patch to the Group-0/1 trapping, reworked commit log
->>
->> Reviewed-by: Eric Auger <eric.auger@redhat.com>
->> Signed-off-by: David Daney <david.daney@cavium.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  Documentation/arm64/silicon-errata.txt |  1 +
->>  arch/arm64/Kconfig                     | 11 +++++++++++
->>  arch/arm64/include/asm/cpucaps.h       |  3 ++-
->>  arch/arm64/kernel/cpu_errata.c         | 21 +++++++++++++++++++++
->>  virt/kvm/arm/vgic/vgic-v3.c            |  7 +++++++
->>  5 files changed, 42 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
->> index 10f2dddbf449..f5f93dca54b7 100644
->> --- a/Documentation/arm64/silicon-errata.txt
->> +++ b/Documentation/arm64/silicon-errata.txt
->> @@ -62,6 +62,7 @@ stable kernels.
->>  | Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154        |
->>  | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456        |
->>  | Cavium         | ThunderX SMMUv2 | #27704          | N/A                         |
->> +| Cavium         | ThunderX Core   | #30115          | CAVIUM_ERRATUM_30115        |
->>  |                |                 |                 |                             |
->>  | Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585         |
->>  |                |                 |                 |                             |
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 3dcd7ec69bca..0950b21e4d17 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -480,6 +480,17 @@ config CAVIUM_ERRATUM_27456
->>  
->>  	  If unsure, say Y.
->>  
->> +config CAVIUM_ERRATUM_30115
->> +	bool "Cavium erratum 30115: Guest may disable interrupts in host"
->> +	default y
->> +	help
->> +	  On ThunderX T88 pass 1.x through 2.2, T81 pass 1.0 through
->> +	  1.2, and T83 Pass 1.0, KVM guest execution may disable
->> +	  interrupts in host. Trapping GICv3 group-1 accesses sidesteps
->> +	  the issue.
->> +
->> +	  If unsure, say Y.
->> +
->>  config QCOM_FALKOR_ERRATUM_1003
->>  	bool "Falkor E1003: Incorrect translation due to ASID change"
->>  	default y
->> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
->> index b3aab8a17868..8d2272c6822c 100644
->> --- a/arch/arm64/include/asm/cpucaps.h
->> +++ b/arch/arm64/include/asm/cpucaps.h
->> @@ -38,7 +38,8 @@
->>  #define ARM64_WORKAROUND_REPEAT_TLBI		17
->>  #define ARM64_WORKAROUND_QCOM_FALKOR_E1003	18
->>  #define ARM64_WORKAROUND_858921			19
->> +#define ARM64_WORKAROUND_CAVIUM_30115		20
->>  
->> -#define ARM64_NCAPS				20
->> +#define ARM64_NCAPS				21
->>  
->>  #endif /* __ASM_CPUCAPS_H */
->> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
->> index 2ed2a7657711..0e27f86ee709 100644
->> --- a/arch/arm64/kernel/cpu_errata.c
->> +++ b/arch/arm64/kernel/cpu_errata.c
->> @@ -133,6 +133,27 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
->>  		MIDR_RANGE(MIDR_THUNDERX_81XX, 0x00, 0x00),
->>  	},
->>  #endif
->> +#ifdef CONFIG_CAVIUM_ERRATUM_30115
->> +	{
->> +	/* Cavium ThunderX, T88 pass 1.x - 2.2 */
->> +		.desc = "Cavium erratum 30115",
->> +		.capability = ARM64_WORKAROUND_CAVIUM_30115,
->> +		MIDR_RANGE(MIDR_THUNDERX, 0x00,
->> +			   (1 << MIDR_VARIANT_SHIFT) | 2),
->> +	},
->> +	{
->> +	/* Cavium ThunderX, T81 pass 1.0 - 1.2 */
->> +		.desc = "Cavium erratum 30115",
->> +		.capability = ARM64_WORKAROUND_CAVIUM_30115,
->> +		MIDR_RANGE(MIDR_THUNDERX_81XX, 0x00, 0x02),
->> +	},
->> +	{
->> +	/* Cavium ThunderX, T83 pass 1.0 */
->> +		.desc = "Cavium erratum 30115",
->> +		.capability = ARM64_WORKAROUND_CAVIUM_30115,
->> +		MIDR_RANGE(MIDR_THUNDERX_83XX, 0x00, 0x00),
->> +	},
->> +#endif
->>  	{
->>  		.desc = "Mismatched cache line size",
->>  		.capability = ARM64_MISMATCHED_CACHE_LINE_SIZE,
->> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
->> index 1486ce25edcb..062be1fe95b5 100644
->> --- a/virt/kvm/arm/vgic/vgic-v3.c
->> +++ b/virt/kvm/arm/vgic/vgic-v3.c
->> @@ -482,6 +482,13 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
->>  	if (kvm_vgic_global_state.vcpu_base == 0)
->>  		kvm_info("disabling GICv2 emulation\n");
->>  
->> +#ifdef CONFIG_ARM64
->> +	if (cpus_have_const_cap(ARM64_WORKAROUND_CAVIUM_30115)) {
->> +		group0_trap = true;
->> +		group1_trap = true;
+
+
+> -----Original Message-----
+> From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
+> Sent: Tuesday, June 06, 2017 3:10 PM
+> To: Shameerali Kolothum Thodi
+> Cc: marc.zyngier at arm.com; sudeep.holla at arm.com; will.deacon at arm.com;
+> robin.murphy at arm.com; hanjun.guo at linaro.org; Gabriele Paoloni; John
+> Garry; iommu at lists.linux-foundation.org; linux-arm-
+> kernel at lists.infradead.org; linux-acpi at vger.kernel.org; devel at acpica.org;
+> Linuxarm; Wangzhou (B); Guohanjun (Hanjun Guo)
+> Subject: Re: [RFCv2 1/2] acpi:iort: Add new helper function to retrieve ITS
+> base addr from dev IORT node
 > 
-> Why does the config help text say that trapping group 1 accesses is
-> enough, yet we trap both group 0 and group 1 ?
+> On Wed, May 31, 2017 at 03:32:12PM +0100, shameer wrote:
+> > This provides a helper function to find and retrieve the ITS base
+> > address from the ID mappings array reference of a device IORT node(if
+> > any).
+> >
+> > This is used in the subsequent patch to retrieve the ITS base address
+> > associated with a pci dev IORT node.
+> 
+> "Add an IORT helper function to retrieve the ITS data through IORT device<-
+> >ITS mappings".
+> 
+> > Signed-off-by: shameer <shameerali.kolothum.thodi@huawei.com>
+> > ---
+> >  drivers/acpi/arm64/iort.c        | 47
+> +++++++++++++++++++++++++++++++++++++---
+> >  drivers/irqchip/irq-gic-v3-its.c |  3 ++-
+> >  include/linux/acpi_iort.h        |  8 ++++++-
+> >  3 files changed, 53 insertions(+), 5 deletions(-)
+> >
+> > diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> > index c5fecf9..12d7347 100644
+> > --- a/drivers/acpi/arm64/iort.c
+> > +++ b/drivers/acpi/arm64/iort.c
+> > @@ -34,6 +34,7 @@
+> >  struct iort_its_msi_chip {
+> >  	struct list_head	list;
+> >  	struct fwnode_handle	*fw_node;
+> > +	u64			base_addr;
+> 
+> phys_addr_t
+> 
+> >  	u32			translation_id;
+> >  };
+> >
+> > @@ -132,13 +133,14 @@ typedef acpi_status (*iort_find_node_callback)
+> >
+> >  /**
+> >   * iort_register_domain_token() - register domain token and related
+> > ITS ID
+> > - * to the list from where we can get it back later on.
+> > + * and base address to the list from where we can get it back later on.
+> >   * @trans_id: ITS ID.
+> 
+> Missing something here
+> 
+> >   * @fw_node: Domain token.
+> >   *
+> >   * Returns: 0 on success, -ENOMEM if no memory when allocating list
+> element
+> >   */
+> > -int iort_register_domain_token(int trans_id, struct fwnode_handle
+> > *fw_node)
+> > +int iort_register_domain_token(int trans_id, u64 base,
+> 
+> phys_addr_t
+> 
+> > +			       struct fwnode_handle *fw_node)
+> >  {
+> >  	struct iort_its_msi_chip *its_msi_chip;
+> >
+> > @@ -148,6 +150,7 @@ int iort_register_domain_token(int trans_id,
+> > struct fwnode_handle *fw_node)
+> >
+> >  	its_msi_chip->fw_node = fw_node;
+> >  	its_msi_chip->translation_id = trans_id;
+> > +	its_msi_chip->base_addr = base;
+> >
+> >  	spin_lock(&iort_msi_chip_lock);
+> >  	list_add(&its_msi_chip->list, &iort_msi_chip_list); @@ -370,7 +373,6
+> > @@ static struct acpi_iort_node *iort_node_map_id(struct
+> > acpi_iort_node *node,
+> >
+> >  		if (!node->mapping_offset || !node->mapping_count)
+> >  			goto fail_map;
+> > -
+> 
+> Unrelated change.
+> 
+> >  		map = ACPI_ADD_PTR(struct acpi_iort_id_mapping, node,
+> >  				   node->mapping_offset);
+> >
+> > @@ -491,6 +493,45 @@ int iort_pmsi_get_dev_id(struct device *dev, u32
+> *dev_id)
+> >  	return -ENODEV;
+> >  }
+> >
+> > +int iort_dev_find_its_base(struct device *dev, u32 req_id,
+> > +			   unsigned int idx, u64 *its_base) {
+> > +	struct acpi_iort_its_group *its;
+> > +	struct acpi_iort_node *node;
+> > +	struct iort_its_msi_chip *its_msi_chip;
+> > +	u32  trans_id;
+> > +
+> > +	node = iort_find_dev_node(dev);
+> > +	if (!node)
+> > +		return -ENXIO;
+> 
+> -ENODEV, throughout
 
-Ah, I missed the help text when adapting the original patch. My bad.
-I'll fix that.
+Ok. The reason for -ENXIO use is that this function is based on the existing
+iort_dev_find_its_id() and it returns -ENXIO for those error cases.
 
-Thanks,
+I will incorporate all the other comments in the next revision.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Many thanks,
+Shameer
+ 
