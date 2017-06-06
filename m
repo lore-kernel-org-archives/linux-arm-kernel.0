@@ -1,35 +1,39 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 6 Jun 2017 19:56:07 +0200
-Subject: [PATCH 0/5] ARM: sunxi: Enable dwmac-sun8i on more boards
-In-Reply-To: <20170605192130.25320-1-clabbe.montjoie@gmail.com>
-References: <20170605192130.25320-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170606175607.r2xsg6lw6wv5c6ul@flea.lan>
+From: hotran@apm.com (Hoan Tran)
+Date: Tue,  6 Jun 2017 11:02:23 -0700
+Subject: [PATCH v3 0/3] perf: xgene: Add support for SoC PMU version 3
+Message-ID: <1496772146-11084-1-git-send-email-hotran@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 05, 2017 at 09:21:25PM +0200, Corentin Labbe wrote:
-> Hello
-> 
-> This serie enable dwmac-sun8i on more boards.
-> The first 3 patch enable dwmac-sun8i on some h3/h5 boards.
-> The last 2 add dwmac-sun8i on a83t.
-> 
-> Corentin Labbe (5):
->   ARM: sun8i: orangepi-plus: Enable dwmac-sun8i
->   ARM: sun8i: bananapi-m2-plus: Enable dwmac-sun8i
->   ARM: sun50i: orangepi-pc2: Enable dwmac-sun8i
+This patch set adds support for SoC-wide (AKA uncore) Performance Monitoring
+Unit version 3.
 
-Applied the first three, thanks!
-Maxime
+It can support up to
+ - 2 IOB PMU instances
+ - 8 L3C PMU instances
+ - 2 MCB PMU instances
+ - 8 MCU PMU instances
+and these PMUs support 64 bit counter
+
+v3:
+ * Seperate acpi_pmu_probe_active_mcb_mcu_l3c for v3
+ * Consistent PMU event name
+ * Update comment
+ * Correct active MCU detection
+
+v2:
+ * Split into separate patches
+ * Use the function pointers for the PMU leaf functions
+ * Parse PMU subnode by the match table
+ * Dont allow user change agent id by config1 for SoC PMU v3
+
+Hoan Tran (3):
+  perf: xgene: Parse PMU subnode from the match table
+  perf: xgene: Move PMU leaf functions into function pointer structure
+  perf: xgene: Add support for SoC PMU version 3
+
+ drivers/perf/xgene_pmu.c | 677 +++++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 622 insertions(+), 55 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170606/01b951a7/attachment-0001.sig>
+1.9.1
