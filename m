@@ -1,48 +1,37 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  6 Jun 2017 15:56:26 +0200
-Subject: [PULL 0/3] KVM/ARM Fixes for v4.12-rc5
-Message-ID: <20170606135629.31664-1-cdall@linaro.org>
+Date: Tue,  6 Jun 2017 15:56:28 +0200
+Subject: [PULL 2/3] KVM: arm/arm64: vgic-v3: Fix nr_pre_bits bitfield
+ extraction
+In-Reply-To: <20170606135629.31664-1-cdall@linaro.org>
+References: <20170606135629.31664-1-cdall@linaro.org>
+Message-ID: <20170606135629.31664-3-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Radim and Paolo,
+We used to extract PRIbits from the ICH_VT_EL2 which was the upper field
+in the register word, so a mask wasn't necessary, but as we switched to
+looking at PREbits, which is bits 26 through 28 with the PRIbits field
+being potentially non-zero, we really need to mask off the field value,
+otherwise fun things may happen.
 
-Three additional fixes for KVM/ARM for v4.12.
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/hyp/vgic-v3-sr.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-They fix an issue with migrating GICv2 VMs on GICv3 systems, squash a
-bug for gicv3 when figuring out preemption levels, and fix a potential
-null pointer derefence in KVM happening under memory pressure.
-
-The following changes since commit fa472fa91a5a0b241f5ddae927d2e235d07545df:
-
-  KVM: arm/arm64: Hold slots_lock when unregistering kvm io bus devices (2017-05-18 11:18:16 +0200)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git kvm-arm-for-v4.12-rc5
-
-for you to fetch changes up to d6dbdd3c8558cad3b6d74cc357b408622d122331:
-
-  KVM: arm/arm64: Handle possible NULL stage2 pud when ageing pages (2017-06-06 15:28:40 +0200)
-
-Thanks,
--Christoffer
-
-----------------------------------------------------------------
-Christoffer Dall (2):
-  KVM: arm/arm64: Fix isues with GICv2 on GICv3 migration
-  KVM: arm/arm64: vgic-v3: Fix nr_pre_bits bitfield extraction
-
-Marc Zyngier (1):
-  KVM: arm/arm64: Handle possible NULL stage2 pud when ageing pages
-
- arch/arm64/kvm/vgic-sys-reg-v3.c   | 10 ++++----
- include/linux/irqchip/arm-gic-v3.h |  4 ++++
- include/linux/irqchip/arm-gic.h    | 28 ++++++++++++++++++++---
- virt/kvm/arm/hyp/vgic-v3-sr.c      |  2 +-
- virt/kvm/arm/mmu.c                 |  3 +++
- virt/kvm/arm/vgic/vgic-mmio-v2.c   | 16 +++++++++++--
- virt/kvm/arm/vgic/vgic-v2.c        | 28 ++++++++++++++++++++---
- virt/kvm/arm/vgic/vgic-v3.c        | 47 ++++++++++++++++++++++++++------------
- virt/kvm/arm/vgic/vgic.h           | 12 ++++++----
- 9 files changed, 118 insertions(+), 32 deletions(-)
+diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+index 32c3295..8794036 100644
+--- a/virt/kvm/arm/hyp/vgic-v3-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+@@ -22,7 +22,7 @@
+ #include <asm/kvm_hyp.h>
+ 
+ #define vtr_to_max_lr_idx(v)		((v) & 0xf)
+-#define vtr_to_nr_pre_bits(v)		(((u32)(v) >> 26) + 1)
++#define vtr_to_nr_pre_bits(v)		((((u32)(v) >> 26) & 7) + 1)
+ 
+ static u64 __hyp_text __gic_v3_get_lr(unsigned int lr)
+ {
+-- 
+2.9.0
