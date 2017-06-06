@@ -1,40 +1,72 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 6 Jun 2017 14:58:29 +0100
-Subject: [PATCH v4 0/8] MFD: add driver for HiSilicon Hi6421v530 PMIC
-In-Reply-To: <CAK8P3a25o6HOFw4MWrsnKjHJf4YuO+UvGk+=f30LREnFHM3QwQ@mail.gmail.com>
-References: <20170606085143.13154-1-guodong.xu@linaro.org>
- <CAK8P3a25o6HOFw4MWrsnKjHJf4YuO+UvGk+=f30LREnFHM3QwQ@mail.gmail.com>
-Message-ID: <20170606135829.dxi3mf7so4j5ml3q@dell>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 6 Jun 2017 14:59:34 +0100
+Subject: [PATCH v2 12/25] KVM: arm64: Enable GICv3 Group-1 sysreg trapping
+ via command-line
+In-Reply-To: <20170606120656.GN9464@cbox>
+References: <20170601102117.17750-1-marc.zyngier@arm.com>
+ <20170601102117.17750-13-marc.zyngier@arm.com> <20170606120656.GN9464@cbox>
+Message-ID: <10aef5e3-706d-2e7b-17d2-0c3eb46095aa@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 06 Jun 2017, Arnd Bergmann wrote:
-
-> On Tue, Jun 6, 2017 at 10:51 AM, Guodong Xu <guodong.xu@linaro.org> wrote:
-> > This patchset adds driver for HiSilicon Hi6421v530 PMIC.
-> >
-> > Mainline kernel already has driver support to a similar chip, Hi6421.
-> > Hi6421 and Hi6421v530 are both from the same vendor, HiSilicon, but
-> > they are at different revisions. They both use the same Memory-mapped
-> > I/O method to communicate with Main SoC. However, they differ quite a
-> > lot in their regulator designs. Eg. they have completely different LDO
-> > voltage points.
-> >
-> > Patch 1 and 2 are hi6421-pmic cleaning up.
-> > Patch 3 and 4 extends hi6421-pmic-core.c to support Hi6421v530 revision.
-> > Patch 5 add hi6421v530-regulator.c driver for LDO regulators.
-> > Patch 6 fixes an issue for hi6421 regulator, which is not related to v530
-> >          but it's found in this review.
-> > Patch 7 is dts change, it depends on and can be applied to hi3660/hikey960
-> >         patchset [1].
-> > Patch 8 enables the relevant config items.
+On 06/06/17 13:06, Christoffer Dall wrote:
+> On Thu, Jun 01, 2017 at 11:21:04AM +0100, Marc Zyngier wrote:
+>> Now that we're able to safely handle Group-1 sysreg access, let's
+>> give the user the opportunity to enable it by passing a specific
+>> command-line option (vgic_v3.group1_trap).
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  virt/kvm/arm/hyp/vgic-v3-sr.c |  6 +++++-
+>>  virt/kvm/arm/vgic/vgic-v3.c   | 11 +++++++++++
+>>  2 files changed, 16 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+>> index 8973bad35748..42ac9ee7650a 100644
+>> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
+>> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+>> @@ -334,7 +334,11 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+>>  		for (i = 0; i < used_lrs; i++)
+>>  			__gic_v3_set_lr(cpu_if->vgic_lr[i], i);
+>>  	} else {
+>> -		/* Always write ICH_HCR_EL2 to enable trapping */
+>> +		/*
+>> +                 * If we don't have any interrupt to inject, but that
+>> +		 * trapping is enabled, write the ICH_HCR_EL2 config
+>> +		 * anyway.
+>> +		 */
 > 
-> Looks good to me,
+> nit: Whitespace and grammar issues, and maybe this hunk was supposed to
+> be in the last patch?
 
-Is that an Ack?
+Indeed, on both counts.
 
+> 
+>>  		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
+>>  			write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
+>>  	}
+>> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+>> index fbd678bc046d..a16769276efd 100644
+>> --- a/virt/kvm/arm/vgic/vgic-v3.c
+>> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+>> @@ -416,6 +416,12 @@ int vgic_v3_map_resources(struct kvm *kvm)
+>>  
+>>  DEFINE_STATIC_KEY_FALSE(vgic_v3_cpuif_trap);
+>>  
+>> +static int __init early_group1_trap_cfg(char *buf)
+>> +{
+>> +	return strtobool(buf, &group1_trap);
+>> +}
+>> +early_param("vgic_v3.group1_trap", early_group1_trap_cfg);
+>> +
+> 
+> this shouldn't be named something with KVM (we're not going to trap
+> anything on the host somehow are we?)?
+
+Good point. kvm_vgic_v3.whatever?
+
+Thanks,
+
+	M.
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Jazz is not dead. It just smells funny...
