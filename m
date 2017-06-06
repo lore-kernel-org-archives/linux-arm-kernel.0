@@ -1,57 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 6 Jun 2017 17:15:52 +0100
-Subject: [RFC PATCH v2 4/6] arm64: signal: Allocate extra sigcontext
- space as needed
-In-Reply-To: <20170606113739.GF30160@e103592.cambridge.arm.com>
-References: <1492016239-19511-1-git-send-email-Dave.Martin@arm.com>
- <1492016495-19689-1-git-send-email-Dave.Martin@arm.com>
- <1492016495-19689-4-git-send-email-Dave.Martin@arm.com>
- <20170512165724.GB8387@e104818-lin.cambridge.arm.com>
- <20170515132442.GB3559@e103592.cambridge.arm.com>
- <20170523113019.GB5948@e104818-lin.cambridge.arm.com>
- <20170526113729.GO3559@e103592.cambridge.arm.com>
- <20170605141744.GB9163@e104818-lin.cambridge.arm.com>
- <20170606113739.GF30160@e103592.cambridge.arm.com>
-Message-ID: <20170606161552.wgufjtgipdffkmyv@localhost>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 6 Jun 2017 16:59:12 +0100
+Subject: [PATCH] arm64: dts: juno: Enable some SMMUs
+In-Reply-To: <5e24adfa-3342-f331-1ed3-ed32ebf164cb@arm.com>
+References: <eeb81dbbd7ddfbbccb961c0f20c5cb90f120e89f.1495110010.git.robin.murphy@arm.com>
+ <5e24adfa-3342-f331-1ed3-ed32ebf164cb@arm.com>
+Message-ID: <398bc8d4-f307-740b-435c-7822bec4f8e1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 06, 2017 at 12:37:53PM +0100, Dave P Martin wrote:
-> On Mon, Jun 05, 2017 at 03:17:44PM +0100, Catalin Marinas wrote:
-> > On Fri, May 26, 2017 at 12:37:32PM +0100, Dave P Martin wrote:
-> > > On Tue, May 23, 2017 at 12:30:19PM +0100, Catalin Marinas wrote:
-> > > > BTW, does SIGFRAME_MAXSZ now become ABI? Or the user only needs to
-> > > > interrogate the frame size and we keep this internal to the kernel?
-> > > 
-> > > If the kernel rejects extra_contexts that cause this limit to be
-> > > exceeded, then yes -- though it will rarely be relevant except in the
-> > > case of memory corruption, or if architecture extensions eventually
-> > > require a larger frame.
-> > > 
-> > > (sve_context could theoretically grow larger then SIGFRAME_MAXSZ all by
-> > > itself, but that's unlikely to happen any time soon.)
-> > > 
-> > > Userspace could hit SIGFRAME_MAXSZ by constructing a valid sequence of
-> > > records that is ridiculously large, by padding out the records: common
-> > > sense suggests not to do this, but it's never been documented or
-> > > enforced.  I didn't feel comfortable changing the behaviour here to be
-> > > more strict.
-> > > 
-> > > So, SIGFRAME_MAXSZ should either be given a larger, more future-proof
-> > > value ... or otherwise we should perhaps get rid of it entirely.
-> > 
-> > If we can, yes, I would get rid of it.
+On 06/06/17 16:45, Jean-Philippe Brucker wrote:
+> Hello,
 > 
-> If the size field is retained I prefer to keep this, but it's
-> deliberately not in any header.  This allows the kernel to have a
-> stricter idea about what is sane, without it formally being ABI.
+> On 18/05/17 13:23, Robin Murphy wrote:
+>> The IOMMU-backed DMA API support has now been in place for a while and
+>> proven stable, so there's no real need to keep most of Juno's SMMUs
+>> disabled. The USB, HDLCDs, and CoreSight ETR all just need to map RAM
+>> buffers for DMA - enabling their SMMUs obviates CPU bounce buffering for
+>> USB's streaming DMA to the upper memory bank, and lets the other two
+>> allocate their relatively large coherent buffers without pressuring CMA.
+>>
+>> Some more software work is still needed for the DMA-330 and PCIe before
+>> those can accommodate SMMU translation correctly in all cases, so we
+>> leave those alone for now.
 > 
-> This is supposed to be a deterrent against people writing signal frame
-> code manipulation code in a stupid way.  SIGFRAME_MAXSZ should only
-> ever be increased during maintenance -- it's probably worth adding a
-> comment on that point.
+> Out of curiosity, what is missing for DMA-330? I can use dmatest over SMMU
+> on my juno-r1 by enabling the node, but I don't have any complex workload
+> yet. Guest pass-through is really unreliable and I'm trying to figure out why.
 
-Fine by me.
+Yes, dmatest has always been fine* since both ends get mapped for DMA
+appropriately by the client. The missing bit is, or should I say was,
+4d6d74e22096 currently in linux-next.
 
--- 
-Catalin
+Robin.
+
+* For certain values of fine, anyway. There are a number of catastrophic
+races in the driver that make it generally a bad idea to use more than 1
+thread per channel.
+
+> 
+> Thanks,
+> Jean
+> 
