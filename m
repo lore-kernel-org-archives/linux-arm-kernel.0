@@ -1,46 +1,73 @@
 From: ruxandra.radulescu@nxp.com (Ioana Radulescu)
-Date: Tue, 6 Jun 2017 10:00:29 -0500
-Subject: [PATCH 06/18] staging: fsl-dpaa2/eth: Minor cleanup in
- dpaa2_eth_set_hash
+Date: Tue, 6 Jun 2017 10:00:38 -0500
+Subject: [PATCH 15/18] staging: fsl-dpaa2/eth: Reorder priv fields
 In-Reply-To: <20170606150041.10955-1-ruxandra.radulescu@nxp.com>
 References: <20170606150041.10955-1-ruxandra.radulescu@nxp.com>
-Message-ID: <20170606150041.10955-7-ruxandra.radulescu@nxp.com>
+Message-ID: <20170606150041.10955-16-ruxandra.radulescu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We already have a variable for the DMA mapping device,
-so use that directly.
+Reorder fields in the device's private structure such that
+the ones most used on the hotpath are at the beginning of
+the structure.
+
+This brings a small performance improvement due to better
+cache usage.
 
 Signed-off-by: Ioana Radulescu <ruxandra.radulescu@nxp.com>
 ---
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h | 26 +++++++++++---------------
+ 1 file changed, 11 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-index c4252f47d57d..bf6f300affa7 100644
---- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-+++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-@@ -2009,10 +2009,10 @@ static int dpaa2_eth_set_hash(struct net_device *net_dev, u64 flags)
- 	memset(&dist_cfg, 0, sizeof(dist_cfg));
+diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
+index 886a0681fee1..c760e9b77e22 100644
+--- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
++++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
+@@ -290,34 +290,30 @@ struct dpaa2_eth_hash_fields {
+ /* Driver private data */
+ struct dpaa2_eth_priv {
+ 	struct net_device *net_dev;
++	/* Standard statistics */
++	struct rtnl_link_stats64 __percpu *percpu_stats;
++	/* Extra stats, in addition to the ones known by the kernel */
++	struct dpaa2_eth_drv_stats __percpu *percpu_extras;
++	struct iommu_domain *iommu_domain;
++	u16 tx_data_offset;
++	u16 bpid;
++	u16 tx_qdid;
  
- 	/* Prepare for setting the rx dist */
--	dist_cfg.key_cfg_iova = dma_map_single(net_dev->dev.parent, dma_mem,
-+	dist_cfg.key_cfg_iova = dma_map_single(dev, dma_mem,
- 					       DPAA2_CLASSIFIER_DMA_SIZE,
- 					       DMA_TO_DEVICE);
--	if (dma_mapping_error(net_dev->dev.parent, dist_cfg.key_cfg_iova)) {
-+	if (dma_mapping_error(dev, dist_cfg.key_cfg_iova)) {
- 		dev_err(dev, "DMA mapping failed\n");
- 		err = -ENOMEM;
- 		goto err_dma_map;
-@@ -2022,7 +2022,7 @@ static int dpaa2_eth_set_hash(struct net_device *net_dev, u64 flags)
- 	dist_cfg.dist_mode = DPNI_DIST_MODE_HASH;
+ 	u8 num_fqs;
+-	struct dpaa2_eth_fq fq[DPAA2_ETH_MAX_QUEUES];
+-
+ 	u8 num_channels;
++	struct dpaa2_eth_fq fq[DPAA2_ETH_MAX_QUEUES];
+ 	struct dpaa2_eth_channel *channel[DPAA2_ETH_MAX_DPCONS];
  
- 	err = dpni_set_rx_tc_dist(priv->mc_io, 0, priv->mc_token, 0, &dist_cfg);
--	dma_unmap_single(net_dev->dev.parent, dist_cfg.key_cfg_iova,
-+	dma_unmap_single(dev, dist_cfg.key_cfg_iova,
- 			 DPAA2_CLASSIFIER_DMA_SIZE, DMA_TO_DEVICE);
- 	if (err)
- 		dev_err(dev, "dpni_set_rx_tc_dist() error %d\n", err);
++	struct fsl_mc_io *mc_io;
++	u16 mc_token;
+ 	struct dpni_attr dpni_attrs;
+-	u16 tx_data_offset;
+-
+ 	struct fsl_mc_device *dpbp_dev;
+-	u16 bpid;
+-	struct iommu_domain *iommu_domain;
+ 
+-	u16 tx_qdid;
+-	struct fsl_mc_io *mc_io;
+ 	/* Cores which have an affine DPIO/DPCON.
+ 	 * This is the cpu set on which Rx and Tx conf frames are processed
+ 	 */
+ 	struct cpumask dpio_cpumask;
+ 
+-	/* Standard statistics */
+-	struct rtnl_link_stats64 __percpu *percpu_stats;
+-	/* Extra stats, in addition to the ones known by the kernel */
+-	struct dpaa2_eth_drv_stats __percpu *percpu_extras;
+-
+-	u16 mc_token;
+-
+ 	struct dpni_link_state link_state;
+ 	bool do_link_poll;
+ 	struct task_struct *poll_thread;
 -- 
 2.11.0
