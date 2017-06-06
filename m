@@ -1,40 +1,59 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 6 Jun 2017 15:46:34 +0200
-Subject: [PATCH 0/2] arm64/kvm: use SYS_REG_DESC() for VGIC-v3
-In-Reply-To: <1496668801-16064-1-git-send-email-mark.rutland@arm.com>
-References: <1496668801-16064-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20170606134634.GE9464@cbox>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 6 Jun 2017 14:48:31 +0100
+Subject: [PATCH] arm64: dts: marvell: 8040-mcbin: Enable 1GB Ethernet
+In-Reply-To: <20170606133446.GI4902@n2100.armlinux.org.uk>
+References: <20170605200107.7692-1-marc.zyngier@arm.com>
+ <20170606133446.GI4902@n2100.armlinux.org.uk>
+Message-ID: <b3bf3f20-76c0-bb12-6b20-0a7dad222793@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On Mon, Jun 05, 2017 at 02:19:59PM +0100, Mark Rutland wrote:
-> While looking around, I spotted that the VGIC-v3 code still uses open-coded SYS
-> encodings. These patches migrate said code to use common <asm/sysreg.h>
-> mnemonics, as we do for the rest of the AArch64 sysregs.
+On 06/06/17 14:34, Russell King - ARM Linux wrote:
+> On Mon, Jun 05, 2017 at 09:01:07PM +0100, Marc Zyngier wrote:
+>> Enable the 1GB Ethernet interface that lives on the slave CP110,
+>> with its corresponding phy (that oddly lives on the master CP110).
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 16 ++++++++++++++++
+>>  1 file changed, 16 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+>> index f7bb0cc03147..1eb3cd5332c1 100644
+>> --- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+>> +++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+>> @@ -100,6 +100,12 @@
+>>  	status = "okay";
+>>  };
+>>  
+>> +&cpm_mdio {
+>> +	phy0: ethernet-phy at 0 {
 > 
-> This is based on Marc's kvm-arm64/gicv3-cpuif-mediated-access branch [1].
+> As the board has multiple phys, can we use a more descriptive label
+> here, such as "ge_phy" (for gigabit ethernet phy) to distinugish it
+> from the 10G PHYs?
+> 
+>> +&cps_ethernet {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&cps_eth1 {
+> 
+> Labelling up the connector as is done elsewhere in the file would be
+> nice:
+> 
+> 	/* CPS Lane 0 - J5 (Gigabit RJ45) */
+> 
+> 
+>> +	status = "okay";
+>> +	phy = <&phy0>;
+>> +	phy-mode = "sgmii";
+> 
 
-Patches look good to me.  I can apply them after we apply [1] if
-Catalin/Will are ok with this.
+Yup, agreed on both counts. I'll update the patch.
 
 Thanks,
--Christoffer
 
-> 
-> [1] git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/gicv3-cpuif-mediated-access
-> 
-> Mark Rutland (2):
->   arm64/kvm: sysreg: fix typo'd SYS_ICC_IGRPEN*_EL1
->   arm64/kvm: vgic: use SYS_DESC()
-> 
->  arch/arm64/include/asm/arch_gicv3.h |  2 +-
->  arch/arm64/include/asm/sysreg.h     | 12 ++++++++--
->  arch/arm64/kvm/vgic-sys-reg-v3.c    | 45 +++++++++++++------------------------
->  virt/kvm/arm/hyp/vgic-v3-sr.c       |  4 ++--
->  4 files changed, 28 insertions(+), 35 deletions(-)
-> 
-> -- 
-> 1.9.1
-> 
+	M.
+-- 
+Jazz is not dead. It just smells funny...
