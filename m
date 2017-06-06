@@ -1,75 +1,41 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 5 Jun 2017 19:08:03 -0700
-Subject: [PATCH v6 00/11] Broadcom Stingray SOC Initial Support
-In-Reply-To: <4c15213f-4ac6-a0a7-f2b8-cde2b4cee891@gmail.com>
-References: <1496385275-6899-1-git-send-email-anup.patel@broadcom.com>
- <4c15213f-4ac6-a0a7-f2b8-cde2b4cee891@gmail.com>
-Message-ID: <c26e95e1-4bfa-0d24-33cc-8d5ae3102864@gmail.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Mon, 5 Jun 2017 21:11:01 -0500
+Subject: [PATCH 1/2] ARM: dts: add GSBI8 defines to the MSM8660 family
+In-Reply-To: <20170602220223.GR20170@codeaurora.org>
+References: <20170515075012.3696-1-linus.walleij@linaro.org>
+ <20170602220223.GR20170@codeaurora.org>
+Message-ID: <20170606021101.GF19546@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 06/05/2017 09:51 AM, Florian Fainelli wrote:
-> On 06/01/2017 11:34 PM, Anup Patel wrote:
->> This patchset adds initial support of Broadcom Stingray SOC
->> by reusing existing Broadcom iProc device drivers.
->>
->> Most of the patches in this patchset are DT patches except
->> the Stingray clock tree support which just one patch.
->>
->> This patchset is based on Linux-4.12-rc3 and it is also available
->> at stingray-v6 branch of https://github.com/Broadcom/arm64-linux.git
->>
->> Changes since v5:
->>  - Rebased patches for Linux-4.12-rc3
->>  - Update DT node names to match register offset
->>
->> Changes since v4:
->>  - Reduce number of include headers in Stingray clk driver
->>
->> Changes since v3:
->>  - Rebased patches for Linux-4.12-rc1
->>  - Updated PATCH3 to have all clocks except genpll3 to be
->>    registered via platform driver probe
->>
->> Changes since v2:
->>  - Remove default bootargs from chosen DT node
->>  - Remove "linux" prefix from stdout DT attribute of chosen DT node
->>  - Remove use of GIC_CPU_MASK_xxx() for PPIs
->>
->> Changes since v1:
->>  - Rebased patches for Linux-4.12-rc1
->>  - Removed unwanted /memreserve/ from bcm958742-base.dtsi
->>  - Use ranges DT property to clear view of memory-layout
->>  - Make bcm-sr.h part of clock DT bindings patch
->>
->> Anup Patel (3):
->>   dt-bindings: bcm: Add Broadcom Stingray bindings document
->>   arm64: dts: Initial DTS files for Broadcom Stingray SOC
->>   arm64: dts: Add PL022, PL330 and SP805 DT nodes for Stingray
->>
->> Oza Pawandeep (1):
->>   arm64: dts: Add I2C DT nodes for Stingray SoC
->>
->> Pramod Kumar (3):
->>   arm64: dts: Add NAND DT nodes for Stingray SOC
->>   arm64: dts: Add pinctrl DT nodes for Stingray SOC
->>   arm64: dts: Add GPIO DT nodes for Stingray SOC
->>
->> Sandeep Tripathy (3):
->>   dt-bindings: clk: Extend binding doc for Stingray SOC
->>   clk: bcm: Add clocks for Stingray SOC
->>   arm64: dts: Add clock DT nodes for Stingray SOC
->>
->> Srinath Mannam (1):
->>   arm64: dts: Add PWM and SDHCI DT nodes for Stingray SOC
+On Fri, Jun 02, 2017 at 03:02:23PM -0700, Stephen Boyd wrote:
+> On 05/15, Linus Walleij wrote:
+> > diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
+> > index 747669a62aa8..a53c0f9970bd 100644
+> > --- a/arch/arm/boot/dts/qcom-msm8660.dtsi
+> > +++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
+> > @@ -107,6 +107,31 @@
+> >  			reg = <0x900000 0x4000>;
+> >  		};
+> >  
+> > +
+> > +		gsbi8: gsbi at 19800000 {
+> > +			compatible = "qcom,gsbi-v1.0.0";
+> > +			cell-index = <12>;
+> > +			reg = <0x19800000 0x100>;
+> > +			clocks = <&gcc GSBI8_H_CLK>;
+> > +			clock-names = "iface";
+> > +			#address-cells = <1>;
+> > +			#size-cells = <1>;
+> > +			ranges;
+> > +
+> > +			syscon-tcsr = <&tcsr>;
+> > +
+> > +			gsbi8_i2c: i2c at 19880000 {
+> > +				compatible = "qcom,i2c-qup-v1.1.1";
+> > +				reg = <0x19880000 0x1000>;
+> > +				interrupts = <0 161 IRQ_TYPE_NONE>;
 > 
-> Applied patches 1, 4-11 to devicetree-arm64/next, thanks!
+> 				interrupts = <GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>?
 
-Also took patch 2, to make sure everything builds properly, Stephen, let
-me know if you want me to take patch #3 as well.
-
-Thanks!
--- 
-Florian
+I'll fix this up.  No need for resend
