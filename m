@@ -1,146 +1,140 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 6 Jun 2017 14:54:46 +0100
-Subject: [PATCH v4 4/8] mfd: hi6421-pmic: add support for HiSilicon
- Hi6421v530
-In-Reply-To: <20170606085143.13154-5-guodong.xu@linaro.org>
-References: <20170606085143.13154-1-guodong.xu@linaro.org>
- <20170606085143.13154-5-guodong.xu@linaro.org>
-Message-ID: <20170606135446.ceqow7bfdlhk4kuv@dell>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 6 Jun 2017 14:56:23 +0100
+Subject: [RFCv2 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
+ erratum 161010801
+In-Reply-To: <20170531143213.82100-3-shameerali.kolothum.thodi@huawei.com>
+References: <20170531143213.82100-1-shameerali.kolothum.thodi@huawei.com>
+ <20170531143213.82100-3-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <20170606135623.GB20126@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 06 Jun 2017, Guodong Xu wrote:
+On Wed, May 31, 2017 at 03:32:13PM +0100, shameer wrote:
+> The HiSilicon erratum 161010801 describes the limitation of HiSilicon
+> platforms Hip06/Hip07 to support the SMMU mappings for MSI transactions.
+> 
+> On these platforms GICv3 ITS translator is presented with the deviceID
+> by extending the MSI payload data to 64 bits to include the deviceID.
+> Hence, the PCIe controller on this platforms has to differentiate the
+> MSI payload against other DMA payload and has to modify the MSI payload.
+> This basically makes it difficult for this platforms to have a SMMU
+> translation for MSI.
+> 
+> This patch implements a ACPI table based quirk to reserve the hw msi
+> regions in the smmu-v3 driver which means these address regions will
+> not be translated and will be excluded from iova allocations.
+> 
+> The HW ITS address region associated with the dev is retrieved
+> using a new helper function added in the IORT code.
 
-> Add support for HiSilicon Hi6421v530 PMIC. Hi6421v530 communicates with
-> main SoC via memory-mapped I/O.
-> 
-> Hi6421v530 and Hi6421 are PMIC chips from the same vendor, HiSilicon,
-> but at different revisions. They share the same memory-mapped I/O
-> design. They differ in integrated devices, such as regulator details,
-> LDO voltage points.
-> 
-> Signed-off-by: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
-> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+Remove or rephrase last paragraph, it reads as if you are adding an IORT
+helper function in this patch but you actually aren't.
+
+> Signed-off-by: shameer <shameerali.kolothum.thodi@huawei.com>
 > ---
->  drivers/mfd/hi6421-pmic-core.c  | 68 ++++++++++++++++++++++++++++++-----------
->  include/linux/mfd/hi6421-pmic.h |  5 +++
->  2 files changed, 55 insertions(+), 18 deletions(-)
+>  drivers/iommu/arm-smmu-v3.c | 49 ++++++++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 46 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/mfd/hi6421-pmic-core.c b/drivers/mfd/hi6421-pmic-core.c
-> index b1139d4..4568a43 100644
-> --- a/drivers/mfd/hi6421-pmic-core.c
-> +++ b/drivers/mfd/hi6421-pmic-core.c
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index abe4b88..3767526 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -597,6 +597,7 @@ struct arm_smmu_device {
+>  	u32				features;
+>  
+>  #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
+> +#define ARM_SMMU_OPT_RESV_HW_MSI	(1 << 1)
+>  	u32				options;
+>  
+>  	struct arm_smmu_cmdq		cmdq;
+> @@ -1755,6 +1756,38 @@ static bool arm_smmu_sid_in_range(struct arm_smmu_device *smmu, u32 sid)
+>  
+>  static struct iommu_ops arm_smmu_ops;
+>  
+> +#ifdef CONFIG_ACPI
+> +static struct iommu_resv_region *arm_smmu_acpi_alloc_hw_msi(struct device *dev)
+> +{
+> +	struct iommu_resv_region *region;
+> +	struct	irq_domain *irq_dom;
+> +	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
+> +	u64	base;
 
-[...]
+phys_addr_t
 
->  static int hi6421_pmic_probe(struct platform_device *pdev)
->  {
->  	struct hi6421_pmic *pmic;
->  	struct resource *res;
-> +	const struct of_device_id *id;
-> +	const struct mfd_cell *subdevs;
->  	void __iomem *base;
-> -	int ret;
-> +	int n_subdevs, ret;
+> +	irq_dom = pci_msi_get_device_domain(to_pci_dev(dev));
+> +	if (irq_dom) {
+> +		int	ret;
+> +		u32	rid;
 > +
-> +	id = of_match_device(of_hi6421_pmic_match, &pdev->dev);
-> +	if (!id)
-> +		return -EINVAL;
->  
->  	pmic = devm_kzalloc(&pdev->dev, sizeof(*pmic), GFP_KERNEL);
->  	if (!pmic)
-> @@ -57,18 +80,33 @@ static int hi6421_pmic_probe(struct platform_device *pdev)
->  		return PTR_ERR(pmic->regmap);
->  	}
->  
-> -	/* set over-current protection debounce 8ms */
-> -	regmap_update_bits(pmic->regmap, HI6421_OCP_DEB_CTRL_REG,
-> +	platform_set_drvdata(pdev, pmic);
-> +
-> +	switch ((unsigned long)id->data) {
+> +		rid = pci_msi_domain_get_msi_rid(irq_dom, to_pci_dev(dev));
+> +		ret = iort_dev_find_its_base(dev, rid, 0, &base);
 
-Whilst this is not a blocker, it would be nicer to place this into a
-'type' variable, in order to clarify what data you are using.
+Well, here we use ITS id 0 which is fine as long as code in IORT uses
+the same policy for getting the irq_domain (ie we want to reserve the
+ITS address space that is actually used by the device to send IRQs not a
+a different one) it is just a heads-up because I find this confusing.
 
-> +	case HI6421:
-> +		/* set over-current protection debounce 8ms */
-> +		regmap_update_bits(pmic->regmap, HI6421_OCP_DEB_CTRL_REG,
->  				(HI6421_OCP_DEB_SEL_MASK
->  				 | HI6421_OCP_EN_DEBOUNCE_MASK
->  				 | HI6421_OCP_AUTO_STOP_MASK),
->  				(HI6421_OCP_DEB_SEL_8MS
->  				 | HI6421_OCP_EN_DEBOUNCE_ENABLE));
->  
-> -	platform_set_drvdata(pdev, pmic);
-> +		subdevs = hi6421_devs;
-> +		n_subdevs = ARRAY_SIZE(hi6421_devs);
-> +		break;
-> +	case HI6421_V530:
-> +		subdevs = hi6421v530_devs;
-> +		n_subdevs = ARRAY_SIZE(hi6421v530_devs);
-> +		break;
-> +	default:
-> +		dev_err(&pdev->dev, "Unknown device type %ld\n",
-> +						(unsigned long)id->data);
-> +		return -EINVAL;
+> +		if (!ret) {
+> +			dev_info(dev, "SMMUv3:HW MSI resv addr 0x%pa\n", &base);
+> +			region = iommu_alloc_resv_region(base, SZ_128K,
+> +							 prot, IOMMU_RESV_MSI);
+> +			return region;
+> +		}
 > +	}
->  
-> -	ret = devm_mfd_add_devices(&pdev->dev, 0, hi6421_devs,
-> -				   ARRAY_SIZE(hi6421_devs), NULL, 0, NULL);
-> +	ret = devm_mfd_add_devices(&pdev->dev, PLATFORM_DEVID_NONE,
-> +				   subdevs, n_subdevs, NULL, 0, NULL);
->  	if (ret) {
->  		dev_err(&pdev->dev, "Failed to add child devices: %d\n", ret);
->  		return ret;
-> @@ -77,16 +115,10 @@ static int hi6421_pmic_probe(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> -static const struct of_device_id of_hi6421_pmic_match_tbl[] = {
-> -	{ .compatible = "hisilicon,hi6421-pmic", },
-> -	{ },
-> -};
-> -MODULE_DEVICE_TABLE(of, of_hi6421_pmic_match_tbl);
-> -
->  static struct platform_driver hi6421_pmic_driver = {
->  	.driver = {
-> -		.name	= "hi6421_pmic",
-> -		.of_match_table = of_hi6421_pmic_match_tbl,
-> +		.name = "hi6421_pmic",
-> +		.of_match_table = of_hi6421_pmic_match,
->  	},
->  	.probe	= hi6421_pmic_probe,
->  };
-> diff --git a/include/linux/mfd/hi6421-pmic.h b/include/linux/mfd/hi6421-pmic.h
-> index 587273e..2457438 100644
-> --- a/include/linux/mfd/hi6421-pmic.h
-> +++ b/include/linux/mfd/hi6421-pmic.h
-> @@ -38,4 +38,9 @@ struct hi6421_pmic {
->  	struct regmap		*regmap;
->  };
->  
-> +enum hi6421_type {
-> +	HI6421      = 1,
-> +	HI6421_V530 = 2,
-> +};
 > +
+> +	return NULL;
+> +}
+> +#else
+> +static struct iommu_resv_region *arm_smmu_acpi_alloc_hw_msi(struct device *dev)
+> +{
+> +	return NULL;
+> +}
+> +#endif
+> +
+>  static int arm_smmu_add_device(struct device *dev)
+>  {
+>  	int i, ret;
+> @@ -1903,11 +1936,20 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+>  static void arm_smmu_get_resv_regions(struct device *dev,
+>  				      struct list_head *head)
+>  {
+> -	struct iommu_resv_region *region;
+> +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
+> +	struct iommu_resv_region *region = NULL;
+>  	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
+> +	struct arm_smmu_device *smmu;
+> +
+> +	smmu = arm_smmu_get_by_fwnode(fwspec->iommu_fwnode);
+>  
+> -	region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
+> -					 prot, IOMMU_RESV_SW_MSI);
+> +	if (smmu && (smmu->options & ARM_SMMU_OPT_RESV_HW_MSI) &&
+> +		      dev_is_pci(dev))
+> +		region = arm_smmu_acpi_alloc_hw_msi(dev);
 
-As programmers we usually start counting at 0.  Then you can rely on
-the C standard to populate the remaining values.
+Is it safe to carry on if arm_smmu_acpi_alloc_hw_msi() returns NULL here ?
 
-Something like:
+Lorenzo
 
-enum hi6421_type {
-	HI6421 = 0,
-	HI6421_V530,
-};
-
-... is more normal.
-
->  #endif		/* __HI6421_PMIC_H */
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> +	if (!region)
+> +		region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
+> +						 prot, IOMMU_RESV_SW_MSI);
+>  	if (!region)
+>  		return;
+>  
+> @@ -2611,6 +2653,7 @@ static void parse_driver_acpi_options(struct acpi_iort_smmu_v3 *iort_smmu,
+>  	switch (iort_smmu->model) {
+>  	case ACPI_IORT_SMMU_HISILICON_HI161X:
+>  		smmu->options |= ARM_SMMU_OPT_SKIP_PREFETCH;
+> +		smmu->options |= ARM_SMMU_OPT_RESV_HW_MSI;
+>  		break;
+>  	default:
+>  		break;
+> -- 
+> 1.9.1
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
