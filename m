@@ -1,38 +1,252 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Jun 2017 11:13:32 +0100
-Subject: [PATCH] arm64: dts: marvell: cp110: add required clocks for mdio
- interface
-In-Reply-To: <8760g9ph23.fsf@free-electrons.com>
-References: <1496743035-4618-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <8760g9ph23.fsf@free-electrons.com>
-Message-ID: <20170606101332.GH4902@n2100.armlinux.org.uk>
+From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
+Date: Tue, 6 Jun 2017 12:15:47 +0200
+Subject: [PATCH v3 01/11] iio: Add hardware consumer support
+In-Reply-To: <1489759704-30217-2-git-send-email-arnaud.pouliquen@st.com>
+References: <1489759704-30217-1-git-send-email-arnaud.pouliquen@st.com>
+ <1489759704-30217-2-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <2f1ea8dc-ff6b-3526-bc9e-50dde1ae9a66@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 06, 2017 at 12:05:24PM +0200, Gregory CLEMENT wrote:
-> Hi Thomas,
+Hello Lars,
+
+Any news on the upstream of your HW consumer interface, prerequisite for
+my STM32 DFSDM upstream?
+Don't hesitate if i can help...
+
+Regards
+Arnaud
+
+
+On 03/17/2017 03:08 PM, Arnaud POULIQUEN wrote:
+> From: Lars-Peter Clausen <lars@metafoo.de>
+> 
+> Hardware consumer's can be used when one IIO device has a direct connection
+> to another device in hardware.
+> 
+> Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
+> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+> ---
+> V2 -> V3:
+> 	 Just Adding sign off.  No update but Jonathan comment.
+>          Need to be taken into account (in agreement with Lars)
+>          when transforming rfc in patch.
+> ---
+>  drivers/iio/Kconfig             |   6 ++
+>  drivers/iio/Makefile            |   1 +
+>  drivers/iio/hw_consumer.c       | 156 ++++++++++++++++++++++++++++++++++++++++
+>  include/linux/iio/hw_consumer.h |  12 ++++
+>  4 files changed, 175 insertions(+)
+>  create mode 100644 drivers/iio/hw_consumer.c
+>  create mode 100644 include/linux/iio/hw_consumer.h
+> 
+> diff --git a/drivers/iio/Kconfig b/drivers/iio/Kconfig
+> index 6743b18..956dd18 100644
+> --- a/drivers/iio/Kconfig
+> +++ b/drivers/iio/Kconfig
+> @@ -30,6 +30,12 @@ config IIO_CONFIGFS
+>  	  (e.g. software triggers). For more info see
+>  	  Documentation/iio/iio_configfs.txt.
 >  
->  On mar., juin 06 2017, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+> +config IIO_HW_CONSUMER
+> +	tristate
+> +	help
+> +	  Hardware consumer buffer
+> +
+> +
+>  config IIO_TRIGGER
+>  	bool "Enable triggered sampling support"
+>  	help
+> diff --git a/drivers/iio/Makefile b/drivers/iio/Makefile
+> index 87e4c43..8472b97 100644
+> --- a/drivers/iio/Makefile
+> +++ b/drivers/iio/Makefile
+> @@ -6,6 +6,7 @@ obj-$(CONFIG_IIO) += industrialio.o
+>  industrialio-y := industrialio-core.o industrialio-event.o inkern.o
+>  industrialio-$(CONFIG_IIO_BUFFER) += industrialio-buffer.o
+>  industrialio-$(CONFIG_IIO_TRIGGER) += industrialio-trigger.o
+> +obj-$(CONFIG_IIO_HW_CONSUMER) += hw_consumer.o
+>  
+>  obj-$(CONFIG_IIO_CONFIGFS) += industrialio-configfs.o
+>  obj-$(CONFIG_IIO_SW_DEVICE) += industrialio-sw-device.o
+> diff --git a/drivers/iio/hw_consumer.c b/drivers/iio/hw_consumer.c
+> new file mode 100644
+> index 0000000..66f0732
+> --- /dev/null
+> +++ b/drivers/iio/hw_consumer.c
+> @@ -0,0 +1,156 @@
+> +#include <linux/err.h>
+> +#include <linux/export.h>
+> +#include <linux/slab.h>
+> +#include <linux/mutex.h>
+> +#include <linux/of.h>
+> +
+> +#include <linux/iio/iio.h>
+> +#include "iio_core.h"
+> +#include <linux/iio/machine.h>
+> +#include <linux/iio/driver.h>
+> +#include <linux/iio/consumer.h>
+> +#include <linux/iio/hw_consumer.h>
+> +#include <linux/iio/buffer.h>
+> +
+> +struct iio_hw_consumer {
+> +	struct list_head buffers;
+> +	struct iio_channel *channels;
+> +};
+> +
+> +struct hw_consumer_buffer {
+> +	struct list_head head;
+> +	struct iio_dev *indio_dev;
+> +	struct iio_buffer buffer;
+> +};
+> +
+> +static struct hw_consumer_buffer *iio_buffer_to_hw_consumer_buffer(
+> +	struct iio_buffer *buffer)
+> +{
+> +	return container_of(buffer, struct hw_consumer_buffer, buffer);
+> +}
+> +
+> +static void iio_hw_buf_release(struct iio_buffer *buffer)
+> +{
+> +	struct hw_consumer_buffer *hw_buf =
+> +		iio_buffer_to_hw_consumer_buffer(buffer);
+> +	kfree(hw_buf->buffer.scan_mask);
+> +	kfree(hw_buf);
+> +}
+> +
+> +static const struct iio_buffer_access_funcs iio_hw_buf_access = {
+> +	.release = &iio_hw_buf_release,
+> +	.modes = INDIO_BUFFER_HARDWARE,
+> +};
+> +
+> +static struct hw_consumer_buffer *iio_hw_consumer_get_buffer(
+> +	struct iio_hw_consumer *hwc, struct iio_dev *indio_dev)
+> +{
+> +	struct hw_consumer_buffer *buf;
+> +
+> +	list_for_each_entry(buf, &hwc->buffers, head) {
+> +		if (buf->indio_dev == indio_dev)
+> +			return buf;
+> +	}
+> +
+> +	buf = kzalloc(sizeof(*buf), GFP_KERNEL);
+> +	if (!buf)
+> +		return NULL;
+> +
+> +	buf->buffer.access = &iio_hw_buf_access;
+> +	buf->indio_dev = indio_dev;
+> +	buf->buffer.scan_mask = kcalloc(BITS_TO_LONGS(indio_dev->masklength),
+> +		sizeof(long), GFP_KERNEL);
+> +	if (!buf->buffer.scan_mask)
+> +		goto err_free_buf;
+> +
+> +	iio_buffer_init(&buf->buffer);
+> +	list_add_tail(&buf->head, &hwc->buffers);
+> +
+> +	return buf;
+> +
+> +err_free_buf:
+> +	kfree(buf);
+> +	return NULL;
+> +}
+> +
+> +struct iio_hw_consumer *iio_hw_consumer_alloc(struct device *dev)
+> +{
+> +	struct hw_consumer_buffer *buf;
+> +	struct iio_hw_consumer *hwc;
+> +	struct iio_channel *chan;
+> +	int ret;
+> +
+> +	hwc = kzalloc(sizeof(*hwc), GFP_KERNEL);
+> +	if (!hwc)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	INIT_LIST_HEAD(&hwc->buffers);
+> +
+> +	hwc->channels = iio_channel_get_all(dev);
+> +	if (IS_ERR(hwc->channels)) {
+> +		ret = PTR_ERR(hwc->channels);
+> +		goto err_free_hwc;
+> +	}
+> +
+> +	chan = &hwc->channels[0];
+> +	while (chan->indio_dev) {
+> +		buf = iio_hw_consumer_get_buffer(hwc, chan->indio_dev);
+> +		if (buf == NULL) {
+> +			ret = -ENOMEM;
+> +			goto err_put_buffers;
+> +		}
+> +		set_bit(chan->channel->scan_index, buf->buffer.scan_mask);
+> +		chan++;
+> +	}
+> +
+> +	return hwc;
+> +
+> +err_put_buffers:
+> +	list_for_each_entry(buf, &hwc->buffers, head)
+> +		iio_buffer_put(&buf->buffer);
+> +	iio_channel_release_all(hwc->channels);
+> +err_free_hwc:
+> +	kfree(hwc);
+> +	return ERR_PTR(ret);
+> +}
+> +EXPORT_SYMBOL_GPL(iio_hw_consumer_alloc);
+> +
+> +void iio_hw_consumer_free(struct iio_hw_consumer *hwc)
+> +{
+> +	struct hw_consumer_buffer *buf;
+> +
+> +	iio_channel_release_all(hwc->channels);
+> +	list_for_each_entry(buf, &hwc->buffers, head)
+> +		iio_buffer_put(&buf->buffer);
+> +	kfree(hwc);
+> +}
+> +EXPORT_SYMBOL_GPL(iio_hw_consumer_free);
+> +
+> +int iio_hw_consumer_enable(struct iio_hw_consumer *hwc)
+> +{
+> +	struct hw_consumer_buffer *buf;
+> +	int ret;
+> +
+> +	list_for_each_entry(buf, &hwc->buffers, head) {
+> +		ret = iio_update_buffers(buf->indio_dev, &buf->buffer, NULL);
+> +		if (ret)
+> +			goto err_disable_buffers;
+> +	}
+> +
+> +	return 0;
+> +
+> +err_disable_buffers:
+> +	list_for_each_entry_continue_reverse(buf, &hwc->buffers, head)
+> +		iio_update_buffers(buf->indio_dev, NULL, &buf->buffer);
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(iio_hw_consumer_enable);
+> +
+> +void iio_hw_consumer_disable(struct iio_hw_consumer *hwc)
+> +{
+> +	struct hw_consumer_buffer *buf;
+> +
+> +	list_for_each_entry(buf, &hwc->buffers, head)
+> +		iio_update_buffers(buf->indio_dev, NULL, &buf->buffer);
+> +}
+> +EXPORT_SYMBOL_GPL(iio_hw_consumer_disable);
+> diff --git a/include/linux/iio/hw_consumer.h b/include/linux/iio/hw_consumer.h
+> new file mode 100644
+> index 0000000..f12653d
+> --- /dev/null
+> +++ b/include/linux/iio/hw_consumer.h
+> @@ -0,0 +1,12 @@
+> +#ifndef LINUX_IIO_HW_CONSUMER_BUFFER_H
+> +#define LINUX_IIO_HW_CONSUMER_BUFFER_H
+> +
+> +struct device;
+> +struct iio_hw_consumer;
+> +
+> +struct iio_hw_consumer *iio_hw_consumer_alloc(struct device *dev);
+> +void iio_hw_consumer_free(struct iio_hw_consumer *hwc);
+> +int iio_hw_consumer_enable(struct iio_hw_consumer *hwc);
+> +void iio_hw_consumer_disable(struct iio_hw_consumer *hwc);
+> +
+> +#endif
 > 
-> > From: Russell King <rmk+kernel@armlinux.org.uk>
-> >
-> > Add the three required clocks for the MDIO interface to be functional
-> 
-> You should also maybe update the commit log and speaking of two clocks
-> as you removed the third one.
-
-When I came up with the patch, I tried to find the minimum number of
-clocks, and it seemed to be the three that were in my original commit.
-
-If people are finding that without the patch, they see hangs, but this
-iteration of the patch fixes it for them, then that's good.
-
-However, with Thomas' comment after my sign-off, I don't think there's
-a need to update the commit text - that comment explains that there
-were originally three clocks, and it's now reduced down to two.  It
-also indicates that the patch has been modified.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
