@@ -1,40 +1,57 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Tue,  6 Jun 2017 02:53:59 +0200
-Subject: [PATCH v4 01/28] dt-bindings: Add vendor prefix for Actions Semi
+Date: Tue,  6 Jun 2017 02:54:00 +0200
+Subject: [PATCH v4 02/28] dt-bindings: arm: Document Actions Semi S500
 In-Reply-To: <20170606005426.26446-1-afaerber@suse.de>
 References: <20170606005426.26446-1-afaerber@suse.de>
-Message-ID: <20170606005426.26446-2-afaerber@suse.de>
+Message-ID: <20170606005426.26446-3-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Actions Semiconductor was listed on NASDAQ as ACTS until Dec 16, 2016.
+The Actions Semi S500 is a quad-core ARM Cortex-A9 SoC.
+The LeMaker Guitar is an SODIMM-format module with that SoC.
 
-Cc: mp-cs at actions-semi.com
 Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- v3 -> v4: Unchanged
- 
- v2 -> v3:
- * Fixed sort order after rename
+ v2 -> v3 -> v4: unchanged
  
  v1 -> v2:
- * Reverted from "acts" to "actions" (cf. IAP140 "mrvl" vs. "marvell")
+ * Adopted "actions" vendor prefix
+ * Extended text
  
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/arm/actions.txt | 24 +++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/actions.txt
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index d808f24af949..3b02d90e2003 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -5,6 +5,7 @@ using them to avoid name-space collisions.
- 
- abcn	Abracon Corporation
- abilis	Abilis Systems
-+actions	Actions Semiconductor Co., Ltd.
- active-semi	Active-Semi International Inc
- ad	Avionic Design GmbH
- adapteva	Adapteva, Inc.
+diff --git a/Documentation/devicetree/bindings/arm/actions.txt b/Documentation/devicetree/bindings/arm/actions.txt
+new file mode 100644
+index 000000000000..1d3782e41b00
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/actions.txt
+@@ -0,0 +1,24 @@
++Actions Semi platforms device tree bindings
++-------------------------------------------
++
++
++S500 SoC
++========
++
++Required root node properties:
++
++ - compatible :  must contain "actions,s500"
++
++
++Modules:
++
++Root node property compatible must contain, depending on module:
++
++ - LeMaker Guitar: "lemaker,guitar"
++
++
++Boards:
++
++Root node property compatible must contain, depending on board:
++
++ - LeMaker Guitar Base Board rev. B: "lemaker,guitar-bb-rev-b", "lemaker,guitar"
 -- 
 2.12.3
