@@ -1,59 +1,46 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Tue, 6 Jun 2017 14:23:05 +0000
-Subject: [PATCH v4 10/10] staging: fsl-mc: move bus driver out of staging
-In-Reply-To: <20170606142014.GA19404@kroah.com>
-References: <20170531105852.22304-1-laurentiu.tudor@nxp.com>
- <20170531105852.22304-11-laurentiu.tudor@nxp.com>
- <20170603084027.GA10784@kroah.com>
- <VI1PR0401MB1856DBA58830206CC7DFC18DECCB0@VI1PR0401MB1856.eurprd04.prod.outlook.com>
- <20170606142014.GA19404@kroah.com>
-Message-ID: <VI1PR0401MB185693EC5052C02CEE5D10A0ECCB0@VI1PR0401MB1856.eurprd04.prod.outlook.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 6 Jun 2017 07:24:35 -0700
+Subject: [PATCH] net: mvpp2: do not bypass the mvpp22_port_mii_set function
+In-Reply-To: <20170606135148.GA22618@kwain.lan>
+References: <20170606133615.20747-1-antoine.tenart@free-electrons.com>
+ <20170606154535.3e87bafb@free-electrons.com>
+ <20170606135148.GA22618@kwain.lan>
+Message-ID: <9ef70606-0918-fc4f-535b-dd1fc3475cb6@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 06/06/2017 06:51 AM, Antoine Tenart wrote:
+> Hello Thomas,
+> 
+> On Tue, Jun 06, 2017 at 03:45:35PM +0200, Thomas Petazzoni wrote:
+>> On Tue,  6 Jun 2017 15:36:15 +0200, Antoine Tenart wrote:
+>>> The mvpp22_port_mii_set() function was added by 2697582144dd, but the
+>>> function directly returns without doing anything. This return was used
+>>> when debugging and wasn't removed before sending the patch. Fix this.
+>>>
+>>> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+>>
+>> Please add:
+>>
+>> Fixes: 2697582144dd ("net: mvpp2: handle misc PPv2.1/PPv2.2 differences")
+>>
+>> with this:
+>>
+>> Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> 
+> OK, will do.
+> 
+>> I am wondering if we shouldn't Cc: stable as well. I don't think we
+>> have seen issues on our side because U-Boot does the necessary
+>> initialization, but people using other bootloaders might have issues.
+> 
+> Yes, that might be safer to cc stable. I'll do this as well.
 
+David queues network patches for stable provided that you submit those
+against his "net" tree [1] and there is an appropriate Fixes tag (which
+Thomas provided).
 
-> -----Original Message-----
-> From: Greg KH [mailto:gregkh at linuxfoundation.org]
-> Sent: Tuesday, June 06, 2017 5:20 PM
-> To: Laurentiu Tudor <laurentiu.tudor@nxp.com>
-> 
-> On Tue, Jun 06, 2017 at 02:03:44PM +0000, Laurentiu Tudor wrote:
-> > Hi Greg,
-> >
-> > > -----Original Message-----
-> > > From: Greg KH [mailto:gregkh at linuxfoundation.org]
-> > > Sent: Saturday, June 03, 2017 11:40 AM
-> > >
-> > > On Wed, May 31, 2017 at 01:58:52PM +0300, laurentiu.tudor at nxp.com
-> wrote:
-> > > > From: Stuart Yoder <stuart.yoder@nxp.com>
-> > >
-> > > Your subject says 'v4' yet the other patches here in the series do
-> > > not, they say nothing, or 'v2', and the 0/10 patch says 'v6'!
-> >
-> > I'm tracking the patch versions individually and use the cover letter
-> > version (v6 currently) to reflect the version of the patch series as a
-> > whole. There are a bunch of patches that are either newly introduced in this
-> series or didn't had multiple versions so I didn't tagged them with a version tag.
-> > The patch [10/10] didn't changed since v4 so I left the version
-> > unchanged. The only change was in patch [07/10] for which I added a commit
-> message so I bumped the version to v2.
-> 
-> And that's totally crazy.  What do you expect me, or anyone else, to know what
-> to do with that.  Heck, I can't even sort them by proper order in which to apply
-> them in, if I wanted to.  You are keeping me from actually using your work :(
-> 
-> > > Please fix up and do this correctly.  The _whole_ patch series is
-> > > versioned, otherwise how can I sort them to apply them in the correct order?
-> >
-> > Want me to tag all the patches with the same version (that is, v7 for
-> > the next respin)?
-> 
-> Yes, like everyone else does please :)
-> 
-
-Ok, finally got it. :-) Will do so in the next spin.
-
----
-Thanks & Best Regards, Laurentiu
+[1]:
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/networking/netdev-FAQ.txt#n114
+-- 
+Florian
