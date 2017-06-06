@@ -1,31 +1,51 @@
-From: varada@codeaurora.org (varada at codeaurora.org)
-Date: Tue, 06 Jun 2017 16:01:43 +0530
-Subject: [PATCH v3 2/5] dt-bindings: qcom: Add IPQ8074 bindings
-In-Reply-To: <20170605165414.zbcwbvto77awdk45@rob-hp-laptop>
-References: <1496316482-25468-1-git-send-email-varada@codeaurora.org>
- <1496316482-25468-3-git-send-email-varada@codeaurora.org>
- <20170605165414.zbcwbvto77awdk45@rob-hp-laptop>
-Message-ID: <a6e380b57702b182cde8dc5317511e58@codeaurora.org>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Tue, 6 Jun 2017 10:35:38 +0000
+Subject: [PATCH 2/4] ARM: shmobile: document iW-RainboW-G20D-Qseven-RZG1M
+ board
+In-Reply-To: <CAMuHMdUHetaZMhfxBXF-1y0yv5UdUQrxH7NpkUfymty5hs_7EQ@mail.gmail.com>
+References: <1496420523-23506-1-git-send-email-biju.das@bp.renesas.com>
+ <1496420523-23506-3-git-send-email-biju.das@bp.renesas.com>
+ <CAMuHMdUHetaZMhfxBXF-1y0yv5UdUQrxH7NpkUfymty5hs_7EQ@mail.gmail.com>
+Message-ID: <KL1PR06MB1702F51A1FE7A965C0EC9FEBB8CB0@KL1PR06MB1702.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-06-05 22:24, Rob Herring wrote:
-> On Thu, Jun 01, 2017 at 04:57:59PM +0530, Varadarajan Narayanan wrote:
->> Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
->> ---
->>  Documentation/devicetree/bindings/arm/qcom.txt | 2 ++
->>  1 file changed, 2 insertions(+)
-> 
-> I acked v2. Please add acks when posting new versions.
-> 
+> On Fri, Jun 2, 2017 at 6:22 PM, Biju Das <biju.das@bp.renesas.com> wrote:
+> > Document the iW-RainboW-G20D-Qseven-RZG1M device tree bindings,
+> > listing it as a supported board.
+> >
+> > This allows to use checkpatch.pl to validate .dts files referring to
+> > the iW-RainboW-G20D-Qseven-RZG1M board.
+>
+> Thanks for your patch!
+>
+> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> > Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+>
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>
+> > --- a/Documentation/devicetree/bindings/arm/shmobile.txt
+> > +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+> > @@ -69,6 +69,8 @@ Boards:
+> >      compatible = "renesas,kzm9d", "renesas,emev2"
+> >    - Kyoto Microcomputer Co. KZM-A9-GT
+> >      compatible = "renesas,kzm9g", "renesas,sh73a0"
+> > +  - iWave Systems RZ/G1M Qseven Development Platform (iW-RainboW-
+> G20D-Qseven)
+> > +    compatible = "iwave,g20d", "renesas,r8a7743"
+>
+> Please keep the list sorted alphabetically.
 
-Sorry for missing that here. I posted V4 to which I added.
+Thanks for the input. I will correct it.
 
-Varada
+> >    - Lager (RTP0RC7790SEB00010S)
+> >      compatible = "renesas,lager", "renesas,r8a7790"
+> >    - M3ULCB (R-Car Starter Kit Pro, RTP0RC7796SKB00010S)
 
-> Rob
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Regards,
+Biju
+
+
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
