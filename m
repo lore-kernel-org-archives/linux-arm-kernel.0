@@ -1,111 +1,176 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue,  6 Jun 2017 16:37:41 -0700
-Subject: [PATCH v2 4/4] [media] davinci: vpif: adaptions for DT support
+Date: Tue,  6 Jun 2017 16:37:40 -0700
+Subject: [PATCH v2 3/4] [media] davinci: vpif_capture: cleanup raw camera
+ support
 In-Reply-To: <20170606233741.26718-1-khilman@baylibre.com>
 References: <20170606233741.26718-1-khilman@baylibre.com>
-Message-ID: <20170606233741.26718-5-khilman@baylibre.com>
+Message-ID: <20170606233741.26718-4-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The davinci VPIF is a single hardware block, but the existing driver
-is broken up into a common library (vpif.c), output (vpif_display.c) and
-intput (vpif_capture.c).
+The current driver has a handful of hard-coded assumptions based on its
+primary use for capture of video signals.  Cleanup those assumptions,
+and also query the subdev for format information and use that if
+available.
 
-When migrating to DT, to better model the hardware, and because
-registers, interrupts, etc. are all common,it was decided to
-have a single VPIF hardware node[1].
+Tested with 10-bit raw bayer input (SGRBG10) using the aptina,mt9v032
+sensor, and also tested that composite video input still works from
+ti,tvp514x decoder.  Both tests done on the da850-evm board with the
+add-on UI board.
 
-Because davinci uses legacy, non-DT boot on several SoCs still, the
-platform_drivers need to remain.  But they are also needed in DT boot.
-Since there are no DT nodes for the display/capture parts in DT
-boot (there is a single node for the parent/common device) we need to
-create platform_devices somewhere to instansiate the platform_drivers.
-
-When VPIF display/capture are needed for a DT boot, the VPIF node
-will have endpoints defined for its subdevs.  Therefore, vpif_probe()
-checks for the presence of endpoints, and if detected manually creates
-the platform_devices for the display and capture platform_drivers.
-
-[1] Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+NOTE: Will need further testing for other sensors with different bus
+formats.
 
 Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 ---
- drivers/media/platform/davinci/vpif.c | 49 ++++++++++++++++++++++++++++++++++-
- 1 file changed, 48 insertions(+), 1 deletion(-)
+ drivers/media/platform/davinci/vpif_capture.c | 82 ++++++++++++++++++++++++++-
+ 1 file changed, 80 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/media/platform/davinci/vpif.c b/drivers/media/platform/davinci/vpif.c
-index 1b02a6363f77..502917abcb13 100644
---- a/drivers/media/platform/davinci/vpif.c
-+++ b/drivers/media/platform/davinci/vpif.c
-@@ -26,6 +26,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/spinlock.h>
- #include <linux/v4l2-dv-timings.h>
-+#include <linux/of_graph.h>
+diff --git a/drivers/media/platform/davinci/vpif_capture.c b/drivers/media/platform/davinci/vpif_capture.c
+index b9d927d1e5a8..67624dbf1272 100644
+--- a/drivers/media/platform/davinci/vpif_capture.c
++++ b/drivers/media/platform/davinci/vpif_capture.c
+@@ -24,6 +24,9 @@
+ #include <media/v4l2-ioctl.h>
+ #include <media/v4l2-of.h>
+ #include <media/i2c/tvp514x.h>
++#include <media/v4l2-mediabus.h>
++
++#include <linux/videodev2.h>
  
  #include "vpif.h"
+ #include "vpif_capture.h"
+@@ -387,7 +390,8 @@ static irqreturn_t vpif_channel_isr(int irq, void *dev_id)
+ 		common = &ch->common[i];
+ 		/* skip If streaming is not started in this channel */
+ 		/* Check the field format */
+-		if (1 == ch->vpifparams.std_info.frm_fmt) {
++		if (1 == ch->vpifparams.std_info.frm_fmt ||
++		    common->fmt.fmt.pix.field == V4L2_FIELD_NONE) {
+ 			/* Progressive mode */
+ 			spin_lock(&common->irqlock);
+ 			if (list_empty(&common->dma_queue)) {
+@@ -468,9 +472,38 @@ static int vpif_update_std_info(struct channel_obj *ch)
+ 	struct vpif_channel_config_params *std_info = &vpifparams->std_info;
+ 	struct video_obj *vid_ch = &ch->video;
+ 	int index;
++	struct v4l2_pix_format *pixfmt = &common->fmt.fmt.pix;
  
-@@ -423,7 +424,9 @@ EXPORT_SYMBOL(vpif_channel_getfid);
+ 	vpif_dbg(2, debug, "vpif_update_std_info\n");
  
- static int vpif_probe(struct platform_device *pdev)
- {
--	static struct resource	*res;
-+	static struct resource	*res, *res_irq;
-+	struct platform_device *pdev_capture, *pdev_display;
-+	struct device_node *endpoint = NULL;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	vpif_base = devm_ioremap_resource(&pdev->dev, res);
-@@ -435,6 +438,50 @@ static int vpif_probe(struct platform_device *pdev)
- 
- 	spin_lock_init(&vpif_lock);
- 	dev_info(&pdev->dev, "vpif probe success\n");
-+
 +	/*
-+	 * If VPIF Node has endpoints, assume "new" DT support,
-+	 * where capture and display drivers don't have DT nodes
-+	 * so their devices need to be registered manually here
-+	 * for their legacy platform_drivers to work.
++	 * if called after try_fmt or g_fmt, there will already be a size
++	 * so use that by default.
 +	 */
-+	endpoint = of_graph_get_next_endpoint(pdev->dev.of_node,
-+					      endpoint);
-+	if (!endpoint) 
-+		return 0;
++	if (pixfmt->width && pixfmt->height) {
++		if (pixfmt->field == V4L2_FIELD_ANY ||
++		    pixfmt->field == V4L2_FIELD_NONE)
++			pixfmt->field = V4L2_FIELD_NONE;
++		
++		vpifparams->iface.if_type = VPIF_IF_BT656;
++		if (pixfmt->pixelformat == V4L2_PIX_FMT_SGRBG10 ||
++		    pixfmt->pixelformat == V4L2_PIX_FMT_SBGGR8)
++			vpifparams->iface.if_type = VPIF_IF_RAW_BAYER;
 +
-+	/*
-+	 * For DT platforms, manually create platform_devices for
-+	 * capture/display drivers.
-+	 */
-+	res_irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-+	if (!res_irq) {
-+		dev_warn(&pdev->dev, "Missing IRQ resource.\n");
-+		return -EINVAL;
++		if (pixfmt->pixelformat == V4L2_PIX_FMT_SGRBG10)
++			vpifparams->params.data_sz = 1; /* 10 bits/pixel.  */
++
++		/* 
++		 * For raw formats from camera sensors, we don't need 
++		 * the std_info from table lookup, so nothing else to do here.
++		 */
++		if (vpifparams->iface.if_type == VPIF_IF_RAW_BAYER) {
++			memset(std_info, 0, sizeof(struct vpif_channel_config_params));
++			vpifparams->std_info.capture_format = 1; /* CCD/raw mode */
++			return 0;
++		}
 +	}
 +
-+	pdev_capture = devm_kzalloc(&pdev->dev, sizeof(*pdev_capture),
-+				    GFP_KERNEL);
-+	pdev_capture->name = "vpif_capture";
-+	pdev_capture->id = -1;
-+	pdev_capture->resource = res_irq;
-+	pdev_capture->num_resources = 1;
-+	pdev_capture->dev.dma_mask = pdev->dev.dma_mask;
-+	pdev_capture->dev.coherent_dma_mask = pdev->dev.coherent_dma_mask;
-+	pdev_capture->dev.parent = &pdev->dev;
-+	platform_device_register(pdev_capture);
-+
-+	pdev_display = devm_kzalloc(&pdev->dev, sizeof(*pdev_display),
-+				    GFP_KERNEL);
-+	pdev_display->name = "vpif_display";
-+	pdev_display->id = -1;
-+	pdev_display->resource = res_irq;
-+	pdev_display->num_resources = 1;
-+	pdev_display->dev.dma_mask = pdev->dev.dma_mask;
-+	pdev_display->dev.coherent_dma_mask = pdev->dev.coherent_dma_mask;
-+	pdev_display->dev.parent = &pdev->dev;
-+	platform_device_register(pdev_display);
+ 	for (index = 0; index < vpif_ch_params_count; index++) {
+ 		config = &vpif_ch_params[index];
+ 		if (config->hd_sd == 0) {
+@@ -939,6 +972,7 @@ static int vpif_try_fmt_vid_cap(struct file *file, void *priv,
+ 	struct v4l2_pix_format *pixfmt = &fmt->fmt.pix;
+ 	struct common_obj *common = &(ch->common[VPIF_VIDEO_INDEX]);
+ 
++	common->fmt = *fmt;
+ 	vpif_update_std_info(ch);
+ 
+ 	pixfmt->field = common->fmt.fmt.pix.field;
+@@ -947,8 +981,17 @@ static int vpif_try_fmt_vid_cap(struct file *file, void *priv,
+ 	pixfmt->width = common->fmt.fmt.pix.width;
+ 	pixfmt->height = common->fmt.fmt.pix.height;
+ 	pixfmt->sizeimage = pixfmt->bytesperline * pixfmt->height * 2;
++	if (pixfmt->pixelformat == V4L2_PIX_FMT_SGRBG10) {
++		pixfmt->bytesperline = common->fmt.fmt.pix.width * 2;
++		pixfmt->sizeimage = pixfmt->bytesperline * pixfmt->height;
++	}
+ 	pixfmt->priv = 0;
+ 
++	dev_dbg(vpif_dev, "%s: %d x %d; pitch=%d pixelformat=0x%08x, field=%d, size=%d\n", __func__,
++		pixfmt->width, pixfmt->height,
++		pixfmt->bytesperline, pixfmt->pixelformat,
++		pixfmt->field, pixfmt->sizeimage);
 +
  	return 0;
  }
  
+@@ -965,13 +1008,47 @@ static int vpif_g_fmt_vid_cap(struct file *file, void *priv,
+ 	struct video_device *vdev = video_devdata(file);
+ 	struct channel_obj *ch = video_get_drvdata(vdev);
+ 	struct common_obj *common = &ch->common[VPIF_VIDEO_INDEX];
++	struct v4l2_pix_format *pix_fmt = &fmt->fmt.pix;
++	struct v4l2_subdev_format format = {
++		.which = V4L2_SUBDEV_FORMAT_ACTIVE,
++	};
++	struct v4l2_mbus_framefmt *mbus_fmt = &format.format;
++	int ret;
+ 
+ 	/* Check the validity of the buffer type */
+ 	if (common->fmt.type != fmt->type)
+ 		return -EINVAL;
+ 
+-	/* Fill in the information about format */
++	/* By default, use currently set fmt */
+ 	*fmt = common->fmt;
++	
++	/* If subdev has get_fmt, use that to override */
++	ret = v4l2_subdev_call(ch->sd, pad, get_fmt, NULL, &format);
++	if (!ret && mbus_fmt->code) {
++		v4l2_fill_pix_format(pix_fmt, mbus_fmt);
++		pix_fmt->bytesperline = pix_fmt->width;
++		if (mbus_fmt->code == MEDIA_BUS_FMT_SGRBG10_1X10) {
++			/* e.g. mt9v032 */
++			pix_fmt->pixelformat = V4L2_PIX_FMT_SGRBG10;
++			pix_fmt->bytesperline = pix_fmt->width * 2;
++		} else if (mbus_fmt->code == MEDIA_BUS_FMT_UYVY8_2X8) {
++			/* e.g. tvp514x */
++			pix_fmt->pixelformat = V4L2_PIX_FMT_NV16;
++			pix_fmt->bytesperline = pix_fmt->width * 2;
++		} else {
++			dev_warn(vpif_dev, "%s: Unhandled media-bus format 0x%x\n",
++				 __func__, mbus_fmt->code);
++		}
++		pix_fmt->sizeimage = pix_fmt->bytesperline * pix_fmt->height;
++		dev_dbg(vpif_dev, "%s: %d x %d; pitch=%d, pixelformat=0x%08x, code=0x%x, field=%d, size=%d\n", __func__,
++			pix_fmt->width, pix_fmt->height,
++			pix_fmt->bytesperline, pix_fmt->pixelformat, 
++			mbus_fmt->code, pix_fmt->field, pix_fmt->sizeimage);
++
++		common->fmt = *fmt;
++		vpif_update_std_info(ch);
++	}
++
+ 	return 0;
+ }
+ 
+@@ -1358,6 +1435,7 @@ static int vpif_probe_complete(void)
+ 		/* set initial format */
+ 		ch->video.stdid = V4L2_STD_525_60;
+ 		memset(&ch->video.dv_timings, 0, sizeof(ch->video.dv_timings));
++		common->fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+ 		vpif_update_std_info(ch);
+ 
+ 		/* Initialize vb2 queue */
 -- 
 2.9.3
