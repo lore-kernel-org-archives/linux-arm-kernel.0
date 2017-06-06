@@ -1,85 +1,40 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 6 Jun 2017 14:57:42 +0100
-Subject: [PATCH v2 10/25] KVM: arm64: vgic-v3: Add ICV_HPPIR1_EL1 handler
-In-Reply-To: <20170606115130.GM9464@cbox>
-References: <20170601102117.17750-1-marc.zyngier@arm.com>
- <20170601102117.17750-11-marc.zyngier@arm.com> <20170606115130.GM9464@cbox>
-Message-ID: <88dd9993-79ec-31bd-e49d-4049656bc525@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 6 Jun 2017 14:58:18 +0100
+Subject: [RFC PATCH v2 4/6] arm64: signal: Allocate extra sigcontext
+ space as needed
+In-Reply-To: <20170606113739.GF30160@e103592.cambridge.arm.com>
+References: <1492016239-19511-1-git-send-email-Dave.Martin@arm.com>
+ <1492016495-19689-1-git-send-email-Dave.Martin@arm.com>
+ <1492016495-19689-4-git-send-email-Dave.Martin@arm.com>
+ <20170512165724.GB8387@e104818-lin.cambridge.arm.com>
+ <20170515132442.GB3559@e103592.cambridge.arm.com>
+ <20170523113019.GB5948@e104818-lin.cambridge.arm.com>
+ <20170526113729.GO3559@e103592.cambridge.arm.com>
+ <20170605141744.GB9163@e104818-lin.cambridge.arm.com>
+ <20170606113739.GF30160@e103592.cambridge.arm.com>
+Message-ID: <20170606135815.GG30160@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/17 12:51, Christoffer Dall wrote:
-> On Thu, Jun 01, 2017 at 11:21:02AM +0100, Marc Zyngier wrote:
->> Add a handler for reading the guest's view of the ICV_HPPIR1_EL1
->> register. This is a simple parsing of the available LRs, extracting the
->> highest available interrupt.
->>
->> Reviewed-by: Eric Auger <eric.auger@redhat.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/include/asm/sysreg.h |  1 +
->>  virt/kvm/arm/hyp/vgic-v3-sr.c   | 23 +++++++++++++++++++++++
->>  2 files changed, 24 insertions(+)
->>
->> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
->> index aad46b8eea5e..bd000686194a 100644
->> --- a/arch/arm64/include/asm/sysreg.h
->> +++ b/arch/arm64/include/asm/sysreg.h
->> @@ -185,6 +185,7 @@
->>  #define SYS_ICC_SGI1R_EL1		sys_reg(3, 0, 12, 11, 5)
->>  #define SYS_ICC_IAR1_EL1		sys_reg(3, 0, 12, 12, 0)
->>  #define SYS_ICC_EOIR1_EL1		sys_reg(3, 0, 12, 12, 1)
->> +#define SYS_ICC_HPPIR1_EL1		sys_reg(3, 0, 12, 12, 2)
->>  #define SYS_ICC_BPR1_EL1		sys_reg(3, 0, 12, 12, 3)
->>  #define SYS_ICC_CTLR_EL1		sys_reg(3, 0, 12, 12, 4)
->>  #define SYS_ICC_SRE_EL1			sys_reg(3, 0, 12, 12, 5)
->> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
->> index d4f07f84602d..f0bc711db258 100644
->> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
->> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
->> @@ -772,6 +772,26 @@ static void __hyp_text __vgic_v3_write_apxr3(struct kvm_vcpu *vcpu,
->>  	__vgic_v3_write_apxrn(vcpu, rt, 3);
->>  }
->>  
->> +static void __hyp_text __vgic_v3_read_hppir(struct kvm_vcpu *vcpu,
->> +					    u32 vmcr, int rt)
->> +{
->> +	u64 lr_val;
->> +	int lr, lr_grp, grp;
->> +
->> +	grp = __vgic_v3_get_group(vcpu);
->> +
->> +	lr = __vgic_v3_highest_priority_lr(vcpu, vmcr, &lr_val);
->> +	if (lr == -1)
->> +		goto spurious;
->> +
->> +	lr_grp = !!(lr_val & ICH_LR_GROUP);
->> +	if (lr_grp != grp)
->> +		lr_val = ICC_IAR1_EL1_SPURIOUS;
+On Tue, Jun 06, 2017 at 12:37:53PM +0100, Dave Martin wrote:
+> On Mon, Jun 05, 2017 at 03:17:44PM +0100, Catalin Marinas wrote:
+
+[...]
+
+[extra_context.size]
+
+> > I'd rather have the time size_t or __u64 to avoid implicit padding.
 > 
-> I don't get this.  The spec says that the special INTID 1023
->   "...is returned in response to an interrupt acknowledge, if there is
->    no pending interrupt with sufficient priority for it to be signaled to
->    the PE, or if the highest priority pending interrupt is not
->    appropriate for the:
->     * Current Security state.  Interrupt group that is associated with
->     * the System register."
-> 
-> So do we just take this to imply that it also covers the HPPIRx_EL1
-> registers (despite them being mentioned explicitly for the other special
-> INTIDs) or is there some other piece of spec I'm missing here?
+> Sure, it can be a u64.  I wanted to avoid the suggestion that the frame
+> should be that large, but 32 bits already allows it to be crazy large
+> anyway, so I don't think making it 32-bit helps.
 
-Here's what the ICV_HPPIRx_EL1 INTID description says:
+Actually, there is still implicit padding even with u64, since the total
+size is 16 bytes + sizeof(extra_context.size).
 
-"If the highest priority pending interrupt is not observable, this field
-contains a special INTID to indicate the reason. This special INTID can
-take the value 1023 only."
+Since u64 is much bigger then we'd ever want, and to avoid introducing
+new bugs, do you object to keeping size as u32 and adding explicit
+padding instead?
 
-Yes, the disparity between ICC_HPPIRx_EL1 and ICV_HPPIRx_EL1 is very
-confusing and makes me want to shout at people.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Cheers
+---Dave
