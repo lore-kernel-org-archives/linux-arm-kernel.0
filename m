@@ -1,858 +1,178 @@
-From: hotran@apm.com (Hoan Tran)
-Date: Tue,  6 Jun 2017 11:02:26 -0700
-Subject: [PATCH v3 3/3] perf: xgene: Add support for SoC PMU version 3
-In-Reply-To: <1496772146-11084-1-git-send-email-hotran@apm.com>
-References: <1496772146-11084-1-git-send-email-hotran@apm.com>
-Message-ID: <1496772146-11084-4-git-send-email-hotran@apm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 6 Jun 2017 20:05:59 +0200
+Subject: [PATCH 46/58] clocksource/drivers: Add a new driver for the
+ Atmel ARM TC blocks
+In-Reply-To: <20170606152104.GC2345@mai>
+References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
+ <20170530215139.9983-47-alexandre.belloni@free-electrons.com>
+ <20170606152104.GC2345@mai>
+Message-ID: <20170606180559.pkrr7ux2qqnmsd6y@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for SoC-wide (AKA uncore) Performance Monitoring
-Unit version 3.
+On 06/06/2017 at 17:21:05 +0200, Daniel Lezcano wrote:
+> On Tue, May 30, 2017 at 11:51:27PM +0200, Alexandre Belloni wrote:
+> > Add a driver for the Atmel Timer Counter Blocks. This driver provides a
+> > clocksource and a clockevent device. The clockevent device is linked to the
+> > clocksource counter and so it will run at the same frequency.
+> 
+> Where is the clockevent in this driver?
+> 
 
-It can support up to
- - 2 IOB PMU instances
- - 8 L3C PMU instances
- - 2 MCB PMU instances
- - 8 MCU PMU instances
-and these PMUs support 64 bit counter
+That's a leftover from v1, it seems I forgot to rework that commit
+message.
 
-Signed-off-by: Hoan Tran <hotran@apm.com>
----
- drivers/perf/xgene_pmu.c | 558 ++++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 529 insertions(+), 29 deletions(-)
+> It seems the cutting out of this driver is a bit fuzzy and hard to follow.
+> 
+> Please re-org the changes in a logical manner when resubmitting.
+> 
 
-diff --git a/drivers/perf/xgene_pmu.c b/drivers/perf/xgene_pmu.c
-index f34fc78..84c32e0 100644
---- a/drivers/perf/xgene_pmu.c
-+++ b/drivers/perf/xgene_pmu.c
-@@ -37,6 +37,8 @@
- 
- #define CSW_CSWCR                       0x0000
- #define  CSW_CSWCR_DUALMCB_MASK         BIT(0)
-+#define  CSW_CSWCR_MCB0_ROUTING(x)	(((x) & 0x0C) >> 2)
-+#define  CSW_CSWCR_MCB1_ROUTING(x)	(((x) & 0x30) >> 4)
- #define MCBADDRMR                       0x0000
- #define  MCBADDRMR_DUALMCU_MODE_MASK    BIT(2)
- 
-@@ -50,8 +52,17 @@
- #define  PCPPMU_INT_L3C		BIT(2)
- #define  PCPPMU_INT_IOB		BIT(3)
- 
-+#define  PCPPMU_V3_INTMASK	0x00FF33FF
-+#define  PCPPMU_V3_INTENMASK	0xFFFFFFFF
-+#define  PCPPMU_V3_INTCLRMASK	0xFF00CC00
-+#define  PCPPMU_V3_INT_MCU	0x000000FF
-+#define  PCPPMU_V3_INT_MCB	0x00000300
-+#define  PCPPMU_V3_INT_L3C	0x00FF0000
-+#define  PCPPMU_V3_INT_IOB	0x00003000
-+
- #define PMU_MAX_COUNTERS	4
--#define PMU_CNT_MAX_PERIOD	0x100000000ULL
-+#define PMU_CNT_MAX_PERIOD	0xFFFFFFFFULL
-+#define PMU_V3_CNT_MAX_PERIOD	0xFFFFFFFFFFFFFFFFULL
- #define PMU_OVERFLOW_MASK	0xF
- #define PMU_PMCR_E		BIT(0)
- #define PMU_PMCR_P		BIT(1)
-@@ -73,6 +84,10 @@
- #define PMU_PMOVSR		0xC80
- #define PMU_PMCR		0xE04
- 
-+/* PMU registers for V3 */
-+#define PMU_PMOVSCLR		0xC80
-+#define PMU_PMOVSSET		0xCC0
-+
- #define to_pmu_dev(p)     container_of(p, struct xgene_pmu_dev, pmu)
- #define GET_CNTR(ev)      (ev->hw.idx)
- #define GET_EVENTID(ev)   (ev->hw.config & 0xFFULL)
-@@ -119,6 +134,7 @@ struct xgene_pmu {
- 	void __iomem *pcppmu_csr;
- 	u32 mcb_active_mask;
- 	u32 mc_active_mask;
-+	u32 l3c_active_mask;
- 	cpumask_t cpu;
- 	raw_spinlock_t lock;
- 	const struct xgene_pmu_ops *ops;
-@@ -143,11 +159,13 @@ struct xgene_pmu_data {
- enum xgene_pmu_version {
- 	PCP_PMU_V1 = 1,
- 	PCP_PMU_V2,
-+	PCP_PMU_V3,
- };
- 
- enum xgene_pmu_dev_type {
- 	PMU_TYPE_L3C = 0,
- 	PMU_TYPE_IOB,
-+	PMU_TYPE_IOB_SLOW,
- 	PMU_TYPE_MCB,
- 	PMU_TYPE_MC,
- };
-@@ -213,6 +231,56 @@ static ssize_t xgene_pmu_format_show(struct device *dev,
- 	.attrs = mc_pmu_format_attrs,
- };
- 
-+static struct attribute *l3c_pmu_v3_format_attrs[] = {
-+	XGENE_PMU_FORMAT_ATTR(l3c_eventid, "config:0-39"),
-+	NULL,
-+};
-+
-+static struct attribute *iob_pmu_v3_format_attrs[] = {
-+	XGENE_PMU_FORMAT_ATTR(iob_eventid, "config:0-47"),
-+	NULL,
-+};
-+
-+static struct attribute *iob_slow_pmu_v3_format_attrs[] = {
-+	XGENE_PMU_FORMAT_ATTR(iob_slow_eventid, "config:0-16"),
-+	NULL,
-+};
-+
-+static struct attribute *mcb_pmu_v3_format_attrs[] = {
-+	XGENE_PMU_FORMAT_ATTR(mcb_eventid, "config:0-35"),
-+	NULL,
-+};
-+
-+static struct attribute *mc_pmu_v3_format_attrs[] = {
-+	XGENE_PMU_FORMAT_ATTR(mc_eventid, "config:0-44"),
-+	NULL,
-+};
-+
-+static const struct attribute_group l3c_pmu_v3_format_attr_group = {
-+	.name = "format",
-+	.attrs = l3c_pmu_v3_format_attrs,
-+};
-+
-+static const struct attribute_group iob_pmu_v3_format_attr_group = {
-+	.name = "format",
-+	.attrs = iob_pmu_v3_format_attrs,
-+};
-+
-+static const struct attribute_group iob_slow_pmu_v3_format_attr_group = {
-+	.name = "format",
-+	.attrs = iob_slow_pmu_v3_format_attrs,
-+};
-+
-+static const struct attribute_group mcb_pmu_v3_format_attr_group = {
-+	.name = "format",
-+	.attrs = mcb_pmu_v3_format_attrs,
-+};
-+
-+static const struct attribute_group mc_pmu_v3_format_attr_group = {
-+	.name = "format",
-+	.attrs = mc_pmu_v3_format_attrs,
-+};
-+
- /*
-  * sysfs event attributes
-  */
-@@ -329,6 +397,219 @@ static ssize_t xgene_pmu_event_show(struct device *dev,
- 	.attrs = mc_pmu_events_attrs,
- };
- 
-+static struct attribute *l3c_pmu_v3_events_attrs[] = {
-+	XGENE_PMU_EVENT_ATTR(cycle-count,			0x00),
-+	XGENE_PMU_EVENT_ATTR(read-hit,				0x01),
-+	XGENE_PMU_EVENT_ATTR(read-miss,				0x02),
-+	XGENE_PMU_EVENT_ATTR(index-flush-eviction,		0x03),
-+	XGENE_PMU_EVENT_ATTR(write-caused-replacement,		0x04),
-+	XGENE_PMU_EVENT_ATTR(write-not-caused-replacement,	0x05),
-+	XGENE_PMU_EVENT_ATTR(clean-eviction,			0x06),
-+	XGENE_PMU_EVENT_ATTR(dirty-eviction,			0x07),
-+	XGENE_PMU_EVENT_ATTR(read,				0x08),
-+	XGENE_PMU_EVENT_ATTR(write,				0x09),
-+	XGENE_PMU_EVENT_ATTR(request,				0x0a),
-+	XGENE_PMU_EVENT_ATTR(tq-bank-conflict-issue-stall,	0x0b),
-+	XGENE_PMU_EVENT_ATTR(tq-full,				0x0c),
-+	XGENE_PMU_EVENT_ATTR(ackq-full,				0x0d),
-+	XGENE_PMU_EVENT_ATTR(wdb-full,				0x0e),
-+	XGENE_PMU_EVENT_ATTR(odb-full,				0x10),
-+	XGENE_PMU_EVENT_ATTR(wbq-full,				0x11),
-+	XGENE_PMU_EVENT_ATTR(input-req-async-fifo-stall,	0x12),
-+	XGENE_PMU_EVENT_ATTR(output-req-async-fifo-stall,	0x13),
-+	XGENE_PMU_EVENT_ATTR(output-data-async-fifo-stall,	0x14),
-+	XGENE_PMU_EVENT_ATTR(total-insertion,			0x15),
-+	XGENE_PMU_EVENT_ATTR(sip-insertions-r-set,		0x16),
-+	XGENE_PMU_EVENT_ATTR(sip-insertions-r-clear,		0x17),
-+	XGENE_PMU_EVENT_ATTR(dip-insertions-r-set,		0x18),
-+	XGENE_PMU_EVENT_ATTR(dip-insertions-r-clear,		0x19),
-+	XGENE_PMU_EVENT_ATTR(dip-insertions-force-r-set,	0x1a),
-+	XGENE_PMU_EVENT_ATTR(egression,				0x1b),
-+	XGENE_PMU_EVENT_ATTR(replacement,			0x1c),
-+	XGENE_PMU_EVENT_ATTR(old-replacement,			0x1d),
-+	XGENE_PMU_EVENT_ATTR(young-replacement,			0x1e),
-+	XGENE_PMU_EVENT_ATTR(r-set-replacement,			0x1f),
-+	XGENE_PMU_EVENT_ATTR(r-clear-replacement,		0x20),
-+	XGENE_PMU_EVENT_ATTR(old-r-replacement,			0x21),
-+	XGENE_PMU_EVENT_ATTR(old-nr-replacement,		0x22),
-+	XGENE_PMU_EVENT_ATTR(young-r-replacement,		0x23),
-+	XGENE_PMU_EVENT_ATTR(young-nr-replacement,		0x24),
-+	XGENE_PMU_EVENT_ATTR(bloomfilter-clearing,		0x25),
-+	XGENE_PMU_EVENT_ATTR(generation-flip,			0x26),
-+	XGENE_PMU_EVENT_ATTR(vcc-droop-detected,		0x27),
-+	NULL,
-+};
-+
-+static struct attribute *iob_fast_pmu_v3_events_attrs[] = {
-+	XGENE_PMU_EVENT_ATTR(cycle-count,			0x00),
-+	XGENE_PMU_EVENT_ATTR(pa-req-buf-alloc-all,		0x01),
-+	XGENE_PMU_EVENT_ATTR(pa-req-buf-alloc-rd,		0x02),
-+	XGENE_PMU_EVENT_ATTR(pa-req-buf-alloc-wr,		0x03),
-+	XGENE_PMU_EVENT_ATTR(pa-all-cp-req,			0x04),
-+	XGENE_PMU_EVENT_ATTR(pa-cp-blk-req,			0x05),
-+	XGENE_PMU_EVENT_ATTR(pa-cp-ptl-req,			0x06),
-+	XGENE_PMU_EVENT_ATTR(pa-cp-rd-req,			0x07),
-+	XGENE_PMU_EVENT_ATTR(pa-cp-wr-req,			0x08),
-+	XGENE_PMU_EVENT_ATTR(ba-all-req,			0x09),
-+	XGENE_PMU_EVENT_ATTR(ba-rd-req,				0x0a),
-+	XGENE_PMU_EVENT_ATTR(ba-wr-req,				0x0b),
-+	XGENE_PMU_EVENT_ATTR(pa-rd-shared-req-issued,		0x10),
-+	XGENE_PMU_EVENT_ATTR(pa-rd-exclusive-req-issued,	0x11),
-+	XGENE_PMU_EVENT_ATTR(pa-wr-invalidate-req-issued-stashable, 0x12),
-+	XGENE_PMU_EVENT_ATTR(pa-wr-invalidate-req-issued-nonstashable, 0x13),
-+	XGENE_PMU_EVENT_ATTR(pa-wr-back-req-issued-stashable,	0x14),
-+	XGENE_PMU_EVENT_ATTR(pa-wr-back-req-issued-nonstashable, 0x15),
-+	XGENE_PMU_EVENT_ATTR(pa-ptl-wr-req,			0x16),
-+	XGENE_PMU_EVENT_ATTR(pa-ptl-rd-req,			0x17),
-+	XGENE_PMU_EVENT_ATTR(pa-wr-back-clean-data,		0x18),
-+	XGENE_PMU_EVENT_ATTR(pa-wr-back-cancelled-on-SS,	0x1b),
-+	XGENE_PMU_EVENT_ATTR(pa-barrier-occurrence,		0x1c),
-+	XGENE_PMU_EVENT_ATTR(pa-barrier-cycles,			0x1d),
-+	XGENE_PMU_EVENT_ATTR(pa-total-cp-snoops,		0x20),
-+	XGENE_PMU_EVENT_ATTR(pa-rd-shared-snoop,		0x21),
-+	XGENE_PMU_EVENT_ATTR(pa-rd-shared-snoop-hit,		0x22),
-+	XGENE_PMU_EVENT_ATTR(pa-rd-exclusive-snoop,		0x23),
-+	XGENE_PMU_EVENT_ATTR(pa-rd-exclusive-snoop-hit,		0x24),
-+	XGENE_PMU_EVENT_ATTR(pa-rd-wr-invalid-snoop,		0x25),
-+	XGENE_PMU_EVENT_ATTR(pa-rd-wr-invalid-snoop-hit,	0x26),
-+	XGENE_PMU_EVENT_ATTR(pa-req-buffer-full,		0x28),
-+	XGENE_PMU_EVENT_ATTR(cswlf-outbound-req-fifo-full,	0x29),
-+	XGENE_PMU_EVENT_ATTR(cswlf-inbound-snoop-fifo-backpressure, 0x2a),
-+	XGENE_PMU_EVENT_ATTR(cswlf-outbound-lack-fifo-full,	0x2b),
-+	XGENE_PMU_EVENT_ATTR(cswlf-inbound-gack-fifo-backpressure, 0x2c),
-+	XGENE_PMU_EVENT_ATTR(cswlf-outbound-data-fifo-full,	0x2d),
-+	XGENE_PMU_EVENT_ATTR(cswlf-inbound-data-fifo-backpressure, 0x2e),
-+	XGENE_PMU_EVENT_ATTR(cswlf-inbound-req-backpressure,	0x2f),
-+	NULL,
-+};
-+
-+static struct attribute *iob_slow_pmu_v3_events_attrs[] = {
-+	XGENE_PMU_EVENT_ATTR(cycle-count,			0x00),
-+	XGENE_PMU_EVENT_ATTR(pa-axi0-rd-req,			0x01),
-+	XGENE_PMU_EVENT_ATTR(pa-axi0-wr-req,			0x02),
-+	XGENE_PMU_EVENT_ATTR(pa-axi1-rd-req,			0x03),
-+	XGENE_PMU_EVENT_ATTR(pa-axi1-wr-req,			0x04),
-+	XGENE_PMU_EVENT_ATTR(ba-all-axi-req,			0x07),
-+	XGENE_PMU_EVENT_ATTR(ba-axi-rd-req,			0x08),
-+	XGENE_PMU_EVENT_ATTR(ba-axi-wr-req,			0x09),
-+	XGENE_PMU_EVENT_ATTR(ba-free-list-empty,		0x10),
-+	NULL,
-+};
-+
-+static struct attribute *mcb_pmu_v3_events_attrs[] = {
-+	XGENE_PMU_EVENT_ATTR(cycle-count,			0x00),
-+	XGENE_PMU_EVENT_ATTR(req-receive,			0x01),
-+	XGENE_PMU_EVENT_ATTR(rd-req-recv,			0x02),
-+	XGENE_PMU_EVENT_ATTR(rd-req-recv-2,			0x03),
-+	XGENE_PMU_EVENT_ATTR(wr-req-recv,			0x04),
-+	XGENE_PMU_EVENT_ATTR(wr-req-recv-2,			0x05),
-+	XGENE_PMU_EVENT_ATTR(rd-req-sent-to-mcu,		0x06),
-+	XGENE_PMU_EVENT_ATTR(rd-req-sent-to-mcu-2,		0x07),
-+	XGENE_PMU_EVENT_ATTR(rd-req-sent-to-spec-mcu,		0x08),
-+	XGENE_PMU_EVENT_ATTR(rd-req-sent-to-spec-mcu-2,		0x09),
-+	XGENE_PMU_EVENT_ATTR(glbl-ack-recv-for-rd-sent-to-spec-mcu, 0x0a),
-+	XGENE_PMU_EVENT_ATTR(glbl-ack-go-recv-for-rd-sent-to-spec-mcu, 0x0b),
-+	XGENE_PMU_EVENT_ATTR(glbl-ack-nogo-recv-for-rd-sent-to-spec-mcu, 0x0c),
-+	XGENE_PMU_EVENT_ATTR(glbl-ack-go-recv-any-rd-req,	0x0d),
-+	XGENE_PMU_EVENT_ATTR(glbl-ack-go-recv-any-rd-req-2,	0x0e),
-+	XGENE_PMU_EVENT_ATTR(wr-req-sent-to-mcu,		0x0f),
-+	XGENE_PMU_EVENT_ATTR(gack-recv,				0x10),
-+	XGENE_PMU_EVENT_ATTR(rd-gack-recv,			0x11),
-+	XGENE_PMU_EVENT_ATTR(wr-gack-recv,			0x12),
-+	XGENE_PMU_EVENT_ATTR(cancel-rd-gack,			0x13),
-+	XGENE_PMU_EVENT_ATTR(cancel-wr-gack,			0x14),
-+	XGENE_PMU_EVENT_ATTR(mcb-csw-req-stall,			0x15),
-+	XGENE_PMU_EVENT_ATTR(mcu-req-intf-blocked,		0x16),
-+	XGENE_PMU_EVENT_ATTR(mcb-mcu-rd-intf-stall,		0x17),
-+	XGENE_PMU_EVENT_ATTR(csw-rd-intf-blocked,		0x18),
-+	XGENE_PMU_EVENT_ATTR(csw-local-ack-intf-blocked,	0x19),
-+	XGENE_PMU_EVENT_ATTR(mcu-req-table-full,		0x1a),
-+	XGENE_PMU_EVENT_ATTR(mcu-stat-table-full,		0x1b),
-+	XGENE_PMU_EVENT_ATTR(mcu-wr-table-full,			0x1c),
-+	XGENE_PMU_EVENT_ATTR(mcu-rdreceipt-resp,		0x1d),
-+	XGENE_PMU_EVENT_ATTR(mcu-wrcomplete-resp,		0x1e),
-+	XGENE_PMU_EVENT_ATTR(mcu-retryack-resp,			0x1f),
-+	XGENE_PMU_EVENT_ATTR(mcu-pcrdgrant-resp,		0x20),
-+	XGENE_PMU_EVENT_ATTR(mcu-req-from-lastload,		0x21),
-+	XGENE_PMU_EVENT_ATTR(mcu-req-from-bypass,		0x22),
-+	XGENE_PMU_EVENT_ATTR(volt-droop-detect,			0x23),
-+	NULL,
-+};
-+
-+static struct attribute *mc_pmu_v3_events_attrs[] = {
-+	XGENE_PMU_EVENT_ATTR(cycle-count,			0x00),
-+	XGENE_PMU_EVENT_ATTR(act-sent,				0x01),
-+	XGENE_PMU_EVENT_ATTR(pre-sent,				0x02),
-+	XGENE_PMU_EVENT_ATTR(rd-sent,				0x03),
-+	XGENE_PMU_EVENT_ATTR(rda-sent,				0x04),
-+	XGENE_PMU_EVENT_ATTR(wr-sent,				0x05),
-+	XGENE_PMU_EVENT_ATTR(wra-sent,				0x06),
-+	XGENE_PMU_EVENT_ATTR(pd-entry-vld,			0x07),
-+	XGENE_PMU_EVENT_ATTR(sref-entry-vld,			0x08),
-+	XGENE_PMU_EVENT_ATTR(prea-sent,				0x09),
-+	XGENE_PMU_EVENT_ATTR(ref-sent,				0x0a),
-+	XGENE_PMU_EVENT_ATTR(rd-rda-sent,			0x0b),
-+	XGENE_PMU_EVENT_ATTR(wr-wra-sent,			0x0c),
-+	XGENE_PMU_EVENT_ATTR(raw-hazard,			0x0d),
-+	XGENE_PMU_EVENT_ATTR(war-hazard,			0x0e),
-+	XGENE_PMU_EVENT_ATTR(waw-hazard,			0x0f),
-+	XGENE_PMU_EVENT_ATTR(rar-hazard,			0x10),
-+	XGENE_PMU_EVENT_ATTR(raw-war-waw-hazard,		0x11),
-+	XGENE_PMU_EVENT_ATTR(hprd-lprd-wr-req-vld,		0x12),
-+	XGENE_PMU_EVENT_ATTR(lprd-req-vld,			0x13),
-+	XGENE_PMU_EVENT_ATTR(hprd-req-vld,			0x14),
-+	XGENE_PMU_EVENT_ATTR(hprd-lprd-req-vld,			0x15),
-+	XGENE_PMU_EVENT_ATTR(wr-req-vld,			0x16),
-+	XGENE_PMU_EVENT_ATTR(partial-wr-req-vld,		0x17),
-+	XGENE_PMU_EVENT_ATTR(rd-retry,				0x18),
-+	XGENE_PMU_EVENT_ATTR(wr-retry,				0x19),
-+	XGENE_PMU_EVENT_ATTR(retry-gnt,				0x1a),
-+	XGENE_PMU_EVENT_ATTR(rank-change,			0x1b),
-+	XGENE_PMU_EVENT_ATTR(dir-change,			0x1c),
-+	XGENE_PMU_EVENT_ATTR(rank-dir-change,			0x1d),
-+	XGENE_PMU_EVENT_ATTR(rank-active,			0x1e),
-+	XGENE_PMU_EVENT_ATTR(rank-idle,				0x1f),
-+	XGENE_PMU_EVENT_ATTR(rank-pd,				0x20),
-+	XGENE_PMU_EVENT_ATTR(rank-sref,				0x21),
-+	XGENE_PMU_EVENT_ATTR(queue-fill-gt-thresh,		0x22),
-+	XGENE_PMU_EVENT_ATTR(queue-rds-gt-thresh,		0x23),
-+	XGENE_PMU_EVENT_ATTR(queue-wrs-gt-thresh,		0x24),
-+	XGENE_PMU_EVENT_ATTR(phy-updt-complt,			0x25),
-+	XGENE_PMU_EVENT_ATTR(tz-fail,				0x26),
-+	XGENE_PMU_EVENT_ATTR(dram-errc,				0x27),
-+	XGENE_PMU_EVENT_ATTR(dram-errd,				0x28),
-+	XGENE_PMU_EVENT_ATTR(rd-enq,				0x29),
-+	XGENE_PMU_EVENT_ATTR(wr-enq,				0x2a),
-+	XGENE_PMU_EVENT_ATTR(tmac-limit-reached,		0x2b),
-+	XGENE_PMU_EVENT_ATTR(tmaw-tracker-full,			0x2c),
-+	NULL,
-+};
-+
-+static const struct attribute_group l3c_pmu_v3_events_attr_group = {
-+	.name = "events",
-+	.attrs = l3c_pmu_v3_events_attrs,
-+};
-+
-+static const struct attribute_group iob_fast_pmu_v3_events_attr_group = {
-+	.name = "events",
-+	.attrs = iob_fast_pmu_v3_events_attrs,
-+};
-+
-+static const struct attribute_group iob_slow_pmu_v3_events_attr_group = {
-+	.name = "events",
-+	.attrs = iob_slow_pmu_v3_events_attrs,
-+};
-+
-+static const struct attribute_group mcb_pmu_v3_events_attr_group = {
-+	.name = "events",
-+	.attrs = mcb_pmu_v3_events_attrs,
-+};
-+
-+static const struct attribute_group mc_pmu_v3_events_attr_group = {
-+	.name = "events",
-+	.attrs = mc_pmu_v3_events_attrs,
-+};
-+
- /*
-  * sysfs cpumask attributes
-  */
-@@ -352,7 +633,7 @@ static ssize_t xgene_pmu_cpumask_show(struct device *dev,
- };
- 
- /*
-- * Per PMU device attribute groups
-+ * Per PMU device attribute groups of PMU v1 and v2
-  */
- static const struct attribute_group *l3c_pmu_attr_groups[] = {
- 	&l3c_pmu_format_attr_group,
-@@ -382,6 +663,44 @@ static ssize_t xgene_pmu_cpumask_show(struct device *dev,
- 	NULL
- };
- 
-+/*
-+ * Per PMU device attribute groups of PMU v3
-+ */
-+static const struct attribute_group *l3c_pmu_v3_attr_groups[] = {
-+	&l3c_pmu_v3_format_attr_group,
-+	&pmu_cpumask_attr_group,
-+	&l3c_pmu_v3_events_attr_group,
-+	NULL
-+};
-+
-+static const struct attribute_group *iob_fast_pmu_v3_attr_groups[] = {
-+	&iob_pmu_v3_format_attr_group,
-+	&pmu_cpumask_attr_group,
-+	&iob_fast_pmu_v3_events_attr_group,
-+	NULL
-+};
-+
-+static const struct attribute_group *iob_slow_pmu_v3_attr_groups[] = {
-+	&iob_slow_pmu_v3_format_attr_group,
-+	&pmu_cpumask_attr_group,
-+	&iob_slow_pmu_v3_events_attr_group,
-+	NULL
-+};
-+
-+static const struct attribute_group *mcb_pmu_v3_attr_groups[] = {
-+	&mcb_pmu_v3_format_attr_group,
-+	&pmu_cpumask_attr_group,
-+	&mcb_pmu_v3_events_attr_group,
-+	NULL
-+};
-+
-+static const struct attribute_group *mc_pmu_v3_attr_groups[] = {
-+	&mc_pmu_v3_format_attr_group,
-+	&pmu_cpumask_attr_group,
-+	&mc_pmu_v3_events_attr_group,
-+	NULL
-+};
-+
- static int get_next_avail_cntr(struct xgene_pmu_dev *pmu_dev)
- {
- 	int cntr;
-@@ -405,15 +724,45 @@ static inline void xgene_pmu_mask_int(struct xgene_pmu *xgene_pmu)
- 	writel(PCPPMU_INTENMASK, xgene_pmu->pcppmu_csr + PCPPMU_INTMASK_REG);
- }
- 
-+static inline void xgene_pmu_v3_mask_int(struct xgene_pmu *xgene_pmu)
-+{
-+	writel(PCPPMU_V3_INTENMASK, xgene_pmu->pcppmu_csr + PCPPMU_INTMASK_REG);
-+}
-+
- static inline void xgene_pmu_unmask_int(struct xgene_pmu *xgene_pmu)
- {
- 	writel(PCPPMU_INTCLRMASK, xgene_pmu->pcppmu_csr + PCPPMU_INTMASK_REG);
- }
- 
-+static inline void xgene_pmu_v3_unmask_int(struct xgene_pmu *xgene_pmu)
-+{
-+	writel(PCPPMU_V3_INTCLRMASK,
-+	       xgene_pmu->pcppmu_csr + PCPPMU_INTMASK_REG);
-+}
-+
- static inline u64 xgene_pmu_read_counter32(struct xgene_pmu_dev *pmu_dev,
- 					   int idx)
- {
--	return (u64)readl(pmu_dev->inf->csr + PMU_PMEVCNTR0 + (4 * idx));
-+	return readl(pmu_dev->inf->csr + PMU_PMEVCNTR0 + (4 * idx));
-+}
-+
-+static inline u64 xgene_pmu_read_counter64(struct xgene_pmu_dev *pmu_dev,
-+					   int idx)
-+{
-+	u32 lo, hi;
-+
-+	/*
-+	 * v3 has 64-bit counter registers composed by 2 32-bit registers
-+	 * This can be a problem if the counter increases and carries
-+	 * out of bit [31] between 2 reads. The extra reads would help
-+	 * to prevent this issue.
-+	 */
-+	do {
-+		hi = xgene_pmu_read_counter32(pmu_dev, 2 * idx + 1);
-+		lo = xgene_pmu_read_counter32(pmu_dev, 2 * idx);
-+	} while (hi != xgene_pmu_read_counter32(pmu_dev, 2 * idx + 1));
-+
-+	return (((u64)hi << 32) | lo);
- }
- 
- static inline void
-@@ -423,6 +772,19 @@ static inline u64 xgene_pmu_read_counter32(struct xgene_pmu_dev *pmu_dev,
- }
- 
- static inline void
-+xgene_pmu_write_counter64(struct xgene_pmu_dev *pmu_dev, int idx, u64 val)
-+{
-+	u32 cnt_lo, cnt_hi;
-+
-+	cnt_hi = upper_32_bits(val);
-+	cnt_lo = lower_32_bits(val);
-+
-+	/* v3 has 64-bit counter registers composed by 2 32-bit registers */
-+	xgene_pmu_write_counter32(pmu_dev, 2 * idx, cnt_lo);
-+	xgene_pmu_write_counter32(pmu_dev, 2 * idx + 1, cnt_hi);
-+}
-+
-+static inline void
- xgene_pmu_write_evttype(struct xgene_pmu_dev *pmu_dev, int idx, u32 val)
- {
- 	writel(val, pmu_dev->inf->csr + PMU_PMEVTYPER0 + (4 * idx));
-@@ -435,12 +797,18 @@ static inline u64 xgene_pmu_read_counter32(struct xgene_pmu_dev *pmu_dev,
- }
- 
- static inline void
-+xgene_pmu_v3_write_agentmsk(struct xgene_pmu_dev *pmu_dev, u32 val) { }
-+
-+static inline void
- xgene_pmu_write_agent1msk(struct xgene_pmu_dev *pmu_dev, u32 val)
- {
- 	writel(val, pmu_dev->inf->csr + PMU_PMAMR1);
- }
- 
- static inline void
-+xgene_pmu_v3_write_agent1msk(struct xgene_pmu_dev *pmu_dev, u32 val) { }
-+
-+static inline void
- xgene_pmu_enable_counter(struct xgene_pmu_dev *pmu_dev, int idx)
- {
- 	u32 val;
-@@ -621,10 +989,11 @@ static void xgene_perf_event_set_period(struct perf_event *event)
- 	struct xgene_pmu *xgene_pmu = pmu_dev->parent;
- 	struct hw_perf_event *hw = &event->hw;
- 	/*
--	 * The X-Gene PMU counters have a period of 2^32. To account for the
--	 * possiblity of extreme interrupt latency we program for a period of
--	 * half that. Hopefully we can handle the interrupt before another 2^31
-+	 * For 32 bit counter, it has a period of 2^32. To account for the
-+	 * possibility of extreme interrupt latency we program for a period of
-+	 * half that. Hopefully, we can handle the interrupt before another 2^31
- 	 * events occur and the counter overtakes its previous value.
-+	 * For 64 bit counter, we don't expect it overflow.
- 	 */
- 	u64 val = 1ULL << 31;
- 
-@@ -741,7 +1110,10 @@ static int xgene_init_perf(struct xgene_pmu_dev *pmu_dev, char *name)
- {
- 	struct xgene_pmu *xgene_pmu;
- 
--	pmu_dev->max_period = PMU_CNT_MAX_PERIOD - 1;
-+	if (pmu_dev->parent->version == PCP_PMU_V3)
-+		pmu_dev->max_period = PMU_V3_CNT_MAX_PERIOD;
-+	else
-+		pmu_dev->max_period = PMU_CNT_MAX_PERIOD;
- 	/* First version PMU supports only single event counter */
- 	xgene_pmu = pmu_dev->parent;
- 	if (xgene_pmu->version == PCP_PMU_V1)
-@@ -786,20 +1158,38 @@ static int xgene_init_perf(struct xgene_pmu_dev *pmu_dev, char *name)
- 
- 	switch (pmu->inf->type) {
- 	case PMU_TYPE_L3C:
--		pmu->attr_groups = l3c_pmu_attr_groups;
-+		if (!(xgene_pmu->l3c_active_mask & pmu->inf->enable_mask))
-+			goto dev_err;
-+		if (xgene_pmu->version == PCP_PMU_V3)
-+			pmu->attr_groups = l3c_pmu_v3_attr_groups;
-+		else
-+			pmu->attr_groups = l3c_pmu_attr_groups;
- 		break;
- 	case PMU_TYPE_IOB:
--		pmu->attr_groups = iob_pmu_attr_groups;
-+		if (xgene_pmu->version == PCP_PMU_V3)
-+			pmu->attr_groups = iob_fast_pmu_v3_attr_groups;
-+		else
-+			pmu->attr_groups = iob_pmu_attr_groups;
-+		break;
-+	case PMU_TYPE_IOB_SLOW:
-+		if (xgene_pmu->version == PCP_PMU_V3)
-+			pmu->attr_groups = iob_slow_pmu_v3_attr_groups;
- 		break;
- 	case PMU_TYPE_MCB:
- 		if (!(xgene_pmu->mcb_active_mask & pmu->inf->enable_mask))
- 			goto dev_err;
--		pmu->attr_groups = mcb_pmu_attr_groups;
-+		if (xgene_pmu->version == PCP_PMU_V3)
-+			pmu->attr_groups = mcb_pmu_v3_attr_groups;
-+		else
-+			pmu->attr_groups = mcb_pmu_attr_groups;
- 		break;
- 	case PMU_TYPE_MC:
- 		if (!(xgene_pmu->mc_active_mask & pmu->inf->enable_mask))
- 			goto dev_err;
--		pmu->attr_groups = mc_pmu_attr_groups;
-+		if (xgene_pmu->version == PCP_PMU_V3)
-+			pmu->attr_groups = mc_pmu_v3_attr_groups;
-+		else
-+			pmu->attr_groups = mc_pmu_attr_groups;
- 		break;
- 	default:
- 		return -EINVAL;
-@@ -823,18 +1213,25 @@ static int xgene_init_perf(struct xgene_pmu_dev *pmu_dev, char *name)
- static void _xgene_pmu_isr(int irq, struct xgene_pmu_dev *pmu_dev)
- {
- 	struct xgene_pmu *xgene_pmu = pmu_dev->parent;
-+	void __iomem *csr = pmu_dev->inf->csr;
- 	u32 pmovsr;
- 	int idx;
- 
--	pmovsr = readl(pmu_dev->inf->csr + PMU_PMOVSR) & PMU_OVERFLOW_MASK;
-+	if (xgene_pmu->version == PCP_PMU_V3)
-+		pmovsr = readl(csr + PMU_PMOVSSET) & PMU_OVERFLOW_MASK;
-+	else
-+		pmovsr = readl(csr + PMU_PMOVSR) & PMU_OVERFLOW_MASK;
-+
- 	if (!pmovsr)
- 		return;
- 
- 	/* Clear interrupt flag */
- 	if (xgene_pmu->version == PCP_PMU_V1)
--		writel(0x0, pmu_dev->inf->csr + PMU_PMOVSR);
-+		writel(0x0, csr + PMU_PMOVSR);
-+	else if (xgene_pmu->version == PCP_PMU_V2)
-+		writel(pmovsr, csr + PMU_PMOVSR);
- 	else
--		writel(pmovsr, pmu_dev->inf->csr + PMU_PMOVSR);
-+		writel(pmovsr, csr + PMU_PMOVSCLR);
- 
- 	for (idx = 0; idx < PMU_MAX_COUNTERS; idx++) {
- 		struct perf_event *event = pmu_dev->pmu_counter_event[idx];
-@@ -850,6 +1247,7 @@ static void _xgene_pmu_isr(int irq, struct xgene_pmu_dev *pmu_dev)
- 
- static irqreturn_t xgene_pmu_isr(int irq, void *dev_id)
- {
-+	u32 intr_mcu, intr_mcb, intr_l3c, intr_iob;
- 	struct xgene_pmu_dev_ctx *ctx;
- 	struct xgene_pmu *xgene_pmu = dev_id;
- 	unsigned long flags;
-@@ -859,22 +1257,33 @@ static irqreturn_t xgene_pmu_isr(int irq, void *dev_id)
- 
- 	/* Get Interrupt PMU source */
- 	val = readl(xgene_pmu->pcppmu_csr + PCPPMU_INTSTATUS_REG);
--	if (val & PCPPMU_INT_MCU) {
-+	if (xgene_pmu->version == PCP_PMU_V3) {
-+		intr_mcu = PCPPMU_V3_INT_MCU;
-+		intr_mcb = PCPPMU_V3_INT_MCB;
-+		intr_l3c = PCPPMU_V3_INT_L3C;
-+		intr_iob = PCPPMU_V3_INT_IOB;
-+	} else {
-+		intr_mcu = PCPPMU_INT_MCU;
-+		intr_mcb = PCPPMU_INT_MCB;
-+		intr_l3c = PCPPMU_INT_L3C;
-+		intr_iob = PCPPMU_INT_IOB;
-+	}
-+	if (val & intr_mcu) {
- 		list_for_each_entry(ctx, &xgene_pmu->mcpmus, next) {
- 			_xgene_pmu_isr(irq, ctx->pmu_dev);
- 		}
- 	}
--	if (val & PCPPMU_INT_MCB) {
-+	if (val & intr_mcb) {
- 		list_for_each_entry(ctx, &xgene_pmu->mcbpmus, next) {
- 			_xgene_pmu_isr(irq, ctx->pmu_dev);
- 		}
- 	}
--	if (val & PCPPMU_INT_L3C) {
-+	if (val & intr_l3c) {
- 		list_for_each_entry(ctx, &xgene_pmu->l3cpmus, next) {
- 			_xgene_pmu_isr(irq, ctx->pmu_dev);
- 		}
- 	}
--	if (val & PCPPMU_INT_IOB) {
-+	if (val & intr_iob) {
- 		list_for_each_entry(ctx, &xgene_pmu->iobpmus, next) {
- 			_xgene_pmu_isr(irq, ctx->pmu_dev);
- 		}
-@@ -885,8 +1294,8 @@ static irqreturn_t xgene_pmu_isr(int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
- 
--static int acpi_pmu_probe_active_mcb_mcu(struct xgene_pmu *xgene_pmu,
--					 struct platform_device *pdev)
-+static int acpi_pmu_probe_active_mcb_mcu_l3c(struct xgene_pmu *xgene_pmu,
-+					     struct platform_device *pdev)
- {
- 	void __iomem *csw_csr, *mcba_csr, *mcbb_csr;
- 	struct resource *res;
-@@ -913,6 +1322,8 @@ static int acpi_pmu_probe_active_mcb_mcu(struct xgene_pmu *xgene_pmu,
- 		return PTR_ERR(mcbb_csr);
- 	}
- 
-+	xgene_pmu->l3c_active_mask = 0x1;
-+
- 	reg = readl(csw_csr + CSW_CSWCR);
- 	if (reg & CSW_CSWCR_DUALMCB_MASK) {
- 		/* Dual MCB active */
-@@ -933,8 +1344,56 @@ static int acpi_pmu_probe_active_mcb_mcu(struct xgene_pmu *xgene_pmu,
- 	return 0;
- }
- 
--static int fdt_pmu_probe_active_mcb_mcu(struct xgene_pmu *xgene_pmu,
--					struct platform_device *pdev)
-+static int acpi_pmu_v3_probe_active_mcb_mcu_l3c(struct xgene_pmu *xgene_pmu,
-+						struct platform_device *pdev)
-+{
-+	void __iomem *csw_csr;
-+	struct resource *res;
-+	unsigned int reg;
-+	u32 mcb0routing;
-+	u32 mcb1routing;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	csw_csr = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(csw_csr)) {
-+		dev_err(&pdev->dev, "ioremap failed for CSW CSR resource\n");
-+		return PTR_ERR(csw_csr);
-+	}
-+
-+	reg = readl(csw_csr + CSW_CSWCR);
-+	mcb0routing = CSW_CSWCR_MCB0_ROUTING(reg);
-+	mcb1routing = CSW_CSWCR_MCB1_ROUTING(reg);
-+	if (reg & CSW_CSWCR_DUALMCB_MASK) {
-+		/* Dual MCB active */
-+		xgene_pmu->mcb_active_mask = 0x3;
-+		/* Probe all active L3C(s), maximum is 8 */
-+		xgene_pmu->l3c_active_mask = 0xFF;
-+		/* Probe all active MC(s), maximum is 8 */
-+		if ((mcb0routing == 0x2) && (mcb1routing == 0x2))
-+			xgene_pmu->mc_active_mask = 0xFF;
-+		else if ((mcb0routing == 0x1) && (mcb1routing == 0x1))
-+			xgene_pmu->mc_active_mask =  0x33;
-+		else
-+			xgene_pmu->mc_active_mask =  0x11;
-+	} else {
-+		/* Single MCB active */
-+		xgene_pmu->mcb_active_mask = 0x1;
-+		/* Probe all active L3C(s), maximum is 4 */
-+		xgene_pmu->l3c_active_mask = 0x0F;
-+		/* Probe all active MC(s), maximum is 4 */
-+		if (mcb0routing == 0x2)
-+			xgene_pmu->mc_active_mask = 0x0F;
-+		else if (mcb0routing == 0x1)
-+			xgene_pmu->mc_active_mask =  0x03;
-+		else
-+			xgene_pmu->mc_active_mask =  0x01;
-+	}
-+
-+	return 0;
-+}
-+
-+static int fdt_pmu_probe_active_mcb_mcu_l3c(struct xgene_pmu *xgene_pmu,
-+					    struct platform_device *pdev)
- {
- 	struct regmap *csw_map, *mcba_map, *mcbb_map;
- 	struct device_node *np = pdev->dev.of_node;
-@@ -958,6 +1417,7 @@ static int fdt_pmu_probe_active_mcb_mcu(struct xgene_pmu *xgene_pmu,
- 		return PTR_ERR(mcbb_map);
- 	}
- 
-+	xgene_pmu->l3c_active_mask = 0x1;
- 	if (regmap_read(csw_map, CSW_CSWCR, &reg))
- 		return -EINVAL;
- 
-@@ -982,12 +1442,18 @@ static int fdt_pmu_probe_active_mcb_mcu(struct xgene_pmu *xgene_pmu,
- 	return 0;
- }
- 
--static int xgene_pmu_probe_active_mcb_mcu(struct xgene_pmu *xgene_pmu,
--					  struct platform_device *pdev)
-+static int xgene_pmu_probe_active_mcb_mcu_l3c(struct xgene_pmu *xgene_pmu,
-+					      struct platform_device *pdev)
- {
--	if (has_acpi_companion(&pdev->dev))
--		return acpi_pmu_probe_active_mcb_mcu(xgene_pmu, pdev);
--	return fdt_pmu_probe_active_mcb_mcu(xgene_pmu, pdev);
-+	if (has_acpi_companion(&pdev->dev)) {
-+		if (xgene_pmu->version == PCP_PMU_V3)
-+			return acpi_pmu_v3_probe_active_mcb_mcu_l3c(xgene_pmu,
-+								    pdev);
-+		else
-+			return acpi_pmu_probe_active_mcb_mcu_l3c(xgene_pmu,
-+								 pdev);
-+	}
-+	return fdt_pmu_probe_active_mcb_mcu_l3c(xgene_pmu, pdev);
- }
- 
- static char *xgene_pmu_dev_name(struct device *dev, u32 type, int id)
-@@ -997,6 +1463,8 @@ static char *xgene_pmu_dev_name(struct device *dev, u32 type, int id)
- 		return devm_kasprintf(dev, GFP_KERNEL, "l3c%d", id);
- 	case PMU_TYPE_IOB:
- 		return devm_kasprintf(dev, GFP_KERNEL, "iob%d", id);
-+	case PMU_TYPE_IOB_SLOW:
-+		return devm_kasprintf(dev, GFP_KERNEL, "iob-slow%d", id);
- 	case PMU_TYPE_MCB:
- 		return devm_kasprintf(dev, GFP_KERNEL, "mcb%d", id);
- 	case PMU_TYPE_MC:
-@@ -1080,6 +1548,11 @@ xgene_pmu_dev_ctx *acpi_get_pmu_hw_inf(struct xgene_pmu *xgene_pmu,
- 	{"APMC0D5E", PMU_TYPE_IOB},
- 	{"APMC0D5F", PMU_TYPE_MCB},
- 	{"APMC0D60", PMU_TYPE_MC},
-+	{"APMC0D84", PMU_TYPE_L3C},
-+	{"APMC0D85", PMU_TYPE_IOB},
-+	{"APMC0D86", PMU_TYPE_IOB_SLOW},
-+	{"APMC0D87", PMU_TYPE_MCB},
-+	{"APMC0D88", PMU_TYPE_MC},
- 	{},
- };
- 
-@@ -1134,6 +1607,9 @@ static acpi_status acpi_pmu_dev_add(acpi_handle handle, u32 level,
- 	case PMU_TYPE_IOB:
- 		list_add(&ctx->next, &xgene_pmu->iobpmus);
- 		break;
-+	case PMU_TYPE_IOB_SLOW:
-+		list_add(&ctx->next, &xgene_pmu->iobpmus);
-+		break;
- 	case PMU_TYPE_MCB:
- 		list_add(&ctx->next, &xgene_pmu->mcbpmus);
- 		break;
-@@ -1255,6 +1731,9 @@ static int fdt_pmu_probe_pmu_dev(struct xgene_pmu *xgene_pmu,
- 		case PMU_TYPE_IOB:
- 			list_add(&ctx->next, &xgene_pmu->iobpmus);
- 			break;
-+		case PMU_TYPE_IOB_SLOW:
-+			list_add(&ctx->next, &xgene_pmu->iobpmus);
-+			break;
- 		case PMU_TYPE_MCB:
- 			list_add(&ctx->next, &xgene_pmu->mcbpmus);
- 			break;
-@@ -1300,6 +1779,23 @@ static int xgene_pmu_probe_pmu_dev(struct xgene_pmu *xgene_pmu,
- 	.stop_counters = xgene_pmu_stop_counters,
- };
- 
-+const struct xgene_pmu_ops xgene_pmu_v3_ops = {
-+	.mask_int = xgene_pmu_v3_mask_int,
-+	.unmask_int = xgene_pmu_v3_unmask_int,
-+	.read_counter = xgene_pmu_read_counter64,
-+	.write_counter = xgene_pmu_write_counter64,
-+	.write_evttype = xgene_pmu_write_evttype,
-+	.write_agentmsk = xgene_pmu_v3_write_agentmsk,
-+	.write_agent1msk = xgene_pmu_v3_write_agent1msk,
-+	.enable_counter = xgene_pmu_enable_counter,
-+	.disable_counter = xgene_pmu_disable_counter,
-+	.enable_counter_int = xgene_pmu_enable_counter_int,
-+	.disable_counter_int = xgene_pmu_disable_counter_int,
-+	.reset_counters = xgene_pmu_reset_counters,
-+	.start_counters = xgene_pmu_start_counters,
-+	.stop_counters = xgene_pmu_stop_counters,
-+};
-+
- static const struct of_device_id xgene_pmu_of_match[] = {
- 	{ .compatible	= "apm,xgene-pmu",	.data = &xgene_pmu_data },
- 	{ .compatible	= "apm,xgene-pmu-v2",	.data = &xgene_pmu_v2_data },
-@@ -1310,6 +1806,7 @@ static int xgene_pmu_probe_pmu_dev(struct xgene_pmu *xgene_pmu,
- static const struct acpi_device_id xgene_pmu_acpi_match[] = {
- 	{"APMC0D5B", PCP_PMU_V1},
- 	{"APMC0D5C", PCP_PMU_V2},
-+	{"APMC0D83", PCP_PMU_V3},
- 	{},
- };
- MODULE_DEVICE_TABLE(acpi, xgene_pmu_acpi_match);
-@@ -1349,7 +1846,10 @@ static int xgene_pmu_probe(struct platform_device *pdev)
- 	if (version < 0)
- 		return -ENODEV;
- 
--	xgene_pmu->ops = &xgene_pmu_ops;
-+	if (version == PCP_PMU_V3)
-+		xgene_pmu->ops = &xgene_pmu_v3_ops;
-+	else
-+		xgene_pmu->ops = &xgene_pmu_ops;
- 
- 	INIT_LIST_HEAD(&xgene_pmu->l3cpmus);
- 	INIT_LIST_HEAD(&xgene_pmu->iobpmus);
-@@ -1384,7 +1884,7 @@ static int xgene_pmu_probe(struct platform_device *pdev)
- 	raw_spin_lock_init(&xgene_pmu->lock);
- 
- 	/* Check for active MCBs and MCUs */
--	rc = xgene_pmu_probe_active_mcb_mcu(xgene_pmu, pdev);
-+	rc = xgene_pmu_probe_active_mcb_mcu_l3c(xgene_pmu, pdev);
- 	if (rc) {
- 		dev_warn(&pdev->dev, "Unknown MCB/MCU active status\n");
- 		xgene_pmu->mcb_active_mask = 0x1;
+I can submit the whole driver as a single patch if that is easier for
+you to review.
+
+> > This driver uses regmap and syscon to be able to probe early in the boot
+> > and avoid having to switch on the TCB clocksource later. Using regmap also
+> > means that unused TCB channels may be used by other drivers (PWM for
+> > example).
+> 
+> Can you give more details, I fail to understand how regmap and syscon help to
+> probe sooner than timer_init()?
+> 
+
+Because before that, the tcb driver relied on atmel_tclib to share the
+TCBs and it happened way too late, at arch_initcall() time.
+
+
+> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > ---
+> >  drivers/clocksource/Kconfig                 |  13 ++
+> >  drivers/clocksource/Makefile                |   3 +-
+> >  drivers/clocksource/timer-atmel-tcbclksrc.c | 252 ++++++++++++++++++++++++++++
+> 
+> As it is a clksrc + clkevt, please change the name to something more adequate:
+> 
+> eg. timer-tcb.c
+> 
+> >  3 files changed, 267 insertions(+), 1 deletion(-)
+> >  create mode 100644 drivers/clocksource/timer-atmel-tcbclksrc.c
+> > 
+> > diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> > index 545d541ae20e..cbd710db3c09 100644
+> > --- a/drivers/clocksource/Kconfig
+> > +++ b/drivers/clocksource/Kconfig
+> > @@ -418,6 +418,19 @@ config ATMEL_ST
+> >  	help
+> >  	  Support for the Atmel ST timer.
+> >  
+> > +config ATMEL_ARM_TCB_CLKSRC
+> > +	bool "TC Block Clocksource"
+> > +	select REGMAP_MMIO
+> > +	depends on GENERIC_CLOCKEVENTS
+> > +	depends on SOC_AT91RM9200 || SOC_AT91SAM9 || SOC_SAMA5 || COMPILE_TEST
+> > +	default SOC_AT91RM9200 || SOC_AT91SAM9 || SOC_SAMA5
+> > +	help
+> > +	  Select this to get a high precision clocksource based on a
+> > +	  TC block with a 5+ MHz base clock rate.
+> > +	  On platforms with 16-bit counters, two timer channels are combined
+> > +	  to make a single 32-bit timer.
+> > +	  It can also be used as a clock event device supporting oneshot mode.
+> > +
+> >  config CLKSRC_METAG_GENERIC
+> >  	def_bool y if METAG
+> >  	help
+> > diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+> > index 2b5b56a6f00f..53a0b40e0db2 100644
+> > --- a/drivers/clocksource/Makefile
+> > +++ b/drivers/clocksource/Makefile
+> > @@ -2,7 +2,8 @@ obj-$(CONFIG_CLKSRC_PROBE)	+= clksrc-probe.o
+> >  obj-$(CONFIG_CLKEVT_PROBE)	+= clkevt-probe.o
+> >  obj-$(CONFIG_ATMEL_PIT)		+= timer-atmel-pit.o
+> >  obj-$(CONFIG_ATMEL_ST)		+= timer-atmel-st.o
+> > -obj-$(CONFIG_ATMEL_TCB_CLKSRC)	+= tcb_clksrc.o
+> > +obj-$(CONFIG_ATMEL_TCB_CLKSRC) += tcb_clksrc.o
+> > +obj-$(CONFIG_ATMEL_ARM_TCB_CLKSRC)	+= timer-atmel-tcbclksrc.o
+> >  obj-$(CONFIG_X86_PM_TIMER)	+= acpi_pm.o
+> >  obj-$(CONFIG_SCx200HR_TIMER)	+= scx200_hrt.o
+> >  obj-$(CONFIG_CS5535_CLOCK_EVENT_SRC)	+= cs5535-clockevt.o
+> > diff --git a/drivers/clocksource/timer-atmel-tcbclksrc.c b/drivers/clocksource/timer-atmel-tcbclksrc.c
+> > new file mode 100644
+> > index 000000000000..f18d177bfdea
+> > --- /dev/null
+> > +++ b/drivers/clocksource/timer-atmel-tcbclksrc.c
+> > @@ -0,0 +1,252 @@
+> > +#include <linux/clk.h>
+> > +#include <linux/clockchips.h>
+> > +#include <linux/clocksource.h>
+> > +#include <linux/interrupt.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/mfd/syscon.h>
+> > +#include <linux/of_irq.h>
+> > +#include <linux/regmap.h>
+> > +#include <linux/sched_clock.h>
+> > +#include <soc/at91/atmel_tcb.h>
+> > +
+> > +static struct atmel_tcb_clksrc {
+> > +	char name[20];
+> 
+> 	^^^^^^^^^^^^^^
+> This field is pointless.
+> 
+
+You mean you don't like how it is used? Or you don't think having the
+timer full name is useful?
+
+> > +	struct clocksource clksrc;
+> 
+> Why is this field defined and passed around to functions which do not use it?
+> 
+> Please consider using clocksource_mmio_init() and remove this field.
+> 
+
+Well, this doesn't work with a regmap so it doesn't fit.
+
+> > +	struct regmap *regmap;
+> > +	struct clk *clk[2];
+> 
+> Can you explain why we have two clocks here?
+> 
+
+Each channel have its clock, I can add a comment if you want.
+
+> > +	int channels[2];
+> 
+> Instead of dealing with 2 channels and a costly bits shifting in the hot path,
+> why not use a single channel with a different wrap up? IOW mask is 16 or 32.
+> 
+> The resulting code will be simpler, nicer and perhaps more efficient if you
+> save the tc_get_cycles() loop?
+> 
+
+I think the rationale behind it is that 16 bits at 5MHz makes it
+wrap every 13ms which is too fast to be useful.
+
+> > +	int bits;
+> 
+> 	^^^^^^^^
+> 
+> This field is pointless.
+> 
+> > +	int irq;
+> 
+> irq belongs to clockevents changes.
+> 
+> > +	bool registered;
+> 
+> What is the purpose of this registered boolean?
+> 
+
+The main reason is that RobH doesn't want to have the use (clocksource
+or clockevent) of the timer in the DT so when probing a timer, I need to
+know whether I already have a clocksource to decide when it is time to
+register a clockevent.
+
 -- 
-1.9.1
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
