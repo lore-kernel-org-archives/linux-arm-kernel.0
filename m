@@ -1,26 +1,45 @@
-From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Tue, 6 Jun 2017 18:13:30 +0200
-Subject: [PATCH 0/3] Add stm32h743i-disco board
-Message-ID: <1496765613-697-1-git-send-email-patrice.chotard@st.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 6 Jun 2017 17:15:03 +0100
+Subject: [RFC PATCH v2 4/6] arm64: signal: Allocate extra sigcontext
+ space as needed
+In-Reply-To: <20170606135815.GG30160@e103592.cambridge.arm.com>
+References: <1492016239-19511-1-git-send-email-Dave.Martin@arm.com>
+ <1492016495-19689-1-git-send-email-Dave.Martin@arm.com>
+ <1492016495-19689-4-git-send-email-Dave.Martin@arm.com>
+ <20170512165724.GB8387@e104818-lin.cambridge.arm.com>
+ <20170515132442.GB3559@e103592.cambridge.arm.com>
+ <20170523113019.GB5948@e104818-lin.cambridge.arm.com>
+ <20170526113729.GO3559@e103592.cambridge.arm.com>
+ <20170605141744.GB9163@e104818-lin.cambridge.arm.com>
+ <20170606113739.GF30160@e103592.cambridge.arm.com>
+ <20170606135815.GG30160@e103592.cambridge.arm.com>
+Message-ID: <20170606161503.xdcg7itqtj5r4i3t@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@st.com>
+On Tue, Jun 06, 2017 at 02:58:18PM +0100, Dave P Martin wrote:
+> On Tue, Jun 06, 2017 at 12:37:53PM +0100, Dave Martin wrote:
+> > On Mon, Jun 05, 2017 at 03:17:44PM +0100, Catalin Marinas wrote:
+> 
+> [...]
+> 
+> [extra_context.size]
+> 
+> > > I'd rather have the time size_t or __u64 to avoid implicit padding.
+> > 
+> > Sure, it can be a u64.  I wanted to avoid the suggestion that the frame
+> > should be that large, but 32 bits already allows it to be crazy large
+> > anyway, so I don't think making it 32-bit helps.
+> 
+> Actually, there is still implicit padding even with u64, since the total
+> size is 16 bytes + sizeof(extra_context.size).
+> 
+> Since u64 is much bigger then we'd ever want, and to avoid introducing
+> new bugs, do you object to keeping size as u32 and adding explicit
+> padding instead?
 
-This series adds basic support for the stm32h743i discovery board 
-based on stm32h7 MCU.
-
-Patrice Chotard (3):
-  ARM: dts: stm32h743: Add usart2_pins
-  ARM: dts: stm32h743: Add usart2 support
-  ARM: dts: stm32h743: Add stm32h743i-disco board
-
- arch/arm/boot/dts/Makefile               |  3 +-
- arch/arm/boot/dts/stm32h743-pinctrl.dtsi | 13 ++++++
- arch/arm/boot/dts/stm32h743.dtsi         |  8 ++++
- arch/arm/boot/dts/stm32h743i-disco.dts   | 74 ++++++++++++++++++++++++++++++++
- 4 files changed, 97 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/stm32h743i-disco.dts
+I missed the extra padding to 16-byte alignment. In this case, I'm fine
+with u32.
 
 -- 
-1.9.1
+Catalin
