@@ -1,212 +1,87 @@
-From: bo.zhang@nxp.com (Bruce Zhang)
-Date: Tue, 6 Jun 2017 02:47:03 +0000
-Subject: [[PATCH]] drivers: leds/trigger: system cannot enter suspend
-In-Reply-To: <9d1f4e47-0713-043a-4359-db8f856e0b0e@gmail.com>
-References: <1496648191-134355-1-git-send-email-bo.zhang@nxp.com>
- <9d1f4e47-0713-043a-4359-db8f856e0b0e@gmail.com>
-Message-ID: <AM3PR04MB404B1161E73CF4D2FB3C5058ACB0@AM3PR04MB404.eurprd04.prod.outlook.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Tue, 6 Jun 2017 10:56:47 +0800
+Subject: [arm:phy 25/29] net/core/ethtool.c:2208: undefined reference to
+ `sfp_get_module_info'
+Message-ID: <201706061044.NTf0IPmc%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacek,
+tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git phy
+head:   3a9fc132d462fcbef5aac7a8b4fe7abcabb9ef1e
+commit: 1b72c8ec227c007d6e49f7e780349d4db6ddb257 [25/29] sfp: move module eeprom ethtool access into netdev core ethtool
+config: cris-allmodconfig (attached as .config)
+compiler: cris-linux-gcc (GCC) 6.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 1b72c8ec227c007d6e49f7e780349d4db6ddb257
+        # save the attached .config to linux build tree
+        make.cross ARCH=cris 
 
-The led_syfs_disable() is used to avoid heartbeat_trig_activate/ heartbeat_trig_deactivate called when this led device is suspended.
-I am not encounter this issue, but I think it is a risk.
+All errors (new ones prefixed by >>):
 
-Best Regards,
-Bo
+   net/built-in.o: In function `__ethtool_get_module_info':
+>> net/core/ethtool.c:2208: undefined reference to `sfp_get_module_info'
+   net/built-in.o: In function `__ethtool_get_module_eeprom':
+>> net/core/ethtool.c:2245: undefined reference to `sfp_get_module_eeprom'
 
------Original Message-----
-From: Jacek Anaszewski [mailto:jacek.anaszewski at gmail.com] 
-Sent: Tuesday, June 06, 2017 3:27 AM
-To: Bruce Zhang <bo.zhang@nxp.com>; linux-arm-kernel at lists.infradead.org
-Cc: pavel at ucw.cz; Linux LED Subsystem <linux-leds@vger.kernel.org>
-Subject: Re: [[PATCH]] drivers: leds/trigger: system cannot enter suspend
+vim +2208 net/core/ethtool.c
 
-Hi Zhang,
+  2202					     struct ethtool_modinfo *modinfo)
+  2203	{
+  2204		const struct ethtool_ops *ops = dev->ethtool_ops;
+  2205		struct phy_device *phydev = dev->phydev;
+  2206	
+  2207		if (dev->sfp_bus)
+> 2208			return sfp_get_module_info(dev->sfp_bus, modinfo);
+  2209	
+  2210		if (phydev && phydev->drv && phydev->drv->module_info)
+  2211			return phydev->drv->module_info(phydev, modinfo);
+  2212	
+  2213		if (ops->get_module_info)
+  2214			return ops->get_module_info(dev, modinfo);
+  2215	
+  2216		return -EOPNOTSUPP;
+  2217	}
+  2218	
+  2219	static int ethtool_get_module_info(struct net_device *dev,
+  2220					   void __user *useraddr)
+  2221	{
+  2222		int ret;
+  2223		struct ethtool_modinfo modinfo;
+  2224	
+  2225		if (copy_from_user(&modinfo, useraddr, sizeof(modinfo)))
+  2226			return -EFAULT;
+  2227	
+  2228		ret = __ethtool_get_module_info(dev, &modinfo);
+  2229		if (ret)
+  2230			return ret;
+  2231	
+  2232		if (copy_to_user(useraddr, &modinfo, sizeof(modinfo)))
+  2233			return -EFAULT;
+  2234	
+  2235		return 0;
+  2236	}
+  2237	
+  2238	static int __ethtool_get_module_eeprom(struct net_device *dev,
+  2239					       struct ethtool_eeprom *ee, u8 *data)
+  2240	{
+  2241		const struct ethtool_ops *ops = dev->ethtool_ops;
+  2242		struct phy_device *phydev = dev->phydev;
+  2243	
+  2244		if (dev->sfp_bus)
+> 2245			return sfp_get_module_eeprom(dev->sfp_bus, ee, data);
+  2246	
+  2247		if (phydev && phydev->drv && phydev->drv->module_eeprom)
+  2248			return phydev->drv->module_eeprom(phydev, ee, data);
 
-Thanks for the patch. It seems to be almost ready to merge.
-Just two issues below.
-
-Please also always cc linux-leds at vger.kernel.org when modifying LED subsystem.
-
-On 06/05/2017 09:36 AM, Zhang Bo wrote:
-> System cannot enter suspend mode because of heartbeat led trigger.
-> Heartbeat_pm_notifier is called when system prepare to enter suspend 
-> mode, then call led_trigger_unregister to change the trigger of led 
-> device to none. It will send uevent message and the wakeup source count changed.
-> 
-> Add suspend/resume ops to the struct led_trigger, implement these two 
-> ops for ledtrig-heartbeat. Add led_trigger_suspend/led_trigger_resume 
-> funcitons to iterate through all LED class devices registered on given 
-> trigger and call their suspend/resume ops and disable/enable sysfs at the same time.
-> 
-> Call led_trigger_suspend{resuem} API in pm_notifier function to 
-> suspend/resume all led devices listed in given trigger.
-> 
-> Signed-off-by: Zhang Bo <bo.zhang@nxp.com>
-> ---
->  drivers/leds/led-triggers.c              | 34 +++++++++++++++++++++++++++++++
->  drivers/leds/trigger/ledtrig-heartbeat.c | 35 ++++++++++++++++++++++++++------
->  include/linux/leds.h                     |  6 ++++++
->  3 files changed, 69 insertions(+), 6 deletions(-)  mode change 100644 
-> => 100755 drivers/leds/led-triggers.c  mode change 100644 => 100755 
-> drivers/leds/trigger/ledtrig-heartbeat.c
->  mode change 100644 => 100755 include/linux/leds.h
-
-You accidentally changed file permissions.
-
-> diff --git a/drivers/leds/led-triggers.c b/drivers/leds/led-triggers.c 
-> old mode 100644 new mode 100755 index 431123b..1cb1674
-> --- a/drivers/leds/led-triggers.c
-> +++ b/drivers/leds/led-triggers.c
-> @@ -333,6 +333,40 @@ void led_trigger_blink_oneshot(struct led_trigger 
-> *trig,  }  EXPORT_SYMBOL_GPL(led_trigger_blink_oneshot);
->  
-> +void led_trigger_suspend(struct led_trigger *trig) {
-> +	struct led_classdev *led_cdev;
-> +
-> +	if (!trig)
-> +		return;
-> +
-> +	read_lock(&trig->leddev_list_lock);
-> +	list_for_each_entry(led_cdev, &trig->led_cdevs, trig_list) {
-> +		if (led_cdev->trigger->suspend)
-> +			led_cdev->trigger->suspend(led_cdev);
-> +		led_sysfs_disable(led_cdev);
-
-Could you share what kind of problem this call to led_syfs_disable() solves? Did you come across one?
-
-> +	}
-> +	read_unlock(&trig->leddev_list_lock);
-> +}
-> +EXPORT_SYMBOL_GPL(led_trigger_suspend);
-> +
-> +void led_trigger_resume(struct led_trigger *trig) {
-> +	struct led_classdev *led_cdev;
-> +
-> +	if (!trig)
-> +		return;
-> +
-> +	read_lock(&trig->leddev_list_lock);
-> +	list_for_each_entry(led_cdev, &trig->led_cdevs, trig_list) {
-> +		if (led_cdev->trigger->resume)
-> +			led_cdev->trigger->resume(led_cdev);
-> +		led_sysfs_enable(led_cdev);
-> +	}
-> +	read_unlock(&trig->leddev_list_lock);
-> +}
-> +EXPORT_SYMBOL_GPL(led_trigger_resume);
-> +
->  void led_trigger_register_simple(const char *name, struct led_trigger 
-> **tp)  {
->  	struct led_trigger *trig;
-> diff --git a/drivers/leds/trigger/ledtrig-heartbeat.c 
-> b/drivers/leds/trigger/ledtrig-heartbeat.c
-> old mode 100644
-> new mode 100755
-> index afa3b40..8f779dd
-> --- a/drivers/leds/trigger/ledtrig-heartbeat.c
-> +++ b/drivers/leds/trigger/ledtrig-heartbeat.c
-> @@ -142,6 +142,7 @@ static void heartbeat_trig_activate(struct led_classdev *led_cdev)
->  	led_heartbeat_function(heartbeat_data->timer.data);
->  	set_bit(LED_BLINK_SW, &led_cdev->work_flags);
->  	led_cdev->activated = true;
-> +	led_cdev->suspended = false;
->  }
->  
->  static void heartbeat_trig_deactivate(struct led_classdev *led_cdev) 
-> @@ -154,6 +155,30 @@ static void heartbeat_trig_deactivate(struct led_classdev *led_cdev)
->  		kfree(heartbeat_data);
->  		clear_bit(LED_BLINK_SW, &led_cdev->work_flags);
->  		led_cdev->activated = false;
-> +		led_cdev->suspended = false;
-> +	}
-> +}
-> +
-> +static void heartbeat_trig_resume(struct led_classdev *led_cdev) {
-> +	struct heartbeat_trig_data *heartbeat_data = led_cdev->trigger_data;
-> +
-> +	if (led_cdev->suspended) {
-> +		setup_timer(&heartbeat_data->timer,
-> +			    led_heartbeat_function, (unsigned long) led_cdev);
-> +		heartbeat_data->phase = 0;
-> +		led_heartbeat_function(heartbeat_data->timer.data);
-> +		led_cdev->suspended = false;
-> +	}
-> +}
-> +
-> +static void heartbeat_trig_suspend(struct led_classdev *led_cdev) {
-> +	struct heartbeat_trig_data *heartbeat_data = led_cdev->trigger_data;
-> +
-> +	if (led_cdev->activated && !led_cdev->suspended) {
-> +		del_timer_sync(&heartbeat_data->timer);
-> +		led_cdev->suspended = true;
->  	}
->  }
->  
-> @@ -161,25 +186,23 @@ static void heartbeat_trig_deactivate(struct led_classdev *led_cdev)
->  	.name     = "heartbeat",
->  	.activate = heartbeat_trig_activate,
->  	.deactivate = heartbeat_trig_deactivate,
-> +	.suspend = heartbeat_trig_suspend,
-> +	.resume = heartbeat_trig_resume,
->  };
->  
->  static int heartbeat_pm_notifier(struct notifier_block *nb,
->  				 unsigned long pm_event, void *unused)  {
-> -	int rc;
-> -
->  	switch (pm_event) {
->  	case PM_SUSPEND_PREPARE:
->  	case PM_HIBERNATION_PREPARE:
->  	case PM_RESTORE_PREPARE:
-> -		led_trigger_unregister(&heartbeat_led_trigger);
-> +		led_trigger_suspend(&heartbeat_led_trigger);
->  		break;
->  	case PM_POST_SUSPEND:
->  	case PM_POST_HIBERNATION:
->  	case PM_POST_RESTORE:
-> -		rc = led_trigger_register(&heartbeat_led_trigger);
-> -		if (rc)
-> -			pr_err("could not re-register heartbeat trigger\n");
-> +		led_trigger_resume(&heartbeat_led_trigger);
->  		break;
->  	default:
->  		break;
-> diff --git a/include/linux/leds.h b/include/linux/leds.h old mode 
-> 100644 new mode 100755 index 64c56d4..b792950
-> --- a/include/linux/leds.h
-> +++ b/include/linux/leds.h
-> @@ -111,6 +111,7 @@ struct led_classdev {
->  	void			*trigger_data;
->  	/* true if activated - deactivate routine uses it to do cleanup */
->  	bool			activated;
-> +	bool			suspended;
->  #endif
->  
->  #ifdef CONFIG_LEDS_BRIGHTNESS_HW_CHANGED @@ -254,6 +255,8 @@ struct 
-> led_trigger {
->  	const char	 *name;
->  	void		(*activate)(struct led_classdev *led_cdev);
->  	void		(*deactivate)(struct led_classdev *led_cdev);
-> +	void		(*suspend)(struct led_classdev *led_cdev);
-> +	void		(*resume)(struct led_classdev *led_cdev);
->  
->  	/* LEDs under control by this trigger (for simple triggers) */
->  	rwlock_t	  leddev_list_lock;
-> @@ -291,6 +294,9 @@ extern void led_trigger_set(struct led_classdev *led_cdev,
->  			struct led_trigger *trigger);
->  extern void led_trigger_remove(struct led_classdev *led_cdev);
->  
-> +extern void led_trigger_suspend(struct led_trigger *trig); extern 
-> +void led_trigger_resume(struct led_trigger *trig);
-> +
->  static inline void *led_get_trigger_data(struct led_classdev 
-> *led_cdev)  {
->  	return led_cdev->trigger_data;
-> 
-
---
-Best regards,
-Jacek Anaszewski
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 43045 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170606/55c39010/attachment-0001.gz>
