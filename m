@@ -1,34 +1,27 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 06 Jun 2017 09:51:11 +0200
-Subject: [PATCH v5 0/2] Add TI SCI Reset Driver
-In-Reply-To: <04a25503-b675-8832-0323-eb7ecbaaefeb@ti.com>
-References: <20170524180930.9290-1-s-anna@ti.com>
- <04a25503-b675-8832-0323-eb7ecbaaefeb@ti.com>
-Message-ID: <1496735471.2966.4.camel@pengutronix.de>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 6 Jun 2017 15:50:50 +0800
+Subject: [PATCH 2/2] thermal: add brcmstb AVS TMON driver
+In-Reply-To: <20170605210930.65432-3-code@mmayer.net>
+Message-ID: <201706061553.IyOv7qkB%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
+Hi Brian,
 
-On Fri, 2017-06-02 at 11:45 -0500, Suman Anna wrote:
-[...]
-> > [1] http://marc.info/?l=devicetree&m=147976458332492&w=2
-> > [2] http://marc.info/?l=linux-arm-kernel&m=149547831708124&w=2
-> > [3] https://patchwork.kernel.org/patch/9744909/
-> > 
-> > Andrew F. Davis (2):
-> >   Documentation: dt: reset: Add TI SCI reset binding
-> >   reset: Add the TI SCI reset driver
-> > 
-> 
-> Can you pick up this series for v4.13 if there are no comments. Btw, [2]
-> is acked by Rob. Will appreciate if you can fixup the patch header from
-> "Documentation: dt: reset: ..." to "dt-bindings: reset: ..." on the
-> first patch when applying. Thanks in advance.
+[auto build test WARNING on thermal/next]
+[also build test WARNING on v4.12-rc4 next-20170606]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Thank you for the reminder, I've now applied both to the reset/next
-branch. I've fixed the dt-bindings patch commit message as you suggested
-and made the struct reset_control_ops const in the driver patch.
+url:    https://github.com/0day-ci/linux/commits/Markus-Mayer/Documentation-devicetree-add-binding-for-Broadcom-STB-AVS-TMON/20170606-133113
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/rzhang/linux.git next
 
-regards
-Philipp
+
+coccinelle warnings: (new ones prefixed by >>)
+
+>> drivers/thermal/broadcom/brcmstb_thermal.c:353:3-8: No need to set .owner here. The core will do it.
+
+Please review and possibly fold the followup patch.
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
