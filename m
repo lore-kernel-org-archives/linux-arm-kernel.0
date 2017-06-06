@@ -1,46 +1,40 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  6 Jun 2017 19:08:35 +0100
-Subject: [PATCH 3/3] arm: KVM: Allow unaligned accesses at HYP
-In-Reply-To: <20170606180835.14421-1-marc.zyngier@arm.com>
-References: <20170606180835.14421-1-marc.zyngier@arm.com>
-Message-ID: <20170606180835.14421-4-marc.zyngier@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 6 Jun 2017 20:09:57 +0200
+Subject: [PATCH v2] clockevents/tcb_clksrc: implement suspend/resume
+In-Reply-To: <20170606164817.GF2345@mai>
+References: <20170512182251.23948-1-alexandre.belloni@free-electrons.com>
+ <20170606164817.GF2345@mai>
+Message-ID: <20170606180957.zjwjcmynzcqfqfgu@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently have the HSCTLR.A bit set, trapping unaligned accesses
-at HYP, but we're not really prepared to deal with it.
+On 06/06/2017 at 18:48:17 +0200, Daniel Lezcano wrote:
+> On Fri, May 12, 2017 at 08:22:51PM +0200, Alexandre Belloni wrote:
+> > On sama5d2, power to the core may be cut while entering suspend mode. It is
+> > necessary to save and restore the TCB registers.
+> > 
+> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > ---
+> > Changes in v2:
+> >  - use writel instead of __raw_writel
+> >  - Document sequence
+> >  - use ARRAY_SIZE(tcb_cache) instead of 3
+> > 
+> >  drivers/clocksource/tcb_clksrc.c | 51 ++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 51 insertions(+)
+> > 
+> > diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+> 
+> Hi,
+> 
+> what should I do with this patch as the patched file is supposed to be removed
+> [1]. 
+> 
 
-Since the rest of the kernel is pretty happy about that, let's follow
-its example and set HSCTLR.A to zero. Modern CPUs don't really care.
+I feel like we are far from reaching an agreement on the other series so
+it is still worth applying.
 
-Cc: stable at vger.kernel.org
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kvm/init.S | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-index 570ed4a9c261..5386528665b5 100644
---- a/arch/arm/kvm/init.S
-+++ b/arch/arm/kvm/init.S
-@@ -104,7 +104,6 @@ __do_hyp_init:
- 	@  - Write permission implies XN: disabled
- 	@  - Instruction cache: enabled
- 	@  - Data/Unified cache: enabled
--	@  - Memory alignment checks: enabled
- 	@  - MMU: enabled (this code must be run from an identity mapping)
- 	mrc	p15, 4, r0, c1, c0, 0	@ HSCR
- 	ldr	r2, =HSCTLR_MASK
-@@ -112,8 +111,8 @@ __do_hyp_init:
- 	mrc	p15, 0, r1, c1, c0, 0	@ SCTLR
- 	ldr	r2, =(HSCTLR_EE | HSCTLR_FI | HSCTLR_I | HSCTLR_C)
- 	and	r1, r1, r2
-- ARM(	ldr	r2, =(HSCTLR_M | HSCTLR_A)			)
-- THUMB(	ldr	r2, =(HSCTLR_M | HSCTLR_A | HSCTLR_TE)		)
-+ ARM(	ldr	r2, =(HSCTLR_M)					)
-+ THUMB(	ldr	r2, =(HSCTLR_M | HSCTLR_TE)			)
- 	orr	r1, r1, r2
- 	orr	r0, r0, r1
- 	mcr	p15, 4, r0, c1, c0, 0	@ HSCR
 -- 
-2.11.0
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
