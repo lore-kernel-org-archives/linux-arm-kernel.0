@@ -1,71 +1,93 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 6 Jun 2017 16:56:27 +0100
-Subject: [PATCH v2 13/25] KVM: arm64: vgic-v3: Add ICV_BPR0_EL1 handler
-In-Reply-To: <20170606154609.GI9464@cbox>
-References: <20170601102117.17750-1-marc.zyngier@arm.com>
- <20170601102117.17750-14-marc.zyngier@arm.com>
- <20170606121150.GO9464@cbox> <7bfbee5d-f765-4fa2-02f0-c76a607658dd@arm.com>
- <20170606154609.GI9464@cbox>
-Message-ID: <CAFEAcA9ZHZTJodXstB2YJRnM8QjZtehUwGwAnKKKceMfpB7=gQ@mail.gmail.com>
+From: john.stultz@linaro.org (John Stultz)
+Date: Tue, 6 Jun 2017 08:58:30 -0700
+Subject: [PATCH 8/8] arm64: dts: hikey: Fix WiFi support
+In-Reply-To: <CAPDyKFrAwntQsK_Rxs0Hzthv6TkbofE7LwgVimo60zVKruJHBA@mail.gmail.com>
+References: <1494260477-25163-1-git-send-email-ulf.hansson@linaro.org>
+ <1494260477-25163-9-git-send-email-ulf.hansson@linaro.org>
+ <CALAqxLX4HwbVm8G4Ch2uYKAy6C9vYAZEcRUdCLDePT55oGz6hw@mail.gmail.com>
+ <d7988293-853f-fb3a-ae29-d1dff4e4d732@linaro.org>
+ <CALAqxLU2zz17sHMFKOe4p248Bu4fRiU_dKoBBPbY38gDrpb_mw@mail.gmail.com>
+ <CAPDyKFrtE1nKrc1Zk_n=rZTrMVT=Vb=cpk-7AEFWZRmVhFi+4w@mail.gmail.com>
+ <CALAqxLWEsQK4g_AM7cPzJSrF_jiTSZpxvLPy_D4HUgdrgf=KuA@mail.gmail.com>
+ <CABGGisxWS2uT6xCATaZbeaDxsEfPz_BSW7Cr=52OwkdFdrV=_Q@mail.gmail.com>
+ <CAPDyKFrAwntQsK_Rxs0Hzthv6TkbofE7LwgVimo60zVKruJHBA@mail.gmail.com>
+Message-ID: <CALAqxLXkQ7qrVx9KKzPYF9_ZD29KHgGeyHO8yn--96k9E6xZEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 June 2017 at 16:46, Christoffer Dall <cdall@linaro.org> wrote:
-> On Tue, Jun 06, 2017 at 04:15:05PM +0100, Marc Zyngier wrote:
->> >> +static void __hyp_text __vgic_v3_write_bpr0(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
->> >> +{
->> >> +  u64 val = vcpu_get_reg(vcpu, rt);
->> >> +  u8 bpr_min = 7 - vtr_to_nr_pre_bits(read_gicreg(ICH_VTR_EL2));
->> >> +
->> >> +  /* Enforce BPR limiting */
->> >> +  if (val < bpr_min)
->> >> +          val = bpr_min;
->> >> +
->> >> +  val <<= ICH_VMCR_BPR0_SHIFT;
->> >> +  val &= ICH_VMCR_BPR0_MASK;
->> >> +  vmcr &= ~ICH_VMCR_BPR0_MASK;
->> >> +  vmcr |= val;
->> >> +
->> >> +  if (vmcr & ICH_VMCR_CBPR_MASK) {
->> >> +          val = __vgic_v3_get_bpr1(vmcr);
->> >> +          val <<= ICH_VMCR_BPR1_SHIFT;
->> >> +          val &= ICH_VMCR_BPR1_MASK;
->> >> +          vmcr &= ~ICH_VMCR_BPR1_MASK;
->> >> +          vmcr |= val;
->> >> +  }
->> >
->> > I don't understand why this block is needed?
->>
->> If you have CBPR already set, and then update BPR0, you need to make
->> sure that BPR1 gets updated as well. You could hope that the HW would do
->> it for you, but since we're erratum workaround land...
->>
+On Tue, Jun 6, 2017 at 3:08 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> [...]
 >
-> I just didn't read the spec that way, I gathered that the hardware would
-> maintain read-as-written for for bpr1 but use bpr0 to set the binary
-> point when cbpr is set, and just ignore writes to bpr1 for as long as
-> cbpr is set.
+>>>>
+>>>> John, thanks for the report!
+>>>>
+>>>> After a some investigation, I realized that the mmc pwrseq_simple
+>>>> driver returns -EPROBE_DEFER as it's not able to get the "ext" clock.
+>>>> Hence the SDIO card will not be detected.
+>>>>
+>>>> To fix the problem, you need to enable CONFIG_COMMON_CLK_HI655X in the
+>>>> kernel config. This is actually also the case when using the arm64
+>>>> defconfig for a plain 4.12 rc3 and later. We should probably make this
+>>>> driver enabled per default when building the arm64 defconfig.
+>>>>
+>>>> Can you run a re-test at your side with the CONFIG_COMMON_CLK_HI655X
+>>>> set? Just to make sure it works also with those boot binaries you are
+>>>> using...
+>>>
+>>> So unfortunately, now I'm seeing a side-effect from enabling
+>>> CONFIG_COMMON_CLK_HI655X.
+>>>
+>>> Using the serial-dev driver for the TI bluetooth, it seems I'm seeing
+>>> failures when CONFIG_COMMON_CLK_HI655X is enabled, but configuring it
+>>> out, bluetooth works (and wifi then fails).
+>>>
+>>> Looking through the dmesg logs, the bluetooth driver seems to
+>>> initialize up properly and load the firmware, but with CLK_HI655X
+>>> enabled, we see:
+>>>
+>>> Bluetooth: hci0 command 0xff05 tx timeout
+>>> Bluetooth: hci0: send command failed\x0a
+>>> Bluetooth: hci0 command 0xff36 tx timeout
+>>> Bluetooth: hci0 command 0x1003 tx timeout
+>>> Bluetooth: hci0 command 0x1001 tx timeout
+>>> Bluetooth: hci0 command 0x1009 tx timeout
+>>> ...
+>
+> As Rob said below, this is because the blue-tooth driver doesn't
+> properly deal with the power on/off sequence.
+>
+> I guess it works for you because your versions of the boot binaries
+> turns all needed resources on. That isn't the case for me, blue-tooth
+> is neither working before or after this change, but wifi is.
+>
+>>>
+>>> This effectively seems to make bluetooth an wifi functionality
+>>> exclusive.  So I don't think this is a sufficient solution (over
+>>> reverting the original patch that changes the dts - which allows both
+>>> to function).
+>
+> Since the issues you are reporting about is depending on the
+> boot-binaries and not a really bugs in the kernel, may I suggest that
+> we invest our efforts in fixing the blue-tooth driver instead, as it's
+> there the real problem is!?
 
-This depends whether you're talking about the ICC/ICV BPR0/BPR1 registers,
-or the fields in the ICH_VMCR*. For the former, if CBPR is set then
-BPR1 reads and writes affect BPR0. For the latter, the two fields
-are both independent and read-as-written regardless of the value
-of CBPR, it's just that the value in the BPR1 field has no effect.
-(The reason for this is for VM state migration: if a guest does:
-  - write X to BPR0
-  - write Y to BPR1
-  - set CBPR
-  - write Z to BPR0
-  - unset CBPR
-  - read BPR1
-it should get back Y still; so EL2 needs to have a way to see
-both the underlying BPR0 and BPR1 values even if CPBR is in effect.)
+I'd agree a fast fix to the bluetooth node would be preferred. But to
+the issue of bugs in the kernel vs bootloader, to users it doesn't
+matter. It worked before, and now it doesn't. That's a regression, so
+either we need a fix or a revert.
 
-So the code above is not correct, I think, because it's making
-writes to BPR0 affect the BPR1 value. Instead what should happen
-is that when we emulate reads and writes to ICC_BPR1 we should pay
-attention to CBPR and work with either the VMCR BPR0 or BPR1 field
-appropriately.
+>> If the clock to the TI chip is described in DT for WiFi, then the BT
+>> side needs it as well (as does the driver) for proper refcounting. The
+>> same would apply to regulators as well. I looked at the regulators for
+>> HiKey and the 2 supplies (Vbat and i/o) appear to both be always on.
+>>
+>> Rob
+>
+> Correct.
+>
+> I am working on patch, I keep you on cc.
+
+Nice, I'll be happy to test!
 
 thanks
--- PMM
+-john
