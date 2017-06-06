@@ -1,47 +1,47 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 6 Jun 2017 16:17:40 +0200
-Subject: [PATCH] ARM64: Kconfig: Fix the missing hi655x common clk
-In-Reply-To: <1496686434-13181-1-git-send-email-daniel.lezcano@linaro.org>
-References: <CALAqxLVn9r9R-wnrZbrFqYfwqZD-tegbJrZLsUeBjjBc4_Q89w@mail.gmail.com>
- <1496686434-13181-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <CAPDyKFqWptneK2V7wCR8LGbgU7=U9kBCKkHrtgGmZKmNQJ4s7g@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 6 Jun 2017 16:20:14 +0200
+Subject: [PATCH v4 10/10] staging: fsl-mc: move bus driver out of staging
+In-Reply-To: <VI1PR0401MB1856DBA58830206CC7DFC18DECCB0@VI1PR0401MB1856.eurprd04.prod.outlook.com>
+References: <20170531105852.22304-1-laurentiu.tudor@nxp.com>
+ <20170531105852.22304-11-laurentiu.tudor@nxp.com>
+ <20170603084027.GA10784@kroah.com>
+ <VI1PR0401MB1856DBA58830206CC7DFC18DECCB0@VI1PR0401MB1856.eurprd04.prod.outlook.com>
+Message-ID: <20170606142014.GA19404@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 June 2017 at 20:13, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
-> With the addition of the hi655x common clock, the config option is missing
-> for the ARM64's hi6220 platform. That leads to a non functionnal WiFi because
-> the hi655x clock driver misses when initializing the power sequence via DT.
->
-> Cc: John Stultz <john.stultz@linaro.org>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Wei Xu <xuwei5@hisilicon.com>
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+On Tue, Jun 06, 2017 at 02:03:44PM +0000, Laurentiu Tudor wrote:
+> Hi Greg, 
+> 
+> > -----Original Message-----
+> > From: Greg KH [mailto:gregkh at linuxfoundation.org]
+> > Sent: Saturday, June 03, 2017 11:40 AM
+> > 
+> > On Wed, May 31, 2017 at 01:58:52PM +0300, laurentiu.tudor at nxp.com wrote:
+> > > From: Stuart Yoder <stuart.yoder@nxp.com>
+> > 
+> > Your subject says 'v4' yet the other patches here in the series do not, they say
+> > nothing, or 'v2', and the 0/10 patch says 'v6'!
+> 
+> I'm tracking the patch versions individually and use the cover letter version (v6 currently)
+> to reflect the version of the patch series as a whole. There are a bunch of patches that are either newly
+> introduced in this series or didn't had multiple versions so I didn't tagged them with a version tag.
+> The patch [10/10] didn't changed since v4 so I left the version unchanged. The only change was in patch [07/10]
+> for which I added a commit message so I bumped the version to v2.
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+And that's totally crazy.  What do you expect me, or anyone else, to
+know what to do with that.  Heck, I can't even sort them by proper order
+in which to apply them in, if I wanted to.  You are keeping me from
+actually using your work :(
 
-Would be nice to get this trivial fix in for 4.12 rcs to make the WiFi
-work for Hikey.
+> > Please fix up and do this correctly.  The _whole_ patch series is versioned,
+> > otherwise how can I sort them to apply them in the correct order?
+> 
+> Want me to tag all the patches with the same version (that is, v7 for
+> the next respin)?
 
-Kind regards
-Uffe
+Yes, like everyone else does please :)
 
-> ---
->  arch/arm64/Kconfig.platforms | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-> index 73272f4..6dfe72c 100644
-> --- a/arch/arm64/Kconfig.platforms
-> +++ b/arch/arm64/Kconfig.platforms
-> @@ -79,6 +79,7 @@ config ARCH_LG1K
->  config ARCH_HISI
->         bool "Hisilicon SoC Family"
->         select ARM_TIMER_SP804
-> +       select COMMON_CLK_HI655X
->         select HISILICON_IRQ_MBIGEN if PCI
->         select PINCTRL
->         help
-> --
-> 2.7.4
->
+thanks,
+
+greg k-h
