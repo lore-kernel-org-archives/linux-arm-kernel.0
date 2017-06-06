@@ -1,59 +1,138 @@
 From: ruxandra.radulescu@nxp.com (Ioana Radulescu)
-Date: Tue, 6 Jun 2017 10:00:33 -0500
-Subject: [PATCH 10/18] staging: fsl-dpaa2/eth: Defer probing if no DPIOs found
+Date: Tue, 6 Jun 2017 10:00:39 -0500
+Subject: [PATCH 16/18] staging: fsl-dpaa2/eth: Errors checking update
 In-Reply-To: <20170606150041.10955-1-ruxandra.radulescu@nxp.com>
 References: <20170606150041.10955-1-ruxandra.radulescu@nxp.com>
-Message-ID: <20170606150041.10955-11-ruxandra.radulescu@nxp.com>
+Message-ID: <20170606150041.10955-17-ruxandra.radulescu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the Ethernet driver doesn't find any DPIO devices during probe,
-it may be either because there's none available or because they
-haven't been probed yet. Request deferred probing in case it's
-the latter.
+On the egress path, frame errors are reported using both a FD control
+field and the frame annotation status. The current code only handles
+FAS errors. Update to look at both fields when accounting Tx errors.
 
-Signed-off-by: Bharat Bhushan <Bharat.Bhushan@nxp.com>
+Signed-off-by: Bogdan Purcareata <bogdan.purcareata@nxp.com>
 Signed-off-by: Ioana Radulescu <ruxandra.radulescu@nxp.com>
 ---
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+Note: Checkpatch complains about a macro(DPAA2_FAS_RX_ERR_MASK) being
+too complex. It's just a bitmask with all possible Rx FAS error bits
+and I'm not sure how the extra parantheses recommended by checkpatch
+would help, so leaving it as is.
+
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c | 36 ++++++++++++++++++++------
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h | 17 ++++++++++--
+ 2 files changed, 43 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-index fd56fbd20087..025b5f6559a4 100644
+index 26f209c78ff9..7dca8c2e5ff9 100644
 --- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
 +++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-@@ -1510,6 +1510,7 @@ static int setup_dpio(struct dpaa2_eth_priv *priv)
- 		if (!channel) {
- 			dev_info(dev,
- 				 "No affine channel for cpu %d and above\n", i);
-+			err = -ENODEV;
- 			goto err_alloc_ch;
- 		}
+@@ -534,7 +534,7 @@ static void free_tx_fd(const struct dpaa2_eth_priv *priv,
+ 	 * buffer but before we free it. The caller function is responsible
+ 	 * for checking the status value.
+ 	 */
+-	if (status && (dpaa2_fd_get_frc(fd) & DPAA2_FD_FRC_FASV))
++	if (status)
+ 		*status = le32_to_cpu(fas->status);
  
-@@ -1524,10 +1525,13 @@ static int setup_dpio(struct dpaa2_eth_priv *priv)
- 		/* Register the new context */
- 		err = dpaa2_io_service_register(NULL, nctx);
- 		if (err) {
--			dev_info(dev, "No affine DPIO for cpu %d\n", i);
-+			dev_dbg(dev, "No affine DPIO for cpu %d\n", i);
- 			/* If no affine DPIO for this core, there's probably
--			 * none available for next cores either.
-+			 * none available for next cores either. Signal we want
-+			 * to retry later, in case the DPIO devices weren't
-+			 * probed yet.
- 			 */
-+			err = -EPROBE_DEFER;
- 			goto err_service_reg;
- 		}
+ 	/* Free SGT buffer kmalloc'ed on tx */
+@@ -638,6 +638,8 @@ static void dpaa2_eth_tx_conf(struct dpaa2_eth_priv *priv,
+ 	struct rtnl_link_stats64 *percpu_stats;
+ 	struct dpaa2_eth_drv_stats *percpu_extras;
+ 	u32 status = 0;
++	u32 fd_errors;
++	bool has_fas_errors = false;
  
-@@ -1565,7 +1569,7 @@ static int setup_dpio(struct dpaa2_eth_priv *priv)
- err_alloc_ch:
- 	if (cpumask_empty(&priv->dpio_cpumask)) {
- 		dev_err(dev, "No cpu with an affine DPIO/DPCON\n");
--		return -ENODEV;
-+		return err;
+ 	/* Tracing point */
+ 	trace_dpaa2_tx_conf_fd(priv->net_dev, fd);
+@@ -646,13 +648,31 @@ static void dpaa2_eth_tx_conf(struct dpaa2_eth_priv *priv,
+ 	percpu_extras->tx_conf_frames++;
+ 	percpu_extras->tx_conf_bytes += dpaa2_fd_get_len(fd);
+ 
+-	free_tx_fd(priv, fd, &status);
+-
+-	if (unlikely(status & DPAA2_ETH_TXCONF_ERR_MASK)) {
+-		percpu_stats = this_cpu_ptr(priv->percpu_stats);
+-		/* Tx-conf logically pertains to the egress path. */
+-		percpu_stats->tx_errors++;
++	/* Check frame errors in the FD field */
++	fd_errors = dpaa2_fd_get_ctrl(fd) & DPAA2_FD_TX_ERR_MASK;
++	if (unlikely(fd_errors)) {
++		/* We only check error bits in the FAS field if corresponding
++		 * FAERR bit is set in FD and the FAS field is marked as valid
++		 */
++		has_fas_errors = (fd_errors & DPAA2_FD_CTRL_FAERR) &&
++				 !!(dpaa2_fd_get_frc(fd) & DPAA2_FD_FRC_FASV);
++		if (net_ratelimit())
++			netdev_dbg(priv->net_dev, "TX frame FD error: %x08\n",
++				   fd_errors);
  	}
++
++	free_tx_fd(priv, fd, has_fas_errors ? &status : NULL);
++
++	if (likely(!fd_errors))
++		return;
++
++	percpu_stats = this_cpu_ptr(priv->percpu_stats);
++	/* Tx-conf logically pertains to the egress path. */
++	percpu_stats->tx_errors++;
++
++	if (has_fas_errors && net_ratelimit())
++		netdev_dbg(priv->net_dev, "TX frame FAS error: %x08\n",
++			   status & DPAA2_FAS_TX_ERR_MASK);
+ }
  
- 	dev_info(dev, "Cores %*pbl available for processing ingress traffic\n",
+ static int set_rx_csum(struct dpaa2_eth_priv *priv, bool enable)
+@@ -2069,7 +2089,7 @@ static int bind_dpni(struct dpaa2_eth_priv *priv)
+ 		netdev_err(net_dev, "Failed to configure hashing\n");
+ 
+ 	/* Configure handling of error frames */
+-	err_cfg.errors = DPAA2_ETH_RX_ERR_MASK;
++	err_cfg.errors = DPAA2_FAS_RX_ERR_MASK;
+ 	err_cfg.set_frame_annotation = 1;
+ 	err_cfg.error_action = DPNI_ERROR_ACTION_DISCARD;
+ 	err = dpni_set_errors_behavior(priv->mc_io, 0, priv->mc_token,
+diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
+index c760e9b77e22..b492c8723bb6 100644
+--- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
++++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
+@@ -120,6 +120,19 @@ struct dpaa2_eth_swa {
+ #define DPAA2_FD_FRC_FASWOV		0x0800
+ #define DPAA2_FD_FRC_FAICFDV		0x0400
+ 
++/* Error bits in FD CTRL */
++#define DPAA2_FD_CTRL_UFD		0x00000004
++#define DPAA2_FD_CTRL_SBE		0x00000008
++#define DPAA2_FD_CTRL_FSE		0x00000010
++#define DPAA2_FD_CTRL_FAERR		0x00000020
++
++#define DPAA2_FD_RX_ERR_MASK		(DPAA2_FD_CTRL_SBE	| \
++					 DPAA2_FD_CTRL_FAERR)
++#define DPAA2_FD_TX_ERR_MASK		(DPAA2_FD_CTRL_UFD	| \
++					 DPAA2_FD_CTRL_SBE	| \
++					 DPAA2_FD_CTRL_FSE	| \
++					 DPAA2_FD_CTRL_FAERR)
++
+ /* Annotation bits in FD CTRL */
+ #define DPAA2_FD_CTRL_ASAL		0x00020000	/* ASAL = 128 */
+ #define DPAA2_FD_CTRL_PTA		0x00800000
+@@ -177,7 +190,7 @@ struct dpaa2_fas {
+ /* L4 csum error */
+ #define DPAA2_FAS_L4CE			0x00000001
+ /* Possible errors on the ingress path */
+-#define DPAA2_ETH_RX_ERR_MASK		(DPAA2_FAS_KSE		| \
++#define DPAA2_FAS_RX_ERR_MASK		(DPAA2_FAS_KSE		| \
+ 					 DPAA2_FAS_EOFHE	| \
+ 					 DPAA2_FAS_MNLE		| \
+ 					 DPAA2_FAS_TIDE		| \
+@@ -191,7 +204,7 @@ struct dpaa2_fas {
+ 					 DPAA2_FAS_L3CE		| \
+ 					 DPAA2_FAS_L4CE)
+ /* Tx errors */
+-#define DPAA2_ETH_TXCONF_ERR_MASK	(DPAA2_FAS_KSE		| \
++#define DPAA2_FAS_TX_ERR_MASK		(DPAA2_FAS_KSE		| \
+ 					 DPAA2_FAS_EOFHE	| \
+ 					 DPAA2_FAS_MNLE		| \
+ 					 DPAA2_FAS_TIDE)
 -- 
 2.11.0
