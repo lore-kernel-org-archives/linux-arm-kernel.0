@@ -1,44 +1,31 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 6 Jun 2017 11:36:26 +0200
-Subject: [PATCH] arm64: dts: marvell: 8040-mcbin: Enable 1GB Ethernet
-In-Reply-To: <87h8ztjwz0.fsf@arm.com>
-References: <20170605200107.7692-1-marc.zyngier@arm.com>
- <20170606110234.239d2c4a@free-electrons.com>
- <20170606110603.2dafb7ed@free-electrons.com>
- <87h8ztjwz0.fsf@arm.com>
-Message-ID: <20170606113626.197efbf7@free-electrons.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 6 Jun 2017 17:38:37 +0800
+Subject: [v6 2/3] iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2
+ erratum #74
+In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA838351762@FRAEML521-MBX.china.huawei.com>
+References: <1494592866-14076-1-git-send-email-gakula@caviumnetworks.com>
+ <1494592866-14076-3-git-send-email-gakula@caviumnetworks.com>
+ <5FC3163CFD30C246ABAA99954A238FA838351762@FRAEML521-MBX.china.huawei.com>
+Message-ID: <9ab6fba9-5270-a618-d149-2e4c11d4cbf6@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 2017/5/17 18:13, Shameerali Kolothum Thodi wrote:
+>>   #ifdef CONFIG_ACPI
+>> +static void acpi_smmu_get_options(u32 model, struct arm_smmu_device
+>> +*smmu) {
+>> +	if (model == ACPI_IORT_SMMU_CAVIUM_CN99XX)
+>> +		smmu->options |= ARM_SMMU_OPT_PAGE0_REGS_ONLY;
+ >
+> HiSIlicon hip06/07 boards have a similar existing option to enable,
+> ARM_SMMU_OPT_SKIP_PREFETCH. I have just sent out a similar patch to enable
+> It-" [PATCH] iommu/arm-smmu-v3: Enable ACPI based HiSilicon CMD_PREFETCH
+>   quirk(erratum 161010701)".  May be it can be merged here, if this series goes through.
+>   Not sure about the protocol though.
 
-On Tue, 06 Jun 2017 10:18:11 +0100, Marc Zyngier wrote:
+I think you can add a patch on top of Geetha's, and clarify
+the dependency in the change log, then it will be easy for
+maintainer to apply.
 
-> > So perhaps we should indeed keep Marc's patch, enabling just the 1GB
-> > Ethernet interface.  
-> 
-> Whichever patch we merge, Andrew's comment remains. Should we stick with
-> "phy", or switch to "phy-handle" everywhere?
-
-Since the binding says to use phy-handle, we should use phy-handle for
-your patch. Of course, progressively, we should migrate all our
-bindings to this new property name, but I don't think this should be a
-prerequisite for your patch to go in.
-
-Side note: I don't understand this change from "phy" to "phy-handle".
-It really doesn't make sense to me to encode the type of the property
-in the name of the property. Are we going to use:
-
-  phy-mode-string = "sgmii";
-  pinctrl-0-handle = <&foo>;
-  reg-u32s = <0xdeadbeef 0xbadcafe>;
-
-is there a pointer to the reasoning for this change?
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Thanks
+Hanjun
