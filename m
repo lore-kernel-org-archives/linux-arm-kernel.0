@@ -1,80 +1,85 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Tue,  6 Jun 2017 16:51:42 +0800
-Subject: [PATCH v4 7/8] arm64: dts: hikey960: add device node for pmic and
- regulators
-In-Reply-To: <20170606085143.13154-1-guodong.xu@linaro.org>
-References: <20170606085143.13154-1-guodong.xu@linaro.org>
-Message-ID: <20170606085143.13154-8-guodong.xu@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 6 Jun 2017 09:55:53 +0100
+Subject: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO devices
+ before scanning
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E40A7B677@FRAEML521-MBX.china.huawei.com>
+References: <1495712248-5232-1-git-send-email-gabriele.paoloni@huawei.com>
+ <1495712248-5232-6-git-send-email-gabriele.paoloni@huawei.com>
+ <20170530132408.GA2556@red-moon>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40A7B677@FRAEML521-MBX.china.huawei.com>
+Message-ID: <20170606085553.GA20085@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
+Hi Gab, Rafael,
 
-add device node for hi6421 pmic core and hi6421v530
-voltage regulator,include LDO(1,3,9,11,15,16)
+On Wed, May 31, 2017 at 10:24:47AM +0000, Gabriele Paoloni wrote:
 
-Signed-off-by: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 46 +++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
+[...]
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-index ca448f0..e579333 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-@@ -97,6 +97,52 @@
- 			default-state = "off";
- 		};
- 	};
-+
-+	pmic: pmic at fff34000 {
-+		compatible = "hisilicon,hi6421v530-pmic";
-+		reg = <0x0 0xfff34000 0x0 0x1000>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+
-+		regulators {
-+			ldo3: LDO3 { /* HDMI */
-+				regulator-name = "VOUT3_1V85";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <2200000>;
-+				regulator-enable-ramp-delay = <120>;
-+			};
-+
-+			ldo9: LDO9 { /* SDCARD I/O */
-+				regulator-name = "VOUT9_1V8_2V95";
-+				regulator-min-microvolt = <1750000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <240>;
-+			};
-+
-+			ldo11: LDO11 { /* Low Speed Connector */
-+				regulator-name = "VOUT11_1V8_2V95";
-+				regulator-min-microvolt = <1750000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <240>;
-+			};
-+
-+			ldo15: LDO15 { /* UFS VCC */
-+				regulator-name = "VOUT15_3V0";
-+				regulator-min-microvolt = <1750000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-enable-ramp-delay = <120>;
-+			};
-+
-+			ldo16: LDO16 { /* SD VDD */
-+				regulator-name = "VOUT16_2V95";
-+				regulator-min-microvolt = <1750000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-enable-ramp-delay = <360>;
-+			};
-+		};
-+	};
- };
- 
- &i2c0 {
--- 
-2.10.2
+> > > diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+> > > index e39ec7b..37dd23c 100644
+> > > --- a/drivers/acpi/scan.c
+> > > +++ b/drivers/acpi/scan.c
+> > > @@ -2035,6 +2035,7 @@ int __init acpi_scan_init(void)
+> > >  	acpi_int340x_thermal_init();
+> > >  	acpi_amba_init();
+> > >  	acpi_watchdog_init();
+> > > +	acpi_indirectio_scan_init();
+
+Unfortunately this is becoming a pattern and we are ending up
+with a static ordering of "subsystems" init (even though for this
+LPC series it is just the Hisilicon driver that requires this call)
+and I am not sure I see any way of avoiding it. I think that's always
+been the case in x86, with fewer subsystems/kernel paths to care
+about, I wanted to flag this up though to check your opinion since
+I am not sure this is the right direction we are taking.
+
+I also think that relying on _DEP to build any dependency is not
+entirely a) usable (owing to legacy bindings and previous _DEP misuse)
+and b) compliant with ACPI bindings given that _DEP has to be used
+for operation regions only.
+
+Thoughts ?
+
+Thanks,
+Lorenzo
+
+> > >  	acpi_scan_add_handler(&generic_device_handler);
+> > >
+> > > diff --git a/include/acpi/acpi_indirect_pio.h
+> > b/include/acpi/acpi_indirect_pio.h
+> > > new file mode 100644
+> > > index 0000000..efc5c43
+> > > --- /dev/null
+> > > +++ b/include/acpi/acpi_indirect_pio.h
+> > > @@ -0,0 +1,24 @@
+> > > +/*
+> > > + * ACPI support for indirect-PIO bus.
+> > > + *
+> > > + * Copyright (C) 2017 Hisilicon Limited, All Rights Reserved.
+> > > + * Author: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+> > > + * Author: Zhichang Yuan <yuanzhichang@hisilicon.com>
+> > > + *
+> > > + * This program is free software; you can redistribute it and/or
+> > modify
+> > > + * it under the terms of the GNU General Public License version 2 as
+> > > + * published by the Free Software Foundation.
+> > > + */
+> > > +
+> > > +#ifndef _ACPI_INDIRECT_PIO_H
+> > > +#define _ACPI_INDIRECT_PIO_H
+> > > +
+> > > +struct indirect_pio_device_desc {
+> > > +	void *pdata; /* device relevant info data */
+> > > +	int (*pre_setup)(struct acpi_device *adev, void *pdata);
+> > > +};
+> > > +
+> > > +int acpi_set_logic_pio_resource(struct device *child,
+> > > +		struct device *hostdev);
+> > > +
+> > > +#endif
+> > > --
+> > > 2.7.4
+> > >
+> > >
