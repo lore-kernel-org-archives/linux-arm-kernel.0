@@ -1,81 +1,75 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 6 Jun 2017 12:04:47 +0200
-Subject: [PATCH] clk: sunxi-ng: Move all clock types to a library
-In-Reply-To: <20170605144546.b6oh5sygrza22hbe@flea.lan>
-References: <20170602223006.1653-1-sboyd@codeaurora.org>
- <201706031243.qNvuUbQX%fengguang.wu@intel.com>
- <20170605144546.b6oh5sygrza22hbe@flea.lan>
-Message-ID: <CAK8P3a1Qvt4nvM5HeK-n87tsi2D5GBOmZo0rZv_Lp==CC=34Uw@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 06 Jun 2017 12:05:24 +0200
+Subject: [PATCH] arm64: dts: marvell: cp110: add required clocks for mdio
+ interface
+In-Reply-To: <1496743035-4618-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ (Thomas Petazzoni's message of "Tue, 6 Jun 2017 11:57:15 +0200")
+References: <1496743035-4618-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <8760g9ph23.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 5, 2017 at 4:45 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
+Hi Thomas,
+ 
+ On mar., juin 06 2017, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+
+> From: Russell King <rmk+kernel@armlinux.org.uk>
 >
-> On Sat, Jun 03, 2017 at 12:22:32PM +0800, kbuild test robot wrote:
->> Hi Stephen,
->>
->> [auto build test ERROR on sunxi/sunxi/for-next]
->> [also build test ERROR on next-20170602]
->> [cannot apply to clk/clk-next v4.12-rc3]
->> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
->>
->>    sunxi_sid.c:(.data+0x1da8c): undefined reference to `ccu_gate_ops'
->>    sunxi_sid.c:(.data+0x1dac8): undefined reference to `ccu_gate_ops'
->>    sunxi_sid.c:(.data+0x1db20): undefined reference to `ccu_mux_ops'
->>    sunxi_sid.c:(.data+0x1db74): undefined reference to `ccu_mux_ops'
->>    sunxi_sid.c:(.data+0x1dbec): undefined reference to `ccu_mp_ops'
->>    sunxi_sid.c:(.data+0x1dc64): undefined reference to `ccu_mp_ops'
+> Add the three required clocks for the MDIO interface to be functional
+
+You should also maybe update the commit log and speaking of two clocks
+as you removed the third one.
+
+
+> on Armada 8k platforms.  Without this, the CPU hangs, causing RCU
+> stalls or the system to become unresponsive.
+
+According to this comment, I guess this patch is a fix and should be
+applied in v4.12-rc.
+
+Gregory
+
 >
-> It seems like even though the lib.a file is compiled properly, it is
-> never linked in. It looks like we would be supposed to add
-> drivers/clk/sunxi-ng/ to libs-y, but that doesn't seem to work for
-> Makefiles in drivers/*
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> [Thomas:
+>  - remove mg_core_clock, since it's a parent of mg_clock
+>  - also add clock references to the slave CP mdio instance]
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 1 +
+>  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 1 +
+>  2 files changed, 2 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> index 00af338..c33e891 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> @@ -95,6 +95,7 @@
+>  				#size-cells = <0>;
+>  				compatible = "marvell,orion-mdio";
+>  				reg = <0x12a200 0x10>;
+> +				clocks = <&cpm_syscon0 1 9>, <&cpm_syscon0 1 5>;
+>  			};
+>  
+>  			cpm_icu: interrupt-controller at 1e0000 {
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> index bee48ae..2a99ff8 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> @@ -100,6 +100,7 @@
+>  				#size-cells = <0>;
+>  				compatible = "marvell,orion-mdio";
+>  				reg = <0x12a200 0x10>;
+> +				clocks = <&cps_syscon0 1 9>, <&cps_syscon0 1 5>;
+>  			};
+>  
+>  			cps_icu: interrupt-controller at 1e0000 {
+> -- 
+> 2.7.4
+>
 
-Ah, too bad. I see that only one directory under drivers/ uses something
-with lib.a, in drivers/firmware/efi/libstub/Makefile, but that seems to
-rely on being special-cased as well.
-
-However, this patch seems to fix it:
-
-diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-index cbc8cb4f70e3..321d3da7cc6a 100644
---- a/drivers/clk/sunxi-ng/Makefile
-+++ b/drivers/clk/sunxi-ng/Makefile
-@@ -18,16 +18,16 @@ lib-$(CONFIG_SUNXI_CCU) += ccu_nm.o
- lib-$(CONFIG_SUNXI_CCU) += ccu_mp.o
-
- # SoC support
--obj-$(CONFIG_SUN50I_A64_CCU) += ccu-sun50i-a64.o
--obj-$(CONFIG_SUN5I_CCU) += ccu-sun5i.o
--obj-$(CONFIG_SUN6I_A31_CCU) += ccu-sun6i-a31.o
--obj-$(CONFIG_SUN8I_A23_CCU) += ccu-sun8i-a23.o
--obj-$(CONFIG_SUN8I_A33_CCU) += ccu-sun8i-a33.o
--obj-$(CONFIG_SUN8I_A83T_CCU) += ccu-sun8i-a83t.o
--obj-$(CONFIG_SUN8I_H3_CCU) += ccu-sun8i-h3.o
--obj-$(CONFIG_SUN8I_V3S_CCU) += ccu-sun8i-v3s.o
--obj-$(CONFIG_SUN8I_DE2_CCU) += ccu-sun8i-de2.o
--obj-$(CONFIG_SUN8I_R_CCU) += ccu-sun8i-r.o
--obj-$(CONFIG_SUN9I_A80_CCU) += ccu-sun9i-a80.o
--obj-$(CONFIG_SUN9I_A80_CCU) += ccu-sun9i-a80-de.o
--obj-$(CONFIG_SUN9I_A80_CCU) += ccu-sun9i-a80-usb.o
-+obj-$(CONFIG_SUN50I_A64_CCU) += ccu-sun50i-a64.o lib.a
-+obj-$(CONFIG_SUN5I_CCU) += ccu-sun5i.o lib.a
-+obj-$(CONFIG_SUN6I_A31_CCU) += ccu-sun6i-a31.o lib.a
-+obj-$(CONFIG_SUN8I_A23_CCU) += ccu-sun8i-a23.o lib.a
-+obj-$(CONFIG_SUN8I_A33_CCU) += ccu-sun8i-a33.o lib.a
-+obj-$(CONFIG_SUN8I_A83T_CCU) += ccu-sun8i-a83t.o lib.a
-+obj-$(CONFIG_SUN8I_H3_CCU) += ccu-sun8i-h3.o lib.a
-+obj-$(CONFIG_SUN8I_V3S_CCU) += ccu-sun8i-v3s.o lib.a
-+obj-$(CONFIG_SUN8I_DE2_CCU) += ccu-sun8i-de2.o lib.a
-+obj-$(CONFIG_SUN8I_R_CCU) += ccu-sun8i-r.o lib.a
-+obj-$(CONFIG_SUN9I_A80_CCU) += ccu-sun9i-a80.o lib.a
-+obj-$(CONFIG_SUN9I_A80_CCU) += ccu-sun9i-a80-de.o lib.a
-+obj-$(CONFIG_SUN9I_A80_CCU) += ccu-sun9i-a80-usb.o lib.a
-
-It's not documented behavior, but I think it's still good enough,
-and improves the current version, unless there is another bug
-after we add this to your patch.
-
-        Arnd
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
