@@ -1,41 +1,35 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Tue,  6 Jun 2017 02:54:13 +0200
-Subject: [PATCH v4 15/28] MAINTAINERS: Add Actions Semi Owl section
+Date: Tue,  6 Jun 2017 02:54:17 +0200
+Subject: [PATCH v4 19/28] dt-bindings: arm: cpus: Add S500 enable-method
 In-Reply-To: <20170606005426.26446-1-afaerber@suse.de>
 References: <20170606005426.26446-1-afaerber@suse.de>
-Message-ID: <20170606005426.26446-16-afaerber@suse.de>
+Message-ID: <20170606005426.26446-20-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The Actions Semi S500 SoC requires a special secondary CPU boot procedure.
+
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- v2 -> v3 -> v4: unchanged
+ v3 -> v4: Unchanged
  
- v2: new
+ v3: new
  
- MAINTAINERS | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ Documentation/devicetree/bindings/arm/cpus.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index f17ffa17abef..a9faa30def9c 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1036,6 +1036,16 @@ S:	Maintained
- F:	drivers/amba/
- F:	include/linux/amba/bus.h
- 
-+ARM/ACTIONS SEMI ARCHITECTURE
-+M:	Andreas F?rber <afaerber@suse.de>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+N:	owl
-+F:	arch/arm/mach-actions/
-+F:	arch/arm/boot/dts/s500*
-+F:	arch/arm64/boot/dts/actions/
-+F:	Documentation/devicetree/bindings/arm/actions.txt
-+
- ARM/ADS SPHERE MACHINE SUPPORT
- M:	Lennert Buytenhek <kernel@wantstofly.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index 2713aadb7411..ad1913bea8d7 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -193,6 +193,7 @@ nodes to be present and contain the properties described below.
+ 			     "spin-table"
+ 			# On ARM 32-bit systems this property is optional and
+ 			  can be one of:
++			    "actions,s500-smp"
+ 			    "allwinner,sun6i-a31"
+ 			    "allwinner,sun8i-a23"
+ 			    "arm,realview-smp"
 -- 
 2.12.3
