@@ -1,24 +1,24 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 6 Jun 2017 18:33:55 +0200
-Subject: [PATCH v4 04/28] clocksource: Add Owl timer
-In-Reply-To: <20170606005426.26446-5-afaerber@suse.de>
-References: <20170606005426.26446-1-afaerber@suse.de>
- <20170606005426.26446-5-afaerber@suse.de>
-Message-ID: <20170606163355.GD2345@mai>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 6 Jun 2017 13:34:52 -0300
+Subject: [PATCH v5 2/3] ARM: dts: imx7: add GPMI NAND and APBH DMA
+In-Reply-To: <151ddece1e1427d0b69c4ff11b86a69b6a035d0d.1496730576.git-series.stefan@agner.ch>
+References: <cover.b62c3a17bd60de48d8fb2ade6dde4f2bc60aaf3c.1496730576.git-series.stefan@agner.ch>
+ <151ddece1e1427d0b69c4ff11b86a69b6a035d0d.1496730576.git-series.stefan@agner.ch>
+Message-ID: <CAOMZO5Ai-_5j3gQviaq19y7MJmirRgBtUp59UYmuGaN3Fd5Sag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 06, 2017 at 02:54:02AM +0200, Andreas F?rber wrote:
-> The Actions Semi S500 SoC provides four timers, 2Hz0/1 and 32-bit TIMER0/1.
-> 
-> Use TIMER0 as clocksource and TIMER1 as clockevents.
-> 
-> Based on LeMaker linux-actions tree.
-> 
-> An S500 datasheet can be found on the LeMaker Guitar pages:
-> http://www.lemaker.org/product-guitar-download-29.html
-> 
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
+On Tue, Jun 6, 2017 at 3:30 AM, Stefan Agner <stefan@agner.ch> wrote:
+> Add i.MX 7 APBH DMA and GPMI NAND modules.
+>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Tested on a imx7d-sdb:
+
+[    1.303543] nand: device found, Manufacturer ID: 0xec, Chip ID: 0xd5
+[    1.309999] nand: Samsung NAND 2GiB 3,3V 8-bit
+[    1.314467] nand: 2048 MiB, MLC, erase size: 256 KiB, page size:
+2048, OOB size: 64
+[    1.346007] gpmi-nand 33002000.gpmi-nand: driver registered.
+
+Tested-by: Fabio Estevam <fabio.estevam@nxp.com>
