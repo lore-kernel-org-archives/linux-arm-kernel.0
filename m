@@ -1,39 +1,92 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 6 Jun 2017 09:21:58 +0100
-Subject: [PATCH] arm64: dts: marvell: 8040-mcbin: Enable 1GB Ethernet
-In-Reply-To: <20170605211639.GB9339@lunn.ch>
-References: <20170605200107.7692-1-marc.zyngier@arm.com>
- <20170605211639.GB9339@lunn.ch>
-Message-ID: <3e387cee-0107-8c29-d99a-abd61bdef9c2@arm.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 6 Jun 2017 16:43:32 +0800
+Subject: [PATCH v2 1/2] ACPICA: IORT: Update SMMU models for IORT rev. C
+In-Reply-To: <11ef7d28c535c01d42b7b3c8e632934f0e0f1048.1495459319.git.robin.murphy@arm.com>
+References: <11ef7d28c535c01d42b7b3c8e632934f0e0f1048.1495459319.git.robin.murphy@arm.com>
+Message-ID: <ec4eeffe-9333-fa89-d471-6c88d8d03435@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
-
-On 05/06/17 22:16, Andrew Lunn wrote:
->> +&cps_eth1 {
->> +	status = "okay";
->> +	phy = <&phy0>;
->> +	phy-mode = "sgmii";
->> +};
+On 2017/5/22 23:06, Robin Murphy wrote:
+> IORT revision C has been published with a number of new SMMU
+> implementation identifiers. Since IORT doesn't have any way of falling
+> back to a more generic model code, we really need Linux to know about
+> these before vendors start updating their firmware tables to use them.
 > 
-> Hi Marc
+> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
+> CC: Robert Moore <robert.moore@intel.com>
+> CC: Lv Zheng <lv.zheng@intel.com>
+> Acked-by: Robert Richter <rrichter@cavium.com>
+> Tested-by: Robert Richter <rrichter@cavium.com>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
 > 
-> Documentation/devicetree/bindings/net/ethernet.txt says:
+> v2: Update more comments, add Robert's tags.
 > 
-> - phy-handle: phandle, specifies a reference to a node representing a PHY
->   device; this property is described in ePAPR and so preferred;
-> - phy: the same as "phy-handle" property, not recommended for new bindings.
+> I'm including this here as a kernel patch just for context - once I've
+> figured out how we actually submit patches to ACPICA directly, I'll do
+> that per the preferred process.
+> 
+> Robin.
+> 
+>   include/acpi/actbl2.h | 12 ++++++++++--
+>   1 file changed, 10 insertions(+), 2 deletions(-)
+> 
+> diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
+> index faa9f2c0d5de..f469ea41f2fd 100644
+> --- a/include/acpi/actbl2.h
+> +++ b/include/acpi/actbl2.h
+> @@ -663,7 +663,7 @@ struct acpi_ibft_target {
+>    * IORT - IO Remapping Table
+>    *
+>    * Conforms to "IO Remapping Table System Software on ARM Platforms",
+> - * Document number: ARM DEN 0049B, October 2015
+> + * Document number: ARM DEN 0049C, May 2017
+>    *
+>    ******************************************************************************/
+>   
+> @@ -778,6 +778,8 @@ struct acpi_iort_smmu {
+>   #define ACPI_IORT_SMMU_V2               0x00000001	/* Generic SMMUv2 */
+>   #define ACPI_IORT_SMMU_CORELINK_MMU400  0x00000002	/* ARM Corelink MMU-400 */
+>   #define ACPI_IORT_SMMU_CORELINK_MMU500  0x00000003	/* ARM Corelink MMU-500 */
+> +#define ACPI_IORT_SMMU_CORELINK_MMU401  0x00000004	/* ARM Corelink MMU-401 */
+> +#define ACPI_IORT_SMMU_CAVIUM_SMMUV2    0x00000005	/* Cavium ThunderX SMMUv2 */
+>   
+>   /* Masks for Flags field above */
+>   
+> @@ -798,13 +800,19 @@ struct acpi_iort_smmu_v3 {
+>   	u32 flags;
+>   	u32 reserved;
+>   	u64 vatos_address;
+> -	u32 model;		/* O: generic SMMUv3 */
+> +	u32 model;
+>   	u32 event_gsiv;
+>   	u32 pri_gsiv;
+>   	u32 gerr_gsiv;
+>   	u32 sync_gsiv;
+>   };
+>   
+> +/* Values for Model field above */
+> +
+> +#define ACPI_IORT_SMMU_V3               0x00000000	/* Generic SMMUv3 */
+> +#define ACPI_IORT_SMMU_HISILICON_HI161X 0x00000001	/* HiSilicon Hi161x SMMUv3 */
+> +#define ACPI_IORT_SMMU_CAVIUM_CN99XX    0x00000002	/* Cavium CN99xx SMMUv3 */
+> +
+>   /* Masks for Flags field above */
+>   
+>   #define ACPI_IORT_SMMU_V3_COHACC_OVERRIDE   (1)
+> 
 
-Happy to amend the patch, though armada-8040-db.dts is already using
-"phy" (and not "phy-handle"). Should that one be fixed as well in the
-name of consistency? Also,
-Documentation/devicetree/bindings/net/marvell-pp2.txt only mentions the
-"phy" property. If feels a bit odd not to at least recommend the new
-property in the binding documentation.
+Looks good to me,
 
-Thanks,
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+By the way, how will this patch be merged? There are pending patches
+on top of it, Rafael suggested to work with ACPICA upstream first [1],
+Robin, will work on that?
+
+[1]: 
+https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1394295.html
+
+Thanks
+Hanjun
