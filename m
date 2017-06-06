@@ -1,107 +1,212 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 6 Jun 2017 11:46:26 +0900
-Subject: [PATCH 2/4] dt-bindings: thermal: add binding documentation for
- UniPhier thermal monitor
-In-Reply-To: <1496049345-14649-3-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1496049345-14649-1-git-send-email-hayashi.kunihiko@socionext.com>
- <1496049345-14649-3-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <CAK7LNAS-1+p7u4RMuF5FVNyuSHvX+SfAYk4+YbQSdEaAVma=zg@mail.gmail.com>
+From: bo.zhang@nxp.com (Bruce Zhang)
+Date: Tue, 6 Jun 2017 02:47:03 +0000
+Subject: [[PATCH]] drivers: leds/trigger: system cannot enter suspend
+In-Reply-To: <9d1f4e47-0713-043a-4359-db8f856e0b0e@gmail.com>
+References: <1496648191-134355-1-git-send-email-bo.zhang@nxp.com>
+ <9d1f4e47-0713-043a-4359-db8f856e0b0e@gmail.com>
+Message-ID: <AM3PR04MB404B1161E73CF4D2FB3C5058ACB0@AM3PR04MB404.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-05-29 18:15 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
-> Add devicetree binding documentation for thermal monitor implemented on
-> Socionext UniPhier SoCs.
->
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+Hi Jacek,
+
+The led_syfs_disable() is used to avoid heartbeat_trig_activate/ heartbeat_trig_deactivate called when this led device is suspended.
+I am not encounter this issue, but I think it is a risk.
+
+Best Regards,
+Bo
+
+-----Original Message-----
+From: Jacek Anaszewski [mailto:jacek.anaszewski at gmail.com] 
+Sent: Tuesday, June 06, 2017 3:27 AM
+To: Bruce Zhang <bo.zhang@nxp.com>; linux-arm-kernel at lists.infradead.org
+Cc: pavel at ucw.cz; Linux LED Subsystem <linux-leds@vger.kernel.org>
+Subject: Re: [[PATCH]] drivers: leds/trigger: system cannot enter suspend
+
+Hi Zhang,
+
+Thanks for the patch. It seems to be almost ready to merge.
+Just two issues below.
+
+Please also always cc linux-leds at vger.kernel.org when modifying LED subsystem.
+
+On 06/05/2017 09:36 AM, Zhang Bo wrote:
+> System cannot enter suspend mode because of heartbeat led trigger.
+> Heartbeat_pm_notifier is called when system prepare to enter suspend 
+> mode, then call led_trigger_unregister to change the trigger of led 
+> device to none. It will send uevent message and the wakeup source count changed.
+> 
+> Add suspend/resume ops to the struct led_trigger, implement these two 
+> ops for ledtrig-heartbeat. Add led_trigger_suspend/led_trigger_resume 
+> funcitons to iterate through all LED class devices registered on given 
+> trigger and call their suspend/resume ops and disable/enable sysfs at the same time.
+> 
+> Call led_trigger_suspend{resuem} API in pm_notifier function to 
+> suspend/resume all led devices listed in given trigger.
+> 
+> Signed-off-by: Zhang Bo <bo.zhang@nxp.com>
 > ---
->  .../bindings/thermal/uniphier-thermal.txt          | 54 ++++++++++++++++++++++
->  1 file changed, 54 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/thermal/uniphier-thermal.txt
->
-> diff --git a/Documentation/devicetree/bindings/thermal/uniphier-thermal.txt b/Documentation/devicetree/bindings/thermal/uniphier-thermal.txt
-> new file mode 100644
-> index 0000000..72834e1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/thermal/uniphier-thermal.txt
-> @@ -0,0 +1,54 @@
-> +* UniPhier Thermal bindings
+>  drivers/leds/led-triggers.c              | 34 +++++++++++++++++++++++++++++++
+>  drivers/leds/trigger/ledtrig-heartbeat.c | 35 ++++++++++++++++++++++++++------
+>  include/linux/leds.h                     |  6 ++++++
+>  3 files changed, 69 insertions(+), 6 deletions(-)  mode change 100644 
+> => 100755 drivers/leds/led-triggers.c  mode change 100644 => 100755 
+> drivers/leds/trigger/ledtrig-heartbeat.c
+>  mode change 100644 => 100755 include/linux/leds.h
+
+You accidentally changed file permissions.
+
+> diff --git a/drivers/leds/led-triggers.c b/drivers/leds/led-triggers.c 
+> old mode 100644 new mode 100755 index 431123b..1cb1674
+> --- a/drivers/leds/led-triggers.c
+> +++ b/drivers/leds/led-triggers.c
+> @@ -333,6 +333,40 @@ void led_trigger_blink_oneshot(struct led_trigger 
+> *trig,  }  EXPORT_SYMBOL_GPL(led_trigger_blink_oneshot);
+>  
+> +void led_trigger_suspend(struct led_trigger *trig) {
+> +	struct led_classdev *led_cdev;
 > +
-> +This describes the devicetree bindings for thermal monitor supported by
-> +PVT(Process, Voltage and Temperature) monitoring unit implemented on Socionext
-> +UniPhier SoCs.
-
-This paragraph implies this might be a HWMON driver if more features
-are implemented,
-but I assume you use only the Temperature part for a thermal driver at
-the moment.
-(I do not know if other sensors are useful or not, so I do not mind it much.)
-
-
-
-> +Required properties:
-> +- compatible :
-> +  - "socionext,uniphier-pxs2-thermal" : For UniPhier PXs2 SoC
-> +  - "socionext,uniphier-ld20-thermal" : For UniPhier LD20 SoC
-> +- reg : Offset address of the thermal registers from sysctrl
-
-
-This "reg" does not exist in the example.
-
-Your driver code uses regmap for register access.
-
-
-
-
-> +- interrupts : IRQ for the temperature alarm
-> +- #thermal-sensor-cells : Should be 0. See ./thermal.txt for details.
+> +	if (!trig)
+> +		return;
 > +
-> +Optional properties:
-> +- socionext,tmod-calibration: A pair of calibrated values referred from PVT,
-> +                              in case that the values aren't set on SoC,
-> +                              like a reference board.
-> +
-> +Example:
-> +
-> +       sysctrl at 61840000 {
-> +               compatible = "socionext,uniphier-ld20-sysctrl",
-> +                            "simple-mfd", "syscon";
-> +               reg = <0x61840000 0x10000>;
-> +               ...
-> +               pvtctl: pvtctl {
-> +                       compatible = "socionext,uniphier-ld20-thermal";
-> +                       interrupts = <0 3 1>;
-> +                       #thermal-sensor-cells = <0>;
-> +               };
-> +               ...
-> +       };
-> +
-> +       thermal-zones {
-> +               cpu_thermal {
-> +                       polling-delay-passive = <250>;  /* 250ms */
-> +                       polling-delay = <1000>;         /* 1000ms */
-> +                       thermal-sensors = <&pvtctl>;
-> +
-> +                       trips {
-> +                               cpu_crit: cpu_crit {
-> +                                       temperature = <95000>;  /* 95C */
-> +                                       hysteresis = <2000>;
-> +                                       type = "critical";
-> +                               };
-> +                               cpu_alert: cpu_alert {
-> +                                       temperature = <85000>;  /* 85C */
-> +                                       hysteresis = <2000>;
-> +                                       type = "passive";
-> +                               };
-> +                       };
-> +               };
-> +       };
-> --
-> 2.7.4
->
+> +	read_lock(&trig->leddev_list_lock);
+> +	list_for_each_entry(led_cdev, &trig->led_cdevs, trig_list) {
+> +		if (led_cdev->trigger->suspend)
+> +			led_cdev->trigger->suspend(led_cdev);
+> +		led_sysfs_disable(led_cdev);
 
+Could you share what kind of problem this call to led_syfs_disable() solves? Did you come across one?
 
+> +	}
+> +	read_unlock(&trig->leddev_list_lock);
+> +}
+> +EXPORT_SYMBOL_GPL(led_trigger_suspend);
+> +
+> +void led_trigger_resume(struct led_trigger *trig) {
+> +	struct led_classdev *led_cdev;
+> +
+> +	if (!trig)
+> +		return;
+> +
+> +	read_lock(&trig->leddev_list_lock);
+> +	list_for_each_entry(led_cdev, &trig->led_cdevs, trig_list) {
+> +		if (led_cdev->trigger->resume)
+> +			led_cdev->trigger->resume(led_cdev);
+> +		led_sysfs_enable(led_cdev);
+> +	}
+> +	read_unlock(&trig->leddev_list_lock);
+> +}
+> +EXPORT_SYMBOL_GPL(led_trigger_resume);
+> +
+>  void led_trigger_register_simple(const char *name, struct led_trigger 
+> **tp)  {
+>  	struct led_trigger *trig;
+> diff --git a/drivers/leds/trigger/ledtrig-heartbeat.c 
+> b/drivers/leds/trigger/ledtrig-heartbeat.c
+> old mode 100644
+> new mode 100755
+> index afa3b40..8f779dd
+> --- a/drivers/leds/trigger/ledtrig-heartbeat.c
+> +++ b/drivers/leds/trigger/ledtrig-heartbeat.c
+> @@ -142,6 +142,7 @@ static void heartbeat_trig_activate(struct led_classdev *led_cdev)
+>  	led_heartbeat_function(heartbeat_data->timer.data);
+>  	set_bit(LED_BLINK_SW, &led_cdev->work_flags);
+>  	led_cdev->activated = true;
+> +	led_cdev->suspended = false;
+>  }
+>  
+>  static void heartbeat_trig_deactivate(struct led_classdev *led_cdev) 
+> @@ -154,6 +155,30 @@ static void heartbeat_trig_deactivate(struct led_classdev *led_cdev)
+>  		kfree(heartbeat_data);
+>  		clear_bit(LED_BLINK_SW, &led_cdev->work_flags);
+>  		led_cdev->activated = false;
+> +		led_cdev->suspended = false;
+> +	}
+> +}
+> +
+> +static void heartbeat_trig_resume(struct led_classdev *led_cdev) {
+> +	struct heartbeat_trig_data *heartbeat_data = led_cdev->trigger_data;
+> +
+> +	if (led_cdev->suspended) {
+> +		setup_timer(&heartbeat_data->timer,
+> +			    led_heartbeat_function, (unsigned long) led_cdev);
+> +		heartbeat_data->phase = 0;
+> +		led_heartbeat_function(heartbeat_data->timer.data);
+> +		led_cdev->suspended = false;
+> +	}
+> +}
+> +
+> +static void heartbeat_trig_suspend(struct led_classdev *led_cdev) {
+> +	struct heartbeat_trig_data *heartbeat_data = led_cdev->trigger_data;
+> +
+> +	if (led_cdev->activated && !led_cdev->suspended) {
+> +		del_timer_sync(&heartbeat_data->timer);
+> +		led_cdev->suspended = true;
+>  	}
+>  }
+>  
+> @@ -161,25 +186,23 @@ static void heartbeat_trig_deactivate(struct led_classdev *led_cdev)
+>  	.name     = "heartbeat",
+>  	.activate = heartbeat_trig_activate,
+>  	.deactivate = heartbeat_trig_deactivate,
+> +	.suspend = heartbeat_trig_suspend,
+> +	.resume = heartbeat_trig_resume,
+>  };
+>  
+>  static int heartbeat_pm_notifier(struct notifier_block *nb,
+>  				 unsigned long pm_event, void *unused)  {
+> -	int rc;
+> -
+>  	switch (pm_event) {
+>  	case PM_SUSPEND_PREPARE:
+>  	case PM_HIBERNATION_PREPARE:
+>  	case PM_RESTORE_PREPARE:
+> -		led_trigger_unregister(&heartbeat_led_trigger);
+> +		led_trigger_suspend(&heartbeat_led_trigger);
+>  		break;
+>  	case PM_POST_SUSPEND:
+>  	case PM_POST_HIBERNATION:
+>  	case PM_POST_RESTORE:
+> -		rc = led_trigger_register(&heartbeat_led_trigger);
+> -		if (rc)
+> -			pr_err("could not re-register heartbeat trigger\n");
+> +		led_trigger_resume(&heartbeat_led_trigger);
+>  		break;
+>  	default:
+>  		break;
+> diff --git a/include/linux/leds.h b/include/linux/leds.h old mode 
+> 100644 new mode 100755 index 64c56d4..b792950
+> --- a/include/linux/leds.h
+> +++ b/include/linux/leds.h
+> @@ -111,6 +111,7 @@ struct led_classdev {
+>  	void			*trigger_data;
+>  	/* true if activated - deactivate routine uses it to do cleanup */
+>  	bool			activated;
+> +	bool			suspended;
+>  #endif
+>  
+>  #ifdef CONFIG_LEDS_BRIGHTNESS_HW_CHANGED @@ -254,6 +255,8 @@ struct 
+> led_trigger {
+>  	const char	 *name;
+>  	void		(*activate)(struct led_classdev *led_cdev);
+>  	void		(*deactivate)(struct led_classdev *led_cdev);
+> +	void		(*suspend)(struct led_classdev *led_cdev);
+> +	void		(*resume)(struct led_classdev *led_cdev);
+>  
+>  	/* LEDs under control by this trigger (for simple triggers) */
+>  	rwlock_t	  leddev_list_lock;
+> @@ -291,6 +294,9 @@ extern void led_trigger_set(struct led_classdev *led_cdev,
+>  			struct led_trigger *trigger);
+>  extern void led_trigger_remove(struct led_classdev *led_cdev);
+>  
+> +extern void led_trigger_suspend(struct led_trigger *trig); extern 
+> +void led_trigger_resume(struct led_trigger *trig);
+> +
+>  static inline void *led_get_trigger_data(struct led_classdev 
+> *led_cdev)  {
+>  	return led_cdev->trigger_data;
+> 
 
--- 
-Best Regards
-Masahiro Yamada
+--
+Best regards,
+Jacek Anaszewski
