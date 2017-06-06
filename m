@@ -1,31 +1,29 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 6 Jun 2017 17:38:37 +0800
-Subject: [v6 2/3] iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2
- erratum #74
-In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA838351762@FRAEML521-MBX.china.huawei.com>
-References: <1494592866-14076-1-git-send-email-gakula@caviumnetworks.com>
- <1494592866-14076-3-git-send-email-gakula@caviumnetworks.com>
- <5FC3163CFD30C246ABAA99954A238FA838351762@FRAEML521-MBX.china.huawei.com>
-Message-ID: <9ab6fba9-5270-a618-d149-2e4c11d4cbf6@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 6 Jun 2017 11:41:11 +0200
+Subject: [PATCH] arm: aspeed: Add clock-names property to timer node
+In-Reply-To: <CACPK8XeM6fBztHwfrPUD+ewpMf==tBqgfj61B-k=SwT3ABTiZw@mail.gmail.com>
+References: <20170605074846.30925-1-andrew@aj.id.au>
+ <CACPK8XeM6fBztHwfrPUD+ewpMf==tBqgfj61B-k=SwT3ABTiZw@mail.gmail.com>
+Message-ID: <CAK8P3a2d=T9igbhe1u3MBUF2F1TMLC7z0DQ2AmHX-LkiBAy2Ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/5/17 18:13, Shameerali Kolothum Thodi wrote:
->>   #ifdef CONFIG_ACPI
->> +static void acpi_smmu_get_options(u32 model, struct arm_smmu_device
->> +*smmu) {
->> +	if (model == ACPI_IORT_SMMU_CAVIUM_CN99XX)
->> +		smmu->options |= ARM_SMMU_OPT_PAGE0_REGS_ONLY;
- >
-> HiSIlicon hip06/07 boards have a similar existing option to enable,
-> ARM_SMMU_OPT_SKIP_PREFETCH. I have just sent out a similar patch to enable
-> It-" [PATCH] iommu/arm-smmu-v3: Enable ACPI based HiSilicon CMD_PREFETCH
->   quirk(erratum 161010701)".  May be it can be merged here, if this series goes through.
->   Not sure about the protocol though.
+On Mon, Jun 5, 2017 at 10:59 AM, Joel Stanley <joel@jms.id.au> wrote:
+> On Mon, Jun 5, 2017 at 5:18 PM, Andrew Jeffery <andrew@aj.id.au> wrote:
+>> The merging of a number of clocksource drivers into fttmr010 means we
+>> require clock-names to be specified in the Aspeed timer node, else the
+>> clocksource fails to probe and boot hangs.
+>
+> Arnd,
+>
+> Linus' reworked timer driver will go into 4.13.
+>
+> Can we get this patch merged into 4.12 as a fix so we don't end up
+> with a broken boot at any stage?
 
-I think you can add a patch on top of Geetha's, and clarify
-the dependency in the change log, then it will be easy for
-maintainer to apply.
+Hmm, can't we make the driver backward-compatible and have it fall
+back on the first clock if no clk named "PCLK" is found? Otherwise
+you still have an incompatible change in the DT binding and it will
+break if someone uses an older dtb with a newer kernel.
 
-Thanks
-Hanjun
+        Arnd
