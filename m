@@ -1,151 +1,88 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 6 Jun 2017 15:22:37 +0200
-Subject: [PATCH v2 09/25] KVM: arm64: vgic-v3: Add ICV_AP1Rn_EL1 handler
-In-Reply-To: <20170601102117.17750-10-marc.zyngier@arm.com>
+Date: Tue, 6 Jun 2017 15:22:41 +0200
+Subject: [PATCH v2 11/25] KVM: arm64: vgic-v3: Enable trapping of Group-1
+ system registers
+In-Reply-To: <20170601102117.17750-12-marc.zyngier@arm.com>
 References: <20170601102117.17750-1-marc.zyngier@arm.com>
- <20170601102117.17750-10-marc.zyngier@arm.com>
-Message-ID: <20170606132237.GU9464@cbox>
+ <20170601102117.17750-12-marc.zyngier@arm.com>
+Message-ID: <20170606132241.GV9464@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 01, 2017 at 11:21:01AM +0100, Marc Zyngier wrote:
-> Add a handler for reading/writing the guest's view of the ICV_AP1Rn_EL1
-> registers. We just map them to the corresponding ICH_AP1Rn_EL2 registers.
+On Thu, Jun 01, 2017 at 11:21:03AM +0100, Marc Zyngier wrote:
+> In order to be able to trap Group-1 GICv3 system registers, we need to
+> set ICH_HCR_EL2.TALL1 before entering the guest. This is conditionally
+> done after having restored the guest's state, and cleared on exit.
 > 
-> Reviewed-by: Eric Auger <eric.auger@redhat.com>
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
+Acked-by: Christoffer Dall <cdall@linaro.org>
 
 > ---
->  arch/arm64/include/asm/sysreg.h |  1 +
->  virt/kvm/arm/hyp/vgic-v3-sr.c   | 94 +++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 95 insertions(+)
+>  include/linux/irqchip/arm-gic-v3.h | 1 +
+>  virt/kvm/arm/hyp/vgic-v3-sr.c      | 7 +++++++
+>  virt/kvm/arm/vgic/vgic-v3.c        | 4 ++++
+>  3 files changed, 12 insertions(+)
 > 
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index 15c142ce991c..aad46b8eea5e 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -180,6 +180,7 @@
+> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> index e50ce5d416a3..03b5a28bb2d0 100644
+> --- a/include/linux/irqchip/arm-gic-v3.h
+> +++ b/include/linux/irqchip/arm-gic-v3.h
+> @@ -417,6 +417,7 @@
 >  
->  #define SYS_VBAR_EL1			sys_reg(3, 0, 12, 0, 0)
+>  #define ICH_HCR_EN			(1 << 0)
+>  #define ICH_HCR_UIE			(1 << 1)
+> +#define ICH_HCR_TALL1			(1 << 12)
+>  #define ICH_HCR_EOIcount_SHIFT		27
+>  #define ICH_HCR_EOIcount_MASK		(0x1f << ICH_HCR_EOIcount_SHIFT)
 >  
-> +#define SYS_ICC_AP1Rn_EL1(n)		sys_reg(3, 0, 12, 9, n)
->  #define SYS_ICC_DIR_EL1			sys_reg(3, 0, 12, 11, 1)
->  #define SYS_ICC_SGI1R_EL1		sys_reg(3, 0, 12, 11, 5)
->  #define SYS_ICC_IAR1_EL1		sys_reg(3, 0, 12, 12, 0)
 > diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> index 3f04122a5d4d..d4f07f84602d 100644
+> index f0bc711db258..8973bad35748 100644
 > --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
 > +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> @@ -702,6 +702,76 @@ static void __hyp_text __vgic_v3_write_bpr1(struct kvm_vcpu *vcpu, u32 vmcr, int
->  	__vgic_v3_write_vmcr(vmcr);
+> @@ -258,6 +258,9 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+>  			cpu_if->vgic_ap1r[0] = __vgic_v3_read_ap1rn(0);
+>  		}
+>  	} else {
+> +		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
+> +			write_gicreg(0, ICH_HCR_EL2);
+> +
+>  		cpu_if->vgic_elrsr = 0xffff;
+>  		cpu_if->vgic_ap0r[0] = 0;
+>  		cpu_if->vgic_ap0r[1] = 0;
+> @@ -330,6 +333,10 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+>  
+>  		for (i = 0; i < used_lrs; i++)
+>  			__gic_v3_set_lr(cpu_if->vgic_lr[i], i);
+> +	} else {
+> +		/* Always write ICH_HCR_EL2 to enable trapping */
+> +		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
+> +			write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
+>  	}
+>  
+>  	/*
+> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+> index 88d9bd9bf468..fbd678bc046d 100644
+> --- a/virt/kvm/arm/vgic/vgic-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+> @@ -21,6 +21,8 @@
+>  
+>  #include "vgic.h"
+>  
+> +static bool group1_trap;
+> +
+>  void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
+>  {
+>  	struct vgic_v3_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v3;
+> @@ -239,6 +241,8 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
+>  
+>  	/* Get the show on the road... */
+>  	vgic_v3->vgic_hcr = ICH_HCR_EN;
+> +	if (group1_trap)
+> +		vgic_v3->vgic_hcr |= ICH_HCR_TALL1;
 >  }
 >  
-> +static void __hyp_text __vgic_v3_read_apxrn(struct kvm_vcpu *vcpu, int rt, int n)
-> +{
-> +	u32 val;
-> +
-> +	if (!__vgic_v3_get_group(vcpu))
-> +		val = __vgic_v3_read_ap0rn(n);
-> +	else
-> +		val = __vgic_v3_read_ap1rn(n);
-> +
-> +	vcpu_set_reg(vcpu, rt, val);
-> +}
-> +
-> +static void __hyp_text __vgic_v3_write_apxrn(struct kvm_vcpu *vcpu, int rt, int n)
-> +{
-> +	u32 val = vcpu_get_reg(vcpu, rt);
-> +
-> +	if (!__vgic_v3_get_group(vcpu))
-> +		__vgic_v3_write_ap0rn(val, n);
-> +	else
-> +		__vgic_v3_write_ap1rn(val, n);
-> +}
-> +
-> +static void __hyp_text __vgic_v3_read_apxr0(struct kvm_vcpu *vcpu,
-> +					    u32 vmcr, int rt)
-> +{
-> +	__vgic_v3_read_apxrn(vcpu, rt, 0);
-> +}
-> +
-> +static void __hyp_text __vgic_v3_read_apxr1(struct kvm_vcpu *vcpu,
-> +					    u32 vmcr, int rt)
-> +{
-> +	__vgic_v3_read_apxrn(vcpu, rt, 1);
-> +}
-> +
-> +static void __hyp_text __vgic_v3_read_apxr2(struct kvm_vcpu *vcpu,
-> +					    u32 vmcr, int rt)
-> +{
-> +	__vgic_v3_read_apxrn(vcpu, rt, 2);
-> +}
-> +
-> +static void __hyp_text __vgic_v3_read_apxr3(struct kvm_vcpu *vcpu,
-> +					    u32 vmcr, int rt)
-> +{
-> +	__vgic_v3_read_apxrn(vcpu, rt, 3);
-> +}
-> +
-> +static void __hyp_text __vgic_v3_write_apxr0(struct kvm_vcpu *vcpu,
-> +					     u32 vmcr, int rt)
-> +{
-> +	__vgic_v3_write_apxrn(vcpu, rt, 0);
-> +}
-> +
-> +static void __hyp_text __vgic_v3_write_apxr1(struct kvm_vcpu *vcpu,
-> +					     u32 vmcr, int rt)
-> +{
-> +	__vgic_v3_write_apxrn(vcpu, rt, 1);
-> +}
-> +
-> +static void __hyp_text __vgic_v3_write_apxr2(struct kvm_vcpu *vcpu,
-> +					     u32 vmcr, int rt)
-> +{
-> +	__vgic_v3_write_apxrn(vcpu, rt, 2);
-> +}
-> +
-> +static void __hyp_text __vgic_v3_write_apxr3(struct kvm_vcpu *vcpu,
-> +					     u32 vmcr, int rt)
-> +{
-> +	__vgic_v3_write_apxrn(vcpu, rt, 3);
-> +}
-> +
->  int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
->  {
->  	int rt;
-> @@ -742,6 +812,30 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
->  		else
->  			fn = __vgic_v3_write_bpr1;
->  		break;
-> +	case SYS_ICC_AP1Rn_EL1(0):
-> +		if (is_read)
-> +			fn = __vgic_v3_read_apxr0;
-> +		else
-> +			fn = __vgic_v3_write_apxr0;
-> +		break;
-> +	case SYS_ICC_AP1Rn_EL1(1):
-> +		if (is_read)
-> +			fn = __vgic_v3_read_apxr1;
-> +		else
-> +			fn = __vgic_v3_write_apxr1;
-> +		break;
-> +	case SYS_ICC_AP1Rn_EL1(2):
-> +		if (is_read)
-> +			fn = __vgic_v3_read_apxr2;
-> +		else
-> +			fn = __vgic_v3_write_apxr2;
-> +		break;
-> +	case SYS_ICC_AP1Rn_EL1(3):
-> +		if (is_read)
-> +			fn = __vgic_v3_read_apxr3;
-> +		else
-> +			fn = __vgic_v3_write_apxr3;
-> +		break;
->  	default:
->  		return 0;
->  	}
+>  int vgic_v3_lpi_sync_pending_status(struct kvm *kvm, struct vgic_irq *irq)
 > -- 
 > 2.11.0
 > 
