@@ -1,63 +1,114 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 06 Jun 2017 20:07:14 +0100
-Subject: Applied "spi: mediatek: Add bindings for mediatek MT7622 soc
- platform" to the spi tree
-In-Reply-To: <1496387923-31674-2-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <E1dIJow-0007ZA-UM@debutante>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue,  6 Jun 2017 21:22:06 +0200
+Subject: [PATCH 01/16] arm: ecard: use dev_groups and not dev_attrs for
+ bus_type
+In-Reply-To: <20170606192221.1617-1-gregkh@linuxfoundation.org>
+References: <20170606192221.1617-1-gregkh@linuxfoundation.org>
+Message-ID: <20170606192221.1617-2-gregkh@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+The dev_attrs field has long been "depreciated" and is finally being
+removed, so move the driver to use the "correct" dev_groups field
+instead for struct bus_type.
 
-   spi: mediatek: Add bindings for mediatek MT7622 soc platform
-
-has been applied to the spi tree at
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From d27ae103bf89a0ed28976da58a8f5e1c4c85ecb5 Mon Sep 17 00:00:00 2001
-From: Leilk Liu <leilk.liu@mediatek.com>
-Date: Fri, 2 Jun 2017 15:18:41 +0800
-Subject: [PATCH] spi: mediatek: Add bindings for mediatek MT7622 soc platform
-
-This patch adds a DT binding documentation for the MT7622 soc.
-
-Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: <linux-arm-kernel@lists.infradead.org>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 ---
- Documentation/devicetree/bindings/spi/spi-mt65xx.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-rpc/ecard.c | 40 +++++++++++++++++++++++-----------------
+ 1 file changed, 23 insertions(+), 17 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-index e43f4cf4cf35..c0b1f0134390 100644
---- a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-@@ -4,6 +4,7 @@ Required properties:
- - compatible: should be one of the following.
-     - mediatek,mt2701-spi: for mt2701 platforms
-     - mediatek,mt6589-spi: for mt6589 platforms
-+    - mediatek,mt7622-spi: for mt7622 platforms
-     - mediatek,mt8135-spi: for mt8135 platforms
-     - mediatek,mt8173-spi: for mt8173 platforms
+diff --git a/arch/arm/mach-rpc/ecard.c b/arch/arm/mach-rpc/ecard.c
+index 6b279d037774..f75b8b562d57 100644
+--- a/arch/arm/mach-rpc/ecard.c
++++ b/arch/arm/mach-rpc/ecard.c
+@@ -761,19 +761,21 @@ static struct expansion_card *__init ecard_alloc_card(int type, int slot)
+ 	return ec;
+ }
  
+-static ssize_t ecard_show_irq(struct device *dev, struct device_attribute *attr, char *buf)
++static ssize_t irq_show(struct device *dev, struct device_attribute *attr, char *buf)
+ {
+ 	struct expansion_card *ec = ECARD_DEV(dev);
+ 	return sprintf(buf, "%u\n", ec->irq);
+ }
++static DEVICE_ATTR_RO(irq);
+ 
+-static ssize_t ecard_show_dma(struct device *dev, struct device_attribute *attr, char *buf)
++static ssize_t dma_show(struct device *dev, struct device_attribute *attr, char *buf)
+ {
+ 	struct expansion_card *ec = ECARD_DEV(dev);
+ 	return sprintf(buf, "%u\n", ec->dma);
+ }
++static DEVICE_ATTR_RO(dma);
+ 
+-static ssize_t ecard_show_resources(struct device *dev, struct device_attribute *attr, char *buf)
++static ssize_t resource_show(struct device *dev, struct device_attribute *attr, char *buf)
+ {
+ 	struct expansion_card *ec = ECARD_DEV(dev);
+ 	char *str = buf;
+@@ -787,35 +789,39 @@ static ssize_t ecard_show_resources(struct device *dev, struct device_attribute
+ 
+ 	return str - buf;
+ }
++static DEVICE_ATTR_RO(resource_show)
+ 
+-static ssize_t ecard_show_vendor(struct device *dev, struct device_attribute *attr, char *buf)
++static ssize_t vendor_show(struct device *dev, struct device_attribute *attr, char *buf)
+ {
+ 	struct expansion_card *ec = ECARD_DEV(dev);
+ 	return sprintf(buf, "%u\n", ec->cid.manufacturer);
+ }
++static DEVICE_ATTR_RO(vendor);
+ 
+-static ssize_t ecard_show_device(struct device *dev, struct device_attribute *attr, char *buf)
++static ssize_t device_show(struct device *dev, struct device_attribute *attr, char *buf)
+ {
+ 	struct expansion_card *ec = ECARD_DEV(dev);
+ 	return sprintf(buf, "%u\n", ec->cid.product);
+ }
++static DEVICE_ATTR_RO(device);
+ 
+-static ssize_t ecard_show_type(struct device *dev, struct device_attribute *attr, char *buf)
++static ssize_t type_show(struct device *dev, struct device_attribute *attr, char *buf)
+ {
+ 	struct expansion_card *ec = ECARD_DEV(dev);
+ 	return sprintf(buf, "%s\n", ec->easi ? "EASI" : "IOC");
+ }
+-
+-static struct device_attribute ecard_dev_attrs[] = {
+-	__ATTR(device,   S_IRUGO, ecard_show_device,    NULL),
+-	__ATTR(dma,      S_IRUGO, ecard_show_dma,       NULL),
+-	__ATTR(irq,      S_IRUGO, ecard_show_irq,       NULL),
+-	__ATTR(resource, S_IRUGO, ecard_show_resources, NULL),
+-	__ATTR(type,     S_IRUGO, ecard_show_type,      NULL),
+-	__ATTR(vendor,   S_IRUGO, ecard_show_vendor,    NULL),
+-	__ATTR_NULL,
++static DEVICE_ATTR_RO(type);
++
++static struct attribute *ecard_dev_attrs[] = {
++	&dev_attr_device.attr,
++	&dev_attr_dma.attr,
++	&dev_attr_irq.attr,
++	&dev_attr_resource.attr,
++	&dev_attr_type.attr,
++	&dev_attr_vendor.attr,
++	NULL,
+ };
+-
++ATTRIBUTE_GROUPS(ecard_dev);
+ 
+ int ecard_request_resources(struct expansion_card *ec)
+ {
+@@ -1120,7 +1126,7 @@ static int ecard_match(struct device *_dev, struct device_driver *_drv)
+ 
+ struct bus_type ecard_bus_type = {
+ 	.name		= "ecard",
+-	.dev_attrs	= ecard_dev_attrs,
++	.dev_groups	= ecard_dev_groups,
+ 	.match		= ecard_match,
+ 	.probe		= ecard_drv_probe,
+ 	.remove		= ecard_drv_remove,
 -- 
-2.11.0
+2.13.0
