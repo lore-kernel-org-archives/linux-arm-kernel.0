@@ -1,114 +1,61 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Tue, 6 Jun 2017 12:11:04 +0100
-Subject: [PATCH 2/7] dt-bindings: PCI: Describe ATS property for root
- complex nodes
-In-Reply-To: <20170605172025.qgnocl5ytexnklue@rob-hp-laptop>
-References: <20170524180143.19855-1-jean-philippe.brucker@arm.com>
- <20170524180143.19855-3-jean-philippe.brucker@arm.com>
- <20170531172320.3u6bdctv44aqighy@rob-hp-laptop>
- <cd63a2dc-8259-482d-19e9-9db60be866f7@arm.com>
- <20170605172025.qgnocl5ytexnklue@rob-hp-laptop>
-Message-ID: <65aea93f-d516-f045-f216-3f56e96bdeb6@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 6 Jun 2017 13:07:44 +0200
+Subject: [PATCH 1/4] dt-bindings: rng: add generic bindings for MediaTek
+ SoCs
+In-Reply-To: <1d9c981e1b45bf2f04732a02d90e6857cc203ce5.1496255334.git.sean.wang@mediatek.com>
+References: <cover.1496255334.git.sean.wang@mediatek.com>
+ <1d9c981e1b45bf2f04732a02d90e6857cc203ce5.1496255334.git.sean.wang@mediatek.com>
+Message-ID: <9eb87222-ca89-0abb-4532-3887008f6e7a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/17 18:20, Rob Herring wrote:
-> On Thu, Jun 01, 2017 at 01:28:01PM +0100, Jean-Philippe Brucker wrote:
->> On 31/05/17 18:23, Rob Herring wrote:
->>> On Wed, May 24, 2017 at 07:01:38PM +0100, Jean-Philippe Brucker wrote:
->>>> Address Translation Service (ATS) is an extension to PCIe allowing
->>>> endpoints to manage their own IOTLB, called Address Translation Cache
->>>> (ATC). Instead of having every memory transaction processed by the IOMMU,
->>>> the endpoint can first send an Address Translation Requests for an IOVA,
->>>> obtain the corresponding Physical Address from the IOMMU and store it in
->>>> its ATC. Subsequent transactions to this memory region can be performed on
->>>> the PA, in which case they are marked 'translated' and (partially) bypass
->>>> the IOMMU.
->>>>
->>>> Since the extension uses fields that were previously reserved in the
->>>> PCIe Translation Layer Packet, it seems ill-advised to enabled it on a
->>>> system that doesn't fully support ATS.
->>>>
->>>> To "old" root complexes that simply ignored the new AT field, an Address
->>>> Translation Request will look exactly like a Memory Read Request, so the
->>>> root bridge will forward a memory read to the IOMMU instead of a
->>>> translation request. If the access succeeds, the RC will send a Read
->>>> Completion, which looks like a Translation Completion, back to the
->>>> endpoint. As a result the endpoint might end up storing the content of
->>>> memory instead of a physical address in its ATC. In reality, it's more
->>>> likely that the size fields will be invalid and either end will detect the
->>>> error, but in any case, it is undesirable.
->>>>
->>>> Add a way for firmware to tell the OS that ATS is supported by the PCI
->>>> root complex.
->>>
->>> Can't firmware have already enabled ATS? Often for things like this, not 
->>> present means "use firmware setting".
->>
->> I don't think it's up to firmware to enable ATS in endpoints, because it
->> depends on IOMMU properties (e.g. configured page size). It must also be
->> enabled after the PASID capability, which the OS may or may not want to
->> enable.
->>
->> While endpoints have ATS capability and config register, there is no
->> architected mechanism in root complexes as far as I know. So firmware may
->> have a mechanism outside the OS scope to toggle ATS in the root complex.
->> If there is a bug and firmware cannot enable ATS, then the OS must be made
->> aware of it, so that it doesn't enable ATS in endpoints, or else we might
->> end up with silent memory corruption as described above. (Lack of ATS may
->> slow the system down but shouldn't be fatal.)
->>
->> If the SMMU supports ATS, then the root complex attached to it will most
->> likely supports ATS. The switch in this patch simply allows firmware to
->> confirm that.
->>
->>>> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
->>>> ---
->>>>  Documentation/devicetree/bindings/pci/pci-iommu.txt | 8 ++++++++
->>>>  1 file changed, 8 insertions(+)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/pci/pci-iommu.txt b/Documentation/devicetree/bindings/pci/pci-iommu.txt
->>>> index 0def586fdcdf..f21a68ec471a 100644
->>>> --- a/Documentation/devicetree/bindings/pci/pci-iommu.txt
->>>> +++ b/Documentation/devicetree/bindings/pci/pci-iommu.txt
->>>> @@ -44,6 +44,14 @@ Optional properties
->>>>  - iommu-map-mask: A mask to be applied to each Requester ID prior to being
->>>>    mapped to an IOMMU specifier per the iommu-map property.
->>>>  
->>>> +- ats-supported: if present, the root complex supports the Address
->>>> +  Translation Service (ATS). It is able to interpret the AT field in PCIe
->>>> +  Transaction Layer Packets, and forward Translation Completions or
->>>> +  Invalidation Requests to endpoints.
->>>
->>> Why can't this be based on the compatible strings?
->>
->> Host controllers like the generic ECAM one should be able to advertise
->> ATS, if for instance the virtual IOMMU in Qemu offers a channel for ATS
->> invalidation. In that case we would have pci-host-{e,}cam-generic{-ats,}
->> compatible strings and double the number of compatible strings each time
->> we add a similar capability.
+
+
+On 31/05/17 20:44, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
 > 
-> It would not double the compatibles. A given SoC will either support ATS 
-> or not, right? A given compatible will imply whether ATS is supported or 
-> not.
+> Add the generic binding for allowing the support of RNG on MediaTek SoCs
+> such as MT7622.
 > 
-> pci-host-{e,}cam-generic is a special case. I'm okay with having a 
-> property for that I suppose. We should not require this property though 
-> and allow for it to be implied by the SoC specific compatible as well.
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> ---
+>   Documentation/devicetree/bindings/rng/mtk-rng.txt | 3 ++-
+>   1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/rng/mtk-rng.txt b/Documentation/devicetree/bindings/rng/mtk-rng.txt
+> index a6d62a2..0772913 100644
+> --- a/Documentation/devicetree/bindings/rng/mtk-rng.txt
+> +++ b/Documentation/devicetree/bindings/rng/mtk-rng.txt
+> @@ -2,7 +2,8 @@ Device-Tree bindings for Mediatek random number generator
+>   found in Mediatek SoC family
+>   
+>   Required properties:
+> -- compatible	    : Should be "mediatek,mt7623-rng"
+> +- compatible	    : Should be "mediatek,generic-rng" or
+> +				"mediatek,mt7623-rng".
 
-The property isn't useful for host-generic since a host like Qemu can
-easily disable ATS in the IOMMU. It would only be here for consistency.
-Changing IOMMU registers wouldn't be as simple for a firmware running on
-real hardware.
+What does generic-rng mean. Is it for all mt7xxx, or also for mt6xxx and 
+mt8xxx based SoCs? I think we should stick with SoC specific bindings, 
+as we don't know if Mediatek won't publish a new IP block next year 
+which is differnet.
 
-The ats-supported property aimed to provide a mechanism identical to what
-IORT provides in root complex nodes, since I have to add support for that
-in Linux anyway. But it is not clear what their rationale is.
+Just in case we should add a binding for the actual SoC + a fallback. 
+For example.
+- compatible " Should be
+	"mediatek,mt7622-rng", 	"mediatek,mt7623-rng" for SoC mt7622
+	"mediatek,mt7623-rng" for SoC mt7623
 
-I couldn't see any more reason to add it, so I'll gladly drop the patch
-and replace it with something based on compatible, if you think that the
-case I described above (bug in hardware, firmware cannot enable ATS in
-root complex) is superfluous.
+This will also eliminate the need of adding mt6722-rng to the driver, as 
+it will use mt7623-rng as fallback. If in the future we realize that 
+mt7622-rng has a extra feature/bug, we can still work around it, without 
+breaking the bindings.
 
-Thanks,
-Jean
+Makes sense?
+
+Regards,
+Matthias
+
+>   - clocks	    : list of clock specifiers, corresponding to
+>   		      entries in clock-names property;
+>   - clock-names	    : Should contain "rng" entries;
+> 
