@@ -1,50 +1,33 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue,  6 Jun 2017 11:57:15 +0200
-Subject: [PATCH] arm64: dts: marvell: cp110: add required clocks for mdio
- interface
-Message-ID: <1496743035-4618-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Jun 2017 10:57:41 +0100
+Subject: [PATCH] arm64: dts: marvell: 8040-mcbin: Enable 1GB Ethernet
+In-Reply-To: <20170606113626.197efbf7@free-electrons.com>
+References: <20170605200107.7692-1-marc.zyngier@arm.com>
+ <20170606110234.239d2c4a@free-electrons.com>
+ <20170606110603.2dafb7ed@free-electrons.com>
+ <87h8ztjwz0.fsf@arm.com>
+ <20170606113626.197efbf7@free-electrons.com>
+Message-ID: <20170606095741.GG4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King <rmk+kernel@armlinux.org.uk>
+On Tue, Jun 06, 2017 at 11:36:26AM +0200, Thomas Petazzoni wrote:
+> Side note: I don't understand this change from "phy" to "phy-handle".
+> It really doesn't make sense to me to encode the type of the property
+> in the name of the property. Are we going to use:
 
-Add the three required clocks for the MDIO interface to be functional
-on Armada 8k platforms.  Without this, the CPU hangs, causing RCU
-stalls or the system to become unresponsive.
+ePAPR 1.1 has specified phy-handle, which as the binding document says
+is the preferred version (probably because it's in ePAPR as the official
+name of the property.)
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-[Thomas:
- - remove mg_core_clock, since it's a parent of mg_clock
- - also add clock references to the slave CP mdio instance]
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 1 +
- arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 1 +
- 2 files changed, 2 insertions(+)
+We've ended up with "phy" and "phy-handle" because there was never a
+central binding document for ethernet devices until 2014, so drivers
+randomly picked between the two property names.  Which one should be
+used is driver dependent, since drivers parse this property.  Many
+drivers parse just one of the names and not the other, so you have to
+use the right one for the driver.
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-index 00af338..c33e891 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-@@ -95,6 +95,7 @@
- 				#size-cells = <0>;
- 				compatible = "marvell,orion-mdio";
- 				reg = <0x12a200 0x10>;
-+				clocks = <&cpm_syscon0 1 9>, <&cpm_syscon0 1 5>;
- 			};
- 
- 			cpm_icu: interrupt-controller at 1e0000 {
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-index bee48ae..2a99ff8 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-@@ -100,6 +100,7 @@
- 				#size-cells = <0>;
- 				compatible = "marvell,orion-mdio";
- 				reg = <0x12a200 0x10>;
-+				clocks = <&cps_syscon0 1 9>, <&cps_syscon0 1 5>;
- 			};
- 
- 			cps_icu: interrupt-controller at 1e0000 {
 -- 
-2.7.4
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
