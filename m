@@ -1,198 +1,222 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Tue,  6 Jun 2017 16:08:52 -0500
-Subject: [PATCH v8 17/24] drivers/fsi: Add error handling for slave
+Date: Tue,  6 Jun 2017 16:08:51 -0500
+Subject: [PATCH v8 16/24] drivers/fsi: Add tracepoints for low-level operations
 In-Reply-To: <20170606210859.80431-1-cbostic@linux.vnet.ibm.com>
 References: <20170606210859.80431-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170606210859.80431-18-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170606210859.80431-17-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jeremy Kerr <jk@ozlabs.org>
 
-This change implements error handling in the FSI core, by cleaining up
-and retrying failed operations, using the SISC, TERM and BREAK
-facilities.
+Trace low level read and write FSI bus operations.
 
 Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
+Signed-off-by: Joel Stanley <joel@jms.id.au>
 Signed-off-by: Christopher Bostic <cbostic@linux.vnet.ibm.com>
 ---
- drivers/fsi/fsi-core.c | 121 ++++++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 114 insertions(+), 7 deletions(-)
+v8 - type cast to 'int' to clean up build warnings
+---
+ drivers/fsi/fsi-core.c     |  27 +++++++---
+ include/trace/events/fsi.h | 127 +++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 148 insertions(+), 6 deletions(-)
+ create mode 100644 include/trace/events/fsi.h
 
 diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index db54561..c9ff8d3 100644
+index 3681365..db54561 100644
 --- a/drivers/fsi/fsi-core.c
 +++ b/drivers/fsi/fsi-core.c
-@@ -46,7 +46,9 @@
- /*
-  * FSI slave engine control register offsets
-  */
--#define FSI_SMODE			0x0	/* R/W: Mode register */
-+#define FSI_SMODE		0x0	/* R/W: Mode register */
-+#define FSI_SISC		0x8	/* R/W: Interrupt condition */
-+#define FSI_SSTAT		0x14	/* R  : Slave status */
+@@ -23,6 +23,9 @@
  
- /*
-  * SMODE fields
-@@ -77,10 +79,14 @@ struct fsi_slave {
- #define to_fsi_master(d) container_of(d, struct fsi_master, dev)
- #define to_fsi_slave(d) container_of(d, struct fsi_slave, dev)
+ #include "fsi-master.h"
  
-+static const int slave_retries = 2;
-+static int discard_errors;
++#define CREATE_TRACE_POINTS
++#include <trace/events/fsi.h>
 +
- static int fsi_master_read(struct fsi_master *master, int link,
- 		uint8_t slave_id, uint32_t addr, void *val, size_t size);
- static int fsi_master_write(struct fsi_master *master, int link,
- 		uint8_t slave_id, uint32_t addr, const void *val, size_t size);
-+static int fsi_master_break(struct fsi_master *master, int link);
+ #define FSI_SLAVE_CONF_NEXT_MASK	GENMASK(31, 31)
+ #define FSI_SLAVE_CONF_SLOTS_MASK	GENMASK(23, 16)
+ #define FSI_SLAVE_CONF_SLOTS_SHIFT	16
+@@ -542,11 +545,16 @@ static int fsi_master_read(struct fsi_master *master, int link,
+ {
+ 	int rc;
  
- /*
-  * fsi_device_read() / fsi_device_write() / fsi_device_peek()
-@@ -173,18 +179,107 @@ static int fsi_slave_calc_addr(struct fsi_slave *slave, uint32_t *addrp,
- 	return 0;
- }
- 
-+int fsi_slave_report_and_clear_errors(struct fsi_slave *slave)
-+{
-+	struct fsi_master *master = slave->master;
-+	uint32_t irq, stat;
-+	int rc, link;
-+	uint8_t id;
++	trace_fsi_master_read(master, link, slave_id, addr, size);
 +
-+	link = slave->link;
-+	id = slave->id;
-+
-+	rc = fsi_master_read(master, link, id, FSI_SLAVE_BASE + FSI_SISC,
-+			&irq, sizeof(irq));
-+	if (rc)
-+		return rc;
-+
-+	rc =  fsi_master_read(master, link, id, FSI_SLAVE_BASE + FSI_SSTAT,
-+			&stat, sizeof(stat));
-+	if (rc)
-+		return rc;
-+
-+	dev_info(&slave->dev, "status: 0x%08x, sisc: 0x%08x\n",
-+			be32_to_cpu(stat), be32_to_cpu(irq));
-+
-+	/* clear interrupts */
-+	return fsi_master_write(master, link, id, FSI_SLAVE_BASE + FSI_SISC,
-+			&irq, sizeof(irq));
-+}
-+
-+static int fsi_slave_set_smode(struct fsi_master *master, int link, int id);
-+
-+int fsi_slave_handle_error(struct fsi_slave *slave, bool write, uint32_t addr,
-+		size_t size)
-+{
-+	struct fsi_master *master = slave->master;
-+	int rc, link;
-+	uint32_t reg;
-+	uint8_t id;
-+
-+	if (discard_errors)
-+		return -1;
-+
-+	link = slave->link;
-+	id = slave->id;
-+
-+	dev_dbg(&slave->dev, "handling error on %s to 0x%08x[%zd]",
-+			write ? "write" : "read", addr, size);
-+
-+	/* try a simple clear of error conditions, which may fail if we've lost
-+	 * communication with the slave
-+	 */
-+	rc = fsi_slave_report_and_clear_errors(slave);
+ 	rc = fsi_check_access(addr, size);
+-	if (rc)
+-		return rc;
 +	if (!rc)
-+		return 0;
++		rc = master->read(master, link, slave_id, addr, val, size);
 +
-+	/* send a TERM and retry */
-+	if (master->term) {
-+		rc = master->term(master, link, id);
-+		if (!rc) {
-+			rc = fsi_master_read(master, link, id, 0,
-+					&reg, sizeof(reg));
-+			if (!rc)
-+				rc = fsi_slave_report_and_clear_errors(slave);
-+			if (!rc)
-+				return 0;
-+		}
-+	}
-+
-+	/* getting serious, reset the slave via BREAK */
-+	rc = fsi_master_break(master, link);
-+	if (rc)
-+		return rc;
-+
-+	rc = fsi_slave_set_smode(master, link, id);
-+	if (rc)
-+		return rc;
-+
-+	return fsi_slave_report_and_clear_errors(slave);
-+}
-+
- int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
- 			void *val, size_t size)
++	trace_fsi_master_rw_result(master, link, slave_id, addr, size,
++			false, val, rc);
+ 
+-	return master->read(master, link, slave_id, addr, val, size);
++	return rc;
+ }
+ 
+ static int fsi_master_write(struct fsi_master *master, int link,
+@@ -554,11 +562,16 @@ static int fsi_master_write(struct fsi_master *master, int link,
  {
- 	uint8_t id = slave->id;
--	int rc;
-+	int rc, err_rc, i;
+ 	int rc;
  
- 	rc = fsi_slave_calc_addr(slave, &addr, &id);
- 	if (rc)
- 		return rc;
- 
--	return fsi_master_read(slave->master, slave->link, id,
--			addr, val, size);
-+	for (i = 0; i < slave_retries; i++) {
-+		rc = fsi_master_read(slave->master, slave->link,
-+				id, addr, val, size);
-+		if (!rc)
-+			break;
++	trace_fsi_master_write(master, link, slave_id, addr, size, val);
 +
-+		err_rc = fsi_slave_handle_error(slave, false, addr, size);
-+		if (err_rc)
-+			break;
-+	}
+ 	rc = fsi_check_access(addr, size);
+-	if (rc)
+-		return rc;
++	if (!rc)
++		rc = master->write(master, link, slave_id, addr, val, size);
+ 
+-	return master->write(master, link, slave_id, addr, val, size);
++	trace_fsi_master_rw_result(master, link, slave_id, addr, size,
++			true, val, rc);
 +
 +	return rc;
  }
- EXPORT_SYMBOL_GPL(fsi_slave_read);
  
-@@ -192,14 +287,24 @@ int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
- 			const void *val, size_t size)
+ static int fsi_master_link_enable(struct fsi_master *master, int link)
+@@ -574,6 +587,8 @@ static int fsi_master_link_enable(struct fsi_master *master, int link)
+  */
+ static int fsi_master_break(struct fsi_master *master, int link)
  {
- 	uint8_t id = slave->id;
--	int rc;
-+	int rc, err_rc, i;
- 
- 	rc = fsi_slave_calc_addr(slave, &addr, &id);
- 	if (rc)
- 		return rc;
- 
--	return fsi_master_write(slave->master, slave->link, id,
--			addr, val, size);
-+	for (i = 0; i < slave_retries; i++) {
-+		rc = fsi_master_write(slave->master, slave->link,
-+				id, addr, val, size);
-+		if (!rc)
-+			break;
++	trace_fsi_master_break(master, link);
 +
-+		err_rc = fsi_slave_handle_error(slave, true, addr, size);
-+		if (err_rc)
-+			break;
-+	}
+ 	if (master->send_break)
+ 		return master->send_break(master, link);
+ 
+diff --git a/include/trace/events/fsi.h b/include/trace/events/fsi.h
+new file mode 100644
+index 0000000..697ee66
+--- /dev/null
++++ b/include/trace/events/fsi.h
+@@ -0,0 +1,127 @@
 +
-+	return rc;
- }
- EXPORT_SYMBOL_GPL(fsi_slave_write);
- 
-@@ -770,3 +875,5 @@ static void fsi_exit(void)
- 
- module_init(fsi_init);
- module_exit(fsi_exit);
-+module_param(discard_errors, int, 0664);
-+MODULE_PARM_DESC(discard_errors, "Don't invoke error handling on bus accesses");
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM fsi
++
++#if !defined(_TRACE_FSI_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_FSI_H
++
++#include <linux/tracepoint.h>
++
++TRACE_EVENT(fsi_master_read,
++	TP_PROTO(const struct fsi_master *master, int link, int id,
++			uint32_t addr, size_t size),
++	TP_ARGS(master, link, id, addr, size),
++	TP_STRUCT__entry(
++		__field(int,	master_idx)
++		__field(int,	link)
++		__field(int,	id)
++		__field(__u32,	addr)
++		__field(size_t,	size)
++	),
++	TP_fast_assign(
++		__entry->master_idx = master->idx;
++		__entry->link = link;
++		__entry->id = id;
++		__entry->addr = addr;
++		__entry->size = size;
++	),
++	TP_printk("fsi%d:%02d:%02d %08x[%zd]",
++		__entry->master_idx,
++		__entry->link,
++		__entry->id,
++		__entry->addr,
++		__entry->size
++	)
++);
++
++TRACE_EVENT(fsi_master_write,
++	TP_PROTO(const struct fsi_master *master, int link, int id,
++			uint32_t addr, size_t size, const void *data),
++	TP_ARGS(master, link, id, addr, size, data),
++	TP_STRUCT__entry(
++		__field(int,	master_idx)
++		__field(int,	link)
++		__field(int,	id)
++		__field(__u32,	addr)
++		__field(size_t,	size)
++		__field(__u32,	data)
++	),
++	TP_fast_assign(
++		__entry->master_idx = master->idx;
++		__entry->link = link;
++		__entry->id = id;
++		__entry->addr = addr;
++		__entry->size = size;
++		__entry->data = 0;
++		memcpy(&__entry->data, data, size);
++	),
++	TP_printk("fsi%d:%02d:%02d %08x[%zd] <= {%*ph}",
++		__entry->master_idx,
++		__entry->link,
++		__entry->id,
++		__entry->addr,
++		__entry->size,
++		(int)__entry->size, &__entry->data
++	)
++);
++
++TRACE_EVENT(fsi_master_rw_result,
++	TP_PROTO(const struct fsi_master *master, int link, int id,
++			uint32_t addr, size_t size,
++			bool write, const void *data, int ret),
++	TP_ARGS(master, link, id, addr, size, write, data, ret),
++	TP_STRUCT__entry(
++		__field(int,	master_idx)
++		__field(int,	link)
++		__field(int,	id)
++		__field(__u32,	addr)
++		__field(size_t,	size)
++		__field(bool,	write)
++		__field(__u32,	data)
++		__field(int,	ret)
++	),
++	TP_fast_assign(
++		__entry->master_idx = master->idx;
++		__entry->link = link;
++		__entry->id = id;
++		__entry->addr = addr;
++		__entry->size = size;
++		__entry->write = write;
++		__entry->data = 0;
++		__entry->ret = ret;
++		if (__entry->write || !__entry->ret)
++			memcpy(&__entry->data, data, size);
++	),
++	TP_printk("fsi%d:%02d:%02d %08x[%zd] %s {%*ph} ret %d",
++		__entry->master_idx,
++		__entry->link,
++		__entry->id,
++		__entry->addr,
++		__entry->size,
++		__entry->write ? "<=" : "=>",
++		(int)__entry->size, &__entry->data,
++		__entry->ret
++	)
++);
++
++TRACE_EVENT(fsi_master_break,
++	TP_PROTO(const struct fsi_master *master, int link),
++	TP_ARGS(master, link),
++	TP_STRUCT__entry(
++		__field(int,	master_idx)
++		__field(int,	link)
++	),
++	TP_fast_assign(
++		__entry->master_idx = master->idx;
++		__entry->link = link;
++	),
++	TP_printk("fsi%d:%d",
++		__entry->master_idx,
++		__entry->link
++	)
++);
++
++
++#endif /* _TRACE_FSI_H */
++
++#include <trace/define_trace.h>
 -- 
 1.8.2.2
