@@ -1,27 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 6 Jun 2017 00:32:07 -0700
-Subject: [PATCH v2] ARM: dts: AM43XX: Remove min and max voltage values
- for dcdc3
-In-Reply-To: <1496395441-29526-1-git-send-email-j-keerthy@ti.com>
-References: <1496395441-29526-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <20170606073207.GV3730@atomide.com>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Tue,  6 Jun 2017 09:31:41 +0200
+Subject: [PATCH v3 1/6] ARM: imx6q: provide documentation for new fsl,
+ pmic-stby-poweroff property
+In-Reply-To: <20170606073146.26882-1-o.rempel@pengutronix.de>
+References: <20170606073146.26882-1-o.rempel@pengutronix.de>
+Message-ID: <20170606073146.26882-2-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Keerthy <j-keerthy@ti.com> [170602 02:27]:
-> dcdc3 supplies to DDR on AM43x series. When we set both
-> min and max values to the same value. The regulator framework
-> sets that particular voltage. This is bad as we are changing
-> the ddr voltage when executing from ddr. Hence remove the min and
-> max values. The ddr supply voltage shall be set from bootloader
-> when not executing from ddr and not while executing from kernel.
-> 
-> The previous discussion can be found here:
-> 
-> http://www.spinics.net/lists/devicetree/msg56399.html
-> 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
+Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+---
+ Documentation/devicetree/bindings/clock/imx6q-clock.txt | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Applying into omap-for-v4.13/dt thanks.
-
-Tony
+diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+index 9252912a5b0e..8f93e1503e59 100644
+--- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
++++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+@@ -6,6 +6,14 @@ Required properties:
+ - interrupts: Should contain CCM interrupt
+ - #clock-cells: Should be <1>
+ 
++Optional properties:
++- fsl,pmic-stby-poweroff: Configure CCM to assert PMIC_STBY_REQ signal
++  on power off.
++  Use this property if the SoC should be powered off by external power
++  management IC (PMIC) triggered via PMIC_STBY_REQ signal.
++  Boards that are designed to initiate poweroff on PMIC_ON_REQ signal should
++  be using "syscon-poweroff" driver instead.
++
+ The clock consumer should specify the desired clock by having the clock
+ ID in its "clocks" phandle cell.  See include/dt-bindings/clock/imx6qdl-clock.h
+ for the full list of i.MX6 Quad and DualLite clock IDs.
+-- 
+2.11.0
