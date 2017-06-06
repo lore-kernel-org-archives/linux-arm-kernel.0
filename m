@@ -1,105 +1,216 @@
-From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Tue,  6 Jun 2017 16:08:58 -0500
-Subject: [PATCH v8 23/24] drivers/fsi: Use asynchronous slave mode
-In-Reply-To: <20170606210859.80431-1-cbostic@linux.vnet.ibm.com>
-References: <20170606210859.80431-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170606210859.80431-24-cbostic@linux.vnet.ibm.com>
+From: bsd@redhat.com (Bandan Das)
+Date: Tue, 06 Jun 2017 18:07:07 -0400
+Subject: [RFC 11/55] KVM: arm64: Emulate taking an exception to the guest
+ hypervisor
+In-Reply-To: <CAHyh4xjvqiXDEa9+vDDc4iOVsEHVZyHUEQ5AqQT65E4BV+b0zA@mail.gmail.com>
+ (Jintack Lim's message of "Tue, 6 Jun 2017 16:38:56 -0400")
+References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
+ <1483943091-1364-12-git-send-email-jintack@cs.columbia.edu>
+ <jpgtw3sdfzw.fsf@linux.bootlegged.copy>
+ <CAHyh4xjvqiXDEa9+vDDc4iOVsEHVZyHUEQ5AqQT65E4BV+b0zA@mail.gmail.com>
+Message-ID: <jpglgp4g48k.fsf@linux.bootlegged.copy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeremy Kerr <jk@ozlabs.org>
+Hi Jintack,
 
-For slaves that are behind a software-clocked master, we want FSI CFAMs
-to run asynchronously to the FSI clock, so set up our slaves to be in
-async mode.
+Jintack Lim <jintack.lim@linaro.org> writes:
 
-Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
-Signed-off-by: Christopher Bostic <cbostic@linux.vnet.ibm.com>
----
- drivers/fsi/fsi-core.c        | 22 +++++++++++++++++++++-
- drivers/fsi/fsi-master-gpio.c |  1 +
- drivers/fsi/fsi-master.h      |  2 ++
- 3 files changed, 24 insertions(+), 1 deletion(-)
+> Hi Bandan,
+>
+> On Tue, Jun 6, 2017 at 4:21 PM, Bandan Das <bsd@redhat.com> wrote:
+>> Jintack Lim <jintack@cs.columbia.edu> writes:
+>>
+>>> Emulate taking an exception to the guest hypervisor running in the
+>>> virtual EL2 as described in ARM ARM AArch64.TakeException().
+>>
+>> ARM newbie here, I keep thinking of ARM ARM as a typo ;)
+>
+> ARM ARM means ARM Architecture Reference Manual :)
+>
+>> ...
+>>> +static inline int kvm_inject_nested_sync(struct kvm_vcpu *vcpu, u64 esr_el2)
+>>> +{
+>>> +     kvm_err("Unexpected call to %s for the non-nesting configuration\n",
+>>> +              __func__);
+>>> +     return -EINVAL;
+>>> +}
+>>> +
+>>> +static inline int kvm_inject_nested_irq(struct kvm_vcpu *vcpu)
+>>> +{
+>>> +     kvm_err("Unexpected call to %s for the non-nesting configuration\n",
+>>> +              __func__);
+>>> +     return -EINVAL;
+>>> +}
+>>> +
+>>
+>> I see these function stubs for aarch32 in the patches. I don't see how they
+>> can actually be called though. Is this because eventually, there will be
+>> a virtual el2 mode for aarch32 ?
+>
+> Current RFC doesn't support nested virtualization on 32bit arm
+> architecture and those functions will be never called. Those functions
+> are there for the compilation.
 
-diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index c9ff8d3..b56f4ed 100644
---- a/drivers/fsi/fsi-core.c
-+++ b/drivers/fsi/fsi-core.c
-@@ -49,6 +49,7 @@
- #define FSI_SMODE		0x0	/* R/W: Mode register */
- #define FSI_SISC		0x8	/* R/W: Interrupt condition */
- #define FSI_SSTAT		0x14	/* R  : Slave status */
-+#define FSI_LLMODE		0x100	/* R/W: Link layer mode register */
- 
- /*
-  * SMODE fields
-@@ -64,6 +65,11 @@
- #define FSI_SMODE_LBCRR_SHIFT	8		/* Clk ratio shift */
- #define FSI_SMODE_LBCRR_MASK	0xf		/* Clk ratio mask */
- 
-+/*
-+ * LLMODE fields
-+ */
-+#define FSI_LLMODE_ASYNC	0x1
-+
- #define FSI_SLAVE_SIZE_23b		0x800000
- 
- static DEFINE_IDA(master_ida);
-@@ -557,8 +563,8 @@ static void fsi_slave_release(struct device *dev)
- 
- static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
- {
-+	uint32_t chip_id, llmode;
- 	struct fsi_slave *slave;
--	uint32_t chip_id;
- 	uint8_t crc;
- 	int rc;
- 
-@@ -594,6 +600,20 @@ static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
- 		return -ENODEV;
- 	}
- 
-+	/* If we're behind a master that doesn't provide a self-running bus
-+	 * clock, put the slave into async mode
-+	 */
-+	if (master->flags & FSI_MASTER_FLAG_SWCLOCK) {
-+		llmode = cpu_to_be32(FSI_LLMODE_ASYNC);
-+		rc = fsi_master_write(master, link, id,
-+				FSI_SLAVE_BASE + FSI_LLMODE,
-+				&llmode, sizeof(llmode));
-+		if (rc)
-+			dev_warn(&master->dev,
-+				"can't set llmode on slave:%02x:%02x %d\n",
-+				link, id, rc);
-+	}
-+
- 	/* We can communicate with a slave; create the slave device and
- 	 * register.
- 	 */
-diff --git a/drivers/fsi/fsi-master-gpio.c b/drivers/fsi/fsi-master-gpio.c
-index a5d6e70..ae26187 100644
---- a/drivers/fsi/fsi-master-gpio.c
-+++ b/drivers/fsi/fsi-master-gpio.c
-@@ -554,6 +554,7 @@ static int fsi_master_gpio_probe(struct platform_device *pdev)
- 	master->gpio_mux = gpio;
- 
- 	master->master.n_links = 1;
-+	master->master.flags = FSI_MASTER_FLAG_SWCLOCK;
- 	master->master.read = fsi_master_gpio_read;
- 	master->master.write = fsi_master_gpio_write;
- 	master->master.term = fsi_master_gpio_term;
-diff --git a/drivers/fsi/fsi-master.h b/drivers/fsi/fsi-master.h
-index 7764b00..12f7b11 100644
---- a/drivers/fsi/fsi-master.h
-+++ b/drivers/fsi/fsi-master.h
-@@ -19,6 +19,8 @@
- 
- #include <linux/device.h>
- 
-+#define FSI_MASTER_FLAG_SWCLOCK		0x1
-+
- struct fsi_master {
- 	struct device	dev;
- 	int		idx;
--- 
-1.8.2.2
+Do you mean that compilation will fail ? It seems these functions are
+defined separately in 32/64 bit specific header files. Or is it that
+64 bit compilation also depends on the 32 bit header file ?
+
+Bandan
+
+> Thanks,
+> Jintack
+>
+>>
+>> Bandan
+>>
+>>>  static inline void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu) { };
+>>>  static inline void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu) { };
+>>>  static inline void kvm_arm_init_cpu_context(kvm_cpu_context_t *cpu_ctxt) { };
+>>> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+>>> index 8892c82..0987ee4 100644
+>>> --- a/arch/arm64/include/asm/kvm_emulate.h
+>>> +++ b/arch/arm64/include/asm/kvm_emulate.h
+>>> @@ -42,6 +42,25 @@
+>>>  void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
+>>>  void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
+>>>
+>>> +#ifdef CONFIG_KVM_ARM_NESTED_HYP
+>>> +int kvm_inject_nested_sync(struct kvm_vcpu *vcpu, u64 esr_el2);
+>>> +int kvm_inject_nested_irq(struct kvm_vcpu *vcpu);
+>>> +#else
+>>> +static inline int kvm_inject_nested_sync(struct kvm_vcpu *vcpu, u64 esr_el2)
+>>> +{
+>>> +     kvm_err("Unexpected call to %s for the non-nesting configuration\n",
+>>> +              __func__);
+>>> +     return -EINVAL;
+>>> +}
+>>> +
+>>> +static inline int kvm_inject_nested_irq(struct kvm_vcpu *vcpu)
+>>> +{
+>>> +     kvm_err("Unexpected call to %s for the non-nesting configuration\n",
+>>> +              __func__);
+>>> +     return -EINVAL;
+>>> +}
+>>> +#endif
+>>> +
+>>>  void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu);
+>>>  void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu);
+>>>  void kvm_arm_init_cpu_context(kvm_cpu_context_t *cpu_ctxt);
+>>> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+>>> index 7811d27..b342bdd 100644
+>>> --- a/arch/arm64/kvm/Makefile
+>>> +++ b/arch/arm64/kvm/Makefile
+>>> @@ -34,3 +34,5 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-its.o
+>>>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/irqchip.o
+>>>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
+>>>  kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
+>>> +
+>>> +kvm-$(CONFIG_KVM_ARM_NESTED_HYP) += emulate-nested.o
+>>> diff --git a/arch/arm64/kvm/emulate-nested.c b/arch/arm64/kvm/emulate-nested.c
+>>> new file mode 100644
+>>> index 0000000..59d147f
+>>> --- /dev/null
+>>> +++ b/arch/arm64/kvm/emulate-nested.c
+>>> @@ -0,0 +1,66 @@
+>>> +/*
+>>> + * Copyright (C) 2016 - Columbia University
+>>> + * Author: Jintack Lim <jintack@cs.columbia.edu>
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License version 2 as
+>>> + * published by the Free Software Foundation.
+>>> + *
+>>> + * This program is distributed in the hope that it will be useful,
+>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>> + * GNU General Public License for more details.
+>>> + *
+>>> + * You should have received a copy of the GNU General Public License
+>>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>>> + */
+>>> +
+>>> +#include <linux/kvm.h>
+>>> +#include <linux/kvm_host.h>
+>>> +
+>>> +#include <asm/kvm_emulate.h>
+>>> +
+>>> +#include "trace.h"
+>>> +
+>>> +#define      EL2_EXCEPT_SYNC_OFFSET  0x400
+>>> +#define      EL2_EXCEPT_ASYNC_OFFSET 0x480
+>>> +
+>>> +
+>>> +/*
+>>> + *  Emulate taking an exception. See ARM ARM J8.1.2 AArch64.TakeException()
+>>> + */
+>>> +static int kvm_inject_nested(struct kvm_vcpu *vcpu, u64 esr_el2,
+>>> +                          int exception_offset)
+>>> +{
+>>> +     int ret = 1;
+>>> +     kvm_cpu_context_t *ctxt = &vcpu->arch.ctxt;
+>>> +
+>>> +     /* We don't inject an exception recursively to virtual EL2 */
+>>> +     if (vcpu_mode_el2(vcpu))
+>>> +             BUG();
+>>> +
+>>> +     ctxt->el2_regs[SPSR_EL2] = *vcpu_cpsr(vcpu);
+>>> +     ctxt->el2_regs[ELR_EL2] = *vcpu_pc(vcpu);
+>>> +     ctxt->el2_regs[ESR_EL2] = esr_el2;
+>>> +
+>>> +     /* On an exception, PSTATE.SP = 1 */
+>>> +     *vcpu_cpsr(vcpu) = PSR_MODE_EL2h;
+>>> +     *vcpu_cpsr(vcpu) |=  (PSR_A_BIT | PSR_F_BIT | PSR_I_BIT | PSR_D_BIT);
+>>> +     *vcpu_pc(vcpu) = ctxt->el2_regs[VBAR_EL2] + exception_offset;
+>>> +
+>>> +     trace_kvm_inject_nested_exception(vcpu, esr_el2, *vcpu_pc(vcpu));
+>>> +
+>>> +     return ret;
+>>> +}
+>>> +
+>>> +int kvm_inject_nested_sync(struct kvm_vcpu *vcpu, u64 esr_el2)
+>>> +{
+>>> +     return kvm_inject_nested(vcpu, esr_el2, EL2_EXCEPT_SYNC_OFFSET);
+>>> +}
+>>> +
+>>> +int kvm_inject_nested_irq(struct kvm_vcpu *vcpu)
+>>> +{
+>>> +     u64 esr_el2 = kvm_vcpu_get_hsr(vcpu);
+>>> +     /* We supports only IRQ and FIQ, so the esr_el2 is not updated. */
+>>> +     return kvm_inject_nested(vcpu, esr_el2, EL2_EXCEPT_ASYNC_OFFSET);
+>>> +}
+>>> diff --git a/arch/arm64/kvm/trace.h b/arch/arm64/kvm/trace.h
+>>> index 7fb0008..7c86cfb 100644
+>>> --- a/arch/arm64/kvm/trace.h
+>>> +++ b/arch/arm64/kvm/trace.h
+>>> @@ -167,6 +167,26 @@
+>>>  );
+>>>
+>>>
+>>> +TRACE_EVENT(kvm_inject_nested_exception,
+>>> +     TP_PROTO(struct kvm_vcpu *vcpu, unsigned long esr_el2,
+>>> +              unsigned long pc),
+>>> +     TP_ARGS(vcpu, esr_el2, pc),
+>>> +
+>>> +     TP_STRUCT__entry(
+>>> +             __field(struct kvm_vcpu *,      vcpu)
+>>> +             __field(unsigned long,          esr_el2)
+>>> +             __field(unsigned long,          pc)
+>>> +     ),
+>>> +
+>>> +     TP_fast_assign(
+>>> +             __entry->vcpu = vcpu;
+>>> +             __entry->esr_el2 = esr_el2;
+>>> +             __entry->pc = pc;
+>>> +     ),
+>>> +
+>>> +     TP_printk("vcpu: %p, inject exception to vEL2: ESR_EL2 0x%lx, vector: 0x%016lx",
+>>> +               __entry->vcpu, __entry->esr_el2, __entry->pc)
+>>> +);
+>>>  #endif /* _TRACE_ARM64_KVM_H */
+>>>
+>>>  #undef TRACE_INCLUDE_PATH
+>> _______________________________________________
+>> kvmarm mailing list
+>> kvmarm at lists.cs.columbia.edu
+>> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
