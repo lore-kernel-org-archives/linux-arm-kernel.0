@@ -1,122 +1,71 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Tue,  6 Jun 2017 16:08:45 -0500
-Subject: [PATCH v8 10/24] drivers/fsi: Add device read/write/peek API
+Date: Tue,  6 Jun 2017 16:08:48 -0500
+Subject: [PATCH v8 13/24] drivers/fsi: Add client driver register utilities
 In-Reply-To: <20170606210859.80431-1-cbostic@linux.vnet.ibm.com>
 References: <20170606210859.80431-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170606210859.80431-11-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170606210859.80431-14-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeremy Kerr <jk@ozlabs.org>
+Add driver_register and driver_unregister wrappers for FSI.
 
-This change introduces the fsi device API: simple read, write and peek
-accessors for the devices' address spaces.
-
-Includes contributions from Christopher Bostic
-<cbostic@linux.vnet.ibm.com> and Edward A. James <eajames@us.ibm.com>.
-
-Signed-off-by: Edward A. James <eajames@us.ibm.com>
-Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
 Signed-off-by: Christopher Bostic <cbostic@linux.vnet.ibm.com>
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- drivers/fsi/fsi-core.c | 50 +++++++++++++++++++++++++++++++++++++++++++++++++-
- include/linux/fsi.h    |  7 ++++++-
- 2 files changed, 55 insertions(+), 2 deletions(-)
+ drivers/fsi/fsi-core.c | 17 +++++++++++++++++
+ include/linux/fsi.h    | 12 ++++++++++++
+ 2 files changed, 29 insertions(+)
 
 diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index eac0bc4..d7a6e76 100644
+index fcb0c81..e9fbd9f 100644
 --- a/drivers/fsi/fsi-core.c
 +++ b/drivers/fsi/fsi-core.c
-@@ -34,6 +34,8 @@
- #define FSI_SLAVE_CONF_CRC_MASK		GENMASK(3, 0)
- #define FSI_SLAVE_CONF_DATA_BITS	28
+@@ -586,6 +586,23 @@ static int fsi_bus_match(struct device *dev, struct device_driver *drv)
+ 	return 0;
+ }
  
-+#define FSI_PEEK_BASE			0x410
-+
- static const int engine_page_size = 0x400;
- 
- #define FSI_SLAVE_BASE			0x800
-@@ -75,8 +77,54 @@ static int fsi_master_read(struct fsi_master *master, int link,
- 		uint8_t slave_id, uint32_t addr, void *val, size_t size);
- static int fsi_master_write(struct fsi_master *master, int link,
- 		uint8_t slave_id, uint32_t addr, const void *val, size_t size);
-+static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
-+		void *val, size_t size);
-+static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
-+		const void *val, size_t size);
-+
-+/*
-+ * fsi_device_read() / fsi_device_write() / fsi_device_peek()
-+ *
-+ * FSI endpoint-device support
-+ *
-+ * Read / write / peek accessors for a client
-+ *
-+ * Parameters:
-+ * dev:  Structure passed to FSI client device drivers on probe().
-+ * addr: FSI address of given device.  Client should pass in its base address
-+ *       plus desired offset to access its register space.
-+ * val:  For read/peek this is the value read at the specified address. For
-+ *       write this is value to write to the specified address.
-+ *       The data in val must be FSI bus endian (big endian).
-+ * size: Size in bytes of the operation.  Sizes supported are 1, 2 and 4 bytes.
-+ *       Addresses must be aligned on size boundaries or an error will result.
-+ */
-+int fsi_device_read(struct fsi_device *dev, uint32_t addr, void *val,
-+		size_t size)
++int fsi_driver_register(struct fsi_driver *fsi_drv)
 +{
-+	if (addr > dev->size || size > dev->size || addr > dev->size - size)
++	if (!fsi_drv)
 +		return -EINVAL;
- 
--/* FSI endpoint-device support */
-+	return fsi_slave_read(dev->slave, dev->addr + addr, val, size);
-+}
-+EXPORT_SYMBOL_GPL(fsi_device_read);
-+
-+int fsi_device_write(struct fsi_device *dev, uint32_t addr, const void *val,
-+		size_t size)
-+{
-+	if (addr > dev->size || size > dev->size || addr > dev->size - size)
++	if (!fsi_drv->id_table)
 +		return -EINVAL;
 +
-+	return fsi_slave_write(dev->slave, dev->addr + addr, val, size);
++	return driver_register(&fsi_drv->drv);
 +}
-+EXPORT_SYMBOL_GPL(fsi_device_write);
++EXPORT_SYMBOL_GPL(fsi_driver_register);
 +
-+int fsi_device_peek(struct fsi_device *dev, void *val)
++void fsi_driver_unregister(struct fsi_driver *fsi_drv)
 +{
-+	uint32_t addr = FSI_PEEK_BASE + ((dev->unit - 2) * sizeof(uint32_t));
-+
-+	return fsi_slave_read(dev->slave, addr, val, sizeof(uint32_t));
++	driver_unregister(&fsi_drv->drv);
 +}
- 
- static void fsi_device_release(struct device *_device)
- {
++EXPORT_SYMBOL_GPL(fsi_driver_unregister);
++
+ struct bus_type fsi_bus_type = {
+ 	.name		= "fsi",
+ 	.match		= fsi_bus_match,
 diff --git a/include/linux/fsi.h b/include/linux/fsi.h
-index efa55ba..66bce48 100644
+index 66bce48..34f1e9a 100644
 --- a/include/linux/fsi.h
 +++ b/include/linux/fsi.h
-@@ -27,6 +27,12 @@ struct fsi_device {
- 	uint32_t		size;
- };
+@@ -54,6 +54,18 @@ struct fsi_driver {
+ #define to_fsi_dev(devp) container_of(devp, struct fsi_device, dev)
+ #define to_fsi_drv(drvp) container_of(drvp, struct fsi_driver, drv)
  
-+extern int fsi_device_read(struct fsi_device *dev, uint32_t addr,
-+		void *val, size_t size);
-+extern int fsi_device_write(struct fsi_device *dev, uint32_t addr,
-+		const void *val, size_t size);
-+extern int fsi_device_peek(struct fsi_device *dev, void *val);
++extern int fsi_driver_register(struct fsi_driver *fsi_drv);
++extern void fsi_driver_unregister(struct fsi_driver *fsi_drv);
 +
- struct fsi_device_id {
- 	u8	engine_type;
- 	u8	version;
-@@ -40,7 +46,6 @@ struct fsi_device_id {
- #define FSI_DEVICE_VERSIONED(t, v) \
- 	.engine_type = (t), .version = (v),
++/* module_fsi_driver() - Helper macro for drivers that don't do
++ * anything special in module init/exit.  This eliminates a lot of
++ * boilerplate.  Each module may only use this macro once, and
++ * calling it replaces module_init() and module_exit()
++ */
++#define module_fsi_driver(__fsi_driver) \
++		module_driver(__fsi_driver, fsi_driver_register, \
++				fsi_driver_unregister)
++
+ extern struct bus_type fsi_bus_type;
  
--
- struct fsi_driver {
- 	struct device_driver		drv;
- 	const struct fsi_device_id	*id_table;
+ #endif /* LINUX_FSI_H */
 -- 
 1.8.2.2
