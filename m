@@ -1,93 +1,47 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Tue, 6 Jun 2017 08:58:30 -0700
-Subject: [PATCH 8/8] arm64: dts: hikey: Fix WiFi support
-In-Reply-To: <CAPDyKFrAwntQsK_Rxs0Hzthv6TkbofE7LwgVimo60zVKruJHBA@mail.gmail.com>
-References: <1494260477-25163-1-git-send-email-ulf.hansson@linaro.org>
- <1494260477-25163-9-git-send-email-ulf.hansson@linaro.org>
- <CALAqxLX4HwbVm8G4Ch2uYKAy6C9vYAZEcRUdCLDePT55oGz6hw@mail.gmail.com>
- <d7988293-853f-fb3a-ae29-d1dff4e4d732@linaro.org>
- <CALAqxLU2zz17sHMFKOe4p248Bu4fRiU_dKoBBPbY38gDrpb_mw@mail.gmail.com>
- <CAPDyKFrtE1nKrc1Zk_n=rZTrMVT=Vb=cpk-7AEFWZRmVhFi+4w@mail.gmail.com>
- <CALAqxLWEsQK4g_AM7cPzJSrF_jiTSZpxvLPy_D4HUgdrgf=KuA@mail.gmail.com>
- <CABGGisxWS2uT6xCATaZbeaDxsEfPz_BSW7Cr=52OwkdFdrV=_Q@mail.gmail.com>
- <CAPDyKFrAwntQsK_Rxs0Hzthv6TkbofE7LwgVimo60zVKruJHBA@mail.gmail.com>
-Message-ID: <CALAqxLXkQ7qrVx9KKzPYF9_ZD29KHgGeyHO8yn--96k9E6xZEQ@mail.gmail.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Tue, 6 Jun 2017 17:16:28 +0100
+Subject: [PATCH] arm64: dts: juno: Enable some SMMUs
+In-Reply-To: <398bc8d4-f307-740b-435c-7822bec4f8e1@arm.com>
+References: <eeb81dbbd7ddfbbccb961c0f20c5cb90f120e89f.1495110010.git.robin.murphy@arm.com>
+ <5e24adfa-3342-f331-1ed3-ed32ebf164cb@arm.com>
+ <398bc8d4-f307-740b-435c-7822bec4f8e1@arm.com>
+Message-ID: <2ab6930b-6afe-2cc5-1b73-b3b6bf341466@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 6, 2017 at 3:08 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> [...]
->
->>>>
->>>> John, thanks for the report!
->>>>
->>>> After a some investigation, I realized that the mmc pwrseq_simple
->>>> driver returns -EPROBE_DEFER as it's not able to get the "ext" clock.
->>>> Hence the SDIO card will not be detected.
->>>>
->>>> To fix the problem, you need to enable CONFIG_COMMON_CLK_HI655X in the
->>>> kernel config. This is actually also the case when using the arm64
->>>> defconfig for a plain 4.12 rc3 and later. We should probably make this
->>>> driver enabled per default when building the arm64 defconfig.
->>>>
->>>> Can you run a re-test at your side with the CONFIG_COMMON_CLK_HI655X
->>>> set? Just to make sure it works also with those boot binaries you are
->>>> using...
->>>
->>> So unfortunately, now I'm seeing a side-effect from enabling
->>> CONFIG_COMMON_CLK_HI655X.
->>>
->>> Using the serial-dev driver for the TI bluetooth, it seems I'm seeing
->>> failures when CONFIG_COMMON_CLK_HI655X is enabled, but configuring it
->>> out, bluetooth works (and wifi then fails).
->>>
->>> Looking through the dmesg logs, the bluetooth driver seems to
->>> initialize up properly and load the firmware, but with CLK_HI655X
->>> enabled, we see:
->>>
->>> Bluetooth: hci0 command 0xff05 tx timeout
->>> Bluetooth: hci0: send command failed\x0a
->>> Bluetooth: hci0 command 0xff36 tx timeout
->>> Bluetooth: hci0 command 0x1003 tx timeout
->>> Bluetooth: hci0 command 0x1001 tx timeout
->>> Bluetooth: hci0 command 0x1009 tx timeout
->>> ...
->
-> As Rob said below, this is because the blue-tooth driver doesn't
-> properly deal with the power on/off sequence.
->
-> I guess it works for you because your versions of the boot binaries
-> turns all needed resources on. That isn't the case for me, blue-tooth
-> is neither working before or after this change, but wifi is.
->
->>>
->>> This effectively seems to make bluetooth an wifi functionality
->>> exclusive.  So I don't think this is a sufficient solution (over
->>> reverting the original patch that changes the dts - which allows both
->>> to function).
->
-> Since the issues you are reporting about is depending on the
-> boot-binaries and not a really bugs in the kernel, may I suggest that
-> we invest our efforts in fixing the blue-tooth driver instead, as it's
-> there the real problem is!?
-
-I'd agree a fast fix to the bluetooth node would be preferred. But to
-the issue of bugs in the kernel vs bootloader, to users it doesn't
-matter. It worked before, and now it doesn't. That's a regression, so
-either we need a fix or a revert.
-
->> If the clock to the TI chip is described in DT for WiFi, then the BT
->> side needs it as well (as does the driver) for proper refcounting. The
->> same would apply to regulators as well. I looked at the regulators for
->> HiKey and the 2 supplies (Vbat and i/o) appear to both be always on.
+On 06/06/17 16:59, Robin Murphy wrote:
+> On 06/06/17 16:45, Jean-Philippe Brucker wrote:
+>> Hello,
 >>
->> Rob
->
-> Correct.
->
-> I am working on patch, I keep you on cc.
+>> On 18/05/17 13:23, Robin Murphy wrote:
+>>> The IOMMU-backed DMA API support has now been in place for a while and
+>>> proven stable, so there's no real need to keep most of Juno's SMMUs
+>>> disabled. The USB, HDLCDs, and CoreSight ETR all just need to map RAM
+>>> buffers for DMA - enabling their SMMUs obviates CPU bounce buffering for
+>>> USB's streaming DMA to the upper memory bank, and lets the other two
+>>> allocate their relatively large coherent buffers without pressuring CMA.
+>>>
+>>> Some more software work is still needed for the DMA-330 and PCIe before
+>>> those can accommodate SMMU translation correctly in all cases, so we
+>>> leave those alone for now.
+>>
+>> Out of curiosity, what is missing for DMA-330? I can use dmatest over SMMU
+>> on my juno-r1 by enabling the node, but I don't have any complex workload
+>> yet. Guest pass-through is really unreliable and I'm trying to figure out why.
+> 
+> Yes, dmatest has always been fine* since both ends get mapped for DMA
+> appropriately by the client. The missing bit is, or should I say was,
+> 4d6d74e22096 currently in linux-next.
+> 
+> Robin.
+> 
+> * For certain values of fine, anyway. There are a number of catastrophic
+> races in the driver that make it generally a bad idea to use more than 1
+> thread per channel.
 
-Nice, I'll be happy to test!
+Ah I see, thanks. The issue I was seeing was mismatched dma-coherency,
+which I fixed. But my guest does sometimes hang when running 1024
+threads/chan in dmatest, so that might be it.
 
-thanks
--john
+Thanks,
+Jean
