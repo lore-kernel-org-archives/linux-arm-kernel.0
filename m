@@ -1,150 +1,111 @@
 From: ruxandra.radulescu@nxp.com (Ioana Radulescu)
-Date: Tue, 6 Jun 2017 10:00:35 -0500
-Subject: [PATCH 12/18] staging: fsl-dpaa2/eth: Add accessor for FAS field
+Date: Tue, 6 Jun 2017 10:00:40 -0500
+Subject: [PATCH 17/18] staging: fsl-dpaa2/eth: Refactor MAC address setup
 In-Reply-To: <20170606150041.10955-1-ruxandra.radulescu@nxp.com>
 References: <20170606150041.10955-1-ruxandra.radulescu@nxp.com>
-Message-ID: <20170606150041.10955-13-ruxandra.radulescu@nxp.com>
+Message-ID: <20170606150041.10955-18-ruxandra.radulescu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a helper macro for accessing the frame annotation
-status field in a frame buffer.
+The driver logic for allocating a MAC address to a net device
+is complicated enough to deserve a function of its own. While
+here, cleanup a bit the code comments.
 
 Signed-off-by: Ioana Radulescu <ruxandra.radulescu@nxp.com>
 ---
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c | 31 ++++++++++++--------------
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h |  6 +++++
- 2 files changed, 20 insertions(+), 17 deletions(-)
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c | 46 ++++++++++++++++----------
+ 1 file changed, 29 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-index 025b5f6559a4..d81c56f4d859 100644
+index 7dca8c2e5ff9..3f7f61b9c462 100644
 --- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
 +++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-@@ -227,6 +227,7 @@ static void dpaa2_eth_rx(struct dpaa2_eth_priv *priv,
- 	struct dpaa2_eth_drv_stats *percpu_extras;
- 	struct device *dev = priv->net_dev->dev.parent;
- 	struct dpaa2_fas *fas;
-+	void *buf_data;
- 	u32 status = 0;
+@@ -2162,15 +2162,12 @@ static void free_rings(struct dpaa2_eth_priv *priv)
+ 		dpaa2_io_store_destroy(priv->channel[i]->store);
+ }
  
- 	/* Tracing point */
-@@ -235,8 +236,10 @@ static void dpaa2_eth_rx(struct dpaa2_eth_priv *priv,
- 	vaddr = dpaa2_iova_to_virt(priv->iommu_domain, addr);
- 	dma_unmap_single(dev, addr, DPAA2_ETH_RX_BUF_SIZE, DMA_FROM_DEVICE);
+-static int netdev_init(struct net_device *net_dev)
++static int set_mac_addr(struct dpaa2_eth_priv *priv)
+ {
+-	int err;
++	struct net_device *net_dev = priv->net_dev;
+ 	struct device *dev = net_dev->dev.parent;
+-	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
+ 	u8 mac_addr[ETH_ALEN], dpni_mac_addr[ETH_ALEN];
+-	u8 bcast_addr[ETH_ALEN];
+-
+-	net_dev->netdev_ops = &dpaa2_eth_ops;
++	int err;
  
--	prefetch(vaddr + priv->buf_layout.private_data_size);
--	prefetch(vaddr + dpaa2_fd_get_offset(fd));
-+	fas = dpaa2_get_fas(vaddr);
-+	prefetch(fas);
-+	buf_data = vaddr + dpaa2_fd_get_offset(fd);
-+	prefetch(buf_data);
- 
- 	percpu_stats = this_cpu_ptr(priv->percpu_stats);
- 	percpu_extras = this_cpu_ptr(priv->percpu_extras);
-@@ -244,9 +247,7 @@ static void dpaa2_eth_rx(struct dpaa2_eth_priv *priv,
- 	if (fd_format == dpaa2_fd_single) {
- 		skb = build_linear_skb(priv, ch, fd, vaddr);
- 	} else if (fd_format == dpaa2_fd_sg) {
--		struct dpaa2_sg_entry *sgt =
--				vaddr + dpaa2_fd_get_offset(fd);
--		skb = build_frag_skb(priv, ch, sgt);
-+		skb = build_frag_skb(priv, ch, buf_data);
- 		skb_free_frag(vaddr);
- 		percpu_extras->rx_sg_frames++;
- 		percpu_extras->rx_sg_bytes += dpaa2_fd_get_len(fd);
-@@ -262,8 +263,6 @@ static void dpaa2_eth_rx(struct dpaa2_eth_priv *priv,
- 
- 	/* Check if we need to validate the L4 csum */
- 	if (likely(dpaa2_fd_get_frc(fd) & DPAA2_FD_FRC_FASV)) {
--		fas = (struct dpaa2_fas *)
--				(vaddr + priv->buf_layout.private_data_size);
- 		status = le32_to_cpu(fas->status);
- 		validate_rx_csum(priv, status, skb);
+ 	/* Get firmware address, if any */
+ 	err = dpni_get_port_mac_addr(priv->mc_io, 0, priv->mc_token, mac_addr);
+@@ -2183,7 +2180,7 @@ static int netdev_init(struct net_device *net_dev)
+ 	err = dpni_get_primary_mac_addr(priv->mc_io, 0, priv->mc_token,
+ 					dpni_mac_addr);
+ 	if (err) {
+-		dev_err(dev, "dpni_get_primary_mac_addr() failed (%d)\n", err);
++		dev_err(dev, "dpni_get_primary_mac_addr() failed\n");
+ 		return err;
  	}
-@@ -327,7 +326,6 @@ static int build_sg_fd(struct dpaa2_eth_priv *priv,
- {
- 	struct device *dev = priv->net_dev->dev.parent;
- 	void *sgt_buf = NULL;
--	void *hwa;
- 	dma_addr_t addr;
- 	int nr_frags = skb_shinfo(skb)->nr_frags;
- 	struct dpaa2_sg_entry *sgt;
-@@ -337,6 +335,7 @@ static int build_sg_fd(struct dpaa2_eth_priv *priv,
- 	int num_sg;
- 	int num_dma_bufs;
- 	struct dpaa2_eth_swa *swa;
-+	struct dpaa2_fas *fas;
  
- 	/* Create and map scatterlist.
- 	 * We don't advertise NETIF_F_FRAGLIST, so skb_to_sgvec() will not have
-@@ -373,8 +372,8 @@ static int build_sg_fd(struct dpaa2_eth_priv *priv,
- 	 * on TX confirmation. We are clearing FAS (Frame Annotation Status)
- 	 * field from the hardware annotation area
- 	 */
--	hwa = sgt_buf + priv->buf_layout.private_data_size;
--	memset(hwa + DPAA2_FAS_OFFSET, 0, DPAA2_FAS_SIZE);
-+	fas = dpaa2_get_fas(sgt_buf);
-+	memset(fas, 0, DPAA2_FAS_SIZE);
- 
- 	sgt = (struct dpaa2_sg_entry *)(sgt_buf + priv->tx_data_offset);
- 
-@@ -433,7 +432,7 @@ static int build_single_fd(struct dpaa2_eth_priv *priv,
- {
- 	struct device *dev = priv->net_dev->dev.parent;
- 	u8 *buffer_start;
--	void *hwa;
-+	struct dpaa2_fas *fas;
- 	struct sk_buff **skbh;
- 	dma_addr_t addr;
- 
-@@ -446,8 +445,8 @@ static int build_single_fd(struct dpaa2_eth_priv *priv,
- 	 * on TX confirmation. We are clearing FAS (Frame Annotation Status)
- 	 * field from the hardware annotation area
- 	 */
--	hwa = buffer_start + priv->buf_layout.private_data_size;
--	memset(hwa + DPAA2_FAS_OFFSET, 0, DPAA2_FAS_SIZE);
-+	fas = dpaa2_get_fas(buffer_start);
-+	memset(fas, 0, DPAA2_FAS_SIZE);
- 
- 	/* Store a backpointer to the skb at the beginning of the buffer
- 	 * (in the private data area) such that we can release it
-@@ -498,6 +497,7 @@ static void free_tx_fd(const struct dpaa2_eth_priv *priv,
- 
- 	fd_addr = dpaa2_fd_get_addr(fd);
- 	skbh = dpaa2_iova_to_virt(priv->iommu_domain, fd_addr);
-+	fas = dpaa2_get_fas(skbh);
- 
- 	if (fd_format == dpaa2_fd_single) {
- 		skb = *skbh;
-@@ -534,11 +534,8 @@ static void free_tx_fd(const struct dpaa2_eth_priv *priv,
- 	 * buffer but before we free it. The caller function is responsible
- 	 * for checking the status value.
- 	 */
--	if (status && (dpaa2_fd_get_frc(fd) & DPAA2_FD_FRC_FASV)) {
--		fas = (struct dpaa2_fas *)
--			((void *)skbh + priv->buf_layout.private_data_size);
-+	if (status && (dpaa2_fd_get_frc(fd) & DPAA2_FD_FRC_FASV))
- 		*status = le32_to_cpu(fas->status);
--	}
- 
- 	/* Free SGT buffer kmalloc'ed on tx */
- 	if (fd_format != dpaa2_fd_single)
-diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
-index 539da71470d9..6462e2cbe4be 100644
---- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
-+++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
-@@ -139,6 +139,12 @@ struct dpaa2_fas {
- #define DPAA2_FAS_OFFSET		0
- #define DPAA2_FAS_SIZE			(sizeof(struct dpaa2_fas))
- 
-+/* Accessors for the hardware annotation fields that we use */
-+#define dpaa2_get_hwa(buf_addr) \
-+	((void *)(buf_addr) + DPAA2_ETH_SWA_SIZE)
-+#define dpaa2_get_fas(buf_addr) \
-+	(struct dpaa2_fas *)(dpaa2_get_hwa(buf_addr) + DPAA2_FAS_OFFSET)
+@@ -2201,18 +2198,19 @@ static int netdev_init(struct net_device *net_dev)
+ 		}
+ 		memcpy(net_dev->dev_addr, mac_addr, net_dev->addr_len);
+ 	} else if (is_zero_ether_addr(dpni_mac_addr)) {
+-		/* Fills in net_dev->dev_addr, as required by
+-		 * register_netdevice()
++		/* No MAC address configured, fill in net_dev->dev_addr
++		 * with a random one
+ 		 */
+ 		eth_hw_addr_random(net_dev);
+-		/* Make the user aware, without cluttering the boot log */
+-		dev_dbg_once(dev, " device(s) have all-zero hwaddr, replaced with random\n");
++		dev_dbg_once(dev, "device(s) have all-zero hwaddr, replaced with random\n");
 +
- /* Error and status bits in the frame annotation status word */
- /* Debug frame, otherwise supposed to be discarded */
- #define DPAA2_FAS_DISC			0x80000000
+ 		err = dpni_set_primary_mac_addr(priv->mc_io, 0, priv->mc_token,
+ 						net_dev->dev_addr);
+ 		if (err) {
+-			dev_err(dev, "dpni_set_primary_mac_addr(): %d\n", err);
++			dev_err(dev, "dpni_set_primary_mac_addr() failed\n");
+ 			return err;
+ 		}
++
+ 		/* Override NET_ADDR_RANDOM set by eth_hw_addr_random(); for all
+ 		 * practical purposes, this will be our "permanent" mac address,
+ 		 * at least until the next reboot. This move will also permit
+@@ -2226,14 +2224,28 @@ static int netdev_init(struct net_device *net_dev)
+ 		memcpy(net_dev->dev_addr, dpni_mac_addr, net_dev->addr_len);
+ 	}
+ 
+-	/* Explicitly add the broadcast address to the MAC filtering table;
+-	 * the MC won't do that for us.
+-	 */
++	return 0;
++}
++
++static int netdev_init(struct net_device *net_dev)
++{
++	struct device *dev = net_dev->dev.parent;
++	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
++	u8 bcast_addr[ETH_ALEN];
++	int err;
++
++	net_dev->netdev_ops = &dpaa2_eth_ops;
++
++	err = set_mac_addr(priv);
++	if (err)
++		return err;
++
++	/* Explicitly add the broadcast address to the MAC filtering table */
+ 	eth_broadcast_addr(bcast_addr);
+ 	err = dpni_add_mac_addr(priv->mc_io, 0, priv->mc_token, bcast_addr);
+ 	if (err) {
+-		dev_warn(dev, "dpni_add_mac_addr() failed (%d)\n", err);
+-		/* Won't return an error; at least, we'd have egress traffic */
++		dev_err(dev, "dpni_add_mac_addr() failed\n");
++		return err;
+ 	}
+ 
+ 	/* Reserve enough space to align buffer as per hardware requirement;
 -- 
 2.11.0
