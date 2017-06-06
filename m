@@ -1,28 +1,61 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 6 Jun 2017 18:36:21 +0100
-Subject: [PATCH v2 13/25] KVM: arm64: vgic-v3: Add ICV_BPR0_EL1 handler
-In-Reply-To: <20170606172348.GJ9464@cbox>
-References: <20170601102117.17750-1-marc.zyngier@arm.com>
- <20170601102117.17750-14-marc.zyngier@arm.com>
- <20170606121150.GO9464@cbox> <7bfbee5d-f765-4fa2-02f0-c76a607658dd@arm.com>
- <20170606154609.GI9464@cbox>
- <CAFEAcA9ZHZTJodXstB2YJRnM8QjZtehUwGwAnKKKceMfpB7=gQ@mail.gmail.com>
- <20170606172348.GJ9464@cbox>
-Message-ID: <CAFEAcA8ZXvEyBJfJSWG7tUc+heNxreZUmF=dgbt6PTvKHYJ=Ow@mail.gmail.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Tue, 6 Jun 2017 20:50:42 +0300
+Subject: [PATCH v2 1/2] ARM: imx: Add MXC_CPU_IMX6ULL and cpu_is_imx6ull
+In-Reply-To: <cover.1496771145.git.leonard.crestez@nxp.com>
+References: <cover.1496771145.git.leonard.crestez@nxp.com>
+Message-ID: <1b0dac2d2236f86c87b066a95f33bd80a5ad5c6b.1496771145.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 June 2017 at 18:23, Christoffer Dall <cdall@linaro.org> wrote:
-> On Tue, Jun 06, 2017 at 04:56:27PM +0100, Peter Maydell wrote:
->> This depends whether you're talking about the ICC/ICV BPR0/BPR1 registers,
->> or the fields in the ICH_VMCR*. For the former, if CBPR is set then
->> BPR1 reads and writes affect BPR0.
->
-> From the spec on ICV_BPR1_EL1: "Non-secure EL1 writes are ignored".
-> Doesn't that mean that reads of BPR1 reflect BPR0 but writes are
-> ignored?
+Support for imx6ull is already present but it's based on
+of_machine_is_compatible("fsl,imx6ull") checks. Add it to the MXC_CPU_*
+enumeration as well.
 
-Yes, you're right.
+This also fixes /sys/devices/soc0/soc_id reading "Unknown".
 
-thanks
--- PMM
+Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+---
+ arch/arm/mach-imx/cpu.c | 3 +++
+ arch/arm/mach-imx/mxc.h | 6 ++++++
+ 2 files changed, 9 insertions(+)
+
+diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
+index b3347d3..94906ed 100644
+--- a/arch/arm/mach-imx/cpu.c
++++ b/arch/arm/mach-imx/cpu.c
+@@ -131,6 +131,9 @@ struct device * __init imx_soc_device_init(void)
+ 	case MXC_CPU_IMX6UL:
+ 		soc_id = "i.MX6UL";
+ 		break;
++	case MXC_CPU_IMX6ULL:
++		soc_id = "i.MX6ULL";
++		break;
+ 	case MXC_CPU_IMX7D:
+ 		soc_id = "i.MX7D";
+ 		break;
+diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
+index 34f2ff6..e00d626 100644
+--- a/arch/arm/mach-imx/mxc.h
++++ b/arch/arm/mach-imx/mxc.h
+@@ -39,6 +39,7 @@
+ #define MXC_CPU_IMX6SX		0x62
+ #define MXC_CPU_IMX6Q		0x63
+ #define MXC_CPU_IMX6UL		0x64
++#define MXC_CPU_IMX6ULL		0x65
+ #define MXC_CPU_IMX7D		0x72
+ 
+ #define IMX_DDR_TYPE_LPDDR2		1
+@@ -73,6 +74,11 @@ static inline bool cpu_is_imx6ul(void)
+ 	return __mxc_cpu_type == MXC_CPU_IMX6UL;
+ }
+ 
++static inline bool cpu_is_imx6ull(void)
++{
++	return __mxc_cpu_type == MXC_CPU_IMX6ULL;
++}
++
+ static inline bool cpu_is_imx6q(void)
+ {
+ 	return __mxc_cpu_type == MXC_CPU_IMX6Q;
+-- 
+2.7.4
