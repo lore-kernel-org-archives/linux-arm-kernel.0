@@ -1,76 +1,43 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Tue, 6 Jun 2017 09:17:42 +0200
-Subject: exynos drm build failure due to cec_* symbols
-In-Reply-To: <20170605085907.GD4902@n2100.armlinux.org.uk>
-References: <CGME20170602135819epcas1p2302294dec8c40b69a19e0b220806eacb@epcas1p2.samsung.com>
- <2d6226cf-4023-2a97-0791-42d3e8dcbdd3@suse.de> <5934B4FE.6060606@samsung.com>
- <20170605085907.GD4902@n2100.armlinux.org.uk>
-Message-ID: <50def393-6391-fd83-c782-a5e57a52af62@xs4all.nl>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 6 Jun 2017 00:29:46 -0700
+Subject: [PATCH] ARM: dts: Add am335x-boneblue
+In-Reply-To: <CA+T6QPngRrST_T5HcTXxiGnBq6ba+txocaxrW-QVTuqxzogYuw@mail.gmail.com>
+References: <20170530162023.20391-1-robertcnelson@gmail.com>
+ <CA+T6QPngRrST_T5HcTXxiGnBq6ba+txocaxrW-QVTuqxzogYuw@mail.gmail.com>
+Message-ID: <20170606072945.GU3730@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/17 10:59, Russell King - ARM Linux wrote:
-> On Mon, Jun 05, 2017 at 10:33:50AM +0900, Inki Dae wrote:
->> 2017? 06? 02? 22:58? Andreas F?rber ?(?) ? ?:
->>> Hello,
->>>
->>> We're observing the following build failure with v4.12-rc3, latest
->>> linux.git and linux-next.git:
->>>
->>> [ 9825s]   LD      vmlinux.o
->>> [ 9904s]   MODPOST vmlinux.o
->>> [ 9915s] drivers/built-in.o: In function `hdmi_get_modes':
->>> [ 9915s]
->>> /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:866:
->>> undefined reference to `cec_notifier_set_phys_addr_from_edid'
->>> [ 9915s] drivers/built-in.o: In function `hdmi_remove':
->>> [ 9915s]
->>> /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1923:
->>> undefined reference to `cec_notifier_set_phys_addr'
->>> [ 9915s]
->>> /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1927:
->>> undefined reference to `cec_notifier_put'
->>> [ 9915s] drivers/built-in.o: In function `hdmi_probe':
->>> [ 9915s]
->>> /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1889:
->>> undefined reference to `cec_notifier_get'
->>> [ 9915s]
->>> /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1904:
->>> undefined reference to `cec_notifier_put'
->>> [ 9915s] drivers/built-in.o: In function `hdmi_disable':
->>> [ 9915s]
->>> /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:1509:
->>> undefined reference to `cec_notifier_set_phys_addr'
->>> [ 9915s] drivers/built-in.o: In function `hdmi_detect':
->>> [ 9915s]
->>> /home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/linux-obj/../drivers/gpu/drm/exynos/exynos_hdmi.c:827:
->>> undefined reference to `cec_notifier_set_phys_addr'
->>> [ 9931s] make[2]: ***
->>> [/home/abuild/rpmbuild/BUILD/kernel-vanilla-4.12.rc3.51.ga374846/linux-4.12-rc3-51-ga374846/Makefile:997:
->>> vmlinux] Error 1
->>> [ 9931s] make[1]: *** [Makefile:152: sub-make] Error 2
->>> [ 9931s] make: *** [Makefile:24: __sub-make] Error 2
->>>
->>> My guess is the symbols used by the exynos drm module are not exported:
->>>
->>> cec_notifier_set_phys_addr_from_edid
->>> cec_notifier_set_phys_addr
->>> cec_notifier_put
->>> cec_notifier_get
->>>
->>> Can you please look into fixing this?
->>
->> Thanks for reporting.
->>
->> Will check and fix it.
+* Jason Kridner <jkridner@beagleboard.org> [170601 00:43]:
+> On Tue, May 30, 2017 at 12:20 PM, Robert Nelson <robertcnelson@gmail.com> wrote:
+> > BeagleBone Blue is robotics-oriented version of the BeagleBone Black (BBB).
+> >
+> > This board can be indentified by the BLAx value after A335BNLT (BBB)
+> > in the at24 eeprom:
+> > BLAx [aa 55 33 ee 41 33 33 35  42 4e 4c 54 42 4c 41 30 |.U3.A335BNLTBLA2|]
+> >
+> > http://beagleboard.org/blue
+> > https://github.com/beagleboard/beaglebone-blue
+> >
+> > firmware: https://github.com/beagleboard/beaglebone-black-wireless/tree/master/firmware
+> > wl18xx mac address: /proc/device-tree/ocp/ethernet at 4a100000/slave at 4a100200/mac-address
+> >
+> > Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
+> > CC: Tony Lindgren <tony@atomide.com>
+> > CC: Jason Kridner <jkridner@beagleboard.org>
 > 
-> Please look at Hans' update to the way CEC's dependencies are handled.
-> https://git.linuxtv.org/hverkuil/media_tree.git/log/?h=drm-cec
-> 
-> These are apparently scheduled for -rc, but Mauro is busy.
+> Acked-by: Jason Kridner <jkridner@beagleboard.org>
 
-They got merged in the media fixes tree, so with luck will appear in 4.12 soon.
+Applying into omap-for-v4.13/dt.
+
+> Discussed offline the fact that the couple of connectors where we'd
+> like to support dynamic pinmuxing that the required pinmux helper code
+> is not upstream.
+
+Hmm do you have some link for that? We do have dynamic muxing
+working with mainline tree using the named pinctrl modes. At
+least omap_hsmmc.c is doing it for am335x SDIO interrupt pin.
 
 Regards,
 
-	Hans
+Tony
