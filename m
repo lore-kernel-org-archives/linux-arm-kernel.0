@@ -1,308 +1,91 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  6 Jun 2017 15:56:27 +0200
-Subject: [PULL 1/3] KVM: arm/arm64: Fix isues with GICv2 on GICv3 migration
+Date: Tue,  6 Jun 2017 15:56:29 +0200
+Subject: [PULL 3/3] KVM: arm/arm64: Handle possible NULL stage2 pud when
+ ageing pages
 In-Reply-To: <20170606135629.31664-1-cdall@linaro.org>
 References: <20170606135629.31664-1-cdall@linaro.org>
-Message-ID: <20170606135629.31664-2-cdall@linaro.org>
+Message-ID: <20170606135629.31664-4-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have been a little loose with our intermediate VMCR representation
-where we had a 'ctlr' field, but we failed to differentiate between the
-GICv2 GICC_CTLR and ICC_CTLR_EL1 layouts, and therefore ended up mapping
-the wrong bits into the individual fields of the ICH_VMCR_EL2 when
-emulating a GICv2 on a GICv3 system.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Fix this by using explicit fields for the VMCR bits instead.
+Under memory pressure, we start ageing pages, which amounts to parsing
+the page tables. Since we don't want to allocate any extra level,
+we pass NULL for our private allocation cache. Which means that
+stage2_get_pud() is allowed to fail. This results in the following
+splat:
 
-Cc: Eric Auger <eric.auger@redhat.com>
-Reported-by: wanghaibin <wanghaibin.wang@huawei.com>
+[ 1520.409577] Unable to handle kernel NULL pointer dereference at virtual address 00000008
+[ 1520.417741] pgd = ffff810f52fef000
+[ 1520.421201] [00000008] *pgd=0000010f636c5003, *pud=0000010f56f48003, *pmd=0000000000000000
+[ 1520.429546] Internal error: Oops: 96000006 [#1] PREEMPT SMP
+[ 1520.435156] Modules linked in:
+[ 1520.438246] CPU: 15 PID: 53550 Comm: qemu-system-aar Tainted: G        W       4.12.0-rc4-00027-g1885c397eaec #7205
+[ 1520.448705] Hardware name: FOXCONN R2-1221R-A4/C2U4N_MB, BIOS G31FB12A 10/26/2016
+[ 1520.463726] task: ffff800ac5fb4e00 task.stack: ffff800ce04e0000
+[ 1520.469666] PC is at stage2_get_pmd+0x34/0x110
+[ 1520.474119] LR is at kvm_age_hva_handler+0x44/0xf0
+[ 1520.478917] pc : [<ffff0000080b137c>] lr : [<ffff0000080b149c>] pstate: 40000145
+[ 1520.486325] sp : ffff800ce04e33d0
+[ 1520.489644] x29: ffff800ce04e33d0 x28: 0000000ffff40064
+[ 1520.494967] x27: 0000ffff27e00000 x26: 0000000000000000
+[ 1520.500289] x25: ffff81051ba65008 x24: 0000ffff40065000
+[ 1520.505618] x23: 0000ffff40064000 x22: 0000000000000000
+[ 1520.510947] x21: ffff810f52b20000 x20: 0000000000000000
+[ 1520.516274] x19: 0000000058264000 x18: 0000000000000000
+[ 1520.521603] x17: 0000ffffa6fe7438 x16: ffff000008278b70
+[ 1520.526940] x15: 000028ccd8000000 x14: 0000000000000008
+[ 1520.532264] x13: ffff7e0018298000 x12: 0000000000000002
+[ 1520.537582] x11: ffff000009241b93 x10: 0000000000000940
+[ 1520.542908] x9 : ffff0000092ef800 x8 : 0000000000000200
+[ 1520.548229] x7 : ffff800ce04e36a8 x6 : 0000000000000000
+[ 1520.553552] x5 : 0000000000000001 x4 : 0000000000000000
+[ 1520.558873] x3 : 0000000000000000 x2 : 0000000000000008
+[ 1520.571696] x1 : ffff000008fd5000 x0 : ffff0000080b149c
+[ 1520.577039] Process qemu-system-aar (pid: 53550, stack limit = 0xffff800ce04e0000)
+[...]
+[ 1521.510735] [<ffff0000080b137c>] stage2_get_pmd+0x34/0x110
+[ 1521.516221] [<ffff0000080b149c>] kvm_age_hva_handler+0x44/0xf0
+[ 1521.522054] [<ffff0000080b0610>] handle_hva_to_gpa+0xb8/0xe8
+[ 1521.527716] [<ffff0000080b3434>] kvm_age_hva+0x44/0xf0
+[ 1521.532854] [<ffff0000080a58b0>] kvm_mmu_notifier_clear_flush_young+0x70/0xc0
+[ 1521.539992] [<ffff000008238378>] __mmu_notifier_clear_flush_young+0x88/0xd0
+[ 1521.546958] [<ffff00000821eca0>] page_referenced_one+0xf0/0x188
+[ 1521.552881] [<ffff00000821f36c>] rmap_walk_anon+0xec/0x250
+[ 1521.558370] [<ffff000008220f78>] rmap_walk+0x78/0xa0
+[ 1521.563337] [<ffff000008221104>] page_referenced+0x164/0x180
+[ 1521.569002] [<ffff0000081f1af0>] shrink_active_list+0x178/0x3b8
+[ 1521.574922] [<ffff0000081f2058>] shrink_node_memcg+0x328/0x600
+[ 1521.580758] [<ffff0000081f23f4>] shrink_node+0xc4/0x328
+[ 1521.585986] [<ffff0000081f2718>] do_try_to_free_pages+0xc0/0x340
+[ 1521.592000] [<ffff0000081f2a64>] try_to_free_pages+0xcc/0x240
+[...]
+
+The trivial fix is to handle this NULL pud value early, rather than
+dereferencing it blindly.
+
+Cc: stable at vger.kernel.org
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Tested-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/vgic-sys-reg-v3.c   | 10 ++++----
- include/linux/irqchip/arm-gic-v3.h |  4 ++++
- include/linux/irqchip/arm-gic.h    | 28 ++++++++++++++++++++---
- virt/kvm/arm/vgic/vgic-mmio-v2.c   | 16 +++++++++++--
- virt/kvm/arm/vgic/vgic-v2.c        | 28 ++++++++++++++++++++---
- virt/kvm/arm/vgic/vgic-v3.c        | 47 ++++++++++++++++++++++++++------------
- virt/kvm/arm/vgic/vgic.h           | 12 ++++++----
- 7 files changed, 114 insertions(+), 31 deletions(-)
+ virt/kvm/arm/mmu.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm64/kvm/vgic-sys-reg-v3.c b/arch/arm64/kvm/vgic-sys-reg-v3.c
-index 79f37e3..6260b69 100644
---- a/arch/arm64/kvm/vgic-sys-reg-v3.c
-+++ b/arch/arm64/kvm/vgic-sys-reg-v3.c
-@@ -65,8 +65,8 @@ static bool access_gic_ctlr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 		 * Here set VMCR.CTLR in ICC_CTLR_EL1 layout.
- 		 * The vgic_set_vmcr() will convert to ICH_VMCR layout.
- 		 */
--		vmcr.ctlr = val & ICC_CTLR_EL1_CBPR_MASK;
--		vmcr.ctlr |= val & ICC_CTLR_EL1_EOImode_MASK;
-+		vmcr.cbpr = (val & ICC_CTLR_EL1_CBPR_MASK) >> ICC_CTLR_EL1_CBPR_SHIFT;
-+		vmcr.eoim = (val & ICC_CTLR_EL1_EOImode_MASK) >> ICC_CTLR_EL1_EOImode_SHIFT;
- 		vgic_set_vmcr(vcpu, &vmcr);
- 	} else {
- 		val = 0;
-@@ -83,8 +83,8 @@ static bool access_gic_ctlr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 		 * The VMCR.CTLR value is in ICC_CTLR_EL1 layout.
- 		 * Extract it directly using ICC_CTLR_EL1 reg definitions.
- 		 */
--		val |= vmcr.ctlr & ICC_CTLR_EL1_CBPR_MASK;
--		val |= vmcr.ctlr & ICC_CTLR_EL1_EOImode_MASK;
-+		val |= (vmcr.cbpr << ICC_CTLR_EL1_CBPR_SHIFT) & ICC_CTLR_EL1_CBPR_MASK;
-+		val |= (vmcr.eoim << ICC_CTLR_EL1_EOImode_SHIFT) & ICC_CTLR_EL1_EOImode_MASK;
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index a2d6324..e2e5eff 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -879,6 +879,9 @@ static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache
+ 	pmd_t *pmd;
  
- 		p->regval = val;
- 	}
-@@ -135,7 +135,7 @@ static bool access_gic_bpr1(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 		p->regval = 0;
- 
- 	vgic_get_vmcr(vcpu, &vmcr);
--	if (!((vmcr.ctlr & ICH_VMCR_CBPR_MASK) >> ICH_VMCR_CBPR_SHIFT)) {
-+	if (!vmcr.cbpr) {
- 		if (p->is_write) {
- 			vmcr.abpr = (p->regval & ICC_BPR1_EL1_MASK) >>
- 				     ICC_BPR1_EL1_SHIFT;
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index fffb912..1fa293a 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -417,6 +417,10 @@
- #define ICH_HCR_EN			(1 << 0)
- #define ICH_HCR_UIE			(1 << 1)
- 
-+#define ICH_VMCR_ACK_CTL_SHIFT		2
-+#define ICH_VMCR_ACK_CTL_MASK		(1 << ICH_VMCR_ACK_CTL_SHIFT)
-+#define ICH_VMCR_FIQ_EN_SHIFT		3
-+#define ICH_VMCR_FIQ_EN_MASK		(1 << ICH_VMCR_FIQ_EN_SHIFT)
- #define ICH_VMCR_CBPR_SHIFT		4
- #define ICH_VMCR_CBPR_MASK		(1 << ICH_VMCR_CBPR_SHIFT)
- #define ICH_VMCR_EOIM_SHIFT		9
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index dc30f3d..d3453ee 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -25,7 +25,18 @@
- #define GICC_ENABLE			0x1
- #define GICC_INT_PRI_THRESHOLD		0xf0
- 
--#define GIC_CPU_CTRL_EOImodeNS		(1 << 9)
-+#define GIC_CPU_CTRL_EnableGrp0_SHIFT	0
-+#define GIC_CPU_CTRL_EnableGrp0		(1 << GIC_CPU_CTRL_EnableGrp0_SHIFT)
-+#define GIC_CPU_CTRL_EnableGrp1_SHIFT	1
-+#define GIC_CPU_CTRL_EnableGrp1		(1 << GIC_CPU_CTRL_EnableGrp1_SHIFT)
-+#define GIC_CPU_CTRL_AckCtl_SHIFT	2
-+#define GIC_CPU_CTRL_AckCtl		(1 << GIC_CPU_CTRL_AckCtl_SHIFT)
-+#define GIC_CPU_CTRL_FIQEn_SHIFT	3
-+#define GIC_CPU_CTRL_FIQEn		(1 << GIC_CPU_CTRL_FIQEn_SHIFT)
-+#define GIC_CPU_CTRL_CBPR_SHIFT		4
-+#define GIC_CPU_CTRL_CBPR		(1 << GIC_CPU_CTRL_CBPR_SHIFT)
-+#define GIC_CPU_CTRL_EOImodeNS_SHIFT	9
-+#define GIC_CPU_CTRL_EOImodeNS		(1 << GIC_CPU_CTRL_EOImodeNS_SHIFT)
- 
- #define GICC_IAR_INT_ID_MASK		0x3ff
- #define GICC_INT_SPURIOUS		1023
-@@ -84,8 +95,19 @@
- #define GICH_LR_EOI			(1 << 19)
- #define GICH_LR_HW			(1 << 31)
- 
--#define GICH_VMCR_CTRL_SHIFT		0
--#define GICH_VMCR_CTRL_MASK		(0x21f << GICH_VMCR_CTRL_SHIFT)
-+#define GICH_VMCR_ENABLE_GRP0_SHIFT	0
-+#define GICH_VMCR_ENABLE_GRP0_MASK	(1 << GICH_VMCR_ENABLE_GRP0_SHIFT)
-+#define GICH_VMCR_ENABLE_GRP1_SHIFT	1
-+#define GICH_VMCR_ENABLE_GRP1_MASK	(1 << GICH_VMCR_ENABLE_GRP1_SHIFT)
-+#define GICH_VMCR_ACK_CTL_SHIFT		2
-+#define GICH_VMCR_ACK_CTL_MASK		(1 << GICH_VMCR_ACK_CTL_SHIFT)
-+#define GICH_VMCR_FIQ_EN_SHIFT		3
-+#define GICH_VMCR_FIQ_EN_MASK		(1 << GICH_VMCR_FIQ_EN_SHIFT)
-+#define GICH_VMCR_CBPR_SHIFT		4
-+#define GICH_VMCR_CBPR_MASK		(1 << GICH_VMCR_CBPR_SHIFT)
-+#define GICH_VMCR_EOI_MODE_SHIFT	9
-+#define GICH_VMCR_EOI_MODE_MASK		(1 << GICH_VMCR_EOI_MODE_SHIFT)
+ 	pud = stage2_get_pud(kvm, cache, addr);
++	if (!pud)
++		return NULL;
 +
- #define GICH_VMCR_PRIMASK_SHIFT		27
- #define GICH_VMCR_PRIMASK_MASK		(0x1f << GICH_VMCR_PRIMASK_SHIFT)
- #define GICH_VMCR_BINPOINT_SHIFT	21
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index 0a4283e..63e0bbd 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -226,7 +226,13 @@ static unsigned long vgic_mmio_read_vcpuif(struct kvm_vcpu *vcpu,
- 
- 	switch (addr & 0xff) {
- 	case GIC_CPU_CTRL:
--		val = vmcr.ctlr;
-+		val = vmcr.grpen0 << GIC_CPU_CTRL_EnableGrp0_SHIFT;
-+		val |= vmcr.grpen1 << GIC_CPU_CTRL_EnableGrp1_SHIFT;
-+		val |= vmcr.ackctl << GIC_CPU_CTRL_AckCtl_SHIFT;
-+		val |= vmcr.fiqen << GIC_CPU_CTRL_FIQEn_SHIFT;
-+		val |= vmcr.cbpr << GIC_CPU_CTRL_CBPR_SHIFT;
-+		val |= vmcr.eoim << GIC_CPU_CTRL_EOImodeNS_SHIFT;
-+
- 		break;
- 	case GIC_CPU_PRIMASK:
- 		/*
-@@ -267,7 +273,13 @@ static void vgic_mmio_write_vcpuif(struct kvm_vcpu *vcpu,
- 
- 	switch (addr & 0xff) {
- 	case GIC_CPU_CTRL:
--		vmcr.ctlr = val;
-+		vmcr.grpen0 = !!(val & GIC_CPU_CTRL_EnableGrp0);
-+		vmcr.grpen1 = !!(val & GIC_CPU_CTRL_EnableGrp1);
-+		vmcr.ackctl = !!(val & GIC_CPU_CTRL_AckCtl);
-+		vmcr.fiqen = !!(val & GIC_CPU_CTRL_FIQEn);
-+		vmcr.cbpr = !!(val & GIC_CPU_CTRL_CBPR);
-+		vmcr.eoim = !!(val & GIC_CPU_CTRL_EOImodeNS);
-+
- 		break;
- 	case GIC_CPU_PRIMASK:
- 		/*
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index 504b4bd..e4187e5 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -177,7 +177,18 @@ void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
- 	u32 vmcr;
- 
--	vmcr  = (vmcrp->ctlr << GICH_VMCR_CTRL_SHIFT) & GICH_VMCR_CTRL_MASK;
-+	vmcr = (vmcrp->grpen0 << GICH_VMCR_ENABLE_GRP0_SHIFT) &
-+		GICH_VMCR_ENABLE_GRP0_MASK;
-+	vmcr |= (vmcrp->grpen1 << GICH_VMCR_ENABLE_GRP1_SHIFT) &
-+		GICH_VMCR_ENABLE_GRP1_MASK;
-+	vmcr |= (vmcrp->ackctl << GICH_VMCR_ACK_CTL_SHIFT) &
-+		GICH_VMCR_ACK_CTL_MASK;
-+	vmcr |= (vmcrp->fiqen << GICH_VMCR_FIQ_EN_SHIFT) &
-+		GICH_VMCR_FIQ_EN_MASK;
-+	vmcr |= (vmcrp->cbpr << GICH_VMCR_CBPR_SHIFT) &
-+		GICH_VMCR_CBPR_MASK;
-+	vmcr |= (vmcrp->eoim << GICH_VMCR_EOI_MODE_SHIFT) &
-+		GICH_VMCR_EOI_MODE_MASK;
- 	vmcr |= (vmcrp->abpr << GICH_VMCR_ALIAS_BINPOINT_SHIFT) &
- 		GICH_VMCR_ALIAS_BINPOINT_MASK;
- 	vmcr |= (vmcrp->bpr << GICH_VMCR_BINPOINT_SHIFT) &
-@@ -195,8 +206,19 @@ void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- 
- 	vmcr = cpu_if->vgic_vmcr;
- 
--	vmcrp->ctlr = (vmcr & GICH_VMCR_CTRL_MASK) >>
--			GICH_VMCR_CTRL_SHIFT;
-+	vmcrp->grpen0 = (vmcr & GICH_VMCR_ENABLE_GRP0_MASK) >>
-+		GICH_VMCR_ENABLE_GRP0_SHIFT;
-+	vmcrp->grpen1 = (vmcr & GICH_VMCR_ENABLE_GRP1_MASK) >>
-+		GICH_VMCR_ENABLE_GRP1_SHIFT;
-+	vmcrp->ackctl = (vmcr & GICH_VMCR_ACK_CTL_MASK) >>
-+		GICH_VMCR_ACK_CTL_SHIFT;
-+	vmcrp->fiqen = (vmcr & GICH_VMCR_FIQ_EN_MASK) >>
-+		GICH_VMCR_FIQ_EN_SHIFT;
-+	vmcrp->cbpr = (vmcr & GICH_VMCR_CBPR_MASK) >>
-+		GICH_VMCR_CBPR_SHIFT;
-+	vmcrp->eoim = (vmcr & GICH_VMCR_EOI_MODE_MASK) >>
-+		GICH_VMCR_EOI_MODE_SHIFT;
-+
- 	vmcrp->abpr = (vmcr & GICH_VMCR_ALIAS_BINPOINT_MASK) >>
- 			GICH_VMCR_ALIAS_BINPOINT_SHIFT;
- 	vmcrp->bpr  = (vmcr & GICH_VMCR_BINPOINT_MASK) >>
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 6fe3f00..030248e 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -159,15 +159,24 @@ void vgic_v3_clear_lr(struct kvm_vcpu *vcpu, int lr)
- void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- {
- 	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
-+	u32 model = vcpu->kvm->arch.vgic.vgic_model;
- 	u32 vmcr;
- 
--	/*
--	 * Ignore the FIQen bit, because GIC emulation always implies
--	 * SRE=1 which means the vFIQEn bit is also RES1.
--	 */
--	vmcr = ((vmcrp->ctlr >> ICC_CTLR_EL1_EOImode_SHIFT) <<
--		 ICH_VMCR_EOIM_SHIFT) & ICH_VMCR_EOIM_MASK;
--	vmcr |= (vmcrp->ctlr << ICH_VMCR_CBPR_SHIFT) & ICH_VMCR_CBPR_MASK;
-+	if (model == KVM_DEV_TYPE_ARM_VGIC_V2) {
-+		vmcr = (vmcrp->ackctl << ICH_VMCR_ACK_CTL_SHIFT) &
-+			ICH_VMCR_ACK_CTL_MASK;
-+		vmcr |= (vmcrp->fiqen << ICH_VMCR_FIQ_EN_SHIFT) &
-+			ICH_VMCR_FIQ_EN_MASK;
-+	} else {
-+		/*
-+		 * When emulating GICv3 on GICv3 with SRE=1 on the
-+		 * VFIQEn bit is RES1 and the VAckCtl bit is RES0.
-+		 */
-+		vmcr = ICH_VMCR_FIQ_EN_MASK;
-+	}
-+
-+	vmcr |= (vmcrp->cbpr << ICH_VMCR_CBPR_SHIFT) & ICH_VMCR_CBPR_MASK;
-+	vmcr |= (vmcrp->eoim << ICH_VMCR_EOIM_SHIFT) & ICH_VMCR_EOIM_MASK;
- 	vmcr |= (vmcrp->abpr << ICH_VMCR_BPR1_SHIFT) & ICH_VMCR_BPR1_MASK;
- 	vmcr |= (vmcrp->bpr << ICH_VMCR_BPR0_SHIFT) & ICH_VMCR_BPR0_MASK;
- 	vmcr |= (vmcrp->pmr << ICH_VMCR_PMR_SHIFT) & ICH_VMCR_PMR_MASK;
-@@ -180,17 +189,27 @@ void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- {
- 	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
-+	u32 model = vcpu->kvm->arch.vgic.vgic_model;
- 	u32 vmcr;
- 
- 	vmcr = cpu_if->vgic_vmcr;
- 
--	/*
--	 * Ignore the FIQen bit, because GIC emulation always implies
--	 * SRE=1 which means the vFIQEn bit is also RES1.
--	 */
--	vmcrp->ctlr = ((vmcr >> ICH_VMCR_EOIM_SHIFT) <<
--			ICC_CTLR_EL1_EOImode_SHIFT) & ICC_CTLR_EL1_EOImode_MASK;
--	vmcrp->ctlr |= (vmcr & ICH_VMCR_CBPR_MASK) >> ICH_VMCR_CBPR_SHIFT;
-+	if (model == KVM_DEV_TYPE_ARM_VGIC_V2) {
-+		vmcrp->ackctl = (vmcr & ICH_VMCR_ACK_CTL_MASK) >>
-+			ICH_VMCR_ACK_CTL_SHIFT;
-+		vmcrp->fiqen = (vmcr & ICH_VMCR_FIQ_EN_MASK) >>
-+			ICH_VMCR_FIQ_EN_SHIFT;
-+	} else {
-+		/*
-+		 * When emulating GICv3 on GICv3 with SRE=1 on the
-+		 * VFIQEn bit is RES1 and the VAckCtl bit is RES0.
-+		 */
-+		vmcrp->fiqen = 1;
-+		vmcrp->ackctl = 0;
-+	}
-+
-+	vmcrp->cbpr = (vmcr & ICH_VMCR_CBPR_MASK) >> ICH_VMCR_CBPR_SHIFT;
-+	vmcrp->eoim = (vmcr & ICH_VMCR_EOIM_MASK) >> ICH_VMCR_EOIM_SHIFT;
- 	vmcrp->abpr = (vmcr & ICH_VMCR_BPR1_MASK) >> ICH_VMCR_BPR1_SHIFT;
- 	vmcrp->bpr  = (vmcr & ICH_VMCR_BPR0_MASK) >> ICH_VMCR_BPR0_SHIFT;
- 	vmcrp->pmr  = (vmcr & ICH_VMCR_PMR_MASK) >> ICH_VMCR_PMR_SHIFT;
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index da83e4c..bba7fa2 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -111,14 +111,18 @@ static inline bool irq_is_pending(struct vgic_irq *irq)
-  * registers regardless of the hardware backed GIC used.
-  */
- struct vgic_vmcr {
--	u32	ctlr;
-+	u32	grpen0;
-+	u32	grpen1;
-+
-+	u32	ackctl;
-+	u32	fiqen;
-+	u32	cbpr;
-+	u32	eoim;
-+
- 	u32	abpr;
- 	u32	bpr;
- 	u32	pmr;  /* Priority mask field in the GICC_PMR and
- 		       * ICC_PMR_EL1 priority field format */
--	/* Below member variable are valid only for GICv3 */
--	u32	grpen0;
--	u32	grpen1;
- };
- 
- struct vgic_reg_attr {
+ 	if (stage2_pud_none(*pud)) {
+ 		if (!cache)
+ 			return NULL;
 -- 
 2.9.0
