@@ -1,52 +1,338 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 6 Jun 2017 14:50:17 +0100
-Subject: [PATCH v4 2/8] mfd: hi6421-pmic: cleanup: update dev_err messages
-In-Reply-To: <20170606085143.13154-3-guodong.xu@linaro.org>
-References: <20170606085143.13154-1-guodong.xu@linaro.org>
- <20170606085143.13154-3-guodong.xu@linaro.org>
-Message-ID: <20170606135017.gwdyrcof5iqvtlw5@dell>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 6 Jun 2017 15:50:16 +0200
+Subject: [PATCH v2 07/25] KVM: arm64: vgic-v3: Add ICV_IAR1_EL1 handler
+In-Reply-To: <58da4fd6-6438-08d3-b17e-5f2b60be3c3d@arm.com>
+References: <20170601102117.17750-1-marc.zyngier@arm.com>
+ <20170601102117.17750-8-marc.zyngier@arm.com>
+ <20170605092100.GI9464@cbox>
+ <4aa402b8-a6fe-fc1c-445d-17be50752d00@arm.com>
+ <20170606110946.GL9464@cbox>
+ <58da4fd6-6438-08d3-b17e-5f2b60be3c3d@arm.com>
+Message-ID: <20170606135016.GF9464@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 06 Jun 2017, Guodong Xu wrote:
-
-> Update dev_err messages to make them more readable.
+On Tue, Jun 06, 2017 at 02:35:30PM +0100, Marc Zyngier wrote:
+> On 06/06/17 12:09, Christoffer Dall wrote:
+> > On Mon, Jun 05, 2017 at 11:33:52AM +0100, Marc Zyngier wrote:
+> >> On 05/06/17 10:21, Christoffer Dall wrote:
+> >>> On Thu, Jun 01, 2017 at 11:20:59AM +0100, Marc Zyngier wrote:
+> >>>> Add a handler for reading the guest's view of the ICC_IAR1_EL1
+> >>>> register. This involves finding the highest priority Group-1
+> >>>> interrupt, checking against both PMR and the active group
+> >>>> priority, activating the interrupt and setting the group
+> >>>> priority as active.
+> >>>>
+> >>>> Reviewed-by: Eric Auger <eric.auger@redhat.com>
+> >>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >>>> ---
+> >>>>  include/linux/irqchip/arm-gic-v3.h |   1 +
+> >>>>  virt/kvm/arm/hyp/vgic-v3-sr.c      | 150 +++++++++++++++++++++++++++++++++++++
+> >>>>  2 files changed, 151 insertions(+)
+> >>>>
+> >>>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> >>>> index fffb91202bc9..401db585a534 100644
+> >>>> --- a/include/linux/irqchip/arm-gic-v3.h
+> >>>> +++ b/include/linux/irqchip/arm-gic-v3.h
+> >>>> @@ -405,6 +405,7 @@
+> >>>>  #define ICH_LR_PHYS_ID_SHIFT		32
+> >>>>  #define ICH_LR_PHYS_ID_MASK		(0x3ffULL << ICH_LR_PHYS_ID_SHIFT)
+> >>>>  #define ICH_LR_PRIORITY_SHIFT		48
+> >>>> +#define ICH_LR_PRIORITY_MASK		(0xffULL << ICH_LR_PRIORITY_SHIFT)
+> >>>>  
+> >>>>  /* These are for GICv2 emulation only */
+> >>>>  #define GICH_LR_VIRTUALID		(0x3ffUL << 0)
+> >>>> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> >>>> index 168539dfd0b9..16a2eadc7a5c 100644
+> >>>> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
+> >>>> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> >>>> @@ -24,6 +24,7 @@
+> >>>>  
+> >>>>  #define vtr_to_max_lr_idx(v)		((v) & 0xf)
+> >>>>  #define vtr_to_nr_pre_bits(v)		(((u32)(v) >> 26) + 1)
+> >>>> +#define vtr_to_nr_apr_regs(v)		(1 << (vtr_to_nr_pre_bits(v) - 5))
+> >>>>  
+> >>>>  static u64 __hyp_text __gic_v3_get_lr(unsigned int lr)
+> >>>>  {
+> >>>> @@ -375,6 +376,79 @@ void __hyp_text __vgic_v3_write_vmcr(u32 vmcr)
+> >>>>  
+> >>>>  #ifdef CONFIG_ARM64
+> >>>>  
+> >>>> +static int __hyp_text __vgic_v3_get_group(struct kvm_vcpu *vcpu)
+> >>>> +{
+> >>>> +	u32 esr = kvm_vcpu_get_hsr(vcpu);
+> >>>> +	u8 crm = (esr & ESR_ELx_SYS64_ISS_CRM_MASK) >> ESR_ELx_SYS64_ISS_CRM_SHIFT;
+> >>>> +
+> >>>> +	return crm != 8;
+> >>>> +}
+> >>>> +
+> >>>> +#define GICv3_IDLE_PRIORITY	0xff
+> >>>> +
+> >>>> +static int __hyp_text __vgic_v3_highest_priority_lr(struct kvm_vcpu *vcpu,
+> >>>> +						    u32 vmcr,
+> >>>> +						    u64 *lr_val)
+> >>>> +{
+> >>>> +	unsigned int used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+> >>>> +	u8 priority = GICv3_IDLE_PRIORITY;
+> >>>> +	int i, lr = -1;
+> >>>> +
+> >>>> +	for (i = 0; i < used_lrs; i++) {
+> >>>> +		u64 val = __gic_v3_get_lr(i);
+> >>>> +		u8 lr_prio = (val & ICH_LR_PRIORITY_MASK) >> ICH_LR_PRIORITY_SHIFT;
+> >>>> +
+> >>>> +		/* Not pending in the state? */
+> >>>> +		if ((val & ICH_LR_STATE) != ICH_LR_PENDING_BIT)
+> >>>> +			continue;
+> >>>> +
+> >>>> +		/* Group-0 interrupt, but Group-0 disabled? */
+> >>>> +		if (!(val & ICH_LR_GROUP) && !(vmcr & ICH_VMCR_ENG0_MASK))
+> >>>> +			continue;
+> >>>> +
+> >>>> +		/* Group-1 interrupt, but Group-1 disabled? */
+> >>>> +		if ((val & ICH_LR_GROUP) && !(vmcr & ICH_VMCR_ENG1_MASK))
+> >>>> +			continue;
+> >>>> +
+> >>>> +		/* Not the highest priority? */
+> >>>> +		if (lr_prio >= priority)
+> >>>> +			continue;
+> >>>> +
+> >>>> +		/* This is a candidate */
+> >>>> +		priority = lr_prio;
+> >>>> +		*lr_val = val;
+> >>>> +		lr = i;
+> >>>> +	}
+> >>>> +
+> >>>> +	if (lr == -1)
+> >>>> +		*lr_val = ICC_IAR1_EL1_SPURIOUS;
+> >>>> +
+> >>>> +	return lr;
+> >>>> +}
+> >>>> +
+> >>>> +static int __hyp_text __vgic_v3_get_highest_active_priority(void)
+> >>>> +{
+> >>>> +	u8 nr_pre_bits = vtr_to_nr_pre_bits(read_gicreg(ICH_VTR_EL2));
+> >>>> +	u8 nr_apr_regs = vtr_to_nr_apr_regs(read_gicreg(ICH_VTR_EL2));
+> >>>> +	u32 hap = 0;
+> >>>> +	int i;
+> >>>> +
+> >>>> +	for (i = 0; i < nr_apr_regs; i++) {
+> >>>> +		u32 val;
+> >>>> +
+> >>>> +		val  = __vgic_v3_read_ap0rn(i);
+> >>>> +		val |= __vgic_v3_read_ap1rn(i);
+> >>>> +		if (!val) {
+> >>>> +			hap += 32;
+> >>>> +			continue;
+> >>>> +		}
+> >>>> +
+> >>>> +		return (hap + __ffs(val)) << (8 - nr_pre_bits);
+> >>>
+> >>> I don't understand this shift, and I think I asked about it before, so
+> >>> maybe if it's a reused concept we can use a static inline or at least
+> >>> provide a comment?
+> >>
+> >> I tried to explain it in my reply to your comment on patch #5. Can
+> >> definitely make that a helper. I think part of the confusion is that
+> >> this constant is used in a number of ways to express the conversion
+> >> between a preemption level and a priority.
+> >>
+> > 
+> > ok, I understand it now, but it's weird that we use 8 as a constant here
+> > (which applied to both group 0 and group 1) but 7 and 8, respecitvely,
+> > for the writes to the bpr0.
 > 
-> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
-> ---
->  drivers/mfd/hi6421-pmic-core.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-
-For my own reference:
-  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
-  
-> diff --git a/drivers/mfd/hi6421-pmic-core.c b/drivers/mfd/hi6421-pmic-core.c
-> index ad9e3d8..b1139d4 100644
-> --- a/drivers/mfd/hi6421-pmic-core.c
-> +++ b/drivers/mfd/hi6421-pmic-core.c
-> @@ -52,8 +52,8 @@ static int hi6421_pmic_probe(struct platform_device *pdev)
->  	pmic->regmap = devm_regmap_init_mmio_clk(&pdev->dev, NULL, base,
->  						 &hi6421_regmap_config);
->  	if (IS_ERR(pmic->regmap)) {
-> -		dev_err(&pdev->dev,
-> -			"regmap init failed: %ld\n", PTR_ERR(pmic->regmap));
-> +		dev_err(&pdev->dev, "Failed to initialise Regmap: %ld\n",
-> +						PTR_ERR(pmic->regmap));
->  		return PTR_ERR(pmic->regmap);
->  	}
+> I made it slightly simpler to understand in my current series (hopefully).
+> 
+> > I understand that these two concepts are actually independent and
+> > loosely related, so maybe adding something like this would help:
+> > 
+> > 		/*
+> > 		 * The ICH_AP0Rn_EL2 and ICH_AP1Rn_EL2 registers contain
+> > 		 * the active priority levels for this VCPU for the
+> > 		 * maximum number of supported priority levels, and we
+> > 		 * return the full priority level only if the BPR is
+> > 		 * programmed to its minimum, otherwise we return a
+> > 		 * combination of the priority level and subpriority, as
+> > 		 * determined by the setting of the BPR, but without the
+> > 		 * full subpriority.
+> > 		 */
+> > 
+> > Maybe this is wrong and will just confuse people more?
+> 
+> It seems right to me, so I'll paste it in.
+> 
+> >>>> +	}
+> >>>> +
+> >>>> +	return GICv3_IDLE_PRIORITY;
+> >>>> +}
+> >>>> +
+> >>>>  static unsigned int __hyp_text __vgic_v3_get_bpr0(u32 vmcr)
+> >>>>  {
+> >>>>  	return (vmcr & ICH_VMCR_BPR0_MASK) >> ICH_VMCR_BPR0_SHIFT;
+> >>>> @@ -395,6 +469,79 @@ static unsigned int __hyp_text __vgic_v3_get_bpr1(u32 vmcr)
+> >>>>  	return bpr;
+> >>>>  }
+> >>>>  
+> >>>> +/*
+> >>>> + * Convert a priority to a preemption level, taking the relevant BPR
+> >>>> + * into account by zeroing the sub-priority bits.
+> >>>> + */
+> >>>> +static u8 __hyp_text __vgic_v3_pri_to_pre(u8 pri, u32 vmcr, int grp)
+> >>>> +{
+> >>>> +	unsigned int bpr;
+> >>>> +
+> >>>> +	if (!grp)
+> >>>> +		bpr = __vgic_v3_get_bpr0(vmcr) + 1;
+> >>>> +	else
+> >>>> +		bpr = __vgic_v3_get_bpr1(vmcr);
+> >>>> +
+> >>>> +	return pri & (GENMASK(7, 0) << bpr);
+> >>>> +}
+> >>>> +
+> >>>> +/*
+> >>>> + * The priority value is independent of any of the BPR values, so we
+> >>>> + * normalize it using nr_pre_bits. This guarantees that no matter what
+> >>>> + * the guest does with its BPR, we can always set/get the same value
+> >>>> + * of a priority.
+> >>>> + */
+> >>>> +static void __hyp_text __vgic_v3_set_active_priority(u8 pri, u32 vmcr, int grp)
+> >>>> +{
+> >>>> +	u8 nr_pre_bits, pre, ap;
+> >>>> +	u32 val;
+> >>>> +	int apr;
+> >>>> +
+> >>>> +	nr_pre_bits = vtr_to_nr_pre_bits(read_gicreg(ICH_VTR_EL2));
+> >>>> +	pre = __vgic_v3_pri_to_pre(pri, vmcr, grp);
+> >>>> +	ap = pre >> (8 - nr_pre_bits);
+> >>>
+> >>> Again here, I don't get this shift.
+> >>>
+> >>>> +	apr = ap / 32;
+> >>>> +
+> >>>> +	val = __vgic_v3_read_ap1rn(apr);
+> >>>> +	__vgic_v3_write_ap1rn(val | BIT(ap % 32), apr);
+> >>>
+> >>> How are we sure this is a group 1 interrupt here?
+> >>
+> >> That's a bug, as we should definitely check grp here. Thanks for
+> >> noticing it!
+> >>
+> > 
+> > Sure.  Also, the spec says "Writing to these registers with any value
+> > other than the last read value of the register (or 0x00000000 for a
+> > newly set up virtual machine) can result in UNPREDICTABLE behavior of
+> > the virtual interrupt prioritization system allowing either: ...".  Does
+> > that just translate to "You should know what you're doing", or could we
+> > be breaking something here?
+> 
+> This is basically a "don't mess with the HW". But in our case, we're mostly
+> using the registers as storage, and doing the heavy lifting in SW.
+> 
+> > 
+> >>>> +}
+> >>>> +
+> >>>> +static void __hyp_text __vgic_v3_read_iar(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
+> >>>> +{
+> >>>> +	u64 lr_val;
+> >>>> +	u8 lr_prio, pmr;
+> >>>> +	int lr, grp;
+> >>>> +
+> >>>> +	grp = __vgic_v3_get_group(vcpu);
+> >>>> +
+> >>>> +	lr = __vgic_v3_highest_priority_lr(vcpu, vmcr, &lr_val);
+> >>>> +	if (lr < 0)
+> >>>> +		goto spurious;
+> >>>> +
+> >>>> +	if (grp != !!(lr_val & ICH_LR_GROUP))
+> >>>> +		goto spurious;
+> >>>> +
+> >>>> +	pmr = (vmcr & ICH_VMCR_PMR_MASK) >> ICH_VMCR_PMR_SHIFT;
+> >>>> +	lr_prio = (lr_val & ICH_LR_PRIORITY_MASK) >> ICH_LR_PRIORITY_SHIFT;
+> >>>> +	if (pmr <= lr_prio)
+> >>>> +		goto spurious;
+> >>>> +
+> >>>> +	if (__vgic_v3_get_highest_active_priority() <= lr_prio)
+> >>>> +		goto spurious;
+> > 
+> > Based on what I wrote above, don't you need to consider the actual
+> > setting of the BPR here?
+> > 
+> > For example, if __vgic_v3_get_highest_active_priority() == 100.10 and
+> > lr_prio == 100.09  (BPR == 5 for a group 1 interrupt) then you'll
+> > compare 10010 <= 10009, you won't take the branch and you'll let the
+> > guest ack another interrupt at the same-and-already-active preemption
+> > level.
+> > 
+> > Or am I again misunderstandin how this whole thing works?
+> 
+> I think you're right. This should read:
+> 
+> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> index 78e267637bbd..8f565983de08 100644
+> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
+> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> @@ -604,7 +604,7 @@ static void __hyp_text __vgic_v3_read_iar(struct kvm_vcpu *vcpu, u32 vmcr, int r
+>  	if (pmr <= lr_prio)
+>  		goto spurious;
 >  
-> @@ -70,7 +70,7 @@ static int hi6421_pmic_probe(struct platform_device *pdev)
->  	ret = devm_mfd_add_devices(&pdev->dev, 0, hi6421_devs,
->  				   ARRAY_SIZE(hi6421_devs), NULL, 0, NULL);
->  	if (ret) {
-> -		dev_err(&pdev->dev, "add mfd devices failed: %d\n", ret);
-> +		dev_err(&pdev->dev, "Failed to add child devices: %d\n", ret);
->  		return ret;
->  	}
+> -	if (__vgic_v3_get_highest_active_priority() <= lr_prio)
+> +	if (__vgic_v3_get_highest_active_priority() <= __vgic_v3_pri_to_pre(lr_prio, vmcr, grp))
+>  		goto spurious;
 >  
+>  	lr_val &= ~ICH_LR_STATE;
+> 
+> so that we actually compare the preemption levels.
+> 
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+That looks good.
+
+> > 
+> >>>> +
+> >>>> +	lr_val &= ~ICH_LR_STATE;
+> >>>> +	/* No active state for LPIs */
+> >>>> +	if ((lr_val & ICH_LR_VIRTUAL_ID_MASK) <= VGIC_MAX_SPI)
+> >>>> +		lr_val |= ICH_LR_ACTIVE_BIT;
+> >>>> +	__gic_v3_set_lr(lr_val, lr);
+> >>>> +	__vgic_v3_set_active_priority(lr_prio, vmcr, grp);
+> >>>> +	vcpu_set_reg(vcpu, rt, lr_val & ICH_LR_VIRTUAL_ID_MASK);
+> >>>> +	return;
+> >>>> +
+> >>>> +spurious:
+> >>>> +	vcpu_set_reg(vcpu, rt, ICC_IAR1_EL1_SPURIOUS);
+> >>>> +}
+> >>>> +
+> >>>>  static void __hyp_text __vgic_v3_read_igrpen1(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
+> >>>>  {
+> >>>>  	vcpu_set_reg(vcpu, rt, !!(vmcr & ICH_VMCR_ENG1_MASK));
+> >>>> @@ -459,6 +606,9 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
+> >>>>  	is_read = (esr & ESR_ELx_SYS64_ISS_DIR_MASK) == ESR_ELx_SYS64_ISS_DIR_READ;
+> >>>>  
+> >>>>  	switch (sysreg) {
+> >>>> +	case SYS_ICC_IAR1_EL1:
+> >>>> +		fn = __vgic_v3_read_iar;
+> >>>> +		break;
+> >>>
+> >>> So we don't provide a write-ignore function here because we rely on the
+> >>> hardware to always trap that at EL1 instead?
+> >>>
+> >>> I remember we discussed this before, but I don't remember if the
+> >>> conclusion was that this is 100% safe.
+> >>
+> >> A properly designed CPU would UNDEF at EL1. I'm happy to try and detect
+> >> broken failing implementations here, but I'm not sure of what to do, as
+> >> we're not in the best context to handle this. We could continue exiting
+> >> to EL1 and handle things there...
+> >>
+> > 
+> > I feel like we decided that other parts of KVM relies on this being
+> > implemented correctly, so maybe this is not the place to begin being
+> > overly cautious about things.
+> > 
+> > That said, having a path back to EL1 where we can print stuff and
+> > create warnings, may not be an entirely bad idea.
+> 
+> I'll look at adding something that takes care of it.
+> 
+
+Thanks!
+-Christoffer
