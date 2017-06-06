@@ -1,123 +1,102 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Tue,  6 Jun 2017 16:08:43 -0500
-Subject: [PATCH v8 08/24] drivers/fsi: Set slave SMODE to init communication
+Date: Tue,  6 Jun 2017 16:08:46 -0500
+Subject: [PATCH v8 11/24] drivers/fsi: Add master unscan
 In-Reply-To: <20170606210859.80431-1-cbostic@linux.vnet.ibm.com>
 References: <20170606210859.80431-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170606210859.80431-9-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170606210859.80431-12-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set CFAM to appropriate ID so that the controlling master can manage
-link memory ranges.  Add slave engine register definitions.
+Allow a master to undo a previous scan.  Should a master scan a bus
+twice it will need to ensure it doesn't double register any
+previously detected device.
 
-Includes changes from Jeremy Kerr <jk@ozlabs.org>.
-
-Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
 Signed-off-by: Christopher Bostic <cbostic@linux.vnet.ibm.com>
 Signed-off-by: Joel Stanley <joel@jms.id.au>
+----
+v7 - Unscan when unregistering master
+   - Remove leading '__'s from function names
+   - Return fail state for sysfs rescan file
 ---
- drivers/fsi/fsi-core.c | 75 ++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 75 insertions(+)
+ drivers/fsi/fsi-core.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
 
 diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index 9d9adc1..04795f2 100644
+index d7a6e76..fcb0c81 100644
 --- a/drivers/fsi/fsi-core.c
 +++ b/drivers/fsi/fsi-core.c
-@@ -22,6 +22,27 @@
+@@ -71,6 +71,7 @@ struct fsi_slave {
+ 	uint32_t		size;	/* size of slave address space */
+ };
  
- #include "fsi-master.h"
++#define to_fsi_master(d) container_of(d, struct fsi_master, dev)
+ #define to_fsi_slave(d) container_of(d, struct fsi_slave, dev)
  
-+#define FSI_SLAVE_BASE			0x800
-+
-+/*
-+ * FSI slave engine control register offsets
-+ */
-+#define FSI_SMODE			0x0	/* R/W: Mode register */
-+
-+/*
-+ * SMODE fields
-+ */
-+#define FSI_SMODE_WSC		0x80000000	/* Warm start done */
-+#define FSI_SMODE_ECRC		0x20000000	/* Hw CRC check */
-+#define FSI_SMODE_SID_SHIFT	24		/* ID shift */
-+#define FSI_SMODE_SID_MASK	3		/* ID Mask */
-+#define FSI_SMODE_ED_SHIFT	20		/* Echo delay shift */
-+#define FSI_SMODE_ED_MASK	0xf		/* Echo delay mask */
-+#define FSI_SMODE_SD_SHIFT	16		/* Send delay shift */
-+#define FSI_SMODE_SD_MASK	0xf		/* Send delay mask */
-+#define FSI_SMODE_LBCRR_SHIFT	8		/* Clk ratio shift */
-+#define FSI_SMODE_LBCRR_MASK	0xf		/* Clk ratio mask */
-+
- #define FSI_SLAVE_SIZE_23b		0x800000
- 
- static DEFINE_IDA(master_ida);
-@@ -94,6 +115,52 @@ static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
- 			addr, val, size);
+ static int fsi_master_read(struct fsi_master *master, int link,
+@@ -488,6 +489,40 @@ static int fsi_master_scan(struct fsi_master *master)
+ 	return 0;
  }
  
-+/* Encode slave local bus echo delay */
-+static inline uint32_t fsi_smode_echodly(int x)
++static int fsi_slave_remove_device(struct device *dev, void *arg)
 +{
-+	return (x & FSI_SMODE_ED_MASK) << FSI_SMODE_ED_SHIFT;
++	device_unregister(dev);
++	return 0;
 +}
 +
-+/* Encode slave local bus send delay */
-+static inline uint32_t fsi_smode_senddly(int x)
++static int fsi_master_remove_slave(struct device *dev, void *arg)
 +{
-+	return (x & FSI_SMODE_SD_MASK) << FSI_SMODE_SD_SHIFT;
++	device_for_each_child(dev, NULL, fsi_slave_remove_device);
++	device_unregister(dev);
++	return 0;
 +}
 +
-+/* Encode slave local bus clock rate ratio */
-+static inline uint32_t fsi_smode_lbcrr(int x)
++static void fsi_master_unscan(struct fsi_master *master)
 +{
-+	return (x & FSI_SMODE_LBCRR_MASK) << FSI_SMODE_LBCRR_SHIFT;
++	device_for_each_child(&master->dev, NULL, fsi_master_remove_slave);
 +}
 +
-+/* Encode slave ID */
-+static inline uint32_t fsi_smode_sid(int x)
++static ssize_t master_rescan_store(struct device *dev,
++		struct device_attribute *attr, const char *buf, size_t count)
 +{
-+	return (x & FSI_SMODE_SID_MASK) << FSI_SMODE_SID_SHIFT;
++	struct fsi_master *master = to_fsi_master(dev);
++	int rc;
++
++	fsi_master_unscan(master);
++	rc = fsi_master_scan(master);
++	if (rc < 0)
++		return rc;
++
++	return count;
 +}
 +
-+static const uint32_t fsi_slave_smode(int id)
-+{
-+	return FSI_SMODE_WSC | FSI_SMODE_ECRC
-+		| fsi_smode_sid(id)
-+		| fsi_smode_echodly(0xf) | fsi_smode_senddly(0xf)
-+		| fsi_smode_lbcrr(0x8);
-+}
++static DEVICE_ATTR(rescan, 0200, NULL, master_rescan_store);
 +
-+static int fsi_slave_set_smode(struct fsi_master *master, int link, int id)
-+{
-+	uint32_t smode;
-+
-+	/* set our smode register with the slave ID field to 0; this enables
-+	 * extended slave addressing
-+	 */
-+	smode = fsi_slave_smode(id);
-+	smode = cpu_to_be32(smode);
-+
-+	return fsi_master_write(master, link, id, FSI_SLAVE_BASE + FSI_SMODE,
-+			&smode, sizeof(smode));
-+}
-+
- static void fsi_slave_release(struct device *dev)
+ int fsi_master_register(struct fsi_master *master)
  {
- 	struct fsi_slave *slave = to_fsi_slave(dev);
-@@ -132,6 +199,14 @@ static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
- 	dev_info(&master->dev, "fsi: found chip %08x at %02x:%02x:%02x\n",
- 			chip_id, master->idx, link, id);
+ 	int rc;
+@@ -504,7 +539,15 @@ int fsi_master_register(struct fsi_master *master)
+ 		return rc;
+ 	}
  
-+	rc = fsi_slave_set_smode(master, link, id);
++	rc = device_create_file(&master->dev, &dev_attr_rescan);
 +	if (rc) {
-+		dev_warn(&master->dev,
-+				"can't set smode on slave:%02x:%02x %d\n",
-+				link, id, rc);
-+		return -ENODEV;
++		device_unregister(&master->dev);
++		ida_simple_remove(&master_ida, master->idx);
++		return rc;
 +	}
 +
- 	/* We can communicate with a slave; create the slave device and
- 	 * register.
- 	 */
+ 	fsi_master_scan(master);
++
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(fsi_master_register);
+@@ -516,6 +559,7 @@ void fsi_master_unregister(struct fsi_master *master)
+ 		master->idx = -1;
+ 	}
+ 
++	fsi_master_unscan(master);
+ 	device_unregister(&master->dev);
+ }
+ EXPORT_SYMBOL_GPL(fsi_master_unregister);
 -- 
 1.8.2.2
