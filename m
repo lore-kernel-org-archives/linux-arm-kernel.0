@@ -1,138 +1,111 @@
 From: ruxandra.radulescu@nxp.com (Ioana Radulescu)
-Date: Tue, 6 Jun 2017 10:00:39 -0500
-Subject: [PATCH 16/18] staging: fsl-dpaa2/eth: Errors checking update
+Date: Tue, 6 Jun 2017 10:00:36 -0500
+Subject: [PATCH 13/18] staging: fsl-dpaa2/eth: Remove unused fields from priv
+ struct
 In-Reply-To: <20170606150041.10955-1-ruxandra.radulescu@nxp.com>
 References: <20170606150041.10955-1-ruxandra.radulescu@nxp.com>
-Message-ID: <20170606150041.10955-17-ruxandra.radulescu@nxp.com>
+Message-ID: <20170606150041.10955-14-ruxandra.radulescu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the egress path, frame errors are reported using both a FD control
-field and the frame annotation status. The current code only handles
-FAS errors. Update to look at both fields when accounting Tx errors.
+Remove the dpni_id and buffer_layout fields from device's
+private structure. They're only used at probe so we don't
+need to store them for further use.
 
-Signed-off-by: Bogdan Purcareata <bogdan.purcareata@nxp.com>
 Signed-off-by: Ioana Radulescu <ruxandra.radulescu@nxp.com>
 ---
-Note: Checkpatch complains about a macro(DPAA2_FAS_RX_ERR_MASK) being
-too complex. It's just a bitmask with all possible Rx FAS error bits
-and I'm not sure how the extra parantheses recommended by checkpatch
-would help, so leaving it as is.
-
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c | 36 ++++++++++++++++++++------
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h | 17 ++++++++++--
- 2 files changed, 43 insertions(+), 10 deletions(-)
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c | 33 +++++++++++++-------------
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h |  5 ----
+ 2 files changed, 16 insertions(+), 22 deletions(-)
 
 diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-index 26f209c78ff9..7dca8c2e5ff9 100644
+index d81c56f4d859..ee71e158b0a9 100644
 --- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
 +++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-@@ -534,7 +534,7 @@ static void free_tx_fd(const struct dpaa2_eth_priv *priv,
- 	 * buffer but before we free it. The caller function is responsible
- 	 * for checking the status value.
- 	 */
--	if (status && (dpaa2_fd_get_frc(fd) & DPAA2_FD_FRC_FASV))
-+	if (status)
- 		*status = le32_to_cpu(fas->status);
+@@ -1734,15 +1734,14 @@ static int setup_dpni(struct fsl_mc_device *ls_dev)
+ 	struct device *dev = &ls_dev->dev;
+ 	struct dpaa2_eth_priv *priv;
+ 	struct net_device *net_dev;
++	struct dpni_buffer_layout buf_layout = {0};
+ 	int err;
  
- 	/* Free SGT buffer kmalloc'ed on tx */
-@@ -638,6 +638,8 @@ static void dpaa2_eth_tx_conf(struct dpaa2_eth_priv *priv,
- 	struct rtnl_link_stats64 *percpu_stats;
- 	struct dpaa2_eth_drv_stats *percpu_extras;
- 	u32 status = 0;
-+	u32 fd_errors;
-+	bool has_fas_errors = false;
+ 	net_dev = dev_get_drvdata(dev);
+ 	priv = netdev_priv(net_dev);
  
- 	/* Tracing point */
- 	trace_dpaa2_tx_conf_fd(priv->net_dev, fd);
-@@ -646,13 +648,31 @@ static void dpaa2_eth_tx_conf(struct dpaa2_eth_priv *priv,
- 	percpu_extras->tx_conf_frames++;
- 	percpu_extras->tx_conf_bytes += dpaa2_fd_get_len(fd);
- 
--	free_tx_fd(priv, fd, &status);
+-	priv->dpni_id = ls_dev->obj_desc.id;
 -
--	if (unlikely(status & DPAA2_ETH_TXCONF_ERR_MASK)) {
--		percpu_stats = this_cpu_ptr(priv->percpu_stats);
--		/* Tx-conf logically pertains to the egress path. */
--		percpu_stats->tx_errors++;
-+	/* Check frame errors in the FD field */
-+	fd_errors = dpaa2_fd_get_ctrl(fd) & DPAA2_FD_TX_ERR_MASK;
-+	if (unlikely(fd_errors)) {
-+		/* We only check error bits in the FAS field if corresponding
-+		 * FAERR bit is set in FD and the FAS field is marked as valid
-+		 */
-+		has_fas_errors = (fd_errors & DPAA2_FD_CTRL_FAERR) &&
-+				 !!(dpaa2_fd_get_frc(fd) & DPAA2_FD_FRC_FASV);
-+		if (net_ratelimit())
-+			netdev_dbg(priv->net_dev, "TX frame FD error: %x08\n",
-+				   fd_errors);
+ 	/* get a handle for the DPNI object */
+-	err = dpni_open(priv->mc_io, 0, priv->dpni_id, &priv->mc_token);
++	err = dpni_open(priv->mc_io, 0, ls_dev->obj_desc.id, &priv->mc_token);
+ 	if (err) {
+ 		dev_err(dev, "dpni_open() failed\n");
+ 		goto err_open;
+@@ -1766,35 +1765,35 @@ static int setup_dpni(struct fsl_mc_device *ls_dev)
+ 
+ 	/* Configure buffer layouts */
+ 	/* rx buffer */
+-	priv->buf_layout.pass_parser_result = true;
+-	priv->buf_layout.pass_frame_status = true;
+-	priv->buf_layout.private_data_size = DPAA2_ETH_SWA_SIZE;
+-	priv->buf_layout.data_align = DPAA2_ETH_RX_BUF_ALIGN;
+-	priv->buf_layout.options = DPNI_BUF_LAYOUT_OPT_PARSER_RESULT |
+-				   DPNI_BUF_LAYOUT_OPT_FRAME_STATUS |
+-				   DPNI_BUF_LAYOUT_OPT_PRIVATE_DATA_SIZE |
+-				   DPNI_BUF_LAYOUT_OPT_DATA_ALIGN;
++	buf_layout.pass_parser_result = true;
++	buf_layout.pass_frame_status = true;
++	buf_layout.private_data_size = DPAA2_ETH_SWA_SIZE;
++	buf_layout.data_align = DPAA2_ETH_RX_BUF_ALIGN;
++	buf_layout.options = DPNI_BUF_LAYOUT_OPT_PARSER_RESULT |
++			     DPNI_BUF_LAYOUT_OPT_FRAME_STATUS |
++			     DPNI_BUF_LAYOUT_OPT_PRIVATE_DATA_SIZE |
++			     DPNI_BUF_LAYOUT_OPT_DATA_ALIGN;
+ 	err = dpni_set_buffer_layout(priv->mc_io, 0, priv->mc_token,
+-				     DPNI_QUEUE_RX, &priv->buf_layout);
++				     DPNI_QUEUE_RX, &buf_layout);
+ 	if (err) {
+ 		dev_err(dev, "dpni_set_buffer_layout(RX) failed\n");
+ 		goto err_buf_layout;
  	}
-+
-+	free_tx_fd(priv, fd, has_fas_errors ? &status : NULL);
-+
-+	if (likely(!fd_errors))
-+		return;
-+
-+	percpu_stats = this_cpu_ptr(priv->percpu_stats);
-+	/* Tx-conf logically pertains to the egress path. */
-+	percpu_stats->tx_errors++;
-+
-+	if (has_fas_errors && net_ratelimit())
-+		netdev_dbg(priv->net_dev, "TX frame FAS error: %x08\n",
-+			   status & DPAA2_FAS_TX_ERR_MASK);
- }
  
- static int set_rx_csum(struct dpaa2_eth_priv *priv, bool enable)
-@@ -2069,7 +2089,7 @@ static int bind_dpni(struct dpaa2_eth_priv *priv)
- 		netdev_err(net_dev, "Failed to configure hashing\n");
+ 	/* tx buffer */
+-	priv->buf_layout.options = DPNI_BUF_LAYOUT_OPT_FRAME_STATUS |
+-				   DPNI_BUF_LAYOUT_OPT_PRIVATE_DATA_SIZE;
++	buf_layout.options = DPNI_BUF_LAYOUT_OPT_FRAME_STATUS |
++			     DPNI_BUF_LAYOUT_OPT_PRIVATE_DATA_SIZE;
+ 	err = dpni_set_buffer_layout(priv->mc_io, 0, priv->mc_token,
+-				     DPNI_QUEUE_TX, &priv->buf_layout);
++				     DPNI_QUEUE_TX, &buf_layout);
+ 	if (err) {
+ 		dev_err(dev, "dpni_set_buffer_layout(TX) failed\n");
+ 		goto err_buf_layout;
+ 	}
  
- 	/* Configure handling of error frames */
--	err_cfg.errors = DPAA2_ETH_RX_ERR_MASK;
-+	err_cfg.errors = DPAA2_FAS_RX_ERR_MASK;
- 	err_cfg.set_frame_annotation = 1;
- 	err_cfg.error_action = DPNI_ERROR_ACTION_DISCARD;
- 	err = dpni_set_errors_behavior(priv->mc_io, 0, priv->mc_token,
+ 	/* tx-confirm buffer */
+-	priv->buf_layout.options = DPNI_BUF_LAYOUT_OPT_FRAME_STATUS;
++	buf_layout.options = DPNI_BUF_LAYOUT_OPT_FRAME_STATUS;
+ 	err = dpni_set_buffer_layout(priv->mc_io, 0, priv->mc_token,
+-				     DPNI_QUEUE_TX_CONFIRM, &priv->buf_layout);
++				     DPNI_QUEUE_TX_CONFIRM, &buf_layout);
+ 	if (err) {
+ 		dev_err(dev, "dpni_set_buffer_layout(TX_CONF) failed\n");
+ 		goto err_buf_layout;
 diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
-index c760e9b77e22..b492c8723bb6 100644
+index 6462e2cbe4be..6697b508cf23 100644
 --- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
 +++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
-@@ -120,6 +120,19 @@ struct dpaa2_eth_swa {
- #define DPAA2_FD_FRC_FASWOV		0x0800
- #define DPAA2_FD_FRC_FAICFDV		0x0400
+@@ -297,12 +297,7 @@ struct dpaa2_eth_priv {
+ 	u8 num_channels;
+ 	struct dpaa2_eth_channel *channel[DPAA2_ETH_MAX_DPCONS];
  
-+/* Error bits in FD CTRL */
-+#define DPAA2_FD_CTRL_UFD		0x00000004
-+#define DPAA2_FD_CTRL_SBE		0x00000008
-+#define DPAA2_FD_CTRL_FSE		0x00000010
-+#define DPAA2_FD_CTRL_FAERR		0x00000020
-+
-+#define DPAA2_FD_RX_ERR_MASK		(DPAA2_FD_CTRL_SBE	| \
-+					 DPAA2_FD_CTRL_FAERR)
-+#define DPAA2_FD_TX_ERR_MASK		(DPAA2_FD_CTRL_UFD	| \
-+					 DPAA2_FD_CTRL_SBE	| \
-+					 DPAA2_FD_CTRL_FSE	| \
-+					 DPAA2_FD_CTRL_FAERR)
-+
- /* Annotation bits in FD CTRL */
- #define DPAA2_FD_CTRL_ASAL		0x00020000	/* ASAL = 128 */
- #define DPAA2_FD_CTRL_PTA		0x00800000
-@@ -177,7 +190,7 @@ struct dpaa2_fas {
- /* L4 csum error */
- #define DPAA2_FAS_L4CE			0x00000001
- /* Possible errors on the ingress path */
--#define DPAA2_ETH_RX_ERR_MASK		(DPAA2_FAS_KSE		| \
-+#define DPAA2_FAS_RX_ERR_MASK		(DPAA2_FAS_KSE		| \
- 					 DPAA2_FAS_EOFHE	| \
- 					 DPAA2_FAS_MNLE		| \
- 					 DPAA2_FAS_TIDE		| \
-@@ -191,7 +204,7 @@ struct dpaa2_fas {
- 					 DPAA2_FAS_L3CE		| \
- 					 DPAA2_FAS_L4CE)
- /* Tx errors */
--#define DPAA2_ETH_TXCONF_ERR_MASK	(DPAA2_FAS_KSE		| \
-+#define DPAA2_FAS_TX_ERR_MASK		(DPAA2_FAS_KSE		| \
- 					 DPAA2_FAS_EOFHE	| \
- 					 DPAA2_FAS_MNLE		| \
- 					 DPAA2_FAS_TIDE)
+-	int dpni_id;
+ 	struct dpni_attr dpni_attrs;
+-	/* Insofar as the MC is concerned, we're using one layout on all 3 types
+-	 * of buffers (Rx, Tx, Tx-Conf).
+-	 */
+-	struct dpni_buffer_layout buf_layout;
+ 	u16 tx_data_offset;
+ 
+ 	struct fsl_mc_device *dpbp_dev;
 -- 
 2.11.0
