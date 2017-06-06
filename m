@@ -1,32 +1,91 @@
 From: ruxandra.radulescu@nxp.com (Ioana Radulescu)
-Date: Tue, 6 Jun 2017 10:00:30 -0500
-Subject: [PATCH 07/18] staging: fsl-dpaa2/eth: Don't use GFP_DMA
+Date: Tue, 6 Jun 2017 10:00:34 -0500
+Subject: [PATCH 11/18] staging: fsl-dpaa2/eth: Update ethtool stats names
 In-Reply-To: <20170606150041.10955-1-ruxandra.radulescu@nxp.com>
 References: <20170606150041.10955-1-ruxandra.radulescu@nxp.com>
-Message-ID: <20170606150041.10955-8-ruxandra.radulescu@nxp.com>
+Message-ID: <20170606150041.10955-12-ruxandra.radulescu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Don't use GFP_DMA when allocating memory for the hash key,
-as we don't actually need to allocate from the lowest zone.
+Add a label to the ethtool statistics counters, to differentiate
+between hardware counters and driver specific ones.
 
 Signed-off-by: Ioana Radulescu <ruxandra.radulescu@nxp.com>
 ---
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c | 54 +++++++++++-----------
+ 1 file changed, 27 insertions(+), 27 deletions(-)
 
-diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-index bf6f300affa7..57628cd3ecf2 100644
---- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-+++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-@@ -1996,7 +1996,7 @@ static int dpaa2_eth_set_hash(struct net_device *net_dev, u64 flags)
- 		priv->rx_hash_fields |= hash_fields[i].rxnfc_field;
- 	}
+diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
+index 6a331c74e542..5312edc26f01 100644
+--- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
++++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
+@@ -35,40 +35,40 @@
  
--	dma_mem = kzalloc(DPAA2_CLASSIFIER_DMA_SIZE, GFP_DMA | GFP_KERNEL);
-+	dma_mem = kzalloc(DPAA2_CLASSIFIER_DMA_SIZE, GFP_KERNEL);
- 	if (!dma_mem)
- 		return -ENOMEM;
+ /* To be kept in sync with DPNI statistics */
+ static char dpaa2_ethtool_stats[][ETH_GSTRING_LEN] = {
+-	"rx frames",
+-	"rx bytes",
+-	"rx mcast frames",
+-	"rx mcast bytes",
+-	"rx bcast frames",
+-	"rx bcast bytes",
+-	"tx frames",
+-	"tx bytes",
+-	"tx mcast frames",
+-	"tx mcast bytes",
+-	"tx bcast frames",
+-	"tx bcast bytes",
+-	"rx filtered frames",
+-	"rx discarded frames",
+-	"rx nobuffer discards",
+-	"tx discarded frames",
+-	"tx confirmed frames",
++	"[hw] rx frames",
++	"[hw] rx bytes",
++	"[hw] rx mcast frames",
++	"[hw] rx mcast bytes",
++	"[hw] rx bcast frames",
++	"[hw] rx bcast bytes",
++	"[hw] tx frames",
++	"[hw] tx bytes",
++	"[hw] tx mcast frames",
++	"[hw] tx mcast bytes",
++	"[hw] tx bcast frames",
++	"[hw] tx bcast bytes",
++	"[hw] rx filtered frames",
++	"[hw] rx discarded frames",
++	"[hw] rx nobuffer discards",
++	"[hw] tx discarded frames",
++	"[hw] tx confirmed frames",
+ };
  
+ #define DPAA2_ETH_NUM_STATS	ARRAY_SIZE(dpaa2_ethtool_stats)
+ 
+ static char dpaa2_ethtool_extras[][ETH_GSTRING_LEN] = {
+ 	/* per-cpu stats */
+-	"tx conf frames",
+-	"tx conf bytes",
+-	"tx sg frames",
+-	"tx sg bytes",
+-	"rx sg frames",
+-	"rx sg bytes",
+-	"enqueue portal busy",
++	"[drv] tx conf frames",
++	"[drv] tx conf bytes",
++	"[drv] tx sg frames",
++	"[drv] tx sg bytes",
++	"[drv] rx sg frames",
++	"[drv] rx sg bytes",
++	"[drv] enqueue portal busy",
+ 	/* Channel stats */
+-	"dequeue portal busy",
+-	"channel pull errors",
+-	"cdan",
++	"[drv] dequeue portal busy",
++	"[drv] channel pull errors",
++	"[drv] cdan",
+ };
+ 
+ #define DPAA2_ETH_NUM_EXTRA_STATS	ARRAY_SIZE(dpaa2_ethtool_extras)
 -- 
 2.11.0
