@@ -1,42 +1,37 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue,  6 Jun 2017 13:59:31 +0800
-Subject: [PATCH 09/10] ARM: sun8i: a83t: Add device node for R_INTC interrupt
- controller
+Date: Tue,  6 Jun 2017 13:59:32 +0800
+Subject: [PATCH 10/10] arm64: allwinner: a64: add NMI (R_INTC) controller on
+ A64
 In-Reply-To: <20170606055932.22548-1-wens@csie.org>
 References: <20170606055932.22548-1-wens@csie.org>
-Message-ID: <20170606055932.22548-10-wens@csie.org>
+Message-ID: <20170606055932.22548-11-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The R_INTC interrupt controller handles the NMI interrupt pin for the
-SoC. While there is no documentation or code from the vendor for this
-device on the A83T, existing mainline kernel drivers and bindings show
-this to be similar to the old Allwinner interrupt controller found on
-the A10 SoC, but with only the NMI interrupt wired. Register poking
-experiments confirm this.
+From: Icenowy Zheng <icenowy@aosc.io>
 
-The device seems to be the same across all recent Allwinner SoCs, apart
-from the A20 and A80, which have a separate set of registers to handle
-the NMI interrupt. We already have a set of bindings supporting this
-on the A31.
+Allwinner A64 SoC features a R_INTC controller, which controls the NMI
+line, and this interrupt line is usually connected to the AXP PMIC.
 
-Add a device node for it, with an SoC specific compatible.
+Add support for it.
 
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+[wens at csie.org: Add fallback sun6i-a31-r-intc compatible]
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-a83t.dtsi | 9 +++++++++
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 9 +++++++++
  1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index 49aeb56970ba..4d64dfdc10d3 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -271,6 +271,15 @@
- 			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 4eb2f3ca602a..1865bc01d89e 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -445,6 +445,15 @@
+ 				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
  		};
  
 +		r_intc: interrupt-controller at 1f00c00 {
-+			compatible = "allwinner,sun8i-a83t-r-intc",
++			compatible = "allwinner,sun50i-a64-r-intc",
 +				     "allwinner,sun6i-a31-r-intc";
 +			interrupt-controller;
 +			#interrupt-cells = <2>;
@@ -45,7 +40,7 @@ index 49aeb56970ba..4d64dfdc10d3 100644
 +		};
 +
  		r_ccu: clock at 1f01400 {
- 			compatible = "allwinner,sun8i-a83t-r-ccu";
- 			reg = <0x01f01400 0x400>;
+ 			compatible = "allwinner,sun50i-a64-r-ccu";
+ 			reg = <0x01f01400 0x100>;
 -- 
 2.11.0
