@@ -1,35 +1,46 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Tue, 6 Jun 2017 20:17:15 +0200
-Subject: [PATCH v4 1/2] Documentation: dt-bindings: Add documentation for
- the Meson GXL USB2 PHY
-In-Reply-To: <00dbbfb5-72ce-c056-8d36-7cdebf8b6712@ti.com>
-References: <20170417191142.26099-1-martin.blumenstingl@googlemail.com>
- <20170520135041.25679-1-martin.blumenstingl@googlemail.com>
- <20170520135041.25679-2-martin.blumenstingl@googlemail.com>
- <00dbbfb5-72ce-c056-8d36-7cdebf8b6712@ti.com>
-Message-ID: <CAFBinCB813htUD9C+MyVc3rpzWizFB2tiKkws8ekvdS=Xkd5hA@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 6 Jun 2017 20:18:09 +0200
+Subject: [PATCH v2] clockevents/tcb_clksrc: implement suspend/resume
+In-Reply-To: <20170606180957.zjwjcmynzcqfqfgu@piout.net>
+References: <20170512182251.23948-1-alexandre.belloni@free-electrons.com>
+ <20170606164817.GF2345@mai> <20170606180957.zjwjcmynzcqfqfgu@piout.net>
+Message-ID: <e8d3209d-adf6-5d23-8edb-6e070ef40831@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
-
-On Tue, Jun 6, 2017 at 10:54 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> Hi,
->
-> On Saturday 20 May 2017 07:20 PM, Martin Blumenstingl wrote:
->> This adds the DT binding documentation for the USB2 PHY(s) found in the
->> Meson GXL and GXM SoCs.
+On 06/06/2017 20:09, Alexandre Belloni wrote:
+> On 06/06/2017 at 18:48:17 +0200, Daniel Lezcano wrote:
+>> On Fri, May 12, 2017 at 08:22:51PM +0200, Alexandre Belloni wrote:
+>>> On sama5d2, power to the core may be cut while entering suspend mode. It is
+>>> necessary to save and restore the TCB registers.
+>>>
+>>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>>> ---
+>>> Changes in v2:
+>>>  - use writel instead of __raw_writel
+>>>  - Document sequence
+>>>  - use ARRAY_SIZE(tcb_cache) instead of 3
+>>>
+>>>  drivers/clocksource/tcb_clksrc.c | 51 ++++++++++++++++++++++++++++++++++++++++
+>>>  1 file changed, 51 insertions(+)
+>>>
+>>> diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
 >>
->> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->> Acked-by: Rob Herring <robh@kernel.org>
->
-> changed $subject to
-> dt-bindings: phy: meson-gxl-usb2-phy: Add documentation for the Meson GXL USB2 PHY
->
-> and merged.
-oh, excellent catch - many thanks for fixing this up (and thus saving
-me another round)!
+>> Hi,
+>>
+>> what should I do with this patch as the patched file is supposed to be removed
+>> [1]. 
+>>
+> 
+> I feel like we are far from reaching an agreement on the other series so
+> it is still worth applying.
+
+Ok.
 
 
-Regards,
-Martin
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
