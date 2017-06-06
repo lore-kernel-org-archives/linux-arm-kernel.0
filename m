@@ -1,40 +1,19 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 6 Jun 2017 22:21:30 +0200
-Subject: [PULL 0/3] KVM/ARM Fixes for v4.12-rc5
-In-Reply-To: <20170606135629.31664-1-cdall@linaro.org>
-References: <20170606135629.31664-1-cdall@linaro.org>
-Message-ID: <20170606202130.GS9464@cbox>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Tue, 6 Jun 2017 22:22:59 +0200
+Subject: [PATCH v2 3/4] net: macb: macb.c changed to macb_main.c
+In-Reply-To: <20170606.150015.1247326483451270973.davem@davemloft.net>
+References: <1496413439-12900-1-git-send-email-rafalo@cadence.com>
+ <1496413661-21452-1-git-send-email-rafalo@cadence.com>
+ <20170606183933.GA1205@localhost.localdomain>
+ <20170606.150015.1247326483451270973.davem@davemloft.net>
+Message-ID: <20170606202259.GE4233@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 06, 2017 at 03:56:26PM +0200, Christoffer Dall wrote:
-> Hi Radim and Paolo,
-> 
-> Three additional fixes for KVM/ARM for v4.12.
+On Tue, Jun 06, 2017 at 03:00:15PM -0400, David Miller wrote:
+> He's adjusting the Makefile so that it build macb_main.c into macb.o
 
-We didn't expect three additional fixes to pop up so quickly, so I'm
-going to send another pull request tomorrow.
+Duh, sorry, brain shutting down...
 
-Please hold off on applying this one if you haven't done so already.
-
-Sorry about that.
-
--Christoffer
-
-> 
-> They fix an issue with migrating GICv2 VMs on GICv3 systems, squash a
-> bug for gicv3 when figuring out preemption levels, and fix a potential
-> null pointer derefence in KVM happening under memory pressure.
-> 
-> The following changes since commit fa472fa91a5a0b241f5ddae927d2e235d07545df:
-> 
->   KVM: arm/arm64: Hold slots_lock when unregistering kvm io bus devices (2017-05-18 11:18:16 +0200)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git kvm-arm-for-v4.12-rc5
-> 
-> for you to fetch changes up to d6dbdd3c8558cad3b6d74cc357b408622d122331:
-> 
->   KVM: arm/arm64: Handle possible NULL stage2 pud when ageing pages (2017-06-06 15:28:40 +0200)
-> 
+Thanks,
+Richard
