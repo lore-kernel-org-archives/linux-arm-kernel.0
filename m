@@ -1,35 +1,82 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Tue, 6 Jun 2017 12:03:51 +0000
-Subject: [PATCH 01/10] staging: fsl-mc: enclose macro params in parens
-In-Reply-To: <20170603084126.GB10784@kroah.com>
-References: <20170531105852.22304-1-laurentiu.tudor@nxp.com>
- <20170531105852.22304-2-laurentiu.tudor@nxp.com>
- <20170603084126.GB10784@kroah.com>
-Message-ID: <VI1PR0401MB185672AD42A817013EB27CAFECCB0@VI1PR0401MB1856.eurprd04.prod.outlook.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 6 Jun 2017 14:06:56 +0200
+Subject: [PATCH v2 12/25] KVM: arm64: Enable GICv3 Group-1 sysreg
+ trapping via command-line
+In-Reply-To: <20170601102117.17750-13-marc.zyngier@arm.com>
+References: <20170601102117.17750-1-marc.zyngier@arm.com>
+ <20170601102117.17750-13-marc.zyngier@arm.com>
+Message-ID: <20170606120656.GN9464@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
-
-> -----Original Message-----
-> From: Greg KH [mailto:gregkh at linuxfoundation.org]
-> Sent: Saturday, June 03, 2017 11:41 AM
+On Thu, Jun 01, 2017 at 11:21:04AM +0100, Marc Zyngier wrote:
+> Now that we're able to safely handle Group-1 sysreg access, let's
+> give the user the opportunity to enable it by passing a specific
+> command-line option (vgic_v3.group1_trap).
 > 
-> On Wed, May 31, 2017 at 01:58:43PM +0300, laurentiu.tudor at nxp.com wrote:
-> > From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
-> >
-> > Several macros didn't had macro params enclosed in parens. Fix them to
-> > avoid precedence issues.
-> >
-> > Found with checkpatch.pl who was issuing this
-> > message:
-> >   "Macro argument 'id' may be better as '(id)'
-> >    to avoid precedence issues"
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  virt/kvm/arm/hyp/vgic-v3-sr.c |  6 +++++-
+>  virt/kvm/arm/vgic/vgic-v3.c   | 11 +++++++++++
+>  2 files changed, 16 insertions(+), 1 deletion(-)
 > 
-> Why are you line-wrapping at such a small number?  Please use 72 columns like
-> git asks you to...
+> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> index 8973bad35748..42ac9ee7650a 100644
+> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
+> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> @@ -334,7 +334,11 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+>  		for (i = 0; i < used_lrs; i++)
+>  			__gic_v3_set_lr(cpu_if->vgic_lr[i], i);
+>  	} else {
+> -		/* Always write ICH_HCR_EL2 to enable trapping */
+> +		/*
+> +                 * If we don't have any interrupt to inject, but that
+> +		 * trapping is enabled, write the ICH_HCR_EL2 config
+> +		 * anyway.
+> +		 */
 
-I'll rewrap the commit message in the next spin.
+nit: Whitespace and grammar issues, and maybe this hunk was supposed to
+be in the last patch?
 
----
-Thanks & Best Regards, Laurentiu
+>  		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
+>  			write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
+>  	}
+> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+> index fbd678bc046d..a16769276efd 100644
+> --- a/virt/kvm/arm/vgic/vgic-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+> @@ -416,6 +416,12 @@ int vgic_v3_map_resources(struct kvm *kvm)
+>  
+>  DEFINE_STATIC_KEY_FALSE(vgic_v3_cpuif_trap);
+>  
+> +static int __init early_group1_trap_cfg(char *buf)
+> +{
+> +	return strtobool(buf, &group1_trap);
+> +}
+> +early_param("vgic_v3.group1_trap", early_group1_trap_cfg);
+> +
+
+this shouldn't be named something with KVM (we're not going to trap
+anything on the host somehow are we?)?
+
+>  /**
+>   * vgic_v3_probe - probe for a GICv3 compatible interrupt controller in DT
+>   * @node:	pointer to the DT node
+> @@ -467,6 +473,11 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
+>  	if (kvm_vgic_global_state.vcpu_base == 0)
+>  		kvm_info("disabling GICv2 emulation\n");
+>  
+> +	if (group1_trap) {
+> +		kvm_info("GICv3 sysreg trapping enabled (reduced performance)\n");
+> +		static_branch_enable(&vgic_v3_cpuif_trap);
+> +	}
+> +
+>  	kvm_vgic_global_state.vctrl_base = NULL;
+>  	kvm_vgic_global_state.type = VGIC_V3;
+>  	kvm_vgic_global_state.max_gic_vcpus = VGIC_V3_MAX_CPUS;
+> -- 
+> 2.11.0
+> 
+
+Thanks,
+-Christoffer
