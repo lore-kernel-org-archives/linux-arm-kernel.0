@@ -1,19 +1,37 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Tue, 6 Jun 2017 20:36:32 +0200
-Subject: [PATCH v2 4/4] net: macb: Add hardware PTP support
-In-Reply-To: <BN3PR07MB251673623B941CAF5DEAB474C9CB0@BN3PR07MB2516.namprd07.prod.outlook.com>
-References: <1496413439-12900-1-git-send-email-rafalo@cadence.com>
- <1496413690-22826-1-git-send-email-rafalo@cadence.com>
- <20170604205516.GA7848@localhost.localdomain>
- <BN3PR07MB251673623B941CAF5DEAB474C9CB0@BN3PR07MB2516.namprd07.prod.outlook.com>
-Message-ID: <20170606183632.GB25220@localhost.localdomain>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 6 Jun 2017 20:37:57 +0200
+Subject: [PATCH 1/2] arm64: allwinner: a64: add DTSI file for SoPine SoM
+In-Reply-To: <20170604024345.23021-1-icenowy@aosc.io>
+References: <20170604024345.23021-1-icenowy@aosc.io>
+Message-ID: <20170606183757.lvpdlxj3rn4z2u2r@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 06, 2017 at 08:54:50AM +0000, Rafal Ozieblo wrote:
-> Would "ENOTSUP" be sufficient ?
+On Sun, Jun 04, 2017 at 10:43:44AM +0800, Icenowy Zheng wrote:
+> From: Icenowy Zheng <icenowy@aosc.xyz>
+> 
+> SoPine is a SoM by Pine64, which have a gold finger compatible with the
+> slot of DDR3 SODIMM (signals are not compatible), and have an A64, an
+> AXP803, a LPDDR3 DRAM chip, a power led and a MicroSD slot on it.
+> 
+> The card detect pin of the MicroSD slot on the SoM is pulled down, which
+> makes it unusable; however, the slot is at the surface of the SoM that
+> is closed to the baseboard, so it's nearly impossible to hot-swap it,
+> thus I make it non-removable.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 
-You mean EOPNOTSUPP?  Yes, sounds ok to me.  EFAULT is surely wrong.
+Applied both, thanks!
+Maxime
 
-Thanks,
-Richard
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170606/70b49317/attachment.sig>
