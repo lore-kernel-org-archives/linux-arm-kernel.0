@@ -1,59 +1,35 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 6 Jun 2017 17:27:13 +0530
-Subject: [PATCH 0/7] dra7: Fixes for MMC devicetree node
-In-Reply-To: <20170606105131.GZ3730@atomide.com>
-References: <20170601143401.16852-1-kishon@ti.com>
- <CAPDyKFqHHjZQnnaGLP=xDj3eYgzADDYoomzBuXRviBgh-n2QFw@mail.gmail.com>
- <f78dd61c-6689-4dbc-d1db-128f92be8e51@ti.com>
- <1d15c9e9-f257-fd97-a9a2-055ee90d7e84@ti.com>
- <20170606105131.GZ3730@atomide.com>
-Message-ID: <08b140b7-de76-c912-9f81-c7cdeca45641@ti.com>
+From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
+Date: Tue, 6 Jun 2017 12:03:51 +0000
+Subject: [PATCH 01/10] staging: fsl-mc: enclose macro params in parens
+In-Reply-To: <20170603084126.GB10784@kroah.com>
+References: <20170531105852.22304-1-laurentiu.tudor@nxp.com>
+ <20170531105852.22304-2-laurentiu.tudor@nxp.com>
+ <20170603084126.GB10784@kroah.com>
+Message-ID: <VI1PR0401MB185672AD42A817013EB27CAFECCB0@VI1PR0401MB1856.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Greg,
 
-On Tuesday 06 June 2017 04:21 PM, Tony Lindgren wrote:
-> * Kishon Vijay Abraham I <kishon@ti.com> [170606 03:40]:
->> omap3-overo-base.dtsi has the following dt node for mmc.
->> /* optional on board WiFi */
->> &mmc2 {
->>         pinctrl-names = "default";
->>         pinctrl-0 = <&mmc2_pins>;
->>         vmmc-supply = <&w3cbw003c_npoweron>;
->>         vqmmc-supply = <&w3cbw003c_bt_nreset>;
->>         vmmc_aux-supply = <&w3cbw003c_wifi_nreset>;
->>         bus-width = <4>;
->>         cap-sdio-irq;
->>         non-removable;
->> };
->>
->> It has both "vqmmc-supply" and "vmmc_aux-supply". However omap-hsmmc driver has
->> never parsed vqmmc so far. So I'd assume bt was never functional and it's used
->> only for wifi.
+> -----Original Message-----
+> From: Greg KH [mailto:gregkh at linuxfoundation.org]
+> Sent: Saturday, June 03, 2017 11:41 AM
 > 
-> Hmm yeah the vqmmc-supply probably got copied from some
-> other SoC for w3cbw003c.
-
-Okay. So I think we can remove vqmmc-supply here without breaking any existing
-functionality.
+> On Wed, May 31, 2017 at 01:58:43PM +0300, laurentiu.tudor at nxp.com wrote:
+> > From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+> >
+> > Several macros didn't had macro params enclosed in parens. Fix them to
+> > avoid precedence issues.
+> >
+> > Found with checkpatch.pl who was issuing this
+> > message:
+> >   "Macro argument 'id' may be better as '(id)'
+> >    to avoid precedence issues"
 > 
->> So for the change suggested by Ulf, Can I do something like below, so that we
->> can keep wifi functional (ignoring bt since that was never functional)?
->> -       vqmmc-supply = <&w3cbw003c_bt_nreset>;
->> -       vmmc_aux-supply = <&w3cbw003c_wifi_nreset>;
->> +       vqmmc-supply = <&w3cbw003c_wifi_nreset>;
-> 
-> Optional sdio pins 4 - 8 need separate power and that's
-> why we have the vmmc_aux supply to start with. But here
-> there are only four pins, so my guess is that only one
-> regulator is needed and the the other two are gpio pins
-> for wland and bt that nowadays should be handled by the
-> mmc power sequence driver.
+> Why are you line-wrapping at such a small number?  Please use 72 columns like
+> git asks you to...
 
-Yeah. Just now checked the pwrseq driver (pwrseq_simple), but it has it's own
-binding. So even if we move to the pwrseq, we still have to support
-"vqmmc-supply = <&w3cbw003c_wifi_nreset>" to avoid breaking old dt compatibiltiy.
+I'll rewrap the commit message in the next spin.
 
-Thanks
-Kishon
+---
+Thanks & Best Regards, Laurentiu
