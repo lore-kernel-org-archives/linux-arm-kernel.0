@@ -1,221 +1,137 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Tue,  6 Jun 2017 16:08:51 -0500
-Subject: [PATCH v8 16/24] drivers/fsi: Add tracepoints for low-level operations
+Date: Tue,  6 Jun 2017 16:08:55 -0500
+Subject: [PATCH v8 20/24] drivers/fsi/gpio: Add tracepoints for GPIO master
 In-Reply-To: <20170606210859.80431-1-cbostic@linux.vnet.ibm.com>
 References: <20170606210859.80431-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170606210859.80431-17-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170606210859.80431-21-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jeremy Kerr <jk@ozlabs.org>
 
-Trace low level read and write FSI bus operations.
+Trace low level input/output GPIO operations.
 
 Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
-Signed-off-by: Joel Stanley <joel@jms.id.au>
 Signed-off-by: Christopher Bostic <cbostic@linux.vnet.ibm.com>
 ---
-v8 - type cast to 'int' to clean up build warnings
----
- drivers/fsi/fsi-core.c     |  27 +++++++---
- include/trace/events/fsi.h | 127 +++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 148 insertions(+), 6 deletions(-)
- create mode 100644 include/trace/events/fsi.h
+ drivers/fsi/fsi-master-gpio.c          |  9 +++++
+ include/trace/events/fsi_master_gpio.h | 68 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 77 insertions(+)
+ create mode 100644 include/trace/events/fsi_master_gpio.h
 
-diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index 3681365..db54561 100644
---- a/drivers/fsi/fsi-core.c
-+++ b/drivers/fsi/fsi-core.c
-@@ -23,6 +23,9 @@
- 
- #include "fsi-master.h"
+diff --git a/drivers/fsi/fsi-master-gpio.c b/drivers/fsi/fsi-master-gpio.c
+index d467e61..a5d6e70 100644
+--- a/drivers/fsi/fsi-master-gpio.c
++++ b/drivers/fsi/fsi-master-gpio.c
+@@ -61,6 +61,9 @@ struct fsi_master_gpio {
+ 	struct gpio_desc	*gpio_mux;	/* Mux control */
+ };
  
 +#define CREATE_TRACE_POINTS
-+#include <trace/events/fsi.h>
++#include <trace/events/fsi_master_gpio.h>
 +
- #define FSI_SLAVE_CONF_NEXT_MASK	GENMASK(31, 31)
- #define FSI_SLAVE_CONF_SLOTS_MASK	GENMASK(23, 16)
- #define FSI_SLAVE_CONF_SLOTS_SHIFT	16
-@@ -542,11 +545,16 @@ static int fsi_master_read(struct fsi_master *master, int link,
- {
- 	int rc;
+ #define to_fsi_master_gpio(m) container_of(m, struct fsi_master_gpio, master)
  
-+	trace_fsi_master_read(master, link, slave_id, addr, size);
+ struct fsi_gpio_msg {
+@@ -126,6 +129,8 @@ static void serial_in(struct fsi_master_gpio *master, struct fsi_gpio_msg *msg,
+ 		msg->msg |= ~in_bit & 0x1;	/* Data is active low */
+ 	}
+ 	msg->bits += num_bits;
 +
- 	rc = fsi_check_access(addr, size);
--	if (rc)
--		return rc;
-+	if (!rc)
-+		rc = master->read(master, link, slave_id, addr, val, size);
-+
-+	trace_fsi_master_rw_result(master, link, slave_id, addr, size,
-+			false, val, rc);
- 
--	return master->read(master, link, slave_id, addr, val, size);
-+	return rc;
++	trace_fsi_master_gpio_in(master, num_bits, msg->msg);
  }
  
- static int fsi_master_write(struct fsi_master *master, int link,
-@@ -554,11 +562,16 @@ static int fsi_master_write(struct fsi_master *master, int link,
- {
- 	int rc;
+ static void serial_out(struct fsi_master_gpio *master,
+@@ -137,6 +142,8 @@ static void serial_out(struct fsi_master_gpio *master,
+ 	uint64_t last_bit = ~0;
+ 	int next_bit;
  
-+	trace_fsi_master_write(master, link, slave_id, addr, size, val);
++	trace_fsi_master_gpio_out(master, cmd->bits, cmd->msg);
 +
- 	rc = fsi_check_access(addr, size);
--	if (rc)
--		return rc;
-+	if (!rc)
-+		rc = master->write(master, link, slave_id, addr, val, size);
+ 	if (!cmd->bits) {
+ 		dev_warn(master->dev, "trying to output 0 bits\n");
+ 		return;
+@@ -458,6 +465,8 @@ static int fsi_master_gpio_break(struct fsi_master *_master, int link)
+ 	if (link != 0)
+ 		return -ENODEV;
  
--	return master->write(master, link, slave_id, addr, val, size);
-+	trace_fsi_master_rw_result(master, link, slave_id, addr, size,
-+			true, val, rc);
++	trace_fsi_master_gpio_break(master);
 +
-+	return rc;
- }
- 
- static int fsi_master_link_enable(struct fsi_master *master, int link)
-@@ -574,6 +587,8 @@ static int fsi_master_link_enable(struct fsi_master *master, int link)
-  */
- static int fsi_master_break(struct fsi_master *master, int link)
- {
-+	trace_fsi_master_break(master, link);
-+
- 	if (master->send_break)
- 		return master->send_break(master, link);
- 
-diff --git a/include/trace/events/fsi.h b/include/trace/events/fsi.h
+ 	set_sda_output(master, 1);
+ 	sda_out(master, 1);
+ 	clock_toggle(master, FSI_PRE_BREAK_CLOCKS);
+diff --git a/include/trace/events/fsi_master_gpio.h b/include/trace/events/fsi_master_gpio.h
 new file mode 100644
-index 0000000..697ee66
+index 0000000..11b36c1
 --- /dev/null
-+++ b/include/trace/events/fsi.h
-@@ -0,0 +1,127 @@
++++ b/include/trace/events/fsi_master_gpio.h
+@@ -0,0 +1,68 @@
 +
 +#undef TRACE_SYSTEM
-+#define TRACE_SYSTEM fsi
++#define TRACE_SYSTEM fsi_master_gpio
 +
-+#if !defined(_TRACE_FSI_H) || defined(TRACE_HEADER_MULTI_READ)
-+#define _TRACE_FSI_H
++#if !defined(_TRACE_FSI_MASTER_GPIO_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_FSI_MASTER_GPIO_H
 +
 +#include <linux/tracepoint.h>
 +
-+TRACE_EVENT(fsi_master_read,
-+	TP_PROTO(const struct fsi_master *master, int link, int id,
-+			uint32_t addr, size_t size),
-+	TP_ARGS(master, link, id, addr, size),
++TRACE_EVENT(fsi_master_gpio_in,
++	TP_PROTO(const struct fsi_master_gpio *master, int bits, uint64_t msg),
++	TP_ARGS(master, bits, msg),
 +	TP_STRUCT__entry(
 +		__field(int,	master_idx)
-+		__field(int,	link)
-+		__field(int,	id)
-+		__field(__u32,	addr)
-+		__field(size_t,	size)
++		__field(int,	bits)
++		__field(uint64_t, msg)
 +	),
 +	TP_fast_assign(
-+		__entry->master_idx = master->idx;
-+		__entry->link = link;
-+		__entry->id = id;
-+		__entry->addr = addr;
-+		__entry->size = size;
++		__entry->master_idx = master->master.idx;
++		__entry->bits = bits;
++		__entry->msg  = msg & ((1ull<<bits) - 1);
 +	),
-+	TP_printk("fsi%d:%02d:%02d %08x[%zd]",
++	TP_printk("fsi-gpio%d => %0*llx[%d]",
 +		__entry->master_idx,
-+		__entry->link,
-+		__entry->id,
-+		__entry->addr,
-+		__entry->size
++		(__entry->bits + 3) / 4,
++		__entry->msg,
++		__entry->bits
 +	)
 +);
 +
-+TRACE_EVENT(fsi_master_write,
-+	TP_PROTO(const struct fsi_master *master, int link, int id,
-+			uint32_t addr, size_t size, const void *data),
-+	TP_ARGS(master, link, id, addr, size, data),
++TRACE_EVENT(fsi_master_gpio_out,
++	TP_PROTO(const struct fsi_master_gpio *master, int bits, uint64_t msg),
++	TP_ARGS(master, bits, msg),
 +	TP_STRUCT__entry(
 +		__field(int,	master_idx)
-+		__field(int,	link)
-+		__field(int,	id)
-+		__field(__u32,	addr)
-+		__field(size_t,	size)
-+		__field(__u32,	data)
++		__field(int,	bits)
++		__field(uint64_t, msg)
 +	),
 +	TP_fast_assign(
-+		__entry->master_idx = master->idx;
-+		__entry->link = link;
-+		__entry->id = id;
-+		__entry->addr = addr;
-+		__entry->size = size;
-+		__entry->data = 0;
-+		memcpy(&__entry->data, data, size);
++		__entry->master_idx = master->master.idx;
++		__entry->bits = bits;
++		__entry->msg  = msg & ((1ull<<bits) - 1);
 +	),
-+	TP_printk("fsi%d:%02d:%02d %08x[%zd] <= {%*ph}",
++	TP_printk("fsi-gpio%d <= %0*llx[%d]",
 +		__entry->master_idx,
-+		__entry->link,
-+		__entry->id,
-+		__entry->addr,
-+		__entry->size,
-+		(int)__entry->size, &__entry->data
++		(__entry->bits + 3) / 4,
++		__entry->msg,
++		__entry->bits
 +	)
 +);
 +
-+TRACE_EVENT(fsi_master_rw_result,
-+	TP_PROTO(const struct fsi_master *master, int link, int id,
-+			uint32_t addr, size_t size,
-+			bool write, const void *data, int ret),
-+	TP_ARGS(master, link, id, addr, size, write, data, ret),
++TRACE_EVENT(fsi_master_gpio_break,
++	TP_PROTO(const struct fsi_master_gpio *master),
++	TP_ARGS(master),
 +	TP_STRUCT__entry(
 +		__field(int,	master_idx)
-+		__field(int,	link)
-+		__field(int,	id)
-+		__field(__u32,	addr)
-+		__field(size_t,	size)
-+		__field(bool,	write)
-+		__field(__u32,	data)
-+		__field(int,	ret)
 +	),
 +	TP_fast_assign(
-+		__entry->master_idx = master->idx;
-+		__entry->link = link;
-+		__entry->id = id;
-+		__entry->addr = addr;
-+		__entry->size = size;
-+		__entry->write = write;
-+		__entry->data = 0;
-+		__entry->ret = ret;
-+		if (__entry->write || !__entry->ret)
-+			memcpy(&__entry->data, data, size);
++		__entry->master_idx = master->master.idx;
 +	),
-+	TP_printk("fsi%d:%02d:%02d %08x[%zd] %s {%*ph} ret %d",
-+		__entry->master_idx,
-+		__entry->link,
-+		__entry->id,
-+		__entry->addr,
-+		__entry->size,
-+		__entry->write ? "<=" : "=>",
-+		(int)__entry->size, &__entry->data,
-+		__entry->ret
++	TP_printk("fsi-gpio%d ----break---",
++		__entry->master_idx
 +	)
 +);
 +
-+TRACE_EVENT(fsi_master_break,
-+	TP_PROTO(const struct fsi_master *master, int link),
-+	TP_ARGS(master, link),
-+	TP_STRUCT__entry(
-+		__field(int,	master_idx)
-+		__field(int,	link)
-+	),
-+	TP_fast_assign(
-+		__entry->master_idx = master->idx;
-+		__entry->link = link;
-+	),
-+	TP_printk("fsi%d:%d",
-+		__entry->master_idx,
-+		__entry->link
-+	)
-+);
-+
-+
-+#endif /* _TRACE_FSI_H */
++#endif /* _TRACE_FSI_MASTER_GPIO_H */
 +
 +#include <trace/define_trace.h>
 -- 
