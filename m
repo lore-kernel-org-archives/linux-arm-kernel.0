@@ -1,30 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Jun 2017 15:46:20 +0100
-Subject: [PATCH 0/2] arm64/kvm: use SYS_REG_DESC() for VGIC-v3
-In-Reply-To: <20170606134634.GE9464@cbox>
-References: <1496668801-16064-1-git-send-email-mark.rutland@arm.com>
- <20170606134634.GE9464@cbox>
-Message-ID: <20170606144620.GE4789@arm.com>
+From: ruxandra.radulescu@nxp.com (Ioana Radulescu)
+Date: Tue, 6 Jun 2017 10:00:25 -0500
+Subject: [PATCH 02/18] staging: fsl-dpaa2/eth: Initialize variable before use
+In-Reply-To: <20170606150041.10955-1-ruxandra.radulescu@nxp.com>
+References: <20170606150041.10955-1-ruxandra.radulescu@nxp.com>
+Message-ID: <20170606150041.10955-3-ruxandra.radulescu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 06, 2017 at 03:46:34PM +0200, Christoffer Dall wrote:
-> Hi Mark,
-> 
-> On Mon, Jun 05, 2017 at 02:19:59PM +0100, Mark Rutland wrote:
-> > While looking around, I spotted that the VGIC-v3 code still uses open-coded SYS
-> > encodings. These patches migrate said code to use common <asm/sysreg.h>
-> > mnemonics, as we do for the rest of the AArch64 sysregs.
-> > 
-> > This is based on Marc's kvm-arm64/gicv3-cpuif-mediated-access branch [1].
-> 
-> Patches look good to me.  I can apply them after we apply [1] if
-> Catalin/Will are ok with this.
+In dpni_get_irq_status(), status is both in and out parameter,
+so initialize before use.
+Issue found through static analysis tool.
 
-Fine by me.
+Signed-off-by: Ioana Radulescu <ruxandra.radulescu@nxp.com>
+---
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-if you need it.
-
-Will
+diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
+index 8ff8951f31b9..f0ef3a7c0f73 100644
+--- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
++++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
+@@ -2252,7 +2252,7 @@ static irqreturn_t dpni_irq0_handler(int irq_num, void *arg)
+ 
+ static irqreturn_t dpni_irq0_handler_thread(int irq_num, void *arg)
+ {
+-	u32 status, clear = 0;
++	u32 status = 0, clear = 0;
+ 	struct device *dev = (struct device *)arg;
+ 	struct fsl_mc_device *dpni_dev = to_fsl_mc_device(dev);
+ 	struct net_device *net_dev = dev_get_drvdata(dev);
+-- 
+2.11.0
