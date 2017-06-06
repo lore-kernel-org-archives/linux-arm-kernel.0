@@ -1,95 +1,82 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 6 Jun 2017 12:04:12 +0900
-Subject: [PATCH 4/4] arm64: dts: uniphier: add nodes of thermal monitor
- and thermal zone for LD20
-In-Reply-To: <1496049345-14649-5-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1496049345-14649-1-git-send-email-hayashi.kunihiko@socionext.com>
- <1496049345-14649-5-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <CAK7LNATm5wbz07_Ny8QkvhgN7kvi-X9o+zrY+-00BK9O__vrxQ@mail.gmail.com>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Tue, 6 Jun 2017 08:50:39 +0530
+Subject: [PATCH v6 00/11] Broadcom Stingray SOC Initial Support
+In-Reply-To: <c26e95e1-4bfa-0d24-33cc-8d5ae3102864@gmail.com>
+References: <1496385275-6899-1-git-send-email-anup.patel@broadcom.com>
+ <4c15213f-4ac6-a0a7-f2b8-cde2b4cee891@gmail.com>
+ <c26e95e1-4bfa-0d24-33cc-8d5ae3102864@gmail.com>
+Message-ID: <CAALAos_T4aWPQrug+9eYLM8z2pxvTiiieFnQ49zft4iXpGKA3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-05-29 18:15 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
-> Add nodes of thermal monitor and thermal zone for UniPhier LD20 SoC.
-> The thermal monitor is included in sysctrl.
+On Tue, Jun 6, 2017 at 7:38 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
 >
-> Furthermore, since SoC installed in the reference board doesn't have a
-> calibrated value of thermal monitor, this patch gives the default value
-> for LD20 Reference board via device-tree property.
 >
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> ---
->  .../arm64/boot/dts/socionext/uniphier-ld20-ref.dts | 25 ++++++++++++++++++++++
->  arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi   |  6 ++++++
->  2 files changed, 31 insertions(+)
+> On 06/05/2017 09:51 AM, Florian Fainelli wrote:
+>> On 06/01/2017 11:34 PM, Anup Patel wrote:
+>>> This patchset adds initial support of Broadcom Stingray SOC
+>>> by reusing existing Broadcom iProc device drivers.
+>>>
+>>> Most of the patches in this patchset are DT patches except
+>>> the Stingray clock tree support which just one patch.
+>>>
+>>> This patchset is based on Linux-4.12-rc3 and it is also available
+>>> at stingray-v6 branch of https://github.com/Broadcom/arm64-linux.git
+>>>
+>>> Changes since v5:
+>>>  - Rebased patches for Linux-4.12-rc3
+>>>  - Update DT node names to match register offset
+>>>
+>>> Changes since v4:
+>>>  - Reduce number of include headers in Stingray clk driver
+>>>
+>>> Changes since v3:
+>>>  - Rebased patches for Linux-4.12-rc1
+>>>  - Updated PATCH3 to have all clocks except genpll3 to be
+>>>    registered via platform driver probe
+>>>
+>>> Changes since v2:
+>>>  - Remove default bootargs from chosen DT node
+>>>  - Remove "linux" prefix from stdout DT attribute of chosen DT node
+>>>  - Remove use of GIC_CPU_MASK_xxx() for PPIs
+>>>
+>>> Changes since v1:
+>>>  - Rebased patches for Linux-4.12-rc1
+>>>  - Removed unwanted /memreserve/ from bcm958742-base.dtsi
+>>>  - Use ranges DT property to clear view of memory-layout
+>>>  - Make bcm-sr.h part of clock DT bindings patch
+>>>
+>>> Anup Patel (3):
+>>>   dt-bindings: bcm: Add Broadcom Stingray bindings document
+>>>   arm64: dts: Initial DTS files for Broadcom Stingray SOC
+>>>   arm64: dts: Add PL022, PL330 and SP805 DT nodes for Stingray
+>>>
+>>> Oza Pawandeep (1):
+>>>   arm64: dts: Add I2C DT nodes for Stingray SoC
+>>>
+>>> Pramod Kumar (3):
+>>>   arm64: dts: Add NAND DT nodes for Stingray SOC
+>>>   arm64: dts: Add pinctrl DT nodes for Stingray SOC
+>>>   arm64: dts: Add GPIO DT nodes for Stingray SOC
+>>>
+>>> Sandeep Tripathy (3):
+>>>   dt-bindings: clk: Extend binding doc for Stingray SOC
+>>>   clk: bcm: Add clocks for Stingray SOC
+>>>   arm64: dts: Add clock DT nodes for Stingray SOC
+>>>
+>>> Srinath Mannam (1):
+>>>   arm64: dts: Add PWM and SDHCI DT nodes for Stingray SOC
+>>
+>> Applied patches 1, 4-11 to devicetree-arm64/next, thanks!
 >
-> diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts b/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
-> index 609162a..79e1363 100644
-> --- a/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
-> +++ b/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
-> @@ -73,6 +73,27 @@
->                 i2c4 = &i2c4;
->                 i2c5 = &i2c5;
->         };
-> +
-> +       thermal-zones {
-> +               cpu_thermal {
-> +                       polling-delay-passive = <250>;  /* 250ms */
-> +                       polling-delay = <1000>;         /* 1000ms */
-> +                       thermal-sensors = <&pvtctl>;
-> +
-> +                       trips {
-> +                               cpu_crit: cpu_crit {
-> +                                       temperature = <95000>;  /* 95C */
-> +                                       hysteresis = <2000>;
-> +                                       type = "critical";
-> +                               };
-> +                               cpu_alert: cpu_alert {
-> +                                       temperature = <85000>;  /* 85C */
-> +                                       hysteresis = <2000>;
-> +                                       type = "passive";
-> +                               };
-> +                       };
-> +               };
-> +       };
->  };
->
->  &ethsc {
-> @@ -86,3 +107,7 @@
->  &i2c0 {
->         status = "okay";
->  };
-> +
-> +&pvtctl {
-> +       socionext,tmod-calibration = <0x0f22 0x68ee>;
-> +};
-> diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-> index a6b3a70..effa2e3 100644
-> --- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-> +++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-> @@ -417,6 +417,12 @@
->                                 compatible = "socionext,uniphier-ld20-reset";
->                                 #reset-cells = <1>;
->                         };
-> +
-> +                       pvtctl: pvtctl {
-> +                               compatible = "socionext,uniphier-ld20-thermal";
-> +                               interrupts = <0 3 1>;
-> +                               #thermal-sensor-cells = <0>;
-> +                       };
+> Also took patch 2, to make sure everything builds properly, Stephen, let
+> me know if you want me to take patch #3 as well.
 
+Thanks for patches 1-2 and patches 4-11.
 
-The 3rd cell of the interrupts is 1.
-So, you mean the interrupt is edge-triggered.
-(Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt)
+Regarding PATCH3, please give us one day. We recently had
+minor comments from Stephen which we will address and
+send v7 of PATCH3.
 
-However, in your driver code, the interrupt is explicitly cleared in
-the IRQ handler.
-
-I checked the SoC implementation document and
-the PVT IRQ seems to be level-triggered.
-
-
--- 
-Best Regards
-Masahiro Yamada
+Regards,,
+Anup
