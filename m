@@ -1,37 +1,40 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 6 Jun 2017 15:45:35 +0200
-Subject: [PATCH] net: mvpp2: do not bypass the mvpp22_port_mii_set function
-In-Reply-To: <20170606133615.20747-1-antoine.tenart@free-electrons.com>
-References: <20170606133615.20747-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170606154535.3e87bafb@free-electrons.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 6 Jun 2017 15:46:34 +0200
+Subject: [PATCH 0/2] arm64/kvm: use SYS_REG_DESC() for VGIC-v3
+In-Reply-To: <1496668801-16064-1-git-send-email-mark.rutland@arm.com>
+References: <1496668801-16064-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20170606134634.GE9464@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Mark,
 
-On Tue,  6 Jun 2017 15:36:15 +0200, Antoine Tenart wrote:
-> The mvpp22_port_mii_set() function was added by 2697582144dd, but the
-> function directly returns without doing anything. This return was used
-> when debugging and wasn't removed before sending the patch. Fix this.
+On Mon, Jun 05, 2017 at 02:19:59PM +0100, Mark Rutland wrote:
+> While looking around, I spotted that the VGIC-v3 code still uses open-coded SYS
+> encodings. These patches migrate said code to use common <asm/sysreg.h>
+> mnemonics, as we do for the rest of the AArch64 sysregs.
 > 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> This is based on Marc's kvm-arm64/gicv3-cpuif-mediated-access branch [1].
 
-Please add:
+Patches look good to me.  I can apply them after we apply [1] if
+Catalin/Will are ok with this.
 
-Fixes: 2697582144dd ("net: mvpp2: handle misc PPv2.1/PPv2.2 differences")
+Thanks,
+-Christoffer
 
-with this:
-
-Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-I am wondering if we shouldn't Cc: stable as well. I don't think we
-have seen issues on our side because U-Boot does the necessary
-initialization, but people using other bootloaders might have issues.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> 
+> [1] git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/gicv3-cpuif-mediated-access
+> 
+> Mark Rutland (2):
+>   arm64/kvm: sysreg: fix typo'd SYS_ICC_IGRPEN*_EL1
+>   arm64/kvm: vgic: use SYS_DESC()
+> 
+>  arch/arm64/include/asm/arch_gicv3.h |  2 +-
+>  arch/arm64/include/asm/sysreg.h     | 12 ++++++++--
+>  arch/arm64/kvm/vgic-sys-reg-v3.c    | 45 +++++++++++++------------------------
+>  virt/kvm/arm/hyp/vgic-v3-sr.c       |  4 ++--
+>  4 files changed, 28 insertions(+), 35 deletions(-)
+> 
+> -- 
+> 1.9.1
+> 
