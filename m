@@ -1,82 +1,70 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Tue, 6 Jun 2017 08:50:39 +0530
-Subject: [PATCH v6 00/11] Broadcom Stingray SOC Initial Support
-In-Reply-To: <c26e95e1-4bfa-0d24-33cc-8d5ae3102864@gmail.com>
-References: <1496385275-6899-1-git-send-email-anup.patel@broadcom.com>
- <4c15213f-4ac6-a0a7-f2b8-cde2b4cee891@gmail.com>
- <c26e95e1-4bfa-0d24-33cc-8d5ae3102864@gmail.com>
-Message-ID: <CAALAos_T4aWPQrug+9eYLM8z2pxvTiiieFnQ49zft4iXpGKA3A@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 6 Jun 2017 09:47:13 +0530
+Subject: [PATCH 0/7] dra7: Fixes for MMC devicetree node
+In-Reply-To: <CAPDyKFqHHjZQnnaGLP=xDj3eYgzADDYoomzBuXRviBgh-n2QFw@mail.gmail.com>
+References: <20170601143401.16852-1-kishon@ti.com>
+ <CAPDyKFqHHjZQnnaGLP=xDj3eYgzADDYoomzBuXRviBgh-n2QFw@mail.gmail.com>
+Message-ID: <f78dd61c-6689-4dbc-d1db-128f92be8e51@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 6, 2017 at 7:38 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->
->
-> On 06/05/2017 09:51 AM, Florian Fainelli wrote:
->> On 06/01/2017 11:34 PM, Anup Patel wrote:
->>> This patchset adds initial support of Broadcom Stingray SOC
->>> by reusing existing Broadcom iProc device drivers.
->>>
->>> Most of the patches in this patchset are DT patches except
->>> the Stingray clock tree support which just one patch.
->>>
->>> This patchset is based on Linux-4.12-rc3 and it is also available
->>> at stingray-v6 branch of https://github.com/Broadcom/arm64-linux.git
->>>
->>> Changes since v5:
->>>  - Rebased patches for Linux-4.12-rc3
->>>  - Update DT node names to match register offset
->>>
->>> Changes since v4:
->>>  - Reduce number of include headers in Stingray clk driver
->>>
->>> Changes since v3:
->>>  - Rebased patches for Linux-4.12-rc1
->>>  - Updated PATCH3 to have all clocks except genpll3 to be
->>>    registered via platform driver probe
->>>
->>> Changes since v2:
->>>  - Remove default bootargs from chosen DT node
->>>  - Remove "linux" prefix from stdout DT attribute of chosen DT node
->>>  - Remove use of GIC_CPU_MASK_xxx() for PPIs
->>>
->>> Changes since v1:
->>>  - Rebased patches for Linux-4.12-rc1
->>>  - Removed unwanted /memreserve/ from bcm958742-base.dtsi
->>>  - Use ranges DT property to clear view of memory-layout
->>>  - Make bcm-sr.h part of clock DT bindings patch
->>>
->>> Anup Patel (3):
->>>   dt-bindings: bcm: Add Broadcom Stingray bindings document
->>>   arm64: dts: Initial DTS files for Broadcom Stingray SOC
->>>   arm64: dts: Add PL022, PL330 and SP805 DT nodes for Stingray
->>>
->>> Oza Pawandeep (1):
->>>   arm64: dts: Add I2C DT nodes for Stingray SoC
->>>
->>> Pramod Kumar (3):
->>>   arm64: dts: Add NAND DT nodes for Stingray SOC
->>>   arm64: dts: Add pinctrl DT nodes for Stingray SOC
->>>   arm64: dts: Add GPIO DT nodes for Stingray SOC
->>>
->>> Sandeep Tripathy (3):
->>>   dt-bindings: clk: Extend binding doc for Stingray SOC
->>>   clk: bcm: Add clocks for Stingray SOC
->>>   arm64: dts: Add clock DT nodes for Stingray SOC
->>>
->>> Srinath Mannam (1):
->>>   arm64: dts: Add PWM and SDHCI DT nodes for Stingray SOC
+Hi,
+
+On Friday 02 June 2017 04:20 PM, Ulf Hansson wrote:
+> On 1 June 2017 at 16:33, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>> There are the set of fixes that were sent initially as part
+>> of [1].
 >>
->> Applied patches 1, 4-11 to devicetree-arm64/next, thanks!
->
-> Also took patch 2, to make sure everything builds properly, Stephen, let
-> me know if you want me to take patch #3 as well.
+>> These are mostly fixes w.r.t populating regulators in
+>> mmc dt node. It was working before because the regulators
+>> connecting to the IO lines are always on regulators. This will
+>> break once we add UHS support where voltage has to be changed
+>> dynamically.
+>>
+>> Performed enumeration testing on dra72-evm-revc, dra72-evm,
+>> dra7-evm, am572x-evm, am571x-idk and am572x-idk.
+>>
+>> This is a preparation series for adding UHS mode support in
+>> the above mentioned platforms.
+>>
+>> [1] -> https://lkml.org/lkml/2017/5/19/196
+>>
+>> Kishon Vijay Abraham I (5):
+>>   ARM: dts: dra72-evm-common: Correct vmmc-supply for mmc2
+>>   ARM: dts: dra72-evm: Add vmmc_aux supply to mmc1
+>>   ARM: dts: dra72-evm-revc: Add vmmc_aux supply to mmc1
+>>   ARM: dts: am57xx-beagle-x15-revb1: Fix supply name used for MMC1 IO
+>>     lines
+>>   ARM: dts: dra7: Add "max-frequency" property to MMC dt nodes
+>>
+>> Ravikumar Kattekola (1):
+>>   ARM: dts: dra7-evm: Correct the vmmc-supply for mmc2
+>>
+>> Sekhar Nori (1):
+>>   ARM: OMAP2+: Add pdata-quirks for MMC/SD on DRA74x EVM
+>>
+>>  arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts |  2 +-
+>>  arch/arm/boot/dts/dra7-evm.dts                | 10 ++++++++-
+>>  arch/arm/boot/dts/dra7.dtsi                   |  5 +++++
+>>  arch/arm/boot/dts/dra71-evm.dts               | 14 ++++++++++++
+>>  arch/arm/boot/dts/dra72-evm-common.dtsi       |  2 --
+>>  arch/arm/boot/dts/dra72-evm-revc.dts          | 18 ++++++++++++++++
+>>  arch/arm/boot/dts/dra72-evm.dts               | 18 ++++++++++++++++
+>>  arch/arm/mach-omap2/pdata-quirks.c            | 31 +++++++++++++++++++++++++++
+>>  include/linux/platform_data/hsmmc-omap.h      |  3 +++
+>>  9 files changed, 99 insertions(+), 4 deletions(-)
+> 
+> This series add a bunch of new vmmc_aux regulators for the mmc
+> controller nodes. I would rather see that omap_hsmmc also converts to
+> use the generic mmc binding for this regulator, which is "vqmmc".
+> 
+> To accomplish that, omap_hsmmc needs to convert to use
+> mmc_regulator_get_supply(). If the "vqmmc" regulator isn't found, it
+> should fallback to try the "vmmc_aux".
+> 
+> Can you do that?
 
-Thanks for patches 1-2 and patches 4-11.
+sure, I'll prepare that change.
 
-Regarding PATCH3, please give us one day. We recently had
-minor comments from Stephen which we will address and
-send v7 of PATCH3.
-
-Regards,,
-Anup
+Thanks
+Kishon
