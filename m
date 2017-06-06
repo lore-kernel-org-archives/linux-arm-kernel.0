@@ -1,31 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 6 Jun 2017 14:54:19 +0200
-Subject: [PATCH v4 0/8] MFD: add driver for HiSilicon Hi6421v530 PMIC
-In-Reply-To: <20170606085143.13154-1-guodong.xu@linaro.org>
-References: <20170606085143.13154-1-guodong.xu@linaro.org>
-Message-ID: <CAK8P3a25o6HOFw4MWrsnKjHJf4YuO+UvGk+=f30LREnFHM3QwQ@mail.gmail.com>
+From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
+Date: Tue,  6 Jun 2017 18:26:25 +0530
+Subject: [PATCH 0/2] acpi, gicv3-its, numa: Adding numa node mapping for its
+Message-ID: <1496753787-27735-1-git-send-email-ganapatrao.kulkarni@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 6, 2017 at 10:51 AM, Guodong Xu <guodong.xu@linaro.org> wrote:
-> This patchset adds driver for HiSilicon Hi6421v530 PMIC.
->
-> Mainline kernel already has driver support to a similar chip, Hi6421.
-> Hi6421 and Hi6421v530 are both from the same vendor, HiSilicon, but
-> they are at different revisions. They both use the same Memory-mapped
-> I/O method to communicate with Main SoC. However, they differ quite a
-> lot in their regulator designs. Eg. they have completely different LDO
-> voltage points.
->
-> Patch 1 and 2 are hi6421-pmic cleaning up.
-> Patch 3 and 4 extends hi6421-pmic-core.c to support Hi6421v530 revision.
-> Patch 5 add hi6421v530-regulator.c driver for LDO regulators.
-> Patch 6 fixes an issue for hi6421 regulator, which is not related to v530
->          but it's found in this review.
-> Patch 7 is dts change, it depends on and can be applied to hi3660/hikey960
->         patchset [1].
-> Patch 8 enables the relevant config items.
+ACPI 6.2 have added SRAT subtable to define proximity domain for ITS
+devices. This patchset Updates acpi header file from acpica repo and
+adds numa node mapping for its devices.
 
-Looks good to me,
+Ganapatrao Kulkarni (2):
+  ACPICA: ACPI 6.2: Add support for new SRAT subtable
+  acpi, gicv3-its, numa: Adding numa node mapping for gic-its devices
 
-    Arnd
+ arch/arm64/include/asm/acpi.h    |  2 ++
+ arch/arm64/kernel/acpi_numa.c    | 59 ++++++++++++++++++++++++++++++++++++++++
+ drivers/acpi/numa.c              | 32 +++++++++++++++++++++-
+ drivers/irqchip/irq-gic-v3-its.c |  3 +-
+ include/acpi/actbl1.h            | 12 +++++++-
+ include/linux/acpi.h             |  3 ++
+ 6 files changed, 108 insertions(+), 3 deletions(-)
+
+-- 
+1.8.1.4
