@@ -1,133 +1,137 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Tue,  6 Jun 2017 16:08:42 -0500
-Subject: [PATCH v8 07/24] drivers/fsi: Implement slave initialisation
+Date: Tue,  6 Jun 2017 16:08:40 -0500
+Subject: [PATCH v8 05/24] drivers/fsi: Add slave & master read/write APIs
 In-Reply-To: <20170606210859.80431-1-cbostic@linux.vnet.ibm.com>
 References: <20170606210859.80431-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170606210859.80431-8-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170606210859.80431-6-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jeremy Kerr <jk@ozlabs.org>
 
-Implement fsi_slave_init: if we can read a chip ID, create fsi_slave
-devices and register with the driver core.
+Introduce functions to perform reads/writes on the slave address space;
+these simply pass the request on the slave's master with the correct
+link and slave ID.
 
-Includes changes from Christopher Bostic <cbostic@linux.vnet.ibm.com>.
+We implement these on top of similar helpers for the master.
 
 Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
-Signed-off-by: Christopher Bostic <cbostic@linux.vnet.ibm.com>
 Signed-off-by: Joel Stanley <joel@jms.id.au>
+Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
 ---
- drivers/fsi/Kconfig    |  1 +
- drivers/fsi/fsi-core.c | 67 ++++++++++++++++++++++++++++++++++++++++++++++++--
- 2 files changed, 66 insertions(+), 2 deletions(-)
+ drivers/fsi/fsi-core.c | 92 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 92 insertions(+)
 
-diff --git a/drivers/fsi/Kconfig b/drivers/fsi/Kconfig
-index 04c1a0e..e1006c6 100644
---- a/drivers/fsi/Kconfig
-+++ b/drivers/fsi/Kconfig
-@@ -6,6 +6,7 @@ menu "FSI support"
- 
- config FSI
- 	tristate "FSI support"
-+	select CRC4
- 	---help---
- 	  FSI - the FRU Support Interface - is a simple bus for low-level
- 	  access to POWER-based hardware.
 diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index 235f17a..9d9adc1 100644
+index e90d45d..1ec9790 100644
 --- a/drivers/fsi/fsi-core.c
 +++ b/drivers/fsi/fsi-core.c
-@@ -13,13 +13,17 @@
-  * GNU General Public License for more details.
-  */
+@@ -32,7 +32,64 @@ struct fsi_slave {
  
-+#include <linux/crc4.h>
- #include <linux/device.h>
- #include <linux/fsi.h>
- #include <linux/idr.h>
- #include <linux/module.h>
-+#include <linux/slab.h>
+ #define to_fsi_slave(d) container_of(d, struct fsi_slave, dev)
  
- #include "fsi-master.h"
- 
-+#define FSI_SLAVE_SIZE_23b		0x800000
++static int fsi_master_read(struct fsi_master *master, int link,
++		uint8_t slave_id, uint32_t addr, void *val, size_t size);
++static int fsi_master_write(struct fsi_master *master, int link,
++		uint8_t slave_id, uint32_t addr, const void *val, size_t size);
 +
- static DEFINE_IDA(master_ida);
- 
- struct fsi_slave {
-@@ -90,11 +94,70 @@ static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
- 			addr, val, size);
- }
- 
-+static void fsi_slave_release(struct device *dev)
+ /* FSI slave support */
++static int fsi_slave_calc_addr(struct fsi_slave *slave, uint32_t *addrp,
++		uint8_t *idp)
 +{
-+	struct fsi_slave *slave = to_fsi_slave(dev);
++	uint32_t addr = *addrp;
++	uint8_t id = *idp;
 +
-+	kfree(slave);
++	if (addr > slave->size)
++		return -EINVAL;
++
++	/* For 23 bit addressing, we encode the extra two bits in the slave
++	 * id (and the slave's actual ID needs to be 0).
++	 */
++	if (addr > 0x1fffff) {
++		if (slave->id != 0)
++			return -EINVAL;
++		id = (addr >> 21) & 0x3;
++		addr &= 0x1fffff;
++	}
++
++	*addrp = addr;
++	*idp = id;
++	return 0;
++}
++
++static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
++			void *val, size_t size)
++{
++	uint8_t id = slave->id;
++	int rc;
++
++	rc = fsi_slave_calc_addr(slave, &addr, &id);
++	if (rc)
++		return rc;
++
++	return fsi_master_read(slave->master, slave->link, id,
++			addr, val, size);
++}
++
++static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
++			const void *val, size_t size)
++{
++	uint8_t id = slave->id;
++	int rc;
++
++	rc = fsi_slave_calc_addr(slave, &addr, &id);
++	if (rc)
++		return rc;
++
++	return fsi_master_write(slave->master, slave->link, id,
++			addr, val, size);
 +}
 +
  static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
  {
--	/* todo: initialise slave device, perform engine scan */
-+	struct fsi_slave *slave;
-+	uint32_t chip_id;
-+	uint8_t crc;
-+	int rc;
-+
-+	/* Currently, we only support single slaves on a link, and use the
-+	 * full 23-bit address range
-+	 */
-+	if (id != 0)
-+		return -EINVAL;
-+
-+	rc = fsi_master_read(master, link, id, 0, &chip_id, sizeof(chip_id));
-+	if (rc) {
-+		dev_dbg(&master->dev, "can't read slave %02x:%02x %d\n",
-+				link, id, rc);
-+		return -ENODEV;
-+	}
-+	chip_id = be32_to_cpu(chip_id);
-+
-+	crc = crc4(0, chip_id, 32);
-+	if (crc) {
-+		dev_warn(&master->dev, "slave %02x:%02x invalid chip id CRC!\n",
-+				link, id);
-+		return -EIO;
-+	}
-+
-+	dev_info(&master->dev, "fsi: found chip %08x at %02x:%02x:%02x\n",
-+			chip_id, master->idx, link, id);
-+
-+	/* We can communicate with a slave; create the slave device and
-+	 * register.
-+	 */
-+	slave = kzalloc(sizeof(*slave), GFP_KERNEL);
-+	if (!slave)
-+		return -ENOMEM;
-+
-+	slave->master = master;
-+	slave->dev.parent = &master->dev;
-+	slave->dev.release = fsi_slave_release;
-+	slave->link = link;
-+	slave->id = id;
-+	slave->size = FSI_SLAVE_SIZE_23b;
-+
-+	dev_set_name(&slave->dev, "slave@%02x:%02x", link, id);
-+	rc = device_register(&slave->dev);
-+	if (rc < 0) {
-+		dev_warn(&master->dev, "failed to create slave device: %d\n",
-+				rc);
-+		put_device(&slave->dev);
-+		return rc;
-+	}
-+
-+	/* todo: perform engine scan */
- 
--	return -ENODEV;
-+	return rc;
+ 	/* todo: initialise slave device, perform engine scan */
+@@ -41,6 +98,41 @@ static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
  }
  
  /* FSI master support */
++static int fsi_check_access(uint32_t addr, size_t size)
++{
++	if (size != 1 && size != 2 && size != 4)
++		return -EINVAL;
++
++	if ((addr & 0x3) != (size & 0x3))
++		return -EINVAL;
++
++	return 0;
++}
++
++static int fsi_master_read(struct fsi_master *master, int link,
++		uint8_t slave_id, uint32_t addr, void *val, size_t size)
++{
++	int rc;
++
++	rc = fsi_check_access(addr, size);
++	if (rc)
++		return rc;
++
++	return master->read(master, link, slave_id, addr, val, size);
++}
++
++static int fsi_master_write(struct fsi_master *master, int link,
++		uint8_t slave_id, uint32_t addr, const void *val, size_t size)
++{
++	int rc;
++
++	rc = fsi_check_access(addr, size);
++	if (rc)
++		return rc;
++
++	return master->write(master, link, slave_id, addr, val, size);
++}
++
+ static int fsi_master_scan(struct fsi_master *master)
+ {
+ 	int link;
 -- 
 1.8.2.2
