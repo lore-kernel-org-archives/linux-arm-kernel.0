@@ -1,97 +1,84 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 6 Jun 2017 16:06:23 +0530
-Subject: [PATCH 0/7] dra7: Fixes for MMC devicetree node
-In-Reply-To: <f78dd61c-6689-4dbc-d1db-128f92be8e51@ti.com>
-References: <20170601143401.16852-1-kishon@ti.com>
- <CAPDyKFqHHjZQnnaGLP=xDj3eYgzADDYoomzBuXRviBgh-n2QFw@mail.gmail.com>
- <f78dd61c-6689-4dbc-d1db-128f92be8e51@ti.com>
-Message-ID: <1d15c9e9-f257-fd97-a9a2-055ee90d7e84@ti.com>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Tue, 6 Jun 2017 10:37:40 +0000
+Subject: [PATCH 4/4] ARM: dts: iwg20d-q7: Add support for iWave G20D-Q7
+ board based on RZ/G1M
+In-Reply-To: <CAMuHMdUWJL-oH7wWzjs5O=WrOshdL_AxijBJe66HrYBx7x8F9w@mail.gmail.com>
+References: <1496420523-23506-1-git-send-email-biju.das@bp.renesas.com>
+ <1496420523-23506-5-git-send-email-biju.das@bp.renesas.com>
+ <CAMuHMdUWJL-oH7wWzjs5O=WrOshdL_AxijBJe66HrYBx7x8F9w@mail.gmail.com>
+Message-ID: <KL1PR06MB1702A62F3ECB628FC9FC1D43B8CB0@KL1PR06MB1702.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+> On Fri, Jun 2, 2017 at 6:22 PM, Biju Das <biju.das@bp.renesas.com> wrote:
+> > Add support for iWave RainboW-G20D-Qseven board based on RZ/G1M.
+>
+> Thanks for your patch!
+>
+> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> > Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+>
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>
+> > --- a/arch/arm/boot/dts/Makefile
+> > +++ b/arch/arm/boot/dts/Makefile
+> > @@ -711,6 +711,7 @@ dtb-$(CONFIG_ARCH_RENESAS) += \
+> >         r8a73a4-ape6evm.dtb \
+> >         r8a7740-armadillo800eva.dtb \
+> >         r8a7743-sk-rzg1m.dtb \
+> > +       r8a7743-iwg20d-q7.dtb \
+>
+> Please preserve sort order.
+>
+> >         r8a7745-sk-rzg1e.dtb \
+> >         r8a7778-bockw.dtb \
+> >         r8a7779-marzen.dtb \
+>
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
+> > @@ -0,0 +1,25 @@
+> > +/*
+> > + * Device Tree Source for the iWave-RZG1M Qseven carrier board
+> > + *
+> > + * Copyright (C) 2017 Renesas Electronics Corp.
+> > + *
+> > + * This file is licensed under the terms of the GNU General Public
+> > +License
+> > + * version 2.  This program is licensed "as is" without any warranty
+> > +of any
+> > + * kind, whether express or implied.
+> > + */
+> > +
+> > +/dts-v1/;
+> > +#include "r8a7743-iwg20m.dtsi"
+> > +
+> > +/ {
+> > +       model = "iWave Systems RainboW-G20D-Qseven board based on
+> RZ/G1M";
+> > +       compatible = "iwave,g20d", "renesas,r8a7743";
+>
+> With my comment on patch [3/4], this should become:
+>
+> compatible = "iwave,g20d", "iwave,g20m", "renesas,r8a7743";
+>
 
-On Tuesday 06 June 2017 09:47 AM, Kishon Vijay Abraham I wrote:
-> Hi,
-> 
-> On Friday 02 June 2017 04:20 PM, Ulf Hansson wrote:
->> On 1 June 2017 at 16:33, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>> There are the set of fixes that were sent initially as part
->>> of [1].
->>>
->>> These are mostly fixes w.r.t populating regulators in
->>> mmc dt node. It was working before because the regulators
->>> connecting to the IO lines are always on regulators. This will
->>> break once we add UHS support where voltage has to be changed
->>> dynamically.
->>>
->>> Performed enumeration testing on dra72-evm-revc, dra72-evm,
->>> dra7-evm, am572x-evm, am571x-idk and am572x-idk.
->>>
->>> This is a preparation series for adding UHS mode support in
->>> the above mentioned platforms.
->>>
->>> [1] -> https://lkml.org/lkml/2017/5/19/196
->>>
->>> Kishon Vijay Abraham I (5):
->>>   ARM: dts: dra72-evm-common: Correct vmmc-supply for mmc2
->>>   ARM: dts: dra72-evm: Add vmmc_aux supply to mmc1
->>>   ARM: dts: dra72-evm-revc: Add vmmc_aux supply to mmc1
->>>   ARM: dts: am57xx-beagle-x15-revb1: Fix supply name used for MMC1 IO
->>>     lines
->>>   ARM: dts: dra7: Add "max-frequency" property to MMC dt nodes
->>>
->>> Ravikumar Kattekola (1):
->>>   ARM: dts: dra7-evm: Correct the vmmc-supply for mmc2
->>>
->>> Sekhar Nori (1):
->>>   ARM: OMAP2+: Add pdata-quirks for MMC/SD on DRA74x EVM
->>>
->>>  arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts |  2 +-
->>>  arch/arm/boot/dts/dra7-evm.dts                | 10 ++++++++-
->>>  arch/arm/boot/dts/dra7.dtsi                   |  5 +++++
->>>  arch/arm/boot/dts/dra71-evm.dts               | 14 ++++++++++++
->>>  arch/arm/boot/dts/dra72-evm-common.dtsi       |  2 --
->>>  arch/arm/boot/dts/dra72-evm-revc.dts          | 18 ++++++++++++++++
->>>  arch/arm/boot/dts/dra72-evm.dts               | 18 ++++++++++++++++
->>>  arch/arm/mach-omap2/pdata-quirks.c            | 31 +++++++++++++++++++++++++++
->>>  include/linux/platform_data/hsmmc-omap.h      |  3 +++
->>>  9 files changed, 99 insertions(+), 4 deletions(-)
->>
->> This series add a bunch of new vmmc_aux regulators for the mmc
->> controller nodes. I would rather see that omap_hsmmc also converts to
->> use the generic mmc binding for this regulator, which is "vqmmc".
->>
->> To accomplish that, omap_hsmmc needs to convert to use
->> mmc_regulator_get_supply(). If the "vqmmc" regulator isn't found, it
->> should fallback to try the "vmmc_aux".
->>
->> Can you do that?
-> 
-> sure, I'll prepare that change.
+Agreed. I will do this change.
 
-omap3-overo-base.dtsi has the following dt node for mmc.
-/* optional on board WiFi */
-&mmc2 {
-        pinctrl-names = "default";
-        pinctrl-0 = <&mmc2_pins>;
-        vmmc-supply = <&w3cbw003c_npoweron>;
-        vqmmc-supply = <&w3cbw003c_bt_nreset>;
-        vmmc_aux-supply = <&w3cbw003c_wifi_nreset>;
-        bus-width = <4>;
-        cap-sdio-irq;
-        non-removable;
-};
+> > +
+> > +       aliases {
+> > +               serial0 = &scif0;
+> > +       };
+> > +};
+> > +
+> > +&scif0 {
+> > +       status = "okay";
+> > +};
+>
 
-It has both "vqmmc-supply" and "vmmc_aux-supply". However omap-hsmmc driver has
-never parsed vqmmc so far. So I'd assume bt was never functional and it's used
-only for wifi.
 
-So for the change suggested by Ulf, Can I do something like below, so that we
-can keep wifi functional (ignoring bt since that was never functional)?
--       vqmmc-supply = <&w3cbw003c_bt_nreset>;
--       vmmc_aux-supply = <&w3cbw003c_wifi_nreset>;
-+       vqmmc-supply = <&w3cbw003c_wifi_nreset>;
+Regards,
+Biju
 
-Thanks
-Kishon
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
