@@ -1,17 +1,32 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 6 Jun 2017 15:38:56 -0300
-Subject: [PATCH v2 2/2] ARM: imx6ull: Make suspend/resume work like on 6ul
-In-Reply-To: <7dcc71ab09d8d459de1826e55516349b1a2bda33.1496771145.git.leonard.crestez@nxp.com>
-References: <cover.1496771145.git.leonard.crestez@nxp.com>
- <7dcc71ab09d8d459de1826e55516349b1a2bda33.1496771145.git.leonard.crestez@nxp.com>
-Message-ID: <CAOMZO5DZt73W4g9wx14KB-uDBhPKeEckbgMVu6aGE+rGJZsLkw@mail.gmail.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Tue, 6 Jun 2017 20:39:33 +0200
+Subject: [PATCH v2 3/4] net: macb: macb.c changed to macb_main.c
+In-Reply-To: <1496413661-21452-1-git-send-email-rafalo@cadence.com>
+References: <1496413439-12900-1-git-send-email-rafalo@cadence.com>
+ <1496413661-21452-1-git-send-email-rafalo@cadence.com>
+Message-ID: <20170606183933.GA1205@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 6, 2017 at 2:50 PM, Leonard Crestez <leonard.crestez@nxp.com> wrote:
-> Suspend and resume on imx6ull is currenty not working because of some
-> missed checks where behavior should match imx6ul.
->
-> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+On Fri, Jun 02, 2017 at 03:27:41PM +0100, Rafal Ozieblo wrote:
+>  drivers/net/ethernet/cadence/macb.c      | 3568 ------------------------------
+>  drivers/net/ethernet/cadence/macb_main.c | 3568 ++++++++++++++++++++++++++++++
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+You deleted macb.c, and so ...
+
+> diff --git a/drivers/net/ethernet/cadence/Makefile b/drivers/net/ethernet/cadence/Makefile
+> index 4ba7559..31ea6e3 100644
+> --- a/drivers/net/ethernet/cadence/Makefile
+> +++ b/drivers/net/ethernet/cadence/Makefile
+> @@ -1,6 +1,7 @@
+>  #
+>  # Makefile for the Atmel network device drivers.
+>  #
+> +macb-y	:= macb_main.o
+>  
+>  obj-$(CONFIG_MACB) += macb.o
+
+how does this rule make sense any more?
+
+Thanks,
+Richard
