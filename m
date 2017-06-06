@@ -1,71 +1,71 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 6 Jun 2017 12:45:17 -0700
-Subject: [PATCH 4/4] ARM: multi_v7_defconfig: Switch AXP20x driver from
- module to built-in
-In-Reply-To: <20170522074414.3qz2wpw4cs2btkhv@flea.lan>
-References: <937914a68e4e7d6db2d12540cc6253b200978e2d.1486590875.git.rask@formelder.dk>
- <49ad3e66452bd78da7b9e581129f76633c56e609.1486590875.git.rask@formelder.dk>
- <20170210084213.uzf25soh7bl73a6g@lukather>
- <CAOi56cV=UBEFQ6V4LLNrHDaDJgb33mrCA6Z+vj_3VziOpkRcvQ@mail.gmail.com>
- <CAOi56cXLo5LaT8CgfwB991gq+gCv4OY3VNkGWviooq43=6Wayg@mail.gmail.com>
- <20170522074414.3qz2wpw4cs2btkhv@flea.lan>
-Message-ID: <CAOi56cW8jimRGkFMAf3daL_SLBGr=TmxFnE-MKCnogci7Kr=oQ@mail.gmail.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 6 Jun 2017 21:45:25 +0200
+Subject: [PATCH 03/11] KVM: arm64: Change hyp_panic()s dependency on
+ tpidr_el2
+In-Reply-To: <20170515174400.29735-4-james.morse@arm.com>
+References: <20170515174400.29735-1-james.morse@arm.com>
+ <20170515174400.29735-4-james.morse@arm.com>
+Message-ID: <20170606194525.GK9464@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 22, 2017 at 12:44 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi Kevin,
->
-> On Thu, May 18, 2017 at 11:59:50AM -0700, Kevin Hilman wrote:
->> On Fri, Mar 17, 2017 at 10:39 AM, Kevin Hilman <khilman@baylibre.com> wrote:
->> > On Fri, Feb 10, 2017 at 12:42 AM, Maxime Ripard
->> > <maxime.ripard@free-electrons.com> wrote:
->> >> On Wed, Feb 08, 2017 at 11:09:31PM +0100, Rask Ingemann Lambertsen wrote:
->> >>> The AXP20X regulator support is currently built as a module, which means
->> >>> it's not available until the root fs has been mounted, but the boot loader
->> >>> might not have enabled the required regulators, so build their drivers
->> >>> into the kernel.
->> >>>
->> >>> Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
->> >>
->> >> Queued for 4.12.
->> >
->> > Hello, kernelci.org is reporting boot failures on sun5i-r8-chip in
->> > linux-next[1]  for a few days and with a variety of defconfigs. I
->> > bisected it[2] down to this patch.
->> >
->> > I verified that reverting this patch on top of next-20170310 makes my
->> > chip board boot again.
->>
->> FYI... this board is still broken in linux-next (and now in mainline),
->> and reverting $SUBJECT patch still makes it work.
->>
->> Is nobody else using mainline on this board?
->
-> I thought about that during the weekend, and it might just be a
-> symptom.
->
-> The CHIP has brown out issues, especially when you enable the WiFi
-> chip, which should happen around the time of the failure when the PMIC
-> regulator support is compiled as a module.
->
-> We mitigate that in upstream's U-Boot by enabling the two regulators
-> for the WiFi chip in U-boot, which levels a bit the current over the
-> boot.
->
-> You have a few ways to prevent that from happening. Having a better
-> power supply / cable will help, I'm not sure how reasonable that is.
->
-> Another thing that can work is, if your USB plugs can take it, to
-> increase the overcurrent trigger in the PMIC, ideally in U-Boot.
->
-> The last, and probably cleaner one, would be to just power it through
-> the 5v input on its header, and not the USB. There's not current
-> limitation there, so it shouldn't cause any problems anymore.
+On Mon, May 15, 2017 at 06:43:51PM +0100, James Morse wrote:
+> KVM calls hyp_panic() when anything unexpected happens. This may occur
+> while a guest owns the EL1 registers. KVM stashes the vcpu pointer in
+> tpidr_el2, which it uses to find the host context in order to restore
+> the host EL1 registers before parachuting into the host's panic().
+> 
+> The host context is a struct kvm_cpu_context allocated in the per-cpu
+> area, and mapped to hyp. Given the per-cpu offset for this CPU, this is
+> easy to find. Change hyp_panic() to take a pointer to the
+> struct kvm_cpu_context. Wrap these calls with an asm function that
+> retrieves the struct kvm_cpu_context from the host's per-cpu area.
+> 
+> Copy the per-cpu offset from the hosts tpidr_el1 into tpidr_el2 during
+> kvm init. (Later patches will make this unnecessary for VHE hosts)
+> 
+> We print out the vcpu pointer as part of the panic message. Add a back
+> reference to the 'running vcpu' in the host cpu context to preserve this.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> ---
+>  arch/arm64/include/asm/kvm_host.h |  2 ++
+>  arch/arm64/kvm/hyp/hyp-entry.S    |  7 +++++++
+>  arch/arm64/kvm/hyp/s2-setup.c     |  3 +++
+>  arch/arm64/kvm/hyp/switch.c       | 25 +++++++++++++------------
+>  4 files changed, 25 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 5e19165c5fa8..1407bfc81e9e 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -188,6 +188,8 @@ struct kvm_cpu_context {
+>  		u64 sys_regs[NR_SYS_REGS];
+>  		u32 copro[NR_COPRO_REGS];
+>  	};
+> +
+> +	struct kvm_vcpu *__hyp_running_vcpu;
+>  };
+>  
+>  typedef struct kvm_cpu_context kvm_cpu_context_t;
+> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+> index fce7cc507e0a..0f83e7e402ad 100644
+> --- a/arch/arm64/kvm/hyp/hyp-entry.S
+> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
+> @@ -163,6 +163,13 @@ ENTRY(__hyp_do_panic)
+>  	eret
+>  ENDPROC(__hyp_do_panic)
+>  
+> +ENTRY(__hyp_panic)
+> +	ldr	x0, =kvm_host_cpu_state
 
-I'm now powering the board via the header (5V to the CHG-IN pin) and
-it doesn't change anything.  Still fails in the same way, and
-reverting $SUBJECT defconfig patch makes it work again.
+Why is this guaranteed to give us a valid EL2 address?
 
-Kevin
+> +	mrs	x1, tpidr_el2
+> +	add	x0, x0, x1
+> +	b	hyp_panic
+> +ENDPROC(__hyp_panic)
+> +
+
+Thanks,
+-Christoffer
