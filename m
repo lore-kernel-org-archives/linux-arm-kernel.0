@@ -1,49 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 6 Jun 2017 03:51:31 -0700
-Subject: [PATCH 0/7] dra7: Fixes for MMC devicetree node
-In-Reply-To: <1d15c9e9-f257-fd97-a9a2-055ee90d7e84@ti.com>
-References: <20170601143401.16852-1-kishon@ti.com>
- <CAPDyKFqHHjZQnnaGLP=xDj3eYgzADDYoomzBuXRviBgh-n2QFw@mail.gmail.com>
- <f78dd61c-6689-4dbc-d1db-128f92be8e51@ti.com>
- <1d15c9e9-f257-fd97-a9a2-055ee90d7e84@ti.com>
-Message-ID: <20170606105131.GZ3730@atomide.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Tue, 6 Jun 2017 13:51:53 +0300
+Subject: [PATCH] ARM: imx6ull: Make suspend/resume work like on 6ul
+In-Reply-To: <20170605053722.GI4094@dragon>
+References: <c63fd9031493cefed47d59c9918c0ecb76ffaf85.1496160320.git.leonard.crestez@nxp.com>
+ <20170605053722.GI4094@dragon>
+Message-ID: <1496746313.28352.19.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kishon Vijay Abraham I <kishon@ti.com> [170606 03:40]:
-> omap3-overo-base.dtsi has the following dt node for mmc.
-> /* optional on board WiFi */
-> &mmc2 {
->         pinctrl-names = "default";
->         pinctrl-0 = <&mmc2_pins>;
->         vmmc-supply = <&w3cbw003c_npoweron>;
->         vqmmc-supply = <&w3cbw003c_bt_nreset>;
->         vmmc_aux-supply = <&w3cbw003c_wifi_nreset>;
->         bus-width = <4>;
->         cap-sdio-irq;
->         non-removable;
-> };
-> 
-> It has both "vqmmc-supply" and "vmmc_aux-supply". However omap-hsmmc driver has
-> never parsed vqmmc so far. So I'd assume bt was never functional and it's used
-> only for wifi.
+On Mon, 2017-06-05 at 13:37 +0800, Shawn Guo wrote:
+> On Tue, May 30, 2017 at 07:11:19PM +0300, Leonard Crestez wrote:
+> > 
+> > Suspend and resume on imx6ull is currenty not working because of some
+> > missed checks where behavior should match imx6ul.
+> > 
+> > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+> > ---
+> > ?arch/arm/mach-imx/mxc.h?????| 6 ++++++
+> > ?arch/arm/mach-imx/pm-imx6.c | 6 ++++--
+> > ?2 files changed, 10 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
+> > index 34f2ff6..e00d626 100644
+> > --- a/arch/arm/mach-imx/mxc.h
+> > +++ b/arch/arm/mach-imx/mxc.h
+> > @@ -39,6 +39,7 @@
+> > ?#define MXC_CPU_IMX6SX		0x62
+> > ?#define MXC_CPU_IMX6Q		0x63
+> > ?#define MXC_CPU_IMX6UL		0x64
+> > +#define MXC_CPU_IMX6ULL		0x65
+> Since you are adding a new CPU type, you should probably patch
+> imx_soc_device_init() for it as well.
 
-Hmm yeah the vqmmc-supply probably got copied from some
-other SoC for w3cbw003c.
+Ok, I will resend as a 2-patch series.
 
-> So for the change suggested by Ulf, Can I do something like below, so that we
-> can keep wifi functional (ignoring bt since that was never functional)?
-> -       vqmmc-supply = <&w3cbw003c_bt_nreset>;
-> -       vmmc_aux-supply = <&w3cbw003c_wifi_nreset>;
-> +       vqmmc-supply = <&w3cbw003c_wifi_nreset>;
+BTW, it actually seems to me that setting BM_CLPCR_BYP_MMDC_CH0_LPM_HS
+on imx6sl/sx/ul/ull is not actually needed. That bit (19) is documented
+as "reserved" in the Reference Manual and likely ignored by hardware.
 
-Optional sdio pins 4 - 8 need separate power and that's
-why we have the vmmc_aux supply to start with. But here
-there are only four pins, so my guess is that only one
-regulator is needed and the the other two are gpio pins
-for wland and bt that nowadays should be handled by the
-mmc power sequence driver.
+As far as I understand the MMDC on imx6qdl has two channels and unless
+2-channel mode is enabled (not currently supported) the handshake with
+CH1 needs to be disabled. Other reduced chips only have one MMDC
+channel and that is CH1 (CH0 was removed) and nothing needs to be done
+from them. The only important thing is to avoid setting
+BM_CLPCR_BYP_MMDC_CH1_LPM_HS.
 
+However perhaps what I am saying is wrong for some early chip versions?
+Because this behavior of setting BM_CLPCR_BYP_MMDC_CH0_LPM_HS has been
+in the kernel for a long time.
+
+--
 Regards,
-
-Tony
+Leonard
