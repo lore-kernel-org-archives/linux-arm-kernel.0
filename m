@@ -1,45 +1,101 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 6 Jun 2017 14:10:25 +0200
-Subject: [PATCH] arm64: dts: marvell: 8040-mcbin: Enable 1GB Ethernet
-In-Reply-To: <3e387cee-0107-8c29-d99a-abd61bdef9c2@arm.com>
-References: <20170605200107.7692-1-marc.zyngier@arm.com>
- <20170605211639.GB9339@lunn.ch>
- <3e387cee-0107-8c29-d99a-abd61bdef9c2@arm.com>
-Message-ID: <20170606121025.GD18198@lunn.ch>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 6 Jun 2017 14:11:50 +0200
+Subject: [PATCH v2 13/25] KVM: arm64: vgic-v3: Add ICV_BPR0_EL1 handler
+In-Reply-To: <20170601102117.17750-14-marc.zyngier@arm.com>
+References: <20170601102117.17750-1-marc.zyngier@arm.com>
+ <20170601102117.17750-14-marc.zyngier@arm.com>
+Message-ID: <20170606121150.GO9464@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 06, 2017 at 09:21:58AM +0100, Marc Zyngier wrote:
-> Hi Andrew,
+On Thu, Jun 01, 2017 at 11:21:05AM +0100, Marc Zyngier wrote:
+> Add a handler for reading/writing the guest's view of the ICC_BPR0_EL1
+> register, which is located in the ICH_VMCR_EL2.BPR0 field.
 > 
-> On 05/06/17 22:16, Andrew Lunn wrote:
-> >> +&cps_eth1 {
-> >> +	status = "okay";
-> >> +	phy = <&phy0>;
-> >> +	phy-mode = "sgmii";
-> >> +};
-> > 
-> > Hi Marc
-> > 
-> > Documentation/devicetree/bindings/net/ethernet.txt says:
-> > 
-> > - phy-handle: phandle, specifies a reference to a node representing a PHY
-> >   device; this property is described in ePAPR and so preferred;
-> > - phy: the same as "phy-handle" property, not recommended for new bindings.
+> Reviewed-by: Eric Auger <eric.auger@redhat.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/include/asm/sysreg.h |  1 +
+>  virt/kvm/arm/hyp/vgic-v3-sr.c   | 36 ++++++++++++++++++++++++++++++++++++
+>  2 files changed, 37 insertions(+)
 > 
-> Happy to amend the patch, though armada-8040-db.dts is already using
-> "phy" (and not "phy-handle"). Should that one be fixed as well in the
-> name of consistency? Also,
-> Documentation/devicetree/bindings/net/marvell-pp2.txt only mentions the
-> "phy" property. If feels a bit odd not to at least recommend the new
-> property in the binding documentation.
+> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+> index bd000686194a..d20be0b28ca4 100644
+> --- a/arch/arm64/include/asm/sysreg.h
+> +++ b/arch/arm64/include/asm/sysreg.h
+> @@ -180,6 +180,7 @@
+>  
+>  #define SYS_VBAR_EL1			sys_reg(3, 0, 12, 0, 0)
+>  
+> +#define SYS_ICC_BPR0_EL1		sys_reg(3, 0, 12, 8, 3)
+>  #define SYS_ICC_AP1Rn_EL1(n)		sys_reg(3, 0, 12, 9, n)
+>  #define SYS_ICC_DIR_EL1			sys_reg(3, 0, 12, 11, 1)
+>  #define SYS_ICC_SGI1R_EL1		sys_reg(3, 0, 12, 11, 5)
+> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> index 42ac9ee7650a..54a8e828c85b 100644
+> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
+> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> @@ -688,11 +688,41 @@ static void __hyp_text __vgic_v3_write_igrpen1(struct kvm_vcpu *vcpu, u32 vmcr,
+>  	__vgic_v3_write_vmcr(vmcr);
+>  }
+>  
+> +static void __hyp_text __vgic_v3_read_bpr0(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
+> +{
+> +	vcpu_set_reg(vcpu, rt, __vgic_v3_get_bpr0(vmcr));
+> +}
+> +
+>  static void __hyp_text __vgic_v3_read_bpr1(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
+>  {
+>  	vcpu_set_reg(vcpu, rt, __vgic_v3_get_bpr1(vmcr));
+>  }
+>  
+> +static void __hyp_text __vgic_v3_write_bpr0(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
+> +{
+> +	u64 val = vcpu_get_reg(vcpu, rt);
+> +	u8 bpr_min = 7 - vtr_to_nr_pre_bits(read_gicreg(ICH_VTR_EL2));
+> +
+> +	/* Enforce BPR limiting */
+> +	if (val < bpr_min)
+> +		val = bpr_min;
+> +
+> +	val <<= ICH_VMCR_BPR0_SHIFT;
+> +	val &= ICH_VMCR_BPR0_MASK;
+> +	vmcr &= ~ICH_VMCR_BPR0_MASK;
+> +	vmcr |= val;
+> +
+> +	if (vmcr & ICH_VMCR_CBPR_MASK) {
+> +		val = __vgic_v3_get_bpr1(vmcr);
+> +		val <<= ICH_VMCR_BPR1_SHIFT;
+> +		val &= ICH_VMCR_BPR1_MASK;
+> +		vmcr &= ~ICH_VMCR_BPR1_MASK;
+> +		vmcr |= val;
+> +	}
 
-Ah. As Russell pointed out, parsing this property is done by the
-driver, not a central helper. mvpp2 only supports phy, not phy-handle.
-This is not a new binding, it has been around since the middle of
-2014. So "phy" is O.K.
+I don't understand why this block is needed?
 
-Sometime in the future, it would be nice to centralise the parsing of
-this and phy-mode.
+Thanks,
+-Christoffer
 
-     Andrew
+> +
+> +	__vgic_v3_write_vmcr(vmcr);
+> +}
+> +
+>  static void __hyp_text __vgic_v3_write_bpr1(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
+>  {
+>  	u64 val = vcpu_get_reg(vcpu, rt);
+> @@ -870,6 +900,12 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
+>  	case SYS_ICC_HPPIR1_EL1:
+>  		fn = __vgic_v3_read_hppir;
+>  		break;
+> +	case SYS_ICC_BPR0_EL1:
+> +		if (is_read)
+> +			fn = __vgic_v3_read_bpr0;
+> +		else
+> +			fn = __vgic_v3_write_bpr0;
+> +		break;
+>  	default:
+>  		return 0;
+>  	}
+> -- 
+> 2.11.0
+> 
