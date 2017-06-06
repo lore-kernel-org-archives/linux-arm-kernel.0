@@ -1,32 +1,37 @@
 From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Tue,  6 Jun 2017 09:31:43 +0200
-Subject: [PATCH v3 3/6] kernel/reboot.c: export pm_power_off_prepare
+Date: Tue,  6 Jun 2017 09:31:44 +0200
+Subject: [PATCH v3 4/6] regulator: pfuze100: add fsl,
+ pmic-stby-poweroff property
 In-Reply-To: <20170606073146.26882-1-o.rempel@pengutronix.de>
 References: <20170606073146.26882-1-o.rempel@pengutronix.de>
-Message-ID: <20170606073146.26882-4-o.rempel@pengutronix.de>
+Message-ID: <20170606073146.26882-5-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Export pm_power_off_prepare. It is needed to implement power off on
-Freescale/NXP iMX6 based boards with external power management
-integrated circuit (PMIC).
+Document the new optional "fsl,pmic_stby_poweroff" property.
 
 Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
 ---
- kernel/reboot.c | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/regulator/pfuze100.txt | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/kernel/reboot.c b/kernel/reboot.c
-index bd30a973fe94..a6903bf772c7 100644
---- a/kernel/reboot.c
-+++ b/kernel/reboot.c
-@@ -49,6 +49,7 @@ int reboot_force;
-  */
+diff --git a/Documentation/devicetree/bindings/regulator/pfuze100.txt b/Documentation/devicetree/bindings/regulator/pfuze100.txt
+index 444c47831a40..197f1a52e960 100644
+--- a/Documentation/devicetree/bindings/regulator/pfuze100.txt
++++ b/Documentation/devicetree/bindings/regulator/pfuze100.txt
+@@ -4,6 +4,13 @@ Required properties:
+ - compatible: "fsl,pfuze100", "fsl,pfuze200", "fsl,pfuze3000"
+ - reg: I2C slave address
  
- void (*pm_power_off_prepare)(void);
-+EXPORT_SYMBOL(pm_power_off_prepare);
- 
- /**
-  *	emergency_restart - reboot the system
++Optional properties:
++- fsl,pmic-stby-poweroff: if present, configure the PMIC to shutdown all
++  power rails when PMIC_STBY_REQ line is asserted during the power off sequence.
++  Use this option if the SoC should be powered off by external power
++  management IC (PMIC) on PMIC_STBY_REQ signal.
++  As opposite to PMIC_STBY_REQ boards can implement PMIC_ON_REQ signal.
++
+ Required child node:
+ - regulators: This is the list of child nodes that specify the regulator
+   initialization data for defined regulators. Please refer to below doc
 -- 
 2.11.0
