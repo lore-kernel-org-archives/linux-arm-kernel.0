@@ -1,27 +1,26 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 6 Jun 2017 19:57:30 +0100
-Subject: [PATCH 2/3] spi: mediatek: support adjust register define
-In-Reply-To: <1496387923-31674-3-git-send-email-leilk.liu@mediatek.com>
+Date: Tue, 6 Jun 2017 19:57:46 +0100
+Subject: [PATCH 1/3] dt-bindings: spi: mediatek: Add bindings for
+ mediatek MT7622 soc platform
+In-Reply-To: <1496387923-31674-2-git-send-email-leilk.liu@mediatek.com>
 References: <1496387923-31674-1-git-send-email-leilk.liu@mediatek.com>
- <1496387923-31674-3-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <20170606185730.mrvgvp4hynftwahx@sirena.org.uk>
+ <1496387923-31674-2-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <20170606185746.t5cp374p2b6lkfhx@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 02, 2017 at 03:18:42PM +0800, Leilk Liu wrote:
+On Fri, Jun 02, 2017 at 03:18:41PM +0800, Leilk Liu wrote:
+> This patch adds a DT binding documentation for the MT7622 soc.
 
-> +	/* some IC design adjust register define */
-> +	bool adjust_reg;
-
-Can we have a name that's more specific to the particular quirk please?
-The current name will get confusing if some future chip also needs
-slightly different register settings.
-
-Otherwise this looks good.
+Please submit patches using subject lines reflecting the style for the
+subsystem.  This makes it easier for people to identify relevant
+patches.  Look at what existing commits in the area you're changing are
+doing and make sure your subject lines visually resemble what they're
+doing.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 488 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170606/8b667a53/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170606/dbbd0ebe/attachment-0001.sig>
