@@ -1,44 +1,56 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 6 Jun 2017 09:41:16 +0200
-Subject: [PATCH 2/4] ARM: shmobile: document iW-RainboW-G20D-Qseven-RZG1M
- board
-In-Reply-To: <1496420523-23506-3-git-send-email-biju.das@bp.renesas.com>
+Date: Tue, 6 Jun 2017 09:41:37 +0200
+Subject: [PATCH 3/4] ARM: dts: iwg20m: Add iWave RZG1M Qseven SOM
+In-Reply-To: <1496420523-23506-4-git-send-email-biju.das@bp.renesas.com>
 References: <1496420523-23506-1-git-send-email-biju.das@bp.renesas.com>
- <1496420523-23506-3-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <CAMuHMdUHetaZMhfxBXF-1y0yv5UdUQrxH7NpkUfymty5hs_7EQ@mail.gmail.com>
+ <1496420523-23506-4-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <CAMuHMdV8Ugz_kvHLbV7sii-2v1WdHTSFm3meM8faVtx3jBpC+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Biju,
 
 On Fri, Jun 2, 2017 at 6:22 PM, Biju Das <biju.das@bp.renesas.com> wrote:
-> Document the iW-RainboW-G20D-Qseven-RZG1M device tree bindings,
-> listing it as a supported board.
->
-> This allows to use checkpatch.pl to validate .dts files referring to the
-> iW-RainboW-G20D-Qseven-RZG1M board.
+> Add support for iWave RZG1M Qseven System On Module.
+> http://www.iwavesystems.com/rz-g1m-qseven-module.html
 
 Thanks for your patch!
 
 > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
 > Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
+> @@ -0,0 +1,27 @@
+> +/*
+> + * Device Tree Source for the iWave-RZG1M-20M Qseven SOM
+> + *
+> + * Copyright (C) 2017 Renesas Electronics Corp.
+> + *
+> + * This file is licensed under the terms of the GNU General Public License
+> + * version 2.  This program is licensed "as is" without any warranty of any
+> + * kind, whether express or implied.
+> + */
+> +
+> +#include "r8a7743.dtsi"
+> +
+> +/ {
 
-> --- a/Documentation/devicetree/bindings/arm/shmobile.txt
-> +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-> @@ -69,6 +69,8 @@ Boards:
->      compatible = "renesas,kzm9d", "renesas,emev2"
->    - Kyoto Microcomputer Co. KZM-A9-GT
->      compatible = "renesas,kzm9g", "renesas,sh73a0"
-> +  - iWave Systems RZ/G1M Qseven Development Platform (iW-RainboW-G20D-Qseven)
-> +    compatible = "iwave,g20d", "renesas,r8a7743"
+Given this is a sub-board with many other components, I think it should have
+its own (documented) compatible value, e.g.
 
-Please keep the list sorted alphabetically.
+    compatible = "iwave,g20m", "renesas,r8a7743";
 
->    - Lager (RTP0RC7790SEB00010S)
->      compatible = "renesas,lager", "renesas,r8a7790"
->    - M3ULCB (R-Car Starter Kit Pro, RTP0RC7796SKB00010S)
+> +       memory at 40000000 {
+> +               device_type = "memory";
+> +               reg = <0 0x40000000 0 0x20000000>;
+> +       };
+> +
+> +       memory at 200000000 {
+> +               device_type = "memory";
+> +               reg = <2 0x00000000 0 0x20000000>;
+> +       };
+> +};
 
 Gr{oetje,eeting}s,
 
