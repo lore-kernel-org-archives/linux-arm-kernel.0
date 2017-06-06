@@ -1,30 +1,33 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 6 Jun 2017 18:34:53 +0200
-Subject: [PATCH v4 05/28] clocksource: owl: Add S900 support
-In-Reply-To: <20170606005426.26446-6-afaerber@suse.de>
-References: <20170606005426.26446-1-afaerber@suse.de>
- <20170606005426.26446-6-afaerber@suse.de>
-Message-ID: <20170606163453.GE2345@mai>
+Date: Tue, 6 Jun 2017 18:48:17 +0200
+Subject: [PATCH v2] clockevents/tcb_clksrc: implement suspend/resume
+In-Reply-To: <20170512182251.23948-1-alexandre.belloni@free-electrons.com>
+References: <20170512182251.23948-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20170606164817.GF2345@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 06, 2017 at 02:54:03AM +0200, Andreas F?rber wrote:
-> The Actions Semi S900 SoC provides four 32-bit timers, TIMER0/1/2/3,
-> but no 2Hz timers.
+On Fri, May 12, 2017 at 08:22:51PM +0200, Alexandre Belloni wrote:
+> On sama5d2, power to the core may be cut while entering suspend mode. It is
+> necessary to save and restore the TCB registers.
 > 
-> An S900 datasheet can be found in 96Boards documentation:
-> https://github.com/96boards/documentation/blob/master/ConsumerEdition/Bubblegum-96/HardwareDocs/SoC_bubblegum96.pdf
-> 
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > ---
+> Changes in v2:
+>  - use writel instead of __raw_writel
+>  - Document sequence
+>  - use ARRAY_SIZE(tcb_cache) instead of 3
+> 
+>  drivers/clocksource/tcb_clksrc.c | 51 ++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 51 insertions(+)
+> 
+> diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Hi,
 
+what should I do with this patch as the patched file is supposed to be removed
+[1]. 
 
--- 
+  -- Daniel
 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+[1]?https://www.spinics.net/lists/kernel/msg2520390.html
