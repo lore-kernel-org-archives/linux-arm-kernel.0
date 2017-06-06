@@ -1,31 +1,41 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 6 Jun 2017 11:06:03 +0200
-Subject: [PATCH] arm64: dts: marvell: 8040-mcbin: Enable 1GB Ethernet
-In-Reply-To: <20170606110234.239d2c4a@free-electrons.com>
-References: <20170605200107.7692-1-marc.zyngier@arm.com>
- <20170606110234.239d2c4a@free-electrons.com>
-Message-ID: <20170606110603.2dafb7ed@free-electrons.com>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Tue,  6 Jun 2017 16:51:41 +0800
+Subject: [PATCH v4 6/8] regulator: hi6421: Describe consumed platform device
+In-Reply-To: <20170606085143.13154-1-guodong.xu@linaro.org>
+References: <20170606085143.13154-1-guodong.xu@linaro.org>
+Message-ID: <20170606085143.13154-7-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The hi6421-regulator driver consumes a similarly named platform device.
+Adding that to the module device table, allows modprobe to locate this
+driver once the device is created.
 
-On Tue, 6 Jun 2017 11:02:34 +0200, Thomas Petazzoni wrote:
+Cc: Jeremy Linton <lintonrjeremy@gmail.com>
+Cc: Mark Brown <broonie@kernel.org>
+Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+---
+ drivers/regulator/hi6421-regulator.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-> This patch is somewhat redundant with
-> https://patchwork.kernel.org/patch/9728207/, which despite the flaming
-> discussion that followed, does the same thing (and more).
-
-That being said, the patch from Marcin was also enabling SDHCI, which
-has already been enabled in the mean time by a patch from Russell.
-
-So perhaps we should indeed keep Marc's patch, enabling just the 1GB
-Ethernet interface.
-
-Best regards,
-
-Thomas
+diff --git a/drivers/regulator/hi6421-regulator.c b/drivers/regulator/hi6421-regulator.c
+index 62c5f54..259c3a8 100644
+--- a/drivers/regulator/hi6421-regulator.c
++++ b/drivers/regulator/hi6421-regulator.c
+@@ -621,7 +621,14 @@ static int hi6421_regulator_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct platform_device_id hi6421_regulator_table[] = {
++	{ .name = "hi6421-regulator" },
++	{},
++};
++MODULE_DEVICE_TABLE(platform, hi6421_regulator_table);
++
+ static struct platform_driver hi6421_regulator_driver = {
++	.id_table = hi6421_regulator_table,
+ 	.driver = {
+ 		.name	= "hi6421-regulator",
+ 	},
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.10.2
