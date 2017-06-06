@@ -1,28 +1,82 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 6 Jun 2017 11:02:34 +0200
-Subject: [PATCH] arm64: dts: marvell: 8040-mcbin: Enable 1GB Ethernet
-In-Reply-To: <20170605200107.7692-1-marc.zyngier@arm.com>
-References: <20170605200107.7692-1-marc.zyngier@arm.com>
-Message-ID: <20170606110234.239d2c4a@free-electrons.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Tue, 6 Jun 2017 11:04:31 +0200
+Subject: [PATCH v5 12/20] ARM: dts: uniphier: Add generic compatible
+ string for I2C EEPROM
+In-Reply-To: <CAK7LNATDvesYLKimY=aKfT6kAiidq6Ufd=kCWGQcCZ_Xy-27tw@mail.gmail.com>
+References: <20170523133448.4794-1-javier@dowhile0.org>
+ <20170523133448.4794-13-javier@dowhile0.org>
+ <CAK7LNATDvesYLKimY=aKfT6kAiidq6Ufd=kCWGQcCZ_Xy-27tw@mail.gmail.com>
+Message-ID: <CABxcv=mPzDVTh_ZH1VtuHMUhVrR+hxz8GwcQT38hwJJqHY+fJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hello Masahiro,
 
-On Mon,  5 Jun 2017 21:01:07 +0100, Marc Zyngier wrote:
-> Enable the 1GB Ethernet interface that lives on the slave CP110,
-> with its corresponding phy (that oddly lives on the master CP110).
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On Mon, Jun 5, 2017 at 7:13 AM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+> Hi.
+>
+> 2017-05-23 22:34 GMT+09:00 Javier Martinez Canillas <javier@dowhile0.org>:
+>> The at24 driver allows to register I2C EEPROM chips using different vendor
+>> and devices, but the I2C subsystem does not take the vendor into account
+>> when matching using the I2C table since it only has device entries.
+>>
+>> But when matching using an OF table, both the vendor and device has to be
+>> taken into account so the driver defines only a set of compatible strings
+>> using the "atmel" vendor as a generic fallback for compatible I2C devices.
+>>
+>> So add this generic fallback to the device node compatible string to make
+>> the device to match the driver using the OF device ID table.
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
+>>
+>> ---
+>>
+>> Changes in v5:
+>> - Only replace atmel variant but keep other EEPROM vendors (Geert Uytterhoeven).
+>>
+>> Changes in v4:
+>> - Only use the atmel manufacturer in the compatible string instead of
+>>   keeping the deprecated ones (Rob Herring).
+>>
+>> Changes in v3: None
+>> Changes in v2: None
+>>
+>>  arch/arm/boot/dts/uniphier-pro4-ace.dts    | 2 +-
+>>  arch/arm/boot/dts/uniphier-pro4-sanji.dts  | 2 +-
+>>  arch/arm/boot/dts/uniphier-pxs2-gentil.dts | 2 +-
+>>  3 files changed, 3 insertions(+), 3 deletions(-)
+>
+>
+> Why didn't you touch
+> arch/arm/boot/dts/uniphier-ref-daughter.dtsi ?
+>
 
-This patch is somewhat redundant with
-https://patchwork.kernel.org/patch/9728207/, which despite the flaming
-discussion that followed, does the same thing (and more).
+Because the compatible string "microchip,24lc128" used by the I2C
+EEPROM node on that DTS is not supported by the
+drivers/misc/eeprom/at24.c driver (in fact the only occurrence for
+24lc128 I see is in that DTS).
+
+Maybe is a typo and it should be "microchip,24c128" instead ? In any
+case, I think this should be fixed as a separate patch and is out of
+scope for this series.
+
+>
+>
+> BTW, has the driver change merged?
+>
+
+No, it hasn't been merged yet but there's no strict order in which the
+changes should be picked so the DTS patches can be applied
+independently. I haven't had feedback from Wolfram yet, but he was the
+one who suggested this and so I guess he will be Ok with the driver
+changes.
+
+>
+>
+> --
+> Best Regards
+> Masahiro Yamada
 
 Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Javier
