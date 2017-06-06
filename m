@@ -1,82 +1,45 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 6 Jun 2017 14:06:56 +0200
-Subject: [PATCH v2 12/25] KVM: arm64: Enable GICv3 Group-1 sysreg
- trapping via command-line
-In-Reply-To: <20170601102117.17750-13-marc.zyngier@arm.com>
-References: <20170601102117.17750-1-marc.zyngier@arm.com>
- <20170601102117.17750-13-marc.zyngier@arm.com>
-Message-ID: <20170606120656.GN9464@cbox>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 6 Jun 2017 14:10:25 +0200
+Subject: [PATCH] arm64: dts: marvell: 8040-mcbin: Enable 1GB Ethernet
+In-Reply-To: <3e387cee-0107-8c29-d99a-abd61bdef9c2@arm.com>
+References: <20170605200107.7692-1-marc.zyngier@arm.com>
+ <20170605211639.GB9339@lunn.ch>
+ <3e387cee-0107-8c29-d99a-abd61bdef9c2@arm.com>
+Message-ID: <20170606121025.GD18198@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 01, 2017 at 11:21:04AM +0100, Marc Zyngier wrote:
-> Now that we're able to safely handle Group-1 sysreg access, let's
-> give the user the opportunity to enable it by passing a specific
-> command-line option (vgic_v3.group1_trap).
+On Tue, Jun 06, 2017 at 09:21:58AM +0100, Marc Zyngier wrote:
+> Hi Andrew,
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  virt/kvm/arm/hyp/vgic-v3-sr.c |  6 +++++-
->  virt/kvm/arm/vgic/vgic-v3.c   | 11 +++++++++++
->  2 files changed, 16 insertions(+), 1 deletion(-)
+> On 05/06/17 22:16, Andrew Lunn wrote:
+> >> +&cps_eth1 {
+> >> +	status = "okay";
+> >> +	phy = <&phy0>;
+> >> +	phy-mode = "sgmii";
+> >> +};
+> > 
+> > Hi Marc
+> > 
+> > Documentation/devicetree/bindings/net/ethernet.txt says:
+> > 
+> > - phy-handle: phandle, specifies a reference to a node representing a PHY
+> >   device; this property is described in ePAPR and so preferred;
+> > - phy: the same as "phy-handle" property, not recommended for new bindings.
 > 
-> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> index 8973bad35748..42ac9ee7650a 100644
-> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> @@ -334,7 +334,11 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
->  		for (i = 0; i < used_lrs; i++)
->  			__gic_v3_set_lr(cpu_if->vgic_lr[i], i);
->  	} else {
-> -		/* Always write ICH_HCR_EL2 to enable trapping */
-> +		/*
-> +                 * If we don't have any interrupt to inject, but that
-> +		 * trapping is enabled, write the ICH_HCR_EL2 config
-> +		 * anyway.
-> +		 */
+> Happy to amend the patch, though armada-8040-db.dts is already using
+> "phy" (and not "phy-handle"). Should that one be fixed as well in the
+> name of consistency? Also,
+> Documentation/devicetree/bindings/net/marvell-pp2.txt only mentions the
+> "phy" property. If feels a bit odd not to at least recommend the new
+> property in the binding documentation.
 
-nit: Whitespace and grammar issues, and maybe this hunk was supposed to
-be in the last patch?
+Ah. As Russell pointed out, parsing this property is done by the
+driver, not a central helper. mvpp2 only supports phy, not phy-handle.
+This is not a new binding, it has been around since the middle of
+2014. So "phy" is O.K.
 
->  		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
->  			write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
->  	}
-> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> index fbd678bc046d..a16769276efd 100644
-> --- a/virt/kvm/arm/vgic/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> @@ -416,6 +416,12 @@ int vgic_v3_map_resources(struct kvm *kvm)
->  
->  DEFINE_STATIC_KEY_FALSE(vgic_v3_cpuif_trap);
->  
-> +static int __init early_group1_trap_cfg(char *buf)
-> +{
-> +	return strtobool(buf, &group1_trap);
-> +}
-> +early_param("vgic_v3.group1_trap", early_group1_trap_cfg);
-> +
+Sometime in the future, it would be nice to centralise the parsing of
+this and phy-mode.
 
-this shouldn't be named something with KVM (we're not going to trap
-anything on the host somehow are we?)?
-
->  /**
->   * vgic_v3_probe - probe for a GICv3 compatible interrupt controller in DT
->   * @node:	pointer to the DT node
-> @@ -467,6 +473,11 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
->  	if (kvm_vgic_global_state.vcpu_base == 0)
->  		kvm_info("disabling GICv2 emulation\n");
->  
-> +	if (group1_trap) {
-> +		kvm_info("GICv3 sysreg trapping enabled (reduced performance)\n");
-> +		static_branch_enable(&vgic_v3_cpuif_trap);
-> +	}
-> +
->  	kvm_vgic_global_state.vctrl_base = NULL;
->  	kvm_vgic_global_state.type = VGIC_V3;
->  	kvm_vgic_global_state.max_gic_vcpus = VGIC_V3_MAX_CPUS;
-> -- 
-> 2.11.0
-> 
-
-Thanks,
--Christoffer
+     Andrew
