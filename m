@@ -1,36 +1,31 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 6 Jun 2017 16:32:12 +0100
-Subject: [PATCH 00/10] irqchip: sunxi-nmi: Cleanups and fix A31 R_INTC
- register offset
-In-Reply-To: <20170606055932.22548-1-wens@csie.org>
-References: <20170606055932.22548-1-wens@csie.org>
-Message-ID: <5b984efe-100c-67f9-4ff4-e03ab5366182@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 6 Jun 2017 17:32:17 +0200
+Subject: [PATCH v2 3/5] ARM: shmobile: document
+ iW-RainboW-G20D-Qseven-RZG1M board
+In-Reply-To: <1496761818-62126-4-git-send-email-biju.das@bp.renesas.com>
+References: <1496420523-23506-4-git-send-email-biju.das@bp.renesas.com>
+ <1496761818-62126-1-git-send-email-biju.das@bp.renesas.com>
+ <1496761818-62126-4-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <CAMuHMdVTWYi727Cp_iDmEv5WGTmfiHYqjCuJodAvObL3GNvK4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/17 06:59, Chen-Yu Tsai wrote:
-> Hi everyone,
-> 
-> This is an alternative to Icenowy's recent A64 R_INTC patches.
-> 
-> This is a two part series. The first four patches clean up the existing
-> sunxi-nmi driver. Patches five and six add a new "sun6i-a31-r-intc"
-> compatible, which mainly adjusts or removes the awkward register region
-> offset the old "sun6i-a31-sc-nmi" compatible needed. The remaining
-> patches fix or add device nodes for SoC's having this hardware.
-> 
-> Using "sun6i-a31-r-intc" introduced in this series, instead of Icenowy's
-> "sun50i-a64-r-intc" is preferred. This follows our policy of naming
-> hardware blocks and compatibles after their first occurrence.
-> 
-> The first six patches should go through the irqchip tree, while we
-> (sunxi) can take the device tree changes after the driver has been
-> merged, to avoid breaking linux-next as a whole.
+On Tue, Jun 6, 2017 at 5:10 PM, Biju Das <biju.das@bp.renesas.com> wrote:
+> Document the iW-RainboW-G20D-Qseven-RZG1M device tree bindings,
+> listing it as a supported board.
+>
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
 
-So should I drop the original two patches and take those six instead?
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Thanks,
+Gr{oetje,eeting}s,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
