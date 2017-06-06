@@ -1,70 +1,50 @@
-From: daniel@iogearbox.net (Daniel Borkmann)
-Date: Tue, 06 Jun 2017 11:50:51 +0200
-Subject: [PATCH net-next] bpf, arm64: implement jiting of BPF_XADD
-In-Reply-To: <20170602120212.GF6371@arm.com>
-References: <47ce6fc238596120f02fb6c7116f05b30be2f377.1493599299.git.daniel@iogearbox.net>
- <20170602120212.GF6371@arm.com>
-Message-ID: <59367AFB.6060703@iogearbox.net>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue,  6 Jun 2017 11:57:15 +0200
+Subject: [PATCH] arm64: dts: marvell: cp110: add required clocks for mdio
+ interface
+Message-ID: <1496743035-4618-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+From: Russell King <rmk+kernel@armlinux.org.uk>
 
-(Sorry for the late reply, was offline for the last 6 days.)
+Add the three required clocks for the MDIO interface to be functional
+on Armada 8k platforms.  Without this, the CPU hangs, causing RCU
+stalls or the system to become unresponsive.
 
-> On Mon, May 01, 2017 at 02:57:20AM +0200, Daniel Borkmann wrote:
->> This work adds BPF_XADD for BPF_W/BPF_DW to the arm64 JIT and therefore
->> completes JITing of all BPF instructions, meaning we can thus also remove
->> the 'notyet' label and do not need to fall back to the interpreter when
->> BPF_XADD is used in a program!
->>
->> This now also brings arm64 JIT in line with x86_64, s390x, ppc64, sparc64,
->> where all current eBPF features are supported.
->>
->> BPF_W example from test_bpf:
->>
->>    .u.insns_int = {
->>      BPF_ALU32_IMM(BPF_MOV, R0, 0x12),
->>      BPF_ST_MEM(BPF_W, R10, -40, 0x10),
->>      BPF_STX_XADD(BPF_W, R10, R0, -40),
->>      BPF_LDX_MEM(BPF_W, R0, R10, -40),
->>      BPF_EXIT_INSN(),
->>    },
->>
->>    [...]
->>    00000020:  52800247  mov w7, #0x12 // #18
->>    00000024:  928004eb  mov x11, #0xffffffffffffffd8 // #-40
->>    00000028:  d280020a  mov x10, #0x10 // #16
->>    0000002c:  b82b6b2a  str w10, [x25,x11]
->>    // start of xadd mapping:
->>    00000030:  928004ea  mov x10, #0xffffffffffffffd8 // #-40
->>    00000034:  8b19014a  add x10, x10, x25
->>    00000038:  f9800151  prfm pstl1strm, [x10]
->>    0000003c:  885f7d4b  ldxr w11, [x10]
->>    00000040:  0b07016b  add w11, w11, w7
->>    00000044:  880b7d4b  stxr w11, w11, [x10]
->
-> This form of STXR (where s == t) is CONSTRAINED UNPREDICTABLE per the
-> architecture; you need to use separate registers for the data and the
-> status flag. You might also be interested in the atomic instructions
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+[Thomas:
+ - remove mg_core_clock, since it's a parent of mg_clock
+ - also add clock references to the slave CP mdio instance]
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 1 +
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 1 +
+ 2 files changed, 2 insertions(+)
 
-Thanks! I tried to find some information on this in the reference
-guide, but seems I must have overlooked something; should have been
-conservative instead. I will send a fix for it later today.
-
-> introduced in ARMv8.1, which includes the LDADD instruction. You can
-> check elf_hwcap & HWCAP_ATOMICS to see if it's supported.
-
-Will take a look on this as well, thanks for letting me know.
-
-> Also, did we get a conclusion on the barrier semantics for this? Currently
-> you don't have any here: is that ok?
-
-As a basis I took the disasm back then for the atomic_add() /
-atomic64_add(), which, iirc, was mapping to ATOMIC_OP() in
-atomic_ll_sc.h. This should be equivalent to what the interpreter
-does in __bpf_prog_run() for the insns BPF_STX | BPF_XADD | BPF_W
-and BPF_STX | BPF_XADD | BPF_DW.
-
-Thanks,
-Daniel
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+index 00af338..c33e891 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+@@ -95,6 +95,7 @@
+ 				#size-cells = <0>;
+ 				compatible = "marvell,orion-mdio";
+ 				reg = <0x12a200 0x10>;
++				clocks = <&cpm_syscon0 1 9>, <&cpm_syscon0 1 5>;
+ 			};
+ 
+ 			cpm_icu: interrupt-controller at 1e0000 {
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+index bee48ae..2a99ff8 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+@@ -100,6 +100,7 @@
+ 				#size-cells = <0>;
+ 				compatible = "marvell,orion-mdio";
+ 				reg = <0x12a200 0x10>;
++				clocks = <&cps_syscon0 1 9>, <&cps_syscon0 1 5>;
+ 			};
+ 
+ 			cps_icu: interrupt-controller at 1e0000 {
+-- 
+2.7.4
