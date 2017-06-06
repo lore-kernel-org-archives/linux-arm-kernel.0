@@ -1,33 +1,150 @@
 From: ruxandra.radulescu@nxp.com (Ioana Radulescu)
-Date: Tue, 6 Jun 2017 10:00:26 -0500
-Subject: [PATCH 03/18] staging: fsl-dpaa2/eth: Fix return type of
- ndo_start_xmit
+Date: Tue, 6 Jun 2017 10:00:35 -0500
+Subject: [PATCH 12/18] staging: fsl-dpaa2/eth: Add accessor for FAS field
 In-Reply-To: <20170606150041.10955-1-ruxandra.radulescu@nxp.com>
 References: <20170606150041.10955-1-ruxandra.radulescu@nxp.com>
-Message-ID: <20170606150041.10955-4-ruxandra.radulescu@nxp.com>
+Message-ID: <20170606150041.10955-13-ruxandra.radulescu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ndo_start_xmit() returns a value of type netdev_tx_t. Update
-our ndo function to use the correct type.
+Introduce a helper macro for accessing the frame annotation
+status field in a frame buffer.
 
 Signed-off-by: Ioana Radulescu <ruxandra.radulescu@nxp.com>
 ---
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c | 31 ++++++++++++--------------
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h |  6 +++++
+ 2 files changed, 20 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-index f0ef3a7c0f73..a9e245df2488 100644
+index 025b5f6559a4..d81c56f4d859 100644
 --- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
 +++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-@@ -551,7 +551,7 @@ static void free_tx_fd(const struct dpaa2_eth_priv *priv,
- 	dev_kfree_skb(skb);
- }
+@@ -227,6 +227,7 @@ static void dpaa2_eth_rx(struct dpaa2_eth_priv *priv,
+ 	struct dpaa2_eth_drv_stats *percpu_extras;
+ 	struct device *dev = priv->net_dev->dev.parent;
+ 	struct dpaa2_fas *fas;
++	void *buf_data;
+ 	u32 status = 0;
  
--static int dpaa2_eth_tx(struct sk_buff *skb, struct net_device *net_dev)
-+static netdev_tx_t dpaa2_eth_tx(struct sk_buff *skb, struct net_device *net_dev)
+ 	/* Tracing point */
+@@ -235,8 +236,10 @@ static void dpaa2_eth_rx(struct dpaa2_eth_priv *priv,
+ 	vaddr = dpaa2_iova_to_virt(priv->iommu_domain, addr);
+ 	dma_unmap_single(dev, addr, DPAA2_ETH_RX_BUF_SIZE, DMA_FROM_DEVICE);
+ 
+-	prefetch(vaddr + priv->buf_layout.private_data_size);
+-	prefetch(vaddr + dpaa2_fd_get_offset(fd));
++	fas = dpaa2_get_fas(vaddr);
++	prefetch(fas);
++	buf_data = vaddr + dpaa2_fd_get_offset(fd);
++	prefetch(buf_data);
+ 
+ 	percpu_stats = this_cpu_ptr(priv->percpu_stats);
+ 	percpu_extras = this_cpu_ptr(priv->percpu_extras);
+@@ -244,9 +247,7 @@ static void dpaa2_eth_rx(struct dpaa2_eth_priv *priv,
+ 	if (fd_format == dpaa2_fd_single) {
+ 		skb = build_linear_skb(priv, ch, fd, vaddr);
+ 	} else if (fd_format == dpaa2_fd_sg) {
+-		struct dpaa2_sg_entry *sgt =
+-				vaddr + dpaa2_fd_get_offset(fd);
+-		skb = build_frag_skb(priv, ch, sgt);
++		skb = build_frag_skb(priv, ch, buf_data);
+ 		skb_free_frag(vaddr);
+ 		percpu_extras->rx_sg_frames++;
+ 		percpu_extras->rx_sg_bytes += dpaa2_fd_get_len(fd);
+@@ -262,8 +263,6 @@ static void dpaa2_eth_rx(struct dpaa2_eth_priv *priv,
+ 
+ 	/* Check if we need to validate the L4 csum */
+ 	if (likely(dpaa2_fd_get_frc(fd) & DPAA2_FD_FRC_FASV)) {
+-		fas = (struct dpaa2_fas *)
+-				(vaddr + priv->buf_layout.private_data_size);
+ 		status = le32_to_cpu(fas->status);
+ 		validate_rx_csum(priv, status, skb);
+ 	}
+@@ -327,7 +326,6 @@ static int build_sg_fd(struct dpaa2_eth_priv *priv,
  {
- 	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
- 	struct dpaa2_fd fd;
+ 	struct device *dev = priv->net_dev->dev.parent;
+ 	void *sgt_buf = NULL;
+-	void *hwa;
+ 	dma_addr_t addr;
+ 	int nr_frags = skb_shinfo(skb)->nr_frags;
+ 	struct dpaa2_sg_entry *sgt;
+@@ -337,6 +335,7 @@ static int build_sg_fd(struct dpaa2_eth_priv *priv,
+ 	int num_sg;
+ 	int num_dma_bufs;
+ 	struct dpaa2_eth_swa *swa;
++	struct dpaa2_fas *fas;
+ 
+ 	/* Create and map scatterlist.
+ 	 * We don't advertise NETIF_F_FRAGLIST, so skb_to_sgvec() will not have
+@@ -373,8 +372,8 @@ static int build_sg_fd(struct dpaa2_eth_priv *priv,
+ 	 * on TX confirmation. We are clearing FAS (Frame Annotation Status)
+ 	 * field from the hardware annotation area
+ 	 */
+-	hwa = sgt_buf + priv->buf_layout.private_data_size;
+-	memset(hwa + DPAA2_FAS_OFFSET, 0, DPAA2_FAS_SIZE);
++	fas = dpaa2_get_fas(sgt_buf);
++	memset(fas, 0, DPAA2_FAS_SIZE);
+ 
+ 	sgt = (struct dpaa2_sg_entry *)(sgt_buf + priv->tx_data_offset);
+ 
+@@ -433,7 +432,7 @@ static int build_single_fd(struct dpaa2_eth_priv *priv,
+ {
+ 	struct device *dev = priv->net_dev->dev.parent;
+ 	u8 *buffer_start;
+-	void *hwa;
++	struct dpaa2_fas *fas;
+ 	struct sk_buff **skbh;
+ 	dma_addr_t addr;
+ 
+@@ -446,8 +445,8 @@ static int build_single_fd(struct dpaa2_eth_priv *priv,
+ 	 * on TX confirmation. We are clearing FAS (Frame Annotation Status)
+ 	 * field from the hardware annotation area
+ 	 */
+-	hwa = buffer_start + priv->buf_layout.private_data_size;
+-	memset(hwa + DPAA2_FAS_OFFSET, 0, DPAA2_FAS_SIZE);
++	fas = dpaa2_get_fas(buffer_start);
++	memset(fas, 0, DPAA2_FAS_SIZE);
+ 
+ 	/* Store a backpointer to the skb at the beginning of the buffer
+ 	 * (in the private data area) such that we can release it
+@@ -498,6 +497,7 @@ static void free_tx_fd(const struct dpaa2_eth_priv *priv,
+ 
+ 	fd_addr = dpaa2_fd_get_addr(fd);
+ 	skbh = dpaa2_iova_to_virt(priv->iommu_domain, fd_addr);
++	fas = dpaa2_get_fas(skbh);
+ 
+ 	if (fd_format == dpaa2_fd_single) {
+ 		skb = *skbh;
+@@ -534,11 +534,8 @@ static void free_tx_fd(const struct dpaa2_eth_priv *priv,
+ 	 * buffer but before we free it. The caller function is responsible
+ 	 * for checking the status value.
+ 	 */
+-	if (status && (dpaa2_fd_get_frc(fd) & DPAA2_FD_FRC_FASV)) {
+-		fas = (struct dpaa2_fas *)
+-			((void *)skbh + priv->buf_layout.private_data_size);
++	if (status && (dpaa2_fd_get_frc(fd) & DPAA2_FD_FRC_FASV))
+ 		*status = le32_to_cpu(fas->status);
+-	}
+ 
+ 	/* Free SGT buffer kmalloc'ed on tx */
+ 	if (fd_format != dpaa2_fd_single)
+diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
+index 539da71470d9..6462e2cbe4be 100644
+--- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
++++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
+@@ -139,6 +139,12 @@ struct dpaa2_fas {
+ #define DPAA2_FAS_OFFSET		0
+ #define DPAA2_FAS_SIZE			(sizeof(struct dpaa2_fas))
+ 
++/* Accessors for the hardware annotation fields that we use */
++#define dpaa2_get_hwa(buf_addr) \
++	((void *)(buf_addr) + DPAA2_ETH_SWA_SIZE)
++#define dpaa2_get_fas(buf_addr) \
++	(struct dpaa2_fas *)(dpaa2_get_hwa(buf_addr) + DPAA2_FAS_OFFSET)
++
+ /* Error and status bits in the frame annotation status word */
+ /* Debug frame, otherwise supposed to be discarded */
+ #define DPAA2_FAS_DISC			0x80000000
 -- 
 2.11.0
