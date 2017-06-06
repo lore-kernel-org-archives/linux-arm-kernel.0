@@ -1,32 +1,46 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Tue, 6 Jun 2017 20:39:33 +0200
-Subject: [PATCH v2 3/4] net: macb: macb.c changed to macb_main.c
-In-Reply-To: <1496413661-21452-1-git-send-email-rafalo@cadence.com>
-References: <1496413439-12900-1-git-send-email-rafalo@cadence.com>
- <1496413661-21452-1-git-send-email-rafalo@cadence.com>
-Message-ID: <20170606183933.GA1205@localhost.localdomain>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 6 Jun 2017 20:47:13 +0200
+Subject: [PATCH 00/10] irqchip: sunxi-nmi: Cleanups and fix A31 R_INTC
+ register offset
+In-Reply-To: <20170606055932.22548-1-wens@csie.org>
+References: <20170606055932.22548-1-wens@csie.org>
+Message-ID: <20170606184713.4qxvap65o33rkzwz@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 02, 2017 at 03:27:41PM +0100, Rafal Ozieblo wrote:
->  drivers/net/ethernet/cadence/macb.c      | 3568 ------------------------------
->  drivers/net/ethernet/cadence/macb_main.c | 3568 ++++++++++++++++++++++++++++++
+On Tue, Jun 06, 2017 at 01:59:22PM +0800, Chen-Yu Tsai wrote:
+> Hi everyone,
+> 
+> This is an alternative to Icenowy's recent A64 R_INTC patches.
+> 
+> This is a two part series. The first four patches clean up the existing
+> sunxi-nmi driver. Patches five and six add a new "sun6i-a31-r-intc"
+> compatible, which mainly adjusts or removes the awkward register region
+> offset the old "sun6i-a31-sc-nmi" compatible needed. The remaining
+> patches fix or add device nodes for SoC's having this hardware.
+> 
+> Using "sun6i-a31-r-intc" introduced in this series, instead of Icenowy's
+> "sun50i-a64-r-intc" is preferred. This follows our policy of naming
+> hardware blocks and compatibles after their first occurrence.
+> 
+> The first six patches should go through the irqchip tree, while we
+> (sunxi) can take the device tree changes after the driver has been
+> merged, to avoid breaking linux-next as a whole.
 
-You deleted macb.c, and so ...
+For the whole serie:
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-> diff --git a/drivers/net/ethernet/cadence/Makefile b/drivers/net/ethernet/cadence/Makefile
-> index 4ba7559..31ea6e3 100644
-> --- a/drivers/net/ethernet/cadence/Makefile
-> +++ b/drivers/net/ethernet/cadence/Makefile
-> @@ -1,6 +1,7 @@
->  #
->  # Makefile for the Atmel network device drivers.
->  #
-> +macb-y	:= macb_main.o
->  
->  obj-$(CONFIG_MACB) += macb.o
+Thanks!
+Maxime
 
-how does this rule make sense any more?
-
-Thanks,
-Richard
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170606/7ea66f24/attachment.sig>
