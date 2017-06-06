@@ -1,76 +1,146 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 6 Jun 2017 21:54:11 +0800
-Subject: [PATCH 5/5] ARM: sun8i: a83t: add dwmac-sun8i ethernet driver
-In-Reply-To: <20170605192130.25320-6-clabbe.montjoie@gmail.com>
-References: <20170605192130.25320-1-clabbe.montjoie@gmail.com>
- <20170605192130.25320-6-clabbe.montjoie@gmail.com>
-Message-ID: <CAGb2v66jo7Fz2Uto_ymuwfHf1PXp2Q6gRRLb9N=tfvaJ=wPoqQ@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 6 Jun 2017 14:54:46 +0100
+Subject: [PATCH v4 4/8] mfd: hi6421-pmic: add support for HiSilicon
+ Hi6421v530
+In-Reply-To: <20170606085143.13154-5-guodong.xu@linaro.org>
+References: <20170606085143.13154-1-guodong.xu@linaro.org>
+ <20170606085143.13154-5-guodong.xu@linaro.org>
+Message-ID: <20170606135446.ceqow7bfdlhk4kuv@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 6, 2017 at 3:21 AM, Corentin Labbe
-<clabbe.montjoie@gmail.com> wrote:
-> The dwmac-sun8i is an ethernet MAC hardware that support 10/100/1000 speed.
-> This patch enable the dwmac-sun8i on the Allwinner a83t SoC Device-tree.
->
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+On Tue, 06 Jun 2017, Guodong Xu wrote:
+
+> Add support for HiSilicon Hi6421v530 PMIC. Hi6421v530 communicates with
+> main SoC via memory-mapped I/O.
+> 
+> Hi6421v530 and Hi6421 are PMIC chips from the same vendor, HiSilicon,
+> but at different revisions. They share the same memory-mapped I/O
+> design. They differ in integrated devices, such as regulator details,
+> LDO voltage points.
+> 
+> Signed-off-by: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
+> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
 > ---
->  arch/arm/boot/dts/sun8i-a83t.dtsi | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> index ae559dc42caa..304a966c8048 100644
-> --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> @@ -200,6 +200,14 @@
->                         #interrupt-cells = <3>;
->                         #gpio-cells = <3>;
->
-> +                       emac_rgmii_pins: emac0-pins {
+>  drivers/mfd/hi6421-pmic-core.c  | 68 ++++++++++++++++++++++++++++++-----------
+>  include/linux/mfd/hi6421-pmic.h |  5 +++
+>  2 files changed, 55 insertions(+), 18 deletions(-)
+> 
+> diff --git a/drivers/mfd/hi6421-pmic-core.c b/drivers/mfd/hi6421-pmic-core.c
+> index b1139d4..4568a43 100644
+> --- a/drivers/mfd/hi6421-pmic-core.c
+> +++ b/drivers/mfd/hi6421-pmic-core.c
 
-I prefer emac-rgmii-pins for the node name.
+[...]
 
-> +                               pins = "PD2", "PD3", "PD4", "PD5", "PD6", "PD7",
-> +                                      "PD11", "PD12", "PD13", "PD14", "PD18",
-> +                                      "PD19", "PD21", "PD22", "PD23";
-> +                               function = "gmac";
-> +                               drive-strength = <40>;
-> +                       };
+>  static int hi6421_pmic_probe(struct platform_device *pdev)
+>  {
+>  	struct hi6421_pmic *pmic;
+>  	struct resource *res;
+> +	const struct of_device_id *id;
+> +	const struct mfd_cell *subdevs;
+>  	void __iomem *base;
+> -	int ret;
+> +	int n_subdevs, ret;
 > +
->                         mmc0_pins: mmc0-pins {
->                                 pins = "PF0", "PF1", "PF2",
->                                        "PF3", "PF4", "PF5";
-> @@ -266,6 +274,26 @@
->                         status = "disabled";
->                 };
->
-> +               emac: ethernet at 1c30000 {
-> +                       compatible = "allwinner,sun8i-a83t-emac";
-> +                       syscon = <&syscon>;
-> +                       reg = <0x01c30000 0x104>;
-> +                       interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-> +                       interrupt-names = "macirq";
-> +                       resets = <&ccu 13>;
-> +                       reset-names = "stmmaceth";
-> +                       clocks = <&ccu 27>;
-> +                       clock-names = "stmmaceth";
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +                       status = "disabled";
+> +	id = of_match_device(of_hi6421_pmic_match, &pdev->dev);
+> +	if (!id)
+> +		return -EINVAL;
+>  
+>  	pmic = devm_kzalloc(&pdev->dev, sizeof(*pmic), GFP_KERNEL);
+>  	if (!pmic)
+> @@ -57,18 +80,33 @@ static int hi6421_pmic_probe(struct platform_device *pdev)
+>  		return PTR_ERR(pmic->regmap);
+>  	}
+>  
+> -	/* set over-current protection debounce 8ms */
+> -	regmap_update_bits(pmic->regmap, HI6421_OCP_DEB_CTRL_REG,
+> +	platform_set_drvdata(pdev, pmic);
 > +
-> +                       mdio: mdio {
-> +                               #address-cells = <1>;
-> +                               #size-cells = <0>;
-> +                       };
-> +               };
+> +	switch ((unsigned long)id->data) {
+
+Whilst this is not a blocker, it would be nicer to place this into a
+'type' variable, in order to clarify what data you are using.
+
+> +	case HI6421:
+> +		/* set over-current protection debounce 8ms */
+> +		regmap_update_bits(pmic->regmap, HI6421_OCP_DEB_CTRL_REG,
+>  				(HI6421_OCP_DEB_SEL_MASK
+>  				 | HI6421_OCP_EN_DEBOUNCE_MASK
+>  				 | HI6421_OCP_AUTO_STOP_MASK),
+>  				(HI6421_OCP_DEB_SEL_8MS
+>  				 | HI6421_OCP_EN_DEBOUNCE_ENABLE));
+>  
+> -	platform_set_drvdata(pdev, pmic);
+> +		subdevs = hi6421_devs;
+> +		n_subdevs = ARRAY_SIZE(hi6421_devs);
+> +		break;
+> +	case HI6421_V530:
+> +		subdevs = hi6421v530_devs;
+> +		n_subdevs = ARRAY_SIZE(hi6421v530_devs);
+> +		break;
+> +	default:
+> +		dev_err(&pdev->dev, "Unknown device type %ld\n",
+> +						(unsigned long)id->data);
+> +		return -EINVAL;
+> +	}
+>  
+> -	ret = devm_mfd_add_devices(&pdev->dev, 0, hi6421_devs,
+> -				   ARRAY_SIZE(hi6421_devs), NULL, 0, NULL);
+> +	ret = devm_mfd_add_devices(&pdev->dev, PLATFORM_DEVID_NONE,
+> +				   subdevs, n_subdevs, NULL, 0, NULL);
+>  	if (ret) {
+>  		dev_err(&pdev->dev, "Failed to add child devices: %d\n", ret);
+>  		return ret;
+> @@ -77,16 +115,10 @@ static int hi6421_pmic_probe(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> -static const struct of_device_id of_hi6421_pmic_match_tbl[] = {
+> -	{ .compatible = "hisilicon,hi6421-pmic", },
+> -	{ },
+> -};
+> -MODULE_DEVICE_TABLE(of, of_hi6421_pmic_match_tbl);
+> -
+>  static struct platform_driver hi6421_pmic_driver = {
+>  	.driver = {
+> -		.name	= "hi6421_pmic",
+> -		.of_match_table = of_hi6421_pmic_match_tbl,
+> +		.name = "hi6421_pmic",
+> +		.of_match_table = of_hi6421_pmic_match,
+>  	},
+>  	.probe	= hi6421_pmic_probe,
+>  };
+> diff --git a/include/linux/mfd/hi6421-pmic.h b/include/linux/mfd/hi6421-pmic.h
+> index 587273e..2457438 100644
+> --- a/include/linux/mfd/hi6421-pmic.h
+> +++ b/include/linux/mfd/hi6421-pmic.h
+> @@ -38,4 +38,9 @@ struct hi6421_pmic {
+>  	struct regmap		*regmap;
+>  };
+>  
+> +enum hi6421_type {
+> +	HI6421      = 1,
+> +	HI6421_V530 = 2,
+> +};
 > +
->                 gic: interrupt-controller at 1c81000 {
->                         compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
->                         reg = <0x01c81000 0x1000>,
-> --
-> 2.13.0
->
 
-Otherwise,
+As programmers we usually start counting at 0.  Then you can rely on
+the C standard to populate the remaining values.
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Something like:
+
+enum hi6421_type {
+	HI6421 = 0,
+	HI6421_V530,
+};
+
+... is more normal.
+
+>  #endif		/* __HI6421_PMIC_H */
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
