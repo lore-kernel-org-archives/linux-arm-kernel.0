@@ -1,92 +1,74 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 6 Jun 2017 16:43:32 +0800
-Subject: [PATCH v2 1/2] ACPICA: IORT: Update SMMU models for IORT rev. C
-In-Reply-To: <11ef7d28c535c01d42b7b3c8e632934f0e0f1048.1495459319.git.robin.murphy@arm.com>
-References: <11ef7d28c535c01d42b7b3c8e632934f0e0f1048.1495459319.git.robin.murphy@arm.com>
-Message-ID: <ec4eeffe-9333-fa89-d471-6c88d8d03435@linaro.org>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Tue,  6 Jun 2017 16:51:35 +0800
+Subject: [PATCH v4 0/8] MFD: add driver for HiSilicon Hi6421v530 PMIC
+Message-ID: <20170606085143.13154-1-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/5/22 23:06, Robin Murphy wrote:
-> IORT revision C has been published with a number of new SMMU
-> implementation identifiers. Since IORT doesn't have any way of falling
-> back to a more generic model code, we really need Linux to know about
-> these before vendors start updating their firmware tables to use them.
-> 
-> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
-> CC: Robert Moore <robert.moore@intel.com>
-> CC: Lv Zheng <lv.zheng@intel.com>
-> Acked-by: Robert Richter <rrichter@cavium.com>
-> Tested-by: Robert Richter <rrichter@cavium.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
-> 
-> v2: Update more comments, add Robert's tags.
-> 
-> I'm including this here as a kernel patch just for context - once I've
-> figured out how we actually submit patches to ACPICA directly, I'll do
-> that per the preferred process.
-> 
-> Robin.
-> 
->   include/acpi/actbl2.h | 12 ++++++++++--
->   1 file changed, 10 insertions(+), 2 deletions(-)
-> 
-> diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
-> index faa9f2c0d5de..f469ea41f2fd 100644
-> --- a/include/acpi/actbl2.h
-> +++ b/include/acpi/actbl2.h
-> @@ -663,7 +663,7 @@ struct acpi_ibft_target {
->    * IORT - IO Remapping Table
->    *
->    * Conforms to "IO Remapping Table System Software on ARM Platforms",
-> - * Document number: ARM DEN 0049B, October 2015
-> + * Document number: ARM DEN 0049C, May 2017
->    *
->    ******************************************************************************/
->   
-> @@ -778,6 +778,8 @@ struct acpi_iort_smmu {
->   #define ACPI_IORT_SMMU_V2               0x00000001	/* Generic SMMUv2 */
->   #define ACPI_IORT_SMMU_CORELINK_MMU400  0x00000002	/* ARM Corelink MMU-400 */
->   #define ACPI_IORT_SMMU_CORELINK_MMU500  0x00000003	/* ARM Corelink MMU-500 */
-> +#define ACPI_IORT_SMMU_CORELINK_MMU401  0x00000004	/* ARM Corelink MMU-401 */
-> +#define ACPI_IORT_SMMU_CAVIUM_SMMUV2    0x00000005	/* Cavium ThunderX SMMUv2 */
->   
->   /* Masks for Flags field above */
->   
-> @@ -798,13 +800,19 @@ struct acpi_iort_smmu_v3 {
->   	u32 flags;
->   	u32 reserved;
->   	u64 vatos_address;
-> -	u32 model;		/* O: generic SMMUv3 */
-> +	u32 model;
->   	u32 event_gsiv;
->   	u32 pri_gsiv;
->   	u32 gerr_gsiv;
->   	u32 sync_gsiv;
->   };
->   
-> +/* Values for Model field above */
-> +
-> +#define ACPI_IORT_SMMU_V3               0x00000000	/* Generic SMMUv3 */
-> +#define ACPI_IORT_SMMU_HISILICON_HI161X 0x00000001	/* HiSilicon Hi161x SMMUv3 */
-> +#define ACPI_IORT_SMMU_CAVIUM_CN99XX    0x00000002	/* Cavium CN99xx SMMUv3 */
-> +
->   /* Masks for Flags field above */
->   
->   #define ACPI_IORT_SMMU_V3_COHACC_OVERRIDE   (1)
-> 
+This patchset adds driver for HiSilicon Hi6421v530 PMIC.
 
-Looks good to me,
+Mainline kernel already has driver support to a similar chip, Hi6421.
+Hi6421 and Hi6421v530 are both from the same vendor, HiSilicon, but
+they are at different revisions. They both use the same Memory-mapped
+I/O method to communicate with Main SoC. However, they differ quite a
+lot in their regulator designs. Eg. they have completely different LDO
+voltage points.
 
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+Patch 1 and 2 are hi6421-pmic cleaning up.
+Patch 3 and 4 extends hi6421-pmic-core.c to support Hi6421v530 revision.
+Patch 5 add hi6421v530-regulator.c driver for LDO regulators.
+Patch 6 fixes an issue for hi6421 regulator, which is not related to v530
+         but it's found in this review.
+Patch 7 is dts change, it depends on and can be applied to hi3660/hikey960
+        patchset [1].
+Patch 8 enables the relevant config items.
 
-By the way, how will this patch be merged? There are pending patches
-on top of it, Rafael suggested to work with ACPICA upstream first [1],
-Robin, will work on that?
+[1], http://www.spinics.net/lists/devicetree/msg178303.html
 
-[1]: 
-https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1394295.html
+Major changes in v4:
+ - put hi6421-pmic cleanup in separate patches.
+ - solve review comments from Lee Johes.
+ - regulator-name should not have '/' character. Otherwise it "Failed to
+     create debugfs directory"
 
-Thanks
-Hanjun
+Major changes in v3:
+ - in hi6421-pmic-core.c
+    * use shorter license script.
+    * arrange #include in alphabetical order.
+    * using recommended error log messages from Lee Jones.
+ - in hi6421v530-regulator.c
+    * remove unused #include files
+    * arrange remaining ones in alphabetical order.
+
+Major changes in v2:
+ - instead of writing a new driver, extend hi6421-pmic-core.c
+     to support its v530 revision
+ - update hi6421v530-regulator.c to use modern regulator driver
+     design logics.
+
+Guodong Xu (6):
+  mfd: hi6421-pmic: cleanup: change license text to shorter form
+  mfd: hi6421-pmic: cleanup: update dev_err messages
+  dt-bindings: mfd: hi6421: Add hi6421v530 compatible string
+  mfd: hi6421-pmic: add support for HiSilicon Hi6421v530
+  regulator: hi6421: Describe consumed platform device
+  arm64: defconfig: enable support hi6421v530 PMIC
+
+Wang Xiaoyin (2):
+  regulator: hi6421v530: add driver for hi6421v530 voltage regulator
+  arm64: dts: hikey960: add device node for pmic and regulators
+
+ Documentation/devicetree/bindings/mfd/hi6421.txt  |   4 +-
+ arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts |  46 +++++
+ arch/arm64/configs/defconfig                      |   2 +
+ drivers/mfd/hi6421-pmic-core.c                    |  87 +++++----
+ drivers/regulator/Kconfig                         |  10 ++
+ drivers/regulator/Makefile                        |   1 +
+ drivers/regulator/hi6421-regulator.c              |   7 +
+ drivers/regulator/hi6421v530-regulator.c          | 207 ++++++++++++++++++++++
+ include/linux/mfd/hi6421-pmic.h                   |   5 +
+ 9 files changed, 336 insertions(+), 33 deletions(-)
+ create mode 100644 drivers/regulator/hi6421v530-regulator.c
+
+-- 
+2.10.2
