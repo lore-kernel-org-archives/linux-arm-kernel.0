@@ -1,40 +1,40 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 6 Jun 2017 14:58:18 +0100
-Subject: [RFC PATCH v2 4/6] arm64: signal: Allocate extra sigcontext
- space as needed
-In-Reply-To: <20170606113739.GF30160@e103592.cambridge.arm.com>
-References: <1492016239-19511-1-git-send-email-Dave.Martin@arm.com>
- <1492016495-19689-1-git-send-email-Dave.Martin@arm.com>
- <1492016495-19689-4-git-send-email-Dave.Martin@arm.com>
- <20170512165724.GB8387@e104818-lin.cambridge.arm.com>
- <20170515132442.GB3559@e103592.cambridge.arm.com>
- <20170523113019.GB5948@e104818-lin.cambridge.arm.com>
- <20170526113729.GO3559@e103592.cambridge.arm.com>
- <20170605141744.GB9163@e104818-lin.cambridge.arm.com>
- <20170606113739.GF30160@e103592.cambridge.arm.com>
-Message-ID: <20170606135815.GG30160@e103592.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 6 Jun 2017 14:58:29 +0100
+Subject: [PATCH v4 0/8] MFD: add driver for HiSilicon Hi6421v530 PMIC
+In-Reply-To: <CAK8P3a25o6HOFw4MWrsnKjHJf4YuO+UvGk+=f30LREnFHM3QwQ@mail.gmail.com>
+References: <20170606085143.13154-1-guodong.xu@linaro.org>
+ <CAK8P3a25o6HOFw4MWrsnKjHJf4YuO+UvGk+=f30LREnFHM3QwQ@mail.gmail.com>
+Message-ID: <20170606135829.dxi3mf7so4j5ml3q@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 06, 2017 at 12:37:53PM +0100, Dave Martin wrote:
-> On Mon, Jun 05, 2017 at 03:17:44PM +0100, Catalin Marinas wrote:
+On Tue, 06 Jun 2017, Arnd Bergmann wrote:
 
-[...]
-
-[extra_context.size]
-
-> > I'd rather have the time size_t or __u64 to avoid implicit padding.
+> On Tue, Jun 6, 2017 at 10:51 AM, Guodong Xu <guodong.xu@linaro.org> wrote:
+> > This patchset adds driver for HiSilicon Hi6421v530 PMIC.
+> >
+> > Mainline kernel already has driver support to a similar chip, Hi6421.
+> > Hi6421 and Hi6421v530 are both from the same vendor, HiSilicon, but
+> > they are at different revisions. They both use the same Memory-mapped
+> > I/O method to communicate with Main SoC. However, they differ quite a
+> > lot in their regulator designs. Eg. they have completely different LDO
+> > voltage points.
+> >
+> > Patch 1 and 2 are hi6421-pmic cleaning up.
+> > Patch 3 and 4 extends hi6421-pmic-core.c to support Hi6421v530 revision.
+> > Patch 5 add hi6421v530-regulator.c driver for LDO regulators.
+> > Patch 6 fixes an issue for hi6421 regulator, which is not related to v530
+> >          but it's found in this review.
+> > Patch 7 is dts change, it depends on and can be applied to hi3660/hikey960
+> >         patchset [1].
+> > Patch 8 enables the relevant config items.
 > 
-> Sure, it can be a u64.  I wanted to avoid the suggestion that the frame
-> should be that large, but 32 bits already allows it to be crazy large
-> anyway, so I don't think making it 32-bit helps.
+> Looks good to me,
 
-Actually, there is still implicit padding even with u64, since the total
-size is 16 bytes + sizeof(extra_context.size).
+Is that an Ack?
 
-Since u64 is much bigger then we'd ever want, and to avoid introducing
-new bugs, do you object to keeping size as u32 and adding explicit
-padding instead?
-
-Cheers
----Dave
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
