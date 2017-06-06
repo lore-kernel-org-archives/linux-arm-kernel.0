@@ -1,111 +1,44 @@
 From: ruxandra.radulescu@nxp.com (Ioana Radulescu)
-Date: Tue, 6 Jun 2017 10:00:36 -0500
-Subject: [PATCH 13/18] staging: fsl-dpaa2/eth: Remove unused fields from priv
- struct
+Date: Tue, 6 Jun 2017 10:00:32 -0500
+Subject: [PATCH 09/18] staging: fsl-dpaa2/eth: Reset dpbp
 In-Reply-To: <20170606150041.10955-1-ruxandra.radulescu@nxp.com>
 References: <20170606150041.10955-1-ruxandra.radulescu@nxp.com>
-Message-ID: <20170606150041.10955-14-ruxandra.radulescu@nxp.com>
+Message-ID: <20170606150041.10955-10-ruxandra.radulescu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the dpni_id and buffer_layout fields from device's
-private structure. They're only used at probe so we don't
-need to store them for further use.
+Reset the buffer pool object before using it, like we do
+for the other DPAA2 objects.
 
 Signed-off-by: Ioana Radulescu <ruxandra.radulescu@nxp.com>
 ---
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c | 33 +++++++++++++-------------
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h |  5 ----
- 2 files changed, 16 insertions(+), 22 deletions(-)
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-index d81c56f4d859..ee71e158b0a9 100644
+index d3ec384c7364..fd56fbd20087 100644
 --- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
 +++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-@@ -1734,15 +1734,14 @@ static int setup_dpni(struct fsl_mc_device *ls_dev)
- 	struct device *dev = &ls_dev->dev;
- 	struct dpaa2_eth_priv *priv;
- 	struct net_device *net_dev;
-+	struct dpni_buffer_layout buf_layout = {0};
- 	int err;
- 
- 	net_dev = dev_get_drvdata(dev);
- 	priv = netdev_priv(net_dev);
- 
--	priv->dpni_id = ls_dev->obj_desc.id;
--
- 	/* get a handle for the DPNI object */
--	err = dpni_open(priv->mc_io, 0, priv->dpni_id, &priv->mc_token);
-+	err = dpni_open(priv->mc_io, 0, ls_dev->obj_desc.id, &priv->mc_token);
- 	if (err) {
- 		dev_err(dev, "dpni_open() failed\n");
+@@ -1687,6 +1687,12 @@ static int setup_dpbp(struct dpaa2_eth_priv *priv)
  		goto err_open;
-@@ -1766,35 +1765,35 @@ static int setup_dpni(struct fsl_mc_device *ls_dev)
- 
- 	/* Configure buffer layouts */
- 	/* rx buffer */
--	priv->buf_layout.pass_parser_result = true;
--	priv->buf_layout.pass_frame_status = true;
--	priv->buf_layout.private_data_size = DPAA2_ETH_SWA_SIZE;
--	priv->buf_layout.data_align = DPAA2_ETH_RX_BUF_ALIGN;
--	priv->buf_layout.options = DPNI_BUF_LAYOUT_OPT_PARSER_RESULT |
--				   DPNI_BUF_LAYOUT_OPT_FRAME_STATUS |
--				   DPNI_BUF_LAYOUT_OPT_PRIVATE_DATA_SIZE |
--				   DPNI_BUF_LAYOUT_OPT_DATA_ALIGN;
-+	buf_layout.pass_parser_result = true;
-+	buf_layout.pass_frame_status = true;
-+	buf_layout.private_data_size = DPAA2_ETH_SWA_SIZE;
-+	buf_layout.data_align = DPAA2_ETH_RX_BUF_ALIGN;
-+	buf_layout.options = DPNI_BUF_LAYOUT_OPT_PARSER_RESULT |
-+			     DPNI_BUF_LAYOUT_OPT_FRAME_STATUS |
-+			     DPNI_BUF_LAYOUT_OPT_PRIVATE_DATA_SIZE |
-+			     DPNI_BUF_LAYOUT_OPT_DATA_ALIGN;
- 	err = dpni_set_buffer_layout(priv->mc_io, 0, priv->mc_token,
--				     DPNI_QUEUE_RX, &priv->buf_layout);
-+				     DPNI_QUEUE_RX, &buf_layout);
- 	if (err) {
- 		dev_err(dev, "dpni_set_buffer_layout(RX) failed\n");
- 		goto err_buf_layout;
  	}
  
- 	/* tx buffer */
--	priv->buf_layout.options = DPNI_BUF_LAYOUT_OPT_FRAME_STATUS |
--				   DPNI_BUF_LAYOUT_OPT_PRIVATE_DATA_SIZE;
-+	buf_layout.options = DPNI_BUF_LAYOUT_OPT_FRAME_STATUS |
-+			     DPNI_BUF_LAYOUT_OPT_PRIVATE_DATA_SIZE;
- 	err = dpni_set_buffer_layout(priv->mc_io, 0, priv->mc_token,
--				     DPNI_QUEUE_TX, &priv->buf_layout);
-+				     DPNI_QUEUE_TX, &buf_layout);
++	err = dpbp_reset(priv->mc_io, 0, dpbp_dev->mc_handle);
++	if (err) {
++		dev_err(dev, "dpbp_reset() failed\n");
++		goto err_reset;
++	}
++
+ 	err = dpbp_enable(priv->mc_io, 0, dpbp_dev->mc_handle);
  	if (err) {
- 		dev_err(dev, "dpni_set_buffer_layout(TX) failed\n");
- 		goto err_buf_layout;
- 	}
- 
- 	/* tx-confirm buffer */
--	priv->buf_layout.options = DPNI_BUF_LAYOUT_OPT_FRAME_STATUS;
-+	buf_layout.options = DPNI_BUF_LAYOUT_OPT_FRAME_STATUS;
- 	err = dpni_set_buffer_layout(priv->mc_io, 0, priv->mc_token,
--				     DPNI_QUEUE_TX_CONFIRM, &priv->buf_layout);
-+				     DPNI_QUEUE_TX_CONFIRM, &buf_layout);
- 	if (err) {
- 		dev_err(dev, "dpni_set_buffer_layout(TX_CONF) failed\n");
- 		goto err_buf_layout;
-diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
-index 6462e2cbe4be..6697b508cf23 100644
---- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
-+++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
-@@ -297,12 +297,7 @@ struct dpaa2_eth_priv {
- 	u8 num_channels;
- 	struct dpaa2_eth_channel *channel[DPAA2_ETH_MAX_DPCONS];
- 
--	int dpni_id;
- 	struct dpni_attr dpni_attrs;
--	/* Insofar as the MC is concerned, we're using one layout on all 3 types
--	 * of buffers (Rx, Tx, Tx-Conf).
--	 */
--	struct dpni_buffer_layout buf_layout;
- 	u16 tx_data_offset;
- 
- 	struct fsl_mc_device *dpbp_dev;
+ 		dev_err(dev, "dpbp_enable() failed\n");
+@@ -1705,6 +1711,7 @@ static int setup_dpbp(struct dpaa2_eth_priv *priv)
+ err_get_attr:
+ 	dpbp_disable(priv->mc_io, 0, dpbp_dev->mc_handle);
+ err_enable:
++err_reset:
+ 	dpbp_close(priv->mc_io, 0, dpbp_dev->mc_handle);
+ err_open:
+ 	fsl_mc_object_free(dpbp_dev);
 -- 
 2.11.0
