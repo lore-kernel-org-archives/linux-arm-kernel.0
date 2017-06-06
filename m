@@ -1,95 +1,32 @@
 From: ruxandra.radulescu@nxp.com (Ioana Radulescu)
-Date: Tue, 6 Jun 2017 10:00:37 -0500
-Subject: [PATCH 14/18] staging: fsl-dpaa2/eth: Only store bpid in priv struct
+Date: Tue, 6 Jun 2017 10:00:30 -0500
+Subject: [PATCH 07/18] staging: fsl-dpaa2/eth: Don't use GFP_DMA
 In-Reply-To: <20170606150041.10955-1-ruxandra.radulescu@nxp.com>
 References: <20170606150041.10955-1-ruxandra.radulescu@nxp.com>
-Message-ID: <20170606150041.10955-15-ruxandra.radulescu@nxp.com>
+Message-ID: <20170606150041.10955-8-ruxandra.radulescu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We only need to know the buffer pool id, so save exactly
-that in the device's private structure, instead of the
-entire DPBP attributes struct.
+Don't use GFP_DMA when allocating memory for the hash key,
+as we don't actually need to allocate from the lowest zone.
 
 Signed-off-by: Ioana Radulescu <ruxandra.radulescu@nxp.com>
 ---
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c | 12 +++++++-----
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h |  2 +-
- 2 files changed, 8 insertions(+), 6 deletions(-)
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-index ee71e158b0a9..26f209c78ff9 100644
+index bf6f300affa7..57628cd3ecf2 100644
 --- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
 +++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-@@ -798,7 +798,7 @@ static void drain_bufs(struct dpaa2_eth_priv *priv, int count)
- 	int ret, i;
- 
- 	do {
--		ret = dpaa2_io_service_acquire(NULL, priv->dpbp_attrs.bpid,
-+		ret = dpaa2_io_service_acquire(NULL, priv->bpid,
- 					       buf_array, count);
- 		if (ret < 0) {
- 			netdev_err(priv->net_dev, "dpaa2_io_service_acquire() failed\n");
-@@ -895,7 +895,7 @@ static int dpaa2_eth_poll(struct napi_struct *napi, int budget)
- 			break;
- 
- 		/* Refill pool if appropriate */
--		refill_pool(priv, ch, priv->dpbp_attrs.bpid);
-+		refill_pool(priv, ch, priv->bpid);
- 
- 		store_cleaned = consume_frames(ch);
- 		cleaned += store_cleaned;
-@@ -980,14 +980,14 @@ static int dpaa2_eth_open(struct net_device *net_dev)
- 	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
- 	int err;
- 
--	err = seed_pool(priv, priv->dpbp_attrs.bpid);
-+	err = seed_pool(priv, priv->bpid);
- 	if (err) {
- 		/* Not much to do; the buffer pool, though not filled up,
- 		 * may still contain some buffers which would enable us
- 		 * to limp on.
- 		 */
- 		netdev_err(net_dev, "Buffer seeding failed for DPBP %d (bpid=%d)\n",
--			   priv->dpbp_dev->obj_desc.id, priv->dpbp_attrs.bpid);
-+			   priv->dpbp_dev->obj_desc.id, priv->bpid);
+@@ -1996,7 +1996,7 @@ static int dpaa2_eth_set_hash(struct net_device *net_dev, u64 flags)
+ 		priv->rx_hash_fields |= hash_fields[i].rxnfc_field;
  	}
  
- 	/* We'll only start the txqs when the link is actually ready; make sure
-@@ -1671,6 +1671,7 @@ static int setup_dpbp(struct dpaa2_eth_priv *priv)
- 	int err;
- 	struct fsl_mc_device *dpbp_dev;
- 	struct device *dev = priv->net_dev->dev.parent;
-+	struct dpbp_attr dpbp_attrs;
+-	dma_mem = kzalloc(DPAA2_CLASSIFIER_DMA_SIZE, GFP_DMA | GFP_KERNEL);
++	dma_mem = kzalloc(DPAA2_CLASSIFIER_DMA_SIZE, GFP_KERNEL);
+ 	if (!dma_mem)
+ 		return -ENOMEM;
  
- 	err = fsl_mc_object_allocate(to_fsl_mc_device(dev), FSL_MC_POOL_DPBP,
- 				     &dpbp_dev);
-@@ -1701,11 +1702,12 @@ static int setup_dpbp(struct dpaa2_eth_priv *priv)
- 	}
- 
- 	err = dpbp_get_attributes(priv->mc_io, 0, dpbp_dev->mc_handle,
--				  &priv->dpbp_attrs);
-+				  &dpbp_attrs);
- 	if (err) {
- 		dev_err(dev, "dpbp_get_attributes() failed\n");
- 		goto err_get_attr;
- 	}
-+	priv->bpid = dpbp_attrs.bpid;
- 
- 	return 0;
- 
-diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
-index 6697b508cf23..886a0681fee1 100644
---- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
-+++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
-@@ -301,7 +301,7 @@ struct dpaa2_eth_priv {
- 	u16 tx_data_offset;
- 
- 	struct fsl_mc_device *dpbp_dev;
--	struct dpbp_attr dpbp_attrs;
-+	u16 bpid;
- 	struct iommu_domain *iommu_domain;
- 
- 	u16 tx_qdid;
 -- 
 2.11.0
