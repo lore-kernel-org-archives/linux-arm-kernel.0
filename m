@@ -1,50 +1,76 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 6 Jun 2017 15:51:48 +0200
-Subject: [PATCH] net: mvpp2: do not bypass the mvpp22_port_mii_set function
-In-Reply-To: <20170606154535.3e87bafb@free-electrons.com>
-References: <20170606133615.20747-1-antoine.tenart@free-electrons.com>
- <20170606154535.3e87bafb@free-electrons.com>
-Message-ID: <20170606135148.GA22618@kwain.lan>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 6 Jun 2017 21:54:11 +0800
+Subject: [PATCH 5/5] ARM: sun8i: a83t: add dwmac-sun8i ethernet driver
+In-Reply-To: <20170605192130.25320-6-clabbe.montjoie@gmail.com>
+References: <20170605192130.25320-1-clabbe.montjoie@gmail.com>
+ <20170605192130.25320-6-clabbe.montjoie@gmail.com>
+Message-ID: <CAGb2v66jo7Fz2Uto_ymuwfHf1PXp2Q6gRRLb9N=tfvaJ=wPoqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Thomas,
+On Tue, Jun 6, 2017 at 3:21 AM, Corentin Labbe
+<clabbe.montjoie@gmail.com> wrote:
+> The dwmac-sun8i is an ethernet MAC hardware that support 10/100/1000 speed.
+> This patch enable the dwmac-sun8i on the Allwinner a83t SoC Device-tree.
+>
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> ---
+>  arch/arm/boot/dts/sun8i-a83t.dtsi | 28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+> index ae559dc42caa..304a966c8048 100644
+> --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+> @@ -200,6 +200,14 @@
+>                         #interrupt-cells = <3>;
+>                         #gpio-cells = <3>;
+>
+> +                       emac_rgmii_pins: emac0-pins {
 
-On Tue, Jun 06, 2017 at 03:45:35PM +0200, Thomas Petazzoni wrote:
-> On Tue,  6 Jun 2017 15:36:15 +0200, Antoine Tenart wrote:
-> > The mvpp22_port_mii_set() function was added by 2697582144dd, but the
-> > function directly returns without doing anything. This return was used
-> > when debugging and wasn't removed before sending the patch. Fix this.
-> > 
-> > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> 
-> Please add:
-> 
-> Fixes: 2697582144dd ("net: mvpp2: handle misc PPv2.1/PPv2.2 differences")
-> 
-> with this:
-> 
-> Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+I prefer emac-rgmii-pins for the node name.
 
-OK, will do.
+> +                               pins = "PD2", "PD3", "PD4", "PD5", "PD6", "PD7",
+> +                                      "PD11", "PD12", "PD13", "PD14", "PD18",
+> +                                      "PD19", "PD21", "PD22", "PD23";
+> +                               function = "gmac";
+> +                               drive-strength = <40>;
+> +                       };
+> +
+>                         mmc0_pins: mmc0-pins {
+>                                 pins = "PF0", "PF1", "PF2",
+>                                        "PF3", "PF4", "PF5";
+> @@ -266,6 +274,26 @@
+>                         status = "disabled";
+>                 };
+>
+> +               emac: ethernet at 1c30000 {
+> +                       compatible = "allwinner,sun8i-a83t-emac";
+> +                       syscon = <&syscon>;
+> +                       reg = <0x01c30000 0x104>;
+> +                       interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
+> +                       interrupt-names = "macirq";
+> +                       resets = <&ccu 13>;
+> +                       reset-names = "stmmaceth";
+> +                       clocks = <&ccu 27>;
+> +                       clock-names = "stmmaceth";
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       status = "disabled";
+> +
+> +                       mdio: mdio {
+> +                               #address-cells = <1>;
+> +                               #size-cells = <0>;
+> +                       };
+> +               };
+> +
+>                 gic: interrupt-controller at 1c81000 {
+>                         compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
+>                         reg = <0x01c81000 0x1000>,
+> --
+> 2.13.0
+>
 
-> I am wondering if we shouldn't Cc: stable as well. I don't think we
-> have seen issues on our side because U-Boot does the necessary
-> initialization, but people using other bootloaders might have issues.
+Otherwise,
 
-Yes, that might be safer to cc stable. I'll do this as well.
-
-Thanks,
-Antoine
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170606/c5161206/attachment.sig>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
