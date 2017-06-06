@@ -1,54 +1,51 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue,  6 Jun 2017 13:59:27 +0800
-Subject: [PATCH 05/10] dt-bindings: interrupt-controller: sunxi-nmi: Add
- compatible for A31 R_INTC
+Date: Tue,  6 Jun 2017 13:59:31 +0800
+Subject: [PATCH 09/10] ARM: sun8i: a83t: Add device node for R_INTC interrupt
+ controller
 In-Reply-To: <20170606055932.22548-1-wens@csie.org>
 References: <20170606055932.22548-1-wens@csie.org>
-Message-ID: <20170606055932.22548-6-wens@csie.org>
+Message-ID: <20170606055932.22548-10-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A31 and later have an R_INTC block which handles the NMI interrupt
-pin on the SoC. This interrupt pin is used by the external PMIC to
-signal interrupts to the SoC.
+The R_INTC interrupt controller handles the NMI interrupt pin for the
+SoC. While there is no documentation or code from the vendor for this
+device on the A83T, existing mainline kernel drivers and bindings show
+this to be similar to the old Allwinner interrupt controller found on
+the A10 SoC, but with only the NMI interrupt wired. Register poking
+experiments confirm this.
 
-While this hardware block is undocumented, the interrupt offsets
-combined with the register regions for the existing "sun6i-a31-sc-nmi"
-compatible line up with the old interrupt controller found on the A10.
-Experiments show that only the first 32 interrupt lines can be enabled,
-and only the first (NMI) interrupt is actually connected.
+The device seems to be the same across all recent Allwinner SoCs, apart
+from the A20 and A80, which have a separate set of registers to handle
+the NMI interrupt. We already have a set of bindings supporting this
+on the A31.
 
-This patch adds a new, properly named compatible for the A31 R_INTC
-block, which requires the register region to be properly aligned to
-the block boundary. For comparison, the old "sun6i-a31-sc-nmi"
-compatible had its register region aligned with the first used
-register. This didn't match up with the memory map in the SoC's
-datasheet/user manual.
-
-Since the new compatible supercedes the old one, deprecate the old one.
+Add a device node for it, with an SoC specific compatible.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- .../bindings/interrupt-controller/allwinner,sunxi-nmi.txt          | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/sun8i-a83t.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-nmi.txt b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-nmi.txt
-index 81cd3692405e..4ae553eb333d 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-nmi.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-nmi.txt
-@@ -3,8 +3,11 @@ Allwinner Sunxi NMI Controller
+diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+index 49aeb56970ba..4d64dfdc10d3 100644
+--- a/arch/arm/boot/dts/sun8i-a83t.dtsi
++++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+@@ -271,6 +271,15 @@
+ 			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
+ 		};
  
- Required properties:
- 
--- compatible : should be "allwinner,sun7i-a20-sc-nmi" or
--  "allwinner,sun6i-a31-sc-nmi" or "allwinner,sun9i-a80-nmi"
-+- compatible : should be one of the following:
-+  - "allwinner,sun7i-a20-sc-nmi"
-+  - "allwinner,sun6i-a31-sc-nmi" (deprecated)
-+  - "allwinner,sun6i-a31-r-intc"
-+  - "allwinner,sun9i-a80-nmi"
- - reg : Specifies base physical address and size of the registers.
- - interrupt-controller : Identifies the node as an interrupt controller
- - #interrupt-cells : Specifies the number of cells needed to encode an
++		r_intc: interrupt-controller at 1f00c00 {
++			compatible = "allwinner,sun8i-a83t-r-intc",
++				     "allwinner,sun6i-a31-r-intc";
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			reg = <0x01f00c00 0x400>;
++			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
+ 		r_ccu: clock at 1f01400 {
+ 			compatible = "allwinner,sun8i-a83t-r-ccu";
+ 			reg = <0x01f01400 0x400>;
 -- 
 2.11.0
