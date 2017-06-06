@@ -1,43 +1,35 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Tue, 6 Jun 2017 20:50:43 +0300
-Subject: [PATCH v2 2/2] ARM: imx6ull: Make suspend/resume work like on 6ul
-In-Reply-To: <cover.1496771145.git.leonard.crestez@nxp.com>
-References: <cover.1496771145.git.leonard.crestez@nxp.com>
-Message-ID: <7dcc71ab09d8d459de1826e55516349b1a2bda33.1496771145.git.leonard.crestez@nxp.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 6 Jun 2017 19:56:07 +0200
+Subject: [PATCH 0/5] ARM: sunxi: Enable dwmac-sun8i on more boards
+In-Reply-To: <20170605192130.25320-1-clabbe.montjoie@gmail.com>
+References: <20170605192130.25320-1-clabbe.montjoie@gmail.com>
+Message-ID: <20170606175607.r2xsg6lw6wv5c6ul@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suspend and resume on imx6ull is currenty not working because of some
-missed checks where behavior should match imx6ul.
+On Mon, Jun 05, 2017 at 09:21:25PM +0200, Corentin Labbe wrote:
+> Hello
+> 
+> This serie enable dwmac-sun8i on more boards.
+> The first 3 patch enable dwmac-sun8i on some h3/h5 boards.
+> The last 2 add dwmac-sun8i on a83t.
+> 
+> Corentin Labbe (5):
+>   ARM: sun8i: orangepi-plus: Enable dwmac-sun8i
+>   ARM: sun8i: bananapi-m2-plus: Enable dwmac-sun8i
+>   ARM: sun50i: orangepi-pc2: Enable dwmac-sun8i
 
-Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
----
- arch/arm/mach-imx/pm-imx6.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+Applied the first three, thanks!
+Maxime
 
-diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
-index e61b1d1..ecdf071 100644
---- a/arch/arm/mach-imx/pm-imx6.c
-+++ b/arch/arm/mach-imx/pm-imx6.c
-@@ -295,7 +295,8 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode)
- 		val &= ~BM_CLPCR_SBYOS;
- 		if (cpu_is_imx6sl())
- 			val |= BM_CLPCR_BYPASS_PMIC_READY;
--		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul())
-+		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul() ||
-+		    cpu_is_imx6ull())
- 			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
- 		else
- 			val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
-@@ -312,7 +313,8 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode)
- 		val |= BM_CLPCR_SBYOS;
- 		if (cpu_is_imx6sl() || cpu_is_imx6sx())
- 			val |= BM_CLPCR_BYPASS_PMIC_READY;
--		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul())
-+		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul() ||
-+		    cpu_is_imx6ull())
- 			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
- 		else
- 			val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
 -- 
-2.7.4
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170606/01b951a7/attachment-0001.sig>
