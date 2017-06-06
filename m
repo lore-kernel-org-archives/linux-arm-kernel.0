@@ -1,94 +1,59 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 6 Jun 2017 13:51:30 +0200
-Subject: [PATCH v2 10/25] KVM: arm64: vgic-v3: Add ICV_HPPIR1_EL1 handler
-In-Reply-To: <20170601102117.17750-11-marc.zyngier@arm.com>
-References: <20170601102117.17750-1-marc.zyngier@arm.com>
- <20170601102117.17750-11-marc.zyngier@arm.com>
-Message-ID: <20170606115130.GM9464@cbox>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 6 Jun 2017 17:27:13 +0530
+Subject: [PATCH 0/7] dra7: Fixes for MMC devicetree node
+In-Reply-To: <20170606105131.GZ3730@atomide.com>
+References: <20170601143401.16852-1-kishon@ti.com>
+ <CAPDyKFqHHjZQnnaGLP=xDj3eYgzADDYoomzBuXRviBgh-n2QFw@mail.gmail.com>
+ <f78dd61c-6689-4dbc-d1db-128f92be8e51@ti.com>
+ <1d15c9e9-f257-fd97-a9a2-055ee90d7e84@ti.com>
+ <20170606105131.GZ3730@atomide.com>
+Message-ID: <08b140b7-de76-c912-9f81-c7cdeca45641@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 01, 2017 at 11:21:02AM +0100, Marc Zyngier wrote:
-> Add a handler for reading the guest's view of the ICV_HPPIR1_EL1
-> register. This is a simple parsing of the available LRs, extracting the
-> highest available interrupt.
+Hi,
+
+On Tuesday 06 June 2017 04:21 PM, Tony Lindgren wrote:
+> * Kishon Vijay Abraham I <kishon@ti.com> [170606 03:40]:
+>> omap3-overo-base.dtsi has the following dt node for mmc.
+>> /* optional on board WiFi */
+>> &mmc2 {
+>>         pinctrl-names = "default";
+>>         pinctrl-0 = <&mmc2_pins>;
+>>         vmmc-supply = <&w3cbw003c_npoweron>;
+>>         vqmmc-supply = <&w3cbw003c_bt_nreset>;
+>>         vmmc_aux-supply = <&w3cbw003c_wifi_nreset>;
+>>         bus-width = <4>;
+>>         cap-sdio-irq;
+>>         non-removable;
+>> };
+>>
+>> It has both "vqmmc-supply" and "vmmc_aux-supply". However omap-hsmmc driver has
+>> never parsed vqmmc so far. So I'd assume bt was never functional and it's used
+>> only for wifi.
 > 
-> Reviewed-by: Eric Auger <eric.auger@redhat.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/include/asm/sysreg.h |  1 +
->  virt/kvm/arm/hyp/vgic-v3-sr.c   | 23 +++++++++++++++++++++++
->  2 files changed, 24 insertions(+)
+> Hmm yeah the vqmmc-supply probably got copied from some
+> other SoC for w3cbw003c.
+
+Okay. So I think we can remove vqmmc-supply here without breaking any existing
+functionality.
 > 
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index aad46b8eea5e..bd000686194a 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -185,6 +185,7 @@
->  #define SYS_ICC_SGI1R_EL1		sys_reg(3, 0, 12, 11, 5)
->  #define SYS_ICC_IAR1_EL1		sys_reg(3, 0, 12, 12, 0)
->  #define SYS_ICC_EOIR1_EL1		sys_reg(3, 0, 12, 12, 1)
-> +#define SYS_ICC_HPPIR1_EL1		sys_reg(3, 0, 12, 12, 2)
->  #define SYS_ICC_BPR1_EL1		sys_reg(3, 0, 12, 12, 3)
->  #define SYS_ICC_CTLR_EL1		sys_reg(3, 0, 12, 12, 4)
->  #define SYS_ICC_SRE_EL1			sys_reg(3, 0, 12, 12, 5)
-> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> index d4f07f84602d..f0bc711db258 100644
-> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> @@ -772,6 +772,26 @@ static void __hyp_text __vgic_v3_write_apxr3(struct kvm_vcpu *vcpu,
->  	__vgic_v3_write_apxrn(vcpu, rt, 3);
->  }
->  
-> +static void __hyp_text __vgic_v3_read_hppir(struct kvm_vcpu *vcpu,
-> +					    u32 vmcr, int rt)
-> +{
-> +	u64 lr_val;
-> +	int lr, lr_grp, grp;
-> +
-> +	grp = __vgic_v3_get_group(vcpu);
-> +
-> +	lr = __vgic_v3_highest_priority_lr(vcpu, vmcr, &lr_val);
-> +	if (lr == -1)
-> +		goto spurious;
-> +
-> +	lr_grp = !!(lr_val & ICH_LR_GROUP);
-> +	if (lr_grp != grp)
-> +		lr_val = ICC_IAR1_EL1_SPURIOUS;
-
-I don't get this.  The spec says that the special INTID 1023
-  "...is returned in response to an interrupt acknowledge, if there is
-   no pending interrupt with sufficient priority for it to be signaled to
-   the PE, or if the highest priority pending interrupt is not
-   appropriate for the:
-    * Current Security state.  Interrupt group that is associated with
-    * the System register."
-
-So do we just take this to imply that it also covers the HPPIRx_EL1
-registers (despite them being mentioned explicitly for the other special
-INTIDs) or is there some other piece of spec I'm missing here?
-
-Thanks,
--Christoffer
-
-> +
-> +spurious:
-> +	vcpu_set_reg(vcpu, rt, lr_val & ICH_LR_VIRTUAL_ID_MASK);
-> +}
-> +
->  int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
->  {
->  	int rt;
-> @@ -836,6 +856,9 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
->  		else
->  			fn = __vgic_v3_write_apxr3;
->  		break;
-> +	case SYS_ICC_HPPIR1_EL1:
-> +		fn = __vgic_v3_read_hppir;
-> +		break;
->  	default:
->  		return 0;
->  	}
-> -- 
-> 2.11.0
+>> So for the change suggested by Ulf, Can I do something like below, so that we
+>> can keep wifi functional (ignoring bt since that was never functional)?
+>> -       vqmmc-supply = <&w3cbw003c_bt_nreset>;
+>> -       vmmc_aux-supply = <&w3cbw003c_wifi_nreset>;
+>> +       vqmmc-supply = <&w3cbw003c_wifi_nreset>;
 > 
+> Optional sdio pins 4 - 8 need separate power and that's
+> why we have the vmmc_aux supply to start with. But here
+> there are only four pins, so my guess is that only one
+> regulator is needed and the the other two are gpio pins
+> for wland and bt that nowadays should be handled by the
+> mmc power sequence driver.
+
+Yeah. Just now checked the pwrseq driver (pwrseq_simple), but it has it's own
+binding. So even if we move to the pwrseq, we still have to support
+"vqmmc-supply = <&w3cbw003c_wifi_nreset>" to avoid breaking old dt compatibiltiy.
+
+Thanks
+Kishon
