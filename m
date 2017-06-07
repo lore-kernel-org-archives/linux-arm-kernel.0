@@ -1,70 +1,114 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Jun 2017 16:41:11 +0100
-Subject: [PATCH v2 1/3] arm64: hugetlb: Fix huge_pte_offset to return
- poisoned page table entries
-In-Reply-To: <87h8zr24qb.fsf@e105922-lin.cambridge.arm.com>
-References: <20170517152336.6052-1-punit.agrawal@arm.com>
- <20170517152336.6052-2-punit.agrawal@arm.com>
- <20170607134731.GG30263@arm.com>
- <20170607143037.ovyo5pxywty2r6as@localhost>
- <20170607145715.GI30263@arm.com>
- <87h8zr24qb.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <20170607154111.GA2669@arm.com>
+From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
+Date: Wed, 7 Jun 2017 12:28:34 -0300
+Subject: [PATCH v2 4/4] [media] davinci: vpif: adaptions for DT support
+In-Reply-To: <20170606233741.26718-5-khilman@baylibre.com>
+References: <20170606233741.26718-1-khilman@baylibre.com>
+ <20170606233741.26718-5-khilman@baylibre.com>
+Message-ID: <20170607122834.4fcb92f4@vento.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 07, 2017 at 04:32:28PM +0100, Punit Agrawal wrote:
-> Will Deacon <will.deacon@arm.com> writes:
-> 
-> > On Wed, Jun 07, 2017 at 03:30:37PM +0100, Catalin Marinas wrote:
-> >> On Wed, Jun 07, 2017 at 02:47:32PM +0100, Will Deacon wrote:
-> >> > On Wed, May 17, 2017 at 04:23:34PM +0100, Punit Agrawal wrote:
-> >> > > --- a/arch/arm64/mm/hugetlbpage.c
-> >> > > +++ b/arch/arm64/mm/hugetlbpage.c
-> >> > > @@ -136,36 +136,27 @@ pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
-> >> > >  {
-> >> > >  	pgd_t *pgd;
-> >> > >  	pud_t *pud;
-> >> > > -	pmd_t *pmd = NULL;
-> >> > > -	pte_t *pte = NULL;
-> >> > > +	pmd_t *pmd;
-> >> > >  
-> >> > >  	pgd = pgd_offset(mm, addr);
-> >> > >  	pr_debug("%s: addr:0x%lx pgd:%p\n", __func__, addr, pgd);
-> >> > >  	if (!pgd_present(*pgd))
-> >> > >  		return NULL;
-> >> > > +
-> >> > >  	pud = pud_offset(pgd, addr);
-> >> > > -	if (!pud_present(*pud))
-> >> > > +	if (pud_none(*pud))
-> >> > >  		return NULL;
-> >> > 
-> >> > Do you actually need this special case?
-> >> > 
-> >> > > -
-> >> > > -	if (pud_huge(*pud))
-> >> > > +	/* swap or huge page */
-> >> > > +	if (!pud_present(*pud) || pud_huge(*pud))
-> >> > 
-> >> > ... couldn't you just add a '|| pud_none(*pud)' in here?
-> >> > 
-> 
-> I think an earlier version took this approach but...
-> 
-> >> > >  		return (pte_t *)pud;
-> >> 
-> >> But then you no longer return NULL if *pud == 0.
-> >
-> > Does that actually matter? The bits of hugetlb code I looked at will
-> > deferenced the returned pud and handle the huge_pte_none case correctly.
-> 
-> For hugetlb fault handling (hugetlb_fault()), returning NULL vs pointer
-> to the pud/pmd results in different behaviour. If we return the pud when
-> pud_none(), then we lose the resulting hugepage size check we get from
-> huge_pte_alloc().
+Em Tue,  6 Jun 2017 16:37:41 -0700
+Kevin Hilman <khilman@baylibre.com> escreveu:
 
-Ok, so does that mean that many of the huge_pte_none checks in mm/hugetlb.c
-that operate on a huge_ptep_get of non-NULL output from huge_pte_offset are
-actually redundant?
+> The davinci VPIF is a single hardware block, but the existing driver
+> is broken up into a common library (vpif.c), output (vpif_display.c) and
+> intput (vpif_capture.c).
+> 
+> When migrating to DT, to better model the hardware, and because
+> registers, interrupts, etc. are all common,it was decided to
+> have a single VPIF hardware node[1].
+> 
+> Because davinci uses legacy, non-DT boot on several SoCs still, the
+> platform_drivers need to remain.  But they are also needed in DT boot.
+> Since there are no DT nodes for the display/capture parts in DT
+> boot (there is a single node for the parent/common device) we need to
+> create platform_devices somewhere to instansiate the platform_drivers.
+> 
+> When VPIF display/capture are needed for a DT boot, the VPIF node
+> will have endpoints defined for its subdevs.  Therefore, vpif_probe()
+> checks for the presence of endpoints, and if detected manually creates
+> the platform_devices for the display and capture platform_drivers.
+> 
+> [1] Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+> 
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+> ---
+>  drivers/media/platform/davinci/vpif.c | 49 ++++++++++++++++++++++++++++++++++-
+>  1 file changed, 48 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/media/platform/davinci/vpif.c b/drivers/media/platform/davinci/vpif.c
+> index 1b02a6363f77..502917abcb13 100644
+> --- a/drivers/media/platform/davinci/vpif.c
+> +++ b/drivers/media/platform/davinci/vpif.c
+> @@ -26,6 +26,7 @@
+>  #include <linux/pm_runtime.h>
+>  #include <linux/spinlock.h>
+>  #include <linux/v4l2-dv-timings.h>
+> +#include <linux/of_graph.h>
+>  
+>  #include "vpif.h"
+>  
+> @@ -423,7 +424,9 @@ EXPORT_SYMBOL(vpif_channel_getfid);
+>  
+>  static int vpif_probe(struct platform_device *pdev)
+>  {
+> -	static struct resource	*res;
+> +	static struct resource	*res, *res_irq;
+> +	struct platform_device *pdev_capture, *pdev_display;
+> +	struct device_node *endpoint = NULL;
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	vpif_base = devm_ioremap_resource(&pdev->dev, res);
+> @@ -435,6 +438,50 @@ static int vpif_probe(struct platform_device *pdev)
+>  
+>  	spin_lock_init(&vpif_lock);
+>  	dev_info(&pdev->dev, "vpif probe success\n");
+> +
+> +	/*
+> +	 * If VPIF Node has endpoints, assume "new" DT support,
+> +	 * where capture and display drivers don't have DT nodes
+> +	 * so their devices need to be registered manually here
+> +	 * for their legacy platform_drivers to work.
+> +	 */
+> +	endpoint = of_graph_get_next_endpoint(pdev->dev.of_node,
+> +					      endpoint);
+> +	if (!endpoint) 
+> +		return 0;
+> +
+> +	/*
+> +	 * For DT platforms, manually create platform_devices for
+> +	 * capture/display drivers.
+> +	 */
+> +	res_irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+> +	if (!res_irq) {
+> +		dev_warn(&pdev->dev, "Missing IRQ resource.\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	pdev_capture = devm_kzalloc(&pdev->dev, sizeof(*pdev_capture),
+> +				    GFP_KERNEL);
 
-Will
+You need to check if it won't return NULL here...
+
+> +	pdev_capture->name = "vpif_capture";
+> +	pdev_capture->id = -1;
+> +	pdev_capture->resource = res_irq;
+> +	pdev_capture->num_resources = 1;
+> +	pdev_capture->dev.dma_mask = pdev->dev.dma_mask;
+> +	pdev_capture->dev.coherent_dma_mask = pdev->dev.coherent_dma_mask;
+> +	pdev_capture->dev.parent = &pdev->dev;
+> +	platform_device_register(pdev_capture);
+> +
+> +	pdev_display = devm_kzalloc(&pdev->dev, sizeof(*pdev_display),
+> +				    GFP_KERNEL);
+
+and here.
+
+Ok, in thesis, if size is lower than page size, it shouldn't fail,
+but we still want to have an explicit check[1].
+
+[1] https://lwn.net/Articles/723317/
+
+Thanks,
+Mauro
