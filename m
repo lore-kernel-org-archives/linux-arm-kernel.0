@@ -1,38 +1,38 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed,  7 Jun 2017 08:23:04 +0800
-Subject: [PATCH 2/3] arm64: allwinner: h5: enable dwmac-sun8i for Orange Pi
- Prime
+Date: Wed,  7 Jun 2017 08:23:05 +0800
+Subject: [PATCH 3/3] arm64: allwinner: h5: enable dwmac-sun8i for Nano Pi NEO2
 In-Reply-To: <20170607002305.15897-1-icenowy@aosc.io>
 References: <20170607002305.15897-1-icenowy@aosc.io>
-Message-ID: <20170607002305.15897-2-icenowy@aosc.io>
+Message-ID: <20170607002305.15897-3-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Add the required DT parts to enable Ethernet (dwmac-sun8i driver) on
-the Orange Pi Prime board. It uses an external Realtek RTL8211E PHY
-connected via RGMII to provide GbE network.
+the Nano Pi NEO2 board. It uses an external Realtek RTL8211E PHY
+connected via RGMII to provide GbE network. Specially unlike other
+Allwinner boards, the phy is connected to MDIO address 7, not 1.
 
 This includes the regulator (which is controlled by a GPIO pin) and
 the actual Ethernet MAC node, referring the RGMII pins of the device.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- .../dts/allwinner/sun50i-h5-orangepi-prime.dts     | 27 ++++++++++++++++++++++
+ .../boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts   | 27 ++++++++++++++++++++++
  1 file changed, 27 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
-index 097c33386190..d906b302cbcd 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
-@@ -54,6 +54,7 @@
- 	compatible = "xunlong,orangepi-prime", "allwinner,sun50i-h5";
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
+index f2767b99c28a..968908761194 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
+@@ -50,6 +50,7 @@
+ 	compatible = "friendlyarm,nanopi-neo2", "allwinner,sun50i-h5";
  
  	aliases {
 +		ethernet0 = &emac;
  		serial0 = &uart0;
  	};
  
-@@ -86,6 +87,16 @@
+@@ -72,6 +73,16 @@
  		};
  	};
  
@@ -49,7 +49,7 @@ index 097c33386190..d906b302cbcd 100644
  	reg_vcc3v3: vcc3v3 {
  		compatible = "regulator-fixed";
  		regulator-name = "vcc3v3";
-@@ -133,12 +144,28 @@
+@@ -98,6 +109,22 @@
  	status = "okay";
  };
  
@@ -62,16 +62,10 @@ index 097c33386190..d906b302cbcd 100644
 +	status = "okay";
 +};
 +
- &ir {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&ir_pins_a>;
- 	status = "okay";
- };
- 
 +&mdio {
-+	ext_rgmii_phy: ethernet-phy at 1 {
++	ext_rgmii_phy: ethernet-phy at 7 {
 +		compatible = "ethernet-phy-ieee802.3-c22";
-+		reg = <1>;
++		reg = <7>;
 +	};
 +};
 +
