@@ -1,40 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 7 Jun 2017 09:12:32 +0200
-Subject: [PATCH v4 0/8] MFD: add driver for HiSilicon Hi6421v530 PMIC
-In-Reply-To: <20170606135829.dxi3mf7so4j5ml3q@dell>
-References: <20170606085143.13154-1-guodong.xu@linaro.org>
- <CAK8P3a25o6HOFw4MWrsnKjHJf4YuO+UvGk+=f30LREnFHM3QwQ@mail.gmail.com>
- <20170606135829.dxi3mf7so4j5ml3q@dell>
-Message-ID: <CAK8P3a1F+DJQfvZdtUT69N3XoqL=c==U+dHEmOaviuJ1pepN8w@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 7 Jun 2017 09:12:57 +0200
+Subject: [[PATCH v2]] drivers: leds/trigger: system cannot enter suspend
+In-Reply-To: <1496803810-57154-1-git-send-email-bo.zhang@nxp.com>
+References: <1496803810-57154-1-git-send-email-bo.zhang@nxp.com>
+Message-ID: <20170607071256.GA3230@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 6, 2017 at 3:58 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Tue, 06 Jun 2017, Arnd Bergmann wrote:
->
->> On Tue, Jun 6, 2017 at 10:51 AM, Guodong Xu <guodong.xu@linaro.org> wrote:
->> > This patchset adds driver for HiSilicon Hi6421v530 PMIC.
->> >
->> > Mainline kernel already has driver support to a similar chip, Hi6421.
->> > Hi6421 and Hi6421v530 are both from the same vendor, HiSilicon, but
->> > they are at different revisions. They both use the same Memory-mapped
->> > I/O method to communicate with Main SoC. However, they differ quite a
->> > lot in their regulator designs. Eg. they have completely different LDO
->> > voltage points.
->> >
->> > Patch 1 and 2 are hi6421-pmic cleaning up.
->> > Patch 3 and 4 extends hi6421-pmic-core.c to support Hi6421v530 revision.
->> > Patch 5 add hi6421v530-regulator.c driver for LDO regulators.
->> > Patch 6 fixes an issue for hi6421 regulator, which is not related to v530
->> >          but it's found in this review.
->> > Patch 7 is dts change, it depends on and can be applied to hi3660/hikey960
->> >         patchset [1].
->> > Patch 8 enables the relevant config items.
->>
->> Looks good to me,
->
-> Is that an Ack?
+On Wed 2017-06-07 10:50:10, Zhang Bo wrote:
+> System cannot enter suspend mode because of heartbeat led trigger.
+> In autosleep_wq, try_to_suspend function will try to enter suspend
+> mode in specific period. it will get wakeup_count then call pm_notifier
+> chain callback function and freeze processes.
+> Heartbeat_pm_notifier is called and it call led_trigger_unregister to
+> change the trigger of led device to none. It will send uevent message
+> and the wakeup source count changed.
+> 
+> Add suspend/resume ops to the struct led_trigger, implement these two ops
+> for ledtrig-heartbeat. Add led_trigger_suspend/led_trigger_resume funcitons
+> to iterate through all LED class devices registered on given trigger and
+> call their suspend/resume ops and disable/enable sysfs at the same time.
+> 
+> Call led_trigger_suspend{resuem} API in pm_notifier function to
+> suspend/resume all led devices listed in given trigger.
+> 
+> Signed-off-by: Zhang Bo <bo.zhang@nxp.com>
 
-Yes, sorry for not being explicit about this.
+NAK.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+led_trigger should not need special handling over suspend.
+
+> It can also fix my issue by reverting  the commit 5ab92a7cb. But this
+> action only does not make
+> led_set_brightness_nosleep function to set brightness. The heartbeat
+> trigger timer is still
+> running even though it is not harmful.
+
+Yes, timers can and should be active over suspend.
+
+Core reason is that 5ab92a7cb is wrong. (Very wrong; it papers over
+the issue for one trigger, but we have more than one... Even if
+special handling for heartbeat is warranted, that handling would be
+"turn the led off" not "unregister the trigger", which is
+userland-visible action.) That one should be reverted, then maybe the
+driver should be fixed to turn the led off during suspend.
+
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170607/7171a591/attachment.sig>
