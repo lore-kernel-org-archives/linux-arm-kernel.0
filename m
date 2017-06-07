@@ -1,246 +1,82 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Wed, 7 Jun 2017 17:37:09 +0300
-Subject: [PATCH v4 16/28] tty: serial: owl: Implement console driver
-In-Reply-To: <20170606005426.26446-17-afaerber@suse.de>
-References: <20170606005426.26446-1-afaerber@suse.de>
- <20170606005426.26446-17-afaerber@suse.de>
-Message-ID: <CAHp75VcYtdxknAw5b1zp+qLi1MT3ktwm99rOJEivcBrc+9B-cg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 7 Jun 2017 16:38:27 +0200
+Subject: [PATCH v2 03/11] drm: sun4i: ignore swapped mixer<->tcon
+ connection for DE2
+In-Reply-To: <01A7F22E-C4FF-4B4B-A9BC-FF0C96B996B9@aosc.io>
+References: <20170604160149.30230-1-icenowy@aosc.io>
+ <20170604160149.30230-4-icenowy@aosc.io>
+ <20170607093512.rfvpefmyskgjw3ik@flea.lan>
+ <01A7F22E-C4FF-4B4B-A9BC-FF0C96B996B9@aosc.io>
+Message-ID: <20170607143827.4ng5gedvzn3f5pyx@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 6, 2017 at 3:54 AM, Andreas F?rber <afaerber@suse.de> wrote:
-> Implement serial console driver to complement earlycon.
->
-> Based on LeMaker linux-actions tree.
-
-> +#define OWL_UART_CTL_DWLS_MASK         (0x3 << 0)
-
-GENMASK() ?
-
-> +#define OWL_UART_CTL_PRS_MASK          (0x7 << 4)
-
-Ditto.
-
->  #define OWL_UART_STAT_TRFL_MASK                (0x1f << 11)
-
-Ditto.
-
-> +static struct owl_uart_port *owl_uart_ports[OWL_UART_PORT_NUM];
-
-And this is needed for...?
-
-> +static void owl_uart_set_mctrl(struct uart_port *port, unsigned int mctrl)
-> +{
-> +}
-
-Do we need an empty stub?
-
-> +static void owl_uart_send_chars(struct uart_port *port)
-> +{
-
-> +               xmit->tail = (xmit->tail + 1) & (SERIAL_XMIT_SIZE - 1);
-
-% SERIAL_XMIT_SIZE shorter (I hope it's a power of 2), but it's up to you.
-
-> +}
-
-> +static irqreturn_t owl_uart_irq(int irq, void *dev_id)
-> +{
-> +       struct uart_port *port = (struct uart_port *)dev_id;
-
-Useless casting.
-
-> +       spin_lock(&port->lock);
-
-spin_lock_irqsave() ?
-
-Consider the kernel command option that switches all IRQ handlers to
-be threaded.
-
-> +}
-
-> +static void owl_uart_change_baudrate(struct owl_uart_port *owl_port,
-> +                                    unsigned long baud)
-> +{
-> +       clk_set_rate(owl_port->clk, baud * 8);
-> +}
-
-> +static void owl_uart_release_port(struct uart_port *port)
-> +{
-> +       struct platform_device *pdev = to_platform_device(port->dev);
-> +       struct resource *res;
-> +
-
-> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       if (!res)
-> +               return;
-> +
-> +       if (port->flags & UPF_IOREMAP) {
-> +               devm_release_mem_region(port->dev, port->mapbase,
-> +                       resource_size(res));
-> +               devm_iounmap(port->dev, port->membase);
-> +               port->membase = NULL;
-> +       }
-
-Above is entirely redundant.
-
-> +}
-> +
-> +static int owl_uart_request_port(struct uart_port *port)
-> +{
-> +       struct platform_device *pdev = to_platform_device(port->dev);
-> +       struct resource *res;
-> +
-> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       if (!res)
-> +               return -ENXIO;
-> +
-> +       if (!devm_request_mem_region(port->dev, port->mapbase,
-> +                       resource_size(res), dev_name(port->dev)))
-> +               return -EBUSY;
-> +
-> +       if (port->flags & UPF_IOREMAP) {
-> +               port->membase = devm_ioremap_nocache(port->dev, port->mapbase,
-> +                               resource_size(res));
-> +               if (!port->membase)
-> +                       return -EBUSY;
-> +       }
-> +
-> +       return 0;
-> +}
-
-> +static void owl_uart_config_port(struct uart_port *port, int flags)
-> +{
-
-> +       if (flags & UART_CONFIG_TYPE) {
-
-if (!(...))
- return;
-
-?
-
-> +               port->type = PORT_OWL;
-> +               owl_uart_request_port(port);
-> +       }
-> +}
-
-
-> +static int owl_uart_probe(struct platform_device *pdev)
-> +{
-> +       struct resource *res_mem, *res_irq;
-> +       struct owl_uart_port *owl_port;
-> +       int ret;
-> +
-> +       if (pdev->dev.of_node)
-> +               pdev->id = of_alias_get_id(pdev->dev.of_node, "serial");
-> +
-> +       if (pdev->id < 0 || pdev->id >= OWL_UART_PORT_NUM) {
-> +               dev_err(&pdev->dev, "id %d out of range\n", pdev->id);
-> +               return -EINVAL;
-> +       }
-> +
-
-
-> +       res_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       if (!res_mem) {
-> +               dev_err(&pdev->dev, "could not get mem\n");
-> +               return -ENODEV;
-> +       }
-
-You can use
-
-struct resource *mem;
-
-mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-x = devm_ioremap_resource();
-if (IS_ERR(x))
- return PTR_ERR(x);
-
-and remote IOREMAP flag below.
-
-> +       res_irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-> +       if (!res_irq) {
-> +               dev_err(&pdev->dev, "could not get irq\n");
-> +               return -ENODEV;
-> +       }
-
-platform_get_irq()
-
-> +       if (owl_uart_ports[pdev->id]) {
-> +               dev_err(&pdev->dev, "port %d already allocated\n", pdev->id);
-> +               return -EBUSY;
-> +       }
-
-I guess it's redundant. It should be conflicting by resource (for example, IRQ).
-
-> +       owl_port->clk = clk_get(&pdev->dev, NULL);
-
-devm_ ?
-
-> +       owl_port->port.iotype = UPIO_MEM;
-> +       owl_port->port.mapbase = res_mem->start;
-> +       owl_port->port.irq = res_irq->start;
-
-
-> +       owl_port->port.uartclk = clk_get_rate(owl_port->clk);
-
-You need to check if it's 0 and use device property instead or bail out.
-
-> +       owl_port->port.flags = UPF_BOOT_AUTOCONF | UPF_IOREMAP | UPF_LOW_LATENCY;
-> +       owl_port->port.x_char = 0;
-> +       owl_port->port.fifosize = 16;
-> +       owl_port->port.ops = &owl_uart_ops;
-> +
-> +       owl_uart_ports[pdev->id] = owl_port;
-
-> +       platform_set_drvdata(pdev, owl_port);
-
-It should be just before return 0, right?..
-
-> +
-> +       ret = uart_add_one_port(&owl_uart_driver, &owl_port->port);
-> +       if (ret)
-> +               owl_uart_ports[pdev->id] = NULL;
-
-...and thus, taking into consideration redundancy of that global var:
-
-      ret = uart_add_one_port(&owl_uart_driver, &owl_port->port);
-      if (ret)
-          retrun ret;
-
-      platform_set_drvdata(pdev, owl_port);
-      return 0;
-
-> +       return ret;
-> +}
-
-> +
-> +static int owl_uart_remove(struct platform_device *pdev)
-> +{
-
-> +       struct owl_uart_port *owl_port;
-> +
-> +       owl_port = platform_get_drvdata(pdev);
-
-Do above in one line.
-
-> +       uart_remove_one_port(&owl_uart_driver, &owl_port->port);
-
-> +       owl_uart_ports[pdev->id] = NULL;
-
-Redundant.
-
-> +
-> +       return 0;
-> +}
-
-> +/* Actions Semi Owl UART */
-> +#define PORT_OWL       117
-
-We can use holes for now IIUC.
-
-See 36 or alike
+On Wed, Jun 07, 2017 at 06:01:02PM +0800, Icenowy Zheng wrote:
+> >I have no idea what this is supposed to be doing either.
+> >
+> >I might be wrong, but I really feel like there's a big mismatch
+> >between your commit log, and what you actually implement.
+> >
+> >In your commit log, you should state:
+> >
+> >A) What is the current behaviour
+> >B) Why that is a problem
+> >C) How do you address it
+> >
+> >And you don't.
+> >
+> >However, after discussing it with Chen-Yu, it seems like you're trying
+> >to have all the mixers probed before the TCONs. If that is so, there's
+> >nothing specific to the H3 here, and we also have the same issue on
+> >dual-pipeline DE1 (A10, A20, A31). Chen-Yu worked on that a bit, but
+> >the easiest solution would be to move from a DFS algorithm to walk
+> >down the graph to a BFS one.
+> >
+> >That way, we would add all mixers first, then the TCONs, then the
+> >encoders, and the component framework will probe them in order.
+> 
+> No. I said that they're swappable, however, I don't want to
+> implement the swap now, but hardcode 0-0 1-1 connection.
+
+We're on the same page, it's definitely not what I was mentionning
+here. This would require a significant rework, and the usecase is
+still unclear for now.
+
+> However, as you and Chen-Yu said, device tree should reflect the
+> real hardware, there will be bonus endpoints for the swapped
+> connection.
+
+If by bonus you mean connections from mixer 0 to tcon 1 and mixer 1 to
+tcon 0, then yes, we're going to need it.
+
+> What I want to do is to ignore the bonus connection, in order to
+> prevent them from confusing the code.
+> 
+> If you just change the bind sequence, I think it cannot be
+> prevented that wrong connections will be bound.
+
+This is where I don't follow you anymore. The component framework
+doesn't list connections but devices. The swapped connections do not
+matter here, we have the same set of devices: mixer0, mixer1, tcon0
+and tcon1.
+
+The thing that does change with your patch is that before, the binding
+sequence would have been mixer0, tcon0, tcon1, mixer1. With your
+patch, it's mixer0, tcon0, mixer1, tcon1.
+
+So, again, stating what issue you were seeing before making this patch
+would be very helpful to see what you're trying to do / fix.
+
+Maxime
 
 -- 
-With Best Regards,
-Andy Shevchenko
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170607/09834a7c/attachment.sig>
