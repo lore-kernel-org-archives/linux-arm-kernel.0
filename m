@@ -1,45 +1,55 @@
-From: andy.tang@nxp.com (Andy Tang)
-Date: Wed, 7 Jun 2017 06:10:34 +0000
-Subject: [PATCH] arm64: dts: ls1088a: update sata node
-In-Reply-To: <20170607060224.GE31070@dragon>
-References: <1496648752-27627-1-git-send-email-andy.tang@nxp.com>
- <20170605151441.GL4094@dragon>
- <HE1PR0402MB2828961E8052683E75B59D5CF3C80@HE1PR0402MB2828.eurprd04.prod.outlook.com>
- <20170607032611.GB31070@dragon>
- <HE1PR0402MB2828FDB61A1AD186E3802962F3C80@HE1PR0402MB2828.eurprd04.prod.outlook.com>
- <20170607060224.GE31070@dragon>
-Message-ID: <HE1PR0402MB28286EA5AD30E856314E5E8CF3C80@HE1PR0402MB2828.eurprd04.prod.outlook.com>
+From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
+Date: Wed, 07 Jun 2017 15:14:20 +0900
+Subject: [PATCH v5 4/5] arm64: dts: exynos: Remove the OF graph from DSI
+ node
+In-Reply-To: <9508dfc9-7cd3-3ed3-f642-2f69a5dcb5ce@samsung.com>
+References: <1488948852-5380-1-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170308045502epcas1p21a483d429e2169b322e40fd833c47f27@epcas1p2.samsung.com>
+ <1488948852-5380-5-git-send-email-hoegeun.kwon@samsung.com>
+ <20170515164829.rfcqj5quw2jooh6u@kozik-lap>
+ <9508dfc9-7cd3-3ed3-f642-2f69a5dcb5ce@samsung.com>
+Message-ID: <ac8dc366-4273-9e24-a60e-ece22a6ad5bc@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On 05/19/2017 03:17 PM, Hoegeun Kwon wrote:
+> On 05/16/2017 01:48 AM, Krzysztof Kozlowski wrote:
+>> On Wed, Mar 08, 2017 at 01:54:11PM +0900, Hoegeun Kwon wrote:
+>>> The OF graph is not needed because the panel is a child of dsi. Remove
+>>> the ports node in DSI node.
+>>>
+>>> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
+>>> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+>>> Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
+>>> ---
+>>>   arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi | 14 
+>>> --------------
+>>>   1 file changed, 14 deletions(-)
+>>>
+>> Hi,
+>>
+>> I wanted to apply this (and 5/5) but it seems that DRM change is not
+>> merged. Was it included in v4.12-rc1?
+>>
+>> Best regards,
+>> Krzysztof
+>
+> Hi,
+>
+> Sorry for my belated reply.
+>
+> The DRM patch(3/5) is not merged in v4.12-rc1 (mainline)...
+> I have checked the David's branch, but not merged.
+> However it was merged into Inki's exynos drm branch.
+>
+> Inki, Could you check the patch(3/5).
+>
+> Best regards,
+> Hoegeun
 
-Yes, if there is a node in dts for ecc register/global register, we only need a phandler. Unfortunately,  ecc register actually is a hidden register.
-If it were not for a sata workaround, we don't need to touch this register.
+Hi Krzysztof,
 
-Thanks for your understanding.
+The drm patch(3/5) has been merged into v4.12-rc4.
 
-Regards
-Andy
- 
-
------Original Message-----
-From: Shawn Guo [mailto:shawnguo at kernel.org] 
-Sent: Wednesday, June 07, 2017 2:02 PM
-To: Andy Tang <andy.tang@nxp.com>
-Cc: mark.rutland at arm.com; catalin.marinas at arm.com; robh+dt at kernel.org; will.deacon at arm.com; linux-arm-kernel at lists.infradead.org
-Subject: Re: [PATCH] arm64: dts: ls1088a: update sata node
-
-On Wed, Jun 07, 2017 at 03:41:03AM +0000, Andy Tang wrote:
-> A: ls1088 is not a new compatible. For ls1088 soc, it should be "fsl,ls1088a-ahci".
-
-Have you added the compatible support into kernel driver and bindings doc?
-
-> Previously, we thought ls1088 is compatible with ls1043, so that we defined compatible string as:  "fsl,ls1088a-ahci", "fsl,ls1043a-ahci"; By doing so, we can reuse code.
-> 
-> Now we found they are not 100% compatible because ECC register address is different. ECC register doesn't belong to SATA IP. It is a global register which controls many IPs. SATA ecc is controlled by only one bit in this register.
-> 
-
-Okay, understood.  It sounds like the register should belong to a global system controller.  If the SATA driver was designed to parse the ECC register and bit from device tree with a phandle pointing to that system controller, we do not need to have so many compatibles for the same SATA IP.
-
-Shawn
+Best regards,
+Hoegeun
