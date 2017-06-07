@@ -1,33 +1,89 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 6 Jun 2017 17:19:16 -0700
-Subject: [PATCH 0/4] [media] davinci: vpif_capture: raw camera support
-In-Reply-To: <519d0131-b9a7-4afa-78d4-8bb6dccec1ad@xs4all.nl>
-References: <20170602213431.10777-1-khilman@baylibre.com>
- <519d0131-b9a7-4afa-78d4-8bb6dccec1ad@xs4all.nl>
-Message-ID: <CAOi56cX2wUvMOoCAGnay0b6weTSuS1+xeO2V7pryfe+aM3Jq8w@mail.gmail.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Wed,  7 Jun 2017 08:23:03 +0800
+Subject: [PATCH 1/3] arm64: allwinner: h5: sort the device nodes in / part for
+ some boards
+Message-ID: <20170607002305.15897-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 6, 2017 at 1:34 PM, Hans Verkuil <hverkuil@xs4all.nl> wrote:
-> Hi Kevin,
->
-> On 02/06/17 23:34, Kevin Hilman wrote:
->> This series fixes/updates the support for raw camera input to the VPIF.
->>
->> Tested on da850-evm boards using the add-on UI board.  Tested with
->> both composite video input (on-board tvp514x) and raw camera input
->> using the camera board from On-Semi based on the aptina,mt9v032
->> sensor[1], as this was the only camera board with the right connector
->> for the da850-evm UI board.
->>
->> Verified that composite video capture is still working well after these
->> updates.
->
-> Can you rebase this patch series against the latest media master branch?
->
-> Mauro merged a lot of patches, in particular the one switching v4l2_of_ to
-> v4l2_fwnode_. And that conflicts with patches 2 and 4.
+The reg_vcc3v3 node is wrongly placed at the start of the / part, but
+not with other fixed regulators used by the board, which makes the
+device nodes unsorted.
 
-Rebased and resent as v2.
+As Orange Pi Prime and Nano Pi NEO2 device trees are copy'n'paste works,
+they share the device node unsorted issue.
 
-Kevin
+Fix this by move reg_vcc3v3 node to the position before reg_usb0_vbus.
+
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts    | 14 +++++++-------
+ arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts | 14 +++++++-------
+ 2 files changed, 14 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
+index f6d71b0d482a..f2767b99c28a 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
+@@ -49,13 +49,6 @@
+ 	model = "FriendlyARM NanoPi NEO 2";
+ 	compatible = "friendlyarm,nanopi-neo2", "allwinner,sun50i-h5";
+ 
+-	reg_vcc3v3: vcc3v3 {
+-		compatible = "regulator-fixed";
+-		regulator-name = "vcc3v3";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-	};
+-
+ 	aliases {
+ 		serial0 = &uart0;
+ 	};
+@@ -79,6 +72,13 @@
+ 		};
+ 	};
+ 
++	reg_vcc3v3: vcc3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
+ 	reg_usb0_vbus: usb0-vbus {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "usb0-vbus";
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
+index 28d92a612329..097c33386190 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
+@@ -53,13 +53,6 @@
+ 	model = "Xunlong Orange Pi Prime";
+ 	compatible = "xunlong,orangepi-prime", "allwinner,sun50i-h5";
+ 
+-	reg_vcc3v3: vcc3v3 {
+-		compatible = "regulator-fixed";
+-		regulator-name = "vcc3v3";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-	};
+-
+ 	aliases {
+ 		serial0 = &uart0;
+ 	};
+@@ -93,6 +86,13 @@
+ 		};
+ 	};
+ 
++	reg_vcc3v3: vcc3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
+ 	reg_usb0_vbus: usb0-vbus {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "usb0-vbus";
+-- 
+2.12.2
