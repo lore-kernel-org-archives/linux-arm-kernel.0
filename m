@@ -1,120 +1,94 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Wed, 7 Jun 2017 22:48:57 +0800
-Subject: [PATCH 1/4] dt-bindings: rng: add generic bindings for MediaTek
- SoCs
-In-Reply-To: <a8b797e9-db6f-7f92-2cee-72d456815310@gmail.com>
-References: <cover.1496255334.git.sean.wang@mediatek.com>
- <1d9c981e1b45bf2f04732a02d90e6857cc203ce5.1496255334.git.sean.wang@mediatek.com>
- <9eb87222-ca89-0abb-4532-3887008f6e7a@gmail.com>
- <1496841619.30833.5.camel@mtkswgap22>
- <a8b797e9-db6f-7f92-2cee-72d456815310@gmail.com>
-Message-ID: <1496846937.30833.10.camel@mtkswgap22>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Wed, 7 Jun 2017 10:50:14 -0400
+Subject: [PATCH] drm/meson: Fix driver bind when only CVBS is available
+In-Reply-To: <1496067352-8733-1-git-send-email-narmstrong@baylibre.com>
+References: <1496067352-8733-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20170607145014.k3xjc3pwi43qvi5m@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-06-07 at 15:25 +0200, Matthias Brugger wrote:
+On Mon, May 29, 2017 at 04:15:52PM +0200, Neil Armstrong wrote:
+> While introducing HDMI support, component matching on connectors node
+> were bypassed since no driver would actually bind on the DT node.
+> But when only a CVBS connector is present, only a single node is found
+> in the graph, but ignored and a NULL match table is given to the
+> component code.
 > 
-> On 07/06/17 15:20, Sean Wang wrote:
-> > On Tue, 2017-06-06 at 13:07 +0200, Matthias Brugger wrote:
-> >>
-> >> On 31/05/17 20:44, sean.wang at mediatek.com wrote:
-> >>> From: Sean Wang <sean.wang@mediatek.com>
-> >>>
-> >>> Add the generic binding for allowing the support of RNG on MediaTek SoCs
-> >>> such as MT7622.
-> >>>
-> >>> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> >>> ---
-> >>>    Documentation/devicetree/bindings/rng/mtk-rng.txt | 3 ++-
-> >>>    1 file changed, 2 insertions(+), 1 deletion(-)
-> >>>
-> >>> diff --git a/Documentation/devicetree/bindings/rng/mtk-rng.txt b/Documentation/devicetree/bindings/rng/mtk-rng.txt
-> >>> index a6d62a2..0772913 100644
-> >>> --- a/Documentation/devicetree/bindings/rng/mtk-rng.txt
-> >>> +++ b/Documentation/devicetree/bindings/rng/mtk-rng.txt
-> >>> @@ -2,7 +2,8 @@ Device-Tree bindings for Mediatek random number generator
-> >>>    found in Mediatek SoC family
-> >>>    
-> >>>    Required properties:
-> >>> -- compatible	    : Should be "mediatek,mt7623-rng"
-> >>> +- compatible	    : Should be "mediatek,generic-rng" or
-> >>> +				"mediatek,mt7623-rng".
-> >>
-> >> What does generic-rng mean. Is it for all mt7xxx, or also for mt6xxx and
-> >> mt8xxx based SoCs? I think we should stick with SoC specific bindings,
-> >> as we don't know if Mediatek won't publish a new IP block next year
-> >> which is differnet.
-> >>
-> > 
-> > Yes, what I mean is generic-rng can be applied to all
-> > platform MediaTek provides.
-> > 
-> > 
-> >> Just in case we should add a binding for the actual SoC + a fallback.
-> >> For example.
-> >> - compatible " Should be
-> >> 	"mediatek,mt7622-rng", 	"mediatek,mt7623-rng" for SoC mt7622
-> >> 	"mediatek,mt7623-rng" for SoC mt7623
-> >>
-> >> This will also eliminate the need of adding mt6722-rng to the driver, as
-> >> it will use mt7623-rng as fallback. If in the future we realize that
-> >> mt7622-rng has a extra feature/bug, we can still work around it, without
-> >> breaking the bindings.
-> >>
-> > 
-> > I knew the fallback rules you said here because I saw them being used in
-> > many drivers such as sysirq and uart driver, such kind of basic drivers.
-> > 
-> > These drivers are basic enough, various following chipsets almost fall
-> > back into the oldest one. So the clues let me think the hardware
-> > interface shouldn't have too much differences among them.
-> > 
-> > If there is string used like generic-uart or generic-sysirq, it can
-> > stop we blindly add new string into the binding document when a new
-> > platform is introduced.
-> > 
-> > And they easily allows users unfamiliar MediaTek platform (they didn't
-> > know what the oldest MediaTek chipset is) pick up the right compatible
-> > string to start bring up the new platform.
-> > 
-> > The specific one can be added after new feature required is added or
-> > critical hardware bug is found. Otherwise the generic one can fit
-> > all generic needs for those.
-> > 
-> > Those are only opinions, if you don't like it, I still can accept the
-> > original way as you suggest :)
-> > 
+> This code permits bypassing the components framework by binding directly
+> the DRM driver when no components needs to be loaded.
 > 
-> I can see your reasoning, but the device tree maintainers prefer to have 
-> the bindings updated for a new SoC. As I mentioned before, just imagine 
-> next year Mediatek changes the IP block and from now on, it uses the new 
-> device in all SoCs. In 5 years we would have a binding which states 
-> 'generic' although it is not compatible with any SoC of the last So
+> Fixes: a41e82e6c457 ("drm/meson: Add support for components")
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+
+Hi Neil,
+Thanks for your patch, I've applied to drm-misc-fixes and will include it in
+this week's pull request.
+
+Sean
+
+> ---
+>  drivers/gpu/drm/meson/meson_drv.c | 20 +++++++++++++++-----
+>  1 file changed, 15 insertions(+), 5 deletions(-)
 > 
-> So please keep with the bindings as done up to now.
-
-Understood, I'll follow up. 
-
-And that also reminds me that all missing bindings need to be added for
-each driver on the MT7623 which can fall back to other existing SoCs.
-
-Thank you a lot
-
-	Sean
-
+> diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
+> index 75382f5..10b227d 100644
+> --- a/drivers/gpu/drm/meson/meson_drv.c
+> +++ b/drivers/gpu/drm/meson/meson_drv.c
+> @@ -152,7 +152,7 @@ static bool meson_vpu_has_available_connectors(struct device *dev)
+>  	.max_register   = 0x1000,
+>  };
+>  
+> -static int meson_drv_bind(struct device *dev)
+> +static int meson_drv_bind_master(struct device *dev, bool has_components)
+>  {
+>  	struct platform_device *pdev = to_platform_device(dev);
+>  	struct meson_drm *priv;
+> @@ -233,10 +233,12 @@ static int meson_drv_bind(struct device *dev)
+>  	if (ret)
+>  		goto free_drm;
+>  
+> -	ret = component_bind_all(drm->dev, drm);
+> -	if (ret) {
+> -		dev_err(drm->dev, "Couldn't bind all components\n");
+> -		goto free_drm;
+> +	if (has_components) {
+> +		ret = component_bind_all(drm->dev, drm);
+> +		if (ret) {
+> +			dev_err(drm->dev, "Couldn't bind all components\n");
+> +			goto free_drm;
+> +		}
+>  	}
+>  
+>  	ret = meson_plane_create(priv);
+> @@ -276,6 +278,11 @@ static int meson_drv_bind(struct device *dev)
+>  	return ret;
+>  }
+>  
+> +static int meson_drv_bind(struct device *dev)
+> +{
+> +	return meson_drv_bind_master(dev, true);
+> +}
+> +
+>  static void meson_drv_unbind(struct device *dev)
+>  {
+>  	struct drm_device *drm = dev_get_drvdata(dev);
+> @@ -357,6 +364,9 @@ static int meson_drv_probe(struct platform_device *pdev)
+>  		count += meson_probe_remote(pdev, &match, np, remote);
+>  	}
+>  
+> +	if (count && !match)
+> +		return meson_drv_bind_master(&pdev->dev, false);
+> +
+>  	/* If some endpoints were found, initialize the nodes */
+>  	if (count) {
+>  		dev_info(&pdev->dev, "Queued %d outputs on vpu\n", count);
+> -- 
+> 1.9.1
 > 
-> Best regards,
-> Matthias
-> 
-> > 
-> >> Makes sense?
-> >>
-> >> Regards,
-> >> Matthias
-> >>
-> >>>    - clocks	    : list of clock specifiers, corresponding to
-> >>>    		      entries in clock-names property;
-> >>>    - clock-names	    : Should contain "rng" entries;
-> >>>
-> > 
-> > 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+
+-- 
+Sean Paul, Software Engineer, Google / Chromium OS
