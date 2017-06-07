@@ -1,129 +1,90 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Wed,  7 Jun 2017 10:45:42 -0700
-Subject: [PATCH 2/2] RFC: ARM: dts: imx7d-sdb: swap pad settings for USDHCx
- 50Mhz and 100Mhz
-In-Reply-To: <1496857542-32200-1-git-send-email-troy.kisky@boundarydevices.com>
-References: <1496857542-32200-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1496857542-32200-2-git-send-email-troy.kisky@boundarydevices.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Wed, 07 Jun 2017 18:47:05 +0100
+Subject: [PATCH v2 2/3] arm64: hwpoison: add VM_FAULT_HWPOISON[_LARGE]
+ handling
+In-Reply-To: <20170607135913.GH30263@arm.com> (Will Deacon's message of "Wed,
+ 7 Jun 2017 14:59:13 +0100")
+References: <20170517152336.6052-1-punit.agrawal@arm.com>
+ <20170517152336.6052-3-punit.agrawal@arm.com>
+ <20170607135913.GH30263@arm.com>
+Message-ID: <877f0n1yhy.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It does not make sense that 100 Mhz pad settings would use a x2
-setting and 50 Mhz would use a x4 setting, so swap.
+Will Deacon <will.deacon@arm.com> writes:
 
-Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
----
- arch/arm/boot/dts/imx7d-sdb.dts | 72 ++++++++++++++++++++---------------------
- 1 file changed, 36 insertions(+), 36 deletions(-)
+> On Wed, May 17, 2017 at 04:23:35PM +0100, Punit Agrawal wrote:
+>> From: "Jonathan (Zhixiong) Zhang" <zjzhang@codeaurora.org>
+>> 
+>> Add VM_FAULT_HWPOISON[_LARGE] handling to the arm64 page fault
+>> handler. Handling of VM_FAULT_HWPOISON[_LARGE] is very similar
+>> to VM_FAULT_OOM, the only difference is that a different si_code
+>> (BUS_MCEERR_AR) is passed to user space and si_addr_lsb field is
+>> initialized.
+>> 
+>> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+>> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+>> (fix new __do_user_fault call-site)
+>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> Acked-by: Steve Capper <steve.capper@arm.com>
+>> ---
+>>  arch/arm64/mm/fault.c | 22 +++++++++++++++++++---
+>>  1 file changed, 19 insertions(+), 3 deletions(-)
+>> 
+>> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+>> index 37b95dff0b07..a85b44343ac6 100644
+>> --- a/arch/arm64/mm/fault.c
+>> +++ b/arch/arm64/mm/fault.c
+>> @@ -31,6 +31,7 @@
+>>  #include <linux/highmem.h>
+>>  #include <linux/perf_event.h>
+>>  #include <linux/preempt.h>
+>> +#include <linux/hugetlb.h>
+>>  
+>>  #include <asm/bug.h>
+>>  #include <asm/cpufeature.h>
+>> @@ -239,10 +240,11 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
+>>   */
+>>  static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
+>>  			    unsigned int esr, unsigned int sig, int code,
+>> -			    struct pt_regs *regs)
+>> +			    struct pt_regs *regs, int fault)
+>>  {
+>>  	struct siginfo si;
+>>  	const struct fault_info *inf;
+>> +	unsigned int lsb = 0;
+>>  
+>>  	if (unhandled_signal(tsk, sig) && show_unhandled_signals_ratelimited()) {
+>>  		inf = esr_to_fault_info(esr);
+>> @@ -259,6 +261,17 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
+>>  	si.si_errno = 0;
+>>  	si.si_code = code;
+>>  	si.si_addr = (void __user *)addr;
+>> +	/*
+>> +	 * Either small page or large page may be poisoned.
+>> +	 * In other words, VM_FAULT_HWPOISON_LARGE and
+>> +	 * VM_FAULT_HWPOISON are mutually exclusive.
+>> +	 */
+>> +	if (fault & VM_FAULT_HWPOISON_LARGE)
+>> +		lsb = hstate_index_to_shift(VM_FAULT_GET_HINDEX(fault));
+>> +	else if (fault & VM_FAULT_HWPOISON)
+>> +		lsb = PAGE_SHIFT;
+>> +	si.si_addr_lsb = lsb;
+>> +
+>
+> If we're going to start handling poison faults, then we should probably
+> rejig the perf page fault accounting around here so that we follow x86:
+>
+>   * Always report PERF_COUNT_SW_PAGE_FAULTS,
+>   * Don't report anything else for VM_FAULT_ERROR
+>   * Report PERF_COUNT_SW_PAGE_FAULTS_MAJ if VM_FAULT_MAJOR
+>   * Otherwise, report PERF_COUNT_SW_PAGE_FAULTS_MIN
+>
+> at the moment, I think you're accounting VM_FAULT_ERROR as
+> PERF_COUNT_SW_PAGE_FAULTS_MIN, which doesn't feel right at all.
 
-diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
-index cab9208..70dcbf4 100644
---- a/arch/arm/boot/dts/imx7d-sdb.dts
-+++ b/arch/arm/boot/dts/imx7d-sdb.dts
-@@ -590,31 +590,20 @@
- 
- 		pinctrl_usdhc1: usdhc1grp {
- 			fsl,pins = <
--				MX7D_PAD_SD1_CMD__SD1_CMD		0x59
--				MX7D_PAD_SD1_CLK__SD1_CLK		0x09
--				MX7D_PAD_SD1_DATA0__SD1_DATA0		0x59
--				MX7D_PAD_SD1_DATA1__SD1_DATA1		0x59
--				MX7D_PAD_SD1_DATA2__SD1_DATA2		0x59
--				MX7D_PAD_SD1_DATA3__SD1_DATA3		0x59
--				MX7D_PAD_SD1_CD_B__GPIO5_IO0		0x59 /* CD */
--				MX7D_PAD_SD1_WP__GPIO5_IO1		0x59 /* WP */
--				MX7D_PAD_SD1_RESET_B__GPIO5_IO2		0x59 /* vmmc */
-+				MX7D_PAD_SD1_CMD__SD1_CMD		0x5a
-+				MX7D_PAD_SD1_CLK__SD1_CLK		0x0a
-+				MX7D_PAD_SD1_DATA0__SD1_DATA0		0x5a
-+				MX7D_PAD_SD1_DATA1__SD1_DATA1		0x5a
-+				MX7D_PAD_SD1_DATA2__SD1_DATA2		0x5a
-+				MX7D_PAD_SD1_DATA3__SD1_DATA3		0x5a
-+				MX7D_PAD_SD1_CD_B__GPIO5_IO0		0x5a /* CD */
-+				MX7D_PAD_SD1_WP__GPIO5_IO1		0x5a /* WP */
-+				MX7D_PAD_SD1_RESET_B__GPIO5_IO2		0x5a /* vmmc */
- 			>;
- 		};
- 
- 		pinctrl_usdhc2: usdhc2grp {
- 			fsl,pins = <
--				MX7D_PAD_SD2_CMD__SD2_CMD		0x59
--				MX7D_PAD_SD2_CLK__SD2_CLK		0x09
--				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x59
--				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x59
--				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x59
--				MX7D_PAD_SD2_DATA3__SD2_DATA3		0x59
--			>;
--		};
--
--		pinctrl_usdhc2_100mhz: usdhc2grp_100mhz {
--			fsl,pins = <
- 				MX7D_PAD_SD2_CMD__SD2_CMD		0x5a
- 				MX7D_PAD_SD2_CLK__SD2_CLK		0x0a
- 				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x5a
-@@ -624,6 +613,17 @@
- 			>;
- 		};
- 
-+		pinctrl_usdhc2_100mhz: usdhc2grp_100mhz {
-+			fsl,pins = <
-+				MX7D_PAD_SD2_CMD__SD2_CMD		0x59
-+				MX7D_PAD_SD2_CLK__SD2_CLK		0x09
-+				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x59
-+				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x59
-+				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x59
-+				MX7D_PAD_SD2_DATA3__SD2_DATA3		0x59
-+			>;
-+		};
-+
- 		pinctrl_usdhc2_200mhz: usdhc2grp_200mhz {
- 			fsl,pins = <
- 				MX7D_PAD_SD2_CMD__SD2_CMD		0x5b
-@@ -638,22 +638,6 @@
- 
- 		pinctrl_usdhc3: usdhc3grp {
- 			fsl,pins = <
--				MX7D_PAD_SD3_CMD__SD3_CMD		0x59
--				MX7D_PAD_SD3_CLK__SD3_CLK		0x09
--				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x59
--				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x59
--				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x59
--				MX7D_PAD_SD3_DATA3__SD3_DATA3		0x59
--				MX7D_PAD_SD3_DATA4__SD3_DATA4		0x59
--				MX7D_PAD_SD3_DATA5__SD3_DATA5		0x59
--				MX7D_PAD_SD3_DATA6__SD3_DATA6		0x59
--				MX7D_PAD_SD3_DATA7__SD3_DATA7		0x59
--				MX7D_PAD_SD3_STROBE__SD3_STROBE		0x19
--			>;
--		};
--
--		pinctrl_usdhc3_100mhz: usdhc3grp_100mhz {
--			fsl,pins = <
- 				MX7D_PAD_SD3_CMD__SD3_CMD		0x5a
- 				MX7D_PAD_SD3_CLK__SD3_CLK		0x0a
- 				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x5a
-@@ -668,6 +652,22 @@
- 			>;
- 		};
- 
-+		pinctrl_usdhc3_100mhz: usdhc3grp_100mhz {
-+			fsl,pins = <
-+				MX7D_PAD_SD3_CMD__SD3_CMD		0x59
-+				MX7D_PAD_SD3_CLK__SD3_CLK		0x09
-+				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x59
-+				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x59
-+				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x59
-+				MX7D_PAD_SD3_DATA3__SD3_DATA3		0x59
-+				MX7D_PAD_SD3_DATA4__SD3_DATA4		0x59
-+				MX7D_PAD_SD3_DATA5__SD3_DATA5		0x59
-+				MX7D_PAD_SD3_DATA6__SD3_DATA6		0x59
-+				MX7D_PAD_SD3_DATA7__SD3_DATA7		0x59
-+				MX7D_PAD_SD3_STROBE__SD3_STROBE		0x19
-+			>;
-+		};
-+
- 		pinctrl_usdhc3_200mhz: usdhc3grp_200mhz {
- 			fsl,pins = <
- 				MX7D_PAD_SD3_CMD__SD3_CMD		0x5b
--- 
-2.7.4
+Ok. I'd missed the implication of enabling poisoned pages fault handling
+on the perf accounting. I'll add a patch to update the reporting.
+
+>
+> Will
