@@ -1,310 +1,116 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Wed,  7 Jun 2017 11:34:08 -0700
-Subject: [PATCH v8 29/34] media: imx: csi: add sink selection rectangles
+Date: Wed,  7 Jun 2017 11:34:09 -0700
+Subject: [PATCH v8 30/34] media: imx: csi: add frame size/interval enumeration
 In-Reply-To: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1496860453-6282-30-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1496860453-6282-31-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philipp Zabel <p.zabel@pengutronix.de>
+From: Russell King <rmk+kernel@armlinux.org.uk>
 
-Move the crop rectangle to the sink pad and add a sink compose rectangle
-to configure scaling. Also propagate rectangles from sink pad to crop
-rectangle, to compose rectangle, and to the source pads both in ACTIVE
-and TRY variants of set_fmt/selection, and initialize the default crop
-and compose rectangles.
+Add frame size and frame interval enumeration to CSI.
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+CSI can downscale the image independently horizontally and vertically by a
+factor of two, which enumerates to four different frame sizes at the
+output pads. The input pad supports a range of frame sizes.
+
+CSI can also drop frames, resulting in frame rate reduction, so
+enumerate the resulting possible output frame rates.
+
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- drivers/staging/media/imx/imx-media-csi.c | 153 +++++++++++++++++++++++-------
- 1 file changed, 117 insertions(+), 36 deletions(-)
+ drivers/staging/media/imx/imx-media-csi.c | 70 +++++++++++++++++++++++++++++++
+ 1 file changed, 70 insertions(+)
 
 diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
-index fb66695..655a095 100644
+index 655a095..c59224f 100644
 --- a/drivers/staging/media/imx/imx-media-csi.c
 +++ b/drivers/staging/media/imx/imx-media-csi.c
-@@ -80,6 +80,7 @@ struct csi_priv {
- 	const struct imx_media_pixfmt *cc[CSI_NUM_PADS];
- 	struct v4l2_fract frame_interval[CSI_NUM_PADS];
- 	struct v4l2_rect crop;
-+	struct v4l2_rect compose;
- 	const struct csi_skip_desc *skip;
- 
- 	/* active vb2 buffers to send to video dev sink */
-@@ -588,8 +589,8 @@ static int csi_setup(struct csi_priv *priv)
- 	ipu_csi_set_window(priv->csi, &priv->crop);
- 
- 	ipu_csi_set_downsize(priv->csi,
--			     priv->crop.width == 2 * outfmt->width,
--			     priv->crop.height == 2 * outfmt->height);
-+			     priv->crop.width == 2 * priv->compose.width,
-+			     priv->crop.height == 2 * priv->compose.height);
- 
- 	ipu_csi_init_interface(priv->csi, &sensor_mbus_cfg, &if_fmt);
- 
-@@ -1047,6 +1048,17 @@ __csi_get_crop(struct csi_priv *priv, struct v4l2_subdev_pad_config *cfg,
- 		return &priv->crop;
- }
- 
-+static struct v4l2_rect *
-+__csi_get_compose(struct csi_priv *priv, struct v4l2_subdev_pad_config *cfg,
-+		  enum v4l2_subdev_format_whence which)
-+{
-+	if (which == V4L2_SUBDEV_FORMAT_TRY)
-+		return v4l2_subdev_get_try_compose(&priv->sd, cfg,
-+						   CSI_SINK_PAD);
-+	else
-+		return &priv->compose;
-+}
-+
- static void csi_try_crop(struct csi_priv *priv,
- 			 struct v4l2_rect *crop,
- 			 struct v4l2_subdev_pad_config *cfg,
-@@ -1156,6 +1168,7 @@ static void csi_try_fmt(struct csi_priv *priv,
- 			struct v4l2_subdev_pad_config *cfg,
- 			struct v4l2_subdev_format *sdformat,
- 			struct v4l2_rect *crop,
-+			struct v4l2_rect *compose,
- 			const struct imx_media_pixfmt **cc)
- {
- 	const struct imx_media_pixfmt *incc;
-@@ -1170,15 +1183,8 @@ static void csi_try_fmt(struct csi_priv *priv,
- 		incc = imx_media_find_mbus_format(infmt->code,
- 						  CS_SEL_ANY, true);
- 
--		if (sdformat->format.width < crop->width * 3 / 4)
--			sdformat->format.width = crop->width / 2;
--		else
--			sdformat->format.width = crop->width;
--
--		if (sdformat->format.height < crop->height * 3 / 4)
--			sdformat->format.height = crop->height / 2;
--		else
--			sdformat->format.height = crop->height;
-+		sdformat->format.width = compose->width;
-+		sdformat->format.height = compose->height;
- 
- 		if (incc->bayer) {
- 			sdformat->format.code = infmt->code;
-@@ -1214,11 +1220,17 @@ static void csi_try_fmt(struct csi_priv *priv,
- 		v4l_bound_align_image(&sdformat->format.width, MIN_W, MAX_W,
- 				      W_ALIGN, &sdformat->format.height,
- 				      MIN_H, MAX_H, H_ALIGN, S_ALIGN);
-+
-+		/* Reset crop and compose rectangles */
- 		crop->left = 0;
- 		crop->top = 0;
- 		crop->width = sdformat->format.width;
- 		crop->height = sdformat->format.height;
- 		csi_try_crop(priv, crop, cfg, &sdformat->format, sensor);
-+		compose->left = 0;
-+		compose->top = 0;
-+		compose->width = crop->width;
-+		compose->height = crop->height;
- 
- 		*cc = imx_media_find_mbus_format(sdformat->format.code,
- 						 CS_SEL_ANY, true);
-@@ -1243,7 +1255,7 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
- 	struct imx_media_subdev *sensor;
- 	struct v4l2_pix_format vdev_fmt;
- 	struct v4l2_mbus_framefmt *fmt;
--	struct v4l2_rect *crop;
-+	struct v4l2_rect *crop, *compose;
- 	int ret = 0;
- 
- 	if (sdformat->pad >= CSI_NUM_PADS)
-@@ -1263,8 +1275,9 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
- 	}
- 
- 	crop = __csi_get_crop(priv, cfg, sdformat->which);
-+	compose = __csi_get_compose(priv, cfg, sdformat->which);
- 
--	csi_try_fmt(priv, sensor, cfg, sdformat, crop, &cc);
-+	csi_try_fmt(priv, sensor, cfg, sdformat, crop, compose, &cc);
- 
- 	fmt = __csi_get_fmt(priv, cfg, sdformat->pad, sdformat->which);
- 	*fmt = sdformat->format;
-@@ -1281,7 +1294,8 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
- 			format.pad = pad;
- 			format.which = sdformat->which;
- 			format.format = sdformat->format;
--			csi_try_fmt(priv, sensor, cfg, &format, crop, &outcc);
-+			csi_try_fmt(priv, sensor, cfg, &format, NULL, compose,
-+				    &outcc);
- 
- 			outfmt = __csi_get_fmt(priv, cfg, pad, sdformat->which);
- 			*outfmt = format.format;
-@@ -1315,16 +1329,17 @@ static int csi_get_selection(struct v4l2_subdev *sd,
- {
- 	struct csi_priv *priv = v4l2_get_subdevdata(sd);
- 	struct v4l2_mbus_framefmt *infmt;
--	struct v4l2_rect *crop;
-+	struct v4l2_rect *crop, *compose;
- 	int ret = 0;
- 
--	if (sel->pad >= CSI_NUM_PADS || sel->pad == CSI_SINK_PAD)
-+	if (sel->pad != CSI_SINK_PAD)
- 		return -EINVAL;
- 
- 	mutex_lock(&priv->lock);
- 
- 	infmt = __csi_get_fmt(priv, cfg, CSI_SINK_PAD, sel->which);
- 	crop = __csi_get_crop(priv, cfg, sel->which);
-+	compose = __csi_get_compose(priv, cfg, sel->which);
- 
- 	switch (sel->target) {
- 	case V4L2_SEL_TGT_CROP_BOUNDS:
-@@ -1336,6 +1351,15 @@ static int csi_get_selection(struct v4l2_subdev *sd,
- 	case V4L2_SEL_TGT_CROP:
- 		sel->r = *crop;
- 		break;
-+	case V4L2_SEL_TGT_COMPOSE_BOUNDS:
-+		sel->r.left = 0;
-+		sel->r.top = 0;
-+		sel->r.width = crop->width;
-+		sel->r.height = crop->height;
-+		break;
-+	case V4L2_SEL_TGT_COMPOSE:
-+		sel->r = *compose;
-+		break;
- 	default:
- 		ret = -EINVAL;
- 	}
-@@ -1344,19 +1368,34 @@ static int csi_get_selection(struct v4l2_subdev *sd,
+@@ -1138,6 +1138,74 @@ static int csi_enum_mbus_code(struct v4l2_subdev *sd,
  	return ret;
  }
  
-+static int csi_set_scale(u32 *compose, u32 crop, u32 flags)
++static int csi_enum_frame_size(struct v4l2_subdev *sd,
++			       struct v4l2_subdev_pad_config *cfg,
++			       struct v4l2_subdev_frame_size_enum *fse)
 +{
-+	if ((flags & (V4L2_SEL_FLAG_LE | V4L2_SEL_FLAG_GE)) ==
-+		     (V4L2_SEL_FLAG_LE | V4L2_SEL_FLAG_GE) &&
-+	    *compose != crop && *compose != crop / 2)
-+		return -ERANGE;
++	struct csi_priv *priv = v4l2_get_subdevdata(sd);
++	struct v4l2_rect *crop;
++	int ret = 0;
 +
-+	if (*compose <= crop / 2 ||
-+	    (*compose < crop * 3 / 4 && !(flags & V4L2_SEL_FLAG_GE)) ||
-+	    (*compose < crop && (flags & V4L2_SEL_FLAG_LE)))
-+		*compose = crop / 2;
-+	else
-+		*compose = crop;
++	if (fse->pad >= CSI_NUM_PADS ||
++	    fse->index > (fse->pad == CSI_SINK_PAD ? 0 : 3))
++		return -EINVAL;
 +
-+	return 0;
++	mutex_lock(&priv->lock);
++
++	if (fse->pad == CSI_SINK_PAD) {
++		fse->min_width = MIN_W;
++		fse->max_width = MAX_W;
++		fse->min_height = MIN_H;
++		fse->max_height = MAX_H;
++	} else {
++		crop = __csi_get_crop(priv, cfg, fse->which);
++
++		fse->min_width = fse->max_width = fse->index & 1 ?
++			crop->width / 2 : crop->width;
++		fse->min_height = fse->max_height = fse->index & 2 ?
++			crop->height / 2 : crop->height;
++	}
++
++	mutex_unlock(&priv->lock);
++	return ret;
 +}
 +
- static int csi_set_selection(struct v4l2_subdev *sd,
- 			     struct v4l2_subdev_pad_config *cfg,
- 			     struct v4l2_subdev_selection *sel)
- {
- 	struct csi_priv *priv = v4l2_get_subdevdata(sd);
- 	struct v4l2_mbus_framefmt *infmt;
-+	struct v4l2_rect *crop, *compose;
- 	struct imx_media_subdev *sensor;
--	struct v4l2_rect *crop;
- 	int pad, ret = 0;
- 
--	if (sel->pad >= CSI_NUM_PADS ||
--	    sel->pad == CSI_SINK_PAD ||
--	    sel->target != V4L2_SEL_TGT_CROP)
-+	if (sel->pad != CSI_SINK_PAD)
- 		return -EINVAL;
- 
- 	sensor = imx_media_find_sensor(priv->md, &priv->sd.entity);
-@@ -1374,30 +1413,66 @@ static int csi_set_selection(struct v4l2_subdev *sd,
- 
- 	infmt = __csi_get_fmt(priv, cfg, CSI_SINK_PAD, sel->which);
- 	crop = __csi_get_crop(priv, cfg, sel->which);
-+	compose = __csi_get_compose(priv, cfg, sel->which);
- 
--	/*
--	 * Modifying the crop rectangle always changes the format on the source
--	 * pad. If the KEEP_CONFIG flag is set, just return the current crop
--	 * rectangle.
--	 */
--	if (sel->flags & V4L2_SEL_FLAG_KEEP_CONFIG) {
--		sel->r = priv->crop;
--		if (sel->which == V4L2_SUBDEV_FORMAT_TRY)
--			*crop = sel->r;
--		goto out;
--	}
-+	switch (sel->target) {
-+	case V4L2_SEL_TGT_CROP:
-+		/*
-+		 * Modifying the crop rectangle always changes the format on
-+		 * the source pads. If the KEEP_CONFIG flag is set, just return
-+		 * the current crop rectangle.
-+		 */
-+		if (sel->flags & V4L2_SEL_FLAG_KEEP_CONFIG) {
-+			sel->r = priv->crop;
-+			if (sel->which == V4L2_SUBDEV_FORMAT_TRY)
-+				*crop = sel->r;
-+			goto out;
-+		}
++static int csi_enum_frame_interval(struct v4l2_subdev *sd,
++				   struct v4l2_subdev_pad_config *cfg,
++				   struct v4l2_subdev_frame_interval_enum *fie)
++{
++	struct csi_priv *priv = v4l2_get_subdevdata(sd);
++	struct v4l2_fract *input_fi;
++	struct v4l2_rect *crop;
++	int ret = 0;
 +
-+		csi_try_crop(priv, &sel->r, cfg, infmt, sensor);
++	if (fie->pad >= CSI_NUM_PADS ||
++	    fie->index >= (fie->pad != CSI_SRC_PAD_IDMAC ?
++			   1 : ARRAY_SIZE(csi_skip)))
++		return -EINVAL;
 +
-+		*crop = sel->r;
++	mutex_lock(&priv->lock);
 +
-+		/* Reset scaling to 1:1 */
-+		compose->width = crop->width;
-+		compose->height = crop->height;
-+		break;
-+	case V4L2_SEL_TGT_COMPOSE:
-+		/*
-+		 * Modifying the compose rectangle always changes the format on
-+		 * the source pads. If the KEEP_CONFIG flag is set, just return
-+		 * the current compose rectangle.
-+		 */
-+		if (sel->flags & V4L2_SEL_FLAG_KEEP_CONFIG) {
-+			sel->r = priv->compose;
-+			if (sel->which == V4L2_SUBDEV_FORMAT_TRY)
-+				*compose = sel->r;
-+			goto out;
-+		}
- 
--	csi_try_crop(priv, &sel->r, cfg, infmt, sensor);
-+		sel->r.left = 0;
-+		sel->r.top = 0;
-+		ret = csi_set_scale(&sel->r.width, crop->width, sel->flags);
-+		if (ret)
-+			goto out;
-+		ret = csi_set_scale(&sel->r.height, crop->height, sel->flags);
-+		if (ret)
-+			goto out;
- 
--	*crop = sel->r;
-+		*compose = sel->r;
-+		break;
-+	default:
++	input_fi = &priv->frame_interval[CSI_SINK_PAD];
++	crop = __csi_get_crop(priv, cfg, fie->which);
++
++	if ((fie->width != crop->width && fie->width != crop->width / 2) ||
++	    (fie->height != crop->height && fie->height != crop->height / 2)) {
 +		ret = -EINVAL;
 +		goto out;
 +	}
- 
--	/* Update the source pad formats */
-+	/* Reset source pads to sink compose rectangle */
- 	for (pad = CSI_SINK_PAD + 1; pad < CSI_NUM_PADS; pad++) {
- 		struct v4l2_mbus_framefmt *outfmt;
- 
- 		outfmt = __csi_get_fmt(priv, cfg, pad, sel->which);
--		outfmt->width = crop->width;
--		outfmt->height = crop->height;
-+		outfmt->width = compose->width;
-+		outfmt->height = compose->height;
- 	}
- 
- out:
-@@ -1464,6 +1539,12 @@ static int csi_registered(struct v4l2_subdev *sd)
- 	/* disable frame skipping */
- 	priv->skip = &csi_skip[0];
- 
-+	/* init default crop and compose rectangle sizes */
-+	priv->crop.width = 640;
-+	priv->crop.height = 480;
-+	priv->compose.width = 640;
-+	priv->compose.height = 480;
 +
- 	priv->fim = imx_media_fim_init(&priv->sd);
- 	if (IS_ERR(priv->fim)) {
- 		ret = PTR_ERR(priv->fim);
++	fie->interval = *input_fi;
++
++	if (fie->pad == CSI_SRC_PAD_IDMAC)
++		csi_apply_skip_interval(&csi_skip[fie->index],
++					&fie->interval);
++
++out:
++	mutex_unlock(&priv->lock);
++	return ret;
++}
++
+ static int csi_get_fmt(struct v4l2_subdev *sd,
+ 		       struct v4l2_subdev_pad_config *cfg,
+ 		       struct v4l2_subdev_format *sdformat)
+@@ -1605,6 +1673,8 @@ static const struct v4l2_subdev_video_ops csi_video_ops = {
+ 
+ static const struct v4l2_subdev_pad_ops csi_pad_ops = {
+ 	.enum_mbus_code = csi_enum_mbus_code,
++	.enum_frame_size = csi_enum_frame_size,
++	.enum_frame_interval = csi_enum_frame_interval,
+ 	.get_fmt = csi_get_fmt,
+ 	.set_fmt = csi_set_fmt,
+ 	.get_selection = csi_get_selection,
 -- 
 2.7.4
