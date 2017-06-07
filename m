@@ -1,38 +1,41 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed,  7 Jun 2017 08:17:50 +0200
-Subject: [PATCH v2] net: mvpp2: do not bypass the mvpp22_port_mii_set function
-Message-ID: <20170607061750.28516-1-antoine.tenart@free-electrons.com>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Tue, 6 Jun 2017 23:20:03 -0700
+Subject: Device address specific mapping of arm,mmu-500
+In-Reply-To: <bc636388-9388-3582-23b0-9f4271cae4b2@arm.com>
+References: <1b79efe2-6835-7a7a-f5ad-361391a7b967@broadcom.com>
+ <20170530151437.GC23067@arm.com>
+ <81637642-22d9-4868-156f-052f64bd042f@broadcom.com>
+ <226bcebc-3902-90d3-24e5-51f2e1f3affb@arm.com>
+ <a85b2e3f-93db-7c4d-cde8-32a57e69bef9@broadcom.com>
+ <16e5fc9d-b014-af7c-dcda-527522ac5cc9@arm.com>
+ <b47a379e-4a1b-42ff-8604-01b5becd685c@broadcom.com>
+ <7bd03bf8-71d5-a974-bea2-a38b4349c547@broadcom.com>
+ <20170531124418.GE9723@arm.com>
+ <ee5bffb3-3aca-8214-1445-98f1f2d4ba09@broadcom.com>
+ <498100e8-e94e-4a65-a9e1-ae59bd59fe2d@broadcom.com>
+ <bc636388-9388-3582-23b0-9f4271cae4b2@arm.com>
+Message-ID: <41f12daa-b46c-83f1-9c9f-51de1cadf14f@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvpp22_port_mii_set() function was added by 2697582144dd, but the
-function directly returns without doing anything. This return was used
-when debugging and wasn't removed before sending the patch. Fix this.
+Hi Robin,
 
-Fixes: 2697582144dd ("net: mvpp2: handle misc PPv2.1/PPv2.2 differences")
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
 
-Since v1:
-  - Added the Fixes tag.
-  - Added Thomas' Acked-by.
+On 6/6/2017 3:02 AM, Robin Murphy wrote:
+> I've currently got some experimental patches pushed out here:
+>
+>      git://linux-arm.org/linux-rm  iommu/pgtable
+>
+> So far, there's still one silly bug (which doesn't affect DMA ops usage)
+> and an awkward race for non-coherent table walks which will need
+> resolving before I have anything to post properly, which I hope will be
+> within the next couple of weeks. In the meantime, though, it already
+> seems to work well enough in practice, so any feedback is welcome!
+>
+> Robin.
+Excellent! I'm going to find time to test it out (likely next week). 
+I'll report back the test result after that.
 
- drivers/net/ethernet/marvell/mvpp2.c | 2 --
- 1 file changed, 2 deletions(-)
+Thanks,
 
-diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 9b875d776b29..70bca2a6fb02 100644
---- a/drivers/net/ethernet/marvell/mvpp2.c
-+++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -4186,8 +4186,6 @@ static void mvpp22_port_mii_set(struct mvpp2_port *port)
- {
- 	u32 val;
- 
--	return;
--
- 	/* Only GOP port 0 has an XLG MAC */
- 	if (port->gop_id == 0) {
- 		val = readl(port->base + MVPP22_XLG_CTRL3_REG);
--- 
-2.9.4
+Ray
