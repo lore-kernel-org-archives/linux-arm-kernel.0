@@ -1,39 +1,22 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Wed, 7 Jun 2017 12:07:52 -0700
-Subject: [PATCH 0/3] arm64: hi6220-hikey: Fix Bluetooth support
-In-Reply-To: <1496826502-1339-1-git-send-email-ulf.hansson@linaro.org>
-References: <1496826502-1339-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CALAqxLVYH8+shjfxkjr5uFzKLznqtRZq2noEa9mcZET9hBNf2g@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 07 Jun 2017 15:08:36 -0400 (EDT)
+Subject: [PATCH v2] net: mvpp2: do not bypass the mvpp22_port_mii_set
+ function
+In-Reply-To: <20170607061750.28516-1-antoine.tenart@free-electrons.com>
+References: <20170607061750.28516-1-antoine.tenart@free-electrons.com>
+Message-ID: <20170607.150836.1506071311612042001.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 7, 2017 at 2:08 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> The commit ea452678734e ("arm64: dts: hikey: Fix WiFi support") indeed managed
-> to fix the WiFi support for the Hikey board. However, it also caused the
-> Bluetooth to break.
->
-> The reason to the problem is because part of the fixes for WiFi, involved
-> explicitly to start manage the external clock for the TI WiLink chip, as it's
-> needed to properly power on/off WiFi. Then, because the Bluetooth driver,
-> hci_ll, don't manage the clock, it fails to initialize Bluetooth.
->
-> This small series add support and DT bindings for the external clock, now
-> properly managed by the hci_ll driver during power on/off. On top of that, the
-> external clock is added to the Bluetooth DT node in the Hikey DTS file.
->
-> The regression has been reported by John Stultz, running a Hikey board with
-> UEFI based boot. I have confirmed that there is no regressions with u-boot as
-> we still don't have bluetooth working on that set up. I intend to fix that as
-> well, although in second step and not being part of a fixup series.
->
-> John, can you please confirm/test this on your Hikey board using UEFI!?
+From: Antoine Tenart <antoine.tenart@free-electrons.com>
+Date: Wed,  7 Jun 2017 08:17:50 +0200
 
-Yes. This does resolve the issue! Bluetooth and wifi are now working
-together again as they were before ea452678734e.
+> The mvpp22_port_mii_set() function was added by 2697582144dd, but the
+> function directly returns without doing anything. This return was used
+> when debugging and wasn't removed before sending the patch. Fix this.
+> 
+> Fixes: 2697582144dd ("net: mvpp2: handle misc PPv2.1/PPv2.2 differences")
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-For the whole set:
-Tested-by: John Stultz <john.stultz@linaro.org>
-
-Thanks so much for working this out Ulf!
-
--john
+Applied, thank you.
