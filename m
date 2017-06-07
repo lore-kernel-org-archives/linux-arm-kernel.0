@@ -1,77 +1,95 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 7 Jun 2017 10:10:54 +0900
-Subject: [PATCH v5 12/20] ARM: dts: uniphier: Add generic compatible
- string for I2C EEPROM
-In-Reply-To: <CABxcv=mPzDVTh_ZH1VtuHMUhVrR+hxz8GwcQT38hwJJqHY+fJA@mail.gmail.com>
-References: <20170523133448.4794-1-javier@dowhile0.org>
- <20170523133448.4794-13-javier@dowhile0.org>
- <CAK7LNATDvesYLKimY=aKfT6kAiidq6Ufd=kCWGQcCZ_Xy-27tw@mail.gmail.com>
- <CABxcv=mPzDVTh_ZH1VtuHMUhVrR+hxz8GwcQT38hwJJqHY+fJA@mail.gmail.com>
-Message-ID: <CAK7LNASBztX033t36vz_MXAgeyHd76roMBtRZ4mi-q9VFB4Lkg@mail.gmail.com>
+From: spjoshi@codeaurora.org (Sarangdhar Joshi)
+Date: Tue,  6 Jun 2017 18:44:41 -0700
+Subject: [PATCH] remoteproc: qcom: mdt_loader: Fix rproc_da_to_va
+Message-ID: <1496799881-11097-1-git-send-email-spjoshi@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+Refactoring MDT loader broke rproc_da_to_va() for Qualcomm images.  This
+causes an incorrect computation of offset and returns an incorrect
+virtual address for the relocatable segment(s).
 
+Fix this by adding an "out" parameter to qcom_mdt_loader() and setting
+the correct segment base address in that parameter.
 
-2017-06-06 18:04 GMT+09:00 Javier Martinez Canillas <javier@dowhile0.org>:
-> Hello Masahiro,
->
-> On Mon, Jun 5, 2017 at 7:13 AM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
->> Hi.
->>
->> 2017-05-23 22:34 GMT+09:00 Javier Martinez Canillas <javier@dowhile0.org>:
->>> The at24 driver allows to register I2C EEPROM chips using different vendor
->>> and devices, but the I2C subsystem does not take the vendor into account
->>> when matching using the I2C table since it only has device entries.
->>>
->>> But when matching using an OF table, both the vendor and device has to be
->>> taken into account so the driver defines only a set of compatible strings
->>> using the "atmel" vendor as a generic fallback for compatible I2C devices.
->>>
->>> So add this generic fallback to the device node compatible string to make
->>> the device to match the driver using the OF device ID table.
->>>
->>> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
->>>
->>> ---
->>>
->>> Changes in v5:
->>> - Only replace atmel variant but keep other EEPROM vendors (Geert Uytterhoeven).
->>>
->>> Changes in v4:
->>> - Only use the atmel manufacturer in the compatible string instead of
->>>   keeping the deprecated ones (Rob Herring).
->>>
->>> Changes in v3: None
->>> Changes in v2: None
->>>
->>>  arch/arm/boot/dts/uniphier-pro4-ace.dts    | 2 +-
->>>  arch/arm/boot/dts/uniphier-pro4-sanji.dts  | 2 +-
->>>  arch/arm/boot/dts/uniphier-pxs2-gentil.dts | 2 +-
->>>  3 files changed, 3 insertions(+), 3 deletions(-)
->>
->>
->> Why didn't you touch
->> arch/arm/boot/dts/uniphier-ref-daughter.dtsi ?
->>
->
-> Because the compatible string "microchip,24lc128" used by the I2C
-> EEPROM node on that DTS is not supported by the
-> drivers/misc/eeprom/at24.c driver (in fact the only occurrence for
-> 24lc128 I see is in that DTS).
->
-> Maybe is a typo and it should be "microchip,24c128" instead ?
+Fixes: 7f0dd07a9b29 ("remoteproc: qcom: mdt_loader: Refactor MDT loader")
+CC: Bjorn Andersson <bjorn.andersson@linaro.org>
+Signed-off-by: Sarangdhar Joshi <spjoshi@codeaurora.org>
+---
+ drivers/remoteproc/qcom_adsp_pil.c  | 3 ++-
+ drivers/remoteproc/qcom_wcnss.c     | 3 ++-
+ drivers/soc/qcom/mdt_loader.c       | 5 ++++-
+ include/linux/soc/qcom/mdt_loader.h | 2 +-
+ 4 files changed, 9 insertions(+), 4 deletions(-)
 
-I do not think so.
-I consulted a board developer.
-
-I also see 24LC128 on Microchip web site:
-http://www.microchip.com/wwwproducts/en/24LC128
-
-
-
+diff --git a/drivers/remoteproc/qcom_adsp_pil.c b/drivers/remoteproc/qcom_adsp_pil.c
+index 49fe2f8..335066e 100644
+--- a/drivers/remoteproc/qcom_adsp_pil.c
++++ b/drivers/remoteproc/qcom_adsp_pil.c
+@@ -79,7 +79,8 @@ static int adsp_load(struct rproc *rproc, const struct firmware *fw)
+ 	struct qcom_adsp *adsp = (struct qcom_adsp *)rproc->priv;
+ 
+ 	return qcom_mdt_load(adsp->dev, fw, rproc->firmware, adsp->pas_id,
+-			     adsp->mem_region, adsp->mem_phys, adsp->mem_size);
++			     adsp->mem_region, adsp->mem_phys,
++			     adsp->mem_size, &adsp->mem_reloc);
+ }
+ 
+ static const struct rproc_fw_ops adsp_fw_ops = {
+diff --git a/drivers/remoteproc/qcom_wcnss.c b/drivers/remoteproc/qcom_wcnss.c
+index a39a1a9..253f152e 100644
+--- a/drivers/remoteproc/qcom_wcnss.c
++++ b/drivers/remoteproc/qcom_wcnss.c
+@@ -153,7 +153,8 @@ static int wcnss_load(struct rproc *rproc, const struct firmware *fw)
+ 	struct qcom_wcnss *wcnss = (struct qcom_wcnss *)rproc->priv;
+ 
+ 	return qcom_mdt_load(wcnss->dev, fw, rproc->firmware, WCNSS_PAS_ID,
+-			     wcnss->mem_region, wcnss->mem_phys, wcnss->mem_size);
++			     wcnss->mem_region, wcnss->mem_phys,
++			     wcnss->mem_size, &wcnss->mem_reloc);
+ }
+ 
+ static const struct rproc_fw_ops wcnss_fw_ops = {
+diff --git a/drivers/soc/qcom/mdt_loader.c b/drivers/soc/qcom/mdt_loader.c
+index bd63df0..b4a30fc 100644
+--- a/drivers/soc/qcom/mdt_loader.c
++++ b/drivers/soc/qcom/mdt_loader.c
+@@ -83,12 +83,13 @@ ssize_t qcom_mdt_get_size(const struct firmware *fw)
+  * @mem_region:	allocated memory region to load firmware into
+  * @mem_phys:	physical address of allocated memory region
+  * @mem_size:	size of the allocated memory region
++ * @img_base:   base address of the firmware image
+  *
+  * Returns 0 on success, negative errno otherwise.
+  */
+ int qcom_mdt_load(struct device *dev, const struct firmware *fw,
+ 		  const char *firmware, int pas_id, void *mem_region,
+-		  phys_addr_t mem_phys, size_t mem_size)
++		  phys_addr_t mem_phys, size_t mem_size, phys_addr_t *img_base)
+ {
+ 	const struct elf32_phdr *phdrs;
+ 	const struct elf32_phdr *phdr;
+@@ -193,6 +194,8 @@ int qcom_mdt_load(struct device *dev, const struct firmware *fw,
+ 			memset(ptr + phdr->p_filesz, 0, phdr->p_memsz - phdr->p_filesz);
+ 	}
+ 
++	if (img_base)
++		*img_base = mem_reloc;
+ out:
+ 	kfree(fw_name);
+ 
+diff --git a/include/linux/soc/qcom/mdt_loader.h b/include/linux/soc/qcom/mdt_loader.h
+index f423001..ea021b3 100644
+--- a/include/linux/soc/qcom/mdt_loader.h
++++ b/include/linux/soc/qcom/mdt_loader.h
+@@ -13,6 +13,6 @@
+ ssize_t qcom_mdt_get_size(const struct firmware *fw);
+ int qcom_mdt_load(struct device *dev, const struct firmware *fw,
+ 		  const char *fw_name, int pas_id, void *mem_region,
+-		  phys_addr_t mem_phys, size_t mem_size);
++		  phys_addr_t mem_phys, size_t mem_size, phys_addr_t *img_base);
+ 
+ #endif
 -- 
-Best Regards
-Masahiro Yamada
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
