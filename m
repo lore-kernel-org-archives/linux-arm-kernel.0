@@ -1,35 +1,45 @@
 From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Wed,  7 Jun 2017 08:41:58 +0200
-Subject: [PATCH v3 3/3] ARM: dts: imx6qdl.dtsi: add "fsl,
- imx6q-snvs-lpgpr" node
+Date: Wed,  7 Jun 2017 08:41:56 +0200
+Subject: [PATCH v3 1/3] nvmem: dt: document SNVS LPGPR binding
 In-Reply-To: <20170607064158.16422-1-o.rempel@pengutronix.de>
 References: <20170607064158.16422-1-o.rempel@pengutronix.de>
-Message-ID: <20170607064158.16422-4-o.rempel@pengutronix.de>
+Message-ID: <20170607064158.16422-2-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This node is for Low Power General Purpose Register which can
-be used as Non-Volatile Storage.
+Documentation bindings for the Low Power General Purpose Register
+available on i.MX6 SoCs in the Secure Non-Volatile Storage.
 
 Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
 ---
- arch/arm/boot/dts/imx6qdl.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+ .../devicetree/bindings/nvmem/snvs-lpgpr.txt          | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index e426faa9c243..94e992558238 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -769,6 +769,10 @@
- 					mask = <0x60>;
- 					status = "disabled";
- 				};
+diff --git a/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt b/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
+new file mode 100644
+index 000000000000..21910fb3159f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
+@@ -0,0 +1,19 @@
++Device tree bindings for Low Power General Purpose Register found in i.MX6Q/D
++Secure Non-Volatile Storage.
 +
-+				snvs_lpgpr: snvs-lpgpr {
-+					compatible = "fsl,imx6q-snvs-lpgpr";
-+				};
- 			};
- 
- 			epit1: epit at 020d0000 { /* EPIT1 */
++This DT node should be represented as a sub-node of a "syscon",
++"simple-mfd" node.
++
++Required properties:
++- compatible: should be:
++	"fsl,imx6q-snvs-lpgpr" for Freescale i.MX6Q/D/DL/S
++
++Example:
++snvs: snvs at 020cc000 {
++	compatible = "fsl,sec-v4.0-mon", "syscon", "simple-mfd";
++	reg = <0x020cc000 0x4000>;
++
++	snvs_lpgpr: snvs-lpgpr {
++		compatible = "fsl,imx6q-snvs-lpgpr";
++	};
++};
 -- 
 2.11.0
