@@ -1,65 +1,37 @@
-From: han.xu@nxp.com (Han Xu)
-Date: Wed, 7 Jun 2017 15:33:26 +0000
-Subject: [PATCH v5 2/3] ARM: dts: imx7: add GPMI NAND and APBH DMA
-In-Reply-To: <151ddece1e1427d0b69c4ff11b86a69b6a035d0d.1496730576.git-series.stefan@agner.ch>
-References: <cover.b62c3a17bd60de48d8fb2ade6dde4f2bc60aaf3c.1496730576.git-series.stefan@agner.ch>
- <151ddece1e1427d0b69c4ff11b86a69b6a035d0d.1496730576.git-series.stefan@agner.ch>
-Message-ID: <9d66efda-d7c1-89a2-e163-c86056e08fb1@nxp.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed,  7 Jun 2017 16:35:11 +0100
+Subject: [PATCH 0/2] arm64: avoid KASAN stack overflows
+Message-ID: <1496849713-17078-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+I recently tried building the kernel with a GCC 7.1.0 toolchain, and
+encountered a number of new and surprising failures on kernels buitl with
+KASAN.
 
-On 06/06/2017 01:30 AM, Stefan Agner wrote:
-> Add i.MX 7 APBH DMA and GPMI NAND modules.
->
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->   arch/arm/boot/dts/imx7s.dtsi | 32 ++++++++++++++++++++++++++++++++
->   1 file changed, 32 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-> index c4f12fd..d71acd8 100644
-> --- a/arch/arm/boot/dts/imx7s.dtsi
-> +++ b/arch/arm/boot/dts/imx7s.dtsi
-> @@ -995,5 +995,37 @@
->   				status = "disabled";
->   			};
->   		};
-> +
-> +		dma_apbh: dma-apbh at 33000000 {
-> +			compatible = "fsl,imx7d-dma-apbh", "fsl,imx28-dma-apbh";
-> +			reg = <0x33000000 0x2000>;
-> +			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-names = "gpmi0", "gpmi1", "gpmi2", "gpmi3";
-> +			#dma-cells = <1>;
-> +			dma-channels = <4>;
-> +			clocks = <&clks IMX7D_NAND_USDHC_BUS_RAWNAND_CLK>;
-> +			clock-names = "dma_apbh_bch", "dma_apbh_io";
+It looks like this is due to stack instrumentation, which my prior toolchain
+didn't support. KASAN's stack instrumentation significantly bloats the stack
+significantly, leading to stack overflows and subsequent failures as a result
+of the data corruption they cause.
 
-please remove the clock names, I am good with all other changes.
+These patches avoid the issue by doubling the stack size for kernels built with
+KASAN, as is already done for x86.
 
-> +		};
-> +
-> +		gpmi: gpmi-nand at 33002000{
-> +			compatible = "fsl,imx7d-gpmi-nand";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			reg = <0x33002000 0x2000>, <0x33004000 0x4000>;
-> +			reg-names = "gpmi-nand", "bch";
-> +			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-names = "bch";
-> +			clocks = <&clks IMX7D_NAND_RAWNAND_CLK>,
-> +				<&clks IMX7D_NAND_USDHC_BUS_RAWNAND_CLK>;
-> +			clock-names = "gpmi_io", "gpmi_bch_apb";
-> +			dmas = <&dma_apbh 0>;
-> +			dma-names = "rx-tx";
-> +			status = "disabled";
-> +			assigned-clocks = <&clks IMX7D_NAND_ROOT_SRC>;
-> +			assigned-clock-parents = <&clks IMX7D_PLL_ENET_MAIN_500M_CLK>;
-> +		};
->   	};
->   };
+I've built and booted 4K and 64K kernels with these patches applied (and with
+KASAN enabled), and so far I haven't seen stack overflows when testing with
+Syzkaller.
+
+Thanks,
+Mark.
+
+Mark Rutland (2):
+  arm64: avoid open-coding THREAD_SIZE{,_ORDER}
+  arm64: use larger stacks for KASAN
+
+ arch/arm64/include/asm/thread_info.h | 22 ++++++++++++++++++----
+ 1 file changed, 18 insertions(+), 4 deletions(-)
+
+-- 
+1.9.1
