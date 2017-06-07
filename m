@@ -1,60 +1,53 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 7 Jun 2017 11:46:10 +0200
-Subject: [[PATCH v2]] drivers: leds/trigger: system cannot enter suspend
-In-Reply-To: <20170607071256.GA3230@amd>
-References: <1496803810-57154-1-git-send-email-bo.zhang@nxp.com>
- <20170607071256.GA3230@amd>
-Message-ID: <CACRpkdacymETLuRmpn07HUKHvrjWc85Jdj0s0qk44zTcaALa9w@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 07 Jun 2017 10:45:32 +0100
+Subject: [PATCH 00/11] arm64/firmware: Software Delegated Exception
+ Interface
+In-Reply-To: <20170606195944.GM9464@cbox>
+References: <20170515174400.29735-1-james.morse@arm.com>
+ <20170606195944.GM9464@cbox>
+Message-ID: <5937CB3C.6040800@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 7, 2017 at 9:12 AM, Pavel Machek <pavel@ucw.cz> wrote:
+Hi Christoffer,
 
-> Core reason is that 5ab92a7cb is wrong. (Very wrong; it papers over
-> the issue for one trigger, but we have more than one... Even if
-> special handling for heartbeat is warranted, that handling would be
-> "turn the led off" not "unregister the trigger", which is
-> userland-visible action.)
+On 06/06/17 20:59, Christoffer Dall wrote:
+> On Mon, May 15, 2017 at 06:43:48PM +0100, James Morse wrote:
+>> Running the event handler behind VHE-KVM's back has some side effects: The
+>> event handler will blindly use any registers that are shared between the host
+>> and guest. The two that I think matter are TPIDR_EL1, and the debug state. The
+>> guest may have set MDSCR_EL1 so debug exceptions must remain masked. The
+>> guest's TPIDR_EL1 will be used by the event handler if it accesses per-cpu
+>> variables. This needs fixing. The first part of this series juggles KVMs use
+>> of TPIDR_EL2 so that we share it with the host on VHE systems. An equivalent
+>> change for 32bit is on my todo list. (one alternative to this is to have a
+>> parody world switch in the SDEI event handler, but this would mean special
+>> casing interrupted guests, and be an ABI link to KVM.)
+>>
+>> Causing a synchronous exception from an event handler will cause KVM to
+>> hyp-panic, but may silently succeed if the event didn't interrupt a guest.
+>> (I may WARN_ON() if this happens in a later patch). You because of this you
+> 
+> The last sentence here doesn't make much sense to me.
 
-OK yeah I guess you're right.
+If this interrupts a VHE-guest, KVM's hyp-vectors remain in vbar_el2. If we then
+take a synchronous exception, KVM will assume this happened during world switch
+and panic.
+In contrast if you didn't interrupt a guest, the kernel vectors are in vbar_el2,
+so the fault will be handled.
 
-I just couldn't think about anything better and didn't get any
-review at the time, so mistakes were made.
+This 'silently succeed' only occurred to me when writing the cover-letter,
+(hence its probably worded badly). I plan to catch it by save-restoring the
+exception registers, and warning if they've changed as this would hyp-panic if
+you interrupted a guest.
 
-> That one should be reverted, then maybe the
-> driver should be fixed to turn the led off during suspend.
 
-Do you mean that the heartbeat trigger driver should be fixed to
-turn off the LED during sleep?
+> For the rest of the KVM part it looks mostly good to me, besides the
+> points I raised in the individual patches.
 
-That is essentially what I was trying to achieve.
+Thanks for taking a look!
 
-The reason it is done as it is, is that the trigger sets up
-a timer to do its job, and the timer may trigger between
-the point you turn off the LED and the system really goes
-to suspend, again maybe turning the LED on and
-again leaving the system with a glowing LED at suspend.
 
-The patch also solves the following phenomenon, sorry
-for not writing in the commit:
+Thanks,
 
-- Turn off LED
-- Suspend I2C hardware
-- Timer trigger
-- Trying to blink the LED using I2C
-- Crap in the console about the failed I2C transaction
-- Actual suspen happens
-- System comes online
-- Trying to blink the LED using I2C
-- Crap in the console about the failed I2C transaction
-- Resume I2C hardware
-
-It's just very fragile this trigger, turning off the LED from
-the PM notifier is obviously not enough, we also need to
-disable the timer, and then take it back online after resume.
-
-That is the tricky part, which is simplified by just removing
-and adding back the trigger.
-
-Yours,
-Linus Walleij
+James
