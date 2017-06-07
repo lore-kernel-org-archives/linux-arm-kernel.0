@@ -1,184 +1,94 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Wed,  7 Jun 2017 11:33:39 -0700
-Subject: [PATCH v8 00/34] i.MX Media Driver
-Message-ID: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
+Date: Wed,  7 Jun 2017 11:33:40 -0700
+Subject: [PATCH v8 01/34] dt-bindings: Add bindings for video-multiplexer
+ device
+In-Reply-To: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
+References: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1496860453-6282-2-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In version 8:
+From: Philipp Zabel <p.zabel@pengutronix.de>
 
-- Switched to v4l2_fwnode APIs.
+Add bindings documentation for the video multiplexer device.
 
-- Always pass a valid CSI id to ipu_set_ic_src_mux() in imx-ic-prp, even
-  if the IC is receiving from the VDIC. The reason is due to a bug in the
-  i.MX6 reference manual: from experiment it is determined that the CSI id
-  select bit in IPU_CONF register selects which CSI is routed to either
-  the VDIC or the IC, and is independent of whether the IC is set to
-  receive from a CSI or the VDIC. Sugested by Marek Vasut <marex@denx.de>.
-
-- ov5640: propagate error codes from all i2c register accesses.
-  Sugested by Sakari Ailus <sakari.ailus@iki.fi>.
-
-- ov5640: drop the entity stream count check in ov5640_s_stream().
-  Sugested by Sakari Ailus <sakari.ailus@iki.fi>.
-
-- ov5640: Fix manual exposure control. The manual exposure setting
-  (in line periods) cannot exceed the max exposure value in registers
-  {0x380E, 0x380F} + {0x350C,0x350D}, however the max eposure value was
-  not being calcualted correctly.
-
-- ov5640: the video mode register tables require auto gain/exposure be
-  disabled before programming the register set. However auto gain/exp was
-  being disabled by direct register write. This caused the auto gain/exp
-  control values to be inconsistent with the actual hardware setting. Fixed
-  by going through v4l2-ctrl when disabling auto gain/exp.
-
-- ov5640: converted virtual channel macro to a module parameter, default
-  to channel 0.
-
-- ov5640: override the v4l2-ctl lock to use the ov5640 subdev driver's
-  lock. Sugested by Sakari Ailus <sakari.ailus@iki.fi>.
-
-- ov5640: switch to unit-less V4L2_CID_EXPOSURE. Using
-  V4L2_CID_EXPOSURE_ABSOLUTE will require converting from 100-usec units
-  to line periods and vice-versa. Sugested by Sakari Ailus and
-  Pavel Machek <pavel@ucw.cz>.
-
-- ov5640: drop dangling regulator_bulk_disable() from probe/remove.
-  Sugested by Sakari Ailus <sakari.ailus@iki.fi>.
-
-- FIM: move input capture channel selection out of the device-tree and
-  make this a V4L2 control. In order to support attaching a FIM to prpencvf,
-  the FIM cannot have any device-tree configuration, because prpencvf has
-  no device node. The FIM now is completely configurable via its V4L2
-  controls.
-
-- FIM: drop imx_media_fim_set_power(), and move the input capture channel
-  request to imx_media_fim_set_stream(). This allows to drop csi_s_power()
-  as well, since the latter only called imx_media_fim_set_power().
-
-- FIM: add a spinlock to protect the frame_interval_monitor() from the
-  setting of new control values. The frame_interval_monitor() is called
-  from interrupt context so a spinlock must be used.
-
-- Updated to version 8 video-mux patchset from Philipp Zabel
-  <p.zabel@pengutronix.de>.
-
-
-Marek Vasut (1):
-  media: imx: Drop warning upon multiple S_STREAM disable calls
-
-Philipp Zabel (8):
-  dt-bindings: Add bindings for video-multiplexer device
-  ARM: dts: imx6qdl: add multiplexer controls
-  ARM: dts: imx6qdl: Add video multiplexers, mipi_csi, and their
-    connections
-  add mux and video interface bridge entity functions
-  platform: add video-multiplexer subdevice driver
-  media: imx: csi: increase burst size for YUV formats
-  media: imx: csi: add frame skipping support
-  media: imx: csi: add sink selection rectangles
-
-Russell King (3):
-  media: imx: csi: add support for bayer formats
-  media: imx: csi: add frame size/interval enumeration
-  media: imx: capture: add frame sizes/interval enumeration
-
-Steve Longerbeam (22):
-  [media] dt-bindings: Add bindings for i.MX media driver
-  [media] dt/bindings: Add bindings for OV5640
-  ARM: dts: imx6qdl: Add compatible, clocks, irqs to MIPI CSI-2 node
-  ARM: dts: imx6qdl: add capture-subsystem device
-  ARM: dts: imx6qdl-sabrelite: remove erratum ERR006687 workaround
-  ARM: dts: imx6-sabrelite: add OV5642 and OV5640 camera sensors
-  ARM: dts: imx6-sabresd: add OV5642 and OV5640 camera sensors
-  ARM: dts: imx6-sabreauto: create i2cmux for i2c3
-  ARM: dts: imx6-sabreauto: add reset-gpios property for max7310_b
-  ARM: dts: imx6-sabreauto: add pinctrl for gpt input capture
-  ARM: dts: imx6-sabreauto: add the ADV7180 video decoder
-  [media] add Omnivision OV5640 sensor driver
-  media: Add userspace header file for i.MX
-  media: Add i.MX media core driver
-  media: imx: Add a TODO file
-  media: imx: Add Capture Device Interface
-  media: imx: Add CSI subdev driver
-  media: imx: Add VDIC subdev driver
-  media: imx: Add IC subdev drivers
-  media: imx: Add MIPI CSI-2 Receiver subdev driver
-  media: imx: set and propagate default field, colorimetry
-  ARM: imx_v6_v7_defconfig: Enable staging video4linux drivers
-
- .../devicetree/bindings/media/i2c/ov5640.txt       |   45 +
- Documentation/devicetree/bindings/media/imx.txt    |   47 +
- .../devicetree/bindings/media/video-mux.txt        |   60 +
- Documentation/media/uapi/mediactl/media-types.rst  |   21 +
- Documentation/media/v4l-drivers/imx.rst            |  614 +++++
- arch/arm/boot/dts/imx6dl-sabrelite.dts             |    5 +
- arch/arm/boot/dts/imx6dl-sabresd.dts               |    5 +
- arch/arm/boot/dts/imx6dl.dtsi                      |  189 ++
- arch/arm/boot/dts/imx6q-sabrelite.dts              |    5 +
- arch/arm/boot/dts/imx6q-sabresd.dts                |    5 +
- arch/arm/boot/dts/imx6q.dtsi                       |  125 ++
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi           |  136 +-
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi           |  152 +-
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi             |  114 +-
- arch/arm/boot/dts/imx6qdl.dtsi                     |   20 +-
- arch/arm/configs/imx_v6_v7_defconfig               |   11 +
- drivers/media/i2c/Kconfig                          |   10 +
- drivers/media/i2c/Makefile                         |    1 +
- drivers/media/i2c/ov5640.c                         | 2344 ++++++++++++++++++++
- drivers/media/platform/Kconfig                     |    6 +
- drivers/media/platform/Makefile                    |    2 +
- drivers/media/platform/video-mux.c                 |  334 +++
- drivers/staging/media/Kconfig                      |    2 +
- drivers/staging/media/Makefile                     |    1 +
- drivers/staging/media/imx/Kconfig                  |   21 +
- drivers/staging/media/imx/Makefile                 |   12 +
- drivers/staging/media/imx/TODO                     |   23 +
- drivers/staging/media/imx/imx-ic-common.c          |  113 +
- drivers/staging/media/imx/imx-ic-prp.c             |  518 +++++
- drivers/staging/media/imx/imx-ic-prpencvf.c        | 1309 +++++++++++
- drivers/staging/media/imx/imx-ic.h                 |   38 +
- drivers/staging/media/imx/imx-media-capture.c      |  775 +++++++
- drivers/staging/media/imx/imx-media-csi.c          | 1816 +++++++++++++++
- drivers/staging/media/imx/imx-media-dev.c          |  666 ++++++
- drivers/staging/media/imx/imx-media-fim.c          |  494 +++++
- drivers/staging/media/imx/imx-media-internal-sd.c  |  349 +++
- drivers/staging/media/imx/imx-media-of.c           |  270 +++
- drivers/staging/media/imx/imx-media-utils.c        |  896 ++++++++
- drivers/staging/media/imx/imx-media-vdic.c         | 1009 +++++++++
- drivers/staging/media/imx/imx-media.h              |  325 +++
- drivers/staging/media/imx/imx6-mipi-csi2.c         |  698 ++++++
- include/linux/imx-media.h                          |   29 +
- include/media/imx.h                                |   15 +
- include/uapi/linux/media.h                         |    6 +
- include/uapi/linux/v4l2-controls.h                 |    4 +
- 45 files changed, 13613 insertions(+), 27 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/media/i2c/ov5640.txt
- create mode 100644 Documentation/devicetree/bindings/media/imx.txt
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Pavel Machek <pavel@ucw.cz>
+---
+ .../devicetree/bindings/media/video-mux.txt        | 60 ++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/media/video-mux.txt
- create mode 100644 Documentation/media/v4l-drivers/imx.rst
- create mode 100644 drivers/media/i2c/ov5640.c
- create mode 100644 drivers/media/platform/video-mux.c
- create mode 100644 drivers/staging/media/imx/Kconfig
- create mode 100644 drivers/staging/media/imx/Makefile
- create mode 100644 drivers/staging/media/imx/TODO
- create mode 100644 drivers/staging/media/imx/imx-ic-common.c
- create mode 100644 drivers/staging/media/imx/imx-ic-prp.c
- create mode 100644 drivers/staging/media/imx/imx-ic-prpencvf.c
- create mode 100644 drivers/staging/media/imx/imx-ic.h
- create mode 100644 drivers/staging/media/imx/imx-media-capture.c
- create mode 100644 drivers/staging/media/imx/imx-media-csi.c
- create mode 100644 drivers/staging/media/imx/imx-media-dev.c
- create mode 100644 drivers/staging/media/imx/imx-media-fim.c
- create mode 100644 drivers/staging/media/imx/imx-media-internal-sd.c
- create mode 100644 drivers/staging/media/imx/imx-media-of.c
- create mode 100644 drivers/staging/media/imx/imx-media-utils.c
- create mode 100644 drivers/staging/media/imx/imx-media-vdic.c
- create mode 100644 drivers/staging/media/imx/imx-media.h
- create mode 100644 drivers/staging/media/imx/imx6-mipi-csi2.c
- create mode 100644 include/linux/imx-media.h
- create mode 100644 include/media/imx.h
 
+diff --git a/Documentation/devicetree/bindings/media/video-mux.txt b/Documentation/devicetree/bindings/media/video-mux.txt
+new file mode 100644
+index 0000000..63b9dc9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/video-mux.txt
+@@ -0,0 +1,60 @@
++Video Multiplexer
++=================
++
++Video multiplexers allow to select between multiple input ports. Video received
++on the active input port is passed through to the output port. Muxes described
++by this binding are controlled by a multiplexer controller that is described by
++the bindings in Documentation/devicetree/bindings/mux/mux-controller.txt
++
++Required properties:
++- compatible : should be "video-mux"
++- mux-controls : mux controller node to use for operating the mux
++- #address-cells: should be <1>
++- #size-cells: should be <0>
++- port@*: at least three port nodes containing endpoints connecting to the
++  source and sink devices according to of_graph bindings. The last port is
++  the output port, all others are inputs.
++
++Optionally, #address-cells, #size-cells, and port nodes can be grouped under a
++ports node as described in Documentation/devicetree/bindings/graph.txt.
++
++Example:
++
++	mux: mux-controller {
++		compatible = "gpio-mux";
++		#mux-control-cells = <0>;
++
++		mux-gpios = <&gpio1 15 GPIO_ACTIVE_HIGH>;
++	};
++
++	video-mux {
++		compatible = "video-mux";
++		mux-controls = <&mux>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		port at 0 {
++			reg = <0>;
++
++			mux_in0: endpoint {
++				remote-endpoint = <&video_source0_out>;
++			};
++		};
++
++		port at 1 {
++			reg = <1>;
++
++			mux_in1: endpoint {
++				remote-endpoint = <&video_source1_out>;
++			};
++		};
++
++		port at 2 {
++			reg = <2>;
++
++			mux_out: endpoint {
++				remote-endpoint = <&capture_interface_in>;
++			};
++		};
++	};
++};
 -- 
 2.7.4
