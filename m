@@ -1,34 +1,31 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 7 Jun 2017 16:42:32 +0200
-Subject: [PATCH 7/9] net: mvmdio: add xmdio support
-In-Reply-To: <20170607121205.GC1271@lunn.ch>
+Date: Wed, 7 Jun 2017 16:43:08 +0200
+Subject: [PATCH 4/9] net: mvmdio: move the read valid check into its own
+ function
+In-Reply-To: <71f0a99b-4736-a405-1d06-9c05f80aa327@cogentembedded.com>
 References: <20170607083810.30922-1-antoine.tenart@free-electrons.com>
- <20170607083810.30922-8-antoine.tenart@free-electrons.com>
- <20170607121205.GC1271@lunn.ch>
-Message-ID: <20170607144232.GA4173@kwain>
+ <20170607083810.30922-5-antoine.tenart@free-electrons.com>
+ <71f0a99b-4736-a405-1d06-9c05f80aa327@cogentembedded.com>
+Message-ID: <20170607144308.GB4173@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Hello,
 
-On Wed, Jun 07, 2017 at 02:12:05PM +0200, Andrew Lunn wrote:
-> On Wed, Jun 07, 2017 at 10:38:08AM +0200, Antoine Tenart wrote:
-> > This patch adds the xMDIO interface support in the mvmdio driver. This
-> > interface is used in Ethernet controllers on Marvell 370, 7k and 8k (as
-> > of now). The xSMI interface supported by this driver complies with the
-> > IEEE 802.3 clause 45 (while the SMI interface complies with the clause
-> > 22). The xSMI interface is used by 10GbE devices.
+On Wed, Jun 07, 2017 at 01:00:21PM +0300, Sergei Shtylyov wrote:
+> On 6/7/2017 11:38 AM, Antoine Tenart wrote:
+> > 
+> > -	val = readl(dev->regs);
+> > -	if (!(val & MVMDIO_SMI_READ_VALID)) {
+> > +	if (orion_mdio_smi_is_read_valid(dev)) {
+> >  		dev_err(bus->parent, "SMI bus read not valid\n");
 > 
-> I've only take a quick look, but i don't see anywhere you look at the
-> register address and see if it has MII_ADDR_C45 to determine if a C45
-> transaction should be done, or a C22. The MDIO bus can have a mix of
-> C45 and C22 devices on it, and you need to use the correct transaction
-> type depending on the target device/address.
+>    I think you reversed the valuid/invalid sense in the new function's name.
 
-So this could be dynamic and not based on the compatible. I'll try this
-and see if it can work.
+Good catch, I'll fix this.
 
 Thanks!
+Antoine
 
 -- 
 Antoine T?nart, Free Electrons
@@ -40,4 +37,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170607/a008eb2c/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170607/61219f52/attachment.sig>
