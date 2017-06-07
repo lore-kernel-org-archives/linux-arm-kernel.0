@@ -1,99 +1,48 @@
-From: thor.thayer@linux.intel.com (Thor Thayer)
-Date: Wed, 7 Jun 2017 15:45:50 -0500
-Subject: [PATCHv3 1/4] ARM: dts: socfpga: Add Altera I2C Controller to
- CycloneV
-In-Reply-To: <73vao9vcsq.fsf@pengutronix.de>
-References: <1496447559-19782-1-git-send-email-thor.thayer@linux.intel.com>
- <1496447559-19782-2-git-send-email-thor.thayer@linux.intel.com>
- <73vao9vcsq.fsf@pengutronix.de>
-Message-ID: <b5b5dd02-9c07-1ecd-086d-ef668f280514@linux.intel.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Wed, 7 Jun 2017 22:50:17 +0200
+Subject: [PATCH 1/2] power: reset: at91-poweroff: fix clobber list
+In-Reply-To: <20170531094915.3469-1-alexandre.belloni@free-electrons.com>
+References: <20170531094915.3469-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20170607205017.a35lbn4q7eizq7rq@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steffen,
+Hi,
 
-On 06/06/2017 01:40 AM, Steffen Trumtrar wrote:
+On Wed, May 31, 2017 at 11:49:14AM +0200, Alexandre Belloni wrote:
+> Assembly in at91_lpddr_poweroff has r0 in the clobber list but uses r6.
 > 
-> Hi!
-> 
-> thor.thayer at linux.intel.com writes:
-> 
->> From: Thor Thayer <thor.thayer@linux.intel.com>
->>
->> Add the Altera I2C Controller to the CycloneV SoCFPGA device tree.
->>
->> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
->> ---
->> v2  Remove altr, from fifo-size.
->>      Rename compatible string to "altr,softip-i2c"
->> v3  Add version to commpatible string "altr,softip-i2c-v1.0"
->> ---
->>   arch/arm/boot/dts/socfpga.dtsi               | 13 ++++++++++---
->>   arch/arm/boot/dts/socfpga_cyclone5_socdk.dts | 28 +++++++++++++++++++++++++++-
->>   2 files changed, 37 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
->> index b2674bd..d69c13d 100644
->> --- a/arch/arm/boot/dts/socfpga.dtsi
->> +++ b/arch/arm/boot/dts/socfpga.dtsi
->> @@ -133,6 +133,13 @@
->>   					#address-cells = <1>;
->>   					#size-cells = <0>;
->>   
->> +					clk_0: clk_0 {
->> +						compatible = "fixed-clock";
->> +						#clock-cells = <0>;
->> +						clock-frequency = <50000000>;
->> +						clock-output-names = "clk_0-clk";
->> +					};
->> +
->>   					osc1: osc1 {
->>   						#clock-cells = <0>;
->>   						compatible = "fixed-clock";
->> @@ -529,11 +536,11 @@
->>   				};
->>   		};
->>   
->> -		fpga_bridge0: fpga_bridge at ff400000 {
->> +		fpga_bridge0: fpga_bridge at ff200000 {
->>   			compatible = "altr,socfpga-lwhps2fpga-bridge";
->> -			reg = <0xff400000 0x100000>;
->> +			reg = <0xff200000 0x00200000>;
->>   			resets = <&rst LWHPS2FPGA_RESET>;
->> -			clocks = <&l4_main_clk>;
->> +			clocks = <&clk_0>;
->>   		};
->>
-> 
-> Why this change? This looks wrong and unrelated. The LWHPS2FPGA bridge
-> is at 0xff400000, so it is correct the way it is or not?
-> 
-Yes, good point. I was using the LWHPS2FPGA slave bus so I shouldn't 
-change this one. I'll add the slave version.
+> Reported-by: Ben Hutchings <ben.hutchings@codethink.co.uk>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Thanks,
+Thanks, queued.
 
-Thor
->>   		fpga_bridge1: fpga_bridge at ff500000 {
->> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
->> index 155829f..f99576b 100644
->> --- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
->> +++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
->> @@ -68,6 +68,7 @@
->>   		regulator-min-microvolt = <3300000>;
->>   		regulator-max-microvolt = <3300000>;
->>   	};
->> +
->>   };
-> 
-> ???
-> 
-Whoops. I should remove the extra space. Thanks!
+-- Sebastian
 
+> ---
+>  drivers/power/reset/at91-poweroff.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> (...)
+> diff --git a/drivers/power/reset/at91-poweroff.c b/drivers/power/reset/at91-poweroff.c
+> index c6c3beea72f9..c30c40193aaa 100644
+> --- a/drivers/power/reset/at91-poweroff.c
+> +++ b/drivers/power/reset/at91-poweroff.c
+> @@ -97,7 +97,7 @@ static void at91_lpddr_poweroff(void)
+>  		  "r" cpu_to_le32(AT91_DDRSDRC_LPDDR2_PWOFF),
+>  		  "r" (at91_shdwc_base),
+>  		  "r" cpu_to_le32(AT91_SHDW_KEY | AT91_SHDW_SHDW)
+> -		: "r0");
+> +		: "r6");
+>  }
+>  
+>  static int at91_poweroff_get_wakeup_mode(struct device_node *np)
+> -- 
+> 2.11.0
 > 
-> 
-> Best regards,
-> Steffen
-> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170607/5e4304be/attachment.sig>
