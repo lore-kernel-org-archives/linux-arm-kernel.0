@@ -1,40 +1,56 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 7 Jun 2017 17:18:16 +0100
-Subject: [PATCH 0/2] arm64: avoid KASAN stack overflows
-In-Reply-To: <07c30069-84f5-be51-85ab-c3c84eea9463@virtuozzo.com>
-References: <1496849713-17078-1-git-send-email-mark.rutland@arm.com>
- <07c30069-84f5-be51-85ab-c3c84eea9463@virtuozzo.com>
-Message-ID: <20170607161816.GA8330@leverpostej>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Wed, 7 Jun 2017 18:35:48 +0200
+Subject: [PATCH v2 3/7] includes: dt-bindings: Rename STM32F429 pinctrl DT
+ bindings
+In-Reply-To: <800a68a4-d6ce-212b-5849-56c9d32f891a@st.com>
+References: <1491568984-20169-1-git-send-email-alexandre.torgue@st.com>
+ <1491568984-20169-4-git-send-email-alexandre.torgue@st.com>
+ <20170410202736.zy7naw74hvrdmfzk@rob-hp-laptop>
+ <800a68a4-d6ce-212b-5849-56c9d32f891a@st.com>
+Message-ID: <832cd436-0704-3709-ba2c-2c1f6db48615@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 07, 2017 at 07:12:30PM +0300, Andrey Ryabinin wrote:
-> On 06/07/2017 06:35 PM, Mark Rutland wrote:
-> > I recently tried building the kernel with a GCC 7.1.0 toolchain, and
-> > encountered a number of new and surprising failures on kernels buitl with
-> > KASAN.
-> > 
-> > It looks like this is due to stack instrumentation, which my prior toolchain
-> > didn't support. KASAN's stack instrumentation significantly bloats the stack
-> > significantly, leading to stack overflows and subsequent failures as a result
-> > of the data corruption they cause.
-> 
-> This is caused by -fsanitize-address-use-after-scope which is added in gcc 7.
-> Arnd reported that sometimes it causes enormously huge stack growth.
+Hi Rob,
 
-Ah. Sorry for the bogus attribution, then.
+Gentle ping.
 
-> Given that we haven't found any single use-after-scope bug so far, I wouldn't object
-> removing it completely.  
+On 04/12/2017 03:31 PM, Alexandre Torgue wrote:
+> Hi Rob,
+>
+> On 04/10/2017 10:27 PM, Rob Herring wrote:
+>> On Fri, Apr 07, 2017 at 02:43:00PM +0200, Alexandre TORGUE wrote:
+>>> STM32F4 MCU series is composed of several SOC (STM32F429, STM32F469,
+>>> ...).
+>>> Most of muxing definition are identical. So to avoid to duplicate
+>>> bindings
+>>> definition, this patch create common definitions.
+>>
+>> This is a lot of churn. Some confirmation that the resultant dtb is the
+>> same before and after would be nice. Perhaps the script you used to
+>> convert this as well.
+>
+> I tried to use fdtdump but it seems bugged. So I used directly dtc
+> binary to (re)generate dts files (before and after apply the series) and
+> I compared "pinmux" field in both case.
+>
+> Example on stm32f469-disco:
+>
+> ./scripts/dtc/dtc -I dtb -O dts -o stm32f469-disco-after.dts
+> stm32f469-disco-after.dtb
+>
+> ./scripts/dtc/dtc -I dtb -O dts -o stm32f469-disco-before.dts
+> stm32f469-disco-before.dtb
+>
+> cat stm32f469-disco-after.dts | grep pinmux
+> cat stm32f469-disco-before.dts | grep pinmux
+>
 
-FWIW, I saw a single use-after-scope splat when testing with syzkaller
-(prior to these patches), but that may have been a result of things
-going wrong after a stack overflow. Unfortuantely I threw away all of
-the results of that run.
+Do you agree with verifications ?
 
-I'll see if anything triggers overnight with this patch.
-
-Otherwise, I'm also happy for use-after-scope checks to be disabled.
-
-Thanks,
-Mark.
+> regards
+> alex
+>
+>>
+>> Rob
+>>
