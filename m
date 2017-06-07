@@ -1,94 +1,31 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 7 Jun 2017 13:45:45 +0800
-Subject: [PATCH] clk: sunxi-ng: Move all clock types to a library
-In-Reply-To: <CAK8P3a1Qvt4nvM5HeK-n87tsi2D5GBOmZo0rZv_Lp==CC=34Uw@mail.gmail.com>
-References: <20170602223006.1653-1-sboyd@codeaurora.org>
- <201706031243.qNvuUbQX%fengguang.wu@intel.com>
- <20170605144546.b6oh5sygrza22hbe@flea.lan>
- <CAK8P3a1Qvt4nvM5HeK-n87tsi2D5GBOmZo0rZv_Lp==CC=34Uw@mail.gmail.com>
-Message-ID: <CAGb2v66QvLdojDe4+uG9Opa7fApA-GH9pW4v0En5j6QSPf1yZw@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 7 Jun 2017 14:02:26 +0800
+Subject: [PATCH] arm64: dts: ls1088a: update sata node
+In-Reply-To: <HE1PR0402MB2828FDB61A1AD186E3802962F3C80@HE1PR0402MB2828.eurprd04.prod.outlook.com>
+References: <1496648752-27627-1-git-send-email-andy.tang@nxp.com>
+ <20170605151441.GL4094@dragon>
+ <HE1PR0402MB2828961E8052683E75B59D5CF3C80@HE1PR0402MB2828.eurprd04.prod.outlook.com>
+ <20170607032611.GB31070@dragon>
+ <HE1PR0402MB2828FDB61A1AD186E3802962F3C80@HE1PR0402MB2828.eurprd04.prod.outlook.com>
+Message-ID: <20170607060224.GE31070@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 6, 2017 at 6:04 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Mon, Jun 5, 2017 at 4:45 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
->> Hi,
->>
->> On Sat, Jun 03, 2017 at 12:22:32PM +0800, kbuild test robot wrote:
->>> Hi Stephen,
->>>
->>> [auto build test ERROR on sunxi/sunxi/for-next]
->>> [also build test ERROR on next-20170602]
->>> [cannot apply to clk/clk-next v4.12-rc3]
->>> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
->>>
->>>    sunxi_sid.c:(.data+0x1da8c): undefined reference to `ccu_gate_ops'
->>>    sunxi_sid.c:(.data+0x1dac8): undefined reference to `ccu_gate_ops'
->>>    sunxi_sid.c:(.data+0x1db20): undefined reference to `ccu_mux_ops'
->>>    sunxi_sid.c:(.data+0x1db74): undefined reference to `ccu_mux_ops'
->>>    sunxi_sid.c:(.data+0x1dbec): undefined reference to `ccu_mp_ops'
->>>    sunxi_sid.c:(.data+0x1dc64): undefined reference to `ccu_mp_ops'
->>
->> It seems like even though the lib.a file is compiled properly, it is
->> never linked in. It looks like we would be supposed to add
->> drivers/clk/sunxi-ng/ to libs-y, but that doesn't seem to work for
->> Makefiles in drivers/*
->
-> Ah, too bad. I see that only one directory under drivers/ uses something
-> with lib.a, in drivers/firmware/efi/libstub/Makefile, but that seems to
-> rely on being special-cased as well.
->
-> However, this patch seems to fix it:
->
-> diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-> index cbc8cb4f70e3..321d3da7cc6a 100644
-> --- a/drivers/clk/sunxi-ng/Makefile
-> +++ b/drivers/clk/sunxi-ng/Makefile
-> @@ -18,16 +18,16 @@ lib-$(CONFIG_SUNXI_CCU) += ccu_nm.o
->  lib-$(CONFIG_SUNXI_CCU) += ccu_mp.o
->
->  # SoC support
-> -obj-$(CONFIG_SUN50I_A64_CCU) += ccu-sun50i-a64.o
-> -obj-$(CONFIG_SUN5I_CCU) += ccu-sun5i.o
-> -obj-$(CONFIG_SUN6I_A31_CCU) += ccu-sun6i-a31.o
-> -obj-$(CONFIG_SUN8I_A23_CCU) += ccu-sun8i-a23.o
-> -obj-$(CONFIG_SUN8I_A33_CCU) += ccu-sun8i-a33.o
-> -obj-$(CONFIG_SUN8I_A83T_CCU) += ccu-sun8i-a83t.o
-> -obj-$(CONFIG_SUN8I_H3_CCU) += ccu-sun8i-h3.o
-> -obj-$(CONFIG_SUN8I_V3S_CCU) += ccu-sun8i-v3s.o
-> -obj-$(CONFIG_SUN8I_DE2_CCU) += ccu-sun8i-de2.o
-> -obj-$(CONFIG_SUN8I_R_CCU) += ccu-sun8i-r.o
-> -obj-$(CONFIG_SUN9I_A80_CCU) += ccu-sun9i-a80.o
-> -obj-$(CONFIG_SUN9I_A80_CCU) += ccu-sun9i-a80-de.o
-> -obj-$(CONFIG_SUN9I_A80_CCU) += ccu-sun9i-a80-usb.o
-> +obj-$(CONFIG_SUN50I_A64_CCU) += ccu-sun50i-a64.o lib.a
-> +obj-$(CONFIG_SUN5I_CCU) += ccu-sun5i.o lib.a
-> +obj-$(CONFIG_SUN6I_A31_CCU) += ccu-sun6i-a31.o lib.a
-> +obj-$(CONFIG_SUN8I_A23_CCU) += ccu-sun8i-a23.o lib.a
-> +obj-$(CONFIG_SUN8I_A33_CCU) += ccu-sun8i-a33.o lib.a
-> +obj-$(CONFIG_SUN8I_A83T_CCU) += ccu-sun8i-a83t.o lib.a
-> +obj-$(CONFIG_SUN8I_H3_CCU) += ccu-sun8i-h3.o lib.a
-> +obj-$(CONFIG_SUN8I_V3S_CCU) += ccu-sun8i-v3s.o lib.a
-> +obj-$(CONFIG_SUN8I_DE2_CCU) += ccu-sun8i-de2.o lib.a
-> +obj-$(CONFIG_SUN8I_R_CCU) += ccu-sun8i-r.o lib.a
-> +obj-$(CONFIG_SUN9I_A80_CCU) += ccu-sun9i-a80.o lib.a
-> +obj-$(CONFIG_SUN9I_A80_CCU) += ccu-sun9i-a80-de.o lib.a
-> +obj-$(CONFIG_SUN9I_A80_CCU) += ccu-sun9i-a80-usb.o lib.a
->
-> It's not documented behavior, but I think it's still good enough,
-> and improves the current version, unless there is another bug
-> after we add this to your patch.
+On Wed, Jun 07, 2017 at 03:41:03AM +0000, Andy Tang wrote:
+> A: ls1088 is not a new compatible. For ls1088 soc, it should be "fsl,ls1088a-ahci".
 
-I think having just
+Have you added the compatible support into kernel driver and bindings
+doc?
 
-obj-$(CONFIG_SUNXI_CCU) += lib.a
+> Previously, we thought ls1088 is compatible with ls1043, so that we defined compatible string as:  "fsl,ls1088a-ahci", "fsl,ls1043a-ahci"; By doing so, we can reuse code.
+> 
+> Now we found they are not 100% compatible because ECC register address is different. ECC register doesn't belong to SATA IP. It is a global register which controls many IPs. SATA ecc is controlled by only one bit in this register.
+> 
 
-at the bottom (with a comment) would be cleaner, and
-we wouldn't need to modify all the existing lines.
-AFAIK about Makefiles, that should work?
+Okay, understood.  It sounds like the register should belong to a global
+system controller.  If the SATA driver was designed to parse the ECC
+register and bit from device tree with a phandle pointing to that
+system controller, we do not need to have so many compatibles for the
+same SATA IP.
 
-ChenYu
-
->
->         Arnd
+Shawn
