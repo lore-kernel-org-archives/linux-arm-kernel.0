@@ -1,55 +1,36 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 7 Jun 2017 11:21:26 +0800
-Subject: [PATCH] ARM: imx6ull: Make suspend/resume work like on 6ul
-In-Reply-To: <1496746313.28352.19.camel@nxp.com>
-References: <c63fd9031493cefed47d59c9918c0ecb76ffaf85.1496160320.git.leonard.crestez@nxp.com>
- <20170605053722.GI4094@dragon> <1496746313.28352.19.camel@nxp.com>
-Message-ID: <20170607032124.GA31070@dragon>
+Date: Wed, 7 Jun 2017 11:26:12 +0800
+Subject: [PATCH] arm64: dts: ls1088a: update sata node
+In-Reply-To: <HE1PR0402MB2828961E8052683E75B59D5CF3C80@HE1PR0402MB2828.eurprd04.prod.outlook.com>
+References: <1496648752-27627-1-git-send-email-andy.tang@nxp.com>
+ <20170605151441.GL4094@dragon>
+ <HE1PR0402MB2828961E8052683E75B59D5CF3C80@HE1PR0402MB2828.eurprd04.prod.outlook.com>
+Message-ID: <20170607032611.GB31070@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 06, 2017 at 01:51:53PM +0300, Leonard Crestez wrote:
-> On Mon, 2017-06-05 at 13:37 +0800, Shawn Guo wrote:
-> > On Tue, May 30, 2017 at 07:11:19PM +0300, Leonard Crestez wrote:
-> > > 
-> > > Suspend and resume on imx6ull is currenty not working because of some
-> > > missed checks where behavior should match imx6ul.
-> > > 
-> > > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-> > > ---
-> > > ?arch/arm/mach-imx/mxc.h?????| 6 ++++++
-> > > ?arch/arm/mach-imx/pm-imx6.c | 6 ++++--
-> > > ?2 files changed, 10 insertions(+), 2 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
-> > > index 34f2ff6..e00d626 100644
-> > > --- a/arch/arm/mach-imx/mxc.h
-> > > +++ b/arch/arm/mach-imx/mxc.h
-> > > @@ -39,6 +39,7 @@
-> > > ?#define MXC_CPU_IMX6SX		0x62
-> > > ?#define MXC_CPU_IMX6Q		0x63
-> > > ?#define MXC_CPU_IMX6UL		0x64
-> > > +#define MXC_CPU_IMX6ULL		0x65
-> > Since you are adding a new CPU type, you should probably patch
-> > imx_soc_device_init() for it as well.
+On Wed, Jun 07, 2017 at 02:38:36AM +0000, Andy Tang wrote:
+> Hi Shawn,
 > 
-> Ok, I will resend as a 2-patch series.
+> Please see the explanation below.
 > 
-> BTW, it actually seems to me that setting BM_CLPCR_BYP_MMDC_CH0_LPM_HS
-> on imx6sl/sx/ul/ull is not actually needed. That bit (19) is documented
-> as "reserved" in the Reference Manual and likely ignored by hardware.
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org] 
+> Sent: Monday, June 05, 2017 11:15 PM
+> To: Andy Tang <andy.tang@nxp.com>
+> Cc: mark.rutland at arm.com; catalin.marinas at arm.com; will.deacon at arm.com; robh+dt at kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH] arm64: dts: ls1088a: update sata node
 > 
-> As far as I understand the MMDC on imx6qdl has two channels and unless
-> 2-channel mode is enabled (not currently supported) the handshake with
-> CH1 needs to be disabled. Other reduced chips only have one MMDC
-> channel and that is CH1 (CH0 was removed) and nothing needs to be done
-> from them. The only important thing is to avoid setting
-> BM_CLPCR_BYP_MMDC_CH1_LPM_HS.
+> On Mon, Jun 05, 2017 at 03:45:52PM +0800, Yuantian Tang wrote:
+> > 1. Remove ls1043a compatible string from node
 > 
-> However perhaps what I am saying is wrong for some early chip versions?
-> Because this behavior of setting BM_CLPCR_BYP_MMDC_CH0_LPM_HS has been
-> in the kernel for a long time.
+> Can you explain a bit why the compatible string needs to be dropped?
+> 
+> A:  We thought ls1088 and ls1043 are 100% compatible in regard to sata.
+> But actually, they are not because their ecc register address is different.
 
-@Anson, you might be the right person to comment here?
+It's quite common that the same IP block is integrated into different
+SoCs with different register address.  That shouldn't be the reason for
+a new compatible.
 
 Shawn
