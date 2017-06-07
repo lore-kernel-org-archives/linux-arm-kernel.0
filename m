@@ -1,26 +1,22 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 7 Jun 2017 20:09:01 +0100
-Subject: [PATCH linux-next v3 1/4] spi: imx: introduce fifo_size and
- has_dmamode in spi_imx_devtype_data
-In-Reply-To: <20170605033809.13726-2-jiada_wang@mentor.com>
-References: <20170605033809.13726-1-jiada_wang@mentor.com>
- <20170605033809.13726-2-jiada_wang@mentor.com>
-Message-ID: <20170607190901.eo7nmitwj6v3yw5e@sirena.org.uk>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 07 Jun 2017 15:09:51 -0400 (EDT)
+Subject: [PATCH 9/9] arm64: marvell: dts: add xmdio nodes for 7k/8k
+In-Reply-To: <87k24onq62.fsf@free-electrons.com>
+References: <20170607083810.30922-1-antoine.tenart@free-electrons.com>
+ <20170607083810.30922-10-antoine.tenart@free-electrons.com>
+ <87k24onq62.fsf@free-electrons.com>
+Message-ID: <20170607.150951.1721000293274061340.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 05, 2017 at 12:38:06PM +0900, Jiada Wang wrote:
-> Different ECSPI controller has different fifosize and DMA capability,
-> instead of calling functions to identify these information by check
-> devtype. add fifo_size and has_dmamode to spi_imx_devtype_data.
-> so that these information can be directly accessed.
+From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Date: Wed, 07 Jun 2017 10:43:49 +0200
 
-This doesn't apply against current code, please check and resend
-(probably due to Sascha's cleanup series).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170607/239821a7/attachment.sig>
+> If you agrees with this series please don't apply this patch. I will
+> take care of it. We have many changes in the dt directory for the next
+> release and I want that all the change are in the same place to take
+> care of the merge conflict.
+
+Ok, I will elide this patch when/if I apply the series to net-next.
+
+Thanks.
