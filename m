@@ -1,23 +1,31 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 7 Jun 2017 10:33:50 +0100
-Subject: [PATCH] Revert "ARM: 8433/1: add a VMSPLIT_3G_OPT config option"
-In-Reply-To: <1496825972-26829-1-git-send-email-xieyisheng1@huawei.com>
-References: <1496825972-26829-1-git-send-email-xieyisheng1@huawei.com>
-Message-ID: <20170607093350.GJ4902@n2100.armlinux.org.uk>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Wed,  7 Jun 2017 15:04:15 +0530
+Subject: [PATCH] watchdog: meson: Handle return value of clk_prepare_enable
+Message-ID: <ee0b1a0d0340608b10c47847a8472bc9e5e8b8e1.1496744678.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 07, 2017 at 04:59:32PM +0800, Yisheng Xie wrote:
-> This reverts commit 63ce446c9b5787a94ed875bab20772e1a2b3092f.
+clk_prepare_enable() can fail here and we must check its return value.
 
-There's no real reason to revert this, thereby removing it from non-LPAE
-cases where it does work.  You've already shown adding a dependency for
-LPAE on this option (or even vice versa) is enough to stop the problem
-occuring.
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+---
+ drivers/watchdog/meson_gxbb_wdt.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-IMHO, It would be better to make VMSPLIT_3G_OPT depend on !ARM_LPAE.
-
+diff --git a/drivers/watchdog/meson_gxbb_wdt.c b/drivers/watchdog/meson_gxbb_wdt.c
+index 45d4766..69a5a57 100644
+--- a/drivers/watchdog/meson_gxbb_wdt.c
++++ b/drivers/watchdog/meson_gxbb_wdt.c
+@@ -203,7 +203,9 @@ static int meson_gxbb_wdt_probe(struct platform_device *pdev)
+ 	if (IS_ERR(data->clk))
+ 		return PTR_ERR(data->clk);
+ 
+-	clk_prepare_enable(data->clk);
++	ret = clk_prepare_enable(data->clk);
++	if (ret)
++		return ret;
+ 
+ 	platform_set_drvdata(pdev, data);
+ 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
