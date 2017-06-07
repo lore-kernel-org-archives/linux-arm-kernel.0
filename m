@@ -1,65 +1,45 @@
-From: andy.tang@nxp.com (Andy Tang)
-Date: Wed, 7 Jun 2017 02:38:36 +0000
-Subject: [PATCH] arm64: dts: ls1088a: update sata node
-In-Reply-To: <20170605151441.GL4094@dragon>
-References: <1496648752-27627-1-git-send-email-andy.tang@nxp.com>
- <20170605151441.GL4094@dragon>
-Message-ID: <HE1PR0402MB2828961E8052683E75B59D5CF3C80@HE1PR0402MB2828.eurprd04.prod.outlook.com>
+From: hoeun.ryu@gmail.com (Hoeun Ryu)
+Date: Wed,  7 Jun 2017 11:39:06 +0900
+Subject: [PATCH] arm:lpae: build TTB control register value from scratch in
+ v7_ttb_setup
+Message-ID: <1496803173-4894-1-git-send-email-hoeun.ryu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+ Reading TTBCR in early boot stage might return the value of the previous
+kernel's configuration, especially in case of kexec. For example, if
+normal kernel (first kernel) had run on a configuration of PHYS_OFFSET <=
+PAGE_OFFSET and crash kernel (second kernel) is running on a configuration
+PHYS_OFFSET > PAGE_OFFSET, which can happen because it depends on the
+reserved area for crash kernel, reading TTBCR and using the value to OR
+other bit fields might be risky because it doesn't have a reset value for
+TTBCR.
 
-Please see the explanation below.
+Suggested-by: Robin Murphy <robin.murphy@arm.com>
+Signed-off-by: Hoeun Ryu <hoeun.ryu@gmail.com>
+---
 
------Original Message-----
-From: Shawn Guo [mailto:shawnguo at kernel.org] 
-Sent: Monday, June 05, 2017 11:15 PM
-To: Andy Tang <andy.tang@nxp.com>
-Cc: mark.rutland at arm.com; catalin.marinas at arm.com; will.deacon at arm.com; robh+dt at kernel.org; linux-arm-kernel at lists.infradead.org
-Subject: Re: [PATCH] arm64: dts: ls1088a: update sata node
+* v1: amended based on
+          - "[PATCHv2] arm: LPAE: kexec: clear TTBCR.T1SZ explicitly when
+             PHYS_OFFSET > PAGE_OFFSET"
+          - https://lkml.org/lkml/2017/6/5/239
 
-On Mon, Jun 05, 2017 at 03:45:52PM +0800, Yuantian Tang wrote:
-> 1. Remove ls1043a compatible string from node
+ arch/arm/mm/proc-v7-3level.S | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Can you explain a bit why the compatible string needs to be dropped?
-
-A:  We thought ls1088 and ls1043 are 100% compatible in regard to sata.
-But actually, they are not because their ecc register address is different.
-
-Please let me know if I need to add those to commit message.
-
-Thanks,
-Andy
-
-> 2. Fix the sata ecc register address error
-> 
-> Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
-> ---
->  arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-> index df16284..c144d06 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-> @@ -360,9 +360,9 @@
->  		};
->  
->  		sata: sata at 3200000 {
-> -			compatible = "fsl,ls1088a-ahci", "fsl,ls1043a-ahci";
-> +			compatible = "fsl,ls1088a-ahci";
->  			reg = <0x0 0x3200000 0x0 0x10000>,
-> -				<0x0 0x20140520 0x0 0x4>;
-> +				<0x7 0x100520 0x0 0x4>;
->  			reg-names = "ahci", "sata-ecc";
->  			interrupts = <0 133 IRQ_TYPE_LEVEL_HIGH>;
->  			clocks = <&clockgen 4 3>;
-> -- 
-> 2.1.0.27.g96db324
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+index 5e5720e..7d16bbc 100644
+--- a/arch/arm/mm/proc-v7-3level.S
++++ b/arch/arm/mm/proc-v7-3level.S
+@@ -129,8 +129,7 @@ ENDPROC(cpu_v7_set_pte_ext)
+ 	.macro	v7_ttb_setup, zero, ttbr0l, ttbr0h, ttbr1, tmp
+ 	ldr	\tmp, =swapper_pg_dir		@ swapper_pg_dir virtual address
+ 	cmp	\ttbr1, \tmp, lsr #12		@ PHYS_OFFSET > PAGE_OFFSET?
+-	mrc	p15, 0, \tmp, c2, c0, 2		@ TTB control egister
+-	orr	\tmp, \tmp, #TTB_EAE
++	mov	\tmp, #TTB_EAE			@ for TTB control egister
+ 	ALT_SMP(orr	\tmp, \tmp, #TTB_FLAGS_SMP)
+ 	ALT_UP(orr	\tmp, \tmp, #TTB_FLAGS_UP)
+ 	ALT_SMP(orr	\tmp, \tmp, #TTB_FLAGS_SMP << 16)
+-- 
+2.7.4
