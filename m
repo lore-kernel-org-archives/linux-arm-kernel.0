@@ -1,25 +1,22 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 7 Jun 2017 17:37:17 -0500
-Subject: [PATCH 06/19] dt-bindings: display: sun4i: Add binding for A31
- HDMI controller
-In-Reply-To: <20170602101024.18940-7-wens@csie.org>
-References: <20170602101024.18940-1-wens@csie.org>
- <20170602101024.18940-7-wens@csie.org>
-Message-ID: <20170607223717.uoh45hhcqugakdk6@rob-hp-laptop>
+Date: Wed, 7 Jun 2017 17:42:57 -0500
+Subject: [PATCH v3 5/6] dt-bindings: display: amlogic: DT fix
+ s/resets-names/reset-names/
+In-Reply-To: <1496407129-13527-6-git-send-email-geert+renesas@glider.be>
+References: <1496407129-13527-1-git-send-email-geert+renesas@glider.be>
+ <1496407129-13527-6-git-send-email-geert+renesas@glider.be>
+Message-ID: <20170607224257.aqwrv7ryxrtr7yva@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 02, 2017 at 06:10:11PM +0800, Chen-Yu Tsai wrote:
-> The HDMI controller in the A31 SoC is slightly different from the
-> earlier version. In addition to the TMDS clock and DDC controls,
-> this version now takes a second DDC clock input.
-> 
-> Add a compatible string for it, and add the DDC clock input to the
-> list of clocks required.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+On Fri, Jun 02, 2017 at 02:38:48PM +0200, Geert Uytterhoeven wrote:
+> Fixes: 8cceda5349377e30 ("dt-bindings: Add bindings for the Amlogic Meson dw-hdmi extension")
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > ---
->  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 +++
->  1 file changed, 3 insertions(+)
+> v3:
+>   - New.
+> ---
+>  Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
 Acked-by: Rob Herring <robh@kernel.org>
