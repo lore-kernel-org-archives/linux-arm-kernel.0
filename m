@@ -1,37 +1,90 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 7 Jun 2017 11:43:43 +0200
-Subject: [PATCH v2 04/11] drm: sun4i: add support for H3's TCON0/1
-In-Reply-To: <493AC6F2-3CB3-48F5-9568-A34AA927238F@aosc.io>
-References: <20170604160149.30230-1-icenowy@aosc.io>
- <20170604160149.30230-5-icenowy@aosc.io>
- <3642057.oKT9kIlu8M@jernej-laptop>
- <493AC6F2-3CB3-48F5-9568-A34AA927238F@aosc.io>
-Message-ID: <20170607094343.qqiwnu2mhmoi6jn7@flea.lan>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Wed, 7 Jun 2017 12:44:07 +0300
+Subject: [PATCH] ARM: imx6ull: Make suspend/resume work like on 6ul
+In-Reply-To: <DB5PR04MB1320775AD16A92EDA884BA32F5C80@DB5PR04MB1320.eurprd04.prod.outlook.com>
+References: <c63fd9031493cefed47d59c9918c0ecb76ffaf85.1496160320.git.leonard.crestez@nxp.com>
+ <20170605053722.GI4094@dragon> <1496746313.28352.19.camel@nxp.com>
+ <20170607032124.GA31070@dragon>
+ <DB5PR04MB1320775AD16A92EDA884BA32F5C80@DB5PR04MB1320.eurprd04.prod.outlook.com>
+Message-ID: <1496828647.28352.58.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 05, 2017 at 03:03:47AM +0800, Icenowy Zheng wrote:
-> >You should also expand function sun4i_drv_node_is_tcon() at sun4i_drv.c
-> >with 
-> >new entries, but I'm not sure if this fits in this patch.
+On Wed, 2017-06-07 at 03:38 +0000, Anson Huang wrote:
+> > -----Original Message-----
+> > From: Shawn Guo [mailto:shawnguo at kernel.org]
+> > Sent: 2017-06-07 11:21 AM
+> > To: Anson Huang <anson.huang@nxp.com>
+> > Cc: Leonard Crestez <leonard.crestez@nxp.com>; Peter Chen
+> > <peter.chen@nxp.com>; linux-kernel at vger.kernel.org; Fabio Estevam
+> > <fabio.estevam@nxp.com>; linux-arm-kernel at lists.infradead.org; Lucas Stach
+> > <l.stach@pengutronix.de>
+> > Subject: Re: [PATCH] ARM: imx6ull: Make suspend/resume work like on 6ul
+> > 
+> > On Tue, Jun 06, 2017 at 01:51:53PM +0300, Leonard Crestez wrote:
+> > > 
+> > > On Mon, 2017-06-05 at 13:37 +0800, Shawn Guo wrote:
+> > > > 
+> > > > On Tue, May 30, 2017 at 07:11:19PM +0300, Leonard Crestez wrote:
+> > > > > 
+> > > > > 
+> > > > > Suspend and resume on imx6ull is currenty not working because of
+> > > > > some missed checks where behavior should match imx6ul.
+> > > > > 
+> > > > > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+> > > > > ---
+> > > > > ?arch/arm/mach-imx/mxc.h?????| 6 ++++++
+> > > > > ?arch/arm/mach-imx/pm-imx6.c | 6 ++++--
+> > > > > ?2 files changed, 10 insertions(+), 2 deletions(-)
+> > > > > 
+> > > > > diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
+> > > > > index 34f2ff6..e00d626 100644
+> > > > > --- a/arch/arm/mach-imx/mxc.h
+> > > > > +++ b/arch/arm/mach-imx/mxc.h
+> > > > > @@ -39,6 +39,7 @@
+> > > > > ?#define MXC_CPU_IMX6SX		0x62
+> > > > > ?#define MXC_CPU_IMX6Q		0x63
+> > > > > ?#define MXC_CPU_IMX6UL		0x64
+> > > > > +#define MXC_CPU_IMX6ULL		0x65
+> > > > Since you are adding a new CPU type, you should probably patch
+> > > > imx_soc_device_init() for it as well.
+> > > Ok, I will resend as a 2-patch series.
+> > > 
+> > > BTW, it actually seems to me that setting
+> > BM_CLPCR_BYP_MMDC_CH0_LPM_HS
+> > > 
+> > > on imx6sl/sx/ul/ull is not actually needed. That bit (19) is
+> > > documented as "reserved" in the Reference Manual and likely ignored by
+> > hardware.
+> > > 
+> > > 
+> > > As far as I understand the MMDC on imx6qdl has two channels and unless
+> > > 2-channel mode is enabled (not currently supported) the handshake with
+> > > CH1 needs to be disabled. Other reduced chips only have one MMDC
+> > > channel and that is CH1 (CH0 was removed) and nothing needs to be done
+> > > from them. The only important thing is to avoid setting
+> > > BM_CLPCR_BYP_MMDC_CH1_LPM_HS.
+> > > 
+> > > However perhaps what I am saying is wrong for some early chip versions?
+> > > Because this behavior of setting BM_CLPCR_BYP_MMDC_CH0_LPM_HS has
+> > been
+> > > 
+> > > in the kernel for a long time.
+> As far as I know, since i.MX6SX, we only use MMDC_CH1, but MMDC_CH0 is still
+> there and we need to bypass its handshake when entering low power mode.
 > 
-> Instead I think it should be renamed to something like
-> "sun4i_drv_node_is_tcon_with_ch0".
+> The bit 19 in DOC is incorrect, I remembered I ever tried it and discuss with design
+> time, they request DOC team to update DOC,
+> but I think doc team forgot to do it. You can try removing this bit 19 setting
+> and see if standby/mem suspend can still work? And try to modify this bit 19 value
+> to see if it can be modified.
 
-I'm not sure, or at least, it shouldn't make any difference, since
-TCON without a channel 0 will not have an endpoint 0, so this will be
-dealt with already.
+After some testing it seems that setting MMDC_CH0 is indeed required.
+So nevermind
 
-Maxime
+I remember testing this earlier and getting the opposite result but I
+probably confused the STOP_POWER_ON and STOP_POWER_OFF paths.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170607/f3b8c14d/attachment.sig>
+--
+Regards,
+Leonard
