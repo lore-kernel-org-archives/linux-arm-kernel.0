@@ -1,119 +1,47 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 7 Jun 2017 08:48:06 -0700
-Subject: [PATCH 7/9] net: mvmdio: add xmdio support
-In-Reply-To: <20170607083810.30922-8-antoine.tenart@free-electrons.com>
-References: <20170607083810.30922-1-antoine.tenart@free-electrons.com>
- <20170607083810.30922-8-antoine.tenart@free-electrons.com>
-Message-ID: <e423ea96-12df-6a19-ce94-149ace2e2272@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 7 Jun 2017 15:50:10 +0000
+Subject: [PATCH v2 2/2] arm64: ftrace: add support for far branches to
+ dynamic ftrace
+In-Reply-To: <20170607114637.1a717019@gandalf.local.home>
+References: <20170530135220.20759-1-ard.biesheuvel@linaro.org>
+ <20170530135220.20759-3-ard.biesheuvel@linaro.org>
+ <20170605171535.GP21944@arm.com>
+ <20170607114637.1a717019@gandalf.local.home>
+Message-ID: <CAKv+Gu8kWt7yDg8hu=bJb4FrA3qGqV2jgShujqHqewDSKr1D8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/2017 01:38 AM, Antoine Tenart wrote:
-> This patch adds the xMDIO interface support in the mvmdio driver. This
-> interface is used in Ethernet controllers on Marvell 370, 7k and 8k (as
-> of now). The xSMI interface supported by this driver complies with the
-> IEEE 802.3 clause 45 (while the SMI interface complies with the clause
-> 22). The xSMI interface is used by 10GbE devices.
-> 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> ---
+On 7 June 2017 at 15:46, Steven Rostedt <rostedt@goodmis.org> wrote:
+> On Mon, 5 Jun 2017 18:15:35 +0100
+> Will Deacon <will.deacon@arm.com> wrote:
+>
+>
+>> > +           tramp = (unsigned long *)mod->arch.ftrace_trampoline->sh_addr;
+>> > +           if (tramp[0] != addr) {
+>> > +                   if (tramp[0] != 0) {
+>> > +                           pr_err("ftrace: far branches to multiple entry points unsupported inside a single module\n");
+>> > +                           return AARCH64_BREAK_FAULT;
+>> > +                   }
+>> > +
+>> > +                   /* point the trampoline to our ftrace entry point */
+>> > +                   module_disable_ro(mod);
+>> > +                   tramp[0] = addr;
+>> > +                   module_enable_ro(mod, true);
+>>
+>> I'm not sure what the barrier semantics are for module_enable_ro, but I'd be
+>> inclined to stick in a smp_wmb() here to order the write of the trampoline
+>> data before the writing of the branch instruction.
+>
+> I would assume that module_disable/enable_ro() has proper barriers for
+> modifying the page tables with respect to code around it, otherwise it
+> would probably be an issues elsewhere in the kernel. Specifically in
+> the module code itself.
+>
+> I don't see how a smp_wmb() would be needed here, especially since this
+> is serialized code, and not something done by multiple CPUs.
+>
 
-> +	if (of_device_is_compatible(np, "marvell,orion-mdio")) {
-> +		ops->is_done = smi_is_done;
-> +		ops->is_read_valid = smi_is_read_valid;
-> +		ops->start_read = smi_start_read_op;
-> +		ops->read = smi_read_op;
-> +		ops->write = smi_write_op;
-> +
-> +		dev->poll_interval_min = MVMDIO_SMI_POLL_INTERVAL_MIN;
-> +		dev->poll_interval_max = MVMDIO_SMI_POLL_INTERVAL_MAX;
-> +	} else if (of_device_is_compatible(np, "marvell,xmdio")) {
-> +		ops->is_done = xsmi_is_done;
-> +		ops->is_read_valid = xsmi_is_read_valid;
-> +		ops->start_read = xsmi_start_read_op;
-> +		ops->read = xsmi_read_op;
-> +		ops->write = xsmi_write_op;
-> +
-> +		dev->poll_interval_min = MVMDIO_XSMI_POLL_INTERVAL_MIN;
-> +		dev->poll_interval_max = MVMDIO_XSMI_POLL_INTERVAL_MAX;
-> +	} else {
-> +		return -EINVAL;
-> +	}
-
-Instead of doing this, you could have the ops structure declared e.g: a
-static global variables in the driver and reference them from the
-of_device_id .data field, something like:
-
-static struct orion_mdio_ops mdio_ops = {
-	...
-};
-
-static struct orion_mdio_data mdio_data = {
-	.ops = &mdio_ops,
-	.poll_intervall_min = ...,
-	.poll_interfave_max = ...,
-};
-
-static struct orion_mdio_ops xmdio_ops = {
-	...
-};
-
-static strcut orion_mdio_data xmdio_ data = {
-};
-
-and then reference those using of_id->data in the probe function
-
-> +
-> +	dev->ops = ops;
-> +	return 0;
-> +}
-> +
->  static int orion_mdio_probe(struct platform_device *pdev)
->  {
->  	struct resource *r;
->  	struct mii_bus *bus;
->  	struct orion_mdio_dev *dev;
-> -	struct orion_mdio_ops *ops;
->  	int i, ret;
->  
->  	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> @@ -278,18 +367,9 @@ static int orion_mdio_probe(struct platform_device *pdev)
->  
->  	mutex_init(&dev->lock);
->  
-> -	ops = devm_kzalloc(&pdev->dev, sizeof(*ops), GFP_KERNEL);
-> -	if (!ops)
-> -		return -ENOMEM;
-> -
-> -	dev->poll_interval_min = MVMDIO_SMI_POLL_INTERVAL_MIN;
-> -	dev->poll_interval_max = MVMDIO_SMI_POLL_INTERVAL_MAX;
-> -	ops->is_done = orion_mdio_smi_is_done;
-> -	ops->is_read_valid = orion_mdio_smi_is_read_valid;
-> -	ops->start_read = orion_mdio_start_read_op;
-> -	ops->read = orion_mdio_read_op;
-> -	ops->write = orion_mdio_write_op;
-> -	dev->ops = ops;
-> +	ret = orion_mdio_populate_ops(pdev, dev);
-> +	if (ret)
-> +		return ret;
->  
->  	if (pdev->dev.of_node)
->  		ret = of_mdiobus_register(bus, pdev->dev.of_node);
-> @@ -340,6 +420,7 @@ static int orion_mdio_remove(struct platform_device *pdev)
->  
->  static const struct of_device_id orion_mdio_match[] = {
->  	{ .compatible = "marvell,orion-mdio" },
-
-and do .data = &mdio_data
-
-> +	{ .compatible = "marvell,xmdio" },
-
-and .data = &xmdio_data
-
->  	{ }
->  };
->  MODULE_DEVICE_TABLE(of, orion_mdio_match);
-> 
-
--- 
-Florian
+But other cores could be invoking the function we are patching here,
+no? So when such a core observes (and executes) the updated
+instruction before it observes the updated target field of the
+trampoline, it will branch to address 0x0.
