@@ -1,146 +1,149 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 7 Jun 2017 06:24:35 +0200
-Subject: [PATCH 8/8] arm64: dts: hikey: Fix WiFi support
-In-Reply-To: <CALAqxLWLbuptEgQ2BS4jx8waum8x=5sKL3yPS5NZs0o=AhyRBA@mail.gmail.com>
-References: <1494260477-25163-1-git-send-email-ulf.hansson@linaro.org>
- <1494260477-25163-9-git-send-email-ulf.hansson@linaro.org>
- <CALAqxLX4HwbVm8G4Ch2uYKAy6C9vYAZEcRUdCLDePT55oGz6hw@mail.gmail.com>
- <d7988293-853f-fb3a-ae29-d1dff4e4d732@linaro.org>
- <CALAqxLU2zz17sHMFKOe4p248Bu4fRiU_dKoBBPbY38gDrpb_mw@mail.gmail.com>
- <CAPDyKFrtE1nKrc1Zk_n=rZTrMVT=Vb=cpk-7AEFWZRmVhFi+4w@mail.gmail.com>
- <CALAqxLWEsQK4g_AM7cPzJSrF_jiTSZpxvLPy_D4HUgdrgf=KuA@mail.gmail.com>
- <CABGGisxWS2uT6xCATaZbeaDxsEfPz_BSW7Cr=52OwkdFdrV=_Q@mail.gmail.com>
- <CAPDyKFrAwntQsK_Rxs0Hzthv6TkbofE7LwgVimo60zVKruJHBA@mail.gmail.com>
- <CAPDyKFp6m=JWu6NWhjy+8h100FQNCbMMBTaY9FdoXysDYzFKkg@mail.gmail.com>
- <CALAqxLWLbuptEgQ2BS4jx8waum8x=5sKL3yPS5NZs0o=AhyRBA@mail.gmail.com>
-Message-ID: <CAPDyKFoihL+=ZNBxoM4=4GTJQoP7ZOgcAEH6HKB3oSpbn5=-1g@mail.gmail.com>
+From: jintack.lim@linaro.org (Jintack Lim)
+Date: Wed, 7 Jun 2017 00:26:06 -0400
+Subject: [RFC 10/55] KVM: arm64: Synchronize EL1 system registers on
+ virtual EL2 entry and exit
+In-Reply-To: <jpgy3t4dg7f.fsf@linux.bootlegged.copy>
+References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
+ <1483943091-1364-11-git-send-email-jintack@cs.columbia.edu>
+ <jpgy3t4dg7f.fsf@linux.bootlegged.copy>
+Message-ID: <CAHyh4xidZ1e_VoLN5hbtQ5RnFabbAYNKxFK1ccVdgTHUxmzPXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 June 2017 at 18:24, John Stultz <john.stultz@linaro.org> wrote:
-> On Tue, Jun 6, 2017 at 7:13 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> On 6 June 2017 at 12:08, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>> [...]
->>>
->>>>>>
->>>>>> John, thanks for the report!
->>>>>>
->>>>>> After a some investigation, I realized that the mmc pwrseq_simple
->>>>>> driver returns -EPROBE_DEFER as it's not able to get the "ext" clock.
->>>>>> Hence the SDIO card will not be detected.
->>>>>>
->>>>>> To fix the problem, you need to enable CONFIG_COMMON_CLK_HI655X in the
->>>>>> kernel config. This is actually also the case when using the arm64
->>>>>> defconfig for a plain 4.12 rc3 and later. We should probably make this
->>>>>> driver enabled per default when building the arm64 defconfig.
->>>>>>
->>>>>> Can you run a re-test at your side with the CONFIG_COMMON_CLK_HI655X
->>>>>> set? Just to make sure it works also with those boot binaries you are
->>>>>> using...
->>>>>
->>>>> So unfortunately, now I'm seeing a side-effect from enabling
->>>>> CONFIG_COMMON_CLK_HI655X.
->>>>>
->>>>> Using the serial-dev driver for the TI bluetooth, it seems I'm seeing
->>>>> failures when CONFIG_COMMON_CLK_HI655X is enabled, but configuring it
->>>>> out, bluetooth works (and wifi then fails).
->>>>>
->>>>> Looking through the dmesg logs, the bluetooth driver seems to
->>>>> initialize up properly and load the firmware, but with CLK_HI655X
->>>>> enabled, we see:
->>>>>
->>>>> Bluetooth: hci0 command 0xff05 tx timeout
->>>>> Bluetooth: hci0: send command failed\x0a
->>>>> Bluetooth: hci0 command 0xff36 tx timeout
->>>>> Bluetooth: hci0 command 0x1003 tx timeout
->>>>> Bluetooth: hci0 command 0x1001 tx timeout
->>>>> Bluetooth: hci0 command 0x1009 tx timeout
->>>>> ...
->>>
->>> As Rob said below, this is because the blue-tooth driver doesn't
->>> properly deal with the power on/off sequence.
->>>
->>> I guess it works for you because your versions of the boot binaries
->>> turns all needed resources on. That isn't the case for me, blue-tooth
->>> is neither working before or after this change, but wifi is.
->>>
->>>>>
->>>>> This effectively seems to make bluetooth an wifi functionality
->>>>> exclusive.  So I don't think this is a sufficient solution (over
->>>>> reverting the original patch that changes the dts - which allows both
->>>>> to function).
->>>
->>> Since the issues you are reporting about is depending on the
->>> boot-binaries and not a really bugs in the kernel, may I suggest that
->>> we invest our efforts in fixing the blue-tooth driver instead, as it's
->>> there the real problem is!?
->>>
->>>>
->>>> If the clock to the TI chip is described in DT for WiFi, then the BT
->>>> side needs it as well (as does the driver) for proper refcounting. The
->>>> same would apply to regulators as well. I looked at the regulators for
->>>> HiKey and the 2 supplies (Vbat and i/o) appear to both be always on.
->>>>
->>>> Rob
->>>
->>> Correct.
->>>
->>> I am working on patch, I keep you on cc.
->>
->> Rob, John,
->>
->> I have now looked into this a bit more. So I have some local patches,
->> which in principle adds the external clock to the bluetooth node for
->> the hikey dts, and adapts the uart bluetooth driver
->> (drivers/bluetooth/hci_ll.c) to also take the ext clock into
->> consideration while powering on/off the chip. I am working on a
->> vanilla kernel, thus not John's tree.
->>
->> However, I can't get the uart1 amba device to be added because of this
->> error during boot:
->> "OF: amba_device_add() failed (-19) for /soc/uart at f7111000"
->>
->> The reason why it fails is because amba_device_try_add() fails to read
->> the amba periphid of the uart1 device. I haven't yet been able to
->> figure out why.
->>
->> Is this problem something you have seen before? I tried out v4.11,
->> v4.12-rc3 and John's tree (dev/hikey-mainline-WIP which is based upon
->> 4.12.rc3), they all suffer from the same problem, not being able to
->> add the uart1 device.
->>
->> The consequence then becomes that the bluetooth node (which is a child
->> node for the uart1 node), added in the below commit by Rob, never gets
->> parsed and thus the device don't become added. In other words, I
->> haven't been able to test my changes since I can't even get the
->> bluetooth device to be added.
->>
->> John, are you using the pcm bluetooth interface or the uart?
->
-> UART.
->
-> I'm not sure why initializing the UART fails for you.  I suspect again
-> it might be related to differences in the bootloader, as I'm not sure
-> if uboot has had nearly the amount of usage as UEFI.
+Hi Bandan,
 
-You are probably right, but that also makes me worried, as we have
-likely other similar issues where UEFI just magically solves things
-for the kernel.
+On Tue, Jun 6, 2017 at 4:16 PM, Bandan Das <bsd@redhat.com> wrote:
+> Jintack Lim <jintack@cs.columbia.edu> writes:
+>
+>> From: Christoffer Dall <christoffer.dall@linaro.org>
+>>
+>> When running in virtual EL2 we use the shadow EL1 systerm register array
+>> for the save/restore process, so that hardware and especially the memory
+>> subsystem behaves as code written for EL2 expects while really running
+>> in EL1.
+>>
+>> This works great for EL1 system register accesses that we trap, because
+>> these accesses will be written into the virtual state for the EL1 system
+>> registers used when eventually switching the VCPU mode to EL1.
+>>
+>> However, there was a collection of EL1 system registers which we do not
+>> trap, and as a consequence all save/restore operations of these
+>> registers were happening locally in the shadow array, with no benefit to
+>> software actually running in virtual EL1 at all.
+>>
+>> To fix this, simply synchronize the shadow and real EL1 state for these
+>> registers on entry/exit to/from virtual EL2 state.
+>>
+>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+>> ---
+>>  arch/arm64/kvm/context.c | 47 +++++++++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 47 insertions(+)
+>>
+>> diff --git a/arch/arm64/kvm/context.c b/arch/arm64/kvm/context.c
+>> index 2e9e386..0025dd9 100644
+>> --- a/arch/arm64/kvm/context.c
+>> +++ b/arch/arm64/kvm/context.c
+>> @@ -88,6 +88,51 @@ static void create_shadow_el1_sysregs(struct kvm_vcpu *vcpu)
+>>       s_sys_regs[CPACR_EL1] = cptr_el2_to_cpacr_el1(el2_regs[CPTR_EL2]);
+>>  }
+>>
+>> +/*
+>> + * List of EL1 registers which we allow the virtual EL2 mode to access
+>> + * directly without trapping and which haven't been paravirtualized.
+>> + *
+>> + * Probably CNTKCTL_EL1 should not be copied but be accessed via trap. Because,
+>> + * the guest hypervisor running in EL1 can be affected by event streams
+>> + * configured via CNTKCTL_EL1, which it does not expect. We don't have a
+>> + * mechanism to trap on CNTKCTL_EL1 as of now (v8.3), keep it in here instead.
+>> + */
+>> +static const int el1_non_trap_regs[] = {
+>> +     CNTKCTL_EL1,
+>> +     CSSELR_EL1,
+>> +     PAR_EL1,
+>> +     TPIDR_EL0,
+>> +     TPIDR_EL1,
+>> +     TPIDRRO_EL0
+>> +};
+>> +
+>
+> Do we trap on all register accesses in the non-nested case +
+> all accesses to the memory access registers ? I am trying to
+> understand how we decide what registers to trap on. For example,
+> shouldn't accesses to CSSELR_EL1, the cache size selection register
+> be trapped ?
+
+So, the principle is that we trap on EL1 register accesses from the
+virtual EL2 if those EL1 register accesses without trap make the guest
+hypervisor's execution different from what it should be if it really
+runs in EL2. (e.g. A write operation to TTBR0_EL1 from the guest
+hypervisor without trap will change the guest hypervisor's page table
+base. However, if a hypervisor runs in EL2, this operation only
+affects the software running in EL1, not itself.)
+
+For non-nested case, this patch does not introduce any additional
+traps since there's no virtual EL2 state.
+
+For CSSELR_EL1 case, this register can be used at any exception level
+other than EL0 and its behavior is the same whether it is executed in
+EL1 or EL2. In other words, the guest hypervisor can interact with
+this register in EL1 just the way a non-nesting hypervisor would do in
+EL2.
+
+Thanks,
+Jintack
 
 >
-> If you want to send a patch my way, I'm happy to test it, or you can
-> grab debian images that use UEFI here:
-> https://www.96boards.org/documentation/ConsumerEdition/HiKey/Downloads/Debian.md/
-
-Seems like I need to give UEFI a try again, however this time I would
-really appreciate your help in testing as I am running out of
-bandwidth for this task.
-
-Just about to post the patches....
-
+> Bandan
 >
-> thanks
-> -john
-
-Kind regards
-Uffe
+>
+>> +/**
+>> + * sync_shadow_el1_state - Going to/from the virtual EL2 state, sync state
+>> + * @vcpu:    The VCPU pointer
+>> + * @setup:   True, if on the way to the guest (called from setup)
+>> + *           False, if returning form the guet (calld from restore)
+>> + *
+>> + * Some EL1 registers are accessed directly by the virtual EL2 mode because
+>> + * they in no way affect execution state in virtual EL2.   However, we must
+>> + * still ensure that virtual EL2 observes the same state of the EL1 registers
+>> + * as the normal VM's EL1 mode, so copy this state as needed on setup/restore.
+>> + */
+>> +static void sync_shadow_el1_state(struct kvm_vcpu *vcpu, bool setup)
+>> +{
+>> +     u64 *sys_regs = vcpu->arch.ctxt.sys_regs;
+>> +     u64 *s_sys_regs = vcpu->arch.ctxt.shadow_sys_regs;
+>> +     int i;
+>> +
+>> +     for (i = 0; i < ARRAY_SIZE(el1_non_trap_regs); i++) {
+>> +             const int sr = el1_non_trap_regs[i];
+>> +
+>> +             if (setup)
+>> +                     s_sys_regs[sr] = sys_regs[sr];
+>> +             else
+>> +                     sys_regs[sr] = s_sys_regs[sr];
+>> +     }
+>> +}
+>> +
+>>  /**
+>>   * kvm_arm_setup_shadow_state -- prepare shadow state based on emulated mode
+>>   * @vcpu: The VCPU pointer
+>> @@ -107,6 +152,7 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
+>>               else
+>>                       ctxt->hw_pstate |= PSR_MODE_EL1t;
+>>
+>> +             sync_shadow_el1_state(vcpu, true);
+>>               create_shadow_el1_sysregs(vcpu);
+>>               ctxt->hw_sys_regs = ctxt->shadow_sys_regs;
+>>               ctxt->hw_sp_el1 = ctxt->el2_regs[SP_EL2];
+>> @@ -125,6 +171,7 @@ void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu)
+>>  {
+>>       struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
+>>       if (unlikely(vcpu_mode_el2(vcpu))) {
+>> +             sync_shadow_el1_state(vcpu, false);
+>>               *vcpu_cpsr(vcpu) &= PSR_MODE_MASK;
+>>               *vcpu_cpsr(vcpu) |= ctxt->hw_pstate & ~PSR_MODE_MASK;
+>>               ctxt->el2_regs[SP_EL2] = ctxt->hw_sp_el1;
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
