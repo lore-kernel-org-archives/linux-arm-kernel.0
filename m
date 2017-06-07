@@ -1,26 +1,40 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 7 Jun 2017 19:16:52 +0300
-Subject: [PATCH v2 0/3] Add R8A7743/SK-RZG1M PFC support
-In-Reply-To: <20170424061217.GC14843@verge.net.au>
-References: <20170420185132.258111787@cogentembedded.com>
- <20170424061217.GC14843@verge.net.au>
-Message-ID: <4937ae78-8800-1a11-547b-2269d063d45a@cogentembedded.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 7 Jun 2017 17:18:16 +0100
+Subject: [PATCH 0/2] arm64: avoid KASAN stack overflows
+In-Reply-To: <07c30069-84f5-be51-85ab-c3c84eea9463@virtuozzo.com>
+References: <1496849713-17078-1-git-send-email-mark.rutland@arm.com>
+ <07c30069-84f5-be51-85ab-c3c84eea9463@virtuozzo.com>
+Message-ID: <20170607161816.GA8330@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/2017 09:12 AM, Simon Horman wrote:
+On Wed, Jun 07, 2017 at 07:12:30PM +0300, Andrey Ryabinin wrote:
+> On 06/07/2017 06:35 PM, Mark Rutland wrote:
+> > I recently tried building the kernel with a GCC 7.1.0 toolchain, and
+> > encountered a number of new and surprising failures on kernels buitl with
+> > KASAN.
+> > 
+> > It looks like this is due to stack instrumentation, which my prior toolchain
+> > didn't support. KASAN's stack instrumentation significantly bloats the stack
+> > significantly, leading to stack overflows and subsequent failures as a result
+> > of the data corruption they cause.
+> 
+> This is caused by -fsanitize-address-use-after-scope which is added in gcc 7.
+> Arnd reported that sometimes it causes enormously huge stack growth.
 
->>    Here's the set of 3 patches against Simon Horman's 'renesas.git' repo,
->> 'renesas-devel-20170420-v4.11-rc7' tag.  We're adding the R8A7743 PFC node
->> and then describing the pins for SCIF0 and Ether devices declared earlier.
->> These patches depend on the R8A7743 PFC suport in order to work properly.
->
-> Thanks. I have marked these as deferred pending acceptance of the PFC
-> driver changes. Please repost or otherwise let me know when dependency
-> is satisfied.
+Ah. Sorry for the bogus attribution, then.
 
-    FYI, Linus W. has pulled the R8A774x PFC patches for 4.13:
+> Given that we haven't found any single use-after-scope bug so far, I wouldn't object
+> removing it completely.  
 
-https://www.spinics.net/lists/linux-renesas-soc/msg14824.html
+FWIW, I saw a single use-after-scope splat when testing with syzkaller
+(prior to these patches), but that may have been a result of things
+going wrong after a stack overflow. Unfortuantely I threw away all of
+the results of that run.
 
-MBR, Sergei
+I'll see if anything triggers overnight with this patch.
+
+Otherwise, I'm also happy for use-after-scope checks to be disabled.
+
+Thanks,
+Mark.
