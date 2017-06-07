@@ -1,81 +1,37 @@
-From: daniel@iogearbox.net (Daniel Borkmann)
-Date: Wed,  7 Jun 2017 13:45:37 +0200
-Subject: [PATCH net] bpf, arm64: use separate register for state in stxr
-Message-ID: <530443d87bd51b3682a1b60ea19b2030d7d21409.1496834547.git.daniel@iogearbox.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 7 Jun 2017 12:50:12 +0100
+Subject: [PATCH V17 00/11] Add UEFI 2.6 and ACPI 6.1 updates for RAS on
+ ARM64
+In-Reply-To: <1495225933-4410-1-git-send-email-tbaicar@codeaurora.org>
+References: <1495225933-4410-1-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <20170607115012.GZ30263@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will reported that in BPF_XADD we must use a different register in stxr
-instruction for the status flag due to otherwise CONSTRAINED UNPREDICTABLE
-behavior per architecture. Reference manual says [1]:
+On Fri, May 19, 2017 at 02:32:02PM -0600, Tyler Baicar wrote:
+> When a memory error, CPU error, PCIe error, or other type of hardware error
+> that's covered by RAS occurs, firmware should populate the shared GHES memory
+> location with the proper GHES structures to notify the OS of the error.
+> For example, platforms that implement firmware first handling may implement
+> separate GHES sources for corrected errors and uncorrected errors. If the
+> error is an uncorrectable error, then the firmware will notify the OS
+> immediately since the error needs to be handled ASAP. The OS will then be able
+> to take the appropriate action needed such as offlining a page. If the error
+> is a corrected error, then the firmware will not interrupt the OS immediately.
+> Instead, the OS will see and report the error the next time it's GHES timer
+> expires. The kernel will first parse the GHES structures and report the errors
+> through the kernel logs and then notify the user space through RAS trace
+> events. This allows user space applications such as RAS Daemon to see the
+> errors and report them however the user desires. This patchset extends the
+> kernel functionality for RAS errors based on updates in the UEFI 2.6 and
+> ACPI 6.1 specifications.
 
-  If s == t, then one of the following behaviors must occur:
+Thanks, I've pushed this out as:
 
-   * The instruction is UNDEFINED.
-   * The instruction executes as a NOP.
-   * The instruction performs the store to the specified address, but
-     the value stored is UNKNOWN.
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/ras-apei
 
-Thus, use a different temporary register for the status flag to fix it.
+which I'll merge into for-next/core (and therefore linux-next) either the
+end of this week or the beginning of next week. Please take a look if you
+get a chance.
 
-Disassembly extract from test 226/STX_XADD_DW from test_bpf.ko:
-
-  [...]
-  0000003c:  c85f7d4b  ldxr x11, [x10]
-  00000040:  8b07016b  add x11, x11, x7
-  00000044:  c80c7d4b  stxr w12, x11, [x10]
-  00000048:  35ffffac  cbnz w12, 0x0000003c
-  [...]
-
-  [1] https://static.docs.arm.com/ddi0487/b/DDI0487B_a_armv8_arm.pdf, p.6132
-
-Fixes: 85f68fe89832 ("bpf, arm64: implement jiting of BPF_XADD")
-Reported-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Daniel Borkmann <daniel@iogearbox.net>
----
- arch/arm64/net/bpf_jit_comp.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-index 71f9305..c870d6f 100644
---- a/arch/arm64/net/bpf_jit_comp.c
-+++ b/arch/arm64/net/bpf_jit_comp.c
-@@ -36,6 +36,7 @@
- #define TMP_REG_1 (MAX_BPF_JIT_REG + 0)
- #define TMP_REG_2 (MAX_BPF_JIT_REG + 1)
- #define TCALL_CNT (MAX_BPF_JIT_REG + 2)
-+#define TMP_REG_3 (MAX_BPF_JIT_REG + 3)
- 
- /* Map BPF registers to A64 registers */
- static const int bpf2a64[] = {
-@@ -57,6 +58,7 @@
- 	/* temporary registers for internal BPF JIT */
- 	[TMP_REG_1] = A64_R(10),
- 	[TMP_REG_2] = A64_R(11),
-+	[TMP_REG_3] = A64_R(12),
- 	/* tail_call_cnt */
- 	[TCALL_CNT] = A64_R(26),
- 	/* temporary register for blinding constants */
-@@ -319,6 +321,7 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
- 	const u8 src = bpf2a64[insn->src_reg];
- 	const u8 tmp = bpf2a64[TMP_REG_1];
- 	const u8 tmp2 = bpf2a64[TMP_REG_2];
-+	const u8 tmp3 = bpf2a64[TMP_REG_3];
- 	const s16 off = insn->off;
- 	const s32 imm = insn->imm;
- 	const int i = insn - ctx->prog->insnsi;
-@@ -689,10 +692,10 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
- 		emit(A64_PRFM(tmp, PST, L1, STRM), ctx);
- 		emit(A64_LDXR(isdw, tmp2, tmp), ctx);
- 		emit(A64_ADD(isdw, tmp2, tmp2, src), ctx);
--		emit(A64_STXR(isdw, tmp2, tmp, tmp2), ctx);
-+		emit(A64_STXR(isdw, tmp2, tmp, tmp3), ctx);
- 		jmp_offset = -3;
- 		check_imm19(jmp_offset);
--		emit(A64_CBNZ(0, tmp2, jmp_offset), ctx);
-+		emit(A64_CBNZ(0, tmp3, jmp_offset), ctx);
- 		break;
- 
- 	/* R0 = ntohx(*(size *)(((struct sk_buff *)R6)->data + imm)) */
--- 
-1.9.3
+Will
