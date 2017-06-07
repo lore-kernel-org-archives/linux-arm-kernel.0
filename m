@@ -1,171 +1,189 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 7 Jun 2017 18:16:18 +0100
-Subject: [RFCv2 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
- erratum 161010801
-In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA838362082@FRAEML521-MBX.china.huawei.com>
-References: <20170531143213.82100-1-shameerali.kolothum.thodi@huawei.com>
- <20170531143213.82100-3-shameerali.kolothum.thodi@huawei.com>
- <20170606135623.GB20126@red-moon>
- <5FC3163CFD30C246ABAA99954A238FA838362082@FRAEML521-MBX.china.huawei.com>
-Message-ID: <20170607171618.GC7937@red-moon>
+From: bsd@redhat.com (Bandan Das)
+Date: Wed, 07 Jun 2017 13:21:01 -0400
+Subject: [RFC 11/55] KVM: arm64: Emulate taking an exception to the guest
+ hypervisor
+In-Reply-To: <CAHyh4xhSbtLEEBV3hnEbL9MMeNM0Ykzdu-U7Xj3KFXMCYLfKwg@mail.gmail.com>
+ (Jintack Lim's message of "Tue, 6 Jun 2017 19:16:17 -0400")
+References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
+ <1483943091-1364-12-git-send-email-jintack@cs.columbia.edu>
+ <jpgtw3sdfzw.fsf@linux.bootlegged.copy>
+ <CAHyh4xjvqiXDEa9+vDDc4iOVsEHVZyHUEQ5AqQT65E4BV+b0zA@mail.gmail.com>
+ <jpglgp4g48k.fsf@linux.bootlegged.copy>
+ <CAHyh4xhSbtLEEBV3hnEbL9MMeNM0Ykzdu-U7Xj3KFXMCYLfKwg@mail.gmail.com>
+Message-ID: <jpgvao7g1du.fsf@linux.bootlegged.copy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 06, 2017 at 03:01:36PM +0000, Shameerali Kolothum Thodi wrote:
-> Hi Lorenzo,
-> 
-> > -----Original Message-----
-> > From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
-> > Sent: Tuesday, June 06, 2017 2:56 PM
-> > To: Shameerali Kolothum Thodi
-> > Cc: marc.zyngier at arm.com; sudeep.holla at arm.com; will.deacon at arm.com;
-> > robin.murphy at arm.com; hanjun.guo at linaro.org; Gabriele Paoloni; John
-> > Garry; iommu at lists.linux-foundation.org; linux-arm-
-> > kernel at lists.infradead.org; linux-acpi at vger.kernel.org; devel at acpica.org;
-> > Linuxarm; Wangzhou (B); Guohanjun (Hanjun Guo)
-> > Subject: Re: [RFCv2 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
-> > erratum 161010801
-> > 
-> > On Wed, May 31, 2017 at 03:32:13PM +0100, shameer wrote:
-> > > The HiSilicon erratum 161010801 describes the limitation of HiSilicon
-> > > platforms Hip06/Hip07 to support the SMMU mappings for MSI
-> > transactions.
-> > >
-> > > On these platforms GICv3 ITS translator is presented with the deviceID
-> > > by extending the MSI payload data to 64 bits to include the deviceID.
-> > > Hence, the PCIe controller on this platforms has to differentiate the
-> > > MSI payload against other DMA payload and has to modify the MSI
-> > payload.
-> > > This basically makes it difficult for this platforms to have a SMMU
-> > > translation for MSI.
-> > >
-> > > This patch implements a ACPI table based quirk to reserve the hw msi
-> > > regions in the smmu-v3 driver which means these address regions will
-> > > not be translated and will be excluded from iova allocations.
-> > >
-> > > The HW ITS address region associated with the dev is retrieved using a
-> > > new helper function added in the IORT code.
-> > 
-> > Remove or rephrase last paragraph, it reads as if you are adding an IORT
-> > helper function in this patch but you actually aren't.
-> 
-> Thanks for going through this patch series. I will remove this in next version.
-> 
-> > > Signed-off-by: shameer <shameerali.kolothum.thodi@huawei.com>
-> > > ---
-> > >  drivers/iommu/arm-smmu-v3.c | 49
-> > > ++++++++++++++++++++++++++++++++++++++++++---
-> > >  1 file changed, 46 insertions(+), 3 deletions(-)
-> > >
-> > > diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-
-> > v3.c
-> > > index abe4b88..3767526 100644
-> > > --- a/drivers/iommu/arm-smmu-v3.c
-> > > +++ b/drivers/iommu/arm-smmu-v3.c
-> > > @@ -597,6 +597,7 @@ struct arm_smmu_device {
-> > >  	u32				features;
-> > >
-> > >  #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-> > > +#define ARM_SMMU_OPT_RESV_HW_MSI	(1 << 1)
-> > >  	u32				options;
-> > >
-> > >  	struct arm_smmu_cmdq		cmdq;
-> > > @@ -1755,6 +1756,38 @@ static bool arm_smmu_sid_in_range(struct
-> > > arm_smmu_device *smmu, u32 sid)
-> > >
-> > >  static struct iommu_ops arm_smmu_ops;
-> > >
-> > > +#ifdef CONFIG_ACPI
-> > > +static struct iommu_resv_region *arm_smmu_acpi_alloc_hw_msi(struct
-> > > +device *dev) {
-> > > +	struct iommu_resv_region *region;
-> > > +	struct	irq_domain *irq_dom;
-> > > +	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
-> > > +	u64	base;
-> > 
-> > phys_addr_t
-> 
-> Ok.
-> 
-> > > +	irq_dom = pci_msi_get_device_domain(to_pci_dev(dev));
-> > > +	if (irq_dom) {
-> > > +		int	ret;
-> > > +		u32	rid;
-> > > +
-> > > +		rid = pci_msi_domain_get_msi_rid(irq_dom,
-> > to_pci_dev(dev));
-> > > +		ret = iort_dev_find_its_base(dev, rid, 0, &base);
-> > 
-> > Well, here we use ITS id 0 which is fine as long as code in IORT uses the same
-> > policy for getting the irq_domain (ie we want to reserve the ITS address
-> > space that is actually used by the device to send IRQs not a a different one) it
-> > is just a heads-up because I find this confusing.
-> 
-> Ok. Just to make it clear, 0 is the index into the ITS identifier list.
-> I noted that iort_get_device_domain() uses index 0 while retrieving the ITS identifier.
-> May be use the same approach here as well? ie, remove the index from function call?
-> 
-> I am not sure, how we can get the index info  though theoretically It is possible for
-> the ITS group node having multiple ITSs.
+Jintack Lim <jintack.lim@linaro.org> writes:
 
-Yes, it would be ideal to avoid the look-up through the ITS index and
-just reuse the ITS node associated with the MSI domain because I do not
-want this quirk to force the ITS domain allocation policy (what I mean
-I do not want to be tied to index 0 if for any reason we change
-the allocation in IORT for normal ITS<->device mapping).
+> Compilation on 32bit arm architecture will fail without them.
+...
+>> It seems these functions are
+>> defined separately in 32/64 bit specific header files. Or is it that
+>> 64 bit compilation also depends on the 32 bit header file ?
+>
+> It's only for 32bit architecture. For example, kvm_inject_nested_irq()
+> is called in virt/kvm/arm/vgic/vgic.c which is shared between 32 and
+> 64 bit.
 
-I will have a further look to see if we can improve the code to
-this extent.
+Ah, that's the catch! Thanks for clearing this up!
 
-> > > +		if (!ret) {
-> > > +			dev_info(dev, "SMMUv3:HW MSI resv addr
-> > 0x%pa\n", &base);
-> > > +			region = iommu_alloc_resv_region(base, SZ_128K,
-> > > +							 prot,
-> > IOMMU_RESV_MSI);
-> > > +			return region;
-> > > +		}
-> > > +	}
-> > > +
-> > > +	return NULL;
-> > > +}
-> > > +#else
-> > > +static struct iommu_resv_region *arm_smmu_acpi_alloc_hw_msi(struct
-> > > +device *dev) {
-> > > +	return NULL;
-> > > +}
-> > > +#endif
-> > > +
-> > >  static int arm_smmu_add_device(struct device *dev)  {
-> > >  	int i, ret;
-> > > @@ -1903,11 +1936,20 @@ static int arm_smmu_of_xlate(struct device
-> > > *dev, struct of_phandle_args *args)  static void
-> > arm_smmu_get_resv_regions(struct device *dev,
-> > >  				      struct list_head *head)
-> > >  {
-> > > -	struct iommu_resv_region *region;
-> > > +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
-> > > +	struct iommu_resv_region *region = NULL;
-> > >  	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
-> > > +	struct arm_smmu_device *smmu;
-> > > +
-> > > +	smmu = arm_smmu_get_by_fwnode(fwspec->iommu_fwnode);
-> > >
-> > > -	region = iommu_alloc_resv_region(MSI_IOVA_BASE,
-> > MSI_IOVA_LENGTH,
-> > > -					 prot, IOMMU_RESV_SW_MSI);
-> > > +	if (smmu && (smmu->options & ARM_SMMU_OPT_RESV_HW_MSI)
-> > &&
-> > > +		      dev_is_pci(dev))
-> > > +		region = arm_smmu_acpi_alloc_hw_msi(dev);
-> > 
-> > Is it safe to carry on if arm_smmu_acpi_alloc_hw_msi() returns NULL here ?
-> 
-> It is just that PCIe devices won't be functional on this platforms as the endpoint will 
-> be configured with ITS IOVA address. May be I should add some dev_warn() here.
-
-Well yes and also I am not sure that if arm_smmu_acpi_alloc_hw_msi()
-fails you should allocate the SW_MSI region I am not sure I understand
-the logic, so you should add a warning and just return on failure right ?
-
-Lorenzo
+>>
+>> Bandan
+>>
+>>> Thanks,
+>>> Jintack
+>>>
+>>>>
+>>>> Bandan
+>>>>
+>>>>>  static inline void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu) { };
+>>>>>  static inline void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu) { };
+>>>>>  static inline void kvm_arm_init_cpu_context(kvm_cpu_context_t *cpu_ctxt) { };
+>>>>> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+>>>>> index 8892c82..0987ee4 100644
+>>>>> --- a/arch/arm64/include/asm/kvm_emulate.h
+>>>>> +++ b/arch/arm64/include/asm/kvm_emulate.h
+>>>>> @@ -42,6 +42,25 @@
+>>>>>  void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
+>>>>>  void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
+>>>>>
+>>>>> +#ifdef CONFIG_KVM_ARM_NESTED_HYP
+>>>>> +int kvm_inject_nested_sync(struct kvm_vcpu *vcpu, u64 esr_el2);
+>>>>> +int kvm_inject_nested_irq(struct kvm_vcpu *vcpu);
+>>>>> +#else
+>>>>> +static inline int kvm_inject_nested_sync(struct kvm_vcpu *vcpu, u64 esr_el2)
+>>>>> +{
+>>>>> +     kvm_err("Unexpected call to %s for the non-nesting configuration\n",
+>>>>> +              __func__);
+>>>>> +     return -EINVAL;
+>>>>> +}
+>>>>> +
+>>>>> +static inline int kvm_inject_nested_irq(struct kvm_vcpu *vcpu)
+>>>>> +{
+>>>>> +     kvm_err("Unexpected call to %s for the non-nesting configuration\n",
+>>>>> +              __func__);
+>>>>> +     return -EINVAL;
+>>>>> +}
+>>>>> +#endif
+>>>>> +
+>>>>>  void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu);
+>>>>>  void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu);
+>>>>>  void kvm_arm_init_cpu_context(kvm_cpu_context_t *cpu_ctxt);
+>>>>> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+>>>>> index 7811d27..b342bdd 100644
+>>>>> --- a/arch/arm64/kvm/Makefile
+>>>>> +++ b/arch/arm64/kvm/Makefile
+>>>>> @@ -34,3 +34,5 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-its.o
+>>>>>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/irqchip.o
+>>>>>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
+>>>>>  kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
+>>>>> +
+>>>>> +kvm-$(CONFIG_KVM_ARM_NESTED_HYP) += emulate-nested.o
+>>>>> diff --git a/arch/arm64/kvm/emulate-nested.c b/arch/arm64/kvm/emulate-nested.c
+>>>>> new file mode 100644
+>>>>> index 0000000..59d147f
+>>>>> --- /dev/null
+>>>>> +++ b/arch/arm64/kvm/emulate-nested.c
+>>>>> @@ -0,0 +1,66 @@
+>>>>> +/*
+>>>>> + * Copyright (C) 2016 - Columbia University
+>>>>> + * Author: Jintack Lim <jintack@cs.columbia.edu>
+>>>>> + *
+>>>>> + * This program is free software; you can redistribute it and/or modify
+>>>>> + * it under the terms of the GNU General Public License version 2 as
+>>>>> + * published by the Free Software Foundation.
+>>>>> + *
+>>>>> + * This program is distributed in the hope that it will be useful,
+>>>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>>>> + * GNU General Public License for more details.
+>>>>> + *
+>>>>> + * You should have received a copy of the GNU General Public License
+>>>>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>>>>> + */
+>>>>> +
+>>>>> +#include <linux/kvm.h>
+>>>>> +#include <linux/kvm_host.h>
+>>>>> +
+>>>>> +#include <asm/kvm_emulate.h>
+>>>>> +
+>>>>> +#include "trace.h"
+>>>>> +
+>>>>> +#define      EL2_EXCEPT_SYNC_OFFSET  0x400
+>>>>> +#define      EL2_EXCEPT_ASYNC_OFFSET 0x480
+>>>>> +
+>>>>> +
+>>>>> +/*
+>>>>> + *  Emulate taking an exception. See ARM ARM J8.1.2 AArch64.TakeException()
+>>>>> + */
+>>>>> +static int kvm_inject_nested(struct kvm_vcpu *vcpu, u64 esr_el2,
+>>>>> +                          int exception_offset)
+>>>>> +{
+>>>>> +     int ret = 1;
+>>>>> +     kvm_cpu_context_t *ctxt = &vcpu->arch.ctxt;
+>>>>> +
+>>>>> +     /* We don't inject an exception recursively to virtual EL2 */
+>>>>> +     if (vcpu_mode_el2(vcpu))
+>>>>> +             BUG();
+>>>>> +
+>>>>> +     ctxt->el2_regs[SPSR_EL2] = *vcpu_cpsr(vcpu);
+>>>>> +     ctxt->el2_regs[ELR_EL2] = *vcpu_pc(vcpu);
+>>>>> +     ctxt->el2_regs[ESR_EL2] = esr_el2;
+>>>>> +
+>>>>> +     /* On an exception, PSTATE.SP = 1 */
+>>>>> +     *vcpu_cpsr(vcpu) = PSR_MODE_EL2h;
+>>>>> +     *vcpu_cpsr(vcpu) |=  (PSR_A_BIT | PSR_F_BIT | PSR_I_BIT | PSR_D_BIT);
+>>>>> +     *vcpu_pc(vcpu) = ctxt->el2_regs[VBAR_EL2] + exception_offset;
+>>>>> +
+>>>>> +     trace_kvm_inject_nested_exception(vcpu, esr_el2, *vcpu_pc(vcpu));
+>>>>> +
+>>>>> +     return ret;
+>>>>> +}
+>>>>> +
+>>>>> +int kvm_inject_nested_sync(struct kvm_vcpu *vcpu, u64 esr_el2)
+>>>>> +{
+>>>>> +     return kvm_inject_nested(vcpu, esr_el2, EL2_EXCEPT_SYNC_OFFSET);
+>>>>> +}
+>>>>> +
+>>>>> +int kvm_inject_nested_irq(struct kvm_vcpu *vcpu)
+>>>>> +{
+>>>>> +     u64 esr_el2 = kvm_vcpu_get_hsr(vcpu);
+>>>>> +     /* We supports only IRQ and FIQ, so the esr_el2 is not updated. */
+>>>>> +     return kvm_inject_nested(vcpu, esr_el2, EL2_EXCEPT_ASYNC_OFFSET);
+>>>>> +}
+>>>>> diff --git a/arch/arm64/kvm/trace.h b/arch/arm64/kvm/trace.h
+>>>>> index 7fb0008..7c86cfb 100644
+>>>>> --- a/arch/arm64/kvm/trace.h
+>>>>> +++ b/arch/arm64/kvm/trace.h
+>>>>> @@ -167,6 +167,26 @@
+>>>>>  );
+>>>>>
+>>>>>
+>>>>> +TRACE_EVENT(kvm_inject_nested_exception,
+>>>>> +     TP_PROTO(struct kvm_vcpu *vcpu, unsigned long esr_el2,
+>>>>> +              unsigned long pc),
+>>>>> +     TP_ARGS(vcpu, esr_el2, pc),
+>>>>> +
+>>>>> +     TP_STRUCT__entry(
+>>>>> +             __field(struct kvm_vcpu *,      vcpu)
+>>>>> +             __field(unsigned long,          esr_el2)
+>>>>> +             __field(unsigned long,          pc)
+>>>>> +     ),
+>>>>> +
+>>>>> +     TP_fast_assign(
+>>>>> +             __entry->vcpu = vcpu;
+>>>>> +             __entry->esr_el2 = esr_el2;
+>>>>> +             __entry->pc = pc;
+>>>>> +     ),
+>>>>> +
+>>>>> +     TP_printk("vcpu: %p, inject exception to vEL2: ESR_EL2 0x%lx, vector: 0x%016lx",
+>>>>> +               __entry->vcpu, __entry->esr_el2, __entry->pc)
+>>>>> +);
+>>>>>  #endif /* _TRACE_ARM64_KVM_H */
+>>>>>
+>>>>>  #undef TRACE_INCLUDE_PATH
+>>>> _______________________________________________
+>>>> kvmarm mailing list
+>>>> kvmarm at lists.cs.columbia.edu
+>>>> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
