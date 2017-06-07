@@ -1,89 +1,82 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed,  7 Jun 2017 08:23:03 +0800
-Subject: [PATCH 1/3] arm64: allwinner: h5: sort the device nodes in / part for
- some boards
-Message-ID: <20170607002305.15897-1-icenowy@aosc.io>
+Date: Wed,  7 Jun 2017 08:23:04 +0800
+Subject: [PATCH 2/3] arm64: allwinner: h5: enable dwmac-sun8i for Orange Pi
+ Prime
+In-Reply-To: <20170607002305.15897-1-icenowy@aosc.io>
+References: <20170607002305.15897-1-icenowy@aosc.io>
+Message-ID: <20170607002305.15897-2-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The reg_vcc3v3 node is wrongly placed at the start of the / part, but
-not with other fixed regulators used by the board, which makes the
-device nodes unsorted.
+Add the required DT parts to enable Ethernet (dwmac-sun8i driver) on
+the Orange Pi Prime board. It uses an external Realtek RTL8211E PHY
+connected via RGMII to provide GbE network.
 
-As Orange Pi Prime and Nano Pi NEO2 device trees are copy'n'paste works,
-they share the device node unsorted issue.
-
-Fix this by move reg_vcc3v3 node to the position before reg_usb0_vbus.
+This includes the regulator (which is controlled by a GPIO pin) and
+the actual Ethernet MAC node, referring the RGMII pins of the device.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts    | 14 +++++++-------
- arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts | 14 +++++++-------
- 2 files changed, 14 insertions(+), 14 deletions(-)
+ .../dts/allwinner/sun50i-h5-orangepi-prime.dts     | 27 ++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
-index f6d71b0d482a..f2767b99c28a 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
-@@ -49,13 +49,6 @@
- 	model = "FriendlyARM NanoPi NEO 2";
- 	compatible = "friendlyarm,nanopi-neo2", "allwinner,sun50i-h5";
- 
--	reg_vcc3v3: vcc3v3 {
--		compatible = "regulator-fixed";
--		regulator-name = "vcc3v3";
--		regulator-min-microvolt = <3300000>;
--		regulator-max-microvolt = <3300000>;
--	};
--
- 	aliases {
- 		serial0 = &uart0;
- 	};
-@@ -79,6 +72,13 @@
- 		};
- 	};
- 
-+	reg_vcc3v3: vcc3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
- 	reg_usb0_vbus: usb0-vbus {
- 		compatible = "regulator-fixed";
- 		regulator-name = "usb0-vbus";
 diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
-index 28d92a612329..097c33386190 100644
+index 097c33386190..d906b302cbcd 100644
 --- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
-@@ -53,13 +53,6 @@
- 	model = "Xunlong Orange Pi Prime";
+@@ -54,6 +54,7 @@
  	compatible = "xunlong,orangepi-prime", "allwinner,sun50i-h5";
  
--	reg_vcc3v3: vcc3v3 {
--		compatible = "regulator-fixed";
--		regulator-name = "vcc3v3";
--		regulator-min-microvolt = <3300000>;
--		regulator-max-microvolt = <3300000>;
--	};
--
  	aliases {
++		ethernet0 = &emac;
  		serial0 = &uart0;
  	};
-@@ -93,6 +86,13 @@
+ 
+@@ -86,6 +87,16 @@
  		};
  	};
  
-+	reg_vcc3v3: vcc3v3 {
++	reg_gmac_3v3: gmac-3v3 {
 +		compatible = "regulator-fixed";
-+		regulator-name = "vcc3v3";
++		regulator-name = "gmac-3v3";
 +		regulator-min-microvolt = <3300000>;
 +		regulator-max-microvolt = <3300000>;
++		startup-delay-us = <100000>;
++		enable-active-high;
++		gpio = <&pio 3 6 GPIO_ACTIVE_HIGH>;
 +	};
 +
- 	reg_usb0_vbus: usb0-vbus {
+ 	reg_vcc3v3: vcc3v3 {
  		compatible = "regulator-fixed";
- 		regulator-name = "usb0-vbus";
+ 		regulator-name = "vcc3v3";
+@@ -133,12 +144,28 @@
+ 	status = "okay";
+ };
+ 
++&emac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&emac_rgmii_pins>;
++	phy-supply = <&reg_gmac_3v3>;
++	phy-handle = <&ext_rgmii_phy>;
++	phy-mode = "rgmii";
++	status = "okay";
++};
++
+ &ir {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&ir_pins_a>;
+ 	status = "okay";
+ };
+ 
++&mdio {
++	ext_rgmii_phy: ethernet-phy at 1 {
++		compatible = "ethernet-phy-ieee802.3-c22";
++		reg = <1>;
++	};
++};
++
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
 -- 
 2.12.2
