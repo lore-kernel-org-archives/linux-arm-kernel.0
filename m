@@ -1,38 +1,66 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed,  7 Jun 2017 19:33:44 +0200
-Subject: [PATCH v2 1/2] ARM: sun8i: a83t: Add dt node for the syscon control
- module
+Date: Wed,  7 Jun 2017 19:33:45 +0200
+Subject: [PATCH v2 2/2] ARM: sun8i: a83t: add dwmac-sun8i ethernet driver
 In-Reply-To: <20170607173345.22462-1-clabbe.montjoie@gmail.com>
 References: <20170607173345.22462-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170607173345.22462-2-clabbe.montjoie@gmail.com>
+Message-ID: <20170607173345.22462-3-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the dt node for the syscon register present on the
-Allwinner A83T
+The dwmac-sun8i is an ethernet MAC hardware that support 10/100/1000 speed.
+This patch enable the dwmac-sun8i on the Allwinner a83t SoC Device-tree.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-a83t.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/sun8i-a83t.dtsi | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index 49aeb56970ba..01a83406f9ae 100644
+index 01a83406f9ae..7d719b4aeaa9 100644
 --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
 +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -163,6 +163,12 @@
- 		#size-cells = <1>;
- 		ranges;
+@@ -200,6 +200,14 @@
+ 			#interrupt-cells = <3>;
+ 			#gpio-cells = <3>;
  
-+		syscon: syscon at 1c00000 {
-+			compatible = "allwinner,sun8i-a83t-system-controller",
-+				"syscon";
-+			reg = <0x01c00000 0x1000>;
++			emac_rgmii_pins: emac-rgmii-pins {
++				pins = "PD2", "PD3", "PD4", "PD5", "PD6", "PD7",
++				       "PD11", "PD12", "PD13", "PD14", "PD18",
++				       "PD19", "PD21", "PD22", "PD23";
++				function = "gmac";
++				drive-strength = <40>;
++			};
++
+ 			mmc0_pins: mmc0-pins {
+ 				pins = "PF0", "PF1", "PF2",
+ 				       "PF3", "PF4", "PF5";
+@@ -266,6 +274,26 @@
+ 			status = "disabled";
+ 		};
+ 
++		emac: ethernet at 1c30000 {
++			compatible = "allwinner,sun8i-a83t-emac";
++			syscon = <&syscon>;
++			reg = <0x01c30000 0x104>;
++			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "macirq";
++			resets = <&ccu 13>;
++			reset-names = "stmmaceth";
++			clocks = <&ccu 27>;
++			clock-names = "stmmaceth";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++
++			mdio: mdio {
++				#address-cells = <1>;
++				#size-cells = <0>;
++			};
 +		};
 +
- 		dma: dma-controller at 1c02000 {
- 			compatible = "allwinner,sun8i-a83t-dma";
- 			reg = <0x01c02000 0x1000>;
+ 		gic: interrupt-controller at 1c81000 {
+ 			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
+ 			reg = <0x01c81000 0x1000>,
 -- 
 2.13.0
