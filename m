@@ -1,102 +1,228 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 7 Jun 2017 15:07:48 +0530
-Subject: [PATCH v2 7/8] ARM: OMAP2+: Add pdata-quirks for MMC/SD on DRA74x EVM
+Date: Wed, 7 Jun 2017 15:07:49 +0530
+Subject: [PATCH v2 8/8] ARM: dts: omap*: Replace deprecated "vmmc_aux" with
+ "vqmmc"
 In-Reply-To: <20170607093749.15656-1-kishon@ti.com>
 References: <20170607093749.15656-1-kishon@ti.com>
-Message-ID: <20170607093749.15656-8-kishon@ti.com>
+Message-ID: <20170607093749.15656-9-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sekhar Nori <nsekhar@ti.com>
-
-DRA74x EVM Rev H EVM comes with revision 2.0 silicon.
-However, earlier versions of EVM can come with either
-revision 1.1 or revision 1.0 of silicon.
-
-The device-tree file is written to support rev 2.0 of
-silicon. pdata quirks are used to then override the
-settings needed for PG 1.1 silicon.
-
-PG 1.1 silicon has limitations w.r.t frequencies at
-which MMC1/2/3 can operate as well as different IOdelay
-numbers.
+Replace deprecated "vmmc_aux" with the generic "vqmmc" binding for
+MMC IO supply.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 ---
- arch/arm/mach-omap2/pdata-quirks.c       | 31 +++++++++++++++++++++++++++++++
- include/linux/platform_data/hsmmc-omap.h |  3 +++
- 2 files changed, 34 insertions(+)
+ arch/arm/boot/dts/am572x-idk.dts               | 2 +-
+ arch/arm/boot/dts/dra7-evm.dts                 | 2 +-
+ arch/arm/boot/dts/dra71-evm.dts                | 2 +-
+ arch/arm/boot/dts/dra72-evm-tps65917.dtsi      | 2 +-
+ arch/arm/boot/dts/omap3-beagle-xm.dts          | 2 +-
+ arch/arm/boot/dts/omap3-beagle.dts             | 2 +-
+ arch/arm/boot/dts/omap3-cm-t3517.dts           | 2 +-
+ arch/arm/boot/dts/omap3-cm-t3730.dts           | 2 +-
+ arch/arm/boot/dts/omap3-devkit8000-common.dtsi | 2 +-
+ arch/arm/boot/dts/omap3-evm-common.dtsi        | 2 +-
+ arch/arm/boot/dts/omap3-n900.dts               | 2 +-
+ arch/arm/boot/dts/omap3-overo-base.dtsi        | 3 +--
+ arch/arm/boot/dts/omap3-tao3530.dtsi           | 2 +-
+ arch/arm/boot/dts/omap3-zoom3.dts              | 2 +-
+ arch/arm/boot/dts/omap3430-sdp.dts             | 2 +-
+ 15 files changed, 15 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index 9700a8ef0f16..6b433fce65a5 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -434,6 +434,26 @@ static void __init omap5_uevm_legacy_init(void)
- }
- #endif
- 
-+#ifdef CONFIG_SOC_DRA7XX
-+static struct omap_hsmmc_platform_data dra7_hsmmc_data_mmc1;
-+static struct omap_hsmmc_platform_data dra7_hsmmc_data_mmc2;
-+static struct omap_hsmmc_platform_data dra7_hsmmc_data_mmc3;
-+
-+static void __init dra7x_evm_mmc_quirk(void)
-+{
-+	if (omap_rev() == DRA752_REV_ES1_1 || omap_rev() == DRA752_REV_ES1_0) {
-+		dra7_hsmmc_data_mmc1.version = "rev11";
-+		dra7_hsmmc_data_mmc1.max_freq = 96000000;
-+
-+		dra7_hsmmc_data_mmc2.version = "rev11";
-+		dra7_hsmmc_data_mmc2.max_freq = 48000000;
-+
-+		dra7_hsmmc_data_mmc3.version = "rev11";
-+		dra7_hsmmc_data_mmc3.max_freq = 48000000;
-+	}
-+}
-+#endif
-+
- static struct pcs_pdata pcs_pdata;
- 
- void omap_pcs_legacy_init(int irq, void (*rearm)(void))
-@@ -561,6 +581,14 @@ static struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("ti,omap4-iommu", 0x55082000, "55082000.mmu",
- 		       &omap4_iommu_pdata),
- #endif
-+#ifdef CONFIG_SOC_DRA7XX
-+	OF_DEV_AUXDATA("ti,dra7-hsmmc", 0x4809c000, "4809c000.mmc",
-+		       &dra7_hsmmc_data_mmc1),
-+	OF_DEV_AUXDATA("ti,dra7-hsmmc", 0x480b4000, "480b4000.mmc",
-+		       &dra7_hsmmc_data_mmc2),
-+	OF_DEV_AUXDATA("ti,dra7-hsmmc", 0x480ad000, "480ad000.mmc",
-+		       &dra7_hsmmc_data_mmc3),
-+#endif
- 	/* Common auxdata */
- 	OF_DEV_AUXDATA("pinctrl-single", 0, NULL, &pcs_pdata),
- 	{ /* sentinel */ },
-@@ -590,6 +618,9 @@ static struct pdata_init pdata_quirks[] __initdata = {
- #ifdef CONFIG_SOC_OMAP5
- 	{ "ti,omap5-uevm", omap5_uevm_legacy_init, },
- #endif
-+#ifdef CONFIG_SOC_DRA7XX
-+	{ "ti,dra7-evm", dra7x_evm_mmc_quirk, },
-+#endif
- 	{ /* sentinel */ },
+diff --git a/arch/arm/boot/dts/am572x-idk.dts b/arch/arm/boot/dts/am572x-idk.dts
+index 8350b4b34b08..8d538f5d9a5f 100644
+--- a/arch/arm/boot/dts/am572x-idk.dts
++++ b/arch/arm/boot/dts/am572x-idk.dts
+@@ -79,7 +79,7 @@
+ &mmc1 {
+ 	status = "okay";
+ 	vmmc-supply = <&v3_3d>;
+-	vmmc_aux-supply = <&ldo1_reg>;
++	vqmmc-supply = <&ldo1_reg>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&gpio6 27 0>; /* gpio 219 */
+ };
+diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
+index e5d7e7f5f645..e4c4037e6314 100644
+--- a/arch/arm/boot/dts/dra7-evm.dts
++++ b/arch/arm/boot/dts/dra7-evm.dts
+@@ -446,7 +446,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc1_pins_default>;
+ 	vmmc-supply = <&evm_3v3_sd>;
+-	vmmc_aux-supply = <&ldo1_reg>;
++	vqmmc-supply = <&ldo1_reg>;
+ 	bus-width = <4>;
+ 	/*
+ 	 * SDCD signal is not being used here - using the fact that GPIO mode
+diff --git a/arch/arm/boot/dts/dra71-evm.dts b/arch/arm/boot/dts/dra71-evm.dts
+index c7a56b6263a6..02c11e658810 100644
+--- a/arch/arm/boot/dts/dra71-evm.dts
++++ b/arch/arm/boot/dts/dra71-evm.dts
+@@ -172,7 +172,7 @@
  };
  
-diff --git a/include/linux/platform_data/hsmmc-omap.h b/include/linux/platform_data/hsmmc-omap.h
-index 8e981be2e2c2..67bded22eae4 100644
---- a/include/linux/platform_data/hsmmc-omap.h
-+++ b/include/linux/platform_data/hsmmc-omap.h
-@@ -70,6 +70,9 @@ struct omap_hsmmc_platform_data {
- #define HSMMC_HAS_HSPE_SUPPORT	(1 << 2)
- 	unsigned features;
+ &mmc1 {
+-	vmmc_aux-supply = <&vpo_sd_1v8_3v3>;
++	vqmmc-supply = <&vpo_sd_1v8_3v3>;
+ };
  
-+	/* string specifying a particular variant of hardware */
-+	char *version;
-+
- 	int gpio_cd;			/* gpio (card detect) */
- 	int gpio_cod;			/* gpio (cover detect) */
- 	int gpio_wp;			/* gpio (write protect) */
+ &mmc2 {
+diff --git a/arch/arm/boot/dts/dra72-evm-tps65917.dtsi b/arch/arm/boot/dts/dra72-evm-tps65917.dtsi
+index e6df676886c0..57bfe5caf5e4 100644
+--- a/arch/arm/boot/dts/dra72-evm-tps65917.dtsi
++++ b/arch/arm/boot/dts/dra72-evm-tps65917.dtsi
+@@ -146,5 +146,5 @@
+ };
+ 
+ &mmc1 {
+-	vmmc_aux-supply = <&ldo1_reg>;
++	vqmmc-supply = <&ldo1_reg>;
+ };
+diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+index 673cee2234b2..683b96a8f73e 100644
+--- a/arch/arm/boot/dts/omap3-beagle-xm.dts
++++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+@@ -299,7 +299,7 @@
+ 
+ &mmc1 {
+ 	vmmc-supply = <&vmmc1>;
+-	vmmc_aux-supply = <&vsim>;
++	vqmmc-supply = <&vsim>;
+ 	bus-width = <8>;
+ };
+ 
+diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+index 4be85ce59dd1..4d2eaf843fa9 100644
+--- a/arch/arm/boot/dts/omap3-beagle.dts
++++ b/arch/arm/boot/dts/omap3-beagle.dts
+@@ -283,7 +283,7 @@
+ 
+ &mmc1 {
+ 	vmmc-supply = <&vmmc1>;
+-	vmmc_aux-supply = <&vsim>;
++	vqmmc-supply = <&vsim>;
+ 	bus-width = <8>;
+ };
+ 
+diff --git a/arch/arm/boot/dts/omap3-cm-t3517.dts b/arch/arm/boot/dts/omap3-cm-t3517.dts
+index 53ae04f9104d..3d293b345e99 100644
+--- a/arch/arm/boot/dts/omap3-cm-t3517.dts
++++ b/arch/arm/boot/dts/omap3-cm-t3517.dts
+@@ -129,7 +129,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc2_pins>;
+ 	vmmc-supply = <&wl12xx_vmmc2>;
+-	vmmc_aux-supply = <&wl12xx_vaux2>;
++	vqmmc-supply = <&wl12xx_vaux2>;
+ 	non-removable;
+ 	bus-width = <4>;
+ 	cap-power-off-card;
+diff --git a/arch/arm/boot/dts/omap3-cm-t3730.dts b/arch/arm/boot/dts/omap3-cm-t3730.dts
+index 2294f5b0aa10..bdf4b7fdda39 100644
+--- a/arch/arm/boot/dts/omap3-cm-t3730.dts
++++ b/arch/arm/boot/dts/omap3-cm-t3730.dts
+@@ -69,7 +69,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc2_pins>;
+ 	vmmc-supply = <&wl12xx_vmmc2>;
+-	vmmc_aux-supply = <&wl12xx_vaux2>;
++	vqmmc-supply = <&wl12xx_vaux2>;
+ 	non-removable;
+ 	bus-width = <4>;
+ 	cap-power-off-card;
+diff --git a/arch/arm/boot/dts/omap3-devkit8000-common.dtsi b/arch/arm/boot/dts/omap3-devkit8000-common.dtsi
+index f330c69cc683..4036cef4f9fc 100644
+--- a/arch/arm/boot/dts/omap3-devkit8000-common.dtsi
++++ b/arch/arm/boot/dts/omap3-devkit8000-common.dtsi
+@@ -149,7 +149,7 @@
+ 
+ &mmc1 {
+ 	vmmc-supply = <&vmmc1>;
+-	vmmc_aux-supply = <&vsim>;
++	vqmmc-supply = <&vsim>;
+ 	bus-width = <8>;
+ };
+ 
+diff --git a/arch/arm/boot/dts/omap3-evm-common.dtsi b/arch/arm/boot/dts/omap3-evm-common.dtsi
+index 090475083c2f..b831f2ed1abc 100644
+--- a/arch/arm/boot/dts/omap3-evm-common.dtsi
++++ b/arch/arm/boot/dts/omap3-evm-common.dtsi
+@@ -98,7 +98,7 @@
+ &mmc1 {
+ 	interrupts-extended = <&intc 83 &omap3_pmx_core 0x11a>;
+ 	vmmc-supply = <&vmmc1>;
+-	vmmc_aux-supply = <&vsim>;
++	vqmmc-supply = <&vsim>;
+ 	bus-width = <8>;
+ };
+ 
+diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+index 49f37084e435..92c1f4ac4040 100644
+--- a/arch/arm/boot/dts/omap3-n900.dts
++++ b/arch/arm/boot/dts/omap3-n900.dts
+@@ -741,7 +741,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc2_pins>;
+ 	vmmc-supply = <&vaux3>;
+-	vmmc_aux-supply = <&vsim>;
++	vqmmc-supply = <&vsim>;
+ 	bus-width = <8>;
+ 	non-removable;
+ 	no-sdio;
+diff --git a/arch/arm/boot/dts/omap3-overo-base.dtsi b/arch/arm/boot/dts/omap3-overo-base.dtsi
+index 401fae838fe9..c11c86f9e09d 100644
+--- a/arch/arm/boot/dts/omap3-overo-base.dtsi
++++ b/arch/arm/boot/dts/omap3-overo-base.dtsi
+@@ -191,8 +191,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc2_pins>;
+ 	vmmc-supply = <&w3cbw003c_npoweron>;
+-	vqmmc-supply = <&w3cbw003c_bt_nreset>;
+-	vmmc_aux-supply = <&w3cbw003c_wifi_nreset>;
++	vqmmc-supply = <&w3cbw003c_wifi_nreset>;
+ 	bus-width = <4>;
+ 	cap-sdio-irq;
+ 	non-removable;
+diff --git a/arch/arm/boot/dts/omap3-tao3530.dtsi b/arch/arm/boot/dts/omap3-tao3530.dtsi
+index dc80886b5329..ac6ff9b4db94 100644
+--- a/arch/arm/boot/dts/omap3-tao3530.dtsi
++++ b/arch/arm/boot/dts/omap3-tao3530.dtsi
+@@ -224,7 +224,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc1_pins>;
+ 	vmmc-supply = <&vmmc1>;
+-	vmmc_aux-supply = <&vsim>;
++	vqmmc-supply = <&vsim>;
+ 	cd-gpios = <&twl_gpio 0 GPIO_ACTIVE_HIGH>;
+ 	bus-width = <8>;
+ };
+diff --git a/arch/arm/boot/dts/omap3-zoom3.dts b/arch/arm/boot/dts/omap3-zoom3.dts
+index 45e2ce0803de..96d0301a336a 100644
+--- a/arch/arm/boot/dts/omap3-zoom3.dts
++++ b/arch/arm/boot/dts/omap3-zoom3.dts
+@@ -174,7 +174,7 @@
+ 
+ &mmc1 {
+ 	vmmc-supply = <&vmmc1>;
+-	vmmc_aux-supply = <&vsim>;
++	vqmmc-supply = <&vsim>;
+ 	bus-width = <4>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc1_pins>;
+diff --git a/arch/arm/boot/dts/omap3430-sdp.dts b/arch/arm/boot/dts/omap3430-sdp.dts
+index abd6921143be..908951eb5943 100644
+--- a/arch/arm/boot/dts/omap3430-sdp.dts
++++ b/arch/arm/boot/dts/omap3430-sdp.dts
+@@ -33,7 +33,7 @@
+ 
+ &mmc1 {
+ 	vmmc-supply = <&vmmc1>;
+-	vmmc_aux-supply = <&vsim>;
++	vqmmc-supply = <&vsim>;
+ 	/*
+ 	 * S6-3 must be in ON position for 8 bit mode to function
+ 	 * Else, use 4 bit mode
 -- 
 2.11.0
