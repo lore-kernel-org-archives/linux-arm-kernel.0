@@ -1,56 +1,91 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Thu, 8 Jun 2017 00:27:11 +0200
-Subject: [PATCH 04/11] ARM: OMAP2+: Remove unused legacy code for device
- init
-In-Reply-To: <20170531225139.30723-5-tony@atomide.com>
-References: <20170531225139.30723-1-tony@atomide.com>
- <20170531225139.30723-5-tony@atomide.com>
-Message-ID: <20170607222711.6kdhuvkymiseootn@earth>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 7 Jun 2017 17:33:17 -0500
+Subject: [PATCH v2 2/6] dt-bindings: interrupt-controller: add DT binding
+ for the Marvell ICU
+In-Reply-To: <1496398017-6487-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1496398017-6487-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1496398017-6487-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20170607223317.hkpak5y2oalktjqe@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jun 02, 2017 at 12:06:53PM +0200, Thomas Petazzoni wrote:
+> This commit adds the Device Tree binding documentation for the Marvell
+> ICU interrupt controller, which collects wired interrupts from the
+> devices located into the CP110 hardware block of Marvell Armada 7K/8K,
+> and converts them into SPI interrupts in the GIC located in the AP
+> hardware block, using the GICP extension.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  .../bindings/interrupt-controller/marvell,icu.txt  | 54 ++++++++++++++++++++++
+>  1 file changed, 54 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
+> new file mode 100644
+> index 0000000..3e7954c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
+> @@ -0,0 +1,54 @@
+> +Marvell ICU Interrupt Controller
+> +--------------------------------
+> +
+> +The Marvell ICU (Interrupt Consolidation Unit) controller is
+> +responsible for collecting all wired-interrupt sources in the CP and
+> +communicating them to the GIC in the AP, the unit translates interrupt
+> +requests on input wires to MSG memory mapped transactions to the GIC.
+> +
+> +Required properties:
+> +
+> +- compatible: Should be "marvell,cp110-icu"
+> +
+> +- reg: Should contain ICU registers location and length.
+> +
+> +- #interrupt-cells: Specifies the number of cells needed to encode an
+> +  interrupt source. The value shall be 3.
+> +
+> +  The 1st cell is the group type of the ICU interrupt. Possible group
+> +  types are:
+> +
+> +   ICU_GRP_NSR (0x0) : Shared peripheral interrupt, non-secure
+> +   ICU_GRP_SR  (0x1) : Shared peripheral interrupt, secure
+> +   ICU_GRP_SEI (0x4) : System error interrupt
+> +   ICU_GRP_REI (0x5) : RAM error interrupt
+> +
+> +  The 2nd cell is the index of the interrupt in the ICU unit.
+> +
+> +  The 3rd cell is the type of the interrupt. See arm,gic.txt for
+> +  details.
+> +
+> +- interrupt-controller: Identifies the node as an interrupt
+> +  controller.
+> +
+> +- interrupt-parent: Indicates the node of the parent interrupt
+> +  controller. Should be pointer to the GIC.
+> +
+> +- gicp: Should point to the GICP controller, the GIC extension that
+> +  allows to trigger interrupts using MSG memory mapped transactions.
+> +
+> +Example:
+> +
+> +icu: interrupt-controller at 1e0000 {
+> +	compatible = "marvell,cp110-icu";
+> +	reg = <0x1e0000 0x10>;
+> +	#interrupt-cells = <3>;
+> +	interrupt-controller;
+> +	interrupt-parent = <&gic>;
 
-On Wed, May 31, 2017 at 03:51:32PM -0700, Tony Lindgren wrote:
-> [...]
-> -
->  static inline void omap_init_sti(void) {}
->  
-> [...]
-> @@ -190,49 +68,8 @@ int __init omap_init_vout(void) { return 0; }
->  
->  static int __init omap2_init_devices(void)
->  {
-> -	/* Enable dummy states for those platforms without pinctrl support */
-> -	if (!of_have_populated_dt())
-> -		pinctrl_provide_dummies();
-> -
-> -	/* If dtb is there, the devices will be created dynamically */
-> -	if (!of_have_populated_dt()) {
-> -		/*
-> -		 * please keep these calls, and their implementations above,
-> -		 * in alphabetical order so they're easier to sort through.
-> -		 */
-> -		omap_init_mcspi();
-> -		omap_init_sham();
-> -		omap_init_aes();
-> -		omap_init_rng();
-> -	}
->  	omap_init_sti();
->  
->  	return 0;
->  }
->  omap_arch_initcall(omap2_init_devices);
-> -
-> [...]
+If you have a parent, then you should have some interrupts. I guess that 
+would be your ranges property? I suppose that is fine.
 
-I guess you can drop omap2_init_devices() completly?
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170608/1e42be47/attachment-0001.sig>
+> +	marvell,gicp = <&gicp>;
+> +};
+> +
+> +usb3h0: usb3 at 500000 {
+> +	interrupt-parent = <&icu>;
+> +	interrupts = <ICU_GRP_NSR 106 IRQ_TYPE_LEVEL_HIGH>;
+> +};
+> -- 
+> 2.7.4
+> 
