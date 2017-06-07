@@ -1,66 +1,129 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed,  7 Jun 2017 19:33:45 +0200
-Subject: [PATCH v2 2/2] ARM: sun8i: a83t: add dwmac-sun8i ethernet driver
-In-Reply-To: <20170607173345.22462-1-clabbe.montjoie@gmail.com>
-References: <20170607173345.22462-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170607173345.22462-3-clabbe.montjoie@gmail.com>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Wed,  7 Jun 2017 10:45:42 -0700
+Subject: [PATCH 2/2] RFC: ARM: dts: imx7d-sdb: swap pad settings for USDHCx
+ 50Mhz and 100Mhz
+In-Reply-To: <1496857542-32200-1-git-send-email-troy.kisky@boundarydevices.com>
+References: <1496857542-32200-1-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1496857542-32200-2-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dwmac-sun8i is an ethernet MAC hardware that support 10/100/1000 speed.
-This patch enable the dwmac-sun8i on the Allwinner a83t SoC Device-tree.
+It does not make sense that 100 Mhz pad settings would use a x2
+setting and 50 Mhz would use a x4 setting, so swap.
 
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 ---
- arch/arm/boot/dts/sun8i-a83t.dtsi | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ arch/arm/boot/dts/imx7d-sdb.dts | 72 ++++++++++++++++++++---------------------
+ 1 file changed, 36 insertions(+), 36 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index 01a83406f9ae..7d719b4aeaa9 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -200,6 +200,14 @@
- 			#interrupt-cells = <3>;
- 			#gpio-cells = <3>;
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+index cab9208..70dcbf4 100644
+--- a/arch/arm/boot/dts/imx7d-sdb.dts
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -590,31 +590,20 @@
  
-+			emac_rgmii_pins: emac-rgmii-pins {
-+				pins = "PD2", "PD3", "PD4", "PD5", "PD6", "PD7",
-+				       "PD11", "PD12", "PD13", "PD14", "PD18",
-+				       "PD19", "PD21", "PD22", "PD23";
-+				function = "gmac";
-+				drive-strength = <40>;
-+			};
-+
- 			mmc0_pins: mmc0-pins {
- 				pins = "PF0", "PF1", "PF2",
- 				       "PF3", "PF4", "PF5";
-@@ -266,6 +274,26 @@
- 			status = "disabled";
+ 		pinctrl_usdhc1: usdhc1grp {
+ 			fsl,pins = <
+-				MX7D_PAD_SD1_CMD__SD1_CMD		0x59
+-				MX7D_PAD_SD1_CLK__SD1_CLK		0x09
+-				MX7D_PAD_SD1_DATA0__SD1_DATA0		0x59
+-				MX7D_PAD_SD1_DATA1__SD1_DATA1		0x59
+-				MX7D_PAD_SD1_DATA2__SD1_DATA2		0x59
+-				MX7D_PAD_SD1_DATA3__SD1_DATA3		0x59
+-				MX7D_PAD_SD1_CD_B__GPIO5_IO0		0x59 /* CD */
+-				MX7D_PAD_SD1_WP__GPIO5_IO1		0x59 /* WP */
+-				MX7D_PAD_SD1_RESET_B__GPIO5_IO2		0x59 /* vmmc */
++				MX7D_PAD_SD1_CMD__SD1_CMD		0x5a
++				MX7D_PAD_SD1_CLK__SD1_CLK		0x0a
++				MX7D_PAD_SD1_DATA0__SD1_DATA0		0x5a
++				MX7D_PAD_SD1_DATA1__SD1_DATA1		0x5a
++				MX7D_PAD_SD1_DATA2__SD1_DATA2		0x5a
++				MX7D_PAD_SD1_DATA3__SD1_DATA3		0x5a
++				MX7D_PAD_SD1_CD_B__GPIO5_IO0		0x5a /* CD */
++				MX7D_PAD_SD1_WP__GPIO5_IO1		0x5a /* WP */
++				MX7D_PAD_SD1_RESET_B__GPIO5_IO2		0x5a /* vmmc */
+ 			>;
  		};
  
-+		emac: ethernet at 1c30000 {
-+			compatible = "allwinner,sun8i-a83t-emac";
-+			syscon = <&syscon>;
-+			reg = <0x01c30000 0x104>;
-+			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "macirq";
-+			resets = <&ccu 13>;
-+			reset-names = "stmmaceth";
-+			clocks = <&ccu 27>;
-+			clock-names = "stmmaceth";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+
-+			mdio: mdio {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
+ 		pinctrl_usdhc2: usdhc2grp {
+ 			fsl,pins = <
+-				MX7D_PAD_SD2_CMD__SD2_CMD		0x59
+-				MX7D_PAD_SD2_CLK__SD2_CLK		0x09
+-				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x59
+-				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x59
+-				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x59
+-				MX7D_PAD_SD2_DATA3__SD2_DATA3		0x59
+-			>;
+-		};
+-
+-		pinctrl_usdhc2_100mhz: usdhc2grp_100mhz {
+-			fsl,pins = <
+ 				MX7D_PAD_SD2_CMD__SD2_CMD		0x5a
+ 				MX7D_PAD_SD2_CLK__SD2_CLK		0x0a
+ 				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x5a
+@@ -624,6 +613,17 @@
+ 			>;
+ 		};
+ 
++		pinctrl_usdhc2_100mhz: usdhc2grp_100mhz {
++			fsl,pins = <
++				MX7D_PAD_SD2_CMD__SD2_CMD		0x59
++				MX7D_PAD_SD2_CLK__SD2_CLK		0x09
++				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x59
++				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x59
++				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x59
++				MX7D_PAD_SD2_DATA3__SD2_DATA3		0x59
++			>;
 +		};
 +
- 		gic: interrupt-controller at 1c81000 {
- 			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
- 			reg = <0x01c81000 0x1000>,
+ 		pinctrl_usdhc2_200mhz: usdhc2grp_200mhz {
+ 			fsl,pins = <
+ 				MX7D_PAD_SD2_CMD__SD2_CMD		0x5b
+@@ -638,22 +638,6 @@
+ 
+ 		pinctrl_usdhc3: usdhc3grp {
+ 			fsl,pins = <
+-				MX7D_PAD_SD3_CMD__SD3_CMD		0x59
+-				MX7D_PAD_SD3_CLK__SD3_CLK		0x09
+-				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x59
+-				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x59
+-				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x59
+-				MX7D_PAD_SD3_DATA3__SD3_DATA3		0x59
+-				MX7D_PAD_SD3_DATA4__SD3_DATA4		0x59
+-				MX7D_PAD_SD3_DATA5__SD3_DATA5		0x59
+-				MX7D_PAD_SD3_DATA6__SD3_DATA6		0x59
+-				MX7D_PAD_SD3_DATA7__SD3_DATA7		0x59
+-				MX7D_PAD_SD3_STROBE__SD3_STROBE		0x19
+-			>;
+-		};
+-
+-		pinctrl_usdhc3_100mhz: usdhc3grp_100mhz {
+-			fsl,pins = <
+ 				MX7D_PAD_SD3_CMD__SD3_CMD		0x5a
+ 				MX7D_PAD_SD3_CLK__SD3_CLK		0x0a
+ 				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x5a
+@@ -668,6 +652,22 @@
+ 			>;
+ 		};
+ 
++		pinctrl_usdhc3_100mhz: usdhc3grp_100mhz {
++			fsl,pins = <
++				MX7D_PAD_SD3_CMD__SD3_CMD		0x59
++				MX7D_PAD_SD3_CLK__SD3_CLK		0x09
++				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x59
++				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x59
++				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x59
++				MX7D_PAD_SD3_DATA3__SD3_DATA3		0x59
++				MX7D_PAD_SD3_DATA4__SD3_DATA4		0x59
++				MX7D_PAD_SD3_DATA5__SD3_DATA5		0x59
++				MX7D_PAD_SD3_DATA6__SD3_DATA6		0x59
++				MX7D_PAD_SD3_DATA7__SD3_DATA7		0x59
++				MX7D_PAD_SD3_STROBE__SD3_STROBE		0x19
++			>;
++		};
++
+ 		pinctrl_usdhc3_200mhz: usdhc3grp_200mhz {
+ 			fsl,pins = <
+ 				MX7D_PAD_SD3_CMD__SD3_CMD		0x5b
 -- 
-2.13.0
+2.7.4
