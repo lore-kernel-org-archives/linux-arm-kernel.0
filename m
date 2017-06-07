@@ -1,32 +1,114 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 7 Jun 2017 20:43:10 +0200
-Subject: [PATCH] pinctrl: samsung: Fix missing object for S5Pv210
-In-Reply-To: <20170531174244.31861-1-krzk@kernel.org>
-References: <20170531174244.31861-1-krzk@kernel.org>
-Message-ID: <20170607184310.g4a7da5ems375klu@kozik-lap>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Wed,  7 Jun 2017 11:34:10 -0700
+Subject: [PATCH v8 31/34] media: imx: capture: add frame sizes/interval
+ enumeration
+In-Reply-To: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
+References: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1496860453-6282-32-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 31, 2017 at 07:42:44PM +0200, Krzysztof Kozlowski wrote:
-> While splitting Samsung pinctrl drivers per ARMv7 and ARMv8
-> architectures, the necessary CONFIG_PINCTRL_EXYNOS_ARM is not selected
-> when building for S5Pv210 family of SoCs thus pinctrl was missing there
-> entirely.
-> 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> 
-> ---
-> 
-> Fixes: 16340fd6dbc1 ("pinctrl: samsung: Split Exynos drivers per ARMv7 and ARMv8")
-> 
-> Fixed commit is in my tree but already applied and sitting in next for
-> some time. This should be squashed though.
-> ---
->  drivers/pinctrl/samsung/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
+From: Russell King <rmk+kernel@armlinux.org.uk>
 
-Applied and squashed with 16340fd6dbc1.
+Add support for enumerating frame sizes and frame intervals from the
+first subdev via the V4L2 interfaces.
 
-Best regards,
-Krzysztof
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+---
+ drivers/staging/media/imx/imx-media-capture.c | 73 +++++++++++++++++++++++++++
+ 1 file changed, 73 insertions(+)
+
+diff --git a/drivers/staging/media/imx/imx-media-capture.c b/drivers/staging/media/imx/imx-media-capture.c
+index f07ed9a..ddab4c2 100644
+--- a/drivers/staging/media/imx/imx-media-capture.c
++++ b/drivers/staging/media/imx/imx-media-capture.c
+@@ -81,6 +81,76 @@ static int vidioc_querycap(struct file *file, void *fh,
+ 	return 0;
+ }
+ 
++static int capture_enum_framesizes(struct file *file, void *fh,
++				   struct v4l2_frmsizeenum *fsize)
++{
++	struct capture_priv *priv = video_drvdata(file);
++	const struct imx_media_pixfmt *cc;
++	struct v4l2_subdev_frame_size_enum fse = {
++		.index = fsize->index,
++		.pad = priv->src_sd_pad,
++		.which = V4L2_SUBDEV_FORMAT_ACTIVE,
++	};
++	int ret;
++
++	cc = imx_media_find_format(fsize->pixel_format, CS_SEL_ANY, true);
++	if (!cc)
++		return -EINVAL;
++
++	fse.code = cc->codes[0];
++
++	ret = v4l2_subdev_call(priv->src_sd, pad, enum_frame_size, NULL, &fse);
++	if (ret)
++		return ret;
++
++	if (fse.min_width == fse.max_width &&
++	    fse.min_height == fse.max_height) {
++		fsize->type = V4L2_FRMSIZE_TYPE_DISCRETE;
++		fsize->discrete.width = fse.min_width;
++		fsize->discrete.height = fse.min_height;
++	} else {
++		fsize->type = V4L2_FRMSIZE_TYPE_CONTINUOUS;
++		fsize->stepwise.min_width = fse.min_width;
++		fsize->stepwise.max_width = fse.max_width;
++		fsize->stepwise.min_height = fse.min_height;
++		fsize->stepwise.max_height = fse.max_height;
++		fsize->stepwise.step_width = 1;
++		fsize->stepwise.step_height = 1;
++	}
++
++	return 0;
++}
++
++static int capture_enum_frameintervals(struct file *file, void *fh,
++				       struct v4l2_frmivalenum *fival)
++{
++	struct capture_priv *priv = video_drvdata(file);
++	const struct imx_media_pixfmt *cc;
++	struct v4l2_subdev_frame_interval_enum fie = {
++		.index = fival->index,
++		.pad = priv->src_sd_pad,
++		.width = fival->width,
++		.height = fival->height,
++		.which = V4L2_SUBDEV_FORMAT_ACTIVE,
++	};
++	int ret;
++
++	cc = imx_media_find_format(fival->pixel_format, CS_SEL_ANY, true);
++	if (!cc)
++		return -EINVAL;
++
++	fie.code = cc->codes[0];
++
++	ret = v4l2_subdev_call(priv->src_sd, pad, enum_frame_interval, NULL, &fie);
++	if (ret)
++		return ret;
++
++	fival->type = V4L2_FRMIVAL_TYPE_DISCRETE;
++	fival->discrete = fie.interval;
++
++	return 0;
++}
++
+ static int capture_enum_fmt_vid_cap(struct file *file, void *fh,
+ 				    struct v4l2_fmtdesc *f)
+ {
+@@ -269,6 +339,9 @@ static int capture_s_parm(struct file *file, void *fh,
+ static const struct v4l2_ioctl_ops capture_ioctl_ops = {
+ 	.vidioc_querycap	= vidioc_querycap,
+ 
++	.vidioc_enum_framesizes = capture_enum_framesizes,
++	.vidioc_enum_frameintervals = capture_enum_frameintervals,
++
+ 	.vidioc_enum_fmt_vid_cap        = capture_enum_fmt_vid_cap,
+ 	.vidioc_g_fmt_vid_cap           = capture_g_fmt_vid_cap,
+ 	.vidioc_try_fmt_vid_cap         = capture_try_fmt_vid_cap,
+-- 
+2.7.4
