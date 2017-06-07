@@ -1,45 +1,79 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed,  7 Jun 2017 11:08:20 +0200
-Subject: [PATCH 1/3] dt-bindings: net: Add binding for the external clock for
- TI WiLink
+Date: Wed,  7 Jun 2017 11:08:21 +0200
+Subject: [PATCH 2/3] Bluetooth: hci_ll: Add support for the external clock
 In-Reply-To: <1496826502-1339-1-git-send-email-ulf.hansson@linaro.org>
 References: <1496826502-1339-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1496826502-1339-2-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1496826502-1339-3-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The external clock is provided to the TI WiLink combo chip and it's needed
-for any of the transport interfaces. However let's make it optional to
-avoid breaking existing platforms that yet doesn't specify the clock.
+Add support to manage the external clock provided to the WiLink combo chip
+as it's needed for any of the transport interfaces.
+
+To avoid breaking platforms not yet specifying the external clock, we make
+it optional. In case the clock is successfully fetched during ->probe(),
+let's manage it via the ->open|close() callbacks, to make sure the device
+get properly powered on/off.
 
 Fixes: ea452678734e ("arm64: dts: hikey: Fix WiFi support")
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- Documentation/devicetree/bindings/net/ti,wilink-st.txt | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/bluetooth/hci_ll.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/net/ti,wilink-st.txt b/Documentation/devicetree/bindings/net/ti,wilink-st.txt
-index cbad73a..3404a4a 100644
---- a/Documentation/devicetree/bindings/net/ti,wilink-st.txt
-+++ b/Documentation/devicetree/bindings/net/ti,wilink-st.txt
-@@ -22,6 +22,10 @@ Optional properties:
-  - enable-gpios : GPIO signal controlling enabling of BT. Active high.
-  - vio-supply : Vio input supply (1.8V)
-  - vbat-supply : Vbat input supply (2.9-4.8V)
-+ - clocks : Must contain an entry, for each entry in clock-names.
-+   See ../clocks/clock-bindings.txt for details.
-+ - clock-names : Must include the following entry:
-+   "ext_clock" (External clock provided to the TI combo chip).
+diff --git a/drivers/bluetooth/hci_ll.c b/drivers/bluetooth/hci_ll.c
+index adc444f..68f3d16 100644
+--- a/drivers/bluetooth/hci_ll.c
++++ b/drivers/bluetooth/hci_ll.c
+@@ -48,6 +48,7 @@
+ #include <linux/serdev.h>
+ #include <linux/skbuff.h>
+ #include <linux/ti_wilink_st.h>
++#include <linux/clk.h>
  
- Example:
- 
-@@ -31,5 +35,7 @@ Example:
- 	bluetooth {
- 		compatible = "ti,wl1835-st";
- 		enable-gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
-+		clocks = <&clk32k_wl18xx>;
-+		clock-names = "ext_clock";
- 	};
+ #include <net/bluetooth/bluetooth.h>
+ #include <net/bluetooth/hci_core.h>
+@@ -84,6 +85,7 @@ struct ll_device {
+ 	struct hci_uart hu;
+ 	struct serdev_device *serdev;
+ 	struct gpio_desc *enable_gpio;
++	struct clk *ext_clk;
  };
+ 
+ struct ll_struct {
+@@ -146,8 +148,12 @@ static int ll_open(struct hci_uart *hu)
+ 
+ 	hu->priv = ll;
+ 
+-	if (hu->serdev)
++	if (hu->serdev) {
++		struct ll_device *lldev = serdev_device_get_drvdata(hu->serdev);
+ 		serdev_device_open(hu->serdev);
++		if (!IS_ERR(lldev->ext_clk))
++			clk_prepare_enable(lldev->ext_clk);
++	}
+ 
+ 	return 0;
+ }
+@@ -181,6 +187,8 @@ static int ll_close(struct hci_uart *hu)
+ 		struct ll_device *lldev = serdev_device_get_drvdata(hu->serdev);
+ 		gpiod_set_value_cansleep(lldev->enable_gpio, 0);
+ 
++		clk_disable_unprepare(lldev->ext_clk);
++
+ 		serdev_device_close(hu->serdev);
+ 	}
+ 
+@@ -720,6 +728,10 @@ static int hci_ti_probe(struct serdev_device *serdev)
+ 	if (IS_ERR(lldev->enable_gpio))
+ 		return PTR_ERR(lldev->enable_gpio);
+ 
++	lldev->ext_clk = devm_clk_get(&serdev->dev, "ext_clock");
++	if (IS_ERR(lldev->ext_clk) && PTR_ERR(lldev->ext_clk) != -ENOENT)
++		return PTR_ERR(lldev->ext_clk);
++
+ 	of_property_read_u32(serdev->dev.of_node, "max-speed", &max_speed);
+ 	hci_uart_set_speeds(hu, 115200, max_speed);
+ 
 -- 
 2.7.4
