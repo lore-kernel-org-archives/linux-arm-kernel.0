@@ -1,22 +1,47 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 07 Jun 2017 15:09:51 -0400 (EDT)
-Subject: [PATCH 9/9] arm64: marvell: dts: add xmdio nodes for 7k/8k
-In-Reply-To: <87k24onq62.fsf@free-electrons.com>
-References: <20170607083810.30922-1-antoine.tenart@free-electrons.com>
- <20170607083810.30922-10-antoine.tenart@free-electrons.com>
- <87k24onq62.fsf@free-electrons.com>
-Message-ID: <20170607.150951.1721000293274061340.davem@davemloft.net>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 7 Jun 2017 21:14:51 +0200
+Subject: [PATCH 0/3] arm64: hi6220-hikey: Fix Bluetooth support
+In-Reply-To: <CALAqxLVYH8+shjfxkjr5uFzKLznqtRZq2noEa9mcZET9hBNf2g@mail.gmail.com>
+References: <1496826502-1339-1-git-send-email-ulf.hansson@linaro.org>
+ <CALAqxLVYH8+shjfxkjr5uFzKLznqtRZq2noEa9mcZET9hBNf2g@mail.gmail.com>
+Message-ID: <738b3232-d725-1642-3c54-374b4d159b62@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Date: Wed, 07 Jun 2017 10:43:49 +0200
+On 07/06/2017 21:07, John Stultz wrote:
+> On Wed, Jun 7, 2017 at 2:08 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> The commit ea452678734e ("arm64: dts: hikey: Fix WiFi support") indeed managed
+>> to fix the WiFi support for the Hikey board. However, it also caused the
+>> Bluetooth to break.
+>>
+>> The reason to the problem is because part of the fixes for WiFi, involved
+>> explicitly to start manage the external clock for the TI WiLink chip, as it's
+>> needed to properly power on/off WiFi. Then, because the Bluetooth driver,
+>> hci_ll, don't manage the clock, it fails to initialize Bluetooth.
+>>
+>> This small series add support and DT bindings for the external clock, now
+>> properly managed by the hci_ll driver during power on/off. On top of that, the
+>> external clock is added to the Bluetooth DT node in the Hikey DTS file.
+>>
+>> The regression has been reported by John Stultz, running a Hikey board with
+>> UEFI based boot. I have confirmed that there is no regressions with u-boot as
+>> we still don't have bluetooth working on that set up. I intend to fix that as
+>> well, although in second step and not being part of a fixup series.
+>>
+>> John, can you please confirm/test this on your Hikey board using UEFI!?
+> 
+> Yes. This does resolve the issue! Bluetooth and wifi are now working
+> together again as they were before ea452678734e.
+> 
+> For the whole set:
+> Tested-by: John Stultz <john.stultz@linaro.org>
 
-> If you agrees with this series please don't apply this patch. I will
-> take care of it. We have many changes in the dt directory for the next
-> release and I want that all the change are in the same place to take
-> care of the merge conflict.
+Great ! Thanks John for testing.
 
-Ok, I will elide this patch when/if I apply the series to net-next.
 
-Thanks.
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
