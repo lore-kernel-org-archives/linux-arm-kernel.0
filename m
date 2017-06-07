@@ -1,91 +1,80 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 7 Jun 2017 17:33:17 -0500
-Subject: [PATCH v2 2/6] dt-bindings: interrupt-controller: add DT binding
- for the Marvell ICU
-In-Reply-To: <1496398017-6487-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1496398017-6487-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1496398017-6487-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170607223317.hkpak5y2oalktjqe@rob-hp-laptop>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 8 Jun 2017 00:34:49 +0200
+Subject: [PATCH v5 1/3] PCI: Add DT binding for tango PCIe controller
+In-Reply-To: <20170607212907.2wr3hqbokjb74kj3@rob-hp-laptop>
+References: <741766e5-cff2-db5f-d40b-6866e08fd966@sigmadesigns.com>
+ <69f3ffe7-3c39-fa94-71f8-91744a869cc9@sigmadesigns.com>
+ <20170607212907.2wr3hqbokjb74kj3@rob-hp-laptop>
+Message-ID: <e8cd62fb-f48e-c72a-f960-4794badfce70@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 02, 2017 at 12:06:53PM +0200, Thomas Petazzoni wrote:
-> This commit adds the Device Tree binding documentation for the Marvell
-> ICU interrupt controller, which collects wired interrupts from the
-> devices located into the CP110 hardware block of Marvell Armada 7K/8K,
-> and converts them into SPI interrupts in the GIC located in the AP
-> hardware block, using the GICP extension.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  .../bindings/interrupt-controller/marvell,icu.txt  | 54 ++++++++++++++++++++++
->  1 file changed, 54 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
-> new file mode 100644
-> index 0000000..3e7954c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
-> @@ -0,0 +1,54 @@
-> +Marvell ICU Interrupt Controller
-> +--------------------------------
-> +
-> +The Marvell ICU (Interrupt Consolidation Unit) controller is
-> +responsible for collecting all wired-interrupt sources in the CP and
-> +communicating them to the GIC in the AP, the unit translates interrupt
-> +requests on input wires to MSG memory mapped transactions to the GIC.
-> +
-> +Required properties:
-> +
-> +- compatible: Should be "marvell,cp110-icu"
-> +
-> +- reg: Should contain ICU registers location and length.
-> +
-> +- #interrupt-cells: Specifies the number of cells needed to encode an
-> +  interrupt source. The value shall be 3.
-> +
-> +  The 1st cell is the group type of the ICU interrupt. Possible group
-> +  types are:
-> +
-> +   ICU_GRP_NSR (0x0) : Shared peripheral interrupt, non-secure
-> +   ICU_GRP_SR  (0x1) : Shared peripheral interrupt, secure
-> +   ICU_GRP_SEI (0x4) : System error interrupt
-> +   ICU_GRP_REI (0x5) : RAM error interrupt
-> +
-> +  The 2nd cell is the index of the interrupt in the ICU unit.
-> +
-> +  The 3rd cell is the type of the interrupt. See arm,gic.txt for
-> +  details.
-> +
-> +- interrupt-controller: Identifies the node as an interrupt
-> +  controller.
-> +
-> +- interrupt-parent: Indicates the node of the parent interrupt
-> +  controller. Should be pointer to the GIC.
-> +
-> +- gicp: Should point to the GICP controller, the GIC extension that
-> +  allows to trigger interrupts using MSG memory mapped transactions.
-> +
-> +Example:
-> +
-> +icu: interrupt-controller at 1e0000 {
-> +	compatible = "marvell,cp110-icu";
-> +	reg = <0x1e0000 0x10>;
-> +	#interrupt-cells = <3>;
-> +	interrupt-controller;
-> +	interrupt-parent = <&gic>;
+Hello Rob,
 
-If you have a parent, then you should have some interrupts. I guess that 
-would be your ranges property? I suppose that is fine.
-
-> +	marvell,gicp = <&gicp>;
-> +};
-> +
-> +usb3h0: usb3 at 500000 {
-> +	interrupt-parent = <&icu>;
-> +	interrupts = <ICU_GRP_NSR 106 IRQ_TYPE_LEVEL_HIGH>;
-> +};
-> -- 
-> 2.7.4
+On 07/06/2017 23:29, Rob Herring wrote:
+> On Wed, May 31, 2017 at 03:30:26PM +0200, Marc Gonzalez wrote:
+>> Binding for the Sigma Designs SMP8759 SoC.
+>>
+>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>> ---
+>>  Documentation/devicetree/bindings/pci/tango-pcie.txt | 30 ++++++++++++++++++++++++++++++
+>>  1 file changed, 30 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/pci/tango-pcie.txt b/Documentation/devicetree/bindings/pci/tango-pcie.txt
+>> new file mode 100644
+>> index 000000000000..35ef2c811a27
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/pci/tango-pcie.txt
+>> @@ -0,0 +1,30 @@
+>> +Sigma Designs Tango PCIe controller
+>> +
+>> +Required properties:
+>> +
+>> +- compatible: "sigma,smp8759-pcie"
+>> +- reg: address/size of PCI configuration space, address/size of register area
+>> +- device_type: "pci"
+>> +- #size-cells: <2>
+>> +- #address-cells: <3>
+>> +- msi-controller
+>> +- ranges: translation from system to bus addresses
+>> +- interrupts: spec for misc interrupts, spec for MSI
+>> +
+>> +http://elinux.org/Device_Tree_Usage#PCI_Address_Translation
+>> +http://elinux.org/Device_Tree_Usage#Advanced_Interrupt_Mapping
 > 
+> Why are these here?
+
+I found these references very helpful when writing the node.
+Where would you put them? In the example?
+
+> There's several standard properties you are missing like bus-range.
+
+My reasoning for omitting "bus-range" was that the PCI core computes
+it by itself (1M per "bus" so SZ_4M => 4 devices). I thought redundant
+information was bad form?
+
+> Build your dts with "W=2". dtc recently gained some checks for PCI 
+> bindings.
+
+I'll give it a try. Did v4.9 already support it?
+
+>> +Example:
+>> +
+>> +	pcie at 2e000 {
+>> +		compatible = "sigma,smp8759-pcie";
+>> +		reg = <0x50000000 SZ_4M>, <0x2e000 0x100>;
+>> +		device_type = "pci";
+>> +		#size-cells = <2>;
+>> +		#address-cells = <3>;
+>> +		msi-controller;
+>> +		ranges = <0x02000000 0x0 0x00400000  0x50400000  0x0 SZ_60M>;
+> 
+> I don't think SZ_60M exists or is available to dts files. Just put the 
+> number in.
+
+I #defined it at the top of my DTS.
+Using symbolic constants in DTS is not acceptable?
+
+Thanks for having a look.
+
+Regards.
