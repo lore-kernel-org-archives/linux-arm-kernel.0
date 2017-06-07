@@ -1,67 +1,28 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 7 Jun 2017 23:08:48 +0200
-Subject: [PATCH 46/58] clocksource/drivers: Add a new driver for the
- Atmel ARM TC blocks
-In-Reply-To: <20170607152750.tksmyf5p3oajbsac@piout.net>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 7 Jun 2017 16:17:52 -0500
+Subject: [PATCH 01/58] ARM: at91: Document new TCB bindings
+In-Reply-To: <20170530215139.9983-2-alexandre.belloni@free-electrons.com>
 References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
- <20170530215139.9983-47-alexandre.belloni@free-electrons.com>
- <20170606152104.GC2345@mai>
- <20170606180559.pkrr7ux2qqnmsd6y@piout.net>
- <20170607141735.GH2345@mai>
- <20170607152750.tksmyf5p3oajbsac@piout.net>
-Message-ID: <20170607210848.GJ2345@mai>
+ <20170530215139.9983-2-alexandre.belloni@free-electrons.com>
+Message-ID: <20170607211752.avts3cofvac7ks3q@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 07, 2017 at 05:27:50PM +0200, Alexandre Belloni wrote:
-> On 07/06/2017 at 16:17:35 +0200, Daniel Lezcano wrote:
-> > > You mean you don't like how it is used? Or you don't think having the
-> > > timer full name is useful?
-> > 
-> > The field is not needed, the only place where it is used is where we affect it.
-> >  
+On Tue, May 30, 2017 at 11:50:42PM +0200, Alexandre Belloni wrote:
+> The current binding for the TCB is not flexible enough for some use cases
+> and prevents proper utilization of all the channels.
 > 
-> It is used in tcb_clksrc_register:
-> 
-> tc.clksrc.name = tc.name;
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: linux-pwm at vger.kernel.org
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  .../devicetree/bindings/arm/atmel-at91.txt         | 32 ------------
+>  .../devicetree/bindings/mfd/atmel-tcb.txt          | 58 ++++++++++++++++++++++
+>  .../devicetree/bindings/pwm/atmel-tcb-pwm.txt      | 12 +++--
+>  3 files changed, 65 insertions(+), 37 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-tcb.txt
 
-Yes, but tc.name is only in the scope of the function, so there is no need to
-include this field in the structure, just a working buffer in the function is
-enough.
- 
-> > > The main reason is that RobH doesn't want to have the use (clocksource
-> > > or clockevent) of the timer in the DT so when probing a timer, I need to
-> > > know whether I already have a clocksource to decide when it is time to
-> > > register a clockevent.
-> > 
-> > Yes, we had this discussion some weeks ago.
-> > 
-> > This registered hack forces the DT to define first the clocksource, then the
-> > clockevent.
-> > 
-> > So, I suggest you fold the timer definition into a single one like the other
-> > drivers.
-> 
-> I was going to agree but this is not flexible enough because the
-> quadrature decoder always uses the first two channels. So on some
-> products, we may have:
->  - TCB0:
->    o channels 0,1: qdec
->    o channel 2: clocksource
-> 
->  - TCB1:
->    o channels 0,1: qdec
->    o channel 2: clockevent
-> 
-> This avoids wasting TCB channels.
-
-Ok. In this case you can check if the interrupt is specified for the node, if
-yes, then it is a clockevent.
-
--- 
-
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Acked-by: Rob Herring <robh@kernel.org>
