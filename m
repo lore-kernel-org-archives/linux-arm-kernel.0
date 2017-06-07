@@ -1,94 +1,48 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 07 Jun 2017 10:41:23 +0100
-Subject: [PATCH v2] KVM: arm/arm64: Signal SIGBUS when stage2 discovers
- hwpoison memory
-In-Reply-To: <20170602104345.GA397@cbox>
-References: <20170524163250.29281-1-james.morse@arm.com>
- <20170601222235.GN20919@cbox> <59313AEA.2060705@arm.com>
- <20170602104345.GA397@cbox>
-Message-ID: <5937CA43.7060108@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 7 Jun 2017 11:42:41 +0200
+Subject: [PATCH v2 10/11] ARM: sun8i: h3: add display engine pipeline for
+ TVE
+In-Reply-To: <20170604160149.30230-11-icenowy@aosc.io>
+References: <20170604160149.30230-1-icenowy@aosc.io>
+ <20170604160149.30230-11-icenowy@aosc.io>
+Message-ID: <20170607094241.65dcm42aacrn4eev@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+On Mon, Jun 05, 2017 at 12:01:48AM +0800, Icenowy Zheng wrote:
+> +	soc {
+> +		display_clocks: clock at 1000000 {
+> +			compatible = "allwinner,sun8i-a83t-de2-clk";
+> +			reg = <0x01000000 0x100000>;
+> +			clocks = <&ccu CLK_BUS_DE>,
+> +				 <&ccu CLK_DE>;
+> +			clock-names = "bus",
+> +				      "mod";
+> +			resets = <&ccu RST_BUS_DE>;
+> +			#clock-cells = <1>;
+> +			#reset-cells = <1>;
+> +			assigned-clocks = <&ccu CLK_DE>;
+> +			assigned-clock-parents = <&ccu CLK_PLL_DE>;
+> +			assigned-clock-rates = <432000000>;
+> +		};
 
-On 02/06/17 11:43, Christoffer Dall wrote:
-> On Fri, Jun 02, 2017 at 11:16:10AM +0100, James Morse wrote:
->> On 01/06/17 23:22, Christoffer Dall wrote:
->>> On Wed, May 24, 2017 at 05:32:50PM +0100, James Morse wrote:
->>>> Once we enable ARCH_SUPPORTS_MEMORY_FAILURE on arm64, notifications for
->>>> broken memory can call memory_failure() in mm/memory-failure.c to deliver
->>>> SIGBUS to any user space process using the page, and notify all the
->>>> in-kernel users.
->>>>
->>>> If the page corresponded with guest memory, KVM will unmap this page
->>>> from its stage2 page tables. The user space process that allocated
->>>> this memory may have never touched this page in which case it may not
->>>> be mapped meaning SIGBUS won't be delivered.
->>
->>> Sorry, I don't remember, what is the scenario where KVM can have a
->>> mapping in stage 2 without there being a corresponding mapping for user
->>> space?
->>
->> (looks like I mean more than one thing by mapping... oops.)
->>
->> Mapping in that there is a physical page for this user-space address, but when
->> qemu first touches it, it will be faulted in as its not been touched before.
-> 
-> So that's where I still get confused.  When KVM faults in the page on
-> behalf of an initial VM access, it calls get_user_pages() (or something
-> equivalent through a series of indirections like gfn_to_pfn_prot()), and
-> wouldn't that create the equivalent mapping in the normal user space
-> page table?
-> 
-> (I may be forgetting some important detail here though).
+We discussed that already a few times, but there's no reason to do
+so. If you need a downstream clock at a particular rate, call
+clk_set_rate on it, period.
 
-I evidently stopped before I got to the bottom of this, the commit message is
-based on the way I first hit this (physical address not found in any rmaps:
-nothing signalled). Maybe there is another bug, or I hit a bug that has been
-fixed. I will go back to reproducing this.
-(I think we still need the patch if a guest is allowed to keep running while
-parts of its memory are hwpoisoned)
+Whether its parent will be coming from PLL_DE or some other more
+appriopriate clock is not relevant and doesn't make any difference.
 
-You're right this should behave the same as a fault from user-space, on arm64
-this path is roughly:
-> do_page_fault()
-> __do_page_fault()
-> handle_mm_fault()
-> __handle_mm_fault()
-> handle_pte_fault()
+Maxime
 
-__handle_mm_fault() then allocates pud/pmd and calls handle_pte_fault() .. which
-disappears back into the jungle.
-
-On a stage2 fault from a guest, the path is roughly:
-> kvm_handle_guest_abort()
-> user_mem_abort()
-> gfn_to_pfn_prot()
-> hva_to_pfn()
-> hva_to_pfn_slow()
-> get_user_pages_unlocked()
-> __get_user_pages_unlocked()
-> __get_user_pages_locked()
-> __get_user_pages()
-> faultin_page()
-> handle_mm_fault()
-
->From where the path/behaviour should be the same as the fault through arch code.
-
-FOLL_POPULATE is a red-herring, it doesn't seem to mean anything unless
-FOLL_MLOCK is set too.
-
-
-> Right, I figured it was just the commit message that needed updating.
-> 
-> Sorry about being pedantic, but having a misleading record of this
-> change is guaranteed to confuse me in the future.
-
-If it's wrong it needs fixing. I'm a fan of pedantry in all its forms!
-
-
-
-Thanks,
-
-James
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170607/5effff3b/attachment.sig>
