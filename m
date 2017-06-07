@@ -1,33 +1,90 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 7 Jun 2017 10:16:29 +0100
-Subject: [PATCH 2/3] arm64: KVM: Allow unaligned accesses at EL2
-In-Reply-To: <20170606200912.GQ9464@cbox>
-References: <20170606180835.14421-1-marc.zyngier@arm.com>
- <20170606180835.14421-3-marc.zyngier@arm.com> <20170606200912.GQ9464@cbox>
-Message-ID: <73f039f7-7597-fd34-367c-1cc6fdda3673@arm.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Wed, 7 Jun 2017 17:16:06 +0800
+Subject: [PATCH v3 1/3] PCI: Add new PCIe Fabric End Node flag,
+ PCI_DEV_FLAGS_NO_RELAXED_ORDERING
+In-Reply-To: <1496826968-10152-1-git-send-email-dingtianhong@huawei.com>
+References: <1496826968-10152-1-git-send-email-dingtianhong@huawei.com>
+Message-ID: <1496826968-10152-2-git-send-email-dingtianhong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/17 21:09, Christoffer Dall wrote:
-> On Tue, Jun 06, 2017 at 07:08:34PM +0100, Marc Zyngier wrote:
->> We currently have the SCTLR_EL2.A bit set, trapping unaligned accesses
->> at EL2, but we're not really prepared to deal with it. So far, this
->> has been unnoticed, until GCC 7 started emitting those (in particular
->> 64bit writes on a 32bit boundary).
->>
->> Since the rest of the kernel is pretty happy about that, let's follow
->> its example and set SCTLR_EL2.A to zero. Modern CPUs don't really
->> care.
-> 
-> Why do we set the A flag via SCTLR_ELx_FLAGS in the first place, only to
-> drop that flag later on for both EL1 and EL2 ?
+From: Casey Leedom <leedom@chelsio.com>
 
-That flag is always cleared at EL1, never set. Actually, only EL2 uses
-that macro to *set* flags. An alternative would be to do away with the
-macro and use the individual flags, like the 32bit side does.
+The new flag PCI_DEV_FLAGS_NO_RELAXED_ORDERING indicates that the Relaxed
+Ordering Attribute should not be used on Transaction Layer Packets destined
+for the PCIe End Node so flagged.  Initially flagged this way are Intel
+E5-26xx Root Complex Ports which suffer from a Flow Control Credit
+Performance Problem and AMD A1100 ARM ("SEATTLE") Root Complex Ports which
+don't obey PCIe 3.0 ordering rules which can lead to Data Corruption.
 
-What do you think?
+Signed-off-by: Casey Leedom <leedom@chelsio.com>
+Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+---
+ drivers/pci/quirks.c | 38 ++++++++++++++++++++++++++++++++++++++
+ include/linux/pci.h  |  2 ++
+ 2 files changed, 40 insertions(+)
 
-	M.
+diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+index 085fb78..58bdd23 100644
+--- a/drivers/pci/quirks.c
++++ b/drivers/pci/quirks.c
+@@ -3999,6 +3999,44 @@ static void quirk_tw686x_class(struct pci_dev *pdev)
+ 			      quirk_tw686x_class);
+ 
+ /*
++ * Some devices have problems with Transaction Layer Packets with the Relaxed
++ * Ordering Attribute set.  Such devices should mark themselves and other
++ * Device Drivers should check before sending TLPs with RO set.
++ */
++static void quirk_relaxedordering_disable(struct pci_dev *dev)
++{
++	dev->dev_flags |= PCI_DEV_FLAGS_NO_RELAXED_ORDERING;
++}
++
++/*
++ * Intel E5-26xx Root Complex has a Flow Control Credit issue which can
++ * cause performance problems with Upstream Transaction Layer Packets with
++ * Relaxed Ordering set.
++ */
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f02, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f04, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f08, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++
++/*
++ * The AMD ARM A1100 (AKA "SEATTLE") SoC has a bug in its PCIe Root Complex
++ * where Upstream Transaction Layer Packets with the Relaxed Ordering
++ * Attribute clear are allowed to bypass earlier TLPs with Relaxed Ordering
++ * set.  This is a violation of the PCIe 3.0 Transaction Ordering Rules
++ * outlined in Section 2.4.1 (PCI Express(r) Base Specification Revision 3.0
++ * November 10, 2010).  As a result, on this platform we can't use Relaxed
++ * Ordering for Upstream TLPs.
++ */
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_AMD, 0x1a00, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_AMD, 0x1a01, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_AMD, 0x1a02, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++
++/*
+  * Per PCIe r3.0, sec 2.2.9, "Completion headers must supply the same
+  * values for the Attribute as were supplied in the header of the
+  * corresponding Request, except as explicitly allowed when IDO is used."
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 33c2b0b..e1e8428 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -183,6 +183,8 @@ enum pci_dev_flags {
+ 	PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT = (__force pci_dev_flags_t) (1 << 9),
+ 	/* Do not use FLR even if device advertises PCI_AF_CAP */
+ 	PCI_DEV_FLAGS_NO_FLR_RESET = (__force pci_dev_flags_t) (1 << 10),
++	/* Don't use Relaxed Ordering for TLPs directed@this device */
++	PCI_DEV_FLAGS_NO_RELAXED_ORDERING = (__force pci_dev_flags_t) (1 << 11),
+ };
+ 
+ enum pci_irq_reroute_variant {
 -- 
-Jazz is not dead. It just smells funny...
+1.9.0
