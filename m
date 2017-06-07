@@ -1,40 +1,40 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Wed,  7 Jun 2017 15:06:06 +0800
-Subject: [PATCH v5 8/8] arm64: defconfig: enable support hi6421v530 PMIC
-In-Reply-To: <20170607070606.8889-1-guodong.xu@linaro.org>
-References: <20170607070606.8889-1-guodong.xu@linaro.org>
-Message-ID: <20170607070606.8889-9-guodong.xu@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 7 Jun 2017 09:12:32 +0200
+Subject: [PATCH v4 0/8] MFD: add driver for HiSilicon Hi6421v530 PMIC
+In-Reply-To: <20170606135829.dxi3mf7so4j5ml3q@dell>
+References: <20170606085143.13154-1-guodong.xu@linaro.org>
+ <CAK8P3a25o6HOFw4MWrsnKjHJf4YuO+UvGk+=f30LREnFHM3QwQ@mail.gmail.com>
+ <20170606135829.dxi3mf7so4j5ml3q@dell>
+Message-ID: <CAK8P3a1F+DJQfvZdtUT69N3XoqL=c==U+dHEmOaviuJ1pepN8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable configs for hi6421v530 mfd and regulator driver
- + CONFIG_MFD_HI6421_PMIC=y
- + CONFIG_REGULATOR_HI6421V530=y
+On Tue, Jun 6, 2017 at 3:58 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Tue, 06 Jun 2017, Arnd Bergmann wrote:
+>
+>> On Tue, Jun 6, 2017 at 10:51 AM, Guodong Xu <guodong.xu@linaro.org> wrote:
+>> > This patchset adds driver for HiSilicon Hi6421v530 PMIC.
+>> >
+>> > Mainline kernel already has driver support to a similar chip, Hi6421.
+>> > Hi6421 and Hi6421v530 are both from the same vendor, HiSilicon, but
+>> > they are at different revisions. They both use the same Memory-mapped
+>> > I/O method to communicate with Main SoC. However, they differ quite a
+>> > lot in their regulator designs. Eg. they have completely different LDO
+>> > voltage points.
+>> >
+>> > Patch 1 and 2 are hi6421-pmic cleaning up.
+>> > Patch 3 and 4 extends hi6421-pmic-core.c to support Hi6421v530 revision.
+>> > Patch 5 add hi6421v530-regulator.c driver for LDO regulators.
+>> > Patch 6 fixes an issue for hi6421 regulator, which is not related to v530
+>> >          but it's found in this review.
+>> > Patch 7 is dts change, it depends on and can be applied to hi3660/hikey960
+>> >         patchset [1].
+>> > Patch 8 enables the relevant config items.
+>>
+>> Looks good to me,
+>
+> Is that an Ack?
 
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
----
- arch/arm64/configs/defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+Yes, sorry for not being explicit about this.
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index ce07285..867d68c 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -305,6 +305,7 @@ CONFIG_S3C2410_WATCHDOG=y
- CONFIG_MESON_GXBB_WATCHDOG=m
- CONFIG_MESON_WATCHDOG=m
- CONFIG_MFD_EXYNOS_LPASS=m
-+CONFIG_MFD_HI6421_PMIC=y
- CONFIG_MFD_MAX77620=y
- CONFIG_MFD_RK808=y
- CONFIG_MFD_SPMI_PMIC=y
-@@ -315,6 +316,7 @@ CONFIG_MFD_CROS_EC=y
- CONFIG_MFD_CROS_EC_I2C=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_GPIO=y
-+CONFIG_REGULATOR_HI6421V530=y
- CONFIG_REGULATOR_HI655X=y
- CONFIG_REGULATOR_MAX77620=y
- CONFIG_REGULATOR_PWM=y
--- 
-2.10.2
+Acked-by: Arnd Bergmann <arnd@arndb.de>
