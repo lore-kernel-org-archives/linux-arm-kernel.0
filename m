@@ -1,5 +1,5 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 7 Jun 2017 17:09:08 +0200
+Date: Wed, 7 Jun 2017 17:27:50 +0200
 Subject: [PATCH 46/58] clocksource/drivers: Add a new driver for the
  Atmel ARM TC blocks
 In-Reply-To: <20170607141735.GH2345@mai>
@@ -8,46 +8,46 @@ References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
  <20170606152104.GC2345@mai>
  <20170606180559.pkrr7ux2qqnmsd6y@piout.net>
  <20170607141735.GH2345@mai>
-Message-ID: <20170607150908.kytgtzwgjjnxtsp3@piout.net>
+Message-ID: <20170607152750.tksmyf5p3oajbsac@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 07/06/2017 at 16:17:35 +0200, Daniel Lezcano wrote:
-> > > > This driver uses regmap and syscon to be able to probe early in the boot
-> > > > and avoid having to switch on the TCB clocksource later. Using regmap also
-> > > > means that unused TCB channels may be used by other drivers (PWM for
-> > > > example).
-> > > 
-> > > Can you give more details, I fail to understand how regmap and syscon help to
-> > > probe sooner than timer_init()?
-> > 
-> > 
-> > Because before that, the tcb driver relied on atmel_tclib to share the
-> > TCBs and it happened way too late, at arch_initcall() time.
+> > You mean you don't like how it is used? Or you don't think having the
+> > timer full name is useful?
 > 
-> So is it still necesary to use regmap? I would like to take the opportunity to
-> move the init routine to the common init routine if possible:
-> 
-> 	https://patchwork.kernel.org/patch/9768845/
-> 
+> The field is not needed, the only place where it is used is where we affect it.
+>  
 
-It is still necessary because we want to be able to share the timer
-between multiple drivers. For example, you can have the clocksource on
-channel 0, clockevent on channel 1 and a pwm on channel 2
+It is used in tcb_clksrc_register:
 
-> > > Can you explain why we have two clocks here?
-> > > 
-> > 
-> > Each channel have its clock, I can add a comment if you want.
-> 
-> I don't understand. Why do we have two clocks?
-> 
-> One channel is driven by one clock and the second one takes the overflow signal
-> from the first one, so no second clock is involved there, no?
-> 
+tc.clksrc.name = tc.name;
 
-Those are the peripheral clocks, they are not used by the counters but
-used to be able to read/write the registers.
+> > The main reason is that RobH doesn't want to have the use (clocksource
+> > or clockevent) of the timer in the DT so when probing a timer, I need to
+> > know whether I already have a clocksource to decide when it is time to
+> > register a clockevent.
+> 
+> Yes, we had this discussion some weeks ago.
+> 
+> This registered hack forces the DT to define first the clocksource, then the
+> clockevent.
+> 
+> So, I suggest you fold the timer definition into a single one like the other
+> drivers.
+
+I was going to agree but this is not flexible enough because the
+quadrature decoder always uses the first two channels. So on some
+products, we may have:
+ - TCB0:
+   o channels 0,1: qdec
+   o channel 2: clocksource
+
+ - TCB1:
+   o channels 0,1: qdec
+   o channel 2: clockevent
+
+This avoids wasting TCB channels.
 
 -- 
 Alexandre Belloni, Free Electrons
