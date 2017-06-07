@@ -1,53 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Jun 2017 15:57:16 +0100
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 7 Jun 2017 15:58:55 +0100
 Subject: [PATCH v2 1/3] arm64: hugetlb: Fix huge_pte_offset to return
  poisoned page table entries
-In-Reply-To: <20170607143037.ovyo5pxywty2r6as@localhost>
+In-Reply-To: <20170517152336.6052-2-punit.agrawal@arm.com>
 References: <20170517152336.6052-1-punit.agrawal@arm.com>
  <20170517152336.6052-2-punit.agrawal@arm.com>
- <20170607134731.GG30263@arm.com>
- <20170607143037.ovyo5pxywty2r6as@localhost>
-Message-ID: <20170607145715.GI30263@arm.com>
+Message-ID: <20170607145855.cu5tob2uck2xbvxm@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 07, 2017 at 03:30:37PM +0100, Catalin Marinas wrote:
-> On Wed, Jun 07, 2017 at 02:47:32PM +0100, Will Deacon wrote:
-> > On Wed, May 17, 2017 at 04:23:34PM +0100, Punit Agrawal wrote:
-> > > --- a/arch/arm64/mm/hugetlbpage.c
-> > > +++ b/arch/arm64/mm/hugetlbpage.c
-> > > @@ -136,36 +136,27 @@ pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
-> > >  {
-> > >  	pgd_t *pgd;
-> > >  	pud_t *pud;
-> > > -	pmd_t *pmd = NULL;
-> > > -	pte_t *pte = NULL;
-> > > +	pmd_t *pmd;
-> > >  
-> > >  	pgd = pgd_offset(mm, addr);
-> > >  	pr_debug("%s: addr:0x%lx pgd:%p\n", __func__, addr, pgd);
-> > >  	if (!pgd_present(*pgd))
-> > >  		return NULL;
-> > > +
-> > >  	pud = pud_offset(pgd, addr);
-> > > -	if (!pud_present(*pud))
-> > > +	if (pud_none(*pud))
-> > >  		return NULL;
-> > 
-> > Do you actually need this special case?
-> > 
-> > > -
-> > > -	if (pud_huge(*pud))
-> > > +	/* swap or huge page */
-> > > +	if (!pud_present(*pud) || pud_huge(*pud))
-> > 
-> > ... couldn't you just add a '|| pud_none(*pud)' in here?
-> > 
-> > >  		return (pte_t *)pud;
+On Wed, May 17, 2017 at 04:23:34PM +0100, Punit Agrawal wrote:
+> When memory failure is enabled, a poisoned hugepage pte is marked as a
+> swap entry. huge_pte_offset() does not return the poisoned page table
+> entries when it encounters PUD/PMD hugepages.
 > 
-> But then you no longer return NULL if *pud == 0.
+> This behaviour of huge_pte_offset() leads to error such as below when
+> munmap is called on poisoned hugepages.
+> 
+> [  344.165544] mm/pgtable-generic.c:33: bad pmd 000000083af00074.
+> 
+> Fix huge_pte_offset() to return the poisoned pte which is then
+> appropriately handled by the generic layer code.
+> 
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Acked-by: Steve Capper <steve.capper@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: David Woods <dwoods@mellanox.com>
 
-Does that actually matter? The bits of hugetlb code I looked at will
-deferenced the returned pud and handle the huge_pte_none case correctly.
+Since the patch matches my suggestions in v1:
 
-Will
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
