@@ -1,54 +1,86 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 7 Jun 2017 11:11:30 +0100
-Subject: [PATCH 2/3] arm64: KVM: Allow unaligned accesses at EL2
-In-Reply-To: <20170607095646.GD24481@cbox>
-References: <20170606180835.14421-1-marc.zyngier@arm.com>
- <20170606180835.14421-3-marc.zyngier@arm.com> <20170606200912.GQ9464@cbox>
- <73f039f7-7597-fd34-367c-1cc6fdda3673@arm.com> <20170607095646.GD24481@cbox>
-Message-ID: <72fb1aed-b99e-27e1-5940-ec160163aef3@arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 7 Jun 2017 12:31:29 +0200
+Subject: [[PATCH v2]] drivers: leds/trigger: system cannot enter suspend
+In-Reply-To: <CACRpkdacymETLuRmpn07HUKHvrjWc85Jdj0s0qk44zTcaALa9w@mail.gmail.com>
+References: <1496803810-57154-1-git-send-email-bo.zhang@nxp.com>
+ <20170607071256.GA3230@amd>
+ <CACRpkdacymETLuRmpn07HUKHvrjWc85Jdj0s0qk44zTcaALa9w@mail.gmail.com>
+Message-ID: <20170607103129.GA13227@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/17 10:56, Christoffer Dall wrote:
-> On Wed, Jun 07, 2017 at 10:16:29AM +0100, Marc Zyngier wrote:
->> On 06/06/17 21:09, Christoffer Dall wrote:
->>> On Tue, Jun 06, 2017 at 07:08:34PM +0100, Marc Zyngier wrote:
->>>> We currently have the SCTLR_EL2.A bit set, trapping unaligned accesses
->>>> at EL2, but we're not really prepared to deal with it. So far, this
->>>> has been unnoticed, until GCC 7 started emitting those (in particular
->>>> 64bit writes on a 32bit boundary).
->>>>
->>>> Since the rest of the kernel is pretty happy about that, let's follow
->>>> its example and set SCTLR_EL2.A to zero. Modern CPUs don't really
->>>> care.
->>>
->>> Why do we set the A flag via SCTLR_ELx_FLAGS in the first place, only to
->>> drop that flag later on for both EL1 and EL2 ?
->>
->> That flag is always cleared at EL1, never set. Actually, only EL2 uses
->> that macro to *set* flags. An alternative would be to do away with the
->> macro and use the individual flags, like the 32bit side does.
->>
->> What do you think?
->>
-> I don't understand why the A bit is part of SCTLR_ELx_FLAGS then?  Is it
-> used as a mask, is that why?
+Hi!
 
-Yes. See arch/arm64/kernel/cpu-reset.S for example, where the macro is
-used to clear all these flags in one go. SCTLR_EL1.A was never set the
-first place (it was cleared at boot time in __cpu_setup).
+On Wed 2017-06-07 11:46:10, Linus Walleij wrote:
+> On Wed, Jun 7, 2017 at 9:12 AM, Pavel Machek <pavel@ucw.cz> wrote:
+> 
+> > Core reason is that 5ab92a7cb is wrong. (Very wrong; it papers over
+> > the issue for one trigger, but we have more than one... Even if
+> > special handling for heartbeat is warranted, that handling would be
+> > "turn the led off" not "unregister the trigger", which is
+> > userland-visible action.)
+> 
+> OK yeah I guess you're right.
+> 
+> I just couldn't think about anything better and didn't get any
+> review at the time, so mistakes were made.
+> 
+> > That one should be reverted, then maybe the
+> > driver should be fixed to turn the led off during suspend.
+> 
+> Do you mean that the heartbeat trigger driver should be fixed to
+> turn off the LED during sleep?
+> 
+> That is essentially what I was trying to achieve.
 
-We could remove the A bit from SCTLR_ELx_FLAGS altogether, and it
-wouldn't have any observable effect (or so I believe). This would be
-another way to fix this problem.
+I don't think we should be fixing it at trigger level.
 
-> In terms of these patches, I think we should apply these, because they
-> solve the problem and do the same thing.
+If userspace keeps blinking using "brightness" attribute, would we
+like the LED to be off during suspend? I think so.
 
-OK.
+> The reason it is done as it is, is that the trigger sets up
+> a timer to do its job, and the timer may trigger between
+> the point you turn off the LED and the system really goes
+> to suspend, again maybe turning the LED on and
+> again leaving the system with a glowing LED at suspend.
+
+> The patch also solves the following phenomenon, sorry
+> for not writing in the commit:
+> 
+> - Turn off LED
+> - Suspend I2C hardware
+> - Timer trigger
+> - Trying to blink the LED using I2C
+> - Crap in the console about the failed I2C transaction
+> - Actual suspen happens
+> - System comes online
+> - Trying to blink the LED using I2C
+> - Crap in the console about the failed I2C transaction
+> - Resume I2C hardware
+> 
+> It's just very fragile this trigger, turning off the LED from
+> the PM notifier is obviously not enough, we also need to
+> disable the timer, and then take it back online after resume.
+
+No, leave the timer alone, and actually leave the trigger alone.
+
+Simply make the driver turn the LED off in .suspend() callback, and
+then ignore further requests until .resume(). That will get rid of
+power drain _and_ "failed I2C transaction" messages, right?
+
+(Actually, I tested with the heartbeat trigger, and it is not
+re-installed after resume. Another reason to revert the patch).
 
 Thanks,
 
-	M.
+									Pavel
 -- 
-Jazz is not dead. It just smells funny...
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170607/2879506a/attachment.sig>
