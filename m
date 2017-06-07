@@ -1,146 +1,76 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Wed,  7 Jun 2017 11:34:05 -0700
-Subject: [PATCH v8 26/34] media: imx: csi: add support for bayer formats
+Date: Wed,  7 Jun 2017 11:34:13 -0700
+Subject: [PATCH v8 34/34] ARM: imx_v6_v7_defconfig: Enable staging video4linux
+ drivers
 In-Reply-To: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1496860453-6282-27-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1496860453-6282-35-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King <rmk+kernel@armlinux.org.uk>
+Enable i.MX v4l2 media staging driver. For video capture on i.MX, the
+video multiplexer subdev is required. On the SabreAuto, the ADV7180
+video decoder is required along with i2c-mux-gpio. The Sabrelite
+and SabreSD require the OV5640 and the SabreLite requires PWM clocks
+for the OV5640.
 
-Bayer formats must be treated as generic data and passthrough mode must
-be used.  Add the correct setup for these formats.
-
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-
-- added check to csi_link_validate() to verify that destination is
-  IDMAC output pad when passthrough conditions exist: bayer formats
-  and 16-bit parallel buses.
+Increase max zoneorder to allow larger video buffer allocations.
 
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- drivers/staging/media/imx/imx-media-csi.c | 74 ++++++++++++++++++++++++-------
- 1 file changed, 57 insertions(+), 17 deletions(-)
+ arch/arm/configs/imx_v6_v7_defconfig | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
-index 4ff2419..83c8697 100644
---- a/drivers/staging/media/imx/imx-media-csi.c
-+++ b/drivers/staging/media/imx/imx-media-csi.c
-@@ -287,10 +287,11 @@ static int csi_idmac_setup_channel(struct csi_priv *priv)
- 	struct imx_media_video_dev *vdev = priv->vdev;
- 	struct v4l2_fwnode_endpoint *sensor_ep;
- 	struct v4l2_mbus_framefmt *infmt;
--	unsigned int burst_size;
- 	struct ipu_image image;
-+	u32 passthrough_bits;
- 	dma_addr_t phys[2];
- 	bool passthrough;
-+	u32 burst_size;
- 	int ret;
- 
- 	infmt = &priv->format_mbus[CSI_SINK_PAD];
-@@ -308,24 +309,52 @@ static int csi_idmac_setup_channel(struct csi_priv *priv)
- 	image.phys0 = phys[0];
- 	image.phys1 = phys[1];
- 
--	ret = ipu_cpmem_set_image(priv->idmac_ch, &image);
--	if (ret)
--		goto unsetup_vb2;
--
--	burst_size = (image.pix.width & 0xf) ? 8 : 16;
--
--	ipu_cpmem_set_burstsize(priv->idmac_ch, burst_size);
--
- 	/*
--	 * If the sensor uses 16-bit parallel CSI bus, we must handle
--	 * the data internally in the IPU as 16-bit generic, aka
--	 * passthrough mode.
-+	 * Check for conditions that require the IPU to handle the
-+	 * data internally as generic data, aka passthrough mode:
-+	 * - raw bayer formats
-+	 * - the sensor bus is 16-bit parallel
- 	 */
--	passthrough = (sensor_ep->bus_type != V4L2_MBUS_CSI2 &&
--		       sensor_ep->bus.parallel.bus_width >= 16);
-+	switch (image.pix.pixelformat) {
-+	case V4L2_PIX_FMT_SBGGR8:
-+	case V4L2_PIX_FMT_SGBRG8:
-+	case V4L2_PIX_FMT_SGRBG8:
-+	case V4L2_PIX_FMT_SRGGB8:
-+		burst_size = 8;
-+		passthrough = true;
-+		passthrough_bits = 8;
-+		break;
-+	case V4L2_PIX_FMT_SBGGR16:
-+	case V4L2_PIX_FMT_SGBRG16:
-+	case V4L2_PIX_FMT_SGRBG16:
-+	case V4L2_PIX_FMT_SRGGB16:
-+		burst_size = 4;
-+		passthrough = true;
-+		passthrough_bits = 16;
-+		break;
-+	default:
-+		burst_size = (image.pix.width & 0xf) ? 8 : 16;
-+		passthrough = (sensor_ep->bus_type != V4L2_MBUS_CSI2 &&
-+			       sensor_ep->bus.parallel.bus_width >= 16);
-+		passthrough_bits = 16;
-+		break;
-+	}
- 
--	if (passthrough)
--		ipu_cpmem_set_format_passthrough(priv->idmac_ch, 16);
-+	if (passthrough) {
-+		ipu_cpmem_set_resolution(priv->idmac_ch, image.rect.width,
-+					 image.rect.height);
-+		ipu_cpmem_set_stride(priv->idmac_ch, image.pix.bytesperline);
-+		ipu_cpmem_set_buffer(priv->idmac_ch, 0, image.phys0);
-+		ipu_cpmem_set_buffer(priv->idmac_ch, 1, image.phys1);
-+		ipu_cpmem_set_format_passthrough(priv->idmac_ch,
-+						 passthrough_bits);
-+	} else {
-+		ret = ipu_cpmem_set_image(priv->idmac_ch, &image);
-+		if (ret)
-+			goto unsetup_vb2;
-+	}
-+
-+	ipu_cpmem_set_burstsize(priv->idmac_ch, burst_size);
- 
- 	/*
- 	 * Set the channel for the direct CSI-->memory via SMFC
-@@ -799,6 +828,7 @@ static int csi_link_validate(struct v4l2_subdev *sd,
- {
- 	struct csi_priv *priv = v4l2_get_subdevdata(sd);
- 	struct v4l2_fwnode_endpoint *sensor_ep;
-+	const struct imx_media_pixfmt *incc;
- 	struct imx_media_subdev *sensor;
- 	bool is_csi2;
- 	int ret;
-@@ -819,6 +849,16 @@ static int csi_link_validate(struct v4l2_subdev *sd,
- 	priv->sensor = sensor;
- 	sensor_ep = &priv->sensor->sensor_ep;
- 	is_csi2 = (sensor_ep->bus_type == V4L2_MBUS_CSI2);
-+	incc = priv->cc[CSI_SINK_PAD];
-+
-+	if (priv->dest != IPU_CSI_DEST_IDMAC &&
-+	    (incc->bayer || (!is_csi2 &&
-+			     sensor_ep->bus.parallel.bus_width >= 16))) {
-+		v4l2_err(&priv->sd,
-+			 "bayer/16-bit parallel buses must go to IDMAC pad\n");
-+		ret = -EINVAL;
-+		goto out;
-+	}
- 
- 	if (is_csi2) {
- 		int vc_num = 0;
-@@ -843,7 +883,7 @@ static int csi_link_validate(struct v4l2_subdev *sd,
- 
- 	/* select either parallel or MIPI-CSI2 as input to CSI */
- 	ipu_set_csi_src_mux(priv->ipu, priv->csi_id, is_csi2);
--
-+out:
- 	mutex_unlock(&priv->lock);
- 	return ret;
- }
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index bb6fa56..63caf25 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -51,6 +51,7 @@ CONFIG_PREEMPT_VOLUNTARY=y
+ CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
+ CONFIG_CMA=y
++CONFIG_FORCE_MAX_ZONEORDER=14
+ CONFIG_CMDLINE="noinitrd console=ttymxc0,115200"
+ CONFIG_KEXEC=y
+ CONFIG_CPU_FREQ=y
+@@ -183,6 +184,7 @@ CONFIG_SERIAL_FSL_LPUART=y
+ CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
+ # CONFIG_I2C_COMPAT is not set
+ CONFIG_I2C_CHARDEV=y
++CONFIG_I2C_MUX=y
+ CONFIG_I2C_MUX_GPIO=y
+ # CONFIG_I2C_HELPER_AUTO is not set
+ CONFIG_I2C_ALGOPCF=m
+@@ -223,14 +225,20 @@ CONFIG_REGULATOR_PFUZE100=y
+ CONFIG_MEDIA_SUPPORT=y
+ CONFIG_MEDIA_CAMERA_SUPPORT=y
+ CONFIG_MEDIA_RC_SUPPORT=y
++CONFIG_MEDIA_CONTROLLER=y
++CONFIG_VIDEO_V4L2_SUBDEV_API=y
+ CONFIG_RC_DEVICES=y
+ CONFIG_IR_GPIO_CIR=y
+ CONFIG_MEDIA_USB_SUPPORT=y
+ CONFIG_USB_VIDEO_CLASS=m
+ CONFIG_V4L_PLATFORM_DRIVERS=y
++CONFIG_VIDEO_MUX=y
+ CONFIG_SOC_CAMERA=y
+ CONFIG_V4L_MEM2MEM_DRIVERS=y
+ CONFIG_VIDEO_CODA=y
++# CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
++CONFIG_VIDEO_ADV7180=m
++CONFIG_VIDEO_OV5640=m
+ CONFIG_SOC_CAMERA_OV2640=y
+ CONFIG_IMX_IPUV3_CORE=y
+ CONFIG_DRM=y
+@@ -340,6 +348,9 @@ CONFIG_FSL_EDMA=y
+ CONFIG_IMX_SDMA=y
+ CONFIG_MXS_DMA=y
+ CONFIG_STAGING=y
++CONFIG_STAGING_MEDIA=y
++CONFIG_VIDEO_IMX_MEDIA=y
++CONFIG_COMMON_CLK_PWM=y
+ CONFIG_IIO=y
+ CONFIG_VF610_ADC=y
+ CONFIG_MPL3115=y
 -- 
 2.7.4
