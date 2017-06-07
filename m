@@ -1,60 +1,64 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed,  7 Jun 2017 16:35:13 +0100
-Subject: [PATCH 2/2] arm64: use larger stacks for KASAN
-In-Reply-To: <1496849713-17078-1-git-send-email-mark.rutland@arm.com>
-References: <1496849713-17078-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1496849713-17078-3-git-send-email-mark.rutland@arm.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 7 Jun 2017 10:38:47 -0500
+Subject: [[PATCH]] drivers: leds/trigger: system cannot enter suspend
+In-Reply-To: <AM3PR04MB4044D34CA2E85B0CE70ED778AC80@AM3PR04MB404.eurprd04.prod.outlook.com>
+References: <1496716596-45414-1-git-send-email-bo.zhang@nxp.com>
+ <20170606192554.GA32171@amd> <1a14165d-2976-50df-18d6-74e5fdec2913@gmail.com>
+ <8afffd09-cb1f-d080-ef4a-ecaa089ad470@ti.com> <20170606203813.GD32171@amd>
+ <AM3PR04MB4044D34CA2E85B0CE70ED778AC80@AM3PR04MB404.eurprd04.prod.outlook.com>
+Message-ID: <81f270ba-6f3c-7759-789b-181203efb7b7@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With recent toolchains (e.g. GCC 7.1.0), KASAN will instrument stack
-accesses, significantly increasing stack pressure. This has been
-observed to result in a boot-time stack overflow on Juno R1, and various
-failures under Syzkaller-directed Qemu VMs.
 
-On x86, this was addressed in commit:
 
-  c420f167db8c799d ("kasan: enable stack instrumentation")
+On 06/06/2017 11:24 PM, Bruce Zhang wrote:
+> Hi Pavel,
+> 
+> It can also fix my issue by reverting  the commit 5ab92a7cb. But this action only does not make led_set_brightness_nosleep function to set brightness. The heartbeat trigger timer is still running even though it is not harmful.
 
-... by doubling the stack size to 32K when the kernel is compiled with
-KASAN.
+Unfortunately, this is sort of design issue of leds triggers framework as it
+doesn't have Suspend related interfaces, so triggers continue running 
+even if led, by it self, is suspended from led_classdev_suspend().
+For example, heartbeat trigger timer can be source of spurious wake-ups 
+in some cases.
 
-This patch does the same for arm64, enabling us to make use of KASAN's
-stack instrumentation. Kernels without KASAN are not affected and will
-retain the current 16K stack size.
+I've had to deal with such kind of issues but related to ledtrig-cpu.c
+connected to gpio.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Alexander Potapenko <glider@google.com>
-Cc: Andrey Ryabinin <aryabinin@virtuozzo.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Dmitry Vyukov <dvyukov@google.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/thread_info.h | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index 4f42275..1dec96e8 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -25,7 +25,17 @@
- 
- #include <asm/page.h>
- 
--#define THREAD_SHIFT		14
-+/*
-+ * AddressSanitizer's stack instrumentation significantly increases stack
-+ * usage. We double the stack size when KASAN is selected to avoid overflows.
-+ */
-+#ifdef CONFIG_KASAN
-+#define KASAN_THREAD_SHIFT	1
-+#else
-+#define KASAN_THREAD_SHIFT	0
-+#endif
-+
-+#define THREAD_SHIFT		(14 + KASAN_THREAD_SHIFT)
- 
- #if THREAD_SHIFT >= PAGE_SHIFT
- #define THREAD_SIZE_ORDER	(THREAD_SHIFT - PAGE_SHIFT)
+
+> 
+> On Tue 2017-06-06 15:19:23, Grygorii Strashko wrote:
+>>
+>>
+>> On 06/06/2017 03:05 PM, Jacek Anaszewski wrote:
+>>> On 06/06/2017 09:25 PM, Pavel Machek wrote:
+>>>> On Tue 2017-06-06 10:36:36, Zhang Bo wrote:
+>>>>> System cannot enter suspend mode because of heartbeat led trigger.
+>>>>> In autosleep_wq, try_to_suspend function will try to enter suspend
+>>>>> mode in specific period. it will get wakeup_count then call
+>>>>> pm_notifier chain callback function and freeze processes.
+>>>>> Heartbeat_pm_notifier is called and it call led_trigger_unregister
+>>>>> to change the trigger of led device to none. It will send uevent
+>>>>
+>>>> Why is heartbeat_pm_notifier calling led_trigger_unregister? That
+>>>> sounds like a bug.
+>>>
+>>> I suggest using git blame. The commit message adding this code is
+>>> pretty informative.
+>>>
+>>
+>> In my opinion original commit do not contain ehough info about root
+>> cause of the problem (commit 5ab92a7cb "leds: handle suspend/resume in
+>> heartbeat trigger")
+> 
+> Zhang: Can you try to revert commit 5ab92a7cb in your tree, to see if it fixes your problem?
+> 
+> Thanks,
+> 									Pavel
+
+
 -- 
-1.9.1
+regards,
+-grygorii
