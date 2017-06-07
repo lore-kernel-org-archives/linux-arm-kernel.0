@@ -1,47 +1,62 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 7 Jun 2017 17:13:32 -0500
-Subject: [PATCH] gpio: mvebu: change compatible string for PWM support
-In-Reply-To: <20170601200820.22396-1-ralph.sennhauser@gmail.com>
-References: <20170601200820.22396-1-ralph.sennhauser@gmail.com>
-Message-ID: <20170607221332.vu2xnzyhtr7x6yoe@rob-hp-laptop>
+Date: Wed, 7 Jun 2017 17:24:20 -0500
+Subject: [PATCH v2 1/6] dt-bindings: interrupt-controller: add DT binding
+ for the Marvell GICP
+In-Reply-To: <1496398017-6487-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1496398017-6487-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1496398017-6487-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20170607222420.perbnsnmizhyl42f@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 01, 2017 at 10:08:20PM +0200, Ralph Sennhauser wrote:
-> As it turns out more than just Armada 370 and XP support using GPIO
-> lines as PWM lines. For example the Armada 38x family has the same
-> hardware support. As such "marvell,armada-370-xp-gpio" for the
-> compatible string is a misnomer.
-> 
-> Change the compatible string to "marvell,armada-370-gpio" before the
-> driver makes it out of the -rc stage. This also follows the practice of
-> using only the first device family supported as part of the name.
-> 
-> Also update the documentation and comments in the code accordingly.
-> 
-> Fixes: 757642f9a584 ("gpio: mvebu: Add limited PWM support")
-> Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
-> 
-> ---
-> 
-> Hi everyone,
-> 
-> The suggestion to change the compatible string last minute comes from
-> Gregory CLEMENT after we realized the bad choice of name due to Richard
-> Genoud reporting an issue when he used the driver with an Armada-388.
-> 
-> Rob Herring just requested to use a separate compatible string but not
-> what it should look like. So I assume he is fine with the new one as
-> well. The rest of this patch is rather minor.
-> 
-> Nothing in tree is using this driver so far, first consumers will be
-> added with 4.13.
-> 
-> Ralph
-> 
-> ---
->  Documentation/devicetree/bindings/gpio/gpio-mvebu.txt | 6 +++---
->  drivers/gpio/gpio-mvebu.c                             | 6 +++---
->  2 files changed, 6 insertions(+), 6 deletions(-)
+On Fri, Jun 02, 2017 at 12:06:52PM +0200, Thomas Petazzoni wrote:
+> This commit adds the Device Tree binding documentation for the Marvell
+> GICP, an extension to the GIC that allows to trigger GIC SPI interrupts
+> using memory transactions. It is used by the ICU unit in the Marvell
+> CP110 block to turn wired interrupts inside the CP into SPI interrupts
+> at the GIC level in the AP.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Sounds like an MSI block?
+
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  .../bindings/interrupt-controller/marvell,gicp.txt | 24 ++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,gicp.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,gicp.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,gicp.txt
+> new file mode 100644
+> index 0000000..3fc36963
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,gicp.txt
+> @@ -0,0 +1,24 @@
+> +Marvell GICP Controller
+> +-----------------------
+> +
+> +GICP is a Marvell extension of the GIC that allows to trigger GIC SPI
+> +interrupts by doing a memory transaction. It is used by the ICU
+> +located in the Marvell CP110 to turn wired interrupts inside the CP
+> +into GIC SPI interrupts.
+> +
+> +Required properties:
+> +
+> +- compatible: Must be "marvell,ap806-gicp"
+> +
+> +- reg: Must be the address and size of the GICP SPI registers
+> +
+> +- marvell,spi-ranges: tuples of GIC SPI interrupts ranges available
+> +  for this GICP
+
+These are base+size?
+
+> +
+> +Example:
+> +
+> +gicp_spi: gicp-spi at 3f0040 {
+> +	compatible = "marvell,ap806-gicp";
+> +	reg = <0x3f0040 0x10>;
+> +	marvell,spi-ranges = <64 64>, <288 64>;
+> +};
+> -- 
+> 2.7.4
+> 
