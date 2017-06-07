@@ -1,35 +1,28 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Wed,  7 Jun 2017 08:43:16 +0200
-Subject: [PATCH 1/1] ARM: imx: Enable REGMAP_MMIO per default
-Message-ID: <20170607064316.2766-1-alexander.stein@systec-electronic.com>
+From: andy.tang@nxp.com (Yuantian Tang)
+Date: Wed, 7 Jun 2017 14:32:47 +0800
+Subject: [PATCH 1/2] dt-bindings: ahci-fsl-qoriq: add ls1088a chip name to the
+ list
+Message-ID: <1496817168-26567-1-git-send-email-andy.tang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If unset, the gpc drivers fails to link with this error:
-drivers/built-in.o: In function `imx_gpc_probe':
-core.c:(.text+0x1e16c): undefined reference to
- `__devm_regmap_init_mmio_clk'
-
-As the gpc driver is built when ARCH_MXC is set, enable REGMAP_MMIO in
-this case too.
-
-Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
-Fixes: 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
+Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
 ---
- arch/arm/mach-imx/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/ata/ahci-fsl-qoriq.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 936c59d0e18b..1b8eead0d113 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -7,6 +7,7 @@ menuconfig ARCH_MXC
- 	select GPIOLIB
- 	select PINCTRL
- 	select PM_OPP if PM
-+	select REGMAP_MMIO
- 	select SOC_BUS
- 	select SRAM
- 	help
+diff --git a/Documentation/devicetree/bindings/ata/ahci-fsl-qoriq.txt b/Documentation/devicetree/bindings/ata/ahci-fsl-qoriq.txt
+index fc33ca0..7c3ca0e 100644
+--- a/Documentation/devicetree/bindings/ata/ahci-fsl-qoriq.txt
++++ b/Documentation/devicetree/bindings/ata/ahci-fsl-qoriq.txt
+@@ -3,7 +3,7 @@ Binding for Freescale QorIQ AHCI SATA Controller
+ Required properties:
+   - reg: Physical base address and size of the controller's register area.
+   - compatible: Compatibility string. Must be 'fsl,<chip>-ahci', where
+-    chip could be ls1021a, ls1043a, ls1046a, ls2080a etc.
++    chip could be ls1021a, ls1043a, ls1046a, ls1088a, ls2080a etc.
+   - clocks: Input clock specifier. Refer to common clock bindings.
+   - interrupts: Interrupt specifier. Refer to interrupt binding.
+ 
 -- 
-2.13.0
+2.1.0.27.g96db324
