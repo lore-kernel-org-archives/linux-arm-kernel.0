@@ -1,54 +1,137 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed,  7 Jun 2017 10:38:07 +0200
-Subject: [PATCH 6/9] net: mvmdio: put the poll intervals in the private
- structure
-In-Reply-To: <20170607083810.30922-1-antoine.tenart@free-electrons.com>
-References: <20170607083810.30922-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170607083810.30922-7-antoine.tenart@free-electrons.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 7 Jun 2017 10:41:25 +0200
+Subject: [PATCH linux-next v4 4/4] spi: imx: Add support for SPI Slave mode
+In-Reply-To: <20170605033809.13726-5-jiada_wang@mentor.com>
+References: <20170605033809.13726-1-jiada_wang@mentor.com>
+ <20170605033809.13726-5-jiada_wang@mentor.com>
+Message-ID: <20170607084125.3eizzs6c773xjssi@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Put the two poll intervals (min and max) in the driver's private
-structure. This is needed to add the xmdio support later.
+On Mon, Jun 05, 2017 at 12:38:09PM +0900, Jiada Wang wrote:
+> Previously i.MX SPI controller only works in Master mode.
+> This patch adds support to i.MX51, i.MX53 and i.MX6 ECSPI
+> controller to work also in Slave mode.
+> 
+> Currently SPI Slave mode support patch has the following limitations:
+> 1. The stale data in RXFIFO will be dropped when the Slave does any new
+>    transfer.
+> 2. One transfer can be finished only after all transfer->len data been
+>    transferred to master device
+> 3. Slave device only accepts transfer->len data. Any data longer than this
+>    from master device will be dropped. Any data shorter than this from
+>    master will cause SPI to stuck due to mentioned HW limitation 2.
+> 4. Only PIO transfer is supported in Slave mode.
+> 
+> Following HW limitation applies:
+> 1.  ECSPI has a HW issue when works in Slave mode, after 64
+>     words written to TXFIFO, even TXFIFO becomes empty,
+>     ECSPI_TXDATA keeps shift out the last word data,
+>     so we have to disable ECSPI when in slave mode after the
+>     transfer completes
+> 2.  Due to Freescale errata ERR003775 "eCSPI: Burst completion by Chip
+>     Select (SS) signal in Slave mode is not functional" burst size must
+>     be set exactly to the size of the transfer. This limit SPI transaction
+>     with maximum 2^12 bits. This errata affects i.MX53 and i.MX6 ECSPI
+>     controllers.
+> 
+> Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
+> ---
+>  drivers/spi/spi-imx.c | 228 +++++++++++++++++++++++++++++++++++++++++++-------
+>  1 file changed, 198 insertions(+), 30 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+> index 5034f89..3db3809 100644
+> --- a/drivers/spi/spi-imx.c
+> +++ b/drivers/spi/spi-imx.c
+> @@ -53,9 +53,13 @@
+>  /* generic defines to abstract from the different register layouts */
+>  #define MXC_INT_RR	(1 << 0) /* Receive data ready interrupt */
+>  #define MXC_INT_TE	(1 << 1) /* Transmit FIFO empty interrupt */
+> +#define MXC_INT_RDR	BIT(4) /* Receive date threshold interrupt */
+>  
+>  /* The maximum  bytes that a sdma BD can transfer.*/
+>  #define MAX_SDMA_BD_BYTES  (1 << 15)
+> +/* The maximum bytes that IMX53_ECSPI can transfer in slave mode.*/
+> +#define MX53_MAX_TRANSFER_BYTES		512
+> +
+>  struct spi_imx_config {
+>  	unsigned int speed_hz;
+>  	unsigned int bpw;
+> @@ -79,7 +83,9 @@ struct spi_imx_devtype_data {
+>  	void (*trigger)(struct spi_imx_data *);
+>  	int (*rx_available)(struct spi_imx_data *);
+>  	void (*reset)(struct spi_imx_data *);
+> +	void (*disable)(struct spi_imx_data *);
+>  	bool has_dmamode;
+> +	bool has_slavemode;
+>  	unsigned int fifo_size;
+>  	enum spi_imx_devtype devtype;
+>  };
+> @@ -107,6 +113,11 @@ struct spi_imx_data {
+>  	const void *tx_buf;
+>  	unsigned int txfifo; /* number of words pushed in tx FIFO */
+>  
+> +	/* Slave mode */
+> +	bool slave_mode;
+> +	bool slave_aborted;
+> +	unsigned int slave_burst;
+> +
+>  	/* DMA */
+>  	bool usedma;
+>  	u32 wml;
+> @@ -223,6 +234,9 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
+>  	if (!transfer)
+>  		return false;
+>  
+> +	if (spi_imx->slave_mode)
+> +		return false;
+> +
+>  	bpw = transfer->bits_per_word;
+>  	if (!bpw)
+>  		bpw = spi->bits_per_word;
+> @@ -266,6 +280,7 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
+>  #define MX51_ECSPI_INT		0x10
+>  #define MX51_ECSPI_INT_TEEN		(1 <<  0)
+>  #define MX51_ECSPI_INT_RREN		(1 <<  3)
+> +#define MX51_ECSPI_INT_RDREN		(1 <<  4)
+>  
+>  #define MX51_ECSPI_DMA      0x14
+>  #define MX51_ECSPI_DMA_TX_WML(wml)	((wml) & 0x3f)
+> @@ -282,6 +297,46 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
+>  #define MX51_ECSPI_TESTREG	0x20
+>  #define MX51_ECSPI_TESTREG_LBC	BIT(31)
+>  
+> +static void mx53_ecspi_rx_slave(struct spi_imx_data *spi_imx)
+> +{
+> +	u32 val = be32_to_cpu(readl(spi_imx->base + MXC_CSPIRXDATA));
+> +
+> +	if (spi_imx->rx_buf) {
+> +		int n_bytes = spi_imx->slave_burst % sizeof(val);
+> +
+> +		if (n_bytes) {
+> +			memcpy(spi_imx->rx_buf,
+> +			       ((u8 *)&val) + sizeof(val) - n_bytes, n_bytes);
+> +		} else {
+> +			*((u32 *)spi_imx->rx_buf) = val;
+> +			n_bytes = sizeof(val);
+> +		}
+> +
+> +		spi_imx->rx_buf += n_bytes;
+> +		spi_imx->slave_burst -= n_bytes;
+> +	}
+> +}
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
- drivers/net/ethernet/marvell/mvmdio.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+You can do the same optimization you have done for mx53_ecspi_tx_slave()
+for mx53_ecspi_rx_slave() aswell.
 
-diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
-index 8a71ef93a61b..3cb3dd3331d8 100644
---- a/drivers/net/ethernet/marvell/mvmdio.c
-+++ b/drivers/net/ethernet/marvell/mvmdio.c
-@@ -63,6 +63,9 @@ struct orion_mdio_dev {
- 	int err_interrupt;
- 	wait_queue_head_t smi_busy_wait;
- 	struct orion_mdio_ops *ops;
-+
-+	unsigned int poll_interval_min;
-+	unsigned int poll_interval_max;
- };
- 
- struct orion_mdio_ops {
-@@ -123,8 +126,8 @@ static int orion_mdio_wait_ready(struct mii_bus *bus)
- 			break;
- 
- 	        if (dev->err_interrupt <= 0) {
--			usleep_range(MVMDIO_SMI_POLL_INTERVAL_MIN,
--				     MVMDIO_SMI_POLL_INTERVAL_MAX);
-+			usleep_range(dev->poll_interval_min,
-+				     dev->poll_interval_max);
- 
- 			if (time_is_before_jiffies(end))
- 				++timedout;
-@@ -279,6 +282,8 @@ static int orion_mdio_probe(struct platform_device *pdev)
- 	if (!ops)
- 		return -ENOMEM;
- 
-+	dev->poll_interval_min = MVMDIO_SMI_POLL_INTERVAL_MIN;
-+	dev->poll_interval_max = MVMDIO_SMI_POLL_INTERVAL_MAX;
- 	ops->is_done = orion_mdio_smi_is_done;
- 	ops->is_read_valid = orion_mdio_smi_is_read_valid;
- 	ops->start_read = orion_mdio_start_read_op;
+Otherwise the patch looks fine to me now.
+
+Sascha
+
+
 -- 
-2.9.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
