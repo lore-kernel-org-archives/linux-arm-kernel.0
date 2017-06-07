@@ -1,62 +1,60 @@
 From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Wed, 7 Jun 2017 15:31:16 +0300
+Date: Wed, 7 Jun 2017 15:31:32 +0300
 Subject: [PATCH v7 16/34] [media] add Omnivision OV5640 sensor driver
-In-Reply-To: <d51acbaa-0dc6-ce5c-5442-62c5c24ad6da@gmail.com>
+In-Reply-To: <3e953953-7bf4-912f-73f7-db568d5df504@gmail.com>
 References: <1495672189-29164-1-git-send-email-steve_longerbeam@mentor.com>
  <1495672189-29164-17-git-send-email-steve_longerbeam@mentor.com>
- <20170531195821.GA16962@amd>
- <20170601082659.GJ1019@valkosipuli.retiisi.org.uk>
- <755909bf-d1de-e0f3-1569-0d4b16e26817@gmail.com>
- <20170603195139.GA3062@amd>
- <20170603215709.GU1019@valkosipuli.retiisi.org.uk>
- <d51acbaa-0dc6-ce5c-5442-62c5c24ad6da@gmail.com>
-Message-ID: <20170607123116.GB1019@valkosipuli.retiisi.org.uk>
+ <20170529155511.GI29527@valkosipuli.retiisi.org.uk>
+ <c50c3c5f-71cf-fa73-f5a8-a4b5f59a87dc@gmail.com>
+ <20170530065632.GK29527@valkosipuli.retiisi.org.uk>
+ <ab04379b-d005-1251-343b-5e490ee6e72d@gmail.com>
+ <3e953953-7bf4-912f-73f7-db568d5df504@gmail.com>
+Message-ID: <20170607123131.GC1019@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 03, 2017 at 09:46:36PM -0700, Steve Longerbeam wrote:
+On Sun, Jun 04, 2017 at 11:00:14AM -0700, Steve Longerbeam wrote:
 > 
 > 
-> On 06/03/2017 02:57 PM, Sakari Ailus wrote:
-> >On Sat, Jun 03, 2017 at 09:51:39PM +0200, Pavel Machek wrote:
-> >>Hi!
-> >>
-> >>>>>>+	/* Auto/manual exposure */
-> >>>>>>+	ctrls->auto_exp = v4l2_ctrl_new_std_menu(hdl, ops,
-> >>>>>>+						 V4L2_CID_EXPOSURE_AUTO,
-> >>>>>>+						 V4L2_EXPOSURE_MANUAL, 0,
-> >>>>>>+						 V4L2_EXPOSURE_AUTO);
-> >>>>>>+	ctrls->exposure = v4l2_ctrl_new_std(hdl, ops,
-> >>>>>>+					    V4L2_CID_EXPOSURE_ABSOLUTE,
-> >>>>>>+					    0, 65535, 1, 0);
-> >>>>>
-> >>>>>Is exposure_absolute supposed to be in microseconds...?
-> >>>>
-> >>>>Yes.
-> >>>
-> >>>According to the docs V4L2_CID_EXPOSURE_ABSOLUTE is in 100 usec units.
-> >>>
-> >>>  OTOH V4L2_CID_EXPOSURE has no defined unit, so it's a better fit IMO.
-> >>>>Way more drivers appear to be using EXPOSURE than EXPOSURE_ABSOLUTE, too.
-> >>>
-> >>>Done, switched to V4L2_CID_EXPOSURE. It's true, this control is not
-> >>>taking 100 usec units, so unit-less is better.
-> >>
-> >>Thanks. If you know the units, it would be of course better to use
-> >>right units...
+> On 06/03/2017 11:02 AM, Steve Longerbeam wrote:
+> >Hi Sakari,
 > >
-> >Steve: what's the unit in this case? Is it lines or something else?
+> >
+> >On 05/29/2017 11:56 PM, Sakari Ailus wrote:
+> >>Hi Steve,
+> >>
+> >>On Mon, May 29, 2017 at 02:50:34PM -0700, Steve Longerbeam wrote:
+> >>>><snip>
+> >>>>
+> >>>>>+
+> >>>>>+static int ov5640_s_ctrl(struct v4l2_ctrl *ctrl)
+> >>>>>+{
+> >>>>>+    struct v4l2_subdev *sd = ctrl_to_sd(ctrl);
+> >>>>>+    struct ov5640_dev *sensor = to_ov5640_dev(sd);
+> >>>>>+    int ret = 0;
+> >>>>>+
+> >>>>>+    mutex_lock(&sensor->lock);
+> >>>>Could you use the same lock for the controls as you use for the
+> >>>>rest? Just
+> >>>>setting handler->lock after handler init does the trick.
+> >>>
+> >>>Can you please rephrase, I don't follow. "same lock for the controls as
+> >>>you use for the rest" - there's only one device lock owned by this
+> >>>driver
+> >>>and I am already using that same lock.
+> >>
+> >>There's another in the control handler. You could use your own lock for
+> >>the
+> >>control handler as well.
+> >
+> >I still don't understand.
+> >
 > 
-> Yes, the register interface for exposure takes lines*16.
-> 
-> Maybe converting from seconds to lines is as simple as
-> framerate * height * seconds. But I'm not sure about that.
+> Hi Sakari, sorry I see what you are referring to now. The lock
+> in 'struct v4l2_ctrl_handler' can be overridden by a caller's own
+> lock. Yes that's a good idea, I'll do that.
 
-The smiapp and a few other drivers are using lines. One option could be to
-use lines as the unit and have step as 16.
-
-Then the hblank + vblank controls will be needed, too, to enable the user to
-at least figure out the conversion to Si units.
+Ack, good! :-)
 
 -- 
 Sakari Ailus
