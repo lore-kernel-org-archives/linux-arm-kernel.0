@@ -1,46 +1,57 @@
-From: imirkin@alum.mit.edu (Ilia Mirkin)
-Date: Wed, 7 Jun 2017 18:47:53 -0400
-Subject: [PATCH 19/19] ARM: sun6i: a31s: Enable HDMI display output on the
- MSI Primo81 tablet
-In-Reply-To: <20170607223625.aofk3cba3w4cvlys@rob-hp-laptop>
-References: <20170602101024.18940-1-wens@csie.org>
- <20170602101024.18940-20-wens@csie.org>
- <20170602194219.hiajr7dt2oikm52q@flea.lan>
- <20170607223625.aofk3cba3w4cvlys@rob-hp-laptop>
-Message-ID: <CAKb7UvgKhgCpeNzUX1ecFPuF6j+KvAWW3vprZ9nnVMBBJFi_zQ@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 8 Jun 2017 01:11:39 +0200
+Subject: [PATCH 46/58] clocksource/drivers: Add a new driver for the
+ Atmel ARM TC blocks
+In-Reply-To: <20170607213810.GK2345@mai>
+References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
+ <20170530215139.9983-47-alexandre.belloni@free-electrons.com>
+ <20170606152104.GC2345@mai>
+ <20170606180559.pkrr7ux2qqnmsd6y@piout.net>
+ <20170607141735.GH2345@mai>
+ <20170607150908.kytgtzwgjjnxtsp3@piout.net>
+ <20170607213810.GK2345@mai>
+Message-ID: <20170607231139.5dgzu3tc4lmuj43y@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 7, 2017 at 6:36 PM, Rob Herring <robh@kernel.org> wrote:
-> On Fri, Jun 02, 2017 at 09:42:19PM +0200, Maxime Ripard wrote:
->> On Fri, Jun 02, 2017 at 06:10:24PM +0800, Chen-Yu Tsai wrote:
->> > The MSI Primo81 tablet has a micro HDMI connector at the bottom.
->> > This is connected to the SoCs HDMI output.
->> >
->> > Enable the display pipeline and the HDMI output.
->> >
->> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> > ---
->> >  arch/arm/boot/dts/sun6i-a31s-primo81.dts | 25 +++++++++++++++++++++++++
->> >  1 file changed, 25 insertions(+)
->> >
->> > diff --git a/arch/arm/boot/dts/sun6i-a31s-primo81.dts b/arch/arm/boot/dts/sun6i-a31s-primo81.dts
->> > index f3712753fa42..26154b2f87a3 100644
->> > --- a/arch/arm/boot/dts/sun6i-a31s-primo81.dts
->> > +++ b/arch/arm/boot/dts/sun6i-a31s-primo81.dts
->> > @@ -52,17 +52,42 @@
->> >  / {
->> >     model = "MSI Primo81 tablet";
->> >     compatible = "msi,primo81", "allwinner,sun6i-a31s";
->> > +
->> > +   hdmi-connector {
->> > +           compatible = "hdmi-connector";
->> > +           type = "c";
->>
->> Should we add a connector type for this one?
->
-> c as in USB Type C? I'd prefer to see a new compatible string. Is type
-> even documented?
+On 07/06/2017 at 23:38:10 +0200, Daniel Lezcano wrote:
+> On Wed, Jun 07, 2017 at 05:09:08PM +0200, Alexandre Belloni wrote:
+> I suggest to look what is in 'lot-of-things()' and especially what is doing
+> regcache_read().
+> 
 
-Probably as in HDMI Type C (there are Type A, C, and D connectors, aka
-"regular", "mini", and "micro").
+I know it does a lot...
+
+> May be you can reconsider the regmap? This driver is the only one use the
+> regmap AFAICT and I don't think it is adequate.
+> 
+
+That is not true, I also converted the PWM driver and both a capture and
+qdec drivers are coming.
+
+
+
+> > > > > Can you explain why we have two clocks here?
+> > > > > 
+> > > > 
+> > > > Each channel have its clock, I can add a comment if you want.
+> > > 
+> > > I don't understand. Why do we have two clocks?
+> > > 
+> > > One channel is driven by one clock and the second one takes the overflow signal
+> > > from the first one, so no second clock is involved there, no?
+> > > 
+> > 
+> > Those are the peripheral clocks, they are not used by the counters but
+> > used to be able to read/write the registers.
+> 
+> Mmh, strange. Why is the clk[0]'s rate used in this case?
+> 
+
+That's abusing the fact that is has the same rate as the clock feeding
+the counter.
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
