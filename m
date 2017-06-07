@@ -1,21 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 7 Jun 2017 09:36:34 +0200
-Subject: [PATCH] clk: sunxi-ng: Move all clock types to a library
-In-Reply-To: <CAGb2v66QvLdojDe4+uG9Opa7fApA-GH9pW4v0En5j6QSPf1yZw@mail.gmail.com>
-References: <20170602223006.1653-1-sboyd@codeaurora.org>
- <201706031243.qNvuUbQX%fengguang.wu@intel.com>
- <20170605144546.b6oh5sygrza22hbe@flea.lan>
- <CAK8P3a1Qvt4nvM5HeK-n87tsi2D5GBOmZo0rZv_Lp==CC=34Uw@mail.gmail.com>
- <CAGb2v66QvLdojDe4+uG9Opa7fApA-GH9pW4v0En5j6QSPf1yZw@mail.gmail.com>
-Message-ID: <CAK8P3a38TyiHXBgB0DQka=0iASuyJO_zMrczXqYBiJj6LEnNWg@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 7 Jun 2017 15:37:48 +0800
+Subject: [PATCH v10] sun4i-codec: Add mixer controls: Line-In, FM-In, Mic
+ 2, Capture Source, Differential Line-In.
+In-Reply-To: <20170607072718.18017-2-dannym@scratchpost.org>
+References: <20170607072718.18017-1-dannym@scratchpost.org>
+ <20170607072718.18017-2-dannym@scratchpost.org>
+Message-ID: <CAGb2v641CX=rM_2shHoM1XxMp82gwFMz-Y_95RBhP5jbjmU7dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 7, 2017 at 7:45 AM, Chen-Yu Tsai <wens@csie.org> wrote:
-> at the bottom (with a comment) would be cleaner, and
-> we wouldn't need to modify all the existing lines.
-> AFAIK about Makefiles, that should work?
+On Wed, Jun 7, 2017 at 3:27 PM, Danny Milosavljevic
+<dannym@scratchpost.org> wrote:
+> Adds support for some mixer controls to sun4i-codec:
+>  - Line-In
+>  - FM-In
+>  - Mic 2
+>  - Capture Source
+>  - Differential Line-In
+>
+> It also adds a mux for the capture source and the PGA for the MIC2 preamp.
+>
+> Where possible, it uses SOC_DAPM_DOUBLE in order to cut down on the number
+> of distinct controls in alsamixer.
 
-Ah, yes. That's much better.
+You are doing too many things in one patch.
 
-      Arnd
+Please split this up into 1 patch per control/mux/source/widget added,
+preceded by patches for any required cleanups.
+
+ChenYu
+
+> Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
