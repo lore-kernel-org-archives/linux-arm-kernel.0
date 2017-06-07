@@ -1,33 +1,124 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 07 Jun 2017 18:00:52 +0800
-Subject: [PATCH v2 04/11] drm: sun4i: add support for H3's TCON0/1
-In-Reply-To: <20170607094343.qqiwnu2mhmoi6jn7@flea.lan>
-References: <20170604160149.30230-1-icenowy@aosc.io>
- <20170604160149.30230-5-icenowy@aosc.io> <3642057.oKT9kIlu8M@jernej-laptop>
- <493AC6F2-3CB3-48F5-9568-A34AA927238F@aosc.io>
- <20170607094343.qqiwnu2mhmoi6jn7@flea.lan>
-Message-ID: <78252AF1-51FB-4B09-80C2-2597990680CE@aosc.io>
+From: rafalo@cadence.com (Rafal Ozieblo)
+Date: Wed, 7 Jun 2017 11:13:36 +0000
+Subject: [PATCH v2 4/4] net: macb: Add hardware PTP support
+In-Reply-To: <20170606183358.GA25220@localhost.localdomain>
+References: <1496413439-12900-1-git-send-email-rafalo@cadence.com>
+ <1496413690-22826-1-git-send-email-rafalo@cadence.com>
+ <20170606183358.GA25220@localhost.localdomain>
+Message-ID: <BN3PR07MB2516A47C2CFEB58BCFFB2C46C9C80@BN3PR07MB2516.namprd07.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+> From: Richard Cochran [mailto:richardcochran at gmail.com]
+> Sent: 6 czerwca 2017 20:34
+> To: Rafal Ozieblo <rafalo@cadence.com>
+> Cc: David Miller <davem@davemloft.net>; nicolas.ferre at atmel.com;
+> netdev at vger.kernel.org; linux-kernel at vger.kernel.org;
+> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> harini.katakam at xilinx.com; andrei.pistirica at microchip.com
+> Subject: Re: [PATCH v2 4/4] net: macb: Add hardware PTP support
+> 
+> On Fri, Jun 02, 2017 at 03:28:10PM +0100, Rafal Ozieblo wrote:
+> > +static void gem_ptp_clear_timer(struct macb *bp)
+> > +{
+> > +	bp->tsu_incr.ns = 0;
+> > +	bp->tsu_incr.sub_ns = 0;
+> 
+> What is the point of this function?
+Cleaning all bellow registers will stop hardware PTP clock.
 
+> 
+> > +	gem_writel(bp, TISUBN, GEM_BF(SUBNSINCR, 0));
+> > +	gem_writel(bp, TI, GEM_BF(NSINCR, 0));
+> > +	gem_writel(bp, TA, 0);
+> > +}
+(...)
+> > +int gem_ptp_txstamp(struct macb_queue *queue, struct sk_buff *skb,
+> > +		    struct macb_dma_desc *desc)
+> > +{
+> > +	struct gem_tx_ts *tx_timestamp;
+> > +	struct macb_dma_desc_ptp *desc_ptp;
+> > +	unsigned long head = queue->tx_ts_head;
+> > +	unsigned long tail = READ_ONCE(queue->tx_ts_tail);
+> > +
+> > +	if (!GEM_BFEXT(DMA_TXVALID, desc->ctrl))
+> > +		return -EINVAL;
+> > +
+> > +	if (CIRC_SPACE(head, tail, PTP_TS_BUFFER_SIZE) == 0)
+> > +		return -ENOMEM;
+> > +
+> > +	skb_shinfo(skb)->tx_flags |= SKBTX_IN_PROGRESS;
+> > +	desc_ptp = macb_ptp_desc(queue->bp, desc);
+> > +	tx_timestamp = &queue->tx_timestamps[head];
+> > +	tx_timestamp->skb = skb;
+> > +	tx_timestamp->desc_ptp.ts_1 = desc_ptp->ts_1;
+> > +	tx_timestamp->desc_ptp.ts_2 = desc_ptp->ts_2;
+> > +	/* move head */
+> > +	smp_store_release(&queue->tx_ts_head,
+> > +			  (head + 1) & (PTP_TS_BUFFER_SIZE - 1));
+> > +
+> > +	schedule_work(&queue->tx_ts_task);
+> 
+> Since the time stamp is in the buffer descriptor, why delay the
+> delivery via the work item?
 
-? 2017?6?7? GMT+08:00 ??5:43:43, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
->On Mon, Jun 05, 2017 at 03:03:47AM +0800, Icenowy Zheng wrote:
->> >You should also expand function sun4i_drv_node_is_tcon() at
->sun4i_drv.c
->> >with 
->> >new entries, but I'm not sure if this fits in this patch.
->> 
->> Instead I think it should be renamed to something like
->> "sun4i_drv_node_is_tcon_with_ch0".
->
->I'm not sure, or at least, it shouldn't make any difference, since
->TCON without a channel 0 will not have an endpoint 0, so this will be
->dealt with already.
+I put comment about that a few months ago:
+https://patchwork.ozlabs.org/patch/705629/
+Let me quote part about not doing it via worker:
 
-But that will prevent new coders from add CH1-less TCON
-compatibles to this function.
+" I think, you can not do it in that way. 
+It will hold two locks. If you enable appropriate option in kernel (as far as I 
+remember CONFIG_DEBUG_SPINLOCK) you will get a warning here.
 
->
->Maxime
+Please look at following call-stack:
+
+1. macb_interrupt()   // spin_lock(&bp->lock) is taken
+2. macb_tx_interrupt()
+3. macb_handle_txtstamp()
+4. skb_tstamp_tx()
+5. __skb_tstamp_tx()
+6. skb_may_tx_timestamp()
+7. read_lock_bh() // second lock is taken
+
+I know that those are different locks and different types. But this could lead 
+to deadlocks. This is the reason of warning I could see.
+And this is the reason why I get timestamp in interrupt routine but pass it to 
+skb outside interrupt (using circular buffer).
+
+Please, refer to this:
+https://lkml.org/lkml/2016/11/18/168
+
+1. macb_tx_interrupt()
+2. macb_tx_timestamp_add() and schedule_work(&queue->tx_timestamp_task)
+
+Then, outside interrupt (without holding a lock) :
+1. macb_tx_timestamp_flush()
+2. macb_tstamp_tx()
+3. skb_tstamp_tx()"
+> 
+> > +	return 0;
+> > +}
+(...)
+> > +void gem_ptp_remove(struct net_device *ndev)
+> > +{
+> > +	struct macb *bp = netdev_priv(ndev);
+> > +
+> > +	if (bp->ptp_clock)
+> > +		ptp_clock_unregister(bp->ptp_clock);
+> > +
+> > +	gem_ptp_clear_timer(bp);
+> 
+> Why is this 'clear' needed?
+To stop hardware PTP clock.
+> 
+> > +	dev_info(&bp->pdev->dev, "%s ptp clock unregistered.\n",
+> > +		 GEM_PTP_TIMER_NAME);
+> > +}
+> 
+> Thanks,
+> Richard
+
+I'll correct all other issues.
+
+Regards,
+Rafal
