@@ -1,44 +1,39 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 07 Jun 2017 22:21:02 +0800
-Subject: [PATCH v2 04/11] drm: sun4i: add support for H3's TCON0/1
-In-Reply-To: <20170607141957.akonr7hmuwpt7hlt@flea.lan>
-References: <20170604160149.30230-1-icenowy@aosc.io>
- <20170604160149.30230-5-icenowy@aosc.io> <3642057.oKT9kIlu8M@jernej-laptop>
- <493AC6F2-3CB3-48F5-9568-A34AA927238F@aosc.io>
- <20170607094343.qqiwnu2mhmoi6jn7@flea.lan>
- <52F9F9C7-9A9C-435D-A0AF-FDD4317DAD69@aosc.io>
- <20170607141957.akonr7hmuwpt7hlt@flea.lan>
-Message-ID: <4CD8A3BB-965C-4C74-884C-ACE8AAF9989B@aosc.io>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 7 Jun 2017 16:29:50 +0200
+Subject: [PATCH] arm: aspeed: Add clock-names property to timer node
+In-Reply-To: <20170607125256.GG2345@mai>
+References: <20170605074846.30925-1-andrew@aj.id.au>
+ <CACPK8XeM6fBztHwfrPUD+ewpMf==tBqgfj61B-k=SwT3ABTiZw@mail.gmail.com>
+ <CAK8P3a2d=T9igbhe1u3MBUF2F1TMLC7z0DQ2AmHX-LkiBAy2Ww@mail.gmail.com>
+ <20170607125256.GG2345@mai>
+Message-ID: <CAK8P3a0v1+FRnXcwF7j45bmDuX5caL9RBcS1bSUwANqb=zxeqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-? 2017?6?7? GMT+08:00 ??10:19:57, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
->On Wed, Jun 07, 2017 at 05:44:56PM +0800, Icenowy Zheng wrote:
->> ? 2017?6?7? GMT+08:00 ??5:43:43, Maxime Ripard
-><maxime.ripard@free-electrons.com> ??:
->> >On Mon, Jun 05, 2017 at 03:03:47AM +0800, Icenowy Zheng wrote:
->> >> >You should also expand function sun4i_drv_node_is_tcon() at
->> >sun4i_drv.c
->> >> >with 
->> >> >new entries, but I'm not sure if this fits in this patch.
->> >> 
->> >> Instead I think it should be renamed to something like
->> >> "sun4i_drv_node_is_tcon_with_ch0".
+On Wed, Jun 7, 2017 at 2:52 PM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
+> On Tue, Jun 06, 2017 at 11:41:11AM +0200, Arnd Bergmann wrote:
+>> On Mon, Jun 5, 2017 at 10:59 AM, Joel Stanley <joel@jms.id.au> wrote:
+>> > On Mon, Jun 5, 2017 at 5:18 PM, Andrew Jeffery <andrew@aj.id.au> wrote:
+>> >> The merging of a number of clocksource drivers into fttmr010 means we
+>> >> require clock-names to be specified in the Aspeed timer node, else the
+>> >> clocksource fails to probe and boot hangs.
 >> >
->> >I'm not sure, or at least, it shouldn't make any difference, since
->> >TCON without a channel 0 will not have an endpoint 0, so this will
->be
->> >dealt with already.
->> 
->> But that will prevent new coders from add CH1-less TCON
->> compatibles to this function.
+>> > Arnd,
+>> >
+>> > Linus' reworked timer driver will go into 4.13.
+>> >
+>> > Can we get this patch merged into 4.12 as a fix so we don't end up
+>> > with a broken boot at any stage?
+>>
+>> Hmm, can't we make the driver backward-compatible and have it fall
+>> back on the first clock if no clk named "PCLK" is found? Otherwise
+>> you still have an incompatible change in the DT binding and it will
+>> break if someone uses an older dtb with a newer kernel.
 >
->Why? We already have such TCONs (like the A33's, or V3S') in that
->function.
+> I would like to avoid to hack the kernel code for backward DT compatible
+> things.
 
-Sorry, CH0-less.
+How about a fixup in the platform code to add the property then?
 
->
->Maxime
+      Arnd
