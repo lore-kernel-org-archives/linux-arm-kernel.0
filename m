@@ -1,48 +1,42 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Wed, 7 Jun 2017 22:50:33 +0200
-Subject: [PATCH 2/2] power: reset: at91-sama5d2_shdwc: fix clobber list
-In-Reply-To: <20170531094915.3469-2-alexandre.belloni@free-electrons.com>
-References: <20170531094915.3469-1-alexandre.belloni@free-electrons.com>
- <20170531094915.3469-2-alexandre.belloni@free-electrons.com>
-Message-ID: <20170607205033.2cmzcrnb5dnp23ej@earth>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 7 Jun 2017 13:52:25 -0700
+Subject: [PATCH] watchdog: meson: Handle return value of clk_prepare_enable
+In-Reply-To: <ee0b1a0d0340608b10c47847a8472bc9e5e8b8e1.1496744678.git.arvind.yadav.cs@gmail.com>
+References: <ee0b1a0d0340608b10c47847a8472bc9e5e8b8e1.1496744678.git.arvind.yadav.cs@gmail.com>
+Message-ID: <20170607205225.GC29222@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jun 07, 2017 at 03:04:15PM +0530, Arvind Yadav wrote:
+> clk_prepare_enable() can fail here and we must check its return value.
+> 
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 
-On Wed, May 31, 2017 at 11:49:15AM +0200, Alexandre Belloni wrote:
-> Assembly in at91_lpddr_poweroff has r0 in the clobber list but uses r6.
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
-Thanks, queued.
-
--- Sebastian
-
-> Reported-by: Ben Hutchings <ben.hutchings@codethink.co.uk>
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > ---
->  drivers/power/reset/at91-sama5d2_shdwc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/watchdog/meson_gxbb_wdt.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/power/reset/at91-sama5d2_shdwc.c b/drivers/power/reset/at91-sama5d2_shdwc.c
-> index 90b0b5a70ce5..55fce8b75245 100644
-> --- a/drivers/power/reset/at91-sama5d2_shdwc.c
-> +++ b/drivers/power/reset/at91-sama5d2_shdwc.c
-> @@ -132,7 +132,7 @@ static void at91_lpddr_poweroff(void)
->  		  "r" cpu_to_le32(AT91_DDRSDRC_LPDDR2_PWOFF),
->  		  "r" (at91_shdwc->at91_shdwc_base),
->  		  "r" cpu_to_le32(AT91_SHDW_KEY | AT91_SHDW_SHDW)
-> -		: "r0");
-> +		: "r6");
->  }
+> diff --git a/drivers/watchdog/meson_gxbb_wdt.c b/drivers/watchdog/meson_gxbb_wdt.c
+> index 45d4766..69a5a57 100644
+> --- a/drivers/watchdog/meson_gxbb_wdt.c
+> +++ b/drivers/watchdog/meson_gxbb_wdt.c
+> @@ -203,7 +203,9 @@ static int meson_gxbb_wdt_probe(struct platform_device *pdev)
+>  	if (IS_ERR(data->clk))
+>  		return PTR_ERR(data->clk);
 >  
->  static u32 at91_shdwc_debouncer_value(struct platform_device *pdev,
+> -	clk_prepare_enable(data->clk);
+> +	ret = clk_prepare_enable(data->clk);
+> +	if (ret)
+> +		return ret;
+>  
+>  	platform_set_drvdata(pdev, data);
+>  
 > -- 
-> 2.11.0
+> 1.9.1
 > 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170607/eb7d0ff2/attachment.sig>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
