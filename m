@@ -1,148 +1,65 @@
 From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Wed, 7 Jun 2017 17:16:07 +0800
-Subject: [PATCH v3 2/3] PCI: Enable PCIe Relaxed Ordering if supported
-In-Reply-To: <1496826968-10152-1-git-send-email-dingtianhong@huawei.com>
-References: <1496826968-10152-1-git-send-email-dingtianhong@huawei.com>
-Message-ID: <1496826968-10152-3-git-send-email-dingtianhong@huawei.com>
+Date: Wed, 7 Jun 2017 17:16:05 +0800
+Subject: [PATCH v3 0/3] Add new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
+Message-ID: <1496826968-10152-1-git-send-email-dingtianhong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCIe Device Control Register use the bit 4 to indicate that
-whether the device is permitted to enable relaxed ordering or not.
-But relaxed ordering is not safe for some platform which could only
-use strong write ordering, so devices are allowed (but not required)
-to enable relaxed ordering bit by default.
+Some devices have problems with Transaction Layer Packets with the Relaxed
+Ordering Attribute set.  This patch set adds a new PCIe Device Flag,
+PCI_DEV_FLAGS_NO_RELAXED_ORDERING, a set of PCI Quirks to catch some known
+devices with Relaxed Ordering issues, and a use of this new flag by the
+cxgb4 driver to avoid using Relaxed Ordering with problematic Root Complex
+Ports.
 
-If a PCIe device didn't enable the relaxed ordering attribute default,
-we should not do anything in the PCIe configuration, otherwise we
-should check if any of the devices above us do not support relaxed
-ordering by the PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag, then base on
-the result if we get a return that indicate that the relaxed ordering
-is not supported we should update our device to disable relaxed ordering
-in configuration space. If the device above us doesn't exist or isn't
-the PCIe device, we shouldn't do anything and skip updating relaxed ordering
-because we are probably running in a guest.
+It's been years since I've submitted kernel.org patches, I appolgise for the
+almost certain submission errors.
 
-Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
----
- drivers/pci/pci.c   | 29 +++++++++++++++++++++++++++++
- drivers/pci/probe.c | 43 +++++++++++++++++++++++++++++++++++++++++++
- include/linux/pci.h |  2 ++
- 3 files changed, 74 insertions(+)
+v2: Alexander point out that the v1 was only a part of the whole solution,
+    some platform which has some issues could use the new flag to indicate
+    that it is not safe to enable relaxed ordering attribute, then we need
+    to clear the relaxed ordering enable bits in the PCI configuration when
+    initializing the device. So add a new second patch to modify the PCI
+    initialization code to clear the relaxed ordering enable bit in the
+    event that the root complex doesn't want relaxed ordering enabled.
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index b01bd5b..3d42b38 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -4878,6 +4878,35 @@ int pcie_set_mps(struct pci_dev *dev, int mps)
- EXPORT_SYMBOL(pcie_set_mps);
- 
- /**
-+ * pcie_clear_relaxed_ordering - clear PCI Express relexed ordering bit
-+ * @dev: PCI device to query
-+ *
-+ * If possible clear relaxed ordering
-+ */
-+int pcie_clear_relaxed_ordering(struct pci_dev *dev)
-+{
-+	return pcie_capability_clear_word(dev, PCI_EXP_DEVCTL,
-+					  PCI_EXP_DEVCTL_RELAX_EN);
-+}
-+EXPORT_SYMBOL(pcie_clear_relaxed_ordering);
-+
-+/**
-+ * pcie_get_relaxed_ordering - check PCI Express relexed ordering bit
-+ * @dev: PCI device to query
-+ *
-+ * Returns true if relaxed ordering is been set
-+ */
-+int pcie_get_relaxed_ordering(struct pci_dev *dev)
-+{
-+	u16 v;
-+
-+	pcie_capability_read_word(dev, PCI_EXP_DEVCTL, &v);
-+
-+	return (v & PCI_EXP_DEVCTL_RELAX_EN) >> 4;
-+}
-+EXPORT_SYMBOL(pcie_get_relaxed_ordering);
-+
-+/**
-  * pcie_get_minimum_link - determine minimum link settings of a PCI device
-  * @dev: PCI device to query
-  * @speed: storage for minimum speed
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 19c8950..0c94c80 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1701,6 +1701,48 @@ static void pci_configure_extended_tags(struct pci_dev *dev)
- 					 PCI_EXP_DEVCTL_EXT_TAG);
- }
- 
-+/**
-+ * pci_dev_disable_relaxed_ordering - check if the PCI device
-+ * should disable the relaxed ordering attribute.
-+ * @dev: PCI device
-+ *
-+ * Return true if any of the PCI devices above us do not support
-+ * relaxed ordering.
-+ */ 
-+static int pci_dev_disable_relaxed_ordering(struct pci_dev *dev)
-+{
-+	int ro_disabled = 0;
-+
-+	while(dev) {
-+		if (dev->dev_flags & PCI_DEV_FLAGS_NO_RELAXED_ORDERING) {
-+			ro_disabled = 1;
-+			break;
-+		}
-+		dev = dev->bus->self;
-+	}
-+
-+	return ro_disabled;
-+}
-+
-+static void pci_configure_relaxed_ordering(struct pci_dev *dev)
-+{
-+	struct pci_dev *bridge = pci_upstream_bridge(dev);
-+	int origin_ero;
-+
-+	if (!pci_is_pcie(dev) || !bridge || !pci_is_pcie(bridge))
-+		return;
-+
-+	origin_ero = pcie_get_relaxed_ordering(dev);
-+	/* If the releaxed ordering enable bit is not set, do nothing. */
-+	if (!origin_ero)
-+		return;
-+
-+	if (pci_dev_disable_relaxed_ordering(dev)) {
-+		pcie_clear_relaxed_ordering(dev);
-+		dev_info(&dev->dev, "Disable Relaxed Ordering\n");
-+	}
-+}
-+
- static void pci_configure_device(struct pci_dev *dev)
- {
- 	struct hotplug_params hpp;
-@@ -1708,6 +1750,7 @@ static void pci_configure_device(struct pci_dev *dev)
- 
- 	pci_configure_mps(dev);
- 	pci_configure_extended_tags(dev);
-+	pci_configure_relaxed_ordering(dev);
- 
- 	memset(&hpp, 0, sizeof(hpp));
- 	ret = pci_get_hp_params(dev, &hpp);
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index e1e8428..299d2f3 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1105,6 +1105,8 @@ int __pci_enable_wake(struct pci_dev *dev, pci_power_t state,
- void pci_pme_wakeup_bus(struct pci_bus *bus);
- void pci_d3cold_enable(struct pci_dev *dev);
- void pci_d3cold_disable(struct pci_dev *dev);
-+int pcie_clear_relaxed_ordering(struct pci_dev *dev);
-+int pcie_get_relaxed_ordering(struct pci_dev *dev);
- 
- static inline int pci_enable_wake(struct pci_dev *dev, pci_power_t state,
- 				  bool enable)
+    The third patch was base on the v1's second patch and only be changed
+    to query the relaxed ordering enable bit in the PCI configuration space
+    to allow the Chelsio NIC to send TLPs with the relaxed ordering attributes
+    set.
+
+    This version didn't plan to drop the defines for Intel Drivers to use the
+    new checking way to enable relaxed ordering because it is not the hardest
+    part of the moment, we could fix it in next patchset when this patches
+    reach the goal.  
+
+v3: Redesigned the logic for pci_configure_relaxed_ordering when configuration,
+    If a PCIe device didn't enable the relaxed ordering attribute default,
+    we should not do anything in the PCIe configuration, otherwise we
+    should check if any of the devices above us do not support relaxed
+    ordering by the PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag, then base on
+    the result if we get a return that indicate that the relaxed ordering
+    is not supported we should update our device to disable relaxed ordering
+    in configuration space. If the device above us doesn't exist or isn't
+    the PCIe device, we shouldn't do anything and skip updating relaxed ordering
+    because we are probably running in a guest.
+
+Casey Leedom (2):
+  PCI: Add new PCIe Fabric End Node flag,
+    PCI_DEV_FLAGS_NO_RELAXED_ORDERING
+  net/cxgb4: Use new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
+
+Ding Tianhong (1):
+  PCI: Enable PCIe Relaxed Ordering if supported
+
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4.h      |  1 +
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c | 17 ++++++++++
+ drivers/net/ethernet/chelsio/cxgb4/sge.c        |  5 +--
+ drivers/pci/pci.c                               | 29 +++++++++++++++++
+ drivers/pci/probe.c                             | 43 +++++++++++++++++++++++++
+ drivers/pci/quirks.c                            | 38 ++++++++++++++++++++++
+ include/linux/pci.h                             |  4 +++
+ 7 files changed, 135 insertions(+), 2 deletions(-)
+
 -- 
 1.9.0
