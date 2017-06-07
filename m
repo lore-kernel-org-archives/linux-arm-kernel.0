@@ -1,29 +1,20 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 7 Jun 2017 21:49:58 +0200
-Subject: [PATCH] ARM: samsung: Save defconfig for Exynos,
- S3C and S5P configs
-In-Reply-To: <20170607181846.13539-1-krzk@kernel.org>
-References: <20170607181846.13539-1-krzk@kernel.org>
-Message-ID: <CAK8P3a2_rLigHqnOkHPM+x2GDrwdGnwJOqEbY7YTsQRUXT_eJg@mail.gmail.com>
+Date: Wed, 7 Jun 2017 21:50:28 +0200
+Subject: [PATCH] arm64: defconfig: Enable ARCH_BRCMSTB
+In-Reply-To: <20170607165806.11242-1-f.fainelli@gmail.com>
+References: <20170607165806.11242-1-f.fainelli@gmail.com>
+Message-ID: <CAK8P3a3zT0bh=itVjwWTEJFwoBxeQgpRZWJRhg8=Rk9-iyE04g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 7, 2017 at 8:18 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> Some configs for Samsung ARM SoCs were not updated for some time and
-> they still contain obsolete Kconfig entries.  Generate new defconfig for
-> all Samsung ARM architectures (Exynos, S3C24xx, S3C64xx, S5Pv210).
+On Wed, Jun 7, 2017 at 6:58 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> ARCH_BRCMSTB was one of the few platforms that were not enabled by
+> default, since we are now adding more and more drivers relevant to that
+> platform get some proper build coverage.
 >
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+> I can submit this through the next arm-soc pull requests (shortly), if
+> that's okay with all of you, thanks!
 
-Hi Krzysztof,
-
-Updating the defconfig files is good, but I'm always a little unsure
-about loss of
-information when we do that. Would it be possible for you to split this patch
-into two halves, with one of them just reordering the entries that moved,
-and the second one removing the entries that have disappeared, with an
-explanation for why they are no longer there? That would let us see whether
-the change was intentional and avoid problems from renamed Kconfig
-symbols that are no longer enabled afterwards.
-
-      Arnd
+Acked-by: Arnd Bergmann <arnd@arndb.de>
