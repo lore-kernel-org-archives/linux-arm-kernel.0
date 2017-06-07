@@ -1,67 +1,77 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Wed, 07 Jun 2017 08:26:01 +0800
-Subject: [PATCH v2 00/11] Support for H3 Composite Output support
-In-Reply-To: <20170604160149.30230-1-icenowy@aosc.io>
-References: <20170604160149.30230-1-icenowy@aosc.io>
-Message-ID: <35fbf653e1c1d4638059913901216245@aosc.io>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 7 Jun 2017 10:10:54 +0900
+Subject: [PATCH v5 12/20] ARM: dts: uniphier: Add generic compatible
+ string for I2C EEPROM
+In-Reply-To: <CABxcv=mPzDVTh_ZH1VtuHMUhVrR+hxz8GwcQT38hwJJqHY+fJA@mail.gmail.com>
+References: <20170523133448.4794-1-javier@dowhile0.org>
+ <20170523133448.4794-13-javier@dowhile0.org>
+ <CAK7LNATDvesYLKimY=aKfT6kAiidq6Ufd=kCWGQcCZ_Xy-27tw@mail.gmail.com>
+ <CABxcv=mPzDVTh_ZH1VtuHMUhVrR+hxz8GwcQT38hwJJqHY+fJA@mail.gmail.com>
+Message-ID: <CAK7LNASBztX033t36vz_MXAgeyHd76roMBtRZ4mi-q9VFB4Lkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-06-05 00:01?Icenowy Zheng ???
-> Allwinner H3 SoC features a TV Encoder like the one in Allwinner A13,
-> which can only output TV Composite signal.
-> 
-> The display pipeline of H3 is also special -- it has two mixers and
-> two TCONs, of which the connection can be swapped. The TCONs do not
-> have channel 0 (as they are all connected to internal bridges, TVE
-> and HDMI TX).
-> 
-> Add support for the display pipeline and the TVE in H3, in order to
-> make it possible to display something with mainline kernel with H3.
-> 
-> The image quality of TVE is bad, so HDMI is a better output -- this
-> patchset also prepared the mixers and TCONs for HDMI output, and
-> the HDMI controller driver is already done by Jernej Skrabec.
-> 
-> So if possible, please apply PATCH 1~5 and 8,9 as soon as possible,
-> so that Jernej can submit his HDMI patches.
-> 
-> Currently the jack detection feature of the TVE is still not so
-> clear -- so it's not implemented in this version. Thus the TV
-> output shouldn't be defaultly enabled now.
-> 
-> Icenowy Zheng (11):
->   dt-bindings: update the binding for Allwinner H3 TVE support
->   drm: sun4i: add support for H3 mixers
->   drm: sun4i: ignore swapped mixer<->tcon connection for DE2
->   drm: sun4i: add support for H3's TCON0/1
->   drm: sun4i: add compatible for H3 display engine
->   drm: sun4i: add color space correction support for DE2 mixer
->   drm: sun4i: add support for the TV encoder in H3 SoC
->   clk: sunxi-ng: allow CLK_DE to set CLK_PLL_DE for H3
->   clk: sunxi-ng: export CLK_PLL_DE for H3
->   ARM: sun8i: h3: add display engine pipeline for TVE
->   [DO NOT MERGE] ARM: sun8i: h3: enable TV output on Orange Pi PC
+Hi Javier,
 
-Maxime, could you pick some patches that you think appliable in this
-series? (especially PATCH 1, the binding patch)
 
-I think they can be useful.
+2017-06-06 18:04 GMT+09:00 Javier Martinez Canillas <javier@dowhile0.org>:
+> Hello Masahiro,
+>
+> On Mon, Jun 5, 2017 at 7:13 AM, Masahiro Yamada
+> <yamada.masahiro@socionext.com> wrote:
+>> Hi.
+>>
+>> 2017-05-23 22:34 GMT+09:00 Javier Martinez Canillas <javier@dowhile0.org>:
+>>> The at24 driver allows to register I2C EEPROM chips using different vendor
+>>> and devices, but the I2C subsystem does not take the vendor into account
+>>> when matching using the I2C table since it only has device entries.
+>>>
+>>> But when matching using an OF table, both the vendor and device has to be
+>>> taken into account so the driver defines only a set of compatible strings
+>>> using the "atmel" vendor as a generic fallback for compatible I2C devices.
+>>>
+>>> So add this generic fallback to the device node compatible string to make
+>>> the device to match the driver using the OF device ID table.
+>>>
+>>> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
+>>>
+>>> ---
+>>>
+>>> Changes in v5:
+>>> - Only replace atmel variant but keep other EEPROM vendors (Geert Uytterhoeven).
+>>>
+>>> Changes in v4:
+>>> - Only use the atmel manufacturer in the compatible string instead of
+>>>   keeping the deprecated ones (Rob Herring).
+>>>
+>>> Changes in v3: None
+>>> Changes in v2: None
+>>>
+>>>  arch/arm/boot/dts/uniphier-pro4-ace.dts    | 2 +-
+>>>  arch/arm/boot/dts/uniphier-pro4-sanji.dts  | 2 +-
+>>>  arch/arm/boot/dts/uniphier-pxs2-gentil.dts | 2 +-
+>>>  3 files changed, 3 insertions(+), 3 deletions(-)
+>>
+>>
+>> Why didn't you touch
+>> arch/arm/boot/dts/uniphier-ref-daughter.dtsi ?
+>>
+>
+> Because the compatible string "microchip,24lc128" used by the I2C
+> EEPROM node on that DTS is not supported by the
+> drivers/misc/eeprom/at24.c driver (in fact the only occurrence for
+> 24lc128 I see is in that DTS).
+>
+> Maybe is a typo and it should be "microchip,24c128" instead ?
 
-Thanks!
+I do not think so.
+I consulted a board developer.
 
-> 
->  .../bindings/display/sunxi/sun4i-drm.txt           |  37 +++-
->  arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |  12 ++
->  arch/arm/boot/dts/sun8i-h3.dtsi                    | 186 
-> +++++++++++++++++++++
->  drivers/clk/sunxi-ng/ccu-sun8i-h3.c                |   2 +-
->  drivers/clk/sunxi-ng/ccu-sun8i-h3.h                |   3 +-
->  drivers/gpu/drm/sun4i/sun4i_drv.c                  |  46 +++++
->  drivers/gpu/drm/sun4i/sun4i_tcon.c                 | 113 ++++++++++---
->  drivers/gpu/drm/sun4i/sun4i_tcon.h                 |   3 +
->  drivers/gpu/drm/sun4i/sun4i_tv.c                   |  35 +++-
->  drivers/gpu/drm/sun4i/sun8i_mixer.c                |  53 ++++++
->  drivers/gpu/drm/sun4i/sun8i_mixer.h                |   6 +-
->  include/dt-bindings/clock/sun8i-h3-ccu.h           |   2 +
->  12 files changed, 463 insertions(+), 35 deletions(-)
+I also see 24LC128 on Microchip web site:
+http://www.microchip.com/wwwproducts/en/24LC128
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
