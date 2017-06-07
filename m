@@ -1,48 +1,40 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed,  7 Jun 2017 10:38:01 +0200
-Subject: [PATCH 0/9] net: mvmdio: add xSMI support
-Message-ID: <20170607083810.30922-1-antoine.tenart@free-electrons.com>
+Date: Wed,  7 Jun 2017 10:38:09 +0200
+Subject: [PATCH 8/9] dt-bindings: orion-mdio: document the new xmdio compatible
+In-Reply-To: <20170607083810.30922-1-antoine.tenart@free-electrons.com>
+References: <20170607083810.30922-1-antoine.tenart@free-electrons.com>
+Message-ID: <20170607083810.30922-9-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+A new compatible for Marvell xMDIO interfaces was added into the Marvell
+MDIO driver. Document this new compatible.
 
-This series aims to add the xSMI support (also called xMDIO) to the
-mvmdio driver. The xSMI interface complies with the IEEE 802.3 clause 45
-and is used by 10GbE devices. On 7k and 8k (as of now), such an
-interface is found and is used by Ethernet controllers.
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ Documentation/devicetree/bindings/net/marvell-orion-mdio.txt | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Patches 1-3 are cosmetic cleanups.
-
-Patches 4-6 are prerequisites to the xSMI support.
-
-Patches 7-9 add the xSMI support to the mvmdio driver, and a node is
-added both in the cp110 slave and master device trees.
-
-This was tested on an Armada 8040 mcbin, as well as on both the
-Armada 7040 DB and the Armada 8040 DB to ensure the SMI interface
-was still working.
-
-Thanks,
-Antoine
-
-Antoine Tenart (9):
-  net: mvmdio: reorder headers alphabetically
-  net: mvmdio: use tabs for defines
-  net: mvmdio: use GENMASK for masks
-  net: mvmdio: move the read valid check into its own function
-  net: mvmdio: introduce an ops structure
-  net: mvmdio: put the poll intervals in the private structure
-  net: mvmdio: add xmdio support
-  dt-bindings: orion-mdio: document the new xmdio compatible
-  arm64: marvell: dts: add xmdio nodes for 7k/8k
-
- .../devicetree/bindings/net/marvell-orion-mdio.txt |   8 +-
- .../boot/dts/marvell/armada-cp110-master.dtsi      |   7 +
- .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi |   7 +
- drivers/net/ethernet/marvell/Kconfig               |   6 +-
- drivers/net/ethernet/marvell/mvmdio.c              | 200 +++++++++++++++++----
- 5 files changed, 184 insertions(+), 44 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt b/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt
+index ccdabdcc8618..315036ff8fed 100644
+--- a/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt
++++ b/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt
+@@ -1,12 +1,12 @@
+ * Marvell MDIO Ethernet Controller interface
+ 
+ The Ethernet controllers of the Marvel Kirkwood, Dove, Orion5x,
+-MV78xx0, Armada 370 and Armada XP have an identical unit that provides
+-an interface with the MDIO bus. This driver handles this MDIO
+-interface.
++MV78xx0, Armada 370, Armada XP, Armada 7k and Armada 8k have an
++identical unit that provides an interface with the MDIO bus or to
++the xMDIO bus. This driver handles these interfaces.
+ 
+ Required properties:
+-- compatible: "marvell,orion-mdio"
++- compatible: "marvell,orion-mdio" or "marvell,xmdio"
+ - reg: address and length of the MDIO registers.  When an interrupt is
+   not present, the length is the size of the SMI register (4 bytes)
+   otherwise it must be 0x84 bytes to cover the interrupt control
 -- 
 2.9.4
