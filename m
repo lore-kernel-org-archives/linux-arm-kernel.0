@@ -1,94 +1,86 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Wed,  7 Jun 2017 11:33:40 -0700
-Subject: [PATCH v8 01/34] dt-bindings: Add bindings for video-multiplexer
- device
+Date: Wed,  7 Jun 2017 11:33:43 -0700
+Subject: [PATCH v8 04/34] ARM: dts: imx6qdl: add multiplexer controls
 In-Reply-To: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1496860453-6282-2-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1496860453-6282-5-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Philipp Zabel <p.zabel@pengutronix.de>
 
-Add bindings documentation for the video multiplexer device.
+The IOMUXC General Purpose Register space contains various bitfields
+that control video bus multiplexers. Describe them using a mmio-mux
+node. The placement of the IPU CSI video mux controls differs between
+i.MX6D/Q and i.MX6S/DL.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
-Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
-Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: Pavel Machek <pavel@ucw.cz>
 ---
- .../devicetree/bindings/media/video-mux.txt        | 60 ++++++++++++++++++++++
- 1 file changed, 60 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/video-mux.txt
+ arch/arm/boot/dts/imx6dl.dtsi  | 10 ++++++++++
+ arch/arm/boot/dts/imx6q.dtsi   | 10 ++++++++++
+ arch/arm/boot/dts/imx6qdl.dtsi |  7 ++++++-
+ 3 files changed, 26 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/media/video-mux.txt b/Documentation/devicetree/bindings/media/video-mux.txt
-new file mode 100644
-index 0000000..63b9dc9
---- /dev/null
-+++ b/Documentation/devicetree/bindings/media/video-mux.txt
-@@ -0,0 +1,60 @@
-+Video Multiplexer
-+=================
-+
-+Video multiplexers allow to select between multiple input ports. Video received
-+on the active input port is passed through to the output port. Muxes described
-+by this binding are controlled by a multiplexer controller that is described by
-+the bindings in Documentation/devicetree/bindings/mux/mux-controller.txt
-+
-+Required properties:
-+- compatible : should be "video-mux"
-+- mux-controls : mux controller node to use for operating the mux
-+- #address-cells: should be <1>
-+- #size-cells: should be <0>
-+- port@*: at least three port nodes containing endpoints connecting to the
-+  source and sink devices according to of_graph bindings. The last port is
-+  the output port, all others are inputs.
-+
-+Optionally, #address-cells, #size-cells, and port nodes can be grouped under a
-+ports node as described in Documentation/devicetree/bindings/graph.txt.
-+
-+Example:
-+
-+	mux: mux-controller {
-+		compatible = "gpio-mux";
-+		#mux-control-cells = <0>;
-+
-+		mux-gpios = <&gpio1 15 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	video-mux {
-+		compatible = "video-mux";
-+		mux-controls = <&mux>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		port at 0 {
-+			reg = <0>;
-+
-+			mux_in0: endpoint {
-+				remote-endpoint = <&video_source0_out>;
-+			};
-+		};
-+
-+		port at 1 {
-+			reg = <1>;
-+
-+			mux_in1: endpoint {
-+				remote-endpoint = <&video_source1_out>;
-+			};
-+		};
-+
-+		port at 2 {
-+			reg = <2>;
-+
-+			mux_out: endpoint {
-+				remote-endpoint = <&capture_interface_in>;
-+			};
-+		};
-+	};
+diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+index 7aa120f..10bc9d1 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsi
++++ b/arch/arm/boot/dts/imx6dl.dtsi
+@@ -181,6 +181,16 @@
+ 		      "di0", "di1";
+ };
+ 
++&mux {
++	mux-reg-masks = <0x34 0x00000007>, /* IPU_CSI0_MUX */
++			<0x34 0x00000038>, /* IPU_CSI1_MUX */
++			<0x0c 0x0000000c>, /* HDMI_MUX_CTL */
++			<0x0c 0x000000c0>, /* LVDS0_MUX_CTL */
++			<0x0c 0x00000300>, /* LVDS1_MUX_CTL */
++			<0x28 0x00000003>, /* DCIC1_MUX_CTL */
++			<0x28 0x0000000c>; /* DCIC2_MUX_CTL */
 +};
++
+ &vpu {
+ 	compatible = "fsl,imx6dl-vpu", "cnm,coda960";
+ };
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index e9a5d0b..a6962be 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -332,6 +332,16 @@
+ 	};
+ };
+ 
++&mux {
++	mux-reg-masks = <0x04 0x00080000>, /* MIPI_IPU1_MUX */
++			<0x04 0x00100000>, /* MIPI_IPU2_MUX */
++			<0x0c 0x0000000c>, /* HDMI_MUX_CTL */
++			<0x0c 0x000000c0>, /* LVDS0_MUX_CTL */
++			<0x0c 0x00000300>, /* LVDS1_MUX_CTL */
++			<0x28 0x00000003>, /* DCIC1_MUX_CTL */
++			<0x28 0x0000000c>; /* DCIC2_MUX_CTL */
++};
++
+ &vpu {
+ 	compatible = "fsl,imx6q-vpu", "cnm,coda960";
+ };
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index e426faa..50534dd 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -808,8 +808,13 @@
+ 			};
+ 
+ 			gpr: iomuxc-gpr at 020e0000 {
+-				compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
++				compatible = "fsl,imx6q-iomuxc-gpr", "syscon", "simple-mfd";
+ 				reg = <0x020e0000 0x38>;
++
++				mux: mux-controller {
++					compatible = "mmio-mux";
++					#mux-control-cells = <1>;
++				};
+ 			};
+ 
+ 			iomuxc: iomuxc at 020e0000 {
 -- 
 2.7.4
