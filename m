@@ -1,36 +1,54 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed,  7 Jun 2017 11:08:22 +0200
-Subject: [PATCH 3/3] arm64: dts: hikey: Add external clock to the Bluetooth
- node
-In-Reply-To: <1496826502-1339-1-git-send-email-ulf.hansson@linaro.org>
-References: <1496826502-1339-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1496826502-1339-4-git-send-email-ulf.hansson@linaro.org>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Wed, 7 Jun 2017 11:11:09 +0200
+Subject: [PATCH v4 3/3] media: mtk-mdp: Fix mdp device tree
+In-Reply-To: <59ac9ca0-3f2f-fa65-011d-c832e4ced265@gmail.com>
+References: <1495509851-29159-1-git-send-email-minghsiu.tsai@mediatek.com>
+ <1495509851-29159-4-git-send-email-minghsiu.tsai@mediatek.com>
+ <e7996ad5-03a1-7b53-5d61-ae171473581f@gmail.com>
+ <2407aa14-610d-0252-f264-edf22961752e@xs4all.nl>
+ <59ac9ca0-3f2f-fa65-011d-c832e4ced265@gmail.com>
+Message-ID: <9ca0b2c5-db3d-4794-1431-89f5a093252f@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To make the TI WiLink chip work again for Bluetooth, let's add the missing
-external clock to the Bluetooth node, such the driver can deal properly
-with it during power on/off.
+On 07/06/17 11:07, Matthias Brugger wrote:
+> 
+> 
+> On 07/06/17 10:56, Hans Verkuil wrote:
+>> On 07/06/17 10:44, Matthias Brugger wrote:
+>>> Hi Hans, hi Mauro,
+>>>
+>>> On 23/05/17 05:24, Minghsiu Tsai wrote:
+>>>> From: Daniel Kurtz <djkurtz@chromium.org>
+>>>>
+>>>> If the mdp_* nodes are under an mdp sub-node, their corresponding
+>>>> platform device does not automatically get its iommu assigned properly.
+>>>>
+>>>> Fix this by moving the mdp component nodes up a level such that they are
+>>>> siblings of mdp and all other SoC subsystems.  This also simplifies the
+>>>> device tree.
+>>>>
+>>>> Although it fixes iommu assignment issue, it also break compatibility
+>>>> with old device tree. So, the patch in driver is needed to iterate over
+>>>> sibling mdp device nodes, not child ones, to keep driver work properly.
+>>>>
+>>>> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+>>>> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+>>>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+>>>>
+>>>
+>>> Are you OK to take this patch, or do you have any further comments?
+>>
+>> Nope, it's all good. Queued for 4.13.
+>>
+> 
+> Thanks!
+> 
+> I queued the other two in v4.12-next/dts64
 
-Fixes: ea452678734e ("arm64: dts: hikey: Fix WiFi support")
-Cc: Wei Xu <xuwei5@hisilicon.com>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 2 ++
- 1 file changed, 2 insertions(+)
+Media bindings normally go through the media subsystem, but you've taken
+that one as well? I need to know, because then I drop it in my tree.
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-index 49f6a62..5cdfe73 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-@@ -141,6 +141,8 @@
- 			bluetooth {
- 				compatible = "ti,wl1835-st";
- 				enable-gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
-+				clocks = <&pmic>;
-+				clock-names = "ext_clock";
- 			};
- 		};
- 
--- 
-2.7.4
+Regards,
+
+	Hans
