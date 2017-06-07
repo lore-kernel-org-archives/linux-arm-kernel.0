@@ -1,72 +1,137 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 7 Jun 2017 10:44:58 +0200
-Subject: [PATCH v4 3/3] media: mtk-mdp: Fix mdp device tree
-In-Reply-To: <1495509851-29159-4-git-send-email-minghsiu.tsai@mediatek.com>
-References: <1495509851-29159-1-git-send-email-minghsiu.tsai@mediatek.com>
- <1495509851-29159-4-git-send-email-minghsiu.tsai@mediatek.com>
-Message-ID: <e7996ad5-03a1-7b53-5d61-ae171473581f@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 7 Jun 2017 10:45:44 +0200
+Subject: [PATCH v2 01/11] dt-bindings: update the binding for Allwinner
+ H3 TVE support
+In-Reply-To: <20170604160149.30230-2-icenowy@aosc.io>
+References: <20170604160149.30230-1-icenowy@aosc.io>
+ <20170604160149.30230-2-icenowy@aosc.io>
+Message-ID: <20170607084544.kgclybyxxttfk3ko@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans, hi Mauro,
-
-On 23/05/17 05:24, Minghsiu Tsai wrote:
-> From: Daniel Kurtz <djkurtz@chromium.org>
+On Mon, Jun 05, 2017 at 12:01:39AM +0800, Icenowy Zheng wrote:
+> Allwinner H3 features a "DE2.0" and a TV Encoder.
 > 
-> If the mdp_* nodes are under an mdp sub-node, their corresponding
-> platform device does not automatically get its iommu assigned properly.
+> Add device tree bindings for the following parts:
+> - H3 TCONs
+> - H3 Mixers
+> - The connection between H3 TCONs and H3 Mixers
+> - H3 TV Encoder
+> - H3 Display engine
 > 
-> Fix this by moving the mdp component nodes up a level such that they are
-> siblings of mdp and all other SoC subsystems.  This also simplifies the
-> device tree.
-> 
-> Although it fixes iommu assignment issue, it also break compatibility
-> with old device tree. So, the patch in driver is needed to iterate over
-> sibling mdp device nodes, not child ones, to keep driver work properly.
-> 
-> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
-> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> 
-
-Are you OK to take this patch, or do you have any further comments?
-
-Regards,
-Matthias
-
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 > ---
->   drivers/media/platform/mtk-mdp/mtk_mdp_core.c | 12 ++++++++++--
->   1 file changed, 10 insertions(+), 2 deletions(-)
+> Changes in v2:
+> - Changed endpoint reg definition on TCONs and Mixers. Now the endpoint
+>   id is just the component id.
+> - Changed TVE and TCON1 binding -- now CLK_TVE is passed as TCON1 lcd-ch1.
 > 
-> diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_core.c b/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
-> index 9e4eb7d..8134755 100644
-> --- a/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
-> +++ b/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
-> @@ -103,7 +103,7 @@ static int mtk_mdp_probe(struct platform_device *pdev)
->   {
->   	struct mtk_mdp_dev *mdp;
->   	struct device *dev = &pdev->dev;
-> -	struct device_node *node;
-> +	struct device_node *node, *parent;
->   	int i, ret = 0;
->   
->   	mdp = devm_kzalloc(dev, sizeof(*mdp), GFP_KERNEL);
-> @@ -117,8 +117,16 @@ static int mtk_mdp_probe(struct platform_device *pdev)
->   	mutex_init(&mdp->lock);
->   	mutex_init(&mdp->vpulock);
->   
-> +	/* Old dts had the components as child nodes */
-> +	if (of_get_next_child(dev->of_node, NULL)) {
-> +		parent = dev->of_node;
-> +		dev_warn(dev, "device tree is out of date\n");
-> +	} else {
-> +		parent = dev->of_node->parent;
-> +	}
+>  .../bindings/display/sunxi/sun4i-drm.txt           | 37 +++++++++++++++++++---
+>  1 file changed, 33 insertions(+), 4 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> index b83e6018041d..7ad164cb7dcb 100644
+> --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> @@ -49,7 +49,9 @@ The TV Encoder supports the composite and VGA output. It is one end of
+>  the pipeline.
+>  
+>  Required properties:
+> - - compatible: value should be "allwinner,sun4i-a10-tv-encoder".
+> + - compatible: value must be either:
+> +    * allwinner,sun4i-a10-tv-encoder
+> +    * allwinner,sun8i-h3-tv-encoder
+>   - reg: base address and size of memory-mapped region
+>   - clocks: the clocks driving the TV encoder
+>   - resets: phandle to the reset controller driving the encoder
+> @@ -69,23 +71,27 @@ Required properties:
+>     * allwinner,sun6i-a31-tcon
+>     * allwinner,sun6i-a31s-tcon
+>     * allwinner,sun8i-a33-tcon
+> +   * allwinner,sun8i-h3-tcon
+>     * allwinner,sun8i-v3s-tcon
+>   - reg: base address and size of memory-mapped region
+>   - interrupts: interrupt associated to this IP
+>   - clocks: phandles to the clocks feeding the TCON. Three are needed:
+>     - 'ahb': the interface clocks
+> -   - 'tcon-ch0': The clock driving the TCON channel 0
+>   - resets: phandles to the reset controllers driving the encoder
+>     - "lcd": the reset line for the TCON channel 0
+>  
+>   - clock-names: the clock names mentioned above
+>   - reset-names: the reset names mentioned above
+> - - clock-output-names: Name of the pixel clock created
+>  
+>  - ports: A ports node with endpoint definitions as defined in
+>    Documentation/devicetree/bindings/media/video-interfaces.txt. The
+>    first port should be the input endpoint, the second one the output
+>  
+> +  In the situation of Display Engine 2.0 that the connection between
+> +  the mixer and the TCON can be swapped, the input should have two
+> +  endpoints. The first input endpoint should be connected to mixer0
+> +  and the second should be connected to mixer1.
 > +
->   	/* Iterate over sibling MDP function blocks */
-> -	for_each_child_of_node(dev->of_node, node) {
-> +	for_each_child_of_node(parent, node) {
->   		const struct of_device_id *of_id;
->   		enum mtk_mdp_comp_type comp_type;
->   		int comp_id;
-> 
+
+AFAIK, this is also the case for dual-pipelines on DE1 (for example on
+the A31). And this is already covered by:
+
+"
+For the input port of all components up to the TCON in the display
+pipeline, if there are multiple components, the local endpoint IDs
+must correspond to the index of the upstream block. For example, if
+the remote endpoint is Frontend 1, then the local endpoint ID must
+be 1.
+"
+
+>    The output may have multiple endpoints. The TCON has two channels,
+>    usually with the first channel being used for the panels interfaces
+>    (RGB, LVDS, etc.), and the second being used for the outputs that
+> @@ -94,7 +100,23 @@ Required properties:
+>    channel the endpoint is associated to. If that property is not
+>    present, the endpoint number will be used as the channel number.
+>  
+> -On SoCs other than the A33 and V3s, there is one more clock required:
+> +For the following compatibles:
+> +   * allwinner,sun5i-a13-tcon
+> +   * allwinner,sun6i-a31-tcon
+> +   * allwinner,sun6i-a31s-tcon
+> +   * allwinner,sun8i-a33-tcon
+> +   * allwinner,sun8i-v3s-tcon
+> +there is one more clock and one more property required:
+> + - clocks:
+> +   - 'tcon-ch0': The clock driving the TCON channel 0
+> + - clock-output-names: Name of the pixel clock created
+> +
+> +For the following compatibles:
+> +   * allwinner,sun5i-a13-tcon
+> +   * allwinner,sun6i-a31-tcon
+> +   * allwinner,sun6i-a31s-tcon
+> +   * allwinner,sun8i-h3-tcon
+> +there is one more clock required:
+>     - 'tcon-ch1': The clock driving the TCON channel 1
+>  
+>  DRC
+> @@ -189,6 +211,8 @@ supported.
+>  Required properties:
+>    - compatible: value must be one of:
+>      * allwinner,sun8i-v3s-de2-mixer
+> +    * allwinner,sun8i-h3-de2-mixer0
+> +    * allwinner,sun8i-h3-de2-mixer1
+
+Again, please explain why we need to have different compatibles
+here. If it's only about the number of planes, this should be dealt
+with a property, not a compatible.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170607/1cba8e0c/attachment.sig>
