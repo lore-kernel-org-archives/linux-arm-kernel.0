@@ -1,36 +1,33 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 7 Jun 2017 15:27:07 +0200
-Subject: [PATCH 3/3] arm64: allwinner: h5: enable dwmac-sun8i for Nano Pi
- NEO2
-In-Reply-To: <20170607002305.15897-3-icenowy@aosc.io>
-References: <20170607002305.15897-1-icenowy@aosc.io>
- <20170607002305.15897-3-icenowy@aosc.io>
-Message-ID: <20170607132707.nh2icuxnbest6swx@flea.lan>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Wed, 7 Jun 2017 15:28:17 +0200
+Subject: [PATCH v2 4/4] net: macb: Add hardware PTP support
+In-Reply-To: <BN3PR07MB2516A47C2CFEB58BCFFB2C46C9C80@BN3PR07MB2516.namprd07.prod.outlook.com>
+References: <1496413439-12900-1-git-send-email-rafalo@cadence.com>
+ <1496413690-22826-1-git-send-email-rafalo@cadence.com>
+ <20170606183358.GA25220@localhost.localdomain>
+ <BN3PR07MB2516A47C2CFEB58BCFFB2C46C9C80@BN3PR07MB2516.namprd07.prod.outlook.com>
+Message-ID: <20170607132817.GA28329@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 07, 2017 at 08:23:05AM +0800, Icenowy Zheng wrote:
-> Add the required DT parts to enable Ethernet (dwmac-sun8i driver) on
-> the Nano Pi NEO2 board. It uses an external Realtek RTL8211E PHY
-> connected via RGMII to provide GbE network. Specially unlike other
-> Allwinner boards, the phy is connected to MDIO address 7, not 1.
+On Wed, Jun 07, 2017 at 11:13:36AM +0000, Rafal Ozieblo wrote:
+> Please look at following call-stack:
 > 
-> This includes the regulator (which is controlled by a GPIO pin) and
-> the actual Ethernet MAC node, referring the RGMII pins of the device.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> 1. macb_interrupt()   // spin_lock(&bp->lock) is taken
+> 2. macb_tx_interrupt()
+> 3. macb_handle_txtstamp()
+> 4. skb_tstamp_tx()
+> 5. __skb_tstamp_tx()
+> 6. skb_may_tx_timestamp()
+> 7. read_lock_bh() // second lock is taken
 
-Applied all three, thanks!
-Maxime
+Well, you can always drop the lock, or postpone the call to
+skb_tstamp_tx() until after the spin lock is released...
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170607/b86079d1/attachment.sig>
+> I know that those are different locks and different types. But this could lead 
+> to deadlocks. This is the reason of warning I could see.
+
+Can you please post the lockdep splat?
+
+Thanks,
+Richard
