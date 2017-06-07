@@ -1,209 +1,35 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Wed,  7 Jun 2017 08:41:57 +0200
-Subject: [PATCH v3 2/3] nvmem: add snvs_lpgpr driver
-In-Reply-To: <20170607064158.16422-1-o.rempel@pengutronix.de>
-References: <20170607064158.16422-1-o.rempel@pengutronix.de>
-Message-ID: <20170607064158.16422-3-o.rempel@pengutronix.de>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Wed,  7 Jun 2017 08:43:16 +0200
+Subject: [PATCH 1/1] ARM: imx: Enable REGMAP_MMIO per default
+Message-ID: <20170607064316.2766-1-alexander.stein@systec-electronic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a driver for Low Power General Purpose Register (LPGPR)
-available on i.MX6 SoCs in Secure Non-Volatile Storage (SNVS)
-of this chip.
+If unset, the gpc drivers fails to link with this error:
+drivers/built-in.o: In function `imx_gpc_probe':
+core.c:(.text+0x1e16c): undefined reference to
+ `__devm_regmap_init_mmio_clk'
 
-It is a 32-bit read/write register located in the low power domain.
-Since LPGPR is located in the battery-backed power domain, LPGPR can
-be used by any application for retaining data during an SoC power-down
-mode.
+As the gpc driver is built when ARCH_MXC is set, enable REGMAP_MMIO in
+this case too.
 
-Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
+Fixes: 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
 ---
- drivers/nvmem/Kconfig      |  13 +++++
- drivers/nvmem/Makefile     |   2 +
- drivers/nvmem/snvs_lpgpr.c | 143 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 158 insertions(+)
- create mode 100644 drivers/nvmem/snvs_lpgpr.c
+ arch/arm/mach-imx/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-index 101ced4c84be..00537b91cc22 100644
---- a/drivers/nvmem/Kconfig
-+++ b/drivers/nvmem/Kconfig
-@@ -144,4 +144,17 @@ config MESON_EFUSE
- 	  This driver can also be built as a module. If so, the module
- 	  will be called nvmem_meson_efuse.
- 
-+config NVMEM_SNVS_LPGPR
-+	tristate "Support for Low Power General Purpose Register"
-+	depends on HAS_IOMEM
-+	depends on OF
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 936c59d0e18b..1b8eead0d113 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -7,6 +7,7 @@ menuconfig ARCH_MXC
+ 	select GPIOLIB
+ 	select PINCTRL
+ 	select PM_OPP if PM
 +	select REGMAP_MMIO
-+	select MFD_SYSCON
-+	help
-+	  This is a driver for Low Power General Purpose Register (LPGPR) available on
-+	  i.MX6 SoCs in Secure Non-Volatile Storage (SNVS) of this chip.
-+
-+	  This driver can also be built as a module. If so, the module
-+	  will be called nvmem-snvs-lpgpr.
-+
- endif
-diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
-index 173140658693..4c589184acee 100644
---- a/drivers/nvmem/Makefile
-+++ b/drivers/nvmem/Makefile
-@@ -30,3 +30,5 @@ obj-$(CONFIG_NVMEM_VF610_OCOTP)	+= nvmem-vf610-ocotp.o
- nvmem-vf610-ocotp-y		:= vf610-ocotp.o
- obj-$(CONFIG_MESON_EFUSE)	+= nvmem_meson_efuse.o
- nvmem_meson_efuse-y		:= meson-efuse.o
-+obj-$(CONFIG_NVMEM_SNVS_LPGPR)	+= nvmem_snvs_lpgpr.o
-+nvmem_snvs_lpgpr-y		:= snvs_lpgpr.o
-diff --git a/drivers/nvmem/snvs_lpgpr.c b/drivers/nvmem/snvs_lpgpr.c
-new file mode 100644
-index 000000000000..c90a8e8a161f
---- /dev/null
-+++ b/drivers/nvmem/snvs_lpgpr.c
-@@ -0,0 +1,143 @@
-+/*
-+ * Copyright (c) 2015 Pengutronix, Steffen Trumtrar <kernel@pengutronix.de>
-+ * Copyright (c) 2017 Pengutronix, Oleksij Rempel <kernel@pengutronix.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2
-+ * as published by the Free Software Foundation.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/device.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/nvmem-provider.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/regmap.h>
-+
-+struct snvs_lpgpr_priv {
-+	struct device_d		*dev;
-+	struct regmap		*regmap;
-+	int			offset;
-+	struct nvmem_config	cfg;
-+};
-+
-+struct snvs_lpgpr_cfg {
-+	int offset;
-+};
-+
-+static const struct snvs_lpgpr_cfg snvs_lpgpr_cfg_imx6q = {
-+	.offset = 0x68,
-+};
-+
-+static int snvs_lpgpr_write(void *context, unsigned int offset, void *_val,
-+			    size_t bytes)
-+{
-+	struct snvs_lpgpr_priv *priv = context;
-+	const u32 *val = _val;
-+	int i = 0, words = bytes / 4;
-+
-+	while (words--)
-+		regmap_write(priv->regmap, priv->offset + offset + (i++ * 4),
-+			     *val++);
-+
-+	return 0;
-+}
-+
-+static int snvs_lpgpr_read(void *context, unsigned int offset, void *_val,
-+			   size_t bytes)
-+{
-+	struct snvs_lpgpr_priv *priv = context;
-+	u32 *val = _val;
-+	int i = 0, words = bytes / 4;
-+
-+	while (words--)
-+		regmap_read(priv->regmap, priv->offset + offset + (i++ * 4),
-+			    val++);
-+
-+	return 0;
-+}
-+
-+static int snvs_lpgpr_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct device_node *node = dev->of_node;
-+	struct device_node *syscon_node;
-+	struct snvs_lpgpr_priv *priv;
-+	struct nvmem_config *cfg;
-+	struct nvmem_device *nvmem;
-+	const struct snvs_lpgpr_cfg *dcfg;
-+	int err;
-+
-+	if (!node)
-+		return -ENOENT;
-+
-+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	dcfg = of_device_get_match_data(dev);
-+	if (!dcfg)
-+		return -EINVAL;
-+
-+	syscon_node = of_get_parent(node);
-+	if (!syscon_node)
-+		return -ENODEV;
-+
-+	priv->regmap = syscon_node_to_regmap(syscon_node);
-+	of_node_put(syscon_node);
-+	if (IS_ERR(priv->regmap))
-+		return PTR_ERR(priv->regmap);
-+
-+	priv->offset = dcfg->offset;
-+
-+	cfg = &priv->cfg;
-+	cfg->priv = priv;
-+	cfg->name = dev_name(dev);
-+	cfg->dev = dev;
-+	cfg->stride = 4,
-+	cfg->word_size = 4,
-+	cfg->size = 4,
-+	cfg->owner = THIS_MODULE,
-+	cfg->reg_read  = snvs_lpgpr_read,
-+	cfg->reg_write = snvs_lpgpr_write,
-+
-+	nvmem = nvmem_register(cfg);
-+	if (IS_ERR(nvmem))
-+		return PTR_ERR(nvmem);
-+
-+	platform_set_drvdata(pdev, nvmem);
-+
-+	return 0;
-+}
-+
-+static int snvs_lpgpr_remove(struct platform_device *pdev)
-+{
-+	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
-+
-+	return nvmem_unregister(nvmem);
-+}
-+
-+static const struct of_device_id snvs_lpgpr_dt_ids[] = {
-+	{ .compatible = "fsl,imx6q-snvs-lpgpr", .data = &snvs_lpgpr_cfg_imx6q },
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, snvs_lpgpr_dt_ids);
-+
-+static struct platform_driver snvs_lpgpr_driver = {
-+	.probe	= snvs_lpgpr_probe,
-+	.remove	= snvs_lpgpr_remove,
-+	.driver = {
-+		.name	= "snvs_lpgpr",
-+		.of_match_table = snvs_lpgpr_dt_ids,
-+	},
-+};
-+module_platform_driver(snvs_lpgpr_driver);
-+
-+MODULE_AUTHOR("Oleksij Rempel <o.rempel@pengutronix.de>");
-+MODULE_DESCRIPTION("Low Power General Purpose Register in i.MX6 Secure Non-Volatile Storage");
-+MODULE_LICENSE("GPL");
+ 	select SOC_BUS
+ 	select SRAM
+ 	help
 -- 
-2.11.0
+2.13.0
