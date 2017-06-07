@@ -1,41 +1,36 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 7 Jun 2017 10:17:08 +0200
-Subject: [PATCH] clk: sunxi-ng: Move all clock types to a library
-In-Reply-To: <CAK8P3a38TyiHXBgB0DQka=0iASuyJO_zMrczXqYBiJj6LEnNWg@mail.gmail.com>
-References: <20170602223006.1653-1-sboyd@codeaurora.org>
- <201706031243.qNvuUbQX%fengguang.wu@intel.com>
- <20170605144546.b6oh5sygrza22hbe@flea.lan>
- <CAK8P3a1Qvt4nvM5HeK-n87tsi2D5GBOmZo0rZv_Lp==CC=34Uw@mail.gmail.com>
- <CAGb2v66QvLdojDe4+uG9Opa7fApA-GH9pW4v0En5j6QSPf1yZw@mail.gmail.com>
- <CAK8P3a38TyiHXBgB0DQka=0iASuyJO_zMrczXqYBiJj6LEnNWg@mail.gmail.com>
-Message-ID: <20170607081708.ycruditlhebizzt2@flea.lan>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Wed, 7 Jun 2017 10:19:49 +0200
+Subject: [PATCH v5 2/3] PCI: Add tango PCIe host bridge support
+In-Reply-To: <1802aae0-f97b-c437-c00e-5fa7c867286d@sigmadesigns.com>
+References: <741766e5-cff2-db5f-d40b-6866e08fd966@sigmadesigns.com>
+ <1802aae0-f97b-c437-c00e-5fa7c867286d@sigmadesigns.com>
+Message-ID: <654acba8-68b9-fb4c-4681-35af94b6bd74@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 07, 2017 at 09:36:34AM +0200, Arnd Bergmann wrote:
-> On Wed, Jun 7, 2017 at 7:45 AM, Chen-Yu Tsai <wens@csie.org> wrote:
-> > at the bottom (with a comment) would be cleaner, and
-> > we wouldn't need to modify all the existing lines.
-> > AFAIK about Makefiles, that should work?
-> 
-> Ah, yes. That's much better.
-> 
->       Arnd
+On 31/05/2017 15:33, Marc Gonzalez wrote:
 
-I just applied the original patch, with that addition, and a comment
-as suggested by Stephen.
+> +static int tango_pcie_probe(struct platform_device *pdev)
+> +{
+> +	int ret = -EINVAL;
+> +	void __iomem *base;
+> +	struct resource *res;
+> +	struct tango_pcie *pcie;
+> +	struct device *dev = &pdev->dev;
+> +
+> +	pr_err("MAJOR ISSUE: PCIe config and mem spaces are muxed\n");
+> +	pr_err("Tainting kernel... Use driver at your own risk\n");
+> +	add_taint(TAINT_FIRMWARE_WORKAROUND, LOCKDEP_STILL_OK);
 
-thanks!
-Maxime
+Hello Bjorn,
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170607/5951889e/attachment.sig>
+In v4, your only comment was
+"[muxing config and mem spaces] is a major issue and possibly even
+a security problem [which requires at least an error message and a
+kernel taint].
+
+Were there any other issues with the host bridge support?
+Or is the HW quirk/bug too severe to mainline the driver?
+(I would hate having to discard all that work though.)
+
+Regards.
