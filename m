@@ -1,72 +1,43 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Wed, 7 Jun 2017 16:27:25 -0500
-Subject: [PATCH 1/6] ARM: dts: omap44xx-clocks: Set IVA DPLL and its output
- clock rates
+Date: Wed, 7 Jun 2017 16:27:27 -0500
+Subject: [PATCH 3/6] ARM: dts: dra7xx-clocks: Source IPU1 functional clock
+ from CORE DPLL
 In-Reply-To: <20170607212730.33002-1-s-anna@ti.com>
 References: <20170607212730.33002-1-s-anna@ti.com>
-Message-ID: <20170607212730.33002-2-s-anna@ti.com>
+Message-ID: <20170607212730.33002-4-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IVA DPLL is not an essential DPLL for the functionality of a
-bootloader and is usually not configured (e.g. older u-boots configure
-it only if CONFIG_SYS_CLOCKS_ENABLE_ALL is enabled and u-boots newer
-than 2014.01 do not even have an option), and this results in incorrect
-operating frequencies when trying to use a DSP or IVAHD, whose root
-clocks are derived from this DPLL. Use the DT standard properties
-"assigned-clocks" and "assigned-clock-rates" to set the IVA DPLL clock
-rate and the rates for its derivative clocks at boot time to properly
-initialize/lock this DPLL. The DPLL will automatically transition
-into a low-power stop mode when the associated output clocks are
-not utilized or gated automatically.
+The IPU1 functional clock is actually the output of a mux clock,
+ipu1_gfclk_mux. The mux clock is sourced by default from the
+DPLL_ABE_X2_CLK, and this results in a rather odd clock frequency
+(361 MHz) for the IPU1 functional clock on platforms where ABE_DPLL
+is configured properly. Reconfigure the mux clock to be sourced from
+CORE_IPU_ISS_BOOST_CLK (dpll_core_h22x2_ck), so that both the IPU1
+and IPU2 are running from the same clock and clocked at the same
+nominal frequency of 425 MHz.
 
-The reset values of the dividers M4 & M5 (functional clocks for DSP and
-IVAHD respectively) are identical to each other, but are different at
-each OPP. The reset values also do not match a specific OPP. So, the
-derived output clocks from the IVA DPLL have to be initialized as well
-to avoid initializing these divider outputs to incorrect frequencies.
-
-The clock rates are chosen based on the OPP100 values as defined in the
-OMAP4430 ES2.x Public TRM vAP, section "3.6.3.8.7 DPLL_IVA Preferred
-Settings". The DPLL locked frequency is 1862.4 MHz (value for
-DPLL_IVA_X2_CLK), so the dpll_iva_ck clock rate used is half of
-this value.
+This also ensures that IPU1 functional clock is always configured
+properly and becomes independent of the state of the ABE DPLL on
+all boards.
 
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- arch/arm/boot/dts/omap44xx-clocks.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/dra7xx-clocks.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap44xx-clocks.dtsi b/arch/arm/boot/dts/omap44xx-clocks.dtsi
-index 9573b37fbaa7..9cb205b87835 100644
---- a/arch/arm/boot/dts/omap44xx-clocks.dtsi
-+++ b/arch/arm/boot/dts/omap44xx-clocks.dtsi
-@@ -357,6 +357,8 @@
- 		compatible = "ti,omap4-dpll-clock";
- 		clocks = <&sys_clkin_ck>, <&iva_hsd_byp_clk_mux_ck>;
- 		reg = <0x01a0>, <0x01a4>, <0x01ac>, <0x01a8>;
-+		assigned-clocks = <&dpll_iva_ck>;
-+		assigned-clock-rates = <931200000>;
+diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+index 3330738e4c6e..cfaf27215901 100644
+--- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
++++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+@@ -791,6 +791,8 @@
+ 		clocks = <&dpll_abe_m2x2_ck>, <&dpll_core_h22x2_ck>;
+ 		ti,bit-shift = <24>;
+ 		reg = <0x0520>;
++		assigned-clocks = <&ipu1_gfclk_mux>;
++		assigned-clock-parents = <&dpll_core_h22x2_ck>;
  	};
  
- 	dpll_iva_x2_ck: dpll_iva_x2_ck {
-@@ -374,6 +376,8 @@
- 		reg = <0x01b8>;
- 		ti,index-starts-at-one;
- 		ti,invert-autoidle-bit;
-+		assigned-clocks = <&dpll_iva_m4x2_ck>;
-+		assigned-clock-rates = <465600000>;
- 	};
- 
- 	dpll_iva_m5x2_ck: dpll_iva_m5x2_ck at 1bc {
-@@ -385,6 +389,8 @@
- 		reg = <0x01bc>;
- 		ti,index-starts-at-one;
- 		ti,invert-autoidle-bit;
-+		assigned-clocks = <&dpll_iva_m5x2_ck>;
-+		assigned-clock-rates = <266100000>;
- 	};
- 
- 	dpll_mpu_ck: dpll_mpu_ck at 160 {
+ 	mcasp1_ahclkr_mux: mcasp1_ahclkr_mux at 550 {
 -- 
 2.12.0
