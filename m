@@ -1,40 +1,49 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 7 Jun 2017 16:43:08 +0200
-Subject: [PATCH 4/9] net: mvmdio: move the read valid check into its own
- function
-In-Reply-To: <71f0a99b-4736-a405-1d06-9c05f80aa327@cogentembedded.com>
-References: <20170607083810.30922-1-antoine.tenart@free-electrons.com>
- <20170607083810.30922-5-antoine.tenart@free-electrons.com>
- <71f0a99b-4736-a405-1d06-9c05f80aa327@cogentembedded.com>
-Message-ID: <20170607144308.GB4173@kwain>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 7 Jun 2017 15:30:37 +0100
+Subject: [PATCH v2 1/3] arm64: hugetlb: Fix huge_pte_offset to return
+ poisoned page table entries
+In-Reply-To: <20170607134731.GG30263@arm.com>
+References: <20170517152336.6052-1-punit.agrawal@arm.com>
+ <20170517152336.6052-2-punit.agrawal@arm.com>
+ <20170607134731.GG30263@arm.com>
+Message-ID: <20170607143037.ovyo5pxywty2r6as@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wed, Jun 07, 2017 at 01:00:21PM +0300, Sergei Shtylyov wrote:
-> On 6/7/2017 11:38 AM, Antoine Tenart wrote:
-> > 
-> > -	val = readl(dev->regs);
-> > -	if (!(val & MVMDIO_SMI_READ_VALID)) {
-> > +	if (orion_mdio_smi_is_read_valid(dev)) {
-> >  		dev_err(bus->parent, "SMI bus read not valid\n");
+On Wed, Jun 07, 2017 at 02:47:32PM +0100, Will Deacon wrote:
+> On Wed, May 17, 2017 at 04:23:34PM +0100, Punit Agrawal wrote:
+> > --- a/arch/arm64/mm/hugetlbpage.c
+> > +++ b/arch/arm64/mm/hugetlbpage.c
+> > @@ -136,36 +136,27 @@ pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
+> >  {
+> >  	pgd_t *pgd;
+> >  	pud_t *pud;
+> > -	pmd_t *pmd = NULL;
+> > -	pte_t *pte = NULL;
+> > +	pmd_t *pmd;
+> >  
+> >  	pgd = pgd_offset(mm, addr);
+> >  	pr_debug("%s: addr:0x%lx pgd:%p\n", __func__, addr, pgd);
+> >  	if (!pgd_present(*pgd))
+> >  		return NULL;
+> > +
+> >  	pud = pud_offset(pgd, addr);
+> > -	if (!pud_present(*pud))
+> > +	if (pud_none(*pud))
+> >  		return NULL;
 > 
->    I think you reversed the valuid/invalid sense in the new function's name.
+> Do you actually need this special case?
+> 
+> > -
+> > -	if (pud_huge(*pud))
+> > +	/* swap or huge page */
+> > +	if (!pud_present(*pud) || pud_huge(*pud))
+> 
+> ... couldn't you just add a '|| pud_none(*pud)' in here?
+> 
+> >  		return (pte_t *)pud;
 
-Good catch, I'll fix this.
-
-Thanks!
-Antoine
+But then you no longer return NULL if *pud == 0.
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170607/61219f52/attachment.sig>
+Catalin
