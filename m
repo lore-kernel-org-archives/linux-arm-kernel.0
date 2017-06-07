@@ -1,137 +1,81 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 7 Jun 2017 10:41:25 +0200
-Subject: [PATCH linux-next v4 4/4] spi: imx: Add support for SPI Slave mode
-In-Reply-To: <20170605033809.13726-5-jiada_wang@mentor.com>
-References: <20170605033809.13726-1-jiada_wang@mentor.com>
- <20170605033809.13726-5-jiada_wang@mentor.com>
-Message-ID: <20170607084125.3eizzs6c773xjssi@pengutronix.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 07 Jun 2017 10:43:49 +0200
+Subject: [PATCH 9/9] arm64: marvell: dts: add xmdio nodes for 7k/8k
+In-Reply-To: <20170607083810.30922-10-antoine.tenart@free-electrons.com>
+ (Antoine Tenart's message of "Wed, 7 Jun 2017 10:38:10 +0200")
+References: <20170607083810.30922-1-antoine.tenart@free-electrons.com>
+ <20170607083810.30922-10-antoine.tenart@free-electrons.com>
+Message-ID: <87k24onq62.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 05, 2017 at 12:38:09PM +0900, Jiada Wang wrote:
-> Previously i.MX SPI controller only works in Master mode.
-> This patch adds support to i.MX51, i.MX53 and i.MX6 ECSPI
-> controller to work also in Slave mode.
-> 
-> Currently SPI Slave mode support patch has the following limitations:
-> 1. The stale data in RXFIFO will be dropped when the Slave does any new
->    transfer.
-> 2. One transfer can be finished only after all transfer->len data been
->    transferred to master device
-> 3. Slave device only accepts transfer->len data. Any data longer than this
->    from master device will be dropped. Any data shorter than this from
->    master will cause SPI to stuck due to mentioned HW limitation 2.
-> 4. Only PIO transfer is supported in Slave mode.
-> 
-> Following HW limitation applies:
-> 1.  ECSPI has a HW issue when works in Slave mode, after 64
->     words written to TXFIFO, even TXFIFO becomes empty,
->     ECSPI_TXDATA keeps shift out the last word data,
->     so we have to disable ECSPI when in slave mode after the
->     transfer completes
-> 2.  Due to Freescale errata ERR003775 "eCSPI: Burst completion by Chip
->     Select (SS) signal in Slave mode is not functional" burst size must
->     be set exactly to the size of the transfer. This limit SPI transaction
->     with maximum 2^12 bits. This errata affects i.MX53 and i.MX6 ECSPI
->     controllers.
-> 
-> Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
+Hi Dave,
+ 
+ On mer., juin 07 2017, Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
+
+> Add the description of the xMDIO bus for the Marvell Armada 7k and
+> Marvell Armada 8k; for both CP110 slave and master. This bus is found
+> on Marvell Ethernet controllers and provides an interface with the
+> xMDIO bus.
+>
+
+If you agrees with this series please don't apply this patch. I will
+take care of it. We have many changes in the dt directory for the next
+release and I want that all the change are in the same place to take
+care of the merge conflict.
+
+Thanks,
+
+Gregory
+
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 > ---
->  drivers/spi/spi-imx.c | 228 +++++++++++++++++++++++++++++++++++++++++++-------
->  1 file changed, 198 insertions(+), 30 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-> index 5034f89..3db3809 100644
-> --- a/drivers/spi/spi-imx.c
-> +++ b/drivers/spi/spi-imx.c
-> @@ -53,9 +53,13 @@
->  /* generic defines to abstract from the different register layouts */
->  #define MXC_INT_RR	(1 << 0) /* Receive data ready interrupt */
->  #define MXC_INT_TE	(1 << 1) /* Transmit FIFO empty interrupt */
-> +#define MXC_INT_RDR	BIT(4) /* Receive date threshold interrupt */
+>  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 7 +++++++
+>  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 7 +++++++
+>  2 files changed, 14 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> index 037ed30d75a7..95953743455e 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> @@ -98,6 +98,13 @@
+>  				clocks = <&cpm_syscon0 1 9>, <&cpm_syscon0 1 5>;
+>  			};
 >  
->  /* The maximum  bytes that a sdma BD can transfer.*/
->  #define MAX_SDMA_BD_BYTES  (1 << 15)
-> +/* The maximum bytes that IMX53_ECSPI can transfer in slave mode.*/
-> +#define MX53_MAX_TRANSFER_BYTES		512
+> +			cpm_xmdio: mdio at 12a600 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "marvell,xmdio";
+> +				reg = <0x12a600 0x10>;
+> +			};
 > +
->  struct spi_imx_config {
->  	unsigned int speed_hz;
->  	unsigned int bpw;
-> @@ -79,7 +83,9 @@ struct spi_imx_devtype_data {
->  	void (*trigger)(struct spi_imx_data *);
->  	int (*rx_available)(struct spi_imx_data *);
->  	void (*reset)(struct spi_imx_data *);
-> +	void (*disable)(struct spi_imx_data *);
->  	bool has_dmamode;
-> +	bool has_slavemode;
->  	unsigned int fifo_size;
->  	enum spi_imx_devtype devtype;
->  };
-> @@ -107,6 +113,11 @@ struct spi_imx_data {
->  	const void *tx_buf;
->  	unsigned int txfifo; /* number of words pushed in tx FIFO */
+>  			cpm_icu: interrupt-controller at 1e0000 {
+>  				compatible = "marvell,cp110-icu"; 
+>  				reg = <0x1e0000 0x10>;
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> index 2a99ff8fca2a..594356243ddb 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> @@ -103,6 +103,13 @@
+>  				clocks = <&cps_syscon0 1 9>, <&cps_syscon0 1 5>;
+>  			};
 >  
-> +	/* Slave mode */
-> +	bool slave_mode;
-> +	bool slave_aborted;
-> +	unsigned int slave_burst;
+> +			cps_xmdio: mdio at 12a600 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "marvell,xmdio";
+> +				reg = <0x12a600 0x10>;
+> +			};
 > +
->  	/* DMA */
->  	bool usedma;
->  	u32 wml;
-> @@ -223,6 +234,9 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
->  	if (!transfer)
->  		return false;
->  
-> +	if (spi_imx->slave_mode)
-> +		return false;
-> +
->  	bpw = transfer->bits_per_word;
->  	if (!bpw)
->  		bpw = spi->bits_per_word;
-> @@ -266,6 +280,7 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
->  #define MX51_ECSPI_INT		0x10
->  #define MX51_ECSPI_INT_TEEN		(1 <<  0)
->  #define MX51_ECSPI_INT_RREN		(1 <<  3)
-> +#define MX51_ECSPI_INT_RDREN		(1 <<  4)
->  
->  #define MX51_ECSPI_DMA      0x14
->  #define MX51_ECSPI_DMA_TX_WML(wml)	((wml) & 0x3f)
-> @@ -282,6 +297,46 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
->  #define MX51_ECSPI_TESTREG	0x20
->  #define MX51_ECSPI_TESTREG_LBC	BIT(31)
->  
-> +static void mx53_ecspi_rx_slave(struct spi_imx_data *spi_imx)
-> +{
-> +	u32 val = be32_to_cpu(readl(spi_imx->base + MXC_CSPIRXDATA));
-> +
-> +	if (spi_imx->rx_buf) {
-> +		int n_bytes = spi_imx->slave_burst % sizeof(val);
-> +
-> +		if (n_bytes) {
-> +			memcpy(spi_imx->rx_buf,
-> +			       ((u8 *)&val) + sizeof(val) - n_bytes, n_bytes);
-> +		} else {
-> +			*((u32 *)spi_imx->rx_buf) = val;
-> +			n_bytes = sizeof(val);
-> +		}
-> +
-> +		spi_imx->rx_buf += n_bytes;
-> +		spi_imx->slave_burst -= n_bytes;
-> +	}
-> +}
-
-You can do the same optimization you have done for mx53_ecspi_tx_slave()
-for mx53_ecspi_rx_slave() aswell.
-
-Otherwise the patch looks fine to me now.
-
-Sascha
-
+>  			cps_icu: interrupt-controller at 1e0000 {
+>  				compatible = "marvell,cp110-icu";
+>  				reg = <0x1e0000 0x10>;
+> -- 
+> 2.9.4
+>
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
