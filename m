@@ -1,33 +1,44 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 7 Jun 2017 14:06:12 +0530
-Subject: [PATCH 3/3] Documentation: dt-bindings: Document deprecation of
- "vmmc_aux" and using "vqmmc"
-In-Reply-To: <20170607083612.14224-1-kishon@ti.com>
-References: <20170607083612.14224-1-kishon@ti.com>
-Message-ID: <20170607083612.14224-4-kishon@ti.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Wed,  7 Jun 2017 10:38:02 +0200
+Subject: [PATCH 1/9] net: mvmdio: reorder headers alphabetically
+In-Reply-To: <20170607083810.30922-1-antoine.tenart@free-electrons.com>
+References: <20170607083810.30922-1-antoine.tenart@free-electrons.com>
+Message-ID: <20170607083810.30922-2-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document deprecation of "vmmc_aux" for io regulator and use of generic
-mmc binding "vqmmc" in omap-hsmmc.
+Cosmetic fix reordering headers alphabetically.
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/net/ethernet/marvell/mvmdio.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-index 74166a0d460d..0e026c151c1c 100644
---- a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-+++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-@@ -18,7 +18,7 @@ Required properties:
- Optional properties:
- ti,dual-volt: boolean, supports dual voltage cards
- <supply-name>-supply: phandle to the regulator device tree node
--"supply-name" examples are "vmmc", "vmmc_aux" etc
-+"supply-name" examples are "vmmc", "vmmc_aux"(deprecated)/"vqmmc" etc
- ti,non-removable: non-removable slot (like eMMC)
- ti,needs-special-reset: Requires a special softreset sequence
- ti,needs-special-hs-handling: HSMMC IP needs special setting for handling High Speed
+diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
+index 90a60b98c28e..109a2bff334d 100644
+--- a/drivers/net/ethernet/marvell/mvmdio.c
++++ b/drivers/net/ethernet/marvell/mvmdio.c
+@@ -17,16 +17,16 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
++#include <linux/clk.h>
++#include <linux/delay.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/mutex.h>
++#include <linux/of_mdio.h>
+ #include <linux/phy.h>
+-#include <linux/interrupt.h>
+ #include <linux/platform_device.h>
+-#include <linux/delay.h>
+-#include <linux/io.h>
+-#include <linux/clk.h>
+-#include <linux/of_mdio.h>
+ #include <linux/sched.h>
+ #include <linux/wait.h>
+ 
 -- 
-2.11.0
+2.9.4
