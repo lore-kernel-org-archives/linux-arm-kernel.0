@@ -1,83 +1,57 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 7 Jun 2017 17:54:30 +0100
-Subject: [PATCH v2 1/3] arm64: hugetlb: Fix huge_pte_offset to return
- poisoned page table entries
-In-Reply-To: <87h8zr24qb.fsf@e105922-lin.cambridge.arm.com>
-References: <20170517152336.6052-1-punit.agrawal@arm.com>
- <20170517152336.6052-2-punit.agrawal@arm.com>
- <20170607134731.GG30263@arm.com>
- <20170607143037.ovyo5pxywty2r6as@localhost>
- <20170607145715.GI30263@arm.com>
- <87h8zr24qb.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <20170607165430.GA25749@e104818-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 7 Jun 2017 17:56:26 +0100
+Subject: [PATCH v2 2/2] arm64: ftrace: add support for far branches to
+ dynamic ftrace
+In-Reply-To: <CAKv+Gu8kWt7yDg8hu=bJb4FrA3qGqV2jgShujqHqewDSKr1D8w@mail.gmail.com>
+References: <20170530135220.20759-1-ard.biesheuvel@linaro.org>
+ <20170530135220.20759-3-ard.biesheuvel@linaro.org>
+ <20170605171535.GP21944@arm.com>
+ <20170607114637.1a717019@gandalf.local.home>
+ <CAKv+Gu8kWt7yDg8hu=bJb4FrA3qGqV2jgShujqHqewDSKr1D8w@mail.gmail.com>
+Message-ID: <20170607165626.GE2669@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 07, 2017 at 04:32:28PM +0100, Punit Agrawal wrote:
-> Will Deacon <will.deacon@arm.com> writes:
-> > On Wed, Jun 07, 2017 at 03:30:37PM +0100, Catalin Marinas wrote:
-> >> On Wed, Jun 07, 2017 at 02:47:32PM +0100, Will Deacon wrote:
-> >> > On Wed, May 17, 2017 at 04:23:34PM +0100, Punit Agrawal wrote:
-> >> > > --- a/arch/arm64/mm/hugetlbpage.c
-> >> > > +++ b/arch/arm64/mm/hugetlbpage.c
-> >> > > @@ -136,36 +136,27 @@ pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
-> >> > >  {
-> >> > >  	pgd_t *pgd;
-> >> > >  	pud_t *pud;
-> >> > > -	pmd_t *pmd = NULL;
-> >> > > -	pte_t *pte = NULL;
-> >> > > +	pmd_t *pmd;
-> >> > >  
-> >> > >  	pgd = pgd_offset(mm, addr);
-> >> > >  	pr_debug("%s: addr:0x%lx pgd:%p\n", __func__, addr, pgd);
-> >> > >  	if (!pgd_present(*pgd))
-> >> > >  		return NULL;
-> >> > > +
-> >> > >  	pud = pud_offset(pgd, addr);
-> >> > > -	if (!pud_present(*pud))
-> >> > > +	if (pud_none(*pud))
-> >> > >  		return NULL;
-> >> > 
-> >> > Do you actually need this special case?
-> >> > 
-> >> > > -
-> >> > > -	if (pud_huge(*pud))
-> >> > > +	/* swap or huge page */
-> >> > > +	if (!pud_present(*pud) || pud_huge(*pud))
-> >> > 
-> >> > ... couldn't you just add a '|| pud_none(*pud)' in here?
-> >> > 
-> 
-> I think an earlier version took this approach but...
-> 
-> >> > >  		return (pte_t *)pud;
-> >> 
-> >> But then you no longer return NULL if *pud == 0.
+On Wed, Jun 07, 2017 at 03:50:10PM +0000, Ard Biesheuvel wrote:
+> On 7 June 2017 at 15:46, Steven Rostedt <rostedt@goodmis.org> wrote:
+> > On Mon, 5 Jun 2017 18:15:35 +0100
+> > Will Deacon <will.deacon@arm.com> wrote:
 > >
-> > Does that actually matter? The bits of hugetlb code I looked at will
-> > deferenced the returned pud and handle the huge_pte_none case correctly.
+> >
+> >> > +           tramp = (unsigned long *)mod->arch.ftrace_trampoline->sh_addr;
+> >> > +           if (tramp[0] != addr) {
+> >> > +                   if (tramp[0] != 0) {
+> >> > +                           pr_err("ftrace: far branches to multiple entry points unsupported inside a single module\n");
+> >> > +                           return AARCH64_BREAK_FAULT;
+> >> > +                   }
+> >> > +
+> >> > +                   /* point the trampoline to our ftrace entry point */
+> >> > +                   module_disable_ro(mod);
+> >> > +                   tramp[0] = addr;
+> >> > +                   module_enable_ro(mod, true);
+> >>
+> >> I'm not sure what the barrier semantics are for module_enable_ro, but I'd be
+> >> inclined to stick in a smp_wmb() here to order the write of the trampoline
+> >> data before the writing of the branch instruction.
+> >
+> > I would assume that module_disable/enable_ro() has proper barriers for
+> > modifying the page tables with respect to code around it, otherwise it
+> > would probably be an issues elsewhere in the kernel. Specifically in
+> > the module code itself.
+> >
+> > I don't see how a smp_wmb() would be needed here, especially since this
+> > is serialized code, and not something done by multiple CPUs.
+> >
 > 
-> For hugetlb fault handling (hugetlb_fault()), returning NULL vs pointer
-> to the pud/pmd results in different behaviour. If we return the pud when
-> pud_none(), then we lose the resulting hugepage size check we get from
-> huge_pte_alloc().
+> But other cores could be invoking the function we are patching here,
+> no? So when such a core observes (and executes) the updated
+> instruction before it observes the updated target field of the
+> trampoline, it will branch to address 0x0.
 
-At a quick look, there are a few other places where not returning NULL
-has some other effects (though I don't think any of them are fatal):
+I think Steve's saying that the TLB invalidation buried in the set_memory_*
+functions called by module_enable_ro will have sufficient barriers to order
+the write of the trampoline with respect to writing the branch instruction,
+but this isn't quite right because module_enable_ro is affected by things
+like CONFIG_STRICT_MODULE_RWX and rodata_enabled.
 
-- copy_huge_tlb_page_range() - unnecessary allocation of a destination
-  pud
-
-- huge_pmd_share() - do we actually need the subsequent get_page()?
-
-- page_vma_mapped_walk() - it even has a comment: "when pud is not
-  present, pte will be NULL". Now, that's no longer true with swap
-  entries but we'd never return NULL for a pud_none() case
-
-Current code behaviour is to return NULL when !p*d_present(). We are
-slightly relaxing this for swap entries while still returning NULL for
-the p*d_none() case but I wouldn't go that far as to never return NULL
-here.
-
--- 
-Catalin
+Will
