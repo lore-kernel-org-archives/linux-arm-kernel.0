@@ -1,103 +1,57 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 6 Jun 2017 21:18:40 -0700
-Subject: [GIT PULL] ARM: SoC fixes
-Message-ID: <20170607041840.GA3213@localhost>
+From: bo.zhang@nxp.com (Bruce Zhang)
+Date: Wed, 7 Jun 2017 04:24:27 +0000
+Subject: [[PATCH]] drivers: leds/trigger: system cannot enter suspend
+In-Reply-To: <20170606203813.GD32171@amd>
+References: <1496716596-45414-1-git-send-email-bo.zhang@nxp.com>
+ <20170606192554.GA32171@amd> <1a14165d-2976-50df-18d6-74e5fdec2913@gmail.com>
+ <8afffd09-cb1f-d080-ef4a-ecaa089ad470@ti.com> <20170606203813.GD32171@amd>
+Message-ID: <AM3PR04MB4044D34CA2E85B0CE70ED778AC80@AM3PR04MB404.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Pavel,
 
-The following changes since commit 08332893e37af6ae779367e78e444f8f9571511d:
+It can also fix my issue by reverting  the commit 5ab92a7cb. But this action only does not make led_set_brightness_nosleep function to set brightness. The heartbeat trigger timer is still running even though it is not harmful.
 
-  Linux 4.12-rc2 (2017-05-21 19:30:23 -0700)
+Best Regards,
+Bo
 
-are available in the git repository at:
+-----Original Message-----
+From: Pavel Machek [mailto:pavel at ucw.cz] 
+Sent: Wednesday, June 07, 2017 4:38 AM
+To: Grygorii Strashko <grygorii.strashko@ti.com>
+Cc: Jacek Anaszewski <jacek.anaszewski@gmail.com>; Bruce Zhang <bo.zhang@nxp.com>; Linus Walleij <linus.walleij@linaro.org>; linux-arm-kernel at lists.infradead.org
+Subject: Re: [[PATCH]] drivers: leds/trigger: system cannot enter suspend
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git armsoc-fixes
+On Tue 2017-06-06 15:19:23, Grygorii Strashko wrote:
+> 
+> 
+> On 06/06/2017 03:05 PM, Jacek Anaszewski wrote:
+> > On 06/06/2017 09:25 PM, Pavel Machek wrote:
+> >> On Tue 2017-06-06 10:36:36, Zhang Bo wrote:
+> >>> System cannot enter suspend mode because of heartbeat led trigger.
+> >>> In autosleep_wq, try_to_suspend function will try to enter suspend 
+> >>> mode in specific period. it will get wakeup_count then call 
+> >>> pm_notifier chain callback function and freeze processes.
+> >>> Heartbeat_pm_notifier is called and it call led_trigger_unregister 
+> >>> to change the trigger of led device to none. It will send uevent
+> >>
+> >> Why is heartbeat_pm_notifier calling led_trigger_unregister? That 
+> >> sounds like a bug.
+> > 
+> > I suggest using git blame. The commit message adding this code is 
+> > pretty informative.
+> > 
+> 
+> In my opinion original commit do not contain ehough info about root 
+> cause of the problem (commit 5ab92a7cb "leds: handle suspend/resume in 
+> heartbeat trigger")
 
-for you to fetch changes up to 151d1d752bb681f29898c68c966f6e17b446456c:
+Zhang: Can you try to revert commit 5ab92a7cb in your tree, to see if it fixes your problem?
 
-  MAINTAINERS: EP93XX: Update maintainership (2017-06-06 21:07:37 -0700)
+Thanks,
+									Pavel
 
-----------------------------------------------------------------
-ARM: SoC fixes
-
-Been sitting on these for a couple of weeks waiting on some larger batches
-to come in but it's been pretty quiet.
-
-Just your garden variety fixes here:
-
- - A few maintainers updates (ep93xx, Exynos, TI, Marvell)
- - Some PM fixes for Atmel/at91 and Marvell
- - A few DT fixes for Marvell, Versatile, TI Keystone, bcm283x
- - A reset driver patch to set module license for symbol access
-
-----------------------------------------------------------------
-Alexander Sverdlin (1):
-      MAINTAINERS: EP93XX: Update maintainership
-
-Antoine Tenart (1):
-      arm64: marvell: dts: fix interrupts in 7k/8k crypto nodes
-
-Arnd Bergmann (2):
-      memory: atmel-ebi: mark PM ops as __maybe_unused
-      ARM: at91: select CONFIG_ARM_CPU_SUSPEND
-
-Christophe JAILLET (2):
-      ARM: davinci: PM: Free resources in error handling path in 'davinci_pm_init'
-      ARM: davinci: PM: Do not free useful resources in normal path in 'davinci_pm_init'
-
-Florian Fainelli (1):
-      Merge tag 'bcm2835-dt-fixes-2017-05-16' into devicetree/fixes
-
-Heiko Stuebner (1):
-      arm64: defconfig: enable some core options for 64bit Rockchip socs
-
-Javier Martinez Canillas (1):
-      MAINTAINERS: Remove Javier Martinez Canillas as reviewer for Exynos
-
-Jeremy Linton (1):
-      reset: hi6220: Set module license so that it can be loaded
-
-Masahiro Yamada (1):
-      ARM: dts: versatile: use #include "..." to include local DT
-
-Murali Karicheri (1):
-      ARM: dts: keystone-k2l: fix broken Ethernet due to disabled OSR
-
-Olof Johansson (8):
-      Merge tag 'davinci-fixes-for-v4.12' of git://git.kernel.org/.../nsekhar/linux-davinci into fixes
-      Merge tag 'arm-soc/for-4.12/devicetree-fixes-2' of http://github.com/Broadcom/stblinux into fixes
-      Merge tag 'samsung-fixes-4.12' of git://git.kernel.org/.../krzk/linux into fixes
-      Merge tag 'at91-4.12-fixes' of git://git.kernel.org/.../abelloni/linux into fixes
-      Merge tag 'reset-fixes-for-4.12' of git://git.pengutronix.de/git/pza/linux into fixes
-      Merge tag 'mvebu-fixes-4.12-1' of git://git.infradead.org/linux-mvebu into fixes
-      Merge tag 'mvebu-fixes-non-critical-4.12-1' of git://git.infradead.org/linux-mvebu into fixes
-      Merge tag 'davinci-fixes-for-v4.12-p2' of git://git.kernel.org/.../nsekhar/linux-davinci into fixes
-
-Patrice Chotard (1):
-      MAINTAINERS: remove kernel at stlinux.com obsolete mailing list
-
-Phil Elwell (1):
-      ARM: dts: bcm283x: Reserve first page for firmware
-
-Sekhar Nori (1):
-      MAINTAINERS: add device-tree files to TI DaVinci entry
-
-Thomas Petazzoni (2):
-      MAINTAINERS: sort F entries for Marvell EBU maintainers
-      MAINTAINERS: add irqchip related drivers to Marvell EBU maintainers
-
- MAINTAINERS                                          | 14 +++++++-------
- arch/arm/boot/dts/bcm283x.dtsi                       |  5 +++++
- arch/arm/boot/dts/keystone-k2l-netcp.dtsi            |  4 ++--
- arch/arm/boot/dts/keystone-k2l.dtsi                  |  8 ++++++++
- arch/arm/boot/dts/versatile-pb.dts                   |  2 +-
- arch/arm/mach-at91/Kconfig                           |  1 +
- arch/arm/mach-davinci/pm.c                           |  7 ++++++-
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi |  3 +--
- arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  |  3 +--
- arch/arm64/configs/defconfig                         | 10 ++++++++++
- drivers/memory/atmel-ebi.c                           |  2 +-
- drivers/reset/hisilicon/hi6220_reset.c               |  2 ++
- 12 files changed, 45 insertions(+), 16 deletions(-)
+--
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
