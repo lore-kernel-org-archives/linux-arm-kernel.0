@@ -1,79 +1,91 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Wed, 07 Jun 2017 21:53:35 +0900
-Subject: [PATCH] ARM: dts: rk1108: change to "max-frequency" from
- "clock-freq-min-max"
-In-Reply-To: <CANbgqAS9_xUfbH6j1u6oM9h8nHAaWUm4Afg8baq4Wxm1vCqg9w@mail.gmail.com>
-References: <CGME20170601044338epcas5p3c202667dad66dabd4f2ad866e8ad870e@epcas5p3.samsung.com>
- <20170601044336.5745-1-jh80.chung@samsung.com>
- <CANbgqAS9_xUfbH6j1u6oM9h8nHAaWUm4Afg8baq4Wxm1vCqg9w@mail.gmail.com>
-Message-ID: <3ce2ba9f-5bb9-6a6c-212c-720e4a06a6fa@samsung.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Wed, 7 Jun 2017 21:20:19 +0800
+Subject: [PATCH 1/4] dt-bindings: rng: add generic bindings for MediaTek
+ SoCs
+In-Reply-To: <9eb87222-ca89-0abb-4532-3887008f6e7a@gmail.com>
+References: <cover.1496255334.git.sean.wang@mediatek.com>
+ <1d9c981e1b45bf2f04732a02d90e6857cc203ce5.1496255334.git.sean.wang@mediatek.com>
+ <9eb87222-ca89-0abb-4532-3887008f6e7a@gmail.com>
+Message-ID: <1496841619.30833.5.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, 2017-06-06 at 13:07 +0200, Matthias Brugger wrote:
+> 
+> On 31/05/17 20:44, sean.wang at mediatek.com wrote:
+> > From: Sean Wang <sean.wang@mediatek.com>
+> > 
+> > Add the generic binding for allowing the support of RNG on MediaTek SoCs
+> > such as MT7622.
+> > 
+> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> > ---
+> >   Documentation/devicetree/bindings/rng/mtk-rng.txt | 3 ++-
+> >   1 file changed, 2 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/rng/mtk-rng.txt b/Documentation/devicetree/bindings/rng/mtk-rng.txt
+> > index a6d62a2..0772913 100644
+> > --- a/Documentation/devicetree/bindings/rng/mtk-rng.txt
+> > +++ b/Documentation/devicetree/bindings/rng/mtk-rng.txt
+> > @@ -2,7 +2,8 @@ Device-Tree bindings for Mediatek random number generator
+> >   found in Mediatek SoC family
+> >   
+> >   Required properties:
+> > -- compatible	    : Should be "mediatek,mt7623-rng"
+> > +- compatible	    : Should be "mediatek,generic-rng" or
+> > +				"mediatek,mt7623-rng".
+> 
+> What does generic-rng mean. Is it for all mt7xxx, or also for mt6xxx and 
+> mt8xxx based SoCs? I think we should stick with SoC specific bindings, 
+> as we don't know if Mediatek won't publish a new IP block next year 
+> which is differnet.
+> 
 
-On 06/06/2017 10:15 AM, Andy Yan wrote:
-> Hi Jaehoon:
-> 
-> 
-> 2017-06-01 12:43 GMT+08:00 Jaehoon Chung <jh80.chung@samsung.com>:
-> 
->> "clock-freq-min-max" was deprecated. There is only using in rk1108.dtsi.
->> Use the "max-frequency" for removiing "clock-freq-min-max" in future.
->>
->> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
->> ---
->>  arch/arm/boot/dts/rk1108.dtsi | 6 +++---
->>  1 file changed, 3 insertions(+), 3 deletions(-)
->>
->>
->   This file now renamed to rv1108.dtsi as rockchip official named it as
-> RV1108.
->    The rename patch now is in Heiko's linux-rockchip tree:v4.13 dts32,
-> maybe you should rebase this patch on it.
+Yes, what I mean is generic-rng can be applied to all
+platform MediaTek provides. 
 
-Thanks for noticing this. After checking it, i will resend the patch.
 
-Best Regards,
-Jaehoon Chung
+> Just in case we should add a binding for the actual SoC + a fallback. 
+> For example.
+> - compatible " Should be
+> 	"mediatek,mt7622-rng", 	"mediatek,mt7623-rng" for SoC mt7622
+> 	"mediatek,mt7623-rng" for SoC mt7623
+> 
+> This will also eliminate the need of adding mt6722-rng to the driver, as 
+> it will use mt7623-rng as fallback. If in the future we realize that 
+> mt7622-rng has a extra feature/bug, we can still work around it, without 
+> breaking the bindings.
+> 
 
+I knew the fallback rules you said here because I saw them being used in
+many drivers such as sysirq and uart driver, such kind of basic drivers.
+
+These drivers are basic enough, various following chipsets almost fall
+back into the oldest one. So the clues let me think the hardware
+interface shouldn't have too much differences among them.
+
+If there is string used like generic-uart or generic-sysirq, it can
+stop we blindly add new string into the binding document when a new
+platform is introduced. 
+
+And they easily allows users unfamiliar MediaTek platform (they didn't
+know what the oldest MediaTek chipset is) pick up the right compatible
+string to start bring up the new platform. 
+
+The specific one can be added after new feature required is added or
+critical hardware bug is found. Otherwise the generic one can fit 
+all generic needs for those.
+
+Those are only opinions, if you don't like it, I still can accept the
+original way as you suggest :)
+
+
+> Makes sense?
 > 
-> diff --git a/arch/arm/boot/dts/rk1108.dtsi b/arch/arm/boot/dts/rk1108.dtsi
->> index 1297924..a9b5293 100644
->> --- a/arch/arm/boot/dts/rk1108.dtsi
->> +++ b/arch/arm/boot/dts/rk1108.dtsi
->> @@ -174,7 +174,7 @@
->>
->>         emmc: dwmmc at 30110000 {
->>                 compatible = "rockchip,rk1108-dw-mshc",
->> "rockchip,rk3288-dw-mshc";
->> -               clock-freq-min-max = <400000 150000000>;
->> +               max-frequency = <150000000>;
->>                 clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>,
->>                          <&cru SCLK_EMMC_DRV>, <&cru SCLK_EMMC_SAMPLE>;
->>                 clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
->> @@ -186,7 +186,7 @@
->>
->>         sdio: dwmmc at 30120000 {
->>                 compatible = "rockchip,rk1108-dw-mshc",
->> "rockchip,rk3288-dw-mshc";
->> -               clock-freq-min-max = <400000 150000000>;
->> +               max-frequency = <150000000>;
->>                 clocks = <&cru HCLK_SDIO>, <&cru SCLK_SDIO>,
->>                          <&cru SCLK_SDIO_DRV>, <&cru SCLK_SDIO_SAMPLE>;
->>                 clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
->> @@ -198,7 +198,7 @@
->>
->>         sdmmc: dwmmc at 30130000 {
->>                 compatible = "rockchip,rk1108-dw-mshc",
->> "rockchip,rk3288-dw-mshc";
->> -               clock-freq-min-max = <400000 100000000>;
->> +               max-frequency = <100000000>;
->>                 clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>,
->>                          <&cru SCLK_SDMMC_DRV>, <&cru SCLK_SDMMC_SAMPLE>;
->>                 clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
->> --
->> 2.10.2
->>
->>
+> Regards,
+> Matthias
 > 
+> >   - clocks	    : list of clock specifiers, corresponding to
+> >   		      entries in clock-names property;
+> >   - clock-names	    : Should contain "rng" entries;
+> > 
