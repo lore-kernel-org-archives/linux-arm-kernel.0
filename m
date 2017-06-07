@@ -1,55 +1,66 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 7 Jun 2017 17:27:50 +0200
-Subject: [PATCH 46/58] clocksource/drivers: Add a new driver for the
- Atmel ARM TC blocks
-In-Reply-To: <20170607141735.GH2345@mai>
-References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
- <20170530215139.9983-47-alexandre.belloni@free-electrons.com>
- <20170606152104.GC2345@mai>
- <20170606180559.pkrr7ux2qqnmsd6y@piout.net>
- <20170607141735.GH2345@mai>
-Message-ID: <20170607152750.tksmyf5p3oajbsac@piout.net>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Wed, 07 Jun 2017 16:32:28 +0100
+Subject: [PATCH v2 1/3] arm64: hugetlb: Fix huge_pte_offset to return
+ poisoned page table entries
+In-Reply-To: <20170607145715.GI30263@arm.com> (Will Deacon's message of "Wed,
+ 7 Jun 2017 15:57:16 +0100")
+References: <20170517152336.6052-1-punit.agrawal@arm.com>
+ <20170517152336.6052-2-punit.agrawal@arm.com>
+ <20170607134731.GG30263@arm.com>
+ <20170607143037.ovyo5pxywty2r6as@localhost>
+ <20170607145715.GI30263@arm.com>
+Message-ID: <87h8zr24qb.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2017 at 16:17:35 +0200, Daniel Lezcano wrote:
-> > You mean you don't like how it is used? Or you don't think having the
-> > timer full name is useful?
-> 
-> The field is not needed, the only place where it is used is where we affect it.
->  
+Will Deacon <will.deacon@arm.com> writes:
 
-It is used in tcb_clksrc_register:
+> On Wed, Jun 07, 2017 at 03:30:37PM +0100, Catalin Marinas wrote:
+>> On Wed, Jun 07, 2017 at 02:47:32PM +0100, Will Deacon wrote:
+>> > On Wed, May 17, 2017 at 04:23:34PM +0100, Punit Agrawal wrote:
+>> > > --- a/arch/arm64/mm/hugetlbpage.c
+>> > > +++ b/arch/arm64/mm/hugetlbpage.c
+>> > > @@ -136,36 +136,27 @@ pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
+>> > >  {
+>> > >  	pgd_t *pgd;
+>> > >  	pud_t *pud;
+>> > > -	pmd_t *pmd = NULL;
+>> > > -	pte_t *pte = NULL;
+>> > > +	pmd_t *pmd;
+>> > >  
+>> > >  	pgd = pgd_offset(mm, addr);
+>> > >  	pr_debug("%s: addr:0x%lx pgd:%p\n", __func__, addr, pgd);
+>> > >  	if (!pgd_present(*pgd))
+>> > >  		return NULL;
+>> > > +
+>> > >  	pud = pud_offset(pgd, addr);
+>> > > -	if (!pud_present(*pud))
+>> > > +	if (pud_none(*pud))
+>> > >  		return NULL;
+>> > 
+>> > Do you actually need this special case?
+>> > 
+>> > > -
+>> > > -	if (pud_huge(*pud))
+>> > > +	/* swap or huge page */
+>> > > +	if (!pud_present(*pud) || pud_huge(*pud))
+>> > 
+>> > ... couldn't you just add a '|| pud_none(*pud)' in here?
+>> > 
 
-tc.clksrc.name = tc.name;
+I think an earlier version took this approach but...
 
-> > The main reason is that RobH doesn't want to have the use (clocksource
-> > or clockevent) of the timer in the DT so when probing a timer, I need to
-> > know whether I already have a clocksource to decide when it is time to
-> > register a clockevent.
-> 
-> Yes, we had this discussion some weeks ago.
-> 
-> This registered hack forces the DT to define first the clocksource, then the
-> clockevent.
-> 
-> So, I suggest you fold the timer definition into a single one like the other
-> drivers.
+>> > >  		return (pte_t *)pud;
+>> 
+>> But then you no longer return NULL if *pud == 0.
+>
+> Does that actually matter? The bits of hugetlb code I looked at will
+> deferenced the returned pud and handle the huge_pte_none case correctly.
 
-I was going to agree but this is not flexible enough because the
-quadrature decoder always uses the first two channels. So on some
-products, we may have:
- - TCB0:
-   o channels 0,1: qdec
-   o channel 2: clocksource
+For hugetlb fault handling (hugetlb_fault()), returning NULL vs pointer
+to the pud/pmd results in different behaviour. If we return the pud when
+pud_none(), then we lose the resulting hugepage size check we get from
+huge_pte_alloc().
 
- - TCB1:
-   o channels 0,1: qdec
-   o channel 2: clockevent
-
-This avoids wasting TCB channels.
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+>
+> Will
