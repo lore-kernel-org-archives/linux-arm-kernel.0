@@ -1,76 +1,146 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Wed,  7 Jun 2017 11:33:54 -0700
-Subject: [PATCH v8 15/34] add mux and video interface bridge entity functions
+Date: Wed,  7 Jun 2017 11:34:05 -0700
+Subject: [PATCH v8 26/34] media: imx: csi: add support for bayer formats
 In-Reply-To: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1496860453-6282-16-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1496860453-6282-27-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philipp Zabel <p.zabel@pengutronix.de>
+From: Russell King <rmk+kernel@armlinux.org.uk>
 
-Add two new media entity function definitions for video multiplexers
-and video interface bridges.
+Bayer formats must be treated as generic data and passthrough mode must
+be used.  Add the correct setup for these formats.
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-- renamed MEDIA_ENT_F_MUX to MEDIA_ENT_F_VID_MUX
+- added check to csi_link_validate() to verify that destination is
+  IDMAC output pad when passthrough conditions exist: bayer formats
+  and 16-bit parallel buses.
 
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
-Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
 ---
- Documentation/media/uapi/mediactl/media-types.rst | 21 +++++++++++++++++++++
- include/uapi/linux/media.h                        |  6 ++++++
- 2 files changed, 27 insertions(+)
+ drivers/staging/media/imx/imx-media-csi.c | 74 ++++++++++++++++++++++++-------
+ 1 file changed, 57 insertions(+), 17 deletions(-)
 
-diff --git a/Documentation/media/uapi/mediactl/media-types.rst b/Documentation/media/uapi/mediactl/media-types.rst
-index 2a5164a..7107856 100644
---- a/Documentation/media/uapi/mediactl/media-types.rst
-+++ b/Documentation/media/uapi/mediactl/media-types.rst
-@@ -299,6 +299,27 @@ Types and flags used to represent the media graph elements
- 	  received on its sink pad and outputs the statistics data on
- 	  its source pad.
+diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
+index 4ff2419..83c8697 100644
+--- a/drivers/staging/media/imx/imx-media-csi.c
++++ b/drivers/staging/media/imx/imx-media-csi.c
+@@ -287,10 +287,11 @@ static int csi_idmac_setup_channel(struct csi_priv *priv)
+ 	struct imx_media_video_dev *vdev = priv->vdev;
+ 	struct v4l2_fwnode_endpoint *sensor_ep;
+ 	struct v4l2_mbus_framefmt *infmt;
+-	unsigned int burst_size;
+ 	struct ipu_image image;
++	u32 passthrough_bits;
+ 	dma_addr_t phys[2];
+ 	bool passthrough;
++	u32 burst_size;
+ 	int ret;
  
-+    -  ..  row 29
-+
-+       ..  _MEDIA-ENT-F-VID-MUX:
-+
-+       -  ``MEDIA_ENT_F_VID_MUX``
-+
-+       - Video multiplexer. An entity capable of multiplexing must have at
-+         least two sink pads and one source pad, and must pass the video
-+         frame(s) received from the active sink pad to the source pad.
-+
-+    -  ..  row 30
-+
-+       ..  _MEDIA-ENT-F-VID-IF-BRIDGE:
-+
-+       -  ``MEDIA_ENT_F_VID_IF_BRIDGE``
-+
-+       - Video interface bridge. A video interface bridge entity must have at
-+         least one sink pad and at least one source pad. It receives video
-+         frames on its sink pad from an input video bus of one type (HDMI, eDP,
-+         MIPI CSI-2, ...), and outputs them on its source pad to an output
-+         video bus of another type (eDP, MIPI CSI-2, parallel, ...).
+ 	infmt = &priv->format_mbus[CSI_SINK_PAD];
+@@ -308,24 +309,52 @@ static int csi_idmac_setup_channel(struct csi_priv *priv)
+ 	image.phys0 = phys[0];
+ 	image.phys1 = phys[1];
  
- ..  tabularcolumns:: |p{5.5cm}|p{12.0cm}|
+-	ret = ipu_cpmem_set_image(priv->idmac_ch, &image);
+-	if (ret)
+-		goto unsetup_vb2;
+-
+-	burst_size = (image.pix.width & 0xf) ? 8 : 16;
+-
+-	ipu_cpmem_set_burstsize(priv->idmac_ch, burst_size);
+-
+ 	/*
+-	 * If the sensor uses 16-bit parallel CSI bus, we must handle
+-	 * the data internally in the IPU as 16-bit generic, aka
+-	 * passthrough mode.
++	 * Check for conditions that require the IPU to handle the
++	 * data internally as generic data, aka passthrough mode:
++	 * - raw bayer formats
++	 * - the sensor bus is 16-bit parallel
+ 	 */
+-	passthrough = (sensor_ep->bus_type != V4L2_MBUS_CSI2 &&
+-		       sensor_ep->bus.parallel.bus_width >= 16);
++	switch (image.pix.pixelformat) {
++	case V4L2_PIX_FMT_SBGGR8:
++	case V4L2_PIX_FMT_SGBRG8:
++	case V4L2_PIX_FMT_SGRBG8:
++	case V4L2_PIX_FMT_SRGGB8:
++		burst_size = 8;
++		passthrough = true;
++		passthrough_bits = 8;
++		break;
++	case V4L2_PIX_FMT_SBGGR16:
++	case V4L2_PIX_FMT_SGBRG16:
++	case V4L2_PIX_FMT_SGRBG16:
++	case V4L2_PIX_FMT_SRGGB16:
++		burst_size = 4;
++		passthrough = true;
++		passthrough_bits = 16;
++		break;
++	default:
++		burst_size = (image.pix.width & 0xf) ? 8 : 16;
++		passthrough = (sensor_ep->bus_type != V4L2_MBUS_CSI2 &&
++			       sensor_ep->bus.parallel.bus_width >= 16);
++		passthrough_bits = 16;
++		break;
++	}
  
-diff --git a/include/uapi/linux/media.h b/include/uapi/linux/media.h
-index 4890787..fac96c6 100644
---- a/include/uapi/linux/media.h
-+++ b/include/uapi/linux/media.h
-@@ -105,6 +105,12 @@ struct media_device_info {
- #define MEDIA_ENT_F_PROC_VIDEO_STATISTICS	(MEDIA_ENT_F_BASE + 0x4006)
- 
- /*
-+ * Switch and bridge entitites
-+ */
-+#define MEDIA_ENT_F_VID_MUX			(MEDIA_ENT_F_BASE + 0x5001)
-+#define MEDIA_ENT_F_VID_IF_BRIDGE		(MEDIA_ENT_F_BASE + 0x5002)
+-	if (passthrough)
+-		ipu_cpmem_set_format_passthrough(priv->idmac_ch, 16);
++	if (passthrough) {
++		ipu_cpmem_set_resolution(priv->idmac_ch, image.rect.width,
++					 image.rect.height);
++		ipu_cpmem_set_stride(priv->idmac_ch, image.pix.bytesperline);
++		ipu_cpmem_set_buffer(priv->idmac_ch, 0, image.phys0);
++		ipu_cpmem_set_buffer(priv->idmac_ch, 1, image.phys1);
++		ipu_cpmem_set_format_passthrough(priv->idmac_ch,
++						 passthrough_bits);
++	} else {
++		ret = ipu_cpmem_set_image(priv->idmac_ch, &image);
++		if (ret)
++			goto unsetup_vb2;
++	}
 +
-+/*
-  * Connectors
-  */
- /* It is a responsibility of the entity drivers to add connectors and links */
++	ipu_cpmem_set_burstsize(priv->idmac_ch, burst_size);
+ 
+ 	/*
+ 	 * Set the channel for the direct CSI-->memory via SMFC
+@@ -799,6 +828,7 @@ static int csi_link_validate(struct v4l2_subdev *sd,
+ {
+ 	struct csi_priv *priv = v4l2_get_subdevdata(sd);
+ 	struct v4l2_fwnode_endpoint *sensor_ep;
++	const struct imx_media_pixfmt *incc;
+ 	struct imx_media_subdev *sensor;
+ 	bool is_csi2;
+ 	int ret;
+@@ -819,6 +849,16 @@ static int csi_link_validate(struct v4l2_subdev *sd,
+ 	priv->sensor = sensor;
+ 	sensor_ep = &priv->sensor->sensor_ep;
+ 	is_csi2 = (sensor_ep->bus_type == V4L2_MBUS_CSI2);
++	incc = priv->cc[CSI_SINK_PAD];
++
++	if (priv->dest != IPU_CSI_DEST_IDMAC &&
++	    (incc->bayer || (!is_csi2 &&
++			     sensor_ep->bus.parallel.bus_width >= 16))) {
++		v4l2_err(&priv->sd,
++			 "bayer/16-bit parallel buses must go to IDMAC pad\n");
++		ret = -EINVAL;
++		goto out;
++	}
+ 
+ 	if (is_csi2) {
+ 		int vc_num = 0;
+@@ -843,7 +883,7 @@ static int csi_link_validate(struct v4l2_subdev *sd,
+ 
+ 	/* select either parallel or MIPI-CSI2 as input to CSI */
+ 	ipu_set_csi_src_mux(priv->ipu, priv->csi_id, is_csi2);
+-
++out:
+ 	mutex_unlock(&priv->lock);
+ 	return ret;
+ }
 -- 
 2.7.4
