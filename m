@@ -1,52 +1,61 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 7 Jun 2017 15:07:46 +0530
-Subject: [PATCH v2 5/8] ARM: dts: dra7-evm: Correct the vmmc-supply for mmc2
+Date: Wed, 7 Jun 2017 15:07:47 +0530
+Subject: [PATCH v2 6/8] ARM: dts: dra7: Add "max-frequency" property to MMC dt
+ nodes
 In-Reply-To: <20170607093749.15656-1-kishon@ti.com>
 References: <20170607093749.15656-1-kishon@ti.com>
-Message-ID: <20170607093749.15656-6-kishon@ti.com>
+Message-ID: <20170607093749.15656-7-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ravikumar Kattekola <rk@ti.com>
+Add "max-frequency" property to MMC dt nodes and set the
+maximum frequency to 192MHz for MMC1/MMC2, 64MHz for MMC3
+and 192MHz for MMC4. pdata quirks must be utilized to
+detect presence of rev 1.1/1.0 of silicon and adjust
+maximum frequencies as per restrictions documented in i843.
 
-On DRA75x EVM, MMC2 vdd/ios are connected to a common supply fixed at 1.8V
-not 3.3V
-
-Fixes: 6cf02dbb4b71 ("ARM: dts: dra7-evm: Add mmc2 node for eMMC support")
-Signed-off-by: Ravikumar Kattekola <rk@ti.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 ---
- arch/arm/boot/dts/dra7-evm.dts | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/dra7.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
-index 31a9e061ddd0..e5d7e7f5f645 100644
---- a/arch/arm/boot/dts/dra7-evm.dts
-+++ b/arch/arm/boot/dts/dra7-evm.dts
-@@ -25,6 +25,14 @@
- 		stdout-path = &uart1;
- 	};
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index e7144662af45..c09a91e77f53 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -1037,6 +1037,7 @@
+ 			dma-names = "tx", "rx";
+ 			status = "disabled";
+ 			pbias-supply = <&pbias_mmc_reg>;
++			max-frequency = <192000000>;
+ 		};
  
-+	evm_1v8_sw: fixedregulator-evm_1v8 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "evm_1v8";
-+		vin-supply = <&smps9_reg>;
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+	};
-+
- 	evm_3v3_sd: fixedregulator-sd {
- 		compatible = "regulator-fixed";
- 		regulator-name = "evm_3v3_sd";
-@@ -451,7 +459,7 @@
- 	status = "okay";
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc2_pins_default>;
--	vmmc-supply = <&evm_3v3_sw>;
-+	vmmc-supply = <&evm_1v8_sw>;
- 	bus-width = <8>;
- };
+ 		mmc2: mmc at 480b4000 {
+@@ -1048,6 +1049,7 @@
+ 			dmas = <&sdma_xbar 47>, <&sdma_xbar 48>;
+ 			dma-names = "tx", "rx";
+ 			status = "disabled";
++			max-frequency = <192000000>;
+ 		};
  
+ 		mmc3: mmc at 480ad000 {
+@@ -1059,6 +1061,8 @@
+ 			dmas = <&sdma_xbar 77>, <&sdma_xbar 78>;
+ 			dma-names = "tx", "rx";
+ 			status = "disabled";
++			/* Errata i887 limits max-frequency of MMC3 to 64 MHz */
++			max-frequency = <64000000>;
+ 		};
+ 
+ 		mmc4: mmc at 480d1000 {
+@@ -1070,6 +1074,7 @@
+ 			dmas = <&sdma_xbar 57>, <&sdma_xbar 58>;
+ 			dma-names = "tx", "rx";
+ 			status = "disabled";
++			max-frequency = <192000000>;
+ 		};
+ 
+ 		mmu0_dsp1: mmu at 40d01000 {
 -- 
 2.11.0
