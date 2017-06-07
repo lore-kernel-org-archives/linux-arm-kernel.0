@@ -1,153 +1,115 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Tue, 6 Jun 2017 22:25:47 -0700
-Subject: [PATCH 8/8] arm64: dts: hikey: Fix WiFi support
-In-Reply-To: <CAPDyKFoihL+=ZNBxoM4=4GTJQoP7ZOgcAEH6HKB3oSpbn5=-1g@mail.gmail.com>
-References: <1494260477-25163-1-git-send-email-ulf.hansson@linaro.org>
- <1494260477-25163-9-git-send-email-ulf.hansson@linaro.org>
- <CALAqxLX4HwbVm8G4Ch2uYKAy6C9vYAZEcRUdCLDePT55oGz6hw@mail.gmail.com>
- <d7988293-853f-fb3a-ae29-d1dff4e4d732@linaro.org>
- <CALAqxLU2zz17sHMFKOe4p248Bu4fRiU_dKoBBPbY38gDrpb_mw@mail.gmail.com>
- <CAPDyKFrtE1nKrc1Zk_n=rZTrMVT=Vb=cpk-7AEFWZRmVhFi+4w@mail.gmail.com>
- <CALAqxLWEsQK4g_AM7cPzJSrF_jiTSZpxvLPy_D4HUgdrgf=KuA@mail.gmail.com>
- <CABGGisxWS2uT6xCATaZbeaDxsEfPz_BSW7Cr=52OwkdFdrV=_Q@mail.gmail.com>
- <CAPDyKFrAwntQsK_Rxs0Hzthv6TkbofE7LwgVimo60zVKruJHBA@mail.gmail.com>
- <CAPDyKFp6m=JWu6NWhjy+8h100FQNCbMMBTaY9FdoXysDYzFKkg@mail.gmail.com>
- <CALAqxLWLbuptEgQ2BS4jx8waum8x=5sKL3yPS5NZs0o=AhyRBA@mail.gmail.com>
- <CAPDyKFoihL+=ZNBxoM4=4GTJQoP7ZOgcAEH6HKB3oSpbn5=-1g@mail.gmail.com>
-Message-ID: <CALAqxLXFs52QZpPWR6ZPvPLjvx4adNdFt5YfzY-FbiCzD-bcrQ@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 7 Jun 2017 14:34:50 +0900
+Subject: [PATCH v3 2/4] arm64: kgdb: disable interrupts while a software
+ step is enabled
+In-Reply-To: <20170605162919.GN21944@arm.com>
+References: <20170523043058.5463-1-takahiro.akashi@linaro.org>
+ <20170523043058.5463-3-takahiro.akashi@linaro.org>
+ <20170605162919.GN21944@arm.com>
+Message-ID: <20170607053449.GE26483@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 6, 2017 at 9:24 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 6 June 2017 at 18:24, John Stultz <john.stultz@linaro.org> wrote:
->> On Tue, Jun 6, 2017 at 7:13 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>> On 6 June 2017 at 12:08, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>>> [...]
->>>>
->>>>>>>
->>>>>>> John, thanks for the report!
->>>>>>>
->>>>>>> After a some investigation, I realized that the mmc pwrseq_simple
->>>>>>> driver returns -EPROBE_DEFER as it's not able to get the "ext" clock.
->>>>>>> Hence the SDIO card will not be detected.
->>>>>>>
->>>>>>> To fix the problem, you need to enable CONFIG_COMMON_CLK_HI655X in the
->>>>>>> kernel config. This is actually also the case when using the arm64
->>>>>>> defconfig for a plain 4.12 rc3 and later. We should probably make this
->>>>>>> driver enabled per default when building the arm64 defconfig.
->>>>>>>
->>>>>>> Can you run a re-test at your side with the CONFIG_COMMON_CLK_HI655X
->>>>>>> set? Just to make sure it works also with those boot binaries you are
->>>>>>> using...
->>>>>>
->>>>>> So unfortunately, now I'm seeing a side-effect from enabling
->>>>>> CONFIG_COMMON_CLK_HI655X.
->>>>>>
->>>>>> Using the serial-dev driver for the TI bluetooth, it seems I'm seeing
->>>>>> failures when CONFIG_COMMON_CLK_HI655X is enabled, but configuring it
->>>>>> out, bluetooth works (and wifi then fails).
->>>>>>
->>>>>> Looking through the dmesg logs, the bluetooth driver seems to
->>>>>> initialize up properly and load the firmware, but with CLK_HI655X
->>>>>> enabled, we see:
->>>>>>
->>>>>> Bluetooth: hci0 command 0xff05 tx timeout
->>>>>> Bluetooth: hci0: send command failed\x0a
->>>>>> Bluetooth: hci0 command 0xff36 tx timeout
->>>>>> Bluetooth: hci0 command 0x1003 tx timeout
->>>>>> Bluetooth: hci0 command 0x1001 tx timeout
->>>>>> Bluetooth: hci0 command 0x1009 tx timeout
->>>>>> ...
->>>>
->>>> As Rob said below, this is because the blue-tooth driver doesn't
->>>> properly deal with the power on/off sequence.
->>>>
->>>> I guess it works for you because your versions of the boot binaries
->>>> turns all needed resources on. That isn't the case for me, blue-tooth
->>>> is neither working before or after this change, but wifi is.
->>>>
->>>>>>
->>>>>> This effectively seems to make bluetooth an wifi functionality
->>>>>> exclusive.  So I don't think this is a sufficient solution (over
->>>>>> reverting the original patch that changes the dts - which allows both
->>>>>> to function).
->>>>
->>>> Since the issues you are reporting about is depending on the
->>>> boot-binaries and not a really bugs in the kernel, may I suggest that
->>>> we invest our efforts in fixing the blue-tooth driver instead, as it's
->>>> there the real problem is!?
->>>>
->>>>>
->>>>> If the clock to the TI chip is described in DT for WiFi, then the BT
->>>>> side needs it as well (as does the driver) for proper refcounting. The
->>>>> same would apply to regulators as well. I looked at the regulators for
->>>>> HiKey and the 2 supplies (Vbat and i/o) appear to both be always on.
->>>>>
->>>>> Rob
->>>>
->>>> Correct.
->>>>
->>>> I am working on patch, I keep you on cc.
->>>
->>> Rob, John,
->>>
->>> I have now looked into this a bit more. So I have some local patches,
->>> which in principle adds the external clock to the bluetooth node for
->>> the hikey dts, and adapts the uart bluetooth driver
->>> (drivers/bluetooth/hci_ll.c) to also take the ext clock into
->>> consideration while powering on/off the chip. I am working on a
->>> vanilla kernel, thus not John's tree.
->>>
->>> However, I can't get the uart1 amba device to be added because of this
->>> error during boot:
->>> "OF: amba_device_add() failed (-19) for /soc/uart at f7111000"
->>>
->>> The reason why it fails is because amba_device_try_add() fails to read
->>> the amba periphid of the uart1 device. I haven't yet been able to
->>> figure out why.
->>>
->>> Is this problem something you have seen before? I tried out v4.11,
->>> v4.12-rc3 and John's tree (dev/hikey-mainline-WIP which is based upon
->>> 4.12.rc3), they all suffer from the same problem, not being able to
->>> add the uart1 device.
->>>
->>> The consequence then becomes that the bluetooth node (which is a child
->>> node for the uart1 node), added in the below commit by Rob, never gets
->>> parsed and thus the device don't become added. In other words, I
->>> haven't been able to test my changes since I can't even get the
->>> bluetooth device to be added.
->>>
->>> John, are you using the pcm bluetooth interface or the uart?
->>
->> UART.
->>
->> I'm not sure why initializing the UART fails for you.  I suspect again
->> it might be related to differences in the bootloader, as I'm not sure
->> if uboot has had nearly the amount of usage as UEFI.
->
-> You are probably right, but that also makes me worried, as we have
-> likely other similar issues where UEFI just magically solves things
-> for the kernel.
+On Mon, Jun 05, 2017 at 05:29:19PM +0100, Will Deacon wrote:
+> On Tue, May 23, 2017 at 01:30:56PM +0900, AKASHI Takahiro wrote:
+> > After entering kgdb mode, 'stepi' may unexpectedly breaks the execution
+> > somewhere in el1_irq.
+> > 
+> > This happens because a debug exception is always enabled in el1_irq
+> > due to the following commit merged in v3.16:
+> >   commit 2a2830703a23 ("arm64: debug: avoid accessing mdscr_el1 on fault
+> > 			paths where possible")
+> > A pending interrupt can be taken after kgdb has enabled a software step,
+> > but before a debug exception is actually taken.
+> > 
+> > This patch enforces interrupts to be masked while single stepping.
+> 
+> The desired behaviour here boils down to whether or not KGDB expects to step
+> into or over interrupts in response a stepi instruction. What do other
+> architectures do?
 
-Yea. If I recall there were a few other clks (like with the gpu) where
-the initialization was moved to UEFI.
+I don't know x86 case, but if we step into interrupt code here,
+doing stepi on a normal function will be almost useless as every
+attempt of stepi will end up falling into irq code (mostly for timer
+interrupt).
 
+> What happens if the instruction being stepped faults?
 
->> If you want to send a patch my way, I'm happy to test it, or you can
->> grab debian images that use UEFI here:
->> https://www.96boards.org/documentation/ConsumerEdition/HiKey/Downloads/Debian.md/
->
-> Seems like I need to give UEFI a try again, however this time I would
-> really appreciate your help in testing as I am running out of
-> bandwidth for this task.
->
-> Just about to post the patches....
+Well, as a matter of fact, we get a gdb control somewhere in exception code
+(actually just after 'enable_dbg' in el1_sync).
+But this is a synchronous event, and 'c' command will put us back where we
+were before stepi.
+I hope this will be a more desirable behavior.
 
-Sure. I'm happy to test and help tinker.
+(The only drawback here is we can't see a correct/complete backtrace of stack
+because the current gdb is not kernel-aware.)
 
-Sorry for my nit-picking of this issue is causing a burden. But
-chasing down these sort of things in every release is a load on my
-side too. :)
+Thanks,
+-Takahiro AKASHI
 
-thanks
--john
+> Will
+> 
+> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Jason Wessel <jason.wessel@windriver.com>
+> > ---
+> >  arch/arm64/kernel/kgdb.c | 16 ++++++++++++++++
+> >  1 file changed, 16 insertions(+)
+> > 
+> > diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
+> > index b9176b324e5a..fddbc6be3780 100644
+> > --- a/arch/arm64/kernel/kgdb.c
+> > +++ b/arch/arm64/kernel/kgdb.c
+> > @@ -28,6 +28,7 @@
+> >  
+> >  #include <asm/debug-monitors.h>
+> >  #include <asm/insn.h>
+> > +#include <asm/ptrace.h>
+> >  #include <asm/traps.h>
+> >  
+> >  struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] = {
+> > @@ -111,6 +112,8 @@ struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] = {
+> >  	{ "fpcr", 4, -1 },
+> >  };
+> >  
+> > +static DEFINE_PER_CPU(unsigned int, kgdb_pstate);
+> > +
+> >  char *dbg_get_reg(int regno, void *mem, struct pt_regs *regs)
+> >  {
+> >  	if (regno >= DBG_MAX_REG_NUM || regno < 0)
+> > @@ -200,6 +203,10 @@ int kgdb_arch_handle_exception(int exception_vector, int signo,
+> >  		err = 0;
+> >  		break;
+> >  	case 's':
+> > +		/* mask interrupts while single stepping */
+> > +		__this_cpu_write(kgdb_pstate, linux_regs->pstate);
+> > +		linux_regs->pstate |= PSR_I_BIT;
+> > +
+> >  		/*
+> >  		 * Update step address value with address passed
+> >  		 * with step packet.
+> > @@ -242,11 +249,20 @@ NOKPROBE_SYMBOL(kgdb_compiled_brk_fn);
+> >  
+> >  static int kgdb_step_brk_fn(struct pt_regs *regs, unsigned int esr)
+> >  {
+> > +	unsigned int pstate;
+> > +
+> >  	if (!kgdb_single_step)
+> >  		return DBG_HOOK_ERROR;
+> >  
+> >  	kernel_disable_single_step();
+> >  
+> > +	/* restore interrupt mask status */
+> > +	pstate = __this_cpu_read(kgdb_pstate);
+> > +	if (pstate & PSR_I_BIT)
+> > +		regs->pstate |= PSR_I_BIT;
+> > +	else
+> > +		regs->pstate &= ~PSR_I_BIT;
+> > +
+> >  	kgdb_handle_exception(1, SIGTRAP, 0, regs);
+> >  	return 0;
+> >  }
+> > -- 
+> > 2.11.1
+> > 
