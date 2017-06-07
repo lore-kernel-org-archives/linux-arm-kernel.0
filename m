@@ -1,28 +1,33 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 7 Jun 2017 14:12:05 +0200
-Subject: [PATCH 7/9] net: mvmdio: add xmdio support
-In-Reply-To: <20170607083810.30922-8-antoine.tenart@free-electrons.com>
-References: <20170607083810.30922-1-antoine.tenart@free-electrons.com>
- <20170607083810.30922-8-antoine.tenart@free-electrons.com>
-Message-ID: <20170607121205.GC1271@lunn.ch>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Wed, 07 Jun 2017 17:44:56 +0800
+Subject: [PATCH v2 04/11] drm: sun4i: add support for H3's TCON0/1
+In-Reply-To: <20170607094343.qqiwnu2mhmoi6jn7@flea.lan>
+References: <20170604160149.30230-1-icenowy@aosc.io>
+ <20170604160149.30230-5-icenowy@aosc.io> <3642057.oKT9kIlu8M@jernej-laptop>
+ <493AC6F2-3CB3-48F5-9568-A34AA927238F@aosc.io>
+ <20170607094343.qqiwnu2mhmoi6jn7@flea.lan>
+Message-ID: <52F9F9C7-9A9C-435D-A0AF-FDD4317DAD69@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 07, 2017 at 10:38:08AM +0200, Antoine Tenart wrote:
-> This patch adds the xMDIO interface support in the mvmdio driver. This
-> interface is used in Ethernet controllers on Marvell 370, 7k and 8k (as
-> of now). The xSMI interface supported by this driver complies with the
-> IEEE 802.3 clause 45 (while the SMI interface complies with the clause
-> 22). The xSMI interface is used by 10GbE devices.
-> 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 
-Hi Antoine
 
-I've only take a quick look, but i don't see anywhere you look at the
-register address and see if it has MII_ADDR_C45 to determine if a C45
-transaction should be done, or a C22. The MDIO bus can have a mix of
-C45 and C22 devices on it, and you need to use the correct transaction
-type depending on the target device/address.
+? 2017?6?7? GMT+08:00 ??5:43:43, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
+>On Mon, Jun 05, 2017 at 03:03:47AM +0800, Icenowy Zheng wrote:
+>> >You should also expand function sun4i_drv_node_is_tcon() at
+>sun4i_drv.c
+>> >with 
+>> >new entries, but I'm not sure if this fits in this patch.
+>> 
+>> Instead I think it should be renamed to something like
+>> "sun4i_drv_node_is_tcon_with_ch0".
+>
+>I'm not sure, or at least, it shouldn't make any difference, since
+>TCON without a channel 0 will not have an endpoint 0, so this will be
+>dealt with already.
 
-	  Andrew
+But that will prevent new coders from add CH1-less TCON
+compatibles to this function.
+
+>
+>Maxime
