@@ -1,87 +1,94 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 7 Jun 2017 11:38:45 +0200
-Subject: [PATCH v2 07/11] drm: sun4i: add support for the TV encoder in
- H3 SoC
-In-Reply-To: <20170604160149.30230-8-icenowy@aosc.io>
-References: <20170604160149.30230-1-icenowy@aosc.io>
- <20170604160149.30230-8-icenowy@aosc.io>
-Message-ID: <20170607093845.cu5kk55nj72roysf@flea.lan>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 07 Jun 2017 10:41:23 +0100
+Subject: [PATCH v2] KVM: arm/arm64: Signal SIGBUS when stage2 discovers
+ hwpoison memory
+In-Reply-To: <20170602104345.GA397@cbox>
+References: <20170524163250.29281-1-james.morse@arm.com>
+ <20170601222235.GN20919@cbox> <59313AEA.2060705@arm.com>
+ <20170602104345.GA397@cbox>
+Message-ID: <5937CA43.7060108@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 05, 2017 at 12:01:45AM +0800, Icenowy Zheng wrote:
-> Allwinner H3 features a TV encoder similar to the one in earlier SoCs,
-> but has a internal fixed clock divider that divides the TCON1 clock
-> (called TVE clock in datasheet) by 11.
-> 
-> Add support for it.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
-> Changes in v2:
-> - Quirk part rewritten.
-> 
->  drivers/gpu/drm/sun4i/sun4i_tv.c | 35 ++++++++++++++++++++++++++++++++++-
->  1 file changed, 34 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c b/drivers/gpu/drm/sun4i/sun4i_tv.c
-> index 338b9e5bb2a3..b9ff6d5ea67a 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_tv.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
-> @@ -13,6 +13,7 @@
->  #include <linux/clk.h>
->  #include <linux/component.h>
->  #include <linux/of_address.h>
-> +#include <linux/of_device.h>
->  #include <linux/regmap.h>
->  #include <linux/reset.h>
->  
-> @@ -169,14 +170,21 @@ struct tv_mode {
->  	const struct resync_parameters	*resync_params;
->  };
->  
-> +struct sun4i_tv_quirks {
-> +	int fixed_divider;
-> +};
-> +
->  struct sun4i_tv {
->  	struct drm_connector	connector;
->  	struct drm_encoder	encoder;
->  
->  	struct clk		*clk;
-> +	struct clk		*mod_clk;
->  	struct regmap		*regs;
->  	struct reset_control	*reset;
->  
-> +	const struct sun4i_tv_quirks *quirks;
-> +
->  	struct sun4i_drv	*drv;
->  };
->  
-> @@ -391,6 +399,12 @@ static void sun4i_tv_mode_set(struct drm_encoder *encoder,
->  	struct sun4i_tcon *tcon = crtc->tcon;
->  	const struct tv_mode *tv_mode = sun4i_tv_find_tv_by_mode(mode);
->  
-> +	if (tv->quirks->fixed_divider) {
-> +		DRM_DEBUG_DRIVER("Applying fixed divider %d on TVE clock\n",
-> +				 tv->quirks->fixed_divider);
-> +		mode->crtc_clock *= tv->quirks->fixed_divider;
-> +	}
-> +
+Hi Christoffer,
 
-You're not allowed to change the mode in mode_set, and you shouldn't
-even change it. The output pixel clock is still 27MHz.
+On 02/06/17 11:43, Christoffer Dall wrote:
+> On Fri, Jun 02, 2017 at 11:16:10AM +0100, James Morse wrote:
+>> On 01/06/17 23:22, Christoffer Dall wrote:
+>>> On Wed, May 24, 2017 at 05:32:50PM +0100, James Morse wrote:
+>>>> Once we enable ARCH_SUPPORTS_MEMORY_FAILURE on arm64, notifications for
+>>>> broken memory can call memory_failure() in mm/memory-failure.c to deliver
+>>>> SIGBUS to any user space process using the page, and notify all the
+>>>> in-kernel users.
+>>>>
+>>>> If the page corresponded with guest memory, KVM will unmap this page
+>>>> from its stage2 page tables. The user space process that allocated
+>>>> this memory may have never touched this page in which case it may not
+>>>> be mapped meaning SIGBUS won't be delivered.
+>>
+>>> Sorry, I don't remember, what is the scenario where KVM can have a
+>>> mapping in stage 2 without there being a corresponding mapping for user
+>>> space?
+>>
+>> (looks like I mean more than one thing by mapping... oops.)
+>>
+>> Mapping in that there is a physical page for this user-space address, but when
+>> qemu first touches it, it will be faulted in as its not been touched before.
+> 
+> So that's where I still get confused.  When KVM faults in the page on
+> behalf of an initial VM access, it calls get_user_pages() (or something
+> equivalent through a series of indirections like gfn_to_pfn_prot()), and
+> wouldn't that create the equivalent mapping in the normal user space
+> page table?
+> 
+> (I may be forgetting some important detail here though).
 
-You should implement that using the states, as we discussed already.
+I evidently stopped before I got to the bottom of this, the commit message is
+based on the way I first hit this (physical address not found in any rmaps:
+nothing signalled). Maybe there is another bug, or I hit a bug that has been
+fixed. I will go back to reproducing this.
+(I think we still need the patch if a guest is allowed to keep running while
+parts of its memory are hwpoisoned)
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170607/79562f82/attachment.sig>
+You're right this should behave the same as a fault from user-space, on arm64
+this path is roughly:
+> do_page_fault()
+> __do_page_fault()
+> handle_mm_fault()
+> __handle_mm_fault()
+> handle_pte_fault()
+
+__handle_mm_fault() then allocates pud/pmd and calls handle_pte_fault() .. which
+disappears back into the jungle.
+
+On a stage2 fault from a guest, the path is roughly:
+> kvm_handle_guest_abort()
+> user_mem_abort()
+> gfn_to_pfn_prot()
+> hva_to_pfn()
+> hva_to_pfn_slow()
+> get_user_pages_unlocked()
+> __get_user_pages_unlocked()
+> __get_user_pages_locked()
+> __get_user_pages()
+> faultin_page()
+> handle_mm_fault()
+
+>From where the path/behaviour should be the same as the fault through arch code.
+
+FOLL_POPULATE is a red-herring, it doesn't seem to mean anything unless
+FOLL_MLOCK is set too.
+
+
+> Right, I figured it was just the commit message that needed updating.
+> 
+> Sorry about being pedantic, but having a misleading record of this
+> change is guaranteed to confuse me in the future.
+
+If it's wrong it needs fixing. I'm a fan of pedantry in all its forms!
+
+
+
+Thanks,
+
+James
