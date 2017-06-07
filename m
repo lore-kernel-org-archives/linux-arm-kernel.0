@@ -1,92 +1,42 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 7 Jun 2017 11:07:25 +0200
-Subject: [PATCH v4 3/3] media: mtk-mdp: Fix mdp device tree
-In-Reply-To: <2407aa14-610d-0252-f264-edf22961752e@xs4all.nl>
-References: <1495509851-29159-1-git-send-email-minghsiu.tsai@mediatek.com>
- <1495509851-29159-4-git-send-email-minghsiu.tsai@mediatek.com>
- <e7996ad5-03a1-7b53-5d61-ae171473581f@gmail.com>
- <2407aa14-610d-0252-f264-edf22961752e@xs4all.nl>
-Message-ID: <59ac9ca0-3f2f-fa65-011d-c832e4ced265@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed,  7 Jun 2017 11:08:19 +0200
+Subject: [PATCH 0/3] arm64: hi6220-hikey: Fix Bluetooth support
+Message-ID: <1496826502-1339-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The commit ea452678734e ("arm64: dts: hikey: Fix WiFi support") indeed managed
+to fix the WiFi support for the Hikey board. However, it also caused the
+Bluetooth to break.
 
+The reason to the problem is because part of the fixes for WiFi, involved
+explicitly to start manage the external clock for the TI WiLink chip, as it's
+needed to properly power on/off WiFi. Then, because the Bluetooth driver,
+hci_ll, don't manage the clock, it fails to initialize Bluetooth.
 
-On 07/06/17 10:56, Hans Verkuil wrote:
-> On 07/06/17 10:44, Matthias Brugger wrote:
->> Hi Hans, hi Mauro,
->>
->> On 23/05/17 05:24, Minghsiu Tsai wrote:
->>> From: Daniel Kurtz <djkurtz@chromium.org>
->>>
->>> If the mdp_* nodes are under an mdp sub-node, their corresponding
->>> platform device does not automatically get its iommu assigned properly.
->>>
->>> Fix this by moving the mdp component nodes up a level such that they are
->>> siblings of mdp and all other SoC subsystems.  This also simplifies the
->>> device tree.
->>>
->>> Although it fixes iommu assignment issue, it also break compatibility
->>> with old device tree. So, the patch in driver is needed to iterate over
->>> sibling mdp device nodes, not child ones, to keep driver work properly.
->>>
->>> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
->>> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
->>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
->>>
->>
->> Are you OK to take this patch, or do you have any further comments?
-> 
-> Nope, it's all good. Queued for 4.13.
-> 
+This small series add support and DT bindings for the external clock, now
+properly managed by the hci_ll driver during power on/off. On top of that, the
+external clock is added to the Bluetooth DT node in the Hikey DTS file.
 
-Thanks!
+The regression has been reported by John Stultz, running a Hikey board with
+UEFI based boot. I have confirmed that there is no regressions with u-boot as
+we still don't have bluetooth working on that set up. I intend to fix that as
+well, although in second step and not being part of a fixup series.
 
-I queued the other two in v4.12-next/dts64
+John, can you please confirm/test this on your Hikey board using UEFI!?
 
-Regards,
-Matthias
+Perhaps this can go in via the bluetooth git, when respective patches has got
+an ack. Or whatever you think is best.
 
-> Regards,
-> 
-> 	Hans
-> 
->>
->> Regards,
->> Matthias
->>
->>> ---
->>>    drivers/media/platform/mtk-mdp/mtk_mdp_core.c | 12 ++++++++++--
->>>    1 file changed, 10 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_core.c b/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
->>> index 9e4eb7d..8134755 100644
->>> --- a/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
->>> +++ b/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
->>> @@ -103,7 +103,7 @@ static int mtk_mdp_probe(struct platform_device *pdev)
->>>    {
->>>        struct mtk_mdp_dev *mdp;
->>>        struct device *dev = &pdev->dev;
->>> -    struct device_node *node;
->>> +    struct device_node *node, *parent;
->>>        int i, ret = 0;
->>>          mdp = devm_kzalloc(dev, sizeof(*mdp), GFP_KERNEL);
->>> @@ -117,8 +117,16 @@ static int mtk_mdp_probe(struct platform_device *pdev)
->>>        mutex_init(&mdp->lock);
->>>        mutex_init(&mdp->vpulock);
->>>    +    /* Old dts had the components as child nodes */
->>> +    if (of_get_next_child(dev->of_node, NULL)) {
->>> +        parent = dev->of_node;
->>> +        dev_warn(dev, "device tree is out of date\n");
->>> +    } else {
->>> +        parent = dev->of_node->parent;
->>> +    }
->>> +
->>>        /* Iterate over sibling MDP function blocks */
->>> -    for_each_child_of_node(dev->of_node, node) {
->>> +    for_each_child_of_node(parent, node) {
->>>            const struct of_device_id *of_id;
->>>            enum mtk_mdp_comp_type comp_type;
->>>            int comp_id;
->>>
-> 
+Ulf Hansson (3):
+  dt-bindings: net: Add binding for the external clock for TI WiLink
+  Bluetooth: hci_ll: Add support for the external clock
+  arm64: dts: hikey: Add external clock to the Bluetooth node
+
+ Documentation/devicetree/bindings/net/ti,wilink-st.txt |  6 ++++++
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts         |  2 ++
+ drivers/bluetooth/hci_ll.c                             | 14 +++++++++++++-
+ 3 files changed, 21 insertions(+), 1 deletion(-)
+
+-- 
+2.7.4
