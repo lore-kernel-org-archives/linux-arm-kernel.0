@@ -1,48 +1,59 @@
-From: aryabinin@virtuozzo.com (Andrey Ryabinin)
-Date: Wed, 7 Jun 2017 19:12:30 +0300
-Subject: [PATCH 0/2] arm64: avoid KASAN stack overflows
-In-Reply-To: <1496849713-17078-1-git-send-email-mark.rutland@arm.com>
-References: <1496849713-17078-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <07c30069-84f5-be51-85ab-c3c84eea9463@virtuozzo.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Wed, 7 Jun 2017 18:13:33 +0200
+Subject: [PATCH 7/9] net: mvmdio: add xmdio support
+In-Reply-To: <e423ea96-12df-6a19-ce94-149ace2e2272@gmail.com>
+References: <20170607083810.30922-1-antoine.tenart@free-electrons.com>
+ <20170607083810.30922-8-antoine.tenart@free-electrons.com>
+ <e423ea96-12df-6a19-ce94-149ace2e2272@gmail.com>
+Message-ID: <20170607161333.GA22888@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Florian,
 
+On Wed, Jun 07, 2017 at 08:48:06AM -0700, Florian Fainelli wrote:
+> On 06/07/2017 01:38 AM, Antoine Tenart wrote:
+> 
+> > +	if (of_device_is_compatible(np, "marvell,orion-mdio")) {
+> > +		ops->is_done = smi_is_done;
+> > +		ops->is_read_valid = smi_is_read_valid;
+> > +		ops->start_read = smi_start_read_op;
+> > +		ops->read = smi_read_op;
+> > +		ops->write = smi_write_op;
+> > +
+> > +		dev->poll_interval_min = MVMDIO_SMI_POLL_INTERVAL_MIN;
+> > +		dev->poll_interval_max = MVMDIO_SMI_POLL_INTERVAL_MAX;
+> > +	} else if (of_device_is_compatible(np, "marvell,xmdio")) {
+> > +		ops->is_done = xsmi_is_done;
+> > +		ops->is_read_valid = xsmi_is_read_valid;
+> > +		ops->start_read = xsmi_start_read_op;
+> > +		ops->read = xsmi_read_op;
+> > +		ops->write = xsmi_write_op;
+> > +
+> > +		dev->poll_interval_min = MVMDIO_XSMI_POLL_INTERVAL_MIN;
+> > +		dev->poll_interval_max = MVMDIO_XSMI_POLL_INTERVAL_MAX;
+> > +	} else {
+> > +		return -EINVAL;
+> > +	}
+> 
+> Instead of doing this, you could have the ops structure declared e.g: a
+> static global variables in the driver and reference them from the
+> of_device_id .data field, something like:
 
-On 06/07/2017 06:35 PM, Mark Rutland wrote:
-> Hi,
-> 
-> I recently tried building the kernel with a GCC 7.1.0 toolchain, and
-> encountered a number of new and surprising failures on kernels buitl with
-> KASAN.
-> 
-> It looks like this is due to stack instrumentation, which my prior toolchain
-> didn't support. KASAN's stack instrumentation significantly bloats the stack
-> significantly, leading to stack overflows and subsequent failures as a result
-> of the data corruption they cause.
-> 
+Good idea, I'll update the series using static global variables for ops
+and poll intervals and reference them in the .data field.
 
-This is caused by -fsanitize-address-use-after-scope which is added in gcc 7.
-Arnd reported that sometimes it causes enormously huge stack growth.
+Thanks!
+Antoine
 
-Given that we haven't found any single use-after-scope bug so far, I wouldn't object
-removing it completely.  
-
-
-> These patches avoid the issue by doubling the stack size for kernels built with
-> KASAN, as is already done for x86.
-> 
-> I've built and booted 4K and 64K kernels with these patches applied (and with
-> KASAN enabled), and so far I haven't seen stack overflows when testing with
-> Syzkaller.
-> 
-> Thanks,
-> Mark.
-> 
-> Mark Rutland (2):
->   arm64: avoid open-coding THREAD_SIZE{,_ORDER}
->   arm64: use larger stacks for KASAN
-> 
->  arch/arm64/include/asm/thread_info.h | 22 ++++++++++++++++++----
->  1 file changed, 18 insertions(+), 4 deletions(-)
-> 
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170607/b292725a/attachment-0001.sig>
