@@ -1,55 +1,38 @@
-From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Wed, 07 Jun 2017 15:14:20 +0900
-Subject: [PATCH v5 4/5] arm64: dts: exynos: Remove the OF graph from DSI
- node
-In-Reply-To: <9508dfc9-7cd3-3ed3-f642-2f69a5dcb5ce@samsung.com>
-References: <1488948852-5380-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170308045502epcas1p21a483d429e2169b322e40fd833c47f27@epcas1p2.samsung.com>
- <1488948852-5380-5-git-send-email-hoegeun.kwon@samsung.com>
- <20170515164829.rfcqj5quw2jooh6u@kozik-lap>
- <9508dfc9-7cd3-3ed3-f642-2f69a5dcb5ce@samsung.com>
-Message-ID: <ac8dc366-4273-9e24-a60e-ece22a6ad5bc@samsung.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Wed,  7 Jun 2017 08:17:50 +0200
+Subject: [PATCH v2] net: mvpp2: do not bypass the mvpp22_port_mii_set function
+Message-ID: <20170607061750.28516-1-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/19/2017 03:17 PM, Hoegeun Kwon wrote:
-> On 05/16/2017 01:48 AM, Krzysztof Kozlowski wrote:
->> On Wed, Mar 08, 2017 at 01:54:11PM +0900, Hoegeun Kwon wrote:
->>> The OF graph is not needed because the panel is a child of dsi. Remove
->>> the ports node in DSI node.
->>>
->>> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
->>> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
->>> Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
->>> ---
->>>   arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi | 14 
->>> --------------
->>>   1 file changed, 14 deletions(-)
->>>
->> Hi,
->>
->> I wanted to apply this (and 5/5) but it seems that DRM change is not
->> merged. Was it included in v4.12-rc1?
->>
->> Best regards,
->> Krzysztof
->
-> Hi,
->
-> Sorry for my belated reply.
->
-> The DRM patch(3/5) is not merged in v4.12-rc1 (mainline)...
-> I have checked the David's branch, but not merged.
-> However it was merged into Inki's exynos drm branch.
->
-> Inki, Could you check the patch(3/5).
->
-> Best regards,
-> Hoegeun
+The mvpp22_port_mii_set() function was added by 2697582144dd, but the
+function directly returns without doing anything. This return was used
+when debugging and wasn't removed before sending the patch. Fix this.
 
-Hi Krzysztof,
+Fixes: 2697582144dd ("net: mvpp2: handle misc PPv2.1/PPv2.2 differences")
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
 
-The drm patch(3/5) has been merged into v4.12-rc4.
+Since v1:
+  - Added the Fixes tag.
+  - Added Thomas' Acked-by.
 
-Best regards,
-Hoegeun
+ drivers/net/ethernet/marvell/mvpp2.c | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
+index 9b875d776b29..70bca2a6fb02 100644
+--- a/drivers/net/ethernet/marvell/mvpp2.c
++++ b/drivers/net/ethernet/marvell/mvpp2.c
+@@ -4186,8 +4186,6 @@ static void mvpp22_port_mii_set(struct mvpp2_port *port)
+ {
+ 	u32 val;
+ 
+-	return;
+-
+ 	/* Only GOP port 0 has an XLG MAC */
+ 	if (port->gop_id == 0) {
+ 		val = readl(port->base + MVPP22_XLG_CTRL3_REG);
+-- 
+2.9.4
