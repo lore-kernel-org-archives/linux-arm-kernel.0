@@ -1,48 +1,102 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Wed,  7 Jun 2017 11:33:59 -0700
-Subject: [PATCH v8 20/34] media: imx: Add a TODO file
+Date: Wed,  7 Jun 2017 11:33:53 -0700
+Subject: [PATCH v8 14/34] ARM: dts: imx6-sabreauto: add the ADV7180 video
+ decoder
 In-Reply-To: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1496860453-6282-21-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1496860453-6282-15-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a TODO file.
+Enables the ADV7180 decoder sensor. The ADV7180 connects to the
+parallel-bus mux input on ipu1_csi0_mux.
+
+The ADV7180 power pin is via max7310_b port expander.
 
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
----
- drivers/staging/media/imx/TODO | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
- create mode 100644 drivers/staging/media/imx/TODO
 
-diff --git a/drivers/staging/media/imx/TODO b/drivers/staging/media/imx/TODO
-new file mode 100644
-index 0000000..0bee313
---- /dev/null
-+++ b/drivers/staging/media/imx/TODO
-@@ -0,0 +1,23 @@
+- Use IRQ_TYPE_LEVEL_LOW instead of 0x8 for interrupt type for clarity.
+- For 8-bit parallel IPU1-CSI0 bus connection only data[12-19] are used.
+
+Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+---
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 50 ++++++++++++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+index 1212f82..c24af28 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+@@ -124,6 +124,21 @@
+ 			#size-cells = <0>;
+ 			reg = <1>;
+ 
++			adv7180: camera at 21 {
++				compatible = "adi,adv7180";
++				reg = <0x21>;
++				powerdown-gpios = <&max7310_b 2 GPIO_ACTIVE_LOW>;
++				interrupt-parent = <&gpio1>;
++				interrupts = <27 IRQ_TYPE_LEVEL_LOW>;
 +
-+- Clean up and move the ov5642 subdev driver to drivers/media/i2c, or
-+  merge support for OV5642 into drivers/media/i2c/ov5640.c, and create
-+  the binding docs for it.
++				port {
++					adv7180_to_ipu1_csi0_mux: endpoint {
++						remote-endpoint = <&ipu1_csi0_mux_from_parallel_sensor>;
++						bus-width = <8>;
++					};
++				};
++			};
 +
-+- The Frame Interval Monitor could be exported to v4l2-core for
-+  general use.
+ 			max7310_a: gpio at 30 {
+ 				compatible = "maxim,max7310";
+ 				reg = <0x30>;
+@@ -151,6 +166,25 @@
+ 	};
+ };
+ 
++&ipu1_csi0_from_ipu1_csi0_mux {
++	bus-width = <8>;
++};
 +
-+- At driver load time, the device-tree node that is the original source
-+  (the "sensor"), is parsed to record its media bus configuration, and
-+  this info is required in imx-media-csi.c to setup the CSI.
-+  Laurent Pinchart argues that instead the CSI subdev should call its
-+  neighbor's g_mbus_config op (which should be propagated if necessary)
-+  to get this info. However Hans Verkuil is planning to remove the
-+  g_mbus_config op. For now this driver uses the parsed DT mbus config
-+  method until this issue is resolved.
++&ipu1_csi0_mux_from_parallel_sensor {
++	remote-endpoint = <&adv7180_to_ipu1_csi0_mux>;
++	bus-width = <8>;
++};
 +
-+- This media driver supports inheriting V4L2 controls to the
-+  video capture devices, from the subdevices in the capture device's
-+  pipeline. The controls for each capture device are updated in the
-+  link_notify callback when the pipeline is modified. It should be
-+  decided whether this feature is useful enough to make it generally
-+  available by exporting to v4l2-core.
++&ipu1_csi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_ipu1_csi0>;
++
++	/* enable frame interval monitor on this port */
++	fim {
++		status = "okay";
++	};
++};
++
+ &clks {
+ 	assigned-clocks = <&clks IMX6QDL_PLL4_BYPASS_SRC>,
+ 			  <&clks IMX6QDL_PLL4_BYPASS>,
+@@ -444,6 +478,22 @@
+ 			>;
+ 		};
+ 
++		pinctrl_ipu1_csi0: ipu1csi0grp {
++			fsl,pins = <
++				MX6QDL_PAD_CSI0_DAT12__IPU1_CSI0_DATA12  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT13__IPU1_CSI0_DATA13  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT14__IPU1_CSI0_DATA14  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT15__IPU1_CSI0_DATA15  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT16__IPU1_CSI0_DATA16  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT17__IPU1_CSI0_DATA17  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT18__IPU1_CSI0_DATA18  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT19__IPU1_CSI0_DATA19  0x1b0b0
++				MX6QDL_PAD_CSI0_PIXCLK__IPU1_CSI0_PIXCLK 0x1b0b0
++				MX6QDL_PAD_CSI0_MCLK__IPU1_CSI0_HSYNC    0x1b0b0
++				MX6QDL_PAD_CSI0_VSYNC__IPU1_CSI0_VSYNC   0x1b0b0
++			>;
++		};
++
+ 		pinctrl_max7310: max7310grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD2_DAT0__GPIO1_IO15 0x1b0b0
 -- 
 2.7.4
