@@ -1,77 +1,81 @@
-From: stefan.schoefegger@ginzinger.com (Stefan Schoefegger)
-Date: Wed, 7 Jun 2017 13:36:11 +0200
-Subject: [PATCH v2 1/1] PCI: imx6: Add pcie compliance test option
-In-Reply-To: <1472121518-9340-1-git-send-email-stefan.schoefegger@ginzinger.com>
-References: <1472121518-9340-1-git-send-email-stefan.schoefegger@ginzinger.com>
-Message-ID: <1496835374-13053-1-git-send-email-stefan.schoefegger@ginzinger.com>
+From: daniel@iogearbox.net (Daniel Borkmann)
+Date: Wed,  7 Jun 2017 13:45:37 +0200
+Subject: [PATCH net] bpf, arm64: use separate register for state in stxr
+Message-ID: <530443d87bd51b3682a1b60ea19b2030d7d21409.1496834547.git.daniel@iogearbox.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Link speed must not be limited to gen1 during link test for compliance
-tests
+Will reported that in BPF_XADD we must use a different register in stxr
+instruction for the status flag due to otherwise CONSTRAINED UNPREDICTABLE
+behavior per architecture. Reference manual says [1]:
 
-Signed-off-by: Stefan Schoefegger <stefan.schoefegger@ginzinger.com>
+  If s == t, then one of the following behaviors must occur:
+
+   * The instruction is UNDEFINED.
+   * The instruction executes as a NOP.
+   * The instruction performs the store to the specified address, but
+     the value stored is UNKNOWN.
+
+Thus, use a different temporary register for the status flag to fix it.
+
+Disassembly extract from test 226/STX_XADD_DW from test_bpf.ko:
+
+  [...]
+  0000003c:  c85f7d4b  ldxr x11, [x10]
+  00000040:  8b07016b  add x11, x11, x7
+  00000044:  c80c7d4b  stxr w12, x11, [x10]
+  00000048:  35ffffac  cbnz w12, 0x0000003c
+  [...]
+
+  [1] https://static.docs.arm.com/ddi0487/b/DDI0487B_a_armv8_arm.pdf, p.6132
+
+Fixes: 85f68fe89832 ("bpf, arm64: implement jiting of BPF_XADD")
+Reported-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Daniel Borkmann <daniel@iogearbox.net>
 ---
+ arch/arm64/net/bpf_jit_comp.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-Changes since v1:
- - pci-imx6.c moved to dwc directory
-
- drivers/pci/dwc/Kconfig    | 10 ++++++++++
- drivers/pci/dwc/pci-imx6.c | 21 ++++++++++++---------
- 2 files changed, 22 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/pci/dwc/Kconfig b/drivers/pci/dwc/Kconfig
-index b7e15526d676..b6e9ced5a45d 100644
---- a/drivers/pci/dwc/Kconfig
-+++ b/drivers/pci/dwc/Kconfig
-@@ -77,6 +77,16 @@ config PCI_IMX6
- 	select PCIEPORTBUS
- 	select PCIE_DW_HOST
+diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+index 71f9305..c870d6f 100644
+--- a/arch/arm64/net/bpf_jit_comp.c
++++ b/arch/arm64/net/bpf_jit_comp.c
+@@ -36,6 +36,7 @@
+ #define TMP_REG_1 (MAX_BPF_JIT_REG + 0)
+ #define TMP_REG_2 (MAX_BPF_JIT_REG + 1)
+ #define TCALL_CNT (MAX_BPF_JIT_REG + 2)
++#define TMP_REG_3 (MAX_BPF_JIT_REG + 3)
  
-+config PCI_IMX6_COMPLIANCE_TEST
-+	bool "Enable pcie compliance tests on imx6"
-+	depends on PCI_IMX6
-+	default n
-+	help
-+	  Enables support for pcie compliance test on FSL iMX SoCs.
-+	  The link speed wouldn't be limited to gen1 when enabled.
-+	  Enable only during compliance tests, otherwise
-+	  link detection will fail on some peripherals.
-+
- config PCIE_SPEAR13XX
- 	bool "STMicroelectronics SPEAr PCIe controller"
- 	depends on PCI
-diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
-index 19a289b8cc94..b0fbe52e25b0 100644
---- a/drivers/pci/dwc/pci-imx6.c
-+++ b/drivers/pci/dwc/pci-imx6.c
-@@ -533,15 +533,18 @@ static int imx6_pcie_establish_link(struct imx6_pcie *imx6_pcie)
- 	u32 tmp;
- 	int ret;
+ /* Map BPF registers to A64 registers */
+ static const int bpf2a64[] = {
+@@ -57,6 +58,7 @@
+ 	/* temporary registers for internal BPF JIT */
+ 	[TMP_REG_1] = A64_R(10),
+ 	[TMP_REG_2] = A64_R(11),
++	[TMP_REG_3] = A64_R(12),
+ 	/* tail_call_cnt */
+ 	[TCALL_CNT] = A64_R(26),
+ 	/* temporary register for blinding constants */
+@@ -319,6 +321,7 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
+ 	const u8 src = bpf2a64[insn->src_reg];
+ 	const u8 tmp = bpf2a64[TMP_REG_1];
+ 	const u8 tmp2 = bpf2a64[TMP_REG_2];
++	const u8 tmp3 = bpf2a64[TMP_REG_3];
+ 	const s16 off = insn->off;
+ 	const s32 imm = insn->imm;
+ 	const int i = insn - ctx->prog->insnsi;
+@@ -689,10 +692,10 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
+ 		emit(A64_PRFM(tmp, PST, L1, STRM), ctx);
+ 		emit(A64_LDXR(isdw, tmp2, tmp), ctx);
+ 		emit(A64_ADD(isdw, tmp2, tmp2, src), ctx);
+-		emit(A64_STXR(isdw, tmp2, tmp, tmp2), ctx);
++		emit(A64_STXR(isdw, tmp2, tmp, tmp3), ctx);
+ 		jmp_offset = -3;
+ 		check_imm19(jmp_offset);
+-		emit(A64_CBNZ(0, tmp2, jmp_offset), ctx);
++		emit(A64_CBNZ(0, tmp3, jmp_offset), ctx);
+ 		break;
  
--	/*
--	 * Force Gen1 operation when starting the link.  In case the link is
--	 * started in Gen2 mode, there is a possibility the devices on the
--	 * bus will not be detected at all.  This happens with PCIe switches.
--	 */
--	tmp = dw_pcie_readl_dbi(pci, PCIE_RC_LCR);
--	tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
--	tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1;
--	dw_pcie_writel_dbi(pci, PCIE_RC_LCR, tmp);
-+	if (!IS_ENABLED(CONFIG_PCI_IMX6_COMPLIANCE_TEST)) {
-+		/*
-+		 * Force Gen1 operation when starting the link.  In case the
-+		 * link is started in Gen2 mode, there is a possibility the
-+		 * devices on the bus will not be detected at all.  This
-+		 * happens with PCIe switches.
-+		 */
-+		tmp = dw_pcie_readl_dbi(pci, PCIE_RC_LCR);
-+		tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
-+		tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1;
-+		dw_pcie_writel_dbi(pci, PCIE_RC_LCR, tmp);
-+	}
- 
- 	/* Start LTSSM. */
- 	if (imx6_pcie->variant == IMX7D)
+ 	/* R0 = ntohx(*(size *)(((struct sk_buff *)R6)->data + imm)) */
 -- 
-2.11.0
+1.9.3
