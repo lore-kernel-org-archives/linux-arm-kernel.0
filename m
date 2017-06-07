@@ -1,54 +1,92 @@
-From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Wed, 7 Jun 2017 16:59:32 +0800
-Subject: [PATCH] Revert "ARM: 8433/1: add a VMSPLIT_3G_OPT config option"
-Message-ID: <1496825972-26829-1-git-send-email-xieyisheng1@huawei.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 7 Jun 2017 11:07:25 +0200
+Subject: [PATCH v4 3/3] media: mtk-mdp: Fix mdp device tree
+In-Reply-To: <2407aa14-610d-0252-f264-edf22961752e@xs4all.nl>
+References: <1495509851-29159-1-git-send-email-minghsiu.tsai@mediatek.com>
+ <1495509851-29159-4-git-send-email-minghsiu.tsai@mediatek.com>
+ <e7996ad5-03a1-7b53-5d61-ae171473581f@gmail.com>
+ <2407aa14-610d-0252-f264-edf22961752e@xs4all.nl>
+Message-ID: <59ac9ca0-3f2f-fa65-011d-c832e4ced265@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 63ce446c9b5787a94ed875bab20772e1a2b3092f.
 
-When enable VMSPLIT_3G_OPT, the PAGE_OFFSET will be 0xB0000000, and then
-we will get the value "1" for TTBR1_SIZE(T1SZ) as the following MACRO:
 
-   #define TTBR1_SIZE     (((PAGE_OFFSET >> 30) - 1) << 16)
+On 07/06/17 10:56, Hans Verkuil wrote:
+> On 07/06/17 10:44, Matthias Brugger wrote:
+>> Hi Hans, hi Mauro,
+>>
+>> On 23/05/17 05:24, Minghsiu Tsai wrote:
+>>> From: Daniel Kurtz <djkurtz@chromium.org>
+>>>
+>>> If the mdp_* nodes are under an mdp sub-node, their corresponding
+>>> platform device does not automatically get its iommu assigned properly.
+>>>
+>>> Fix this by moving the mdp component nodes up a level such that they are
+>>> siblings of mdp and all other SoC subsystems.  This also simplifies the
+>>> device tree.
+>>>
+>>> Although it fixes iommu assignment issue, it also break compatibility
+>>> with old device tree. So, the patch in driver is needed to iterate over
+>>> sibling mdp device nodes, not child ones, to keep driver work properly.
+>>>
+>>> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+>>> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+>>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+>>>
+>>
+>> Are you OK to take this patch, or do you have any further comments?
+> 
+> Nope, it's all good. Queued for 4.13.
+> 
 
-which means TTBR1's range will be 0x80000000 to 0xffffffff, and it is
-waster of VA [0x80000000, 0xB0000000). So it is better to use VMSPLIT_2G
-instead, to achieve the goal "allows for 1GB systems to have their RAM
-entirely mapped as low memory".
+Thanks!
 
-Meanwhile, It will trigger a bug of boot fail with CONFIG_ARM_LPAE=y,
-which I reported:
-    https://patchwork.kernel.org/patch/9768573/
+I queued the other two in v4.12-next/dts64
 
-For ARM_LPAE only support 3:1, 2:2, 1:3 split of TTBR1, which mention in:
-  http://elinux.org/images/6/6a/Elce11_marinas.pdf - p16
+Regards,
+Matthias
 
-Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
----
- arch/arm/Kconfig | 3 ---
- 1 file changed, 3 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 4c1a35f..5961835a 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1415,8 +1415,6 @@ choice
- 
- 	config VMSPLIT_3G
- 		bool "3G/1G user/kernel split"
--	config VMSPLIT_3G_OPT
--		bool "3G/1G user/kernel split (for full 1G low memory)"
- 	config VMSPLIT_2G
- 		bool "2G/2G user/kernel split"
- 	config VMSPLIT_1G
-@@ -1428,7 +1426,6 @@ config PAGE_OFFSET
- 	default PHYS_OFFSET if !MMU
- 	default 0x40000000 if VMSPLIT_1G
- 	default 0x80000000 if VMSPLIT_2G
--	default 0xB0000000 if VMSPLIT_3G_OPT
- 	default 0xC0000000
- 
- config NR_CPUS
--- 
-1.7.12.4
+> Regards,
+> 
+> 	Hans
+> 
+>>
+>> Regards,
+>> Matthias
+>>
+>>> ---
+>>>    drivers/media/platform/mtk-mdp/mtk_mdp_core.c | 12 ++++++++++--
+>>>    1 file changed, 10 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_core.c b/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
+>>> index 9e4eb7d..8134755 100644
+>>> --- a/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
+>>> +++ b/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
+>>> @@ -103,7 +103,7 @@ static int mtk_mdp_probe(struct platform_device *pdev)
+>>>    {
+>>>        struct mtk_mdp_dev *mdp;
+>>>        struct device *dev = &pdev->dev;
+>>> -    struct device_node *node;
+>>> +    struct device_node *node, *parent;
+>>>        int i, ret = 0;
+>>>          mdp = devm_kzalloc(dev, sizeof(*mdp), GFP_KERNEL);
+>>> @@ -117,8 +117,16 @@ static int mtk_mdp_probe(struct platform_device *pdev)
+>>>        mutex_init(&mdp->lock);
+>>>        mutex_init(&mdp->vpulock);
+>>>    +    /* Old dts had the components as child nodes */
+>>> +    if (of_get_next_child(dev->of_node, NULL)) {
+>>> +        parent = dev->of_node;
+>>> +        dev_warn(dev, "device tree is out of date\n");
+>>> +    } else {
+>>> +        parent = dev->of_node->parent;
+>>> +    }
+>>> +
+>>>        /* Iterate over sibling MDP function blocks */
+>>> -    for_each_child_of_node(dev->of_node, node) {
+>>> +    for_each_child_of_node(parent, node) {
+>>>            const struct of_device_id *of_id;
+>>>            enum mtk_mdp_comp_type comp_type;
+>>>            int comp_id;
+>>>
+> 
