@@ -1,124 +1,366 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed,  7 Jun 2017 05:25:25 -0700
-Subject: [GIT PULL 2/2] device tree changes for omaps for v4.13
-In-Reply-To: <pull-1496838233-684770>
-References: <pull-1496838233-684770>
-Message-ID: <pull-1496838233-684770-2>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Wed,  7 Jun 2017 17:59:07 +0530
+Subject: [PATCH] dmaengine: qcom-bam: Process multiple pending descriptors
+Message-ID: <1496838547-15092-1-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+The bam dmaengine has a circular FIFO to which we
+add hw descriptors that describes the transaction.
+The FIFO has space for about 4096 hw descriptors.
 
-  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+Currently we add one descriptor and wait for it to
+complete with interrupt and start processing the
+next pending descriptor. In this way, FIFO is
+underutilised and also adds additional interrupt
+overhead for each of the descriptor. This results
+in loss of throughput for clients that submits
+multiple descriptors together, that can be processed
+by bam and the client peripheral together.
+So instead, when a client does an issue_pending,
+we can keep pulling in descriptors from the pending
+queue and add it to the FIFO, till either the FIFO
+is full (or) client has requested for an interrupt
+notification for that descriptor. After this,
+receiving a completion interrupt implies that all
+descriptors that were submitted have completed.
+so notify completion for all the descriptors.
 
-are available in the git repository at:
+CURRENT:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.13/dt-signed
+            ------      -------   ---------------
+            |DES 0|     |DESC 1|  |DESC 2 + INT |
+            ------      -------   ---------------
+               |           |            |
+               |           |            |
+INTERRUPT:   (INT)       (INT)	      (INT)
+CALLBACK:     (CB)        (CB)         (CB)
 
-for you to fetch changes up to de09eb52a1cceb6f80464a008c67c7bebb242314:
+		MTD_SPEEDTEST READ PAGE: 3560 KiB/s
+		MTD_SPEEDTEST WRITE PAGE: 2664 KiB/s
+		IOZONE READ: 2456 KB/s
+		IOZONE WRITE: 1230 KB/s
 
-  arm: dts: am33xx: Remove redundant interrupt-parent property (2017-06-06 00:33:48 -0700)
+	bam dma interrupts (after tests): 96508
 
-----------------------------------------------------------------
-Device tree changes for omaps for v4.13 merge window.
-This adds support for am335x-boneblue. The rest of
-the changes are for enabling features on various
-devices with the git shortlog describing the changes.
+CHANGE:
 
-----------------------------------------------------------------
-Alexandre Belloni (1):
-      ARM: dts: am335x-phycore-som: fix rv4162 compatible
+        ------  -------    -------------
+        |DES 0| |DESC 1   |DESC 2 + INT |
+        ------  -------   --------------
+				|
+				|
+          		      (INT)
+			      (CB for 0, 1, 2)
 
-Fabio Estevam (1):
-      ARM: dts: omap3: Remove 'enable-active-low' property
+		MTD_SPEEDTEST READ PAGE: 3860 KiB/s
+		MTD_SPEEDTEST WRITE PAGE: 2837 KiB/s
+		IOZONE READ: 2677 KB/s
+		IOZONE WRITE: 1308 KB/s
 
-H. Nikolaus Schaller (1):
-      ARM: dts: OMAP5: uevm: add ?SD card detect
+	bam dma interrupts (after tests): 58806
 
-Javier Martinez Canillas (1):
-      ARM: dts: omap: Add generic compatible string for I2C EEPROM
+Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+---
+ drivers/dma/qcom/bam_dma.c | 180 +++++++++++++++++++++++++++++----------------
+ 1 file changed, 115 insertions(+), 65 deletions(-)
 
-Keerthy (1):
-      ARM: dts: AM43XX: Remove min and max voltage values for dcdc3
-
-Marek Belisko (1):
-      ARM: dts: twl4030: Add missing madc reference for bci subnode
-
-Peter Ujfalusi (1):
-      ARM: dts: am43xx-clocks: Add support for CLKOUT2
-
-Ricardo Salveti (1):
-      arm: dts: boneblack-wireless: add WL1835 Bluetooth device node
-
-Robert Nelson (2):
-      ARM: dts: Add am335x-boneblue
-      ARM: dts: bonegreen-wireless: add WL1835 Bluetooth device node
-
-Roger Quadros (1):
-      ARM: dts: dra7x-evm: Enable dual-role mode for USB1
-
-Sebastian Reichel (1):
-      ARM: dts: omap4-droid4: Add bluetooth
-
-Suman Anna (2):
-      ARM: dts: am572x-idk: Enable the system mailboxes 5 and 6
-      ARM: dts: am571x-idk: Enable the system mailboxes 5 and 6
-
-Suniel Mahesh (1):
-      arm: dts: am33xx: Remove redundant interrupt-parent property
-
-Tony Lindgren (3):
-      ARM: dts: Enable earlycon stdout path for duovero
-      ARM: dts: Enable earlycon stdout path for LogicPD torpedo
-      ARM: dts: Configure USB host for 37xx-evm
-
-Uwe Kleine-K?nig (1):
-      ARM: dts: omap4-devkit8000: fix gpmc ranges property
-
-Viresh Kumar (1):
-      ARM: dts: Use - instead of @ for DT OPP entries for TI SoCs
-
- .../devicetree/bindings/cpufreq/ti-cpufreq.txt     |  20 +-
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/am335x-baltos.dtsi               |   2 +-
- arch/arm/boot/dts/am335x-base0033.dts              |   2 +-
- arch/arm/boot/dts/am335x-bone-common.dtsi          |  10 +-
- arch/arm/boot/dts/am335x-boneblack-wireless.dts    |   5 +
- arch/arm/boot/dts/am335x-boneblack.dts             |   2 +-
- arch/arm/boot/dts/am335x-boneblue.dts              | 460 +++++++++++++++++++++
- arch/arm/boot/dts/am335x-bonegreen-wireless.dts    |   5 +
- arch/arm/boot/dts/am335x-nano.dts                  |   2 +-
- arch/arm/boot/dts/am335x-pepper.dts                |   2 +-
- arch/arm/boot/dts/am335x-phycore-som.dtsi          |   2 +-
- arch/arm/boot/dts/am335x-shc.dts                   |   2 +-
- arch/arm/boot/dts/am335x-sl50.dts                  |   2 +-
- arch/arm/boot/dts/am33xx.dtsi                      |  26 +-
- arch/arm/boot/dts/am4372.dtsi                      |  10 +-
- arch/arm/boot/dts/am437x-gp-evm.dts                |   2 -
- arch/arm/boot/dts/am437x-idk-evm.dts               |   2 +-
- arch/arm/boot/dts/am437x-sk-evm.dts                |   4 +-
- arch/arm/boot/dts/am43x-epos-evm.dts               |   4 +-
- arch/arm/boot/dts/am43xx-clocks.dtsi               |  36 ++
- arch/arm/boot/dts/am571x-idk.dts                   |  17 +
- arch/arm/boot/dts/am572x-idk.dts                   |  20 +
- arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi    |   2 +-
- arch/arm/boot/dts/dra7-evm.dts                     |   3 +-
- arch/arm/boot/dts/dra7.dtsi                        |   4 +-
- arch/arm/boot/dts/dra72-evm-common.dtsi            |   3 +-
- arch/arm/boot/dts/logicpd-torpedo-som.dtsi         |   4 +
- arch/arm/boot/dts/omap3-cm-t3x.dtsi                |   2 +-
- arch/arm/boot/dts/omap3-devkit8000-common.dtsi     |   9 +-
- arch/arm/boot/dts/omap3-evm-37xx.dts               | 102 +++++
- arch/arm/boot/dts/omap3-evm-common.dtsi            |  34 +-
- arch/arm/boot/dts/omap3-gta04.dtsi                 |   2 +-
- arch/arm/boot/dts/omap3-sb-t35.dtsi                |   3 +-
- arch/arm/boot/dts/omap3-tao3530.dtsi               |   1 -
- arch/arm/boot/dts/omap4-droid4-xt894.dts           |  20 +
- arch/arm/boot/dts/omap4-duovero.dtsi               |   4 +
- arch/arm/boot/dts/omap4-var-som-om44.dtsi          |   2 +-
- arch/arm/boot/dts/omap5-cm-t54.dts                 |   2 +-
- arch/arm/boot/dts/omap5-sbc-t54.dts                |   2 +-
- arch/arm/boot/dts/omap5-uevm.dts                   |  13 +
- arch/arm/boot/dts/twl4030.dtsi                     |   2 +
- 42 files changed, 779 insertions(+), 73 deletions(-)
- create mode 100644 arch/arm/boot/dts/am335x-boneblue.dts
+diff --git a/drivers/dma/qcom/bam_dma.c b/drivers/dma/qcom/bam_dma.c
+index 03c4eb3..97892f7 100644
+--- a/drivers/dma/qcom/bam_dma.c
++++ b/drivers/dma/qcom/bam_dma.c
+@@ -46,6 +46,7 @@
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_dma.h>
++#include <linux/circ_buf.h>
+ #include <linux/clk.h>
+ #include <linux/dmaengine.h>
+ #include <linux/pm_runtime.h>
+@@ -76,7 +77,8 @@ struct bam_async_desc {
+ 	u16 flags;
+ 
+ 	struct bam_desc_hw *curr_desc;
+-
++	/* list node for the desc in the bam_chan list of descriptors */
++	struct list_head desc_node;
+ 	enum dma_transfer_direction dir;
+ 	size_t length;
+ 	struct bam_desc_hw desc[0];
+@@ -371,6 +373,8 @@ struct bam_chan {
+ 	unsigned int initialized;	/* is the channel hw initialized? */
+ 	unsigned int paused;		/* is the channel paused? */
+ 	unsigned int reconfigure;	/* new slave config? */
++	/* list of descriptors currently processed */
++	struct list_head desc_list;
+ 
+ 	struct list_head node;
+ };
+@@ -486,6 +490,8 @@ static void bam_chan_init_hw(struct bam_chan *bchan,
+ 
+ 	bchan->initialized = 1;
+ 
++	INIT_LIST_HEAD(&bchan->desc_list);
++
+ 	/* init FIFO pointers */
+ 	bchan->head = 0;
+ 	bchan->tail = 0;
+@@ -631,8 +637,6 @@ static struct dma_async_tx_descriptor *bam_prep_slave_sg(struct dma_chan *chan,
+ 
+ 	if (flags & DMA_PREP_INTERRUPT)
+ 		async_desc->flags |= DESC_FLAG_EOT;
+-	else
+-		async_desc->flags |= DESC_FLAG_INT;
+ 
+ 	async_desc->num_desc = num_alloc;
+ 	async_desc->curr_desc = async_desc->desc;
+@@ -680,13 +684,18 @@ static struct dma_async_tx_descriptor *bam_prep_slave_sg(struct dma_chan *chan,
+ static int bam_dma_terminate_all(struct dma_chan *chan)
+ {
+ 	struct bam_chan *bchan = to_bam_chan(chan);
++	struct bam_async_desc *async_desc;
+ 	unsigned long flag;
+ 	LIST_HEAD(head);
+ 
+ 	/* remove all transactions, including active transaction */
+ 	spin_lock_irqsave(&bchan->vc.lock, flag);
+ 	if (bchan->curr_txd) {
+-		list_add(&bchan->curr_txd->vd.node, &bchan->vc.desc_issued);
++		list_for_each_entry(async_desc, &bchan->desc_list, desc_node) {
++			bchan->curr_txd = async_desc;
++			list_add(&bchan->curr_txd->vd.node,
++				 &bchan->vc.desc_issued);
++		}
+ 		bchan->curr_txd = NULL;
+ 	}
+ 
+@@ -761,7 +770,7 @@ static u32 process_channel_irqs(struct bam_device *bdev)
+ {
+ 	u32 i, srcs, pipe_stts;
+ 	unsigned long flags;
+-	struct bam_async_desc *async_desc;
++	struct bam_async_desc *async_desc, *tmp;
+ 
+ 	srcs = readl_relaxed(bam_addr(bdev, 0, BAM_IRQ_SRCS_EE));
+ 
+@@ -777,33 +786,39 @@ static u32 process_channel_irqs(struct bam_device *bdev)
+ 
+ 		/* clear pipe irq */
+ 		pipe_stts = readl_relaxed(bam_addr(bdev, i, BAM_P_IRQ_STTS));
+-
+ 		writel_relaxed(pipe_stts, bam_addr(bdev, i, BAM_P_IRQ_CLR));
+ 
+ 		spin_lock_irqsave(&bchan->vc.lock, flags);
+-		async_desc = bchan->curr_txd;
+-
+-		if (async_desc) {
+-			async_desc->num_desc -= async_desc->xfer_len;
+-			async_desc->curr_desc += async_desc->xfer_len;
+-			bchan->curr_txd = NULL;
+-
+-			/* manage FIFO */
+-			bchan->head += async_desc->xfer_len;
+-			bchan->head %= MAX_DESCRIPTORS;
+-
+-			/*
+-			 * if complete, process cookie.  Otherwise
+-			 * push back to front of desc_issued so that
+-			 * it gets restarted by the tasklet
+-			 */
+-			if (!async_desc->num_desc)
+-				vchan_cookie_complete(&async_desc->vd);
+-			else
+-				list_add(&async_desc->vd.node,
+-					&bchan->vc.desc_issued);
++
++		list_for_each_entry_safe(async_desc, tmp,
++					 &bchan->desc_list, desc_node) {
++			bchan->curr_txd = async_desc;
++
++			if (async_desc) {
++				async_desc->num_desc -= async_desc->xfer_len;
++				async_desc->curr_desc += async_desc->xfer_len;
++
++				/* manage FIFO */
++				bchan->head += async_desc->xfer_len;
++				bchan->head %= MAX_DESCRIPTORS;
++
++				/*
++				 * if complete, process cookie.  Otherwise
++				 * push back to front of desc_issued so that
++				 * it gets restarted by the tasklet
++				 */
++				if (!async_desc->num_desc) {
++					vchan_cookie_complete(&async_desc->vd);
++				} else {
++					list_add(&async_desc->vd.node,
++						 &bchan->vc.desc_issued);
++				}
++				list_del(&async_desc->desc_node);
++			}
+ 		}
+ 
++		bchan->curr_txd = NULL;
++
+ 		spin_unlock_irqrestore(&bchan->vc.lock, flags);
+ 	}
+ 
+@@ -863,6 +878,7 @@ static enum dma_status bam_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
+ 		struct dma_tx_state *txstate)
+ {
+ 	struct bam_chan *bchan = to_bam_chan(chan);
++	struct bam_async_desc *async_desc;
+ 	struct virt_dma_desc *vd;
+ 	int ret;
+ 	size_t residue = 0;
+@@ -877,12 +893,21 @@ static enum dma_status bam_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
+ 		return bchan->paused ? DMA_PAUSED : ret;
+ 
+ 	spin_lock_irqsave(&bchan->vc.lock, flags);
++
+ 	vd = vchan_find_desc(&bchan->vc, cookie);
+-	if (vd)
++	if (vd) {
+ 		residue = container_of(vd, struct bam_async_desc, vd)->length;
+-	else if (bchan->curr_txd && bchan->curr_txd->vd.tx.cookie == cookie)
+-		for (i = 0; i < bchan->curr_txd->num_desc; i++)
+-			residue += bchan->curr_txd->curr_desc[i].size;
++	} else if (bchan->curr_txd) {
++		list_for_each_entry(async_desc, &bchan->desc_list, desc_node) {
++			bchan->curr_txd = async_desc;
++
++			if (bchan->curr_txd->vd.tx.cookie != cookie)
++				continue;
++
++			for (i = 0; i < bchan->curr_txd->num_desc; i++)
++				residue += bchan->curr_txd->curr_desc[i].size;
++		}
++	}
+ 
+ 	spin_unlock_irqrestore(&bchan->vc.lock, flags);
+ 
+@@ -923,63 +948,88 @@ static void bam_start_dma(struct bam_chan *bchan)
+ {
+ 	struct virt_dma_desc *vd = vchan_next_desc(&bchan->vc);
+ 	struct bam_device *bdev = bchan->bdev;
+-	struct bam_async_desc *async_desc;
++	struct bam_async_desc *async_desc = NULL;
+ 	struct bam_desc_hw *desc;
+ 	struct bam_desc_hw *fifo = PTR_ALIGN(bchan->fifo_virt,
+ 					sizeof(struct bam_desc_hw));
+ 	int ret;
++	unsigned int avail;
+ 
+ 	lockdep_assert_held(&bchan->vc.lock);
+ 
+ 	if (!vd)
+ 		return;
+ 
+-	list_del(&vd->node);
+-
+-	async_desc = container_of(vd, struct bam_async_desc, vd);
+-	bchan->curr_txd = async_desc;
+-
+ 	ret = pm_runtime_get_sync(bdev->dev);
+ 	if (ret < 0)
+ 		return;
+ 
+-	/* on first use, initialize the channel hardware */
+-	if (!bchan->initialized)
+-		bam_chan_init_hw(bchan, async_desc->dir);
++	while (vd) {
++		list_del(&vd->node);
+ 
+-	/* apply new slave config changes, if necessary */
+-	if (bchan->reconfigure)
+-		bam_apply_new_config(bchan, async_desc->dir);
++		async_desc = container_of(vd, struct bam_async_desc, vd);
+ 
+-	desc = bchan->curr_txd->curr_desc;
++		/* on first use, initialize the channel hardware */
++		if (!bchan->initialized)
++			bam_chan_init_hw(bchan, async_desc->dir);
+ 
+-	if (async_desc->num_desc > MAX_DESCRIPTORS)
+-		async_desc->xfer_len = MAX_DESCRIPTORS;
+-	else
+-		async_desc->xfer_len = async_desc->num_desc;
++		/* apply new slave config changes, if necessary */
++		if (bchan->reconfigure)
++			bam_apply_new_config(bchan, async_desc->dir);
+ 
+-	/* set any special flags on the last descriptor */
+-	if (async_desc->num_desc == async_desc->xfer_len)
+-		desc[async_desc->xfer_len - 1].flags =
+-					cpu_to_le16(async_desc->flags);
+-	else
+-		desc[async_desc->xfer_len - 1].flags |=
++		bchan->curr_txd = async_desc;
++		desc = bchan->curr_txd->curr_desc;
++		avail = CIRC_SPACE(bchan->tail, bchan->head,
++				   MAX_DESCRIPTORS + 1);
++
++		if (async_desc->num_desc > avail)
++			async_desc->xfer_len = avail;
++		else
++			async_desc->xfer_len = async_desc->num_desc;
++
++		/* set any special flags on the last descriptor */
++		if (async_desc->num_desc == async_desc->xfer_len)
++			desc[async_desc->xfer_len - 1].flags |=
++						cpu_to_le16(async_desc->flags);
++
++		vd = vchan_next_desc(&bchan->vc);
++
++		/*
++		 * This will be the last descriptor in the chain if,
++		 *  - FIFO is FULL.
++		 *  - No more descriptors to add.
++		 *  - This descriptor has interrupt flags set,
++		 *    so that we will have to indicate finishing of
++		 *    that descriptor.
++		 */
++		if (!(avail - async_desc->xfer_len) || !vd ||
++		    (async_desc->flags & DESC_FLAG_EOT)) {
++			/* set INT flag for the last descriptor if unset */
++			if ((async_desc->num_desc != async_desc->xfer_len) ||
++			    (!(async_desc->flags & DESC_FLAG_EOT)))
++				desc[async_desc->xfer_len - 1].flags |=
+ 					cpu_to_le16(DESC_FLAG_INT);
++			vd = NULL;
++		}
+ 
+-	if (bchan->tail + async_desc->xfer_len > MAX_DESCRIPTORS) {
+-		u32 partial = MAX_DESCRIPTORS - bchan->tail;
++		if (bchan->tail + async_desc->xfer_len > MAX_DESCRIPTORS) {
++			u32 partial = MAX_DESCRIPTORS - bchan->tail;
+ 
+-		memcpy(&fifo[bchan->tail], desc,
+-				partial * sizeof(struct bam_desc_hw));
+-		memcpy(fifo, &desc[partial], (async_desc->xfer_len - partial) *
++			memcpy(&fifo[bchan->tail], desc,
++			       partial * sizeof(struct bam_desc_hw));
++			memcpy(fifo, &desc[partial],
++			       (async_desc->xfer_len - partial) *
+ 				sizeof(struct bam_desc_hw));
+-	} else {
+-		memcpy(&fifo[bchan->tail], desc,
+-			async_desc->xfer_len * sizeof(struct bam_desc_hw));
+-	}
++		} else {
++			memcpy(&fifo[bchan->tail], desc,
++			       async_desc->xfer_len *
++			       sizeof(struct bam_desc_hw));
++		}
+ 
+-	bchan->tail += async_desc->xfer_len;
+-	bchan->tail %= MAX_DESCRIPTORS;
++		bchan->tail += async_desc->xfer_len;
++		bchan->tail %= MAX_DESCRIPTORS;
++		list_add_tail(&async_desc->desc_node, &bchan->desc_list);
++	}
+ 
+ 	/* ensure descriptor writes and dma start not reordered */
+ 	wmb();
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
