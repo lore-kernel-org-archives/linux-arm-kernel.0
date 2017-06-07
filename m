@@ -1,96 +1,73 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Jun 2017 14:47:32 +0100
-Subject: [PATCH v2 1/3] arm64: hugetlb: Fix huge_pte_offset to return
- poisoned page table entries
-In-Reply-To: <20170517152336.6052-2-punit.agrawal@arm.com>
-References: <20170517152336.6052-1-punit.agrawal@arm.com>
- <20170517152336.6052-2-punit.agrawal@arm.com>
-Message-ID: <20170607134731.GG30263@arm.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Wed,  7 Jun 2017 15:48:41 +0200
+Subject: [PATCH] ARM64: dts: meson-gx: use specific compatible for the AO pwms
+Message-ID: <20170607134841.6822-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 17, 2017 at 04:23:34PM +0100, Punit Agrawal wrote:
-> When memory failure is enabled, a poisoned hugepage pte is marked as a
-> swap entry. huge_pte_offset() does not return the poisoned page table
-> entries when it encounters PUD/PMD hugepages.
-> 
-> This behaviour of huge_pte_offset() leads to error such as below when
-> munmap is called on poisoned hugepages.
-> 
-> [  344.165544] mm/pgtable-generic.c:33: bad pmd 000000083af00074.
-> 
-> Fix huge_pte_offset() to return the poisoned pte which is then
-> appropriately handled by the generic layer code.
-> 
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Acked-by: Steve Capper <steve.capper@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: David Woods <dwoods@mellanox.com>
-> ---
->  arch/arm64/include/asm/pgtable.h |  2 +-
->  arch/arm64/mm/hugetlbpage.c      | 29 ++++++++++-------------------
->  2 files changed, 11 insertions(+), 20 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index c213fdbd056c..6eae342ced6b 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -441,7 +441,7 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
->  
->  #define pud_none(pud)		(!pud_val(pud))
->  #define pud_bad(pud)		(!(pud_val(pud) & PUD_TABLE_BIT))
-> -#define pud_present(pud)	(pud_val(pud))
-> +#define pud_present(pud)	pte_present(pud_pte(pud))
->  
->  static inline void set_pud(pud_t *pudp, pud_t pud)
->  {
-> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-> index 7514a000e361..69b8200b1cfd 100644
-> --- a/arch/arm64/mm/hugetlbpage.c
-> +++ b/arch/arm64/mm/hugetlbpage.c
-> @@ -136,36 +136,27 @@ pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
->  {
->  	pgd_t *pgd;
->  	pud_t *pud;
-> -	pmd_t *pmd = NULL;
-> -	pte_t *pte = NULL;
-> +	pmd_t *pmd;
->  
->  	pgd = pgd_offset(mm, addr);
->  	pr_debug("%s: addr:0x%lx pgd:%p\n", __func__, addr, pgd);
->  	if (!pgd_present(*pgd))
->  		return NULL;
-> +
->  	pud = pud_offset(pgd, addr);
-> -	if (!pud_present(*pud))
-> +	if (pud_none(*pud))
->  		return NULL;
+Use the specific compatiable for AO pwms so the pwms input can
+be correctly set
 
-Do you actually need this special case?
+FDIV4 is not present on the pwm A0, so change kadhas vim input
+clocks to xtal.
 
-> -
-> -	if (pud_huge(*pud))
-> +	/* swap or huge page */
-> +	if (!pud_present(*pud) || pud_huge(*pud))
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+---
+This patch depends on the pwm patchset available here [0]
 
-... couldn't you just add a '|| pud_none(*pud)' in here?
+On the Khadas Vim I chose to replace FDIV4 with the crytal.
+Only PWM_AO_B is actually used and It is used for led dimming.
+The frequency, as long as it is high enough, does not matter.
+Only the duty cycle does. After testing, xtal seems to be fast
+enough.
 
->  		return (pte_t *)pud;
-> +	/* table; check the next level */
-> +
->  	pmd = pmd_offset(pud, addr);
-> -	if (!pmd_present(*pmd))
-> +	if (pmd_none(*pmd))
->  		return NULL;
-> -
-> -	if (pte_cont(pmd_pte(*pmd))) {
-> -		pmd = pmd_offset(
-> -			pud, (addr & CONT_PMD_MASK));
-> -		return (pte_t *)pmd;
-> -	}
-> -	if (pmd_huge(*pmd))
-> +	if (!pmd_present(*pmd) || pmd_huge(*pmd))
+PWM_AO_A is outputed on the general purpose header, but no usage is
+defined for it.
 
-Similarly here.
+It might be bit late for that but I wonder why it defined and enabled ?
+Same goes for the other peripherals activated on this general purpose
+header.
 
-Will
+I know that's what shows the schematics but one could choose to do
+anything else possible with it ? like use in GPIO mode, or another
+function. In addition, we never which setting will be required ? (eg
+which clock source ?).
+
+Should we keep those ? or remove them ?
+
+[0]: https://lkml.kernel.org/r/20170607133013.4766-1-jbrunet at baylibre.com
+
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi                  | 2 +-
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+index 436b875060e7..fbaa6b598fca 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+@@ -391,7 +391,7 @@
+ 			};
+ 
+ 			pwm_AO_ab: pwm at 550 {
+-				compatible = "amlogic,meson-gx-pwm", "amlogic,meson-gxbb-pwm";
++				compatible = "amlogic,meson-gx-ao-pwm", "amlogic,meson-gxbb-ao-pwm";
+ 				reg = <0x0 0x00550 0x0 0x10>;
+ 				#pwm-cells = <3>;
+ 				status = "disabled";
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
+index 6a81f0168da5..371f43cdd3ab 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
+@@ -86,8 +86,8 @@
+ 	status = "okay";
+ 	pinctrl-0 = <&pwm_ao_a_3_pins>, <&pwm_ao_b_pins>;
+ 	pinctrl-names = "default";
+-	clocks = <&clkc CLKID_FCLK_DIV4>;
+-	clock-names = "clkin0";
++	clocks = <&xtal> , <&xtal>;
++	clock-names = "clkin0", "clkin1" ;
+ };
+ 
+ &pwm_ef {
+-- 
+2.9.4
