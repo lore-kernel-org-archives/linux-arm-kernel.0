@@ -1,72 +1,233 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 7 Jun 2017 17:38:42 +0100
-Subject: [PATCH v2 2/2] acpi/iort: numa: Add numa node mapping for smmuv3
- devices
-In-Reply-To: <1496746065-11082-3-git-send-email-ganapatrao.kulkarni@cavium.com>
-References: <1496746065-11082-1-git-send-email-ganapatrao.kulkarni@cavium.com>
- <1496746065-11082-3-git-send-email-ganapatrao.kulkarni@cavium.com>
-Message-ID: <20170607163842.GA7937@red-moon>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Wed, 7 Jun 2017 17:44:37 +0100
+Subject: [PATCH v3 2/3] nvmem: add snvs_lpgpr driver
+In-Reply-To: <20170607064158.16422-3-o.rempel@pengutronix.de>
+References: <20170607064158.16422-1-o.rempel@pengutronix.de>
+ <20170607064158.16422-3-o.rempel@pengutronix.de>
+Message-ID: <db48c285-996e-6e73-2bc9-4afd8941a937@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 06, 2017 at 04:17:45PM +0530, Ganapatrao Kulkarni wrote:
-> Add code to parse proximity domain in SMMUv3 IORT table to
-> set numa node mapping for smmuv3 devices.
-> 
-> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+
+
+On 07/06/17 07:41, Oleksij Rempel wrote:
+> This is a driver for Low Power General Purpose Register (LPGPR)
+> available on i.MX6 SoCs in Secure Non-Volatile Storage (SNVS)
+> of this chip.
+>
+> It is a 32-bit read/write register located in the low power domain.
+> Since LPGPR is located in the battery-backed power domain, LPGPR can
+> be used by any application for retaining data during an SoC power-down
+> mode.
+>
+> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
 > ---
->  drivers/acpi/arm64/iort.c | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
-> 
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index bba2b59..b4f328f 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -882,6 +882,23 @@ static bool __init arm_smmu_v3_is_coherent(struct acpi_iort_node *node)
->  	return smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE;
->  }
->  
-> +/*
-> + * set numa proximity domain for smmv3 device
-> + */
-> +static void  __init iort_set_proximity(struct acpi_iort_node *node,
-> +		struct device *dev)
-> +{
-> +	struct acpi_iort_smmu_v3 *smmu;
+>  drivers/nvmem/Kconfig      |  13 +++++
+>  drivers/nvmem/Makefile     |   2 +
+>  drivers/nvmem/snvs_lpgpr.c | 143 +++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 158 insertions(+)
+>  create mode 100644 drivers/nvmem/snvs_lpgpr.c
+
+Minor comments...
+
+
+>
+> diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
+> index 101ced4c84be..00537b91cc22 100644
+> --- a/drivers/nvmem/Kconfig
+> +++ b/drivers/nvmem/Kconfig
+> @@ -144,4 +144,17 @@ config MESON_EFUSE
+>  	  This driver can also be built as a module. If so, the module
+>  	  will be called nvmem_meson_efuse.
+>
+> +config NVMEM_SNVS_LPGPR
+> +	tristate "Support for Low Power General Purpose Register"
+
+<--
+> +	depends on HAS_IOMEM
+> +	depends on OF
+> +	select REGMAP_MMIO
+-->
+Not sure why we need this selects here, if you are accessing regmap via 
+syscon.
+
+Consider adding COMPILE_TEST so that driver gets good test coverage.
+
+> +	select MFD_SYSCON
+> +	help
+> +	  This is a driver for Low Power General Purpose Register (LPGPR) available on
+> +	  i.MX6 SoCs in Secure Non-Volatile Storage (SNVS) of this chip.
 > +
-> +	smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
-> +	if (smmu->flags & ACPI_IORT_SMMU_V3_PXM_VALID) {
-> +		set_dev_node(dev, acpi_map_pxm_to_node(smmu->pxm));
-> +		pr_info("SMMUV3[%llx] Mapped to Proximity domain %d\n",
-> +			smmu->base_address,
-> +			smmu->pxm);
-> +	}
+> +	  This driver can also be built as a module. If so, the module
+> +	  will be called nvmem-snvs-lpgpr.
+> +
+>  endif
+> diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
+> index 173140658693..4c589184acee 100644
+> --- a/drivers/nvmem/Makefile
+> +++ b/drivers/nvmem/Makefile
+> @@ -30,3 +30,5 @@ obj-$(CONFIG_NVMEM_VF610_OCOTP)	+= nvmem-vf610-ocotp.o
+>  nvmem-vf610-ocotp-y		:= vf610-ocotp.o
+>  obj-$(CONFIG_MESON_EFUSE)	+= nvmem_meson_efuse.o
+>  nvmem_meson_efuse-y		:= meson-efuse.o
+> +obj-$(CONFIG_NVMEM_SNVS_LPGPR)	+= nvmem_snvs_lpgpr.o
+> +nvmem_snvs_lpgpr-y		:= snvs_lpgpr.o
+> diff --git a/drivers/nvmem/snvs_lpgpr.c b/drivers/nvmem/snvs_lpgpr.c
+> new file mode 100644
+> index 000000000000..c90a8e8a161f
+> --- /dev/null
+> +++ b/drivers/nvmem/snvs_lpgpr.c
+> @@ -0,0 +1,143 @@
+> +/*
+> + * Copyright (c) 2015 Pengutronix, Steffen Trumtrar <kernel@pengutronix.de>
+> + * Copyright (c) 2017 Pengutronix, Oleksij Rempel <kernel@pengutronix.de>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2
+> + * as published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/clk.h>
+
+??
+
+> +#include <linux/device.h>
+> +#include <linux/io.h>
+
+??
+
+> +#include <linux/module.h>
+> +#include <linux/nvmem-provider.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/regmap.h>
+> +
+> +struct snvs_lpgpr_priv {
+> +	struct device_d		*dev;
+> +	struct regmap		*regmap;
+> +	int			offset;
+> +	struct nvmem_config	cfg;
+> +};
+> +
+> +struct snvs_lpgpr_cfg {
+> +	int offset;
+> +};
+> +
+> +static const struct snvs_lpgpr_cfg snvs_lpgpr_cfg_imx6q = {
+> +	.offset = 0x68,
+> +};
+> +
+> +static int snvs_lpgpr_write(void *context, unsigned int offset, void *_val,
+> +			    size_t bytes)
+> +{
+> +	struct snvs_lpgpr_priv *priv = context;
+> +	const u32 *val = _val;
+> +	int i = 0, words = bytes / 4;
+> +
+> +	while (words--)
+> +		regmap_write(priv->regmap, priv->offset + offset + (i++ * 4),
+> +			     *val++);
+> +
+> +	return 0;
 > +}
 > +
->  static int __init arm_smmu_count_resources(struct acpi_iort_node *node)
->  {
->  	struct acpi_iort_smmu *smmu;
-> @@ -1002,6 +1019,9 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
->  	if (!pdev)
->  		return -ENOMEM;
->  
-> +	if (node->type == ACPI_IORT_NODE_SMMU_V3)
-> +		iort_set_proximity(node, &pdev->dev);
+> +static int snvs_lpgpr_read(void *context, unsigned int offset, void *_val,
+> +			   size_t bytes)
+> +{
+> +	struct snvs_lpgpr_priv *priv = context;
+> +	u32 *val = _val;
+> +	int i = 0, words = bytes / 4;
+> +
+> +	while (words--)
+> +		regmap_read(priv->regmap, priv->offset + offset + (i++ * 4),
+> +			    val++);
+> +
+> +	return 0;
+> +}
+> +
+> +static int snvs_lpgpr_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct device_node *node = dev->of_node;
+> +	struct device_node *syscon_node;
+> +	struct snvs_lpgpr_priv *priv;
+> +	struct nvmem_config *cfg;
+> +	struct nvmem_device *nvmem;
+> +	const struct snvs_lpgpr_cfg *dcfg;
+> +	int err;
+> +
+> +	if (!node)
+> +		return -ENOENT;
+> +
+> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+> +	dcfg = of_device_get_match_data(dev);
+> +	if (!dcfg)
+> +		return -EINVAL;
+> +
+> +	syscon_node = of_get_parent(node);
+> +	if (!syscon_node)
+> +		return -ENODEV;
+> +
+> +	priv->regmap = syscon_node_to_regmap(syscon_node);
+> +	of_node_put(syscon_node);
+> +	if (IS_ERR(priv->regmap))
+> +		return PTR_ERR(priv->regmap);
+> +
+> +	priv->offset = dcfg->offset;
+> +
+> +	cfg = &priv->cfg;
+> +	cfg->priv = priv;
+> +	cfg->name = dev_name(dev);
+> +	cfg->dev = dev;
+> +	cfg->stride = 4,
+> +	cfg->word_size = 4,
+> +	cfg->size = 4,
+> +	cfg->owner = THIS_MODULE,
+> +	cfg->reg_read  = snvs_lpgpr_read,
+> +	cfg->reg_write = snvs_lpgpr_write,
+> +
+> +	nvmem = nvmem_register(cfg);
+> +	if (IS_ERR(nvmem))
+> +		return PTR_ERR(nvmem);
+> +
+> +	platform_set_drvdata(pdev, nvmem);
+> +
+> +	return 0;
+> +}
+> +
+> +static int snvs_lpgpr_remove(struct platform_device *pdev)
+> +{
+> +	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
+> +
+> +	return nvmem_unregister(nvmem);
+> +}
+> +
+> +static const struct of_device_id snvs_lpgpr_dt_ids[] = {
+> +	{ .compatible = "fsl,imx6q-snvs-lpgpr", .data = &snvs_lpgpr_cfg_imx6q },
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, snvs_lpgpr_dt_ids);
+> +
+> +static struct platform_driver snvs_lpgpr_driver = {
+> +	.probe	= snvs_lpgpr_probe,
+> +	.remove	= snvs_lpgpr_remove,
+> +	.driver = {
+> +		.name	= "snvs_lpgpr",
+> +		.of_match_table = snvs_lpgpr_dt_ids,
+> +	},
+> +};
+> +module_platform_driver(snvs_lpgpr_driver);
+> +
+> +MODULE_AUTHOR("Oleksij Rempel <o.rempel@pengutronix.de>");
+> +MODULE_DESCRIPTION("Low Power General Purpose Register in i.MX6 Secure Non-Volatile Storage");
+> +MODULE_LICENSE("GPL");
 
-Nit: while at it you may add an ops hook to set the proximity
-(NULL for SMMU v2) and call it if present, it is just to make
-the code adding devices more uniform.
+GPLv2??
 
-Who is queueing these patches ? I am asking to make sure we sort
-the ACPICA dependency (there are other IORT/ACPICA patches to consider
-too).
-
-Thanks,
-Lorenzo
-
->  	count = ops->iommu_count_resources(node);
->  
->  	r = kcalloc(count, sizeof(*r), GFP_KERNEL);
-> -- 
-> 1.8.1.4
-> 
+>
