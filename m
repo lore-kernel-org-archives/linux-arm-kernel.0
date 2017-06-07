@@ -1,37 +1,48 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Jun 2017 12:50:12 +0100
-Subject: [PATCH V17 00/11] Add UEFI 2.6 and ACPI 6.1 updates for RAS on
- ARM64
-In-Reply-To: <1495225933-4410-1-git-send-email-tbaicar@codeaurora.org>
-References: <1495225933-4410-1-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <20170607115012.GZ30263@arm.com>
+Date: Wed, 7 Jun 2017 12:51:31 +0100
+Subject: [PATCH net] bpf, arm64: use separate register for state in stxr
+In-Reply-To: <530443d87bd51b3682a1b60ea19b2030d7d21409.1496834547.git.daniel@iogearbox.net>
+References: <530443d87bd51b3682a1b60ea19b2030d7d21409.1496834547.git.daniel@iogearbox.net>
+Message-ID: <20170607115131.GA30263@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 19, 2017 at 02:32:02PM -0600, Tyler Baicar wrote:
-> When a memory error, CPU error, PCIe error, or other type of hardware error
-> that's covered by RAS occurs, firmware should populate the shared GHES memory
-> location with the proper GHES structures to notify the OS of the error.
-> For example, platforms that implement firmware first handling may implement
-> separate GHES sources for corrected errors and uncorrected errors. If the
-> error is an uncorrectable error, then the firmware will notify the OS
-> immediately since the error needs to be handled ASAP. The OS will then be able
-> to take the appropriate action needed such as offlining a page. If the error
-> is a corrected error, then the firmware will not interrupt the OS immediately.
-> Instead, the OS will see and report the error the next time it's GHES timer
-> expires. The kernel will first parse the GHES structures and report the errors
-> through the kernel logs and then notify the user space through RAS trace
-> events. This allows user space applications such as RAS Daemon to see the
-> errors and report them however the user desires. This patchset extends the
-> kernel functionality for RAS errors based on updates in the UEFI 2.6 and
-> ACPI 6.1 specifications.
+Hi Daniel,
 
-Thanks, I've pushed this out as:
+On Wed, Jun 07, 2017 at 01:45:37PM +0200, Daniel Borkmann wrote:
+> Will reported that in BPF_XADD we must use a different register in stxr
+> instruction for the status flag due to otherwise CONSTRAINED UNPREDICTABLE
+> behavior per architecture. Reference manual says [1]:
+> 
+>   If s == t, then one of the following behaviors must occur:
+> 
+>    * The instruction is UNDEFINED.
+>    * The instruction executes as a NOP.
+>    * The instruction performs the store to the specified address, but
+>      the value stored is UNKNOWN.
+> 
+> Thus, use a different temporary register for the status flag to fix it.
+> 
+> Disassembly extract from test 226/STX_XADD_DW from test_bpf.ko:
+> 
+>   [...]
+>   0000003c:  c85f7d4b  ldxr x11, [x10]
+>   00000040:  8b07016b  add x11, x11, x7
+>   00000044:  c80c7d4b  stxr w12, x11, [x10]
+>   00000048:  35ffffac  cbnz w12, 0x0000003c
+>   [...]
+> 
+>   [1] https://static.docs.arm.com/ddi0487/b/DDI0487B_a_armv8_arm.pdf, p.6132
+> 
+> Fixes: 85f68fe89832 ("bpf, arm64: implement jiting of BPF_XADD")
+> Reported-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Daniel Borkmann <daniel@iogearbox.net>
+> ---
+>  arch/arm64/net/bpf_jit_comp.c | 7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/ras-apei
+Cheers for fixing this up:
 
-which I'll merge into for-next/core (and therefore linux-next) either the
-end of this week or the beginning of next week. Please take a look if you
-get a chance.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
 Will
