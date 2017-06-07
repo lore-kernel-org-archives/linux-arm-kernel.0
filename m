@@ -1,82 +1,207 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Jun 2017 14:59:13 +0100
-Subject: [PATCH v2 2/3] arm64: hwpoison: add VM_FAULT_HWPOISON[_LARGE]
- handling
-In-Reply-To: <20170517152336.6052-3-punit.agrawal@arm.com>
-References: <20170517152336.6052-1-punit.agrawal@arm.com>
- <20170517152336.6052-3-punit.agrawal@arm.com>
-Message-ID: <20170607135913.GH30263@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 7 Jun 2017 16:17:35 +0200
+Subject: [PATCH 46/58] clocksource/drivers: Add a new driver for the
+ Atmel ARM TC blocks
+In-Reply-To: <20170606180559.pkrr7ux2qqnmsd6y@piout.net>
+References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
+ <20170530215139.9983-47-alexandre.belloni@free-electrons.com>
+ <20170606152104.GC2345@mai>
+ <20170606180559.pkrr7ux2qqnmsd6y@piout.net>
+Message-ID: <20170607141735.GH2345@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 17, 2017 at 04:23:35PM +0100, Punit Agrawal wrote:
-> From: "Jonathan (Zhixiong) Zhang" <zjzhang@codeaurora.org>
+On Tue, Jun 06, 2017 at 08:05:59PM +0200, Alexandre Belloni wrote:
+> On 06/06/2017 at 17:21:05 +0200, Daniel Lezcano wrote:
+> > On Tue, May 30, 2017 at 11:51:27PM +0200, Alexandre Belloni wrote:
+> > > Add a driver for the Atmel Timer Counter Blocks. This driver provides a
+> > > clocksource and a clockevent device. The clockevent device is linked to the
+> > > clocksource counter and so it will run at the same frequency.
+> > 
+> > Where is the clockevent in this driver?
+> > 
 > 
-> Add VM_FAULT_HWPOISON[_LARGE] handling to the arm64 page fault
-> handler. Handling of VM_FAULT_HWPOISON[_LARGE] is very similar
-> to VM_FAULT_OOM, the only difference is that a different si_code
-> (BUS_MCEERR_AR) is passed to user space and si_addr_lsb field is
-> initialized.
+> That's a leftover from v1, it seems I forgot to rework that commit
+> message.
 > 
-> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> (fix new __do_user_fault call-site)
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Acked-by: Steve Capper <steve.capper@arm.com>
-> ---
->  arch/arm64/mm/fault.c | 22 +++++++++++++++++++---
->  1 file changed, 19 insertions(+), 3 deletions(-)
+> > It seems the cutting out of this driver is a bit fuzzy and hard to follow.
+> > 
+> > Please re-org the changes in a logical manner when resubmitting.
+> > 
 > 
-> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> index 37b95dff0b07..a85b44343ac6 100644
-> --- a/arch/arm64/mm/fault.c
-> +++ b/arch/arm64/mm/fault.c
-> @@ -31,6 +31,7 @@
->  #include <linux/highmem.h>
->  #include <linux/perf_event.h>
->  #include <linux/preempt.h>
-> +#include <linux/hugetlb.h>
->  
->  #include <asm/bug.h>
->  #include <asm/cpufeature.h>
-> @@ -239,10 +240,11 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
->   */
->  static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
->  			    unsigned int esr, unsigned int sig, int code,
-> -			    struct pt_regs *regs)
-> +			    struct pt_regs *regs, int fault)
->  {
->  	struct siginfo si;
->  	const struct fault_info *inf;
-> +	unsigned int lsb = 0;
->  
->  	if (unhandled_signal(tsk, sig) && show_unhandled_signals_ratelimited()) {
->  		inf = esr_to_fault_info(esr);
-> @@ -259,6 +261,17 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
->  	si.si_errno = 0;
->  	si.si_code = code;
->  	si.si_addr = (void __user *)addr;
-> +	/*
-> +	 * Either small page or large page may be poisoned.
-> +	 * In other words, VM_FAULT_HWPOISON_LARGE and
-> +	 * VM_FAULT_HWPOISON are mutually exclusive.
-> +	 */
-> +	if (fault & VM_FAULT_HWPOISON_LARGE)
-> +		lsb = hstate_index_to_shift(VM_FAULT_GET_HINDEX(fault));
-> +	else if (fault & VM_FAULT_HWPOISON)
-> +		lsb = PAGE_SHIFT;
-> +	si.si_addr_lsb = lsb;
-> +
+> I can submit the whole driver as a single patch if that is easier for
+> you to review.
 
-If we're going to start handling poison faults, then we should probably
-rejig the perf page fault accounting around here so that we follow x86:
+As you wish. A single driver or a split into consistent parts.
 
-  * Always report PERF_COUNT_SW_PAGE_FAULTS,
-  * Don't report anything else for VM_FAULT_ERROR
-  * Report PERF_COUNT_SW_PAGE_FAULTS_MAJ if VM_FAULT_MAJOR
-  * Otherwise, report PERF_COUNT_SW_PAGE_FAULTS_MIN
+> > > This driver uses regmap and syscon to be able to probe early in the boot
+> > > and avoid having to switch on the TCB clocksource later. Using regmap also
+> > > means that unused TCB channels may be used by other drivers (PWM for
+> > > example).
+> > 
+> > Can you give more details, I fail to understand how regmap and syscon help to
+> > probe sooner than timer_init()?
+> 
+> 
+> Because before that, the tcb driver relied on atmel_tclib to share the
+> TCBs and it happened way too late, at arch_initcall() time.
 
-at the moment, I think you're accounting VM_FAULT_ERROR as
-PERF_COUNT_SW_PAGE_FAULTS_MIN, which doesn't feel right at all.
+So is it still necesary to use regmap? I would like to take the opportunity to
+move the init routine to the common init routine if possible:
 
-Will
+	https://patchwork.kernel.org/patch/9768845/
+
+> > > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > > ---
+> > >  drivers/clocksource/Kconfig                 |  13 ++
+> > >  drivers/clocksource/Makefile                |   3 +-
+> > >  drivers/clocksource/timer-atmel-tcbclksrc.c | 252 ++++++++++++++++++++++++++++
+> > 
+> > As it is a clksrc + clkevt, please change the name to something more adequate:
+> > 
+> > eg. timer-tcb.c
+> > 
+> > >  3 files changed, 267 insertions(+), 1 deletion(-)
+> > >  create mode 100644 drivers/clocksource/timer-atmel-tcbclksrc.c
+> > > 
+> > > diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> > > index 545d541ae20e..cbd710db3c09 100644
+> > > --- a/drivers/clocksource/Kconfig
+> > > +++ b/drivers/clocksource/Kconfig
+> > > @@ -418,6 +418,19 @@ config ATMEL_ST
+> > >  	help
+> > >  	  Support for the Atmel ST timer.
+> > >  
+> > > +config ATMEL_ARM_TCB_CLKSRC
+> > > +	bool "TC Block Clocksource"
+> > > +	select REGMAP_MMIO
+> > > +	depends on GENERIC_CLOCKEVENTS
+> > > +	depends on SOC_AT91RM9200 || SOC_AT91SAM9 || SOC_SAMA5 || COMPILE_TEST
+> > > +	default SOC_AT91RM9200 || SOC_AT91SAM9 || SOC_SAMA5
+> > > +	help
+> > > +	  Select this to get a high precision clocksource based on a
+> > > +	  TC block with a 5+ MHz base clock rate.
+> > > +	  On platforms with 16-bit counters, two timer channels are combined
+> > > +	  to make a single 32-bit timer.
+> > > +	  It can also be used as a clock event device supporting oneshot mode.
+> > > +
+> > >  config CLKSRC_METAG_GENERIC
+> > >  	def_bool y if METAG
+> > >  	help
+> > > diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+> > > index 2b5b56a6f00f..53a0b40e0db2 100644
+> > > --- a/drivers/clocksource/Makefile
+> > > +++ b/drivers/clocksource/Makefile
+> > > @@ -2,7 +2,8 @@ obj-$(CONFIG_CLKSRC_PROBE)	+= clksrc-probe.o
+> > >  obj-$(CONFIG_CLKEVT_PROBE)	+= clkevt-probe.o
+> > >  obj-$(CONFIG_ATMEL_PIT)		+= timer-atmel-pit.o
+> > >  obj-$(CONFIG_ATMEL_ST)		+= timer-atmel-st.o
+> > > -obj-$(CONFIG_ATMEL_TCB_CLKSRC)	+= tcb_clksrc.o
+> > > +obj-$(CONFIG_ATMEL_TCB_CLKSRC) += tcb_clksrc.o
+> > > +obj-$(CONFIG_ATMEL_ARM_TCB_CLKSRC)	+= timer-atmel-tcbclksrc.o
+> > >  obj-$(CONFIG_X86_PM_TIMER)	+= acpi_pm.o
+> > >  obj-$(CONFIG_SCx200HR_TIMER)	+= scx200_hrt.o
+> > >  obj-$(CONFIG_CS5535_CLOCK_EVENT_SRC)	+= cs5535-clockevt.o
+> > > diff --git a/drivers/clocksource/timer-atmel-tcbclksrc.c b/drivers/clocksource/timer-atmel-tcbclksrc.c
+> > > new file mode 100644
+> > > index 000000000000..f18d177bfdea
+> > > --- /dev/null
+> > > +++ b/drivers/clocksource/timer-atmel-tcbclksrc.c
+> > > @@ -0,0 +1,252 @@
+> > > +#include <linux/clk.h>
+> > > +#include <linux/clockchips.h>
+> > > +#include <linux/clocksource.h>
+> > > +#include <linux/interrupt.h>
+> > > +#include <linux/kernel.h>
+> > > +#include <linux/mfd/syscon.h>
+> > > +#include <linux/of_irq.h>
+> > > +#include <linux/regmap.h>
+> > > +#include <linux/sched_clock.h>
+> > > +#include <soc/at91/atmel_tcb.h>
+> > > +
+> > > +static struct atmel_tcb_clksrc {
+> > > +	char name[20];
+> > 
+> > 	^^^^^^^^^^^^^^
+> > This field is pointless.
+> > 
+> 
+> You mean you don't like how it is used? Or you don't think having the
+> timer full name is useful?
+
+The field is not needed, the only place where it is used is where we affect it.
+ 
+> > > +	struct clocksource clksrc;
+> > 
+> > Why is this field defined and passed around to functions which do not use it?
+> > 
+> > Please consider using clocksource_mmio_init() and remove this field.
+> > 
+> 
+> Well, this doesn't work with a regmap so it doesn't fit.
+>
+> > > +	struct regmap *regmap;
+> > > +	struct clk *clk[2];
+> > 
+> > Can you explain why we have two clocks here?
+> > 
+> 
+> Each channel have its clock, I can add a comment if you want.
+
+I don't understand. Why do we have two clocks?
+
+One channel is driven by one clock and the second one takes the overflow signal
+from the first one, so no second clock is involved there, no?
+
+> > > +	int channels[2];
+> > 
+> > Instead of dealing with 2 channels and a costly bits shifting in the hot path,
+> > why not use a single channel with a different wrap up? IOW mask is 16 or 32.
+> > 
+> > The resulting code will be simpler, nicer and perhaps more efficient if you
+> > save the tc_get_cycles() loop?
+> > 
+> 
+> I think the rationale behind it is that 16 bits at 5MHz makes it
+> wrap every 13ms which is too fast to be useful.
+
+Ok, I see.
+
+> > > +	int bits;
+> > 
+> > 	^^^^^^^^
+> > 
+> > This field is pointless.
+> > 
+> > > +	int irq;
+> > 
+> > irq belongs to clockevents changes.
+> > 
+> > > +	bool registered;
+> > 
+> > What is the purpose of this registered boolean?
+> > 
+> 
+> The main reason is that RobH doesn't want to have the use (clocksource
+> or clockevent) of the timer in the DT so when probing a timer, I need to
+> know whether I already have a clocksource to decide when it is time to
+> register a clockevent.
+
+Yes, we had this discussion some weeks ago.
+
+This registered hack forces the DT to define first the clocksource, then the
+clockevent.
+
+So, I suggest you fold the timer definition into a single one like the other
+drivers.
+
+
+-- 
+
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
