@@ -1,765 +1,170 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed,  7 Jun 2017 20:18:46 +0200
-Subject: [PATCH] ARM: samsung: Save defconfig for Exynos, S3C and S5P configs
-Message-ID: <20170607181846.13539-1-krzk@kernel.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed,  7 Jun 2017 18:20:52 +0000
+Subject: [PATCH] mm: vmalloc: simplify vread/vwrite to use existing mappings
+Message-ID: <20170607182052.31447-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some configs for Samsung ARM SoCs were not updated for some time and
-they still contain obsolete Kconfig entries.  Generate new defconfig for
-all Samsung ARM architectures (Exynos, S3C24xx, S3C64xx, S5Pv210).
+The vread() and vwrite() routines contain elaborate plumbing to access
+the contents of vmalloc/vmap regions safely. According to the comments,
+this removes the need for locking, but given that both these routines
+execute with the vmap_area_lock spinlock held anyway, this is not much
+of an advantage, and so the only safety these routines provide is the
+assurance that only valid mappings are dereferenced.
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+The current safe path iterates over each mapping page by page, and
+kmap()'s each one individually, which is expensive and unnecessary.
+Instead, let's use kern_addr_valid() to establish on a per-VMA basis
+whether we may safely derefence them, and do so via its mapping in
+the VMALLOC region. This can be done safely due to the fact that we
+are holding the vmap_area_lock spinlock.
 
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
+ mm/vmalloc.c | 103 ++------------------
+ 1 file changed, 10 insertions(+), 93 deletions(-)
 
-Generated on next-20170607 so any recent changes should not be lost.
----
- arch/arm/configs/exynos_defconfig     |  6 +--
- arch/arm/configs/mini2440_defconfig   | 90 +++++++++--------------------------
- arch/arm/configs/s3c2410_defconfig    | 38 ++-------------
- arch/arm/configs/s3c6400_defconfig    | 17 +------
- arch/arm/configs/s5pv210_defconfig    | 26 +++-------
- arch/arm/configs/tct_hammer_defconfig | 14 ------
- 6 files changed, 35 insertions(+), 156 deletions(-)
-
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index 960d55445e05..25325ed9319e 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -49,7 +49,6 @@ CONFIG_IP_PNP_DHCP=y
- CONFIG_IP_PNP_BOOTP=y
- CONFIG_IP_PNP_RARP=y
- CONFIG_CFG80211=y
--CONFIG_RFKILL_REGULATOR=y
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_DMA_CMA=y
-@@ -74,6 +73,7 @@ CONFIG_MWIFIEX=m
- CONFIG_MWIFIEX_SDIO=m
- CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
-+CONFIG_KEYBOARD_SAMSUNG=y
- CONFIG_KEYBOARD_CROS_EC=y
- # CONFIG_MOUSE_PS2 is not set
- CONFIG_MOUSE_CYAPA=y
-@@ -83,7 +83,6 @@ CONFIG_TOUCHSCREEN_MMS114=y
- CONFIG_INPUT_MISC=y
- CONFIG_INPUT_MAX77693_HAPTIC=y
- CONFIG_INPUT_MAX8997_HAPTIC=y
--CONFIG_KEYBOARD_SAMSUNG=y
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_OF_PLATFORM=y
- CONFIG_SERIAL_SAMSUNG=y
-@@ -158,6 +157,7 @@ CONFIG_VIDEO_SAMSUNG_S5P_JPEG=m
- CONFIG_VIDEO_SAMSUNG_S5P_MFC=m
- CONFIG_VIDEO_SAMSUNG_EXYNOS_GSC=m
- CONFIG_V4L_TEST_DRIVERS=y
-+CONFIG_VIDEO_VIVID=m
- CONFIG_DRM=y
- CONFIG_DRM_EXYNOS=y
- CONFIG_DRM_EXYNOS_FIMD=y
-@@ -220,7 +220,6 @@ CONFIG_DMADEVICES=y
- CONFIG_PL330_DMA=y
- CONFIG_CROS_EC_CHARDEV=y
- CONFIG_COMMON_CLK_MAX77686=y
--CONFIG_COMMON_CLK_MAX77802=y
- CONFIG_COMMON_CLK_S2MPS11=y
- CONFIG_PM_DEVFREQ=y
- CONFIG_DEVFREQ_GOV_PERFORMANCE=y
-@@ -280,4 +279,3 @@ CONFIG_CRYPTO_AES_ARM_BS=m
- CONFIG_CRC_CCITT=y
- CONFIG_FONTS=y
- CONFIG_FONT_7x14=y
--CONFIG_VIDEO_VIVID=m
-diff --git a/arch/arm/configs/mini2440_defconfig b/arch/arm/configs/mini2440_defconfig
-index 0b02e4f43c6a..226d2f2626bb 100644
---- a/arch/arm/configs/mini2440_defconfig
-+++ b/arch/arm/configs/mini2440_defconfig
-@@ -1,10 +1,7 @@
--CONFIG_EXPERIMENTAL=y
- # CONFIG_LOCALVERSION_AUTO is not set
- CONFIG_SYSVIPC=y
- CONFIG_POSIX_MQUEUE=y
- CONFIG_RELAY=y
--CONFIG_UTS_NS=y
--CONFIG_IPC_NS=y
- CONFIG_BLK_DEV_INITRD=y
- # CONFIG_COMPAT_BRK is not set
- CONFIG_MODULES=y
-@@ -13,19 +10,22 @@ CONFIG_MODULE_UNLOAD=y
- CONFIG_MODULE_FORCE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- CONFIG_BLK_DEV_INTEGRITY=y
-+CONFIG_PARTITION_ADVANCED=y
-+CONFIG_BSD_DISKLABEL=y
-+CONFIG_MINIX_SUBPARTITION=y
-+CONFIG_SOLARIS_X86_PARTITION=y
-+CONFIG_UNIXWARE_DISKLABEL=y
-+CONFIG_LDM_PARTITION=y
- CONFIG_ARCH_S3C24XX=y
- # CONFIG_CPU_S3C2410 is not set
- CONFIG_CPU_S3C2440=y
-+CONFIG_MACH_MINI2440=y
- CONFIG_S3C_ADC=y
- CONFIG_S3C24XX_PWM=y
--CONFIG_MACH_MINI2440=y
- CONFIG_AEABI=y
--# CONFIG_OABI_COMPAT is not set
- CONFIG_KEXEC=y
- CONFIG_CPU_IDLE=y
--CONFIG_BINFMT_AOUT=m
- CONFIG_BINFMT_MISC=m
--CONFIG_PM=y
- CONFIG_APM_EMULATION=y
- CONFIG_NET=y
- CONFIG_PACKET=y
-@@ -49,7 +49,6 @@ CONFIG_SYN_COOKIES=y
- # CONFIG_INET_XFRM_MODE_TRANSPORT is not set
- # CONFIG_INET_XFRM_MODE_TUNNEL is not set
- # CONFIG_INET_XFRM_MODE_BEET is not set
--# CONFIG_INET_LRO is not set
- CONFIG_INET_DIAG=m
- # CONFIG_IPV6 is not set
- CONFIG_NETFILTER=y
-@@ -58,8 +57,6 @@ CONFIG_VLAN_8021Q=m
- CONFIG_VLAN_8021Q_GVRP=y
- CONFIG_NET_PKTGEN=m
- CONFIG_BT=m
--CONFIG_BT_L2CAP=m
--CONFIG_BT_SCO=m
- CONFIG_BT_RFCOMM=m
- CONFIG_BT_RFCOMM_TTY=y
- CONFIG_BT_BNEP=m
-@@ -69,15 +66,12 @@ CONFIG_BT_HIDP=m
- CONFIG_BT_HCIBTUSB=m
- CONFIG_BT_HCIBTSDIO=m
- CONFIG_BT_HCIUART=m
--CONFIG_BT_HCIUART_H4=y
- CONFIG_BT_HCIUART_BCSP=y
--CONFIG_BT_HCIUART_LL=y
- CONFIG_BT_HCIBCM203X=m
- CONFIG_BT_HCIBPA10X=m
- CONFIG_BT_HCIBFUSB=m
- CONFIG_BT_HCIVHCI=m
- CONFIG_CFG80211=m
--CONFIG_CFG80211_REG_DEBUG=y
- CONFIG_MAC80211=m
- CONFIG_MAC80211_MESH=y
- CONFIG_MAC80211_LEDS=y
-@@ -85,10 +79,7 @@ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- # CONFIG_FIRMWARE_IN_KERNEL is not set
- CONFIG_CONNECTOR=m
- CONFIG_MTD=y
--CONFIG_MTD_CONCAT=y
--CONFIG_MTD_PARTITIONS=y
- CONFIG_MTD_CMDLINE_PARTS=y
--CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
- CONFIG_FTL=y
- CONFIG_NFTL=y
-@@ -111,6 +102,7 @@ CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=65536
- CONFIG_CDROM_PKTCDVD=m
- CONFIG_SENSORS_TSL2550=m
-+CONFIG_EEPROM_AT24=y
- CONFIG_SCSI=m
- # CONFIG_SCSI_PROC_FS is not set
- CONFIG_BLK_DEV_SD=m
-@@ -118,10 +110,15 @@ CONFIG_CHR_DEV_SG=m
- # CONFIG_SCSI_LOWLEVEL is not set
- CONFIG_NETDEVICES=y
- CONFIG_TUN=m
--CONFIG_NET_ETHERNET=y
- CONFIG_DM9000=y
--# CONFIG_NETDEV_1000 is not set
--# CONFIG_NETDEV_10000 is not set
-+CONFIG_PPP=m
-+CONFIG_PPP_BSDCOMP=m
-+CONFIG_PPP_DEFLATE=m
-+CONFIG_PPP_FILTER=y
-+CONFIG_PPP_MPPE=m
-+CONFIG_PPP_MULTILINK=y
-+CONFIG_PPP_ASYNC=m
-+CONFIG_PPP_SYNC_TTY=m
- CONFIG_HOSTAP=m
- CONFIG_HOSTAP_FIRMWARE=y
- CONFIG_HOSTAP_FIRMWARE_NVRAM=y
-@@ -129,14 +126,6 @@ CONFIG_LIBERTAS=m
- CONFIG_LIBERTAS_SDIO=m
- CONFIG_ZD1211RW=m
- CONFIG_ZD1211RW_DEBUG=y
--CONFIG_PPP=m
--CONFIG_PPP_MULTILINK=y
--CONFIG_PPP_FILTER=y
--CONFIG_PPP_ASYNC=m
--CONFIG_PPP_SYNC_TTY=m
--CONFIG_PPP_DEFLATE=m
--CONFIG_PPP_BSDCOMP=m
--CONFIG_PPP_MPPE=m
- CONFIG_INPUT_FF_MEMLESS=y
- CONFIG_INPUT_EVDEV=y
- CONFIG_INPUT_EVBUG=m
-@@ -144,10 +133,9 @@ CONFIG_INPUT_EVBUG=m
- CONFIG_KEYBOARD_GPIO=y
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_SERIO_RAW=y
--CONFIG_VT_HW_CONSOLE_BINDING=y
-+CONFIG_LEGACY_PTY_COUNT=128
- CONFIG_SERIAL_SAMSUNG=y
- CONFIG_SERIAL_SAMSUNG_CONSOLE=y
--CONFIG_LEGACY_PTY_COUNT=128
- CONFIG_IPMI_HANDLER=m
- CONFIG_IPMI_DEVICE_INTERFACE=m
- CONFIG_IPMI_SI=m
-@@ -158,7 +146,6 @@ CONFIG_I2C=y
- CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_S3C2410=y
- CONFIG_I2C_SIMTEC=y
--CONFIG_EEPROM_AT24=y
- CONFIG_SPI=y
- CONFIG_SPI_S3C24XX=y
- CONFIG_SPI_SPIDEV=y
-@@ -167,7 +154,6 @@ CONFIG_SENSORS_LM75=y
- CONFIG_THERMAL=m
- CONFIG_WATCHDOG=y
- CONFIG_S3C2410_WATCHDOG=y
--CONFIG_VIDEO_OUTPUT_CONTROL=y
- CONFIG_FB=y
- CONFIG_FIRMWARE_EDID=y
- CONFIG_FB_MODE_HELPERS=y
-@@ -179,14 +165,9 @@ CONFIG_LCD_PLATFORM=y
- CONFIG_BACKLIGHT_CLASS_DEVICE=y
- # CONFIG_BACKLIGHT_GENERIC is not set
- CONFIG_BACKLIGHT_PWM=y
--CONFIG_DISPLAY_SUPPORT=y
--# CONFIG_VGA_CONSOLE is not set
- CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
- CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
--CONFIG_FONTS=y
--CONFIG_FONT_8x8=y
--CONFIG_FONT_MINI_4x6=y
- CONFIG_LOGO=y
- # CONFIG_LOGO_LINUX_MONO is not set
- # CONFIG_LOGO_LINUX_VGA16 is not set
-@@ -205,10 +186,7 @@ CONFIG_SND_USB_AUDIO=m
- CONFIG_SND_USB_CAIAQ=m
- CONFIG_SND_USB_CAIAQ_INPUT=y
- CONFIG_SND_SOC=y
--CONFIG_SND_S3C24XX_SOC=y
- CONFIG_HIDRAW=y
--CONFIG_HID_PID=y
--CONFIG_USB_HIDDEV=y
- CONFIG_HID_GYRATION=y
- CONFIG_HID_NTRIG=y
- CONFIG_HID_PANTHERLORD=y
-@@ -217,8 +195,9 @@ CONFIG_HID_SAMSUNG=y
- CONFIG_HID_SONY=y
- CONFIG_HID_SUNPLUS=y
- CONFIG_HID_TOPSEED=y
-+CONFIG_HID_PID=y
-+CONFIG_USB_HIDDEV=y
- CONFIG_USB=y
--# CONFIG_USB_DEVICE_CLASS is not set
- CONFIG_USB_OHCI_HCD=y
- CONFIG_USB_ACM=m
- CONFIG_USB_WDM=m
-@@ -230,13 +209,11 @@ CONFIG_USB_STORAGE_SDDR09=m
- CONFIG_USB_STORAGE_SDDR55=m
- CONFIG_USB_STORAGE_JUMPSHOT=m
- CONFIG_USB_STORAGE_ALAUDA=m
--CONFIG_USB_LIBUSUAL=y
- CONFIG_USB_SERIAL=m
- CONFIG_USB_SERIAL_CP210X=m
- CONFIG_USB_SERIAL_FTDI_SIO=m
- CONFIG_USB_SERIAL_SPCP8X5=m
- CONFIG_USB_GADGET=y
--CONFIG_USB_GADGET_S3C2410=y
- CONFIG_USB_ZERO=m
- CONFIG_USB_ETH=m
- CONFIG_USB_GADGETFS=m
-@@ -247,8 +224,6 @@ CONFIG_MMC=y
- CONFIG_SDIO_UART=y
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SPI=y
--CONFIG_MMC_S3C=y
--CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_S3C24XX=y
- CONFIG_LEDS_GPIO=y
- CONFIG_LEDS_TRIGGER_TIMER=y
-@@ -266,30 +241,19 @@ CONFIG_EXT2_FS_SECURITY=y
- CONFIG_EXT3_FS=y
- CONFIG_EXT3_FS_POSIX_ACL=y
- CONFIG_EXT3_FS_SECURITY=y
--CONFIG_INOTIFY=y
--CONFIG_AUTOFS_FS=y
- CONFIG_AUTOFS4_FS=y
- CONFIG_MSDOS_FS=y
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
- CONFIG_TMPFS_POSIX_ACL=y
--CONFIG_CONFIGFS_FS=m
- CONFIG_JFFS2_FS=y
- CONFIG_CRAMFS=y
- CONFIG_ROMFS_FS=y
- CONFIG_ROMFS_BACKED_BY_BOTH=y
- CONFIG_NFS_FS=y
--CONFIG_NFS_V3=y
- CONFIG_NFS_V3_ACL=y
- CONFIG_NFS_V4=y
- CONFIG_ROOT_NFS=y
--CONFIG_PARTITION_ADVANCED=y
--CONFIG_BSD_DISKLABEL=y
--CONFIG_MINIX_SUBPARTITION=y
--CONFIG_SOLARIS_X86_PARTITION=y
--CONFIG_UNIXWARE_DISKLABEL=y
--CONFIG_LDM_PARTITION=y
--CONFIG_EFI_PARTITION=y
- CONFIG_NLS_DEFAULT="cp437"
- CONFIG_NLS_CODEPAGE_437=m
- CONFIG_NLS_CODEPAGE_737=m
-@@ -329,24 +293,17 @@ CONFIG_NLS_ISO8859_15=m
- CONFIG_NLS_KOI8_R=m
- CONFIG_NLS_KOI8_U=m
- CONFIG_NLS_UTF8=m
-+CONFIG_DEBUG_INFO=y
- # CONFIG_ENABLE_WARN_DEPRECATED is not set
- # CONFIG_ENABLE_MUST_CHECK is not set
- CONFIG_STRIP_ASM_SYMS=y
- CONFIG_DEBUG_FS=y
- CONFIG_DEBUG_KERNEL=y
- # CONFIG_SCHED_DEBUG is not set
--CONFIG_DEBUG_INFO=y
--# CONFIG_RCU_CPU_STALL_DETECTOR is not set
--CONFIG_SYSCTL_SYSCALL_CHECK=y
- CONFIG_DEBUG_USER=y
--CONFIG_KEYS=y
--CONFIG_CRYPTO_FIPS=y
--CONFIG_CRYPTO_NULL=m
- CONFIG_CRYPTO_CRYPTD=m
- CONFIG_CRYPTO_AUTHENC=m
- CONFIG_CRYPTO_TEST=m
--CONFIG_CRYPTO_CCM=m
--CONFIG_CRYPTO_GCM=m
- CONFIG_CRYPTO_CTS=m
- CONFIG_CRYPTO_ECB=y
- CONFIG_CRYPTO_LRW=m
-@@ -360,11 +317,9 @@ CONFIG_CRYPTO_RMD128=m
- CONFIG_CRYPTO_RMD160=m
- CONFIG_CRYPTO_RMD256=m
- CONFIG_CRYPTO_RMD320=m
--CONFIG_CRYPTO_SHA256=m
- CONFIG_CRYPTO_SHA512=m
- CONFIG_CRYPTO_TGR192=m
- CONFIG_CRYPTO_WP512=m
--CONFIG_CRYPTO_AES=y
- CONFIG_CRYPTO_ANUBIS=m
- CONFIG_CRYPTO_ARC4=y
- CONFIG_CRYPTO_BLOWFISH=m
-@@ -379,7 +334,8 @@ CONFIG_CRYPTO_SERPENT=m
- CONFIG_CRYPTO_TEA=m
- CONFIG_CRYPTO_TWOFISH=m
- CONFIG_CRYPTO_DEFLATE=m
--CONFIG_CRYPTO_ZLIB=m
- CONFIG_CRYPTO_LZO=m
--CONFIG_CRC_T10DIF=y
- CONFIG_LIBCRC32C=m
-+CONFIG_FONTS=y
-+CONFIG_FONT_8x8=y
-+CONFIG_FONT_MINI_4x6=y
-diff --git a/arch/arm/configs/s3c2410_defconfig b/arch/arm/configs/s3c2410_defconfig
-index 1e6c48dd7b11..25486647caa8 100644
---- a/arch/arm/configs/s3c2410_defconfig
-+++ b/arch/arm/configs/s3c2410_defconfig
-@@ -1,4 +1,3 @@
--CONFIG_EXPERIMENTAL=y
- CONFIG_SYSVIPC=y
- CONFIG_IKCONFIG=m
- CONFIG_IKCONFIG_PROC=y
-@@ -12,9 +11,6 @@ CONFIG_PARTITION_ADVANCED=y
- CONFIG_BSD_DISKLABEL=y
- CONFIG_SOLARIS_X86_PARTITION=y
- CONFIG_ARCH_S3C24XX=y
--CONFIG_S3C_BOOT_ERROR_RESET=y
--CONFIG_S3C_ADC=y
--CONFIG_S3C24XX_PWM=y
- CONFIG_CPU_S3C2412=y
- CONFIG_CPU_S3C2416=y
- CONFIG_CPU_S3C2440=y
-@@ -38,20 +34,17 @@ CONFIG_MACH_AT2440EVB=y
- CONFIG_MACH_MINI2440=y
- CONFIG_MACH_NEXCODER_2440=y
- CONFIG_MACH_OSIRIS=y
--CONFIG_MACH_OSIRIS_DVS=m
- CONFIG_MACH_RX3715=y
- CONFIG_ARCH_S3C2440=y
- CONFIG_MACH_NEO1973_GTA02=y
- CONFIG_MACH_RX1950=y
--CONFIG_SMDK2440_CPU2442=y
- CONFIG_MACH_SMDK2443=y
--# CONFIG_ARM_THUMB is not set
-+CONFIG_S3C_ADC=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_CMDLINE="root=/dev/hda1 ro init=/bin/bash console=ttySAC0"
- CONFIG_FPE_NWFPE=y
- CONFIG_FPE_NWFPE_XP=y
--CONFIG_BINFMT_AOUT=y
- CONFIG_APM_EMULATION=m
- CONFIG_NET=y
- CONFIG_PACKET=y
-@@ -67,7 +60,6 @@ CONFIG_NET_IPIP=m
- CONFIG_INET_AH=m
- CONFIG_INET_ESP=m
- CONFIG_INET_IPCOMP=m
--# CONFIG_INET_LRO is not set
- CONFIG_TCP_CONG_ADVANCED=y
- CONFIG_TCP_CONG_HSTCP=m
- CONFIG_TCP_CONG_HYBLA=m
-@@ -86,9 +78,6 @@ CONFIG_IPV6_TUNNEL=m
- CONFIG_NETFILTER=y
- CONFIG_NF_CONNTRACK=m
- CONFIG_NF_CONNTRACK_EVENTS=y
--CONFIG_NF_CT_PROTO_DCCP=y
--CONFIG_NF_CT_PROTO_SCTP=y
--CONFIG_NF_CT_PROTO_UDPLITE=y
- CONFIG_NF_CONNTRACK_AMANDA=m
- CONFIG_NF_CONNTRACK_FTP=m
- CONFIG_NF_CONNTRACK_H323=m
-@@ -139,19 +128,12 @@ CONFIG_NETFILTER_XT_MATCH_TIME=m
- CONFIG_NETFILTER_XT_MATCH_U32=m
- CONFIG_IP_VS=m
- CONFIG_NF_CONNTRACK_IPV4=m
--CONFIG_IP_NF_QUEUE=m
- CONFIG_IP_NF_IPTABLES=m
- CONFIG_IP_NF_MATCH_AH=m
- CONFIG_IP_NF_MATCH_ECN=m
- CONFIG_IP_NF_MATCH_TTL=m
- CONFIG_IP_NF_FILTER=m
- CONFIG_IP_NF_TARGET_REJECT=m
--CONFIG_IP_NF_TARGET_LOG=m
--CONFIG_IP_NF_TARGET_ULOG=m
--CONFIG_NF_NAT=m
--CONFIG_IP_NF_TARGET_MASQUERADE=m
--CONFIG_IP_NF_TARGET_NETMAP=m
--CONFIG_IP_NF_TARGET_REDIRECT=m
- CONFIG_IP_NF_MANGLE=m
- CONFIG_IP_NF_TARGET_CLUSTERIP=m
- CONFIG_IP_NF_TARGET_ECN=m
-@@ -161,7 +143,6 @@ CONFIG_IP_NF_ARPTABLES=m
- CONFIG_IP_NF_ARPFILTER=m
- CONFIG_IP_NF_ARP_MANGLE=m
- CONFIG_NF_CONNTRACK_IPV6=m
--CONFIG_IP6_NF_QUEUE=m
- CONFIG_IP6_NF_IPTABLES=m
- CONFIG_IP6_NF_MATCH_AH=m
- CONFIG_IP6_NF_MATCH_EUI64=m
-@@ -172,7 +153,6 @@ CONFIG_IP6_NF_MATCH_IPV6HEADER=m
- CONFIG_IP6_NF_MATCH_MH=m
- CONFIG_IP6_NF_MATCH_RT=m
- CONFIG_IP6_NF_TARGET_HL=m
--CONFIG_IP6_NF_TARGET_LOG=m
- CONFIG_IP6_NF_FILTER=m
- CONFIG_IP6_NF_TARGET_REJECT=m
- CONFIG_IP6_NF_MANGLE=m
-@@ -185,9 +165,7 @@ CONFIG_BT_BNEP_MC_FILTER=y
- CONFIG_BT_BNEP_PROTO_FILTER=y
- CONFIG_BT_HIDP=m
- CONFIG_BT_HCIUART=m
--CONFIG_BT_HCIUART_H4=y
- CONFIG_BT_HCIUART_BCSP=y
--CONFIG_BT_HCIUART_LL=y
- CONFIG_BT_HCIBCM203X=m
- CONFIG_BT_HCIBPA10X=m
- CONFIG_BT_HCIBFUSB=m
-@@ -201,7 +179,6 @@ CONFIG_MTD=y
- CONFIG_MTD_REDBOOT_PARTS=y
- CONFIG_MTD_REDBOOT_PARTS_UNALLOCATED=y
- CONFIG_MTD_CMDLINE_PARTS=y
--CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_CFI=y
- CONFIG_MTD_JEDECPROBE=y
-@@ -216,9 +193,9 @@ CONFIG_PARPORT_AX88796=m
- CONFIG_PARPORT_1284=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_NBD=m
--CONFIG_BLK_DEV_UB=m
- CONFIG_BLK_DEV_RAM=y
- CONFIG_ATA_OVER_ETH=m
-+CONFIG_EEPROM_AT24=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_CHR_DEV_ST=m
- CONFIG_BLK_DEV_SR=y
-@@ -285,7 +262,6 @@ CONFIG_HW_RANDOM=y
- CONFIG_I2C_CHARDEV=m
- CONFIG_I2C_S3C2410=y
- CONFIG_I2C_SIMTEC=y
--CONFIG_EEPROM_AT24=y
- CONFIG_SPI=y
- CONFIG_SPI_GPIO=m
- CONFIG_SPI_S3C24XX=m
-@@ -336,7 +312,6 @@ CONFIG_USB_STORAGE_ALAUDA=m
- CONFIG_USB_STORAGE_ONETOUCH=m
- CONFIG_USB_STORAGE_KARMA=m
- CONFIG_USB_STORAGE_CYPRESS_ATACB=m
--CONFIG_USB_LIBUSUAL=y
- CONFIG_USB_MDC800=m
- CONFIG_USB_MICROTEK=m
- CONFIG_USB_USS720=m
-@@ -353,7 +328,6 @@ CONFIG_USB_SEVSEG=m
- CONFIG_USB_RIO500=m
- CONFIG_USB_LEGOTOWER=m
- CONFIG_USB_LCD=m
--CONFIG_USB_LED=m
- CONFIG_USB_CYPRESS_CY7C63=m
- CONFIG_USB_CYTHERM=m
- CONFIG_USB_IDMOUSE=m
-@@ -368,7 +342,6 @@ CONFIG_SDIO_UART=m
- CONFIG_MMC_TEST=m
- CONFIG_MMC_SDHCI=m
- CONFIG_MMC_SPI=m
--CONFIG_MMC_S3C=y
- CONFIG_LEDS_S3C24XX=m
- CONFIG_LEDS_PCA9532=m
- CONFIG_LEDS_GPIO=m
-@@ -388,8 +361,6 @@ CONFIG_EXT2_FS_POSIX_ACL=y
- CONFIG_EXT2_FS_SECURITY=y
- CONFIG_EXT3_FS=y
- CONFIG_EXT3_FS_POSIX_ACL=y
--CONFIG_EXT4_FS=m
--CONFIG_EXT4_FS_POSIX_ACL=y
- CONFIG_AUTOFS4_FS=m
- CONFIG_FUSE_FS=m
- CONFIG_ISO9660_FS=y
-@@ -407,7 +378,6 @@ CONFIG_CRAMFS=y
- CONFIG_SQUASHFS=m
- CONFIG_ROMFS_FS=y
- CONFIG_NFS_FS=y
--CONFIG_NFS_V3=y
- CONFIG_NFS_V3_ACL=y
- CONFIG_ROOT_NFS=y
- CONFIG_NFSD=m
-@@ -452,11 +422,9 @@ CONFIG_NLS_ISO8859_15=m
- CONFIG_NLS_KOI8_R=m
- CONFIG_NLS_KOI8_U=m
- CONFIG_NLS_UTF8=m
-+CONFIG_DEBUG_INFO=y
- CONFIG_MAGIC_SYSRQ=y
- CONFIG_DEBUG_KERNEL=y
- CONFIG_DEBUG_MUTEXES=y
--CONFIG_DEBUG_INFO=y
--CONFIG_SYSCTL_SYSCALL_CHECK=y
- CONFIG_DEBUG_USER=y
- CONFIG_DEBUG_LL=y
--# CONFIG_CRYPTO_ANSI_CPRNG is not set
-diff --git a/arch/arm/configs/s3c6400_defconfig b/arch/arm/configs/s3c6400_defconfig
-index e0f66936ae02..59292e674067 100644
---- a/arch/arm/configs/s3c6400_defconfig
-+++ b/arch/arm/configs/s3c6400_defconfig
-@@ -1,5 +1,3 @@
--CONFIG_EXPERIMENTAL=y
--CONFIG_SYSFS_DEPRECATED_V2=y
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_KALLSYMS_ALL=y
- CONFIG_MODULES=y
-@@ -8,7 +6,6 @@ CONFIG_MODULE_UNLOAD=y
- CONFIG_ARCH_MULTI_V6=y
- # CONFIG_ARCH_MULTI_V7 is not set
- CONFIG_ARCH_S3C64XX=y
--CONFIG_S3C_BOOT_ERROR_RESET=y
- CONFIG_MACH_SMDK6400=y
- CONFIG_MACH_ANW6410=y
- CONFIG_MACH_MINI6410=y
-@@ -19,11 +16,9 @@ CONFIG_MACH_HMT=y
- CONFIG_MACH_SMARTQ5=y
- CONFIG_MACH_SMARTQ7=y
- CONFIG_MACH_WLF_CRAGG_6410=y
--CONFIG_CPU_32v6K=y
- CONFIG_AEABI=y
- CONFIG_CMDLINE="console=ttySAC0,115200 root=/dev/ram init=/linuxrc initrd=0x51000000,6M ramdisk_size=6144"
- CONFIG_VFP=y
--CONFIG_PM=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_MTD=y
- CONFIG_MTD_NAND=y
-@@ -47,15 +42,11 @@ CONFIG_BACKLIGHT_LCD_SUPPORT=y
- CONFIG_LCD_CLASS_DEVICE=y
- CONFIG_LCD_LTV350QV=y
- CONFIG_BACKLIGHT_CLASS_DEVICE=y
--CONFIG_BACKLIGHT_PWM=y
--# CONFIG_VGA_CONSOLE is not set
- CONFIG_SOUND=y
- CONFIG_SND=m
- CONFIG_SND_MIXER_OSS=m
- CONFIG_SND_PCM_OSS=m
- CONFIG_SND_SOC=m
--CONFIG_SND_S3C24XX_SOC=m
--CONFIG_SND_SOC_SMDK_WM9713=m
- CONFIG_USB=y
- CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
- CONFIG_USB_OHCI_HCD=y
-@@ -68,7 +59,6 @@ CONFIG_USB_SERIAL_FTDI_SIO=m
- CONFIG_USB_SERIAL_PL2303=m
- CONFIG_MMC=y
- CONFIG_MMC_DEBUG=y
--CONFIG_MMC_UNSAFE_RESUME=y
- CONFIG_SDIO_UART=y
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_S3C=y
-@@ -78,20 +68,15 @@ CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
- CONFIG_EXT3_FS_POSIX_ACL=y
- CONFIG_EXT3_FS_SECURITY=y
--CONFIG_INOTIFY=y
- CONFIG_TMPFS=y
- CONFIG_TMPFS_POSIX_ACL=y
- CONFIG_CRAMFS=y
- CONFIG_ROMFS_FS=y
-+CONFIG_DEBUG_INFO=y
- CONFIG_MAGIC_SYSRQ=y
- CONFIG_DEBUG_KERNEL=y
- CONFIG_DEBUG_RT_MUTEXES=y
- CONFIG_DEBUG_SPINLOCK=y
- CONFIG_DEBUG_MUTEXES=y
--CONFIG_DEBUG_SPINLOCK_SLEEP=y
--CONFIG_DEBUG_INFO=y
--# CONFIG_RCU_CPU_STALL_DETECTOR is not set
--CONFIG_SYSCTL_SYSCALL_CHECK=y
- CONFIG_DEBUG_USER=y
--CONFIG_DEBUG_ERRORS=y
- CONFIG_DEBUG_LL=y
-diff --git a/arch/arm/configs/s5pv210_defconfig b/arch/arm/configs/s5pv210_defconfig
-index c51f0f02012b..d92fb0f9e486 100644
---- a/arch/arm/configs/s5pv210_defconfig
-+++ b/arch/arm/configs/s5pv210_defconfig
-@@ -1,16 +1,14 @@
--CONFIG_EXPERIMENTAL=y
--CONFIG_SYSFS_DEPRECATED_V2=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_KALLSYMS_ALL=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
-+CONFIG_PARTITION_ADVANCED=y
-+CONFIG_BSD_DISKLABEL=y
-+CONFIG_SOLARIS_X86_PARTITION=y
- CONFIG_ARCH_S5PV210=y
--CONFIG_S3C_LOWLEVEL_UART_PORT=1
--CONFIG_S3C_DEV_FB=y
--CONFIG_S5PV210_SETUP_FB_24BPP=y
--CONFIG_NO_HZ=y
--CONFIG_HIGH_RES_TIMERS=y
- CONFIG_VMSPLIT_2G=y
- CONFIG_PREEMPT=y
- CONFIG_AEABI=y
-@@ -21,7 +19,6 @@ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=8192
--# CONFIG_MISC_DEVICES is not set
- CONFIG_SCSI=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_CHR_DEV_SG=y
-@@ -34,36 +31,25 @@ CONFIG_SERIAL_SAMSUNG=y
- CONFIG_SERIAL_SAMSUNG_CONSOLE=y
- CONFIG_HW_RANDOM=y
- # CONFIG_HWMON is not set
--# CONFIG_VGA_CONSOLE is not set
--# CONFIG_HID_SUPPORT is not set
- # CONFIG_USB_SUPPORT is not set
- CONFIG_EXT2_FS=y
--CONFIG_INOTIFY=y
- CONFIG_MSDOS_FS=y
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
- CONFIG_TMPFS_POSIX_ACL=y
- CONFIG_CRAMFS=y
- CONFIG_ROMFS_FS=y
--CONFIG_PARTITION_ADVANCED=y
--CONFIG_BSD_DISKLABEL=y
--CONFIG_SOLARIS_X86_PARTITION=y
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ASCII=y
- CONFIG_NLS_ISO8859_1=y
-+CONFIG_DEBUG_INFO=y
- CONFIG_MAGIC_SYSRQ=y
- CONFIG_DEBUG_KERNEL=y
- # CONFIG_DEBUG_PREEMPT is not set
- CONFIG_DEBUG_RT_MUTEXES=y
- CONFIG_DEBUG_SPINLOCK=y
- CONFIG_DEBUG_MUTEXES=y
--CONFIG_DEBUG_SPINLOCK_SLEEP=y
--CONFIG_DEBUG_INFO=y
--# CONFIG_RCU_CPU_STALL_DETECTOR is not set
--CONFIG_SYSCTL_SYSCALL_CHECK=y
- CONFIG_DEBUG_USER=y
--CONFIG_DEBUG_ERRORS=y
- CONFIG_DEBUG_LL=y
- CONFIG_EARLY_PRINTK=y
--CONFIG_DEBUG_S3C_UART=1
- CONFIG_CRC_CCITT=y
-diff --git a/arch/arm/configs/tct_hammer_defconfig b/arch/arm/configs/tct_hammer_defconfig
-index 7209a2caefcf..2cf60df74b40 100644
---- a/arch/arm/configs/tct_hammer_defconfig
-+++ b/arch/arm/configs/tct_hammer_defconfig
-@@ -1,13 +1,10 @@
--CONFIG_EXPERIMENTAL=y
- # CONFIG_LOCALVERSION_AUTO is not set
- # CONFIG_SWAP is not set
- CONFIG_SYSVIPC=y
- CONFIG_LOG_BUF_SHIFT=14
--CONFIG_SYSFS_DEPRECATED_V2=y
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_EXPERT=y
- # CONFIG_KALLSYMS is not set
--# CONFIG_BUGVERBOSE is not set
- # CONFIG_ELF_CORE is not set
- # CONFIG_SHMEM is not set
- CONFIG_SLOB=y
-@@ -26,8 +23,6 @@ CONFIG_UNIX=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- # CONFIG_PREVENT_FIRMWARE_BUILD is not set
- CONFIG_MTD=y
--CONFIG_MTD_PARTITIONS=y
--CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_CFI=y
- CONFIG_MTD_CFI_ADV_OPTIONS=y
-@@ -36,22 +31,16 @@ CONFIG_MTD_CFI_INTELEXT=y
- CONFIG_MTD_PHYSMAP=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=10240
--# CONFIG_MISC_DEVICES is not set
--# CONFIG_INPUT_MOUSEDEV is not set
- # CONFIG_INPUT_KEYBOARD is not set
- # CONFIG_INPUT_MOUSE is not set
- # CONFIG_SERIO is not set
- # CONFIG_VT_CONSOLE is not set
- # CONFIG_HW_RANDOM is not set
- # CONFIG_HWMON is not set
--# CONFIG_VGA_CONSOLE is not set
--# CONFIG_HID_SUPPORT is not set
- CONFIG_USB=y
--# CONFIG_USB_DEVICE_CLASS is not set
- CONFIG_USB_MON=y
- CONFIG_USB_OHCI_HCD=y
- CONFIG_USB_GADGET=y
--CONFIG_USB_GADGET_S3C2410=y
- CONFIG_USB_ETH=m
- CONFIG_EXT2_FS=y
- # CONFIG_DNOTIFY is not set
-@@ -62,8 +51,5 @@ CONFIG_JFFS2_FS=y
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ISO8859_1=y
- # CONFIG_ENABLE_MUST_CHECK is not set
--CONFIG_DEBUG_KERNEL=y
--# CONFIG_DETECT_SOFTLOCKUP is not set
--CONFIG_DEBUG_ERRORS=y
- CONFIG_DEBUG_LL=y
- CONFIG_CRC_CCITT=y
+diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+index 34a1c3e46ed7..982d29511f92 100644
+--- a/mm/vmalloc.c
++++ b/mm/vmalloc.c
+@@ -1983,87 +1983,6 @@ void *vmalloc_32_user(unsigned long size)
+ }
+ EXPORT_SYMBOL(vmalloc_32_user);
+ 
+-/*
+- * small helper routine , copy contents to buf from addr.
+- * If the page is not present, fill zero.
+- */
+-
+-static int aligned_vread(char *buf, char *addr, unsigned long count)
+-{
+-	struct page *p;
+-	int copied = 0;
+-
+-	while (count) {
+-		unsigned long offset, length;
+-
+-		offset = offset_in_page(addr);
+-		length = PAGE_SIZE - offset;
+-		if (length > count)
+-			length = count;
+-		p = vmalloc_to_page(addr);
+-		/*
+-		 * To do safe access to this _mapped_ area, we need
+-		 * lock. But adding lock here means that we need to add
+-		 * overhead of vmalloc()/vfree() calles for this _debug_
+-		 * interface, rarely used. Instead of that, we'll use
+-		 * kmap() and get small overhead in this access function.
+-		 */
+-		if (p) {
+-			/*
+-			 * we can expect USER0 is not used (see vread/vwrite's
+-			 * function description)
+-			 */
+-			void *map = kmap_atomic(p);
+-			memcpy(buf, map + offset, length);
+-			kunmap_atomic(map);
+-		} else
+-			memset(buf, 0, length);
+-
+-		addr += length;
+-		buf += length;
+-		copied += length;
+-		count -= length;
+-	}
+-	return copied;
+-}
+-
+-static int aligned_vwrite(char *buf, char *addr, unsigned long count)
+-{
+-	struct page *p;
+-	int copied = 0;
+-
+-	while (count) {
+-		unsigned long offset, length;
+-
+-		offset = offset_in_page(addr);
+-		length = PAGE_SIZE - offset;
+-		if (length > count)
+-			length = count;
+-		p = vmalloc_to_page(addr);
+-		/*
+-		 * To do safe access to this _mapped_ area, we need
+-		 * lock. But adding lock here means that we need to add
+-		 * overhead of vmalloc()/vfree() calles for this _debug_
+-		 * interface, rarely used. Instead of that, we'll use
+-		 * kmap() and get small overhead in this access function.
+-		 */
+-		if (p) {
+-			/*
+-			 * we can expect USER0 is not used (see vread/vwrite's
+-			 * function description)
+-			 */
+-			void *map = kmap_atomic(p);
+-			memcpy(map + offset, buf, length);
+-			kunmap_atomic(map);
+-		}
+-		addr += length;
+-		buf += length;
+-		copied += length;
+-		count -= length;
+-	}
+-	return copied;
+-}
+-
+ /**
+  *	vread() -  read vmalloc area in a safe way.
+  *	@buf:		buffer for reading data
+@@ -2083,10 +2002,8 @@ static int aligned_vwrite(char *buf, char *addr, unsigned long count)
+  *	If [addr...addr+count) doesn't includes any intersects with alive
+  *	vm_struct area, returns 0. @buf should be kernel's buffer.
+  *
+- *	Note: In usual ops, vread() is never necessary because the caller
+- *	should know vmalloc() area is valid and can use memcpy().
+- *	This is for routines which have to access vmalloc area without
+- *	any informaion, as /dev/kmem.
++ *	Note: This routine executes with the vmap_area_lock spinlock held,
++ *	which means it can safely access mappings at their virtual address.
+  *
+  */
+ 
+@@ -2125,8 +2042,9 @@ long vread(char *buf, char *addr, unsigned long count)
+ 		n = vaddr + get_vm_area_size(vm) - addr;
+ 		if (n > count)
+ 			n = count;
+-		if (!(vm->flags & VM_IOREMAP))
+-			aligned_vread(buf, addr, n);
++		if (!(vm->flags & VM_IOREMAP) &&
++		    kern_addr_valid((unsigned long)addr))
++			memcpy(buf, addr, n);
+ 		else /* IOREMAP area is treated as memory hole */
+ 			memset(buf, 0, n);
+ 		buf += n;
+@@ -2165,10 +2083,8 @@ long vread(char *buf, char *addr, unsigned long count)
+  *	If [addr...addr+count) doesn't includes any intersects with alive
+  *	vm_struct area, returns 0. @buf should be kernel's buffer.
+  *
+- *	Note: In usual ops, vwrite() is never necessary because the caller
+- *	should know vmalloc() area is valid and can use memcpy().
+- *	This is for routines which have to access vmalloc area without
+- *	any informaion, as /dev/kmem.
++ *	Note: This routine executes with the vmap_area_lock spinlock held,
++ *	which means it can safely access mappings at their virtual address.
+  */
+ 
+ long vwrite(char *buf, char *addr, unsigned long count)
+@@ -2206,8 +2122,9 @@ long vwrite(char *buf, char *addr, unsigned long count)
+ 		n = vaddr + get_vm_area_size(vm) - addr;
+ 		if (n > count)
+ 			n = count;
+-		if (!(vm->flags & VM_IOREMAP)) {
+-			aligned_vwrite(buf, addr, n);
++		if (!(vm->flags & VM_IOREMAP) &&
++		    kern_addr_valid((unsigned long)addr)) {
++			memcpy(addr, buf, n);
+ 			copied++;
+ 		}
+ 		buf += n;
 -- 
 2.9.3
