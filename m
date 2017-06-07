@@ -1,193 +1,75 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Wed, 7 Jun 2017 21:02:03 +0200
-Subject: [PATCH v8 00/34] i.MX Media Driver
-In-Reply-To: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
-References: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <e7e4669c-2963-b9e1-edd7-02731a6e0f9c@xs4all.nl>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Wed, 7 Jun 2017 15:02:01 -0400
+Subject: [PATCH v2 2/2] arm64: ftrace: add support for far branches to
+ dynamic ftrace
+In-Reply-To: <20170607165626.GE2669@arm.com>
+References: <20170530135220.20759-1-ard.biesheuvel@linaro.org>
+ <20170530135220.20759-3-ard.biesheuvel@linaro.org>
+ <20170605171535.GP21944@arm.com>
+ <20170607114637.1a717019@gandalf.local.home>
+ <CAKv+Gu8kWt7yDg8hu=bJb4FrA3qGqV2jgShujqHqewDSKr1D8w@mail.gmail.com>
+ <20170607165626.GE2669@arm.com>
+Message-ID: <20170607150201.7123c48f@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're still waiting for an Ack for patch 02/34, right?
+On Wed, 7 Jun 2017 17:56:26 +0100
+Will Deacon <will.deacon@arm.com> wrote:
 
-Other than that everything is ready AFAICT.
+> On Wed, Jun 07, 2017 at 03:50:10PM +0000, Ard Biesheuvel wrote:
+> > On 7 June 2017 at 15:46, Steven Rostedt <rostedt@goodmis.org> wrote:  
+> > > On Mon, 5 Jun 2017 18:15:35 +0100
+> > > Will Deacon <will.deacon@arm.com> wrote:
+> > >
+> > >  
+> > >> > +           tramp = (unsigned long *)mod->arch.ftrace_trampoline->sh_addr;
+> > >> > +           if (tramp[0] != addr) {
+> > >> > +                   if (tramp[0] != 0) {
+> > >> > +                           pr_err("ftrace: far branches to multiple entry points unsupported inside a single module\n");
+> > >> > +                           return AARCH64_BREAK_FAULT;
+> > >> > +                   }
+> > >> > +
+> > >> > +                   /* point the trampoline to our ftrace entry point */
+> > >> > +                   module_disable_ro(mod);
+> > >> > +                   tramp[0] = addr;
+> > >> > +                   module_enable_ro(mod, true);  
+> > >>
+> > >> I'm not sure what the barrier semantics are for module_enable_ro, but I'd be
+> > >> inclined to stick in a smp_wmb() here to order the write of the trampoline
+> > >> data before the writing of the branch instruction.  
+> > >
+> > > I would assume that module_disable/enable_ro() has proper barriers for
+> > > modifying the page tables with respect to code around it, otherwise it
+> > > would probably be an issues elsewhere in the kernel. Specifically in
+> > > the module code itself.
+> > >
+> > > I don't see how a smp_wmb() would be needed here, especially since this
+> > > is serialized code, and not something done by multiple CPUs.
+> > >  
+> > 
+> > But other cores could be invoking the function we are patching here,
+> > no? So when such a core observes (and executes) the updated
+> > instruction before it observes the updated target field of the
+> > trampoline, it will branch to address 0x0.  
+> 
+> I think Steve's saying that the TLB invalidation buried in the set_memory_*
+> functions called by module_enable_ro will have sufficient barriers to order
+> the write of the trampoline with respect to writing the branch instruction,
+> but this isn't quite right because module_enable_ro is affected by things
+> like CONFIG_STRICT_MODULE_RWX and rodata_enabled.
+> 
 
-Regards,
+Sorry, I was thinking that you were worried about the update with the
+page tables taking affect.
 
-	Hans
+But from the above comment by Ard, I'm now thinking you are worried
+about the jump to the trampoline itself when the branch is enabled. Now,
+my question is, can a smp_wmb() be good enough as there's no smp_rmb()
+to accompany it. Even with an smp_wmb() the reads can still come out of
+order without any smp_rmb() on the execution path.
 
-On 07/06/17 20:33, Steve Longerbeam wrote:
-> In version 8:
-> 
-> - Switched to v4l2_fwnode APIs.
-> 
-> - Always pass a valid CSI id to ipu_set_ic_src_mux() in imx-ic-prp, even
->   if the IC is receiving from the VDIC. The reason is due to a bug in the
->   i.MX6 reference manual: from experiment it is determined that the CSI id
->   select bit in IPU_CONF register selects which CSI is routed to either
->   the VDIC or the IC, and is independent of whether the IC is set to
->   receive from a CSI or the VDIC. Sugested by Marek Vasut <marex@denx.de>.
-> 
-> - ov5640: propagate error codes from all i2c register accesses.
->   Sugested by Sakari Ailus <sakari.ailus@iki.fi>.
-> 
-> - ov5640: drop the entity stream count check in ov5640_s_stream().
->   Sugested by Sakari Ailus <sakari.ailus@iki.fi>.
-> 
-> - ov5640: Fix manual exposure control. The manual exposure setting
->   (in line periods) cannot exceed the max exposure value in registers
->   {0x380E, 0x380F} + {0x350C,0x350D}, however the max eposure value was
->   not being calcualted correctly.
-> 
-> - ov5640: the video mode register tables require auto gain/exposure be
->   disabled before programming the register set. However auto gain/exp was
->   being disabled by direct register write. This caused the auto gain/exp
->   control values to be inconsistent with the actual hardware setting. Fixed
->   by going through v4l2-ctrl when disabling auto gain/exp.
-> 
-> - ov5640: converted virtual channel macro to a module parameter, default
->   to channel 0.
-> 
-> - ov5640: override the v4l2-ctl lock to use the ov5640 subdev driver's
->   lock. Sugested by Sakari Ailus <sakari.ailus@iki.fi>.
-> 
-> - ov5640: switch to unit-less V4L2_CID_EXPOSURE. Using
->   V4L2_CID_EXPOSURE_ABSOLUTE will require converting from 100-usec units
->   to line periods and vice-versa. Sugested by Sakari Ailus and
->   Pavel Machek <pavel@ucw.cz>.
-> 
-> - ov5640: drop dangling regulator_bulk_disable() from probe/remove.
->   Sugested by Sakari Ailus <sakari.ailus@iki.fi>.
-> 
-> - FIM: move input capture channel selection out of the device-tree and
->   make this a V4L2 control. In order to support attaching a FIM to prpencvf,
->   the FIM cannot have any device-tree configuration, because prpencvf has
->   no device node. The FIM now is completely configurable via its V4L2
->   controls.
-> 
-> - FIM: drop imx_media_fim_set_power(), and move the input capture channel
->   request to imx_media_fim_set_stream(). This allows to drop csi_s_power()
->   as well, since the latter only called imx_media_fim_set_power().
-> 
-> - FIM: add a spinlock to protect the frame_interval_monitor() from the
->   setting of new control values. The frame_interval_monitor() is called
->   from interrupt context so a spinlock must be used.
-> 
-> - Updated to version 8 video-mux patchset from Philipp Zabel
->   <p.zabel@pengutronix.de>.
-> 
-> 
-> Marek Vasut (1):
->   media: imx: Drop warning upon multiple S_STREAM disable calls
-> 
-> Philipp Zabel (8):
->   dt-bindings: Add bindings for video-multiplexer device
->   ARM: dts: imx6qdl: add multiplexer controls
->   ARM: dts: imx6qdl: Add video multiplexers, mipi_csi, and their
->     connections
->   add mux and video interface bridge entity functions
->   platform: add video-multiplexer subdevice driver
->   media: imx: csi: increase burst size for YUV formats
->   media: imx: csi: add frame skipping support
->   media: imx: csi: add sink selection rectangles
-> 
-> Russell King (3):
->   media: imx: csi: add support for bayer formats
->   media: imx: csi: add frame size/interval enumeration
->   media: imx: capture: add frame sizes/interval enumeration
-> 
-> Steve Longerbeam (22):
->   [media] dt-bindings: Add bindings for i.MX media driver
->   [media] dt/bindings: Add bindings for OV5640
->   ARM: dts: imx6qdl: Add compatible, clocks, irqs to MIPI CSI-2 node
->   ARM: dts: imx6qdl: add capture-subsystem device
->   ARM: dts: imx6qdl-sabrelite: remove erratum ERR006687 workaround
->   ARM: dts: imx6-sabrelite: add OV5642 and OV5640 camera sensors
->   ARM: dts: imx6-sabresd: add OV5642 and OV5640 camera sensors
->   ARM: dts: imx6-sabreauto: create i2cmux for i2c3
->   ARM: dts: imx6-sabreauto: add reset-gpios property for max7310_b
->   ARM: dts: imx6-sabreauto: add pinctrl for gpt input capture
->   ARM: dts: imx6-sabreauto: add the ADV7180 video decoder
->   [media] add Omnivision OV5640 sensor driver
->   media: Add userspace header file for i.MX
->   media: Add i.MX media core driver
->   media: imx: Add a TODO file
->   media: imx: Add Capture Device Interface
->   media: imx: Add CSI subdev driver
->   media: imx: Add VDIC subdev driver
->   media: imx: Add IC subdev drivers
->   media: imx: Add MIPI CSI-2 Receiver subdev driver
->   media: imx: set and propagate default field, colorimetry
->   ARM: imx_v6_v7_defconfig: Enable staging video4linux drivers
-> 
->  .../devicetree/bindings/media/i2c/ov5640.txt       |   45 +
->  Documentation/devicetree/bindings/media/imx.txt    |   47 +
->  .../devicetree/bindings/media/video-mux.txt        |   60 +
->  Documentation/media/uapi/mediactl/media-types.rst  |   21 +
->  Documentation/media/v4l-drivers/imx.rst            |  614 +++++
->  arch/arm/boot/dts/imx6dl-sabrelite.dts             |    5 +
->  arch/arm/boot/dts/imx6dl-sabresd.dts               |    5 +
->  arch/arm/boot/dts/imx6dl.dtsi                      |  189 ++
->  arch/arm/boot/dts/imx6q-sabrelite.dts              |    5 +
->  arch/arm/boot/dts/imx6q-sabresd.dts                |    5 +
->  arch/arm/boot/dts/imx6q.dtsi                       |  125 ++
->  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi           |  136 +-
->  arch/arm/boot/dts/imx6qdl-sabrelite.dtsi           |  152 +-
->  arch/arm/boot/dts/imx6qdl-sabresd.dtsi             |  114 +-
->  arch/arm/boot/dts/imx6qdl.dtsi                     |   20 +-
->  arch/arm/configs/imx_v6_v7_defconfig               |   11 +
->  drivers/media/i2c/Kconfig                          |   10 +
->  drivers/media/i2c/Makefile                         |    1 +
->  drivers/media/i2c/ov5640.c                         | 2344 ++++++++++++++++++++
->  drivers/media/platform/Kconfig                     |    6 +
->  drivers/media/platform/Makefile                    |    2 +
->  drivers/media/platform/video-mux.c                 |  334 +++
->  drivers/staging/media/Kconfig                      |    2 +
->  drivers/staging/media/Makefile                     |    1 +
->  drivers/staging/media/imx/Kconfig                  |   21 +
->  drivers/staging/media/imx/Makefile                 |   12 +
->  drivers/staging/media/imx/TODO                     |   23 +
->  drivers/staging/media/imx/imx-ic-common.c          |  113 +
->  drivers/staging/media/imx/imx-ic-prp.c             |  518 +++++
->  drivers/staging/media/imx/imx-ic-prpencvf.c        | 1309 +++++++++++
->  drivers/staging/media/imx/imx-ic.h                 |   38 +
->  drivers/staging/media/imx/imx-media-capture.c      |  775 +++++++
->  drivers/staging/media/imx/imx-media-csi.c          | 1816 +++++++++++++++
->  drivers/staging/media/imx/imx-media-dev.c          |  666 ++++++
->  drivers/staging/media/imx/imx-media-fim.c          |  494 +++++
->  drivers/staging/media/imx/imx-media-internal-sd.c  |  349 +++
->  drivers/staging/media/imx/imx-media-of.c           |  270 +++
->  drivers/staging/media/imx/imx-media-utils.c        |  896 ++++++++
->  drivers/staging/media/imx/imx-media-vdic.c         | 1009 +++++++++
->  drivers/staging/media/imx/imx-media.h              |  325 +++
->  drivers/staging/media/imx/imx6-mipi-csi2.c         |  698 ++++++
->  include/linux/imx-media.h                          |   29 +
->  include/media/imx.h                                |   15 +
->  include/uapi/linux/media.h                         |    6 +
->  include/uapi/linux/v4l2-controls.h                 |    4 +
->  45 files changed, 13613 insertions(+), 27 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/media/i2c/ov5640.txt
->  create mode 100644 Documentation/devicetree/bindings/media/imx.txt
->  create mode 100644 Documentation/devicetree/bindings/media/video-mux.txt
->  create mode 100644 Documentation/media/v4l-drivers/imx.rst
->  create mode 100644 drivers/media/i2c/ov5640.c
->  create mode 100644 drivers/media/platform/video-mux.c
->  create mode 100644 drivers/staging/media/imx/Kconfig
->  create mode 100644 drivers/staging/media/imx/Makefile
->  create mode 100644 drivers/staging/media/imx/TODO
->  create mode 100644 drivers/staging/media/imx/imx-ic-common.c
->  create mode 100644 drivers/staging/media/imx/imx-ic-prp.c
->  create mode 100644 drivers/staging/media/imx/imx-ic-prpencvf.c
->  create mode 100644 drivers/staging/media/imx/imx-ic.h
->  create mode 100644 drivers/staging/media/imx/imx-media-capture.c
->  create mode 100644 drivers/staging/media/imx/imx-media-csi.c
->  create mode 100644 drivers/staging/media/imx/imx-media-dev.c
->  create mode 100644 drivers/staging/media/imx/imx-media-fim.c
->  create mode 100644 drivers/staging/media/imx/imx-media-internal-sd.c
->  create mode 100644 drivers/staging/media/imx/imx-media-of.c
->  create mode 100644 drivers/staging/media/imx/imx-media-utils.c
->  create mode 100644 drivers/staging/media/imx/imx-media-vdic.c
->  create mode 100644 drivers/staging/media/imx/imx-media.h
->  create mode 100644 drivers/staging/media/imx/imx6-mipi-csi2.c
->  create mode 100644 include/linux/imx-media.h
->  create mode 100644 include/media/imx.h
-> 
+The way I get around that on x86 is I call on_each_cpu() a sync_core()
+routine. See run_sync() in arch/x86/kernel/ftrace.c. That makes sure
+that all cores are updated before I proceed to the next step.
+
+-- Steve
