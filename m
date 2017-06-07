@@ -1,41 +1,66 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed, 7 Jun 2017 11:56:46 +0200
-Subject: [PATCH 2/3] arm64: KVM: Allow unaligned accesses at EL2
-In-Reply-To: <73f039f7-7597-fd34-367c-1cc6fdda3673@arm.com>
-References: <20170606180835.14421-1-marc.zyngier@arm.com>
- <20170606180835.14421-3-marc.zyngier@arm.com>
- <20170606200912.GQ9464@cbox>
- <73f039f7-7597-fd34-367c-1cc6fdda3673@arm.com>
-Message-ID: <20170607095646.GD24481@cbox>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 7 Jun 2017 13:00:21 +0300
+Subject: [PATCH 4/9] net: mvmdio: move the read valid check into its own
+ function
+In-Reply-To: <20170607083810.30922-5-antoine.tenart@free-electrons.com>
+References: <20170607083810.30922-1-antoine.tenart@free-electrons.com>
+ <20170607083810.30922-5-antoine.tenart@free-electrons.com>
+Message-ID: <71f0a99b-4736-a405-1d06-9c05f80aa327@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 07, 2017 at 10:16:29AM +0100, Marc Zyngier wrote:
-> On 06/06/17 21:09, Christoffer Dall wrote:
-> > On Tue, Jun 06, 2017 at 07:08:34PM +0100, Marc Zyngier wrote:
-> >> We currently have the SCTLR_EL2.A bit set, trapping unaligned accesses
-> >> at EL2, but we're not really prepared to deal with it. So far, this
-> >> has been unnoticed, until GCC 7 started emitting those (in particular
-> >> 64bit writes on a 32bit boundary).
-> >>
-> >> Since the rest of the kernel is pretty happy about that, let's follow
-> >> its example and set SCTLR_EL2.A to zero. Modern CPUs don't really
-> >> care.
-> > 
-> > Why do we set the A flag via SCTLR_ELx_FLAGS in the first place, only to
-> > drop that flag later on for both EL1 and EL2 ?
-> 
-> That flag is always cleared at EL1, never set. Actually, only EL2 uses
-> that macro to *set* flags. An alternative would be to do away with the
-> macro and use the individual flags, like the 32bit side does.
-> 
-> What do you think?
-> 
-I don't understand why the A bit is part of SCTLR_ELx_FLAGS then?  Is it
-used as a mask, is that why?
+Hello!
 
-In terms of these patches, I think we should apply these, because they
-solve the problem and do the same thing.
+On 6/7/2017 11:38 AM, Antoine Tenart wrote:
 
-Thanks,
--Christoffer
+> Move the read valid check in its own function. This is needed as a
+> requirement to factorize the driver to add the xMDIO support in the
+> future.
+>
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> ---
+>  drivers/net/ethernet/marvell/mvmdio.c | 11 +++++++----
+>  1 file changed, 7 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
+> index 96af8d57d9e5..56bbe3990590 100644
+> --- a/drivers/net/ethernet/marvell/mvmdio.c
+> +++ b/drivers/net/ethernet/marvell/mvmdio.c
+> @@ -69,6 +69,11 @@ static int orion_mdio_smi_is_done(struct orion_mdio_dev *dev)
+>  	return !(readl(dev->regs) & MVMDIO_SMI_BUSY);
+>  }
+>
+> +static int orion_mdio_smi_is_read_valid(struct orion_mdio_dev *dev)
+> +{
+> +	return !(readl(dev->regs) & MVMDIO_SMI_READ_VALID);
+> +}
+> +
+>  /* Wait for the SMI unit to be ready for another operation
+>   */
+>  static int orion_mdio_wait_ready(struct mii_bus *bus)
+> @@ -113,7 +118,6 @@ static int orion_mdio_read(struct mii_bus *bus, int mii_id,
+>  			   int regnum)
+>  {
+>  	struct orion_mdio_dev *dev = bus->priv;
+> -	u32 val;
+>  	int ret;
+>
+>  	mutex_lock(&dev->lock);
+> @@ -131,14 +135,13 @@ static int orion_mdio_read(struct mii_bus *bus, int mii_id,
+>  	if (ret < 0)
+>  		goto out;
+>
+> -	val = readl(dev->regs);
+> -	if (!(val & MVMDIO_SMI_READ_VALID)) {
+> +	if (orion_mdio_smi_is_read_valid(dev)) {
+>  		dev_err(bus->parent, "SMI bus read not valid\n");
+
+    I think you reversed the valuid/invalid sense in the new function's name.
+
+>  		ret = -ENODEV;
+>  		goto out;
+>  	}
+>
+[...]
+
+MBR, Sergei
