@@ -1,66 +1,65 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 07 Jun 2017 16:32:28 +0100
-Subject: [PATCH v2 1/3] arm64: hugetlb: Fix huge_pte_offset to return
- poisoned page table entries
-In-Reply-To: <20170607145715.GI30263@arm.com> (Will Deacon's message of "Wed,
- 7 Jun 2017 15:57:16 +0100")
-References: <20170517152336.6052-1-punit.agrawal@arm.com>
- <20170517152336.6052-2-punit.agrawal@arm.com>
- <20170607134731.GG30263@arm.com>
- <20170607143037.ovyo5pxywty2r6as@localhost>
- <20170607145715.GI30263@arm.com>
-Message-ID: <87h8zr24qb.fsf@e105922-lin.cambridge.arm.com>
+From: han.xu@nxp.com (Han Xu)
+Date: Wed, 7 Jun 2017 15:33:26 +0000
+Subject: [PATCH v5 2/3] ARM: dts: imx7: add GPMI NAND and APBH DMA
+In-Reply-To: <151ddece1e1427d0b69c4ff11b86a69b6a035d0d.1496730576.git-series.stefan@agner.ch>
+References: <cover.b62c3a17bd60de48d8fb2ade6dde4f2bc60aaf3c.1496730576.git-series.stefan@agner.ch>
+ <151ddece1e1427d0b69c4ff11b86a69b6a035d0d.1496730576.git-series.stefan@agner.ch>
+Message-ID: <9d66efda-d7c1-89a2-e163-c86056e08fb1@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon <will.deacon@arm.com> writes:
 
-> On Wed, Jun 07, 2017 at 03:30:37PM +0100, Catalin Marinas wrote:
->> On Wed, Jun 07, 2017 at 02:47:32PM +0100, Will Deacon wrote:
->> > On Wed, May 17, 2017 at 04:23:34PM +0100, Punit Agrawal wrote:
->> > > --- a/arch/arm64/mm/hugetlbpage.c
->> > > +++ b/arch/arm64/mm/hugetlbpage.c
->> > > @@ -136,36 +136,27 @@ pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
->> > >  {
->> > >  	pgd_t *pgd;
->> > >  	pud_t *pud;
->> > > -	pmd_t *pmd = NULL;
->> > > -	pte_t *pte = NULL;
->> > > +	pmd_t *pmd;
->> > >  
->> > >  	pgd = pgd_offset(mm, addr);
->> > >  	pr_debug("%s: addr:0x%lx pgd:%p\n", __func__, addr, pgd);
->> > >  	if (!pgd_present(*pgd))
->> > >  		return NULL;
->> > > +
->> > >  	pud = pud_offset(pgd, addr);
->> > > -	if (!pud_present(*pud))
->> > > +	if (pud_none(*pud))
->> > >  		return NULL;
->> > 
->> > Do you actually need this special case?
->> > 
->> > > -
->> > > -	if (pud_huge(*pud))
->> > > +	/* swap or huge page */
->> > > +	if (!pud_present(*pud) || pud_huge(*pud))
->> > 
->> > ... couldn't you just add a '|| pud_none(*pud)' in here?
->> > 
 
-I think an earlier version took this approach but...
-
->> > >  		return (pte_t *)pud;
->> 
->> But then you no longer return NULL if *pud == 0.
+On 06/06/2017 01:30 AM, Stefan Agner wrote:
+> Add i.MX 7 APBH DMA and GPMI NAND modules.
 >
-> Does that actually matter? The bits of hugetlb code I looked at will
-> deferenced the returned pud and handle the huge_pte_none case correctly.
-
-For hugetlb fault handling (hugetlb_fault()), returning NULL vs pointer
-to the pud/pmd results in different behaviour. If we return the pud when
-pud_none(), then we lose the resulting hugepage size check we get from
-huge_pte_alloc().
-
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>   arch/arm/boot/dts/imx7s.dtsi | 32 ++++++++++++++++++++++++++++++++
+>   1 file changed, 32 insertions(+)
 >
-> Will
+> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+> index c4f12fd..d71acd8 100644
+> --- a/arch/arm/boot/dts/imx7s.dtsi
+> +++ b/arch/arm/boot/dts/imx7s.dtsi
+> @@ -995,5 +995,37 @@
+>   				status = "disabled";
+>   			};
+>   		};
+> +
+> +		dma_apbh: dma-apbh at 33000000 {
+> +			compatible = "fsl,imx7d-dma-apbh", "fsl,imx28-dma-apbh";
+> +			reg = <0x33000000 0x2000>;
+> +			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
+> +			interrupt-names = "gpmi0", "gpmi1", "gpmi2", "gpmi3";
+> +			#dma-cells = <1>;
+> +			dma-channels = <4>;
+> +			clocks = <&clks IMX7D_NAND_USDHC_BUS_RAWNAND_CLK>;
+> +			clock-names = "dma_apbh_bch", "dma_apbh_io";
+
+please remove the clock names, I am good with all other changes.
+
+> +		};
+> +
+> +		gpmi: gpmi-nand at 33002000{
+> +			compatible = "fsl,imx7d-gpmi-nand";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			reg = <0x33002000 0x2000>, <0x33004000 0x4000>;
+> +			reg-names = "gpmi-nand", "bch";
+> +			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
+> +			interrupt-names = "bch";
+> +			clocks = <&clks IMX7D_NAND_RAWNAND_CLK>,
+> +				<&clks IMX7D_NAND_USDHC_BUS_RAWNAND_CLK>;
+> +			clock-names = "gpmi_io", "gpmi_bch_apb";
+> +			dmas = <&dma_apbh 0>;
+> +			dma-names = "rx-tx";
+> +			status = "disabled";
+> +			assigned-clocks = <&clks IMX7D_NAND_ROOT_SRC>;
+> +			assigned-clock-parents = <&clks IMX7D_PLL_ENET_MAIN_500M_CLK>;
+> +		};
+>   	};
+>   };
