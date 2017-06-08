@@ -1,224 +1,250 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 8 Jun 2017 13:37:22 +0300
-Subject: [PATCH 07/11] ARM: OMAP2+: Remove unused legacy code for DMA
-In-Reply-To: <20170608095618.GJ3730@atomide.com>
-References: <20170531225139.30723-1-tony@atomide.com>
- <20170531225139.30723-8-tony@atomide.com>
- <10f65a24-0459-5df7-378d-84933b83c070@ti.com>
- <20170608082432.GF3730@atomide.com> <20170608095618.GJ3730@atomide.com>
-Message-ID: <300ceefe-b015-60d2-2ebf-57dea9fd1d8b@ti.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 8 Jun 2017 11:39:56 +0100
+Subject: [PATCH v2 pci] PCI/MSI: pci-xgene-msi: Enable MSI support in
+ ACPI boot for X-Gene v1
+In-Reply-To: <CAAsHzqvnGWkG_KN6m_+HzGFaNOHU-m2FocTxy3pyM7Hhd9rz7w@mail.gmail.com>
+References: <1493340847-25720-1-git-send-email-kdinh@apm.com>
+ <f5cb58a5-7c06-8d54-6293-1a72ee0a4707@arm.com>
+ <CAAsHzquFJE7X0MQyZCP4+UW_E+WK2ORe1EK6yxiq-ev81i1-xg@mail.gmail.com>
+ <20170505165119.GA8614@red-moon>
+ <CAAsHzqttOoWOCAEmYaWjWmH4a--o0FXCRKfFC9S-+3KGiZVuHQ@mail.gmail.com>
+ <CAAsHzqvnGWkG_KN6m_+HzGFaNOHU-m2FocTxy3pyM7Hhd9rz7w@mail.gmail.com>
+Message-ID: <20170608103956.GB8644@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+On Tue, Jun 06, 2017 at 09:44:15AM -0700, Khuong Dinh wrote:
+> Hi Lorenzo,
+> 
+> On Tue, May 9, 2017 at 3:55 PM, Khuong Dinh <kdinh@apm.com> wrote:
+> > Hi Lorenzo,
+> >
+> > On Fri, May 5, 2017 at 9:51 AM, Lorenzo Pieralisi
+> > <lorenzo.pieralisi@arm.com> wrote:
+> >> On Thu, May 04, 2017 at 05:36:06PM -0700, Khuong Dinh wrote:
+> >>> Hi Marc,
+> >>> There's no explicit dependency between pcie driver and msi
+> >>> controller.  The current solution that we did is relying on the
+> >>> node ordering in BIOS.  ACPI 5.0 introduced _DEP method to assign a
+> >>> higher priority in start ordering.  This method could be applied in
+> >>> case of msi and pcie are the same level of subsys_init (in ACPI
+> >>> boot).  However, PCIe driver has not supported for this dependency
+> >>> check yet.  How do you think about this solution.
+> >>
+> >> First off, you can't post emails with confidentiality notices on
+> >> mailing lists so remove it from now onwards.
+> >
+> > Fixed
+> >
+> >> Secondly, I commented on this before, so you know what my opinion is.
+> >
+> > I got your opinion. I'll implement as your suggestion.
+> >
+> 
+>   Regarding to your previous suggestion to add a hook walking the ACPI
+>   namespace before acpi_bus_scan() in acpi_scan_init() to make MSI
+>   controllers must be probed before PCI.  I have a concern that the
+>   MSI namespace ? _SB.MSIX? is not a unique name and how can we walk
+>   the ACPI namespace and use this name to make MSI probed before PCI.
+>   May you have little bit more information for this or do you have
+>   another suggestion for this?
+> 
+>    There?s another solution which makes this simpler and I?d like to
+>    ask your opinion about this.
+>    The solution is to make an hierarchy between MSI and PCI nodes  as below:
+> Device(\_SB.MSIX) {
+>    Device(\_SB.PCI0)
+>    Device(\_SB.PCI1)
+>    ??
+> }
+>   In other word, MSIX node is a parent node of PCI nodes in ACPI
+>   table.  In this sense, there?s an explicit dependency between MSI
+>   and PCI, MSI controller must be probed before PCI and it will
+>   guarantee not breaking next kernel releases.  How do you think about
+>   this solution.
 
-On 2017-06-08 12:56, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [170608 01:28]:
->> * Peter Ujfalusi <peter.ujfalusi@ti.com> [170607 23:29]:
->>>
->>> This will conflict with the changes introduced by the tusb6010 DMAengine
->>> conversion:
->>> https://patchwork.kernel.org/patch/9734219/
->>
->> Oops forgot about that one. I'll take a look if it makes sense
->> to leave the braces for now to avoid a merge conflict.
->>
->>> with this patch I think the omap24xx_sdma_map and omap3xxx_sdma_map can
->>> also be removed, but we need to keep the omap24xx_sdma_dt_map for now
->>> till we have proper DT support for tusb.
->>
->> OK good point, will check.
-> 
-> Here's this one updated.
-> 
-> Regards,
-> 
-> Tony
-> 
-> 8< ------------------
-> From tony Mon Sep 17 00:00:00 2001
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Wed, 31 May 2017 15:51:35 -0700
-> Subject: [PATCH] ARM: OMAP2+: Remove unused legacy code for DMA
-> 
-> We are now booting all mach-omap2 in device tree only mode.
-> Any code that is only called in legacy boot mode where
-> of_have_populated_dt() is not set is safe to remove now.
-> 
-> Let's leave the dummy omap2_system_dma_init_dev() check
-> in place for now to avoid a pointless merge conflict with
-> tusb6010 dmaengine conversion as pointed out by Peter
-> Ujfalusi <peter.ujfalusi@ti.com>.
+I think that's a plaster as ineffective as reordering nodes, in short
+it is not a solution and you still rely on kernel link ordering, you
+can fiddle with ACPI tables as much as you want but that does not change.
 
-unfortunately we still have conflict as the
-https://patchwork.kernel.org/patch/9734219/
-adds entries to omap24xx_sdma_map[] for - back then - valid non DT boot
-support.
+>  I also tried to use _DEP method to describe the dependency of PCIe
+>  nodes, but it looks that it does not work as PCI and MSI are handed
+>  by acpi_bus_scan and still having issue when we re-probe PCI.
 
-I have rebased and reworked my patch locally on top of your v1, but
-things must go in in a certain order to avoid conflict.
+That's a tad vague to be frank, anyway it is pretty clear to me that we
+have hit a wall. In ACPI there is no way to describe probe dependencies
+like the one you have, it is as simple as that, and this MSI issue you
+are facing is just an example, there are more eg:
 
-The tsub conversion series in not yet in linux-next, but afaik Bin
-already applied it to somewhere.
-Leave the mach-omap2/dma.c cleanup for -rc1?
+https://www.spinics.net/lists/arm-kernel/msg585825.html
 
+At the end of the day the choice is simple either we accept (and we
+maintain because that's the problem) these hacks - and I am not willing
+to do that - or we find a way to solve this from a general perspective not
+as a point hack.
+
+I can have a look at solving the whole issue but it won't happen
+tomorrow.
+
+Thanks,
+Lorenzo
+
+> Thanks,
+> Khuong Dinh
 > 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/mach-omap2/dma.c | 125 +---------------------------------------------
->  1 file changed, 2 insertions(+), 123 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/dma.c b/arch/arm/mach-omap2/dma.c
-> --- a/arch/arm/mach-omap2/dma.c
-> +++ b/arch/arm/mach-omap2/dma.c
-> @@ -204,108 +204,6 @@ static unsigned configure_dma_errata(void)
->  	return errata;
->  }
->  
-> -static const struct dma_slave_map omap24xx_sdma_map[] = {
-> -	{ "omap-gpmc", "rxtx", SDMA_FILTER_PARAM(4) },
-> -	{ "omap-aes", "tx", SDMA_FILTER_PARAM(9) },
-> -	{ "omap-aes", "rx", SDMA_FILTER_PARAM(10) },
-> -	{ "omap-sham", "rx", SDMA_FILTER_PARAM(13) },
-> -	{ "omap2_mcspi.2", "tx0", SDMA_FILTER_PARAM(15) },
-> -	{ "omap2_mcspi.2", "rx0", SDMA_FILTER_PARAM(16) },
-> -	{ "omap-mcbsp.3", "tx", SDMA_FILTER_PARAM(17) },
-> -	{ "omap-mcbsp.3", "rx", SDMA_FILTER_PARAM(18) },
-> -	{ "omap-mcbsp.4", "tx", SDMA_FILTER_PARAM(19) },
-> -	{ "omap-mcbsp.4", "rx", SDMA_FILTER_PARAM(20) },
-> -	{ "omap-mcbsp.5", "tx", SDMA_FILTER_PARAM(21) },
-> -	{ "omap-mcbsp.5", "rx", SDMA_FILTER_PARAM(22) },
-> -	{ "omap2_mcspi.2", "tx1", SDMA_FILTER_PARAM(23) },
-> -	{ "omap2_mcspi.2", "rx1", SDMA_FILTER_PARAM(24) },
-> -	{ "omap_i2c.1", "tx", SDMA_FILTER_PARAM(27) },
-> -	{ "omap_i2c.1", "rx", SDMA_FILTER_PARAM(28) },
-> -	{ "omap_i2c.2", "tx", SDMA_FILTER_PARAM(29) },
-> -	{ "omap_i2c.2", "rx", SDMA_FILTER_PARAM(30) },
-> -	{ "omap-mcbsp.1", "tx", SDMA_FILTER_PARAM(31) },
-> -	{ "omap-mcbsp.1", "rx", SDMA_FILTER_PARAM(32) },
-> -	{ "omap-mcbsp.2", "tx", SDMA_FILTER_PARAM(33) },
-> -	{ "omap-mcbsp.2", "rx", SDMA_FILTER_PARAM(34) },
-> -	{ "omap2_mcspi.0", "tx0", SDMA_FILTER_PARAM(35) },
-> -	{ "omap2_mcspi.0", "rx0", SDMA_FILTER_PARAM(36) },
-> -	{ "omap2_mcspi.0", "tx1", SDMA_FILTER_PARAM(37) },
-> -	{ "omap2_mcspi.0", "rx1", SDMA_FILTER_PARAM(38) },
-> -	{ "omap2_mcspi.0", "tx2", SDMA_FILTER_PARAM(39) },
-> -	{ "omap2_mcspi.0", "rx2", SDMA_FILTER_PARAM(40) },
-> -	{ "omap2_mcspi.0", "tx3", SDMA_FILTER_PARAM(41) },
-> -	{ "omap2_mcspi.0", "rx3", SDMA_FILTER_PARAM(42) },
-> -	{ "omap2_mcspi.1", "tx0", SDMA_FILTER_PARAM(43) },
-> -	{ "omap2_mcspi.1", "rx0", SDMA_FILTER_PARAM(44) },
-> -	{ "omap2_mcspi.1", "tx1", SDMA_FILTER_PARAM(45) },
-> -	{ "omap2_mcspi.1", "rx1", SDMA_FILTER_PARAM(46) },
-> -	{ "omap_hsmmc.1", "tx", SDMA_FILTER_PARAM(47) },
-> -	{ "omap_hsmmc.1", "rx", SDMA_FILTER_PARAM(48) },
-> -	{ "omap_uart.0", "tx", SDMA_FILTER_PARAM(49) },
-> -	{ "omap_uart.0", "rx", SDMA_FILTER_PARAM(50) },
-> -	{ "omap_uart.1", "tx", SDMA_FILTER_PARAM(51) },
-> -	{ "omap_uart.1", "rx", SDMA_FILTER_PARAM(52) },
-> -	{ "omap_uart.2", "tx", SDMA_FILTER_PARAM(53) },
-> -	{ "omap_uart.2", "rx", SDMA_FILTER_PARAM(54) },
-> -	{ "omap_hsmmc.0", "tx", SDMA_FILTER_PARAM(61) },
-> -	{ "omap_hsmmc.0", "rx", SDMA_FILTER_PARAM(62) },
-> -};
-> -
-> -static const struct dma_slave_map omap3xxx_sdma_map[] = {
-> -	{ "omap-gpmc", "rxtx", SDMA_FILTER_PARAM(4) },
-> -	{ "omap2_mcspi.2", "tx0", SDMA_FILTER_PARAM(15) },
-> -	{ "omap2_mcspi.2", "rx0", SDMA_FILTER_PARAM(16) },
-> -	{ "omap-mcbsp.3", "tx", SDMA_FILTER_PARAM(17) },
-> -	{ "omap-mcbsp.3", "rx", SDMA_FILTER_PARAM(18) },
-> -	{ "omap-mcbsp.4", "tx", SDMA_FILTER_PARAM(19) },
-> -	{ "omap-mcbsp.4", "rx", SDMA_FILTER_PARAM(20) },
-> -	{ "omap-mcbsp.5", "tx", SDMA_FILTER_PARAM(21) },
-> -	{ "omap-mcbsp.5", "rx", SDMA_FILTER_PARAM(22) },
-> -	{ "omap2_mcspi.2", "tx1", SDMA_FILTER_PARAM(23) },
-> -	{ "omap2_mcspi.2", "rx1", SDMA_FILTER_PARAM(24) },
-> -	{ "omap_i2c.3", "tx", SDMA_FILTER_PARAM(25) },
-> -	{ "omap_i2c.3", "rx", SDMA_FILTER_PARAM(26) },
-> -	{ "omap_i2c.1", "tx", SDMA_FILTER_PARAM(27) },
-> -	{ "omap_i2c.1", "rx", SDMA_FILTER_PARAM(28) },
-> -	{ "omap_i2c.2", "tx", SDMA_FILTER_PARAM(29) },
-> -	{ "omap_i2c.2", "rx", SDMA_FILTER_PARAM(30) },
-> -	{ "omap-mcbsp.1", "tx", SDMA_FILTER_PARAM(31) },
-> -	{ "omap-mcbsp.1", "rx", SDMA_FILTER_PARAM(32) },
-> -	{ "omap-mcbsp.2", "tx", SDMA_FILTER_PARAM(33) },
-> -	{ "omap-mcbsp.2", "rx", SDMA_FILTER_PARAM(34) },
-> -	{ "omap2_mcspi.0", "tx0", SDMA_FILTER_PARAM(35) },
-> -	{ "omap2_mcspi.0", "rx0", SDMA_FILTER_PARAM(36) },
-> -	{ "omap2_mcspi.0", "tx1", SDMA_FILTER_PARAM(37) },
-> -	{ "omap2_mcspi.0", "rx1", SDMA_FILTER_PARAM(38) },
-> -	{ "omap2_mcspi.0", "tx2", SDMA_FILTER_PARAM(39) },
-> -	{ "omap2_mcspi.0", "rx2", SDMA_FILTER_PARAM(40) },
-> -	{ "omap2_mcspi.0", "tx3", SDMA_FILTER_PARAM(41) },
-> -	{ "omap2_mcspi.0", "rx3", SDMA_FILTER_PARAM(42) },
-> -	{ "omap2_mcspi.1", "tx0", SDMA_FILTER_PARAM(43) },
-> -	{ "omap2_mcspi.1", "rx0", SDMA_FILTER_PARAM(44) },
-> -	{ "omap2_mcspi.1", "tx1", SDMA_FILTER_PARAM(45) },
-> -	{ "omap2_mcspi.1", "rx1", SDMA_FILTER_PARAM(46) },
-> -	{ "omap_hsmmc.1", "tx", SDMA_FILTER_PARAM(47) },
-> -	{ "omap_hsmmc.1", "rx", SDMA_FILTER_PARAM(48) },
-> -	{ "omap_uart.0", "tx", SDMA_FILTER_PARAM(49) },
-> -	{ "omap_uart.0", "rx", SDMA_FILTER_PARAM(50) },
-> -	{ "omap_uart.1", "tx", SDMA_FILTER_PARAM(51) },
-> -	{ "omap_uart.1", "rx", SDMA_FILTER_PARAM(52) },
-> -	{ "omap_uart.2", "tx", SDMA_FILTER_PARAM(53) },
-> -	{ "omap_uart.2", "rx", SDMA_FILTER_PARAM(54) },
-> -	{ "omap_hsmmc.0", "tx", SDMA_FILTER_PARAM(61) },
-> -	{ "omap_hsmmc.0", "rx", SDMA_FILTER_PARAM(62) },
-> -	{ "omap-aes", "tx", SDMA_FILTER_PARAM(65) },
-> -	{ "omap-aes", "rx", SDMA_FILTER_PARAM(66) },
-> -	{ "omap-sham", "rx", SDMA_FILTER_PARAM(69) },
-> -	{ "omap2_mcspi.3", "tx0", SDMA_FILTER_PARAM(70) },
-> -	{ "omap2_mcspi.3", "rx0", SDMA_FILTER_PARAM(71) },
-> -	{ "omap_hsmmc.2", "tx", SDMA_FILTER_PARAM(77) },
-> -	{ "omap_hsmmc.2", "rx", SDMA_FILTER_PARAM(78) },
-> -	{ "omap_uart.3", "tx", SDMA_FILTER_PARAM(81) },
-> -	{ "omap_uart.3", "rx", SDMA_FILTER_PARAM(82) },
-> -};
-> -
->  static struct omap_system_dma_plat_info dma_plat_info __initdata = {
->  	.reg_map	= reg_map,
->  	.channel_stride	= 0x60,
-> @@ -334,14 +232,9 @@ static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *unused)
->  	p.dma_attr = (struct omap_dma_dev_attr *)oh->dev_attr;
->  	p.errata = configure_dma_errata();
->  
-> +	/* REVISIT: Remove after v4.13 with a follow-up patch */
->  	if (!of_have_populated_dt()) {
->  		if (soc_is_omap24xx()) {
-> -			p.slave_map = omap24xx_sdma_map;
-> -			p.slavecnt = ARRAY_SIZE(omap24xx_sdma_map);
-> -		} else if (soc_is_omap34xx() || soc_is_omap3630()) {
-> -			p.slave_map = omap3xxx_sdma_map;
-> -			p.slavecnt = ARRAY_SIZE(omap3xxx_sdma_map);
-> -		} else {
->  			pr_err("%s: The legacy DMA map is not provided!\n",
->  			       __func__);
->  			return -ENODEV;
-> @@ -389,21 +282,7 @@ static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *unused)
->  
->  static int __init omap2_system_dma_init(void)
->  {
-> -	struct platform_device *pdev;
-> -	int res;
-> -
-> -	res = omap_hwmod_for_each_by_class("dma",
-> +	return omap_hwmod_for_each_by_class("dma",
->  			omap2_system_dma_init_dev, NULL);
-> -	if (res)
-> -		return res;
-> -
-> -	if (of_have_populated_dt())
-> -		return res;
-> -
-> -	pdev = platform_device_register_full(&omap_dma_dev_info);
-> -	if (IS_ERR(pdev))
-> -		return PTR_ERR(pdev);
-> -
-> -	return res;
->  }
->  omap_arch_initcall(omap2_system_dma_init);
-> 
-
-- P?ter
+> >> Finally, please execute this command on the vmlinux that "works"
+> >> for you:
+> >>
+> >> nm vmlinux | grep -E '__initcall_(xgene_pcie_msi_init|acpi_init)'
+> >
+> > $ nm vmlinux | grep -E '__initcall_(xgene_pcie_msi_init|acpi_init)'
+> > ffff000008dab2d8 t __initcall_acpi_init4
+> > ffff000008dab2c8 t __initcall_xgene_pcie_msi_init4
+> >
+> > Best regards,
+> > Khuong Dinh
+> >
+> >> Even by ordering devices in the ACPI tables (that I abhor) I still do
+> >> not understand how this works (I mean without relying on kernel link
+> >> order to ensure that the MSI driver is probed before PCI devices are
+> >> enumerated in acpi_init()).
+> >>
+> >> Thanks,
+> >> Lorenzo
+> >>
+> >>> Best regards,
+> >>> Khuong
+> >>>
+> >>> On Fri, Apr 28, 2017 at 2:27 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >>> > On 28/04/17 01:54, Khuong Dinh wrote:
+> >>> >> From: Khuong Dinh <kdinh@apm.com>
+> >>> >>
+> >>> >> This patch makes pci-xgene-msi driver ACPI-aware and provides
+> >>> >> MSI capability for X-Gene v1 PCIe controllers in ACPI boot mode.
+> >>> >>
+> >>> >> Signed-off-by: Khuong Dinh <kdinh@apm.com>
+> >>> >> Signed-off-by: Duc Dang <dhdang@apm.com>
+> >>> >> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> >>> >> ---
+> >>> >> v2:
+> >>> >>  - Verify with BIOS version 3.06.25 and 3.07.09
+> >>> >> v1:
+> >>> >>  - Initial version
+> >>> >> ---
+> >>> >>  drivers/pci/host/pci-xgene-msi.c |   35 ++++++++++++++++++++++++++++++++---
+> >>> >>  1 files changed, 32 insertions(+), 3 deletions(-)
+> >>> >>
+> >>> >> diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
+> >>> >> index f1b633b..00aaa3d 100644
+> >>> >> --- a/drivers/pci/host/pci-xgene-msi.c
+> >>> >> +++ b/drivers/pci/host/pci-xgene-msi.c
+> >>> >> @@ -24,6 +24,7 @@
+> >>> >>  #include <linux/pci.h>
+> >>> >>  #include <linux/platform_device.h>
+> >>> >>  #include <linux/of_pci.h>
+> >>> >> +#include <linux/acpi.h>
+> >>> >>
+> >>> >>  #define MSI_IR0                      0x000000
+> >>> >>  #define MSI_INT0             0x800000
+> >>> >> @@ -39,7 +40,7 @@ struct xgene_msi_group {
+> >>> >>  };
+> >>> >>
+> >>> >>  struct xgene_msi {
+> >>> >> -     struct device_node      *node;
+> >>> >> +     struct fwnode_handle    *fwnode;
+> >>> >>       struct irq_domain       *inner_domain;
+> >>> >>       struct irq_domain       *msi_domain;
+> >>> >>       u64                     msi_addr;
+> >>> >> @@ -249,6 +250,13 @@ static void xgene_irq_domain_free(struct irq_domain *domain,
+> >>> >>       .free   = xgene_irq_domain_free,
+> >>> >>  };
+> >>> >>
+> >>> >> +#ifdef CONFIG_ACPI
+> >>> >> +static struct fwnode_handle *xgene_msi_get_fwnode(struct device *dev)
+> >>> >> +{
+> >>> >> +     return xgene_msi_ctrl.fwnode;
+> >>> >> +}
+> >>> >> +#endif
+> >>> >> +
+> >>> >>  static int xgene_allocate_domains(struct xgene_msi *msi)
+> >>> >>  {
+> >>> >>       msi->inner_domain = irq_domain_add_linear(NULL, NR_MSI_VEC,
+> >>> >> @@ -256,7 +264,7 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
+> >>> >>       if (!msi->inner_domain)
+> >>> >>               return -ENOMEM;
+> >>> >>
+> >>> >> -     msi->msi_domain = pci_msi_create_irq_domain(of_node_to_fwnode(msi->node),
+> >>> >> +     msi->msi_domain = pci_msi_create_irq_domain(msi->fwnode,
+> >>> >>                                                   &xgene_msi_domain_info,
+> >>> >>                                                   msi->inner_domain);
+> >>> >>
+> >>> >> @@ -265,6 +273,9 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
+> >>> >>               return -ENOMEM;
+> >>> >>       }
+> >>> >>
+> >>> >> +#ifdef CONFIG_ACPI
+> >>> >> +     pci_msi_register_fwnode_provider(&xgene_msi_get_fwnode);
+> >>> >> +#endif
+> >>> >>       return 0;
+> >>> >>  }
+> >>> >>
+> >>> >> @@ -449,6 +460,13 @@ static int xgene_msi_hwirq_free(unsigned int cpu)
+> >>> >>       {},
+> >>> >>  };
+> >>> >>
+> >>> >> +#ifdef CONFIG_ACPI
+> >>> >> +static const struct acpi_device_id xgene_msi_acpi_ids[] = {
+> >>> >> +     {"APMC0D0E", 0},
+> >>> >> +     { },
+> >>> >> +};
+> >>> >> +#endif
+> >>> >> +
+> >>> >>  static int xgene_msi_probe(struct platform_device *pdev)
+> >>> >>  {
+> >>> >>       struct resource *res;
+> >>> >> @@ -469,7 +487,17 @@ static int xgene_msi_probe(struct platform_device *pdev)
+> >>> >>               goto error;
+> >>> >>       }
+> >>> >>       xgene_msi->msi_addr = res->start;
+> >>> >> -     xgene_msi->node = pdev->dev.of_node;
+> >>> >> +
+> >>> >> +     xgene_msi->fwnode = of_node_to_fwnode(pdev->dev.of_node);
+> >>> >> +     if (!xgene_msi->fwnode) {
+> >>> >> +             xgene_msi->fwnode = irq_domain_alloc_fwnode(NULL);
+> >>> >
+> >>> > Please provide something other than NULL, such as the base address if
+> >>> > the device. That's quite useful for debugging.
+> >>> >
+> >>> >> +             if (!xgene_msi->fwnode) {
+> >>> >> +                     dev_err(&pdev->dev, "Failed to create fwnode\n");
+> >>> >> +                     rc = ENOMEM;
+> >>> >> +                     goto error;
+> >>> >> +             }
+> >>> >> +     }
+> >>> >> +
+> >>> >>       xgene_msi->num_cpus = num_possible_cpus();
+> >>> >>
+> >>> >>       rc = xgene_msi_init_allocator(xgene_msi);
+> >>> >> @@ -540,6 +568,7 @@ static int xgene_msi_probe(struct platform_device *pdev)
+> >>> >>       .driver = {
+> >>> >>               .name = "xgene-msi",
+> >>> >>               .of_match_table = xgene_msi_match_table,
+> >>> >> +             .acpi_match_table = ACPI_PTR(xgene_msi_acpi_ids),
+> >>> >>       },
+> >>> >>       .probe = xgene_msi_probe,
+> >>> >>       .remove = xgene_msi_remove,
+> >>> >>
+> >>> >
+> >>> > The code is trivial, but relies on the MSI controller to probe before
+> >>> > the PCI bus. What enforces this? How is it making sure that this is not
+> >>> > going to break in the next kernel release? As far as I can tell, there
+> >>> > is no explicit dependency between the two, making it the whole thing
+> >>> > extremely fragile.
+> >>> >
+> >>> > Thanks,
+> >>> >
+> >>> >         M.
+> >>> > --
+> >>> > Jazz is not dead. It just smells funny...
+> >>>
+> >>> --
