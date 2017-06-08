@@ -1,111 +1,217 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 08 Jun 2017 19:09:15 +0200
-Subject: [PATCH v2 7/7] arm64: dts: marvell: use new binding for the
- system controller on ap806
-In-Reply-To: <e12e9b027462646e16cb51783d6e14660a019ba6.1496239589.git-series.gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Wed, 31 May 2017 16:07:28 +0200")
-References: <cover.21754b3184e2122d1c83a664477ed26ec562b3e9.1496239589.git-series.gregory.clement@free-electrons.com>
- <cover.21754b3184e2122d1c83a664477ed26ec562b3e9.1496239589.git-series.gregory.clement@free-electrons.com>
- <e12e9b027462646e16cb51783d6e14660a019ba6.1496239589.git-series.gregory.clement@free-electrons.com>
-Message-ID: <87lgp2pft0.fsf@free-electrons.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 8 Jun 2017 12:11:35 -0500
+Subject: [PATCH 4/4] mfd: tps65217: Instantiate sub-devices from device
+ tree
+In-Reply-To: <CAFqH_53v32iODN4xhoh4ho4s6grxknEDS3Ak6CHBcTAQo6fDNw@mail.gmail.com>
+References: <20170607103242.16008-1-enric.balletbo@collabora.com>
+ <20170607103242.16008-4-enric.balletbo@collabora.com>
+ <6359abe2-9a21-78a2-f5ea-87e2e3335af3@ti.com>
+ <CAFqH_53v32iODN4xhoh4ho4s6grxknEDS3Ak6CHBcTAQo6fDNw@mail.gmail.com>
+Message-ID: <578f348c-509f-79d3-9770-73c9fcffe19c@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On mer., mai 31 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
-
-> The new binding for the system controller on ap806 moved the clock into a
-> subnode. This preliminary step will allow to add gpio and pinctrl
-> subnodes
->
-> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
 
-Applied on mvebu/dt64
+On 06/08/2017 08:16 AM, Enric Balletbo Serra wrote:
+> 2017-06-07 18:05 GMT+02:00 Grygorii Strashko <grygorii.strashko@ti.com>:
+>>
+>>
+>> On 06/07/2017 05:32 AM, Enric Balletbo i Serra wrote:
+>>> The driver boots only via device tree but currently all the MFD sub-devices
+>>> are instatiated independently of the device tree configuration, i.e
+>>> although tps65217-charger is disabled by default it's instantiated by the
+>>> MFD driver.
+>>>
+>>> Instead of register all sub-devices, if the TPS65217 device tree node has a
+>>> sub-node enabled, try to instatiate them as MFD sub-devices but not
+>>> instantiate sub-nodes that are not enabled.
+>>>
+>>> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+>>> ---
+>>>    drivers/mfd/tps65217.c       | 56 +++++++-------------------------------------
+>>>    include/linux/mfd/tps65217.h |  6 -----
+>>>    2 files changed, 9 insertions(+), 53 deletions(-)
+>>>
+>>> diff --git a/drivers/mfd/tps65217.c b/drivers/mfd/tps65217.c
+>>> index f769c7d..9effdda 100644
+>>> --- a/drivers/mfd/tps65217.c
+>>> +++ b/drivers/mfd/tps65217.c
+>>> @@ -33,14 +33,7 @@
+>>>    #include <linux/mfd/core.h>
+>>>    #include <linux/mfd/tps65217.h>
+>>>
+>>> -static struct resource charger_resources[] = {
+>>> -     DEFINE_RES_IRQ_NAMED(TPS65217_IRQ_AC, "AC"),
+>>> -     DEFINE_RES_IRQ_NAMED(TPS65217_IRQ_USB, "USB"),
+>>> -};
+>>> -
+>>> -static struct resource pb_resources[] = {
+>>> -     DEFINE_RES_IRQ_NAMED(TPS65217_IRQ_PB, "PB"),
+>>> -};
+>>
+>> May be I messed smth, but how about interrupts for charger and pwrbutton?
+>>
+> 
+> I might be wrong but as this driver is DT-only these resources came
+> from the DT. The driver calls platform_get_irq_byname and then
+> of_irq_get_byname.
+> 
+> i.e arch/arm/boot/dts/am335x-bone-common.dtsi
+> 
+> &tps {
+>          charger {
+>                  interrupts = <0>, <1>;
+>                  interrupt-names = "USB", "AC";
+>                  status = "okay";
+>          };
+> 
+>          pwrbutton {
+>                  interrupts = <2>;
+>                  status = "okay";
+>          };
+> };
 
-Gregory
+Sry, but this make no sense - those IRQ configuration is static,
+so it should be defined in arch/arm/boot/dts/tps65217.dtsi at least.
+But, again, it also not required, because it is strictly static for 
+this particular device and so defined in code.
+And  platform_get_irq_byname() should perfectly work with mfd_add_devices().
 
-> ---
->  arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 19 +++++++++++--------
->  1 file changed, 11 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> index 0c25ec62a2a3..205037e3e7dc 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> @@ -193,7 +193,7 @@
->  				#size-cells = <0>;
->  				cell-index = <0>;
->  				interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
-> -				clocks = <&ap_syscon 3>;
-> +				clocks = <&ap_clk 3>;
->  				status = "disabled";
->  			};
->  
-> @@ -204,7 +204,7 @@
->  				#size-cells = <0>;
->  				interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
->  				timeout-ms = <1000>;
-> -				clocks = <&ap_syscon 3>;
-> +				clocks = <&ap_clk 3>;
->  				status = "disabled";
->  			};
->  
-> @@ -214,7 +214,7 @@
->  				reg-shift = <2>;
->  				interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
->  				reg-io-width = <1>;
-> -				clocks = <&ap_syscon 3>;
-> +				clocks = <&ap_clk 3>;
->  				status = "disabled";
->  			};
->  
-> @@ -224,7 +224,7 @@
->  				reg-shift = <2>;
->  				interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
->  				reg-io-width = <1>;
-> -				clocks = <&ap_syscon 3>;
-> +				clocks = <&ap_clk 3>;
->  				status = "disabled";
->  
->  			};
-> @@ -234,17 +234,20 @@
->  				reg = <0x6e0000 0x300>;
->  				interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
->  				clock-names = "core";
-> -				clocks = <&ap_syscon 4>;
-> +				clocks = <&ap_clk 4>;
->  				dma-coherent;
->  				marvell,xenon-phy-slow-mode;
->  				status = "disabled";
->  			};
->  
->  			ap_syscon: system-controller at 6f4000 {
-> -				compatible = "marvell,ap806-system-controller",
-> -					     "syscon";
-> -				#clock-cells = <1>;
-> +				compatible = "syscon", "simple-mfd";
->  				reg = <0x6f4000 0x1000>;
-> +
-> +				ap_clk: clock {
-> +					compatible = "marvell,ap806-clock";
-> +					#clock-cells = <1>;
-> +				};
->  			};
->  		};
->  	};
-> -- 
-> git-series 0.9.1
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Also not that  tps65217.dtsi included in below files, but 
+
+./arch/arm/boot/dts/am335x-bone-common.dtsi:/include/ "tps65217.dtsi"
+./arch/arm/boot/dts/am335x-chilisom.dtsi:/include/ "tps65217.dtsi"
+./arch/arm/boot/dts/am335x-nano.dts:#include "tps65217.dtsi"
+./arch/arm/boot/dts/am335x-pepper.dts:/include/ "tps65217.dtsi"
+./arch/arm/boot/dts/am335x-sl50.dts:#include "tps65217.dtsi"
+
+but IRQs defined only in
+./arch/arm/boot/dts/am335x-bone-common.dtsi:		interrupt-names = "USB", "AC";
+./arch/arm/boot/dts/am335x-chiliboard.dts:		interrupt-names = "USB", "AC";
+
+So how are other boards working?
+
+
+> 
+>>> +#define TPS65217_NUM_IRQ     3
+>>>
+>>>    static void tps65217_irq_lock(struct irq_data *data)
+>>>    {
+>>> @@ -86,29 +79,6 @@ static struct irq_chip tps65217_irq_chip = {
+>>>        .irq_disable            = tps65217_irq_disable,
+>>>    };
+>>>
+>>> -static struct mfd_cell tps65217s[] = {
+>>> -     {
+>>> -             .name = "tps65217-pmic",
+>>> -             .of_compatible = "ti,tps65217-pmic",
+>>> -     },
+>>> -     {
+>>> -             .name = "tps65217-bl",
+>>> -             .of_compatible = "ti,tps65217-bl",
+>>> -     },
+>>> -     {
+>>> -             .name = "tps65217-charger",
+>>> -             .num_resources = ARRAY_SIZE(charger_resources),
+>>> -             .resources = charger_resources,
+>>> -             .of_compatible = "ti,tps65217-charger",
+>>> -     },
+>>> -     {
+>>> -             .name = "tps65217-pwrbutton",
+>>> -             .num_resources = ARRAY_SIZE(pb_resources),
+>>> -             .resources = pb_resources,
+>>> -             .of_compatible = "ti,tps65217-pwrbutton",
+>>> -     },
+>>> -};
+>>> -
+>>>    static irqreturn_t tps65217_irq_thread(int irq, void *data)
+>>>    {
+>>>        struct tps65217 *tps = data;
+>>> @@ -359,23 +329,8 @@ static int tps65217_probe(struct i2c_client *client,
+>>>                return ret;
+>>>        }
+>>>
+>>> -     if (client->irq) {
+>>> +     if (client->irq)
+>>>                tps65217_irq_init(tps, client->irq);
+>>> -     } else {
+>>> -             int i;
+>>> -
+>>> -             /* Don't tell children about IRQ resources which won't fire */
+>>> -             for (i = 0; i < ARRAY_SIZE(tps65217s); i++)
+>>> -                     tps65217s[i].num_resources = 0;
+>>> -     }
+>>> -
+>>> -     ret = devm_mfd_add_devices(tps->dev, -1, tps65217s,
+>>> -                                ARRAY_SIZE(tps65217s), NULL, 0,
+>>> -                                tps->irq_domain);
+>>> -     if (ret < 0) {
+>>> -             dev_err(tps->dev, "mfd_add_devices failed: %d\n", ret);
+>>> -             return ret;
+>>> -     }
+>>
+>> And as I remember there was a request to use mfd_add_devices()
+>> and not of_platform_populate() for mfd sub-devices instantiation.
+>>
+> 
+>  From what I know or you add the sub-devices via mfd_add_devices or
+> using the DT with of_platform_populate, and the first is probably the
+> preferred, but in this specific case this driver is DT-only so IMHO
+> makes more sense adding via the DT, there are already some bindings
+> i.e:
+>   arch/arm/boot/dts/tps65217.dtsi
+>   arch/arm/boot/dts/am335x-bone-common.dtsi
+> 
+> Let me explain a bit more,  assume that you have another AM335x with
+> the TPS65217 PMIC but you don't want the charger because is not wired
+> in your board. Your board DT will include the tps65217.dtsi, in this
+> file you can see:
+> 
+> &tps {
+>         ...
+>          charger {
+>                  compatible = "ti,tps65217-charger";
+>                  status = "disabled";
+>          };
+>          ...
+> };
+> 
+> Seems that's fine but actually not works as expected, the TPS65217 MFD
+> registers all the sub-devices so the charger is enabled and running
+> even you have status = "disabled" in your DT. This looks incoherent to
+> me, hence I replaced the devm_mfd_add_devices() for the
+> of_platform_populate which takes care of the status propriety and only
+> calls the probe of the sub-devices that match and are enabled (status
+> = "okay").
+
+I can't find links on corresponding discussions, but mfd_add_devices() is
+preferred for MDF devices. Below is one commit i've found. Also you can compare number of
+drivers using mfd_add_devices() and of_platform_populate().
+
+
+regarding your problem - I think, It might be reasonable from your side to propose change to
+mfd_add_device() which will take into account 'status = "disabled";' DT property.
+
+---
+commit 4531156db726d27e593d35800d43c74be4e393b9
+Author: Keerthy <j-keerthy@ti.com>
+Date:   Mon Sep 19 13:09:05 2016 +0530
+
+    mfd: tps65218: Use mfd_add_devices instead of of_platform_populate
+    
+    mfd_add_devices enables parsing device tree nodes without compatibles
+    for regulators and gpio modules. Replace of_platform_populate with
+    mfd_add_devices. mfd_cell currently is populated with regulators,
+    gpio and powerbutton.
+    
+    Signed-off-by: Keerthy <j-keerthy@ti.com>
+    Signed-off-by: Lee Jones <lee.jones@linaro.org>
+
+
+
+
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+regards,
+-grygorii
