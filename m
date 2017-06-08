@@ -1,21 +1,35 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 8 Jun 2017 13:45:35 -0300
-Subject: [PATCH 2/2] ARM: dts: imx6ul: Add imx6ul-tempmon
-In-Reply-To: <b9b91617985607f24c4986bcad5199483805d6b7.1496939031.git.leonard.crestez@nxp.com>
-References: <7055ce6095c0b7f026ac6f0dc37e43fc5c0b1793.1496939031.git.leonard.crestez@nxp.com>
- <b9b91617985607f24c4986bcad5199483805d6b7.1496939031.git.leonard.crestez@nxp.com>
-Message-ID: <CAOMZO5BP4fPyzDmSg+DFLRYh3QMf-8T0gqvnZn6mEMt-QqSgfw@mail.gmail.com>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Thu,  8 Jun 2017 18:51:31 +0200
+Subject: [PATCH v4 0/3] nvmem: upstream snvs_lpgpr driver
+Message-ID: <20170608165134.14971-1-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 8, 2017 at 1:26 PM, Leonard Crestez <leonard.crestez@nxp.com> wrote:
+changes v4:
+ - change dependencies in Kconfig
+ - remove unused includes and order them alphabetically
+ - set MODULE_LICENSE = GPL v2
+ - remove unused int err variable
 
-> +                       tempmon: tempmon {
-> +                               compatible = "fsl,imx6ul-tempmon", "fsl,imx6sx-tempmon";
-> +                               interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
-> +                               fsl,tempmon = <&anatop>;
-> +                               fsl,tempmon-data = <&ocotp>;
-> +                               clocks = <&clks IMX6UL_CLK_PLL3_USB_OTG>;
+changes v3:
+ - remove regmap and offset properties.
 
-Does the IMX6UL_CLK_PLL3_USB_OTG clock really control tempmon? Please
-double check.
+changes v2:
+ - correct typos: Registe, parrent...
+
+Oleksij Rempel (3):
+  nvmem: dt: document SNVS LPGPR binding
+  nvmem: add snvs_lpgpr driver
+  ARM: dts: imx6qdl.dtsi: add "fsl,imx6q-snvs-lpgpr" node
+
+ .../devicetree/bindings/nvmem/snvs-lpgpr.txt       |  19 +++
+ arch/arm/boot/dts/imx6qdl.dtsi                     |   4 +
+ drivers/nvmem/Kconfig                              |  10 ++
+ drivers/nvmem/Makefile                             |   2 +
+ drivers/nvmem/snvs_lpgpr.c                         | 136 +++++++++++++++++++++
+ 5 files changed, 171 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
+ create mode 100644 drivers/nvmem/snvs_lpgpr.c
+
+-- 
+2.11.0
