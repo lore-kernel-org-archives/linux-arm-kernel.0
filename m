@@ -1,59 +1,58 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 8 Jun 2017 09:58:58 +0100
-Subject: [PATCH v7 1/3] ACPI/IORT: Fixup SMMUv3 resource size for Cavium
- ThunderX2 SMMUv3 model
-In-Reply-To: <1496145821-3411-2-git-send-email-gakula@caviumnetworks.com>
-References: <1496145821-3411-1-git-send-email-gakula@caviumnetworks.com>
- <1496145821-3411-2-git-send-email-gakula@caviumnetworks.com>
-Message-ID: <20170608085857.GB8607@red-moon>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Thu, 8 Jun 2017 11:03:07 +0200
+Subject: [PATCH 9/9] arm64: marvell: dts: add xmdio nodes for 7k/8k
+In-Reply-To: <8737barh96.fsf@free-electrons.com>
+References: <20170607083810.30922-1-antoine.tenart@free-electrons.com>
+ <20170607083810.30922-10-antoine.tenart@free-electrons.com>
+ <20170608084515.GA12385@kwain> <8737barh96.fsf@free-electrons.com>
+Message-ID: <20170608090307.GC12385@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 30, 2017 at 05:33:39PM +0530, Geetha sowjanya wrote:
-> From: Linu Cherian <linu.cherian@cavium.com>
-> 
-> Cavium ThunderX2 implementation doesn't support second page in SMMU
-> register space. Hence, resource size is set as 64k for this model.
-> 
-> Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
-> Signed-off-by: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
-> ---
->  drivers/acpi/arm64/iort.c |   10 +++++++++-
->  1 files changed, 9 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index c5fecf9..bba2b59 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -833,12 +833,20 @@ static void __init arm_smmu_v3_init_resources(struct resource *res,
->  {
->  	struct acpi_iort_smmu_v3 *smmu;
->  	int num_res = 0;
-> +	unsigned long size = SZ_128K;
->  
->  	/* Retrieve SMMUv3 specific data */
->  	smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
->  
-> +	/*
-> +	 * Override the size, for Cavium ThunderX2 implementation
-> +	 * which doesn't support the page 1 SMMU register space.
-> +	 */
-> +	if (smmu->model == ACPI_IORT_SMMU_CAVIUM_CN99XX)
-> +		size = SZ_64K;
+Hi Gregory,
 
-Nit: add a function, say arm_smmu_v3_resource_size() with the logic
-above that by default returns SZ_128K, I do not like this switch
-in the middle of this function.
-
-Lorenzo
-
-> +
->  	res[num_res].start = smmu->base_address;
-> -	res[num_res].end = smmu->base_address + SZ_128K - 1;
-> +	res[num_res].end = smmu->base_address + size - 1;
->  	res[num_res].flags = IORESOURCE_MEM;
->  
->  	num_res++;
-> -- 
-> 1.7.1
+On Thu, Jun 08, 2017 at 10:55:01AM +0200, Gregory CLEMENT wrote:
+>  On jeu., juin 08 2017, Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
+> > On Wed, Jun 07, 2017 at 10:38:10AM +0200, Antoine Tenart wrote:
+> >> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> >> index 2a99ff8fca2a..594356243ddb 100644
+> >> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> >> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> >> @@ -103,6 +103,13 @@
+> >>  				clocks = <&cps_syscon0 1 9>, <&cps_syscon0 1 5>;
+> >>  			};
+> >>  
+> >> +			cps_xmdio: mdio at 12a600 {
+> >> +				#address-cells = <1>;
+> >> +				#size-cells = <0>;
+> >> +				compatible = "marvell,xmdio";
+> >> +				reg = <0x12a600 0x10>;
+> >> +			};
+> >> +
+> >
+> > Russell pointed out on IRC the mdio/xmdio interfaces aren't wired to
+> > anything on the mcbin. We could either disable these interfaces by
+> > default, or add explicit disables in the mcbin device tree.
+> >
+> > What's your thoughts on this?
 > 
+> I prefer that we disable it by default and only enable it on the boards
+> using it.
+
+OK. I'll add a disabled status property in this patch, and I'll make
+another series to fix the existing mdio nodes.
+
+Thanks!
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170608/ad114e0f/attachment.sig>
