@@ -1,81 +1,49 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Thu, 8 Jun 2017 08:57:02 +0530
-Subject: [PATCH v2 2/2] acpi/iort: numa: Add numa node mapping for smmuv3
- devices
-In-Reply-To: <20170607163842.GA7937@red-moon>
-References: <1496746065-11082-1-git-send-email-ganapatrao.kulkarni@cavium.com>
- <1496746065-11082-3-git-send-email-ganapatrao.kulkarni@cavium.com>
- <20170607163842.GA7937@red-moon>
-Message-ID: <CAFpQJXUxHuaRC4JYsahLb2_gO_ZY7aR=gBkHm31zv1=A_esb0Q@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 8 Jun 2017 09:17:09 +0530
+Subject: [PATCH] cpufreq: exynos5440: Fix inconsistent indenting
+In-Reply-To: <20170607181324.32199-1-krzk@kernel.org>
+References: <20170607181324.32199-1-krzk@kernel.org>
+Message-ID: <20170608034709.GA4634@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 7, 2017 at 10:08 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Tue, Jun 06, 2017 at 04:17:45PM +0530, Ganapatrao Kulkarni wrote:
->> Add code to parse proximity domain in SMMUv3 IORT table to
->> set numa node mapping for smmuv3 devices.
->>
->> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->> ---
->>  drivers/acpi/arm64/iort.c | 20 ++++++++++++++++++++
->>  1 file changed, 20 insertions(+)
->>
->> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
->> index bba2b59..b4f328f 100644
->> --- a/drivers/acpi/arm64/iort.c
->> +++ b/drivers/acpi/arm64/iort.c
->> @@ -882,6 +882,23 @@ static bool __init arm_smmu_v3_is_coherent(struct acpi_iort_node *node)
->>       return smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE;
->>  }
->>
->> +/*
->> + * set numa proximity domain for smmv3 device
->> + */
->> +static void  __init iort_set_proximity(struct acpi_iort_node *node,
->> +             struct device *dev)
->> +{
->> +     struct acpi_iort_smmu_v3 *smmu;
->> +
->> +     smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
->> +     if (smmu->flags & ACPI_IORT_SMMU_V3_PXM_VALID) {
->> +             set_dev_node(dev, acpi_map_pxm_to_node(smmu->pxm));
->> +             pr_info("SMMUV3[%llx] Mapped to Proximity domain %d\n",
->> +                     smmu->base_address,
->> +                     smmu->pxm);
->> +     }
->> +}
->> +
->>  static int __init arm_smmu_count_resources(struct acpi_iort_node *node)
->>  {
->>       struct acpi_iort_smmu *smmu;
->> @@ -1002,6 +1019,9 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
->>       if (!pdev)
->>               return -ENOMEM;
->>
->> +     if (node->type == ACPI_IORT_NODE_SMMU_V3)
->> +             iort_set_proximity(node, &pdev->dev);
->
-> Nit: while at it you may add an ops hook to set the proximity
-> (NULL for SMMU v2) and call it if present, it is just to make
-> the code adding devices more uniform.
+On 07-06-17, 20:13, Krzysztof Kozlowski wrote:
+> Fix inconsistent indenting and unneeded white space in assignment.
+> 
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> ---
+>  drivers/cpufreq/exynos5440-cpufreq.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/cpufreq/exynos5440-cpufreq.c b/drivers/cpufreq/exynos5440-cpufreq.c
+> index 9180d34cc9fc..b6b369c22272 100644
+> --- a/drivers/cpufreq/exynos5440-cpufreq.c
+> +++ b/drivers/cpufreq/exynos5440-cpufreq.c
+> @@ -173,12 +173,12 @@ static void exynos_enable_dvfs(unsigned int cur_frequency)
+>  	/* Enable PSTATE Change Event */
+>  	tmp = __raw_readl(dvfs_info->base + XMU_PMUEVTEN);
+>  	tmp |= (1 << PSTATE_CHANGED_EVTEN_SHIFT);
+> -	 __raw_writel(tmp, dvfs_info->base + XMU_PMUEVTEN);
+> +	__raw_writel(tmp, dvfs_info->base + XMU_PMUEVTEN);
+>  
+>  	/* Enable PSTATE Change IRQ */
+>  	tmp = __raw_readl(dvfs_info->base + XMU_PMUIRQEN);
+>  	tmp |= (1 << PSTATE_CHANGED_IRQEN_SHIFT);
+> -	 __raw_writel(tmp, dvfs_info->base + XMU_PMUIRQEN);
+> +	__raw_writel(tmp, dvfs_info->base + XMU_PMUIRQEN);
+>  
+>  	/* Set initial performance index */
+>  	cpufreq_for_each_entry(pos, freq_table)
+> @@ -330,7 +330,7 @@ static int exynos_cpufreq_probe(struct platform_device *pdev)
+>  	struct resource res;
+>  	unsigned int cur_frequency;
+>  
+> -	np =  pdev->dev.of_node;
+> +	np = pdev->dev.of_node;
+>  	if (!np)
+>  		return -ENODEV;
 
-thanks, will do
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
->
-> Who is queueing these patches ? I am asking to make sure we sort
-> the ACPICA dependency (there are other IORT/ACPICA patches to consider
-> too).
->
-> Thanks,
-> Lorenzo
->
->>       count = ops->iommu_count_resources(node);
->>
->>       r = kcalloc(count, sizeof(*r), GFP_KERNEL);
->> --
->> 1.8.1.4
->>
-
-thanks
-Ganapat
+-- 
+viresh
