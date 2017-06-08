@@ -1,40 +1,32 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 8 Jun 2017 15:23:31 +0200
-Subject: Staging r8723bs driver for kernel 4.12.0-rc2 on CHIPPro
-In-Reply-To: <32a79e1299eecf52c454cf3e80e903ac@www.akkea.ca>
-References: <bcc1a7c44ba34cb077a1df09971d6926@www.akkea.ca>
- <8485e88721d4761d5b1a10ff1eebfd36@www.akkea.ca>
- <1496925243.11482.19.camel@hadess.net>
- <20170608123844.igx7dofpakpcqg4o@flea.home>
- <32a79e1299eecf52c454cf3e80e903ac@www.akkea.ca>
-Message-ID: <20170608132331.zmqsjqeffu55rwh4@flea.home>
+From: hch@lst.de (Christoph Hellwig)
+Date: Thu,  8 Jun 2017 15:25:25 +0200
+Subject: clean up and modularize arch dma_mapping interface
+Message-ID: <20170608132609.32662-1-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 08, 2017 at 07:13:56AM -0600, Angus Ainslie wrote:
-> On 2017-06-08 06:38, Maxime Ripard wrote:
-> > 
-> > This is for the old NTC's 4.4 kernel though. I think Angus is talking
-> > about a mainline 4.12.
-> > 
-> 
-> Yeah I'm working with the 4.12 kernel . I would have just stuck with the 4.4
-> but I wasn't able to get suspend working on 4.4 . 4.12 suspend looks to be
-> working so I started forward on that.
+Hi all,
 
-Who told you that? suspend is not implemented, neither in NTC's 4.4
-nor mainline 4.12.
+for a while we have a generic implementation of the dma mapping routines
+that call into per-arch or per-device operations.  But right now there
+still are various bits in the interfaces where don't clearly operate
+on these ops.  This series tries to clean up a lot of those (but not all
+yet, but the series is big enough).  It gets rid of the DMA_ERROR_CODE
+way of signaling failures of the mapping routines from the
+implementations to the generic code (and cleans up various drivers that
+were incorrectly using it), and gets rid of the ->set_dma_mask routine
+in favor of relying on the ->dma_capable method that can be used in
+the same way, but which requires less code duplication.
 
-Maxime
+Btw, we don't seem to have a tree every-growing amount of common dma
+mapping code, and given that I have a fair amount of all over the tree
+work in that area in my plate I'd like to start one.  Any good reason
+to that?  Anyone willing to volunteer as co maintainer?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170608/79070d33/attachment.sig>
+The whole series is also available in git:
+
+    git://git.infradead.org/users/hch/misc.git dma-map
+
+Gitweb:
+
+    http://git.infradead.org/users/hch/misc.git/shortlog/refs/heads/dma-map
