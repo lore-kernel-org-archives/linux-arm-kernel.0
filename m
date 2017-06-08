@@ -1,48 +1,79 @@
-From: hadess@hadess.net (Bastien Nocera)
-Date: Thu, 08 Jun 2017 14:39:46 +0200
-Subject: Staging r8723bs driver for kernel 4.12.0-rc2 on CHIPPro
-In-Reply-To: <20170608123844.igx7dofpakpcqg4o@flea.home>
-References: <bcc1a7c44ba34cb077a1df09971d6926@www.akkea.ca>
- <8485e88721d4761d5b1a10ff1eebfd36@www.akkea.ca>
- <1496925243.11482.19.camel@hadess.net>
- <20170608123844.igx7dofpakpcqg4o@flea.home>
-Message-ID: <1496925586.11482.20.camel@hadess.net>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Thu,  8 Jun 2017 14:39:55 +0200
+Subject: [PATCH RESEND] ARM64: dts: meson-gx: use specific compatible for the
+ AO pwms
+In-Reply-To: <b3812e40-cb59-a30f-9558-2926ca49a29a@baylibre.com>
+References: <b3812e40-cb59-a30f-9558-2926ca49a29a@baylibre.com>
+Message-ID: <20170608123955.3571-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-06-08 at 14:38 +0200, Maxime Ripard wrote:
-> Hi Bastien,
-> 
-> On Thu, Jun 08, 2017 at 02:34:03PM +0200, Bastien Nocera wrote:
-> > On Wed, 2017-05-31 at 10:29 -0600, Angus Ainslie wrote:
-> > > On 2017-05-24 15:03, Angus Ainslie wrote:
-> > > > Hi
-> > > > 
-> > > > Has the realtek rtl8723bs staging driver in kernel 4.12.0-rc2
-> > > > been
-> > > > tested on the CHIPPro.
-> > > > 
-> > > 
-> > > This is still an issue with 4.12.0-rc3
-> > 
-> > I only have access to the original CHIP, and the default kernel
-> > configuration there didn't have the necessary options for the
-> > staging
-> > driver to work.
-> > 
-> > I filed a bug and a PR a while ago:
-> > https://github.com/NextThingCo/CHIP-linux/issues/33
-> > https://github.com/NextThingCo/CHIP-linux/pull/39
-> > 
-> > I haven't looked at it again in a long while due to lack of time,
-> > but
-> > that might be a good first pass at the problem, before getting onto
-> > the
-> > CHIP Pro.
-> 
-> This is for the old NTC's 4.4 kernel though. I think Angus is talking
-> about a mainline 4.12.
+Use the specific compatible for AO pwms so the pwms input can
+be correctly set
 
-Which I would test on a CHIP before a CHIP Pro ;)
+FDIV4 is not present on the pwm A0, so change kadhas vim input
+clocks to xtal.
 
-Then again, I don't have a CHIP Pro to test with, so...
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+---
+This patch depends on the pwm patchset available here [0]
+
+On the Khadas Vim I chose to replace FDIV4 with the crytal.
+Only PWM_AO_B is actually used and It is used for led dimming.
+The frequency, as long as it is high enough, does not matter.
+Only the duty cycle does. After testing, xtal seems to be fast
+enough.
+
+PWM_AO_A is outputed on the general purpose header, but no usage is
+defined for it.
+
+It might be bit late for that but I wonder why it defined and enabled ?
+Same goes for the other peripherals activated on this general purpose
+header.
+
+I know that's what shows the schematics but one could choose to do
+anything else possible with it ? like use in GPIO mode, or another
+function. In addition, we never which setting will be required ? (eg
+which clock source ?).
+
+Should we keep those ? or remove them ?
+
+Resend to correct the typo reported by Neil and update the dependency to
+the v2 of the pwm series.
+
+[0]: https://lkml.kernel.org/r/20170608122416.1993-1-jbrunet at baylibre.com
+
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi                  | 2 +-
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+index 436b875060e7..fbaa6b598fca 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+@@ -391,7 +391,7 @@
+ 			};
+ 
+ 			pwm_AO_ab: pwm at 550 {
+-				compatible = "amlogic,meson-gx-pwm", "amlogic,meson-gxbb-pwm";
++				compatible = "amlogic,meson-gx-ao-pwm", "amlogic,meson-gxbb-ao-pwm";
+ 				reg = <0x0 0x00550 0x0 0x10>;
+ 				#pwm-cells = <3>;
+ 				status = "disabled";
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
+index 6a81f0168da5..371f43cdd3ab 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
+@@ -86,8 +86,8 @@
+ 	status = "okay";
+ 	pinctrl-0 = <&pwm_ao_a_3_pins>, <&pwm_ao_b_pins>;
+ 	pinctrl-names = "default";
+-	clocks = <&clkc CLKID_FCLK_DIV4>;
+-	clock-names = "clkin0";
++	clocks = <&xtal> , <&xtal>;
++	clock-names = "clkin0", "clkin1" ;
+ };
+ 
+ &pwm_ef {
+-- 
+2.9.4
