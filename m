@@ -1,34 +1,40 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  8 Jun 2017 19:41:37 +0000
-Subject: [PATCH 0/2] arm64: fix crash when reading /proc/kcore
-Message-ID: <20170608194139.9250-1-ard.biesheuvel@linaro.org>
+Date: Thu,  8 Jun 2017 19:41:38 +0000
+Subject: [PATCH 1/2] fs/proc: kcore: use kcore_list type to check for
+ vmalloc/module address
+In-Reply-To: <20170608194139.9250-1-ard.biesheuvel@linaro.org>
+References: <20170608194139.9250-1-ard.biesheuvel@linaro.org>
+Message-ID: <20170608194139.9250-2-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a follow-up to patches from zhonjiang [0] and myself [1] that aim
-to solve a problem in the kcore code, which gets confused by the presence
-of block mappings in the vmalloc region.
+Instead of passing each start address into is_vmalloc_or_module_addr()
+to decide whether it falls into either the VMALLOC or the MODULES region,
+we can simply check the type field of the current kcore_list entry, since
+it will be set to KCORE_VMALLOC based on exactly the same conditions.
 
-While fixing the crash is quite straight forward [2], we need to tweak
-the kcore code itself to ensure that it operates correctly on arm64.
-Fortunately, we can achieve this with two very simple changes:
+As a bonus, when reading the KCORE_TEXT region on architectures that have
+one, this will avoid using vread() on the region if it happens to intersect
+with a KCORE_VMALLOC region. This is due the fact that the KCORE_TEXT
+region is the first one to be added to the kcore region list.
 
-- replace a call to is_vmalloc_or_module_addr() in read_kcore() with a
-  comparison of the kclist type field (#1)
-- enable CONFIG_ARCH_PROC_KCORE_TEXT for arm64 (#2)
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ fs/proc/kcore.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-[0] http://marc.info/?l=linux-mm&m=149632393629295&w=2
-[1] http://marc.info/?l=linux-mm&m=149685966530180&w=2
-[2] http://marc.info/?l=linux-mm&m=149694975123959&w=2
-
-Ard Biesheuvel (2):
-  fs/proc: kcore: use kcore_list type to check for vmalloc/module
-    address
-  arm64: mm: select CONFIG_ARCH_PROC_KCORE_TEXT
-
- arch/arm64/Kconfig | 3 +++
- fs/proc/kcore.c    | 2 +-
- 2 files changed, 4 insertions(+), 1 deletion(-)
-
+diff --git a/fs/proc/kcore.c b/fs/proc/kcore.c
+index 4ee55274f155..45629f4b5402 100644
+--- a/fs/proc/kcore.c
++++ b/fs/proc/kcore.c
+@@ -504,7 +504,7 @@ read_kcore(struct file *file, char __user *buffer, size_t buflen, loff_t *fpos)
+ 		if (&m->list == &kclist_head) {
+ 			if (clear_user(buffer, tsz))
+ 				return -EFAULT;
+-		} else if (is_vmalloc_or_module_addr((void *)start)) {
++		} else if (m->type == KCORE_VMALLOC) {
+ 			vread(buf, (char *)start, tsz);
+ 			/* we have to zero-fill user buffer even if no read */
+ 			if (copy_to_user(buffer, buf, tsz))
 -- 
 2.9.3
