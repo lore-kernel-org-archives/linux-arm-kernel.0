@@ -1,40 +1,107 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu,  8 Jun 2017 15:34:49 -0700
-Subject: [PATCH v6 3/3] ARM: dts: imx7-colibri: add NAND support
-In-Reply-To: <cover.9fab78eaa869dbad4c9ad7e8578c9cef3e49daa8.1496961128.git-series.stefan@agner.ch>
-References: <cover.9fab78eaa869dbad4c9ad7e8578c9cef3e49daa8.1496961128.git-series.stefan@agner.ch>
-Message-ID: <eed2e4bdf1823ac6548b2a21fb7c49fb123f467c.1496961128.git-series.stefan@agner.ch>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Fri, 9 Jun 2017 01:40:59 +0300
+Subject: [PATCH 05/20] arm64: rename COMPAT to AARCH32_EL0 in Kconfig
+In-Reply-To: <20170608140912.56rww67adolr4ytr@localhost>
+References: <20170604120009.342-1-ynorov@caviumnetworks.com>
+ <20170604120009.342-6-ynorov@caviumnetworks.com>
+ <20170608140912.56rww67adolr4ytr@localhost>
+Message-ID: <20170608224059.fi4a5urcjoxhbgwb@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Colibri iMX7 modules come with 512MB on-module SLC NAND flash
-populated. Make use of it by enabling the GPMI controller.
+Hi Catalin, thanks for review.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
-Tested-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx7-colibri.dtsi |  9 +++++++++
- 1 file changed, 9 insertions(+)
+On Thu, Jun 08, 2017 at 03:09:12PM +0100, Catalin Marinas wrote:
+> On Sun, Jun 04, 2017 at 02:59:54PM +0300, Yury Norov wrote:
+> > --- a/arch/arm64/Kconfig
+> > +++ b/arch/arm64/Kconfig
+> > @@ -402,7 +402,7 @@ config ARM64_ERRATUM_834220
+> >  
+> >  config ARM64_ERRATUM_845719
+> >  	bool "Cortex-A53: 845719: a load might read incorrect data"
+> > -	depends on COMPAT
+> > +	depends on AARCH32_EL0
+> >  	default y
+> >  	help
+> >  	  This option adds an alternative code sequence to work around ARM
+> > @@ -784,7 +784,7 @@ config FORCE_MAX_ZONEORDER
+> >  
+> >  menuconfig ARMV8_DEPRECATED
+> >  	bool "Emulate deprecated/obsolete ARMv8 instructions"
+> > -	depends on COMPAT
+> > +	depends on AARCH32_EL0
+> >  	help
+> >  	  Legacy software support may require certain instructions
+> >  	  that have been deprecated or obsoleted in the architecture.
+> > @@ -1062,9 +1062,15 @@ menu "Userspace binary formats"
+> >  source "fs/Kconfig.binfmt"
+> >  
+> >  config COMPAT
+> > +	bool
+> > +	depends on AARCH32_EL0
+> 
+> You could just use "def_bool y" here
+> 
+> > +
+> > +config AARCH32_EL0
+> >  	bool "Kernel support for 32-bit EL0"
+> > +	def_bool y
+> >  	depends on ARM64_4K_PAGES || EXPERT
+> >  	select COMPAT_BINFMT_ELF if BINFMT_ELF
+> > +	select COMPAT
+> 
+> and avoid the explicit select.
 
-diff --git a/arch/arm/boot/dts/imx7-colibri.dtsi b/arch/arm/boot/dts/imx7-colibri.dtsi
-index 2d87489..ad4ce19 100644
---- a/arch/arm/boot/dts/imx7-colibri.dtsi
-+++ b/arch/arm/boot/dts/imx7-colibri.dtsi
-@@ -106,6 +106,15 @@
- 	fsl,magic-packet;
- };
- 
-+&gpmi {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_gpmi_nand>;
-+	fsl,use-minimum-ecc;
-+	nand-on-flash-bbt;
-+	nand-ecc-mode = "hw";
-+	status = "okay";
-+};
-+
- &i2c1 {
- 	clock-frequency = <100000>;
- 	pinctrl-names = "default";
--- 
-git-series 0.9.1
+in patch 20 COMPAT becomes depending also on ARM64_ILP32, like this:
+-       depends on AARCH32_EL0
++       depends on AARCH32_EL0 || ARM64_ILP32
+
+So this is a preparation for it. If it looks confusing, I think it's
+better to underline it in the description to the patch in addition to
+this:
+
+> From now, AARCH32_EL0 (former COMPAT) config option means the support of
+> AARCH32 userspace, ARM64_ILP32 - support of ILP32 ABI (see next patches),
+> and COMPAT indicates that one of them, or both, is enabled.
+
+But if you prefer, I can do like you suggested here and make COMPAT
+depend on AARCH32_EL0 in the last patch.
+
+> 
+> >  	select HAVE_UID16
+> >  	select OLD_SIGSUSPEND3
+> >  	select COMPAT_OLD_SIGACTION
+> [...]
+> > --- a/arch/arm64/kernel/cpuinfo.c
+> > +++ b/arch/arm64/kernel/cpuinfo.c
+> > @@ -139,15 +139,17 @@ static int c_show(struct seq_file *m, void *v)
+> >  		 */
+> >  		seq_puts(m, "Features\t:");
+> >  		if (compat) {
+> > -#ifdef CONFIG_COMPAT
+> > -			for (j = 0; compat_hwcap_str[j]; j++)
+> > -				if (compat_elf_hwcap & (1 << j))
+> > -					seq_printf(m, " %s", compat_hwcap_str[j]);
+> > -
+> > -			for (j = 0; compat_hwcap2_str[j]; j++)
+> > -				if (compat_elf_hwcap2 & (1 << j))
+> > -					seq_printf(m, " %s", compat_hwcap2_str[j]);
+> > -#endif /* CONFIG_COMPAT */
+> > +#ifdef CONFIG_AARCH32_EL0
+> > +			if (personality(current->personality) == PER_LINUX32) {
+> > +				for (j = 0; compat_hwcap_str[j]; j++)
+> > +					if (compat_elf_hwcap & (1 << j))
+> > +						seq_printf(m, " %s", compat_hwcap_str[j]);
+> > +
+> > +				for (j = 0; compat_hwcap2_str[j]; j++)
+> > +					if (compat_elf_hwcap2 & (1 << j))
+> > +						seq_printf(m, " %s", compat_hwcap2_str[j]);
+> > +			}
+> > +#endif /* CONFIG_AARCH32_EL0 */
+> 
+> I don't understand this hunk. Why do you need another check on
+> personality? "compat" is already true if PER_LINUX32.
+
+I think it's rebase issue. I'll fix it.
+
+Yury
