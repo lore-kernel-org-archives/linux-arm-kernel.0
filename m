@@ -1,56 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  8 Jun 2017 11:42:43 +0100
-Subject: [PATCH v2] arm64: dts: marvell: 8040-mcbin: Enable 1GB Ethernet
-Message-ID: <20170608104243.12476-1-marc.zyngier@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 8 Jun 2017 03:45:38 -0700
+Subject: [PATCH 07/11] ARM: OMAP2+: Remove unused legacy code for DMA
+In-Reply-To: <300ceefe-b015-60d2-2ebf-57dea9fd1d8b@ti.com>
+References: <20170531225139.30723-1-tony@atomide.com>
+ <20170531225139.30723-8-tony@atomide.com>
+ <10f65a24-0459-5df7-378d-84933b83c070@ti.com>
+ <20170608082432.GF3730@atomide.com>
+ <20170608095618.GJ3730@atomide.com>
+ <300ceefe-b015-60d2-2ebf-57dea9fd1d8b@ti.com>
+Message-ID: <20170608104537.GK3730@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the 1GB Ethernet interface that lives on the slave CP110,
-with its corresponding phy (that oddly lives on the master CP110).
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [170608 03:40]:
+> unfortunately we still have conflict as the
+> https://patchwork.kernel.org/patch/9734219/
+> adds entries to omap24xx_sdma_map[] for - back then - valid non DT boot
+> support.
+> 
+> I have rebased and reworked my patch locally on top of your v1, but
+> things must go in in a certain order to avoid conflict.
+> 
+> The tsub conversion series in not yet in linux-next, but afaik Bin
+> already applied it to somewhere.
+> Leave the mach-omap2/dma.c cleanup for -rc1?
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
-* From v1: 
-  - renamed phy0 -> ge_phy (rmk)
-  - Added lane number and connector location (rmk)
+OK I'll save this for later then.
 
- arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+Regards,
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-index f7bb0cc03147..e7296b2d0f0f 100644
---- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-@@ -100,6 +100,12 @@
- 	status = "okay";
- };
- 
-+&cpm_mdio {
-+	ge_phy: ethernet-phy at 0 {
-+		reg = <0>;
-+	};
-+};
-+
- &cpm_sata0 {
- 	/* CPM Lane 0 - U29 */
- 	status = "okay";
-@@ -115,6 +121,17 @@
- 	status = "okay";
- };
- 
-+&cps_ethernet {
-+	status = "okay";
-+};
-+
-+&cps_eth1 {
-+	/* CPS Lane 0 - J5 (Gigabit RJ45) */
-+	status = "okay";
-+	phy = <&ge_phy>;
-+	phy-mode = "sgmii";
-+};
-+
- &cps_sata0 {
- 	/* CPS Lane 1 - U32 */
- 	/* CPS Lane 3 - U31 */
--- 
-2.11.0
+Tony
