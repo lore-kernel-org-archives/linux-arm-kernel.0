@@ -1,34 +1,29 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 8 Jun 2017 20:07:32 +0530
-Subject: [PATCH 1/2] ARM: davinci_all_defconfig: enable mtdtests
-In-Reply-To: <20170608143733.30004-1-nsekhar@ti.com>
-References: <20170608143733.30004-1-nsekhar@ti.com>
-Message-ID: <20170608143733.30004-2-nsekhar@ti.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 8 Jun 2017 15:43:14 +0100
+Subject: [PATCH 25/44] arm: implement ->mapping_error
+In-Reply-To: <20170608132609.32662-26-hch@lst.de>
+References: <20170608132609.32662-1-hch@lst.de>
+ <20170608132609.32662-26-hch@lst.de>
+Message-ID: <20170608144313.GL4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mtdtests module has some useful tests to verify that
-mtd drivers like davinci_nand are working correctly.
+BOn Thu, Jun 08, 2017 at 03:25:50PM +0200, Christoph Hellwig wrote:
+> +static int dmabounce_mapping_error(struct device *dev, dma_addr_t dma_addr)
+> +{
+> +	if (dev->archdata.dmabounce)
+> +		return 0;
 
-Enable it in davinci_all_defconfig to make testing and
-debug easier.
+I'm not convinced that we need this check here:
 
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/configs/davinci_all_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+        dev->archdata.dmabounce = device_info;
+        set_dma_ops(dev, &dmabounce_ops);
 
-diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
-index 7f726277dd1b..1f1b4a795dc6 100644
---- a/arch/arm/configs/davinci_all_defconfig
-+++ b/arch/arm/configs/davinci_all_defconfig
-@@ -58,6 +58,7 @@ CONFIG_DEVTMPFS_MOUNT=y
- # CONFIG_FW_LOADER is not set
- CONFIG_DA8XX_MSTPRI=y
- CONFIG_MTD=m
-+CONFIG_MTD_TESTS=m
- CONFIG_MTD_BLOCK=m
- CONFIG_MTD_CFI=m
- CONFIG_MTD_CFI_INTELEXT=m
+There shouldn't be any chance of dev->archdata.dmabounce being NULL if
+the dmabounce_ops has been set as the current device DMA ops.  So I
+think that test can be killed.
+
 -- 
-2.9.0
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
