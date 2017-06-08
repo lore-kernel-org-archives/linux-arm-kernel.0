@@ -1,107 +1,36 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 9 Jun 2017 01:40:59 +0300
-Subject: [PATCH 05/20] arm64: rename COMPAT to AARCH32_EL0 in Kconfig
-In-Reply-To: <20170608140912.56rww67adolr4ytr@localhost>
-References: <20170604120009.342-1-ynorov@caviumnetworks.com>
- <20170604120009.342-6-ynorov@caviumnetworks.com>
- <20170608140912.56rww67adolr4ytr@localhost>
-Message-ID: <20170608224059.fi4a5urcjoxhbgwb@yury-thinkpad>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 8 Jun 2017 17:44:13 -0500
+Subject: [PATCH 1/3] clk: meson: meson8b: add compatibles for Meson8 and
+ Meson8m2
+In-Reply-To: <1496651008.3552.24.camel@baylibre.com>
+References: <20170604183341.21417-1-martin.blumenstingl@googlemail.com>
+ <20170604183341.21417-2-martin.blumenstingl@googlemail.com>
+ <1496606325.3552.16.camel@baylibre.com>
+ <CAFBinCCLL5ZqiZzWi-RsfZ-5_h20O5LRRY3+K7dt=U4qrveQ_w@mail.gmail.com>
+ <1496651008.3552.24.camel@baylibre.com>
+Message-ID: <20170608224413.fdv4xlvnjld4bgtz@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin, thanks for review.
-
-On Thu, Jun 08, 2017 at 03:09:12PM +0100, Catalin Marinas wrote:
-> On Sun, Jun 04, 2017 at 02:59:54PM +0300, Yury Norov wrote:
-> > --- a/arch/arm64/Kconfig
-> > +++ b/arch/arm64/Kconfig
-> > @@ -402,7 +402,7 @@ config ARM64_ERRATUM_834220
-> >  
-> >  config ARM64_ERRATUM_845719
-> >  	bool "Cortex-A53: 845719: a load might read incorrect data"
-> > -	depends on COMPAT
-> > +	depends on AARCH32_EL0
-> >  	default y
-> >  	help
-> >  	  This option adds an alternative code sequence to work around ARM
-> > @@ -784,7 +784,7 @@ config FORCE_MAX_ZONEORDER
-> >  
-> >  menuconfig ARMV8_DEPRECATED
-> >  	bool "Emulate deprecated/obsolete ARMv8 instructions"
-> > -	depends on COMPAT
-> > +	depends on AARCH32_EL0
-> >  	help
-> >  	  Legacy software support may require certain instructions
-> >  	  that have been deprecated or obsoleted in the architecture.
-> > @@ -1062,9 +1062,15 @@ menu "Userspace binary formats"
-> >  source "fs/Kconfig.binfmt"
-> >  
-> >  config COMPAT
-> > +	bool
-> > +	depends on AARCH32_EL0
+On Mon, Jun 05, 2017 at 10:23:28AM +0200, Jerome Brunet wrote:
+> On Mon, 2017-06-05 at 00:27 +0200, Martin Blumenstingl wrote:
+> > > I think you should split the binding documentation and clk changes into
+> > > separate
+> > > patches.
+> > 
+> > OK, from what I know is that for "trivial" changes the driver and
+> > dt-binding changes can go through one patch.
+> > this patch started as a four-line patch which added two lines of
+> > documentation and two lines of driver code.
 > 
-> You could just use "def_bool y" here
+> I'm not aware of such tolerance but if you've have seen that the DT maintainers
+> are OK with it, feel free to point me to it.
 > 
-> > +
-> > +config AARCH32_EL0
-> >  	bool "Kernel support for 32-bit EL0"
-> > +	def_bool y
-> >  	depends on ARM64_4K_PAGES || EXPERT
-> >  	select COMPAT_BINFMT_ELF if BINFMT_ELF
-> > +	select COMPAT
-> 
-> and avoid the explicit select.
+> Last time I heard about it, DT guys were using filter-branch on the kernel tree
+> to create a separate tree, so I was thinking that this "documentation as a
+> separate patch" was a hard rule ... but I may be wrong
 
-in patch 20 COMPAT becomes depending also on ARM64_ILP32, like this:
--       depends on AARCH32_EL0
-+       depends on AARCH32_EL0 || ARM64_ILP32
+That is one of the reasons, but there is no hard rule. It's not worth a 
+respin just for that either.
 
-So this is a preparation for it. If it looks confusing, I think it's
-better to underline it in the description to the patch in addition to
-this:
-
-> From now, AARCH32_EL0 (former COMPAT) config option means the support of
-> AARCH32 userspace, ARM64_ILP32 - support of ILP32 ABI (see next patches),
-> and COMPAT indicates that one of them, or both, is enabled.
-
-But if you prefer, I can do like you suggested here and make COMPAT
-depend on AARCH32_EL0 in the last patch.
-
-> 
-> >  	select HAVE_UID16
-> >  	select OLD_SIGSUSPEND3
-> >  	select COMPAT_OLD_SIGACTION
-> [...]
-> > --- a/arch/arm64/kernel/cpuinfo.c
-> > +++ b/arch/arm64/kernel/cpuinfo.c
-> > @@ -139,15 +139,17 @@ static int c_show(struct seq_file *m, void *v)
-> >  		 */
-> >  		seq_puts(m, "Features\t:");
-> >  		if (compat) {
-> > -#ifdef CONFIG_COMPAT
-> > -			for (j = 0; compat_hwcap_str[j]; j++)
-> > -				if (compat_elf_hwcap & (1 << j))
-> > -					seq_printf(m, " %s", compat_hwcap_str[j]);
-> > -
-> > -			for (j = 0; compat_hwcap2_str[j]; j++)
-> > -				if (compat_elf_hwcap2 & (1 << j))
-> > -					seq_printf(m, " %s", compat_hwcap2_str[j]);
-> > -#endif /* CONFIG_COMPAT */
-> > +#ifdef CONFIG_AARCH32_EL0
-> > +			if (personality(current->personality) == PER_LINUX32) {
-> > +				for (j = 0; compat_hwcap_str[j]; j++)
-> > +					if (compat_elf_hwcap & (1 << j))
-> > +						seq_printf(m, " %s", compat_hwcap_str[j]);
-> > +
-> > +				for (j = 0; compat_hwcap2_str[j]; j++)
-> > +					if (compat_elf_hwcap2 & (1 << j))
-> > +						seq_printf(m, " %s", compat_hwcap2_str[j]);
-> > +			}
-> > +#endif /* CONFIG_AARCH32_EL0 */
-> 
-> I don't understand this hunk. Why do you need another check on
-> personality? "compat" is already true if PER_LINUX32.
-
-I think it's rebase issue. I'll fix it.
-
-Yury
+Acked-by: Rob Herring <robh@kernel.org>
