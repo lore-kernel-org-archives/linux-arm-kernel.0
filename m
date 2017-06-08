@@ -1,127 +1,70 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 8 Jun 2017 07:42:36 +0200
-Subject: [PATCH 46/58] clocksource/drivers: Add a new driver for the
- Atmel ARM TC blocks
-In-Reply-To: <20170607231715.ns2vcxza2eexnzjs@piout.net>
-References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
- <20170530215139.9983-47-alexandre.belloni@free-electrons.com>
- <20170606152104.GC2345@mai>
- <20170606180559.pkrr7ux2qqnmsd6y@piout.net>
- <20170607141735.GH2345@mai>
- <20170607152750.tksmyf5p3oajbsac@piout.net>
- <20170607210848.GJ2345@mai>
- <20170607231715.ns2vcxza2eexnzjs@piout.net>
-Message-ID: <20170608074236.62924f01@bbrezillon>
+From: varada@codeaurora.org (Varadarajan Narayanan)
+Date: Thu,  8 Jun 2017 11:13:55 +0530
+Subject: [PATCH v5 0/6] Add minimal boot support for IPQ8074
+Message-ID: <1496900641-27755-1-git-send-email-varada@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Thu, 8 Jun 2017 01:17:15 +0200,
-Alexandre Belloni <alexandre.belloni@free-electrons.com> a ?crit :
 
-> On 07/06/2017 at 23:08:48 +0200, Daniel Lezcano wrote:
-> > > I was going to agree but this is not flexible enough because the
-> > > quadrature decoder always uses the first two channels. So on some
-> > > products, we may have:
-> > >  - TCB0:
-> > >    o channels 0,1: qdec
-> > >    o channel 2: clocksource
-> > > 
-> > >  - TCB1:
-> > >    o channels 0,1: qdec
-> > >    o channel 2: clockevent
-> > > 
-> > > This avoids wasting TCB channels.  
-> > 
-> > Ok. In this case you can check if the interrupt is specified for the node, if
-> > yes, then it is a clockevent.
-> >   
-> 
-> But currently it is always specified in the SoC's dtsi. I don't find
-> that too practical to push that to the board's dts. Also, lying by
-> omission (the IRQ is always wired) in the DT is not different from
-> having a property selecting which timer is the clocksource and which is
-> the clockevent.
-> 
+v5:
+  * Removed the 'NA' binding from documentation
 
-I agree with Alexandre here. Really, there's not much we can do to
-detect which timer should be used as a clockevent and which one should
-be used as a clocksource except explicitly specifying it in the DT.
-Having an interrupt defined in one case (clockevent) and undefined in
-the other case (clocksource), is just as hack-ish as the detection logic
-Alexandre developed to avoid explicitly specifying the function
-assigned to a specific timer.
+v4:
+  * Split the clock patch and addressed a minor comment
+    in the clock driver as per stephen's feedback.
 
-Can we please find a solution that makes everyone happy (DT,
-clocksoure/clockevent and at91 maintainers)?
+v3:
+  * Addressed review feedback from Bjorn for pinctrl
+     - Unified the names for qpic pads.
+     - Corrected the names for pwm pins.
+  * Updated pinctrl documentation.
+  * Updated the default bootargs in ipq8074-hk01.dts.
+  * Updated the gcc clocks driver for removing the
+    unused halt_bit in few places.
 
-How about adding a linux,timer-function property to specify which
-function this timer is providing?
+v2:
+  * Addressed review feedback from Stephen
+    - Removed cpu-map entries
+    - Added mmio-timer nodes
+  * Fix sparse warnings in the gcc-ipq8074.c
+  * Updated pinctrl documentation
 
-Something like that for example:
+v1:
+  https://www.spinics.net/lists/kernel/msg2498734.html
+  This series adds minimal board boot support for ipq8074-hk01
+  board.
 
-	tcb0: timer at fff7c000 {
-		compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
-		#address-cells = <1>;
-		#size-cells = <0>;
-		reg = <0xfff7c000 0x100>;
-		interrupts = <18 4>;
-		clocks = <&tcb0_clk>, <&clk32k>;
-		clock-names = "t0_clk", "slow_clk";
+Abhishek Sahu (3):
+  clk: qcom: Add DT bindings for ipq8074 gcc clock controller
+  clk: qcom: Add ipq8074 Global Clock Controller support
+  arm64: defconfig: Enable qcom ipq8074 clock and pinctrl
 
-		timer at 0 {
-			compatible = "atmel,tcb-timer";
-			reg = <0>, <1>;
-			linux,timer-function = "clocksource";
-		};
+Varadarajan Narayanan (3):
+  pinctrl: qcom: Add ipq8074 pinctrl driver
+  dt-bindings: qcom: Add ipq8074 bindings
+  arm64: dts: Add ipq8074 SoC and HK01 board support
 
-		timer at 2 {
-			compatible = "atmel,tcb-timer";
-			reg = <2>;
-			linux,timer-function = "clockevent";
-		};
-	};
+ Documentation/devicetree/bindings/arm/qcom.txt     |    2 +
+ .../devicetree/bindings/clock/qcom,gcc.txt         |    1 +
+ .../bindings/pinctrl/qcom,ipq8074-pinctrl.txt      |  172 ++++
+ arch/arm64/boot/dts/qcom/Makefile                  |    1 +
+ arch/arm64/boot/dts/qcom/ipq8074-hk01.dts          |   53 +
+ arch/arm64/boot/dts/qcom/ipq8074.dtsi              |  194 ++++
+ arch/arm64/configs/defconfig                       |    2 +
+ drivers/clk/qcom/Kconfig                           |    9 +
+ drivers/clk/qcom/Makefile                          |    1 +
+ drivers/clk/qcom/gcc-ipq8074.c                     | 1007 ++++++++++++++++++
+ drivers/pinctrl/qcom/Kconfig                       |   10 +
+ drivers/pinctrl/qcom/Makefile                      |    1 +
+ drivers/pinctrl/qcom/pinctrl-ipq8074.c             | 1076 ++++++++++++++++++++
+ include/dt-bindings/clock/qcom,gcc-ipq8074.h       |  152 +++
+ 14 files changed, 2681 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/qcom,ipq8074-pinctrl.txt
+ create mode 100644 arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
+ create mode 100644 arch/arm64/boot/dts/qcom/ipq8074.dtsi
+ create mode 100644 drivers/clk/qcom/gcc-ipq8074.c
+ create mode 100644 drivers/pinctrl/qcom/pinctrl-ipq8074.c
+ create mode 100644 include/dt-bindings/clock/qcom,gcc-ipq8074.h
 
-Alternatively, we could have a property or a node in chosen describing which
-timer should be used:
-
-	chosen {
-		clockevent {
-			timer = <&timer2>;
-		};
-
-		clocksource {
-			timer = <&timer0>;
-		};
-
-		/*
-		 * or
-		 *
-		 * clockevent = <&timer2>;
-		 * clocksource = <&timer0>;
-		 *
-		 * but I think the clocksource/clockevent node approach
-		 * is more future proof in case we need to add extra
-		 * information like the expected resolution/precision or
-		 * anything that could be tweakable.
-		 */
-	};
-
-	tcb0: timer at fff7c000 {
-		compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
-		#address-cells = <1>;
-		#size-cells = <0>;
-		reg = <0xfff7c000 0x100>;
-		interrupts = <18 4>;
-		clocks = <&tcb0_clk>, <&clk32k>;
-		clock-names = "t0_clk", "slow_clk";
-
-		timer0: timer at 0 {
-			compatible = "atmel,tcb-timer";
-			reg = <0>, <1>;
-		};
-
-		timer2: timer at 2 {
-			compatible = "atmel,tcb-timer";
-			reg = <2>;
-		};
-	};
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
