@@ -1,42 +1,34 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Thu, 8 Jun 2017 12:44:36 -0700
-Subject: [PATCH 3/3] efi/libstub: arm64: set -fpie when building the EFI
- stub
-In-Reply-To: <CAKv+Gu--WbvmS3EMPSD8sx6yVqgHQJO1r70+SYBRo_WZjUxioQ@mail.gmail.com>
-References: <20170518090953.32628-1-ard.biesheuvel@linaro.org>
- <20170518090953.32628-4-ard.biesheuvel@linaro.org>
- <20170608190804.GG141096@google.com>
- <CAKv+Gu--WbvmS3EMPSD8sx6yVqgHQJO1r70+SYBRo_WZjUxioQ@mail.gmail.com>
-Message-ID: <20170608194436.GH141096@google.com>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Thu,  8 Jun 2017 22:04:23 +0200
+Subject: [PATCH V2 0/5] phy: bcm-ns-usb3: add MDIO driver
+In-Reply-To: <20170511132925.14564-1-zajec5@gmail.com>
+References: <20170511132925.14564-1-zajec5@gmail.com>
+Message-ID: <20170608200428.9187-1-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-El Thu, Jun 08, 2017 at 07:18:36PM +0000 Ard Biesheuvel ha dit:
+From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-> On 8 June 2017 at 19:08, Matthias Kaehlcke <mka@chromium.org> wrote:
-> > El Thu, May 18, 2017 at 10:09:53AM +0100 Ard Biesheuvel ha dit:
-> >
-> >> Clang may emit absolute symbol references when building in non-PIC mode,
-> >> even when using the default 'small' code model, which is already mostly
-> >> position independent to begin with, due to its use of adrp/add pairs
-> >> that have a relative range of +/- 4 GB. The remedy is to pass the -fpie
-> >> flag, which can be done safely now that the code has been updated to avoid
-> >> GOT indirections (which may be emitted due to the compiler assuming that
-> >> the PIC/PIE code may end up in a shared library that is subject to ELF
-> >> symbol preemption)
-> >>
-> >> Passing -fpie when building code that needs to execute at an a priori
-> >> unknown offset is arguably an improvement in any case, and given that
-> >> the recent visibility changes allow the PIC build to pass with GCC as
-> >> well, let's add -fpie for all arm64 builds rather than only for Clang.
-> >>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >
-> > Tested-by: Matthias Kaehlcke <mka@chromium.org>
-> 
-> Thanks Matthias.
-> 
-> For the record, did you test only with Clang?
+As explained in the commit 9200c6f177638 ("Revert "phy: Add USB3 PHY support
+for Broadcom NSP SoC"") this module should be modified to use MDIO bus as
+this is how PHY is really attached.
 
-With both gcc and clang. Booting has only been tested with an older
-kernel (v3.18), I suppose it shouldn't make a difference.
+This should allow reusing this driver on NSP and any other platform with
+MDIO bus and this particular PHY.
+
+V2: Rebase and update 4/5 and 5/5.
+
+Rafa? Mi?ecki (5):
+  phy: bcm-ns-usb3: always wait for idle after writing to the PHY reg
+  phy: bcm-ns-usb3: use pointer for PHY writing function
+  phy: bcm-ns-usb3: enable MDIO in the platform specific code
+  dt-bindings: phy: Modify Broadcom NS USB 3.0 PHY binding to use MDIO
+  phy: bcm-ns-usb3: add MDIO driver using proper bus layer
+
+ .../devicetree/bindings/phy/bcm-ns-usb3-phy.txt    |  27 ++-
+ drivers/phy/broadcom/Kconfig                       |   1 +
+ drivers/phy/broadcom/phy-bcm-ns-usb3.c             | 230 +++++++++++++++------
+ 3 files changed, 186 insertions(+), 72 deletions(-)
+
+-- 
+2.11.0
