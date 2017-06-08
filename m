@@ -1,47 +1,56 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 8 Jun 2017 14:12:02 +0200
-Subject: [PATCH v2 2/6] dt-bindings: interrupt-controller: add DT
- binding for the Marvell ICU
-In-Reply-To: <20170607223317.hkpak5y2oalktjqe@rob-hp-laptop>
-References: <1496398017-6487-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1496398017-6487-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20170607223317.hkpak5y2oalktjqe@rob-hp-laptop>
-Message-ID: <20170608141202.14e4801e@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 8 Jun 2017 14:18:02 +0200
+Subject: [PATCH 2/2 v4] clk: Add Gemini SoC clock controller
+In-Reply-To: <20170605195812.GH20170@codeaurora.org>
+References: <20170524082044.8473-1-linus.walleij@linaro.org>
+ <20170601070208.GO20170@codeaurora.org>
+ <CACRpkdZv8MzXVecEXVdJ+P0MxVscYSy=MxC-yQAR0S4yQ6-rwQ@mail.gmail.com>
+ <20170605195812.GH20170@codeaurora.org>
+Message-ID: <CACRpkdbya9xaN-i7AkG0bTyuFYfZc59sSTYhWB43=9btSKfPpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Jun 5, 2017 at 9:58 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 06/05, Linus Walleij wrote:
+>> On Thu, Jun 1, 2017 at 9:02 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>>
+>> >> +CLK_OF_DECLARE_DRIVER(gemini_cc, "cortina,gemini-syscon", gemini_cc_init);
+>> >
+>> > Is there a reason why this isn't a platform driver?
+>>
+>> I can't get the platform to boot if I try, I guess because the console
+>> UART needs the clock like super-early.
+>>
+>> I fixed all the other issues, resending soon.
+>>
+>
+> Does the console uart driver support probe defer?
 
-On Wed, 7 Jun 2017 17:33:17 -0500, Rob Herring wrote:
+It's the 8250_of.c driver.
 
-> > +Example:
-> > +
-> > +icu: interrupt-controller at 1e0000 {
-> > +	compatible = "marvell,cp110-icu";
-> > +	reg = <0x1e0000 0x10>;
-> > +	#interrupt-cells = <3>;
-> > +	interrupt-controller;
-> > +	interrupt-parent = <&gic>;  
-> 
-> If you have a parent, then you should have some interrupts. I guess that 
-> would be your ranges property? I suppose that is fine.
+It's such a big driver that I don't dare to say, I guess I would
+have to go in and debug and patch around in the 8250 driver
+if you insist.
 
-The ranges of interrupts available is defined by the gicp node. Indeed,
-as explained in the cover letter:
+But I'm not even sure that is the problem actually, I'd have to
+analyze.
 
- - We have one GICP in the SoC, providing a number of GIC SPI interrupts
+I think the timer may be more of an issue...
 
- - We have one ICU per CP in the SoC. So for example in the Armada 8K,
-   we have two CPs, and therefore two ICUs.
+It is using CLOCKSOURCE_OF_DECLARE(), at least last time
+I checked there was no such thing as clocksources retrying their
+calls, and that cannot be regular probes because of, yeah device
+core is using the timer, I think.
 
-So the range of available GIC SPI interrupts it not associated to each
-ICU, it's a global range of GIC SPI interrupts: each can freely be
-allocated by any of the ICUs in the system.
+Yeah I looked in:
+drivers/clocksource/clksrc-probe.c
 
-Best regards,
+It will just fail if it can't initialize the clocksource.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+I don't understand what platforms can actually get their timers
+up at all without the clock framework? Those hardcoding the
+clock frequency in the device tree, or things like the ARM
+TWD which has it encoded in hardware perhaps?
+
+Yours,
+Linus Walleij
