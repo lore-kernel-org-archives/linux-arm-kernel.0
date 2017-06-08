@@ -1,110 +1,58 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu,  8 Jun 2017 15:13:03 +0100
-Subject: [RFT PATCH v2 03/42] drivers: pci: host: ftpci100: convert IRQ
- masking to raw PCI config accessors
+Date: Thu,  8 Jun 2017 15:13:04 +0100
+Subject: [RFT PATCH v2 04/42] PCI: Initialize bridge release function at
+ bridge allocation
 In-Reply-To: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
 References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170608141342.2018-4-lorenzo.pieralisi@arm.com>
+Message-ID: <20170608141342.2018-5-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current ftpci100 driver host bridge controller driver requires struct
-pci_bus to be created in order to mask and clear IRQs using standard
-PCI bus config accessors.
+The introduction of pci_register_host_bridge() kernel interface
+allows PCI host controller drivers to create the struct pci_host_bridge
+object, initialize it and register it with the kernel so that its
+corresponding PCI bus can be scanned and its devices probed.
 
-This struct pci_bus dependency is fictitious and burdens the driver
-with unneeded constraints (eg to use separate APIs to create and scan
-the root bus).
+The host bridge device release function pci_release_host_bridge_dev is a
+static function common for all struct pci_host_bridge allocated objects,
+so in its current form cannot be used by PCI host bridge controllers
+drivers to initialize the allocated struct pci_host_bridge, which
+leaves struct pci_host_bridge devices release function uninitialized.
 
-Add PCI raw config space accessors to PCIe ftpci100 driver and remove the
-fictitious struct pci_bus dependency.
+Since pci_release_host_bridge_dev is a function common to all PCI
+host bridge objects, initialize it in pci_alloc_host_bridge() (ie
+common host bridge allocation interface) so that all struct
+pci_host_bridge objects have their release function initialized by
+default at allocation time, removing the need for exporting the
+common pci_release_host_bridge_dev function to other compilation
+units.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/pci/host/pci-ftpci100.c | 44 ++++++++++++++++++++++++-----------------
- 1 file changed, 26 insertions(+), 18 deletions(-)
+ drivers/pci/probe.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/pci/host/pci-ftpci100.c b/drivers/pci/host/pci-ftpci100.c
-index d26501c..1c1fd60 100644
---- a/drivers/pci/host/pci-ftpci100.c
-+++ b/drivers/pci/host/pci-ftpci100.c
-@@ -204,17 +204,13 @@ static int faraday_pci_read_config(struct pci_bus *bus, unsigned int fn,
- 	return PCIBIOS_SUCCESSFUL;
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 19c8950..586d83d 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -531,6 +531,7 @@ struct pci_host_bridge *pci_alloc_host_bridge(size_t priv)
+ 		return NULL;
+ 
+ 	INIT_LIST_HEAD(&bridge->windows);
++	bridge->dev.release = pci_release_host_bridge_dev;
+ 
+ 	return bridge;
  }
+@@ -2310,7 +2311,6 @@ static struct pci_bus *pci_create_root_bus_msi(struct device *parent,
+ 		return NULL;
  
--static int faraday_pci_write_config(struct pci_bus *bus, unsigned int fn,
--				    int config, int size, u32 value)
-+static int faraday_raw_pci_write_config(struct faraday_pci *p, int bus_number,
-+					 unsigned int fn, int config, int size,
-+					 u32 value)
- {
--	struct faraday_pci *p = bus->sysdata;
- 	int ret = PCIBIOS_SUCCESSFUL;
+ 	bridge->dev.parent = parent;
+-	bridge->dev.release = pci_release_host_bridge_dev;
  
--	dev_dbg(&bus->dev,
--		"[write] slt: %.2d, fnc: %d, cnf: 0x%.2X, val (%d bytes): 0x%.8X\n",
--		PCI_SLOT(fn), PCI_FUNC(fn), config, size, value);
--
--	writel(PCI_CONF_BUS(bus->number) |
-+	writel(PCI_CONF_BUS(bus_number) |
- 			PCI_CONF_DEVICE(PCI_SLOT(fn)) |
- 			PCI_CONF_FUNCTION(PCI_FUNC(fn)) |
- 			PCI_CONF_WHERE(config) |
-@@ -238,6 +234,19 @@ static int faraday_pci_write_config(struct pci_bus *bus, unsigned int fn,
- 	return ret;
- }
- 
-+static int faraday_pci_write_config(struct pci_bus *bus, unsigned int fn,
-+				    int config, int size, u32 value)
-+{
-+	struct faraday_pci *p = bus->sysdata;
-+
-+	dev_dbg(&bus->dev,
-+		"[write] slt: %.2d, fnc: %d, cnf: 0x%.2X, val (%d bytes): 0x%.8X\n",
-+		PCI_SLOT(fn), PCI_FUNC(fn), config, size, value);
-+
-+	return faraday_raw_pci_write_config(p, bus->number, fn, config, size,
-+					    value);
-+}
-+
- static struct pci_ops faraday_pci_ops = {
- 	.read	= faraday_pci_read_config,
- 	.write	= faraday_pci_write_config,
-@@ -496,17 +505,8 @@ static int faraday_pci_probe(struct platform_device *pdev)
- 	val |= PCI_COMMAND_MEMORY;
- 	val |= PCI_COMMAND_MASTER;
- 	writel(val, p->base + PCI_CTRL);
--
--	list_splice_init(&res, &host->windows);
--	ret = pci_register_host_bridge(host);
--	if (ret) {
--		dev_err(dev, "failed to register host: %d\n", ret);
--		return ret;
--	}
--	p->bus = host->bus;
--
- 	/* Mask and clear all interrupts */
--	faraday_pci_write_config(p->bus, 0, FARADAY_PCI_CTRL2 + 2, 2, 0xF000);
-+	faraday_raw_pci_write_config(p, 0, 0, FARADAY_PCI_CTRL2 + 2, 2, 0xF000);
- 	if (variant->cascaded_irq) {
- 		ret = faraday_pci_setup_cascaded_irq(p);
- 		if (ret) {
-@@ -519,6 +519,14 @@ static int faraday_pci_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
-+	list_splice_init(&res, &host->windows);
-+	ret = pci_register_host_bridge(host);
-+	if (ret) {
-+		dev_err(dev, "failed to register host: %d\n", ret);
-+		return ret;
-+	}
-+	p->bus = host->bus;
-+
- 	pci_scan_child_bus(p->bus);
- 	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
- 	pci_bus_assign_resources(p->bus);
+ 	list_splice_init(resources, &bridge->windows);
+ 	bridge->sysdata = sysdata;
 -- 
 2.10.0
