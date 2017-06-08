@@ -1,151 +1,38 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu,  8 Jun 2017 15:13:15 +0100
-Subject: [RFT PATCH v2 15/42] PCI: iproc: Convert PCI scan API to
- pci_scan_root_bus_bridge()
+Date: Thu,  8 Jun 2017 15:13:27 +0100
+Subject: [RFT PATCH v2 27/42] OF/PCI: Update of_irq_parse_and_map_pci() comment
 In-Reply-To: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
 References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170608141342.2018-16-lorenzo.pieralisi@arm.com>
+Message-ID: <20170608141342.2018-28-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The introduction of pci_scan_root_bus_bridge() provides a PCI core
-API to scan a PCI root bus backed by an already initialized
-struct pci_host_bridge object, which simplifies the bus scan
-interface and makes the PCI scan root bus interface easier to
-generalize as members are added to the struct pci_host_bridge.
+From: Matthew Minter <matt@masarand.com>
 
-Convert PCI iproc host code to pci_scan_root_bus_bridge() to
-improve the PCI root bus scanning interface.
+With the introduction of struct pci_host_bridge.(*map_irq) function
+pointer add another direct usage of of_irq_parse_and_map_pci().
 
+Update the function comment to reflect this behaviour.
+
+Signed-off-by: Matthew Minter <matt@masarand.com>
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Scott Branden <sbranden@broadcom.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Ray Jui <rjui@broadcom.com>
-Cc: Jon Mason <jonmason@broadcom.com>
 ---
- drivers/pci/host/pcie-iproc-bcma.c     |  7 +++++--
- drivers/pci/host/pcie-iproc-platform.c |  7 +++++--
- drivers/pci/host/pcie-iproc.c          | 38 ++++++++++++++++++----------------
- 3 files changed, 30 insertions(+), 22 deletions(-)
+ drivers/of/of_pci_irq.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pci/host/pcie-iproc-bcma.c b/drivers/pci/host/pcie-iproc-bcma.c
-index 384c27e..f03d5e3 100644
---- a/drivers/pci/host/pcie-iproc-bcma.c
-+++ b/drivers/pci/host/pcie-iproc-bcma.c
-@@ -45,12 +45,15 @@ static int iproc_pcie_bcma_probe(struct bcma_device *bdev)
- 	struct device *dev = &bdev->dev;
- 	struct iproc_pcie *pcie;
- 	LIST_HEAD(resources);
-+	struct pci_host_bridge *bridge;
- 	int ret;
- 
--	pcie = devm_kzalloc(dev, sizeof(*pcie), GFP_KERNEL);
--	if (!pcie)
-+	bridge = devm_pci_alloc_host_bridge(dev, sizeof(*pcie));
-+	if (!bridge)
- 		return -ENOMEM;
- 
-+	pcie = pci_host_bridge_priv(bridge);
-+
- 	pcie->dev = dev;
- 
- 	pcie->type = IPROC_PCIE_PAXB_BCMA;
-diff --git a/drivers/pci/host/pcie-iproc-platform.c b/drivers/pci/host/pcie-iproc-platform.c
-index 90d2bdd..2253119 100644
---- a/drivers/pci/host/pcie-iproc-platform.c
-+++ b/drivers/pci/host/pcie-iproc-platform.c
-@@ -52,12 +52,15 @@ static int iproc_pcie_pltfm_probe(struct platform_device *pdev)
- 	struct resource reg;
- 	resource_size_t iobase = 0;
- 	LIST_HEAD(resources);
-+	struct pci_host_bridge *bridge;
- 	int ret;
- 
--	pcie = devm_kzalloc(dev, sizeof(*pcie), GFP_KERNEL);
--	if (!pcie)
-+	bridge = devm_pci_alloc_host_bridge(dev, sizeof(*pcie));
-+	if (!bridge)
- 		return -ENOMEM;
- 
-+	pcie = pci_host_bridge_priv(bridge);
-+
- 	pcie->dev = dev;
- 	pcie->type = (enum iproc_pcie_type) of_device_get_match_data(dev);
- 
-diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-index e48b8e2..55a3665 100644
---- a/drivers/pci/host/pcie-iproc.c
-+++ b/drivers/pci/host/pcie-iproc.c
-@@ -1259,7 +1259,8 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
- 	struct device *dev;
- 	int ret;
- 	void *sysdata;
--	struct pci_bus *bus, *child;
-+	struct pci_bus *child;
-+	struct pci_host_bridge *host = pci_host_bridge_from_priv(pcie);
- 
- 	dev = pcie->dev;
- 
-@@ -1306,18 +1307,10 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
- 	sysdata = pcie;
- #endif
- 
--	bus = pci_create_root_bus(dev, 0, &iproc_pcie_ops, sysdata, res);
--	if (!bus) {
--		dev_err(dev, "unable to create PCI root bus\n");
--		ret = -ENOMEM;
--		goto err_power_off_phy;
--	}
--	pcie->root_bus = bus;
--
- 	ret = iproc_pcie_check_link(pcie);
- 	if (ret) {
- 		dev_err(dev, "no PCIe EP device detected\n");
--		goto err_rm_root_bus;
-+		goto err_power_off_phy;
- 	}
- 
- 	iproc_pcie_enable(pcie);
-@@ -1326,23 +1319,32 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
- 		if (iproc_pcie_msi_enable(pcie))
- 			dev_info(dev, "not using iProc MSI\n");
- 
--	pci_scan_child_bus(bus);
--	pci_assign_unassigned_bus_resources(bus);
-+	list_splice_init(res, &host->windows);
-+	host->busnr = 0;
-+	host->dev.parent = dev;
-+	host->ops = &iproc_pcie_ops;
-+	host->sysdata = sysdata;
-+
-+	ret = pci_scan_root_bus_bridge(host);
-+	if (ret < 0) {
-+		dev_err(dev, "failed to scan host: %d\n", ret);
-+		goto err_power_off_phy;
-+	}
- 
- 	if (pcie->map_irq)
- 		pci_fixup_irqs(pci_common_swizzle, pcie->map_irq);
- 
--	list_for_each_entry(child, &bus->children, node)
-+	pci_assign_unassigned_bus_resources(host->bus);
-+
-+	pcie->root_bus = host->bus;
-+
-+	list_for_each_entry(child, &host->bus->children, node)
- 		pcie_bus_configure_settings(child);
- 
--	pci_bus_add_devices(bus);
-+	pci_bus_add_devices(host->bus);
- 
- 	return 0;
- 
--err_rm_root_bus:
--	pci_stop_root_bus(bus);
--	pci_remove_root_bus(bus);
--
- err_power_off_phy:
- 	phy_power_off(pcie->phy);
- err_exit_phy:
+diff --git a/drivers/of/of_pci_irq.c b/drivers/of/of_pci_irq.c
+index c175d9c..3a05568 100644
+--- a/drivers/of/of_pci_irq.c
++++ b/drivers/of/of_pci_irq.c
+@@ -113,7 +113,8 @@ EXPORT_SYMBOL_GPL(of_irq_parse_pci);
+  * @pin: PCI irq pin number; passed when used as map_irq callback. Unused
+  *
+  * @slot and @pin are unused, but included in the function so that this
+- * function can be used directly as the map_irq callback to pci_fixup_irqs().
++ * function can be used directly as the map_irq callback to
++ * pci_assign_irq() and struct pci_host_bridge.map_irq pointer
+  */
+ int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin)
+ {
 -- 
 2.10.0
