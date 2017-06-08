@@ -1,46 +1,47 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu,  8 Jun 2017 15:13:30 +0100
-Subject: [RFT PATCH v2 30/42] PCI: tegra: Drop pci_fixup_irqs()
+Date: Thu,  8 Jun 2017 15:13:32 +0100
+Subject: [RFT PATCH v2 32/42] PCI: rcar: Drop pci_fixup_irqs()
 In-Reply-To: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
 References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170608141342.2018-31-lorenzo.pieralisi@arm.com>
+Message-ID: <20170608141342.2018-33-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Since, through struct pci_host_bridge.map/swizzle_irq hooks, IRQs
 are now allocated in the pci_assign_irq() callback automatically,
 PCI host bridge drivers can stop relying on pci_fixup_irqs()
-for IRQ allocation
+for IRQ allocation.
 
-Drop pci_fixup_irqs() usage from PCI tegra host bridge driver.
+Drop pci_fixup_irqs() usage from PCI rcar host bridge driver.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: Simon Horman <horms@verge.net.au>
 ---
- drivers/pci/host/pci-tegra.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/pci/host/pcie-rcar.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
-index 0383418..0dadb81 100644
---- a/drivers/pci/host/pci-tegra.c
-+++ b/drivers/pci/host/pci-tegra.c
-@@ -2284,6 +2284,8 @@ static int tegra_pcie_probe(struct platform_device *pdev)
- 	host->busnr = pcie->busn.start;
- 	host->dev.parent = &pdev->dev;
- 	host->ops = &tegra_pcie_ops;
-+	host->map_irq = tegra_pcie_map_irq;
-+	host->swizzle_irq = pci_common_swizzle;
+diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
+index 8380274..246d485 100644
+--- a/drivers/pci/host/pcie-rcar.c
++++ b/drivers/pci/host/pcie-rcar.c
+@@ -465,6 +465,8 @@ static int rcar_pcie_enable(struct rcar_pcie *pcie)
+ 	bridge->sysdata = pcie;
+ 	bridge->busnr = pcie->root_bus_nr;
+ 	bridge->ops = &rcar_pcie_ops;
++	bridge->map_irq = of_irq_parse_and_map_pci;
++	bridge->swizzle_irq = pci_common_swizzle;
+ 	if (IS_ENABLED(CONFIG_PCI_MSI))
+ 		bridge->msi = &pcie->msi.chip;
  
- 	err = pci_scan_root_bus_bridge(host);
- 	if (err < 0) {
-@@ -2291,7 +2293,6 @@ static int tegra_pcie_probe(struct platform_device *pdev)
- 		goto disable_msi;
- 	}
+@@ -476,8 +478,6 @@ static int rcar_pcie_enable(struct rcar_pcie *pcie)
  
--	pci_fixup_irqs(pci_common_swizzle, tegra_pcie_map_irq);
- 	pci_bus_size_bridges(host->bus);
- 	pci_bus_assign_resources(host->bus);
+ 	bus = bridge->bus;
+ 
+-	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+-
+ 	pci_bus_size_bridges(bus);
+ 	pci_bus_assign_resources(bus);
  
 -- 
 2.10.0
