@@ -1,98 +1,100 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Thu,  8 Jun 2017 18:25:26 +0100
-Subject: [PATCH v3 1/4] arm64: hugetlb: Fix huge_pte_offset to return poisoned
- page table entries
+Date: Thu,  8 Jun 2017 18:25:27 +0100
+Subject: [PATCH v3 2/4] arm64: hwpoison: add VM_FAULT_HWPOISON[_LARGE] handling
 In-Reply-To: <20170608172529.11986-1-punit.agrawal@arm.com>
 References: <20170608172529.11986-1-punit.agrawal@arm.com>
-Message-ID: <20170608172529.11986-2-punit.agrawal@arm.com>
+Message-ID: <20170608172529.11986-3-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When memory failure is enabled, a poisoned hugepage pte is marked as a
-swap entry. huge_pte_offset() does not return the poisoned page table
-entries when it encounters PUD/PMD hugepages.
+From: "Jonathan (Zhixiong) Zhang" <zjzhang@codeaurora.org>
 
-This behaviour of huge_pte_offset() leads to error such as below when
-munmap is called on poisoned hugepages.
+Add VM_FAULT_HWPOISON[_LARGE] handling to the arm64 page fault
+handler. Handling of VM_FAULT_HWPOISON[_LARGE] is very similar
+to VM_FAULT_OOM, the only difference is that a different si_code
+(BUS_MCEERR_AR) is passed to user space and si_addr_lsb field is
+initialized.
 
-[  344.165544] mm/pgtable-generic.c:33: bad pmd 000000083af00074.
-
-Fix huge_pte_offset() to return the poisoned pte which is then
-appropriately handled by the generic layer code.
-
+Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+(fix new __do_user_fault call-site)
 Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 Acked-by: Steve Capper <steve.capper@arm.com>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: David Woods <dwoods@mellanox.com>
 Tested-by: Manoj Iyer <manoj.iyer@canonical.com>
 ---
- arch/arm64/include/asm/pgtable.h |  2 +-
- arch/arm64/mm/hugetlbpage.c      | 29 ++++++++++-------------------
- 2 files changed, 11 insertions(+), 20 deletions(-)
+ arch/arm64/mm/fault.c | 22 +++++++++++++++++++---
+ 1 file changed, 19 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index c213fdbd056c..6eae342ced6b 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -441,7 +441,7 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 37b95dff0b07..a85b44343ac6 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -31,6 +31,7 @@
+ #include <linux/highmem.h>
+ #include <linux/perf_event.h>
+ #include <linux/preempt.h>
++#include <linux/hugetlb.h>
  
- #define pud_none(pud)		(!pud_val(pud))
- #define pud_bad(pud)		(!(pud_val(pud) & PUD_TABLE_BIT))
--#define pud_present(pud)	(pud_val(pud))
-+#define pud_present(pud)	pte_present(pud_pte(pud))
- 
- static inline void set_pud(pud_t *pudp, pud_t pud)
+ #include <asm/bug.h>
+ #include <asm/cpufeature.h>
+@@ -239,10 +240,11 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
+  */
+ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
+ 			    unsigned int esr, unsigned int sig, int code,
+-			    struct pt_regs *regs)
++			    struct pt_regs *regs, int fault)
  {
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index 7514a000e361..69b8200b1cfd 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -136,36 +136,27 @@ pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
- {
- 	pgd_t *pgd;
- 	pud_t *pud;
--	pmd_t *pmd = NULL;
--	pte_t *pte = NULL;
-+	pmd_t *pmd;
+ 	struct siginfo si;
+ 	const struct fault_info *inf;
++	unsigned int lsb = 0;
  
- 	pgd = pgd_offset(mm, addr);
- 	pr_debug("%s: addr:0x%lx pgd:%p\n", __func__, addr, pgd);
- 	if (!pgd_present(*pgd))
- 		return NULL;
+ 	if (unhandled_signal(tsk, sig) && show_unhandled_signals_ratelimited()) {
+ 		inf = esr_to_fault_info(esr);
+@@ -259,6 +261,17 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
+ 	si.si_errno = 0;
+ 	si.si_code = code;
+ 	si.si_addr = (void __user *)addr;
++	/*
++	 * Either small page or large page may be poisoned.
++	 * In other words, VM_FAULT_HWPOISON_LARGE and
++	 * VM_FAULT_HWPOISON are mutually exclusive.
++	 */
++	if (fault & VM_FAULT_HWPOISON_LARGE)
++		lsb = hstate_index_to_shift(VM_FAULT_GET_HINDEX(fault));
++	else if (fault & VM_FAULT_HWPOISON)
++		lsb = PAGE_SHIFT;
++	si.si_addr_lsb = lsb;
 +
- 	pud = pud_offset(pgd, addr);
--	if (!pud_present(*pud))
-+	if (pud_none(*pud))
- 		return NULL;
--
--	if (pud_huge(*pud))
-+	/* swap or huge page */
-+	if (!pud_present(*pud) || pud_huge(*pud))
- 		return (pte_t *)pud;
-+	/* table; check the next level */
-+
- 	pmd = pmd_offset(pud, addr);
--	if (!pmd_present(*pmd))
-+	if (pmd_none(*pmd))
- 		return NULL;
--
--	if (pte_cont(pmd_pte(*pmd))) {
--		pmd = pmd_offset(
--			pud, (addr & CONT_PMD_MASK));
--		return (pte_t *)pmd;
--	}
--	if (pmd_huge(*pmd))
-+	if (!pmd_present(*pmd) || pmd_huge(*pmd))
- 		return (pte_t *)pmd;
--	pte = pte_offset_kernel(pmd, addr);
--	if (pte_present(*pte) && pte_cont(*pte)) {
--		pte = pte_offset_kernel(
--			pmd, (addr & CONT_PTE_MASK));
--		return pte;
--	}
-+
- 	return NULL;
+ 	force_sig_info(sig, &si, tsk);
  }
  
+@@ -274,7 +287,7 @@ static void do_bad_area(unsigned long addr, unsigned int esr, struct pt_regs *re
+ 	 */
+ 	if (user_mode(regs)) {
+ 		inf = esr_to_fault_info(esr);
+-		__do_user_fault(tsk, addr, esr, inf->sig, inf->code, regs);
++		__do_user_fault(tsk, addr, esr, inf->sig, inf->code, regs, 0);
+ 	} else
+ 		__do_kernel_fault(mm, addr, esr, regs);
+ }
+@@ -461,6 +474,9 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
+ 		 */
+ 		sig = SIGBUS;
+ 		code = BUS_ADRERR;
++	} else if (fault & (VM_FAULT_HWPOISON | VM_FAULT_HWPOISON_LARGE)) {
++		sig = SIGBUS;
++		code = BUS_MCEERR_AR;
+ 	} else {
+ 		/*
+ 		 * Something tried to access memory that isn't in our memory
+@@ -471,7 +487,7 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
+ 			SEGV_ACCERR : SEGV_MAPERR;
+ 	}
+ 
+-	__do_user_fault(tsk, addr, esr, sig, code, regs);
++	__do_user_fault(tsk, addr, esr, sig, code, regs, fault);
+ 	return 0;
+ 
+ no_context:
 -- 
 2.11.0
