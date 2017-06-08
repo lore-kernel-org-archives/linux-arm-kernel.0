@@ -1,46 +1,77 @@
-From: chris.paterson2@renesas.com (Chris Paterson)
-Date: Thu,  8 Jun 2017 11:08:14 +0100
-Subject: [PATCH v2] ARM: debug-ll: Add support for r8a7743
-In-Reply-To: <1496908117-19368-1-git-send-email-chris.paterson2@renesas.com>
-References: <1496908117-19368-1-git-send-email-chris.paterson2@renesas.com>
-Message-ID: <1496916494-19725-1-git-send-email-chris.paterson2@renesas.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 8 Jun 2017 11:15:08 +0100
+Subject: [RFCv2 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
+ erratum 161010801
+In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA838363D5D@FRAEML521-MBX.china.huawei.com>
+References: <20170531143213.82100-1-shameerali.kolothum.thodi@huawei.com>
+ <20170531143213.82100-3-shameerali.kolothum.thodi@huawei.com>
+ <20170606135623.GB20126@red-moon>
+ <5FC3163CFD30C246ABAA99954A238FA838362082@FRAEML521-MBX.china.huawei.com>
+ <20170608084851.GA8607@red-moon>
+ <5FC3163CFD30C246ABAA99954A238FA838363D5D@FRAEML521-MBX.china.huawei.com>
+Message-ID: <20170608101508.GA8644@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable low-level debugging support for RZ/G1M (r8a7743). RZ/G1M uses
-SCIF0 for the debug console, like most of the R-Car Gen2 SoCs.
+On Thu, Jun 08, 2017 at 09:09:28AM +0000, Shameerali Kolothum Thodi wrote:
+> 
+> 
+> > -----Original Message-----
+> > From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
+> > Sent: Thursday, June 08, 2017 9:49 AM
+> > To: Shameerali Kolothum Thodi
+> > Cc: marc.zyngier at arm.com; sudeep.holla at arm.com; will.deacon at arm.com;
+> > robin.murphy at arm.com; hanjun.guo at linaro.org; Gabriele Paoloni; John
+> > Garry; iommu at lists.linux-foundation.org; linux-arm-
+> > kernel at lists.infradead.org; linux-acpi at vger.kernel.org; devel at acpica.org;
+> > Linuxarm; Wangzhou (B); Guohanjun (Hanjun Guo)
+> > Subject: Re: [RFCv2 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
+> > erratum 161010801
+> > 
+> > On Tue, Jun 06, 2017 at 03:01:36PM +0000, Shameerali Kolothum Thodi
+> > wrote:
+> > 
+> > [...]
+> > 
+> > > > > +	irq_dom = pci_msi_get_device_domain(to_pci_dev(dev));
+> > > > > +	if (irq_dom) {
+> > > > > +		int	ret;
+> > > > > +		u32	rid;
+> > > > > +
+> > > > > +		rid = pci_msi_domain_get_msi_rid(irq_dom,
+> > > > to_pci_dev(dev));
+> > > > > +		ret = iort_dev_find_its_base(dev, rid, 0, &base);
+> > > >
+> > > > Well, here we use ITS id 0 which is fine as long as code in IORT
+> > > > uses the same policy for getting the irq_domain (ie we want to
+> > > > reserve the ITS address space that is actually used by the device to
+> > > > send IRQs not a a different one) it is just a heads-up because I find this
+> > confusing.
+> > >
+> > > Ok. Just to make it clear, 0 is the index into the ITS identifier
+> > > list.  I noted that iort_get_device_domain() uses index 0 while
+> > > retrieving the ITS identifier.  May be use the same approach here as
+> > > well? ie, remove the index from function call?
+> > >
+> > > I am not sure, how we can get the index info  though theoretically It
+> > > is possible for the ITS group node having multiple ITSs.
+> > 
+> > Actually I think it would make sense to reserve ALL ITS regions a device may
+> > be mapped to instead of just index 0 (ie in your case it is equivalent); this
+> > leaves us some leeway as to choose which ITS the device will be actually
+> > mapped to and this code does not have to care.
+> 
+> Ok. That make sense. Just a quick one, is it ok to add another helper function in
+> iort code to retrieve the its->its_count then? 
 
-Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v2:
-- Added Geert reviewed-by
-- Shortened config description
+While at it, given that the pci API code to retrieve domain and rid falls
+back to IORT anyway, I would add the whole reservation to IORT (mind,
+it depends on IOMMU_API) as one function instead of fiddling about with
+indexes.
 
- arch/arm/Kconfig.debug | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+Side note: why Hilisicon dts upstream (eg hip07.dtsi) report ITS size
+as 256K ? I was just checking whether the ITS reg map size is system
+dependent and I bumped into them, I suspect there may be some dts
+patching needed here.
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index ba2cb63..1b2c4c4 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -895,12 +895,13 @@ choice
- 		  via SCIF2 on Renesas R-Car H1 (R8A7779).
- 
- 	config DEBUG_RCAR_GEN2_SCIF0
--		bool "Kernel low-level debugging messages via SCIF0 on R8A7790/R8A7791/R8A7792/R8A7793"
--		depends on ARCH_R8A7790 || ARCH_R8A7791 || ARCH_R8A7792 || ARCH_R8A7793
-+		bool "Kernel low-level debugging messages via SCIF0 on R-Car Gen2 and RZ/G1"
-+		depends on ARCH_R8A7743 || ARCH_R8A7790 || ARCH_R8A7791 || \
-+			ARCH_R8A7792 || ARCH_R8A7793
- 		help
- 		  Say Y here if you want kernel low-level debugging support
--		  via SCIF0 on Renesas R-Car H2 (R8A7790), M2-W (R8A7791), V2H
--		  (R8A7792), or M2-N (R8A7793).
-+		  via SCIF0 on Renesas RZ/G1M (R8A7743), R-Car H2 (R8A7790),
-+		  M2-W (R8A7791), V2H (R8A7792), or M2-N (R8A7793).
- 
- 	config DEBUG_RCAR_GEN2_SCIF2
- 		bool "Kernel low-level debugging messages via SCIF2 on R8A7794"
--- 
-1.9.1
+Lorenzo
