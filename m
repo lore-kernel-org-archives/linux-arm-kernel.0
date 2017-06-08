@@ -1,137 +1,224 @@
 From: jiada_wang@mentor.com (Jiada Wang)
-Date: Thu, 8 Jun 2017 14:16:00 +0900
-Subject: [PATCH linux-next v4 1/4] spi: imx: introduce fifo_size and
- has_dmamode in spi_imx_devtype_data
+Date: Thu, 8 Jun 2017 14:16:02 +0900
+Subject: [PATCH linux-next v4 3/4] ARM: dts: imx: change compatibility for SPI
+ controllers on imx53 later soc
 In-Reply-To: <20170608051603.16070-1-jiada_wang@mentor.com>
 References: <20170608051603.16070-1-jiada_wang@mentor.com>
-Message-ID: <20170608051603.16070-2-jiada_wang@mentor.com>
+Message-ID: <20170608051603.16070-4-jiada_wang@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Different ECSPI controller has different fifosize and DMA capability,
-instead of calling functions to identify these information by check
-devtype. add fifo_size and has_dmamode to spi_imx_devtype_data.
-so that these information can be directly accessed.
+for SPI controllers on imx53 and later SoCs, there is HW issue when
+work in slave mode, as new device type 'IMX53_ECSPI' has been added
+for these SPI controllers which is compatible with 'fsl,imx53-ecspi'.
+
+This patch updates DTS to make imx53 later SPI controller only be
+compatibile with 'fsl,imx53-ecspi'.
 
 Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
 ---
- drivers/spi/spi-imx.c | 27 ++++++++++++++++++---------
- 1 file changed, 18 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/imx53.dtsi   | 4 ++--
+ arch/arm/boot/dts/imx6q.dtsi   | 2 +-
+ arch/arm/boot/dts/imx6qdl.dtsi | 8 ++++----
+ arch/arm/boot/dts/imx6sl.dtsi  | 8 ++++----
+ arch/arm/boot/dts/imx6sx.dtsi  | 8 ++++----
+ arch/arm/boot/dts/imx6ul.dtsi  | 8 ++++----
+ 6 files changed, 19 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-index e544f45..4469121 100644
---- a/drivers/spi/spi-imx.c
-+++ b/drivers/spi/spi-imx.c
-@@ -74,6 +74,8 @@ struct spi_imx_devtype_data {
- 	void (*trigger)(struct spi_imx_data *);
- 	int (*rx_available)(struct spi_imx_data *);
- 	void (*reset)(struct spi_imx_data *);
-+	bool has_dmamode;
-+	unsigned int fifo_size;
- 	enum spi_imx_devtype devtype;
- };
- 
-@@ -125,11 +127,6 @@ static inline int is_imx51_ecspi(struct spi_imx_data *d)
- 	return d->devtype_data->devtype == IMX51_ECSPI;
- }
- 
--static inline unsigned spi_imx_get_fifosize(struct spi_imx_data *d)
--{
--	return is_imx51_ecspi(d) ? 64 : 8;
--}
--
- #define MXC_SPI_BUF_RX(type)						\
- static void spi_imx_buf_rx_##type(struct spi_imx_data *spi_imx)		\
- {									\
-@@ -219,7 +216,7 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
- 	if (bytes_per_word != 1 && bytes_per_word != 2 && bytes_per_word != 4)
- 		return false;
- 
--	for (i = spi_imx_get_fifosize(spi_imx) / 2; i > 0; i--) {
-+	for (i = spi_imx->devtype_data->fifo_size / 2; i > 0; i--) {
- 		if (!(transfer->len % (i * bytes_per_word)))
- 			break;
- 	}
-@@ -693,6 +690,8 @@ static struct spi_imx_devtype_data imx1_cspi_devtype_data = {
- 	.trigger = mx1_trigger,
- 	.rx_available = mx1_rx_available,
- 	.reset = mx1_reset,
-+	.fifo_size = 8,
-+	.has_dmamode = false,
- 	.devtype = IMX1_CSPI,
- };
- 
-@@ -702,6 +701,8 @@ static struct spi_imx_devtype_data imx21_cspi_devtype_data = {
- 	.trigger = mx21_trigger,
- 	.rx_available = mx21_rx_available,
- 	.reset = mx21_reset,
-+	.fifo_size = 8,
-+	.has_dmamode = false,
- 	.devtype = IMX21_CSPI,
- };
- 
-@@ -712,6 +713,8 @@ static struct spi_imx_devtype_data imx27_cspi_devtype_data = {
- 	.trigger = mx21_trigger,
- 	.rx_available = mx21_rx_available,
- 	.reset = mx21_reset,
-+	.fifo_size = 8,
-+	.has_dmamode = false,
- 	.devtype = IMX27_CSPI,
- };
- 
-@@ -721,6 +724,8 @@ static struct spi_imx_devtype_data imx31_cspi_devtype_data = {
- 	.trigger = mx31_trigger,
- 	.rx_available = mx31_rx_available,
- 	.reset = mx31_reset,
-+	.fifo_size = 8,
-+	.has_dmamode = false,
- 	.devtype = IMX31_CSPI,
- };
- 
-@@ -731,6 +736,8 @@ static struct spi_imx_devtype_data imx35_cspi_devtype_data = {
- 	.trigger = mx31_trigger,
- 	.rx_available = mx31_rx_available,
- 	.reset = mx31_reset,
-+	.fifo_size = 8,
-+	.has_dmamode = true,
- 	.devtype = IMX35_CSPI,
- };
- 
-@@ -740,6 +747,8 @@ static struct spi_imx_devtype_data imx51_ecspi_devtype_data = {
- 	.trigger = mx51_ecspi_trigger,
- 	.rx_available = mx51_ecspi_rx_available,
- 	.reset = mx51_ecspi_reset,
-+	.fifo_size = 64,
-+	.has_dmamode = true,
- 	.devtype = IMX51_ECSPI,
- };
- 
-@@ -791,7 +800,7 @@ static void spi_imx_chipselect(struct spi_device *spi, int is_active)
- 
- static void spi_imx_push(struct spi_imx_data *spi_imx)
- {
--	while (spi_imx->txfifo < spi_imx_get_fifosize(spi_imx)) {
-+	while (spi_imx->txfifo < spi_imx->devtype_data->fifo_size) {
- 		if (!spi_imx->count)
- 			break;
- 		spi_imx->tx(spi_imx);
-@@ -938,7 +947,7 @@ static int spi_imx_sdma_init(struct device *dev, struct spi_imx_data *spi_imx,
- 	if (of_machine_is_compatible("fsl,imx6dl"))
- 		return 0;
- 
--	spi_imx->wml = spi_imx_get_fifosize(spi_imx) / 2;
-+	spi_imx->wml = spi_imx->devtype_data->fifo_size / 2;
- 
- 	/* Prepare for TX DMA: */
- 	master->dma_tx = dma_request_slave_channel_reason(dev, "tx");
-@@ -1262,7 +1271,7 @@ static int spi_imx_probe(struct platform_device *pdev)
- 	 * Only validated on i.mx35 and i.mx6 now, can remove the constraint
- 	 * if validated on other chips.
- 	 */
--	if (is_imx35_cspi(spi_imx) || is_imx51_ecspi(spi_imx)) {
-+	if (spi_imx->devtype_data->has_dmamode) {
- 		ret = spi_imx_sdma_init(&pdev->dev, spi_imx, master);
- 		if (ret == -EPROBE_DEFER)
- 			goto out_clk_put;
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 2e516f4..9eeafb9 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -243,7 +243,7 @@
+ 				ecspi1: ecspi at 50010000 {
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+-					compatible = "fsl,imx53-ecspi", "fsl,imx51-ecspi";
++					compatible = "fsl,imx53-ecspi";
+ 					reg = <0x50010000 0x4000>;
+ 					interrupts = <36>;
+ 					clocks = <&clks IMX5_CLK_ECSPI1_IPG_GATE>,
+@@ -662,7 +662,7 @@
+ 			ecspi2: ecspi at 63fac000 {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+-				compatible = "fsl,imx53-ecspi", "fsl,imx51-ecspi";
++				compatible = "fsl,imx53-ecspi";
+ 				reg = <0x63fac000 0x4000>;
+ 				interrupts = <37>;
+ 				clocks = <&clks IMX5_CLK_ECSPI2_IPG_GATE>,
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index dd33849..b214442 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -90,7 +90,7 @@
+ 				ecspi5: ecspi at 02018000 {
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+-					compatible = "fsl,imx6q-ecspi", "fsl,imx51-ecspi";
++					compatible = "fsl,imx6q-ecspi", "fsl,imx53-ecspi";
+ 					reg = <0x02018000 0x4000>;
+ 					interrupts = <0 35 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks IMX6Q_CLK_ECSPI5>,
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index f325411..ac19c58 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -266,7 +266,7 @@
+ 				ecspi1: ecspi at 02008000 {
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+-					compatible = "fsl,imx6q-ecspi", "fsl,imx51-ecspi";
++					compatible = "fsl,imx6q-ecspi", "fsl,imx53-ecspi";
+ 					reg = <0x02008000 0x4000>;
+ 					interrupts = <0 31 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks IMX6QDL_CLK_ECSPI1>,
+@@ -280,7 +280,7 @@
+ 				ecspi2: ecspi at 0200c000 {
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+-					compatible = "fsl,imx6q-ecspi", "fsl,imx51-ecspi";
++					compatible = "fsl,imx6q-ecspi", "fsl,imx53-ecspi";
+ 					reg = <0x0200c000 0x4000>;
+ 					interrupts = <0 32 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks IMX6QDL_CLK_ECSPI2>,
+@@ -294,7 +294,7 @@
+ 				ecspi3: ecspi at 02010000 {
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+-					compatible = "fsl,imx6q-ecspi", "fsl,imx51-ecspi";
++					compatible = "fsl,imx6q-ecspi", "fsl,imx53-ecspi";
+ 					reg = <0x02010000 0x4000>;
+ 					interrupts = <0 33 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks IMX6QDL_CLK_ECSPI3>,
+@@ -308,7 +308,7 @@
+ 				ecspi4: ecspi at 02014000 {
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+-					compatible = "fsl,imx6q-ecspi", "fsl,imx51-ecspi";
++					compatible = "fsl,imx6q-ecspi", "fsl,imx53-ecspi";
+ 					reg = <0x02014000 0x4000>;
+ 					interrupts = <0 34 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks IMX6QDL_CLK_ECSPI4>,
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index 3243af4..d9b9053 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -168,7 +168,7 @@
+ 				ecspi1: ecspi at 02008000 {
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+-					compatible = "fsl,imx6sl-ecspi", "fsl,imx51-ecspi";
++					compatible = "fsl,imx6sl-ecspi", "fsl,imx53-ecspi";
+ 					reg = <0x02008000 0x4000>;
+ 					interrupts = <0 31 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks IMX6SL_CLK_ECSPI1>,
+@@ -180,7 +180,7 @@
+ 				ecspi2: ecspi at 0200c000 {
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+-					compatible = "fsl,imx6sl-ecspi", "fsl,imx51-ecspi";
++					compatible = "fsl,imx6sl-ecspi", "fsl,imx53-ecspi";
+ 					reg = <0x0200c000 0x4000>;
+ 					interrupts = <0 32 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks IMX6SL_CLK_ECSPI2>,
+@@ -192,7 +192,7 @@
+ 				ecspi3: ecspi at 02010000 {
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+-					compatible = "fsl,imx6sl-ecspi", "fsl,imx51-ecspi";
++					compatible = "fsl,imx6sl-ecspi", "fsl,imx53-ecspi";
+ 					reg = <0x02010000 0x4000>;
+ 					interrupts = <0 33 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks IMX6SL_CLK_ECSPI3>,
+@@ -204,7 +204,7 @@
+ 				ecspi4: ecspi at 02014000 {
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+-					compatible = "fsl,imx6sl-ecspi", "fsl,imx51-ecspi";
++					compatible = "fsl,imx6sl-ecspi", "fsl,imx53-ecspi";
+ 					reg = <0x02014000 0x4000>;
+ 					interrupts = <0 34 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks IMX6SL_CLK_ECSPI4>,
+diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+index f16b9df..149ef79 100644
+--- a/arch/arm/boot/dts/imx6sx.dtsi
++++ b/arch/arm/boot/dts/imx6sx.dtsi
+@@ -251,7 +251,7 @@
+ 				ecspi1: ecspi at 02008000 {
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+-					compatible = "fsl,imx6sx-ecspi", "fsl,imx51-ecspi";
++					compatible = "fsl,imx6sx-ecspi", "fsl,imx53-ecspi";
+ 					reg = <0x02008000 0x4000>;
+ 					interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks IMX6SX_CLK_ECSPI1>,
+@@ -263,7 +263,7 @@
+ 				ecspi2: ecspi at 0200c000 {
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+-					compatible = "fsl,imx6sx-ecspi", "fsl,imx51-ecspi";
++					compatible = "fsl,imx6sx-ecspi", "fsl,imx53-ecspi";
+ 					reg = <0x0200c000 0x4000>;
+ 					interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks IMX6SX_CLK_ECSPI2>,
+@@ -275,7 +275,7 @@
+ 				ecspi3: ecspi at 02010000 {
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+-					compatible = "fsl,imx6sx-ecspi", "fsl,imx51-ecspi";
++					compatible = "fsl,imx6sx-ecspi", "fsl,imx53-ecspi";
+ 					reg = <0x02010000 0x4000>;
+ 					interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks IMX6SX_CLK_ECSPI3>,
+@@ -287,7 +287,7 @@
+ 				ecspi4: ecspi at 02014000 {
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+-					compatible = "fsl,imx6sx-ecspi", "fsl,imx51-ecspi";
++					compatible = "fsl,imx6sx-ecspi", "fsl,imx53-ecspi";
+ 					reg = <0x02014000 0x4000>;
+ 					interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks IMX6SX_CLK_ECSPI4>,
+diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+index 6da2b77..7226061 100644
+--- a/arch/arm/boot/dts/imx6ul.dtsi
++++ b/arch/arm/boot/dts/imx6ul.dtsi
+@@ -204,7 +204,7 @@
+ 				ecspi1: ecspi at 02008000 {
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+-					compatible = "fsl,imx6ul-ecspi", "fsl,imx51-ecspi";
++					compatible = "fsl,imx6ul-ecspi", "fsl,imx53-ecspi";
+ 					reg = <0x02008000 0x4000>;
+ 					interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks IMX6UL_CLK_ECSPI1>,
+@@ -216,7 +216,7 @@
+ 				ecspi2: ecspi at 0200c000 {
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+-					compatible = "fsl,imx6ul-ecspi", "fsl,imx51-ecspi";
++					compatible = "fsl,imx6ul-ecspi", "fsl,imx53-ecspi";
+ 					reg = <0x0200c000 0x4000>;
+ 					interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks IMX6UL_CLK_ECSPI2>,
+@@ -228,7 +228,7 @@
+ 				ecspi3: ecspi at 02010000 {
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+-					compatible = "fsl,imx6ul-ecspi", "fsl,imx51-ecspi";
++					compatible = "fsl,imx6ul-ecspi", "fsl,imx53-ecspi";
+ 					reg = <0x02010000 0x4000>;
+ 					interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks IMX6UL_CLK_ECSPI3>,
+@@ -240,7 +240,7 @@
+ 				ecspi4: ecspi at 02014000 {
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+-					compatible = "fsl,imx6ul-ecspi", "fsl,imx51-ecspi";
++					compatible = "fsl,imx6ul-ecspi", "fsl,imx53-ecspi";
+ 					reg = <0x02014000 0x4000>;
+ 					interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks IMX6UL_CLK_ECSPI4>,
 -- 
 2.9.3
