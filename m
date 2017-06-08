@@ -1,90 +1,39 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 8 Jun 2017 09:20:42 +0200
-Subject: [PATCH v2 0/8] omap*: Fixes/Cleanups for MMC devicetree node
-In-Reply-To: <20170607093749.15656-1-kishon@ti.com>
-References: <20170607093749.15656-1-kishon@ti.com>
-Message-ID: <CAPDyKFrJh9qAz6q2-TH8rMshuMjDTkT5pHP==FUUH9KZEOehOQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 8 Jun 2017 09:25:15 +0200
+Subject: [PATCH] ARM: samsung: Save defconfig for Exynos,
+ S3C and S5P configs
+In-Reply-To: <20170608064520.GA2770@kozik-book>
+References: <20170607181846.13539-1-krzk@kernel.org>
+ <CAK8P3a2_rLigHqnOkHPM+x2GDrwdGnwJOqEbY7YTsQRUXT_eJg@mail.gmail.com>
+ <20170608064520.GA2770@kozik-book>
+Message-ID: <CAK8P3a3GT3L0KaA2jLWWRuSpsTOCo0d=0hqX3Xh=yV3AZ72Drg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 June 2017 at 11:37, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> There are the set of fixes that were sent initially as part
-> of [1].
+On Thu, Jun 8, 2017 at 8:45 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> On Wed, Jun 07, 2017 at 09:49:58PM +0200, Arnd Bergmann wrote:
+>> On Wed, Jun 7, 2017 at 8:18 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>> > Some configs for Samsung ARM SoCs were not updated for some time and
+>> > they still contain obsolete Kconfig entries.  Generate new defconfig for
+>> > all Samsung ARM architectures (Exynos, S3C24xx, S3C64xx, S5Pv210).
+>> >
+>> > Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+>>
+>> Hi Krzysztof,
+>>
+>> Updating the defconfig files is good, but I'm always a little unsure
+>> about loss of
+>> information when we do that. Would it be possible for you to split this patch
+>> into two halves, with one of them just reordering the entries that moved,
+>> and the second one removing the entries that have disappeared, with an
+>> explanation for why they are no longer there? That would let us see whether
+>> the change was intentional and avoid problems from renamed Kconfig
+>> symbols that are no longer enabled afterwards.
 >
-> These are mostly fixes w.r.t populating regulators in
-> mmc dt node. It was working before because the regulators
-> connecting to the IO lines are always on regulators. This will
-> break once we add UHS support where voltage has to be changed
-> dynamically.
->
-> It also includes a patch to replace all vmmc_aux-supply
-> with vqmmc-supply (In omap3-overo-base.dtsi remove the existing
-> vqmmc-supply and then replace vmmc_aux-supply with vqmmc-supply).
-> This will break old dt compatibility but not sure how better
-> to handle this.
->
-> Performed enumeration testing on dra72-evm-revc, dra72-evm,
-> dra7-evm, am572x-evm, am571x-idk, am572x-idk, omap5-evm,
-> pandaboard-es, am43xx-evm, am335x-evm, beagleboard etc.,
->
-> This is a preparation series for adding UHS mode support in
-> the above mentioned platforms.
->
-> Changes from v1:
-> *) Included a patch to replace deprecated "vmmc_aux" with
->    "vqmmc"
->
-> [1] -> https://lkml.org/lkml/2017/5/19/196
->
-> Kishon Vijay Abraham I (6):
->   ARM: dts: dra72-evm-common: Correct vmmc-supply for mmc2
->   ARM: dts: dra72-evm: Add vqmmc supply to mmc1
->   ARM: dts: dra72-evm-revc: Add vqmmc supply to mmc1
->   ARM: dts: am57xx-beagle-x15-revb1: Fix supply name used for MMC1 IO
->     lines
->   ARM: dts: dra7: Add "max-frequency" property to MMC dt nodes
->   ARM: dts: omap*: Replace deprecated "vmmc_aux" with "vqmmc"
->
-> Ravikumar Kattekola (1):
->   ARM: dts: dra7-evm: Correct the vmmc-supply for mmc2
->
-> Sekhar Nori (1):
->   ARM: OMAP2+: Add pdata-quirks for MMC/SD on DRA74x EVM
->
->  arch/arm/boot/dts/am572x-idk.dts               |  2 +-
->  arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts  |  2 +-
->  arch/arm/boot/dts/dra7-evm.dts                 | 12 ++++++++--
->  arch/arm/boot/dts/dra7.dtsi                    |  5 +++++
->  arch/arm/boot/dts/dra71-evm.dts                | 16 ++++++++++++-
->  arch/arm/boot/dts/dra72-evm-common.dtsi        |  2 --
->  arch/arm/boot/dts/dra72-evm-revc.dts           | 18 +++++++++++++++
->  arch/arm/boot/dts/dra72-evm-tps65917.dtsi      |  2 +-
->  arch/arm/boot/dts/dra72-evm.dts                | 18 +++++++++++++++
->  arch/arm/boot/dts/omap3-beagle-xm.dts          |  2 +-
->  arch/arm/boot/dts/omap3-beagle.dts             |  2 +-
->  arch/arm/boot/dts/omap3-cm-t3517.dts           |  2 +-
->  arch/arm/boot/dts/omap3-cm-t3730.dts           |  2 +-
->  arch/arm/boot/dts/omap3-devkit8000-common.dtsi |  2 +-
->  arch/arm/boot/dts/omap3-evm-common.dtsi        |  2 +-
->  arch/arm/boot/dts/omap3-n900.dts               |  2 +-
->  arch/arm/boot/dts/omap3-overo-base.dtsi        |  3 +--
->  arch/arm/boot/dts/omap3-tao3530.dtsi           |  2 +-
->  arch/arm/boot/dts/omap3-zoom3.dts              |  2 +-
->  arch/arm/boot/dts/omap3430-sdp.dts             |  2 +-
->  arch/arm/mach-omap2/pdata-quirks.c             | 31 ++++++++++++++++++++++++++
->  include/linux/platform_data/hsmmc-omap.h       |  3 +++
->  22 files changed, 114 insertions(+), 20 deletions(-)
->
-> --
-> 2.11.0
->
+> Splitting the change into two commits (reorder and removal) makes sense.
+> However getting the information why some things were removed, will
+> require more effort. I'll see what I can do.
 
-If it helps, I can host a branch with the updates on the omap_hsmmc
-driver, such it can be pulled in from arm soc?
+Ok, thanks!
 
-I guess you need that as, the DT changes relies on the new vqmmc
-binding. Or you thing it doesn't matter, because for the current
-changes that regulator is always an always on regulator?
-
-Br
-Uffe
+       Arnd
