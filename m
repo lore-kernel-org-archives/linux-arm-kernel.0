@@ -1,31 +1,49 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 8 Jun 2017 20:07:33 +0530
-Subject: [PATCH 2/2] ARM: davinci_all_defconfig: enable USB CDC NCM gadget
-In-Reply-To: <20170608143733.30004-1-nsekhar@ti.com>
-References: <20170608143733.30004-1-nsekhar@ti.com>
-Message-ID: <20170608143733.30004-3-nsekhar@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 8 Jun 2017 16:34:15 +0200
+Subject: [PATCH] arm: aspeed: Add clock-names property to timer node
+In-Reply-To: <20170608132640.GD2244@mai>
+References: <20170605074846.30925-1-andrew@aj.id.au>
+ <CACPK8XeM6fBztHwfrPUD+ewpMf==tBqgfj61B-k=SwT3ABTiZw@mail.gmail.com>
+ <CAK8P3a2d=T9igbhe1u3MBUF2F1TMLC7z0DQ2AmHX-LkiBAy2Ww@mail.gmail.com>
+ <20170607125256.GG2345@mai>
+ <CAK8P3a0v1+FRnXcwF7j45bmDuX5caL9RBcS1bSUwANqb=zxeqQ@mail.gmail.com>
+ <20170608132640.GD2244@mai>
+Message-ID: <CAK8P3a0EaqwmAMRWn--29e4Kt6zJA9kHL2dpj=7Uabn5hANxOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable USB CDC NCM gadget module in davinci_all_defconfig
-to make it easier to use it on these devices.
+On Thu, Jun 8, 2017 at 3:26 PM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
+> On Wed, Jun 07, 2017 at 04:29:50PM +0200, Arnd Bergmann wrote:
+>> On Wed, Jun 7, 2017 at 2:52 PM, Daniel Lezcano
+>> <daniel.lezcano@linaro.org> wrote:
+>> > On Tue, Jun 06, 2017 at 11:41:11AM +0200, Arnd Bergmann wrote:
+>> >> On Mon, Jun 5, 2017 at 10:59 AM, Joel Stanley <joel@jms.id.au> wrote:
+>> >> > On Mon, Jun 5, 2017 at 5:18 PM, Andrew Jeffery <andrew@aj.id.au> wrote:
+>> >> >> The merging of a number of clocksource drivers into fttmr010 means we
+>> >> >> require clock-names to be specified in the Aspeed timer node, else the
+>> >> >> clocksource fails to probe and boot hangs.
+>> >> >
+>> >> > Arnd,
+>> >> >
+>> >> > Linus' reworked timer driver will go into 4.13.
+>> >> >
+>> >> > Can we get this patch merged into 4.12 as a fix so we don't end up
+>> >> > with a broken boot at any stage?
+>> >>
+>> >> Hmm, can't we make the driver backward-compatible and have it fall
+>> >> back on the first clock if no clk named "PCLK" is found? Otherwise
+>> >> you still have an incompatible change in the DT binding and it will
+>> >> break if someone uses an older dtb with a newer kernel.
+>> >
+>> > I would like to avoid to hack the kernel code for backward DT compatible
+>> > things.
+>>
+>> How about a fixup in the platform code to add the property then?
+>
+> Dunno, do you have an example?
 
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/configs/davinci_all_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+armada_375_380_coherency_init() adds a "arm,io-coherent" property on
+some machines, when the DT might be lacking this.
 
-diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
-index 1f1b4a795dc6..06e2e2a1a9be 100644
---- a/arch/arm/configs/davinci_all_defconfig
-+++ b/arch/arm/configs/davinci_all_defconfig
-@@ -186,6 +186,7 @@ CONFIG_USB_GADGET_DEBUG_FILES=y
- CONFIG_USB_GADGET_DEBUG_FS=y
- CONFIG_USB_ZERO=m
- CONFIG_USB_ETH=m
-+CONFIG_USB_G_NCM=m
- CONFIG_USB_GADGETFS=m
- CONFIG_USB_MASS_STORAGE=m
- CONFIG_USB_G_SERIAL=m
--- 
-2.9.0
+        Arnd
