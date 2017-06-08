@@ -1,64 +1,23 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu,  8 Jun 2017 15:13:42 +0100
-Subject: [RFT PATCH v2 42/42] ARM64: PCI: Drop DT IRQ allocation from
- pcibios_alloc_irq()
-In-Reply-To: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
-References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170608141342.2018-43-lorenzo.pieralisi@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 8 Jun 2017 09:18:04 -0500
+Subject: [PATCH v2 09/11] gpio: dt-bindings: Add documentation for gpio
+ controllers on Armada 7K/8K
+In-Reply-To: <7b92aabfb7309eb0b138c149cc3fc61e8f64cd61.1496413293.git-series.gregory.clement@free-electrons.com>
+References: <cover.8fe5f7c62a787452878ca071fa00b953e96988ef.1496413293.git-series.gregory.clement@free-electrons.com>
+ <7b92aabfb7309eb0b138c149cc3fc61e8f64cd61.1496413293.git-series.gregory.clement@free-electrons.com>
+Message-ID: <20170608141804.fm72esb5lpbqcp4m@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the introduction of struct pci_host_bridge.map_irq pointer it is
-possible to assign IRQs for all devices originating from a PCI host
-bridge at probe time; this is implemented through pci_assign_irq() that
-relies on the struct pci_host_bridge.map_irq pointer to map IRQ for a
-given device.
+On Fri, Jun 02, 2017 at 04:23:16PM +0200, Gregory CLEMENT wrote:
+> Document the device tree binding for the gpio controllers found on the
+> Marvell Armada 7K and Armada 8K SoCs.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt  | 20 ++++++++++++++++++++
+>  Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt | 24 +++++++++++++++++++++++-
+>  Documentation/devicetree/bindings/gpio/gpio-mvebu.txt                      | 24 +++++++++++++++++-------
+>  3 files changed, 60 insertions(+), 8 deletions(-)
 
-The benefits this brings are twofold:
-
-- the IRQ for a device is assigned once at probe time
-- the IRQ assignment works also for hotplugged devices
-
-With all DT based PCI host bridges converted to the struct
-pci_host_bridge.{map/swizzle}_irq hooks mechanism the DT IRQ
-allocation in ARM64 pcibios_alloc_irq() is now redundant and can
-be removed.
-
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
----
- arch/arm64/kernel/pci.c | 10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index 4f0e3eb..efcc351 100644
---- a/arch/arm64/kernel/pci.c
-+++ b/arch/arm64/kernel/pci.c
-@@ -39,20 +39,18 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
- 	return res->start;
- }
- 
-+#ifdef CONFIG_ACPI
- /*
-  * Try to assign the IRQ number when probing a new device
-  */
- int pcibios_alloc_irq(struct pci_dev *dev)
- {
--	if (acpi_disabled)
--		dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
--#ifdef CONFIG_ACPI
--	else
--		return acpi_pci_irq_enable(dev);
--#endif
-+	if (!acpi_disabled)
-+		acpi_pci_irq_enable(dev);
- 
- 	return 0;
- }
-+#endif
- 
- /*
-  * raw_pci_read/write - Platform-specific PCI config space access.
--- 
-2.10.0
+Acked-by: Rob Herring <robh@kernel.org>
