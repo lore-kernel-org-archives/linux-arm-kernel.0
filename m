@@ -1,104 +1,36 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 8 Jun 2017 08:52:33 +0200
-Subject: [PATCH 46/58] clocksource/drivers: Add a new driver for the
- Atmel ARM TC blocks
-In-Reply-To: <20170607213810.GK2345@mai>
-References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
- <20170530215139.9983-47-alexandre.belloni@free-electrons.com>
- <20170606152104.GC2345@mai>
- <20170606180559.pkrr7ux2qqnmsd6y@piout.net>
- <20170607141735.GH2345@mai>
- <20170607150908.kytgtzwgjjnxtsp3@piout.net>
- <20170607213810.GK2345@mai>
-Message-ID: <20170608085233.01c82788@bbrezillon>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 8 Jun 2017 09:12:40 +0200
+Subject: [PATCH 2/3] mmc: host: omap_hsmmc: use mmc_regulator_get_supply()
+ to get regulators
+In-Reply-To: <20170607083612.14224-3-kishon@ti.com>
+References: <20170607083612.14224-1-kishon@ti.com>
+ <20170607083612.14224-3-kishon@ti.com>
+Message-ID: <CAPDyKFrsrUYTmpYE9WYgCfvNkvhtfaFDXUrgr8rxtNVUk0BxTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Wed, 7 Jun 2017 23:38:10 +0200,
-Daniel Lezcano <daniel.lezcano@linaro.org> a ?crit :
+>         host->pbias = devm_regulator_get_optional(host->dev, "pbias");
+> @@ -2143,7 +2136,8 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+>         if (ret)
+>                 goto err_irq;
+>
+> -       mmc->ocr_avail = mmc_pdata(host)->ocr_mask;
+> +       if (mmc_pdata(host)->ocr_mask)
+> +               mmc->ocr_avail = mmc_pdata(host)->ocr_mask;
 
-> On Wed, Jun 07, 2017 at 05:09:08PM +0200, Alexandre Belloni wrote:
-> > On 07/06/2017 at 16:17:35 +0200, Daniel Lezcano wrote:  
-> > > > > > This driver uses regmap and syscon to be able to probe early in the boot
-> > > > > > and avoid having to switch on the TCB clocksource later. Using regmap also
-> > > > > > means that unused TCB channels may be used by other drivers (PWM for
-> > > > > > example).  
-> > > > > 
-> > > > > Can you give more details, I fail to understand how regmap and syscon help to
-> > > > > probe sooner than timer_init()?  
-> > > > 
-> > > > 
-> > > > Because before that, the tcb driver relied on atmel_tclib to share the
-> > > > TCBs and it happened way too late, at arch_initcall() time.  
-> > > 
-> > > So is it still necesary to use regmap? I would like to take the opportunity to
-> > > move the init routine to the common init routine if possible:
-> > > 
-> > > 	https://patchwork.kernel.org/patch/9768845/
-> > >   
-> > 
-> > It is still necessary because we want to be able to share the timer
-> > between multiple drivers. For example, you can have the clocksource on
-> > channel 0, clockevent on channel 1 and a pwm on channel 2  
-> 
-> The hardware timer can be shared, the channels used in different subsystem.
-> 
-> Each channel are used exclusively.
+This should rather be:
 
-Yes, that's correct, but some registers are shared, and we need locking
-to control accesses to these registers. There's one register in
-particular that has to be protected against concurrent accesses:
-TC_BMR. But this register is only written at init time, not in the hot
-path.
+if (!mmc->ocr_avail)
+     mmc->ocr_avail = mmc_pdata(host)->ocr_mask
 
-> 
-> What is the benefit of regmap? It has a cost, and takes a lock at each read.
-> 
-> For instance:
-> 
-> +static u64 tc_get_cycles(struct clocksource *cs)
-> +{
-> +	u32		lower, upper, tmp;
-> +
-> +	do {
-> +		regmap_read(tc.regmap, ATMEL_TC_CV(1), &upper);
-> +		regmap_read(tc.regmap, ATMEL_TC_CV(0), &lower);
-> +		regmap_read(tc.regmap, ATMEL_TC_CV(1), &tmp);
-> +	} while (upper != tmp);
-> +
-> +	return (upper << 16) | lower;
-> +}
-> 
-> Is:
-> 
-> +static u64 tc_get_cycles(struct clocksource *cs)
-> +{
-> +	u32		lower, upper, tmp;
-> +
-> +	do {
-> +		regmap_read(tc.regmap, ATMEL_TC_CV(1), &upper);
-> 			lock();
-> 			lot-of-things();
-> 			unlock();
-> +		regmap_read(tc.regmap, ATMEL_TC_CV(0), &lower);
-> 			lock();
-> 			lot-of-things();
-> 			unlock();
-> +		regmap_read(tc.regmap, ATMEL_TC_CV(1), &tmp);
-> 			lock();
-> 			lot-of-things();
-> 			unlock();
-> +	} while (upper != tmp);
-> +
-> +	return (upper << 16) | lower;
-> +}
-> 
-> I suggest to look what is in 'lot-of-things()' and especially what is doing
-> regcache_read().
-> 
-> May be you can reconsider the regmap? This driver is the only one use the
-> regmap AFAICT and I don't think it is adequate.
+In other words, fall back to the platform ocr mask.
 
-Alexandre, maybe we could of_ioremap() the TCB region in this driver
-and use regular readl to read TC_CV regs: those are attached to a
-specific channel, so we shouldn't have concurrency issues here.
+>
+>         omap_hsmmc_disable_irq(host);
+>
+> --
+> 2.11.0
+>
+
+Kind regards
+Uffe
