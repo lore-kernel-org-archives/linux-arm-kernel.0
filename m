@@ -1,85 +1,47 @@
-From: Chris.Paterson2@renesas.com (Chris Paterson)
-Date: Thu, 8 Jun 2017 08:50:01 +0000
-Subject: [PATCH] ARM: debug-ll: Add support for r8a7743
-In-Reply-To: <CAMuHMdUg2Ox7ATSBKMiCua=VekEaoPZLpyQXGg=45XWV+12imA@mail.gmail.com>
-References: <1496908117-19368-1-git-send-email-chris.paterson2@renesas.com>
- <CAMuHMdUg2Ox7ATSBKMiCua=VekEaoPZLpyQXGg=45XWV+12imA@mail.gmail.com>
-Message-ID: <TY1PR06MB07020A244304230FD27FB68FB7C90@TY1PR06MB0702.apcprd06.prod.outlook.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Thu, 8 Jun 2017 10:51:27 +0200
+Subject: [PATCH 9/9] arm64: marvell: dts: add xmdio nodes for 7k/8k
+In-Reply-To: <20170608084515.GA12385@kwain>
+References: <20170607083810.30922-1-antoine.tenart@free-electrons.com>
+ <20170607083810.30922-10-antoine.tenart@free-electrons.com>
+ <20170608084515.GA12385@kwain>
+Message-ID: <20170608085127.GB12385@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Geert,
+On Thu, Jun 08, 2017 at 10:45:15AM +0200, Antoine Tenart wrote:
+> On Wed, Jun 07, 2017 at 10:38:10AM +0200, Antoine Tenart wrote:
+> > diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> > index 2a99ff8fca2a..594356243ddb 100644
+> > --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> > +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> > @@ -103,6 +103,13 @@
+> >  				clocks = <&cps_syscon0 1 9>, <&cps_syscon0 1 5>;
+> >  			};
+> >  
+> > +			cps_xmdio: mdio at 12a600 {
+> > +				#address-cells = <1>;
+> > +				#size-cells = <0>;
+> > +				compatible = "marvell,xmdio";
+> > +				reg = <0x12a600 0x10>;
+> > +			};
+> > +
+> 
+> Russell pointed out on IRC the mdio/xmdio interfaces aren't wired to
+> anything on the mcbin.
 
-> From: geert.uytterhoeven at gmail.com
-> [mailto:geert.uytterhoeven at gmail.com] On Behalf Of Geert Uytterhoeven
-> Sent: 08 June 2017 09:27
-> 
-> Hi Chris,
-> 
-> On Thu, Jun 8, 2017 at 9:48 AM, Chris Paterson
-> <chris.paterson2@renesas.com> wrote:
-> > Enable low-level debugging support for RZ/G1M (r8a7743). RZ/G1M uses
-> > SCIF0 for the debug console, like most of the R-Car Gen2 SoCs.
-> 
-> Thanks for your patch!
+The ones found in the cp110 slave *
 
-Thank you for your review!
+Antoine
 
-> 
-> While the recommended debug method these days is "earlycon", DEBUG_LL
-> is indeed still useful to debug issues before earlycon is initialized.
-> Let's hope you will never encounter such issues on arm64, which doesn't
-> have DEBUG_LL per policy decision...
-
-Thank you for the information. It's hard to keep up with these decisions!
-
-> 
-> > Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
-> 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> 
-> > --- a/arch/arm/Kconfig.debug
-> > +++ b/arch/arm/Kconfig.debug
-> > @@ -895,12 +895,13 @@ choice
-> >                   via SCIF2 on Renesas R-Car H1 (R8A7779).
-> >
-> >         config DEBUG_RCAR_GEN2_SCIF0
-> > -               bool "Kernel low-level debugging messages via SCIF0 on
-> R8A7790/R8A7791/R8A7792/R8A7793"
-> > -               depends on ARCH_R8A7790 || ARCH_R8A7791 || ARCH_R8A7792
-> || ARCH_R8A7793
-> > +               bool "Kernel low-level debugging messages via SCIF0 on
-> R8A7743/R8A7790/R8A7791/R8A7792/R8A7793"
-> 
-> This line is becoming a bit long, and it'll only become worse in the future.
-> What about "Kernel low-level debugging messages via SCIF0 on R-Car Gen2"?
-
-What about "Kernel low-level debugging messages via SCIF0 on R-Car Gen2 and RZ/G1"?
-
-I'd like to try and keep some sort of split between the two product lines if possible.
-
-Kind regards, Chris
-
-> The full list of SoCs is still available in the extended help text.
-> 
-> > +               depends on ARCH_R8A7743 || ARCH_R8A7790 || ARCH_R8A7791
-> || \
-> > +                       ARCH_R8A7792 || ARCH_R8A7793
-> >                 help
-> >                   Say Y here if you want kernel low-level debugging support
-> > -                 via SCIF0 on Renesas R-Car H2 (R8A7790), M2-W (R8A7791), V2H
-> > -                 (R8A7792), or M2-N (R8A7793).
-> > +                 via SCIF0 on Renesas RZ/G1M (R8A7743), R-Car H2 (R8A7790),
-> > +                 M2-W (R8A7791), V2H (R8A7792), or M2-N (R8A7793).
-> 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-
-> m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170608/0eb19b16/attachment-0001.sig>
