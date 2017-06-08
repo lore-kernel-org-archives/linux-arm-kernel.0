@@ -1,96 +1,96 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 8 Jun 2017 09:48:51 +0100
-Subject: [RFCv2 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
- erratum 161010801
-In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA838362082@FRAEML521-MBX.china.huawei.com>
-References: <20170531143213.82100-1-shameerali.kolothum.thodi@huawei.com>
- <20170531143213.82100-3-shameerali.kolothum.thodi@huawei.com>
- <20170606135623.GB20126@red-moon>
- <5FC3163CFD30C246ABAA99954A238FA838362082@FRAEML521-MBX.china.huawei.com>
-Message-ID: <20170608084851.GA8607@red-moon>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 8 Jun 2017 09:46:17 +0100
+Subject: [RFC PATCH v2 4/6] arm64: signal: Allocate extra sigcontext
+ space as needed
+In-Reply-To: <20170523113019.GB5948@e104818-lin.cambridge.arm.com>
+References: <1492016239-19511-1-git-send-email-Dave.Martin@arm.com>
+ <1492016495-19689-1-git-send-email-Dave.Martin@arm.com>
+ <1492016495-19689-4-git-send-email-Dave.Martin@arm.com>
+ <20170512165724.GB8387@e104818-lin.cambridge.arm.com>
+ <20170515132442.GB3559@e103592.cambridge.arm.com>
+ <20170523113019.GB5948@e104818-lin.cambridge.arm.com>
+Message-ID: <20170608084614.GH30160@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 06, 2017 at 03:01:36PM +0000, Shameerali Kolothum Thodi wrote:
-
-[...]
-
-> > > +	irq_dom = pci_msi_get_device_domain(to_pci_dev(dev));
-> > > +	if (irq_dom) {
-> > > +		int	ret;
-> > > +		u32	rid;
-> > > +
-> > > +		rid = pci_msi_domain_get_msi_rid(irq_dom,
-> > to_pci_dev(dev));
-> > > +		ret = iort_dev_find_its_base(dev, rid, 0, &base);
+On Tue, May 23, 2017 at 12:30:19PM +0100, Catalin Marinas wrote:
+> On Mon, May 15, 2017 at 02:24:45PM +0100, Dave P Martin wrote:
+> > On Fri, May 12, 2017 at 05:57:24PM +0100, Catalin Marinas wrote:
+> > > On Wed, Apr 12, 2017 at 06:01:13PM +0100, Dave P Martin wrote:
+> > > > --- a/arch/arm64/include/uapi/asm/sigcontext.h
+> > > > +++ b/arch/arm64/include/uapi/asm/sigcontext.h
+> > > > @@ -80,4 +80,31 @@ struct esr_context {
+> > > >  	__u64 esr;
+> > > >  };
+> > > >  
+> > > > +/*
+> > > > + * Pointer to extra space for additional structures that don't fit in
+> > > > + * sigcontext.__reserved[].  Note:
+> > > > + *
+> > > > + * 1) fpsimd_context, esr_context and extra_context must be placed in
+> > > > + * sigcontext.__reserved[] if present.  They cannot be placed in the
+> > > > + * extra space.  Any other record can be placed either in the extra
+> > > > + * space or in sigcontext.__reserved[].
+> > > > + *
+> > > > + * 2) There must not be more than one extra_context.
+> > > > + *
+> > > > + * 3) If extra_context is present, it must be followed immediately in
+> > > > + * sigcontext.__reserved[] by the terminating null _aarch64_ctx (i.e.,
+> > > > + * extra_context must be the last record in sigcontext.__reserved[]
+> > > > + * except for the terminator).
+> > > > + *
+> > > > + * 4) The extra space must itself be terminated with a null
+> > > > + * _aarch64_ctx.
+> > > > + */
+> > > 
+> > > IIUC, if we need to save some state that doesn't fit in what's left of
+> > > sigcontext.__reserved[] (e.g. SVE with 1024-bit vector length), we
+> > > ignore the available space and go for a memory block following the end
+> > > of sigcontext.__reserved[] + 16. Is there a reason we can't store the
+> > > new state across the end of sigcontext.__reserved[] and move fp/lr at
+> > > the end of the new frame? I'm not sure the fp/lr position immediately
+> > > after __reserved[] counts as ABI.
 > > 
-> > Well, here we use ITS id 0 which is fine as long as code in IORT uses the same
-> > policy for getting the irq_domain (ie we want to reserve the ITS address
-> > space that is actually used by the device to send IRQs not a a different one) it
-> > is just a heads-up because I find this confusing.
-> 
-> Ok. Just to make it clear, 0 is the index into the ITS identifier
-> list.  I noted that iort_get_device_domain() uses index 0 while
-> retrieving the ITS identifier.  May be use the same approach here as
-> well? ie, remove the index from function call?
-> 
-> I am not sure, how we can get the index info  though theoretically It
-> is possible for the ITS group node having multiple ITSs.
-
-Actually I think it would make sense to reserve ALL ITS regions a device
-may be mapped to instead of just index 0 (ie in your case it is
-equivalent); this leaves us some leeway as to choose which ITS the
-device will be actually mapped to and this code does not have to care.
-
-Lorenzo
-
->  
-> > > +		if (!ret) {
-> > > +			dev_info(dev, "SMMUv3:HW MSI resv addr
-> > 0x%pa\n", &base);
-> > > +			region = iommu_alloc_resv_region(base, SZ_128K,
-> > > +							 prot,
-> > IOMMU_RESV_MSI);
-> > > +			return region;
-> > > +		}
-> > > +	}
-> > > +
-> > > +	return NULL;
-> > > +}
-> > > +#else
-> > > +static struct iommu_resv_region *arm_smmu_acpi_alloc_hw_msi(struct
-> > > +device *dev) {
-> > > +	return NULL;
-> > > +}
-> > > +#endif
-> > > +
-> > >  static int arm_smmu_add_device(struct device *dev)  {
-> > >  	int i, ret;
-> > > @@ -1903,11 +1936,20 @@ static int arm_smmu_of_xlate(struct device
-> > > *dev, struct of_phandle_args *args)  static void
-> > arm_smmu_get_resv_regions(struct device *dev,
-> > >  				      struct list_head *head)
-> > >  {
-> > > -	struct iommu_resv_region *region;
-> > > +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
-> > > +	struct iommu_resv_region *region = NULL;
-> > >  	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
-> > > +	struct arm_smmu_device *smmu;
-> > > +
-> > > +	smmu = arm_smmu_get_by_fwnode(fwspec->iommu_fwnode);
-> > >
-> > > -	region = iommu_alloc_resv_region(MSI_IOVA_BASE,
-> > MSI_IOVA_LENGTH,
-> > > -					 prot, IOMMU_RESV_SW_MSI);
-> > > +	if (smmu && (smmu->options & ARM_SMMU_OPT_RESV_HW_MSI)
-> > &&
-> > > +		      dev_is_pci(dev))
-> > > +		region = arm_smmu_acpi_alloc_hw_msi(dev);
+> > This was my original view.
 > > 
-> > Is it safe to carry on if arm_smmu_acpi_alloc_hw_msi() returns NULL here ?
+> > Originally I preferred not to waste the space and did move fp/lr to the
+> > end, but someone (I think you or Will) expressed concern that the fp/lr
+> > position relative to the signal frame _might_ count as ABI.
+> > 
+> > I think it's not that likely that software will be relying on this,
+> > since it appears easier just to follow the frame chain than to treat
+> > this as a special case.
+> > 
+> > But it's hard to be certain.  It comes down to a judgement call.
 > 
-> It is just that PCIe devices won't be functional on this platforms as the endpoint will 
-> be configured with ITS IOVA address. May be I should add some dev_warn() here.
-> 
-> Thanks,
-> Shameer
+> I would not consider this ABI. The ABI part is that the fp register
+> points to where fp/lr were saved.
+
+On this point, it looks like the libgcc unwinder
+
+https://gcc.gnu.org/git/?p=gcc.git;a=blob;f=libgcc/config/aarch64/linux-unwind.h;h=d5d6980442fd47b1f1e499e99cb25b5fffbdbeb3;hb=HEAD
+
+doesn't rely on the frame record location.  It clones the (internal)
+struct rt_sigframe definition from v3.7, which doesn't include any frame
+record, and mines fp and lr out of the signal frame AFAICT.
+
+It appears that gdb and libunwind likely take the same approach, but
+I've not looked closely yet.
+
+The frame record in rt_sigframe was added in by Will in 304ef4e83672
+("arm64: signal: push the unwinding prologue on the signal stack"),
+which changes from pushing the frame record onto the interrupted stack
+(which may be inaccessible for a SEGV), to pushing onto the signal
+stack.
+
+
+Even with the frame record split from rt_sigframe, I've not seen any
+failed backtrace in gdb.  Throwing an exception from a SEGV handler in
+C++ (with -fnon-call-exceptions) also appears to work reliably with
+that change, even when the signal frame grows.
+
+In any case, there is no ABI break unless there is extra_context, so
+it shouldn't impact current userspace.
+
+Cheers
+---Dave
