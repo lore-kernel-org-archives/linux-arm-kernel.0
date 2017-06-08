@@ -1,38 +1,90 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Thu, 8 Jun 2017 19:26:58 +0300
-Subject: [PATCH 2/2] ARM: dts: imx6ul: Add imx6ul-tempmon
-In-Reply-To: <7055ce6095c0b7f026ac6f0dc37e43fc5c0b1793.1496939031.git.leonard.crestez@nxp.com>
-References: <7055ce6095c0b7f026ac6f0dc37e43fc5c0b1793.1496939031.git.leonard.crestez@nxp.com>
-Message-ID: <b9b91617985607f24c4986bcad5199483805d6b7.1496939031.git.leonard.crestez@nxp.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Thu, 08 Jun 2017 17:28:31 +0100
+Subject: [PATCH v2 1/3] arm64: hugetlb: Fix huge_pte_offset to return
+ poisoned page table entries
+In-Reply-To: <20170607154111.GA2669@arm.com> (Will Deacon's message of "Wed, 7
+ Jun 2017 16:41:11 +0100")
+References: <20170517152336.6052-1-punit.agrawal@arm.com>
+ <20170517152336.6052-2-punit.agrawal@arm.com>
+ <20170607134731.GG30263@arm.com>
+ <20170607143037.ovyo5pxywty2r6as@localhost>
+ <20170607145715.GI30263@arm.com>
+ <87h8zr24qb.fsf@e105922-lin.cambridge.arm.com>
+ <20170607154111.GA2669@arm.com>
+Message-ID: <87y3t2zbo0.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This seems to work fine with the existing imx thermal driver on both 6ul
-and 6ull. It was just missing in dts.
+Will Deacon <will.deacon@arm.com> writes:
 
-Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
----
- arch/arm/boot/dts/imx6ul.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+> On Wed, Jun 07, 2017 at 04:32:28PM +0100, Punit Agrawal wrote:
+>> Will Deacon <will.deacon@arm.com> writes:
+>> 
+>> > On Wed, Jun 07, 2017 at 03:30:37PM +0100, Catalin Marinas wrote:
+>> >> On Wed, Jun 07, 2017 at 02:47:32PM +0100, Will Deacon wrote:
+>> >> > On Wed, May 17, 2017 at 04:23:34PM +0100, Punit Agrawal wrote:
+>> >> > > --- a/arch/arm64/mm/hugetlbpage.c
+>> >> > > +++ b/arch/arm64/mm/hugetlbpage.c
+>> >> > > @@ -136,36 +136,27 @@ pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
+>> >> > >  {
+>> >> > >  	pgd_t *pgd;
+>> >> > >  	pud_t *pud;
+>> >> > > -	pmd_t *pmd = NULL;
+>> >> > > -	pte_t *pte = NULL;
+>> >> > > +	pmd_t *pmd;
+>> >> > >  
+>> >> > >  	pgd = pgd_offset(mm, addr);
+>> >> > >  	pr_debug("%s: addr:0x%lx pgd:%p\n", __func__, addr, pgd);
+>> >> > >  	if (!pgd_present(*pgd))
+>> >> > >  		return NULL;
+>> >> > > +
+>> >> > >  	pud = pud_offset(pgd, addr);
+>> >> > > -	if (!pud_present(*pud))
+>> >> > > +	if (pud_none(*pud))
+>> >> > >  		return NULL;
+>> >> > 
+>> >> > Do you actually need this special case?
+>> >> > 
+>> >> > > -
+>> >> > > -	if (pud_huge(*pud))
+>> >> > > +	/* swap or huge page */
+>> >> > > +	if (!pud_present(*pud) || pud_huge(*pud))
+>> >> > 
+>> >> > ... couldn't you just add a '|| pud_none(*pud)' in here?
+>> >> > 
+>> 
+>> I think an earlier version took this approach but...
+>> 
+>> >> > >  		return (pte_t *)pud;
+>> >> 
+>> >> But then you no longer return NULL if *pud == 0.
+>> >
+>> > Does that actually matter? The bits of hugetlb code I looked at will
+>> > deferenced the returned pud and handle the huge_pte_none case correctly.
+>> 
+>> For hugetlb fault handling (hugetlb_fault()), returning NULL vs pointer
+>> to the pud/pmd results in different behaviour. If we return the pud when
+>> pud_none(), then we lose the resulting hugepage size check we get from
+>> huge_pte_alloc().
+>
+> Ok, so does that mean that many of the huge_pte_none checks in mm/hugetlb.c
+> that operate on a huge_ptep_get of non-NULL output from huge_pte_offset are
+> actually redundant?
 
-diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index b9d7d2d..cda5e9e 100644
---- a/arch/arm/boot/dts/imx6ul.dtsi
-+++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -597,6 +597,14 @@
- 				fsl,anatop = <&anatop>;
- 			};
- 
-+			tempmon: tempmon {
-+				compatible = "fsl,imx6ul-tempmon", "fsl,imx6sx-tempmon";
-+				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
-+				fsl,tempmon = <&anatop>;
-+				fsl,tempmon-data = <&ocotp>;
-+				clocks = <&clks IMX6UL_CLK_PLL3_USB_OTG>;
-+			};
-+
- 			snvs: snvs at 020cc000 {
- 				compatible = "fsl,sec-v4.0-mon", "syscon", "simple-mfd";
- 				reg = <0x020cc000 0x4000>;
--- 
-2.7.4
+Summarising our offline discussion - the semantics of huge_pte_offset()
+are unclear in terms of when a pointer to (p*d) is returned vs when to
+return NULL.
+
+As part of enabling contiguous hugepage support[0][1], I have a patch to
+add a size argument to huge_pte_offset() that can then help disambiguate
+when we have a valid pte* vs when we have an error (NULL).
+
+I'll separately look at clarifying the semantics of the generic version
+of huge_pte_offse() and potentially also look at unifying the
+huge_pte_offset() implementations across the various architectures.
+
+[0] https://lkml.org/lkml/2017/5/24/463
+[1] https://www.spinics.net/lists/arm-kernel/msg583367.html
+
+>
+> Will
