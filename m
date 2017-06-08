@@ -1,38 +1,85 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu,  8 Jun 2017 15:13:27 +0100
-Subject: [RFT PATCH v2 27/42] OF/PCI: Update of_irq_parse_and_map_pci() comment
+Date: Thu,  8 Jun 2017 15:13:22 +0100
+Subject: [RFT PATCH v2 22/42] PCI: xilinx-nwl: Convert PCI scan API to
+ pci_scan_root_bus_bridge()
 In-Reply-To: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
 References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170608141342.2018-28-lorenzo.pieralisi@arm.com>
+Message-ID: <20170608141342.2018-23-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matthew Minter <matt@masarand.com>
+The introduction of pci_scan_root_bus_bridge() provides a PCI core
+API to scan a PCI root bus backed by an already initialized
+struct pci_host_bridge object, which simplifies the bus scan
+interface and makes the PCI scan root bus interface easier to
+generalize as members are added to the struct pci_host_bridge.
 
-With the introduction of struct pci_host_bridge.(*map_irq) function
-pointer add another direct usage of of_irq_parse_and_map_pci().
+Convert PCI xilinx-nwl host code to pci_scan_root_bus_bridge() to
+improve the PCI root bus scanning interface.
 
-Update the function comment to reflect this behaviour.
-
-Signed-off-by: Matthew Minter <matt@masarand.com>
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Bharat Kumar Gogada <bharat.kumar.gogada@xilinx.com>
 ---
- drivers/of/of_pci_irq.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/pci/host/pcie-xilinx-nwl.c | 28 ++++++++++++++++++----------
+ 1 file changed, 18 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/of/of_pci_irq.c b/drivers/of/of_pci_irq.c
-index c175d9c..3a05568 100644
---- a/drivers/of/of_pci_irq.c
-+++ b/drivers/of/of_pci_irq.c
-@@ -113,7 +113,8 @@ EXPORT_SYMBOL_GPL(of_irq_parse_pci);
-  * @pin: PCI irq pin number; passed when used as map_irq callback. Unused
-  *
-  * @slot and @pin are unused, but included in the function so that this
-- * function can be used directly as the map_irq callback to pci_fixup_irqs().
-+ * function can be used directly as the map_irq callback to
-+ * pci_assign_irq() and struct pci_host_bridge.map_irq pointer
-  */
- int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin)
- {
+diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
+index 26e66e8..e8a5894 100644
+--- a/drivers/pci/host/pcie-xilinx-nwl.c
++++ b/drivers/pci/host/pcie-xilinx-nwl.c
+@@ -791,13 +791,16 @@ static int nwl_pcie_probe(struct platform_device *pdev)
+ 	struct nwl_pcie *pcie;
+ 	struct pci_bus *bus;
+ 	struct pci_bus *child;
++	struct pci_host_bridge *bridge;
+ 	int err;
+ 	resource_size_t iobase = 0;
+ 	LIST_HEAD(res);
+ 
+-	pcie = devm_kzalloc(dev, sizeof(*pcie), GFP_KERNEL);
+-	if (!pcie)
+-		return -ENOMEM;
++	bridge = devm_pci_alloc_host_bridge(dev, sizeof(*pcie));
++	if (!bridge)
++		return -ENODEV;
++
++	pcie = pci_host_bridge_priv(bridge);
+ 
+ 	pcie->dev = dev;
+ 	pcie->ecam_value = NWL_ECAM_VALUE_DEFAULT;
+@@ -830,12 +833,11 @@ static int nwl_pcie_probe(struct platform_device *pdev)
+ 		goto error;
+ 	}
+ 
+-	bus = pci_create_root_bus(dev, pcie->root_busno,
+-				  &nwl_pcie_ops, pcie, &res);
+-	if (!bus) {
+-		err = -ENOMEM;
+-		goto error;
+-	}
++	list_splice_init(&res, &bridge->windows);
++	bridge->dev.parent = dev;
++	bridge->sysdata = pcie;
++	bridge->busnr = pcie->root_busno;
++	bridge->ops = &nwl_pcie_ops;
+ 
+ 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+ 		err = nwl_pcie_enable_msi(pcie);
+@@ -844,7 +846,13 @@ static int nwl_pcie_probe(struct platform_device *pdev)
+ 			goto error;
+ 		}
+ 	}
+-	pci_scan_child_bus(bus);
++
++	err = pci_scan_root_bus_bridge(bridge);
++	if (err)
++		goto error;
++
++	bus = bridge->bus;
++
+ 	pci_assign_unassigned_bus_resources(bus);
+ 	list_for_each_entry(child, &bus->children, node)
+ 		pcie_bus_configure_settings(child);
 -- 
 2.10.0
