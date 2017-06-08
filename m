@@ -1,23 +1,27 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 8 Jun 2017 09:18:04 -0500
-Subject: [PATCH v2 09/11] gpio: dt-bindings: Add documentation for gpio
- controllers on Armada 7K/8K
-In-Reply-To: <7b92aabfb7309eb0b138c149cc3fc61e8f64cd61.1496413293.git-series.gregory.clement@free-electrons.com>
-References: <cover.8fe5f7c62a787452878ca071fa00b953e96988ef.1496413293.git-series.gregory.clement@free-electrons.com>
- <7b92aabfb7309eb0b138c149cc3fc61e8f64cd61.1496413293.git-series.gregory.clement@free-electrons.com>
-Message-ID: <20170608141804.fm72esb5lpbqcp4m@rob-hp-laptop>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 08 Jun 2017 10:21:36 -0400 (EDT)
+Subject: clean up and modularize arch dma_mapping interface
+In-Reply-To: <20170608132609.32662-1-hch@lst.de>
+References: <20170608132609.32662-1-hch@lst.de>
+Message-ID: <20170608.102136.2294569179855411095.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 02, 2017 at 04:23:16PM +0200, Gregory CLEMENT wrote:
-> Document the device tree binding for the gpio controllers found on the
-> Marvell Armada 7K and Armada 8K SoCs.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt  | 20 ++++++++++++++++++++
->  Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt | 24 +++++++++++++++++++++++-
->  Documentation/devicetree/bindings/gpio/gpio-mvebu.txt                      | 24 +++++++++++++++++-------
->  3 files changed, 60 insertions(+), 8 deletions(-)
+From: Christoph Hellwig <hch@lst.de>
+Date: Thu,  8 Jun 2017 15:25:25 +0200
 
-Acked-by: Rob Herring <robh@kernel.org>
+> for a while we have a generic implementation of the dma mapping routines
+> that call into per-arch or per-device operations.  But right now there
+> still are various bits in the interfaces where don't clearly operate
+> on these ops.  This series tries to clean up a lot of those (but not all
+> yet, but the series is big enough).  It gets rid of the DMA_ERROR_CODE
+> way of signaling failures of the mapping routines from the
+> implementations to the generic code (and cleans up various drivers that
+> were incorrectly using it), and gets rid of the ->set_dma_mask routine
+> in favor of relying on the ->dma_capable method that can be used in
+> the same way, but which requires less code duplication.
+
+There is unlikely to be conflicts for the sparc and net changes, so I
+will simply ACK them.
+
+Thanks Christoph.
