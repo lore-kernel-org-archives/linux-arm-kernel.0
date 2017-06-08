@@ -1,10 +1,10 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu,  8 Jun 2017 15:13:22 +0100
-Subject: [RFT PATCH v2 22/42] PCI: xilinx-nwl: Convert PCI scan API to
+Date: Thu,  8 Jun 2017 15:13:16 +0100
+Subject: [RFT PATCH v2 16/42] PCI: versatile: Convert PCI scan API to
  pci_scan_root_bus_bridge()
 In-Reply-To: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
 References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170608141342.2018-23-lorenzo.pieralisi@arm.com>
+Message-ID: <20170608141342.2018-17-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,69 +14,54 @@ struct pci_host_bridge object, which simplifies the bus scan
 interface and makes the PCI scan root bus interface easier to
 generalize as members are added to the struct pci_host_bridge.
 
-Convert PCI xilinx-nwl host code to pci_scan_root_bus_bridge() to
+Convert PCI versatile host code to pci_scan_root_bus_bridge() to
 improve the PCI root bus scanning interface.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Bharat Kumar Gogada <bharat.kumar.gogada@xilinx.com>
+Cc: Rob Herring <robh@kernel.org>
 ---
- drivers/pci/host/pcie-xilinx-nwl.c | 28 ++++++++++++++++++----------
- 1 file changed, 18 insertions(+), 10 deletions(-)
+ drivers/pci/host/pci-versatile.c | 20 +++++++++++++++++---
+ 1 file changed, 17 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
-index 26e66e8..e8a5894 100644
---- a/drivers/pci/host/pcie-xilinx-nwl.c
-+++ b/drivers/pci/host/pcie-xilinx-nwl.c
-@@ -791,13 +791,16 @@ static int nwl_pcie_probe(struct platform_device *pdev)
- 	struct nwl_pcie *pcie;
- 	struct pci_bus *bus;
- 	struct pci_bus *child;
+diff --git a/drivers/pci/host/pci-versatile.c b/drivers/pci/host/pci-versatile.c
+index 9281eee..a67cf0b 100644
+--- a/drivers/pci/host/pci-versatile.c
++++ b/drivers/pci/host/pci-versatile.c
+@@ -125,8 +125,13 @@ static int versatile_pci_probe(struct platform_device *pdev)
+ 	u32 val;
+ 	void __iomem *local_pci_cfg_base;
+ 	struct pci_bus *bus, *child;
 +	struct pci_host_bridge *bridge;
- 	int err;
- 	resource_size_t iobase = 0;
- 	LIST_HEAD(res);
+ 	LIST_HEAD(pci_res);
  
--	pcie = devm_kzalloc(dev, sizeof(*pcie), GFP_KERNEL);
--	if (!pcie)
--		return -ENOMEM;
-+	bridge = devm_pci_alloc_host_bridge(dev, sizeof(*pcie));
++	bridge = devm_pci_alloc_host_bridge(dev, 0);
 +	if (!bridge)
-+		return -ENODEV;
++		return -ENOMEM;
 +
-+	pcie = pci_host_bridge_priv(bridge);
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	versatile_pci_base = devm_ioremap_resource(&pdev->dev, res);
+ 	if (IS_ERR(versatile_pci_base))
+@@ -199,11 +204,20 @@ static int versatile_pci_probe(struct platform_device *pdev)
+ 	pci_add_flags(PCI_ENABLE_PROC_DOMAINS);
+ 	pci_add_flags(PCI_REASSIGN_ALL_BUS | PCI_REASSIGN_ALL_RSRC);
  
- 	pcie->dev = dev;
- 	pcie->ecam_value = NWL_ECAM_VALUE_DEFAULT;
-@@ -830,12 +833,11 @@ static int nwl_pcie_probe(struct platform_device *pdev)
- 		goto error;
- 	}
- 
--	bus = pci_create_root_bus(dev, pcie->root_busno,
--				  &nwl_pcie_ops, pcie, &res);
--	if (!bus) {
--		err = -ENOMEM;
--		goto error;
--	}
-+	list_splice_init(&res, &bridge->windows);
-+	bridge->dev.parent = dev;
-+	bridge->sysdata = pcie;
-+	bridge->busnr = pcie->root_busno;
-+	bridge->ops = &nwl_pcie_ops;
- 
- 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
- 		err = nwl_pcie_enable_msi(pcie);
-@@ -844,7 +846,13 @@ static int nwl_pcie_probe(struct platform_device *pdev)
- 			goto error;
- 		}
- 	}
--	pci_scan_child_bus(bus);
+-	bus = pci_scan_root_bus(&pdev->dev, 0, &pci_versatile_ops, NULL, &pci_res);
+-	if (!bus)
+-		return -ENOMEM;
++	list_splice_init(&pci_res, &bridge->windows);
++	bridge->dev.parent = &pdev->dev;
++	bridge->sysdata = NULL;
++	bridge->busnr = 0;
++	bridge->ops = &pci_versatile_ops;
 +
-+	err = pci_scan_root_bus_bridge(bridge);
-+	if (err)
-+		goto error;
++	ret = pci_scan_root_bus_bridge(bridge);
++	if (ret < 0)
++		return ret;
 +
 +	bus = bridge->bus;
+ 
+ 	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
 +
  	pci_assign_unassigned_bus_resources(bus);
  	list_for_each_entry(child, &bus->children, node)
