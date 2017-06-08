@@ -1,57 +1,80 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Thu,  8 Jun 2017 15:26:02 +0200
-Subject: [PATCH 37/44] mips/loongson64: implement ->dma_supported instead of
- ->set_dma_mask
-In-Reply-To: <20170608132609.32662-1-hch@lst.de>
-References: <20170608132609.32662-1-hch@lst.de>
-Message-ID: <20170608132609.32662-38-hch@lst.de>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Thu,  8 Jun 2017 15:34:37 +0200
+Subject: [PATCH v3 0/9] Userspace timer IRQ number control and PMU with
+ userspace-gic
+Message-ID: <20170608133446.3875-1-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Same behavior, less code duplication.
+So far we have been getting away with letting the kernel choosing
+interrupt numbers for the timers in the kernel and we have crossed our
+fingers in hoping that the DT/ACPI provided by userspace matches with
+the interrupt number we use in the kernel for a given VCPU type.
 
-Signed-off-by: Christoph Hellwig <hch@lst.de>
----
- arch/mips/loongson64/common/dma-swiotlb.c | 19 +++++--------------
- 1 file changed, 5 insertions(+), 14 deletions(-)
+But as we are generally moving towards letting userspace be in more fine
+grained control of what is being emulated, let userspace decide the irq
+numbers for the timers.
 
-diff --git a/arch/mips/loongson64/common/dma-swiotlb.c b/arch/mips/loongson64/common/dma-swiotlb.c
-index 178ca17a5667..34486c138206 100644
---- a/arch/mips/loongson64/common/dma-swiotlb.c
-+++ b/arch/mips/loongson64/common/dma-swiotlb.c
-@@ -75,19 +75,11 @@ static void loongson_dma_sync_sg_for_device(struct device *dev,
- 	mb();
- }
- 
--static int loongson_dma_set_mask(struct device *dev, u64 mask)
-+static int loongson_dma_supported(struct device *dev, u64 mask)
- {
--	if (!dev->dma_mask || !dma_supported(dev, mask))
--		return -EIO;
--
--	if (mask > DMA_BIT_MASK(loongson_sysconf.dma_mask_bits)) {
--		*dev->dma_mask = DMA_BIT_MASK(loongson_sysconf.dma_mask_bits);
--		return -EIO;
--	}
--
--	*dev->dma_mask = mask;
--
--	return 0;
-+	if (mask > DMA_BIT_MASK(loongson_sysconf.dma_mask_bits))
-+		return 0;
-+	return swiotlb_dma_supported(dev, mask);
- }
- 
- dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
-@@ -126,8 +118,7 @@ static const struct dma_map_ops loongson_dma_map_ops = {
- 	.sync_sg_for_cpu = swiotlb_sync_sg_for_cpu,
- 	.sync_sg_for_device = loongson_dma_sync_sg_for_device,
- 	.mapping_error = swiotlb_dma_mapping_error,
--	.dma_supported = swiotlb_dma_supported,
--	.set_dma_mask = loongson_dma_set_mask
-+	.dma_supported = loongson_dma_supported,
- };
- 
- void __init plat_swiotlb_setup(void)
+Slightly related, and therefore included in this series, we have
+recently added support for a userspace GIC while still supporting the
+generic timers and the PMU from inside the VM.  Unfortunately we forgot
+to rework the code to actually let userspace create the PMU device
+without creating an in-kernel GIC.
+
+Patches 6-9 could be omitted and still support the basic functionality
+targeted by this series if preferred.
+
+Tested on APM X-Gene, Thunder-X, and TC2.
+
+QEMU patches used for testing can be found here:
+
+https://git.linaro.org/people/christoffer.dall/qemu-arm.git timer-pmu-irqs
+
+Changes since v2:
+ - Grammer change
+ - Move PMU irq consistency check to when we are about to run a VCPU,
+   ensuring that we do not allow an unconfigure irq line with an
+   in-kernel gic.
+ - Rebased on kvmarm/queue.
+ - Acked reviewed-by and acked-by from Marc on some patches
+
+Changes since v1:
+ - Rebased on v4.12-rc1
+ - Check for irqchip_in_kernel() in kvm_arm_pmu_v3_get_attr
+ - Slightly change the wording around default timer IRQs
+ - Add fix for the PMU IRQ setting that assumes an initialized vgic
+ - Introduce an allocator for IRQ lines so that in-kernel owned IRQ
+   lines cannot be signalled from userspace and such that an IRQ line
+   can only be assigned to a single device.
+
+Christoffer Dall (9):
+  KVM: arm64: Allow creating the PMU without the in-kernel GIC
+  KVM: arm: Handle VCPU device attributes in guest.c
+  KVM: arm/arm64: Move irq_is_ppi() to header file
+  KVM: arm/arm64: Move timer IRQ default init to arch_timer.c
+  KVM: arm/arm64: Allow setting the timer IRQ numbers from userspace
+  KVM: arm/arm64: Introduce an allocator for in-kernel irq lines
+  KVM: arm/arm64: Check if irq lines to the GIC are already used
+  KVM: arm/arm64: Disallow userspace control of in-kernel IRQ lines
+  KVM: arm/arm64: Don't assume initialized vgic when setting PMU IRQ
+
+ Documentation/virtual/kvm/devices/vcpu.txt |  41 +++++++--
+ arch/arm/include/asm/kvm_host.h            |  22 ++---
+ arch/arm/include/uapi/asm/kvm.h            |   8 ++
+ arch/arm/kvm/guest.c                       |  51 +++++++++++
+ arch/arm/kvm/reset.c                       |  16 +---
+ arch/arm64/include/uapi/asm/kvm.h          |   3 +
+ arch/arm64/kvm/guest.c                     |   9 ++
+ arch/arm64/kvm/reset.c                     |  16 +---
+ include/kvm/arm_arch_timer.h               |   8 +-
+ include/kvm/arm_pmu.h                      |   6 ++
+ include/kvm/arm_vgic.h                     |  13 ++-
+ virt/kvm/arm/arch_timer.c                  | 137 ++++++++++++++++++++++++++---
+ virt/kvm/arm/arm.c                         |   8 +-
+ virt/kvm/arm/pmu.c                         |  65 ++++++++++----
+ virt/kvm/arm/vgic/vgic-irqfd.c             |   2 +-
+ virt/kvm/arm/vgic/vgic.c                   |  48 +++++++++-
+ 16 files changed, 359 insertions(+), 94 deletions(-)
+
 -- 
-2.11.0
+2.9.0
