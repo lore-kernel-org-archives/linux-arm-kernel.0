@@ -1,103 +1,110 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 08 Jun 2017 15:12:45 +0100
-Subject: [PATCH v3 7/9] KVM: arm/arm64: Check if irq lines to the GIC are
- already used
-In-Reply-To: <20170608133446.3875-8-cdall@linaro.org> (Christoffer Dall's
- message of "Thu, 8 Jun 2017 15:34:44 +0200")
-References: <20170608133446.3875-1-cdall@linaro.org>
- <20170608133446.3875-8-cdall@linaro.org>
-Message-ID: <877f0min4y.fsf@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu,  8 Jun 2017 15:13:03 +0100
+Subject: [RFT PATCH v2 03/42] drivers: pci: host: ftpci100: convert IRQ
+ masking to raw PCI config accessors
+In-Reply-To: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
+References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
+Message-ID: <20170608141342.2018-4-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 08 2017 at  3:34:44 pm BST, Christoffer Dall <cdall@linaro.org> wrote:
-> We check if other in-kernel devices have already been connected to the
-> GIC for a particular interrupt line when possible.
->
-> For the PMU, we can do this whenever setting the PMU interrupt number
-> from userspace.
->
-> For the timers, we have to wait until we try to enable the timer,
-> because we have a concept of default IRQ numbers that userspace
-> shouldn't have to work around in the initialization phase.
->
-> Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> ---
->  virt/kvm/arm/arch_timer.c | 18 ++++++++++--------
->  virt/kvm/arm/pmu.c        |  7 +++++++
->  2 files changed, 17 insertions(+), 8 deletions(-)
->
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index e03da1a..07f6f9b 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -618,20 +618,22 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
->  	kvm_vgic_unmap_phys_irq(vcpu, vtimer->irq.irq);
->  }
->  
-> -static bool timer_irqs_are_valid(struct kvm *kvm)
-> +static bool timer_irqs_are_valid(struct kvm_vcpu *vcpu)
->  {
-> -	struct kvm_vcpu *vcpu;
->  	int vtimer_irq, ptimer_irq;
-> -	int i;
-> +	int i, ret;
->  
-> -	vcpu = kvm_get_vcpu(kvm, 0);
->  	vtimer_irq = vcpu_vtimer(vcpu)->irq.irq;
-> -	ptimer_irq = vcpu_ptimer(vcpu)->irq.irq;
-> +	ret = kvm_vgic_set_owner(vcpu, vtimer_irq, vcpu_vtimer(vcpu));
-> +	if (ret)
-> +		return false;
->  
-> -	if (vtimer_irq == ptimer_irq)
-> +	ptimer_irq = vcpu_ptimer(vcpu)->irq.irq;
-> +	ret = kvm_vgic_set_owner(vcpu, ptimer_irq, vcpu_ptimer(vcpu));
-> +	if (ret)
->  		return false;
->  
-> -	kvm_for_each_vcpu(i, vcpu, kvm) {
-> +	kvm_for_each_vcpu(i, vcpu, vcpu->kvm) {
->  		if (vcpu_vtimer(vcpu)->irq.irq != vtimer_irq ||
->  		    vcpu_ptimer(vcpu)->irq.irq != ptimer_irq)
->  			return false;
-> @@ -659,7 +661,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
->  	if (!vgic_initialized(vcpu->kvm))
->  		return -ENODEV;
->  
-> -	if (!timer_irqs_are_valid(vcpu->kvm)) {
-> +	if (!timer_irqs_are_valid(vcpu)) {
->  		kvm_debug("incorrectly configured timer irqs\n");
->  		return -EINVAL;
->  	}
-> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-> index 574feff..3f08669 100644
-> --- a/virt/kvm/arm/pmu.c
-> +++ b/virt/kvm/arm/pmu.c
-> @@ -480,6 +480,8 @@ static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
->  		return -EBUSY;
->  
->  	if (irqchip_in_kernel(vcpu->kvm)) {
-> +		int ret;
-> +
->  		/*
->  		 * If using the PMU with an in-kernel virtual GIC
->  		 * implementation, we require the GIC to be already
-> @@ -490,6 +492,11 @@ static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
->  
->  		if (!kvm_arm_pmu_irq_initialized(vcpu))
->  			return -ENXIO;
-> +
-> +		ret = kvm_vgic_set_owner(vcpu, vcpu->arch.pmu.irq_num,
-> +					 &vcpu->arch.pmu);
-> +		if (ret)
-> +			return ret;
->  	}
->  
->  	vcpu->arch.pmu.created = true;
+Current ftpci100 driver host bridge controller driver requires struct
+pci_bus to be created in order to mask and clear IRQs using standard
+PCI bus config accessors.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+This struct pci_bus dependency is fictitious and burdens the driver
+with unneeded constraints (eg to use separate APIs to create and scan
+the root bus).
 
-	M.
+Add PCI raw config space accessors to PCIe ftpci100 driver and remove the
+fictitious struct pci_bus dependency.
+
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pci/host/pci-ftpci100.c | 44 ++++++++++++++++++++++++-----------------
+ 1 file changed, 26 insertions(+), 18 deletions(-)
+
+diff --git a/drivers/pci/host/pci-ftpci100.c b/drivers/pci/host/pci-ftpci100.c
+index d26501c..1c1fd60 100644
+--- a/drivers/pci/host/pci-ftpci100.c
++++ b/drivers/pci/host/pci-ftpci100.c
+@@ -204,17 +204,13 @@ static int faraday_pci_read_config(struct pci_bus *bus, unsigned int fn,
+ 	return PCIBIOS_SUCCESSFUL;
+ }
+ 
+-static int faraday_pci_write_config(struct pci_bus *bus, unsigned int fn,
+-				    int config, int size, u32 value)
++static int faraday_raw_pci_write_config(struct faraday_pci *p, int bus_number,
++					 unsigned int fn, int config, int size,
++					 u32 value)
+ {
+-	struct faraday_pci *p = bus->sysdata;
+ 	int ret = PCIBIOS_SUCCESSFUL;
+ 
+-	dev_dbg(&bus->dev,
+-		"[write] slt: %.2d, fnc: %d, cnf: 0x%.2X, val (%d bytes): 0x%.8X\n",
+-		PCI_SLOT(fn), PCI_FUNC(fn), config, size, value);
+-
+-	writel(PCI_CONF_BUS(bus->number) |
++	writel(PCI_CONF_BUS(bus_number) |
+ 			PCI_CONF_DEVICE(PCI_SLOT(fn)) |
+ 			PCI_CONF_FUNCTION(PCI_FUNC(fn)) |
+ 			PCI_CONF_WHERE(config) |
+@@ -238,6 +234,19 @@ static int faraday_pci_write_config(struct pci_bus *bus, unsigned int fn,
+ 	return ret;
+ }
+ 
++static int faraday_pci_write_config(struct pci_bus *bus, unsigned int fn,
++				    int config, int size, u32 value)
++{
++	struct faraday_pci *p = bus->sysdata;
++
++	dev_dbg(&bus->dev,
++		"[write] slt: %.2d, fnc: %d, cnf: 0x%.2X, val (%d bytes): 0x%.8X\n",
++		PCI_SLOT(fn), PCI_FUNC(fn), config, size, value);
++
++	return faraday_raw_pci_write_config(p, bus->number, fn, config, size,
++					    value);
++}
++
+ static struct pci_ops faraday_pci_ops = {
+ 	.read	= faraday_pci_read_config,
+ 	.write	= faraday_pci_write_config,
+@@ -496,17 +505,8 @@ static int faraday_pci_probe(struct platform_device *pdev)
+ 	val |= PCI_COMMAND_MEMORY;
+ 	val |= PCI_COMMAND_MASTER;
+ 	writel(val, p->base + PCI_CTRL);
+-
+-	list_splice_init(&res, &host->windows);
+-	ret = pci_register_host_bridge(host);
+-	if (ret) {
+-		dev_err(dev, "failed to register host: %d\n", ret);
+-		return ret;
+-	}
+-	p->bus = host->bus;
+-
+ 	/* Mask and clear all interrupts */
+-	faraday_pci_write_config(p->bus, 0, FARADAY_PCI_CTRL2 + 2, 2, 0xF000);
++	faraday_raw_pci_write_config(p, 0, 0, FARADAY_PCI_CTRL2 + 2, 2, 0xF000);
+ 	if (variant->cascaded_irq) {
+ 		ret = faraday_pci_setup_cascaded_irq(p);
+ 		if (ret) {
+@@ -519,6 +519,14 @@ static int faraday_pci_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
++	list_splice_init(&res, &host->windows);
++	ret = pci_register_host_bridge(host);
++	if (ret) {
++		dev_err(dev, "failed to register host: %d\n", ret);
++		return ret;
++	}
++	p->bus = host->bus;
++
+ 	pci_scan_child_bus(p->bus);
+ 	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+ 	pci_bus_assign_resources(p->bus);
 -- 
-Jazz is not dead, it just smell funny.
+2.10.0
