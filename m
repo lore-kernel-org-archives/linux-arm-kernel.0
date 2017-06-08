@@ -1,10 +1,10 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu,  8 Jun 2017 15:13:13 +0100
-Subject: [RFT PATCH v2 13/42] PCI: aardvark: Convert PCI scan API to
+Date: Thu,  8 Jun 2017 15:13:14 +0100
+Subject: [RFT PATCH v2 14/42] PCI: rcar: Convert PCI scan API to
  pci_scan_root_bus_bridge()
 In-Reply-To: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
 References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170608141342.2018-14-lorenzo.pieralisi@arm.com>
+Message-ID: <20170608141342.2018-15-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,62 +14,104 @@ struct pci_host_bridge object, which simplifies the bus scan
 interface and makes the PCI scan root bus interface easier to
 generalize as members are added to the struct pci_host_bridge.
 
-Convert PCI aardvark host code to pci_scan_root_bus_bridge() to
+Convert PCI rcar host code to pci_scan_root_bus_bridge() to
 improve the PCI root bus scanning interface.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Simon Horman <horms@verge.net.au>
 ---
- drivers/pci/host/pci-aardvark.c | 21 +++++++++++++++------
- 1 file changed, 15 insertions(+), 6 deletions(-)
+ drivers/pci/host/pcie-rcar.c | 38 ++++++++++++++++++++++++--------------
+ 1 file changed, 24 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
-index 37d0bcd..5fb9b62 100644
---- a/drivers/pci/host/pci-aardvark.c
-+++ b/drivers/pci/host/pci-aardvark.c
-@@ -886,12 +886,14 @@ static int advk_pcie_probe(struct platform_device *pdev)
- 	struct advk_pcie *pcie;
- 	struct resource *res;
+diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
+index cb07c45..8380274 100644
+--- a/drivers/pci/host/pcie-rcar.c
++++ b/drivers/pci/host/pcie-rcar.c
+@@ -450,28 +450,32 @@ static void rcar_pcie_force_speedup(struct rcar_pcie *pcie)
+ static int rcar_pcie_enable(struct rcar_pcie *pcie)
+ {
+ 	struct device *dev = pcie->dev;
++	struct pci_host_bridge *bridge = pci_host_bridge_from_priv(pcie);
  	struct pci_bus *bus, *child;
-+	struct pci_host_bridge *bridge;
- 	int ret, irq;
+-	LIST_HEAD(res);
++	int ret;
  
--	pcie = devm_kzalloc(dev, sizeof(struct advk_pcie), GFP_KERNEL);
--	if (!pcie)
-+	bridge = devm_pci_alloc_host_bridge(dev, sizeof(struct advk_pcie));
-+	if (!bridge)
- 		return -ENOMEM;
+ 	/* Try setting 5 GT/s link speed */
+ 	rcar_pcie_force_speedup(pcie);
  
-+	pcie = pci_host_bridge_priv(bridge);
- 	pcie->pdev = pdev;
+-	rcar_pcie_setup(&res, pcie);
++	rcar_pcie_setup(&bridge->windows, pcie);
  
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -929,14 +931,21 @@ static int advk_pcie_probe(struct platform_device *pdev)
- 		return ret;
- 	}
+ 	pci_add_flags(PCI_REASSIGN_ALL_RSRC | PCI_REASSIGN_ALL_BUS);
  
--	bus = pci_scan_root_bus(dev, 0, &advk_pcie_ops,
--				pcie, &pcie->resources);
--	if (!bus) {
-+	list_splice_init(&pcie->resources, &bridge->windows);
 +	bridge->dev.parent = dev;
 +	bridge->sysdata = pcie;
-+	bridge->busnr = 0;
-+	bridge->ops = &advk_pcie_ops;
-+
++	bridge->busnr = pcie->root_bus_nr;
++	bridge->ops = &rcar_pcie_ops;
+ 	if (IS_ENABLED(CONFIG_PCI_MSI))
+-		bus = pci_scan_root_bus_msi(dev, pcie->root_bus_nr,
+-				&rcar_pcie_ops, pcie, &res, &pcie->msi.chip);
+-	else
+-		bus = pci_scan_root_bus(dev, pcie->root_bus_nr,
+-				&rcar_pcie_ops, pcie, &res);
++		bridge->msi = &pcie->msi.chip;
+ 
+-	if (!bus) {
+-		dev_err(dev, "Scanning rootbus failed");
+-		return -ENODEV;
 +	ret = pci_scan_root_bus_bridge(bridge);
 +	if (ret < 0) {
- 		advk_pcie_remove_msi_irq_domain(pcie);
- 		advk_pcie_remove_irq_domain(pcie);
--		return -ENOMEM;
++		kfree(bridge);
 +		return ret;
  	}
  
 +	bus = bridge->bus;
 +
- 	pci_bus_assign_resources(bus);
+ 	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
  
- 	list_for_each_entry(child, &bus->children, node)
+ 	pci_bus_size_bridges(bus);
+@@ -1127,11 +1131,14 @@ static int rcar_pcie_probe(struct platform_device *pdev)
+ 	unsigned int data;
+ 	int err;
+ 	int (*hw_init_fn)(struct rcar_pcie *);
++	struct pci_host_bridge *bridge;
+ 
+-	pcie = devm_kzalloc(dev, sizeof(*pcie), GFP_KERNEL);
+-	if (!pcie)
++	bridge = pci_alloc_host_bridge(sizeof(*pcie));
++	if (!bridge)
+ 		return -ENOMEM;
+ 
++	pcie = pci_host_bridge_priv(bridge);
++
+ 	pcie->dev = dev;
+ 
+ 	INIT_LIST_HEAD(&pcie->resources);
+@@ -1141,12 +1148,12 @@ static int rcar_pcie_probe(struct platform_device *pdev)
+ 	err = rcar_pcie_get_resources(pcie);
+ 	if (err < 0) {
+ 		dev_err(dev, "failed to request resources: %d\n", err);
+-		return err;
++		goto err_free_bridge;
+ 	}
+ 
+ 	err = rcar_pcie_parse_map_dma_ranges(pcie, dev->of_node);
+ 	if (err)
+-		return err;
++		goto err_free_bridge;
+ 
+ 	pm_runtime_enable(dev);
+ 	err = pm_runtime_get_sync(dev);
+@@ -1183,6 +1190,9 @@ static int rcar_pcie_probe(struct platform_device *pdev)
+ 
+ 	return 0;
+ 
++err_free_bridge:
++	pci_free_host_bridge(bridge);
++
+ err_pm_put:
+ 	pm_runtime_put(dev);
+ 
 -- 
 2.10.0
