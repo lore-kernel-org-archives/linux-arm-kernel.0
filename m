@@ -1,43 +1,58 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 8 Jun 2017 15:53:55 +0300
-Subject: [PATCH v2 0/3] Add R8A7743/SK-RZG1M PFC support
-In-Reply-To: <CAMuHMdUDO-+F_fOf4Z1ZPdZhs_MBn8J6ig-Pn4K0oMvv-EM2gw@mail.gmail.com>
-References: <20170420185132.258111787@cogentembedded.com>
- <20170424061217.GC14843@verge.net.au>
- <4937ae78-8800-1a11-547b-2269d063d45a@cogentembedded.com>
- <CAMuHMdUDO-+F_fOf4Z1ZPdZhs_MBn8J6ig-Pn4K0oMvv-EM2gw@mail.gmail.com>
-Message-ID: <fdebbddc-f6d6-c340-b643-e0f6c61a4b8d@cogentembedded.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu,  8 Jun 2017 12:58:47 +0000
+Subject: [PATCH] arm: boot/compressed: fix inappropriate Thumb2 mnemonic for
+ __nop
+Message-ID: <20170608125847.2611-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+Commit 06a4b6d009a1 ("ARM: 8677/1: boot/compressed: fix decompressor
+header layout for v7-M") fixed an issue in the layout of the header
+of the compressed kernel image that was caused by the assembler
+emitting narrow opcodes for 'mov r0, r0', and for this reason, the
+mnemonic was updated to use the W() macro, which will append the .w
+suffix (which forces a wide encoding) if required, i.e., when building
+the kernel in Thumb2 mode.
 
-On 06/07/2017 08:52 PM, Geert Uytterhoeven wrote:
+However, this failed to take into account that on Thumb2 kernels built
+for CPUs that are also ARM capable, the entry point is entered in ARM
+mode, and so the instructions emitted here will be ARM instructions
+that only exist in a wide encoding to begin with, which is why the
+assembler rejects the .w suffix here and aborts the build with the
+following message:
 
->>>>    Here's the set of 3 patches against Simon Horman's 'renesas.git' repo,
->>>> 'renesas-devel-20170420-v4.11-rc7' tag.  We're adding the R8A7743 PFC
->>>> node
->>>> and then describing the pins for SCIF0 and Ether devices declared
->>>> earlier.
->>>> These patches depend on the R8A7743 PFC suport in order to work properly.
->>>
->>>
->>> Thanks. I have marked these as deferred pending acceptance of the PFC
->>> driver changes. Please repost or otherwise let me know when dependency
->>> is satisfied.
->>
->>    FYI, Linus W. has pulled the R8A774x PFC patches for 4.13:
->>
->> https://www.spinics.net/lists/linux-renesas-soc/msg14824.html
->
-> But Simon has to wait for v4.13-rc1 to apply the DTS parts, to avoid
-> regressions in renesas/devel.
+  head.S: Assembler messages:
+  head.S:132: Error: width suffixes are invalid in ARM mode -- `mov.w r0,r0'
 
-    Indeed, now that pinctrl_bind_pins() causes really_probe() to fail!
-The 1st patch in the series should be safe to apply still...
+So replace the W(mov) with separate ARM and Thumb2 instructions, where
+the latter will only be used for CPU_THUMBONLY builds.
 
-> Gr{oetje,eeting}s,
->
->                         Geert
+Fixes: 06a4b6d009a1 ("ARM: 8677/1: boot/compressed: fix decompressor ...")
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
 
-MBR, Sergei
+Apologies for the breakage: apparently, the combination CONFIG_THUMB2_KERNEL=y,
+CONFIG_CPU_THUMBONLY=n and CONFIG_EFI_STUB=y was not among the configurations
+I tested before sending out the original patch.
+
+ arch/arm/boot/compressed/efi-header.S | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
+index 3f7d1b74c5e0..a17ca8d78656 100644
+--- a/arch/arm/boot/compressed/efi-header.S
++++ b/arch/arm/boot/compressed/efi-header.S
+@@ -17,7 +17,8 @@
+ 		@ there.
+ 		.inst	'M' | ('Z' << 8) | (0x1310 << 16)   @ tstne r0, #0x4d000
+ #else
+-		W(mov)	r0, r0
++ AR_CLASS(	mov	r0, r0		)
++  M_CLASS(	nop.w			)
+ #endif
+ 		.endm
+ 
+-- 
+2.9.3
