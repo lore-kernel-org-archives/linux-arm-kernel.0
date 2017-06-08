@@ -1,36 +1,61 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 8 Jun 2017 19:18:36 +0000
-Subject: [PATCH 3/3] efi/libstub: arm64: set -fpie when building the EFI
- stub
-In-Reply-To: <20170608190804.GG141096@google.com>
-References: <20170518090953.32628-1-ard.biesheuvel@linaro.org>
- <20170518090953.32628-4-ard.biesheuvel@linaro.org>
- <20170608190804.GG141096@google.com>
-Message-ID: <CAKv+Gu--WbvmS3EMPSD8sx6yVqgHQJO1r70+SYBRo_WZjUxioQ@mail.gmail.com>
+Date: Thu,  8 Jun 2017 19:22:19 +0000
+Subject: [PATCH v4] mm: huge-vmap: fail gracefully on unexpected huge vmap
+ mappings
+Message-ID: <20170608192219.8338-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 June 2017 at 19:08, Matthias Kaehlcke <mka@chromium.org> wrote:
-> El Thu, May 18, 2017 at 10:09:53AM +0100 Ard Biesheuvel ha dit:
->
->> Clang may emit absolute symbol references when building in non-PIC mode,
->> even when using the default 'small' code model, which is already mostly
->> position independent to begin with, due to its use of adrp/add pairs
->> that have a relative range of +/- 4 GB. The remedy is to pass the -fpie
->> flag, which can be done safely now that the code has been updated to avoid
->> GOT indirections (which may be emitted due to the compiler assuming that
->> the PIC/PIE code may end up in a shared library that is subject to ELF
->> symbol preemption)
->>
->> Passing -fpie when building code that needs to execute at an a priori
->> unknown offset is arguably an improvement in any case, and given that
->> the recent visibility changes allow the PIC build to pass with GCC as
->> well, let's add -fpie for all arm64 builds rather than only for Clang.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
-> Tested-by: Matthias Kaehlcke <mka@chromium.org>
+Existing code that uses vmalloc_to_page() may assume that any
+address for which is_vmalloc_addr() returns true may be passed
+into vmalloc_to_page() to retrieve the associated struct page.
 
-Thanks Matthias.
+This is not un unreasonable assumption to make, but on architectures
+that have CONFIG_HAVE_ARCH_HUGE_VMAP=y, it no longer holds, and we
+need to ensure that vmalloc_to_page() does not go off into the weeds
+trying to dereference huge PUDs or PMDs as table entries.
 
-For the record, did you test only with Clang?
+Given that vmalloc() and vmap() themselves never create huge
+mappings or deal with compound pages at all, there is no correct
+answer in this case, so return NULL instead, and issue a warning.
+
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+v4: - use pud_bad/pmd_bad instead of pud_huge/pmd_huge, which don't require
+      changes to hugetlb.h, and give us what we need on all architectures
+    - move WARN_ON_ONCE() calls out of conditionals
+    - add explanatory comment
+
+ mm/vmalloc.c | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
+
+diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+index 34a1c3e46ed7..0ba20eb17212 100644
+--- a/mm/vmalloc.c
++++ b/mm/vmalloc.c
+@@ -287,10 +287,21 @@ struct page *vmalloc_to_page(const void *vmalloc_addr)
+ 	if (p4d_none(*p4d))
+ 		return NULL;
+ 	pud = pud_offset(p4d, addr);
+-	if (pud_none(*pud))
++
++	/*
++	 * Don't dereference bad PUD or PMD (below) entries. This will also
++	 * identify huge mappings, which we may encounter on architectures
++	 * that define CONFIG_HAVE_ARCH_HUGE_VMAP=y. Such regions will be
++	 * identified as vmalloc addresses by is_vmalloc_addr(), but are not
++	 * [unambiguously] associated with a struct page, so there is no
++	 * correct value to return for them.
++	 */
++	WARN_ON_ONCE(pud_bad(*pud));
++	if (pud_none(*pud) || pud_bad(*pud))
+ 		return NULL;
+ 	pmd = pmd_offset(pud, addr);
+-	if (pmd_none(*pmd))
++	WARN_ON_ONCE(pmd_bad(*pmd);
++	if (pmd_none(*pmd) || pmd_bad(*pmd))
+ 		return NULL;
+ 
+ 	ptep = pte_offset_map(pmd, addr);
+-- 
+2.9.3
