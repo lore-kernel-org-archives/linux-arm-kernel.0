@@ -1,32 +1,23 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 8 Jun 2017 17:21:50 -0500
-Subject: [PATCHv3 3/4] dt-bindings: i2c: Add Altera I2C Controller
-In-Reply-To: <1496447559-19782-4-git-send-email-thor.thayer@linux.intel.com>
-References: <1496447559-19782-1-git-send-email-thor.thayer@linux.intel.com>
- <1496447559-19782-4-git-send-email-thor.thayer@linux.intel.com>
-Message-ID: <20170608222150.xxlrzrfhhqqvuovl@rob-hp-laptop>
+Date: Thu, 8 Jun 2017 17:22:07 -0500
+Subject: [PATCH 1/3] dt-bindings: pinctrl: sunxi: Add compatible string
+ for A83T R_PIO
+In-Reply-To: <20170603144427.22855-2-wens@csie.org>
+References: <20170603144427.22855-1-wens@csie.org>
+ <20170603144427.22855-2-wens@csie.org>
+Message-ID: <20170608222207.gi2m5gjetmtxiyxj@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 02, 2017 at 06:52:38PM -0500, thor.thayer at linux.intel.com wrote:
-> From: Thor Thayer <thor.thayer@linux.intel.com>
+On Sat, Jun 03, 2017 at 10:44:25PM +0800, Chen-Yu Tsai wrote:
+> The R_PIO on the A83T is almost the same as the one found on the A64,
+> except that the CIR_RX function was moved from pin PL11 to pin PL12.
 > 
-> Add the documentation to support the Altera synthesizable
-> logic I2C Controller in FPGA.
+> Add a compatible string for it.
 > 
-> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
-> v2  Change the subject to identify dt-bindings
->     Add synthesizable logic to description.
->     Change compatible string to "altr,softip-i2c"
->     Make description of clock phandle singular since 1 clock.
->     Remove altr, from fifo-size
->     Specify fifo-size is in bytes.
-> v3  Add version to compatible string "altr,softip-i2c-v1.0"
->     Add for use in FPGA in description.
-> ---
->  .../devicetree/bindings/i2c/i2c-altera.txt         | 39 ++++++++++++++++++++++
->  1 file changed, 39 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-altera.txt
+>  Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
