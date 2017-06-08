@@ -1,64 +1,114 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 8 Jun 2017 10:40:28 -0500
-Subject: [PATCH v3 2/6] dt-bindings: display: Add Synopsys DW MIPI DSI
- DRM bridge driver
-In-Reply-To: <1496414235-20098-3-git-send-email-philippe.cornu@st.com>
-References: <1496414235-20098-1-git-send-email-philippe.cornu@st.com>
- <1496414235-20098-3-git-send-email-philippe.cornu@st.com>
-Message-ID: <20170608154028.6ck3dos6de2dogrk@rob-hp-laptop>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 8 Jun 2017 16:40:29 +0100
+Subject: [PATCH v3 9/9] KVM: arm/arm64: Don't assume initialized vgic when
+ setting PMU IRQ
+In-Reply-To: <20170608151818.GB6378@cbox>
+References: <20170608133446.3875-1-cdall@linaro.org>
+ <20170608133446.3875-10-cdall@linaro.org> <87y3t2h7ja.fsf@arm.com>
+ <20170608151818.GB6378@cbox>
+Message-ID: <5aacc2c4-aa13-3b5e-6255-558268f86660@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 02, 2017 at 04:37:11PM +0200, Philippe CORNU wrote:
-> This patch adds documentation of device tree bindings for the
-> Synopsys DesignWare MIPI DSI host DRM bridge driver.
+On 08/06/17 16:18, Christoffer Dall wrote:
+> On Thu, Jun 08, 2017 at 03:35:05PM +0100, Marc Zyngier wrote:
+>> On Thu, Jun 08 2017 at  3:34:46 pm BST, Christoffer Dall <cdall@linaro.org> wrote:
+>>> The PMU IRQ number is set through the VCPU device's KVM_SET_DEVICE_ATTR
+>>> ioctl handler for the KVM_ARM_VCPU_PMU_V3_IRQ attribute, but there is no
+>>> enforced or stated requirement that this must happen after initializing
+>>> the VGIC.  As a result, calling vgic_valid_spi() which relies on the
+>>> nr_spis being set during the VGIC init can incorrectly fail.
+>>>
+>>> Introduce irq_is_spi, which determines if an IRQ number is within the
+>>> SPI range without verifying it against the actual VGIC properties.
+>>>
+>>> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+>>> ---
+>>>  include/kvm/arm_vgic.h | 2 ++
+>>>  virt/kvm/arm/pmu.c     | 2 +-
+>>>  2 files changed, 3 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+>>> index 131668f..a2ae9d2 100644
+>>> --- a/include/kvm/arm_vgic.h
+>>> +++ b/include/kvm/arm_vgic.h
+>>> @@ -39,6 +39,8 @@
+>>>  #define KVM_IRQCHIP_NUM_PINS	(1020 - 32)
+>>>  
+>>>  #define irq_is_ppi(irq) ((irq) >= VGIC_NR_SGIS && (irq) < VGIC_NR_PRIVATE_IRQS)
+>>> +#define irq_is_spi(irq) ((irq) >= VGIC_NR_PRIVATE_IRQS && \
+>>> +			 (irq) <= VGIC_MAX_SPI)
+>>>  
+>>>  enum vgic_type {
+>>>  	VGIC_V2,		/* Good ol' GICv2 */
+>>> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+>>> index 26a42a9..87cb325 100644
+>>> --- a/virt/kvm/arm/pmu.c
+>>> +++ b/virt/kvm/arm/pmu.c
+>>> @@ -547,7 +547,7 @@ int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
+>>>  			return -EFAULT;
+>>>  
+>>>  		/* The PMU overflow interrupt can be a PPI or a valid SPI. */
+>>> -		if (!(irq_is_ppi(irq) || vgic_valid_spi(vcpu->kvm, irq)))
+>>> +		if (!(irq_is_ppi(irq) || irq_is_spi(irq)))
+>>>  			return -EINVAL;
+>>>  
+>>>  		if (!pmu_irq_is_valid(vcpu->kvm, irq))
+>>
+>> Does it mean that we can now fail an injection if the SPI is out of the
+>> range of configured SPIs?
+>>
+>> If that's the case, the WARN_ON() in kvm_pmu_update_state() is going to
+>> fire badly, and that's going to be ugly. Should we add a check for this
+>> case in kvm_arm_pmu_v3_init()?
+>>
 > 
-> Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
-> ---
->  .../bindings/display/bridge/dw_mipi_dsi.txt        | 30 ++++++++++++++++++++++
->  1 file changed, 30 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
+> Yes, we should.  How about this fixup?
 > 
-> diff --git a/Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt b/Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
-> new file mode 100644
-> index 0000000..1d7c438
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
-> @@ -0,0 +1,30 @@
-> +Synopsys DesignWare MIPI DSI host controller
-> +============================================
+> 
+> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+> index 5dbaa2c7..fc8a723 100644
+> --- a/virt/kvm/arm/pmu.c
+> +++ b/virt/kvm/arm/pmu.c
+> @@ -458,10 +458,24 @@ int kvm_arm_pmu_v3_enable(struct kvm_vcpu *vcpu)
+>  	/*
+>  	 * A valid interrupt configuration for the PMU is either to have a
+>  	 * properly configured interrupt number and using an in-kernel
+> -	 * irqchip, or to neither set an IRQ nor create an in-kernel irqchip.
+> +	 * irqchip, or to not have an in-kernel GIC and not set an IRQ.
+>  	 */
+> -	if (kvm_arm_pmu_irq_initialized(vcpu) != irqchip_in_kernel(vcpu->kvm))
+> -		return -EINVAL;
+> +	if (irqchip_in_kernel(vcpu->kvm)) {
+> +		int irq = vcpu->arch.pmu.irq_num;
+> +		if (!kvm_arm_pmu_irq_initialized(vcpu))
+> +			return -EINVAL;
 > +
-> +This document defines device tree properties for the Synopsys DesignWare MIPI
-> +DSI host controller. It doesn't constitue a device tree binding specification
-> +by itself but is meant to be referenced by platform-specific device tree
-> +bindings.
-> +
-> +When referenced from platform device tree bindings the properties defined in
-> +this document are defined as follows. The platform device tree bindings are
-> +responsible for defining whether each property is required or optional.
-> +
-> +- reg: Memory mapped base address and length of the DWC MIPI DSI
-> +  registers. (mandatory)
-> +
-> +- clocks: References to all the clocks specified in the clock-names property
-> +  as specified in [1]. (mandatory)
-> +
-> +- clock-names: "pclk" is peripheral clock for either AHB and APB. (mandatory)
+> +		/*
+> +		 * If we are using an in-kernel vgic, at this point we know
+> +		 * the vgic will be initialized, so we can check the PMU irq
+> +		 * number against the dimensions of the vgic and make sure
+> +		 * it's valid.
+> +		 */
+> +		if (!irq_is_ppi(irq) && !vgic_valid_spi(vcpu->kvm, irq))
+> +			return -EINVAL;
+> +	} else if (kvm_arm_pmu_irq_initialized(vcpu)) {
+> +		   return -EINVAL;
+> +	}
+>  
+>  	kvm_pmu_vcpu_reset(vcpu);
+>  	vcpu->arch.pmu.ready = true;
+> 
+> 
+> If you're happy with that, I'll just squash that into the current patch
+> before applying the series.
 
-Seems strange there's not also a pixel or bit clock? Or this gets driven 
-from the phy?
+Yup, looks good to me! For the squashed version:
 
-> +
-> +- resets: References to all the resets specified in the reset-names property
-> +  as specified in [2]. (optional)
-> +
-> +- reset-names: string reset name, must be "apb" if used. (optional)
-> +
-> +- panel or bridge node: see [3]. (mandatory)
-> +
-> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +[2] Documentation/devicetree/bindings/reset/reset.txt
-> +[3] Documentation/devicetree/bindings/display/mipi-dsi-bus.txt
-> -- 
-> 1.9.1
-> 
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
