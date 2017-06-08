@@ -1,57 +1,36 @@
-From: raviteja.garimella@broadcom.com (Raviteja Garimella)
-Date: Thu,  8 Jun 2017 16:05:01 +0530
-Subject: [PATCH v8 1/3] dt-bindings: phy: Add DT bindings documentation for
- NS2 USB DRD PHY
-In-Reply-To: <1496918103-14948-1-git-send-email-raviteja.garimella@broadcom.com>
-References: <1496918103-14948-1-git-send-email-raviteja.garimella@broadcom.com>
-Message-ID: <1496918103-14948-2-git-send-email-raviteja.garimella@broadcom.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 8 Jun 2017 13:35:38 +0300
+Subject: [PATCH v2 3/8] net: mvmdio: use GENMASK for masks
+In-Reply-To: <20170608092653.25221-4-antoine.tenart@free-electrons.com>
+References: <20170608092653.25221-1-antoine.tenart@free-electrons.com>
+ <20170608092653.25221-4-antoine.tenart@free-electrons.com>
+Message-ID: <6b94a360-dcc7-a78c-819b-4f3c87cf3c6c@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds DT bindings documentation for NS2 DRD PHY driver.
+Hello!
 
-Signed-off-by: Raviteja Garimella <raviteja.garimella@broadcom.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- .../devicetree/bindings/phy/brcm,ns2-drd-phy.txt   | 30 ++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/brcm,ns2-drd-phy.txt
+On 6/8/2017 12:26 PM, Antoine Tenart wrote:
 
-diff --git a/Documentation/devicetree/bindings/phy/brcm,ns2-drd-phy.txt b/Documentation/devicetree/bindings/phy/brcm,ns2-drd-phy.txt
-new file mode 100644
-index 0000000..04f063a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/brcm,ns2-drd-phy.txt
-@@ -0,0 +1,30 @@
-+BROADCOM NORTHSTAR2 USB2 (DUAL ROLE DEVICE) PHY
-+
-+Required properties:
-+ - compatible: brcm,ns2-drd-phy
-+ - reg: offset and length of the NS2 PHY related registers.
-+ - reg-names
-+   The below registers must be provided.
-+   icfg - for DRD ICFG configurations
-+   rst-ctrl - for DRD IDM reset
-+   crmu-ctrl - for CRMU core vdd, PHY and PHY PLL reset
-+   usb2-strap - for port over current polarity reversal
-+ - #phy-cells: Must be 0. No args required.
-+ - vbus-gpios: vbus gpio binding
-+ - id-gpios: id gpio binding
-+
-+Refer to phy/phy-bindings.txt for the generic PHY binding properties
-+
-+Example:
-+	usbdrd_phy: phy at 66000960 {
-+			#phy-cells = <0>;
-+			compatible = "brcm,ns2-drd-phy";
-+			reg = <0x66000960 0x24>,
-+			      <0x67012800 0x4>,
-+			      <0x6501d148 0x4>,
-+			      <0x664d0700 0x4>;
-+			reg-names = "icfg", "rst-ctrl",
-+				    "crmu-ctrl", "usb2-strap";
-+			id-gpios = <&gpio_g 30 0>;
-+			vbus-gpios = <&gpio_g 31 0>;
-+	};
--- 
-2.1.0
+> Cosmetic patch to use the GENMASK helper for masks.
+>
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  drivers/net/ethernet/marvell/mvmdio.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
+> index 17b518b13ae3..96af8d57d9e5 100644
+> --- a/drivers/net/ethernet/marvell/mvmdio.c
+> +++ b/drivers/net/ethernet/marvell/mvmdio.c
+> @@ -138,7 +138,7 @@ static int orion_mdio_read(struct mii_bus *bus, int mii_id,
+>  		goto out;
+>  	}
+>
+> -	ret = val & 0xFFFF;
+> +	ret = val & GENMASK(15,0);
+
+    Need a space after comma.
+
+MBR, Sergei
