@@ -1,67 +1,80 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Thu, 8 Jun 2017 12:34:38 +0200
-Subject: [PATCH 03/11] KVM: arm64: Change hyp_panic()s dependency on
- tpidr_el2
-In-Reply-To: <593925BB.30503@arm.com>
-References: <20170515174400.29735-1-james.morse@arm.com>
- <20170515174400.29735-4-james.morse@arm.com>
- <20170606194525.GK9464@cbox> <593925BB.30503@arm.com>
-Message-ID: <20170608103438.GD7657@cbox>
+From: raviteja.garimella@broadcom.com (Raviteja Garimella)
+Date: Thu,  8 Jun 2017 16:05:00 +0530
+Subject: [PATCH v8 0/3] Support for USB DRD PHY driver for NS2
+Message-ID: <1496918103-14948-1-git-send-email-raviteja.garimella@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 08, 2017 at 11:23:55AM +0100, James Morse wrote:
-> Hi Christoffer,
-> 
-> On 06/06/17 20:45, Christoffer Dall wrote:
-> > On Mon, May 15, 2017 at 06:43:51PM +0100, James Morse wrote:
-> >> KVM calls hyp_panic() when anything unexpected happens. This may occur
-> >> while a guest owns the EL1 registers. KVM stashes the vcpu pointer in
-> >> tpidr_el2, which it uses to find the host context in order to restore
-> >> the host EL1 registers before parachuting into the host's panic().
-> >>
-> >> The host context is a struct kvm_cpu_context allocated in the per-cpu
-> >> area, and mapped to hyp. Given the per-cpu offset for this CPU, this is
-> >> easy to find. Change hyp_panic() to take a pointer to the
-> >> struct kvm_cpu_context. Wrap these calls with an asm function that
-> >> retrieves the struct kvm_cpu_context from the host's per-cpu area.
-> >>
-> >> Copy the per-cpu offset from the hosts tpidr_el1 into tpidr_el2 during
-> >> kvm init. (Later patches will make this unnecessary for VHE hosts)
-> >>
-> >> We print out the vcpu pointer as part of the panic message. Add a back
-> >> reference to the 'running vcpu' in the host cpu context to preserve this.
-> 
-> >> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-> >> index fce7cc507e0a..0f83e7e402ad 100644
-> >> --- a/arch/arm64/kvm/hyp/hyp-entry.S
-> >> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
-> >> @@ -163,6 +163,13 @@ ENTRY(__hyp_do_panic)
-> >>  	eret
-> >>  ENDPROC(__hyp_do_panic)
-> >>  
-> >> +ENTRY(__hyp_panic)
-> >> +	ldr	x0, =kvm_host_cpu_state
-> > 
-> > Why is this guaranteed to give us a valid EL2 address?
-> 
-> ... it doesn't. Its a host address from the constant pool which is used by
-> hyp-panic as __host_ctxt:
-> > void __hyp_text __noreturn hyp_panic(struct kvm_cpu_context *__host_ctxt);
-> 
-> and fixed up with:
-> > host_ctxt = kern_hyp_va(__host_ctxt);
-> 
+Changes in v8:
+=============
+-Renamed phy shutdown routine
+-Used devm_request_irq in stead of threaded irq
+-Removed devm_unregister calls in probe routine
 
-Ah, right, we only dereference the pointer inside the function, I missed
-that.
+Changes in v7:
+=============
+Cleaned up unused variables in phy private data structure that's
+missed out in v6.
+Setting of phy mode to device/host is removed from phy power on.
+routine.
 
-> to give us the EL2 address before we access it.
-> For VHE the last step is a nop as the host address can be accessed directly.
-> 
-> I will add a comment here explaining this.
-> 
-> 
+Changes in v6:
+=============
+Removed spin locks which are not required as the references
+to phy_ops in the same driver were removed in v5.
 
-Thanks!
--Christoffer
+Removed host/device 'notify' routines which are registered
+using 'extcon_register_notifier'. The irq handler is sufficient
+to deal with the change in extcon events within the same driver.
+
+Changes in v5:
+=============
+Removed references to phy_ops in the same driver by connect_work
+event handler to change the phy modes.
+
+To support dynamically changing the mode of the phy, it does
+not require doing a phy reset/programming of PHY PLL. Changes
+are made to the connect_work routine to just program the required
+register bits to achieve this purpose.
+
+Changes in v4:
+=============
+Remove references to edev->name in debug prints.
+
+Changes in v3:
+=============
+Remove unnecessary checks for poweron as suggested in review.
+
+Changes in v2:
+=============
+1. Initialize file operations .owner field with THIS_MODULE.
+2. Remove unnecessary gpio example in DT bindings documentation.
+   This is previously acked by Rob Herring <robh@kernel.org>
+
+Introduction for PATCH v1:
+
+This patch adds support for USB Dual Role Device Phy for Broadcom
+Northstar2 SoC. Apart from the new phy driver, this patchset contains
+changes to Kconfig, Makefile, and Device tree files.
+
+This patchset is tested on Broadcom NS2 BCM958712K reference board.
+
+Repo: https://github.com/Broadcom/arm64-linux.git
+Branch: ns2_drdphy_v8
+
+Raviteja Garimella (3):
+  dt-bindings: phy: Add DT bindings documentation for NS2 USB DRD PHY
+  phy: phy-bcm-ns2-usbdrd: Broadcom USB DRD PHY driver for Northstar2
+  arm64: dts: NS2: Add USB DRD PHY device tree node
+
+ .../devicetree/bindings/phy/brcm,ns2-drd-phy.txt   |  30 ++
+ arch/arm64/boot/dts/broadcom/ns2.dtsi              |  14 +
+ drivers/phy/Kconfig                                |  13 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-bcm-ns2-usbdrd.c                   | 437 +++++++++++++++++++++
+ 5 files changed, 495 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/brcm,ns2-drd-phy.txt
+ create mode 100644 drivers/phy/phy-bcm-ns2-usbdrd.c
+
+-- 
+2.1.0
