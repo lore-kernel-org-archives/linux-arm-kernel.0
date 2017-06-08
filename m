@@ -1,26 +1,26 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  8 Jun 2017 17:31:21 +0200
-Subject: [PATCH 2/4] ARM64: dts: meson-gxl-s905d-p230: Add HDMI nodes
+Date: Thu,  8 Jun 2017 17:31:23 +0200
+Subject: [PATCH 4/4] ARM64: dts: meson-gxl-s905x-p212: Add HDMI and CVBS nodes
 In-Reply-To: <1496935883-4966-1-git-send-email-narmstrong@baylibre.com>
 References: <1496935883-4966-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1496935883-4966-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1496935883-4966-5-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add HDMI nodes for the Amlogic P230 board.
+Add HDMI and CVBS nodes for the Amlogic P212 reference board.
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- .../boot/dts/amlogic/meson-gxl-s905d-p230.dts      | 24 ++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ .../boot/dts/amlogic/meson-gxl-s905x-p212.dts      | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts
-index f9fbfda..3e0c023 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts
-@@ -84,6 +84,17 @@
- 		regulator-min-microvolt = <1800000>;
- 		regulator-max-microvolt = <1800000>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
+index db31e09..6ab17c1 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
+@@ -58,6 +58,17 @@
+ 			};
+ 		};
  	};
 +
 +	hdmi-connector {
@@ -35,12 +35,11 @@ index f9fbfda..3e0c023 100644
 +	};
  };
  
- /* P230 has exclusive choice between internal or external PHY */
-@@ -113,6 +124,19 @@
+ &cvbs_vdac_port {
+@@ -66,6 +77,18 @@
  	};
  };
  
-+
 +&hdmi_tx {
 +	status = "okay";
 +	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
@@ -53,8 +52,8 @@ index f9fbfda..3e0c023 100644
 +	};
 +};
 +
- &saradc {
+ /* This UART is brought out to the DB9 connector */
+ &uart_AO {
  	status = "okay";
- 	vref-supply = <&vddio_ao18>;
 -- 
 1.9.1
