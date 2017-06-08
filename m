@@ -1,20 +1,30 @@
-From: patch-notifications@ellerman.id.au (Michael Ellerman)
-Date: Thu,  8 Jun 2017 14:07:37 +1000 (AEST)
-Subject: [1/2] MAINTAINERS: update entry for Freescale SoC drivers
-In-Reply-To: <1496445623-22390-1-git-send-email-leoyang.li@nxp.com>
-Message-ID: <3wjsMY52Jpz9sD5@ozlabs.org>
+From: chris.packham@alliedtelesis.co.nz (Chris Packham)
+Date: Thu,  8 Jun 2017 16:11:24 +1200
+Subject: [RFC PATCH 4/4] ARM: dts: enable l2c parity and ecc protection on
+ 98dx3236
+In-Reply-To: <20170608041124.4624-1-chris.packham@alliedtelesis.co.nz>
+References: <20170608041124.4624-1-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20170608041124.4624-5-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-06-02 at 23:20:22 UTC, Yang Li wrote:
-> Add myself as the maintainer for drivers/fsl/soc/ and fix the scope for
-> device tree bindings.
-> 
-> Signed-off-by: Li Yang <leoyang.li@nxp.com>
-> Acked-by: Scott Wood <oss@buserror.net>
+Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+---
+ arch/arm/boot/dts/armada-xp-98dx3236.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Applied to powerpc next, thanks.
-
-https://git.kernel.org/powerpc/c/c67ec7010132a4d948686eeab8a23a
-
-cheers
+diff --git a/arch/arm/boot/dts/armada-xp-98dx3236.dtsi b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
+index 84cc232a29e9..32d05ec88ffd 100644
+--- a/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
++++ b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
+@@ -138,6 +138,8 @@
+ 				cache-level = <2>;
+ 				cache-unified;
+ 				wt-override;
++				arm,parity-enable;
++				arm,ecc-enable;
+ 			};
+ 
+ 			gpio0: gpio at 18100 {
+-- 
+2.13.0
