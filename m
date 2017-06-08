@@ -1,112 +1,70 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Fri, 9 Jun 2017 00:30:51 +0200
-Subject: [PATCH 4/4] mfd: tps65217: Instantiate sub-devices from device
- tree
-In-Reply-To: <CAFqH_52rU7ZBG_Muy2JHoqJGdXOdsNfmtJxsZoPRyx3V1aWmFw@mail.gmail.com>
-References: <20170607103242.16008-1-enric.balletbo@collabora.com>
- <20170607103242.16008-4-enric.balletbo@collabora.com>
- <6359abe2-9a21-78a2-f5ea-87e2e3335af3@ti.com>
- <CAFqH_53v32iODN4xhoh4ho4s6grxknEDS3Ak6CHBcTAQo6fDNw@mail.gmail.com>
- <578f348c-509f-79d3-9770-73c9fcffe19c@ti.com>
- <CAFqH_52rU7ZBG_Muy2JHoqJGdXOdsNfmtJxsZoPRyx3V1aWmFw@mail.gmail.com>
-Message-ID: <CABxcv=mN6=hbDSqrVkwSL8zccCntN7m_3DP6ZCbkOT6CLw+skQ@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu,  8 Jun 2017 15:34:47 -0700
+Subject: [PATCH v6 1/3] clk: imx7d: create clocks behind rawnand clock gate
+In-Reply-To: <cover.9fab78eaa869dbad4c9ad7e8578c9cef3e49daa8.1496961128.git-series.stefan@agner.ch>
+References: <cover.9fab78eaa869dbad4c9ad7e8578c9cef3e49daa8.1496961128.git-series.stefan@agner.ch>
+Message-ID: <8b9edf13938e3166081e72ba8fa4ac822035079c.1496961128.git-series.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 8, 2017 at 11:35 PM, Enric Balletbo Serra
-<eballetbo@gmail.com> wrote:
-> 2017-06-08 19:11 GMT+02:00 Grygorii Strashko <grygorii.strashko@ti.com>:
+The rawnand clock gate gates two clocks, NAND_USDHC_BUS_CLK_ROOT
+and NAND_CLK_ROOT. However, the gate has been in the chain of the
+latter only. This does not allow to use the NAND_USDHC_BUS_CLK_ROOT
+only, e.g. as required by APBH-Bridge-DMA.
 
-[snip]
+Add new clocks which represent the clock after the gate, and use a
+shared clock gate to correctly model the hardware.
 
->>>
->>> &tps {
->>>          charger {
->>>                  interrupts = <0>, <1>;
->>>                  interrupt-names = "USB", "AC";
->>>                  status = "okay";
->>>          };
->>>
->>>          pwrbutton {
->>>                  interrupts = <2>;
->>>                  status = "okay";
->>>          };
->>> };
->>
->> Sry, but this make no sense - those IRQ configuration is static,
->> so it should be defined in arch/arm/boot/dts/tps65217.dtsi at least.
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+Tested-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ drivers/clk/imx/clk-imx7d.c             | 6 ++++--
+ include/dt-bindings/clock/imx7d-clock.h | 4 +++-
+ 2 files changed, 7 insertions(+), 3 deletions(-)
 
-Agreed.
-
->
-> I was describing the state-of-art not what should be. If you mean that
-> what doesn't make sense have these interrupts portions in the DT and
-> the resources in the driver I'm completely agree. So we have two
-> options:
->
->  1) Get rid of the irq resources from tps65217 MFD driver and
-> configure all with the DT (these patches)
->  2) Get rid of the DT portions as doesn't make sense have them in two places.
->
-> If we select 2) at least we have the problem that currently all
-> sub-devices are instantiated and there is no way to disable a
-> sub-device (the problem I'm trying to solve) hence I proposed 1)
->
-
-There's also an option (3) AFAICT. To do (1) but instead of hardcoding
-in the DTS[i], to do it in the charger driver since it seems the
-sub-devices are only used for this particular MFD device, and so the
-IRQ numbers are always going to be the same (it's already hardcoded in
-the MFD driver anyways).
-
-So you can just move TPS65217_IRQ_{AC,USB} to the driver. Not sure
-what's general opinion of having drivers calling irq_create_mapping()
-to get the virtual IRQ's though...
-
-[snip]
-
->>
->> I can't find links on corresponding discussions, but mfd_add_devices() is
->> preferred for MDF devices. Below is one commit i've found. Also you can compare number of
->> drivers using mfd_add_devices() and of_platform_populate().
-
-I'm not sure if we should use that as an argument, it may well be
-that's just the drivers being half converted to DT (which is pretty
-common TBH).
-
->>
->
-> I don't think this a valid argument, I can also provide you a commit
-> that does exactly the contrary, replaces mfd_add_devices for
-> of_platform_populate (commit bb03ffb96c72)
->
->>
-
-[snip]
-
->
->> ---
->> commit 4531156db726d27e593d35800d43c74be4e393b9
->> Author: Keerthy <j-keerthy@ti.com>
->> Date:   Mon Sep 19 13:09:05 2016 +0530
->>
->>     mfd: tps65218: Use mfd_add_devices instead of of_platform_populate
->>
->>     mfd_add_devices enables parsing device tree nodes without compatibles
->>     for regulators and gpio modules. Replace of_platform_populate with
->>     mfd_add_devices. mfd_cell currently is populated with regulators,
->>     gpio and powerbutton.
->>
-
-For tps65218 couldn't instead of using mfd_add_devices() for all the
-sub-devs, had used of_platform_populate() for the ones that have
-device nodes and mfd_add_devices() only for the "tps65218-regulator"?
-
-The commit talks about nodes without compatibles but's actually about
-sub-devices without an associated device node. For me it makes sense
-to use of_platform_populate() when the MFD has device nodes for their
-sub-devices and mfd_add_devices() when DT knows nothing about the
-sub-devices.
-
-Best regards,
-Javier
+diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
+index 93b0364..e364060 100644
+--- a/drivers/clk/imx/clk-imx7d.c
++++ b/drivers/clk/imx/clk-imx7d.c
+@@ -25,6 +25,7 @@
+ static u32 share_count_sai1;
+ static u32 share_count_sai2;
+ static u32 share_count_sai3;
++static u32 share_count_nand;
+ 
+ static struct clk_div_table test_div_table[] = {
+ 	{ .val = 3, .div = 1, },
+@@ -748,7 +749,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX7D_ENET2_TIME_ROOT_DIV] = imx_clk_divider2("enet2_time_post_div", "enet2_time_pre_div", base + 0xa880, 0, 6);
+ 	clks[IMX7D_ENET_PHY_REF_ROOT_DIV] = imx_clk_divider2("enet_phy_ref_post_div", "enet_phy_ref_pre_div", base + 0xa900, 0, 6);
+ 	clks[IMX7D_EIM_ROOT_DIV] = imx_clk_divider2("eim_post_div", "eim_pre_div", base + 0xa980, 0, 6);
+-	clks[IMX7D_NAND_ROOT_DIV] = imx_clk_divider2("nand_post_div", "nand_pre_div", base + 0xaa00, 0, 6);
++	clks[IMX7D_NAND_ROOT_CLK] = imx_clk_divider2("nand_root_clk", "nand_pre_div", base + 0xaa00, 0, 6);
+ 	clks[IMX7D_QSPI_ROOT_DIV] = imx_clk_divider2("qspi_post_div", "qspi_pre_div", base + 0xaa80, 0, 6);
+ 	clks[IMX7D_USDHC1_ROOT_DIV] = imx_clk_divider2("usdhc1_post_div", "usdhc1_pre_div", base + 0xab00, 0, 6);
+ 	clks[IMX7D_USDHC2_ROOT_DIV] = imx_clk_divider2("usdhc2_post_div", "usdhc2_pre_div", base + 0xab80, 0, 6);
+@@ -825,7 +826,8 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX7D_ENET2_TIME_ROOT_CLK] = imx_clk_gate4("enet2_time_root_clk", "enet2_time_post_div", base + 0x4510, 0);
+ 	clks[IMX7D_ENET_PHY_REF_ROOT_CLK] = imx_clk_gate4("enet_phy_ref_root_clk", "enet_phy_ref_post_div", base + 0x4520, 0);
+ 	clks[IMX7D_EIM_ROOT_CLK] = imx_clk_gate4("eim_root_clk", "eim_post_div", base + 0x4160, 0);
+-	clks[IMX7D_NAND_ROOT_CLK] = imx_clk_gate4("nand_root_clk", "nand_post_div", base + 0x4140, 0);
++	clks[IMX7D_NAND_RAWNAND_CLK] = imx_clk_gate2_shared2("nand_rawnand_clk", "nand_root_clk", base + 0x4140, 0, &share_count_nand);
++	clks[IMX7D_NAND_USDHC_BUS_RAWNAND_CLK] = imx_clk_gate2_shared2("nand_usdhc_rawnand_clk", "nand_usdhc_root_clk", base + 0x4140, 0, &share_count_nand);
+ 	clks[IMX7D_QSPI_ROOT_CLK] = imx_clk_gate4("qspi_root_clk", "qspi_post_div", base + 0x4150, 0);
+ 	clks[IMX7D_USDHC1_ROOT_CLK] = imx_clk_gate4("usdhc1_root_clk", "usdhc1_post_div", base + 0x46c0, 0);
+ 	clks[IMX7D_USDHC2_ROOT_CLK] = imx_clk_gate4("usdhc2_root_clk", "usdhc2_post_div", base + 0x46d0, 0);
+diff --git a/include/dt-bindings/clock/imx7d-clock.h b/include/dt-bindings/clock/imx7d-clock.h
+index a7a1a50..de62a83 100644
+--- a/include/dt-bindings/clock/imx7d-clock.h
++++ b/include/dt-bindings/clock/imx7d-clock.h
+@@ -450,5 +450,7 @@
+ #define IMX7D_CLK_ARM			437
+ #define IMX7D_CKIL			438
+ #define IMX7D_OCOTP_CLK			439
+-#define IMX7D_CLK_END			440
++#define IMX7D_NAND_RAWNAND_CLK		440
++#define IMX7D_NAND_USDHC_BUS_RAWNAND_CLK 441
++#define IMX7D_CLK_END			442
+ #endif /* __DT_BINDINGS_CLOCK_IMX7D_H */
+-- 
+git-series 0.9.1
