@@ -1,39 +1,145 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 8 Jun 2017 09:25:15 +0200
-Subject: [PATCH] ARM: samsung: Save defconfig for Exynos,
- S3C and S5P configs
-In-Reply-To: <20170608064520.GA2770@kozik-book>
-References: <20170607181846.13539-1-krzk@kernel.org>
- <CAK8P3a2_rLigHqnOkHPM+x2GDrwdGnwJOqEbY7YTsQRUXT_eJg@mail.gmail.com>
- <20170608064520.GA2770@kozik-book>
-Message-ID: <CAK8P3a3GT3L0KaA2jLWWRuSpsTOCo0d=0hqX3Xh=yV3AZ72Drg@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 8 Jun 2017 09:44:46 +0200
+Subject: [PATCH 46/58] clocksource/drivers: Add a new driver for the
+ Atmel ARM TC blocks
+In-Reply-To: <20170608074236.62924f01@bbrezillon>
+References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
+ <20170530215139.9983-47-alexandre.belloni@free-electrons.com>
+ <20170606152104.GC2345@mai>
+ <20170606180559.pkrr7ux2qqnmsd6y@piout.net>
+ <20170607141735.GH2345@mai>
+ <20170607152750.tksmyf5p3oajbsac@piout.net>
+ <20170607210848.GJ2345@mai>
+ <20170607231715.ns2vcxza2eexnzjs@piout.net>
+ <20170608074236.62924f01@bbrezillon>
+Message-ID: <20170608074446.GM2345@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 8, 2017 at 8:45 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> On Wed, Jun 07, 2017 at 09:49:58PM +0200, Arnd Bergmann wrote:
->> On Wed, Jun 7, 2017 at 8:18 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->> > Some configs for Samsung ARM SoCs were not updated for some time and
->> > they still contain obsolete Kconfig entries.  Generate new defconfig for
->> > all Samsung ARM architectures (Exynos, S3C24xx, S3C64xx, S5Pv210).
->> >
->> > Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
->>
->> Hi Krzysztof,
->>
->> Updating the defconfig files is good, but I'm always a little unsure
->> about loss of
->> information when we do that. Would it be possible for you to split this patch
->> into two halves, with one of them just reordering the entries that moved,
->> and the second one removing the entries that have disappeared, with an
->> explanation for why they are no longer there? That would let us see whether
->> the change was intentional and avoid problems from renamed Kconfig
->> symbols that are no longer enabled afterwards.
->
-> Splitting the change into two commits (reorder and removal) makes sense.
-> However getting the information why some things were removed, will
-> require more effort. I'll see what I can do.
 
-Ok, thanks!
++Mark Rutland, +Rob Herring
 
-       Arnd
+
+Alexandre, Boris, have a look at https://www.spinics.net/lists/arm-kernel/msg572652.html
+
+That will tell you the story.
+
+On Thu, Jun 08, 2017 at 07:42:36AM +0200, Boris Brezillon wrote:
+> Le Thu, 8 Jun 2017 01:17:15 +0200,
+> Alexandre Belloni <alexandre.belloni@free-electrons.com> a ?crit :
+> 
+> > On 07/06/2017 at 23:08:48 +0200, Daniel Lezcano wrote:
+> > > > I was going to agree but this is not flexible enough because the
+> > > > quadrature decoder always uses the first two channels. So on some
+> > > > products, we may have:
+> > > >  - TCB0:
+> > > >    o channels 0,1: qdec
+> > > >    o channel 2: clocksource
+> > > > 
+> > > >  - TCB1:
+> > > >    o channels 0,1: qdec
+> > > >    o channel 2: clockevent
+> > > > 
+> > > > This avoids wasting TCB channels.  
+> > > 
+> > > Ok. In this case you can check if the interrupt is specified for the node, if
+> > > yes, then it is a clockevent.
+> > >   
+> > 
+> > But currently it is always specified in the SoC's dtsi. I don't find
+> > that too practical to push that to the board's dts. Also, lying by
+> > omission (the IRQ is always wired) in the DT is not different from
+> > having a property selecting which timer is the clocksource and which is
+> > the clockevent.
+> > 
+> 
+> I agree with Alexandre here. Really, there's not much we can do to
+> detect which timer should be used as a clockevent and which one should
+> be used as a clocksource except explicitly specifying it in the DT.
+> Having an interrupt defined in one case (clockevent) and undefined in
+> the other case (clocksource), is just as hack-ish as the detection logic
+> Alexandre developed to avoid explicitly specifying the function
+> assigned to a specific timer.
+> 
+> Can we please find a solution that makes everyone happy (DT,
+> clocksoure/clockevent and at91 maintainers)?
+> 
+> How about adding a linux,timer-function property to specify which
+> function this timer is providing?
+> 
+> Something like that for example:
+> 
+> 	tcb0: timer at fff7c000 {
+> 		compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
+> 		#address-cells = <1>;
+> 		#size-cells = <0>;
+> 		reg = <0xfff7c000 0x100>;
+> 		interrupts = <18 4>;
+> 		clocks = <&tcb0_clk>, <&clk32k>;
+> 		clock-names = "t0_clk", "slow_clk";
+> 
+> 		timer at 0 {
+> 			compatible = "atmel,tcb-timer";
+> 			reg = <0>, <1>;
+> 			linux,timer-function = "clocksource";
+> 		};
+> 
+> 		timer at 2 {
+> 			compatible = "atmel,tcb-timer";
+> 			reg = <2>;
+> 			linux,timer-function = "clockevent";
+> 		};
+> 	};
+> 
+> Alternatively, we could have a property or a node in chosen describing which
+> timer should be used:
+> 
+> 	chosen {
+> 		clockevent {
+> 			timer = <&timer2>;
+> 		};
+> 
+> 		clocksource {
+> 			timer = <&timer0>;
+> 		};
+> 
+> 		/*
+> 		 * or
+> 		 *
+> 		 * clockevent = <&timer2>;
+> 		 * clocksource = <&timer0>;
+> 		 *
+> 		 * but I think the clocksource/clockevent node approach
+> 		 * is more future proof in case we need to add extra
+> 		 * information like the expected resolution/precision or
+> 		 * anything that could be tweakable.
+> 		 */
+> 	};
+> 
+> 	tcb0: timer at fff7c000 {
+> 		compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
+> 		#address-cells = <1>;
+> 		#size-cells = <0>;
+> 		reg = <0xfff7c000 0x100>;
+> 		interrupts = <18 4>;
+> 		clocks = <&tcb0_clk>, <&clk32k>;
+> 		clock-names = "t0_clk", "slow_clk";
+> 
+> 		timer0: timer at 0 {
+> 			compatible = "atmel,tcb-timer";
+> 			reg = <0>, <1>;
+> 		};
+> 
+> 		timer2: timer at 2 {
+> 			compatible = "atmel,tcb-timer";
+> 			reg = <2>;
+> 		};
+> 	};
+
+-- 
+
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
