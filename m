@@ -1,51 +1,108 @@
 From: varada@codeaurora.org (Varadarajan Narayanan)
-Date: Thu,  8 Jun 2017 11:13:58 +0530
-Subject: [PATCH v5 3/6] clk: qcom: Add DT bindings for ipq8074 gcc clock
- controller
+Date: Thu,  8 Jun 2017 11:14:00 +0530
+Subject: [PATCH v5 5/6] arm64: dts: Add ipq8074 SoC and HK01 board support
 In-Reply-To: <1496900641-27755-1-git-send-email-varada@codeaurora.org>
 References: <1496900641-27755-1-git-send-email-varada@codeaurora.org>
-Message-ID: <1496900641-27755-4-git-send-email-varada@codeaurora.org>
+Message-ID: <1496900641-27755-6-git-send-email-varada@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Abhishek Sahu <absahu@codeaurora.org>
+Add initial device tree support for the Qualcomm IPQ8074 SoC and
+HK01 evaluation board.
 
-Add the compatible strings and the include file for ipq8074 gcc
-clock controller.
-
-Acked-by: Rob Herring <robh@kernel.org> (bindings)
-Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
+Signed-off-by: Manoharan Vijaya Raghavan <mraghava@codeaurora.org>
 Signed-off-by: Abhishek Sahu <absahu@codeaurora.org>
+Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
 ---
- .../devicetree/bindings/clock/qcom,gcc.txt         |   1 +
- include/dt-bindings/clock/qcom,gcc-ipq8074.h       | 152 +++++++++++++++++++++
- 2 files changed, 153 insertions(+)
- create mode 100644 include/dt-bindings/clock/qcom,gcc-ipq8074.h
+ arch/arm64/boot/dts/qcom/Makefile         |   1 +
+ arch/arm64/boot/dts/qcom/ipq8074-hk01.dts |  53 ++++++++
+ arch/arm64/boot/dts/qcom/ipq8074.dtsi     | 194 ++++++++++++++++++++++++++++++
+ 3 files changed, 248 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
+ create mode 100644 arch/arm64/boot/dts/qcom/ipq8074.dtsi
 
-diff --git a/Documentation/devicetree/bindings/clock/qcom,gcc.txt b/Documentation/devicetree/bindings/clock/qcom,gcc.txt
-index 5b4dfc1..551d03b 100644
---- a/Documentation/devicetree/bindings/clock/qcom,gcc.txt
-+++ b/Documentation/devicetree/bindings/clock/qcom,gcc.txt
-@@ -8,6 +8,7 @@ Required properties :
- 			"qcom,gcc-apq8084"
- 			"qcom,gcc-ipq8064"
- 			"qcom,gcc-ipq4019"
-+			"qcom,gcc-ipq8074"
- 			"qcom,gcc-msm8660"
- 			"qcom,gcc-msm8916"
- 			"qcom,gcc-msm8960"
-diff --git a/include/dt-bindings/clock/qcom,gcc-ipq8074.h b/include/dt-bindings/clock/qcom,gcc-ipq8074.h
+diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
+index cc0f02d..ff81d7e 100644
+--- a/arch/arm64/boot/dts/qcom/Makefile
++++ b/arch/arm64/boot/dts/qcom/Makefile
+@@ -1,5 +1,6 @@
+ dtb-$(CONFIG_ARCH_QCOM)	+= apq8016-sbc.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= apq8096-db820c.dtb
++dtb-$(CONFIG_ARCH_QCOM)	+= ipq8074-hk01.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= msm8916-mtp.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= msm8992-bullhead-rev-101.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= msm8994-angler-rev-101.dtb
+diff --git a/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts b/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
 new file mode 100644
-index 0000000..370c83c
+index 0000000..7d44be9
 --- /dev/null
-+++ b/include/dt-bindings/clock/qcom,gcc-ipq8074.h
-@@ -0,0 +1,152 @@
-+/*
-+ * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
++++ b/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
+@@ -0,0 +1,53 @@
++/dts-v1/;
++/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
 + *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++#include "ipq8074.dtsi"
++
++/ {
++	#address-cells = <0x2>;
++	#size-cells = <0x2>;
++	model = "Qualcomm Technologies, Inc. IPQ8074-HK01";
++	compatible = "qcom,ipq8074-hk01", "qcom,ipq8074";
++	interrupt-parent = <&intc>;
++
++	aliases {
++		serial0 = &blsp1_uart5;
++	};
++
++	chosen {
++		bootargs = "root=/dev/ram0 rw init=/init";
++		stdout-path = "serial0";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x0 0x40000000 0x0 0x20000000>;
++	};
++
++	soc {
++		pinctrl at 1000000 {
++			serial_4_pins: serial4_pinmux {
++				mux {
++					pins = "gpio23", "gpio24";
++					function = "blsp4_uart1";
++					bias-disable;
++				};
++			};
++		};
++
++		serial at 78b3000 {
++			pinctrl-0 = <&serial_4_pins>;
++			pinctrl-names = "default";
++			status = "ok";
++		};
++	};
++};
+diff --git a/arch/arm64/boot/dts/qcom/ipq8074.dtsi b/arch/arm64/boot/dts/qcom/ipq8074.dtsi
+new file mode 100644
+index 0000000..2bc5dec
+--- /dev/null
++++ b/arch/arm64/boot/dts/qcom/ipq8074.dtsi
+@@ -0,0 +1,194 @@
++/*
++ * Copyright (c) 2017, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
 + *
 + * This program is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -53,144 +110,186 @@ index 0000000..370c83c
 + * GNU General Public License for more details.
 + */
 +
-+#ifndef _DT_BINDINGS_CLOCK_IPQ_GCC_8074_H
-+#define _DT_BINDINGS_CLOCK_IPQ_GCC_8074_H
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/clock/qcom,gcc-ipq8074.h>
 +
-+#define GPLL0					0
-+#define GPLL0_MAIN				1
-+#define GCC_SLEEP_CLK_SRC			2
-+#define BLSP1_QUP1_I2C_APPS_CLK_SRC		3
-+#define BLSP1_QUP1_SPI_APPS_CLK_SRC		4
-+#define BLSP1_QUP2_I2C_APPS_CLK_SRC		5
-+#define BLSP1_QUP2_SPI_APPS_CLK_SRC		6
-+#define BLSP1_QUP3_I2C_APPS_CLK_SRC		7
-+#define BLSP1_QUP3_SPI_APPS_CLK_SRC		8
-+#define BLSP1_QUP4_I2C_APPS_CLK_SRC		9
-+#define BLSP1_QUP4_SPI_APPS_CLK_SRC		10
-+#define BLSP1_QUP5_I2C_APPS_CLK_SRC		11
-+#define BLSP1_QUP5_SPI_APPS_CLK_SRC		12
-+#define BLSP1_QUP6_I2C_APPS_CLK_SRC		13
-+#define BLSP1_QUP6_SPI_APPS_CLK_SRC		14
-+#define BLSP1_UART1_APPS_CLK_SRC		15
-+#define BLSP1_UART2_APPS_CLK_SRC		16
-+#define BLSP1_UART3_APPS_CLK_SRC		17
-+#define BLSP1_UART4_APPS_CLK_SRC		18
-+#define BLSP1_UART5_APPS_CLK_SRC		19
-+#define BLSP1_UART6_APPS_CLK_SRC		20
-+#define GCC_BLSP1_AHB_CLK			21
-+#define GCC_BLSP1_QUP1_I2C_APPS_CLK		22
-+#define GCC_BLSP1_QUP1_SPI_APPS_CLK		23
-+#define GCC_BLSP1_QUP2_I2C_APPS_CLK		24
-+#define GCC_BLSP1_QUP2_SPI_APPS_CLK		25
-+#define GCC_BLSP1_QUP3_I2C_APPS_CLK		26
-+#define GCC_BLSP1_QUP3_SPI_APPS_CLK		27
-+#define GCC_BLSP1_QUP4_I2C_APPS_CLK		28
-+#define GCC_BLSP1_QUP4_SPI_APPS_CLK		29
-+#define GCC_BLSP1_QUP5_I2C_APPS_CLK		30
-+#define GCC_BLSP1_QUP5_SPI_APPS_CLK		31
-+#define GCC_BLSP1_QUP6_I2C_APPS_CLK		32
-+#define GCC_BLSP1_QUP6_SPI_APPS_CLK		33
-+#define GCC_BLSP1_UART1_APPS_CLK		34
-+#define GCC_BLSP1_UART2_APPS_CLK		35
-+#define GCC_BLSP1_UART3_APPS_CLK		36
-+#define GCC_BLSP1_UART4_APPS_CLK		37
-+#define GCC_BLSP1_UART5_APPS_CLK		38
-+#define GCC_BLSP1_UART6_APPS_CLK		39
-+#define GCC_PRNG_AHB_CLK			40
-+#define GCC_QPIC_AHB_CLK			41
-+#define GCC_QPIC_CLK				42
-+#define PCNOC_BFDCD_CLK_SRC			43
++/ {
++	model = "Qualcomm Technologies, Inc. IPQ8074";
++	compatible = "qcom,ipq8074";
 +
-+#define GCC_BLSP1_BCR				0
-+#define GCC_BLSP1_QUP1_BCR			1
-+#define GCC_BLSP1_UART1_BCR			2
-+#define GCC_BLSP1_QUP2_BCR			3
-+#define GCC_BLSP1_UART2_BCR			4
-+#define GCC_BLSP1_QUP3_BCR			5
-+#define GCC_BLSP1_UART3_BCR			6
-+#define GCC_BLSP1_QUP4_BCR			7
-+#define GCC_BLSP1_UART4_BCR			8
-+#define GCC_BLSP1_QUP5_BCR			9
-+#define GCC_BLSP1_UART5_BCR			10
-+#define GCC_BLSP1_QUP6_BCR			11
-+#define GCC_BLSP1_UART6_BCR			12
-+#define GCC_IMEM_BCR				13
-+#define GCC_SMMU_BCR				14
-+#define GCC_APSS_TCU_BCR			15
-+#define GCC_SMMU_XPU_BCR			16
-+#define GCC_PCNOC_TBU_BCR			17
-+#define GCC_SMMU_CFG_BCR			18
-+#define GCC_PRNG_BCR				19
-+#define GCC_BOOT_ROM_BCR			20
-+#define GCC_CRYPTO_BCR				21
-+#define GCC_WCSS_BCR				22
-+#define GCC_WCSS_Q6_BCR				23
-+#define GCC_NSS_BCR				24
-+#define GCC_SEC_CTRL_BCR			25
-+#define GCC_ADSS_BCR				26
-+#define GCC_DDRSS_BCR				27
-+#define GCC_SYSTEM_NOC_BCR			28
-+#define GCC_PCNOC_BCR				29
-+#define GCC_TCSR_BCR				30
-+#define GCC_QDSS_BCR				31
-+#define GCC_DCD_BCR				32
-+#define GCC_MSG_RAM_BCR				33
-+#define GCC_MPM_BCR				34
-+#define GCC_SPMI_BCR				35
-+#define GCC_SPDM_BCR				36
-+#define GCC_RBCPR_BCR				37
-+#define GCC_RBCPR_MX_BCR			38
-+#define GCC_TLMM_BCR				39
-+#define GCC_RBCPR_WCSS_BCR			40
-+#define GCC_USB0_PHY_BCR			41
-+#define GCC_USB3PHY_0_PHY_BCR			42
-+#define GCC_USB0_BCR				43
-+#define GCC_USB1_PHY_BCR			44
-+#define GCC_USB3PHY_1_PHY_BCR			45
-+#define GCC_USB1_BCR				46
-+#define GCC_QUSB2_0_PHY_BCR			47
-+#define GCC_QUSB2_1_PHY_BCR			48
-+#define GCC_SDCC1_BCR				49
-+#define GCC_SDCC2_BCR				50
-+#define GCC_SNOC_BUS_TIMEOUT0_BCR		51
-+#define GCC_SNOC_BUS_TIMEOUT2_BCR		52
-+#define GCC_SNOC_BUS_TIMEOUT3_BCR		53
-+#define GCC_PCNOC_BUS_TIMEOUT0_BCR		54
-+#define GCC_PCNOC_BUS_TIMEOUT1_BCR		55
-+#define GCC_PCNOC_BUS_TIMEOUT2_BCR		56
-+#define GCC_PCNOC_BUS_TIMEOUT3_BCR		57
-+#define GCC_PCNOC_BUS_TIMEOUT4_BCR		58
-+#define GCC_PCNOC_BUS_TIMEOUT5_BCR		59
-+#define GCC_PCNOC_BUS_TIMEOUT6_BCR		60
-+#define GCC_PCNOC_BUS_TIMEOUT7_BCR		61
-+#define GCC_PCNOC_BUS_TIMEOUT8_BCR		62
-+#define GCC_PCNOC_BUS_TIMEOUT9_BCR		63
-+#define GCC_UNIPHY0_BCR				64
-+#define GCC_UNIPHY1_BCR				65
-+#define GCC_UNIPHY2_BCR				66
-+#define GCC_CMN_12GPLL_BCR			67
-+#define GCC_QPIC_BCR				68
-+#define GCC_MDIO_BCR				69
-+#define GCC_PCIE1_TBU_BCR			70
-+#define GCC_WCSS_CORE_TBU_BCR			71
-+#define GCC_WCSS_Q6_TBU_BCR			72
-+#define GCC_USB0_TBU_BCR			73
-+#define GCC_USB1_TBU_BCR			74
-+#define GCC_PCIE0_TBU_BCR			75
-+#define GCC_NSS_NOC_TBU_BCR			76
-+#define GCC_PCIE0_BCR				77
-+#define GCC_PCIE0_PHY_BCR			78
-+#define GCC_PCIE0PHY_PHY_BCR			79
-+#define GCC_PCIE0_LINK_DOWN_BCR			80
-+#define GCC_PCIE1_BCR				81
-+#define GCC_PCIE1_PHY_BCR			82
-+#define GCC_PCIE1PHY_PHY_BCR			83
-+#define GCC_PCIE1_LINK_DOWN_BCR			84
-+#define GCC_DCC_BCR				85
-+#define GCC_APC0_VOLTAGE_DROOP_DETECTOR_BCR	86
-+#define GCC_APC1_VOLTAGE_DROOP_DETECTOR_BCR	87
-+#define GCC_SMMU_CATS_BCR			88
++	soc: soc {
++		#address-cells = <0x1>;
++		#size-cells = <0x1>;
++		ranges = <0 0 0 0xffffffff>;
++		compatible = "simple-bus";
 +
-+#endif
++		pinctrl at 1000000 {
++			compatible = "qcom,ipq8074-pinctrl";
++			reg = <0x1000000 0x300000>;
++			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
++			gpio-controller;
++			#gpio-cells = <0x2>;
++			interrupt-controller;
++			#interrupt-cells = <0x2>;
++		};
++
++		intc: interrupt-controller at b000000 {
++			compatible = "qcom,msm-qgic2";
++			interrupt-controller;
++			#interrupt-cells = <0x3>;
++			reg = <0xb000000 0x1000>, <0xb002000 0x1000>;
++		};
++
++		timer {
++			compatible = "arm,armv8-timer";
++			interrupts = <GIC_PPI 2 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++				     <GIC_PPI 3 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++				     <GIC_PPI 4 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++				     <GIC_PPI 1 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
++		};
++
++		timer at b120000 {
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++			compatible = "arm,armv7-timer-mem";
++			reg = <0xb120000 0x1000>;
++			clock-frequency = <19200000>;
++
++			frame at b120000 {
++				frame-number = <0>;
++				interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0xb121000 0x1000>,
++				      <0xb122000 0x1000>;
++			};
++
++			frame at b123000 {
++				frame-number = <1>;
++				interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0xb123000 0x1000>;
++				status = "disabled";
++			};
++
++			frame at b124000 {
++				frame-number = <2>;
++				interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0xb124000 0x1000>;
++				status = "disabled";
++			};
++
++			frame at b125000 {
++				frame-number = <3>;
++				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0xb125000 0x1000>;
++				status = "disabled";
++			};
++
++			frame at b126000 {
++				frame-number = <4>;
++				interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0xb126000 0x1000>;
++				status = "disabled";
++			};
++
++			frame at b127000 {
++				frame-number = <5>;
++				interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0xb127000 0x1000>;
++				status = "disabled";
++			};
++
++			frame at b128000 {
++				frame-number = <6>;
++				interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0xb128000 0x1000>;
++				status = "disabled";
++			};
++		};
++
++		gcc: gcc at 1800000 {
++			compatible = "qcom,gcc-ipq8074";
++			reg = <0x1800000 0x80000>;
++			#clock-cells = <0x1>;
++			#reset-cells = <0x1>;
++		};
++
++		blsp1_uart5: serial at 78b3000 {
++			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
++			reg = <0x78b3000 0x200>;
++			interrupts = <GIC_SPI 308 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&gcc GCC_BLSP1_UART5_APPS_CLK>,
++				 <&gcc GCC_BLSP1_AHB_CLK>;
++			clock-names = "core", "iface";
++			status = "disabled";
++		};
++	};
++
++	cpus {
++		#address-cells = <0x1>;
++		#size-cells = <0x0>;
++
++		CPU0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0>;
++			next-level-cache = <&L2_0>;
++			enable-method = "psci";
++		};
++
++		CPU1: cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			enable-method = "psci";
++			reg = <0x1>;
++			next-level-cache = <&L2_0>;
++		};
++
++		CPU2: cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			enable-method = "psci";
++			reg = <0x2>;
++			next-level-cache = <&L2_0>;
++		};
++
++		CPU3: cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			enable-method = "psci";
++			reg = <0x3>;
++			next-level-cache = <&L2_0>;
++		};
++
++		L2_0: l2-cache {
++			compatible = "cache";
++			cache-level = <0x2>;
++		};
++	};
++
++	psci {
++		compatible = "arm,psci-1.0";
++		method = "smc";
++	};
++
++	pmu {
++		compatible = "arm,armv8-pmuv3";
++		interrupts = <GIC_PPI 7 GIC_CPU_MASK_SIMPLE(4)>;
++	};
++
++	clocks {
++		sleep_clk: sleep_clk {
++			compatible = "fixed-clock";
++			clock-frequency = <32000>;
++			#clock-cells = <0>;
++		};
++
++		xo: xo {
++			compatible = "fixed-clock";
++			clock-frequency = <19200000>;
++			#clock-cells = <0>;
++		};
++	};
++};
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
