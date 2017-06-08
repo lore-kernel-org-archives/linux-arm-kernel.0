@@ -1,50 +1,60 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 8 Jun 2017 01:24:32 -0700
-Subject: [PATCH 07/11] ARM: OMAP2+: Remove unused legacy code for DMA
-In-Reply-To: <10f65a24-0459-5df7-378d-84933b83c070@ti.com>
-References: <20170531225139.30723-1-tony@atomide.com>
- <20170531225139.30723-8-tony@atomide.com>
- <10f65a24-0459-5df7-378d-84933b83c070@ti.com>
-Message-ID: <20170608082432.GF3730@atomide.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 8 Jun 2017 10:26:46 +0200
+Subject: [PATCH] ARM: debug-ll: Add support for r8a7743
+In-Reply-To: <1496908117-19368-1-git-send-email-chris.paterson2@renesas.com>
+References: <1496908117-19368-1-git-send-email-chris.paterson2@renesas.com>
+Message-ID: <CAMuHMdUg2Ox7ATSBKMiCua=VekEaoPZLpyQXGg=45XWV+12imA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [170607 23:29]:
-> On 2017-06-01 01:51, Tony Lindgren wrote:
-> > --- a/arch/arm/mach-omap2/dma.c
-> > +++ b/arch/arm/mach-omap2/dma.c
-> > @@ -334,20 +334,6 @@ static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *unused)
-> >  	p.dma_attr = (struct omap_dma_dev_attr *)oh->dev_attr;
-> >  	p.errata = configure_dma_errata();
-> >  
-> > -	if (!of_have_populated_dt()) {
-> > -		if (soc_is_omap24xx()) {
-> > -			p.slave_map = omap24xx_sdma_map;
-> > -			p.slavecnt = ARRAY_SIZE(omap24xx_sdma_map);
-> > -		} else if (soc_is_omap34xx() || soc_is_omap3630()) {
-> > -			p.slave_map = omap3xxx_sdma_map;
-> > -			p.slavecnt = ARRAY_SIZE(omap3xxx_sdma_map);
-> > -		} else {
-> > -			pr_err("%s: The legacy DMA map is not provided!\n",
-> > -			       __func__);
-> > -			return -ENODEV;
-> > -		}
-> > -	}
-> > -
-> 
-> This will conflict with the changes introduced by the tusb6010 DMAengine
-> conversion:
-> https://patchwork.kernel.org/patch/9734219/
+Hi Chris,
 
-Oops forgot about that one. I'll take a look if it makes sense
-to leave the braces for now to avoid a merge conflict.
+On Thu, Jun 8, 2017 at 9:48 AM, Chris Paterson
+<chris.paterson2@renesas.com> wrote:
+> Enable low-level debugging support for RZ/G1M (r8a7743). RZ/G1M uses
+> SCIF0 for the debug console, like most of the R-Car Gen2 SoCs.
 
-> with this patch I think the omap24xx_sdma_map and omap3xxx_sdma_map can
-> also be removed, but we need to keep the omap24xx_sdma_dt_map for now
-> till we have proper DT support for tusb.
+Thanks for your patch!
 
-OK good point, will check.
+While the recommended debug method these days is "earlycon", DEBUG_LL is
+indeed still useful to debug issues before earlycon is initialized.
+Let's hope you will never encounter such issues on arm64, which doesn't
+have DEBUG_LL per policy decision...
 
-Regards,
+> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
 
-Tony
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -895,12 +895,13 @@ choice
+>                   via SCIF2 on Renesas R-Car H1 (R8A7779).
+>
+>         config DEBUG_RCAR_GEN2_SCIF0
+> -               bool "Kernel low-level debugging messages via SCIF0 on R8A7790/R8A7791/R8A7792/R8A7793"
+> -               depends on ARCH_R8A7790 || ARCH_R8A7791 || ARCH_R8A7792 || ARCH_R8A7793
+> +               bool "Kernel low-level debugging messages via SCIF0 on R8A7743/R8A7790/R8A7791/R8A7792/R8A7793"
+
+This line is becoming a bit long, and it'll only become worse in the future.
+What about "Kernel low-level debugging messages via SCIF0 on R-Car Gen2"?
+The full list of SoCs is still available in the extended help text.
+
+> +               depends on ARCH_R8A7743 || ARCH_R8A7790 || ARCH_R8A7791 || \
+> +                       ARCH_R8A7792 || ARCH_R8A7793
+>                 help
+>                   Say Y here if you want kernel low-level debugging support
+> -                 via SCIF0 on Renesas R-Car H2 (R8A7790), M2-W (R8A7791), V2H
+> -                 (R8A7792), or M2-N (R8A7793).
+> +                 via SCIF0 on Renesas RZ/G1M (R8A7743), R-Car H2 (R8A7790),
+> +                 M2-W (R8A7791), V2H (R8A7792), or M2-N (R8A7793).
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
