@@ -1,102 +1,86 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 08 Jun 2017 15:07:19 +0100
-Subject: [PATCH v3 6/9] KVM: arm/arm64: Introduce an allocator for
- in-kernel irq lines
-In-Reply-To: <20170608133446.3875-7-cdall@linaro.org> (Christoffer Dall's
- message of "Thu, 8 Jun 2017 15:34:43 +0200")
-References: <20170608133446.3875-1-cdall@linaro.org>
- <20170608133446.3875-7-cdall@linaro.org>
-Message-ID: <87bmpyine0.fsf@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 8 Jun 2017 15:09:12 +0100
+Subject: [PATCH 05/20] arm64: rename COMPAT to AARCH32_EL0 in Kconfig
+In-Reply-To: <20170604120009.342-6-ynorov@caviumnetworks.com>
+References: <20170604120009.342-1-ynorov@caviumnetworks.com>
+ <20170604120009.342-6-ynorov@caviumnetworks.com>
+Message-ID: <20170608140912.56rww67adolr4ytr@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 08 2017 at  3:34:43 pm BST, Christoffer Dall <cdall@linaro.org> wrote:
-> Having multiple devices being able to signal the same interrupt line is
-> very confusing and almost certainly guarantees a configuration error.
->
-> Therefore, introduce a very simple allocator which allows a device to
-> claim an interrupt line from the vgic for a given VM.
->
-> Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> ---
->  include/kvm/arm_vgic.h   |  5 +++++
->  virt/kvm/arm/vgic/vgic.c | 33 +++++++++++++++++++++++++++++++++
->  2 files changed, 38 insertions(+)
->
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index dde59fb..5d5b345 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -121,6 +121,9 @@ struct vgic_irq {
->  	u8 source;			/* GICv2 SGIs only */
->  	u8 priority;
->  	enum vgic_irq_config config;	/* Level or edge */
-> +
-> +	void *owner;			/* Opaque pointer to reserve an interrupt
-> +					   for in-kernel devices. */
->  };
+On Sun, Jun 04, 2017 at 02:59:54PM +0300, Yury Norov wrote:
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -402,7 +402,7 @@ config ARM64_ERRATUM_834220
 >  
->  struct vgic_register_region;
-> @@ -340,4 +343,6 @@ int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi);
->   */
->  int kvm_vgic_setup_default_irq_routing(struct kvm *kvm);
+>  config ARM64_ERRATUM_845719
+>  	bool "Cortex-A53: 845719: a load might read incorrect data"
+> -	depends on COMPAT
+> +	depends on AARCH32_EL0
+>  	default y
+>  	help
+>  	  This option adds an alternative code sequence to work around ARM
+> @@ -784,7 +784,7 @@ config FORCE_MAX_ZONEORDER
 >  
-> +int kvm_vgic_set_owner(struct kvm_vcpu *vcpu, unsigned int intid, void *owner);
-> +
->  #endif /* __KVM_ARM_VGIC_H */
-> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> index c66feac..9628945 100644
-> --- a/virt/kvm/arm/vgic/vgic.c
-> +++ b/virt/kvm/arm/vgic/vgic.c
-> @@ -435,6 +435,39 @@ int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq)
->  }
+>  menuconfig ARMV8_DEPRECATED
+>  	bool "Emulate deprecated/obsolete ARMv8 instructions"
+> -	depends on COMPAT
+> +	depends on AARCH32_EL0
+>  	help
+>  	  Legacy software support may require certain instructions
+>  	  that have been deprecated or obsoleted in the architecture.
+> @@ -1062,9 +1062,15 @@ menu "Userspace binary formats"
+>  source "fs/Kconfig.binfmt"
 >  
->  /**
-> + * kvm_vgic_set_owner - Set the owner of an interrupt for a VM
-> + *
-> + * @vcpu:   Pointer to the VCPU (used for PPIs)
-> + * @intid:  The virtual INTID identifying the interrupt (PPI or SPI)
-> + * @owner:  Opaque pointer to the owner
-> + *
-> + * Returns 0 if intid is not already used by another in-kernel device and the
-> + * owner is set, otherwise returns an error code.
-> + */
-> +int kvm_vgic_set_owner(struct kvm_vcpu *vcpu, unsigned int intid, void *owner)
-> +{
-> +	struct vgic_irq *irq;
-> +	int ret = 0;
-> +
-> +	if (!vgic_initialized(vcpu->kvm))
-> +		return -EAGAIN;
-> +
-> +	/* SGIs and LPIs cannot be wired up to any device */
-> +	if (!irq_is_ppi(intid) && !vgic_valid_spi(vcpu->kvm, intid))
-> +		return -EINVAL;
-> +
-> +	irq = vgic_get_irq(vcpu->kvm, vcpu, intid);
-> +	spin_lock(&irq->irq_lock);
-> +	if (irq->owner && irq->owner != owner)
-> +		ret = -EEXIST;
-> +	else
-> +		irq->owner = owner;
+>  config COMPAT
+> +	bool
+> +	depends on AARCH32_EL0
 
-Is there any case where you'd end-up setting the owner multiple times?
-Or is that just convenient?
+You could just use "def_bool y" here
 
-> +	spin_unlock(&irq->irq_lock);
 > +
-> +	return ret;
-> +}
+> +config AARCH32_EL0
+>  	bool "Kernel support for 32-bit EL0"
+> +	def_bool y
+>  	depends on ARM64_4K_PAGES || EXPERT
+>  	select COMPAT_BINFMT_ELF if BINFMT_ELF
+> +	select COMPAT
+
+and avoid the explicit select.
+
+>  	select HAVE_UID16
+>  	select OLD_SIGSUSPEND3
+>  	select COMPAT_OLD_SIGACTION
+[...]
+> --- a/arch/arm64/kernel/cpuinfo.c
+> +++ b/arch/arm64/kernel/cpuinfo.c
+> @@ -139,15 +139,17 @@ static int c_show(struct seq_file *m, void *v)
+>  		 */
+>  		seq_puts(m, "Features\t:");
+>  		if (compat) {
+> -#ifdef CONFIG_COMPAT
+> -			for (j = 0; compat_hwcap_str[j]; j++)
+> -				if (compat_elf_hwcap & (1 << j))
+> -					seq_printf(m, " %s", compat_hwcap_str[j]);
+> -
+> -			for (j = 0; compat_hwcap2_str[j]; j++)
+> -				if (compat_elf_hwcap2 & (1 << j))
+> -					seq_printf(m, " %s", compat_hwcap2_str[j]);
+> -#endif /* CONFIG_COMPAT */
+> +#ifdef CONFIG_AARCH32_EL0
+> +			if (personality(current->personality) == PER_LINUX32) {
+> +				for (j = 0; compat_hwcap_str[j]; j++)
+> +					if (compat_elf_hwcap & (1 << j))
+> +						seq_printf(m, " %s", compat_hwcap_str[j]);
 > +
-> +/**
->   * vgic_prune_ap_list - Remove non-relevant interrupts from the list
->   *
->   * @vcpu: The VCPU pointer
+> +				for (j = 0; compat_hwcap2_str[j]; j++)
+> +					if (compat_elf_hwcap2 & (1 << j))
+> +						seq_printf(m, " %s", compat_hwcap2_str[j]);
+> +			}
+> +#endif /* CONFIG_AARCH32_EL0 */
 
-Otherwise,
+I don't understand this hunk. Why do you need another check on
+personality? "compat" is already true if PER_LINUX32.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
 -- 
-Jazz is not dead, it just smell funny.
+Catalin
