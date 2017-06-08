@@ -1,31 +1,127 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 8 Jun 2017 10:55:16 +0530
-Subject: [PATCH 1/2] ARM: davinci: pdata-quirks: fix const warnings
-In-Reply-To: <20170602231210.19553-2-khilman@baylibre.com>
-References: <20170602231210.19553-1-khilman@baylibre.com>
- <20170602231210.19553-2-khilman@baylibre.com>
-Message-ID: <5144c8fc-06a8-1d85-0bd3-2640d0903d5c@ti.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 8 Jun 2017 07:42:36 +0200
+Subject: [PATCH 46/58] clocksource/drivers: Add a new driver for the
+ Atmel ARM TC blocks
+In-Reply-To: <20170607231715.ns2vcxza2eexnzjs@piout.net>
+References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
+ <20170530215139.9983-47-alexandre.belloni@free-electrons.com>
+ <20170606152104.GC2345@mai>
+ <20170606180559.pkrr7ux2qqnmsd6y@piout.net>
+ <20170607141735.GH2345@mai>
+ <20170607152750.tksmyf5p3oajbsac@piout.net>
+ <20170607210848.GJ2345@mai>
+ <20170607231715.ns2vcxza2eexnzjs@piout.net>
+Message-ID: <20170608074236.62924f01@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Le Thu, 8 Jun 2017 01:17:15 +0200,
+Alexandre Belloni <alexandre.belloni@free-electrons.com> a ?crit :
 
-On Saturday 03 June 2017 04:42 AM, Kevin Hilman wrote:
-> After VPIF was converted to enable getting subdevs from DT, the
-> pdata is no longer const, so remove these to avoid compiler warnings.
+> On 07/06/2017 at 23:08:48 +0200, Daniel Lezcano wrote:
+> > > I was going to agree but this is not flexible enough because the
+> > > quadrature decoder always uses the first two channels. So on some
+> > > products, we may have:
+> > >  - TCB0:
+> > >    o channels 0,1: qdec
+> > >    o channel 2: clocksource
+> > > 
+> > >  - TCB1:
+> > >    o channels 0,1: qdec
+> > >    o channel 2: clockevent
+> > > 
+> > > This avoids wasting TCB channels.  
+> > 
+> > Ok. In this case you can check if the interrupt is specified for the node, if
+> > yes, then it is a clockevent.
+> >   
 > 
-> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+> But currently it is always specified in the SoC's dtsi. I don't find
+> that too practical to push that to the board's dts. Also, lying by
+> omission (the IRQ is always wired) in the DT is not different from
+> having a property selecting which timer is the clocksource and which is
+> the clockevent.
+> 
 
-I think this should be squashed into patch 2/4 of "davinci:
-vpif_capture: raw camera support" series where the warning is
-introduced. That does mix the platform and driver parts in one patch,
-but I think its better that way so that no patch introduces a warning.
+I agree with Alexandre here. Really, there's not much we can do to
+detect which timer should be used as a clockevent and which one should
+be used as a clocksource except explicitly specifying it in the DT.
+Having an interrupt defined in one case (clockevent) and undefined in
+the other case (clocksource), is just as hack-ish as the detection logic
+Alexandre developed to avoid explicitly specifying the function
+assigned to a specific timer.
 
-The patch does not clash with anything queued in davinci tree, so I
-think it should be fine.
+Can we please find a solution that makes everyone happy (DT,
+clocksoure/clockevent and at91 maintainers)?
 
-Also, there is a warning introduced in
-arch/arm/mach-davinci/board-dm646x-evm.c that should be fixed as well.
+How about adding a linux,timer-function property to specify which
+function this timer is providing?
 
-Thanks,
-Sekhar
+Something like that for example:
+
+	tcb0: timer at fff7c000 {
+		compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0xfff7c000 0x100>;
+		interrupts = <18 4>;
+		clocks = <&tcb0_clk>, <&clk32k>;
+		clock-names = "t0_clk", "slow_clk";
+
+		timer at 0 {
+			compatible = "atmel,tcb-timer";
+			reg = <0>, <1>;
+			linux,timer-function = "clocksource";
+		};
+
+		timer at 2 {
+			compatible = "atmel,tcb-timer";
+			reg = <2>;
+			linux,timer-function = "clockevent";
+		};
+	};
+
+Alternatively, we could have a property or a node in chosen describing which
+timer should be used:
+
+	chosen {
+		clockevent {
+			timer = <&timer2>;
+		};
+
+		clocksource {
+			timer = <&timer0>;
+		};
+
+		/*
+		 * or
+		 *
+		 * clockevent = <&timer2>;
+		 * clocksource = <&timer0>;
+		 *
+		 * but I think the clocksource/clockevent node approach
+		 * is more future proof in case we need to add extra
+		 * information like the expected resolution/precision or
+		 * anything that could be tweakable.
+		 */
+	};
+
+	tcb0: timer at fff7c000 {
+		compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0xfff7c000 0x100>;
+		interrupts = <18 4>;
+		clocks = <&tcb0_clk>, <&clk32k>;
+		clock-names = "t0_clk", "slow_clk";
+
+		timer0: timer at 0 {
+			compatible = "atmel,tcb-timer";
+			reg = <0>, <1>;
+		};
+
+		timer2: timer at 2 {
+			compatible = "atmel,tcb-timer";
+			reg = <2>;
+		};
+	};
