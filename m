@@ -1,43 +1,28 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 08 Jun 2017 10:22:20 +0900
-Subject: [PATCH] devfreq: exynos-ppmu: Staticize event list
-In-Reply-To: <20170607181228.32102-1-krzk@kernel.org>
-References: <CGME20170607181258epcas2p4191204d7b3853ef0482d84df7a06589d@epcas2p4.samsung.com>
- <20170607181228.32102-1-krzk@kernel.org>
-Message-ID: <5938A6CC.8030206@samsung.com>
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Thu, 8 Jun 2017 09:23:10 +0800
+Subject: [PATCH] Revert "ARM: 8433/1: add a VMSPLIT_3G_OPT config option"
+In-Reply-To: <20170607093350.GJ4902@n2100.armlinux.org.uk>
+References: <1496825972-26829-1-git-send-email-xieyisheng1@huawei.com>
+ <20170607093350.GJ4902@n2100.armlinux.org.uk>
+Message-ID: <9fbfa9c0-e46f-0f88-4c8f-de8be9114941@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Hi Russell,
 
-On 2017? 06? 08? 03:12, Krzysztof Kozlowski wrote:
-> The ppmu_events array is accessed only in this compilation unit so it
-> can be made static.
+Thanks for comment!
+On 2017/6/7 17:33, Russell King - ARM Linux wrote:
+> On Wed, Jun 07, 2017 at 04:59:32PM +0800, Yisheng Xie wrote:
+>> This reverts commit 63ce446c9b5787a94ed875bab20772e1a2b3092f.
 > 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> ---
->  drivers/devfreq/event/exynos-ppmu.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> There's no real reason to revert this, thereby removing it from non-LPAE
+> cases where it does work.  You've already shown adding a dependency for
+> LPAE on this option (or even vice versa) is enough to stop the problem
+> occuring.
 > 
-> diff --git a/drivers/devfreq/event/exynos-ppmu.c b/drivers/devfreq/event/exynos-ppmu.c
-> index 9b7350935b73..c68f3b5a10b5 100644
-> --- a/drivers/devfreq/event/exynos-ppmu.c
-> +++ b/drivers/devfreq/event/exynos-ppmu.c
-> @@ -44,7 +44,7 @@ struct exynos_ppmu {
->  	{ "ppmu-event2-"#name, PPMU_PMNCNT2 },	\
->  	{ "ppmu-event3-"#name, PPMU_PMNCNT3 }
->  
-> -struct __exynos_ppmu_events {
-> +static struct __exynos_ppmu_events {
->  	char *name;
->  	int id;
->  } ppmu_events[] = {
-> 
+> IMHO, It would be better to make VMSPLIT_3G_OPT depend on !ARM_LPAE.
 
-Looks good to me.
-Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
+OK, I will send a patch as your suggestion.
 
--- 
-Best Regards,
-Chanwoo Choi
-Samsung Electronics
+Thanks
+Yisheng Xie
