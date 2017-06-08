@@ -1,96 +1,85 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 8 Jun 2017 09:46:17 +0100
-Subject: [RFC PATCH v2 4/6] arm64: signal: Allocate extra sigcontext
- space as needed
-In-Reply-To: <20170523113019.GB5948@e104818-lin.cambridge.arm.com>
-References: <1492016239-19511-1-git-send-email-Dave.Martin@arm.com>
- <1492016495-19689-1-git-send-email-Dave.Martin@arm.com>
- <1492016495-19689-4-git-send-email-Dave.Martin@arm.com>
- <20170512165724.GB8387@e104818-lin.cambridge.arm.com>
- <20170515132442.GB3559@e103592.cambridge.arm.com>
- <20170523113019.GB5948@e104818-lin.cambridge.arm.com>
-Message-ID: <20170608084614.GH30160@e103592.cambridge.arm.com>
+From: Chris.Paterson2@renesas.com (Chris Paterson)
+Date: Thu, 8 Jun 2017 08:50:01 +0000
+Subject: [PATCH] ARM: debug-ll: Add support for r8a7743
+In-Reply-To: <CAMuHMdUg2Ox7ATSBKMiCua=VekEaoPZLpyQXGg=45XWV+12imA@mail.gmail.com>
+References: <1496908117-19368-1-git-send-email-chris.paterson2@renesas.com>
+ <CAMuHMdUg2Ox7ATSBKMiCua=VekEaoPZLpyQXGg=45XWV+12imA@mail.gmail.com>
+Message-ID: <TY1PR06MB07020A244304230FD27FB68FB7C90@TY1PR06MB0702.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 23, 2017 at 12:30:19PM +0100, Catalin Marinas wrote:
-> On Mon, May 15, 2017 at 02:24:45PM +0100, Dave P Martin wrote:
-> > On Fri, May 12, 2017 at 05:57:24PM +0100, Catalin Marinas wrote:
-> > > On Wed, Apr 12, 2017 at 06:01:13PM +0100, Dave P Martin wrote:
-> > > > --- a/arch/arm64/include/uapi/asm/sigcontext.h
-> > > > +++ b/arch/arm64/include/uapi/asm/sigcontext.h
-> > > > @@ -80,4 +80,31 @@ struct esr_context {
-> > > >  	__u64 esr;
-> > > >  };
-> > > >  
-> > > > +/*
-> > > > + * Pointer to extra space for additional structures that don't fit in
-> > > > + * sigcontext.__reserved[].  Note:
-> > > > + *
-> > > > + * 1) fpsimd_context, esr_context and extra_context must be placed in
-> > > > + * sigcontext.__reserved[] if present.  They cannot be placed in the
-> > > > + * extra space.  Any other record can be placed either in the extra
-> > > > + * space or in sigcontext.__reserved[].
-> > > > + *
-> > > > + * 2) There must not be more than one extra_context.
-> > > > + *
-> > > > + * 3) If extra_context is present, it must be followed immediately in
-> > > > + * sigcontext.__reserved[] by the terminating null _aarch64_ctx (i.e.,
-> > > > + * extra_context must be the last record in sigcontext.__reserved[]
-> > > > + * except for the terminator).
-> > > > + *
-> > > > + * 4) The extra space must itself be terminated with a null
-> > > > + * _aarch64_ctx.
-> > > > + */
-> > > 
-> > > IIUC, if we need to save some state that doesn't fit in what's left of
-> > > sigcontext.__reserved[] (e.g. SVE with 1024-bit vector length), we
-> > > ignore the available space and go for a memory block following the end
-> > > of sigcontext.__reserved[] + 16. Is there a reason we can't store the
-> > > new state across the end of sigcontext.__reserved[] and move fp/lr at
-> > > the end of the new frame? I'm not sure the fp/lr position immediately
-> > > after __reserved[] counts as ABI.
-> > 
-> > This was my original view.
-> > 
-> > Originally I preferred not to waste the space and did move fp/lr to the
-> > end, but someone (I think you or Will) expressed concern that the fp/lr
-> > position relative to the signal frame _might_ count as ABI.
-> > 
-> > I think it's not that likely that software will be relying on this,
-> > since it appears easier just to follow the frame chain than to treat
-> > this as a special case.
-> > 
-> > But it's hard to be certain.  It comes down to a judgement call.
+Hello Geert,
+
+> From: geert.uytterhoeven at gmail.com
+> [mailto:geert.uytterhoeven at gmail.com] On Behalf Of Geert Uytterhoeven
+> Sent: 08 June 2017 09:27
 > 
-> I would not consider this ABI. The ABI part is that the fp register
-> points to where fp/lr were saved.
+> Hi Chris,
+> 
+> On Thu, Jun 8, 2017 at 9:48 AM, Chris Paterson
+> <chris.paterson2@renesas.com> wrote:
+> > Enable low-level debugging support for RZ/G1M (r8a7743). RZ/G1M uses
+> > SCIF0 for the debug console, like most of the R-Car Gen2 SoCs.
+> 
+> Thanks for your patch!
 
-On this point, it looks like the libgcc unwinder
+Thank you for your review!
 
-https://gcc.gnu.org/git/?p=gcc.git;a=blob;f=libgcc/config/aarch64/linux-unwind.h;h=d5d6980442fd47b1f1e499e99cb25b5fffbdbeb3;hb=HEAD
+> 
+> While the recommended debug method these days is "earlycon", DEBUG_LL
+> is indeed still useful to debug issues before earlycon is initialized.
+> Let's hope you will never encounter such issues on arm64, which doesn't
+> have DEBUG_LL per policy decision...
 
-doesn't rely on the frame record location.  It clones the (internal)
-struct rt_sigframe definition from v3.7, which doesn't include any frame
-record, and mines fp and lr out of the signal frame AFAICT.
+Thank you for the information. It's hard to keep up with these decisions!
 
-It appears that gdb and libunwind likely take the same approach, but
-I've not looked closely yet.
+> 
+> > Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+> 
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> 
+> > --- a/arch/arm/Kconfig.debug
+> > +++ b/arch/arm/Kconfig.debug
+> > @@ -895,12 +895,13 @@ choice
+> >                   via SCIF2 on Renesas R-Car H1 (R8A7779).
+> >
+> >         config DEBUG_RCAR_GEN2_SCIF0
+> > -               bool "Kernel low-level debugging messages via SCIF0 on
+> R8A7790/R8A7791/R8A7792/R8A7793"
+> > -               depends on ARCH_R8A7790 || ARCH_R8A7791 || ARCH_R8A7792
+> || ARCH_R8A7793
+> > +               bool "Kernel low-level debugging messages via SCIF0 on
+> R8A7743/R8A7790/R8A7791/R8A7792/R8A7793"
+> 
+> This line is becoming a bit long, and it'll only become worse in the future.
+> What about "Kernel low-level debugging messages via SCIF0 on R-Car Gen2"?
 
-The frame record in rt_sigframe was added in by Will in 304ef4e83672
-("arm64: signal: push the unwinding prologue on the signal stack"),
-which changes from pushing the frame record onto the interrupted stack
-(which may be inaccessible for a SEGV), to pushing onto the signal
-stack.
+What about "Kernel low-level debugging messages via SCIF0 on R-Car Gen2 and RZ/G1"?
 
+I'd like to try and keep some sort of split between the two product lines if possible.
 
-Even with the frame record split from rt_sigframe, I've not seen any
-failed backtrace in gdb.  Throwing an exception from a SEGV handler in
-C++ (with -fnon-call-exceptions) also appears to work reliably with
-that change, even when the signal frame grows.
+Kind regards, Chris
 
-In any case, there is no ABI break unless there is extra_context, so
-it shouldn't impact current userspace.
-
-Cheers
----Dave
+> The full list of SoCs is still available in the extended help text.
+> 
+> > +               depends on ARCH_R8A7743 || ARCH_R8A7790 || ARCH_R8A7791
+> || \
+> > +                       ARCH_R8A7792 || ARCH_R8A7793
+> >                 help
+> >                   Say Y here if you want kernel low-level debugging support
+> > -                 via SCIF0 on Renesas R-Car H2 (R8A7790), M2-W (R8A7791), V2H
+> > -                 (R8A7792), or M2-N (R8A7793).
+> > +                 via SCIF0 on Renesas RZ/G1M (R8A7743), R-Car H2 (R8A7790),
+> > +                 M2-W (R8A7791), V2H (R8A7792), or M2-N (R8A7793).
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-
+> m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
