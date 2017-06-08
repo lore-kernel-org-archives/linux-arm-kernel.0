@@ -1,72 +1,57 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Thu, 8 Jun 2017 09:29:24 +0100
-Subject: [PATCH] ARM: V7M: Set cacheid iff DminLine or IminLine is nonzero
-In-Reply-To: <bf924528-164b-8dda-eeea-376f1faa5eb8@arm.com>
-References: <1493201074-35472-1-git-send-email-vladimir.murzin@arm.com>
- <6c933cd2-bfaf-e7d3-b868-9d9955a1a105@arm.com>
- <20170503191437.GB22219@n2100.armlinux.org.uk>
- <8e0ee9d1-ba0e-9083-0299-80f9f32444ce@arm.com>
- <bf924528-164b-8dda-eeea-376f1faa5eb8@arm.com>
-Message-ID: <43dbdd8a-3806-34bb-1388-3a3428d7d0c1@arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 08 Jun 2017 10:31:21 +0200
+Subject: [GIT PULL] Reset controller changes for v4.13, part 2
+Message-ID: <1496910681.2941.16.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping!
+Dear arm-soc maintainers,
 
-On 26/05/17 10:52, Vladimir Murzin wrote:
-> Gentle ping...
-> 
-> On 04/05/17 09:13, Vladimir Murzin wrote:
->> On 03/05/17 20:14, Russell King - ARM Linux wrote:
->>> On Tue, May 02, 2017 at 09:31:24AM +0100, Vladimir Murzin wrote:
->>>> On 26/04/17 11:04, Vladimir Murzin wrote:
->>>>> Cache support is optional feature in M-class cores, thus DminLine or
->>>>> IminLine of Cache Type Register is zero if caches are not implemented,
->>>>> but we check the whole CTR which has other features encoded there.
->>>>> Let's be more precise and check for DminLine and IminLine of CTR
->>>>> before we set cacheid.
->>>>>
->>>>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
->>>>> ---
->>>>>  arch/arm/kernel/setup.c | 2 +-
->>>>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>>>
->>>>> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
->>>>> index f4e5450..231a1d83 100644
->>>>> --- a/arch/arm/kernel/setup.c
->>>>> +++ b/arch/arm/kernel/setup.c
->>>>> @@ -315,7 +315,7 @@ static void __init cacheid_init(void)
->>>>>  	if (arch >= CPU_ARCH_ARMv6) {
->>>>>  		unsigned int cachetype = read_cpuid_cachetype();
->>>>>  
->>>>> -		if ((arch == CPU_ARCH_ARMv7M) && !cachetype) {
->>>>> +		if ((arch == CPU_ARCH_ARMv7M) && !(cachetype & 0xf000f)) {
->>>>>  			cacheid = 0;
->>>>>  		} else if ((cachetype & (7 << 29)) == 4 << 29) {
->>>>>  			/* ARMv7 register format */
->>>>>
->>>>
->>>> Ok for patch tracker?
->>>
->>> Not yet, I've been away and I've no time right now to evaluate this
->>> change.  I'm hopefully going to catch up with some email in the coming
->>> days.
->>>
->>
->> Noted.
->>
->> Cheers
->> Vladimir
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+please consider merging this tag for v4.13. It adds a new TI SCI reset
+controller driver, adds reset offsets for Stratix10, and switches to
+kref for reference counting on the reset_control structures.
+
+regards
+Philipp
+
+The following changes since commit 2acb037fc42b8ce5ae59a7d5db3c9b35672e3dd7:
+
+  reset: Add a Gemini reset controller (2017-05-24 10:46:13 +0200)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.13-2
+
+for you to fetch changes up to 28df169b9afa121153ef2a3ef4ceae72512cde6d:
+
+  reset: Add the TI SCI reset driver (2017-06-06 09:44:17 +0200)
+
+----------------------------------------------------------------
+Reset controller changes for v4.13, part 2
+
+- Add reset manager offsets for Stratix10
+- Use kref for reset contol reference counting
+- Add new TI SCI reset driver for TI Keystone SoCs
+
+----------------------------------------------------------------
+Andrew F. Davis (2):
+      dt-bindings: reset: Add TI SCI reset binding
+      reset: Add the TI SCI reset driver
+
+Philipp Zabel (1):
+      reset: use kref for reference counting
+
+Richard Gong (1):
+      dt-bindings: reset: Add reset manager offsets for Stratix10
+
+ .../devicetree/bindings/reset/ti,sci-reset.txt     |  62 +++++
+ MAINTAINERS                                        |   2 +
+ drivers/reset/Kconfig                              |   8 +
+ drivers/reset/Makefile                             |   1 +
+ drivers/reset/core.c                               |  23 +-
+ drivers/reset/reset-ti-sci.c                       | 269 +++++++++++++++++++++
+ include/dt-bindings/reset/altr,rst-mgr-s10.h       | 108 +++++++++
+ 7 files changed, 465 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/reset/ti,sci-reset.txt
+ create mode 100644 drivers/reset/reset-ti-sci.c
+ create mode 100644 include/dt-bindings/reset/altr,rst-mgr-s10.h
