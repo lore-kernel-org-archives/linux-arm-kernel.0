@@ -1,50 +1,30 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 8 Jun 2017 15:45:21 +0200
-Subject: [PATCH v2] ARM: dts: armadillo800eva: Split LCD mux and gpio
-In-Reply-To: <38369176.p2s9nCEmhA@avalon>
-References: <1496312820-27237-1-git-send-email-geert+renesas@glider.be>
- <38369176.p2s9nCEmhA@avalon>
-Message-ID: <20170608134516.GC19821@verge.net.au>
+Date: Thu, 8 Jun 2017 15:47:41 +0200
+Subject: [PATCH] ARM: shmobile: Update R-Car Gen3 ULCB board part numbers
+In-Reply-To: <20170607221203.hgjp3izxpjuvxd7t@rob-hp-laptop>
+References: <1496313269-27795-1-git-send-email-geert+renesas@glider.be>
+ <20170607221203.hgjp3izxpjuvxd7t@rob-hp-laptop>
+Message-ID: <20170608134741.GD19821@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 02, 2017 at 08:53:26AM +0300, Laurent Pinchart wrote:
-> Hi Geert,
-> 
-> Thank you for the patch.
-> 
-> On Thursday 01 Jun 2017 12:27:00 Geert Uytterhoeven wrote:
-> > Configuration of the lcd0 pinmux group and GPIO hog for the external
-> > GPIO mux are done using a single device node, causing the "output-high"
-> > property to be applied to both.  This will fail for the pinmux group,
-> > but doesn't cause any harm, as the failure is ignored silently.
+On Wed, Jun 07, 2017 at 05:12:03PM -0500, Rob Herring wrote:
+> On Thu, Jun 01, 2017 at 12:34:29PM +0200, Geert Uytterhoeven wrote:
+> > The board part numbers for the R-Car H3 and M3 ULCB boards corresponded
+> > to versions predating mass production.  Update them for mass production.
 > > 
-> > However, after "pinctrl: sh-pfc: propagate errors on group config", the
-> > failure will become fatal, leading to a broken display:
+> > Note that the H3 ULCB board can be equipped with either revision ES1.1
+> > or ES2.0 of the R-Car H3 SoC.  While these have different board part
+> > numbers, no new compatible values are needed, as the revision can be
+> > detected at runtime using the PRR register.
 > > 
-> >     sh-pfc e6050000.pin-controller: pin_config_group_set op failed for group
-> > 102 sh-pfc e6050000.pin-controller: Error applying setting, reverse things
-> > back sh-pfc e6050000.pin-controller: failed to select default state
-> > 
-> > Move the GPIO hog to its own node to fix this.
-> > 
-> > Fixes: ffd2f9a5afb730b9 ("ARM: shmobile: armadillo800eva dts: Add pinctrl
-> > and gpio-hog for lcdc0") Signed-off-by: Geert Uytterhoeven
-> > <geert+renesas@glider.be>
+> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > > ---
-> > This is a hard dependency for "pinctrl: sh-pfc: propagate errors on
-> > group config" (https://patchwork.kernel.org/patch/9186713/).
+> > See also http://elinux.org/index.php?title=R-Car/Boards/H3SK
 > > 
-> > v2:
-> >   - Keep the GPIO hog, but move it to its own node, instead of using
-> >     another level of subnodes.  As the GPIO hog node is not referenced from
-> >     a pinctrl-0 property, pinconf doesn't fail with "No pin or group
-> >     provided in DT node".
+> >  Documentation/devicetree/bindings/arm/shmobile.txt | 5 +++--
+> >  1 file changed, 3 insertions(+), 2 deletions(-)
 > 
-> I like this approach better, it allows us to drive the output instead of 
-> pulling it up, without requiring a full implementation of output drive control 
-> in the pfc driver.
-> 
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Thanks, I have queued this up as a fix for v4.12.
+Thanks, I have queued this up for v4.13.
