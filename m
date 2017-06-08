@@ -1,59 +1,96 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 8 Jun 2017 15:02:00 +0100
-Subject: [PATCH 16/44] arm64: remove DMA_ERROR_CODE
-In-Reply-To: <20170608132609.32662-17-hch@lst.de>
-References: <20170608132609.32662-1-hch@lst.de>
- <20170608132609.32662-17-hch@lst.de>
-Message-ID: <dddc8995-8278-0604-07cd-ffe34526686e@arm.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Thu,  8 Jun 2017 15:34:44 +0200
+Subject: [PATCH v3 7/9] KVM: arm/arm64: Check if irq lines to the GIC are
+ already used
+In-Reply-To: <20170608133446.3875-1-cdall@linaro.org>
+References: <20170608133446.3875-1-cdall@linaro.org>
+Message-ID: <20170608133446.3875-8-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06/17 14:25, Christoph Hellwig wrote:
-> The dma alloc interface returns an error by return NULL, and the
-> mapping interfaces rely on the mapping_error method, which the dummy
-> ops already implement correctly.
-> 
-> Thus remove the DMA_ERROR_CODE define.
+We check if other in-kernel devices have already been connected to the
+GIC for a particular interrupt line when possible.
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+For the PMU, we can do this whenever setting the PMU interrupt number
+from userspace.
 
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-> ---
->  arch/arm64/include/asm/dma-mapping.h | 1 -
->  arch/arm64/mm/dma-mapping.c          | 3 +--
->  2 files changed, 1 insertion(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-> index 5392dbeffa45..cf8fc8f05580 100644
-> --- a/arch/arm64/include/asm/dma-mapping.h
-> +++ b/arch/arm64/include/asm/dma-mapping.h
-> @@ -24,7 +24,6 @@
->  #include <xen/xen.h>
->  #include <asm/xen/hypervisor.h>
->  
-> -#define DMA_ERROR_CODE	(~(dma_addr_t)0)
->  extern const struct dma_map_ops dummy_dma_ops;
->  
->  static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
-> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> index 3216e098c058..147fbb907a2f 100644
-> --- a/arch/arm64/mm/dma-mapping.c
-> +++ b/arch/arm64/mm/dma-mapping.c
-> @@ -184,7 +184,6 @@ static void *__dma_alloc(struct device *dev, size_t size,
->  no_map:
->  	__dma_free_coherent(dev, size, ptr, *dma_handle, attrs);
->  no_mem:
-> -	*dma_handle = DMA_ERROR_CODE;
->  	return NULL;
->  }
->  
-> @@ -487,7 +486,7 @@ static dma_addr_t __dummy_map_page(struct device *dev, struct page *page,
->  				   enum dma_data_direction dir,
->  				   unsigned long attrs)
->  {
-> -	return DMA_ERROR_CODE;
-> +	return 0;
->  }
->  
->  static void __dummy_unmap_page(struct device *dev, dma_addr_t dev_addr,
-> 
+For the timers, we have to wait until we try to enable the timer,
+because we have a concept of default IRQ numbers that userspace
+shouldn't have to work around in the initialization phase.
+
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
+---
+ virt/kvm/arm/arch_timer.c | 18 ++++++++++--------
+ virt/kvm/arm/pmu.c        |  7 +++++++
+ 2 files changed, 17 insertions(+), 8 deletions(-)
+
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index e03da1a..07f6f9b 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -618,20 +618,22 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
+ 	kvm_vgic_unmap_phys_irq(vcpu, vtimer->irq.irq);
+ }
+ 
+-static bool timer_irqs_are_valid(struct kvm *kvm)
++static bool timer_irqs_are_valid(struct kvm_vcpu *vcpu)
+ {
+-	struct kvm_vcpu *vcpu;
+ 	int vtimer_irq, ptimer_irq;
+-	int i;
++	int i, ret;
+ 
+-	vcpu = kvm_get_vcpu(kvm, 0);
+ 	vtimer_irq = vcpu_vtimer(vcpu)->irq.irq;
+-	ptimer_irq = vcpu_ptimer(vcpu)->irq.irq;
++	ret = kvm_vgic_set_owner(vcpu, vtimer_irq, vcpu_vtimer(vcpu));
++	if (ret)
++		return false;
+ 
+-	if (vtimer_irq == ptimer_irq)
++	ptimer_irq = vcpu_ptimer(vcpu)->irq.irq;
++	ret = kvm_vgic_set_owner(vcpu, ptimer_irq, vcpu_ptimer(vcpu));
++	if (ret)
+ 		return false;
+ 
+-	kvm_for_each_vcpu(i, vcpu, kvm) {
++	kvm_for_each_vcpu(i, vcpu, vcpu->kvm) {
+ 		if (vcpu_vtimer(vcpu)->irq.irq != vtimer_irq ||
+ 		    vcpu_ptimer(vcpu)->irq.irq != ptimer_irq)
+ 			return false;
+@@ -659,7 +661,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+ 	if (!vgic_initialized(vcpu->kvm))
+ 		return -ENODEV;
+ 
+-	if (!timer_irqs_are_valid(vcpu->kvm)) {
++	if (!timer_irqs_are_valid(vcpu)) {
+ 		kvm_debug("incorrectly configured timer irqs\n");
+ 		return -EINVAL;
+ 	}
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+index 574feff..3f08669 100644
+--- a/virt/kvm/arm/pmu.c
++++ b/virt/kvm/arm/pmu.c
+@@ -480,6 +480,8 @@ static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
+ 		return -EBUSY;
+ 
+ 	if (irqchip_in_kernel(vcpu->kvm)) {
++		int ret;
++
+ 		/*
+ 		 * If using the PMU with an in-kernel virtual GIC
+ 		 * implementation, we require the GIC to be already
+@@ -490,6 +492,11 @@ static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
+ 
+ 		if (!kvm_arm_pmu_irq_initialized(vcpu))
+ 			return -ENXIO;
++
++		ret = kvm_vgic_set_owner(vcpu, vcpu->arch.pmu.irq_num,
++					 &vcpu->arch.pmu);
++		if (ret)
++			return ret;
+ 	}
+ 
+ 	vcpu->arch.pmu.created = true;
+-- 
+2.9.0
