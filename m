@@ -1,78 +1,82 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Thu,  8 Jun 2017 22:04:27 +0200
-Subject: [PATCH V2 4/5] dt-bindings: phy: Modify Broadcom NS USB 3.0 PHY
- binding to use MDIO
-In-Reply-To: <20170608200428.9187-1-zajec5@gmail.com>
-References: <20170511132925.14564-1-zajec5@gmail.com>
- <20170608200428.9187-1-zajec5@gmail.com>
-Message-ID: <20170608200428.9187-5-zajec5@gmail.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Thu, 8 Jun 2017 13:25:27 -0700
+Subject: [PATCH v8 14/34] ARM: dts: imx6-sabreauto: add the ADV7180 video
+ decoder
+In-Reply-To: <1496860453-6282-15-git-send-email-steve_longerbeam@mentor.com>
+References: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
+ <1496860453-6282-15-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <CAJ+vNU0C0=4hUq+g1P7yTzLzFPidfauQROPOVr4WQWKNZz_xmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rafa? Mi?ecki <rafal@milecki.pl>
+On Wed, Jun 7, 2017 at 11:33 AM, Steve Longerbeam <slongerbeam@gmail.com> wrote:
+> Enables the ADV7180 decoder sensor. The ADV7180 connects to the
+> parallel-bus mux input on ipu1_csi0_mux.
+>
+> The ADV7180 power pin is via max7310_b port expander.
+>
+> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+>
+> - Use IRQ_TYPE_LEVEL_LOW instead of 0x8 for interrupt type for clarity.
+> - For 8-bit parallel IPU1-CSI0 bus connection only data[12-19] are used.
+>
+> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+> ---
+>  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 50 ++++++++++++++++++++++++++++++++
+>  1 file changed, 50 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> index 1212f82..c24af28 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> @@ -124,6 +124,21 @@
+>                         #size-cells = <0>;
+>                         reg = <1>;
+>
+> +                       adv7180: camera at 21 {
+> +                               compatible = "adi,adv7180";
+> +                               reg = <0x21>;
+> +                               powerdown-gpios = <&max7310_b 2 GPIO_ACTIVE_LOW>;
+> +                               interrupt-parent = <&gpio1>;
+> +                               interrupts = <27 IRQ_TYPE_LEVEL_LOW>;
+> +
+> +                               port {
+> +                                       adv7180_to_ipu1_csi0_mux: endpoint {
+> +                                               remote-endpoint = <&ipu1_csi0_mux_from_parallel_sensor>;
+> +                                               bus-width = <8>;
+> +                                       };
+> +                               };
+> +                       };
+> +
+>                         max7310_a: gpio at 30 {
+>                                 compatible = "maxim,max7310";
+>                                 reg = <0x30>;
+> @@ -151,6 +166,25 @@
+>         };
+>  };
+>
+> +&ipu1_csi0_from_ipu1_csi0_mux {
+> +       bus-width = <8>;
+> +};
+> +
+> +&ipu1_csi0_mux_from_parallel_sensor {
+> +       remote-endpoint = <&adv7180_to_ipu1_csi0_mux>;
+> +       bus-width = <8>;
+> +};
+> +
+> +&ipu1_csi0 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&pinctrl_ipu1_csi0>;
+> +
+> +       /* enable frame interval monitor on this port */
+> +       fim {
+> +               status = "okay";
+> +       };
 
-Thanks to work done by Broadcom explaining their USB 3.0 PHY details we
-know it's attached to the MDIO bus. Use this knowledge to update the
-binding: make it a subnode to the MDIO bus and rework way of specifying
-required registers. This will describe hardware more precisely and will
-allow to support (describe) more devices attached to the MDIO.
+Steve,
 
-While compatibility strings remain the same there isn't a direct
-conflict (compatibility breakage) for the binding. Originally it wasn't
-supposed to be used for MDIO subnode so this change should be safe
-unless some operating system was probing MDIO subnodes as standalone
-devices.
+You need to remove the fim node now that you've moved this to V4L2 controls.
 
-Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
----
-V2: Extend commit message to better describe reason and includ info on
-    (non-)breakage.
----
- .../devicetree/bindings/phy/bcm-ns-usb3-phy.txt    | 27 +++++++++++++++-------
- 1 file changed, 19 insertions(+), 8 deletions(-)
+Regards,
 
-diff --git a/Documentation/devicetree/bindings/phy/bcm-ns-usb3-phy.txt b/Documentation/devicetree/bindings/phy/bcm-ns-usb3-phy.txt
-index 09aeba94538d..32f057260351 100644
---- a/Documentation/devicetree/bindings/phy/bcm-ns-usb3-phy.txt
-+++ b/Documentation/devicetree/bindings/phy/bcm-ns-usb3-phy.txt
-@@ -3,9 +3,10 @@ Driver for Broadcom Northstar USB 3.0 PHY
- Required properties:
- 
- - compatible: one of: "brcm,ns-ax-usb3-phy", "brcm,ns-bx-usb3-phy".
--- reg: register mappings for DMP (Device Management Plugin) and ChipCommon B
--       MMI.
--- reg-names: "dmp" and "ccb-mii"
-+- reg: address of MDIO bus device
-+- usb3-dmp-syscon: phandle to syscon with DMP (Device Management Plugin)
-+		   registers
-+- #phy-cells: must be 0
- 
- Initialization of USB 3.0 PHY depends on Northstar version. There are currently
- three known series: Ax, Bx and Cx.
-@@ -15,9 +16,19 @@ Known B1: BCM4707 rev 6
- Known C0: BCM47094 rev 0
- 
- Example:
--	usb3-phy {
--		compatible = "brcm,ns-ax-usb3-phy";
--		reg = <0x18105000 0x1000>, <0x18003000 0x1000>;
--		reg-names = "dmp", "ccb-mii";
--		#phy-cells = <0>;
-+	mdio: mdio at 0 {
-+		reg = <0x0>;
-+		#size-cells = <1>;
-+		#address-cells = <0>;
-+
-+		usb3-phy at 10 {
-+			compatible = "brcm,ns-ax-usb3-phy";
-+			reg = <0x10>;
-+			usb3-dmp-syscon = <&usb3_dmp>;
-+			#phy-cells = <0>;
-+		};
-+	};
-+
-+	usb3_dmp: syscon at 18105000 {
-+		reg = <0x18105000 0x1000>;
- 	};
--- 
-2.11.0
+Tim
