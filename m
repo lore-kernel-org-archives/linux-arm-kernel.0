@@ -1,49 +1,102 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 8 Jun 2017 15:26:40 +0200
-Subject: [PATCH] arm: aspeed: Add clock-names property to timer node
-In-Reply-To: <CAK8P3a0v1+FRnXcwF7j45bmDuX5caL9RBcS1bSUwANqb=zxeqQ@mail.gmail.com>
-References: <20170605074846.30925-1-andrew@aj.id.au>
- <CACPK8XeM6fBztHwfrPUD+ewpMf==tBqgfj61B-k=SwT3ABTiZw@mail.gmail.com>
- <CAK8P3a2d=T9igbhe1u3MBUF2F1TMLC7z0DQ2AmHX-LkiBAy2Ww@mail.gmail.com>
- <20170607125256.GG2345@mai>
- <CAK8P3a0v1+FRnXcwF7j45bmDuX5caL9RBcS1bSUwANqb=zxeqQ@mail.gmail.com>
-Message-ID: <20170608132640.GD2244@mai>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 08 Jun 2017 15:07:19 +0100
+Subject: [PATCH v3 6/9] KVM: arm/arm64: Introduce an allocator for
+ in-kernel irq lines
+In-Reply-To: <20170608133446.3875-7-cdall@linaro.org> (Christoffer Dall's
+ message of "Thu, 8 Jun 2017 15:34:43 +0200")
+References: <20170608133446.3875-1-cdall@linaro.org>
+ <20170608133446.3875-7-cdall@linaro.org>
+Message-ID: <87bmpyine0.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 07, 2017 at 04:29:50PM +0200, Arnd Bergmann wrote:
-> On Wed, Jun 7, 2017 at 2:52 PM, Daniel Lezcano
-> <daniel.lezcano@linaro.org> wrote:
-> > On Tue, Jun 06, 2017 at 11:41:11AM +0200, Arnd Bergmann wrote:
-> >> On Mon, Jun 5, 2017 at 10:59 AM, Joel Stanley <joel@jms.id.au> wrote:
-> >> > On Mon, Jun 5, 2017 at 5:18 PM, Andrew Jeffery <andrew@aj.id.au> wrote:
-> >> >> The merging of a number of clocksource drivers into fttmr010 means we
-> >> >> require clock-names to be specified in the Aspeed timer node, else the
-> >> >> clocksource fails to probe and boot hangs.
-> >> >
-> >> > Arnd,
-> >> >
-> >> > Linus' reworked timer driver will go into 4.13.
-> >> >
-> >> > Can we get this patch merged into 4.12 as a fix so we don't end up
-> >> > with a broken boot at any stage?
-> >>
-> >> Hmm, can't we make the driver backward-compatible and have it fall
-> >> back on the first clock if no clk named "PCLK" is found? Otherwise
-> >> you still have an incompatible change in the DT binding and it will
-> >> break if someone uses an older dtb with a newer kernel.
-> >
-> > I would like to avoid to hack the kernel code for backward DT compatible
-> > things.
-> 
-> How about a fixup in the platform code to add the property then?
+On Thu, Jun 08 2017 at  3:34:43 pm BST, Christoffer Dall <cdall@linaro.org> wrote:
+> Having multiple devices being able to signal the same interrupt line is
+> very confusing and almost certainly guarantees a configuration error.
+>
+> Therefore, introduce a very simple allocator which allows a device to
+> claim an interrupt line from the vgic for a given VM.
+>
+> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> ---
+>  include/kvm/arm_vgic.h   |  5 +++++
+>  virt/kvm/arm/vgic/vgic.c | 33 +++++++++++++++++++++++++++++++++
+>  2 files changed, 38 insertions(+)
+>
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index dde59fb..5d5b345 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -121,6 +121,9 @@ struct vgic_irq {
+>  	u8 source;			/* GICv2 SGIs only */
+>  	u8 priority;
+>  	enum vgic_irq_config config;	/* Level or edge */
+> +
+> +	void *owner;			/* Opaque pointer to reserve an interrupt
+> +					   for in-kernel devices. */
+>  };
+>  
+>  struct vgic_register_region;
+> @@ -340,4 +343,6 @@ int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi);
+>   */
+>  int kvm_vgic_setup_default_irq_routing(struct kvm *kvm);
+>  
+> +int kvm_vgic_set_owner(struct kvm_vcpu *vcpu, unsigned int intid, void *owner);
+> +
+>  #endif /* __KVM_ARM_VGIC_H */
+> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> index c66feac..9628945 100644
+> --- a/virt/kvm/arm/vgic/vgic.c
+> +++ b/virt/kvm/arm/vgic/vgic.c
+> @@ -435,6 +435,39 @@ int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq)
+>  }
+>  
+>  /**
+> + * kvm_vgic_set_owner - Set the owner of an interrupt for a VM
+> + *
+> + * @vcpu:   Pointer to the VCPU (used for PPIs)
+> + * @intid:  The virtual INTID identifying the interrupt (PPI or SPI)
+> + * @owner:  Opaque pointer to the owner
+> + *
+> + * Returns 0 if intid is not already used by another in-kernel device and the
+> + * owner is set, otherwise returns an error code.
+> + */
+> +int kvm_vgic_set_owner(struct kvm_vcpu *vcpu, unsigned int intid, void *owner)
+> +{
+> +	struct vgic_irq *irq;
+> +	int ret = 0;
+> +
+> +	if (!vgic_initialized(vcpu->kvm))
+> +		return -EAGAIN;
+> +
+> +	/* SGIs and LPIs cannot be wired up to any device */
+> +	if (!irq_is_ppi(intid) && !vgic_valid_spi(vcpu->kvm, intid))
+> +		return -EINVAL;
+> +
+> +	irq = vgic_get_irq(vcpu->kvm, vcpu, intid);
+> +	spin_lock(&irq->irq_lock);
+> +	if (irq->owner && irq->owner != owner)
+> +		ret = -EEXIST;
+> +	else
+> +		irq->owner = owner;
 
-Dunno, do you have an example?
+Is there any case where you'd end-up setting the owner multiple times?
+Or is that just convenient?
 
+> +	spin_unlock(&irq->irq_lock);
+> +
+> +	return ret;
+> +}
+> +
+> +/**
+>   * vgic_prune_ap_list - Remove non-relevant interrupts from the list
+>   *
+>   * @vcpu: The VCPU pointer
+
+Otherwise,
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
 -- 
-
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Jazz is not dead, it just smell funny.
