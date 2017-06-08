@@ -1,207 +1,92 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 8 Jun 2017 02:56:19 -0700
-Subject: [PATCH 07/11] ARM: OMAP2+: Remove unused legacy code for DMA
-In-Reply-To: <20170608082432.GF3730@atomide.com>
-References: <20170531225139.30723-1-tony@atomide.com>
- <20170531225139.30723-8-tony@atomide.com>
- <10f65a24-0459-5df7-378d-84933b83c070@ti.com>
- <20170608082432.GF3730@atomide.com>
-Message-ID: <20170608095618.GJ3730@atomide.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 8 Jun 2017 10:59:57 +0100
+Subject: [PATCH v2 2/2] arm64: ftrace: add support for far branches to
+ dynamic ftrace
+In-Reply-To: <20170607150201.7123c48f@gandalf.local.home>
+References: <20170530135220.20759-1-ard.biesheuvel@linaro.org>
+ <20170530135220.20759-3-ard.biesheuvel@linaro.org>
+ <20170605171535.GP21944@arm.com>
+ <20170607114637.1a717019@gandalf.local.home>
+ <CAKv+Gu8kWt7yDg8hu=bJb4FrA3qGqV2jgShujqHqewDSKr1D8w@mail.gmail.com>
+ <20170607165626.GE2669@arm.com>
+ <20170607150201.7123c48f@gandalf.local.home>
+Message-ID: <20170608095957.GB6071@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [170608 01:28]:
-> * Peter Ujfalusi <peter.ujfalusi@ti.com> [170607 23:29]:
+Hi Steve,
+
+On Wed, Jun 07, 2017 at 03:02:01PM -0400, Steven Rostedt wrote:
+> On Wed, 7 Jun 2017 17:56:26 +0100
+> Will Deacon <will.deacon@arm.com> wrote:
+> 
+> > On Wed, Jun 07, 2017 at 03:50:10PM +0000, Ard Biesheuvel wrote:
+> > > On 7 June 2017 at 15:46, Steven Rostedt <rostedt@goodmis.org> wrote:  
+> > > > On Mon, 5 Jun 2017 18:15:35 +0100
+> > > > Will Deacon <will.deacon@arm.com> wrote:
+> > > >
+> > > >  
+> > > >> > +           tramp = (unsigned long *)mod->arch.ftrace_trampoline->sh_addr;
+> > > >> > +           if (tramp[0] != addr) {
+> > > >> > +                   if (tramp[0] != 0) {
+> > > >> > +                           pr_err("ftrace: far branches to multiple entry points unsupported inside a single module\n");
+> > > >> > +                           return AARCH64_BREAK_FAULT;
+> > > >> > +                   }
+> > > >> > +
+> > > >> > +                   /* point the trampoline to our ftrace entry point */
+> > > >> > +                   module_disable_ro(mod);
+> > > >> > +                   tramp[0] = addr;
+> > > >> > +                   module_enable_ro(mod, true);  
+> > > >>
+> > > >> I'm not sure what the barrier semantics are for module_enable_ro, but I'd be
+> > > >> inclined to stick in a smp_wmb() here to order the write of the trampoline
+> > > >> data before the writing of the branch instruction.  
+> > > >
+> > > > I would assume that module_disable/enable_ro() has proper barriers for
+> > > > modifying the page tables with respect to code around it, otherwise it
+> > > > would probably be an issues elsewhere in the kernel. Specifically in
+> > > > the module code itself.
+> > > >
+> > > > I don't see how a smp_wmb() would be needed here, especially since this
+> > > > is serialized code, and not something done by multiple CPUs.
+> > > >  
+> > > 
+> > > But other cores could be invoking the function we are patching here,
+> > > no? So when such a core observes (and executes) the updated
+> > > instruction before it observes the updated target field of the
+> > > trampoline, it will branch to address 0x0.  
 > > 
-> > This will conflict with the changes introduced by the tusb6010 DMAengine
-> > conversion:
-> > https://patchwork.kernel.org/patch/9734219/
+> > I think Steve's saying that the TLB invalidation buried in the set_memory_*
+> > functions called by module_enable_ro will have sufficient barriers to order
+> > the write of the trampoline with respect to writing the branch instruction,
+> > but this isn't quite right because module_enable_ro is affected by things
+> > like CONFIG_STRICT_MODULE_RWX and rodata_enabled.
+> > 
 > 
-> Oops forgot about that one. I'll take a look if it makes sense
-> to leave the braces for now to avoid a merge conflict.
+> Sorry, I was thinking that you were worried about the update with the
+> page tables taking affect.
 > 
-> > with this patch I think the omap24xx_sdma_map and omap3xxx_sdma_map can
-> > also be removed, but we need to keep the omap24xx_sdma_dt_map for now
-> > till we have proper DT support for tusb.
-> 
-> OK good point, will check.
+> But from the above comment by Ard, I'm now thinking you are worried
+> about the jump to the trampoline itself when the branch is enabled. Now,
+> my question is, can a smp_wmb() be good enough as there's no smp_rmb()
+> to accompany it. Even with an smp_wmb() the reads can still come out of
+> order without any smp_rmb() on the execution path.
 
-Here's this one updated.
+So this is actually really subtle and the architecture manual doesn't
+give us *quite* what we need. The reads that we're trying to order are:
 
-Regards,
+  1. The instruction fetch of the branch instruction
+  2. The load of the offset for the indirect branch in the trampoline
 
-Tony
+You might think there's a strong dependency here because the second load
+doesn't take place if the branch isn't taken, but branch prediction could
+in theory break that assumption.
 
-8< ------------------
->From tony Mon Sep 17 00:00:00 2001
-From: Tony Lindgren <tony@atomide.com>
-Date: Wed, 31 May 2017 15:51:35 -0700
-Subject: [PATCH] ARM: OMAP2+: Remove unused legacy code for DMA
+Now, having a branch predictor predict on a NOP is extremely unlikely,
+so I'll see if I can get the architecture clarified here. In the meantime,
+I've merged this patch because I'm pretty confident it will work in practice
+and if the architecture really won't give us the guarantee then we'll have
+other things to fix too (like the whole applicability of the _nosync
+patching).
 
-We are now booting all mach-omap2 in device tree only mode.
-Any code that is only called in legacy boot mode where
-of_have_populated_dt() is not set is safe to remove now.
-
-Let's leave the dummy omap2_system_dma_init_dev() check
-in place for now to avoid a pointless merge conflict with
-tusb6010 dmaengine conversion as pointed out by Peter
-Ujfalusi <peter.ujfalusi@ti.com>.
-
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/dma.c | 125 +---------------------------------------------
- 1 file changed, 2 insertions(+), 123 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/dma.c b/arch/arm/mach-omap2/dma.c
---- a/arch/arm/mach-omap2/dma.c
-+++ b/arch/arm/mach-omap2/dma.c
-@@ -204,108 +204,6 @@ static unsigned configure_dma_errata(void)
- 	return errata;
- }
- 
--static const struct dma_slave_map omap24xx_sdma_map[] = {
--	{ "omap-gpmc", "rxtx", SDMA_FILTER_PARAM(4) },
--	{ "omap-aes", "tx", SDMA_FILTER_PARAM(9) },
--	{ "omap-aes", "rx", SDMA_FILTER_PARAM(10) },
--	{ "omap-sham", "rx", SDMA_FILTER_PARAM(13) },
--	{ "omap2_mcspi.2", "tx0", SDMA_FILTER_PARAM(15) },
--	{ "omap2_mcspi.2", "rx0", SDMA_FILTER_PARAM(16) },
--	{ "omap-mcbsp.3", "tx", SDMA_FILTER_PARAM(17) },
--	{ "omap-mcbsp.3", "rx", SDMA_FILTER_PARAM(18) },
--	{ "omap-mcbsp.4", "tx", SDMA_FILTER_PARAM(19) },
--	{ "omap-mcbsp.4", "rx", SDMA_FILTER_PARAM(20) },
--	{ "omap-mcbsp.5", "tx", SDMA_FILTER_PARAM(21) },
--	{ "omap-mcbsp.5", "rx", SDMA_FILTER_PARAM(22) },
--	{ "omap2_mcspi.2", "tx1", SDMA_FILTER_PARAM(23) },
--	{ "omap2_mcspi.2", "rx1", SDMA_FILTER_PARAM(24) },
--	{ "omap_i2c.1", "tx", SDMA_FILTER_PARAM(27) },
--	{ "omap_i2c.1", "rx", SDMA_FILTER_PARAM(28) },
--	{ "omap_i2c.2", "tx", SDMA_FILTER_PARAM(29) },
--	{ "omap_i2c.2", "rx", SDMA_FILTER_PARAM(30) },
--	{ "omap-mcbsp.1", "tx", SDMA_FILTER_PARAM(31) },
--	{ "omap-mcbsp.1", "rx", SDMA_FILTER_PARAM(32) },
--	{ "omap-mcbsp.2", "tx", SDMA_FILTER_PARAM(33) },
--	{ "omap-mcbsp.2", "rx", SDMA_FILTER_PARAM(34) },
--	{ "omap2_mcspi.0", "tx0", SDMA_FILTER_PARAM(35) },
--	{ "omap2_mcspi.0", "rx0", SDMA_FILTER_PARAM(36) },
--	{ "omap2_mcspi.0", "tx1", SDMA_FILTER_PARAM(37) },
--	{ "omap2_mcspi.0", "rx1", SDMA_FILTER_PARAM(38) },
--	{ "omap2_mcspi.0", "tx2", SDMA_FILTER_PARAM(39) },
--	{ "omap2_mcspi.0", "rx2", SDMA_FILTER_PARAM(40) },
--	{ "omap2_mcspi.0", "tx3", SDMA_FILTER_PARAM(41) },
--	{ "omap2_mcspi.0", "rx3", SDMA_FILTER_PARAM(42) },
--	{ "omap2_mcspi.1", "tx0", SDMA_FILTER_PARAM(43) },
--	{ "omap2_mcspi.1", "rx0", SDMA_FILTER_PARAM(44) },
--	{ "omap2_mcspi.1", "tx1", SDMA_FILTER_PARAM(45) },
--	{ "omap2_mcspi.1", "rx1", SDMA_FILTER_PARAM(46) },
--	{ "omap_hsmmc.1", "tx", SDMA_FILTER_PARAM(47) },
--	{ "omap_hsmmc.1", "rx", SDMA_FILTER_PARAM(48) },
--	{ "omap_uart.0", "tx", SDMA_FILTER_PARAM(49) },
--	{ "omap_uart.0", "rx", SDMA_FILTER_PARAM(50) },
--	{ "omap_uart.1", "tx", SDMA_FILTER_PARAM(51) },
--	{ "omap_uart.1", "rx", SDMA_FILTER_PARAM(52) },
--	{ "omap_uart.2", "tx", SDMA_FILTER_PARAM(53) },
--	{ "omap_uart.2", "rx", SDMA_FILTER_PARAM(54) },
--	{ "omap_hsmmc.0", "tx", SDMA_FILTER_PARAM(61) },
--	{ "omap_hsmmc.0", "rx", SDMA_FILTER_PARAM(62) },
--};
--
--static const struct dma_slave_map omap3xxx_sdma_map[] = {
--	{ "omap-gpmc", "rxtx", SDMA_FILTER_PARAM(4) },
--	{ "omap2_mcspi.2", "tx0", SDMA_FILTER_PARAM(15) },
--	{ "omap2_mcspi.2", "rx0", SDMA_FILTER_PARAM(16) },
--	{ "omap-mcbsp.3", "tx", SDMA_FILTER_PARAM(17) },
--	{ "omap-mcbsp.3", "rx", SDMA_FILTER_PARAM(18) },
--	{ "omap-mcbsp.4", "tx", SDMA_FILTER_PARAM(19) },
--	{ "omap-mcbsp.4", "rx", SDMA_FILTER_PARAM(20) },
--	{ "omap-mcbsp.5", "tx", SDMA_FILTER_PARAM(21) },
--	{ "omap-mcbsp.5", "rx", SDMA_FILTER_PARAM(22) },
--	{ "omap2_mcspi.2", "tx1", SDMA_FILTER_PARAM(23) },
--	{ "omap2_mcspi.2", "rx1", SDMA_FILTER_PARAM(24) },
--	{ "omap_i2c.3", "tx", SDMA_FILTER_PARAM(25) },
--	{ "omap_i2c.3", "rx", SDMA_FILTER_PARAM(26) },
--	{ "omap_i2c.1", "tx", SDMA_FILTER_PARAM(27) },
--	{ "omap_i2c.1", "rx", SDMA_FILTER_PARAM(28) },
--	{ "omap_i2c.2", "tx", SDMA_FILTER_PARAM(29) },
--	{ "omap_i2c.2", "rx", SDMA_FILTER_PARAM(30) },
--	{ "omap-mcbsp.1", "tx", SDMA_FILTER_PARAM(31) },
--	{ "omap-mcbsp.1", "rx", SDMA_FILTER_PARAM(32) },
--	{ "omap-mcbsp.2", "tx", SDMA_FILTER_PARAM(33) },
--	{ "omap-mcbsp.2", "rx", SDMA_FILTER_PARAM(34) },
--	{ "omap2_mcspi.0", "tx0", SDMA_FILTER_PARAM(35) },
--	{ "omap2_mcspi.0", "rx0", SDMA_FILTER_PARAM(36) },
--	{ "omap2_mcspi.0", "tx1", SDMA_FILTER_PARAM(37) },
--	{ "omap2_mcspi.0", "rx1", SDMA_FILTER_PARAM(38) },
--	{ "omap2_mcspi.0", "tx2", SDMA_FILTER_PARAM(39) },
--	{ "omap2_mcspi.0", "rx2", SDMA_FILTER_PARAM(40) },
--	{ "omap2_mcspi.0", "tx3", SDMA_FILTER_PARAM(41) },
--	{ "omap2_mcspi.0", "rx3", SDMA_FILTER_PARAM(42) },
--	{ "omap2_mcspi.1", "tx0", SDMA_FILTER_PARAM(43) },
--	{ "omap2_mcspi.1", "rx0", SDMA_FILTER_PARAM(44) },
--	{ "omap2_mcspi.1", "tx1", SDMA_FILTER_PARAM(45) },
--	{ "omap2_mcspi.1", "rx1", SDMA_FILTER_PARAM(46) },
--	{ "omap_hsmmc.1", "tx", SDMA_FILTER_PARAM(47) },
--	{ "omap_hsmmc.1", "rx", SDMA_FILTER_PARAM(48) },
--	{ "omap_uart.0", "tx", SDMA_FILTER_PARAM(49) },
--	{ "omap_uart.0", "rx", SDMA_FILTER_PARAM(50) },
--	{ "omap_uart.1", "tx", SDMA_FILTER_PARAM(51) },
--	{ "omap_uart.1", "rx", SDMA_FILTER_PARAM(52) },
--	{ "omap_uart.2", "tx", SDMA_FILTER_PARAM(53) },
--	{ "omap_uart.2", "rx", SDMA_FILTER_PARAM(54) },
--	{ "omap_hsmmc.0", "tx", SDMA_FILTER_PARAM(61) },
--	{ "omap_hsmmc.0", "rx", SDMA_FILTER_PARAM(62) },
--	{ "omap-aes", "tx", SDMA_FILTER_PARAM(65) },
--	{ "omap-aes", "rx", SDMA_FILTER_PARAM(66) },
--	{ "omap-sham", "rx", SDMA_FILTER_PARAM(69) },
--	{ "omap2_mcspi.3", "tx0", SDMA_FILTER_PARAM(70) },
--	{ "omap2_mcspi.3", "rx0", SDMA_FILTER_PARAM(71) },
--	{ "omap_hsmmc.2", "tx", SDMA_FILTER_PARAM(77) },
--	{ "omap_hsmmc.2", "rx", SDMA_FILTER_PARAM(78) },
--	{ "omap_uart.3", "tx", SDMA_FILTER_PARAM(81) },
--	{ "omap_uart.3", "rx", SDMA_FILTER_PARAM(82) },
--};
--
- static struct omap_system_dma_plat_info dma_plat_info __initdata = {
- 	.reg_map	= reg_map,
- 	.channel_stride	= 0x60,
-@@ -334,14 +232,9 @@ static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *unused)
- 	p.dma_attr = (struct omap_dma_dev_attr *)oh->dev_attr;
- 	p.errata = configure_dma_errata();
- 
-+	/* REVISIT: Remove after v4.13 with a follow-up patch */
- 	if (!of_have_populated_dt()) {
- 		if (soc_is_omap24xx()) {
--			p.slave_map = omap24xx_sdma_map;
--			p.slavecnt = ARRAY_SIZE(omap24xx_sdma_map);
--		} else if (soc_is_omap34xx() || soc_is_omap3630()) {
--			p.slave_map = omap3xxx_sdma_map;
--			p.slavecnt = ARRAY_SIZE(omap3xxx_sdma_map);
--		} else {
- 			pr_err("%s: The legacy DMA map is not provided!\n",
- 			       __func__);
- 			return -ENODEV;
-@@ -389,21 +282,7 @@ static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *unused)
- 
- static int __init omap2_system_dma_init(void)
- {
--	struct platform_device *pdev;
--	int res;
--
--	res = omap_hwmod_for_each_by_class("dma",
-+	return omap_hwmod_for_each_by_class("dma",
- 			omap2_system_dma_init_dev, NULL);
--	if (res)
--		return res;
--
--	if (of_have_populated_dt())
--		return res;
--
--	pdev = platform_device_register_full(&omap_dma_dev_info);
--	if (IS_ERR(pdev))
--		return PTR_ERR(pdev);
--
--	return res;
- }
- omap_arch_initcall(omap2_system_dma_init);
--- 
-2.13.0
+Will
