@@ -1,56 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 8 Jun 2017 14:18:02 +0200
-Subject: [PATCH 2/2 v4] clk: Add Gemini SoC clock controller
-In-Reply-To: <20170605195812.GH20170@codeaurora.org>
-References: <20170524082044.8473-1-linus.walleij@linaro.org>
- <20170601070208.GO20170@codeaurora.org>
- <CACRpkdZv8MzXVecEXVdJ+P0MxVscYSy=MxC-yQAR0S4yQ6-rwQ@mail.gmail.com>
- <20170605195812.GH20170@codeaurora.org>
-Message-ID: <CACRpkdbya9xaN-i7AkG0bTyuFYfZc59sSTYhWB43=9btSKfPpQ@mail.gmail.com>
+From: hadess@hadess.net (Bastien Nocera)
+Date: Thu, 08 Jun 2017 14:34:03 +0200
+Subject: Staging r8723bs driver for kernel 4.12.0-rc2 on CHIPPro
+In-Reply-To: <8485e88721d4761d5b1a10ff1eebfd36@www.akkea.ca>
+References: <bcc1a7c44ba34cb077a1df09971d6926@www.akkea.ca>
+ <8485e88721d4761d5b1a10ff1eebfd36@www.akkea.ca>
+Message-ID: <1496925243.11482.19.camel@hadess.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 5, 2017 at 9:58 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 06/05, Linus Walleij wrote:
->> On Thu, Jun 1, 2017 at 9:02 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->>
->> >> +CLK_OF_DECLARE_DRIVER(gemini_cc, "cortina,gemini-syscon", gemini_cc_init);
->> >
->> > Is there a reason why this isn't a platform driver?
->>
->> I can't get the platform to boot if I try, I guess because the console
->> UART needs the clock like super-early.
->>
->> I fixed all the other issues, resending soon.
->>
->
-> Does the console uart driver support probe defer?
+On Wed, 2017-05-31 at 10:29 -0600, Angus Ainslie wrote:
+> On 2017-05-24 15:03, Angus Ainslie wrote:
+> > Hi
+> > 
+> > Has the realtek rtl8723bs staging driver in kernel 4.12.0-rc2 been
+> > tested on the CHIPPro.
+> > 
+> 
+> This is still an issue with 4.12.0-rc3
 
-It's the 8250_of.c driver.
+I only have access to the original CHIP, and the default kernel
+configuration there didn't have the necessary options for the staging
+driver to work.
 
-It's such a big driver that I don't dare to say, I guess I would
-have to go in and debug and patch around in the 8250 driver
-if you insist.
+I filed a bug and a PR a while ago:
+https://github.com/NextThingCo/CHIP-linux/issues/33
+https://github.com/NextThingCo/CHIP-linux/pull/39
 
-But I'm not even sure that is the problem actually, I'd have to
-analyze.
+I haven't looked at it again in a long while due to lack of time, but
+that might be a good first pass at the problem, before getting onto the
+CHIP Pro.
 
-I think the timer may be more of an issue...
-
-It is using CLOCKSOURCE_OF_DECLARE(), at least last time
-I checked there was no such thing as clocksources retrying their
-calls, and that cannot be regular probes because of, yeah device
-core is using the timer, I think.
-
-Yeah I looked in:
-drivers/clocksource/clksrc-probe.c
-
-It will just fail if it can't initialize the clocksource.
-
-I don't understand what platforms can actually get their timers
-up at all without the clock framework? Those hardcoding the
-clock frequency in the device tree, or things like the ARM
-TWD which has it encoded in hardware perhaps?
-
-Yours,
-Linus Walleij
+Cheers
