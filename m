@@ -1,103 +1,47 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 8 Jun 2017 09:20:18 +0300
-Subject: [PATCH 05/11] ARM: OMAP2+: Remove unused legacy code for McBSP
-In-Reply-To: <20170531225139.30723-6-tony@atomide.com>
-References: <20170531225139.30723-1-tony@atomide.com>
- <20170531225139.30723-6-tony@atomide.com>
-Message-ID: <453777a3-ba95-61ef-494c-af0442b42284@ti.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 8 Jun 2017 08:21:48 +0200
+Subject: [PATCH 46/58] clocksource/drivers: Add a new driver for the
+ Atmel ARM TC blocks
+In-Reply-To: <20170607210848.GJ2345@mai>
+References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
+ <20170530215139.9983-47-alexandre.belloni@free-electrons.com>
+ <20170606152104.GC2345@mai>
+ <20170606180559.pkrr7ux2qqnmsd6y@piout.net>
+ <20170607141735.GH2345@mai>
+ <20170607152750.tksmyf5p3oajbsac@piout.net>
+ <20170607210848.GJ2345@mai>
+Message-ID: <20170608082148.78bcf1a0@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-06-01 01:51, Tony Lindgren wrote:
-> We are now booting all mach-omap2 in device tree only mode.
-> Any code that is only called in legacy boot mode where
-> of_have_populated_dt() is not set is safe to remove now.
-> 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+Le Wed, 7 Jun 2017 23:08:48 +0200,
+Daniel Lezcano <daniel.lezcano@linaro.org> a ?crit :
 
-Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-
-> ---
->  arch/arm/mach-omap2/mcbsp.c | 70 ---------------------------------------------
->  1 file changed, 70 deletions(-)
+> On Wed, Jun 07, 2017 at 05:27:50PM +0200, Alexandre Belloni wrote:
+> > On 07/06/2017 at 16:17:35 +0200, Daniel Lezcano wrote:  
+> > > > You mean you don't like how it is used? Or you don't think having the
+> > > > timer full name is useful?  
+> > > 
+> > > The field is not needed, the only place where it is used is where we affect it.
+> > >    
+> > 
+> > It is used in tcb_clksrc_register:
+> > 
+> > tc.clksrc.name = tc.name;  
 > 
-> diff --git a/arch/arm/mach-omap2/mcbsp.c b/arch/arm/mach-omap2/mcbsp.c
-> --- a/arch/arm/mach-omap2/mcbsp.c
-> +++ b/arch/arm/mach-omap2/mcbsp.c
-> @@ -53,73 +53,3 @@ void __init omap3_mcbsp_init_pdata_callback(
->  
->  	pdata->force_ick_on = omap3_mcbsp_force_ick_on;
->  }
-> -
-> -static int __init omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
-> -{
-> -	int id, count = 1;
-> -	char *name = "omap-mcbsp";
-> -	struct omap_hwmod *oh_device[2];
-> -	struct omap_mcbsp_platform_data *pdata = NULL;
-> -	struct platform_device *pdev;
-> -
-> -	sscanf(oh->name, "mcbsp%d", &id);
-> -
-> -	pdata = kzalloc(sizeof(struct omap_mcbsp_platform_data), GFP_KERNEL);
-> -	if (!pdata) {
-> -		pr_err("%s: No memory for mcbsp\n", __func__);
-> -		return -ENOMEM;
-> -	}
-> -
-> -	pdata->reg_step = 4;
-> -	if (oh->class->rev < MCBSP_CONFIG_TYPE2) {
-> -		pdata->reg_size = 2;
-> -	} else {
-> -		pdata->reg_size = 4;
-> -		pdata->has_ccr = true;
-> -	}
-> -
-> -	if (oh->class->rev == MCBSP_CONFIG_TYPE2) {
-> -		/* The FIFO has 128 locations */
-> -		pdata->buffer_size = 0x80;
-> -	} else if (oh->class->rev == MCBSP_CONFIG_TYPE3) {
-> -		if (id == 2)
-> -			/* The FIFO has 1024 + 256 locations */
-> -			pdata->buffer_size = 0x500;
-> -		else
-> -			/* The FIFO has 128 locations */
-> -			pdata->buffer_size = 0x80;
-> -	} else if (oh->class->rev == MCBSP_CONFIG_TYPE4) {
-> -		/* The FIFO has 128 locations for all instances */
-> -		pdata->buffer_size = 0x80;
-> -	}
-> -
-> -	if (oh->class->rev >= MCBSP_CONFIG_TYPE3)
-> -		pdata->has_wakeup = true;
-> -
-> -	oh_device[0] = oh;
-> -
-> -	if (oh->dev_attr) {
-> -		oh_device[1] = omap_hwmod_lookup((
-> -		(struct omap_mcbsp_dev_attr *)(oh->dev_attr))->sidetone);
-> -		pdata->force_ick_on = omap3_mcbsp_force_ick_on;
-> -		count++;
-> -	}
-> -	pdev = omap_device_build_ss(name, id, oh_device, count, pdata,
-> -				    sizeof(*pdata));
-> -	kfree(pdata);
-> -	if (IS_ERR(pdev))  {
-> -		pr_err("%s: Can't build omap_device for %s:%s.\n", __func__,
-> -					name, oh->name);
-> -		return PTR_ERR(pdev);
-> -	}
-> -	return 0;
-> -}
-> -
-> -static int __init omap2_mcbsp_init(void)
-> -{
-> -	if (!of_have_populated_dt())
-> -		omap_hwmod_for_each_by_class("mcbsp", omap_init_mcbsp, NULL);
-> -
-> -	return 0;
-> -}
-> -omap_arch_initcall(omap2_mcbsp_init);
-> 
+> Yes, but tc.name is only in the scope of the function, so there is no need to
+> include this field in the structure, just a working buffer in the function is
+> enough.
 
-- P?ter
+Hm, do you mean allocating the buffer dynamically and leaking the
+resource (not a real leak here, since we're talking about something
+that cannot be unregistered) or defining a 'static char name[]' variable
+in the function and passing this pointer to clksrc.name? Note
+that putting the name var on the stack won't work, because the core
+does not seem to duplicate the name, and uses clksrc->name after
+tcb_clksrc_register() has returned.
+
+Anyway, I'm not sure dynamically generating the name is really
+needed because we only accept a single tcb-clocksource device. We can
+just set tc.clksrc.name to "atmel-tcb-clocksource" and we should be
+good.
