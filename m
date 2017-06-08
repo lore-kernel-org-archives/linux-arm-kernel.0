@@ -1,67 +1,60 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Thu,  8 Jun 2017 15:34:46 -0700
-Subject: [PATCH v6 0/3] ARM: dts: imx7: add NAND support
-Message-ID: <cover.9fab78eaa869dbad4c9ad7e8578c9cef3e49daa8.1496961128.git-series.stefan@agner.ch>
+Date: Thu,  8 Jun 2017 15:34:48 -0700
+Subject: [PATCH v6 2/3] ARM: dts: imx7: add GPMI NAND and APBH DMA
+In-Reply-To: <cover.9fab78eaa869dbad4c9ad7e8578c9cef3e49daa8.1496961128.git-series.stefan@agner.ch>
+References: <cover.9fab78eaa869dbad4c9ad7e8578c9cef3e49daa8.1496961128.git-series.stefan@agner.ch>
+Message-ID: <d4aaef68978524bb46eee79d639dde2b83e8bb5f.1496961128.git-series.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This revision alters the clock tree such that the clock required by
-the APBH DMA (NAND_USDHC_BUS_CLK_ROOT _after_ gate CCGR20) is available
-as an independent clock.
+Add i.MX 7 APBH DMA and GPMI NAND modules.
 
-So far the gate CCGR20 was used by the NAND_ROOT_CLK only. A previous
-patch added the NAND_ROOT_CLK to the APBH DMA which lead the clock
-gate CCGR20 getting enabled:
-https://patchwork.ozlabs.org/patch/551967/
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+Tested-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/imx7s.dtsi | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-The data sheet seems to indicate that the APBH DMA only uses hclk which
-is connected to NAND_USDHC_BUS_CLK_ROOT, but also through gate CCGR20.
-Tests seem to confirm this wiring.
-
-By adding a new clock IMX7D_NAND_USDHC_BUS_RAWNAND_CLK we can assign
-a clock which also enables the shared CCGR20 gate without changing the
-DMA driver. This better reflects the true wiring and encapsulates the
-SoC specific clock wiring in the clock tree instead leaking it into
-the driver code.
-
-The wording "rawnand" has been taken from Table 5-12, Module APBHDMA
-in the i.MX 7 Reference Manual.
-
-Versions 2 and earlier also included NAND driver changes, which are
-already merged.
-
---
-Stefan
-
-Changes since v5:
-- Remove clock-names from dma-apbh node
-
-Changes since v4:
-- Introduce *_RAWNAND_CLK which represent clocks after CCGR20
-- Use *_RAWNAND_CLK for APBH DMA and GPMI NAND
-- Use assigned-clocks to set a reasonable parent for NAND_ROOT_SRC
-
-Changes since v3:
-- Only specify IMX7D_NAND_USDHC_BUS_ROOT_CLK which seems to be sufficent
-
-Changes since v2:
-- Dropped driver changes, alreay merged
-
-Changes since v1:
-- Make clks_count const
-- Introduce IS_IMX7D for i.MX 7 SoC's and make it part of GPMI_IS_MX6
-
-Stefan Agner (3):
-  clk: imx7d: create clocks behind rawnand clock gate
-  ARM: dts: imx7: add GPMI NAND and APBH DMA
-  ARM: dts: imx7-colibri: add NAND support
-
- arch/arm/boot/dts/imx7-colibri.dtsi     |  9 ++++++++-
- arch/arm/boot/dts/imx7s.dtsi            | 31 ++++++++++++++++++++++++++-
- drivers/clk/imx/clk-imx7d.c             |  6 +++--
- include/dt-bindings/clock/imx7d-clock.h |  4 ++-
- 4 files changed, 47 insertions(+), 3 deletions(-)
-
-base-commit: e2bb3be2c6c623ff0bad975dc9435531f450f0c5
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index c4f12fd..4902f62 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -995,5 +995,36 @@
+ 				status = "disabled";
+ 			};
+ 		};
++
++		dma_apbh: dma-apbh at 33000000 {
++			compatible = "fsl,imx7d-dma-apbh", "fsl,imx28-dma-apbh";
++			reg = <0x33000000 0x2000>;
++			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "gpmi0", "gpmi1", "gpmi2", "gpmi3";
++			#dma-cells = <1>;
++			dma-channels = <4>;
++			clocks = <&clks IMX7D_NAND_USDHC_BUS_RAWNAND_CLK>;
++		};
++
++		gpmi: gpmi-nand at 33002000{
++			compatible = "fsl,imx7d-gpmi-nand";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x33002000 0x2000>, <0x33004000 0x4000>;
++			reg-names = "gpmi-nand", "bch";
++			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "bch";
++			clocks = <&clks IMX7D_NAND_RAWNAND_CLK>,
++				<&clks IMX7D_NAND_USDHC_BUS_RAWNAND_CLK>;
++			clock-names = "gpmi_io", "gpmi_bch_apb";
++			dmas = <&dma_apbh 0>;
++			dma-names = "rx-tx";
++			status = "disabled";
++			assigned-clocks = <&clks IMX7D_NAND_ROOT_SRC>;
++			assigned-clock-parents = <&clks IMX7D_PLL_ENET_MAIN_500M_CLK>;
++		};
+ 	};
+ };
 -- 
 git-series 0.9.1
