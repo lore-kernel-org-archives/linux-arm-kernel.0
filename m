@@ -1,47 +1,81 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 8 Jun 2017 08:21:48 +0200
-Subject: [PATCH 46/58] clocksource/drivers: Add a new driver for the
- Atmel ARM TC blocks
-In-Reply-To: <20170607210848.GJ2345@mai>
-References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
- <20170530215139.9983-47-alexandre.belloni@free-electrons.com>
- <20170606152104.GC2345@mai>
- <20170606180559.pkrr7ux2qqnmsd6y@piout.net>
- <20170607141735.GH2345@mai>
- <20170607152750.tksmyf5p3oajbsac@piout.net>
- <20170607210848.GJ2345@mai>
-Message-ID: <20170608082148.78bcf1a0@bbrezillon>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 8 Jun 2017 09:25:47 +0300
+Subject: [PATCH 07/11] ARM: OMAP2+: Remove unused legacy code for DMA
+In-Reply-To: <20170531225139.30723-8-tony@atomide.com>
+References: <20170531225139.30723-1-tony@atomide.com>
+ <20170531225139.30723-8-tony@atomide.com>
+Message-ID: <10f65a24-0459-5df7-378d-84933b83c070@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Wed, 7 Jun 2017 23:08:48 +0200,
-Daniel Lezcano <daniel.lezcano@linaro.org> a ?crit :
+Tony,
 
-> On Wed, Jun 07, 2017 at 05:27:50PM +0200, Alexandre Belloni wrote:
-> > On 07/06/2017 at 16:17:35 +0200, Daniel Lezcano wrote:  
-> > > > You mean you don't like how it is used? Or you don't think having the
-> > > > timer full name is useful?  
-> > > 
-> > > The field is not needed, the only place where it is used is where we affect it.
-> > >    
-> > 
-> > It is used in tcb_clksrc_register:
-> > 
-> > tc.clksrc.name = tc.name;  
+On 2017-06-01 01:51, Tony Lindgren wrote:
+> We are now booting all mach-omap2 in device tree only mode.
+> Any code that is only called in legacy boot mode where
+> of_have_populated_dt() is not set is safe to remove now.
 > 
-> Yes, but tc.name is only in the scope of the function, so there is no need to
-> include this field in the structure, just a working buffer in the function is
-> enough.
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap2/dma.c | 30 +-----------------------------
+>  1 file changed, 1 insertion(+), 29 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/dma.c b/arch/arm/mach-omap2/dma.c
+> --- a/arch/arm/mach-omap2/dma.c
+> +++ b/arch/arm/mach-omap2/dma.c
+> @@ -334,20 +334,6 @@ static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *unused)
+>  	p.dma_attr = (struct omap_dma_dev_attr *)oh->dev_attr;
+>  	p.errata = configure_dma_errata();
+>  
+> -	if (!of_have_populated_dt()) {
+> -		if (soc_is_omap24xx()) {
+> -			p.slave_map = omap24xx_sdma_map;
+> -			p.slavecnt = ARRAY_SIZE(omap24xx_sdma_map);
+> -		} else if (soc_is_omap34xx() || soc_is_omap3630()) {
+> -			p.slave_map = omap3xxx_sdma_map;
+> -			p.slavecnt = ARRAY_SIZE(omap3xxx_sdma_map);
+> -		} else {
+> -			pr_err("%s: The legacy DMA map is not provided!\n",
+> -			       __func__);
+> -			return -ENODEV;
+> -		}
+> -	}
+> -
 
-Hm, do you mean allocating the buffer dynamically and leaking the
-resource (not a real leak here, since we're talking about something
-that cannot be unregistered) or defining a 'static char name[]' variable
-in the function and passing this pointer to clksrc.name? Note
-that putting the name var on the stack won't work, because the core
-does not seem to duplicate the name, and uses clksrc->name after
-tcb_clksrc_register() has returned.
+This will conflict with the changes introduced by the tusb6010 DMAengine
+conversion:
+https://patchwork.kernel.org/patch/9734219/
 
-Anyway, I'm not sure dynamically generating the name is really
-needed because we only accept a single tcb-clocksource device. We can
-just set tc.clksrc.name to "atmel-tcb-clocksource" and we should be
-good.
+with this patch I think the omap24xx_sdma_map and omap3xxx_sdma_map can
+also be removed, but we need to keep the omap24xx_sdma_dt_map for now
+till we have proper DT support for tusb.
+
+>  	pdev = omap_device_build(name, 0, oh, &p, sizeof(p));
+>  	if (IS_ERR(pdev)) {
+>  		pr_err("%s: Can't build omap_device for %s:%s.\n",
+> @@ -389,21 +375,7 @@ static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *unused)
+>  
+>  static int __init omap2_system_dma_init(void)
+>  {
+> -	struct platform_device *pdev;
+> -	int res;
+> -
+> -	res = omap_hwmod_for_each_by_class("dma",
+> +	return omap_hwmod_for_each_by_class("dma",
+>  			omap2_system_dma_init_dev, NULL);
+> -	if (res)
+> -		return res;
+> -
+> -	if (of_have_populated_dt())
+> -		return res;
+> -
+> -	pdev = platform_device_register_full(&omap_dma_dev_info);
+> -	if (IS_ERR(pdev))
+> -		return PTR_ERR(pdev);
+> -
+> -	return res;
+>  }
+>  omap_arch_initcall(omap2_system_dma_init);
+> 
+
+- P?ter
