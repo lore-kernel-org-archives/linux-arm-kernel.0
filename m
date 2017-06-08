@@ -1,113 +1,70 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 8 Jun 2017 13:59:46 +0100
-Subject: [PATCH v3] mm: huge-vmap: fail gracefully on unexpected huge
- vmap mappings
-In-Reply-To: <20170608113548.24905-1-ard.biesheuvel@linaro.org>
-References: <20170608113548.24905-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170608125946.GD5765@leverpostej>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Thu, 8 Jun 2017 15:04:50 +0200
+Subject: [PULL v2 0/6] KVM/ARM Fixes for v4.12-rc5 - Take 2
+In-Reply-To: <20170607171152.21874-1-cdall@linaro.org>
+References: <20170607171152.21874-1-cdall@linaro.org>
+Message-ID: <2a8a3bf1-d7dc-e005-b8b2-d7eb03e7a998@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 08, 2017 at 11:35:48AM +0000, Ard Biesheuvel wrote:
-> Existing code that uses vmalloc_to_page() may assume that any
-> address for which is_vmalloc_addr() returns true may be passed
-> into vmalloc_to_page() to retrieve the associated struct page.
+
+
+On 07/06/2017 19:11, Christoffer Dall wrote:
+> Hi Radim and Paolo,
 > 
-> This is not un unreasonable assumption to make, but on architectures
-> that have CONFIG_HAVE_ARCH_HUGE_VMAP=y, it no longer holds, and we
-> need to ensure that vmalloc_to_page() does not go off into the weeds
-> trying to dereference huge PUDs or PMDs as table entries.
+> Six additional fixes for KVM/ARM for v4.12 (instead of only the first
+> three in the first version of this pull request).
 > 
-> Given that vmalloc() and vmap() themselves never create huge
-> mappings or deal with compound pages at all, there is no correct
-> value to return in this case, so return NULL instead, and issue a
-> warning.
+> The changes are:
+>  - Fix an issue with migrating GICv2 VMs on GICv3 systems.
+>  - Squashed a bug for gicv3 when figuring out preemption levels.
+>  - Fix a potential null pointer derefence in KVM happening under memory
+>    pressure.
+>  - Maintain RES1 bits in the SCTLR_EL2 to make sure KVM works on new
+>    architecture revisions.
+>  - Allow unaligned accesses at EL2/HYP
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> The following changes since commit fa472fa91a5a0b241f5ddae927d2e235d07545df:
+> 
+>   KVM: arm/arm64: Hold slots_lock when unregistering kvm io bus devices (2017-05-18 11:18:16 +0200)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git kvm-arm-for-v4.12-rc5-take2
+> 
+> for you to fetch changes up to 33b5c38852b29736f3b472dd095c9a18ec22746f:
+> 
+>   arm: KVM: Allow unaligned accesses at HYP (2017-06-06 22:20:02 +0200)
+> 
+> Thanks,
+> -Christoffer
+
+Pulled, thanks.
+
+Paolo
+
 > ---
-> This is a followup to '[PATCH v2] mm: vmalloc: make vmalloc_to_page()
-> deal with PMD/PUD mappings', hence the v3. The root issue with /proc/kcore
-> on arm64 is now handled by '[PATCH] mm: vmalloc: simplify vread/vwrite to
-> use existing mappings' [1], and this patch now only complements it by
-> taking care of other vmalloc_to_page() users.
+> Christoffer Dall (2):
+>       KVM: arm/arm64: Fix isues with GICv2 on GICv3 migration
+>       KVM: arm/arm64: vgic-v3: Fix nr_pre_bits bitfield extraction
 > 
-> [0] http://marc.info/?l=linux-mm&m=149641886821855&w=2
-> [1] http://marc.info/?l=linux-mm&m=149685966530180&w=2
+> Marc Zyngier (4):
+>       KVM: arm/arm64: Handle possible NULL stage2 pud when ageing pages
+>       arm64: KVM: Preserve RES1 bits in SCTLR_EL2
+>       arm64: KVM: Allow unaligned accesses at EL2
+>       arm: KVM: Allow unaligned accesses at HYP
 > 
->  include/linux/hugetlb.h | 13 +++++++++----
->  mm/vmalloc.c            |  5 +++--
->  2 files changed, 12 insertions(+), 6 deletions(-)
+>  arch/arm/kvm/init.S                |  5 ++--
+>  arch/arm64/include/asm/sysreg.h    |  4 ++++
+>  arch/arm64/kvm/hyp-init.S          | 11 +++++----
+>  arch/arm64/kvm/vgic-sys-reg-v3.c   | 10 ++++----
+>  include/linux/irqchip/arm-gic-v3.h |  4 ++++
+>  include/linux/irqchip/arm-gic.h    | 28 ++++++++++++++++++++---
+>  virt/kvm/arm/hyp/vgic-v3-sr.c      |  2 +-
+>  virt/kvm/arm/mmu.c                 |  3 +++
+>  virt/kvm/arm/vgic/vgic-mmio-v2.c   | 16 +++++++++++--
+>  virt/kvm/arm/vgic/vgic-v2.c        | 28 ++++++++++++++++++++---
+>  virt/kvm/arm/vgic/vgic-v3.c        | 47 ++++++++++++++++++++++++++------------
+>  virt/kvm/arm/vgic/vgic.h           | 12 ++++++----
+>  12 files changed, 131 insertions(+), 39 deletions(-)
 > 
-> diff --git a/include/linux/hugetlb.h b/include/linux/hugetlb.h
-> index b857fc8cc2ec..b7166e5426b6 100644
-> --- a/include/linux/hugetlb.h
-> +++ b/include/linux/hugetlb.h
-> @@ -121,8 +121,6 @@ struct page *follow_huge_pmd(struct mm_struct *mm, unsigned long address,
->  				pmd_t *pmd, int flags);
->  struct page *follow_huge_pud(struct mm_struct *mm, unsigned long address,
->  				pud_t *pud, int flags);
-> -int pmd_huge(pmd_t pmd);
-> -int pud_huge(pud_t pud);
->  unsigned long hugetlb_change_protection(struct vm_area_struct *vma,
->  		unsigned long address, unsigned long end, pgprot_t newprot);
->  
-> @@ -150,8 +148,6 @@ static inline void hugetlb_show_meminfo(void)
->  #define follow_huge_pmd(mm, addr, pmd, flags)	NULL
->  #define follow_huge_pud(mm, addr, pud, flags)	NULL
->  #define prepare_hugepage_range(file, addr, len)	(-EINVAL)
-> -#define pmd_huge(x)	0
-> -#define pud_huge(x)	0
->  #define is_hugepage_only_range(mm, addr, len)	0
->  #define hugetlb_free_pgd_range(tlb, addr, end, floor, ceiling) ({BUG(); 0; })
->  #define hugetlb_fault(mm, vma, addr, flags)	({ BUG(); 0; })
-> @@ -190,6 +186,15 @@ static inline void __unmap_hugepage_range(struct mmu_gather *tlb,
->  }
->  
->  #endif /* !CONFIG_HUGETLB_PAGE */
-> +
-> +#if defined(CONFIG_HUGETLB_PAGE) || defined(CONFIG_HAVE_ARCH_HUGE_VMAP)
-> +int pmd_huge(pmd_t pmd);
-> +int pud_huge(pud_t pud);
-> +#else
-> +#define pmd_huge(x)	0
-> +#define pud_huge(x)	0
-> +#endif
-> +
->  /*
->   * hugepages at page global directory. If arch support
->   * hugepages at pgd level, they need to define this.
-> diff --git a/mm/vmalloc.c b/mm/vmalloc.c
-> index 982d29511f92..67e1a304c467 100644
-> --- a/mm/vmalloc.c
-> +++ b/mm/vmalloc.c
-> @@ -12,6 +12,7 @@
->  #include <linux/mm.h>
->  #include <linux/module.h>
->  #include <linux/highmem.h>
-> +#include <linux/hugetlb.h>
->  #include <linux/sched/signal.h>
->  #include <linux/slab.h>
->  #include <linux/spinlock.h>
-> @@ -287,10 +288,10 @@ struct page *vmalloc_to_page(const void *vmalloc_addr)
->  	if (p4d_none(*p4d))
->  		return NULL;
->  	pud = pud_offset(p4d, addr);
-> -	if (pud_none(*pud))
-> +	if (pud_none(*pud) || WARN_ON_ONCE(pud_huge(*pud)))
->  		return NULL;
->  	pmd = pmd_offset(pud, addr);
-> -	if (pmd_none(*pmd))
-> +	if (pmd_none(*pmd) || WARN_ON_ONCE(pmd_huge(*pmd)))
->  		return NULL;
-
-I think it might be better to use p*d_bad() here, since that doesn't
-depend on CONFIG_HUGETLB_PAGE.
-
-While the cross-arch semantics are a little fuzzy, my understanding is
-those should return true if an entry is not a pointer to a next level of
-table (so pXd_huge(p) implies pXd_bad(p)).
-
-Otherwise, this looks sensible to me.
-
-Thanks,
-Mark.
