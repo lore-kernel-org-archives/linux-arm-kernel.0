@@ -1,51 +1,68 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 8 Jun 2017 10:46:28 +0900
-Subject: [PATCH] clk: sunxi-ng: Move all clock types to a library
-In-Reply-To: <20170607081708.ycruditlhebizzt2@flea.lan>
-References: <20170602223006.1653-1-sboyd@codeaurora.org>
- <201706031243.qNvuUbQX%fengguang.wu@intel.com>
- <20170605144546.b6oh5sygrza22hbe@flea.lan>
- <CAK8P3a1Qvt4nvM5HeK-n87tsi2D5GBOmZo0rZv_Lp==CC=34Uw@mail.gmail.com>
- <CAGb2v66QvLdojDe4+uG9Opa7fApA-GH9pW4v0En5j6QSPf1yZw@mail.gmail.com>
- <CAK8P3a38TyiHXBgB0DQka=0iASuyJO_zMrczXqYBiJj6LEnNWg@mail.gmail.com>
- <20170607081708.ycruditlhebizzt2@flea.lan>
-Message-ID: <CAK7LNAQUTiM3DoD3_NCOA-95_LQ0P2m-CXDSQAKJ+eON5fAuYQ@mail.gmail.com>
+From: jk@ozlabs.org (Jeremy Kerr)
+Date: Thu, 8 Jun 2017 10:06:16 +0800
+Subject: [PATCH v8 16/24] drivers/fsi: Add tracepoints for low-level
+ operations
+In-Reply-To: <20170607151610.52f7bc88@gandalf.local.home>
+References: <20170606210859.80431-1-cbostic@linux.vnet.ibm.com>
+ <20170606210859.80431-17-cbostic@linux.vnet.ibm.com>
+ <20170607151610.52f7bc88@gandalf.local.home>
+Message-ID: <4441a1ba-e66e-368a-cc07-8e3859dc8c13@ozlabs.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-06-07 17:17 GMT+09:00 Maxime Ripard <maxime.ripard@free-electrons.com>:
-> On Wed, Jun 07, 2017 at 09:36:34AM +0200, Arnd Bergmann wrote:
->> On Wed, Jun 7, 2017 at 7:45 AM, Chen-Yu Tsai <wens@csie.org> wrote:
->> > at the bottom (with a comment) would be cleaner, and
->> > we wouldn't need to modify all the existing lines.
->> > AFAIK about Makefiles, that should work?
->>
->> Ah, yes. That's much better.
->>
->>       Arnd
->
-> I just applied the original patch, with that addition, and a comment
-> as suggested by Stephen.
->
+Hi Steven,
+
+Thanks for checking this out.
+
+>> +TRACE_EVENT(fsi_master_write,
+>> +	TP_PROTO(const struct fsi_master *master, int link, int id,
+>> +			uint32_t addr, size_t size, const void *data),
+>> +	TP_ARGS(master, link, id, addr, size, data),
+>> +	TP_STRUCT__entry(
+>> +		__field(int,	master_idx)
+>> +		__field(int,	link)
+>> +		__field(int,	id)
+>> +		__field(__u32,	addr)
+>> +		__field(size_t,	size)
+>> +		__field(__u32,	data)
+>> +	),
+>> +	TP_fast_assign(
+>> +		__entry->master_idx = master->idx;
+>> +		__entry->link = link;
+>> +		__entry->id = id;
+>> +		__entry->addr = addr;
+>> +		__entry->size = size;
+>> +		__entry->data = 0;
+>> +		memcpy(&__entry->data, data, size);
+> 
+> 
+> Um, can size ever be greater than 4? If so, this is a bug.
+
+No, size will only ever be 1, 2, or 4, as they're the only valid FSI bus
+transactions. Hence storing ->data as a u32 to keep things simple.
+
+> I think you may want to use a dynamic array here.
+> 
+> 	TP_STRUCT__entry(
+> 		[..]
+> 		__dynamic_array(char, data, size)
+> 	[..]
+> 
+> 	TP_fast_assign(
+> 		[..]
+> 		memcpy(__get_dynamic_array(data), data, size);
+> 	[..]
+> 
+> 	TP_printk(...
+> 		[..]
+> 		__entry->size,
+> 		__get_dynamic_array(data)
+> 
+> You may also want to look at __print_array() too.
+
+The %ph specifier seems to do a decent job though...
+
+Cheers,
 
 
-Hmm, I think Kbuild expects lib.a only for the final link
-(at least in official level)
-Is it a problem to compile common files all the time?
-
-# Common objects
-obj-y += ccu_common.o
-obj-y += ccu_reset.o
-
-
-We may end up with some unused functions in vmlinux,
-but it will not be a big impact on the image size in this case.
-
-CONFIG_LD_DEAD_CODE_DATA_ELIMINATION may
-take care of unused symbols.  I have not tested this CONFIG, though.
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+Jeremy
