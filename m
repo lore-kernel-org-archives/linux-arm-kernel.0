@@ -1,59 +1,64 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  8 Jun 2017 17:31:23 +0200
-Subject: [PATCH 4/4] ARM64: dts: meson-gxl-s905x-p212: Add HDMI and CVBS nodes
-In-Reply-To: <1496935883-4966-1-git-send-email-narmstrong@baylibre.com>
-References: <1496935883-4966-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1496935883-4966-5-git-send-email-narmstrong@baylibre.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 8 Jun 2017 10:40:28 -0500
+Subject: [PATCH v3 2/6] dt-bindings: display: Add Synopsys DW MIPI DSI
+ DRM bridge driver
+In-Reply-To: <1496414235-20098-3-git-send-email-philippe.cornu@st.com>
+References: <1496414235-20098-1-git-send-email-philippe.cornu@st.com>
+ <1496414235-20098-3-git-send-email-philippe.cornu@st.com>
+Message-ID: <20170608154028.6ck3dos6de2dogrk@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add HDMI and CVBS nodes for the Amlogic P212 reference board.
+On Fri, Jun 02, 2017 at 04:37:11PM +0200, Philippe CORNU wrote:
+> This patch adds documentation of device tree bindings for the
+> Synopsys DesignWare MIPI DSI host DRM bridge driver.
+> 
+> Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
+> ---
+>  .../bindings/display/bridge/dw_mipi_dsi.txt        | 30 ++++++++++++++++++++++
+>  1 file changed, 30 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt b/Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
+> new file mode 100644
+> index 0000000..1d7c438
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
+> @@ -0,0 +1,30 @@
+> +Synopsys DesignWare MIPI DSI host controller
+> +============================================
+> +
+> +This document defines device tree properties for the Synopsys DesignWare MIPI
+> +DSI host controller. It doesn't constitue a device tree binding specification
+> +by itself but is meant to be referenced by platform-specific device tree
+> +bindings.
+> +
+> +When referenced from platform device tree bindings the properties defined in
+> +this document are defined as follows. The platform device tree bindings are
+> +responsible for defining whether each property is required or optional.
+> +
+> +- reg: Memory mapped base address and length of the DWC MIPI DSI
+> +  registers. (mandatory)
+> +
+> +- clocks: References to all the clocks specified in the clock-names property
+> +  as specified in [1]. (mandatory)
+> +
+> +- clock-names: "pclk" is peripheral clock for either AHB and APB. (mandatory)
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- .../boot/dts/amlogic/meson-gxl-s905x-p212.dts      | 23 ++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+Seems strange there's not also a pixel or bit clock? Or this gets driven 
+from the phy?
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
-index db31e09..6ab17c1 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
-@@ -58,6 +58,17 @@
- 			};
- 		};
- 	};
-+
-+	hdmi-connector {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_connector_in: endpoint {
-+				remote-endpoint = <&hdmi_tx_tmds_out>;
-+			};
-+		};
-+	};
- };
- 
- &cvbs_vdac_port {
-@@ -66,6 +77,18 @@
- 	};
- };
- 
-+&hdmi_tx {
-+	status = "okay";
-+	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&hdmi_tx_tmds_port {
-+	hdmi_tx_tmds_out: endpoint {
-+		remote-endpoint = <&hdmi_connector_in>;
-+	};
-+};
-+
- /* This UART is brought out to the DB9 connector */
- &uart_AO {
- 	status = "okay";
--- 
-1.9.1
+> +
+> +- resets: References to all the resets specified in the reset-names property
+> +  as specified in [2]. (optional)
+> +
+> +- reset-names: string reset name, must be "apb" if used. (optional)
+> +
+> +- panel or bridge node: see [3]. (mandatory)
+> +
+> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +[2] Documentation/devicetree/bindings/reset/reset.txt
+> +[3] Documentation/devicetree/bindings/display/mipi-dsi-bus.txt
+> -- 
+> 1.9.1
+> 
