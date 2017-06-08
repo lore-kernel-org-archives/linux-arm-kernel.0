@@ -1,104 +1,192 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Thu,  8 Jun 2017 15:34:39 +0200
-Subject: [PATCH v3 2/9] KVM: arm: Handle VCPU device attributes in guest.c
+Date: Thu,  8 Jun 2017 15:34:38 +0200
+Subject: [PATCH v3 1/9] KVM: arm64: Allow creating the PMU without the
+ in-kernel GIC
 In-Reply-To: <20170608133446.3875-1-cdall@linaro.org>
 References: <20170608133446.3875-1-cdall@linaro.org>
-Message-ID: <20170608133446.3875-3-cdall@linaro.org>
+Message-ID: <20170608133446.3875-2-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we are about to support VCPU attributes to set the timer IRQ numbers
-in guest.c, move the static inlines for the VCPU attributes handlers
-from the header file to guest.c.
+Since we got support for devices in userspace which allows reporting the
+PMU overflow output status to userspace, we should actually allow
+creating the PMU on systems without an in-kernel irqchip, which in turn
+requires us to slightly clarify error codes for the ABI and move things
+around for the initialization phase.
 
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_host.h | 22 +++++++--------------
- arch/arm/kvm/guest.c            | 42 +++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 49 insertions(+), 15 deletions(-)
+ Documentation/virtual/kvm/devices/vcpu.txt | 16 ++++++----
+ include/kvm/arm_pmu.h                      |  6 ++++
+ virt/kvm/arm/arm.c                         |  4 +++
+ virt/kvm/arm/pmu.c                         | 51 +++++++++++++++++++++++-------
+ 4 files changed, 58 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 00ad56e..127e2dd 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -291,20 +291,12 @@ static inline void kvm_arm_init_debug(void) {}
- static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
--static inline int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
--					     struct kvm_device_attr *attr)
--{
--	return -ENXIO;
--}
--static inline int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
--					     struct kvm_device_attr *attr)
--{
--	return -ENXIO;
--}
--static inline int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
--					     struct kvm_device_attr *attr)
--{
--	return -ENXIO;
--}
-+
-+int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
-+			       struct kvm_device_attr *attr);
-+int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
-+			       struct kvm_device_attr *attr);
-+int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
-+			       struct kvm_device_attr *attr);
+diff --git a/Documentation/virtual/kvm/devices/vcpu.txt b/Documentation/virtual/kvm/devices/vcpu.txt
+index 02f5068..d7236a3 100644
+--- a/Documentation/virtual/kvm/devices/vcpu.txt
++++ b/Documentation/virtual/kvm/devices/vcpu.txt
+@@ -16,7 +16,9 @@ Parameters: in kvm_device_attr.addr the address for PMU overflow interrupt is a
+ Returns: -EBUSY: The PMU overflow interrupt is already set
+          -ENXIO: The overflow interrupt not set when attempting to get it
+          -ENODEV: PMUv3 not supported
+-         -EINVAL: Invalid PMU overflow interrupt number supplied
++         -EINVAL: Invalid PMU overflow interrupt number supplied or
++                  trying to set the IRQ number without using an in-kernel
++                  irqchip.
  
- #endif /* __ARM_KVM_HOST_H__ */
-diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
-index fa6182a..acea05e 100644
---- a/arch/arm/kvm/guest.c
-+++ b/arch/arm/kvm/guest.c
-@@ -301,3 +301,45 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
+ A value describing the PMUv3 (Performance Monitor Unit v3) overflow interrupt
+ number for this vcpu. This interrupt could be a PPI or SPI, but the interrupt
+@@ -25,11 +27,11 @@ all vcpus, while as an SPI it must be a separate number per vcpu.
+ 
+ 1.2 ATTRIBUTE: KVM_ARM_VCPU_PMU_V3_INIT
+ Parameters: no additional parameter in kvm_device_attr.addr
+-Returns: -ENODEV: PMUv3 not supported
+-         -ENXIO: PMUv3 not properly configured as required prior to calling this
+-                 attribute
++Returns: -ENODEV: PMUv3 not supported or GIC not initialized
++         -ENXIO: PMUv3 not properly configured or in-kernel irqchip not
++                 configured as required prior to calling this attribute
+          -EBUSY: PMUv3 already initialized
+ 
+-Request the initialization of the PMUv3.  This must be done after creating the
+-in-kernel irqchip.  Creating a PMU with a userspace irqchip is currently not
+-supported.
++Request the initialization of the PMUv3.  If using the PMUv3 with an in-kernel
++virtual GIC implementation, this must be done after initializing the in-kernel
++irqchip.
+diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+index 1ab4633..f6e0306 100644
+--- a/include/kvm/arm_pmu.h
++++ b/include/kvm/arm_pmu.h
+@@ -35,6 +35,7 @@ struct kvm_pmu {
+ 	int irq_num;
+ 	struct kvm_pmc pmc[ARMV8_PMU_MAX_COUNTERS];
+ 	bool ready;
++	bool created;
+ 	bool irq_level;
+ };
+ 
+@@ -63,6 +64,7 @@ int kvm_arm_pmu_v3_get_attr(struct kvm_vcpu *vcpu,
+ 			    struct kvm_device_attr *attr);
+ int kvm_arm_pmu_v3_has_attr(struct kvm_vcpu *vcpu,
+ 			    struct kvm_device_attr *attr);
++int kvm_arm_pmu_v3_enable(struct kvm_vcpu *vcpu);
+ #else
+ struct kvm_pmu {
+ };
+@@ -112,6 +114,10 @@ static inline int kvm_arm_pmu_v3_has_attr(struct kvm_vcpu *vcpu,
  {
- 	return -EINVAL;
+ 	return -ENXIO;
  }
-+
-+int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
-+			       struct kvm_device_attr *attr)
++static inline int kvm_arm_pmu_v3_enable(struct kvm_vcpu *vcpu)
 +{
-+	int ret;
++	return 0;
++}
+ #endif
+ 
+ #endif
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index cac5c2f..72816d3 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -527,6 +527,10 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
+ 	}
+ 
+ 	ret = kvm_timer_enable(vcpu);
++	if (ret)
++		return ret;
 +
-+	switch (attr->group) {
-+	default:
-+		ret = -ENXIO;
-+		break;
-+	}
++	ret = kvm_arm_pmu_v3_enable(vcpu);
+ 
+ 	return ret;
+ }
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+index 2451607..96a9cab 100644
+--- a/virt/kvm/arm/pmu.c
++++ b/virt/kvm/arm/pmu.c
+@@ -449,29 +449,50 @@ bool kvm_arm_support_pmu_v3(void)
+ 	return (perf_num_counters() > 0);
+ }
+ 
+-static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
++int kvm_arm_pmu_v3_enable(struct kvm_vcpu *vcpu)
+ {
+-	if (!kvm_arm_support_pmu_v3())
+-		return -ENODEV;
++	if (!vcpu->arch.pmu.created)
++		return 0;
+ 
+ 	/*
+-	 * We currently require an in-kernel VGIC to use the PMU emulation,
+-	 * because we do not support forwarding PMU overflow interrupts to
+-	 * userspace yet.
++	 * A valid interrupt configuration for the PMU is either to have a
++	 * properly configured interrupt number and using an in-kernel
++	 * irqchip, or to neither set an IRQ nor create an in-kernel irqchip.
+ 	 */
+-	if (!irqchip_in_kernel(vcpu->kvm) || !vgic_initialized(vcpu->kvm))
++	if (kvm_arm_pmu_irq_initialized(vcpu) != irqchip_in_kernel(vcpu->kvm))
++		return -EINVAL;
 +
-+	return ret;
++	kvm_pmu_vcpu_reset(vcpu);
++	vcpu->arch.pmu.ready = true;
++
++	return 0;
 +}
 +
-+int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
-+			       struct kvm_device_attr *attr)
++static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
 +{
-+	int ret;
++	if (!kvm_arm_support_pmu_v3())
+ 		return -ENODEV;
+ 
+-	if (!test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features) ||
+-	    !kvm_arm_pmu_irq_initialized(vcpu))
++	if (!test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features))
+ 		return -ENXIO;
+ 
+-	if (kvm_arm_pmu_v3_ready(vcpu))
++	if (vcpu->arch.pmu.created)
+ 		return -EBUSY;
+ 
+-	kvm_pmu_vcpu_reset(vcpu);
+-	vcpu->arch.pmu.ready = true;
++	if (irqchip_in_kernel(vcpu->kvm)) {
++		/*
++		 * If using the PMU with an in-kernel virtual GIC
++		 * implementation, we require the GIC to be already
++		 * initialized when initializing the PMU.
++		 */
++		if (!vgic_initialized(vcpu->kvm))
++			return -ENODEV;
 +
-+	switch (attr->group) {
-+	default:
-+		ret = -ENXIO;
-+		break;
++		if (!kvm_arm_pmu_irq_initialized(vcpu))
++			return -ENXIO;
 +	}
+ 
++	vcpu->arch.pmu.created = true;
+ 	return 0;
+ }
+ 
+@@ -510,6 +531,9 @@ int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
+ 		int __user *uaddr = (int __user *)(long)attr->addr;
+ 		int irq;
+ 
++		if (!irqchip_in_kernel(vcpu->kvm))
++			return -EINVAL;
 +
-+	return ret;
-+}
+ 		if (!test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features))
+ 			return -ENODEV;
+ 
+@@ -544,6 +568,9 @@ int kvm_arm_pmu_v3_get_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
+ 		int __user *uaddr = (int __user *)(long)attr->addr;
+ 		int irq;
+ 
++		if (!irqchip_in_kernel(vcpu->kvm))
++			return -EINVAL;
 +
-+int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
-+			       struct kvm_device_attr *attr)
-+{
-+	int ret;
-+
-+	switch (attr->group) {
-+	default:
-+		ret = -ENXIO;
-+		break;
-+	}
-+
-+	return ret;
-+}
+ 		if (!test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features))
+ 			return -ENODEV;
+ 
 -- 
 2.9.0
