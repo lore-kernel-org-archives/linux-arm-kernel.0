@@ -1,82 +1,104 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 9 Jun 2017 02:06:16 +0300
-Subject: [PATCH 19/20] arm64:ilp32: add vdso-ilp32 and use for signal
- return
-In-Reply-To: <20170608152434.5jgcrk6jisdaqap7@localhost>
-References: <20170604120009.342-1-ynorov@caviumnetworks.com>
- <20170604120009.342-20-ynorov@caviumnetworks.com>
- <20170608152434.5jgcrk6jisdaqap7@localhost>
-Message-ID: <20170608230616.2mi6w6llskl35bh4@yury-thinkpad>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Thu,  8 Jun 2017 16:40:20 -0700
+Subject: [PATCH v9 14/34] ARM: dts: imx6-sabreauto: add the ADV7180 video
+ decoder
+In-Reply-To: <1496860453-6282-15-git-send-email-steve_longerbeam@mentor.com>
+References: <1496860453-6282-15-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1496965220-27028-1-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 08, 2017 at 04:24:34PM +0100, Catalin Marinas wrote:
-> On Sun, Jun 04, 2017 at 03:00:08PM +0300, Yury Norov wrote:
-> > From: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-> > 
-> > ILP32 VDSO exports following symbols:
-> >  __kernel_rt_sigreturn;
-> >  __kernel_gettimeofday;
-> >  __kernel_clock_gettime;
-> >  __kernel_clock_getres.
-> > 
-> > What shared object to use, kernel selects depending on result of
-> > is_ilp32_compat_task() in arch/arm64/kernel/vdso.c, so it substitutes
-> > correct pages and spec.
-> > 
-> > Adjusted to move the data page before code pages in sync with
-> > commit 601255ae3c98 ("arm64: vdso: move data page before code pages")
-> > 
-> > Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-> > Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
-> > Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-> > Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@linaro.org>
-> > ---
-> >  arch/arm64/Makefile                           |  3 +
-> >  arch/arm64/include/asm/vdso.h                 |  6 ++
-> >  arch/arm64/kernel/Makefile                    |  1 +
-> >  arch/arm64/kernel/asm-offsets.c               |  7 ++
-> >  arch/arm64/kernel/signal.c                    |  2 +
-> >  arch/arm64/kernel/vdso-ilp32/.gitignore       |  2 +
-> >  arch/arm64/kernel/vdso-ilp32/Makefile         | 80 ++++++++++++++++++++++
-> >  arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S     | 33 ++++++++++
-> >  arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S | 95 +++++++++++++++++++++++++++
-> >  arch/arm64/kernel/vdso.c                      | 65 +++++++++++++++---
-> >  arch/arm64/kernel/vdso/gettimeofday.S         | 20 +++++-
-> >  arch/arm64/kernel/vdso/vdso.S                 |  6 +-
-> >  12 files changed, 304 insertions(+), 16 deletions(-)
-> >  create mode 100644 arch/arm64/kernel/vdso-ilp32/.gitignore
-> >  create mode 100644 arch/arm64/kernel/vdso-ilp32/Makefile
-> >  create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S
-> >  create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
-> 
-> Does this patch get simpler with Andrew Pinski's vdso in C proposal?
-> I have to read the other thread in detail, Will followed up already.
+Enables the ADV7180 decoder sensor. The ADV7180 connects to the
+parallel-bus mux input on ipu1_csi0_mux.
 
-Not much. arch/arm64/kernel/vdso/gettimeofday.S is removed by Andrew,
-so it will also disappear here. New gettimeofday.c is just compiled with
-mabi=ilp32, and almost don't need modifications. Makefiles will be modified
-accordingly. The rest is the same. This is the draft for the changes we
-need to apply ilp32 series on top of Andrew's patch (there's few typos
-though, so only for reference):
-http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1409447.html
+The ADV7180 power pin is via max7310_b port expander.
 
-> > diff --git a/arch/arm64/include/asm/vdso.h b/arch/arm64/include/asm/vdso.h
-> > index 839ce0031bd5..649a9a416500 100644
-> > --- a/arch/arm64/include/asm/vdso.h
-> > +++ b/arch/arm64/include/asm/vdso.h
-> > @@ -29,6 +29,12 @@
-> >  
-> >  #include <generated/vdso-offsets.h>
-> >  
-> > +#ifdef CONFIG_ARM64_ILP32
-> > +#include <generated/vdso-ilp32-offsets.h>
-> > +#else
-> > +#define vdso_offset_sigtramp_ilp32
-> > +#endif
-> 
-> BTW, here you could do something like:
-> 
-> #define vdso_offset_sigtramp_ilp32	({ BUILD_BUG(); 0; })
+Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 
-OK, will change
+- Use IRQ_TYPE_LEVEL_LOW instead of 0x8 for interrupt type for clarity.
+- For 8-bit parallel IPU1-CSI0 bus connection only data[12-19] are used.
+
+Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+
+---
+Changes since v8 [1]:
+
+- drop no-longer-applicable fim node from ipu1_csi0 port.
+
+[1] https://patchwork.linuxtv.org/patch/41705/
+---
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 45 ++++++++++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+index 1212f82..6a7594e 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+@@ -124,6 +124,21 @@
+ 			#size-cells = <0>;
+ 			reg = <1>;
+ 
++			adv7180: camera at 21 {
++				compatible = "adi,adv7180";
++				reg = <0x21>;
++				powerdown-gpios = <&max7310_b 2 GPIO_ACTIVE_LOW>;
++				interrupt-parent = <&gpio1>;
++				interrupts = <27 IRQ_TYPE_LEVEL_LOW>;
++
++				port {
++					adv7180_to_ipu1_csi0_mux: endpoint {
++						remote-endpoint = <&ipu1_csi0_mux_from_parallel_sensor>;
++						bus-width = <8>;
++					};
++				};
++			};
++
+ 			max7310_a: gpio at 30 {
+ 				compatible = "maxim,max7310";
+ 				reg = <0x30>;
+@@ -151,6 +166,20 @@
+ 	};
+ };
+ 
++&ipu1_csi0_from_ipu1_csi0_mux {
++	bus-width = <8>;
++};
++
++&ipu1_csi0_mux_from_parallel_sensor {
++	remote-endpoint = <&adv7180_to_ipu1_csi0_mux>;
++	bus-width = <8>;
++};
++
++&ipu1_csi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_ipu1_csi0>;
++};
++
+ &clks {
+ 	assigned-clocks = <&clks IMX6QDL_PLL4_BYPASS_SRC>,
+ 			  <&clks IMX6QDL_PLL4_BYPASS>,
+@@ -444,6 +473,22 @@
+ 			>;
+ 		};
+ 
++		pinctrl_ipu1_csi0: ipu1csi0grp {
++			fsl,pins = <
++				MX6QDL_PAD_CSI0_DAT12__IPU1_CSI0_DATA12  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT13__IPU1_CSI0_DATA13  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT14__IPU1_CSI0_DATA14  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT15__IPU1_CSI0_DATA15  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT16__IPU1_CSI0_DATA16  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT17__IPU1_CSI0_DATA17  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT18__IPU1_CSI0_DATA18  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT19__IPU1_CSI0_DATA19  0x1b0b0
++				MX6QDL_PAD_CSI0_PIXCLK__IPU1_CSI0_PIXCLK 0x1b0b0
++				MX6QDL_PAD_CSI0_MCLK__IPU1_CSI0_HSYNC    0x1b0b0
++				MX6QDL_PAD_CSI0_VSYNC__IPU1_CSI0_VSYNC   0x1b0b0
++			>;
++		};
++
+ 		pinctrl_max7310: max7310grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD2_DAT0__GPIO1_IO15 0x1b0b0
+-- 
+2.7.4
