@@ -1,45 +1,71 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 8 Jun 2017 19:13:24 +0200
-Subject: [PATCH v7 0/3] Cavium ThunderX2 SMMUv3 errata workarounds
-In-Reply-To: <20170608163213.GA2216@red-moon>
-References: <1496145821-3411-1-git-send-email-gakula@caviumnetworks.com>
- <20170608163213.GA2216@red-moon>
-Message-ID: <CAJZ5v0gnjxwBXEQ--u6Sbviks74MXLFWTfN+J90cdDZbO2Q7+w@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 08 Jun 2017 19:13:42 +0200
+Subject: [PATCH] arm64: dts: marvell: cp110: add required clocks for mdio
+ interface
+In-Reply-To: <1496743035-4618-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ (Thomas Petazzoni's message of "Tue, 6 Jun 2017 11:57:15 +0200")
+References: <1496743035-4618-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <87h8zqpfll.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 8, 2017 at 6:32 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Tue, May 30, 2017 at 05:33:38PM +0530, Geetha sowjanya wrote:
->> Cavium ThunderX2 SMMUv3 implementation has two Silicon Erratas.
->> 1. Errata ID #74
->>    SMMU register alias Page 1 is not implemented
->> 2. Errata ID #126
->>    SMMU doesnt support unique IRQ lines and also MSI for gerror,
->>    eventq and cmdq-sync
->>
->> The following patchset does software workaround for these two erratas.
->>
->> This series is based on patchset.
->> https://www.spinics.net/lists/arm-kernel/msg578443.html
+Hi Thomas,
+ 
+ On mar., juin 06 2017, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+
+> From: Russell King <rmk+kernel@armlinux.org.uk>
 >
-> Yes so it is not standalone. How are we going to merge these
-> ACPI IORT/ACPICA/SMMU patches - inclusive of:
+> Add the three required clocks for the MDIO interface to be functional
+> on Armada 8k platforms.  Without this, the CPU hangs, causing RCU
+> stalls or the system to become unresponsive.
 >
-> [1] https://www.spinics.net/lists/arm-kernel/msg586458.html
->
-> Rafael, do ACPICA patches go upstream via the ACPI tree pull request ?
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> [Thomas:
+>  - remove mg_core_clock, since it's a parent of mg_clock
+>  - also add clock references to the slave CP mdio instance]
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Not as a rule.
-
-> To remove dependency on ACPICA changes this series needs updating
-> anyway and for [1] above I think the only solution is for all the
-> patches to go via the ACPI tree (if ACPICA updates go upstream with it).
-
-I think we may ask Lv to backport the header changes once they have
-been merged into Linux.
-
-Lv, would that work?
+Applied on mvebu/dt64
 
 Thanks,
-Rafael
+
+Gregory
+
+> ---
+>  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 1 +
+>  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 1 +
+>  2 files changed, 2 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> index 00af338..c33e891 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> @@ -95,6 +95,7 @@
+>  				#size-cells = <0>;
+>  				compatible = "marvell,orion-mdio";
+>  				reg = <0x12a200 0x10>;
+> +				clocks = <&cpm_syscon0 1 9>, <&cpm_syscon0 1 5>;
+>  			};
+>  
+>  			cpm_icu: interrupt-controller at 1e0000 {
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> index bee48ae..2a99ff8 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> @@ -100,6 +100,7 @@
+>  				#size-cells = <0>;
+>  				compatible = "marvell,orion-mdio";
+>  				reg = <0x12a200 0x10>;
+> +				clocks = <&cps_syscon0 1 9>, <&cps_syscon0 1 5>;
+>  			};
+>  
+>  			cps_icu: interrupt-controller at 1e0000 {
+> -- 
+> 2.7.4
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
