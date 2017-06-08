@@ -1,33 +1,37 @@
 From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu,  8 Jun 2017 16:11:20 +1200
-Subject: [RFC PATCH 0/4] EDAC support for Marvell Armada SoCs
-Message-ID: <20170608041124.4624-1-chris.packham@alliedtelesis.co.nz>
+Date: Thu,  8 Jun 2017 16:11:22 +1200
+Subject: [RFC PATCH 2/4] ARM: l2x0: support parity-enable/disable on aurora
+In-Reply-To: <20170608041124.4624-1-chris.packham@alliedtelesis.co.nz>
+References: <20170608041124.4624-1-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20170608041124.4624-3-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds a basic EDAC driver for the memory controller and L2 cache
-on the Marvell Armada SoCs. My test platform uses armada-xp-98dx3236 so I've
-included some patches for that also.
+The aurora cache on the Marvell Armada-XP SoC supports the same tag
+parity features as the other l2x0 cache implementations.
 
-I'm still chasing Marvell for some more info on how to inject errors, hence
-the RFC.
+Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+---
+ arch/arm/mm/cache-l2x0.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Chris Packham (4):
-  EDAC: mvebu: Add driver for Marvell Armada SoCs
-  ARM: l2x0: support parity-enable/disable on aurora
-  ARM: l2x0: add arm,ecc-enable property for aurora
-  ARM: dts: enable l2c parity and ecc protection on 98dx3236
-
- Documentation/devicetree/bindings/arm/l2c2x0.txt |   2 +
- arch/arm/boot/dts/armada-xp-98dx3236.dtsi        |   2 +
- arch/arm/mm/cache-l2x0.c                         |  14 +
- drivers/edac/Kconfig                             |   7 +
- drivers/edac/Makefile                            |   1 +
- drivers/edac/mvebu_edac.c                        | 506 +++++++++++++++++++++++
- drivers/edac/mvebu_edac.h                        |  66 +++
- 7 files changed, 598 insertions(+)
- create mode 100644 drivers/edac/mvebu_edac.c
- create mode 100644 drivers/edac/mvebu_edac.h
-
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 808efbb89b88..2cc2653b046f 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -1505,6 +1505,13 @@ static void __init aurora_of_parse(const struct device_node *np,
+ 		mask |= AURORA_ACR_FORCE_WRITE_POLICY_MASK;
+ 	}
+ 
++	if (of_property_read_bool(np, "arm,parity-enable")) {
++		mask |= L2C_AUX_CTRL_PARITY_ENABLE;
++		val |= L2C_AUX_CTRL_PARITY_ENABLE;
++	} else if (of_property_read_bool(np, "arm,parity-disable")) {
++		mask |= L2C_AUX_CTRL_PARITY_ENABLE;
++	}
++
+ 	*aux_val &= ~mask;
+ 	*aux_val |= val;
+ 	*aux_mask &= ~mask;
 -- 
 2.13.0
