@@ -1,43 +1,64 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu,  8 Jun 2017 15:13:41 +0100
-Subject: [RFT PATCH v2 41/42] PCI: xilinx-nwl: Move to struct pci_host_bridge
- IRQ mapping functions
+Date: Thu,  8 Jun 2017 15:13:42 +0100
+Subject: [RFT PATCH v2 42/42] ARM64: PCI: Drop DT IRQ allocation from
+ pcibios_alloc_irq()
 In-Reply-To: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
 References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170608141342.2018-42-lorenzo.pieralisi@arm.com>
+Message-ID: <20170608141342.2018-43-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-struct pci_host_bridge gained hooks to map/swizzle IRQs, so that
-the IRQ mapping can be done automatically by PCI core code through
-the pci_assign_irq() function instead of resorting to per-arch
-specific implementation callbacks to carry out the same task which
-force PCI host bridge drivers implementation to implement per-arch
-kludges to carry out a task that is inherently architecture agnostic.
+With the introduction of struct pci_host_bridge.map_irq pointer it is
+possible to assign IRQs for all devices originating from a PCI host
+bridge at probe time; this is implemented through pci_assign_irq() that
+relies on the struct pci_host_bridge.map_irq pointer to map IRQ for a
+given device.
 
-Add map/swizzle IRQs hooks to the xilinx-nwl PCI host driver to move
-the IRQ allocation into core code and stop relying on arch specific
-callbacks.
+The benefits this brings are twofold:
+
+- the IRQ for a device is assigned once at probe time
+- the IRQ assignment works also for hotplugged devices
+
+With all DT based PCI host bridges converted to the struct
+pci_host_bridge.{map/swizzle}_irq hooks mechanism the DT IRQ
+allocation in ARM64 pcibios_alloc_irq() is now redundant and can
+be removed.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Bharat Kumar Gogada <bharat.kumar.gogada@xilinx.com>
 ---
- drivers/pci/host/pcie-xilinx-nwl.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/kernel/pci.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
-index e8a5894..d1f7e4c 100644
---- a/drivers/pci/host/pcie-xilinx-nwl.c
-+++ b/drivers/pci/host/pcie-xilinx-nwl.c
-@@ -838,6 +838,8 @@ static int nwl_pcie_probe(struct platform_device *pdev)
- 	bridge->sysdata = pcie;
- 	bridge->busnr = pcie->root_busno;
- 	bridge->ops = &nwl_pcie_ops;
-+	bridge->map_irq = of_irq_parse_and_map_pci;
-+	bridge->swizzle_irq = pci_common_swizzle;
+diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+index 4f0e3eb..efcc351 100644
+--- a/arch/arm64/kernel/pci.c
++++ b/arch/arm64/kernel/pci.c
+@@ -39,20 +39,18 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+ 	return res->start;
+ }
  
- 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
- 		err = nwl_pcie_enable_msi(pcie);
++#ifdef CONFIG_ACPI
+ /*
+  * Try to assign the IRQ number when probing a new device
+  */
+ int pcibios_alloc_irq(struct pci_dev *dev)
+ {
+-	if (acpi_disabled)
+-		dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+-#ifdef CONFIG_ACPI
+-	else
+-		return acpi_pci_irq_enable(dev);
+-#endif
++	if (!acpi_disabled)
++		acpi_pci_irq_enable(dev);
+ 
+ 	return 0;
+ }
++#endif
+ 
+ /*
+  * raw_pci_read/write - Platform-specific PCI config space access.
 -- 
 2.10.0
