@@ -1,48 +1,92 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu,  8 Jun 2017 18:10:39 +0200
-Subject: [PATCH 28/35] ARM: s3c6400_defconfig: Bring back lost (but wanted)
- options
+Date: Thu,  8 Jun 2017 18:10:42 +0200
+Subject: [PATCH 31/35] ARM: s3c2410_defconfig: Save defconfig
 In-Reply-To: <20170608160836.12196-1-krzk@kernel.org>
 References: <20170608160836.12196-1-krzk@kernel.org>
-Message-ID: <20170608161049.12421-28-krzk@kernel.org>
+Message-ID: <20170608161049.12421-31-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The config was not updated for some time so it needs updates to get the
-same options as wanted initially:
- - SYSFS_DEPRECATED is now needed for SYSFS_DEPRECATED_V2;
- - PWM is now needed for BACKLIGHT_PWM;
- - DEBUG_SPINLOCK_SLEEP was replaced by DEBUG_ATOMIC_SLEEP;
+Generate new defconfig to get rid of obsolete Kconfig entries:
+ - S3C_BOOT_ERROR_RESET, SMDK2440_CPU2442 are gone;
+ - ARM_THUMB is changed to yes (selected by default);
+ - BINFMT_AOUT cannot be selected anymore;
+ - rest of entries is being removed by default values;
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- arch/arm/configs/s3c6400_defconfig | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/configs/s3c2410_defconfig | 13 -------------
+ 1 file changed, 13 deletions(-)
 
-diff --git a/arch/arm/configs/s3c6400_defconfig b/arch/arm/configs/s3c6400_defconfig
-index 97e377a4c118..8979e343d255 100644
---- a/arch/arm/configs/s3c6400_defconfig
-+++ b/arch/arm/configs/s3c6400_defconfig
-@@ -1,3 +1,4 @@
-+CONFIG_SYSFS_DEPRECATED=y
- CONFIG_SYSFS_DEPRECATED_V2=y
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_KALLSYMS_ALL=y
-@@ -72,6 +73,7 @@ CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_S3C=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_S3C=y
-+CONFIG_PWM=y
- CONFIG_EXT2_FS=y
+diff --git a/arch/arm/configs/s3c2410_defconfig b/arch/arm/configs/s3c2410_defconfig
+index aacc788f5d55..2afb359f3168 100644
+--- a/arch/arm/configs/s3c2410_defconfig
++++ b/arch/arm/configs/s3c2410_defconfig
+@@ -11,8 +11,6 @@ CONFIG_PARTITION_ADVANCED=y
+ CONFIG_BSD_DISKLABEL=y
+ CONFIG_SOLARIS_X86_PARTITION=y
+ CONFIG_ARCH_S3C24XX=y
+-CONFIG_S3C_BOOT_ERROR_RESET=y
+-CONFIG_S3C24XX_PWM=y
+ CONFIG_CPU_S3C2412=y
+ CONFIG_CPU_S3C2416=y
+ CONFIG_CPU_S3C2440=y
+@@ -41,16 +39,13 @@ CONFIG_MACH_RX3715=y
+ CONFIG_ARCH_S3C2440=y
+ CONFIG_MACH_NEO1973_GTA02=y
+ CONFIG_MACH_RX1950=y
+-CONFIG_SMDK2440_CPU2442=y
+ CONFIG_MACH_SMDK2443=y
+-# CONFIG_ARM_THUMB is not set
+ CONFIG_S3C_ADC=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_CMDLINE="root=/dev/hda1 ro init=/bin/bash console=ttySAC0"
+ CONFIG_FPE_NWFPE=y
+ CONFIG_FPE_NWFPE_XP=y
+-CONFIG_BINFMT_AOUT=y
+ CONFIG_APM_EMULATION=m
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+@@ -84,9 +79,6 @@ CONFIG_IPV6_TUNNEL=m
+ CONFIG_NETFILTER=y
+ CONFIG_NF_CONNTRACK=m
+ CONFIG_NF_CONNTRACK_EVENTS=y
+-CONFIG_NF_CT_PROTO_DCCP=y
+-CONFIG_NF_CT_PROTO_SCTP=y
+-CONFIG_NF_CT_PROTO_UDPLITE=y
+ CONFIG_NF_CONNTRACK_AMANDA=m
+ CONFIG_NF_CONNTRACK_FTP=m
+ CONFIG_NF_CONNTRACK_H323=m
+@@ -179,7 +171,6 @@ CONFIG_BT_BNEP_MC_FILTER=y
+ CONFIG_BT_BNEP_PROTO_FILTER=y
+ CONFIG_BT_HIDP=m
+ CONFIG_BT_HCIUART=m
+-CONFIG_BT_HCIUART_H4=y
+ CONFIG_BT_HCIUART_BCSP=y
+ CONFIG_BT_HCIUART_LL=y
+ CONFIG_BT_HCIBCM203X=m
+@@ -382,8 +373,6 @@ CONFIG_EXT2_FS_POSIX_ACL=y
+ CONFIG_EXT2_FS_SECURITY=y
  CONFIG_EXT3_FS=y
  CONFIG_EXT3_FS_POSIX_ACL=y
-@@ -86,6 +88,6 @@ CONFIG_DEBUG_KERNEL=y
- CONFIG_DEBUG_RT_MUTEXES=y
- CONFIG_DEBUG_SPINLOCK=y
+-CONFIG_EXT4_FS=m
+-CONFIG_EXT4_FS_POSIX_ACL=y
+ CONFIG_AUTOFS4_FS=m
+ CONFIG_FUSE_FS=m
+ CONFIG_ISO9660_FS=y
+@@ -401,7 +390,6 @@ CONFIG_CRAMFS=y
+ CONFIG_SQUASHFS=m
+ CONFIG_ROMFS_FS=y
+ CONFIG_NFS_FS=y
+-CONFIG_NFS_V3=y
+ CONFIG_NFS_V3_ACL=y
+ CONFIG_ROOT_NFS=y
+ CONFIG_NFSD=m
+@@ -452,4 +440,3 @@ CONFIG_DEBUG_KERNEL=y
  CONFIG_DEBUG_MUTEXES=y
--CONFIG_DEBUG_SPINLOCK_SLEEP=y
-+CONFIG_DEBUG_ATOMIC_SLEEP=y
  CONFIG_DEBUG_USER=y
  CONFIG_DEBUG_LL=y
+-# CONFIG_CRYPTO_ANSI_CPRNG is not set
 -- 
 2.9.3
