@@ -1,86 +1,84 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 8 Jun 2017 16:15:13 +0000
-Subject: [PATCH] mm: vmalloc: simplify vread/vwrite to use existing
- mappings
-In-Reply-To: <20170608160644.GM4902@n2100.armlinux.org.uk>
-References: <20170607182052.31447-1-ard.biesheuvel@linaro.org>
- <20170608160644.GM4902@n2100.armlinux.org.uk>
-Message-ID: <CAKv+Gu93O7_BmfFa-5yPr18GoRu=24JOEX3-c4bu3kmUhKrd7w@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 8 Jun 2017 17:22:03 +0100
+Subject: [PATCH] ARM: V7M: Set cacheid iff DminLine or IminLine is nonzero
+In-Reply-To: <43dbdd8a-3806-34bb-1388-3a3428d7d0c1@arm.com>
+References: <1493201074-35472-1-git-send-email-vladimir.murzin@arm.com>
+ <6c933cd2-bfaf-e7d3-b868-9d9955a1a105@arm.com>
+ <20170503191437.GB22219@n2100.armlinux.org.uk>
+ <8e0ee9d1-ba0e-9083-0299-80f9f32444ce@arm.com>
+ <bf924528-164b-8dda-eeea-376f1faa5eb8@arm.com>
+ <43dbdd8a-3806-34bb-1388-3a3428d7d0c1@arm.com>
+Message-ID: <20170608162203.GO4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 June 2017 at 16:06, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
-> On Wed, Jun 07, 2017 at 06:20:52PM +0000, Ard Biesheuvel wrote:
->> The current safe path iterates over each mapping page by page, and
->> kmap()'s each one individually, which is expensive and unnecessary.
->> Instead, let's use kern_addr_valid() to establish on a per-VMA basis
->> whether we may safely derefence them, and do so via its mapping in
->> the VMALLOC region. This can be done safely due to the fact that we
->> are holding the vmap_area_lock spinlock.
->
-> This doesn't sound correct if you look at the definition of
-> kern_addr_valid().  For example, x86-32 has:
->
-> /*
->  * kern_addr_valid() is (1) for FLATMEM and (0) for
->  * SPARSEMEM and DISCONTIGMEM
->  */
-> #ifdef CONFIG_FLATMEM
-> #define kern_addr_valid(addr)   (1)
-> #else
-> #define kern_addr_valid(kaddr)  (0)
-> #endif
->
-> The majority of architectures simply do:
->
-> #define kern_addr_valid(addr)   (1)
->
+Yea, found a copy of the ARMv7M ARM, and this seems to be sane, as the
+minimum cache line size (according to CCSIDR) is 4 words, so the minimum
+value in CTR for these fields should be 2 when caches are implemented.
 
-That is interesting, thanks for pointing it out.
+On Thu, Jun 08, 2017 at 09:29:24AM +0100, Vladimir Murzin wrote:
+> Ping!
+> 
+> On 26/05/17 10:52, Vladimir Murzin wrote:
+> > Gentle ping...
+> > 
+> > On 04/05/17 09:13, Vladimir Murzin wrote:
+> >> On 03/05/17 20:14, Russell King - ARM Linux wrote:
+> >>> On Tue, May 02, 2017 at 09:31:24AM +0100, Vladimir Murzin wrote:
+> >>>> On 26/04/17 11:04, Vladimir Murzin wrote:
+> >>>>> Cache support is optional feature in M-class cores, thus DminLine or
+> >>>>> IminLine of Cache Type Register is zero if caches are not implemented,
+> >>>>> but we check the whole CTR which has other features encoded there.
+> >>>>> Let's be more precise and check for DminLine and IminLine of CTR
+> >>>>> before we set cacheid.
+> >>>>>
+> >>>>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> >>>>> ---
+> >>>>>  arch/arm/kernel/setup.c | 2 +-
+> >>>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>>>>
+> >>>>> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> >>>>> index f4e5450..231a1d83 100644
+> >>>>> --- a/arch/arm/kernel/setup.c
+> >>>>> +++ b/arch/arm/kernel/setup.c
+> >>>>> @@ -315,7 +315,7 @@ static void __init cacheid_init(void)
+> >>>>>  	if (arch >= CPU_ARCH_ARMv6) {
+> >>>>>  		unsigned int cachetype = read_cpuid_cachetype();
+> >>>>>  
+> >>>>> -		if ((arch == CPU_ARCH_ARMv7M) && !cachetype) {
+> >>>>> +		if ((arch == CPU_ARCH_ARMv7M) && !(cachetype & 0xf000f)) {
+> >>>>>  			cacheid = 0;
+> >>>>>  		} else if ((cachetype & (7 << 29)) == 4 << 29) {
+> >>>>>  			/* ARMv7 register format */
+> >>>>>
+> >>>>
+> >>>> Ok for patch tracker?
+> >>>
+> >>> Not yet, I've been away and I've no time right now to evaluate this
+> >>> change.  I'm hopefully going to catch up with some email in the coming
+> >>> days.
+> >>>
+> >>
+> >> Noted.
+> >>
+> >> Cheers
+> >> Vladimir
+> >>
+> >> _______________________________________________
+> >> linux-arm-kernel mailing list
+> >> linux-arm-kernel at lists.infradead.org
+> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >>
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
+> 
 
-The function read_kcore() [which is where the issue I am trying to fix
-originates] currently has this logic:
-
-  if (kern_addr_valid(start)) {
-          unsigned long n;
-
-          /*
-           * Using bounce buffer to bypass the
-           * hardened user copy kernel text checks.
-           */
-          memcpy(buf, (char *) start, tsz);
-          n = copy_to_user(buffer, buf, tsz);
-          /*
-           * We cannot distinguish between fault on source
-           * and fault on destination. When this happens
-           * we clear too and hope it will trigger the
-           * EFAULT again.
-           */
-          if (n) {
-                  if (clear_user(buffer + tsz - n,
-                                          n))
-                          return -EFAULT;
-          }
-  } else {
-          if (clear_user(buffer, tsz))
-                  return -EFAULT;
-  }
-
-and the implementation I looked at [on arm64] happens to be the only
-one that does something non-trivial.
-
-> So, the result is that on the majority of architectures, we're now
-> going to simply dereference 'addr' with very little in the way of
-> checks.
->
-
-Indeed.
-
-> I think this makes these functions racy - the point at which the
-> entry is placed onto the vmalloc list is quite different from the
-> point where the page table entries for it are populated (which
-> happens with the lock dropped.)  So, I think this is asking for
-> an oops.
->
-
-Fair enough. I will try to find a different approach then.
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
