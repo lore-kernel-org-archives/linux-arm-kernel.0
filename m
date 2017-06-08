@@ -1,55 +1,205 @@
-From: angus@akkea.ca (Angus Ainslie)
-Date: Thu, 08 Jun 2017 07:15:24 -0600
-Subject: Staging r8723bs driver for kernel 4.12.0-rc2 on CHIPPro
-In-Reply-To: <1496925586.11482.20.camel@hadess.net>
-References: <bcc1a7c44ba34cb077a1df09971d6926@www.akkea.ca>
- <8485e88721d4761d5b1a10ff1eebfd36@www.akkea.ca>
- <1496925243.11482.19.camel@hadess.net>
- <20170608123844.igx7dofpakpcqg4o@flea.home>
- <1496925586.11482.20.camel@hadess.net>
-Message-ID: <b63d0dc5b769451b2c6597fb8d02d1da@www.akkea.ca>
+From: eballetbo@gmail.com (Enric Balletbo Serra)
+Date: Thu, 8 Jun 2017 15:16:11 +0200
+Subject: [PATCH 4/4] mfd: tps65217: Instantiate sub-devices from device
+ tree
+In-Reply-To: <6359abe2-9a21-78a2-f5ea-87e2e3335af3@ti.com>
+References: <20170607103242.16008-1-enric.balletbo@collabora.com>
+ <20170607103242.16008-4-enric.balletbo@collabora.com>
+ <6359abe2-9a21-78a2-f5ea-87e2e3335af3@ti.com>
+Message-ID: <CAFqH_53v32iODN4xhoh4ho4s6grxknEDS3Ak6CHBcTAQo6fDNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-06-08 06:39, Bastien Nocera wrote:
-> On Thu, 2017-06-08 at 14:38 +0200, Maxime Ripard wrote:
->> Hi Bastien,
->> 
->> On Thu, Jun 08, 2017 at 02:34:03PM +0200, Bastien Nocera wrote:
->> > On Wed, 2017-05-31 at 10:29 -0600, Angus Ainslie wrote:
->> > > On 2017-05-24 15:03, Angus Ainslie wrote:
->> > > > Hi
->> > > >
->> > > > Has the realtek rtl8723bs staging driver in kernel 4.12.0-rc2
->> > > > been
->> > > > tested on the CHIPPro.
->> > > >
->> > >
->> > > This is still an issue with 4.12.0-rc3
->> >
->> > I only have access to the original CHIP, and the default kernel
->> > configuration there didn't have the necessary options for the
->> > staging
->> > driver to work.
->> >
->> > I filed a bug and a PR a while ago:
->> > https://github.com/NextThingCo/CHIP-linux/issues/33
->> > https://github.com/NextThingCo/CHIP-linux/pull/39
->> >
->> > I haven't looked at it again in a long while due to lack of time,
->> > but
->> > that might be a good first pass at the problem, before getting onto
->> > the
->> > CHIP Pro.
->> 
->> This is for the old NTC's 4.4 kernel though. I think Angus is talking
->> about a mainline 4.12.
-> 
-> Which I would test on a CHIP before a CHIP Pro ;)
-> 
+2017-06-07 18:05 GMT+02:00 Grygorii Strashko <grygorii.strashko@ti.com>:
+>
+>
+> On 06/07/2017 05:32 AM, Enric Balletbo i Serra wrote:
+>> The driver boots only via device tree but currently all the MFD sub-devices
+>> are instatiated independently of the device tree configuration, i.e
+>> although tps65217-charger is disabled by default it's instantiated by the
+>> MFD driver.
+>>
+>> Instead of register all sub-devices, if the TPS65217 device tree node has a
+>> sub-node enabled, try to instatiate them as MFD sub-devices but not
+>> instantiate sub-nodes that are not enabled.
+>>
+>> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+>> ---
+>>   drivers/mfd/tps65217.c       | 56 +++++++-------------------------------------
+>>   include/linux/mfd/tps65217.h |  6 -----
+>>   2 files changed, 9 insertions(+), 53 deletions(-)
+>>
+>> diff --git a/drivers/mfd/tps65217.c b/drivers/mfd/tps65217.c
+>> index f769c7d..9effdda 100644
+>> --- a/drivers/mfd/tps65217.c
+>> +++ b/drivers/mfd/tps65217.c
+>> @@ -33,14 +33,7 @@
+>>   #include <linux/mfd/core.h>
+>>   #include <linux/mfd/tps65217.h>
+>>
+>> -static struct resource charger_resources[] = {
+>> -     DEFINE_RES_IRQ_NAMED(TPS65217_IRQ_AC, "AC"),
+>> -     DEFINE_RES_IRQ_NAMED(TPS65217_IRQ_USB, "USB"),
+>> -};
+>> -
+>> -static struct resource pb_resources[] = {
+>> -     DEFINE_RES_IRQ_NAMED(TPS65217_IRQ_PB, "PB"),
+>> -};
+>
+> May be I messed smth, but how about interrupts for charger and pwrbutton?
+>
 
-If you can get it working on the CHIP that would be awesome.
+I might be wrong but as this driver is DT-only these resources came
+from the DT. The driver calls platform_get_irq_byname and then
+of_irq_get_byname.
 
-> Then again, I don't have a CHIP Pro to test with, so...
+i.e arch/arm/boot/dts/am335x-bone-common.dtsi
 
-I'll promise to test it on the CHIPPro for you :)
+&tps {
+        charger {
+                interrupts = <0>, <1>;
+                interrupt-names = "USB", "AC";
+                status = "okay";
+        };
+
+        pwrbutton {
+                interrupts = <2>;
+                status = "okay";
+        };
+};
+
+>> +#define TPS65217_NUM_IRQ     3
+>>
+>>   static void tps65217_irq_lock(struct irq_data *data)
+>>   {
+>> @@ -86,29 +79,6 @@ static struct irq_chip tps65217_irq_chip = {
+>>       .irq_disable            = tps65217_irq_disable,
+>>   };
+>>
+>> -static struct mfd_cell tps65217s[] = {
+>> -     {
+>> -             .name = "tps65217-pmic",
+>> -             .of_compatible = "ti,tps65217-pmic",
+>> -     },
+>> -     {
+>> -             .name = "tps65217-bl",
+>> -             .of_compatible = "ti,tps65217-bl",
+>> -     },
+>> -     {
+>> -             .name = "tps65217-charger",
+>> -             .num_resources = ARRAY_SIZE(charger_resources),
+>> -             .resources = charger_resources,
+>> -             .of_compatible = "ti,tps65217-charger",
+>> -     },
+>> -     {
+>> -             .name = "tps65217-pwrbutton",
+>> -             .num_resources = ARRAY_SIZE(pb_resources),
+>> -             .resources = pb_resources,
+>> -             .of_compatible = "ti,tps65217-pwrbutton",
+>> -     },
+>> -};
+>> -
+>>   static irqreturn_t tps65217_irq_thread(int irq, void *data)
+>>   {
+>>       struct tps65217 *tps = data;
+>> @@ -359,23 +329,8 @@ static int tps65217_probe(struct i2c_client *client,
+>>               return ret;
+>>       }
+>>
+>> -     if (client->irq) {
+>> +     if (client->irq)
+>>               tps65217_irq_init(tps, client->irq);
+>> -     } else {
+>> -             int i;
+>> -
+>> -             /* Don't tell children about IRQ resources which won't fire */
+>> -             for (i = 0; i < ARRAY_SIZE(tps65217s); i++)
+>> -                     tps65217s[i].num_resources = 0;
+>> -     }
+>> -
+>> -     ret = devm_mfd_add_devices(tps->dev, -1, tps65217s,
+>> -                                ARRAY_SIZE(tps65217s), NULL, 0,
+>> -                                tps->irq_domain);
+>> -     if (ret < 0) {
+>> -             dev_err(tps->dev, "mfd_add_devices failed: %d\n", ret);
+>> -             return ret;
+>> -     }
+>
+> And as I remember there was a request to use mfd_add_devices()
+> and not of_platform_populate() for mfd sub-devices instantiation.
+>
+
+>From what I know or you add the sub-devices via mfd_add_devices or
+using the DT with of_platform_populate, and the first is probably the
+preferred, but in this specific case this driver is DT-only so IMHO
+makes more sense adding via the DT, there are already some bindings
+i.e:
+ arch/arm/boot/dts/tps65217.dtsi
+ arch/arm/boot/dts/am335x-bone-common.dtsi
+
+Let me explain a bit more,  assume that you have another AM335x with
+the TPS65217 PMIC but you don't want the charger because is not wired
+in your board. Your board DT will include the tps65217.dtsi, in this
+file you can see:
+
+&tps {
+       ...
+        charger {
+                compatible = "ti,tps65217-charger";
+                status = "disabled";
+        };
+        ...
+};
+
+Seems that's fine but actually not works as expected, the TPS65217 MFD
+registers all the sub-devices so the charger is enabled and running
+even you have status = "disabled" in your DT. This looks incoherent to
+me, hence I replaced the devm_mfd_add_devices for the
+of_platform_populate which takes care of the status propriety and only
+calls the probe of the sub-devices that match and are enabled (status
+= "okay").
+
+>
+>>
+>>       ret = tps65217_reg_read(tps, TPS65217_REG_CHIPID, &version);
+>>       if (ret < 0) {
+>> @@ -384,6 +339,13 @@ static int tps65217_probe(struct i2c_client *client,
+>>               return ret;
+>>       }
+>>
+>> +     ret = of_platform_populate(client->dev.of_node, NULL, NULL,
+>> +                                &client->dev);
+>> +     if (ret) {
+>> +             dev_err(&client->dev, "Failed to register sub-devices\n");
+>> +             return ret;
+>> +     }
+>> +
+>>       /* Set the PMIC to shutdown on PWR_EN toggle */
+>>       if (status_off) {
+>>               ret = tps65217_set_bits(tps, TPS65217_REG_STATUS,
+>> diff --git a/include/linux/mfd/tps65217.h b/include/linux/mfd/tps65217.h
+>> index eac2857..dfc51f5 100644
+>> --- a/include/linux/mfd/tps65217.h
+>> +++ b/include/linux/mfd/tps65217.h
+>> @@ -236,12 +236,6 @@ struct tps65217_bl_pdata {
+>>       int dft_brightness;
+>>   };
+>>
+>> -/* Interrupt numbers */
+>> -#define TPS65217_IRQ_USB             0
+>> -#define TPS65217_IRQ_AC                      1
+>> -#define TPS65217_IRQ_PB                      2
+>> -#define TPS65217_NUM_IRQ             3
+>> -
+>>   /**
+>>    * struct tps65217_board - packages regulator init data
+>>    * @tps65217_regulator_data: regulator initialization values
+>>
+>
+> --
+> regards,
+> -grygorii
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
