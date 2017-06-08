@@ -1,90 +1,71 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Thu, 08 Jun 2017 17:28:31 +0100
-Subject: [PATCH v2 1/3] arm64: hugetlb: Fix huge_pte_offset to return
- poisoned page table entries
-In-Reply-To: <20170607154111.GA2669@arm.com> (Will Deacon's message of "Wed, 7
- Jun 2017 16:41:11 +0100")
-References: <20170517152336.6052-1-punit.agrawal@arm.com>
- <20170517152336.6052-2-punit.agrawal@arm.com>
- <20170607134731.GG30263@arm.com>
- <20170607143037.ovyo5pxywty2r6as@localhost>
- <20170607145715.GI30263@arm.com>
- <87h8zr24qb.fsf@e105922-lin.cambridge.arm.com>
- <20170607154111.GA2669@arm.com>
-Message-ID: <87y3t2zbo0.fsf@e105922-lin.cambridge.arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 8 Jun 2017 17:29:39 +0100
+Subject: [PATCH] arm: boot/compressed: fix inappropriate Thumb2 mnemonic
+ for __nop
+In-Reply-To: <20170608125847.2611-1-ard.biesheuvel@linaro.org>
+References: <20170608125847.2611-1-ard.biesheuvel@linaro.org>
+Message-ID: <20170608162939.GQ4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon <will.deacon@arm.com> writes:
+Gah, it's rather unfortunate that this has been discovered only a
+few days after the other decompressor fix was merged and hit Linus'
+tree...
 
-> On Wed, Jun 07, 2017 at 04:32:28PM +0100, Punit Agrawal wrote:
->> Will Deacon <will.deacon@arm.com> writes:
->> 
->> > On Wed, Jun 07, 2017 at 03:30:37PM +0100, Catalin Marinas wrote:
->> >> On Wed, Jun 07, 2017 at 02:47:32PM +0100, Will Deacon wrote:
->> >> > On Wed, May 17, 2017 at 04:23:34PM +0100, Punit Agrawal wrote:
->> >> > > --- a/arch/arm64/mm/hugetlbpage.c
->> >> > > +++ b/arch/arm64/mm/hugetlbpage.c
->> >> > > @@ -136,36 +136,27 @@ pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
->> >> > >  {
->> >> > >  	pgd_t *pgd;
->> >> > >  	pud_t *pud;
->> >> > > -	pmd_t *pmd = NULL;
->> >> > > -	pte_t *pte = NULL;
->> >> > > +	pmd_t *pmd;
->> >> > >  
->> >> > >  	pgd = pgd_offset(mm, addr);
->> >> > >  	pr_debug("%s: addr:0x%lx pgd:%p\n", __func__, addr, pgd);
->> >> > >  	if (!pgd_present(*pgd))
->> >> > >  		return NULL;
->> >> > > +
->> >> > >  	pud = pud_offset(pgd, addr);
->> >> > > -	if (!pud_present(*pud))
->> >> > > +	if (pud_none(*pud))
->> >> > >  		return NULL;
->> >> > 
->> >> > Do you actually need this special case?
->> >> > 
->> >> > > -
->> >> > > -	if (pud_huge(*pud))
->> >> > > +	/* swap or huge page */
->> >> > > +	if (!pud_present(*pud) || pud_huge(*pud))
->> >> > 
->> >> > ... couldn't you just add a '|| pud_none(*pud)' in here?
->> >> > 
->> 
->> I think an earlier version took this approach but...
->> 
->> >> > >  		return (pte_t *)pud;
->> >> 
->> >> But then you no longer return NULL if *pud == 0.
->> >
->> > Does that actually matter? The bits of hugetlb code I looked at will
->> > deferenced the returned pud and handle the huge_pte_none case correctly.
->> 
->> For hugetlb fault handling (hugetlb_fault()), returning NULL vs pointer
->> to the pud/pmd results in different behaviour. If we return the pud when
->> pud_none(), then we lose the resulting hugepage size check we get from
->> huge_pte_alloc().
->
-> Ok, so does that mean that many of the huge_pte_none checks in mm/hugetlb.c
-> that operate on a huge_ptep_get of non-NULL output from huge_pte_offset are
-> actually redundant?
+On Thu, Jun 08, 2017 at 12:58:47PM +0000, Ard Biesheuvel wrote:
+> Commit 06a4b6d009a1 ("ARM: 8677/1: boot/compressed: fix decompressor
+> header layout for v7-M") fixed an issue in the layout of the header
+> of the compressed kernel image that was caused by the assembler
+> emitting narrow opcodes for 'mov r0, r0', and for this reason, the
+> mnemonic was updated to use the W() macro, which will append the .w
+> suffix (which forces a wide encoding) if required, i.e., when building
+> the kernel in Thumb2 mode.
+> 
+> However, this failed to take into account that on Thumb2 kernels built
+> for CPUs that are also ARM capable, the entry point is entered in ARM
+> mode, and so the instructions emitted here will be ARM instructions
+> that only exist in a wide encoding to begin with, which is why the
+> assembler rejects the .w suffix here and aborts the build with the
+> following message:
+> 
+>   head.S: Assembler messages:
+>   head.S:132: Error: width suffixes are invalid in ARM mode -- `mov.w r0,r0'
+> 
+> So replace the W(mov) with separate ARM and Thumb2 instructions, where
+> the latter will only be used for CPU_THUMBONLY builds.
+> 
+> Fixes: 06a4b6d009a1 ("ARM: 8677/1: boot/compressed: fix decompressor ...")
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> 
+> Apologies for the breakage: apparently, the combination CONFIG_THUMB2_KERNEL=y,
+> CONFIG_CPU_THUMBONLY=n and CONFIG_EFI_STUB=y was not among the configurations
+> I tested before sending out the original patch.
+> 
+>  arch/arm/boot/compressed/efi-header.S | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
+> index 3f7d1b74c5e0..a17ca8d78656 100644
+> --- a/arch/arm/boot/compressed/efi-header.S
+> +++ b/arch/arm/boot/compressed/efi-header.S
+> @@ -17,7 +17,8 @@
+>  		@ there.
+>  		.inst	'M' | ('Z' << 8) | (0x1310 << 16)   @ tstne r0, #0x4d000
+>  #else
+> -		W(mov)	r0, r0
+> + AR_CLASS(	mov	r0, r0		)
+> +  M_CLASS(	nop.w			)
+>  #endif
+>  		.endm
+>  
+> -- 
+> 2.9.3
+> 
 
-Summarising our offline discussion - the semantics of huge_pte_offset()
-are unclear in terms of when a pointer to (p*d) is returned vs when to
-return NULL.
-
-As part of enabling contiguous hugepage support[0][1], I have a patch to
-add a size argument to huge_pte_offset() that can then help disambiguate
-when we have a valid pte* vs when we have an error (NULL).
-
-I'll separately look at clarifying the semantics of the generic version
-of huge_pte_offse() and potentially also look at unifying the
-huge_pte_offset() implementations across the various architectures.
-
-[0] https://lkml.org/lkml/2017/5/24/463
-[1] https://www.spinics.net/lists/arm-kernel/msg583367.html
-
->
-> Will
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
