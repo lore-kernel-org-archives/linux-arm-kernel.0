@@ -1,69 +1,53 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 8 Jun 2017 17:37:48 +0100
-Subject: [PATCH v3] mm: huge-vmap: fail gracefully on unexpected huge
- vmap mappings
-In-Reply-To: <CAKv+Gu8FuRE5fMunqOw9XgpPJK1uPRAJdY8y20+OszjsM1QOWQ@mail.gmail.com>
-References: <20170608113548.24905-1-ard.biesheuvel@linaro.org>
- <20170608125946.GD5765@leverpostej>
- <20170608132859.GE5765@leverpostej>
- <CAKv+Gu8FuRE5fMunqOw9XgpPJK1uPRAJdY8y20+OszjsM1QOWQ@mail.gmail.com>
-Message-ID: <20170608163747.GB19643@leverpostej>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 8 Jun 2017 09:42:21 -0700
+Subject: [PATCH v2 7/8] net: mvmdio: add xmdio support
+In-Reply-To: <20170608092653.25221-8-antoine.tenart@free-electrons.com>
+References: <20170608092653.25221-1-antoine.tenart@free-electrons.com>
+ <20170608092653.25221-8-antoine.tenart@free-electrons.com>
+Message-ID: <a60a0b26-62b1-7c9e-e846-215747dddb1f@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 08, 2017 at 02:51:08PM +0000, Ard Biesheuvel wrote:
-> On 8 June 2017 at 13:28, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Thu, Jun 08, 2017 at 01:59:46PM +0100, Mark Rutland wrote:
-> >> On Thu, Jun 08, 2017 at 11:35:48AM +0000, Ard Biesheuvel wrote:
-> >> > @@ -287,10 +288,10 @@ struct page *vmalloc_to_page(const void *vmalloc_addr)
-> >> >     if (p4d_none(*p4d))
-> >> >             return NULL;
-> >> >     pud = pud_offset(p4d, addr);
-> >> > -   if (pud_none(*pud))
-> >> > +   if (pud_none(*pud) || WARN_ON_ONCE(pud_huge(*pud)))
-> >> >             return NULL;
-> >> >     pmd = pmd_offset(pud, addr);
-> >> > -   if (pmd_none(*pmd))
-> >> > +   if (pmd_none(*pmd) || WARN_ON_ONCE(pmd_huge(*pmd)))
-> >> >             return NULL;
-> >>
-> >> I think it might be better to use p*d_bad() here, since that doesn't
-> >> depend on CONFIG_HUGETLB_PAGE.
-> >>
-> >> While the cross-arch semantics are a little fuzzy, my understanding is
-> >> those should return true if an entry is not a pointer to a next level of
-> >> table (so pXd_huge(p) implies pXd_bad(p)).
-> >
-> > Ugh; it turns out this isn't universally true.
-> >
-> > I see that at least arch/hexagon's pmd_bad() always returns 0, and they
-> > support CONFIG_HUGETLB_PAGE.
-> >
-> 
-> Well, the comment in arch/hexagon/include/asm/pgtable.h suggests otherwise:
-> 
-> /*  HUGETLB not working currently  */
+On 06/08/2017 02:26 AM, Antoine Tenart wrote:
+> This patch adds the xMDIO interface support in the mvmdio driver. This
+> interface is used in Ethernet controllers on Marvell 370, 7k and 8k (as
+> of now). The xSMI interface supported by this driver complies with the
+> IEEE 802.3 clause 45 (while the SMI interface complies with the clause
+> 22). The xSMI interface is used by 10GbE devices.
 
-Ah; I missed that.
+In the previous version you were properly defining a new compatibles
+strings for xmdio, but now you don't and instead you runtime select the
+operations based on whether MII_ADDR_C45 is set in the register which is
+fine from a functional perspective.
 
-> > So I guess there isn't an arch-neutral, always-available way of checking
-> > this. Sorry for having mislead you.
-> >
-> > For arm64, p*d_bad() would still be preferable, so maybe we should check
-> > both?
-> 
-> I am primarily interested in hardening architectures that define
-> CONFIG_HAVE_ARCH_HUGE_VMAP, given that they intentionally create huge
-> mappings in the VMALLOC area which this code may choke on. So whether
-> pmd_bad() always returns 0 on an arch that does not define
-> CONFIG_HAVE_ARCH_HUGE_VMAP does not really matter, because it simply
-> nullifies this change for that particular architecture.
-> 
-> So as long as x86 and arm64 [which are the only ones to define
-> CONFIG_HAVE_ARCH_HUGE_VMAP atm] work correctly with pXd_bad(), I think
-> we should use it instead of pXd_huge(),
+If I get this right, the xMDIO controller is actually a superset of the
+MDIO controller and has an extra MVMDIO_XSMI_ADDR_REG register to
+preform C45 accesses?
 
-Sure; that sounds good to me.
+If that is the case (and looking at patch 8 that seems to be the case),
+you probably still need to define a new compatible string for that
+block, because it has a different register layout than its predecessor.
 
-Thanks,
-Mark.
+[snip]
+>  static int orion_mdio_wait_ready(const struct orion_mdio_ops *ops,
+> @@ -164,7 +236,7 @@ static int orion_mdio_read(struct mii_bus *bus, int mii_id,
+>  			   int regnum)
+>  {
+>  	struct orion_mdio_dev *dev = bus->priv;
+> -	const struct orion_mdio_ops *ops = &orion_mdio_smi_ops;
+> +	const struct orion_mdio_ops *ops = orion_mdio_get_ops(regnum);
+>  	int ret;
+>  
+>  	mutex_lock(&dev->lock);
+> @@ -195,7 +267,7 @@ static int orion_mdio_write(struct mii_bus *bus, int mii_id,
+>  			    int regnum, u16 value)
+>  {
+>  	struct orion_mdio_dev *dev = bus->priv;
+> -	const struct orion_mdio_ops *ops = &orion_mdio_smi_ops;
+> +	const struct orion_mdio_ops *ops = orion_mdio_get_ops(regnum);
+>  	int ret;
+
+ok, that seems to work since you get the operation based on
+MII_ADDR_C45. Thanks!
+--
+Florian
