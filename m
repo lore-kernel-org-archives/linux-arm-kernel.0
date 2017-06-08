@@ -1,49 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 8 Jun 2017 16:34:15 +0200
-Subject: [PATCH] arm: aspeed: Add clock-names property to timer node
-In-Reply-To: <20170608132640.GD2244@mai>
-References: <20170605074846.30925-1-andrew@aj.id.au>
- <CACPK8XeM6fBztHwfrPUD+ewpMf==tBqgfj61B-k=SwT3ABTiZw@mail.gmail.com>
- <CAK8P3a2d=T9igbhe1u3MBUF2F1TMLC7z0DQ2AmHX-LkiBAy2Ww@mail.gmail.com>
- <20170607125256.GG2345@mai>
- <CAK8P3a0v1+FRnXcwF7j45bmDuX5caL9RBcS1bSUwANqb=zxeqQ@mail.gmail.com>
- <20170608132640.GD2244@mai>
-Message-ID: <CAK8P3a0EaqwmAMRWn--29e4Kt6zJA9kHL2dpj=7Uabn5hANxOA@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 8 Jun 2017 14:51:08 +0000
+Subject: [PATCH v3] mm: huge-vmap: fail gracefully on unexpected huge vmap
+ mappings
+In-Reply-To: <20170608132859.GE5765@leverpostej>
+References: <20170608113548.24905-1-ard.biesheuvel@linaro.org>
+ <20170608125946.GD5765@leverpostej> <20170608132859.GE5765@leverpostej>
+Message-ID: <CAKv+Gu8FuRE5fMunqOw9XgpPJK1uPRAJdY8y20+OszjsM1QOWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 8, 2017 at 3:26 PM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
-> On Wed, Jun 07, 2017 at 04:29:50PM +0200, Arnd Bergmann wrote:
->> On Wed, Jun 7, 2017 at 2:52 PM, Daniel Lezcano
->> <daniel.lezcano@linaro.org> wrote:
->> > On Tue, Jun 06, 2017 at 11:41:11AM +0200, Arnd Bergmann wrote:
->> >> On Mon, Jun 5, 2017 at 10:59 AM, Joel Stanley <joel@jms.id.au> wrote:
->> >> > On Mon, Jun 5, 2017 at 5:18 PM, Andrew Jeffery <andrew@aj.id.au> wrote:
->> >> >> The merging of a number of clocksource drivers into fttmr010 means we
->> >> >> require clock-names to be specified in the Aspeed timer node, else the
->> >> >> clocksource fails to probe and boot hangs.
->> >> >
->> >> > Arnd,
->> >> >
->> >> > Linus' reworked timer driver will go into 4.13.
->> >> >
->> >> > Can we get this patch merged into 4.12 as a fix so we don't end up
->> >> > with a broken boot at any stage?
->> >>
->> >> Hmm, can't we make the driver backward-compatible and have it fall
->> >> back on the first clock if no clk named "PCLK" is found? Otherwise
->> >> you still have an incompatible change in the DT binding and it will
->> >> break if someone uses an older dtb with a newer kernel.
->> >
->> > I would like to avoid to hack the kernel code for backward DT compatible
->> > things.
+On 8 June 2017 at 13:28, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Jun 08, 2017 at 01:59:46PM +0100, Mark Rutland wrote:
+>> On Thu, Jun 08, 2017 at 11:35:48AM +0000, Ard Biesheuvel wrote:
+>> > @@ -287,10 +288,10 @@ struct page *vmalloc_to_page(const void *vmalloc_addr)
+>> >     if (p4d_none(*p4d))
+>> >             return NULL;
+>> >     pud = pud_offset(p4d, addr);
+>> > -   if (pud_none(*pud))
+>> > +   if (pud_none(*pud) || WARN_ON_ONCE(pud_huge(*pud)))
+>> >             return NULL;
+>> >     pmd = pmd_offset(pud, addr);
+>> > -   if (pmd_none(*pmd))
+>> > +   if (pmd_none(*pmd) || WARN_ON_ONCE(pmd_huge(*pmd)))
+>> >             return NULL;
 >>
->> How about a fixup in the platform code to add the property then?
+>> I think it might be better to use p*d_bad() here, since that doesn't
+>> depend on CONFIG_HUGETLB_PAGE.
+>>
+>> While the cross-arch semantics are a little fuzzy, my understanding is
+>> those should return true if an entry is not a pointer to a next level of
+>> table (so pXd_huge(p) implies pXd_bad(p)).
 >
-> Dunno, do you have an example?
+> Ugh; it turns out this isn't universally true.
+>
+> I see that at least arch/hexagon's pmd_bad() always returns 0, and they
+> support CONFIG_HUGETLB_PAGE.
+>
 
-armada_375_380_coherency_init() adds a "arm,io-coherent" property on
-some machines, when the DT might be lacking this.
+Well, the comment in arch/hexagon/include/asm/pgtable.h suggests otherwise:
 
-        Arnd
+/*  HUGETLB not working currently  */
+
+
+> So I guess there isn't an arch-neutral, always-available way of checking
+> this. Sorry for having mislead you.
+>
+> For arm64, p*d_bad() would still be preferable, so maybe we should check
+> both?
+>
+
+I am primarily interested in hardening architectures that define
+CONFIG_HAVE_ARCH_HUGE_VMAP, given that they intentionally create huge
+mappings in the VMALLOC area which this code may choke on. So whether
+pmd_bad() always returns 0 on an arch that does not define
+CONFIG_HAVE_ARCH_HUGE_VMAP does not really matter, because it simply
+nullifies this change for that particular architecture.
+
+So as long as x86 and arm64 [which are the only ones to define
+CONFIG_HAVE_ARCH_HUGE_VMAP atm] work correctly with pXd_bad(), I think
+we should use it instead of pXd_huge(),
+
+-- 
+Ard.
