@@ -1,39 +1,102 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 8 Jun 2017 16:53:50 +0530
-Subject: [GIT PULL 3/3] DaVinci defconfig updates for v4.13
-In-Reply-To: <20170608112350.1602-1-nsekhar@ti.com>
-References: <20170608112350.1602-1-nsekhar@ti.com>
-Message-ID: <20170608112350.1602-3-nsekhar@ti.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu,  8 Jun 2017 11:35:48 +0000
+Subject: [PATCH v3] mm: huge-vmap: fail gracefully on unexpected huge vmap
+ mappings
+Message-ID: <20170608113548.24905-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+Existing code that uses vmalloc_to_page() may assume that any
+address for which is_vmalloc_addr() returns true may be passed
+into vmalloc_to_page() to retrieve the associated struct page.
 
-  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+This is not un unreasonable assumption to make, but on architectures
+that have CONFIG_HAVE_ARCH_HUGE_VMAP=y, it no longer holds, and we
+need to ensure that vmalloc_to_page() does not go off into the weeds
+trying to dereference huge PUDs or PMDs as table entries.
 
-are available in the git repository at:
+Given that vmalloc() and vmap() themselves never create huge
+mappings or deal with compound pages at all, there is no correct
+value to return in this case, so return NULL instead, and issue a
+warning.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.13/defconfig
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+This is a followup to '[PATCH v2] mm: vmalloc: make vmalloc_to_page()
+deal with PMD/PUD mappings', hence the v3. The root issue with /proc/kcore
+on arm64 is now handled by '[PATCH] mm: vmalloc: simplify vread/vwrite to
+use existing mappings' [1], and this patch now only complements it by
+taking care of other vmalloc_to_page() users.
 
-for you to fetch changes up to 0b997c8c9562dd61733dfeb9e1a5962730338e6e:
+[0] http://marc.info/?l=linux-mm&m=149641886821855&w=2
+[1] http://marc.info/?l=linux-mm&m=149685966530180&w=2
 
-  ARM: davinci_all_defconfig: Enable CPPI 4.1 USB OTG DMA (2017-05-30 16:12:51 +0530)
+ include/linux/hugetlb.h | 13 +++++++++----
+ mm/vmalloc.c            |  5 +++--
+ 2 files changed, 12 insertions(+), 6 deletions(-)
 
-----------------------------------------------------------------
-Re-sync of davinci_all_defconfig with savedefconfig and enable
-CPPI 4.1 DMA for MUSB, some commonly used USB devices, and
-Lego Mindstorms EV3 battery driver.
-
-----------------------------------------------------------------
-Alexandre Bailon (1):
-      ARM: davinci_all_defconfig: Enable CPPI 4.1 USB OTG DMA
-
-David Lechner (1):
-      ARM: davinci_all_defconfig: enable LEGO MINDSTORMS EV3 battery module
-
-Sekhar Nori (2):
-      ARM: davinci_all_defconfig: cleanup with savedefconfig
-      ARM: davinci_all_defconfig: enable USB audio/video device support
-
- arch/arm/configs/davinci_all_defconfig | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+diff --git a/include/linux/hugetlb.h b/include/linux/hugetlb.h
+index b857fc8cc2ec..b7166e5426b6 100644
+--- a/include/linux/hugetlb.h
++++ b/include/linux/hugetlb.h
+@@ -121,8 +121,6 @@ struct page *follow_huge_pmd(struct mm_struct *mm, unsigned long address,
+ 				pmd_t *pmd, int flags);
+ struct page *follow_huge_pud(struct mm_struct *mm, unsigned long address,
+ 				pud_t *pud, int flags);
+-int pmd_huge(pmd_t pmd);
+-int pud_huge(pud_t pud);
+ unsigned long hugetlb_change_protection(struct vm_area_struct *vma,
+ 		unsigned long address, unsigned long end, pgprot_t newprot);
+ 
+@@ -150,8 +148,6 @@ static inline void hugetlb_show_meminfo(void)
+ #define follow_huge_pmd(mm, addr, pmd, flags)	NULL
+ #define follow_huge_pud(mm, addr, pud, flags)	NULL
+ #define prepare_hugepage_range(file, addr, len)	(-EINVAL)
+-#define pmd_huge(x)	0
+-#define pud_huge(x)	0
+ #define is_hugepage_only_range(mm, addr, len)	0
+ #define hugetlb_free_pgd_range(tlb, addr, end, floor, ceiling) ({BUG(); 0; })
+ #define hugetlb_fault(mm, vma, addr, flags)	({ BUG(); 0; })
+@@ -190,6 +186,15 @@ static inline void __unmap_hugepage_range(struct mmu_gather *tlb,
+ }
+ 
+ #endif /* !CONFIG_HUGETLB_PAGE */
++
++#if defined(CONFIG_HUGETLB_PAGE) || defined(CONFIG_HAVE_ARCH_HUGE_VMAP)
++int pmd_huge(pmd_t pmd);
++int pud_huge(pud_t pud);
++#else
++#define pmd_huge(x)	0
++#define pud_huge(x)	0
++#endif
++
+ /*
+  * hugepages at page global directory. If arch support
+  * hugepages at pgd level, they need to define this.
+diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+index 982d29511f92..67e1a304c467 100644
+--- a/mm/vmalloc.c
++++ b/mm/vmalloc.c
+@@ -12,6 +12,7 @@
+ #include <linux/mm.h>
+ #include <linux/module.h>
+ #include <linux/highmem.h>
++#include <linux/hugetlb.h>
+ #include <linux/sched/signal.h>
+ #include <linux/slab.h>
+ #include <linux/spinlock.h>
+@@ -287,10 +288,10 @@ struct page *vmalloc_to_page(const void *vmalloc_addr)
+ 	if (p4d_none(*p4d))
+ 		return NULL;
+ 	pud = pud_offset(p4d, addr);
+-	if (pud_none(*pud))
++	if (pud_none(*pud) || WARN_ON_ONCE(pud_huge(*pud)))
+ 		return NULL;
+ 	pmd = pmd_offset(pud, addr);
+-	if (pmd_none(*pmd))
++	if (pmd_none(*pmd) || WARN_ON_ONCE(pmd_huge(*pmd)))
+ 		return NULL;
+ 
+ 	ptep = pte_offset_map(pmd, addr);
+-- 
+2.9.3
