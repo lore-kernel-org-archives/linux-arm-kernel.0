@@ -1,10 +1,10 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu,  8 Jun 2017 15:13:20 +0100
-Subject: [RFT PATCH v2 20/42] PCI: host-common: Convert PCI scan API to
+Date: Thu,  8 Jun 2017 15:13:18 +0100
+Subject: [RFT PATCH v2 18/42] PCI: xilinx: Convert PCI scan API to
  pci_scan_root_bus_bridge()
 In-Reply-To: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
 References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170608141342.2018-21-lorenzo.pieralisi@arm.com>
+Message-ID: <20170608141342.2018-19-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,60 +14,73 @@ struct pci_host_bridge object, which simplifies the bus scan
 interface and makes the PCI scan root bus interface easier to
 generalize as members are added to the struct pci_host_bridge.
 
-Convert PCI host-common code to pci_scan_root_bus_bridge() to
+Convert PCI xilinx host code to pci_scan_root_bus_bridge() to
 improve the PCI root bus scanning interface.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
+CC: Michal Simek <michal.simek@xilinx.com>
 ---
- drivers/pci/host/pci-host-common.c | 23 ++++++++++++++++++-----
- 1 file changed, 18 insertions(+), 5 deletions(-)
+ drivers/pci/host/pcie-xilinx.c | 29 +++++++++++++++++++----------
+ 1 file changed, 19 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/pci/host/pci-host-common.c b/drivers/pci/host/pci-host-common.c
-index e9a53ba..8e2614ba 100644
---- a/drivers/pci/host/pci-host-common.c
-+++ b/drivers/pci/host/pci-host-common.c
-@@ -117,8 +117,14 @@ int pci_host_common_probe(struct platform_device *pdev,
+diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+index 2fe2df5..761f048 100644
+--- a/drivers/pci/host/pcie-xilinx.c
++++ b/drivers/pci/host/pcie-xilinx.c
+@@ -633,6 +633,7 @@ static int xilinx_pcie_probe(struct platform_device *pdev)
  	struct device *dev = &pdev->dev;
- 	struct device_node *np = dev->of_node;
+ 	struct xilinx_pcie_port *port;
  	struct pci_bus *bus, *child;
 +	struct pci_host_bridge *bridge;
- 	struct pci_config_window *cfg;
- 	struct list_head resources;
-+	int ret;
-+
-+	bridge = devm_pci_alloc_host_bridge(dev, 0);
+ 	int err;
+ 	resource_size_t iobase = 0;
+ 	LIST_HEAD(res);
+@@ -640,9 +641,11 @@ static int xilinx_pcie_probe(struct platform_device *pdev)
+ 	if (!dev->of_node)
+ 		return -ENODEV;
+ 
+-	port = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
+-	if (!port)
+-		return -ENOMEM;
++	bridge = devm_pci_alloc_host_bridge(dev, sizeof(*port));
 +	if (!bridge)
-+		return -ENOMEM;
- 
- 	type = of_get_property(np, "device_type", NULL);
- 	if (!type || strcmp(type, "pci")) {
-@@ -138,13 +144,20 @@ int pci_host_common_probe(struct platform_device *pdev,
- 	if (!pci_has_flag(PCI_PROBE_ONLY))
- 		pci_add_flags(PCI_REASSIGN_ALL_RSRC | PCI_REASSIGN_ALL_BUS);
- 
--	bus = pci_scan_root_bus(dev, cfg->busr.start, &ops->pci_ops, cfg,
--				&resources);
--	if (!bus) {
--		dev_err(dev, "Scanning rootbus failed");
--		return -ENODEV;
-+	list_splice_init(&resources, &bridge->windows);
-+	bridge->dev.parent = dev;
-+	bridge->sysdata = cfg;
-+	bridge->busnr = cfg->busr.start;
-+	bridge->ops = &ops->pci_ops;
++		return -ENODEV;
 +
-+	ret = pci_scan_root_bus_bridge(bridge);
-+	if (ret < 0) {
-+		dev_err(dev, "Scanning root bridge failed");
-+		return ret;
- 	}
++	port = pci_host_bridge_priv(bridge);
  
+ 	port->dev = dev;
+ 
+@@ -671,17 +674,23 @@ static int xilinx_pcie_probe(struct platform_device *pdev)
+ 	if (err)
+ 		goto error;
+ 
+-	bus = pci_create_root_bus(dev, 0, &xilinx_pcie_ops, port, &res);
+-	if (!bus) {
+-		err = -ENOMEM;
+-		goto error;
+-	}
++
++	list_splice_init(&res, &bridge->windows);
++	bridge->dev.parent = dev;
++	bridge->sysdata = port;
++	bridge->busnr = 0;
++	bridge->ops = &xilinx_pcie_ops;
+ 
+ #ifdef CONFIG_PCI_MSI
+ 	xilinx_pcie_msi_chip.dev = dev;
+-	bus->msi = &xilinx_pcie_msi_chip;
++	bridge->msi = &xilinx_pcie_msi_chip;
+ #endif
+-	pci_scan_child_bus(bus);
++	err = pci_scan_root_bus_bridge(bridge);
++	if (err < 0)
++		goto error;
++
 +	bus = bridge->bus;
 +
- #ifdef CONFIG_ARM
+ 	pci_assign_unassigned_bus_resources(bus);
+ #ifndef CONFIG_MICROBLAZE
  	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
- #endif
 -- 
 2.10.0
