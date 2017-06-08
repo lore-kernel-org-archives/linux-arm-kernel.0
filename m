@@ -1,47 +1,104 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Thu,  8 Jun 2017 15:34:40 +0200
-Subject: [PATCH v3 3/9] KVM: arm/arm64: Move irq_is_ppi() to header file
+Date: Thu,  8 Jun 2017 15:34:39 +0200
+Subject: [PATCH v3 2/9] KVM: arm: Handle VCPU device attributes in guest.c
 In-Reply-To: <20170608133446.3875-1-cdall@linaro.org>
 References: <20170608133446.3875-1-cdall@linaro.org>
-Message-ID: <20170608133446.3875-4-cdall@linaro.org>
+Message-ID: <20170608133446.3875-3-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are about to need this define in the arch timer code as well so move
-it to a common location.
+As we are about to support VCPU attributes to set the timer IRQ numbers
+in guest.c, move the static inlines for the VCPU attributes handlers
+from the header file to guest.c.
 
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/kvm/arm_vgic.h | 2 ++
- virt/kvm/arm/pmu.c     | 2 --
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/kvm_host.h | 22 +++++++--------------
+ arch/arm/kvm/guest.c            | 42 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 49 insertions(+), 15 deletions(-)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 97b8d37..dde59fb 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -38,6 +38,8 @@
- #define VGIC_MIN_LPI		8192
- #define KVM_IRQCHIP_NUM_PINS	(1020 - 32)
- 
-+#define irq_is_ppi(irq) ((irq) >= VGIC_NR_SGIS && (irq) < VGIC_NR_PRIVATE_IRQS)
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 00ad56e..127e2dd 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -291,20 +291,12 @@ static inline void kvm_arm_init_debug(void) {}
+ static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
+-static inline int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
+-					     struct kvm_device_attr *attr)
+-{
+-	return -ENXIO;
+-}
+-static inline int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
+-					     struct kvm_device_attr *attr)
+-{
+-	return -ENXIO;
+-}
+-static inline int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
+-					     struct kvm_device_attr *attr)
+-{
+-	return -ENXIO;
+-}
 +
- enum vgic_type {
- 	VGIC_V2,		/* Good ol' GICv2 */
- 	VGIC_V3,		/* New fancy GICv3 */
-diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index 96a9cab..574feff 100644
---- a/virt/kvm/arm/pmu.c
-+++ b/virt/kvm/arm/pmu.c
-@@ -496,8 +496,6 @@ static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
- 	return 0;
- }
++int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
++			       struct kvm_device_attr *attr);
++int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
++			       struct kvm_device_attr *attr);
++int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
++			       struct kvm_device_attr *attr);
  
--#define irq_is_ppi(irq) ((irq) >= VGIC_NR_SGIS && (irq) < VGIC_NR_PRIVATE_IRQS)
--
- /*
-  * For one VM the interrupt type must be same for each vcpu.
-  * As a PPI, the interrupt number is the same for all vcpus,
+ #endif /* __ARM_KVM_HOST_H__ */
+diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+index fa6182a..acea05e 100644
+--- a/arch/arm/kvm/guest.c
++++ b/arch/arm/kvm/guest.c
+@@ -301,3 +301,45 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
+ {
+ 	return -EINVAL;
+ }
++
++int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
++			       struct kvm_device_attr *attr)
++{
++	int ret;
++
++	switch (attr->group) {
++	default:
++		ret = -ENXIO;
++		break;
++	}
++
++	return ret;
++}
++
++int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
++			       struct kvm_device_attr *attr)
++{
++	int ret;
++
++	switch (attr->group) {
++	default:
++		ret = -ENXIO;
++		break;
++	}
++
++	return ret;
++}
++
++int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
++			       struct kvm_device_attr *attr)
++{
++	int ret;
++
++	switch (attr->group) {
++	default:
++		ret = -ENXIO;
++		break;
++	}
++
++	return ret;
++}
 -- 
 2.9.0
