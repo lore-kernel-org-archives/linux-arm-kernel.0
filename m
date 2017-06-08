@@ -1,38 +1,46 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Thu, 8 Jun 2017 16:12:15 +0200
-Subject: [Question or BUG] [NUMA]: I feel puzzled at the function
- cpumask_of_node
-In-Reply-To: <5937C608.7010905@huawei.com>
-References: <5937C608.7010905@huawei.com>
-Message-ID: <20170608141214.GJ19866@dhcp22.suse.cz>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu,  8 Jun 2017 15:13:01 +0100
+Subject: [RFT PATCH v2 01/42] PCI: xilinx-nwl: Remove nwl_pcie_enable_msi()
+ unused bus parameter
+In-Reply-To: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
+References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
+Message-ID: <20170608141342.2018-2-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[CC linux-api]
+nwl_pcie_enable_msi() second parameter (ie bus) is unused and creates
+a fake dependency on the struct pci_bus that just does not exist.
 
-On Wed 07-06-17 17:23:20, Leizhen (ThunderTown) wrote:
-> When I executed numactl -H(print cpumask_of_node for each node), I got
-> different result on X86 and ARM64.  For each numa node, the former
-> only displayed online CPUs, and the latter displayed all possible
-> CPUs.  Actually, all other ARCHs is the same to ARM64.
-> 
-> So, my question is: Which case(online or possible) should function
-> cpumask_of_node be? Or there is no matter about it?
+Remove it.
 
-Unfortunatelly the documentation is quite unclear
-What:		/sys/devices/system/node/nodeX/cpumap
-Date:		October 2002
-Contact:	Linux Memory Management list <linux-mm@kvack.org>
-Description:
-		The node's cpumap.
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Bharat Kumar Gogada <bharat.kumar.gogada@xilinx.com>
+---
+ drivers/pci/host/pcie-xilinx-nwl.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-not really helpeful, is it? Semantically I _think_ printing online cpus
-makes more sense because it doesn't really make much sense to bind
-anything on offline nodes. Generic implementtion of cpumask_of_node
-indeed provides only online cpus. I haven't checked specific
-implementations of arch specific code but listing offline cpus sounds
-confusing to me.
-
+diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
+index 4b16b26..26e66e8 100644
+--- a/drivers/pci/host/pcie-xilinx-nwl.c
++++ b/drivers/pci/host/pcie-xilinx-nwl.c
+@@ -530,7 +530,7 @@ static int nwl_pcie_init_irq_domain(struct nwl_pcie *pcie)
+ 	return 0;
+ }
+ 
+-static int nwl_pcie_enable_msi(struct nwl_pcie *pcie, struct pci_bus *bus)
++static int nwl_pcie_enable_msi(struct nwl_pcie *pcie)
+ {
+ 	struct device *dev = pcie->dev;
+ 	struct platform_device *pdev = to_platform_device(dev);
+@@ -838,7 +838,7 @@ static int nwl_pcie_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+-		err = nwl_pcie_enable_msi(pcie, bus);
++		err = nwl_pcie_enable_msi(pcie);
+ 		if (err < 0) {
+ 			dev_err(dev, "failed to enable MSI support: %d\n", err);
+ 			goto error;
 -- 
-Michal Hocko
-SUSE Labs
+2.10.0
