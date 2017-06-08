@@ -1,42 +1,45 @@
-From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Thu, 8 Jun 2017 17:28:53 +0300
-Subject: [PATCH v7 08/10] staging: fsl-mc: drop reference to restool
-In-Reply-To: <20170608142855.10455-1-laurentiu.tudor@nxp.com>
-References: <20170608142855.10455-1-laurentiu.tudor@nxp.com>
-Message-ID: <20170608142855.10455-9-laurentiu.tudor@nxp.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu,  8 Jun 2017 15:13:28 +0100
+Subject: [RFT PATCH v2 28/42] PCI: Add a call to pci_assign_irq() in
+ pci_device_probe()
+In-Reply-To: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
+References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
+Message-ID: <20170608141342.2018-29-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+From: Matthew Minter <matt@masarand.com>
 
-Drop reference to user space restool utility from the README.
-It will be added back together with the actual support in the
-bus driver.
+The pci_assign_irq() function allows assignment of an irq to devices
+during device enable time rather than only at boot. Therefore call it
+in the pci_device_probe() function during the enable device code path
+so this assignment can be performed.
 
-Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+This patch will do nothing on arches which do not set the irq mapping
+function pointers and is therefore currently a nop, however as support
+for these function pointers is added to arch specific code this will
+cause irq assignment to migrate to device enable time allowing the new
+code paths to be used.
+
+Signed-off-by: Matthew Minter <matt@masarand.com>
+[lorenzo.pieralisi at arm.com: moved pci_assign_irq() call site]
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
+ drivers/pci/pci-driver.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Notes:
-    -v7
-      -no changes
-
- drivers/staging/fsl-mc/README.txt | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
-
-diff --git a/drivers/staging/fsl-mc/README.txt b/drivers/staging/fsl-mc/README.txt
-index 179536a..d7cd70a 100644
---- a/drivers/staging/fsl-mc/README.txt
-+++ b/drivers/staging/fsl-mc/README.txt
-@@ -131,9 +131,7 @@ in creating a network interfaces.
+diff --git a/drivers/pci/pci-driver.c b/drivers/pci/pci-driver.c
+index 192e7b6..11167c6 100644
+--- a/drivers/pci/pci-driver.c
++++ b/drivers/pci/pci-driver.c
+@@ -412,6 +412,8 @@ static int pci_device_probe(struct device *dev)
+ 	struct pci_dev *pci_dev = to_pci_dev(dev);
+ 	struct pci_driver *drv = to_pci_driver(dev->driver);
  
-     DPRCs can be defined statically and populated with objects
-     via a config file passed to the MC when firmware starts
--    it.  There is also a Linux user space tool called "restool"
--    that can be used to create/destroy containers and objects
--    dynamically.
-+    it.
- 
- -DPAA2 Objects for an Ethernet Network Interface
- 
++	pci_assign_irq(pci_dev);
++
+ 	error = pcibios_alloc_irq(pci_dev);
+ 	if (error < 0)
+ 		return error;
 -- 
-2.9.4
+2.10.0
