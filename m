@@ -1,108 +1,104 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 8 Jun 2017 11:36:56 +0000
-Subject: [PATCH v3] mm: huge-vmap: fail gracefully on unexpected huge vmap
- mappings
-In-Reply-To: <20170608113548.24905-1-ard.biesheuvel@linaro.org>
-References: <20170608113548.24905-1-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu9Wp06Nk33CVFr5W51gnsjaRsf0fQJOS4RWbHfRP+KEcg@mail.gmail.com>
+From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
+Date: Thu, 8 Jun 2017 11:43:59 +0000
+Subject: [RFCv2 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
+ erratum 161010801
+In-Reply-To: <20170608101508.GA8644@red-moon>
+References: <20170531143213.82100-1-shameerali.kolothum.thodi@huawei.com>
+ <20170531143213.82100-3-shameerali.kolothum.thodi@huawei.com>
+ <20170606135623.GB20126@red-moon>
+ <5FC3163CFD30C246ABAA99954A238FA838362082@FRAEML521-MBX.china.huawei.com>
+ <20170608084851.GA8607@red-moon>
+ <5FC3163CFD30C246ABAA99954A238FA838363D5D@FRAEML521-MBX.china.huawei.com>
+ <20170608101508.GA8644@red-moon>
+Message-ID: <5FC3163CFD30C246ABAA99954A238FA838363EC5@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(+ Dave)
 
-On 8 June 2017 at 11:35, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> Existing code that uses vmalloc_to_page() may assume that any
-> address for which is_vmalloc_addr() returns true may be passed
-> into vmalloc_to_page() to retrieve the associated struct page.
->
-> This is not un unreasonable assumption to make, but on architectures
-> that have CONFIG_HAVE_ARCH_HUGE_VMAP=y, it no longer holds, and we
-> need to ensure that vmalloc_to_page() does not go off into the weeds
-> trying to dereference huge PUDs or PMDs as table entries.
->
-> Given that vmalloc() and vmap() themselves never create huge
-> mappings or deal with compound pages at all, there is no correct
-> value to return in this case, so return NULL instead, and issue a
-> warning.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> This is a followup to '[PATCH v2] mm: vmalloc: make vmalloc_to_page()
-> deal with PMD/PUD mappings', hence the v3. The root issue with /proc/kcore
-> on arm64 is now handled by '[PATCH] mm: vmalloc: simplify vread/vwrite to
-> use existing mappings' [1], and this patch now only complements it by
-> taking care of other vmalloc_to_page() users.
->
-> [0] http://marc.info/?l=linux-mm&m=149641886821855&w=2
-> [1] http://marc.info/?l=linux-mm&m=149685966530180&w=2
->
->  include/linux/hugetlb.h | 13 +++++++++----
->  mm/vmalloc.c            |  5 +++--
->  2 files changed, 12 insertions(+), 6 deletions(-)
->
-> diff --git a/include/linux/hugetlb.h b/include/linux/hugetlb.h
-> index b857fc8cc2ec..b7166e5426b6 100644
-> --- a/include/linux/hugetlb.h
-> +++ b/include/linux/hugetlb.h
-> @@ -121,8 +121,6 @@ struct page *follow_huge_pmd(struct mm_struct *mm, unsigned long address,
->                                 pmd_t *pmd, int flags);
->  struct page *follow_huge_pud(struct mm_struct *mm, unsigned long address,
->                                 pud_t *pud, int flags);
-> -int pmd_huge(pmd_t pmd);
-> -int pud_huge(pud_t pud);
->  unsigned long hugetlb_change_protection(struct vm_area_struct *vma,
->                 unsigned long address, unsigned long end, pgprot_t newprot);
->
-> @@ -150,8 +148,6 @@ static inline void hugetlb_show_meminfo(void)
->  #define follow_huge_pmd(mm, addr, pmd, flags)  NULL
->  #define follow_huge_pud(mm, addr, pud, flags)  NULL
->  #define prepare_hugepage_range(file, addr, len)        (-EINVAL)
-> -#define pmd_huge(x)    0
-> -#define pud_huge(x)    0
->  #define is_hugepage_only_range(mm, addr, len)  0
->  #define hugetlb_free_pgd_range(tlb, addr, end, floor, ceiling) ({BUG(); 0; })
->  #define hugetlb_fault(mm, vma, addr, flags)    ({ BUG(); 0; })
-> @@ -190,6 +186,15 @@ static inline void __unmap_hugepage_range(struct mmu_gather *tlb,
->  }
->
->  #endif /* !CONFIG_HUGETLB_PAGE */
-> +
-> +#if defined(CONFIG_HUGETLB_PAGE) || defined(CONFIG_HAVE_ARCH_HUGE_VMAP)
-> +int pmd_huge(pmd_t pmd);
-> +int pud_huge(pud_t pud);
-> +#else
-> +#define pmd_huge(x)    0
-> +#define pud_huge(x)    0
-> +#endif
-> +
->  /*
->   * hugepages at page global directory. If arch support
->   * hugepages at pgd level, they need to define this.
-> diff --git a/mm/vmalloc.c b/mm/vmalloc.c
-> index 982d29511f92..67e1a304c467 100644
-> --- a/mm/vmalloc.c
-> +++ b/mm/vmalloc.c
-> @@ -12,6 +12,7 @@
->  #include <linux/mm.h>
->  #include <linux/module.h>
->  #include <linux/highmem.h>
-> +#include <linux/hugetlb.h>
->  #include <linux/sched/signal.h>
->  #include <linux/slab.h>
->  #include <linux/spinlock.h>
-> @@ -287,10 +288,10 @@ struct page *vmalloc_to_page(const void *vmalloc_addr)
->         if (p4d_none(*p4d))
->                 return NULL;
->         pud = pud_offset(p4d, addr);
-> -       if (pud_none(*pud))
-> +       if (pud_none(*pud) || WARN_ON_ONCE(pud_huge(*pud)))
->                 return NULL;
->         pmd = pmd_offset(pud, addr);
-> -       if (pmd_none(*pmd))
-> +       if (pmd_none(*pmd) || WARN_ON_ONCE(pmd_huge(*pmd)))
->                 return NULL;
->
->         ptep = pte_offset_map(pmd, addr);
-> --
-> 2.9.3
->
+
+> -----Original Message-----
+> From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
+> Sent: Thursday, June 08, 2017 11:15 AM
+> To: Shameerali Kolothum Thodi
+> Cc: marc.zyngier at arm.com; sudeep.holla at arm.com; will.deacon at arm.com;
+> robin.murphy at arm.com; hanjun.guo at linaro.org; Gabriele Paoloni; John
+> Garry; iommu at lists.linux-foundation.org; linux-arm-
+> kernel at lists.infradead.org; linux-acpi at vger.kernel.org; devel at acpica.org;
+> Linuxarm; Wangzhou (B); Guohanjun (Hanjun Guo)
+> Subject: Re: [RFCv2 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
+> erratum 161010801
+> 
+> On Thu, Jun 08, 2017 at 09:09:28AM +0000, Shameerali Kolothum Thodi
+> wrote:
+> >
+> >
+> > > -----Original Message-----
+> > > From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
+> > > Sent: Thursday, June 08, 2017 9:49 AM
+> > > To: Shameerali Kolothum Thodi
+> > > Cc: marc.zyngier at arm.com; sudeep.holla at arm.com;
+> will.deacon at arm.com;
+> > > robin.murphy at arm.com; hanjun.guo at linaro.org; Gabriele Paoloni; John
+> > > Garry; iommu at lists.linux-foundation.org; linux-arm-
+> > > kernel at lists.infradead.org; linux-acpi at vger.kernel.org;
+> devel at acpica.org;
+> > > Linuxarm; Wangzhou (B); Guohanjun (Hanjun Guo)
+> > > Subject: Re: [RFCv2 2/2] iommu/arm-smmu-v3:Enable ACPI based
+> HiSilicon
+> > > erratum 161010801
+> > >
+> > > On Tue, Jun 06, 2017 at 03:01:36PM +0000, Shameerali Kolothum Thodi
+> > > wrote:
+> > >
+> > > [...]
+> > >
+> > > > > > +	irq_dom = pci_msi_get_device_domain(to_pci_dev(dev));
+> > > > > > +	if (irq_dom) {
+> > > > > > +		int	ret;
+> > > > > > +		u32	rid;
+> > > > > > +
+> > > > > > +		rid = pci_msi_domain_get_msi_rid(irq_dom,
+> > > > > to_pci_dev(dev));
+> > > > > > +		ret = iort_dev_find_its_base(dev, rid, 0, &base);
+> > > > >
+> > > > > Well, here we use ITS id 0 which is fine as long as code in IORT
+> > > > > uses the same policy for getting the irq_domain (ie we want to
+> > > > > reserve the ITS address space that is actually used by the device to
+> > > > > send IRQs not a a different one) it is just a heads-up because I find
+> this
+> > > confusing.
+> > > >
+> > > > Ok. Just to make it clear, 0 is the index into the ITS identifier
+> > > > list.  I noted that iort_get_device_domain() uses index 0 while
+> > > > retrieving the ITS identifier.  May be use the same approach here as
+> > > > well? ie, remove the index from function call?
+> > > >
+> > > > I am not sure, how we can get the index info  though theoretically It
+> > > > is possible for the ITS group node having multiple ITSs.
+> > >
+> > > Actually I think it would make sense to reserve ALL ITS regions a device
+> may
+> > > be mapped to instead of just index 0 (ie in your case it is equivalent); this
+> > > leaves us some leeway as to choose which ITS the device will be actually
+> > > mapped to and this code does not have to care.
+> >
+> > Ok. That make sense. Just a quick one, is it ok to add another helper
+> function in
+> > iort code to retrieve the its->its_count then?
+> 
+> While at it, given that the pci API code to retrieve domain and rid falls
+> back to IORT anyway, I would add the whole reservation to IORT (mind,
+> it depends on IOMMU_API) as one function instead of fiddling about with
+> indexes.
+
+Ok. I will take a look at this. 
+
+> Side note: why Hilisicon dts upstream (eg hip07.dtsi) report ITS size
+> as 256K ? I was just checking whether the ITS reg map size is system
+> dependent and I bumped into them, I suspect there may be some dts
+> patching needed here.
+> 
+
+Thanks for catching this. I will check with the team and update.
+
+Shameer
