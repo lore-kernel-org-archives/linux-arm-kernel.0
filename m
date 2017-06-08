@@ -1,44 +1,36 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Thu, 8 Jun 2017 08:29:50 +0200
-Subject: [PATCH v2 2/4] [media] davinci: vpif_capture: get subdevs from DT
- when available
-In-Reply-To: <20170606233741.26718-3-khilman@baylibre.com>
-References: <20170606233741.26718-1-khilman@baylibre.com>
- <20170606233741.26718-3-khilman@baylibre.com>
-Message-ID: <f305d0fc-b5cd-591a-1d95-7ae66bfa72ec@xs4all.nl>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 8 Jun 2017 08:45:20 +0200
+Subject: [PATCH] ARM: samsung: Save defconfig for Exynos, S3C and S5P
+ configs
+In-Reply-To: <CAK8P3a2_rLigHqnOkHPM+x2GDrwdGnwJOqEbY7YTsQRUXT_eJg@mail.gmail.com>
+References: <20170607181846.13539-1-krzk@kernel.org>
+ <CAK8P3a2_rLigHqnOkHPM+x2GDrwdGnwJOqEbY7YTsQRUXT_eJg@mail.gmail.com>
+Message-ID: <20170608064520.GA2770@kozik-book>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/17 01:37, Kevin Hilman wrote:
-> Enable  getting of subdevs from DT ports and endpoints.
+On Wed, Jun 07, 2017 at 09:49:58PM +0200, Arnd Bergmann wrote:
+> On Wed, Jun 7, 2017 at 8:18 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> > Some configs for Samsung ARM SoCs were not updated for some time and
+> > they still contain obsolete Kconfig entries.  Generate new defconfig for
+> > all Samsung ARM architectures (Exynos, S3C24xx, S3C64xx, S5Pv210).
+> >
+> > Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 > 
-> The _get_pdata() function was larely inspired by (i.e. stolen from)
-> am437x-vpfe.c
+> Hi Krzysztof,
 > 
-> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
-> ---
->  drivers/media/platform/davinci/vpif_capture.c | 126 +++++++++++++++++++++++++-
->  drivers/media/platform/davinci/vpif_display.c |   5 +
->  include/media/davinci/vpif_types.h            |   9 +-
->  3 files changed, 134 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/media/platform/davinci/vpif_capture.c b/drivers/media/platform/davinci/vpif_capture.c
-> index fc5c7622660c..b9d927d1e5a8 100644
-> --- a/drivers/media/platform/davinci/vpif_capture.c
-> +++ b/drivers/media/platform/davinci/vpif_capture.c
-> @@ -22,6 +22,8 @@
->  #include <linux/slab.h>
->  
->  #include <media/v4l2-ioctl.h>
-> +#include <media/v4l2-of.h>
+> Updating the defconfig files is good, but I'm always a little unsure
+> about loss of
+> information when we do that. Would it be possible for you to split this patch
+> into two halves, with one of them just reordering the entries that moved,
+> and the second one removing the entries that have disappeared, with an
+> explanation for why they are no longer there? That would let us see whether
+> the change was intentional and avoid problems from renamed Kconfig
+> symbols that are no longer enabled afterwards.
 
-v4l2-of.h no longer exists, so this v2 is wrong. Unfortunately this patch has
-already been merged in our master. I'm not sure how this could have slipped past
-both my and Mauro's patch testing (and yours, for that matter).
+Splitting the change into two commits (reorder and removal) makes sense.
+However getting the information why some things were removed, will
+require more effort. I'll see what I can do.
 
-Can you fix this and post a patch on top of the media master that makes this
-compile again?
-
-Regards,
-
-	Hans
+Best regards,
+Krzysztof
