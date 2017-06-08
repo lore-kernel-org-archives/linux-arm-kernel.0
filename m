@@ -1,81 +1,44 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 8 Jun 2017 09:25:47 +0300
-Subject: [PATCH 07/11] ARM: OMAP2+: Remove unused legacy code for DMA
-In-Reply-To: <20170531225139.30723-8-tony@atomide.com>
-References: <20170531225139.30723-1-tony@atomide.com>
- <20170531225139.30723-8-tony@atomide.com>
-Message-ID: <10f65a24-0459-5df7-378d-84933b83c070@ti.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Thu, 8 Jun 2017 08:29:50 +0200
+Subject: [PATCH v2 2/4] [media] davinci: vpif_capture: get subdevs from DT
+ when available
+In-Reply-To: <20170606233741.26718-3-khilman@baylibre.com>
+References: <20170606233741.26718-1-khilman@baylibre.com>
+ <20170606233741.26718-3-khilman@baylibre.com>
+Message-ID: <f305d0fc-b5cd-591a-1d95-7ae66bfa72ec@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
-
-On 2017-06-01 01:51, Tony Lindgren wrote:
-> We are now booting all mach-omap2 in device tree only mode.
-> Any code that is only called in legacy boot mode where
-> of_have_populated_dt() is not set is safe to remove now.
+On 07/06/17 01:37, Kevin Hilman wrote:
+> Enable  getting of subdevs from DT ports and endpoints.
 > 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> The _get_pdata() function was larely inspired by (i.e. stolen from)
+> am437x-vpfe.c
+> 
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 > ---
->  arch/arm/mach-omap2/dma.c | 30 +-----------------------------
->  1 file changed, 1 insertion(+), 29 deletions(-)
+>  drivers/media/platform/davinci/vpif_capture.c | 126 +++++++++++++++++++++++++-
+>  drivers/media/platform/davinci/vpif_display.c |   5 +
+>  include/media/davinci/vpif_types.h            |   9 +-
+>  3 files changed, 134 insertions(+), 6 deletions(-)
 > 
-> diff --git a/arch/arm/mach-omap2/dma.c b/arch/arm/mach-omap2/dma.c
-> --- a/arch/arm/mach-omap2/dma.c
-> +++ b/arch/arm/mach-omap2/dma.c
-> @@ -334,20 +334,6 @@ static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *unused)
->  	p.dma_attr = (struct omap_dma_dev_attr *)oh->dev_attr;
->  	p.errata = configure_dma_errata();
+> diff --git a/drivers/media/platform/davinci/vpif_capture.c b/drivers/media/platform/davinci/vpif_capture.c
+> index fc5c7622660c..b9d927d1e5a8 100644
+> --- a/drivers/media/platform/davinci/vpif_capture.c
+> +++ b/drivers/media/platform/davinci/vpif_capture.c
+> @@ -22,6 +22,8 @@
+>  #include <linux/slab.h>
 >  
-> -	if (!of_have_populated_dt()) {
-> -		if (soc_is_omap24xx()) {
-> -			p.slave_map = omap24xx_sdma_map;
-> -			p.slavecnt = ARRAY_SIZE(omap24xx_sdma_map);
-> -		} else if (soc_is_omap34xx() || soc_is_omap3630()) {
-> -			p.slave_map = omap3xxx_sdma_map;
-> -			p.slavecnt = ARRAY_SIZE(omap3xxx_sdma_map);
-> -		} else {
-> -			pr_err("%s: The legacy DMA map is not provided!\n",
-> -			       __func__);
-> -			return -ENODEV;
-> -		}
-> -	}
-> -
+>  #include <media/v4l2-ioctl.h>
+> +#include <media/v4l2-of.h>
 
-This will conflict with the changes introduced by the tusb6010 DMAengine
-conversion:
-https://patchwork.kernel.org/patch/9734219/
+v4l2-of.h no longer exists, so this v2 is wrong. Unfortunately this patch has
+already been merged in our master. I'm not sure how this could have slipped past
+both my and Mauro's patch testing (and yours, for that matter).
 
-with this patch I think the omap24xx_sdma_map and omap3xxx_sdma_map can
-also be removed, but we need to keep the omap24xx_sdma_dt_map for now
-till we have proper DT support for tusb.
+Can you fix this and post a patch on top of the media master that makes this
+compile again?
 
->  	pdev = omap_device_build(name, 0, oh, &p, sizeof(p));
->  	if (IS_ERR(pdev)) {
->  		pr_err("%s: Can't build omap_device for %s:%s.\n",
-> @@ -389,21 +375,7 @@ static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *unused)
->  
->  static int __init omap2_system_dma_init(void)
->  {
-> -	struct platform_device *pdev;
-> -	int res;
-> -
-> -	res = omap_hwmod_for_each_by_class("dma",
-> +	return omap_hwmod_for_each_by_class("dma",
->  			omap2_system_dma_init_dev, NULL);
-> -	if (res)
-> -		return res;
-> -
-> -	if (of_have_populated_dt())
-> -		return res;
-> -
-> -	pdev = platform_device_register_full(&omap_dma_dev_info);
-> -	if (IS_ERR(pdev))
-> -		return PTR_ERR(pdev);
-> -
-> -	return res;
->  }
->  omap_arch_initcall(omap2_system_dma_init);
-> 
+Regards,
 
-- P?ter
+	Hans
