@@ -1,26 +1,43 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 8 Jun 2017 13:46:41 -0700
-Subject: [PATCH] arm64: defconfig: Enable ARCH_BRCMSTB
-In-Reply-To: <CAK8P3a3zT0bh=itVjwWTEJFwoBxeQgpRZWJRhg8=Rk9-iyE04g@mail.gmail.com>
-References: <20170607165806.11242-1-f.fainelli@gmail.com>
- <CAK8P3a3zT0bh=itVjwWTEJFwoBxeQgpRZWJRhg8=Rk9-iyE04g@mail.gmail.com>
-Message-ID: <647c565a-9207-b108-265e-2259530752c0@gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Thu, 8 Jun 2017 15:47:43 -0500
+Subject: [PATCH 0/4] Davinci remoteproc cleanups/fixes
+In-Reply-To: <20170518220902.2846-1-s-anna@ti.com>
+References: <20170518220902.2846-1-s-anna@ti.com>
+Message-ID: <d2b8d230-33db-0615-f6cf-23b8446d8f50@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/2017 12:50 PM, Arnd Bergmann wrote:
-> On Wed, Jun 7, 2017 at 6:58 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->> ARCH_BRCMSTB was one of the few platforms that were not enabled by
->> default, since we are now adding more and more drivers relevant to that
->> platform get some proper build coverage.
->>
->> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
->> ---
->> I can submit this through the next arm-soc pull requests (shortly), if
->> that's okay with all of you, thanks!
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+Bjorn,
 
-Applied to defconfig-arm64/next, thanks!
--- 
-Florian
+On 05/18/2017 05:08 PM, Suman Anna wrote:
+> Hi Bjorn,
+> 
+> The following series includes various fixes and cleanups for the TI's
+> Davinci DSP remoteproc driver. Patches are based on 4.12-rc1. Following
+> is the patch summary:
+> 
+>  - Patch1 updates/fixes the build dependency on DMA_CMA which is not
+>    selected by default in the davinci_defconfig.
+>  - Patch 3 fixes a DSP boot/functionality issue with repeated 'start'
+>    and 'stop' commands using the sysfs 'state' variable.
+>  - Patch 2 and 4 are cleanups/code simplifications.
+
+If you don't have any comments, can you queue these patches for v4.13?
+
+Thanks
+Suman
+
+> 
+> regards
+> Suman
+> 
+> Suman Anna (4):
+>   remoteproc/davinci: Update Kconfig to depend on DMA_CMA
+>   remoteproc/davinci: simplify the reset function
+>   remoteproc/davinci: fix unbalanced reset between start and stop ops
+>   remoteproc/davinci: streamline the interrupt management
+> 
+>  drivers/remoteproc/Kconfig            |  2 +-
+>  drivers/remoteproc/da8xx_remoteproc.c | 60 ++++++++---------------------------
+>  2 files changed, 15 insertions(+), 47 deletions(-)
+> 
