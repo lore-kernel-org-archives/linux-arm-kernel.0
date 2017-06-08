@@ -1,70 +1,67 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Thu,  8 Jun 2017 15:34:47 -0700
-Subject: [PATCH v6 1/3] clk: imx7d: create clocks behind rawnand clock gate
-In-Reply-To: <cover.9fab78eaa869dbad4c9ad7e8578c9cef3e49daa8.1496961128.git-series.stefan@agner.ch>
-References: <cover.9fab78eaa869dbad4c9ad7e8578c9cef3e49daa8.1496961128.git-series.stefan@agner.ch>
-Message-ID: <8b9edf13938e3166081e72ba8fa4ac822035079c.1496961128.git-series.stefan@agner.ch>
+Date: Thu,  8 Jun 2017 15:34:46 -0700
+Subject: [PATCH v6 0/3] ARM: dts: imx7: add NAND support
+Message-ID: <cover.9fab78eaa869dbad4c9ad7e8578c9cef3e49daa8.1496961128.git-series.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rawnand clock gate gates two clocks, NAND_USDHC_BUS_CLK_ROOT
-and NAND_CLK_ROOT. However, the gate has been in the chain of the
-latter only. This does not allow to use the NAND_USDHC_BUS_CLK_ROOT
-only, e.g. as required by APBH-Bridge-DMA.
+This revision alters the clock tree such that the clock required by
+the APBH DMA (NAND_USDHC_BUS_CLK_ROOT _after_ gate CCGR20) is available
+as an independent clock.
 
-Add new clocks which represent the clock after the gate, and use a
-shared clock gate to correctly model the hardware.
+So far the gate CCGR20 was used by the NAND_ROOT_CLK only. A previous
+patch added the NAND_ROOT_CLK to the APBH DMA which lead the clock
+gate CCGR20 getting enabled:
+https://patchwork.ozlabs.org/patch/551967/
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
-Tested-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- drivers/clk/imx/clk-imx7d.c             | 6 ++++--
- include/dt-bindings/clock/imx7d-clock.h | 4 +++-
- 2 files changed, 7 insertions(+), 3 deletions(-)
+The data sheet seems to indicate that the APBH DMA only uses hclk which
+is connected to NAND_USDHC_BUS_CLK_ROOT, but also through gate CCGR20.
+Tests seem to confirm this wiring.
 
-diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
-index 93b0364..e364060 100644
---- a/drivers/clk/imx/clk-imx7d.c
-+++ b/drivers/clk/imx/clk-imx7d.c
-@@ -25,6 +25,7 @@
- static u32 share_count_sai1;
- static u32 share_count_sai2;
- static u32 share_count_sai3;
-+static u32 share_count_nand;
- 
- static struct clk_div_table test_div_table[] = {
- 	{ .val = 3, .div = 1, },
-@@ -748,7 +749,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
- 	clks[IMX7D_ENET2_TIME_ROOT_DIV] = imx_clk_divider2("enet2_time_post_div", "enet2_time_pre_div", base + 0xa880, 0, 6);
- 	clks[IMX7D_ENET_PHY_REF_ROOT_DIV] = imx_clk_divider2("enet_phy_ref_post_div", "enet_phy_ref_pre_div", base + 0xa900, 0, 6);
- 	clks[IMX7D_EIM_ROOT_DIV] = imx_clk_divider2("eim_post_div", "eim_pre_div", base + 0xa980, 0, 6);
--	clks[IMX7D_NAND_ROOT_DIV] = imx_clk_divider2("nand_post_div", "nand_pre_div", base + 0xaa00, 0, 6);
-+	clks[IMX7D_NAND_ROOT_CLK] = imx_clk_divider2("nand_root_clk", "nand_pre_div", base + 0xaa00, 0, 6);
- 	clks[IMX7D_QSPI_ROOT_DIV] = imx_clk_divider2("qspi_post_div", "qspi_pre_div", base + 0xaa80, 0, 6);
- 	clks[IMX7D_USDHC1_ROOT_DIV] = imx_clk_divider2("usdhc1_post_div", "usdhc1_pre_div", base + 0xab00, 0, 6);
- 	clks[IMX7D_USDHC2_ROOT_DIV] = imx_clk_divider2("usdhc2_post_div", "usdhc2_pre_div", base + 0xab80, 0, 6);
-@@ -825,7 +826,8 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
- 	clks[IMX7D_ENET2_TIME_ROOT_CLK] = imx_clk_gate4("enet2_time_root_clk", "enet2_time_post_div", base + 0x4510, 0);
- 	clks[IMX7D_ENET_PHY_REF_ROOT_CLK] = imx_clk_gate4("enet_phy_ref_root_clk", "enet_phy_ref_post_div", base + 0x4520, 0);
- 	clks[IMX7D_EIM_ROOT_CLK] = imx_clk_gate4("eim_root_clk", "eim_post_div", base + 0x4160, 0);
--	clks[IMX7D_NAND_ROOT_CLK] = imx_clk_gate4("nand_root_clk", "nand_post_div", base + 0x4140, 0);
-+	clks[IMX7D_NAND_RAWNAND_CLK] = imx_clk_gate2_shared2("nand_rawnand_clk", "nand_root_clk", base + 0x4140, 0, &share_count_nand);
-+	clks[IMX7D_NAND_USDHC_BUS_RAWNAND_CLK] = imx_clk_gate2_shared2("nand_usdhc_rawnand_clk", "nand_usdhc_root_clk", base + 0x4140, 0, &share_count_nand);
- 	clks[IMX7D_QSPI_ROOT_CLK] = imx_clk_gate4("qspi_root_clk", "qspi_post_div", base + 0x4150, 0);
- 	clks[IMX7D_USDHC1_ROOT_CLK] = imx_clk_gate4("usdhc1_root_clk", "usdhc1_post_div", base + 0x46c0, 0);
- 	clks[IMX7D_USDHC2_ROOT_CLK] = imx_clk_gate4("usdhc2_root_clk", "usdhc2_post_div", base + 0x46d0, 0);
-diff --git a/include/dt-bindings/clock/imx7d-clock.h b/include/dt-bindings/clock/imx7d-clock.h
-index a7a1a50..de62a83 100644
---- a/include/dt-bindings/clock/imx7d-clock.h
-+++ b/include/dt-bindings/clock/imx7d-clock.h
-@@ -450,5 +450,7 @@
- #define IMX7D_CLK_ARM			437
- #define IMX7D_CKIL			438
- #define IMX7D_OCOTP_CLK			439
--#define IMX7D_CLK_END			440
-+#define IMX7D_NAND_RAWNAND_CLK		440
-+#define IMX7D_NAND_USDHC_BUS_RAWNAND_CLK 441
-+#define IMX7D_CLK_END			442
- #endif /* __DT_BINDINGS_CLOCK_IMX7D_H */
+By adding a new clock IMX7D_NAND_USDHC_BUS_RAWNAND_CLK we can assign
+a clock which also enables the shared CCGR20 gate without changing the
+DMA driver. This better reflects the true wiring and encapsulates the
+SoC specific clock wiring in the clock tree instead leaking it into
+the driver code.
+
+The wording "rawnand" has been taken from Table 5-12, Module APBHDMA
+in the i.MX 7 Reference Manual.
+
+Versions 2 and earlier also included NAND driver changes, which are
+already merged.
+
+--
+Stefan
+
+Changes since v5:
+- Remove clock-names from dma-apbh node
+
+Changes since v4:
+- Introduce *_RAWNAND_CLK which represent clocks after CCGR20
+- Use *_RAWNAND_CLK for APBH DMA and GPMI NAND
+- Use assigned-clocks to set a reasonable parent for NAND_ROOT_SRC
+
+Changes since v3:
+- Only specify IMX7D_NAND_USDHC_BUS_ROOT_CLK which seems to be sufficent
+
+Changes since v2:
+- Dropped driver changes, alreay merged
+
+Changes since v1:
+- Make clks_count const
+- Introduce IS_IMX7D for i.MX 7 SoC's and make it part of GPMI_IS_MX6
+
+Stefan Agner (3):
+  clk: imx7d: create clocks behind rawnand clock gate
+  ARM: dts: imx7: add GPMI NAND and APBH DMA
+  ARM: dts: imx7-colibri: add NAND support
+
+ arch/arm/boot/dts/imx7-colibri.dtsi     |  9 ++++++++-
+ arch/arm/boot/dts/imx7s.dtsi            | 31 ++++++++++++++++++++++++++-
+ drivers/clk/imx/clk-imx7d.c             |  6 +++--
+ include/dt-bindings/clock/imx7d-clock.h |  4 ++-
+ 4 files changed, 47 insertions(+), 3 deletions(-)
+
+base-commit: e2bb3be2c6c623ff0bad975dc9435531f450f0c5
 -- 
 git-series 0.9.1
