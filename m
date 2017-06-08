@@ -1,40 +1,36 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  8 Jun 2017 19:41:38 +0000
-Subject: [PATCH 1/2] fs/proc: kcore: use kcore_list type to check for
- vmalloc/module address
+Date: Thu,  8 Jun 2017 19:41:39 +0000
+Subject: [PATCH 2/2] arm64: mm: select CONFIG_ARCH_PROC_KCORE_TEXT
 In-Reply-To: <20170608194139.9250-1-ard.biesheuvel@linaro.org>
 References: <20170608194139.9250-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170608194139.9250-2-ard.biesheuvel@linaro.org>
+Message-ID: <20170608194139.9250-3-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of passing each start address into is_vmalloc_or_module_addr()
-to decide whether it falls into either the VMALLOC or the MODULES region,
-we can simply check the type field of the current kcore_list entry, since
-it will be set to KCORE_VMALLOC based on exactly the same conditions.
-
-As a bonus, when reading the KCORE_TEXT region on architectures that have
-one, this will avoid using vread() on the region if it happens to intersect
-with a KCORE_VMALLOC region. This is due the fact that the KCORE_TEXT
-region is the first one to be added to the kcore region list.
+To avoid issues with the /proc/kcore code getting confused about the
+kernels block mappings in the VMALLOC region, enable the existing
+facility that describes the [_text, _end) interval as a separate
+KCORE_TEXT region, which supersedes the KCORE_VMALLOC region that
+it intersects with on arm64.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- fs/proc/kcore.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/Kconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/fs/proc/kcore.c b/fs/proc/kcore.c
-index 4ee55274f155..45629f4b5402 100644
---- a/fs/proc/kcore.c
-+++ b/fs/proc/kcore.c
-@@ -504,7 +504,7 @@ read_kcore(struct file *file, char __user *buffer, size_t buflen, loff_t *fpos)
- 		if (&m->list == &kclist_head) {
- 			if (clear_user(buffer, tsz))
- 				return -EFAULT;
--		} else if (is_vmalloc_or_module_addr((void *)start)) {
-+		} else if (m->type == KCORE_VMALLOC) {
- 			vread(buf, (char *)start, tsz);
- 			/* we have to zero-fill user buffer even if no read */
- 			if (copy_to_user(buffer, buf, tsz))
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 3dcd7ec69bca..65173b39cfc2 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -244,6 +244,9 @@ config PGTABLE_LEVELS
+ config ARCH_SUPPORTS_UPROBES
+ 	def_bool y
+ 
++config ARCH_PROC_KCORE_TEXT
++	def_bool y
++
+ source "init/Kconfig"
+ 
+ source "kernel/Kconfig.freezer"
 -- 
 2.9.3
