@@ -1,92 +1,57 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu,  8 Jun 2017 18:10:42 +0200
-Subject: [PATCH 31/35] ARM: s3c2410_defconfig: Save defconfig
+Date: Thu,  8 Jun 2017 18:10:46 +0200
+Subject: [PATCH 35/35] ARM: tct_hammer_defconfig: Save defconfig
 In-Reply-To: <20170608160836.12196-1-krzk@kernel.org>
 References: <20170608160836.12196-1-krzk@kernel.org>
-Message-ID: <20170608161049.12421-31-krzk@kernel.org>
+Message-ID: <20170608161049.12421-35-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Generate new defconfig to get rid of obsolete Kconfig entries:
- - S3C_BOOT_ERROR_RESET, SMDK2440_CPU2442 are gone;
- - ARM_THUMB is changed to yes (selected by default);
- - BINFMT_AOUT cannot be selected anymore;
+ - BUGVERBOSE was changed into DEBUG_BUGVERBOSE and will be enabled by
+   default (it is useful);
+ - DETECT_SOFTLOCKUP was changed into LOCKUP_DETECTOR;
  - rest of entries is being removed by default values;
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- arch/arm/configs/s3c2410_defconfig | 13 -------------
- 1 file changed, 13 deletions(-)
+ arch/arm/configs/tct_hammer_defconfig | 5 -----
+ 1 file changed, 5 deletions(-)
 
-diff --git a/arch/arm/configs/s3c2410_defconfig b/arch/arm/configs/s3c2410_defconfig
-index aacc788f5d55..2afb359f3168 100644
---- a/arch/arm/configs/s3c2410_defconfig
-+++ b/arch/arm/configs/s3c2410_defconfig
-@@ -11,8 +11,6 @@ CONFIG_PARTITION_ADVANCED=y
- CONFIG_BSD_DISKLABEL=y
- CONFIG_SOLARIS_X86_PARTITION=y
- CONFIG_ARCH_S3C24XX=y
--CONFIG_S3C_BOOT_ERROR_RESET=y
--CONFIG_S3C24XX_PWM=y
- CONFIG_CPU_S3C2412=y
- CONFIG_CPU_S3C2416=y
- CONFIG_CPU_S3C2440=y
-@@ -41,16 +39,13 @@ CONFIG_MACH_RX3715=y
- CONFIG_ARCH_S3C2440=y
- CONFIG_MACH_NEO1973_GTA02=y
- CONFIG_MACH_RX1950=y
--CONFIG_SMDK2440_CPU2442=y
- CONFIG_MACH_SMDK2443=y
--# CONFIG_ARM_THUMB is not set
- CONFIG_S3C_ADC=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_CMDLINE="root=/dev/hda1 ro init=/bin/bash console=ttySAC0"
- CONFIG_FPE_NWFPE=y
- CONFIG_FPE_NWFPE_XP=y
--CONFIG_BINFMT_AOUT=y
- CONFIG_APM_EMULATION=m
- CONFIG_NET=y
- CONFIG_PACKET=y
-@@ -84,9 +79,6 @@ CONFIG_IPV6_TUNNEL=m
- CONFIG_NETFILTER=y
- CONFIG_NF_CONNTRACK=m
- CONFIG_NF_CONNTRACK_EVENTS=y
--CONFIG_NF_CT_PROTO_DCCP=y
--CONFIG_NF_CT_PROTO_SCTP=y
--CONFIG_NF_CT_PROTO_UDPLITE=y
- CONFIG_NF_CONNTRACK_AMANDA=m
- CONFIG_NF_CONNTRACK_FTP=m
- CONFIG_NF_CONNTRACK_H323=m
-@@ -179,7 +171,6 @@ CONFIG_BT_BNEP_MC_FILTER=y
- CONFIG_BT_BNEP_PROTO_FILTER=y
- CONFIG_BT_HIDP=m
- CONFIG_BT_HCIUART=m
--CONFIG_BT_HCIUART_H4=y
- CONFIG_BT_HCIUART_BCSP=y
- CONFIG_BT_HCIUART_LL=y
- CONFIG_BT_HCIBCM203X=m
-@@ -382,8 +373,6 @@ CONFIG_EXT2_FS_POSIX_ACL=y
- CONFIG_EXT2_FS_SECURITY=y
- CONFIG_EXT3_FS=y
- CONFIG_EXT3_FS_POSIX_ACL=y
--CONFIG_EXT4_FS=m
--CONFIG_EXT4_FS_POSIX_ACL=y
- CONFIG_AUTOFS4_FS=m
- CONFIG_FUSE_FS=m
- CONFIG_ISO9660_FS=y
-@@ -401,7 +390,6 @@ CONFIG_CRAMFS=y
- CONFIG_SQUASHFS=m
- CONFIG_ROMFS_FS=y
- CONFIG_NFS_FS=y
--CONFIG_NFS_V3=y
- CONFIG_NFS_V3_ACL=y
- CONFIG_ROOT_NFS=y
- CONFIG_NFSD=m
-@@ -452,4 +440,3 @@ CONFIG_DEBUG_KERNEL=y
- CONFIG_DEBUG_MUTEXES=y
- CONFIG_DEBUG_USER=y
+diff --git a/arch/arm/configs/tct_hammer_defconfig b/arch/arm/configs/tct_hammer_defconfig
+index 71a2e0fb70f5..d0a9e5dd9135 100644
+--- a/arch/arm/configs/tct_hammer_defconfig
++++ b/arch/arm/configs/tct_hammer_defconfig
+@@ -7,7 +7,6 @@ CONFIG_SYSFS_DEPRECATED_V2=y
+ CONFIG_BLK_DEV_INITRD=y
+ CONFIG_EXPERT=y
+ # CONFIG_KALLSYMS is not set
+-# CONFIG_BUGVERBOSE is not set
+ # CONFIG_ELF_CORE is not set
+ # CONFIG_SHMEM is not set
+ CONFIG_SLOB=y
+@@ -34,14 +33,12 @@ CONFIG_MTD_CFI_INTELEXT=y
+ CONFIG_MTD_PHYSMAP=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=10240
+-# CONFIG_INPUT_MOUSEDEV is not set
+ # CONFIG_INPUT_KEYBOARD is not set
+ # CONFIG_INPUT_MOUSE is not set
+ # CONFIG_SERIO is not set
+ # CONFIG_VT_CONSOLE is not set
+ # CONFIG_HW_RANDOM is not set
+ # CONFIG_HWMON is not set
+-# CONFIG_VGA_CONSOLE is not set
+ CONFIG_USB=y
+ CONFIG_USB_MON=y
+ CONFIG_USB_OHCI_HCD=y
+@@ -57,7 +54,5 @@ CONFIG_JFFS2_FS=y
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ISO8859_1=y
+ # CONFIG_ENABLE_MUST_CHECK is not set
+-CONFIG_DEBUG_KERNEL=y
+-# CONFIG_DETECT_SOFTLOCKUP is not set
  CONFIG_DEBUG_LL=y
--# CONFIG_CRYPTO_ANSI_CPRNG is not set
+ CONFIG_CRC_CCITT=y
 -- 
 2.9.3
