@@ -1,45 +1,48 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Thu,  8 Jun 2017 15:25:55 +0200
-Subject: [PATCH 30/44] dma-virt: remove dma_supported and mapping_error methods
+Date: Thu,  8 Jun 2017 15:26:03 +0200
+Subject: [PATCH 38/44] arm: implement ->dma_supported instead of ->set_dma_mask
 In-Reply-To: <20170608132609.32662-1-hch@lst.de>
 References: <20170608132609.32662-1-hch@lst.de>
-Message-ID: <20170608132609.32662-31-hch@lst.de>
+Message-ID: <20170608132609.32662-39-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These just duplicate the default behavior if no method is provided.
+Same behavior, less code duplication.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- lib/dma-virt.c | 12 ------------
- 1 file changed, 12 deletions(-)
+ arch/arm/common/dmabounce.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/lib/dma-virt.c b/lib/dma-virt.c
-index dcd4df1f7174..5c4f11329721 100644
---- a/lib/dma-virt.c
-+++ b/lib/dma-virt.c
-@@ -51,22 +51,10 @@ static int dma_virt_map_sg(struct device *dev, struct scatterlist *sgl,
- 	return nents;
+diff --git a/arch/arm/common/dmabounce.c b/arch/arm/common/dmabounce.c
+index 4aabf117e136..d89a0b56b245 100644
+--- a/arch/arm/common/dmabounce.c
++++ b/arch/arm/common/dmabounce.c
+@@ -445,12 +445,12 @@ static void dmabounce_sync_for_device(struct device *dev,
+ 	arm_dma_ops.sync_single_for_device(dev, handle, size, dir);
  }
  
--static int dma_virt_mapping_error(struct device *dev, dma_addr_t dma_addr)
--{
--	return false;
--}
--
--static int dma_virt_supported(struct device *dev, u64 mask)
--{
--	return true;
--}
--
- const struct dma_map_ops dma_virt_ops = {
- 	.alloc			= dma_virt_alloc,
- 	.free			= dma_virt_free,
- 	.map_page		= dma_virt_map_page,
- 	.map_sg			= dma_virt_map_sg,
--	.mapping_error		= dma_virt_mapping_error,
--	.dma_supported		= dma_virt_supported,
+-static int dmabounce_set_mask(struct device *dev, u64 dma_mask)
++static int dmabounce_dma_supported(struct device *dev, u64 dma_mask)
+ {
+ 	if (dev->archdata.dmabounce)
+ 		return 0;
+ 
+-	return arm_dma_ops.set_dma_mask(dev, dma_mask);
++	return arm_dma_ops.dma_supported(dev, dma_mask);
+ }
+ 
+ static int dmabounce_mapping_error(struct device *dev, dma_addr_t dma_addr)
+@@ -474,9 +474,8 @@ static const struct dma_map_ops dmabounce_ops = {
+ 	.unmap_sg		= arm_dma_unmap_sg,
+ 	.sync_sg_for_cpu	= arm_dma_sync_sg_for_cpu,
+ 	.sync_sg_for_device	= arm_dma_sync_sg_for_device,
+-	.set_dma_mask		= dmabounce_set_mask,
++	.dma_supported		= dmabounce_dma_supported,
+ 	.mapping_error		= dmabounce_mapping_error,
+-	.dma_supported		= arm_dma_supported,
  };
- EXPORT_SYMBOL(dma_virt_ops);
+ 
+ static int dmabounce_init_pool(struct dmabounce_pool *pool, struct device *dev,
 -- 
 2.11.0
