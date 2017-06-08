@@ -1,58 +1,113 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  8 Jun 2017 12:58:47 +0000
-Subject: [PATCH] arm: boot/compressed: fix inappropriate Thumb2 mnemonic for
- __nop
-Message-ID: <20170608125847.2611-1-ard.biesheuvel@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 8 Jun 2017 13:59:46 +0100
+Subject: [PATCH v3] mm: huge-vmap: fail gracefully on unexpected huge
+ vmap mappings
+In-Reply-To: <20170608113548.24905-1-ard.biesheuvel@linaro.org>
+References: <20170608113548.24905-1-ard.biesheuvel@linaro.org>
+Message-ID: <20170608125946.GD5765@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 06a4b6d009a1 ("ARM: 8677/1: boot/compressed: fix decompressor
-header layout for v7-M") fixed an issue in the layout of the header
-of the compressed kernel image that was caused by the assembler
-emitting narrow opcodes for 'mov r0, r0', and for this reason, the
-mnemonic was updated to use the W() macro, which will append the .w
-suffix (which forces a wide encoding) if required, i.e., when building
-the kernel in Thumb2 mode.
+On Thu, Jun 08, 2017 at 11:35:48AM +0000, Ard Biesheuvel wrote:
+> Existing code that uses vmalloc_to_page() may assume that any
+> address for which is_vmalloc_addr() returns true may be passed
+> into vmalloc_to_page() to retrieve the associated struct page.
+> 
+> This is not un unreasonable assumption to make, but on architectures
+> that have CONFIG_HAVE_ARCH_HUGE_VMAP=y, it no longer holds, and we
+> need to ensure that vmalloc_to_page() does not go off into the weeds
+> trying to dereference huge PUDs or PMDs as table entries.
+> 
+> Given that vmalloc() and vmap() themselves never create huge
+> mappings or deal with compound pages at all, there is no correct
+> value to return in this case, so return NULL instead, and issue a
+> warning.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> This is a followup to '[PATCH v2] mm: vmalloc: make vmalloc_to_page()
+> deal with PMD/PUD mappings', hence the v3. The root issue with /proc/kcore
+> on arm64 is now handled by '[PATCH] mm: vmalloc: simplify vread/vwrite to
+> use existing mappings' [1], and this patch now only complements it by
+> taking care of other vmalloc_to_page() users.
+> 
+> [0] http://marc.info/?l=linux-mm&m=149641886821855&w=2
+> [1] http://marc.info/?l=linux-mm&m=149685966530180&w=2
+> 
+>  include/linux/hugetlb.h | 13 +++++++++----
+>  mm/vmalloc.c            |  5 +++--
+>  2 files changed, 12 insertions(+), 6 deletions(-)
+> 
+> diff --git a/include/linux/hugetlb.h b/include/linux/hugetlb.h
+> index b857fc8cc2ec..b7166e5426b6 100644
+> --- a/include/linux/hugetlb.h
+> +++ b/include/linux/hugetlb.h
+> @@ -121,8 +121,6 @@ struct page *follow_huge_pmd(struct mm_struct *mm, unsigned long address,
+>  				pmd_t *pmd, int flags);
+>  struct page *follow_huge_pud(struct mm_struct *mm, unsigned long address,
+>  				pud_t *pud, int flags);
+> -int pmd_huge(pmd_t pmd);
+> -int pud_huge(pud_t pud);
+>  unsigned long hugetlb_change_protection(struct vm_area_struct *vma,
+>  		unsigned long address, unsigned long end, pgprot_t newprot);
+>  
+> @@ -150,8 +148,6 @@ static inline void hugetlb_show_meminfo(void)
+>  #define follow_huge_pmd(mm, addr, pmd, flags)	NULL
+>  #define follow_huge_pud(mm, addr, pud, flags)	NULL
+>  #define prepare_hugepage_range(file, addr, len)	(-EINVAL)
+> -#define pmd_huge(x)	0
+> -#define pud_huge(x)	0
+>  #define is_hugepage_only_range(mm, addr, len)	0
+>  #define hugetlb_free_pgd_range(tlb, addr, end, floor, ceiling) ({BUG(); 0; })
+>  #define hugetlb_fault(mm, vma, addr, flags)	({ BUG(); 0; })
+> @@ -190,6 +186,15 @@ static inline void __unmap_hugepage_range(struct mmu_gather *tlb,
+>  }
+>  
+>  #endif /* !CONFIG_HUGETLB_PAGE */
+> +
+> +#if defined(CONFIG_HUGETLB_PAGE) || defined(CONFIG_HAVE_ARCH_HUGE_VMAP)
+> +int pmd_huge(pmd_t pmd);
+> +int pud_huge(pud_t pud);
+> +#else
+> +#define pmd_huge(x)	0
+> +#define pud_huge(x)	0
+> +#endif
+> +
+>  /*
+>   * hugepages at page global directory. If arch support
+>   * hugepages at pgd level, they need to define this.
+> diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+> index 982d29511f92..67e1a304c467 100644
+> --- a/mm/vmalloc.c
+> +++ b/mm/vmalloc.c
+> @@ -12,6 +12,7 @@
+>  #include <linux/mm.h>
+>  #include <linux/module.h>
+>  #include <linux/highmem.h>
+> +#include <linux/hugetlb.h>
+>  #include <linux/sched/signal.h>
+>  #include <linux/slab.h>
+>  #include <linux/spinlock.h>
+> @@ -287,10 +288,10 @@ struct page *vmalloc_to_page(const void *vmalloc_addr)
+>  	if (p4d_none(*p4d))
+>  		return NULL;
+>  	pud = pud_offset(p4d, addr);
+> -	if (pud_none(*pud))
+> +	if (pud_none(*pud) || WARN_ON_ONCE(pud_huge(*pud)))
+>  		return NULL;
+>  	pmd = pmd_offset(pud, addr);
+> -	if (pmd_none(*pmd))
+> +	if (pmd_none(*pmd) || WARN_ON_ONCE(pmd_huge(*pmd)))
+>  		return NULL;
 
-However, this failed to take into account that on Thumb2 kernels built
-for CPUs that are also ARM capable, the entry point is entered in ARM
-mode, and so the instructions emitted here will be ARM instructions
-that only exist in a wide encoding to begin with, which is why the
-assembler rejects the .w suffix here and aborts the build with the
-following message:
+I think it might be better to use p*d_bad() here, since that doesn't
+depend on CONFIG_HUGETLB_PAGE.
 
-  head.S: Assembler messages:
-  head.S:132: Error: width suffixes are invalid in ARM mode -- `mov.w r0,r0'
+While the cross-arch semantics are a little fuzzy, my understanding is
+those should return true if an entry is not a pointer to a next level of
+table (so pXd_huge(p) implies pXd_bad(p)).
 
-So replace the W(mov) with separate ARM and Thumb2 instructions, where
-the latter will only be used for CPU_THUMBONLY builds.
+Otherwise, this looks sensible to me.
 
-Fixes: 06a4b6d009a1 ("ARM: 8677/1: boot/compressed: fix decompressor ...")
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-
-Apologies for the breakage: apparently, the combination CONFIG_THUMB2_KERNEL=y,
-CONFIG_CPU_THUMBONLY=n and CONFIG_EFI_STUB=y was not among the configurations
-I tested before sending out the original patch.
-
- arch/arm/boot/compressed/efi-header.S | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
-index 3f7d1b74c5e0..a17ca8d78656 100644
---- a/arch/arm/boot/compressed/efi-header.S
-+++ b/arch/arm/boot/compressed/efi-header.S
-@@ -17,7 +17,8 @@
- 		@ there.
- 		.inst	'M' | ('Z' << 8) | (0x1310 << 16)   @ tstne r0, #0x4d000
- #else
--		W(mov)	r0, r0
-+ AR_CLASS(	mov	r0, r0		)
-+  M_CLASS(	nop.w			)
- #endif
- 		.endm
- 
--- 
-2.9.3
+Thanks,
+Mark.
