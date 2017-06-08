@@ -1,58 +1,107 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu,  8 Jun 2017 15:13:04 +0100
-Subject: [RFT PATCH v2 04/42] PCI: Initialize bridge release function at
- bridge allocation
+Date: Thu,  8 Jun 2017 15:13:09 +0100
+Subject: [RFT PATCH v2 09/42] PCI: Introduce pci_scan_root_bus_bridge()
 In-Reply-To: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
 References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170608141342.2018-5-lorenzo.pieralisi@arm.com>
+Message-ID: <20170608141342.2018-10-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The introduction of pci_register_host_bridge() kernel interface
-allows PCI host controller drivers to create the struct pci_host_bridge
-object, initialize it and register it with the kernel so that its
-corresponding PCI bus can be scanned and its devices probed.
+Current pci_scan_root_bus() interface is made up of two main
+code paths:
 
-The host bridge device release function pci_release_host_bridge_dev is a
-static function common for all struct pci_host_bridge allocated objects,
-so in its current form cannot be used by PCI host bridge controllers
-drivers to initialize the allocated struct pci_host_bridge, which
-leaves struct pci_host_bridge devices release function uninitialized.
+- pci_create_root_bus()
+- pci_scan_child_bus()
 
-Since pci_release_host_bridge_dev is a function common to all PCI
-host bridge objects, initialize it in pci_alloc_host_bridge() (ie
-common host bridge allocation interface) so that all struct
-pci_host_bridge objects have their release function initialized by
-default at allocation time, removing the need for exporting the
-common pci_release_host_bridge_dev function to other compilation
-units.
+pci_create_root_bus() is a wrapper function that allows to create
+a struct pci_host_bridge structure, initialize it with the passed
+parameters and register it with the kernel.
+
+As the struct pci_host_bridge require additional struct members,
+pci_create_root_bus() parameters list has grown in time, making
+it unwieldy to add further parameters to it in case the struct
+pci_host_bridge gains more members fields to augment its functionality.
+
+Since PCI core code provides functions to allocate struct
+pci_host_bridge, instead of forcing the pci_create_root_bus() interface
+to add new parameters to cater for new struct pci_host_bridge
+functionality, it is more suitable to add an interface in PCI
+core code to scan a PCI bus straight from a struct pci_host_bridge
+created and customized by each specific PCI host controller driver.
+
+Add a pci_scan_root_bus_bridge() function to allow PCI host controller
+drivers to create and initialize struct pci_host_bridge and scan
+the resulting bus.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
 ---
- drivers/pci/probe.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pci/probe.c | 39 +++++++++++++++++++++++++++++++++++++++
+ include/linux/pci.h |  1 +
+ 2 files changed, 40 insertions(+)
 
 diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 19c8950..586d83d 100644
+index e3f6965..690f0b3 100644
 --- a/drivers/pci/probe.c
 +++ b/drivers/pci/probe.c
-@@ -531,6 +531,7 @@ struct pci_host_bridge *pci_alloc_host_bridge(size_t priv)
- 		return NULL;
- 
- 	INIT_LIST_HEAD(&bridge->windows);
-+	bridge->dev.release = pci_release_host_bridge_dev;
- 
- 	return bridge;
+@@ -2426,6 +2426,45 @@ void pci_bus_release_busn_res(struct pci_bus *b)
+ 			res, ret ? "can not be" : "is");
  }
-@@ -2310,7 +2311,6 @@ static struct pci_bus *pci_create_root_bus_msi(struct device *parent,
- 		return NULL;
  
- 	bridge->dev.parent = parent;
--	bridge->dev.release = pci_release_host_bridge_dev;
- 
- 	list_splice_init(resources, &bridge->windows);
- 	bridge->sysdata = sysdata;
++int pci_scan_root_bus_bridge(struct pci_host_bridge *bridge)
++{
++	struct resource_entry *window;
++	bool found = false;
++	struct pci_bus *b;
++	int max, bus, ret;
++
++	if (!bridge)
++		return -EINVAL;
++
++	resource_list_for_each_entry(window, &bridge->windows)
++		if (window->res->flags & IORESOURCE_BUS) {
++			found = true;
++			break;
++		}
++
++	ret = pci_register_host_bridge(bridge);
++	if (ret < 0)
++		return ret;
++
++	b = bridge->bus;
++	bus = bridge->busnr;
++
++	if (!found) {
++		dev_info(&b->dev,
++		 "No busn resource found for root bus, will use [bus %02x-ff]\n",
++			bus);
++		pci_bus_insert_busn_res(b, bus, 255);
++	}
++
++	max = pci_scan_child_bus(b);
++
++	if (!found)
++		pci_bus_update_busn_res_end(b, max);
++
++	return 0;
++}
++EXPORT_SYMBOL(pci_scan_root_bus_bridge);
++
+ struct pci_bus *pci_scan_root_bus_msi(struct device *parent, int bus,
+ 		struct pci_ops *ops, void *sysdata,
+ 		struct list_head *resources, struct msi_controller *msi)
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index b21308e..72940cc 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -862,6 +862,7 @@ struct pci_bus *pci_scan_root_bus_msi(struct device *parent, int bus,
+ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
+ 					     struct pci_ops *ops, void *sysdata,
+ 					     struct list_head *resources);
++int pci_scan_root_bus_bridge(struct pci_host_bridge *bridge);
+ struct pci_bus *pci_add_new_bus(struct pci_bus *parent, struct pci_dev *dev,
+ 				int busnr);
+ void pcie_update_link_speed(struct pci_bus *bus, u16 link_status);
 -- 
 2.10.0
