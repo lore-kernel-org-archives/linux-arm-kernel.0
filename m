@@ -1,81 +1,82 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Fri,  9 Jun 2017 06:08:40 +0800
-Subject: [PATCH v6 7/8] arm64: dts: hikey960: add device node for pmic and
- regulators
-In-Reply-To: <20170608220841.26531-1-guodong.xu@linaro.org>
-References: <20170608220841.26531-1-guodong.xu@linaro.org>
-Message-ID: <20170608220841.26531-8-guodong.xu@linaro.org>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Fri, 9 Jun 2017 02:06:16 +0300
+Subject: [PATCH 19/20] arm64:ilp32: add vdso-ilp32 and use for signal
+ return
+In-Reply-To: <20170608152434.5jgcrk6jisdaqap7@localhost>
+References: <20170604120009.342-1-ynorov@caviumnetworks.com>
+ <20170604120009.342-20-ynorov@caviumnetworks.com>
+ <20170608152434.5jgcrk6jisdaqap7@localhost>
+Message-ID: <20170608230616.2mi6w6llskl35bh4@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
+On Thu, Jun 08, 2017 at 04:24:34PM +0100, Catalin Marinas wrote:
+> On Sun, Jun 04, 2017 at 03:00:08PM +0300, Yury Norov wrote:
+> > From: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+> > 
+> > ILP32 VDSO exports following symbols:
+> >  __kernel_rt_sigreturn;
+> >  __kernel_gettimeofday;
+> >  __kernel_clock_gettime;
+> >  __kernel_clock_getres.
+> > 
+> > What shared object to use, kernel selects depending on result of
+> > is_ilp32_compat_task() in arch/arm64/kernel/vdso.c, so it substitutes
+> > correct pages and spec.
+> > 
+> > Adjusted to move the data page before code pages in sync with
+> > commit 601255ae3c98 ("arm64: vdso: move data page before code pages")
+> > 
+> > Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+> > Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
+> > Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+> > Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@linaro.org>
+> > ---
+> >  arch/arm64/Makefile                           |  3 +
+> >  arch/arm64/include/asm/vdso.h                 |  6 ++
+> >  arch/arm64/kernel/Makefile                    |  1 +
+> >  arch/arm64/kernel/asm-offsets.c               |  7 ++
+> >  arch/arm64/kernel/signal.c                    |  2 +
+> >  arch/arm64/kernel/vdso-ilp32/.gitignore       |  2 +
+> >  arch/arm64/kernel/vdso-ilp32/Makefile         | 80 ++++++++++++++++++++++
+> >  arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S     | 33 ++++++++++
+> >  arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S | 95 +++++++++++++++++++++++++++
+> >  arch/arm64/kernel/vdso.c                      | 65 +++++++++++++++---
+> >  arch/arm64/kernel/vdso/gettimeofday.S         | 20 +++++-
+> >  arch/arm64/kernel/vdso/vdso.S                 |  6 +-
+> >  12 files changed, 304 insertions(+), 16 deletions(-)
+> >  create mode 100644 arch/arm64/kernel/vdso-ilp32/.gitignore
+> >  create mode 100644 arch/arm64/kernel/vdso-ilp32/Makefile
+> >  create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S
+> >  create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
+> 
+> Does this patch get simpler with Andrew Pinski's vdso in C proposal?
+> I have to read the other thread in detail, Will followed up already.
 
-add device node for hi6421 pmic core and hi6421v530
-voltage regulator,include LDO(1,3,9,11,15,16)
+Not much. arch/arm64/kernel/vdso/gettimeofday.S is removed by Andrew,
+so it will also disappear here. New gettimeofday.c is just compiled with
+mabi=ilp32, and almost don't need modifications. Makefiles will be modified
+accordingly. The rest is the same. This is the draft for the changes we
+need to apply ilp32 series on top of Andrew's patch (there's few typos
+though, so only for reference):
+http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1409447.html
 
-Signed-off-by: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 46 +++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
+> > diff --git a/arch/arm64/include/asm/vdso.h b/arch/arm64/include/asm/vdso.h
+> > index 839ce0031bd5..649a9a416500 100644
+> > --- a/arch/arm64/include/asm/vdso.h
+> > +++ b/arch/arm64/include/asm/vdso.h
+> > @@ -29,6 +29,12 @@
+> >  
+> >  #include <generated/vdso-offsets.h>
+> >  
+> > +#ifdef CONFIG_ARM64_ILP32
+> > +#include <generated/vdso-ilp32-offsets.h>
+> > +#else
+> > +#define vdso_offset_sigtramp_ilp32
+> > +#endif
+> 
+> BTW, here you could do something like:
+> 
+> #define vdso_offset_sigtramp_ilp32	({ BUILD_BUG(); 0; })
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-index ca448f0..e579333 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-@@ -97,6 +97,52 @@
- 			default-state = "off";
- 		};
- 	};
-+
-+	pmic: pmic at fff34000 {
-+		compatible = "hisilicon,hi6421v530-pmic";
-+		reg = <0x0 0xfff34000 0x0 0x1000>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+
-+		regulators {
-+			ldo3: LDO3 { /* HDMI */
-+				regulator-name = "VOUT3_1V85";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <2200000>;
-+				regulator-enable-ramp-delay = <120>;
-+			};
-+
-+			ldo9: LDO9 { /* SDCARD I/O */
-+				regulator-name = "VOUT9_1V8_2V95";
-+				regulator-min-microvolt = <1750000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <240>;
-+			};
-+
-+			ldo11: LDO11 { /* Low Speed Connector */
-+				regulator-name = "VOUT11_1V8_2V95";
-+				regulator-min-microvolt = <1750000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <240>;
-+			};
-+
-+			ldo15: LDO15 { /* UFS VCC */
-+				regulator-name = "VOUT15_3V0";
-+				regulator-min-microvolt = <1750000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-enable-ramp-delay = <120>;
-+			};
-+
-+			ldo16: LDO16 { /* SD VDD */
-+				regulator-name = "VOUT16_2V95";
-+				regulator-min-microvolt = <1750000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-enable-ramp-delay = <360>;
-+			};
-+		};
-+	};
- };
- 
- &i2c0 {
--- 
-2.10.2
+OK, will change
