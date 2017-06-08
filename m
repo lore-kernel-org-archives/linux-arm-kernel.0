@@ -1,139 +1,108 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 8 Jun 2017 15:52:57 +0200
-Subject: [PATCH v3 2/3] arm64: dts: mt7622: add basic nodes to the
- mt7622.dtsi file
-In-Reply-To: <60640937c793184ce12f88e5c66f3f316e97cefa.1496250798.git.sean.wang@mediatek.com>
-References: <cover.1496250798.git.sean.wang@mediatek.com>
- <60640937c793184ce12f88e5c66f3f316e97cefa.1496250798.git.sean.wang@mediatek.com>
-Message-ID: <1abcc8b1-de0f-859e-0200-ccdc2dce7354@gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 8 Jun 2017 14:59:07 +0100
+Subject: [PATCH 06/44] iommu/dma: don't rely on DMA_ERROR_CODE
+In-Reply-To: <20170608132609.32662-7-hch@lst.de>
+References: <20170608132609.32662-1-hch@lst.de>
+ <20170608132609.32662-7-hch@lst.de>
+Message-ID: <0bfb0841-f054-78de-628d-a0955336bcb4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Christoph,
 
+On 08/06/17 14:25, Christoph Hellwig wrote:
+> DMA_ERROR_CODE is not a public API and will go away soon.  dma dma-iommu
+> driver already implements a proper ->mapping_error method, so it's only
+> using the value internally.  Add a new local define using the value
+> that arm64 which is the only current user of dma-iommu.
 
-On 31/05/17 19:29, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> add basic nodes into the mt7622.dtsi for the system
-> bring-up which includes ARM CPU, GIC, timer, MediaTek
-> UART, SYSIRQ and one reserved memory region for ATF.
-> 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+It would be fine to just use 0, since dma-iommu already makes sure that
+that will never be allocated for a valid DMA address.
+
+Otherwise, looks good!
+
+Robin.
+
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
 > ---
->   arch/arm64/boot/dts/mediatek/mt7622.dtsi | 103 +++++++++++++++++++++++++++++++
->   1 file changed, 103 insertions(+)
->   create mode 100644 arch/arm64/boot/dts/mediatek/mt7622.dtsi
+>  drivers/iommu/dma-iommu.c | 18 ++++++++++--------
+>  1 file changed, 10 insertions(+), 8 deletions(-)
 > 
-> diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-> new file mode 100644
-> index 0000000..2031b73
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-> @@ -0,0 +1,103 @@
-> +/*
-> + * Copyright (c) 2017 MediaTek Inc.
-> + * Author: Ming Huang <ming.huang@mediatek.com>
-> + *	   Sean Wang <sean.wang@mediatek.com>
-> + *
-> + * SPDX-License-Identifier: (GPL-2.0 OR MIT)
-> + */
+> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+> index 62618e77bedc..638aea814b94 100644
+> --- a/drivers/iommu/dma-iommu.c
+> +++ b/drivers/iommu/dma-iommu.c
+> @@ -31,6 +31,8 @@
+>  #include <linux/scatterlist.h>
+>  #include <linux/vmalloc.h>
+>  
+> +#define IOMMU_MAPPING_ERROR	(~(dma_addr_t)0)
 > +
-> +#include <dt-bindings/interrupt-controller/irq.h>
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +
-> +/ {
-> +	compatible = "mediatek,mt7622";
-> +	interrupt-parent = <&sysirq>;
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +
-> +	cpus {
-> +		#address-cells = <2>;
-> +		#size-cells = <0>;
-> +
-> +		cpu0: cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			reg = <0x0 0x0>;
-> +			enable-method = "psci";
-> +			clock-frequency = <1300000000>;
-> +		};
-> +
-> +		cpu1: cpu at 1 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			reg = <0x0 0x1>;
-> +			enable-method = "psci";
-> +			clock-frequency = <1300000000>;
-> +		};
-> +	};
-> +
-> +	uart_clk: dummy26m {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <25000000>;
-> +	};
-> +
-> +	psci {
-> +		compatible  = "arm,psci-0.2";
-> +		method      = "smc";
-> +	};
-> +
-> +	reserved-memory {
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges;
-> +
-> +		/* 192 KiB reserved for ARM Trusted Firmware (BL31) */
-> +		secmon_reserved: secmon at 43000000 {
-> +			reg = <0 0x43000000 0 0x30000>;
-> +			no-map;
-> +		};
-> +	};
-> +
-> +	timer {
-> +		compatible = "arm,armv8-timer";
-> +		interrupt-parent = <&gic>;
-> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
-> +			      IRQ_TYPE_LEVEL_HIGH)>,
-> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) |
-> +			      IRQ_TYPE_LEVEL_HIGH)>,
-> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) |
-> +			      IRQ_TYPE_LEVEL_HIGH)>,
-> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) |
-> +			      IRQ_TYPE_LEVEL_HIGH)>;
-> +	};
-> +
-> +	sysirq: interrupt-controller at 10200620 {
-> +		compatible = "mediatek,mt7622-sysirq",
-> +			     "mediatek,mt6577-sysirq";
-> +		interrupt-controller;
-> +		#interrupt-cells = <3>;
-> +		interrupt-parent = <&gic>;
-> +		reg = <0 0x10200620 0 0x20>;
-> +	};
-> +
-> +	gic: interrupt-controller at 10300000 {
-> +		compatible = "arm,gic-400";
-> +		interrupt-controller;
-> +		#interrupt-cells = <3>;
-> +		interrupt-parent = <&gic>;
-> +		reg = <0 0x10310000 0 0x1000>,
-> +		      <0 0x10320000 0 0x1000>,
-> +		      <0 0x10340000 0 0x2000>,
-> +		      <0 0x10360000 0 0x2000>;
-> +	};
-> +
-> +	uart0: serial at 11002000 {
-> +		compatible = "mediatek,mt7622-uart",
-> +			     "mediatek,mt6577-uart";
-> +		reg = <0 0x11002000 0 0x400>;
-> +		interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>;
-> +		clocks = <&uart_clk>;
-
-mt6577-uart has two clocks. Please fix this.
-I would appreciate if you could rebase on the mediatek for-next branch 
-(especially for 3/3), which will make it easier for me to take this.
-
-Regards,
-Matthias
+>  struct iommu_dma_msi_page {
+>  	struct list_head	list;
+>  	dma_addr_t		iova;
+> @@ -500,7 +502,7 @@ void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
+>  {
+>  	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), *handle, size);
+>  	__iommu_dma_free_pages(pages, PAGE_ALIGN(size) >> PAGE_SHIFT);
+> -	*handle = DMA_ERROR_CODE;
+> +	*handle = IOMMU_MAPPING_ERROR;
+>  }
+>  
+>  /**
+> @@ -533,7 +535,7 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
+>  	dma_addr_t iova;
+>  	unsigned int count, min_size, alloc_sizes = domain->pgsize_bitmap;
+>  
+> -	*handle = DMA_ERROR_CODE;
+> +	*handle = IOMMU_MAPPING_ERROR;
+>  
+>  	min_size = alloc_sizes & -alloc_sizes;
+>  	if (min_size < PAGE_SIZE) {
+> @@ -627,11 +629,11 @@ static dma_addr_t __iommu_dma_map(struct device *dev, phys_addr_t phys,
+>  
+>  	iova = iommu_dma_alloc_iova(domain, size, dma_get_mask(dev), dev);
+>  	if (!iova)
+> -		return DMA_ERROR_CODE;
+> +		return IOMMU_MAPPING_ERROR;
+>  
+>  	if (iommu_map(domain, iova, phys - iova_off, size, prot)) {
+>  		iommu_dma_free_iova(cookie, iova, size);
+> -		return DMA_ERROR_CODE;
+> +		return IOMMU_MAPPING_ERROR;
+>  	}
+>  	return iova + iova_off;
+>  }
+> @@ -671,7 +673,7 @@ static int __finalise_sg(struct device *dev, struct scatterlist *sg, int nents,
+>  
+>  		s->offset += s_iova_off;
+>  		s->length = s_length;
+> -		sg_dma_address(s) = DMA_ERROR_CODE;
+> +		sg_dma_address(s) = IOMMU_MAPPING_ERROR;
+>  		sg_dma_len(s) = 0;
+>  
+>  		/*
+> @@ -714,11 +716,11 @@ static void __invalidate_sg(struct scatterlist *sg, int nents)
+>  	int i;
+>  
+>  	for_each_sg(sg, s, nents, i) {
+> -		if (sg_dma_address(s) != DMA_ERROR_CODE)
+> +		if (sg_dma_address(s) != IOMMU_MAPPING_ERROR)
+>  			s->offset += sg_dma_address(s);
+>  		if (sg_dma_len(s))
+>  			s->length = sg_dma_len(s);
+> -		sg_dma_address(s) = DMA_ERROR_CODE;
+> +		sg_dma_address(s) = IOMMU_MAPPING_ERROR;
+>  		sg_dma_len(s) = 0;
+>  	}
+>  }
+> @@ -836,7 +838,7 @@ void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
+>  
+>  int iommu_dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
+>  {
+> -	return dma_addr == DMA_ERROR_CODE;
+> +	return dma_addr == IOMMU_MAPPING_ERROR;
+>  }
+>  
+>  static struct iommu_dma_msi_page *iommu_dma_get_msi_page(struct device *dev,
+> 
