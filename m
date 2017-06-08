@@ -1,36 +1,104 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 8 Jun 2017 08:45:20 +0200
-Subject: [PATCH] ARM: samsung: Save defconfig for Exynos, S3C and S5P
- configs
-In-Reply-To: <CAK8P3a2_rLigHqnOkHPM+x2GDrwdGnwJOqEbY7YTsQRUXT_eJg@mail.gmail.com>
-References: <20170607181846.13539-1-krzk@kernel.org>
- <CAK8P3a2_rLigHqnOkHPM+x2GDrwdGnwJOqEbY7YTsQRUXT_eJg@mail.gmail.com>
-Message-ID: <20170608064520.GA2770@kozik-book>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 8 Jun 2017 08:52:33 +0200
+Subject: [PATCH 46/58] clocksource/drivers: Add a new driver for the
+ Atmel ARM TC blocks
+In-Reply-To: <20170607213810.GK2345@mai>
+References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
+ <20170530215139.9983-47-alexandre.belloni@free-electrons.com>
+ <20170606152104.GC2345@mai>
+ <20170606180559.pkrr7ux2qqnmsd6y@piout.net>
+ <20170607141735.GH2345@mai>
+ <20170607150908.kytgtzwgjjnxtsp3@piout.net>
+ <20170607213810.GK2345@mai>
+Message-ID: <20170608085233.01c82788@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 07, 2017 at 09:49:58PM +0200, Arnd Bergmann wrote:
-> On Wed, Jun 7, 2017 at 8:18 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> > Some configs for Samsung ARM SoCs were not updated for some time and
-> > they still contain obsolete Kconfig entries.  Generate new defconfig for
-> > all Samsung ARM architectures (Exynos, S3C24xx, S3C64xx, S5Pv210).
-> >
-> > Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> 
-> Hi Krzysztof,
-> 
-> Updating the defconfig files is good, but I'm always a little unsure
-> about loss of
-> information when we do that. Would it be possible for you to split this patch
-> into two halves, with one of them just reordering the entries that moved,
-> and the second one removing the entries that have disappeared, with an
-> explanation for why they are no longer there? That would let us see whether
-> the change was intentional and avoid problems from renamed Kconfig
-> symbols that are no longer enabled afterwards.
+Le Wed, 7 Jun 2017 23:38:10 +0200,
+Daniel Lezcano <daniel.lezcano@linaro.org> a ?crit :
 
-Splitting the change into two commits (reorder and removal) makes sense.
-However getting the information why some things were removed, will
-require more effort. I'll see what I can do.
+> On Wed, Jun 07, 2017 at 05:09:08PM +0200, Alexandre Belloni wrote:
+> > On 07/06/2017 at 16:17:35 +0200, Daniel Lezcano wrote:  
+> > > > > > This driver uses regmap and syscon to be able to probe early in the boot
+> > > > > > and avoid having to switch on the TCB clocksource later. Using regmap also
+> > > > > > means that unused TCB channels may be used by other drivers (PWM for
+> > > > > > example).  
+> > > > > 
+> > > > > Can you give more details, I fail to understand how regmap and syscon help to
+> > > > > probe sooner than timer_init()?  
+> > > > 
+> > > > 
+> > > > Because before that, the tcb driver relied on atmel_tclib to share the
+> > > > TCBs and it happened way too late, at arch_initcall() time.  
+> > > 
+> > > So is it still necesary to use regmap? I would like to take the opportunity to
+> > > move the init routine to the common init routine if possible:
+> > > 
+> > > 	https://patchwork.kernel.org/patch/9768845/
+> > >   
+> > 
+> > It is still necessary because we want to be able to share the timer
+> > between multiple drivers. For example, you can have the clocksource on
+> > channel 0, clockevent on channel 1 and a pwm on channel 2  
+> 
+> The hardware timer can be shared, the channels used in different subsystem.
+> 
+> Each channel are used exclusively.
 
-Best regards,
-Krzysztof
+Yes, that's correct, but some registers are shared, and we need locking
+to control accesses to these registers. There's one register in
+particular that has to be protected against concurrent accesses:
+TC_BMR. But this register is only written at init time, not in the hot
+path.
+
+> 
+> What is the benefit of regmap? It has a cost, and takes a lock at each read.
+> 
+> For instance:
+> 
+> +static u64 tc_get_cycles(struct clocksource *cs)
+> +{
+> +	u32		lower, upper, tmp;
+> +
+> +	do {
+> +		regmap_read(tc.regmap, ATMEL_TC_CV(1), &upper);
+> +		regmap_read(tc.regmap, ATMEL_TC_CV(0), &lower);
+> +		regmap_read(tc.regmap, ATMEL_TC_CV(1), &tmp);
+> +	} while (upper != tmp);
+> +
+> +	return (upper << 16) | lower;
+> +}
+> 
+> Is:
+> 
+> +static u64 tc_get_cycles(struct clocksource *cs)
+> +{
+> +	u32		lower, upper, tmp;
+> +
+> +	do {
+> +		regmap_read(tc.regmap, ATMEL_TC_CV(1), &upper);
+> 			lock();
+> 			lot-of-things();
+> 			unlock();
+> +		regmap_read(tc.regmap, ATMEL_TC_CV(0), &lower);
+> 			lock();
+> 			lot-of-things();
+> 			unlock();
+> +		regmap_read(tc.regmap, ATMEL_TC_CV(1), &tmp);
+> 			lock();
+> 			lot-of-things();
+> 			unlock();
+> +	} while (upper != tmp);
+> +
+> +	return (upper << 16) | lower;
+> +}
+> 
+> I suggest to look what is in 'lot-of-things()' and especially what is doing
+> regcache_read().
+> 
+> May be you can reconsider the regmap? This driver is the only one use the
+> regmap AFAICT and I don't think it is adequate.
+
+Alexandre, maybe we could of_ioremap() the TCB region in this driver
+and use regular readl to read TC_CV regs: those are attached to a
+specific channel, so we shouldn't have concurrency issues here.
