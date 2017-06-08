@@ -1,217 +1,129 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 8 Jun 2017 12:11:35 -0500
-Subject: [PATCH 4/4] mfd: tps65217: Instantiate sub-devices from device
- tree
-In-Reply-To: <CAFqH_53v32iODN4xhoh4ho4s6grxknEDS3Ak6CHBcTAQo6fDNw@mail.gmail.com>
-References: <20170607103242.16008-1-enric.balletbo@collabora.com>
- <20170607103242.16008-4-enric.balletbo@collabora.com>
- <6359abe2-9a21-78a2-f5ea-87e2e3335af3@ti.com>
- <CAFqH_53v32iODN4xhoh4ho4s6grxknEDS3Ak6CHBcTAQo6fDNw@mail.gmail.com>
-Message-ID: <578f348c-509f-79d3-9770-73c9fcffe19c@ti.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 8 Jun 2017 12:12:44 -0500
+Subject: [PATCH v3 5/6] dt-bindings: display: stm32: Add DSI host driver
+In-Reply-To: <1496414235-20098-6-git-send-email-philippe.cornu@st.com>
+References: <1496414235-20098-1-git-send-email-philippe.cornu@st.com>
+ <1496414235-20098-6-git-send-email-philippe.cornu@st.com>
+Message-ID: <20170608171244.twgn4xmqd5pstb2i@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 06/08/2017 08:16 AM, Enric Balletbo Serra wrote:
-> 2017-06-07 18:05 GMT+02:00 Grygorii Strashko <grygorii.strashko@ti.com>:
->>
->>
->> On 06/07/2017 05:32 AM, Enric Balletbo i Serra wrote:
->>> The driver boots only via device tree but currently all the MFD sub-devices
->>> are instatiated independently of the device tree configuration, i.e
->>> although tps65217-charger is disabled by default it's instantiated by the
->>> MFD driver.
->>>
->>> Instead of register all sub-devices, if the TPS65217 device tree node has a
->>> sub-node enabled, try to instatiate them as MFD sub-devices but not
->>> instantiate sub-nodes that are not enabled.
->>>
->>> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
->>> ---
->>>    drivers/mfd/tps65217.c       | 56 +++++++-------------------------------------
->>>    include/linux/mfd/tps65217.h |  6 -----
->>>    2 files changed, 9 insertions(+), 53 deletions(-)
->>>
->>> diff --git a/drivers/mfd/tps65217.c b/drivers/mfd/tps65217.c
->>> index f769c7d..9effdda 100644
->>> --- a/drivers/mfd/tps65217.c
->>> +++ b/drivers/mfd/tps65217.c
->>> @@ -33,14 +33,7 @@
->>>    #include <linux/mfd/core.h>
->>>    #include <linux/mfd/tps65217.h>
->>>
->>> -static struct resource charger_resources[] = {
->>> -     DEFINE_RES_IRQ_NAMED(TPS65217_IRQ_AC, "AC"),
->>> -     DEFINE_RES_IRQ_NAMED(TPS65217_IRQ_USB, "USB"),
->>> -};
->>> -
->>> -static struct resource pb_resources[] = {
->>> -     DEFINE_RES_IRQ_NAMED(TPS65217_IRQ_PB, "PB"),
->>> -};
->>
->> May be I messed smth, but how about interrupts for charger and pwrbutton?
->>
+On Fri, Jun 02, 2017 at 04:37:14PM +0200, Philippe CORNU wrote:
+> This patch adds documentation of device tree bindings for the STM32
+> DSI host driver based on the Synopsys DW MIPI DSI bridge driver.
+> ---
+>  .../devicetree/bindings/display/st,stm32-ltdc.txt  | 83 +++++++++++++++++++++-
+>  1 file changed, 82 insertions(+), 1 deletion(-)
 > 
-> I might be wrong but as this driver is DT-only these resources came
-> from the DT. The driver calls platform_get_irq_byname and then
-> of_irq_get_byname.
+> diff --git a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+> index 90a8459..4cd32bd 100644
+> --- a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+> +++ b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+> @@ -12,8 +12,39 @@
+>    Required nodes:
+>      - Video port for RGB output.
+>  
+> -Example:
+> +* STMicroelectronics STM32 dsi specific extensions to Synopsys DesignWare MIPI
+> +  DSI host controller
+>  
+> +The STMicroelectronics STM32 dsi driver uses the Synopsys DesignWare MIPI
+> +DSI host controller driver (related documentation in [5]).
+> +
+> +Required properties:
+> +- #address-cells: Should be <1>.
+> +- #size-cells: Should be <0>.
+> +- compatible: "st,stm32-dsi".
+> +- reg: Memory mapped base address and length of the DWC MIPI DSI registers.
+> +- clocks: References to all the clocks specified in the clock-names property
+> +  as specified in [1].
+> +- clock-names:
+> +  - peripheral clock string name, must be "pclk".
+> +  - phy pll reference clock string name, must be "ref".
+
+I still have the same comment as v1.
+
+> +- resets: References to all the resets specified in the reset-names property
+> +  as specified in [2].
+> +- reset-names: string reset name, must be "apb".
+> +
+> +Required nodes:
+> +- dsi input port node: connected to the ltdc rgb output port, see [3] & [4].
+> +- panel or bridge node: see [6].
+
+Need to be explicit here. Port 0 is ... Port 1 is ...
+
+> +
+> +Note: You can find more documentation
+> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +[2] Documentation/devicetree/bindings/reset/reset.txt
+> +[3] Documentation/devicetree/bindings/media/video-interfaces.txt
+> +[4] Documentation/devicetree/bindings/graph.txt
+> +[5] Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
+> +[6] Documentation/devicetree/bindings/display/mipi-dsi-bus.txt
+> +
+> +Example 1: RGB panel
+>  / {
+>  	...
+>  	soc {
+> @@ -33,3 +64,53 @@ Example:
+>  		};
+>  	};
+>  };
+> +
+> +Example 2: DSI panel
+> +
+> +/ {
+> +	...
+> +	soc {
+> +	...
+> +		ltdc: display-controller at 40016800 {
+> +			compatible = "st,stm32-ltdc";
+> +			reg = <0x40016800 0x200>;
+> +			interrupts = <88>, <89>;
+> +			resets = <&rcc STM32F4_APB2_RESET(LTDC)>;
+> +			clocks = <&rcc 1 CLK_LCD>;
+> +			clock-names = "lcd";
+> +
+> +			port {
+> +				ltdc_out_dsi: endpoint {
+> +					remote-endpoint = <&dsi_in>;
+> +				};
+> +			};
+> +		};
+> +
+> +
+> +		dsi: dsi at 40016c00 {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			compatible = "st,stm32-dsi";
+> +			reg = <0x40016c00 0x800>;
+> +			clocks = <&rcc 1 CLK_F469_DSI>, <&clk_hse>;
+> +			clock-names = "ref", "pclk";
+> +			resets = <&rcc STM32F4_APB2_RESET(DSI)>;
+> +			reset-names = "apb";
+> +
+> +			port {
+> +				dsi_in: endpoint {
+> +					remote-endpoint = <&ltdc_out_dsi>;
+> +				};
+> +			};
+> +
+> +			panel-dsi at 0 {
+
+This should use graph binding instead. Or at least we should allow that 
+and be clear above that we do.
+
+> +				reg = <0>; /* dsi virtual channel (0..3) */
+> +				compatible = ...;
+> +				enable-gpios = ...;
+> +
+> +			};
+> +
+> +		};
+> +
+> +	};
+> +};
+> -- 
+> 1.9.1
 > 
-> i.e arch/arm/boot/dts/am335x-bone-common.dtsi
-> 
-> &tps {
->          charger {
->                  interrupts = <0>, <1>;
->                  interrupt-names = "USB", "AC";
->                  status = "okay";
->          };
-> 
->          pwrbutton {
->                  interrupts = <2>;
->                  status = "okay";
->          };
-> };
-
-Sry, but this make no sense - those IRQ configuration is static,
-so it should be defined in arch/arm/boot/dts/tps65217.dtsi at least.
-But, again, it also not required, because it is strictly static for 
-this particular device and so defined in code.
-And  platform_get_irq_byname() should perfectly work with mfd_add_devices().
-
-Also not that  tps65217.dtsi included in below files, but 
-
-./arch/arm/boot/dts/am335x-bone-common.dtsi:/include/ "tps65217.dtsi"
-./arch/arm/boot/dts/am335x-chilisom.dtsi:/include/ "tps65217.dtsi"
-./arch/arm/boot/dts/am335x-nano.dts:#include "tps65217.dtsi"
-./arch/arm/boot/dts/am335x-pepper.dts:/include/ "tps65217.dtsi"
-./arch/arm/boot/dts/am335x-sl50.dts:#include "tps65217.dtsi"
-
-but IRQs defined only in
-./arch/arm/boot/dts/am335x-bone-common.dtsi:		interrupt-names = "USB", "AC";
-./arch/arm/boot/dts/am335x-chiliboard.dts:		interrupt-names = "USB", "AC";
-
-So how are other boards working?
-
-
-> 
->>> +#define TPS65217_NUM_IRQ     3
->>>
->>>    static void tps65217_irq_lock(struct irq_data *data)
->>>    {
->>> @@ -86,29 +79,6 @@ static struct irq_chip tps65217_irq_chip = {
->>>        .irq_disable            = tps65217_irq_disable,
->>>    };
->>>
->>> -static struct mfd_cell tps65217s[] = {
->>> -     {
->>> -             .name = "tps65217-pmic",
->>> -             .of_compatible = "ti,tps65217-pmic",
->>> -     },
->>> -     {
->>> -             .name = "tps65217-bl",
->>> -             .of_compatible = "ti,tps65217-bl",
->>> -     },
->>> -     {
->>> -             .name = "tps65217-charger",
->>> -             .num_resources = ARRAY_SIZE(charger_resources),
->>> -             .resources = charger_resources,
->>> -             .of_compatible = "ti,tps65217-charger",
->>> -     },
->>> -     {
->>> -             .name = "tps65217-pwrbutton",
->>> -             .num_resources = ARRAY_SIZE(pb_resources),
->>> -             .resources = pb_resources,
->>> -             .of_compatible = "ti,tps65217-pwrbutton",
->>> -     },
->>> -};
->>> -
->>>    static irqreturn_t tps65217_irq_thread(int irq, void *data)
->>>    {
->>>        struct tps65217 *tps = data;
->>> @@ -359,23 +329,8 @@ static int tps65217_probe(struct i2c_client *client,
->>>                return ret;
->>>        }
->>>
->>> -     if (client->irq) {
->>> +     if (client->irq)
->>>                tps65217_irq_init(tps, client->irq);
->>> -     } else {
->>> -             int i;
->>> -
->>> -             /* Don't tell children about IRQ resources which won't fire */
->>> -             for (i = 0; i < ARRAY_SIZE(tps65217s); i++)
->>> -                     tps65217s[i].num_resources = 0;
->>> -     }
->>> -
->>> -     ret = devm_mfd_add_devices(tps->dev, -1, tps65217s,
->>> -                                ARRAY_SIZE(tps65217s), NULL, 0,
->>> -                                tps->irq_domain);
->>> -     if (ret < 0) {
->>> -             dev_err(tps->dev, "mfd_add_devices failed: %d\n", ret);
->>> -             return ret;
->>> -     }
->>
->> And as I remember there was a request to use mfd_add_devices()
->> and not of_platform_populate() for mfd sub-devices instantiation.
->>
-> 
->  From what I know or you add the sub-devices via mfd_add_devices or
-> using the DT with of_platform_populate, and the first is probably the
-> preferred, but in this specific case this driver is DT-only so IMHO
-> makes more sense adding via the DT, there are already some bindings
-> i.e:
->   arch/arm/boot/dts/tps65217.dtsi
->   arch/arm/boot/dts/am335x-bone-common.dtsi
-> 
-> Let me explain a bit more,  assume that you have another AM335x with
-> the TPS65217 PMIC but you don't want the charger because is not wired
-> in your board. Your board DT will include the tps65217.dtsi, in this
-> file you can see:
-> 
-> &tps {
->         ...
->          charger {
->                  compatible = "ti,tps65217-charger";
->                  status = "disabled";
->          };
->          ...
-> };
-> 
-> Seems that's fine but actually not works as expected, the TPS65217 MFD
-> registers all the sub-devices so the charger is enabled and running
-> even you have status = "disabled" in your DT. This looks incoherent to
-> me, hence I replaced the devm_mfd_add_devices() for the
-> of_platform_populate which takes care of the status propriety and only
-> calls the probe of the sub-devices that match and are enabled (status
-> = "okay").
-
-I can't find links on corresponding discussions, but mfd_add_devices() is
-preferred for MDF devices. Below is one commit i've found. Also you can compare number of
-drivers using mfd_add_devices() and of_platform_populate().
-
-
-regarding your problem - I think, It might be reasonable from your side to propose change to
-mfd_add_device() which will take into account 'status = "disabled";' DT property.
-
----
-commit 4531156db726d27e593d35800d43c74be4e393b9
-Author: Keerthy <j-keerthy@ti.com>
-Date:   Mon Sep 19 13:09:05 2016 +0530
-
-    mfd: tps65218: Use mfd_add_devices instead of of_platform_populate
-    
-    mfd_add_devices enables parsing device tree nodes without compatibles
-    for regulators and gpio modules. Replace of_platform_populate with
-    mfd_add_devices. mfd_cell currently is populated with regulators,
-    gpio and powerbutton.
-    
-    Signed-off-by: Keerthy <j-keerthy@ti.com>
-    Signed-off-by: Lee Jones <lee.jones@linaro.org>
-
-
-
-
-
--- 
-regards,
--grygorii
