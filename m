@@ -1,19 +1,17 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Thu, 8 Jun 2017 17:28:46 +0300
-Subject: [PATCH v7 01/10] staging: fsl-mc: enclose macro params in parens
+Date: Thu, 8 Jun 2017 17:28:48 +0300
+Subject: [PATCH v7 03/10] staging: fsl-mc: simplify couple of deallocations
 In-Reply-To: <20170608142855.10455-1-laurentiu.tudor@nxp.com>
 References: <20170608142855.10455-1-laurentiu.tudor@nxp.com>
-Message-ID: <20170608142855.10455-2-laurentiu.tudor@nxp.com>
+Message-ID: <20170608142855.10455-4-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-Several macros didn't had macro params enclosed in parens. Fix them to
-avoid precedence issues. Found with checkpatch.pl who was issuing this
-message:
-    "Macro argument 'id' may be better as '(id)' to avoid precedence
-     issues"
+Simplify a couple of deallocations code paths. This also fixes these
+checkpatch.pl false positives:
+ "WARNING: kfree(NULL) is safe and this check is probably not required"
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
@@ -22,63 +20,42 @@ Notes:
     -v7
       -rewrapped commit message
 
- drivers/staging/fsl-mc/bus/dpbp-cmd.h  | 2 +-
- drivers/staging/fsl-mc/bus/dpmcp-cmd.h | 2 +-
- drivers/staging/fsl-mc/bus/dpmng-cmd.h | 2 +-
- drivers/staging/fsl-mc/bus/dprc-cmd.h  | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+ drivers/staging/fsl-mc/bus/fsl-mc-bus.c | 12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/staging/fsl-mc/bus/dpbp-cmd.h b/drivers/staging/fsl-mc/bus/dpbp-cmd.h
-index 8aa6545..5904836 100644
---- a/drivers/staging/fsl-mc/bus/dpbp-cmd.h
-+++ b/drivers/staging/fsl-mc/bus/dpbp-cmd.h
-@@ -40,7 +40,7 @@
- #define DPBP_CMD_BASE_VERSION			1
- #define DPBP_CMD_ID_OFFSET			4
+diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
+index 50eb415..7b48ade 100644
+--- a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
++++ b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
+@@ -420,15 +420,11 @@ bool fsl_mc_is_root_dprc(struct device *dev)
+ static void fsl_mc_device_release(struct device *dev)
+ {
+ 	struct fsl_mc_device *mc_dev = to_fsl_mc_device(dev);
+-	struct fsl_mc_bus *mc_bus = NULL;
  
--#define DPBP_CMD(id)	((id << DPBP_CMD_ID_OFFSET) | DPBP_CMD_BASE_VERSION)
-+#define DPBP_CMD(id)	(((id) << DPBP_CMD_ID_OFFSET) | DPBP_CMD_BASE_VERSION)
+ 	kfree(mc_dev->regions);
  
- /* Command IDs */
- #define DPBP_CMDID_CLOSE		DPBP_CMD(0x800)
-diff --git a/drivers/staging/fsl-mc/bus/dpmcp-cmd.h b/drivers/staging/fsl-mc/bus/dpmcp-cmd.h
-index 384a13d..861b2a7 100644
---- a/drivers/staging/fsl-mc/bus/dpmcp-cmd.h
-+++ b/drivers/staging/fsl-mc/bus/dpmcp-cmd.h
-@@ -40,7 +40,7 @@
- #define DPMCP_CMD_BASE_VERSION		1
- #define DPMCP_CMD_ID_OFFSET		4
+ 	if (strcmp(mc_dev->obj_desc.type, "dprc") == 0)
+-		mc_bus = to_fsl_mc_bus(mc_dev);
+-
+-	if (mc_bus)
+-		kfree(mc_bus);
++		kfree(to_fsl_mc_bus(mc_dev));
+ 	else
+ 		kfree(mc_dev);
+ }
+@@ -559,10 +555,8 @@ int fsl_mc_device_add(struct dprc_obj_desc *obj_desc,
  
--#define DPMCP_CMD(id)	((id << DPMCP_CMD_ID_OFFSET) | DPMCP_CMD_BASE_VERSION)
-+#define DPMCP_CMD(id)	(((id) << DPMCP_CMD_ID_OFFSET) | DPMCP_CMD_BASE_VERSION)
+ error_cleanup_dev:
+ 	kfree(mc_dev->regions);
+-	if (mc_bus)
+-		kfree(mc_bus);
+-	else
+-		kfree(mc_dev);
++	kfree(mc_bus);
++	kfree(mc_dev);
  
- /* Command IDs */
- #define DPMCP_CMDID_CLOSE		DPMCP_CMD(0x800)
-diff --git a/drivers/staging/fsl-mc/bus/dpmng-cmd.h b/drivers/staging/fsl-mc/bus/dpmng-cmd.h
-index cdddfb8..d1f04ac 100644
---- a/drivers/staging/fsl-mc/bus/dpmng-cmd.h
-+++ b/drivers/staging/fsl-mc/bus/dpmng-cmd.h
-@@ -44,7 +44,7 @@
- #define DPMNG_CMD_BASE_VERSION		1
- #define DPMNG_CMD_ID_OFFSET		4
- 
--#define DPMNG_CMD(id)	((id << DPMNG_CMD_ID_OFFSET) | DPMNG_CMD_BASE_VERSION)
-+#define DPMNG_CMD(id)	(((id) << DPMNG_CMD_ID_OFFSET) | DPMNG_CMD_BASE_VERSION)
- 
- /* Command IDs */
- #define DPMNG_CMDID_GET_VERSION		DPMNG_CMD(0x831)
-diff --git a/drivers/staging/fsl-mc/bus/dprc-cmd.h b/drivers/staging/fsl-mc/bus/dprc-cmd.h
-index e9fdca4..d9b2dcd 100644
---- a/drivers/staging/fsl-mc/bus/dprc-cmd.h
-+++ b/drivers/staging/fsl-mc/bus/dprc-cmd.h
-@@ -48,7 +48,7 @@
- #define DPRC_CMD_BASE_VERSION			1
- #define DPRC_CMD_ID_OFFSET			4
- 
--#define DPRC_CMD(id)	((id << DPRC_CMD_ID_OFFSET) | DPRC_CMD_BASE_VERSION)
-+#define DPRC_CMD(id)	(((id) << DPRC_CMD_ID_OFFSET) | DPRC_CMD_BASE_VERSION)
- 
- /* Command IDs */
- #define DPRC_CMDID_CLOSE                        DPRC_CMD(0x800)
+ 	return error;
+ }
 -- 
 2.9.4
