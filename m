@@ -1,50 +1,206 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 8 Jun 2017 15:41:42 +0200
-Subject: [PATCH v2 0/5] ARM: dts: Add iWave RZ/G1M board support
-In-Reply-To: <1496761818-62126-1-git-send-email-biju.das@bp.renesas.com>
-References: <1496420523-23506-4-git-send-email-biju.das@bp.renesas.com>
- <1496761818-62126-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <20170608134142.GB19821@verge.net.au>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Thu,  8 Jun 2017 15:34:41 +0200
+Subject: [PATCH v3 4/9] KVM: arm/arm64: Move timer IRQ default init to
+ arch_timer.c
+In-Reply-To: <20170608133446.3875-1-cdall@linaro.org>
+References: <20170608133446.3875-1-cdall@linaro.org>
+Message-ID: <20170608133446.3875-5-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 06, 2017 at 04:10:13PM +0100, Biju Das wrote:
-> Hello,
-> 
-> This series aims to add iWave RZ/G1M R8A7743 based Qseven SOM and RainboW-G20D- Qseven board support. 
-> 
-> This series has been tested against linux-next tag next-20170606.
-> 
-> Modifications:
-> v1->v2
-> -Documented iWave iW-RainboW-G20M-Qseven-RZG1M system on module
-> -Documented iW-RainboW-G20D-Qseven-RZG1M board in alphabatical order
-> -Added compatible string in iWave RZG1M Qseven SOM
-> -Modified the compatible string in iWave G20D-Q7 board 
-> 
-> History:
-> -------
-> [v1]: http://www.spinics.net/lists/devicetree/msg179565.html
-> 
-> Biju Das (5):
->   of: Add vendor prefix for iWave Systems Technologies Pvt. Ltd
->   ARM: shmobile: document iW-RainboW-G20M-Qseven-RZG1M system on module
->   ARM: shmobile: document iW-RainboW-G20D-Qseven-RZG1M board
->   ARM: dts: iwg20m: Add iWave RZG1M Qseven SOM
->   ARM: dts: iwg20d-q7: Add support for iWave G20D-Q7 board based on
->     RZ/G1M
-> 
->  Documentation/devicetree/bindings/arm/shmobile.txt |  4 +++
->  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
->  arch/arm/boot/dts/Makefile                         |  1 +
->  arch/arm/boot/dts/r8a7743-iwg20d-q7.dts            | 25 +++++++++++++++++++
->  arch/arm/boot/dts/r8a7743-iwg20m.dtsi              | 29 ++++++++++++++++++++++
->  5 files changed, 60 insertions(+)
->  create mode 100644 arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
->  create mode 100644 arch/arm/boot/dts/r8a7743-iwg20m.dtsi
+We currently initialize the arch timer IRQ numbers from the reset code,
+presumably because we once intended to model multiple CPU or SoC types
+from within the kernel and have hard-coded reset values in the reset
+code.
 
-Thanks,
+As we are moving towards userspace being in charge of more fine-grained
+CPU emulation and stitching together the pieces needed to emulate a
+particular type of CPU, we should no longer have a tight coupling
+between resetting a VCPU and setting IRQ numbers.
 
-I have queued these up after moving the Makefile change from the 2nd to
-last to the last patch. They should appear in the next and devel branches
-of the renesas tree later today.
+Therefore, move the logic to define and use the default IRQ numbers to
+the timer code and set the IRQ number immediately when creating the
+VCPU.
+
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kvm/reset.c         | 16 +---------------
+ arch/arm64/kvm/reset.c       | 16 +---------------
+ include/kvm/arm_arch_timer.h |  4 +---
+ virt/kvm/arm/arch_timer.c    | 28 ++++++++++++++++------------
+ 4 files changed, 19 insertions(+), 45 deletions(-)
+
+diff --git a/arch/arm/kvm/reset.c b/arch/arm/kvm/reset.c
+index 1da8b2d..5ed0c3e 100644
+--- a/arch/arm/kvm/reset.c
++++ b/arch/arm/kvm/reset.c
+@@ -37,16 +37,6 @@ static struct kvm_regs cortexa_regs_reset = {
+ 	.usr_regs.ARM_cpsr = SVC_MODE | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT,
+ };
+ 
+-static const struct kvm_irq_level cortexa_ptimer_irq = {
+-	{ .irq = 30 },
+-	.level = 1,
+-};
+-
+-static const struct kvm_irq_level cortexa_vtimer_irq = {
+-	{ .irq = 27 },
+-	.level = 1,
+-};
+-
+ 
+ /*******************************************************************************
+  * Exported reset function
+@@ -62,16 +52,12 @@ static const struct kvm_irq_level cortexa_vtimer_irq = {
+ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ {
+ 	struct kvm_regs *reset_regs;
+-	const struct kvm_irq_level *cpu_vtimer_irq;
+-	const struct kvm_irq_level *cpu_ptimer_irq;
+ 
+ 	switch (vcpu->arch.target) {
+ 	case KVM_ARM_TARGET_CORTEX_A7:
+ 	case KVM_ARM_TARGET_CORTEX_A15:
+ 		reset_regs = &cortexa_regs_reset;
+ 		vcpu->arch.midr = read_cpuid_id();
+-		cpu_vtimer_irq = &cortexa_vtimer_irq;
+-		cpu_ptimer_irq = &cortexa_ptimer_irq;
+ 		break;
+ 	default:
+ 		return -ENODEV;
+@@ -84,5 +70,5 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 	kvm_reset_coprocs(vcpu);
+ 
+ 	/* Reset arch_timer context */
+-	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq, cpu_ptimer_irq);
++	return kvm_timer_vcpu_reset(vcpu);
+ }
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index 561badf..3256b92 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -46,16 +46,6 @@ static const struct kvm_regs default_regs_reset32 = {
+ 			COMPAT_PSR_I_BIT | COMPAT_PSR_F_BIT),
+ };
+ 
+-static const struct kvm_irq_level default_ptimer_irq = {
+-	.irq	= 30,
+-	.level	= 1,
+-};
+-
+-static const struct kvm_irq_level default_vtimer_irq = {
+-	.irq	= 27,
+-	.level	= 1,
+-};
+-
+ static bool cpu_has_32bit_el1(void)
+ {
+ 	u64 pfr0;
+@@ -108,8 +98,6 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+  */
+ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ {
+-	const struct kvm_irq_level *cpu_vtimer_irq;
+-	const struct kvm_irq_level *cpu_ptimer_irq;
+ 	const struct kvm_regs *cpu_reset;
+ 
+ 	switch (vcpu->arch.target) {
+@@ -122,8 +110,6 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 			cpu_reset = &default_regs_reset;
+ 		}
+ 
+-		cpu_vtimer_irq = &default_vtimer_irq;
+-		cpu_ptimer_irq = &default_ptimer_irq;
+ 		break;
+ 	}
+ 
+@@ -137,5 +123,5 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 	kvm_pmu_vcpu_reset(vcpu);
+ 
+ 	/* Reset timer */
+-	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq, cpu_ptimer_irq);
++	return kvm_timer_vcpu_reset(vcpu);
+ }
+diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+index 295584f..f1c967a 100644
+--- a/include/kvm/arm_arch_timer.h
++++ b/include/kvm/arm_arch_timer.h
+@@ -57,9 +57,7 @@ struct arch_timer_cpu {
+ 
+ int kvm_timer_hyp_init(void);
+ int kvm_timer_enable(struct kvm_vcpu *vcpu);
+-int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+-			 const struct kvm_irq_level *virt_irq,
+-			 const struct kvm_irq_level *phys_irq);
++int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu);
+ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
+ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu);
+ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu);
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 7933b1f..72d5aa7 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -35,6 +35,16 @@ static struct timecounter *timecounter;
+ static unsigned int host_vtimer_irq;
+ static u32 host_vtimer_irq_flags;
+ 
++static const struct kvm_irq_level default_ptimer_irq = {
++	.irq	= 30,
++	.level	= 1,
++};
++
++static const struct kvm_irq_level default_vtimer_irq = {
++	.irq	= 27,
++	.level	= 1,
++};
++
+ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
+ {
+ 	vcpu_vtimer(vcpu)->active_cleared_last = false;
+@@ -445,23 +455,12 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
+ 	kvm_timer_update_state(vcpu);
+ }
+ 
+-int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+-			 const struct kvm_irq_level *virt_irq,
+-			 const struct kvm_irq_level *phys_irq)
++int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+ 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+ 
+ 	/*
+-	 * The vcpu timer irq number cannot be determined in
+-	 * kvm_timer_vcpu_init() because it is called much before
+-	 * kvm_vcpu_set_target(). To handle this, we determine
+-	 * vcpu timer irq number when the vcpu is reset.
+-	 */
+-	vtimer->irq.irq = virt_irq->irq;
+-	ptimer->irq.irq = phys_irq->irq;
+-
+-	/*
+ 	 * The bits in CNTV_CTL are architecturally reset to UNKNOWN for ARMv8
+ 	 * and to 0 for ARMv7.  We provide an implementation that always
+ 	 * resets the timer to be disabled and unmasked and is compliant with
+@@ -496,6 +495,8 @@ static void update_vtimer_cntvoff(struct kvm_vcpu *vcpu, u64 cntvoff)
+ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
++	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
++	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+ 
+ 	/* Synchronize cntvoff across all vtimers of a VM. */
+ 	update_vtimer_cntvoff(vcpu, kvm_phys_timer_read());
+@@ -504,6 +505,9 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
+ 	INIT_WORK(&timer->expired, kvm_timer_inject_irq_work);
+ 	hrtimer_init(&timer->timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
+ 	timer->timer.function = kvm_timer_expire;
++
++	vtimer->irq.irq = default_vtimer_irq.irq;
++	ptimer->irq.irq = default_ptimer_irq.irq;
+ }
+ 
+ static void kvm_timer_init_interrupt(void *info)
+-- 
+2.9.0
