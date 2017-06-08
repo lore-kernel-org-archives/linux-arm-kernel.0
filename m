@@ -1,71 +1,79 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 8 Jun 2017 17:29:39 +0100
-Subject: [PATCH] arm: boot/compressed: fix inappropriate Thumb2 mnemonic
- for __nop
-In-Reply-To: <20170608125847.2611-1-ard.biesheuvel@linaro.org>
-References: <20170608125847.2611-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170608162939.GQ4902@n2100.armlinux.org.uk>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 8 Jun 2017 17:32:13 +0100
+Subject: [PATCH v7 0/3] Cavium ThunderX2 SMMUv3 errata workarounds
+In-Reply-To: <1496145821-3411-1-git-send-email-gakula@caviumnetworks.com>
+References: <1496145821-3411-1-git-send-email-gakula@caviumnetworks.com>
+Message-ID: <20170608163213.GA2216@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gah, it's rather unfortunate that this has been discovered only a
-few days after the other decompressor fix was merged and hit Linus'
-tree...
+On Tue, May 30, 2017 at 05:33:38PM +0530, Geetha sowjanya wrote:
+> Cavium ThunderX2 SMMUv3 implementation has two Silicon Erratas.
+> 1. Errata ID #74
+>    SMMU register alias Page 1 is not implemented
+> 2. Errata ID #126
+>    SMMU doesnt support unique IRQ lines and also MSI for gerror,
+>    eventq and cmdq-sync
+> 
+> The following patchset does software workaround for these two erratas.
+> 
+> This series is based on patchset.
+> https://www.spinics.net/lists/arm-kernel/msg578443.html
 
-On Thu, Jun 08, 2017 at 12:58:47PM +0000, Ard Biesheuvel wrote:
-> Commit 06a4b6d009a1 ("ARM: 8677/1: boot/compressed: fix decompressor
-> header layout for v7-M") fixed an issue in the layout of the header
-> of the compressed kernel image that was caused by the assembler
-> emitting narrow opcodes for 'mov r0, r0', and for this reason, the
-> mnemonic was updated to use the W() macro, which will append the .w
-> suffix (which forces a wide encoding) if required, i.e., when building
-> the kernel in Thumb2 mode.
-> 
-> However, this failed to take into account that on Thumb2 kernels built
-> for CPUs that are also ARM capable, the entry point is entered in ARM
-> mode, and so the instructions emitted here will be ARM instructions
-> that only exist in a wide encoding to begin with, which is why the
-> assembler rejects the .w suffix here and aborts the build with the
-> following message:
-> 
->   head.S: Assembler messages:
->   head.S:132: Error: width suffixes are invalid in ARM mode -- `mov.w r0,r0'
-> 
-> So replace the W(mov) with separate ARM and Thumb2 instructions, where
-> the latter will only be used for CPU_THUMBONLY builds.
-> 
-> Fixes: 06a4b6d009a1 ("ARM: 8677/1: boot/compressed: fix decompressor ...")
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> 
-> Apologies for the breakage: apparently, the combination CONFIG_THUMB2_KERNEL=y,
-> CONFIG_CPU_THUMBONLY=n and CONFIG_EFI_STUB=y was not among the configurations
-> I tested before sending out the original patch.
-> 
->  arch/arm/boot/compressed/efi-header.S | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
-> index 3f7d1b74c5e0..a17ca8d78656 100644
-> --- a/arch/arm/boot/compressed/efi-header.S
-> +++ b/arch/arm/boot/compressed/efi-header.S
-> @@ -17,7 +17,8 @@
->  		@ there.
->  		.inst	'M' | ('Z' << 8) | (0x1310 << 16)   @ tstne r0, #0x4d000
->  #else
-> -		W(mov)	r0, r0
-> + AR_CLASS(	mov	r0, r0		)
-> +  M_CLASS(	nop.w			)
->  #endif
->  		.endm
->  
-> -- 
-> 2.9.3
-> 
+Yes so it is not standalone. How are we going to merge these
+ACPI IORT/ACPICA/SMMU patches - inclusive of:
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+[1] https://www.spinics.net/lists/arm-kernel/msg586458.html
+
+Rafael, do ACPICA patches go upstream via the ACPI tree pull request ?
+
+To remove dependency on ACPICA changes this series needs updating
+anyway and for [1] above I think the only solution is for all the
+patches to go via the ACPI tree (if ACPICA updates go upstream with it).
+
+Thanks,
+Lorenzo
+
+> Changes since v6:
+>    - Changed device tree compatible string to vendor specific.
+>    - Rebased on Robin's latest "Update SMMU models for IORT rev. C" v2 patch.
+>      https://www.spinics.net/lists/arm-kernel/msg582809.html
+> 
+> Changes since v5:
+>   - Rebased on Robin's "Update SMMU models for IORT rev. C" patch.
+>      https://www.spinics.net/lists/arm-kernel/msg580728.html
+>   - Replaced ACPI_IORT_SMMU_V3_CAVIUM_CN99XX macro with ACPI_IORT_SMMU_CAVIUM_CN99XX
+> 
+> Changes since v4:
+>  - Replaced all page1 offset macros ARM_SMMU_EVTQ/PRIQ_PROD/CONS with
+>     arm_smmu_page1_fixup(ARM_SMMU_EVTQ/PRIQ_PROD/CONS, smmu)
+> 
+> Changes since v3:
+>  - Merged patches 1, 2 and 4 of Version 3.
+>  - Modified the page1_offset_adjust() and get_irq_flags() implementation as
+>    suggested by Robin.
+> 
+> Changes since v2:
+>  - Updated "Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt" document with
+>    new SMMU option used to enable errata workaround.
+> 
+> Changes since v1:
+>  - Since the use of MIDR register is rejected and SMMU_IIDR is broken on this
+>    silicon, as suggested by Will Deacon modified the patches to use ThunderX2
+>    SMMUv3 IORT model number to enable errata workaround.
+> 
+> Geetha Sowjanya (1):
+>   iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2 erratum #126
+> 
+> Linu Cherian (2):
+>   ACPI/IORT: Fixup SMMUv3 resource size for Cavium ThunderX2 SMMUv3
+>     model
+>   iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2      erratum
+>     #74
+> 
+>  Documentation/arm64/silicon-errata.txt             |    2 +
+>  .../devicetree/bindings/iommu/arm,smmu-v3.txt      |    6 ++
+>  drivers/acpi/arm64/iort.c                          |   10 ++-
+>  drivers/iommu/arm-smmu-v3.c                        |   93 ++++++++++++++++----
+>  4 files changed, 91 insertions(+), 20 deletions(-)
+> 
