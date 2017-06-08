@@ -1,45 +1,58 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu,  8 Jun 2017 15:13:28 +0100
-Subject: [RFT PATCH v2 28/42] PCI: Add a call to pci_assign_irq() in
- pci_device_probe()
+Date: Thu,  8 Jun 2017 15:13:24 +0100
+Subject: [RFT PATCH v2 24/42] PCI: Build setup-irq.o on all arches
 In-Reply-To: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
 References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170608141342.2018-29-lorenzo.pieralisi@arm.com>
+Message-ID: <20170608141342.2018-25-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Matthew Minter <matt@masarand.com>
 
-The pci_assign_irq() function allows assignment of an irq to devices
-during device enable time rather than only at boot. Therefore call it
-in the pci_device_probe() function during the enable device code path
-so this assignment can be performed.
-
-This patch will do nothing on arches which do not set the irq mapping
-function pointers and is therefore currently a nop, however as support
-for these function pointers is added to arch specific code this will
-cause irq assignment to migrate to device enable time allowing the new
-code paths to be used.
+The functions included in setup-irq.o currently apply only to a selection
+of architectures which share common IRQ assignment code. However this
+code needs to be generalised for all arches to allow deferred IRQ
+assignment. So the first step is to build it on all architectures.
 
 Signed-off-by: Matthew Minter <matt@masarand.com>
-[lorenzo.pieralisi at arm.com: moved pci_assign_irq() call site]
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- drivers/pci/pci-driver.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/pci/Makefile | 17 ++---------------
+ 1 file changed, 2 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/pci/pci-driver.c b/drivers/pci/pci-driver.c
-index 192e7b6..11167c6 100644
---- a/drivers/pci/pci-driver.c
-+++ b/drivers/pci/pci-driver.c
-@@ -412,6 +412,8 @@ static int pci_device_probe(struct device *dev)
- 	struct pci_dev *pci_dev = to_pci_dev(dev);
- 	struct pci_driver *drv = to_pci_driver(dev->driver);
+diff --git a/drivers/pci/Makefile b/drivers/pci/Makefile
+index 462c1f5..66a21ac 100644
+--- a/drivers/pci/Makefile
++++ b/drivers/pci/Makefile
+@@ -4,7 +4,8 @@
  
-+	pci_assign_irq(pci_dev);
+ obj-y		+= access.o bus.o probe.o host-bridge.o remove.o pci.o \
+ 			pci-driver.o search.o pci-sysfs.o rom.o setup-res.o \
+-			irq.o vpd.o setup-bus.o vc.o mmap.o
++			irq.o vpd.o setup-bus.o vc.o mmap.o setup-irq.o
 +
- 	error = pcibios_alloc_irq(pci_dev);
- 	if (error < 0)
- 		return error;
+ obj-$(CONFIG_PROC_FS) += proc.o
+ obj-$(CONFIG_SYSFS) += slot.o
+ 
+@@ -29,20 +30,6 @@ obj-$(CONFIG_PCI_ATS) += ats.o
+ obj-$(CONFIG_PCI_IOV) += iov.o
+ 
+ #
+-# Some architectures use the generic PCI setup functions
+-#
+-obj-$(CONFIG_ALPHA) += setup-irq.o
+-obj-$(CONFIG_ARC) += setup-irq.o
+-obj-$(CONFIG_ARM) += setup-irq.o
+-obj-$(CONFIG_ARM64) += setup-irq.o
+-obj-$(CONFIG_UNICORE32) += setup-irq.o
+-obj-$(CONFIG_SUPERH) += setup-irq.o
+-obj-$(CONFIG_MIPS) += setup-irq.o
+-obj-$(CONFIG_TILE) += setup-irq.o
+-obj-$(CONFIG_SPARC_LEON) += setup-irq.o
+-obj-$(CONFIG_M68K) += setup-irq.o
+-
+-#
+ # ACPI Related PCI FW Functions
+ # ACPI _DSM provided firmware instance and string name
+ #
 -- 
 2.10.0
