@@ -1,42 +1,172 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Wed, 7 Jun 2017 19:24:44 -0500
-Subject: [PATCH v2 0/3] Add Keystone2 Remoteproc driver
-Message-ID: <20170608002447.47580-1-s-anna@ti.com>
+Date: Wed, 7 Jun 2017 19:24:45 -0500
+Subject: [PATCH v2 1/3] dt-bindings: remoteproc: Add Keystone DSP remoteproc
+ binding
+In-Reply-To: <20170608002447.47580-1-s-anna@ti.com>
+References: <20170608002447.47580-1-s-anna@ti.com>
+Message-ID: <20170608002447.47580-2-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add the device tree bindings document for the Texas Instrument's
+Keystone 2 DSP remoteproc devices.
 
-This is v2 of the patchset that adds the DT binding and the driver for
-loading and booting the DSP devices present on various Keystone2 SoC families.
-The current series supports the 66AK2H/K, 66AK2L and 66AK2E SoC families.
-The DTS nodes will be posted separately once the binding is accepted,
-and dependent patches from Loic are merged. See v1 cover-letter for details.
+Signed-off-by: Suman Anna <s-anna@ti.com>
+Signed-off-by: Sam Nelson <sam.nelson@ti.com>
+---
+v2 Changes:
+ - Modified the patch title
+ - Dropped unstable binding status
+ - Dropped the 'label' property and replaced the device node description
+   to use an alias
+ - Renamed 'kick-gpio' to 'kick-gpios'
+ - Updated the example
+v1: https://patchwork.kernel.org/patch/9750839/
 
-Main changes are in the binding to address various comments from 
-Rob Herring. The driver is updated to construct firmware names based on
-alias property. Exact changes are summarized in each patch.
-
-v1:
-http://marc.info/?t=149581802500004&r=1&w=2
-
-regards
-Suman
-
-Andrew F. Davis (1):
-  remoteproc/keystone: Ensure the DSPs are in reset in probe
-
-Suman Anna (2):
-  dt-bindings: remoteproc: Add Keystone DSP remoteproc binding
-  remoteproc/keystone: Add a remoteproc driver for Keystone 2 DSPs
-
- .../bindings/remoteproc/ti,keystone-rproc.txt      | 135 ++++++
- drivers/remoteproc/Kconfig                         |  13 +
- drivers/remoteproc/Makefile                        |   1 +
- drivers/remoteproc/keystone_remoteproc.c           | 525 +++++++++++++++++++++
- 4 files changed, 674 insertions(+)
+ .../bindings/remoteproc/ti,keystone-rproc.txt      | 135 +++++++++++++++++++++
+ 1 file changed, 135 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/remoteproc/ti,keystone-rproc.txt
- create mode 100644 drivers/remoteproc/keystone_remoteproc.c
 
+diff --git a/Documentation/devicetree/bindings/remoteproc/ti,keystone-rproc.txt b/Documentation/devicetree/bindings/remoteproc/ti,keystone-rproc.txt
+new file mode 100644
+index 000000000000..162229244d14
+--- /dev/null
++++ b/Documentation/devicetree/bindings/remoteproc/ti,keystone-rproc.txt
+@@ -0,0 +1,135 @@
++TI Keystone DSP devices
++=======================
++
++The TI Keystone 2 family of SoCs usually have one or more (upto 8) TI DSP Core
++sub-systems that are used to offload some of the processor-intensive tasks or
++algorithms, for achieving various system level goals.
++
++These processor sub-systems usually contain additional sub-modules like L1
++and/or L2 caches/SRAMs, an Interrupt Controller, an external memory controller,
++a dedicated local power/sleep controller etc. The DSP processor core in
++Keystone 2 SoCs is usually a TMS320C66x CorePac processor.
++
++DSP Device Node:
++================
++Each DSP Core sub-system is represented as a single DT node, and should also
++have an alias with the stem 'rproc' defined. Each node has a number of required
++or optional properties that enable the OS running on the host processor (ARM
++CorePac) to perform the device management of the remote processor and to
++communicate with the remote processor.
++
++Required properties:
++--------------------
++The following are the mandatory properties:
++
++- compatible:		Should be one of the following,
++			    "ti,k2hk-dsp" for DSPs on Keystone 2 66AK2H/K SoCs
++			    "ti,k2l-dsp" for DSPs on Keystone 2 66AK2L SoCs
++			    "ti,k2e-dsp" for DSPs on Keystone 2 66AK2E SoCs
++
++- reg:			Should contain an entry for each value in 'reg-names'.
++			Each entry should have the memory region's start address
++			and the size of the region, the representation matching
++			the parent node's '#address-cells' and '#size-cells' values.
++
++- reg-names:		Should contain strings with the following names, each
++			representing a specific internal memory region, and
++			should be defined in this order,
++			     "l2sram", "l1pram", "l1dram"
++
++- clocks: 		Should contain the device's input clock, and should be
++			defined as per the bindings in,
++			Documentation/devicetree/bindings/clock/keystone-gate.txt
++
++- ti,syscon-dev:	Should be a pair of the phandle to the Keystone Device
++			State Control node, and the register offset of the DSP
++			boot address register within that node's address space.
++
++- resets:		Should contain the phandle to the reset controller node
++			managing the resets for this device, and a reset
++			specifier. Please refer to the following reset bindings
++			for the reset argument specifier as per SoC,
++			Documentation/devicetree/bindings/reset/ti-syscon-reset.txt
++			    for 66AK2HK/66AK2L/66AK2E SoCs
++
++- interrupt-parent:	Should contain a phandle to the Keystone 2 IRQ controller
++			IP node that is used by the ARM CorePac processor to
++			receive interrupts from the DSP remote processors. See
++			Documentation/devicetree/bindings/interrupt-controller/ti,keystone-irq.txt
++			for details.
++
++- interrupts: 		Should contain an entry for each value in 'interrupt-names'.
++			Each entry should have the interrupt source number used by
++			the remote processor to the host processor. The values should
++			follow the interrupt-specifier format as dictated by the
++			'interrupt-parent' node. The purpose of each is as per the
++			description in the 'interrupt-names' property.
++
++- interrupt-names:	Should contain strings with the following names, each
++			representing a specific interrupt,
++			    "vring" - interrupt for virtio based IPC
++			    "exception" - interrupt for exception notification
++
++- kick-gpios: 		Should specify the gpio device needed for the virtio IPC
++			stack. This will be used to interrupt the remote processor.
++			The gpio device to be used is as per the bindings in,
++			Documentation/devicetree/bindings/gpio/gpio-dsp-keystone.txt
++
++Optional properties:
++--------------------
++
++- memory-region:	phandle to the reserved memory node to be associated
++			with the remoteproc device. The reserved memory node
++			can be a CMA memory node, and should be defined as
++			per the bindings in
++			Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
++
++
++Example:
++--------
++	/* 66AK2H/K DSP aliases */
++	aliases {
++		rproc0 = &dsp0;
++		rproc1 = &dsp1;
++		rproc2 = &dsp2;
++		rproc3 = &dsp3;
++		rproc4 = &dsp4;
++		rproc5 = &dsp5;
++		rproc6 = &dsp6;
++		rproc7 = &dsp7;
++	};
++
++	/* 66AK2H/K DSP memory node */
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		dsp_common_memory: dsp-common-memory at 81f800000 {
++			compatible = "shared-dma-pool";
++			reg = <0x00000008 0x1f800000 0x00000000 0x800000>;
++			reusable;
++		};
++	};
++
++	/* 66AK2H/K DSP node */
++	soc {
++		dsp0: dsp at 10800000 {
++			compatible = "ti,k2hk-dsp";
++			reg = <0x10800000 0x00100000>,
++			      <0x10e00000 0x00008000>,
++			      <0x10f00000 0x00008000>;
++			reg-names = "l2sram", "l1pram", "l1dram";
++			label = "dsp0";
++			clocks = <&clkgem0>;
++			ti,syscon-dev = <&devctrl 0x40>;
++			resets = <&pscrst 0>;
++			interrupt-parent = <&kirq0>;
++			interrupts = <0 8>;
++			interrupt-names = "vring", "exception";
++			kick-gpios = <&dspgpio0 27 0>;
++			memory-region = <&dsp_common_memory>;
++		};
++
++	};
++
 -- 
 2.12.0
