@@ -1,38 +1,27 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  8 Jun 2017 17:31:20 +0200
-Subject: [PATCH 1/4] ARM64: dts: meson-gxbb-wetek-play2: Add HDMI and CVBS
- Nodes
+Date: Thu,  8 Jun 2017 17:31:21 +0200
+Subject: [PATCH 2/4] ARM64: dts: meson-gxl-s905d-p230: Add HDMI nodes
 In-Reply-To: <1496935883-4966-1-git-send-email-narmstrong@baylibre.com>
 References: <1496935883-4966-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1496935883-4966-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1496935883-4966-3-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add HDMI and CVBS nodes for the Wetek Play2 board.
+Add HDMI nodes for the Amlogic P230 board.
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- .../boot/dts/amlogic/meson-gxbb-wetek-play2.dts    | 40 ++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+ .../boot/dts/amlogic/meson-gxl-s905d-p230.dts      | 24 ++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-play2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-play2.dts
-index 743acb5..e76ac31 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-play2.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-play2.dts
-@@ -85,6 +85,34 @@
- 			gpios = <&gpio_ao GPIOAO_3 GPIO_ACTIVE_LOW>;
- 		};
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts
+index f9fbfda..3e0c023 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts
+@@ -84,6 +84,17 @@
+ 		regulator-min-microvolt = <1800000>;
+ 		regulator-max-microvolt = <1800000>;
  	};
-+
-+	cvbs-connector {
-+		compatible = "composite-video-connector";
-+
-+		port {
-+			cvbs_connector_in: endpoint {
-+				remote-endpoint = <&cvbs_vdac_out>;
-+			};
-+		};
-+	};
 +
 +	hdmi-connector {
 +		compatible = "hdmi-connector";
@@ -44,20 +33,14 @@ index 743acb5..e76ac31 100644
 +			};
 +		};
 +	};
-+};
-+
-+
-+&cvbs_vdac_port {
-+	cvbs_vdac_out: endpoint {
-+		remote-endpoint = <&cvbs_connector_in>;
-+	};
  };
  
- &ethmac {
-@@ -113,6 +141,18 @@
+ /* P230 has exclusive choice between internal or external PHY */
+@@ -113,6 +124,19 @@
  	};
  };
  
++
 +&hdmi_tx {
 +	status = "okay";
 +	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
@@ -70,8 +53,8 @@ index 743acb5..e76ac31 100644
 +	};
 +};
 +
- &i2c_A {
+ &saradc {
  	status = "okay";
- 	pinctrl-0 = <&i2c_a_pins>;
+ 	vref-supply = <&vddio_ao18>;
 -- 
 1.9.1
