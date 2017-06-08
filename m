@@ -1,43 +1,20 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 8 Jun 2017 15:47:43 -0500
-Subject: [PATCH 0/4] Davinci remoteproc cleanups/fixes
-In-Reply-To: <20170518220902.2846-1-s-anna@ti.com>
-References: <20170518220902.2846-1-s-anna@ti.com>
-Message-ID: <d2b8d230-33db-0615-f6cf-23b8446d8f50@ti.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 8 Jun 2017 13:57:00 -0700
+Subject: [PATCH v8 3/3] arm64: dts: NS2: Add USB DRD PHY device tree node
+In-Reply-To: <1496918103-14948-4-git-send-email-raviteja.garimella@broadcom.com>
+References: <1496918103-14948-1-git-send-email-raviteja.garimella@broadcom.com>
+ <1496918103-14948-4-git-send-email-raviteja.garimella@broadcom.com>
+Message-ID: <84aa2a67-3326-1a0a-c42f-23ef93306ed0@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bjorn,
+On 06/08/2017 03:35 AM, Raviteja Garimella wrote:
+> This patch adds device tree node for USB Dual Role Device PHY for
+> Broadcom's Northstar2 SoC.
+> 
+> Signed-off-by: Raviteja Garimella <raviteja.garimella@broadcom.com>
 
-On 05/18/2017 05:08 PM, Suman Anna wrote:
-> Hi Bjorn,
-> 
-> The following series includes various fixes and cleanups for the TI's
-> Davinci DSP remoteproc driver. Patches are based on 4.12-rc1. Following
-> is the patch summary:
-> 
->  - Patch1 updates/fixes the build dependency on DMA_CMA which is not
->    selected by default in the davinci_defconfig.
->  - Patch 3 fixes a DSP boot/functionality issue with repeated 'start'
->    and 'stop' commands using the sysfs 'state' variable.
->  - Patch 2 and 4 are cleanups/code simplifications.
-
-If you don't have any comments, can you queue these patches for v4.13?
-
-Thanks
-Suman
-
-> 
-> regards
-> Suman
-> 
-> Suman Anna (4):
->   remoteproc/davinci: Update Kconfig to depend on DMA_CMA
->   remoteproc/davinci: simplify the reset function
->   remoteproc/davinci: fix unbalanced reset between start and stop ops
->   remoteproc/davinci: streamline the interrupt management
-> 
->  drivers/remoteproc/Kconfig            |  2 +-
->  drivers/remoteproc/da8xx_remoteproc.c | 60 ++++++++---------------------------
->  2 files changed, 15 insertions(+), 47 deletions(-)
-> 
+Since Rob acked the binding, applied to devicetree-arm64/next, thanks
+-- 
+-- 
+Florian
