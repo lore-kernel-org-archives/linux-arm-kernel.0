@@ -1,27 +1,34 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 8 Jun 2017 14:25:49 -0500
-Subject: [PATCH v5 1/6] pinctrl: qcom: Add ipq8074 pinctrl driver
-In-Reply-To: <1496900641-27755-2-git-send-email-varada@codeaurora.org>
-References: <1496900641-27755-1-git-send-email-varada@codeaurora.org>
- <1496900641-27755-2-git-send-email-varada@codeaurora.org>
-Message-ID: <20170608192549.g444mzh4brpv2crj@rob-hp-laptop>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu,  8 Jun 2017 19:41:37 +0000
+Subject: [PATCH 0/2] arm64: fix crash when reading /proc/kcore
+Message-ID: <20170608194139.9250-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 08, 2017 at 11:13:56AM +0530, Varadarajan Narayanan wrote:
-> Add initial pinctrl driver to support pin configuration with
-> pinctrl framework for ipq8074.
-> 
-> Signed-off-by: Manoharan Vijaya Raghavan <mraghava@codeaurora.org>
-> Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
-> ---
->  .../bindings/pinctrl/qcom,ipq8074-pinctrl.txt      |  172 ++++
+This is a follow-up to patches from zhonjiang [0] and myself [1] that aim
+to solve a problem in the kcore code, which gets confused by the presence
+of block mappings in the vmalloc region.
 
-Acked-by: Rob Herring <robh@kernel.org>
+While fixing the crash is quite straight forward [2], we need to tweak
+the kcore code itself to ensure that it operates correctly on arm64.
+Fortunately, we can achieve this with two very simple changes:
 
->  drivers/pinctrl/qcom/Kconfig                       |   10 +
->  drivers/pinctrl/qcom/Makefile                      |    1 +
->  drivers/pinctrl/qcom/pinctrl-ipq8074.c             | 1076 ++++++++++++++++++++
->  4 files changed, 1259 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pinctrl/qcom,ipq8074-pinctrl.txt
->  create mode 100644 drivers/pinctrl/qcom/pinctrl-ipq8074.c
+- replace a call to is_vmalloc_or_module_addr() in read_kcore() with a
+  comparison of the kclist type field (#1)
+- enable CONFIG_ARCH_PROC_KCORE_TEXT for arm64 (#2)
+
+[0] http://marc.info/?l=linux-mm&m=149632393629295&w=2
+[1] http://marc.info/?l=linux-mm&m=149685966530180&w=2
+[2] http://marc.info/?l=linux-mm&m=149694975123959&w=2
+
+Ard Biesheuvel (2):
+  fs/proc: kcore: use kcore_list type to check for vmalloc/module
+    address
+  arm64: mm: select CONFIG_ARCH_PROC_KCORE_TEXT
+
+ arch/arm64/Kconfig | 3 +++
+ fs/proc/kcore.c    | 2 +-
+ 2 files changed, 4 insertions(+), 1 deletion(-)
+
+-- 
+2.9.3
