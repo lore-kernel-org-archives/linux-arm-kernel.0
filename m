@@ -1,62 +1,77 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 08 Jun 2017 10:55:01 +0200
-Subject: [PATCH 9/9] arm64: marvell: dts: add xmdio nodes for 7k/8k
-In-Reply-To: <20170608084515.GA12385@kwain> (Antoine Tenart's message of "Thu,
- 8 Jun 2017 10:45:15 +0200")
-References: <20170607083810.30922-1-antoine.tenart@free-electrons.com>
- <20170607083810.30922-10-antoine.tenart@free-electrons.com>
- <20170608084515.GA12385@kwain>
-Message-ID: <8737barh96.fsf@free-electrons.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 8 Jun 2017 10:57:10 +0200
+Subject: [PATCH 46/58] clocksource/drivers: Add a new driver for the
+ Atmel ARM TC blocks
+In-Reply-To: <20170608084026.GB2244@mai>
+References: <20170530215139.9983-47-alexandre.belloni@free-electrons.com>
+ <20170606152104.GC2345@mai>
+ <20170606180559.pkrr7ux2qqnmsd6y@piout.net>
+ <20170607141735.GH2345@mai>
+ <20170607152750.tksmyf5p3oajbsac@piout.net>
+ <20170607210848.GJ2345@mai>
+ <20170607231715.ns2vcxza2eexnzjs@piout.net>
+ <20170608074236.62924f01@bbrezillon> <20170608074446.GM2345@mai>
+ <20170608101334.4e60aa4c@bbrezillon> <20170608084026.GB2244@mai>
+Message-ID: <20170608105710.54a551d8@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antoine,
- 
- On jeu., juin 08 2017, Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
+On Thu, 8 Jun 2017 10:40:26 +0200
+Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
 
-> Hi Gregory,
->
-> On Wed, Jun 07, 2017 at 10:38:10AM +0200, Antoine Tenart wrote:
->> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
->> index 2a99ff8fca2a..594356243ddb 100644
->> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
->> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
->> @@ -103,6 +103,13 @@
->>  				clocks = <&cps_syscon0 1 9>, <&cps_syscon0 1 5>;
->>  			};
->>  
->> +			cps_xmdio: mdio at 12a600 {
->> +				#address-cells = <1>;
->> +				#size-cells = <0>;
->> +				compatible = "marvell,xmdio";
->> +				reg = <0x12a600 0x10>;
->> +			};
->> +
->
-> Russell pointed out on IRC the mdio/xmdio interfaces aren't wired to
-> anything on the mcbin. We could either disable these interfaces by
-> default, or add explicit disables in the mcbin device tree.
->
-> What's your thoughts on this?
+> > > 
+> > > Alexandre, Boris, have a look at https://www.spinics.net/lists/arm-kernel/msg572652.html
+> > > 
+> > > That will tell you the story.  
+> > 
+> > Then we're in a deadlock situation here. I'm tired of hearing this kind
+> > of argument "DT is only supposed to describe HW, not configuration, bla
+> > bla". The truth is, we already have plenty of bindings that do not
+> > strictly describe HW.
+> > 
+> > A simple example: ECC configuration on NAND devices. This is clearly a
+> > configuration thing, the NAND controller is usually able to support
+> > several kind of strength+ECC-block-size config, but we are able to
+> > overload this with the nand-ecc-xxx properties. Another example, still
+> > MTD related: MTD partitions, this is purely a software configuration,
+> > still we allow users to pass this information in the DT. You want
+> > another one? What about the linux,code and linux,input-type properties
+> > described here [1]?
+> > 
+> > So please, let's not use these "this is not decribing HW" or "this is
+> > linux specific" arguments every time someone tries to encode something
+> > that can be considered a configuration detail.
+> > 
+> > Let's be pragmatic. How you want to use your timer counter blocks (I'm
+> > talking about atmel TCBs) is clearly board specific. Whether you want
+> > to use the PIT for your clocksource or use one or 2 channels of a TCB
+> > at a specific resolution is again board specific. We need a solution to
+> > assign timer channels to a linux function, and I'm not convinced
+> > passing this information through the command line makes much more sense
+> > than specifying it in the DT (and it's definitely less intuitive, since
+> > you have to reference something defined in the DT from the cmdline).
+> > 
+> > Now, in his review, Mark says:
+> > 
+> > "
+> > To me it sounds like what we need is Linux infrastructure that allows
+> > one to register a device as having both clockevent/clocksource
+> > functionality.
+> > 
+> > That way, we can choose to do something sane at boot time, and if the
+> > user really wants specific devices used in specific ways, they can
+> > request that.
+> > "
+> > 
+> > Does that mean that, after adding this "HW timer" infrastructure, we
+> > would have a standard way to assign a function to a specific timer
+> > block from the DT? How is this different from what I suggest below
+> > (note the linux, prefix on my linux,timer-function property, which
+> > clearly shows that this is Linux specific)?  
+> 
+> I like the 'chosen' approach with the nodes you are proposing below. Thanks for
+> the constructive suggestion. The binding description matches perfectly what we
+> are trying to achieve.
 
-I prefer that we disable it by default and only enable it on the boards
-using it.
-
-Thanks,
-
-Gregory
-
->
-> Thanks!
-> Antoine
->
-> -- 
-> Antoine T?nart, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Actually, this is Alexandre who initially suggested the chosen
+approach (I thought it was important to mention that ;-)).
