@@ -1,24 +1,43 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Thu, 8 Jun 2017 09:01:59 +0800
-Subject: [PATCH v5 6/8] regulator: hi6421: Describe consumed platform
- device
-In-Reply-To: <20170607192524.ggci4pn47smrduex@sirena.org.uk>
-References: <20170607070606.8889-1-guodong.xu@linaro.org>
- <20170607070606.8889-7-guodong.xu@linaro.org>
- <20170607192524.ggci4pn47smrduex@sirena.org.uk>
-Message-ID: <CAFGCpxzHCX6uatj4+T0muJaHOyhx1RkQrNpzNv+wm=BY5AN7wQ@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 08 Jun 2017 10:22:20 +0900
+Subject: [PATCH] devfreq: exynos-ppmu: Staticize event list
+In-Reply-To: <20170607181228.32102-1-krzk@kernel.org>
+References: <CGME20170607181258epcas2p4191204d7b3853ef0482d84df7a06589d@epcas2p4.samsung.com>
+ <20170607181228.32102-1-krzk@kernel.org>
+Message-ID: <5938A6CC.8030206@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 8, 2017 at 3:25 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Wed, Jun 07, 2017 at 03:06:04PM +0800, Guodong Xu wrote:
->> The hi6421-regulator driver consumes a similarly named platform device.
->> Adding that to the module device table, allows modprobe to locate this
->> driver once the device is created.
->
-> You need this in hi6421v530 too.
+Hi Krzysztof,
 
-I will add that in v6.
-Thanks, Mark.
+On 2017? 06? 08? 03:12, Krzysztof Kozlowski wrote:
+> The ppmu_events array is accessed only in this compilation unit so it
+> can be made static.
+> 
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> ---
+>  drivers/devfreq/event/exynos-ppmu.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/devfreq/event/exynos-ppmu.c b/drivers/devfreq/event/exynos-ppmu.c
+> index 9b7350935b73..c68f3b5a10b5 100644
+> --- a/drivers/devfreq/event/exynos-ppmu.c
+> +++ b/drivers/devfreq/event/exynos-ppmu.c
+> @@ -44,7 +44,7 @@ struct exynos_ppmu {
+>  	{ "ppmu-event2-"#name, PPMU_PMNCNT2 },	\
+>  	{ "ppmu-event3-"#name, PPMU_PMNCNT3 }
+>  
+> -struct __exynos_ppmu_events {
+> +static struct __exynos_ppmu_events {
+>  	char *name;
+>  	int id;
+>  } ppmu_events[] = {
+> 
 
--Guodong
+Looks good to me.
+Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
+
+-- 
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
