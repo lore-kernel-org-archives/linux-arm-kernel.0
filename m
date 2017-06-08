@@ -1,506 +1,252 @@
-From: raviteja.garimella@broadcom.com (Raviteja Garimella)
-Date: Thu,  8 Jun 2017 16:05:02 +0530
-Subject: [PATCH v8 2/3] phy: phy-bcm-ns2-usbdrd: Broadcom USB DRD PHY driver
- for Northstar2
-In-Reply-To: <1496918103-14948-1-git-send-email-raviteja.garimella@broadcom.com>
-References: <1496918103-14948-1-git-send-email-raviteja.garimella@broadcom.com>
-Message-ID: <1496918103-14948-3-git-send-email-raviteja.garimella@broadcom.com>
+From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
+Date: Thu, 8 Jun 2017 12:55:53 +0200
+Subject: [PATCH 04/11] ARM: OMAP2+: Remove unused legacy code for device
+ init
+In-Reply-To: <20170608094712.GI3730@atomide.com>
+References: <20170531225139.30723-1-tony@atomide.com>
+ <20170531225139.30723-5-tony@atomide.com>
+ <20170607222711.6kdhuvkymiseootn@earth>
+ <20170608082825.GG3730@atomide.com>
+ <20170608094712.GI3730@atomide.com>
+Message-ID: <20170608105553.dq7rhfwhvz3wwa3e@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is driver for USB DRD PHY used in Broadcom's Northstar2
-SoC. The phy can be configured to be in Device mode or Host
-mode based on the type of cable connected to the port. The
-driver registers to  extcon framework to get appropriate
-connect events for Host/Device cables connect/disconnect
-states based on VBUS and ID interrupts.
+Hi,
 
-Signed-off-by: Raviteja Garimella <raviteja.garimella@broadcom.com>
----
- drivers/phy/Kconfig              |  13 ++
- drivers/phy/Makefile             |   1 +
- drivers/phy/phy-bcm-ns2-usbdrd.c | 437 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 451 insertions(+)
- create mode 100644 drivers/phy/phy-bcm-ns2-usbdrd.c
+On Thu, Jun 08, 2017 at 02:47:12AM -0700, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [170608 01:32]:
+> > * Sebastian Reichel <sre@kernel.org> [170607 15:30]:
+> > > I guess you can drop omap2_init_devices() completly?
+> > 
+> > We still have omap_init_sti() left there, but it's
+> > just static inline void omap_init_sti(void) {} :)
+> > 
+> > So yeah will remove that too.
+> 
+> Here's this one updated.
 
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index afaf7b6..8028da7 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -507,6 +507,19 @@ config PHY_CYGNUS_PCIE
- 	  Enable this to support the Broadcom Cygnus PCIe PHY.
- 	  If unsure, say N.
- 
-+config PHY_NS2_USB_DRD
-+	tristate "Broadcom Northstar2 USB DRD PHY support"
-+	depends on OF && (ARCH_BCM_IPROC || COMPILE_TEST)
-+	select GENERIC_PHY
-+	select EXTCON
-+	default ARCH_BCM_IPROC
-+	help
-+	  Enable this to support the Broadcom Northstar2 USB DRD PHY.
-+	  This driver initializes the PHY in either HOST or DEVICE mode.
-+	  The host or device configuration is read from device tree.
-+
-+	  If unsure, say N.
-+
- source "drivers/phy/tegra/Kconfig"
- 
- config PHY_NS2_PCIE
-diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-index f8047b4..e5fbb0e 100644
---- a/drivers/phy/Makefile
-+++ b/drivers/phy/Makefile
-@@ -61,6 +61,7 @@ obj-$(CONFIG_PHY_TUSB1210)		+= phy-tusb1210.o
- obj-$(CONFIG_PHY_BRCM_SATA)		+= phy-brcm-sata.o
- obj-$(CONFIG_PHY_PISTACHIO_USB)		+= phy-pistachio-usb.o
- obj-$(CONFIG_PHY_CYGNUS_PCIE)		+= phy-bcm-cygnus-pcie.o
-+obj-$(CONFIG_PHY_NS2_USB_DRD)		+= phy-bcm-ns2-usbdrd.o
- obj-$(CONFIG_ARCH_TEGRA) += tegra/
- obj-$(CONFIG_PHY_NS2_PCIE)		+= phy-bcm-ns2-pcie.o
- obj-$(CONFIG_PHY_MESON8B_USB2)		+= phy-meson8b-usb2.o
-diff --git a/drivers/phy/phy-bcm-ns2-usbdrd.c b/drivers/phy/phy-bcm-ns2-usbdrd.c
-new file mode 100644
-index 0000000..9ae59e2
---- /dev/null
-+++ b/drivers/phy/phy-bcm-ns2-usbdrd.c
-@@ -0,0 +1,437 @@
-+/*
-+ * Copyright (C) 2017 Broadcom
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/delay.h>
-+#include <linux/extcon.h>
-+#include <linux/gpio.h>
-+#include <linux/gpio/consumer.h>
-+#include <linux/init.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/phy/phy.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+#include <linux/slab.h>
-+#include <linux/workqueue.h>
-+
-+#define ICFG_DRD_AFE		0x0
-+#define ICFG_MISC_STAT		0x18
-+#define ICFG_DRD_P0CTL		0x1C
-+#define ICFG_STRAP_CTRL		0x20
-+#define ICFG_FSM_CTRL		0x24
-+
-+#define ICFG_DEV_BIT		BIT(2)
-+#define IDM_RST_BIT		BIT(0)
-+#define AFE_CORERDY_VDDC	BIT(18)
-+#define PHY_PLL_RESETB		BIT(15)
-+#define PHY_RESETB		BIT(14)
-+#define PHY_PLL_LOCK		BIT(0)
-+
-+#define DRD_DEV_MODE		BIT(20)
-+#define OHCI_OVRCUR_POL		BIT(11)
-+#define ICFG_OFF_MODE		BIT(6)
-+#define PLL_LOCK_RETRY		1000
-+
-+#define EVT_DEVICE		0
-+#define EVT_HOST		1
-+
-+#define DRD_HOST_MODE		(BIT(2) | BIT(3))
-+#define DRD_DEVICE_MODE		(BIT(4) | BIT(5))
-+#define DRD_HOST_VAL		0x803
-+#define DRD_DEV_VAL		0x807
-+#define GPIO_DELAY		20
-+
-+struct ns2_phy_data;
-+struct ns2_phy_driver {
-+	void __iomem *icfgdrd_regs;
-+	void __iomem *idmdrd_rst_ctrl;
-+	void __iomem *crmu_usb2_ctrl;
-+	void __iomem *usb2h_strap_reg;
-+	struct ns2_phy_data *data;
-+	struct extcon_dev *edev;
-+	struct gpio_desc *vbus_gpiod;
-+	struct gpio_desc *id_gpiod;
-+	int id_irq;
-+	int vbus_irq;
-+	unsigned long debounce_jiffies;
-+	struct delayed_work wq_extcon;
-+};
-+
-+struct ns2_phy_data {
-+	struct ns2_phy_driver *driver;
-+	struct phy *phy;
-+	int new_state;
-+};
-+
-+static const unsigned int usb_extcon_cable[] = {
-+	EXTCON_USB,
-+	EXTCON_USB_HOST,
-+	EXTCON_NONE,
-+};
-+
-+static inline int pll_lock_stat(u32 usb_reg, int reg_mask,
-+				struct ns2_phy_driver *driver)
-+{
-+	int retry = PLL_LOCK_RETRY;
-+	u32 val;
-+
-+	do {
-+		udelay(1);
-+		val = readl(driver->icfgdrd_regs + usb_reg);
-+		if (val & reg_mask)
-+			return 0;
-+	} while (--retry > 0);
-+
-+	return -EBUSY;
-+}
-+
-+static int ns2_drd_phy_init(struct phy *phy)
-+{
-+	struct ns2_phy_data *data = phy_get_drvdata(phy);
-+	struct ns2_phy_driver *driver = data->driver;
-+	u32 val;
-+
-+	val = readl(driver->icfgdrd_regs + ICFG_FSM_CTRL);
-+
-+	if (data->new_state == EVT_HOST) {
-+		val &= ~DRD_DEVICE_MODE;
-+		val |= DRD_HOST_MODE;
-+	} else {
-+		val &= ~DRD_HOST_MODE;
-+		val |= DRD_DEVICE_MODE;
-+	}
-+	writel(val, driver->icfgdrd_regs + ICFG_FSM_CTRL);
-+
-+	return 0;
-+}
-+
-+static int ns2_drd_phy_poweroff(struct phy *phy)
-+{
-+	struct ns2_phy_data *data = phy_get_drvdata(phy);
-+	struct ns2_phy_driver *driver = data->driver;
-+	u32 val;
-+
-+	val = readl(driver->crmu_usb2_ctrl);
-+	val &= ~AFE_CORERDY_VDDC;
-+	writel(val, driver->crmu_usb2_ctrl);
-+
-+	val = readl(driver->crmu_usb2_ctrl);
-+	val &= ~DRD_DEV_MODE;
-+	writel(val, driver->crmu_usb2_ctrl);
-+
-+	/* Disable Host and Device Mode */
-+	val = readl(driver->icfgdrd_regs + ICFG_FSM_CTRL);
-+	val &= ~(DRD_HOST_MODE | DRD_DEVICE_MODE | ICFG_OFF_MODE);
-+	writel(val, driver->icfgdrd_regs + ICFG_FSM_CTRL);
-+
-+	return 0;
-+}
-+
-+static int ns2_drd_phy_poweron(struct phy *phy)
-+{
-+	struct ns2_phy_data *data = phy_get_drvdata(phy);
-+	struct ns2_phy_driver *driver = data->driver;
-+	u32 extcon_event = data->new_state;
-+	int ret;
-+	u32 val;
-+
-+	if (extcon_event == EVT_DEVICE) {
-+		writel(DRD_DEV_VAL, driver->icfgdrd_regs + ICFG_DRD_P0CTL);
-+
-+		val = readl(driver->idmdrd_rst_ctrl);
-+		val &= ~IDM_RST_BIT;
-+		writel(val, driver->idmdrd_rst_ctrl);
-+
-+		val = readl(driver->crmu_usb2_ctrl);
-+		val |= (AFE_CORERDY_VDDC | DRD_DEV_MODE);
-+		writel(val, driver->crmu_usb2_ctrl);
-+
-+		/* Bring PHY and PHY_PLL out of Reset */
-+		val = readl(driver->crmu_usb2_ctrl);
-+		val |= (PHY_PLL_RESETB | PHY_RESETB);
-+		writel(val, driver->crmu_usb2_ctrl);
-+
-+		ret = pll_lock_stat(ICFG_MISC_STAT, PHY_PLL_LOCK, driver);
-+		if (ret < 0) {
-+			dev_err(&phy->dev, "Phy PLL lock failed\n");
-+			return ret;
-+		}
-+	} else {
-+		writel(DRD_HOST_VAL, driver->icfgdrd_regs + ICFG_DRD_P0CTL);
-+
-+		val = readl(driver->crmu_usb2_ctrl);
-+		val |= AFE_CORERDY_VDDC;
-+		writel(val, driver->crmu_usb2_ctrl);
-+
-+		ret = pll_lock_stat(ICFG_MISC_STAT, PHY_PLL_LOCK, driver);
-+		if (ret < 0) {
-+			dev_err(&phy->dev, "Phy PLL lock failed\n");
-+			return ret;
-+		}
-+
-+		val = readl(driver->idmdrd_rst_ctrl);
-+		val &= ~IDM_RST_BIT;
-+		writel(val, driver->idmdrd_rst_ctrl);
-+
-+		/* port over current Polarity */
-+		val = readl(driver->usb2h_strap_reg);
-+		val |= OHCI_OVRCUR_POL;
-+		writel(val, driver->usb2h_strap_reg);
-+	}
-+
-+	return 0;
-+}
-+
-+static void connect_change(struct ns2_phy_driver *driver)
-+{
-+	u32 extcon_event;
-+	u32 val;
-+
-+	extcon_event = driver->data->new_state;
-+	val = readl(driver->icfgdrd_regs + ICFG_FSM_CTRL);
-+
-+	switch (extcon_event) {
-+	case EVT_DEVICE:
-+		val &= ~(DRD_HOST_MODE | DRD_DEVICE_MODE);
-+		writel(val, driver->icfgdrd_regs + ICFG_FSM_CTRL);
-+
-+		val = (val & ~DRD_HOST_MODE) | DRD_DEVICE_MODE;
-+		writel(val, driver->icfgdrd_regs + ICFG_FSM_CTRL);
-+
-+		val = readl(driver->icfgdrd_regs + ICFG_DRD_P0CTL);
-+		val |= ICFG_DEV_BIT;
-+		writel(val, driver->icfgdrd_regs + ICFG_DRD_P0CTL);
-+		break;
-+
-+	case EVT_HOST:
-+		val &= ~(DRD_HOST_MODE | DRD_DEVICE_MODE);
-+		writel(val, driver->icfgdrd_regs + ICFG_FSM_CTRL);
-+
-+		val = (val & ~DRD_DEVICE_MODE) | DRD_HOST_MODE;
-+		writel(val, driver->icfgdrd_regs + ICFG_FSM_CTRL);
-+
-+		val = readl(driver->usb2h_strap_reg);
-+		val |= OHCI_OVRCUR_POL;
-+		writel(val, driver->usb2h_strap_reg);
-+
-+		val = readl(driver->icfgdrd_regs + ICFG_DRD_P0CTL);
-+		val &= ~ICFG_DEV_BIT;
-+		writel(val, driver->icfgdrd_regs + ICFG_DRD_P0CTL);
-+		break;
-+
-+	default:
-+		pr_err("Invalid extcon event\n");
-+		break;
-+	}
-+}
-+
-+static void extcon_work(struct work_struct *work)
-+{
-+	struct ns2_phy_driver *driver;
-+	int vbus;
-+	int id;
-+
-+	driver  = container_of(to_delayed_work(work),
-+			       struct ns2_phy_driver, wq_extcon);
-+
-+	id = gpiod_get_value_cansleep(driver->id_gpiod);
-+	vbus = gpiod_get_value_cansleep(driver->vbus_gpiod);
-+
-+	if (!id && vbus) { /* Host connected */
-+		extcon_set_cable_state_(driver->edev, EXTCON_USB_HOST, true);
-+		pr_debug("Host cable connected\n");
-+		driver->data->new_state = EVT_HOST;
-+		connect_change(driver);
-+	} else if (id && !vbus) { /* Disconnected */
-+		extcon_set_cable_state_(driver->edev, EXTCON_USB_HOST, false);
-+		extcon_set_cable_state_(driver->edev, EXTCON_USB, false);
-+		pr_debug("Cable disconnected\n");
-+	} else if (id && vbus) { /* Device connected */
-+		extcon_set_cable_state_(driver->edev, EXTCON_USB, true);
-+		pr_debug("Device cable connected\n");
-+		driver->data->new_state = EVT_DEVICE;
-+		connect_change(driver);
-+	}
-+}
-+
-+static irqreturn_t gpio_irq_handler(int irq, void *dev_id)
-+{
-+	struct ns2_phy_driver *driver = dev_id;
-+
-+	queue_delayed_work(system_power_efficient_wq, &driver->wq_extcon,
-+			   driver->debounce_jiffies);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static struct phy_ops ops = {
-+	.init		= ns2_drd_phy_init,
-+	.power_on	= ns2_drd_phy_poweron,
-+	.power_off	= ns2_drd_phy_poweroff,
-+	.owner		= THIS_MODULE,
-+};
-+
-+static const struct of_device_id ns2_drd_phy_dt_ids[] = {
-+	{ .compatible = "brcm,ns2-drd-phy", },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, ns2_drd_phy_dt_ids);
-+
-+static int ns2_drd_phy_probe(struct platform_device *pdev)
-+{
-+	struct phy_provider *phy_provider;
-+	struct device *dev = &pdev->dev;
-+	struct ns2_phy_driver *driver;
-+	struct ns2_phy_data *data;
-+	struct resource *res;
-+	int ret;
-+	u32 val;
-+
-+	driver = devm_kzalloc(dev, sizeof(struct ns2_phy_driver),
-+			      GFP_KERNEL);
-+	if (!driver)
-+		return -ENOMEM;
-+
-+	driver->data = devm_kzalloc(dev, sizeof(struct ns2_phy_data),
-+				  GFP_KERNEL);
-+	if (!driver->data)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "icfg");
-+	driver->icfgdrd_regs = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(driver->icfgdrd_regs))
-+		return PTR_ERR(driver->icfgdrd_regs);
-+
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "rst-ctrl");
-+	driver->idmdrd_rst_ctrl = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(driver->idmdrd_rst_ctrl))
-+		return PTR_ERR(driver->idmdrd_rst_ctrl);
-+
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "crmu-ctrl");
-+	driver->crmu_usb2_ctrl = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(driver->crmu_usb2_ctrl))
-+		return PTR_ERR(driver->crmu_usb2_ctrl);
-+
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "usb2-strap");
-+	driver->usb2h_strap_reg = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(driver->usb2h_strap_reg))
-+		return PTR_ERR(driver->usb2h_strap_reg);
-+
-+	 /* create extcon */
-+	driver->id_gpiod = devm_gpiod_get(&pdev->dev, "id", GPIOD_IN);
-+	if (IS_ERR(driver->id_gpiod)) {
-+		dev_err(dev, "failed to get ID GPIO\n");
-+		return PTR_ERR(driver->id_gpiod);
-+	}
-+	driver->vbus_gpiod = devm_gpiod_get(&pdev->dev, "vbus", GPIOD_IN);
-+	if (IS_ERR(driver->vbus_gpiod)) {
-+		dev_err(dev, "failed to get VBUS GPIO\n");
-+		return PTR_ERR(driver->vbus_gpiod);
-+	}
-+
-+	driver->edev = devm_extcon_dev_allocate(dev, usb_extcon_cable);
-+	if (IS_ERR(driver->edev)) {
-+		dev_err(dev, "failed to allocate extcon device\n");
-+		return -ENOMEM;
-+	}
-+
-+	ret = devm_extcon_dev_register(dev, driver->edev);
-+	if (ret < 0) {
-+		dev_err(dev, "failed to register extcon device\n");
-+		return ret;
-+	}
-+
-+	ret = gpiod_set_debounce(driver->id_gpiod, GPIO_DELAY * 1000);
-+	if (ret < 0)
-+		driver->debounce_jiffies = msecs_to_jiffies(GPIO_DELAY);
-+
-+	INIT_DELAYED_WORK(&driver->wq_extcon, extcon_work);
-+
-+	driver->id_irq = gpiod_to_irq(driver->id_gpiod);
-+	if (driver->id_irq < 0) {
-+		dev_err(dev, "failed to get ID IRQ\n");
-+		return driver->id_irq;
-+	}
-+
-+	driver->vbus_irq = gpiod_to_irq(driver->vbus_gpiod);
-+	if (driver->vbus_irq < 0) {
-+		dev_err(dev, "failed to get ID IRQ\n");
-+		return driver->vbus_irq;
-+	}
-+
-+	ret = devm_request_irq(dev, driver->id_irq, gpio_irq_handler,
-+			       IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
-+			       "usb_id", driver);
-+	if (ret < 0) {
-+		dev_err(dev, "failed to request handler for ID IRQ\n");
-+		return ret;
-+	}
-+
-+	ret = devm_request_irq(dev, driver->vbus_irq, gpio_irq_handler,
-+			       IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
-+			       "usb_vbus", driver);
-+	if (ret < 0) {
-+		dev_err(dev, "failed to request handler for VBUS IRQ\n");
-+		return ret;
-+	}
-+
-+	dev_set_drvdata(dev, driver);
-+
-+	/* Shutdown all ports. They can be powered up as required */
-+	val = readl(driver->crmu_usb2_ctrl);
-+	val &= ~(AFE_CORERDY_VDDC | PHY_RESETB);
-+	writel(val, driver->crmu_usb2_ctrl);
-+
-+	data = driver->data;
-+	data->phy = devm_phy_create(dev, dev->of_node, &ops);
-+	if (IS_ERR(data->phy)) {
-+		dev_err(dev, "Failed to create usb drd phy\n");
-+		return PTR_ERR(data->phy);
-+	}
-+
-+	data->driver = driver;
-+	phy_set_drvdata(data->phy, data);
-+
-+	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
-+	if (IS_ERR(phy_provider)) {
-+		dev_err(dev, "Failed to register as phy provider\n");
-+		return PTR_ERR(phy_provider);
-+	}
-+
-+	platform_set_drvdata(pdev, driver);
-+
-+	dev_info(dev, "Registered NS2 DRD Phy device\n");
-+	queue_delayed_work(system_power_efficient_wq, &driver->wq_extcon,
-+			   driver->debounce_jiffies);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver ns2_drd_phy_driver = {
-+	.probe = ns2_drd_phy_probe,
-+	.driver = {
-+		.name = "bcm-ns2-usbphy",
-+		.of_match_table = of_match_ptr(ns2_drd_phy_dt_ids),
-+	},
-+};
-+module_platform_driver(ns2_drd_phy_driver);
-+
-+MODULE_ALIAS("platform:bcm-ns2-drd-phy");
-+MODULE_AUTHOR("Broadcom");
-+MODULE_DESCRIPTION("Broadcom NS2 USB2 PHY driver");
-+MODULE_LICENSE("GPL v2");
--- 
-2.1.0
+Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+
+Defines for L3_MODULES_MAX_LEN + L3_MODULES and most of the includes
+could be dropped now.
+
+-- Sebastian
+
+> 8< -----------------
+> From tony Mon Sep 17 00:00:00 2001
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Wed, 31 May 2017 15:51:32 -0700
+> Subject: [PATCH] ARM: OMAP2+: Remove unused legacy code for device init
+> 
+> We are now booting all mach-omap2 in device tree only mode.
+> Any code that is only called in legacy boot mode where
+> of_have_populated_dt() is not set is safe to remove now.
+> 
+> Note that omap_init_sti() won't do anything so we can
+> remove omap2_init_devices() as pointed out by Sebastian
+> Reichel <sebastian.reichel@collabora.co.uk>.
+> 
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap2/devices.c | 175 ------------------------------------------
+>  1 file changed, 175 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+> --- a/arch/arm/mach-omap2/devices.c
+> +++ b/arch/arm/mach-omap2/devices.c
+> @@ -36,130 +36,6 @@
+>  #define L3_MODULES_MAX_LEN 12
+>  #define L3_MODULES 3
+>  
+> -static int __init omap3_l3_init(void)
+> -{
+> -	struct omap_hwmod *oh;
+> -	struct platform_device *pdev;
+> -	char oh_name[L3_MODULES_MAX_LEN];
+> -
+> -	/*
+> -	 * To avoid code running on other OMAPs in
+> -	 * multi-omap builds
+> -	 */
+> -	if (!(cpu_is_omap34xx()) || of_have_populated_dt())
+> -		return -ENODEV;
+> -
+> -	snprintf(oh_name, L3_MODULES_MAX_LEN, "l3_main");
+> -
+> -	oh = omap_hwmod_lookup(oh_name);
+> -
+> -	if (!oh)
+> -		pr_err("could not look up %s\n", oh_name);
+> -
+> -	pdev = omap_device_build("omap_l3_smx", 0, oh, NULL, 0);
+> -
+> -	WARN(IS_ERR(pdev), "could not build omap_device for %s\n", oh_name);
+> -
+> -	return PTR_ERR_OR_ZERO(pdev);
+> -}
+> -omap_postcore_initcall(omap3_l3_init);
+> -
+> -static inline void omap_init_sti(void) {}
+> -
+> -#if IS_ENABLED(CONFIG_SPI_OMAP24XX)
+> -
+> -#include <linux/platform_data/spi-omap2-mcspi.h>
+> -
+> -static int __init omap_mcspi_init(struct omap_hwmod *oh, void *unused)
+> -{
+> -	struct platform_device *pdev;
+> -	char *name = "omap2_mcspi";
+> -	struct omap2_mcspi_platform_config *pdata;
+> -	static int spi_num;
+> -	struct omap2_mcspi_dev_attr *mcspi_attrib = oh->dev_attr;
+> -
+> -	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
+> -	if (!pdata) {
+> -		pr_err("Memory allocation for McSPI device failed\n");
+> -		return -ENOMEM;
+> -	}
+> -
+> -	pdata->num_cs = mcspi_attrib->num_chipselect;
+> -	switch (oh->class->rev) {
+> -	case OMAP2_MCSPI_REV:
+> -	case OMAP3_MCSPI_REV:
+> -			pdata->regs_offset = 0;
+> -			break;
+> -	case OMAP4_MCSPI_REV:
+> -			pdata->regs_offset = OMAP4_MCSPI_REG_OFFSET;
+> -			break;
+> -	default:
+> -			pr_err("Invalid McSPI Revision value\n");
+> -			kfree(pdata);
+> -			return -EINVAL;
+> -	}
+> -
+> -	spi_num++;
+> -	pdev = omap_device_build(name, spi_num, oh, pdata, sizeof(*pdata));
+> -	WARN(IS_ERR(pdev), "Can't build omap_device for %s:%s\n",
+> -				name, oh->name);
+> -	kfree(pdata);
+> -	return 0;
+> -}
+> -
+> -static void omap_init_mcspi(void)
+> -{
+> -	omap_hwmod_for_each_by_class("mcspi", omap_mcspi_init, NULL);
+> -}
+> -
+> -#else
+> -static inline void omap_init_mcspi(void) {}
+> -#endif
+> -
+> -/**
+> - * omap_init_rng - bind the RNG hwmod to the RNG omap_device
+> - *
+> - * Bind the RNG hwmod to the RNG omap_device.  No return value.
+> - */
+> -static void __init omap_init_rng(void)
+> -{
+> -	struct omap_hwmod *oh;
+> -	struct platform_device *pdev;
+> -
+> -	oh = omap_hwmod_lookup("rng");
+> -	if (!oh)
+> -		return;
+> -
+> -	pdev = omap_device_build("omap_rng", -1, oh, NULL, 0);
+> -	WARN(IS_ERR(pdev), "Can't build omap_device for omap_rng\n");
+> -}
+> -
+> -static void __init omap_init_sham(void)
+> -{
+> -	struct omap_hwmod *oh;
+> -	struct platform_device *pdev;
+> -
+> -	oh = omap_hwmod_lookup("sham");
+> -	if (!oh)
+> -		return;
+> -
+> -	pdev = omap_device_build("omap-sham", -1, oh, NULL, 0);
+> -	WARN(IS_ERR(pdev), "Can't build omap_device for omap-sham\n");
+> -}
+> -
+> -static void __init omap_init_aes(void)
+> -{
+> -	struct omap_hwmod *oh;
+> -	struct platform_device *pdev;
+> -
+> -	oh = omap_hwmod_lookup("aes");
+> -	if (!oh)
+> -		return;
+> -
+> -	pdev = omap_device_build("omap-aes", -1, oh, NULL, 0);
+> -	WARN(IS_ERR(pdev), "Can't build omap_device for omap-aes\n");
+> -}
+> -
+>  /*-------------------------------------------------------------------------*/
+>  
+>  #if IS_ENABLED(CONFIG_VIDEO_OMAP2_VOUT)
+> @@ -185,54 +61,3 @@ int __init omap_init_vout(void)
+>  #else
+>  int __init omap_init_vout(void) { return 0; }
+>  #endif
+> -
+> -/*-------------------------------------------------------------------------*/
+> -
+> -static int __init omap2_init_devices(void)
+> -{
+> -	/* Enable dummy states for those platforms without pinctrl support */
+> -	if (!of_have_populated_dt())
+> -		pinctrl_provide_dummies();
+> -
+> -	/* If dtb is there, the devices will be created dynamically */
+> -	if (!of_have_populated_dt()) {
+> -		/*
+> -		 * please keep these calls, and their implementations above,
+> -		 * in alphabetical order so they're easier to sort through.
+> -		 */
+> -		omap_init_mcspi();
+> -		omap_init_sham();
+> -		omap_init_aes();
+> -		omap_init_rng();
+> -	}
+> -	omap_init_sti();
+> -
+> -	return 0;
+> -}
+> -omap_arch_initcall(omap2_init_devices);
+> -
+> -static int __init omap_gpmc_init(void)
+> -{
+> -	struct omap_hwmod *oh;
+> -	struct platform_device *pdev;
+> -	char *oh_name = "gpmc";
+> -
+> -	/*
+> -	 * if the board boots up with a populated DT, do not
+> -	 * manually add the device from this initcall
+> -	 */
+> -	if (of_have_populated_dt())
+> -		return -ENODEV;
+> -
+> -	oh = omap_hwmod_lookup(oh_name);
+> -	if (!oh) {
+> -		pr_err("Could not look up %s\n", oh_name);
+> -		return -ENODEV;
+> -	}
+> -
+> -	pdev = omap_device_build("omap-gpmc", -1, oh, NULL, 0);
+> -	WARN(IS_ERR(pdev), "could not build omap_device for %s\n", oh_name);
+> -
+> -	return PTR_ERR_OR_ZERO(pdev);
+> -}
+> -omap_postcore_initcall(omap_gpmc_init);
+> -- 
+> 2.13.0
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170608/a39a2270/attachment.sig>
