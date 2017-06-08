@@ -1,70 +1,48 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu,  8 Jun 2017 15:13:05 +0100
-Subject: [RFT PATCH v2 05/42] PCI: Add pci_free_host_bridge interface
-In-Reply-To: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
-References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170608141342.2018-6-lorenzo.pieralisi@arm.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Thu, 8 Jun 2017 16:35:01 +0200
+Subject: [PATCH v2 00/25] arm64: KVM: Mediate access to GICv3 sysregs at
+ EL2
+In-Reply-To: <20170601102117.17750-1-marc.zyngier@arm.com>
+References: <20170601102117.17750-1-marc.zyngier@arm.com>
+Message-ID: <615c301e-faa7-ab31-24f2-8000b6a6fc21@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit a52d1443bba1 ("PCI: Export host bridge registration interface")
-exported the pci_alloc_host_bridge() interface so that PCI host
-controllers drivers can make use of it.
 
-Introduce pci_alloc_host_bridge() kernel counterpart to free the
-host bridge data structures, pci_free_host_bridge(), export it
-and update kernel functions releasing host bridge objects allocated
-memory to make use of it.
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
----
- drivers/pci/probe.c | 12 +++++++++---
- include/linux/pci.h |  1 +
- 2 files changed, 10 insertions(+), 3 deletions(-)
+On 01.06.17 12:20, Marc Zyngier wrote:
+> Some systems have less than perfect GICv3 implementations, leading to
+> all kind of ugly issues (guest hanging, host dying). In order to allow
+> some level of diagnostic, and in some cases implement workarounds,
+> this series enables the trapping of both Group-0, Group-1 and Common
+> sysregs. Mediating the access at EL2 allows some form of sanity
+> checking that the HW is sometimes sorely lacking.
+> 
+> Instead of fully emulating a GICv3 CPU interface, we still use the
+> existing HW (list registers, AP registers, VMCR...), which allows the
+> code to be independent from the rest of the KVM code, and to cope with
+> partial trapping.
+> 
+> Of course, trapping has a cost, which is why this must be either
+> enabled on the command line, or selected by another cpu capability
+> (see Cavium erratum 30115). A quick test on an A57-based platform
+> shows a 25% hit when repeatedly banging on the trapped registers,
+> while normal workloads do not seem to suffer noticeably from such
+> trapping (hackbench variance is in the usual noise, despite being very
+> IPI happy).
+> 
+> This has been tested on a dual socket Thundex-X and a Freescale LS-2085a.
+> 
+> I've taken the liberty to rebase David Daney's initial Cavium erratum
+> 30115 workaround on top of this series, and included it here as a
+> typical use case.
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 586d83d..cbf0d0c 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -517,9 +517,7 @@ static void pci_release_host_bridge_dev(struct device *dev)
- 	if (bridge->release_fn)
- 		bridge->release_fn(bridge);
- 
--	pci_free_resource_list(&bridge->windows);
--
--	kfree(bridge);
-+	pci_free_host_bridge(bridge);
- }
- 
- struct pci_host_bridge *pci_alloc_host_bridge(size_t priv)
-@@ -537,6 +535,14 @@ struct pci_host_bridge *pci_alloc_host_bridge(size_t priv)
- }
- EXPORT_SYMBOL(pci_alloc_host_bridge);
- 
-+void pci_free_host_bridge(struct pci_host_bridge *bridge)
-+{
-+	pci_free_resource_list(&bridge->windows);
-+
-+	kfree(bridge);
-+}
-+EXPORT_SYMBOL(pci_free_host_bridge);
-+
- static const unsigned char pcix_bus_speed[] = {
- 	PCI_SPEED_UNKNOWN,		/* 0 */
- 	PCI_SPEED_66MHz_PCIX,		/* 1 */
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 8039f9f..5720635 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -463,6 +463,7 @@ static inline struct pci_host_bridge *pci_host_bridge_from_priv(void *priv)
- }
- 
- struct pci_host_bridge *pci_alloc_host_bridge(size_t priv);
-+void pci_free_host_bridge(struct pci_host_bridge *bridge);
- int pci_register_host_bridge(struct pci_host_bridge *bridge);
- struct pci_host_bridge *pci_find_host_bridge(struct pci_bus *bus);
- 
--- 
-2.10.0
+I've run this patch set on an affected ThunderX system and indeed not 
+seen any hangs. I have seen lost guest USB keyboard events which might 
+point at interrupt problems or not, but let's assume it's a different 
+issue for now.
+
+Tested-by: Alexander Graf <agraf@suse.de>
+
+
+Alex
