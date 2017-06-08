@@ -1,58 +1,49 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 8 Jun 2017 12:04:43 -0400 (EDT)
-Subject: [PATCH] ARM/Kconfig: make VMSPLIT_3G_OPT depends on !ARM_LPAE
-In-Reply-To: <1496901944-42140-1-git-send-email-xieyisheng1@huawei.com>
-References: <1496901944-42140-1-git-send-email-xieyisheng1@huawei.com>
-Message-ID: <alpine.LFD.2.20.1706081203090.29475@knanqh.ubzr>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 8 Jun 2017 17:06:44 +0100
+Subject: [PATCH] mm: vmalloc: simplify vread/vwrite to use existing
+ mappings
+In-Reply-To: <20170607182052.31447-1-ard.biesheuvel@linaro.org>
+References: <20170607182052.31447-1-ard.biesheuvel@linaro.org>
+Message-ID: <20170608160644.GM4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 8 Jun 2017, Yisheng Xie wrote:
+On Wed, Jun 07, 2017 at 06:20:52PM +0000, Ard Biesheuvel wrote:
+> The current safe path iterates over each mapping page by page, and
+> kmap()'s each one individually, which is expensive and unnecessary.
+> Instead, let's use kern_addr_valid() to establish on a per-VMA basis
+> whether we may safely derefence them, and do so via its mapping in
+> the VMALLOC region. This can be done safely due to the fact that we
+> are holding the vmap_area_lock spinlock.
 
-> When both enable CONFIG_ARM_LPAE=y and CONFIG_VMSPLIT_3G_OPT=y, which
-> means use PAGE_OFFSET=0xB0000000 with ARM_LPAE, the kernel will boot
-> fail and stop after uncompressed:
-> 
->    Starting kernel ...
-> 
->    Uart base = 0x20001000
->    watchdog reg = 0x20013000
->    dtb addr = 0x80840308
->    Uncompressing Linux... done, booting the kernel.
-> 
-> For ARM_LPAE only support 3:1, 2:2, 1:3 split of TTBR1, which mention in:
->    http://elinux.org/images/6/6a/Elce11_marinas.pdf - p16
-> 
-> So we should make VMSPLIT_3G_OPT depends on !ARM_LPAE to avoid trigger
-> this bug.
-> 
-> Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
+This doesn't sound correct if you look at the definition of
+kern_addr_valid().  For example, x86-32 has:
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+/*
+ * kern_addr_valid() is (1) for FLATMEM and (0) for
+ * SPARSEMEM and DISCONTIGMEM
+ */
+#ifdef CONFIG_FLATMEM
+#define kern_addr_valid(addr)   (1)
+#else
+#define kern_addr_valid(kaddr)  (0)
+#endif
 
+The majority of architectures simply do:
 
-> ---
->  arch/arm/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 4c1a35f..c0fcab6 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1416,6 +1416,7 @@ choice
->  	config VMSPLIT_3G
->  		bool "3G/1G user/kernel split"
->  	config VMSPLIT_3G_OPT
-> +		depends on !ARM_LPAE
->  		bool "3G/1G user/kernel split (for full 1G low memory)"
->  	config VMSPLIT_2G
->  		bool "2G/2G user/kernel split"
-> -- 
-> 1.7.12.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+#define kern_addr_valid(addr)   (1)
+
+So, the result is that on the majority of architectures, we're now
+going to simply dereference 'addr' with very little in the way of
+checks.
+
+I think this makes these functions racy - the point at which the
+entry is placed onto the vmalloc list is quite different from the
+point where the page table entries for it are populated (which
+happens with the lock dropped.)  So, I think this is asking for
+an oops.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
