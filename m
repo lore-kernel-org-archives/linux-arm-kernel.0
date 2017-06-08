@@ -1,29 +1,21 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 08 Jun 2017 19:13:42 +0200
-Subject: [PATCH] arm64: dts: marvell: cp110: add required clocks for mdio
- interface
-In-Reply-To: <1496743035-4618-1-git-send-email-thomas.petazzoni@free-electrons.com>
- (Thomas Petazzoni's message of "Tue, 6 Jun 2017 11:57:15 +0200")
-References: <1496743035-4618-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <87h8zqpfll.fsf@free-electrons.com>
+Date: Thu, 08 Jun 2017 19:16:42 +0200
+Subject: [PATCH v2] arm64: dts: marvell: 8040-mcbin: Enable 1GB Ethernet
+In-Reply-To: <20170608104243.12476-1-marc.zyngier@arm.com> (Marc Zyngier's
+ message of "Thu, 8 Jun 2017 11:42:43 +0100")
+References: <20170608104243.12476-1-marc.zyngier@arm.com>
+Message-ID: <87d1aepfgl.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi Marc,
  
- On mar., juin 06 2017, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+ On jeu., juin 08 2017, Marc Zyngier <marc.zyngier@arm.com> wrote:
 
-> From: Russell King <rmk+kernel@armlinux.org.uk>
+> Enable the 1GB Ethernet interface that lives on the slave CP110,
+> with its corresponding phy (that oddly lives on the master CP110).
 >
-> Add the three required clocks for the MDIO interface to be functional
-> on Armada 8k platforms.  Without this, the CPU hangs, causing RCU
-> stalls or the system to become unresponsive.
->
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> [Thomas:
->  - remove mg_core_clock, since it's a parent of mg_clock
->  - also add clock references to the slave CP mdio instance]
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
 Applied on mvebu/dt64
 
@@ -32,36 +24,50 @@ Thanks,
 Gregory
 
 > ---
->  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 1 +
->  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 1 +
->  2 files changed, 2 insertions(+)
+> * From v1: 
+>   - renamed phy0 -> ge_phy (rmk)
+>   - Added lane number and connector location (rmk)
 >
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> index 00af338..c33e891 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> @@ -95,6 +95,7 @@
->  				#size-cells = <0>;
->  				compatible = "marvell,orion-mdio";
->  				reg = <0x12a200 0x10>;
-> +				clocks = <&cpm_syscon0 1 9>, <&cpm_syscon0 1 5>;
->  			};
+>  arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+> index f7bb0cc03147..e7296b2d0f0f 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+> +++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+> @@ -100,6 +100,12 @@
+>  	status = "okay";
+>  };
 >  
->  			cpm_icu: interrupt-controller at 1e0000 {
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> index bee48ae..2a99ff8 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> @@ -100,6 +100,7 @@
->  				#size-cells = <0>;
->  				compatible = "marvell,orion-mdio";
->  				reg = <0x12a200 0x10>;
-> +				clocks = <&cps_syscon0 1 9>, <&cps_syscon0 1 5>;
->  			};
+> +&cpm_mdio {
+> +	ge_phy: ethernet-phy at 0 {
+> +		reg = <0>;
+> +	};
+> +};
+> +
+>  &cpm_sata0 {
+>  	/* CPM Lane 0 - U29 */
+>  	status = "okay";
+> @@ -115,6 +121,17 @@
+>  	status = "okay";
+>  };
 >  
->  			cps_icu: interrupt-controller at 1e0000 {
+> +&cps_ethernet {
+> +	status = "okay";
+> +};
+> +
+> +&cps_eth1 {
+> +	/* CPS Lane 0 - J5 (Gigabit RJ45) */
+> +	status = "okay";
+> +	phy = <&ge_phy>;
+> +	phy-mode = "sgmii";
+> +};
+> +
+>  &cps_sata0 {
+>  	/* CPS Lane 1 - U32 */
+>  	/* CPS Lane 3 - U31 */
 > -- 
-> 2.7.4
+> 2.11.0
 >
 
 -- 
