@@ -1,82 +1,122 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu, 8 Jun 2017 13:25:27 -0700
-Subject: [PATCH v8 14/34] ARM: dts: imx6-sabreauto: add the ADV7180 video
- decoder
-In-Reply-To: <1496860453-6282-15-git-send-email-steve_longerbeam@mentor.com>
-References: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
- <1496860453-6282-15-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <CAJ+vNU0C0=4hUq+g1P7yTzLzFPidfauQROPOVr4WQWKNZz_xmQ@mail.gmail.com>
+From: jacek.anaszewski@gmail.com (Jacek Anaszewski)
+Date: Thu, 8 Jun 2017 22:27:38 +0200
+Subject: [[PATCH v2]] drivers: leds/trigger: system cannot enter suspend
+In-Reply-To: <AM3PR04MB4045292078845DDB27718BD8AC90@AM3PR04MB404.eurprd04.prod.outlook.com>
+References: <1496803810-57154-1-git-send-email-bo.zhang@nxp.com>
+ <20170607071256.GA3230@amd>
+ <CACRpkdacymETLuRmpn07HUKHvrjWc85Jdj0s0qk44zTcaALa9w@mail.gmail.com>
+ <20170607103129.GA13227@amd>
+ <AM3PR04MB4045292078845DDB27718BD8AC90@AM3PR04MB404.eurprd04.prod.outlook.com>
+Message-ID: <711ac25b-ee32-1bd6-8a18-1e261b445920@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 7, 2017 at 11:33 AM, Steve Longerbeam <slongerbeam@gmail.com> wrote:
-> Enables the ADV7180 decoder sensor. The ADV7180 connects to the
-> parallel-bus mux input on ipu1_csi0_mux.
->
-> The ADV7180 power pin is via max7310_b port expander.
->
-> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
->
-> - Use IRQ_TYPE_LEVEL_LOW instead of 0x8 for interrupt type for clarity.
-> - For 8-bit parallel IPU1-CSI0 bus connection only data[12-19] are used.
->
-> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-> ---
->  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 50 ++++++++++++++++++++++++++++++++
->  1 file changed, 50 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> index 1212f82..c24af28 100644
-> --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> @@ -124,6 +124,21 @@
->                         #size-cells = <0>;
->                         reg = <1>;
->
-> +                       adv7180: camera at 21 {
-> +                               compatible = "adi,adv7180";
-> +                               reg = <0x21>;
-> +                               powerdown-gpios = <&max7310_b 2 GPIO_ACTIVE_LOW>;
-> +                               interrupt-parent = <&gpio1>;
-> +                               interrupts = <27 IRQ_TYPE_LEVEL_LOW>;
-> +
-> +                               port {
-> +                                       adv7180_to_ipu1_csi0_mux: endpoint {
-> +                                               remote-endpoint = <&ipu1_csi0_mux_from_parallel_sensor>;
-> +                                               bus-width = <8>;
-> +                                       };
-> +                               };
-> +                       };
-> +
->                         max7310_a: gpio at 30 {
->                                 compatible = "maxim,max7310";
->                                 reg = <0x30>;
-> @@ -151,6 +166,25 @@
->         };
->  };
->
-> +&ipu1_csi0_from_ipu1_csi0_mux {
-> +       bus-width = <8>;
-> +};
-> +
-> +&ipu1_csi0_mux_from_parallel_sensor {
-> +       remote-endpoint = <&adv7180_to_ipu1_csi0_mux>;
-> +       bus-width = <8>;
-> +};
-> +
-> +&ipu1_csi0 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_ipu1_csi0>;
-> +
-> +       /* enable frame interval monitor on this port */
-> +       fim {
-> +               status = "okay";
-> +       };
+Hi Bruce,
 
-Steve,
+On 06/08/2017 04:57 AM, Bruce Zhang wrote:
+> Hi,
+> 
+> As suspend/resume procedure is as below:
+> pm_notifier_call_chain(PM_SUSPEND_PREPARE)->device suspend -> syscore suspend -> enter suspend mode -> syscore resume -> device resume -> pm_notifier_call_chain(PM_POST_SUSPEND).
+> If led brightness control depends on other device/hardware (such as I2C), the LED turn off action should be earlier than device suspend. pm_notifier may be a suitable method to turn off LED.
 
-You need to remove the fim node now that you've moved this to V4L2 controls.
+OK, so I agree that the most proper fix to the discussed problem
+would be ignoring brightness setting requests after suspend, as Pavel
+suggested.
 
-Regards,
+led_classdev_suspend() already turns the LED off and
+led_classdev_resume() brings the brightness back.
 
-Tim
+Also led_set_brightness_nosleep() and led_set_brightness_sync()
+don't propagate brightness change to the driver if LED_SUSPENDED
+is set.
+
+There are two problems though:
+1. __led_set_brightness() and __led_set_brightness_blocking() don't
+   check the flag, and they can be called from set_brightness_delayed(),
+   that was already queued at the time of setting LED_SUSPENDED flag.
+2. LED_SUSPENDED flag is accessed in a non-atomic way.
+
+The solution as I see it would be respectively:
+1. Return from __led_set_brightness() and
+   __led_set_brightness_blocking() if LED_SUSPENDED is set.
+2. Switch to accessing struct led_classdev's flags with use of
+   bitops. Fortunately those flags are mainly set prior LED class
+   device registration and only LED_SYSFS_DISABLE, LED_SUSPENDED
+   and LED_UNREGISTERING are accessed afterwards, and only in the LED
+   core, so only those places would have to be modified.
+
+Best regards,
+Jacek Anaszewski
+
+> -----Original Message-----
+> From: Pavel Machek [mailto:pavel at ucw.cz] 
+> Sent: Wednesday, June 07, 2017 6:31 PM
+> To: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Bruce Zhang <bo.zhang@nxp.com>; Ulf Hansson <ulf.hansson@linaro.org>; linux-arm-kernel at lists.infradead.org; Jacek Anaszewski <jacek.anaszewski@gmail.com>; Richard Purdie <rpurdie@rpsys.net>; linux-leds at vger.kernel.org
+> Subject: Re: [[PATCH v2]] drivers: leds/trigger: system cannot enter suspend
+> 
+> Hi!
+> 
+> On Wed 2017-06-07 11:46:10, Linus Walleij wrote:
+>> On Wed, Jun 7, 2017 at 9:12 AM, Pavel Machek <pavel@ucw.cz> wrote:
+>>
+>>> Core reason is that 5ab92a7cb is wrong. (Very wrong; it papers over 
+>>> the issue for one trigger, but we have more than one... Even if 
+>>> special handling for heartbeat is warranted, that handling would be 
+>>> "turn the led off" not "unregister the trigger", which is 
+>>> userland-visible action.)
+>>
+>> OK yeah I guess you're right.
+>>
+>> I just couldn't think about anything better and didn't get any review 
+>> at the time, so mistakes were made.
+>>
+>>> That one should be reverted, then maybe the driver should be fixed 
+>>> to turn the led off during suspend.
+>>
+>> Do you mean that the heartbeat trigger driver should be fixed to turn 
+>> off the LED during sleep?
+>>
+>> That is essentially what I was trying to achieve.
+> 
+> I don't think we should be fixing it at trigger level.
+> 
+> If userspace keeps blinking using "brightness" attribute, would we like the LED to be off during suspend? I think so.
+> 
+>> The reason it is done as it is, is that the trigger sets up a timer to 
+>> do its job, and the timer may trigger between the point you turn off 
+>> the LED and the system really goes to suspend, again maybe turning the 
+>> LED on and again leaving the system with a glowing LED at suspend.
+> 
+>> The patch also solves the following phenomenon, sorry for not writing 
+>> in the commit:
+>>
+>> - Turn off LED
+>> - Suspend I2C hardware
+>> - Timer trigger
+>> - Trying to blink the LED using I2C
+>> - Crap in the console about the failed I2C transaction
+>> - Actual suspen happens
+>> - System comes online
+>> - Trying to blink the LED using I2C
+>> - Crap in the console about the failed I2C transaction
+>> - Resume I2C hardware
+>>
+>> It's just very fragile this trigger, turning off the LED from the PM 
+>> notifier is obviously not enough, we also need to disable the timer, 
+>> and then take it back online after resume.
+> 
+> No, leave the timer alone, and actually leave the trigger alone.
+> 
+> Simply make the driver turn the LED off in .suspend() callback, and then ignore further requests until .resume(). That will get rid of power drain _and_ "failed I2C transaction" messages, right?
+> 
+> (Actually, I tested with the heartbeat trigger, and it is not re-installed after resume. Another reason to revert the patch).
+> 
+> Thanks,
+> 
+> 									Pavel
+> --
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> 
