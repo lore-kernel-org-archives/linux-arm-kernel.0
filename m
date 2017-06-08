@@ -1,10 +1,10 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu,  8 Jun 2017 15:13:17 +0100
-Subject: [RFT PATCH v2 17/42] PCI: altera: Convert PCI scan API to
+Date: Thu,  8 Jun 2017 15:13:12 +0100
+Subject: [RFT PATCH v2 12/42] PCI: designware: Convert PCI scan API to
  pci_scan_root_bus_bridge()
 In-Reply-To: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
 References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170608141342.2018-18-lorenzo.pieralisi@arm.com>
+Message-ID: <20170608141342.2018-13-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,61 +14,97 @@ struct pci_host_bridge object, which simplifies the bus scan
 interface and makes the PCI scan root bus interface easier to
 generalize as members are added to the struct pci_host_bridge.
 
-Convert PCI altera host code to pci_scan_root_bus_bridge() to
+Convert PCI designware host code to pci_scan_root_bus_bridge() to
 improve the PCI root bus scanning interface.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Jingoo Han <jingoohan1@gmail.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Ley Foon Tan <lftan@altera.com>
+Cc: Joao Pinto <Joao.Pinto@synopsys.com>
 ---
- drivers/pci/host/pcie-altera.c | 22 ++++++++++++++++------
- 1 file changed, 16 insertions(+), 6 deletions(-)
+ drivers/pci/dwc/pcie-designware-host.c | 36 +++++++++++++++++++++-------------
+ 1 file changed, 22 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/pci/host/pcie-altera.c b/drivers/pci/host/pcie-altera.c
-index 75ec5ce..7f023b2 100644
---- a/drivers/pci/host/pcie-altera.c
-+++ b/drivers/pci/host/pcie-altera.c
-@@ -579,12 +579,14 @@ static int altera_pcie_probe(struct platform_device *pdev)
- 	struct altera_pcie *pcie;
- 	struct pci_bus *bus;
- 	struct pci_bus *child;
+diff --git a/drivers/pci/dwc/pcie-designware-host.c b/drivers/pci/dwc/pcie-designware-host.c
+index 28ed32b..351a277 100644
+--- a/drivers/pci/dwc/pcie-designware-host.c
++++ b/drivers/pci/dwc/pcie-designware-host.c
+@@ -280,9 +280,9 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 	struct device_node *np = dev->of_node;
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct pci_bus *bus, *child;
 +	struct pci_host_bridge *bridge;
- 	int ret;
+ 	struct resource *cfg_res;
+ 	int i, ret;
+-	LIST_HEAD(res);
+ 	struct resource_entry *win, *tmp;
  
--	pcie = devm_kzalloc(dev, sizeof(*pcie), GFP_KERNEL);
--	if (!pcie)
-+	bridge = devm_pci_alloc_host_bridge(dev, sizeof(*pcie));
+ 	cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
+@@ -295,16 +295,21 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 		dev_err(dev, "missing *config* reg space\n");
+ 	}
+ 
+-	ret = of_pci_get_host_bridge_resources(np, 0, 0xff, &res, &pp->io_base);
++	bridge = pci_alloc_host_bridge(0);
 +	if (!bridge)
- 		return -ENOMEM;
- 
-+	pcie = pci_host_bridge_priv(bridge);
- 	pcie->pdev = pdev;
- 
- 	ret = altera_pcie_parse_dt(pcie);
-@@ -613,12 +615,20 @@ static int altera_pcie_probe(struct platform_device *pdev)
- 	cra_writel(pcie, P2A_INT_ENA_ALL, P2A_INT_ENABLE);
- 	altera_pcie_host_init(pcie);
- 
--	bus = pci_scan_root_bus(dev, pcie->root_bus_nr, &altera_pcie_ops,
--				pcie, &pcie->resources);
--	if (!bus)
--		return -ENOMEM;
-+	list_splice_init(&pcie->resources, &bridge->windows);
-+	bridge->dev.parent = dev;
-+	bridge->sysdata = pcie;
-+	bridge->busnr = pcie->root_bus_nr;
-+	bridge->ops = &altera_pcie_ops;
++		return -ENOMEM;
 +
++	ret = of_pci_get_host_bridge_resources(np, 0, 0xff,
++					&bridge->windows, &pp->io_base);
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = devm_request_pci_bus_resources(dev, &res);
++	ret = devm_request_pci_bus_resources(dev, &bridge->windows);
+ 	if (ret)
+ 		goto error;
+ 
+ 	/* Get the I/O and memory ranges from DT */
+-	resource_list_for_each_entry_safe(win, tmp, &res) {
++	resource_list_for_each_entry_safe(win, tmp, &bridge->windows) {
+ 		switch (resource_type(win->res)) {
+ 		case IORESOURCE_IO:
+ 			ret = pci_remap_iospace(win->res, pp->io_base);
+@@ -400,19 +405,22 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 		pp->ops->host_init(pp);
+ 
+ 	pp->root_bus_nr = pp->busn->start;
++
++	bridge->dev.parent = dev;
++	bridge->sysdata = pp;
++	bridge->busnr = pp->root_bus_nr;
++	bridge->ops = &dw_pcie_ops;
+ 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+-		bus = pci_scan_root_bus_msi(dev, pp->root_bus_nr,
+-					    &dw_pcie_ops, pp, &res,
+-					    &dw_pcie_msi_chip);
++		bridge->msi = &dw_pcie_msi_chip;
+ 		dw_pcie_msi_chip.dev = dev;
+-	} else
+-		bus = pci_scan_root_bus(dev, pp->root_bus_nr, &dw_pcie_ops,
+-					pp, &res);
+-	if (!bus) {
+-		ret = -ENOMEM;
+-		goto error;
+ 	}
+ 
 +	ret = pci_scan_root_bus_bridge(bridge);
-+	if (ret < 0)
-+		return ret;
++	if (ret)
++		goto error;
 +
 +	bus = bridge->bus;
- 
- 	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
 +
- 	pci_assign_unassigned_bus_resources(bus);
+ 	if (pp->ops->scan_bus)
+ 		pp->ops->scan_bus(pp);
  
- 	/* Configure PCI Express setting. */
+@@ -431,7 +439,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 	return 0;
+ 
+ error:
+-	pci_free_resource_list(&res);
++	pci_free_host_bridge(bridge);
+ 	return ret;
+ }
+ 
 -- 
 2.10.0
