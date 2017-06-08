@@ -1,61 +1,43 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 8 Jun 2017 14:48:41 +0200
-Subject: [PATCH v2 2/2] ARM: sun8i: a83t: add dwmac-sun8i ethernet driver
-In-Reply-To: <20170608084222.GA10830@Red>
-References: <20170607173345.22462-1-clabbe.montjoie@gmail.com>
- <20170607173345.22462-3-clabbe.montjoie@gmail.com>
- <20170608083428.csv54tryvgwdb552@flea.home>
- <20170608084222.GA10830@Red>
-Message-ID: <20170608124841.b6i5qphsyubksbvb@flea.home>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 8 Jun 2017 15:53:55 +0300
+Subject: [PATCH v2 0/3] Add R8A7743/SK-RZG1M PFC support
+In-Reply-To: <CAMuHMdUDO-+F_fOf4Z1ZPdZhs_MBn8J6ig-Pn4K0oMvv-EM2gw@mail.gmail.com>
+References: <20170420185132.258111787@cogentembedded.com>
+ <20170424061217.GC14843@verge.net.au>
+ <4937ae78-8800-1a11-547b-2269d063d45a@cogentembedded.com>
+ <CAMuHMdUDO-+F_fOf4Z1ZPdZhs_MBn8J6ig-Pn4K0oMvv-EM2gw@mail.gmail.com>
+Message-ID: <fdebbddc-f6d6-c340-b643-e0f6c61a4b8d@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 08, 2017 at 10:42:22AM +0200, Corentin Labbe wrote:
-> On Thu, Jun 08, 2017 at 10:34:28AM +0200, Maxime Ripard wrote:
-> > On Wed, Jun 07, 2017 at 07:33:45PM +0200, Corentin Labbe wrote:
-> > > The dwmac-sun8i is an ethernet MAC hardware that support 10/100/1000 speed.
-> > > This patch enable the dwmac-sun8i on the Allwinner a83t SoC Device-tree.
-> > > 
-> > > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> > > ---
-> > >  arch/arm/boot/dts/sun8i-a83t.dtsi | 28 ++++++++++++++++++++++++++++
-> > >  1 file changed, 28 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> > > index 01a83406f9ae..7d719b4aeaa9 100644
-> > > --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-> > > +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> > > @@ -200,6 +200,14 @@
-> > >  			#interrupt-cells = <3>;
-> > >  			#gpio-cells = <3>;
-> > >  
-> > > +			emac_rgmii_pins: emac-rgmii-pins {
-> > > +				pins = "PD2", "PD3", "PD4", "PD5", "PD6", "PD7",
-> > > +				       "PD11", "PD12", "PD13", "PD14", "PD18",
-> > > +				       "PD19", "PD21", "PD22", "PD23";
-> > > +				function = "gmac";
-> > > +				drive-strength = <40>;
-> > > +			};
-> > > +
-> > 
-> > This is not used anywhere.
-> > 
-> But will be used by bpim3 board
+Hello!
 
-Then will add it when we'll add support for that board, until then,
-it's dead code.
+On 06/07/2017 08:52 PM, Geert Uytterhoeven wrote:
 
-Maxime
+>>>>    Here's the set of 3 patches against Simon Horman's 'renesas.git' repo,
+>>>> 'renesas-devel-20170420-v4.11-rc7' tag.  We're adding the R8A7743 PFC
+>>>> node
+>>>> and then describing the pins for SCIF0 and Ether devices declared
+>>>> earlier.
+>>>> These patches depend on the R8A7743 PFC suport in order to work properly.
+>>>
+>>>
+>>> Thanks. I have marked these as deferred pending acceptance of the PFC
+>>> driver changes. Please repost or otherwise let me know when dependency
+>>> is satisfied.
+>>
+>>    FYI, Linus W. has pulled the R8A774x PFC patches for 4.13:
+>>
+>> https://www.spinics.net/lists/linux-renesas-soc/msg14824.html
+>
+> But Simon has to wait for v4.13-rc1 to apply the DTS parts, to avoid
+> regressions in renesas/devel.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170608/e6027579/attachment-0001.sig>
+    Indeed, now that pinctrl_bind_pins() causes really_probe() to fail!
+The 1st patch in the series should be safe to apply still...
+
+> Gr{oetje,eeting}s,
+>
+>                         Geert
+
+MBR, Sergei
