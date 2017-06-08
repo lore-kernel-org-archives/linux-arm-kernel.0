@@ -1,63 +1,191 @@
-From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
-Date: Thu, 8 Jun 2017 10:13:05 +0200
-Subject: [PATCH 00/11] Remove unused omap legacy code
-In-Reply-To: <20170531225139.30723-1-tony@atomide.com>
-References: <20170531225139.30723-1-tony@atomide.com>
-Message-ID: <20170608081305.fyxu7tvimox4wbjg@earth>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 8 Jun 2017 10:13:34 +0200
+Subject: [PATCH 46/58] clocksource/drivers: Add a new driver for the
+ Atmel ARM TC blocks
+In-Reply-To: <20170608074446.GM2345@mai>
+References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
+ <20170530215139.9983-47-alexandre.belloni@free-electrons.com>
+ <20170606152104.GC2345@mai>
+ <20170606180559.pkrr7ux2qqnmsd6y@piout.net>
+ <20170607141735.GH2345@mai>
+ <20170607152750.tksmyf5p3oajbsac@piout.net>
+ <20170607210848.GJ2345@mai>
+ <20170607231715.ns2vcxza2eexnzjs@piout.net>
+ <20170608074236.62924f01@bbrezillon> <20170608074446.GM2345@mai>
+Message-ID: <20170608101334.4e60aa4c@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 8 Jun 2017 09:44:46 +0200
+Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
 
-On Wed, May 31, 2017 at 03:51:28PM -0700, Tony Lindgren wrote:
-> We can now remove quite a bit of clutter with legacy booting
-> gone. Basically anything with of_have_populated_dt() not set
-> can now go.
+> +Mark Rutland, +Rob Herring
 
-Except for the comment on patch 4 the series is
+Mark doesn't seem to be CCed.
 
-Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
-
--- Sebastian
-
-> Tony Lindgren (11):
->   ARM: OMAP2+: Remove unused legacy code for opp
->   ARM: OMAP2+: Remove unused legacy code for timer
->   ARM: OMAP2+: Remove unused legacy code for PMU
->   ARM: OMAP2+: Remove unused legacy code for device init
->   ARM: OMAP2+: Remove unused legacy code for McBSP
->   ARM: OMAP2+: Remove unused legacy code for io.c
->   ARM: OMAP2+: Remove unused legacy code for DMA
->   ARM: OMAP2+: Remove unused legacy code for PRM
->   ARM: OMAP2+: Remove unused legacy code for interconnects
->   ARM: OMAP2+: Remove unused legacy code for watchdog
->   ARM: OMAP2+: Remove unused legacy code for n8x0
 > 
->  arch/arm/mach-omap2/Makefile               |   4 -
->  arch/arm/mach-omap2/board-n8x0.c           |  14 +--
->  arch/arm/mach-omap2/devices.c              | 163 ---------------------------
->  arch/arm/mach-omap2/dma.c                  |  30 +----
->  arch/arm/mach-omap2/io.c                   |  59 +++-------
->  arch/arm/mach-omap2/mcbsp.c                |  70 ------------
->  arch/arm/mach-omap2/omap_device.c          |   5 +-
->  arch/arm/mach-omap2/omap_hwmod.c           |  23 ++--
->  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   3 +-
->  arch/arm/mach-omap2/opp.c                  | 104 -----------------
->  arch/arm/mach-omap2/opp3xxx_data.c         |  86 ---------------
->  arch/arm/mach-omap2/opp4xxx_data.c         |  79 -------------
->  arch/arm/mach-omap2/pmu.c                  |  97 ----------------
->  arch/arm/mach-omap2/prm3xxx.c              |  17 ++-
->  arch/arm/mach-omap2/prm44xx.c              |  59 ----------
->  arch/arm/mach-omap2/prm_common.c           |   9 +-
->  arch/arm/mach-omap2/timer.c                | 172 ++++-------------------------
->  arch/arm/mach-omap2/wd_timer.c             |  28 -----
->  18 files changed, 63 insertions(+), 959 deletions(-)
->  delete mode 100644 arch/arm/mach-omap2/opp.c
->  delete mode 100644 arch/arm/mach-omap2/pmu.c
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170608/2c037f41/attachment-0001.sig>
+> 
+> Alexandre, Boris, have a look at https://www.spinics.net/lists/arm-kernel/msg572652.html
+> 
+> That will tell you the story.
+
+Then we're in a deadlock situation here. I'm tired of hearing this kind
+of argument "DT is only supposed to describe HW, not configuration, bla
+bla". The truth is, we already have plenty of bindings that do not
+strictly describe HW.
+
+A simple example: ECC configuration on NAND devices. This is clearly a
+configuration thing, the NAND controller is usually able to support
+several kind of strength+ECC-block-size config, but we are able to
+overload this with the nand-ecc-xxx properties. Another example, still
+MTD related: MTD partitions, this is purely a software configuration,
+still we allow users to pass this information in the DT. You want
+another one? What about the linux,code and linux,input-type properties
+described here [1]?
+
+So please, let's not use these "this is not decribing HW" or "this is
+linux specific" arguments every time someone tries to encode something
+that can be considered a configuration detail.
+
+Let's be pragmatic. How you want to use your timer counter blocks (I'm
+talking about atmel TCBs) is clearly board specific. Whether you want
+to use the PIT for your clocksource or use one or 2 channels of a TCB
+at a specific resolution is again board specific. We need a solution to
+assign timer channels to a linux function, and I'm not convinced
+passing this information through the command line makes much more sense
+than specifying it in the DT (and it's definitely less intuitive, since
+you have to reference something defined in the DT from the cmdline).
+
+Now, in his review, Mark says:
+
+"
+To me it sounds like what we need is Linux infrastructure that allows
+one to register a device as having both clockevent/clocksource
+functionality.
+
+That way, we can choose to do something sane at boot time, and if the
+user really wants specific devices used in specific ways, they can
+request that.
+"
+
+Does that mean that, after adding this "HW timer" infrastructure, we
+would have a standard way to assign a function to a specific timer
+block from the DT? How is this different from what I suggest below
+(note the linux, prefix on my linux,timer-function property, which
+clearly shows that this is Linux specific)?
+
+> 
+> On Thu, Jun 08, 2017 at 07:42:36AM +0200, Boris Brezillon wrote:
+> > Le Thu, 8 Jun 2017 01:17:15 +0200,
+> > Alexandre Belloni <alexandre.belloni@free-electrons.com> a ?crit :
+> >   
+> > > On 07/06/2017 at 23:08:48 +0200, Daniel Lezcano wrote:  
+> > > > > I was going to agree but this is not flexible enough because the
+> > > > > quadrature decoder always uses the first two channels. So on some
+> > > > > products, we may have:
+> > > > >  - TCB0:
+> > > > >    o channels 0,1: qdec
+> > > > >    o channel 2: clocksource
+> > > > > 
+> > > > >  - TCB1:
+> > > > >    o channels 0,1: qdec
+> > > > >    o channel 2: clockevent
+> > > > > 
+> > > > > This avoids wasting TCB channels.    
+> > > > 
+> > > > Ok. In this case you can check if the interrupt is specified for the node, if
+> > > > yes, then it is a clockevent.
+> > > >     
+> > > 
+> > > But currently it is always specified in the SoC's dtsi. I don't find
+> > > that too practical to push that to the board's dts. Also, lying by
+> > > omission (the IRQ is always wired) in the DT is not different from
+> > > having a property selecting which timer is the clocksource and which is
+> > > the clockevent.
+> > >   
+> > 
+> > I agree with Alexandre here. Really, there's not much we can do to
+> > detect which timer should be used as a clockevent and which one should
+> > be used as a clocksource except explicitly specifying it in the DT.
+> > Having an interrupt defined in one case (clockevent) and undefined in
+> > the other case (clocksource), is just as hack-ish as the detection logic
+> > Alexandre developed to avoid explicitly specifying the function
+> > assigned to a specific timer.
+> > 
+> > Can we please find a solution that makes everyone happy (DT,
+> > clocksoure/clockevent and at91 maintainers)?
+> > 
+> > How about adding a linux,timer-function property to specify which
+> > function this timer is providing?
+> > 
+> > Something like that for example:
+> > 
+> > 	tcb0: timer at fff7c000 {
+> > 		compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
+> > 		#address-cells = <1>;
+> > 		#size-cells = <0>;
+> > 		reg = <0xfff7c000 0x100>;
+> > 		interrupts = <18 4>;
+> > 		clocks = <&tcb0_clk>, <&clk32k>;
+> > 		clock-names = "t0_clk", "slow_clk";
+> > 
+> > 		timer at 0 {
+> > 			compatible = "atmel,tcb-timer";
+> > 			reg = <0>, <1>;
+> > 			linux,timer-function = "clocksource";
+> > 		};
+> > 
+> > 		timer at 2 {
+> > 			compatible = "atmel,tcb-timer";
+> > 			reg = <2>;
+> > 			linux,timer-function = "clockevent";
+> > 		};
+> > 	};
+> > 
+> > Alternatively, we could have a property or a node in chosen describing which
+> > timer should be used:
+> > 
+> > 	chosen {
+> > 		clockevent {
+> > 			timer = <&timer2>;
+> > 		};
+> > 
+> > 		clocksource {
+> > 			timer = <&timer0>;
+> > 		};
+> > 
+> > 		/*
+> > 		 * or
+> > 		 *
+> > 		 * clockevent = <&timer2>;
+> > 		 * clocksource = <&timer0>;
+> > 		 *
+> > 		 * but I think the clocksource/clockevent node approach
+> > 		 * is more future proof in case we need to add extra
+> > 		 * information like the expected resolution/precision or
+> > 		 * anything that could be tweakable.
+> > 		 */
+> > 	};
+> > 
+> > 	tcb0: timer at fff7c000 {
+> > 		compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
+> > 		#address-cells = <1>;
+> > 		#size-cells = <0>;
+> > 		reg = <0xfff7c000 0x100>;
+> > 		interrupts = <18 4>;
+> > 		clocks = <&tcb0_clk>, <&clk32k>;
+> > 		clock-names = "t0_clk", "slow_clk";
+> > 
+> > 		timer0: timer at 0 {
+> > 			compatible = "atmel,tcb-timer";
+> > 			reg = <0>, <1>;
+> > 		};
+> > 
+> > 		timer2: timer at 2 {
+> > 			compatible = "atmel,tcb-timer";
+> > 			reg = <2>;
+> > 		};
+> > 	};  
+> 
+
+[1]http://elixir.free-electrons.com/linux/latest/source/Documentation/devicetree/bindings/input/gpio-keys.txt
