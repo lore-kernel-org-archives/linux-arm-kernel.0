@@ -1,79 +1,25 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu,  8 Jun 2017 15:13:21 +0100
-Subject: [RFT PATCH v2 21/42] PCI: rockchip: Convert PCI scan API to
- pci_scan_root_bus_bridge()
-In-Reply-To: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
-References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170608141342.2018-22-lorenzo.pieralisi@arm.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 08 Jun 2017 10:22:35 -0400 (EDT)
+Subject: [PATCH 27/44] sparc: remove leon_dma_ops
+In-Reply-To: <20170608132609.32662-28-hch@lst.de>
+References: <20170608132609.32662-1-hch@lst.de>
+ <20170608132609.32662-28-hch@lst.de>
+Message-ID: <20170608.102235.262414851920420864.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The introduction of pci_scan_root_bus_bridge() provides a PCI core
-API to scan a PCI root bus backed by an already initialized
-struct pci_host_bridge object, which simplifies the bus scan
-interface and makes the PCI scan root bus interface easier to
-generalize as members are added to the struct pci_host_bridge.
+From: Christoph Hellwig <hch@lst.de>
+Date: Thu,  8 Jun 2017 15:25:52 +0200
 
-Convert PCI rockchip host code to pci_scan_root_bus_bridge() to
-improve the PCI root bus scanning interface.
+> We can just use pci32_dma_ops.
+> 
+> Btw, given that leon is 32-bit and appears to be PCI based, do even need
+> the special case for it in get_arch_dma_ops at all?
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Wenrui Li <wenrui.li@rock-chips.com>
-Cc: Shawn Lin <shawn.lin@rock-chips.com>
----
- drivers/pci/host/pcie-rockchip.c | 22 ++++++++++++++++------
- 1 file changed, 16 insertions(+), 6 deletions(-)
+I would need to defer to the LEON developers on that, but they haven't
+been very actively lately so whether you'll get a response or not is
+hard to predict.
 
-diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
-index 0e020b6..cae5a6d 100644
---- a/drivers/pci/host/pcie-rockchip.c
-+++ b/drivers/pci/host/pcie-rockchip.c
-@@ -1284,6 +1284,7 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
- 	struct rockchip_pcie *rockchip;
- 	struct device *dev = &pdev->dev;
- 	struct pci_bus *bus, *child;
-+	struct pci_host_bridge *bridge;
- 	struct resource_entry *win;
- 	resource_size_t io_base;
- 	struct resource	*mem;
-@@ -1295,10 +1296,12 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
- 	if (!dev->of_node)
- 		return -ENODEV;
- 
--	rockchip = devm_kzalloc(dev, sizeof(*rockchip), GFP_KERNEL);
--	if (!rockchip)
-+	bridge = devm_pci_alloc_host_bridge(dev, sizeof(*rockchip));
-+	if (!bridge)
- 		return -ENOMEM;
- 
-+	rockchip = pci_host_bridge_priv(bridge);
-+
- 	platform_set_drvdata(pdev, rockchip);
- 	rockchip->dev = dev;
- 
-@@ -1396,11 +1399,18 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
- 		goto err_free_res;
- 	}
- 
--	bus = pci_scan_root_bus(&pdev->dev, 0, &rockchip_pcie_ops, rockchip, &res);
--	if (!bus) {
--		err = -ENOMEM;
-+	list_splice_init(&res, &bridge->windows);
-+	bridge->dev.parent = &pdev->dev;
-+	bridge->sysdata = rockchip;
-+	bridge->busnr = 0;
-+	bridge->ops = &rockchip_pcie_ops;
-+
-+	err = pci_scan_root_bus_bridge(bridge);
-+	if (!err)
- 		goto err_free_res;
--	}
-+
-+	bus = bridge->bus;
-+
- 	rockchip->root_bus = bus;
- 
- 	pci_bus_size_bridges(bus);
--- 
-2.10.0
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+
+Acked-by: David S. Miller <davem@davemloft.net>
