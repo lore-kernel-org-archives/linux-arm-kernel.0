@@ -1,203 +1,103 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu,  8 Jun 2017 15:13:02 +0100
-Subject: [RFT PATCH v2 02/42] drivers: pci: host: iproc: Convert link check to
- raw PCI config accessors
-In-Reply-To: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
-References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170608141342.2018-3-lorenzo.pieralisi@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 08 Jun 2017 15:12:45 +0100
+Subject: [PATCH v3 7/9] KVM: arm/arm64: Check if irq lines to the GIC are
+ already used
+In-Reply-To: <20170608133446.3875-8-cdall@linaro.org> (Christoffer Dall's
+ message of "Thu, 8 Jun 2017 15:34:44 +0200")
+References: <20170608133446.3875-1-cdall@linaro.org>
+ <20170608133446.3875-8-cdall@linaro.org>
+Message-ID: <877f0min4y.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current iproc driver host bridge controller driver requires struct
-pci_bus to be created in order to carry out PCI link checks with standard
-PCI config space accessors.
+On Thu, Jun 08 2017 at  3:34:44 pm BST, Christoffer Dall <cdall@linaro.org> wrote:
+> We check if other in-kernel devices have already been connected to the
+> GIC for a particular interrupt line when possible.
+>
+> For the PMU, we can do this whenever setting the PMU interrupt number
+> from userspace.
+>
+> For the timers, we have to wait until we try to enable the timer,
+> because we have a concept of default IRQ numbers that userspace
+> shouldn't have to work around in the initialization phase.
+>
+> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> ---
+>  virt/kvm/arm/arch_timer.c | 18 ++++++++++--------
+>  virt/kvm/arm/pmu.c        |  7 +++++++
+>  2 files changed, 17 insertions(+), 8 deletions(-)
+>
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index e03da1a..07f6f9b 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -618,20 +618,22 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
+>  	kvm_vgic_unmap_phys_irq(vcpu, vtimer->irq.irq);
+>  }
+>  
+> -static bool timer_irqs_are_valid(struct kvm *kvm)
+> +static bool timer_irqs_are_valid(struct kvm_vcpu *vcpu)
+>  {
+> -	struct kvm_vcpu *vcpu;
+>  	int vtimer_irq, ptimer_irq;
+> -	int i;
+> +	int i, ret;
+>  
+> -	vcpu = kvm_get_vcpu(kvm, 0);
+>  	vtimer_irq = vcpu_vtimer(vcpu)->irq.irq;
+> -	ptimer_irq = vcpu_ptimer(vcpu)->irq.irq;
+> +	ret = kvm_vgic_set_owner(vcpu, vtimer_irq, vcpu_vtimer(vcpu));
+> +	if (ret)
+> +		return false;
+>  
+> -	if (vtimer_irq == ptimer_irq)
+> +	ptimer_irq = vcpu_ptimer(vcpu)->irq.irq;
+> +	ret = kvm_vgic_set_owner(vcpu, ptimer_irq, vcpu_ptimer(vcpu));
+> +	if (ret)
+>  		return false;
+>  
+> -	kvm_for_each_vcpu(i, vcpu, kvm) {
+> +	kvm_for_each_vcpu(i, vcpu, vcpu->kvm) {
+>  		if (vcpu_vtimer(vcpu)->irq.irq != vtimer_irq ||
+>  		    vcpu_ptimer(vcpu)->irq.irq != ptimer_irq)
+>  			return false;
+> @@ -659,7 +661,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+>  	if (!vgic_initialized(vcpu->kvm))
+>  		return -ENODEV;
+>  
+> -	if (!timer_irqs_are_valid(vcpu->kvm)) {
+> +	if (!timer_irqs_are_valid(vcpu)) {
+>  		kvm_debug("incorrectly configured timer irqs\n");
+>  		return -EINVAL;
+>  	}
+> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+> index 574feff..3f08669 100644
+> --- a/virt/kvm/arm/pmu.c
+> +++ b/virt/kvm/arm/pmu.c
+> @@ -480,6 +480,8 @@ static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
+>  		return -EBUSY;
+>  
+>  	if (irqchip_in_kernel(vcpu->kvm)) {
+> +		int ret;
+> +
+>  		/*
+>  		 * If using the PMU with an in-kernel virtual GIC
+>  		 * implementation, we require the GIC to be already
+> @@ -490,6 +492,11 @@ static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
+>  
+>  		if (!kvm_arm_pmu_irq_initialized(vcpu))
+>  			return -ENXIO;
+> +
+> +		ret = kvm_vgic_set_owner(vcpu, vcpu->arch.pmu.irq_num,
+> +					 &vcpu->arch.pmu);
+> +		if (ret)
+> +			return ret;
+>  	}
+>  
+>  	vcpu->arch.pmu.created = true;
 
-This struct pci_bus dependency is fictitious and burdens the driver
-with unneeded constraints (eg to use separate APIs to create and scan
-the root bus).
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Add PCI raw config space accessors to PCIe iproc driver and remove the
-fictitious struct pci_bus dependency.
-
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Scott Branden <sbranden@broadcom.com>
-Cc: Ray Jui <rjui@broadcom.com>
-Cc: Jon Mason <jonmason@broadcom.com>
----
- drivers/pci/host/pcie-iproc.c | 94 ++++++++++++++++++++++++++++++++++---------
- 1 file changed, 74 insertions(+), 20 deletions(-)
-
-diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-index 0f39bd2..e48b8e2 100644
---- a/drivers/pci/host/pcie-iproc.c
-+++ b/drivers/pci/host/pcie-iproc.c
-@@ -452,14 +452,13 @@ static inline void iproc_pcie_apb_err_disable(struct pci_bus *bus,
-  * Note access to the configuration registers are protected at the higher layer
-  * by 'pci_lock' in drivers/pci/access.c
-  */
--static void __iomem *iproc_pcie_map_cfg_bus(struct pci_bus *bus,
-+static void __iomem *iproc_pcie_map_cfg_bus(struct iproc_pcie *pcie,
-+					    int busno,
- 					    unsigned int devfn,
- 					    int where)
- {
--	struct iproc_pcie *pcie = iproc_data(bus);
- 	unsigned slot = PCI_SLOT(devfn);
- 	unsigned fn = PCI_FUNC(devfn);
--	unsigned busno = bus->number;
- 	u32 val;
- 	u16 offset;
- 
-@@ -499,6 +498,58 @@ static void __iomem *iproc_pcie_map_cfg_bus(struct pci_bus *bus,
- 		return (pcie->base + offset);
- }
- 
-+static void __iomem *iproc_pcie_bus_map_cfg_bus(struct pci_bus *bus,
-+						unsigned int devfn,
-+						int where)
-+{
-+	return iproc_pcie_map_cfg_bus(iproc_data(bus), bus->number, devfn,
-+				      where);
-+}
-+
-+static int iproc_pci_raw_config_read32(struct iproc_pcie *pcie,
-+				       unsigned int devfn, int where,
-+				       int size, u32 *val)
-+{
-+	void __iomem *addr;
-+
-+	addr = iproc_pcie_map_cfg_bus(pcie, 0, devfn, where & ~0x3);
-+	if (!addr) {
-+		*val = ~0;
-+		return PCIBIOS_DEVICE_NOT_FOUND;
-+	}
-+
-+	*val = readl(addr);
-+
-+	if (size <= 2)
-+		*val = (*val >> (8 * (where & 3))) & ((1 << (size * 8)) - 1);
-+
-+	return PCIBIOS_SUCCESSFUL;
-+}
-+
-+static int iproc_pci_raw_config_write32(struct iproc_pcie *pcie,
-+					unsigned int devfn, int where,
-+					int size, u32 val)
-+{
-+	void __iomem *addr;
-+	u32 mask, tmp;
-+
-+	addr = iproc_pcie_map_cfg_bus(pcie, 0, devfn, where & ~0x3);
-+	if (!addr)
-+		return PCIBIOS_DEVICE_NOT_FOUND;
-+
-+	if (size == 4) {
-+		writel(val, addr);
-+		return PCIBIOS_SUCCESSFUL;
-+	}
-+
-+	mask = ~(((1 << (size * 8)) - 1) << ((where & 0x3) * 8));
-+	tmp = readl(addr) & mask;
-+	tmp |= val << ((where & 0x3) * 8);
-+	writel(tmp, addr);
-+
-+	return PCIBIOS_SUCCESSFUL;
-+}
-+
- static int iproc_pcie_config_read32(struct pci_bus *bus, unsigned int devfn,
- 				    int where, int size, u32 *val)
- {
-@@ -524,7 +575,7 @@ static int iproc_pcie_config_write32(struct pci_bus *bus, unsigned int devfn,
- }
- 
- static struct pci_ops iproc_pcie_ops = {
--	.map_bus = iproc_pcie_map_cfg_bus,
-+	.map_bus = iproc_pcie_bus_map_cfg_bus,
- 	.read = iproc_pcie_config_read32,
- 	.write = iproc_pcie_config_write32,
- };
-@@ -556,12 +607,11 @@ static void iproc_pcie_reset(struct iproc_pcie *pcie)
- 	msleep(100);
- }
- 
--static int iproc_pcie_check_link(struct iproc_pcie *pcie, struct pci_bus *bus)
-+static int iproc_pcie_check_link(struct iproc_pcie *pcie)
- {
- 	struct device *dev = pcie->dev;
--	u8 hdr_type;
--	u32 link_ctrl, class, val;
--	u16 pos = PCI_EXP_CAP, link_status;
-+	u32 hdr_type, link_ctrl, link_status, class, val;
-+	u16 pos = PCI_EXP_CAP;
- 	bool link_is_active = false;
- 
- 	/*
-@@ -578,7 +628,7 @@ static int iproc_pcie_check_link(struct iproc_pcie *pcie, struct pci_bus *bus)
- 	}
- 
- 	/* make sure we are not in EP mode */
--	pci_bus_read_config_byte(bus, 0, PCI_HEADER_TYPE, &hdr_type);
-+	iproc_pci_raw_config_read32(pcie,  0, PCI_HEADER_TYPE, 1, &hdr_type);
- 	if ((hdr_type & 0x7f) != PCI_HEADER_TYPE_BRIDGE) {
- 		dev_err(dev, "in EP mode, hdr=%#02x\n", hdr_type);
- 		return -EFAULT;
-@@ -588,13 +638,16 @@ static int iproc_pcie_check_link(struct iproc_pcie *pcie, struct pci_bus *bus)
- #define PCI_BRIDGE_CTRL_REG_OFFSET 0x43c
- #define PCI_CLASS_BRIDGE_MASK      0xffff00
- #define PCI_CLASS_BRIDGE_SHIFT     8
--	pci_bus_read_config_dword(bus, 0, PCI_BRIDGE_CTRL_REG_OFFSET, &class);
-+	iproc_pci_raw_config_read32(pcie, 0, PCI_BRIDGE_CTRL_REG_OFFSET,
-+				    4, &class);
- 	class &= ~PCI_CLASS_BRIDGE_MASK;
- 	class |= (PCI_CLASS_BRIDGE_PCI << PCI_CLASS_BRIDGE_SHIFT);
--	pci_bus_write_config_dword(bus, 0, PCI_BRIDGE_CTRL_REG_OFFSET, class);
-+	iproc_pci_raw_config_write32(pcie, 0, PCI_BRIDGE_CTRL_REG_OFFSET,
-+				     4, class);
- 
- 	/* check link status to see if link is active */
--	pci_bus_read_config_word(bus, 0, pos + PCI_EXP_LNKSTA, &link_status);
-+	iproc_pci_raw_config_read32(pcie, 0, pos + PCI_EXP_LNKSTA,
-+				    2, &link_status);
- 	if (link_status & PCI_EXP_LNKSTA_NLW)
- 		link_is_active = true;
- 
-@@ -603,20 +656,21 @@ static int iproc_pcie_check_link(struct iproc_pcie *pcie, struct pci_bus *bus)
- #define PCI_TARGET_LINK_SPEED_MASK    0xf
- #define PCI_TARGET_LINK_SPEED_GEN2    0x2
- #define PCI_TARGET_LINK_SPEED_GEN1    0x1
--		pci_bus_read_config_dword(bus, 0,
--					  pos + PCI_EXP_LNKCTL2,
-+		iproc_pci_raw_config_read32(pcie, 0,
-+					  pos + PCI_EXP_LNKCTL2, 4,
- 					  &link_ctrl);
- 		if ((link_ctrl & PCI_TARGET_LINK_SPEED_MASK) ==
- 		    PCI_TARGET_LINK_SPEED_GEN2) {
- 			link_ctrl &= ~PCI_TARGET_LINK_SPEED_MASK;
- 			link_ctrl |= PCI_TARGET_LINK_SPEED_GEN1;
--			pci_bus_write_config_dword(bus, 0,
--					   pos + PCI_EXP_LNKCTL2,
--					   link_ctrl);
-+			iproc_pci_raw_config_write32(pcie, 0,
-+						pos + PCI_EXP_LNKCTL2,
-+						4, link_ctrl);
- 			msleep(100);
- 
--			pci_bus_read_config_word(bus, 0, pos + PCI_EXP_LNKSTA,
--						 &link_status);
-+			iproc_pci_raw_config_read32(pcie, 0,
-+						pos + PCI_EXP_LNKSTA,
-+						2, &link_status);
- 			if (link_status & PCI_EXP_LNKSTA_NLW)
- 				link_is_active = true;
- 		}
-@@ -1260,7 +1314,7 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
- 	}
- 	pcie->root_bus = bus;
- 
--	ret = iproc_pcie_check_link(pcie, bus);
-+	ret = iproc_pcie_check_link(pcie);
- 	if (ret) {
- 		dev_err(dev, "no PCIe EP device detected\n");
- 		goto err_rm_root_bus;
+	M.
 -- 
-2.10.0
+Jazz is not dead, it just smell funny.
