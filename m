@@ -1,129 +1,45 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 8 Jun 2017 12:12:44 -0500
-Subject: [PATCH v3 5/6] dt-bindings: display: stm32: Add DSI host driver
-In-Reply-To: <1496414235-20098-6-git-send-email-philippe.cornu@st.com>
-References: <1496414235-20098-1-git-send-email-philippe.cornu@st.com>
- <1496414235-20098-6-git-send-email-philippe.cornu@st.com>
-Message-ID: <20170608171244.twgn4xmqd5pstb2i@rob-hp-laptop>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Thu, 8 Jun 2017 19:13:24 +0200
+Subject: [PATCH v7 0/3] Cavium ThunderX2 SMMUv3 errata workarounds
+In-Reply-To: <20170608163213.GA2216@red-moon>
+References: <1496145821-3411-1-git-send-email-gakula@caviumnetworks.com>
+ <20170608163213.GA2216@red-moon>
+Message-ID: <CAJZ5v0gnjxwBXEQ--u6Sbviks74MXLFWTfN+J90cdDZbO2Q7+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 02, 2017 at 04:37:14PM +0200, Philippe CORNU wrote:
-> This patch adds documentation of device tree bindings for the STM32
-> DSI host driver based on the Synopsys DW MIPI DSI bridge driver.
-> ---
->  .../devicetree/bindings/display/st,stm32-ltdc.txt  | 83 +++++++++++++++++++++-
->  1 file changed, 82 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
-> index 90a8459..4cd32bd 100644
-> --- a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
-> +++ b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
-> @@ -12,8 +12,39 @@
->    Required nodes:
->      - Video port for RGB output.
->  
-> -Example:
-> +* STMicroelectronics STM32 dsi specific extensions to Synopsys DesignWare MIPI
-> +  DSI host controller
->  
-> +The STMicroelectronics STM32 dsi driver uses the Synopsys DesignWare MIPI
-> +DSI host controller driver (related documentation in [5]).
-> +
-> +Required properties:
-> +- #address-cells: Should be <1>.
-> +- #size-cells: Should be <0>.
-> +- compatible: "st,stm32-dsi".
-> +- reg: Memory mapped base address and length of the DWC MIPI DSI registers.
-> +- clocks: References to all the clocks specified in the clock-names property
-> +  as specified in [1].
-> +- clock-names:
-> +  - peripheral clock string name, must be "pclk".
-> +  - phy pll reference clock string name, must be "ref".
+On Thu, Jun 8, 2017 at 6:32 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Tue, May 30, 2017 at 05:33:38PM +0530, Geetha sowjanya wrote:
+>> Cavium ThunderX2 SMMUv3 implementation has two Silicon Erratas.
+>> 1. Errata ID #74
+>>    SMMU register alias Page 1 is not implemented
+>> 2. Errata ID #126
+>>    SMMU doesnt support unique IRQ lines and also MSI for gerror,
+>>    eventq and cmdq-sync
+>>
+>> The following patchset does software workaround for these two erratas.
+>>
+>> This series is based on patchset.
+>> https://www.spinics.net/lists/arm-kernel/msg578443.html
+>
+> Yes so it is not standalone. How are we going to merge these
+> ACPI IORT/ACPICA/SMMU patches - inclusive of:
+>
+> [1] https://www.spinics.net/lists/arm-kernel/msg586458.html
+>
+> Rafael, do ACPICA patches go upstream via the ACPI tree pull request ?
 
-I still have the same comment as v1.
+Not as a rule.
 
-> +- resets: References to all the resets specified in the reset-names property
-> +  as specified in [2].
-> +- reset-names: string reset name, must be "apb".
-> +
-> +Required nodes:
-> +- dsi input port node: connected to the ltdc rgb output port, see [3] & [4].
-> +- panel or bridge node: see [6].
+> To remove dependency on ACPICA changes this series needs updating
+> anyway and for [1] above I think the only solution is for all the
+> patches to go via the ACPI tree (if ACPICA updates go upstream with it).
 
-Need to be explicit here. Port 0 is ... Port 1 is ...
+I think we may ask Lv to backport the header changes once they have
+been merged into Linux.
 
-> +
-> +Note: You can find more documentation
-> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +[2] Documentation/devicetree/bindings/reset/reset.txt
-> +[3] Documentation/devicetree/bindings/media/video-interfaces.txt
-> +[4] Documentation/devicetree/bindings/graph.txt
-> +[5] Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
-> +[6] Documentation/devicetree/bindings/display/mipi-dsi-bus.txt
-> +
-> +Example 1: RGB panel
->  / {
->  	...
->  	soc {
-> @@ -33,3 +64,53 @@ Example:
->  		};
->  	};
->  };
-> +
-> +Example 2: DSI panel
-> +
-> +/ {
-> +	...
-> +	soc {
-> +	...
-> +		ltdc: display-controller at 40016800 {
-> +			compatible = "st,stm32-ltdc";
-> +			reg = <0x40016800 0x200>;
-> +			interrupts = <88>, <89>;
-> +			resets = <&rcc STM32F4_APB2_RESET(LTDC)>;
-> +			clocks = <&rcc 1 CLK_LCD>;
-> +			clock-names = "lcd";
-> +
-> +			port {
-> +				ltdc_out_dsi: endpoint {
-> +					remote-endpoint = <&dsi_in>;
-> +				};
-> +			};
-> +		};
-> +
-> +
-> +		dsi: dsi at 40016c00 {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			compatible = "st,stm32-dsi";
-> +			reg = <0x40016c00 0x800>;
-> +			clocks = <&rcc 1 CLK_F469_DSI>, <&clk_hse>;
-> +			clock-names = "ref", "pclk";
-> +			resets = <&rcc STM32F4_APB2_RESET(DSI)>;
-> +			reset-names = "apb";
-> +
-> +			port {
-> +				dsi_in: endpoint {
-> +					remote-endpoint = <&ltdc_out_dsi>;
-> +				};
-> +			};
-> +
-> +			panel-dsi at 0 {
+Lv, would that work?
 
-This should use graph binding instead. Or at least we should allow that 
-and be clear above that we do.
-
-> +				reg = <0>; /* dsi virtual channel (0..3) */
-> +				compatible = ...;
-> +				enable-gpios = ...;
-> +
-> +			};
-> +
-> +		};
-> +
-> +	};
-> +};
-> -- 
-> 1.9.1
-> 
+Thanks,
+Rafael
