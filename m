@@ -1,43 +1,86 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu,  8 Jun 2017 18:10:45 +0200
-Subject: [PATCH 34/35] ARM: s5pv210_defconfig: Save defconfig
-In-Reply-To: <20170608160836.12196-1-krzk@kernel.org>
-References: <20170608160836.12196-1-krzk@kernel.org>
-Message-ID: <20170608161049.12421-34-krzk@kernel.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 8 Jun 2017 16:15:13 +0000
+Subject: [PATCH] mm: vmalloc: simplify vread/vwrite to use existing
+ mappings
+In-Reply-To: <20170608160644.GM4902@n2100.armlinux.org.uk>
+References: <20170607182052.31447-1-ard.biesheuvel@linaro.org>
+ <20170608160644.GM4902@n2100.armlinux.org.uk>
+Message-ID: <CAKv+Gu93O7_BmfFa-5yPr18GoRu=24JOEX3-c4bu3kmUhKrd7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Generate new defconfig to get rid of obsolete Kconfig entries:
- - S3C_LOWLEVEL_UART_PORT and S3C_DEV_FB are invalid for S5P;
- - S5PV210_SETUP_FB_24BPP is gone;
- - rest of entries is being removed by default values;
+On 8 June 2017 at 16:06, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+> On Wed, Jun 07, 2017 at 06:20:52PM +0000, Ard Biesheuvel wrote:
+>> The current safe path iterates over each mapping page by page, and
+>> kmap()'s each one individually, which is expensive and unnecessary.
+>> Instead, let's use kern_addr_valid() to establish on a per-VMA basis
+>> whether we may safely derefence them, and do so via its mapping in
+>> the VMALLOC region. This can be done safely due to the fact that we
+>> are holding the vmap_area_lock spinlock.
+>
+> This doesn't sound correct if you look at the definition of
+> kern_addr_valid().  For example, x86-32 has:
+>
+> /*
+>  * kern_addr_valid() is (1) for FLATMEM and (0) for
+>  * SPARSEMEM and DISCONTIGMEM
+>  */
+> #ifdef CONFIG_FLATMEM
+> #define kern_addr_valid(addr)   (1)
+> #else
+> #define kern_addr_valid(kaddr)  (0)
+> #endif
+>
+> The majority of architectures simply do:
+>
+> #define kern_addr_valid(addr)   (1)
+>
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- arch/arm/configs/s5pv210_defconfig | 4 ----
- 1 file changed, 4 deletions(-)
+That is interesting, thanks for pointing it out.
 
-diff --git a/arch/arm/configs/s5pv210_defconfig b/arch/arm/configs/s5pv210_defconfig
-index ddf7f75ba8d9..09b5a7386414 100644
---- a/arch/arm/configs/s5pv210_defconfig
-+++ b/arch/arm/configs/s5pv210_defconfig
-@@ -11,9 +11,6 @@ CONFIG_PARTITION_ADVANCED=y
- CONFIG_BSD_DISKLABEL=y
- CONFIG_SOLARIS_X86_PARTITION=y
- CONFIG_ARCH_S5PV210=y
--CONFIG_S3C_LOWLEVEL_UART_PORT=1
--CONFIG_S3C_DEV_FB=y
--CONFIG_S5PV210_SETUP_FB_24BPP=y
- CONFIG_VMSPLIT_2G=y
- CONFIG_PREEMPT=y
- CONFIG_AEABI=y
-@@ -36,7 +33,6 @@ CONFIG_SERIAL_SAMSUNG=y
- CONFIG_SERIAL_SAMSUNG_CONSOLE=y
- CONFIG_HW_RANDOM=y
- # CONFIG_HWMON is not set
--# CONFIG_VGA_CONSOLE is not set
- # CONFIG_USB_SUPPORT is not set
- CONFIG_EXT2_FS=y
- CONFIG_MSDOS_FS=y
--- 
-2.9.3
+The function read_kcore() [which is where the issue I am trying to fix
+originates] currently has this logic:
+
+  if (kern_addr_valid(start)) {
+          unsigned long n;
+
+          /*
+           * Using bounce buffer to bypass the
+           * hardened user copy kernel text checks.
+           */
+          memcpy(buf, (char *) start, tsz);
+          n = copy_to_user(buffer, buf, tsz);
+          /*
+           * We cannot distinguish between fault on source
+           * and fault on destination. When this happens
+           * we clear too and hope it will trigger the
+           * EFAULT again.
+           */
+          if (n) {
+                  if (clear_user(buffer + tsz - n,
+                                          n))
+                          return -EFAULT;
+          }
+  } else {
+          if (clear_user(buffer, tsz))
+                  return -EFAULT;
+  }
+
+and the implementation I looked at [on arm64] happens to be the only
+one that does something non-trivial.
+
+> So, the result is that on the majority of architectures, we're now
+> going to simply dereference 'addr' with very little in the way of
+> checks.
+>
+
+Indeed.
+
+> I think this makes these functions racy - the point at which the
+> entry is placed onto the vmalloc list is quite different from the
+> point where the page table entries for it are populated (which
+> happens with the lock dropped.)  So, I think this is asking for
+> an oops.
+>
+
+Fair enough. I will try to find a different approach then.
