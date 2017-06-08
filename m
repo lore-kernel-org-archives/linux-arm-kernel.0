@@ -1,60 +1,55 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Thu,  8 Jun 2017 15:26:09 +0200
-Subject: [PATCH 44/44] powerpc: merge __dma_set_mask into dma_set_mask
+Date: Thu,  8 Jun 2017 15:25:56 +0200
+Subject: [PATCH 31/44] hexagon: remove arch-specific dma_supported
+ implementation
 In-Reply-To: <20170608132609.32662-1-hch@lst.de>
 References: <20170608132609.32662-1-hch@lst.de>
-Message-ID: <20170608132609.32662-45-hch@lst.de>
+Message-ID: <20170608132609.32662-32-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This implementation is simply bogus - hexagon only has a simple
+direct mapped DMA implementation and thus doesn't care about the
+address.
+
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- arch/powerpc/include/asm/dma-mapping.h |  1 -
- arch/powerpc/kernel/dma.c              | 13 ++++---------
- 2 files changed, 4 insertions(+), 10 deletions(-)
+ arch/hexagon/include/asm/dma-mapping.h | 2 --
+ arch/hexagon/kernel/dma.c              | 9 ---------
+ 2 files changed, 11 deletions(-)
 
-diff --git a/arch/powerpc/include/asm/dma-mapping.h b/arch/powerpc/include/asm/dma-mapping.h
-index 73aedbe6c977..eaece3d3e225 100644
---- a/arch/powerpc/include/asm/dma-mapping.h
-+++ b/arch/powerpc/include/asm/dma-mapping.h
-@@ -112,7 +112,6 @@ static inline void set_dma_offset(struct device *dev, dma_addr_t off)
- #define HAVE_ARCH_DMA_SET_MASK 1
- extern int dma_set_mask(struct device *dev, u64 dma_mask);
- 
--extern int __dma_set_mask(struct device *dev, u64 dma_mask);
- extern u64 __dma_get_required_mask(struct device *dev);
- 
- static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
-diff --git a/arch/powerpc/kernel/dma.c b/arch/powerpc/kernel/dma.c
-index 466c9f07b288..4194bbbbdb10 100644
---- a/arch/powerpc/kernel/dma.c
-+++ b/arch/powerpc/kernel/dma.c
-@@ -314,14 +314,6 @@ EXPORT_SYMBOL(dma_set_coherent_mask);
- 
- #define PREALLOC_DMA_DEBUG_ENTRIES (1 << 16)
- 
--int __dma_set_mask(struct device *dev, u64 dma_mask)
--{
--	if (!dev->dma_mask || !dma_supported(dev, dma_mask))
--		return -EIO;
--	*dev->dma_mask = dma_mask;
--	return 0;
--}
--
- int dma_set_mask(struct device *dev, u64 dma_mask)
- {
- 	if (ppc_md.dma_set_mask)
-@@ -334,7 +326,10 @@ int dma_set_mask(struct device *dev, u64 dma_mask)
- 			return phb->controller_ops.dma_set_mask(pdev, dma_mask);
- 	}
- 
--	return __dma_set_mask(dev, dma_mask);
-+	if (!dev->dma_mask || !dma_supported(dev, dma_mask))
-+		return -EIO;
-+	*dev->dma_mask = dma_mask;
-+	return 0;
+diff --git a/arch/hexagon/include/asm/dma-mapping.h b/arch/hexagon/include/asm/dma-mapping.h
+index 00e3f10113b0..9c15cb5271a6 100644
+--- a/arch/hexagon/include/asm/dma-mapping.h
++++ b/arch/hexagon/include/asm/dma-mapping.h
+@@ -37,8 +37,6 @@ static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
+ 	return dma_ops;
  }
- EXPORT_SYMBOL(dma_set_mask);
+ 
+-#define HAVE_ARCH_DMA_SUPPORTED 1
+-extern int dma_supported(struct device *dev, u64 mask);
+ extern int dma_is_consistent(struct device *dev, dma_addr_t dma_handle);
+ extern void dma_cache_sync(struct device *dev, void *vaddr, size_t size,
+ 			   enum dma_data_direction direction);
+diff --git a/arch/hexagon/kernel/dma.c b/arch/hexagon/kernel/dma.c
+index 71269dc0f225..9ff1b2041f85 100644
+--- a/arch/hexagon/kernel/dma.c
++++ b/arch/hexagon/kernel/dma.c
+@@ -35,15 +35,6 @@ static inline void *dma_addr_to_virt(dma_addr_t dma_addr)
+ 	return phys_to_virt((unsigned long) dma_addr);
+ }
+ 
+-int dma_supported(struct device *dev, u64 mask)
+-{
+-	if (mask == DMA_BIT_MASK(32))
+-		return 1;
+-	else
+-		return 0;
+-}
+-EXPORT_SYMBOL(dma_supported);
+-
+ static struct gen_pool *coherent_pool;
+ 
  
 -- 
 2.11.0
