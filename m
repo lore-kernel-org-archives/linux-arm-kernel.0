@@ -1,79 +1,26 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu,  8 Jun 2017 14:39:55 +0200
-Subject: [PATCH RESEND] ARM64: dts: meson-gx: use specific compatible for the
- AO pwms
-In-Reply-To: <b3812e40-cb59-a30f-9558-2926ca49a29a@baylibre.com>
-References: <b3812e40-cb59-a30f-9558-2926ca49a29a@baylibre.com>
-Message-ID: <20170608123955.3571-1-jbrunet@baylibre.com>
+From: angus@akkea.ca (Angus Ainslie)
+Date: Thu, 08 Jun 2017 06:43:59 -0600
+Subject: Staging r8723bs driver for kernel 4.12.0-rc2 on CHIPPro
+In-Reply-To: <1496925243.11482.19.camel@hadess.net>
+References: <bcc1a7c44ba34cb077a1df09971d6926@www.akkea.ca>
+ <8485e88721d4761d5b1a10ff1eebfd36@www.akkea.ca>
+ <1496925243.11482.19.camel@hadess.net>
+Message-ID: <6c396e96b0534a710411a1641aeb1e10@www.akkea.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the specific compatible for AO pwms so the pwms input can
-be correctly set
+On 2017-06-08 06:34, Bastien Nocera wrote:
+> I haven't looked at it again in a long while due to lack of time, but
+> that might be a good first pass at the problem, before getting onto the
+> CHIP Pro.
+> 
 
-FDIV4 is not present on the pwm A0, so change kadhas vim input
-clocks to xtal.
+I ran out of time as well, I hope to get back to it in a couple of week. 
+I could try on the CHIP but I suspect it will have the same issue.
 
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
-This patch depends on the pwm patchset available here [0]
+At this point to mmc0 is being detected but the driver doesn't load the 
+sdio driver. I've tried various changes to the dts including adding a 
+dts match table to the rtl8723bs driver but haven't had any success yet.
 
-On the Khadas Vim I chose to replace FDIV4 with the crytal.
-Only PWM_AO_B is actually used and It is used for led dimming.
-The frequency, as long as it is high enough, does not matter.
-Only the duty cycle does. After testing, xtal seems to be fast
-enough.
-
-PWM_AO_A is outputed on the general purpose header, but no usage is
-defined for it.
-
-It might be bit late for that but I wonder why it defined and enabled ?
-Same goes for the other peripherals activated on this general purpose
-header.
-
-I know that's what shows the schematics but one could choose to do
-anything else possible with it ? like use in GPIO mode, or another
-function. In addition, we never which setting will be required ? (eg
-which clock source ?).
-
-Should we keep those ? or remove them ?
-
-Resend to correct the typo reported by Neil and update the dependency to
-the v2 of the pwm series.
-
-[0]: https://lkml.kernel.org/r/20170608122416.1993-1-jbrunet at baylibre.com
-
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi                  | 2 +-
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-index 436b875060e7..fbaa6b598fca 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-@@ -391,7 +391,7 @@
- 			};
- 
- 			pwm_AO_ab: pwm at 550 {
--				compatible = "amlogic,meson-gx-pwm", "amlogic,meson-gxbb-pwm";
-+				compatible = "amlogic,meson-gx-ao-pwm", "amlogic,meson-gxbb-ao-pwm";
- 				reg = <0x0 0x00550 0x0 0x10>;
- 				#pwm-cells = <3>;
- 				status = "disabled";
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
-index 6a81f0168da5..371f43cdd3ab 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
-@@ -86,8 +86,8 @@
- 	status = "okay";
- 	pinctrl-0 = <&pwm_ao_a_3_pins>, <&pwm_ao_b_pins>;
- 	pinctrl-names = "default";
--	clocks = <&clkc CLKID_FCLK_DIV4>;
--	clock-names = "clkin0";
-+	clocks = <&xtal> , <&xtal>;
-+	clock-names = "clkin0", "clkin1" ;
- };
- 
- &pwm_ef {
--- 
-2.9.4
+I wish ntc would stop coming up with new products and finish the ones 
+they already have released.
