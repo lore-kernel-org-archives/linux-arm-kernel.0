@@ -1,61 +1,27 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  8 Jun 2017 19:22:19 +0000
-Subject: [PATCH v4] mm: huge-vmap: fail gracefully on unexpected huge vmap
- mappings
-Message-ID: <20170608192219.8338-1-ard.biesheuvel@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 8 Jun 2017 14:25:49 -0500
+Subject: [PATCH v5 1/6] pinctrl: qcom: Add ipq8074 pinctrl driver
+In-Reply-To: <1496900641-27755-2-git-send-email-varada@codeaurora.org>
+References: <1496900641-27755-1-git-send-email-varada@codeaurora.org>
+ <1496900641-27755-2-git-send-email-varada@codeaurora.org>
+Message-ID: <20170608192549.g444mzh4brpv2crj@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Existing code that uses vmalloc_to_page() may assume that any
-address for which is_vmalloc_addr() returns true may be passed
-into vmalloc_to_page() to retrieve the associated struct page.
+On Thu, Jun 08, 2017 at 11:13:56AM +0530, Varadarajan Narayanan wrote:
+> Add initial pinctrl driver to support pin configuration with
+> pinctrl framework for ipq8074.
+> 
+> Signed-off-by: Manoharan Vijaya Raghavan <mraghava@codeaurora.org>
+> Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
+> ---
+>  .../bindings/pinctrl/qcom,ipq8074-pinctrl.txt      |  172 ++++
 
-This is not un unreasonable assumption to make, but on architectures
-that have CONFIG_HAVE_ARCH_HUGE_VMAP=y, it no longer holds, and we
-need to ensure that vmalloc_to_page() does not go off into the weeds
-trying to dereference huge PUDs or PMDs as table entries.
+Acked-by: Rob Herring <robh@kernel.org>
 
-Given that vmalloc() and vmap() themselves never create huge
-mappings or deal with compound pages at all, there is no correct
-answer in this case, so return NULL instead, and issue a warning.
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-v4: - use pud_bad/pmd_bad instead of pud_huge/pmd_huge, which don't require
-      changes to hugetlb.h, and give us what we need on all architectures
-    - move WARN_ON_ONCE() calls out of conditionals
-    - add explanatory comment
-
- mm/vmalloc.c | 15 +++++++++++++--
- 1 file changed, 13 insertions(+), 2 deletions(-)
-
-diff --git a/mm/vmalloc.c b/mm/vmalloc.c
-index 34a1c3e46ed7..0ba20eb17212 100644
---- a/mm/vmalloc.c
-+++ b/mm/vmalloc.c
-@@ -287,10 +287,21 @@ struct page *vmalloc_to_page(const void *vmalloc_addr)
- 	if (p4d_none(*p4d))
- 		return NULL;
- 	pud = pud_offset(p4d, addr);
--	if (pud_none(*pud))
-+
-+	/*
-+	 * Don't dereference bad PUD or PMD (below) entries. This will also
-+	 * identify huge mappings, which we may encounter on architectures
-+	 * that define CONFIG_HAVE_ARCH_HUGE_VMAP=y. Such regions will be
-+	 * identified as vmalloc addresses by is_vmalloc_addr(), but are not
-+	 * [unambiguously] associated with a struct page, so there is no
-+	 * correct value to return for them.
-+	 */
-+	WARN_ON_ONCE(pud_bad(*pud));
-+	if (pud_none(*pud) || pud_bad(*pud))
- 		return NULL;
- 	pmd = pmd_offset(pud, addr);
--	if (pmd_none(*pmd))
-+	WARN_ON_ONCE(pmd_bad(*pmd);
-+	if (pmd_none(*pmd) || pmd_bad(*pmd))
- 		return NULL;
- 
- 	ptep = pte_offset_map(pmd, addr);
--- 
-2.9.3
+>  drivers/pinctrl/qcom/Kconfig                       |   10 +
+>  drivers/pinctrl/qcom/Makefile                      |    1 +
+>  drivers/pinctrl/qcom/pinctrl-ipq8074.c             | 1076 ++++++++++++++++++++
+>  4 files changed, 1259 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/qcom,ipq8074-pinctrl.txt
+>  create mode 100644 drivers/pinctrl/qcom/pinctrl-ipq8074.c
