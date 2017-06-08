@@ -1,105 +1,73 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Thu, 8 Jun 2017 17:18:18 +0200
-Subject: [PATCH v3 9/9] KVM: arm/arm64: Don't assume initialized vgic
- when setting PMU IRQ
-In-Reply-To: <87y3t2h7ja.fsf@arm.com>
-References: <20170608133446.3875-1-cdall@linaro.org>
- <20170608133446.3875-10-cdall@linaro.org> <87y3t2h7ja.fsf@arm.com>
-Message-ID: <20170608151818.GB6378@cbox>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 8 Jun 2017 16:24:34 +0100
+Subject: [PATCH 19/20] arm64:ilp32: add vdso-ilp32 and use for signal
+ return
+In-Reply-To: <20170604120009.342-20-ynorov@caviumnetworks.com>
+References: <20170604120009.342-1-ynorov@caviumnetworks.com>
+ <20170604120009.342-20-ynorov@caviumnetworks.com>
+Message-ID: <20170608152434.5jgcrk6jisdaqap7@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 08, 2017 at 03:35:05PM +0100, Marc Zyngier wrote:
-> On Thu, Jun 08 2017 at  3:34:46 pm BST, Christoffer Dall <cdall@linaro.org> wrote:
-> > The PMU IRQ number is set through the VCPU device's KVM_SET_DEVICE_ATTR
-> > ioctl handler for the KVM_ARM_VCPU_PMU_V3_IRQ attribute, but there is no
-> > enforced or stated requirement that this must happen after initializing
-> > the VGIC.  As a result, calling vgic_valid_spi() which relies on the
-> > nr_spis being set during the VGIC init can incorrectly fail.
-> >
-> > Introduce irq_is_spi, which determines if an IRQ number is within the
-> > SPI range without verifying it against the actual VGIC properties.
-> >
-> > Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> > ---
-> >  include/kvm/arm_vgic.h | 2 ++
-> >  virt/kvm/arm/pmu.c     | 2 +-
-> >  2 files changed, 3 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> > index 131668f..a2ae9d2 100644
-> > --- a/include/kvm/arm_vgic.h
-> > +++ b/include/kvm/arm_vgic.h
-> > @@ -39,6 +39,8 @@
-> >  #define KVM_IRQCHIP_NUM_PINS	(1020 - 32)
-> >  
-> >  #define irq_is_ppi(irq) ((irq) >= VGIC_NR_SGIS && (irq) < VGIC_NR_PRIVATE_IRQS)
-> > +#define irq_is_spi(irq) ((irq) >= VGIC_NR_PRIVATE_IRQS && \
-> > +			 (irq) <= VGIC_MAX_SPI)
-> >  
-> >  enum vgic_type {
-> >  	VGIC_V2,		/* Good ol' GICv2 */
-> > diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-> > index 26a42a9..87cb325 100644
-> > --- a/virt/kvm/arm/pmu.c
-> > +++ b/virt/kvm/arm/pmu.c
-> > @@ -547,7 +547,7 @@ int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
-> >  			return -EFAULT;
-> >  
-> >  		/* The PMU overflow interrupt can be a PPI or a valid SPI. */
-> > -		if (!(irq_is_ppi(irq) || vgic_valid_spi(vcpu->kvm, irq)))
-> > +		if (!(irq_is_ppi(irq) || irq_is_spi(irq)))
-> >  			return -EINVAL;
-> >  
-> >  		if (!pmu_irq_is_valid(vcpu->kvm, irq))
+On Sun, Jun 04, 2017 at 03:00:08PM +0300, Yury Norov wrote:
+> From: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
 > 
-> Does it mean that we can now fail an injection if the SPI is out of the
-> range of configured SPIs?
+> ILP32 VDSO exports following symbols:
+>  __kernel_rt_sigreturn;
+>  __kernel_gettimeofday;
+>  __kernel_clock_gettime;
+>  __kernel_clock_getres.
 > 
-> If that's the case, the WARN_ON() in kvm_pmu_update_state() is going to
-> fire badly, and that's going to be ugly. Should we add a check for this
-> case in kvm_arm_pmu_v3_init()?
+> What shared object to use, kernel selects depending on result of
+> is_ilp32_compat_task() in arch/arm64/kernel/vdso.c, so it substitutes
+> correct pages and spec.
 > 
+> Adjusted to move the data page before code pages in sync with
+> commit 601255ae3c98 ("arm64: vdso: move data page before code pages")
+> 
+> Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+> Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
+> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+> Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@linaro.org>
+> ---
+>  arch/arm64/Makefile                           |  3 +
+>  arch/arm64/include/asm/vdso.h                 |  6 ++
+>  arch/arm64/kernel/Makefile                    |  1 +
+>  arch/arm64/kernel/asm-offsets.c               |  7 ++
+>  arch/arm64/kernel/signal.c                    |  2 +
+>  arch/arm64/kernel/vdso-ilp32/.gitignore       |  2 +
+>  arch/arm64/kernel/vdso-ilp32/Makefile         | 80 ++++++++++++++++++++++
+>  arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S     | 33 ++++++++++
+>  arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S | 95 +++++++++++++++++++++++++++
+>  arch/arm64/kernel/vdso.c                      | 65 +++++++++++++++---
+>  arch/arm64/kernel/vdso/gettimeofday.S         | 20 +++++-
+>  arch/arm64/kernel/vdso/vdso.S                 |  6 +-
+>  12 files changed, 304 insertions(+), 16 deletions(-)
+>  create mode 100644 arch/arm64/kernel/vdso-ilp32/.gitignore
+>  create mode 100644 arch/arm64/kernel/vdso-ilp32/Makefile
+>  create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S
+>  create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
 
-Yes, we should.  How about this fixup?
+Does this patch get simpler with Andrew Pinski's vdso in C proposal?
+I have to read the other thread in detail, Will followed up already.
 
+> diff --git a/arch/arm64/include/asm/vdso.h b/arch/arm64/include/asm/vdso.h
+> index 839ce0031bd5..649a9a416500 100644
+> --- a/arch/arm64/include/asm/vdso.h
+> +++ b/arch/arm64/include/asm/vdso.h
+> @@ -29,6 +29,12 @@
+>  
+>  #include <generated/vdso-offsets.h>
+>  
+> +#ifdef CONFIG_ARM64_ILP32
+> +#include <generated/vdso-ilp32-offsets.h>
+> +#else
+> +#define vdso_offset_sigtramp_ilp32
+> +#endif
 
-diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index 5dbaa2c7..fc8a723 100644
---- a/virt/kvm/arm/pmu.c
-+++ b/virt/kvm/arm/pmu.c
-@@ -458,10 +458,24 @@ int kvm_arm_pmu_v3_enable(struct kvm_vcpu *vcpu)
- 	/*
- 	 * A valid interrupt configuration for the PMU is either to have a
- 	 * properly configured interrupt number and using an in-kernel
--	 * irqchip, or to neither set an IRQ nor create an in-kernel irqchip.
-+	 * irqchip, or to not have an in-kernel GIC and not set an IRQ.
- 	 */
--	if (kvm_arm_pmu_irq_initialized(vcpu) != irqchip_in_kernel(vcpu->kvm))
--		return -EINVAL;
-+	if (irqchip_in_kernel(vcpu->kvm)) {
-+		int irq = vcpu->arch.pmu.irq_num;
-+		if (!kvm_arm_pmu_irq_initialized(vcpu))
-+			return -EINVAL;
-+
-+		/*
-+		 * If we are using an in-kernel vgic, at this point we know
-+		 * the vgic will be initialized, so we can check the PMU irq
-+		 * number against the dimensions of the vgic and make sure
-+		 * it's valid.
-+		 */
-+		if (!irq_is_ppi(irq) && !vgic_valid_spi(vcpu->kvm, irq))
-+			return -EINVAL;
-+	} else if (kvm_arm_pmu_irq_initialized(vcpu)) {
-+		   return -EINVAL;
-+	}
- 
- 	kvm_pmu_vcpu_reset(vcpu);
- 	vcpu->arch.pmu.ready = true;
+BTW, here you could do something like:
 
+#define vdso_offset_sigtramp_ilp32	({ BUILD_BUG(); 0; })
 
-If you're happy with that, I'll just squash that into the current patch
-before applying the series.
-
-Thanks,
--Christoffer
+-- 
+Catalin
