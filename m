@@ -1,64 +1,106 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 8 Jun 2017 14:51:08 +0000
-Subject: [PATCH v3] mm: huge-vmap: fail gracefully on unexpected huge vmap
- mappings
-In-Reply-To: <20170608132859.GE5765@leverpostej>
-References: <20170608113548.24905-1-ard.biesheuvel@linaro.org>
- <20170608125946.GD5765@leverpostej> <20170608132859.GE5765@leverpostej>
-Message-ID: <CAKv+Gu8FuRE5fMunqOw9XgpPJK1uPRAJdY8y20+OszjsM1QOWQ@mail.gmail.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Thu, 8 Jun 2017 16:59:38 +0200
+Subject: [PATCH v3 6/9] KVM: arm/arm64: Introduce an allocator for
+ in-kernel irq lines
+In-Reply-To: <87bmpyine0.fsf@arm.com>
+References: <20170608133446.3875-1-cdall@linaro.org>
+ <20170608133446.3875-7-cdall@linaro.org> <87bmpyine0.fsf@arm.com>
+Message-ID: <20170608145938.GA6378@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 June 2017 at 13:28, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Jun 08, 2017 at 01:59:46PM +0100, Mark Rutland wrote:
->> On Thu, Jun 08, 2017 at 11:35:48AM +0000, Ard Biesheuvel wrote:
->> > @@ -287,10 +288,10 @@ struct page *vmalloc_to_page(const void *vmalloc_addr)
->> >     if (p4d_none(*p4d))
->> >             return NULL;
->> >     pud = pud_offset(p4d, addr);
->> > -   if (pud_none(*pud))
->> > +   if (pud_none(*pud) || WARN_ON_ONCE(pud_huge(*pud)))
->> >             return NULL;
->> >     pmd = pmd_offset(pud, addr);
->> > -   if (pmd_none(*pmd))
->> > +   if (pmd_none(*pmd) || WARN_ON_ONCE(pmd_huge(*pmd)))
->> >             return NULL;
->>
->> I think it might be better to use p*d_bad() here, since that doesn't
->> depend on CONFIG_HUGETLB_PAGE.
->>
->> While the cross-arch semantics are a little fuzzy, my understanding is
->> those should return true if an entry is not a pointer to a next level of
->> table (so pXd_huge(p) implies pXd_bad(p)).
->
-> Ugh; it turns out this isn't universally true.
->
-> I see that at least arch/hexagon's pmd_bad() always returns 0, and they
-> support CONFIG_HUGETLB_PAGE.
->
+On Thu, Jun 08, 2017 at 03:07:19PM +0100, Marc Zyngier wrote:
+> On Thu, Jun 08 2017 at  3:34:43 pm BST, Christoffer Dall <cdall@linaro.org> wrote:
+> > Having multiple devices being able to signal the same interrupt line is
+> > very confusing and almost certainly guarantees a configuration error.
+> >
+> > Therefore, introduce a very simple allocator which allows a device to
+> > claim an interrupt line from the vgic for a given VM.
+> >
+> > Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> > ---
+> >  include/kvm/arm_vgic.h   |  5 +++++
+> >  virt/kvm/arm/vgic/vgic.c | 33 +++++++++++++++++++++++++++++++++
+> >  2 files changed, 38 insertions(+)
+> >
+> > diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> > index dde59fb..5d5b345 100644
+> > --- a/include/kvm/arm_vgic.h
+> > +++ b/include/kvm/arm_vgic.h
+> > @@ -121,6 +121,9 @@ struct vgic_irq {
+> >  	u8 source;			/* GICv2 SGIs only */
+> >  	u8 priority;
+> >  	enum vgic_irq_config config;	/* Level or edge */
+> > +
+> > +	void *owner;			/* Opaque pointer to reserve an interrupt
+> > +					   for in-kernel devices. */
+> >  };
+> >  
+> >  struct vgic_register_region;
+> > @@ -340,4 +343,6 @@ int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi);
+> >   */
+> >  int kvm_vgic_setup_default_irq_routing(struct kvm *kvm);
+> >  
+> > +int kvm_vgic_set_owner(struct kvm_vcpu *vcpu, unsigned int intid, void *owner);
+> > +
+> >  #endif /* __KVM_ARM_VGIC_H */
+> > diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> > index c66feac..9628945 100644
+> > --- a/virt/kvm/arm/vgic/vgic.c
+> > +++ b/virt/kvm/arm/vgic/vgic.c
+> > @@ -435,6 +435,39 @@ int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq)
+> >  }
+> >  
+> >  /**
+> > + * kvm_vgic_set_owner - Set the owner of an interrupt for a VM
+> > + *
+> > + * @vcpu:   Pointer to the VCPU (used for PPIs)
+> > + * @intid:  The virtual INTID identifying the interrupt (PPI or SPI)
+> > + * @owner:  Opaque pointer to the owner
+> > + *
+> > + * Returns 0 if intid is not already used by another in-kernel device and the
+> > + * owner is set, otherwise returns an error code.
+> > + */
+> > +int kvm_vgic_set_owner(struct kvm_vcpu *vcpu, unsigned int intid, void *owner)
+> > +{
+> > +	struct vgic_irq *irq;
+> > +	int ret = 0;
+> > +
+> > +	if (!vgic_initialized(vcpu->kvm))
+> > +		return -EAGAIN;
+> > +
+> > +	/* SGIs and LPIs cannot be wired up to any device */
+> > +	if (!irq_is_ppi(intid) && !vgic_valid_spi(vcpu->kvm, intid))
+> > +		return -EINVAL;
+> > +
+> > +	irq = vgic_get_irq(vcpu->kvm, vcpu, intid);
+> > +	spin_lock(&irq->irq_lock);
+> > +	if (irq->owner && irq->owner != owner)
+> > +		ret = -EEXIST;
+> > +	else
+> > +		irq->owner = owner;
+> 
+> Is there any case where you'd end-up setting the owner multiple times?
+> Or is that just convenient?
+> 
 
-Well, the comment in arch/hexagon/include/asm/pgtable.h suggests otherwise:
+I think the timer code ended up doing that in some sequence, but maybe
+not.  In any case, I'm not sure if it makes much of a difference?
 
-/*  HUGETLB not working currently  */
+> > +	spin_unlock(&irq->irq_lock);
+> > +
+> > +	return ret;
+> > +}
+> > +
+> > +/**
+> >   * vgic_prune_ap_list - Remove non-relevant interrupts from the list
+> >   *
+> >   * @vcpu: The VCPU pointer
+> 
+> Otherwise,
+> 
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
 
-
-> So I guess there isn't an arch-neutral, always-available way of checking
-> this. Sorry for having mislead you.
->
-> For arm64, p*d_bad() would still be preferable, so maybe we should check
-> both?
->
-
-I am primarily interested in hardening architectures that define
-CONFIG_HAVE_ARCH_HUGE_VMAP, given that they intentionally create huge
-mappings in the VMALLOC area which this code may choke on. So whether
-pmd_bad() always returns 0 on an arch that does not define
-CONFIG_HAVE_ARCH_HUGE_VMAP does not really matter, because it simply
-nullifies this change for that particular architecture.
-
-So as long as x86 and arm64 [which are the only ones to define
-CONFIG_HAVE_ARCH_HUGE_VMAP atm] work correctly with pXd_bad(), I think
-we should use it instead of pXd_huge(),
-
--- 
-Ard.
+Thanks,
+-Christoffer
