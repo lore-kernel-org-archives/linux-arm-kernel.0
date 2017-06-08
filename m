@@ -1,74 +1,42 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 8 Jun 2017 17:11:04 -0500
-Subject: [PATCH 2/3] dt-bindings: Add Broadcom STB USB PHY binding document
-In-Reply-To: <1496426512-10590-3-git-send-email-alcooperx@gmail.com>
-References: <1496426512-10590-1-git-send-email-alcooperx@gmail.com>
- <1496426512-10590-3-git-send-email-alcooperx@gmail.com>
-Message-ID: <20170608221104.7nsinggo4vngbmus@rob-hp-laptop>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Fri,  9 Jun 2017 06:08:39 +0800
+Subject: [PATCH v6 6/8] regulator: hi6421: Describe consumed platform device
+In-Reply-To: <20170608220841.26531-1-guodong.xu@linaro.org>
+References: <20170608220841.26531-1-guodong.xu@linaro.org>
+Message-ID: <20170608220841.26531-7-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 02, 2017 at 02:01:51PM -0400, Al Cooper wrote:
-> Add DT bindings document for Broadcom STB USB PHYs
-> 
-> Signed-off-by: Al Cooper <alcooperx@gmail.com>
-> ---
->  .../bindings/phy/brcm,brcmstb-usb-phy.txt          | 37 ++++++++++++++++++++++
->  1 file changed, 37 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/brcm,brcmstb-usb-phy.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/brcm,brcmstb-usb-phy.txt b/Documentation/devicetree/bindings/phy/brcm,brcmstb-usb-phy.txt
-> new file mode 100644
-> index 0000000..e1e9b16
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/phy/brcm,brcmstb-usb-phy.txt
-> @@ -0,0 +1,37 @@
-> +Broadcom STB USB PHY
-> +
-> +Required properties:
-> + - compatible: brcm,brcmstb-usb-phy
-> + - reg: two offset and length pairs. The second pair specifies optional
-> +        registers used by some of the SoCs that support USB 3.x
-> + - #phy-cells: Shall be 1 as it expects one argument for setting
-> +	       the type of the PHY. Possible values are 0 (1.1 and 2.0),
-> +	       1 (3.x)
-> +
-> +Optional Properties:
-> +- clocks : clock phandles.
-> +- clock-names: String, clock name.
-> +- brcm,ipp: Boolean, Invert Port Power.
-> +  Possible values are: 0 (Don't invert), 1 (Invert)
-> +- brcm,ioc: Boolean, Invert Over Current detection.
-> +  Possible values are: 0 (Don't invert), 1 (Invert)
-> +- brcm,has-xhci: Boolean indicating an optional 3.x only XHCI controller.
-> +- brcm,has-xhci-only: Boolean indicating an XHCI controller that supports
-> +  1.1, 2.0 and 3.0 devices
-> +- brcm,device: String, PHY Device mode.
-> +  Possible values are: off (Host), on (Device), dual (DRD)
-> +  or typec-pd (Type-C PD control)
+The hi6421-regulator driver consumes a similarly named platform device.
+Adding that to the module device table, allows modprobe to locate this
+driver once the device is created.
 
-I believe we have standard property for this though maybe not type C.
+Cc: Jeremy Linton <lintonrjeremy@gmail.com>
+Cc: Mark Brown <broonie@kernel.org>
+Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/regulator/hi6421-regulator.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-off/on seem strange for meaning host/device as well.
-
-> +
-> +Example:
-> +
-> +usbphy_0: usb-phy at f0470200 {
-> +	reg = <0xf0470200 0xb8>,
-> +		<0xf0471940 0x6c0>;
-> +	compatible = "brcm,brcmstb-usb-phy";
-> +	#phy-cells = <1>;
-> +	brcm,ioc = <1>;
-> +	brcm,ipp = <1>;
-> +	brcm,has-xhci;
-> +	clocks = <&usb20>, <&usb30>;
-> +	clock-names = "sw_usb", "sw_usb3";
-> +};
-> -- 
-> 1.9.0.138.g2de3478
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/drivers/regulator/hi6421-regulator.c b/drivers/regulator/hi6421-regulator.c
+index 62c5f54..259c3a8 100644
+--- a/drivers/regulator/hi6421-regulator.c
++++ b/drivers/regulator/hi6421-regulator.c
+@@ -621,7 +621,14 @@ static int hi6421_regulator_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct platform_device_id hi6421_regulator_table[] = {
++	{ .name = "hi6421-regulator" },
++	{},
++};
++MODULE_DEVICE_TABLE(platform, hi6421_regulator_table);
++
+ static struct platform_driver hi6421_regulator_driver = {
++	.id_table = hi6421_regulator_table,
+ 	.driver = {
+ 		.name	= "hi6421-regulator",
+ 	},
+-- 
+2.10.2
