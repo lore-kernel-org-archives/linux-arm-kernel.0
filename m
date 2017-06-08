@@ -1,42 +1,43 @@
-From: varada@codeaurora.org (Varadarajan Narayanan)
-Date: Thu,  8 Jun 2017 11:14:01 +0530
-Subject: [PATCH v5 6/6] arm64: defconfig: Enable qcom ipq8074 clock and pinctrl
-In-Reply-To: <1496900641-27755-1-git-send-email-varada@codeaurora.org>
-References: <1496900641-27755-1-git-send-email-varada@codeaurora.org>
-Message-ID: <1496900641-27755-7-git-send-email-varada@codeaurora.org>
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Thu, 8 Jun 2017 14:05:44 +0800
+Subject: [PATCH] ARM/Kconfig: make VMSPLIT_3G_OPT depends on !ARM_LPAE
+Message-ID: <1496901944-42140-1-git-send-email-xieyisheng1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Abhishek Sahu <absahu@codeaurora.org>
+When both enable CONFIG_ARM_LPAE=y and CONFIG_VMSPLIT_3G_OPT=y, which
+means use PAGE_OFFSET=0xB0000000 with ARM_LPAE, the kernel will boot
+fail and stop after uncompressed:
 
-These configs are required for booting kernel in qcom
-ipq8074 boards.
+   Starting kernel ...
 
-Signed-off-by: Abhishek Sahu <absahu@codeaurora.org>
-Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
+   Uart base = 0x20001000
+   watchdog reg = 0x20013000
+   dtb addr = 0x80840308
+   Uncompressing Linux... done, booting the kernel.
+
+For ARM_LPAE only support 3:1, 2:2, 1:3 split of TTBR1, which mention in:
+   http://elinux.org/images/6/6a/Elce11_marinas.pdf - p16
+
+So we should make VMSPLIT_3G_OPT depends on !ARM_LPAE to avoid trigger
+this bug.
+
+Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
 ---
- arch/arm64/configs/defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 65cdd87..c20328e 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -267,6 +267,7 @@ CONFIG_SPI_S3C64XX=y
- CONFIG_SPI_SPIDEV=m
- CONFIG_SPMI=y
- CONFIG_PINCTRL_SINGLE=y
-+CONFIG_PINCTRL_IPQ8074=y
- CONFIG_PINCTRL_MAX77620=y
- CONFIG_PINCTRL_MSM8916=y
- CONFIG_PINCTRL_MSM8994=y
-@@ -450,6 +451,7 @@ CONFIG_CLK_QORIQ=y
- CONFIG_COMMON_CLK_PWM=y
- CONFIG_COMMON_CLK_QCOM=y
- CONFIG_QCOM_CLK_SMD_RPM=y
-+CONFIG_IPQ_GCC_8074=y
- CONFIG_MSM_GCC_8916=y
- CONFIG_MSM_GCC_8994=y
- CONFIG_MSM_MMCC_8996=y
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 4c1a35f..c0fcab6 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1416,6 +1416,7 @@ choice
+ 	config VMSPLIT_3G
+ 		bool "3G/1G user/kernel split"
+ 	config VMSPLIT_3G_OPT
++		depends on !ARM_LPAE
+ 		bool "3G/1G user/kernel split (for full 1G low memory)"
+ 	config VMSPLIT_2G
+ 		bool "2G/2G user/kernel split"
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+1.7.12.4
