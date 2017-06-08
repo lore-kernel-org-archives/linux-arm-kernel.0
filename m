@@ -1,26 +1,59 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 08 Jun 2017 15:00:44 +0100
-Subject: [PATCH v3 1/9] KVM: arm64: Allow creating the PMU without the
- in-kernel GIC
-In-Reply-To: <20170608133446.3875-2-cdall@linaro.org> (Christoffer Dall's
- message of "Thu, 8 Jun 2017 15:34:38 +0200")
-References: <20170608133446.3875-1-cdall@linaro.org>
- <20170608133446.3875-2-cdall@linaro.org>
-Message-ID: <87fufainoz.fsf@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 8 Jun 2017 15:02:00 +0100
+Subject: [PATCH 16/44] arm64: remove DMA_ERROR_CODE
+In-Reply-To: <20170608132609.32662-17-hch@lst.de>
+References: <20170608132609.32662-1-hch@lst.de>
+ <20170608132609.32662-17-hch@lst.de>
+Message-ID: <dddc8995-8278-0604-07cd-ffe34526686e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 08 2017 at  3:34:38 pm BST, Christoffer Dall <cdall@linaro.org> wrote:
-> Since we got support for devices in userspace which allows reporting the
-> PMU overflow output status to userspace, we should actually allow
-> creating the PMU on systems without an in-kernel irqchip, which in turn
-> requires us to slightly clarify error codes for the ABI and move things
-> around for the initialization phase.
->
-> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+On 08/06/17 14:25, Christoph Hellwig wrote:
+> The dma alloc interface returns an error by return NULL, and the
+> mapping interfaces rely on the mapping_error method, which the dummy
+> ops already implement correctly.
+> 
+> Thus remove the DMA_ERROR_CODE define.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 
-	M.
--- 
-Jazz is not dead, it just smell funny.
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> ---
+>  arch/arm64/include/asm/dma-mapping.h | 1 -
+>  arch/arm64/mm/dma-mapping.c          | 3 +--
+>  2 files changed, 1 insertion(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+> index 5392dbeffa45..cf8fc8f05580 100644
+> --- a/arch/arm64/include/asm/dma-mapping.h
+> +++ b/arch/arm64/include/asm/dma-mapping.h
+> @@ -24,7 +24,6 @@
+>  #include <xen/xen.h>
+>  #include <asm/xen/hypervisor.h>
+>  
+> -#define DMA_ERROR_CODE	(~(dma_addr_t)0)
+>  extern const struct dma_map_ops dummy_dma_ops;
+>  
+>  static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index 3216e098c058..147fbb907a2f 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -184,7 +184,6 @@ static void *__dma_alloc(struct device *dev, size_t size,
+>  no_map:
+>  	__dma_free_coherent(dev, size, ptr, *dma_handle, attrs);
+>  no_mem:
+> -	*dma_handle = DMA_ERROR_CODE;
+>  	return NULL;
+>  }
+>  
+> @@ -487,7 +486,7 @@ static dma_addr_t __dummy_map_page(struct device *dev, struct page *page,
+>  				   enum dma_data_direction dir,
+>  				   unsigned long attrs)
+>  {
+> -	return DMA_ERROR_CODE;
+> +	return 0;
+>  }
+>  
+>  static void __dummy_unmap_page(struct device *dev, dma_addr_t dev_addr,
+> 
