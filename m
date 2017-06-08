@@ -1,140 +1,82 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Thu,  8 Jun 2017 18:25:28 +0100
-Subject: [PATCH v3 3/4] arm64: mm: Update perf accounting to handle poison
- faults
-In-Reply-To: <20170608172529.11986-1-punit.agrawal@arm.com>
-References: <20170608172529.11986-1-punit.agrawal@arm.com>
-Message-ID: <20170608172529.11986-4-punit.agrawal@arm.com>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Thu, 8 Jun 2017 10:32:07 -0700
+Subject: [PATCH] gpio: zynq: Clarify quirk and provide helper function
+Message-ID: <20170608173207.30056-1-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Re-organise the perf accounting for fault handling in preparation for
-enabling handling of hardware poison faults in subsequent commits. The
-change updates perf accounting to be inline with the behaviour on
-x86.
+The one quirk used in the zynq GPIO driver was called FOO which is not
+very descriptive. Rename the quirk to IS_ZYNQ as it indicates whether
+the HW is a zynq or zynqmp device to allow handling of device-specific
+differences of the HW.
+Also provide a helper function to test whether the HW is zynq or zynqmp.
 
-With this update, the perf fault accounting -
-
-  * Always report PERF_COUNT_SW_PAGE_FAULTS
-
-  * Doesn't report anything else for VM_FAULT_ERROR (which includes
-    hwpoison faults)
-
-  * Reports PERF_COUNT_SW_PAGE_FAULTS_MAJ if it's a major
-    fault (indicated by VM_FAULT_MAJOR)
-
-  * Otherwise, reports PERF_COUNT_SW_PAGE_FAULTS_MIN
-
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 ---
- arch/arm64/mm/fault.c | 68 +++++++++++++++++++++++++++------------------------
- 1 file changed, 36 insertions(+), 32 deletions(-)
+ drivers/gpio/gpio-zynq.c | 21 +++++++++++++++------
+ 1 file changed, 15 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index a85b44343ac6..7e501e7faec1 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -342,7 +342,7 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
+diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
+index ed87c9a6e0e6..df0851464006 100644
+--- a/drivers/gpio/gpio-zynq.c
++++ b/drivers/gpio/gpio-zynq.c
+@@ -96,8 +96,8 @@
+ /* GPIO upper 16 bit mask */
+ #define ZYNQ_GPIO_UPPER_MASK 0xFFFF0000
+ 
+-/* For GPIO quirks */
+-#define ZYNQ_GPIO_QUIRK_FOO	BIT(0)
++/* set to differentiate zynq from zynqmp, 0=zynqmp, 1=zynq */
++#define ZYNQ_GPIO_QUIRK_IS_ZYNQ	BIT(0)
+ 
+ /**
+  * struct zynq_gpio - gpio device private data structure
+@@ -136,6 +136,17 @@ static struct irq_chip zynq_gpio_level_irqchip;
+ static struct irq_chip zynq_gpio_edge_irqchip;
+ 
+ /**
++ * zynq_gpio_is_zynq - test if HW is zynq or zynqmp
++ * @gpio:	Pointer to driver data struct
++ *
++ * Return: 0 if zynqmp, 1 if zynq.
++ */
++static int zynq_gpio_is_zynq(struct zynq_gpio *gpio)
++{
++	return !!(gpio->p_data->quirks & ZYNQ_GPIO_QUIRK_IS_ZYNQ);
++}
++
++/**
+  * zynq_gpio_get_bank_pin - Get the bank number and pin number within that bank
+  * for a given pin in the GPIO device
+  * @pin_num:	gpio pin number within the device
+@@ -242,18 +253,16 @@ static void zynq_gpio_set_value(struct gpio_chip *chip, unsigned int pin,
+ static int zynq_gpio_dir_in(struct gpio_chip *chip, unsigned int pin)
  {
- 	struct task_struct *tsk;
- 	struct mm_struct *mm;
--	int fault, sig, code;
-+	int fault, sig, code, major = 0;
- 	unsigned long vm_flags = VM_READ | VM_WRITE;
- 	unsigned int mm_flags = FAULT_FLAG_ALLOW_RETRY | FAULT_FLAG_KILLABLE;
+ 	u32 reg;
+-	bool is_zynq_gpio;
+ 	unsigned int bank_num, bank_pin_num;
+ 	struct zynq_gpio *gpio = gpiochip_get_data(chip);
  
-@@ -381,6 +381,8 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
- 			die("Accessing user space memory outside uaccess.h routines", regs, esr);
- 	}
- 
-+	perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS, 1, regs, addr);
-+
- 	/*
- 	 * As per x86, we may deadlock here. However, since the kernel only
- 	 * validly references user space from well defined areas of the code,
-@@ -404,24 +406,42 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
- 	}
- 
- 	fault = __do_page_fault(mm, addr, mm_flags, vm_flags, tsk);
-+	major |= fault & VM_FAULT_MAJOR;
- 
--	/*
--	 * If we need to retry but a fatal signal is pending, handle the
--	 * signal first. We do not need to release the mmap_sem because it
--	 * would already be released in __lock_page_or_retry in mm/filemap.c.
--	 */
--	if ((fault & VM_FAULT_RETRY) && fatal_signal_pending(current))
--		return 0;
-+	if (fault & VM_FAULT_RETRY) {
-+		/*
-+		 * If we need to retry but a fatal signal is pending,
-+		 * handle the signal first. We do not need to release
-+		 * the mmap_sem because it would already be released
-+		 * in __lock_page_or_retry in mm/filemap.c.
-+		 */
-+		if (fatal_signal_pending(current))
-+			return 0;
-+
-+		/*
-+		 * Clear FAULT_FLAG_ALLOW_RETRY to avoid any risk of
-+		 * starvation.
-+		 */
-+		if (mm_flags & FAULT_FLAG_ALLOW_RETRY) {
-+			mm_flags &= ~FAULT_FLAG_ALLOW_RETRY;
-+			mm_flags |= FAULT_FLAG_TRIED;
-+			goto retry;
-+		}
-+	}
-+	up_read(&mm->mmap_sem);
+-	is_zynq_gpio = gpio->p_data->quirks & ZYNQ_GPIO_QUIRK_FOO;
+ 	zynq_gpio_get_bank_pin(pin, &bank_num, &bank_pin_num, gpio);
  
  	/*
--	 * Major/minor page fault accounting is only done on the initial
--	 * attempt. If we go through a retry, it is extremely likely that the
--	 * page will be found in page cache at that point.
-+	 * Handle the "normal" (no error) case first.
+ 	 * On zynq bank 0 pins 7 and 8 are special and cannot be used
+ 	 * as inputs.
  	 */
--
--	perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS, 1, regs, addr);
--	if (mm_flags & FAULT_FLAG_ALLOW_RETRY) {
--		if (fault & VM_FAULT_MAJOR) {
-+	if (likely(!(fault & (VM_FAULT_ERROR | VM_FAULT_BADMAP |
-+			      VM_FAULT_BADACCESS)))) {
-+		/*
-+		 * Major/minor page fault accounting is only done
-+		 * once. If we go through a retry, it is extremely
-+		 * likely that the page will be found in page cache at
-+		 * that point.
-+		 */
-+		if (major) {
- 			tsk->maj_flt++;
- 			perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS_MAJ, 1, regs,
- 				      addr);
-@@ -430,25 +450,9 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
- 			perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS_MIN, 1, regs,
- 				      addr);
- 		}
--		if (fault & VM_FAULT_RETRY) {
--			/*
--			 * Clear FAULT_FLAG_ALLOW_RETRY to avoid any risk of
--			 * starvation.
--			 */
--			mm_flags &= ~FAULT_FLAG_ALLOW_RETRY;
--			mm_flags |= FAULT_FLAG_TRIED;
--			goto retry;
--		}
--	}
--
--	up_read(&mm->mmap_sem);
+-	if (is_zynq_gpio && bank_num == 0 &&
++	if (zynq_gpio_is_zynq(gpio) && bank_num == 0 &&
+ 		(bank_pin_num == 7 || bank_pin_num == 8))
+ 		return -EINVAL;
  
--	/*
--	 * Handle the "normal" case first - VM_FAULT_MAJOR
--	 */
--	if (likely(!(fault & (VM_FAULT_ERROR | VM_FAULT_BADMAP |
--			      VM_FAULT_BADACCESS))))
- 		return 0;
-+	}
+@@ -637,7 +646,7 @@ static const struct zynq_platform_data zynqmp_gpio_def = {
  
- 	/*
- 	 * If we are in kernel mode at this point, we have no context to
+ static const struct zynq_platform_data zynq_gpio_def = {
+ 	.label = "zynq_gpio",
+-	.quirks = ZYNQ_GPIO_QUIRK_FOO,
++	.quirks = ZYNQ_GPIO_QUIRK_IS_ZYNQ,
+ 	.ngpio = ZYNQ_GPIO_NR_GPIOS,
+ 	.max_bank = ZYNQ_GPIO_MAX_BANK,
+ 	.bank_min[0] = ZYNQ_GPIO_BANK0_PIN_MIN(),
 -- 
-2.11.0
+2.13.1.3.g25490cb03
