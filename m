@@ -1,67 +1,67 @@
 From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Thu,  8 Jun 2017 22:04:24 +0200
-Subject: [PATCH V2 1/5] phy: bcm-ns-usb3: always wait for idle after writing
- to the PHY reg
+Date: Thu,  8 Jun 2017 22:04:26 +0200
+Subject: [PATCH V2 3/5] phy: bcm-ns-usb3: enable MDIO in the platform specific
+ code
 In-Reply-To: <20170608200428.9187-1-zajec5@gmail.com>
 References: <20170511132925.14564-1-zajec5@gmail.com>
  <20170608200428.9187-1-zajec5@gmail.com>
-Message-ID: <20170608200428.9187-2-zajec5@gmail.com>
+Message-ID: <20170608200428.9187-4-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-Move MDIO specific code to the writing helper function. This makes init
-code a bit more generic and doesn't require it to track what happens
-after every write.
+When we finally start using MDIO layer then bus initialization will be
+handled in a separated driver. It means our code handling this has to be
+used for the platform driver only.
 
 Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 ---
- drivers/phy/broadcom/phy-bcm-ns-usb3.c | 11 +----------
- 1 file changed, 1 insertion(+), 10 deletions(-)
+ drivers/phy/broadcom/phy-bcm-ns-usb3.c | 18 ++++++------------
+ 1 file changed, 6 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/phy/broadcom/phy-bcm-ns-usb3.c b/drivers/phy/broadcom/phy-bcm-ns-usb3.c
-index 22b5e7047fa6..5e89326886dc 100644
+index 3d0fe5728029..2c9a0d5f43d8 100644
 --- a/drivers/phy/broadcom/phy-bcm-ns-usb3.c
 +++ b/drivers/phy/broadcom/phy-bcm-ns-usb3.c
-@@ -112,7 +112,7 @@ static int bcm_ns_usb3_mdio_phy_write(struct bcm_ns_usb3 *usb3, u16 reg,
- 	tmp |= value;
- 	writel(tmp, usb3->ccb_mii + BCMA_CCB_MII_MNG_CMD_DATA);
+@@ -80,12 +80,6 @@ static int bcm_ns_usb3_phy_init_ns_bx(struct bcm_ns_usb3 *usb3)
+ {
+ 	int err;
  
--	return 0;
-+	return bcm_ns_usb3_mii_mng_wait_idle(usb3);
- }
- 
- static int bcm_ns_usb3_phy_init_ns_bx(struct bcm_ns_usb3 *usb3)
-@@ -143,9 +143,6 @@ static int bcm_ns_usb3_phy_init_ns_bx(struct bcm_ns_usb3 *usb3)
- 	/* Deaaserting PLL Reset */
- 	bcm_ns_usb3_mdio_phy_write(usb3, BCM_NS_USB3_PLLA_CONTROL1, 0x8000);
- 
--	/* Waiting MII Mgt interface idle */
--	bcm_ns_usb3_mii_mng_wait_idle(usb3);
+-	/* Enable MDIO. Setting MDCDIV as 26  */
+-	writel(0x0000009a, usb3->ccb_mii + BCMA_CCB_MII_MNG_CTL);
 -
- 	/* Deasserting USB3 system reset */
- 	writel(0, usb3->dmp + BCMA_RESET_CTL);
- 
-@@ -169,9 +166,6 @@ static int bcm_ns_usb3_phy_init_ns_bx(struct bcm_ns_usb3 *usb3)
- 	/* Enabling SSC */
- 	bcm_ns_usb3_mdio_phy_write(usb3, BCM_NS_USB3_TX_PMD_CONTROL1, 0x1003);
- 
--	/* Waiting MII Mgt interface idle */
--	bcm_ns_usb3_mii_mng_wait_idle(usb3);
+-	/* Wait for MDIO? */
+-	udelay(2);
 -
- 	return 0;
- }
+ 	/* USB3 PLL Block */
+ 	err = bcm_ns_usb3_mdio_phy_write(usb3, BCM_NS_USB3_PHY_BASE_ADDR_REG,
+ 					 BCM_NS_USB3_PHY_PLL30_BLOCK);
+@@ -134,12 +128,6 @@ static int bcm_ns_usb3_phy_init_ns_ax(struct bcm_ns_usb3 *usb3)
+ {
+ 	int err;
  
-@@ -205,9 +199,6 @@ static int bcm_ns_usb3_phy_init_ns_ax(struct bcm_ns_usb3 *usb3)
- 
- 	bcm_ns_usb3_mdio_phy_write(usb3, BCM_NS_USB3_TX_PMD_CONTROL1, 0x1003);
- 
--	/* Waiting MII Mgt interface idle */
--	bcm_ns_usb3_mii_mng_wait_idle(usb3);
+-	/* Enable MDIO. Setting MDCDIV as 26  */
+-	writel(0x0000009a, usb3->ccb_mii + BCMA_CCB_MII_MNG_CTL);
 -
- 	/* Deasserting USB3 system reset */
- 	writel(0, usb3->dmp + BCMA_RESET_CTL);
+-	/* Wait for MDIO? */
+-	udelay(2);
+-
+ 	/* PLL30 block */
+ 	err = bcm_ns_usb3_mdio_phy_write(usb3, BCM_NS_USB3_PHY_BASE_ADDR_REG,
+ 					 BCM_NS_USB3_PHY_PLL30_BLOCK);
+@@ -278,6 +266,12 @@ static int bcm_ns_usb3_probe(struct platform_device *pdev)
+ 		return PTR_ERR(usb3->ccb_mii);
+ 	}
  
++	/* Enable MDIO. Setting MDCDIV as 26  */
++	writel(0x0000009a, usb3->ccb_mii + BCMA_CCB_MII_MNG_CTL);
++
++	/* Wait for MDIO? */
++	udelay(2);
++
+ 	usb3->phy_write = bcm_ns_usb3_platform_phy_write;
+ 
+ 	usb3->phy = devm_phy_create(dev, NULL, &ops);
 -- 
 2.11.0
