@@ -1,42 +1,32 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Fri,  9 Jun 2017 06:08:39 +0800
-Subject: [PATCH v6 6/8] regulator: hi6421: Describe consumed platform device
-In-Reply-To: <20170608220841.26531-1-guodong.xu@linaro.org>
-References: <20170608220841.26531-1-guodong.xu@linaro.org>
-Message-ID: <20170608220841.26531-7-guodong.xu@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 8 Jun 2017 17:21:50 -0500
+Subject: [PATCHv3 3/4] dt-bindings: i2c: Add Altera I2C Controller
+In-Reply-To: <1496447559-19782-4-git-send-email-thor.thayer@linux.intel.com>
+References: <1496447559-19782-1-git-send-email-thor.thayer@linux.intel.com>
+ <1496447559-19782-4-git-send-email-thor.thayer@linux.intel.com>
+Message-ID: <20170608222150.xxlrzrfhhqqvuovl@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The hi6421-regulator driver consumes a similarly named platform device.
-Adding that to the module device table, allows modprobe to locate this
-driver once the device is created.
+On Fri, Jun 02, 2017 at 06:52:38PM -0500, thor.thayer at linux.intel.com wrote:
+> From: Thor Thayer <thor.thayer@linux.intel.com>
+> 
+> Add the documentation to support the Altera synthesizable
+> logic I2C Controller in FPGA.
+> 
+> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+> ---
+> v2  Change the subject to identify dt-bindings
+>     Add synthesizable logic to description.
+>     Change compatible string to "altr,softip-i2c"
+>     Make description of clock phandle singular since 1 clock.
+>     Remove altr, from fifo-size
+>     Specify fifo-size is in bytes.
+> v3  Add version to compatible string "altr,softip-i2c-v1.0"
+>     Add for use in FPGA in description.
+> ---
+>  .../devicetree/bindings/i2c/i2c-altera.txt         | 39 ++++++++++++++++++++++
+>  1 file changed, 39 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-altera.txt
 
-Cc: Jeremy Linton <lintonrjeremy@gmail.com>
-Cc: Mark Brown <broonie@kernel.org>
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/regulator/hi6421-regulator.c | 7 +++++++
- 1 file changed, 7 insertions(+)
-
-diff --git a/drivers/regulator/hi6421-regulator.c b/drivers/regulator/hi6421-regulator.c
-index 62c5f54..259c3a8 100644
---- a/drivers/regulator/hi6421-regulator.c
-+++ b/drivers/regulator/hi6421-regulator.c
-@@ -621,7 +621,14 @@ static int hi6421_regulator_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct platform_device_id hi6421_regulator_table[] = {
-+	{ .name = "hi6421-regulator" },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(platform, hi6421_regulator_table);
-+
- static struct platform_driver hi6421_regulator_driver = {
-+	.id_table = hi6421_regulator_table,
- 	.driver = {
- 		.name	= "hi6421-regulator",
- 	},
--- 
-2.10.2
+Acked-by: Rob Herring <robh@kernel.org>
