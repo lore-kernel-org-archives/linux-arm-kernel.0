@@ -1,109 +1,50 @@
-From: alexander.duyck@gmail.com (Alexander Duyck)
-Date: Wed, 7 Jun 2017 16:24:36 -0700
-Subject: [PATCH v3 3/3] net/cxgb4: Use new
- PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
-In-Reply-To: <1496826968-10152-4-git-send-email-dingtianhong@huawei.com>
-References: <1496826968-10152-1-git-send-email-dingtianhong@huawei.com>
- <1496826968-10152-4-git-send-email-dingtianhong@huawei.com>
-Message-ID: <CAKgT0UeN7BK94wgU=LiD9CAo0ihrFgv2bZLFrTtr_+bgSbswxQ@mail.gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Wed, 7 Jun 2017 19:24:47 -0500
+Subject: [PATCH v2 3/3] remoteproc/keystone: Ensure the DSPs are in reset in
+ probe
+In-Reply-To: <20170608002447.47580-1-s-anna@ti.com>
+References: <20170608002447.47580-1-s-anna@ti.com>
+Message-ID: <20170608002447.47580-4-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 7, 2017 at 2:16 AM, Ding Tianhong <dingtianhong@huawei.com> wrote:
-> From: Casey Leedom <leedom@chelsio.com>
->
-> cxgb4 Ethernet driver now queries Root Complex Port to determine if it can
-> send TLPs to it with the Relaxed Ordering Attribute set.
->
-> Signed-off-by: Casey Leedom <leedom@chelsio.com>
-> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+From: "Andrew F. Davis" <afd@ti.com>
 
-So I am pretty sure this patch doesn't work with patch 2. We need to
-update it so that it doesn't check the root complex but instead checks
-itself to see if it is allowed to use relaxed ordering.
+The DSPs are expected to be in reset when the driver probes a device.
+If the DSPs are out of reset in probe, the system may crash when the
+firmware is being loaded. So, add a check to make sure the DSP resets
+are asserted, and if not, throw a eye-catchy warning and assert the
+resets specifically.
 
-What we need here is the ability to detect if relaxed ordering is
-disabled, and if so take the steps needed to enable peer to peer
-relaxed ordering without enabling relaxed ordering to the root
-complex. Do I have that right Casey?
+Signed-off-by: Andrew F. Davis <afd@ti.com>
+[s-anna at ti.com: replace warning with a WARN]
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
+v2: No code changes
 
-> ---
->  drivers/net/ethernet/chelsio/cxgb4/cxgb4.h      |  1 +
->  drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c | 17 +++++++++++++++++
->  drivers/net/ethernet/chelsio/cxgb4/sge.c        |  5 +++--
->  3 files changed, 21 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
-> index e88c180..478f25a 100644
-> --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
-> +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
-> @@ -521,6 +521,7 @@ enum {                                 /* adapter flags */
->         USING_SOFT_PARAMS  = (1 << 6),
->         MASTER_PF          = (1 << 7),
->         FW_OFLD_CONN       = (1 << 9),
-> +       ROOT_NO_RELAXED_ORDERING = (1 << 10),
->  };
->
->  enum {
-> diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-> index 38a5c67..fbfe341 100644
-> --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-> +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-> @@ -4628,6 +4628,7 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
->  #ifdef CONFIG_PCI_IOV
->         u32 v, port_vec;
->  #endif
-> +       struct pci_dev *root;
->
->         printk_once(KERN_INFO "%s - version %s\n", DRV_DESC, DRV_VERSION);
->
-> @@ -4726,6 +4727,22 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
->         adapter->msg_enable = DFLT_MSG_ENABLE;
->         memset(adapter->chan_map, 0xff, sizeof(adapter->chan_map));
->
-> +       /* If possible, we use PCIe Relaxed Ordering Attribute to deliver
-> +        * Ingress Packet Data to Free List Buffers in order to allow for
-> +        * chipset performance optimizations between the Root Complex and
-> +        * Memory Controllers.  (Messages to the associated Ingress Queue
-> +        * notifying new Packet Placement in the Free Lists Buffers will be
-> +        * send without the Relaxed Ordering Attribute thus guaranteing that
-> +        * all preceding PCIe Transaction Layer Packets will be processed
-> +        * first.)  But some Root Complexes have various issues with Upstream
-> +        * Transaction Layer Packets with the Relaxed Ordering Attribute set.
-> +        * So we check our Root Complex to see if it's flaged with advice
-> +        * against using Relaxed Ordering.
-> +        */
-> +       root = pci_find_pcie_root_port(adapter->pdev);
-> +       if (pcie_get_relaxed_ordering(root))
-> +               adapter->flags |= ROOT_NO_RELAXED_ORDERING;
-> +
->         spin_lock_init(&adapter->stats_lock);
->         spin_lock_init(&adapter->tid_release_lock);
->         spin_lock_init(&adapter->win0_lock);
-> diff --git a/drivers/net/ethernet/chelsio/cxgb4/sge.c b/drivers/net/ethernet/chelsio/cxgb4/sge.c
-> index f05f0d4..ac229a3 100644
-> --- a/drivers/net/ethernet/chelsio/cxgb4/sge.c
-> +++ b/drivers/net/ethernet/chelsio/cxgb4/sge.c
-> @@ -2571,6 +2571,7 @@ int t4_sge_alloc_rxq(struct adapter *adap, struct sge_rspq *iq, bool fwevtq,
->         struct fw_iq_cmd c;
->         struct sge *s = &adap->sge;
->         struct port_info *pi = netdev_priv(dev);
-> +       int relaxed = !(adap->flags & ROOT_NO_RELAXED_ORDERING);
->
->         /* Size needs to be multiple of 16, including status entry. */
->         iq->size = roundup(iq->size, 16);
-> @@ -2624,8 +2625,8 @@ int t4_sge_alloc_rxq(struct adapter *adap, struct sge_rspq *iq, bool fwevtq,
->
->                 flsz = fl->size / 8 + s->stat_len / sizeof(struct tx_desc);
->                 c.iqns_to_fl0congen |= htonl(FW_IQ_CMD_FL0PACKEN_F |
-> -                                            FW_IQ_CMD_FL0FETCHRO_F |
-> -                                            FW_IQ_CMD_FL0DATARO_F |
-> +                                            FW_IQ_CMD_FL0FETCHRO_V(relaxed) |
-> +                                            FW_IQ_CMD_FL0DATARO_V(relaxed) |
->                                              FW_IQ_CMD_FL0PADEN_F);
->                 if (cong >= 0)
->                         c.iqns_to_fl0congen |=
-> --
-> 1.9.0
->
->
+ drivers/remoteproc/keystone_remoteproc.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/drivers/remoteproc/keystone_remoteproc.c b/drivers/remoteproc/keystone_remoteproc.c
+index 6e09ef76f7c7..5f776bfd674a 100644
+--- a/drivers/remoteproc/keystone_remoteproc.c
++++ b/drivers/remoteproc/keystone_remoteproc.c
+@@ -456,6 +456,16 @@ static int keystone_rproc_probe(struct platform_device *pdev)
+ 	if (of_reserved_mem_device_init(dev))
+ 		dev_warn(dev, "device does not have specific CMA pool\n");
+ 
++	/* ensure the DSP is in reset before loading firmware */
++	ret = reset_control_status(ksproc->reset);
++	if (ret < 0) {
++		dev_err(dev, "failed to get reset status, status = %d\n", ret);
++		goto release_mem;
++	} else if (ret == 0) {
++		WARN(1, "device is not in reset\n");
++		keystone_rproc_dsp_reset(ksproc);
++	}
++
+ 	ret = rproc_add(rproc);
+ 	if (ret) {
+ 		dev_err(dev, "failed to add register device with remoteproc core, status = %d\n",
+-- 
+2.12.0
