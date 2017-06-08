@@ -1,29 +1,37 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 8 Jun 2017 15:43:14 +0100
-Subject: [PATCH 25/44] arm: implement ->mapping_error
-In-Reply-To: <20170608132609.32662-26-hch@lst.de>
-References: <20170608132609.32662-1-hch@lst.de>
- <20170608132609.32662-26-hch@lst.de>
-Message-ID: <20170608144313.GL4902@n2100.armlinux.org.uk>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 8 Jun 2017 16:37:11 +0200
+Subject: [PATCH v3 1/3] dt-bindings: mediatek: add bindings for MediaTek
+ MT7622 SoC
+In-Reply-To: <20170607213028.xsbgwwjgbgghk3vg@rob-hp-laptop>
+References: <cover.1496250798.git.sean.wang@mediatek.com>
+ <1b9dd0df077a59aea5a15e3cb7775f80224b0b06.1496250798.git.sean.wang@mediatek.com>
+ <20170607213028.xsbgwwjgbgghk3vg@rob-hp-laptop>
+Message-ID: <dc04ea44-4f4c-a914-2f92-266b3d11eb54@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-BOn Thu, Jun 08, 2017 at 03:25:50PM +0200, Christoph Hellwig wrote:
-> +static int dmabounce_mapping_error(struct device *dev, dma_addr_t dma_addr)
-> +{
-> +	if (dev->archdata.dmabounce)
-> +		return 0;
 
-I'm not convinced that we need this check here:
 
-        dev->archdata.dmabounce = device_info;
-        set_dma_ops(dev, &dmabounce_ops);
+On 07/06/17 23:30, Rob Herring wrote:
+> On Thu, Jun 01, 2017 at 01:28:59AM +0800, sean.wang at mediatek.com wrote:
+>> From: Sean Wang <sean.wang@mediatek.com>
+>>
+>> This adds dt-binding documentation for MediaTek MT7622 SoC
+>> which currently only includes basic items such as ARM CPU,
+>> MediaTek SYSIRQ and UART.
+>>
+>> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+>> Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+>> ---
+>>   Documentation/devicetree/bindings/arm/mediatek.txt                    | 4 ++++
+>>   .../devicetree/bindings/interrupt-controller/mediatek,sysirq.txt      | 3 ++-
+>>   Documentation/devicetree/bindings/serial/mtk-uart.txt                 | 1 +
+>>   3 files changed, 7 insertions(+), 1 deletion(-)
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
+> 
 
-There shouldn't be any chance of dev->archdata.dmabounce being NULL if
-the dmabounce_ops has been set as the current device DMA ops.  So I
-think that test can be killed.
+Pushed this one to v4.12-next/dts64
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+Matthias
