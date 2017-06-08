@@ -1,28 +1,52 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  8 Jun 2017 17:31:19 +0200
-Subject: [PATCH 0/4] ARM64: dts: meson-gx: Add HDMI and CVBS nodes for
- selected boards
-Message-ID: <1496935883-4966-1-git-send-email-narmstrong@baylibre.com>
+Date: Thu,  8 Jun 2017 17:31:22 +0200
+Subject: [PATCH 3/4] ARM64: dts: meson-gxl-s905x-khadas-vim: Add HDMI nodes
+In-Reply-To: <1496935883-4966-1-git-send-email-narmstrong@baylibre.com>
+References: <1496935883-4966-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1496935883-4966-4-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the CVBS and HDMI nodes for the following boards :
- - Wetek Play2
- - Khadas VIM
- - Amlogic P230 Reference board
- - Amlogic P212 Reference board
+Add HDMI nodes for the Khadas Vim board.
 
-Neil Armstrong (4):
-  ARM64: dts: meson-gxbb-wetek-play2: Add HDMI and CVBS Nodes
-  ARM64: dts: meson-gxl-s905d-p230: Add HDMI nodes
-  ARM64: dts: meson-gxl-s905x-khadas-vim: Add HDMI nodes
-  ARM64: dts: meson-gxl-s905x-p212: Add HDMI and CVBS nodes
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ .../dts/amlogic/meson-gxl-s905x-khadas-vim.dts     | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
- .../boot/dts/amlogic/meson-gxbb-wetek-play2.dts    | 40 ++++++++++++++++++++++
- .../boot/dts/amlogic/meson-gxl-s905d-p230.dts      | 24 +++++++++++++
- .../dts/amlogic/meson-gxl-s905x-khadas-vim.dts     | 23 +++++++++++++
- .../boot/dts/amlogic/meson-gxl-s905x-p212.dts      | 23 +++++++++++++
- 4 files changed, 110 insertions(+)
-
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
+index 6a81f01..72c5a9f 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
+@@ -54,6 +54,29 @@
+ 			linux,default-trigger = "default-on";
+ 		};
+ 	};
++
++	hdmi-connector {
++		compatible = "hdmi-connector";
++		type = "a";
++
++		port {
++			hdmi_connector_in: endpoint {
++				remote-endpoint = <&hdmi_tx_tmds_out>;
++			};
++		};
++	};
++};
++
++&hdmi_tx {
++	status = "okay";
++	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
++	pinctrl-names = "default";
++};
++
++&hdmi_tx_tmds_port {
++	hdmi_tx_tmds_out: endpoint {
++		remote-endpoint = <&hdmi_connector_in>;
++	};
+ };
+ 
+ &i2c_A {
 -- 
 1.9.1
