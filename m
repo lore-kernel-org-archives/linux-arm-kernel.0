@@ -1,44 +1,155 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Thu,  8 Jun 2017 08:55:13 +0100
-Subject: [PATCH 6/6] arm64: wire cpu-invariant accounting support up to the
- task scheduler
-In-Reply-To: <20170608075513.12475-1-dietmar.eggemann@arm.com>
-References: <20170608075513.12475-1-dietmar.eggemann@arm.com>
-Message-ID: <20170608075513.12475-7-dietmar.eggemann@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 8 Jun 2017 09:59:01 +0200
+Subject: [PATCH 46/58] clocksource/drivers: Add a new driver for the
+ Atmel ARM TC blocks
+In-Reply-To: <20170608074446.GM2345@mai>
+References: <20170530215139.9983-1-alexandre.belloni@free-electrons.com>
+ <20170530215139.9983-47-alexandre.belloni@free-electrons.com>
+ <20170606152104.GC2345@mai>
+ <20170606180559.pkrr7ux2qqnmsd6y@piout.net>
+ <20170607141735.GH2345@mai>
+ <20170607152750.tksmyf5p3oajbsac@piout.net>
+ <20170607210848.GJ2345@mai>
+ <20170607231715.ns2vcxza2eexnzjs@piout.net>
+ <20170608074236.62924f01@bbrezillon> <20170608074446.GM2345@mai>
+Message-ID: <20170608075900.i554dgbh3p5sq5ml@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 8cd5601c5060 ("sched/fair: Convert arch_scale_cpu_capacity() from
-weak function to #define") changed the wiring which now has to be done
-by associating arch_scale_cpu_capacity with the actual implementation
-provided by the architecture.
+On 08/06/2017 at 09:44:46 +0200, Daniel Lezcano wrote:
+> 
+> +Mark Rutland, +Rob Herring
+> 
+> 
+> Alexandre, Boris, have a look at https://www.spinics.net/lists/arm-kernel/msg572652.html
+> 
+> That will tell you the story.
+> 
 
-Define arch_scale_cpu_capacity to use the arch_topology "driver"
-function topology_get_cpu_scale() for the task scheduler's cpu-invariant
-accounting instead of the default arch_scale_cpu_capacity() in
-kernel/sched/sched.h.
+Ok, so is the solution putting the driver back in mach-at91 were we can
+do whatever we want like mach-omap2 is doing?
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Juri Lelli <juri.lelli@arm.com>
-Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
----
- arch/arm64/include/asm/topology.h | 3 +++
- 1 file changed, 3 insertions(+)
+> On Thu, Jun 08, 2017 at 07:42:36AM +0200, Boris Brezillon wrote:
+> > Le Thu, 8 Jun 2017 01:17:15 +0200,
+> > Alexandre Belloni <alexandre.belloni@free-electrons.com> a ?crit :
+> > 
+> > > On 07/06/2017 at 23:08:48 +0200, Daniel Lezcano wrote:
+> > > > > I was going to agree but this is not flexible enough because the
+> > > > > quadrature decoder always uses the first two channels. So on some
+> > > > > products, we may have:
+> > > > >  - TCB0:
+> > > > >    o channels 0,1: qdec
+> > > > >    o channel 2: clocksource
+> > > > > 
+> > > > >  - TCB1:
+> > > > >    o channels 0,1: qdec
+> > > > >    o channel 2: clockevent
+> > > > > 
+> > > > > This avoids wasting TCB channels.  
+> > > > 
+> > > > Ok. In this case you can check if the interrupt is specified for the node, if
+> > > > yes, then it is a clockevent.
+> > > >   
+> > > 
+> > > But currently it is always specified in the SoC's dtsi. I don't find
+> > > that too practical to push that to the board's dts. Also, lying by
+> > > omission (the IRQ is always wired) in the DT is not different from
+> > > having a property selecting which timer is the clocksource and which is
+> > > the clockevent.
+> > > 
+> > 
+> > I agree with Alexandre here. Really, there's not much we can do to
+> > detect which timer should be used as a clockevent and which one should
+> > be used as a clocksource except explicitly specifying it in the DT.
+> > Having an interrupt defined in one case (clockevent) and undefined in
+> > the other case (clocksource), is just as hack-ish as the detection logic
+> > Alexandre developed to avoid explicitly specifying the function
+> > assigned to a specific timer.
+> > 
+> > Can we please find a solution that makes everyone happy (DT,
+> > clocksoure/clockevent and at91 maintainers)?
+> > 
+> > How about adding a linux,timer-function property to specify which
+> > function this timer is providing?
+> > 
+> > Something like that for example:
+> > 
+> > 	tcb0: timer at fff7c000 {
+> > 		compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
+> > 		#address-cells = <1>;
+> > 		#size-cells = <0>;
+> > 		reg = <0xfff7c000 0x100>;
+> > 		interrupts = <18 4>;
+> > 		clocks = <&tcb0_clk>, <&clk32k>;
+> > 		clock-names = "t0_clk", "slow_clk";
+> > 
+> > 		timer at 0 {
+> > 			compatible = "atmel,tcb-timer";
+> > 			reg = <0>, <1>;
+> > 			linux,timer-function = "clocksource";
+> > 		};
+> > 
+> > 		timer at 2 {
+> > 			compatible = "atmel,tcb-timer";
+> > 			reg = <2>;
+> > 			linux,timer-function = "clockevent";
+> > 		};
+> > 	};
+> > 
+> > Alternatively, we could have a property or a node in chosen describing which
+> > timer should be used:
+> > 
+> > 	chosen {
+> > 		clockevent {
+> > 			timer = <&timer2>;
+> > 		};
+> > 
+> > 		clocksource {
+> > 			timer = <&timer0>;
+> > 		};
+> > 
+> > 		/*
+> > 		 * or
+> > 		 *
+> > 		 * clockevent = <&timer2>;
+> > 		 * clocksource = <&timer0>;
+> > 		 *
+> > 		 * but I think the clocksource/clockevent node approach
+> > 		 * is more future proof in case we need to add extra
+> > 		 * information like the expected resolution/precision or
+> > 		 * anything that could be tweakable.
+> > 		 */
+> > 	};
+> > 
+> > 	tcb0: timer at fff7c000 {
+> > 		compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
+> > 		#address-cells = <1>;
+> > 		#size-cells = <0>;
+> > 		reg = <0xfff7c000 0x100>;
+> > 		interrupts = <18 4>;
+> > 		clocks = <&tcb0_clk>, <&clk32k>;
+> > 		clock-names = "t0_clk", "slow_clk";
+> > 
+> > 		timer0: timer at 0 {
+> > 			compatible = "atmel,tcb-timer";
+> > 			reg = <0>, <1>;
+> > 		};
+> > 
+> > 		timer2: timer at 2 {
+> > 			compatible = "atmel,tcb-timer";
+> > 			reg = <2>;
+> > 		};
+> > 	};
+> 
+> -- 
+> 
+>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+> 
+> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter |
+> <http://www.linaro.org/linaro-blog/> Blog
 
-diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
-index 44598a86ec4a..e313eeb10756 100644
---- a/arch/arm64/include/asm/topology.h
-+++ b/arch/arm64/include/asm/topology.h
-@@ -37,6 +37,9 @@ int pcibus_to_node(struct pci_bus *bus);
- /* Replace task scheduler's default frequency-invariant accounting */
- #define arch_scale_freq_capacity topology_get_freq_scale
- 
-+/* Replace task scheduler's default cpu-invariant accounting */
-+#define arch_scale_cpu_capacity topology_get_cpu_scale
-+
- #include <asm-generic/topology.h>
- 
- #endif /* _ASM_ARM_TOPOLOGY_H */
 -- 
-2.11.0
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
