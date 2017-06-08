@@ -1,107 +1,39 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu,  8 Jun 2017 15:13:09 +0100
-Subject: [RFT PATCH v2 09/42] PCI: Introduce pci_scan_root_bus_bridge()
+Date: Thu,  8 Jun 2017 15:13:07 +0100
+Subject: [RFT PATCH v2 07/42] drivers: pci: host: ftpci100: Fix host bridge
+ memory leakage
 In-Reply-To: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
 References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170608141342.2018-10-lorenzo.pieralisi@arm.com>
+Message-ID: <20170608141342.2018-8-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current pci_scan_root_bus() interface is made up of two main
-code paths:
+When probing the PCI host controller driver, if an error condition
+is trigger the probe function code does not free memory allocated
+for the struct pci_host_bridge resulting in memory leakage.
 
-- pci_create_root_bus()
-- pci_scan_child_bus()
-
-pci_create_root_bus() is a wrapper function that allows to create
-a struct pci_host_bridge structure, initialize it with the passed
-parameters and register it with the kernel.
-
-As the struct pci_host_bridge require additional struct members,
-pci_create_root_bus() parameters list has grown in time, making
-it unwieldy to add further parameters to it in case the struct
-pci_host_bridge gains more members fields to augment its functionality.
-
-Since PCI core code provides functions to allocate struct
-pci_host_bridge, instead of forcing the pci_create_root_bus() interface
-to add new parameters to cater for new struct pci_host_bridge
-functionality, it is more suitable to add an interface in PCI
-core code to scan a PCI bus straight from a struct pci_host_bridge
-created and customized by each specific PCI host controller driver.
-
-Add a pci_scan_root_bus_bridge() function to allow PCI host controller
-drivers to create and initialize struct pci_host_bridge and scan
-the resulting bus.
+Move the struct pci_host_bridge allocation over to the respective
+devm interface to fix the issue.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
 ---
- drivers/pci/probe.c | 39 +++++++++++++++++++++++++++++++++++++++
- include/linux/pci.h |  1 +
- 2 files changed, 40 insertions(+)
+ drivers/pci/host/pci-ftpci100.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index e3f6965..690f0b3 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -2426,6 +2426,45 @@ void pci_bus_release_busn_res(struct pci_bus *b)
- 			res, ret ? "can not be" : "is");
- }
+diff --git a/drivers/pci/host/pci-ftpci100.c b/drivers/pci/host/pci-ftpci100.c
+index 1c1fd60..89cbb1f 100644
+--- a/drivers/pci/host/pci-ftpci100.c
++++ b/drivers/pci/host/pci-ftpci100.c
+@@ -441,7 +441,7 @@ static int faraday_pci_probe(struct platform_device *pdev)
+ 	u32 val;
+ 	LIST_HEAD(res);
  
-+int pci_scan_root_bus_bridge(struct pci_host_bridge *bridge)
-+{
-+	struct resource_entry *window;
-+	bool found = false;
-+	struct pci_bus *b;
-+	int max, bus, ret;
-+
-+	if (!bridge)
-+		return -EINVAL;
-+
-+	resource_list_for_each_entry(window, &bridge->windows)
-+		if (window->res->flags & IORESOURCE_BUS) {
-+			found = true;
-+			break;
-+		}
-+
-+	ret = pci_register_host_bridge(bridge);
-+	if (ret < 0)
-+		return ret;
-+
-+	b = bridge->bus;
-+	bus = bridge->busnr;
-+
-+	if (!found) {
-+		dev_info(&b->dev,
-+		 "No busn resource found for root bus, will use [bus %02x-ff]\n",
-+			bus);
-+		pci_bus_insert_busn_res(b, bus, 255);
-+	}
-+
-+	max = pci_scan_child_bus(b);
-+
-+	if (!found)
-+		pci_bus_update_busn_res_end(b, max);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(pci_scan_root_bus_bridge);
-+
- struct pci_bus *pci_scan_root_bus_msi(struct device *parent, int bus,
- 		struct pci_ops *ops, void *sysdata,
- 		struct list_head *resources, struct msi_controller *msi)
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index b21308e..72940cc 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -862,6 +862,7 @@ struct pci_bus *pci_scan_root_bus_msi(struct device *parent, int bus,
- struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
- 					     struct pci_ops *ops, void *sysdata,
- 					     struct list_head *resources);
-+int pci_scan_root_bus_bridge(struct pci_host_bridge *bridge);
- struct pci_bus *pci_add_new_bus(struct pci_bus *parent, struct pci_dev *dev,
- 				int busnr);
- void pcie_update_link_speed(struct pci_bus *bus, u16 link_status);
+-	host = pci_alloc_host_bridge(sizeof(*p));
++	host = devm_pci_alloc_host_bridge(dev, sizeof(*p));
+ 	if (!host)
+ 		return -ENOMEM;
+ 
 -- 
 2.10.0
