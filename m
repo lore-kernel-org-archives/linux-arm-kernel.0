@@ -1,82 +1,51 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Thu, 8 Jun 2017 10:32:07 -0700
-Subject: [PATCH] gpio: zynq: Clarify quirk and provide helper function
-Message-ID: <20170608173207.30056-1-soren.brinkmann@xilinx.com>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Thu, 8 Jun 2017 11:12:02 -0700 (PDT)
+Subject: [PATCH v2] xen: avoid type warning in xchg_xen_ulong
+In-Reply-To: <20170608085323.2209174-1-arnd@arndb.de>
+References: <20170608085323.2209174-1-arnd@arndb.de>
+Message-ID: <alpine.DEB.2.10.1706081110190.26108@sstabellini-ThinkPad-X260>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The one quirk used in the zynq GPIO driver was called FOO which is not
-very descriptive. Rename the quirk to IS_ZYNQ as it indicates whether
-the HW is a zynq or zynqmp device to allow handling of device-specific
-differences of the HW.
-Also provide a helper function to test whether the HW is zynq or zynqmp.
+On Thu, 8 Jun 2017, Arnd Bergmann wrote:
+> The improved type-checking version of container_of() triggers a warning for
+> xchg_xen_ulong, pointing out that 'xen_ulong_t' is unsigned, but atomic64_t
+> contains a signed value:
+> 
+> drivers/xen/events/events_2l.c: In function 'evtchn_2l_handle_events':
+> drivers/xen/events/events_2l.c:187:1020: error: call to '__compiletime_assert_187' declared with attribute error: pointer type mismatch in container_of()
+> 
+> This adds a cast to work around the warning.
+> 
+> Cc: Ian Abbott <abbotti@mev.co.uk>
+> Fixes: 85323a991d40 ("xen: arm: mandate EABI and use generic atomic operations.")
+> Fixes: daa2ac80834d ("kernel.h: handle pointers to arrays better in container_of()")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
- drivers/gpio/gpio-zynq.c | 21 +++++++++++++++------
- 1 file changed, 15 insertions(+), 6 deletions(-)
+Reviewed-by: Stefano Stabellini <sstabellini@kernel.org>
 
-diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
-index ed87c9a6e0e6..df0851464006 100644
---- a/drivers/gpio/gpio-zynq.c
-+++ b/drivers/gpio/gpio-zynq.c
-@@ -96,8 +96,8 @@
- /* GPIO upper 16 bit mask */
- #define ZYNQ_GPIO_UPPER_MASK 0xFFFF0000
- 
--/* For GPIO quirks */
--#define ZYNQ_GPIO_QUIRK_FOO	BIT(0)
-+/* set to differentiate zynq from zynqmp, 0=zynqmp, 1=zynq */
-+#define ZYNQ_GPIO_QUIRK_IS_ZYNQ	BIT(0)
- 
- /**
-  * struct zynq_gpio - gpio device private data structure
-@@ -136,6 +136,17 @@ static struct irq_chip zynq_gpio_level_irqchip;
- static struct irq_chip zynq_gpio_edge_irqchip;
- 
- /**
-+ * zynq_gpio_is_zynq - test if HW is zynq or zynqmp
-+ * @gpio:	Pointer to driver data struct
-+ *
-+ * Return: 0 if zynqmp, 1 if zynq.
-+ */
-+static int zynq_gpio_is_zynq(struct zynq_gpio *gpio)
-+{
-+	return !!(gpio->p_data->quirks & ZYNQ_GPIO_QUIRK_IS_ZYNQ);
-+}
-+
-+/**
-  * zynq_gpio_get_bank_pin - Get the bank number and pin number within that bank
-  * for a given pin in the GPIO device
-  * @pin_num:	gpio pin number within the device
-@@ -242,18 +253,16 @@ static void zynq_gpio_set_value(struct gpio_chip *chip, unsigned int pin,
- static int zynq_gpio_dir_in(struct gpio_chip *chip, unsigned int pin)
- {
- 	u32 reg;
--	bool is_zynq_gpio;
- 	unsigned int bank_num, bank_pin_num;
- 	struct zynq_gpio *gpio = gpiochip_get_data(chip);
- 
--	is_zynq_gpio = gpio->p_data->quirks & ZYNQ_GPIO_QUIRK_FOO;
- 	zynq_gpio_get_bank_pin(pin, &bank_num, &bank_pin_num, gpio);
- 
- 	/*
- 	 * On zynq bank 0 pins 7 and 8 are special and cannot be used
- 	 * as inputs.
- 	 */
--	if (is_zynq_gpio && bank_num == 0 &&
-+	if (zynq_gpio_is_zynq(gpio) && bank_num == 0 &&
- 		(bank_pin_num == 7 || bank_pin_num == 8))
- 		return -EINVAL;
- 
-@@ -637,7 +646,7 @@ static const struct zynq_platform_data zynqmp_gpio_def = {
- 
- static const struct zynq_platform_data zynq_gpio_def = {
- 	.label = "zynq_gpio",
--	.quirks = ZYNQ_GPIO_QUIRK_FOO,
-+	.quirks = ZYNQ_GPIO_QUIRK_IS_ZYNQ,
- 	.ngpio = ZYNQ_GPIO_NR_GPIOS,
- 	.max_bank = ZYNQ_GPIO_MAX_BANK,
- 	.bank_min[0] = ZYNQ_GPIO_BANK0_PIN_MIN(),
--- 
-2.13.1.3.g25490cb03
+I'll queue it up on xentip for Linux 4.13.
+
+
+> ---
+> v2: found the correct warning message and updated the changelog
+> ---
+>  arch/arm/include/asm/xen/events.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/include/asm/xen/events.h b/arch/arm/include/asm/xen/events.h
+> index 71e473d05fcc..620dc75362e5 100644
+> --- a/arch/arm/include/asm/xen/events.h
+> +++ b/arch/arm/include/asm/xen/events.h
+> @@ -16,7 +16,7 @@ static inline int xen_irqs_disabled(struct pt_regs *regs)
+>  	return raw_irqs_disabled_flags(regs->ARM_cpsr);
+>  }
+>  
+> -#define xchg_xen_ulong(ptr, val) atomic64_xchg(container_of((ptr),	\
+> +#define xchg_xen_ulong(ptr, val) atomic64_xchg(container_of((long long*)(ptr),\
+>  							    atomic64_t,	\
+>  							    counter), (val))
+>  
+> -- 
+> 2.9.0
+> 
