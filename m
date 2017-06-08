@@ -1,47 +1,41 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 8 Jun 2017 10:51:27 +0200
-Subject: [PATCH 9/9] arm64: marvell: dts: add xmdio nodes for 7k/8k
-In-Reply-To: <20170608084515.GA12385@kwain>
-References: <20170607083810.30922-1-antoine.tenart@free-electrons.com>
- <20170607083810.30922-10-antoine.tenart@free-electrons.com>
- <20170608084515.GA12385@kwain>
-Message-ID: <20170608085127.GB12385@kwain>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu,  8 Jun 2017 10:53:10 +0200
+Subject: [PATCH v2] xen: avoid type warning in xchg_xen_ulong
+Message-ID: <20170608085323.2209174-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 08, 2017 at 10:45:15AM +0200, Antoine Tenart wrote:
-> On Wed, Jun 07, 2017 at 10:38:10AM +0200, Antoine Tenart wrote:
-> > diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> > index 2a99ff8fca2a..594356243ddb 100644
-> > --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> > +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> > @@ -103,6 +103,13 @@
-> >  				clocks = <&cps_syscon0 1 9>, <&cps_syscon0 1 5>;
-> >  			};
-> >  
-> > +			cps_xmdio: mdio at 12a600 {
-> > +				#address-cells = <1>;
-> > +				#size-cells = <0>;
-> > +				compatible = "marvell,xmdio";
-> > +				reg = <0x12a600 0x10>;
-> > +			};
-> > +
-> 
-> Russell pointed out on IRC the mdio/xmdio interfaces aren't wired to
-> anything on the mcbin.
+The improved type-checking version of container_of() triggers a warning for
+xchg_xen_ulong, pointing out that 'xen_ulong_t' is unsigned, but atomic64_t
+contains a signed value:
 
-The ones found in the cp110 slave *
+drivers/xen/events/events_2l.c: In function 'evtchn_2l_handle_events':
+drivers/xen/events/events_2l.c:187:1020: error: call to '__compiletime_assert_187' declared with attribute error: pointer type mismatch in container_of()
 
-Antoine
+This adds a cast to work around the warning.
 
+Cc: Ian Abbott <abbotti@mev.co.uk>
+Fixes: 85323a991d40 ("xen: arm: mandate EABI and use generic atomic operations.")
+Fixes: daa2ac80834d ("kernel.h: handle pointers to arrays better in container_of()")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+v2: found the correct warning message and updated the changelog
+---
+ arch/arm/include/asm/xen/events.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/include/asm/xen/events.h b/arch/arm/include/asm/xen/events.h
+index 71e473d05fcc..620dc75362e5 100644
+--- a/arch/arm/include/asm/xen/events.h
++++ b/arch/arm/include/asm/xen/events.h
+@@ -16,7 +16,7 @@ static inline int xen_irqs_disabled(struct pt_regs *regs)
+ 	return raw_irqs_disabled_flags(regs->ARM_cpsr);
+ }
+ 
+-#define xchg_xen_ulong(ptr, val) atomic64_xchg(container_of((ptr),	\
++#define xchg_xen_ulong(ptr, val) atomic64_xchg(container_of((long long*)(ptr),\
+ 							    atomic64_t,	\
+ 							    counter), (val))
+ 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170608/0eb19b16/attachment-0001.sig>
+2.9.0
