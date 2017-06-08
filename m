@@ -1,64 +1,59 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu,  8 Jun 2017 11:26:53 +0200
-Subject: [PATCH v2 8/8] arm64: marvell: dts: add xmdio nodes for 7k/8k
-In-Reply-To: <20170608092653.25221-1-antoine.tenart@free-electrons.com>
-References: <20170608092653.25221-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170608092653.25221-9-antoine.tenart@free-electrons.com>
+Date: Thu,  8 Jun 2017 11:26:45 +0200
+Subject: [PATCH v2 0/8] net: mvmdio: add xSMI support
+Message-ID: <20170608092653.25221-1-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the description of the xMDIO bus for the Marvell Armada 7k and
-Marvell Armada 8k; for both CP110 slave and master. This bus is found
-on Marvell Ethernet controllers and provides an interface with the
-xMDIO bus.
+Hello,
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
+This series aims to add the xSMI support (also called xMDIO) to the
+mvmdio driver. The xSMI interface complies with the IEEE 802.3 clause 45
+and is used by 10GbE devices. On 7k and 8k (as of now), such an
+interface is found and is used by Ethernet controllers.
+
+Patches 1-3 are cosmetic cleanups.
+
+Patches 4-6 are prerequisites to the xSMI support.
+
+Patches 7-8 add the xSMI support to the mvmdio driver, and a node is
+added both in the cp110 slave and master device trees.
+
+This was tested on an Armada 8040 mcbin, as well as on both the
+Armada 7040 DB and the Armada 8040 DB to ensure the SMI interface
+was still working.
 
 @Dave: patch 8 should go through the mvebu tree as asked by Gregory,
 thanks!
 
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 8 ++++++++
- arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 8 ++++++++
- 2 files changed, 16 insertions(+)
+Thanks,
+Antoine
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-index 037ed30d75a7..ab728aacdfae 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-@@ -98,6 +98,14 @@
- 				clocks = <&cpm_syscon0 1 9>, <&cpm_syscon0 1 5>;
- 			};
- 
-+			cpm_xmdio: mdio at 12a600 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "marvell,orion-mdio";
-+				reg = <0x12a600 0x10>;
-+				status = "disabled";
-+			};
-+
- 			cpm_icu: interrupt-controller at 1e0000 {
- 				compatible = "marvell,cp110-icu"; 
- 				reg = <0x1e0000 0x10>;
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-index 2a99ff8fca2a..89af7a31e622 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-@@ -103,6 +103,14 @@
- 				clocks = <&cps_syscon0 1 9>, <&cps_syscon0 1 5>;
- 			};
- 
-+			cps_xmdio: mdio at 12a600 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "marvell,orion-mdio";
-+				reg = <0x12a600 0x10>;
-+				status = "disabled";
-+			};
-+
- 			cps_icu: interrupt-controller at 1e0000 {
- 				compatible = "marvell,cp110-icu";
- 				reg = <0x1e0000 0x10>;
+Since v1:
+  - Instead of using the smi/xsmi helpers based on the compatible, now
+    check if the MII_ADDR_C45 bit is set.
+  - Removed the marvell,xmdio compatible addition.
+  - Fixed the is_read_valid logic.
+  - Updated to use static const variables for ops.
+  - Added 3 Reviewed-by tags from Florian (I dropped another one as the
+    patch changed in v2).
+
+Antoine Tenart (8):
+  net: mvmdio: reorder headers alphabetically
+  net: mvmdio: use tabs for defines
+  net: mvmdio: use GENMASK for masks
+  net: mvmdio: move the read valid check into its own function
+  net: mvmdio: introduce an ops structure
+  net: mvmdio: put the poll intervals in the ops structure
+  net: mvmdio: add xmdio support
+  arm64: marvell: dts: add xmdio nodes for 7k/8k
+
+ .../devicetree/bindings/net/marvell-orion-mdio.txt |   6 +-
+ .../boot/dts/marvell/armada-cp110-master.dtsi      |   8 +
+ .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi |   8 +
+ drivers/net/ethernet/marvell/Kconfig               |   6 +-
+ drivers/net/ethernet/marvell/mvmdio.c              | 196 ++++++++++++++++-----
+ 5 files changed, 178 insertions(+), 46 deletions(-)
+
 -- 
 2.9.4
