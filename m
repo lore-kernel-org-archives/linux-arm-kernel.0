@@ -1,50 +1,42 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Wed, 7 Jun 2017 19:24:47 -0500
-Subject: [PATCH v2 3/3] remoteproc/keystone: Ensure the DSPs are in reset in
- probe
-In-Reply-To: <20170608002447.47580-1-s-anna@ti.com>
-References: <20170608002447.47580-1-s-anna@ti.com>
-Message-ID: <20170608002447.47580-4-s-anna@ti.com>
+Date: Wed, 7 Jun 2017 19:24:44 -0500
+Subject: [PATCH v2 0/3] Add Keystone2 Remoteproc driver
+Message-ID: <20170608002447.47580-1-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Andrew F. Davis" <afd@ti.com>
+Hi,
 
-The DSPs are expected to be in reset when the driver probes a device.
-If the DSPs are out of reset in probe, the system may crash when the
-firmware is being loaded. So, add a check to make sure the DSP resets
-are asserted, and if not, throw a eye-catchy warning and assert the
-resets specifically.
+This is v2 of the patchset that adds the DT binding and the driver for
+loading and booting the DSP devices present on various Keystone2 SoC families.
+The current series supports the 66AK2H/K, 66AK2L and 66AK2E SoC families.
+The DTS nodes will be posted separately once the binding is accepted,
+and dependent patches from Loic are merged. See v1 cover-letter for details.
 
-Signed-off-by: Andrew F. Davis <afd@ti.com>
-[s-anna at ti.com: replace warning with a WARN]
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
-v2: No code changes
+Main changes are in the binding to address various comments from 
+Rob Herring. The driver is updated to construct firmware names based on
+alias property. Exact changes are summarized in each patch.
 
- drivers/remoteproc/keystone_remoteproc.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+v1:
+http://marc.info/?t=149581802500004&r=1&w=2
 
-diff --git a/drivers/remoteproc/keystone_remoteproc.c b/drivers/remoteproc/keystone_remoteproc.c
-index 6e09ef76f7c7..5f776bfd674a 100644
---- a/drivers/remoteproc/keystone_remoteproc.c
-+++ b/drivers/remoteproc/keystone_remoteproc.c
-@@ -456,6 +456,16 @@ static int keystone_rproc_probe(struct platform_device *pdev)
- 	if (of_reserved_mem_device_init(dev))
- 		dev_warn(dev, "device does not have specific CMA pool\n");
- 
-+	/* ensure the DSP is in reset before loading firmware */
-+	ret = reset_control_status(ksproc->reset);
-+	if (ret < 0) {
-+		dev_err(dev, "failed to get reset status, status = %d\n", ret);
-+		goto release_mem;
-+	} else if (ret == 0) {
-+		WARN(1, "device is not in reset\n");
-+		keystone_rproc_dsp_reset(ksproc);
-+	}
-+
- 	ret = rproc_add(rproc);
- 	if (ret) {
- 		dev_err(dev, "failed to add register device with remoteproc core, status = %d\n",
+regards
+Suman
+
+Andrew F. Davis (1):
+  remoteproc/keystone: Ensure the DSPs are in reset in probe
+
+Suman Anna (2):
+  dt-bindings: remoteproc: Add Keystone DSP remoteproc binding
+  remoteproc/keystone: Add a remoteproc driver for Keystone 2 DSPs
+
+ .../bindings/remoteproc/ti,keystone-rproc.txt      | 135 ++++++
+ drivers/remoteproc/Kconfig                         |  13 +
+ drivers/remoteproc/Makefile                        |   1 +
+ drivers/remoteproc/keystone_remoteproc.c           | 525 +++++++++++++++++++++
+ 4 files changed, 674 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/remoteproc/ti,keystone-rproc.txt
+ create mode 100644 drivers/remoteproc/keystone_remoteproc.c
+
 -- 
 2.12.0
