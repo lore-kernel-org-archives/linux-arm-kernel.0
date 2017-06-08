@@ -1,73 +1,238 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 8 Jun 2017 10:36:04 +0100
-Subject: [kvmtool PATCH v10 00/15] kvmtool: arm: ITS emulation and GSI
- routing support
-In-Reply-To: <87wp8mj12p.fsf@arm.com>
-References: <20170425143932.17235-1-andre.przywara@arm.com>
- <87wp8mj12p.fsf@arm.com>
-Message-ID: <887621e2-83d2-300f-ae13-f5b86c101ae3@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 8 Jun 2017 02:47:12 -0700
+Subject: [PATCH 04/11] ARM: OMAP2+: Remove unused legacy code for device
+ init
+In-Reply-To: <20170608082825.GG3730@atomide.com>
+References: <20170531225139.30723-1-tony@atomide.com>
+ <20170531225139.30723-5-tony@atomide.com>
+ <20170607222711.6kdhuvkymiseootn@earth>
+ <20170608082825.GG3730@atomide.com>
+Message-ID: <20170608094712.GI3730@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 08/06/17 10:11, Marc Zyngier wrote:
-> On Tue, Apr 25 2017 at  3:39:17 pm BST, Andre Przywara <andre.przywara@arm.com> wrote:
->> Hi,
->>
->> another update to the ITS emulation series for kvmtool.
->> This addresses the comments Marc and Jean-Philippe had on the last
->> version (thanks for that!): I moved the DevID feature detection to avoid
->> static variables, rewrote the error path on creating IRQ routes and
->> extended the MMIO reservation to cover the ITS doorbell page as well.
->> Not sure if that's the right way to do, though.
->> Also we now ignore writes to the PBA region, which is what the spec
->> somewhat recommends.
->> -------------------------------------------
->>
->> This series teaches kvmtool how to support KVM's ITS emulation. Also
->> (as this is somewhat related and has been co-developed) it enables GSI
->> routing for ARM/ARM64, which allows IRQFDs to be used, for instance
->> to use vhost_net. At the moment this is dependent on the guest
->> using the ITS emulation, but GICv2M support may be added at a later time.
->>
->> The first six patches are generic fixes and refactoring to pave the
->> road for the rest of the patches. Most importantly patch 3/15 pulls
->> the GSI routing code from x86 into generic code.
->> Patch 7 updates the Linux headers to pull the new ITS and 32-bit
->> GICv3 definitions in. This allows us to enable GICv3 emulation for 32-bit
->> ARM and also get rid of some placeholder lines in patch 8.
->> The following four patches add ITS emulation support. They reserve and
->> register the required ITS register frame and populate a DT node with
->> the necessary data. Also the patches add the required device ID to the
->> KVM_SIGNAL_MSI ioctl.
->> Patches 13 and 14 enable IRQ GSI routing for ARM/ARM64.
->> This is needed to use IRQFDs, which is a prerequisite for vhost
->> functionality, for instance. The code sets up the (dummy) SPI
->> routing table and adds the device ID to the routing entry.
->> The last patch finally enables the guest ITS support by extending the
->> existing --irqchip= parameter to allow "--irqchip=gicv3-its".
->>
->> These patches make use of the KVM kernel functionality merged into
->> 4.8-rc: both Eric's IRQ routing series and the ITS emulation.
->> It can also be found in my kvmtool git repository [1].
+* Tony Lindgren <tony@atomide.com> [170608 01:32]:
+> * Sebastian Reichel <sre@kernel.org> [170607 15:30]:
+> > I guess you can drop omap2_init_devices() completly?
 > 
-> [...]
+> We still have omap_init_sti() left there, but it's
+> just static inline void omap_init_sti(void) {} :)
 > 
-> Apologies for having dropped the ball on this series. Apart from the
-> Linux include import which should be that of 4.11,
+> So yeah will remove that too.
 
-I copied the headers five days before the 4.11 release, and just
-confirmed that the files are identical with the release (even with
-4.11.4), so I think it's just the commit message of patch 07/15 that is
-a bit wrong here. Hopefully we can ignore this then.
+Here's this one updated.
 
-> this looks good to
-> me. For the whole series:
-> 
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Regards,
 
-Thanks a lot!
+Tony
 
-Cheers,
-Andre.
+8< -----------------
+>From tony Mon Sep 17 00:00:00 2001
+From: Tony Lindgren <tony@atomide.com>
+Date: Wed, 31 May 2017 15:51:32 -0700
+Subject: [PATCH] ARM: OMAP2+: Remove unused legacy code for device init
+
+We are now booting all mach-omap2 in device tree only mode.
+Any code that is only called in legacy boot mode where
+of_have_populated_dt() is not set is safe to remove now.
+
+Note that omap_init_sti() won't do anything so we can
+remove omap2_init_devices() as pointed out by Sebastian
+Reichel <sebastian.reichel@collabora.co.uk>.
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/devices.c | 175 ------------------------------------------
+ 1 file changed, 175 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -36,130 +36,6 @@
+ #define L3_MODULES_MAX_LEN 12
+ #define L3_MODULES 3
+ 
+-static int __init omap3_l3_init(void)
+-{
+-	struct omap_hwmod *oh;
+-	struct platform_device *pdev;
+-	char oh_name[L3_MODULES_MAX_LEN];
+-
+-	/*
+-	 * To avoid code running on other OMAPs in
+-	 * multi-omap builds
+-	 */
+-	if (!(cpu_is_omap34xx()) || of_have_populated_dt())
+-		return -ENODEV;
+-
+-	snprintf(oh_name, L3_MODULES_MAX_LEN, "l3_main");
+-
+-	oh = omap_hwmod_lookup(oh_name);
+-
+-	if (!oh)
+-		pr_err("could not look up %s\n", oh_name);
+-
+-	pdev = omap_device_build("omap_l3_smx", 0, oh, NULL, 0);
+-
+-	WARN(IS_ERR(pdev), "could not build omap_device for %s\n", oh_name);
+-
+-	return PTR_ERR_OR_ZERO(pdev);
+-}
+-omap_postcore_initcall(omap3_l3_init);
+-
+-static inline void omap_init_sti(void) {}
+-
+-#if IS_ENABLED(CONFIG_SPI_OMAP24XX)
+-
+-#include <linux/platform_data/spi-omap2-mcspi.h>
+-
+-static int __init omap_mcspi_init(struct omap_hwmod *oh, void *unused)
+-{
+-	struct platform_device *pdev;
+-	char *name = "omap2_mcspi";
+-	struct omap2_mcspi_platform_config *pdata;
+-	static int spi_num;
+-	struct omap2_mcspi_dev_attr *mcspi_attrib = oh->dev_attr;
+-
+-	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
+-	if (!pdata) {
+-		pr_err("Memory allocation for McSPI device failed\n");
+-		return -ENOMEM;
+-	}
+-
+-	pdata->num_cs = mcspi_attrib->num_chipselect;
+-	switch (oh->class->rev) {
+-	case OMAP2_MCSPI_REV:
+-	case OMAP3_MCSPI_REV:
+-			pdata->regs_offset = 0;
+-			break;
+-	case OMAP4_MCSPI_REV:
+-			pdata->regs_offset = OMAP4_MCSPI_REG_OFFSET;
+-			break;
+-	default:
+-			pr_err("Invalid McSPI Revision value\n");
+-			kfree(pdata);
+-			return -EINVAL;
+-	}
+-
+-	spi_num++;
+-	pdev = omap_device_build(name, spi_num, oh, pdata, sizeof(*pdata));
+-	WARN(IS_ERR(pdev), "Can't build omap_device for %s:%s\n",
+-				name, oh->name);
+-	kfree(pdata);
+-	return 0;
+-}
+-
+-static void omap_init_mcspi(void)
+-{
+-	omap_hwmod_for_each_by_class("mcspi", omap_mcspi_init, NULL);
+-}
+-
+-#else
+-static inline void omap_init_mcspi(void) {}
+-#endif
+-
+-/**
+- * omap_init_rng - bind the RNG hwmod to the RNG omap_device
+- *
+- * Bind the RNG hwmod to the RNG omap_device.  No return value.
+- */
+-static void __init omap_init_rng(void)
+-{
+-	struct omap_hwmod *oh;
+-	struct platform_device *pdev;
+-
+-	oh = omap_hwmod_lookup("rng");
+-	if (!oh)
+-		return;
+-
+-	pdev = omap_device_build("omap_rng", -1, oh, NULL, 0);
+-	WARN(IS_ERR(pdev), "Can't build omap_device for omap_rng\n");
+-}
+-
+-static void __init omap_init_sham(void)
+-{
+-	struct omap_hwmod *oh;
+-	struct platform_device *pdev;
+-
+-	oh = omap_hwmod_lookup("sham");
+-	if (!oh)
+-		return;
+-
+-	pdev = omap_device_build("omap-sham", -1, oh, NULL, 0);
+-	WARN(IS_ERR(pdev), "Can't build omap_device for omap-sham\n");
+-}
+-
+-static void __init omap_init_aes(void)
+-{
+-	struct omap_hwmod *oh;
+-	struct platform_device *pdev;
+-
+-	oh = omap_hwmod_lookup("aes");
+-	if (!oh)
+-		return;
+-
+-	pdev = omap_device_build("omap-aes", -1, oh, NULL, 0);
+-	WARN(IS_ERR(pdev), "Can't build omap_device for omap-aes\n");
+-}
+-
+ /*-------------------------------------------------------------------------*/
+ 
+ #if IS_ENABLED(CONFIG_VIDEO_OMAP2_VOUT)
+@@ -185,54 +61,3 @@ int __init omap_init_vout(void)
+ #else
+ int __init omap_init_vout(void) { return 0; }
+ #endif
+-
+-/*-------------------------------------------------------------------------*/
+-
+-static int __init omap2_init_devices(void)
+-{
+-	/* Enable dummy states for those platforms without pinctrl support */
+-	if (!of_have_populated_dt())
+-		pinctrl_provide_dummies();
+-
+-	/* If dtb is there, the devices will be created dynamically */
+-	if (!of_have_populated_dt()) {
+-		/*
+-		 * please keep these calls, and their implementations above,
+-		 * in alphabetical order so they're easier to sort through.
+-		 */
+-		omap_init_mcspi();
+-		omap_init_sham();
+-		omap_init_aes();
+-		omap_init_rng();
+-	}
+-	omap_init_sti();
+-
+-	return 0;
+-}
+-omap_arch_initcall(omap2_init_devices);
+-
+-static int __init omap_gpmc_init(void)
+-{
+-	struct omap_hwmod *oh;
+-	struct platform_device *pdev;
+-	char *oh_name = "gpmc";
+-
+-	/*
+-	 * if the board boots up with a populated DT, do not
+-	 * manually add the device from this initcall
+-	 */
+-	if (of_have_populated_dt())
+-		return -ENODEV;
+-
+-	oh = omap_hwmod_lookup(oh_name);
+-	if (!oh) {
+-		pr_err("Could not look up %s\n", oh_name);
+-		return -ENODEV;
+-	}
+-
+-	pdev = omap_device_build("omap-gpmc", -1, oh, NULL, 0);
+-	WARN(IS_ERR(pdev), "could not build omap_device for %s\n", oh_name);
+-
+-	return PTR_ERR_OR_ZERO(pdev);
+-}
+-omap_postcore_initcall(omap_gpmc_init);
+-- 
+2.13.0
