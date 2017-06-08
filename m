@@ -1,271 +1,95 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 8 Jun 2017 16:07:40 +0100
-Subject: [PATCH v2 3/6] irqchip: irq-mvebu-gicp: new driver for Marvell
- GICP
-In-Reply-To: <1496398017-6487-4-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1496398017-6487-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1496398017-6487-4-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <255f8d8d-8011-b980-5b29-b56c387af940@arm.com>
+Date: Thu, 8 Jun 2017 16:09:31 +0100
+Subject: [PATCH v3 6/9] KVM: arm/arm64: Introduce an allocator for
+ in-kernel irq lines
+In-Reply-To: <20170608145938.GA6378@cbox>
+References: <20170608133446.3875-1-cdall@linaro.org>
+ <20170608133446.3875-7-cdall@linaro.org> <87bmpyine0.fsf@arm.com>
+ <20170608145938.GA6378@cbox>
+Message-ID: <125804d9-8022-cb4a-deac-84d1b144f486@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-On 02/06/17 11:06, Thomas Petazzoni wrote:
-> This commit adds a simple driver for the Marvell GICP, a hardware unit
-> that converts memory writes into GIC SPI interrupts. The driver provides
-> a number of functions to the ICU driver to allocate GICP interrupts, and
-> get the physical addresses that the ICUs should write to to set/clear
-> interrupts.
+On 08/06/17 15:59, Christoffer Dall wrote:
+> On Thu, Jun 08, 2017 at 03:07:19PM +0100, Marc Zyngier wrote:
+>> On Thu, Jun 08 2017 at  3:34:43 pm BST, Christoffer Dall <cdall@linaro.org> wrote:
+>>> Having multiple devices being able to signal the same interrupt line is
+>>> very confusing and almost certainly guarantees a configuration error.
+>>>
+>>> Therefore, introduce a very simple allocator which allows a device to
+>>> claim an interrupt line from the vgic for a given VM.
+>>>
+>>> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+>>> ---
+>>>  include/kvm/arm_vgic.h   |  5 +++++
+>>>  virt/kvm/arm/vgic/vgic.c | 33 +++++++++++++++++++++++++++++++++
+>>>  2 files changed, 38 insertions(+)
+>>>
+>>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+>>> index dde59fb..5d5b345 100644
+>>> --- a/include/kvm/arm_vgic.h
+>>> +++ b/include/kvm/arm_vgic.h
+>>> @@ -121,6 +121,9 @@ struct vgic_irq {
+>>>  	u8 source;			/* GICv2 SGIs only */
+>>>  	u8 priority;
+>>>  	enum vgic_irq_config config;	/* Level or edge */
+>>> +
+>>> +	void *owner;			/* Opaque pointer to reserve an interrupt
+>>> +					   for in-kernel devices. */
+>>>  };
+>>>  
+>>>  struct vgic_register_region;
+>>> @@ -340,4 +343,6 @@ int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi);
+>>>   */
+>>>  int kvm_vgic_setup_default_irq_routing(struct kvm *kvm);
+>>>  
+>>> +int kvm_vgic_set_owner(struct kvm_vcpu *vcpu, unsigned int intid, void *owner);
+>>> +
+>>>  #endif /* __KVM_ARM_VGIC_H */
+>>> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+>>> index c66feac..9628945 100644
+>>> --- a/virt/kvm/arm/vgic/vgic.c
+>>> +++ b/virt/kvm/arm/vgic/vgic.c
+>>> @@ -435,6 +435,39 @@ int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq)
+>>>  }
+>>>  
+>>>  /**
+>>> + * kvm_vgic_set_owner - Set the owner of an interrupt for a VM
+>>> + *
+>>> + * @vcpu:   Pointer to the VCPU (used for PPIs)
+>>> + * @intid:  The virtual INTID identifying the interrupt (PPI or SPI)
+>>> + * @owner:  Opaque pointer to the owner
+>>> + *
+>>> + * Returns 0 if intid is not already used by another in-kernel device and the
+>>> + * owner is set, otherwise returns an error code.
+>>> + */
+>>> +int kvm_vgic_set_owner(struct kvm_vcpu *vcpu, unsigned int intid, void *owner)
+>>> +{
+>>> +	struct vgic_irq *irq;
+>>> +	int ret = 0;
+>>> +
+>>> +	if (!vgic_initialized(vcpu->kvm))
+>>> +		return -EAGAIN;
+>>> +
+>>> +	/* SGIs and LPIs cannot be wired up to any device */
+>>> +	if (!irq_is_ppi(intid) && !vgic_valid_spi(vcpu->kvm, intid))
+>>> +		return -EINVAL;
+>>> +
+>>> +	irq = vgic_get_irq(vcpu->kvm, vcpu, intid);
+>>> +	spin_lock(&irq->irq_lock);
+>>> +	if (irq->owner && irq->owner != owner)
+>>> +		ret = -EEXIST;
+>>> +	else
+>>> +		irq->owner = owner;
+>>
+>> Is there any case where you'd end-up setting the owner multiple times?
+>> Or is that just convenient?
+>>
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  drivers/irqchip/Kconfig          |   3 +
->  drivers/irqchip/Makefile         |   1 +
->  drivers/irqchip/irq-mvebu-gicp.c | 170 +++++++++++++++++++++++++++++++++++++++
->  drivers/irqchip/irq-mvebu-gicp.h |  15 ++++
->  4 files changed, 189 insertions(+)
->  create mode 100644 drivers/irqchip/irq-mvebu-gicp.c
->  create mode 100644 drivers/irqchip/irq-mvebu-gicp.h
-> 
-> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-> index 478f8ac..e527ee5 100644
-> --- a/drivers/irqchip/Kconfig
-> +++ b/drivers/irqchip/Kconfig
-> @@ -268,6 +268,9 @@ config IRQ_MXS
->  	select IRQ_DOMAIN
->  	select STMP_DEVICE
->  
-> +config MVEBU_GICP
-> +	bool
-> +
->  config MVEBU_ODMI
->  	bool
->  	select GENERIC_MSI_IRQ_DOMAIN
-> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-> index b64c59b..11eb858 100644
-> --- a/drivers/irqchip/Makefile
-> +++ b/drivers/irqchip/Makefile
-> @@ -69,6 +69,7 @@ obj-$(CONFIG_ARCH_SA1100)		+= irq-sa11x0.o
->  obj-$(CONFIG_INGENIC_IRQ)		+= irq-ingenic.o
->  obj-$(CONFIG_IMX_GPCV2)			+= irq-imx-gpcv2.o
->  obj-$(CONFIG_PIC32_EVIC)		+= irq-pic32-evic.o
-> +obj-$(CONFIG_MVEBU_GICP)		+= irq-mvebu-gicp.o
->  obj-$(CONFIG_MVEBU_ODMI)		+= irq-mvebu-odmi.o
->  obj-$(CONFIG_MVEBU_PIC)			+= irq-mvebu-pic.o
->  obj-$(CONFIG_LS_SCFG_MSI)		+= irq-ls-scfg-msi.o
-> diff --git a/drivers/irqchip/irq-mvebu-gicp.c b/drivers/irqchip/irq-mvebu-gicp.c
-> new file mode 100644
-> index 0000000..73c0117
-> --- /dev/null
-> +++ b/drivers/irqchip/irq-mvebu-gicp.c
-> @@ -0,0 +1,170 @@
-> +/*
-> + * Copyright (C) 2017 Marvell
-> + *
-> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +
-> +#include "irq-mvebu-gicp.h"
-> +
-> +#define GICP_SETSPI_NSR_OFFSET	0x0
-> +#define GICP_CLRSPI_NSR_OFFSET	0x8
-> +
-> +struct mvebu_gicp_spi_range {
-> +	unsigned int start;
-> +	unsigned int count;
-> +};
-> +
-> +struct mvebu_gicp {
-> +	struct mvebu_gicp_spi_range *spi_ranges;
-> +	unsigned int spi_ranges_cnt;
-> +	unsigned int spi_cnt;
-> +	unsigned long *spi_bitmap;
-> +	spinlock_t spi_lock;
-> +	struct resource *res;
-> +};
-> +
-> +int mvebu_gicp_alloc(struct mvebu_gicp *gicp)
-> +{
-> +	int idx;
-> +
-> +	spin_lock(&gicp->spi_lock);
-> +	idx = find_first_zero_bit(gicp->spi_bitmap, gicp->spi_cnt);
-> +	if (idx == gicp->spi_cnt) {
-> +		spin_unlock(&gicp->spi_lock);
-> +		return -ENOSPC;
-> +	}
-> +	set_bit(idx, gicp->spi_bitmap);
-> +	spin_unlock(&gicp->spi_lock);
-> +
-> +	return idx;
-> +}
-> +
-> +void mvebu_gicp_free(struct mvebu_gicp *gicp, int idx)
-> +{
-> +	spin_lock(&gicp->spi_lock);
-> +	clear_bit(idx, gicp->spi_bitmap);
-> +	spin_unlock(&gicp->spi_lock);
-> +}
-> +
-> +int mvebu_gicp_idx_to_spi(struct mvebu_gicp *gicp, int idx)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < gicp->spi_ranges_cnt; i++) {
-> +		struct mvebu_gicp_spi_range *r = &gicp->spi_ranges[i];
-> +
-> +		if (idx < r->count)
-> +			return r->start + idx;
-> +
-> +		idx -= r->count;
-> +	}
-> +
-> +	return -EINVAL;
-> +}
-> +
-> +int mvebu_gicp_spi_to_idx(struct mvebu_gicp *gicp, int spi)
-> +{
-> +	int i;
-> +	int idx = 0;
-> +
-> +	for (i = 0; i < gicp->spi_ranges_cnt; i++) {
-> +		struct mvebu_gicp_spi_range *r = &gicp->spi_ranges[i];
-> +
-> +		if (spi >= r->start && spi < (r->start + r->count))
-> +			return idx + (spi - r->start);
-> +
-> +		idx += r->count;
-> +	}
-> +
-> +	return -EINVAL;
-> +}
-> +
-> +int mvebu_gicp_spi_count(struct mvebu_gicp *gicp)
-> +{
-> +	return gicp->spi_cnt;
-> +}
-> +
-> +phys_addr_t mvebu_gicp_setspi_phys_addr(struct mvebu_gicp *gicp)
-> +{
-> +	return gicp->res->start + GICP_SETSPI_NSR_OFFSET;
-> +}
-> +
-> +phys_addr_t mvebu_gicp_clrspi_phys_addr(struct mvebu_gicp *gicp)
-> +{
-> +	return gicp->res->start + GICP_CLRSPI_NSR_OFFSET;
-> +}
-> +
-> +static int mvebu_gicp_probe(struct platform_device *pdev)
-> +{
-> +	struct mvebu_gicp *gicp;
-> +	int ret, i;
-> +
-> +	gicp = devm_kzalloc(&pdev->dev, sizeof(*gicp), GFP_KERNEL);
-> +	if (!gicp)
-> +		return -ENOMEM;
-> +
-> +	gicp->res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!gicp->res)
-> +		return -ENODEV;
-> +
-> +	ret = of_property_count_u32_elems(pdev->dev.of_node,
-> +					  "marvell,spi-ranges");
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	gicp->spi_ranges_cnt = ret / 2;
-> +
-> +	gicp->spi_ranges =
-> +		devm_kzalloc(&pdev->dev,
-> +			     gicp->spi_ranges_cnt *
-> +			     sizeof(struct mvebu_gicp_spi_range),
-> +			     GFP_KERNEL);
-> +	if (!gicp->spi_ranges)
-> +		return -ENOMEM;
-> +
-> +	for (i = 0; i < gicp->spi_ranges_cnt; i++) {
-> +		of_property_read_u32_index(pdev->dev.of_node,
-> +					   "marvell,spi-ranges",
-> +					   i * 2,
-> +					   &gicp->spi_ranges[i].start);
-> +
-> +		of_property_read_u32_index(pdev->dev.of_node,
-> +					   "marvell,spi-ranges",
-> +					   i * 2 + 1,
-> +					   &gicp->spi_ranges[i].count);
-> +
-> +		gicp->spi_cnt += gicp->spi_ranges[i].count;
-> +	}
-> +
-> +	gicp->spi_bitmap = devm_kzalloc(&pdev->dev,
-> +					BITS_TO_LONGS(gicp->spi_cnt),
-> +					GFP_KERNEL);
-> +	if (!gicp->spi_bitmap)
-> +		return -ENOMEM;
-> +
-> +	platform_set_drvdata(pdev, gicp);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id mvebu_gicp_of_match[] = {
-> +	{ .compatible = "marvell,ap806-gicp", },
-> +	{},
-> +};
-> +
-> +static struct platform_driver mvebu_gicp_driver = {
-> +	.probe  = mvebu_gicp_probe,
-> +	.driver = {
-> +		.name = "mvebu-gicp",
-> +		.of_match_table = mvebu_gicp_of_match,
-> +	},
-> +};
-> +builtin_platform_driver(mvebu_gicp_driver);
-> diff --git a/drivers/irqchip/irq-mvebu-gicp.h b/drivers/irqchip/irq-mvebu-gicp.h
-> new file mode 100644
-> index 0000000..7290166
-> --- /dev/null
-> +++ b/drivers/irqchip/irq-mvebu-gicp.h
-> @@ -0,0 +1,15 @@
-> +#ifndef __MVEBU_GICP_H__
-> +#define __MVEBU_GICP_H__
-> +
-> +struct mvebu_gicp;
-> +
-> +int mvebu_gicp_alloc(struct mvebu_gicp *gicp);
-> +void mvebu_gicp_free(struct mvebu_gicp *gicp, int idx);
-> +int mvebu_gicp_idx_to_spi(struct mvebu_gicp *gicp, int idx);
-> +int mvebu_gicp_spi_to_idx(struct mvebu_gicp *gicp, int spi);
-> +phys_addr_t mvebu_gicp_setspi_phys_addr(struct mvebu_gicp *gicp);
-> +phys_addr_t mvebu_gicp_clrspi_phys_addr(struct mvebu_gicp *gicp);
-> +int mvebu_gicp_spi_count(struct mvebu_gicp *gicp);
-> +
-> +#endif /* __MVEBU_GICP_H__ */
-> +
-> 
+> I think the timer code ended up doing that in some sequence, but maybe
+> not.  In any case, I'm not sure if it makes much of a difference?
 
-The more I look at this code, the more I think this should actually be
-an IRQ domain of its own. It already has an allocator, and I believe a
-number of these exported functions disappear by virtue of having linked
-data structures.
-
-Also, given that this GICP is a perfect clone of the equivalent GICv3
-feature, we could use it the same way should someone glue an ICU on a
-GICv3 system...
-
-I appreciate that I did say the exact opposite on IRC, but hey, I admit
-I was wrong! ;-)
-
-What do you think?
+None whatsoever.
 
 Thanks,
 
