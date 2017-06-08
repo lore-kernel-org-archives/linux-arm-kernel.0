@@ -1,224 +1,235 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 8 Jun 2017 17:36:14 +0100
-Subject: [RFT PATCH v2 02/42] drivers: pci: host: iproc: Convert link
- check to raw PCI config accessors
-In-Reply-To: <0eb77019-9945-592c-375d-e2de742b3237@broadcom.com>
-References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
- <20170608141342.2018-3-lorenzo.pieralisi@arm.com>
- <0eb77019-9945-592c-375d-e2de742b3237@broadcom.com>
-Message-ID: <20170608163614.GB2216@red-moon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 8 Jun 2017 17:35:19 +0100
+Subject: [PATCH v8 6/9] drivers: perf: hisi: Add support for Hisilicon
+ Djtag driver
+In-Reply-To: <1495457312-237127-1-git-send-email-zhangshaokun@hisilicon.com>
+References: <1495457312-237127-1-git-send-email-zhangshaokun@hisilicon.com>
+Message-ID: <20170608163519.GA19643@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[dropped rock-chips maintainers, email bounces]
+Hi,
 
-On Thu, Jun 08, 2017 at 08:56:05AM -0700, Ray Jui wrote:
-> Hi Lorenzo,
-> 
-> Thanks, I'll try my best to find time to test this along 15/42 and
-> 33/42 patches. Hopefully I can get to that some time next week.
-> 
-> I have not yet reviewed these patches in details. Do they have
-> dependency on other patches to the generic framework code you
-> changed?
-> 
-> If so, is there a repo I can pull them?
+On Mon, May 22, 2017 at 08:48:32PM +0800, Shaokun Zhang wrote:
+> +/*
+> + * hisi_djtag_lock_v2: djtag lock to avoid djtag access conflict b/w kernel
+> + * and UEFI.
 
-I added it in the cover letter but anyway here it is:
+The mention of UEFI here worries me somewhat, and I have a number of
+questions specifically relating to how we interact with UEFI here.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git pci/pci-fixup-irqs-removal-v2
+When precisely does UEFI need to touch the djtag hardware? e.g. does
+this happen in runtime services? ... or completely asynchronously?
 
-Thanks for testing it, please let me know.
+What does UEFI do with djtag when it holds the lock?
 
-Thank you !
-Lorenzo
+Are there other software agents (e.g. secure firmware) which try to
+take this lock?
 
-> 
-> Thanks,
-> 
-> Ray
-> 
-> 
-> On 6/8/2017 7:13 AM, Lorenzo Pieralisi wrote:
-> >Current iproc driver host bridge controller driver requires struct
-> >pci_bus to be created in order to carry out PCI link checks with standard
-> >PCI config space accessors.
-> >
-> >This struct pci_bus dependency is fictitious and burdens the driver
-> >with unneeded constraints (eg to use separate APIs to create and scan
-> >the root bus).
-> >
-> >Add PCI raw config space accessors to PCIe iproc driver and remove the
-> >fictitious struct pci_bus dependency.
-> >
-> >Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >Cc: Scott Branden <sbranden@broadcom.com>
-> >Cc: Ray Jui <rjui@broadcom.com>
-> >Cc: Jon Mason <jonmason@broadcom.com>
-> >---
-> >  drivers/pci/host/pcie-iproc.c | 94 ++++++++++++++++++++++++++++++++++---------
-> >  1 file changed, 74 insertions(+), 20 deletions(-)
-> >
-> >diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-> >index 0f39bd2..e48b8e2 100644
-> >--- a/drivers/pci/host/pcie-iproc.c
-> >+++ b/drivers/pci/host/pcie-iproc.c
-> >@@ -452,14 +452,13 @@ static inline void iproc_pcie_apb_err_disable(struct pci_bus *bus,
-> >   * Note access to the configuration registers are protected at the higher layer
-> >   * by 'pci_lock' in drivers/pci/access.c
-> >   */
-> >-static void __iomem *iproc_pcie_map_cfg_bus(struct pci_bus *bus,
-> >+static void __iomem *iproc_pcie_map_cfg_bus(struct iproc_pcie *pcie,
-> >+					    int busno,
-> >  					    unsigned int devfn,
-> >  					    int where)
-> >  {
-> >-	struct iproc_pcie *pcie = iproc_data(bus);
-> >  	unsigned slot = PCI_SLOT(devfn);
-> >  	unsigned fn = PCI_FUNC(devfn);
-> >-	unsigned busno = bus->number;
-> >  	u32 val;
-> >  	u16 offset;
-> >@@ -499,6 +498,58 @@ static void __iomem *iproc_pcie_map_cfg_bus(struct pci_bus *bus,
-> >  		return (pcie->base + offset);
-> >  }
-> >+static void __iomem *iproc_pcie_bus_map_cfg_bus(struct pci_bus *bus,
-> >+						unsigned int devfn,
-> >+						int where)
-> >+{
-> >+	return iproc_pcie_map_cfg_bus(iproc_data(bus), bus->number, devfn,
-> >+				      where);
-> >+}
-> >+
-> >+static int iproc_pci_raw_config_read32(struct iproc_pcie *pcie,
-> >+				       unsigned int devfn, int where,
-> >+				       int size, u32 *val)
-> >+{
-> >+	void __iomem *addr;
-> >+
-> >+	addr = iproc_pcie_map_cfg_bus(pcie, 0, devfn, where & ~0x3);
-> >+	if (!addr) {
-> >+		*val = ~0;
-> >+		return PCIBIOS_DEVICE_NOT_FOUND;
-> >+	}
-> >+
-> >+	*val = readl(addr);
-> >+
-> >+	if (size <= 2)
-> >+		*val = (*val >> (8 * (where & 3))) & ((1 << (size * 8)) - 1);
-> >+
-> >+	return PCIBIOS_SUCCESSFUL;
-> >+}
-> >+
-> >+static int iproc_pci_raw_config_write32(struct iproc_pcie *pcie,
-> >+					unsigned int devfn, int where,
-> >+					int size, u32 val)
-> >+{
-> >+	void __iomem *addr;
-> >+	u32 mask, tmp;
-> >+
-> >+	addr = iproc_pcie_map_cfg_bus(pcie, 0, devfn, where & ~0x3);
-> >+	if (!addr)
-> >+		return PCIBIOS_DEVICE_NOT_FOUND;
-> >+
-> >+	if (size == 4) {
-> >+		writel(val, addr);
-> >+		return PCIBIOS_SUCCESSFUL;
-> >+	}
-> >+
-> >+	mask = ~(((1 << (size * 8)) - 1) << ((where & 0x3) * 8));
-> >+	tmp = readl(addr) & mask;
-> >+	tmp |= val << ((where & 0x3) * 8);
-> >+	writel(tmp, addr);
-> >+
-> >+	return PCIBIOS_SUCCESSFUL;
-> >+}
-> >+
-> >  static int iproc_pcie_config_read32(struct pci_bus *bus, unsigned int devfn,
-> >  				    int where, int size, u32 *val)
-> >  {
-> >@@ -524,7 +575,7 @@ static int iproc_pcie_config_write32(struct pci_bus *bus, unsigned int devfn,
-> >  }
-> >  static struct pci_ops iproc_pcie_ops = {
-> >-	.map_bus = iproc_pcie_map_cfg_bus,
-> >+	.map_bus = iproc_pcie_bus_map_cfg_bus,
-> >  	.read = iproc_pcie_config_read32,
-> >  	.write = iproc_pcie_config_write32,
-> >  };
-> >@@ -556,12 +607,11 @@ static void iproc_pcie_reset(struct iproc_pcie *pcie)
-> >  	msleep(100);
-> >  }
-> >-static int iproc_pcie_check_link(struct iproc_pcie *pcie, struct pci_bus *bus)
-> >+static int iproc_pcie_check_link(struct iproc_pcie *pcie)
-> >  {
-> >  	struct device *dev = pcie->dev;
-> >-	u8 hdr_type;
-> >-	u32 link_ctrl, class, val;
-> >-	u16 pos = PCI_EXP_CAP, link_status;
-> >+	u32 hdr_type, link_ctrl, link_status, class, val;
-> >+	u16 pos = PCI_EXP_CAP;
-> >  	bool link_is_active = false;
-> >  	/*
-> >@@ -578,7 +628,7 @@ static int iproc_pcie_check_link(struct iproc_pcie *pcie, struct pci_bus *bus)
-> >  	}
-> >  	/* make sure we are not in EP mode */
-> >-	pci_bus_read_config_byte(bus, 0, PCI_HEADER_TYPE, &hdr_type);
-> >+	iproc_pci_raw_config_read32(pcie,  0, PCI_HEADER_TYPE, 1, &hdr_type);
-> >  	if ((hdr_type & 0x7f) != PCI_HEADER_TYPE_BRIDGE) {
-> >  		dev_err(dev, "in EP mode, hdr=%#02x\n", hdr_type);
-> >  		return -EFAULT;
-> >@@ -588,13 +638,16 @@ static int iproc_pcie_check_link(struct iproc_pcie *pcie, struct pci_bus *bus)
-> >  #define PCI_BRIDGE_CTRL_REG_OFFSET 0x43c
-> >  #define PCI_CLASS_BRIDGE_MASK      0xffff00
-> >  #define PCI_CLASS_BRIDGE_SHIFT     8
-> >-	pci_bus_read_config_dword(bus, 0, PCI_BRIDGE_CTRL_REG_OFFSET, &class);
-> >+	iproc_pci_raw_config_read32(pcie, 0, PCI_BRIDGE_CTRL_REG_OFFSET,
-> >+				    4, &class);
-> >  	class &= ~PCI_CLASS_BRIDGE_MASK;
-> >  	class |= (PCI_CLASS_BRIDGE_PCI << PCI_CLASS_BRIDGE_SHIFT);
-> >-	pci_bus_write_config_dword(bus, 0, PCI_BRIDGE_CTRL_REG_OFFSET, class);
-> >+	iproc_pci_raw_config_write32(pcie, 0, PCI_BRIDGE_CTRL_REG_OFFSET,
-> >+				     4, class);
-> >  	/* check link status to see if link is active */
-> >-	pci_bus_read_config_word(bus, 0, pos + PCI_EXP_LNKSTA, &link_status);
-> >+	iproc_pci_raw_config_read32(pcie, 0, pos + PCI_EXP_LNKSTA,
-> >+				    2, &link_status);
-> >  	if (link_status & PCI_EXP_LNKSTA_NLW)
-> >  		link_is_active = true;
-> >@@ -603,20 +656,21 @@ static int iproc_pcie_check_link(struct iproc_pcie *pcie, struct pci_bus *bus)
-> >  #define PCI_TARGET_LINK_SPEED_MASK    0xf
-> >  #define PCI_TARGET_LINK_SPEED_GEN2    0x2
-> >  #define PCI_TARGET_LINK_SPEED_GEN1    0x1
-> >-		pci_bus_read_config_dword(bus, 0,
-> >-					  pos + PCI_EXP_LNKCTL2,
-> >+		iproc_pci_raw_config_read32(pcie, 0,
-> >+					  pos + PCI_EXP_LNKCTL2, 4,
-> >  					  &link_ctrl);
-> >  		if ((link_ctrl & PCI_TARGET_LINK_SPEED_MASK) ==
-> >  		    PCI_TARGET_LINK_SPEED_GEN2) {
-> >  			link_ctrl &= ~PCI_TARGET_LINK_SPEED_MASK;
-> >  			link_ctrl |= PCI_TARGET_LINK_SPEED_GEN1;
-> >-			pci_bus_write_config_dword(bus, 0,
-> >-					   pos + PCI_EXP_LNKCTL2,
-> >-					   link_ctrl);
-> >+			iproc_pci_raw_config_write32(pcie, 0,
-> >+						pos + PCI_EXP_LNKCTL2,
-> >+						4, link_ctrl);
-> >  			msleep(100);
-> >-			pci_bus_read_config_word(bus, 0, pos + PCI_EXP_LNKSTA,
-> >-						 &link_status);
-> >+			iproc_pci_raw_config_read32(pcie, 0,
-> >+						pos + PCI_EXP_LNKSTA,
-> >+						2, &link_status);
-> >  			if (link_status & PCI_EXP_LNKSTA_NLW)
-> >  				link_is_active = true;
-> >  		}
-> >@@ -1260,7 +1314,7 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
-> >  	}
-> >  	pcie->root_bus = bus;
-> >-	ret = iproc_pcie_check_link(pcie, bus);
-> >+	ret = iproc_pcie_check_link(pcie);
-> >  	if (ret) {
-> >  		dev_err(dev, "no PCIe EP device detected\n");
-> >  		goto err_rm_root_bus;
-> 
+Can you explain how the locking scheme works? e.g. is this an advisory
+software-only policy, or does the hardware prohibit accesses from other
+agents somehow?
+
+What happens if the kernel takes the lock, but doesn't release it?
+
+What happens if UEFI takes the lock, but doesn't release it?
+
+Are there any points at which UEFI needs to hold the locks of several
+djtag units simultaneously?
+
+> + * @reg_base:	djtag register base address
+> + *
+> + * Return - none.
+> + */
+> +static void hisi_djtag_lock_v2(void __iomem *regs_base)
+> +{
+> +	u32 rd, wr, mod_sel;
+> +
+> +	/* Continuously poll to ensure the djtag is free */
+> +	while (1) {
+> +		rd = readl(regs_base + SC_DJTAG_MSTR_CFG_EX);
+> +		mod_sel = ((rd >> DEBUG_MODULE_SEL_SHIFT_EX) & 0xFF);
+> +		if (mod_sel == SC_DJTAG_V2_UNLOCK) {
+> +			wr = ((rd & SC_DJTAG_V2_MODULE_SEL_MASK) |
+> +			      (SC_DJTAG_V2_KERNEL_LOCK <<
+> +			       DEBUG_MODULE_SEL_SHIFT_EX));
+> +			writel(wr, regs_base + SC_DJTAG_MSTR_CFG_EX);
+> +			udelay(10); /* 10us */
+> +
+> +			rd = readl(regs_base + SC_DJTAG_MSTR_CFG_EX);
+> +			mod_sel = ((rd >> DEBUG_MODULE_SEL_SHIFT_EX) & 0xFF);
+> +			if (mod_sel == SC_DJTAG_V2_KERNEL_LOCK)
+> +				break;
+> +		}
+> +		udelay(10); /* 10us */
+> +	}
+> +}
+> +
+> +/*
+> + * hisi_djtag_unlock_v2: djtag unlock
+> + * @reg_base:	djtag register base address
+> + *
+> + * Return - none.
+> + */
+> +static void hisi_djtag_unlock_v2(void __iomem *regs_base)
+> +{
+> +	u32 rd, wr;
+> +
+> +	rd = readl(regs_base + SC_DJTAG_MSTR_CFG_EX);
+> +
+> +	wr = ((rd & SC_DJTAG_V2_MODULE_SEL_MASK) |
+> +	      (SC_DJTAG_V2_UNLOCK << DEBUG_MODULE_SEL_SHIFT_EX));
+> +	/*
+> +	 * Release djtag module by writing to module
+> +	 * selection bits of DJTAG_MSTR_CFG register
+> +	 */
+> +	writel(wr, regs_base + SC_DJTAG_MSTR_CFG_EX);
+> +}
+
+[...]
+
+> +static void hisi_djtag_prepare_v2(void __iomem *regs_base, u32 offset,
+> +				  u32 mod_sel, u32 mod_mask)
+> +{
+> +	/* djtag mster enable */
+
+s/mster/master/ ?
+
+[...]
+
+> +static ssize_t show_modalias(struct device *dev,
+> +			     struct device_attribute *attr, char *buf)
+> +{
+> +	struct hisi_djtag_client *client = to_hisi_djtag_client(dev);
+> +
+> +	return sprintf(buf, "%s%s\n", MODULE_PREFIX, dev_name(&client->dev));
+> +}
+> +static DEVICE_ATTR(modalias, 0444, show_modalias, NULL);
+> +
+> +static struct attribute *hisi_djtag_dev_attrs[] = {
+> +	/* modalias helps coldplug:  modprobe $(cat .../modalias) */
+> +	&dev_attr_modalias.attr,
+> +	NULL
+> +};
+> +ATTRIBUTE_GROUPS(hisi_djtag_dev);
+> +
+> +static struct device_type hisi_djtag_client_type = {
+> +	.groups	= hisi_djtag_dev_groups,
+> +};
+
+Can you elaborate on what this sysfs stuff is for?
+
+> +static int hisi_djtag_device_match(struct device *dev,
+> +				   struct device_driver *drv)
+> +{
+> +	/* Attempt an OF style match */
+> +	if (of_driver_match_device(dev, drv))
+> +		return true;
+> +
+> +#ifdef CONFIG_ACPI
+> +	if (acpi_driver_match_device(dev, drv))
+> +		return true;
+> +#endif
+
+You can drop the ifdef here. When CONFIG_ACPI is not selected,
+acpi_driver_match_device() is a static inline that always returns false.
+
+> +	return false;
+> +}
+
+[...]
+
+> +static int hisi_djtag_set_client_name(struct hisi_djtag_client *client,
+> +				      const char *device_name)
+> +{
+> +	char name[DJTAG_CLIENT_NAME_LEN];
+> +	int id;
+> +
+> +	id = hisi_djtag_get_client_id(client);
+> +	if (id < 0)
+> +		return id;
+> +
+> +	client->id = id;
+> +	snprintf(name, DJTAG_CLIENT_NAME_LEN, "%s%s_%d", DJTAG_PREFIX,
+> +		 device_name, client->id);
+> +	dev_set_name(&client->dev, "%s", name);
+> +
+> +	return 0;
+> +}
+
+Given dev_set_name() takes a fmt string, you don't need the temporary
+name here, and can have dev_set_name() handle that directly, e.g.
+
+	err = dev_set_name(&client->dev, %s%s_%d",
+  			   DJTAG_PREFIX, device_name, client->id);
+	if (err)
+		return err;
+
+
+Given DJTAG_PREFIX is only used here, it would be better to fold it into
+the format string, also.
+
+> +
+> +static int hisi_djtag_new_of_device(struct hisi_djtag_host *host,
+> +				    struct device_node *node)
+> +{
+> +	struct hisi_djtag_client *client;
+> +	int ret;
+> +
+> +	client = hisi_djtag_client_alloc(host);
+> +	if (!client) {
+> +		dev_err(&host->dev, "DT: Client alloc fail!\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	client->dev.of_node = of_node_get(node);
+> +
+> +	ret = hisi_djtag_set_client_name(client, node->name);
+
+I don't think it's a good idea to take the name directly from the DT.
+
+Can we please use a standard name, looked up based on the compatible
+string? Then we can also use the same names for ACPI. Where there are
+multiple instances, we can use the module-id too.
+
+[...]
+
+> +static void djtag_register_devices(struct hisi_djtag_host *host)
+> +{
+> +	struct device_node *node;
+> +
+> +	if (host->of_node) {
+> +		for_each_available_child_of_node(host->of_node, node) {
+> +			if (of_node_test_and_set_flag(node, OF_POPULATED))
+> +				continue;
+> +			if (hisi_djtag_new_of_device(host, node))
+> +				break;
+
+Why do we stop, rather than rolling back and freeing what we allocated?
+
+Either that, or we should return an error code, such that a higher level
+can choose to do so.
+
+> +		}
+> +	} else if (host->acpi_handle) {
+> +		acpi_handle handle = host->acpi_handle;
+> +		acpi_status status;
+> +
+> +		status = acpi_walk_namespace(ACPI_TYPE_DEVICE, handle, 1,
+> +					     djtag_add_new_acpi_device, NULL,
+> +					     host, NULL);
+> +		if (ACPI_FAILURE(status)) {
+> +			dev_err(&host->dev,
+> +				"ACPI: Fail to read client devices!\n");
+> +			return;
+
+Likewise, why aren't we rolling back?
+
+[...]
+
+> +#define DJTAG_CLIENT_NAME_LEN 32
+
+I beleive this can go.
+
+Thanks,
+Mark.
