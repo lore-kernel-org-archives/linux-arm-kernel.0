@@ -1,90 +1,96 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 9 Jun 2017 17:33:25 +0530
-Subject: [PATCH v9 0/3] Support for USB DRD PHY driver for NS2
-In-Reply-To: <1497008582-17974-1-git-send-email-raviteja.garimella@broadcom.com>
-References: <1497008582-17974-1-git-send-email-raviteja.garimella@broadcom.com>
-Message-ID: <22badb49-2961-e552-1b99-b7d7d4809b92@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri,  9 Jun 2017 12:49:55 +0100
+Subject: [PATCH v3 26/27] KVM: arm64: Log an error if trapping a
+ read-from-write-only GICv3 access
+In-Reply-To: <20170609114956.25963-1-marc.zyngier@arm.com>
+References: <20170609114956.25963-1-marc.zyngier@arm.com>
+Message-ID: <20170609114956.25963-27-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+A read-from-write-only GICv3 access should UNDEF at EL1. But since
+we're in complete paranoia-land with broken CPUs, let's assume the
+worse and gracefully handle the case.
 
-On Friday 09 June 2017 05:12 PM, Raviteja Garimella wrote:
-> Changes in V9: 
-> =============
-> Rebased on linux-phy next. Driver files and Kconfig/Makefile
-> changes now in drivers/phy/broadcom.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kvm/sys_regs.c     | 12 ++++++++----
+ virt/kvm/arm/hyp/vgic-v3-sr.c |  4 ++++
+ 2 files changed, 12 insertions(+), 4 deletions(-)
 
-merged the _phy_ patches to linux-phy. Thanks for doing multiple revisions to
-get it merged.
-
--Kishon
-> 
-> Changes in v8:
-> =============
-> -Renamed phy shutdown routine
-> -Used devm_request_irq in stead of threaded irq
-> -Removed devm_unregister calls in probe routine
-> 
-> Changes in v7:
-> =============
-> Cleaned up unused variables in phy private data structure that's
-> missed out in v6.
-> Setting of phy mode to device/host is removed from phy power on.
-> routine.
-> 
-> Changes in v6:
-> =============
-> Removed spin locks which are not required as the references
-> to phy_ops in the same driver were removed in v5.
-> 
-> Removed host/device 'notify' routines which are registered
-> using 'extcon_register_notifier'. The irq handler is sufficient
-> to deal with the change in extcon events within the same driver.
-> 
-> Changes in v5:
-> =============
-> Removed references to phy_ops in the same driver by connect_work
-> event handler to change the phy modes.
-> 
-> To support dynamically changing the mode of the phy, it does
-> not require doing a phy reset/programming of PHY PLL. Changes
-> are made to the connect_work routine to just program the required
-> register bits to achieve this purpose.
-> 
-> Changes in v4:
-> =============
-> Remove references to edev->name in debug prints.
-> 
-> Changes in v3:
-> =============
-> Remove unnecessary checks for poweron as suggested in review.
-> 
-> Changes in v2:
-> =============
-> 1. Initialize file operations .owner field with THIS_MODULE.
-> 2. Remove unnecessary gpio example in DT bindings documentation.
->    This is previously acked by Rob Herring <robh@kernel.org>
-> 
-> Introduction for PATCH v1:
-> 
-> This patch adds support for USB Dual Role Device Phy for Broadcom
-> Northstar2 SoC. Apart from the new phy driver, this patchset contains
-> changes to Kconfig, Makefile, and Device tree files.
-> 
-> This patchset is tested on Broadcom NS2 BCM958712K reference board.
-> 
-> Raviteja Garimella (3):
->   dt-bindings: phy: Add DT bindings documentation for NS2 USB DRD PHY
->   phy: phy-bcm-ns2-usbdrd: Broadcom USB DRD PHY driver for Northstar2
->   arm64: dts: NS2: Add USB DRD PHY device tree node
-> 
->  .../devicetree/bindings/phy/brcm,ns2-drd-phy.txt   |  30 ++
->  arch/arm64/boot/dts/broadcom/ns2.dtsi              |  14 +
->  drivers/phy/broadcom/Kconfig                       |  13 +
->  drivers/phy/broadcom/Makefile                      |   1 +
->  drivers/phy/broadcom/phy-bcm-ns2-usbdrd.c          | 437 +++++++++++++++++++++
->  5 files changed, 495 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/brcm,ns2-drd-phy.txt
->  create mode 100644 drivers/phy/broadcom/phy-bcm-ns2-usbdrd.c
-> 
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 0fe27024a2e1..8d51c075966d 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -56,7 +56,8 @@
+  */
+ 
+ static bool read_from_write_only(struct kvm_vcpu *vcpu,
+-				 const struct sys_reg_params *params)
++				 struct sys_reg_params *params,
++				 const struct sys_reg_desc *r)
+ {
+ 	WARN_ONCE(1, "Unexpected sys_reg read to write-only register\n");
+ 	print_sys_reg_instr(params);
+@@ -93,7 +94,7 @@ static bool access_dcsw(struct kvm_vcpu *vcpu,
+ 			const struct sys_reg_desc *r)
+ {
+ 	if (!p->is_write)
+-		return read_from_write_only(vcpu, p);
++		return read_from_write_only(vcpu, p, r);
+ 
+ 	kvm_set_way_flush(vcpu);
+ 	return true;
+@@ -135,7 +136,7 @@ static bool access_gic_sgi(struct kvm_vcpu *vcpu,
+ 			   const struct sys_reg_desc *r)
+ {
+ 	if (!p->is_write)
+-		return read_from_write_only(vcpu, p);
++		return read_from_write_only(vcpu, p, r);
+ 
+ 	vgic_v3_dispatch_sgi(vcpu, p->regval);
+ 
+@@ -773,7 +774,7 @@ static bool access_pmswinc(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 		return trap_raz_wi(vcpu, p, r);
+ 
+ 	if (!p->is_write)
+-		return read_from_write_only(vcpu, p);
++		return read_from_write_only(vcpu, p, r);
+ 
+ 	if (pmu_write_swinc_el0_disabled(vcpu))
+ 		return false;
+@@ -953,7 +954,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 
+ 	{ SYS_DESC(SYS_VBAR_EL1), NULL, reset_val, VBAR_EL1, 0 },
+ 
++	{ SYS_DESC(SYS_ICC_EOIR0_EL1), read_from_write_only },
++	{ SYS_DESC(SYS_ICC_DIR_EL1), read_from_write_only },
+ 	{ SYS_DESC(SYS_ICC_SGI1R_EL1), access_gic_sgi },
++	{ SYS_DESC(SYS_ICC_EOIR1_EL1), read_from_write_only },
+ 	{ SYS_DESC(SYS_ICC_SRE_EL1), access_gic_sre },
+ 
+ 	{ SYS_DESC(SYS_CONTEXTIDR_EL1), access_vm_reg, reset_val, CONTEXTIDR_EL1, 0 },
+diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+index 15b557697086..b26ce58b012a 100644
+--- a/virt/kvm/arm/hyp/vgic-v3-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+@@ -980,6 +980,8 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
+ 		break;
+ 	case SYS_ICC_EOIR0_EL1:
+ 	case SYS_ICC_EOIR1_EL1:
++		if (unlikely(is_read))
++			return 0;
+ 		fn = __vgic_v3_write_eoir;
+ 		break;
+ 	case SYS_ICC_GRPEN1_EL1:
+@@ -1039,6 +1041,8 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
+ 			fn = __vgic_v3_write_bpr0;
+ 		break;
+ 	case SYS_ICC_DIR_EL1:
++		if (unlikely(is_read))
++			return 0;
+ 		fn = __vgic_v3_write_dir;
+ 		break;
+ 	case SYS_ICC_RPR_EL1:
+-- 
+2.11.0
