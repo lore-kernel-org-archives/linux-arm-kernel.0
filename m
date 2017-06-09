@@ -1,105 +1,180 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Fri, 9 Jun 2017 16:27:24 +0200
-Subject: [PATCH 2/4] drm/bridge: dw-hdmi: add cec notifier support
-In-Reply-To: <E1dFi3E-0004lh-Pu@rmk-PC.armlinux.org.uk>
-References: <20170530142218.GS22219@n2100.armlinux.org.uk>
- <E1dFi3E-0004lh-Pu@rmk-PC.armlinux.org.uk>
-Message-ID: <15a00b10-9525-859e-80af-fe87b78e8fe8@xs4all.nl>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 9 Jun 2017 09:27:44 -0500
+Subject: [PATCH v2 1/3] dt-bindings: remoteproc: Add Keystone DSP
+ remoteproc binding
+In-Reply-To: <20170608002447.47580-2-s-anna@ti.com>
+References: <20170608002447.47580-1-s-anna@ti.com>
+ <20170608002447.47580-2-s-anna@ti.com>
+Message-ID: <20170609142744.23mq37yoy5w2sr5o@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/05/17 16:23, Russell King wrote:
-> Add CEC notifier support to the HDMI bridge driver, so that the CEC
-> part of the IP can receive its physical address.
+On Wed, Jun 07, 2017 at 07:24:45PM -0500, Suman Anna wrote:
+> Add the device tree bindings document for the Texas Instrument's
+> Keystone 2 DSP remoteproc devices.
 > 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-
-Given the fact that there are devices that do not use the built-in dw-hdmi
-CEC IP but something else, using a notifier here makes a lot of sense.
-
-So:
-
-Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
-
-Regards,
-
-	Hans
-
+> Signed-off-by: Suman Anna <s-anna@ti.com>
+> Signed-off-by: Sam Nelson <sam.nelson@ti.com>
 > ---
->  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 22 +++++++++++++++++++++-
->  1 file changed, 21 insertions(+), 1 deletion(-)
+> v2 Changes:
+>  - Modified the patch title
+>  - Dropped unstable binding status
+>  - Dropped the 'label' property and replaced the device node description
+>    to use an alias
+>  - Renamed 'kick-gpio' to 'kick-gpios'
+>  - Updated the example
+> v1: https://patchwork.kernel.org/patch/9750839/
 > 
-> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> index 4e1f54a675d8..966422576c44 100644
-> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> @@ -36,7 +36,10 @@
->  #include "dw-hdmi.h"
->  #include "dw-hdmi-audio.h"
->  
-> +#include <media/cec-notifier.h>
+>  .../bindings/remoteproc/ti,keystone-rproc.txt      | 135 +++++++++++++++++++++
+>  1 file changed, 135 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/remoteproc/ti,keystone-rproc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/remoteproc/ti,keystone-rproc.txt b/Documentation/devicetree/bindings/remoteproc/ti,keystone-rproc.txt
+> new file mode 100644
+> index 000000000000..162229244d14
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/remoteproc/ti,keystone-rproc.txt
+> @@ -0,0 +1,135 @@
+> +TI Keystone DSP devices
+> +=======================
 > +
->  #define DDC_SEGMENT_ADDR	0x30
+> +The TI Keystone 2 family of SoCs usually have one or more (upto 8) TI DSP Core
+> +sub-systems that are used to offload some of the processor-intensive tasks or
+> +algorithms, for achieving various system level goals.
 > +
->  #define HDMI_EDID_LEN		512
->  
->  enum hdmi_datamap {
-> @@ -173,6 +176,8 @@ struct dw_hdmi {
->  
->  	unsigned int reg_shift;
->  	struct regmap *regm;
+> +These processor sub-systems usually contain additional sub-modules like L1
+> +and/or L2 caches/SRAMs, an Interrupt Controller, an external memory controller,
+> +a dedicated local power/sleep controller etc. The DSP processor core in
+> +Keystone 2 SoCs is usually a TMS320C66x CorePac processor.
 > +
-> +	struct cec_notifier *cec_notifier;
->  };
->  
->  #define HDMI_IH_PHY_STAT0_RX_SENSE \
-> @@ -1870,6 +1875,7 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
->  		hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
->  		hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
->  		drm_mode_connector_update_edid_property(connector, edid);
-> +		cec_notifier_set_phys_addr_from_edid(hdmi->cec_notifier, edid);
->  		ret = drm_add_edid_modes(connector, edid);
->  		/* Store the ELD */
->  		drm_edid_to_eld(connector, edid);
-> @@ -2108,11 +2114,16 @@ static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
->  	 * ask the source to re-read the EDID.
->  	 */
->  	if (intr_stat &
-> -	    (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_IH_PHY_STAT0_HPD))
-> +	    (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_IH_PHY_STAT0_HPD)) {
->  		__dw_hdmi_setup_rx_sense(hdmi,
->  					 phy_stat & HDMI_PHY_HPD,
->  					 phy_stat & HDMI_PHY_RX_SENSE);
->  
-> +		if ((phy_stat & (HDMI_PHY_RX_SENSE | HDMI_PHY_HPD)) == 0)
-> +			cec_notifier_set_phys_addr(hdmi->cec_notifier,
-> +						   CEC_PHYS_ADDR_INVALID);
-> +	}
+> +DSP Device Node:
+> +================
+> +Each DSP Core sub-system is represented as a single DT node, and should also
+> +have an alias with the stem 'rproc' defined. Each node has a number of required
+> +or optional properties that enable the OS running on the host processor (ARM
+> +CorePac) to perform the device management of the remote processor and to
+> +communicate with the remote processor.
 > +
->  	if (intr_stat & HDMI_IH_PHY_STAT0_HPD) {
->  		dev_dbg(hdmi->dev, "EVENT=%s\n",
->  			phy_int_pol & HDMI_PHY_HPD ? "plugin" : "plugout");
-> @@ -2365,6 +2376,12 @@ __dw_hdmi_probe(struct platform_device *pdev,
->  	if (ret)
->  		goto err_iahb;
->  
-> +	hdmi->cec_notifier = cec_notifier_get(dev);
-> +	if (!hdmi->cec_notifier) {
-> +		ret = -ENOMEM;
-> +		goto err_iahb;
-> +	}
+> +Required properties:
+> +--------------------
+> +The following are the mandatory properties:
 > +
->  	/*
->  	 * To prevent overflows in HDMI_IH_FC_STAT2, set the clk regenerator
->  	 * N and cts values before enabling phy
-> @@ -2437,6 +2454,9 @@ __dw_hdmi_probe(struct platform_device *pdev,
->  		hdmi->ddc = NULL;
->  	}
->  
-> +	if (hdmi->cec_notifier)
-> +		cec_notifier_put(hdmi->cec_notifier);
+> +- compatible:		Should be one of the following,
+> +			    "ti,k2hk-dsp" for DSPs on Keystone 2 66AK2H/K SoCs
+> +			    "ti,k2l-dsp" for DSPs on Keystone 2 66AK2L SoCs
+> +			    "ti,k2e-dsp" for DSPs on Keystone 2 66AK2E SoCs
 > +
->  	clk_disable_unprepare(hdmi->iahb_clk);
->  err_isfr:
->  	clk_disable_unprepare(hdmi->isfr_clk);
+> +- reg:			Should contain an entry for each value in 'reg-names'.
+> +			Each entry should have the memory region's start address
+> +			and the size of the region, the representation matching
+> +			the parent node's '#address-cells' and '#size-cells' values.
+> +
+> +- reg-names:		Should contain strings with the following names, each
+> +			representing a specific internal memory region, and
+> +			should be defined in this order,
+> +			     "l2sram", "l1pram", "l1dram"
+> +
+> +- clocks: 		Should contain the device's input clock, and should be
+> +			defined as per the bindings in,
+> +			Documentation/devicetree/bindings/clock/keystone-gate.txt
+> +
+> +- ti,syscon-dev:	Should be a pair of the phandle to the Keystone Device
+> +			State Control node, and the register offset of the DSP
+> +			boot address register within that node's address space.
+> +
+> +- resets:		Should contain the phandle to the reset controller node
+> +			managing the resets for this device, and a reset
+> +			specifier. Please refer to the following reset bindings
+> +			for the reset argument specifier as per SoC,
+> +			Documentation/devicetree/bindings/reset/ti-syscon-reset.txt
+> +			    for 66AK2HK/66AK2L/66AK2E SoCs
+> +
+> +- interrupt-parent:	Should contain a phandle to the Keystone 2 IRQ controller
+> +			IP node that is used by the ARM CorePac processor to
+> +			receive interrupts from the DSP remote processors. See
+> +			Documentation/devicetree/bindings/interrupt-controller/ti,keystone-irq.txt
+> +			for details.
+> +
+> +- interrupts: 		Should contain an entry for each value in 'interrupt-names'.
+> +			Each entry should have the interrupt source number used by
+> +			the remote processor to the host processor. The values should
+> +			follow the interrupt-specifier format as dictated by the
+> +			'interrupt-parent' node. The purpose of each is as per the
+> +			description in the 'interrupt-names' property.
+> +
+> +- interrupt-names:	Should contain strings with the following names, each
+> +			representing a specific interrupt,
+> +			    "vring" - interrupt for virtio based IPC
+> +			    "exception" - interrupt for exception notification
+> +
+> +- kick-gpios: 		Should specify the gpio device needed for the virtio IPC
+> +			stack. This will be used to interrupt the remote processor.
+> +			The gpio device to be used is as per the bindings in,
+> +			Documentation/devicetree/bindings/gpio/gpio-dsp-keystone.txt
+> +
+> +Optional properties:
+> +--------------------
+> +
+> +- memory-region:	phandle to the reserved memory node to be associated
+> +			with the remoteproc device. The reserved memory node
+> +			can be a CMA memory node, and should be defined as
+> +			per the bindings in
+> +			Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+> +
+> +
+> +Example:
+> +--------
+> +	/* 66AK2H/K DSP aliases */
+> +	aliases {
+> +		rproc0 = &dsp0;
+> +		rproc1 = &dsp1;
+> +		rproc2 = &dsp2;
+> +		rproc3 = &dsp3;
+> +		rproc4 = &dsp4;
+> +		rproc5 = &dsp5;
+> +		rproc6 = &dsp6;
+> +		rproc7 = &dsp7;
+> +	};
+> +
+> +	/* 66AK2H/K DSP memory node */
+> +	reserved-memory {
+> +		#address-cells = <2>;
+> +		#size-cells = <2>;
+> +		ranges;
+> +
+> +		dsp_common_memory: dsp-common-memory at 81f800000 {
+> +			compatible = "shared-dma-pool";
+> +			reg = <0x00000008 0x1f800000 0x00000000 0x800000>;
+> +			reusable;
+> +		};
+> +	};
+> +
+> +	/* 66AK2H/K DSP node */
+> +	soc {
+> +		dsp0: dsp at 10800000 {
+> +			compatible = "ti,k2hk-dsp";
+> +			reg = <0x10800000 0x00100000>,
+> +			      <0x10e00000 0x00008000>,
+> +			      <0x10f00000 0x00008000>;
+> +			reg-names = "l2sram", "l1pram", "l1dram";
+> +			label = "dsp0";
+
+Need to drop this. With that,
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+> +			clocks = <&clkgem0>;
+> +			ti,syscon-dev = <&devctrl 0x40>;
+> +			resets = <&pscrst 0>;
+> +			interrupt-parent = <&kirq0>;
+> +			interrupts = <0 8>;
+> +			interrupt-names = "vring", "exception";
+> +			kick-gpios = <&dspgpio0 27 0>;
+> +			memory-region = <&dsp_common_memory>;
+> +		};
+> +
+> +	};
+> +
+> -- 
+> 2.12.0
 > 
