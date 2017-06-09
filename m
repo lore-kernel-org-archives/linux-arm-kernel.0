@@ -1,75 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 9 Jun 2017 15:30:50 +0100
-Subject: [PATCH v8 6/9] drivers: perf: hisi: Add support for Hisilicon
- Djtag driver
-In-Reply-To: <8666a0fa-126d-e4a3-ac4b-7962f5d79942@huawei.com>
-References: <1495457312-237127-1-git-send-email-zhangshaokun@hisilicon.com>
- <20170608163519.GA19643@leverpostej>
- <8666a0fa-126d-e4a3-ac4b-7962f5d79942@huawei.com>
-Message-ID: <20170609143050.GM13955@arm.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Fri, 9 Jun 2017 16:38:22 +0200
+Subject: [PATCH 2/4] drm/bridge: dw-hdmi: add cec notifier support
+In-Reply-To: <20170609141056.GS4902@n2100.armlinux.org.uk>
+References: <20170530142218.GS22219@n2100.armlinux.org.uk>
+ <E1dFi3E-0004lh-Pu@rmk-PC.armlinux.org.uk>
+ <0c2c4988-37bb-fd01-efee-c6878cc53923@baylibre.com>
+ <20170609133822.GR4902@n2100.armlinux.org.uk>
+ <5b2fdadd-f1fa-c454-b3fe-facf221beb78@baylibre.com>
+ <20170609141056.GS4902@n2100.armlinux.org.uk>
+Message-ID: <9f877352-4122-14d9-4517-af01989161ba@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 09, 2017 at 03:18:39PM +0100, John Garry wrote:
-> On 08/06/2017 17:35, Mark Rutland wrote:
-> >Hi,
-> >
-> >On Mon, May 22, 2017 at 08:48:32PM +0800, Shaokun Zhang wrote:
-> >>+/*
-> >>+ * hisi_djtag_lock_v2: djtag lock to avoid djtag access conflict b/w kernel
-> >>+ * and UEFI.
-> >
-> >The mention of UEFI here worries me somewhat, and I have a number of
-> >questions specifically relating to how we interact with UEFI here.
-> >
+On 09/06/17 16:10, Russell King - ARM Linux wrote:
+> On Fri, Jun 09, 2017 at 03:56:39PM +0200, Neil Armstrong wrote:
+>> Yes, but on the Amlogic Meson plarform, the DW-HDMI CEC controller is
+>> not used, but a custom one, so this notifier is actually useful for
+>> this platform and maybe others.
 > 
-> Hi Mark,
+> Is the CEC controller configured into dw-hdmi (is the config bit set?)
+> I'm just wondering if we're going to end up with two CEC drivers trying
+> to bind to the same notifier.
 > 
-> This djtag locking mechanism is an advisory software-only policy. The
-> problem is the hardware designers made an interface which does not consider
-> multiple agents in the system concurrently accessing the djtag registers.
+>> Should we really wait until I push the Amlogic AO CEC driver ? Having a
+>> notifier in the DW-HDMI driver won't harm anybody since it *will be used*.
 > 
-> System wide, djtag is used as an interface to other HW modules, but we only
-> use for perf HW in the kernel.
+> It sounds like this adds additional information that has been missing
+> from the review of my patches - and I suspect changes Hans' comments.
+> So, I'll wait, it seems pointless to try and update the patches when
+> it's not clear how to proceed due to other dependencies, especially
+> when it means that their existing state is what's required (I'm pleased
+> that I've held off modifying the patches so far.)
 > 
-> >When precisely does UEFI need to touch the djtag hardware? e.g. does
-> >this happen in runtime services? ... or completely asynchronously?
-> >
+> If that means having to wait another kernel revision, then I guess that's
+> what will have to happen.
 > 
-> Actually it's trusted firmware which accesses for L3 cache management in CPU
-> hotplug
-> 
-> >What does UEFI do with djtag when it holds the lock?
-> >
-> 
-> As mentioned, cache management
-> 
-> >Are there other software agents (e.g. secure firmware) which try to
-> >take this lock?
-> >
-> 
-> No
-> 
-> >Can you explain how the locking scheme works? e.g. is this an advisory
-> >software-only policy, or does the hardware prohibit accesses from other
-> >agents somehow?
-> >
-> 
-> The locking scheme is a software solution to spinlock. It's uses djtag
-> module select register as the spinlock flag, to avoid using some shared
-> memory.
-> 
-> The tricky part is that there is no test-and-set hardware support, so we use
-> this algorithm:
-> - precondition: flag initially set unlocked
-> 
-> a. agent reads flag
->     - if not unlocked, continues to poll
->     - otherwise, writes agent's unique lock value to flag
-> b. agent waits defined amount of time *uninterrupted* and then checks the
-> flag
 
-How do you figure out this time period? Doesn't it need to be no shorter
-than the longest critical section?
+I've Acked patches 1-3. Patch 4 can be rebased on top of the latest mainline
+and just ignore any notifier-related comments I made in my review of this
+patch.
 
-Will
+I have no problem with patches 1-3 being merged now.
+
+Regards,
+
+	Hans
