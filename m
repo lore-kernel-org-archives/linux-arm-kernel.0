@@ -1,55 +1,73 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri, 9 Jun 2017 08:39:34 +0200
-Subject: [PATCH v2 7/8] net: mvmdio: add xmdio support
-In-Reply-To: <20170608165546.GC20216@lunn.ch>
-References: <20170608092653.25221-1-antoine.tenart@free-electrons.com>
- <20170608092653.25221-8-antoine.tenart@free-electrons.com>
- <a60a0b26-62b1-7c9e-e846-215747dddb1f@gmail.com>
- <20170608165546.GC20216@lunn.ch>
-Message-ID: <20170609063934.GA31464@kwain>
+From: dannym@scratchpost.org (Danny Milosavljevic)
+Date: Fri,  9 Jun 2017 08:22:06 +0200
+Subject: [PATCH v11 02/12] sun4i-codec: Add Differential Line Capture Switch
+ and its routes
+In-Reply-To: <20170609062216.26807-1-dannym@scratchpost.org>
+References: <20170609062216.26807-1-dannym@scratchpost.org>
+Message-ID: <20170609062216.26807-3-dannym@scratchpost.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Florian, Andrew,
+Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
+---
+ sound/soc/sunxi/sun4i-codec.c | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-On Thu, Jun 08, 2017 at 06:55:46PM +0200, Andrew Lunn wrote:
-> On Thu, Jun 08, 2017 at 09:42:21AM -0700, Florian Fainelli wrote:
-> > On 06/08/2017 02:26 AM, Antoine Tenart wrote:
-> > > This patch adds the xMDIO interface support in the mvmdio driver. This
-> > > interface is used in Ethernet controllers on Marvell 370, 7k and 8k (as
-> > > of now). The xSMI interface supported by this driver complies with the
-> > > IEEE 802.3 clause 45 (while the SMI interface complies with the clause
-> > > 22). The xSMI interface is used by 10GbE devices.
-> > 
-> > In the previous version you were properly defining a new compatibles
-> > strings for xmdio, but now you don't and instead you runtime select the
-> > operations based on whether MII_ADDR_C45 is set in the register which is
-> > fine from a functional perspective.
-> > 
-> > If I get this right, the xMDIO controller is actually a superset of the
-> > MDIO controller and has an extra MVMDIO_XSMI_ADDR_REG register to
-> > preform C45 accesses?
-> > 
-> > If that is the case (and looking at patch 8 that seems to be the case),
-> > you probably still need to define a new compatible string for that
-> > block, because it has a different register layout than its predecessor.
-> 
-> Yes, i think you need the compatible string to return -EOPNOSUP when
-> somebody tries to do a C45 access on the older IP which only has C22.
-
-That's a very good point. I'll update the series to fix this.
-
-Thanks!
-Antoine
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170609/02ae2b79/attachment.sig>
+diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+index 2f65aa72..a2435c6e 100644
+--- a/sound/soc/sunxi/sun4i-codec.c
++++ b/sound/soc/sunxi/sun4i-codec.c
+@@ -96,6 +96,7 @@
+ #define SUN4I_CODEC_ADC_ACTL_VMICEN			(27)
+ #define SUN4I_CODEC_ADC_ACTL_VADCG			(20)
+ #define SUN4I_CODEC_ADC_ACTL_ADCIS			(17)
++#define SUN4I_CODEC_ADC_ACTL_LNRDF			(16)
+ #define SUN4I_CODEC_ADC_ACTL_PA_EN			(4)
+ #define SUN4I_CODEC_ADC_ACTL_DDE			(3)
+ #define SUN4I_CODEC_ADC_DEBUG			(0x2c)
+@@ -644,6 +645,20 @@ static const struct snd_kcontrol_new sun4i_codec_pa_mute =
+ 
+ static DECLARE_TLV_DB_SCALE(sun4i_codec_pa_volume_scale, -6300, 100, 1);
+ 
++static const char * const sun4i_codec_difflinein_capture_source[] = {
++	"Stereo",
++	"Differential",
++};
++
++static SOC_ENUM_SINGLE_DECL(sun4i_codec_enum_difflinein_capture_source,
++			    SUN4I_CODEC_ADC_ACTL,
++			    SUN4I_CODEC_ADC_ACTL_LNRDF,
++			    sun4i_codec_difflinein_capture_source);
++
++static const struct snd_kcontrol_new sun4i_codec_difflinein_capture_source_controls =
++	SOC_DAPM_ENUM("Differential Line Capture Switch",
++	sun4i_codec_enum_difflinein_capture_source);
++
+ static const struct snd_kcontrol_new sun4i_codec_controls[] = {
+ 	SOC_SINGLE_TLV("Power Amplifier Volume", SUN4I_CODEC_DAC_ACTL,
+ 		       SUN4I_CODEC_DAC_ACTL_PA_VOL, 0x3F, 0,
+@@ -720,6 +735,12 @@ static const struct snd_soc_dapm_widget sun4i_codec_codec_dapm_widgets[] = {
+ 	SND_SOC_DAPM_SWITCH("Power Amplifier Mute", SND_SOC_NOPM, 0, 0,
+ 			    &sun4i_codec_pa_mute),
+ 
++	/* MUX */
++	SND_SOC_DAPM_MUX("Differential Line Capture Switch", SND_SOC_NOPM,
++			 0,
++			 0,
++			 &sun4i_codec_difflinein_capture_source_controls),
++
+ 	/* Inputs */
+ 	SND_SOC_DAPM_INPUT("Mic1"),
+ 	SND_SOC_DAPM_INPUT("Mic2"),
+@@ -767,6 +788,11 @@ static const struct snd_soc_dapm_route sun4i_codec_codec_dapm_routes[] = {
+ 	{ "Right ADC", NULL, "MIC1 Pre-Amplifier" },
+ 	{ "MIC1 Pre-Amplifier", NULL, "Mic1"},
+ 	{ "Mic1", NULL, "VMIC" },
++
++	/* LNRDF Routes */
++	{ "Differential Line Capture Switch", "Differential", "Line Left" },
++	{ "Differential Line Capture Switch", "Differential", "Line Right" },
++
+ };
+ 
+ static struct snd_soc_codec_driver sun4i_codec_codec = {
