@@ -1,54 +1,55 @@
-From: nwatters@codeaurora.org (Nate Watterson)
-Date: Fri, 9 Jun 2017 15:28:46 -0400
-Subject: [PATCH 0/8] io-pgtable lock removal
-In-Reply-To: <cover.1496921366.git.robin.murphy@arm.com>
-References: <cover.1496921366.git.robin.murphy@arm.com>
-Message-ID: <458ad41d-6679-eeca-3c0f-13ccb6c933b6@codeaurora.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 9 Jun 2017 20:51:39 +0100
+Subject: [PATCH v2 7/8] net: mvmdio: add xmdio support
+In-Reply-To: <20170609144936.GF20756@lunn.ch>
+References: <20170608092653.25221-1-antoine.tenart@free-electrons.com>
+ <20170608092653.25221-8-antoine.tenart@free-electrons.com>
+ <a60a0b26-62b1-7c9e-e846-215747dddb1f@gmail.com>
+ <20170609082541.GC31464@kwain> <20170609132624.GC20756@lunn.ch>
+ <20170609140922.GD31464@kwain> <20170609144936.GF20756@lunn.ch>
+Message-ID: <20170609195139.GT4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On Fri, Jun 09, 2017 at 04:49:36PM +0200, Andrew Lunn wrote:
+> On Fri, Jun 09, 2017 at 04:09:22PM +0200, Antoine Tenart wrote:
+> > The MDIO/xMDIO registers are embedded into the network controller. The
+> > mvmdio driver was created at first to abstract this functionality
+> > outside the network controller driver because it is shared between all
+> > ports and used in different IPs. So it's not really devices per say.
+> > 
+> > Looking at the datasheet/schematics there are two hardware buses, one
+> > for c22 and one for c45. So we should keep two separate nodes to
+> > describe the two interfaces. From what I read c45 is backward
+> > compatible with c22 so the xSMI interface should be capable to speak to
+> > c22 PHYs as well.
+> 
+> The on the wire protocol of c45 is backwards compatible with c22, in
+> that a c22 device will not get confused by a c45 transaction on the
+> bus. A c22 device will just ignore it. You cannot talk to a c22 device
+> using c45.
 
-On 6/8/2017 7:51 AM, Robin Murphy wrote:
-> Hi all,
-> 
-> Here's the cleaned up nominally-final version of the patches everybody's
-> keen to see. #1 is just a non-critical thing-I-spotted-in-passing fix,
-> #2-#4 do some preparatory work (and bid farewell to everyone's least
-> favourite bit of code, hooray!), and #5-#8 do the dirty deed itself.
-> 
-> The branch I've previously shared has been updated too:
-> 
->    git://linux-arm.org/linux-rm  iommu/pgtable
-> 
-> All feedback welcome, as I'd really like to land this for 4.13.
->
+>From what I can tell, having 'scoped the MDIO line and tried writing
+several different values to the XSMI registers, it is not possible
+for the XSMI block to generate C22 frame structures - the "start"
+bits are always "00", and I can't make them the required "01" for C22.
 
-I tested the series on a QDF2400 development platform and see notable
-performance improvements particularly in workloads that make concurrent
-accesses to a single iommu_domain.
+However, I can confirm that bits 26 and 27 of the XSMI register are used
+directly for the OP field (so 0 << 26 produces a C45 address frame.)  I
+suspect, although I haven't delved that deeply (yet) that bit 28 sets
+whether XSMI produces an address cycle itself along with the data cycle.
 
-> Robin.
-> 
-> 
-> Robin Murphy (8):
->    iommu/io-pgtable-arm-v7s: Check table PTEs more precisely
->    iommu/io-pgtable-arm: Improve split_blk_unmap
->    iommu/io-pgtable-arm-v7s: Refactor split_blk_unmap
->    iommu/io-pgtable: Introduce explicit coherency
->    iommu/io-pgtable-arm: Support lockless operation
->    iommu/io-pgtable-arm-v7s: Support lockless operation
->    iommu/arm-smmu: Remove io-pgtable spinlock
->    iommu/arm-smmu-v3: Remove io-pgtable spinlock
-> 
->   drivers/iommu/arm-smmu-v3.c        |  36 ++-----
->   drivers/iommu/arm-smmu.c           |  48 ++++------
->   drivers/iommu/io-pgtable-arm-v7s.c | 173 +++++++++++++++++++++------------
->   drivers/iommu/io-pgtable-arm.c     | 190 ++++++++++++++++++++++++-------------
->   drivers/iommu/io-pgtable.h         |   6 ++
->   5 files changed, 268 insertions(+), 185 deletions(-)
-> 
+Bit 31 appears to be writable, but has no effect on the frame structure.
+
+> What i'm worried about is there being one set of MDC/MDIO lines. You
+> should not expose that to linux as two mdio busses. It is one bus.
+
+We're independent - the SMI and XSMI blocks are two entirely separate
+interfaces with entirely separate hardware MDC/MDIO lines.  The XSMI
+MDC/MDIO lines remain at logic '1' while phylib polls the PHY via
+the SMI interface.
 
 -- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
