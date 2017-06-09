@@ -1,54 +1,59 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Fri, 9 Jun 2017 18:34:44 +0300
-Subject: [PATCH 2/2] ARM: dts: imx6ul: Add imx6ul-tempmon
-In-Reply-To: <20170609154638.3b64e6d0@karo-electronics.de>
-References: <7055ce6095c0b7f026ac6f0dc37e43fc5c0b1793.1496939031.git.leonard.crestez@nxp.com>
- <b9b91617985607f24c4986bcad5199483805d6b7.1496939031.git.leonard.crestez@nxp.com>
- <CAOMZO5BP4fPyzDmSg+DFLRYh3QMf-8T0gqvnZn6mEMt-QqSgfw@mail.gmail.com>
- <1497005895.28352.88.camel@nxp.com>
- <20170609154638.3b64e6d0@karo-electronics.de>
-Message-ID: <1497022484.28352.105.camel@nxp.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri,  9 Jun 2017 23:34:36 +0800
+Subject: [PATCH] ARM: sun8i: h3: Enable EMAC with external PHY on Orange Pi
+ Plus 2E
+Message-ID: <20170609153436.18370-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-06-09 at 15:46 +0200, Lothar Wa?mann wrote:
-> On Fri, 9 Jun 2017 13:58:15 +0300 Leonard Crestez wrote:
-> > On Thu, 2017-06-08 at 13:45 -0300, Fabio Estevam wrote:
-> > > On Thu, Jun 8, 2017 at 1:26 PM, Leonard Crestez??wrote:
-> > > > +???????????????????????tempmon: tempmon {
-> > > > +???????????????????????????????compatible = "fsl,imx6ul-tempmon", "fsl,imx6sx-tempmon";
-> > > > +???????????????????????????????interrupts = ;
-> > > > +???????????????????????????????fsl,tempmon = <&anatop>;
-> > > > +???????????????????????????????fsl,tempmon-data = <&ocotp>;
-> > > > +???????????????????????????????clocks = <&clks IMX6UL_CLK_PLL3_USB_OTG>;
-> > > Does the IMX6UL_CLK_PLL3_USB_OTG clock really control tempmon? Please
-> > > double check.
-> > Yes, as far as I can tell the tempmon block uses the 480 Mhz PLL3 clock
-> > directly. This is similar to other imx6 SOCs. This PLL is used for
-> > stuff like USB but not only that. My understanding is the _USB_OTG
-> > suffix is descriptive, similar to PLL4_AUDIO and PLL6_ENET. Other non-
-> > usb components use PLL3 (like UART) but through other gates/dividers.
-> > 
-> > Setting this to?IMX6UL_CLK_DUMMY will cause temperature reads to fail.
-> > Even if PLL3 usually ends up being constantly enabled because of uarts
-> > this is not true at imx_thermal_probe time (or uarts can be disabled).
-> > 
-> Since the driver is accessing the OCOTP registers it definitely needs
-> the IMX6UL_CLK_OCOTP too!
-> 
-I don't think so. OCOTP reads fuse values into shadows registers on
-chip reset and values seem to be available even if it's specific OCOTP
-clock is off. I think that clock is only required for writes or?shadow
-updates.
+The Orange Pi Plus 2E, unlike the Orange Pi PC and PC Plus which its
+schematics are based on, uses an external Realtek RTL8211E PHY in
+RGMII mode, with a GPIO enabling the regulator for I/O signalling
+power supplies. The PHY's main power supply is enabled by the main
+5V power supply.
 
-In theory perhaps tempmon could be made to read ocotp through the imx-
-ocotp nvmem driver? It is not clear in what scenario this would
-actually be required.
+Add the regulator and PHY nodes, and override the PHY phandle under
+the EMAC node, so that the EMAC works properly on this board.
 
-This discussion is not specific to 6ul/6ull. There are other reads from
-ocotp which don't enable it's clock, for example
-imx6q_opp_check_speed_grading.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun8i-h3-orangepi-plus2e.dts | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
---
-Regards,
-Leonard
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus2e.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus2e.dts
+index 5851a47a3089..80026f3caafc 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus2e.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus2e.dts
+@@ -50,4 +50,30 @@
+ / {
+ 	model = "Xunlong Orange Pi Plus 2E";
+ 	compatible = "xunlong,orangepi-plus2e", "allwinner,sun8i-h3";
++
++	reg_gmac_3v3: gmac-3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "gmac-3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		startup-delay-us = <100000>;
++		enable-active-high;
++		gpio = <&pio 3 6 GPIO_ACTIVE_HIGH>; /* PD6 */
++	};
++};
++
++&emac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&emac_rgmii_pins>;
++	phy-supply = <&reg_gmac_3v3>;
++	phy-handle = <&ext_rgmii_phy>;
++	phy-mode = "rgmii";
++	status = "okay";
++};
++
++&mdio {
++	ext_rgmii_phy: ethernet-phy at 1 {
++		compatible = "ethernet-phy-ieee802.3-c22";
++		reg = <1>;
++	};
+ };
+-- 
+2.11.0
