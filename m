@@ -1,35 +1,33 @@
-From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Fri, 09 Jun 2017 17:35:21 +0900
-Subject: [PATCH 3/3] ARM: dts: exynos: Remove the display-timing and
- delay from rinato dts
-In-Reply-To: <20170609074509.GD4018@kozik-book>
-References: <1496984354-5271-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170609045939epcas1p2e4b50c78978b8f14630ca29550c1cb34@epcas1p2.samsung.com>
- <1496984354-5271-4-git-send-email-hoegeun.kwon@samsung.com>
- <20170609074509.GD4018@kozik-book>
-Message-ID: <ffe37769-d2f4-d224-f9b2-6fa0a3af6cff@samsung.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 9 Jun 2017 17:35:13 +0900
+Subject: [PATCH] kbuild: replace genhdr-y with generated-y,
+ deprecating genhdr-y
+In-Reply-To: <1496996992-17857-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1496996992-17857-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK7LNAQYfJxJEazU+pTqOFBuB3YzCH96ZmHn7wPK9V-XTuPgnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/09/2017 04:45 PM, Krzysztof Kozlowski wrote:
-> On Fri, Jun 09, 2017 at 01:59:14PM +0900, Hoegeun Kwon wrote:
->> The display-timing and delay are included in the panel driver. So it
->> should be removed in dts.
->>
->> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
->> ---
->>   arch/arm/boot/dts/exynos3250-rinato.dts | 22 ----------------------
->>   1 file changed, 22 deletions(-)
-> I understand this depends on merging in the panel driver so this will
-> have to wait till then. I'll take it when panel hits mainline (arm-soc
-> folks discourage recently cross-tree merges for DT).
+2017-06-09 17:29 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> Prior to commit fcc8487d477a ("uapi: export all headers under uapi
+> directories"), genhdr-y was meant to specify generated UAPI headers.
 >
-> Best regards,
-> Krzysztof
+> - generated-y: generated headers (other than asm-generic wrappers)
+> - header-y   : headers to be exported
+> - genhdr-y   : generated headers to be exported (generated-y + header-y)
+>
+> Now headers under UAPI directories are all exported.  So, there is no
+> more difference between generated-y and genhdr-y.
+>
+> We see two users of genhdr-y, arch/{arm,x86}/include/uapi/asm/Kbuild.
+> They generate some headers in arch/{arm,x86}/include/uapi/generated/
 
-Thanks for your reply.
-I agree with your opinion,
-I will wait for the panel driver to merge.
+The correct path is arch/{arm,x86}/include/generated/uapi/
 
-Best regards,
-Hoegeun
+I will fix it.
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
