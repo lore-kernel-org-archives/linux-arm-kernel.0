@@ -1,86 +1,55 @@
-From: david@lechnology.com (David Lechner)
-Date: Fri, 9 Jun 2017 16:17:19 -0500
-Subject: [PATCH v2 2/2] ARM: dts: da850-evm: drop VPIF endpoints
-In-Reply-To: <20170609172111.23057-3-khilman@baylibre.com>
-References: <20170609172111.23057-1-khilman@baylibre.com>
- <20170609172111.23057-3-khilman@baylibre.com>
-Message-ID: <b659fcf2-518a-4c1a-4989-d53dfc951ff2@lechnology.com>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Fri, 09 Jun 2017 23:24:47 +0200
+Subject: [linux-sunxi] Re: [PATCH v2 01/11] dt-bindings: update the
+ binding for Allwinner H3 TVE support
+In-Reply-To: <53E8FC74-8AC0-461A-B875-812EE4A3267E@aosc.io>
+References: <20170604160149.30230-1-icenowy@aosc.io>
+ <20170609164915.enap3epreg5vr2gy@flea.home>
+ <53E8FC74-8AC0-461A-B875-812EE4A3267E@aosc.io>
+Message-ID: <7305754.diZEu7DK25@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/09/2017 12:21 PM, Kevin Hilman wrote:
-> Drop the unused endpoints.  They should only be used when there is
-> an actual remote-endpoint connected.
+Hi!
+
+Dne petek, 09. junij 2017 ob 18:51:02 CEST je Icenowy Zheng napisal(a):
+> ? 2017?6?10? GMT+08:00 ??12:49:15, Maxime Ripard <maxime.ripard@free-
+electrons.com> ??:
+> >On Wed, Jun 07, 2017 at 04:48:50PM +0800, Icenowy Zheng wrote:
+> >> >> @@ -189,6 +211,8 @@ supported.
+> >> >> 
+> >> >>  Required properties:
+> >> >>    - compatible: value must be one of:
+> >> >>      * allwinner,sun8i-v3s-de2-mixer
+> >> >> 
+> >> >> +    * allwinner,sun8i-h3-de2-mixer0
+> >> >> +    * allwinner,sun8i-h3-de2-mixer1
+> >> >
+> >> >Again, please explain why we need to have different compatibles
+> >> >here. If it's only about the number of planes, this should be dealt
+> >> >with a property, not a compatible.
+> >> 
+> >> Only mixer0 has "VEP" and write-back support, at least on H3.
+> >
+> >What is that VEP? writeback support can also be expressed by a
+> >property.
 > 
+> I don't know what VEP is...
 
-Would it make sense to implement the status property here instead of 
-removing the nodes completely? If other property values are the same for 
-all users, then it seems like making all users have to dig up the docs 
-and copy/paste is not as nice as just overriding the status property. 
-But, if users have to change other values as well, then it makes sense 
-to just delete these.
+VEP is probably Video Enhancement Processor (?). Although I'm not sure if that 
+is really mixer specific. Icenowy, can you explain where did you get this info? 
 
+Best regards,
+Jernej
 
- > -	/* VPIF capture port */
- > -	port at 0 {
-
--->		status = "disabled";
-
- > -		vpif_input_ch0: endpoint at 0 {
- > -			reg = <0>;
- > -			bus-width = <8>;
- > -		};
- > -
- > -		vpif_input_ch1: endpoint at 1 {
- > -			reg = <1>;
- > -			bus-width = <8>;
- > -			data-shift = <8>;
- > -		};
- > -	};
- > -
- > -	/* VPIF display port */
- > -	port at 1 {
-
--->		status = "disabled";
-
- > -		vpif_output_ch0: endpoint {
- > -			bus-width = <8>;
- > -		};
- > -	};
-
-> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
-> ---
->   arch/arm/boot/dts/da850-evm.dts | 21 ---------------------
->   1 file changed, 21 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-> index a423e8ebfb37..67e72bc72e80 100644
-> --- a/arch/arm/boot/dts/da850-evm.dts
-> +++ b/arch/arm/boot/dts/da850-evm.dts
-> @@ -301,25 +301,4 @@
->   	pinctrl-names = "default";
->   	pinctrl-0 = <&vpif_capture_pins>, <&vpif_display_pins>;
->   	status = "okay";
-> -
-> -	/* VPIF capture port */
-> -	port at 0 {
-> -		vpif_input_ch0: endpoint at 0 {
-> -			reg = <0>;
-> -			bus-width = <8>;
-> -		};
-> -
-> -		vpif_input_ch1: endpoint at 1 {
-> -			reg = <1>;
-> -			bus-width = <8>;
-> -			data-shift = <8>;
-> -		};
-> -	};
-> -
-> -	/* VPIF display port */
-> -	port at 1 {
-> -		vpif_output_ch0: endpoint {
-> -			bus-width = <8>;
-> -		};
-> -	};
->   };
+> But we are really facing different cores, like sun50i-a64-mmc
+> and sun50i-a64-emmc.
 > 
+> >Maxime
+> 
+> --
+> You received this message because you are subscribed to the Google Groups
+> "linux-sunxi" group. To unsubscribe from this group and stop receiving
+> emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
