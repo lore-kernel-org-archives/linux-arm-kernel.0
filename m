@@ -1,92 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri,  9 Jun 2017 12:20:27 +0200
-Subject: [PATCH] ARM: davinci: don't mark vpif_input structures as 'const'
-Message-ID: <20170609102131.2836298-1-arnd@arndb.de>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Fri, 9 Jun 2017 13:27:52 +0300
+Subject: [PATCH v2 2/4] [media] davinci: vpif_capture: get subdevs from
+ DT when available
+In-Reply-To: <CAOi56cV18wJce8hzTk0r0YKvr4vzLi8QDwu01Az1rae-9=wMRg@mail.gmail.com>
+References: <20170606233741.26718-1-khilman@baylibre.com>
+ <20170606233741.26718-3-khilman@baylibre.com>
+ <f305d0fc-b5cd-591a-1d95-7ae66bfa72ec@xs4all.nl>
+ <CAOi56cV18wJce8hzTk0r0YKvr4vzLi8QDwu01Az1rae-9=wMRg@mail.gmail.com>
+Message-ID: <20170609102752.GO1019@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A change to the platform data definitions caused a warning in the board code:
+Hi Kevin,
 
-arch/arm/mach-davinci/board-dm646x-evm.c:680:13: error: initialization discards 'const' qualifier from pointer target type [-Werror=discarded-qualifiers]
-arch/arm/mach-davinci/board-dm646x-evm.c:690:13: error: initialization discards 'const' qualifier from pointer target type [-Werror=discarded-qualifiers]
+On Thu, Jun 08, 2017 at 06:01:45PM -0700, Kevin Hilman wrote:
+> On Wed, Jun 7, 2017 at 11:29 PM, Hans Verkuil <hverkuil@xs4all.nl> wrote:
+> > On 07/06/17 01:37, Kevin Hilman wrote:
+> >> Enable  getting of subdevs from DT ports and endpoints.
+> >>
+> >> The _get_pdata() function was larely inspired by (i.e. stolen from)
+> >> am437x-vpfe.c
+> >>
+> >> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+> >> ---
+> >>  drivers/media/platform/davinci/vpif_capture.c | 126 +++++++++++++++++++++++++-
+> >>  drivers/media/platform/davinci/vpif_display.c |   5 +
+> >>  include/media/davinci/vpif_types.h            |   9 +-
+> >>  3 files changed, 134 insertions(+), 6 deletions(-)
+> >>
+> >> diff --git a/drivers/media/platform/davinci/vpif_capture.c b/drivers/media/platform/davinci/vpif_capture.c
+> >> index fc5c7622660c..b9d927d1e5a8 100644
+> >> --- a/drivers/media/platform/davinci/vpif_capture.c
+> >> +++ b/drivers/media/platform/davinci/vpif_capture.c
+> >> @@ -22,6 +22,8 @@
+> >>  #include <linux/slab.h>
+> >>
+> >>  #include <media/v4l2-ioctl.h>
+> >> +#include <media/v4l2-of.h>
+> >
+> > v4l2-of.h no longer exists, so this v2 is wrong. Unfortunately this patch has
+> > already been merged in our master. I'm not sure how this could have slipped past
+> > both my and Mauro's patch testing (and yours, for that matter).
+> 
+> I have that file in the various trees I tested agains.
+> 
+> > Can you fix this and post a patch on top of the media master that makes this
+> > compile again?
+> 
+> Sorry for the dumb question, but what tree are you referring to?  I
+> tried the master branch of both [1] and [2] and both seem to have that
+> include.
 
-This is a bit unfortunate, since we generally like structure definitions to
-be const, but as this is legacy code, the easiest way out is still to
-remove the 'const' annotation here.
+These patches are now merged as well as the changes requested:
 
-Fixes: 4a5f8ae50b66 ("[media] davinci: vpif_capture: get subdevs from DT when available")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mach-davinci/board-da850-evm.c  | 4 ++--
- arch/arm/mach-davinci/board-dm646x-evm.c | 4 ++--
- arch/arm/mach-davinci/pdata-quirks.c     | 4 ++--
- 3 files changed, 6 insertions(+), 6 deletions(-)
+<URL:https://git.linuxtv.org/media_tree.git/commit/?id=a2d17962c9ca7ac66a132bbbfc6054559856e14e>
 
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index b5625d009288..e568c8c6f69c 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -1166,7 +1166,7 @@ static struct tvp514x_platform_data tvp5146_pdata = {
- 
- #define TVP514X_STD_ALL (V4L2_STD_NTSC | V4L2_STD_PAL)
- 
--static const struct vpif_input da850_ch0_inputs[] = {
-+static struct vpif_input da850_ch0_inputs[] = {
- 	{
- 		.input = {
- 			.index = 0,
-@@ -1181,7 +1181,7 @@ static const struct vpif_input da850_ch0_inputs[] = {
- 	},
- };
- 
--static const struct vpif_input da850_ch1_inputs[] = {
-+static struct vpif_input da850_ch1_inputs[] = {
- 	{
- 		.input = {
- 			.index = 0,
-diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
-index ca69d0b96a4f..1d76e7480a42 100644
---- a/arch/arm/mach-davinci/board-dm646x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm646x-evm.c
-@@ -641,7 +641,7 @@ static struct vpif_subdev_info vpif_capture_sdev_info[] = {
- 	},
- };
- 
--static const struct vpif_input dm6467_ch0_inputs[] = {
-+static struct vpif_input dm6467_ch0_inputs[] = {
- 	{
- 		.input = {
- 			.index = 0,
-@@ -656,7 +656,7 @@ static const struct vpif_input dm6467_ch0_inputs[] = {
- 	},
- };
- 
--static const struct vpif_input dm6467_ch1_inputs[] = {
-+static struct vpif_input dm6467_ch1_inputs[] = {
-        {
- 		.input = {
- 			.index = 0,
-diff --git a/arch/arm/mach-davinci/pdata-quirks.c b/arch/arm/mach-davinci/pdata-quirks.c
-index 329f5402ad1d..4858b1cdf31b 100644
---- a/arch/arm/mach-davinci/pdata-quirks.c
-+++ b/arch/arm/mach-davinci/pdata-quirks.c
-@@ -33,7 +33,7 @@ static struct tvp514x_platform_data tvp5146_pdata = {
- 
- #define TVP514X_STD_ALL (V4L2_STD_NTSC | V4L2_STD_PAL)
- 
--static const struct vpif_input da850_ch0_inputs[] = {
-+static struct vpif_input da850_ch0_inputs[] = {
- 	{
- 		.input = {
- 			.index = 0,
-@@ -48,7 +48,7 @@ static const struct vpif_input da850_ch0_inputs[] = {
- 	},
- };
- 
--static const struct vpif_input da850_ch1_inputs[] = {
-+static struct vpif_input da850_ch1_inputs[] = {
- 	{
- 		.input = {
- 			.index = 0,
 -- 
-2.9.0
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
