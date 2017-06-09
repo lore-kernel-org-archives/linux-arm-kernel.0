@@ -1,196 +1,81 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Fri, 9 Jun 2017 17:13:37 +0800
-Subject: [PATCH v3 2/3] PCI: Enable PCIe Relaxed Ordering if supported
-In-Reply-To: <a4b98567-286a-1fba-e935-f9ba50f1178d@huawei.com>
-References: <1496826968-10152-1-git-send-email-dingtianhong@huawei.com>
- <1496826968-10152-3-git-send-email-dingtianhong@huawei.com>
- <a4b98567-286a-1fba-e935-f9ba50f1178d@huawei.com>
-Message-ID: <cf91605b-2c9d-150f-ad1d-a8cc17e0a1ee@huawei.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 9 Jun 2017 09:15:22 +0000
+Subject: [PATCH] arm: boot/compressed: fix inappropriate Thumb2 mnemonic
+ for __nop
+In-Reply-To: <20170608162939.GQ4902@n2100.armlinux.org.uk>
+References: <20170608125847.2611-1-ard.biesheuvel@linaro.org>
+ <20170608162939.GQ4902@n2100.armlinux.org.uk>
+Message-ID: <CAKv+Gu-SBpZ7VAvjWFpZYhVeUjU=KKBGgYbc983Ncc9ZzUjAHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 8 June 2017 at 16:29, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+> Gah, it's rather unfortunate that this has been discovered only a
+> few days after the other decompressor fix was merged and hit Linus'
+> tree...
+>
 
-Hi John:
+I guess that is where Arnd found it, although he didn't specify. In
+any case, apologies for the breakage and thanks to Arnd for reporting
+it.
 
-Thanks for the reviewing, I will fix it in next version.
+I have dropped this into the patch system.
 
-Ding
 
-On 2017/6/8 1:55, John Garry wrote:
-> On 07/06/2017 10:16, Ding Tianhong wrote:
-> 
-> Hi Ding,
-> 
-> A few general style comments:
-> 
->> The PCIe Device Control Register use the bit 4 to indicate that
->> whether the device is permitted to enable relaxed ordering or not.
->> But relaxed ordering is not safe for some platform which could only
->> use strong write ordering, so devices are allowed (but not required)
->> to enable relaxed ordering bit by default.
+> On Thu, Jun 08, 2017 at 12:58:47PM +0000, Ard Biesheuvel wrote:
+>> Commit 06a4b6d009a1 ("ARM: 8677/1: boot/compressed: fix decompressor
+>> header layout for v7-M") fixed an issue in the layout of the header
+>> of the compressed kernel image that was caused by the assembler
+>> emitting narrow opcodes for 'mov r0, r0', and for this reason, the
+>> mnemonic was updated to use the W() macro, which will append the .w
+>> suffix (which forces a wide encoding) if required, i.e., when building
+>> the kernel in Thumb2 mode.
 >>
->> If a PCIe device didn't enable the relaxed ordering attribute default,
->> we should not do anything in the PCIe configuration, otherwise we
->> should check if any of the devices above us do not support relaxed
->> ordering by the PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag, then base on
->> the result if we get a return that indicate that the relaxed ordering
->> is not supported we should update our device to disable relaxed ordering
->> in configuration space. If the device above us doesn't exist or isn't
->> the PCIe device, we shouldn't do anything and skip updating relaxed ordering
->> because we are probably running in a guest.
-> 
-> A guest machine/environment
-> 
+>> However, this failed to take into account that on Thumb2 kernels built
+>> for CPUs that are also ARM capable, the entry point is entered in ARM
+>> mode, and so the instructions emitted here will be ARM instructions
+>> that only exist in a wide encoding to begin with, which is why the
+>> assembler rejects the .w suffix here and aborts the build with the
+>> following message:
 >>
->> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+>>   head.S: Assembler messages:
+>>   head.S:132: Error: width suffixes are invalid in ARM mode -- `mov.w r0,r0'
+>>
+>> So replace the W(mov) with separate ARM and Thumb2 instructions, where
+>> the latter will only be used for CPU_THUMBONLY builds.
+>>
+>> Fixes: 06a4b6d009a1 ("ARM: 8677/1: boot/compressed: fix decompressor ...")
+>> Reported-by: Arnd Bergmann <arnd@arndb.de>
+>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 >> ---
->>  drivers/pci/pci.c   | 29 +++++++++++++++++++++++++++++
->>  drivers/pci/probe.c | 43 +++++++++++++++++++++++++++++++++++++++++++
->>  include/linux/pci.h |  2 ++
->>  3 files changed, 74 insertions(+)
 >>
->> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
->> index b01bd5b..3d42b38 100644
->> --- a/drivers/pci/pci.c
->> +++ b/drivers/pci/pci.c
->> @@ -4878,6 +4878,35 @@ int pcie_set_mps(struct pci_dev *dev, int mps)
->>  EXPORT_SYMBOL(pcie_set_mps);
+>> Apologies for the breakage: apparently, the combination CONFIG_THUMB2_KERNEL=y,
+>> CONFIG_CPU_THUMBONLY=n and CONFIG_EFI_STUB=y was not among the configurations
+>> I tested before sending out the original patch.
 >>
->>  /**
->> + * pcie_clear_relaxed_ordering - clear PCI Express relexed ordering bit
->> + * @dev: PCI device to query
->> + *
->> + * If possible clear relaxed ordering
->> + */
->> +int pcie_clear_relaxed_ordering(struct pci_dev *dev)
->> +{
->> +    return pcie_capability_clear_word(dev, PCI_EXP_DEVCTL,
->> +                      PCI_EXP_DEVCTL_RELAX_EN);
->> +}
->> +EXPORT_SYMBOL(pcie_clear_relaxed_ordering);
->> +
->> +/**
->> + * pcie_get_relaxed_ordering - check PCI Express relexed ordering bit
-> 
-> s/relexed/relaxed/
-> 
-> Check what on relaxed ordering bit?
-> 
-> And the function name is inconsistent with this discription.
-> 
->> + * @dev: PCI device to query
->> + *
->> + * Returns true if relaxed ordering is been set
-> 
-> If you want to return true/false, then use !!, below in the function
-> 
->> + */
->> +int pcie_get_relaxed_ordering(struct pci_dev *dev)
->> +{
->> +    u16 v;
->> +
->> +    pcie_capability_read_word(dev, PCI_EXP_DEVCTL, &v);
->> +
->> +    return (v & PCI_EXP_DEVCTL_RELAX_EN) >> 4;
->> +}
->> +EXPORT_SYMBOL(pcie_get_relaxed_ordering);
->> +
->> +/**
->>   * pcie_get_minimum_link - determine minimum link settings of a PCI device
->>   * @dev: PCI device to query
->>   * @speed: storage for minimum speed
->> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
->> index 19c8950..0c94c80 100644
->> --- a/drivers/pci/probe.c
->> +++ b/drivers/pci/probe.c
->> @@ -1701,6 +1701,48 @@ static void pci_configure_extended_tags(struct pci_dev *dev)
->>                       PCI_EXP_DEVCTL_EXT_TAG);
->>  }
+>>  arch/arm/boot/compressed/efi-header.S | 3 ++-
+>>  1 file changed, 2 insertions(+), 1 deletion(-)
 >>
->> +/**
->> + * pci_dev_disable_relaxed_ordering - check if the PCI device
->> + * should disable the relaxed ordering attribute.
-> 
-> I think that we need a more accurate description. I know some people think a function which just "checks" is vague.
-> 
->> + * @dev: PCI device
->> + *
->> + * Return true if any of the PCI devices above us do not support
->> + * relaxed ordering.
->> + */
->> +static int pci_dev_disable_relaxed_ordering(struct pci_dev *dev)
-> 
-> The function name implies an action - disabling - but this function does nothing except return a value
-> 
->> +{
->> +    int ro_disabled = 0;
->> +
->> +    while(dev) {
-> 
-> Did you run checkpatch?
-> 
->> +        if (dev->dev_flags & PCI_DEV_FLAGS_NO_RELAXED_ORDERING) {
->> +            ro_disabled = 1;
-> 
-> just return true, and return false at the bottom, so you can do away with ro_disabled (which is not a bool)
-> 
->> +            break;
->> +        }
->> +        dev = dev->bus->self;
->> +    }
->> +
->> +    return ro_disabled;
->> +}
->> +
->> +static void pci_configure_relaxed_ordering(struct pci_dev *dev)
->> +{
->> +    struct pci_dev *bridge = pci_upstream_bridge(dev);
->> +    int origin_ero;
-> 
-> You don't need this variable
-> 
->> +
->> +    if (!pci_is_pcie(dev) || !bridge || !pci_is_pcie(bridge))
->> +        return;
->> +
->> +    origin_ero = pcie_get_relaxed_ordering(dev);
->> +    /* If the releaxed ordering enable bit is not set, do nothing. */
->> +    if (!origin_ero)
->> +        return;
->> +
->> +    if (pci_dev_disable_relaxed_ordering(dev)) {
->> +        pcie_clear_relaxed_ordering(dev);
->> +        dev_info(&dev->dev, "Disable Relaxed Ordering\n");
->> +    }
->> +}
->> +
->>  static void pci_configure_device(struct pci_dev *dev)
->>  {
->>      struct hotplug_params hpp;
->> @@ -1708,6 +1750,7 @@ static void pci_configure_device(struct pci_dev *dev)
+>> diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
+>> index 3f7d1b74c5e0..a17ca8d78656 100644
+>> --- a/arch/arm/boot/compressed/efi-header.S
+>> +++ b/arch/arm/boot/compressed/efi-header.S
+>> @@ -17,7 +17,8 @@
+>>               @ there.
+>>               .inst   'M' | ('Z' << 8) | (0x1310 << 16)   @ tstne r0, #0x4d000
+>>  #else
+>> -             W(mov)  r0, r0
+>> + AR_CLASS(   mov     r0, r0          )
+>> +  M_CLASS(   nop.w                   )
+>>  #endif
+>>               .endm
 >>
->>      pci_configure_mps(dev);
->>      pci_configure_extended_tags(dev);
->> +    pci_configure_relaxed_ordering(dev);
+>> --
+>> 2.9.3
 >>
->>      memset(&hpp, 0, sizeof(hpp));
->>      ret = pci_get_hp_params(dev, &hpp);
->> diff --git a/include/linux/pci.h b/include/linux/pci.h
->> index e1e8428..299d2f3 100644
->> --- a/include/linux/pci.h
->> +++ b/include/linux/pci.h
->> @@ -1105,6 +1105,8 @@ int __pci_enable_wake(struct pci_dev *dev, pci_power_t state,
->>  void pci_pme_wakeup_bus(struct pci_bus *bus);
->>  void pci_d3cold_enable(struct pci_dev *dev);
->>  void pci_d3cold_disable(struct pci_dev *dev);
->> +int pcie_clear_relaxed_ordering(struct pci_dev *dev);
->> +int pcie_get_relaxed_ordering(struct pci_dev *dev);
->>
->>  static inline int pci_enable_wake(struct pci_dev *dev, pci_power_t state,
->>                    bool enable)
->>
-> 
-> 
-> 
-> .
-> 
+>
+> --
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
