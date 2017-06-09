@@ -1,47 +1,82 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Fri, 9 Jun 2017 15:35:26 -0700
-Subject: [PATCH v8 14/34] ARM: dts: imx6-sabreauto: add the ADV7180 video
- decoder
-In-Reply-To: <20170609213843.GB28596@amd>
-References: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
- <1496860453-6282-15-git-send-email-steve_longerbeam@mentor.com>
- <CAJ+vNU0C0=4hUq+g1P7yTzLzFPidfauQROPOVr4WQWKNZz_xmQ@mail.gmail.com>
- <dd5b29b7-bf92-5f03-caef-1843a9f32cd3@gmail.com> <20170609213843.GB28596@amd>
-Message-ID: <cb9d79e9-fa36-d0ad-3df6-27f1b8790f78@gmail.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sat, 10 Jun 2017 00:37:09 +0200
+Subject: [PATCH v4 6/7] ARM: dts: meson8: switch to new bindings for UART
+ nodes
+In-Reply-To: <1497001756-942-7-git-send-email-narmstrong@baylibre.com>
+References: <1497001756-942-1-git-send-email-narmstrong@baylibre.com>
+ <1497001756-942-7-git-send-email-narmstrong@baylibre.com>
+Message-ID: <CAFBinCD6_nGdqBSOJwyj0XQe8H05nw-r52pctY7ADJu0EqMb2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Neil,
 
+On Fri, Jun 9, 2017 at 11:49 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+> Switch to the stable UART bindings by adding a XTAL node and using the
+> proper compatible strings.
+unfortunately this won't apply now that Kevin has merged my "ARM: dts:
+meson8: add and use the real clock controller"
+on the other hand this will make the patch easier as you can now do
+the same changes as in meson8b.dtsi
 
-On 06/09/2017 02:38 PM, Pavel Machek wrote:
-> On Thu 2017-06-08 13:36:12, Steve Longerbeam wrote:
->>
->>
->> On 06/08/2017 01:25 PM, Tim Harvey wrote:
->>>
->>>
->>> Steve,
->>>
->>> You need to remove the fim node now that you've moved this to V4L2 controls.
->>>
->>
->> Yep, I caught this just after sending the v8 patchset. I'll send
->> a v9 of this patch.
-> 
-> This needs ack from devicetree people, then it can be merged. Can you
-> be a bit more forceful getting the ack?
-
-OK, I need an Ack please, he said, in a forceful way. :)
-
-In fact Ack's are needed for all the changes to dts sources,
-patches 4-14.
-
-
-> 
-> I don't think it makes sense to resubmit v9 before that. This is not a
-> rocket science.
-
-I guess that makes sense, I'll wait for Ack's from all these patches
-before submitting the entire patchset as v9.
-
-Steve
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  arch/arm/boot/dts/meson8.dtsi | 23 +++++++++++++++++++----
+>  1 file changed, 19 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/meson8.dtsi b/arch/arm/boot/dts/meson8.dtsi
+> index 6993077..a2ea112 100644
+> --- a/arch/arm/boot/dts/meson8.dtsi
+> +++ b/arch/arm/boot/dts/meson8.dtsi
+> @@ -83,6 +83,13 @@
+>                 };
+>         };
+>
+> +       xtal: xtal-clk {
+> +               compatible = "fixed-clock";
+> +               clock-frequency = <24000000>;
+> +               clock-output-names = "xtal";
+> +               #clock-cells = <0>;
+> +       };
+> +
+>         clk81: clk at 0 {
+>                 #clock-cells = <0>;
+>                 compatible = "fixed-clock";
+> @@ -199,17 +206,25 @@
+>  };
+>
+>  &uart_AO {
+> -       clocks = <&clk81>;
+> +       compatible = "amlogic,meson8-uart", "amlogic,meson-ao-uart";
+> +       clocks = <&xtal>, <&clk81>, <&clk81>;
+> +       clock-names = "xtal", "pclk", "baud";
+>  };
+>
+>  &uart_A {
+> -       clocks = <&clk81>;
+> +       compatible = "amlogic,meson8-uart";
+> +       clocks = <&xtal>, <&clk81>, <&clk81>;
+> +       clock-names = "xtal", "pclk", "baud";
+>  };
+>
+>  &uart_B {
+> -       clocks = <&clk81>;
+> +       compatible = "amlogic,meson8-uart";
+> +       clocks = <&xtal>, <&clk81>, <&clk81>;
+> +       clock-names = "xtal", "pclk", "baud";
+>  };
+>
+>  &uart_C {
+> -       clocks = <&clk81>;
+> +       compatible = "amlogic,meson8-uart";
+> +       clocks = <&xtal>, <&clk81>, <&clk81>;
+> +       clock-names = "xtal", "pclk", "baud";
+>  };
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-amlogic mailing list
+> linux-amlogic at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-amlogic
