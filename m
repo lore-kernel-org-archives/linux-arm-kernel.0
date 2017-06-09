@@ -1,123 +1,91 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 9 Jun 2017 09:27:54 +0200
-Subject: [PATCH] ARM: dts: exynos: Add the OF graph between fimd and dsi
-In-Reply-To: <1496977173-20550-1-git-send-email-hoegeun.kwon@samsung.com>
-References: <CGME20170609025951epcas1p19f5ca8c241b8b79068a84eb239ed46ed@epcas1p1.samsung.com>
- <1496977173-20550-1-git-send-email-hoegeun.kwon@samsung.com>
-Message-ID: <20170609072754.GB4018@kozik-book>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 9 Jun 2017 15:29:54 +0800
+Subject: [PATCH v11 02/12] sun4i-codec: Add Differential Line Capture
+ Switch and its routes
+In-Reply-To: <20170609062216.26807-3-dannym@scratchpost.org>
+References: <20170609062216.26807-1-dannym@scratchpost.org>
+ <20170609062216.26807-3-dannym@scratchpost.org>
+Message-ID: <CAGb2v67hDBmUYzTyHppWsymVbgaBJO+prjr9X7UgTpdYV-HSuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 09, 2017 at 11:59:33AM +0900, Hoegeun Kwon wrote:
-> It should be connected to OF graph between fimd and dsi.
-> Add the OF graph between fimd and dsi.
-
-I need more explanation why this is needed. What happens without this?
-What issue is fixed here?
-
-What about Exynos5250 and Exynos5420? I think we do not have a board in
-mainline using FIMD but maybe this should be added just for correct
-hardware description?
-
-
-Best regards,
-Krzysztof
-
-> 
-> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
+On Fri, Jun 9, 2017 at 2:22 PM, Danny Milosavljevic
+<dannym@scratchpost.org> wrote:
+> Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
 > ---
->  arch/arm/boot/dts/exynos3250.dtsi | 26 ++++++++++++++++++++++++++
->  arch/arm/boot/dts/exynos4.dtsi    | 26 ++++++++++++++++++++++++++
->  2 files changed, 52 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-> index 590ee44..22d523f 100644
-> --- a/arch/arm/boot/dts/exynos3250.dtsi
-> +++ b/arch/arm/boot/dts/exynos3250.dtsi
-> @@ -311,6 +311,19 @@
->  			iommus = <&sysmmu_fimd0>;
->  			samsung,sysreg = <&sys_reg>;
->  			status = "disabled";
+>  sound/soc/sunxi/sun4i-codec.c | 26 ++++++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>
+> diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+> index 2f65aa72..a2435c6e 100644
+> --- a/sound/soc/sunxi/sun4i-codec.c
+> +++ b/sound/soc/sunxi/sun4i-codec.c
+> @@ -96,6 +96,7 @@
+>  #define SUN4I_CODEC_ADC_ACTL_VMICEN                    (27)
+>  #define SUN4I_CODEC_ADC_ACTL_VADCG                     (20)
+>  #define SUN4I_CODEC_ADC_ACTL_ADCIS                     (17)
+> +#define SUN4I_CODEC_ADC_ACTL_LNRDF                     (16)
+>  #define SUN4I_CODEC_ADC_ACTL_PA_EN                     (4)
+>  #define SUN4I_CODEC_ADC_ACTL_DDE                       (3)
+>  #define SUN4I_CODEC_ADC_DEBUG                  (0x2c)
+> @@ -644,6 +645,20 @@ static const struct snd_kcontrol_new sun4i_codec_pa_mute =
+>
+>  static DECLARE_TLV_DB_SCALE(sun4i_codec_pa_volume_scale, -6300, 100, 1);
+>
+> +static const char * const sun4i_codec_difflinein_capture_source[] = {
+> +       "Stereo",
+> +       "Differential",
+> +};
 > +
-> +			ports {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
+> +static SOC_ENUM_SINGLE_DECL(sun4i_codec_enum_difflinein_capture_source,
+> +                           SUN4I_CODEC_ADC_ACTL,
+> +                           SUN4I_CODEC_ADC_ACTL_LNRDF,
+> +                           sun4i_codec_difflinein_capture_source);
 > +
-> +				port at 0 {
-> +					reg = <0>;
-> +					fimd_to_dsi: endpoint {
-> +						remote-endpoint =
-> +							<&dsi_to_fimd>;
-> +					};
-> +				};
-> +			};
->  		};
->  
->  		dsi_0: dsi at 11C80000 {
-> @@ -326,6 +339,19 @@
->  			#address-cells = <1>;
->  			#size-cells = <0>;
->  			status = "disabled";
+> +static const struct snd_kcontrol_new sun4i_codec_difflinein_capture_source_controls =
+> +       SOC_DAPM_ENUM("Differential Line Capture Switch",
+
+A mux control or widget should not be named "XXX Switch". Please use
+"XXX Route" or "XXX Source Route". Second, this control is not limited
+to capture. Please drop the "Capture" suffix. Just call it "Line Source"
+or "Line In Source".
+
+> +       sun4i_codec_enum_difflinein_capture_source);
 > +
-> +			ports {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
+>  static const struct snd_kcontrol_new sun4i_codec_controls[] = {
+>         SOC_SINGLE_TLV("Power Amplifier Volume", SUN4I_CODEC_DAC_ACTL,
+>                        SUN4I_CODEC_DAC_ACTL_PA_VOL, 0x3F, 0,
+> @@ -720,6 +735,12 @@ static const struct snd_soc_dapm_widget sun4i_codec_codec_dapm_widgets[] = {
+>         SND_SOC_DAPM_SWITCH("Power Amplifier Mute", SND_SOC_NOPM, 0, 0,
+>                             &sun4i_codec_pa_mute),
+>
+> +       /* MUX */
+> +       SND_SOC_DAPM_MUX("Differential Line Capture Switch", SND_SOC_NOPM,
+
+Same here.
+
+> +                        0,
+> +                        0,
+> +                        &sun4i_codec_difflinein_capture_source_controls),
+
+There is not much benefit in putting every value on a separate line,
+except increasing line count and taking up screen real estate.
+
+ChenYu
+
 > +
-> +				port at 0 {
-> +					reg = <0>;
-> +					dsi_to_fimd: endpoint {
-> +						remote-endpoint =
-> +							<&fimd_to_dsi>;
-> +					};
-> +				};
-> +			};
->  		};
->  
->  		sysmmu_fimd0: sysmmu at 11E20000 {
-> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-> index 497a947..773d392 100644
-> --- a/arch/arm/boot/dts/exynos4.dtsi
-> +++ b/arch/arm/boot/dts/exynos4.dtsi
-> @@ -193,6 +193,19 @@
->  		status = "disabled";
->  		#address-cells = <1>;
->  		#size-cells = <0>;
+>         /* Inputs */
+>         SND_SOC_DAPM_INPUT("Mic1"),
+>         SND_SOC_DAPM_INPUT("Mic2"),
+> @@ -767,6 +788,11 @@ static const struct snd_soc_dapm_route sun4i_codec_codec_dapm_routes[] = {
+>         { "Right ADC", NULL, "MIC1 Pre-Amplifier" },
+>         { "MIC1 Pre-Amplifier", NULL, "Mic1"},
+>         { "Mic1", NULL, "VMIC" },
 > +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
+> +       /* LNRDF Routes */
+> +       { "Differential Line Capture Switch", "Differential", "Line Left" },
+> +       { "Differential Line Capture Switch", "Differential", "Line Right" },
 > +
-> +			port at 0 {
-> +				reg = <0>;
-> +				dsi_to_fimd: endpoint {
-> +					remote-endpoint =
-> +						<&fimd_to_dsi>;
-> +				};
-> +			};
-> +		};
->  	};
->  
->  	camera {
-> @@ -715,6 +728,19 @@
->  		iommus = <&sysmmu_fimd0>;
->  		samsung,sysreg = <&sys_reg>;
->  		status = "disabled";
-> +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			port at 0 {
-> +				reg = <0>;
-> +				fimd_to_dsi: endpoint {
-> +					remote-endpoint =
-> +						<&dsi_to_fimd>;
-> +				};
-> +			};
-> +		};
->  	};
->  
->  	tmu: tmu at 100C0000 {
-> -- 
-> 1.9.1
-> 
+>  };
+>
+>  static struct snd_soc_codec_driver sun4i_codec_codec = {
