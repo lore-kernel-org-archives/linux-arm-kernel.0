@@ -1,74 +1,114 @@
 From: sugar.zhang@rock-chips.com (Sugar Zhang)
-Date: Fri,  9 Jun 2017 16:52:47 +0800
-Subject: [PATCH v1 2/4] ASoC: rockchip: i2s: add support for i2s bclk fs
- configuration
+Date: Fri,  9 Jun 2017 16:52:48 +0800
+Subject: [PATCH v1 3/4] ASoC: rockchip: i2s: add other configurable formats
 In-Reply-To: <1496998369-30556-1-git-send-email-sugar.zhang@rock-chips.com>
 References: <1496998369-30556-1-git-send-email-sugar.zhang@rock-chips.com>
-Message-ID: <1496998369-30556-3-git-send-email-sugar.zhang@rock-chips.com>
+Message-ID: <1496998369-30556-4-git-send-email-sugar.zhang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this patch add support for i2s bclk fs configuration, we can
-configure bclk_fs by devicetree as required.
+From: zhangjun <zhangjun@rock-chips.com>
 
+simple-audio-card,bitclock-inversion = <1> : bclk falling edge taken
+simple-audio-card,format = "dsp_a" : pcm no delay mode
+simple-audio-card,format = "dsp_b" : pcm late 1 mode
+
+Signed-off-by: zhangjun <zhangjun@rock-chips.com>
 Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
 ---
 
- Documentation/devicetree/bindings/sound/rockchip-i2s.txt | 2 ++
- sound/soc/rockchip/rockchip_i2s.c                        | 9 ++++++++-
- 2 files changed, 10 insertions(+), 1 deletion(-)
+ sound/soc/rockchip/rockchip_i2s.c | 30 ++++++++++++++++++++++++++++--
+ sound/soc/rockchip/rockchip_i2s.h |  3 +++
+ 2 files changed, 31 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
-index 206aba1..de3cbbe 100644
---- a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
-+++ b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
-@@ -23,6 +23,7 @@ Required properties:
-    - "i2s_clk" : clock for I2S controller
- - rockchip,playback-channels: max playback channels, if not set, 8 channels default.
- - rockchip,capture-channels: max capture channels, if not set, 2 channels default.
-+- rockchip,bclk-fs: configure the i2s bclk fs.
- 
- Required properties for controller which support multi channels
- playback/capture:
-@@ -41,4 +42,5 @@ i2s at ff890000 {
- 	clocks = <&cru HCLK_I2S0>, <&cru SCLK_I2S0>;
- 	rockchip,playback-channels = <8>;
- 	rockchip,capture-channels = <2>;
-+	rockchip,bclk-fs = <128>;
- };
 diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
-index f548433..220232b 100644
+index 220232b..2a15a00 100644
 --- a/sound/soc/rockchip/rockchip_i2s.c
 +++ b/sound/soc/rockchip/rockchip_i2s.c
-@@ -51,6 +51,7 @@ struct rk_i2s_dev {
- 	bool rx_start;
- 	bool is_master_mode;
- 	const struct rk_i2s_pins *pins;
-+	unsigned int bclk_fs;
- };
+@@ -207,7 +207,21 @@ static int rockchip_i2s_set_fmt(struct snd_soc_dai *cpu_dai,
  
- static int i2s_runtime_suspend(struct device *dev)
-@@ -254,7 +255,7 @@ static int rockchip_i2s_hw_params(struct snd_pcm_substream *substream,
+ 	regmap_update_bits(i2s->regmap, I2S_CKR, mask, val);
  
- 	if (i2s->is_master_mode) {
- 		mclk_rate = clk_get_rate(i2s->mclk);
--		bclk_rate = 2 * 32 * params_rate(params);
-+		bclk_rate = i2s->bclk_fs * params_rate(params);
- 		if (bclk_rate && mclk_rate % bclk_rate)
- 			return -EINVAL;
- 
-@@ -633,6 +634,12 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
- 			soc_dai->capture.channels_max = val;
- 	}
- 
-+	i2s->bclk_fs = 64;
-+	if (!of_property_read_u32(node, "rockchip,bclk-fs", &val)) {
-+		if ((val >= 32) && (val % 2 == 0))
-+			i2s->bclk_fs = val;
+-	mask = I2S_TXCR_IBM_MASK;
++	mask = I2S_CKR_CKP_MASK;
++	switch (fmt & SND_SOC_DAIFMT_INV_MASK) {
++	case SND_SOC_DAIFMT_NB_NF:
++		val = I2S_CKR_CKP_NEG;
++		break;
++	case SND_SOC_DAIFMT_IB_NF:
++		val = I2S_CKR_CKP_POS;
++		break;
++	default:
++		return -EINVAL;
 +	}
 +
- 	ret = devm_snd_soc_register_component(&pdev->dev,
- 					      &rockchip_i2s_component,
- 					      soc_dai, 1);
++	regmap_update_bits(i2s->regmap, I2S_CKR, mask, val);
++
++	mask = I2S_TXCR_IBM_MASK | I2S_TXCR_TFS_MASK | I2S_TXCR_PBM_MASK;
+ 	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
+ 	case SND_SOC_DAIFMT_RIGHT_J:
+ 		val = I2S_TXCR_IBM_RSJM;
+@@ -218,13 +232,19 @@ static int rockchip_i2s_set_fmt(struct snd_soc_dai *cpu_dai,
+ 	case SND_SOC_DAIFMT_I2S:
+ 		val = I2S_TXCR_IBM_NORMAL;
+ 		break;
++	case SND_SOC_DAIFMT_DSP_A: /* PCM no delay mode */
++		val = I2S_TXCR_TFS_PCM;
++		break;
++	case SND_SOC_DAIFMT_DSP_B: /* PCM delay 1 mode */
++		val = I2S_TXCR_TFS_PCM | I2S_TXCR_PBM_MODE(1);
++		break;
+ 	default:
+ 		return -EINVAL;
+ 	}
+ 
+ 	regmap_update_bits(i2s->regmap, I2S_TXCR, mask, val);
+ 
+-	mask = I2S_RXCR_IBM_MASK;
++	mask = I2S_RXCR_IBM_MASK | I2S_RXCR_TFS_MASK | I2S_RXCR_PBM_MASK;
+ 	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
+ 	case SND_SOC_DAIFMT_RIGHT_J:
+ 		val = I2S_RXCR_IBM_RSJM;
+@@ -235,6 +255,12 @@ static int rockchip_i2s_set_fmt(struct snd_soc_dai *cpu_dai,
+ 	case SND_SOC_DAIFMT_I2S:
+ 		val = I2S_RXCR_IBM_NORMAL;
+ 		break;
++	case SND_SOC_DAIFMT_DSP_A: /* PCM no delay mode */
++		val = I2S_RXCR_TFS_PCM;
++		break;
++	case SND_SOC_DAIFMT_DSP_B: /* PCM delay 1 mode */
++		val = I2S_RXCR_TFS_PCM | I2S_RXCR_PBM_MODE(1);
++		break;
+ 	default:
+ 		return -EINVAL;
+ 	}
+diff --git a/sound/soc/rockchip/rockchip_i2s.h b/sound/soc/rockchip/rockchip_i2s.h
+index 31f11fd..a7b8527 100644
+--- a/sound/soc/rockchip/rockchip_i2s.h
++++ b/sound/soc/rockchip/rockchip_i2s.h
+@@ -41,6 +41,7 @@
+ #define I2S_TXCR_TFS_SHIFT	5
+ #define I2S_TXCR_TFS_I2S	(0 << I2S_TXCR_TFS_SHIFT)
+ #define I2S_TXCR_TFS_PCM	(1 << I2S_TXCR_TFS_SHIFT)
++#define I2S_TXCR_TFS_MASK	(1 << I2S_TXCR_TFS_SHIFT)
+ #define I2S_TXCR_VDW_SHIFT	0
+ #define I2S_TXCR_VDW(x)		((x - 1) << I2S_TXCR_VDW_SHIFT)
+ #define I2S_TXCR_VDW_MASK	(0x1f << I2S_TXCR_VDW_SHIFT)
+@@ -70,6 +71,7 @@
+ #define I2S_RXCR_TFS_SHIFT	5
+ #define I2S_RXCR_TFS_I2S	(0 << I2S_RXCR_TFS_SHIFT)
+ #define I2S_RXCR_TFS_PCM	(1 << I2S_RXCR_TFS_SHIFT)
++#define I2S_RXCR_TFS_MASK	(1 << I2S_RXCR_TFS_SHIFT)
+ #define I2S_RXCR_VDW_SHIFT	0
+ #define I2S_RXCR_VDW(x)		((x - 1) << I2S_RXCR_VDW_SHIFT)
+ #define I2S_RXCR_VDW_MASK	(0x1f << I2S_RXCR_VDW_SHIFT)
+@@ -91,6 +93,7 @@
+ #define I2S_CKR_CKP_SHIFT	26
+ #define I2S_CKR_CKP_NEG		(0 << I2S_CKR_CKP_SHIFT)
+ #define I2S_CKR_CKP_POS		(1 << I2S_CKR_CKP_SHIFT)
++#define I2S_CKR_CKP_MASK	(1 << I2S_CKR_CKP_SHIFT)
+ #define I2S_CKR_RLP_SHIFT	25
+ #define I2S_CKR_RLP_NORMAL	(0 << I2S_CKR_RLP_SHIFT)
+ #define I2S_CKR_RLP_OPPSITE	(1 << I2S_CKR_RLP_SHIFT)
 -- 
 1.9.1
