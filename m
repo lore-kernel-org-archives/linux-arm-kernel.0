@@ -1,61 +1,76 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 9 Jun 2017 16:48:25 +0200
-Subject: [PATCH v2 04/11] drm: sun4i: add support for H3's TCON0/1
-In-Reply-To: <4CD8A3BB-965C-4C74-884C-ACE8AAF9989B@aosc.io>
-References: <20170604160149.30230-1-icenowy@aosc.io>
- <20170604160149.30230-5-icenowy@aosc.io>
- <3642057.oKT9kIlu8M@jernej-laptop>
- <493AC6F2-3CB3-48F5-9568-A34AA927238F@aosc.io>
- <20170607094343.qqiwnu2mhmoi6jn7@flea.lan>
- <52F9F9C7-9A9C-435D-A0AF-FDD4317DAD69@aosc.io>
- <20170607141957.akonr7hmuwpt7hlt@flea.lan>
- <4CD8A3BB-965C-4C74-884C-ACE8AAF9989B@aosc.io>
-Message-ID: <20170609144825.jdalt2xakhcenhk5@flea.home>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 9 Jun 2017 16:49:36 +0200
+Subject: [PATCH v2 7/8] net: mvmdio: add xmdio support
+In-Reply-To: <20170609140922.GD31464@kwain>
+References: <20170608092653.25221-1-antoine.tenart@free-electrons.com>
+ <20170608092653.25221-8-antoine.tenart@free-electrons.com>
+ <a60a0b26-62b1-7c9e-e846-215747dddb1f@gmail.com>
+ <20170609082541.GC31464@kwain> <20170609132624.GC20756@lunn.ch>
+ <20170609140922.GD31464@kwain>
+Message-ID: <20170609144936.GF20756@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 07, 2017 at 10:21:02PM +0800, Icenowy Zheng wrote:
+On Fri, Jun 09, 2017 at 04:09:22PM +0200, Antoine Tenart wrote:
+> Hi Andrew,
 > 
+> On Fri, Jun 09, 2017 at 03:26:24PM +0200, Andrew Lunn wrote:
+> > On Fri, Jun 09, 2017 at 10:25:41AM +0200, Antoine Tenart wrote:
+> > > On Thu, Jun 08, 2017 at 09:42:21AM -0700, Florian Fainelli wrote:
+> > > > 
+> > > > If I get this right, the xMDIO controller is actually a superset of the
+> > > > MDIO controller and has an extra MVMDIO_XSMI_ADDR_REG register to
+> > > > preform C45 accesses?
+> > > 
+> > > This is also a mistake. It's not a superset as the register offsets are
+> > > different. So we can't use the same smi operations in both cases. We
+> > > would need dedicated xmdio smi operations, but I don't think there is a
+> > > board where a c22 PHY is connected to the xMDIO interface.
+> > 
+> > Is it described as one device, which can do c22 via one set of
+> > registers, and c45 by another set of registers?
+> > 
+> > Or are there two separate devices. In particular, does each device
+> > have there own MDC and MDIO pins? Do we have an C22 only device/bus,
+> > and a C45 only device/bus?
 > 
-> ? 2017?6?7? GMT+08:00 ??10:19:57, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
-> >On Wed, Jun 07, 2017 at 05:44:56PM +0800, Icenowy Zheng wrote:
-> >> ? 2017?6?7? GMT+08:00 ??5:43:43, Maxime Ripard
-> ><maxime.ripard@free-electrons.com> ??:
-> >> >On Mon, Jun 05, 2017 at 03:03:47AM +0800, Icenowy Zheng wrote:
-> >> >> >You should also expand function sun4i_drv_node_is_tcon() at
-> >> >sun4i_drv.c
-> >> >> >with 
-> >> >> >new entries, but I'm not sure if this fits in this patch.
-> >> >> 
-> >> >> Instead I think it should be renamed to something like
-> >> >> "sun4i_drv_node_is_tcon_with_ch0".
-> >> >
-> >> >I'm not sure, or at least, it shouldn't make any difference, since
-> >> >TCON without a channel 0 will not have an endpoint 0, so this will
-> >be
-> >> >dealt with already.
-> >> 
-> >> But that will prevent new coders from add CH1-less TCON
-> >> compatibles to this function.
-> >
-> >Why? We already have such TCONs (like the A33's, or V3S') in that
-> >function.
+> The MDIO/xMDIO registers are embedded into the network controller. The
+> mvmdio driver was created at first to abstract this functionality
+> outside the network controller driver because it is shared between all
+> ports and used in different IPs. So it's not really devices per say.
 > 
-> Sorry, CH0-less.
+> Looking at the datasheet/schematics there are two hardware buses, one
+> for c22 and one for c45. So we should keep two separate nodes to
+> describe the two interfaces. From what I read c45 is backward
+> compatible with c22 so the xSMI interface should be capable to speak to
+> c22 PHYs as well.
 
-That's not really an issue I think, since the endpoint 0 will not be
-there on those TCONs, the code will bail out.
+The on the wire protocol of c45 is backwards compatible with c22, in
+that a c22 device will not get confused by a c45 transaction on the
+bus. A c22 device will just ignore it. You cannot talk to a c22 device
+using c45.
 
-Maxime
+>From what you are saying, you have a hardware block generating c45
+transactions and a hardware block which generates c22 transactions.
+What is not clear to me is if these two hardware blocks are using the
+same physical MDC/MDIO pins, i.e. there is just one MDIO bus to the
+outside world, or are there two busses?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170609/31fd9761/attachment.sig>
+> And by looking at the datasheet this seems possible, although it's
+> not completely clear. But anyway this wouldn't impact the dt
+> bindings.
+
+What i'm worried about is there being one set of MDC/MDIO lines. You
+should not expose that to linux as two mdio busses. It is one bus.
+
+The phylib will poll each phy on the bus once per second to check its
+state. The phylib serialises the read/writes at a bus level. So if you
+have one physical bus registered as two logical bus, at some point you
+are going to get simultaneous read/writes, and you are going to need a
+mutex low down to serialise this for physical bus access.
+
+And in the end, this would affect the dt binding. If it is one
+physical bus, you want one binding representing both c22 and c45
+transactions.
+
+      Andrew
