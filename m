@@ -1,84 +1,57 @@
 From: raviteja.garimella@broadcom.com (Raviteja Garimella)
-Date: Fri,  9 Jun 2017 16:23:48 +0530
-Subject: [RESEND PATCH v8 0/3] Support for USB DRD PHY driver for NS2
-Message-ID: <1497005631-2836-1-git-send-email-raviteja.garimella@broadcom.com>
+Date: Fri,  9 Jun 2017 16:23:49 +0530
+Subject: [RESEND PATCH v8 1/3] dt-bindings: phy: Add DT bindings documentation
+ for NS2 USB DRD PHY
+In-Reply-To: <1497005631-2836-1-git-send-email-raviteja.garimella@broadcom.com>
+References: <1497005631-2836-1-git-send-email-raviteja.garimella@broadcom.com>
+Message-ID: <1497005631-2836-2-git-send-email-raviteja.garimella@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Resending the patchset after rebasing on linux-phy next branch.
+This patch adds DT bindings documentation for NS2 DRD PHY driver.
 
-Changes in v8:
-=============
--Renamed phy shutdown routine
--Used devm_request_irq in stead of threaded irq
--Removed devm_unregister calls in probe routine
-
-Changes in v7:
-=============
-Cleaned up unused variables in phy private data structure that's
-missed out in v6.
-Setting of phy mode to device/host is removed from phy power on.
-routine.
-
-Changes in v6:
-=============
-Removed spin locks which are not required as the references
-to phy_ops in the same driver were removed in v5.
-
-Removed host/device 'notify' routines which are registered
-using 'extcon_register_notifier'. The irq handler is sufficient
-to deal with the change in extcon events within the same driver.
-
-Changes in v5:
-=============
-Removed references to phy_ops in the same driver by connect_work
-event handler to change the phy modes.
-
-To support dynamically changing the mode of the phy, it does
-not require doing a phy reset/programming of PHY PLL. Changes
-are made to the connect_work routine to just program the required
-register bits to achieve this purpose.
-
-Changes in v4:
-=============
-Remove references to edev->name in debug prints.
-
-Changes in v3:
-=============
-Remove unnecessary checks for poweron as suggested in review.
-
-Changes in v2:
-=============
-1. Initialize file operations .owner field with THIS_MODULE.
-2. Remove unnecessary gpio example in DT bindings documentation.
-   This is previously acked by Rob Herring <robh@kernel.org>
-
-Introduction for PATCH v1:
-
-This patch adds support for USB Dual Role Device Phy for Broadcom
-Northstar2 SoC. Apart from the new phy driver, this patchset contains
-changes to Kconfig, Makefile, and Device tree files.
-
-This patchset is tested on Broadcom NS2 BCM958712K reference board.
-
-Repo: https://github.com/Broadcom/arm64-linux.git
-Branch: ns2_drdphy_v8
-
-*** BLURB HERE ***
-
-Raviteja Garimella (3):
-  dt-bindings: phy: Add DT bindings documentation for NS2 USB DRD PHY
-  phy: phy-bcm-ns2-usbdrd: Broadcom USB DRD PHY driver for Northstar2
-  arm64: dts: NS2: Add USB DRD PHY device tree node
-
- .../devicetree/bindings/phy/brcm,ns2-drd-phy.txt   |  30 ++
- arch/arm64/boot/dts/broadcom/ns2.dtsi              |  14 +
- drivers/phy/Kconfig                                |  13 +
- drivers/phy/Makefile                               |   1 +
- drivers/phy/phy-bcm-ns2-usbdrd.c                   | 437 +++++++++++++++++++++
- 5 files changed, 495 insertions(+)
+Signed-off-by: Raviteja Garimella <raviteja.garimella@broadcom.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ .../devicetree/bindings/phy/brcm,ns2-drd-phy.txt   | 30 ++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/phy/brcm,ns2-drd-phy.txt
- create mode 100644 drivers/phy/phy-bcm-ns2-usbdrd.c
 
+diff --git a/Documentation/devicetree/bindings/phy/brcm,ns2-drd-phy.txt b/Documentation/devicetree/bindings/phy/brcm,ns2-drd-phy.txt
+new file mode 100644
+index 0000000..04f063a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/brcm,ns2-drd-phy.txt
+@@ -0,0 +1,30 @@
++BROADCOM NORTHSTAR2 USB2 (DUAL ROLE DEVICE) PHY
++
++Required properties:
++ - compatible: brcm,ns2-drd-phy
++ - reg: offset and length of the NS2 PHY related registers.
++ - reg-names
++   The below registers must be provided.
++   icfg - for DRD ICFG configurations
++   rst-ctrl - for DRD IDM reset
++   crmu-ctrl - for CRMU core vdd, PHY and PHY PLL reset
++   usb2-strap - for port over current polarity reversal
++ - #phy-cells: Must be 0. No args required.
++ - vbus-gpios: vbus gpio binding
++ - id-gpios: id gpio binding
++
++Refer to phy/phy-bindings.txt for the generic PHY binding properties
++
++Example:
++	usbdrd_phy: phy at 66000960 {
++			#phy-cells = <0>;
++			compatible = "brcm,ns2-drd-phy";
++			reg = <0x66000960 0x24>,
++			      <0x67012800 0x4>,
++			      <0x6501d148 0x4>,
++			      <0x664d0700 0x4>;
++			reg-names = "icfg", "rst-ctrl",
++				    "crmu-ctrl", "usb2-strap";
++			id-gpios = <&gpio_g 30 0>;
++			vbus-gpios = <&gpio_g 31 0>;
++	};
 -- 
 2.1.0
