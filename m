@@ -1,42 +1,249 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri, 9 Jun 2017 08:40:19 +0200
-Subject: [PATCH v2 7/8] net: mvmdio: add xmdio support
-In-Reply-To: <20170608160331.GA20216@lunn.ch>
-References: <20170608092653.25221-1-antoine.tenart@free-electrons.com>
- <20170608092653.25221-8-antoine.tenart@free-electrons.com>
- <20170608160331.GA20216@lunn.ch>
-Message-ID: <20170609064019.GB31464@kwain>
+From: andy.tang@nxp.com (Yuantian Tang)
+Date: Fri, 9 Jun 2017 14:25:45 +0800
+Subject: [PATCH] ARM: dts: ls1021a: update the clockgen node
+Message-ID: <1496989545-27282-1-git-send-email-andy.tang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+qoriq clock driver has been updated to parse the clock configuration
+information defined in driver itself not in dts.
+Since the new implementation and the bindings have been merged,
+it is time to update the clock related node and remove redundent clock
+configuration information from the dts.
 
-On Thu, Jun 08, 2017 at 06:03:31PM +0200, Andrew Lunn wrote:
-> On Thu, Jun 08, 2017 at 11:26:52AM +0200, Antoine Tenart wrote:
-> > +#define MVMDIO_XSMI_MGNT_REG		0x0
-> > +#define  MVMDIO_XSMI_READ_VALID		BIT(29)
-> > +#define  MVMDIO_XSMI_BUSY		BIT(30)
-> > +#define MVMDIO_XSMI_ADDR_REG		0x8
-> > +#define  MVMDIO_XSMI_PHYADDR_SHIFT	16
-> > +#define  MVMDIO_XSMI_DEVADDR_SHIFT	21
-> > +#define  MVMDIO_XSMI_READ_OPERATION	(0x7 << 26)
-> > +#define  MVMDIO_XSMI_WRITE_OPERATION	(0x5 << 27)
-> 
-> These two operations seem odd. Generally ops have the same shift.
+Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
+---
+ arch/arm/boot/dts/ls1021a.dtsi | 90 ++++++++++++++++--------------------------
+ 1 file changed, 33 insertions(+), 57 deletions(-)
 
-Indeed, this is odd. I'll have a look at this.
-
-Thanks,
-Antoine
-
+diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+index 45ea57f..7bb9df2 100644
+--- a/arch/arm/boot/dts/ls1021a.dtsi
++++ b/arch/arm/boot/dts/ls1021a.dtsi
+@@ -75,7 +75,7 @@
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <0xf00>;
+-			clocks = <&cluster1_clk>;
++			clocks = <&clockgen 1 0>;
+ 			#cooling-cells = <2>;
+ 		};
+ 
+@@ -83,10 +83,17 @@
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <0xf01>;
+-			clocks = <&cluster1_clk>;
++			clocks = <&clockgen 1 0>;
+ 		};
+ 	};
+ 
++	sysclk: sysclk {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <100000000>;
++		clock-output-names = "sysclk";
++	};
++
+ 	timer {
+ 		compatible = "arm,armv7-timer";
+ 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+@@ -165,7 +172,7 @@
+ 			      <0x0 0x20220520 0x0 0x4>;
+ 			reg-names = "ahci", "sata-ecc";
+ 			interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&platform_clk 1>;
++			clocks = <&clockgen 4 1>;
+ 			dma-coherent;
+ 			status = "disabled";
+ 		};
+@@ -216,41 +223,10 @@
+ 		};
+ 
+ 		clockgen: clocking at 1ee1000 {
+-			#address-cells = <1>;
+-			#size-cells = <1>;
+-			ranges = <0x0 0x0 0x1ee1000 0x10000>;
+-
+-			sysclk: sysclk {
+-				compatible = "fixed-clock";
+-				#clock-cells = <0>;
+-				clock-output-names = "sysclk";
+-			};
+-
+-			cga_pll1: pll at 800 {
+-				compatible = "fsl,qoriq-core-pll-2.0";
+-				#clock-cells = <1>;
+-				reg = <0x800 0x10>;
+-				clocks = <&sysclk>;
+-				clock-output-names = "cga-pll1", "cga-pll1-div2",
+-						     "cga-pll1-div4";
+-			};
+-
+-			platform_clk: pll at c00 {
+-				compatible = "fsl,qoriq-core-pll-2.0";
+-				#clock-cells = <1>;
+-				reg = <0xc00 0x10>;
+-				clocks = <&sysclk>;
+-				clock-output-names = "platform-clk", "platform-clk-div2";
+-			};
+-
+-			cluster1_clk: clk0c0 at 0 {
+-				compatible = "fsl,qoriq-core-mux-2.0";
+-				#clock-cells = <0>;
+-				reg = <0x0 0x10>;
+-				clock-names = "pll1cga", "pll1cga-div2", "pll1cga-div4";
+-				clocks = <&cga_pll1 0>, <&cga_pll1 1>, <&cga_pll1 2>;
+-				clock-output-names = "cluster1-clk";
+-			};
++			compatible = "fsl,ls1021a-clockgen";
++			reg = <0x0 0x1ee1000 0x0 0x1000>;
++			#clock-cells = <2>;
++			clocks = <&sysclk>;
+ 		};
+ 
+ 		tmu: tmu at 1f00000 {
+@@ -338,7 +314,7 @@
+ 			reg = <0x0 0x2100000 0x0 0x10000>;
+ 			interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-names = "dspi";
+-			clocks = <&platform_clk 1>;
++			clocks = <&clockgen 4 1>;
+ 			spi-num-chipselects = <6>;
+ 			big-endian;
+ 			status = "disabled";
+@@ -351,7 +327,7 @@
+ 			reg = <0x0 0x2110000 0x0 0x10000>;
+ 			interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-names = "dspi";
+-			clocks = <&platform_clk 1>;
++			clocks = <&clockgen 4 1>;
+ 			spi-num-chipselects = <6>;
+ 			big-endian;
+ 			status = "disabled";
+@@ -364,7 +340,7 @@
+ 			reg = <0x0 0x2180000 0x0 0x10000>;
+ 			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-names = "i2c";
+-			clocks = <&platform_clk 1>;
++			clocks = <&clockgen 4 1>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -375,7 +351,7 @@
+ 			reg = <0x0 0x2190000 0x0 0x10000>;
+ 			interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-names = "i2c";
+-			clocks = <&platform_clk 1>;
++			clocks = <&clockgen 4 1>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -386,7 +362,7 @@
+ 			reg = <0x0 0x21a0000 0x0 0x10000>;
+ 			interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-names = "i2c";
+-			clocks = <&platform_clk 1>;
++			clocks = <&clockgen 4 1>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -479,7 +455,7 @@
+ 			compatible = "fsl,ls1021a-lpuart";
+ 			reg = <0x0 0x2960000 0x0 0x1000>;
+ 			interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&platform_clk 1>;
++			clocks = <&clockgen 4 1>;
+ 			clock-names = "ipg";
+ 			status = "disabled";
+ 		};
+@@ -488,7 +464,7 @@
+ 			compatible = "fsl,ls1021a-lpuart";
+ 			reg = <0x0 0x2970000 0x0 0x1000>;
+ 			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&platform_clk 1>;
++			clocks = <&clockgen 4 1>;
+ 			clock-names = "ipg";
+ 			status = "disabled";
+ 		};
+@@ -497,7 +473,7 @@
+ 			compatible = "fsl,ls1021a-lpuart";
+ 			reg = <0x0 0x2980000 0x0 0x1000>;
+ 			interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&platform_clk 1>;
++			clocks = <&clockgen 4 1>;
+ 			clock-names = "ipg";
+ 			status = "disabled";
+ 		};
+@@ -506,7 +482,7 @@
+ 			compatible = "fsl,ls1021a-lpuart";
+ 			reg = <0x0 0x2990000 0x0 0x1000>;
+ 			interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&platform_clk 1>;
++			clocks = <&clockgen 4 1>;
+ 			clock-names = "ipg";
+ 			status = "disabled";
+ 		};
+@@ -515,7 +491,7 @@
+ 			compatible = "fsl,ls1021a-lpuart";
+ 			reg = <0x0 0x29a0000 0x0 0x1000>;
+ 			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&platform_clk 1>;
++			clocks = <&clockgen 4 1>;
+ 			clock-names = "ipg";
+ 			status = "disabled";
+ 		};
+@@ -524,7 +500,7 @@
+ 			compatible = "fsl,imx21-wdt";
+ 			reg = <0x0 0x2ad0000 0x0 0x10000>;
+ 			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&platform_clk 1>;
++			clocks = <&clockgen 4 1>;
+ 			clock-names = "wdog-en";
+ 			big-endian;
+ 		};
+@@ -534,8 +510,8 @@
+ 			compatible = "fsl,vf610-sai";
+ 			reg = <0x0 0x2b50000 0x0 0x10000>;
+ 			interrupts = <GIC_SPI 132 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&platform_clk 1>, <&platform_clk 1>,
+-				 <&platform_clk 1>, <&platform_clk 1>;
++			clocks = <&clockgen 4 1>, <&clockgen 4 1>,
++				 <&clockgen 4 1>, <&clockgen 4 1>;
+ 			clock-names = "bus", "mclk1", "mclk2", "mclk3";
+ 			dma-names = "tx", "rx";
+ 			dmas = <&edma0 1 47>,
+@@ -548,8 +524,8 @@
+ 			compatible = "fsl,vf610-sai";
+ 			reg = <0x0 0x2b60000 0x0 0x10000>;
+ 			interrupts = <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&platform_clk 1>, <&platform_clk 1>,
+-				 <&platform_clk 1>, <&platform_clk 1>;
++			clocks = <&clockgen 4 1>, <&clockgen 4 1>,
++				 <&clockgen 4 1>, <&clockgen 4 1>;
+ 			clock-names = "bus", "mclk1", "mclk2", "mclk3";
+ 			dma-names = "tx", "rx";
+ 			dmas = <&edma0 1 45>,
+@@ -569,16 +545,16 @@
+ 			dma-channels = <32>;
+ 			big-endian;
+ 			clock-names = "dmamux0", "dmamux1";
+-			clocks = <&platform_clk 1>,
+-				 <&platform_clk 1>;
++			clocks = <&clockgen 4 1>,
++				 <&clockgen 4 1>;
+ 		};
+ 
+ 		dcu: dcu at 2ce0000 {
+ 			compatible = "fsl,ls1021a-dcu";
+ 			reg = <0x0 0x2ce0000 0x0 0x10000>;
+ 			interrupts = <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&platform_clk 0>,
+-				<&platform_clk 0>;
++			clocks = <&clockgen 4 0>,
++				<&clockgen 4 0>;
+ 			clock-names = "dcu", "pix";
+ 			big-endian;
+ 			status = "disabled";
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170609/d6fc7877/attachment.sig>
+2.1.0.27.g96db324
