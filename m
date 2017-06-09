@@ -1,37 +1,107 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 9 Jun 2017 15:44:20 +0100
-Subject: [PATCH v2 2/2] arm64: dts: Add Mediatek SoC MT2712 and evaluation
- board dts and Makefile
-In-Reply-To: <1497016569.29586.36.camel@mtksdaap41>
-References: <1496230773-22633-1-git-send-email-yt.shen@mediatek.com>
- <1496230773-22633-3-git-send-email-yt.shen@mediatek.com>
- <92e438b3-4e9c-421b-5398-5aad2541524c@gmail.com>
- <1497016569.29586.36.camel@mtksdaap41>
-Message-ID: <3ac6fe47-9e56-b88a-4bab-efddc886ec76@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 9 Jun 2017 16:45:40 +0200
+Subject: [PATCH v2 03/11] drm: sun4i: ignore swapped mixer<->tcon
+ connection for DE2
+In-Reply-To: <74846068.xK7nHVXuC6@jernej-laptop>
+References: <20170604160149.30230-1-icenowy@aosc.io>
+ <01A7F22E-C4FF-4B4B-A9BC-FF0C96B996B9@aosc.io>
+ <20170607143827.4ng5gedvzn3f5pyx@flea.lan>
+ <74846068.xK7nHVXuC6@jernej-laptop>
+Message-ID: <20170609144540.ijly4b4bp5kphubo@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/06/17 14:56, YT Shen wrote:
-> On Wed, 2017-05-31 at 14:42 +0200, Matthias Brugger wrote:
+Hi Jernej,
 
-[...]
+On Wed, Jun 07, 2017 at 08:15:12PM +0200, Jernej ?krabec wrote:
+> Hi!
+> 
+> Dne sreda, 07. junij 2017 ob 16:38:27 CEST je Maxime Ripard napisal(a):
+> > On Wed, Jun 07, 2017 at 06:01:02PM +0800, Icenowy Zheng wrote:
+> > > >I have no idea what this is supposed to be doing either.
+> > > >
+> > > >I might be wrong, but I really feel like there's a big mismatch
+> > > >between your commit log, and what you actually implement.
+> > > >
+> > > >In your commit log, you should state:
+> > > >
+> > > >A) What is the current behaviour
+> > > >B) Why that is a problem
+> > > >C) How do you address it
+> > > >
+> > > >And you don't.
+> > > >
+> > > >However, after discussing it with Chen-Yu, it seems like you're trying
+> > > >to have all the mixers probed before the TCONs. If that is so, there's
+> > > >nothing specific to the H3 here, and we also have the same issue on
+> > > >dual-pipeline DE1 (A10, A20, A31). Chen-Yu worked on that a bit, but
+> > > >the easiest solution would be to move from a DFS algorithm to walk
+> > > >down the graph to a BFS one.
+> > > >
+> > > >That way, we would add all mixers first, then the TCONs, then the
+> > > >encoders, and the component framework will probe them in order.
+> > > 
+> > > No. I said that they're swappable, however, I don't want to
+> > > implement the swap now, but hardcode 0-0 1-1 connection.
+> > 
+> > We're on the same page, it's definitely not what I was mentionning
+> > here. This would require a significant rework, and the usecase is
+> > still unclear for now.
+> > 
+> > > However, as you and Chen-Yu said, device tree should reflect the
+> > > real hardware, there will be bonus endpoints for the swapped
+> > > connection.
+> > 
+> > If by bonus you mean connections from mixer 0 to tcon 1 and mixer 1 to
+> > tcon 0, then yes, we're going to need it.
+> > 
+> > > What I want to do is to ignore the bonus connection, in order to
+> > > prevent them from confusing the code.
+> > > 
+> > > If you just change the bind sequence, I think it cannot be
+> > > prevented that wrong connections will be bound.
+> > 
+> > This is where I don't follow you anymore. The component framework
+> > doesn't list connections but devices. The swapped connections do not
+> > matter here, we have the same set of devices: mixer0, mixer1, tcon0
+> > and tcon1.
+> > 
+> > The thing that does change with your patch is that before, the binding
+> > sequence would have been mixer0, tcon0, tcon1, mixer1. With your
+> > patch, it's mixer0, tcon0, mixer1, tcon1.
+> > 
+> > So, again, stating what issue you were seeing before making this patch
+> > would be very helpful to see what you're trying to do / fix.
+> 
+> If I understand correctly, she wants to make sure that DT has mixer0 - tcon0 
+> and mixer1 - tcon1 relationship and discard mixed relationship. I also believe 
+> that this is just temporary measure until mixed relationship is supported by 
+> the driver.
 
->>> +		cpu0: cpu at 0 {
->>> +			device_type = "cpu";
->>> +			compatible = "arm,cortex-a35";
->>
->> do you mean cortex-a53?
-> No, the cpu is cortex-a35.
-> Although I cannot find other cortex-a35 description in mainline kernel.
+yeah, but all the component stuff doesn't care about the relationships
+themselves, it just cares about the set of devices, and we use those
+relationships to build that set. In this case, even with the swapped
+connections, the set of devices remains the same, which is what
+puzzles me.
 
-We usually don't keep track of individual cores if we don't need to
-(errata workarounds, for example). And for the record, here's some blurb
-about Cortex-A35:
+> Maybe we could just leave this out for now and define only one endpoint in DT 
+> for TVE instead of two? Vast majority of users will have 0-0 and 1-1 
+> relationship, since there is not much point connecting HDMI with less capable 
+> mixer than TVE.
 
-https://www.arm.com/products/processors/cortex-a/cortex-a35-processor.php
+Yeah, but unfortunately, we have to have a perfect representation from
+day one now...
 
-Thanks,
+Maxime
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170609/c2f40c72/attachment.sig>
