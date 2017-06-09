@@ -1,32 +1,94 @@
-From: sugar.zhang@rock-chips.com (Sugar Zhang)
-Date: Fri,  9 Jun 2017 17:02:47 +0800
-Subject: [PATCH] ARM: dts: rk322x: fix i2s1 pinctrl error
-Message-ID: <1496998967-31520-1-git-send-email-sugar.zhang@rock-chips.com>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Fri, 9 Jun 2017 10:08:02 +0100
+Subject: [PATCH 01/35] ARM: defconfig: Cleanup from old Kconfig options
+In-Reply-To: <20170608161049.12421-1-krzk@kernel.org>
+References: <20170608160836.12196-1-krzk@kernel.org>
+ <20170608161049.12421-1-krzk@kernel.org>
+Message-ID: <20170609090802.GL10049@e110455-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
----
+On Thu, Jun 08, 2017 at 06:10:12PM +0200, Krzysztof Kozlowski wrote:
+> Remove old, dead Kconfig options (in order appearing in this commit):
+>  - EXPERIMENTAL is gone since v3.9;
+>  - INET_LRO: commit 7bbf3cae65b6 ("ipv4: Remove inet_lro library");
+>  - MTD_CONCAT: commit f53fdebcc3e1 ("mtd: drop MTD_CONCAT from Kconfig
+>    entirely");
+>  - MTD_PARTITIONS: commit 6a8a98b22b10 ("mtd: kill
+>    CONFIG_MTD_PARTITIONS");
+>  - MTD_CHAR: commit 660685d9d1b4 ("mtd: merge mtdchar module with
+>    mtdcore");
+>  - NETDEV_1000 and NETDEV_10000: commit f860b0522f65 ("drivers/net:
+>    Kconfig and Makefile cleanup"); NET_ETHERNET should be replaced with
+>    just ETHERNET but that is separate change;
+>  - INOTIFY: commit 2dfc1cae4c42 ("inotify: remove inotify in kernel
+>    interface");
+>  - MISC_DEVICES: commit 7c5763b8453a ("drivers: misc: Remove
+>    MISC_DEVICES config option");
+>  - HID_SUPPORT: commit 1f41a6a99476 ("HID: Fix the generic Kconfig
+>    options");
+>  - BT_L2CAP and BT_SCO: commit f1e91e1640d8 ("Bluetooth: Always compile
+>    SCO and L2CAP in Bluetooth Core");
+>  - DEBUG_ERRORS: commit b025a3f836d1 ("ARM: 6876/1: Kconfig.debug:
+>    Remove unused CONFIG_DEBUG_ERRORS");
+>  - USB_DEVICE_CLASS: commit 007bab91324e ("USB: remove
+>    CONFIG_USB_DEVICE_CLASS");
+>  - RCU_CPU_STALL_DETECTOR: commit a00e0d714fbd ("rcu: Remove conditional
+>    compilation for RCU CPU stall warnings");
+>  - SYSCTL_SYSCALL_CHECK: commit 7c60c48f58a7 ("sysctl: Improve the
+>    sysctl sanity checks");
+>  - IP_NF_QUEUE: commit 3dd6664fac7e ("netfilter: remove unused "config
+>    IP_NF_QUEUE"");
+>  - IP_NF_TARGET_ULOG: commit d4da843e6fad ("netfilter: kill remnants of
+>    ulog targets");
+>  - IP6_NF_QUEUE: commit d16cf20e2f2f ("netfilter: remove ip_queue
+>    support");
+>  - IP6_NF_TARGET_LOG: commit 6939c33a757b ("netfilter: merge ipt_LOG and
+>    ip6_LOG into xt_LOG");
+>  - USB_LED: commit a335aaf3125c ("usb: misc: remove outdated USB LED
+>    driver");
+>  - MMC_UNSAFE_RESUME: commit 2501c9179dff ("mmc: core: Use
+>    MMC_UNSAFE_RESUME as default behavior");
+>  - AUTOFS_FS: commit 561c5cf9236a ("staging: Remove autofs3");
+>  - DISPLAY_SUPPORT: commit 5a6b5e02d673 ("fbdev: remove display
+>    subsystem");
+>  - CFG80211_REG_DEBUG: commit c799ba6eab7a ("cfg80211: remove
+>    CFG80211_REG_DEBUG");
+>  - VIDEO_OUTPUT_CONTROL: commit f167a64e9d67 ("video / output: Drop
+>    display output class support");
+>  - USB_LIBUSUAL: commit f61870ee6f8c ("usb: remove libusual");
+>  - CRYPTO_ZLIB: commit 110492183c4b ("crypto: compress - remove unused
+>    pcomp interface");
+>  - BLK_DEV_UB: commit 68a5059ecf82 ("block: remove the deprecated ub
+>    driver");
+> 
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
- arch/arm/boot/dts/rk322x.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+[....]
+> diff --git a/arch/arm/configs/vexpress_defconfig b/arch/arm/configs/vexpress_defconfig
+> index 37fe607a4ede..0fa0ed577b15 100644
+> --- a/arch/arm/configs/vexpress_defconfig
+> +++ b/arch/arm/configs/vexpress_defconfig
+> @@ -46,7 +46,6 @@ CONFIG_INET=y
+>  CONFIG_IP_PNP=y
+>  CONFIG_IP_PNP_DHCP=y
+>  CONFIG_IP_PNP_BOOTP=y
+> -# CONFIG_INET_LRO is not set
+>  # CONFIG_IPV6 is not set
+>  # CONFIG_WIRELESS is not set
+>  CONFIG_NET_9P=y
+[...]
 
-diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
-index 48a0c1c..cc6a27d 100644
---- a/arch/arm/boot/dts/rk322x.dtsi
-+++ b/arch/arm/boot/dts/rk322x.dtsi
-@@ -621,9 +621,9 @@
- 						<0 12 RK_FUNC_1 &pcfg_pull_none>,
- 						<0 13 RK_FUNC_1 &pcfg_pull_none>,
- 						<0 14 RK_FUNC_1 &pcfg_pull_none>,
--						<1 2 RK_FUNC_1 &pcfg_pull_none>,
--						<1 4 RK_FUNC_1 &pcfg_pull_none>,
--						<1 5 RK_FUNC_1 &pcfg_pull_none>;
-+						<1 2 RK_FUNC_2 &pcfg_pull_none>,
-+						<1 4 RK_FUNC_2 &pcfg_pull_none>,
-+						<1 5 RK_FUNC_2 &pcfg_pull_none>;
- 			};
- 		};
- 
+Acked-by: Liviu Dudau <liviu.dudau@arm.com>
+
+Thanks for the cleanup!
+Liviu
 -- 
-1.9.1
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
