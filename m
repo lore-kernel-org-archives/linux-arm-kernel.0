@@ -1,32 +1,68 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 09 Jun 2017 12:15:36 +0200
-Subject: [GIT PULL 3/3] Rockchip soc32 updates for 4.13 part1
-In-Reply-To: <2090243.QTRV0U63fj@phil>
-References: <2090243.QTRV0U63fj@phil>
-Message-ID: <6711954.Z0p86Q0GiD@phil>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri,  9 Jun 2017 12:18:02 +0200
+Subject: [PATCH] ARM: at91: fix at91_suspend_entering_slow_clock link error
+Message-ID: <20170609101821.2776168-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+When CONFIG_ARCH_AT91 is enabled, but none of the specific SoC support
+is in use, some at91 specific drivers fail to link:
 
-  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+drivers/tty/serial/atmel_serial.o: In function `atmel_serial_suspend':
+atmel_serial.c:(.text.atmel_serial_suspend+0x1e): undefined reference to `at91_suspend_entering_slow_clock'
+drivers/usb/host/ohci-at91.o: In function `ohci_hcd_at91_drv_suspend':
+ohci-at91.c:(.text.ohci_hcd_at91_drv_suspend+0x12): undefined reference to `at91_suspend_entering_slow_clock'
+drivers/usb/gadget/udc/at91_udc.o: In function `at91udc_suspend':
+at91_udc.c:(.text.at91udc_suspend+0x26): undefined reference to `at91_suspend_entering_slow_clock'
 
-are available in the git repository at:
+This changes the at91_suspend_entering_slow_clock hack once more, adding
+an alternative inline implementation that is used exactly in those cases
+that don't provide the normal implementation.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.13-rockchip-soc32-1
+Fixes: c1892c2379d2 ("ARM: at91: handle CONFIG_PM for armv7m configurations")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mach-at91/samv7.c          | 9 ---------
+ include/linux/platform_data/atmel.h | 7 +++++++
+ 2 files changed, 7 insertions(+), 9 deletions(-)
 
-for you to fetch changes up to 51f6bfc78beaaa4c42bd2ab394e2550285caab0c:
-
-  ARM: rockchip: enable support for RV1108 SoC (2017-05-14 00:38:27 +0200)
-
-----------------------------------------------------------------
-Add support for the RV1108 and its debug uart
-
-----------------------------------------------------------------
-Andy Yan (2):
-      ARM: debug: add low level debug uart for rv1108
-      ARM: rockchip: enable support for RV1108 SoC
-
- arch/arm/Kconfig.debug            | 30 ++++++++++++++++++++++++++++++
- arch/arm/mach-rockchip/rockchip.c |  1 +
- 2 files changed, 31 insertions(+)
+diff --git a/arch/arm/mach-at91/samv7.c b/arch/arm/mach-at91/samv7.c
+index 910f0c68db62..11386f190c83 100644
+--- a/arch/arm/mach-at91/samv7.c
++++ b/arch/arm/mach-at91/samv7.c
+@@ -15,15 +15,6 @@
+ #include <asm/system_misc.h>
+ #include "generic.h"
+ 
+-#ifdef CONFIG_PM
+-/* This function has to be defined for various drivers that are using it */
+-int at91_suspend_entering_slow_clock(void)
+-{
+-	return 0;
+-}
+-EXPORT_SYMBOL(at91_suspend_entering_slow_clock);
+-#endif
+-
+ static const char *const samv7_dt_board_compat[] __initconst = {
+ 	"atmel,samv7",
+ 	NULL
+diff --git a/include/linux/platform_data/atmel.h b/include/linux/platform_data/atmel.h
+index 3c8825b67298..7b6dce7d6d33 100644
+--- a/include/linux/platform_data/atmel.h
++++ b/include/linux/platform_data/atmel.h
+@@ -52,6 +52,13 @@ struct atmel_uart_data {
+ };
+ 
+ /* FIXME: this needs a better location, but gets stuff building again */
++#ifdef CONFIG_ATMEL_PM
+ extern int at91_suspend_entering_slow_clock(void);
++#else
++static inline int at91_suspend_entering_slow_clock(void)
++{
++	return 0;
++}
++#endif
+ 
+ #endif /* __ATMEL_H__ */
+-- 
+2.9.0
