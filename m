@@ -1,42 +1,28 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 09 Jun 2017 10:14:58 -0700
-Subject: [PATCH 1/2] ARM: davinci: pdata-quirks: fix const warnings
-In-Reply-To: <5144c8fc-06a8-1d85-0bd3-2640d0903d5c@ti.com> (Sekhar Nori's
- message of "Thu, 8 Jun 2017 10:55:16 +0530")
-References: <20170602231210.19553-1-khilman@baylibre.com>
- <20170602231210.19553-2-khilman@baylibre.com>
- <5144c8fc-06a8-1d85-0bd3-2640d0903d5c@ti.com>
-Message-ID: <m2shj99j71.fsf@baylibre.com>
+Date: Fri,  9 Jun 2017 10:21:09 -0700
+Subject: [PATCH v2 0/2] ARM: davinci: misc. VPIF cleanups
+Message-ID: <20170609172111.23057-1-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sekhar Nori <nsekhar@ti.com> writes:
+This are the platforms-specific cleanups needed to go along with the
+VPIF cleanups for raw capture support[1], which is now merged in the
+media tree.
 
-> Hi Kevin,
->
-> On Saturday 03 June 2017 04:42 AM, Kevin Hilman wrote:
->> After VPIF was converted to enable getting subdevs from DT, the
->> pdata is no longer const, so remove these to avoid compiler warnings.
->> 
->> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
->
-> I think this should be squashed into patch 2/4 of "davinci:
-> vpif_capture: raw camera support" series where the warning is
-> introduced. That does mix the platform and driver parts in one patch,
-> but I think its better that way so that no patch introduces a warning.
+[1] https://marc.info/?l=linux-arm-kernel&m=149643932427173
 
-Well, media maintainers have already taken that patch, and probably
-won't want to take this as a separate patch now.  So, IMO, as long as
-this goes in the same merge window, a couple warnings in -next while
-things are settling will be OK.
+Changes since v1:
+- fix additional warning in board-dm646x-evm.c
+- add DT maintiners in CC for patch 2
 
-> The patch does not clash with anything queued in davinci tree, so I
-> think it should be fine.
->
-> Also, there is a warning introduced in
-> arch/arm/mach-davinci/board-dm646x-evm.c that should be fixed as well.
+Kevin Hilman (2):
+  ARM: davinci: pdata-quirks: fix const warnings
+  ARM: dts: da850-evm: drop VPIF endpoints
 
-I'll fix that and resend the series (this time with DT maintainers in
-copy for PATCH 2/2.
+ arch/arm/boot/dts/da850-evm.dts          | 21 ---------------------
+ arch/arm/mach-davinci/board-dm646x-evm.c |  4 ++--
+ arch/arm/mach-davinci/pdata-quirks.c     |  4 ++--
+ 3 files changed, 4 insertions(+), 25 deletions(-)
 
-Kevin
+-- 
+2.9.3
