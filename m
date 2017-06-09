@@ -1,58 +1,38 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 09 Jun 2017 15:15:35 +0200
-Subject: [PATCH v8 19/34] media: Add i.MX media core driver
-In-Reply-To: <1496860453-6282-20-git-send-email-steve_longerbeam@mentor.com>
-References: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
- <1496860453-6282-20-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1497014135.20356.12.camel@pengutronix.de>
+From: jlu@pengutronix.de (Jan =?ISO-8859-1?Q?L=FCbbe?=)
+Date: Fri, 09 Jun 2017 15:23:48 +0200
+Subject: [RFC PATCH 0/7] EDAC drivers for Armada XP L2 and DDR
+In-Reply-To: <20170609093651.nfhthfdjn2jfkpxx@pd.tnic>
+References: <20170609083123.6539-1-jlu@pengutronix.de>
+ <20170609093651.nfhthfdjn2jfkpxx@pd.tnic>
+Message-ID: <1497014628.3536.60.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-06-07 at 11:33 -0700, Steve Longerbeam wrote:
-> Add the core media driver for i.MX SOC.
-> 
-> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
-> 
-> Switch from the v4l2_of_ APIs to the v4l2_fwnode_ APIs.
-> 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> 
-> Add the bayer formats to imx-media's list of supported pixel and bus
-> formats.
-> 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
-[...]
-> diff --git a/drivers/staging/media/imx/imx-media-dev.c b/drivers/staging/media/imx/imx-media-dev.c
-> new file mode 100644
-> index 0000000..da694f6
-> --- /dev/null
-> +++ b/drivers/staging/media/imx/imx-media-dev.c
-> @@ -0,0 +1,666 @@
-[...]
-> +/*
-> + * adds given video device to given imx-media source pad vdev list.
-> + * Continues upstream from the pad entity's sink pads.
-> + */
-> +static int imx_media_add_vdev_to_pad(struct imx_media_dev *imxmd,
-> +				     struct imx_media_video_dev *vdev,
-> +				     struct media_pad *srcpad)
-> +{
-> +	struct media_entity *entity = srcpad->entity;
-> +	struct imx_media_subdev *imxsd;
-> +	struct imx_media_pad *imxpad;
-> +	struct media_link *link;
-> +	struct v4l2_subdev *sd;
-> +	int i, vdev_idx, ret;
-> +
-> +	if (!is_media_entity_v4l2_subdev(entity))
-> +		return -EINVAL;
+Hi Borislav,
 
-Could we make this return 0, to just skip non-v4l2_subdev entities?
-Currently, imx_media_probe_complete silently fails with this -EINVAL if
-there is a tvp5150 connected due to the separate media entities that the
-tvp5150 driver creates for the input connectors (Composite0, for
-example).
+On Fr, 2017-06-09 at 11:36 +0200, Borislav Petkov wrote:
+> Before we go any further, pls put all the Marvell RAS functionality
+> into a single file - I don't want a separate compilation unit per an
+> IP block.
+The L2 cache and DDR RAM controller are completely separate IP cores,
+with separate register spaces, interrupts and so on. The cache is an ARM
+design (some L2x0) extended by Marvell, while the DDR controller seems
+to be unique to Marvell. It wouldn't surprise me if Marvell would decide
+to reuse the DDR controller in another SoC using newer ARM cores with a
+different cache.
 
-regards
-Philipp
+> Also, some of your commit messages are empty and I'm sure they could
+> use some text.
+Sure, I mainly wanted to start the discussion with Chris. :-)
+
+> And yes, it'd be very productive not to get conflicting submissions
+> from you and Chris. :-)
+Of course!
+
+Regards,
+Jan
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
