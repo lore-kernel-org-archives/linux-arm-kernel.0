@@ -1,149 +1,72 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri,  9 Jun 2017 11:49:12 +0200
-Subject: [PATCH v4 3/7] ARM64: dts: meson-gx: use stable UART bindings with
- correct gate clock
-In-Reply-To: <1497001756-942-1-git-send-email-narmstrong@baylibre.com>
-References: <1497001756-942-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1497001756-942-4-git-send-email-narmstrong@baylibre.com>
+From: eballetbo@gmail.com (Enric Balletbo Serra)
+Date: Fri, 9 Jun 2017 11:55:05 +0200
+Subject: [PATCH 4/4] mfd: tps65217: Instantiate sub-devices from device
+ tree
+In-Reply-To: <CABxcv=nzCreCSm9wkY+Kv_-vmoQN12Ct=_VegsfTrbe6H-1hTw@mail.gmail.com>
+References: <20170607103242.16008-1-enric.balletbo@collabora.com>
+ <20170607103242.16008-4-enric.balletbo@collabora.com>
+ <6359abe2-9a21-78a2-f5ea-87e2e3335af3@ti.com>
+ <CAFqH_53v32iODN4xhoh4ho4s6grxknEDS3Ak6CHBcTAQo6fDNw@mail.gmail.com>
+ <578f348c-509f-79d3-9770-73c9fcffe19c@ti.com>
+ <CAFqH_52rU7ZBG_Muy2JHoqJGdXOdsNfmtJxsZoPRyx3V1aWmFw@mail.gmail.com>
+ <CABxcv=mN6=hbDSqrVkwSL8zccCntN7m_3DP6ZCbkOT6CLw+skQ@mail.gmail.com>
+ <fba09819-7d7e-57bb-c147-46c39098cff8@ti.com>
+ <CABxcv=nzCreCSm9wkY+Kv_-vmoQN12Ct=_VegsfTrbe6H-1hTw@mail.gmail.com>
+Message-ID: <CAFqH_50MDAAMcj0RW8Vzu71n=vAHAukpGw--mn3+PZBfj+m88w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Helmut Klein <hgkr.klein@gmail.com>
+Hello Grygorii, Javier,
 
-This patch switches to the stable UART bindings but also add the correct
-gate clock to the non-AO UART nodes for GXBB and GXL SoCs.
+2017-06-09 2:00 GMT+02:00 Javier Martinez Canillas <javier@dowhile0.org>:
+> Hello Grygorii,
+>
+> [snip]
+>
+>>>
+>>> For tps65218 couldn't instead of using mfd_add_devices() for all the
+>>> sub-devs, had used of_platform_populate() for the ones that have
+>>> device nodes and mfd_add_devices() only for the "tps65218-regulator"?
+>>>
+>>> The commit talks about nodes without compatibles but's actually about
+>>> sub-devices without an associated device node. For me it makes sense
+>>> to use of_platform_populate() when the MFD has device nodes for their
+>>> sub-devices and mfd_add_devices() when DT knows nothing about the
+>>> sub-devices.
+>>
+>> FYI. Below is link discussion I'm referring to between Mark Brown and Andrew F. Davis
+>> https://lkml.org/lkml/2015/10/22/823
+>> the same - https://groups.google.com/forum/#!topic/linux.kernel/wQsdSpPMroQ
+>>
+>
+> Thanks a lot for the pointer. There's a subtle difference between the
+> argument you made and the one that Mark is making in this thread
+> though.
+>
+> Because you said (sorry if I misunderstood) that mfd_add_devices()
+> should be used instead of of_device_populate() even when sub-devices
+> are described as DT nodes (as is the case in the commit you shared)
+> while Mark is saying that if the sub-devs IP blocks are part of the
+> MFD, then it shouldn't be exposed in the DT and be instantiated via
+> mfd_add_devices() and I absolutely agree with that.
+>
+> So I was arguing for using of_device_populate() if the sub-devices are
+> described in the DT. If that makes sense or not to expose the
+> sub-devices in the DT for this particular driver is a different
+> discussion and I can't comment on that since I'm not familiar with the
+> HW.
+>
 
-Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi   | 12 +++++-------
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 25 +++++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 25 +++++++++++++++++++++++++
- 3 files changed, 55 insertions(+), 7 deletions(-)
+I'm agree with Grygorii here that has no sense describe the static
+interrupts resources in the DT here unless DT maintainers prefer have
+them (dunno their preferences). OTOH, for the charger we need a way to
+disable (or having a mfd propriety or having a DT subnode with the
+status). I have a new idea that might be acceptable by Grygorii and
+also solve my use case. Let me prepare a second patchset and lets
+continue the discussion there?
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-index 436b875..d2b8d52 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-@@ -225,7 +225,7 @@
- 			};
- 
- 			uart_A: serial at 84c0 {
--				compatible = "amlogic,meson-uart";
-+				compatible = "amlogic,meson-gx-uart";
- 				reg = <0x0 0x84c0 0x0 0x14>;
- 				interrupts = <GIC_SPI 26 IRQ_TYPE_EDGE_RISING>;
- 				clocks = <&xtal>;
-@@ -233,7 +233,7 @@
- 			};
- 
- 			uart_B: serial at 84dc {
--				compatible = "amlogic,meson-uart";
-+				compatible = "amlogic,meson-gx-uart";
- 				reg = <0x0 0x84dc 0x0 0x14>;
- 				interrupts = <GIC_SPI 75 IRQ_TYPE_EDGE_RISING>;
- 				clocks = <&xtal>;
-@@ -279,7 +279,7 @@
- 			};
- 
- 			uart_C: serial at 8700 {
--				compatible = "amlogic,meson-uart";
-+				compatible = "amlogic,meson-gx-uart";
- 				reg = <0x0 0x8700 0x0 0x14>;
- 				interrupts = <GIC_SPI 93 IRQ_TYPE_EDGE_RISING>;
- 				clocks = <&xtal>;
-@@ -366,18 +366,16 @@
- 			};
- 
- 			uart_AO: serial at 4c0 {
--				compatible = "amlogic,meson-uart";
-+				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
- 				reg = <0x0 0x004c0 0x0 0x14>;
- 				interrupts = <GIC_SPI 193 IRQ_TYPE_EDGE_RISING>;
--				clocks = <&xtal>;
- 				status = "disabled";
- 			};
- 
- 			uart_AO_B: serial at 4e0 {
--				compatible = "amlogic,meson-uart";
-+				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
- 				reg = <0x0 0x004e0 0x0 0x14>;
- 				interrupts = <GIC_SPI 197 IRQ_TYPE_EDGE_RISING>;
--				clocks = <&xtal>;
- 				status = "disabled";
- 			};
- 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-index dbd300f..1ae8da7 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -675,6 +675,31 @@
- 	clocks = <&clkc CLKID_SPI>;
- };
- 
-+&uart_A {
-+	clocks = <&xtal>, <&clkc CLKID_UART0>, <&xtal>;
-+	clock-names = "xtal", "pclk", "baud";
-+};
-+
-+&uart_AO {
-+	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
-+	clock-names = "xtal", "pclk", "baud";
-+};
-+
-+&uart_AO_B {
-+	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
-+	clock-names = "xtal", "pclk", "baud";
-+};
-+
-+&uart_B {
-+	clocks = <&xtal>, <&clkc CLKID_UART1>, <&xtal>;
-+	clock-names = "xtal", "core", "baud";
-+};
-+
-+&uart_C {
-+	clocks = <&xtal>, <&clkc CLKID_UART2>, <&xtal>;
-+	clock-names = "xtal", "core", "baud";
-+};
-+
- &vpu {
- 	compatible = "amlogic,meson-gxbb-vpu", "amlogic,meson-gx-vpu";
- };
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-index 4dfc22b..0c601f8 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-@@ -616,6 +616,31 @@
- 	clocks = <&clkc CLKID_SPI>;
- };
- 
-+&uart_A {
-+	clocks = <&xtal>, <&clkc CLKID_UART0>, <&xtal>;
-+	clock-names = "xtal", "core", "baud";
-+};
-+
-+&uart_AO {
-+	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
-+	clock-names = "xtal", "pclk", "baud";
-+};
-+
-+&uart_AO_B {
-+	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
-+	clock-names = "xtal", "pclk", "baud";
-+};
-+
-+&uart_B {
-+	clocks = <&xtal>, <&clkc CLKID_UART1>, <&xtal>;
-+	clock-names = "xtal", "core", "baud";
-+};
-+
-+&uart_C {
-+	clocks = <&xtal>, <&clkc CLKID_UART2>, <&xtal>;
-+	clock-names = "xtal", "core", "baud";
-+};
-+
- &vpu {
- 	compatible = "amlogic,meson-gxl-vpu", "amlogic,meson-gx-vpu";
- };
--- 
-1.9.1
+Best regards,
+ Enric
+
+> Best regards,
+> Javier
