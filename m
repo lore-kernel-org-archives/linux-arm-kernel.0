@@ -1,62 +1,81 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 9 Jun 2017 17:46:52 +0200
-Subject: [PATCH] ARM64: Kconfig: Fix the missing hi655x common clk
-In-Reply-To: <CAPDyKFqWptneK2V7wCR8LGbgU7=U9kBCKkHrtgGmZKmNQJ4s7g@mail.gmail.com>
-References: <CALAqxLVn9r9R-wnrZbrFqYfwqZD-tegbJrZLsUeBjjBc4_Q89w@mail.gmail.com>
- <1496686434-13181-1-git-send-email-daniel.lezcano@linaro.org>
- <CAPDyKFqWptneK2V7wCR8LGbgU7=U9kBCKkHrtgGmZKmNQJ4s7g@mail.gmail.com>
-Message-ID: <20170609154652.GG2244@mai>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 9 Jun 2017 10:46:37 -0500
+Subject: [PATCH v2 1/3] dt-bindings: arm: amlogic: Add SoC information
+ bindings
+In-Reply-To: <955d2903-9057-919b-004d-b1f5985dca5c@baylibre.com>
+References: <1496742340-10307-1-git-send-email-narmstrong@baylibre.com>
+ <1496742340-10307-2-git-send-email-narmstrong@baylibre.com>
+ <20170609133717.gkqnyatqezkrcaeg@rob-hp-laptop>
+ <955d2903-9057-919b-004d-b1f5985dca5c@baylibre.com>
+Message-ID: <CAL_JsqKGuq2sW1m+JpkYgN-aBj537aNfZn2wb_pnU+FLEa_igg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 06, 2017 at 04:17:40PM +0200, Ulf Hansson wrote:
-> On 5 June 2017 at 20:13, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
-> > With the addition of the hi655x common clock, the config option is missing
-> > for the ARM64's hi6220 platform. That leads to a non functionnal WiFi because
-> > the hi655x clock driver misses when initializing the power sequence via DT.
-> >
-> > Cc: John Stultz <john.stultz@linaro.org>
-> > Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> > Cc: Wei Xu <xuwei5@hisilicon.com>
-> > Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> 
-> Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
-> 
-> Would be nice to get this trivial fix in for 4.12 rcs to make the WiFi
-> work for Hikey.
-> 
+On Fri, Jun 9, 2017 at 8:58 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+> On 06/09/2017 03:37 PM, Rob Herring wrote:
+>> On Tue, Jun 06, 2017 at 11:45:38AM +0200, Neil Armstrong wrote:
+>>> Add bindings for the SoC information register of the Amlogic SoCs.
+>>>
+>>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>>> ---
+>>>  Documentation/devicetree/bindings/arm/amlogic.txt | 32 +++++++++++++++++++++++
+>>>  1 file changed, 32 insertions(+)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
+>>> index 5c01e65..ae3e8ed 100644
+>>> --- a/Documentation/devicetree/bindings/arm/amlogic.txt
+>>> +++ b/Documentation/devicetree/bindings/arm/amlogic.txt
+>>> @@ -60,3 +60,35 @@ Board compatible values (alphabetically, grouped by SoC):
+>>>    - "amlogic,q201" (Meson gxm s912)
+>>>    - "kingnovel,r-box-pro" (Meson gxm S912)
+>>>    - "nexbox,a1" (Meson gxm s912)
+>>> +
+>>> +Amlogic Meson Firmware registers Interface
+>>> +------------------------------------------
+>>> +
+>>> +The Meson SoCs have a register bank with status and data shared with the
+>>> +secure firmware.
+>>> +
+>>> +Required properties:
+>>> + - compatible: For Meson GX SoCs, must be "amlogic,meson-gx-ao-secure", "syscon", "simple-mfd"
+>>> +
+>>> +Sub-nodes should indentify components of this register interface :
+>>> +
+>>> +Meson GX SoC Information
+>>> +------------------------
+>>> +A firmware register encodes the SoC type, package and revision information on
+>>> +the Meson GX SoCs.
+>>> +If present, a device node for this register should be added.
+>>> +
+>>> +Required properties:
+>>> +  - compatible: For Meson GX SoCs, must be "amlogic,meson-gx-chipid".
+>>> +
+>>> +Example
+>>> +-------
+>>> +
+>>> +ao-secure at 140 {
+>>> +    compatible = "amlogic,meson-gx-ao-secure", "syscon", "simple-mfd";
+>>> +    reg = <0x0 0x140 0x0 0x140>;
+>>> +
+>>> +    chipid {
+>>> +            compatible = "amlogic,meson-gx-chipid";
+>>
+>> No registers for this block? If not, this node is pointless.
+>> "amlogic,meson-gx-ao-secure" should be specific enough to determine if
+>> you have this block or not and the driver for it can create a device if
+>> the OS needs it.
+>>
+>> Rob
+>>
+>
+> Well OK, but since it's a firmware interface, it can be handy to list the
+> possible capabilities, not especially tied to a driver.
 
-I'm wondering if I submitted this patch for the right path.
+A "has-chip-id;" property would do that.
 
-Shall it go through arm-soc ?
+It would be better to just be very explicit about what version of
+firmware you have and that can imply anything and everything you need
+to know about the firmware without needing to up date the dtb every
+time you need to provide a new (to Linux) firmware capability.
 
-+Olof, +Arnd
-
-> 
-> > ---
-> >  arch/arm64/Kconfig.platforms | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> > diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-> > index 73272f4..6dfe72c 100644
-> > --- a/arch/arm64/Kconfig.platforms
-> > +++ b/arch/arm64/Kconfig.platforms
-> > @@ -79,6 +79,7 @@ config ARCH_LG1K
-> >  config ARCH_HISI
-> >         bool "Hisilicon SoC Family"
-> >         select ARM_TIMER_SP804
-> > +       select COMMON_CLK_HI655X
-> >         select HISILICON_IRQ_MBIGEN if PCI
-> >         select PINCTRL
-> >         help
-> > --
-> > 2.7.4
-> >
-
--- 
-
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Rob
