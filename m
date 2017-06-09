@@ -1,87 +1,42 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 9 Jun 2017 16:59:41 +0000
-Subject: [RFC PATCH] drivers/char: kmem: disable read/write if
- VMALLOC_START < PAGE_OFFSET
-In-Reply-To: <20170609163228.446-1-ard.biesheuvel@linaro.org>
-References: <20170609163228.446-1-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu9VBH2C1u5JwMfGP17ZDXzGcsbFWTkDfxdYa0r2OR56kg@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 09 Jun 2017 10:14:58 -0700
+Subject: [PATCH 1/2] ARM: davinci: pdata-quirks: fix const warnings
+In-Reply-To: <5144c8fc-06a8-1d85-0bd3-2640d0903d5c@ti.com> (Sekhar Nori's
+ message of "Thu, 8 Jun 2017 10:55:16 +0530")
+References: <20170602231210.19553-1-khilman@baylibre.com>
+ <20170602231210.19553-2-khilman@baylibre.com>
+ <5144c8fc-06a8-1d85-0bd3-2640d0903d5c@ti.com>
+Message-ID: <m2shj99j71.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 June 2017 at 16:32, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> As it turns out, arm64 deviates from other architectures in the way it
-> maps the VMALLOC region: on most (all?) other architectures, it resides
-> strictly above the kernel's direct mapping of DRAM, but on arm64, this
-> is the other way around. For instance, for a 48-bit VA configuration,
-> we have
->
->   modules : 0xffff000000000000 - 0xffff000008000000   (   128 MB)
->   vmalloc : 0xffff000008000000 - 0xffff7dffbfff0000   (129022 GB)
->   ...
->   vmemmap : 0xffff7e0000000000 - 0xffff800000000000   (  2048 GB maximum)
->             0xffff7e0000000000 - 0xffff7e0003ff0000   (    63 MB actual)
->   memory  : 0xffff800000000000 - 0xffff8000ffc00000   (  4092 MB)
->
-> This has mostly gone unnoticed until now, but it does appear that it
-> breaks an assumption in the kcore read/write code, which does something
+Sekhar Nori <nsekhar@ti.com> writes:
 
-kmem not kcore
+> Hi Kevin,
+>
+> On Saturday 03 June 2017 04:42 AM, Kevin Hilman wrote:
+>> After VPIF was converted to enable getting subdevs from DT, the
+>> pdata is no longer const, so remove these to avoid compiler warnings.
+>> 
+>> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+>
+> I think this should be squashed into patch 2/4 of "davinci:
+> vpif_capture: raw camera support" series where the warning is
+> introduced. That does mix the platform and driver parts in one patch,
+> but I think its better that way so that no patch introduces a warning.
 
-> like
+Well, media maintainers have already taken that patch, and probably
+won't want to take this as a separate patch now.  So, IMO, as long as
+this goes in the same merge window, a couple warnings in -next while
+things are settling will be OK.
+
+> The patch does not clash with anything queued in davinci tree, so I
+> think it should be fine.
 >
->   if (p < (unsigned long) high_memory) {
->     ... use straight copy_[to|from]_user() using p as virtual address ...
->   }
->   ...
->   if (count > 0) {
->     ... use vread/vwrite for accesses past high_memory ...
->   }
->
-> The first condition will inadvertently hold for the VMALLOC region if
-> VMALLOC_START < PAGE_OFFSET, but the read/write will subsequently fail
-> the virt_addr_valid() check, resulting in a -ENXIO return value.
->
-> Given how kmem seems to be living in borrowed time anyway, and given
-> the fact that nobody noticed that the read/write interface is broken
-> on arm64 in the first place, let's not bother trying to fix it, but
-> simply fail such calls with a warning if VMALLOC_START < PAGE_OFFSET.
-> (Note that kmem's mmap() interface is not affected by this)
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->
-> This is just an RFC. There may be better ways to deal with this, including
-> disabling /dev/kmem altogether on arm64.
->
->  drivers/char/mem.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
->
-> diff --git a/drivers/char/mem.c b/drivers/char/mem.c
-> index 6e0cbe092220..c90ca6703dd5 100644
-> --- a/drivers/char/mem.c
-> +++ b/drivers/char/mem.c
-> @@ -408,6 +408,10 @@ static ssize_t read_kmem(struct file *file, char __user *buf,
->         char *kbuf; /* k-addr because vread() takes vmlist_lock rwlock */
->         int err = 0;
->
-> +       /* the code below assumes VMALLOC_START > PAGE_OFFSET */
-> +       if (WARN_ON_ONCE(VMALLOC_START < PAGE_OFFSET))
-> +               return -ENXIO;
-> +
->         read = 0;
->         if (p < (unsigned long) high_memory) {
->                 low_count = count;
-> @@ -484,6 +488,10 @@ static ssize_t do_write_kmem(unsigned long p, const char __user *buf,
->         ssize_t written, sz;
->         unsigned long copied;
->
-> +       /* the code below assumes VMALLOC_START > PAGE_OFFSET */
-> +       if (WARN_ON_ONCE(VMALLOC_START < PAGE_OFFSET))
-> +               return -ENXIO;
-> +
->         written = 0;
->  #ifdef __ARCH_HAS_NO_PAGE_ZERO_MAPPED
->         /* we don't have page 0 mapped on sparc and m68k.. */
-> --
-> 2.9.3
->
+> Also, there is a warning introduced in
+> arch/arm/mach-davinci/board-dm646x-evm.c that should be fixed as well.
+
+I'll fix that and resend the series (this time with DT maintainers in
+copy for PATCH 2/2.
+
+Kevin
