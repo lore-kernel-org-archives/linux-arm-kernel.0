@@ -1,23 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 9 Jun 2017 11:22:03 +0200
-Subject: [PATCH 3/3] ARM: sun8i: a83t: Add device node for R_PIO
-In-Reply-To: <20170603144427.22855-4-wens@csie.org>
-References: <20170603144427.22855-1-wens@csie.org>
- <20170603144427.22855-4-wens@csie.org>
-Message-ID: <CACRpkdai=frHn4BfYAppMuNVZ=v3Adr6h5MKwhz8v30AVGqp8g@mail.gmail.com>
+From: varada@codeaurora.org (Varadarajan Narayanan)
+Date: Fri,  9 Jun 2017 15:02:59 +0530
+Subject: [PATCH v5 2/6] dt-bindings: qcom: Add ipq8074 bindings
+In-Reply-To: <1497000783-27916-1-git-send-email-varada@codeaurora.org>
+References: <1497000783-27916-1-git-send-email-varada@codeaurora.org>
+Message-ID: <1497000783-27916-3-git-send-email-varada@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 3, 2017 at 4:44 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
+---
+ Documentation/devicetree/bindings/arm/qcom.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> The A83T has 1 pingroup with 13 pins belonging to the R_PIO
-> or special pin controller.
->
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Pls funnel this through the ARM SoC tree.
-
-Yours,
-Linus Walleij
+diff --git a/Documentation/devicetree/bindings/arm/qcom.txt b/Documentation/devicetree/bindings/arm/qcom.txt
+index 028d16e..0ed4d39 100644
+--- a/Documentation/devicetree/bindings/arm/qcom.txt
++++ b/Documentation/devicetree/bindings/arm/qcom.txt
+@@ -25,6 +25,7 @@ The 'SoC' element must be one of the following strings:
+ 	msm8994
+ 	msm8996
+ 	mdm9615
++	ipq8074
+ 
+ The 'board' element must be one of the following strings:
+ 
+@@ -33,6 +34,7 @@ The 'board' element must be one of the following strings:
+ 	dragonboard
+ 	mtp
+ 	sbc
++	hk01
+ 
+ The 'soc_version' and 'board_version' elements take the form of v<Major>.<Minor>
+ where the minor number may be omitted when it's zero, i.e.  v1.0 is the same
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
