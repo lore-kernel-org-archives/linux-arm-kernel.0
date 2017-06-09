@@ -1,58 +1,37 @@
-From: raviteja.garimella@broadcom.com (Raviteja Garimella)
-Date: Fri, 9 Jun 2017 17:06:08 +0530
-Subject: [PATCH v8 0/3] Support for USB DRD PHY driver for NS2
-In-Reply-To: <03f87297-a986-ac9d-b20b-0f75abcc12f7@ti.com>
-References: <1496918103-14948-1-git-send-email-raviteja.garimella@broadcom.com>
- <a5344bd7-f7b1-90b5-cce1-d513370103e5@ti.com>
- <CAEHZuqNwPBgWM9mAeWTTQLQVJYjX8uNuUDRqsD_ZidgaSV9pcA@mail.gmail.com>
- <2f492d5a-9016-f965-8dc2-f669d785ba4d@ti.com>
- <CAEHZuqO3zquZokENqBLmcn1ZnSCYSYitCXmKrQ-v9HMB0gJrvg@mail.gmail.com>
- <03f87297-a986-ac9d-b20b-0f75abcc12f7@ti.com>
-Message-ID: <CAEHZuqNskNCt6LqY==Qrw3v8RyagNa+K=ruWZMpn8tqrOfssdQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 9 Jun 2017 12:38:50 +0100
+Subject: [PATCH] arm64: ftrace: fix building without CONFIG_MODULES
+In-Reply-To: <20170609102807.2992510-1-arnd@arndb.de>
+References: <20170609102807.2992510-1-arnd@arndb.de>
+Message-ID: <20170609113850.GF13955@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd,
 
-On Fri, Jun 9, 2017 at 4:46 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->
->
-> On Friday 09 June 2017 04:23 PM, Raviteja Garimella wrote:
->> Hi Kishon,
->>
->> On Fri, Jun 9, 2017 at 2:36 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>> Hi,
->>>
->>> On Friday 09 June 2017 02:30 PM, Raviteja Garimella wrote:
->>>> Hi,
->>>>
->>>> On Fri, Jun 9, 2017 at 2:25 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>>>> Hi,
->>>>>
->>>>> On Thursday 08 June 2017 04:05 PM, Raviteja Garimella wrote:
->>>>>> Changes in v8:
->>>>>> =============
->>>>>> -Renamed phy shutdown routine
->>>>>> -Used devm_request_irq in stead of threaded irq
->>>>>
->>>>> That's not what I intended. Continue to use threaded irq but remove delayed work.
->>>>>
->>>>
->>>> Yes I get that. We see intermittent connection issues without delayed
->>>> work. Debounce delay matters there.
->>>
->>> All right!
->>>
->>> I'm unable to apply the series. Please rebase to linux-phy next (directory
->>> structure has changed)
->>>
->>
->> Ok. They got applied to linux-phy next for me without issues.
->> I will resend the patchset anyways after rebasing to linux-phy next.
->
-> the patch you sent is not rebased to the latest linux-phy next.
->
+On Fri, Jun 09, 2017 at 12:27:06PM +0200, Arnd Bergmann wrote:
+> When CONFIG_MODULES is disabled, we cannot dereference a module pointer:
+> 
+> arch/arm64/kernel/ftrace.c: In function 'ftrace_make_call':
+> arch/arm64/kernel/ftrace.c:107:36: error: dereferencing pointer to incomplete type 'struct module'
+>    trampoline = (unsigned long *)mod->arch.ftrace_trampoline;
+> 
+> Also, the within_module() function is not defined:
+> 
+> arch/arm64/kernel/ftrace.c: In function 'ftrace_make_nop':
+> arch/arm64/kernel/ftrace.c:171:8: error: implicit declaration of function 'within_module'; did you mean 'init_module'? [-Werror=implicit-function-declaration]
+> 
+> This addresses both by adding the appropriate stubs.
+> 
+> Fixes: e71a4e1bebaf ("arm64: ftrace: add support for far branches to dynamic ftrace")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm64/include/asm/module.h | 6 ++++++
+>  arch/arm64/kernel/ftrace.c      | 2 +-
+>  include/linux/module.h          | 5 +++++
+>  3 files changed, 12 insertions(+), 1 deletion(-)
 
-Sorry.. That's correct, I am sending v9. Thanks.
+I can't seem to reproduce this simply by disabling MODULES in defconfig.
+Could you share your .config, please?
 
-> -Kishon
+Will
