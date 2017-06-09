@@ -1,20 +1,37 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 09 Jun 2017 12:56:04 +0200
-Subject: [PATCH] ARM: dts: rk322x: fix i2s1 pinctrl error
-In-Reply-To: <1496998967-31520-1-git-send-email-sugar.zhang@rock-chips.com>
-References: <1496998967-31520-1-git-send-email-sugar.zhang@rock-chips.com>
-Message-ID: <1870239.lCo0kzT3Kb@phil>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Fri, 9 Jun 2017 13:58:15 +0300
+Subject: [PATCH 2/2] ARM: dts: imx6ul: Add imx6ul-tempmon
+In-Reply-To: <CAOMZO5BP4fPyzDmSg+DFLRYh3QMf-8T0gqvnZn6mEMt-QqSgfw@mail.gmail.com>
+References: <7055ce6095c0b7f026ac6f0dc37e43fc5c0b1793.1496939031.git.leonard.crestez@nxp.com>
+ <b9b91617985607f24c4986bcad5199483805d6b7.1496939031.git.leonard.crestez@nxp.com>
+ <CAOMZO5BP4fPyzDmSg+DFLRYh3QMf-8T0gqvnZn6mEMt-QqSgfw@mail.gmail.com>
+Message-ID: <1497005895.28352.88.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 2017-06-08 at 13:45 -0300, Fabio Estevam wrote:
+> On Thu, Jun 8, 2017 at 1:26 PM, Leonard Crestez  wrote:
+> 
+> > 
+> > +???????????????????????tempmon: tempmon {
+> > +???????????????????????????????compatible = "fsl,imx6ul-tempmon", "fsl,imx6sx-tempmon";
+> > +???????????????????????????????interrupts = ;
+> > +???????????????????????????????fsl,tempmon = <&anatop>;
+> > +???????????????????????????????fsl,tempmon-data = <&ocotp>;
+> > +???????????????????????????????clocks = <&clks IMX6UL_CLK_PLL3_USB_OTG>;
+> Does the IMX6UL_CLK_PLL3_USB_OTG clock really control tempmon? Please
+> double check.
 
-Am Freitag, 9. Juni 2017, 17:02:47 CEST schrieb Sugar Zhang:
-> Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
+Yes, as far as I can tell the tempmon block uses the 480 Mhz PLL3 clock
+directly. This is similar to other imx6 SOCs. This PLL is used for
+stuff like USB but not only that. My understanding is the _USB_OTG
+suffix is descriptive, similar to PLL4_AUDIO and PLL6_ENET. Other non-
+usb components use PLL3 (like UART) but through other gates/dividers.
 
-I've already applied a previous version (from you and Frank).
-See
-https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/arch/arm/boot/dts/rk322x.dtsi?id=9d420e9b4140f8938ad6aa0d29e2428a2af6122b
+Setting this to?IMX6UL_CLK_DUMMY will cause temperature reads to fail.
+Even if PLL3 usually ends up being constantly enabled because of uarts
+this is not true at imx_thermal_probe time (or uarts can be disabled).
 
-
-Heiko
+--
+Regards,
+Leonard
