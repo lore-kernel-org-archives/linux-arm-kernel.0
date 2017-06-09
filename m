@@ -1,16 +1,16 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Fri, 9 Jun 2017 17:33:06 +0200
-Subject: [PATCH v3 26/27] KVM: arm64: Log an error if trapping a
- read-from-write-only GICv3 access
-In-Reply-To: <20170609114956.25963-27-marc.zyngier@arm.com>
+Date: Fri, 9 Jun 2017 17:34:19 +0200
+Subject: [PATCH v3 27/27] KVM: arm64: Log an error if trapping a
+ write-to-read-only GICv3 access
+In-Reply-To: <20170609114956.25963-28-marc.zyngier@arm.com>
 References: <20170609114956.25963-1-marc.zyngier@arm.com>
- <20170609114956.25963-27-marc.zyngier@arm.com>
-Message-ID: <20170609153306.GH11099@cbox>
+ <20170609114956.25963-28-marc.zyngier@arm.com>
+Message-ID: <20170609153419.GI11099@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 09, 2017 at 12:49:55PM +0100, Marc Zyngier wrote:
-> A read-from-write-only GICv3 access should UNDEF at EL1. But since
+On Fri, Jun 09, 2017 at 12:49:56PM +0100, Marc Zyngier wrote:
+> A write-to-read-only GICv3 access should UNDEF at EL1. But since
 > we're in complete paranoia-land with broken CPUs, let's assume the
 > worse and gracefully handle the case.
 > 
@@ -19,84 +19,78 @@ On Fri, Jun 09, 2017 at 12:49:55PM +0100, Marc Zyngier wrote:
 Reviewed-by: Christoffer Dall <cdall@linaro.org>
 
 > ---
->  arch/arm64/kvm/sys_regs.c     | 12 ++++++++----
->  virt/kvm/arm/hyp/vgic-v3-sr.c |  4 ++++
->  2 files changed, 12 insertions(+), 4 deletions(-)
+>  arch/arm64/kvm/sys_regs.c     | 15 +++++++++++++++
+>  virt/kvm/arm/hyp/vgic-v3-sr.c |  6 ++++++
+>  2 files changed, 21 insertions(+)
 > 
 > diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 0fe27024a2e1..8d51c075966d 100644
+> index 8d51c075966d..77862881ae86 100644
 > --- a/arch/arm64/kvm/sys_regs.c
 > +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -56,7 +56,8 @@
->   */
+> @@ -65,6 +65,16 @@ static bool read_from_write_only(struct kvm_vcpu *vcpu,
+>  	return false;
+>  }
 >  
->  static bool read_from_write_only(struct kvm_vcpu *vcpu,
-> -				 const struct sys_reg_params *params)
-> +				 struct sys_reg_params *params,
-> +				 const struct sys_reg_desc *r)
->  {
->  	WARN_ONCE(1, "Unexpected sys_reg read to write-only register\n");
->  	print_sys_reg_instr(params);
-> @@ -93,7 +94,7 @@ static bool access_dcsw(struct kvm_vcpu *vcpu,
->  			const struct sys_reg_desc *r)
->  {
->  	if (!p->is_write)
-> -		return read_from_write_only(vcpu, p);
-> +		return read_from_write_only(vcpu, p, r);
+> +static bool write_to_read_only(struct kvm_vcpu *vcpu,
+> +			       struct sys_reg_params *params,
+> +			       const struct sys_reg_desc *r)
+> +{
+> +	WARN_ONCE(1, "Unexpected sys_reg write to read-only register\n");
+> +	print_sys_reg_instr(params);
+> +	kvm_inject_undefined(vcpu);
+> +	return false;
+> +}
+> +
+>  /* 3 bits per cache level, as per CLIDR, but non-existent caches always 0 */
+>  static u32 cache_levels;
 >  
->  	kvm_set_way_flush(vcpu);
->  	return true;
-> @@ -135,7 +136,7 @@ static bool access_gic_sgi(struct kvm_vcpu *vcpu,
->  			   const struct sys_reg_desc *r)
->  {
->  	if (!p->is_write)
-> -		return read_from_write_only(vcpu, p);
-> +		return read_from_write_only(vcpu, p, r);
->  
->  	vgic_v3_dispatch_sgi(vcpu, p->regval);
->  
-> @@ -773,7 +774,7 @@ static bool access_pmswinc(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
->  		return trap_raz_wi(vcpu, p, r);
->  
->  	if (!p->is_write)
-> -		return read_from_write_only(vcpu, p);
-> +		return read_from_write_only(vcpu, p, r);
->  
->  	if (pmu_write_swinc_el0_disabled(vcpu))
->  		return false;
-> @@ -953,7 +954,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+> @@ -954,10 +964,15 @@ static const struct sys_reg_desc sys_reg_descs[] = {
 >  
 >  	{ SYS_DESC(SYS_VBAR_EL1), NULL, reset_val, VBAR_EL1, 0 },
 >  
-> +	{ SYS_DESC(SYS_ICC_EOIR0_EL1), read_from_write_only },
-> +	{ SYS_DESC(SYS_ICC_DIR_EL1), read_from_write_only },
+> +	{ SYS_DESC(SYS_ICC_IAR0_EL1), write_to_read_only },
+>  	{ SYS_DESC(SYS_ICC_EOIR0_EL1), read_from_write_only },
+> +	{ SYS_DESC(SYS_ICC_HPPIR0_EL1), write_to_read_only },
+>  	{ SYS_DESC(SYS_ICC_DIR_EL1), read_from_write_only },
+> +	{ SYS_DESC(SYS_ICC_RPR_EL1), write_to_read_only },
 >  	{ SYS_DESC(SYS_ICC_SGI1R_EL1), access_gic_sgi },
-> +	{ SYS_DESC(SYS_ICC_EOIR1_EL1), read_from_write_only },
+> +	{ SYS_DESC(SYS_ICC_IAR1_EL1), write_to_read_only },
+>  	{ SYS_DESC(SYS_ICC_EOIR1_EL1), read_from_write_only },
+> +	{ SYS_DESC(SYS_ICC_HPPIR1_EL1), write_to_read_only },
 >  	{ SYS_DESC(SYS_ICC_SRE_EL1), access_gic_sre },
 >  
 >  	{ SYS_DESC(SYS_CONTEXTIDR_EL1), access_vm_reg, reset_val, CONTEXTIDR_EL1, 0 },
 > diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> index 15b557697086..b26ce58b012a 100644
+> index b26ce58b012a..79e3c2d3b754 100644
 > --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
 > +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> @@ -980,6 +980,8 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
+> @@ -976,6 +976,8 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
+>  	switch (sysreg) {
+>  	case SYS_ICC_IAR0_EL1:
+>  	case SYS_ICC_IAR1_EL1:
+> +		if (unlikely(!is_read))
+> +			return 0;
+>  		fn = __vgic_v3_read_iar;
 >  		break;
 >  	case SYS_ICC_EOIR0_EL1:
->  	case SYS_ICC_EOIR1_EL1:
-> +		if (unlikely(is_read))
-> +			return 0;
->  		fn = __vgic_v3_write_eoir;
+> @@ -1026,6 +1028,8 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
 >  		break;
->  	case SYS_ICC_GRPEN1_EL1:
-> @@ -1039,6 +1041,8 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
->  			fn = __vgic_v3_write_bpr0;
->  		break;
->  	case SYS_ICC_DIR_EL1:
-> +		if (unlikely(is_read))
+>  	case SYS_ICC_HPPIR0_EL1:
+>  	case SYS_ICC_HPPIR1_EL1:
+> +		if (unlikely(!is_read))
 > +			return 0;
+>  		fn = __vgic_v3_read_hppir;
+>  		break;
+>  	case SYS_ICC_GRPEN0_EL1:
+> @@ -1046,6 +1050,8 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
 >  		fn = __vgic_v3_write_dir;
 >  		break;
 >  	case SYS_ICC_RPR_EL1:
+> +		if (unlikely(!is_read))
+> +			return 0;
+>  		fn = __vgic_v3_read_rpr;
+>  		break;
+>  	case SYS_ICC_CTLR_EL1:
 > -- 
 > 2.11.0
 > 
