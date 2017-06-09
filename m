@@ -1,56 +1,106 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 10 Jun 2017 00:08:31 +0800
-Subject: [PATCH 19/19] ARM: sun6i: a31s: Enable HDMI display output on the
- MSI Primo81 tablet
-In-Reply-To: <CAKb7UvgKhgCpeNzUX1ecFPuF6j+KvAWW3vprZ9nnVMBBJFi_zQ@mail.gmail.com>
-References: <20170602101024.18940-1-wens@csie.org>
- <20170602101024.18940-20-wens@csie.org>
- <20170602194219.hiajr7dt2oikm52q@flea.lan>
- <20170607223625.aofk3cba3w4cvlys@rob-hp-laptop>
- <CAKb7UvgKhgCpeNzUX1ecFPuF6j+KvAWW3vprZ9nnVMBBJFi_zQ@mail.gmail.com>
-Message-ID: <CAGb2v64uxmxptf9VgHO8tT=AbPc+VtDhtG+rVd3Nwf9bEGr8pg@mail.gmail.com>
+From: john.garry@huawei.com (John Garry)
+Date: Fri, 9 Jun 2017 17:09:25 +0100
+Subject: [PATCH v8 6/9] drivers: perf: hisi: Add support for Hisilicon
+ Djtag driver
+In-Reply-To: <20170609154425.GH10665@leverpostej>
+References: <1495457312-237127-1-git-send-email-zhangshaokun@hisilicon.com>
+ <20170608163519.GA19643@leverpostej>
+ <8666a0fa-126d-e4a3-ac4b-7962f5d79942@huawei.com>
+ <20170609154425.GH10665@leverpostej>
+Message-ID: <e120463d-2936-90ec-8aad-f0f7be558054@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 8, 2017 at 6:47 AM, Ilia Mirkin <imirkin@alum.mit.edu> wrote:
-> On Wed, Jun 7, 2017 at 6:36 PM, Rob Herring <robh@kernel.org> wrote:
->> On Fri, Jun 02, 2017 at 09:42:19PM +0200, Maxime Ripard wrote:
->>> On Fri, Jun 02, 2017 at 06:10:24PM +0800, Chen-Yu Tsai wrote:
->>> > The MSI Primo81 tablet has a micro HDMI connector at the bottom.
->>> > This is connected to the SoCs HDMI output.
->>> >
->>> > Enable the display pipeline and the HDMI output.
->>> >
->>> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->>> > ---
->>> >  arch/arm/boot/dts/sun6i-a31s-primo81.dts | 25 +++++++++++++++++++++++++
->>> >  1 file changed, 25 insertions(+)
->>> >
->>> > diff --git a/arch/arm/boot/dts/sun6i-a31s-primo81.dts b/arch/arm/boot/dts/sun6i-a31s-primo81.dts
->>> > index f3712753fa42..26154b2f87a3 100644
->>> > --- a/arch/arm/boot/dts/sun6i-a31s-primo81.dts
->>> > +++ b/arch/arm/boot/dts/sun6i-a31s-primo81.dts
->>> > @@ -52,17 +52,42 @@
->>> >  / {
->>> >     model = "MSI Primo81 tablet";
->>> >     compatible = "msi,primo81", "allwinner,sun6i-a31s";
->>> > +
->>> > +   hdmi-connector {
->>> > +           compatible = "hdmi-connector";
->>> > +           type = "c";
->>>
->>> Should we add a connector type for this one?
+Hi Mark,
+
+> What happens if the lock is already held by an agent in that case?
+>
+> Does the FW block until the lock is released?
+
+The FW must also honour the contract - it must also block until the lock 
+is available.
+
+This may sound bad, but, in reality, probablity of simultaneous perf and 
+hotplug access is very low.
+
+>
+> Can you elaborate on CPU hotplug? Which CPU is performing the
+> maintenance in this scenario, and when? Can this block other CPUs until
+> the lock is released?
+>
+> What happens if another agent pokes the djtag (without acquiring the
+> lock) while FW is doing this? Can this result in issues on the secure
+> side?
+>
+
+I need to check on this.
+
+> [...]
+>
+>>> Can you explain how the locking scheme works? e.g. is this an
+>>> advisory software-only policy, or does the hardware prohibit accesses
+>> >from other agents somehow?
 >>
->> c as in USB Type C? I'd prefer to see a new compatible string. Is type
->> even documented?
+>> The locking scheme is a software solution to spinlock. It's uses
+>> djtag module select register as the spinlock flag, to avoid using
+>> some shared memory.
+>>
+>> The tricky part is that there is no test-and-set hardware support,
+>> so we use this algorithm:
+>> - precondition: flag initially set unlocked
+>>
+>> a. agent reads flag
+>>     - if not unlocked, continues to poll
+>>     - otherwise, writes agent's unique lock value to flag
+>> b. agent waits defined amount of time *uninterrupted* and then
+>> checks the flag
+>>     - if it is unchanged, it has the lock -> continue
+>>     - if it is changed, it means other agent is trying to access the
+>> lock and got it, so it goes back to a.
+>> c. has lock, so safe to access djtag
+>> d. to unlock, release by writing "unlock" value to flag
+>
+> This does not sound safe to me. There's always the potential for a race,
+> no matter how long an agent waits.
+>
+>>> What happens if the kernel takes the lock, but doesn't release it?
+>>
+>> This should not happen. We use spinlock_irqsave() when locking.
+>> However I have noted that we can BUG if djtag access timeout, so we
+>> need to release the lock at this point. I don't think the code
+>> handles this properly now.
+>
+> I was worried aobut BUG() and friends, and also preempt kernels.
+>
+> It doesn't sound like it's possible to make this robust.
+>
+>>> What happens if UEFI takes the lock, but doesn't release it?
+>>
+>> Again, we would not expect this to happen; but, if it does, Kernel
+>> access should timeout.
+>
+> ... which they do not, in this patch series, as far as I can tell.
+>
 
-Indeed it is:
+I noticed this also.
 
-http://elixir.free-electrons.com/linux/latest/source/Documentation/devicetree/bindings/display/connector/hdmi-connector.txt#L6
+> This doesn't sound safe at all. :/
 
-> Probably as in HDMI Type C (there are Type A, C, and D connectors, aka
-> "regular", "mini", and "micro").
+Right, we need to consider if this will fly at all.
 
-Correct.
+At this point, we would rather concentrate on our new chipset, which is 
+based on same perf HW architecture (so much code reuse), but uses 
+directly mapped registers and *no djtag* - in this, most of the upstream 
+effort from all parties is not wasted.
 
-ChenYu
+Please advise.
+
+Much appreciated,
+John
+
+>
+> Thanks,
+> Mark.
+>
+> .
+>
