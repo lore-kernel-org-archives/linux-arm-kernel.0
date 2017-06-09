@@ -1,40 +1,50 @@
 From: kristina.martsenko@arm.com (Kristina Martsenko)
-Date: Fri,  9 Jun 2017 16:35:53 +0100
-Subject: [PATCH v2 2/3] arm64: mm: don't print out page table entries on EL0
- faults
+Date: Fri,  9 Jun 2017 16:35:54 +0100
+Subject: [PATCH v2 3/3] arm64: mm: print file name of faulting vma
 In-Reply-To: <1497022554-1451-1-git-send-email-kristina.martsenko@arm.com>
 References: <1497022554-1451-1-git-send-email-kristina.martsenko@arm.com>
-Message-ID: <1497022554-1451-2-git-send-email-kristina.martsenko@arm.com>
+Message-ID: <1497022554-1451-3-git-send-email-kristina.martsenko@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we take a fault from EL0 that can't be handled, we print out the
-page table entries associated with the faulting address. This allows
-userspace to print out any current page table entries, including kernel
-(TTBR1) entries. Exposing kernel mappings like this could pose a
-security risk, so don't print out page table information on EL0 faults.
-(But still print it out for EL1 faults.) This also follows the same
-behaviour as x86, printing out page table entries on kernel mode faults
-but not user mode faults.
+Print out the name of the file associated with the vma that faulted.
+This is usually the executable or shared library name. We already print
+out the task name, but also printing the library name is useful for
+pinpointing bugs to libraries.
+
+Also print the base address and size of the vma, which together with the
+PC (printed by __show_regs) gives the offset into the library.
+
+Fault prints now look like:
+test[2361]: unhandled level 2 translation fault (11) at 0x00000012, esr 0x92000006, in libfoo.so[ffffa0145000+1000]
+
+This is already done on x86, for more details see commit 03252919b798
+("x86: print which shared library/executable faulted in segfault etc.
+messages v3").
 
 Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
 ---
 
 v2:
- - mention x86 in commit message
+ - add this patch
 
- arch/arm64/mm/fault.c | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm64/mm/fault.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index a9dfb37c87a2..b070dcd50ed0 100644
+index b070dcd50ed0..6a2a5dd7cf36 100644
 --- a/arch/arm64/mm/fault.c
 +++ b/arch/arm64/mm/fault.c
-@@ -259,7 +259,6 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
- 		pr_info("%s[%d]: unhandled %s (%d) at 0x%08lx, esr 0x%03x\n",
+@@ -256,9 +256,11 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
+ 
+ 	if (unhandled_signal(tsk, sig) && show_unhandled_signals_ratelimited()) {
+ 		inf = esr_to_fault_info(esr);
+-		pr_info("%s[%d]: unhandled %s (%d) at 0x%08lx, esr 0x%03x\n",
++		pr_info("%s[%d]: unhandled %s (%d) at 0x%08lx, esr 0x%03x",
  			tsk->comm, task_pid_nr(tsk), inf->name, sig,
  			addr, esr);
--		show_pte(addr);
++		print_vma_addr(KERN_CONT ", in ", regs->pc);
++		pr_cont("\n");
  		__show_regs(regs);
  	}
  
