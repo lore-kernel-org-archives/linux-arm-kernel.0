@@ -1,91 +1,134 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 9 Jun 2017 15:29:54 +0800
-Subject: [PATCH v11 02/12] sun4i-codec: Add Differential Line Capture
- Switch and its routes
-In-Reply-To: <20170609062216.26807-3-dannym@scratchpost.org>
-References: <20170609062216.26807-1-dannym@scratchpost.org>
- <20170609062216.26807-3-dannym@scratchpost.org>
-Message-ID: <CAGb2v67hDBmUYzTyHppWsymVbgaBJO+prjr9X7UgTpdYV-HSuQ@mail.gmail.com>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Fri,  9 Jun 2017 17:00:37 +0930
+Subject: [PATCH] arm: aspeed: Add Aspeed board file with clocksource
+ devicetree fixup
+In-Reply-To: <CAK8P3a0EaqwmAMRWn--29e4Kt6zJA9kHL2dpj=7Uabn5hANxOA@mail.gmail.com>
+References: <CAK8P3a0EaqwmAMRWn--29e4Kt6zJA9kHL2dpj=7Uabn5hANxOA@mail.gmail.com>
+Message-ID: <20170609073037.21871-1-andrew@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 9, 2017 at 2:22 PM, Danny Milosavljevic
-<dannym@scratchpost.org> wrote:
-> Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
-> ---
->  sound/soc/sunxi/sun4i-codec.c | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
->
-> diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-> index 2f65aa72..a2435c6e 100644
-> --- a/sound/soc/sunxi/sun4i-codec.c
-> +++ b/sound/soc/sunxi/sun4i-codec.c
-> @@ -96,6 +96,7 @@
->  #define SUN4I_CODEC_ADC_ACTL_VMICEN                    (27)
->  #define SUN4I_CODEC_ADC_ACTL_VADCG                     (20)
->  #define SUN4I_CODEC_ADC_ACTL_ADCIS                     (17)
-> +#define SUN4I_CODEC_ADC_ACTL_LNRDF                     (16)
->  #define SUN4I_CODEC_ADC_ACTL_PA_EN                     (4)
->  #define SUN4I_CODEC_ADC_ACTL_DDE                       (3)
->  #define SUN4I_CODEC_ADC_DEBUG                  (0x2c)
-> @@ -644,6 +645,20 @@ static const struct snd_kcontrol_new sun4i_codec_pa_mute =
->
->  static DECLARE_TLV_DB_SCALE(sun4i_codec_pa_volume_scale, -6300, 100, 1);
->
-> +static const char * const sun4i_codec_difflinein_capture_source[] = {
-> +       "Stereo",
-> +       "Differential",
-> +};
-> +
-> +static SOC_ENUM_SINGLE_DECL(sun4i_codec_enum_difflinein_capture_source,
-> +                           SUN4I_CODEC_ADC_ACTL,
-> +                           SUN4I_CODEC_ADC_ACTL_LNRDF,
-> +                           sun4i_codec_difflinein_capture_source);
-> +
-> +static const struct snd_kcontrol_new sun4i_codec_difflinein_capture_source_controls =
-> +       SOC_DAPM_ENUM("Differential Line Capture Switch",
+Add the clock-names property in init_timer() to work-around Aspeed
+devicetrees from times prior to merging the Moxart/Aspeed and Faraday
+drivers.
 
-A mux control or widget should not be named "XXX Switch". Please use
-"XXX Route" or "XXX Source Route". Second, this control is not limited
-to capture. Please drop the "Capture" suffix. Just call it "Line Source"
-or "Line In Source".
+Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+---
+Well, here's an implementation I knocked up. It's a fair chunk of code for
+marginal benefit. Joel is against it.
 
-> +       sun4i_codec_enum_difflinein_capture_source);
-> +
->  static const struct snd_kcontrol_new sun4i_codec_controls[] = {
->         SOC_SINGLE_TLV("Power Amplifier Volume", SUN4I_CODEC_DAC_ACTL,
->                        SUN4I_CODEC_DAC_ACTL_PA_VOL, 0x3F, 0,
-> @@ -720,6 +735,12 @@ static const struct snd_soc_dapm_widget sun4i_codec_codec_dapm_widgets[] = {
->         SND_SOC_DAPM_SWITCH("Power Amplifier Mute", SND_SOC_NOPM, 0, 0,
->                             &sun4i_codec_pa_mute),
->
-> +       /* MUX */
-> +       SND_SOC_DAPM_MUX("Differential Line Capture Switch", SND_SOC_NOPM,
+At least it's something to debate.
 
-Same here.
+Tested under QEMU for both AST2400 and AST2500 SoCs.
 
-> +                        0,
-> +                        0,
-> +                        &sun4i_codec_difflinein_capture_source_controls),
+Cheers,
 
-There is not much benefit in putting every value on a separate line,
-except increasing line count and taking up screen real estate.
+Andrew
 
-ChenYu
+ arch/arm/Makefile             |  1 +
+ arch/arm/mach-aspeed/Makefile |  1 +
+ arch/arm/mach-aspeed/aspeed.c | 73 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 75 insertions(+)
+ create mode 100644 arch/arm/mach-aspeed/Makefile
+ create mode 100644 arch/arm/mach-aspeed/aspeed.c
 
-> +
->         /* Inputs */
->         SND_SOC_DAPM_INPUT("Mic1"),
->         SND_SOC_DAPM_INPUT("Mic2"),
-> @@ -767,6 +788,11 @@ static const struct snd_soc_dapm_route sun4i_codec_codec_dapm_routes[] = {
->         { "Right ADC", NULL, "MIC1 Pre-Amplifier" },
->         { "MIC1 Pre-Amplifier", NULL, "Mic1"},
->         { "Mic1", NULL, "VMIC" },
-> +
-> +       /* LNRDF Routes */
-> +       { "Differential Line Capture Switch", "Differential", "Line Left" },
-> +       { "Differential Line Capture Switch", "Differential", "Line Right" },
-> +
->  };
->
->  static struct snd_soc_codec_driver sun4i_codec_codec = {
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index ab30cc634d02..f3ed359e5b28 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -154,6 +154,7 @@ textofs-$(CONFIG_ARCH_AXXIA) := 0x00308000
+ machine-$(CONFIG_ARCH_ALPINE)		+= alpine
+ machine-$(CONFIG_ARCH_ARTPEC)		+= artpec
+ machine-$(CONFIG_ARCH_AT91)		+= at91
++machine-$(CONFIG_ARCH_ASPEED)		+= aspeed
+ machine-$(CONFIG_ARCH_AXXIA)		+= axxia
+ machine-$(CONFIG_ARCH_BCM)		+= bcm
+ machine-$(CONFIG_ARCH_BERLIN)		+= berlin
+diff --git a/arch/arm/mach-aspeed/Makefile b/arch/arm/mach-aspeed/Makefile
+new file mode 100644
+index 000000000000..de8cd76fcf5d
+--- /dev/null
++++ b/arch/arm/mach-aspeed/Makefile
+@@ -0,0 +1 @@
++obj-y	 += aspeed.o
+diff --git a/arch/arm/mach-aspeed/aspeed.c b/arch/arm/mach-aspeed/aspeed.c
+new file mode 100644
+index 000000000000..feaac8eb5d2d
+--- /dev/null
++++ b/arch/arm/mach-aspeed/aspeed.c
+@@ -0,0 +1,73 @@
++/*
++ * Copyright 2017 IBM Corporation
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version
++ * 2 of the License, or (at your option) any later version.
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/clocksource.h>
++#include <linux/init.h>
++#include <linux/of.h>
++#include <linux/slab.h>
++#include <asm/mach/arch.h>
++
++const char *aspeed_timer_compatibles[] = {
++	"aspeed,ast2400-timer",
++	"aspeed,ast2500-timer",
++	NULL,
++};
++
++/*
++ * For backwards compatibility with pre-4.13 devicetrees, populate the
++ * clock-names property in the clocksource node
++ */
++static void __init aspeed_timer_set_clock_names(void)
++{
++	const char **compatible = aspeed_timer_compatibles;
++	struct device_node *np;
++
++	while (*compatible) {
++		for_each_compatible_node(np, NULL, *compatible) {
++			struct property *clock_names;
++			int rc;
++
++			rc = of_property_count_strings(np, "clock-names");
++			if (rc != -EINVAL)
++				continue;
++
++			clock_names = kzalloc(sizeof(*clock_names), GFP_KERNEL);
++
++			clock_names->name = kstrdup("clock-names", GFP_KERNEL);
++			clock_names->length = sizeof("PCLK");
++			clock_names->value = kstrdup("PCLK", GFP_KERNEL);
++
++			of_add_property(np, clock_names);
++		}
++
++		compatible++;
++	}
++}
++
++static void __init aspeed_init_time(void)
++{
++	aspeed_timer_set_clock_names();
++
++#ifdef CONFIG_COMMON_CLK
++	of_clk_init(NULL);
++#endif
++	timer_probe();
++}
++
++static const char *const aspeed_dt_match[] __initconst = {
++		"aspeed,ast2400",
++		"aspeed,ast2500",
++		NULL,
++};
++
++DT_MACHINE_START(aspeed_dt, "Aspeed SoC")
++	.init_time	= aspeed_init_time,
++	.dt_compat	= aspeed_dt_match,
++MACHINE_END
+-- 
+2.11.0
