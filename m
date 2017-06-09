@@ -1,49 +1,26 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri,  9 Jun 2017 10:21:11 -0700
-Subject: [PATCH v2 2/2] ARM: dts: da850-evm: drop VPIF endpoints
-In-Reply-To: <20170609172111.23057-1-khilman@baylibre.com>
-References: <20170609172111.23057-1-khilman@baylibre.com>
-Message-ID: <20170609172111.23057-3-khilman@baylibre.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 09 Jun 2017 19:36:22 +0200
+Subject: [Patch v4 00/12] Add MFC v10.10 support
+In-Reply-To: <1491459105-16641-1-git-send-email-smitha.t@samsung.com>
+References: <CGME20170406060957epcas1p36f883512ccfaf24359d1b31a6d199d87@epcas1p3.samsung.com>
+ <1491459105-16641-1-git-send-email-smitha.t@samsung.com>
+Message-ID: <95f6389c-4535-75c0-dcc9-6076b76777a0@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop the unused endpoints.  They should only be used when there is
-an actual remote-endpoint connected.
+On 04/06/2017 08:11 AM, Smitha T Murthy wrote:
+> This patch series adds MFC v10.10 support. MFC v10.10 is used in some
+> of Exynos7 variants.
+> 
+> This adds support for following:
+> 
+> * Add support for HEVC encoder and decoder
+> * Add support for VP9 decoder
+> * Update Documentation for control id definitions
+> * Update computation of min scratch buffer size requirement for V8 onwards
+Smitha, do you have any updates on this?  IIRC, there were few things
+which needed corrections but we were rather close to the final version.
 
-Signed-off-by: Kevin Hilman <khilman@baylibre.com>
----
- arch/arm/boot/dts/da850-evm.dts | 21 ---------------------
- 1 file changed, 21 deletions(-)
-
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index a423e8ebfb37..67e72bc72e80 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -301,25 +301,4 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&vpif_capture_pins>, <&vpif_display_pins>;
- 	status = "okay";
--
--	/* VPIF capture port */
--	port at 0 {
--		vpif_input_ch0: endpoint at 0 {
--			reg = <0>;
--			bus-width = <8>;
--		};
--
--		vpif_input_ch1: endpoint at 1 {
--			reg = <1>;
--			bus-width = <8>;
--			data-shift = <8>;
--		};
--	};
--
--	/* VPIF display port */
--	port at 1 {
--		vpif_output_ch0: endpoint {
--			bus-width = <8>;
--		};
--	};
- };
--- 
-2.9.3
+--
+Thanks,
+Sylwester
