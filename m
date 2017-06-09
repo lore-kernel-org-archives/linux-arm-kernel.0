@@ -1,81 +1,43 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 9 Jun 2017 10:46:37 -0500
-Subject: [PATCH v2 1/3] dt-bindings: arm: amlogic: Add SoC information
- bindings
-In-Reply-To: <955d2903-9057-919b-004d-b1f5985dca5c@baylibre.com>
-References: <1496742340-10307-1-git-send-email-narmstrong@baylibre.com>
- <1496742340-10307-2-git-send-email-narmstrong@baylibre.com>
- <20170609133717.gkqnyatqezkrcaeg@rob-hp-laptop>
- <955d2903-9057-919b-004d-b1f5985dca5c@baylibre.com>
-Message-ID: <CAL_JsqKGuq2sW1m+JpkYgN-aBj537aNfZn2wb_pnU+FLEa_igg@mail.gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Fri, 9 Jun 2017 18:48:30 +0300
+Subject: [PATCH 6/6] tty: serial: lpuart: add a more accurate baud rate
+ calculation method
+In-Reply-To: <AM3PR04MB30678CBD87777C6816DEFA580CE0@AM3PR04MB306.eurprd04.prod.outlook.com>
+References: <1494316248-24052-1-git-send-email-aisheng.dong@nxp.com>
+ <1494316248-24052-7-git-send-email-aisheng.dong@nxp.com>
+ <CAHp75Vemc5qoD7gbc_sJBSasYTFYSYOuWZv4N-4X60arWX8aJg@mail.gmail.com>
+ <AM3PR04MB3062F7BCE82860C377C214E80F10@AM3PR04MB306.eurprd04.prod.outlook.com>
+ <CAHp75VcH0j3ddaZ3iStNO4QcAwJKZ7BAMwUTthum2no1ucs2ww@mail.gmail.com>
+ <AM3PR04MB306214514B820D66535E28B80CE0@AM3PR04MB306.eurprd04.prod.outlook.com>
+ <CAHp75VcSToSfbUZ2TP0OsLRjV4TNpq7D_=4tnB_+rDvS2jp22Q@mail.gmail.com>
+ <AM3PR04MB30678CBD87777C6816DEFA580CE0@AM3PR04MB306.eurprd04.prod.outlook.com>
+Message-ID: <CAHp75VdgLoavZrf+T1-cyPj2A30mGeyDEgye3qZoWXJE6inE_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 9, 2017 at 8:58 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
-> On 06/09/2017 03:37 PM, Rob Herring wrote:
->> On Tue, Jun 06, 2017 at 11:45:38AM +0200, Neil Armstrong wrote:
->>> Add bindings for the SoC information register of the Amlogic SoCs.
->>>
->>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->>> ---
->>>  Documentation/devicetree/bindings/arm/amlogic.txt | 32 +++++++++++++++++++++++
->>>  1 file changed, 32 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
->>> index 5c01e65..ae3e8ed 100644
->>> --- a/Documentation/devicetree/bindings/arm/amlogic.txt
->>> +++ b/Documentation/devicetree/bindings/arm/amlogic.txt
->>> @@ -60,3 +60,35 @@ Board compatible values (alphabetically, grouped by SoC):
->>>    - "amlogic,q201" (Meson gxm s912)
->>>    - "kingnovel,r-box-pro" (Meson gxm S912)
->>>    - "nexbox,a1" (Meson gxm s912)
->>> +
->>> +Amlogic Meson Firmware registers Interface
->>> +------------------------------------------
->>> +
->>> +The Meson SoCs have a register bank with status and data shared with the
->>> +secure firmware.
->>> +
->>> +Required properties:
->>> + - compatible: For Meson GX SoCs, must be "amlogic,meson-gx-ao-secure", "syscon", "simple-mfd"
->>> +
->>> +Sub-nodes should indentify components of this register interface :
->>> +
->>> +Meson GX SoC Information
->>> +------------------------
->>> +A firmware register encodes the SoC type, package and revision information on
->>> +the Meson GX SoCs.
->>> +If present, a device node for this register should be added.
->>> +
->>> +Required properties:
->>> +  - compatible: For Meson GX SoCs, must be "amlogic,meson-gx-chipid".
->>> +
->>> +Example
->>> +-------
->>> +
->>> +ao-secure at 140 {
->>> +    compatible = "amlogic,meson-gx-ao-secure", "syscon", "simple-mfd";
->>> +    reg = <0x0 0x140 0x0 0x140>;
->>> +
->>> +    chipid {
->>> +            compatible = "amlogic,meson-gx-chipid";
+On Fri, Jun 9, 2017 at 5:20 PM, A.S. Dong <aisheng.dong@nxp.com> wrote:
+>> > How about you send a separate baud algorithm improvement patch later?
 >>
->> No registers for this block? If not, this node is pointless.
->> "amlogic,meson-gx-ao-secure" should be specific enough to determine if
->> you have this block or not and the driver for it can create a device if
->> the OS needs it.
->>
->> Rob
+>> Why not to do it right a way?
 >>
 >
-> Well OK, but since it's a firmware interface, it can be handy to list the
-> possible capabilities, not especially tied to a driver.
+> Because I thought that could be a separate patch which is doing algorithm
+> improvement, then we can have the full history and a clear comparison.
+>
+> And also we are still not sure whether it works, we don't want to block on it
+> too long.
+>
+> But if you're pretty sure about it, I would wait for some more time.
+>
+> However, personally I would still rather keep them in two separate Patches
+> for clearer history and comparison.
 
-A "has-chip-id;" property would do that.
+Since we already near to -rc5, I would rather agree with you.
+So, please proceed with your approach and we can modify it in relaxing
+mode later on.
 
-It would be better to just be very explicit about what version of
-firmware you have and that can imply anything and everything you need
-to know about the firmware without needing to up date the dtb every
-time you need to provide a new (to Linux) firmware capability.
+Thanks, and sorry for the delay!
 
-Rob
+-- 
+With Best Regards,
+Andy Shevchenko
