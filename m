@@ -1,20 +1,26 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 10 Jun 2017 00:22:40 +0800
-Subject: [PATCH v2 3/3] pwm: sun4i: drop legacy callbacks
-In-Reply-To: <20170530193209.19247-4-alexandre.belloni@free-electrons.com>
-References: <20170530193209.19247-1-alexandre.belloni@free-electrons.com>
- <20170530193209.19247-4-alexandre.belloni@free-electrons.com>
-Message-ID: <CAGb2v64sL=uJtLmtEeGcbAMrgsEmKDsca0f2+HfDS18jZeMjqQ@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 9 Jun 2017 09:25:02 -0700
+Subject: [PATCH v9 0/3] Support for USB DRD PHY driver for NS2
+In-Reply-To: <22badb49-2961-e552-1b99-b7d7d4809b92@ti.com>
+References: <1497008582-17974-1-git-send-email-raviteja.garimella@broadcom.com>
+ <22badb49-2961-e552-1b99-b7d7d4809b92@ti.com>
+Message-ID: <d6d64d4c-0eb0-2b60-9033-372a31020f0b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 31, 2017 at 3:32 AM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> Remove the legacy callbacks .enable(), .disable(), .set_polarity() and
-> .config().
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On 06/09/2017 05:03 AM, 'Kishon Vijay Abraham I' via
+BCM-KERNEL-FEEDBACK-LIST,PDL wrote:
+> Hi,
+> 
+> On Friday 09 June 2017 05:12 PM, Raviteja Garimella wrote:
+>> Changes in V9: 
+>> =============
+>> Rebased on linux-phy next. Driver files and Kconfig/Makefile
+>> changes now in drivers/phy/broadcom.
+> 
+> merged the _phy_ patches to linux-phy. Thanks for doing multiple revisions to
+> get it merged.
 
-FWIW,
-
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Thanks Kishon, patch 3 is applied in my tree, so we are now all set.
+-- 
+Florian
