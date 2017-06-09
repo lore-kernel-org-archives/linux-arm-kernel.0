@@ -1,53 +1,75 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Fri, 9 Jun 2017 13:15:18 -0700
-Subject: [PATCH] ARM64: Kconfig: Fix the missing hi655x common clk
-In-Reply-To: <CAK8P3a1PsFcqLC95rSQf6EdkqhQ6sE3OXC9gDQ8TLp2mTVO3pw@mail.gmail.com>
-References: <CALAqxLVn9r9R-wnrZbrFqYfwqZD-tegbJrZLsUeBjjBc4_Q89w@mail.gmail.com>
- <1496686434-13181-1-git-send-email-daniel.lezcano@linaro.org>
- <CAPDyKFqWptneK2V7wCR8LGbgU7=U9kBCKkHrtgGmZKmNQJ4s7g@mail.gmail.com>
- <20170609154652.GG2244@mai>
- <CAK8P3a1PsFcqLC95rSQf6EdkqhQ6sE3OXC9gDQ8TLp2mTVO3pw@mail.gmail.com>
-Message-ID: <CALAqxLXtLc16zT9AFaHXbbQp-Vf3GNOJ1nb7PoUJgj22rh=X-w@mail.gmail.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Fri, 9 Jun 2017 23:22:36 +0300
+Subject: [PATCH v2 1/3] arm64: mm: print out correct page table entries
+In-Reply-To: <1497022554-1451-1-git-send-email-kristina.martsenko@arm.com>
+References: <1497022554-1451-1-git-send-email-kristina.martsenko@arm.com>
+Message-ID: <20170609202236.t75jejhvhksqmkw3@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 9, 2017 at 1:06 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Fri, Jun 9, 2017 at 5:46 PM, Daniel Lezcano
-> <daniel.lezcano@linaro.org> wrote:
->> On Tue, Jun 06, 2017 at 04:17:40PM +0200, Ulf Hansson wrote:
->>> On 5 June 2017 at 20:13, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
->>> > With the addition of the hi655x common clock, the config option is missing
->>> > for the ARM64's hi6220 platform. That leads to a non functionnal WiFi because
->>> > the hi655x clock driver misses when initializing the power sequence via DT.
->>> >
->>> > Cc: John Stultz <john.stultz@linaro.org>
->>> > Cc: Ulf Hansson <ulf.hansson@linaro.org>
->>> > Cc: Wei Xu <xuwei5@hisilicon.com>
->>> > Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->>>
->>> Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
->>>
->>> Would be nice to get this trivial fix in for 4.12 rcs to make the WiFi
->>> work for Hikey.
->>>
->>
->> I'm wondering if I submitted this patch for the right path.
->>
->> Shall it go through arm-soc ?
->
-> Yes, but I'm not sure this is the right patch either. We tend to not
-> use 'select' for user-visible drivers, and most hisilicon platforms
-> won't need this driver.
->
-> I think it would be more consistent to add this to the defconfig
-> and regard it as a user error when the driver is disabled on a
-> machine that needs it.
+Hi, Kristina,
 
-Maybe the select is not exactly in the right place, but I don't really
-feel like a pmic on an SoC is a "user-visible driver". I deal with the
-board often and when the new dependency was made on the clk, I would
-have never have found it on my own w/o Ulf and Daniel pointing out
-what I needed to enable.
+On Fri, Jun 09, 2017 at 04:35:52PM +0100, Kristina Martsenko wrote:
+> When we take a fault that can't be handled, we print out the page table
+> entries associated with the faulting address. In some cases we currently
+> print out the wrong entries. For a faulting TTBR1 address, we sometimes
+> print out TTBR0 table entries instead, and for a faulting TTBR0 address
+> we sometimes print out TTBR1 table entries. Fix this by choosing the
+> tables based on the faulting address.
+> 
+> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
+> ---
+> 
+> v2:
+>  - use TASK_SIZE and VA_START, change printed message
+> 
+>  arch/arm64/include/asm/system_misc.h |  2 +-
+>  arch/arm64/mm/fault.c                | 29 +++++++++++++++++++----------
+>  2 files changed, 20 insertions(+), 11 deletions(-)
 
-thanks
--john
+[...]
+
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index c3f2b1048f83..a9dfb37c87a2 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -80,14 +80,24 @@ static inline int notify_page_fault(struct pt_regs *regs, unsigned int esr)
+>  #endif
+>  
+>  /*
+> - * Dump out the page tables associated with 'addr' in mm 'mm'.
+> + * Dump out the page tables associated with 'addr' in the currently active mm.
+>   */
+> -void show_pte(struct mm_struct *mm, unsigned long addr)
+> +void show_pte(unsigned long addr)
+>  {
+> +	struct mm_struct *mm;
+>  	pgd_t *pgd;
+>  
+> -	if (!mm)
+> +	if (addr < TASK_SIZE) {
+> +		/* TTBR0 */
+> +		mm = current->active_mm;
+> +	} else if (addr >= VA_START) {
+> +		/* TTBR1 */
+>  		mm = &init_mm;
+> +	} else {
+> +		pr_alert("[%08lx] address between user and kernel address ranges\n",
+> +			 addr);
+> +		return;
+> +	}
+>  
+>  	pr_alert("pgd = %p\n", mm->pgd);
+>  	pgd = pgd_offset(mm, addr);
+
+Is there any reason to change the prototype of the function?
+You say nothing about it in patch description. The show_pte()
+is implemented in several arches, and everywhere it takes mm_struct
+as 1st argument. For me, if you don't need to change the prototype,
+you'd better leave things as is. The patch will get much shorter
+and expressive with it.
+
+If you really need to change the prototype, it would be better to do
+it in separated patch and give clear explanations - what for?
+
+Yury
