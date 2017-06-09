@@ -1,55 +1,44 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 9 Jun 2017 15:05:52 -0700
-Subject: Drivers taking different actions depending on sleep state
-In-Reply-To: <9dc7b7f4-e47d-59f3-3b51-52e0aefd2487@free.fr>
-References: <9dc7b7f4-e47d-59f3-3b51-52e0aefd2487@free.fr>
-Message-ID: <9d929be0-67af-22f9-6412-424e258ac9d4@gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 10 Jun 2017 00:16:11 +0200
+Subject: [[PATCH]] drivers: leds/trigger: system cannot enter suspend
+In-Reply-To: <81f270ba-6f3c-7759-789b-181203efb7b7@ti.com>
+References: <1496716596-45414-1-git-send-email-bo.zhang@nxp.com>
+ <20170606192554.GA32171@amd>
+ <1a14165d-2976-50df-18d6-74e5fdec2913@gmail.com>
+ <8afffd09-cb1f-d080-ef4a-ecaa089ad470@ti.com>
+ <20170606203813.GD32171@amd>
+ <AM3PR04MB4044D34CA2E85B0CE70ED778AC80@AM3PR04MB404.eurprd04.prod.outlook.com>
+ <81f270ba-6f3c-7759-789b-181203efb7b7@ti.com>
+Message-ID: <20170609221611.GD28596@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/09/2017 08:20 AM, Mason wrote:
-> Hello,
+On Wed 2017-06-07 10:38:47, Grygorii Strashko wrote:
 > 
-> I read the "Sleep States" documentation:
-> https://www.kernel.org/doc/Documentation/power/states.txt
 > 
-> It mentions /sys/power/mem_sleep but I don't have that in 4.9
-> # ll /sys/power/
-> -rw-r--r--    1 root     root          4096 Jan  1 00:31 pm_async
-> -rw-r--r--    1 root     root          4096 Jan  1 00:31 pm_freeze_timeout
-> -rw-r--r--    1 root     root          4096 Jan  1 00:31 state
-> -rw-r--r--    1 root     root          4096 Jan  1 00:31 wakeup_count
+> On 06/06/2017 11:24 PM, Bruce Zhang wrote:
+> > Hi Pavel,
+> > 
+> > It can also fix my issue by reverting  the commit 5ab92a7cb. But this action only does not make led_set_brightness_nosleep function to set brightness. The heartbeat trigger timer is still running even though it is not harmful.
 > 
-> # cat /sys/power/state 
-> freeze mem
-> 
-> Currently my platform's "mem" is a true suspend-to-RAM trigger,
-> where drivers are supposed to save their state (register values
-> will be lost), then Linux hands control over to firmware which
-> enables RAM self-refresh and powers the chip down. When the system
-> resumes, drivers restore their state from their copy in memory.
-> 
-> One driver is responsible for loading/unloading microcode running
-> on the DSPs. This operation is required only when powering down
-> the chip, but it should be avoided for "low-latency" sleeps.
+> Unfortunately, this is sort of design issue of leds triggers framework as it
+> doesn't have Suspend related interfaces, so triggers continue running 
+> even if led, by it self, is suspended from led_classdev_suspend().
+> For example, heartbeat trigger timer can be source of spurious wake-ups 
+> in some cases.
 
-Yes, makes sense, the STB SoCs I work with have similar requirements,
-and we could benefit from being able to skip/bypass re-initialization
-while entering/leaving S2 for instance.
+Yes, trigger keeps running. It should not be a problem... right?
 
-> 
-> The problem is that, if I understand correctly, drivers have no way
-> of knowing which sleep state is being entered/exited?
-> 
-> How can I have the microcode driver take different decisions
-> based on the sleep state?
+									Pavel
+							
 
-Ideally, pm_message_t could have reflected the system suspend/resume
-state you are entering/leaving, but that does not appear to be the case
-(unlike say, PCI).
-
-I am not sure why that's not the case, but since most platform drivers
-use the "SIMPLE_DEV_PM_OPS" if we were to actually make pm_message_t
-reflect the system sleep state (PM_SUSPEND_STANDBY, PM_SUSPEND_MEM etc.)
 -- 
-Florian
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170610/bcd6e3f4/attachment.sig>
