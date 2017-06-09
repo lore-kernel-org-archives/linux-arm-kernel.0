@@ -1,73 +1,71 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 9 Jun 2017 10:06:17 +0300
-Subject: [PATCH 14/20] arm64: ilp32: add sys_ilp32.c and a separate table
- (in entry.S) to use it
-In-Reply-To: <593967C0.4030904@arm.com>
-References: <20170604120009.342-1-ynorov@caviumnetworks.com>
- <20170604120009.342-15-ynorov@caviumnetworks.com>
- <593967C0.4030904@arm.com>
-Message-ID: <20170609070617.74bimhscmzeykx6d@yury-thinkpad>
+From: eugen.hristev@microchip.com (Eugen Hristev)
+Date: Fri, 9 Jun 2017 10:07:15 +0300
+Subject: [PATCH v4 0/4] iio: adc: sama5d2_adc hw triggers and buffers
+Message-ID: <1496992039-17964-1-git-send-email-eugen.hristev@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 08, 2017 at 04:05:36PM +0100, James Morse wrote:
-> Hi Yury,
-> 
-> On 04/06/17 13:00, Yury Norov wrote:
-> > From: Andrew Pinski <apinski@cavium.com>
-> > 
-> > Add a separate syscall-table for ILP32, which dispatches either to native
-> > LP64 system call implementation or to compat-syscalls, as appropriate.
-> 
-> (I'm still reading through this series trying to understand it, but spotted this: )
-> 
-> > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> > index 279bc2ab10c3..7d52fe1ec6bd 100644
-> > --- a/arch/arm64/kernel/entry.S
-> > +++ b/arch/arm64/kernel/entry.S
-> > @@ -577,6 +594,7 @@ el0_svc_compat:
-> >  	 * AArch32 syscall handling
-> >  	 */
-> >  	adrp	stbl, compat_sys_call_table	// load compat syscall table pointer
-> > +	ldr     x16, [tsk, #TSK_TI_FLAGS]
-> >  	uxtw	scno, w7			// syscall number in w7 (r7)
-> >  	mov     sc_nr, #__NR_compat_syscalls
-> >  	b	el0_svc_naked
-> > @@ -798,15 +816,21 @@ ENDPROC(ret_from_fork)
-> >  	.align	6
-> >  el0_svc:
-> >  	adrp	stbl, sys_call_table		// load syscall table pointer
-> > +	ldr	x16, [tsk, #TSK_TI_FLAGS]
-> >  	uxtw	scno, w8			// syscall number in w8
-> >  	mov	sc_nr, #__NR_syscalls
-> > +#ifdef CONFIG_ARM64_ILP32
-> > +	tst	x16, #_TIF_32BIT_AARCH64
-> > +	b.eq	el0_svc_naked			// We are using LP64  syscall table
-> > +	adrp	stbl, sys_call_ilp32_table	// load ilp32 syscall table pointer
-> > +	delouse_input_regs
-> > +#endif
-> >  el0_svc_naked:					// compat entry point
-> >  	stp	x0, scno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
-> >  	enable_dbg_and_irq
-> >  	ct_user_exit 1
-> >  
-> 
-> > -	ldr	x16, [tsk, #TSK_TI_FLAGS]	// check for syscall hooks
-> 
-> If built with CONFIG_CONTEXT_TRACKING, ct_user_exit will call
-> context_tracking_user_exit(), this will clobber x16 which you depend on not
-> changing below:
-> 
-> 
-> > -	tst	x16, #_TIF_SYSCALL_WORK
-> > +	tst	x16, #_TIF_SYSCALL_WORK		// check for syscall hooks
-> 
-> >  	b.ne	__sys_trace
-> >  	cmp     scno, sc_nr                     // check upper syscall limit
-> >  	b.hs	ni_sys
+This patch implements the hardware triggers support and buffer management
+for sama5d2.
+The DT modifications ( [PATCH v4 1/4] ARM: dts: at91: sama5d2_xplained:
+enable ADTRG pin) are for demonstration purposes of the feature,
+setting the pinctrl for the ADC hw trigger pin,should go through
+at91 maintainers.
+As discussed on the mailing list, since we have a single external trigger
+namely the ADTRG, but three different possible edges that can trigger it,
+will have a single trigger in the IIO subsystem and three possible edges
+which can be selected from the device tree.
+Thus I created new bindings in the device tree for having the possible
+edge types for the ADTRG pin.
+The documentation for the bindings is in the patch
+[PATCH v4 2/4] Documentation: dt: iio: at91-sama5d2_adc: add adtrg
+ trigger binding
+The modifications in the DT are in the patch
+[PATCH v4 3/4] ARM: dts: at91: sama5d2: add ADC hw trigger
+The new property must be set with the values from interrupt edge types, as this
+pin is effectively an internal interrupt.
 
-Hi James,
+  Changes in v4:
+ - Modified bindings to be similar with interrupts
+ - Used iio claim direct to make sure buffer is not enabled when someone might
+   try to use a software triggered conversion
 
-Thanks for the catch. I'll use x19 insteas - it's callee-saved.
+  Changes in v3:
+ - No longer have all three possible triggers registered in the subsystem and
+   available in the sysfs. Only registering one trigger, and the possible edge
+   is being read from the device tree. In the device tree, any possible edge
+   can be set. There are three already made nodes for each possible edge which
+   can be selected.
+ - Fixed a bug where software triggered conversion could be started even if
+   the hardware trigger was enabled.
+ - Preallocate enough space for the buffer, considering all the channels
+   and timestamp
 
-Yury
+
+
+  Changes in v2:
+ - Moved buffer allocation and freeing into the preenable and postdisable
+   callbacks.
+   We have a total of scan bytes that can vary a lot depending on each channel
+   enabled at a certain point.
+ - made the at91 trigger list part of state structure
+ - made the iio trigger list preallocated in state structure
+ - moved irq enabling/disabling into the try_reenable callback
+ - on trigger disable must write disable registries as well
+ - Modified trigger name length to 64
+
+
+Eugen Hristev (4):
+  ARM: dts: at91: sama5d2_xplained: enable ADTRG pin
+  Documentation: dt: iio: at91-sama5d2_adc: add hw trigger edge binding
+  ARM: dts: at91: sama5d2: add ADC hw trigger edge type
+  iio: adc: at91-sama5d2_adc: add hw trigger and buffer support
+
+ .../bindings/iio/adc/at91-sama5d2_adc.txt          |   6 +
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts        |  16 +-
+ arch/arm/boot/dts/sama5d2.dtsi                     |   1 +
+ drivers/iio/adc/at91-sama5d2_adc.c                 | 236 ++++++++++++++++++++-
+ 4 files changed, 253 insertions(+), 6 deletions(-)
+
+-- 
+2.7.4
