@@ -1,31 +1,26 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri,  9 Jun 2017 18:42:49 +0200
-Subject: [GIT PULL 1/4] ARM: exynos: Soc for v4.13
-In-Reply-To: <20170609164249.1656-1-krzk@kernel.org>
-References: <20170609164249.1656-1-krzk@kernel.org>
-Message-ID: <20170609164249.1656-5-krzk@kernel.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 9 Jun 2017 17:45:53 +0100
+Subject: [PATCH v8 6/9] drivers: perf: hisi: Add support for Hisilicon
+ Djtag driver
+In-Reply-To: <e120463d-2936-90ec-8aad-f0f7be558054@huawei.com>
+References: <1495457312-237127-1-git-send-email-zhangshaokun@hisilicon.com>
+ <20170608163519.GA19643@leverpostej>
+ <8666a0fa-126d-e4a3-ac4b-7962f5d79942@huawei.com>
+ <20170609154425.GH10665@leverpostej>
+ <e120463d-2936-90ec-8aad-f0f7be558054@huawei.com>
+Message-ID: <20170609164553.GB3043@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+On Fri, Jun 09, 2017 at 05:09:25PM +0100, John Garry wrote:
+> At this point, we would rather concentrate on our new chipset, which
+> is based on same perf HW architecture (so much code reuse), but uses
+> directly mapped registers and *no djtag* - in this, most of the
+> upstream effort from all parties is not wasted.
 
-  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+FWIW, I suspect the MMIO-based PMU is going to have a smoother path
+upstream, assuming it's not shared with other agents (and we don't have
+another locking scheme to contend with).
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc-4.13
-
-for you to fetch changes up to 44fc41f92694241917a1590eb03081a68a38f480:
-
-  ARM: s3c64xx: Do not select ARM_AMBA from S3C64XX_PL080 (2017-05-31 20:33:23 +0200)
-
-----------------------------------------------------------------
-Samsung mach/soc update for v4.13:
-1. Fix possible circular Kconfig dependency on S3C64xx.
-
-----------------------------------------------------------------
-Arnd Bergmann (1):
-      ARM: s3c64xx: Do not select ARM_AMBA from S3C64XX_PL080
-
- arch/arm/mach-s3c64xx/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
+Thanks,
+Mark.
