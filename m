@@ -1,96 +1,54 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Fri, 9 Jun 2017 17:34:19 +0200
-Subject: [PATCH v3 27/27] KVM: arm64: Log an error if trapping a
- write-to-read-only GICv3 access
-In-Reply-To: <20170609114956.25963-28-marc.zyngier@arm.com>
-References: <20170609114956.25963-1-marc.zyngier@arm.com>
- <20170609114956.25963-28-marc.zyngier@arm.com>
-Message-ID: <20170609153419.GI11099@cbox>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Fri, 9 Jun 2017 18:34:44 +0300
+Subject: [PATCH 2/2] ARM: dts: imx6ul: Add imx6ul-tempmon
+In-Reply-To: <20170609154638.3b64e6d0@karo-electronics.de>
+References: <7055ce6095c0b7f026ac6f0dc37e43fc5c0b1793.1496939031.git.leonard.crestez@nxp.com>
+ <b9b91617985607f24c4986bcad5199483805d6b7.1496939031.git.leonard.crestez@nxp.com>
+ <CAOMZO5BP4fPyzDmSg+DFLRYh3QMf-8T0gqvnZn6mEMt-QqSgfw@mail.gmail.com>
+ <1497005895.28352.88.camel@nxp.com>
+ <20170609154638.3b64e6d0@karo-electronics.de>
+Message-ID: <1497022484.28352.105.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 09, 2017 at 12:49:56PM +0100, Marc Zyngier wrote:
-> A write-to-read-only GICv3 access should UNDEF at EL1. But since
-> we're in complete paranoia-land with broken CPUs, let's assume the
-> worse and gracefully handle the case.
+On Fri, 2017-06-09 at 15:46 +0200, Lothar Wa?mann wrote:
+> On Fri, 9 Jun 2017 13:58:15 +0300 Leonard Crestez wrote:
+> > On Thu, 2017-06-08 at 13:45 -0300, Fabio Estevam wrote:
+> > > On Thu, Jun 8, 2017 at 1:26 PM, Leonard Crestez??wrote:
+> > > > +???????????????????????tempmon: tempmon {
+> > > > +???????????????????????????????compatible = "fsl,imx6ul-tempmon", "fsl,imx6sx-tempmon";
+> > > > +???????????????????????????????interrupts = ;
+> > > > +???????????????????????????????fsl,tempmon = <&anatop>;
+> > > > +???????????????????????????????fsl,tempmon-data = <&ocotp>;
+> > > > +???????????????????????????????clocks = <&clks IMX6UL_CLK_PLL3_USB_OTG>;
+> > > Does the IMX6UL_CLK_PLL3_USB_OTG clock really control tempmon? Please
+> > > double check.
+> > Yes, as far as I can tell the tempmon block uses the 480 Mhz PLL3 clock
+> > directly. This is similar to other imx6 SOCs. This PLL is used for
+> > stuff like USB but not only that. My understanding is the _USB_OTG
+> > suffix is descriptive, similar to PLL4_AUDIO and PLL6_ENET. Other non-
+> > usb components use PLL3 (like UART) but through other gates/dividers.
+> > 
+> > Setting this to?IMX6UL_CLK_DUMMY will cause temperature reads to fail.
+> > Even if PLL3 usually ends up being constantly enabled because of uarts
+> > this is not true at imx_thermal_probe time (or uarts can be disabled).
+> > 
+> Since the driver is accessing the OCOTP registers it definitely needs
+> the IMX6UL_CLK_OCOTP too!
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+I don't think so. OCOTP reads fuse values into shadows registers on
+chip reset and values seem to be available even if it's specific OCOTP
+clock is off. I think that clock is only required for writes or?shadow
+updates.
 
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
+In theory perhaps tempmon could be made to read ocotp through the imx-
+ocotp nvmem driver? It is not clear in what scenario this would
+actually be required.
 
-> ---
->  arch/arm64/kvm/sys_regs.c     | 15 +++++++++++++++
->  virt/kvm/arm/hyp/vgic-v3-sr.c |  6 ++++++
->  2 files changed, 21 insertions(+)
-> 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 8d51c075966d..77862881ae86 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -65,6 +65,16 @@ static bool read_from_write_only(struct kvm_vcpu *vcpu,
->  	return false;
->  }
->  
-> +static bool write_to_read_only(struct kvm_vcpu *vcpu,
-> +			       struct sys_reg_params *params,
-> +			       const struct sys_reg_desc *r)
-> +{
-> +	WARN_ONCE(1, "Unexpected sys_reg write to read-only register\n");
-> +	print_sys_reg_instr(params);
-> +	kvm_inject_undefined(vcpu);
-> +	return false;
-> +}
-> +
->  /* 3 bits per cache level, as per CLIDR, but non-existent caches always 0 */
->  static u32 cache_levels;
->  
-> @@ -954,10 +964,15 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->  
->  	{ SYS_DESC(SYS_VBAR_EL1), NULL, reset_val, VBAR_EL1, 0 },
->  
-> +	{ SYS_DESC(SYS_ICC_IAR0_EL1), write_to_read_only },
->  	{ SYS_DESC(SYS_ICC_EOIR0_EL1), read_from_write_only },
-> +	{ SYS_DESC(SYS_ICC_HPPIR0_EL1), write_to_read_only },
->  	{ SYS_DESC(SYS_ICC_DIR_EL1), read_from_write_only },
-> +	{ SYS_DESC(SYS_ICC_RPR_EL1), write_to_read_only },
->  	{ SYS_DESC(SYS_ICC_SGI1R_EL1), access_gic_sgi },
-> +	{ SYS_DESC(SYS_ICC_IAR1_EL1), write_to_read_only },
->  	{ SYS_DESC(SYS_ICC_EOIR1_EL1), read_from_write_only },
-> +	{ SYS_DESC(SYS_ICC_HPPIR1_EL1), write_to_read_only },
->  	{ SYS_DESC(SYS_ICC_SRE_EL1), access_gic_sre },
->  
->  	{ SYS_DESC(SYS_CONTEXTIDR_EL1), access_vm_reg, reset_val, CONTEXTIDR_EL1, 0 },
-> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> index b26ce58b012a..79e3c2d3b754 100644
-> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> @@ -976,6 +976,8 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
->  	switch (sysreg) {
->  	case SYS_ICC_IAR0_EL1:
->  	case SYS_ICC_IAR1_EL1:
-> +		if (unlikely(!is_read))
-> +			return 0;
->  		fn = __vgic_v3_read_iar;
->  		break;
->  	case SYS_ICC_EOIR0_EL1:
-> @@ -1026,6 +1028,8 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
->  		break;
->  	case SYS_ICC_HPPIR0_EL1:
->  	case SYS_ICC_HPPIR1_EL1:
-> +		if (unlikely(!is_read))
-> +			return 0;
->  		fn = __vgic_v3_read_hppir;
->  		break;
->  	case SYS_ICC_GRPEN0_EL1:
-> @@ -1046,6 +1050,8 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
->  		fn = __vgic_v3_write_dir;
->  		break;
->  	case SYS_ICC_RPR_EL1:
-> +		if (unlikely(!is_read))
-> +			return 0;
->  		fn = __vgic_v3_read_rpr;
->  		break;
->  	case SYS_ICC_CTLR_EL1:
-> -- 
-> 2.11.0
-> 
+This discussion is not specific to 6ul/6ull. There are other reads from
+ocotp which don't enable it's clock, for example
+imx6q_opp_check_speed_grading.
+
+--
+Regards,
+Leonard
