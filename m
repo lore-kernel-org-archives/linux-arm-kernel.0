@@ -1,180 +1,100 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 9 Jun 2017 09:27:44 -0500
-Subject: [PATCH v2 1/3] dt-bindings: remoteproc: Add Keystone DSP
- remoteproc binding
-In-Reply-To: <20170608002447.47580-2-s-anna@ti.com>
-References: <20170608002447.47580-1-s-anna@ti.com>
- <20170608002447.47580-2-s-anna@ti.com>
-Message-ID: <20170609142744.23mq37yoy5w2sr5o@rob-hp-laptop>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Fri, 9 Jun 2017 16:28:03 +0200
+Subject: [PATCH 3/4] drm/bridge: dw-hdmi: add better clock disable control
+In-Reply-To: <E1dFi3J-0004lo-TU@rmk-PC.armlinux.org.uk>
+References: <20170530142218.GS22219@n2100.armlinux.org.uk>
+ <E1dFi3J-0004lo-TU@rmk-PC.armlinux.org.uk>
+Message-ID: <1b08fcdb-ae38-7981-a518-b5c4aad62700@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 07, 2017 at 07:24:45PM -0500, Suman Anna wrote:
-> Add the device tree bindings document for the Texas Instrument's
-> Keystone 2 DSP remoteproc devices.
+On 30/05/17 16:23, Russell King wrote:
+> The video setup path aways sets the clock disable register to a specific
+> value, which has the effect of disabling the CEC engine.  When we add the
+> CEC driver, this becomes a problem.
 > 
-> Signed-off-by: Suman Anna <s-anna@ti.com>
-> Signed-off-by: Sam Nelson <sam.nelson@ti.com>
+> Fix this by only setting/clearing the bits that the video path needs to.
+> 
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+
+For what it is worth:
+
+Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
+
+Regards,
+
+	Hans
+
 > ---
-> v2 Changes:
->  - Modified the patch title
->  - Dropped unstable binding status
->  - Dropped the 'label' property and replaced the device node description
->    to use an alias
->  - Renamed 'kick-gpio' to 'kick-gpios'
->  - Updated the example
-> v1: https://patchwork.kernel.org/patch/9750839/
+>  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 25 +++++++++++++++----------
+>  1 file changed, 15 insertions(+), 10 deletions(-)
 > 
->  .../bindings/remoteproc/ti,keystone-rproc.txt      | 135 +++++++++++++++++++++
->  1 file changed, 135 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/remoteproc/ti,keystone-rproc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/remoteproc/ti,keystone-rproc.txt b/Documentation/devicetree/bindings/remoteproc/ti,keystone-rproc.txt
-> new file mode 100644
-> index 000000000000..162229244d14
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/remoteproc/ti,keystone-rproc.txt
-> @@ -0,0 +1,135 @@
-> +TI Keystone DSP devices
-> +=======================
-> +
-> +The TI Keystone 2 family of SoCs usually have one or more (upto 8) TI DSP Core
-> +sub-systems that are used to offload some of the processor-intensive tasks or
-> +algorithms, for achieving various system level goals.
-> +
-> +These processor sub-systems usually contain additional sub-modules like L1
-> +and/or L2 caches/SRAMs, an Interrupt Controller, an external memory controller,
-> +a dedicated local power/sleep controller etc. The DSP processor core in
-> +Keystone 2 SoCs is usually a TMS320C66x CorePac processor.
-> +
-> +DSP Device Node:
-> +================
-> +Each DSP Core sub-system is represented as a single DT node, and should also
-> +have an alias with the stem 'rproc' defined. Each node has a number of required
-> +or optional properties that enable the OS running on the host processor (ARM
-> +CorePac) to perform the device management of the remote processor and to
-> +communicate with the remote processor.
-> +
-> +Required properties:
-> +--------------------
-> +The following are the mandatory properties:
-> +
-> +- compatible:		Should be one of the following,
-> +			    "ti,k2hk-dsp" for DSPs on Keystone 2 66AK2H/K SoCs
-> +			    "ti,k2l-dsp" for DSPs on Keystone 2 66AK2L SoCs
-> +			    "ti,k2e-dsp" for DSPs on Keystone 2 66AK2E SoCs
-> +
-> +- reg:			Should contain an entry for each value in 'reg-names'.
-> +			Each entry should have the memory region's start address
-> +			and the size of the region, the representation matching
-> +			the parent node's '#address-cells' and '#size-cells' values.
-> +
-> +- reg-names:		Should contain strings with the following names, each
-> +			representing a specific internal memory region, and
-> +			should be defined in this order,
-> +			     "l2sram", "l1pram", "l1dram"
-> +
-> +- clocks: 		Should contain the device's input clock, and should be
-> +			defined as per the bindings in,
-> +			Documentation/devicetree/bindings/clock/keystone-gate.txt
-> +
-> +- ti,syscon-dev:	Should be a pair of the phandle to the Keystone Device
-> +			State Control node, and the register offset of the DSP
-> +			boot address register within that node's address space.
-> +
-> +- resets:		Should contain the phandle to the reset controller node
-> +			managing the resets for this device, and a reset
-> +			specifier. Please refer to the following reset bindings
-> +			for the reset argument specifier as per SoC,
-> +			Documentation/devicetree/bindings/reset/ti-syscon-reset.txt
-> +			    for 66AK2HK/66AK2L/66AK2E SoCs
-> +
-> +- interrupt-parent:	Should contain a phandle to the Keystone 2 IRQ controller
-> +			IP node that is used by the ARM CorePac processor to
-> +			receive interrupts from the DSP remote processors. See
-> +			Documentation/devicetree/bindings/interrupt-controller/ti,keystone-irq.txt
-> +			for details.
-> +
-> +- interrupts: 		Should contain an entry for each value in 'interrupt-names'.
-> +			Each entry should have the interrupt source number used by
-> +			the remote processor to the host processor. The values should
-> +			follow the interrupt-specifier format as dictated by the
-> +			'interrupt-parent' node. The purpose of each is as per the
-> +			description in the 'interrupt-names' property.
-> +
-> +- interrupt-names:	Should contain strings with the following names, each
-> +			representing a specific interrupt,
-> +			    "vring" - interrupt for virtio based IPC
-> +			    "exception" - interrupt for exception notification
-> +
-> +- kick-gpios: 		Should specify the gpio device needed for the virtio IPC
-> +			stack. This will be used to interrupt the remote processor.
-> +			The gpio device to be used is as per the bindings in,
-> +			Documentation/devicetree/bindings/gpio/gpio-dsp-keystone.txt
-> +
-> +Optional properties:
-> +--------------------
-> +
-> +- memory-region:	phandle to the reserved memory node to be associated
-> +			with the remoteproc device. The reserved memory node
-> +			can be a CMA memory node, and should be defined as
-> +			per the bindings in
-> +			Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
-> +
-> +
-> +Example:
-> +--------
-> +	/* 66AK2H/K DSP aliases */
-> +	aliases {
-> +		rproc0 = &dsp0;
-> +		rproc1 = &dsp1;
-> +		rproc2 = &dsp2;
-> +		rproc3 = &dsp3;
-> +		rproc4 = &dsp4;
-> +		rproc5 = &dsp5;
-> +		rproc6 = &dsp6;
-> +		rproc7 = &dsp7;
-> +	};
-> +
-> +	/* 66AK2H/K DSP memory node */
-> +	reserved-memory {
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges;
-> +
-> +		dsp_common_memory: dsp-common-memory at 81f800000 {
-> +			compatible = "shared-dma-pool";
-> +			reg = <0x00000008 0x1f800000 0x00000000 0x800000>;
-> +			reusable;
-> +		};
-> +	};
-> +
-> +	/* 66AK2H/K DSP node */
-> +	soc {
-> +		dsp0: dsp at 10800000 {
-> +			compatible = "ti,k2hk-dsp";
-> +			reg = <0x10800000 0x00100000>,
-> +			      <0x10e00000 0x00008000>,
-> +			      <0x10f00000 0x00008000>;
-> +			reg-names = "l2sram", "l1pram", "l1dram";
-> +			label = "dsp0";
-
-Need to drop this. With that,
-
-Acked-by: Rob Herring <robh@kernel.org>
-
-> +			clocks = <&clkgem0>;
-> +			ti,syscon-dev = <&devctrl 0x40>;
-> +			resets = <&pscrst 0>;
-> +			interrupt-parent = <&kirq0>;
-> +			interrupts = <0 8>;
-> +			interrupt-names = "vring", "exception";
-> +			kick-gpios = <&dspgpio0 27 0>;
-> +			memory-region = <&dsp_common_memory>;
-> +		};
-> +
-> +	};
-> +
-> -- 
-> 2.12.0
+> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> index 966422576c44..58781d4c1034 100644
+> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> @@ -166,6 +166,7 @@ struct dw_hdmi {
+>  	bool bridge_is_on;		/* indicates the bridge is on */
+>  	bool rxsense;			/* rxsense state */
+>  	u8 phy_mask;			/* desired phy int mask settings */
+> +	u8 mc_clkdis;			/* clock disable register */
+>  
+>  	spinlock_t audio_lock;
+>  	struct mutex audio_mutex;
+> @@ -1543,8 +1544,6 @@ static void hdmi_av_composer(struct dw_hdmi *hdmi,
+>  /* HDMI Initialization Step B.4 */
+>  static void dw_hdmi_enable_video_path(struct dw_hdmi *hdmi)
+>  {
+> -	u8 clkdis;
+> -
+>  	/* control period minimum duration */
+>  	hdmi_writeb(hdmi, 12, HDMI_FC_CTRLDUR);
+>  	hdmi_writeb(hdmi, 32, HDMI_FC_EXCTRLDUR);
+> @@ -1556,17 +1555,21 @@ static void dw_hdmi_enable_video_path(struct dw_hdmi *hdmi)
+>  	hdmi_writeb(hdmi, 0x21, HDMI_FC_CH2PREAM);
+>  
+>  	/* Enable pixel clock and tmds data path */
+> -	clkdis = 0x7F;
+> -	clkdis &= ~HDMI_MC_CLKDIS_PIXELCLK_DISABLE;
+> -	hdmi_writeb(hdmi, clkdis, HDMI_MC_CLKDIS);
+> +	hdmi->mc_clkdis |= HDMI_MC_CLKDIS_HDCPCLK_DISABLE |
+> +			   HDMI_MC_CLKDIS_CSCCLK_DISABLE |
+> +			   HDMI_MC_CLKDIS_AUDCLK_DISABLE |
+> +			   HDMI_MC_CLKDIS_PREPCLK_DISABLE |
+> +			   HDMI_MC_CLKDIS_TMDSCLK_DISABLE;
+> +	hdmi->mc_clkdis &= ~HDMI_MC_CLKDIS_PIXELCLK_DISABLE;
+> +	hdmi_writeb(hdmi, hdmi->mc_clkdis, HDMI_MC_CLKDIS);
+>  
+> -	clkdis &= ~HDMI_MC_CLKDIS_TMDSCLK_DISABLE;
+> -	hdmi_writeb(hdmi, clkdis, HDMI_MC_CLKDIS);
+> +	hdmi->mc_clkdis &= ~HDMI_MC_CLKDIS_TMDSCLK_DISABLE;
+> +	hdmi_writeb(hdmi, hdmi->mc_clkdis, HDMI_MC_CLKDIS);
+>  
+>  	/* Enable csc path */
+>  	if (is_color_space_conversion(hdmi)) {
+> -		clkdis &= ~HDMI_MC_CLKDIS_CSCCLK_DISABLE;
+> -		hdmi_writeb(hdmi, clkdis, HDMI_MC_CLKDIS);
+> +		hdmi->mc_clkdis &= ~HDMI_MC_CLKDIS_CSCCLK_DISABLE;
+> +		hdmi_writeb(hdmi, hdmi->mc_clkdis, HDMI_MC_CLKDIS);
+>  	}
+>  
+>  	/* Enable color space conversion if needed */
+> @@ -1580,7 +1583,8 @@ static void dw_hdmi_enable_video_path(struct dw_hdmi *hdmi)
+>  
+>  static void hdmi_enable_audio_clk(struct dw_hdmi *hdmi)
+>  {
+> -	hdmi_modb(hdmi, 0, HDMI_MC_CLKDIS_AUDCLK_DISABLE, HDMI_MC_CLKDIS);
+> +	hdmi->mc_clkdis &= ~HDMI_MC_CLKDIS_AUDCLK_DISABLE;
+> +	hdmi_writeb(hdmi, hdmi->mc_clkdis, HDMI_MC_CLKDIS);
+>  }
+>  
+>  /* Workaround to clear the overflow condition */
+> @@ -2261,6 +2265,7 @@ __dw_hdmi_probe(struct platform_device *pdev,
+>  	hdmi->disabled = true;
+>  	hdmi->rxsense = true;
+>  	hdmi->phy_mask = (u8)~(HDMI_PHY_HPD | HDMI_PHY_RX_SENSE);
+> +	hdmi->mc_clkdis = 0x7f;
+>  
+>  	mutex_init(&hdmi->mutex);
+>  	mutex_init(&hdmi->audio_mutex);
 > 
