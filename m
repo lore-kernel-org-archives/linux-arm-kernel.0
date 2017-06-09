@@ -1,70 +1,39 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri, 9 Jun 2017 16:09:22 +0200
-Subject: [PATCH v2 7/8] net: mvmdio: add xmdio support
-In-Reply-To: <20170609132624.GC20756@lunn.ch>
-References: <20170608092653.25221-1-antoine.tenart@free-electrons.com>
- <20170608092653.25221-8-antoine.tenart@free-electrons.com>
- <a60a0b26-62b1-7c9e-e846-215747dddb1f@gmail.com>
- <20170609082541.GC31464@kwain> <20170609132624.GC20756@lunn.ch>
-Message-ID: <20170609140922.GD31464@kwain>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 9 Jun 2017 15:10:56 +0100
+Subject: [PATCH 2/4] drm/bridge: dw-hdmi: add cec notifier support
+In-Reply-To: <5b2fdadd-f1fa-c454-b3fe-facf221beb78@baylibre.com>
+References: <20170530142218.GS22219@n2100.armlinux.org.uk>
+ <E1dFi3E-0004lh-Pu@rmk-PC.armlinux.org.uk>
+ <0c2c4988-37bb-fd01-efee-c6878cc53923@baylibre.com>
+ <20170609133822.GR4902@n2100.armlinux.org.uk>
+ <5b2fdadd-f1fa-c454-b3fe-facf221beb78@baylibre.com>
+Message-ID: <20170609141056.GS4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+On Fri, Jun 09, 2017 at 03:56:39PM +0200, Neil Armstrong wrote:
+> Yes, but on the Amlogic Meson plarform, the DW-HDMI CEC controller is
+> not used, but a custom one, so this notifier is actually useful for
+> this platform and maybe others.
 
-On Fri, Jun 09, 2017 at 03:26:24PM +0200, Andrew Lunn wrote:
-> On Fri, Jun 09, 2017 at 10:25:41AM +0200, Antoine Tenart wrote:
-> > On Thu, Jun 08, 2017 at 09:42:21AM -0700, Florian Fainelli wrote:
-> > > 
-> > > If I get this right, the xMDIO controller is actually a superset of the
-> > > MDIO controller and has an extra MVMDIO_XSMI_ADDR_REG register to
-> > > preform C45 accesses?
-> > 
-> > This is also a mistake. It's not a superset as the register offsets are
-> > different. So we can't use the same smi operations in both cases. We
-> > would need dedicated xmdio smi operations, but I don't think there is a
-> > board where a c22 PHY is connected to the xMDIO interface.
-> 
-> Is it described as one device, which can do c22 via one set of
-> registers, and c45 by another set of registers?
-> 
-> Or are there two separate devices. In particular, does each device
-> have there own MDC and MDIO pins? Do we have an C22 only device/bus,
-> and a C45 only device/bus?
+Is the CEC controller configured into dw-hdmi (is the config bit set?)
+I'm just wondering if we're going to end up with two CEC drivers trying
+to bind to the same notifier.
 
-The MDIO/xMDIO registers are embedded into the network controller. The
-mvmdio driver was created at first to abstract this functionality
-outside the network controller driver because it is shared between all
-ports and used in different IPs. So it's not really devices per say.
+> Should we really wait until I push the Amlogic AO CEC driver ? Having a
+> notifier in the DW-HDMI driver won't harm anybody since it *will be used*.
 
-Looking at the datasheet/schematics there are two hardware buses, one
-for c22 and one for c45. So we should keep two separate nodes to
-describe the two interfaces. From what I read c45 is backward
-compatible with c22 so the xSMI interface should be capable to speak to
-c22 PHYs as well. And by looking at the datasheet this seems possible,
-although it's not completely clear. But anyway this wouldn't impact the
-dt bindings.
+It sounds like this adds additional information that has been missing
+from the review of my patches - and I suspect changes Hans' comments.
+So, I'll wait, it seems pointless to try and update the patches when
+it's not clear how to proceed due to other dependencies, especially
+when it means that their existing state is what's required (I'm pleased
+that I've held off modifying the patches so far.)
 
-What I'll propose in v3 is two separate nodes, with their own
-compatibles. The driver will have smi ops for the marvell,orion-mdio and
-xsmi ops for the marvell,xmdio. I won't implement for now the smi ops
-for marvell,xmdio as I can't test them and can't be 100% sure it would
-work. (But again this won't impact the dt and can be updated in the
-driver later).
-
-Does that sound right?
-
-Thanks!
-Antoine
+If that means having to wait another kernel revision, then I guess that's
+what will have to happen.
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170609/cbd68fcc/attachment-0001.sig>
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
