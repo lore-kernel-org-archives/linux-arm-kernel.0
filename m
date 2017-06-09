@@ -1,53 +1,51 @@
 From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Fri,  9 Jun 2017 15:39:37 -0700
-Subject: [PATCH v13 4/6] ARM: dts: imx6q-evi: support altera-ps-spi
+Date: Fri,  9 Jun 2017 15:39:39 -0700
+Subject: [PATCH v13 6/6] fpga-manager: altera-ps-spi: use bitrev8x4
 In-Reply-To: <03e591707dc72f4c2b5e63a1272060956294ea51.1497047816.git.stillcompiling@gmail.com>
 References: <03e591707dc72f4c2b5e63a1272060956294ea51.1497047816.git.stillcompiling@gmail.com>
-Message-ID: <e7981dfa7459fb548c15669f7f968ba4e54d51cf.1497047816.git.stillcompiling@gmail.com>
+Message-ID: <133de0a3543747b6784c50ffe7d78e76639f1167.1497047816.git.stillcompiling@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for Altera FPGA connected to an spi port
-to the evi devicetree file
+Speed up bit reversal by using hardware bit reversal
+Add extra code to handle less than 4byte remnants, if any
 
 Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
 ---
- arch/arm/boot/dts/imx6q-evi.dts | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ drivers/fpga/altera-ps-spi.c | 19 +++++++++++++++----
+ 1 file changed, 15 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q-evi.dts b/arch/arm/boot/dts/imx6q-evi.dts
-index 24fe093a66db..59aebbc95671 100644
---- a/arch/arm/boot/dts/imx6q-evi.dts
-+++ b/arch/arm/boot/dts/imx6q-evi.dts
-@@ -82,6 +82,15 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_ecspi1 &pinctrl_ecspi1cs>;
- 	status = "okay";
-+
-+	fpga: fpga at 0 {
-+		compatible = "altr,fpga-passive-serial";
-+		spi-max-frequency = <20000000>;
-+		reg = <0>;
-+		pinctrl-0 = <&pinctrl_fpgaspi>;
-+		nconfig-gpios = <&gpio4 9 GPIO_ACTIVE_LOW>;
-+		nstat-gpios = <&gpio4 11 GPIO_ACTIVE_LOW>;
-+	};
- };
+diff --git a/drivers/fpga/altera-ps-spi.c b/drivers/fpga/altera-ps-spi.c
+index 0db8def668ed..14f14efdf0d5 100644
+--- a/drivers/fpga/altera-ps-spi.c
++++ b/drivers/fpga/altera-ps-spi.c
+@@ -149,12 +149,23 @@ static int altera_ps_write_init(struct fpga_manager *mgr,
  
- &ecspi3 {
-@@ -313,6 +322,13 @@
- 		>;
- 	};
+ static void rev_buf(char *buf, size_t len)
+ {
+-	const char *fw_end = (buf + len);
++	u32 *fw32 = (u32 *)buf;
++	size_t extra_bytes = (len & 0x03);
++	const u32 *fw_end = (u32 *)(buf + len - extra_bytes);
  
-+	pinctrl_fpgaspi: fpgaspigrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_ROW1__GPIO4_IO09 0x1b0b0
-+			MX6QDL_PAD_KEY_ROW2__GPIO4_IO11 0x1b0b0
-+		>;
-+	};
+ 	/* set buffer to lsb first */
+-	while (buf < fw_end) {
+-		*buf = bitrev8(*buf);
+-		buf++;
++	while (fw32 < fw_end) {
++		*fw32 = bitrev8x4(*fw32);
++		fw32++;
++	}
 +
- 	pinctrl_gpminand: gpminandgrp {
- 		fsl,pins = <
- 			MX6QDL_PAD_NANDF_CLE__NAND_CLE 0xb0b1
++	if (extra_bytes) {
++		buf = (char *)fw_end;
++		while (extra_bytes) {
++			*buf = bitrev8(*buf);
++			buf++;
++			extra_bytes--;
++		}
+ 	}
+ }
+ 
 -- 
 2.11.0
