@@ -1,33 +1,24 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 9 Jun 2017 09:37:55 +0200
-Subject: [PATCHv2 1/2] gpio: mvebu: fix blink counter register selection
-In-Reply-To: <20170601121826.14685-2-richard.genoud@gmail.com>
-References: <20170601121826.14685-1-richard.genoud@gmail.com>
- <20170601121826.14685-2-richard.genoud@gmail.com>
-Message-ID: <CACRpkdbRN3pgNqUJXHimpMjSOMeZepjxACveTSVzYJWneM9hOQ@mail.gmail.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Fri, 9 Jun 2017 09:37:52 +0200
+Subject: [PATCH 0/2] Fix STM32 timers dt-bindings
+Message-ID: <1496993874-9870-1-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 1, 2017 at 2:18 PM, Richard Genoud <richard.genoud@gmail.com> wrote:
+STM32 timers clock names has been updated during driver/DT binding review:
+https://lkml.org/lkml/2016/12/13/718
 
-> The blink counter A was always selected because 0 was forced in the
-> blink select counter register.
-> The variable 'set' was obviously there to be used as the register value,
-> selecting the B counter when id==1 and A counter when id==0.
->
-> Tested on clearfog-pro (Marvell 88F6828)
->
-> Fixes: 757642f9a584 ("gpio: mvebu: Add limited PWM support")
-> Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Reviewed-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+STM32 timers driver has been fixed with these remarks. It looks like it's
+been missed on DT binding part.
+Update DT binding doc to reflect this as well.
 
-Patch applied for fixes.
+Fabrice Gasnier (2):
+  dt-bindings: mfd: update STM32 timers clock names
+  dt-bindings: iio: update STM32 timers clock names
 
-It appears this will clash with patches on the development branch :(
+ Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt | 2 +-
+ Documentation/devicetree/bindings/mfd/stm32-timers.txt              | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-I might screw up the merges so help me check the end result
-later.
-
-Yours,
-Linus Walleij
+-- 
+1.9.1
