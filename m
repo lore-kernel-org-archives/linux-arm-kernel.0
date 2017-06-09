@@ -1,38 +1,48 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Fri, 9 Jun 2017 09:45:39 +0200
-Subject: [PATCH] gpio: mvebu: change compatible string for PWM support
-In-Reply-To: <CACRpkdY7yy=U1DgFHXGd06UXg0hh5eC7mBKHLr7hq01hR__q8g@mail.gmail.com>
-References: <20170601200820.22396-1-ralph.sennhauser@gmail.com>
- <CACRpkdY7yy=U1DgFHXGd06UXg0hh5eC7mBKHLr7hq01hR__q8g@mail.gmail.com>
-Message-ID: <CACQ1gAht7kPysPofvyykYrfcRgJ_i_FFC8NqyN+J2L9WXwHfcg@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 9 Jun 2017 15:47:26 +0800
+Subject: [PATCH v11 06/12] sun4i-codec: Add support for extra controls to
+ struct sun4i_codec_quirks and use them.
+In-Reply-To: <20170609062216.26807-7-dannym@scratchpost.org>
+References: <20170609062216.26807-1-dannym@scratchpost.org>
+ <20170609062216.26807-7-dannym@scratchpost.org>
+Message-ID: <CAGb2v66-iiyQN1v3J5buyeX9YA7ELxYxC_0s+hvaOF6mjRmGOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-06-09 9:42 GMT+02:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Thu, Jun 1, 2017 at 10:08 PM, Ralph Sennhauser
-> <ralph.sennhauser@gmail.com> wrote:
->
->> As it turns out more than just Armada 370 and XP support using GPIO
->> lines as PWM lines. For example the Armada 38x family has the same
->> hardware support. As such "marvell,armada-370-xp-gpio" for the
->> compatible string is a misnomer.
->>
->> Change the compatible string to "marvell,armada-370-gpio" before the
->> driver makes it out of the -rc stage. This also follows the practice of
->> using only the first device family supported as part of the name.
->>
->> Also update the documentation and comments in the code accordingly.
->>
->> Fixes: 757642f9a584 ("gpio: mvebu: Add limited PWM support")
->> Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
->
-> Patch applied for next with the tags.
-You mean for fixes right ?
-The goal was to correct "marvell,armada-370-xp-gpio" before 4.12 is out.
+On Fri, Jun 9, 2017 at 2:22 PM, Danny Milosavljevic
+<dannym@scratchpost.org> wrote:
 
->
-> Yours,
-> Linus Walleij
+Again, why?
 
-Regards,
-Richard
+> Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
+> ---
+>  sound/soc/sunxi/sun4i-codec.c | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+>
+> diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+> index f56a59ad..b1da14d1 100644
+> --- a/sound/soc/sunxi/sun4i-codec.c
+> +++ b/sound/soc/sunxi/sun4i-codec.c
+> @@ -897,9 +897,22 @@ struct sun4i_codec_quirks {
+>         unsigned int reg_dac_txdata;    /* TX FIFO offset for DMA config */
+>         unsigned int reg_adc_rxdata;    /* RX FIFO offset for DMA config */
+>         bool has_reset;
+> +       const struct snd_kcontrol_new *controls;
+> +       unsigned int num_controls;
+>  };
+>
+> +static int sun4i_codec_codec_probe(struct snd_soc_codec *scodec)
+> +{
+> +       const struct sun4i_codec_quirks *quirks;
+> +
+> +       quirks = of_device_get_match_data(scodec->dev);
+> +       return snd_soc_add_codec_controls(scodec,
+> +                                         quirks->controls,
+> +                                         quirks->num_controls);
+> +}
+> +
+>  static struct snd_soc_codec_driver sun4i_codec_codec = {
+> +       .probe = sun4i_codec_codec_probe,
+>         .component_driver = {
+>                 .controls               = sun4i_codec_controls,
+>                 .num_controls           = ARRAY_SIZE(sun4i_codec_controls),
