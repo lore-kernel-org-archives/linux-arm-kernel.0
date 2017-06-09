@@ -1,39 +1,67 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 9 Jun 2017 09:05:37 +0200
-Subject: [PATCH 0/4] ARM: dts: bcm2835-rpi-zero: Enable OTG mode
-In-Reply-To: <542130487.90500.1496306283902@email.1und1.de>
-References: <1495385079-3697-1-git-send-email-stefan.wahren@i2se.com>
- <542130487.90500.1496306283902@email.1und1.de>
-Message-ID: <6a45fcd8-0d88-bc17-6432-d38fe771dc80@i2se.com>
+From: prabhakar.csengg@gmail.com (Lad, Prabhakar)
+Date: Fri, 9 Jun 2017 08:12:18 +0100
+Subject: [PATCH v2 2/4] [media] davinci: vpif_capture: get subdevs from DT
+ when available
+In-Reply-To: <CAOi56cV18wJce8hzTk0r0YKvr4vzLi8QDwu01Az1rae-9=wMRg@mail.gmail.com>
+References: <20170606233741.26718-1-khilman@baylibre.com>
+ <20170606233741.26718-3-khilman@baylibre.com>
+ <f305d0fc-b5cd-591a-1d95-7ae66bfa72ec@xs4all.nl>
+ <CAOi56cV18wJce8hzTk0r0YKvr4vzLi8QDwu01Az1rae-9=wMRg@mail.gmail.com>
+Message-ID: <CA+V-a8sXbZFfb2+2iaZ6XSaRJqKnSswjPVuf5Qj7EN28absdnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 01.06.2017 um 10:38 schrieb Stefan Wahren:
->> Stefan Wahren <stefan.wahren@i2se.com> hat am 21. Mai 2017 um 18:44 geschrieben:
+Hi Kevin,
+
+Thanks for the patch.
+
+On Fri, Jun 9, 2017 at 2:01 AM, Kevin Hilman <khilman@baylibre.com> wrote:
+> On Wed, Jun 7, 2017 at 11:29 PM, Hans Verkuil <hverkuil@xs4all.nl> wrote:
+>> On 07/06/17 01:37, Kevin Hilman wrote:
+>>> Enable  getting of subdevs from DT ports and endpoints.
+>>>
+>>> The _get_pdata() function was larely inspired by (i.e. stolen from)
+>>> am437x-vpfe.c
+>>>
+>>> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+>>> ---
+>>>  drivers/media/platform/davinci/vpif_capture.c | 126 +++++++++++++++++++++++++-
+>>>  drivers/media/platform/davinci/vpif_display.c |   5 +
+
+Can you make this as a separate patch.
+
+>>>  include/media/davinci/vpif_types.h            |   9 +-
+>>>  3 files changed, 134 insertions(+), 6 deletions(-)
+>>>
+>>> diff --git a/drivers/media/platform/davinci/vpif_capture.c b/drivers/media/platform/davinci/vpif_capture.c
+>>> index fc5c7622660c..b9d927d1e5a8 100644
+>>> --- a/drivers/media/platform/davinci/vpif_capture.c
+>>> +++ b/drivers/media/platform/davinci/vpif_capture.c
+>>> @@ -22,6 +22,8 @@
+>>>  #include <linux/slab.h>
+>>>
+>>>  #include <media/v4l2-ioctl.h>
+>>> +#include <media/v4l2-of.h>
 >>
->>
->> This patch series enable OTG mode for Raspberry Pi Zero because dwc2 driver
->> has been fixed now.
->>
->> Patch 1 adds a new dtsi file to setup OTG mode (could also be used for boards
->> like RPi Zero W or the Compute Module). The second patch adds the USB PHY and
->> was part of Raspberry Pi Zero support patch series before split up [1].
->> The enabling of OTG mode of RPi Zero is done by patch number 3. The last patch
->> updates the BCM2835 defconfig.
->>
->> [1] - http://lists.infradead.org/pipermail/linux-rpi-kernel/2016-July/004153.html
->>
->> Stefan Wahren (4):
->>   ARM: dts: bcm283x: Add dtsi for OTG mode
->>   ARM: dts: bcm283x: Add generic USB PHY
->>   ARM: dts: bcm2835-rpi-zero: Enable OTG mode
->>   ARM: bcm2835_defconfig: Enable serial & ethernet USB gadget support
->>
-> No comments to this patch series?
+>> v4l2-of.h no longer exists, so this v2 is wrong. Unfortunately this patch has
+>> already been merged in our master. I'm not sure how this could have slipped past
+>> both my and Mauro's patch testing (and yours, for that matter).
 >
-> Regards
-> Stefan
+> I have that file in the various trees I tested agains.
+>
+>> Can you fix this and post a patch on top of the media master that makes this
+>> compile again?
+>
+> Sorry for the dumb question, but what tree are you referring to?  I
+> tried the master branch of both [1] and [2] and both seem to have that
+> include.
+>
+> Kevin
+>
+> [1] https://git.kernel.org/pub/scm/linux/kernel/git/mchehab/linux-media.git
+> [2] git://linuxtv.org/mchehab/media-next.git
 
-@Eric
+media master is https://git.linuxtv.org/media_tree.git/
 
-Should i merge them?
+Cheers,
+--Prabhakar Lad
