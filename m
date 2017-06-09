@@ -1,51 +1,47 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Sat, 10 Jun 2017 00:32:23 +0200
-Subject: [PATCH] ARM: OMAP: PM: stop early on systems without twl
-Message-ID: <20170609223223.19079-1-sre@kernel.org>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Fri, 9 Jun 2017 15:35:26 -0700
+Subject: [PATCH v8 14/34] ARM: dts: imx6-sabreauto: add the ADV7180 video
+ decoder
+In-Reply-To: <20170609213843.GB28596@amd>
+References: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
+ <1496860453-6282-15-git-send-email-steve_longerbeam@mentor.com>
+ <CAJ+vNU0C0=4hUq+g1P7yTzLzFPidfauQROPOVr4WQWKNZz_xmQ@mail.gmail.com>
+ <dd5b29b7-bf92-5f03-caef-1843a9f32cd3@gmail.com> <20170609213843.GB28596@amd>
+Message-ID: <cb9d79e9-fa36-d0ad-3df6-27f1b8790f78@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Motorola Droid 4 has an OMAP4, but no TWL6030. It currently
-complains verbosely about this during boot:
 
-twl: not initialized
-twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
-twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
-twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
-twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
-twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
-twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
-twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1410000 Vs max 1316660
-omap2_set_init_voltage: unable to find boot up OPP for vdd_core
-omap2_set_init_voltage: unable to set vdd_core
-omap2_set_init_voltage: unable to find boot up OPP for vdd_iva
-omap2_set_init_voltage: unable to set vdd_iva
 
-While proper support for CPCAP should be added at some point,
-let's exit early in omap2_common_pm_late_init() until that
-has been implemented to avoid the above errors. There is still
-a reminder about missing PM in dmesg:
+On 06/09/2017 02:38 PM, Pavel Machek wrote:
+> On Thu 2017-06-08 13:36:12, Steve Longerbeam wrote:
+>>
+>>
+>> On 06/08/2017 01:25 PM, Tim Harvey wrote:
+>>>
+>>>
+>>> Steve,
+>>>
+>>> You need to remove the fim node now that you've moved this to V4L2 controls.
+>>>
+>>
+>> Yep, I caught this just after sending the v8 patchset. I'll send
+>> a v9 of this patch.
+> 
+> This needs ack from devicetree people, then it can be merged. Can you
+> be a bit more forceful getting the ack?
 
-Missing OMAP4 PM for this platform!
+OK, I need an Ack please, he said, in a forceful way. :)
 
-Signed-off-by: Sebastian Reichel <sre@kernel.org>
----
- arch/arm/mach-omap2/pm.c | 3 +++
- 1 file changed, 3 insertions(+)
+In fact Ack's are needed for all the changes to dts sources,
+patches 4-14.
 
-diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-index 63027e60cc20..4e4313cecc26 100644
---- a/arch/arm/mach-omap2/pm.c
-+++ b/arch/arm/mach-omap2/pm.c
-@@ -240,6 +240,9 @@ omap_postcore_initcall(omap2_common_pm_init);
- 
- int __init omap2_common_pm_late_init(void)
- {
-+	if (!twl_rev())
-+		return -ENODEV;
-+
- 	/* Init the voltage layer */
- 	omap3_twl_init();
- 	omap4_twl_init();
--- 
-2.11.0
+
+> 
+> I don't think it makes sense to resubmit v9 before that. This is not a
+> rocket science.
+
+I guess that makes sense, I'll wait for Ack's from all these patches
+before submitting the entire patchset as v9.
+
+Steve
