@@ -1,81 +1,96 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 09 Jun 2017 10:07:01 +0200
-Subject: [PATCH v2 01/11] pinctrl: dt-bindings: add documentation for
- AP806 pin controllers
-In-Reply-To: <CACRpkdYw3AgKBa+y-U9=1d9HqYyPGYK1y_5eBYoobV6s=4T0Wg@mail.gmail.com>
- (Linus Walleij's message of "Fri, 9 Jun 2017 09:50:20 +0200")
-References: <cover.8fe5f7c62a787452878ca071fa00b953e96988ef.1496413293.git-series.gregory.clement@free-electrons.com>
- <2d89fbc10d07c890336eabbd362e55cb2e5055b5.1496413293.git-series.gregory.clement@free-electrons.com>
- <CACRpkdYw3AgKBa+y-U9=1d9HqYyPGYK1y_5eBYoobV6s=4T0Wg@mail.gmail.com>
-Message-ID: <878tl1pot6.fsf@free-electrons.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 9 Jun 2017 10:12:50 +0200
+Subject: [PATCH 2/3] arm: dts: mt2701: Add display bls related nodes for
+ MT2701
+In-Reply-To: <1496297324-21091-3-git-send-email-erin.lo@mediatek.com>
+References: <1496297324-21091-1-git-send-email-erin.lo@mediatek.com>
+ <1496297324-21091-3-git-send-email-erin.lo@mediatek.com>
+Message-ID: <82c8b877-ec34-bd37-7428-8af86191a66e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
- 
- On ven., juin 09 2017, Linus Walleij <linus.walleij@linaro.org> wrote:
-
-> On Fri, Jun 2, 2017 at 4:23 PM, Gregory CLEMENT
-> <gregory.clement@free-electrons.com> wrote:
->
->> Document the device tree binding for the pin controllers found on the
->> Armada 7K and Armada 8K SoCs.
->>
->> Acked-by: Rob Herring <robh@kernel.org>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->
-> This patch does not apply to any of my branches, I have no clue
-> what tree you're basing this on.
->
-> I would prefer a series based on a pure v4.12-rc2 I think, as this
-> is what both the pin control and GPIO development branches
-> is based on, unless you have a better merge strategy to suggest?
-
-As I wrote in the cover letter :
-"The patch modifying the documentation still depend on the ones of the
-clk series. For the ap806 a first stable branch is already available:
-https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git/log/?h=clk-ap806"
-
-In the previous version of the series the clk maintainer said they will
-provide stable branch for the documentation. For ap806 it is already
-done, but not yet for cp110. But if you still have problem with it Rob
-offer to take care of the devie tree documentation.
-
-Just let us know what you prefer.
-
->
-> I hope for the love of god that this does not also clash with the
-> PWM stuff that is patching around in the GPIO tree, if it does
-> I might very well throw up my hands and defer merging all of
-> this until the next kernel cycle past v4.13-rc1.
-
-To avoid this kind of issues the series are based on next-20170531 in
-order to have in the same time the devel branch of the linux-gpio tree
-and the devel branch of the linux-pinctrl tree.
 
 
->
-> Please rebase on v4.12-rc2 and resend.
+On 01/06/17 08:08, Erin Lo wrote:
+> From: YT Shen <yt.shen@mediatek.com>
 
-I use the linux-next tree because you already picked up some patches of
-my first series and applied it on your devel branches. If I rebased on
-v4;12-rc2, obviously it won't work. So really basing the series on your
-devel branch is the best thing to do.
+I miss the Singed-off-by from YT Shen.
 
-I saw that you already applied the PWM patch so as soon as they were
-visible on the devel branches I will rebased the series on it and submit
-it a new version.
+> 
+> This patch adds the device node of display backlight for MT2701
+> 
+> Signed-off-by: Weiqing Kong <weiqing.kong@mediatek.com>
+> Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+> ---
+>   arch/arm/boot/dts/mt2701-evb.dts | 29 +++++++++++++++++++++++++++++
+>   arch/arm/boot/dts/mt2701.dtsi    |  9 +++++++++
+>   2 files changed, 38 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
+> index a483798..e49c2b7 100644
+> --- a/arch/arm/boot/dts/mt2701-evb.dts
+> +++ b/arch/arm/boot/dts/mt2701-evb.dts
+> @@ -22,6 +22,35 @@
+>   	memory {
+>   		reg = <0 0x80000000 0 0x40000000>;
+>   	};
+> +
+> +	backlight_lcd: backlight_lcd {
+> +		compatible = "pwm-backlight";
+> +		pwms = <&bls 0 100000>;
+> +		brightness-levels = <
+> +			  0  16  32  48  64  80  96 112
+> +			128 144 160 176 192 208 224 240
+> +			255
+> +		>;
+> +		default-brightness-level = <9>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pwm_bls_gpio>;
+> +	};
+> +};
+> +
+> +&bls {
+> +	status = "okay";
+> +};
+> +
+> +&mmsys {
+> +	status = "okay";
+> +};
+> +
+> +&pio {
+> +	pwm_bls_gpio: pwm_bls_gpio {
+> +		pins_cmd_dat {
+> +			pinmux = <MT2701_PIN_208_AUD_EXT_CK1__FUNC_DISP_PWM>;
+> +		};
+> +	};
+>   };
+>   
+>   &auxadc {
+> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+> index de88bd7..4f110d5 100644
+> --- a/arch/arm/boot/dts/mt2701.dtsi
+> +++ b/arch/arm/boot/dts/mt2701.dtsi
+> @@ -366,6 +366,15 @@
+>   		#clock-cells = <1>;
+>   	};
+>   
+> +	bls: bls at 1400a000 {
+> +		compatible = "mediatek,mt2701-disp-pwm";
+> +		reg = <0 0x1400a000 0 0x1000>;
+> +		#pwm-cells = <2>;
+> +		clocks = <&mmsys CLK_MM_MDP_BLS_26M>, <&mmsys CLK_MM_DISP_BLS>;
+> +		clock-names = "main", "mm";
+> +		status = "disabled";
+> +	};
+> +
+
+Can you make this a new patch please. It's preferred to have one patch 
+for the dtsi and another one for the actual board.
 
 Thanks,
+Matthias
 
-Gregory
-
->
-> Yours,
-> Linus Walleij
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+>   	larb0: larb at 14010000 {
+>   		compatible = "mediatek,mt2701-smi-larb";
+>   		reg = <0 0x14010000 0 0x1000>;
+> 
