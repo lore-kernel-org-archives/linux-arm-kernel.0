@@ -1,81 +1,70 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Fri,  9 Jun 2017 16:07:35 +0200
-Subject: [PATCH v4 2/6] ARM: imx6: register pm_power_off handler if "fsl,
- pmic-stby-poweroff" is set
-In-Reply-To: <20170609140739.15726-1-o.rempel@pengutronix.de>
-References: <20170609140739.15726-1-o.rempel@pengutronix.de>
-Message-ID: <20170609140739.15726-3-o.rempel@pengutronix.de>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Fri, 9 Jun 2017 16:09:22 +0200
+Subject: [PATCH v2 7/8] net: mvmdio: add xmdio support
+In-Reply-To: <20170609132624.GC20756@lunn.ch>
+References: <20170608092653.25221-1-antoine.tenart@free-electrons.com>
+ <20170608092653.25221-8-antoine.tenart@free-electrons.com>
+ <a60a0b26-62b1-7c9e-e846-215747dddb1f@gmail.com>
+ <20170609082541.GC31464@kwain> <20170609132624.GC20756@lunn.ch>
+Message-ID: <20170609140922.GD31464@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One of the Freescale recommended sequences for power off with external
-PMIC is the following:
-...
-3.  SoC is programming PMIC for power off when standby is asserted.
-4.  In CCM STOP mode, Standby is asserted, PMIC gates SoC supplies.
+Hi Andrew,
 
-See:
-http://www.nxp.com/assets/documents/data/en/reference-manuals/IMX6DQRM.pdf
-page 5083
+On Fri, Jun 09, 2017 at 03:26:24PM +0200, Andrew Lunn wrote:
+> On Fri, Jun 09, 2017 at 10:25:41AM +0200, Antoine Tenart wrote:
+> > On Thu, Jun 08, 2017 at 09:42:21AM -0700, Florian Fainelli wrote:
+> > > 
+> > > If I get this right, the xMDIO controller is actually a superset of the
+> > > MDIO controller and has an extra MVMDIO_XSMI_ADDR_REG register to
+> > > preform C45 accesses?
+> > 
+> > This is also a mistake. It's not a superset as the register offsets are
+> > different. So we can't use the same smi operations in both cases. We
+> > would need dedicated xmdio smi operations, but I don't think there is a
+> > board where a c22 PHY is connected to the xMDIO interface.
+> 
+> Is it described as one device, which can do c22 via one set of
+> registers, and c45 by another set of registers?
+> 
+> Or are there two separate devices. In particular, does each device
+> have there own MDC and MDIO pins? Do we have an C22 only device/bus,
+> and a C45 only device/bus?
 
-This patch implements step 4. of this sequence.
+The MDIO/xMDIO registers are embedded into the network controller. The
+mvmdio driver was created at first to abstract this functionality
+outside the network controller driver because it is shared between all
+ports and used in different IPs. So it's not really devices per say.
 
-Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
----
- arch/arm/mach-imx/pm-imx6.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+Looking at the datasheet/schematics there are two hardware buses, one
+for c22 and one for c45. So we should keep two separate nodes to
+describe the two interfaces. From what I read c45 is backward
+compatible with c22 so the xSMI interface should be capable to speak to
+c22 PHYs as well. And by looking at the datasheet this seems possible,
+although it's not completely clear. But anyway this wouldn't impact the
+dt bindings.
 
-diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
-index e61b1d1027e1..3a4f8f289f4d 100644
---- a/arch/arm/mach-imx/pm-imx6.c
-+++ b/arch/arm/mach-imx/pm-imx6.c
-@@ -27,6 +27,8 @@
- #include <asm/proc-fns.h>
- #include <asm/suspend.h>
- #include <asm/tlb.h>
-+#include <linux/kallsyms.h>
-+#include <linux/regulator/machine.h>
- 
- #include "common.h"
- #include "hardware.h"
-@@ -602,6 +604,28 @@ static void __init imx6_pm_common_init(const struct imx6_pm_socdata
- 				   IMX6Q_GPR1_GINT);
- }
- 
-+static void imx6_pm_poweroff(void)
-+{
-+	imx6_set_lpm(STOP_POWER_OFF);
-+	cpu_suspend(0, imx6q_suspend_finish);
-+
-+	mdelay(1000);
-+
-+	pr_emerg("Unable to poweroff system\n");
-+}
-+
-+static int imx6_pm_poweroff_probe(void)
-+{
-+	if (pm_power_off) {
-+		pr_warn("%s: pm_power_off already claimed  %p %pf!\n",
-+			__func__, pm_power_off, pm_power_off);
-+		return -EBUSY;
-+	}
-+
-+	pm_power_off = imx6_pm_poweroff;
-+	return 0;
-+}
-+
- void __init imx6_pm_ccm_init(const char *ccm_compat)
- {
- 	struct device_node *np;
-@@ -618,6 +642,9 @@ void __init imx6_pm_ccm_init(const char *ccm_compat)
- 	val = readl_relaxed(ccm_base + CLPCR);
- 	val &= ~BM_CLPCR_LPM;
- 	writel_relaxed(val, ccm_base + CLPCR);
-+
-+	if (of_property_read_bool(np, "fsl,pmic-stby-poweroff"))
-+		imx6_pm_poweroff_probe();
- }
- 
- void __init imx6q_pm_init(void)
+What I'll propose in v3 is two separate nodes, with their own
+compatibles. The driver will have smi ops for the marvell,orion-mdio and
+xsmi ops for the marvell,xmdio. I won't implement for now the smi ops
+for marvell,xmdio as I can't test them and can't be 100% sure it would
+work. (But again this won't impact the dt and can be updated in the
+driver later).
+
+Does that sound right?
+
+Thanks!
+Antoine
+
 -- 
-2.11.0
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170609/cbd68fcc/attachment-0001.sig>
