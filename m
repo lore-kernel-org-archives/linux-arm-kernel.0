@@ -1,37 +1,56 @@
 From: dannym@scratchpost.org (Danny Milosavljevic)
-Date: Fri,  9 Jun 2017 08:22:11 +0200
-Subject: [PATCH v11 07/12] sun4i-codec: Add extra controls to
- sun4i_codec_quirks, sun7i_codec_quirks.
+Date: Fri,  9 Jun 2017 08:22:14 +0200
+Subject: [PATCH v11 10/12] sun4i-codec: Add Left Capture Select,
+ Right Capture Select.
 In-Reply-To: <20170609062216.26807-1-dannym@scratchpost.org>
 References: <20170609062216.26807-1-dannym@scratchpost.org>
-Message-ID: <20170609062216.26807-8-dannym@scratchpost.org>
+Message-ID: <20170609062216.26807-11-dannym@scratchpost.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
 ---
- sound/soc/sunxi/sun4i-codec.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ sound/soc/sunxi/sun4i-codec.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
 diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index b1da14d1..d453af65 100644
+index 21ece880..730f6151 100644
 --- a/sound/soc/sunxi/sun4i-codec.c
 +++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -1576,6 +1576,8 @@ static const struct sun4i_codec_quirks sun4i_codec_quirks = {
- 	.reg_adc_fifoc	= REG_FIELD(SUN4I_CODEC_ADC_FIFOC, 0, 31),
- 	.reg_dac_txdata	= SUN4I_CODEC_DAC_TXDATA,
- 	.reg_adc_rxdata	= SUN4I_CODEC_ADC_RXDATA,
-+	.controls = sun4i_codec_extra_controls,
-+	.num_controls = ARRAY_SIZE(sun4i_codec_extra_controls),
- };
+@@ -685,6 +685,25 @@ static DECLARE_TLV_DB_RANGE(sun7i_codec_micin_preamp_gain_scale,
+ 			    0, 0, TLV_DB_SCALE_ITEM(0, 0, 0),
+ 			    1, 7, TLV_DB_SCALE_ITEM(2400, 300, 0));
  
- static const struct sun4i_codec_quirks sun6i_a31_codec_quirks = {
-@@ -1595,6 +1597,8 @@ static const struct sun4i_codec_quirks sun7i_codec_quirks = {
- 	.reg_adc_fifoc	= REG_FIELD(SUN4I_CODEC_ADC_FIFOC, 0, 31),
- 	.reg_dac_txdata	= SUN4I_CODEC_DAC_TXDATA,
- 	.reg_adc_rxdata	= SUN4I_CODEC_ADC_RXDATA,
-+	.controls = sun7i_codec_extra_controls,
-+	.num_controls = ARRAY_SIZE(sun7i_codec_extra_controls),
- };
++static const char * const sun4i_codec_capture_source[] = {
++	"Line",
++	"FM",
++	"Mic1",
++	"Mic2",
++	"Mic1,Mic2",
++	"Mic1+Mic2",
++	"Output Mixer",
++	"Line,Mic1",
++};
++
++static SOC_ENUM_SINGLE_DECL(sun4i_codec_enum_capture_source,
++			    SUN4I_CODEC_ADC_ACTL,
++			    SUN4I_CODEC_ADC_ACTL_ADCIS,
++			    sun4i_codec_capture_source);
++
++static const struct snd_kcontrol_new sun4i_codec_capture_source_controls =
++	SOC_DAPM_ENUM("Capture Source", sun4i_codec_enum_capture_source);
++
+ static const char * const sun4i_codec_difflinein_capture_source[] = {
+ 	"Stereo",
+ 	"Differential",
+@@ -851,6 +870,10 @@ static const struct snd_soc_dapm_widget sun4i_codec_codec_dapm_widgets[] = {
+ 			    &sun4i_codec_pa_mute),
  
- static const struct sun4i_codec_quirks sun8i_a23_codec_quirks = {
+ 	/* MUX */
++	SND_SOC_DAPM_MUX("Left Capture Select", SND_SOC_NOPM, 0, 0,
++			 &sun4i_codec_capture_source_controls),
++	SND_SOC_DAPM_MUX("Right Capture Select", SND_SOC_NOPM, 0, 0,
++			 &sun4i_codec_capture_source_controls),
+ 	SND_SOC_DAPM_MUX("Differential Line Capture Switch", SND_SOC_NOPM,
+ 			 0,
+ 			 0,
