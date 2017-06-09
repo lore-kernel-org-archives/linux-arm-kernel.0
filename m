@@ -1,26 +1,38 @@
 From: sre@kernel.org (Sebastian Reichel)
-Date: Sat, 10 Jun 2017 01:12:03 +0200
-Subject: [PATCH 0/3] OMAP4: crypto support
-Message-ID: <20170609231206.19798-1-sre@kernel.org>
+Date: Sat, 10 Jun 2017 01:12:04 +0200
+Subject: [PATCH 1/3] ARM: dts: omap4: add missing des_fck
+In-Reply-To: <20170609231206.19798-1-sre@kernel.org>
+References: <20170609231206.19798-1-sre@kernel.org>
+Message-ID: <20170609231206.19798-2-sre@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add missing functional clock for DES3DES IP core. This is
+documented in the TRM as CM_L4SEC_DES3DES_CLKCTRL.
 
-This adds crypto support for OMAP4, which was missing for some reason.
-This fixes error about missing hwmod on Droid 4. IP-Cores for AES and
-DES are working according to selftest.
+Signed-off-by: Sebastian Reichel <sre@kernel.org>
+---
+ arch/arm/boot/dts/omap44xx-clocks.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
--- Sebastian
-
-Sebastian Reichel (3):
-  ARM: dts: omap4: add missing des_fck
-  ARM: OMAP4: hwmod data: add aes
-  ARM: OMAP4: hwmod data: add des
-
- arch/arm/boot/dts/omap44xx-clocks.dtsi     |  8 +++
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 78 ++++++++++++++++++++++++++++++
- 2 files changed, 86 insertions(+)
-
+diff --git a/arch/arm/boot/dts/omap44xx-clocks.dtsi b/arch/arm/boot/dts/omap44xx-clocks.dtsi
+index 9573b37fbaa7..e997265460d4 100644
+--- a/arch/arm/boot/dts/omap44xx-clocks.dtsi
++++ b/arch/arm/boot/dts/omap44xx-clocks.dtsi
+@@ -985,6 +985,14 @@
+ 		reg = <0x15a8>;
+ 	};
+ 
++	des_fck: des_fck at 15b0 {
++		#clock-cells = <0>;
++		compatible = "ti,gate-clock";
++		clocks = <&l3_div_ck>;
++		ti,bit-shift = <1>;
++		reg = <0x15b0>;
++	};
++
+ 	dss_sys_clk: dss_sys_clk at 1120 {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,gate-clock";
 -- 
 2.11.0
