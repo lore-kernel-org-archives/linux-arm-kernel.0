@@ -1,75 +1,70 @@
-From: david.wu@rock-chips.com (David Wu)
-Date: Fri,  9 Jun 2017 17:36:14 +0800
-Subject: [PATCH] PM / AVS: rockchip-io: add io selectors and supplies for
- rk3228
-Message-ID: <1497000974-12696-1-git-send-email-david.wu@rock-chips.com>
+From: varada@codeaurora.org (Varadarajan Narayanan)
+Date: Fri,  9 Jun 2017 15:02:57 +0530
+Subject: [PATCH v5 0/6] Add minimal boot support for IPQ8074
+Message-ID: <1497000783-27916-1-git-send-email-varada@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the necessary data for handling io voltage domains on the rk3228.
 
-Signed-off-by: David Wu <david.wu@rock-chips.com>
----
- .../devicetree/bindings/power/rockchip-io-domain.txt       |  7 +++++++
- drivers/power/avs/rockchip-io-domain.c                     | 14 ++++++++++++++
- 2 files changed, 21 insertions(+)
+v5:
+  * Removed the 'NA' binding from documentation
 
-diff --git a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
-index d3a5a93..43c21fb 100644
---- a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
-+++ b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
-@@ -32,6 +32,7 @@ SoC is on the same page.
- Required properties:
- - compatible: should be one of:
-   - "rockchip,rk3188-io-voltage-domain" for rk3188
-+  - "rockchip,rk3228-io-voltage-domain" for rk3228
-   - "rockchip,rk3288-io-voltage-domain" for rk3288
-   - "rockchip,rk3328-io-voltage-domain" for rk3328
-   - "rockchip,rk3368-io-voltage-domain" for rk3368
-@@ -59,6 +60,12 @@ Possible supplies for rk3188:
- - vccio1-supply: The supply connected to VCCIO1.
-                  Sometimes also labeled VCCIO1 and VCCIO2.
- 
-+Possible supplies for rk3228:
-+- vccio1-supply: The supply connected to VCCIO1.
-+- vccio2-supply: The supply connected to VCCIO2.
-+- vccio3-supply: The supply connected to VCCIO3.
-+- vccio4-supply: The supply connected to VCCIO4.
-+
- Possible supplies for rk3288:
- - audio-supply:  The supply connected to APIO4_VDD.
- - bb-supply:     The supply connected to APIO5_VDD.
-diff --git a/drivers/power/avs/rockchip-io-domain.c b/drivers/power/avs/rockchip-io-domain.c
-index 8581252..031a343 100644
---- a/drivers/power/avs/rockchip-io-domain.c
-+++ b/drivers/power/avs/rockchip-io-domain.c
-@@ -253,6 +253,16 @@ static void rk3399_pmu_iodomain_init(struct rockchip_iodomain *iod)
- 	},
- };
- 
-+static const struct rockchip_iodomain_soc_data soc_data_rk3228 = {
-+	.grf_offset = 0x418,
-+	.supply_names = {
-+		"vccio1",
-+		"vccio2",
-+		"vccio3",
-+		"vccio4",
-+	},
-+};
-+
- static const struct rockchip_iodomain_soc_data soc_data_rk3288 = {
- 	.grf_offset = 0x380,
- 	.supply_names = {
-@@ -345,6 +355,10 @@ static void rk3399_pmu_iodomain_init(struct rockchip_iodomain *iod)
- 		.data = (void *)&soc_data_rk3188
- 	},
- 	{
-+		.compatible = "rockchip,rk3228-io-voltage-domain",
-+		.data = (void *)&soc_data_rk3228
-+	},
-+	{
- 		.compatible = "rockchip,rk3288-io-voltage-domain",
- 		.data = (void *)&soc_data_rk3288
- 	},
+v4:
+  * Split the clock patch and addressed a minor comment
+    in the clock driver as per stephen's feedback.
+
+v3:
+  * Addressed review feedback from Bjorn for pinctrl
+     - Unified the names for qpic pads.
+     - Corrected the names for pwm pins.
+  * Updated pinctrl documentation.
+  * Updated the default bootargs in ipq8074-hk01.dts.
+  * Updated the gcc clocks driver for removing the
+    unused halt_bit in few places.
+
+v2:
+  * Addressed review feedback from Stephen
+    - Removed cpu-map entries
+    - Added mmio-timer nodes
+  * Fix sparse warnings in the gcc-ipq8074.c
+  * Updated pinctrl documentation
+
+v1:
+  https://www.spinics.net/lists/kernel/msg2498734.html
+  This series adds minimal board boot support for ipq8074-hk01
+  board.
+
+Abhishek Sahu (3):
+  clk: qcom: Add DT bindings for ipq8074 gcc clock controller
+  clk: qcom: Add ipq8074 Global Clock Controller support
+  arm64: defconfig: Enable qcom ipq8074 clock and pinctrl
+
+Varadarajan Narayanan (3):
+  pinctrl: qcom: Add ipq8074 pinctrl driver
+  dt-bindings: qcom: Add ipq8074 bindings
+  arm64: dts: Add ipq8074 SoC and HK01 board support
+
+ Documentation/devicetree/bindings/arm/qcom.txt     |    2 +
+ .../devicetree/bindings/clock/qcom,gcc.txt         |    1 +
+ .../bindings/pinctrl/qcom,ipq8074-pinctrl.txt      |  172 ++++
+ arch/arm64/boot/dts/qcom/Makefile                  |    1 +
+ arch/arm64/boot/dts/qcom/ipq8074-hk01.dts          |   53 +
+ arch/arm64/boot/dts/qcom/ipq8074.dtsi              |  194 ++++
+ arch/arm64/configs/defconfig                       |    2 +
+ drivers/clk/qcom/Kconfig                           |    9 +
+ drivers/clk/qcom/Makefile                          |    1 +
+ drivers/clk/qcom/gcc-ipq8074.c                     | 1007 ++++++++++++++++++
+ drivers/pinctrl/qcom/Kconfig                       |   10 +
+ drivers/pinctrl/qcom/Makefile                      |    1 +
+ drivers/pinctrl/qcom/pinctrl-ipq8074.c             | 1076 ++++++++++++++++++++
+ include/dt-bindings/clock/qcom,gcc-ipq8074.h       |  152 +++
+ 14 files changed, 2681 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/qcom,ipq8074-pinctrl.txt
+ create mode 100644 arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
+ create mode 100644 arch/arm64/boot/dts/qcom/ipq8074.dtsi
+ create mode 100644 drivers/clk/qcom/gcc-ipq8074.c
+ create mode 100644 drivers/pinctrl/qcom/pinctrl-ipq8074.c
+ create mode 100644 include/dt-bindings/clock/qcom,gcc-ipq8074.h
+
 -- 
-1.9.1
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
