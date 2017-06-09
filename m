@@ -1,283 +1,133 @@
-From: yt.shen@mediatek.com (YT Shen)
-Date: Fri, 9 Jun 2017 21:56:09 +0800
-Subject: [PATCH v2 2/2] arm64: dts: Add Mediatek SoC MT2712 and
- evaluation board dts and Makefile
-In-Reply-To: <92e438b3-4e9c-421b-5398-5aad2541524c@gmail.com>
-References: <1496230773-22633-1-git-send-email-yt.shen@mediatek.com>
- <1496230773-22633-3-git-send-email-yt.shen@mediatek.com>
- <92e438b3-4e9c-421b-5398-5aad2541524c@gmail.com>
-Message-ID: <1497016569.29586.36.camel@mtksdaap41>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 9 Jun 2017 15:56:39 +0200
+Subject: [PATCH 2/4] drm/bridge: dw-hdmi: add cec notifier support
+In-Reply-To: <20170609133822.GR4902@n2100.armlinux.org.uk>
+References: <20170530142218.GS22219@n2100.armlinux.org.uk>
+ <E1dFi3E-0004lh-Pu@rmk-PC.armlinux.org.uk>
+ <0c2c4988-37bb-fd01-efee-c6878cc53923@baylibre.com>
+ <20170609133822.GR4902@n2100.armlinux.org.uk>
+Message-ID: <5b2fdadd-f1fa-c454-b3fe-facf221beb78@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-05-31 at 14:42 +0200, Matthias Brugger wrote:
+On 06/09/2017 03:38 PM, Russell King - ARM Linux wrote:
+> On Fri, Jun 09, 2017 at 02:59:20PM +0200, Neil Armstrong wrote:
+>> On 05/30/2017 04:23 PM, Russell King wrote:
+>>> Add CEC notifier support to the HDMI bridge driver, so that the CEC
+>>> part of the IP can receive its physical address.
+>>>
+>>> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+>>> ---
+>>>  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 22 +++++++++++++++++++++-
+>>>  1 file changed, 21 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+>>> index 4e1f54a675d8..966422576c44 100644
+>>> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+>>> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+>>> @@ -36,7 +36,10 @@
+>>>  #include "dw-hdmi.h"
+>>>  #include "dw-hdmi-audio.h"
+>>>  
+>>> +#include <media/cec-notifier.h>
+>>> +
+>>>  #define DDC_SEGMENT_ADDR	0x30
+>>> +
+>>>  #define HDMI_EDID_LEN		512
+>>>  
+>>>  enum hdmi_datamap {
+>>> @@ -173,6 +176,8 @@ struct dw_hdmi {
+>>>  
+>>>  	unsigned int reg_shift;
+>>>  	struct regmap *regm;
+>>> +
+>>> +	struct cec_notifier *cec_notifier;
+>>>  };
+>>>  
+>>>  #define HDMI_IH_PHY_STAT0_RX_SENSE \
+>>> @@ -1870,6 +1875,7 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
+>>>  		hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
+>>>  		hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
+>>>  		drm_mode_connector_update_edid_property(connector, edid);
+>>> +		cec_notifier_set_phys_addr_from_edid(hdmi->cec_notifier, edid);
+>>>  		ret = drm_add_edid_modes(connector, edid);
+>>>  		/* Store the ELD */
+>>>  		drm_edid_to_eld(connector, edid);
+>>> @@ -2108,11 +2114,16 @@ static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
+>>>  	 * ask the source to re-read the EDID.
+>>>  	 */
+>>>  	if (intr_stat &
+>>> -	    (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_IH_PHY_STAT0_HPD))
+>>> +	    (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_IH_PHY_STAT0_HPD)) {
+>>>  		__dw_hdmi_setup_rx_sense(hdmi,
+>>>  					 phy_stat & HDMI_PHY_HPD,
+>>>  					 phy_stat & HDMI_PHY_RX_SENSE);
+>>>  
+>>> +		if ((phy_stat & (HDMI_PHY_RX_SENSE | HDMI_PHY_HPD)) == 0)
+>>> +			cec_notifier_set_phys_addr(hdmi->cec_notifier,
+>>> +						   CEC_PHYS_ADDR_INVALID);
+>>> +	}
+>>> +
+>>>  	if (intr_stat & HDMI_IH_PHY_STAT0_HPD) {
+>>>  		dev_dbg(hdmi->dev, "EVENT=%s\n",
+>>>  			phy_int_pol & HDMI_PHY_HPD ? "plugin" : "plugout");
+>>> @@ -2365,6 +2376,12 @@ __dw_hdmi_probe(struct platform_device *pdev,
+>>>  	if (ret)
+>>>  		goto err_iahb;
+>>>  
+>>> +	hdmi->cec_notifier = cec_notifier_get(dev);
+>>> +	if (!hdmi->cec_notifier) {
+>>> +		ret = -ENOMEM;
+>>> +		goto err_iahb;
+>>> +	}
+>>> +
+>>>  	/*
+>>>  	 * To prevent overflows in HDMI_IH_FC_STAT2, set the clk regenerator
+>>>  	 * N and cts values before enabling phy
+>>> @@ -2437,6 +2454,9 @@ __dw_hdmi_probe(struct platform_device *pdev,
+>>>  		hdmi->ddc = NULL;
+>>>  	}
+>>>  
+>>> +	if (hdmi->cec_notifier)
+>>> +		cec_notifier_put(hdmi->cec_notifier);
+>>> +
+>>>  	clk_disable_unprepare(hdmi->iahb_clk);
+>>>  err_isfr:
+>>>  	clk_disable_unprepare(hdmi->isfr_clk);
+>>>
+>>
+>> Hi Archit,
+>>
+>> I think this one could go through drm-next since it's quite
+>> standalone and will reduce the DW-HDMI CEC patchset and dependencies.
 > 
-> On 31/05/17 13:39, YT Shen wrote:
-> > This adds basic chip support for Mediatek 2712
-> > 
-> > Signed-off-by: YT Shen <yt.shen@mediatek.com>
-> > ---
-> >   arch/arm64/boot/dts/mediatek/Makefile       |   1 +
-> >   arch/arm64/boot/dts/mediatek/mt2712-evb.dts |  39 +++++++
-> >   arch/arm64/boot/dts/mediatek/mt2712e.dtsi   | 166 ++++++++++++++++++++++++++++
-> >   3 files changed, 206 insertions(+)
-> >   create mode 100644 arch/arm64/boot/dts/mediatek/mt2712-evb.dts
-> >   create mode 100644 arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-> > 
-> > diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
-> > index 9fbfd32..fcc0604 100644
-> > --- a/arch/arm64/boot/dts/mediatek/Makefile
-> > +++ b/arch/arm64/boot/dts/mediatek/Makefile
-> > @@ -1,3 +1,4 @@
-> > +dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
-> >   dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
-> >   dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
-> >   dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt2712-evb.dts b/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
-> > new file mode 100644
-> > index 0000000..e526c0f
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
-> > @@ -0,0 +1,39 @@
-> > +/*
-> > + * Copyright (c) 2017 MediaTek Inc.
-> > + * Author: YT Shen <yt.shen@mediatek.com>
-> > + *
-> > + * SPDX-License-Identifier: (GPL-2.0 OR MIT)
-> > + */
-> > +
-> > +/dts-v1/;
-> > +#include "mt2712e.dtsi"
-> > +
-> > +/ {
-> > +	model = "MediaTek MT2712 evaluation board";
-> > +	compatible = "mediatek,mt2712-evb", "mediatek,mt2712";
-> > +
-> > +	aliases {
-> > +		serial0 = &uart0;
-> > +		serial1 = &uart1;
-> > +		serial2 = &uart2;
-> > +		serial3 = &uart3;
-> > +		serial4 = &uart4;
-> > +		serial5 = &uart5;
-> > +	};
-> 
-> Just declare serial0 here, as you don't use the others.
-Ok, will remove the others.
+> Not a good idea.  If you read all the comments, Hans is suggesting that
+> CEC should be part of dw-hdmi itself, not stand-alone.  That would mean
+> this patch probably changes - basically, with CEC support built-in to
+> dw-hdmi, we don't need the notifier stuff.
 
-Sorry for the late reply.
+Hi Russell,
 
-> > +
-> > +	memory at 40000000 {
-> > +		device_type = "memory";
-> > +		reg = <0 0x40000000 0 0x80000000>;
-> > +	};
-> > +
-> > +	chosen {
-> > +		stdout-path = "serial0:921600n8";
-> > +		linux,initrd-start = <0x45000000>;
-> > +		linux,initrd-end   = <0x4a000000>;
-> 
-> initrd-start and end should be dynamically set by the bootloader and not 
-> via a chosen node. Is your bootloader not able to do that?
-OK, will remove initrd start and end later.
-Yes, current bootloader I used is new development and it does not send
-any parameters now
-
-> 
-> > +	};
-> > +};
-> > +
-> > +&uart0 {
-> > +	status = "okay";
-> > +};
-> > +
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-> > new file mode 100644
-> > index 0000000..6df0da9
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-> > @@ -0,0 +1,166 @@
-> > +/*
-> > + * Copyright (c) 2017 MediaTek Inc.
-> > + * Author: YT Shen <yt.shen@mediatek.com>
-> > + *
-> > + * SPDX-License-Identifier: (GPL-2.0 OR MIT)
-> > + */
-> > +
-> > +#include <dt-bindings/interrupt-controller/irq.h>
-> > +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> > +
-> > +/ {
-> > +	compatible = "mediatek,mt2712";
-> > +	interrupt-parent = <&sysirq>;
-> > +	#address-cells = <2>;
-> > +	#size-cells = <2>;
-> > +
-> > +	cpus {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +
-> > +		cpu-map {
-> > +			cluster0 {
-> > +				core0 {
-> > +					cpu = <&cpu0>;
-> > +				};
-> > +				core1 {
-> > +					cpu = <&cpu1>;
-> > +				};
-> > +			};
-> > +
-> > +			cluster1 {
-> > +				core0 {
-> > +					cpu = <&cpu2>;
-> > +				};
-> > +			};
-> > +		};
-> > +
-> > +		cpu0: cpu at 0 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a35";
-> 
-> do you mean cortex-a53?
-No, the cpu is cortex-a35.
-Although I cannot find other cortex-a35 description in mainline kernel.
-
-Thanks for the review.
-
-yt.shen
+Yes, but on the Amlogic Meson plarform, the DW-HDMI CEC controller is not used,
+but a custom one, so this notifier is actually useful for this platform and
+maybe others.
 
 > 
-> > +			reg = <0x000>;
-> > +		};
-> > +
-> > +		cpu1: cpu at 1 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a35";
+> So, I'd suggest _not_ merging it at the moment, because the patch could
+> well become obsolete.
+
+It won't since the Meson platform needs it...
+
 > 
-> same here.
+> Wait until the CEC changes that Hans has talked about have hit mainline
+> and I've had a chance to rework this for those.  We're waiting on Mauro
+> for that at the moment.
 > 
-> Regards,
-> Matthias
+> (I do find it rather frustrating that CEC seems to evolve very rapidly,
+> it makes it quite difficult to publish a patch set, and get it merged.)
 > 
-> > +			reg = <0x001>;
-> > +			enable-method = "psci";
-> > +		};
-> > +
-> > +		cpu2: cpu at 200 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a72";
-> > +			reg = <0x200>;
-> > +			enable-method = "psci";
-> > +		};
-> > +	};
-> > +
-> > +	psci {
-> > +		compatible = "arm,psci-0.2";
-> > +		method = "smc";
-> > +	};
-> > +
-> > +	uart_clk: dummy26m {
-> > +		compatible = "fixed-clock";
-> > +		clock-frequency = <26000000>;
-> > +		#clock-cells = <0>;
-> > +	};
-> > +
-> > +	timer {
-> > +		compatible = "arm,armv8-timer";
-> > +		interrupt-parent = <&gic>;
-> > +		interrupts = <GIC_PPI 13
-> > +			      (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
-> > +			     <GIC_PPI 14
-> > +			      (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
-> > +			     <GIC_PPI 11
-> > +			      (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
-> > +			     <GIC_PPI 10
-> > +			      (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>;
-> > +	};
-> > +
-> > +	soc {
-> > +		#address-cells = <2>;
-> > +		#size-cells = <2>;
-> > +		compatible = "simple-bus";
-> > +		ranges;
-> > +
-> > +		uart5: serial at 1000f000 {
-> > +			compatible = "mediatek,mt2712-uart",
-> > +				     "mediatek,mt6577-uart";
-> > +			reg = <0 0x1000f000 0 0x400>;
-> > +			interrupts = <GIC_SPI 127 IRQ_TYPE_LEVEL_LOW>;
-> > +			clocks = <&uart_clk>;
-> > +			status = "disabled";
-> > +		};
-> > +
-> > +		sysirq: interrupt-controller at 10220a80 {
-> > +			compatible = "mediatek,mt2712-sysirq",
-> > +				     "mediatek,mt6577-sysirq";
-> > +			interrupt-controller;
-> > +			#interrupt-cells = <3>;
-> > +			interrupt-parent = <&gic>;
-> > +			reg = <0 0x10220a80 0 0x40>;
-> > +		};
-> > +
-> > +		gic: interrupt-controller at 10510000 {
-> > +			compatible = "arm,gic-400";
-> > +			#interrupt-cells = <3>;
-> > +			interrupt-parent = <&gic>;
-> > +			interrupt-controller;
-> > +			reg = <0 0x10510000 0 0x1000>,
-> > +			      <0 0x10520000 0 0x1000>,
-> > +			      <0 0x10540000 0 0x2000>,
-> > +			      <0 0x10560000 0 0x2000>;
-> > +			interrupts = <GIC_PPI 9
-> > +				(GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_HIGH)>;
-> > +		};
-> > +
-> > +		uart0: serial at 11002000 {
-> > +			compatible = "mediatek,mt2712-uart",
-> > +				     "mediatek,mt6577-uart";
-> > +			reg = <0 0x11002000 0 0x400>;
-> > +			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>;
-> > +			clocks = <&uart_clk>;
-> > +			status = "disabled";
-> > +		};
-> > +
-> > +		uart1: serial at 11003000 {
-> > +			compatible = "mediatek,mt2712-uart",
-> > +				     "mediatek,mt6577-uart";
-> > +			reg = <0 0x11003000 0 0x400>;
-> > +			interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_LOW>;
-> > +			clocks = <&uart_clk>;
-> > +			status = "disabled";
-> > +		};
-> > +
-> > +		uart2: serial at 11004000 {
-> > +			compatible = "mediatek,mt2712-uart",
-> > +				     "mediatek,mt6577-uart";
-> > +			reg = <0 0x11004000 0 0x400>;
-> > +			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_LOW>;
-> > +			clocks = <&uart_clk>;
-> > +			status = "disabled";
-> > +		};
-> > +
-> > +		uart3: serial at 11005000 {
-> > +			compatible = "mediatek,mt2712-uart",
-> > +				     "mediatek,mt6577-uart";
-> > +			reg = <0 0x11005000 0 0x400>;
-> > +			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_LOW>;
-> > +			clocks = <&uart_clk>;
-> > +			status = "disabled";
-> > +		};
-> > +
-> > +		uart4: serial at 11019000 {
-> > +			compatible = "mediatek,mt2712-uart",
-> > +				     "mediatek,mt6577-uart";
-> > +			reg = <0 0x11019000 0 0x400>;
-> > +			interrupts = <GIC_SPI 126 IRQ_TYPE_LEVEL_LOW>;
-> > +			clocks = <&uart_clk>;
-> > +			status = "disabled";
-> > +		};
-> > +	};
-> > +};
-> > +
-> > 
+
+Should we really wait until I push the Amlogic AO CEC driver ? Having a
+notifier in the DW-HDMI driver won't harm anybody since it *will be used*.
+
+Neil
