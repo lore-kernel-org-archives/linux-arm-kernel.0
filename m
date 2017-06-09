@@ -1,52 +1,35 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 9 Jun 2017 17:04:07 +0100
-Subject: [PATCH v2 1/3] arm64: mm: print out correct page table entries
-In-Reply-To: <1497022554-1451-1-git-send-email-kristina.martsenko@arm.com>
-References: <1497022554-1451-1-git-send-email-kristina.martsenko@arm.com>
-Message-ID: <20170609160407.GK10665@leverpostej>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 10 Jun 2017 00:05:49 +0800
+Subject: [PATCH] ARM: sun6i: a31s: primo81: Enable battery power supply
+In-Reply-To: <20170609160549.3566-1-wens@csie.org>
+References: <20170609160549.3566-1-wens@csie.org>
+Message-ID: <20170609160549.3566-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 09, 2017 at 04:35:52PM +0100, Kristina Martsenko wrote:
->  /*
-> - * Dump out the page tables associated with 'addr' in mm 'mm'.
-> + * Dump out the page tables associated with 'addr' in the currently active mm.
->   */
-> -void show_pte(struct mm_struct *mm, unsigned long addr)
-> +void show_pte(unsigned long addr)
->  {
-> +	struct mm_struct *mm;
->  	pgd_t *pgd;
->  
-> -	if (!mm)
-> +	if (addr < TASK_SIZE) {
-> +		/* TTBR0 */
-> +		mm = current->active_mm;
+The MSI Primo81 tablet has a 3500 mAh 3.7V LiPo battery.
 
-Can we log something for the active_mm == &init_mm case?
+Enable the PMIC's battery power supply so the battery can be monitored.
 
-e.g.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun6i-a31s-primo81.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-	if (addr < TASK_SIZE) {
-		if (current->active_mm == &init_mm)
-			pr_alert("[%016lx] address in unknown TTBR0 range\n",
-				addr);
-		else
-			mm = current->active_mm;
-	} ...
-	
-> +	} else if (addr >= VA_START) {
-> +		/* TTBR1 */
->  		mm = &init_mm;
-> +	} else {
-> +		pr_alert("[%08lx] address between user and kernel address ranges\n",
-> +			 addr);
-
-I think that should be %016lx, given the address will be 64-bit.
-
-With those:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
+diff --git a/arch/arm/boot/dts/sun6i-a31s-primo81.dts b/arch/arm/boot/dts/sun6i-a31s-primo81.dts
+index 73b163a7d9dd..4c10123509c4 100644
+--- a/arch/arm/boot/dts/sun6i-a31s-primo81.dts
++++ b/arch/arm/boot/dts/sun6i-a31s-primo81.dts
+@@ -164,6 +164,10 @@
+ 
+ #include "axp22x.dtsi"
+ 
++&battery_power_supply {
++	status = "okay";
++};
++
+ &reg_aldo3 {
+ 	regulator-always-on;
+ 	regulator-min-microvolt = <2700000>;
+-- 
+2.11.0
