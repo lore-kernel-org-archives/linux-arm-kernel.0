@@ -1,25 +1,20 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 9 Jun 2017 11:43:08 +0100
-Subject: [PATCH 25/31] arm64: Add workaround for Cavium Thunder erratum
- 30115
-In-Reply-To: <20170503104606.19342-26-marc.zyngier@arm.com>
-References: <20170503104606.19342-1-marc.zyngier@arm.com>
- <20170503104606.19342-26-marc.zyngier@arm.com>
-Message-ID: <20170609104308.GI2186@e104818-lin.cambridge.arm.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 09 Jun 2017 12:45:46 +0200
+Subject: [PATCH] PM / AVS: rockchip-io: add io selectors and supplies for
+ rk3228
+In-Reply-To: <1497000974-12696-1-git-send-email-david.wu@rock-chips.com>
+References: <1497000974-12696-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <8439045.hRh8SXquWF@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 03, 2017 at 11:46:00AM +0100, Marc Zyngier wrote:
-> From: David Daney <david.daney@cavium.com>
+Am Freitag, 9. Juni 2017, 17:36:14 CEST schrieb David Wu:
+> This adds the necessary data for handling io voltage domains on the rk3228.
 > 
-> Some Cavium Thunder CPUs suffer a problem where a KVM guest may
-> inadvertently cause the host kernel to quit receiving interrupts.
-> 
-> Use the Group-0/1 trapping in order to deal with it.
-> 
-> [maz]: Adapted patch to the Group-0/1 trapping, reworked commit log
-> 
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: David Wu <david.wu@rock-chips.com>
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+matches the manual, so
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+
+
+Heiko
