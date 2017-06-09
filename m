@@ -1,40 +1,72 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 9 Jun 2017 15:58:17 +0200
-Subject: [linux-sunxi] [PATCH] arm64: allwinner: sun50i-a64: Remove
- duplicate ethernet@1c30000
-In-Reply-To: <6d21516d-7412-5f16-f6f8-b7d46106b4f5@arm.com>
-References: <1497012052-14027-1-git-send-email-jteki@openedev.com>
- <6d21516d-7412-5f16-f6f8-b7d46106b4f5@arm.com>
-Message-ID: <20170609135817.wntaqkbekiagq45e@flea.home>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 9 Jun 2017 15:58:30 +0200
+Subject: [PATCH v2 1/3] dt-bindings: arm: amlogic: Add SoC information
+ bindings
+In-Reply-To: <20170609133717.gkqnyatqezkrcaeg@rob-hp-laptop>
+References: <1496742340-10307-1-git-send-email-narmstrong@baylibre.com>
+ <1496742340-10307-2-git-send-email-narmstrong@baylibre.com>
+ <20170609133717.gkqnyatqezkrcaeg@rob-hp-laptop>
+Message-ID: <955d2903-9057-919b-004d-b1f5985dca5c@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 09, 2017 at 02:38:39PM +0100, Andre Przywara wrote:
-> Hi,
+On 06/09/2017 03:37 PM, Rob Herring wrote:
+> On Tue, Jun 06, 2017 at 11:45:38AM +0200, Neil Armstrong wrote:
+>> Add bindings for the SoC information register of the Amlogic SoCs.
+>>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>>  Documentation/devicetree/bindings/arm/amlogic.txt | 32 +++++++++++++++++++++++
+>>  1 file changed, 32 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
+>> index 5c01e65..ae3e8ed 100644
+>> --- a/Documentation/devicetree/bindings/arm/amlogic.txt
+>> +++ b/Documentation/devicetree/bindings/arm/amlogic.txt
+>> @@ -60,3 +60,35 @@ Board compatible values (alphabetically, grouped by SoC):
+>>    - "amlogic,q201" (Meson gxm s912)
+>>    - "kingnovel,r-box-pro" (Meson gxm S912)
+>>    - "nexbox,a1" (Meson gxm s912)
+>> +
+>> +Amlogic Meson Firmware registers Interface
+>> +------------------------------------------
+>> +
+>> +The Meson SoCs have a register bank with status and data shared with the
+>> +secure firmware.
+>> +
+>> +Required properties:
+>> + - compatible: For Meson GX SoCs, must be "amlogic,meson-gx-ao-secure", "syscon", "simple-mfd"
+>> +
+>> +Sub-nodes should indentify components of this register interface :
+>> +
+>> +Meson GX SoC Information
+>> +------------------------
+>> +A firmware register encodes the SoC type, package and revision information on
+>> +the Meson GX SoCs.
+>> +If present, a device node for this register should be added.
+>> +
+>> +Required properties:
+>> +  - compatible: For Meson GX SoCs, must be "amlogic,meson-gx-chipid".
+>> +
+>> +Example
+>> +-------
+>> +
+>> +ao-secure at 140 {
+>> +	compatible = "amlogic,meson-gx-ao-secure", "syscon", "simple-mfd";
+>> +	reg = <0x0 0x140 0x0 0x140>;
+>> +
+>> +	chipid {
+>> +		compatible = "amlogic,meson-gx-chipid";
 > 
-> On 09/06/17 13:40, Jagan Teki wrote:
-> > From: Jagan Teki <jagan@amarulasolutions.com>
-> > 
-> > Remove duplicate ethernet at 1c30000 from allwinner/sun50i-a64.dtsi
+> No registers for this block? If not, this node is pointless. 
+> "amlogic,meson-gx-ao-secure" should be specific enough to determine if 
+> you have this block or not and the driver for it can create a device if 
+> the OS needs it.
 > 
-> I think this is an artefact of the sun8i-dwmac merging, where both David
-> and Maxime merged the DT patches in their trees (compare e53f67e9 and
-> 103aefa0). I think both of them are in the process of sorting this out
-> (as this effects more than this hunk, I believe).
+> Rob
+> 
 
-Yeah, hopefully we'll manage to fix this.
+Well OK, but since it's a firmware interface, it can be handy to list the
+possible capabilities, not especially tied to a driver.
 
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170609/f19d7f79/attachment.sig>
+Neil
