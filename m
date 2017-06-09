@@ -1,65 +1,85 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  9 Jun 2017 12:49:49 +0100
-Subject: [PATCH v3 20/27] KVM: arm64: vgic-v3: Add ICV_DIR_EL1 handler
+Date: Fri,  9 Jun 2017 12:49:51 +0100
+Subject: [PATCH v3 22/27] KVM: arm64: vgic-v3: Add ICV_CTLR_EL1 handler
 In-Reply-To: <20170609114956.25963-1-marc.zyngier@arm.com>
 References: <20170609114956.25963-1-marc.zyngier@arm.com>
-Message-ID: <20170609114956.25963-21-marc.zyngier@arm.com>
+Message-ID: <20170609114956.25963-23-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a handler for writing the guest's view of the ICC_DIR_EL1
-register, performing the deactivation of an interrupt if EOImode
-is set ot 1.
+Add a handler for reading/writing the guest's view of the ICV_CTLR_EL1
+register. only EOIMode and CBPR are of interest here, as all the other
+bits directly come from ICH_VTR_EL2 and are Read-Only.
 
 Tested-by: Alexander Graf <agraf@suse.de>
 Acked-by: David Daney <david.daney@cavium.com>
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
+Acked-by: Christoffer Dall <cdall@linaro.org>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/hyp/vgic-v3-sr.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ virt/kvm/arm/hyp/vgic-v3-sr.c | 46 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
 
 diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index 08a5d76c82c7..2f2af03e8932 100644
+index 406da9c667ff..a8a58dedc38e 100644
 --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
 +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -652,6 +652,30 @@ static void __hyp_text __vgic_v3_bump_eoicount(void)
- 	write_gicreg(hcr, ICH_HCR_EL2);
+@@ -891,6 +891,46 @@ static void __hyp_text __vgic_v3_read_rpr(struct kvm_vcpu *vcpu,
+ 	vcpu_set_reg(vcpu, rt, val);
  }
  
-+static void __hyp_text __vgic_v3_write_dir(struct kvm_vcpu *vcpu,
++static void __hyp_text __vgic_v3_read_ctlr(struct kvm_vcpu *vcpu,
 +					   u32 vmcr, int rt)
 +{
-+	u32 vid = vcpu_get_reg(vcpu, rt);
-+	u64 lr_val;
-+	int lr;
++	u32 vtr, val;
 +
-+	/* EOImode == 0, nothing to be done here */
-+	if (!(vmcr & ICH_VMCR_EOIM_MASK))
-+		return;
++	vtr = read_gicreg(ICH_VTR_EL2);
++	/* PRIbits */
++	val = ((vtr >> 29) & 7) << ICC_CTLR_EL1_PRI_BITS_SHIFT;
++	/* IDbits */
++	val |= ((vtr >> 23) & 7) << ICC_CTLR_EL1_ID_BITS_SHIFT;
++	/* SEIS */
++	val |= ((vtr >> 22) & 1) << ICC_CTLR_EL1_SEIS_SHIFT;
++	/* A3V */
++	val |= ((vtr >> 21) & 1) << ICC_CTLR_EL1_A3V_SHIFT;
++	/* EOImode */
++	val |= ((vmcr & ICH_VMCR_EOIM_MASK) >> ICH_VMCR_EOIM_SHIFT) << ICC_CTLR_EL1_EOImode_SHIFT;
++	/* CBPR */
++	val |= (vmcr & ICH_VMCR_CBPR_MASK) >> ICH_VMCR_CBPR_SHIFT;
 +
-+	/* No deactivate to be performed on an LPI */
-+	if (vid >= VGIC_MIN_LPI)
-+		return;
-+
-+	lr = __vgic_v3_find_active_lr(vcpu, vid, &lr_val);
-+	if (lr == -1) {
-+		__vgic_v3_bump_eoicount();
-+		return;
-+	}
-+
-+	__vgic_v3_clear_active_lr(lr, lr_val);
++	vcpu_set_reg(vcpu, rt, val);
 +}
 +
- static void __hyp_text __vgic_v3_write_eoir(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
++static void __hyp_text __vgic_v3_write_ctlr(struct kvm_vcpu *vcpu,
++					    u32 vmcr, int rt)
++{
++	u32 val = vcpu_get_reg(vcpu, rt);
++
++	if (val & ICC_CTLR_EL1_CBPR_MASK)
++		vmcr |= ICH_VMCR_CBPR_MASK;
++	else
++		vmcr &= ~ICH_VMCR_CBPR_MASK;
++
++	if (val & ICC_CTLR_EL1_EOImode_MASK)
++		vmcr |= ICH_VMCR_EOIM_MASK;
++	else
++		vmcr &= ~ICH_VMCR_EOIM_MASK;
++
++	write_gicreg(vmcr, ICH_VMCR_EL2);
++}
++
+ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
  {
- 	u32 vid = vcpu_get_reg(vcpu, rt);
-@@ -946,6 +970,9 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
- 		else
- 			fn = __vgic_v3_write_bpr0;
+ 	int rt;
+@@ -983,6 +1023,12 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
+ 	case SYS_ICC_RPR_EL1:
+ 		fn = __vgic_v3_read_rpr;
  		break;
-+	case SYS_ICC_DIR_EL1:
-+		fn = __vgic_v3_write_dir;
++	case SYS_ICC_CTLR_EL1:
++		if (is_read)
++			fn = __vgic_v3_read_ctlr;
++		else
++			fn = __vgic_v3_write_ctlr;
 +		break;
  	default:
  		return 0;
