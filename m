@@ -1,96 +1,58 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 9 Jun 2017 10:12:50 +0200
-Subject: [PATCH 2/3] arm: dts: mt2701: Add display bls related nodes for
- MT2701
-In-Reply-To: <1496297324-21091-3-git-send-email-erin.lo@mediatek.com>
-References: <1496297324-21091-1-git-send-email-erin.lo@mediatek.com>
- <1496297324-21091-3-git-send-email-erin.lo@mediatek.com>
-Message-ID: <82c8b877-ec34-bd37-7428-8af86191a66e@gmail.com>
+From: sugar.zhang@rock-chips.com (Sugar Zhang)
+Date: Fri,  9 Jun 2017 15:59:33 +0800
+Subject: [PATCH v1 2/2] ARM: dts: rk322x: add spdif node
+In-Reply-To: <1496995173-63532-1-git-send-email-sugar.zhang@rock-chips.com>
+References: <1496995173-63532-1-git-send-email-sugar.zhang@rock-chips.com>
+Message-ID: <1496995173-63532-3-git-send-email-sugar.zhang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch add spdif node for rk322x.
 
+Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
 
-On 01/06/17 08:08, Erin Lo wrote:
-> From: YT Shen <yt.shen@mediatek.com>
+---
 
-I miss the Singed-off-by from YT Shen.
+ arch/arm/boot/dts/rk322x.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-> 
-> This patch adds the device node of display backlight for MT2701
-> 
-> Signed-off-by: Weiqing Kong <weiqing.kong@mediatek.com>
-> Signed-off-by: Erin Lo <erin.lo@mediatek.com>
-> ---
->   arch/arm/boot/dts/mt2701-evb.dts | 29 +++++++++++++++++++++++++++++
->   arch/arm/boot/dts/mt2701.dtsi    |  9 +++++++++
->   2 files changed, 38 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
-> index a483798..e49c2b7 100644
-> --- a/arch/arm/boot/dts/mt2701-evb.dts
-> +++ b/arch/arm/boot/dts/mt2701-evb.dts
-> @@ -22,6 +22,35 @@
->   	memory {
->   		reg = <0 0x80000000 0 0x40000000>;
->   	};
-> +
-> +	backlight_lcd: backlight_lcd {
-> +		compatible = "pwm-backlight";
-> +		pwms = <&bls 0 100000>;
-> +		brightness-levels = <
-> +			  0  16  32  48  64  80  96 112
-> +			128 144 160 176 192 208 224 240
-> +			255
-> +		>;
-> +		default-brightness-level = <9>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pwm_bls_gpio>;
-> +	};
-> +};
-> +
-> +&bls {
-> +	status = "okay";
-> +};
-> +
-> +&mmsys {
-> +	status = "okay";
-> +};
-> +
-> +&pio {
-> +	pwm_bls_gpio: pwm_bls_gpio {
-> +		pins_cmd_dat {
-> +			pinmux = <MT2701_PIN_208_AUD_EXT_CK1__FUNC_DISP_PWM>;
-> +		};
-> +	};
->   };
->   
->   &auxadc {
-> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-> index de88bd7..4f110d5 100644
-> --- a/arch/arm/boot/dts/mt2701.dtsi
-> +++ b/arch/arm/boot/dts/mt2701.dtsi
-> @@ -366,6 +366,15 @@
->   		#clock-cells = <1>;
->   	};
->   
-> +	bls: bls at 1400a000 {
-> +		compatible = "mediatek,mt2701-disp-pwm";
-> +		reg = <0 0x1400a000 0 0x1000>;
-> +		#pwm-cells = <2>;
-> +		clocks = <&mmsys CLK_MM_MDP_BLS_26M>, <&mmsys CLK_MM_DISP_BLS>;
-> +		clock-names = "main", "mm";
-> +		status = "disabled";
-> +	};
-> +
-
-Can you make this a new patch please. It's preferred to have one patch 
-for the dtsi and another one for the actual board.
-
-Thanks,
-Matthias
-
->   	larb0: larb at 14010000 {
->   		compatible = "mediatek,mt2701-smi-larb";
->   		reg = <0 0x14010000 0 0x1000>;
-> 
+diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
+index 48a0c1c..56f0842 100644
+--- a/arch/arm/boot/dts/rk322x.dtsi
++++ b/arch/arm/boot/dts/rk322x.dtsi
+@@ -168,6 +168,20 @@
+ 		status = "disabled";
+ 	};
+ 
++	spdif: spdif at 100d0000 {
++		compatible = "rockchip,rk3228-spdif";
++		reg = <0x100d0000 0x1000>;
++		interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru SCLK_SPDIF>, <&cru HCLK_SPDIF_8CH>;
++		clock-names = "mclk", "hclk";
++		dmas = <&pdma 10>;
++		#dma-cells = <1>;
++		dma-names = "tx";
++		pinctrl-names = "default";
++		pinctrl-0 = <&spdif_tx>;
++		status = "disabled";
++	};
++
+ 	i2s2: i2s2 at 100e0000 {
+ 		compatible = "rockchip,rk3228-i2s", "rockchip,rk3066-i2s";
+ 		reg = <0x100e0000 0x4000>;
+@@ -651,6 +665,12 @@
+ 			};
+ 		};
+ 
++		spdif {
++			spdif_tx: spdif-tx {
++				rockchip,pins = <3 31 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
+ 		tsadc {
+ 			otp_gpio: otp-gpio {
+ 				rockchip,pins = <0 24 RK_FUNC_GPIO &pcfg_pull_none>;
+-- 
+1.9.1
