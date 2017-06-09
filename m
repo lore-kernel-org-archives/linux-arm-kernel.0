@@ -1,43 +1,36 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 9 Jun 2017 15:48:59 +0800
-Subject: [PATCH v11 07/12] sun4i-codec: Add extra controls to
- sun4i_codec_quirks, sun7i_codec_quirks.
-In-Reply-To: <20170609062216.26807-8-dannym@scratchpost.org>
-References: <20170609062216.26807-1-dannym@scratchpost.org>
- <20170609062216.26807-8-dannym@scratchpost.org>
-Message-ID: <CAGb2v654SNZcGVx9SXVvLfpz2kHchftyeL2sGOgnvj2T9G7KBA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 9 Jun 2017 09:50:20 +0200
+Subject: [PATCH v2 01/11] pinctrl: dt-bindings: add documentation for
+ AP806 pin controllers
+In-Reply-To: <2d89fbc10d07c890336eabbd362e55cb2e5055b5.1496413293.git-series.gregory.clement@free-electrons.com>
+References: <cover.8fe5f7c62a787452878ca071fa00b953e96988ef.1496413293.git-series.gregory.clement@free-electrons.com>
+ <2d89fbc10d07c890336eabbd362e55cb2e5055b5.1496413293.git-series.gregory.clement@free-electrons.com>
+Message-ID: <CACRpkdYw3AgKBa+y-U9=1d9HqYyPGYK1y_5eBYoobV6s=4T0Wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 9, 2017 at 2:22 PM, Danny Milosavljevic
-<dannym@scratchpost.org> wrote:
-> Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
-> ---
->  sound/soc/sunxi/sun4i-codec.c | 4 ++++
->  1 file changed, 4 insertions(+)
->
-> diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-> index b1da14d1..d453af65 100644
-> --- a/sound/soc/sunxi/sun4i-codec.c
-> +++ b/sound/soc/sunxi/sun4i-codec.c
-> @@ -1576,6 +1576,8 @@ static const struct sun4i_codec_quirks sun4i_codec_quirks = {
->         .reg_adc_fifoc  = REG_FIELD(SUN4I_CODEC_ADC_FIFOC, 0, 31),
->         .reg_dac_txdata = SUN4I_CODEC_DAC_TXDATA,
->         .reg_adc_rxdata = SUN4I_CODEC_ADC_RXDATA,
-> +       .controls = sun4i_codec_extra_controls,
-> +       .num_controls = ARRAY_SIZE(sun4i_codec_extra_controls),
+On Fri, Jun 2, 2017 at 4:23 PM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
 
-Where did these come from?
+> Document the device tree binding for the pin controllers found on the
+> Armada 7K and Armada 8K SoCs.
+>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
->  };
->
->  static const struct sun4i_codec_quirks sun6i_a31_codec_quirks = {
-> @@ -1595,6 +1597,8 @@ static const struct sun4i_codec_quirks sun7i_codec_quirks = {
->         .reg_adc_fifoc  = REG_FIELD(SUN4I_CODEC_ADC_FIFOC, 0, 31),
->         .reg_dac_txdata = SUN4I_CODEC_DAC_TXDATA,
->         .reg_adc_rxdata = SUN4I_CODEC_ADC_RXDATA,
-> +       .controls = sun7i_codec_extra_controls,
-> +       .num_controls = ARRAY_SIZE(sun7i_codec_extra_controls),
->  };
->
->  static const struct sun4i_codec_quirks sun8i_a23_codec_quirks = {
+This patch does not apply to any of my branches, I have no clue
+what tree you're basing this on.
+
+I would prefer a series based on a pure v4.12-rc2 I think, as this
+is what both the pin control and GPIO development branches
+is based on, unless you have a better merge strategy to suggest?
+
+I hope for the love of god that this does not also clash with the
+PWM stuff that is patching around in the GPIO tree, if it does
+I might very well throw up my hands and defer merging all of
+this until the next kernel cycle past v4.13-rc1.
+
+Please rebase on v4.12-rc2 and resend.
+
+Yours,
+Linus Walleij
