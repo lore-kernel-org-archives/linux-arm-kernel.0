@@ -1,43 +1,164 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Fri, 9 Jun 2017 18:48:30 +0300
-Subject: [PATCH 6/6] tty: serial: lpuart: add a more accurate baud rate
- calculation method
-In-Reply-To: <AM3PR04MB30678CBD87777C6816DEFA580CE0@AM3PR04MB306.eurprd04.prod.outlook.com>
-References: <1494316248-24052-1-git-send-email-aisheng.dong@nxp.com>
- <1494316248-24052-7-git-send-email-aisheng.dong@nxp.com>
- <CAHp75Vemc5qoD7gbc_sJBSasYTFYSYOuWZv4N-4X60arWX8aJg@mail.gmail.com>
- <AM3PR04MB3062F7BCE82860C377C214E80F10@AM3PR04MB306.eurprd04.prod.outlook.com>
- <CAHp75VcH0j3ddaZ3iStNO4QcAwJKZ7BAMwUTthum2no1ucs2ww@mail.gmail.com>
- <AM3PR04MB306214514B820D66535E28B80CE0@AM3PR04MB306.eurprd04.prod.outlook.com>
- <CAHp75VcSToSfbUZ2TP0OsLRjV4TNpq7D_=4tnB_+rDvS2jp22Q@mail.gmail.com>
- <AM3PR04MB30678CBD87777C6816DEFA580CE0@AM3PR04MB306.eurprd04.prod.outlook.com>
-Message-ID: <CAHp75VdgLoavZrf+T1-cyPj2A30mGeyDEgye3qZoWXJE6inE_Q@mail.gmail.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Fri,  9 Jun 2017 17:50:40 +0200
+Subject: [PATCH v2] ARM: dts: r8a779x: Fix PCI bus dtc warnings
+Message-ID: <1497023440-23845-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 9, 2017 at 5:20 PM, A.S. Dong <aisheng.dong@nxp.com> wrote:
->> > How about you send a separate baud algorithm improvement patch later?
->>
->> Why not to do it right a way?
->>
->
-> Because I thought that could be a separate patch which is doing algorithm
-> improvement, then we can have the full history and a clear comparison.
->
-> And also we are still not sure whether it works, we don't want to block on it
-> too long.
->
-> But if you're pretty sure about it, I would wait for some more time.
->
-> However, personally I would still rather keep them in two separate Patches
-> for clearer history and comparison.
+From: Rob Herring <robh@kernel.org>
 
-Since we already near to -rc5, I would rather agree with you.
-So, please proceed with your approach and we can modify it in relaxing
-mode later on.
+The bogus 'device_type = "pci"' confuses dtc, causing lots of totally
+unrelated warnings.  After fixing that, real warnings like
 
-Thanks, and sorry for the delay!
+    arch/arm/boot/dts/r8a7790-lager.dtb: Warning (pci_device_reg): Node /pci at ee090000/usb at 0,1 PCI unit address format error, expected "1,0"
 
+are left.  Correct the unit-addresses and reg properties of the subnodes
+to fix these.
+
+Signed-off-by: Rob Herring <robh@kernel.org>
+[geert: Improve description]
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v2:
+  - Take over from Rob,
+  - Improve patch description.
+
+ arch/arm/boot/dts/r8a7790.dtsi | 16 ++++++----------
+ arch/arm/boot/dts/r8a7791.dtsi | 16 ++++++----------
+ arch/arm/boot/dts/r8a7794.dtsi | 16 ++++++----------
+ 3 files changed, 18 insertions(+), 30 deletions(-)
+
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 043c599011798042..2ed727f81a66981b 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -1233,16 +1233,14 @@
+ 				 0x0800 0 0 1 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH
+ 				 0x1000 0 0 2 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
+ 
+-		usb at 0,1 {
++		usb at 1,0 {
+ 			reg = <0x800 0 0 0 0>;
+-			device_type = "pci";
+ 			phys = <&usb0 0>;
+ 			phy-names = "usb";
+ 		};
+ 
+-		usb at 0,2 {
++		usb at 2,0 {
+ 			reg = <0x1000 0 0 0 0>;
+-			device_type = "pci";
+ 			phys = <&usb0 0>;
+ 			phy-names = "usb";
+ 		};
+@@ -1289,16 +1287,14 @@
+ 				 0x0800 0 0 1 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
+ 				 0x1000 0 0 2 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
+ 
+-		usb at 0,1 {
+-			reg = <0x800 0 0 0 0>;
+-			device_type = "pci";
++		usb at 1,0 {
++			reg = <0x20800 0 0 0 0>;
+ 			phys = <&usb2 0>;
+ 			phy-names = "usb";
+ 		};
+ 
+-		usb at 0,2 {
+-			reg = <0x1000 0 0 0 0>;
+-			device_type = "pci";
++		usb at 2,0 {
++			reg = <0x21000 0 0 0 0>;
+ 			phys = <&usb2 0>;
+ 			phy-names = "usb";
+ 		};
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index a56be0f9dcfc907d..111027383e6cdd8a 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -1254,16 +1254,14 @@
+ 				 0x0800 0 0 1 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH
+ 				 0x1000 0 0 2 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
+ 
+-		usb at 0,1 {
++		usb at 1,0 {
+ 			reg = <0x800 0 0 0 0>;
+-			device_type = "pci";
+ 			phys = <&usb0 0>;
+ 			phy-names = "usb";
+ 		};
+ 
+-		usb at 0,2 {
++		usb at 2,0 {
+ 			reg = <0x1000 0 0 0 0>;
+-			device_type = "pci";
+ 			phys = <&usb0 0>;
+ 			phy-names = "usb";
+ 		};
+@@ -1289,16 +1287,14 @@
+ 				 0x0800 0 0 1 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
+ 				 0x1000 0 0 2 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
+ 
+-		usb at 0,1 {
+-			reg = <0x800 0 0 0 0>;
+-			device_type = "pci";
++		usb at 1,0 {
++			reg = <0x10800 0 0 0 0>;
+ 			phys = <&usb2 0>;
+ 			phy-names = "usb";
+ 		};
+ 
+-		usb at 0,2 {
+-			reg = <0x1000 0 0 0 0>;
+-			device_type = "pci";
++		usb at 2,0 {
++			reg = <0x11000 0 0 0 0>;
+ 			phys = <&usb2 0>;
+ 			phy-names = "usb";
+ 		};
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index c2bc6ba9200ecc40..33fc723f0c2ec42e 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -820,16 +820,14 @@
+ 				 0x0800 0 0 1 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH
+ 				 0x1000 0 0 2 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
+ 
+-		usb at 0,1 {
++		usb at 1,0 {
+ 			reg = <0x800 0 0 0 0>;
+-			device_type = "pci";
+ 			phys = <&usb0 0>;
+ 			phy-names = "usb";
+ 		};
+ 
+-		usb at 0,2 {
++		usb at 2,0 {
+ 			reg = <0x1000 0 0 0 0>;
+-			device_type = "pci";
+ 			phys = <&usb0 0>;
+ 			phy-names = "usb";
+ 		};
+@@ -855,16 +853,14 @@
+ 				 0x0800 0 0 1 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
+ 				 0x1000 0 0 2 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
+ 
+-		usb at 0,1 {
+-			reg = <0x800 0 0 0 0>;
+-			device_type = "pci";
++		usb at 1,0 {
++			reg = <0x10800 0 0 0 0>;
+ 			phys = <&usb2 0>;
+ 			phy-names = "usb";
+ 		};
+ 
+-		usb at 0,2 {
+-			reg = <0x1000 0 0 0 0>;
+-			device_type = "pci";
++		usb at 2,0 {
++			reg = <0x11000 0 0 0 0>;
+ 			phys = <&usb2 0>;
+ 			phy-names = "usb";
+ 		};
 -- 
-With Best Regards,
-Andy Shevchenko
+2.7.4
