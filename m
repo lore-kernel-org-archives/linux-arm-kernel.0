@@ -1,53 +1,103 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 9 Jun 2017 15:45:09 +0800
-Subject: [PATCH v3] mm: huge-vmap: fail gracefully on unexpected huge
- vmap mappings
-In-Reply-To: <20170608113548.24905-1-ard.biesheuvel@linaro.org>
-Message-ID: <201706091553.AtM2cOo2%fengguang.wu@intel.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 9 Jun 2017 15:45:52 +0800
+Subject: [PATCH v11 04/12] sun4i-codec: Add Mic1 Capture Volume, Mic2
+ Capture Volume.
+In-Reply-To: <20170609062216.26807-5-dannym@scratchpost.org>
+References: <20170609062216.26807-1-dannym@scratchpost.org>
+ <20170609062216.26807-5-dannym@scratchpost.org>
+Message-ID: <CAGb2v66PNg=PfYCGMTczms_vn2VDn0r_umZj=6BCrmu2xdcv=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On Fri, Jun 9, 2017 at 2:22 PM, Danny Milosavljevic
+<dannym@scratchpost.org> wrote:
+> Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
+> ---
+>  sound/soc/sunxi/sun4i-codec.c | 41 +++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+>
+> diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+> index b5a3b5b3..25870a64 100644
+> --- a/sound/soc/sunxi/sun4i-codec.c
+> +++ b/sound/soc/sunxi/sun4i-codec.c
+> @@ -97,6 +97,8 @@
+>  #define SUN4I_CODEC_ADC_ACTL_PREG1EN                   (29)
+>  #define SUN4I_CODEC_ADC_ACTL_PREG2EN                   (28)
+>  #define SUN4I_CODEC_ADC_ACTL_VMICEN                    (27)
+> +#define SUN4I_CODEC_ADC_ACTL_PREG1                     (25)
+> +#define SUN4I_CODEC_ADC_ACTL_PREG2                     (23)
+>  #define SUN4I_CODEC_ADC_ACTL_ADCG                      (20)
+>  #define SUN4I_CODEC_ADC_ACTL_ADCIS                     (17)
+>  #define SUN4I_CODEC_ADC_ACTL_LNRDF                     (16)
+> @@ -115,6 +117,9 @@
+>  /* Microphone controls (sun7i only) */
+>  #define SUN7I_CODEC_AC_MIC_PHONE_CAL           (0x3c)
+>
+> +#define SUN7I_CODEC_AC_MIC_PHONE_CAL_PREG1             (29)
+> +#define SUN7I_CODEC_AC_MIC_PHONE_CAL_PREG2             (26)
+> +
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.12-rc4]
-[cannot apply to next-20170608]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+These aren't used.
 
-url:    https://github.com/0day-ci/linux/commits/Ard-Biesheuvel/mm-huge-vmap-fail-gracefully-on-unexpected-huge-vmap-mappings/20170609-093900
-config: i386-randconfig-i1-06042254 (attached as .config)
-compiler: gcc-4.8 (Debian 4.8.4-1) 4.8.4
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+>  /*
+>   * sun6i specific registers
+>   *
+> @@ -665,6 +670,12 @@ static DECLARE_TLV_DB_SCALE(sun4i_codec_micin_loopback_gain_scale,
+>                             150,
+>                             0);
+>  static DECLARE_TLV_DB_SCALE(sun4i_codec_adc_gain_scale, -450, 150, 0);
+> +static DECLARE_TLV_DB_RANGE(sun4i_codec_micin_preamp_gain_scale,
+> +                           0, 0, TLV_DB_SCALE_ITEM(0, 0, 0),
+> +                           1, 7, TLV_DB_SCALE_ITEM(3500, 300, 0));
+> +static DECLARE_TLV_DB_RANGE(sun7i_codec_micin_preamp_gain_scale,
+> +                           0, 0, TLV_DB_SCALE_ITEM(0, 0, 0),
+> +                           1, 7, TLV_DB_SCALE_ITEM(2400, 300, 0));
+>
+>  static const char * const sun4i_codec_difflinein_capture_source[] = {
+>         "Stereo",
+> @@ -718,6 +729,36 @@ static const struct snd_kcontrol_new sun4i_codec_controls[] = {
+>                        sun4i_codec_adc_gain_scale),
+>  };
+>
+> +static const struct snd_kcontrol_new sun4i_codec_extra_controls[] = {
+> +       SOC_SINGLE_TLV("Mic1 Capture Volume",
+> +                      SUN4I_CODEC_ADC_ACTL,
+> +                      SUN4I_CODEC_ADC_ACTL_PREG1,
+> +                      3,
+> +                      0,
+> +                      sun4i_codec_micin_preamp_gain_scale),
 
-All errors (new ones prefixed by >>):
+You correctly name them preamp gain here.
 
-   arch/x86/built-in.o: In function `vmalloc_fault':
->> fault.c:(.text.unlikely+0x1765): undefined reference to `pmd_huge'
-   mm/built-in.o: In function `follow_page_mask':
-   (.text+0x21da6): undefined reference to `pud_huge'
-   mm/built-in.o: In function `follow_page_mask':
-   (.text+0x21e39): undefined reference to `pmd_huge'
-   mm/built-in.o: In function `__follow_pte_pmd.isra.86':
-   memory.c:(.text+0x2381c): undefined reference to `pmd_huge'
-   memory.c:(.text+0x2384a): undefined reference to `pmd_huge'
-   mm/built-in.o: In function `apply_to_page_range':
-   (.text+0x2648d): undefined reference to `pud_huge'
-   mm/built-in.o: In function `apply_to_page_range':
-   (.text+0x26608): undefined reference to `pmd_huge'
-   mm/built-in.o: In function `vmalloc_to_page':
-   (.text+0x30ea3): undefined reference to `pud_huge'
-   mm/built-in.o: In function `vmalloc_to_page':
-   (.text+0x30ec8): undefined reference to `pmd_huge'
+> +       SOC_SINGLE_TLV("Mic2 Capture Volume",
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 27823 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170609/e3264f7f/attachment-0001.gz>
+But incorrect name the controls. They do not just affect capture.
+Call them "Mic1/Mic2 Boost Volume".
+
+ChenYu
+
+> +                      SUN4I_CODEC_ADC_ACTL,
+> +                      SUN4I_CODEC_ADC_ACTL_PREG2,
+> +                      3,
+> +                      0,
+> +                      sun4i_codec_micin_preamp_gain_scale),
+> +};
+> +
+> +static const struct snd_kcontrol_new sun7i_codec_extra_controls[] = {
+> +       SOC_SINGLE_TLV("Mic1 Capture Volume",
+> +                      SUN7I_CODEC_AC_MIC_PHONE_CAL,
+> +                      SUN7I_CODEC_AC_MIC_PHONE_CAL_PREG1,
+> +                      7,
+> +                      0,
+> +                      sun7i_codec_micin_preamp_gain_scale),
+> +       SOC_SINGLE_TLV("Mic2 Capture Volume",
+> +                      SUN7I_CODEC_AC_MIC_PHONE_CAL,
+> +                      SUN7I_CODEC_AC_MIC_PHONE_CAL_PREG2,
+> +                      7,
+> +                      0,
+> +                      sun7i_codec_micin_preamp_gain_scale),
+> +};
+> +
+>  static const struct snd_kcontrol_new sun4i_codec_left_mixer_controls[] = {
+>         SOC_DAPM_SINGLE("Left DAC Playback Switch", SUN4I_CODEC_DAC_ACTL,
+>                         SUN4I_CODEC_DAC_ACTL_LDACLMIXS, 1, 0),
