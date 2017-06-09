@@ -1,35 +1,33 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 9 Jun 2017 16:51:41 +0200
-Subject: [PATCH v2] arm64: allwinner: a64: Add initial NanoPi A64 support
-In-Reply-To: <1497012052-14027-2-git-send-email-jteki@openedev.com>
-References: <1497012052-14027-1-git-send-email-jteki@openedev.com>
- <1497012052-14027-2-git-send-email-jteki@openedev.com>
-Message-ID: <20170609145141.aknbsis25vmy3rj6@flea.home>
+Date: Fri, 9 Jun 2017 16:52:36 +0200
+Subject: [PATCH] arm64: allwinner: a64: Add initial NanoPi A64 support
+In-Reply-To: <1497013436-14107-1-git-send-email-jteki@openedev.com>
+References: <1497013436-14107-1-git-send-email-jteki@openedev.com>
+Message-ID: <20170609145236.tunnjyiorfggyhk5@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jagan,
+On Fri, Jun 09, 2017 at 01:03:56PM +0000, Jagan Teki wrote:
+> From: Jagan Teki <jagan@amarulasolutions.com>
+> 
+> NanoPi A64 is a new board of high performance with low cost
+> designed by FriendlyElec., using the Allwinner A64 SOC.
+> 
+> Nanopi A64 features
+> - Allwinner A64, 64-bit Quad-core Cortex-A53 at 648MHz to 1.152GHz, DVFS
+> - 1GB DDR3 RAM
+> - MicroSD
+> - Gigabit Ethernet (RTL8211E)
+> - Wi-Fi 802.11b/g/n
+> - IR receiver
+> - Audio In/Out
+> - Video In/Out
+> - Serial Debug Port
+> - microUSB 5V 2A DC power-supply
+> 
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 
-On Fri, Jun 09, 2017 at 12:40:52PM +0000, Jagan Teki wrote:
-> +&i2c1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c1_pins>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c1_pins {
-> +	bias-pull-up;
-> +};
-
-What is connected on that bus?
-
-> +&uart1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
-> +	status = "okay";
-> +};
-
-And on that UART?
+Hmmm, I'm confused, didn't you just send that DT already?
 
 Maxime
 
@@ -43,4 +41,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170609/625c79ba/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170609/08ed8d59/attachment.sig>
