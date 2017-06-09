@@ -1,120 +1,86 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Fri, 9 Jun 2017 12:26:20 +0300
-Subject: [PATCH 6/6] tty: serial: lpuart: add a more accurate baud rate
- calculation method
-In-Reply-To: <AM3PR04MB306214514B820D66535E28B80CE0@AM3PR04MB306.eurprd04.prod.outlook.com>
-References: <1494316248-24052-1-git-send-email-aisheng.dong@nxp.com>
- <1494316248-24052-7-git-send-email-aisheng.dong@nxp.com>
- <CAHp75Vemc5qoD7gbc_sJBSasYTFYSYOuWZv4N-4X60arWX8aJg@mail.gmail.com>
- <AM3PR04MB3062F7BCE82860C377C214E80F10@AM3PR04MB306.eurprd04.prod.outlook.com>
- <CAHp75VcH0j3ddaZ3iStNO4QcAwJKZ7BAMwUTthum2no1ucs2ww@mail.gmail.com>
- <AM3PR04MB306214514B820D66535E28B80CE0@AM3PR04MB306.eurprd04.prod.outlook.com>
-Message-ID: <CAHp75VcSToSfbUZ2TP0OsLRjV4TNpq7D_=4tnB_+rDvS2jp22Q@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 9 Jun 2017 09:27:15 +0000
+Subject: [PATCH v5] mm: huge-vmap: fail gracefully on unexpected huge vmap
+ mappings
+In-Reply-To: <20170609092209.GA10665@leverpostej>
+References: <20170609082226.26152-1-ard.biesheuvel@linaro.org>
+ <20170609092209.GA10665@leverpostej>
+Message-ID: <CAKv+Gu_te54d9VU9AKYevkOvSpCBBeDQy5PE+PhX-t=ka3L8JA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 9, 2017 at 11:01 AM, A.S. Dong <aisheng.dong@nxp.com> wrote:
-
->> >> > +       u32 sbr, osr, baud_diff, tmp_osr, tmp_sbr, tmp_diff, tmp;
->> >> > +       u32 clk = sport->port.uartclk;
->> >> > +
->> >> > +       /*
->> >> > +        * The idea is to use the best OSR (over-sampling rate)
->> possible.
->> >> > +        * Note, OSR is typically hard-set to 16 in other LPUART
->> >> instantiations.
->> >> > +        * Loop to find the best OSR value possible, one that
->> >> > + generates
->> >> minimum
->> >> > +        * baud_diff iterate through the rest of the supported
->> >> > + values of
->> >> OSR.
->> >> > +        *
->> >> > +        * Calculation Formula:
->> >> > +        *  Baud Rate = baud clock / ((OSR+1) ? SBR)
->> >> > +        */
->> >> > +       baud_diff = baudrate;
->> >> > +       osr = 0;
->> >> > +       sbr = 0;
->> >> > +
->> >>
->> >> > +       for (tmp_osr = 4; tmp_osr <= 32; tmp_osr++) {
+On 9 June 2017 at 09:22, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Jun 09, 2017 at 08:22:26AM +0000, Ard Biesheuvel wrote:
+>> Existing code that uses vmalloc_to_page() may assume that any
+>> address for which is_vmalloc_addr() returns true may be passed
+>> into vmalloc_to_page() to retrieve the associated struct page.
 >>
->> I missed one thing, what happened by default to OSR? What is the value in
->> use?
+>> This is not un unreasonable assumption to make, but on architectures
+>> that have CONFIG_HAVE_ARCH_HUGE_VMAP=y, it no longer holds, and we
+>> need to ensure that vmalloc_to_page() does not go off into the weeds
+>> trying to dereference huge PUDs or PMDs as table entries.
 >>
->
-> No valid default value. (osc/sbr are 0 by default)
-> If no proper osc and sbr calculated, a WARNING will show.
-
-Okay, so, it means the maximum supported speed is UART clock / 4. Correct?
-
->> So, the algo is the following:
+>> Given that vmalloc() and vmap() themselves never create huge
+>> mappings or deal with compound pages at all, there is no correct
+>> answer in this case, so return NULL instead, and issue a warning.
 >>
->> Assume the ranges like this:
->> OSR = [4 ... 32]
->> SBR = [2 ... 8192]
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>> v5: - fix typo
 >>
->
-> Baud Rate = baud clock / ((OSR+1) ? SBR)
->
-> In HW:
-> OSR range : 3 ? 31
-> SBR range: 1 ? 8191
+>> v4: - use pud_bad/pmd_bad instead of pud_huge/pmd_huge, which don't require
+>>       changes to hugetlb.h, and give us what we need on all architectures
+>>     - move WARN_ON_ONCE() calls out of conditionals
 
-I've read that, but think outside the box.
+^^^
 
->> Then:
+>>     - add explanatory comment
 >>
->> 1. Get ratio factor as
->>       ratio = CLK / desired baud rate
->> 2. If ratio < 8192 * 9 / 2, just use (ratio / 4, 4) as (OSR, SBR) setting.
->> (Needs clarification on OSR < 4)
->
-> Sorry that I'm a bit mess here.
-> What is 8192 * 9 /2 meaning?
-
-I forgot the details...
-
-> And for (ratio / 4, 4) as (OSR,SBR), take 115200 as an example:
-> Assuming baud clock 24Mhz.
->
-> Ratio = 24000000 / 115200 = 208
-> OSR = Ratio / 4 = 52
-> Then OSR is out of range which seems wrong.
-
-...yes...
-
->> 3. if ratio >= 8192 * 31, just use those
->> two numbers (8192, 31). You can't do anything better there.
->
-> This actually may not happen.
-> Even take a 9600 as example, the clk becomes:
-> 8191 * 31 * 9600 = 2.4GHz
-> Which is theoretically not exist.
->
->> 4. Otherwise, get a minimum required factor of OSR
->>       osr_min = ratio / 8192
->> 5. Start your loop from osr_min + 1 to 31.
+>>  mm/vmalloc.c | 15 +++++++++++++--
+>>  1 file changed, 13 insertions(+), 2 deletions(-)
 >>
->> 6 (optional). Of course you may not consider baud_diff > osr_min, it's I
->> suppose obvious
->>
->> P.S. Note, all divisions by 2^n are just simple right shifts. Diffs are
->> calculated as multiplication of OSR and SBR in comparison to ratio. One
->> division so far.
+>> diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+>> index 34a1c3e46ed7..0fcd371266a4 100644
+>> --- a/mm/vmalloc.c
+>> +++ b/mm/vmalloc.c
+>> @@ -287,10 +287,21 @@ struct page *vmalloc_to_page(const void *vmalloc_addr)
+>>       if (p4d_none(*p4d))
+>>               return NULL;
+>>       pud = pud_offset(p4d, addr);
+>> -     if (pud_none(*pud))
+>> +
+>> +     /*
+>> +      * Don't dereference bad PUD or PMD (below) entries. This will also
+>> +      * identify huge mappings, which we may encounter on architectures
+>> +      * that define CONFIG_HAVE_ARCH_HUGE_VMAP=y. Such regions will be
+>> +      * identified as vmalloc addresses by is_vmalloc_addr(), but are
+>> +      * not [unambiguously] associated with a struct page, so there is
+>> +      * no correct value to return for them.
+>> +      */
+>> +     WARN_ON_ONCE(pud_bad(*pud));
+>> +     if (pud_none(*pud) || pud_bad(*pud))
+>>               return NULL;
+>
+> Nit: the WARN_ON_ONCE() can be folded into the conditional:
+>
+>         if (pud_none(*pud) || WARN_ON_ONCE(pud_bad(*pud)))
+>                 reutrn NULL;
+>
+>>       pmd = pmd_offset(pud, addr);
+>> -     if (pmd_none(*pmd))
+>> +     WARN_ON_ONCE(pmd_bad(*pmd));
+>> +     if (pmd_none(*pmd) || pmd_bad(*pmd))
+>>               return NULL;
+>
+> Likewise here.
+>
 
-> I'm not quite understand the approach.
+Actually, it was Dave who requested them to be taken out of the conditional.
 
-...lemme prepare a python script demonstrating it.
+> Otherwise, looks good to me. FWIW:
+>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+>
 
-> How about you send a separate baud algorithm improvement patch later?
-
-Why not to do it right a way?
-
-Just describe it in a comment if you afraid of reader can't understand
-from the code.
-
--- 
-With Best Regards,
-Andy Shevchenko
+Thanks,
+Ard.
