@@ -1,83 +1,74 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 9 Jun 2017 13:44:16 +0200
-Subject: [PATCH] ARM: at91: fix at91_suspend_entering_slow_clock link error
-In-Reply-To: <20170609101821.2776168-1-arnd@arndb.de>
-References: <20170609101821.2776168-1-arnd@arndb.de>
-Message-ID: <20170609114416.6ru5emtqmbubgmzd@piout.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri,  9 Jun 2017 12:49:30 +0100
+Subject: [PATCH v3 01/27] arm64: Add a facility to turn an ESR syndrome into a
+ sysreg encoding
+In-Reply-To: <20170609114956.25963-1-marc.zyngier@arm.com>
+References: <20170609114956.25963-1-marc.zyngier@arm.com>
+Message-ID: <20170609114956.25963-2-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+It is often useful to compare an ESR syndrome reporting the trapping
+of a system register with a value matching that system register.
 
-On 09/06/2017 at 12:18:02 +0200, Arnd Bergmann wrote:
-> When CONFIG_ARCH_AT91 is enabled, but none of the specific SoC support
-> is in use, some at91 specific drivers fail to link:
-> 
-> drivers/tty/serial/atmel_serial.o: In function `atmel_serial_suspend':
-> atmel_serial.c:(.text.atmel_serial_suspend+0x1e): undefined reference to `at91_suspend_entering_slow_clock'
-> drivers/usb/host/ohci-at91.o: In function `ohci_hcd_at91_drv_suspend':
-> ohci-at91.c:(.text.ohci_hcd_at91_drv_suspend+0x12): undefined reference to `at91_suspend_entering_slow_clock'
-> drivers/usb/gadget/udc/at91_udc.o: In function `at91udc_suspend':
-> at91_udc.c:(.text.at91udc_suspend+0x26): undefined reference to `at91_suspend_entering_slow_clock'
->
+Since encoding both the sysreg and the ESR version seem to be a bit
+overkill, let's add a set of macros that convert an ESR value into
+the corresponding sysreg encoding.
 
-How you present it makes me think, that this was present for a while,
-even before samv7 support was added. Am I wrong?
+We handle both AArch32 and AArch64, taking advantage of identical
+encodings between system registers and CP15 accessors.
 
-> This changes the at91_suspend_entering_slow_clock hack once more, adding
-> an alternative inline implementation that is used exactly in those cases
-> that don't provide the normal implementation.
-> 
-> Fixes: c1892c2379d2 ("ARM: at91: handle CONFIG_PM for armv7m configurations")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/mach-at91/samv7.c          | 9 ---------
->  include/linux/platform_data/atmel.h | 7 +++++++
->  2 files changed, 7 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/samv7.c b/arch/arm/mach-at91/samv7.c
-> index 910f0c68db62..11386f190c83 100644
-> --- a/arch/arm/mach-at91/samv7.c
-> +++ b/arch/arm/mach-at91/samv7.c
-> @@ -15,15 +15,6 @@
->  #include <asm/system_misc.h>
->  #include "generic.h"
->  
-> -#ifdef CONFIG_PM
-> -/* This function has to be defined for various drivers that are using it */
-> -int at91_suspend_entering_slow_clock(void)
-> -{
-> -	return 0;
-> -}
-> -EXPORT_SYMBOL(at91_suspend_entering_slow_clock);
-> -#endif
-> -
->  static const char *const samv7_dt_board_compat[] __initconst = {
->  	"atmel,samv7",
->  	NULL
-> diff --git a/include/linux/platform_data/atmel.h b/include/linux/platform_data/atmel.h
-> index 3c8825b67298..7b6dce7d6d33 100644
-> --- a/include/linux/platform_data/atmel.h
-> +++ b/include/linux/platform_data/atmel.h
-> @@ -52,6 +52,13 @@ struct atmel_uart_data {
->  };
->  
->  /* FIXME: this needs a better location, but gets stuff building again */
-> +#ifdef CONFIG_ATMEL_PM
->  extern int at91_suspend_entering_slow_clock(void);
-> +#else
-> +static inline int at91_suspend_entering_slow_clock(void)
-> +{
-> +	return 0;
-> +}
-> +#endif
->  
->  #endif /* __ATMEL_H__ */
-> -- 
-> 2.9.0
-> 
+Tested-by: Alexander Graf <agraf@suse.de>
+Acked-by: David Daney <david.daney@cavium.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/esr.h | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index 85997c0e5443..e7d8e281ff62 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -19,6 +19,7 @@
+ #define __ASM_ESR_H
+ 
+ #include <asm/memory.h>
++#include <asm/sysreg.h>
+ 
+ #define ESR_ELx_EC_UNKNOWN	(0x00)
+ #define ESR_ELx_EC_WFx		(0x01)
+@@ -181,6 +182,29 @@
+ #define ESR_ELx_SYS64_ISS_SYS_CNTFRQ	(ESR_ELx_SYS64_ISS_SYS_VAL(3, 3, 0, 14, 0) | \
+ 					 ESR_ELx_SYS64_ISS_DIR_READ)
+ 
++#define esr_sys64_to_sysreg(e)					\
++	sys_reg((((e) & ESR_ELx_SYS64_ISS_OP0_MASK) >>		\
++		 ESR_ELx_SYS64_ISS_OP0_SHIFT),			\
++		(((e) & ESR_ELx_SYS64_ISS_OP1_MASK) >>		\
++		 ESR_ELx_SYS64_ISS_OP1_SHIFT),			\
++		(((e) & ESR_ELx_SYS64_ISS_CRN_MASK) >>		\
++		 ESR_ELx_SYS64_ISS_CRN_SHIFT),			\
++		(((e) & ESR_ELx_SYS64_ISS_CRM_MASK) >>		\
++		 ESR_ELx_SYS64_ISS_CRM_SHIFT),			\
++		(((e) & ESR_ELx_SYS64_ISS_OP2_MASK) >>		\
++		 ESR_ELx_SYS64_ISS_OP2_SHIFT))
++
++#define esr_cp15_to_sysreg(e)					\
++	sys_reg(3,						\
++		(((e) & ESR_ELx_SYS64_ISS_OP1_MASK) >>		\
++		 ESR_ELx_SYS64_ISS_OP1_SHIFT),			\
++		(((e) & ESR_ELx_SYS64_ISS_CRN_MASK) >>		\
++		 ESR_ELx_SYS64_ISS_CRN_SHIFT),			\
++		(((e) & ESR_ELx_SYS64_ISS_CRM_MASK) >>		\
++		 ESR_ELx_SYS64_ISS_CRM_SHIFT),			\
++		(((e) & ESR_ELx_SYS64_ISS_OP2_MASK) >>		\
++		 ESR_ELx_SYS64_ISS_OP2_SHIFT))
++
+ #ifndef __ASSEMBLY__
+ #include <asm/types.h>
+ 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.11.0
