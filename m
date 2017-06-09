@@ -1,25 +1,25 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 9 Jun 2017 10:56:36 +0200
-Subject: [PATCH v3 1/5] pinctrl: qcom: Add ipq8074 pinctrl driver
-In-Reply-To: <1496316482-25468-2-git-send-email-varada@codeaurora.org>
-References: <1496316482-25468-1-git-send-email-varada@codeaurora.org>
- <1496316482-25468-2-git-send-email-varada@codeaurora.org>
-Message-ID: <CACRpkdaLhD+ONwDTebT7q+M-CHDVPKUE4eKfusmyWkitQC1ZPQ@mail.gmail.com>
+From: sugar.zhang@rock-chips.com (Sugar Zhang)
+Date: Fri,  9 Jun 2017 16:52:45 +0800
+Subject: [PATCH v1 0/4] Patches to fix some problem for rockchip i2s
+Message-ID: <1496998369-30556-1-git-send-email-sugar.zhang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 1, 2017 at 1:27 PM, Varadarajan Narayanan
-<varada@codeaurora.org> wrote:
+These patches to fix some problem for rockchip i2s.
 
-> Add initial pinctrl driver to support pin configuration with
-> pinctrl framework for ipq8074.
->
-> Signed-off-by: Manoharan Vijaya Raghavan <mraghava@codeaurora.org>
-> Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
 
-It's a good idea that you include the maintainer, Bjorn Andersson
-<bjorn.andersson@linaro.org>
-on these pin control patches. I'll wait for his review.
+Sugar Zhang (3):
+  ASoC: rockchip: i2s: add a delay before i2s clear
+  ASoC: rockchip: i2s: add support for i2s bclk fs configuration
+  ASoC: rockchip: i2s: fixup clk div
 
-Yours,
-Linus Walleij
+zhangjun (1):
+  ASoC: rockchip: i2s: add other configurable formats
+
+ .../devicetree/bindings/sound/rockchip-i2s.txt     |  2 +
+ sound/soc/rockchip/rockchip_i2s.c                  | 45 +++++++++++++++++++---
+ sound/soc/rockchip/rockchip_i2s.h                  |  3 ++
+ 3 files changed, 45 insertions(+), 5 deletions(-)
+
+-- 
+1.9.1
