@@ -1,71 +1,60 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 8 Jun 2017 18:42:40 -0700
-Subject: [PATCH v3 1/9] mtd: sharpslpart: add sharpslpart MTD partition
- parser
-In-Reply-To: <1496270458-6479-2-git-send-email-andrea.adami@gmail.com>
-References: <1496270458-6479-1-git-send-email-andrea.adami@gmail.com>
- <1496270458-6479-2-git-send-email-andrea.adami@gmail.com>
-Message-ID: <20170609014240.GM102137@google.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Fri, 9 Jun 2017 07:49:53 +0530
+Subject: [PATCH v3 0/4] Add support for ThunderX2 pmu events using json
+ files
+In-Reply-To: <CAFpQJXXRiUnGCkmbdDySEknGfSdaR40xdUY8F+hvwegeH5P5-A@mail.gmail.com>
+References: <1494923619-18687-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <CAFpQJXXRiUnGCkmbdDySEknGfSdaR40xdUY8F+hvwegeH5P5-A@mail.gmail.com>
+Message-ID: <CAFpQJXWSJTMcw4v=ou_tBM81iLqPKN=mjZrkc8xn8Osd2MCmsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Oh, one more thing:
+ping?
 
-On Thu, Jun 01, 2017 at 12:40:50AM +0200, Andrea Adami wrote:
-> diff --git a/drivers/mtd/sharpslpart.c b/drivers/mtd/sharpslpart.c
-> new file mode 100644
-> index 0000000..40aebe9
-> --- /dev/null
-> +++ b/drivers/mtd/sharpslpart.c
-> @@ -0,0 +1,132 @@
-> +/*
-> + * MTD partition parser for NAND flash on Sharp SL Series
-> + *
-> + * Copyright (C) 2017 Andrea Adami <andrea.adami@gmail.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/slab.h>
-> +#include <linux/module.h>
-> +#include <linux/mtd/mtd.h>
-> +#include <linux/mtd/partitions.h>
-> +#include "sharpsl_ftl.h"
-> +
-> +/* factory defaults */
-> +#define SHARPSL_NAND_PARTS		3
-> +#define SHARPSL_FTL_PARTITION_SIZE	(7 * 1024 * 1024)
-> +#define PARAM_BLOCK_PARTITIONINFO1	0x00060000
-> +#define PARAM_BLOCK_PARTITIONINFO2	0x00064000
-> +
-> +#define BOOT_MAGIC			be32_to_cpu(0x424f4f54)   /* BOOT */
-> +#define FSRO_MAGIC			be32_to_cpu(0x4653524f)   /* FSRO */
-> +#define FSRW_MAGIC			be32_to_cpu(0x46535257)   /* FSRW */
-
-[...]
-
-> +struct sharpsl_nand_partitioninfo {
-> +	u32 start;
-> +	u32 end;
-
-I was going to ignore this earlier, but I just noticed that you handle
-endianness for the magic values above, so...
-
-shouldn't you handle endianness for the start and end fields too?
-
-> +	u32 magic;
-> +	u32 reserved;
-> +};
-[...]
-
-Brian
+On Mon, May 29, 2017 at 8:49 AM, Ganapatrao Kulkarni
+<gpkulkarni@gmail.com> wrote:
+> Any further review comments on this patch series?
+> can it go in 4.13?
+>
+> On Tue, May 16, 2017 at 2:03 PM, Ganapatrao Kulkarni
+> <ganapatrao.kulkarni@cavium.com> wrote:
+>> Extending json/jevent framework for parsing arm64 event files.
+>> Adding jevents for ThunderX2 implementation defined PMU events.
+>>
+>> v3:
+>>    - Addressed comments from Will Deacon and Jayachandran C.
+>>    - Rebased to 4.12-rc1
+>>
+>> v2:
+>>    - Updated as per Mark Rutland's suggestions.
+>>    - Added provision for get_cpuid_str to get cpu id string
+>>      from associated cpus of pmu core device.
+>>
+>> v1: Initial patchset.
+>>
+>> Ganapatrao Kulkarni (4):
+>>   perf utils: passing pmu as a parameter to function get_cpuid_str
+>>   perf tools arm64: Add support for get_cpuid_str function.
+>>   perf utils: Add helper function is_pmu_core to detect PMU CORE devices
+>>   perf vendor events arm64: Add ThunderX2 implementation defined pmu
+>>     core events
+>>
+>>  tools/perf/arch/arm64/util/Build                   |  1 +
+>>  tools/perf/arch/arm64/util/header.c                | 59 ++++++++++++++++++++
+>>  tools/perf/arch/powerpc/util/header.c              |  2 +-
+>>  tools/perf/arch/x86/util/header.c                  |  2 +-
+>>  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
+>>  .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
+>>  tools/perf/util/header.h                           |  3 +-
+>>  tools/perf/util/pmu.c                              | 53 +++++++++++++++---
+>>  8 files changed, 186 insertions(+), 11 deletions(-)
+>>  create mode 100644 tools/perf/arch/arm64/util/header.c
+>>  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
+>>  create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+>>
+>> --
+>> 1.8.1.4
+>>
+>
+> thanks
+> Ganapat
