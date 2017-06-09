@@ -1,24 +1,33 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Fri, 9 Jun 2017 09:37:52 +0200
-Subject: [PATCH 0/2] Fix STM32 timers dt-bindings
-Message-ID: <1496993874-9870-1-git-send-email-fabrice.gasnier@st.com>
+Date: Fri, 9 Jun 2017 09:37:54 +0200
+Subject: [PATCH 2/2] dt-bindings: iio: update STM32 timers clock names
+In-Reply-To: <1496993874-9870-1-git-send-email-fabrice.gasnier@st.com>
+References: <1496993874-9870-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1496993874-9870-3-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-STM32 timers clock names has been updated during driver/DT binding review:
+Clock name has been updated during driver/DT binding review:
 https://lkml.org/lkml/2016/12/13/718
+Update DT binding doc to reflect this.
 
-STM32 timers driver has been fixed with these remarks. It looks like it's
-been missed on DT binding part.
-Update DT binding doc to reflect this as well.
-
-Fabrice Gasnier (2):
-  dt-bindings: mfd: update STM32 timers clock names
-  dt-bindings: iio: update STM32 timers clock names
-
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
  Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt | 2 +-
- Documentation/devicetree/bindings/mfd/stm32-timers.txt              | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt b/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
+index 55a653d..6abc755 100644
+--- a/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
++++ b/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
+@@ -14,7 +14,7 @@ Example:
+ 		compatible = "st,stm32-timers";
+ 		reg = <0x40010000 0x400>;
+ 		clocks = <&rcc 0 160>;
+-		clock-names = "clk_int";
++		clock-names = "int";
+ 
+ 		timer at 0 {
+ 			compatible = "st,stm32-timer-trigger";
 -- 
 1.9.1
