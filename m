@@ -1,38 +1,55 @@
-From: dannym@scratchpost.org (Danny Milosavljevic)
-Date: Fri,  9 Jun 2017 22:49:43 +0200
-Subject: [PATCH v12 14/14] sun4i-codec: Add Capture Volume.
-In-Reply-To: <20170609204943.29116-1-dannym@scratchpost.org>
-References: <20170609204943.29116-1-dannym@scratchpost.org>
-Message-ID: <20170609204943.29116-15-dannym@scratchpost.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 9 Jun 2017 15:05:52 -0700
+Subject: Drivers taking different actions depending on sleep state
+In-Reply-To: <9dc7b7f4-e47d-59f3-3b51-52e0aefd2487@free.fr>
+References: <9dc7b7f4-e47d-59f3-3b51-52e0aefd2487@free.fr>
+Message-ID: <9d929be0-67af-22f9-6412-424e258ac9d4@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
----
- sound/soc/sunxi/sun4i-codec.c | 5 +++++
- 1 file changed, 5 insertions(+)
+On 06/09/2017 08:20 AM, Mason wrote:
+> Hello,
+> 
+> I read the "Sleep States" documentation:
+> https://www.kernel.org/doc/Documentation/power/states.txt
+> 
+> It mentions /sys/power/mem_sleep but I don't have that in 4.9
+> # ll /sys/power/
+> -rw-r--r--    1 root     root          4096 Jan  1 00:31 pm_async
+> -rw-r--r--    1 root     root          4096 Jan  1 00:31 pm_freeze_timeout
+> -rw-r--r--    1 root     root          4096 Jan  1 00:31 state
+> -rw-r--r--    1 root     root          4096 Jan  1 00:31 wakeup_count
+> 
+> # cat /sys/power/state 
+> freeze mem
+> 
+> Currently my platform's "mem" is a true suspend-to-RAM trigger,
+> where drivers are supposed to save their state (register values
+> will be lost), then Linux hands control over to firmware which
+> enables RAM self-refresh and powers the chip down. When the system
+> resumes, drivers restore their state from their copy in memory.
+> 
+> One driver is responsible for loading/unloading microcode running
+> on the DSPs. This operation is required only when powering down
+> the chip, but it should be avoided for "low-latency" sleeps.
 
-diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index 65a4685..a596249 100644
---- a/sound/soc/sunxi/sun4i-codec.c
-+++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -675,6 +675,7 @@ static DECLARE_TLV_DB_RANGE(sun4i_codec_micin_preamp_gain_scale,
- static DECLARE_TLV_DB_RANGE(sun7i_codec_micin_preamp_gain_scale,
- 			    0, 0, TLV_DB_SCALE_ITEM(0, 0, 0),
- 			    1, 7, TLV_DB_SCALE_ITEM(2400, 300, 0));
-+static DECLARE_TLV_DB_SCALE(sun4i_codec_adc_gain_scale, -450, 150, 0);
- 
- static const char * const sun4i_codec_capture_source[] = {
- 	"Line",
-@@ -725,6 +726,10 @@ static const struct snd_kcontrol_new sun4i_codec_controls[] = {
- 	SOC_SINGLE_TLV("Mic Playback Volume", SUN4I_CODEC_DAC_ACTL,
- 		       SUN4I_CODEC_DAC_ACTL_MICG, 7, 0,
- 		       sun4i_codec_micin_loopback_gain_scale),
-+	/* ADC */
-+	SOC_SINGLE_TLV("Capture Volume", SUN4I_CODEC_ADC_ACTL,
-+		       SUN4I_CODEC_ADC_ACTL_VADCG, 4, 0,
-+		       sun4i_codec_adc_gain_scale),
- };
- 
- static const struct snd_kcontrol_new sun4i_codec_extra_controls[] = {
+Yes, makes sense, the STB SoCs I work with have similar requirements,
+and we could benefit from being able to skip/bypass re-initialization
+while entering/leaving S2 for instance.
+
+> 
+> The problem is that, if I understand correctly, drivers have no way
+> of knowing which sleep state is being entered/exited?
+> 
+> How can I have the microcode driver take different decisions
+> based on the sleep state?
+
+Ideally, pm_message_t could have reflected the system suspend/resume
+state you are entering/leaving, but that does not appear to be the case
+(unlike say, PCI).
+
+I am not sure why that's not the case, but since most platform drivers
+use the "SIMPLE_DEV_PM_OPS" if we were to actually make pm_message_t
+reflect the system sleep state (PM_SUSPEND_STANDBY, PM_SUSPEND_MEM etc.)
 -- 
-2.1.4
+Florian
