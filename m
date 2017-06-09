@@ -1,164 +1,54 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri,  9 Jun 2017 17:50:40 +0200
-Subject: [PATCH v2] ARM: dts: r8a779x: Fix PCI bus dtc warnings
-Message-ID: <1497023440-23845-1-git-send-email-geert+renesas@glider.be>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 9 Jun 2017 16:50:30 +0100
+Subject: [PATCH v2 2/3] arm64: mm: don't print out page table entries on
+ EL0 faults
+In-Reply-To: <1497022554-1451-2-git-send-email-kristina.martsenko@arm.com>
+References: <1497022554-1451-1-git-send-email-kristina.martsenko@arm.com>
+ <1497022554-1451-2-git-send-email-kristina.martsenko@arm.com>
+Message-ID: <20170609155030.GI10665@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <robh@kernel.org>
+On Fri, Jun 09, 2017 at 04:35:53PM +0100, Kristina Martsenko wrote:
+> When we take a fault from EL0 that can't be handled, we print out the
+> page table entries associated with the faulting address. This allows
+> userspace to print out any current page table entries, including kernel
+> (TTBR1) entries. Exposing kernel mappings like this could pose a
+> security risk, so don't print out page table information on EL0 faults.
+> (But still print it out for EL1 faults.) This also follows the same
+> behaviour as x86, printing out page table entries on kernel mode faults
+> but not user mode faults.
+> 
+> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
+> ---
+> 
+> v2:
+>  - mention x86 in commit message
+> 
+>  arch/arm64/mm/fault.c | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index a9dfb37c87a2..b070dcd50ed0 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -259,7 +259,6 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
+>  		pr_info("%s[%d]: unhandled %s (%d) at 0x%08lx, esr 0x%03x\n",
+>  			tsk->comm, task_pid_nr(tsk), inf->name, sig,
+>  			addr, esr);
+> -		show_pte(addr);
+>  		__show_regs(regs);
+>  	}
 
-The bogus 'device_type = "pci"' confuses dtc, causing lots of totally
-unrelated warnings.  After fixing that, real warnings like
+AFAICT, we haven't taken mmap_sem or anything else that would stop
+another thread modifying the user page tables. So show_pte() here could
+result in dereferencing junk if we were particularly unlucky.
 
-    arch/arm/boot/dts/r8a7790-lager.dtb: Warning (pci_device_reg): Node /pci at ee090000/usb at 0,1 PCI unit address format error, expected "1,0"
+I think we might want to Cc stable on this.
 
-are left.  Correct the unit-addresses and reg properties of the subnodes
-to fix these.
+Either way:
 
-Signed-off-by: Rob Herring <robh@kernel.org>
-[geert: Improve description]
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v2:
-  - Take over from Rob,
-  - Improve patch description.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
- arch/arm/boot/dts/r8a7790.dtsi | 16 ++++++----------
- arch/arm/boot/dts/r8a7791.dtsi | 16 ++++++----------
- arch/arm/boot/dts/r8a7794.dtsi | 16 ++++++----------
- 3 files changed, 18 insertions(+), 30 deletions(-)
-
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 043c599011798042..2ed727f81a66981b 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -1233,16 +1233,14 @@
- 				 0x0800 0 0 1 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH
- 				 0x1000 0 0 2 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
- 
--		usb at 0,1 {
-+		usb at 1,0 {
- 			reg = <0x800 0 0 0 0>;
--			device_type = "pci";
- 			phys = <&usb0 0>;
- 			phy-names = "usb";
- 		};
- 
--		usb at 0,2 {
-+		usb at 2,0 {
- 			reg = <0x1000 0 0 0 0>;
--			device_type = "pci";
- 			phys = <&usb0 0>;
- 			phy-names = "usb";
- 		};
-@@ -1289,16 +1287,14 @@
- 				 0x0800 0 0 1 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
- 				 0x1000 0 0 2 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
- 
--		usb at 0,1 {
--			reg = <0x800 0 0 0 0>;
--			device_type = "pci";
-+		usb at 1,0 {
-+			reg = <0x20800 0 0 0 0>;
- 			phys = <&usb2 0>;
- 			phy-names = "usb";
- 		};
- 
--		usb at 0,2 {
--			reg = <0x1000 0 0 0 0>;
--			device_type = "pci";
-+		usb at 2,0 {
-+			reg = <0x21000 0 0 0 0>;
- 			phys = <&usb2 0>;
- 			phy-names = "usb";
- 		};
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index a56be0f9dcfc907d..111027383e6cdd8a 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -1254,16 +1254,14 @@
- 				 0x0800 0 0 1 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH
- 				 0x1000 0 0 2 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
- 
--		usb at 0,1 {
-+		usb at 1,0 {
- 			reg = <0x800 0 0 0 0>;
--			device_type = "pci";
- 			phys = <&usb0 0>;
- 			phy-names = "usb";
- 		};
- 
--		usb at 0,2 {
-+		usb at 2,0 {
- 			reg = <0x1000 0 0 0 0>;
--			device_type = "pci";
- 			phys = <&usb0 0>;
- 			phy-names = "usb";
- 		};
-@@ -1289,16 +1287,14 @@
- 				 0x0800 0 0 1 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
- 				 0x1000 0 0 2 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
- 
--		usb at 0,1 {
--			reg = <0x800 0 0 0 0>;
--			device_type = "pci";
-+		usb at 1,0 {
-+			reg = <0x10800 0 0 0 0>;
- 			phys = <&usb2 0>;
- 			phy-names = "usb";
- 		};
- 
--		usb at 0,2 {
--			reg = <0x1000 0 0 0 0>;
--			device_type = "pci";
-+		usb at 2,0 {
-+			reg = <0x11000 0 0 0 0>;
- 			phys = <&usb2 0>;
- 			phy-names = "usb";
- 		};
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index c2bc6ba9200ecc40..33fc723f0c2ec42e 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -820,16 +820,14 @@
- 				 0x0800 0 0 1 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH
- 				 0x1000 0 0 2 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
- 
--		usb at 0,1 {
-+		usb at 1,0 {
- 			reg = <0x800 0 0 0 0>;
--			device_type = "pci";
- 			phys = <&usb0 0>;
- 			phy-names = "usb";
- 		};
- 
--		usb at 0,2 {
-+		usb at 2,0 {
- 			reg = <0x1000 0 0 0 0>;
--			device_type = "pci";
- 			phys = <&usb0 0>;
- 			phy-names = "usb";
- 		};
-@@ -855,16 +853,14 @@
- 				 0x0800 0 0 1 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
- 				 0x1000 0 0 2 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
- 
--		usb at 0,1 {
--			reg = <0x800 0 0 0 0>;
--			device_type = "pci";
-+		usb at 1,0 {
-+			reg = <0x10800 0 0 0 0>;
- 			phys = <&usb2 0>;
- 			phy-names = "usb";
- 		};
- 
--		usb at 0,2 {
--			reg = <0x1000 0 0 0 0>;
--			device_type = "pci";
-+		usb at 2,0 {
-+			reg = <0x11000 0 0 0 0>;
- 			phys = <&usb2 0>;
- 			phy-names = "usb";
- 		};
--- 
-2.7.4
+Thanks,
+Mark.
