@@ -1,53 +1,91 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Fri, 09 Jun 2017 20:17:47 +0900
-Subject: [PATCH v2] ARM: dts: rv1108: change to "max-frequency" from
- "clock-freq-min-max"
-References: <CGME20170609111748epcas5p163d65c6bd94776383381d80b632414a5@epcas5p1.samsung.com>
-Message-ID: <20170609111747.24591-1-jh80.chung@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 9 Jun 2017 13:25:28 +0200
+Subject: [[PATCH]] drivers: leds/trigger: system cannot enter suspend
+In-Reply-To: <1496648191-134355-1-git-send-email-bo.zhang@nxp.com>
+References: <1496648191-134355-1-git-send-email-bo.zhang@nxp.com>
+Message-ID: <CACRpkdZpMsqt9gjehSQ5c86LyqhZcnYF7QuGk=N4JTi-GJ1SMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"clock-freq-min-max" was deprecated. There is only using in rv1108.dtsi.
-Use the "max-frequency" for removiing "clock-freq-min-max" in future.
+On Mon, Jun 5, 2017 at 9:36 AM, Zhang Bo <bo.zhang@nxp.com> wrote:
 
-Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
----
-Changelog on V2:
-- Rebased on Heiko's git repository (v4.13-armsoc/dts32 branch)
+> System cannot enter suspend mode because of heartbeat led trigger.
 
- arch/arm/boot/dts/rv1108.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+As mentioned this should not be a problem.
 
-diff --git a/arch/arm/boot/dts/rv1108.dtsi b/arch/arm/boot/dts/rv1108.dtsi
-index 437098b..6a3da2d 100644
---- a/arch/arm/boot/dts/rv1108.dtsi
-+++ b/arch/arm/boot/dts/rv1108.dtsi
-@@ -174,7 +174,7 @@
- 
- 	emmc: dwmmc at 30110000 {
- 		compatible = "rockchip,rv1108-dw-mshc", "rockchip,rk3288-dw-mshc";
--		clock-freq-min-max = <400000 150000000>;
-+		max-frequency = <150000000>;
- 		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>,
- 			 <&cru SCLK_EMMC_DRV>, <&cru SCLK_EMMC_SAMPLE>;
- 		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
-@@ -186,7 +186,7 @@
- 
- 	sdio: dwmmc at 30120000 {
- 		compatible = "rockchip,rv1108-dw-mshc", "rockchip,rk3288-dw-mshc";
--		clock-freq-min-max = <400000 150000000>;
-+		max-frequency = <150000000>;
- 		clocks = <&cru HCLK_SDIO>, <&cru SCLK_SDIO>,
- 			 <&cru SCLK_SDIO_DRV>, <&cru SCLK_SDIO_SAMPLE>;
- 		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
-@@ -198,7 +198,7 @@
- 
- 	sdmmc: dwmmc at 30130000 {
- 		compatible = "rockchip,rv1108-dw-mshc", "rockchip,rk3288-dw-mshc";
--		clock-freq-min-max = <400000 100000000>;
-+		max-frequency = <100000000>;
- 		clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>,
- 			 <&cru SCLK_SDMMC_DRV>, <&cru SCLK_SDMMC_SAMPLE>;
- 		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
--- 
-2.10.2
+> Heartbeat_pm_notifier is called when system prepare to enter suspend
+> mode, then call led_trigger_unregister to change the trigger of led device
+> to none. It will send uevent message and the wakeup source count changed.
+>
+> Add suspend/resume ops to the struct led_trigger, implement these two ops
+> for ledtrig-heartbeat. Add led_trigger_suspend/led_trigger_resume funcitons
+> to iterate through all LED class devices registered on given trigger and
+> call their suspend/resume ops and disable/enable sysfs at the same time.
+>
+> Call led_trigger_suspend{resuem} API in pm_notifier function to
+> suspend/resume all led devices listed in given trigger.
+>
+> Signed-off-by: Zhang Bo <bo.zhang@nxp.com>
+
+The patch is nice because it fixes my sloppy approach of just adding/removing
+the trigger made earlier.
+
+It stops unsolicited I2C traffic and other nastines from happening during the
+suspend/resume cycle.
+
+I would even add:
+
+Fixes: 5ab92a7cb82c ("leds: handle suspend/resume in heartbeat trigger")
+
+(...)
+> +static void heartbeat_trig_resume(struct led_classdev *led_cdev)
+> +{
+> +       struct heartbeat_trig_data *heartbeat_data = led_cdev->trigger_data;
+> +
+> +       if (led_cdev->suspended) {
+> +               setup_timer(&heartbeat_data->timer,
+> +                           led_heartbeat_function, (unsigned long) led_cdev);
+> +               heartbeat_data->phase = 0;
+> +               led_heartbeat_function(heartbeat_data->timer.data);
+> +               led_cdev->suspended = false;
+> +       }
+> +}
+> +
+> +static void heartbeat_trig_suspend(struct led_classdev *led_cdev)
+> +{
+> +       struct heartbeat_trig_data *heartbeat_data = led_cdev->trigger_data;
+> +
+> +       if (led_cdev->activated && !led_cdev->suspended) {
+> +               del_timer_sync(&heartbeat_data->timer);
+> +               led_cdev->suspended = true;
+>         }
+
+Are we sure that the LED is *off* at this point so you don't suspend/resume
+with a glowing LED?
+
+Else insert a call to make sure that it's like so, and maybe even
+a variable to hold the current state (off/on) across the suspend/resume
+cycle.
+
+> @@ -161,25 +186,23 @@ static void heartbeat_trig_deactivate(struct led_classdev *led_cdev)
+>         .name     = "heartbeat",
+>         .activate = heartbeat_trig_activate,
+>         .deactivate = heartbeat_trig_deactivate,
+> +       .suspend = heartbeat_trig_suspend,
+> +       .resume = heartbeat_trig_resume,
+(...)
+> +       void            (*suspend)(struct led_classdev *led_cdev);
+> +       void            (*resume)(struct led_classdev *led_cdev);
+
+
+These names do not correspons to the actual PM calls
+they are utilized for.
+
+Name them
+.pm_prepare_suspend()
+.pm_post_suspend()
+
+Instead, this indicates better the place when they get called.
+
+Yours,
+Linus Walleij
