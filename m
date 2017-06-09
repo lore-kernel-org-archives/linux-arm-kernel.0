@@ -1,55 +1,43 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 9 Jun 2017 20:51:39 +0100
+Date: Fri, 9 Jun 2017 20:56:12 +0100
 Subject: [PATCH v2 7/8] net: mvmdio: add xmdio support
-In-Reply-To: <20170609144936.GF20756@lunn.ch>
+In-Reply-To: <20170609162216.GF31464@kwain>
 References: <20170608092653.25221-1-antoine.tenart@free-electrons.com>
  <20170608092653.25221-8-antoine.tenart@free-electrons.com>
  <a60a0b26-62b1-7c9e-e846-215747dddb1f@gmail.com>
  <20170609082541.GC31464@kwain> <20170609132624.GC20756@lunn.ch>
  <20170609140922.GD31464@kwain> <20170609144936.GF20756@lunn.ch>
-Message-ID: <20170609195139.GT4902@n2100.armlinux.org.uk>
+ <20170609145630.GE31464@kwain> <20170609150340.GH20756@lunn.ch>
+ <20170609162216.GF31464@kwain>
+Message-ID: <20170609195611.GU4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 09, 2017 at 04:49:36PM +0200, Andrew Lunn wrote:
-> On Fri, Jun 09, 2017 at 04:09:22PM +0200, Antoine Tenart wrote:
-> > The MDIO/xMDIO registers are embedded into the network controller. The
-> > mvmdio driver was created at first to abstract this functionality
-> > outside the network controller driver because it is shared between all
-> > ports and used in different IPs. So it's not really devices per say.
+On Fri, Jun 09, 2017 at 06:22:16PM +0200, Antoine Tenart wrote:
+> On Fri, Jun 09, 2017 at 05:03:40PM +0200, Andrew Lunn wrote:
+> > > There are two busses, one generating c22 transactions and one generating
+> > > c45 transactions. Each bus has its own MDC/MDIO pins.
 > > 
-> > Looking at the datasheet/schematics there are two hardware buses, one
-> > for c22 and one for c45. So we should keep two separate nodes to
-> > describe the two interfaces. From what I read c45 is backward
-> > compatible with c22 so the xSMI interface should be capable to speak to
-> > c22 PHYs as well.
+> > O.K. That is what i wanted to know. So we want two completely separate
+> > device tree bindings, busses registered with Linux, etc.
+> > 
+> > Thanks for clarification.
 > 
-> The on the wire protocol of c45 is backwards compatible with c22, in
-> that a c22 device will not get confused by a c45 transaction on the
-> bus. A c22 device will just ignore it. You cannot talk to a c22 device
-> using c45.
+> So in the end I need one change in v3: to bind the xSMI usage to
+> marvell,xmdio and the SMI one to marvell,orion-mdio. (Plus the GENMASK
+> and offset comments).
 
->From what I can tell, having 'scoped the MDIO line and tried writing
-several different values to the XSMI registers, it is not possible
-for the XSMI block to generate C22 frame structures - the "start"
-bits are always "00", and I can't make them the required "01" for C22.
-
-However, I can confirm that bits 26 and 27 of the XSMI register are used
-directly for the OP field (so 0 << 26 produces a C45 address frame.)  I
-suspect, although I haven't delved that deeply (yet) that bit 28 sets
-whether XSMI produces an address cycle itself along with the data cycle.
-
-Bit 31 appears to be writable, but has no effect on the frame structure.
-
-> What i'm worried about is there being one set of MDC/MDIO lines. You
-> should not expose that to linux as two mdio busses. It is one bus.
-
-We're independent - the SMI and XSMI blocks are two entirely separate
-interfaces with entirely separate hardware MDC/MDIO lines.  The XSMI
-MDC/MDIO lines remain at logic '1' while phylib polls the PHY via
-the SMI interface.
+Also, you need to
+1. trap out on incorrect MII_ADDR_C45 in regnum for the interface.
+2. mask the dev_addr with GENMASK(4, 0) (as merely shifting will leave
+   the MII_ADDR_C45 bit set.)
+3. moving MVMDIO_XSMI_PHYADDR_SHIFT / MVMDIO_XSMI_DEVADDR_SHIFT /
+   MVMDIO_XSMI_READ_OPERATION / MVMDIO_XSMI_WRITE_OPERATION under the
+   MVMDIO_XSMI_MGNT_REG reg - these definitions are nothing to do with
+   MVMDIO_XSMI_ADDR_REG.
+4. fixing MVMDIO_XSMI_WRITE_OPERATION to be 5 << 26, not 5 << 27.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+FTTC broadband for 0.8mile line: currently@9.6Mbps down 400kbps up
 according to speedtest.net.
