@@ -1,51 +1,53 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 9 Jun 2017 16:46:15 +0530
-Subject: [PATCH v8 0/3] Support for USB DRD PHY driver for NS2
-In-Reply-To: <CAEHZuqO3zquZokENqBLmcn1ZnSCYSYitCXmKrQ-v9HMB0gJrvg@mail.gmail.com>
-References: <1496918103-14948-1-git-send-email-raviteja.garimella@broadcom.com>
- <a5344bd7-f7b1-90b5-cce1-d513370103e5@ti.com>
- <CAEHZuqNwPBgWM9mAeWTTQLQVJYjX8uNuUDRqsD_ZidgaSV9pcA@mail.gmail.com>
- <2f492d5a-9016-f965-8dc2-f669d785ba4d@ti.com>
- <CAEHZuqO3zquZokENqBLmcn1ZnSCYSYitCXmKrQ-v9HMB0gJrvg@mail.gmail.com>
-Message-ID: <03f87297-a986-ac9d-b20b-0f75abcc12f7@ti.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Fri, 09 Jun 2017 20:17:47 +0900
+Subject: [PATCH v2] ARM: dts: rv1108: change to "max-frequency" from
+ "clock-freq-min-max"
+References: <CGME20170609111748epcas5p163d65c6bd94776383381d80b632414a5@epcas5p1.samsung.com>
+Message-ID: <20170609111747.24591-1-jh80.chung@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+"clock-freq-min-max" was deprecated. There is only using in rv1108.dtsi.
+Use the "max-frequency" for removiing "clock-freq-min-max" in future.
 
+Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+---
+Changelog on V2:
+- Rebased on Heiko's git repository (v4.13-armsoc/dts32 branch)
 
-On Friday 09 June 2017 04:23 PM, Raviteja Garimella wrote:
-> Hi Kishon,
-> 
-> On Fri, Jun 9, 2017 at 2:36 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->> Hi,
->>
->> On Friday 09 June 2017 02:30 PM, Raviteja Garimella wrote:
->>> Hi,
->>>
->>> On Fri, Jun 9, 2017 at 2:25 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>>> Hi,
->>>>
->>>> On Thursday 08 June 2017 04:05 PM, Raviteja Garimella wrote:
->>>>> Changes in v8:
->>>>> =============
->>>>> -Renamed phy shutdown routine
->>>>> -Used devm_request_irq in stead of threaded irq
->>>>
->>>> That's not what I intended. Continue to use threaded irq but remove delayed work.
->>>>
->>>
->>> Yes I get that. We see intermittent connection issues without delayed
->>> work. Debounce delay matters there.
->>
->> All right!
->>
->> I'm unable to apply the series. Please rebase to linux-phy next (directory
->> structure has changed)
->>
-> 
-> Ok. They got applied to linux-phy next for me without issues.
-> I will resend the patchset anyways after rebasing to linux-phy next.
+ arch/arm/boot/dts/rv1108.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-the patch you sent is not rebased to the latest linux-phy next.
-
--Kishon
+diff --git a/arch/arm/boot/dts/rv1108.dtsi b/arch/arm/boot/dts/rv1108.dtsi
+index 437098b..6a3da2d 100644
+--- a/arch/arm/boot/dts/rv1108.dtsi
++++ b/arch/arm/boot/dts/rv1108.dtsi
+@@ -174,7 +174,7 @@
+ 
+ 	emmc: dwmmc at 30110000 {
+ 		compatible = "rockchip,rv1108-dw-mshc", "rockchip,rk3288-dw-mshc";
+-		clock-freq-min-max = <400000 150000000>;
++		max-frequency = <150000000>;
+ 		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>,
+ 			 <&cru SCLK_EMMC_DRV>, <&cru SCLK_EMMC_SAMPLE>;
+ 		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+@@ -186,7 +186,7 @@
+ 
+ 	sdio: dwmmc at 30120000 {
+ 		compatible = "rockchip,rv1108-dw-mshc", "rockchip,rk3288-dw-mshc";
+-		clock-freq-min-max = <400000 150000000>;
++		max-frequency = <150000000>;
+ 		clocks = <&cru HCLK_SDIO>, <&cru SCLK_SDIO>,
+ 			 <&cru SCLK_SDIO_DRV>, <&cru SCLK_SDIO_SAMPLE>;
+ 		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+@@ -198,7 +198,7 @@
+ 
+ 	sdmmc: dwmmc at 30130000 {
+ 		compatible = "rockchip,rv1108-dw-mshc", "rockchip,rk3288-dw-mshc";
+-		clock-freq-min-max = <400000 100000000>;
++		max-frequency = <100000000>;
+ 		clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>,
+ 			 <&cru SCLK_SDMMC_DRV>, <&cru SCLK_SDMMC_SAMPLE>;
+ 		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+-- 
+2.10.2
