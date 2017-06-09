@@ -1,34 +1,67 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 9 Jun 2017 12:04:35 +0200
-Subject: [PATCH] gpio: mvebu: fix regmap_update_bits usage
-In-Reply-To: <20170609100318.26450-1-gregory.clement@free-electrons.com>
-References: <20170609100318.26450-1-gregory.clement@free-electrons.com>
-Message-ID: <20170609120435.60191c76@free-electrons.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri,  9 Jun 2017 11:49:15 +0200
+Subject: [PATCH v4 6/7] ARM: dts: meson8: switch to new bindings for UART nodes
+In-Reply-To: <1497001756-942-1-git-send-email-narmstrong@baylibre.com>
+References: <1497001756-942-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1497001756-942-7-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Switch to the stable UART bindings by adding a XTAL node and using the
+proper compatible strings.
 
-On Fri,  9 Jun 2017 12:03:18 +0200, Gregory CLEMENT wrote:
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ arch/arm/boot/dts/meson8.dtsi | 23 +++++++++++++++++++----
+ 1 file changed, 19 insertions(+), 4 deletions(-)
 
->  	regmap_update_bits(mvchip->regs, GPIO_IO_CONF_OFF,
-> -			   BIT(pin), 1);
-> +			   BIT(pin), BIT(pin));
->  
->  	return 0;
->  }
-> @@ -364,7 +364,7 @@ static int mvebu_gpio_direction_output(struct gpio_chip *chip, unsigned int pin,
->  	mvebu_gpio_set(chip, pin, value);
->  
->  	regmap_update_bits(mvchip->regs, GPIO_IO_CONF_OFF,
-> -			   BIT(pin), 0);
-> +			   BIT(pin), BIT(pin));
-
-Are you sure here? We want to clear the bit, so I guess the 0 is
-appropriate, no?
-
-Thomas
+diff --git a/arch/arm/boot/dts/meson8.dtsi b/arch/arm/boot/dts/meson8.dtsi
+index 6993077..a2ea112 100644
+--- a/arch/arm/boot/dts/meson8.dtsi
++++ b/arch/arm/boot/dts/meson8.dtsi
+@@ -83,6 +83,13 @@
+ 		};
+ 	};
+ 
++	xtal: xtal-clk {
++		compatible = "fixed-clock";
++		clock-frequency = <24000000>;
++		clock-output-names = "xtal";
++		#clock-cells = <0>;
++	};
++
+ 	clk81: clk at 0 {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-clock";
+@@ -199,17 +206,25 @@
+ };
+ 
+ &uart_AO {
+-	clocks = <&clk81>;
++	compatible = "amlogic,meson8-uart", "amlogic,meson-ao-uart";
++	clocks = <&xtal>, <&clk81>, <&clk81>;
++	clock-names = "xtal", "pclk", "baud";
+ };
+ 
+ &uart_A {
+-	clocks = <&clk81>;
++	compatible = "amlogic,meson8-uart";
++	clocks = <&xtal>, <&clk81>, <&clk81>;
++	clock-names = "xtal", "pclk", "baud";
+ };
+ 
+ &uart_B {
+-	clocks = <&clk81>;
++	compatible = "amlogic,meson8-uart";
++	clocks = <&xtal>, <&clk81>, <&clk81>;
++	clock-names = "xtal", "pclk", "baud";
+ };
+ 
+ &uart_C {
+-	clocks = <&clk81>;
++	compatible = "amlogic,meson8-uart";
++	clocks = <&xtal>, <&clk81>, <&clk81>;
++	clock-names = "xtal", "pclk", "baud";
+ };
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.9.1
