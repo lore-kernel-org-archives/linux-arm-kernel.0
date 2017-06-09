@@ -1,47 +1,37 @@
 From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Fri,  9 Jun 2017 16:07:39 +0200
-Subject: [PATCH v4 6/6] ARM: dts: imx6: RIoTboard provide standby on power off
- option
+Date: Fri,  9 Jun 2017 16:07:37 +0200
+Subject: [PATCH v4 4/6] regulator: pfuze100: add fsl,
+ pmic-stby-poweroff property
 In-Reply-To: <20170609140739.15726-1-o.rempel@pengutronix.de>
 References: <20170609140739.15726-1-o.rempel@pengutronix.de>
-Message-ID: <20170609140739.15726-7-o.rempel@pengutronix.de>
+Message-ID: <20170609140739.15726-5-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This board, as well as some other boards with i.MX6 and a PMIC, uses a
-"MPIC_STBY_REQ" line to notify the PMIC about a state change.
-The PMIC is programmed for a specific state change before triggering the
-line.
-In this case, PMIC_STBY_REQ can be used for stand by, sleep
-and power off modes.
+Document the new optional "fsl,pmic-stby-poweroff" property.
 
 Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
 ---
- arch/arm/boot/dts/imx6dl-riotboard.dts | 5 +++++
- 1 file changed, 5 insertions(+)
+ Documentation/devicetree/bindings/regulator/pfuze100.txt | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6dl-riotboard.dts b/arch/arm/boot/dts/imx6dl-riotboard.dts
-index 2cb72824e800..da9d0c102a31 100644
---- a/arch/arm/boot/dts/imx6dl-riotboard.dts
-+++ b/arch/arm/boot/dts/imx6dl-riotboard.dts
-@@ -90,6 +90,10 @@
- 	status = "okay";
- };
+diff --git a/Documentation/devicetree/bindings/regulator/pfuze100.txt b/Documentation/devicetree/bindings/regulator/pfuze100.txt
+index 444c47831a40..197f1a52e960 100644
+--- a/Documentation/devicetree/bindings/regulator/pfuze100.txt
++++ b/Documentation/devicetree/bindings/regulator/pfuze100.txt
+@@ -4,6 +4,13 @@ Required properties:
+ - compatible: "fsl,pfuze100", "fsl,pfuze200", "fsl,pfuze3000"
+ - reg: I2C slave address
  
-+&clks {
-+	fsl,pmic-stby-poweroff;
-+};
++Optional properties:
++- fsl,pmic-stby-poweroff: if present, configure the PMIC to shutdown all
++  power rails when PMIC_STBY_REQ line is asserted during the power off sequence.
++  Use this option if the SoC should be powered off by external power
++  management IC (PMIC) on PMIC_STBY_REQ signal.
++  As opposite to PMIC_STBY_REQ boards can implement PMIC_ON_REQ signal.
 +
- &fec {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_enet>;
-@@ -125,6 +129,7 @@
- 		reg = <0x08>;
- 		interrupt-parent = <&gpio5>;
- 		interrupts = <16 8>;
-+		fsl,pmic-stby-poweroff;
- 
- 		regulators {
- 			reg_vddcore: sw1ab {				/* VDDARM_IN */
+ Required child node:
+ - regulators: This is the list of child nodes that specify the regulator
+   initialization data for defined regulators. Please refer to below doc
 -- 
 2.11.0
