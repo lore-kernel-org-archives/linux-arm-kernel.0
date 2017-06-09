@@ -1,36 +1,54 @@
 From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Fri, 09 Jun 2017 13:59:11 +0900
-Subject: [PATCH 0/3] Add support for the s6e63j0x03 panel on Rinato board
-References: <CGME20170609045937epcas5p2120f6388b74fa73ea6ed835f7741f61e@epcas5p2.samsung.com>
-Message-ID: <1496984354-5271-1-git-send-email-hoegeun.kwon@samsung.com>
+Date: Fri, 09 Jun 2017 13:59:14 +0900
+Subject: [PATCH 3/3] ARM: dts: exynos: Remove the display-timing and delay
+ from rinato dts
+In-Reply-To: <1496984354-5271-1-git-send-email-hoegeun.kwon@samsung.com>
+References: <1496984354-5271-1-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170609045939epcas1p2e4b50c78978b8f14630ca29550c1cb34@epcas1p2.samsung.com>
+Message-ID: <1496984354-5271-4-git-send-email-hoegeun.kwon@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+The display-timing and delay are included in the panel driver. So it
+should be removed in dts.
 
-The purpose of this patch is add support for s6e63j0x03 AMOLED panel
-on the rinato board(Samsung Galaxy Gear 2).
+Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
+---
+ arch/arm/boot/dts/exynos3250-rinato.dts | 22 ----------------------
+ 1 file changed, 22 deletions(-)
 
-The first and second patches are Add the binding document and panel
-driver. The third patch is remove the unnecessary properties in the
-rinato dts.
-
-Best regards,
-Hoegeun
-
-Hoegeun Kwon (3):
-  dt-bindings: Add support for samsung s6e63j0x03 panel binding
-  drm/panel: Add support for s6e63j0x03 panel driver
-  ARM: dts: exynos: Remove the display-timing and delay from rinato dts
-
- .../bindings/display/panel/samsung,s6e63j0x03.txt  |  24 +
- arch/arm/boot/dts/exynos3250-rinato.dts            |  22 -
- drivers/gpu/drm/panel/Kconfig                      |   7 +
- drivers/gpu/drm/panel/Makefile                     |   1 +
- drivers/gpu/drm/panel/panel-samsung-s6e63j0x03.c   | 491 +++++++++++++++++++++
- 5 files changed, 523 insertions(+), 22 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/display/panel/samsung,s6e63j0x03.txt
- create mode 100644 drivers/gpu/drm/panel/panel-samsung-s6e63j0x03.c
-
+diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
+index 82e676a..3d19b7c 100644
+--- a/arch/arm/boot/dts/exynos3250-rinato.dts
++++ b/arch/arm/boot/dts/exynos3250-rinato.dts
+@@ -227,28 +227,6 @@
+ 		vci-supply = <&ldo20_reg>;
+ 		reset-gpios = <&gpe0 1 GPIO_ACTIVE_HIGH>;
+ 		te-gpios = <&gpx0 6 GPIO_ACTIVE_HIGH>;
+-		power-on-delay= <30>;
+-		power-off-delay= <120>;
+-		reset-delay = <5>;
+-		init-delay = <100>;
+-		flip-horizontal;
+-		flip-vertical;
+-		panel-width-mm = <29>;
+-		panel-height-mm = <29>;
+-
+-		display-timings {
+-			timing-0 {
+-				clock-frequency = <4600000>;
+-				hactive = <320>;
+-				vactive = <320>;
+-				hfront-porch = <1>;
+-				hback-porch = <1>;
+-				hsync-len = <1>;
+-				vfront-porch = <150>;
+-				vback-porch = <1>;
+-				vsync-len = <2>;
+-			};
+-		};
+ 	};
+ };
+ 
 -- 
 1.9.1
