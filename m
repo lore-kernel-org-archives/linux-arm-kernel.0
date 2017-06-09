@@ -1,43 +1,44 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 9 Jun 2017 21:00:48 +0100
-Subject: [PATCH v2 7/8] net: mvmdio: add xmdio support
-In-Reply-To: <20170609064019.GB31464@kwain>
-References: <20170608092653.25221-1-antoine.tenart@free-electrons.com>
- <20170608092653.25221-8-antoine.tenart@free-electrons.com>
- <20170608160331.GA20216@lunn.ch> <20170609064019.GB31464@kwain>
-Message-ID: <20170609200047.GV4902@n2100.armlinux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 9 Jun 2017 22:06:41 +0200
+Subject: [PATCH] ARM64: Kconfig: Fix the missing hi655x common clk
+In-Reply-To: <20170609154652.GG2244@mai>
+References: <CALAqxLVn9r9R-wnrZbrFqYfwqZD-tegbJrZLsUeBjjBc4_Q89w@mail.gmail.com>
+ <1496686434-13181-1-git-send-email-daniel.lezcano@linaro.org>
+ <CAPDyKFqWptneK2V7wCR8LGbgU7=U9kBCKkHrtgGmZKmNQJ4s7g@mail.gmail.com>
+ <20170609154652.GG2244@mai>
+Message-ID: <CAK8P3a1PsFcqLC95rSQf6EdkqhQ6sE3OXC9gDQ8TLp2mTVO3pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 09, 2017 at 08:40:19AM +0200, Antoine Tenart wrote:
-> Hi Andrew,
-> 
-> On Thu, Jun 08, 2017 at 06:03:31PM +0200, Andrew Lunn wrote:
-> > On Thu, Jun 08, 2017 at 11:26:52AM +0200, Antoine Tenart wrote:
-> > > +#define MVMDIO_XSMI_MGNT_REG		0x0
-> > > +#define  MVMDIO_XSMI_READ_VALID		BIT(29)
-> > > +#define  MVMDIO_XSMI_BUSY		BIT(30)
-> > > +#define MVMDIO_XSMI_ADDR_REG		0x8
-> > > +#define  MVMDIO_XSMI_PHYADDR_SHIFT	16
-> > > +#define  MVMDIO_XSMI_DEVADDR_SHIFT	21
-> > > +#define  MVMDIO_XSMI_READ_OPERATION	(0x7 << 26)
-> > > +#define  MVMDIO_XSMI_WRITE_OPERATION	(0x5 << 27)
-> > 
-> > These two operations seem odd. Generally ops have the same shift.
-> 
-> Indeed, this is odd. I'll have a look at this.
+On Fri, Jun 9, 2017 at 5:46 PM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
+> On Tue, Jun 06, 2017 at 04:17:40PM +0200, Ulf Hansson wrote:
+>> On 5 June 2017 at 20:13, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+>> > With the addition of the hi655x common clock, the config option is missing
+>> > for the ARM64's hi6220 platform. That leads to a non functionnal WiFi because
+>> > the hi655x clock driver misses when initializing the power sequence via DT.
+>> >
+>> > Cc: John Stultz <john.stultz@linaro.org>
+>> > Cc: Ulf Hansson <ulf.hansson@linaro.org>
+>> > Cc: Wei Xu <xuwei5@hisilicon.com>
+>> > Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>
+>> Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>
+>> Would be nice to get this trivial fix in for 4.12 rcs to make the WiFi
+>> work for Hikey.
+>>
+>
+> I'm wondering if I submitted this patch for the right path.
+>
+> Shall it go through arm-soc ?
 
-The Marvell driver uses 5 << 26:
+Yes, but I'm not sure this is the right patch either. We tend to not
+use 'select' for user-visible drivers, and most hisilicon platforms
+won't need this driver.
 
-+#define XOPCODE_OFFS           26
-+#define XOPCODE_ADDR_READ      (7 << XOPCODE_OFFS)
-+#define XOPCODE_ADDR_WRITE     (5 << XOPCODE_OFFS)
+I think it would be more consistent to add this to the defconfig
+and regard it as a user error when the driver is disabled on a
+machine that needs it.
 
-What this means is that with the incorrect shift in your driver,
-although writes appeared to work, they actually resulted in a
-post-read-increment-address frame (and hence no error.)
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently@9.6Mbps down 400kbps up
-according to speedtest.net.
+       Arnd
