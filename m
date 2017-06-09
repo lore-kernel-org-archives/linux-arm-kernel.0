@@ -1,54 +1,54 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 9 Jun 2017 12:32:47 +0800
-Subject: [PATCH v3] mm: huge-vmap: fail gracefully on unexpected huge
- vmap mappings
-In-Reply-To: <20170608113548.24905-1-ard.biesheuvel@linaro.org>
-Message-ID: <201706091241.ZiwfHOYj%fengguang.wu@intel.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 9 Jun 2017 12:35:08 +0800
+Subject: [PATCH v2 2/2] ARM: sun8i: a83t: add dwmac-sun8i ethernet driver
+In-Reply-To: <20170608124841.b6i5qphsyubksbvb@flea.home>
+References: <20170607173345.22462-1-clabbe.montjoie@gmail.com>
+ <20170607173345.22462-3-clabbe.montjoie@gmail.com>
+ <20170608083428.csv54tryvgwdb552@flea.home>
+ <20170608084222.GA10830@Red> <20170608124841.b6i5qphsyubksbvb@flea.home>
+Message-ID: <CAGb2v650dPV+WgP_8L1dNEuav3jRSQkk_sQL0bi=PcjOXoQgVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On Thu, Jun 8, 2017 at 8:48 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Thu, Jun 08, 2017 at 10:42:22AM +0200, Corentin Labbe wrote:
+>> On Thu, Jun 08, 2017 at 10:34:28AM +0200, Maxime Ripard wrote:
+>> > On Wed, Jun 07, 2017 at 07:33:45PM +0200, Corentin Labbe wrote:
+>> > > The dwmac-sun8i is an ethernet MAC hardware that support 10/100/1000 speed.
+>> > > This patch enable the dwmac-sun8i on the Allwinner a83t SoC Device-tree.
+>> > >
+>> > > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+>> > > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+>> > > ---
+>> > >  arch/arm/boot/dts/sun8i-a83t.dtsi | 28 ++++++++++++++++++++++++++++
+>> > >  1 file changed, 28 insertions(+)
+>> > >
+>> > > diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+>> > > index 01a83406f9ae..7d719b4aeaa9 100644
+>> > > --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
+>> > > +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+>> > > @@ -200,6 +200,14 @@
+>> > >                   #interrupt-cells = <3>;
+>> > >                   #gpio-cells = <3>;
+>> > >
+>> > > +                 emac_rgmii_pins: emac-rgmii-pins {
+>> > > +                         pins = "PD2", "PD3", "PD4", "PD5", "PD6", "PD7",
+>> > > +                                "PD11", "PD12", "PD13", "PD14", "PD18",
+>> > > +                                "PD19", "PD21", "PD22", "PD23";
+>> > > +                         function = "gmac";
+>> > > +                         drive-strength = <40>;
+>> > > +                 };
+>> > > +
+>> >
+>> > This is not used anywhere.
+>> >
+>> But will be used by bpim3 board
+>
+> Then will add it when we'll add support for that board, until then,
+> it's dead code.
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.12-rc4]
-[cannot apply to next-20170608]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+I'll include this in my A83T work branch and resend it when I get around to it.
 
-url:    https://github.com/0day-ci/linux/commits/Ard-Biesheuvel/mm-huge-vmap-fail-gracefully-on-unexpected-huge-vmap-mappings/20170609-093900
-config: x86_64-kexec (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
-
-All errors (new ones prefixed by >>):
-
-   arch/x86/built-in.o: In function `vmalloc_fault':
->> fault.c:(.text+0x422c5): undefined reference to `pud_huge'
->> fault.c:(.text+0x4238e): undefined reference to `pmd_huge'
-   mm/built-in.o: In function `follow_page_mask':
->> (.text+0x2fcde): undefined reference to `pud_huge'
-   mm/built-in.o: In function `follow_page_mask':
->> (.text+0x2fda8): undefined reference to `pmd_huge'
-   mm/built-in.o: In function `__follow_pte_pmd.isra.10':
->> memory.c:(.text+0x31b91): undefined reference to `pmd_huge'
-   memory.c:(.text+0x31bbf): undefined reference to `pmd_huge'
-   mm/built-in.o: In function `apply_to_page_range':
-   (.text+0x34e77): undefined reference to `pud_huge'
-   mm/built-in.o: In function `apply_to_page_range':
-   (.text+0x35043): undefined reference to `pmd_huge'
-   mm/built-in.o: In function `vmalloc_to_page':
-   (.text+0x421a0): undefined reference to `pud_huge'
-   mm/built-in.o: In function `vmalloc_to_page':
-   (.text+0x421ec): undefined reference to `pmd_huge'
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 25324 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170609/379ddcad/attachment-0001.gz>
+Thanks
+ChenYu
