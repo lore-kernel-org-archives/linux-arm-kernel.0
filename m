@@ -1,72 +1,68 @@
-From: eballetbo@gmail.com (Enric Balletbo Serra)
-Date: Fri, 9 Jun 2017 11:55:05 +0200
-Subject: [PATCH 4/4] mfd: tps65217: Instantiate sub-devices from device
- tree
-In-Reply-To: <CABxcv=nzCreCSm9wkY+Kv_-vmoQN12Ct=_VegsfTrbe6H-1hTw@mail.gmail.com>
-References: <20170607103242.16008-1-enric.balletbo@collabora.com>
- <20170607103242.16008-4-enric.balletbo@collabora.com>
- <6359abe2-9a21-78a2-f5ea-87e2e3335af3@ti.com>
- <CAFqH_53v32iODN4xhoh4ho4s6grxknEDS3Ak6CHBcTAQo6fDNw@mail.gmail.com>
- <578f348c-509f-79d3-9770-73c9fcffe19c@ti.com>
- <CAFqH_52rU7ZBG_Muy2JHoqJGdXOdsNfmtJxsZoPRyx3V1aWmFw@mail.gmail.com>
- <CABxcv=mN6=hbDSqrVkwSL8zccCntN7m_3DP6ZCbkOT6CLw+skQ@mail.gmail.com>
- <fba09819-7d7e-57bb-c147-46c39098cff8@ti.com>
- <CABxcv=nzCreCSm9wkY+Kv_-vmoQN12Ct=_VegsfTrbe6H-1hTw@mail.gmail.com>
-Message-ID: <CAFqH_50MDAAMcj0RW8Vzu71n=vAHAukpGw--mn3+PZBfj+m88w@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri,  9 Jun 2017 11:49:16 +0200
+Subject: [PATCH v4 7/7] ARM: dts: meson8b: switch to new bindings for UART
+ nodes
+In-Reply-To: <1497001756-942-1-git-send-email-narmstrong@baylibre.com>
+References: <1497001756-942-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1497001756-942-8-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Grygorii, Javier,
+Switch to the stable UART bindings by adding a XTAL node and using the
+proper compatible strings.
 
-2017-06-09 2:00 GMT+02:00 Javier Martinez Canillas <javier@dowhile0.org>:
-> Hello Grygorii,
->
-> [snip]
->
->>>
->>> For tps65218 couldn't instead of using mfd_add_devices() for all the
->>> sub-devs, had used of_platform_populate() for the ones that have
->>> device nodes and mfd_add_devices() only for the "tps65218-regulator"?
->>>
->>> The commit talks about nodes without compatibles but's actually about
->>> sub-devices without an associated device node. For me it makes sense
->>> to use of_platform_populate() when the MFD has device nodes for their
->>> sub-devices and mfd_add_devices() when DT knows nothing about the
->>> sub-devices.
->>
->> FYI. Below is link discussion I'm referring to between Mark Brown and Andrew F. Davis
->> https://lkml.org/lkml/2015/10/22/823
->> the same - https://groups.google.com/forum/#!topic/linux.kernel/wQsdSpPMroQ
->>
->
-> Thanks a lot for the pointer. There's a subtle difference between the
-> argument you made and the one that Mark is making in this thread
-> though.
->
-> Because you said (sorry if I misunderstood) that mfd_add_devices()
-> should be used instead of of_device_populate() even when sub-devices
-> are described as DT nodes (as is the case in the commit you shared)
-> while Mark is saying that if the sub-devs IP blocks are part of the
-> MFD, then it shouldn't be exposed in the DT and be instantiated via
-> mfd_add_devices() and I absolutely agree with that.
->
-> So I was arguing for using of_device_populate() if the sub-devices are
-> described in the DT. If that makes sense or not to expose the
-> sub-devices in the DT for this particular driver is a different
-> discussion and I can't comment on that since I'm not familiar with the
-> HW.
->
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ arch/arm/boot/dts/meson8b.dtsi | 23 +++++++++++++++++++----
+ 1 file changed, 19 insertions(+), 4 deletions(-)
 
-I'm agree with Grygorii here that has no sense describe the static
-interrupts resources in the DT here unless DT maintainers prefer have
-them (dunno their preferences). OTOH, for the charger we need a way to
-disable (or having a mfd propriety or having a DT subnode with the
-status). I have a new idea that might be acceptable by Grygorii and
-also solve my use case. Let me prepare a second patchset and lets
-continue the discussion there?
-
-Best regards,
- Enric
-
-> Best regards,
-> Javier
+diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
+index d9f116a..651ad4a 100644
+--- a/arch/arm/boot/dts/meson8b.dtsi
++++ b/arch/arm/boot/dts/meson8b.dtsi
+@@ -82,6 +82,13 @@
+ 			reg = <0x203>;
+ 		};
+ 	};
++
++	xtal: xtal-clk {
++		compatible = "fixed-clock";
++		clock-frequency = <24000000>;
++		clock-output-names = "xtal";
++		#clock-cells = <0>;
++	};
+ }; /* end of / */
+ 
+ &aobus {
+@@ -178,17 +185,25 @@
+ };
+ 
+ &uart_AO {
+-	clocks = <&clkc CLKID_CLK81>;
++	compatible = "amlogic,meson8b-uart", "amlogic,meson-ao-uart";
++	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&clkc CLKID_CLK81>;
++	clock-names = "xtal", "pclk", "baud";
+ };
+ 
+ &uart_A {
+-	clocks = <&clkc CLKID_CLK81>;
++	compatible = "amlogic,meson8b-uart";
++	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&clkc CLKID_CLK81>;
++	clock-names = "xtal", "pclk", "baud";
+ };
+ 
+ &uart_B {
+-	clocks = <&clkc CLKID_CLK81>;
++	compatible = "amlogic,meson8b-uart";
++	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&clkc CLKID_CLK81>;
++	clock-names = "xtal", "pclk", "baud";
+ };
+ 
+ &uart_C {
+-	clocks = <&clkc CLKID_CLK81>;
++	compatible = "amlogic,meson8b-uart";
++	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&clkc CLKID_CLK81>;
++	clock-names = "xtal", "pclk", "baud";
+ };
+-- 
+1.9.1
