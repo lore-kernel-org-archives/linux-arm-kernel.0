@@ -1,106 +1,121 @@
-From: john.garry@huawei.com (John Garry)
-Date: Fri, 9 Jun 2017 17:09:25 +0100
-Subject: [PATCH v8 6/9] drivers: perf: hisi: Add support for Hisilicon
- Djtag driver
-In-Reply-To: <20170609154425.GH10665@leverpostej>
-References: <1495457312-237127-1-git-send-email-zhangshaokun@hisilicon.com>
- <20170608163519.GA19643@leverpostej>
- <8666a0fa-126d-e4a3-ac4b-7962f5d79942@huawei.com>
- <20170609154425.GH10665@leverpostej>
-Message-ID: <e120463d-2936-90ec-8aad-f0f7be558054@huawei.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri,  9 Jun 2017 09:10:26 -0700
+Subject: [PATCH v2] [media] davinci: vpif: adaptions for DT support
+Message-ID: <20170609161026.7582-1-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+The davinci VPIF is a single hardware block, but the existing driver
+is broken up into a common library (vpif.c), output (vpif_display.c) and
+intput (vpif_capture.c).
 
-> What happens if the lock is already held by an agent in that case?
->
-> Does the FW block until the lock is released?
+When migrating to DT, to better model the hardware, and because
+registers, interrupts, etc. are all common,it was decided to
+have a single VPIF hardware node[1].
 
-The FW must also honour the contract - it must also block until the lock 
-is available.
+Because davinci uses legacy, non-DT boot on several SoCs still, the
+platform_drivers need to remain.  But they are also needed in DT boot.
+Since there are no DT nodes for the display/capture parts in DT
+boot (there is a single node for the parent/common device) we need to
+create platform_devices somewhere to instansiate the platform_drivers.
 
-This may sound bad, but, in reality, probablity of simultaneous perf and 
-hotplug access is very low.
+When VPIF display/capture are needed for a DT boot, the VPIF node
+will have endpoints defined for its subdevs.  Therefore, vpif_probe()
+checks for the presence of endpoints, and if detected manually creates
+the platform_devices for the display and capture platform_drivers.
 
->
-> Can you elaborate on CPU hotplug? Which CPU is performing the
-> maintenance in this scenario, and when? Can this block other CPUs until
-> the lock is released?
->
-> What happens if another agent pokes the djtag (without acquiring the
-> lock) while FW is doing this? Can this result in issues on the secure
-> side?
->
+[1] Documentation/devicetree/bindings/media/ti,da850-vpif.txt
 
-I need to check on this.
+Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+---
+Changes since v1:
+- added proper error checking to kzalloc calls
+- rebased onto media/master
 
-> [...]
->
->>> Can you explain how the locking scheme works? e.g. is this an
->>> advisory software-only policy, or does the hardware prohibit accesses
->> >from other agents somehow?
->>
->> The locking scheme is a software solution to spinlock. It's uses
->> djtag module select register as the spinlock flag, to avoid using
->> some shared memory.
->>
->> The tricky part is that there is no test-and-set hardware support,
->> so we use this algorithm:
->> - precondition: flag initially set unlocked
->>
->> a. agent reads flag
->>     - if not unlocked, continues to poll
->>     - otherwise, writes agent's unique lock value to flag
->> b. agent waits defined amount of time *uninterrupted* and then
->> checks the flag
->>     - if it is unchanged, it has the lock -> continue
->>     - if it is changed, it means other agent is trying to access the
->> lock and got it, so it goes back to a.
->> c. has lock, so safe to access djtag
->> d. to unlock, release by writing "unlock" value to flag
->
-> This does not sound safe to me. There's always the potential for a race,
-> no matter how long an agent waits.
->
->>> What happens if the kernel takes the lock, but doesn't release it?
->>
->> This should not happen. We use spinlock_irqsave() when locking.
->> However I have noted that we can BUG if djtag access timeout, so we
->> need to release the lock at this point. I don't think the code
->> handles this properly now.
->
-> I was worried aobut BUG() and friends, and also preempt kernels.
->
-> It doesn't sound like it's possible to make this robust.
->
->>> What happens if UEFI takes the lock, but doesn't release it?
->>
->> Again, we would not expect this to happen; but, if it does, Kernel
->> access should timeout.
->
-> ... which they do not, in this patch series, as far as I can tell.
->
+ drivers/media/platform/davinci/vpif.c | 57 ++++++++++++++++++++++++++++++++++-
+ 1 file changed, 56 insertions(+), 1 deletion(-)
 
-I noticed this also.
-
-> This doesn't sound safe at all. :/
-
-Right, we need to consider if this will fly at all.
-
-At this point, we would rather concentrate on our new chipset, which is 
-based on same perf HW architecture (so much code reuse), but uses 
-directly mapped registers and *no djtag* - in this, most of the upstream 
-effort from all parties is not wasted.
-
-Please advise.
-
-Much appreciated,
-John
-
->
-> Thanks,
-> Mark.
->
-> .
->
+diff --git a/drivers/media/platform/davinci/vpif.c b/drivers/media/platform/davinci/vpif.c
+index 1b02a6363f77..c2d214dfaa3e 100644
+--- a/drivers/media/platform/davinci/vpif.c
++++ b/drivers/media/platform/davinci/vpif.c
+@@ -26,6 +26,7 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/spinlock.h>
+ #include <linux/v4l2-dv-timings.h>
++#include <linux/of_graph.h>
+ 
+ #include "vpif.h"
+ 
+@@ -423,7 +424,9 @@ EXPORT_SYMBOL(vpif_channel_getfid);
+ 
+ static int vpif_probe(struct platform_device *pdev)
+ {
+-	static struct resource	*res;
++	static struct resource	*res, *res_irq;
++	struct platform_device *pdev_capture, *pdev_display;
++	struct device_node *endpoint = NULL;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	vpif_base = devm_ioremap_resource(&pdev->dev, res);
+@@ -435,6 +438,58 @@ static int vpif_probe(struct platform_device *pdev)
+ 
+ 	spin_lock_init(&vpif_lock);
+ 	dev_info(&pdev->dev, "vpif probe success\n");
++
++	/*
++	 * If VPIF Node has endpoints, assume "new" DT support,
++	 * where capture and display drivers don't have DT nodes
++	 * so their devices need to be registered manually here
++	 * for their legacy platform_drivers to work.
++	 */
++	endpoint = of_graph_get_next_endpoint(pdev->dev.of_node,
++					      endpoint);
++	if (!endpoint) 
++		return 0;
++
++	/*
++	 * For DT platforms, manually create platform_devices for
++	 * capture/display drivers.
++	 */
++	res_irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
++	if (!res_irq) {
++		dev_warn(&pdev->dev, "Missing IRQ resource.\n");
++		return -EINVAL;
++	}
++
++	pdev_capture = devm_kzalloc(&pdev->dev, sizeof(*pdev_capture),
++				    GFP_KERNEL);
++	if (pdev_capture) {
++		pdev_capture->name = "vpif_capture";
++		pdev_capture->id = -1;
++		pdev_capture->resource = res_irq;
++		pdev_capture->num_resources = 1;
++		pdev_capture->dev.dma_mask = pdev->dev.dma_mask;
++		pdev_capture->dev.coherent_dma_mask = pdev->dev.coherent_dma_mask;
++		pdev_capture->dev.parent = &pdev->dev;
++		platform_device_register(pdev_capture);
++	} else {
++		dev_warn(&pdev->dev, "Unable to allocate memory for pdev_capture.\n");
++	}
++
++	pdev_display = devm_kzalloc(&pdev->dev, sizeof(*pdev_display),
++				    GFP_KERNEL);
++	if (pdev_display) {
++		pdev_display->name = "vpif_display";
++		pdev_display->id = -1;
++		pdev_display->resource = res_irq;
++		pdev_display->num_resources = 1;
++		pdev_display->dev.dma_mask = pdev->dev.dma_mask;
++		pdev_display->dev.coherent_dma_mask = pdev->dev.coherent_dma_mask;
++		pdev_display->dev.parent = &pdev->dev;
++		platform_device_register(pdev_display);
++	} else {
++		dev_warn(&pdev->dev, "Unable to allocate memory for pdev_display.\n");
++	}
++
+ 	return 0;
+ }
+ 
+-- 
+2.9.3
