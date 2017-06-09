@@ -1,49 +1,68 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Fri, 9 Jun 2017 07:49:13 +0200
-Subject: [PATCH 0/3] arm64: hi6220-hikey: Fix Bluetooth support
-In-Reply-To: <1496826502-1339-1-git-send-email-ulf.hansson@linaro.org>
-References: <1496826502-1339-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <85B2CA30-73CC-41A9-8CE5-937825D85952@holtmann.org>
+From: geethasowjanya.akula@gmail.com (Geetha Akula)
+Date: Fri, 9 Jun 2017 11:30:53 +0530
+Subject: [PATCH v7 1/3] ACPI/IORT: Fixup SMMUv3 resource size for Cavium
+ ThunderX2 SMMUv3 model
+In-Reply-To: <20170608085857.GB8607@red-moon>
+References: <1496145821-3411-1-git-send-email-gakula@caviumnetworks.com>
+ <1496145821-3411-2-git-send-email-gakula@caviumnetworks.com>
+ <20170608085857.GB8607@red-moon>
+Message-ID: <CANHdaib+mNgVS7g=vft-5ZtabSKkeyXO7Jp1EQhL3jduhu5F7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+On Thu, Jun 8, 2017 at 2:28 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Tue, May 30, 2017 at 05:33:39PM +0530, Geetha sowjanya wrote:
+>> From: Linu Cherian <linu.cherian@cavium.com>
+>>
+>> Cavium ThunderX2 implementation doesn't support second page in SMMU
+>> register space. Hence, resource size is set as 64k for this model.
+>>
+>> Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
+>> Signed-off-by: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
+>> ---
+>>  drivers/acpi/arm64/iort.c |   10 +++++++++-
+>>  1 files changed, 9 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+>> index c5fecf9..bba2b59 100644
+>> --- a/drivers/acpi/arm64/iort.c
+>> +++ b/drivers/acpi/arm64/iort.c
+>> @@ -833,12 +833,20 @@ static void __init arm_smmu_v3_init_resources(struct resource *res,
+>>  {
+>>       struct acpi_iort_smmu_v3 *smmu;
+>>       int num_res = 0;
+>> +     unsigned long size = SZ_128K;
+>>
+>>       /* Retrieve SMMUv3 specific data */
+>>       smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
+>>
+>> +     /*
+>> +      * Override the size, for Cavium ThunderX2 implementation
+>> +      * which doesn't support the page 1 SMMU register space.
+>> +      */
+>> +     if (smmu->model == ACPI_IORT_SMMU_CAVIUM_CN99XX)
+>> +             size = SZ_64K;
+>
+> Nit: add a function, say arm_smmu_v3_resource_size() with the logic
+> above that by default returns SZ_128K, I do not like this switch
+> in the middle of this function.
 
-> The commit ea452678734e ("arm64: dts: hikey: Fix WiFi support") indeed managed
-> to fix the WiFi support for the Hikey board. However, it also caused the
-> Bluetooth to break.
-> 
-> The reason to the problem is because part of the fixes for WiFi, involved
-> explicitly to start manage the external clock for the TI WiLink chip, as it's
-> needed to properly power on/off WiFi. Then, because the Bluetooth driver,
-> hci_ll, don't manage the clock, it fails to initialize Bluetooth.
-> 
-> This small series add support and DT bindings for the external clock, now
-> properly managed by the hci_ll driver during power on/off. On top of that, the
-> external clock is added to the Bluetooth DT node in the Hikey DTS file.
-> 
-> The regression has been reported by John Stultz, running a Hikey board with
-> UEFI based boot. I have confirmed that there is no regressions with u-boot as
-> we still don't have bluetooth working on that set up. I intend to fix that as
-> well, although in second step and not being part of a fixup series.
-> 
-> John, can you please confirm/test this on your Hikey board using UEFI!?
-> 
-> Perhaps this can go in via the bluetooth git, when respective patches has got
-> an ack. Or whatever you think is best.
-> 
-> Ulf Hansson (3):
->  dt-bindings: net: Add binding for the external clock for TI WiLink
->  Bluetooth: hci_ll: Add support for the external clock
->  arm64: dts: hikey: Add external clock to the Bluetooth node
-> 
-> Documentation/devicetree/bindings/net/ti,wilink-st.txt |  6 ++++++
-> arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts         |  2 ++
-> drivers/bluetooth/hci_ll.c                             | 14 +++++++++++++-
-> 3 files changed, 21 insertions(+), 1 deletion(-)
+I will resubmit the patch with suggested changes.
 
-all 3 patches have been applied to bluetooth-next tree.
 
-Regards
-
-Marcel
+Thanks,
+Geetha.
+>
+> Lorenzo
+>
+>> +
+>>       res[num_res].start = smmu->base_address;
+>> -     res[num_res].end = smmu->base_address + SZ_128K - 1;
+>> +     res[num_res].end = smmu->base_address + size - 1;
+>>       res[num_res].flags = IORESOURCE_MEM;
+>>
+>>       num_res++;
+>> --
+>> 1.7.1
+>>
