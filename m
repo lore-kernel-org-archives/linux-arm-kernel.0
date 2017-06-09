@@ -1,68 +1,132 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  9 Jun 2017 12:49:52 +0100
-Subject: [PATCH v3 23/27] KVM: arm64: vgic-v3: Add ICV_PMR_EL1 handler
+Date: Fri,  9 Jun 2017 12:49:48 +0100
+Subject: [PATCH v3 19/27] arm64: Add workaround for Cavium Thunder erratum
+ 30115
 In-Reply-To: <20170609114956.25963-1-marc.zyngier@arm.com>
 References: <20170609114956.25963-1-marc.zyngier@arm.com>
-Message-ID: <20170609114956.25963-24-marc.zyngier@arm.com>
+Message-ID: <20170609114956.25963-20-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a handler for reading/writing the guest's view of the ICC_PMR_EL1
-register, which is located in the ICH_VMCR_EL2.VPMR field.
+From: David Daney <david.daney@cavium.com>
+
+Some Cavium Thunder CPUs suffer a problem where a KVM guest may
+inadvertently cause the host kernel to quit receiving interrupts.
+
+Use the Group-0/1 trapping in order to deal with it.
+
+[maz]: Adapted patch to the Group-0/1 trapping, reworked commit log
 
 Tested-by: Alexander Graf <agraf@suse.de>
-Acked-by: David Daney <david.daney@cavium.com>
-Acked-by: Christoffer Dall <cdall@linaro.org>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Signed-off-by: David Daney <david.daney@cavium.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/hyp/vgic-v3-sr.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ Documentation/arm64/silicon-errata.txt |  1 +
+ arch/arm64/Kconfig                     | 11 +++++++++++
+ arch/arm64/include/asm/cpucaps.h       |  3 ++-
+ arch/arm64/kernel/cpu_errata.c         | 21 +++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-v3.c            |  7 +++++++
+ 5 files changed, 42 insertions(+), 1 deletion(-)
 
-diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index a8a58dedc38e..15b557697086 100644
---- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -884,6 +884,27 @@ static void __hyp_text __vgic_v3_read_hppir(struct kvm_vcpu *vcpu,
- 	vcpu_set_reg(vcpu, rt, lr_val & ICH_LR_VIRTUAL_ID_MASK);
- }
+diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+index 10f2dddbf449..f5f93dca54b7 100644
+--- a/Documentation/arm64/silicon-errata.txt
++++ b/Documentation/arm64/silicon-errata.txt
+@@ -62,6 +62,7 @@ stable kernels.
+ | Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154        |
+ | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456        |
+ | Cavium         | ThunderX SMMUv2 | #27704          | N/A                         |
++| Cavium         | ThunderX Core   | #30115          | CAVIUM_ERRATUM_30115        |
+ |                |                 |                 |                             |
+ | Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585         |
+ |                |                 |                 |                             |
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 3dcd7ec69bca..6252365b0c96 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -480,6 +480,17 @@ config CAVIUM_ERRATUM_27456
  
-+static void __hyp_text __vgic_v3_read_pmr(struct kvm_vcpu *vcpu,
-+					  u32 vmcr, int rt)
-+{
-+	vmcr &= ICH_VMCR_PMR_MASK;
-+	vmcr >>= ICH_VMCR_PMR_SHIFT;
-+	vcpu_set_reg(vcpu, rt, vmcr);
-+}
+ 	  If unsure, say Y.
+ 
++config CAVIUM_ERRATUM_30115
++	bool "Cavium erratum 30115: Guest may disable interrupts in host"
++	default y
++	help
++	  On ThunderX T88 pass 1.x through 2.2, T81 pass 1.0 through
++	  1.2, and T83 Pass 1.0, KVM guest execution may disable
++	  interrupts in host. Trapping both GICv3 group-0 and group-1
++	  accesses sidesteps the issue.
 +
-+static void __hyp_text __vgic_v3_write_pmr(struct kvm_vcpu *vcpu,
-+					   u32 vmcr, int rt)
-+{
-+	u32 val = vcpu_get_reg(vcpu, rt);
++	  If unsure, say Y.
 +
-+	val <<= ICH_VMCR_PMR_SHIFT;
-+	val &= ICH_VMCR_PMR_MASK;
-+	vmcr &= ~ICH_VMCR_PMR_MASK;
-+	vmcr |= val;
+ config QCOM_FALKOR_ERRATUM_1003
+ 	bool "Falkor E1003: Incorrect translation due to ASID change"
+ 	default y
+diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+index b3aab8a17868..8d2272c6822c 100644
+--- a/arch/arm64/include/asm/cpucaps.h
++++ b/arch/arm64/include/asm/cpucaps.h
+@@ -38,7 +38,8 @@
+ #define ARM64_WORKAROUND_REPEAT_TLBI		17
+ #define ARM64_WORKAROUND_QCOM_FALKOR_E1003	18
+ #define ARM64_WORKAROUND_858921			19
++#define ARM64_WORKAROUND_CAVIUM_30115		20
+ 
+-#define ARM64_NCAPS				20
++#define ARM64_NCAPS				21
+ 
+ #endif /* __ASM_CPUCAPS_H */
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 2ed2a7657711..0e27f86ee709 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -133,6 +133,27 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 		MIDR_RANGE(MIDR_THUNDERX_81XX, 0x00, 0x00),
+ 	},
+ #endif
++#ifdef CONFIG_CAVIUM_ERRATUM_30115
++	{
++	/* Cavium ThunderX, T88 pass 1.x - 2.2 */
++		.desc = "Cavium erratum 30115",
++		.capability = ARM64_WORKAROUND_CAVIUM_30115,
++		MIDR_RANGE(MIDR_THUNDERX, 0x00,
++			   (1 << MIDR_VARIANT_SHIFT) | 2),
++	},
++	{
++	/* Cavium ThunderX, T81 pass 1.0 - 1.2 */
++		.desc = "Cavium erratum 30115",
++		.capability = ARM64_WORKAROUND_CAVIUM_30115,
++		MIDR_RANGE(MIDR_THUNDERX_81XX, 0x00, 0x02),
++	},
++	{
++	/* Cavium ThunderX, T83 pass 1.0 */
++		.desc = "Cavium erratum 30115",
++		.capability = ARM64_WORKAROUND_CAVIUM_30115,
++		MIDR_RANGE(MIDR_THUNDERX_83XX, 0x00, 0x00),
++	},
++#endif
+ 	{
+ 		.desc = "Mismatched cache line size",
+ 		.capability = ARM64_MISMATCHED_CACHE_LINE_SIZE,
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index e0e50ca547de..ffc581b70c4e 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -482,6 +482,13 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
+ 	if (kvm_vgic_global_state.vcpu_base == 0)
+ 		kvm_info("disabling GICv2 emulation\n");
+ 
++#ifdef CONFIG_ARM64
++	if (cpus_have_const_cap(ARM64_WORKAROUND_CAVIUM_30115)) {
++		group0_trap = true;
++		group1_trap = true;
++	}
++#endif
 +
-+	write_gicreg(vmcr, ICH_VMCR_EL2);
-+}
-+
- static void __hyp_text __vgic_v3_read_rpr(struct kvm_vcpu *vcpu,
- 					  u32 vmcr, int rt)
- {
-@@ -1029,6 +1050,12 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
- 		else
- 			fn = __vgic_v3_write_ctlr;
- 		break;
-+	case SYS_ICC_PMR_EL1:
-+		if (is_read)
-+			fn = __vgic_v3_read_pmr;
-+		else
-+			fn = __vgic_v3_write_pmr;
-+		break;
- 	default:
- 		return 0;
- 	}
+ 	if (group0_trap || group1_trap) {
+ 		kvm_info("GICv3 sysreg trapping enabled (reduced performance)\n");
+ 		static_branch_enable(&vgic_v3_cpuif_trap);
 -- 
 2.11.0
