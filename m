@@ -1,117 +1,53 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 9 Jun 2017 11:00:30 +0100
-Subject: [PATCH 0/2] arm64: fix crash when reading /proc/kcore
-In-Reply-To: <20170608194139.9250-1-ard.biesheuvel@linaro.org>
-References: <20170608194139.9250-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170609100029.GC10665@leverpostej>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri,  9 Jun 2017 12:03:18 +0200
+Subject: [PATCH] gpio: mvebu: fix regmap_update_bits usage
+Message-ID: <20170609100318.26450-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 08, 2017 at 07:41:37PM +0000, Ard Biesheuvel wrote:
-> This is a follow-up to patches from zhonjiang [0] and myself [1] that aim
-> to solve a problem in the kcore code, which gets confused by the presence
-> of block mappings in the vmalloc region.
-> 
-> While fixing the crash is quite straight forward [2], we need to tweak
-> the kcore code itself to ensure that it operates correctly on arm64.
-> Fortunately, we can achieve this with two very simple changes:
-> 
-> - replace a call to is_vmalloc_or_module_addr() in read_kcore() with a
->   comparison of the kclist type field (#1)
-> - enable CONFIG_ARCH_PROC_KCORE_TEXT for arm64 (#2)
+In some place in the driver regmap_update_bits was misused. Indeed the
+last argument is not the value of the bit (or group of bits) itself but
+the mask value inside the register.
 
-FWIW, I gave this a spin on a Juno R1 board, and can confirm this
-prevents the crash one could previously trigger with:
+So when setting the bit N, then the value must be BIT(N) and not 1.
 
-# cat /proc/kcore > /dev/null
+CC: Chris Packham <Chris.Packham@alliedtelesis.co.nz>
+CC: Ralph Sennhauser <ralph.sennhauser@gmail.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/gpio/gpio-mvebu.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-FWIW, for the series:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
-
-Prior to these patches, I'd get a splat after a couple of seconds, as
-below.
-
-Thanks,
-Mark.
-
-root at ribbensteg:/home/nanook# cat /proc/kcore  > /dev/null
-[   44.923557] Unable to handle kernel paging request at virtual address ffffa3a379000000
-[   44.931437] pgd = ffff800975e84000
-[   44.934832] [ffffa3a379000000] *pgd=0000000000000000
-[   44.939772] Internal error: Oops: 96000004 [#1] PREEMPT SMP
-[   44.945295] Modules linked in:
-[   44.948328] CPU: 4 PID: 2190 Comm: cat Not tainted 4.12.0-rc4-00006-gc50d1fe #2
-[   44.955573] Hardware name: ARM Juno development board (r1) (DT)
-[   44.961441] task: ffff80097658e800 task.stack: ffff8009748bc000
-[   44.967316] PC is at __memcpy+0x100/0x180
-[   44.971294] LR is at vread+0x13c/0x260
-[   44.975009] pc : [<ffff00000839fe00>] lr : [<ffff0000081be1fc>] pstate: 20000145
-[   44.982340] sp : ffff8009748bfca0
-[   44.985623] x29: ffff8009748bfca0 x28: ffff80097560f000 
-[   44.990892] x27: ffff80097658e800 x26: ffff800977801380 
-[   44.996162] x25: 0000000000001000 x24: ffff000008201000 
-[   45.001431] x23: 0000000000001000 x22: ffff80097560f000 
-[   45.006700] x21: ffff000008e8aa88 x20: ffff000008201000 
-[   45.011980] x19: 0000000000001000 x18: 0000ffffeac5f340 
-[   45.017259] x17: 0000ffff961def30 x16: ffff0000081fb098 
-[   45.022537] x15: 0000ffff96268588 x14: 0000000000000000 
-[   45.027815] x13: 0000000000000000 x12: 0000000000000000 
-[   45.033094] x11: 0000000000000000 x10: 0000000000000000 
-[   45.038372] x9 : 0000000000000000 x8 : 0000000000000000 
-[   45.043649] x7 : 0000000000000000 x6 : ffff80097560f000 
-[   45.048928] x5 : ffff8009778013b0 x4 : 0000000000000000 
-[   45.054206] x3 : 0400000000000001 x2 : 0000000000000f80 
-[   45.059484] x1 : ffffa3a379000000 x0 : ffff80097560f000 
-[   45.064764] Process cat (pid: 2190, stack limit = 0xffff8009748bc000)
-[   45.071158] Stack: (0xffff8009748bfca0 to 0xffff8009748c0000)
-[   45.076866] fca0: ffff8009748bfd20 ffff00000826d848 ffff000008fb7958 000000000000d000
-[   45.084651] fcc0: 0000000000f5b000 ffff000008fb7948 ffff8009748bfeb8 0000000000003000
-[   45.092435] fce0: ffff80097658e800 ffff000008201000 ffff000008e8ff70 0000000000001000
-[   45.100219] fd00: ffff8009748bfeb8 0000000000001000 ffff80097560f000 0000000000001000
-[   45.108004] fd20: ffff8009748bfdb0 ffff00000825fd30 ffff80097643dc00 fffffffffffffffb
-[   45.115788] fd40: 0000000000f58000 ffff8009748bfeb8 0000000060000000 0000000000000015
-[   45.123572] fd60: 0000000000000124 000000000000003f ffff000008952000 ffff80097658e800
-[   45.131356] fd80: 0000000000000124 ffff80097658e800 ffff80097658e800 ffff80097560f000
-[   45.139140] fda0: 0000000376521100 0000000000002000 ffff8009748bfdd0 ffff0000081f8924
-[   45.146924] fdc0: 0000000000010000 ffff800976521900 ffff8009748bfe50 ffff0000081f9bf0
-[   45.154709] fde0: 0000000000010000 ffff800976521900 0000000060000000 ffff0000081f9ae4
-[   45.162493] fe00: ffff8009748bfe30 ffff0000081f9ae4 ffff800976521900 0000000000000000
-[   45.170277] fe20: 0000000000f58000 ffff8009748bfeb8 ffff8009748bfe50 ffff0000081f9bcc
-[   45.178062] fe40: 0000000000010000 ffff800976521900 ffff8009748bfe80 ffff0000081fb0dc
-[   45.185846] fe60: ffff800976521900 ffff800976521900 0000000000f58000 0000000000010000
-[   45.193630] fe80: 0000000000000000 ffff000008082f30 0000000000000000 0000800977159000
-[   45.201415] fea0: ffffffffffffffff 0000ffff961def4c 0000000000000124 0000000008203000
-[   45.209199] fec0: 0000000000000003 0000000000f58000 0000000000010000 0000000000000000
-[   45.216983] fee0: 0000000000011011 0000000000000001 0000000000000011 0000000000000002
-[   45.224766] ff00: 000000000000003f ff53424451514e42 00000000ffffffff 0000000000000030
-[   45.232550] ff20: 0000000000000038 0000000000000000 0000ffff96121a94 0000ffff96268588
-[   45.240334] ff40: 0000000000000000 0000ffff961def30 0000ffffeac5f340 0000000000010000
-[   45.248118] ff60: 000000000041a310 0000000000f58000 0000000000000003 000000007fffe000
-[   45.255901] ff80: 00000000004088d0 0000000000010000 0000000000000000 0000000000000000
-[   45.263685] ffa0: 0000000000010000 0000ffffeac5f610 0000000000404dcc 0000ffffeac5f610
-[   45.271469] ffc0: 0000ffff961def4c 0000000060000000 0000000000000003 000000000000003f
-[   45.279252] ffe0: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
-[   45.287032] Call trace:
-[   45.289466] Exception stack(0xffff8009748bfad0 to 0xffff8009748bfc00)
-[   45.295861] fac0:                                   0000000000001000 0001000000000000
-[   45.303645] fae0: ffff8009748bfca0 ffff00000839fe00 ffff8009748bfb20 ffff0000080eca80
-[   45.311429] fb00: ffff8009748bfb20 ffff0000080ff95c 0000000000000000 0000000000000025
-[   45.319213] fb20: ffff8009748bfb50 ffff0000080eca80 ffff80097658e800 00000000000019a0
-[   45.326997] fb40: ffff80097658e800 0000000000000001 ffff8009748bfb70 ffff0000080edbbc
-[   45.334782] fb60: ffff8009748bfb70 ffff0000080edbd0 ffff80097560f000 ffffa3a379000000
-[   45.342566] fb80: 0000000000000f80 0400000000000001 0000000000000000 ffff8009778013b0
-[   45.350349] fba0: ffff80097560f000 0000000000000000 0000000000000000 0000000000000000
-[   45.358132] fbc0: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
-[   45.365916] fbe0: 0000000000000000 0000ffff96268588 ffff0000081fb098 0000ffff961def30
-[   45.373701] [<ffff00000839fe00>] __memcpy+0x100/0x180
-[   45.378721] [<ffff00000826d848>] read_kcore+0x280/0x3b8
-[   45.383914] [<ffff00000825fd30>] proc_reg_read+0x60/0x90
-[   45.389193] [<ffff0000081f8924>] __vfs_read+0x1c/0x108
-[   45.394299] [<ffff0000081f9bf0>] vfs_read+0x80/0x130
-[   45.399233] [<ffff0000081fb0dc>] SyS_read+0x44/0xa0
-[   45.404082] [<ffff000008082f30>] el0_svc_naked+0x24/0x28
-[   45.409360] Code: d503201f d503201f d503201f d503201f (a8c12027) 
-[   45.415467] ---[ end trace 1e058edb915b6297 ]---
-[   45.420080] note: cat[2190] exited with preempt_count 2
+diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
+index 3d03740a20e7..59cb1d8514b3 100644
+--- a/drivers/gpio/gpio-mvebu.c
++++ b/drivers/gpio/gpio-mvebu.c
+@@ -341,7 +341,7 @@ static int mvebu_gpio_direction_input(struct gpio_chip *chip, unsigned int pin)
+ 		return ret;
+ 
+ 	regmap_update_bits(mvchip->regs, GPIO_IO_CONF_OFF,
+-			   BIT(pin), 1);
++			   BIT(pin), BIT(pin));
+ 
+ 	return 0;
+ }
+@@ -364,7 +364,7 @@ static int mvebu_gpio_direction_output(struct gpio_chip *chip, unsigned int pin,
+ 	mvebu_gpio_set(chip, pin, value);
+ 
+ 	regmap_update_bits(mvchip->regs, GPIO_IO_CONF_OFF,
+-			   BIT(pin), 0);
++			   BIT(pin), BIT(pin));
+ 
+ 	return 0;
+ }
+@@ -503,7 +503,7 @@ static int mvebu_gpio_irq_set_type(struct irq_data *d, unsigned int type)
+ 	case IRQ_TYPE_EDGE_FALLING:
+ 	case IRQ_TYPE_LEVEL_LOW:
+ 		regmap_update_bits(mvchip->regs, GPIO_IN_POL_OFF,
+-				   BIT(pin), 1);
++				   BIT(pin), BIT(pin));
+ 		break;
+ 	case IRQ_TYPE_EDGE_BOTH: {
+ 		u32 data_in, in_pol, val;
+-- 
+2.11.0
