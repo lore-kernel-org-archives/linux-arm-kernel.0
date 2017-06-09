@@ -1,73 +1,63 @@
 From: han.xu@nxp.com (Han Xu)
-Date: Fri, 9 Jun 2017 19:16:33 +0000
-Subject: [PATCH v6 1/3] clk: imx7d: create clocks behind rawnand clock gate
-In-Reply-To: <8b9edf13938e3166081e72ba8fa4ac822035079c.1496961128.git-series.stefan@agner.ch>
+Date: Fri, 9 Jun 2017 19:17:03 +0000
+Subject: [PATCH v6 2/3] ARM: dts: imx7: add GPMI NAND and APBH DMA
+In-Reply-To: <d4aaef68978524bb46eee79d639dde2b83e8bb5f.1496961128.git-series.stefan@agner.ch>
 References: <cover.9fab78eaa869dbad4c9ad7e8578c9cef3e49daa8.1496961128.git-series.stefan@agner.ch>
- <8b9edf13938e3166081e72ba8fa4ac822035079c.1496961128.git-series.stefan@agner.ch>
-Message-ID: <a454ef9c-ab6a-631a-98b8-6d58f8065927@nxp.com>
+ <d4aaef68978524bb46eee79d639dde2b83e8bb5f.1496961128.git-series.stefan@agner.ch>
+Message-ID: <5699f899-32f8-4c8d-fb47-aa257a51863a@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
 On 06/08/2017 05:34 PM, Stefan Agner wrote:
-> The rawnand clock gate gates two clocks, NAND_USDHC_BUS_CLK_ROOT
-> and NAND_CLK_ROOT. However, the gate has been in the chain of the
-> latter only. This does not allow to use the NAND_USDHC_BUS_CLK_ROOT
-> only, e.g. as required by APBH-Bridge-DMA.
->
-> Add new clocks which represent the clock after the gate, and use a
-> shared clock gate to correctly model the hardware.
+> Add i.MX 7 APBH DMA and GPMI NAND modules.
 >
 > Signed-off-by: Stefan Agner <stefan@agner.ch>
 > Tested-by: Fabio Estevam <fabio.estevam@nxp.com>
 Acked-by: Han Xu <han.xu@nxp.com>
 > ---
->   drivers/clk/imx/clk-imx7d.c             | 6 ++++--
->   include/dt-bindings/clock/imx7d-clock.h | 4 +++-
->   2 files changed, 7 insertions(+), 3 deletions(-)
+>   arch/arm/boot/dts/imx7s.dtsi | 31 +++++++++++++++++++++++++++++++
+>   1 file changed, 31 insertions(+)
 >
-> diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
-> index 93b0364..e364060 100644
-> --- a/drivers/clk/imx/clk-imx7d.c
-> +++ b/drivers/clk/imx/clk-imx7d.c
-> @@ -25,6 +25,7 @@
->   static u32 share_count_sai1;
->   static u32 share_count_sai2;
->   static u32 share_count_sai3;
-> +static u32 share_count_nand;
->   
->   static struct clk_div_table test_div_table[] = {
->   	{ .val = 3, .div = 1, },
-> @@ -748,7 +749,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
->   	clks[IMX7D_ENET2_TIME_ROOT_DIV] = imx_clk_divider2("enet2_time_post_div", "enet2_time_pre_div", base + 0xa880, 0, 6);
->   	clks[IMX7D_ENET_PHY_REF_ROOT_DIV] = imx_clk_divider2("enet_phy_ref_post_div", "enet_phy_ref_pre_div", base + 0xa900, 0, 6);
->   	clks[IMX7D_EIM_ROOT_DIV] = imx_clk_divider2("eim_post_div", "eim_pre_div", base + 0xa980, 0, 6);
-> -	clks[IMX7D_NAND_ROOT_DIV] = imx_clk_divider2("nand_post_div", "nand_pre_div", base + 0xaa00, 0, 6);
-> +	clks[IMX7D_NAND_ROOT_CLK] = imx_clk_divider2("nand_root_clk", "nand_pre_div", base + 0xaa00, 0, 6);
->   	clks[IMX7D_QSPI_ROOT_DIV] = imx_clk_divider2("qspi_post_div", "qspi_pre_div", base + 0xaa80, 0, 6);
->   	clks[IMX7D_USDHC1_ROOT_DIV] = imx_clk_divider2("usdhc1_post_div", "usdhc1_pre_div", base + 0xab00, 0, 6);
->   	clks[IMX7D_USDHC2_ROOT_DIV] = imx_clk_divider2("usdhc2_post_div", "usdhc2_pre_div", base + 0xab80, 0, 6);
-> @@ -825,7 +826,8 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
->   	clks[IMX7D_ENET2_TIME_ROOT_CLK] = imx_clk_gate4("enet2_time_root_clk", "enet2_time_post_div", base + 0x4510, 0);
->   	clks[IMX7D_ENET_PHY_REF_ROOT_CLK] = imx_clk_gate4("enet_phy_ref_root_clk", "enet_phy_ref_post_div", base + 0x4520, 0);
->   	clks[IMX7D_EIM_ROOT_CLK] = imx_clk_gate4("eim_root_clk", "eim_post_div", base + 0x4160, 0);
-> -	clks[IMX7D_NAND_ROOT_CLK] = imx_clk_gate4("nand_root_clk", "nand_post_div", base + 0x4140, 0);
-> +	clks[IMX7D_NAND_RAWNAND_CLK] = imx_clk_gate2_shared2("nand_rawnand_clk", "nand_root_clk", base + 0x4140, 0, &share_count_nand);
-> +	clks[IMX7D_NAND_USDHC_BUS_RAWNAND_CLK] = imx_clk_gate2_shared2("nand_usdhc_rawnand_clk", "nand_usdhc_root_clk", base + 0x4140, 0, &share_count_nand);
->   	clks[IMX7D_QSPI_ROOT_CLK] = imx_clk_gate4("qspi_root_clk", "qspi_post_div", base + 0x4150, 0);
->   	clks[IMX7D_USDHC1_ROOT_CLK] = imx_clk_gate4("usdhc1_root_clk", "usdhc1_post_div", base + 0x46c0, 0);
->   	clks[IMX7D_USDHC2_ROOT_CLK] = imx_clk_gate4("usdhc2_root_clk", "usdhc2_post_div", base + 0x46d0, 0);
-> diff --git a/include/dt-bindings/clock/imx7d-clock.h b/include/dt-bindings/clock/imx7d-clock.h
-> index a7a1a50..de62a83 100644
-> --- a/include/dt-bindings/clock/imx7d-clock.h
-> +++ b/include/dt-bindings/clock/imx7d-clock.h
-> @@ -450,5 +450,7 @@
->   #define IMX7D_CLK_ARM			437
->   #define IMX7D_CKIL			438
->   #define IMX7D_OCOTP_CLK			439
-> -#define IMX7D_CLK_END			440
-> +#define IMX7D_NAND_RAWNAND_CLK		440
-> +#define IMX7D_NAND_USDHC_BUS_RAWNAND_CLK 441
-> +#define IMX7D_CLK_END			442
->   #endif /* __DT_BINDINGS_CLOCK_IMX7D_H */
+> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+> index c4f12fd..4902f62 100644
+> --- a/arch/arm/boot/dts/imx7s.dtsi
+> +++ b/arch/arm/boot/dts/imx7s.dtsi
+> @@ -995,5 +995,36 @@
+>   				status = "disabled";
+>   			};
+>   		};
+> +
+> +		dma_apbh: dma-apbh at 33000000 {
+> +			compatible = "fsl,imx7d-dma-apbh", "fsl,imx28-dma-apbh";
+> +			reg = <0x33000000 0x2000>;
+> +			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
+> +			interrupt-names = "gpmi0", "gpmi1", "gpmi2", "gpmi3";
+> +			#dma-cells = <1>;
+> +			dma-channels = <4>;
+> +			clocks = <&clks IMX7D_NAND_USDHC_BUS_RAWNAND_CLK>;
+> +		};
+> +
+> +		gpmi: gpmi-nand at 33002000{
+> +			compatible = "fsl,imx7d-gpmi-nand";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			reg = <0x33002000 0x2000>, <0x33004000 0x4000>;
+> +			reg-names = "gpmi-nand", "bch";
+> +			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
+> +			interrupt-names = "bch";
+> +			clocks = <&clks IMX7D_NAND_RAWNAND_CLK>,
+> +				<&clks IMX7D_NAND_USDHC_BUS_RAWNAND_CLK>;
+> +			clock-names = "gpmi_io", "gpmi_bch_apb";
+> +			dmas = <&dma_apbh 0>;
+> +			dma-names = "rx-tx";
+> +			status = "disabled";
+> +			assigned-clocks = <&clks IMX7D_NAND_ROOT_SRC>;
+> +			assigned-clock-parents = <&clks IMX7D_PLL_ENET_MAIN_500M_CLK>;
+> +		};
+>   	};
+>   };
