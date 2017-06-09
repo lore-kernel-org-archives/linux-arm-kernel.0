@@ -1,68 +1,77 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri,  9 Jun 2017 11:49:16 +0200
-Subject: [PATCH v4 7/7] ARM: dts: meson8b: switch to new bindings for UART
- nodes
-In-Reply-To: <1497001756-942-1-git-send-email-narmstrong@baylibre.com>
-References: <1497001756-942-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1497001756-942-8-git-send-email-narmstrong@baylibre.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 9 Jun 2017 11:00:14 +0100
+Subject: [PATCH v7 3/3] iommu/arm-smmu-v3: Add workaround for Cavium
+ ThunderX2 erratum #126
+In-Reply-To: <1496145821-3411-4-git-send-email-gakula@caviumnetworks.com>
+References: <1496145821-3411-1-git-send-email-gakula@caviumnetworks.com>
+ <1496145821-3411-4-git-send-email-gakula@caviumnetworks.com>
+Message-ID: <20170609100014.GB13955@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to the stable UART bindings by adding a XTAL node and using the
-proper compatible strings.
+Hi Geetha,
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm/boot/dts/meson8b.dtsi | 23 +++++++++++++++++++----
- 1 file changed, 19 insertions(+), 4 deletions(-)
+On Tue, May 30, 2017 at 05:33:41PM +0530, Geetha sowjanya wrote:
+> From: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
+> 
+> Cavium ThunderX2 SMMU doesn't support MSI and also doesn't have unique irq
+> lines for gerror, eventq and cmdq-sync.
+> 
+> This patch addresses the issue by checking if any interrupt sources are
+> using same irq number, then they are registered as shared irqs.
+> 
+> Signed-off-by: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
+> ---
+>  Documentation/arm64/silicon-errata.txt |    1 +
+>  drivers/iommu/arm-smmu-v3.c            |   29 +++++++++++++++++++++++++----
+>  2 files changed, 26 insertions(+), 4 deletions(-)
+> 
+> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+> index 4693a32..42422f6 100644
+> --- a/Documentation/arm64/silicon-errata.txt
+> +++ b/Documentation/arm64/silicon-errata.txt
+> @@ -63,6 +63,7 @@ stable kernels.
+>  | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456        |
+>  | Cavium         | ThunderX SMMUv2 | #27704          | N/A                         |
+>  | Cavium         | ThunderX2 SMMUv3| #74             | N/A                         |
+> +| Cavium         | ThunderX2 SMMUv3| #126            | N/A                         |
+>  |                |                 |                 |                             |
+>  | Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585         |
+>  |                |                 |                 |                             |
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 4e80205..d2db01f 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -2232,6 +2232,25 @@ static void arm_smmu_setup_msis(struct arm_smmu_device *smmu)
+>  	devm_add_action(dev, arm_smmu_free_msis, dev);
+>  }
+>  
+> +static int get_irq_flags(struct arm_smmu_device *smmu, int irq)
+> +{
+> +	int match_count = 0;
+> +
+> +	if (irq == smmu->evtq.q.irq)
+> +		match_count++;
+> +	if (irq == smmu->cmdq.q.irq)
+> +		match_count++;
+> +	if (irq == smmu->gerr_irq)
+> +		match_count++;
+> +	if (irq == smmu->priq.q.irq)
+> +		match_count++;
+> +
+> +	if (match_count > 1)
+> +		return IRQF_SHARED | IRQF_ONESHOT;
+> +
+> +	return IRQF_ONESHOT;
+> +}
 
-diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
-index d9f116a..651ad4a 100644
---- a/arch/arm/boot/dts/meson8b.dtsi
-+++ b/arch/arm/boot/dts/meson8b.dtsi
-@@ -82,6 +82,13 @@
- 			reg = <0x203>;
- 		};
- 	};
-+
-+	xtal: xtal-clk {
-+		compatible = "fixed-clock";
-+		clock-frequency = <24000000>;
-+		clock-output-names = "xtal";
-+		#clock-cells = <0>;
-+	};
- }; /* end of / */
- 
- &aobus {
-@@ -178,17 +185,25 @@
- };
- 
- &uart_AO {
--	clocks = <&clkc CLKID_CLK81>;
-+	compatible = "amlogic,meson8b-uart", "amlogic,meson-ao-uart";
-+	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&clkc CLKID_CLK81>;
-+	clock-names = "xtal", "pclk", "baud";
- };
- 
- &uart_A {
--	clocks = <&clkc CLKID_CLK81>;
-+	compatible = "amlogic,meson8b-uart";
-+	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&clkc CLKID_CLK81>;
-+	clock-names = "xtal", "pclk", "baud";
- };
- 
- &uart_B {
--	clocks = <&clkc CLKID_CLK81>;
-+	compatible = "amlogic,meson8b-uart";
-+	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&clkc CLKID_CLK81>;
-+	clock-names = "xtal", "pclk", "baud";
- };
- 
- &uart_C {
--	clocks = <&clkc CLKID_CLK81>;
-+	compatible = "amlogic,meson8b-uart";
-+	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&clkc CLKID_CLK81>;
-+	clock-names = "xtal", "pclk", "baud";
- };
--- 
-1.9.1
+I really think this is the wrong way of solving the problem: using
+IRQF_SHARED has implications elsewhere in the driver (for example, we must
+then pass a unique dev_id otherwise freeing the IRQs won't work properly)
+and I don't want to have to worry about these constraints just because of
+this broken platform.
+
+Please do what I suggested instead: register a single threaded interrupt
+handler that acts as a multiplexer and manually calls the other routines.
+
+Will
