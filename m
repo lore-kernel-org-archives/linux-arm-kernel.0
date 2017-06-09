@@ -1,60 +1,76 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Fri, 9 Jun 2017 13:27:52 +0300
-Subject: [PATCH v2 2/4] [media] davinci: vpif_capture: get subdevs from
- DT when available
-In-Reply-To: <CAOi56cV18wJce8hzTk0r0YKvr4vzLi8QDwu01Az1rae-9=wMRg@mail.gmail.com>
-References: <20170606233741.26718-1-khilman@baylibre.com>
- <20170606233741.26718-3-khilman@baylibre.com>
- <f305d0fc-b5cd-591a-1d95-7ae66bfa72ec@xs4all.nl>
- <CAOi56cV18wJce8hzTk0r0YKvr4vzLi8QDwu01Az1rae-9=wMRg@mail.gmail.com>
-Message-ID: <20170609102752.GO1019@valkosipuli.retiisi.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri,  9 Jun 2017 12:27:06 +0200
+Subject: [PATCH] arm64: ftrace: fix building without CONFIG_MODULES
+Message-ID: <20170609102807.2992510-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+When CONFIG_MODULES is disabled, we cannot dereference a module pointer:
 
-On Thu, Jun 08, 2017 at 06:01:45PM -0700, Kevin Hilman wrote:
-> On Wed, Jun 7, 2017 at 11:29 PM, Hans Verkuil <hverkuil@xs4all.nl> wrote:
-> > On 07/06/17 01:37, Kevin Hilman wrote:
-> >> Enable  getting of subdevs from DT ports and endpoints.
-> >>
-> >> The _get_pdata() function was larely inspired by (i.e. stolen from)
-> >> am437x-vpfe.c
-> >>
-> >> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
-> >> ---
-> >>  drivers/media/platform/davinci/vpif_capture.c | 126 +++++++++++++++++++++++++-
-> >>  drivers/media/platform/davinci/vpif_display.c |   5 +
-> >>  include/media/davinci/vpif_types.h            |   9 +-
-> >>  3 files changed, 134 insertions(+), 6 deletions(-)
-> >>
-> >> diff --git a/drivers/media/platform/davinci/vpif_capture.c b/drivers/media/platform/davinci/vpif_capture.c
-> >> index fc5c7622660c..b9d927d1e5a8 100644
-> >> --- a/drivers/media/platform/davinci/vpif_capture.c
-> >> +++ b/drivers/media/platform/davinci/vpif_capture.c
-> >> @@ -22,6 +22,8 @@
-> >>  #include <linux/slab.h>
-> >>
-> >>  #include <media/v4l2-ioctl.h>
-> >> +#include <media/v4l2-of.h>
-> >
-> > v4l2-of.h no longer exists, so this v2 is wrong. Unfortunately this patch has
-> > already been merged in our master. I'm not sure how this could have slipped past
-> > both my and Mauro's patch testing (and yours, for that matter).
-> 
-> I have that file in the various trees I tested agains.
-> 
-> > Can you fix this and post a patch on top of the media master that makes this
-> > compile again?
-> 
-> Sorry for the dumb question, but what tree are you referring to?  I
-> tried the master branch of both [1] and [2] and both seem to have that
-> include.
+arch/arm64/kernel/ftrace.c: In function 'ftrace_make_call':
+arch/arm64/kernel/ftrace.c:107:36: error: dereferencing pointer to incomplete type 'struct module'
+   trampoline = (unsigned long *)mod->arch.ftrace_trampoline;
 
-These patches are now merged as well as the changes requested:
+Also, the within_module() function is not defined:
 
-<URL:https://git.linuxtv.org/media_tree.git/commit/?id=a2d17962c9ca7ac66a132bbbfc6054559856e14e>
+arch/arm64/kernel/ftrace.c: In function 'ftrace_make_nop':
+arch/arm64/kernel/ftrace.c:171:8: error: implicit declaration of function 'within_module'; did you mean 'init_module'? [-Werror=implicit-function-declaration]
 
+This addresses both by adding the appropriate stubs.
+
+Fixes: e71a4e1bebaf ("arm64: ftrace: add support for far branches to dynamic ftrace")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm64/include/asm/module.h | 6 ++++++
+ arch/arm64/kernel/ftrace.c      | 2 +-
+ include/linux/module.h          | 5 +++++
+ 3 files changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
+index 19bd97671bb8..ca5d024f4247 100644
+--- a/arch/arm64/include/asm/module.h
++++ b/arch/arm64/include/asm/module.h
+@@ -36,6 +36,12 @@ struct mod_arch_specific {
+ };
+ #endif
+ 
++#if defined(CONFIG_MODULES) && defined(CONFIG_ARM64_MODULE_PLTS)
++#define module_ftrace_trampoline(mod) ((mod)->arch.ftrace_trampoline)
++#else
++#define module_ftrace_trampoline(mod) NULL
++#endif
++
+ u64 module_emit_plt_entry(struct module *mod, void *loc, const Elf64_Rela *rela,
+ 			  Elf64_Sym *sym);
+ 
+diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
+index 8a42be0693c9..7f5eb9939a55 100644
+--- a/arch/arm64/kernel/ftrace.c
++++ b/arch/arm64/kernel/ftrace.c
+@@ -104,7 +104,7 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
+ 		 * is added in the future, but for now, the pr_err() below
+ 		 * deals with a theoretical issue only.
+ 		 */
+-		trampoline = (unsigned long *)mod->arch.ftrace_trampoline;
++		trampoline = module_ftrace_trampoline(mod);
+ 		if (trampoline[0] != addr) {
+ 			if (trampoline[0] != 0) {
+ 				pr_err("ftrace: far branches to multiple entry points unsupported inside a single module\n");
+diff --git a/include/linux/module.h b/include/linux/module.h
+index 21f56393602f..9196f532f158 100644
+--- a/include/linux/module.h
++++ b/include/linux/module.h
+@@ -671,6 +671,11 @@ static inline bool is_module_text_address(unsigned long addr)
+ 	return false;
+ }
+ 
++static inline bool within_module(unsigned long addr, const struct module *mod)
++{
++	return false;
++}
++
+ /* Get/put a kernel symbol (calls should be symmetric) */
+ #define symbol_get(x) ({ extern typeof(x) x __attribute__((weak)); &(x); })
+ #define symbol_put(x) do { } while (0)
 -- 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+2.9.0
