@@ -1,53 +1,134 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri, 9 Jun 2017 10:25:41 +0200
-Subject: [PATCH v2 7/8] net: mvmdio: add xmdio support
-In-Reply-To: <a60a0b26-62b1-7c9e-e846-215747dddb1f@gmail.com>
-References: <20170608092653.25221-1-antoine.tenart@free-electrons.com>
- <20170608092653.25221-8-antoine.tenart@free-electrons.com>
- <a60a0b26-62b1-7c9e-e846-215747dddb1f@gmail.com>
-Message-ID: <20170609082541.GC31464@kwain>
+From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
+Date: Fri, 09 Jun 2017 17:26:32 +0900
+Subject: [PATCH] ARM: dts: exynos: Add the OF graph between fimd and dsi
+In-Reply-To: <20170609072754.GB4018@kozik-book>
+References: <CGME20170609025951epcas1p19f5ca8c241b8b79068a84eb239ed46ed@epcas1p1.samsung.com>
+ <1496977173-20550-1-git-send-email-hoegeun.kwon@samsung.com>
+ <20170609072754.GB4018@kozik-book>
+Message-ID: <a98fe97c-6196-c7a1-d458-8a7204531e80@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 08, 2017 at 09:42:21AM -0700, Florian Fainelli wrote:
-> On 06/08/2017 02:26 AM, Antoine Tenart wrote:
-> > This patch adds the xMDIO interface support in the mvmdio driver. This
-> > interface is used in Ethernet controllers on Marvell 370, 7k and 8k (as
-> > of now). The xSMI interface supported by this driver complies with the
-> > IEEE 802.3 clause 45 (while the SMI interface complies with the clause
-> > 22). The xSMI interface is used by 10GbE devices.
-> 
-> In the previous version you were properly defining a new compatibles
-> strings for xmdio, but now you don't and instead you runtime select the
-> operations based on whether MII_ADDR_C45 is set in the register which is
-> fine from a functional perspective.
-> 
-> If I get this right, the xMDIO controller is actually a superset of the
-> MDIO controller and has an extra MVMDIO_XSMI_ADDR_REG register to
-> preform C45 accesses?
+On 06/09/2017 04:27 PM, Krzysztof Kozlowski wrote:
+> On Fri, Jun 09, 2017 at 11:59:33AM +0900, Hoegeun Kwon wrote:
+>> It should be connected to OF graph between fimd and dsi.
+>> Add the OF graph between fimd and dsi.
+> I need more explanation why this is needed. What happens without this?
+> What issue is fixed here?
+>
+> What about Exynos5250 and Exynos5420? I think we do not have a board in
+> mainline using FIMD but maybe this should be added just for correct
+> hardware description?
 
-This is also a mistake. It's not a superset as the register offsets are
-different. So we can't use the same smi operations in both cases. We
-would need dedicated xmdio smi operations, but I don't think there is a
-board where a c22 PHY is connected to the xMDIO interface.
+Thank you for your review.
 
-I'll add smi and xsmi flags and return -ENOTSUPP based on the
-MII_ADDR_C45 bit and flags combination. If the need to support smi
-operations on the xMDIO bus arise it will be fairly easy to implement in
-the future. I'll rename the ops functions as well to differentiate mdio
-and xmdio operations.
+I'm sorry, this patch is wrong.
+Please ignore this patch. :)
 
-Thanks,
-Antoine
+Best regards,
+Hoegeun
 
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170609/4782d8b0/attachment-0001.sig>
+>
+>
+> Best regards,
+> Krzysztof
+>
+>> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
+>> ---
+>>   arch/arm/boot/dts/exynos3250.dtsi | 26 ++++++++++++++++++++++++++
+>>   arch/arm/boot/dts/exynos4.dtsi    | 26 ++++++++++++++++++++++++++
+>>   2 files changed, 52 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+>> index 590ee44..22d523f 100644
+>> --- a/arch/arm/boot/dts/exynos3250.dtsi
+>> +++ b/arch/arm/boot/dts/exynos3250.dtsi
+>> @@ -311,6 +311,19 @@
+>>   			iommus = <&sysmmu_fimd0>;
+>>   			samsung,sysreg = <&sys_reg>;
+>>   			status = "disabled";
+>> +
+>> +			ports {
+>> +				#address-cells = <1>;
+>> +				#size-cells = <0>;
+>> +
+>> +				port at 0 {
+>> +					reg = <0>;
+>> +					fimd_to_dsi: endpoint {
+>> +						remote-endpoint =
+>> +							<&dsi_to_fimd>;
+>> +					};
+>> +				};
+>> +			};
+>>   		};
+>>   
+>>   		dsi_0: dsi at 11C80000 {
+>> @@ -326,6 +339,19 @@
+>>   			#address-cells = <1>;
+>>   			#size-cells = <0>;
+>>   			status = "disabled";
+>> +
+>> +			ports {
+>> +				#address-cells = <1>;
+>> +				#size-cells = <0>;
+>> +
+>> +				port at 0 {
+>> +					reg = <0>;
+>> +					dsi_to_fimd: endpoint {
+>> +						remote-endpoint =
+>> +							<&fimd_to_dsi>;
+>> +					};
+>> +				};
+>> +			};
+>>   		};
+>>   
+>>   		sysmmu_fimd0: sysmmu at 11E20000 {
+>> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+>> index 497a947..773d392 100644
+>> --- a/arch/arm/boot/dts/exynos4.dtsi
+>> +++ b/arch/arm/boot/dts/exynos4.dtsi
+>> @@ -193,6 +193,19 @@
+>>   		status = "disabled";
+>>   		#address-cells = <1>;
+>>   		#size-cells = <0>;
+>> +
+>> +		ports {
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +
+>> +			port at 0 {
+>> +				reg = <0>;
+>> +				dsi_to_fimd: endpoint {
+>> +					remote-endpoint =
+>> +						<&fimd_to_dsi>;
+>> +				};
+>> +			};
+>> +		};
+>>   	};
+>>   
+>>   	camera {
+>> @@ -715,6 +728,19 @@
+>>   		iommus = <&sysmmu_fimd0>;
+>>   		samsung,sysreg = <&sys_reg>;
+>>   		status = "disabled";
+>> +
+>> +		ports {
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +
+>> +			port at 0 {
+>> +				reg = <0>;
+>> +				fimd_to_dsi: endpoint {
+>> +					remote-endpoint =
+>> +						<&dsi_to_fimd>;
+>> +				};
+>> +			};
+>> +		};
+>>   	};
+>>   
+>>   	tmu: tmu at 100C0000 {
+>> -- 
+>> 1.9.1
+>>
+>
+>
