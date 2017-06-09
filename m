@@ -1,135 +1,68 @@
-From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Fri, 09 Jun 2017 20:08:15 +0200
-Subject: patch "arm: ecard: use dev_groups and not dev_attrs for bus_type"
- added to driver-core-next
-Message-ID: <1497031695204131@kroah.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Fri, 9 Jun 2017 11:13:12 -0700
+Subject: [PATCH v5] mm: huge-vmap: fail gracefully on unexpected huge vmap
+ mappings
+In-Reply-To: <20170609082226.26152-1-ard.biesheuvel@linaro.org>
+References: <20170609082226.26152-1-ard.biesheuvel@linaro.org>
+Message-ID: <d58379fe-9e18-8e58-0f77-24d09a02fc05@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 06/09/2017 01:22 AM, Ard Biesheuvel wrote:
+> Existing code that uses vmalloc_to_page() may assume that any
+> address for which is_vmalloc_addr() returns true may be passed
+> into vmalloc_to_page() to retrieve the associated struct page.
+> 
+> This is not un unreasonable assumption to make, but on architectures
+> that have CONFIG_HAVE_ARCH_HUGE_VMAP=y, it no longer holds, and we
+> need to ensure that vmalloc_to_page() does not go off into the weeds
+> trying to dereference huge PUDs or PMDs as table entries.
+> 
+> Given that vmalloc() and vmap() themselves never create huge
+> mappings or deal with compound pages at all, there is no correct
+> answer in this case, so return NULL instead, and issue a warning.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-This is a note to let you know that I've just added the patch titled
+Reviewed-by: Laura Abbott <labbott@redhat.com>
 
-    arm: ecard: use dev_groups and not dev_attrs for bus_type
-
-to my driver-core git tree which can be found at
-    git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/driver-core.git
-in the driver-core-next branch.
-
-The patch will show up in the next release of the linux-next tree
-(usually sometime within the next 24 hours during the week.)
-
-The patch will also be merged in the next major kernel release
-during the merge window.
-
-If you have any questions about this process, please let me know.
-
-
->From 71d1e5d71cec76e927a92354a7eb9d476e7054ad Mon Sep 17 00:00:00 2001
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Tue, 6 Jun 2017 14:14:16 +0200
-Subject: arm: ecard: use dev_groups and not dev_attrs for bus_type
-
-The dev_attrs field has long been "depreciated" and is finally being
-removed, so move the driver to use the "correct" dev_groups field
-instead for struct bus_type.
-
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: <linux-arm-kernel@lists.infradead.org>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
----
- arch/arm/mach-rpc/ecard.c | 40 +++++++++++++++++++++++-----------------
- 1 file changed, 23 insertions(+), 17 deletions(-)
-
-diff --git a/arch/arm/mach-rpc/ecard.c b/arch/arm/mach-rpc/ecard.c
-index 6b279d037774..f75b8b562d57 100644
---- a/arch/arm/mach-rpc/ecard.c
-+++ b/arch/arm/mach-rpc/ecard.c
-@@ -761,19 +761,21 @@ static struct expansion_card *__init ecard_alloc_card(int type, int slot)
- 	return ec;
- }
- 
--static ssize_t ecard_show_irq(struct device *dev, struct device_attribute *attr, char *buf)
-+static ssize_t irq_show(struct device *dev, struct device_attribute *attr, char *buf)
- {
- 	struct expansion_card *ec = ECARD_DEV(dev);
- 	return sprintf(buf, "%u\n", ec->irq);
- }
-+static DEVICE_ATTR_RO(irq);
- 
--static ssize_t ecard_show_dma(struct device *dev, struct device_attribute *attr, char *buf)
-+static ssize_t dma_show(struct device *dev, struct device_attribute *attr, char *buf)
- {
- 	struct expansion_card *ec = ECARD_DEV(dev);
- 	return sprintf(buf, "%u\n", ec->dma);
- }
-+static DEVICE_ATTR_RO(dma);
- 
--static ssize_t ecard_show_resources(struct device *dev, struct device_attribute *attr, char *buf)
-+static ssize_t resource_show(struct device *dev, struct device_attribute *attr, char *buf)
- {
- 	struct expansion_card *ec = ECARD_DEV(dev);
- 	char *str = buf;
-@@ -787,35 +789,39 @@ static ssize_t ecard_show_resources(struct device *dev, struct device_attribute
- 
- 	return str - buf;
- }
-+static DEVICE_ATTR_RO(resource_show)
- 
--static ssize_t ecard_show_vendor(struct device *dev, struct device_attribute *attr, char *buf)
-+static ssize_t vendor_show(struct device *dev, struct device_attribute *attr, char *buf)
- {
- 	struct expansion_card *ec = ECARD_DEV(dev);
- 	return sprintf(buf, "%u\n", ec->cid.manufacturer);
- }
-+static DEVICE_ATTR_RO(vendor);
- 
--static ssize_t ecard_show_device(struct device *dev, struct device_attribute *attr, char *buf)
-+static ssize_t device_show(struct device *dev, struct device_attribute *attr, char *buf)
- {
- 	struct expansion_card *ec = ECARD_DEV(dev);
- 	return sprintf(buf, "%u\n", ec->cid.product);
- }
-+static DEVICE_ATTR_RO(device);
- 
--static ssize_t ecard_show_type(struct device *dev, struct device_attribute *attr, char *buf)
-+static ssize_t type_show(struct device *dev, struct device_attribute *attr, char *buf)
- {
- 	struct expansion_card *ec = ECARD_DEV(dev);
- 	return sprintf(buf, "%s\n", ec->easi ? "EASI" : "IOC");
- }
--
--static struct device_attribute ecard_dev_attrs[] = {
--	__ATTR(device,   S_IRUGO, ecard_show_device,    NULL),
--	__ATTR(dma,      S_IRUGO, ecard_show_dma,       NULL),
--	__ATTR(irq,      S_IRUGO, ecard_show_irq,       NULL),
--	__ATTR(resource, S_IRUGO, ecard_show_resources, NULL),
--	__ATTR(type,     S_IRUGO, ecard_show_type,      NULL),
--	__ATTR(vendor,   S_IRUGO, ecard_show_vendor,    NULL),
--	__ATTR_NULL,
-+static DEVICE_ATTR_RO(type);
-+
-+static struct attribute *ecard_dev_attrs[] = {
-+	&dev_attr_device.attr,
-+	&dev_attr_dma.attr,
-+	&dev_attr_irq.attr,
-+	&dev_attr_resource.attr,
-+	&dev_attr_type.attr,
-+	&dev_attr_vendor.attr,
-+	NULL,
- };
--
-+ATTRIBUTE_GROUPS(ecard_dev);
- 
- int ecard_request_resources(struct expansion_card *ec)
- {
-@@ -1120,7 +1126,7 @@ static int ecard_match(struct device *_dev, struct device_driver *_drv)
- 
- struct bus_type ecard_bus_type = {
- 	.name		= "ecard",
--	.dev_attrs	= ecard_dev_attrs,
-+	.dev_groups	= ecard_dev_groups,
- 	.match		= ecard_match,
- 	.probe		= ecard_drv_probe,
- 	.remove		= ecard_drv_remove,
--- 
-2.13.1
+> ---
+> v5: - fix typo
+> 
+> v4: - use pud_bad/pmd_bad instead of pud_huge/pmd_huge, which don't require
+>       changes to hugetlb.h, and give us what we need on all architectures
+>     - move WARN_ON_ONCE() calls out of conditionals
+>     - add explanatory comment
+> 
+>  mm/vmalloc.c | 15 +++++++++++++--
+>  1 file changed, 13 insertions(+), 2 deletions(-)
+> 
+> diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+> index 34a1c3e46ed7..0fcd371266a4 100644
+> --- a/mm/vmalloc.c
+> +++ b/mm/vmalloc.c
+> @@ -287,10 +287,21 @@ struct page *vmalloc_to_page(const void *vmalloc_addr)
+>  	if (p4d_none(*p4d))
+>  		return NULL;
+>  	pud = pud_offset(p4d, addr);
+> -	if (pud_none(*pud))
+> +
+> +	/*
+> +	 * Don't dereference bad PUD or PMD (below) entries. This will also
+> +	 * identify huge mappings, which we may encounter on architectures
+> +	 * that define CONFIG_HAVE_ARCH_HUGE_VMAP=y. Such regions will be
+> +	 * identified as vmalloc addresses by is_vmalloc_addr(), but are
+> +	 * not [unambiguously] associated with a struct page, so there is
+> +	 * no correct value to return for them.
+> +	 */
+> +	WARN_ON_ONCE(pud_bad(*pud));
+> +	if (pud_none(*pud) || pud_bad(*pud))
+>  		return NULL;
+>  	pmd = pmd_offset(pud, addr);
+> -	if (pmd_none(*pmd))
+> +	WARN_ON_ONCE(pmd_bad(*pmd));
+> +	if (pmd_none(*pmd) || pmd_bad(*pmd))
+>  		return NULL;
+>  
+>  	ptep = pte_offset_map(pmd, addr);
+> 
