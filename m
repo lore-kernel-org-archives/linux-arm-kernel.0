@@ -1,144 +1,47 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Fri, 9 Jun 2017 16:04:20 +0200
-Subject: [PATCH 2/4] drm/bridge: dw-hdmi: add cec notifier support
-In-Reply-To: <5b2fdadd-f1fa-c454-b3fe-facf221beb78@baylibre.com>
-References: <20170530142218.GS22219@n2100.armlinux.org.uk>
- <E1dFi3E-0004lh-Pu@rmk-PC.armlinux.org.uk>
- <0c2c4988-37bb-fd01-efee-c6878cc53923@baylibre.com>
- <20170609133822.GR4902@n2100.armlinux.org.uk>
- <5b2fdadd-f1fa-c454-b3fe-facf221beb78@baylibre.com>
-Message-ID: <34525119-5700-76fc-fcf4-5d90bd674b77@xs4all.nl>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Fri,  9 Jun 2017 16:07:39 +0200
+Subject: [PATCH v4 6/6] ARM: dts: imx6: RIoTboard provide standby on power off
+ option
+In-Reply-To: <20170609140739.15726-1-o.rempel@pengutronix.de>
+References: <20170609140739.15726-1-o.rempel@pengutronix.de>
+Message-ID: <20170609140739.15726-7-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/06/17 15:56, Neil Armstrong wrote:
-> On 06/09/2017 03:38 PM, Russell King - ARM Linux wrote:
->> On Fri, Jun 09, 2017 at 02:59:20PM +0200, Neil Armstrong wrote:
->>> On 05/30/2017 04:23 PM, Russell King wrote:
->>>> Add CEC notifier support to the HDMI bridge driver, so that the CEC
->>>> part of the IP can receive its physical address.
->>>>
->>>> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
->>>> ---
->>>>  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 22 +++++++++++++++++++++-
->>>>  1 file changed, 21 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
->>>> index 4e1f54a675d8..966422576c44 100644
->>>> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
->>>> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
->>>> @@ -36,7 +36,10 @@
->>>>  #include "dw-hdmi.h"
->>>>  #include "dw-hdmi-audio.h"
->>>>  
->>>> +#include <media/cec-notifier.h>
->>>> +
->>>>  #define DDC_SEGMENT_ADDR	0x30
->>>> +
->>>>  #define HDMI_EDID_LEN		512
->>>>  
->>>>  enum hdmi_datamap {
->>>> @@ -173,6 +176,8 @@ struct dw_hdmi {
->>>>  
->>>>  	unsigned int reg_shift;
->>>>  	struct regmap *regm;
->>>> +
->>>> +	struct cec_notifier *cec_notifier;
->>>>  };
->>>>  
->>>>  #define HDMI_IH_PHY_STAT0_RX_SENSE \
->>>> @@ -1870,6 +1875,7 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
->>>>  		hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
->>>>  		hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
->>>>  		drm_mode_connector_update_edid_property(connector, edid);
->>>> +		cec_notifier_set_phys_addr_from_edid(hdmi->cec_notifier, edid);
->>>>  		ret = drm_add_edid_modes(connector, edid);
->>>>  		/* Store the ELD */
->>>>  		drm_edid_to_eld(connector, edid);
->>>> @@ -2108,11 +2114,16 @@ static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
->>>>  	 * ask the source to re-read the EDID.
->>>>  	 */
->>>>  	if (intr_stat &
->>>> -	    (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_IH_PHY_STAT0_HPD))
->>>> +	    (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_IH_PHY_STAT0_HPD)) {
->>>>  		__dw_hdmi_setup_rx_sense(hdmi,
->>>>  					 phy_stat & HDMI_PHY_HPD,
->>>>  					 phy_stat & HDMI_PHY_RX_SENSE);
->>>>  
->>>> +		if ((phy_stat & (HDMI_PHY_RX_SENSE | HDMI_PHY_HPD)) == 0)
->>>> +			cec_notifier_set_phys_addr(hdmi->cec_notifier,
->>>> +						   CEC_PHYS_ADDR_INVALID);
->>>> +	}
->>>> +
->>>>  	if (intr_stat & HDMI_IH_PHY_STAT0_HPD) {
->>>>  		dev_dbg(hdmi->dev, "EVENT=%s\n",
->>>>  			phy_int_pol & HDMI_PHY_HPD ? "plugin" : "plugout");
->>>> @@ -2365,6 +2376,12 @@ __dw_hdmi_probe(struct platform_device *pdev,
->>>>  	if (ret)
->>>>  		goto err_iahb;
->>>>  
->>>> +	hdmi->cec_notifier = cec_notifier_get(dev);
->>>> +	if (!hdmi->cec_notifier) {
->>>> +		ret = -ENOMEM;
->>>> +		goto err_iahb;
->>>> +	}
->>>> +
->>>>  	/*
->>>>  	 * To prevent overflows in HDMI_IH_FC_STAT2, set the clk regenerator
->>>>  	 * N and cts values before enabling phy
->>>> @@ -2437,6 +2454,9 @@ __dw_hdmi_probe(struct platform_device *pdev,
->>>>  		hdmi->ddc = NULL;
->>>>  	}
->>>>  
->>>> +	if (hdmi->cec_notifier)
->>>> +		cec_notifier_put(hdmi->cec_notifier);
->>>> +
->>>>  	clk_disable_unprepare(hdmi->iahb_clk);
->>>>  err_isfr:
->>>>  	clk_disable_unprepare(hdmi->isfr_clk);
->>>>
->>>
->>> Hi Archit,
->>>
->>> I think this one could go through drm-next since it's quite
->>> standalone and will reduce the DW-HDMI CEC patchset and dependencies.
->>
->> Not a good idea.  If you read all the comments, Hans is suggesting that
->> CEC should be part of dw-hdmi itself, not stand-alone.  That would mean
->> this patch probably changes - basically, with CEC support built-in to
->> dw-hdmi, we don't need the notifier stuff.
-> 
-> Hi Russell,
-> 
-> Yes, but on the Amlogic Meson plarform, the DW-HDMI CEC controller is not used,
-> but a custom one, so this notifier is actually useful for this platform and
-> maybe others.
-> 
->>
->> So, I'd suggest _not_ merging it at the moment, because the patch could
->> well become obsolete.
-> 
-> It won't since the Meson platform needs it...
+This board, as well as some other boards with i.MX6 and a PMIC, uses a
+"MPIC_STBY_REQ" line to notify the PMIC about a state change.
+The PMIC is programmed for a specific state change before triggering the
+line.
+In this case, PMIC_STBY_REQ can be used for stand by, sleep
+and power off modes.
 
-Ah, I wasn't aware of that when I wrote my original comments. In that case
-we do need the notifier. Which is fine, as long as the reason for that is
-documented.
+Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+---
+ arch/arm/boot/dts/imx6dl-riotboard.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-> 
->>
->> Wait until the CEC changes that Hans has talked about have hit mainline
->> and I've had a chance to rework this for those.  We're waiting on Mauro
->> for that at the moment.
->>
->> (I do find it rather frustrating that CEC seems to evolve very rapidly,
->> it makes it quite difficult to publish a patch set, and get it merged.)
->>
-> 
-> Should we really wait until I push the Amlogic AO CEC driver ? Having a
-> notifier in the DW-HDMI driver won't harm anybody since it *will be used*.
-
-I'm OK with the notifier in this case.
-
-Regards,
-
-	Hans
+diff --git a/arch/arm/boot/dts/imx6dl-riotboard.dts b/arch/arm/boot/dts/imx6dl-riotboard.dts
+index 2cb72824e800..da9d0c102a31 100644
+--- a/arch/arm/boot/dts/imx6dl-riotboard.dts
++++ b/arch/arm/boot/dts/imx6dl-riotboard.dts
+@@ -90,6 +90,10 @@
+ 	status = "okay";
+ };
+ 
++&clks {
++	fsl,pmic-stby-poweroff;
++};
++
+ &fec {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet>;
+@@ -125,6 +129,7 @@
+ 		reg = <0x08>;
+ 		interrupt-parent = <&gpio5>;
+ 		interrupts = <16 8>;
++		fsl,pmic-stby-poweroff;
+ 
+ 		regulators {
+ 			reg_vddcore: sw1ab {				/* VDDARM_IN */
+-- 
+2.11.0
