@@ -1,100 +1,75 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Fri, 9 Jun 2017 16:28:03 +0200
-Subject: [PATCH 3/4] drm/bridge: dw-hdmi: add better clock disable control
-In-Reply-To: <E1dFi3J-0004lo-TU@rmk-PC.armlinux.org.uk>
-References: <20170530142218.GS22219@n2100.armlinux.org.uk>
- <E1dFi3J-0004lo-TU@rmk-PC.armlinux.org.uk>
-Message-ID: <1b08fcdb-ae38-7981-a518-b5c4aad62700@xs4all.nl>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 9 Jun 2017 15:30:50 +0100
+Subject: [PATCH v8 6/9] drivers: perf: hisi: Add support for Hisilicon
+ Djtag driver
+In-Reply-To: <8666a0fa-126d-e4a3-ac4b-7962f5d79942@huawei.com>
+References: <1495457312-237127-1-git-send-email-zhangshaokun@hisilicon.com>
+ <20170608163519.GA19643@leverpostej>
+ <8666a0fa-126d-e4a3-ac4b-7962f5d79942@huawei.com>
+Message-ID: <20170609143050.GM13955@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/05/17 16:23, Russell King wrote:
-> The video setup path aways sets the clock disable register to a specific
-> value, which has the effect of disabling the CEC engine.  When we add the
-> CEC driver, this becomes a problem.
+On Fri, Jun 09, 2017 at 03:18:39PM +0100, John Garry wrote:
+> On 08/06/2017 17:35, Mark Rutland wrote:
+> >Hi,
+> >
+> >On Mon, May 22, 2017 at 08:48:32PM +0800, Shaokun Zhang wrote:
+> >>+/*
+> >>+ * hisi_djtag_lock_v2: djtag lock to avoid djtag access conflict b/w kernel
+> >>+ * and UEFI.
+> >
+> >The mention of UEFI here worries me somewhat, and I have a number of
+> >questions specifically relating to how we interact with UEFI here.
+> >
 > 
-> Fix this by only setting/clearing the bits that the video path needs to.
+> Hi Mark,
 > 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-
-For what it is worth:
-
-Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
-
-Regards,
-
-	Hans
-
-> ---
->  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 25 +++++++++++++++----------
->  1 file changed, 15 insertions(+), 10 deletions(-)
+> This djtag locking mechanism is an advisory software-only policy. The
+> problem is the hardware designers made an interface which does not consider
+> multiple agents in the system concurrently accessing the djtag registers.
 > 
-> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> index 966422576c44..58781d4c1034 100644
-> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> @@ -166,6 +166,7 @@ struct dw_hdmi {
->  	bool bridge_is_on;		/* indicates the bridge is on */
->  	bool rxsense;			/* rxsense state */
->  	u8 phy_mask;			/* desired phy int mask settings */
-> +	u8 mc_clkdis;			/* clock disable register */
->  
->  	spinlock_t audio_lock;
->  	struct mutex audio_mutex;
-> @@ -1543,8 +1544,6 @@ static void hdmi_av_composer(struct dw_hdmi *hdmi,
->  /* HDMI Initialization Step B.4 */
->  static void dw_hdmi_enable_video_path(struct dw_hdmi *hdmi)
->  {
-> -	u8 clkdis;
-> -
->  	/* control period minimum duration */
->  	hdmi_writeb(hdmi, 12, HDMI_FC_CTRLDUR);
->  	hdmi_writeb(hdmi, 32, HDMI_FC_EXCTRLDUR);
-> @@ -1556,17 +1555,21 @@ static void dw_hdmi_enable_video_path(struct dw_hdmi *hdmi)
->  	hdmi_writeb(hdmi, 0x21, HDMI_FC_CH2PREAM);
->  
->  	/* Enable pixel clock and tmds data path */
-> -	clkdis = 0x7F;
-> -	clkdis &= ~HDMI_MC_CLKDIS_PIXELCLK_DISABLE;
-> -	hdmi_writeb(hdmi, clkdis, HDMI_MC_CLKDIS);
-> +	hdmi->mc_clkdis |= HDMI_MC_CLKDIS_HDCPCLK_DISABLE |
-> +			   HDMI_MC_CLKDIS_CSCCLK_DISABLE |
-> +			   HDMI_MC_CLKDIS_AUDCLK_DISABLE |
-> +			   HDMI_MC_CLKDIS_PREPCLK_DISABLE |
-> +			   HDMI_MC_CLKDIS_TMDSCLK_DISABLE;
-> +	hdmi->mc_clkdis &= ~HDMI_MC_CLKDIS_PIXELCLK_DISABLE;
-> +	hdmi_writeb(hdmi, hdmi->mc_clkdis, HDMI_MC_CLKDIS);
->  
-> -	clkdis &= ~HDMI_MC_CLKDIS_TMDSCLK_DISABLE;
-> -	hdmi_writeb(hdmi, clkdis, HDMI_MC_CLKDIS);
-> +	hdmi->mc_clkdis &= ~HDMI_MC_CLKDIS_TMDSCLK_DISABLE;
-> +	hdmi_writeb(hdmi, hdmi->mc_clkdis, HDMI_MC_CLKDIS);
->  
->  	/* Enable csc path */
->  	if (is_color_space_conversion(hdmi)) {
-> -		clkdis &= ~HDMI_MC_CLKDIS_CSCCLK_DISABLE;
-> -		hdmi_writeb(hdmi, clkdis, HDMI_MC_CLKDIS);
-> +		hdmi->mc_clkdis &= ~HDMI_MC_CLKDIS_CSCCLK_DISABLE;
-> +		hdmi_writeb(hdmi, hdmi->mc_clkdis, HDMI_MC_CLKDIS);
->  	}
->  
->  	/* Enable color space conversion if needed */
-> @@ -1580,7 +1583,8 @@ static void dw_hdmi_enable_video_path(struct dw_hdmi *hdmi)
->  
->  static void hdmi_enable_audio_clk(struct dw_hdmi *hdmi)
->  {
-> -	hdmi_modb(hdmi, 0, HDMI_MC_CLKDIS_AUDCLK_DISABLE, HDMI_MC_CLKDIS);
-> +	hdmi->mc_clkdis &= ~HDMI_MC_CLKDIS_AUDCLK_DISABLE;
-> +	hdmi_writeb(hdmi, hdmi->mc_clkdis, HDMI_MC_CLKDIS);
->  }
->  
->  /* Workaround to clear the overflow condition */
-> @@ -2261,6 +2265,7 @@ __dw_hdmi_probe(struct platform_device *pdev,
->  	hdmi->disabled = true;
->  	hdmi->rxsense = true;
->  	hdmi->phy_mask = (u8)~(HDMI_PHY_HPD | HDMI_PHY_RX_SENSE);
-> +	hdmi->mc_clkdis = 0x7f;
->  
->  	mutex_init(&hdmi->mutex);
->  	mutex_init(&hdmi->audio_mutex);
+> System wide, djtag is used as an interface to other HW modules, but we only
+> use for perf HW in the kernel.
 > 
+> >When precisely does UEFI need to touch the djtag hardware? e.g. does
+> >this happen in runtime services? ... or completely asynchronously?
+> >
+> 
+> Actually it's trusted firmware which accesses for L3 cache management in CPU
+> hotplug
+> 
+> >What does UEFI do with djtag when it holds the lock?
+> >
+> 
+> As mentioned, cache management
+> 
+> >Are there other software agents (e.g. secure firmware) which try to
+> >take this lock?
+> >
+> 
+> No
+> 
+> >Can you explain how the locking scheme works? e.g. is this an advisory
+> >software-only policy, or does the hardware prohibit accesses from other
+> >agents somehow?
+> >
+> 
+> The locking scheme is a software solution to spinlock. It's uses djtag
+> module select register as the spinlock flag, to avoid using some shared
+> memory.
+> 
+> The tricky part is that there is no test-and-set hardware support, so we use
+> this algorithm:
+> - precondition: flag initially set unlocked
+> 
+> a. agent reads flag
+>     - if not unlocked, continues to poll
+>     - otherwise, writes agent's unique lock value to flag
+> b. agent waits defined amount of time *uninterrupted* and then checks the
+> flag
+
+How do you figure out this time period? Doesn't it need to be no shorter
+than the longest critical section?
+
+Will
