@@ -1,67 +1,98 @@
-From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Fri, 09 Jun 2017 12:52:36 +0900
-Subject: [PATCH v3 0/3] Add support for the S6E3HF2 panel on TM2e board
-In-Reply-To: <4b974579-eb2f-1258-86e3-21ffeb22589a@samsung.com>
-References: <CGME20170418084047epcas5p493261a4cb9204e682f60cde8d659565c@epcas5p4.samsung.com>
- <1492504836-19225-1-git-send-email-hoegeun.kwon@samsung.com>
- <4b974579-eb2f-1258-86e3-21ffeb22589a@samsung.com>
-Message-ID: <50d5707c-378c-e338-3358-08ff1657cf8f@samsung.com>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Fri, 9 Jun 2017 09:41:00 +0530
+Subject: [PATCH v3 2/6] dt-bindings: display: Add Synopsys DW MIPI DSI DRM
+ bridge driver
+In-Reply-To: <20170608154028.6ck3dos6de2dogrk@rob-hp-laptop>
+References: <1496414235-20098-1-git-send-email-philippe.cornu@st.com>
+ <1496414235-20098-3-git-send-email-philippe.cornu@st.com>
+ <20170608154028.6ck3dos6de2dogrk@rob-hp-laptop>
+Message-ID: <7502cbc2-9feb-4dd3-3d95-b5f33b8a8872@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Thierry,
+Hi Philippe, Rob,
 
-Could you check these patches.
+On 06/08/2017 09:10 PM, Rob Herring wrote:
+> On Fri, Jun 02, 2017 at 04:37:11PM +0200, Philippe CORNU wrote:
+>> This patch adds documentation of device tree bindings for the
+>> Synopsys DesignWare MIPI DSI host DRM bridge driver.
+>>
 
-Regards,
-Hoegeun
+Could you drop "DRM bridge driver" from the subject and commit message and
+replace it with just "bridge" or "controller". DT bindings shouldn't mention
+drivers.
 
-On 05/19/2017 03:56 PM, Hoegeun Kwon wrote:
-> Dear Thierry,
->
-> Could you check these patches?
-> I think this patches have accumulated enough dust.
-> If you have a another opinion, please tell me.
->
-> Best regards,
-> Hoegeun
->
-> On 04/18/2017 05:40 PM, Hoegeun Kwon wrote:
->> Hi all,
+>> Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
+>> ---
+>>   .../bindings/display/bridge/dw_mipi_dsi.txt        | 30 ++++++++++++++++++++++
+>>   1 file changed, 30 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
 >>
->> The purpose of this patch is add support for s6e3hf2 AMOLED panel on
->> the TM2e board. The panel has 1600x2560 resolution in 5.65" physical
->> panel in the TM2e device.
+>> diff --git a/Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt b/Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
+>> new file mode 100644
+>> index 0000000..1d7c438
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
+>> @@ -0,0 +1,30 @@
+>> +Synopsys DesignWare MIPI DSI host controller
+>> +============================================
+>> +
+>> +This document defines device tree properties for the Synopsys DesignWare MIPI
+>> +DSI host controller. It doesn't constitue a device tree binding specification
+
+s/constitue/constitute
+
+>> +by itself but is meant to be referenced by platform-specific device tree
+>> +bindings.
+>> +
+>> +When referenced from platform device tree bindings the properties defined in
+>> +this document are defined as follows. The platform device tree bindings are
+>> +responsible for defining whether each property is required or optional.
+>> +
+>> +- reg: Memory mapped base address and length of the DWC MIPI DSI
+>> +  registers. (mandatory)
+>> +
+>> +- clocks: References to all the clocks specified in the clock-names property
+>> +  as specified in [1]. (mandatory)
+>> +
+>> +- clock-names: "pclk" is peripheral clock for either AHB and APB. (mandatory)
+> 
+> Seems strange there's not also a pixel or bit clock? Or this gets driven
+> from the phy?
+
+Since you mention phy here, I wanted to share a concern with the bindings.
+These bindings don't have a separate PHY DT node. The PHY is assumed as a
+part of the IP when integrated by a SoC. There are already rockchip and
+hisil DSI bindings that use this IP but don't define a PHY node.
+
+It's a similar situation with the DW-HDMI bindings.
+
+For example, when the DW HDMI is integrated in rockchip or renesas SoC, the
+bindings "rockchip,rk3288-dw-hdmi" or "renesas,r8a7795-dw-hdmi" are used,
+and they don't have a separate PHY DT node.
+
+I wasn't sure whether this is the right way to proceed or not for such IPs.
+Some advice would help us here.
+
+Thanks,
+Archit
+
+> 
+>> +
+>> +- resets: References to all the resets specified in the reset-names property
+>> +  as specified in [2]. (optional)
+>> +
+>> +- reset-names: string reset name, must be "apb" if used. (optional)
+>> +
+>> +- panel or bridge node: see [3]. (mandatory)
+>> +
+>> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+>> +[2] Documentation/devicetree/bindings/reset/reset.txt
+>> +[3] Documentation/devicetree/bindings/display/mipi-dsi-bus.txt
+>> -- 
+>> 1.9.1
 >>
->> The s6e3hf2 panel(5.65") is simliar to the previous s6e3ha2 panel(5.7"),
->> but resolution and some command message are different. So it can be
->> distinguished as a compatiblitiy string.
->>
->> Best regards,
->> Hoegeun
->>
->> Changes for V3:
->> - Remove te-gpios property in dts.
->> - Added Reviewed-by: Andrzej Hajda <a.hajda@samsung.com> on all patches.
->> - Added Reviewed-by: Inki Dae <inki.dae@samsung.com> on patch (2/3).
->>
->> Changes for V2:
->> - Add new compatible string to "samsung,s6e3ha2.txt binding with 
->> comments.
->> - Fix the panel name from s6e3ha2-e to s6e3hf2
->>
->> Hoegeun Kwon (3):
->>    dt-bindings: Add support for samsung s6e3hf2 panel
->>    drm/panel: s6e3ha2: Add support for s6e3hf2 panel on TM2e board
->>    arm64: dts: exynos: Add support for s6e3hf2 panel device on TM2e 
->> board
->>
->>   .../bindings/display/panel/samsung,s6e3ha2.txt     |  5 +-
->>   arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     | 11 ++++
->>   drivers/gpu/drm/panel/panel-samsung-s6e3ha2.c      | 64 
->> +++++++++++++++++++---
->>   3 files changed, 72 insertions(+), 8 deletions(-)
->>
->
->
->
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
