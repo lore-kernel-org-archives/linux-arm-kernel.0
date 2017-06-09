@@ -1,34 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 9 Jun 2017 20:55:26 +0200
-Subject: [PATCH] ARM: at91: fix at91_suspend_entering_slow_clock link error
-In-Reply-To: <20170609114416.6ru5emtqmbubgmzd@piout.net>
-References: <20170609101821.2776168-1-arnd@arndb.de>
- <20170609114416.6ru5emtqmbubgmzd@piout.net>
-Message-ID: <CAK8P3a2dp-phi1vZQhq_97vP7-on=mF6i7wdL3H5kf82aoR4VQ@mail.gmail.com>
+Date: Fri, 9 Jun 2017 20:57:31 +0200
+Subject: [PATCH] arm64: ftrace: fix building without CONFIG_MODULES
+In-Reply-To: <20170609113850.GF13955@arm.com>
+References: <20170609102807.2992510-1-arnd@arndb.de>
+ <20170609113850.GF13955@arm.com>
+Message-ID: <CAK8P3a10CQq3mvQzysTTk+y=WQ=zcXehjPDUXzqh8SnTZ6WkXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 9, 2017 at 1:44 PM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> Hi,
+On Fri, Jun 9, 2017 at 1:38 PM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Arnd,
 >
-> On 09/06/2017 at 12:18:02 +0200, Arnd Bergmann wrote:
->> When CONFIG_ARCH_AT91 is enabled, but none of the specific SoC support
->> is in use, some at91 specific drivers fail to link:
+> On Fri, Jun 09, 2017 at 12:27:06PM +0200, Arnd Bergmann wrote:
+>> When CONFIG_MODULES is disabled, we cannot dereference a module pointer:
 >>
->> drivers/tty/serial/atmel_serial.o: In function `atmel_serial_suspend':
->> atmel_serial.c:(.text.atmel_serial_suspend+0x1e): undefined reference to `at91_suspend_entering_slow_clock'
->> drivers/usb/host/ohci-at91.o: In function `ohci_hcd_at91_drv_suspend':
->> ohci-at91.c:(.text.ohci_hcd_at91_drv_suspend+0x12): undefined reference to `at91_suspend_entering_slow_clock'
->> drivers/usb/gadget/udc/at91_udc.o: In function `at91udc_suspend':
->> at91_udc.c:(.text.at91udc_suspend+0x26): undefined reference to `at91_suspend_entering_slow_clock'
+>> arch/arm64/kernel/ftrace.c: In function 'ftrace_make_call':
+>> arch/arm64/kernel/ftrace.c:107:36: error: dereferencing pointer to incomplete type 'struct module'
+>>    trampoline = (unsigned long *)mod->arch.ftrace_trampoline;
 >>
+>> Also, the within_module() function is not defined:
+>>
+>> arch/arm64/kernel/ftrace.c: In function 'ftrace_make_nop':
+>> arch/arm64/kernel/ftrace.c:171:8: error: implicit declaration of function 'within_module'; did you mean 'init_module'? [-Werror=implicit-function-declaration]
+>>
+>> This addresses both by adding the appropriate stubs.
+>>
+>> Fixes: e71a4e1bebaf ("arm64: ftrace: add support for far branches to dynamic ftrace")
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> ---
+>>  arch/arm64/include/asm/module.h | 6 ++++++
+>>  arch/arm64/kernel/ftrace.c      | 2 +-
+>>  include/linux/module.h          | 5 +++++
+>>  3 files changed, 12 insertions(+), 1 deletion(-)
 >
-> How you present it makes me think, that this was present for a while,
-> even before samv7 support was added. Am I wrong?
+> I can't seem to reproduce this simply by disabling MODULES in defconfig.
+> Could you share your .config, please?
 
-I only ran into the problem after samv7 support was added. Before that,
-pm.o was always built-in when CONFIG_AT91 was set, even when none
-of the specific platforms got enabled.
+This is the randconfig I used: https://pastebin.com/SfKBY7f8
 
-       Arnd
+      Arnd
