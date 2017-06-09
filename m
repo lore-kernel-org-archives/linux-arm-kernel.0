@@ -1,94 +1,196 @@
-From: liviu.dudau@arm.com (Liviu Dudau)
-Date: Fri, 9 Jun 2017 10:08:02 +0100
-Subject: [PATCH 01/35] ARM: defconfig: Cleanup from old Kconfig options
-In-Reply-To: <20170608161049.12421-1-krzk@kernel.org>
-References: <20170608160836.12196-1-krzk@kernel.org>
- <20170608161049.12421-1-krzk@kernel.org>
-Message-ID: <20170609090802.GL10049@e110455-lin.cambridge.arm.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Fri, 9 Jun 2017 17:13:37 +0800
+Subject: [PATCH v3 2/3] PCI: Enable PCIe Relaxed Ordering if supported
+In-Reply-To: <a4b98567-286a-1fba-e935-f9ba50f1178d@huawei.com>
+References: <1496826968-10152-1-git-send-email-dingtianhong@huawei.com>
+ <1496826968-10152-3-git-send-email-dingtianhong@huawei.com>
+ <a4b98567-286a-1fba-e935-f9ba50f1178d@huawei.com>
+Message-ID: <cf91605b-2c9d-150f-ad1d-a8cc17e0a1ee@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 08, 2017 at 06:10:12PM +0200, Krzysztof Kozlowski wrote:
-> Remove old, dead Kconfig options (in order appearing in this commit):
->  - EXPERIMENTAL is gone since v3.9;
->  - INET_LRO: commit 7bbf3cae65b6 ("ipv4: Remove inet_lro library");
->  - MTD_CONCAT: commit f53fdebcc3e1 ("mtd: drop MTD_CONCAT from Kconfig
->    entirely");
->  - MTD_PARTITIONS: commit 6a8a98b22b10 ("mtd: kill
->    CONFIG_MTD_PARTITIONS");
->  - MTD_CHAR: commit 660685d9d1b4 ("mtd: merge mtdchar module with
->    mtdcore");
->  - NETDEV_1000 and NETDEV_10000: commit f860b0522f65 ("drivers/net:
->    Kconfig and Makefile cleanup"); NET_ETHERNET should be replaced with
->    just ETHERNET but that is separate change;
->  - INOTIFY: commit 2dfc1cae4c42 ("inotify: remove inotify in kernel
->    interface");
->  - MISC_DEVICES: commit 7c5763b8453a ("drivers: misc: Remove
->    MISC_DEVICES config option");
->  - HID_SUPPORT: commit 1f41a6a99476 ("HID: Fix the generic Kconfig
->    options");
->  - BT_L2CAP and BT_SCO: commit f1e91e1640d8 ("Bluetooth: Always compile
->    SCO and L2CAP in Bluetooth Core");
->  - DEBUG_ERRORS: commit b025a3f836d1 ("ARM: 6876/1: Kconfig.debug:
->    Remove unused CONFIG_DEBUG_ERRORS");
->  - USB_DEVICE_CLASS: commit 007bab91324e ("USB: remove
->    CONFIG_USB_DEVICE_CLASS");
->  - RCU_CPU_STALL_DETECTOR: commit a00e0d714fbd ("rcu: Remove conditional
->    compilation for RCU CPU stall warnings");
->  - SYSCTL_SYSCALL_CHECK: commit 7c60c48f58a7 ("sysctl: Improve the
->    sysctl sanity checks");
->  - IP_NF_QUEUE: commit 3dd6664fac7e ("netfilter: remove unused "config
->    IP_NF_QUEUE"");
->  - IP_NF_TARGET_ULOG: commit d4da843e6fad ("netfilter: kill remnants of
->    ulog targets");
->  - IP6_NF_QUEUE: commit d16cf20e2f2f ("netfilter: remove ip_queue
->    support");
->  - IP6_NF_TARGET_LOG: commit 6939c33a757b ("netfilter: merge ipt_LOG and
->    ip6_LOG into xt_LOG");
->  - USB_LED: commit a335aaf3125c ("usb: misc: remove outdated USB LED
->    driver");
->  - MMC_UNSAFE_RESUME: commit 2501c9179dff ("mmc: core: Use
->    MMC_UNSAFE_RESUME as default behavior");
->  - AUTOFS_FS: commit 561c5cf9236a ("staging: Remove autofs3");
->  - DISPLAY_SUPPORT: commit 5a6b5e02d673 ("fbdev: remove display
->    subsystem");
->  - CFG80211_REG_DEBUG: commit c799ba6eab7a ("cfg80211: remove
->    CFG80211_REG_DEBUG");
->  - VIDEO_OUTPUT_CONTROL: commit f167a64e9d67 ("video / output: Drop
->    display output class support");
->  - USB_LIBUSUAL: commit f61870ee6f8c ("usb: remove libusual");
->  - CRYPTO_ZLIB: commit 110492183c4b ("crypto: compress - remove unused
->    pcomp interface");
->  - BLK_DEV_UB: commit 68a5059ecf82 ("block: remove the deprecated ub
->    driver");
+
+Hi John:
+
+Thanks for the reviewing, I will fix it in next version.
+
+Ding
+
+On 2017/6/8 1:55, John Garry wrote:
+> On 07/06/2017 10:16, Ding Tianhong wrote:
 > 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-
-[....]
-> diff --git a/arch/arm/configs/vexpress_defconfig b/arch/arm/configs/vexpress_defconfig
-> index 37fe607a4ede..0fa0ed577b15 100644
-> --- a/arch/arm/configs/vexpress_defconfig
-> +++ b/arch/arm/configs/vexpress_defconfig
-> @@ -46,7 +46,6 @@ CONFIG_INET=y
->  CONFIG_IP_PNP=y
->  CONFIG_IP_PNP_DHCP=y
->  CONFIG_IP_PNP_BOOTP=y
-> -# CONFIG_INET_LRO is not set
->  # CONFIG_IPV6 is not set
->  # CONFIG_WIRELESS is not set
->  CONFIG_NET_9P=y
-[...]
-
-Acked-by: Liviu Dudau <liviu.dudau@arm.com>
-
-Thanks for the cleanup!
-Liviu
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+> Hi Ding,
+> 
+> A few general style comments:
+> 
+>> The PCIe Device Control Register use the bit 4 to indicate that
+>> whether the device is permitted to enable relaxed ordering or not.
+>> But relaxed ordering is not safe for some platform which could only
+>> use strong write ordering, so devices are allowed (but not required)
+>> to enable relaxed ordering bit by default.
+>>
+>> If a PCIe device didn't enable the relaxed ordering attribute default,
+>> we should not do anything in the PCIe configuration, otherwise we
+>> should check if any of the devices above us do not support relaxed
+>> ordering by the PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag, then base on
+>> the result if we get a return that indicate that the relaxed ordering
+>> is not supported we should update our device to disable relaxed ordering
+>> in configuration space. If the device above us doesn't exist or isn't
+>> the PCIe device, we shouldn't do anything and skip updating relaxed ordering
+>> because we are probably running in a guest.
+> 
+> A guest machine/environment
+> 
+>>
+>> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+>> ---
+>>  drivers/pci/pci.c   | 29 +++++++++++++++++++++++++++++
+>>  drivers/pci/probe.c | 43 +++++++++++++++++++++++++++++++++++++++++++
+>>  include/linux/pci.h |  2 ++
+>>  3 files changed, 74 insertions(+)
+>>
+>> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+>> index b01bd5b..3d42b38 100644
+>> --- a/drivers/pci/pci.c
+>> +++ b/drivers/pci/pci.c
+>> @@ -4878,6 +4878,35 @@ int pcie_set_mps(struct pci_dev *dev, int mps)
+>>  EXPORT_SYMBOL(pcie_set_mps);
+>>
+>>  /**
+>> + * pcie_clear_relaxed_ordering - clear PCI Express relexed ordering bit
+>> + * @dev: PCI device to query
+>> + *
+>> + * If possible clear relaxed ordering
+>> + */
+>> +int pcie_clear_relaxed_ordering(struct pci_dev *dev)
+>> +{
+>> +    return pcie_capability_clear_word(dev, PCI_EXP_DEVCTL,
+>> +                      PCI_EXP_DEVCTL_RELAX_EN);
+>> +}
+>> +EXPORT_SYMBOL(pcie_clear_relaxed_ordering);
+>> +
+>> +/**
+>> + * pcie_get_relaxed_ordering - check PCI Express relexed ordering bit
+> 
+> s/relexed/relaxed/
+> 
+> Check what on relaxed ordering bit?
+> 
+> And the function name is inconsistent with this discription.
+> 
+>> + * @dev: PCI device to query
+>> + *
+>> + * Returns true if relaxed ordering is been set
+> 
+> If you want to return true/false, then use !!, below in the function
+> 
+>> + */
+>> +int pcie_get_relaxed_ordering(struct pci_dev *dev)
+>> +{
+>> +    u16 v;
+>> +
+>> +    pcie_capability_read_word(dev, PCI_EXP_DEVCTL, &v);
+>> +
+>> +    return (v & PCI_EXP_DEVCTL_RELAX_EN) >> 4;
+>> +}
+>> +EXPORT_SYMBOL(pcie_get_relaxed_ordering);
+>> +
+>> +/**
+>>   * pcie_get_minimum_link - determine minimum link settings of a PCI device
+>>   * @dev: PCI device to query
+>>   * @speed: storage for minimum speed
+>> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+>> index 19c8950..0c94c80 100644
+>> --- a/drivers/pci/probe.c
+>> +++ b/drivers/pci/probe.c
+>> @@ -1701,6 +1701,48 @@ static void pci_configure_extended_tags(struct pci_dev *dev)
+>>                       PCI_EXP_DEVCTL_EXT_TAG);
+>>  }
+>>
+>> +/**
+>> + * pci_dev_disable_relaxed_ordering - check if the PCI device
+>> + * should disable the relaxed ordering attribute.
+> 
+> I think that we need a more accurate description. I know some people think a function which just "checks" is vague.
+> 
+>> + * @dev: PCI device
+>> + *
+>> + * Return true if any of the PCI devices above us do not support
+>> + * relaxed ordering.
+>> + */
+>> +static int pci_dev_disable_relaxed_ordering(struct pci_dev *dev)
+> 
+> The function name implies an action - disabling - but this function does nothing except return a value
+> 
+>> +{
+>> +    int ro_disabled = 0;
+>> +
+>> +    while(dev) {
+> 
+> Did you run checkpatch?
+> 
+>> +        if (dev->dev_flags & PCI_DEV_FLAGS_NO_RELAXED_ORDERING) {
+>> +            ro_disabled = 1;
+> 
+> just return true, and return false at the bottom, so you can do away with ro_disabled (which is not a bool)
+> 
+>> +            break;
+>> +        }
+>> +        dev = dev->bus->self;
+>> +    }
+>> +
+>> +    return ro_disabled;
+>> +}
+>> +
+>> +static void pci_configure_relaxed_ordering(struct pci_dev *dev)
+>> +{
+>> +    struct pci_dev *bridge = pci_upstream_bridge(dev);
+>> +    int origin_ero;
+> 
+> You don't need this variable
+> 
+>> +
+>> +    if (!pci_is_pcie(dev) || !bridge || !pci_is_pcie(bridge))
+>> +        return;
+>> +
+>> +    origin_ero = pcie_get_relaxed_ordering(dev);
+>> +    /* If the releaxed ordering enable bit is not set, do nothing. */
+>> +    if (!origin_ero)
+>> +        return;
+>> +
+>> +    if (pci_dev_disable_relaxed_ordering(dev)) {
+>> +        pcie_clear_relaxed_ordering(dev);
+>> +        dev_info(&dev->dev, "Disable Relaxed Ordering\n");
+>> +    }
+>> +}
+>> +
+>>  static void pci_configure_device(struct pci_dev *dev)
+>>  {
+>>      struct hotplug_params hpp;
+>> @@ -1708,6 +1750,7 @@ static void pci_configure_device(struct pci_dev *dev)
+>>
+>>      pci_configure_mps(dev);
+>>      pci_configure_extended_tags(dev);
+>> +    pci_configure_relaxed_ordering(dev);
+>>
+>>      memset(&hpp, 0, sizeof(hpp));
+>>      ret = pci_get_hp_params(dev, &hpp);
+>> diff --git a/include/linux/pci.h b/include/linux/pci.h
+>> index e1e8428..299d2f3 100644
+>> --- a/include/linux/pci.h
+>> +++ b/include/linux/pci.h
+>> @@ -1105,6 +1105,8 @@ int __pci_enable_wake(struct pci_dev *dev, pci_power_t state,
+>>  void pci_pme_wakeup_bus(struct pci_bus *bus);
+>>  void pci_d3cold_enable(struct pci_dev *dev);
+>>  void pci_d3cold_disable(struct pci_dev *dev);
+>> +int pcie_clear_relaxed_ordering(struct pci_dev *dev);
+>> +int pcie_get_relaxed_ordering(struct pci_dev *dev);
+>>
+>>  static inline int pci_enable_wake(struct pci_dev *dev, pci_power_t state,
+>>                    bool enable)
+>>
+> 
+> 
+> 
+> .
+> 
