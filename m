@@ -1,32 +1,129 @@
-From: nicolas.dichtel@6wind.com (Nicolas Dichtel)
-Date: Fri, 9 Jun 2017 16:12:29 +0200
-Subject: [PATCH] kbuild: replace genhdr-y with generated-y, deprecating
- genhdr-y
-In-Reply-To: <1496996992-17857-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1496996992-17857-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <40a662b5-055b-b5ac-cebe-39b417b677de@6wind.com>
+From: john.garry@huawei.com (John Garry)
+Date: Fri, 9 Jun 2017 15:18:39 +0100
+Subject: [PATCH v8 6/9] drivers: perf: hisi: Add support for Hisilicon
+ Djtag driver
+In-Reply-To: <20170608163519.GA19643@leverpostej>
+References: <1495457312-237127-1-git-send-email-zhangshaokun@hisilicon.com>
+ <20170608163519.GA19643@leverpostej>
+Message-ID: <8666a0fa-126d-e4a3-ac4b-7962f5d79942@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 09/06/2017 ? 10:29, Masahiro Yamada a ?crit :
-> Prior to commit fcc8487d477a ("uapi: export all headers under uapi
-> directories"), genhdr-y was meant to specify generated UAPI headers.
-> 
-> - generated-y: generated headers (other than asm-generic wrappers)
-> - header-y   : headers to be exported
-> - genhdr-y   : generated headers to be exported (generated-y + header-y)
-> 
-> Now headers under UAPI directories are all exported.  So, there is no
-> more difference between generated-y and genhdr-y.
-> 
-> We see two users of genhdr-y, arch/{arm,x86}/include/uapi/asm/Kbuild.
-> They generate some headers in arch/{arm,x86}/include/uapi/generated/
-> directories, which are obviously exported.
-> 
-> Replace genhdr-y with generated-y, and deprecate genhdr-y.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-Good catch. It eases the understanding of all those mechanisms.
+On 08/06/2017 17:35, Mark Rutland wrote:
+> Hi,
+>
+> On Mon, May 22, 2017 at 08:48:32PM +0800, Shaokun Zhang wrote:
+>> +/*
+>> + * hisi_djtag_lock_v2: djtag lock to avoid djtag access conflict b/w kernel
+>> + * and UEFI.
+>
+> The mention of UEFI here worries me somewhat, and I have a number of
+> questions specifically relating to how we interact with UEFI here.
+>
 
-After the fix of the typo in the commitlog:
-Acked-by: Nicolas Dichtel <nicolas.dichtel@6wind.com>
+Hi Mark,
+
+This djtag locking mechanism is an advisory software-only policy. The 
+problem is the hardware designers made an interface which does not 
+consider multiple agents in the system concurrently accessing the djtag 
+registers.
+
+System wide, djtag is used as an interface to other HW modules, but we 
+only use for perf HW in the kernel.
+
+> When precisely does UEFI need to touch the djtag hardware? e.g. does
+> this happen in runtime services? ... or completely asynchronously?
+>
+
+Actually it's trusted firmware which accesses for L3 cache management in 
+CPU hotplug
+
+> What does UEFI do with djtag when it holds the lock?
+>
+
+As mentioned, cache management
+
+> Are there other software agents (e.g. secure firmware) which try to
+> take this lock?
+>
+
+No
+
+> Can you explain how the locking scheme works? e.g. is this an advisory
+> software-only policy, or does the hardware prohibit accesses from other
+> agents somehow?
+>
+
+The locking scheme is a software solution to spinlock. It's uses djtag 
+module select register as the spinlock flag, to avoid using some shared 
+memory.
+
+The tricky part is that there is no test-and-set hardware support, so we 
+use this algorithm:
+- precondition: flag initially set unlocked
+
+a. agent reads flag
+     - if not unlocked, continues to poll
+     - otherwise, writes agent's unique lock value to flag
+b. agent waits defined amount of time *uninterrupted* and then checks 
+the flag
+     - if it is unchanged, it has the lock -> continue
+     - if it is changed, it means other agent is trying to access the 
+lock and got it, so it goes back to a.
+c. has lock, so safe to access djtag
+d. to unlock, release by writing "unlock" value to flag
+
+> What happens if the kernel takes the lock, but doesn't release it?
+>
+
+This should not happen. We use spinlock_irqsave() when locking. However 
+I have noted that we can BUG if djtag access timeout, so we need to 
+release the lock at this point. I don't think the code handles this 
+properly now.
+
+> What happens if UEFI takes the lock, but doesn't release it?
+>
+
+Again, we would not expect this to happen; but, if it does, Kernel 
+access should timeout.
+
+> Are there any points at which UEFI needs to hold the locks of several
+> djtag units simultaneously?
+
+No
+
+Thanks,
+John
+
+>
+>> + * @reg_base:	djtag register base address
+>> + *
+>> + * Return - none.
+>> + */
+>> +static void hisi_djtag_lock_v2(void __iomem *regs_base)
+>> +{
+>> +	u32 rd, wr, mod_sel;
+>> +
+>> +	/* Continuously poll to ensure the djtag is free */
+>> +	while (1) {
+>> +		rd = readl(regs_base + SC_DJTAG_MSTR_CFG_EX);
+>> +		mod_sel = ((rd >> DEBUG_MODULE_SEL_SHIFT_EX) & 0xFF);
+>> +		if (mod_sel == SC_DJTAG_V2_UNLOCK) {
+>> +			wr = ((rd & SC_DJTAG_V2_MODULE_SEL_MASK) |
+>> +			      (SC_DJTAG_V2_KERNEL_LOCK <<
+>> +			       DEBUG_MODULE_SEL_SHIFT_EX));
+>> +			writel(wr, regs_base + SC_DJTAG_MSTR_CFG_EX);
+>> +			udelay(10); /* 10us */
+>> +
+>> +			rd = readl(regs_base + SC_DJTAG_MSTR_CFG_EX);
+>> +			mod_sel = ((rd >> DEBUG_MODULE_SEL_SHIFT_EX) & 0xFF);
+>> +			if (mod_sel == SC_DJTAG_V2_KERNEL_LOCK)
+>> +				break;
+>> +		}
+>> +		udelay(10); /* 10us */
+>> +	}
+>> +}
+>> +
+>> +/*
+
+[ ... ]
