@@ -1,107 +1,161 @@
-From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Fri, 09 Jun 2017 11:59:33 +0900
-Subject: [PATCH] ARM: dts: exynos: Add the OF graph between fimd and dsi
-References: <CGME20170609025951epcas1p19f5ca8c241b8b79068a84eb239ed46ed@epcas1p1.samsung.com>
-Message-ID: <1496977173-20550-1-git-send-email-hoegeun.kwon@samsung.com>
+From: mark.yao@rock-chips.com (Mark Yao)
+Date: Fri,  9 Jun 2017 11:05:33 +0800
+Subject: [PATCH v2 2/4] drm/rockchip: dw_hdmi: add RK3399 HDMI support
+In-Reply-To: <1496976070-29573-1-git-send-email-mark.yao@rock-chips.com>
+References: <1496976070-29573-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1496977533-32070-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It should be connected to OF graph between fimd and dsi.
-Add the OF graph between fimd and dsi.
+RK3399 and RK3288 shared the same HDMI IP controller, only some light
+difference with GRF configure.
 
-Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
+base on Yakir Yang's rk3399 patch, rebase to newest upstrem kernel:
+    https://patchwork.kernel.org/patch/9223323
+
+Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+
+Changes in v2:
+  reuse hdmi_phy_configure_dwc_hdmi_3d_tx for phy configure
+  fixup Documentation
+
 ---
- arch/arm/boot/dts/exynos3250.dtsi | 26 ++++++++++++++++++++++++++
- arch/arm/boot/dts/exynos4.dtsi    | 26 ++++++++++++++++++++++++++
- 2 files changed, 52 insertions(+)
+ .../bindings/display/rockchip/dw_hdmi-rockchip.txt |  3 +-
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        | 69 ++++++++++++++++++----
+ 2 files changed, 60 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-index 590ee44..22d523f 100644
---- a/arch/arm/boot/dts/exynos3250.dtsi
-+++ b/arch/arm/boot/dts/exynos3250.dtsi
-@@ -311,6 +311,19 @@
- 			iommus = <&sysmmu_fimd0>;
- 			samsung,sysreg = <&sys_reg>;
- 			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 0 {
-+					reg = <0>;
-+					fimd_to_dsi: endpoint {
-+						remote-endpoint =
-+							<&dsi_to_fimd>;
-+					};
-+				};
-+			};
- 		};
+diff --git a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
+index 046076c..495bcf5 100644
+--- a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
++++ b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
+@@ -11,7 +11,8 @@ following device-specific properties.
  
- 		dsi_0: dsi at 11C80000 {
-@@ -326,6 +339,19 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 0 {
-+					reg = <0>;
-+					dsi_to_fimd: endpoint {
-+						remote-endpoint =
-+							<&fimd_to_dsi>;
-+					};
-+				};
-+			};
- 		};
+ Required properties:
  
- 		sysmmu_fimd0: sysmmu at 11E20000 {
-diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-index 497a947..773d392 100644
---- a/arch/arm/boot/dts/exynos4.dtsi
-+++ b/arch/arm/boot/dts/exynos4.dtsi
-@@ -193,6 +193,19 @@
- 		status = "disabled";
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				dsi_to_fimd: endpoint {
-+					remote-endpoint =
-+						<&fimd_to_dsi>;
-+				};
-+			};
-+		};
- 	};
+-- compatible: Shall contain "rockchip,rk3288-dw-hdmi".
++- compatible: "rockchip,rk3288-dw-hdmi",
++              "rockchip,rk3399-dw-hdmi";
+ - reg: See dw_hdmi.txt.
+ - reg-io-width: See dw_hdmi.txt. Shall be 4.
+ - interrupts: HDMI interrupt number
+diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+index 63dab6f..15a8989 100644
+--- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+@@ -20,13 +20,30 @@
+ #include "rockchip_drm_drv.h"
+ #include "rockchip_drm_vop.h"
  
- 	camera {
-@@ -715,6 +728,19 @@
- 		iommus = <&sysmmu_fimd0>;
- 		samsung,sysreg = <&sys_reg>;
- 		status = "disabled";
+-#define GRF_SOC_CON6                    0x025c
+-#define HDMI_SEL_VOP_LIT                (1 << 4)
++#define RK3288_GRF_SOC_CON6		0x025C
++#define RK3288_HDMI_LCDC_SEL		BIT(4)
++#define RK3399_GRF_SOC_CON20		0x6250
++#define RK3399_HDMI_LCDC_SEL		BIT(6)
 +
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
++#define HIWORD_UPDATE(val, mask)	(val | (mask) << 16)
 +
-+			port at 0 {
-+				reg = <0>;
-+				fimd_to_dsi: endpoint {
-+					remote-endpoint =
-+						<&dsi_to_fimd>;
-+				};
-+			};
-+		};
- 	};
++/**
++ * struct rockchip_hdmi_chip_data - splite the grf setting of kind of chips
++ * @lcdsel_grf_reg: grf register offset of lcdc select
++ * @lcdsel_big: reg value of selecting vop big for HDMI
++ * @lcdsel_lit: reg value of selecting vop little for HDMI
++ */
++struct rockchip_hdmi_chip_data {
++	u32	lcdsel_grf_reg;
++	u32	lcdsel_big;
++	u32	lcdsel_lit;
++};
  
- 	tmu: tmu at 100C0000 {
+ struct rockchip_hdmi {
+ 	struct device *dev;
+ 	struct regmap *regmap;
+ 	struct drm_encoder encoder;
++	const struct rockchip_hdmi_chip_data *chip_data;
+ };
+ 
+ #define to_rockchip_hdmi(x)	container_of(x, struct rockchip_hdmi, x)
+@@ -198,17 +215,20 @@ static void dw_hdmi_rockchip_encoder_enable(struct drm_encoder *encoder)
+ {
+ 	struct rockchip_hdmi *hdmi = to_rockchip_hdmi(encoder);
+ 	u32 val;
+-	int mux;
++	int ret;
+ 
+-	mux = drm_of_encoder_active_endpoint_id(hdmi->dev->of_node, encoder);
+-	if (mux)
+-		val = HDMI_SEL_VOP_LIT | (HDMI_SEL_VOP_LIT << 16);
++	ret = drm_of_encoder_active_endpoint_id(hdmi->dev->of_node, encoder);
++	if (ret)
++		val = hdmi->chip_data->lcdsel_lit;
+ 	else
+-		val = HDMI_SEL_VOP_LIT << 16;
++		val = hdmi->chip_data->lcdsel_big;
++
++	ret = regmap_write(hdmi->regmap, hdmi->chip_data->lcdsel_grf_reg, val);
++	if (ret != 0)
++		dev_err(hdmi->dev, "Could not write to GRF: %d\n", ret);
+ 
+-	regmap_write(hdmi->regmap, GRF_SOC_CON6, val);
+ 	dev_dbg(hdmi->dev, "vop %s output to hdmi\n",
+-		(mux) ? "LIT" : "BIG");
++		ret ? "LIT" : "BIG");
+ }
+ 
+ static int
+@@ -232,16 +252,42 @@ static void dw_hdmi_rockchip_encoder_enable(struct drm_encoder *encoder)
+ 	.atomic_check = dw_hdmi_rockchip_encoder_atomic_check,
+ };
+ 
+-static const struct dw_hdmi_plat_data rockchip_hdmi_drv_data = {
++static struct rockchip_hdmi_chip_data rk3288_chip_data = {
++	.lcdsel_grf_reg = RK3288_GRF_SOC_CON6,
++	.lcdsel_big = HIWORD_UPDATE(0, RK3288_HDMI_LCDC_SEL),
++	.lcdsel_lit = HIWORD_UPDATE(RK3288_HDMI_LCDC_SEL, RK3288_HDMI_LCDC_SEL),
++};
++
++static const struct dw_hdmi_plat_data rk3288_hdmi_drv_data = {
++	.mode_valid = dw_hdmi_rockchip_mode_valid,
++	.mpll_cfg   = rockchip_mpll_cfg,
++	.cur_ctr    = rockchip_cur_ctr,
++	.phy_config = rockchip_phy_config,
++	.configure_phy = hdmi_phy_configure_dwc_hdmi_3d_tx,
++	.phy_data = &rk3288_chip_data,
++};
++
++static struct rockchip_hdmi_chip_data rk3399_chip_data = {
++	.lcdsel_grf_reg = RK3399_GRF_SOC_CON20,
++	.lcdsel_big = HIWORD_UPDATE(0, RK3399_HDMI_LCDC_SEL),
++	.lcdsel_lit = HIWORD_UPDATE(RK3399_HDMI_LCDC_SEL, RK3399_HDMI_LCDC_SEL),
++};
++
++static const struct dw_hdmi_plat_data rk3399_hdmi_drv_data = {
+ 	.mode_valid = dw_hdmi_rockchip_mode_valid,
+ 	.mpll_cfg   = rockchip_mpll_cfg,
+ 	.cur_ctr    = rockchip_cur_ctr,
+ 	.phy_config = rockchip_phy_config,
++	.configure_phy = hdmi_phy_configure_dwc_hdmi_3d_tx,
++	.phy_data = &rk3399_chip_data,
+ };
+ 
+ static const struct of_device_id dw_hdmi_rockchip_dt_ids[] = {
+ 	{ .compatible = "rockchip,rk3288-dw-hdmi",
+-	  .data = &rockchip_hdmi_drv_data
++	  .data = &rk3288_hdmi_drv_data
++	},
++	{ .compatible = "rockchip,rk3399-dw-hdmi",
++	  .data = &rk3399_hdmi_drv_data
+ 	},
+ 	{},
+ };
+@@ -268,6 +314,7 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
+ 	match = of_match_node(dw_hdmi_rockchip_dt_ids, pdev->dev.of_node);
+ 	plat_data = match->data;
+ 	hdmi->dev = &pdev->dev;
++	hdmi->chip_data = plat_data->phy_data;
+ 	encoder = &hdmi->encoder;
+ 
+ 	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm, dev->of_node);
 -- 
 1.9.1
