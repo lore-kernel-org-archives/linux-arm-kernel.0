@@ -1,84 +1,39 @@
-From: mark.yao@rock-chips.com (Mark Yao)
-Date: Fri,  9 Jun 2017 15:10:46 +0800
-Subject: [PATCH v3 3/3] drm/rockchip: dw_hdmi: introduce the pclk for grf
-In-Reply-To: <1496992228-10582-1-git-send-email-mark.yao@rock-chips.com>
-References: <1496992228-10582-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <1496992247-10727-1-git-send-email-mark.yao@rock-chips.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 9 Jun 2017 09:05:37 +0200
+Subject: [PATCH 0/4] ARM: dts: bcm2835-rpi-zero: Enable OTG mode
+In-Reply-To: <542130487.90500.1496306283902@email.1und1.de>
+References: <1495385079-3697-1-git-send-email-stefan.wahren@i2se.com>
+ <542130487.90500.1496306283902@email.1und1.de>
+Message-ID: <6a45fcd8-0d88-bc17-6432-d38fe771dc80@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For RK3399's GRF module, if we want to operate the graphic related grf
-registers, we need to enable the pclk_vio_grf which supply power for VIO
-GRF IOs, so it's better to introduce an optional grf clock in driver.
+Am 01.06.2017 um 10:38 schrieb Stefan Wahren:
+>> Stefan Wahren <stefan.wahren@i2se.com> hat am 21. Mai 2017 um 18:44 geschrieben:
+>>
+>>
+>> This patch series enable OTG mode for Raspberry Pi Zero because dwc2 driver
+>> has been fixed now.
+>>
+>> Patch 1 adds a new dtsi file to setup OTG mode (could also be used for boards
+>> like RPi Zero W or the Compute Module). The second patch adds the USB PHY and
+>> was part of Raspberry Pi Zero support patch series before split up [1].
+>> The enabling of OTG mode of RPi Zero is done by patch number 3. The last patch
+>> updates the BCM2835 defconfig.
+>>
+>> [1] - http://lists.infradead.org/pipermail/linux-rpi-kernel/2016-July/004153.html
+>>
+>> Stefan Wahren (4):
+>>   ARM: dts: bcm283x: Add dtsi for OTG mode
+>>   ARM: dts: bcm283x: Add generic USB PHY
+>>   ARM: dts: bcm2835-rpi-zero: Enable OTG mode
+>>   ARM: bcm2835_defconfig: Enable serial & ethernet USB gadget support
+>>
+> No comments to this patch series?
+>
+> Regards
+> Stefan
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
----
-Changes in v3: none
-Changes in v2: describe grf on Documentation.
+@Eric
 
- .../bindings/display/rockchip/dw_hdmi-rockchip.txt     |  1 +
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c            | 18 ++++++++++++++++++
- 2 files changed, 19 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-index 779e8ac..6bce639 100644
---- a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-+++ b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-@@ -31,6 +31,7 @@ Optional properties
-   I2C master controller.
- - clock-names: See dw_hdmi.txt. The "cec" clock is optional.
- - clock-names: May contain "cec" as defined in dw_hdmi.txt.
-+- clock-names: May contain "grf", power for grf io.
- - clock-names: May contain "vpll", external clock for some hdmi phy.
- 
- Example:
-diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-index aaa0f3e..2b9cb47 100644
---- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-+++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-@@ -47,6 +47,7 @@ struct rockchip_hdmi {
- 	struct drm_encoder encoder;
- 	const struct rockchip_hdmi_chip_data *chip_data;
- 	struct clk *vpll_clk;
-+	struct clk *grf_clk;
- };
- 
- #define to_rockchip_hdmi(x)	container_of(x, struct rockchip_hdmi, x)
-@@ -181,6 +182,16 @@ static int rockchip_hdmi_parse_dt(struct rockchip_hdmi *hdmi)
- 		return PTR_ERR(hdmi->vpll_clk);
- 	}
- 
-+	hdmi->grf_clk = devm_clk_get(hdmi->dev, "grf");
-+	if (PTR_ERR(hdmi->grf_clk) == -ENOENT) {
-+		hdmi->grf_clk = NULL;
-+	} else if (PTR_ERR(hdmi->grf_clk) == -EPROBE_DEFER) {
-+		return -EPROBE_DEFER;
-+	} else if (IS_ERR(hdmi->grf_clk)) {
-+		dev_err(hdmi->dev, "failed to get grf clock\n");
-+		return PTR_ERR(hdmi->grf_clk);
-+	}
-+
- 	ret = clk_prepare_enable(hdmi->vpll_clk);
- 	if (ret) {
- 		dev_err(hdmi->dev, "Failed to enable HDMI vpll: %d\n", ret);
-@@ -246,10 +257,17 @@ static void dw_hdmi_rockchip_encoder_enable(struct drm_encoder *encoder)
- 	else
- 		val = hdmi->chip_data->lcdsel_big;
- 
-+	ret = clk_prepare_enable(hdmi->grf_clk);
-+	if (ret < 0) {
-+		dev_err(hdmi->dev, "failed to enable grfclk %d\n", ret);
-+		return;
-+	}
-+
- 	ret = regmap_write(hdmi->regmap, hdmi->chip_data->lcdsel_grf_reg, val);
- 	if (ret != 0)
- 		dev_err(hdmi->dev, "Could not write to GRF: %d\n", ret);
- 
-+	clk_disable_unprepare(hdmi->grf_clk);
- 	dev_dbg(hdmi->dev, "vop %s output to hdmi\n",
- 		ret ? "LIT" : "BIG");
- }
--- 
-1.9.1
+Should i merge them?
