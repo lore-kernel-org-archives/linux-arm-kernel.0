@@ -1,37 +1,27 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Fri, 9 Jun 2017 09:43:42 +0200
-Subject: [PATCH 2/2] dt-bindings: iio: update STM32 timers clock names
-In-Reply-To: <1496993874-9870-3-git-send-email-fabrice.gasnier@st.com>
-References: <1496993874-9870-1-git-send-email-fabrice.gasnier@st.com>
- <1496993874-9870-3-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <CA+M3ks4z46rPmjBt=pfJQBBjr5Hr7Oj4P=tv5wjo9WB_Ca_vsA@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 9 Jun 2017 09:45:09 +0200
+Subject: [PATCH 3/3] ARM: dts: exynos: Remove the display-timing and
+ delay from rinato dts
+In-Reply-To: <1496984354-5271-4-git-send-email-hoegeun.kwon@samsung.com>
+References: <1496984354-5271-1-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170609045939epcas1p2e4b50c78978b8f14630ca29550c1cb34@epcas1p2.samsung.com>
+ <1496984354-5271-4-git-send-email-hoegeun.kwon@samsung.com>
+Message-ID: <20170609074509.GD4018@kozik-book>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-06-09 9:37 GMT+02:00 Fabrice Gasnier <fabrice.gasnier@st.com>:
-> Clock name has been updated during driver/DT binding review:
-> https://lkml.org/lkml/2016/12/13/718
-> Update DT binding doc to reflect this.
->
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+On Fri, Jun 09, 2017 at 01:59:14PM +0900, Hoegeun Kwon wrote:
+> The display-timing and delay are included in the panel driver. So it
+> should be removed in dts.
+> 
+> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
 > ---
->  Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt b/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
-> index 55a653d..6abc755 100644
-> --- a/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
-> +++ b/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
-> @@ -14,7 +14,7 @@ Example:
->                 compatible = "st,stm32-timers";
->                 reg = <0x40010000 0x400>;
->                 clocks = <&rcc 0 160>;
-> -               clock-names = "clk_int";
-> +               clock-names = "int";
->
->                 timer at 0 {
->                         compatible = "st,stm32-timer-trigger";
-> --
-> 1.9.1
->
-Acked-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+>  arch/arm/boot/dts/exynos3250-rinato.dts | 22 ----------------------
+>  1 file changed, 22 deletions(-)
+
+I understand this depends on merging in the panel driver so this will
+have to wait till then. I'll take it when panel hits mainline (arm-soc
+folks discourage recently cross-tree merges for DT).
+
+Best regards,
+Krzysztof
