@@ -1,56 +1,45 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Fri, 9 Jun 2017 02:00:01 +0200
-Subject: [PATCH 4/4] mfd: tps65217: Instantiate sub-devices from device
- tree
-In-Reply-To: <fba09819-7d7e-57bb-c147-46c39098cff8@ti.com>
-References: <20170607103242.16008-1-enric.balletbo@collabora.com>
- <20170607103242.16008-4-enric.balletbo@collabora.com>
- <6359abe2-9a21-78a2-f5ea-87e2e3335af3@ti.com>
- <CAFqH_53v32iODN4xhoh4ho4s6grxknEDS3Ak6CHBcTAQo6fDNw@mail.gmail.com>
- <578f348c-509f-79d3-9770-73c9fcffe19c@ti.com>
- <CAFqH_52rU7ZBG_Muy2JHoqJGdXOdsNfmtJxsZoPRyx3V1aWmFw@mail.gmail.com>
- <CABxcv=mN6=hbDSqrVkwSL8zccCntN7m_3DP6ZCbkOT6CLw+skQ@mail.gmail.com>
- <fba09819-7d7e-57bb-c147-46c39098cff8@ti.com>
-Message-ID: <CABxcv=nzCreCSm9wkY+Kv_-vmoQN12Ct=_VegsfTrbe6H-1hTw@mail.gmail.com>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Fri, 09 Jun 2017 00:28:27 +0000
+Subject: [PATCH] devfreq: exynos-ppmu: Staticize event list
+In-Reply-To: <5938A6CC.8030206@samsung.com>
+References: <5938A6CC.8030206@samsung.com>
+ <20170607181228.32102-1-krzk@kernel.org>
+ <CGME20170607181258epcas2p4191204d7b3853ef0482d84df7a06589d@epcms1p7>
+Message-ID: <20170609002827epcms1p74adfa60f131853c9c7ab9826a921fb53@epcms1p7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Grygorii,
+> Hi Krzysztof,
+> 
+> On 2017? 06? 08? 03:12, Krzysztof Kozlowski wrote:
+> > The ppmu_events array is accessed only in this compilation unit so it
+> > can be made static.
+> > 
+> > Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> > ---
+> >  drivers/devfreq/event/exynos-ppmu.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/devfreq/event/exynos-ppmu.c b/drivers/devfreq/event/exynos-ppmu.c
+> > index 9b7350935b73..c68f3b5a10b5 100644
+> > --- a/drivers/devfreq/event/exynos-ppmu.c
+> > +++ b/drivers/devfreq/event/exynos-ppmu.c
+> > @@ -44,7 +44,7 @@ struct exynos_ppmu {
+> >  	{ "ppmu-event2-"#name, PPMU_PMNCNT2 },	\
+> >  	{ "ppmu-event3-"#name, PPMU_PMNCNT3 }
+> >  
+> > -struct __exynos_ppmu_events {
+> > +static struct __exynos_ppmu_events {
+> >  	char *name;
+> >  	int id;
+> >  } ppmu_events[] = {
+> > 
+> 
+> Looks good to me.
+> Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
 
-[snip]
+Acked-by: MyungJoo Ham <myungjoo.ham@samsung.com>
 
->>
->> For tps65218 couldn't instead of using mfd_add_devices() for all the
->> sub-devs, had used of_platform_populate() for the ones that have
->> device nodes and mfd_add_devices() only for the "tps65218-regulator"?
->>
->> The commit talks about nodes without compatibles but's actually about
->> sub-devices without an associated device node. For me it makes sense
->> to use of_platform_populate() when the MFD has device nodes for their
->> sub-devices and mfd_add_devices() when DT knows nothing about the
->> sub-devices.
->
-> FYI. Below is link discussion I'm referring to between Mark Brown and Andrew F. Davis
-> https://lkml.org/lkml/2015/10/22/823
-> the same - https://groups.google.com/forum/#!topic/linux.kernel/wQsdSpPMroQ
->
 
-Thanks a lot for the pointer. There's a subtle difference between the
-argument you made and the one that Mark is making in this thread
-though.
-
-Because you said (sorry if I misunderstood) that mfd_add_devices()
-should be used instead of of_device_populate() even when sub-devices
-are described as DT nodes (as is the case in the commit you shared)
-while Mark is saying that if the sub-devs IP blocks are part of the
-MFD, then it shouldn't be exposed in the DT and be instantiated via
-mfd_add_devices() and I absolutely agree with that.
-
-So I was arguing for using of_device_populate() if the sub-devices are
-described in the DT. If that makes sense or not to expose the
-sub-devices in the DT for this particular driver is a different
-discussion and I can't comment on that since I'm not familiar with the
-HW.
-
-Best regards,
-Javier
+Cheers,
+MyungJoo
