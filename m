@@ -1,22 +1,45 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 09 Jun 2017 14:53:06 +0200
-Subject: [PATCH v2] ARM: dts: rv1108: change to "max-frequency" from
- "clock-freq-min-max"
-In-Reply-To: <20170609111747.24591-1-jh80.chung@samsung.com>
-References: <CGME20170609111748epcas5p163d65c6bd94776383381d80b632414a5@epcas5p1.samsung.com>
- <20170609111747.24591-1-jh80.chung@samsung.com>
-Message-ID: <4537978.5RC1Gv988B@phil>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Fri,  9 Jun 2017 14:57:28 +0200
+Subject: [PATCH v5 1/3] nvmem: dt: document SNVS LPGPR binding
+In-Reply-To: <20170609125730.25502-1-o.rempel@pengutronix.de>
+References: <20170609125730.25502-1-o.rempel@pengutronix.de>
+Message-ID: <20170609125730.25502-2-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 9. Juni 2017, 20:17:47 CEST schrieb Jaehoon Chung:
-> "clock-freq-min-max" was deprecated. There is only using in rv1108.dtsi.
-> Use the "max-frequency" for removiing "clock-freq-min-max" in future.
-> 
-> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+Documentation bindings for the Low Power General Purpose Register
+available on i.MX6 SoCs in the Secure Non-Volatile Storage.
 
-applied for 4.13
+Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+---
+ .../devicetree/bindings/nvmem/snvs-lpgpr.txt          | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
 
-
-Thanks
-Heiko
+diff --git a/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt b/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
+new file mode 100644
+index 000000000000..21910fb3159f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
+@@ -0,0 +1,19 @@
++Device tree bindings for Low Power General Purpose Register found in i.MX6Q/D
++Secure Non-Volatile Storage.
++
++This DT node should be represented as a sub-node of a "syscon",
++"simple-mfd" node.
++
++Required properties:
++- compatible: should be:
++	"fsl,imx6q-snvs-lpgpr" for Freescale i.MX6Q/D/DL/S
++
++Example:
++snvs: snvs at 020cc000 {
++	compatible = "fsl,sec-v4.0-mon", "syscon", "simple-mfd";
++	reg = <0x020cc000 0x4000>;
++
++	snvs_lpgpr: snvs-lpgpr {
++		compatible = "fsl,imx6q-snvs-lpgpr";
++	};
++};
+-- 
+2.11.0
