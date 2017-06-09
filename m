@@ -1,100 +1,187 @@
-From: bo.zhang@nxp.com (Bruce Zhang)
-Date: Fri, 9 Jun 2017 13:01:31 +0000
-Subject: [[PATCH]] drivers: leds/trigger: system cannot enter suspend
-In-Reply-To: <CACRpkdZpMsqt9gjehSQ5c86LyqhZcnYF7QuGk=N4JTi-GJ1SMA@mail.gmail.com>
-References: <1496648191-134355-1-git-send-email-bo.zhang@nxp.com>
- <CACRpkdZpMsqt9gjehSQ5c86LyqhZcnYF7QuGk=N4JTi-GJ1SMA@mail.gmail.com>
-Message-ID: <AM3PR04MB4041CD5659C02FF30AF159A8ACE0@AM3PR04MB404.eurprd04.prod.outlook.com>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Fri,  9 Jun 2017 13:03:56 +0000
+Subject: [PATCH] arm64: allwinner: a64: Add initial NanoPi A64 support
+Message-ID: <1497013436-14107-1-git-send-email-jteki@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At first we should check that whether exist the use case that LED turn on/off is based on other device(such as I2C). If true, how to guarantee the other devices(such as I2C) are available when turn off LED. Maybe pm_notifier is accepted method to process this case, because pm_notifier callback function is executed before other devices enter suspend mode.
+From: Jagan Teki <jagan@amarulasolutions.com>
 
-If we don't need to care such case or not exist such use case in application, we can revert the patch 5ab92a7cb.
+NanoPi A64 is a new board of high performance with low cost
+designed by FriendlyElec., using the Allwinner A64 SOC.
 
-Best Regards,
-Bruce
+Nanopi A64 features
+- Allwinner A64, 64-bit Quad-core Cortex-A53 at 648MHz to 1.152GHz, DVFS
+- 1GB DDR3 RAM
+- MicroSD
+- Gigabit Ethernet (RTL8211E)
+- Wi-Fi 802.11b/g/n
+- IR receiver
+- Audio In/Out
+- Video In/Out
+- Serial Debug Port
+- microUSB 5V 2A DC power-supply
 
------Original Message-----
-From: Linus Walleij [mailto:linus.walleij at linaro.org] 
-Sent: Friday, June 09, 2017 7:25 PM
-To: Bruce Zhang <bo.zhang@nxp.com>
-Cc: linux-arm-kernel at lists.infradead.org; Jacek Anaszewski <jacek.anaszewski@gmail.com>; Pavel Machek <pavel@ucw.cz>
-Subject: Re: [[PATCH]] drivers: leds/trigger: system cannot enter suspend
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+Changes for v3:
+- Fix to use mmc1 for SDIO instead of mmc2
+- Replace buswidth by 4 instead of 8 mmc1
+- Drop cap-mmc-hw-reset for mmc1
+Changes for v2:
+- Added ohci0, ehci0, ohic1, ehci1, usbphy.
+- Tested on A64
 
-On Mon, Jun 5, 2017 at 9:36 AM, Zhang Bo <bo.zhang@nxp.com> wrote:
+ arch/arm64/boot/dts/allwinner/Makefile             |   1 +
+ .../boot/dts/allwinner/sun50i-a64-nanopi-a64.dts   | 130 +++++++++++++++++++++
+ 2 files changed, 131 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
 
-> System cannot enter suspend mode because of heartbeat led trigger.
-
-As mentioned this should not be a problem.
-
-> Heartbeat_pm_notifier is called when system prepare to enter suspend 
-> mode, then call led_trigger_unregister to change the trigger of led 
-> device to none. It will send uevent message and the wakeup source count changed.
->
-> Add suspend/resume ops to the struct led_trigger, implement these two 
-> ops for ledtrig-heartbeat. Add led_trigger_suspend/led_trigger_resume 
-> funcitons to iterate through all LED class devices registered on given 
-> trigger and call their suspend/resume ops and disable/enable sysfs at the same time.
->
-> Call led_trigger_suspend{resuem} API in pm_notifier function to 
-> suspend/resume all led devices listed in given trigger.
->
-> Signed-off-by: Zhang Bo <bo.zhang@nxp.com>
-
-The patch is nice because it fixes my sloppy approach of just adding/removing the trigger made earlier.
-
-It stops unsolicited I2C traffic and other nastines from happening during the suspend/resume cycle.
-
-I would even add:
-
-Fixes: 5ab92a7cb82c ("leds: handle suspend/resume in heartbeat trigger")
-
-(...)
-> +static void heartbeat_trig_resume(struct led_classdev *led_cdev) {
-> +       struct heartbeat_trig_data *heartbeat_data = 
-> +led_cdev->trigger_data;
-> +
-> +       if (led_cdev->suspended) {
-> +               setup_timer(&heartbeat_data->timer,
-> +                           led_heartbeat_function, (unsigned long) led_cdev);
-> +               heartbeat_data->phase = 0;
-> +               led_heartbeat_function(heartbeat_data->timer.data);
-> +               led_cdev->suspended = false;
-> +       }
-> +}
-> +
-> +static void heartbeat_trig_suspend(struct led_classdev *led_cdev) {
-> +       struct heartbeat_trig_data *heartbeat_data = 
-> +led_cdev->trigger_data;
-> +
-> +       if (led_cdev->activated && !led_cdev->suspended) {
-> +               del_timer_sync(&heartbeat_data->timer);
-> +               led_cdev->suspended = true;
->         }
-
-Are we sure that the LED is *off* at this point so you don't suspend/resume with a glowing LED?
-
-Else insert a call to make sure that it's like so, and maybe even a variable to hold the current state (off/on) across the suspend/resume cycle.
-
-> @@ -161,25 +186,23 @@ static void heartbeat_trig_deactivate(struct led_classdev *led_cdev)
->         .name     = "heartbeat",
->         .activate = heartbeat_trig_activate,
->         .deactivate = heartbeat_trig_deactivate,
-> +       .suspend = heartbeat_trig_suspend,
-> +       .resume = heartbeat_trig_resume,
-(...)
-> +       void            (*suspend)(struct led_classdev *led_cdev);
-> +       void            (*resume)(struct led_classdev *led_cdev);
-
-
-These names do not correspons to the actual PM calls they are utilized for.
-
-Name them
-.pm_prepare_suspend()
-.pm_post_suspend()
-
-Instead, this indicates better the place when they get called.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
+index e7d5490..1ea7709 100644
+--- a/arch/arm64/boot/dts/allwinner/Makefile
++++ b/arch/arm64/boot/dts/allwinner/Makefile
+@@ -1,4 +1,5 @@
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
++dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-nanopi-a64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+new file mode 100644
+index 0000000..d56736d
+--- /dev/null
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+@@ -0,0 +1,130 @@
++/*
++ * Copyright (C) 2017 Jagan Teki <jteki@openedev.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "sun50i-a64.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	model = "FriendlyARM NanoPi A64";
++	compatible = "friendlyarm,nanopi-a64", "allwinner,sun50i-a64";
++
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart1;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	reg_vcc3v3: vcc3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&ehci1 {
++	status = "okay";
++};
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins>;
++	status = "okay";
++};
++
++&i2c1_pins {
++	bias-pull-up;
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins>;
++	vmmc-supply = <&reg_vcc3v3>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
++	cd-inverted;
++	disable-wp;
++	bus-width = <4>;
++	status = "okay";
++};
++
++&mmc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pins>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	non-removable;
++	status = "okay";
++};
++
++&ohci0 {
++	status = "okay";
++};
++
++&ohci1 {
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
++	status = "okay";
++};
++
++&usbphy {
++	status = "okay";
++};
+-- 
+1.9.1
