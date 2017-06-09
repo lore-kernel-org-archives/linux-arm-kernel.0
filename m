@@ -1,55 +1,63 @@
 From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Fri,  9 Jun 2017 15:39:35 -0700
-Subject: [PATCH v13 2/6] doc: dt: document altera-passive-serial binding
+Date: Fri,  9 Jun 2017 15:39:38 -0700
+Subject: [PATCH v13 5/6] lib: add bitrev8x4()
 In-Reply-To: <03e591707dc72f4c2b5e63a1272060956294ea51.1497047816.git.stillcompiling@gmail.com>
 References: <03e591707dc72f4c2b5e63a1272060956294ea51.1497047816.git.stillcompiling@gmail.com>
-Message-ID: <239fb9ad4848c96ddc944f99db811721653da95b.1497047816.git.stillcompiling@gmail.com>
+Message-ID: <74028f801ba1d69e44b21d0f6d3d6ea8352fde4a.1497047816.git.stillcompiling@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe an altera-passive-serial devicetree entry, required features
+Add a function to reverse bytes within a 32 bit word.
+Operate on a u32 rather than individual bytes.
 
 Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../bindings/fpga/altera-passive-serial.txt        | 29 ++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/fpga/altera-passive-serial.txt
+ include/linux/bitrev.h | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/fpga/altera-passive-serial.txt b/Documentation/devicetree/bindings/fpga/altera-passive-serial.txt
-new file mode 100644
-index 000000000000..48478bc07e29
---- /dev/null
-+++ b/Documentation/devicetree/bindings/fpga/altera-passive-serial.txt
-@@ -0,0 +1,29 @@
-+Altera Passive Serial SPI FPGA Manager
+diff --git a/include/linux/bitrev.h b/include/linux/bitrev.h
+index fb790b8449c1..b97be27e5a85 100644
+--- a/include/linux/bitrev.h
++++ b/include/linux/bitrev.h
+@@ -29,6 +29,8 @@ static inline u32 __bitrev32(u32 x)
+ 
+ #endif /* CONFIG_HAVE_ARCH_BITREVERSE */
+ 
++#define __bitrev8x4(x)	(__bitrev32(swab32(x)))
 +
-+Altera FPGAs support a method of loading the bitstream over what is
-+referred to as "passive serial".
-+The passive serial link is not technically SPI, and might require extra
-+circuits in order to play nicely with other SPI slaves on the same bus.
+ #define __constant_bitrev32(x)	\
+ ({					\
+ 	u32 __x = x;			\
+@@ -50,6 +52,15 @@ static inline u32 __bitrev32(u32 x)
+ 	__x;								\
+ })
+ 
++#define __constant_bitrev8x4(x) \
++({			\
++	u32 __x = x;	\
++	__x = ((__x & (u32)0xF0F0F0F0UL) >> 4) | ((__x & (u32)0x0F0F0F0FUL) << 4);	\
++	__x = ((__x & (u32)0xCCCCCCCCUL) >> 2) | ((__x & (u32)0x33333333UL) << 2);	\
++	__x = ((__x & (u32)0xAAAAAAAAUL) >> 1) | ((__x & (u32)0x55555555UL) << 1);	\
++	__x;								\
++})
 +
-+See https://www.altera.com/literature/hb/cyc/cyc_c51013.pdf
+ #define __constant_bitrev8(x)	\
+ ({					\
+ 	u8 __x = x;			\
+@@ -75,6 +86,14 @@ static inline u32 __bitrev32(u32 x)
+ 	__bitrev16(__x);				\
+  })
+ 
++#define bitrev8x4(x) \
++({			\
++	u32 __x = x;	\
++	__builtin_constant_p(__x) ?	\
++	__constant_bitrev8x4(__x) :			\
++	__bitrev8x4(__x);				\
++ })
 +
-+Required properties:
-+- compatible: Must be one of the following:
-+	"altr,fpga-passive-serial",
-+	"altr,fpga-arria10-passive-serial"
-+- reg: SPI chip select of the FPGA
-+- nconfig-gpios: config pin (referred to as nCONFIG in the manual)
-+- nstat-gpios: status pin (referred to as nSTATUS in the manual)
-+
-+Optional properties:
-+- confd-gpios: confd pin (referred to as CONF_DONE in the manual)
-+
-+Example:
-+	fpga: fpga at 0 {
-+		compatible = "altr,fpga-passive-serial";
-+		spi-max-frequency = <20000000>;
-+		reg = <0>;
-+		nconfig-gpios = <&gpio4 9 GPIO_ACTIVE_LOW>;
-+		nstat-gpios = <&gpio4 11 GPIO_ACTIVE_LOW>;
-+		confd-gpios = <&gpio4 12 GPIO_ACTIVE_LOW>;
-+	};
+ #define bitrev8(x) \
+ ({			\
+ 	u8 __x = x;	\
 -- 
 2.11.0
