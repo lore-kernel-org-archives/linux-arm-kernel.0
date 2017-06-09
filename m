@@ -1,33 +1,68 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 9 Jun 2017 15:37:02 +0200
-Subject: [RFC PATCH 0/7] EDAC drivers for Armada XP L2 and DDR
-In-Reply-To: <1497014628.3536.60.camel@pengutronix.de>
-References: <20170609083123.6539-1-jlu@pengutronix.de>
- <20170609093651.nfhthfdjn2jfkpxx@pd.tnic>
- <1497014628.3536.60.camel@pengutronix.de>
-Message-ID: <20170609133702.avtdlmdx42rptyc4@pd.tnic>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 9 Jun 2017 14:38:39 +0100
+Subject: [linux-sunxi] [PATCH] arm64: allwinner: sun50i-a64: Remove
+ duplicate ethernet@1c30000
+In-Reply-To: <1497012052-14027-1-git-send-email-jteki@openedev.com>
+References: <1497012052-14027-1-git-send-email-jteki@openedev.com>
+Message-ID: <6d21516d-7412-5f16-f6f8-b7d46106b4f5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 09, 2017 at 03:23:48PM +0200, Jan L?bbe wrote:
-> The L2 cache and DDR RAM controller are completely separate IP cores,
-> with separate register spaces, interrupts and so on. The cache is an ARM
-> design (some L2x0) extended by Marvell, while the DDR controller seems
-> to be unique to Marvell. It wouldn't surprise me if Marvell would decide
-> to reuse the DDR controller in another SoC using newer ARM cores with a
-> different cache.
+Hi,
 
-That's fine, we can carve it out then. We've done stuff like that
-already, see drivers/edac/fsl_ddr_edac.c, for example.
+On 09/06/17 13:40, Jagan Teki wrote:
+> From: Jagan Teki <jagan@amarulasolutions.com>
+> 
+> Remove duplicate ethernet at 1c30000 from allwinner/sun50i-a64.dtsi
 
-So think of an EDAC driver as a platform driver. If a platform uses IP
-from a different platform, then we mirror this in the driver design by
-sharing compilation modules.
+I think this is an artefact of the sun8i-dwmac merging, where both David
+and Maxime merged the DT patches in their trees (compare e53f67e9 and
+103aefa0). I think both of them are in the process of sorting this out
+(as this effects more than this hunk, I believe).
 
-Thanks.
+Cheers,
+Andre.
 
--- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+> 
+> Build error:
+> arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dtb:
+> ERROR (duplicate_node_names): Duplicate node name /soc/ethernet at 1c30000
+> ERROR: Input tree has errors, aborting (use -f to force output)
+> 
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> ---
+>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 20 --------------------
+>  1 file changed, 20 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> index 1b36aab..9d00622 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> @@ -469,26 +469,6 @@
+>  			};
+>  		};
+>  
+> -		emac: ethernet at 1c30000 {
+> -			compatible = "allwinner,sun50i-a64-emac";
+> -			syscon = <&syscon>;
+> -			reg = <0x01c30000 0x100>;
+> -			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
+> -			interrupt-names = "macirq";
+> -			resets = <&ccu RST_BUS_EMAC>;
+> -			reset-names = "stmmaceth";
+> -			clocks = <&ccu CLK_BUS_EMAC>;
+> -			clock-names = "stmmaceth";
+> -			status = "disabled";
+> -			#address-cells = <1>;
+> -			#size-cells = <0>;
+> -
+> -			mdio: mdio {
+> -				#address-cells = <1>;
+> -				#size-cells = <0>;
+> -			};
+> -		};
+> -
+>  		gic: interrupt-controller at 1c81000 {
+>  			compatible = "arm,gic-400";
+>  			reg = <0x01c81000 0x1000>,
+> 
