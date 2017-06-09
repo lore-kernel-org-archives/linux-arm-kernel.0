@@ -1,22 +1,20 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 9 Jun 2017 16:45:40 +0200
+Date: Fri, 9 Jun 2017 16:46:49 +0200
 Subject: [PATCH v2 03/11] drm: sun4i: ignore swapped mixer<->tcon
  connection for DE2
-In-Reply-To: <74846068.xK7nHVXuC6@jernej-laptop>
+In-Reply-To: <66881eac1dd06d918692482bdb1ea9e6@aosc.io>
 References: <20170604160149.30230-1-icenowy@aosc.io>
+ <20170604160149.30230-4-icenowy@aosc.io>
+ <20170607093512.rfvpefmyskgjw3ik@flea.lan>
  <01A7F22E-C4FF-4B4B-A9BC-FF0C96B996B9@aosc.io>
  <20170607143827.4ng5gedvzn3f5pyx@flea.lan>
- <74846068.xK7nHVXuC6@jernej-laptop>
-Message-ID: <20170609144540.ijly4b4bp5kphubo@flea.home>
+ <66881eac1dd06d918692482bdb1ea9e6@aosc.io>
+Message-ID: <20170609144649.67i3zscq26jt5hhe@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jernej,
-
-On Wed, Jun 07, 2017 at 08:15:12PM +0200, Jernej ?krabec wrote:
-> Hi!
-> 
-> Dne sreda, 07. junij 2017 ob 16:38:27 CEST je Maxime Ripard napisal(a):
+On Thu, Jun 08, 2017 at 01:01:53PM +0800, icenowy at aosc.io wrote:
+> ? 2017-06-07 22:38?Maxime Ripard ???
 > > On Wed, Jun 07, 2017 at 06:01:02PM +0800, Icenowy Zheng wrote:
 > > > >I have no idea what this is supposed to be doing either.
 > > > >
@@ -73,24 +71,21 @@ On Wed, Jun 07, 2017 at 08:15:12PM +0200, Jernej ?krabec wrote:
 > > So, again, stating what issue you were seeing before making this patch
 > > would be very helpful to see what you're trying to do / fix.
 > 
-> If I understand correctly, she wants to make sure that DT has mixer0 - tcon0 
-> and mixer1 - tcon1 relationship and discard mixed relationship. I also believe 
-> that this is just temporary measure until mixed relationship is supported by 
-> the driver.
+> So maybe I can drop the forward search (searching output) code, and keep
+> only the backward search (search input) code in TCON?
+> 
+> Forward search code is only used when binding, but backward search is used
+> for TCON to find connected mixer.
 
-yeah, but all the component stuff doesn't care about the relationships
-themselves, it just cares about the set of devices, and we use those
-relationships to build that set. In this case, even with the swapped
-connections, the set of devices remains the same, which is what
-puzzles me.
+It is hard to talk about a solution, when it's not clear what the
+issue is.
 
-> Maybe we could just leave this out for now and define only one endpoint in DT 
-> for TVE instead of two? Vast majority of users will have 0-0 and 1-1 
-> relationship, since there is not much point connecting HDMI with less capable 
-> mixer than TVE.
+So please state 
+> > > >A) What is the current behaviour
+> > > >B) Why that is a problem
+> > > >C) How do you address it
 
-Yeah, but unfortunately, we have to have a perfect representation from
-day one now...
+We'll talk about a solution once this is done.
 
 Maxime
 
@@ -104,4 +99,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170609/c2f40c72/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170609/c7897777/attachment-0001.sig>
