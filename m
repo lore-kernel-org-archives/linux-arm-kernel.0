@@ -1,56 +1,63 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 9 Jun 2017 10:22:01 +0200
-Subject: [PATCH 1/3] arm: dts: mt2701: Add ethernet device node
-In-Reply-To: <1496297324-21091-2-git-send-email-erin.lo@mediatek.com>
-References: <1496297324-21091-1-git-send-email-erin.lo@mediatek.com>
- <1496297324-21091-2-git-send-email-erin.lo@mediatek.com>
-Message-ID: <d0a1217b-7761-fea6-888a-da06573400b8@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri,  9 Jun 2017 08:22:26 +0000
+Subject: [PATCH v5] mm: huge-vmap: fail gracefully on unexpected huge vmap
+ mappings
+Message-ID: <20170609082226.26152-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Existing code that uses vmalloc_to_page() may assume that any
+address for which is_vmalloc_addr() returns true may be passed
+into vmalloc_to_page() to retrieve the associated struct page.
 
+This is not un unreasonable assumption to make, but on architectures
+that have CONFIG_HAVE_ARCH_HUGE_VMAP=y, it no longer holds, and we
+need to ensure that vmalloc_to_page() does not go off into the weeds
+trying to dereference huge PUDs or PMDs as table entries.
 
-On 01/06/17 08:08, Erin Lo wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> Add ethernet device node for MT2701
-> 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> Signed-off-by: Erin Lo <erin.lo@mediatek.com>
-> ---
->   arch/arm/boot/dts/mt2701.dtsi | 20 ++++++++++++++++++++
->   1 file changed, 20 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-> index 8037210..de88bd7 100644
-> --- a/arch/arm/boot/dts/mt2701.dtsi
-> +++ b/arch/arm/boot/dts/mt2701.dtsi
-> @@ -420,6 +420,26 @@
->   		#clock-cells = <1>;
->   	};
->   
-> +	eth: ethernet at 1b100000 {
-> +		compatible = "mediatek,mt2701-eth", "syscon";
-> +		reg = <0 0x1b100000 0 0x20000>;
-> +		interrupts = <GIC_SPI 200 IRQ_TYPE_LEVEL_LOW>,
-> +			     <GIC_SPI 199 IRQ_TYPE_LEVEL_LOW>,
-> +			     <GIC_SPI 198 IRQ_TYPE_LEVEL_LOW>;
-> +		clocks = <&topckgen CLK_TOP_ETHIF_SEL>,
-> +			 <&ethsys CLK_ETHSYS_ESW>,
-> +			 <&ethsys CLK_ETHSYS_GP1>,
-> +			 <&ethsys CLK_ETHSYS_GP2>,
-> +			 <&apmixedsys CLK_APMIXED_TRGPLL>;
-> +		clock-names = "ethif", "esw", "gp1", "gp2", "trgpll";
-> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
-> +		mediatek,ethsys = <&ethsys>;
-> +		mediatek,pctl = <&syscfg_pctl_a>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		status = "disabled";
-> +	};
-> +
+Given that vmalloc() and vmap() themselves never create huge
+mappings or deal with compound pages at all, there is no correct
+answer in this case, so return NULL instead, and issue a warning.
 
-I'm missing the reset properties.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+v5: - fix typo
 
-Regards,
-Matthias
+v4: - use pud_bad/pmd_bad instead of pud_huge/pmd_huge, which don't require
+      changes to hugetlb.h, and give us what we need on all architectures
+    - move WARN_ON_ONCE() calls out of conditionals
+    - add explanatory comment
+
+ mm/vmalloc.c | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
+
+diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+index 34a1c3e46ed7..0fcd371266a4 100644
+--- a/mm/vmalloc.c
++++ b/mm/vmalloc.c
+@@ -287,10 +287,21 @@ struct page *vmalloc_to_page(const void *vmalloc_addr)
+ 	if (p4d_none(*p4d))
+ 		return NULL;
+ 	pud = pud_offset(p4d, addr);
+-	if (pud_none(*pud))
++
++	/*
++	 * Don't dereference bad PUD or PMD (below) entries. This will also
++	 * identify huge mappings, which we may encounter on architectures
++	 * that define CONFIG_HAVE_ARCH_HUGE_VMAP=y. Such regions will be
++	 * identified as vmalloc addresses by is_vmalloc_addr(), but are
++	 * not [unambiguously] associated with a struct page, so there is
++	 * no correct value to return for them.
++	 */
++	WARN_ON_ONCE(pud_bad(*pud));
++	if (pud_none(*pud) || pud_bad(*pud))
+ 		return NULL;
+ 	pmd = pmd_offset(pud, addr);
+-	if (pmd_none(*pmd))
++	WARN_ON_ONCE(pmd_bad(*pmd));
++	if (pmd_none(*pmd) || pmd_bad(*pmd))
+ 		return NULL;
+ 
+ 	ptep = pte_offset_map(pmd, addr);
+-- 
+2.9.3
