@@ -1,68 +1,65 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Fri, 9 Jun 2017 11:13:12 -0700
-Subject: [PATCH v5] mm: huge-vmap: fail gracefully on unexpected huge vmap
- mappings
-In-Reply-To: <20170609082226.26152-1-ard.biesheuvel@linaro.org>
-References: <20170609082226.26152-1-ard.biesheuvel@linaro.org>
-Message-ID: <d58379fe-9e18-8e58-0f77-24d09a02fc05@redhat.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 09 Jun 2017 11:13:17 -0700
+Subject: [PATCH 1/3] clk: meson: meson8b: add compatibles for Meson8 and
+ Meson8m2
+In-Reply-To: <1496606325.3552.16.camel@baylibre.com> (Jerome Brunet's message
+ of "Sun, 04 Jun 2017 21:58:45 +0200")
+References: <20170604183341.21417-1-martin.blumenstingl@googlemail.com>
+ <20170604183341.21417-2-martin.blumenstingl@googlemail.com>
+ <1496606325.3552.16.camel@baylibre.com>
+Message-ID: <m2lgp19ghu.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/09/2017 01:22 AM, Ard Biesheuvel wrote:
-> Existing code that uses vmalloc_to_page() may assume that any
-> address for which is_vmalloc_addr() returns true may be passed
-> into vmalloc_to_page() to retrieve the associated struct page.
-> 
-> This is not un unreasonable assumption to make, but on architectures
-> that have CONFIG_HAVE_ARCH_HUGE_VMAP=y, it no longer holds, and we
-> need to ensure that vmalloc_to_page() does not go off into the weeds
-> trying to dereference huge PUDs or PMDs as table entries.
-> 
-> Given that vmalloc() and vmap() themselves never create huge
-> mappings or deal with compound pages at all, there is no correct
-> answer in this case, so return NULL instead, and issue a warning.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Jerome Brunet <jbrunet@baylibre.com> writes:
 
-Reviewed-by: Laura Abbott <labbott@redhat.com>
+> On Sun, 2017-06-04 at 20:33 +0200, Martin Blumenstingl wrote:
+>> The clock controller on Meson8, Meson8b and Meson8m2 is very similar
+>> based on the code from the Amlogic GPL kernel sources. Add separate
+>> compatibles for each SoC to make sure that we can easily implement
+>> all the small differences for each SoC later on.
+>> 
+>> In general the Meson8 and Meson8m2 seem to be almost identical as they
+>> even share the same mach-meson8 directory in Amlogic's GPL kernel
+>> sources.
+>> The main clocks on Meson8, Meson8b and Meson8m2 are very similar,
+>> because they are all using the same PLL values, 90% of the clock gates
+>> are the same (the actual diffstat of the mach-meson8/clock.c and
+>> mach-meson8b/clock.c files is around 30 to 40 lines, when excluding
+>> all commented out code).
+>> The difference between the Meson8 and Meson8b clock gates seem to be:
+>> - Meson8 has AIU_PCLK, HDMI_RX, VCLK2_ENCT, VCLK2_ENCL, UART3,
+>> ? CSI_DIG_CLKIN gates which don't seem to be available on Meson8b
+>> - the gate on Meson8 for bit 7 seems to be named "_1200XXX" instead
+>> ? of "PERIPHS_TOP" (on Meson8b)
+>> - Meson8b has a SANA gate which doesn't seem to exist on Meson8 (or
+>> ? on Meson8 the same bit is used by the UART3 gate in Amlogic's GPL
+>> ? kernel sources)
+>> None of these gates is added for now, since it's unclear whether these
+>> definitions are actually correct (the VCLK2_ENCT gate for example is
+>> defined, but only used in some commented block).
+>> 
+>> The main difference between all three SoCs seem to be the video (VPU)
+>> clocks. Apart from different supported clock rates (according to vpu.c
+>> in mach-meson8 and mach-meson8b from Amlogic's GPL kernel sources) the
+>> most notable difference is that Meson8m2 has a GP_PLL clock and a mux
+>> (probably the same as on the Meson GX SoCs) to support glitch-free
+>> (clock rate) switching.
+>> None of these VPU clocks are not supported by our mainline meson8b
+>> clock driver yet though.
+>> 
+>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>> ---
+>> ?.../devicetree/bindings/clock/amlogic,meson8b-clkc.txt????????| 11 +++++++---
+>
+> I think you should split the binding documentation and clk changes into separate
+> patches.
+>
+>> -
+>> ?drivers/clk/meson/Kconfig?????????????????????????????????????|??6 +++---
+>> ?drivers/clk/meson/meson8b.c???????????????????????????????????|??5 ++++-
+>
+> The change being more platform than clock related, I'd prefer if Kevin or Carlo
+> ack it before we apply it.
 
-> ---
-> v5: - fix typo
-> 
-> v4: - use pud_bad/pmd_bad instead of pud_huge/pmd_huge, which don't require
->       changes to hugetlb.h, and give us what we need on all architectures
->     - move WARN_ON_ONCE() calls out of conditionals
->     - add explanatory comment
-> 
->  mm/vmalloc.c | 15 +++++++++++++--
->  1 file changed, 13 insertions(+), 2 deletions(-)
-> 
-> diff --git a/mm/vmalloc.c b/mm/vmalloc.c
-> index 34a1c3e46ed7..0fcd371266a4 100644
-> --- a/mm/vmalloc.c
-> +++ b/mm/vmalloc.c
-> @@ -287,10 +287,21 @@ struct page *vmalloc_to_page(const void *vmalloc_addr)
->  	if (p4d_none(*p4d))
->  		return NULL;
->  	pud = pud_offset(p4d, addr);
-> -	if (pud_none(*pud))
-> +
-> +	/*
-> +	 * Don't dereference bad PUD or PMD (below) entries. This will also
-> +	 * identify huge mappings, which we may encounter on architectures
-> +	 * that define CONFIG_HAVE_ARCH_HUGE_VMAP=y. Such regions will be
-> +	 * identified as vmalloc addresses by is_vmalloc_addr(), but are
-> +	 * not [unambiguously] associated with a struct page, so there is
-> +	 * no correct value to return for them.
-> +	 */
-> +	WARN_ON_ONCE(pud_bad(*pud));
-> +	if (pud_none(*pud) || pud_bad(*pud))
->  		return NULL;
->  	pmd = pmd_offset(pud, addr);
-> -	if (pmd_none(*pmd))
-> +	WARN_ON_ONCE(pmd_bad(*pmd));
-> +	if (pmd_none(*pmd) || pmd_bad(*pmd))
->  		return NULL;
->  
->  	ptep = pte_offset_map(pmd, addr);
-> 
+Acked-by: Kevin Hilman <khilman@baylibre.com>
