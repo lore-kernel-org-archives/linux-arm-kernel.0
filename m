@@ -1,27 +1,53 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 9 Jun 2017 09:45:09 +0200
-Subject: [PATCH 3/3] ARM: dts: exynos: Remove the display-timing and
- delay from rinato dts
-In-Reply-To: <1496984354-5271-4-git-send-email-hoegeun.kwon@samsung.com>
-References: <1496984354-5271-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170609045939epcas1p2e4b50c78978b8f14630ca29550c1cb34@epcas1p2.samsung.com>
- <1496984354-5271-4-git-send-email-hoegeun.kwon@samsung.com>
-Message-ID: <20170609074509.GD4018@kozik-book>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 9 Jun 2017 15:45:09 +0800
+Subject: [PATCH v3] mm: huge-vmap: fail gracefully on unexpected huge
+ vmap mappings
+In-Reply-To: <20170608113548.24905-1-ard.biesheuvel@linaro.org>
+Message-ID: <201706091553.AtM2cOo2%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 09, 2017 at 01:59:14PM +0900, Hoegeun Kwon wrote:
-> The display-timing and delay are included in the panel driver. So it
-> should be removed in dts.
-> 
-> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos3250-rinato.dts | 22 ----------------------
->  1 file changed, 22 deletions(-)
+Hi Ard,
 
-I understand this depends on merging in the panel driver so this will
-have to wait till then. I'll take it when panel hits mainline (arm-soc
-folks discourage recently cross-tree merges for DT).
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.12-rc4]
+[cannot apply to next-20170608]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Best regards,
-Krzysztof
+url:    https://github.com/0day-ci/linux/commits/Ard-Biesheuvel/mm-huge-vmap-fail-gracefully-on-unexpected-huge-vmap-mappings/20170609-093900
+config: i386-randconfig-i1-06042254 (attached as .config)
+compiler: gcc-4.8 (Debian 4.8.4-1) 4.8.4
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
+
+All errors (new ones prefixed by >>):
+
+   arch/x86/built-in.o: In function `vmalloc_fault':
+>> fault.c:(.text.unlikely+0x1765): undefined reference to `pmd_huge'
+   mm/built-in.o: In function `follow_page_mask':
+   (.text+0x21da6): undefined reference to `pud_huge'
+   mm/built-in.o: In function `follow_page_mask':
+   (.text+0x21e39): undefined reference to `pmd_huge'
+   mm/built-in.o: In function `__follow_pte_pmd.isra.86':
+   memory.c:(.text+0x2381c): undefined reference to `pmd_huge'
+   memory.c:(.text+0x2384a): undefined reference to `pmd_huge'
+   mm/built-in.o: In function `apply_to_page_range':
+   (.text+0x2648d): undefined reference to `pud_huge'
+   mm/built-in.o: In function `apply_to_page_range':
+   (.text+0x26608): undefined reference to `pmd_huge'
+   mm/built-in.o: In function `vmalloc_to_page':
+   (.text+0x30ea3): undefined reference to `pud_huge'
+   mm/built-in.o: In function `vmalloc_to_page':
+   (.text+0x30ec8): undefined reference to `pmd_huge'
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 27823 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170609/e3264f7f/attachment-0001.gz>
