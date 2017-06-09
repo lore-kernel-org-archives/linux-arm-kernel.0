@@ -1,61 +1,64 @@
 From: jlu@pengutronix.de (Jan Luebbe)
-Date: Fri,  9 Jun 2017 10:31:19 +0200
-Subject: [RFC PATCH 3/7] EDAC: Add missing debugfs_create_x32 wrapper
-In-Reply-To: <20170609083123.6539-1-jlu@pengutronix.de>
-References: <20170609083123.6539-1-jlu@pengutronix.de>
-Message-ID: <20170609083123.6539-4-jlu@pengutronix.de>
+Date: Fri,  9 Jun 2017 10:31:16 +0200
+Subject: [RFC PATCH 0/7] EDAC drivers for Armada XP L2 and DDR
+Message-ID: <20170609083123.6539-1-jlu@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We already have wrappers for x8 and x16.
+This series add drivers for the L2 cache and DDR RAM ECC functionality as found
+on the MV78230/MV78x60 SoCs. I've tested these changes with the MV78460 (on a
+custom board with a DDR3 ECC DIMM).
 
-Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
----
- drivers/edac/debugfs.c     | 11 +++++++++++
- drivers/edac/edac_module.h |  5 +++++
- 2 files changed, 16 insertions(+)
+Also contained in this series are devm_ helpers for edac_mc_/edac_device_
+allocation and registration, which make error handing and cleanup simpler. They
+may already be mergeable.
 
-diff --git a/drivers/edac/debugfs.c b/drivers/edac/debugfs.c
-index 92dbb7e2320c..268ede7a60b2 100644
---- a/drivers/edac/debugfs.c
-+++ b/drivers/edac/debugfs.c
-@@ -161,3 +161,14 @@ struct dentry *edac_debugfs_create_x16(const char *name, umode_t mode,
- 	return debugfs_create_x16(name, mode, parent, value);
- }
- EXPORT_SYMBOL_GPL(edac_debugfs_create_x16);
-+
-+/* Wrapper for debugfs_create_x32() */
-+struct dentry *edac_debugfs_create_x32(const char *name, umode_t mode,
-+				       struct dentry *parent, u32 *value)
-+{
-+	if (!parent)
-+		parent = edac_debugfs;
-+
-+	return debugfs_create_x32(name, mode, parent, value);
-+}
-+EXPORT_SYMBOL_GPL(edac_debugfs_create_x32);
-diff --git a/drivers/edac/edac_module.h b/drivers/edac/edac_module.h
-index 014871e169cc..3d87cb15ab45 100644
---- a/drivers/edac/edac_module.h
-+++ b/drivers/edac/edac_module.h
-@@ -81,6 +81,8 @@ struct dentry *
- edac_debugfs_create_x8(const char *name, umode_t mode, struct dentry *parent, u8 *value);
- struct dentry *
- edac_debugfs_create_x16(const char *name, umode_t mode, struct dentry *parent, u16 *value);
-+struct dentry *
-+edac_debugfs_create_x32(const char *name, umode_t mode, struct dentry *parent, u32 *value);
- #else
- static inline int edac_debugfs_init(void)					{ return -ENODEV; }
- static inline void edac_debugfs_exit(void)					{ }
-@@ -97,6 +99,9 @@ edac_debugfs_create_x8(const char *name, umode_t mode,
- static inline struct dentry *
- edac_debugfs_create_x16(const char *name, umode_t mode,
- 		       struct dentry *parent, u16 *value)			{ return NULL; }
-+static inline struct dentry *
-+edac_debugfs_create_x32(const char *name, umode_t mode,
-+		       struct dentry *parent, u32 *value)			{ return NULL; }
- #endif
- 
- /*
+It seems Chris and I had a race condition, he posted a driver for this
+functionality just yesterday. Compared to his submission, the L2 and DDR
+support is split into two drivers for this series, as they don't actually share
+any functionality.
+
+Some further differences in this series are:
+- The error details are decoded and passed to the edac error handler.
+- Multiple errors are counted even if the details are unavailable.
+- The DDR RAM configuration is read back to fill out the DIMM structures.
+- The DDR RAM error address is calculated from the bank/row/col information.
+- The L2 injection registers are exposed via debugfs instead of sysfs
+  (resulting in less driver code).
+
+Chris, how do you want to proceed? We should probably combine our efforts in one
+series. I've already picked up part of DDR RAM config reading from your series
+for this submission. I'll send some questions/comments to your series, as well.
+
+Jan Luebbe (7):
+  ARM: l2c: move cache-aurora-l2.h to asm/hardware
+  ARM: aurora-l2: add prefix to MAX_RANGE_SIZE
+  EDAC: Add missing debugfs_create_x32 wrapper
+  EDAC: Add devres helpers for
+    edac_mc_alloc/edac_mc_add_mc(_with_groups)
+  EDAC: Add devres helpers for
+    edac_device_alloc_ctl_info/edac_device_add_device
+  EDAC: Add driver for the AURORA L2 cache
+  EDAC: Add driver for the Marvell Armada XP SDRAM controller
+
+ arch/arm/include/asm/hardware/cache-aurora-l2.h | 104 +++++++
+ arch/arm/mm/cache-aurora-l2.h                   |  55 ----
+ arch/arm/mm/cache-l2x0.c                        |   6 +-
+ drivers/edac/Kconfig                            |  14 +
+ drivers/edac/Makefile                           |   2 +
+ drivers/edac/armada_xp_mc_edac.c                | 366 ++++++++++++++++++++++++
+ drivers/edac/aurora_l2_edac.c                   | 252 ++++++++++++++++
+ drivers/edac/debugfs.c                          |  11 +
+ drivers/edac/edac_device.c                      |  59 ++++
+ drivers/edac/edac_device.h                      |  29 ++
+ drivers/edac/edac_mc.c                          |  53 ++++
+ drivers/edac/edac_mc.h                          |  26 ++
+ drivers/edac/edac_module.h                      |   5 +
+ 13 files changed, 924 insertions(+), 58 deletions(-)
+ create mode 100644 arch/arm/include/asm/hardware/cache-aurora-l2.h
+ delete mode 100644 arch/arm/mm/cache-aurora-l2.h
+ create mode 100644 drivers/edac/armada_xp_mc_edac.c
+ create mode 100644 drivers/edac/aurora_l2_edac.c
+
 -- 
 2.11.0
