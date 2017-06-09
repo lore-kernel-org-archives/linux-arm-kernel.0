@@ -1,61 +1,64 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 9 Jun 2017 14:50:57 +0200
-Subject: [PATCH v6 00/21] net-next: stmmac: add dwmac-sun8i ethernet driver
-In-Reply-To: <20170602222422.2elv6snjp3ahrhbi@flea.lan>
-References: <20170601.145819.789604139072328057.davem@davemloft.net>
- <20170602063752.aqyvwcykvepiyt4y@flea.lan>
- <20170602091320.lyfxsanxrypfpozb@flea.lan>
- <20170602.102205.701672574727845689.davem@davemloft.net>
- <20170602222422.2elv6snjp3ahrhbi@flea.lan>
-Message-ID: <20170609125057.ja6ftva7fji66wo2@flea.home>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Fri, 09 Jun 2017 22:22:52 +0930
+Subject: [PATCH] arm: aspeed: Add Aspeed board file with clocksource
+ devicetree fixup
+In-Reply-To: <CAK8P3a23XpDQhnM=j8FBS8NGck2ZfaAotVo191NEOttP2GDCYA@mail.gmail.com>
+References: <CAK8P3a0EaqwmAMRWn--29e4Kt6zJA9kHL2dpj=7Uabn5hANxOA@mail.gmail.com>
+ <20170609073037.21871-1-andrew@aj.id.au>
+ <CAK8P3a23XpDQhnM=j8FBS8NGck2ZfaAotVo191NEOttP2GDCYA@mail.gmail.com>
+Message-ID: <1497012772.23335.12.camel@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 03, 2017 at 12:24:22AM +0200, Maxime Ripard wrote:
-> Hi,
+On Fri, 2017-06-09 at 11:19 +0200, Arnd Bergmann wrote:
+> > On Fri, Jun 9, 2017 at 9:30 AM, Andrew Jeffery <andrew@aj.id.au> wrote:
+> > Add the clock-names property in init_timer() to work-around Aspeed
+> > devicetrees from times prior to merging the Moxart/Aspeed and Faraday
+> > drivers.
+> > 
+> > > > Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+> > ---
+> > Well, here's an implementation I knocked up. It's a fair chunk of code for
+> > marginal benefit. Joel is against it.
+> > 
+> > At least it's something to debate.
+> > 
+> > Tested under QEMU for both AST2400 and AST2500 SoCs.
 > 
-> On Fri, Jun 02, 2017 at 10:22:05AM -0400, David Miller wrote:
-> > From: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > Date: Fri, 2 Jun 2017 11:13:20 +0200
-> > 
-> > > On Fri, Jun 02, 2017 at 08:37:52AM +0200, Maxime Ripard wrote:
-> > >> On Thu, Jun 01, 2017 at 02:58:19PM -0400, David Miller wrote:
-> > >> > From: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > >> > Date: Wed, 31 May 2017 09:18:31 +0200
-> > >> > 
-> > >> > > This patch series add the driver for dwmac-sun8i which handle the Ethernet MAC
-> > >> > > present on Allwinner H3/H5/A83T/A64 SoCs.
-> > >> > 
-> > >> > Series applied, but wow that's a lot of DT file changes :-(
-> > >> 
-> > >> The DT patches should not go through your tree, but arm-soc, so I
-> > >> guess this is not an issue for you?
-> > > 
-> > > Ok, so I saw that you actually merged them. Can you revert or drop
-> > > that merge for the DT part?
-> > > 
-> > > This will generate a lot of conflicts with our tree, and I'm not sure
-> > > this would be efficient to make you take all the entirely unrelated to
-> > > next patches.
-> > 
-> > Please tell me which specific changes to revert.
-> > 
-> > Thank you.
+> Right, I think having the one-line fixup in the driver makes way more sense
+> here, and that is what we usually do, but we could do this if Daniel has good
+> reasons to keep the driver free of backwards-compatibility support.
+
+Yeah, choosing between the two with no further information I'd prefer
+adding support to the driver.
+
 > 
-> Ideally everything from 2c0cba482e79 ("arm: sun8i: sunxi-h3-h5: Add dt
-> node for the syscon control module") to 2428fd0fe550 ("arm64:
-> defconfig: Enable dwmac-sun8i driver on defconfig")
+> It also depends a bit on how common the old binding version already
+> is, and if anyone is shipping systems with that.
 
-Ping?
+So the fttmr010 bindings describe the clocks and clock-names properties
+as optional (a little confusingly, "Optionally required properties"). 
+I guess keeping in mind the bindings describe the hardware and not the
+driver this might be reasonable, but the driver fails init if they're
+not present. arch/arm/boot/dts/moxart.dtsi doesn't specify clock-names
+either so I would have thought systems based on it would also fail.
+However, Linus' fttmr010 series has Tested-by tags from Jonas, so maybe
+I've missed something.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Regardless, if it's the case that Moxa systems now fail to init the
+clocksource then the Aspeed-specific init_time() solution is even less
+attractive. moxart.dtsi dates back to December 2013 ("448e7edefa92 ARM:
+moxart: add MOXA ART SoC device tree files").
+
+The old binding is less of a problem for Aspeed systems as we don't yet
+have a clk driver upstream. Joel only recently added fixed-clock nodes
+in 4.12 so Aspeed systems could boot without DTS modifications.
+
+Andrew
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170609/40accff3/attachment.sig>
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170609/908ac828/attachment.sig>
