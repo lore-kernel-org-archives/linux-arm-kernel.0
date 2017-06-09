@@ -1,54 +1,52 @@
 From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Fri, 09 Jun 2017 13:59:14 +0900
-Subject: [PATCH 3/3] ARM: dts: exynos: Remove the display-timing and delay
- from rinato dts
+Date: Fri, 09 Jun 2017 13:59:12 +0900
+Subject: [PATCH 1/3] dt-bindings: Add support for samsung s6e63j0x03 panel
+ binding
 In-Reply-To: <1496984354-5271-1-git-send-email-hoegeun.kwon@samsung.com>
 References: <1496984354-5271-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170609045939epcas1p2e4b50c78978b8f14630ca29550c1cb34@epcas1p2.samsung.com>
-Message-ID: <1496984354-5271-4-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170609045938epcas5p2025914487ca22a0a2d419824402e89e9@epcas5p2.samsung.com>
+Message-ID: <1496984354-5271-2-git-send-email-hoegeun.kwon@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The display-timing and delay are included in the panel driver. So it
-should be removed in dts.
+The Samsung s6e63j0x03 is a 1.63" 320x320 AMOLED panel connected using
+MIPI-DSI interfaces.
 
 Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
 ---
- arch/arm/boot/dts/exynos3250-rinato.dts | 22 ----------------------
- 1 file changed, 22 deletions(-)
+ .../bindings/display/panel/samsung,s6e63j0x03.txt  | 24 ++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/samsung,s6e63j0x03.txt
 
-diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
-index 82e676a..3d19b7c 100644
---- a/arch/arm/boot/dts/exynos3250-rinato.dts
-+++ b/arch/arm/boot/dts/exynos3250-rinato.dts
-@@ -227,28 +227,6 @@
- 		vci-supply = <&ldo20_reg>;
- 		reset-gpios = <&gpe0 1 GPIO_ACTIVE_HIGH>;
- 		te-gpios = <&gpx0 6 GPIO_ACTIVE_HIGH>;
--		power-on-delay= <30>;
--		power-off-delay= <120>;
--		reset-delay = <5>;
--		init-delay = <100>;
--		flip-horizontal;
--		flip-vertical;
--		panel-width-mm = <29>;
--		panel-height-mm = <29>;
--
--		display-timings {
--			timing-0 {
--				clock-frequency = <4600000>;
--				hactive = <320>;
--				vactive = <320>;
--				hfront-porch = <1>;
--				hback-porch = <1>;
--				hsync-len = <1>;
--				vfront-porch = <150>;
--				vback-porch = <1>;
--				vsync-len = <2>;
--			};
--		};
- 	};
- };
- 
+diff --git a/Documentation/devicetree/bindings/display/panel/samsung,s6e63j0x03.txt b/Documentation/devicetree/bindings/display/panel/samsung,s6e63j0x03.txt
+new file mode 100644
+index 0000000..34b6e2a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/samsung,s6e63j0x03.txt
+@@ -0,0 +1,24 @@
++Samsung S6E63J0X03 1.63" 320x320 AMOLED panel
++
++Required properties:
++  - compatible: "samsung,s6e63j0x03"
++  - reg: the virtual channel number of a DSI peripheral
++  - vdd3-supply: I/O voltage supply
++  - vci-supply: voltage supply for analog circuits
++  - reset-gpios: a GPIO spec for the reset pin (active high)
++  - te-gpios: a GPIO spec for the tearing effect synchronization signal
++    gpio pin (active high)
++
++Example:
++&dsi {
++	...
++
++	panel at 0 {
++		compatible = "samsung,s6e63j0x03";
++		reg = <0>;
++		vdd3-supply = <&ldo16_reg>;
++		vci-supply = <&ldo20_reg>;
++		reset-gpios = <&gpe0 1 GPIO_ACTIVE_HIGH>;
++		te-gpios = <&gpx0 6 GPIO_ACTIVE_HIGH>;
++	};
++};
 -- 
 1.9.1
