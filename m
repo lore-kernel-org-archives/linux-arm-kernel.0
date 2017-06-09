@@ -1,41 +1,33 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 9 Jun 2017 09:01:52 +0000
-Subject: [PATCH] efi: arm: Don't mark ACPI reclaim memory as MEMBLOCK_NOMAP
-In-Reply-To: <20170605090847.GC4650@leverpostej>
-References: <20170605080435.2498-1-ard.biesheuvel@linaro.org>
- <20170605090847.GC4650@leverpostej>
-Message-ID: <CAKv+Gu8sfKu-3E2kQtni7VuRTE-RFivN_suT+GPz2bnNkfMqaw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 9 Jun 2017 11:19:13 +0200
+Subject: [PATCH] arm: aspeed: Add Aspeed board file with clocksource
+ devicetree fixup
+In-Reply-To: <20170609073037.21871-1-andrew@aj.id.au>
+References: <CAK8P3a0EaqwmAMRWn--29e4Kt6zJA9kHL2dpj=7Uabn5hANxOA@mail.gmail.com>
+ <20170609073037.21871-1-andrew@aj.id.au>
+Message-ID: <CAK8P3a23XpDQhnM=j8FBS8NGck2ZfaAotVo191NEOttP2GDCYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 June 2017 at 09:08, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Mon, Jun 05, 2017 at 08:04:35AM +0000, Ard Biesheuvel wrote:
->> On ARM, regions of memory that are described by UEFI as having special
->> significance to the firmware itself are omitted from the linear mapping.
->> This is necessary since we cannot guarantee that alternate mappings of
->> the same physical region will use attributes that are compatible with
->> the ones we use for the linear mapping, and aliases with mismatched
->> attributes are prohibited by the architecture.
->>
->> The above does not apply to ACPI reclaim regions: such regions have no
->> special significance to the firmware, and it is up to the OS to decide
->> whether or not to preserve them after it has consumed their contents,
->> and for how long, after which time the OS can use the memory in any way
->> it likes. In the Linux case, such regions are preserved indefinitely,
->> and are simply treated the same way as other 'reserved' memory types.
->>
->> Punching holes into the linear mapping causes page table fragmentation,
->> which increases TLB pressure, and so we should avoid doing so if we can.
->> So add a special case for regions of type EFI_ACPI_RECLAIM_MEMORY, and
->> memblock_reserve() them instead of marking them MEMBLOCK_NOMAP.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On Fri, Jun 9, 2017 at 9:30 AM, Andrew Jeffery <andrew@aj.id.au> wrote:
+> Add the clock-names property in init_timer() to work-around Aspeed
+> devicetrees from times prior to merging the Moxart/Aspeed and Faraday
+> drivers.
 >
-> Sounds sane to me. FWIW:
+> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+> ---
+> Well, here's an implementation I knocked up. It's a fair chunk of code for
+> marginal benefit. Joel is against it.
 >
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> At least it's something to debate.
 >
+> Tested under QEMU for both AST2400 and AST2500 SoCs.
 
-Thanks.
+Right, I think having the one-line fixup in the driver makes way more sense
+here, and that is what we usually do, but we could do this if Daniel has good
+reasons to keep the driver free of backwards-compatibility support.
 
-I have queued this in efi/next
+It also depends a bit on how common the old binding version already
+is, and if anyone is shipping systems with that.
+
+       Arnd
