@@ -1,38 +1,83 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Sat, 10 Jun 2017 01:26:36 +0200
-Subject: [PATCH v8 00/34] i.MX Media Driver
-In-Reply-To: <c0b69c93-b9cd-25e8-ea36-fc0600efdb69@gmail.com>
-References: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
- <e7e4669c-2963-b9e1-edd7-02731a6e0f9c@xs4all.nl>
- <c0b69c93-b9cd-25e8-ea36-fc0600efdb69@gmail.com>
-Message-ID: <e4f152de-6e75-7654-178e-e6dcf9ad12f3@xs4all.nl>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Sat, 10 Jun 2017 09:29:44 +1000
+Subject: arm64: build is broken on next-20170609 with merge-commit
+ 9afca2c4e379 (arm64: allwinner: sun50i-a64: add dwmac-sun8i Ethernet
+ driver)
+In-Reply-To: <20170609124325.p7b6fhdbwtki4w2z@yury-thinkpad>
+References: <20170609124325.p7b6fhdbwtki4w2z@yury-thinkpad>
+Message-ID: <20170610092944.4022d550@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/06/17 01:16, Steve Longerbeam wrote:
-> 
-> 
-> On 06/07/2017 12:02 PM, Hans Verkuil wrote:
->> We're still waiting for an Ack for patch 02/34, right?
->>
-> 
-> Hi Hans, Rub has provided an Ack for patch 2.
-> 
->> Other than that everything is ready AFAICT.
->>
-> 
-> But as Pavel pointed out, in fact we are missing many
-> Acks still, for all of the dts source changes (patches
-> 4-14), as well as really everything else (imx-media staging
-> driver patches).
+Hi Yury,
 
-No Acks needed for the staging part. It's staging, so not held
-to the same standards as non-staging parts. That doesn't mean
-Acks aren't welcome, of course.
+On Fri, 9 Jun 2017 15:43:25 +0300 Yury Norov <ynorov@caviumnetworks.com> wrote:
+>
+> Today's linux-next breaks build with:
+>   DTC     arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dtb
+> arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dtb: ERROR (duplicate_node_names): Duplicate node name /soc/ethernet at 1c30000
+> ERROR: Input tree has errors, aborting (use -f to force output)
+> scripts/Makefile.lib:325: recipe for target 'arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dtb' failed
+> make[2]: *** [arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dtb] Error 2
+> scripts/Makefile.build:561: recipe for target 'arch/arm64/boot/dts/allwinner' failed
+> make[1]: *** [arch/arm64/boot/dts/allwinner] Error 2 arch/arm64/Makefile:130: recipe for target 'dtbs' failed
+> make: *** [dtbs] Error 2
+> 
+> It seems, it's due to duplication error in merge-commit 9afca2c4e379.
+> Removing it fixes the build.
 
-You don't need Greg's Ack for staging/media either, patches there
-go in via us (generally at least) and we handle those, not Greg.
+Thanks for the reports Yury and Sumit.  I will apply the following
+merge fixup patch when I next build linux-next (unless one of the
+patches is removed in the mean time).
 
-Regards,
+From: Stephen Rothwell <sfr@canb.auug.org.au>
+Date: Sat, 10 Jun 2017 09:18:14 +1000
+Subject: [PATCH] remove duplicate ethernet noce intruduced by merge
 
-	Hans
+caused by patch "arm64: allwinner: sun50i-a64: add dwmac-sun8i Ethernet
+driver" being merged into the sunxi and net-next trees as different
+commits (e53f67e981bc and 103aefa01c1b respectively). Presumably the
+former will turn up in the arm-soc tree before being sent to Linus.
+
+Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
+---
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 20 --------------------
+ 1 file changed, 20 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 1b36aab5afb6..9d00622ce845 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -469,26 +469,6 @@
+ 			};
+ 		};
+ 
+-		emac: ethernet at 1c30000 {
+-			compatible = "allwinner,sun50i-a64-emac";
+-			syscon = <&syscon>;
+-			reg = <0x01c30000 0x100>;
+-			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
+-			interrupt-names = "macirq";
+-			resets = <&ccu RST_BUS_EMAC>;
+-			reset-names = "stmmaceth";
+-			clocks = <&ccu CLK_BUS_EMAC>;
+-			clock-names = "stmmaceth";
+-			status = "disabled";
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-
+-			mdio: mdio {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-			};
+-		};
+-
+ 		gic: interrupt-controller at 1c81000 {
+ 			compatible = "arm,gic-400";
+ 			reg = <0x01c81000 0x1000>,
+-- 
+2.11.0
+
+-- 
+Cheers,
+Stephen Rothwell
