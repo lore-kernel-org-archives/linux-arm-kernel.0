@@ -1,42 +1,53 @@
-From: varada@codeaurora.org (Varadarajan Narayanan)
-Date: Fri,  9 Jun 2017 15:11:59 +0530
-Subject: [PATCH v6 6/6] arm64: defconfig: Enable qcom ipq8074 clock and pinctrl
-In-Reply-To: <1497001319-30353-1-git-send-email-varada@codeaurora.org>
-References: <1497001319-30353-1-git-send-email-varada@codeaurora.org>
-Message-ID: <1497001319-30353-7-git-send-email-varada@codeaurora.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 09 Jun 2017 12:05:40 +0200
+Subject: [PATCH] gpio: mvebu: fix regmap_update_bits usage
+In-Reply-To: <20170609120435.60191c76@free-electrons.com> (Thomas Petazzoni's
+ message of "Fri, 9 Jun 2017 12:04:35 +0200")
+References: <20170609100318.26450-1-gregory.clement@free-electrons.com>
+ <20170609120435.60191c76@free-electrons.com>
+Message-ID: <87zidho4qz.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Abhishek Sahu <absahu@codeaurora.org>
+Hi Thomas,
+ 
+ On ven., juin 09 2017, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-These configs are required for booting kernel in qcom
-ipq8074 boards.
+> Hello,
+>
+> On Fri,  9 Jun 2017 12:03:18 +0200, Gregory CLEMENT wrote:
+>
+>>  	regmap_update_bits(mvchip->regs, GPIO_IO_CONF_OFF,
+>> -			   BIT(pin), 1);
+>> +			   BIT(pin), BIT(pin));
+>>  
+>>  	return 0;
+>>  }
+>> @@ -364,7 +364,7 @@ static int mvebu_gpio_direction_output(struct gpio_chip *chip, unsigned int pin,
+>>  	mvebu_gpio_set(chip, pin, value);
+>>  
+>>  	regmap_update_bits(mvchip->regs, GPIO_IO_CONF_OFF,
+>> -			   BIT(pin), 0);
+>> +			   BIT(pin), BIT(pin));
+>
+> Are you sure here? We want to clear the bit, so I guess the 0 is
+> appropriate, no?
 
-Signed-off-by: Abhishek Sahu <absahu@codeaurora.org>
-Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
----
- arch/arm64/configs/defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+argh!
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 65cdd87..c20328e 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -267,6 +267,7 @@ CONFIG_SPI_S3C64XX=y
- CONFIG_SPI_SPIDEV=m
- CONFIG_SPMI=y
- CONFIG_PINCTRL_SINGLE=y
-+CONFIG_PINCTRL_IPQ8074=y
- CONFIG_PINCTRL_MAX77620=y
- CONFIG_PINCTRL_MSM8916=y
- CONFIG_PINCTRL_MSM8994=y
-@@ -450,6 +451,7 @@ CONFIG_CLK_QORIQ=y
- CONFIG_COMMON_CLK_PWM=y
- CONFIG_COMMON_CLK_QCOM=y
- CONFIG_QCOM_CLK_SMD_RPM=y
-+CONFIG_IPQ_GCC_8074=y
- CONFIG_MSM_GCC_8916=y
- CONFIG_MSM_GCC_8994=y
- CONFIG_MSM_MMCC_8996=y
+yes it was a mistake
+
+Gregory
+
+>
+> Thomas
+> -- 
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
