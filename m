@@ -1,83 +1,33 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 9 Jun 2017 10:22:10 +0100
-Subject: [PATCH v5] mm: huge-vmap: fail gracefully on unexpected huge
- vmap mappings
-In-Reply-To: <20170609082226.26152-1-ard.biesheuvel@linaro.org>
-References: <20170609082226.26152-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170609092209.GA10665@leverpostej>
+From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
+Date: Fri, 09 Jun 2017 18:23:00 +0900
+Subject: [PATCH] drm/exynos/dsi: Remove error handling for bridge_node DT
+ parsing
+References: <CGME20170609092307epcas5p3a7851f80bd799626782941a640824521@epcas5p3.samsung.com>
+Message-ID: <1497000180-30669-1-git-send-email-hoegeun.kwon@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 09, 2017 at 08:22:26AM +0000, Ard Biesheuvel wrote:
-> Existing code that uses vmalloc_to_page() may assume that any
-> address for which is_vmalloc_addr() returns true may be passed
-> into vmalloc_to_page() to retrieve the associated struct page.
-> 
-> This is not un unreasonable assumption to make, but on architectures
-> that have CONFIG_HAVE_ARCH_HUGE_VMAP=y, it no longer holds, and we
-> need to ensure that vmalloc_to_page() does not go off into the weeds
-> trying to dereference huge PUDs or PMDs as table entries.
-> 
-> Given that vmalloc() and vmap() themselves never create huge
-> mappings or deal with compound pages at all, there is no correct
-> answer in this case, so return NULL instead, and issue a warning.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> v5: - fix typo
-> 
-> v4: - use pud_bad/pmd_bad instead of pud_huge/pmd_huge, which don't require
->       changes to hugetlb.h, and give us what we need on all architectures
->     - move WARN_ON_ONCE() calls out of conditionals
->     - add explanatory comment
-> 
->  mm/vmalloc.c | 15 +++++++++++++--
->  1 file changed, 13 insertions(+), 2 deletions(-)
-> 
-> diff --git a/mm/vmalloc.c b/mm/vmalloc.c
-> index 34a1c3e46ed7..0fcd371266a4 100644
-> --- a/mm/vmalloc.c
-> +++ b/mm/vmalloc.c
-> @@ -287,10 +287,21 @@ struct page *vmalloc_to_page(const void *vmalloc_addr)
->  	if (p4d_none(*p4d))
->  		return NULL;
->  	pud = pud_offset(p4d, addr);
-> -	if (pud_none(*pud))
-> +
-> +	/*
-> +	 * Don't dereference bad PUD or PMD (below) entries. This will also
-> +	 * identify huge mappings, which we may encounter on architectures
-> +	 * that define CONFIG_HAVE_ARCH_HUGE_VMAP=y. Such regions will be
-> +	 * identified as vmalloc addresses by is_vmalloc_addr(), but are
-> +	 * not [unambiguously] associated with a struct page, so there is
-> +	 * no correct value to return for them.
-> +	 */
-> +	WARN_ON_ONCE(pud_bad(*pud));
-> +	if (pud_none(*pud) || pud_bad(*pud))
->  		return NULL;
+The bridge_node is unnecessary between FIMD and DSIM. If don't remove
+error handling, it will not work between FIMD and DSIM. So remove
+error handling.
 
-Nit: the WARN_ON_ONCE() can be folded into the conditional:
+Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
+---
+ drivers/gpu/drm/exynos/exynos_drm_dsi.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-	if (pud_none(*pud) || WARN_ON_ONCE(pud_bad(*pud)))
-		reutrn NULL;
-
->  	pmd = pmd_offset(pud, addr);
-> -	if (pmd_none(*pmd))
-> +	WARN_ON_ONCE(pmd_bad(*pmd));
-> +	if (pmd_none(*pmd) || pmd_bad(*pmd))
->  		return NULL;
-
-Likewise here.
-
-Otherwise, looks good to me. FWIW:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
-
->  
->  	ptep = pte_offset_map(pmd, addr);
-> -- 
-> 2.9.3
-> 
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+index a11b795..6ee0dac 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+@@ -1651,8 +1651,6 @@ static int exynos_dsi_parse_dt(struct exynos_dsi *dsi)
+ 		return ret;
+ 
+ 	dsi->bridge_node = of_graph_get_remote_node(node, DSI_PORT_IN, 0);
+-	if (!dsi->bridge_node)
+-		return -EINVAL;
+ 
+ 	return 0;
+ }
+-- 
+1.9.1
