@@ -1,89 +1,68 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  9 Jun 2017 12:49:40 +0100
-Subject: [PATCH v3 11/27] KVM: arm64: vgic-v3: Enable trapping of Group-1
- system registers
+Date: Fri,  9 Jun 2017 12:49:49 +0100
+Subject: [PATCH v3 20/27] KVM: arm64: vgic-v3: Add ICV_DIR_EL1 handler
 In-Reply-To: <20170609114956.25963-1-marc.zyngier@arm.com>
 References: <20170609114956.25963-1-marc.zyngier@arm.com>
-Message-ID: <20170609114956.25963-12-marc.zyngier@arm.com>
+Message-ID: <20170609114956.25963-21-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to be able to trap Group-1 GICv3 system registers, we need to
-set ICH_HCR_EL2.TALL1 before entering the guest. This is conditionally
-done after having restored the guest's state, and cleared on exit.
+Add a handler for writing the guest's view of the ICC_DIR_EL1
+register, performing the deactivation of an interrupt if EOImode
+is set ot 1.
 
 Tested-by: Alexander Graf <agraf@suse.de>
 Acked-by: David Daney <david.daney@cavium.com>
-Acked-by: Christoffer Dall <cdall@linaro.org>
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/linux/irqchip/arm-gic-v3.h |  1 +
- virt/kvm/arm/hyp/vgic-v3-sr.c      | 11 +++++++++++
- virt/kvm/arm/vgic/vgic-v3.c        |  4 ++++
- 3 files changed, 16 insertions(+)
+ virt/kvm/arm/hyp/vgic-v3-sr.c | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index e50ce5d416a3..03b5a28bb2d0 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -417,6 +417,7 @@
- 
- #define ICH_HCR_EN			(1 << 0)
- #define ICH_HCR_UIE			(1 << 1)
-+#define ICH_HCR_TALL1			(1 << 12)
- #define ICH_HCR_EOIcount_SHIFT		27
- #define ICH_HCR_EOIcount_MASK		(0x1f << ICH_HCR_EOIcount_SHIFT)
- 
 diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index f031e8f088ae..a2a62f030341 100644
+index 08a5d76c82c7..2f2af03e8932 100644
 --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
 +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -258,6 +258,9 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 			cpu_if->vgic_ap1r[0] = __vgic_v3_read_ap1rn(0);
- 		}
- 	} else {
-+		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
-+			write_gicreg(0, ICH_HCR_EL2);
-+
- 		cpu_if->vgic_elrsr = 0xffff;
- 		cpu_if->vgic_ap0r[0] = 0;
- 		cpu_if->vgic_ap0r[1] = 0;
-@@ -330,6 +333,14 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
- 
- 		for (i = 0; i < used_lrs; i++)
- 			__gic_v3_set_lr(cpu_if->vgic_lr[i], i);
-+	} else {
-+		/*
-+		 * If we need to trap system registers, we must write
-+		 * ICH_HCR_EL2 anyway, even if no interrupts are being
-+		 * injected,
-+		 */
-+		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
-+			write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
- 	}
- 
- 	/*
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 88d9bd9bf468..fbd678bc046d 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -21,6 +21,8 @@
- 
- #include "vgic.h"
- 
-+static bool group1_trap;
-+
- void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_v3_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v3;
-@@ -239,6 +241,8 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
- 
- 	/* Get the show on the road... */
- 	vgic_v3->vgic_hcr = ICH_HCR_EN;
-+	if (group1_trap)
-+		vgic_v3->vgic_hcr |= ICH_HCR_TALL1;
+@@ -652,6 +652,30 @@ static void __hyp_text __vgic_v3_bump_eoicount(void)
+ 	write_gicreg(hcr, ICH_HCR_EL2);
  }
  
- int vgic_v3_lpi_sync_pending_status(struct kvm *kvm, struct vgic_irq *irq)
++static void __hyp_text __vgic_v3_write_dir(struct kvm_vcpu *vcpu,
++					   u32 vmcr, int rt)
++{
++	u32 vid = vcpu_get_reg(vcpu, rt);
++	u64 lr_val;
++	int lr;
++
++	/* EOImode == 0, nothing to be done here */
++	if (!(vmcr & ICH_VMCR_EOIM_MASK))
++		return;
++
++	/* No deactivate to be performed on an LPI */
++	if (vid >= VGIC_MIN_LPI)
++		return;
++
++	lr = __vgic_v3_find_active_lr(vcpu, vid, &lr_val);
++	if (lr == -1) {
++		__vgic_v3_bump_eoicount();
++		return;
++	}
++
++	__vgic_v3_clear_active_lr(lr, lr_val);
++}
++
+ static void __hyp_text __vgic_v3_write_eoir(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
+ {
+ 	u32 vid = vcpu_get_reg(vcpu, rt);
+@@ -946,6 +970,9 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
+ 		else
+ 			fn = __vgic_v3_write_bpr0;
+ 		break;
++	case SYS_ICC_DIR_EL1:
++		fn = __vgic_v3_write_dir;
++		break;
+ 	default:
+ 		return 0;
+ 	}
 -- 
 2.11.0
