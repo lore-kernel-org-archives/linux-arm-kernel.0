@@ -1,63 +1,59 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri,  9 Jun 2017 08:22:26 +0000
-Subject: [PATCH v5] mm: huge-vmap: fail gracefully on unexpected huge vmap
- mappings
-Message-ID: <20170609082226.26152-1-ard.biesheuvel@linaro.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 09 Jun 2017 10:22:42 +0200
+Subject: [PATCH 3/3] arm: dts: mt2701: Add display subsystem related
+ nodes for MT2701
+In-Reply-To: <eafa6c79-4d12-abf5-f8ec-e91c6cc22cd4@gmail.com>
+References: <1496297324-21091-1-git-send-email-erin.lo@mediatek.com>
+ <1496297324-21091-4-git-send-email-erin.lo@mediatek.com>
+ <eafa6c79-4d12-abf5-f8ec-e91c6cc22cd4@gmail.com>
+Message-ID: <1496996562.2343.3.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Existing code that uses vmalloc_to_page() may assume that any
-address for which is_vmalloc_addr() returns true may be passed
-into vmalloc_to_page() to retrieve the associated struct page.
+Hi Matthias,
 
-This is not un unreasonable assumption to make, but on architectures
-that have CONFIG_HAVE_ARCH_HUGE_VMAP=y, it no longer holds, and we
-need to ensure that vmalloc_to_page() does not go off into the weeds
-trying to dereference huge PUDs or PMDs as table entries.
+On Fri, 2017-06-09 at 10:14 +0200, Matthias Brugger wrote:
+> 
+> On 01/06/17 08:08, Erin Lo wrote:
+> > From: YT Shen <yt.shen@mediatek.com>
+> > 
+> > This patch adds the device nodes for the DISP function blocks for MT2701
+> > 
+> > Signed-off-by: YT Shen <yt.shen@mediatek.com>
+> > Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+> > ---
+> >   arch/arm/boot/dts/mt2701.dtsi | 84 +++++++++++++++++++++++++++++++++++++++++++
+> >   1 file changed, 84 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+> > index 4f110d5..e20b65c 100644
+> > --- a/arch/arm/boot/dts/mt2701.dtsi
+> > +++ b/arch/arm/boot/dts/mt2701.dtsi
+> > @@ -17,6 +17,7 @@
+> >   #include <dt-bindings/interrupt-controller/irq.h>
+> >   #include <dt-bindings/interrupt-controller/arm-gic.h>
+> >   #include <dt-bindings/reset/mt2701-resets.h>
+> > +#include <dt-bindings/memory/mt2701-larb-port.h>
+> >   #include "skeleton64.dtsi"
+> >   #include "mt2701-pinfunc.h"
+> >   
+> > @@ -24,6 +25,11 @@
+> >   	compatible = "mediatek,mt2701";
+> >   	interrupt-parent = <&sysirq>;
+> >   
+> > +	aliases {
+> > +		rdma0 = &rdma0;
+> > +		rdma1 = &rdma1;
+> > +	};
+> > +
+> 
+> I know we have this alias in mt8173.dtsi, but I don't understand what 
+> they are for. Do you know?
 
-Given that vmalloc() and vmap() themselves never create huge
-mappings or deal with compound pages at all, there is no correct
-answer in this case, so return NULL instead, and issue a warning.
+The mtk_disp_rdma platform driver uses mtk_ddp_comp_get_id() to identify
+the specific RDMA instance, which calls of_alias_get_id(). The core code
+needs to know which RDMA is which to correctly set up the display data
+paths.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-v5: - fix typo
-
-v4: - use pud_bad/pmd_bad instead of pud_huge/pmd_huge, which don't require
-      changes to hugetlb.h, and give us what we need on all architectures
-    - move WARN_ON_ONCE() calls out of conditionals
-    - add explanatory comment
-
- mm/vmalloc.c | 15 +++++++++++++--
- 1 file changed, 13 insertions(+), 2 deletions(-)
-
-diff --git a/mm/vmalloc.c b/mm/vmalloc.c
-index 34a1c3e46ed7..0fcd371266a4 100644
---- a/mm/vmalloc.c
-+++ b/mm/vmalloc.c
-@@ -287,10 +287,21 @@ struct page *vmalloc_to_page(const void *vmalloc_addr)
- 	if (p4d_none(*p4d))
- 		return NULL;
- 	pud = pud_offset(p4d, addr);
--	if (pud_none(*pud))
-+
-+	/*
-+	 * Don't dereference bad PUD or PMD (below) entries. This will also
-+	 * identify huge mappings, which we may encounter on architectures
-+	 * that define CONFIG_HAVE_ARCH_HUGE_VMAP=y. Such regions will be
-+	 * identified as vmalloc addresses by is_vmalloc_addr(), but are
-+	 * not [unambiguously] associated with a struct page, so there is
-+	 * no correct value to return for them.
-+	 */
-+	WARN_ON_ONCE(pud_bad(*pud));
-+	if (pud_none(*pud) || pud_bad(*pud))
- 		return NULL;
- 	pmd = pmd_offset(pud, addr);
--	if (pmd_none(*pmd))
-+	WARN_ON_ONCE(pmd_bad(*pmd));
-+	if (pmd_none(*pmd) || pmd_bad(*pmd))
- 		return NULL;
- 
- 	ptep = pte_offset_map(pmd, addr);
--- 
-2.9.3
+regards
+Philipp
