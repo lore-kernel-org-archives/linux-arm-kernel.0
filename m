@@ -1,84 +1,67 @@
-From: mark.yao@rock-chips.com (Mark Yao)
-Date: Fri,  9 Jun 2017 11:18:52 +0800
-Subject: [PATCH v2 4/4] drm/rockchip: dw_hdmi: introduce the pclk for grf
-In-Reply-To: <1496976070-29573-1-git-send-email-mark.yao@rock-chips.com>
-References: <1496976070-29573-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <1496978332-327-1-git-send-email-mark.yao@rock-chips.com>
+From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
+Date: Fri, 09 Jun 2017 12:52:36 +0900
+Subject: [PATCH v3 0/3] Add support for the S6E3HF2 panel on TM2e board
+In-Reply-To: <4b974579-eb2f-1258-86e3-21ffeb22589a@samsung.com>
+References: <CGME20170418084047epcas5p493261a4cb9204e682f60cde8d659565c@epcas5p4.samsung.com>
+ <1492504836-19225-1-git-send-email-hoegeun.kwon@samsung.com>
+ <4b974579-eb2f-1258-86e3-21ffeb22589a@samsung.com>
+Message-ID: <50d5707c-378c-e338-3358-08ff1657cf8f@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For RK3399's GRF module, if we want to operate the graphic related grf
-registers, we need to enable the pclk_vio_grf which supply power for VIO
-GRF IOs, so it's better to introduce an optional grf clock in driver.
+Dear Thierry,
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+Could you check these patches.
 
-Changes in v2: describe grf on Documentation.
----
+Regards,
+Hoegeun
 
- .../bindings/display/rockchip/dw_hdmi-rockchip.txt     |  1 +
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c            | 18 ++++++++++++++++++
- 2 files changed, 19 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-index b76b7ee..b4ef61a 100644
---- a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-+++ b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-@@ -30,6 +30,7 @@ Optional properties
-   I2C master controller.
- - clock-names: See dw_hdmi.txt. The "cec" clock is optional.
- - clock-names: May contain "cec" as defined in dw_hdmi.txt.
-+- clock-names: May contain "grf", power for grf io.
- - clock-names: May contain "vpll", external clock for some hdmi phy.
- 
- Example:
-diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-index 69256cf..a090fc6 100644
---- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-+++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-@@ -47,6 +47,7 @@ struct rockchip_hdmi {
- 	struct drm_encoder encoder;
- 	const struct rockchip_hdmi_chip_data *chip_data;
- 	struct clk *vpll_clk;
-+	struct clk *grf_clk;
- };
- 
- #define to_rockchip_hdmi(x)	container_of(x, struct rockchip_hdmi, x)
-@@ -181,6 +182,16 @@ static int rockchip_hdmi_parse_dt(struct rockchip_hdmi *hdmi)
- 		return PTR_ERR(hdmi->vpll_clk);
- 	}
- 
-+	hdmi->grf_clk = devm_clk_get(hdmi->dev, "grf");
-+	if (PTR_ERR(hdmi->grf_clk) == -ENOENT) {
-+		hdmi->grf_clk = NULL;
-+	} else if (PTR_ERR(hdmi->grf_clk) == -EPROBE_DEFER) {
-+		return -EPROBE_DEFER;
-+	} else if (IS_ERR(hdmi->grf_clk)) {
-+		dev_err(hdmi->dev, "failed to get grf clock\n");
-+		return PTR_ERR(hdmi->grf_clk);
-+	}
-+
- 	ret = clk_prepare_enable(hdmi->vpll_clk);
- 	if (ret) {
- 		dev_err(hdmi->dev, "Failed to enable HDMI vpll: %d\n", ret);
-@@ -246,10 +257,17 @@ static void dw_hdmi_rockchip_encoder_enable(struct drm_encoder *encoder)
- 	else
- 		val = hdmi->chip_data->lcdsel_big;
- 
-+	ret = clk_prepare_enable(hdmi->grf_clk);
-+	if (ret < 0) {
-+		dev_err(hdmi->dev, "failed to enable grfclk %d\n", ret);
-+		return;
-+	}
-+
- 	ret = regmap_write(hdmi->regmap, hdmi->chip_data->lcdsel_grf_reg, val);
- 	if (ret != 0)
- 		dev_err(hdmi->dev, "Could not write to GRF: %d\n", ret);
- 
-+	clk_disable_unprepare(hdmi->grf_clk);
- 	dev_dbg(hdmi->dev, "vop %s output to hdmi\n",
- 		ret ? "LIT" : "BIG");
- }
--- 
-1.9.1
+On 05/19/2017 03:56 PM, Hoegeun Kwon wrote:
+> Dear Thierry,
+>
+> Could you check these patches?
+> I think this patches have accumulated enough dust.
+> If you have a another opinion, please tell me.
+>
+> Best regards,
+> Hoegeun
+>
+> On 04/18/2017 05:40 PM, Hoegeun Kwon wrote:
+>> Hi all,
+>>
+>> The purpose of this patch is add support for s6e3hf2 AMOLED panel on
+>> the TM2e board. The panel has 1600x2560 resolution in 5.65" physical
+>> panel in the TM2e device.
+>>
+>> The s6e3hf2 panel(5.65") is simliar to the previous s6e3ha2 panel(5.7"),
+>> but resolution and some command message are different. So it can be
+>> distinguished as a compatiblitiy string.
+>>
+>> Best regards,
+>> Hoegeun
+>>
+>> Changes for V3:
+>> - Remove te-gpios property in dts.
+>> - Added Reviewed-by: Andrzej Hajda <a.hajda@samsung.com> on all patches.
+>> - Added Reviewed-by: Inki Dae <inki.dae@samsung.com> on patch (2/3).
+>>
+>> Changes for V2:
+>> - Add new compatible string to "samsung,s6e3ha2.txt binding with 
+>> comments.
+>> - Fix the panel name from s6e3ha2-e to s6e3hf2
+>>
+>> Hoegeun Kwon (3):
+>>    dt-bindings: Add support for samsung s6e3hf2 panel
+>>    drm/panel: s6e3ha2: Add support for s6e3hf2 panel on TM2e board
+>>    arm64: dts: exynos: Add support for s6e3hf2 panel device on TM2e 
+>> board
+>>
+>>   .../bindings/display/panel/samsung,s6e3ha2.txt     |  5 +-
+>>   arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     | 11 ++++
+>>   drivers/gpu/drm/panel/panel-samsung-s6e3ha2.c      | 64 
+>> +++++++++++++++++++---
+>>   3 files changed, 72 insertions(+), 8 deletions(-)
+>>
+>
+>
+>
