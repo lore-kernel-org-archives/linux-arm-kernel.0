@@ -1,45 +1,20 @@
-From: raviteja.garimella@broadcom.com (Raviteja Garimella)
-Date: Fri,  9 Jun 2017 16:23:51 +0530
-Subject: [RESEND PATCH v8 3/3] arm64: dts: NS2: Add USB DRD PHY device tree
- node
-In-Reply-To: <1497005631-2836-1-git-send-email-raviteja.garimella@broadcom.com>
-References: <1497005631-2836-1-git-send-email-raviteja.garimella@broadcom.com>
-Message-ID: <1497005631-2836-4-git-send-email-raviteja.garimella@broadcom.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 09 Jun 2017 12:56:04 +0200
+Subject: [PATCH] ARM: dts: rk322x: fix i2s1 pinctrl error
+In-Reply-To: <1496998967-31520-1-git-send-email-sugar.zhang@rock-chips.com>
+References: <1496998967-31520-1-git-send-email-sugar.zhang@rock-chips.com>
+Message-ID: <1870239.lCo0kzT3Kb@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree node for USB Dual Role Device PHY for
-Broadcom's Northstar2 SoC.
+Hi,
 
-Signed-off-by: Raviteja Garimella <raviteja.garimella@broadcom.com>
----
- arch/arm64/boot/dts/broadcom/ns2.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+Am Freitag, 9. Juni 2017, 17:02:47 CEST schrieb Sugar Zhang:
+> Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
 
-diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-index 35a309a..35c8457 100644
---- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-@@ -460,6 +460,20 @@
- 			};
- 		};
- 
-+		usbdrd_phy: phy at 66000960 {
-+			#phy-cells = <0>;
-+			compatible = "brcm,ns2-drd-phy";
-+			reg = <0x66000960 0x24>,
-+			      <0x67012800 0x4>,
-+			      <0x6501d148 0x4>,
-+			      <0x664d0700 0x4>;
-+			reg-names = "icfg", "rst-ctrl",
-+				    "crmu-ctrl", "usb2-strap";
-+			id-gpios = <&gpio_g 30 0>;
-+			vbus-gpios = <&gpio_g 31 0>;
-+			status = "disabled";
-+		};
-+
- 		pwm: pwm at 66010000 {
- 			compatible = "brcm,iproc-pwm";
- 			reg = <0x66010000 0x28>;
--- 
-2.1.0
+I've already applied a previous version (from you and Frank).
+See
+https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/arch/arm/boot/dts/rk322x.dtsi?id=9d420e9b4140f8938ad6aa0d29e2428a2af6122b
+
+
+Heiko
