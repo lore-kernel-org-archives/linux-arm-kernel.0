@@ -1,53 +1,52 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 09 Jun 2017 12:05:40 +0200
-Subject: [PATCH] gpio: mvebu: fix regmap_update_bits usage
-In-Reply-To: <20170609120435.60191c76@free-electrons.com> (Thomas Petazzoni's
- message of "Fri, 9 Jun 2017 12:04:35 +0200")
-References: <20170609100318.26450-1-gregory.clement@free-electrons.com>
- <20170609120435.60191c76@free-electrons.com>
-Message-ID: <87zidho4qz.fsf@free-electrons.com>
+Date: Fri,  9 Jun 2017 12:09:17 +0200
+Subject: [PATCH v2] gpio: mvebu: fix regmap_update_bits usage
+Message-ID: <20170609100917.26660-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On ven., juin 09 2017, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+In some place in the driver regmap_update_bits was misused. Indeed the
+last argument is not the value of the bit (or group of bits) itself but
+the mask value inside the register.
 
-> Hello,
->
-> On Fri,  9 Jun 2017 12:03:18 +0200, Gregory CLEMENT wrote:
->
->>  	regmap_update_bits(mvchip->regs, GPIO_IO_CONF_OFF,
->> -			   BIT(pin), 1);
->> +			   BIT(pin), BIT(pin));
->>  
->>  	return 0;
->>  }
->> @@ -364,7 +364,7 @@ static int mvebu_gpio_direction_output(struct gpio_chip *chip, unsigned int pin,
->>  	mvebu_gpio_set(chip, pin, value);
->>  
->>  	regmap_update_bits(mvchip->regs, GPIO_IO_CONF_OFF,
->> -			   BIT(pin), 0);
->> +			   BIT(pin), BIT(pin));
->
-> Are you sure here? We want to clear the bit, so I guess the 0 is
-> appropriate, no?
+So when setting the bit N, then the value must be BIT(N) and not 1.
 
-argh!
+CC: Chris Packham <Chris.Packham@alliedtelesis.co.nz>
+CC: Ralph Sennhauser <ralph.sennhauser@gmail.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+Hi,
 
-yes it was a mistake
+In this second version I fixed the improper changed pointed by Thomas.
+
+Dorry for the noise,
 
 Gregory
 
->
-> Thomas
-> -- 
-> Thomas Petazzoni, CTO, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+ drivers/gpio/gpio-mvebu.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
+index 3d03740a20e7..877a3edffa47 100644
+--- a/drivers/gpio/gpio-mvebu.c
++++ b/drivers/gpio/gpio-mvebu.c
+@@ -341,7 +341,7 @@ static int mvebu_gpio_direction_input(struct gpio_chip *chip, unsigned int pin)
+ 		return ret;
+ 
+ 	regmap_update_bits(mvchip->regs, GPIO_IO_CONF_OFF,
+-			   BIT(pin), 1);
++			   BIT(pin), BIT(pin));
+ 
+ 	return 0;
+ }
+@@ -503,7 +503,7 @@ static int mvebu_gpio_irq_set_type(struct irq_data *d, unsigned int type)
+ 	case IRQ_TYPE_EDGE_FALLING:
+ 	case IRQ_TYPE_LEVEL_LOW:
+ 		regmap_update_bits(mvchip->regs, GPIO_IN_POL_OFF,
+-				   BIT(pin), 1);
++				   BIT(pin), BIT(pin));
+ 		break;
+ 	case IRQ_TYPE_EDGE_BOTH: {
+ 		u32 data_in, in_pol, val;
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.11.0
