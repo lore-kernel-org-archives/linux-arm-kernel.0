@@ -1,81 +1,41 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 9 Jun 2017 09:15:22 +0000
-Subject: [PATCH] arm: boot/compressed: fix inappropriate Thumb2 mnemonic
- for __nop
-In-Reply-To: <20170608162939.GQ4902@n2100.armlinux.org.uk>
-References: <20170608125847.2611-1-ard.biesheuvel@linaro.org>
- <20170608162939.GQ4902@n2100.armlinux.org.uk>
-Message-ID: <CAKv+Gu-SBpZ7VAvjWFpZYhVeUjU=KKBGgYbc983Ncc9ZzUjAHg@mail.gmail.com>
+Date: Fri, 9 Jun 2017 09:01:52 +0000
+Subject: [PATCH] efi: arm: Don't mark ACPI reclaim memory as MEMBLOCK_NOMAP
+In-Reply-To: <20170605090847.GC4650@leverpostej>
+References: <20170605080435.2498-1-ard.biesheuvel@linaro.org>
+ <20170605090847.GC4650@leverpostej>
+Message-ID: <CAKv+Gu8sfKu-3E2kQtni7VuRTE-RFivN_suT+GPz2bnNkfMqaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 June 2017 at 16:29, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
-> Gah, it's rather unfortunate that this has been discovered only a
-> few days after the other decompressor fix was merged and hit Linus'
-> tree...
->
-
-I guess that is where Arnd found it, although he didn't specify. In
-any case, apologies for the breakage and thanks to Arnd for reporting
-it.
-
-I have dropped this into the patch system.
-
-
-> On Thu, Jun 08, 2017 at 12:58:47PM +0000, Ard Biesheuvel wrote:
->> Commit 06a4b6d009a1 ("ARM: 8677/1: boot/compressed: fix decompressor
->> header layout for v7-M") fixed an issue in the layout of the header
->> of the compressed kernel image that was caused by the assembler
->> emitting narrow opcodes for 'mov r0, r0', and for this reason, the
->> mnemonic was updated to use the W() macro, which will append the .w
->> suffix (which forces a wide encoding) if required, i.e., when building
->> the kernel in Thumb2 mode.
+On 5 June 2017 at 09:08, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Mon, Jun 05, 2017 at 08:04:35AM +0000, Ard Biesheuvel wrote:
+>> On ARM, regions of memory that are described by UEFI as having special
+>> significance to the firmware itself are omitted from the linear mapping.
+>> This is necessary since we cannot guarantee that alternate mappings of
+>> the same physical region will use attributes that are compatible with
+>> the ones we use for the linear mapping, and aliases with mismatched
+>> attributes are prohibited by the architecture.
 >>
->> However, this failed to take into account that on Thumb2 kernels built
->> for CPUs that are also ARM capable, the entry point is entered in ARM
->> mode, and so the instructions emitted here will be ARM instructions
->> that only exist in a wide encoding to begin with, which is why the
->> assembler rejects the .w suffix here and aborts the build with the
->> following message:
+>> The above does not apply to ACPI reclaim regions: such regions have no
+>> special significance to the firmware, and it is up to the OS to decide
+>> whether or not to preserve them after it has consumed their contents,
+>> and for how long, after which time the OS can use the memory in any way
+>> it likes. In the Linux case, such regions are preserved indefinitely,
+>> and are simply treated the same way as other 'reserved' memory types.
 >>
->>   head.S: Assembler messages:
->>   head.S:132: Error: width suffixes are invalid in ARM mode -- `mov.w r0,r0'
+>> Punching holes into the linear mapping causes page table fragmentation,
+>> which increases TLB pressure, and so we should avoid doing so if we can.
+>> So add a special case for regions of type EFI_ACPI_RECLAIM_MEMORY, and
+>> memblock_reserve() them instead of marking them MEMBLOCK_NOMAP.
 >>
->> So replace the W(mov) with separate ARM and Thumb2 instructions, where
->> the latter will only be used for CPU_THUMBONLY builds.
->>
->> Fixes: 06a4b6d009a1 ("ARM: 8677/1: boot/compressed: fix decompressor ...")
->> Reported-by: Arnd Bergmann <arnd@arndb.de>
->> Acked-by: Arnd Bergmann <arnd@arndb.de>
 >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>
->> Apologies for the breakage: apparently, the combination CONFIG_THUMB2_KERNEL=y,
->> CONFIG_CPU_THUMBONLY=n and CONFIG_EFI_STUB=y was not among the configurations
->> I tested before sending out the original patch.
->>
->>  arch/arm/boot/compressed/efi-header.S | 3 ++-
->>  1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
->> index 3f7d1b74c5e0..a17ca8d78656 100644
->> --- a/arch/arm/boot/compressed/efi-header.S
->> +++ b/arch/arm/boot/compressed/efi-header.S
->> @@ -17,7 +17,8 @@
->>               @ there.
->>               .inst   'M' | ('Z' << 8) | (0x1310 << 16)   @ tstne r0, #0x4d000
->>  #else
->> -             W(mov)  r0, r0
->> + AR_CLASS(   mov     r0, r0          )
->> +  M_CLASS(   nop.w                   )
->>  #endif
->>               .endm
->>
->> --
->> 2.9.3
->>
 >
-> --
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+> Sounds sane to me. FWIW:
+>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+>
+
+Thanks.
+
+I have queued this in efi/next
