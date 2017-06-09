@@ -1,71 +1,44 @@
 From: eugen.hristev@microchip.com (Eugen Hristev)
-Date: Fri, 9 Jun 2017 10:07:15 +0300
-Subject: [PATCH v4 0/4] iio: adc: sama5d2_adc hw triggers and buffers
-Message-ID: <1496992039-17964-1-git-send-email-eugen.hristev@microchip.com>
+Date: Fri, 9 Jun 2017 10:07:17 +0300
+Subject: [PATCH v4 2/4] Documentation: dt: iio: at91-sama5d2_adc: add hw
+ trigger edge binding
+In-Reply-To: <1496992039-17964-1-git-send-email-eugen.hristev@microchip.com>
+References: <1496992039-17964-1-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <1496992039-17964-3-git-send-email-eugen.hristev@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements the hardware triggers support and buffer management
-for sama5d2.
-The DT modifications ( [PATCH v4 1/4] ARM: dts: at91: sama5d2_xplained:
-enable ADTRG pin) are for demonstration purposes of the feature,
-setting the pinctrl for the ADC hw trigger pin,should go through
-at91 maintainers.
-As discussed on the mailing list, since we have a single external trigger
-namely the ADTRG, but three different possible edges that can trigger it,
-will have a single trigger in the IIO subsystem and three possible edges
-which can be selected from the device tree.
-Thus I created new bindings in the device tree for having the possible
-edge types for the ADTRG pin.
-The documentation for the bindings is in the patch
-[PATCH v4 2/4] Documentation: dt: iio: at91-sama5d2_adc: add adtrg
- trigger binding
-The modifications in the DT are in the patch
-[PATCH v4 3/4] ARM: dts: at91: sama5d2: add ADC hw trigger
-The new property must be set with the values from interrupt edge types, as this
-pin is effectively an internal interrupt.
+Add property for the edge type of the hardware trigger pin ADTRG
 
+Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+---
   Changes in v4:
  - Modified bindings to be similar with interrupts
- - Used iio claim direct to make sure buffer is not enabled when someone might
-   try to use a software triggered conversion
 
-  Changes in v3:
- - No longer have all three possible triggers registered in the subsystem and
-   available in the sysfs. Only registering one trigger, and the possible edge
-   is being read from the device tree. In the device tree, any possible edge
-   can be set. There are three already made nodes for each possible edge which
-   can be selected.
- - Fixed a bug where software triggered conversion could be started even if
-   the hardware trigger was enabled.
- - Preallocate enough space for the buffer, considering all the channels
-   and timestamp
+ Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-
-
-  Changes in v2:
- - Moved buffer allocation and freeing into the preenable and postdisable
-   callbacks.
-   We have a total of scan bytes that can vary a lot depending on each channel
-   enabled at a certain point.
- - made the at91 trigger list part of state structure
- - made the iio trigger list preallocated in state structure
- - moved irq enabling/disabling into the try_reenable callback
- - on trigger disable must write disable registries as well
- - Modified trigger name length to 64
-
-
-Eugen Hristev (4):
-  ARM: dts: at91: sama5d2_xplained: enable ADTRG pin
-  Documentation: dt: iio: at91-sama5d2_adc: add hw trigger edge binding
-  ARM: dts: at91: sama5d2: add ADC hw trigger edge type
-  iio: adc: at91-sama5d2_adc: add hw trigger and buffer support
-
- .../bindings/iio/adc/at91-sama5d2_adc.txt          |   6 +
- arch/arm/boot/dts/at91-sama5d2_xplained.dts        |  16 +-
- arch/arm/boot/dts/sama5d2.dtsi                     |   1 +
- drivers/iio/adc/at91-sama5d2_adc.c                 | 236 ++++++++++++++++++++-
- 4 files changed, 253 insertions(+), 6 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt b/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
+index 3223684..552e7a8 100644
+--- a/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
++++ b/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
+@@ -11,6 +11,11 @@ Required properties:
+   - atmel,min-sample-rate-hz: Minimum sampling rate, it depends on SoC.
+   - atmel,max-sample-rate-hz: Maximum sampling rate, it depends on SoC.
+   - atmel,startup-time-ms: Startup time expressed in ms, it depends on SoC.
++  - atmel,trigger-edge-type: One of possible edge types for the ADTRG hardware
++  trigger pin. When the specific edge type is detected, the conversion will
++  start. Possible values are rising, falling, or both.
++  This property uses the IRQ edge types values: IRQ_TYPE_EDGE_RISING ,
++  IRQ_TYPE_EDGE_FALLING or IRQ_TYPE_EDGE_BOTH
+ 
+ Example:
+ 
+@@ -25,4 +30,5 @@ adc: adc at fc030000 {
+ 	atmel,startup-time-ms = <4>;
+ 	vddana-supply = <&vdd_3v3_lp_reg>;
+ 	vref-supply = <&vdd_3v3_lp_reg>;
++	atmel,trigger-edge-type = <IRQ_TYPE_EDGE_BOTH>;
+ }
 -- 
 2.7.4
