@@ -1,86 +1,38 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 9 Jun 2017 09:27:15 +0000
-Subject: [PATCH v5] mm: huge-vmap: fail gracefully on unexpected huge vmap
- mappings
-In-Reply-To: <20170609092209.GA10665@leverpostej>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 9 Jun 2017 10:29:48 +0100
+Subject: [PATCH v5] mm: huge-vmap: fail gracefully on unexpected huge
+ vmap mappings
+In-Reply-To: <CAKv+Gu_te54d9VU9AKYevkOvSpCBBeDQy5PE+PhX-t=ka3L8JA@mail.gmail.com>
 References: <20170609082226.26152-1-ard.biesheuvel@linaro.org>
  <20170609092209.GA10665@leverpostej>
-Message-ID: <CAKv+Gu_te54d9VU9AKYevkOvSpCBBeDQy5PE+PhX-t=ka3L8JA@mail.gmail.com>
+ <CAKv+Gu_te54d9VU9AKYevkOvSpCBBeDQy5PE+PhX-t=ka3L8JA@mail.gmail.com>
+Message-ID: <20170609092947.GB10665@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 June 2017 at 09:22, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Jun 09, 2017 at 08:22:26AM +0000, Ard Biesheuvel wrote:
->> Existing code that uses vmalloc_to_page() may assume that any
->> address for which is_vmalloc_addr() returns true may be passed
->> into vmalloc_to_page() to retrieve the associated struct page.
->>
->> This is not un unreasonable assumption to make, but on architectures
->> that have CONFIG_HAVE_ARCH_HUGE_VMAP=y, it no longer holds, and we
->> need to ensure that vmalloc_to_page() does not go off into the weeds
->> trying to dereference huge PUDs or PMDs as table entries.
->>
->> Given that vmalloc() and vmap() themselves never create huge
->> mappings or deal with compound pages at all, there is no correct
->> answer in this case, so return NULL instead, and issue a warning.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->> v5: - fix typo
->>
->> v4: - use pud_bad/pmd_bad instead of pud_huge/pmd_huge, which don't require
->>       changes to hugetlb.h, and give us what we need on all architectures
->>     - move WARN_ON_ONCE() calls out of conditionals
+On Fri, Jun 09, 2017 at 09:27:15AM +0000, Ard Biesheuvel wrote:
+> On 9 June 2017 at 09:22, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Fri, Jun 09, 2017 at 08:22:26AM +0000, Ard Biesheuvel wrote:
+> >> v4: - use pud_bad/pmd_bad instead of pud_huge/pmd_huge, which don't require
+> >>       changes to hugetlb.h, and give us what we need on all architectures
+> >>     - move WARN_ON_ONCE() calls out of conditionals
+> 
+> ^^^
 
-^^^
+Ah, sorry. Clearly I scanned this too quickly.
 
->>     - add explanatory comment
->>
->>  mm/vmalloc.c | 15 +++++++++++++--
->>  1 file changed, 13 insertions(+), 2 deletions(-)
->>
->> diff --git a/mm/vmalloc.c b/mm/vmalloc.c
->> index 34a1c3e46ed7..0fcd371266a4 100644
->> --- a/mm/vmalloc.c
->> +++ b/mm/vmalloc.c
->> @@ -287,10 +287,21 @@ struct page *vmalloc_to_page(const void *vmalloc_addr)
->>       if (p4d_none(*p4d))
->>               return NULL;
->>       pud = pud_offset(p4d, addr);
->> -     if (pud_none(*pud))
->> +
->> +     /*
->> +      * Don't dereference bad PUD or PMD (below) entries. This will also
->> +      * identify huge mappings, which we may encounter on architectures
->> +      * that define CONFIG_HAVE_ARCH_HUGE_VMAP=y. Such regions will be
->> +      * identified as vmalloc addresses by is_vmalloc_addr(), but are
->> +      * not [unambiguously] associated with a struct page, so there is
->> +      * no correct value to return for them.
->> +      */
->> +     WARN_ON_ONCE(pud_bad(*pud));
->> +     if (pud_none(*pud) || pud_bad(*pud))
->>               return NULL;
->
-> Nit: the WARN_ON_ONCE() can be folded into the conditional:
->
->         if (pud_none(*pud) || WARN_ON_ONCE(pud_bad(*pud)))
->                 reutrn NULL;
->
->>       pmd = pmd_offset(pud, addr);
->> -     if (pmd_none(*pmd))
->> +     WARN_ON_ONCE(pmd_bad(*pmd));
->> +     if (pmd_none(*pmd) || pmd_bad(*pmd))
->>               return NULL;
->
-> Likewise here.
->
+> >> +     WARN_ON_ONCE(pud_bad(*pud));
+> >> +     if (pud_none(*pud) || pud_bad(*pud))
+> >>               return NULL;
+> >
+> > Nit: the WARN_ON_ONCE() can be folded into the conditional:
+> >
+> >         if (pud_none(*pud) || WARN_ON_ONCE(pud_bad(*pud)))
+> >                 reutrn NULL;
 
-Actually, it was Dave who requested them to be taken out of the conditional.
+> Actually, it was Dave who requested them to be taken out of the conditional.
 
-> Otherwise, looks good to me. FWIW:
->
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
->
+Fair enough. My ack stands, either way!
 
 Thanks,
-Ard.
+Mark.
