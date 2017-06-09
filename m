@@ -1,91 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 9 Jun 2017 13:25:28 +0200
-Subject: [[PATCH]] drivers: leds/trigger: system cannot enter suspend
-In-Reply-To: <1496648191-134355-1-git-send-email-bo.zhang@nxp.com>
-References: <1496648191-134355-1-git-send-email-bo.zhang@nxp.com>
-Message-ID: <CACRpkdZpMsqt9gjehSQ5c86LyqhZcnYF7QuGk=N4JTi-GJ1SMA@mail.gmail.com>
+From: raviteja.garimella@broadcom.com (Raviteja Garimella)
+Date: Fri, 9 Jun 2017 17:06:08 +0530
+Subject: [PATCH v8 0/3] Support for USB DRD PHY driver for NS2
+In-Reply-To: <03f87297-a986-ac9d-b20b-0f75abcc12f7@ti.com>
+References: <1496918103-14948-1-git-send-email-raviteja.garimella@broadcom.com>
+ <a5344bd7-f7b1-90b5-cce1-d513370103e5@ti.com>
+ <CAEHZuqNwPBgWM9mAeWTTQLQVJYjX8uNuUDRqsD_ZidgaSV9pcA@mail.gmail.com>
+ <2f492d5a-9016-f965-8dc2-f669d785ba4d@ti.com>
+ <CAEHZuqO3zquZokENqBLmcn1ZnSCYSYitCXmKrQ-v9HMB0gJrvg@mail.gmail.com>
+ <03f87297-a986-ac9d-b20b-0f75abcc12f7@ti.com>
+Message-ID: <CAEHZuqNskNCt6LqY==Qrw3v8RyagNa+K=ruWZMpn8tqrOfssdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 5, 2017 at 9:36 AM, Zhang Bo <bo.zhang@nxp.com> wrote:
+Hi,
 
-> System cannot enter suspend mode because of heartbeat led trigger.
-
-As mentioned this should not be a problem.
-
-> Heartbeat_pm_notifier is called when system prepare to enter suspend
-> mode, then call led_trigger_unregister to change the trigger of led device
-> to none. It will send uevent message and the wakeup source count changed.
+On Fri, Jun 9, 2017 at 4:46 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
 >
-> Add suspend/resume ops to the struct led_trigger, implement these two ops
-> for ledtrig-heartbeat. Add led_trigger_suspend/led_trigger_resume funcitons
-> to iterate through all LED class devices registered on given trigger and
-> call their suspend/resume ops and disable/enable sysfs at the same time.
 >
-> Call led_trigger_suspend{resuem} API in pm_notifier function to
-> suspend/resume all led devices listed in given trigger.
+> On Friday 09 June 2017 04:23 PM, Raviteja Garimella wrote:
+>> Hi Kishon,
+>>
+>> On Fri, Jun 9, 2017 at 2:36 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>> Hi,
+>>>
+>>> On Friday 09 June 2017 02:30 PM, Raviteja Garimella wrote:
+>>>> Hi,
+>>>>
+>>>> On Fri, Jun 9, 2017 at 2:25 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>>>> Hi,
+>>>>>
+>>>>> On Thursday 08 June 2017 04:05 PM, Raviteja Garimella wrote:
+>>>>>> Changes in v8:
+>>>>>> =============
+>>>>>> -Renamed phy shutdown routine
+>>>>>> -Used devm_request_irq in stead of threaded irq
+>>>>>
+>>>>> That's not what I intended. Continue to use threaded irq but remove delayed work.
+>>>>>
+>>>>
+>>>> Yes I get that. We see intermittent connection issues without delayed
+>>>> work. Debounce delay matters there.
+>>>
+>>> All right!
+>>>
+>>> I'm unable to apply the series. Please rebase to linux-phy next (directory
+>>> structure has changed)
+>>>
+>>
+>> Ok. They got applied to linux-phy next for me without issues.
+>> I will resend the patchset anyways after rebasing to linux-phy next.
 >
-> Signed-off-by: Zhang Bo <bo.zhang@nxp.com>
+> the patch you sent is not rebased to the latest linux-phy next.
+>
 
-The patch is nice because it fixes my sloppy approach of just adding/removing
-the trigger made earlier.
+Sorry.. That's correct, I am sending v9. Thanks.
 
-It stops unsolicited I2C traffic and other nastines from happening during the
-suspend/resume cycle.
-
-I would even add:
-
-Fixes: 5ab92a7cb82c ("leds: handle suspend/resume in heartbeat trigger")
-
-(...)
-> +static void heartbeat_trig_resume(struct led_classdev *led_cdev)
-> +{
-> +       struct heartbeat_trig_data *heartbeat_data = led_cdev->trigger_data;
-> +
-> +       if (led_cdev->suspended) {
-> +               setup_timer(&heartbeat_data->timer,
-> +                           led_heartbeat_function, (unsigned long) led_cdev);
-> +               heartbeat_data->phase = 0;
-> +               led_heartbeat_function(heartbeat_data->timer.data);
-> +               led_cdev->suspended = false;
-> +       }
-> +}
-> +
-> +static void heartbeat_trig_suspend(struct led_classdev *led_cdev)
-> +{
-> +       struct heartbeat_trig_data *heartbeat_data = led_cdev->trigger_data;
-> +
-> +       if (led_cdev->activated && !led_cdev->suspended) {
-> +               del_timer_sync(&heartbeat_data->timer);
-> +               led_cdev->suspended = true;
->         }
-
-Are we sure that the LED is *off* at this point so you don't suspend/resume
-with a glowing LED?
-
-Else insert a call to make sure that it's like so, and maybe even
-a variable to hold the current state (off/on) across the suspend/resume
-cycle.
-
-> @@ -161,25 +186,23 @@ static void heartbeat_trig_deactivate(struct led_classdev *led_cdev)
->         .name     = "heartbeat",
->         .activate = heartbeat_trig_activate,
->         .deactivate = heartbeat_trig_deactivate,
-> +       .suspend = heartbeat_trig_suspend,
-> +       .resume = heartbeat_trig_resume,
-(...)
-> +       void            (*suspend)(struct led_classdev *led_cdev);
-> +       void            (*resume)(struct led_classdev *led_cdev);
-
-
-These names do not correspons to the actual PM calls
-they are utilized for.
-
-Name them
-.pm_prepare_suspend()
-.pm_post_suspend()
-
-Instead, this indicates better the place when they get called.
-
-Yours,
-Linus Walleij
+> -Kishon
