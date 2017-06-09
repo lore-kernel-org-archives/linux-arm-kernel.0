@@ -1,106 +1,64 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 9 Jun 2017 14:59:20 +0200
-Subject: [PATCH 2/4] drm/bridge: dw-hdmi: add cec notifier support
-In-Reply-To: <E1dFi3E-0004lh-Pu@rmk-PC.armlinux.org.uk>
-References: <20170530142218.GS22219@n2100.armlinux.org.uk>
- <E1dFi3E-0004lh-Pu@rmk-PC.armlinux.org.uk>
-Message-ID: <0c2c4988-37bb-fd01-efee-c6878cc53923@baylibre.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 9 Jun 2017 08:01:17 -0500
+Subject: [PATCH v3 2/6] dt-bindings: display: Add Synopsys DW MIPI DSI
+ DRM bridge driver
+In-Reply-To: <7dd31d6d-1d5d-2432-07aa-96349f50c924@synopsys.com>
+References: <1496414235-20098-1-git-send-email-philippe.cornu@st.com>
+ <1496414235-20098-3-git-send-email-philippe.cornu@st.com>
+ <20170608154028.6ck3dos6de2dogrk@rob-hp-laptop>
+ <7502cbc2-9feb-4dd3-3d95-b5f33b8a8872@codeaurora.org>
+ <7dd31d6d-1d5d-2432-07aa-96349f50c924@synopsys.com>
+Message-ID: <20170609130117.m5eyqrmv3gsokmuj@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/30/2017 04:23 PM, Russell King wrote:
-> Add CEC notifier support to the HDMI bridge driver, so that the CEC
-> part of the IP can receive its physical address.
+On Fri, Jun 09, 2017 at 10:43:07AM +0100, Jose Abreu wrote:
+> Hello,
 > 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
->  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 22 +++++++++++++++++++++-
->  1 file changed, 21 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> index 4e1f54a675d8..966422576c44 100644
-> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> @@ -36,7 +36,10 @@
->  #include "dw-hdmi.h"
->  #include "dw-hdmi-audio.h"
->  
-> +#include <media/cec-notifier.h>
-> +
->  #define DDC_SEGMENT_ADDR	0x30
-> +
->  #define HDMI_EDID_LEN		512
->  
->  enum hdmi_datamap {
-> @@ -173,6 +176,8 @@ struct dw_hdmi {
->  
->  	unsigned int reg_shift;
->  	struct regmap *regm;
-> +
-> +	struct cec_notifier *cec_notifier;
->  };
->  
->  #define HDMI_IH_PHY_STAT0_RX_SENSE \
-> @@ -1870,6 +1875,7 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
->  		hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
->  		hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
->  		drm_mode_connector_update_edid_property(connector, edid);
-> +		cec_notifier_set_phys_addr_from_edid(hdmi->cec_notifier, edid);
->  		ret = drm_add_edid_modes(connector, edid);
->  		/* Store the ELD */
->  		drm_edid_to_eld(connector, edid);
-> @@ -2108,11 +2114,16 @@ static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
->  	 * ask the source to re-read the EDID.
->  	 */
->  	if (intr_stat &
-> -	    (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_IH_PHY_STAT0_HPD))
-> +	    (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_IH_PHY_STAT0_HPD)) {
->  		__dw_hdmi_setup_rx_sense(hdmi,
->  					 phy_stat & HDMI_PHY_HPD,
->  					 phy_stat & HDMI_PHY_RX_SENSE);
->  
-> +		if ((phy_stat & (HDMI_PHY_RX_SENSE | HDMI_PHY_HPD)) == 0)
-> +			cec_notifier_set_phys_addr(hdmi->cec_notifier,
-> +						   CEC_PHYS_ADDR_INVALID);
-> +	}
-> +
->  	if (intr_stat & HDMI_IH_PHY_STAT0_HPD) {
->  		dev_dbg(hdmi->dev, "EVENT=%s\n",
->  			phy_int_pol & HDMI_PHY_HPD ? "plugin" : "plugout");
-> @@ -2365,6 +2376,12 @@ __dw_hdmi_probe(struct platform_device *pdev,
->  	if (ret)
->  		goto err_iahb;
->  
-> +	hdmi->cec_notifier = cec_notifier_get(dev);
-> +	if (!hdmi->cec_notifier) {
-> +		ret = -ENOMEM;
-> +		goto err_iahb;
-> +	}
-> +
->  	/*
->  	 * To prevent overflows in HDMI_IH_FC_STAT2, set the clk regenerator
->  	 * N and cts values before enabling phy
-> @@ -2437,6 +2454,9 @@ __dw_hdmi_probe(struct platform_device *pdev,
->  		hdmi->ddc = NULL;
->  	}
->  
-> +	if (hdmi->cec_notifier)
-> +		cec_notifier_put(hdmi->cec_notifier);
-> +
->  	clk_disable_unprepare(hdmi->iahb_clk);
->  err_isfr:
->  	clk_disable_unprepare(hdmi->isfr_clk);
+> On 09-06-2017 05:11, Archit Taneja wrote:
+> > Hi Philippe, Rob,
+> >
+> > On 06/08/2017 09:10 PM, Rob Herring wrote:
+> >> Seems strange there's not also a pixel or bit clock? Or this
+> >> gets driven
+> >> from the phy?
+> >
+> > Since you mention phy here, I wanted to share a concern with
+> > the bindings.
+> > These bindings don't have a separate PHY DT node. The PHY is
+> > assumed as a
+> > part of the IP when integrated by a SoC. There are already
+> > rockchip and
+> > hisil DSI bindings that use this IP but don't define a PHY node.
+> >
+> > It's a similar situation with the DW-HDMI bindings.
+> >
+> > For example, when the DW HDMI is integrated in rockchip or
+> > renesas SoC, the
+> > bindings "rockchip,rk3288-dw-hdmi" or "renesas,r8a7795-dw-hdmi"
+> > are used,
+> > and they don't have a separate PHY DT node.
+> >
+> > I wasn't sure whether this is the right way to proceed or not
+> > for such IPs.
+> > Some advice would help us here.
+> >
+> > Thanks,
+> > Archit
+> >
 > 
+> I just want to add that read/writes from/to phy are done using
+> the controller (in HDMI and in MIPI DSI Host), so the only way to
+> have a phy driver is that if some custom callbacks are provided
+> or if the memory region is shared.
+> 
+> Anyway, I agree with Archit in the sense that phy + controller
+> are highly tied. Also, these two "pieces" are SoC specific and
+> sometimes very different between SoC's because they can be
+> customized so I think a different compatible string suits well here.
 
-Hi Archit,
+When the phy is integrated like this, I agree that it doesn't make sense 
+to have a separate phy node.
 
-I think this one could go through drm-next since it's quite
-standalone and will reduce the DW-HDMI CEC patchset and dependencies.
-
-Tested on Amlogic SoCs using my in-development CEC driver.
-
-Tested-by: Neil Armstrong <narmstrong@baylibre.com>
-Acked-by: Neil Armstrong <narmstrong@baylibre.com>
-
-Thanks Russell for the patch,
-Neil
+Rob
