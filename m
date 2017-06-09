@@ -1,91 +1,50 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 9 Jun 2017 16:46:49 +0200
-Subject: [PATCH v2 03/11] drm: sun4i: ignore swapped mixer<->tcon
- connection for DE2
-In-Reply-To: <66881eac1dd06d918692482bdb1ea9e6@aosc.io>
+Date: Fri, 9 Jun 2017 16:48:25 +0200
+Subject: [PATCH v2 04/11] drm: sun4i: add support for H3's TCON0/1
+In-Reply-To: <4CD8A3BB-965C-4C74-884C-ACE8AAF9989B@aosc.io>
 References: <20170604160149.30230-1-icenowy@aosc.io>
- <20170604160149.30230-4-icenowy@aosc.io>
- <20170607093512.rfvpefmyskgjw3ik@flea.lan>
- <01A7F22E-C4FF-4B4B-A9BC-FF0C96B996B9@aosc.io>
- <20170607143827.4ng5gedvzn3f5pyx@flea.lan>
- <66881eac1dd06d918692482bdb1ea9e6@aosc.io>
-Message-ID: <20170609144649.67i3zscq26jt5hhe@flea.home>
+ <20170604160149.30230-5-icenowy@aosc.io>
+ <3642057.oKT9kIlu8M@jernej-laptop>
+ <493AC6F2-3CB3-48F5-9568-A34AA927238F@aosc.io>
+ <20170607094343.qqiwnu2mhmoi6jn7@flea.lan>
+ <52F9F9C7-9A9C-435D-A0AF-FDD4317DAD69@aosc.io>
+ <20170607141957.akonr7hmuwpt7hlt@flea.lan>
+ <4CD8A3BB-965C-4C74-884C-ACE8AAF9989B@aosc.io>
+Message-ID: <20170609144825.jdalt2xakhcenhk5@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 08, 2017 at 01:01:53PM +0800, icenowy at aosc.io wrote:
-> ? 2017-06-07 22:38?Maxime Ripard ???
-> > On Wed, Jun 07, 2017 at 06:01:02PM +0800, Icenowy Zheng wrote:
-> > > >I have no idea what this is supposed to be doing either.
-> > > >
-> > > >I might be wrong, but I really feel like there's a big mismatch
-> > > >between your commit log, and what you actually implement.
-> > > >
-> > > >In your commit log, you should state:
-> > > >
-> > > >A) What is the current behaviour
-> > > >B) Why that is a problem
-> > > >C) How do you address it
-> > > >
-> > > >And you don't.
-> > > >
-> > > >However, after discussing it with Chen-Yu, it seems like you're trying
-> > > >to have all the mixers probed before the TCONs. If that is so, there's
-> > > >nothing specific to the H3 here, and we also have the same issue on
-> > > >dual-pipeline DE1 (A10, A20, A31). Chen-Yu worked on that a bit, but
-> > > >the easiest solution would be to move from a DFS algorithm to walk
-> > > >down the graph to a BFS one.
-> > > >
-> > > >That way, we would add all mixers first, then the TCONs, then the
-> > > >encoders, and the component framework will probe them in order.
-> > > 
-> > > No. I said that they're swappable, however, I don't want to
-> > > implement the swap now, but hardcode 0-0 1-1 connection.
-> > 
-> > We're on the same page, it's definitely not what I was mentionning
-> > here. This would require a significant rework, and the usecase is
-> > still unclear for now.
-> > 
-> > > However, as you and Chen-Yu said, device tree should reflect the
-> > > real hardware, there will be bonus endpoints for the swapped
-> > > connection.
-> > 
-> > If by bonus you mean connections from mixer 0 to tcon 1 and mixer 1 to
-> > tcon 0, then yes, we're going to need it.
-> > 
-> > > What I want to do is to ignore the bonus connection, in order to
-> > > prevent them from confusing the code.
-> > > 
-> > > If you just change the bind sequence, I think it cannot be
-> > > prevented that wrong connections will be bound.
-> > 
-> > This is where I don't follow you anymore. The component framework
-> > doesn't list connections but devices. The swapped connections do not
-> > matter here, we have the same set of devices: mixer0, mixer1, tcon0
-> > and tcon1.
-> > 
-> > The thing that does change with your patch is that before, the binding
-> > sequence would have been mixer0, tcon0, tcon1, mixer1. With your
-> > patch, it's mixer0, tcon0, mixer1, tcon1.
-> > 
-> > So, again, stating what issue you were seeing before making this patch
-> > would be very helpful to see what you're trying to do / fix.
+On Wed, Jun 07, 2017 at 10:21:02PM +0800, Icenowy Zheng wrote:
 > 
-> So maybe I can drop the forward search (searching output) code, and keep
-> only the backward search (search input) code in TCON?
 > 
-> Forward search code is only used when binding, but backward search is used
-> for TCON to find connected mixer.
+> ? 2017?6?7? GMT+08:00 ??10:19:57, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
+> >On Wed, Jun 07, 2017 at 05:44:56PM +0800, Icenowy Zheng wrote:
+> >> ? 2017?6?7? GMT+08:00 ??5:43:43, Maxime Ripard
+> ><maxime.ripard@free-electrons.com> ??:
+> >> >On Mon, Jun 05, 2017 at 03:03:47AM +0800, Icenowy Zheng wrote:
+> >> >> >You should also expand function sun4i_drv_node_is_tcon() at
+> >> >sun4i_drv.c
+> >> >> >with 
+> >> >> >new entries, but I'm not sure if this fits in this patch.
+> >> >> 
+> >> >> Instead I think it should be renamed to something like
+> >> >> "sun4i_drv_node_is_tcon_with_ch0".
+> >> >
+> >> >I'm not sure, or at least, it shouldn't make any difference, since
+> >> >TCON without a channel 0 will not have an endpoint 0, so this will
+> >be
+> >> >dealt with already.
+> >> 
+> >> But that will prevent new coders from add CH1-less TCON
+> >> compatibles to this function.
+> >
+> >Why? We already have such TCONs (like the A33's, or V3S') in that
+> >function.
+> 
+> Sorry, CH0-less.
 
-It is hard to talk about a solution, when it's not clear what the
-issue is.
-
-So please state 
-> > > >A) What is the current behaviour
-> > > >B) Why that is a problem
-> > > >C) How do you address it
-
-We'll talk about a solution once this is done.
+That's not really an issue I think, since the endpoint 0 will not be
+there on those TCONs, the code will bail out.
 
 Maxime
 
@@ -99,4 +58,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170609/c7897777/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170609/31fd9761/attachment.sig>
