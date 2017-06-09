@@ -1,45 +1,38 @@
 From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Fri,  9 Jun 2017 14:57:28 +0200
-Subject: [PATCH v5 1/3] nvmem: dt: document SNVS LPGPR binding
-In-Reply-To: <20170609125730.25502-1-o.rempel@pengutronix.de>
-References: <20170609125730.25502-1-o.rempel@pengutronix.de>
-Message-ID: <20170609125730.25502-2-o.rempel@pengutronix.de>
+Date: Fri,  9 Jun 2017 14:57:27 +0200
+Subject: [PATCH v5 0/3] nvmem: upstream snvs_lpgpr driver
+Message-ID: <20170609125730.25502-1-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Documentation bindings for the Low Power General Purpose Register
-available on i.MX6 SoCs in the Secure Non-Volatile Storage.
+changes v5:
+ - use dcfg->offset instead of priv->offset.
 
-Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
----
- .../devicetree/bindings/nvmem/snvs-lpgpr.txt          | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+changes v4:
+ - change dependencies in Kconfig
+ - remove unused includes and order them alphabetically
+ - set MODULE_LICENSE = GPL v2
+ - remove unused int err variable
+
+changes v3:
+ - remove regmap and offset properties.
+
+changes v2:
+ - correct typos: Registe, parrent...
+
+Oleksij Rempel (3):
+  nvmem: dt: document SNVS LPGPR binding
+  nvmem: add snvs_lpgpr driver
+  ARM: dts: imx6qdl.dtsi: add "fsl,imx6q-snvs-lpgpr" node
+
+ .../devicetree/bindings/nvmem/snvs-lpgpr.txt       |  19 +++
+ arch/arm/boot/dts/imx6qdl.dtsi                     |   4 +
+ drivers/nvmem/Kconfig                              |  10 ++
+ drivers/nvmem/Makefile                             |   2 +
+ drivers/nvmem/snvs_lpgpr.c                         | 138 +++++++++++++++++++++
+ 5 files changed, 173 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
+ create mode 100644 drivers/nvmem/snvs_lpgpr.c
 
-diff --git a/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt b/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
-new file mode 100644
-index 000000000000..21910fb3159f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
-@@ -0,0 +1,19 @@
-+Device tree bindings for Low Power General Purpose Register found in i.MX6Q/D
-+Secure Non-Volatile Storage.
-+
-+This DT node should be represented as a sub-node of a "syscon",
-+"simple-mfd" node.
-+
-+Required properties:
-+- compatible: should be:
-+	"fsl,imx6q-snvs-lpgpr" for Freescale i.MX6Q/D/DL/S
-+
-+Example:
-+snvs: snvs at 020cc000 {
-+	compatible = "fsl,sec-v4.0-mon", "syscon", "simple-mfd";
-+	reg = <0x020cc000 0x4000>;
-+
-+	snvs_lpgpr: snvs-lpgpr {
-+		compatible = "fsl,imx6q-snvs-lpgpr";
-+	};
-+};
 -- 
 2.11.0
