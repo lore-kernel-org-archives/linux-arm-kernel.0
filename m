@@ -1,59 +1,61 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri,  9 Jun 2017 23:34:36 +0800
-Subject: [PATCH] ARM: sun8i: h3: Enable EMAC with external PHY on Orange Pi
- Plus 2E
-Message-ID: <20170609153436.18370-1-wens@csie.org>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 9 Jun 2017 16:36:09 +0100
+Subject: [linux-sunxi] Re: [PATCH v2] arm64: allwinner: a64: Add initial
+ NanoPi A64 support
+In-Reply-To: <3049841d-36f0-a761-fbed-57971462697c@openedev.com>
+References: <1497012052-14027-1-git-send-email-jteki@openedev.com>
+ <1497012052-14027-2-git-send-email-jteki@openedev.com>
+ <20170609145141.aknbsis25vmy3rj6@flea.home>
+ <3049841d-36f0-a761-fbed-57971462697c@openedev.com>
+Message-ID: <3b4dda48-c403-88c4-5c89-63753f508d76@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Orange Pi Plus 2E, unlike the Orange Pi PC and PC Plus which its
-schematics are based on, uses an external Realtek RTL8211E PHY in
-RGMII mode, with a GPIO enabling the regulator for I/O signalling
-power supplies. The PHY's main power supply is enabled by the main
-5V power supply.
+Hi,
 
-Add the regulator and PHY nodes, and override the PHY phandle under
-the EMAC node, so that the EMAC works properly on this board.
+On 09/06/17 16:26, Jagan Teki wrote:
+> On Friday 09 June 2017 08:21 PM, Maxime Ripard wrote:
+>> Hi Jagan,
+>>
+>> On Fri, Jun 09, 2017 at 12:40:52PM +0000, Jagan Teki wrote:
+>>> +&i2c1 {
+>>> +    pinctrl-names = "default";
+>>> +    pinctrl-0 = <&i2c1_pins>;
+>>> +    status = "okay";
+>>> +};
+>>> +
+>>> +&i2c1_pins {
+>>> +    bias-pull-up;
+>>> +};
+>>
+>> What is connected on that bus?
+> 
+> i2c1 connected with gpio/i2s
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun8i-h3-orangepi-plus2e.dts | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+Those are the I2C pins connected to the headers. We have them in the
+other A64 DTs as well (Pine64, BananaPi).
+If that is not the right approach, we should discuss this and keep it
+consistent at least across the A64 boards.
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus2e.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus2e.dts
-index 5851a47a3089..80026f3caafc 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus2e.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus2e.dts
-@@ -50,4 +50,30 @@
- / {
- 	model = "Xunlong Orange Pi Plus 2E";
- 	compatible = "xunlong,orangepi-plus2e", "allwinner,sun8i-h3";
-+
-+	reg_gmac_3v3: gmac-3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "gmac-3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		startup-delay-us = <100000>;
-+		enable-active-high;
-+		gpio = <&pio 3 6 GPIO_ACTIVE_HIGH>; /* PD6 */
-+	};
-+};
-+
-+&emac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emac_rgmii_pins>;
-+	phy-supply = <&reg_gmac_3v3>;
-+	phy-handle = <&ext_rgmii_phy>;
-+	phy-mode = "rgmii";
-+	status = "okay";
-+};
-+
-+&mdio {
-+	ext_rgmii_phy: ethernet-phy at 1 {
-+		compatible = "ethernet-phy-ieee802.3-c22";
-+		reg = <1>;
-+	};
- };
--- 
-2.11.0
+>>
+>>> +&uart1 {
+>>> +    pinctrl-names = "default";
+>>> +    pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
+>>> +    status = "okay";
+>>> +};
+>>
+>> And on that UART?
+> 
+> uart1 for SDIO (Wifi connector, with RTS/CTS), this along with mmc1
+
+To be precise, UART1 (with h/w handshake) is connected to the Bluetooth
+part of the WiFi/BT chip, which is soldered on that board. Regardless of
+the actual *WiFi* support state BT should work already - at least it did
+when I tried this a few months ago on the Pine64 (although this involved
+some userland heavy lifting).
+Not sure what the approach here is in regard to the power supply and
+wake-up GPIOs, shall they be described in this node as well or is that
+up for userspace to control?
+
+Cheers,
+Andre.
