@@ -1,74 +1,58 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 10 Jun 2017 11:20:18 +0100
-Subject: [PATCH 1/2] arm:omap2+: put omap_uart_phys/virt/lsr in .text
- section when ZIMAGE is true
-In-Reply-To: <6C915D66-C962-4264-89C1-C75A0530A2A1@gmail.com>
-References: <1496888232-30764-1-git-send-email-hoeun.ryu@gmail.com>
- <6C915D66-C962-4264-89C1-C75A0530A2A1@gmail.com>
-Message-ID: <20170610102018.GX4902@n2100.armlinux.org.uk>
+From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
+Date: Sat, 10 Jun 2017 14:33:10 +0200
+Subject: patch "arm: ecard: fix dev_groups patch typo" added to
+ driver-core-testing
+Message-ID: <149709799097146@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 10, 2017 at 01:44:00PM +0900, Hoeun Ryu wrote:
-> Hello, Russell.
-> 
-> Would you please review this patch ?
 
-It's really up to Tony Lindgren, who is the OMAP maintainer.
+This is a note to let you know that I've just added the patch titled
 
-> 
-> Than you
-> 
-> > On Jun 8, 2017, at 11:16 AM, Hoeun Ryu <hoeun.ryu@gmail.com> wrote:
-> > 
-> > omap_uart_phys, omap_uart_virt and omap_uart_lsr reside in .data section
-> > and it's right implementation. But because of this, we cannot enable
-> > CONFIG_DEBUG_UNCOMPRESS. LL_DEBUG and DEBUG_UNCOMPRESS are very useful tools
-> > for debugging early boot stage when something goes wrong if you don't have
-> > any hardware based debugging tools like a JTAG debugger.
-> > This patch is to put the variables into .text section instead only when the
-> > DEBUG_LL_INCLUDE file is included in the kernel decompressor, which is only
-> > when ZIMAGE is defined.
-> > This patch does not change anything when DEBUG_LL_INCLUDE is included in
-> > the other kernel parts like arch/arm/kernel/*
-> > 
-> > Signed-off-by: Hoeun Ryu <hoeun.ryu@gmail.com>
-> > ---
-> > arch/arm/include/debug/omap2plus.S | 11 +++++++++++
-> > 1 file changed, 11 insertions(+)
-> > 
-> > diff --git a/arch/arm/include/debug/omap2plus.S b/arch/arm/include/debug/omap2plus.S
-> > index 6d867ae..6ce6ef9 100644
-> > --- a/arch/arm/include/debug/omap2plus.S
-> > +++ b/arch/arm/include/debug/omap2plus.S
-> > @@ -58,11 +58,22 @@
-> > 
-> > #define UART_OFFSET(addr)    ((addr) & 0x00ffffff)
-> > 
-> > +/*
-> > + * Definition of ZIMAGE is in arch/arm/boot/compressed/Makefile.
-> > + * Place the following block in .text section only when this file is
-> > + * included by arch/arm/boot/compressed/* to make it possible to
-> > + * enable CONFIG_DEBUG_UNCOMPRESS and DEBUG in arch/arm/boot/compressed/head.S
-> > + * on OMAP2+ SoCs.
-> > + */
-> > +#ifndef ZIMAGE
-> >        .pushsection .data
-> > +#endif
-> > omap_uart_phys:    .word    0
-> > omap_uart_virt:    .word    0
-> > omap_uart_lsr:    .word    0
-> > +#ifndef ZIMAGE
-> >        .popsection
-> > +#endif
-> > 
-> >        .macro    addruart, rp, rv, tmp
-> > 
-> > -- 
-> > 2.7.4
-> > 
+    arm: ecard: fix dev_groups patch typo
 
+to my driver-core git tree which can be found at
+    git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/driver-core.git
+in the driver-core-testing branch.
+
+The patch will show up in the next release of the linux-next tree
+(usually sometime within the next 24 hours during the week.)
+
+The patch will be merged to the driver-core-next branch sometime soon,
+after it passes testing, and the merge window is open.
+
+If you have any questions about this process, please let me know.
+
+
+>From 1b8b02f0d084a2d9a966d5ae004d49c8e76aa8cc Mon Sep 17 00:00:00 2001
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Sat, 10 Jun 2017 14:31:21 +0200
+Subject: arm: ecard: fix dev_groups patch typo
+
+Commit 71d1e5d71cec ("arm: ecard: use dev_groups and not dev_attrs for bus_type")
+had a typo in the resource attribute definition.  Fix that up.
+
+Reported-by: kbuild test robot <fengguang.wu@intel.com>
+Fixes: 71d1e5d71cec ("arm: ecard: use dev_groups and not dev_attrs for bus_type")
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: <linux-arm-kernel@lists.infradead.org>
+Signed-off-by: Greg Kroah-Hartman gregkh at linuxfoundation.org
+---
+ arch/arm/mach-rpc/ecard.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-rpc/ecard.c b/arch/arm/mach-rpc/ecard.c
+index f75b8b562d57..5966964222b5 100644
+--- a/arch/arm/mach-rpc/ecard.c
++++ b/arch/arm/mach-rpc/ecard.c
+@@ -789,7 +789,7 @@ static ssize_t resource_show(struct device *dev, struct device_attribute *attr,
+ 
+ 	return str - buf;
+ }
+-static DEVICE_ATTR_RO(resource_show)
++static DEVICE_ATTR_RO(resource)
+ 
+ static ssize_t vendor_show(struct device *dev, struct device_attribute *attr, char *buf)
+ {
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.13.1
