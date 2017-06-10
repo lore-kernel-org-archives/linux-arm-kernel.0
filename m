@@ -1,47 +1,147 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 10 Jun 2017 16:22:52 +0000
-Subject: [PATCH 06/12] crypto: arm64/sha2-ce - add non-SIMD scalar fallback
+Date: Sat, 10 Jun 2017 16:22:53 +0000
+Subject: [PATCH 07/12] crypto: arm64/aes-ce-cipher - match round key
+ endianness with generic code
 In-Reply-To: <1497111778-4210-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1497111778-4210-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1497111778-4210-7-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1497111778-4210-8-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm64 kernel will shortly disallow nested kernel mode NEON, so
-add a fallback to scalar code that can be invoked in that case.
+In order to be able to reuse the generic AES code as a fallback for
+situations where the NEON may not be used, update the key handling
+to match the byte order of the generic code: it stores round keys
+as sequences of 32-bit quantities rather than streams of bytes, and
+so our code needs to be updated to reflect that.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/crypto/Kconfig        |  3 +-
- arch/arm64/crypto/sha2-ce-glue.c | 30 +++++++++++++++++---
- arch/arm64/crypto/sha256-glue.c  |  1 +
- 3 files changed, 29 insertions(+), 5 deletions(-)
+ arch/arm64/crypto/aes-ce-ccm-core.S | 30 ++++++++---------
+ arch/arm64/crypto/aes-ce-cipher.c   | 35 +++++++++-----------
+ arch/arm64/crypto/aes-ce.S          | 12 +++----
+ 3 files changed, 37 insertions(+), 40 deletions(-)
 
-diff --git a/arch/arm64/crypto/Kconfig b/arch/arm64/crypto/Kconfig
-index 5d5953545dad..8cd145f9c1ff 100644
---- a/arch/arm64/crypto/Kconfig
-+++ b/arch/arm64/crypto/Kconfig
-@@ -24,8 +24,9 @@ config CRYPTO_SHA1_ARM64_CE
- 
- config CRYPTO_SHA2_ARM64_CE
- 	tristate "SHA-224/SHA-256 digest algorithm (ARMv8 Crypto Extensions)"
--	depends on ARM64 && KERNEL_MODE_NEON
-+	depends on KERNEL_MODE_NEON
- 	select CRYPTO_HASH
-+	select CRYPTO_SHA256_ARM64
- 
- config CRYPTO_GHASH_ARM64_CE
- 	tristate "GHASH (for GCM chaining mode) using ARMv8 Crypto Extensions"
-diff --git a/arch/arm64/crypto/sha2-ce-glue.c b/arch/arm64/crypto/sha2-ce-glue.c
-index 7cd587564a41..eb71543568b6 100644
---- a/arch/arm64/crypto/sha2-ce-glue.c
-+++ b/arch/arm64/crypto/sha2-ce-glue.c
+diff --git a/arch/arm64/crypto/aes-ce-ccm-core.S b/arch/arm64/crypto/aes-ce-ccm-core.S
+index 3363560c79b7..e3a375c4cb83 100644
+--- a/arch/arm64/crypto/aes-ce-ccm-core.S
++++ b/arch/arm64/crypto/aes-ce-ccm-core.S
 @@ -1,7 +1,7 @@
  /*
-  * sha2-ce-glue.c - SHA-224/SHA-256 using ARMv8 Crypto Extensions
+  * aesce-ccm-core.S - AES-CCM transform for ARMv8 with Crypto Extensions
   *
-- * Copyright (C) 2014 Linaro Ltd <ard.biesheuvel@linaro.org>
-+ * Copyright (C) 2014 - 2017 Linaro Ltd <ard.biesheuvel@linaro.org>
+- * Copyright (C) 2013 - 2014 Linaro Ltd <ard.biesheuvel@linaro.org>
++ * Copyright (C) 2013 - 2017 Linaro Ltd <ard.biesheuvel@linaro.org>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -32,7 +32,7 @@ ENTRY(ce_aes_ccm_auth_data)
+ 	beq	8f				/* out of input? */
+ 	cbnz	w8, 0b
+ 	eor	v0.16b, v0.16b, v1.16b
+-1:	ld1	{v3.16b}, [x4]			/* load first round key */
++1:	ld1	{v3.4s}, [x4]			/* load first round key */
+ 	prfm	pldl1strm, [x1]
+ 	cmp	w5, #12				/* which key size? */
+ 	add	x6, x4, #16
+@@ -42,17 +42,17 @@ ENTRY(ce_aes_ccm_auth_data)
+ 	mov	v5.16b, v3.16b
+ 	b	4f
+ 2:	mov	v4.16b, v3.16b
+-	ld1	{v5.16b}, [x6], #16		/* load 2nd round key */
++	ld1	{v5.4s}, [x6], #16		/* load 2nd round key */
+ 3:	aese	v0.16b, v4.16b
+ 	aesmc	v0.16b, v0.16b
+-4:	ld1	{v3.16b}, [x6], #16		/* load next round key */
++4:	ld1	{v3.4s}, [x6], #16		/* load next round key */
+ 	aese	v0.16b, v5.16b
+ 	aesmc	v0.16b, v0.16b
+-5:	ld1	{v4.16b}, [x6], #16		/* load next round key */
++5:	ld1	{v4.4s}, [x6], #16		/* load next round key */
+ 	subs	w7, w7, #3
+ 	aese	v0.16b, v3.16b
+ 	aesmc	v0.16b, v0.16b
+-	ld1	{v5.16b}, [x6], #16		/* load next round key */
++	ld1	{v5.4s}, [x6], #16		/* load next round key */
+ 	bpl	3b
+ 	aese	v0.16b, v4.16b
+ 	subs	w2, w2, #16			/* last data? */
+@@ -90,7 +90,7 @@ ENDPROC(ce_aes_ccm_auth_data)
+ 	 * 			 u32 rounds);
+ 	 */
+ ENTRY(ce_aes_ccm_final)
+-	ld1	{v3.16b}, [x2], #16		/* load first round key */
++	ld1	{v3.4s}, [x2], #16		/* load first round key */
+ 	ld1	{v0.16b}, [x0]			/* load mac */
+ 	cmp	w3, #12				/* which key size? */
+ 	sub	w3, w3, #2			/* modified # of rounds */
+@@ -100,17 +100,17 @@ ENTRY(ce_aes_ccm_final)
+ 	mov	v5.16b, v3.16b
+ 	b	2f
+ 0:	mov	v4.16b, v3.16b
+-1:	ld1	{v5.16b}, [x2], #16		/* load next round key */
++1:	ld1	{v5.4s}, [x2], #16		/* load next round key */
+ 	aese	v0.16b, v4.16b
+ 	aesmc	v0.16b, v0.16b
+ 	aese	v1.16b, v4.16b
+ 	aesmc	v1.16b, v1.16b
+-2:	ld1	{v3.16b}, [x2], #16		/* load next round key */
++2:	ld1	{v3.4s}, [x2], #16		/* load next round key */
+ 	aese	v0.16b, v5.16b
+ 	aesmc	v0.16b, v0.16b
+ 	aese	v1.16b, v5.16b
+ 	aesmc	v1.16b, v1.16b
+-3:	ld1	{v4.16b}, [x2], #16		/* load next round key */
++3:	ld1	{v4.4s}, [x2], #16		/* load next round key */
+ 	subs	w3, w3, #3
+ 	aese	v0.16b, v3.16b
+ 	aesmc	v0.16b, v0.16b
+@@ -137,31 +137,31 @@ CPU_LE(	rev	x8, x8			)	/* keep swabbed ctr in reg */
+ 	cmp	w4, #12				/* which key size? */
+ 	sub	w7, w4, #2			/* get modified # of rounds */
+ 	ins	v1.d[1], x9			/* no carry in lower ctr */
+-	ld1	{v3.16b}, [x3]			/* load first round key */
++	ld1	{v3.4s}, [x3]			/* load first round key */
+ 	add	x10, x3, #16
+ 	bmi	1f
+ 	bne	4f
+ 	mov	v5.16b, v3.16b
+ 	b	3f
+ 1:	mov	v4.16b, v3.16b
+-	ld1	{v5.16b}, [x10], #16		/* load 2nd round key */
++	ld1	{v5.4s}, [x10], #16		/* load 2nd round key */
+ 2:	/* inner loop: 3 rounds, 2x interleaved */
+ 	aese	v0.16b, v4.16b
+ 	aesmc	v0.16b, v0.16b
+ 	aese	v1.16b, v4.16b
+ 	aesmc	v1.16b, v1.16b
+-3:	ld1	{v3.16b}, [x10], #16		/* load next round key */
++3:	ld1	{v3.4s}, [x10], #16		/* load next round key */
+ 	aese	v0.16b, v5.16b
+ 	aesmc	v0.16b, v0.16b
+ 	aese	v1.16b, v5.16b
+ 	aesmc	v1.16b, v1.16b
+-4:	ld1	{v4.16b}, [x10], #16		/* load next round key */
++4:	ld1	{v4.4s}, [x10], #16		/* load next round key */
+ 	subs	w7, w7, #3
+ 	aese	v0.16b, v3.16b
+ 	aesmc	v0.16b, v0.16b
+ 	aese	v1.16b, v3.16b
+ 	aesmc	v1.16b, v1.16b
+-	ld1	{v5.16b}, [x10], #16		/* load next round key */
++	ld1	{v5.4s}, [x10], #16		/* load next round key */
+ 	bpl	2b
+ 	aese	v0.16b, v4.16b
+ 	aese	v1.16b, v4.16b
+diff --git a/arch/arm64/crypto/aes-ce-cipher.c b/arch/arm64/crypto/aes-ce-cipher.c
+index 50d9fe11d0c8..a0a0e5e3a8b5 100644
+--- a/arch/arm64/crypto/aes-ce-cipher.c
++++ b/arch/arm64/crypto/aes-ce-cipher.c
+@@ -1,7 +1,7 @@
+ /*
+  * aes-ce-cipher.c - core AES cipher using ARMv8 Crypto Extensions
+  *
+- * Copyright (C) 2013 - 2014 Linaro Ltd <ard.biesheuvel@linaro.org>
++ * Copyright (C) 2013 - 2017 Linaro Ltd <ard.biesheuvel@linaro.org>
   *
   * This program is free software; you can redistribute it and/or modify
   * it under the terms of the GNU General Public License version 2 as
@@ -49,82 +149,134 @@ index 7cd587564a41..eb71543568b6 100644
   */
  
  #include <asm/neon.h>
-+#include <asm/simd.h>
- #include <asm/unaligned.h>
- #include <crypto/internal/hash.h>
- #include <crypto/sha.h>
-@@ -32,13 +33,19 @@ struct sha256_ce_state {
- asmlinkage void sha2_ce_transform(struct sha256_ce_state *sst, u8 const *src,
- 				  int blocks);
++#include <asm/unaligned.h>
+ #include <crypto/aes.h>
+ #include <linux/cpufeature.h>
+ #include <linux/crypto.h>
+@@ -47,24 +48,24 @@ static void aes_cipher_encrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
+ 	kernel_neon_begin_partial(4);
  
-+asmlinkage void sha256_block_data_order(u32 *digest, u8 const *src, int blocks);
-+
- static int sha256_ce_update(struct shash_desc *desc, const u8 *data,
- 			    unsigned int len)
- {
- 	struct sha256_ce_state *sctx = shash_desc_ctx(desc);
+ 	__asm__("	ld1	{v0.16b}, %[in]			;"
+-		"	ld1	{v1.16b}, [%[key]], #16		;"
++		"	ld1	{v1.4s}, [%[key]], #16		;"
+ 		"	cmp	%w[rounds], #10			;"
+ 		"	bmi	0f				;"
+ 		"	bne	3f				;"
+ 		"	mov	v3.16b, v1.16b			;"
+ 		"	b	2f				;"
+ 		"0:	mov	v2.16b, v1.16b			;"
+-		"	ld1	{v3.16b}, [%[key]], #16		;"
++		"	ld1	{v3.4s}, [%[key]], #16		;"
+ 		"1:	aese	v0.16b, v2.16b			;"
+ 		"	aesmc	v0.16b, v0.16b			;"
+-		"2:	ld1	{v1.16b}, [%[key]], #16		;"
++		"2:	ld1	{v1.4s}, [%[key]], #16		;"
+ 		"	aese	v0.16b, v3.16b			;"
+ 		"	aesmc	v0.16b, v0.16b			;"
+-		"3:	ld1	{v2.16b}, [%[key]], #16		;"
++		"3:	ld1	{v2.4s}, [%[key]], #16		;"
+ 		"	subs	%w[rounds], %w[rounds], #3	;"
+ 		"	aese	v0.16b, v1.16b			;"
+ 		"	aesmc	v0.16b, v0.16b			;"
+-		"	ld1	{v3.16b}, [%[key]], #16		;"
++		"	ld1	{v3.4s}, [%[key]], #16		;"
+ 		"	bpl	1b				;"
+ 		"	aese	v0.16b, v2.16b			;"
+ 		"	eor	v0.16b, v0.16b, v3.16b		;"
+@@ -92,24 +93,24 @@ static void aes_cipher_decrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
+ 	kernel_neon_begin_partial(4);
  
-+	if (!may_use_simd())
-+		return sha256_base_do_update(desc, data, len,
-+				(sha256_block_fn *)sha256_block_data_order);
-+
- 	sctx->finalize = 0;
--	kernel_neon_begin_partial(28);
-+	kernel_neon_begin();
- 	sha256_base_do_update(desc, data, len,
- 			      (sha256_block_fn *)sha2_ce_transform);
- 	kernel_neon_end();
-@@ -57,13 +64,22 @@ static int sha256_ce_finup(struct shash_desc *desc, const u8 *data,
- 	ASM_EXPORT(sha256_ce_offsetof_finalize,
- 		   offsetof(struct sha256_ce_state, finalize));
+ 	__asm__("	ld1	{v0.16b}, %[in]			;"
+-		"	ld1	{v1.16b}, [%[key]], #16		;"
++		"	ld1	{v1.4s}, [%[key]], #16		;"
+ 		"	cmp	%w[rounds], #10			;"
+ 		"	bmi	0f				;"
+ 		"	bne	3f				;"
+ 		"	mov	v3.16b, v1.16b			;"
+ 		"	b	2f				;"
+ 		"0:	mov	v2.16b, v1.16b			;"
+-		"	ld1	{v3.16b}, [%[key]], #16		;"
++		"	ld1	{v3.4s}, [%[key]], #16		;"
+ 		"1:	aesd	v0.16b, v2.16b			;"
+ 		"	aesimc	v0.16b, v0.16b			;"
+-		"2:	ld1	{v1.16b}, [%[key]], #16		;"
++		"2:	ld1	{v1.4s}, [%[key]], #16		;"
+ 		"	aesd	v0.16b, v3.16b			;"
+ 		"	aesimc	v0.16b, v0.16b			;"
+-		"3:	ld1	{v2.16b}, [%[key]], #16		;"
++		"3:	ld1	{v2.4s}, [%[key]], #16		;"
+ 		"	subs	%w[rounds], %w[rounds], #3	;"
+ 		"	aesd	v0.16b, v1.16b			;"
+ 		"	aesimc	v0.16b, v0.16b			;"
+-		"	ld1	{v3.16b}, [%[key]], #16		;"
++		"	ld1	{v3.4s}, [%[key]], #16		;"
+ 		"	bpl	1b				;"
+ 		"	aesd	v0.16b, v2.16b			;"
+ 		"	eor	v0.16b, v0.16b, v3.16b		;"
+@@ -165,20 +166,16 @@ int ce_aes_expandkey(struct crypto_aes_ctx *ctx, const u8 *in_key,
+ 	    key_len != AES_KEYSIZE_256)
+ 		return -EINVAL;
  
-+	if (!may_use_simd()) {
-+		if (len)
-+			sha256_base_do_update(desc, data, len,
-+				(sha256_block_fn *)sha256_block_data_order);
-+		sha256_base_do_finalize(desc,
-+				(sha256_block_fn *)sha256_block_data_order);
-+		return sha256_base_finish(desc, out);
-+	}
-+
- 	/*
- 	 * Allow the asm code to perform the finalization if there is no
- 	 * partial data and the input is a round multiple of the block size.
- 	 */
- 	sctx->finalize = finalize;
+-	memcpy(ctx->key_enc, in_key, key_len);
+ 	ctx->key_length = key_len;
++	for (i = 0; i < kwords; i++)
++		ctx->key_enc[i] = get_unaligned_le32(in_key + i * sizeof(u32));
  
--	kernel_neon_begin_partial(28);
-+	kernel_neon_begin();
- 	sha256_base_do_update(desc, data, len,
- 			      (sha256_block_fn *)sha2_ce_transform);
- 	if (!finalize)
-@@ -77,8 +93,14 @@ static int sha256_ce_final(struct shash_desc *desc, u8 *out)
- {
- 	struct sha256_ce_state *sctx = shash_desc_ctx(desc);
+ 	kernel_neon_begin_partial(2);
+ 	for (i = 0; i < sizeof(rcon); i++) {
+ 		u32 *rki = ctx->key_enc + (i * kwords);
+ 		u32 *rko = rki + kwords;
  
-+	if (!may_use_simd()) {
-+		sha256_base_do_finalize(desc,
-+				(sha256_block_fn *)sha256_block_data_order);
-+		return sha256_base_finish(desc, out);
-+	}
-+
- 	sctx->finalize = 0;
--	kernel_neon_begin_partial(28);
-+	kernel_neon_begin();
- 	sha256_base_do_finalize(desc, (sha256_block_fn *)sha2_ce_transform);
- 	kernel_neon_end();
- 	return sha256_base_finish(desc, out);
-diff --git a/arch/arm64/crypto/sha256-glue.c b/arch/arm64/crypto/sha256-glue.c
-index a2226f841960..b064d925fe2a 100644
---- a/arch/arm64/crypto/sha256-glue.c
-+++ b/arch/arm64/crypto/sha256-glue.c
-@@ -29,6 +29,7 @@ MODULE_ALIAS_CRYPTO("sha256");
+-#ifndef CONFIG_CPU_BIG_ENDIAN
+ 		rko[0] = ror32(aes_sub(rki[kwords - 1]), 8) ^ rcon[i] ^ rki[0];
+-#else
+-		rko[0] = rol32(aes_sub(rki[kwords - 1]), 8) ^ (rcon[i] << 24) ^
+-			 rki[0];
+-#endif
+ 		rko[1] = rko[0] ^ rki[1];
+ 		rko[2] = rko[1] ^ rki[2];
+ 		rko[3] = rko[2] ^ rki[3];
+@@ -210,9 +207,9 @@ int ce_aes_expandkey(struct crypto_aes_ctx *ctx, const u8 *in_key,
  
- asmlinkage void sha256_block_data_order(u32 *digest, const void *data,
- 					unsigned int num_blks);
-+EXPORT_SYMBOL(sha256_block_data_order);
+ 	key_dec[0] = key_enc[j];
+ 	for (i = 1, j--; j > 0; i++, j--)
+-		__asm__("ld1	{v0.16b}, %[in]		;"
++		__asm__("ld1	{v0.4s}, %[in]		;"
+ 			"aesimc	v1.16b, v0.16b		;"
+-			"st1	{v1.16b}, %[out]	;"
++			"st1	{v1.4s}, %[out]	;"
  
- asmlinkage void sha256_block_neon(u32 *digest, const void *data,
- 				  unsigned int num_blks);
+ 		:	[out]	"=Q"(key_dec[i])
+ 		:	[in]	"Q"(key_enc[j])
+diff --git a/arch/arm64/crypto/aes-ce.S b/arch/arm64/crypto/aes-ce.S
+index b46093d567e5..50330f5c3adc 100644
+--- a/arch/arm64/crypto/aes-ce.S
++++ b/arch/arm64/crypto/aes-ce.S
+@@ -2,7 +2,7 @@
+  * linux/arch/arm64/crypto/aes-ce.S - AES cipher for ARMv8 with
+  *                                    Crypto Extensions
+  *
+- * Copyright (C) 2013 Linaro Ltd <ard.biesheuvel@linaro.org>
++ * Copyright (C) 2013 - 2017 Linaro Ltd <ard.biesheuvel@linaro.org>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -22,11 +22,11 @@
+ 	cmp		\rounds, #12
+ 	blo		2222f		/* 128 bits */
+ 	beq		1111f		/* 192 bits */
+-	ld1		{v17.16b-v18.16b}, [\rk], #32
+-1111:	ld1		{v19.16b-v20.16b}, [\rk], #32
+-2222:	ld1		{v21.16b-v24.16b}, [\rk], #64
+-	ld1		{v25.16b-v28.16b}, [\rk], #64
+-	ld1		{v29.16b-v31.16b}, [\rk]
++	ld1		{v17.4s-v18.4s}, [\rk], #32
++1111:	ld1		{v19.4s-v20.4s}, [\rk], #32
++2222:	ld1		{v21.4s-v24.4s}, [\rk], #64
++	ld1		{v25.4s-v28.4s}, [\rk], #64
++	ld1		{v29.4s-v31.4s}, [\rk]
+ 	.endm
+ 
+ 	/* prepare for encryption with key in rk[] */
 -- 
 2.7.4
