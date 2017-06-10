@@ -1,97 +1,57 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 10 Jun 2017 16:22:46 +0000
-Subject: [PATCH 00/12] arm64: crypto: prepare for new kernel mode NEON policy
-Message-ID: <1497111778-4210-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Sat, 10 Jun 2017 16:22:49 +0000
+Subject: [PATCH 03/12] crypto: arm64/crct10dif - add non-SIMD generic fallback
+In-Reply-To: <1497111778-4210-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1497111778-4210-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1497111778-4210-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TL;DR: preparatory work for expected changes in arm64's handling of kernel
-       mode SIMD
+The arm64 kernel will shortly disallow nested kernel mode NEON, so
+add a fallback to scalar C code that can be invoked in that case.
 
-@Herbert: The arm64 maintainers may want to take this through the arm64 tree,
-          and if not, we need their acks on patch #1. Thanks.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/crypto/crct10dif-ce-glue.c | 13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
 
-Currently, arm64 allows kernel mode NEON (KMN) in process, softirq or hardirq
-context. In the process case, we preserve/restore the NEON context lazily,
-but in the softirq/hardirq cases, we eagerly stash a slice of the NEON
-register file, and immediately restore it when kernel_neon_end() is called.
-
-Given the above, arm64 actually does not use the generic may_use_simd() API
-at all*, which was added to allow async wrappers of synchronous SIMD routines
-to be implemented in a generic manner. (On x86, kernel mode SIMD may be used
-in process context or while serving an interrupt taken from user space. On ARM,
-SIMD may only be used in process context)
-
-When adding support for the SVE architecture extension, which shared part of
-the NEON register file with the SIMD and crypto extensions, the eager preserve/
-restore in interrupt context is becoming a problem: it should either preserve
-and restore the entire SVE state (which may be up to 8 KB in size), or it
-should not be allowed to interrupt the lazy preserve, which does need to deal
-with the large SVE state anyway. Otherwise, such an interruption would corrupt
-the NEON state the lazy preserve sees after the interruption.
-
-Given how
-a) KMN is never actually used in hardirq context,
-b) KMN is only used in softirq context by mac80211 code running on behalf of
-   WiFi devices that don't perform the crypto in hardware,
-b) KMN in softirq context is statistically unlikely to interrupt the kernel
-   while it is doing kernel mode NEON in process context,
-
-the unconditional eager preserve/restore typically executes when no KMN in
-process context is in progress, and we can simplify things substantially by
-disallowing nested KMN, i.e., disallow KMN in hardirq context, and allow KMN
-in softirq only if no KMN in process context is already in progress.
-
-The no-nesting rule leaves only the outer SVE-aware lazy preserve/restore,
-which needs to execute with bottom halves disabled, but other than that, no
-intrusive changes should be needed to deal with the SVE payloads.
-
-Given that the no-nesting rule implies that SIMD is no longer allowed in any
-context, the KMN users need to be made aware of this. This series updates the
-current KMN users in the arm64 tree to take may_use_simd() into account. Since
-at this time, SIMD is still allowed in any context, an implementation of
-may_use_simd() is added that simply returns true (#1). It will be updated in
-the future when the no-nesting modifications are made.
-
-* may_use_simd() is only used as a hint in the SHA256 NEON code, since on some
-  microarchitectures, it is only marginally faster, and the eager preserve and
-  restore could actually make it slower.
-
-Ard Biesheuvel (12):
-  arm64: neon: replace generic definition of may_use_simd()
-  crypto: arm64/ghash-ce - add non-SIMD scalar fallback
-  crypto: arm64/crct10dif - add non-SIMD generic fallback
-  crypto: arm64/crc32 - add non-SIMD scalar fallback
-  crypto: arm64/sha1-ce - add non-SIMD generic fallback
-  crypto: arm64/sha2-ce - add non-SIMD scalar fallback
-  crypto: arm64/aes-ce-cipher - match round key endianness with generic
-    code
-  crypto: arm64/aes-ce-cipher: add non-SIMD generic fallback
-  crypto: arm64/aes-ce-ccm: add non-SIMD generic fallback
-  crypto: arm64/aes-blk - add a non-SIMD fallback for synchronous CTR
-  crypto: arm64/chacha20 - take may_use_simd() into account
-  crypto: arm64/aes-bs - implement non-SIMD fallback for AES-CTR
-
- arch/arm64/crypto/Kconfig              |  22 ++-
- arch/arm64/crypto/aes-ce-ccm-core.S    |  30 ++--
- arch/arm64/crypto/aes-ce-ccm-glue.c    | 152 +++++++++++++++-----
- arch/arm64/crypto/aes-ce-cipher.c      |  55 ++++---
- arch/arm64/crypto/aes-ce.S             |  12 +-
- arch/arm64/crypto/aes-ctr-fallback.h   |  55 +++++++
- arch/arm64/crypto/aes-glue.c           |  17 ++-
- arch/arm64/crypto/aes-neonbs-glue.c    |  48 ++++++-
- arch/arm64/crypto/chacha20-neon-glue.c |   5 +-
- arch/arm64/crypto/crc32-ce-glue.c      |  11 +-
- arch/arm64/crypto/crct10dif-ce-glue.c  |  13 +-
- arch/arm64/crypto/ghash-ce-glue.c      |  49 +++++--
- arch/arm64/crypto/sha1-ce-glue.c       |  18 ++-
- arch/arm64/crypto/sha2-ce-glue.c       |  30 +++-
- arch/arm64/crypto/sha256-glue.c        |   1 +
- arch/arm64/include/asm/Kbuild          |   1 -
- arch/arm64/include/asm/simd.h          |  24 ++++
- 17 files changed, 420 insertions(+), 123 deletions(-)
- create mode 100644 arch/arm64/crypto/aes-ctr-fallback.h
- create mode 100644 arch/arm64/include/asm/simd.h
-
+diff --git a/arch/arm64/crypto/crct10dif-ce-glue.c b/arch/arm64/crypto/crct10dif-ce-glue.c
+index 60cb590c2590..96f0cae4a022 100644
+--- a/arch/arm64/crypto/crct10dif-ce-glue.c
++++ b/arch/arm64/crypto/crct10dif-ce-glue.c
+@@ -1,7 +1,7 @@
+ /*
+  * Accelerated CRC-T10DIF using arm64 NEON and Crypto Extensions instructions
+  *
+- * Copyright (C) 2016 Linaro Ltd <ard.biesheuvel@linaro.org>
++ * Copyright (C) 2016 - 2017 Linaro Ltd <ard.biesheuvel@linaro.org>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -18,6 +18,7 @@
+ #include <crypto/internal/hash.h>
+ 
+ #include <asm/neon.h>
++#include <asm/simd.h>
+ 
+ #define CRC_T10DIF_PMULL_CHUNK_SIZE	16U
+ 
+@@ -48,9 +49,13 @@ static int crct10dif_update(struct shash_desc *desc, const u8 *data,
+ 	}
+ 
+ 	if (length > 0) {
+-		kernel_neon_begin_partial(14);
+-		*crc = crc_t10dif_pmull(*crc, data, length);
+-		kernel_neon_end();
++		if (may_use_simd()) {
++			kernel_neon_begin();
++			*crc = crc_t10dif_pmull(*crc, data, length);
++			kernel_neon_end();
++		} else {
++			*crc = crc_t10dif_generic(*crc, data, length);
++		}
+ 	}
+ 
+ 	return 0;
 -- 
 2.7.4
