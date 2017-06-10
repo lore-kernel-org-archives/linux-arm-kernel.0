@@ -1,80 +1,95 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Sat, 10 Jun 2017 23:26:47 +0800
-Subject: [linux-sunxi] Re: [PATCH v2 01/11] dt-bindings: update the
- binding for Allwinner H3 TVE support
-In-Reply-To: <7305754.diZEu7DK25@jernej-laptop>
-References: <20170604160149.30230-1-icenowy@aosc.io>
- <20170609164915.enap3epreg5vr2gy@flea.home>
- <53E8FC74-8AC0-461A-B875-812EE4A3267E@aosc.io>
- <7305754.diZEu7DK25@jernej-laptop>
-Message-ID: <34f5ad92200d09a854d4b62ef7d60a4f@aosc.io>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 10 Jun 2017 18:17:14 +0200
+Subject: [PATCH 4/4] ARM: multi_v7_defconfig: Switch AXP20x driver from
+ module to built-in
+In-Reply-To: <CAOi56cW8jimRGkFMAf3daL_SLBGr=TmxFnE-MKCnogci7Kr=oQ@mail.gmail.com>
+References: <937914a68e4e7d6db2d12540cc6253b200978e2d.1486590875.git.rask@formelder.dk>
+ <49ad3e66452bd78da7b9e581129f76633c56e609.1486590875.git.rask@formelder.dk>
+ <20170210084213.uzf25soh7bl73a6g@lukather>
+ <CAOi56cV=UBEFQ6V4LLNrHDaDJgb33mrCA6Z+vj_3VziOpkRcvQ@mail.gmail.com>
+ <CAOi56cXLo5LaT8CgfwB991gq+gCv4OY3VNkGWviooq43=6Wayg@mail.gmail.com>
+ <20170522074414.3qz2wpw4cs2btkhv@flea.lan>
+ <CAOi56cW8jimRGkFMAf3daL_SLBGr=TmxFnE-MKCnogci7Kr=oQ@mail.gmail.com>
+Message-ID: <20170610161714.wiztqlnwz5qu73fz@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-06-10 05:24?Jernej ?krabec ???
-> Hi!
+On Tue, Jun 06, 2017 at 12:45:17PM -0700, Kevin Hilman wrote:
+> On Mon, May 22, 2017 at 12:44 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi Kevin,
+> >
+> > On Thu, May 18, 2017 at 11:59:50AM -0700, Kevin Hilman wrote:
+> >> On Fri, Mar 17, 2017 at 10:39 AM, Kevin Hilman <khilman@baylibre.com> wrote:
+> >> > On Fri, Feb 10, 2017 at 12:42 AM, Maxime Ripard
+> >> > <maxime.ripard@free-electrons.com> wrote:
+> >> >> On Wed, Feb 08, 2017 at 11:09:31PM +0100, Rask Ingemann Lambertsen wrote:
+> >> >>> The AXP20X regulator support is currently built as a module, which means
+> >> >>> it's not available until the root fs has been mounted, but the boot loader
+> >> >>> might not have enabled the required regulators, so build their drivers
+> >> >>> into the kernel.
+> >> >>>
+> >> >>> Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
+> >> >>
+> >> >> Queued for 4.12.
+> >> >
+> >> > Hello, kernelci.org is reporting boot failures on sun5i-r8-chip in
+> >> > linux-next[1]  for a few days and with a variety of defconfigs. I
+> >> > bisected it[2] down to this patch.
+> >> >
+> >> > I verified that reverting this patch on top of next-20170310 makes my
+> >> > chip board boot again.
+> >>
+> >> FYI... this board is still broken in linux-next (and now in mainline),
+> >> and reverting $SUBJECT patch still makes it work.
+> >>
+> >> Is nobody else using mainline on this board?
+> >
+> > I thought about that during the weekend, and it might just be a
+> > symptom.
+> >
+> > The CHIP has brown out issues, especially when you enable the WiFi
+> > chip, which should happen around the time of the failure when the PMIC
+> > regulator support is compiled as a module.
+> >
+> > We mitigate that in upstream's U-Boot by enabling the two regulators
+> > for the WiFi chip in U-boot, which levels a bit the current over the
+> > boot.
+> >
+> > You have a few ways to prevent that from happening. Having a better
+> > power supply / cable will help, I'm not sure how reasonable that is.
+> >
+> > Another thing that can work is, if your USB plugs can take it, to
+> > increase the overcurrent trigger in the PMIC, ideally in U-Boot.
+> >
+> > The last, and probably cleaner one, would be to just power it through
+> > the 5v input on its header, and not the USB. There's not current
+> > limitation there, so it shouldn't cause any problems anymore.
 > 
-> Dne petek, 09. junij 2017 ob 18:51:02 CEST je Icenowy Zheng napisal(a):
->> ? 2017?6?10? GMT+08:00 ??12:49:15, Maxime Ripard <maxime.ripard@free-
-> electrons.com> ??:
->> >On Wed, Jun 07, 2017 at 04:48:50PM +0800, Icenowy Zheng wrote:
->> >> >> @@ -189,6 +211,8 @@ supported.
->> >> >>
->> >> >>  Required properties:
->> >> >>    - compatible: value must be one of:
->> >> >>      * allwinner,sun8i-v3s-de2-mixer
->> >> >>
->> >> >> +    * allwinner,sun8i-h3-de2-mixer0
->> >> >> +    * allwinner,sun8i-h3-de2-mixer1
->> >> >
->> >> >Again, please explain why we need to have different compatibles
->> >> >here. If it's only about the number of planes, this should be dealt
->> >> >with a property, not a compatible.
->> >>
->> >> Only mixer0 has "VEP" and write-back support, at least on H3.
->> >
->> >What is that VEP? writeback support can also be expressed by a
->> >property.
->> 
->> I don't know what VEP is...
-> 
-> VEP is probably Video Enhancement Processor (?). Although I'm not sure 
-> if that
-> is really mixer specific. Icenowy, can you explain where did you get 
-> this info?
+> I'm now powering the board via the header (5V to the CHG-IN pin) and
+> it doesn't change anything.  Still fails in the same way, and
+> reverting $SUBJECT defconfig patch makes it work again.
 
-In 
-lichee/linux-3.4/drivers/video/sunxi/disp2/disp/de/lowlevel_sun8iw7/de_feat.c:
+I tried it today with sunxi_defconfig that has AXP20X_REGULATOR
+built-in as well. It can boot fine on my CHIP here.
 
-static const int de_is_support_vep[] = {
-	/* DISP0 CH0 */
-	1,
-	/* DISP0 CH1 */
-	0,
-	/* DISP0 CH2 */
-	0,
-	/* DISP0 CH3 */
-	0,
-	/* DISP1 CH0 */
-	0,
-	/* DISP1 CH1 */
-	0,
-};
+After looking at your failed boot example (1), I'm a bit
+puzzled. Where is supposed to be your filesystem?
 
-> 
-> Best regards,
-> Jernej
-> 
->> 
->> But we are really facing different cores, like sun50i-a64-mmc
->> and sun50i-a64-emmc.
->> 
->> >Maxime
->> 
->> --
->> You received this message because you are subscribed to the Google 
->> Groups
->> "linux-sunxi" group. To unsubscribe from this group and stop receiving
->> emails from it, send an email to 
->> linux-sunxi+unsubscribe at googlegroups.com.
->> For more options, visit https://groups.google.com/d/optout.
+You have a ubi rootfs, but we don't have the NAND enabled in mainline,
+so that cannot work. And you seem to load an initramfs earlier in
+U-Boot, but you don't pass it is your bootz call.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170610/d975ef1e/attachment-0001.sig>
