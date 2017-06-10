@@ -1,95 +1,97 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 10 Jun 2017 18:17:14 +0200
-Subject: [PATCH 4/4] ARM: multi_v7_defconfig: Switch AXP20x driver from
- module to built-in
-In-Reply-To: <CAOi56cW8jimRGkFMAf3daL_SLBGr=TmxFnE-MKCnogci7Kr=oQ@mail.gmail.com>
-References: <937914a68e4e7d6db2d12540cc6253b200978e2d.1486590875.git.rask@formelder.dk>
- <49ad3e66452bd78da7b9e581129f76633c56e609.1486590875.git.rask@formelder.dk>
- <20170210084213.uzf25soh7bl73a6g@lukather>
- <CAOi56cV=UBEFQ6V4LLNrHDaDJgb33mrCA6Z+vj_3VziOpkRcvQ@mail.gmail.com>
- <CAOi56cXLo5LaT8CgfwB991gq+gCv4OY3VNkGWviooq43=6Wayg@mail.gmail.com>
- <20170522074414.3qz2wpw4cs2btkhv@flea.lan>
- <CAOi56cW8jimRGkFMAf3daL_SLBGr=TmxFnE-MKCnogci7Kr=oQ@mail.gmail.com>
-Message-ID: <20170610161714.wiztqlnwz5qu73fz@flea.home>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 10 Jun 2017 16:22:46 +0000
+Subject: [PATCH 00/12] arm64: crypto: prepare for new kernel mode NEON policy
+Message-ID: <1497111778-4210-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 06, 2017 at 12:45:17PM -0700, Kevin Hilman wrote:
-> On Mon, May 22, 2017 at 12:44 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi Kevin,
-> >
-> > On Thu, May 18, 2017 at 11:59:50AM -0700, Kevin Hilman wrote:
-> >> On Fri, Mar 17, 2017 at 10:39 AM, Kevin Hilman <khilman@baylibre.com> wrote:
-> >> > On Fri, Feb 10, 2017 at 12:42 AM, Maxime Ripard
-> >> > <maxime.ripard@free-electrons.com> wrote:
-> >> >> On Wed, Feb 08, 2017 at 11:09:31PM +0100, Rask Ingemann Lambertsen wrote:
-> >> >>> The AXP20X regulator support is currently built as a module, which means
-> >> >>> it's not available until the root fs has been mounted, but the boot loader
-> >> >>> might not have enabled the required regulators, so build their drivers
-> >> >>> into the kernel.
-> >> >>>
-> >> >>> Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
-> >> >>
-> >> >> Queued for 4.12.
-> >> >
-> >> > Hello, kernelci.org is reporting boot failures on sun5i-r8-chip in
-> >> > linux-next[1]  for a few days and with a variety of defconfigs. I
-> >> > bisected it[2] down to this patch.
-> >> >
-> >> > I verified that reverting this patch on top of next-20170310 makes my
-> >> > chip board boot again.
-> >>
-> >> FYI... this board is still broken in linux-next (and now in mainline),
-> >> and reverting $SUBJECT patch still makes it work.
-> >>
-> >> Is nobody else using mainline on this board?
-> >
-> > I thought about that during the weekend, and it might just be a
-> > symptom.
-> >
-> > The CHIP has brown out issues, especially when you enable the WiFi
-> > chip, which should happen around the time of the failure when the PMIC
-> > regulator support is compiled as a module.
-> >
-> > We mitigate that in upstream's U-Boot by enabling the two regulators
-> > for the WiFi chip in U-boot, which levels a bit the current over the
-> > boot.
-> >
-> > You have a few ways to prevent that from happening. Having a better
-> > power supply / cable will help, I'm not sure how reasonable that is.
-> >
-> > Another thing that can work is, if your USB plugs can take it, to
-> > increase the overcurrent trigger in the PMIC, ideally in U-Boot.
-> >
-> > The last, and probably cleaner one, would be to just power it through
-> > the 5v input on its header, and not the USB. There's not current
-> > limitation there, so it shouldn't cause any problems anymore.
-> 
-> I'm now powering the board via the header (5V to the CHG-IN pin) and
-> it doesn't change anything.  Still fails in the same way, and
-> reverting $SUBJECT defconfig patch makes it work again.
+TL;DR: preparatory work for expected changes in arm64's handling of kernel
+       mode SIMD
 
-I tried it today with sunxi_defconfig that has AXP20X_REGULATOR
-built-in as well. It can boot fine on my CHIP here.
+@Herbert: The arm64 maintainers may want to take this through the arm64 tree,
+          and if not, we need their acks on patch #1. Thanks.
 
-After looking at your failed boot example (1), I'm a bit
-puzzled. Where is supposed to be your filesystem?
+Currently, arm64 allows kernel mode NEON (KMN) in process, softirq or hardirq
+context. In the process case, we preserve/restore the NEON context lazily,
+but in the softirq/hardirq cases, we eagerly stash a slice of the NEON
+register file, and immediately restore it when kernel_neon_end() is called.
 
-You have a ubi rootfs, but we don't have the NAND enabled in mainline,
-so that cannot work. And you seem to load an initramfs earlier in
-U-Boot, but you don't pass it is your bootz call.
+Given the above, arm64 actually does not use the generic may_use_simd() API
+at all*, which was added to allow async wrappers of synchronous SIMD routines
+to be implemented in a generic manner. (On x86, kernel mode SIMD may be used
+in process context or while serving an interrupt taken from user space. On ARM,
+SIMD may only be used in process context)
 
-Maxime
+When adding support for the SVE architecture extension, which shared part of
+the NEON register file with the SIMD and crypto extensions, the eager preserve/
+restore in interrupt context is becoming a problem: it should either preserve
+and restore the entire SVE state (which may be up to 8 KB in size), or it
+should not be allowed to interrupt the lazy preserve, which does need to deal
+with the large SVE state anyway. Otherwise, such an interruption would corrupt
+the NEON state the lazy preserve sees after the interruption.
+
+Given how
+a) KMN is never actually used in hardirq context,
+b) KMN is only used in softirq context by mac80211 code running on behalf of
+   WiFi devices that don't perform the crypto in hardware,
+b) KMN in softirq context is statistically unlikely to interrupt the kernel
+   while it is doing kernel mode NEON in process context,
+
+the unconditional eager preserve/restore typically executes when no KMN in
+process context is in progress, and we can simplify things substantially by
+disallowing nested KMN, i.e., disallow KMN in hardirq context, and allow KMN
+in softirq only if no KMN in process context is already in progress.
+
+The no-nesting rule leaves only the outer SVE-aware lazy preserve/restore,
+which needs to execute with bottom halves disabled, but other than that, no
+intrusive changes should be needed to deal with the SVE payloads.
+
+Given that the no-nesting rule implies that SIMD is no longer allowed in any
+context, the KMN users need to be made aware of this. This series updates the
+current KMN users in the arm64 tree to take may_use_simd() into account. Since
+at this time, SIMD is still allowed in any context, an implementation of
+may_use_simd() is added that simply returns true (#1). It will be updated in
+the future when the no-nesting modifications are made.
+
+* may_use_simd() is only used as a hint in the SHA256 NEON code, since on some
+  microarchitectures, it is only marginally faster, and the eager preserve and
+  restore could actually make it slower.
+
+Ard Biesheuvel (12):
+  arm64: neon: replace generic definition of may_use_simd()
+  crypto: arm64/ghash-ce - add non-SIMD scalar fallback
+  crypto: arm64/crct10dif - add non-SIMD generic fallback
+  crypto: arm64/crc32 - add non-SIMD scalar fallback
+  crypto: arm64/sha1-ce - add non-SIMD generic fallback
+  crypto: arm64/sha2-ce - add non-SIMD scalar fallback
+  crypto: arm64/aes-ce-cipher - match round key endianness with generic
+    code
+  crypto: arm64/aes-ce-cipher: add non-SIMD generic fallback
+  crypto: arm64/aes-ce-ccm: add non-SIMD generic fallback
+  crypto: arm64/aes-blk - add a non-SIMD fallback for synchronous CTR
+  crypto: arm64/chacha20 - take may_use_simd() into account
+  crypto: arm64/aes-bs - implement non-SIMD fallback for AES-CTR
+
+ arch/arm64/crypto/Kconfig              |  22 ++-
+ arch/arm64/crypto/aes-ce-ccm-core.S    |  30 ++--
+ arch/arm64/crypto/aes-ce-ccm-glue.c    | 152 +++++++++++++++-----
+ arch/arm64/crypto/aes-ce-cipher.c      |  55 ++++---
+ arch/arm64/crypto/aes-ce.S             |  12 +-
+ arch/arm64/crypto/aes-ctr-fallback.h   |  55 +++++++
+ arch/arm64/crypto/aes-glue.c           |  17 ++-
+ arch/arm64/crypto/aes-neonbs-glue.c    |  48 ++++++-
+ arch/arm64/crypto/chacha20-neon-glue.c |   5 +-
+ arch/arm64/crypto/crc32-ce-glue.c      |  11 +-
+ arch/arm64/crypto/crct10dif-ce-glue.c  |  13 +-
+ arch/arm64/crypto/ghash-ce-glue.c      |  49 +++++--
+ arch/arm64/crypto/sha1-ce-glue.c       |  18 ++-
+ arch/arm64/crypto/sha2-ce-glue.c       |  30 +++-
+ arch/arm64/crypto/sha256-glue.c        |   1 +
+ arch/arm64/include/asm/Kbuild          |   1 -
+ arch/arm64/include/asm/simd.h          |  24 ++++
+ 17 files changed, 420 insertions(+), 123 deletions(-)
+ create mode 100644 arch/arm64/crypto/aes-ctr-fallback.h
+ create mode 100644 arch/arm64/include/asm/simd.h
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170610/d975ef1e/attachment-0001.sig>
+2.7.4
