@@ -1,86 +1,56 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Fri, 9 Jun 2017 17:19:31 -0700
-Subject: [PATCH v8 14/34] ARM: dts: imx6-sabreauto: add the ADV7180 video
- decoder
-In-Reply-To: <20170609232358.GA14181@amd>
-References: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
- <1496860453-6282-15-git-send-email-steve_longerbeam@mentor.com>
- <CAJ+vNU0C0=4hUq+g1P7yTzLzFPidfauQROPOVr4WQWKNZz_xmQ@mail.gmail.com>
- <dd5b29b7-bf92-5f03-caef-1843a9f32cd3@gmail.com> <20170609213843.GB28596@amd>
- <cb9d79e9-fa36-d0ad-3df6-27f1b8790f78@gmail.com> <20170609232358.GA14181@amd>
-Message-ID: <f5cad571-9147-1c72-47d9-4e6f68116f97@gmail.com>
+From: frowand.list@gmail.com (frowand.list at gmail.com)
+Date: Fri,  9 Jun 2017 17:26:32 -0700
+Subject: [PATCH] clocksource: fix read and iounmap of incorrect variable
+Message-ID: <1497054392-13783-1-git-send-email-frowand.list@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Frank Rowand <frank.rowand@sony.com>
 
+Fix boot warning 'Trying to vfree() nonexistent vm area'
+from arch_timer_mem_of_init().
 
-On 06/09/2017 04:23 PM, Pavel Machek wrote:
-> Hi!
-> 
->>>>> Steve,
->>>>>
->>>>> You need to remove the fim node now that you've moved this to V4L2 controls.
->>>>>
->>>>
->>>> Yep, I caught this just after sending the v8 patchset. I'll send
->>>> a v9 of this patch.
->>>
->>> This needs ack from devicetree people, then it can be merged. Can you
->>> be a bit more forceful getting the ack?
->>
->> OK, I need an Ack please, he said, in a forceful way. :)
-> 
-> I'd tune the force up a tiny bit more. This is not FreeBSD ;-). You
-> can read some emails from Linus for inspiration. Or drink few beers
-> and look at Al Viro's emails.
-> 
->> In fact Ack's are needed for all the changes to dts sources,
->> patches 4-14.
-> 
-> Actually, are they? Those should not need acks from device tree
-> people, just acks from ARM people, and those are easier to get... in
-> fact they should not need any acks, you should just send them to arm
-> people and get them merged.
+Refactored code attempts to read and iounmap using address frame
+instead of address ioremap(frame->cntbase).
 
+Fixes: c389d701dfb70 ("clocksource: arm_arch_timer: split MMIO timer probing.")
 
-Hans said he prefers to have the dts patches as part of the whole set
-rather than submitted separately. But I did add --to's for the ARM
-people for 4-14.
+Signed-off-by: Frank Rowand <frank.rowand@sony.com>
+---
 
+WARNING: CPU: 0 PID: 0 at mm/vmalloc.c:1514 iounmap+0x14/0x18
+Trying to vfree() nonexistent vm area (ee821000)
+Modules linked in:
+CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.12.0-rc1-dirty #1
+Hardware name: Generic DT based system
+[<c030f574>] (unwind_backtrace) from [<c030b8e0>] (show_stack+0x10/0x14)
+[<c030b8e0>] (show_stack) from [<c05f5204>] (dump_stack+0x6c/0x8c)
+[<c05f5204>] (dump_stack) from [<c031dcdc>] (__warn+0xd0/0xf8)
+[<c031dcdc>] (__warn) from [<c031ddac>] (warn_slowpath_fmt+0x38/0x48)
+[<c031ddac>] (warn_slowpath_fmt) from [<c0315e78>] (iounmap+0x14/0x18)
+[<c0315e78>] (iounmap) from [<c0d36e98>] (arch_timer_mem_of_init+0x224/0x414)
+[<c0d36e98>] (arch_timer_mem_of_init) from [<c0d36868>] (clocksource_probe+0x44/0xa8)
+[<c0d36868>] (clocksource_probe) from [<c0d00ae8>] (start_kernel+0x228/0x3a0)
+[<c0d00ae8>] (start_kernel) from [<0020807c>] (0x20807c)
 
-> 
-> 1-4 is just a documentation, and you have acks there. (Except 2?)
-> That's ready to be merged, probably via the media tree? Just make it
-> clear you want it merged.
+ drivers/clocksource/arm_arch_timer.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Yes, 1-3 now have Acks (binding docs).
-
-> 
-> 15,16 should be ready to. Media tree, too, I guess.
-
-Yes, those have Acks (video-mux entity functions and subdev driver).
-
-> 
-> drivers/staging is greg. Advantage is these do _not_ need to go after
-> the dts changes. It is a driver. Actually I'd normally add dts support
-> after the driver. So you can push it now.
-
-Right, Hans agrees, except that for staging drivers we don't really need
-an Ack from Greg.
-
-
-> 
->>> I don't think it makes sense to resubmit v9 before that. This is not a
->>> rocket science.
->>
->> I guess that makes sense, I'll wait for Ack's from all these patches
->> before submitting the entire patchset as v9.
-> 
-> You may want to split the series, according to mainainters, or just
-> ask the maintainers to merge the relevant parts. I believe most of it
-> can be pushed now.
-> 
-> Good luck,
-
-Thanks!
-Steve
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 4bed671e490e..8b5c30062d99 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -1209,9 +1209,9 @@ static int __init arch_timer_of_init(struct device_node *np)
+ 		return 0;
+ 	}
+ 
+-	rate = readl_relaxed(frame + CNTFRQ);
++	rate = readl_relaxed(base + CNTFRQ);
+ 
+-	iounmap(frame);
++	iounmap(base);
+ 
+ 	return rate;
+ }
+-- 
+Frank Rowand <frank.rowand@sony.com>
