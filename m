@@ -1,70 +1,71 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 10 Jun 2017 10:49:36 +0100
-Subject: [PATCH] clocksource: fix read and iounmap of incorrect variable
-In-Reply-To: <1497054392-13783-1-git-send-email-frowand.list@gmail.com>
- (frowand list's message of "Fri, 9 Jun 2017 17:26:32 -0700")
-References: <1497054392-13783-1-git-send-email-frowand.list@gmail.com>
-Message-ID: <87r2ysgojz.fsf@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sat, 10 Jun 2017 11:19:43 +0100
+Subject: [PATCH] arm:lpae: build TTB control register value from scratch
+ in v7_ttb_setup
+In-Reply-To: <448EF961-9178-4A3F-8995-F4E3466F4A92@gmail.com>
+References: <1496803173-4894-1-git-send-email-hoeun.ryu@gmail.com>
+ <448EF961-9178-4A3F-8995-F4E3466F4A92@gmail.com>
+Message-ID: <20170610101943.GW4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 09 2017 at  5:26:32 pm BST, frowand.list at gmail.com wrote:
-> From: Frank Rowand <frank.rowand@sony.com>
->
-> Fix boot warning 'Trying to vfree() nonexistent vm area'
-> from arch_timer_mem_of_init().
->
-> Refactored code attempts to read and iounmap using address frame
-> instead of address ioremap(frame->cntbase).
->
-> Fixes: c389d701dfb70 ("clocksource: arm_arch_timer: split MMIO timer probing.")
->
-> Signed-off-by: Frank Rowand <frank.rowand@sony.com>
-> ---
->
-> WARNING: CPU: 0 PID: 0 at mm/vmalloc.c:1514 iounmap+0x14/0x18
-> Trying to vfree() nonexistent vm area (ee821000)
-> Modules linked in:
-> CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.12.0-rc1-dirty #1
-> Hardware name: Generic DT based system
-> [<c030f574>] (unwind_backtrace) from [<c030b8e0>] (show_stack+0x10/0x14)
-> [<c030b8e0>] (show_stack) from [<c05f5204>] (dump_stack+0x6c/0x8c)
-> [<c05f5204>] (dump_stack) from [<c031dcdc>] (__warn+0xd0/0xf8)
-> [<c031dcdc>] (__warn) from [<c031ddac>] (warn_slowpath_fmt+0x38/0x48)
-> [<c031ddac>] (warn_slowpath_fmt) from [<c0315e78>] (iounmap+0x14/0x18)
-> [<c0315e78>] (iounmap) from [<c0d36e98>] (arch_timer_mem_of_init+0x224/0x414)
-> [<c0d36e98>] (arch_timer_mem_of_init) from [<c0d36868>] (clocksource_probe+0x44/0xa8)
-> [<c0d36868>] (clocksource_probe) from [<c0d00ae8>] (start_kernel+0x228/0x3a0)
-> [<c0d00ae8>] (start_kernel) from [<0020807c>] (0x20807c)
->
->  drivers/clocksource/arm_arch_timer.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 4bed671e490e..8b5c30062d99 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -1209,9 +1209,9 @@ static int __init arch_timer_of_init(struct device_node *np)
->  		return 0;
->  	}
->  
-> -	rate = readl_relaxed(frame + CNTFRQ);
-> +	rate = readl_relaxed(base + CNTFRQ);
->  
-> -	iounmap(frame);
-> +	iounmap(base);
->  
->  	return rate;
->  }
+On Sat, Jun 10, 2017 at 01:43:24PM +0900, Hoeun Ryu wrote:
+> Hello, Russell and Robin.
+> 
+> Would you please review this patch ?
 
-Ah, nice find.
+I think it's fine, thanks.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> Than you
+> 
+> > On Jun 7, 2017, at 11:39 AM, Hoeun Ryu <hoeun.ryu@gmail.com> wrote:
+> > 
+> > Reading TTBCR in early boot stage might return the value of the previous
+> > kernel's configuration, especially in case of kexec. For example, if
+> > normal kernel (first kernel) had run on a configuration of PHYS_OFFSET <=
+> > PAGE_OFFSET and crash kernel (second kernel) is running on a configuration
+> > PHYS_OFFSET > PAGE_OFFSET, which can happen because it depends on the
+> > reserved area for crash kernel, reading TTBCR and using the value to OR
+> > other bit fields might be risky because it doesn't have a reset value for
+> > TTBCR.
+> > 
+> > Suggested-by: Robin Murphy <robin.murphy@arm.com>
+> > Signed-off-by: Hoeun Ryu <hoeun.ryu@gmail.com>
+> > ---
+> > 
+> > * v1: amended based on
+> >          - "[PATCHv2] arm: LPAE: kexec: clear TTBCR.T1SZ explicitly when
+> >             PHYS_OFFSET > PAGE_OFFSET"
+> >          - https://lkml.org/lkml/2017/6/5/239
+> > 
+> > arch/arm/mm/proc-v7-3level.S | 3 +--
+> > 1 file changed, 1 insertion(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+> > index 5e5720e..7d16bbc 100644
+> > --- a/arch/arm/mm/proc-v7-3level.S
+> > +++ b/arch/arm/mm/proc-v7-3level.S
+> > @@ -129,8 +129,7 @@ ENDPROC(cpu_v7_set_pte_ext)
+> >    .macro    v7_ttb_setup, zero, ttbr0l, ttbr0h, ttbr1, tmp
+> >    ldr    \tmp, =swapper_pg_dir        @ swapper_pg_dir virtual address
+> >    cmp    \ttbr1, \tmp, lsr #12        @ PHYS_OFFSET > PAGE_OFFSET?
+> > -    mrc    p15, 0, \tmp, c2, c0, 2        @ TTB control egister
+> > -    orr    \tmp, \tmp, #TTB_EAE
+> > +    mov    \tmp, #TTB_EAE            @ for TTB control egister
+> >    ALT_SMP(orr    \tmp, \tmp, #TTB_FLAGS_SMP)
+> >    ALT_UP(orr    \tmp, \tmp, #TTB_FLAGS_UP)
+> >    ALT_SMP(orr    \tmp, \tmp, #TTB_FLAGS_SMP << 16)
+> > -- 
+> > 2.7.4
+> > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Thomas, Daniel: Can you queue this for the next -rc please?
-
-Thanks,
-
-        M.
 -- 
-Jazz is not dead, it just smell funny.
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
