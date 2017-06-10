@@ -1,65 +1,138 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 10 Jun 2017 16:22:47 +0000
-Subject: [PATCH 01/12] arm64: neon: replace generic definition of
- may_use_simd()
+Date: Sat, 10 Jun 2017 16:22:48 +0000
+Subject: [PATCH 02/12] crypto: arm64/ghash-ce - add non-SIMD scalar fallback
 In-Reply-To: <1497111778-4210-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1497111778-4210-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1497111778-4210-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1497111778-4210-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation of modifying the logic that decides whether kernel mode
-NEON is allowable, which is required for SVE support, introduce an
-implementation of may_use_simd() that reflects the current reality, i.e.,
-that SIMD is allowed in any context.
+The arm64 kernel will shortly disallow nested kernel mode NEON, so
+add a fallback to scalar C code that can be invoked in that case.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/Kbuild |  1 -
- arch/arm64/include/asm/simd.h | 24 ++++++++++++++++++++
- 2 files changed, 24 insertions(+), 1 deletion(-)
+ arch/arm64/crypto/Kconfig         |  3 +-
+ arch/arm64/crypto/ghash-ce-glue.c | 49 ++++++++++++++++----
+ 2 files changed, 43 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
-index a7a97a608033..3c469b557ee8 100644
---- a/arch/arm64/include/asm/Kbuild
-+++ b/arch/arm64/include/asm/Kbuild
-@@ -31,7 +31,6 @@ generic-y += sembuf.h
- generic-y += serial.h
- generic-y += set_memory.h
- generic-y += shmbuf.h
--generic-y += simd.h
- generic-y += sizes.h
- generic-y += socket.h
- generic-y += sockios.h
-diff --git a/arch/arm64/include/asm/simd.h b/arch/arm64/include/asm/simd.h
-new file mode 100644
-index 000000000000..f8aa7b3a0140
---- /dev/null
-+++ b/arch/arm64/include/asm/simd.h
-@@ -0,0 +1,24 @@
-+/*
-+ * Copyright (C) 2017 Linaro Ltd. <ard.biesheuvel@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published
-+ * by the Free Software Foundation.
-+ */
-+
-+#ifndef __ASM_SIMD_H
-+#define __ASM_SIMD_H
-+
-+#include <linux/compiler.h>
-+#include <linux/types.h>
-+
-+/*
-+ * may_use_simd - whether it is allowable at this time to issue SIMD
-+ *                instructions or access the SIMD register file
-+ */
-+static __must_check inline bool may_use_simd(void)
+diff --git a/arch/arm64/crypto/Kconfig b/arch/arm64/crypto/Kconfig
+index d92293747d63..7d75a363e317 100644
+--- a/arch/arm64/crypto/Kconfig
++++ b/arch/arm64/crypto/Kconfig
+@@ -28,8 +28,9 @@ config CRYPTO_SHA2_ARM64_CE
+ 
+ config CRYPTO_GHASH_ARM64_CE
+ 	tristate "GHASH (for GCM chaining mode) using ARMv8 Crypto Extensions"
+-	depends on ARM64 && KERNEL_MODE_NEON
++	depends on KERNEL_MODE_NEON
+ 	select CRYPTO_HASH
++	select CRYPTO_GF128MUL
+ 
+ config CRYPTO_CRCT10DIF_ARM64_CE
+ 	tristate "CRCT10DIF digest algorithm using PMULL instructions"
+diff --git a/arch/arm64/crypto/ghash-ce-glue.c b/arch/arm64/crypto/ghash-ce-glue.c
+index 833ec1e3f3e9..3e1a778b181a 100644
+--- a/arch/arm64/crypto/ghash-ce-glue.c
++++ b/arch/arm64/crypto/ghash-ce-glue.c
+@@ -1,7 +1,7 @@
+ /*
+  * Accelerated GHASH implementation with ARMv8 PMULL instructions.
+  *
+- * Copyright (C) 2014 Linaro Ltd. <ard.biesheuvel@linaro.org>
++ * Copyright (C) 2014 - 2017 Linaro Ltd. <ard.biesheuvel@linaro.org>
+  *
+  * This program is free software; you can redistribute it and/or modify it
+  * under the terms of the GNU General Public License version 2 as published
+@@ -9,7 +9,9 @@
+  */
+ 
+ #include <asm/neon.h>
++#include <asm/simd.h>
+ #include <asm/unaligned.h>
++#include <crypto/gf128mul.h>
+ #include <crypto/internal/hash.h>
+ #include <linux/cpufeature.h>
+ #include <linux/crypto.h>
+@@ -25,6 +27,7 @@ MODULE_LICENSE("GPL v2");
+ struct ghash_key {
+ 	u64 a;
+ 	u64 b;
++	be128 k;
+ };
+ 
+ struct ghash_desc_ctx {
+@@ -44,6 +47,36 @@ static int ghash_init(struct shash_desc *desc)
+ 	return 0;
+ }
+ 
++static void ghash_do_update(int blocks, u64 dg[], const char *src,
++			    struct ghash_key *key, const char *head)
 +{
-+	return true;
++	if (may_use_simd()) {
++		kernel_neon_begin();
++		pmull_ghash_update(blocks, dg, src, key, head);
++		kernel_neon_end();
++	} else {
++		be128 dst = { cpu_to_be64(dg[1]), cpu_to_be64(dg[0]) };
++
++		do {
++			const u8 *in = src;
++
++			if (head) {
++				in = head;
++				blocks++;
++				head = NULL;
++			} else {
++				src += GHASH_BLOCK_SIZE;
++			}
++
++			crypto_xor((u8 *)&dst, in, GHASH_BLOCK_SIZE);
++			gf128mul_lle(&dst, &key->k);
++		} while (--blocks);
++
++		dg[0] = be64_to_cpu(dst.b);
++		dg[1] = be64_to_cpu(dst.a);
++	}
 +}
 +
-+#endif
+ static int ghash_update(struct shash_desc *desc, const u8 *src,
+ 			unsigned int len)
+ {
+@@ -67,10 +100,9 @@ static int ghash_update(struct shash_desc *desc, const u8 *src,
+ 		blocks = len / GHASH_BLOCK_SIZE;
+ 		len %= GHASH_BLOCK_SIZE;
+ 
+-		kernel_neon_begin_partial(8);
+-		pmull_ghash_update(blocks, ctx->digest, src, key,
+-				   partial ? ctx->buf : NULL);
+-		kernel_neon_end();
++		ghash_do_update(blocks, ctx->digest, src, key,
++				partial ? ctx->buf : NULL);
++
+ 		src += blocks * GHASH_BLOCK_SIZE;
+ 		partial = 0;
+ 	}
+@@ -89,9 +121,7 @@ static int ghash_final(struct shash_desc *desc, u8 *dst)
+ 
+ 		memset(ctx->buf + partial, 0, GHASH_BLOCK_SIZE - partial);
+ 
+-		kernel_neon_begin_partial(8);
+-		pmull_ghash_update(1, ctx->digest, ctx->buf, key, NULL);
+-		kernel_neon_end();
++		ghash_do_update(1, ctx->digest, ctx->buf, key, NULL);
+ 	}
+ 	put_unaligned_be64(ctx->digest[1], dst);
+ 	put_unaligned_be64(ctx->digest[0], dst + 8);
+@@ -111,6 +141,9 @@ static int ghash_setkey(struct crypto_shash *tfm,
+ 		return -EINVAL;
+ 	}
+ 
++	/* needed for the fallback */
++	memcpy(&key->k, inkey, GHASH_BLOCK_SIZE);
++
+ 	/* perform multiplication by 'x' in GF(2^128) */
+ 	b = get_unaligned_be64(inkey);
+ 	a = get_unaligned_be64(inkey + 8);
 -- 
 2.7.4
