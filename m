@@ -1,49 +1,31 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 10 Jun 2017 09:35:12 +0200
-Subject: [PATCH v8 00/34] i.MX Media Driver
-In-Reply-To: <e4f152de-6e75-7654-178e-e6dcf9ad12f3@xs4all.nl>
-References: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
- <e7e4669c-2963-b9e1-edd7-02731a6e0f9c@xs4all.nl>
- <c0b69c93-b9cd-25e8-ea36-fc0600efdb69@gmail.com>
- <e4f152de-6e75-7654-178e-e6dcf9ad12f3@xs4all.nl>
-Message-ID: <20170610073512.GA15980@amd>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 10 Jun 2017 10:32:13 +0200
+Subject: [PATCH] ARM: sun6i: a31s: primo81: Enable battery power supply
+In-Reply-To: <20170609160549.3566-2-wens@csie.org>
+References: <20170609160549.3566-1-wens@csie.org>
+ <20170609160549.3566-2-wens@csie.org>
+Message-ID: <20170610083213.gsjkd7bzmul33hxy@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> >> Other than that everything is ready AFAICT.
-> >>
-> > 
-> > But as Pavel pointed out, in fact we are missing many
-> > Acks still, for all of the dts source changes (patches
-> > 4-14), as well as really everything else (imx-media staging
-> > driver patches).
+On Sat, Jun 10, 2017 at 12:05:49AM +0800, Chen-Yu Tsai wrote:
+> The MSI Primo81 tablet has a 3500 mAh 3.7V LiPo battery.
 > 
-> No Acks needed for the staging part. It's staging, so not held
-> to the same standards as non-staging parts. That doesn't mean
-> Acks aren't welcome, of course.
+> Enable the PMIC's battery power supply so the battery can be monitored.
 > 
-> You don't need Greg's Ack for staging/media either, patches there
-> go in via us (generally at least) and we handle those, not Greg.
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Ok, good.
+Applied both, thanks!
+Maxime
 
-Can you just apply the patches? This is staging, they can be
-reviewed/fixed there -- as expected for staging. They are already way
-beyond staging quality, we don't want to get to "series v17"
-here, and repeatedly sending them over the email does not really do
-them any good.
-
-Thanks,
-								Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170610/ae3ad840/attachment.sig>
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170610/5ab66edf/attachment.sig>
