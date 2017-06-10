@@ -1,73 +1,88 @@
-From: ohaugan@codeaurora.org (Olav Haugan)
-Date: Sat, 10 Jun 2017 12:41:10 -0700
-Subject: [PATCH] arm64/dma-mapping: Fix null-pointer check
-Message-ID: <20170610194110.27712-1-ohaugan@codeaurora.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 10 Jun 2017 22:28:31 +0200
+Subject: [linux-sunxi] Re: [PATCH v2] arm64: allwinner: a64: Add initial
+ NanoPi A64 support
+In-Reply-To: <3b4dda48-c403-88c4-5c89-63753f508d76@arm.com>
+References: <1497012052-14027-1-git-send-email-jteki@openedev.com>
+ <1497012052-14027-2-git-send-email-jteki@openedev.com>
+ <20170609145141.aknbsis25vmy3rj6@flea.home>
+ <3049841d-36f0-a761-fbed-57971462697c@openedev.com>
+ <3b4dda48-c403-88c4-5c89-63753f508d76@arm.com>
+Message-ID: <20170610202831.usdhtuqc4uqxojmr@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current null-pointer check in __dma_alloc_coherent and
-__dma_free_coherent is pretty much useless since we are dereferencing
-the pointer before checking for null.
-Check for null-pointer before the actual dereferencing of the pointer.
+On Fri, Jun 09, 2017 at 04:36:09PM +0100, Andre Przywara wrote:
+> Hi,
+> 
+> On 09/06/17 16:26, Jagan Teki wrote:
+> > On Friday 09 June 2017 08:21 PM, Maxime Ripard wrote:
+> >> Hi Jagan,
+> >>
+> >> On Fri, Jun 09, 2017 at 12:40:52PM +0000, Jagan Teki wrote:
+> >>> +&i2c1 {
+> >>> +    pinctrl-names = "default";
+> >>> +    pinctrl-0 = <&i2c1_pins>;
+> >>> +    status = "okay";
+> >>> +};
+> >>> +
+> >>> +&i2c1_pins {
+> >>> +    bias-pull-up;
+> >>> +};
+> >>
+> >> What is connected on that bus?
+> > 
+> > i2c1 connected with gpio/i2s
+> 
+> Those are the I2C pins connected to the headers. We have them in the
+> other A64 DTs as well (Pine64, BananaPi).
 
-Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
----
- arch/arm64/mm/dma-mapping.c | 21 +++++++++++----------
- 1 file changed, 11 insertions(+), 10 deletions(-)
+We've always had the policy of not enabling anything outside of the
+board has been there from the very start, arm64 or not.
 
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 3216e098c058..a4b65773711d 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -95,11 +95,6 @@ static void *__dma_alloc_coherent(struct device *dev, size_t size,
- 				  dma_addr_t *dma_handle, gfp_t flags,
- 				  unsigned long attrs)
- {
--	if (dev == NULL) {
--		WARN_ONCE(1, "Use an actual device structure for DMA allocation\n");
--		return NULL;
--	}
--
- 	if (IS_ENABLED(CONFIG_ZONE_DMA) &&
- 	    dev->coherent_dma_mask <= DMA_BIT_MASK(32))
- 		flags |= GFP_DMA;
-@@ -128,10 +123,6 @@ static void __dma_free_coherent(struct device *dev, size_t size,
- 	bool freed;
- 	phys_addr_t paddr = dma_to_phys(dev, dma_handle);
- 
--	if (dev == NULL) {
--		WARN_ONCE(1, "Use an actual device structure for DMA allocation\n");
--		return;
--	}
- 
- 	freed = dma_release_from_contiguous(dev,
- 					phys_to_page(paddr),
-@@ -149,6 +140,11 @@ static void *__dma_alloc(struct device *dev, size_t size,
- 	bool coherent = is_device_dma_coherent(dev);
- 	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, false);
- 
-+	if (!dev) {
-+		WARN_ONCE(1, "Use an actual device structure for DMA allocation\n");
-+		return NULL;
-+	}
-+
- 	size = PAGE_ALIGN(size);
- 
- 	if (!coherent && !gfpflags_allow_blocking(flags)) {
-@@ -192,8 +188,13 @@ static void __dma_free(struct device *dev, size_t size,
- 		       void *vaddr, dma_addr_t dma_handle,
- 		       unsigned long attrs)
- {
--	void *swiotlb_addr = phys_to_virt(dma_to_phys(dev, dma_handle));
-+	void *swiotlb_addr;
- 
-+	if (!dev) {
-+		WARN_ONCE(1, "Use an actual device structure for DMA free\n");
-+		return;
-+	}
-+	swiotlb_addr = phys_to_virt(dma_to_phys(dev, dma_handle));
- 	size = PAGE_ALIGN(size);
- 
- 	if (!is_device_dma_coherent(dev)) {
+> If that is not the right approach, we should discuss this and keep it
+> consistent at least across the A64 boards.
+
+If some boards slipped through, then that would be on me I guess,
+but it's (unfortunate) exceptions.
+
+If you want to ease that for the users, you can have that node with
+the pinctrl nodes pre-set, but leave it disabled. We have that on a
+number of boards already.
+
+> >>> +&uart1 {
+> >>> +    pinctrl-names = "default";
+> >>> +    pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
+> >>> +    status = "okay";
+> >>> +};
+> >>
+> >> And on that UART?
+> > 
+> > uart1 for SDIO (Wifi connector, with RTS/CTS), this along with mmc1
+> 
+> To be precise, UART1 (with h/w handshake) is connected to the Bluetooth
+> part of the WiFi/BT chip, which is soldered on that board. Regardless of
+> the actual *WiFi* support state BT should work already - at least it did
+> when I tried this a few months ago on the Pine64 (although this involved
+> some userland heavy lifting).
+> Not sure what the approach here is in regard to the power supply and
+> wake-up GPIOs, shall they be described in this node as well or is that
+> up for userspace to control?
+
+There's probably more to it though. Most BT chips require regulators
+and clocks to be enabled. Ideally, this would even be a full DT node
+for the bluetooth chip.
+
+Maxime
+
 -- 
-2.13.0
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170610/50069cd4/attachment.sig>
