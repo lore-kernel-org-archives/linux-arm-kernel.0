@@ -1,35 +1,31 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Sun, 11 Jun 2017 00:55:33 +0300
-Subject: [PATCH v8 17/34] [media] add Omnivision OV5640 sensor driver
-In-Reply-To: <1496860453-6282-18-git-send-email-steve_longerbeam@mentor.com>
-References: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
- <1496860453-6282-18-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <20170610215532.GU1019@valkosipuli.retiisi.org.uk>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sat, 10 Jun 2017 23:03:54 +0100
+Subject: [PATCH] arm64/dma-mapping: Fix null-pointer check
+In-Reply-To: <20170610194110.27712-1-ohaugan@codeaurora.org>
+References: <20170610194110.27712-1-ohaugan@codeaurora.org>
+Message-ID: <20170610220354.GY4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
+On Sat, Jun 10, 2017 at 12:41:10PM -0700, Olav Haugan wrote:
+> @@ -149,6 +140,11 @@ static void *__dma_alloc(struct device *dev, size_t size,
+>  	bool coherent = is_device_dma_coherent(dev);
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-On Wed, Jun 07, 2017 at 11:33:56AM -0700, Steve Longerbeam wrote:
-...
-> +/*
-> + * FIXME: remove this when a subdev API becomes available
-> + * to set the MIPI CSI-2 virtual channel.
-> + */
-> +static unsigned int virtual_channel;
-> +module_param(virtual_channel, int, 0);
-> +MODULE_PARM_DESC(virtual_channel,
-> +		 "MIPI CSI-2 virtual channel (0..3), default 0");
+This re-introduces an instance that you say you're getting rid of...
 
-If this works for you it's a good workaround. I hope we can address the
-matter properly soon --- it's related to data types, embedded data etc.
-
-For the patch:
-
-Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+>  	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, false);
+>  
+> +	if (!dev) {
+> +		WARN_ONCE(1, "Use an actual device structure for DMA allocation\n");
+> +		return NULL;
+> +	}
+> +
+>  	size = PAGE_ALIGN(size);
+>  
+>  	if (!coherent && !gfpflags_allow_blocking(flags)) {
 
 -- 
-Regards,
-
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
