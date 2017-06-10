@@ -1,57 +1,65 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 10 Jun 2017 16:22:49 +0000
-Subject: [PATCH 03/12] crypto: arm64/crct10dif - add non-SIMD generic fallback
+Date: Sat, 10 Jun 2017 16:22:47 +0000
+Subject: [PATCH 01/12] arm64: neon: replace generic definition of
+ may_use_simd()
 In-Reply-To: <1497111778-4210-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1497111778-4210-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1497111778-4210-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1497111778-4210-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm64 kernel will shortly disallow nested kernel mode NEON, so
-add a fallback to scalar C code that can be invoked in that case.
+In preparation of modifying the logic that decides whether kernel mode
+NEON is allowable, which is required for SVE support, introduce an
+implementation of may_use_simd() that reflects the current reality, i.e.,
+that SIMD is allowed in any context.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/crypto/crct10dif-ce-glue.c | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/Kbuild |  1 -
+ arch/arm64/include/asm/simd.h | 24 ++++++++++++++++++++
+ 2 files changed, 24 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/crypto/crct10dif-ce-glue.c b/arch/arm64/crypto/crct10dif-ce-glue.c
-index 60cb590c2590..96f0cae4a022 100644
---- a/arch/arm64/crypto/crct10dif-ce-glue.c
-+++ b/arch/arm64/crypto/crct10dif-ce-glue.c
-@@ -1,7 +1,7 @@
- /*
-  * Accelerated CRC-T10DIF using arm64 NEON and Crypto Extensions instructions
-  *
-- * Copyright (C) 2016 Linaro Ltd <ard.biesheuvel@linaro.org>
-+ * Copyright (C) 2016 - 2017 Linaro Ltd <ard.biesheuvel@linaro.org>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -18,6 +18,7 @@
- #include <crypto/internal/hash.h>
- 
- #include <asm/neon.h>
-+#include <asm/simd.h>
- 
- #define CRC_T10DIF_PMULL_CHUNK_SIZE	16U
- 
-@@ -48,9 +49,13 @@ static int crct10dif_update(struct shash_desc *desc, const u8 *data,
- 	}
- 
- 	if (length > 0) {
--		kernel_neon_begin_partial(14);
--		*crc = crc_t10dif_pmull(*crc, data, length);
--		kernel_neon_end();
-+		if (may_use_simd()) {
-+			kernel_neon_begin();
-+			*crc = crc_t10dif_pmull(*crc, data, length);
-+			kernel_neon_end();
-+		} else {
-+			*crc = crc_t10dif_generic(*crc, data, length);
-+		}
- 	}
- 
- 	return 0;
+diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
+index a7a97a608033..3c469b557ee8 100644
+--- a/arch/arm64/include/asm/Kbuild
++++ b/arch/arm64/include/asm/Kbuild
+@@ -31,7 +31,6 @@ generic-y += sembuf.h
+ generic-y += serial.h
+ generic-y += set_memory.h
+ generic-y += shmbuf.h
+-generic-y += simd.h
+ generic-y += sizes.h
+ generic-y += socket.h
+ generic-y += sockios.h
+diff --git a/arch/arm64/include/asm/simd.h b/arch/arm64/include/asm/simd.h
+new file mode 100644
+index 000000000000..f8aa7b3a0140
+--- /dev/null
++++ b/arch/arm64/include/asm/simd.h
+@@ -0,0 +1,24 @@
++/*
++ * Copyright (C) 2017 Linaro Ltd. <ard.biesheuvel@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published
++ * by the Free Software Foundation.
++ */
++
++#ifndef __ASM_SIMD_H
++#define __ASM_SIMD_H
++
++#include <linux/compiler.h>
++#include <linux/types.h>
++
++/*
++ * may_use_simd - whether it is allowable at this time to issue SIMD
++ *                instructions or access the SIMD register file
++ */
++static __must_check inline bool may_use_simd(void)
++{
++	return true;
++}
++
++#endif
 -- 
 2.7.4
