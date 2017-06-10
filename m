@@ -1,29 +1,73 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Sat, 10 Jun 2017 12:33:38 -0700
-Subject: [PATCH v2 1/3] dt-bindings: remoteproc: Add Keystone DSP
- remoteproc binding
-In-Reply-To: <20170608002447.47580-2-s-anna@ti.com>
-References: <20170608002447.47580-1-s-anna@ti.com>
- <20170608002447.47580-2-s-anna@ti.com>
-Message-ID: <3a4d0c88-6077-1c59-8559-d3db3de914f4@oracle.com>
+From: ohaugan@codeaurora.org (Olav Haugan)
+Date: Sat, 10 Jun 2017 12:41:10 -0700
+Subject: [PATCH] arm64/dma-mapping: Fix null-pointer check
+Message-ID: <20170610194110.27712-1-ohaugan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/7/2017 5:24 PM, Suman Anna wrote:
-> Add the device tree bindings document for the Texas Instrument's
-> Keystone 2 DSP remoteproc devices.
-> 
-> Signed-off-by: Suman Anna <s-anna@ti.com>
-> Signed-off-by: Sam Nelson <sam.nelson@ti.com>
-> ---
-> v2 Changes:
->   - Modified the patch title
->   - Dropped unstable binding status
->   - Dropped the 'label' property and replaced the device node description
->     to use an alias
->   - Renamed 'kick-gpio' to 'kick-gpios'
->   - Updated the example
+The current null-pointer check in __dma_alloc_coherent and
+__dma_free_coherent is pretty much useless since we are dereferencing
+the pointer before checking for null.
+Check for null-pointer before the actual dereferencing of the pointer.
 
-Looks reasonable to me. Ofcourse you need Rob's ack for this one.
+Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
+---
+ arch/arm64/mm/dma-mapping.c | 21 +++++++++++----------
+ 1 file changed, 11 insertions(+), 10 deletions(-)
 
-Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index 3216e098c058..a4b65773711d 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -95,11 +95,6 @@ static void *__dma_alloc_coherent(struct device *dev, size_t size,
+ 				  dma_addr_t *dma_handle, gfp_t flags,
+ 				  unsigned long attrs)
+ {
+-	if (dev == NULL) {
+-		WARN_ONCE(1, "Use an actual device structure for DMA allocation\n");
+-		return NULL;
+-	}
+-
+ 	if (IS_ENABLED(CONFIG_ZONE_DMA) &&
+ 	    dev->coherent_dma_mask <= DMA_BIT_MASK(32))
+ 		flags |= GFP_DMA;
+@@ -128,10 +123,6 @@ static void __dma_free_coherent(struct device *dev, size_t size,
+ 	bool freed;
+ 	phys_addr_t paddr = dma_to_phys(dev, dma_handle);
+ 
+-	if (dev == NULL) {
+-		WARN_ONCE(1, "Use an actual device structure for DMA allocation\n");
+-		return;
+-	}
+ 
+ 	freed = dma_release_from_contiguous(dev,
+ 					phys_to_page(paddr),
+@@ -149,6 +140,11 @@ static void *__dma_alloc(struct device *dev, size_t size,
+ 	bool coherent = is_device_dma_coherent(dev);
+ 	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, false);
+ 
++	if (!dev) {
++		WARN_ONCE(1, "Use an actual device structure for DMA allocation\n");
++		return NULL;
++	}
++
+ 	size = PAGE_ALIGN(size);
+ 
+ 	if (!coherent && !gfpflags_allow_blocking(flags)) {
+@@ -192,8 +188,13 @@ static void __dma_free(struct device *dev, size_t size,
+ 		       void *vaddr, dma_addr_t dma_handle,
+ 		       unsigned long attrs)
+ {
+-	void *swiotlb_addr = phys_to_virt(dma_to_phys(dev, dma_handle));
++	void *swiotlb_addr;
+ 
++	if (!dev) {
++		WARN_ONCE(1, "Use an actual device structure for DMA free\n");
++		return;
++	}
++	swiotlb_addr = phys_to_virt(dma_to_phys(dev, dma_handle));
+ 	size = PAGE_ALIGN(size);
+ 
+ 	if (!is_device_dma_coherent(dev)) {
+-- 
+2.13.0
