@@ -1,83 +1,86 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Sat, 10 Jun 2017 09:29:44 +1000
-Subject: arm64: build is broken on next-20170609 with merge-commit
- 9afca2c4e379 (arm64: allwinner: sun50i-a64: add dwmac-sun8i Ethernet
- driver)
-In-Reply-To: <20170609124325.p7b6fhdbwtki4w2z@yury-thinkpad>
-References: <20170609124325.p7b6fhdbwtki4w2z@yury-thinkpad>
-Message-ID: <20170610092944.4022d550@canb.auug.org.au>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Fri, 9 Jun 2017 17:19:31 -0700
+Subject: [PATCH v8 14/34] ARM: dts: imx6-sabreauto: add the ADV7180 video
+ decoder
+In-Reply-To: <20170609232358.GA14181@amd>
+References: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
+ <1496860453-6282-15-git-send-email-steve_longerbeam@mentor.com>
+ <CAJ+vNU0C0=4hUq+g1P7yTzLzFPidfauQROPOVr4WQWKNZz_xmQ@mail.gmail.com>
+ <dd5b29b7-bf92-5f03-caef-1843a9f32cd3@gmail.com> <20170609213843.GB28596@amd>
+ <cb9d79e9-fa36-d0ad-3df6-27f1b8790f78@gmail.com> <20170609232358.GA14181@amd>
+Message-ID: <f5cad571-9147-1c72-47d9-4e6f68116f97@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yury,
 
-On Fri, 9 Jun 2017 15:43:25 +0300 Yury Norov <ynorov@caviumnetworks.com> wrote:
->
-> Today's linux-next breaks build with:
->   DTC     arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dtb
-> arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dtb: ERROR (duplicate_node_names): Duplicate node name /soc/ethernet at 1c30000
-> ERROR: Input tree has errors, aborting (use -f to force output)
-> scripts/Makefile.lib:325: recipe for target 'arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dtb' failed
-> make[2]: *** [arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dtb] Error 2
-> scripts/Makefile.build:561: recipe for target 'arch/arm64/boot/dts/allwinner' failed
-> make[1]: *** [arch/arm64/boot/dts/allwinner] Error 2 arch/arm64/Makefile:130: recipe for target 'dtbs' failed
-> make: *** [dtbs] Error 2
+
+On 06/09/2017 04:23 PM, Pavel Machek wrote:
+> Hi!
 > 
-> It seems, it's due to duplication error in merge-commit 9afca2c4e379.
-> Removing it fixes the build.
+>>>>> Steve,
+>>>>>
+>>>>> You need to remove the fim node now that you've moved this to V4L2 controls.
+>>>>>
+>>>>
+>>>> Yep, I caught this just after sending the v8 patchset. I'll send
+>>>> a v9 of this patch.
+>>>
+>>> This needs ack from devicetree people, then it can be merged. Can you
+>>> be a bit more forceful getting the ack?
+>>
+>> OK, I need an Ack please, he said, in a forceful way. :)
+> 
+> I'd tune the force up a tiny bit more. This is not FreeBSD ;-). You
+> can read some emails from Linus for inspiration. Or drink few beers
+> and look at Al Viro's emails.
+> 
+>> In fact Ack's are needed for all the changes to dts sources,
+>> patches 4-14.
+> 
+> Actually, are they? Those should not need acks from device tree
+> people, just acks from ARM people, and those are easier to get... in
+> fact they should not need any acks, you should just send them to arm
+> people and get them merged.
 
-Thanks for the reports Yury and Sumit.  I will apply the following
-merge fixup patch when I next build linux-next (unless one of the
-patches is removed in the mean time).
 
-From: Stephen Rothwell <sfr@canb.auug.org.au>
-Date: Sat, 10 Jun 2017 09:18:14 +1000
-Subject: [PATCH] remove duplicate ethernet noce intruduced by merge
+Hans said he prefers to have the dts patches as part of the whole set
+rather than submitted separately. But I did add --to's for the ARM
+people for 4-14.
 
-caused by patch "arm64: allwinner: sun50i-a64: add dwmac-sun8i Ethernet
-driver" being merged into the sunxi and net-next trees as different
-commits (e53f67e981bc and 103aefa01c1b respectively). Presumably the
-former will turn up in the arm-soc tree before being sent to Linus.
 
-Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
----
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 20 --------------------
- 1 file changed, 20 deletions(-)
+> 
+> 1-4 is just a documentation, and you have acks there. (Except 2?)
+> That's ready to be merged, probably via the media tree? Just make it
+> clear you want it merged.
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 1b36aab5afb6..9d00622ce845 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -469,26 +469,6 @@
- 			};
- 		};
- 
--		emac: ethernet at 1c30000 {
--			compatible = "allwinner,sun50i-a64-emac";
--			syscon = <&syscon>;
--			reg = <0x01c30000 0x100>;
--			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
--			interrupt-names = "macirq";
--			resets = <&ccu RST_BUS_EMAC>;
--			reset-names = "stmmaceth";
--			clocks = <&ccu CLK_BUS_EMAC>;
--			clock-names = "stmmaceth";
--			status = "disabled";
--			#address-cells = <1>;
--			#size-cells = <0>;
--
--			mdio: mdio {
--				#address-cells = <1>;
--				#size-cells = <0>;
--			};
--		};
--
- 		gic: interrupt-controller at 1c81000 {
- 			compatible = "arm,gic-400";
- 			reg = <0x01c81000 0x1000>,
--- 
-2.11.0
+Yes, 1-3 now have Acks (binding docs).
 
--- 
-Cheers,
-Stephen Rothwell
+> 
+> 15,16 should be ready to. Media tree, too, I guess.
+
+Yes, those have Acks (video-mux entity functions and subdev driver).
+
+> 
+> drivers/staging is greg. Advantage is these do _not_ need to go after
+> the dts changes. It is a driver. Actually I'd normally add dts support
+> after the driver. So you can push it now.
+
+Right, Hans agrees, except that for staging drivers we don't really need
+an Ack from Greg.
+
+
+> 
+>>> I don't think it makes sense to resubmit v9 before that. This is not a
+>>> rocket science.
+>>
+>> I guess that makes sense, I'll wait for Ack's from all these patches
+>> before submitting the entire patchset as v9.
+> 
+> You may want to split the series, according to mainainters, or just
+> ask the maintainers to merge the relevant parts. I believe most of it
+> can be pushed now.
+> 
+> Good luck,
+
+Thanks!
+Steve
