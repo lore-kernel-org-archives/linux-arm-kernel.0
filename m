@@ -1,56 +1,64 @@
 From: hoeun.ryu@gmail.com (Hoeun Ryu)
-Date: Sat, 10 Jun 2017 13:43:24 +0900
-Subject: [PATCH] arm:lpae: build TTB control register value from scratch
- in v7_ttb_setup
-In-Reply-To: <1496803173-4894-1-git-send-email-hoeun.ryu@gmail.com>
-References: <1496803173-4894-1-git-send-email-hoeun.ryu@gmail.com>
-Message-ID: <448EF961-9178-4A3F-8995-F4E3466F4A92@gmail.com>
+Date: Sat, 10 Jun 2017 13:44:00 +0900
+Subject: [PATCH 1/2] arm:omap2+: put omap_uart_phys/virt/lsr in .text
+ section when ZIMAGE is true
+In-Reply-To: <1496888232-30764-1-git-send-email-hoeun.ryu@gmail.com>
+References: <1496888232-30764-1-git-send-email-hoeun.ryu@gmail.com>
+Message-ID: <6C915D66-C962-4264-89C1-C75A0530A2A1@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Russell and Robin.
+Hello, Russell.
 
 Would you please review this patch ?
 
 Than you
 
-> On Jun 7, 2017, at 11:39 AM, Hoeun Ryu <hoeun.ryu@gmail.com> wrote:
+> On Jun 8, 2017, at 11:16 AM, Hoeun Ryu <hoeun.ryu@gmail.com> wrote:
 > 
-> Reading TTBCR in early boot stage might return the value of the previous
-> kernel's configuration, especially in case of kexec. For example, if
-> normal kernel (first kernel) had run on a configuration of PHYS_OFFSET <=
-> PAGE_OFFSET and crash kernel (second kernel) is running on a configuration
-> PHYS_OFFSET > PAGE_OFFSET, which can happen because it depends on the
-> reserved area for crash kernel, reading TTBCR and using the value to OR
-> other bit fields might be risky because it doesn't have a reset value for
-> TTBCR.
+> omap_uart_phys, omap_uart_virt and omap_uart_lsr reside in .data section
+> and it's right implementation. But because of this, we cannot enable
+> CONFIG_DEBUG_UNCOMPRESS. LL_DEBUG and DEBUG_UNCOMPRESS are very useful tools
+> for debugging early boot stage when something goes wrong if you don't have
+> any hardware based debugging tools like a JTAG debugger.
+> This patch is to put the variables into .text section instead only when the
+> DEBUG_LL_INCLUDE file is included in the kernel decompressor, which is only
+> when ZIMAGE is defined.
+> This patch does not change anything when DEBUG_LL_INCLUDE is included in
+> the other kernel parts like arch/arm/kernel/*
 > 
-> Suggested-by: Robin Murphy <robin.murphy@arm.com>
 > Signed-off-by: Hoeun Ryu <hoeun.ryu@gmail.com>
 > ---
+> arch/arm/include/debug/omap2plus.S | 11 +++++++++++
+> 1 file changed, 11 insertions(+)
 > 
-> * v1: amended based on
->          - "[PATCHv2] arm: LPAE: kexec: clear TTBCR.T1SZ explicitly when
->             PHYS_OFFSET > PAGE_OFFSET"
->          - https://lkml.org/lkml/2017/6/5/239
+> diff --git a/arch/arm/include/debug/omap2plus.S b/arch/arm/include/debug/omap2plus.S
+> index 6d867ae..6ce6ef9 100644
+> --- a/arch/arm/include/debug/omap2plus.S
+> +++ b/arch/arm/include/debug/omap2plus.S
+> @@ -58,11 +58,22 @@
 > 
-> arch/arm/mm/proc-v7-3level.S | 3 +--
-> 1 file changed, 1 insertion(+), 2 deletions(-)
+> #define UART_OFFSET(addr)    ((addr) & 0x00ffffff)
 > 
-> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
-> index 5e5720e..7d16bbc 100644
-> --- a/arch/arm/mm/proc-v7-3level.S
-> +++ b/arch/arm/mm/proc-v7-3level.S
-> @@ -129,8 +129,7 @@ ENDPROC(cpu_v7_set_pte_ext)
->    .macro    v7_ttb_setup, zero, ttbr0l, ttbr0h, ttbr1, tmp
->    ldr    \tmp, =swapper_pg_dir        @ swapper_pg_dir virtual address
->    cmp    \ttbr1, \tmp, lsr #12        @ PHYS_OFFSET > PAGE_OFFSET?
-> -    mrc    p15, 0, \tmp, c2, c0, 2        @ TTB control egister
-> -    orr    \tmp, \tmp, #TTB_EAE
-> +    mov    \tmp, #TTB_EAE            @ for TTB control egister
->    ALT_SMP(orr    \tmp, \tmp, #TTB_FLAGS_SMP)
->    ALT_UP(orr    \tmp, \tmp, #TTB_FLAGS_UP)
->    ALT_SMP(orr    \tmp, \tmp, #TTB_FLAGS_SMP << 16)
+> +/*
+> + * Definition of ZIMAGE is in arch/arm/boot/compressed/Makefile.
+> + * Place the following block in .text section only when this file is
+> + * included by arch/arm/boot/compressed/* to make it possible to
+> + * enable CONFIG_DEBUG_UNCOMPRESS and DEBUG in arch/arm/boot/compressed/head.S
+> + * on OMAP2+ SoCs.
+> + */
+> +#ifndef ZIMAGE
+>        .pushsection .data
+> +#endif
+> omap_uart_phys:    .word    0
+> omap_uart_virt:    .word    0
+> omap_uart_lsr:    .word    0
+> +#ifndef ZIMAGE
+>        .popsection
+> +#endif
+> 
+>        .macro    addruart, rp, rv, tmp
+> 
 > -- 
 > 2.7.4
 > 
