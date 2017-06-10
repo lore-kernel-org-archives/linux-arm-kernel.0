@@ -1,129 +1,40 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 10 Jun 2017 16:22:58 +0000
-Subject: [PATCH 12/12] crypto: arm64/aes-bs - implement non-SIMD fallback for
- AES-CTR
-In-Reply-To: <1497111778-4210-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1497111778-4210-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1497111778-4210-13-git-send-email-ard.biesheuvel@linaro.org>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Sat, 10 Jun 2017 12:32:18 -0700
+Subject: [PATCH v2 2/3] remoteproc/keystone: Add a remoteproc driver for
+ Keystone 2 DSPs
+In-Reply-To: <20170608002447.47580-3-s-anna@ti.com>
+References: <20170608002447.47580-1-s-anna@ti.com>
+ <20170608002447.47580-3-s-anna@ti.com>
+Message-ID: <a8bc0ae1-5583-8622-fe01-406e77f25bc4@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Of the various chaining modes implemented by the bit sliced AES driver,
-only CTR is exposed as a synchronous cipher, and requires a fallback in
-order to remain usable once we update the kernel mode NEON handling logic
-to disallow nested use. So wire up the existing CTR fallback C code.
+6/7/2017 5:24 PM, Suman Anna wrote:
+> The Texas Instrument's Keystone 2 family of SoCs has 1 or more
+> TMS320C66x DSP Core Subsystems (C66x CorePacs). Each subsystem has
+> a C66x Fixed/Floating-Point DSP Core, with 32KB of L1P and L1D SRAMs,
+> that can be configured and partitioned as either RAM and/or Cache,
+> and 1 MB of L2 SRAM. The CorePac also includes an Internal DMA (IDMA),
+> External Memory Controller (EMC), Extended Memory Controller (XMC)
+> with a Memory Protection and Address Extension (MPAX) unit, a Bandwidth
+> Management (BWM) unit, an Interrupt Controller (INTC) and a Powerdown
+> Controller (PDC).
+> 
+> A new remoteproc module is added to perform the device management of
+> these DSP devices. The driver expects the firmware names to be of the
+> form "keystone-dsp<X>-fw", where X is the corresponding DSP number, and
+> uses the standard remoteproc core ELF loader. The support is limited
+> to images only using the DSP internal memories at the moment. This
+> remoteproc driver is also designed to work with virtio, and uses the
+> IPC Generation registers for performing the virtio signalling and
+> getting notified of exceptions.
+> 
+> The driver currently supports the 66AK2H/66AK2K, 66AK2L and 66AK2E
+> SoCs.
+> 
+> Signed-off-by: Suman Anna <s-anna@ti.com>
+> Signed-off-by: Sam Nelson <sam.nelson@ti.com>
+> Signed-off-by: Andrew F. Davis <afd@ti.com>
+> ---
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/crypto/aes-neonbs-glue.c | 48 ++++++++++++++++++--
- 1 file changed, 43 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm64/crypto/aes-neonbs-glue.c b/arch/arm64/crypto/aes-neonbs-glue.c
-index db2501d93550..5fe442c26ff1 100644
---- a/arch/arm64/crypto/aes-neonbs-glue.c
-+++ b/arch/arm64/crypto/aes-neonbs-glue.c
-@@ -1,7 +1,7 @@
- /*
-  * Bit sliced AES using NEON instructions
-  *
-- * Copyright (C) 2016 Linaro Ltd <ard.biesheuvel@linaro.org>
-+ * Copyright (C) 2016 - 2017 Linaro Ltd <ard.biesheuvel@linaro.org>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -9,12 +9,15 @@
-  */
- 
- #include <asm/neon.h>
-+#include <asm/simd.h>
- #include <crypto/aes.h>
- #include <crypto/internal/simd.h>
- #include <crypto/internal/skcipher.h>
- #include <crypto/xts.h>
- #include <linux/module.h>
- 
-+#include "aes-ctr-fallback.h"
-+
- MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
- MODULE_LICENSE("GPL v2");
- 
-@@ -58,6 +61,11 @@ struct aesbs_cbc_ctx {
- 	u32			enc[AES_MAX_KEYLENGTH_U32];
- };
- 
-+struct aesbs_ctr_ctx {
-+	struct aesbs_ctx	key;		/* must be first member */
-+	struct crypto_aes_ctx	fallback;
-+};
-+
- struct aesbs_xts_ctx {
- 	struct aesbs_ctx	key;
- 	u32			twkey[AES_MAX_KEYLENGTH_U32];
-@@ -196,6 +204,25 @@ static int cbc_decrypt(struct skcipher_request *req)
- 	return err;
- }
- 
-+static int aesbs_ctr_setkey_sync(struct crypto_skcipher *tfm, const u8 *in_key,
-+				 unsigned int key_len)
-+{
-+	struct aesbs_ctr_ctx *ctx = crypto_skcipher_ctx(tfm);
-+	int err;
-+
-+	err = crypto_aes_expand_key(&ctx->fallback, in_key, key_len);
-+	if (err)
-+		return err;
-+
-+	ctx->key.rounds = 6 + key_len / 4;
-+
-+	kernel_neon_begin();
-+	aesbs_convert_key(ctx->key.rk, ctx->fallback.key_enc, ctx->key.rounds);
-+	kernel_neon_end();
-+
-+	return 0;
-+}
-+
- static int ctr_encrypt(struct skcipher_request *req)
- {
- 	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
-@@ -260,6 +287,17 @@ static int aesbs_xts_setkey(struct crypto_skcipher *tfm, const u8 *in_key,
- 	return aesbs_setkey(tfm, in_key, key_len);
- }
- 
-+static int ctr_encrypt_sync(struct skcipher_request *req)
-+{
-+	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
-+	struct aesbs_ctr_ctx *ctx = crypto_skcipher_ctx(tfm);
-+
-+	if (!may_use_simd())
-+		return aes_ctr_encrypt_fallback(&ctx->fallback, req);
-+
-+	return ctr_encrypt(req);
-+}
-+
- static int __xts_crypt(struct skcipher_request *req,
- 		       void (*fn)(u8 out[], u8 const in[], u8 const rk[],
- 				  int rounds, int blocks, u8 iv[]))
-@@ -356,7 +394,7 @@ static struct skcipher_alg aes_algs[] = { {
- 	.base.cra_driver_name	= "ctr-aes-neonbs",
- 	.base.cra_priority	= 250 - 1,
- 	.base.cra_blocksize	= 1,
--	.base.cra_ctxsize	= sizeof(struct aesbs_ctx),
-+	.base.cra_ctxsize	= sizeof(struct aesbs_ctr_ctx),
- 	.base.cra_module	= THIS_MODULE,
- 
- 	.min_keysize		= AES_MIN_KEY_SIZE,
-@@ -364,9 +402,9 @@ static struct skcipher_alg aes_algs[] = { {
- 	.chunksize		= AES_BLOCK_SIZE,
- 	.walksize		= 8 * AES_BLOCK_SIZE,
- 	.ivsize			= AES_BLOCK_SIZE,
--	.setkey			= aesbs_setkey,
--	.encrypt		= ctr_encrypt,
--	.decrypt		= ctr_encrypt,
-+	.setkey			= aesbs_ctr_setkey_sync,
-+	.encrypt		= ctr_encrypt_sync,
-+	.decrypt		= ctr_encrypt_sync,
- }, {
- 	.base.cra_name		= "__xts(aes)",
- 	.base.cra_driver_name	= "__xts-aes-neonbs",
--- 
-2.7.4
+Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
