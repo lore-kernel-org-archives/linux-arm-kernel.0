@@ -1,52 +1,64 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 11 Jun 2017 23:48:34 +0200
-Subject: [PATCHv2 1/2] gpio: mvebu: fix blink counter register selection
-In-Reply-To: <20170609100322.765adf7f@gmail.com>
-References: <20170601121826.14685-1-richard.genoud@gmail.com>
- <20170601121826.14685-2-richard.genoud@gmail.com>
- <CACRpkdbRN3pgNqUJXHimpMjSOMeZepjxACveTSVzYJWneM9hOQ@mail.gmail.com>
- <20170609100322.765adf7f@gmail.com>
-Message-ID: <CACRpkdbH4L=k+RjP7wpmpUQC4kthBF07Brk6K+sxXyf+G1Ke9g@mail.gmail.com>
+Date: Sun, 11 Jun 2017 23:52:28 +0200
+Subject: [PATCH v2 01/11] pinctrl: dt-bindings: add documentation for
+ AP806 pin controllers
+In-Reply-To: <878tl1pot6.fsf@free-electrons.com>
+References: <cover.8fe5f7c62a787452878ca071fa00b953e96988ef.1496413293.git-series.gregory.clement@free-electrons.com>
+ <2d89fbc10d07c890336eabbd362e55cb2e5055b5.1496413293.git-series.gregory.clement@free-electrons.com>
+ <CACRpkdYw3AgKBa+y-U9=1d9HqYyPGYK1y_5eBYoobV6s=4T0Wg@mail.gmail.com>
+ <878tl1pot6.fsf@free-electrons.com>
+Message-ID: <CACRpkdauBvun9COkL2Qox2k0vyOyWbRti=QmZPNE2DnwWCiJoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 9, 2017 at 10:03 AM, Ralph Sennhauser
-<ralph.sennhauser@gmail.com> wrote:
-> On Fri, 9 Jun 2017 09:37:55 +0200
-> Linus Walleij <linus.walleij@linaro.org> wrote:
->
->> On Thu, Jun 1, 2017 at 2:18 PM, Richard Genoud
->> <richard.genoud@gmail.com> wrote:
->>
->> > The blink counter A was always selected because 0 was forced in the
->> > blink select counter register.
->> > The variable 'set' was obviously there to be used as the register
->> > value, selecting the B counter when id==1 and A counter when id==0.
->> >
->> > Tested on clearfog-pro (Marvell 88F6828)
->> >
->> > Fixes: 757642f9a584 ("gpio: mvebu: Add limited PWM support")
->> > Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> > Reviewed-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
->> > Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
->>
->> Patch applied for fixes.
->>
->> It appears this will clash with patches on the development branch :(
->
-> Hi Linus,
->
-> The commit 2233bf7a92e7 ("gpio: mvebu: switch to regmap for register
-> access") which you likely mean breaks gpio-keys, reported about an hour
-> ago, so you might just want to drop that one for now instead as it
-> needs mor work anyway.
+On Fri, Jun 9, 2017 at 10:07 AM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
 
-I would like to get an indication from Thomas and/or Gregory if they think
-it is a good idea to revert or if they just wanna fix it.
+> As I wrote in the cover letter :
+> "The patch modifying the documentation still depend on the ones of the
+> clk series. For the ap806 a first stable branch is already available:
+> https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git/log/?h=clk-ap806"
 
-We still have development time before we even start merging for v4.13
-and then we have all the release candidates. No point to throw up hands
-this early?
+Sorry I may miss things like that... usually it is better if patches
+that depend on each other for merging are in the same series.
+
+> In the previous version of the series the clk maintainer said they will
+> provide stable branch for the documentation. For ap806 it is already
+> done, but not yet for cp110. But if you still have problem with it Rob
+> offer to take care of the devie tree documentation.
+>
+> Just let us know what you prefer.
+
+I don't understand. Tell me what I need to do or we can just wait
+a kernel cycle before merging this I guess.
+
+Either I need an immutable branch or I merge the clock patches
+I guess. Neither is very good but I'm open to compromises.
+
+>> I hope for the love of god that this does not also clash with the
+>> PWM stuff that is patching around in the GPIO tree, if it does
+>> I might very well throw up my hands and defer merging all of
+>> this until the next kernel cycle past v4.13-rc1.
+>
+> To avoid this kind of issues the series are based on next-20170531 in
+> order to have in the same time the devel branch of the linux-gpio tree
+> and the devel branch of the linux-pinctrl tree.
+
+I see. Well if nothing else works, we just defer.
+
+> I use the linux-next tree because you already picked up some patches of
+> my first series and applied it on your devel branches. If I rebased on
+> v4;12-rc2, obviously it won't work. So really basing the series on your
+> devel branch is the best thing to do.
+
+Indeed, sorry, the left hand doesn't know what the right hand is
+doing sometimes.
+
+> I saw that you already applied the PWM patch so as soon as they were
+> visible on the devel branches I will rebased the series on it and submit
+> it a new version.
+
+OK
 
 Yours,
 Linus Walleij
