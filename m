@@ -1,59 +1,68 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 11 Jun 2017 15:04:19 +0200
-Subject: [PATCH v4 07/28] ARM64: Prepare Actions Semi S900
-In-Reply-To: <20170606005426.26446-8-afaerber@suse.de>
-References: <20170606005426.26446-1-afaerber@suse.de>
- <20170606005426.26446-8-afaerber@suse.de>
-Message-ID: <7aa77b69-a5ac-f5a8-0c9c-87cc94f6122e@suse.de>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 11 Jun 2017 15:18:37 +0100
+Subject: [PATCH v5 0/5] iio: ADC driver for EP93xx SoC
+In-Reply-To: <20170603232652.21401-1-alexander.sverdlin@gmail.com>
+References: <20170603232652.21401-1-alexander.sverdlin@gmail.com>
+Message-ID: <20170611151837.35fc64a4@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 06.06.2017 um 02:54 schrieb Andreas F?rber:
-> Add ARCH_ACTIONS.
+On Sun,  4 Jun 2017 01:26:47 +0200
+Alexander Sverdlin <alexander.sverdlin@gmail.com> wrote:
+
+> This series prepares the necessary infrastructure for ADC platform device on
+> Cirrus Logic EP93xx family of SoCs and adds the driver for ADC device using
+> IIO subsystem.
+The reason these have been reposted is because the EP93xx don't
+have an actual tree as such.  They are typically handled
+directly through the arm-soc tree.
+
+As such I'm looking for a route to get this applied.
+The dependencies are such that the whole series should go through
+either arm-soc or iio.  I don't really mind which.
+Either I need Acks for applying the patches that touch
+the arch bits (we have Ryan's but I'd like a more general
+arm-soc one given this will be in your area), or
+I will probably ack the driver in a minute so the log can
+go through arm-soc.
+
+Anyhow, don't really mind but let's get this moving!
+
+Jonathan
 > 
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  v3 -> v4: Unchanged
->  
->  v2 -> v3:
->  * Selected clocksource driver
->  
->  v1 -> v2:
->  * Renamed ARCH_OWL to ARCH_ACTION (Arnd)
->  
->  arch/arm64/Kconfig.platforms | 6 ++++++
->  1 file changed, 6 insertions(+)
-
-To make a start somewhere, given Daniel's ack for OWL_TIMER, I'm
-applying this to my new linux-actions.git v4.13/arm64 branch:
-
-https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.13/arm64
-
-For arm I'm still giving Actions Semi a final chance to comment on the
-vendor prefix and DT bindings (none on v3 and none for a week for v4).
-
-Regards,
-Andreas
-
+> Changelog
+> v5:
+>   Rebased to ea094f3c830a
+>   Added Ryan's ack
+> v4:
+>   Spelling improvements
+>   sign_extend32() usage
+> v3:
+>   Rebased to the current master
+>   sizeof(struct foo) -> sizeof(*bar)
+> v2:
+>   Added Documentation/iio/ep93xx_adc.txt
+>   Removed extend_name
+>   Added timeout to the status polling loop
+>   Used iio_device_register() instead of devm_iio_device_register()
 > 
-> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-> index 9a6f50fed239..7b0615161750 100644
-> --- a/arch/arm64/Kconfig.platforms
-> +++ b/arch/arm64/Kconfig.platforms
-> @@ -1,5 +1,11 @@
->  menu "Platform selection"
->  
-> +config ARCH_ACTIONS
-> +	bool "Actions Semi Platforms"
-> +	select OWL_TIMER
-> +	help
-> +	  This enables support for the Actions Semiconductor S900 SoC family.
-> +
->  config ARCH_SUNXI
->  	bool "Allwinner sunxi 64-bit SoC Family"
->  	select ARCH_HAS_RESET_CONTROLLER
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+> Alexander Sverdlin (5):
+>   clk: ep93xx: Implement clk_get_parent()
+>   clk: ep93xx: Add ADC clock
+>   ep93xx: Add ADC platform device support to core
+>   edb93xx: Add ADC platform device
+>   iio: adc: New driver for Cirrus Logic EP93xx ADC
+> 
+>  Documentation/iio/ep93xx_adc.txt             |  29 +++
+>  arch/arm/mach-ep93xx/clock.c                 |  14 ++
+>  arch/arm/mach-ep93xx/core.c                  |  24 +++
+>  arch/arm/mach-ep93xx/edb93xx.c               |   1 +
+>  arch/arm/mach-ep93xx/include/mach/platform.h |   1 +
+>  arch/arm/mach-ep93xx/soc.h                   |   1 +
+>  drivers/iio/adc/Kconfig                      |  11 ++
+>  drivers/iio/adc/Makefile                     |   1 +
+>  drivers/iio/adc/ep93xx_adc.c                 | 255 +++++++++++++++++++++++++++
+>  9 files changed, 337 insertions(+)
+>  create mode 100644 Documentation/iio/ep93xx_adc.txt
+>  create mode 100644 drivers/iio/adc/ep93xx_adc.c
+> 
