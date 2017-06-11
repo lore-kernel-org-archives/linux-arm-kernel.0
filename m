@@ -1,55 +1,55 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 11 Jun 2017 12:20:09 +0100
-Subject: [PATCH 2/2] dt-bindings: iio: update STM32 timers clock names
-In-Reply-To: <CA+M3ks4z46rPmjBt=pfJQBBjr5Hr7Oj4P=tv5wjo9WB_Ca_vsA@mail.gmail.com>
-References: <1496993874-9870-1-git-send-email-fabrice.gasnier@st.com>
- <1496993874-9870-3-git-send-email-fabrice.gasnier@st.com>
- <CA+M3ks4z46rPmjBt=pfJQBBjr5Hr7Oj4P=tv5wjo9WB_Ca_vsA@mail.gmail.com>
-Message-ID: <20170611122009.37ed409b@kernel.org>
+Date: Sun, 11 Jun 2017 12:24:13 +0100
+Subject: [PATCH v4 2/4] Documentation: dt: iio: at91-sama5d2_adc: add hw
+ trigger edge binding
+In-Reply-To: <1496992039-17964-3-git-send-email-eugen.hristev@microchip.com>
+References: <1496992039-17964-1-git-send-email-eugen.hristev@microchip.com>
+ <1496992039-17964-3-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <20170611122413.20008d30@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 Jun 2017 09:43:42 +0200
-Benjamin Gaignard <benjamin.gaignard@linaro.org> wrote:
+On Fri, 9 Jun 2017 10:07:17 +0300
+Eugen Hristev <eugen.hristev@microchip.com> wrote:
 
-> 2017-06-09 9:37 GMT+02:00 Fabrice Gasnier <fabrice.gasnier@st.com>:
-> > Clock name has been updated during driver/DT binding review:
-> > https://lkml.org/lkml/2016/12/13/718
-> > Update DT binding doc to reflect this.
-> >
-> > Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Same fixes tag as previous as this is an example of the binding for the
-mfd rather than actually part of the IIO binding.
+> Add property for the edge type of the hardware trigger pin ADTRG
+> 
+> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+Hi Eugen,
 
-Fixes: d0f949e220fd ("mfd: Add STM32 Timers driver")
-Acked-by: Jonathan Cameron <jic23@kernel.org>
+CC the device tree maintainers and list for devicetree binding changes.
 
-I'm assuming Rob / Mark or Lee will pick this up.  If people
-do want it to go through the IIO tree let me know.
+I've added them.   This one is unusual enough it will need and Ack from
+that direction (and I prefer to get them even for the trivial patches
+when Rob and Mark aren't too busy!)
 
 Jonathan
-> > ---
-> >  Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt b/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
-> > index 55a653d..6abc755 100644
-> > --- a/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
-> > +++ b/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
-> > @@ -14,7 +14,7 @@ Example:
-> >                 compatible = "st,stm32-timers";
-> >                 reg = <0x40010000 0x400>;
-> >                 clocks = <&rcc 0 160>;
-> > -               clock-names = "clk_int";
-> > +               clock-names = "int";
-> >
-> >                 timer at 0 {
-> >                         compatible = "st,stm32-timer-trigger";
-> > --
-> > 1.9.1
-> >  
-> Acked-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> ---
+>   Changes in v4:
+>  - Modified bindings to be similar with interrupts
+> 
+>  Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt b/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
+> index 3223684..552e7a8 100644
+> --- a/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
+> +++ b/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
+> @@ -11,6 +11,11 @@ Required properties:
+>    - atmel,min-sample-rate-hz: Minimum sampling rate, it depends on SoC.
+>    - atmel,max-sample-rate-hz: Maximum sampling rate, it depends on SoC.
+>    - atmel,startup-time-ms: Startup time expressed in ms, it depends on SoC.
+> +  - atmel,trigger-edge-type: One of possible edge types for the ADTRG hardware
+> +  trigger pin. When the specific edge type is detected, the conversion will
+> +  start. Possible values are rising, falling, or both.
+> +  This property uses the IRQ edge types values: IRQ_TYPE_EDGE_RISING ,
+> +  IRQ_TYPE_EDGE_FALLING or IRQ_TYPE_EDGE_BOTH
+>  
+>  Example:
+>  
+> @@ -25,4 +30,5 @@ adc: adc at fc030000 {
+>  	atmel,startup-time-ms = <4>;
+>  	vddana-supply = <&vdd_3v3_lp_reg>;
+>  	vref-supply = <&vdd_3v3_lp_reg>;
+> +	atmel,trigger-edge-type = <IRQ_TYPE_EDGE_BOTH>;
+>  }
