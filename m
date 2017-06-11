@@ -1,93 +1,30 @@
-From: daniel@iogearbox.net (Daniel Borkmann)
-Date: Sun, 11 Jun 2017 03:55:27 +0200
-Subject: [PATCH net-next] bpf, arm64: take advantage of stack_depth tracking
-Message-ID: <afc90487fc573886a44178c2428f3157312128d8.1497145004.git.daniel@iogearbox.net>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Sat, 10 Jun 2017 22:36:44 -0400
+Subject: [PATCH 07/44] xen-swiotlb: consolidate xen_swiotlb_dma_ops
+In-Reply-To: <20170608132609.32662-8-hch@lst.de>
+References: <20170608132609.32662-1-hch@lst.de>
+ <20170608132609.32662-8-hch@lst.de>
+Message-ID: <20170611023644.GE30966@char.us.oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make use of recently implemented stack_depth tracking for arm64 JIT,
-so that stack usage can be reduced heavily for programs not using
-tail calls at least.
+On Thu, Jun 08, 2017 at 03:25:32PM +0200, Christoph Hellwig wrote:
+> ARM and x86 had duplicated versions of the dma_ops structure, the
+> only difference is that x86 hasn't wired up the set_dma_mask,
+> mmap, and get_sgtable ops yet.  On x86 all of them are identical
+> to the generic version, so they aren't needed but harmless.
+> 
+> All the symbols used only for xen_swiotlb_dma_ops can now be marked
+> static as well.
+> 
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> ---
+>  arch/arm/xen/mm.c              | 17 --------
+>  arch/x86/xen/pci-swiotlb-xen.c | 14 -------
+>  drivers/xen/swiotlb-xen.c      | 93 ++++++++++++++++++++++--------------------
+>  include/xen/swiotlb-xen.h      | 62 +---------------------------
+>  4 files changed, 49 insertions(+), 137 deletions(-)
 
-Signed-off-by: Daniel Borkmann <daniel@iogearbox.net>
-Acked-by: Alexei Starovoitov <ast@kernel.org>
----
- arch/arm64/net/bpf_jit_comp.c | 22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
+Yeeey!
 
-diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-index 4f95873..73de2c7 100644
---- a/arch/arm64/net/bpf_jit_comp.c
-+++ b/arch/arm64/net/bpf_jit_comp.c
-@@ -69,6 +69,7 @@ struct jit_ctx {
- 	int epilogue_offset;
- 	int *offset;
- 	u32 *image;
-+	u32 stack_size;
- };
- 
- static inline void emit(const u32 insn, struct jit_ctx *ctx)
-@@ -145,16 +146,11 @@ static inline int epilogue_offset(const struct jit_ctx *ctx)
- /* Stack must be multiples of 16B */
- #define STACK_ALIGN(sz) (((sz) + 15) & ~15)
- 
--#define _STACK_SIZE \
--	(MAX_BPF_STACK \
--	 + 4 /* extra for skb_copy_bits buffer */)
--
--#define STACK_SIZE STACK_ALIGN(_STACK_SIZE)
--
- #define PROLOGUE_OFFSET 8
- 
- static int build_prologue(struct jit_ctx *ctx)
- {
-+	const struct bpf_prog *prog = ctx->prog;
- 	const u8 r6 = bpf2a64[BPF_REG_6];
- 	const u8 r7 = bpf2a64[BPF_REG_7];
- 	const u8 r8 = bpf2a64[BPF_REG_8];
-@@ -176,9 +172,9 @@ static int build_prologue(struct jit_ctx *ctx)
- 	 *                        |     |
- 	 *                        | ... | BPF prog stack
- 	 *                        |     |
--	 *                        +-----+ <= (BPF_FP - MAX_BPF_STACK)
-+	 *                        +-----+ <= (BPF_FP - prog->aux->stack_depth)
- 	 *                        |RSVD | JIT scratchpad
--	 * current A64_SP =>      +-----+ <= (BPF_FP - STACK_SIZE)
-+	 * current A64_SP =>      +-----+ <= (BPF_FP - ctx->stack_size)
- 	 *                        |     |
- 	 *                        | ... | Function call stack
- 	 *                        |     |
-@@ -202,8 +198,12 @@ static int build_prologue(struct jit_ctx *ctx)
- 	/* Initialize tail_call_cnt */
- 	emit(A64_MOVZ(1, tcc, 0, 0), ctx);
- 
-+	/* 4 byte extra for skb_copy_bits buffer */
-+	ctx->stack_size = prog->aux->stack_depth + 4;
-+	ctx->stack_size = STACK_ALIGN(ctx->stack_size);
-+
- 	/* Set up function call stack */
--	emit(A64_SUB_I(1, A64_SP, A64_SP, STACK_SIZE), ctx);
-+	emit(A64_SUB_I(1, A64_SP, A64_SP, ctx->stack_size), ctx);
- 
- 	cur_offset = ctx->idx - idx0;
- 	if (cur_offset != PROLOGUE_OFFSET) {
-@@ -288,7 +288,7 @@ static void build_epilogue(struct jit_ctx *ctx)
- 	const u8 fp = bpf2a64[BPF_REG_FP];
- 
- 	/* We're done with BPF stack */
--	emit(A64_ADD_I(1, A64_SP, A64_SP, STACK_SIZE), ctx);
-+	emit(A64_ADD_I(1, A64_SP, A64_SP, ctx->stack_size), ctx);
- 
- 	/* Restore fs (x25) and x26 */
- 	emit(A64_POP(fp, A64_R(26), A64_SP), ctx);
-@@ -732,7 +732,7 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
- 			return -EINVAL;
- 		}
- 		emit_a64_mov_i64(r3, size, ctx);
--		emit(A64_SUB_I(1, r4, fp, STACK_SIZE), ctx);
-+		emit(A64_SUB_I(1, r4, fp, ctx->stack_size), ctx);
- 		emit_a64_mov_i64(r5, (unsigned long)bpf_load_pointer, ctx);
- 		emit(A64_BLR(r5), ctx);
- 		emit(A64_MOV(1, r0, A64_R(0)), ctx);
--- 
-1.9.3
+Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
