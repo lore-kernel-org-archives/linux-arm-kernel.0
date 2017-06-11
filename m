@@ -1,252 +1,169 @@
-From: oza.oza@broadcom.com (Oza Oza)
-Date: Sun, 11 Jun 2017 09:42:34 +0530
-Subject: [RFT PATCH v2 02/42] drivers: pci: host: iproc: Convert link
- check to raw PCI config accessors
-In-Reply-To: <20170608163614.GB2216@red-moon>
-References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
- <20170608141342.2018-3-lorenzo.pieralisi@arm.com>
- <0eb77019-9945-592c-375d-e2de742b3237@broadcom.com>
- <20170608163614.GB2216@red-moon>
-Message-ID: <CAMSpPPe6bXfu=ntMedrt0w4UfqJLy1a9ZBu_kXy1j4B63x1Nww@mail.gmail.com>
+From: bo.zhang@nxp.com (Bruce Zhang)
+Date: Sun, 11 Jun 2017 04:43:57 +0000
+Subject: [[PATCH v2]] drivers: leds/trigger: system cannot enter suspend
+In-Reply-To: <e83c61cd-2895-aff7-f0a8-8a7e02d8d8e1@gmail.com>
+References: <1496803810-57154-1-git-send-email-bo.zhang@nxp.com>
+ <20170607071256.GA3230@amd>
+ <CACRpkdacymETLuRmpn07HUKHvrjWc85Jdj0s0qk44zTcaALa9w@mail.gmail.com>
+ <20170607103129.GA13227@amd>
+ <AM3PR04MB4045292078845DDB27718BD8AC90@AM3PR04MB404.eurprd04.prod.outlook.com>
+ <711ac25b-ee32-1bd6-8a18-1e261b445920@gmail.com>
+ <AM3PR04MB404B44A56FC58C12D3DF2A68ACE0@AM3PR04MB404.eurprd04.prod.outlook.com>
+ <e83c61cd-2895-aff7-f0a8-8a7e02d8d8e1@gmail.com>
+Message-ID: <AM3PR04MB4046350735A24BB7E9B63208ACC0@AM3PR04MB404.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 8, 2017 at 10:06 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> [dropped rock-chips maintainers, email bounces]
->
-> On Thu, Jun 08, 2017 at 08:56:05AM -0700, Ray Jui wrote:
->> Hi Lorenzo,
+Hi Jacek,
+
+Of course I can submit the patch. But we need to confirm that it does not bring back the problem the commit 5ab92a7cb8 was solving. Maybe we can use reference counter to record if some device used by other device. When some device suspend, it should decrease the reference count of the other device that it depends on. Only when reference count of some device decrease to zero, it can enter suspend mode. By the way, we should avoid devices call loop.
+
+Best Regards,
+Bo
+
+-----Original Message-----
+From: Jacek Anaszewski [mailto:jacek.anaszewski at gmail.com] 
+Sent: Saturday, June 10, 2017 4:47 AM
+To: Bruce Zhang <bo.zhang@nxp.com>; Pavel Machek <pavel@ucw.cz>; Linus Walleij <linus.walleij@linaro.org>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>; linux-arm-kernel at lists.infradead.org; Richard Purdie <rpurdie@rpsys.net>; linux-leds at vger.kernel.org
+Subject: Re: [[PATCH v2]] drivers: leds/trigger: system cannot enter suspend
+
+Hi Bruce,
+
+On 06/09/2017 04:57 AM, Bruce Zhang wrote:
+> Hi Jacek,
+> 
+> I think that no change need to make for __led_set_brightness() and __led_set_brightness_blocking() function. Because led_classdev_suspend() need to turn off LED with these API. set_brightness_delayed() is the same level API as __led_set_brightness(). No need to add LED_SUSPENDED checking as well.
+
+Indeed, it would be even harmful with the current sequence of instructions in the led_classdev_suspend().
+
+So, the only action to take is to revert the commit 5ab92a7cb8.
+
+Would you mind submitting the patch so that everyone interested could give their ack?
+
+Best regards,
+Jacek Anaszewski
+
+> -----Original Message-----
+> From: Jacek Anaszewski [mailto:jacek.anaszewski at gmail.com]
+> Sent: Friday, June 09, 2017 4:28 AM
+> To: Bruce Zhang <bo.zhang@nxp.com>; Pavel Machek <pavel@ucw.cz>; Linus 
+> Walleij <linus.walleij@linaro.org>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>; 
+> linux-arm-kernel at lists.infradead.org; Richard Purdie 
+> <rpurdie@rpsys.net>; linux-leds at vger.kernel.org
+> Subject: Re: [[PATCH v2]] drivers: leds/trigger: system cannot enter 
+> suspend
+> 
+> Hi Bruce,
+> 
+> On 06/08/2017 04:57 AM, Bruce Zhang wrote:
+>> Hi,
 >>
->> Thanks, I'll try my best to find time to test this along 15/42 and
->> 33/42 patches. Hopefully I can get to that some time next week.
+>> As suspend/resume procedure is as below:
+>> pm_notifier_call_chain(PM_SUSPEND_PREPARE)->device suspend -> syscore suspend -> enter suspend mode -> syscore resume -> device resume -> pm_notifier_call_chain(PM_POST_SUSPEND).
+>> If led brightness control depends on other device/hardware (such as I2C), the LED turn off action should be earlier than device suspend. pm_notifier may be a suitable method to turn off LED.
+> 
+> OK, so I agree that the most proper fix to the discussed problem would be ignoring brightness setting requests after suspend, as Pavel suggested.
+> 
+> led_classdev_suspend() already turns the LED off and
+> led_classdev_resume() brings the brightness back.
+> 
+> Also led_set_brightness_nosleep() and led_set_brightness_sync() don't propagate brightness change to the driver if LED_SUSPENDED is set.
+> 
+> There are two problems though:
+> 1. __led_set_brightness() and __led_set_brightness_blocking() don't
+>    check the flag, and they can be called from set_brightness_delayed(),
+>    that was already queued at the time of setting LED_SUSPENDED flag.
+> 2. LED_SUSPENDED flag is accessed in a non-atomic way.
+> 
+> The solution as I see it would be respectively:
+> 1. Return from __led_set_brightness() and
+>    __led_set_brightness_blocking() if LED_SUSPENDED is set.
+> 2. Switch to accessing struct led_classdev's flags with use of
+>    bitops. Fortunately those flags are mainly set prior LED class
+>    device registration and only LED_SYSFS_DISABLE, LED_SUSPENDED
+>    and LED_UNREGISTERING are accessed afterwards, and only in the LED
+>    core, so only those places would have to be modified.
+> 
+> Best regards,
+> Jacek Anaszewski
+> 
+>> -----Original Message-----
+>> From: Pavel Machek [mailto:pavel at ucw.cz]
+>> Sent: Wednesday, June 07, 2017 6:31 PM
+>> To: Linus Walleij <linus.walleij@linaro.org>
+>> Cc: Bruce Zhang <bo.zhang@nxp.com>; Ulf Hansson 
+>> <ulf.hansson@linaro.org>; linux-arm-kernel at lists.infradead.org; Jacek 
+>> Anaszewski <jacek.anaszewski@gmail.com>; Richard Purdie 
+>> <rpurdie@rpsys.net>; linux-leds at vger.kernel.org
+>> Subject: Re: [[PATCH v2]] drivers: leds/trigger: system cannot enter 
+>> suspend
 >>
->> I have not yet reviewed these patches in details. Do they have
->> dependency on other patches to the generic framework code you
->> changed?
+>> Hi!
 >>
->> If so, is there a repo I can pull them?
->
-> I added it in the cover letter but anyway here it is:
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git pci/pci-fixup-irqs-removal-v2
-
-Hi Lorenzo,
-
-I picked up your changes, and tested on iproc based SOC,
-and ran basic fio data transfer.. and it looks okay.
-
-
-Hi Bjorn,
-
-please help to review following changes, to avoid merge conflicts
-since Lorenzo's changes in iproc driver is touching basic config APIs.
-
-[PATCH v3 1/2] PCI: iproc: Retry request when CRS returned from EP
-[PATCH v3 2/2] PCI: iproc: add device shutdown for PCI RC
-
-Regards,
-Oza.
-
-
-
->
-> Thanks for testing it, please let me know.
->
-> Thank you !
-> Lorenzo
->
+>> On Wed 2017-06-07 11:46:10, Linus Walleij wrote:
+>>> On Wed, Jun 7, 2017 at 9:12 AM, Pavel Machek <pavel@ucw.cz> wrote:
+>>>
+>>>> Core reason is that 5ab92a7cb is wrong. (Very wrong; it papers over 
+>>>> the issue for one trigger, but we have more than one... Even if 
+>>>> special handling for heartbeat is warranted, that handling would be 
+>>>> "turn the led off" not "unregister the trigger", which is 
+>>>> userland-visible action.)
+>>>
+>>> OK yeah I guess you're right.
+>>>
+>>> I just couldn't think about anything better and didn't get any 
+>>> review at the time, so mistakes were made.
+>>>
+>>>> That one should be reverted, then maybe the driver should be fixed 
+>>>> to turn the led off during suspend.
+>>>
+>>> Do you mean that the heartbeat trigger driver should be fixed to 
+>>> turn off the LED during sleep?
+>>>
+>>> That is essentially what I was trying to achieve.
+>>
+>> I don't think we should be fixing it at trigger level.
+>>
+>> If userspace keeps blinking using "brightness" attribute, would we like the LED to be off during suspend? I think so.
+>>
+>>> The reason it is done as it is, is that the trigger sets up a timer 
+>>> to do its job, and the timer may trigger between the point you turn 
+>>> off the LED and the system really goes to suspend, again maybe 
+>>> turning the LED on and again leaving the system with a glowing LED at suspend.
+>>
+>>> The patch also solves the following phenomenon, sorry for not 
+>>> writing in the commit:
+>>>
+>>> - Turn off LED
+>>> - Suspend I2C hardware
+>>> - Timer trigger
+>>> - Trying to blink the LED using I2C
+>>> - Crap in the console about the failed I2C transaction
+>>> - Actual suspen happens
+>>> - System comes online
+>>> - Trying to blink the LED using I2C
+>>> - Crap in the console about the failed I2C transaction
+>>> - Resume I2C hardware
+>>>
+>>> It's just very fragile this trigger, turning off the LED from the PM 
+>>> notifier is obviously not enough, we also need to disable the timer, 
+>>> and then take it back online after resume.
+>>
+>> No, leave the timer alone, and actually leave the trigger alone.
+>>
+>> Simply make the driver turn the LED off in .suspend() callback, and then ignore further requests until .resume(). That will get rid of power drain _and_ "failed I2C transaction" messages, right?
+>>
+>> (Actually, I tested with the heartbeat trigger, and it is not re-installed after resume. Another reason to revert the patch).
 >>
 >> Thanks,
 >>
->> Ray
+>> 									Pavel
+>> --
+>> (english) http://www.livejournal.com/~pavelmachek
+>> (cesky, pictures)
+>> http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
 >>
->>
->> On 6/8/2017 7:13 AM, Lorenzo Pieralisi wrote:
->> >Current iproc driver host bridge controller driver requires struct
->> >pci_bus to be created in order to carry out PCI link checks with standard
->> >PCI config space accessors.
->> >
->> >This struct pci_bus dependency is fictitious and burdens the driver
->> >with unneeded constraints (eg to use separate APIs to create and scan
->> >the root bus).
->> >
->> >Add PCI raw config space accessors to PCIe iproc driver and remove the
->> >fictitious struct pci_bus dependency.
->> >
->> >Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> >Cc: Scott Branden <sbranden@broadcom.com>
->> >Cc: Ray Jui <rjui@broadcom.com>
->> >Cc: Jon Mason <jonmason@broadcom.com>
->> >---
->> >  drivers/pci/host/pcie-iproc.c | 94 ++++++++++++++++++++++++++++++++++---------
->> >  1 file changed, 74 insertions(+), 20 deletions(-)
->> >
->> >diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
->> >index 0f39bd2..e48b8e2 100644
->> >--- a/drivers/pci/host/pcie-iproc.c
->> >+++ b/drivers/pci/host/pcie-iproc.c
->> >@@ -452,14 +452,13 @@ static inline void iproc_pcie_apb_err_disable(struct pci_bus *bus,
->> >   * Note access to the configuration registers are protected at the higher layer
->> >   * by 'pci_lock' in drivers/pci/access.c
->> >   */
->> >-static void __iomem *iproc_pcie_map_cfg_bus(struct pci_bus *bus,
->> >+static void __iomem *iproc_pcie_map_cfg_bus(struct iproc_pcie *pcie,
->> >+                                        int busno,
->> >                                         unsigned int devfn,
->> >                                         int where)
->> >  {
->> >-    struct iproc_pcie *pcie = iproc_data(bus);
->> >     unsigned slot = PCI_SLOT(devfn);
->> >     unsigned fn = PCI_FUNC(devfn);
->> >-    unsigned busno = bus->number;
->> >     u32 val;
->> >     u16 offset;
->> >@@ -499,6 +498,58 @@ static void __iomem *iproc_pcie_map_cfg_bus(struct pci_bus *bus,
->> >             return (pcie->base + offset);
->> >  }
->> >+static void __iomem *iproc_pcie_bus_map_cfg_bus(struct pci_bus *bus,
->> >+                                            unsigned int devfn,
->> >+                                            int where)
->> >+{
->> >+    return iproc_pcie_map_cfg_bus(iproc_data(bus), bus->number, devfn,
->> >+                                  where);
->> >+}
->> >+
->> >+static int iproc_pci_raw_config_read32(struct iproc_pcie *pcie,
->> >+                                   unsigned int devfn, int where,
->> >+                                   int size, u32 *val)
->> >+{
->> >+    void __iomem *addr;
->> >+
->> >+    addr = iproc_pcie_map_cfg_bus(pcie, 0, devfn, where & ~0x3);
->> >+    if (!addr) {
->> >+            *val = ~0;
->> >+            return PCIBIOS_DEVICE_NOT_FOUND;
->> >+    }
->> >+
->> >+    *val = readl(addr);
->> >+
->> >+    if (size <= 2)
->> >+            *val = (*val >> (8 * (where & 3))) & ((1 << (size * 8)) - 1);
->> >+
->> >+    return PCIBIOS_SUCCESSFUL;
->> >+}
->> >+
->> >+static int iproc_pci_raw_config_write32(struct iproc_pcie *pcie,
->> >+                                    unsigned int devfn, int where,
->> >+                                    int size, u32 val)
->> >+{
->> >+    void __iomem *addr;
->> >+    u32 mask, tmp;
->> >+
->> >+    addr = iproc_pcie_map_cfg_bus(pcie, 0, devfn, where & ~0x3);
->> >+    if (!addr)
->> >+            return PCIBIOS_DEVICE_NOT_FOUND;
->> >+
->> >+    if (size == 4) {
->> >+            writel(val, addr);
->> >+            return PCIBIOS_SUCCESSFUL;
->> >+    }
->> >+
->> >+    mask = ~(((1 << (size * 8)) - 1) << ((where & 0x3) * 8));
->> >+    tmp = readl(addr) & mask;
->> >+    tmp |= val << ((where & 0x3) * 8);
->> >+    writel(tmp, addr);
->> >+
->> >+    return PCIBIOS_SUCCESSFUL;
->> >+}
->> >+
->> >  static int iproc_pcie_config_read32(struct pci_bus *bus, unsigned int devfn,
->> >                                 int where, int size, u32 *val)
->> >  {
->> >@@ -524,7 +575,7 @@ static int iproc_pcie_config_write32(struct pci_bus *bus, unsigned int devfn,
->> >  }
->> >  static struct pci_ops iproc_pcie_ops = {
->> >-    .map_bus = iproc_pcie_map_cfg_bus,
->> >+    .map_bus = iproc_pcie_bus_map_cfg_bus,
->> >     .read = iproc_pcie_config_read32,
->> >     .write = iproc_pcie_config_write32,
->> >  };
->> >@@ -556,12 +607,11 @@ static void iproc_pcie_reset(struct iproc_pcie *pcie)
->> >     msleep(100);
->> >  }
->> >-static int iproc_pcie_check_link(struct iproc_pcie *pcie, struct pci_bus *bus)
->> >+static int iproc_pcie_check_link(struct iproc_pcie *pcie)
->> >  {
->> >     struct device *dev = pcie->dev;
->> >-    u8 hdr_type;
->> >-    u32 link_ctrl, class, val;
->> >-    u16 pos = PCI_EXP_CAP, link_status;
->> >+    u32 hdr_type, link_ctrl, link_status, class, val;
->> >+    u16 pos = PCI_EXP_CAP;
->> >     bool link_is_active = false;
->> >     /*
->> >@@ -578,7 +628,7 @@ static int iproc_pcie_check_link(struct iproc_pcie *pcie, struct pci_bus *bus)
->> >     }
->> >     /* make sure we are not in EP mode */
->> >-    pci_bus_read_config_byte(bus, 0, PCI_HEADER_TYPE, &hdr_type);
->> >+    iproc_pci_raw_config_read32(pcie,  0, PCI_HEADER_TYPE, 1, &hdr_type);
->> >     if ((hdr_type & 0x7f) != PCI_HEADER_TYPE_BRIDGE) {
->> >             dev_err(dev, "in EP mode, hdr=%#02x\n", hdr_type);
->> >             return -EFAULT;
->> >@@ -588,13 +638,16 @@ static int iproc_pcie_check_link(struct iproc_pcie *pcie, struct pci_bus *bus)
->> >  #define PCI_BRIDGE_CTRL_REG_OFFSET 0x43c
->> >  #define PCI_CLASS_BRIDGE_MASK      0xffff00
->> >  #define PCI_CLASS_BRIDGE_SHIFT     8
->> >-    pci_bus_read_config_dword(bus, 0, PCI_BRIDGE_CTRL_REG_OFFSET, &class);
->> >+    iproc_pci_raw_config_read32(pcie, 0, PCI_BRIDGE_CTRL_REG_OFFSET,
->> >+                                4, &class);
->> >     class &= ~PCI_CLASS_BRIDGE_MASK;
->> >     class |= (PCI_CLASS_BRIDGE_PCI << PCI_CLASS_BRIDGE_SHIFT);
->> >-    pci_bus_write_config_dword(bus, 0, PCI_BRIDGE_CTRL_REG_OFFSET, class);
->> >+    iproc_pci_raw_config_write32(pcie, 0, PCI_BRIDGE_CTRL_REG_OFFSET,
->> >+                                 4, class);
->> >     /* check link status to see if link is active */
->> >-    pci_bus_read_config_word(bus, 0, pos + PCI_EXP_LNKSTA, &link_status);
->> >+    iproc_pci_raw_config_read32(pcie, 0, pos + PCI_EXP_LNKSTA,
->> >+                                2, &link_status);
->> >     if (link_status & PCI_EXP_LNKSTA_NLW)
->> >             link_is_active = true;
->> >@@ -603,20 +656,21 @@ static int iproc_pcie_check_link(struct iproc_pcie *pcie, struct pci_bus *bus)
->> >  #define PCI_TARGET_LINK_SPEED_MASK    0xf
->> >  #define PCI_TARGET_LINK_SPEED_GEN2    0x2
->> >  #define PCI_TARGET_LINK_SPEED_GEN1    0x1
->> >-            pci_bus_read_config_dword(bus, 0,
->> >-                                      pos + PCI_EXP_LNKCTL2,
->> >+            iproc_pci_raw_config_read32(pcie, 0,
->> >+                                      pos + PCI_EXP_LNKCTL2, 4,
->> >                                       &link_ctrl);
->> >             if ((link_ctrl & PCI_TARGET_LINK_SPEED_MASK) ==
->> >                 PCI_TARGET_LINK_SPEED_GEN2) {
->> >                     link_ctrl &= ~PCI_TARGET_LINK_SPEED_MASK;
->> >                     link_ctrl |= PCI_TARGET_LINK_SPEED_GEN1;
->> >-                    pci_bus_write_config_dword(bus, 0,
->> >-                                       pos + PCI_EXP_LNKCTL2,
->> >-                                       link_ctrl);
->> >+                    iproc_pci_raw_config_write32(pcie, 0,
->> >+                                            pos + PCI_EXP_LNKCTL2,
->> >+                                            4, link_ctrl);
->> >                     msleep(100);
->> >-                    pci_bus_read_config_word(bus, 0, pos + PCI_EXP_LNKSTA,
->> >-                                             &link_status);
->> >+                    iproc_pci_raw_config_read32(pcie, 0,
->> >+                                            pos + PCI_EXP_LNKSTA,
->> >+                                            2, &link_status);
->> >                     if (link_status & PCI_EXP_LNKSTA_NLW)
->> >                             link_is_active = true;
->> >             }
->> >@@ -1260,7 +1314,7 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
->> >     }
->> >     pcie->root_bus = bus;
->> >-    ret = iproc_pcie_check_link(pcie, bus);
->> >+    ret = iproc_pcie_check_link(pcie);
->> >     if (ret) {
->> >             dev_err(dev, "no PCIe EP device detected\n");
->> >             goto err_rm_root_bus;
->>
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
