@@ -1,106 +1,52 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 11 Jun 2017 23:26:17 +0200
-Subject: [PATCH 2/2] drivers/clocksource/fttmr010: Implement delay timer
-In-Reply-To: <20170611212617.6906-1-linus.walleij@linaro.org>
-References: <20170611212617.6906-1-linus.walleij@linaro.org>
-Message-ID: <20170611212617.6906-2-linus.walleij@linaro.org>
+Date: Sun, 11 Jun 2017 23:48:34 +0200
+Subject: [PATCHv2 1/2] gpio: mvebu: fix blink counter register selection
+In-Reply-To: <20170609100322.765adf7f@gmail.com>
+References: <20170601121826.14685-1-richard.genoud@gmail.com>
+ <20170601121826.14685-2-richard.genoud@gmail.com>
+ <CACRpkdbRN3pgNqUJXHimpMjSOMeZepjxACveTSVzYJWneM9hOQ@mail.gmail.com>
+ <20170609100322.765adf7f@gmail.com>
+Message-ID: <CACRpkdbH4L=k+RjP7wpmpUQC4kthBF07Brk6K+sxXyf+G1Ke9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This timer is often used on the ARM architecture, so as with so
-many siblings, we can implement delay timers, removing the need
-for the system to calibrate jiffys at boot, and potentially
-handling CPU frequency scaling on targets.
+On Fri, Jun 9, 2017 at 10:03 AM, Ralph Sennhauser
+<ralph.sennhauser@gmail.com> wrote:
+> On Fri, 9 Jun 2017 09:37:55 +0200
+> Linus Walleij <linus.walleij@linaro.org> wrote:
+>
+>> On Thu, Jun 1, 2017 at 2:18 PM, Richard Genoud
+>> <richard.genoud@gmail.com> wrote:
+>>
+>> > The blink counter A was always selected because 0 was forced in the
+>> > blink select counter register.
+>> > The variable 'set' was obviously there to be used as the register
+>> > value, selecting the B counter when id==1 and A counter when id==0.
+>> >
+>> > Tested on clearfog-pro (Marvell 88F6828)
+>> >
+>> > Fixes: 757642f9a584 ("gpio: mvebu: Add limited PWM support")
+>> > Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> > Reviewed-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
+>> > Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+>>
+>> Patch applied for fixes.
+>>
+>> It appears this will clash with patches on the development branch :(
+>
+> Hi Linus,
+>
+> The commit 2233bf7a92e7 ("gpio: mvebu: switch to regmap for register
+> access") which you likely mean breaks gpio-keys, reported about an hour
+> ago, so you might just want to drop that one for now instead as it
+> needs mor work anyway.
 
-We cannot just protect the Kconfig with a "depends on ARM" because
-it is already known that different architectures are using Faraday
-IP blocks, so it is better to make things open-ended and use
+I would like to get an indication from Thomas and/or Gregory if they think
+it is a good idea to revert or if they just wanna fix it.
 
-Result on boot dmesg:
+We still have development time before we even start merging for v4.13
+and then we have all the release candidates. No point to throw up hands
+this early?
 
-Switching to timer-based delay loop, resolution 40n
-Calibrating delay loop (skipped), value calculated using
-  timer frequency.. 50.00 BogoMIPS (lpj=250000)
-
-This is accurately the timer frequency, 250MHz on the APB
-bus.
-
-Cc: Andrew Jeffery <andrew@aj.id.au>
-Cc: Joel Stanley <joel@jms.id.au>
-Cc: Jonas Jensen <jonas.jensen@gmail.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/clocksource/timer-fttmr010.c | 35 ++++++++++++++++++++++++++++++++++-
- 1 file changed, 34 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/clocksource/timer-fttmr010.c b/drivers/clocksource/timer-fttmr010.c
-index 5e82469995cb..0074d89cd2ce 100644
---- a/drivers/clocksource/timer-fttmr010.c
-+++ b/drivers/clocksource/timer-fttmr010.c
-@@ -17,6 +17,7 @@
- #include <linux/clk.h>
- #include <linux/slab.h>
- #include <linux/bitops.h>
-+#include <linux/delay.h>
- 
- /*
-  * Register definitions for the timers
-@@ -81,9 +82,15 @@ struct fttmr010 {
- 	bool count_down;
- 	u32 t1_enable_val;
- 	struct clock_event_device clkevt;
-+#ifdef CONFIG_ARM
-+	struct delay_timer delay_timer;
-+#endif
- };
- 
--/* A local singleton used by sched_clock, which is stateless */
-+/*
-+ * A local singleton used by sched_clock and delay timer reads, which are
-+ * fast and stateless
-+ */
- static struct fttmr010 *local_fttmr;
- 
- static inline struct fttmr010 *to_fttmr010(struct clock_event_device *evt)
-@@ -101,6 +108,20 @@ static u64 notrace fttmr010_read_sched_clock_down(void)
- 	return ~readl(local_fttmr->base + TIMER2_COUNT);
- }
- 
-+#ifdef CONFIG_ARM
-+
-+static unsigned long fttmr010_read_current_timer_up(void)
-+{
-+	return readl(local_fttmr->base + TIMER2_COUNT);
-+}
-+
-+static unsigned long fttmr010_read_current_timer_down(void)
-+{
-+	return ~readl(local_fttmr->base + TIMER2_COUNT);
-+}
-+
-+#endif
-+
- static int fttmr010_timer_set_next_event(unsigned long cycles,
- 				       struct clock_event_device *evt)
- {
-@@ -349,6 +370,18 @@ static int __init fttmr010_timer_init(struct device_node *np)
- 					fttmr010->tick_rate,
- 					1, 0xffffffff);
- 
-+#ifdef CONFIG_ARM
-+	/* Also use this timer for delays */
-+	if (fttmr010->count_down)
-+		fttmr010->delay_timer.read_current_timer =
-+			fttmr010_read_current_timer_down;
-+	else
-+		fttmr010->delay_timer.read_current_timer =
-+			fttmr010_read_current_timer_up;
-+	fttmr010->delay_timer.freq = fttmr010->tick_rate;
-+	register_current_timer_delay(&fttmr010->delay_timer);
-+#endif
-+
- 	return 0;
- 
- out_unmap:
--- 
-2.9.4
+Yours,
+Linus Walleij
