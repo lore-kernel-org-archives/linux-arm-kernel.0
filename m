@@ -1,53 +1,59 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 11 Jun 2017 20:22:46 +0800
-Subject: [PATCH v2 2/2] spi: mediatek: add spi support for mt7622 IC
-In-Reply-To: <1497069989-30584-3-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <201706112011.OnVoVqgK%fengguang.wu@intel.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Sun, 11 Jun 2017 15:04:19 +0200
+Subject: [PATCH v4 07/28] ARM64: Prepare Actions Semi S900
+In-Reply-To: <20170606005426.26446-8-afaerber@suse.de>
+References: <20170606005426.26446-1-afaerber@suse.de>
+ <20170606005426.26446-8-afaerber@suse.de>
+Message-ID: <7aa77b69-a5ac-f5a8-0c9c-87cc94f6122e@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leilk,
+Am 06.06.2017 um 02:54 schrieb Andreas F?rber:
+> Add ARCH_ACTIONS.
+> 
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  v3 -> v4: Unchanged
+>  
+>  v2 -> v3:
+>  * Selected clocksource driver
+>  
+>  v1 -> v2:
+>  * Renamed ARCH_OWL to ARCH_ACTION (Arnd)
+>  
+>  arch/arm64/Kconfig.platforms | 6 ++++++
+>  1 file changed, 6 insertions(+)
 
-[auto build test ERROR on spi/for-next]
-[also build test ERROR on v4.12-rc4 next-20170609]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+To make a start somewhere, given Daniel's ack for OWL_TIMER, I'm
+applying this to my new linux-actions.git v4.13/arm64 branch:
 
-url:    https://github.com/0day-ci/linux/commits/Leilk-Liu/add-mt7622-spi-support/20170611-185202
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git for-next
-config: xtensa-allmodconfig (attached as .config)
-compiler: xtensa-linux-gcc (GCC) 4.9.0
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=xtensa 
+https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.13/arm64
 
-All errors (new ones prefixed by >>):
+For arm I'm still giving Actions Semi a final chance to comment on the
+vendor prefix and DT bindings (none on v3 and none for a week for v4).
 
->> drivers//spi/spi-mt65xx.c:110:2: error: unknown field 'adjust_reg' specified in initializer
-     .adjust_reg = true,
-     ^
+Regards,
+Andreas
 
-vim +/adjust_reg +110 drivers//spi/spi-mt65xx.c
+> 
+> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+> index 9a6f50fed239..7b0615161750 100644
+> --- a/arch/arm64/Kconfig.platforms
+> +++ b/arch/arm64/Kconfig.platforms
+> @@ -1,5 +1,11 @@
+>  menu "Platform selection"
+>  
+> +config ARCH_ACTIONS
+> +	bool "Actions Semi Platforms"
+> +	select OWL_TIMER
+> +	help
+> +	  This enables support for the Actions Semiconductor S900 SoC family.
+> +
+>  config ARCH_SUNXI
+>  	bool "Allwinner sunxi 64-bit SoC Family"
+>  	select ARCH_HAS_RESET_CONTROLLER
 
-   104	};
-   105	
-   106	static const struct mtk_spi_compatible mtk_common_compat;
-   107	
-   108	static const struct mtk_spi_compatible mt7622_compat = {
-   109		.must_tx = true,
- > 110		.adjust_reg = true,
-   111	};
-   112	
-   113	static const struct mtk_spi_compatible mt8173_compat = {
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 50160 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170611/034ffdc6/attachment-0001.gz>
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
