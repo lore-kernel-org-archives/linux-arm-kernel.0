@@ -1,80 +1,153 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Sun, 11 Jun 2017 10:53:53 +0200
-Subject: [PATCH v6 1/5] Documentation/bindings: Document the SafeXel
- cryptographic engine driver
-In-Reply-To: <20170524141035.21031-2-antoine.tenart@free-electrons.com>
-References: <20170524141035.21031-1-antoine.tenart@free-electrons.com>
- <20170524141035.21031-2-antoine.tenart@free-electrons.com>
-Message-ID: <20170611085353.GG31464@kwain>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Sun, 11 Jun 2017 14:46:05 +0530
+Subject: [PATCH v2] arm64: allwinner: a64: Add initial Orangepi Win/WinPlus
+ support
+Message-ID: <1497172565-13125-1-git-send-email-jteki@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Herbert,
+From: Jagan Teki <jagan@amarulasolutions.com>
 
-On Wed, May 24, 2017 at 04:10:31PM +0200, Antoine Tenart wrote:
-> The Inside Secure Safexcel cryptographic engine is found on some Marvell
-> SoCs (7k/8k). Document the bindings used by its driver.
-> 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Orangepi Win/WinPlus is an open-source single-board computer
+using the Allwinner A64 SOC.
 
-Since you applied the Safexcel crypto driver patch, I think you should
-also apply this patch adding the corresponding bindings documentation.
+A64 Orangepi Win/WinPlus has
+- A64 Quad-core Cortex-A53 64bit
+- 1GB(Win)/2GB(Win Plus) DDR3 SDRAM
+- Debug TTL UART
+- Four USB 2.0
+- HDMI
+- LCD
+- Audio and MIC
+- Wifi + BT
+- IR receiver
+- 5V DC power supply
 
-Thanks!
-Antoine
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+Changes for v2:
+- Remove http link from commit message
+- Re-arrange nodes in ascending order
 
-> ---
->  .../bindings/crypto/inside-secure-safexcel.txt     | 29 ++++++++++++++++++++++
->  1 file changed, 29 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/crypto/inside-secure-safexcel.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/crypto/inside-secure-safexcel.txt b/Documentation/devicetree/bindings/crypto/inside-secure-safexcel.txt
-> new file mode 100644
-> index 000000000000..f69773f4252b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/crypto/inside-secure-safexcel.txt
-> @@ -0,0 +1,29 @@
-> +Inside Secure SafeXcel cryptographic engine
-> +
-> +Required properties:
-> +- compatible: Should be "inside-secure,safexcel-eip197".
-> +- reg: Base physical address of the engine and length of memory mapped region.
-> +- interrupts: Interrupt numbers for the rings and engine.
-> +- interrupt-names: Should be "ring0", "ring1", "ring2", "ring3", "eip", "mem".
-> +
-> +Optional properties:
-> +- clocks: Reference to the crypto engine clock.
-> +- dma-mask: The address mask limitation. Defaults to 64.
-> +
-> +Example:
-> +
-> +	crypto: crypto at 800000 {
-> +		compatible = "inside-secure,safexcel-eip197";
-> +		reg = <0x800000 0x200000>;
-> +		interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
-> +		interrupt-names = "mem", "ring0", "ring1", "ring2", "ring3",
-> +				  "eip";
-> +		clocks = <&cpm_syscon0 1 26>;
-> +		dma-mask = <0xff 0xffffffff>;
-> +		status = "disabled";
-> +	};
-> -- 
-> 2.9.4
-> 
+ arch/arm64/boot/dts/allwinner/Makefile             |  1 +
+ .../boot/dts/allwinner/sun50i-a64-orangepi-win.dts | 97 ++++++++++++++++++++++
+ 2 files changed, 98 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
 
+diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
+index 8adba9c..2fb5057 100644
+--- a/arch/arm64/boot/dts/allwinner/Makefile
++++ b/arch/arm64/boot/dts/allwinner/Makefile
+@@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
++dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-orangepi-win.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus2.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo2.dtb
+ 
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
+new file mode 100644
+index 0000000..31166b5
+--- /dev/null
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
+@@ -0,0 +1,97 @@
++/*
++ * Copyright (C) 2017 Jagan Teki <jteki@openedev.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "sun50i-a64.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	model = "OrangePi Win/Win Plus";
++	compatible = "xunlong,orangepi-win", "allwinner,sun50i-a64";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	soc {
++		reg_vcc3v3: vcc3v3 {
++			compatible = "regulator-fixed";
++			regulator-name = "vcc3v3";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++		};
++	};
++};
++
++&ehci1 {
++       status = "okay";
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins>;
++	vmmc-supply = <&reg_vcc3v3>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
++	cd-inverted;
++	status = "okay";
++};
++
++&ohci1 {
++       status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&usbphy {
++       status = "okay";
++};
++
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170611/43206d9e/attachment.sig>
+2.7.4
