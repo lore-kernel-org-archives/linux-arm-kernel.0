@@ -1,55 +1,32 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sun, 11 Jun 2017 11:52:19 +0200
-Subject: [PATCH] watchdog: meson-wdt: add support for the watchdog on Meson8
- and Meson8m2
-Message-ID: <20170611095219.22095-1-martin.blumenstingl@googlemail.com>
+Date: Sun, 11 Jun 2017 12:03:42 +0200
+Subject: [PATCH 2/3] ARM: multi_v7_defconfig: enable the Meson PWM controller
+In-Reply-To: <20170611100343.25868-1-martin.blumenstingl@googlemail.com>
+References: <20170611100343.25868-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20170611100343.25868-3-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The watchdog IP block on Meson8 and Meson8m2 is already supported by the
-existing meson-wdt driver. Meson8 uses the same register bits as Meson6,
-while the newer Meson8m2 SoC uses the same register bits as Meson8b.
-
-Currently watchdog support on Meson8 SoC already works because
-meson8.dtsi simply uses the "amlogic,meson6-wdt" compatible. Adding a
-separate compatible for Meson8 makes this more explicit though.
+This enables the Amlogic Meson PWM controller. It is used for a dimmable
+LED on some devices. Additionally some devices use it to generate the
+32.768 kHz (low power oscillator) clock.
 
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 ---
- Documentation/devicetree/bindings/watchdog/meson-wdt.txt | 6 +++++-
- drivers/watchdog/meson_wdt.c                             | 2 ++
- 2 files changed, 7 insertions(+), 1 deletion(-)
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/watchdog/meson-wdt.txt b/Documentation/devicetree/bindings/watchdog/meson-wdt.txt
-index ae70185d96e6..f2fbe1a39d31 100644
---- a/Documentation/devicetree/bindings/watchdog/meson-wdt.txt
-+++ b/Documentation/devicetree/bindings/watchdog/meson-wdt.txt
-@@ -2,7 +2,11 @@ Meson SoCs Watchdog timer
- 
- Required properties:
- 
--- compatible : should be "amlogic,meson6-wdt" or "amlogic,meson8b-wdt"
-+- compatible : depending on the SoC this should be one of:
-+	"amlogic,meson6-wdt"
-+	"amlogic,meson8-wdt"
-+	"amlogic,meson8b-wdt"
-+	"amlogic,meson8m2-wdt"
- - reg : Specifies base physical address and size of the registers.
- 
- Example:
-diff --git a/drivers/watchdog/meson_wdt.c b/drivers/watchdog/meson_wdt.c
-index 491b9bf13d84..304274c67735 100644
---- a/drivers/watchdog/meson_wdt.c
-+++ b/drivers/watchdog/meson_wdt.c
-@@ -155,7 +155,9 @@ static const struct watchdog_ops meson_wdt_ops = {
- 
- static const struct of_device_id meson_wdt_dt_ids[] = {
- 	{ .compatible = "amlogic,meson6-wdt", .data = &meson6_wdt_data },
-+	{ .compatible = "amlogic,meson8-wdt", .data = &meson6_wdt_data },
- 	{ .compatible = "amlogic,meson8b-wdt", .data = &meson8b_wdt_data },
-+	{ .compatible = "amlogic,meson8m2-wdt", .data = &meson8b_wdt_data },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, meson_wdt_dt_ids);
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 49f038dcdd7c..abbe288a5134 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -870,6 +870,7 @@ CONFIG_PWM_ATMEL=m
+ CONFIG_PWM_ATMEL_HLCDC_PWM=m
+ CONFIG_PWM_ATMEL_TCB=m
+ CONFIG_PWM_FSL_FTM=m
++CONFIG_PWM_MESON=y
+ CONFIG_PWM_RENESAS_TPU=y
+ CONFIG_PWM_ROCKCHIP=m
+ CONFIG_PWM_SAMSUNG=m
 -- 
 2.13.1
