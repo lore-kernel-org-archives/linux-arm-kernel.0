@@ -1,47 +1,94 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Sun, 11 Jun 2017 23:05:02 +0300
-Subject: [PATCH v8 00/34] i.MX Media Driver
-In-Reply-To: <e4f152de-6e75-7654-178e-e6dcf9ad12f3@xs4all.nl>
-References: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
- <e7e4669c-2963-b9e1-edd7-02731a6e0f9c@xs4all.nl>
- <c0b69c93-b9cd-25e8-ea36-fc0600efdb69@gmail.com>
- <e4f152de-6e75-7654-178e-e6dcf9ad12f3@xs4all.nl>
-Message-ID: <43887f25-bb73-9020-0909-d275c319aaad@mentor.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sun, 11 Jun 2017 22:18:54 +0200
+Subject: [PATCH v4 6/7] ARM: dts: meson8: switch to new bindings for UART
+ nodes
+In-Reply-To: <CAFBinCD6_nGdqBSOJwyj0XQe8H05nw-r52pctY7ADJu0EqMb2A@mail.gmail.com>
+References: <1497001756-942-1-git-send-email-narmstrong@baylibre.com>
+ <1497001756-942-7-git-send-email-narmstrong@baylibre.com>
+ <CAFBinCD6_nGdqBSOJwyj0XQe8H05nw-r52pctY7ADJu0EqMb2A@mail.gmail.com>
+Message-ID: <CAFBinCBNhRtt8jiY+19_B-9_mNmB800rvD+rwBzYNfB5pXM53Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2017 02:26 AM, Hans Verkuil wrote:
-> On 10/06/17 01:16, Steve Longerbeam wrote:
->>
->>
->> On 06/07/2017 12:02 PM, Hans Verkuil wrote:
->>> We're still waiting for an Ack for patch 02/34, right?
->>>
->>
->> Hi Hans, Rub has provided an Ack for patch 2.
->>
->>> Other than that everything is ready AFAICT.
->>>
->>
->> But as Pavel pointed out, in fact we are missing many
->> Acks still, for all of the dts source changes (patches
->> 4-14), as well as really everything else (imx-media staging
->> driver patches).
-> 
-> No Acks needed for the staging part. It's staging, so not held
-> to the same standards as non-staging parts. That doesn't mean
-> Acks aren't welcome, of course.
+On Sat, Jun 10, 2017 at 12:37 AM, Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+> Hi Neil,
+>
+> On Fri, Jun 9, 2017 at 11:49 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+>> Switch to the stable UART bindings by adding a XTAL node and using the
+>> proper compatible strings.
+> unfortunately this won't apply now that Kevin has merged my "ARM: dts:
+> meson8: add and use the real clock controller"
+> on the other hand this will make the patch easier as you can now do
+> the same changes as in meson8b.dtsi
+Neil, if you want you could also drop this from your series and let me
+handle this (just let me know). I would even go one step further and
+export the CLKID_UART0, CLKID_UART1 and CLKID_UART2 gates and pass
+them as "pclk" for uart_{A,B,C}
+I'll even *try* to test if this works on real hardware (my Meson8m2
+board has a RTL8723BS SDIO wifi + bluetooth chip - wifi driver support
+has been pretty bad so far - but I'll try to see if I can get and
+messages out of the bluetooth part)
+just let me know if you want me to handle this patch for you
 
-Acks are wanted for particular i.MX DTS changes including device
-tree binding descriptions.
-
-Shawn, please bless the series.
-
-> 
-> You don't need Greg's Ack for staging/media either, patches there
-> go in via us (generally at least) and we handle those, not Greg.
-> 
-
---
-With best wishes,
-Vladimir
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>>  arch/arm/boot/dts/meson8.dtsi | 23 +++++++++++++++++++----
+>>  1 file changed, 19 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/meson8.dtsi b/arch/arm/boot/dts/meson8.dtsi
+>> index 6993077..a2ea112 100644
+>> --- a/arch/arm/boot/dts/meson8.dtsi
+>> +++ b/arch/arm/boot/dts/meson8.dtsi
+>> @@ -83,6 +83,13 @@
+>>                 };
+>>         };
+>>
+>> +       xtal: xtal-clk {
+>> +               compatible = "fixed-clock";
+>> +               clock-frequency = <24000000>;
+>> +               clock-output-names = "xtal";
+>> +               #clock-cells = <0>;
+>> +       };
+>> +
+>>         clk81: clk at 0 {
+>>                 #clock-cells = <0>;
+>>                 compatible = "fixed-clock";
+>> @@ -199,17 +206,25 @@
+>>  };
+>>
+>>  &uart_AO {
+>> -       clocks = <&clk81>;
+>> +       compatible = "amlogic,meson8-uart", "amlogic,meson-ao-uart";
+>> +       clocks = <&xtal>, <&clk81>, <&clk81>;
+>> +       clock-names = "xtal", "pclk", "baud";
+>>  };
+>>
+>>  &uart_A {
+>> -       clocks = <&clk81>;
+>> +       compatible = "amlogic,meson8-uart";
+>> +       clocks = <&xtal>, <&clk81>, <&clk81>;
+>> +       clock-names = "xtal", "pclk", "baud";
+>>  };
+>>
+>>  &uart_B {
+>> -       clocks = <&clk81>;
+>> +       compatible = "amlogic,meson8-uart";
+>> +       clocks = <&xtal>, <&clk81>, <&clk81>;
+>> +       clock-names = "xtal", "pclk", "baud";
+>>  };
+>>
+>>  &uart_C {
+>> -       clocks = <&clk81>;
+>> +       compatible = "amlogic,meson8-uart";
+>> +       clocks = <&xtal>, <&clk81>, <&clk81>;
+>> +       clock-names = "xtal", "pclk", "baud";
+>>  };
+>> --
+>> 1.9.1
+>>
+>>
+>> _______________________________________________
+>> linux-amlogic mailing list
+>> linux-amlogic at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-amlogic
