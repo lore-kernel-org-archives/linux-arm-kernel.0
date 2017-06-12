@@ -1,58 +1,74 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Mon, 12 Jun 2017 16:23:31 +0530
-Subject: [PATCH] usb: dwc3: exynos: Handle return value of clk_prepare_enable
-Message-ID: <3e8b3037c345341c2bda612b6de204f6c83dde38.1497264433.git.arvind.yadav.cs@gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 12 Jun 2017 14:49:14 +0200
+Subject: [PATCH v4 5/7] ARM: dts: meson6: switch to new bindings for UART
+ nodes
+In-Reply-To: <1497260577.3086.11.camel@baylibre.com>
+References: <1497001756-942-1-git-send-email-narmstrong@baylibre.com>
+ <1497001756-942-6-git-send-email-narmstrong@baylibre.com>
+ <1497260577.3086.11.camel@baylibre.com>
+Message-ID: <85fec9ad-1191-4afb-3938-a3d07918823e@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_prepare_enable() can fail here and we must check its return value.
+On 06/12/2017 11:42 AM, Jerome Brunet wrote:
+> On Fri, 2017-06-09 at 11:49 +0200, Neil Armstrong wrote:
+>> Switch to the stable UART bindings by adding a XTAL node and using the
+>> proper compatible strings.
+>>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> 
+> Shouldn't this patch be squashed with patch 4 ?
+> 
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
----
- drivers/usb/dwc3/dwc3-exynos.c | 13 ++++++++++---
- 1 file changed, 10 insertions(+), 3 deletions(-)
+Yep, so it doesn't break bisect.
 
-diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
-index 98f74ff..e089df7 100644
---- a/drivers/usb/dwc3/dwc3-exynos.c
-+++ b/drivers/usb/dwc3/dwc3-exynos.c
-@@ -125,12 +125,16 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
- 		dev_err(dev, "couldn't get clock\n");
- 		return -EINVAL;
- 	}
--	clk_prepare_enable(exynos->clk);
-+	ret = clk_prepare_enable(exynos->clk);
-+	if (ret)
-+		return ret;
- 
- 	exynos->susp_clk = devm_clk_get(dev, "usbdrd30_susp_clk");
- 	if (IS_ERR(exynos->susp_clk))
- 		exynos->susp_clk = NULL;
--	clk_prepare_enable(exynos->susp_clk);
-+	ret = clk_prepare_enable(exynos->susp_clk);
-+	if (ret)
-+		goto susp_clk_err;
- 
- 	if (of_device_is_compatible(node, "samsung,exynos7-dwusb3")) {
- 		exynos->axius_clk = devm_clk_get(dev, "usbdrd30_axius_clk");
-@@ -139,7 +143,9 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
- 			ret = -ENODEV;
- 			goto axius_clk_err;
- 		}
--		clk_prepare_enable(exynos->axius_clk);
-+		ret = clk_prepare_enable(exynos->axius_clk);
-+		if (ret)
-+			goto axius_clk_err;
- 	} else {
- 		exynos->axius_clk = NULL;
- 	}
-@@ -197,6 +203,7 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
- 	clk_disable_unprepare(exynos->axius_clk);
- axius_clk_err:
- 	clk_disable_unprepare(exynos->susp_clk);
-+susp_clk_err:
- 	clk_disable_unprepare(exynos->clk);
- 	return ret;
- }
--- 
-1.9.1
+Neil
+
+> 
+>> ---
+>>  arch/arm/boot/dts/meson6.dtsi | 28 ++++++++++++++++++++++++++++
+>>  1 file changed, 28 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/meson6.dtsi b/arch/arm/boot/dts/meson6.dtsi
+>> index b0fc91f..a334fbe 100644
+>> --- a/arch/arm/boot/dts/meson6.dtsi
+>> +++ b/arch/arm/boot/dts/meson6.dtsi
+>> @@ -70,9 +70,37 @@
+>>  		};
+>>  	};
+>>  
+>> +	xtal: xtal-clk {
+>> +		compatible = "fixed-clock";
+>> +		clock-frequency = <24000000>;
+>> +		clock-output-names = "xtal";
+>> +		#clock-cells = <0>;
+>> +	};
+>> +
+>>  	clk81: clk at 0 {
+>>  		#clock-cells = <0>;
+>>  		compatible = "fixed-clock";
+>>  		clock-frequency = <200000000>;
+>>  	};
+>>  }; /* end of / */
+>> +
+>> +
+>> +&uart_AO {
+>> +	clocks = <&xtal>, <&clk81>, <&clk81>;
+>> +	clock-names = "xtal", "pclk", "baud";
+>> +};
+>> +
+>> +&uart_A {
+>> +	clocks = <&xtal>, <&clk81>, <&clk81>;
+>> +	clock-names = "xtal", "pclk", "baud";
+>> +};
+>> +
+>> +&uart_B {
+>> +	clocks = <&xtal>, <&clk81>, <&clk81>;
+>> +	clock-names = "xtal", "pclk", "baud";
+>> +};
+>> +
+>> +&uart_C {
+>> +	clocks = <&xtal>, <&clk81>, <&clk81>;
+>> +	clock-names = "xtal", "pclk", "baud";
+>> +};
+> 
