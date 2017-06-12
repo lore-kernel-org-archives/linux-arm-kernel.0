@@ -1,93 +1,135 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Mon, 12 Jun 2017 14:47:08 +0300
-Subject: [PATCH 2/2] ARM: dts: imx6ul: Add imx6ul-tempmon
-In-Reply-To: <20170612124029.1643469d@karo-electronics.de>
-References: <7055ce6095c0b7f026ac6f0dc37e43fc5c0b1793.1496939031.git.leonard.crestez@nxp.com>
- <b9b91617985607f24c4986bcad5199483805d6b7.1496939031.git.leonard.crestez@nxp.com>
- <CAOMZO5BP4fPyzDmSg+DFLRYh3QMf-8T0gqvnZn6mEMt-QqSgfw@mail.gmail.com>
- <1497005895.28352.88.camel@nxp.com>
- <20170609154638.3b64e6d0@karo-electronics.de>
- <1497022484.28352.105.camel@nxp.com>
- <20170612124029.1643469d@karo-electronics.de>
-Message-ID: <1497268028.32422.15.camel@nxp.com>
+From: jun.gao@mediatek.com (Jun Gao)
+Date: Mon, 12 Jun 2017 19:54:28 +0800
+Subject: [PATCH v4 2/2] arm: dts: Add Mediatek MT2701 i2c device node
+In-Reply-To: <1495784107-6711-3-git-send-email-jun.gao@mediatek.com>
+References: <1495784107-6711-1-git-send-email-jun.gao@mediatek.com>
+ <1495784107-6711-3-git-send-email-jun.gao@mediatek.com>
+Message-ID: <1497268468.930.26.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-06-12 at 12:40 +0200, Lothar Wa?mann wrote:
-> On Fri, 9 Jun 2017 18:34:44 +0300 Leonard Crestez wrote:
-> > 
-> > On Fri, 2017-06-09 at 15:46 +0200, Lothar Wa?mann wrote:
-> > > 
-> > > On Fri, 9 Jun 2017 13:58:15 +0300 Leonard Crestez wrote:
-> > > > 
-> > > > On Thu, 2017-06-08 at 13:45 -0300, Fabio Estevam wrote:
-> > > > > 
-> > > > > On Thu, Jun 8, 2017 at 1:26 PM, Leonard Crestez??wrote:
-> > > > > > 
-> > > > > > +???????????????????????tempmon: tempmon {
-> > > > > > +???????????????????????????????compatible = "fsl,imx6ul-tempmon", "fsl,imx6sx-tempmon";
-> > > > > > +???????????????????????????????interrupts = ;
-> > > > > > +???????????????????????????????fsl,tempmon = <&anatop>;
-> > > > > > +???????????????????????????????fsl,tempmon-data = <&ocotp>;
-> > > > > > +???????????????????????????????clocks = <&clks IMX6UL_CLK_PLL3_USB_OTG>;
-> > > > > Does the IMX6UL_CLK_PLL3_USB_OTG clock really control tempmon? Please
-> > > > > double check.
-> > > > Yes, as far as I can tell the tempmon block uses the 480 Mhz PLL3 clock
-> > > > directly. This is similar to other imx6 SOCs. This PLL is used for
-> > > > stuff like USB but not only that. My understanding is the _USB_OTG
-> > > > suffix is descriptive, similar to PLL4_AUDIO and PLL6_ENET. Other non-
-> > > > usb components use PLL3 (like UART) but through other gates/dividers.
-> > > > 
-> > > > Setting this to?IMX6UL_CLK_DUMMY will cause temperature reads to fail.
-> > > > Even if PLL3 usually ends up being constantly enabled because of uarts
-> > > > this is not true at imx_thermal_probe time (or uarts can be disabled).
-> > > > 
-> > > Since the driver is accessing the OCOTP registers it definitely needs
-> > > the IMX6UL_CLK_OCOTP too!
-> > > 
-> > I don't think so. OCOTP reads fuse values into shadows registers on
-> > chip reset and values seem to be available even if it's specific OCOTP
-> > 
-> Shadow registers are registers nonetheless which require a clock for
-> accessing them.
+On Fri, 2017-05-26 at 15:35 +0800, Jun Gao wrote:
+> From: Jun Gao <jun.gao@mediatek.com>
 > 
-> > 
-> > clock is off. I think that clock is only required for writes or?shadow
-> > updates.
-> > 
-> Sometimes it helps to read the Reference Manual or take hardware and try
-> it out. The i.MX6(Q|UL) Reference Manual lists the required clocks as:
-> ??????????????????????????????????Table 35-1. OCOTP Clocks
-> Clock name???????Clock Root???????????Description
-> ipg_clk??????????ipg_clk_root?????????Peripheral clock
-> ipg_clk_s????????ipg_clk_root?????????Peripheral access clock
+> Add MT2701 i2c device node.
 > 
-> and Table 18-3. "System Clocks, Gating, and Override (continued)"
-> for i.MX6UL shows:
-> OCOTP IPG_CLK???IPG_CLK_ROOT CCGR2[CG6] (IIM_CLK_ENABLE)
-> ??????IPG_CLK_S IPG_CLK_ROOT CCGR2[CG6] (IIM_CLK_ENABLE)
+> Signed-off-by: Jun Gao <jun.gao@mediatek.com>
+> ---
+>  arch/arm/boot/dts/mt2701-evb.dts | 42 ++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/mt2701.dtsi    | 42 ++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 84 insertions(+)
 > 
-> while the same table for i.MX6Q shows:
-> OCOTP ipg_clk???ipg_clk_root CCGR2[CG6] (iim_clk_enable)
-> ??????ipg_clk_s ipg_clk_root
-> 
-> with a blank entry in the "Clock Gating" column for the access clock.
-> So, for i.MX6Q there is no clock enable necessary for the access clock,
-> but for i.MX6UL there is!
-> 
-> You can simply verify it by trying to read any of the fuse registers
-> with the OCOTP clock disabled (which immediately hangs the processor).
+> diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
+> index a483798..3f5a96c 100644
+> --- a/arch/arm/boot/dts/mt2701-evb.dts
+> +++ b/arch/arm/boot/dts/mt2701-evb.dts
+> @@ -28,7 +28,49 @@
+>  	status = "okay";
+>  };
+>  
+> +&i2c0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&i2c0_pins_a>;
+> +	status = "okay";
+> +};
+> +
+> +&i2c1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&i2c1_pins_a>;
+> +	status = "okay";
+> +};
+> +
+> +&i2c2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&i2c2_pins_a>;
+> +	status = "okay";
+> +};
+> +
+>  &pio {
+> +	i2c0_pins_a: i2c0 at 0 {
+> +		pins1 {
+> +			pinmux = <MT2701_PIN_75_SDA0__FUNC_SDA0>,
+> +				 <MT2701_PIN_76_SCL0__FUNC_SCL0>;
+> +			bias-disable;
+> +		};
+> +	};
+> +
+> +	i2c1_pins_a: i2c1 at 0 {
+> +		pins1 {
+> +			pinmux = <MT2701_PIN_57_SDA1__FUNC_SDA1>,
+> +				 <MT2701_PIN_58_SCL1__FUNC_SCL1>;
+> +			bias-disable;
+> +		};
+> +	};
+> +
+> +	i2c2_pins_a: i2c2 at 0 {
+> +		pins1 {
+> +			pinmux = <MT2701_PIN_77_SDA2__FUNC_SDA2>,
+> +				 <MT2701_PIN_78_SCL2__FUNC_SCL2>;
+> +			bias-disable;
+> +		};
+> +	};
+> +
+>  	spi_pins_a: spi0 at 0 {
+>  		pins_spi {
+>  			pinmux = <MT2701_PIN_53_SPI0_CSN__FUNC_SPI0_CS>,
+> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+> index 8037210..1b6157e 100644
+> --- a/arch/arm/boot/dts/mt2701.dtsi
+> +++ b/arch/arm/boot/dts/mt2701.dtsi
+> @@ -286,6 +286,48 @@
+>  		status = "disabled";
+>  	};
+>  
+> +	i2c0: i2c at 11007000 {
+> +		compatible = "mediatek,mt2701-i2c",
+> +			     "mediatek,mt6577-i2c";
+> +		reg = <0 0x11007000 0 0x70>,
+> +		      <0 0x11000200 0 0x80>;
+> +		interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_LOW>;
+> +		clock-div = <16>;
+> +		clocks = <&pericfg CLK_PERI_I2C0>, <&pericfg CLK_PERI_AP_DMA>;
+> +		clock-names = "main", "dma";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		status = "disabled";
+> +	};
+> +
+> +	i2c1: i2c at 11008000 {
+> +		compatible = "mediatek,mt2701-i2c",
+> +			     "mediatek,mt6577-i2c";
+> +		reg = <0 0x11008000 0 0x70>,
+> +		      <0 0x11000280 0 0x80>;
+> +		interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_LOW>;
+> +		clock-div = <16>;
+> +		clocks = <&pericfg CLK_PERI_I2C1>, <&pericfg CLK_PERI_AP_DMA>;
+> +		clock-names = "main", "dma";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		status = "disabled";
+> +	};
+> +
+> +	i2c2: i2c at 11009000 {
+> +		compatible = "mediatek,mt2701-i2c",
+> +			     "mediatek,mt6577-i2c";
+> +		reg = <0 0x11009000 0 0x70>,
+> +		      <0 0x11000300 0 0x80>;
+> +		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_LOW>;
+> +		clock-div = <16>;
+> +		clocks = <&pericfg CLK_PERI_I2C2>, <&pericfg CLK_PERI_AP_DMA>;
+> +		clock-names = "main", "dma";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		status = "disabled";
+> +	};
+> +
+>  	spi0: spi at 1100a000 {
+>  		compatible = "mediatek,mt2701-spi";
+>  		#address-cells = <1>;
 
-I did check this on real hardware and it seems to work. Printing the
-values read from OCOTP inside?imx_get_sensor_data displays what looks
-like valid data.
+Dear Matthias,
 
-However it seems that this might be accidental, it just happens that
-the OCOTP clock starts as enabled and is only disabled later in the
-boot from "clk_disable_unused". But in theory imx-tempmon can be built
-as a module so this is a real bug. It currently seems to already affect
-imx6sx.
+Could you take this patch together with 
+[PATCH v4 1/2]dt-bindings: i2c: Add Mediatek MT2701 i2c binding ?
 
---
-Regards,
-Leonard
+Thanks!
