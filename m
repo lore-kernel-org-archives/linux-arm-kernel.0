@@ -1,27 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Jun 2017 16:22:23 +0200
-Subject: [PATCH] arm64: ftrace: fix building without CONFIG_MODULES
-In-Reply-To: <20170612124805.GA11581@arm.com>
-References: <20170609102807.2992510-1-arnd@arndb.de>
- <20170609113850.GF13955@arm.com>
- <CAK8P3a10CQq3mvQzysTTk+y=WQ=zcXehjPDUXzqh8SnTZ6WkXg@mail.gmail.com>
- <20170612124805.GA11581@arm.com>
-Message-ID: <CAK8P3a2pjsVztw81NA92wEwnqAMq83itYwJKfRTxT4q6AeC2Lg@mail.gmail.com>
+From: aisheng.dong@nxp.com (A.S. Dong)
+Date: Mon, 12 Jun 2017 14:23:10 +0000
+Subject: [PATCH 6/6] tty: serial: lpuart: add a more accurate baud rate
+ calculation method
+In-Reply-To: <CAHp75VdgLoavZrf+T1-cyPj2A30mGeyDEgye3qZoWXJE6inE_Q@mail.gmail.com>
+References: <1494316248-24052-1-git-send-email-aisheng.dong@nxp.com>
+ <1494316248-24052-7-git-send-email-aisheng.dong@nxp.com>
+ <CAHp75Vemc5qoD7gbc_sJBSasYTFYSYOuWZv4N-4X60arWX8aJg@mail.gmail.com>
+ <AM3PR04MB3062F7BCE82860C377C214E80F10@AM3PR04MB306.eurprd04.prod.outlook.com>
+ <CAHp75VcH0j3ddaZ3iStNO4QcAwJKZ7BAMwUTthum2no1ucs2ww@mail.gmail.com>
+ <AM3PR04MB306214514B820D66535E28B80CE0@AM3PR04MB306.eurprd04.prod.outlook.com>
+ <CAHp75VcSToSfbUZ2TP0OsLRjV4TNpq7D_=4tnB_+rDvS2jp22Q@mail.gmail.com>
+ <AM3PR04MB30678CBD87777C6816DEFA580CE0@AM3PR04MB306.eurprd04.prod.outlook.com>
+ <CAHp75VdgLoavZrf+T1-cyPj2A30mGeyDEgye3qZoWXJE6inE_Q@mail.gmail.com>
+Message-ID: <AM3PR04MB30630CDA4E0FD2B5079072E80CD0@AM3PR04MB306.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 12, 2017 at 2:48 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Jun 09, 2017 at 08:57:31PM +0200, Arnd Bergmann wrote:
->> On Fri, Jun 9, 2017 at 1:38 PM, Will Deacon <will.deacon@arm.com> wrote:
->> > I can't seem to reproduce this simply by disabling MODULES in defconfig.
->> > Could you share your .config, please?
->>
->> This is the randconfig I used: https://pastebin.com/SfKBY7f8
->
-> Thanks, I was forgetting to enable ftrace. I think a simpler patch (and one
-> that I can just apply via arm64) is switching the IS_ENABLEDs out for
-> #ifdefs. See below.
+> -----Original Message-----
+> From: Andy Shevchenko [mailto:andy.shevchenko at gmail.com]
+> Sent: Friday, June 09, 2017 11:49 PM
+> To: A.S. Dong
+> Cc: linux-serial at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm
+> Mailing List; Greg Kroah-Hartman; Jiri Slaby; Andy Duan; Stefan Agner;
+> Mingkai Hu; Y.B. Lu; Dong Aisheng
+> Subject: Re: [PATCH 6/6] tty: serial: lpuart: add a more accurate baud
+> rate calculation method
+> 
+> On Fri, Jun 9, 2017 at 5:20 PM, A.S. Dong <aisheng.dong@nxp.com> wrote:
+> >> > How about you send a separate baud algorithm improvement patch later?
+> >>
+> >> Why not to do it right a way?
+> >>
+> >
+> > Because I thought that could be a separate patch which is doing
+> > algorithm improvement, then we can have the full history and a clear
+> comparison.
+> >
+> > And also we are still not sure whether it works, we don't want to
+> > block on it too long.
+> >
+> > But if you're pretty sure about it, I would wait for some more time.
+> >
+> > However, personally I would still rather keep them in two separate
+> > Patches for clearer history and comparison.
+> 
+> Since we already near to -rc5, I would rather agree with you.
+> So, please proceed with your approach and we can modify it in relaxing
+> mode later on.
+> 
+> Thanks, and sorry for the delay!
 
-Yes, good idea.
+Never mind.
+A professional review is always respectable and appreciated.
 
-        Arnd
+Thanks
+
+Regards
+Dong Aisheng
