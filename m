@@ -1,55 +1,63 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 12 Jun 2017 11:57:42 +0200
-Subject: [PATCH v3 6/9] net: mvmdio: put the poll intervals in the ops
- structure
+Date: Mon, 12 Jun 2017 11:57:45 +0200
+Subject: [PATCH v3 9/9] arm64: marvell: dts: add xmdio nodes for 7k/8k
 In-Reply-To: <20170612095745.11300-1-antoine.tenart@free-electrons.com>
 References: <20170612095745.11300-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170612095745.11300-7-antoine.tenart@free-electrons.com>
+Message-ID: <20170612095745.11300-10-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Put the two poll intervals (min and max) in the driver's ops
-structure. This is needed to add the xmdio support later.
+Add the description of the xMDIO bus for the Marvell Armada 7k and
+Marvell Armada 8k; for both CP110 slave and master. This bus is found
+on Marvell Ethernet controllers and provides an interface with the
+xMDIO bus.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvmdio.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
-index 7d2f1b2e1fe1..41c75d7b84fb 100644
---- a/drivers/net/ethernet/marvell/mvmdio.c
-+++ b/drivers/net/ethernet/marvell/mvmdio.c
-@@ -70,6 +70,9 @@ struct orion_mdio_ops {
- 	void (*start_read)(struct orion_mdio_dev *, int, int);
- 	u16 (*read)(struct orion_mdio_dev *);
- 	void (*write)(struct orion_mdio_dev *, int, int, u16);
+@Dave: this patch should go through the mvebu tree as asked by Gregory, thanks!
+
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 8 ++++++++
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 8 ++++++++
+ 2 files changed, 16 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+index 037ed30d75a7..464c41d0e66a 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+@@ -98,6 +98,14 @@
+ 				clocks = <&cpm_syscon0 1 9>, <&cpm_syscon0 1 5>;
+ 			};
+ 
++			cpm_xmdio: mdio at 12a600 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "marvell,xmdio";
++				reg = <0x12a600 0x10>;
++				status = "disabled";
++			};
 +
-+	unsigned int poll_interval_min;
-+	unsigned int poll_interval_max;
- };
+ 			cpm_icu: interrupt-controller at 1e0000 {
+ 				compatible = "marvell,cp110-icu"; 
+ 				reg = <0x1e0000 0x10>;
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+index 2a99ff8fca2a..bbb603234f30 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+@@ -103,6 +103,14 @@
+ 				clocks = <&cps_syscon0 1 9>, <&cps_syscon0 1 5>;
+ 			};
  
- static int orion_mdio_smi_is_done(struct orion_mdio_dev *dev)
-@@ -112,6 +115,9 @@ static const struct orion_mdio_ops orion_mdio_smi_ops = {
- 	.start_read = orion_mdio_smi_start_read_op,
- 	.read = orion_mdio_smi_read_op,
- 	.write = orion_mdio_smi_write_op,
++			cps_xmdio: mdio at 12a600 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "marvell,xmdio";
++				reg = <0x12a600 0x10>;
++				status = "disabled";
++			};
 +
-+	.poll_interval_min = MVMDIO_SMI_POLL_INTERVAL_MIN,
-+	.poll_interval_max = MVMDIO_SMI_POLL_INTERVAL_MAX,
- };
- 
- /* Wait for the SMI unit to be ready for another operation
-@@ -131,8 +137,8 @@ static int orion_mdio_wait_ready(const struct orion_mdio_ops *ops,
- 			break;
- 
- 	        if (dev->err_interrupt <= 0) {
--			usleep_range(MVMDIO_SMI_POLL_INTERVAL_MIN,
--				     MVMDIO_SMI_POLL_INTERVAL_MAX);
-+			usleep_range(ops->poll_interval_min,
-+				     ops->poll_interval_max);
- 
- 			if (time_is_before_jiffies(end))
- 				++timedout;
+ 			cps_icu: interrupt-controller at 1e0000 {
+ 				compatible = "marvell,cp110-icu";
+ 				reg = <0x1e0000 0x10>;
 -- 
 2.9.4
