@@ -1,53 +1,62 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 12 Jun 2017 11:17:39 +0100
-Subject: [PATCH v3 7/9] net: mvmdio: add xmdio xsmi support
-In-Reply-To: <20170612095745.11300-8-antoine.tenart@free-electrons.com>
-References: <20170612095745.11300-1-antoine.tenart@free-electrons.com>
- <20170612095745.11300-8-antoine.tenart@free-electrons.com>
-Message-ID: <20170612101739.GA4902@n2100.armlinux.org.uk>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Mon, 12 Jun 2017 12:03:31 +0200
+Subject: [PATCH v5 0/8] Add support for DCMI camera interface of
+ STMicroelectronics STM32 SoC series
+In-Reply-To: <1493998287-5828-1-git-send-email-hugues.fruchet@st.com>
+References: <1493998287-5828-1-git-send-email-hugues.fruchet@st.com>
+Message-ID: <f50a3320-a0ef-bdef-d236-f57fd477bccc@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 12, 2017 at 11:57:43AM +0200, Antoine Tenart wrote:
-> +static const struct orion_mdio_ops *orion_mdio_get_ops(struct orion_mdio_dev *dev,
-> +						       int regnum)
-> +{
-> +	if (dev->bus_type == BUS_TYPE_XSMI && (regnum & MII_ADDR_C45))
-> +		return &orion_mdio_xsmi_ops;
-> +	else if (dev->bus_type == BUS_TYPE_SMI)
-> +		return &orion_mdio_smi_ops;
-> +
-> +	return ERR_PTR(-EOPNOTSUPP);
-> +}
+Hi Hugues
 
-Oh, this is where you're doing it - I'm not sure having this complexity
-is really necessary - there is no dynamic choice between the two.  This
-seems to be way over-engineered.
+On 05/05/2017 05:31 PM, Hugues Fruchet wrote:
+> This patchset introduces a basic support for Digital Camera Memory Interface
+> (DCMI) of STMicroelectronics STM32 SoC series.
+> 
+> This first basic support implements RGB565 & YUV frame grabbing.
+> Cropping and JPEG support will be added later on.
+> 
+> This has been tested on STM324x9I-EVAL evaluation board embedding
+> an OV2640 camera sensor.
+> 
+.....
+> 
+> Hugues Fruchet (8):
+>    dt-bindings: Document STM32 DCMI bindings
+>    [media] stm32-dcmi: STM32 DCMI camera interface driver
+>    ARM: dts: stm32: Enable DCMI support on STM32F429 MCU
+>    ARM: dts: stm32: Enable DCMI camera interface on STM32F429-EVAL board
+>    ARM: dts: stm32: Enable STMPE1600 gpio expander of STM32F429-EVAL
+>      board
+>    ARM: dts: stm32: Enable OV2640 camera support of STM32F429-EVAL board
+>    ARM: configs: stm32: STMPE1600 GPIO expander
+>    ARM: configs: stm32: DCMI + OV2640 camera support
+> 
+>   .../devicetree/bindings/media/st,stm32-dcmi.txt    |   46 +
+>   arch/arm/boot/dts/stm32429i-eval.dts               |   56 +
+>   arch/arm/boot/dts/stm32f429.dtsi                   |   37 +
+>   arch/arm/configs/stm32_defconfig                   |    9 +
+>   drivers/media/platform/Kconfig                     |   12 +
+>   drivers/media/platform/Makefile                    |    2 +
+>   drivers/media/platform/stm32/Makefile              |    1 +
+>   drivers/media/platform/stm32/stm32-dcmi.c          | 1403 ++++++++++++++++++++
+>   8 files changed, 1566 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/media/st,stm32-dcmi.txt
+>   create mode 100644 drivers/media/platform/stm32/Makefile
+>   create mode 100644 drivers/media/platform/stm32/stm32-dcmi.c
+> 
 
-You might as well make the SMI operations fail if MII_ADDR_C45 is set,
-and the XSMI operations fail if MII_ADDR_C45 is not set.
+Patches 3, 4, 5, 6 applied on stm32-dt-for-v4.13
 
-Hmm, I think this whole driver is over-engineered:
+Patch 7 applied on stm32-defconfig-for-v4.13
 
-1. the mdio read/write functions implement their own locking.
+Patch 8 will not be applied: As SDRAM used on STM32 MCUs is small,
+I don't want to penalize other users:
+  - by increasing static kernel size
+  - by enabling devices which consume dynamically lot of memory
 
-   At the MDIO level, there is already locking in the form of a per-bus
-   lock "bus->mdio_lock" which will be taken whenever either of these
-   functions is called.  So the driver's "dev->lock" is redundant.
+User will be free to enable it through menuconfig.
 
-2. with the redundant locking removed, orion_mdio_write() becomes a
-   call to orion_mdio_wait_ready() followed by a call to dev->ops->write.
-   It seems that orion_mdio_wait_ready() could be a library function
-   shared between a SMI version of orion_mdio_write() and a XSMI version.
-
-3. the same is really true of orion_mdio_read(), although that function
-   is a little more complex in itself, the result would actually end up
-   being simpler.
-
-With those changes together, it elimates "struct orion_mdio_ops" entirely,
-and I think makes the driver smaller, simpler, and cleaner.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Regards
+Alex
