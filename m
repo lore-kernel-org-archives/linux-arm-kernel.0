@@ -1,93 +1,193 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 12 Jun 2017 11:38:53 +0200
-Subject: [PATCH] ARM64: Kconfig: Fix the missing hi655x common clk
-In-Reply-To: <CAK8P3a0L6QNAJf6DB876DFHf7aGcD=uwxOUB36LKr-AX67VYAA@mail.gmail.com>
-References: <CALAqxLVn9r9R-wnrZbrFqYfwqZD-tegbJrZLsUeBjjBc4_Q89w@mail.gmail.com>
- <1496686434-13181-1-git-send-email-daniel.lezcano@linaro.org>
- <CAPDyKFqWptneK2V7wCR8LGbgU7=U9kBCKkHrtgGmZKmNQJ4s7g@mail.gmail.com>
- <20170609154652.GG2244@mai>
- <CAK8P3a1PsFcqLC95rSQf6EdkqhQ6sE3OXC9gDQ8TLp2mTVO3pw@mail.gmail.com>
- <CALAqxLXtLc16zT9AFaHXbbQp-Vf3GNOJ1nb7PoUJgj22rh=X-w@mail.gmail.com>
- <CAK8P3a0L6QNAJf6DB876DFHf7aGcD=uwxOUB36LKr-AX67VYAA@mail.gmail.com>
-Message-ID: <20170612093853.GB2261@mai>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Mon, 12 Jun 2017 11:39:04 +0200
+Subject: [PATCH v4 2/7] tty/serial: meson_uart: update to stable bindings
+In-Reply-To: <1497001756-942-3-git-send-email-narmstrong@baylibre.com>
+References: <1497001756-942-1-git-send-email-narmstrong@baylibre.com>
+ <1497001756-942-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1497260344.3086.8.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 09, 2017 at 10:48:13PM +0200, Arnd Bergmann wrote:
-> On Fri, Jun 9, 2017 at 10:15 PM, John Stultz <john.stultz@linaro.org> wrote:
-> > On Fri, Jun 9, 2017 at 1:06 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> On Fri, Jun 9, 2017 at 5:46 PM, Daniel Lezcano
-> >> <daniel.lezcano@linaro.org> wrote:
-> >>> On Tue, Jun 06, 2017 at 04:17:40PM +0200, Ulf Hansson wrote:
-> >>>> On 5 June 2017 at 20:13, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
-> >>>> > With the addition of the hi655x common clock, the config option is missing
-> >>>> > for the ARM64's hi6220 platform. That leads to a non functionnal WiFi because
-> >>>> > the hi655x clock driver misses when initializing the power sequence via DT.
-> >>>> >
-> >>>> > Cc: John Stultz <john.stultz@linaro.org>
-> >>>> > Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> >>>> > Cc: Wei Xu <xuwei5@hisilicon.com>
-> >>>> > Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> >>>>
-> >>>> Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
-> >>>>
-> >>>> Would be nice to get this trivial fix in for 4.12 rcs to make the WiFi
-> >>>> work for Hikey.
-> >>>>
-> >>>
-> >>> I'm wondering if I submitted this patch for the right path.
-> >>>
-> >>> Shall it go through arm-soc ?
-> >>
-> >> Yes, but I'm not sure this is the right patch either. We tend to not
-> >> use 'select' for user-visible drivers, and most hisilicon platforms
-> >> won't need this driver.
-> >>
-> >> I think it would be more consistent to add this to the defconfig
-> >> and regard it as a user error when the driver is disabled on a
-> >> machine that needs it.
-> >
-> > Maybe the select is not exactly in the right place, but I don't really
-> > feel like a pmic on an SoC is a "user-visible driver". I deal with the
-> > board often and when the new dependency was made on the clk, I would
-> > have never have found it on my own w/o Ulf and Daniel pointing out
-> > what I needed to enable.
+On Fri, 2017-06-09 at 11:49 +0200, Neil Armstrong wrote:
+> From: Helmut Klein <hgkr.klein@gmail.com>
 > 
-> What I meant is that the Kconfig option is user-visible. On a very high
-> level, this is a result of arch/arm64/Kconfig.platforms listing only
-> very broad categories of SoCs, in many cases only the manufacturers
-> of very different chip families, which then control the visibility of the
-> individual Kconfig items for things like pinctrl or clk.
+> This patch handle the stable UART bindings but also keeps compatibility
+> with the legacy non-stable bindings until all boards uses them.
 > 
-> I now see that MFD_HI655X_PMIC is the top-level driver that you
-> have to select before enabling COMMON_CLK_HI655X, so the
-> patch is actually broken unless it actually selects both.
+> Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+> ?drivers/tty/serial/meson_uart.c | 109 +++++++++++++++++++++++++++++++++++++
+> ---
+> ?1 file changed, 103 insertions(+), 6 deletions(-)
 > 
-> How about simply adding a 'default MFD_HI655X_PMIC' to
-> COMMON_CLK_HI655X to enable it unless it is explicitly
-> turned off?
+> diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
+> index 60f1679..d2c8136 100644
+> --- a/drivers/tty/serial/meson_uart.c
+> +++ b/drivers/tty/serial/meson_uart.c
+> @@ -579,8 +579,12 @@ static void meson_serial_early_console_write(struct
+> console *co,
+> ?	device->con->write = meson_serial_early_console_write;
+> ?	return 0;
+> ?}
+> +/* Legacy bindings, should be removed when no more used */
+> ?OF_EARLYCON_DECLARE(meson, "amlogic,meson-uart",
+> ?		????meson_serial_early_console_setup);
+> +/* Stable bindings */
+> +OF_EARLYCON_DECLARE(meson, "amlogic,meson-ao-uart",
+> +		????meson_serial_early_console_setup);
+> ?
+> ?#define MESON_SERIAL_CONSOLE	(&meson_serial_console)
+> ?#else
+> @@ -595,11 +599,95 @@ static void meson_serial_early_console_write(struct
+> console *co,
+> ?	.cons		= MESON_SERIAL_CONSOLE,
+> ?};
+> ?
+> +/*
+> + * This function gets clocks in the legacy non-stable DT bindings.
+> + * This code will be remove once all the platforms switch to the
+> + * new DT bindings.
+> + */
+> +static int meson_uart_probe_clocks_legacy(struct platform_device *pdev,
+> +					??struct uart_port *port)
+> +{
+> +	struct clk *clk = NULL;
+> +	int ret;
+> +
+> +	clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(clk))
+> +		return PTR_ERR(clk);
+> +
+> +	ret = clk_prepare_enable(clk);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "couldn't enable clk\n");
+> +		return ret;
+> +	}
+> +
+> +	devm_add_action_or_reset(&pdev->dev,
+> +			(void(*)(void *))clk_disable_unprepare,
+> +			clk);
+> +
+> +	port->uartclk = clk_get_rate(clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static int meson_uart_probe_clocks(struct platform_device *pdev,
+> +				???struct uart_port *port)
+> +{
+> +	struct clk *clk_xtal = NULL;
+> +	struct clk *clk_pclk = NULL;
+> +	struct clk *clk_baud = NULL;
+> +	int ret;
+> +
+> +	clk_pclk = devm_clk_get(&pdev->dev, "pclk");
+> +	if (IS_ERR(clk_pclk))
+> +		return PTR_ERR(clk_pclk);
+> +
+> +	clk_xtal = devm_clk_get(&pdev->dev, "xtal");
+> +	if (IS_ERR(clk_xtal))
+> +		return PTR_ERR(clk_xtal);
+> +
+> +	clk_baud = devm_clk_get(&pdev->dev, "baud");
+> +	if (IS_ERR(clk_xtal))
+> +		return PTR_ERR(clk_baud);
+> +
+> +	ret = clk_prepare_enable(clk_pclk);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "couldn't enable pclk\n");
+> +		return ret;
+> +	}
+> +
+> +	devm_add_action_or_reset(&pdev->dev,
+> +			(void(*)(void *))clk_disable_unprepare,
+> +			clk_pclk);
+> +
+> +	ret = clk_prepare_enable(clk_xtal);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "couldn't enable xtal\n");
+> +		return ret;
+> +	}
+> +
+> +	devm_add_action_or_reset(&pdev->dev,
+> +			(void(*)(void *))clk_disable_unprepare,
+> +			clk_xtal);
+> +
+> +	ret = clk_prepare_enable(clk_baud);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "couldn't enable baud clk\n");
+> +		return ret;
+> +	}
+> +
+> +	devm_add_action_or_reset(&pdev->dev,
+> +			(void(*)(void *))clk_disable_unprepare,
+> +			clk_baud);
 
-Actually, I share John's opinion.
+It's not critical but there is a lot of duplication here. Should we add an
+helper function doing "get, prepare_enable, add_reset_action" with the clock
+name as argument ?
 
-Ideally when we choose a platform, all the relevants devices configuration
-options should be selected automatically from a single topmost node of a tree
-(platform selection) to all the nodes corresponding to the devices, leaving the
-user to select one simple option without knowledge of the SoC hardware
-internals.
+Apart from this:
 
-If the user is expert in the platform and knows exactly what he does, then he
-can select an _EXPERT_ like option and be able to disable some drivers.
+Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
 
-It is how I tend to write the Kconfig options, so the 'default MFD_HI655X_PMIC'
-is confusing for me. Wouldn't make sense to select COMMON_CLK_HI655X when
-MFD_HI655X_PMIC is enabled?
+> +
+> +	port->uartclk = clk_get_rate(clk_baud);
 
+This was already like this, but I wonder if we should store the *clk instead of
+caching the rate. Then call get_rate when appropriate
+
+Could be done in separate patch.
 
 
--- 
-
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> +
+> +	return 0;
+> +}
+> +
+> ?static int meson_uart_probe(struct platform_device *pdev)
+> ?{
+> ?	struct resource *res_mem, *res_irq;
+> ?	struct uart_port *port;
+> -	struct clk *clk;
+> ?	int ret = 0;
+> ?
+> ?	if (pdev->dev.of_node)
+> @@ -625,11 +713,15 @@ static int meson_uart_probe(struct platform_device
+> *pdev)
+> ?	if (!port)
+> ?		return -ENOMEM;
+> ?
+> -	clk = clk_get(&pdev->dev, NULL);
+> -	if (IS_ERR(clk))
+> -		return PTR_ERR(clk);
+> +	/* Use legacy way until all platforms switch to new bindings */
+> +	if (of_device_is_compatible(pdev->dev.of_node, "amlogic,meson-uart"))
+> +		ret = meson_uart_probe_clocks_legacy(pdev, port);
+> +	else
+> +		ret = meson_uart_probe_clocks(pdev, port);
+> +
+> +	if (ret)
+> +		return ret;
+> ?
+> -	port->uartclk = clk_get_rate(clk);
+> ?	port->iotype = UPIO_MEM;
+> ?	port->mapbase = res_mem->start;
+> ?	port->irq = res_irq->start;
+> @@ -668,9 +760,14 @@ static int meson_uart_remove(struct platform_device
+> *pdev)
+> ?	return 0;
+> ?}
+> ?
+> -
+> ?static const struct of_device_id meson_uart_dt_match[] = {
+> +	/* Legacy bindings, should be removed when no more used */
+> ?	{ .compatible = "amlogic,meson-uart" },
+> +	/* Stable bindings */
+> +	{ .compatible = "amlogic,meson6-uart" },
+> +	{ .compatible = "amlogic,meson8-uart" },
+> +	{ .compatible = "amlogic,meson8b-uart" },
+> +	{ .compatible = "amlogic,meson-gx-uart" },
+> ?	{ /* sentinel */ },
+> ?};
+> ?MODULE_DEVICE_TABLE(of, meson_uart_dt_match);
