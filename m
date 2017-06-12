@@ -1,59 +1,52 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Mon, 12 Jun 2017 23:37:27 +0800
-Subject: [PATCH V3 6/7] tty: serial: lpuart: add earlycon support for imx7ulp
-In-Reply-To: <1497281848-12995-1-git-send-email-aisheng.dong@nxp.com>
-References: <1497281848-12995-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1497281848-12995-7-git-send-email-aisheng.dong@nxp.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 12 Jun 2017 10:53:45 -0500
+Subject: [PATCH linux-next v4 2/4] spi: imx: add selection for iMX53 and
+ iMX6 controller
+In-Reply-To: <20170608051603.16070-3-jiada_wang@mentor.com>
+References: <20170608051603.16070-1-jiada_wang@mentor.com>
+ <20170608051603.16070-3-jiada_wang@mentor.com>
+Message-ID: <20170612155345.qtgaq4wjj2vidohd@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-earlycon is executed quite early before the device tree probe,
-so we need correctly initialize the port membase and iotype for
-imx7ulp during early console setup before using.
+On Thu, Jun 08, 2017 at 02:16:01PM +0900, Jiada Wang wrote:
+> ECSPI contorller for iMX53 and iMX6 has few hardware issues
+> comparing to iMX51.
+> The change add possibility to detect which controller is used
+> to apply possible workaround and limitations.
+> 
+> Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
+> ---
+>  .../devicetree/bindings/spi/fsl-imx-cspi.txt       |  1 +
+>  drivers/spi/spi-imx.c                              | 26 ++++++++++++++++++++--
+>  2 files changed, 25 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt b/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
+> index 31b5b21..5bf1396 100644
+> --- a/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
+> +++ b/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
+> @@ -9,6 +9,7 @@ Required properties:
+>    - "fsl,imx31-cspi" for SPI compatible with the one integrated on i.MX31
+>    - "fsl,imx35-cspi" for SPI compatible with the one integrated on i.MX35
+>    - "fsl,imx51-ecspi" for SPI compatible with the one integrated on i.MX51
+> +  - "fsl,imx53-ecspi" for SPI compatible with the one integrated on i.MX53 and later Soc
+>  - reg : Offset and length of the register set for the device
+>  - interrupts : Should contain CSPI/eCSPI interrupt
+>  - cs-gpios : Specifies the gpio pins to be used for chipselects.
+> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+> index 4469121..8e6f339 100644
+> --- a/drivers/spi/spi-imx.c
+> +++ b/drivers/spi/spi-imx.c
+> @@ -63,7 +63,8 @@ enum spi_imx_devtype {
+>  	IMX27_CSPI,
+>  	IMX31_CSPI,
+>  	IMX35_CSPI,	/* CSPI on all i.mx except above */
+> -	IMX51_ECSPI,	/* ECSPI on i.mx51 and later */
+> +	IMX51_ECSPI,	/* ECSPI on i.mx51 */
+> +	IMX53_ECSPI,	/* ECSPI on i.mx53 and later */
 
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Jiri Slaby <jslaby@suse.com>
-Cc: Stefan Agner <stefan@agner.ch>
-Cc: Mingkai Hu <Mingkai.Hu@nxp.com>
-Cc: Yangbo Lu <yangbo.lu@nxp.com>
-Acked-by: Fugang Duan <fugang.duan@nxp.com>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+Looks like i.MX51 and i.MX53 are the same. While the DT should have 
+different compatibles (with fallbacks), the driver should map them to 
+the same type until there's some difference found.
 
----
-Change Log:
-v2->v3:
- * use standard port->iotype to represent endians
-v1->v2:
- * updated due to lpuart_reg_off removed
----
- drivers/tty/serial/fsl_lpuart.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
-
-diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
-index 9d05e53..6a725cb 100644
---- a/drivers/tty/serial/fsl_lpuart.c
-+++ b/drivers/tty/serial/fsl_lpuart.c
-@@ -1982,8 +1982,21 @@ static int __init lpuart32_early_console_setup(struct earlycon_device *device,
- 	return 0;
- }
- 
-+static int __init lpuart32_imx_early_console_setup(struct earlycon_device *device,
-+						   const char *opt)
-+{
-+	if (!device->port.membase)
-+		return -ENODEV;
-+
-+	device->port.iotype = UPIO_MEM32;
-+	device->port.membase += IMX_REG_OFF;
-+	device->con->write = lpuart32_early_write;
-+
-+	return 0;
-+}
- OF_EARLYCON_DECLARE(lpuart, "fsl,vf610-lpuart", lpuart_early_console_setup);
- OF_EARLYCON_DECLARE(lpuart32, "fsl,ls1021a-lpuart", lpuart32_early_console_setup);
-+OF_EARLYCON_DECLARE(lpuart32, "fsl,imx7ulp-lpuart", lpuart32_imx_early_console_setup);
- EARLYCON_DECLARE(lpuart, lpuart_early_console_setup);
- EARLYCON_DECLARE(lpuart32, lpuart32_early_console_setup);
- 
--- 
-2.7.4
+Rob
