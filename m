@@ -1,96 +1,108 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Mon, 12 Jun 2017 11:24:04 -0700
-Subject: [PATCH 11/11] ARM: dts: imx6-sabreauto: add the ADV7180 video decoder
-In-Reply-To: <1497291844-14632-1-git-send-email-steve_longerbeam@mentor.com>
-References: <1497291844-14632-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1497291844-14632-12-git-send-email-steve_longerbeam@mentor.com>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Mon, 12 Jun 2017 11:52:36 -0700
+Subject: [RFT PATCH v2 02/42] drivers: pci: host: iproc: Convert link
+ check to raw PCI config accessors
+In-Reply-To: <CAMSpPPc0uwV0JZYkegrCaemuoJ-wfWwkSXd7TMtFwENoLRXdBQ@mail.gmail.com>
+References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
+ <20170608141342.2018-3-lorenzo.pieralisi@arm.com>
+ <0eb77019-9945-592c-375d-e2de742b3237@broadcom.com>
+ <20170608163614.GB2216@red-moon>
+ <CAMSpPPe6bXfu=ntMedrt0w4UfqJLy1a9ZBu_kXy1j4B63x1Nww@mail.gmail.com>
+ <20170612161358.GA32043@red-moon>
+ <CAMSpPPc0uwV0JZYkegrCaemuoJ-wfWwkSXd7TMtFwENoLRXdBQ@mail.gmail.com>
+Message-ID: <403daa9b-c0f6-971d-9312-ef103460d738@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enables the ADV7180 decoder sensor. The ADV7180 connects to the
-parallel-bus mux input on ipu1_csi0_mux.
 
-The ADV7180 power pin is via max7310_b port expander.
 
-Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+On 6/12/17 10:40 AM, Oza Oza wrote:
+> On Mon, Jun 12, 2017 at 9:43 PM, Lorenzo Pieralisi
+> <lorenzo.pieralisi@arm.com> wrote:
+>> On Sun, Jun 11, 2017 at 09:42:34AM +0530, Oza Oza wrote:
+>>> On Thu, Jun 8, 2017 at 10:06 PM, Lorenzo Pieralisi
+>>> <lorenzo.pieralisi@arm.com> wrote:
+>>>> [dropped rock-chips maintainers, email bounces]
+>>>>
+>>>> On Thu, Jun 08, 2017 at 08:56:05AM -0700, Ray Jui wrote:
+>>>>> Hi Lorenzo,
+>>>>>
+>>>>> Thanks, I'll try my best to find time to test this along 15/42 and
+>>>>> 33/42 patches. Hopefully I can get to that some time next week.
+>>>>>
+>>>>> I have not yet reviewed these patches in details. Do they have
+>>>>> dependency on other patches to the generic framework code you
+>>>>> changed?
+>>>>>
+>>>>> If so, is there a repo I can pull them?
+>>>>
+>>>> I added it in the cover letter but anyway here it is:
+>>>>
+>>>> git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git pci/pci-fixup-irqs-removal-v2
+>>>
+>>> Hi Lorenzo,
+>>>
+>>> I picked up your changes, and tested on iproc based SOC,
+>>> and ran basic fio data transfer.. and it looks okay.
+>>
+>> Thank you. If you could also check it is all OK from a legacy
+>> IRQ allocation (ie same as before applying series) I'd be grateful.
+>>
+> 
+> I disabled msi and it should default to legacy IRQ, looks like there
+> is a problem, if I missed any change !
+> 
+> before applying series:  cat /proc/interrupts
+> 377:        168          0          0          0          0          0
+>          0          0     dummy   1 Edge      nvme0q0, nvme0q1
+> 
+> after applying series:
+> root at bcm958742k:~# dmesg | grep nvme
+> [    3.855466] nvme 0000:01:00.0: assign irq: got 0
+> [    3.855469] nvme 0000:01:00.0: assigning IRQ 00
+> [    3.855515] nvme nvme0: pci function 0000:01:00.0
+> [    4.270850] nvme 0000:01:00.0: enabling device (0000 -> 0002)
+> [    4.276787] nvme 0000:01:00.0: enabling bus mastering
+> [    4.276817] nvme nvme0: Removing after probe failure status: -22
+> 
+> here is my git status of your series, let me know if I am missing any
+> change with respect to legacy IRQ ?
+> 
+>  modified:   arch/arm/include/asm/mach/pci.h
+>         modified:   arch/arm/kernel/bios32.c
+>         modified:   arch/arm/mach-dove/pcie.c
+>         modified:   arch/arm/mach-iop13xx/pci.c
+>         modified:   arch/arm/mach-iop13xx/pci.h
+>         modified:   arch/arm/mach-mv78xx0/pcie.c
+>         modified:   arch/arm/mach-orion5x/common.h
+>         modified:   arch/arm/mach-orion5x/pci.c
+>         modified:   arch/arm64/kernel/pci.c
+>         modified:   drivers/of/of_pci_irq.c
+>         modified:   drivers/pci/Makefile
+>         modified:   drivers/pci/host/pci-aardvark.c
+>         modified:   drivers/pci/host/pci-ftpci100.c
+>         modified:   drivers/pci/host/pci-host-common.c
+>         modified:   drivers/pci/host/pci-tegra.c
+>         modified:   drivers/pci/host/pci-versatile.c
+>         modified:   drivers/pci/host/pci-xgene.c
+>         modified:   drivers/pci/host/pcie-altera.c
+>         modified:   drivers/pci/host/pcie-iproc-bcma.c
+>         modified:   drivers/pci/host/pcie-iproc-platform.c
+>         modified:   drivers/pci/host/pcie-iproc.c
+>         modified:   drivers/pci/host/pcie-iproc.h
+>         modified:   drivers/pci/host/pcie-rcar.c
+>         modified:   drivers/pci/host/pcie-rockchip.c
+>         modified:   drivers/pci/host/pcie-xilinx-nwl.c
+>         modified:   drivers/pci/host/pcie-xilinx.c
+>         modified:   drivers/pci/pci-driver.c
+>         modified:   drivers/pci/probe.c
+>         modified:   drivers/pci/setup-irq.c
+>         modified:   include/linux/pci.h
+> 
 
-- Use IRQ_TYPE_LEVEL_LOW instead of 0x8 for interrupt type for clarity.
-- For 8-bit parallel IPU1-CSI0 bus connection only data[12-19] are used.
+Did you test with or without my change in bcm/master to emulate legacy
+interrupt through dummy IRQ domain?
 
-Signed-off-by: Tim Harvey <tharvey@gateworks.com>
----
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 45 ++++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+Thanks,
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-index 1212f82..6a7594e 100644
---- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-@@ -124,6 +124,21 @@
- 			#size-cells = <0>;
- 			reg = <1>;
- 
-+			adv7180: camera at 21 {
-+				compatible = "adi,adv7180";
-+				reg = <0x21>;
-+				powerdown-gpios = <&max7310_b 2 GPIO_ACTIVE_LOW>;
-+				interrupt-parent = <&gpio1>;
-+				interrupts = <27 IRQ_TYPE_LEVEL_LOW>;
-+
-+				port {
-+					adv7180_to_ipu1_csi0_mux: endpoint {
-+						remote-endpoint = <&ipu1_csi0_mux_from_parallel_sensor>;
-+						bus-width = <8>;
-+					};
-+				};
-+			};
-+
- 			max7310_a: gpio at 30 {
- 				compatible = "maxim,max7310";
- 				reg = <0x30>;
-@@ -151,6 +166,20 @@
- 	};
- };
- 
-+&ipu1_csi0_from_ipu1_csi0_mux {
-+	bus-width = <8>;
-+};
-+
-+&ipu1_csi0_mux_from_parallel_sensor {
-+	remote-endpoint = <&adv7180_to_ipu1_csi0_mux>;
-+	bus-width = <8>;
-+};
-+
-+&ipu1_csi0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ipu1_csi0>;
-+};
-+
- &clks {
- 	assigned-clocks = <&clks IMX6QDL_PLL4_BYPASS_SRC>,
- 			  <&clks IMX6QDL_PLL4_BYPASS>,
-@@ -444,6 +473,22 @@
- 			>;
- 		};
- 
-+		pinctrl_ipu1_csi0: ipu1csi0grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_CSI0_DAT12__IPU1_CSI0_DATA12  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT13__IPU1_CSI0_DATA13  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT14__IPU1_CSI0_DATA14  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT15__IPU1_CSI0_DATA15  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT16__IPU1_CSI0_DATA16  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT17__IPU1_CSI0_DATA17  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT18__IPU1_CSI0_DATA18  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT19__IPU1_CSI0_DATA19  0x1b0b0
-+				MX6QDL_PAD_CSI0_PIXCLK__IPU1_CSI0_PIXCLK 0x1b0b0
-+				MX6QDL_PAD_CSI0_MCLK__IPU1_CSI0_HSYNC    0x1b0b0
-+				MX6QDL_PAD_CSI0_VSYNC__IPU1_CSI0_VSYNC   0x1b0b0
-+			>;
-+		};
-+
- 		pinctrl_max7310: max7310grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD2_DAT0__GPIO1_IO15 0x1b0b0
--- 
-2.7.4
+Ray
