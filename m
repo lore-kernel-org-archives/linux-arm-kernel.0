@@ -1,49 +1,53 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Mon, 12 Jun 2017 11:23:57 -0700
-Subject: [PATCH 04/11] ARM: dts: imx6qdl: add capture-subsystem device
+Date: Mon, 12 Jun 2017 11:23:58 -0700
+Subject: [PATCH 05/11] ARM: dts: imx6qdl-sabrelite: remove erratum ERR006687
+ workaround
 In-Reply-To: <1497291844-14632-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1497291844-14632-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1497291844-14632-5-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1497291844-14632-6-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+There is a pin conflict with GPIO_6. This pin functions as a power
+input pin to the OV5642 camera sensor, but ENET uses it as the h/w
+workaround for erratum ERR006687, to wake-up the ARM cores on normal
+RX and TX packet done events. So we need to remove the h/w workaround
+to support the OV5642. The result is that the CPUidle driver will no
+longer allow entering the deep idle states on the sabrelite.
+
+This is a partial revert of
+
+commit 6261c4c8f13e ("ARM: dts: imx6qdl-sabrelite: use GPIO_6 for FEC
+			interrupt.")
+commit a28eeb43ee57 ("ARM: dts: imx6: tag boards that have the HW workaround
+			for ERR006687")
+
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- arch/arm/boot/dts/imx6dl.dtsi | 5 +++++
- arch/arm/boot/dts/imx6q.dtsi  | 5 +++++
- 2 files changed, 10 insertions(+)
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index 4049af7..8475e6c 100644
---- a/arch/arm/boot/dts/imx6dl.dtsi
-+++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -100,6 +100,11 @@
- 		};
- 	};
+diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+index 8413179..89dce27 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+@@ -270,9 +270,6 @@
+ 	txd1-skew-ps = <0>;
+ 	txd2-skew-ps = <0>;
+ 	txd3-skew-ps = <0>;
+-	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
+-			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
+-	fsl,err006687-workaround-present;
+ 	status = "okay";
+ };
  
-+	capture-subsystem {
-+		compatible = "fsl,imx-capture-subsystem";
-+		ports = <&ipu1_csi0>, <&ipu1_csi1>;
-+	};
-+
- 	display-subsystem {
- 		compatible = "fsl,imx-display-subsystem";
- 		ports = <&ipu1_di0>, <&ipu1_di1>;
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 214bbb3..89dab0f 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -206,6 +206,11 @@
+@@ -373,7 +370,6 @@
+ 				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b030
+ 				/* Phy reset */
+ 				MX6QDL_PAD_EIM_D23__GPIO3_IO23		0x000b0
+-				MX6QDL_PAD_GPIO_6__ENET_IRQ		0x000b1
+ 			>;
  		};
- 	};
  
-+	capture-subsystem {
-+		compatible = "fsl,imx-capture-subsystem";
-+		ports = <&ipu1_csi0>, <&ipu1_csi1>, <&ipu2_csi0>, <&ipu2_csi1>;
-+	};
-+
- 	display-subsystem {
- 		compatible = "fsl,imx-display-subsystem";
- 		ports = <&ipu1_di0>, <&ipu1_di1>, <&ipu2_di0>, <&ipu2_di1>;
 -- 
 2.7.4
