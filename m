@@ -1,65 +1,120 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 12 Jun 2017 17:54:40 +0200
-Subject: [PATCH 3/4 v4] ata: Add driver for Faraday Technology FTIDE010
-In-Reply-To: <20170604085009.11902-3-linus.walleij@linaro.org>
-References: <20170604085009.11902-1-linus.walleij@linaro.org>
- <CGME20170604085035epcas3p42ba2630fc743acafb65a2b501696c66d@epcas3p4.samsung.com>
- <20170604085009.11902-3-linus.walleij@linaro.org>
-Message-ID: <2693110.AQhD5I4g7H@amdc3058>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 12 Jun 2017 16:57:00 +0100
+Subject: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO devices
+ before scanning
+In-Reply-To: <20170606085553.GA20085@red-moon>
+References: <1495712248-5232-1-git-send-email-gabriele.paoloni@huawei.com>
+ <1495712248-5232-6-git-send-email-gabriele.paoloni@huawei.com>
+ <20170530132408.GA2556@red-moon>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40A7B677@FRAEML521-MBX.china.huawei.com>
+ <20170606085553.GA20085@red-moon>
+Message-ID: <20170612155700.GA31930@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, June 04, 2017 10:50:08 AM Linus Walleij wrote:
-> This adds a driver for the Faraday Technology FTIDE010
-> PATA IP block.
-> 
-> When used with the Storlink/Storm/Cortina Systems Gemini
-> SoC, the PATA interface is accompanied by a PATA<->SATA
-> bridge, so while the device appear as a PATA controller,
-> it attaches physically to SATA disks, and also has a
-> designated memory area with registers to set up the bridge.
-> 
-> The Gemini SATA bridge is separated into its own driver
-> file to make things modular and make it possible to reuse
-> the PATA driver as stand-alone on other systems than the
-> Gemini.
-> 
-> dmesg excerpt from the D-Link DIR-685 storage router:
-> gemini-sata-bridge 46000000.sata: SATA ID 00000e00, PHY ID: 01000100
-> gemini-sata-bridge 46000000.sata: set up the Gemini IDE/SATA nexus
-> ftide010 63000000.ata: set up Gemini PATA0
-> ftide010 63000000.ata: device ID 00000500, irq 26, io base 0x63000000
-> ftide010 63000000.ata: SATA0 (master) start
-> gemini-sata-bridge 46000000.sata: SATA0 PHY ready
-> scsi host0: pata-ftide010
-> ata1: PATA max UDMA/133 irq 26
-> ata1.00: ATA-8: INTEL SSDSA2CW120G3, 4PC10302, max UDMA/133
-> ata1.00: 234441648 sectors, multi 1: LBA48 NCQ (depth 0/32)
-> ata1.00: configured for UDMA/133
-> scsi 0:0:0:0: Direct-Access     ATA      INTEL SSDSA2CW12 0302 PQ: 0 ANSI: 5
-> ata1.00: Enabling discard_zeroes_data
-> sd 0:0:0:0: [sda] 234441648 512-byte logical blocks: (120 GB/112 GiB)
-> sd 0:0:0:0: [sda] Write Protect is off
-> sd 0:0:0:0: [sda] Write cache: enabled, read cache:
->                   enabled, doesn't support DPO or FUA
-> ata1.00: Enabling discard_zeroes_data
-> ata1.00: Enabling discard_zeroes_data
-> sd 0:0:0:0: [sda] Attached SCSI disk
-> 
-> After this I can flawlessly mount and read/write copy etc files
-> from /dev/sda[n].
-> 
-> Cc: John Feng-Hsin Chiang <john453@faraday-tech.com>
-> Cc: Greentime Hu <green.hu@gmail.com>
-> Acked-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+[+Mika]
 
-Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Gab, Rafael,
 
-Thanks for fixing it.
+On Tue, Jun 06, 2017 at 09:55:53AM +0100, Lorenzo Pieralisi wrote:
+> Hi Gab, Rafael,
+> 
+> On Wed, May 31, 2017 at 10:24:47AM +0000, Gabriele Paoloni wrote:
+> 
+> [...]
+> 
+> > > > diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+> > > > index e39ec7b..37dd23c 100644
+> > > > --- a/drivers/acpi/scan.c
+> > > > +++ b/drivers/acpi/scan.c
+> > > > @@ -2035,6 +2035,7 @@ int __init acpi_scan_init(void)
+> > > >  	acpi_int340x_thermal_init();
+> > > >  	acpi_amba_init();
+> > > >  	acpi_watchdog_init();
+> > > > +	acpi_indirectio_scan_init();
+> 
+> Unfortunately this is becoming a pattern and we are ending up
+> with a static ordering of "subsystems" init (even though for this
+> LPC series it is just the Hisilicon driver that requires this call)
+> and I am not sure I see any way of avoiding it. I think that's always
+> been the case in x86, with fewer subsystems/kernel paths to care
+> about, I wanted to flag this up though to check your opinion since
+> I am not sure this is the right direction we are taking.
+> 
+> I also think that relying on _DEP to build any dependency is not
+> entirely a) usable (owing to legacy bindings and previous _DEP misuse)
+> and b) compliant with ACPI bindings given that _DEP has to be used
+> for operation regions only.
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+I had a more in-depth look at this series and from my understanding
+the problem are the following to manage the LPC bindings in ACPI.
+
+(1) Child devices of an LPC controller require special handling when
+    filling their resources (ie they need to be translated - in DT
+    that's guaranteed by the "isa" binding, in ACPI it has to be
+    done by new code)
+(2) In DT systems, LPC child devices are created by the LPC bus
+    controller driver through an of_platform_populate() call with
+    the LPC controller node as the fwnode root. For ACPI to work
+    the same way there must be a way to prevent LPC children to
+    be enumerated in acpi_default_enumeration() something like
+    I2C does (and then the LPC driver would enumerate its children as
+    DT does)
+
+I am not sure how (1) and (2) can be managed with current ACPI bindings
+and kernel code - I suspect it may be done by mirroring what's done
+for I2C but I am not sure, that's why I CC'ed Mika (ie the LPC adapter
+is matched as a platform device and it takes care of enumerating its
+children - problem though is preventing enumeration from core ACPI code).
+
+I will let Gabriele and Hisilicon guys chime in if I missed something,
+which is likely, please let me know your opinion on how this code
+can be made functional on ACPI systems - it is uncharted territory.
+
+Thank you !
+Lorenzo
+
+> 
+> Thoughts ?
+> 
+> Thanks,
+> Lorenzo
+> 
+> > > >  	acpi_scan_add_handler(&generic_device_handler);
+> > > >
+> > > > diff --git a/include/acpi/acpi_indirect_pio.h
+> > > b/include/acpi/acpi_indirect_pio.h
+> > > > new file mode 100644
+> > > > index 0000000..efc5c43
+> > > > --- /dev/null
+> > > > +++ b/include/acpi/acpi_indirect_pio.h
+> > > > @@ -0,0 +1,24 @@
+> > > > +/*
+> > > > + * ACPI support for indirect-PIO bus.
+> > > > + *
+> > > > + * Copyright (C) 2017 Hisilicon Limited, All Rights Reserved.
+> > > > + * Author: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+> > > > + * Author: Zhichang Yuan <yuanzhichang@hisilicon.com>
+> > > > + *
+> > > > + * This program is free software; you can redistribute it and/or
+> > > modify
+> > > > + * it under the terms of the GNU General Public License version 2 as
+> > > > + * published by the Free Software Foundation.
+> > > > + */
+> > > > +
+> > > > +#ifndef _ACPI_INDIRECT_PIO_H
+> > > > +#define _ACPI_INDIRECT_PIO_H
+> > > > +
+> > > > +struct indirect_pio_device_desc {
+> > > > +	void *pdata; /* device relevant info data */
+> > > > +	int (*pre_setup)(struct acpi_device *adev, void *pdata);
+> > > > +};
+> > > > +
+> > > > +int acpi_set_logic_pio_resource(struct device *child,
+> > > > +		struct device *hostdev);
+> > > > +
+> > > > +#endif
+> > > > --
+> > > > 2.7.4
+> > > >
+> > > >
