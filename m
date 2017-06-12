@@ -1,161 +1,41 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 12 Jun 2017 11:57:41 +0200
-Subject: [PATCH v3 5/9] net: mvmdio: introduce an ops structure
+Date: Mon, 12 Jun 2017 11:57:44 +0200
+Subject: [PATCH v3 8/9] dt-bindings: orion-mdio: document the new xmdio
+ compatible
 In-Reply-To: <20170612095745.11300-1-antoine.tenart@free-electrons.com>
 References: <20170612095745.11300-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170612095745.11300-6-antoine.tenart@free-electrons.com>
+Message-ID: <20170612095745.11300-9-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce an ops structure to add an indirection on functions accessing
-the registers. This is needed to add the xMDIO support later.
+A new compatible for Marvell xMDIO interfaces was added into the Marvell
+MDIO driver. Document this new compatible.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvmdio.c | 71 ++++++++++++++++++++++++++---------
- 1 file changed, 53 insertions(+), 18 deletions(-)
+ Documentation/devicetree/bindings/net/marvell-orion-mdio.txt | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
-index 2ed819d25305..7d2f1b2e1fe1 100644
---- a/drivers/net/ethernet/marvell/mvmdio.c
-+++ b/drivers/net/ethernet/marvell/mvmdio.c
-@@ -64,6 +64,14 @@ struct orion_mdio_dev {
- 	wait_queue_head_t smi_busy_wait;
- };
+diff --git a/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt b/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt
+index ccdabdcc8618..b93a5b5a0472 100644
+--- a/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt
++++ b/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt
+@@ -1,12 +1,12 @@
+ * Marvell MDIO Ethernet Controller interface
  
-+struct orion_mdio_ops {
-+	int (*is_done)(struct orion_mdio_dev *);
-+	int (*is_read_valid)(struct orion_mdio_dev *);
-+	void (*start_read)(struct orion_mdio_dev *, int, int);
-+	u16 (*read)(struct orion_mdio_dev *);
-+	void (*write)(struct orion_mdio_dev *, int, int, u16);
-+};
-+
- static int orion_mdio_smi_is_done(struct orion_mdio_dev *dev)
- {
- 	return !(readl(dev->regs) & MVMDIO_SMI_BUSY);
-@@ -74,9 +82,42 @@ static int orion_mdio_smi_is_read_valid(struct orion_mdio_dev *dev)
- 	return readl(dev->regs) & MVMDIO_SMI_READ_VALID;
- }
+ The Ethernet controllers of the Marvel Kirkwood, Dove, Orion5x,
+-MV78xx0, Armada 370 and Armada XP have an identical unit that provides
+-an interface with the MDIO bus. This driver handles this MDIO
+-interface.
++MV78xx0, Armada 370, Armada XP, Armada 7k and Armada 8k have an
++identical unit that provides an interface with the MDIO bus or
++with the xMDIO bus. This driver handles these interfaces.
  
-+static void orion_mdio_smi_start_read_op(struct orion_mdio_dev *dev, int mii_id,
-+					 int regnum)
-+{
-+	writel(((mii_id << MVMDIO_SMI_PHY_ADDR_SHIFT) |
-+		(regnum << MVMDIO_SMI_PHY_REG_SHIFT)  |
-+		MVMDIO_SMI_READ_OPERATION),
-+	       dev->regs);
-+}
-+
-+static u16 orion_mdio_smi_read_op(struct orion_mdio_dev *dev)
-+{
-+	return readl(dev->regs) & GENMASK(15, 0);
-+}
-+
-+static void orion_mdio_smi_write_op(struct orion_mdio_dev *dev, int mii_id,
-+				    int regnum, u16 value)
-+{
-+	writel(((mii_id << MVMDIO_SMI_PHY_ADDR_SHIFT) |
-+		(regnum << MVMDIO_SMI_PHY_REG_SHIFT)  |
-+		MVMDIO_SMI_WRITE_OPERATION            |
-+		(value << MVMDIO_SMI_DATA_SHIFT)),
-+	       dev->regs);
-+}
-+
-+static const struct orion_mdio_ops orion_mdio_smi_ops = {
-+	.is_done = orion_mdio_smi_is_done,
-+	.is_read_valid = orion_mdio_smi_is_read_valid,
-+	.start_read = orion_mdio_smi_start_read_op,
-+	.read = orion_mdio_smi_read_op,
-+	.write = orion_mdio_smi_write_op,
-+};
-+
- /* Wait for the SMI unit to be ready for another operation
-  */
--static int orion_mdio_wait_ready(struct mii_bus *bus)
-+static int orion_mdio_wait_ready(const struct orion_mdio_ops *ops,
-+				 struct mii_bus *bus)
- {
- 	struct orion_mdio_dev *dev = bus->priv;
- 	unsigned long timeout = usecs_to_jiffies(MVMDIO_SMI_TIMEOUT);
-@@ -84,7 +125,7 @@ static int orion_mdio_wait_ready(struct mii_bus *bus)
- 	int timedout = 0;
- 
- 	while (1) {
--	        if (orion_mdio_smi_is_done(dev))
-+	        if (ops->is_done(dev))
- 			return 0;
- 	        else if (timedout)
- 			break;
-@@ -103,8 +144,7 @@ static int orion_mdio_wait_ready(struct mii_bus *bus)
- 			if (timeout < 2)
- 				timeout = 2;
- 			wait_event_timeout(dev->smi_busy_wait,
--				           orion_mdio_smi_is_done(dev),
--				           timeout);
-+				           ops->is_done(dev), timeout);
- 
- 			++timedout;
- 	        }
-@@ -118,30 +158,28 @@ static int orion_mdio_read(struct mii_bus *bus, int mii_id,
- 			   int regnum)
- {
- 	struct orion_mdio_dev *dev = bus->priv;
-+	const struct orion_mdio_ops *ops = &orion_mdio_smi_ops;
- 	int ret;
- 
- 	mutex_lock(&dev->lock);
- 
--	ret = orion_mdio_wait_ready(bus);
-+	ret = orion_mdio_wait_ready(ops, bus);
- 	if (ret < 0)
- 		goto out;
- 
--	writel(((mii_id << MVMDIO_SMI_PHY_ADDR_SHIFT) |
--		(regnum << MVMDIO_SMI_PHY_REG_SHIFT)  |
--		MVMDIO_SMI_READ_OPERATION),
--	       dev->regs);
-+	ops->start_read(dev, mii_id, regnum);
- 
--	ret = orion_mdio_wait_ready(bus);
-+	ret = orion_mdio_wait_ready(ops, bus);
- 	if (ret < 0)
- 		goto out;
- 
--	if (!orion_mdio_smi_is_read_valid(dev)) {
-+	if (!ops->is_read_valid(dev)) {
- 		dev_err(bus->parent, "SMI bus read not valid\n");
- 		ret = -ENODEV;
- 		goto out;
- 	}
- 
--	ret = readl(dev->regs) & GENMASK(15, 0);
-+	ret = ops->read(dev);
- out:
- 	mutex_unlock(&dev->lock);
- 	return ret;
-@@ -151,19 +189,16 @@ static int orion_mdio_write(struct mii_bus *bus, int mii_id,
- 			    int regnum, u16 value)
- {
- 	struct orion_mdio_dev *dev = bus->priv;
-+	const struct orion_mdio_ops *ops = &orion_mdio_smi_ops;
- 	int ret;
- 
- 	mutex_lock(&dev->lock);
- 
--	ret = orion_mdio_wait_ready(bus);
-+	ret = orion_mdio_wait_ready(ops, bus);
- 	if (ret < 0)
- 		goto out;
- 
--	writel(((mii_id << MVMDIO_SMI_PHY_ADDR_SHIFT) |
--		(regnum << MVMDIO_SMI_PHY_REG_SHIFT)  |
--		MVMDIO_SMI_WRITE_OPERATION            |
--		(value << MVMDIO_SMI_DATA_SHIFT)),
--	       dev->regs);
-+	ops->write(dev, mii_id, regnum, value);
- 
- out:
- 	mutex_unlock(&dev->lock);
+ Required properties:
+-- compatible: "marvell,orion-mdio"
++- compatible: "marvell,orion-mdio" or "marvell,xmdio"
+ - reg: address and length of the MDIO registers.  When an interrupt is
+   not present, the length is the size of the SMI register (4 bytes)
+   otherwise it must be 0x84 bytes to cover the interrupt control
 -- 
 2.9.4
