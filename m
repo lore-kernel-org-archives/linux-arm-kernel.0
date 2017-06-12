@@ -1,152 +1,61 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Mon, 12 Jun 2017 23:37:28 +0800
-Subject: [PATCH V3 7/7] tty: serial: lpuart: add a more accurate baud rate
- calculation method
-In-Reply-To: <1497281848-12995-1-git-send-email-aisheng.dong@nxp.com>
-References: <1497281848-12995-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1497281848-12995-8-git-send-email-aisheng.dong@nxp.com>
+Date: Mon, 12 Jun 2017 23:37:21 +0800
+Subject: [PATCH V3 0/7] tty: serial: lpuart: add imx7ulp support
+Message-ID: <1497281848-12995-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On new LPUART versions, the oversampling ratio for the receiver can be
-changed from 4x (00011) to 32x (11111) which could help us get a more
-accurate baud rate divider.
+This patch series mainly intends to add imx7ulp support which is also
+using FSL lpuart.
 
-The idea is to use the best OSR (over-sampling rate) possible.
-Note, OSR is typically hard-set to 16 in other LPUART instantiations.
-Loop to find the best OSR value possible, one that generates minimum
-baud diff iterate through the rest of the supported values of OSR.
+The lpuart in imx7ulp is basically the same as ls1021a. It's also
+32 bit width register, but unlike ls1021a, it's little endian.
+Besides that, imx7ulp lpuart has a minor different register layout
+from ls1021a that it has four extra registers (verid, param, global,
+pincfg) located at the beginning of register map, which are currently
+not used by the driver and less to be used later.
 
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Jiri Slaby <jslaby@suse.com>
-Cc: Stefan Agner <stefan@agner.ch>
-Cc: Mingkai Hu <Mingkai.Hu@nxp.com>
-Cc: Yangbo Lu <yangbo.lu@nxp.com>
-Acked-by: Fugang Duan <fugang.duan@nxp.com>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+Furthermore, this patch serial also add a new more accurate baud rate
+calculation method as MX7ULP can't divide a suitable baud rate
+with the default setting.
 
----
+Currently the new baud rate calculation is only enabled on MX7ULP.
+However, i guess the Layerscape may also be able to use it as there
+seems to be no difference in baud rate setting register after checking
+the Layerscape Reference Manual.
+
+As i don't have Layerscape boards, i can't test it, so i only enable it
+for MX7ULP by default to avoid a potential break.
+
+I copied LayerScape guys in this series and hope they can help test later.
+If it works on Layerscape as well, then they can switch to the new setting
+too and totally remove the old stuff.
+
 ChangeLog:
 v2->v3:
- * enable new baud rate calculation method by default to get Layerscape
-   platforms run and test.
- * break out in case we already find the minum baud_diff
-v1->v2:
- * No changes
----
- drivers/tty/serial/fsl_lpuart.c | 79 +++++++++++++++++++++++++++++++++++++----
- 1 file changed, 72 insertions(+), 7 deletions(-)
+ * Remove global lpuart_is_be.
+   Instead use struct uart_port's iotype member.
+   lpuart32_read/write API prototype is also updated to use the iotype to
+   distingush the endians. And most importantly, this way also works with
+   earlycon.
 
-diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
-index 6a725cb..a146289 100644
---- a/drivers/tty/serial/fsl_lpuart.c
-+++ b/drivers/tty/serial/fsl_lpuart.c
-@@ -140,6 +140,8 @@
- #define UARTBAUD_SBNS		0x00002000
- #define UARTBAUD_SBR		0x00000000
- #define UARTBAUD_SBR_MASK	0x1fff
-+#define UARTBAUD_OSR_MASK       0x1f
-+#define UARTBAUD_OSR_SHIFT      24
- 
- #define UARTSTAT_LBKDIF		0x80000000
- #define UARTSTAT_RXEDGIF	0x40000000
-@@ -1511,6 +1513,75 @@ lpuart_set_termios(struct uart_port *port, struct ktermios *termios,
- }
- 
- static void
-+lpuart32_serial_setbrg(struct lpuart_port *sport, unsigned int baudrate)
-+{
-+	u32 sbr, osr, baud_diff, tmp_osr, tmp_sbr, tmp_diff, tmp;
-+	u32 clk = sport->port.uartclk;
-+
-+	/*
-+	 * The idea is to use the best OSR (over-sampling rate) possible.
-+	 * Note, OSR is typically hard-set to 16 in other LPUART instantiations.
-+	 * Loop to find the best OSR value possible, one that generates minimum
-+	 * baud_diff iterate through the rest of the supported values of OSR.
-+	 *
-+	 * Calculation Formula:
-+	 *  Baud Rate = baud clock / ((OSR+1) ? SBR)
-+	 */
-+	baud_diff = baudrate;
-+	osr = 0;
-+	sbr = 0;
-+
-+	for (tmp_osr = 4; tmp_osr <= 32; tmp_osr++) {
-+		/* calculate the temporary sbr value  */
-+		tmp_sbr = (clk / (baudrate * tmp_osr));
-+		if (tmp_sbr == 0)
-+			tmp_sbr = 1;
-+
-+		/*
-+		 * calculate the baud rate difference based on the temporary
-+		 * osr and sbr values
-+		 */
-+		tmp_diff = clk / (tmp_osr * tmp_sbr) - baudrate;
-+
-+		/* select best values between sbr and sbr+1 */
-+		tmp = clk / (tmp_osr * (tmp_sbr + 1));
-+		if (tmp_diff > (baudrate - tmp)) {
-+			tmp_diff = baudrate - tmp;
-+			tmp_sbr++;
-+		}
-+
-+		if (tmp_diff <= baud_diff) {
-+			baud_diff = tmp_diff;
-+			osr = tmp_osr;
-+			sbr = tmp_sbr;
-+
-+			if (!baud_diff)
-+				break;
-+		}
-+	}
-+
-+	/* handle buadrate outside acceptable rate */
-+	if (baud_diff > ((baudrate / 100) * 3))
-+		dev_warn(sport->port.dev,
-+			 "unacceptable baud rate difference of more than 3%%\n");
-+
-+	tmp = lpuart32_read(&sport->port, UARTBAUD);
-+
-+	if ((osr > 3) && (osr < 8))
-+		tmp |= UARTBAUD_BOTHEDGE;
-+
-+	tmp &= ~(UARTBAUD_OSR_MASK << UARTBAUD_OSR_SHIFT);
-+	tmp |= (((osr-1) & UARTBAUD_OSR_MASK) << UARTBAUD_OSR_SHIFT);
-+
-+	tmp &= ~UARTBAUD_SBR_MASK;
-+	tmp |= sbr & UARTBAUD_SBR_MASK;
-+
-+	tmp &= ~(UARTBAUD_TDMAE | UARTBAUD_RDMAE);
-+
-+	lpuart32_write(&sport->port, tmp, UARTBAUD);
-+}
-+
-+static void
- lpuart32_set_termios(struct uart_port *port, struct ktermios *termios,
- 		   struct ktermios *old)
- {
-@@ -1519,7 +1590,6 @@ lpuart32_set_termios(struct uart_port *port, struct ktermios *termios,
- 	unsigned long ctrl, old_ctrl, bd, modem;
- 	unsigned int  baud;
- 	unsigned int old_csize = old ? old->c_cflag & CSIZE : CS8;
--	unsigned int sbr;
- 
- 	ctrl = old_ctrl = lpuart32_read(&sport->port, UARTCTRL);
- 	bd = lpuart32_read(&sport->port, UARTBAUD);
-@@ -1616,12 +1686,7 @@ lpuart32_set_termios(struct uart_port *port, struct ktermios *termios,
- 	lpuart32_write(&sport->port, old_ctrl & ~(UARTCTRL_TE | UARTCTRL_RE),
- 		       UARTCTRL);
- 
--	sbr = sport->port.uartclk / (16 * baud);
--	bd &= ~UARTBAUD_SBR_MASK;
--	bd |= sbr & UARTBAUD_SBR_MASK;
--	bd |= UARTBAUD_BOTHEDGE;
--	bd &= ~(UARTBAUD_TDMAE | UARTBAUD_RDMAE);
--	lpuart32_write(&sport->port, bd, UARTBAUD);
-+	lpuart32_serial_setbrg(sport, baud);
- 	lpuart32_write(&sport->port, modem, UARTMODIR);
- 	lpuart32_write(&sport->port, ctrl, UARTCTRL);
- 	/* restore control register */
+v1->v2:
+ * Patch 2/4/5 chagned, other no changes.
+   See individuals for details.
+
+Dong Aisheng (7):
+  tty: serial: lpuart: introduce lpuart_soc_data to represent SoC
+    property
+  tty: serial: lpuart: refactor lpuart32_{read|write} prototype
+  tty: serial: lpuart: add little endian 32 bit register support
+  dt-bindings: serial: fsl-lpuart: add i.MX7ULP support
+  tty: serial: lpuart: add imx7ulp support
+  tty: serial: lpuart: add earlycon support for imx7ulp
+  tty: serial: lpuart: add a more accurate baud rate calculation method
+
+ .../devicetree/bindings/serial/fsl-lpuart.txt      |   2 +
+ drivers/tty/serial/fsl_lpuart.c                    | 286 ++++++++++++++-------
+ 2 files changed, 201 insertions(+), 87 deletions(-)
+
 -- 
 2.7.4
