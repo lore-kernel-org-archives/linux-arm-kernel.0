@@ -1,86 +1,39 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Mon, 12 Jun 2017 11:23:54 -0700
-Subject: [PATCH 01/11] ARM: dts: imx6qdl: add multiplexer controls
+Date: Mon, 12 Jun 2017 11:23:55 -0700
+Subject: [PATCH 02/11] ARM: dts: imx6qdl: Add compatible, clocks,
+ irqs to MIPI CSI-2 node
 In-Reply-To: <1497291844-14632-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1497291844-14632-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1497291844-14632-2-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1497291844-14632-3-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philipp Zabel <p.zabel@pengutronix.de>
+Add to the MIPI CSI2 receiver node: compatible strings,
+interrupt sources, and clocks.
 
-The IOMUXC General Purpose Register space contains various bitfields
-that control video bus multiplexers. Describe them using a mmio-mux
-node. The placement of the IPU CSI video mux controls differs between
-i.MX6D/Q and i.MX6S/DL.
-
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- arch/arm/boot/dts/imx6dl.dtsi  | 10 ++++++++++
- arch/arm/boot/dts/imx6q.dtsi   | 10 ++++++++++
- arch/arm/boot/dts/imx6qdl.dtsi |  7 ++++++-
- 3 files changed, 26 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx6qdl.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index 7aa120f..10bc9d1 100644
---- a/arch/arm/boot/dts/imx6dl.dtsi
-+++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -181,6 +181,16 @@
- 		      "di0", "di1";
- };
- 
-+&mux {
-+	mux-reg-masks = <0x34 0x00000007>, /* IPU_CSI0_MUX */
-+			<0x34 0x00000038>, /* IPU_CSI1_MUX */
-+			<0x0c 0x0000000c>, /* HDMI_MUX_CTL */
-+			<0x0c 0x000000c0>, /* LVDS0_MUX_CTL */
-+			<0x0c 0x00000300>, /* LVDS1_MUX_CTL */
-+			<0x28 0x00000003>, /* DCIC1_MUX_CTL */
-+			<0x28 0x0000000c>; /* DCIC2_MUX_CTL */
-+};
-+
- &vpu {
- 	compatible = "fsl,imx6dl-vpu", "cnm,coda960";
- };
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index e9a5d0b..a6962be 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -332,6 +332,16 @@
- 	};
- };
- 
-+&mux {
-+	mux-reg-masks = <0x04 0x00080000>, /* MIPI_IPU1_MUX */
-+			<0x04 0x00100000>, /* MIPI_IPU2_MUX */
-+			<0x0c 0x0000000c>, /* HDMI_MUX_CTL */
-+			<0x0c 0x000000c0>, /* LVDS0_MUX_CTL */
-+			<0x0c 0x00000300>, /* LVDS1_MUX_CTL */
-+			<0x28 0x00000003>, /* DCIC1_MUX_CTL */
-+			<0x28 0x0000000c>; /* DCIC2_MUX_CTL */
-+};
-+
- &vpu {
- 	compatible = "fsl,imx6q-vpu", "cnm,coda960";
- };
 diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index e426faa..50534dd 100644
+index 50534dd..381b482 100644
 --- a/arch/arm/boot/dts/imx6qdl.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -808,8 +808,13 @@
+@@ -1140,7 +1140,14 @@
  			};
  
- 			gpr: iomuxc-gpr at 020e0000 {
--				compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
-+				compatible = "fsl,imx6q-iomuxc-gpr", "syscon", "simple-mfd";
- 				reg = <0x020e0000 0x38>;
-+
-+				mux: mux-controller {
-+					compatible = "mmio-mux";
-+					#mux-control-cells = <1>;
-+				};
+ 			mipi_csi: mipi at 021dc000 {
++				compatible = "fsl,imx6-mipi-csi2";
+ 				reg = <0x021dc000 0x4000>;
++				interrupts = <0 100 0x04>, <0 101 0x04>;
++				clocks = <&clks IMX6QDL_CLK_HSI_TX>,
++					 <&clks IMX6QDL_CLK_VIDEO_27M>,
++					 <&clks IMX6QDL_CLK_EIM_PODF>;
++				clock-names = "dphy", "ref", "pix";
++				status = "disabled";
  			};
  
- 			iomuxc: iomuxc at 020e0000 {
+ 			mipi_dsi: mipi at 021e0000 {
 -- 
 2.7.4
