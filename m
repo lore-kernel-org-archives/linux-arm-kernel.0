@@ -1,7 +1,9 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 12 Jun 2017 10:31:05 -0700
-Subject: [GIT PULL 1/5] Broadcom soc changes for 4.13
-Message-ID: <20170612173109.11188-1-f.fainelli@gmail.com>
+Date: Mon, 12 Jun 2017 10:31:06 -0700
+Subject: [GIT PULL 2/5] Broadcom devicetree changes for 4.13
+In-Reply-To: <20170612173109.11188-1-f.fainelli@gmail.com>
+References: <20170612173109.11188-1-f.fainelli@gmail.com>
+Message-ID: <20170612173109.11188-2-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,21 +13,37 @@ The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 
 are available in the git repository at:
 
-  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.13/soc
+  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.13/devicetree
 
-for you to fetch changes up to 27d9fa06c122b135ad7552fa3138c3b47e5776c5:
+for you to fetch changes up to 40c26d3af60af5c5d1c434465ffd38a42e5d9bb1:
 
-  ARM: BCM: Enable thermal support for NSP SoCs (2017-05-19 11:30:25 -0700)
-
-----------------------------------------------------------------
-This pull request contains Broadcom ARM-based SoCs (non Device Tree) changes:
-
-- Jon updates the Kconfig entry for Northstar Plus to have THERMAL and THERMAL_OF
-  selected in order to get the NS/NSP thermal driver dependencies to be satistfied
+  ARM: dts: Cygnus: Add the ethernet switch and ethernet PHY (2017-06-12 09:52:37 -0700)
 
 ----------------------------------------------------------------
+This pull request contains Broadcom ARM-based Device Tree changes for 4.13,
+please pull the following:
+
+- Rafal adds CPU and thermal zones to the Northstar (BCM5301X) Device Tree and he
+  also adds the MDIO controller nodes for later use by USB PHYs
+
+- Eric adds support for the V3D engine and Ethernet switch on the Cygnus platforms
+
+- Jon adds CPU and thermal zones to the Northstar Plus Device Tree files
+
+----------------------------------------------------------------
+Eric Anholt (2):
+      ARM: dts: Cygnus: Add BCM11360's V3D device
+      ARM: dts: Cygnus: Add the ethernet switch and ethernet PHY
+
 Jon Mason (1):
-      ARM: BCM: Enable thermal support for NSP SoCs
+      ARM: dts: NSP: Add Thermal Support
 
- arch/arm/mach-bcm/Kconfig | 2 ++
- 1 file changed, 2 insertions(+)
+Rafa? Mi?ecki (2):
+      ARM: dts: BCM5301X: Add CPU thermal sensor and zone
+      ARM: dts: BCM5301X: Specify MDIO bus in the DT
+
+ arch/arm/boot/dts/bcm-cygnus.dtsi      | 71 ++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/bcm-nsp.dtsi         | 26 +++++++++++++
+ arch/arm/boot/dts/bcm5301x.dtsi        | 34 ++++++++++++++++
+ arch/arm/boot/dts/bcm911360_entphn.dts | 20 ++++++++++
+ 4 files changed, 151 insertions(+)
