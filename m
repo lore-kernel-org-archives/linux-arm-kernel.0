@@ -1,210 +1,180 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 12 Jun 2017 17:34:56 +0200
-Subject: [PATCH v3 5/9] pinctrl: mvebu: add driver for Armada AP806 pinctrl
+Date: Mon, 12 Jun 2017 17:35:00 +0200
+Subject: [PATCH v3 9/9] arm64: dts: marvell: add gpio support for Armada 7K/8K
 In-Reply-To: <cover.d003a5e862e6d732d901a61d1765a349c9a89eef.1497281623.git-series.gregory.clement@free-electrons.com>
 References: <cover.d003a5e862e6d732d901a61d1765a349c9a89eef.1497281623.git-series.gregory.clement@free-electrons.com>
-Message-ID: <a557c9f9a37ed42b8b2fa850c58a3bd82c45644a.1497281623.git-series.gregory.clement@free-electrons.com>
+Message-ID: <dfe7cb1d616169bdf96e88aef7bfc46e668dba5a.1497281623.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanna Hawa <hannah@marvell.com>
+Enable gpio support for CP and AP on the Marvell Armada 7K/8K SoCs.
 
-This commit adds a pinctrl driver for the pin-muxing controller found in
-the AP806 part of the Marvell Armada 7K and 8K SoCs. Its register
-interface is compatible with the one used by previous mvebu pin
-controllers, so the common logic in drivers/pinctrl/mvebu/pinctrl-mvebu.c
-is used.
+The Armada 8K has two CP110 blocks, each having two GPIO controllers.
+However, in each CP110 block, one of the GPIO controller cannot be
+used: in the master CP110, only the second GPIO controller can be used,
+while on the slave CP110, only the first GPIO controller can be used.
 
-Signed-off-by: Hanna Hawa <hannah@marvell.com>
-Reviewed-by: Shadi Ammouri <shadi@marvell.com>
-[updated for mvebu pinctrl changes
- - converted to simple_mmio
- - removed unimplemented .remove function
- - removed DTS description
-  - converted  to use syscon/regmap
- --rmk]
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+On the other side, the Armada 7K has only one CP110, but both its GPIO
+controllers can be used.
+
+For this reason, the GPIO controllers are marked as "disabled" in the
+armada-cp110-master.dtsi and armada-cp110-slave.dtsi files, and only
+enabled in the per-SoC dtsi files.
+
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/pinctrl/mvebu/Kconfig                |   4 +-
- drivers/pinctrl/mvebu/Makefile               |   1 +-
- drivers/pinctrl/mvebu/pinctrl-armada-ap806.c | 140 ++++++++++++++++++++-
- 3 files changed, 145 insertions(+)
- create mode 100644 drivers/pinctrl/mvebu/pinctrl-armada-ap806.c
+ arch/arm64/boot/dts/marvell/armada-70x0.dtsi         | 15 +++++++++-
+ arch/arm64/boot/dts/marvell/armada-80x0.dtsi         | 16 +++++++++-
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi        | 10 ++++++-
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 21 ++++++++++++-
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 22 +++++++++++++-
+ 5 files changed, 84 insertions(+)
 
-diff --git a/drivers/pinctrl/mvebu/Kconfig b/drivers/pinctrl/mvebu/Kconfig
-index 8cb444b60ae9..0e0b009f2b71 100644
---- a/drivers/pinctrl/mvebu/Kconfig
-+++ b/drivers/pinctrl/mvebu/Kconfig
-@@ -28,6 +28,10 @@ config PINCTRL_ARMADA_39X
- 	bool
- 	select PINCTRL_MVEBU
+diff --git a/arch/arm64/boot/dts/marvell/armada-70x0.dtsi b/arch/arm64/boot/dts/marvell/armada-70x0.dtsi
+index f6c22665d091..860b6ae9dcc5 100644
+--- a/arch/arm64/boot/dts/marvell/armada-70x0.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-70x0.dtsi
+@@ -46,6 +46,21 @@
  
-+config PINCTRL_ARMADA_AP806
-+	bool
-+	select PINCTRL_MVEBU
-+
- config PINCTRL_ARMADA_XP
- 	bool
- 	select PINCTRL_MVEBU
-diff --git a/drivers/pinctrl/mvebu/Makefile b/drivers/pinctrl/mvebu/Makefile
-index 60c245a60f39..455db274b53d 100644
---- a/drivers/pinctrl/mvebu/Makefile
-+++ b/drivers/pinctrl/mvebu/Makefile
-@@ -5,6 +5,7 @@ obj-$(CONFIG_PINCTRL_ARMADA_370) += pinctrl-armada-370.o
- obj-$(CONFIG_PINCTRL_ARMADA_375) += pinctrl-armada-375.o
- obj-$(CONFIG_PINCTRL_ARMADA_38X) += pinctrl-armada-38x.o
- obj-$(CONFIG_PINCTRL_ARMADA_39X) += pinctrl-armada-39x.o
-+obj-$(CONFIG_PINCTRL_ARMADA_AP806) += pinctrl-armada-ap806.o
- obj-$(CONFIG_PINCTRL_ARMADA_XP)  += pinctrl-armada-xp.o
- obj-$(CONFIG_PINCTRL_ARMADA_37XX)  += pinctrl-armada-37xx.o
- obj-$(CONFIG_PINCTRL_ORION)  += pinctrl-orion.o
-diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-ap806.c b/drivers/pinctrl/mvebu/pinctrl-armada-ap806.c
-new file mode 100644
-index 000000000000..66e442260a4e
---- /dev/null
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-ap806.c
-@@ -0,0 +1,140 @@
-+/*
-+ * Marvell Armada ap806 pinctrl driver based on mvebu pinctrl core
-+ *
-+ * Copyright (C) 2017 Marvell
-+ *
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ * Hanna Hawa <hannah@marvell.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/platform_device.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/pinctrl/pinctrl.h>
-+
-+#include "pinctrl-mvebu.h"
-+
-+static struct mvebu_mpp_mode armada_ap806_mpp_modes[] = {
-+	MPP_MODE(0,
-+		 MPP_FUNCTION(0, "gpio",    NULL),
-+		 MPP_FUNCTION(1, "sdio",    "clk"),
-+		 MPP_FUNCTION(3, "spi0",    "clk")),
-+	MPP_MODE(1,
-+		 MPP_FUNCTION(0, "gpio",    NULL),
-+		 MPP_FUNCTION(1, "sdio",    "cmd"),
-+		 MPP_FUNCTION(3, "spi0",    "miso")),
-+	MPP_MODE(2,
-+		 MPP_FUNCTION(0, "gpio",    NULL),
-+		 MPP_FUNCTION(1, "sdio",    "d0"),
-+		 MPP_FUNCTION(3, "spi0",    "mosi")),
-+	MPP_MODE(3,
-+		 MPP_FUNCTION(0, "gpio",    NULL),
-+		 MPP_FUNCTION(1, "sdio",    "d1"),
-+		 MPP_FUNCTION(3, "spi0",    "cs0n")),
-+	MPP_MODE(4,
-+		 MPP_FUNCTION(0, "gpio",    NULL),
-+		 MPP_FUNCTION(1, "sdio",    "d2"),
-+		 MPP_FUNCTION(3, "i2c0",    "sda")),
-+	MPP_MODE(5,
-+		 MPP_FUNCTION(0, "gpio",    NULL),
-+		 MPP_FUNCTION(1, "sdio",    "d3"),
-+		 MPP_FUNCTION(3, "i2c0",    "sdk")),
-+	MPP_MODE(6,
-+		 MPP_FUNCTION(0, "gpio",    NULL),
-+		 MPP_FUNCTION(1, "sdio",    "ds")),
-+	MPP_MODE(7,
-+		 MPP_FUNCTION(0, "gpio",    NULL),
-+		 MPP_FUNCTION(1, "sdio",    "d4"),
-+		 MPP_FUNCTION(3, "uart1",   "rxd")),
-+	MPP_MODE(8,
-+		 MPP_FUNCTION(0, "gpio",    NULL),
-+		 MPP_FUNCTION(1, "sdio",    "d5"),
-+		 MPP_FUNCTION(3, "uart1",   "txd")),
-+	MPP_MODE(9,
-+		 MPP_FUNCTION(0, "gpio",    NULL),
-+		 MPP_FUNCTION(1, "sdio",    "d6"),
-+		 MPP_FUNCTION(3, "spi0",    "cs1n")),
-+	MPP_MODE(10,
-+		 MPP_FUNCTION(0, "gpio",    NULL),
-+		 MPP_FUNCTION(1, "sdio",    "d7")),
-+	MPP_MODE(11,
-+		 MPP_FUNCTION(0, "gpio",    NULL),
-+		 MPP_FUNCTION(3, "uart0",   "txd")),
-+	MPP_MODE(12,
-+		 MPP_FUNCTION(0, "gpio",    NULL),
-+		 MPP_FUNCTION(1, "sdio",    "pw_off"),
-+		 MPP_FUNCTION(2, "sdio",    "hw_rst")),
-+	MPP_MODE(13,
-+		 MPP_FUNCTION(0, "gpio",    NULL)),
-+	MPP_MODE(14,
-+		 MPP_FUNCTION(0, "gpio",    NULL)),
-+	MPP_MODE(15,
-+		 MPP_FUNCTION(0, "gpio",    NULL)),
-+	MPP_MODE(16,
-+		 MPP_FUNCTION(0, "gpio",    NULL)),
-+	MPP_MODE(17,
-+		 MPP_FUNCTION(0, "gpio",    NULL)),
-+	MPP_MODE(18,
-+		 MPP_FUNCTION(0, "gpio",    NULL)),
-+	MPP_MODE(19,
-+		 MPP_FUNCTION(0, "gpio",    NULL),
-+		 MPP_FUNCTION(3, "uart0",   "rxd"),
-+		 MPP_FUNCTION(4, "sdio",    "pw_off")),
+ #include "armada-cp110-master.dtsi"
+ 
++/ {
++	aliases {
++		gpio1 = &cpm_gpio1;
++		gpio2 = &cpm_gpio2;
++	};
 +};
 +
-+static struct mvebu_pinctrl_soc_info armada_ap806_pinctrl_info;
-+
-+static const struct of_device_id armada_ap806_pinctrl_of_match[] = {
-+	{
-+		.compatible = "marvell,ap806-pinctrl",
-+	},
-+	{ },
++&cpm_gpio1 {
++	status = "okay";
 +};
 +
-+static const struct mvebu_mpp_ctrl armada_ap806_mpp_controls[] = {
-+	MPP_FUNC_CTRL(0, 19, NULL, mvebu_regmap_mpp_ctrl),
++&cpm_gpio2 {
++	status = "okay";
 +};
 +
-+static struct pinctrl_gpio_range armada_ap806_mpp_gpio_ranges[] = {
-+	MPP_GPIO_RANGE(0,   0,  0, 20),
+ &cpm_syscon0 {
+ 	cpm_pinctrl: pinctrl {
+ 		compatible = "marvell,armada-7k-pinctrl";
+diff --git a/arch/arm64/boot/dts/marvell/armada-80x0.dtsi b/arch/arm64/boot/dts/marvell/armada-80x0.dtsi
+index 93d1de03b39a..666ebe96ba0d 100644
+--- a/arch/arm64/boot/dts/marvell/armada-80x0.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-80x0.dtsi
+@@ -47,6 +47,22 @@
+ #include "armada-cp110-master.dtsi"
+ #include "armada-cp110-slave.dtsi"
+ 
++/ {
++	aliases {
++		gpio1 = &cps_gpio1;
++		gpio2 = &cpm_gpio2;
++	};
 +};
 +
-+static int armada_ap806_pinctrl_probe(struct platform_device *pdev)
-+{
-+	struct mvebu_pinctrl_soc_info *soc = &armada_ap806_pinctrl_info;
-+	const struct of_device_id *match =
-+		of_match_device(armada_ap806_pinctrl_of_match, &pdev->dev);
-+
-+	if (!match || !pdev->dev.parent)
-+		return -ENODEV;
-+
-+	soc->variant = 0; /* no variants for Armada AP806 */
-+	soc->controls = armada_ap806_mpp_controls;
-+	soc->ncontrols = ARRAY_SIZE(armada_ap806_mpp_controls);
-+	soc->gpioranges = armada_ap806_mpp_gpio_ranges;
-+	soc->ngpioranges = ARRAY_SIZE(armada_ap806_mpp_gpio_ranges);
-+	soc->modes = armada_ap806_mpp_modes;
-+	soc->nmodes = armada_ap806_mpp_controls[0].npins;
-+
-+	pdev->dev.platform_data = soc;
-+
-+	return mvebu_pinctrl_simple_regmap_probe(pdev, pdev->dev.parent, 0);
-+}
-+
-+static struct platform_driver armada_ap806_pinctrl_driver = {
-+	.driver = {
-+		.name = "armada-ap806-pinctrl",
-+		.of_match_table = of_match_ptr(armada_ap806_pinctrl_of_match),
-+	},
-+	.probe = armada_ap806_pinctrl_probe,
++/* The 80x0 has two CP blocks, but uses only one block from each. */
++&cps_gpio1 {
++	status = "okay";
 +};
 +
-+builtin_platform_driver(armada_ap806_pinctrl_driver);
++&cpm_gpio2 {
++	status = "okay";
++};
++
+ &cpm_syscon0 {
+ 	cpm_pinctrl: pinctrl {
+ 		compatible = "marvell,armada-8k-cpm-pinctrl";
+diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+index 4a1b6e0a604a..64608658de5a 100644
+--- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+@@ -57,6 +57,7 @@
+ 	aliases {
+ 		serial0 = &uart0;
+ 		serial1 = &uart1;
++		gpio0 = &ap_gpio;
+ 	};
+ 
+ 	psci {
+@@ -252,6 +253,15 @@
+ 				ap_pinctrl: pinctrl {
+ 					compatible = "marvell,ap806-pinctrl";
+ 				};
++
++				ap_gpio: gpio {
++					compatible = "marvell,armada-8k-gpio";
++					offset = <0x1040>;
++					ngpios = <19>;
++					gpio-controller;
++					#gpio-cells = <2>;
++					gpio-ranges = <&ap_pinctrl 0 0 19>;
++				};
+ 			};
+ 		};
+ 	};
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+index 96a4ff75b3b0..f88618185d58 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+@@ -104,6 +104,27 @@
+ 					compatible = "marvell,cp110-clock";
+ 					#clock-cells = <2>;
+ 				};
++
++				cpm_gpio1: gpio at 100 {
++					compatible = "marvell,armada-8k-gpio";
++					offset = <0x100>;
++					ngpios = <32>;
++					gpio-controller;
++					#gpio-cells = <2>;
++					gpio-ranges = <&cpm_pinctrl 0 0 32>;
++					status = "disabled";
++
++				};
++
++				cpm_gpio2: gpio at 140 {
++					compatible = "marvell,armada-8k-gpio";
++					offset = <0x140>;
++					ngpios = <31>;
++					gpio-controller;
++					#gpio-cells = <2>;
++					gpio-ranges = <&cpm_pinctrl 0 32 31>;
++					status = "disabled";
++				};
+ 			};
+ 
+ 			cpm_rtc: rtc at 284000 {
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+index 48a658aa5b32..f3a6e6742442 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+@@ -111,6 +111,28 @@
+ 					compatible = "marvell,cp110-clock";
+ 					#clock-cells = <2>;
+ 				};
++
++				cps_gpio1: gpio at 100 {
++					compatible = "marvell,armada-8k-gpio";
++					offset = <0x100>;
++					ngpios = <32>;
++					gpio-controller;
++					#gpio-cells = <2>;
++					gpio-ranges = <&cps_pinctrl 0 0 32>;
++					status = "disabled";
++
++				};
++
++				cps_gpio2: gpio at 140 {
++					compatible = "marvell,armada-8k-gpio";
++					offset = <0x140>;
++					ngpios = <31>;
++					gpio-controller;
++					#gpio-cells = <2>;
++					gpio-ranges = <&cps_pinctrl 0 32 31>;
++					status = "disabled";
++				};
++
+ 			};
+ 
+ 			cps_sata0: sata at 540000 {
 -- 
 git-series 0.9.1
