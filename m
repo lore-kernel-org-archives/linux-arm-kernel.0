@@ -1,138 +1,59 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 12 Jun 2017 15:36:44 +0100
-Subject: [PATCH 05/12] coresight tmc: Add helpers for accessing 64bit registers
+Date: Mon, 12 Jun 2017 15:36:46 +0100
+Subject: [PATCH 07/12] coresight replicator: Expose replicator management
+ registers
 In-Reply-To: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
 References: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1497278211-5001-6-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1497278211-5001-8-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Coresight TMC splits 64bit registers into a pair of 32bit registers
-(e.g DBA, RRP, RWP). Provide helpers to read/write to these registers.
+Expose the idfilter* registers of the programmable replicator.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-priv.h    |  8 ++++++++
- drivers/hwtracing/coresight/coresight-tmc-etf.c |  8 ++++----
- drivers/hwtracing/coresight/coresight-tmc-etr.c |  8 ++++----
- drivers/hwtracing/coresight/coresight-tmc.h     | 19 +++++++++++++++++++
- 4 files changed, 35 insertions(+), 8 deletions(-)
+ .../hwtracing/coresight/coresight-replicator-qcom.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-index b62dc6a..1a16964 100644
---- a/drivers/hwtracing/coresight/coresight-priv.h
-+++ b/drivers/hwtracing/coresight/coresight-priv.h
-@@ -123,6 +123,14 @@ coresight_read_reg_pair(void __iomem *addr, s32 lo_offset, s32 hi_offset)
- 	return val;
- }
+diff --git a/drivers/hwtracing/coresight/coresight-replicator-qcom.c b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
+index b029a5f..4dd18e0 100644
+--- a/drivers/hwtracing/coresight/coresight-replicator-qcom.c
++++ b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
+@@ -95,6 +95,26 @@ static const struct coresight_ops replicator_cs_ops = {
+ 	.link_ops	= &replicator_link_ops,
+ };
  
-+static inline void coresight_write_reg_pair(void __iomem *addr, u64 val,
-+						 s32 lo_offset, s32 hi_offset)
-+{
-+	writel_relaxed((u32)val, addr + lo_offset);
-+	if (hi_offset >= 0)
-+		writel_relaxed((u32)(val >> 32), addr + hi_offset);
-+}
++coresight_simple_func(struct replicator_state, NULL, idfilter0,
++				 REPLICATOR_IDFILTER0);
++coresight_simple_func(struct replicator_state, NULL, idfilter1,
++				REPLICATOR_IDFILTER1);
++static struct attribute *replicator_mgmt_attrs[] = {
++	&dev_attr_idfilter0.attr,
++	&dev_attr_idfilter1.attr,
++	NULL,
++};
 +
- void coresight_disable_path(struct list_head *path);
- int coresight_enable_path(struct list_head *path, u32 mode);
- struct coresight_device *coresight_get_sink(struct list_head *path);
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-index e3b9fb8..aecd712 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-@@ -371,7 +371,7 @@ static void tmc_update_etf_buffer(struct coresight_device *csdev,
++static const struct attribute_group replicator_mgmt_group = {
++	.attrs = replicator_mgmt_attrs,
++	.name = "mgmt",
++};
++
++static const struct attribute_group *replicator_groups[] = {
++	&replicator_mgmt_group,
++	NULL,
++};
++
+ static int replicator_probe(struct amba_device *adev, const struct amba_id *id)
  {
- 	int i, cur;
- 	u32 *buf_ptr;
--	u32 read_ptr, write_ptr;
-+	u64 read_ptr, write_ptr;
- 	u32 status, to_read;
- 	unsigned long offset;
- 	struct cs_buffers *buf = sink_config;
-@@ -388,8 +388,8 @@ static void tmc_update_etf_buffer(struct coresight_device *csdev,
- 
- 	tmc_flush_and_stop(drvdata);
- 
--	read_ptr = readl_relaxed(drvdata->base + TMC_RRP);
--	write_ptr = readl_relaxed(drvdata->base + TMC_RWP);
-+	read_ptr = tmc_read_rrp(drvdata);
-+	write_ptr = tmc_read_rwp(drvdata);
- 
- 	/*
- 	 * Get a hold of the status register and see if a wrap around
-@@ -441,7 +441,7 @@ static void tmc_update_etf_buffer(struct coresight_device *csdev,
- 		if (read_ptr > (drvdata->size - 1))
- 			read_ptr -= drvdata->size;
- 		/* Tell the HW */
--		writel_relaxed(read_ptr, drvdata->base + TMC_RRP);
-+		tmc_write_rrp(drvdata, read_ptr);
- 		perf_aux_output_flag(handle, PERF_AUX_FLAG_TRUNCATED);
- 	}
- 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index 5d31269..ff11b92 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -44,9 +44,8 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
- 		  ~(TMC_AXICTL_PROT_CTL_B0 | TMC_AXICTL_PROT_CTL_B1)) |
- 		  TMC_AXICTL_PROT_CTL_B1;
- 	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
-+	tmc_write_dba(drvdata, drvdata->paddr);
- 
--	writel_relaxed(drvdata->paddr, drvdata->base + TMC_DBALO);
--	writel_relaxed(0x0, drvdata->base + TMC_DBAHI);
- 	writel_relaxed(TMC_FFCR_EN_FMT | TMC_FFCR_EN_TI |
- 		       TMC_FFCR_FON_FLIN | TMC_FFCR_FON_TRIG_EVT |
- 		       TMC_FFCR_TRIGON_TRIGIN,
-@@ -59,9 +58,10 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
- 
- static void tmc_etr_dump_hw(struct tmc_drvdata *drvdata)
- {
--	u32 rwp, val;
-+	u64 rwp;
-+	u32 val;
- 
--	rwp = readl_relaxed(drvdata->base + TMC_RWP);
-+	rwp = tmc_read_rwp(drvdata);
- 	val = readl_relaxed(drvdata->base + TMC_STS);
- 
- 	/*
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-index 51c0185..c78de00 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.h
-+++ b/drivers/hwtracing/coresight/coresight-tmc.h
-@@ -18,6 +18,7 @@
- #ifndef _CORESIGHT_TMC_H
- #define _CORESIGHT_TMC_H
- 
-+#include <linux/io.h>
- #include <linux/miscdevice.h>
- 
- #define TMC_RSZ			0x004
-@@ -139,4 +140,22 @@ extern const struct coresight_ops tmc_etf_cs_ops;
- int tmc_read_prepare_etr(struct tmc_drvdata *drvdata);
- int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata);
- extern const struct coresight_ops tmc_etr_cs_ops;
-+
-+
-+#define TMC_REG_PAIR(name, lo_off, hi_off)				\
-+static inline u64							\
-+tmc_read_##name(struct tmc_drvdata *drvdata)				\
-+{									\
-+	return coresight_read_reg_pair(drvdata->base, lo_off, hi_off);	\
-+}									\
-+static inline void							\
-+tmc_write_##name(struct tmc_drvdata *drvdata, u64 val)			\
-+{									\
-+	coresight_write_reg_pair(drvdata->base, val, lo_off, hi_off);	\
-+}
-+
-+TMC_REG_PAIR(rrp, TMC_RRP, TMC_RRPHI)
-+TMC_REG_PAIR(rwp, TMC_RWP, TMC_RWPHI)
-+TMC_REG_PAIR(dba, TMC_DBALO, TMC_DBAHI)
-+
- #endif
+ 	int ret;
+@@ -139,6 +159,7 @@ static int replicator_probe(struct amba_device *adev, const struct amba_id *id)
+ 	desc.ops = &replicator_cs_ops;
+ 	desc.pdata = adev->dev.platform_data;
+ 	desc.dev = &adev->dev;
++	desc.groups = replicator_groups;
+ 	drvdata->csdev = coresight_register(&desc);
+ 	if (IS_ERR(drvdata->csdev))
+ 		return PTR_ERR(drvdata->csdev);
 -- 
 2.7.4
