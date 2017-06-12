@@ -1,779 +1,158 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 12 Jun 2017 17:34:57 +0200
-Subject: [PATCH v3 6/9] pinctrl: mvebu: add driver for Armada CP110 pinctrl
-In-Reply-To: <cover.d003a5e862e6d732d901a61d1765a349c9a89eef.1497281623.git-series.gregory.clement@free-electrons.com>
-References: <cover.d003a5e862e6d732d901a61d1765a349c9a89eef.1497281623.git-series.gregory.clement@free-electrons.com>
-Message-ID: <2d71d93a22ed24c45b7ce7b52fa066cc0a14a69f.1497281623.git-series.gregory.clement@free-electrons.com>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Mon, 12 Jun 2017 23:37:24 +0800
+Subject: [PATCH V3 3/7] tty: serial: lpuart: add little endian 32 bit register
+ support
+In-Reply-To: <1497281848-12995-1-git-send-email-aisheng.dong@nxp.com>
+References: <1497281848-12995-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1497281848-12995-4-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanna Hawa <hannah@marvell.com>
+Use standard port->iotype to distinguish endian difference. Note as we
+read/write register by checking iotype dynamically, we need to initialize
+the iotype correctly for earlycon as well to avoid a break.
 
-This commit adds a pinctrl driver for the CP110 part of the Marvell
-Armada 7K and 8K SoCs. The Armada 7K has a single CP110, where almost all
-the MPP pins are available. On the other side, the Armada 8K has two
-CP110, and the available MPPs are split between the master CP110 (MPPs 32
-to 62) and the slave CP110 (MPPs 0 to 31).
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Jiri Slaby <jslaby@suse.com> (supporter:TTY LAYER)
+Cc: Stefan Agner <stefan@agner.ch>
+Cc: Mingkai Hu <Mingkai.Hu@nxp.com>
+Cc: Yangbo Lu <yangbo.lu@nxp.com>
+Cc: Fugang Duan <fugang.duan@nxp.com>
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-The register interface to control the MPPs is however the same as all
-other mvebu SoCs, so we can reuse the common pinctrl-mvebu.c logic.
-
-Signed-off-by: Hanna Hawa <hannah@marvell.com>
-Reviewed-by: Shadi Ammouri <shadi@marvell.com>
-
-[updated for mvebu pinctrl and 4.9 changes:
- - converted to simple_mmio
- - converted to syscon/regmap
- - removed unimplemented .remove function
- - dropped DTS changes
- - defered gpio ranges to DT
- - fixed warning
- - properly set soc->nmodes
- -- rmk]
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-
-[ add missing MPP[61:56] function 14 (SDIO)
--- Konstantin Porotchkin]
-Signed-off-by: Konstantin Porotchkin <kostap@marvell.com>
-
-[ allow to properly register more then one instance of this driver
--- Grzegorz Jaszczyk]
-Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
-
-[ - rebased on 4.12-rc1
-  - fixed the 80 character limit for mvebu_mpp_mode array
-  - aligned the compatible name on the ones already used
-  - fixed the MPP table for CP110: some MPP are not available on Armada 7K
--- Gregory CLEMENT]
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+ChangeLog:
+v2->v3:
+ * Instead of using global var, use standard port->iotype to distinguish
+   endian difference.
+v1->v2:
+ * No changes
 ---
- drivers/pinctrl/mvebu/Kconfig                |   4 +-
- drivers/pinctrl/mvebu/Makefile               |   1 +-
- drivers/pinctrl/mvebu/pinctrl-armada-cp110.c | 687 ++++++++++++++++++++-
- 3 files changed, 692 insertions(+)
- create mode 100644 drivers/pinctrl/mvebu/pinctrl-armada-cp110.c
+ drivers/tty/serial/fsl_lpuart.c | 43 +++++++++++++++++++++++++++--------------
+ 1 file changed, 29 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/pinctrl/mvebu/Kconfig b/drivers/pinctrl/mvebu/Kconfig
-index 0e0b009f2b71..d9773b77ff9f 100644
---- a/drivers/pinctrl/mvebu/Kconfig
-+++ b/drivers/pinctrl/mvebu/Kconfig
-@@ -32,6 +32,10 @@ config PINCTRL_ARMADA_AP806
- 	bool
- 	select PINCTRL_MVEBU
+diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
+index ed9db2f..bbf47a0 100644
+--- a/drivers/tty/serial/fsl_lpuart.c
++++ b/drivers/tty/serial/fsl_lpuart.c
+@@ -280,15 +280,29 @@ MODULE_DEVICE_TABLE(of, lpuart_dt_ids);
+ /* Forward declare this for the dma callbacks*/
+ static void lpuart_dma_tx_complete(void *arg);
  
-+config PINCTRL_ARMADA_CP110
-+	bool
-+	select PINCTRL_MVEBU
-+
- config PINCTRL_ARMADA_XP
- 	bool
- 	select PINCTRL_MVEBU
-diff --git a/drivers/pinctrl/mvebu/Makefile b/drivers/pinctrl/mvebu/Makefile
-index 455db274b53d..5b03fd55e28d 100644
---- a/drivers/pinctrl/mvebu/Makefile
-+++ b/drivers/pinctrl/mvebu/Makefile
-@@ -6,6 +6,7 @@ obj-$(CONFIG_PINCTRL_ARMADA_375) += pinctrl-armada-375.o
- obj-$(CONFIG_PINCTRL_ARMADA_38X) += pinctrl-armada-38x.o
- obj-$(CONFIG_PINCTRL_ARMADA_39X) += pinctrl-armada-39x.o
- obj-$(CONFIG_PINCTRL_ARMADA_AP806) += pinctrl-armada-ap806.o
-+obj-$(CONFIG_PINCTRL_ARMADA_CP110) += pinctrl-armada-cp110.o
- obj-$(CONFIG_PINCTRL_ARMADA_XP)  += pinctrl-armada-xp.o
- obj-$(CONFIG_PINCTRL_ARMADA_37XX)  += pinctrl-armada-37xx.o
- obj-$(CONFIG_PINCTRL_ORION)  += pinctrl-orion.o
-diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-cp110.c b/drivers/pinctrl/mvebu/pinctrl-armada-cp110.c
-new file mode 100644
-index 000000000000..7f85beb45482
---- /dev/null
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-cp110.c
-@@ -0,0 +1,687 @@
-+/*
-+ * Marvell Armada CP110 pinctrl driver based on mvebu pinctrl core
-+ *
-+ * Copyright (C) 2017 Marvell
-+ *
-+ * Hanna Hawa <hannah@marvell.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/pinctrl/pinctrl.h>
-+#include <linux/platform_device.h>
-+
-+#include "pinctrl-mvebu.h"
-+
-+/*
-+ * Even if the pin controller is the same the MMP available depend on the SoC
-+ * integration.
-+ *  - In Armada7K (single CP) almost all the MPPs are available (except the
-+ *    MMP 39 to 43)
-+ *  - In Armada8K (dual CP) the MPPs are split into 2 parts, MPPs 0-31 from
-+ *    CPS, and MPPs 32-62 from CPM, the below flags (V_ARMADA_8K_CPM,
-+ *    V_ARMADA_8K_CPS) set which MPP is available to the CPx.
-+ * The x_PLUS enum mean that the MPP available for CPx and for Armada70x0
-+ */
-+enum {
-+	V_ARMADA_7K = BIT(0),
-+	V_ARMADA_8K_CPM = BIT(1),
-+	V_ARMADA_8K_CPS = BIT(2),
-+	V_ARMADA_7K_8K_CPM = (V_ARMADA_7K | V_ARMADA_8K_CPM),
-+	V_ARMADA_7K_8K_CPS = (V_ARMADA_7K | V_ARMADA_8K_CPS),
-+};
-+
-+static struct mvebu_mpp_mode armada_cp110_mpp_modes[] = {
-+	MPP_MODE(0,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"ale1"),
-+		 MPP_FUNCTION(2,	"au",		"i2smclk"),
-+		 MPP_FUNCTION(3,	"ge0",		"rxd3"),
-+		 MPP_FUNCTION(4,	"tdm",		"pclk"),
-+		 MPP_FUNCTION(6,	"ptp",		"pulse"),
-+		 MPP_FUNCTION(7,	"mss_i2c",	"sda"),
-+		 MPP_FUNCTION(8,	"uart0",	"rxd"),
-+		 MPP_FUNCTION(9,	"sata0",	"present_act"),
-+		 MPP_FUNCTION(10,	"ge",		"mdio")),
-+	MPP_MODE(1,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"ale0"),
-+		 MPP_FUNCTION(2,	"au",		"i2sdo_spdifo"),
-+		 MPP_FUNCTION(3,	"ge0",		"rxd2"),
-+		 MPP_FUNCTION(4,	"tdm",		"drx"),
-+		 MPP_FUNCTION(6,	"ptp",		"clk"),
-+		 MPP_FUNCTION(7,	"mss_i2c",	"sck"),
-+		 MPP_FUNCTION(8,	"uart0",	"txd"),
-+		 MPP_FUNCTION(9,	"sata1",	"present_act"),
-+		 MPP_FUNCTION(10,	"ge",		"mdc")),
-+	MPP_MODE(2,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"ad15"),
-+		 MPP_FUNCTION(2,	"au",		"i2sextclk"),
-+		 MPP_FUNCTION(3,	"ge0",		"rxd1"),
-+		 MPP_FUNCTION(4,	"tdm",		"dtx"),
-+		 MPP_FUNCTION(5,	"mss_uart",	"rxd"),
-+		 MPP_FUNCTION(6,	"ptp",		"pclk_out"),
-+		 MPP_FUNCTION(7,	"i2c1",		"sck"),
-+		 MPP_FUNCTION(8,	"uart1",	"rxd"),
-+		 MPP_FUNCTION(9,	"sata0",	"present_act"),
-+		 MPP_FUNCTION(10,	"xg",		"mdc")),
-+	MPP_MODE(3,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"ad14"),
-+		 MPP_FUNCTION(2,	"au",		"i2slrclk"),
-+		 MPP_FUNCTION(3,	"ge0",		"rxd0"),
-+		 MPP_FUNCTION(4,	"tdm",		"fsync"),
-+		 MPP_FUNCTION(5,	"mss_uart",	"txd"),
-+		 MPP_FUNCTION(6,	"pcie",		"rstoutn"),
-+		 MPP_FUNCTION(7,	"i2c1",		"sda"),
-+		 MPP_FUNCTION(8,	"uart1",	"txd"),
-+		 MPP_FUNCTION(9,	"sata1",	"present_act"),
-+		 MPP_FUNCTION(10,	"xg",		"mdio")),
-+	MPP_MODE(4,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"ad13"),
-+		 MPP_FUNCTION(2,	"au",		"i2sbclk"),
-+		 MPP_FUNCTION(3,	"ge0",		"rxctl"),
-+		 MPP_FUNCTION(4,	"tdm",		"rstn"),
-+		 MPP_FUNCTION(5,	"mss_uart",	"rxd"),
-+		 MPP_FUNCTION(6,	"uart1",	"cts"),
-+		 MPP_FUNCTION(7,	"pcie0",	"clkreq"),
-+		 MPP_FUNCTION(8,	"uart3",	"rxd"),
-+		 MPP_FUNCTION(10,	"ge",		"mdc")),
-+	MPP_MODE(5,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"ad12"),
-+		 MPP_FUNCTION(2,	"au",		"i2sdi"),
-+		 MPP_FUNCTION(3,	"ge0",		"rxclk"),
-+		 MPP_FUNCTION(4,	"tdm",		"intn"),
-+		 MPP_FUNCTION(5,	"mss_uart",	"txd"),
-+		 MPP_FUNCTION(6,	"uart1",	"rts"),
-+		 MPP_FUNCTION(7,	"pcie1",	"clkreq"),
-+		 MPP_FUNCTION(8,	"uart3",	"txd"),
-+		 MPP_FUNCTION(10,	"ge",		"mdio")),
-+	MPP_MODE(6,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"ad11"),
-+		 MPP_FUNCTION(3,	"ge0",		"txd3"),
-+		 MPP_FUNCTION(4,	"spi0",		"csn2"),
-+		 MPP_FUNCTION(5,	"au",		"i2sextclk"),
-+		 MPP_FUNCTION(6,	"sata1",	"present_act"),
-+		 MPP_FUNCTION(7,	"pcie2",	"clkreq"),
-+		 MPP_FUNCTION(8,	"uart0",	"rxd"),
-+		 MPP_FUNCTION(9,	"ptp",		"pulse")),
-+	MPP_MODE(7,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"ad10"),
-+		 MPP_FUNCTION(3,	"ge0",		"txd2"),
-+		 MPP_FUNCTION(4,	"spi0",		"csn1"),
-+		 MPP_FUNCTION(5,	"spi1",		"csn1"),
-+		 MPP_FUNCTION(6,	"sata0",	"present_act"),
-+		 MPP_FUNCTION(7,	"led",		"data"),
-+		 MPP_FUNCTION(8,	"uart0",	"txd"),
-+		 MPP_FUNCTION(9,	"ptp",		"clk")),
-+	MPP_MODE(8,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"ad9"),
-+		 MPP_FUNCTION(3,	"ge0",		"txd1"),
-+		 MPP_FUNCTION(4,	"spi0",		"csn0"),
-+		 MPP_FUNCTION(5,	"spi1",		"csn0"),
-+		 MPP_FUNCTION(6,	"uart0",	"cts"),
-+		 MPP_FUNCTION(7,	"led",		"stb"),
-+		 MPP_FUNCTION(8,	"uart2",	"rxd"),
-+		 MPP_FUNCTION(9,	"ptp",		"pclk_out"),
-+		 MPP_FUNCTION(10,	"synce1",	"clk")),
-+	MPP_MODE(9,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"ad8"),
-+		 MPP_FUNCTION(3,	"ge0",		"txd0"),
-+		 MPP_FUNCTION(4,	"spi0",		"mosi"),
-+		 MPP_FUNCTION(5,	"spi1",		"mosi"),
-+		 MPP_FUNCTION(7,	"pcie",		"rstoutn"),
-+		 MPP_FUNCTION(10,	"synce2",	"clk")),
-+	MPP_MODE(10,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"readyn"),
-+		 MPP_FUNCTION(3,	"ge0",		"txctl"),
-+		 MPP_FUNCTION(4,	"spi0",		"miso"),
-+		 MPP_FUNCTION(5,	"spi1",		"miso"),
-+		 MPP_FUNCTION(6,	"uart0",	"cts"),
-+		 MPP_FUNCTION(7,	"sata1",	"present_act")),
-+	MPP_MODE(11,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"wen1"),
-+		 MPP_FUNCTION(3,	"ge0",		"txclkout"),
-+		 MPP_FUNCTION(4,	"spi0",		"clk"),
-+		 MPP_FUNCTION(5,	"spi1",		"clk"),
-+		 MPP_FUNCTION(6,	"uart0",	"rts"),
-+		 MPP_FUNCTION(7,	"led",		"clk"),
-+		 MPP_FUNCTION(8,	"uart2",	"txd"),
-+		 MPP_FUNCTION(9,	"sata0",	"present_act")),
-+	MPP_MODE(12,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"clk_out"),
-+		 MPP_FUNCTION(2,	"nf",		"rbn1"),
-+		 MPP_FUNCTION(3,	"spi1",		"csn1"),
-+		 MPP_FUNCTION(4,	"ge0",		"rxclk")),
-+	MPP_MODE(13,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"burstn"),
-+		 MPP_FUNCTION(2,	"nf",		"rbn0"),
-+		 MPP_FUNCTION(3,	"spi1",		"miso"),
-+		 MPP_FUNCTION(4,	"ge0",		"rxctl"),
-+		 MPP_FUNCTION(8,	"mss_spi",	"miso")),
-+	MPP_MODE(14,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"bootcsn"),
-+		 MPP_FUNCTION(2,	"dev",		"csn0"),
-+		 MPP_FUNCTION(3,	"spi1",		"csn0"),
-+		 MPP_FUNCTION(4,	"spi0",		"csn3"),
-+		 MPP_FUNCTION(5,	"au",		"i2sextclk"),
-+		 MPP_FUNCTION(6,	"spi0",		"miso"),
-+		 MPP_FUNCTION(7,	"sata0",	"present_act"),
-+		 MPP_FUNCTION(8,	"mss_spi",	"csn")),
-+	MPP_MODE(15,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"ad7"),
-+		 MPP_FUNCTION(3,	"spi1",		"mosi"),
-+		 MPP_FUNCTION(6,	"spi0",		"mosi"),
-+		 MPP_FUNCTION(8,	"mss_spi",	"mosi"),
-+		 MPP_FUNCTION(11,	"ptp",		"pulse_cp2cp")),
-+	MPP_MODE(16,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"ad6"),
-+		 MPP_FUNCTION(3,	"spi1",		"clk"),
-+		 MPP_FUNCTION(8,	"mss_spi",	"clk")),
-+	MPP_MODE(17,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"ad5"),
-+		 MPP_FUNCTION(4,	"ge0",		"txd3")),
-+	MPP_MODE(18,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"ad4"),
-+		 MPP_FUNCTION(4,	"ge0",		"txd2"),
-+		 MPP_FUNCTION(11,	"ptp",		"clk_cp2cp")),
-+	MPP_MODE(19,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"ad3"),
-+		 MPP_FUNCTION(4,	"ge0",		"txd1"),
-+		 MPP_FUNCTION(11,	"wakeup",	"out_cp2cp")),
-+	MPP_MODE(20,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"ad2"),
-+		 MPP_FUNCTION(4,	"ge0",		"txd0")),
-+	MPP_MODE(21,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"ad1"),
-+		 MPP_FUNCTION(4,	"ge0",		"txctl"),
-+		 MPP_FUNCTION(11,	"sei",		"in_cp2cp")),
-+	MPP_MODE(22,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"ad0"),
-+		 MPP_FUNCTION(4,	"ge0",		"txclkout"),
-+		 MPP_FUNCTION(11,	"wakeup",	"in_cp2cp")),
-+	MPP_MODE(23,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"a1"),
-+		 MPP_FUNCTION(5,	"au",		"i2smclk"),
-+		 MPP_FUNCTION(11,	"link",		"rd_in_cp2cp")),
-+	MPP_MODE(24,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"a0"),
-+		 MPP_FUNCTION(5,	"au",		"i2slrclk")),
-+	MPP_MODE(25,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"oen"),
-+		 MPP_FUNCTION(5,	"au",		"i2sdo_spdifo")),
-+	MPP_MODE(26,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"wen0"),
-+		 MPP_FUNCTION(5,	"au",		"i2sbclk")),
-+	MPP_MODE(27,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"csn0"),
-+		 MPP_FUNCTION(2,	"spi1",		"miso"),
-+		 MPP_FUNCTION(3,	"mss_gpio4",	NULL),
-+		 MPP_FUNCTION(4,	"ge0",		"rxd3"),
-+		 MPP_FUNCTION(5,	"spi0",		"csn4"),
-+		 MPP_FUNCTION(8,	"ge",		"mdio"),
-+		 MPP_FUNCTION(9,	"sata0",	"present_act"),
-+		 MPP_FUNCTION(10,	"uart0",	"rts"),
-+		 MPP_FUNCTION(11,	"rei",		"in_cp2cp")),
-+	MPP_MODE(28,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"csn1"),
-+		 MPP_FUNCTION(2,	"spi1",		"csn0"),
-+		 MPP_FUNCTION(3,	"mss_gpio5",	NULL),
-+		 MPP_FUNCTION(4,	"ge0",		"rxd2"),
-+		 MPP_FUNCTION(5,	"spi0",		"csn5"),
-+		 MPP_FUNCTION(6,	"pcie2",	"clkreq"),
-+		 MPP_FUNCTION(7,	"ptp",		"pulse"),
-+		 MPP_FUNCTION(8,	"ge",		"mdc"),
-+		 MPP_FUNCTION(9,	"sata1",	"present_act"),
-+		 MPP_FUNCTION(10,	"uart0",	"cts"),
-+		 MPP_FUNCTION(11,	"led",		"data")),
-+	MPP_MODE(29,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"csn2"),
-+		 MPP_FUNCTION(2,	"spi1",		"mosi"),
-+		 MPP_FUNCTION(3,	"mss_gpio6",	NULL),
-+		 MPP_FUNCTION(4,	"ge0",		"rxd1"),
-+		 MPP_FUNCTION(5,	"spi0",		"csn6"),
-+		 MPP_FUNCTION(6,	"pcie1",	"clkreq"),
-+		 MPP_FUNCTION(7,	"ptp",		"clk"),
-+		 MPP_FUNCTION(8,	"mss_i2c",	"sda"),
-+		 MPP_FUNCTION(9,	"sata0",	"present_act"),
-+		 MPP_FUNCTION(10,	"uart0",	"rxd"),
-+		 MPP_FUNCTION(11,	"led",		"stb")),
-+	MPP_MODE(30,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"csn3"),
-+		 MPP_FUNCTION(2,	"spi1",		"clk"),
-+		 MPP_FUNCTION(3,	"mss_gpio7",	NULL),
-+		 MPP_FUNCTION(4,	"ge0",		"rxd0"),
-+		 MPP_FUNCTION(5,	"spi0",		"csn7"),
-+		 MPP_FUNCTION(6,	"pcie0",	"clkreq"),
-+		 MPP_FUNCTION(7,	"ptp",		"pclk_out"),
-+		 MPP_FUNCTION(8,	"mss_i2c",	"sck"),
-+		 MPP_FUNCTION(9,	"sata1",	"present_act"),
-+		 MPP_FUNCTION(10,	"uart0",	"txd"),
-+		 MPP_FUNCTION(11,	"led",		"clk")),
-+	MPP_MODE(31,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"dev",		"a2"),
-+		 MPP_FUNCTION(3,	"mss_gpio4",	NULL),
-+		 MPP_FUNCTION(6,	"pcie",		"rstoutn"),
-+		 MPP_FUNCTION(8,	"ge",		"mdc")),
-+	MPP_MODE(32,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"mii",		"col"),
-+		 MPP_FUNCTION(2,	"mii",		"txerr"),
-+		 MPP_FUNCTION(3,	"mss_spi",	"miso"),
-+		 MPP_FUNCTION(4,	"tdm",		"drx"),
-+		 MPP_FUNCTION(5,	"au",		"i2sextclk"),
-+		 MPP_FUNCTION(6,	"au",		"i2sdi"),
-+		 MPP_FUNCTION(7,	"ge",		"mdio"),
-+		 MPP_FUNCTION(8,	"sdio",		"v18_en"),
-+		 MPP_FUNCTION(9,	"pcie1",	"clkreq"),
-+		 MPP_FUNCTION(10,	"mss_gpio0",	NULL)),
-+	MPP_MODE(33,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"mii",		"txclk"),
-+		 MPP_FUNCTION(2,	"sdio",		"pwr10"),
-+		 MPP_FUNCTION(3,	"mss_spi",	"csn"),
-+		 MPP_FUNCTION(4,	"tdm",		"fsync"),
-+		 MPP_FUNCTION(5,	"au",		"i2smclk"),
-+		 MPP_FUNCTION(6,	"sdio",		"bus_pwr"),
-+		 MPP_FUNCTION(8,	"xg",		"mdio"),
-+		 MPP_FUNCTION(9,	"pcie2",	"clkreq"),
-+		 MPP_FUNCTION(10,	"mss_gpio1",	NULL)),
-+	MPP_MODE(34,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"mii",		"rxerr"),
-+		 MPP_FUNCTION(2,	"sdio",		"pwr11"),
-+		 MPP_FUNCTION(3,	"mss_spi",	"mosi"),
-+		 MPP_FUNCTION(4,	"tdm",		"dtx"),
-+		 MPP_FUNCTION(5,	"au",		"i2slrclk"),
-+		 MPP_FUNCTION(6,	"sdio",		"wr_protect"),
-+		 MPP_FUNCTION(7,	"ge",		"mdc"),
-+		 MPP_FUNCTION(9,	"pcie0",	"clkreq"),
-+		 MPP_FUNCTION(10,	"mss_gpio2",	NULL)),
-+	MPP_MODE(35,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"sata1",	"present_act"),
-+		 MPP_FUNCTION(2,	"i2c1",		"sda"),
-+		 MPP_FUNCTION(3,	"mss_spi",	"clk"),
-+		 MPP_FUNCTION(4,	"tdm",		"pclk"),
-+		 MPP_FUNCTION(5,	"au",		"i2sdo_spdifo"),
-+		 MPP_FUNCTION(6,	"sdio",		"card_detect"),
-+		 MPP_FUNCTION(7,	"xg",		"mdio"),
-+		 MPP_FUNCTION(8,	"ge",		"mdio"),
-+		 MPP_FUNCTION(9,	"pcie",		"rstoutn"),
-+		 MPP_FUNCTION(10,	"mss_gpio3",	NULL)),
-+	MPP_MODE(36,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"synce2",	"clk"),
-+		 MPP_FUNCTION(2,	"i2c1",		"sck"),
-+		 MPP_FUNCTION(3,	"ptp",		"clk"),
-+		 MPP_FUNCTION(4,	"synce1",	"clk"),
-+		 MPP_FUNCTION(5,	"au",		"i2sbclk"),
-+		 MPP_FUNCTION(6,	"sata0",	"present_act"),
-+		 MPP_FUNCTION(7,	"xg",		"mdc"),
-+		 MPP_FUNCTION(8,	"ge",		"mdc"),
-+		 MPP_FUNCTION(9,	"pcie2",	"clkreq"),
-+		 MPP_FUNCTION(10,	"mss_gpio5",	NULL)),
-+	MPP_MODE(37,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"uart2",	"rxd"),
-+		 MPP_FUNCTION(2,	"i2c0",		"sck"),
-+		 MPP_FUNCTION(3,	"ptp",		"pclk_out"),
-+		 MPP_FUNCTION(4,	"tdm",		"intn"),
-+		 MPP_FUNCTION(5,	"mss_i2c",	"sck"),
-+		 MPP_FUNCTION(6,	"sata1",	"present_act"),
-+		 MPP_FUNCTION(7,	"ge",		"mdc"),
-+		 MPP_FUNCTION(8,	"xg",		"mdc"),
-+		 MPP_FUNCTION(9,	"pcie1",	"clkreq"),
-+		 MPP_FUNCTION(10,	"mss_gpio6",	NULL),
-+		 MPP_FUNCTION(11,	"link",		"rd_out_cp2cp")),
-+	MPP_MODE(38,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"uart2",	"txd"),
-+		 MPP_FUNCTION(2,	"i2c0",		"sda"),
-+		 MPP_FUNCTION(3,	"ptp",		"pulse"),
-+		 MPP_FUNCTION(4,	"tdm",		"rstn"),
-+		 MPP_FUNCTION(5,	"mss_i2c",	"sda"),
-+		 MPP_FUNCTION(6,	"sata0",	"present_act"),
-+		 MPP_FUNCTION(7,	"ge",		"mdio"),
-+		 MPP_FUNCTION(8,	"xg",		"mdio"),
-+		 MPP_FUNCTION(9,	"au",		"i2sextclk"),
-+		 MPP_FUNCTION(10,	"mss_gpio7",	NULL),
-+		 MPP_FUNCTION(11,	"ptp",		"pulse_cp2cp")),
-+	MPP_MODE(39,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"sdio",		"wr_protect"),
-+		 MPP_FUNCTION(4,	"au",		"i2sbclk"),
-+		 MPP_FUNCTION(5,	"ptp",		"clk"),
-+		 MPP_FUNCTION(6,	"spi0",		"csn1"),
-+		 MPP_FUNCTION(9,	"sata1",	"present_act"),
-+		 MPP_FUNCTION(10,	"mss_gpio0",	NULL)),
-+	MPP_MODE(40,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"sdio",		"pwr11"),
-+		 MPP_FUNCTION(2,	"synce1",	"clk"),
-+		 MPP_FUNCTION(3,	"mss_i2c",	"sda"),
-+		 MPP_FUNCTION(4,	"au",		"i2sdo_spdifo"),
-+		 MPP_FUNCTION(5,	"ptp",		"pclk_out"),
-+		 MPP_FUNCTION(6,	"spi0",		"clk"),
-+		 MPP_FUNCTION(7,	"uart1",	"txd"),
-+		 MPP_FUNCTION(8,	"ge",		"mdio"),
-+		 MPP_FUNCTION(9,	"sata0",	"present_act"),
-+		 MPP_FUNCTION(10,	"mss_gpio1",	NULL)),
-+	MPP_MODE(41,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"sdio",		"pwr10"),
-+		 MPP_FUNCTION(2,	"sdio",		"bus_pwr"),
-+		 MPP_FUNCTION(3,	"mss_i2c",	"sck"),
-+		 MPP_FUNCTION(4,	"au",		"i2slrclk"),
-+		 MPP_FUNCTION(5,	"ptp",		"pulse"),
-+		 MPP_FUNCTION(6,	"spi0",		"mosi"),
-+		 MPP_FUNCTION(7,	"uart1",	"rxd"),
-+		 MPP_FUNCTION(8,	"ge",		"mdc"),
-+		 MPP_FUNCTION(9,	"sata1",	"present_act"),
-+		 MPP_FUNCTION(10,	"mss_gpio2",	NULL),
-+		 MPP_FUNCTION(11,	"rei",		"out_cp2cp")),
-+	MPP_MODE(42,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"sdio",		"v18_en"),
-+		 MPP_FUNCTION(2,	"sdio",		"wr_protect"),
-+		 MPP_FUNCTION(3,	"synce2",	"clk"),
-+		 MPP_FUNCTION(4,	"au",		"i2smclk"),
-+		 MPP_FUNCTION(5,	"mss_uart",	"txd"),
-+		 MPP_FUNCTION(6,	"spi0",		"miso"),
-+		 MPP_FUNCTION(7,	"uart1",	"cts"),
-+		 MPP_FUNCTION(8,	"xg",		"mdc"),
-+		 MPP_FUNCTION(9,	"sata0",	"present_act"),
-+		 MPP_FUNCTION(10,	"mss_gpio4",	NULL)),
-+	MPP_MODE(43,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"sdio",		"card_detect"),
-+		 MPP_FUNCTION(3,	"synce1",	"clk"),
-+		 MPP_FUNCTION(4,	"au",		"i2sextclk"),
-+		 MPP_FUNCTION(5,	"mss_uart",	"rxd"),
-+		 MPP_FUNCTION(6,	"spi0",		"csn0"),
-+		 MPP_FUNCTION(7,	"uart1",	"rts"),
-+		 MPP_FUNCTION(8,	"xg",		"mdio"),
-+		 MPP_FUNCTION(9,	"sata1",	"present_act"),
-+		 MPP_FUNCTION(10,	"mss_gpio5",	NULL),
-+		 MPP_FUNCTION(11,	"wakeup",	"out_cp2cp")),
-+	MPP_MODE(44,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"ge1",		"txd2"),
-+		 MPP_FUNCTION(7,	"uart0",	"rts"),
-+		 MPP_FUNCTION(11,	"ptp",		"clk_cp2cp")),
-+	MPP_MODE(45,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"ge1",		"txd3"),
-+		 MPP_FUNCTION(7,	"uart0",	"txd"),
-+		 MPP_FUNCTION(9,	"pcie",		"rstoutn")),
-+	MPP_MODE(46,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"ge1",		"txd1"),
-+		 MPP_FUNCTION(7,	"uart1",	"rts")),
-+	MPP_MODE(47,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"ge1",		"txd0"),
-+		 MPP_FUNCTION(5,	"spi1",		"clk"),
-+		 MPP_FUNCTION(7,	"uart1",	"txd"),
-+		 MPP_FUNCTION(8,	"ge",		"mdc")),
-+	MPP_MODE(48,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"ge1",		"txctl_txen"),
-+		 MPP_FUNCTION(5,	"spi1",		"mosi"),
-+		 MPP_FUNCTION(8,	"xg",		"mdc"),
-+		 MPP_FUNCTION(11,	"wakeup",	"in_cp2cp")),
-+	MPP_MODE(49,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"ge1",		"txclkout"),
-+		 MPP_FUNCTION(2,	"mii",		"crs"),
-+		 MPP_FUNCTION(5,	"spi1",		"miso"),
-+		 MPP_FUNCTION(7,	"uart1",	"rxd"),
-+		 MPP_FUNCTION(8,	"ge",		"mdio"),
-+		 MPP_FUNCTION(9,	"pcie0",	"clkreq"),
-+		 MPP_FUNCTION(10,	"sdio",		"v18_en"),
-+		 MPP_FUNCTION(11,	"sei",		"out_cp2cp")),
-+	MPP_MODE(50,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"ge1",		"rxclk"),
-+		 MPP_FUNCTION(2,	"mss_i2c",	"sda"),
-+		 MPP_FUNCTION(5,	"spi1",		"csn0"),
-+		 MPP_FUNCTION(6,	"uart2",	"txd"),
-+		 MPP_FUNCTION(7,	"uart0",	"rxd"),
-+		 MPP_FUNCTION(8,	"xg",		"mdio"),
-+		 MPP_FUNCTION(10,	"sdio",		"pwr11")),
-+	MPP_MODE(51,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"ge1",		"rxd0"),
-+		 MPP_FUNCTION(2,	"mss_i2c",	"sck"),
-+		 MPP_FUNCTION(5,	"spi1",		"csn1"),
-+		 MPP_FUNCTION(6,	"uart2",	"rxd"),
-+		 MPP_FUNCTION(7,	"uart0",	"cts"),
-+		 MPP_FUNCTION(10,	"sdio",		"pwr10")),
-+	MPP_MODE(52,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"ge1",		"rxd1"),
-+		 MPP_FUNCTION(2,	"synce1",	"clk"),
-+		 MPP_FUNCTION(4,	"synce2",	"clk"),
-+		 MPP_FUNCTION(5,	"spi1",		"csn2"),
-+		 MPP_FUNCTION(7,	"uart1",	"cts"),
-+		 MPP_FUNCTION(8,	"led",		"clk"),
-+		 MPP_FUNCTION(9,	"pcie",		"rstoutn"),
-+		 MPP_FUNCTION(10,	"pcie0",	"clkreq")),
-+	MPP_MODE(53,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"ge1",		"rxd2"),
-+		 MPP_FUNCTION(3,	"ptp",		"clk"),
-+		 MPP_FUNCTION(5,	"spi1",		"csn3"),
-+		 MPP_FUNCTION(7,	"uart1",	"rxd"),
-+		 MPP_FUNCTION(8,	"led",		"stb"),
-+		 MPP_FUNCTION(11,	"sdio",		"led")),
-+	MPP_MODE(54,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"ge1",		"rxd3"),
-+		 MPP_FUNCTION(2,	"synce2",	"clk"),
-+		 MPP_FUNCTION(3,	"ptp",		"pclk_out"),
-+		 MPP_FUNCTION(4,	"synce1",	"clk"),
-+		 MPP_FUNCTION(8,	"led",		"data"),
-+		 MPP_FUNCTION(10,	"sdio",		"hw_rst"),
-+		 MPP_FUNCTION(11,	"sdio",		"wr_protect")),
-+	MPP_MODE(55,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"ge1",		"rxctl_rxdv"),
-+		 MPP_FUNCTION(3,	"ptp",		"pulse"),
-+		 MPP_FUNCTION(10,	"sdio",		"led"),
-+		 MPP_FUNCTION(11,	"sdio",		"card_detect")),
-+	MPP_MODE(56,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(4,	"tdm",		"drx"),
-+		 MPP_FUNCTION(5,	"au",		"i2sdo_spdifo"),
-+		 MPP_FUNCTION(6,	"spi0",		"clk"),
-+		 MPP_FUNCTION(7,	"uart1",	"rxd"),
-+		 MPP_FUNCTION(9,	"sata1",	"present_act"),
-+		 MPP_FUNCTION(14,	"sdio",		"clk")),
-+	MPP_MODE(57,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(2,	"mss_i2c",	"sda"),
-+		 MPP_FUNCTION(3,	"ptp",		"pclk_out"),
-+		 MPP_FUNCTION(4,	"tdm",		"intn"),
-+		 MPP_FUNCTION(5,	"au",		"i2sbclk"),
-+		 MPP_FUNCTION(6,	"spi0",		"mosi"),
-+		 MPP_FUNCTION(7,	"uart1",	"txd"),
-+		 MPP_FUNCTION(9,	"sata0",	"present_act"),
-+		 MPP_FUNCTION(14,	"sdio",		"cmd")),
-+	MPP_MODE(58,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(2,	"mss_i2c",	"sck"),
-+		 MPP_FUNCTION(3,	"ptp",		"clk"),
-+		 MPP_FUNCTION(4,	"tdm",		"rstn"),
-+		 MPP_FUNCTION(5,	"au",		"i2sdi"),
-+		 MPP_FUNCTION(6,	"spi0",		"miso"),
-+		 MPP_FUNCTION(7,	"uart1",	"cts"),
-+		 MPP_FUNCTION(8,	"led",		"clk"),
-+		 MPP_FUNCTION(14,	"sdio",		"d0")),
-+	MPP_MODE(59,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"mss_gpio7",	NULL),
-+		 MPP_FUNCTION(2,	"synce2",	"clk"),
-+		 MPP_FUNCTION(4,	"tdm",		"fsync"),
-+		 MPP_FUNCTION(5,	"au",		"i2slrclk"),
-+		 MPP_FUNCTION(6,	"spi0",		"csn0"),
-+		 MPP_FUNCTION(7,	"uart0",	"cts"),
-+		 MPP_FUNCTION(8,	"led",		"stb"),
-+		 MPP_FUNCTION(9,	"uart1",	"txd"),
-+		 MPP_FUNCTION(14,	"sdio",		"d1")),
-+	MPP_MODE(60,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"mss_gpio6",	NULL),
-+		 MPP_FUNCTION(3,	"ptp",		"pulse"),
-+		 MPP_FUNCTION(4,	"tdm",		"dtx"),
-+		 MPP_FUNCTION(5,	"au",		"i2smclk"),
-+		 MPP_FUNCTION(6,	"spi0",		"csn1"),
-+		 MPP_FUNCTION(7,	"uart0",	"rts"),
-+		 MPP_FUNCTION(8,	"led",		"data"),
-+		 MPP_FUNCTION(9,	"uart1",	"rxd"),
-+		 MPP_FUNCTION(14,	"sdio",		"d2")),
-+	MPP_MODE(61,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"mss_gpio5",	NULL),
-+		 MPP_FUNCTION(3,	"ptp",		"clk"),
-+		 MPP_FUNCTION(4,	"tdm",		"pclk"),
-+		 MPP_FUNCTION(5,	"au",		"i2sextclk"),
-+		 MPP_FUNCTION(6,	"spi0",		"csn2"),
-+		 MPP_FUNCTION(7,	"uart0",	"txd"),
-+		 MPP_FUNCTION(8,	"uart2",	"txd"),
-+		 MPP_FUNCTION(9,	"sata1",	"present_act"),
-+		 MPP_FUNCTION(10,	"ge",		"mdio"),
-+		 MPP_FUNCTION(14,	"sdio",		"d3")),
-+	MPP_MODE(62,
-+		 MPP_FUNCTION(0,	"gpio",		NULL),
-+		 MPP_FUNCTION(1,	"mss_gpio4",	NULL),
-+		 MPP_FUNCTION(2,	"synce1",	"clk"),
-+		 MPP_FUNCTION(3,	"ptp",		"pclk_out"),
-+		 MPP_FUNCTION(5,	"sata1",	"present_act"),
-+		 MPP_FUNCTION(6,	"spi0",		"csn3"),
-+		 MPP_FUNCTION(7,	"uart0",	"rxd"),
-+		 MPP_FUNCTION(8,	"uart2",	"rxd"),
-+		 MPP_FUNCTION(9,	"sata0",	"present_act"),
-+		 MPP_FUNCTION(10,	"ge",		"mdc")),
-+};
-+
-+static const struct of_device_id armada_cp110_pinctrl_of_match[] = {
-+	{
-+		.compatible	= "marvell,armada-7k-pinctrl",
-+		.data		= (void *) V_ARMADA_7K,
-+	},
-+	{
-+		.compatible	= "marvell,armada-8k-cpm-pinctrl",
-+		.data		= (void *) V_ARMADA_8K_CPM,
-+	},
-+	{
-+		.compatible	= "marvell,armada-8k-cps-pinctrl",
-+		.data		= (void *) V_ARMADA_8K_CPS,
-+	},
-+	{ },
-+};
-+
-+static const struct mvebu_mpp_ctrl armada_cp110_mpp_controls[] = {
-+	MPP_FUNC_CTRL(0, 62, NULL, mvebu_regmap_mpp_ctrl),
-+};
-+
-+static void mvebu_pinctrl_assign_variant(struct mvebu_mpp_mode *m,
-+					 u8 variant)
+-static inline u32 lpuart32_read(struct uart_port *port, u32 reg_off)
+-{
+-	return ioread32be(port->membase + reg_off);
++static inline u32 lpuart32_read(struct uart_port *port, u32 off)
 +{
-+	struct mvebu_mpp_ctrl_setting *s;
-+
-+	for (s = m->settings ; s->name ; s++)
-+		s->variant = variant;
-+}
-+
-+static int armada_cp110_pinctrl_probe(struct platform_device *pdev)
-+{
-+	struct mvebu_pinctrl_soc_info *soc;
-+	const struct of_device_id *match =
-+		of_match_device(armada_cp110_pinctrl_of_match, &pdev->dev);
-+	int i;
-+
-+	if (!pdev->dev.parent)
-+		return -ENODEV;
-+
-+	soc = devm_kzalloc(&pdev->dev,
-+			   sizeof(struct mvebu_pinctrl_soc_info), GFP_KERNEL);
-+	if (!soc)
-+		return -ENOMEM;
-+
-+	soc->variant = (unsigned long) match->data & 0xff;
-+	soc->controls = armada_cp110_mpp_controls;
-+	soc->ncontrols = ARRAY_SIZE(armada_cp110_mpp_controls);
-+	soc->modes = armada_cp110_mpp_modes;
-+	soc->nmodes = ARRAY_SIZE(armada_cp110_mpp_modes);
-+	for (i = 0; i < ARRAY_SIZE(armada_cp110_mpp_modes); i++) {
-+		struct mvebu_mpp_mode *m = &armada_cp110_mpp_modes[i];
-+
-+		switch (i) {
-+		case 0 ... 31:
-+			mvebu_pinctrl_assign_variant(m, V_ARMADA_7K_8K_CPS);
-+			break;
-+		case 32 ... 38:
-+			mvebu_pinctrl_assign_variant(m, V_ARMADA_7K_8K_CPM);
-+			break;
-+		case 39 ... 43:
-+			mvebu_pinctrl_assign_variant(m, V_ARMADA_8K_CPM);
-+			break;
-+		case 44 ... 62:
-+			mvebu_pinctrl_assign_variant(m, V_ARMADA_7K_8K_CPM);
-+			break;
-+		}
-+	}
-+	pdev->dev.platform_data = soc;
-+
-+	return mvebu_pinctrl_simple_regmap_probe(pdev, pdev->dev.parent, 0);
-+}
-+
-+static struct platform_driver armada_cp110_pinctrl_driver = {
-+	.driver = {
-+		.name = "armada-cp110-pinctrl",
-+		.of_match_table = of_match_ptr(armada_cp110_pinctrl_of_match),
-+	},
-+	.probe = armada_cp110_pinctrl_probe,
-+};
-+
-+builtin_platform_driver(armada_cp110_pinctrl_driver);
++	switch (port->iotype) {
++	case UPIO_MEM32:
++		return readl(port->membase + off);
++	case UPIO_MEM32BE:
++		return ioread32be(port->membase + off);
++	default:
++		return 0;
++	};
+ }
+ 
+ static inline void lpuart32_write(struct uart_port *port, u32 val,
+-				  u32 reg_off)
++				  u32 off)
+ {
+-	iowrite32be(val, port->membase + reg_off);
++	switch (port->iotype) {
++	case UPIO_MEM32:
++		writel(val, port->membase + off);
++		break;
++	case UPIO_MEM32BE:
++		iowrite32be(val, port->membase + off);
++		break;
++	};
+ }
+ 
+ static void lpuart_stop_tx(struct uart_port *port)
+@@ -602,7 +616,7 @@ static irqreturn_t lpuart_txint(int irq, void *dev_id)
+ 
+ 	spin_lock_irqsave(&sport->port.lock, flags);
+ 	if (sport->port.x_char) {
+-		if (sport->port.iotype & UPIO_MEM32BE)
++		if (sport->port.iotype & (UPIO_MEM32 | UPIO_MEM32BE))
+ 			lpuart32_write(&sport->port, sport->port.x_char, UARTDATA);
+ 		else
+ 			writeb(sport->port.x_char, sport->port.membase + UARTDR);
+@@ -610,14 +624,14 @@ static irqreturn_t lpuart_txint(int irq, void *dev_id)
+ 	}
+ 
+ 	if (uart_circ_empty(xmit) || uart_tx_stopped(&sport->port)) {
+-		if (sport->port.iotype & UPIO_MEM32BE)
++		if (sport->port.iotype & (UPIO_MEM32 | UPIO_MEM32BE))
+ 			lpuart32_stop_tx(&sport->port);
+ 		else
+ 			lpuart_stop_tx(&sport->port);
+ 		goto out;
+ 	}
+ 
+-	if (sport->port.iotype & UPIO_MEM32BE)
++	if (sport->port.iotype & (UPIO_MEM32 | UPIO_MEM32BE))
+ 		lpuart32_transmit_buffer(sport);
+ 	else
+ 		lpuart_transmit_buffer(sport);
+@@ -1890,12 +1904,12 @@ static int __init lpuart_console_setup(struct console *co, char *options)
+ 	if (options)
+ 		uart_parse_options(options, &baud, &parity, &bits, &flow);
+ 	else
+-		if (sport->port.iotype & UPIO_MEM32BE)
++		if (sport->port.iotype & (UPIO_MEM32 | UPIO_MEM32BE))
+ 			lpuart32_console_get_options(sport, &baud, &parity, &bits);
+ 		else
+ 			lpuart_console_get_options(sport, &baud, &parity, &bits);
+ 
+-	if (sport->port.iotype & UPIO_MEM32BE)
++	if (sport->port.iotype & (UPIO_MEM32 | UPIO_MEM32BE))
+ 		lpuart32_setup_watermark(sport);
+ 	else
+ 		lpuart_setup_watermark(sport);
+@@ -1954,6 +1968,7 @@ static int __init lpuart32_early_console_setup(struct earlycon_device *device,
+ 	if (!device->port.membase)
+ 		return -ENODEV;
+ 
++	device->port.iotype = UPIO_MEM32BE;
+ 	device->con->write = lpuart32_early_write;
+ 	return 0;
+ }
+@@ -2015,7 +2030,7 @@ static int lpuart_probe(struct platform_device *pdev)
+ 	}
+ 	sport->port.irq = ret;
+ 	sport->port.iotype = sdata->iotype;
+-	if (sport->port.iotype & UPIO_MEM32BE)
++	if (sport->port.iotype & (UPIO_MEM32 | UPIO_MEM32BE))
+ 		sport->port.ops = &lpuart32_pops;
+ 	else
+ 		sport->port.ops = &lpuart_pops;
+@@ -2042,7 +2057,7 @@ static int lpuart_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, &sport->port);
+ 
+-	if (sport->port.iotype & UPIO_MEM32BE)
++	if (sport->port.iotype & (UPIO_MEM32 | UPIO_MEM32BE))
+ 		lpuart_reg.cons = LPUART32_CONSOLE;
+ 	else
+ 		lpuart_reg.cons = LPUART_CONSOLE;
+@@ -2095,7 +2110,7 @@ static int lpuart_suspend(struct device *dev)
+ 	struct lpuart_port *sport = dev_get_drvdata(dev);
+ 	unsigned long temp;
+ 
+-	if (sport->port.iotype & UPIO_MEM32BE) {
++	if (sport->port.iotype & (UPIO_MEM32 | UPIO_MEM32BE)) {
+ 		/* disable Rx/Tx and interrupts */
+ 		temp = lpuart32_read(&sport->port, UARTCTRL);
+ 		temp &= ~(UARTCTRL_TE | UARTCTRL_TIE | UARTCTRL_TCIE);
+@@ -2146,7 +2161,7 @@ static int lpuart_resume(struct device *dev)
+ 	if (sport->port.suspended && !sport->port.irq_wake)
+ 		clk_prepare_enable(sport->clk);
+ 
+-	if (sport->port.iotype & UPIO_MEM32BE) {
++	if (sport->port.iotype & (UPIO_MEM32 | UPIO_MEM32BE)) {
+ 		lpuart32_setup_watermark(sport);
+ 		temp = lpuart32_read(&sport->port, UARTCTRL);
+ 		temp |= (UARTCTRL_RIE | UARTCTRL_TIE | UARTCTRL_RE |
 -- 
-git-series 0.9.1
+2.7.4
