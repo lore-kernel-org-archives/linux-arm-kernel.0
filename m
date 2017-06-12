@@ -1,64 +1,107 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 12 Jun 2017 16:30:50 +0200
-Subject: [PATCH 3/6] arm: wire frequency-invariant accounting support up
- to the task scheduler
-In-Reply-To: <20170608075513.12475-4-dietmar.eggemann@arm.com>
-References: <20170608075513.12475-1-dietmar.eggemann@arm.com>
- <20170608075513.12475-4-dietmar.eggemann@arm.com>
-Message-ID: <CAKfTPtCHOsEDMDTiBvu-vdLgNJjD_j=hancL8RTJHOe9a6gJag@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 12 Jun 2017 16:31:24 +0200
+Subject: [PATCH 00/12] arm64: crypto: prepare for new kernel mode NEON
+ policy
+In-Reply-To: <1497111778-4210-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1497111778-4210-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu8YG1zYSZ9wAG7AYFTgANB6z68=n26s2tUW9uLG__MXmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 June 2017 at 09:55, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
-> Commit dfbca41f3479 ("sched: Optimize freq invariant accounting")
-> changed the wiring which now has to be done by associating
-> arch_scale_freq_capacity with the actual implementation provided
-> by the architecture.
+On 10 June 2017 at 18:22, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> TL;DR: preparatory work for expected changes in arm64's handling of kernel
+>        mode SIMD
 >
-> Define arch_scale_freq_capacity to use the arch_topology "driver"
-> function topology_get_freq_scale() for the task scheduler's
-> frequency-invariant accounting instead of the default
-> arch_scale_freq_capacity() in kernel/sched/sched.h.
+> @Herbert: The arm64 maintainers may want to take this through the arm64 tree,
+>           and if not, we need their acks on patch #1. Thanks.
 >
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Juri Lelli <juri.lelli@arm.com>
-> Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
 
-Acked-by: Vincent Guittot <vincent.guittot@linaro.org>
+Please disregard this for merging for now. I am looking into whether
+it is possible to use time invariant fallbacks instead for the AES
+routines (and I missed a couple of AES MAC routines in the conversion)
 
-> ---
->  arch/arm/include/asm/topology.h | 5 +++++
->  arch/arm/kernel/topology.c      | 1 -
->  2 files changed, 5 insertions(+), 1 deletion(-)
+> Currently, arm64 allows kernel mode NEON (KMN) in process, softirq or hardirq
+> context. In the process case, we preserve/restore the NEON context lazily,
+> but in the softirq/hardirq cases, we eagerly stash a slice of the NEON
+> register file, and immediately restore it when kernel_neon_end() is called.
 >
-> diff --git a/arch/arm/include/asm/topology.h b/arch/arm/include/asm/topology.h
-> index 370f7a732900..a56a9e24f4c0 100644
-> --- a/arch/arm/include/asm/topology.h
-> +++ b/arch/arm/include/asm/topology.h
-> @@ -24,6 +24,11 @@ void init_cpu_topology(void);
->  void store_cpu_topology(unsigned int cpuid);
->  const struct cpumask *cpu_coregroup_mask(int cpu);
+> Given the above, arm64 actually does not use the generic may_use_simd() API
+> at all*, which was added to allow async wrappers of synchronous SIMD routines
+> to be implemented in a generic manner. (On x86, kernel mode SIMD may be used
+> in process context or while serving an interrupt taken from user space. On ARM,
+> SIMD may only be used in process context)
 >
-> +#include <linux/arch_topology.h>
-> +
-> +/* Replace task scheduler's default frequency-invariant accounting */
-> +#define arch_scale_freq_capacity topology_get_freq_scale
-> +
->  #else
+> When adding support for the SVE architecture extension, which shared part of
+> the NEON register file with the SIMD and crypto extensions, the eager preserve/
+> restore in interrupt context is becoming a problem: it should either preserve
+> and restore the entire SVE state (which may be up to 8 KB in size), or it
+> should not be allowed to interrupt the lazy preserve, which does need to deal
+> with the large SVE state anyway. Otherwise, such an interruption would corrupt
+> the NEON state the lazy preserve sees after the interruption.
 >
->  static inline void init_cpu_topology(void) { }
-> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-> index bf949a763dbe..2c47a76c67b0 100644
-> --- a/arch/arm/kernel/topology.c
-> +++ b/arch/arm/kernel/topology.c
-> @@ -11,7 +11,6 @@
->   * for more details.
->   */
+> Given how
+> a) KMN is never actually used in hardirq context,
+> b) KMN is only used in softirq context by mac80211 code running on behalf of
+>    WiFi devices that don't perform the crypto in hardware,
+> b) KMN in softirq context is statistically unlikely to interrupt the kernel
+>    while it is doing kernel mode NEON in process context,
 >
-> -#include <linux/arch_topology.h>
->  #include <linux/cpu.h>
->  #include <linux/cpufreq.h>
->  #include <linux/cpumask.h>
+> the unconditional eager preserve/restore typically executes when no KMN in
+> process context is in progress, and we can simplify things substantially by
+> disallowing nested KMN, i.e., disallow KMN in hardirq context, and allow KMN
+> in softirq only if no KMN in process context is already in progress.
+>
+> The no-nesting rule leaves only the outer SVE-aware lazy preserve/restore,
+> which needs to execute with bottom halves disabled, but other than that, no
+> intrusive changes should be needed to deal with the SVE payloads.
+>
+> Given that the no-nesting rule implies that SIMD is no longer allowed in any
+> context, the KMN users need to be made aware of this. This series updates the
+> current KMN users in the arm64 tree to take may_use_simd() into account. Since
+> at this time, SIMD is still allowed in any context, an implementation of
+> may_use_simd() is added that simply returns true (#1). It will be updated in
+> the future when the no-nesting modifications are made.
+>
+> * may_use_simd() is only used as a hint in the SHA256 NEON code, since on some
+>   microarchitectures, it is only marginally faster, and the eager preserve and
+>   restore could actually make it slower.
+>
+> Ard Biesheuvel (12):
+>   arm64: neon: replace generic definition of may_use_simd()
+>   crypto: arm64/ghash-ce - add non-SIMD scalar fallback
+>   crypto: arm64/crct10dif - add non-SIMD generic fallback
+>   crypto: arm64/crc32 - add non-SIMD scalar fallback
+>   crypto: arm64/sha1-ce - add non-SIMD generic fallback
+>   crypto: arm64/sha2-ce - add non-SIMD scalar fallback
+>   crypto: arm64/aes-ce-cipher - match round key endianness with generic
+>     code
+>   crypto: arm64/aes-ce-cipher: add non-SIMD generic fallback
+>   crypto: arm64/aes-ce-ccm: add non-SIMD generic fallback
+>   crypto: arm64/aes-blk - add a non-SIMD fallback for synchronous CTR
+>   crypto: arm64/chacha20 - take may_use_simd() into account
+>   crypto: arm64/aes-bs - implement non-SIMD fallback for AES-CTR
+>
+>  arch/arm64/crypto/Kconfig              |  22 ++-
+>  arch/arm64/crypto/aes-ce-ccm-core.S    |  30 ++--
+>  arch/arm64/crypto/aes-ce-ccm-glue.c    | 152 +++++++++++++++-----
+>  arch/arm64/crypto/aes-ce-cipher.c      |  55 ++++---
+>  arch/arm64/crypto/aes-ce.S             |  12 +-
+>  arch/arm64/crypto/aes-ctr-fallback.h   |  55 +++++++
+>  arch/arm64/crypto/aes-glue.c           |  17 ++-
+>  arch/arm64/crypto/aes-neonbs-glue.c    |  48 ++++++-
+>  arch/arm64/crypto/chacha20-neon-glue.c |   5 +-
+>  arch/arm64/crypto/crc32-ce-glue.c      |  11 +-
+>  arch/arm64/crypto/crct10dif-ce-glue.c  |  13 +-
+>  arch/arm64/crypto/ghash-ce-glue.c      |  49 +++++--
+>  arch/arm64/crypto/sha1-ce-glue.c       |  18 ++-
+>  arch/arm64/crypto/sha2-ce-glue.c       |  30 +++-
+>  arch/arm64/crypto/sha256-glue.c        |   1 +
+>  arch/arm64/include/asm/Kbuild          |   1 -
+>  arch/arm64/include/asm/simd.h          |  24 ++++
+>  17 files changed, 420 insertions(+), 123 deletions(-)
+>  create mode 100644 arch/arm64/crypto/aes-ctr-fallback.h
+>  create mode 100644 arch/arm64/include/asm/simd.h
+>
 > --
-> 2.11.0
+> 2.7.4
 >
