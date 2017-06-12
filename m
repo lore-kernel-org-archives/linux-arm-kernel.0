@@ -1,104 +1,147 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 12 Jun 2017 09:27:23 +0200
-Subject: [PATCH v4 6/7] ARM: dts: meson8: switch to new bindings for UART
- nodes
-In-Reply-To: <CAFBinCBNhRtt8jiY+19_B-9_mNmB800rvD+rwBzYNfB5pXM53Q@mail.gmail.com>
-References: <1497001756-942-1-git-send-email-narmstrong@baylibre.com>
- <1497001756-942-7-git-send-email-narmstrong@baylibre.com>
- <CAFBinCD6_nGdqBSOJwyj0XQe8H05nw-r52pctY7ADJu0EqMb2A@mail.gmail.com>
- <CAFBinCBNhRtt8jiY+19_B-9_mNmB800rvD+rwBzYNfB5pXM53Q@mail.gmail.com>
-Message-ID: <4a53855c-3e72-243d-6d74-2ccc5cbdc706@baylibre.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 12 Jun 2017 09:30:31 +0200
+Subject: [PATCH 2/2] drivers/clocksource/fttmr010: Implement delay timer
+In-Reply-To: <20170611212617.6906-2-linus.walleij@linaro.org>
+References: <20170611212617.6906-1-linus.walleij@linaro.org>
+ <20170611212617.6906-2-linus.walleij@linaro.org>
+Message-ID: <20170612073031.GA2261@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2017 10:18 PM, Martin Blumenstingl wrote:
-> On Sat, Jun 10, 2017 at 12:37 AM, Martin Blumenstingl
-> <martin.blumenstingl@googlemail.com> wrote:
->> Hi Neil,
->>
->> On Fri, Jun 9, 2017 at 11:49 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
->>> Switch to the stable UART bindings by adding a XTAL node and using the
->>> proper compatible strings.
->> unfortunately this won't apply now that Kevin has merged my "ARM: dts:
->> meson8: add and use the real clock controller"
->> on the other hand this will make the patch easier as you can now do
->> the same changes as in meson8b.dtsi
-> Neil, if you want you could also drop this from your series and let me
-> handle this (just let me know). I would even go one step further and
-> export the CLKID_UART0, CLKID_UART1 and CLKID_UART2 gates and pass
-> them as "pclk" for uart_{A,B,C}
-> I'll even *try* to test if this works on real hardware (my Meson8m2
-> board has a RTL8723BS SDIO wifi + bluetooth chip - wifi driver support
-> has been pretty bad so far - but I'll try to see if I can get and
-> messages out of the bluetooth part)
-> just let me know if you want me to handle this patch for you
-
-
-No in fact it was just a "PoC" to show how to handle it on non-gx DTS.
-
-I'm ok to leave it to you when the UART code is merged.
-
-Neil
-
+On Sun, Jun 11, 2017 at 11:26:17PM +0200, Linus Walleij wrote:
+> This timer is often used on the ARM architecture, so as with so
+> many siblings, we can implement delay timers, removing the need
+> for the system to calibrate jiffys at boot, and potentially
+> handling CPU frequency scaling on targets.
 > 
->>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->>> ---
->>>  arch/arm/boot/dts/meson8.dtsi | 23 +++++++++++++++++++----
->>>  1 file changed, 19 insertions(+), 4 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/meson8.dtsi b/arch/arm/boot/dts/meson8.dtsi
->>> index 6993077..a2ea112 100644
->>> --- a/arch/arm/boot/dts/meson8.dtsi
->>> +++ b/arch/arm/boot/dts/meson8.dtsi
->>> @@ -83,6 +83,13 @@
->>>                 };
->>>         };
->>>
->>> +       xtal: xtal-clk {
->>> +               compatible = "fixed-clock";
->>> +               clock-frequency = <24000000>;
->>> +               clock-output-names = "xtal";
->>> +               #clock-cells = <0>;
->>> +       };
->>> +
->>>         clk81: clk at 0 {
->>>                 #clock-cells = <0>;
->>>                 compatible = "fixed-clock";
->>> @@ -199,17 +206,25 @@
->>>  };
->>>
->>>  &uart_AO {
->>> -       clocks = <&clk81>;
->>> +       compatible = "amlogic,meson8-uart", "amlogic,meson-ao-uart";
->>> +       clocks = <&xtal>, <&clk81>, <&clk81>;
->>> +       clock-names = "xtal", "pclk", "baud";
->>>  };
->>>
->>>  &uart_A {
->>> -       clocks = <&clk81>;
->>> +       compatible = "amlogic,meson8-uart";
->>> +       clocks = <&xtal>, <&clk81>, <&clk81>;
->>> +       clock-names = "xtal", "pclk", "baud";
->>>  };
->>>
->>>  &uart_B {
->>> -       clocks = <&clk81>;
->>> +       compatible = "amlogic,meson8-uart";
->>> +       clocks = <&xtal>, <&clk81>, <&clk81>;
->>> +       clock-names = "xtal", "pclk", "baud";
->>>  };
->>>
->>>  &uart_C {
->>> -       clocks = <&clk81>;
->>> +       compatible = "amlogic,meson8-uart";
->>> +       clocks = <&xtal>, <&clk81>, <&clk81>;
->>> +       clock-names = "xtal", "pclk", "baud";
->>>  };
->>> --
->>> 1.9.1
->>>
->>>
->>> _______________________________________________
->>> linux-amlogic mailing list
->>> linux-amlogic at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-amlogic
+> We cannot just protect the Kconfig with a "depends on ARM" because
+> it is already known that different architectures are using Faraday
+> IP blocks, so it is better to make things open-ended and use
+> 
+> Result on boot dmesg:
+> 
+> Switching to timer-based delay loop, resolution 40n
+> Calibrating delay loop (skipped), value calculated using
+>   timer frequency.. 50.00 BogoMIPS (lpj=250000)
+> 
+> This is accurately the timer frequency, 250MHz on the APB
+> bus.
+> 
+> Cc: Andrew Jeffery <andrew@aj.id.au>
+> Cc: Joel Stanley <joel@jms.id.au>
+> Cc: Jonas Jensen <jonas.jensen@gmail.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  drivers/clocksource/timer-fttmr010.c | 35 ++++++++++++++++++++++++++++++++++-
+>  1 file changed, 34 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clocksource/timer-fttmr010.c b/drivers/clocksource/timer-fttmr010.c
+> index 5e82469995cb..0074d89cd2ce 100644
+> --- a/drivers/clocksource/timer-fttmr010.c
+> +++ b/drivers/clocksource/timer-fttmr010.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/clk.h>
+>  #include <linux/slab.h>
+>  #include <linux/bitops.h>
+> +#include <linux/delay.h>
+>  
+>  /*
+>   * Register definitions for the timers
+> @@ -81,9 +82,15 @@ struct fttmr010 {
+>  	bool count_down;
+>  	u32 t1_enable_val;
+>  	struct clock_event_device clkevt;
+> +#ifdef CONFIG_ARM
+> +	struct delay_timer delay_timer;
+> +#endif
+>  };
+>  
+> -/* A local singleton used by sched_clock, which is stateless */
+> +/*
+> + * A local singleton used by sched_clock and delay timer reads, which are
+> + * fast and stateless
+> + */
+>  static struct fttmr010 *local_fttmr;
+>  
+>  static inline struct fttmr010 *to_fttmr010(struct clock_event_device *evt)
+> @@ -101,6 +108,20 @@ static u64 notrace fttmr010_read_sched_clock_down(void)
+>  	return ~readl(local_fttmr->base + TIMER2_COUNT);
+>  }
+>  
+> +#ifdef CONFIG_ARM
+> +
+> +static unsigned long fttmr010_read_current_timer_up(void)
+> +{
+> +	return readl(local_fttmr->base + TIMER2_COUNT);
+> +}
+> +
+> +static unsigned long fttmr010_read_current_timer_down(void)
+> +{
+> +	return ~readl(local_fttmr->base + TIMER2_COUNT);
+> +}
+> +
+> +#endif
+> +
+
+These functions are duplicated with fttmr010_read_sched_clock_down() /
+fttmr010_read_sched_clock_up().
+
+Could you factor them out?
+
+eg.
+
+static inline unsigned long fttmr010_read_current_timer_up(void)
+{
+	return readl(local_fttmr->base + TIMER2_COUNT);
+}
+
+static inline unsigned long fttmr010_read_current_timer_down(void)
+{
+	return ~readl(local_fttmr->base + TIMER2_COUNT);
+}
+
+static u64 notrace fttmr010_read_sched_clock_down(void)
+{
+	return fttmr010_read_current_timer_down()
+}
+
+static u64 notrace fttmr010_read_sched_clock_up(void)
+{
+	return fttmr010_read_current_timer_up();
+}
+
+So we get rid of these CONFIG_ARM section above.
+
+>  static int fttmr010_timer_set_next_event(unsigned long cycles,
+>  				       struct clock_event_device *evt)
+>  {
+> @@ -349,6 +370,18 @@ static int __init fttmr010_timer_init(struct device_node *np)
+>  					fttmr010->tick_rate,
+>  					1, 0xffffffff);
+>  
+> +#ifdef CONFIG_ARM
+> +	/* Also use this timer for delays */
+> +	if (fttmr010->count_down)
+> +		fttmr010->delay_timer.read_current_timer =
+> +			fttmr010_read_current_timer_down;
+> +	else
+> +		fttmr010->delay_timer.read_current_timer =
+> +			fttmr010_read_current_timer_up;
+> +	fttmr010->delay_timer.freq = fttmr010->tick_rate;
+> +	register_current_timer_delay(&fttmr010->delay_timer);
+> +#endif
+> +
+>  	return 0;
+>  
+>  out_unmap:
+> -- 
+> 2.9.4
+> 
+
+-- 
+
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
