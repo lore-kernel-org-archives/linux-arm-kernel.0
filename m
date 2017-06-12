@@ -1,61 +1,35 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 12 Jun 2017 10:28:13 +0900
-Subject: Fwd: [PATCH] ARM: prima2: remove redundant select CPU_V7
-In-Reply-To: <1488078449-3902-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1488078449-3902-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK7LNASAUDsBOLvmrKjX1+36HESg2SK3AE3e_18YaLF-8sQmPg@mail.gmail.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Mon, 12 Jun 2017 09:29:07 +0800
+Subject: [PATCH 1/2] clk: hi6220: add acpu clock
+In-Reply-To: <0e1a391e-cec5-1e94-c491-1c816eca85c3@linaro.org>
+References: <1492478242-16146-1-git-send-email-zhangfei.gao@linaro.org>
+ <20170420155717.mohnrg6lxpwkoytb@rob-hp-laptop>
+ <0e1a391e-cec5-1e94-c491-1c816eca85c3@linaro.org>
+Message-ID: <85a39ff8-5d69-ac21-ec9e-6d0bb224f023@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Hi, Stephen
 
 
-It has been more than 3 months since this patch was posted,
-but the maintainer of prima2 did not respond.
-(I guess mach-prima2 is not maintained.)
-
-This is a minor clean-up,
-but could you consider picking it up to ARM-SOC tree?
-
-Thanks,
+Would you mind taking this patch, it's better go through 4.12.
 
 
----------- Forwarded message ----------
-From: Masahiro Yamada <yamada.masahiro@socionext.com>
-Date: 2017-02-26 12:07 GMT+09:00
-Subject: [PATCH] ARM: prima2: remove redundant select CPU_V7
-To: linux-arm-kernel at lists.infradead.org
-Cc: Masahiro Yamada <yamada.masahiro@socionext.com>, Russell King
-<linux@armlinux.org.uk>, Barry Song <baohua@kernel.org>,
-linux-kernel at vger.kernel.org
+On 2017?05?17? 09:31, zhangfei wrote:
+>
+>
+> On 2017?04?20? 23:57, Rob Herring wrote:
+>> On Tue, Apr 18, 2017 at 09:17:21AM +0800, Zhangfei Gao wrote:
+>>> Add acpu clock, including sft clock controlling hi6220 coresight module
+>>>
+>>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>>> Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
+>>> ---
+>>>   .../devicetree/bindings/clock/hi6220-clock.txt     |  1 +
+>> Acked-by: Rob Herring <robh@kernel.org>
+>
+> Thanks Rob
+>
+> Btw, have tested on 4.12-rc1, the patches can be applied directly.
 
-
-ARCH_ATLAS7 resides in "if ARCH_SIRF ... end", and ARCH_SIRF depends
-on ARCH_MULTI_V7, which selects CPU_V7.
-
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
-
- arch/arm/mach-prima2/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/mach-prima2/Kconfig b/arch/arm/mach-prima2/Kconfig
-index 85e874a..7426211 100644
---- a/arch/arm/mach-prima2/Kconfig
-+++ b/arch/arm/mach-prima2/Kconfig
-@@ -27,7 +27,6 @@ config ARCH_ATLAS7
-        bool "CSR SiRFSoC ATLAS7 ARM Cortex A7 Platform"
-        default y
-        select ARM_GIC
--       select CPU_V7
-        select ATLAS7_TIMER
-        select HAVE_ARM_SCU if SMP
-        select HAVE_SMP
---
-2.7.4
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+Thanks
