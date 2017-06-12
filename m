@@ -1,35 +1,132 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 12 Jun 2017 10:09:39 -0400 (EDT)
-Subject: [PATCH] usb: host: ehci-exynos: Handle return value of
- clk_prepare_enable
-In-Reply-To: <3aa745c2cea5b8a91d10f898bc201121001a9a0b.1497265923.git.arvind.yadav.cs@gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1706121008340.2092-100000@iolanthe.rowland.org>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Mon, 12 Jun 2017 17:13:56 +0300
+Subject: [RFC v2 0/3] Introduce on-chip interconnect API
+Message-ID: <20170612141359.26117-1-georgi.djakov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Jun 2017, Arvind Yadav wrote:
+Modern SoCs have multiple processors and various dedicated cores (video, gpu,
+graphics, modem). These cores are talking to each other and can generate a lot
+of data flowing through the on-chip interconnects. These interconnect buses
+could form different topologies such as crossbar, point to point buses,
+hierarchical buses or use the network-on-chip concept.
 
-> clk_prepare_enable() can fail here and we must check its return value.
-> 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-> ---
->  drivers/usb/host/ehci-exynos.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/usb/host/ehci-exynos.c b/drivers/usb/host/ehci-exynos.c
-> index 7a603f6..26b6411 100644
-> --- a/drivers/usb/host/ehci-exynos.c
-> +++ b/drivers/usb/host/ehci-exynos.c
-> @@ -279,7 +279,9 @@ static int exynos_ehci_resume(struct device *dev)
->  	struct exynos_ehci_hcd *exynos_ehci = to_exynos_ehci(hcd);
->  	int ret;
->  
-> -	clk_prepare_enable(exynos_ehci->clk);
-> +	ret = clk_prepare_enable(exynos_ehci->clk);
-> +	if (ret)
-> +		return ret;
->  
->  	ret = exynos_ehci_phy_enable(dev);
->  	if (ret) {
+These buses have been sized usually to handle use cases with high data
+throughput but it is not necessary all the time and consume a lot of power.
+Furthermore, the priority between masters can vary depending on the running
+use case like video playback or cpu intensive tasks.
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+Having an API to control the requirement of the system in term of bandwidth
+and QoS, so we can adapt the interconnect configuration to match those by
+scaling the frequencies, setting link priority and tuning QoS parameters.
+This configuration can be a static, one-time operation done at boot for some
+platforms or a dynamic set of operations that happen at run-time.
+
+This patchset introduce a new API to get the requirement and configure the
+interconnect buses across the entire chipset to fit with the current demand.
+The API is NOT for changing the performance of the endpoint devices, but only
+the interconnect path in between them.
+
+The API is using a consumer/provider-based model, where the providers are
+the interconnect controllers and the consumers could be various drivers.
+The consumers request interconnect resources (path) to an endpoint and set
+the desired constraints on this data flow path. The provider(s) receive
+requests from consumers and aggregate these requests for all master-slave
+pairs on that path. Then the providers configure each participating in the
+topology node according to the requested data flow path, physical links and
+constraints. The topology could be complicated and multi-tiered and is SoC
+specific.
+
+Below is a simplified diagram of a real-world SoC topology. The interconnect
+providers are the memory front-end and the NoCs.
+
++----------------+    +----------------+
+| HW Accelerator |--->|      M NoC     |<---------------+
++----------------+    +----------------+                |
+                        |      |                    +------------+
+          +-------------+      V       +------+     |            |
+          |                +--------+  | PCIe |     |            |
+          |                | Slaves |  +------+     |            |
+          |                +--------+     |         |   C NoC    |
+          V                               V         |            |
++------------------+   +------------------------+   |            |   +-----+
+|                  |-->|                        |-->|            |-->| CPU |
+|                  |-->|                        |<--|            |   +-----+
+|      Memory      |   |         S NoC          |   +------------+
+|                  |<--|                        |---------+    |
+|                  |<--|                        |<------+ |    |   +--------+
++------------------+   +------------------------+       | |    +-->| Slaves |
+   ^     ^    ^           ^                             | |        +--------+
+   |     |    |           |                             | V
++-----+  |  +-----+    +-----+  +---------+   +----------------+   +--------+
+| CPU |  |  | GPU |    | DSP |  | Masters |-->|       P NoC    |-->| Slaves |
++-----+  |  +-----+    +-----+  +---------+   +----------------+   +--------+
+         |
+     +-------+
+     | Modem |
+     +-------+
+
+This RFC does not implement all features but only main skeleton to check the
+validity of the proposal.
+
+TODO:
+ * Constraints are currently stored in internal data structure. Should PM QoS
+ be used instead?
+ * Extend interconect_set() to handle parameters such as latency and other QoS
+   values.
+ * Cache the path between the nodes instead of walking the graph on each get().
+ * Sync interconnect requests with the idle state of the device.
+
+Summary of the patches:
+Patch 1 introduces the interconnect API.
+Patch 2 creates the first vendor specific interconnect controller driver.
+Patch 3 is a proposal for DT bindings
+
+Changes since RFC v1 (https://lkml.org/lkml/2017/5/15/605)
+* Refactored code into shorter functions.
+* Added a new aggregate() API function.
+* Rearranged some structs to reduce padding bytes.
+
+Changes since RFC v0 (https://lkml.org/lkml/2017/3/1/599)
+* Removed DT support and added optional Patch 3 with new bindings proposal.
+* Converted the topology into internal driver data.
+* Made the framework modular.
+* interconnect_get() now takes (src and dst ports as arguments).
+* Removed public declarations of some structs.
+* Now passing prev/next nodes to the vendor driver.
+* Properly remove requests on _put().
+* Added refcounting.
+* Updated documentation.
+* Changed struct interconnect_path to use array instead of linked list.
+
+
+Georgi Djakov (3):
+  interconnect: Add generic interconnect controller API
+  interconnect: Add Qualcomm msm8916 interconnect provider driver
+  dt-binding: Interconnect device-tree bindings draft
+
+ .../bindings/interconnect/interconnect.txt         |  75 ++++
+ Documentation/interconnect/interconnect.txt        |  65 ++++
+ drivers/Kconfig                                    |   2 +
+ drivers/Makefile                                   |   1 +
+ drivers/interconnect/Kconfig                       |  15 +
+ drivers/interconnect/Makefile                      |   2 +
+ drivers/interconnect/interconnect.c                | 376 +++++++++++++++++++
+ drivers/interconnect/qcom/Kconfig                  |  12 +
+ drivers/interconnect/qcom/Makefile                 |   2 +
+ drivers/interconnect/qcom/interconnect_msm8916.c   | 417 +++++++++++++++++++++
+ include/dt-bindings/interconnect/qcom,msm8916.h    |  87 +++++
+ include/linux/interconnect-consumer.h              |  72 ++++
+ include/linux/interconnect-provider.h              | 120 ++++++
+ 13 files changed, 1246 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interconnect/interconnect.txt
+ create mode 100644 Documentation/interconnect/interconnect.txt
+ create mode 100644 drivers/interconnect/Kconfig
+ create mode 100644 drivers/interconnect/Makefile
+ create mode 100644 drivers/interconnect/interconnect.c
+ create mode 100644 drivers/interconnect/qcom/Kconfig
+ create mode 100644 drivers/interconnect/qcom/Makefile
+ create mode 100644 drivers/interconnect/qcom/interconnect_msm8916.c
+ create mode 100644 include/dt-bindings/interconnect/qcom,msm8916.h
+ create mode 100644 include/linux/interconnect-consumer.h
+ create mode 100644 include/linux/interconnect-provider.h
