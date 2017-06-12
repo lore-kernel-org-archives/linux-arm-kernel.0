@@ -1,12 +1,11 @@
 From: dmitry.rezvanov@yandex.ru (Dmitry Rezvanov)
-Date: Tue, 13 Jun 2017 03:58:39 +0900
-Subject: [PATCH] Signed-off-by: Dmitry Rezvanov <dmitry.rezvanov@yandex.ru>
-Message-ID: <20170612185839.17434-1-dmitry.rezvanov@yandex.ru>
+Date: Tue, 13 Jun 2017 04:43:14 +0900
+Subject: [PATCH] ARM: dts: at91: add support DT for AC97 driver for at91sam9g45
+Message-ID: <20170612194314.19289-1-dmitry.rezvanov@yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ALSA: sound/atmel/ac97c.c: add support DT for at91sam9m10g45ek
-ARM: at91/dt: add DT structure for AC97 driver for at91sam9g45
+Signed-off-by: Dmitry Rezvanov <dmitry.rezvanov@yandex.ru>
 ---
  arch/arm/boot/dts/at91sam9g45.dtsi     | 23 +++++++++++++++++++++--
  arch/arm/boot/dts/at91sam9m10g45ek.dts | 10 +++++++---
