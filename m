@@ -1,589 +1,345 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Mon, 12 Jun 2017 17:13:58 +0300
-Subject: [RFC v2 2/3] interconnect: Add Qualcomm msm8916 interconnect provider
- driver
-In-Reply-To: <20170612141359.26117-1-georgi.djakov@linaro.org>
-References: <20170612141359.26117-1-georgi.djakov@linaro.org>
-Message-ID: <20170612141359.26117-3-georgi.djakov@linaro.org>
+From: yuval.shaia@oracle.com (Yuval Shaia)
+Date: Mon, 12 Jun 2017 17:15:08 +0300
+Subject: [PATCH v2] net: phy: Make phy_ethtool_ksettings_get return void
+Message-ID: <20170612141508.29229-1-yuval.shaia@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add driver for the Qualcomm interconnect controllers found in
-msm8916 based platforms.
+Make return value void since function never return meaningfull value
 
-Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+Signed-off-by: Yuval Shaia <yuval.shaia@oracle.com>
+Acked-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 ---
- drivers/interconnect/Kconfig                     |   5 +
- drivers/interconnect/Makefile                    |   1 +
- drivers/interconnect/qcom/Kconfig                |  12 +
- drivers/interconnect/qcom/Makefile               |   2 +
- drivers/interconnect/qcom/interconnect_msm8916.c | 417 +++++++++++++++++++++++
- include/dt-bindings/interconnect/qcom,msm8916.h  |  87 +++++
- 6 files changed, 524 insertions(+)
- create mode 100644 drivers/interconnect/qcom/Kconfig
- create mode 100644 drivers/interconnect/qcom/Makefile
- create mode 100644 drivers/interconnect/qcom/interconnect_msm8916.c
- create mode 100644 include/dt-bindings/interconnect/qcom,msm8916.h
+v0 ->v1:
+	* These files were missing in v0
+		* drivers/net/ethernet/renesas/ravb_main.c
+		* drivers/net/ethernet/renesas/sh_eth.c
+		* drivers/net/ethernet/ti/netcp_ethss.c
+	* Add Acked-by: Sergei Shtylyov
+v1 -> v2:
+	* Adjust to net-next tree
+---
+ drivers/net/ethernet/broadcom/b44.c                |  3 ++-
+ drivers/net/ethernet/broadcom/bcm63xx_enet.c       |  3 ++-
+ drivers/net/ethernet/broadcom/genet/bcmgenet.c     |  4 +++-
+ drivers/net/ethernet/broadcom/tg3.c                |  4 +++-
+ drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c |  6 ++----
+ drivers/net/ethernet/freescale/ucc_geth_ethtool.c  |  4 +++-
+ drivers/net/ethernet/marvell/mv643xx_eth.c         |  5 ++---
+ drivers/net/ethernet/renesas/ravb_main.c           | 14 +++++++-------
+ drivers/net/ethernet/renesas/sh_eth.c              |  5 ++---
+ drivers/net/ethernet/ti/cpsw.c                     |  9 +++++----
+ drivers/net/ethernet/ti/netcp_ethss.c              |  8 +++-----
+ drivers/net/phy/phy.c                              | 10 +++++-----
+ drivers/net/usb/lan78xx.c                          |  2 +-
+ include/linux/phy.h                                |  4 ++--
+ net/dsa/slave.c                                    |  9 +++++----
+ 15 files changed, 47 insertions(+), 43 deletions(-)
 
-diff --git a/drivers/interconnect/Kconfig b/drivers/interconnect/Kconfig
-index 1e50e951cdc1..b123a76e2f9d 100644
---- a/drivers/interconnect/Kconfig
-+++ b/drivers/interconnect/Kconfig
-@@ -8,3 +8,8 @@ menuconfig INTERCONNECT
+diff --git a/drivers/net/ethernet/broadcom/b44.c b/drivers/net/ethernet/broadcom/b44.c
+index 5b95bb4..9873d2d 100644
+--- a/drivers/net/ethernet/broadcom/b44.c
++++ b/drivers/net/ethernet/broadcom/b44.c
+@@ -1836,7 +1836,8 @@ static int b44_get_link_ksettings(struct net_device *dev,
  
- 	  If unsure, say no.
+ 	if (bp->flags & B44_FLAG_EXTERNAL_PHY) {
+ 		BUG_ON(!dev->phydev);
+-		return phy_ethtool_ksettings_get(dev->phydev, cmd);
++		phy_ethtool_ksettings_get(dev->phydev, cmd);
++		return 0;
+ 	}
  
-+if INTERCONNECT
-+
-+source "drivers/interconnect/qcom/Kconfig"
-+
-+endif
-diff --git a/drivers/interconnect/Makefile b/drivers/interconnect/Makefile
-index d9da6a6c3560..62a01de24aeb 100644
---- a/drivers/interconnect/Makefile
-+++ b/drivers/interconnect/Makefile
-@@ -1 +1,2 @@
- obj-$(CONFIG_INTERCONNECT)  += interconnect.o
-+obj-$(CONFIG_INTERCONNECT_QCOM)                += qcom/
-diff --git a/drivers/interconnect/qcom/Kconfig b/drivers/interconnect/qcom/Kconfig
-new file mode 100644
-index 000000000000..d96dbf5fd547
---- /dev/null
-+++ b/drivers/interconnect/qcom/Kconfig
-@@ -0,0 +1,12 @@
-+config INTERCONNECT_QCOM
-+	bool "Qualcomm Network-on-Chip interconnect drivers"
-+	depends on OF
-+	depends on ARCH_QCOM || COMPILE_TEST
-+	default y
-+
-+config INTERCONNECT_QCOM_MSM8916
-+	tristate "Qualcomm MSM8916 interconnect driver"
-+	depends on INTERCONNECT_QCOM
-+	help
-+	  This is a driver for the Qualcomm Network-on-Chip on msm8916-based platforms.
-+
-diff --git a/drivers/interconnect/qcom/Makefile b/drivers/interconnect/qcom/Makefile
-new file mode 100644
-index 000000000000..e5bf8e2b92ac
---- /dev/null
-+++ b/drivers/interconnect/qcom/Makefile
-@@ -0,0 +1,2 @@
-+obj-$(CONFIG_INTERCONNECT_QCOM_MSM8916) += interconnect_msm8916.o
-+
-diff --git a/drivers/interconnect/qcom/interconnect_msm8916.c b/drivers/interconnect/qcom/interconnect_msm8916.c
-new file mode 100644
-index 000000000000..b84fae2aa74e
---- /dev/null
-+++ b/drivers/interconnect/qcom/interconnect_msm8916.c
-@@ -0,0 +1,417 @@
-+/*
-+ * Copyright (C) 2017 Linaro Ltd
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <asm/div64.h>
-+#include <linux/clk.h>
-+#include <linux/device.h>
-+#include <linux/io.h>
-+#include <linux/interconnect-provider.h>
-+#include <linux/module.h>
-+#include <linux/of_device.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+#include <dt-bindings/interconnect/qcom,msm8916.h>
-+
-+#define to_qcom_icp(_icp) \
-+	container_of(_icp, struct qcom_interconnect_provider, icp)
-+#define to_qcom_node(_node) \
-+	container_of(_node, struct qcom_interconnect_node, node)
-+
-+enum qcom_bus_type {
-+	QCOM_BUS_TYPE_NOC = 0,
-+	QCOM_BUS_TYPE_MEM,
-+	QCOM_BUS_TYPE_MAX,
-+};
-+
-+struct qcom_interconnect_provider {
-+	struct icp		icp;
-+	void __iomem		*base;
-+	enum qcom_bus_type	type;
-+	u32			base_offset;
-+	u32			qos_offset;
-+	struct clk		*bus_clk;
-+	struct clk		*bus_a_clk;
-+};
-+
-+struct qcom_interconnect_node {
-+	struct interconnect_node node;
-+	unsigned char *name;
-+	struct interconnect_node *links[8];
-+	u16 id;
-+	u16 num_links;
-+	u16 port;
-+	u16 buswidth;
-+	u64 rate;
-+};
-+
-+static struct qcom_interconnect_node snoc_int_0;
-+static struct qcom_interconnect_node snoc_int_1;
-+static struct qcom_interconnect_node snoc_int_bimc;
-+static struct qcom_interconnect_node snoc_bimc_0_mas;
-+static struct qcom_interconnect_node pnoc_snoc_slv;
-+
-+static struct qcom_interconnect_node snoc_bimc_0_slv;
-+static struct qcom_interconnect_node slv_ebi_ch0;
-+
-+static struct qcom_interconnect_node pnoc_int_1;
-+static struct qcom_interconnect_node mas_pnoc_sdcc_1;
-+static struct qcom_interconnect_node mas_pnoc_sdcc_2;
-+static struct qcom_interconnect_node pnoc_snoc_mas;
-+
-+struct qcom_interconnect_desc {
-+	struct qcom_interconnect_node **nodes;
-+	size_t num_nodes;
-+};
-+
-+static struct qcom_interconnect_node snoc_int_0 = {
-+	.id = 10004,
-+	.name = "snoc-int-0",
-+	/*.links = { &snoc_pnoc_mas.node },
-+	.num_links = 1,*/
-+	.buswidth = 8,
-+};
-+
-+static struct qcom_interconnect_node snoc_int_1 = {
-+	.id = 10005,
-+	.name = "snoc-int-1",
-+	/*.links = { &slv_apss.node, &slv_cats_0.node, &slv_cats_1.node },
-+	.num_links = 3,*/
-+	.buswidth = 8,
-+};
-+
-+static struct qcom_interconnect_node snoc_int_bimc = {
-+	.id = 10006,
-+	.name = "snoc-bimc",
-+	.links = { &snoc_bimc_0_mas.node },
-+	.num_links = 1,
-+	.buswidth = 8,
-+};
-+
-+static struct qcom_interconnect_node snoc_bimc_0_mas = {
-+	.id = 10007,
-+	.name = "snoc-bimc-0-mas",
-+	.links = { &snoc_bimc_0_slv.node },
-+	.num_links = 1,
-+	.buswidth = 8,
-+};
-+
-+static struct qcom_interconnect_node pnoc_snoc_slv = {
-+	.id = 10011,
-+	.name = "snoc-pnoc",
-+	.links = { &snoc_int_0.node, &snoc_int_bimc.node, &snoc_int_1.node },
-+	.num_links = 3,
-+	.buswidth = 8,
-+};
-+
-+static struct qcom_interconnect_node *msm8916_snoc_nodes[] = {
-+	[SNOC_INT_0] = &snoc_int_0,
-+	[SNOC_INT_1] = &snoc_int_1,
-+	[SNOC_INT_BIMC] = &snoc_int_bimc,
-+	[SNOC_BIMC_0_MAS] = &snoc_bimc_0_mas,
-+	[PNOC_SNOC_SLV] = &pnoc_snoc_slv,
-+};
-+
-+static struct qcom_interconnect_desc msm8916_snoc = {
-+	.nodes = msm8916_snoc_nodes,
-+	.num_nodes = ARRAY_SIZE(msm8916_snoc_nodes),
-+};
-+
-+static struct qcom_interconnect_node snoc_bimc_0_slv = {
-+	.id = 10025,
-+	.name = "snoc_bimc_0_slv",
-+	.links = { &slv_ebi_ch0.node },
-+	.num_links = 1,
-+	.buswidth = 8,
-+};
-+
-+static struct qcom_interconnect_node slv_ebi_ch0 = {
-+	.id = 512,
-+	.name = "slv-ebi-ch0",
-+	.buswidth = 8,
-+};
-+
-+static struct qcom_interconnect_node *msm8916_bimc_nodes[] = {
-+	[SNOC_BIMC_0_SLV] = &snoc_bimc_0_slv,
-+	[SLV_EBI_CH0] = &slv_ebi_ch0,
-+};
-+
-+static struct qcom_interconnect_desc msm8916_bimc = {
-+	.nodes = msm8916_bimc_nodes,
-+	.num_nodes = ARRAY_SIZE(msm8916_bimc_nodes),
-+};
-+
-+static struct qcom_interconnect_node pnoc_int_1 = {
-+	.id = 10013,
-+	.name = "pnoc-int-1",
-+	.links = { &pnoc_snoc_mas.node },
-+	.num_links = 1,
-+	.buswidth = 8,
-+};
-+
-+static struct qcom_interconnect_node mas_pnoc_sdcc_1 = {
-+	.id = 78,
-+	.name = "mas-pnoc-sdcc-1",
-+	.links = { &pnoc_int_1.node },
-+	.num_links = 1,
-+	.port = 7,
-+	.buswidth = 8,
-+};
-+
-+static struct qcom_interconnect_node mas_pnoc_sdcc_2 = {
-+	.id = 81,
-+	.name = "mas-pnoc-sdcc-2",
-+	.links = { &pnoc_int_1.node },
-+	.num_links = 1,
-+	.port = 8,
-+	.buswidth = 8,
-+};
-+
-+static struct qcom_interconnect_node pnoc_snoc_mas = {
-+	.id = 10010,
-+	.name = "pnoc-snoc-mas",
-+	.links = { &pnoc_snoc_slv.node },
-+	.num_links = 1,
-+	.buswidth = 8,
-+};
-+
-+static struct qcom_interconnect_node *msm8916_pnoc_nodes[] = {
-+	[PNOC_INT_1] = &pnoc_int_1,
-+	[MAS_PNOC_SDCC_1] = &mas_pnoc_sdcc_1,
-+	[MAS_PNOC_SDCC_2] = &mas_pnoc_sdcc_2,
-+	[PNOC_SNOC_MAS] = &pnoc_snoc_mas,
-+};
-+
-+static struct qcom_interconnect_desc msm8916_pnoc = {
-+	.nodes = msm8916_pnoc_nodes,
-+	.num_nodes = ARRAY_SIZE(msm8916_pnoc_nodes),
-+};
-+
-+static int qcom_interconnect_init(struct interconnect_node *node)
-+{
-+	struct qcom_interconnect_node *qn = to_qcom_node(node);
-+	int ret = 0;
-+
-+	/* populate default values */
-+	if (!qn->buswidth)
-+		qn->buswidth = 8;
-+
-+	/* TODO: init qos and priority */
-+
-+	return ret;
-+}
-+
-+static int qcom_interconnect_aggregate(struct interconnect_node *node,
-+				       struct interconnect_creq *creq)
-+{
-+	struct interconnect_node *n;
-+	struct interconnect_req *r;
-+	struct icp *icp = node->icp;
-+	u32 avg_bw = 0;
-+	u32 max_bw = 0;
-+
-+	list_for_each_entry(n, &node->icp->nodes, icn_list) {
-+		hlist_for_each_entry(r, &n->req_list, req_node) {
-+			if (n == node) {
-+				/* update constraints */
-+				r->avg_bw = creq->avg_bw;
-+				r->max_bw = creq->max_bw;
-+			}
-+			avg_bw += r->avg_bw;
-+			max_bw = max(max_bw, r->max_bw);
-+		}
-+	}
-+
-+	/* save the aggregated values */
-+	icp->creq.avg_bw = avg_bw;
-+	icp->creq.max_bw = max_bw;
+ 	supported = (SUPPORTED_Autoneg);
+diff --git a/drivers/net/ethernet/broadcom/bcm63xx_enet.c b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
+index 50d88d3..34ebb40 100644
+--- a/drivers/net/ethernet/broadcom/bcm63xx_enet.c
++++ b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
+@@ -1453,7 +1453,8 @@ static int bcm_enet_get_link_ksettings(struct net_device *dev,
+ 	if (priv->has_phy) {
+ 		if (!dev->phydev)
+ 			return -ENODEV;
+-		return phy_ethtool_ksettings_get(dev->phydev, cmd);
++		phy_ethtool_ksettings_get(dev->phydev, cmd);
++		return 0;
+ 	} else {
+ 		cmd->base.autoneg = 0;
+ 		cmd->base.speed = (priv->force_speed_100) ?
+diff --git a/drivers/net/ethernet/broadcom/genet/bcmgenet.c b/drivers/net/ethernet/broadcom/genet/bcmgenet.c
+index a205a9f..daca1c9 100644
+--- a/drivers/net/ethernet/broadcom/genet/bcmgenet.c
++++ b/drivers/net/ethernet/broadcom/genet/bcmgenet.c
+@@ -477,7 +477,9 @@ static int bcmgenet_get_link_ksettings(struct net_device *dev,
+ 	if (!priv->phydev)
+ 		return -ENODEV;
+ 
+-	return phy_ethtool_ksettings_get(priv->phydev, cmd);
++	phy_ethtool_ksettings_get(priv->phydev, cmd);
 +
 +	return 0;
-+}
+ }
+ 
+ static int bcmgenet_set_link_ksettings(struct net_device *dev,
+diff --git a/drivers/net/ethernet/broadcom/tg3.c b/drivers/net/ethernet/broadcom/tg3.c
+index 537d571..d600c41 100644
+--- a/drivers/net/ethernet/broadcom/tg3.c
++++ b/drivers/net/ethernet/broadcom/tg3.c
+@@ -12097,7 +12097,9 @@ static int tg3_get_link_ksettings(struct net_device *dev,
+ 		if (!(tp->phy_flags & TG3_PHYFLG_IS_CONNECTED))
+ 			return -EAGAIN;
+ 		phydev = mdiobus_get_phy(tp->mdio_bus, tp->phy_addr);
+-		return phy_ethtool_ksettings_get(phydev, cmd);
++		phy_ethtool_ksettings_get(phydev, cmd);
 +
-+static int qcom_interconnect_set(struct interconnect_node *src,
-+				 struct interconnect_node *dst,
-+				 struct interconnect_creq *creq)
-+{
-+	struct qcom_interconnect_provider *qicp;
-+	struct qcom_interconnect_node *qn;
-+	struct interconnect_node *node;
-+	struct icp *icp;
-+	u64 rate = 0;
-+	int ret = 0;
++		return 0;
+ 	}
+ 
+ 	supported = (SUPPORTED_Autoneg);
+diff --git a/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c b/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
+index 15571e2..aad825088 100644
+--- a/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
++++ b/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
+@@ -75,16 +75,14 @@ static char dpaa_stats_global[][ETH_GSTRING_LEN] = {
+ static int dpaa_get_link_ksettings(struct net_device *net_dev,
+ 				   struct ethtool_link_ksettings *cmd)
+ {
+-	int err;
+-
+ 	if (!net_dev->phydev) {
+ 		netdev_dbg(net_dev, "phy device not initialized\n");
+ 		return 0;
+ 	}
+ 
+-	err = phy_ethtool_ksettings_get(net_dev->phydev, cmd);
++	phy_ethtool_ksettings_get(net_dev->phydev, cmd);
+ 
+-	return err;
++	return 0;
+ }
+ 
+ static int dpaa_set_link_ksettings(struct net_device *net_dev,
+diff --git a/drivers/net/ethernet/freescale/ucc_geth_ethtool.c b/drivers/net/ethernet/freescale/ucc_geth_ethtool.c
+index b642990..4df282e 100644
+--- a/drivers/net/ethernet/freescale/ucc_geth_ethtool.c
++++ b/drivers/net/ethernet/freescale/ucc_geth_ethtool.c
+@@ -113,7 +113,9 @@ uec_get_ksettings(struct net_device *netdev, struct ethtool_link_ksettings *cmd)
+ 	if (!phydev)
+ 		return -ENODEV;
+ 
+-	return phy_ethtool_ksettings_get(phydev, cmd);
++	phy_ethtool_ksettings_get(phydev, cmd);
 +
-+	if (!src && !dst)
++	return 0;
+ }
+ 
+ static int
+diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
+index 25642de..5794d98 100644
+--- a/drivers/net/ethernet/marvell/mv643xx_eth.c
++++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
+@@ -1501,10 +1501,9 @@ mv643xx_eth_get_link_ksettings_phy(struct mv643xx_eth_private *mp,
+ 				   struct ethtool_link_ksettings *cmd)
+ {
+ 	struct net_device *dev = mp->dev;
+-	int err;
+ 	u32 supported, advertising;
+ 
+-	err = phy_ethtool_ksettings_get(dev->phydev, cmd);
++	phy_ethtool_ksettings_get(dev->phydev, cmd);
+ 
+ 	/*
+ 	 * The MAC does not support 1000baseT_Half.
+@@ -1520,7 +1519,7 @@ mv643xx_eth_get_link_ksettings_phy(struct mv643xx_eth_private *mp,
+ 	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
+ 						advertising);
+ 
+-	return err;
++	return 0;
+ }
+ 
+ static int
+diff --git a/drivers/net/ethernet/renesas/ravb_main.c b/drivers/net/ethernet/renesas/ravb_main.c
+index 784782d..5931e85 100644
+--- a/drivers/net/ethernet/renesas/ravb_main.c
++++ b/drivers/net/ethernet/renesas/ravb_main.c
+@@ -1076,16 +1076,16 @@ static int ravb_get_link_ksettings(struct net_device *ndev,
+ 				   struct ethtool_link_ksettings *cmd)
+ {
+ 	struct ravb_private *priv = netdev_priv(ndev);
+-	int error = -ENODEV;
+ 	unsigned long flags;
+ 
+-	if (ndev->phydev) {
+-		spin_lock_irqsave(&priv->lock, flags);
+-		error = phy_ethtool_ksettings_get(ndev->phydev, cmd);
+-		spin_unlock_irqrestore(&priv->lock, flags);
+-	}
++	if (!ndev->phydev)
 +		return -ENODEV;
+ 
+-	return error;
++	spin_lock_irqsave(&priv->lock, flags);
++	phy_ethtool_ksettings_get(ndev->phydev, cmd);
++	spin_unlock_irqrestore(&priv->lock, flags);
 +
-+	if (!src)
-+		node = dst;
-+	else
-+		node = src;
-+
-+	qn = to_qcom_node(node);
-+	icp = qn->node.icp;
-+	qicp = to_qcom_icp(node->icp);
-+
-+	rate = max(icp->creq.avg_bw, icp->creq.max_bw);
-+
-+	do_div(rate, qn->buswidth);
-+
-+	if (qn->rate != rate) {
-+		ret = clk_set_rate(qicp->bus_clk, rate);
-+		if (ret) {
-+			pr_err("set clk rate %lld error %d\n", rate, ret);
-+			return ret;
-+		}
-+
-+		ret = clk_set_rate(qicp->bus_a_clk, rate);
-+		if (ret) {
-+			pr_err("set clk rate %lld error %d\n", rate, ret);
-+			return ret;
-+		}
-+
-+		qn->rate = rate;
++	return 0;
+ }
+ 
+ static int ravb_set_link_ksettings(struct net_device *ndev,
+diff --git a/drivers/net/ethernet/renesas/sh_eth.c b/drivers/net/ethernet/renesas/sh_eth.c
+index 2d686cc..b2f0cea 100644
+--- a/drivers/net/ethernet/renesas/sh_eth.c
++++ b/drivers/net/ethernet/renesas/sh_eth.c
+@@ -1915,16 +1915,15 @@ static int sh_eth_get_link_ksettings(struct net_device *ndev,
+ {
+ 	struct sh_eth_private *mdp = netdev_priv(ndev);
+ 	unsigned long flags;
+-	int ret;
+ 
+ 	if (!ndev->phydev)
+ 		return -ENODEV;
+ 
+ 	spin_lock_irqsave(&mdp->lock, flags);
+-	ret = phy_ethtool_ksettings_get(ndev->phydev, cmd);
++	phy_ethtool_ksettings_get(ndev->phydev, cmd);
+ 	spin_unlock_irqrestore(&mdp->lock, flags);
+ 
+-	return ret;
++	return 0;
+ }
+ 
+ static int sh_eth_set_link_ksettings(struct net_device *ndev,
+diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+index b6a0d92..f72742d 100644
+--- a/drivers/net/ethernet/ti/cpsw.c
++++ b/drivers/net/ethernet/ti/cpsw.c
+@@ -2170,11 +2170,12 @@ static int cpsw_get_link_ksettings(struct net_device *ndev,
+ 	struct cpsw_common *cpsw = priv->cpsw;
+ 	int slave_no = cpsw_slave_index(cpsw, priv);
+ 
+-	if (cpsw->slaves[slave_no].phy)
+-		return phy_ethtool_ksettings_get(cpsw->slaves[slave_no].phy,
+-						 ecmd);
+-	else
++	if (cpsw->slaves[slave_no].phy) {
++		phy_ethtool_ksettings_get(cpsw->slaves[slave_no].phy, ecmd);
++		return 0;
++	} else {
+ 		return -EOPNOTSUPP;
 +	}
+ }
+ 
+ static int cpsw_set_link_ksettings(struct net_device *ndev,
+diff --git a/drivers/net/ethernet/ti/netcp_ethss.c b/drivers/net/ethernet/ti/netcp_ethss.c
+index dd92950..0847a8f 100644
+--- a/drivers/net/ethernet/ti/netcp_ethss.c
++++ b/drivers/net/ethernet/ti/netcp_ethss.c
+@@ -1927,7 +1927,6 @@ static int keystone_get_link_ksettings(struct net_device *ndev,
+ 	struct netcp_intf *netcp = netdev_priv(ndev);
+ 	struct phy_device *phy = ndev->phydev;
+ 	struct gbe_intf *gbe_intf;
+-	int ret;
+ 
+ 	if (!phy)
+ 		return -EINVAL;
+@@ -1939,11 +1938,10 @@ static int keystone_get_link_ksettings(struct net_device *ndev,
+ 	if (!gbe_intf->slave)
+ 		return -EINVAL;
+ 
+-	ret = phy_ethtool_ksettings_get(phy, cmd);
+-	if (!ret)
+-		cmd->base.port = gbe_intf->slave->phy_port_t;
++	phy_ethtool_ksettings_get(phy, cmd);
++	cmd->base.port = gbe_intf->slave->phy_port_t;
+ 
+-	return ret;
++	return 0;
+ }
+ 
+ static int keystone_set_link_ksettings(struct net_device *ndev,
+diff --git a/drivers/net/phy/phy.c b/drivers/net/phy/phy.c
+index 14fc5bc..edcdf0d 100644
+--- a/drivers/net/phy/phy.c
++++ b/drivers/net/phy/phy.c
+@@ -509,8 +509,8 @@ int phy_ethtool_ksettings_set(struct phy_device *phydev,
+ }
+ EXPORT_SYMBOL(phy_ethtool_ksettings_set);
+ 
+-int phy_ethtool_ksettings_get(struct phy_device *phydev,
+-			      struct ethtool_link_ksettings *cmd)
++void phy_ethtool_ksettings_get(struct phy_device *phydev,
++			       struct ethtool_link_ksettings *cmd)
+ {
+ 	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
+ 						phydev->supported);
+@@ -532,8 +532,6 @@ int phy_ethtool_ksettings_get(struct phy_device *phydev,
+ 	cmd->base.autoneg = phydev->autoneg;
+ 	cmd->base.eth_tp_mdix_ctrl = phydev->mdix_ctrl;
+ 	cmd->base.eth_tp_mdix = phydev->mdix;
+-
+-	return 0;
+ }
+ EXPORT_SYMBOL(phy_ethtool_ksettings_get);
+ 
+@@ -1449,7 +1447,9 @@ int phy_ethtool_get_link_ksettings(struct net_device *ndev,
+ 	if (!phydev)
+ 		return -ENODEV;
+ 
+-	return phy_ethtool_ksettings_get(phydev, cmd);
++	phy_ethtool_ksettings_get(phydev, cmd);
 +
-+	return ret;
-+}
++	return 0;
+ }
+ EXPORT_SYMBOL(phy_ethtool_get_link_ksettings);
+ 
+diff --git a/drivers/net/usb/lan78xx.c b/drivers/net/usb/lan78xx.c
+index 9eff97a..5833f7e 100644
+--- a/drivers/net/usb/lan78xx.c
++++ b/drivers/net/usb/lan78xx.c
+@@ -1490,7 +1490,7 @@ static int lan78xx_get_link_ksettings(struct net_device *net,
+ 	if (ret < 0)
+ 		return ret;
+ 
+-	ret = phy_ethtool_ksettings_get(phydev, cmd);
++	phy_ethtool_ksettings_get(phydev, cmd);
+ 
+ 	usb_autopm_put_interface(dev->intf);
+ 
+diff --git a/include/linux/phy.h b/include/linux/phy.h
+index 4142422..e70360a 100644
+--- a/include/linux/phy.h
++++ b/include/linux/phy.h
+@@ -874,8 +874,8 @@ void phy_start_machine(struct phy_device *phydev);
+ void phy_stop_machine(struct phy_device *phydev);
+ void phy_trigger_machine(struct phy_device *phydev, bool sync);
+ int phy_ethtool_sset(struct phy_device *phydev, struct ethtool_cmd *cmd);
+-int phy_ethtool_ksettings_get(struct phy_device *phydev,
+-			      struct ethtool_link_ksettings *cmd);
++void phy_ethtool_ksettings_get(struct phy_device *phydev,
++			       struct ethtool_link_ksettings *cmd);
+ int phy_ethtool_ksettings_set(struct phy_device *phydev,
+ 			      const struct ethtool_link_ksettings *cmd);
+ int phy_mii_ioctl(struct phy_device *phydev, struct ifreq *ifr, int cmd);
+diff --git a/net/dsa/slave.c b/net/dsa/slave.c
+index 5f3caee..5e45ae5 100644
+--- a/net/dsa/slave.c
++++ b/net/dsa/slave.c
+@@ -387,12 +387,13 @@ dsa_slave_get_link_ksettings(struct net_device *dev,
+ 			     struct ethtool_link_ksettings *cmd)
+ {
+ 	struct dsa_slave_priv *p = netdev_priv(dev);
+-	int err = -EOPNOTSUPP;
+ 
+-	if (p->phy != NULL)
+-		err = phy_ethtool_ksettings_get(p->phy, cmd);
++	if (!p->phy)
++		return -EOPNOTSUPP;
+ 
+-	return err;
++	phy_ethtool_ksettings_get(p->phy, cmd);
 +
-+struct interconnect_onecell_data {
-+	struct interconnect_node **nodes;
-+	unsigned int num_nodes;
-+};
-+
-+static const struct icp_ops qcom_ops = {
-+	.aggregate = qcom_interconnect_aggregate,
-+	.set = qcom_interconnect_set,
-+};
-+
-+static int qnoc_probe(struct platform_device *pdev)
-+{
-+	struct qcom_interconnect_provider *qicp;
-+	struct icp *icp;
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
-+	struct resource *res;
-+	void __iomem *base;
-+	struct clk *bus_clk, *bus_a_clk;
-+	size_t num_nodes, i;
-+	const struct qcom_interconnect_desc *desc;
-+	struct qcom_interconnect_node **qnodes;
-+	struct interconnect_node *nodes;
-+	struct interconnect_onecell_data *data;
-+	u32 type, base_offset, qos_offset = 0;
-+
-+	desc = of_device_get_match_data(&pdev->dev);
-+	if (!desc)
-+		return -EINVAL;
-+
-+	qnodes = desc->nodes;
-+	num_nodes = desc->num_nodes;
-+
-+	qicp = devm_kzalloc(dev, sizeof(*qicp), GFP_KERNEL);
-+	if (!qicp)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
-+
-+	bus_clk = devm_clk_get(&pdev->dev, "bus_clk");
-+	if (IS_ERR(bus_clk))
-+		return PTR_ERR(bus_clk);
-+	bus_a_clk = devm_clk_get(&pdev->dev, "bus_a_clk");
-+	if (IS_ERR(bus_a_clk))
-+		return PTR_ERR(bus_a_clk);
-+
-+	of_property_read_u32(np, "type", &type);
-+	of_property_read_u32(np, "base-offset", &base_offset);
-+	of_property_read_u32(np, "qos-offset", &qos_offset);
-+
-+	qicp->base = base;
-+	qicp->type = type;
-+	qicp->base_offset = base_offset;
-+	qicp->qos_offset = qos_offset;
-+	qicp->bus_clk = bus_clk;
-+	qicp->bus_a_clk = bus_a_clk;
-+	icp = &qicp->icp;
-+	icp->dev = dev;
-+	icp->ops = &qcom_ops;
-+	INIT_LIST_HEAD(&icp->nodes);
-+
-+	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
-+	if (!data)
-+		return -ENOMEM;
-+
-+	icp->data = data;
-+	data->num_nodes = num_nodes;
-+
-+	data->nodes = devm_kcalloc(dev, num_nodes, sizeof(*nodes), GFP_KERNEL);
-+	if (!data->nodes)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < num_nodes; i++) {
-+		struct interconnect_node *node;
-+		int ret;
-+		size_t j;
-+
-+		if (!qnodes[i])
-+			continue;
-+
-+		node = &qnodes[i]->node;
-+		node->dev_id = kstrdup_const(qnodes[i]->name, GFP_KERNEL);
-+		node->con_id = qnodes[i]->id;
-+		node->icp = icp;
-+		node->num_links = qnodes[i]->num_links;
-+		node->links = devm_kcalloc(dev, node->num_links,
-+				sizeof(*node->links), GFP_KERNEL);
-+		if (!node->links)
-+			return -ENOMEM;
-+
-+		/* populate links */
-+		for (j = 0; j < node->num_links; j++)
-+			node->links[j] = qnodes[i]->links[j];
-+
-+		/* add node to interconnect provider */
-+		data->nodes[i] = node;
-+		list_add_tail(&node->icn_list, &icp->nodes);
-+		dev_dbg(&pdev->dev, "registered node %p %s %d\n", node,
-+			node->dev_id, node->con_id);
-+
-+		ret = qcom_interconnect_init(node);
-+		if (ret)
-+			dev_err(&pdev->dev, "node init error (%d)\n", ret);
-+	}
-+
-+	return interconnect_add_provider(icp);
-+}
-+
-+static const struct of_device_id qnoc_of_match[] = {
-+	{ .compatible = "qcom,msm-bus-pnoc", .data = &msm8916_pnoc },
-+	{ .compatible = "qcom,msm-bus-snoc", .data = &msm8916_snoc },
-+	{ .compatible = "qcom,msm-bus-bimc", .data = &msm8916_bimc },
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, qnoc_of_match);
-+
-+static struct platform_driver qnoc_driver = {
-+	.probe = qnoc_probe,
-+	.driver = {
-+		.name = "qcom,qnoc",
-+		.of_match_table = qnoc_of_match,
-+	},
-+};
-+module_platform_driver(qnoc_driver);
-+MODULE_AUTHOR("Georgi Djakov <georgi.djakov@linaro.org>");
-+MODULE_DESCRIPTION("Qualcomm msm8916 NoC driver");
-+MODULE_LICENSE("GPL v2");
-diff --git a/include/dt-bindings/interconnect/qcom,msm8916.h b/include/dt-bindings/interconnect/qcom,msm8916.h
-new file mode 100644
-index 000000000000..ea772b34ac96
---- /dev/null
-+++ b/include/dt-bindings/interconnect/qcom,msm8916.h
-@@ -0,0 +1,87 @@
-+#define MAS_VIDEO				0
-+#define MAS_JPEG				1
-+#define MAS_VFE					2
-+#define MAS_MDP					3
-+#define MAS_QDSS_BAM				4
-+#define MAS_SNOC_CFG				5
-+#define MAS_QDSS_ETR				6
-+#define MM_INT_0				7
-+#define MM_INT_1				8
-+#define MM_INT_2				9
-+#define MM_INT_BIMC				10
-+#define SNOC_INT_0				11
-+#define SNOC_INT_1				12
-+#define SNOC_INT_BIMC				13
-+#define SNOC_BIMC_0_MAS				14
-+#define SNOC_BIMC_1_MAS				15
-+#define QDSS_INT				16
-+#define BIMC_SNOC_SLV				17
-+#define SNOC_PNOC_MAS				18
-+#define PNOC_SNOC_SLV				19
-+#define SLV_SRVC_SNOC				20
-+#define SLV_QDSS_STM				21
-+#define SLV_IMEM				22
-+#define SLV_APSS				23
-+#define SLV_CATS_0				24
-+#define SLV_CATS_1				25
-+
-+#define MAS_APPS				0
-+#define MAS_TCU0				1
-+#define MAS_TCU1				2
-+#define MAS_GFX					3
-+#define BIMC_SNOC_MAS				4
-+#define SNOC_BIMC_0_SLV				5
-+#define SNOC_BIMC_1_SLV				6
-+#define SLV_EBI_CH0				7
-+#define SLV_APPS_L2				8
-+
-+#define SNOC_PNOC_SLV				0
-+#define PNOC_INT_0				1
-+#define PNOC_INT_1				2
-+#define PNOC_M_0				3
-+#define PNOC_M_1				4
-+#define PNOC_S_0				5
-+#define PNOC_S_1				6
-+#define PNOC_S_2				7
-+#define PNOC_S_3				8
-+#define PNOC_S_4				9
-+#define PNOC_S_8				10
-+#define PNOC_S_9				11
-+#define SLV_IMEM_CFG				12
-+#define SLV_CRYPTO_0_CFG			13
-+#define SLV_MSG_RAM				14
-+#define SLV_PDM					15
-+#define SLV_PRNG				16
-+#define SLV_CLK_CTL				17
-+#define SLV_MSS					18
-+#define SLV_TLMM				19
-+#define SLV_TCSR				20
-+#define SLV_SECURITY				21
-+#define SLV_SPDM				22
-+#define SLV_PNOC_CFG				23
-+#define SLV_PMIC_ARB				24
-+#define SLV_BIMC_CFG				25
-+#define SLV_BOOT_ROM				26
-+#define SLV_MPM					27
-+#define SLV_QDSS_CFG				28
-+#define SLV_RBCPR_CFG				29
-+#define SLV_SNOC_CFG				30
-+#define SLV_DEHR_CFG				31
-+#define SLV_VENUS_CFG				32
-+#define SLV_DISPLAY_CFG				33
-+#define SLV_CAMERA_CFG				34
-+#define SLV_USB_HS				35
-+#define SLV_SDCC_1				36
-+#define SLV_BLSP_1				37
-+#define SLV_SDCC_2				38
-+#define SLV_GFX_CFG				39
-+#define SLV_AUDIO				40
-+#define MAS_BLSP_1				41
-+#define MAS_SPDM				42
-+#define MAS_DEHR				43
-+#define MAS_AUDIO				44
-+#define MAS_USB_HS				45
-+#define MAS_PNOC_CRYPTO_0			46
-+#define MAS_PNOC_SDCC_1				47
-+#define MAS_PNOC_SDCC_2				48
-+#define PNOC_SNOC_MAS				49
++	return 0;
+ }
+ 
+ static int
+-- 
+2.9.4
