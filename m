@@ -1,61 +1,28 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 12 Jun 2017 14:41:05 +0100
-Subject: [PATCH REPOST] fs: Preventing READ_IMPLIES_EXEC Propagation
-In-Reply-To: <481124c6-07ba-4cb8-ca56-fb228b05f796@huawei.com>
-References: <2414e3b3-03f6-bd6c-5aa4-ad58c66b5aa5@huawei.com>
- <481124c6-07ba-4cb8-ca56-fb228b05f796@huawei.com>
-Message-ID: <20170612134105.apx373745ozsc47z@localhost>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 12 Jun 2017 09:51:21 -0400 (EDT)
+Subject: [PATCH v1] net/phy: Make phy_ethtool_ksettings_get return void
+In-Reply-To: <20170612074233.8688-1-yuval.shaia@oracle.com>
+References: <20170612074233.8688-1-yuval.shaia@oracle.com>
+Message-ID: <20170612.095121.1880452682603577061.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 25, 2017 at 02:58:01PM +0800, dongbo (E) wrote:
-> From: Dong Bo <dongbo4@huawei.com>
+From: Yuval Shaia <yuval.shaia@oracle.com>
+Date: Mon, 12 Jun 2017 10:42:33 +0300
+
+> Make return value void since function never return meaningfull value
 > 
-> In load_elf_binary(), once the READ_IMPLIES_EXEC flag is set,
-> the flag is propagated to its child processes, even the elf
-> files are marked as not requiring executable stack. It may
-> cause superfluous operations on some arch, e.g.
-> __sync_icache_dcache on aarch64 due to a PROT_READ mmap is
-> also marked as PROT_EXEC.
-> 
-> This patch was originally posted and discussed here:
-> https://patchwork.kernel.org/patch/9685891/
-> 
-> Signed-off-by: Dong Bo <dongbo4@huawei.com>
+> Signed-off-by: Yuval Shaia <yuval.shaia@oracle.com>
+> Acked-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > ---
->  fs/binfmt_elf.c       | 2 ++
->  fs/binfmt_elf_fdpic.c | 2 ++
->  2 files changed, 4 insertions(+)
-> 
-> diff --git a/fs/binfmt_elf.c b/fs/binfmt_elf.c
-> index 5075fd5..c52e670 100644
-> --- a/fs/binfmt_elf.c
-> +++ b/fs/binfmt_elf.c
-> @@ -863,6 +863,8 @@ static int load_elf_binary(struct linux_binprm *bprm)
->  	SET_PERSONALITY2(loc->elf_ex, &arch_state);
->  	if (elf_read_implies_exec(loc->elf_ex, executable_stack))
->  		current->personality |= READ_IMPLIES_EXEC;
-> +	else
-> +		current->personality &= ~READ_IMPLIES_EXEC;
->   	if (!(current->personality & ADDR_NO_RANDOMIZE) && randomize_va_space)
->  		current->flags |= PF_RANDOMIZE;
-> diff --git a/fs/binfmt_elf_fdpic.c b/fs/binfmt_elf_fdpic.c
-> index cf93a4f..c4bc4d0 100644
-> --- a/fs/binfmt_elf_fdpic.c
-> +++ b/fs/binfmt_elf_fdpic.c
-> @@ -354,6 +354,8 @@ static int load_elf_fdpic_binary(struct linux_binprm *bprm)
->  		set_personality(PER_LINUX);
->  	if (elf_read_implies_exec(&exec_params.hdr, executable_stack))
->  		current->personality |= READ_IMPLIES_EXEC;
-> +	else
-> +		current->personality &= ~READ_IMPLIES_EXEC;
->   	setup_new_exec(bprm);
->  -- 1.9.1
+> Re-sending since last time forgot to add netdev-list
+> v0 ->v1:
+> 	* These files were missing in v0
+> 		* drivers/net/ethernet/renesas/ravb_main.c
+> 		* drivers/net/ethernet/renesas/sh_eth.c
+> 		* drivers/net/ethernet/ti/netcp_ethss.c
+> 	* Add Acked-by: Sergei Shtylyov
 
-FWIW, we queued the arm64-equivalent patch (commit 48f99c8ec0b25 in
-linux-next). It doesn't change the behaviour for compat tasks since
-we want to keep the same behaviour with arch/arm. If the above generic
-patch gets merged, we'll drop the arm64-specific one.
+This doesn't apply cleanly to net-next at all.
 
--- 
-Catalin
+Please respin against an uptodate net-next tree, thank you.
