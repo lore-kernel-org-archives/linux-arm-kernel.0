@@ -1,56 +1,102 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 12 Jun 2017 03:25:28 -0700
-Subject: [PATCH] ARM: OMAP: PM: stop early on systems without twl
-In-Reply-To: <20170612073946.GU3730@atomide.com>
-References: <20170609223223.19079-1-sre@kernel.org>
- <20170612073946.GU3730@atomide.com>
-Message-ID: <20170612102527.GX3730@atomide.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 12 Jun 2017 12:31:47 +0200
+Subject: [GIT PULL] ARM: Medaitek armv7 DTS for v4.13
+Message-ID: <5056d433-90b3-a3ca-4df7-9ff02ab6027b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [170612 00:43]:
-> * Sebastian Reichel <sre@kernel.org> [170609 15:36]:
-> > Motorola Droid 4 has an OMAP4, but no TWL6030. It currently
-> > complains verbosely about this during boot:
-> > 
-> > twl: not initialized
-> > twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
-> > twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
-> > twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
-> > twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
-> > twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
-> > twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
-> > twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1410000 Vs max 1316660
-> > omap2_set_init_voltage: unable to find boot up OPP for vdd_core
-> > omap2_set_init_voltage: unable to set vdd_core
-> > omap2_set_init_voltage: unable to find boot up OPP for vdd_iva
-> > omap2_set_init_voltage: unable to set vdd_iva
-> > 
-> > While proper support for CPCAP should be added at some point,
-> > let's exit early in omap2_common_pm_late_init() until that
-> > has been implemented to avoid the above errors. There is still
-> > a reminder about missing PM in dmesg:
-> > 
-> > Missing OMAP4 PM for this platform!
-> 
-> Great good to see this dmesg spam go away. Applying into
-> omap-for-v4.13/soc-v3 thanks.
+Hi Arnd and Olof,
 
-After running make randconfig builds over lunch I noticed
-we can now get "undefined reference to `twl_rev'" so we
-need something more here if CONFIG_TWL4030_CORE or
-CONFIG_TWL6040_CORE is not selected or is a loadable module.
-
-Maybe making the whole function depend on the following
-might work:
-
-#if IS_BUILTIN(CONFIG_TWL6040_CORE) || \
-	IS_BUILTIN(CONFIG_TWL4030_CORE)
-...
-#endif
-
-Anyways dropping for now.
+Please find below my merge request for armv7 device tree changes.
 
 Regards,
+Matthias
 
-Tony
+---
+
+The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+
+   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+
+are available in the git repository at:
+
+   https://github.com/mbgg/linux-mediatek.git tags/v4.12-next-dts32
+
+for you to fetch changes up to aac5e972d4c7bc728df605f5427d9c2458c34ea9:
+
+   arm: dts: mediatek: Add audio driver node for MT2701 (2017-06-07 
+10:47:25 +0200)
+
+----------------------------------------------------------------
+Add device tree nodes for
+mt7623:
+- clocks
+- power domain
+- pmic-wrapper
+- pinctrl
+- i2c
+- spi
+- nand
+- mmc
+- usb
+- pwm
+- ethernet
+- crypto engine
+- infared remote control
+- audio controller
+- ADC
+- efuse
+- thermal driver
+- HW random generator
+
+mt2701:
+- NOR flash
+- JPEG decoder
+- i2c
+- audio controller
+
+----------------------------------------------------------------
+Garlic Tseng (1):
+       arm: dts: mediatek: Add audio driver node for MT2701
+
+Guochun Mao (1):
+       arm: dts: mt2701: add nor flash node
+
+John Crispin (9):
+       arm: dts: mt7623: add clock controller device nodes
+       arm: dts: mt7623: add subsystem clock controller device nodes
+       arm: dts: mt7623: add power domain controller device node
+       arm: dts: mt7623: add pinctrl nodes to the mt7623 dtsi file
+       arm: dts: mt7623: add pmic wrapper nodes to the mt7623 dtsi file
+       arm: dts: mt7623: add i2c nodes to the mt7623.dtsi file
+       arm: dts: mt7623: add nand nodes to the mt7623.dtsi file
+       arm: dts: mt7623: add mmc nodes to the mt7623.dtsi file
+       arm: dts: mt7623: add usb nodes to the mt7623.dtsi file
+
+Jun Gao (1):
+       arm: dts: Add Mediatek MT2701 i2c device node
+
+Rick Chang (1):
+       arm: dts: mt2701: Add node for Mediatek JPEG Decoder
+
+Sean Wang (11):
+       arm: dts: mt7623: add spi nodes to the mt7623.dtsi file
+       arm: dts: mt7623: add pwm nodes to the mt7623.dtsi file
+       arm: dts: mt7623: add ethernet nodes to the mt7623.dtsi file
+       arm: dts: mt7623: add crypto engine nodes to the mt7623.dtsi file
+       arm: dts: mt7623: add ir nodes to the mt7623.dtsi file
+       arm: dts: mt7623: add afe nodes to the mt7623.dtsi file
+       arm: dts: mt7623: add rng nodes to the mt7623.dtsi file
+       arm: dts: mt7623: add auxadc nodes to the mt7623.dtsi file
+       arm: dts: mt7623: add efuse nodes to the mt7623.dtsi file
+       arm: dts: mt7623: add thermal nodes to the mt7623.dtsi file
+       arm: dts: mt7623: add Sean as one of authors for mt7623.dtsi files
+
+Youlin Pei (1):
+       ARM: dts: mt2701: Add mtk-cirq node for mt2701
+
+  arch/arm/boot/dts/mt2701-evb.dts | 132 ++++++++++
+  arch/arm/boot/dts/mt2701.dtsi    | 179 ++++++++++++-
+  arch/arm/boot/dts/mt7623.dtsi    | 546 
+++++++++++++++++++++++++++++++++++++++-
+  3 files changed, 846 insertions(+), 11 deletions(-)
