@@ -1,38 +1,64 @@
-From: al.cooper@broadcom.com (Al Cooper)
-Date: Mon, 12 Jun 2017 16:53:12 -0400
-Subject: [PATCH 2/3] dt-bindings: Add Broadcom STB USB PHY binding document
-In-Reply-To: <CAGh=XAAzbrNUopwsxQeXfRXi9gd=J4mdG-6UqTJ+-ikd=xqGig@mail.gmail.com>
-References: <1496426512-10590-1-git-send-email-alcooperx@gmail.com>
- <1496426512-10590-3-git-send-email-alcooperx@gmail.com>
- <20170608221104.7nsinggo4vngbmus@rob-hp-laptop>
- <CAGh=XAAzbrNUopwsxQeXfRXi9gd=J4mdG-6UqTJ+-ikd=xqGig@mail.gmail.com>
-Message-ID: <CAGh=XAAdMm6oGUjDNkiT_oK43gEK8_n+q1ynWo=e8+H7_g9wgw@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 12 Jun 2017 14:02:48 -0700
+Subject: [PATCH 2/2 v4] clk: Add Gemini SoC clock controller
+In-Reply-To: <CACRpkdapAgHix2vw-woDFi4sh+H3_EX7w-5q=opBGMyegFrXbA@mail.gmail.com>
+References: <20170524082044.8473-1-linus.walleij@linaro.org>
+ <20170601070208.GO20170@codeaurora.org>
+ <CACRpkdZv8MzXVecEXVdJ+P0MxVscYSy=MxC-yQAR0S4yQ6-rwQ@mail.gmail.com>
+ <20170605195812.GH20170@codeaurora.org>
+ <CACRpkdbya9xaN-i7AkG0bTyuFYfZc59sSTYhWB43=9btSKfPpQ@mail.gmail.com>
+ <CACRpkdapAgHix2vw-woDFi4sh+H3_EX7w-5q=opBGMyegFrXbA@mail.gmail.com>
+Message-ID: <20170612210248.GP20170@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 12, 2017 at 4:19 PM, Al Cooper <al.cooper@broadcom.com> wrote:
-> On Thu, Jun 8, 2017 at 6:11 PM, Rob Herring <robh@kernel.org> wrote:
->>> +- brcm,device: String, PHY Device mode.
->>> +  Possible values are: off (Host), on (Device), dual (DRD)
->>> +  or typec-pd (Type-C PD control)
->>
->> I believe we have standard property for this though maybe not type C.
->>
->> off/on seem strange for meaning host/device as well.
->
-> I'll change this to:
->
-> mode: String, PHY Device mode.
-> Possible values are: "host", "device", "drd" or "typec-pd"
+On 06/12, Linus Walleij wrote:
+> On Thu, Jun 8, 2017 at 2:18 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> 
+> > I think the timer may be more of an issue...
+> >
+> > It is using CLOCKSOURCE_OF_DECLARE(), at least last time
+> > I checked there was no such thing as clocksources retrying their
+> > calls, and that cannot be regular probes because of, yeah device
+> > core is using the timer, I think.
+> >
+> > Yeah I looked in:
+> > drivers/clocksource/clksrc-probe.c
+> >
+> > It will just fail if it can't initialize the clocksource.
+> >
+> > I don't understand what platforms can actually get their timers
+> > up at all without the clock framework? Those hardcoding the
+> > clock frequency in the device tree, or things like the ARM
+> > TWD which has it encoded in hardware perhaps?
+> 
+> I just confirmed this to be the problem using a scratch patch for
+> a platform device init and some earlydebug prints:
+> 
+> Uncompressing Linux... done, booting the kernel.
+>  Booting Linux on physical CPU 0x0
+> start_kernel
+> (...)
+>  NR_IRQS:16 nr_irqs:16 16
+>  could not get PCLK
+> Failed to initialize '/soc/timer at 43000000': -517
+>  clocksource_probe: no matching clocksources found
+>  sched_clock: 32 bits at 100 Hz, resolution 10000000ns, wraps every
+> 21474836475000000ns
+>  Console: colour dummy device 80x30
+>  Calibrating delay loop...
+> 
+> So the deferred clock makes the whole platform hang because the timer
+> needs it. Without a clocksource, the delay loop cannot be calibrated, so
+> it hangs there.
+> 
 
-I just found "dr_mode" in Documentation/devicetree/bindings/usb/generic.txt.
-I'd like to change this to:
+Ok. So can the certain clks that are required to get the timer
+going be put into CLK_OF_DECLARE_DRIVER() and then have a regular
+platform driver for the rest of the clks that aren't required for
+early boot? We've been doing this sort of hybrid design lately,
+so hopefully that works here too.
 
-dr_mode: String, PHY Device mode.
-Possible values are: "host", "device", "drd" or "typec-pd"
-
-I used a standard property name ("dr_mode") and 2 of the standard
-values ("host", "device") and added 2 new values "drd" and "typec_pd".
-
-Thanks
-Al
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
