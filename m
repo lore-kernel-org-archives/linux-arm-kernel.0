@@ -1,35 +1,48 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Mon, 12 Jun 2017 09:29:07 +0800
-Subject: [PATCH 1/2] clk: hi6220: add acpu clock
-In-Reply-To: <0e1a391e-cec5-1e94-c491-1c816eca85c3@linaro.org>
-References: <1492478242-16146-1-git-send-email-zhangfei.gao@linaro.org>
- <20170420155717.mohnrg6lxpwkoytb@rob-hp-laptop>
- <0e1a391e-cec5-1e94-c491-1c816eca85c3@linaro.org>
-Message-ID: <85a39ff8-5d69-ac21-ec9e-6d0bb224f023@linaro.org>
+From: hoeun.ryu@gmail.com (Hoeun Ryu)
+Date: Mon, 12 Jun 2017 10:47:40 +0900
+Subject: [PATCH] arm:lpae: build TTB control register value from scratch in
+ v7_ttb_setup
+Message-ID: <1497232084-31907-1-git-send-email-hoeun.ryu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Stephen
+ Reading TTBCR in early boot stage might return the value of the previous
+kernel's configuration, especially in case of kexec. For example, if
+normal kernel (first kernel) had run on a configuration of PHYS_OFFSET <=
+PAGE_OFFSET and crash kernel (second kernel) is running on a configuration
+PHYS_OFFSET > PAGE_OFFSET, which can happen because it depends on the
+reserved area for crash kernel, reading TTBCR and using the value to OR
+other bit fields might be risky because it doesn't have a reset value for
+TTBCR.
 
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+Suggested-by: Robin Murphy <robin.murphy@arm.com>
+Signed-off-by: Hoeun Ryu <hoeun.ryu@gmail.com>
 
-Would you mind taking this patch, it's better go through 4.12.
+---
 
+ * add Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+ * v1: amended based on
+     - "[PATCHv2] arm: LPAE: kexec: clear TTBCR.T1SZ explicitly when
+        PHYS_OFFSET > PAGE_OFFSET"
+     - https://lkml.org/lkml/2017/6/5/239
 
-On 2017?05?17? 09:31, zhangfei wrote:
->
->
-> On 2017?04?20? 23:57, Rob Herring wrote:
->> On Tue, Apr 18, 2017 at 09:17:21AM +0800, Zhangfei Gao wrote:
->>> Add acpu clock, including sft clock controlling hi6220 coresight module
->>>
->>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->>> Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
->>> ---
->>>   .../devicetree/bindings/clock/hi6220-clock.txt     |  1 +
->> Acked-by: Rob Herring <robh@kernel.org>
->
-> Thanks Rob
->
-> Btw, have tested on 4.12-rc1, the patches can be applied directly.
+ arch/arm/mm/proc-v7-3level.S | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Thanks
+diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+index 5e5720e..7d16bbc 100644
+--- a/arch/arm/mm/proc-v7-3level.S
++++ b/arch/arm/mm/proc-v7-3level.S
+@@ -129,8 +129,7 @@ ENDPROC(cpu_v7_set_pte_ext)
+ 	.macro	v7_ttb_setup, zero, ttbr0l, ttbr0h, ttbr1, tmp
+ 	ldr	\tmp, =swapper_pg_dir		@ swapper_pg_dir virtual address
+ 	cmp	\ttbr1, \tmp, lsr #12		@ PHYS_OFFSET > PAGE_OFFSET?
+-	mrc	p15, 0, \tmp, c2, c0, 2		@ TTB control egister
+-	orr	\tmp, \tmp, #TTB_EAE
++	mov	\tmp, #TTB_EAE			@ for TTB control egister
+ 	ALT_SMP(orr	\tmp, \tmp, #TTB_FLAGS_SMP)
+ 	ALT_UP(orr	\tmp, \tmp, #TTB_FLAGS_UP)
+ 	ALT_SMP(orr	\tmp, \tmp, #TTB_FLAGS_SMP << 16)
+-- 
+2.7.4
