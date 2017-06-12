@@ -1,42 +1,59 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 12 Jun 2017 09:38:15 +0200
-Subject: [PATCH 0/3] Meson (32-bit) multi_v7_defconfig updates
-In-Reply-To: <20170611100343.25868-1-martin.blumenstingl@googlemail.com>
-References: <20170611100343.25868-1-martin.blumenstingl@googlemail.com>
-Message-ID: <888ef3fd-d8aa-d09c-dace-8662a7fd9c5a@baylibre.com>
+Date: Mon, 12 Jun 2017 09:38:42 +0200
+Subject: [PATCH] watchdog: meson-wdt: add support for the watchdog on
+ Meson8 and Meson8m2
+In-Reply-To: <20170611095219.22095-1-martin.blumenstingl@googlemail.com>
+References: <20170611095219.22095-1-martin.blumenstingl@googlemail.com>
+Message-ID: <af787a82-e798-411a-3402-b9332deda672@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2017 12:03 PM, Martin Blumenstingl wrote:
-> This enables the following drivers which are supported on Meson8 and
-> Meson8b (as well as Meson8m2):
-> - Meson USB2 PHY driver (USB controller support is provided by dwc2,
->   which is already enabled)
-> - Meson PWM driver (used to dim LEDs and generate the 32.768 kHz LPO
->   clock for the SDIO wifi modules)
-> - the generic PWM clock driver (for the 32.768 kHz LPO clock for the
->   SDIO wifi modules)
+On 06/11/2017 11:52 AM, Martin Blumenstingl wrote:
+> The watchdog IP block on Meson8 and Meson8m2 is already supported by the
+> existing meson-wdt driver. Meson8 uses the same register bits as Meson6,
+> while the newer Meson8m2 SoC uses the same register bits as Meson8b.
 > 
+> Currently watchdog support on Meson8 SoC already works because
+> meson8.dtsi simply uses the "amlogic,meson6-wdt" compatible. Adding a
+> separate compatible for Meson8 makes this more explicit though.
 > 
-> I am not sure if these patches will go through Kevin's Amlogic tree
-> or through some other tree. However, these should be independent from
-> anything else, so it's just a matter of preference through which tree
-> they go.
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> ---
+>  Documentation/devicetree/bindings/watchdog/meson-wdt.txt | 6 +++++-
+>  drivers/watchdog/meson_wdt.c                             | 2 ++
+>  2 files changed, 7 insertions(+), 1 deletion(-)
 > 
-> 
-> Martin Blumenstingl (3):
->   ARM: multi_v7_defconfig: enable the Amlogic Meson USB2 PHY driver
->   ARM: multi_v7_defconfig: enable the Meson PWM controller
->   ARM: multi_v7_defconfig: enable the PWM clock driver
-> 
->  arch/arm/configs/multi_v7_defconfig | 3 +++
->  1 file changed, 3 insertions(+)
+> diff --git a/Documentation/devicetree/bindings/watchdog/meson-wdt.txt b/Documentation/devicetree/bindings/watchdog/meson-wdt.txt
+> index ae70185d96e6..f2fbe1a39d31 100644
+> --- a/Documentation/devicetree/bindings/watchdog/meson-wdt.txt
+> +++ b/Documentation/devicetree/bindings/watchdog/meson-wdt.txt
+> @@ -2,7 +2,11 @@ Meson SoCs Watchdog timer
+>  
+>  Required properties:
+>  
+> -- compatible : should be "amlogic,meson6-wdt" or "amlogic,meson8b-wdt"
+> +- compatible : depending on the SoC this should be one of:
+> +	"amlogic,meson6-wdt"
+> +	"amlogic,meson8-wdt"
+> +	"amlogic,meson8b-wdt"
+> +	"amlogic,meson8m2-wdt"
+>  - reg : Specifies base physical address and size of the registers.
+>  
+>  Example:
+> diff --git a/drivers/watchdog/meson_wdt.c b/drivers/watchdog/meson_wdt.c
+> index 491b9bf13d84..304274c67735 100644
+> --- a/drivers/watchdog/meson_wdt.c
+> +++ b/drivers/watchdog/meson_wdt.c
+> @@ -155,7 +155,9 @@ static const struct watchdog_ops meson_wdt_ops = {
+>  
+>  static const struct of_device_id meson_wdt_dt_ids[] = {
+>  	{ .compatible = "amlogic,meson6-wdt", .data = &meson6_wdt_data },
+> +	{ .compatible = "amlogic,meson8-wdt", .data = &meson6_wdt_data },
+>  	{ .compatible = "amlogic,meson8b-wdt", .data = &meson8b_wdt_data },
+> +	{ .compatible = "amlogic,meson8m2-wdt", .data = &meson8b_wdt_data },
+>  	{ /* sentinel */ }
+>  };
+>  MODULE_DEVICE_TABLE(of, meson_wdt_dt_ids);
 > 
 
-
-Hi Martin,
-
-Isn't it better to have these as modules like for the ARM64 counterpart ?
-
-Thanks,
-Neil
+Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
