@@ -1,24 +1,24 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 12 Jun 2017 16:32:28 +0200
-Subject: [PATCH 5/6] arm64: wire frequency-invariant accounting support up
- to the task scheduler
-In-Reply-To: <20170608075513.12475-6-dietmar.eggemann@arm.com>
+Date: Mon, 12 Jun 2017 16:33:35 +0200
+Subject: [PATCH 6/6] arm64: wire cpu-invariant accounting support up to
+ the task scheduler
+In-Reply-To: <20170608075513.12475-7-dietmar.eggemann@arm.com>
 References: <20170608075513.12475-1-dietmar.eggemann@arm.com>
- <20170608075513.12475-6-dietmar.eggemann@arm.com>
-Message-ID: <CAKfTPtDzsWPgZsf0gMSKPR7GJ8ovmvdW3_vXv=eyVH_Z6buYzw@mail.gmail.com>
+ <20170608075513.12475-7-dietmar.eggemann@arm.com>
+Message-ID: <CAKfTPtBNbXtO3hb-GE_LSbAXVOGOUQR7-iFOvfumDJKqmg_Ung@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 8 June 2017 at 09:55, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
-> Commit dfbca41f3479 ("sched: Optimize freq invariant accounting")
-> changed the wiring which now has to be done by associating
-> arch_scale_freq_capacity with the actual implementation provided
-> by the architecture.
+> Commit 8cd5601c5060 ("sched/fair: Convert arch_scale_cpu_capacity() from
+> weak function to #define") changed the wiring which now has to be done
+> by associating arch_scale_cpu_capacity with the actual implementation
+> provided by the architecture.
 >
-> Define arch_scale_freq_capacity to use the arch_topology "driver"
-> function topology_get_freq_scale() for the task scheduler's
-> frequency-invariant accounting instead of the default
-> arch_scale_freq_capacity() in kernel/sched/sched.h.
+> Define arch_scale_cpu_capacity to use the arch_topology "driver"
+> function topology_get_cpu_scale() for the task scheduler's cpu-invariant
+> accounting instead of the default arch_scale_cpu_capacity() in
+> kernel/sched/sched.h.
 >
 > Cc: Catalin Marinas <catalin.marinas@arm.com>
 > Cc: Will Deacon <will.deacon@arm.com>
