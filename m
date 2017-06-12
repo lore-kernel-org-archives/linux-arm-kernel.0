@@ -1,59 +1,58 @@
 From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Mon, 12 Jun 2017 15:23:13 +0530
-Subject: [PATCH v3] arm64: allwinner: a64: Add initial Orangepi Win/WinPlus
+Date: Mon, 12 Jun 2017 15:23:14 +0530
+Subject: [PATCH v3] arm64: allwinner: h5: Add initial Orangepi Zero Plus 2
  support
-Message-ID: <1497261194-28815-1-git-send-email-jteki@openedev.com>
+In-Reply-To: <1497261194-28815-1-git-send-email-jteki@openedev.com>
+References: <1497261194-28815-1-git-send-email-jteki@openedev.com>
+Message-ID: <1497261194-28815-2-git-send-email-jteki@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jagan Teki <jagan@amarulasolutions.com>
 
-Orangepi Win/WinPlus is an open-source single-board computer
-using the Allwinner A64 SOC.
+Orangepi Zero Plus 2 is an open-source single-board computer
+using the Allwinner h5 SOC.
 
-A64 Orangepi Win/WinPlus has
-- A64 Quad-core Cortex-A53 64bit
-- 1GB(Win)/2GB(Win Plus) DDR3 SDRAM
+H5 Orangepi Zero Plus 2 has
+- Quad-core Cortex-A53
+- 512MB DDR3
+- micrSD slot and 8GB eMMC
 - Debug TTL UART
-- Four USB 2.0
 - HDMI
-- LCD
-- Audio and MIC
 - Wifi + BT
-- IR receiver
-- 5V DC power supply
+- OTG+power supply
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
 Changes for v2:
-- Remove http link from commit message
-- Re-arrange nodes in ascending order
-Changed for v3:
-- Remove /soc node for regualtor node
-- Move Makefile definition in a64 place
+- Add emmc node
+Changes for v3:
+- Drop memory node
+- Remove /soc for regulator node
 
  arch/arm64/boot/dts/allwinner/Makefile             |  1 +
- .../boot/dts/allwinner/sun50i-a64-orangepi-win.dts | 95 ++++++++++++++++++++++
- 2 files changed, 96 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
+ .../allwinner/sun50i-h5-orangepi-zero-plus2.dts    | 92 ++++++++++++++++++++++
+ 2 files changed, 93 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
 
 diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-index 8adba9c..c997b5c 100644
+index 1ea7709..8adba9c 100644
 --- a/arch/arm64/boot/dts/allwinner/Makefile
 +++ b/arch/arm64/boot/dts/allwinner/Makefile
-@@ -1,5 +1,6 @@
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-nanopi-a64.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-orangepi-win.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
+@@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
++dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus2.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo2.dtb
+ 
+ always		:= $(dtb-y)
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
 new file mode 100644
-index 0000000..1f39e1c
+index 0000000..b6b7a56
 --- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-@@ -0,0 +1,95 @@
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+@@ -0,0 +1,92 @@
 +/*
 + * Copyright (C) 2017 Jagan Teki <jteki@openedev.com>
 + *
@@ -98,13 +97,13 @@ index 0000000..1f39e1c
 +
 +/dts-v1/;
 +
-+#include "sun50i-a64.dtsi"
++#include "sun50i-h5.dtsi"
 +
 +#include <dt-bindings/gpio/gpio.h>
 +
 +/ {
-+	model = "OrangePi Win/Win Plus";
-+	compatible = "xunlong,orangepi-win", "allwinner,sun50i-a64";
++	model = "OrangePi Zero Plus2";
++	compatible = "xunlong,orangepi-zero-plus2", "allwinner,sun50i-h5";
 +
 +	aliases {
 +		serial0 = &uart0;
@@ -122,21 +121,23 @@ index 0000000..1f39e1c
 +	};
 +};
 +
-+&ehci1 {
-+       status = "okay";
-+};
-+
 +&mmc0 {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins>;
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
 +	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
 +	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
-+	cd-inverted;
 +	status = "okay";
 +};
 +
-+&ohci1 {
-+       status = "okay";
++&mmc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc2_8bit_pins>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <8>;
++	non-removable;
++	cap-mmc-hw-reset;
++	status = "okay";
 +};
 +
 +&uart0 {
@@ -144,10 +145,5 @@ index 0000000..1f39e1c
 +	pinctrl-0 = <&uart0_pins_a>;
 +	status = "okay";
 +};
-+
-+&usbphy {
-+       status = "okay";
-+};
-+
 -- 
 2.7.4
