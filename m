@@ -1,76 +1,93 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 12 Jun 2017 15:36:49 +0100
-Subject: [PATCH 10/12] coresight tmc: Support for save-restore in ETR
+Date: Mon, 12 Jun 2017 15:36:48 +0100
+Subject: [PATCH 09/12] coresight tmc: Add capability information
 In-Reply-To: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
 References: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1497278211-5001-11-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1497278211-5001-10-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Coresight SoC 600 TMC ETR supports save-restore feature,
-where the values of the RRP/RWP and STS.Full are retained
-when it leaves the Disabled state. Hence, we must program the
-RRP/RWP and STS.Full to a proper value. For now, set the RRP/RWP
-to the base address of the buffer and clear the STS.Full register.
-This can be later exploited for proper save-restore of ETR
-trace contexts (e.g, perf).
+This patch adds description of the capabilities of a given TMC.
+This will help us to handle different versions of the TMC in the
+same driver by checking the capabilities.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-tmc-etr.c | 13 ++++++++++++-
- drivers/hwtracing/coresight/coresight-tmc.h     |  8 ++++++++
- 2 files changed, 20 insertions(+), 1 deletion(-)
+ drivers/hwtracing/coresight/coresight-tmc.c | 10 +++++++++-
+ drivers/hwtracing/coresight/coresight-tmc.h | 18 ++++++++++++++++++
+ 2 files changed, 27 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index ff11b92..7294fb7 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -22,7 +22,7 @@
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+index 7152656..e88f2f3 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.c
++++ b/drivers/hwtracing/coresight/coresight-tmc.c
+@@ -399,16 +399,24 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
+ 	ret = misc_register(&drvdata->miscdev);
+ 	if (ret)
+ 		coresight_unregister(drvdata->csdev);
++	else if (id->data)
++		drvdata->caps = *(struct tmc_caps *)id->data;
+ out:
+ 	return ret;
+ }
  
- static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
- {
--	u32 axictl;
-+	u32 axictl, sts;
- 
- 	/* Zero out the memory to help with debug */
- 	memset(drvdata->vaddr, 0, drvdata->size);
-@@ -45,6 +45,17 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
- 		  TMC_AXICTL_PROT_CTL_B1;
- 	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
- 	tmc_write_dba(drvdata, drvdata->paddr);
-+	/*
-+	 * If the TMC pointers must be programmed before the session,
-+	 * we have to set it properly (i.e, RRP/RWP to base address and
-+	 * STS to "not full").
-+	 */
-+	if (tmc_has_cap(drvdata, TMC_CAP_ETR_SAVE_RESTORE)) {
-+		tmc_write_rrp(drvdata, drvdata->paddr);
-+		tmc_write_rwp(drvdata, drvdata->paddr);
-+		sts = readl_relaxed(drvdata->base + TMC_STS) & ~TMC_STS_FULL;
-+		writel_relaxed(sts, drvdata->base + TMC_STS);
-+	}
- 
- 	writel_relaxed(TMC_FFCR_EN_FMT | TMC_FFCR_EN_TI |
- 		       TMC_FFCR_FON_FLIN | TMC_FFCR_FON_TRIG_EVT |
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-index 87e4561..d5ef51e 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.h
-+++ b/drivers/hwtracing/coresight/coresight-tmc.h
-@@ -90,6 +90,14 @@ enum tmc_mem_intf_width {
++static struct tmc_caps coresight_soc_400_tmc_caps = {
++	.caps = CORESIGHT_SOC_400_TMC_CAPS,
++};
++
+ static struct amba_id tmc_ids[] = {
+ 	{
++		/* Coresight SoC 400 TMC */
+ 		.id     = 0x000bb961,
+ 		.mask   = 0x000fffff,
++		.data	= &coresight_soc_400_tmc_caps,
+ 	},
+-	{ 0, 0},
++	{},
  };
  
- #define TMC_CAP_ETR_SG_UNIT			(1U << 0)
-+/*
-+ * TMC_CAP_ETR_SAVE_RESTORE - Values of RRP/RWP/STS.Full are
-+ * retained when TMC leaves Disabled state, allowing us to continue
-+ * the tracing from a point where we stopped. This also implies that
-+ * the RRP/RWP/STS.Full should always be programmed to the correct
-+ * value.
-+ */
-+#define TMC_CAP_ETR_SAVE_RESTORE	(1U << 1)
+ static struct amba_driver tmc_driver = {
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
+index c78de00..87e4561 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.h
++++ b/drivers/hwtracing/coresight/coresight-tmc.h
+@@ -89,6 +89,18 @@ enum tmc_mem_intf_width {
+ 	TMC_MEM_INTF_WIDTH_256BITS	= 8,
+ };
  
++#define TMC_CAP_ETR_SG_UNIT			(1U << 0)
++
++/**
++ * struct tmc_cap - Describes the capabilities of the TMC.
++ * @caps:	- Bitmask of the capacities
++ */
++struct tmc_caps {
++	u32	caps;
++};
++
++#define CORESIGHT_SOC_400_TMC_CAPS	(TMC_CAP_ETR_SG_UNIT)
++
  /**
-  * struct tmc_cap - Describes the capabilities of the TMC.
+  * struct tmc_drvdata - specifics associated to an TMC component
+  * @base:	memory mapped base address for this component.
+@@ -110,6 +122,7 @@ struct tmc_drvdata {
+ 	void __iomem		*base;
+ 	struct device		*dev;
+ 	struct coresight_device	*csdev;
++	struct tmc_caps		caps;
+ 	struct miscdevice	miscdev;
+ 	spinlock_t		spinlock;
+ 	bool			reading;
+@@ -158,4 +171,9 @@ TMC_REG_PAIR(rrp, TMC_RRP, TMC_RRPHI)
+ TMC_REG_PAIR(rwp, TMC_RWP, TMC_RWPHI)
+ TMC_REG_PAIR(dba, TMC_DBALO, TMC_DBAHI)
+ 
++static inline bool tmc_has_cap(struct tmc_drvdata *drvdata, u32 cap)
++{
++	return !!(drvdata->caps.caps & cap);
++}
++
+ #endif
 -- 
 2.7.4
