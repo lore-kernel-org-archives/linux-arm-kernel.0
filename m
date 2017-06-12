@@ -1,69 +1,137 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 12 Jun 2017 10:36:38 +0200
-Subject: [PATCH 1/2] spi: rockchip: add support for "cs-gpios" dts property
-In-Reply-To: <593E501F.5060906@rock-chips.com>
-References: <1497248057-16550-1-git-send-email-jeffy.chen@rock-chips.com>
- <dfe87919-b2cc-37e8-1598-6b3c730ff356@rock-chips.com>
- <593E501F.5060906@rock-chips.com>
-Message-ID: <4418523.E0t9k04HOG@diego>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 12 Jun 2017 10:38:01 +0200
+Subject: [PATCH v2] arm64: allwinner: h5: Add initial Orangepi Zero Plus
+ 2 support
+In-Reply-To: <1497099474-5435-1-git-send-email-jteki@openedev.com>
+References: <1497099474-5435-1-git-send-email-jteki@openedev.com>
+Message-ID: <20170612083801.guu4gv5osbjs2qe5@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 12. Juni 2017, 16:26:07 CEST schrieb jeffy:
-> Hi Shawn,
+On Sat, Jun 10, 2017 at 06:27:54PM +0530, Jagan Teki wrote:
+> From: Jagan Teki <jagan@amarulasolutions.com>
 > 
-> On 06/12/2017 03:15 PM, Shawn Lin wrote:
-> > Hi Jeffy,
-> > 
-> > On 2017/6/12 14:14, Jeffy Chen wrote:
-> >> Support using "cs-gpios" property to specify cs gpios.
-> >> 
-> >> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> >> ---
-> >> 
-> >>   .../devicetree/bindings/spi/spi-rockchip.txt       |  2 +
-> >>   drivers/spi/spi-rockchip.c                         | 52
-> >> 
-> >> ++++++++++++++++++++++
-> >> 
-> >>   2 files changed, 54 insertions(+)
-> >> 
-> >> diff --git a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-> >> b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-> >> index 83da493..02171b2 100644
-> >> --- a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-> >> +++ b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-> > 
-> > The changes for doc should be another patch, and...
+> Orangepi Zero Plus 2 is an open-source single-board computer
+> using the Allwinner h5 SOC.
 > 
-> but i saw others didn't separate them:
-> cf9e478 spi: sh-msiof: Add slave mode support
-> 23e291c spi: rockchip: support "sleep" pin configuration
-
-it sometimes falls through the cracks, but having dt-binding patches
-separate is meant to make it easier on DT-Maintainers to find
-patches they need to look at.
-
-
-> >> +    if (!data->cs_gpio_requested) {
-> >> +        ret = gpio_request_one(spi->cs_gpio, flags,
-> >> +                       dev_name(&spi->dev));
-> >> +        if (!ret)
-> >> +            data->cs_gpio_requested = 1;
-> >> +    } else
-> >> +        ret = gpio_direction_output(spi->cs_gpio, flags);
-> > 
-> > need brace around 'else' statement. Also I don't see data used
-> > elsewhere, so you need these code above.
+> H5 Orangepi Zero Plus 2 has
+> - Quad-core Cortex-A53
+> - 512MB DDR3
+> - micrSD slot and 8GB eMMC
+> - Debug TTL UART
+> - HDMI
+> - Wifi + BT
+> - OTG+power supply
 > 
-> ok.
-> and the cs_gpio_requested is to mark cs_gpio requested, because the
-> setup func might be called multiple times, we only need to request gpio
-> at the first time.
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> ---
+> Changes for v2:
+> - Add emmc node
+> 
+>  arch/arm64/boot/dts/allwinner/Makefile             |  1 +
+>  .../allwinner/sun50i-h5-orangepi-zero-plus2.dts    | 98 ++++++++++++++++++++++
+>  2 files changed, 99 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+> 
+> diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
+> index 1ea7709..8adba9c 100644
+> --- a/arch/arm64/boot/dts/allwinner/Makefile
+> +++ b/arch/arm64/boot/dts/allwinner/Makefile
+> @@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
+>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
+>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
+>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
+> +dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus2.dtb
+>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo2.dtb
+>  
+>  always		:= $(dtb-y)
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+> new file mode 100644
+> index 0000000..6136a3f
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+> @@ -0,0 +1,98 @@
+> +/*
+> + * Copyright (C) 2017 Jagan Teki <jteki@openedev.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This library is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This library is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "sun50i-h5.dtsi"
+> +
+> +#include <dt-bindings/gpio/gpio.h>
+> +
+> +/ {
+> +	model = "OrangePi Zero Plus2";
+> +	compatible = "xunlong,orangepi-zero-plus2", "allwinner,sun50i-h5";
+> +
+> +	aliases {
+> +		serial0 = &uart0;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	memory {
+> +		reg = <0x40000000 0x20000000>;
+> +	};
 
-Aren't the gpiod* functions meant to be used for new things?
-Also you might actually do a bit of error handling there, especially 
-EPROBE_DEFER.
+You don't need the memory node, it will be added at runtime.
 
+> +
+> +	soc {
 
-Heiko
+Why is it under /soc ?
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170612/41934da4/attachment.sig>
