@@ -1,70 +1,344 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 12 Jun 2017 09:40:25 +0200
-Subject: [PATCH 1/3] clk: meson: meson8b: add compatibles for Meson8 and
- Meson8m2
-In-Reply-To: <m2lgp19ghu.fsf@baylibre.com>
-References: <20170604183341.21417-1-martin.blumenstingl@googlemail.com>
- <20170604183341.21417-2-martin.blumenstingl@googlemail.com>
- <1496606325.3552.16.camel@baylibre.com> <m2lgp19ghu.fsf@baylibre.com>
-Message-ID: <1497253225.3086.2.camel@baylibre.com>
+From: yuval.shaia@oracle.com (Yuval Shaia)
+Date: Mon, 12 Jun 2017 10:42:33 +0300
+Subject: [PATCH v1] net/phy: Make phy_ethtool_ksettings_get return void
+Message-ID: <20170612074233.8688-1-yuval.shaia@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-06-09 at 11:13 -0700, Kevin Hilman wrote:
-> Jerome Brunet <jbrunet@baylibre.com> writes:
-> 
-> > On Sun, 2017-06-04 at 20:33 +0200, Martin Blumenstingl wrote:
-> > > The clock controller on Meson8, Meson8b and Meson8m2 is very similar
-> > > based on the code from the Amlogic GPL kernel sources. Add separate
-> > > compatibles for each SoC to make sure that we can easily implement
-> > > all the small differences for each SoC later on.
-> > > 
-> > > In general the Meson8 and Meson8m2 seem to be almost identical as they
-> > > even share the same mach-meson8 directory in Amlogic's GPL kernel
-> > > sources.
-> > > The main clocks on Meson8, Meson8b and Meson8m2 are very similar,
-> > > because they are all using the same PLL values, 90% of the clock gates
-> > > are the same (the actual diffstat of the mach-meson8/clock.c and
-> > > mach-meson8b/clock.c files is around 30 to 40 lines, when excluding
-> > > all commented out code).
-> > > The difference between the Meson8 and Meson8b clock gates seem to be:
-> > > - Meson8 has AIU_PCLK, HDMI_RX, VCLK2_ENCT, VCLK2_ENCL, UART3,
-> > > ? CSI_DIG_CLKIN gates which don't seem to be available on Meson8b
-> > > - the gate on Meson8 for bit 7 seems to be named "_1200XXX" instead
-> > > ? of "PERIPHS_TOP" (on Meson8b)
-> > > - Meson8b has a SANA gate which doesn't seem to exist on Meson8 (or
-> > > ? on Meson8 the same bit is used by the UART3 gate in Amlogic's GPL
-> > > ? kernel sources)
-> > > None of these gates is added for now, since it's unclear whether these
-> > > definitions are actually correct (the VCLK2_ENCT gate for example is
-> > > defined, but only used in some commented block).
-> > > 
-> > > The main difference between all three SoCs seem to be the video (VPU)
-> > > clocks. Apart from different supported clock rates (according to vpu.c
-> > > in mach-meson8 and mach-meson8b from Amlogic's GPL kernel sources) the
-> > > most notable difference is that Meson8m2 has a GP_PLL clock and a mux
-> > > (probably the same as on the Meson GX SoCs) to support glitch-free
-> > > (clock rate) switching.
-> > > None of these VPU clocks are not supported by our mainline meson8b
-> > > clock driver yet though.
-> > > 
-> > > Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> > > ---
-> > > ?.../devicetree/bindings/clock/amlogic,meson8b-clkc.txt????????| 11
-> > > +++++++---
-> > 
-> > I think you should split the binding documentation and clk changes into
-> > separate
-> > patches.
-> > 
-> > > -
-> > > ?drivers/clk/meson/Kconfig?????????????????????????????????????|??6 +++---
-> > > ?drivers/clk/meson/meson8b.c???????????????????????????????????|??5 ++++-
-> > 
-> > The change being more platform than clock related, I'd prefer if Kevin or
-> > Carlo
-> > ack it before we apply it.
-> 
-> Acked-by: Kevin Hilman <khilman@baylibre.com>
+Make return value void since function never return meaningfull value
 
-Applied to next/drivers with Kevin and Rob's Acks.
+Signed-off-by: Yuval Shaia <yuval.shaia@oracle.com>
+Acked-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+---
+Re-sending since last time forgot to add netdev-list
+v0 ->v1:
+	* These files were missing in v0
+		* drivers/net/ethernet/renesas/ravb_main.c
+		* drivers/net/ethernet/renesas/sh_eth.c
+		* drivers/net/ethernet/ti/netcp_ethss.c
+	* Add Acked-by: Sergei Shtylyov
+---
+ drivers/net/ethernet/broadcom/b44.c                |  3 ++-
+ drivers/net/ethernet/broadcom/bcm63xx_enet.c       |  3 ++-
+ drivers/net/ethernet/broadcom/genet/bcmgenet.c     |  4 +++-
+ drivers/net/ethernet/broadcom/tg3.c                |  4 +++-
+ drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c |  6 ++----
+ drivers/net/ethernet/freescale/ucc_geth_ethtool.c  |  4 +++-
+ drivers/net/ethernet/marvell/mv643xx_eth.c         |  5 ++---
+ drivers/net/ethernet/renesas/ravb_main.c           | 14 +++++++-------
+ drivers/net/ethernet/renesas/sh_eth.c              |  5 ++---
+ drivers/net/ethernet/ti/cpsw.c                     |  9 +++++----
+ drivers/net/ethernet/ti/netcp_ethss.c              |  8 +++-----
+ drivers/net/phy/phy.c                              | 10 +++++-----
+ drivers/net/usb/lan78xx.c                          |  2 +-
+ include/linux/phy.h                                |  4 ++--
+ net/dsa/slave.c                                    |  9 +++++----
+ 15 files changed, 47 insertions(+), 43 deletions(-)
+
+diff --git a/drivers/net/ethernet/broadcom/b44.c b/drivers/net/ethernet/broadcom/b44.c
+index 5b95bb4..9873d2d 100644
+--- a/drivers/net/ethernet/broadcom/b44.c
++++ b/drivers/net/ethernet/broadcom/b44.c
+@@ -1836,7 +1836,8 @@ static int b44_get_link_ksettings(struct net_device *dev,
+ 
+ 	if (bp->flags & B44_FLAG_EXTERNAL_PHY) {
+ 		BUG_ON(!dev->phydev);
+-		return phy_ethtool_ksettings_get(dev->phydev, cmd);
++		phy_ethtool_ksettings_get(dev->phydev, cmd);
++		return 0;
+ 	}
+ 
+ 	supported = (SUPPORTED_Autoneg);
+diff --git a/drivers/net/ethernet/broadcom/bcm63xx_enet.c b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
+index 50d88d3..34ebb40 100644
+--- a/drivers/net/ethernet/broadcom/bcm63xx_enet.c
++++ b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
+@@ -1453,7 +1453,8 @@ static int bcm_enet_get_link_ksettings(struct net_device *dev,
+ 	if (priv->has_phy) {
+ 		if (!dev->phydev)
+ 			return -ENODEV;
+-		return phy_ethtool_ksettings_get(dev->phydev, cmd);
++		phy_ethtool_ksettings_get(dev->phydev, cmd);
++		return 0;
+ 	} else {
+ 		cmd->base.autoneg = 0;
+ 		cmd->base.speed = (priv->force_speed_100) ?
+diff --git a/drivers/net/ethernet/broadcom/genet/bcmgenet.c b/drivers/net/ethernet/broadcom/genet/bcmgenet.c
+index a205a9f..daca1c9 100644
+--- a/drivers/net/ethernet/broadcom/genet/bcmgenet.c
++++ b/drivers/net/ethernet/broadcom/genet/bcmgenet.c
+@@ -477,7 +477,9 @@ static int bcmgenet_get_link_ksettings(struct net_device *dev,
+ 	if (!priv->phydev)
+ 		return -ENODEV;
+ 
+-	return phy_ethtool_ksettings_get(priv->phydev, cmd);
++	phy_ethtool_ksettings_get(priv->phydev, cmd);
++
++	return 0;
+ }
+ 
+ static int bcmgenet_set_link_ksettings(struct net_device *dev,
+diff --git a/drivers/net/ethernet/broadcom/tg3.c b/drivers/net/ethernet/broadcom/tg3.c
+index 537d571..d600c41 100644
+--- a/drivers/net/ethernet/broadcom/tg3.c
++++ b/drivers/net/ethernet/broadcom/tg3.c
+@@ -12097,7 +12097,9 @@ static int tg3_get_link_ksettings(struct net_device *dev,
+ 		if (!(tp->phy_flags & TG3_PHYFLG_IS_CONNECTED))
+ 			return -EAGAIN;
+ 		phydev = mdiobus_get_phy(tp->mdio_bus, tp->phy_addr);
+-		return phy_ethtool_ksettings_get(phydev, cmd);
++		phy_ethtool_ksettings_get(phydev, cmd);
++
++		return 0;
+ 	}
+ 
+ 	supported = (SUPPORTED_Autoneg);
+diff --git a/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c b/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
+index 15571e2..aad825088 100644
+--- a/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
++++ b/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
+@@ -75,16 +75,14 @@ static char dpaa_stats_global[][ETH_GSTRING_LEN] = {
+ static int dpaa_get_link_ksettings(struct net_device *net_dev,
+ 				   struct ethtool_link_ksettings *cmd)
+ {
+-	int err;
+-
+ 	if (!net_dev->phydev) {
+ 		netdev_dbg(net_dev, "phy device not initialized\n");
+ 		return 0;
+ 	}
+ 
+-	err = phy_ethtool_ksettings_get(net_dev->phydev, cmd);
++	phy_ethtool_ksettings_get(net_dev->phydev, cmd);
+ 
+-	return err;
++	return 0;
+ }
+ 
+ static int dpaa_set_link_ksettings(struct net_device *net_dev,
+diff --git a/drivers/net/ethernet/freescale/ucc_geth_ethtool.c b/drivers/net/ethernet/freescale/ucc_geth_ethtool.c
+index b642990..4df282e 100644
+--- a/drivers/net/ethernet/freescale/ucc_geth_ethtool.c
++++ b/drivers/net/ethernet/freescale/ucc_geth_ethtool.c
+@@ -113,7 +113,9 @@ uec_get_ksettings(struct net_device *netdev, struct ethtool_link_ksettings *cmd)
+ 	if (!phydev)
+ 		return -ENODEV;
+ 
+-	return phy_ethtool_ksettings_get(phydev, cmd);
++	phy_ethtool_ksettings_get(phydev, cmd);
++
++	return 0;
+ }
+ 
+ static int
+diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
+index 25642de..5794d98 100644
+--- a/drivers/net/ethernet/marvell/mv643xx_eth.c
++++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
+@@ -1501,10 +1501,9 @@ mv643xx_eth_get_link_ksettings_phy(struct mv643xx_eth_private *mp,
+ 				   struct ethtool_link_ksettings *cmd)
+ {
+ 	struct net_device *dev = mp->dev;
+-	int err;
+ 	u32 supported, advertising;
+ 
+-	err = phy_ethtool_ksettings_get(dev->phydev, cmd);
++	phy_ethtool_ksettings_get(dev->phydev, cmd);
+ 
+ 	/*
+ 	 * The MAC does not support 1000baseT_Half.
+@@ -1520,7 +1519,7 @@ mv643xx_eth_get_link_ksettings_phy(struct mv643xx_eth_private *mp,
+ 	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
+ 						advertising);
+ 
+-	return err;
++	return 0;
+ }
+ 
+ static int
+diff --git a/drivers/net/ethernet/renesas/ravb_main.c b/drivers/net/ethernet/renesas/ravb_main.c
+index 3cd7989..9b8e210 100644
+--- a/drivers/net/ethernet/renesas/ravb_main.c
++++ b/drivers/net/ethernet/renesas/ravb_main.c
+@@ -1076,16 +1076,16 @@ static int ravb_get_link_ksettings(struct net_device *ndev,
+ 				   struct ethtool_link_ksettings *cmd)
+ {
+ 	struct ravb_private *priv = netdev_priv(ndev);
+-	int error = -ENODEV;
+ 	unsigned long flags;
+ 
+-	if (ndev->phydev) {
+-		spin_lock_irqsave(&priv->lock, flags);
+-		error = phy_ethtool_ksettings_get(ndev->phydev, cmd);
+-		spin_unlock_irqrestore(&priv->lock, flags);
+-	}
++	if (!ndev->phydev)
++		return -ENODEV;
+ 
+-	return error;
++	spin_lock_irqsave(&priv->lock, flags);
++	phy_ethtool_ksettings_get(ndev->phydev, cmd);
++	spin_unlock_irqrestore(&priv->lock, flags);
++
++	return 0;
+ }
+ 
+ static int ravb_set_link_ksettings(struct net_device *ndev,
+diff --git a/drivers/net/ethernet/renesas/sh_eth.c b/drivers/net/ethernet/renesas/sh_eth.c
+index 2d686cc..b2f0cea 100644
+--- a/drivers/net/ethernet/renesas/sh_eth.c
++++ b/drivers/net/ethernet/renesas/sh_eth.c
+@@ -1915,16 +1915,15 @@ static int sh_eth_get_link_ksettings(struct net_device *ndev,
+ {
+ 	struct sh_eth_private *mdp = netdev_priv(ndev);
+ 	unsigned long flags;
+-	int ret;
+ 
+ 	if (!ndev->phydev)
+ 		return -ENODEV;
+ 
+ 	spin_lock_irqsave(&mdp->lock, flags);
+-	ret = phy_ethtool_ksettings_get(ndev->phydev, cmd);
++	phy_ethtool_ksettings_get(ndev->phydev, cmd);
+ 	spin_unlock_irqrestore(&mdp->lock, flags);
+ 
+-	return ret;
++	return 0;
+ }
+ 
+ static int sh_eth_set_link_ksettings(struct net_device *ndev,
+diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+index f4d7aec..03707ee 100644
+--- a/drivers/net/ethernet/ti/cpsw.c
++++ b/drivers/net/ethernet/ti/cpsw.c
+@@ -2165,11 +2165,12 @@ static int cpsw_get_link_ksettings(struct net_device *ndev,
+ 	struct cpsw_common *cpsw = priv->cpsw;
+ 	int slave_no = cpsw_slave_index(cpsw, priv);
+ 
+-	if (cpsw->slaves[slave_no].phy)
+-		return phy_ethtool_ksettings_get(cpsw->slaves[slave_no].phy,
+-						 ecmd);
+-	else
++	if (cpsw->slaves[slave_no].phy) {
++		phy_ethtool_ksettings_get(cpsw->slaves[slave_no].phy, ecmd);
++		return 0;
++	} else {
+ 		return -EOPNOTSUPP;
++	}
+ }
+ 
+ static int cpsw_set_link_ksettings(struct net_device *ndev,
+diff --git a/drivers/net/ethernet/ti/netcp_ethss.c b/drivers/net/ethernet/ti/netcp_ethss.c
+index dd92950..0847a8f 100644
+--- a/drivers/net/ethernet/ti/netcp_ethss.c
++++ b/drivers/net/ethernet/ti/netcp_ethss.c
+@@ -1927,7 +1927,6 @@ static int keystone_get_link_ksettings(struct net_device *ndev,
+ 	struct netcp_intf *netcp = netdev_priv(ndev);
+ 	struct phy_device *phy = ndev->phydev;
+ 	struct gbe_intf *gbe_intf;
+-	int ret;
+ 
+ 	if (!phy)
+ 		return -EINVAL;
+@@ -1939,11 +1938,10 @@ static int keystone_get_link_ksettings(struct net_device *ndev,
+ 	if (!gbe_intf->slave)
+ 		return -EINVAL;
+ 
+-	ret = phy_ethtool_ksettings_get(phy, cmd);
+-	if (!ret)
+-		cmd->base.port = gbe_intf->slave->phy_port_t;
++	phy_ethtool_ksettings_get(phy, cmd);
++	cmd->base.port = gbe_intf->slave->phy_port_t;
+ 
+-	return ret;
++	return 0;
+ }
+ 
+ static int keystone_set_link_ksettings(struct net_device *ndev,
+diff --git a/drivers/net/phy/phy.c b/drivers/net/phy/phy.c
+index 82ab8fb..9c372bf 100644
+--- a/drivers/net/phy/phy.c
++++ b/drivers/net/phy/phy.c
+@@ -508,8 +508,8 @@ int phy_ethtool_gset(struct phy_device *phydev, struct ethtool_cmd *cmd)
+ }
+ EXPORT_SYMBOL(phy_ethtool_gset);
+ 
+-int phy_ethtool_ksettings_get(struct phy_device *phydev,
+-			      struct ethtool_link_ksettings *cmd)
++void phy_ethtool_ksettings_get(struct phy_device *phydev,
++			       struct ethtool_link_ksettings *cmd)
+ {
+ 	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
+ 						phydev->supported);
+@@ -531,8 +531,6 @@ int phy_ethtool_ksettings_get(struct phy_device *phydev,
+ 	cmd->base.autoneg = phydev->autoneg;
+ 	cmd->base.eth_tp_mdix_ctrl = phydev->mdix_ctrl;
+ 	cmd->base.eth_tp_mdix = phydev->mdix;
+-
+-	return 0;
+ }
+ EXPORT_SYMBOL(phy_ethtool_ksettings_get);
+ 
+@@ -1448,7 +1446,9 @@ int phy_ethtool_get_link_ksettings(struct net_device *ndev,
+ 	if (!phydev)
+ 		return -ENODEV;
+ 
+-	return phy_ethtool_ksettings_get(phydev, cmd);
++	phy_ethtool_ksettings_get(phydev, cmd);
++
++	return 0;
+ }
+ EXPORT_SYMBOL(phy_ethtool_get_link_ksettings);
+ 
+diff --git a/drivers/net/usb/lan78xx.c b/drivers/net/usb/lan78xx.c
+index 9eff97a..5833f7e 100644
+--- a/drivers/net/usb/lan78xx.c
++++ b/drivers/net/usb/lan78xx.c
+@@ -1490,7 +1490,7 @@ static int lan78xx_get_link_ksettings(struct net_device *net,
+ 	if (ret < 0)
+ 		return ret;
+ 
+-	ret = phy_ethtool_ksettings_get(phydev, cmd);
++	phy_ethtool_ksettings_get(phydev, cmd);
+ 
+ 	usb_autopm_put_interface(dev->intf);
+ 
+diff --git a/include/linux/phy.h b/include/linux/phy.h
+index e76e4ad..4ec07a6 100644
+--- a/include/linux/phy.h
++++ b/include/linux/phy.h
+@@ -844,8 +844,8 @@ void phy_stop_machine(struct phy_device *phydev);
+ void phy_trigger_machine(struct phy_device *phydev, bool sync);
+ int phy_ethtool_sset(struct phy_device *phydev, struct ethtool_cmd *cmd);
+ int phy_ethtool_gset(struct phy_device *phydev, struct ethtool_cmd *cmd);
+-int phy_ethtool_ksettings_get(struct phy_device *phydev,
+-			      struct ethtool_link_ksettings *cmd);
++void phy_ethtool_ksettings_get(struct phy_device *phydev,
++			       struct ethtool_link_ksettings *cmd);
+ int phy_ethtool_ksettings_set(struct phy_device *phydev,
+ 			      const struct ethtool_link_ksettings *cmd);
+ int phy_mii_ioctl(struct phy_device *phydev, struct ifreq *ifr, int cmd);
+diff --git a/net/dsa/slave.c b/net/dsa/slave.c
+index 7693182..ba9f78b 100644
+--- a/net/dsa/slave.c
++++ b/net/dsa/slave.c
+@@ -689,12 +689,13 @@ dsa_slave_get_link_ksettings(struct net_device *dev,
+ 			     struct ethtool_link_ksettings *cmd)
+ {
+ 	struct dsa_slave_priv *p = netdev_priv(dev);
+-	int err = -EOPNOTSUPP;
+ 
+-	if (p->phy != NULL)
+-		err = phy_ethtool_ksettings_get(p->phy, cmd);
++	if (!p->phy)
++		return -EOPNOTSUPP;
+ 
+-	return err;
++	phy_ethtool_ksettings_get(p->phy, cmd);
++
++	return 0;
+ }
+ 
+ static int
+-- 
+2.9.4
