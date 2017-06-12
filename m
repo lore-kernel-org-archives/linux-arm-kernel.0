@@ -1,87 +1,61 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Mon, 12 Jun 2017 12:40:29 +0200
-Subject: [PATCH 2/2] ARM: dts: imx6ul: Add imx6ul-tempmon
-In-Reply-To: <1497022484.28352.105.camel@nxp.com>
-References: <7055ce6095c0b7f026ac6f0dc37e43fc5c0b1793.1496939031.git.leonard.crestez@nxp.com>
- <b9b91617985607f24c4986bcad5199483805d6b7.1496939031.git.leonard.crestez@nxp.com>
- <CAOMZO5BP4fPyzDmSg+DFLRYh3QMf-8T0gqvnZn6mEMt-QqSgfw@mail.gmail.com>
- <1497005895.28352.88.camel@nxp.com>
- <20170609154638.3b64e6d0@karo-electronics.de>
- <1497022484.28352.105.camel@nxp.com>
-Message-ID: <20170612124029.1643469d@karo-electronics.de>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 12 Jun 2017 11:41:26 +0100
+Subject: [PATCH v3 7/9] net: mvmdio: add xmdio xsmi support
+In-Reply-To: <20170612101739.GA4902@n2100.armlinux.org.uk>
+References: <20170612095745.11300-1-antoine.tenart@free-electrons.com>
+ <20170612095745.11300-8-antoine.tenart@free-electrons.com>
+ <20170612101739.GA4902@n2100.armlinux.org.uk>
+Message-ID: <20170612104126.GB4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, 9 Jun 2017 18:34:44 +0300 Leonard Crestez wrote:
-> On Fri, 2017-06-09 at 15:46 +0200, Lothar Wa?mann wrote:
-> > On Fri, 9 Jun 2017 13:58:15 +0300 Leonard Crestez wrote:
-> > > On Thu, 2017-06-08 at 13:45 -0300, Fabio Estevam wrote:
-> > > > On Thu, Jun 8, 2017 at 1:26 PM, Leonard Crestez??wrote:
-> > > > > +???????????????????????tempmon: tempmon {
-> > > > > +???????????????????????????????compatible = "fsl,imx6ul-tempmon", "fsl,imx6sx-tempmon";
-> > > > > +???????????????????????????????interrupts = ;
-> > > > > +???????????????????????????????fsl,tempmon = <&anatop>;
-> > > > > +???????????????????????????????fsl,tempmon-data = <&ocotp>;
-> > > > > +???????????????????????????????clocks = <&clks IMX6UL_CLK_PLL3_USB_OTG>;
-> > > > Does the IMX6UL_CLK_PLL3_USB_OTG clock really control tempmon? Please
-> > > > double check.
-> > > Yes, as far as I can tell the tempmon block uses the 480 Mhz PLL3 clock
-> > > directly. This is similar to other imx6 SOCs. This PLL is used for
-> > > stuff like USB but not only that. My understanding is the _USB_OTG
-> > > suffix is descriptive, similar to PLL4_AUDIO and PLL6_ENET. Other non-
-> > > usb components use PLL3 (like UART) but through other gates/dividers.
-> > > 
-> > > Setting this to?IMX6UL_CLK_DUMMY will cause temperature reads to fail.
-> > > Even if PLL3 usually ends up being constantly enabled because of uarts
-> > > this is not true at imx_thermal_probe time (or uarts can be disabled).
-> > > 
-> > Since the driver is accessing the OCOTP registers it definitely needs
-> > the IMX6UL_CLK_OCOTP too!
-> > 
-> I don't think so. OCOTP reads fuse values into shadows registers on
-> chip reset and values seem to be available even if it's specific OCOTP
->
-Shadow registers are registers nonetheless which require a clock for
-accessing them.
-
-> clock is off. I think that clock is only required for writes or?shadow
-> updates.
+On Mon, Jun 12, 2017 at 11:17:39AM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jun 12, 2017 at 11:57:43AM +0200, Antoine Tenart wrote:
+> > +static const struct orion_mdio_ops *orion_mdio_get_ops(struct orion_mdio_dev *dev,
+> > +						       int regnum)
+> > +{
+> > +	if (dev->bus_type == BUS_TYPE_XSMI && (regnum & MII_ADDR_C45))
+> > +		return &orion_mdio_xsmi_ops;
+> > +	else if (dev->bus_type == BUS_TYPE_SMI)
+> > +		return &orion_mdio_smi_ops;
+> > +
+> > +	return ERR_PTR(-EOPNOTSUPP);
+> > +}
 > 
-Sometimes it helps to read the Reference Manual or take hardware and try
-it out. The i.MX6(Q|UL) Reference Manual lists the required clocks as:
-                                  Table 35-1. OCOTP Clocks
-Clock name       Clock Root           Description
-ipg_clk          ipg_clk_root         Peripheral clock
-ipg_clk_s        ipg_clk_root         Peripheral access clock
-
-and Table 18-3. "System Clocks, Gating, and Override (continued)"
-for i.MX6UL shows:
-OCOTP IPG_CLK   IPG_CLK_ROOT CCGR2[CG6] (IIM_CLK_ENABLE)
-      IPG_CLK_S IPG_CLK_ROOT CCGR2[CG6] (IIM_CLK_ENABLE)
-
-while the same table for i.MX6Q shows:
-OCOTP ipg_clk   ipg_clk_root CCGR2[CG6] (iim_clk_enable)
-      ipg_clk_s ipg_clk_root
-
-with a blank entry in the "Clock Gating" column for the access clock.
-So, for i.MX6Q there is no clock enable necessary for the access clock,
-but for i.MX6UL there is!
-
-You can simply verify it by trying to read any of the fuse registers
-with the OCOTP clock disabled (which immediately hangs the processor).
-
-> In theory perhaps tempmon could be made to read ocotp through the imx-
-> ocotp nvmem driver? It is not clear in what scenario this would
-> actually be required.
+> Oh, this is where you're doing it - I'm not sure having this complexity
+> is really necessary - there is no dynamic choice between the two.  This
+> seems to be way over-engineered.
 > 
-> This discussion is not specific to 6ul/6ull. There are other reads from
-> ocotp which don't enable it's clock, for example
-> imx6q_opp_check_speed_grading.
+> You might as well make the SMI operations fail if MII_ADDR_C45 is set,
+> and the XSMI operations fail if MII_ADDR_C45 is not set.
 > 
-Which works, because i.MX6Q doesn't require to enable the OCOTP access
-clock.
+> Hmm, I think this whole driver is over-engineered:
+> 
+> 1. the mdio read/write functions implement their own locking.
+> 
+>    At the MDIO level, there is already locking in the form of a per-bus
+>    lock "bus->mdio_lock" which will be taken whenever either of these
+>    functions is called.  So the driver's "dev->lock" is redundant.
+> 
+> 2. with the redundant locking removed, orion_mdio_write() becomes a
+>    call to orion_mdio_wait_ready() followed by a call to dev->ops->write.
+>    It seems that orion_mdio_wait_ready() could be a library function
+>    shared between a SMI version of orion_mdio_write() and a XSMI version.
+> 
+> 3. the same is really true of orion_mdio_read(), although that function
+>    is a little more complex in itself, the result would actually end up
+>    being simpler.
+> 
+> With those changes together, it elimates "struct orion_mdio_ops" entirely,
+> and I think makes the driver smaller, simpler, and cleaner.
 
+I wasn't able to completely get rid of the ops structure, but I think
+this is cleaner.  I haven't tested these two patches yet.
 
-Lothar Wa?mann
+ drivers/net/ethernet/marvell/mvmdio.c | 276 +++++++++++++++-------------------
+ 1 file changed, 123 insertions(+), 153 deletions(-)
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
