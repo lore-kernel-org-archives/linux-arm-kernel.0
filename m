@@ -1,48 +1,26 @@
-From: hoeun.ryu@gmail.com (Hoeun Ryu)
-Date: Mon, 12 Jun 2017 10:47:40 +0900
-Subject: [PATCH] arm:lpae: build TTB control register value from scratch in
- v7_ttb_setup
-Message-ID: <1497232084-31907-1-git-send-email-hoeun.ryu@gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Sun, 11 Jun 2017 19:00:43 -0700
+Subject: [PATCH v2] arm: eBPF JIT compiler
+In-Reply-To: <CAHgaXdJ=-n8J8ot_5YQC=YMZrwTBvdNTp5Ta_J_J9vNGWQ4DCQ@mail.gmail.com>
+References: <1495754003-21099-1-git-send-email-illusionist.neo@gmail.com>
+ <CAGXu5jKmLNMR+uhM9Ov2XPW6kCjip_SjScgEH0fTFp6fQtKFiA@mail.gmail.com>
+ <CAHgaXdJ=-n8J8ot_5YQC=YMZrwTBvdNTp5Ta_J_J9vNGWQ4DCQ@mail.gmail.com>
+Message-ID: <CAGXu5jKHQNO8QtbfudLZ8vg1FmdLb3SiMikTvkEryggUQz=AcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Reading TTBCR in early boot stage might return the value of the previous
-kernel's configuration, especially in case of kexec. For example, if
-normal kernel (first kernel) had run on a configuration of PHYS_OFFSET <=
-PAGE_OFFSET and crash kernel (second kernel) is running on a configuration
-PHYS_OFFSET > PAGE_OFFSET, which can happen because it depends on the
-reserved area for crash kernel, reading TTBCR and using the value to OR
-other bit fields might be risky because it doesn't have a reset value for
-TTBCR.
+On Tue, Jun 6, 2017 at 12:47 PM, Shubham Bansal
+<illusionist.neo@gmail.com> wrote:
+> Hi Russell, Alexei, David, Daniel, kees,
+>
+> Any update on this patch moving forward?
 
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
-Suggested-by: Robin Murphy <robin.murphy@arm.com>
-Signed-off-by: Hoeun Ryu <hoeun.ryu@gmail.com>
+Since this has gotten testing by various people and passes the
+existing self-tests, I think this can probably go in via the ARM patch
+tracker? Russell does that sound okay to you?
 
----
+-Kees
 
- * add Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
- * v1: amended based on
-     - "[PATCHv2] arm: LPAE: kexec: clear TTBCR.T1SZ explicitly when
-        PHYS_OFFSET > PAGE_OFFSET"
-     - https://lkml.org/lkml/2017/6/5/239
-
- arch/arm/mm/proc-v7-3level.S | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
-index 5e5720e..7d16bbc 100644
---- a/arch/arm/mm/proc-v7-3level.S
-+++ b/arch/arm/mm/proc-v7-3level.S
-@@ -129,8 +129,7 @@ ENDPROC(cpu_v7_set_pte_ext)
- 	.macro	v7_ttb_setup, zero, ttbr0l, ttbr0h, ttbr1, tmp
- 	ldr	\tmp, =swapper_pg_dir		@ swapper_pg_dir virtual address
- 	cmp	\ttbr1, \tmp, lsr #12		@ PHYS_OFFSET > PAGE_OFFSET?
--	mrc	p15, 0, \tmp, c2, c0, 2		@ TTB control egister
--	orr	\tmp, \tmp, #TTB_EAE
-+	mov	\tmp, #TTB_EAE			@ for TTB control egister
- 	ALT_SMP(orr	\tmp, \tmp, #TTB_FLAGS_SMP)
- 	ALT_UP(orr	\tmp, \tmp, #TTB_FLAGS_UP)
- 	ALT_SMP(orr	\tmp, \tmp, #TTB_FLAGS_SMP << 16)
 -- 
-2.7.4
+Kees Cook
+Pixel Security
