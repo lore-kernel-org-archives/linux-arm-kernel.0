@@ -1,66 +1,83 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Mon, 12 Jun 2017 14:04:16 +0100
-Subject: [PATCH 0/6] arm, arm64: frequency- and cpu-invariant accounting
- support for task scheduler
-In-Reply-To: <20170612130052.6ujugxmbxarvgsyf@e106622-lin>
-References: <20170608075513.12475-1-dietmar.eggemann@arm.com>
- <20170612130052.6ujugxmbxarvgsyf@e106622-lin>
-Message-ID: <20170612130416.yhxp4cogdjkgwjqm@e106622-lin>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 12 Jun 2017 14:49:45 +0200
+Subject: [PATCH v4 6/7] ARM: dts: meson8: switch to new bindings for UART
+ nodes
+In-Reply-To: <1497258823.3086.6.camel@baylibre.com>
+References: <1497001756-942-1-git-send-email-narmstrong@baylibre.com>
+ <1497001756-942-7-git-send-email-narmstrong@baylibre.com>
+ <1497258823.3086.6.camel@baylibre.com>
+Message-ID: <bec2573f-ff71-8c69-9581-e74cdd80a551@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This time hopefully fixing Vincent's email address..
+On 06/12/2017 11:13 AM, Jerome Brunet wrote:
+> On Fri, 2017-06-09 at 11:49 +0200, Neil Armstrong wrote:
+>> Switch to the stable UART bindings by adding a XTAL node and using the
+>> proper compatible strings.
+>>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>>  arch/arm/boot/dts/meson8.dtsi | 23 +++++++++++++++++++----
+>>  1 file changed, 19 insertions(+), 4 deletions(-)
+> 
+> I think this is clashing with the recent change from Martin on meson8 clock
+> driver. Kevin just applied it : 
+> 
+> https://lkml.kernel.org/r/m2d1ad9g38.fsf at baylibre.com
+> 
+> <&clk81> no longer exists ...
+> 
+>>
+>> diff --git a/arch/arm/boot/dts/meson8.dtsi b/arch/arm/boot/dts/meson8.dtsi
+>> index 6993077..a2ea112 100644
+>> --- a/arch/arm/boot/dts/meson8.dtsi
+>> +++ b/arch/arm/boot/dts/meson8.dtsi
+>> @@ -83,6 +83,13 @@
+>>  		};
+>>  	};
+>>  
+>> +	xtal: xtal-clk {
+>> +		compatible = "fixed-clock";
+>> +		clock-frequency = <24000000>;
+>> +		clock-output-names = "xtal";
+>> +		#clock-cells = <0>;
+>> +	};
+>> +
+>>  	clk81: clk at 0 {
+>>  		#clock-cells = <0>;
+>>  		compatible = "fixed-clock";
+>> @@ -199,17 +206,25 @@
+>>  };
+>>  
+>>  &uart_AO {
+>> -	clocks = <&clk81>;
+>> +	compatible = "amlogic,meson8-uart", "amlogic,meson-ao-uart";
+>> +	clocks = <&xtal>, <&clk81>, <&clk81>;
+>> +	clock-names = "xtal", "pclk", "baud";
+>>  };
+>>  
+>>  &uart_A {
+>> -	clocks = <&clk81>;
+>> +	compatible = "amlogic,meson8-uart";
+>> +	clocks = <&xtal>, <&clk81>, <&clk81>;
+>> +	clock-names = "xtal", "pclk", "baud";
+>>  };
+>>  
+>>  &uart_B {
+>> -	clocks = <&clk81>;
+>> +	compatible = "amlogic,meson8-uart";
+>> +	clocks = <&xtal>, <&clk81>, <&clk81>;
+>> +	clock-names = "xtal", "pclk", "baud";
+>>  };
+>>  
+>>  &uart_C {
+>> -	clocks = <&clk81>;
+>> +	compatible = "amlogic,meson8-uart";
+>> +	clocks = <&xtal>, <&clk81>, <&clk81>;
+>> +	clock-names = "xtal", "pclk", "baud";
+>>  };
+> 
 
-On 12/06/17 14:00, Juri Lelli wrote:
-> Hi Dietmar,
-> 
-> On 08/06/17 08:55, Dietmar Eggemann wrote:
-> > For a more accurate (i.e. frequency- and cpu-invariant) load-tracking
-> > the task scheduler needs a frequency-scaling and on a heterogeneous
-> > system a cpu-scaling correction factor.
-> > 
-> > This patch-set implements a Frequency Invariance Engine (FIE)
-> > (topology_get_freq_scale()) in drivers/base/arch_topology.c to provide
-> > a frequency-scaling correction factor.
-> > 
-> > The Cpu Invariance Engine (CIE) (topology_get_cpu_scale()) providing a
-> > cpu-scaling correction factor was already introduced by the "Fix issues
-> > and factorize arm/arm64 capacity information code" patch-set [1].
-> > 
-> > This patch-set also enables the frequency- and cpu-invariant accounting
-> > support. Enabling here means to associate (wire) the task scheduler
-> > cname arch_scale_freq_capacity and arch_scale_cpu_capacity with the FIE
-> > and CIE function names from drivers/base/arch_topology.c. This replaces
-> > the task scheduler's default FIE and CIE in kernel/sched/sched.h.
-> > 
-> > Patch high level description:
-> > 
-> >  [   01/06] Rework cpufreq policy notifier for frequency-invariant
-> >             accounting support
-> >  [   02/06] Frequency Invariance Engine (FIE)
-> >  [03,04/06] Enable frequency- and cpu-invariant accounting support on
-> >             arm
-> >  [05,06/06] Enable frequency- and cpu-invariant accounting support on
-> >             arm64
-> > 
-> > The patch-set is based on top of linux-next/master (tag: next-20170607)
-> > and it is also available from:
-> > 
-> >  git://linux-arm.org/linux-de.git upstream/freq_and_cpu_inv
-> > 
-> > It has been tested on TC2 (arm) and JUNO (arm64) by running a ramp-up
-> > rt-app task pinned to a cpu with the ondemand cpufreq governor and
-> > checking the load-tracking signals of this task.
-> > 
-> 
-> The whole set looks OK to me, and I tested it as well.
-> 
-> Feel free to add my
-> 
-> Reviewed-and-tested-by: Juri Lelli <juri.lelli@arm.com>
-> 
-> to it.
-> 
-> Best,
-> 
-> - Juri
+I will drop this until martin has a better version, and tested !
+
+Neil
