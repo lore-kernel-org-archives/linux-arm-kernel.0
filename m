@@ -1,42 +1,49 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 12 Jun 2017 17:34:54 +0200
-Subject: [PATCH v3 3/9] pinctrl: avoid PLAT_ORION dependency
+Date: Mon, 12 Jun 2017 17:34:52 +0200
+Subject: [PATCH v3 1/9] gpio: mvebu: fix regmap_update_bits usage
 In-Reply-To: <cover.d003a5e862e6d732d901a61d1765a349c9a89eef.1497281623.git-series.gregory.clement@free-electrons.com>
 References: <cover.d003a5e862e6d732d901a61d1765a349c9a89eef.1497281623.git-series.gregory.clement@free-electrons.com>
-Message-ID: <58b227242d015c9a9db62bfd331be351037b1054.1497281623.git-series.gregory.clement@free-electrons.com>
+Message-ID: <9a098130daa8daeef89fd6c1e80d982699d5c175.1497281623.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King <rmk+kernel@armlinux.org.uk>
+In some place in the driver regmap_update_bits was misused. Indeed the
+last argument is not the value of the bit (or group of bits) itself but
+the mask value inside the register.
 
-Armada 8040 also needs orion pinctrl, and as these symbols are only
-selected, there's no need to make them depend on PLAT_ORION.
+So when setting the bit N, then the value must be BIT(N) and not 1.
 
+CC: Chris Packham <Chris.Packham@alliedtelesis.co.nz>
+CC: Ralph Sennhauser <ralph.sennhauser@gmail.com>
 Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+Tested-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
+Tested-by: Chris Packham <Chris.Packham@alliedtelesis.co.nz>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/pinctrl/mvebu/Kconfig | 4 ----
- 1 file changed, 4 deletions(-)
+ drivers/gpio/gpio-mvebu.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pinctrl/mvebu/Kconfig b/drivers/pinctrl/mvebu/Kconfig
-index 5bade32d3089..8cb444b60ae9 100644
---- a/drivers/pinctrl/mvebu/Kconfig
-+++ b/drivers/pinctrl/mvebu/Kconfig
-@@ -1,5 +1,3 @@
--if PLAT_ORION
--
- config PINCTRL_MVEBU
- 	bool
- 	select PINMUX
-@@ -38,8 +36,6 @@ config PINCTRL_ORION
- 	bool
- 	select PINCTRL_MVEBU
+diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
+index 4aec8762fdc5..d5939913d310 100644
+--- a/drivers/gpio/gpio-mvebu.c
++++ b/drivers/gpio/gpio-mvebu.c
+@@ -341,7 +341,7 @@ static int mvebu_gpio_direction_input(struct gpio_chip *chip, unsigned int pin)
+ 		return ret;
  
--endif
--
- config PINCTRL_ARMADA_37XX
-        bool
-        select GENERIC_PINCONF
+ 	regmap_update_bits(mvchip->regs, GPIO_IO_CONF_OFF,
+-			   BIT(pin), 1);
++			   BIT(pin), BIT(pin));
+ 
+ 	return 0;
+ }
+@@ -503,7 +503,7 @@ static int mvebu_gpio_irq_set_type(struct irq_data *d, unsigned int type)
+ 	case IRQ_TYPE_EDGE_FALLING:
+ 	case IRQ_TYPE_LEVEL_LOW:
+ 		regmap_update_bits(mvchip->regs, GPIO_IN_POL_OFF,
+-				   BIT(pin), 1);
++				   BIT(pin), BIT(pin));
+ 		break;
+ 	case IRQ_TYPE_EDGE_BOTH: {
+ 		u32 data_in, in_pol, val;
 -- 
 git-series 0.9.1
