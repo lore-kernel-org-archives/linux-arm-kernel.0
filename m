@@ -1,197 +1,148 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 12 Jun 2017 18:51:04 -0500
-Subject: [PATCH] PCI: dwc: Constify dw_pcie_host_ops structures
-In-Reply-To: <20170605085346.3732-1-jszhang@marvell.com>
-References: <20170605085346.3732-1-jszhang@marvell.com>
-Message-ID: <20170612235104.GF4379@bhelgaas-glaptop.roam.corp.google.com>
+From: kdinh@apm.com (Khuong Dinh)
+Date: Mon, 12 Jun 2017 16:58:20 -0700
+Subject: [RFT PATCH v2 00/42] PCI: ARM/ARM64: remove pci_fixup_irqs() usage
+In-Reply-To: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
+References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
+Message-ID: <CAAsHzqsxRC18cN8fgZM7827QmisWATv9ZhkSdtroEiS-iYwmdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 05, 2017 at 04:53:46PM +0800, Jisheng Zhang wrote:
-> The dw_pcie_host_ops structures are never modified. Constify these
-> structures such that these can be write-protected.
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Hi Lorenzo,
 
-Applied with Jingoo's ack to pci/host-designware for v4.13, thanks!
+Tested-by: Khuong Dinh <kdinh@apm.com>
 
-> ---
->  drivers/pci/dwc/pci-dra7xx.c           | 2 +-
->  drivers/pci/dwc/pci-exynos.c           | 2 +-
->  drivers/pci/dwc/pci-imx6.c             | 2 +-
->  drivers/pci/dwc/pci-keystone.c         | 2 +-
->  drivers/pci/dwc/pci-layerscape.c       | 6 +++---
->  drivers/pci/dwc/pcie-armada8k.c        | 2 +-
->  drivers/pci/dwc/pcie-artpec6.c         | 2 +-
->  drivers/pci/dwc/pcie-designware-plat.c | 2 +-
->  drivers/pci/dwc/pcie-designware.h      | 2 +-
->  drivers/pci/dwc/pcie-qcom.c            | 2 +-
->  drivers/pci/dwc/pcie-spear13xx.c       | 2 +-
->  11 files changed, 13 insertions(+), 13 deletions(-)
-> 
-> diff --git a/drivers/pci/dwc/pci-dra7xx.c b/drivers/pci/dwc/pci-dra7xx.c
-> index 8decf46cf525..e4166032b3c6 100644
-> --- a/drivers/pci/dwc/pci-dra7xx.c
-> +++ b/drivers/pci/dwc/pci-dra7xx.c
-> @@ -208,7 +208,7 @@ static void dra7xx_pcie_host_init(struct pcie_port *pp)
->  	dra7xx_pcie_enable_interrupts(dra7xx);
->  }
->  
-> -static struct dw_pcie_host_ops dra7xx_pcie_host_ops = {
-> +static const struct dw_pcie_host_ops dra7xx_pcie_host_ops = {
->  	.host_init = dra7xx_pcie_host_init,
->  };
->  
-> diff --git a/drivers/pci/dwc/pci-exynos.c b/drivers/pci/dwc/pci-exynos.c
-> index 546082ad5a3f..c78c06552590 100644
-> --- a/drivers/pci/dwc/pci-exynos.c
-> +++ b/drivers/pci/dwc/pci-exynos.c
-> @@ -590,7 +590,7 @@ static void exynos_pcie_host_init(struct pcie_port *pp)
->  	exynos_pcie_enable_interrupts(ep);
->  }
->  
-> -static struct dw_pcie_host_ops exynos_pcie_host_ops = {
-> +static const struct dw_pcie_host_ops exynos_pcie_host_ops = {
->  	.rd_own_conf = exynos_pcie_rd_own_conf,
->  	.wr_own_conf = exynos_pcie_wr_own_conf,
->  	.host_init = exynos_pcie_host_init,
-> diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
-> index a98cba55c7f0..fb4816088a7a 100644
-> --- a/drivers/pci/dwc/pci-imx6.c
-> +++ b/drivers/pci/dwc/pci-imx6.c
-> @@ -602,7 +602,7 @@ static int imx6_pcie_link_up(struct dw_pcie *pci)
->  			PCIE_PHY_DEBUG_R1_XMLH_LINK_UP;
->  }
->  
-> -static struct dw_pcie_host_ops imx6_pcie_host_ops = {
-> +static const struct dw_pcie_host_ops imx6_pcie_host_ops = {
->  	.host_init = imx6_pcie_host_init,
->  };
->  
-> diff --git a/drivers/pci/dwc/pci-keystone.c b/drivers/pci/dwc/pci-keystone.c
-> index fcc9723bad6e..4783cec1f78d 100644
-> --- a/drivers/pci/dwc/pci-keystone.c
-> +++ b/drivers/pci/dwc/pci-keystone.c
-> @@ -291,7 +291,7 @@ static void __init ks_pcie_host_init(struct pcie_port *pp)
->  			"Asynchronous external abort");
->  }
->  
-> -static struct dw_pcie_host_ops keystone_pcie_host_ops = {
-> +static const struct dw_pcie_host_ops keystone_pcie_host_ops = {
->  	.rd_other_conf = ks_dw_pcie_rd_other_conf,
->  	.wr_other_conf = ks_dw_pcie_wr_other_conf,
->  	.host_init = ks_pcie_host_init,
-> diff --git a/drivers/pci/dwc/pci-layerscape.c b/drivers/pci/dwc/pci-layerscape.c
-> index 27d638c4e134..fd861289ad8b 100644
-> --- a/drivers/pci/dwc/pci-layerscape.c
-> +++ b/drivers/pci/dwc/pci-layerscape.c
-> @@ -39,7 +39,7 @@ struct ls_pcie_drvdata {
->  	u32 lut_offset;
->  	u32 ltssm_shift;
->  	u32 lut_dbg;
-> -	struct dw_pcie_host_ops *ops;
-> +	const struct dw_pcie_host_ops *ops;
->  	const struct dw_pcie_ops *dw_pcie_ops;
->  };
->  
-> @@ -185,12 +185,12 @@ static int ls_pcie_msi_host_init(struct pcie_port *pp,
->  	return 0;
->  }
->  
-> -static struct dw_pcie_host_ops ls1021_pcie_host_ops = {
-> +static const struct dw_pcie_host_ops ls1021_pcie_host_ops = {
->  	.host_init = ls1021_pcie_host_init,
->  	.msi_host_init = ls_pcie_msi_host_init,
->  };
->  
-> -static struct dw_pcie_host_ops ls_pcie_host_ops = {
-> +static const struct dw_pcie_host_ops ls_pcie_host_ops = {
->  	.host_init = ls_pcie_host_init,
->  	.msi_host_init = ls_pcie_msi_host_init,
->  };
-> diff --git a/drivers/pci/dwc/pcie-armada8k.c b/drivers/pci/dwc/pcie-armada8k.c
-> index 495b023042b3..ea8f34af6a85 100644
-> --- a/drivers/pci/dwc/pcie-armada8k.c
-> +++ b/drivers/pci/dwc/pcie-armada8k.c
-> @@ -160,7 +160,7 @@ static irqreturn_t armada8k_pcie_irq_handler(int irq, void *arg)
->  	return IRQ_HANDLED;
->  }
->  
-> -static struct dw_pcie_host_ops armada8k_pcie_host_ops = {
-> +static const struct dw_pcie_host_ops armada8k_pcie_host_ops = {
->  	.host_init = armada8k_pcie_host_init,
->  };
->  
-> diff --git a/drivers/pci/dwc/pcie-artpec6.c b/drivers/pci/dwc/pcie-artpec6.c
-> index 82a04acc42fd..01c6f7823672 100644
-> --- a/drivers/pci/dwc/pcie-artpec6.c
-> +++ b/drivers/pci/dwc/pcie-artpec6.c
-> @@ -184,7 +184,7 @@ static void artpec6_pcie_host_init(struct pcie_port *pp)
->  	artpec6_pcie_enable_interrupts(artpec6_pcie);
->  }
->  
-> -static struct dw_pcie_host_ops artpec6_pcie_host_ops = {
-> +static const struct dw_pcie_host_ops artpec6_pcie_host_ops = {
->  	.host_init = artpec6_pcie_host_init,
->  };
->  
-> diff --git a/drivers/pci/dwc/pcie-designware-plat.c b/drivers/pci/dwc/pcie-designware-plat.c
-> index a9865d91b43c..091b4e7ad059 100644
-> --- a/drivers/pci/dwc/pcie-designware-plat.c
-> +++ b/drivers/pci/dwc/pcie-designware-plat.c
-> @@ -46,7 +46,7 @@ static void dw_plat_pcie_host_init(struct pcie_port *pp)
->  		dw_pcie_msi_init(pp);
->  }
->  
-> -static struct dw_pcie_host_ops dw_plat_pcie_host_ops = {
-> +static const struct dw_pcie_host_ops dw_plat_pcie_host_ops = {
->  	.host_init = dw_plat_pcie_host_init,
->  };
->  
-> diff --git a/drivers/pci/dwc/pcie-designware.h b/drivers/pci/dwc/pcie-designware.h
-> index c6a840575796..b4d2a89f8e58 100644
-> --- a/drivers/pci/dwc/pcie-designware.h
-> +++ b/drivers/pci/dwc/pcie-designware.h
-> @@ -162,7 +162,7 @@ struct pcie_port {
->  	struct resource		*mem;
->  	struct resource		*busn;
->  	int			irq;
-> -	struct dw_pcie_host_ops	*ops;
-> +	const struct dw_pcie_host_ops *ops;
->  	int			msi_irq;
->  	struct irq_domain	*irq_domain;
->  	unsigned long		msi_data;
-> diff --git a/drivers/pci/dwc/pcie-qcom.c b/drivers/pci/dwc/pcie-qcom.c
-> index 96ee527c1ed2..39e8c0095715 100644
-> --- a/drivers/pci/dwc/pcie-qcom.c
-> +++ b/drivers/pci/dwc/pcie-qcom.c
-> @@ -634,7 +634,7 @@ static int qcom_pcie_rd_own_conf(struct pcie_port *pp, int where, int size,
->  	return dw_pcie_read(pci->dbi_base + where, size, val);
->  }
->  
-> -static struct dw_pcie_host_ops qcom_pcie_dw_ops = {
-> +static const struct dw_pcie_host_ops qcom_pcie_dw_ops = {
->  	.host_init = qcom_pcie_host_init,
->  	.rd_own_conf = qcom_pcie_rd_own_conf,
->  };
-> diff --git a/drivers/pci/dwc/pcie-spear13xx.c b/drivers/pci/dwc/pcie-spear13xx.c
-> index 8ff36b3dbbdf..80897291e0fb 100644
-> --- a/drivers/pci/dwc/pcie-spear13xx.c
-> +++ b/drivers/pci/dwc/pcie-spear13xx.c
-> @@ -186,7 +186,7 @@ static void spear13xx_pcie_host_init(struct pcie_port *pp)
->  	spear13xx_pcie_enable_interrupts(spear13xx_pcie);
->  }
->  
-> -static struct dw_pcie_host_ops spear13xx_pcie_host_ops = {
-> +static const struct dw_pcie_host_ops spear13xx_pcie_host_ops = {
->  	.host_init = spear13xx_pcie_host_init,
->  };
->  
-> -- 
-> 2.11.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I tested the patchset on X-Gene boards. It works fine with e1000e.
+
+Best regards,
+Khuong Dinh
+
+On Thu, Jun 8, 2017 at 7:13 AM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> v1 -> v2
+>
+> - Split pci_fixup_irqs() removal in several patches
+> - Embedded pci_register_host_bridge() in pci_scan_root_bus_bridge()
+> - Refactored iproc, faraday and xilinx-nwl host bridges in preparation
+>   for irq fixup removal
+> - Converted all DT PCI host bridge drivers to pci_scan_root_bus_bridge()
+> - Dropped RFC tag
+> - Added devm_pci_alloc_host_bridge() interface
+> - Rebased against v4.12-rc3
+>
+> v1: http://marc.info/?l=linux-pci&m=149320545522205&w=2
+>
+> Current pci_fixup_irqs() usage on ARM/ARM64 host controller drivers is
+> flawed in that pci_fixup_irqs() allocates IRQs for all PCI devices present
+> in a system; those PCI devices possibly belong to different PCI bus trees
+> (and possibly rooted at different host bridges) and may well be enabled
+> (ie probed and bound to a driver) by the time pci_fixup_irqs() is called
+> when probing a given host bridge driver.
+>
+> Furthermore, current kernel code relying on pci_fixup_irqs() to
+> assign legacy PCI IRQs to devices does not work at all for
+> hotplugged devices in that the code carrying out the IRQ fixup
+> is called at host bridge driver probe time, which just cannot take
+> into account devices hotplugged after system has booted.
+>
+> By leveraging Matthew Minter's patch series (and its purpose):
+>
+> http://lkml.kernel.org/r/1445576642-29624-2-git-send-email-matt at masarand.com
+>
+> this series[1] adds IRQs mapping and swizzling primitives to
+> the struct pci_host_bridge which allows IRQs to be allocated for
+> for a device at probe time with host bridge specific functions,
+> fixing the aforementioned limitations.
+>
+> Current series remove pci_fixup_irqs() usage on ARM/ARM64; removal
+> can be extended to other architectures provided the IRQs map/swizzle
+> functions are set-up properly in the respective host bridges
+> set-up/probe paths.
+>
+> Tested on kvmtool with PCI host generic.
+>
+> [1] git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git pci/pci-fixup-irqs-removal-v2
+>
+> Lorenzo Pieralisi (37):
+>   PCI: xilinx-nwl: Remove nwl_pcie_enable_msi() unused bus parameter
+>   drivers: pci: host: iproc: Convert link check to raw PCI config
+>     accessors
+>   drivers: pci: host: ftpci100: convert IRQ masking to raw PCI config
+>     accessors
+>   PCI: Initialize bridge release function at bridge allocation
+>   PCI: Add pci_free_host_bridge interface
+>   PCI: Add devm_pci_alloc_host_bridge() interface
+>   drivers: pci: host: ftpci100: Fix host bridge memory leakage
+>   drivers: pci: host: tegra: Fix host bridge memory leakage
+>   PCI: Introduce pci_scan_root_bus_bridge()
+>   PCI: Make pci_register_host_bridge() PCI core internal
+>   ARM: PCI: bios32: Convert PCI scan API to pci_scan_root_bus_bridge()
+>   PCI: designware: Convert PCI scan API to pci_scan_root_bus_bridge()
+>   PCI: aardvark: Convert PCI scan API to pci_scan_root_bus_bridge()
+>   PCI: rcar: Convert PCI scan API to pci_scan_root_bus_bridge()
+>   PCI: iproc: Convert PCI scan API to pci_scan_root_bus_bridge()
+>   PCI: versatile: Convert PCI scan API to pci_scan_root_bus_bridge()
+>   PCI: altera: Convert PCI scan API to pci_scan_root_bus_bridge()
+>   PCI: xilinx: Convert PCI scan API to pci_scan_root_bus_bridge()
+>   PCI: xgene: Convert PCI scan API to pci_scan_root_bus_bridge()
+>   PCI: host-common: Convert PCI scan API to pci_scan_root_bus_bridge()
+>   PCI: rockchip: Convert PCI scan API to pci_scan_root_bus_bridge()
+>   PCI: xilinx-nwl: Convert PCI scan API to pci_scan_root_bus_bridge()
+>   PCI: Remove pci_scan_root_bus_msi()
+>   ARM: PCI: Remove pci_fixup_irqs() call for bios32 host controllers
+>   PCI: tegra: Drop pci_fixup_irqs()
+>   PCI: xilinx: Drop pci_fixup_irqs()
+>   PCI: rcar: Drop pci_fixup_irqs()
+>   PCI: iproc: Drop pci_fixup_irqs()
+>   PCI: designware-host: Drop pci_fixup_irqs()
+>   PCI: ftpci100: Drop pci_fixup_irqs()
+>   PCI: host-common: Drop pci_fixup_irqs()
+>   PCI: versatile: Drop pci_fixup_irqs()
+>   PCI: altera: Drop pci_fixup_irqs()
+>   PCI: xgene: Move to struct pci_host_bridge IRQ mapping functions
+>   PCI: rockchip: Move to struct pci_host_bridge IRQ mapping functions
+>   PCI: xilinx-nwl: Move to struct pci_host_bridge IRQ mapping functions
+>   ARM64: PCI: Drop DT IRQ allocation from pcibios_alloc_irq()
+>
+> Matthew Minter (5):
+>   PCI: Build setup-irq.o on all arches
+>   PCI: Add IRQ mapping function pointers to pci_host_bridge struct
+>   PCI: Add pci_assign_irq() function and have pci_fixup_irqs() use it
+>   OF/PCI: Update of_irq_parse_and_map_pci() comment
+>   PCI: Add a call to pci_assign_irq() in pci_device_probe()
+>
+>  Documentation/driver-model/devres.txt  |   1 +
+>  arch/arm/include/asm/mach/pci.h        |   3 +-
+>  arch/arm/kernel/bios32.c               |  43 +++++++----
+>  arch/arm/mach-dove/pcie.c              |  33 +++++---
+>  arch/arm/mach-iop13xx/pci.c            |  31 +++++---
+>  arch/arm/mach-iop13xx/pci.h            |   3 +-
+>  arch/arm/mach-mv78xx0/pcie.c           |   8 +-
+>  arch/arm/mach-orion5x/common.h         |   3 +-
+>  arch/arm/mach-orion5x/pci.c            |  39 ++++++----
+>  arch/arm64/kernel/pci.c                |  10 +--
+>  drivers/of/of_pci_irq.c                |   3 +-
+>  drivers/pci/Makefile                   |  17 +----
+>  drivers/pci/dwc/pcie-designware-host.c |  43 ++++++-----
+>  drivers/pci/host/pci-aardvark.c        |  21 +++--
+>  drivers/pci/host/pci-ftpci100.c        |  50 +++++++-----
+>  drivers/pci/host/pci-host-common.c     |  27 +++++--
+>  drivers/pci/host/pci-tegra.c           |   9 +--
+>  drivers/pci/host/pci-versatile.c       |  22 +++++-
+>  drivers/pci/host/pci-xgene.c           |  23 ++++--
+>  drivers/pci/host/pcie-altera.c         |  24 ++++--
+>  drivers/pci/host/pcie-iproc-bcma.c     |   7 +-
+>  drivers/pci/host/pcie-iproc-platform.c |   7 +-
+>  drivers/pci/host/pcie-iproc.c          | 135 +++++++++++++++++++++++----------
+>  drivers/pci/host/pcie-rcar.c           |  40 ++++++----
+>  drivers/pci/host/pcie-rockchip.c       |  24 ++++--
+>  drivers/pci/host/pcie-xilinx-nwl.c     |  34 ++++++---
+>  drivers/pci/host/pcie-xilinx.c         |  34 +++++----
+>  drivers/pci/pci-driver.c               |   2 +
+>  drivers/pci/probe.c                    | 105 ++++++++++++++++++-------
+>  drivers/pci/setup-irq.c                |  45 ++++++++---
+>  include/linux/pci.h                    |  12 +--
+>  31 files changed, 565 insertions(+), 293 deletions(-)
+>
+> --
+> 2.10.0
+>
