@@ -1,56 +1,60 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 12 Jun 2017 10:38:01 +0200
-Subject: [PATCH v2] arm64: allwinner: h5: Add initial Orangepi Zero Plus
- 2 support
-In-Reply-To: <1497099474-5435-1-git-send-email-jteki@openedev.com>
-References: <1497099474-5435-1-git-send-email-jteki@openedev.com>
-Message-ID: <20170612083801.guu4gv5osbjs2qe5@flea.home>
+Date: Mon, 12 Jun 2017 10:38:38 +0200
+Subject: [PATCH v2] arm64: allwinner: a64: Add initial Orangepi
+ Win/WinPlus support
+In-Reply-To: <1497172565-13125-1-git-send-email-jteki@openedev.com>
+References: <1497172565-13125-1-git-send-email-jteki@openedev.com>
+Message-ID: <20170612083838.e7gynimxjjzk3zxg@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 10, 2017 at 06:27:54PM +0530, Jagan Teki wrote:
+On Sun, Jun 11, 2017 at 02:46:05PM +0530, Jagan Teki wrote:
 > From: Jagan Teki <jagan@amarulasolutions.com>
 > 
-> Orangepi Zero Plus 2 is an open-source single-board computer
-> using the Allwinner h5 SOC.
+> Orangepi Win/WinPlus is an open-source single-board computer
+> using the Allwinner A64 SOC.
 > 
-> H5 Orangepi Zero Plus 2 has
-> - Quad-core Cortex-A53
-> - 512MB DDR3
-> - micrSD slot and 8GB eMMC
+> A64 Orangepi Win/WinPlus has
+> - A64 Quad-core Cortex-A53 64bit
+> - 1GB(Win)/2GB(Win Plus) DDR3 SDRAM
 > - Debug TTL UART
+> - Four USB 2.0
 > - HDMI
+> - LCD
+> - Audio and MIC
 > - Wifi + BT
-> - OTG+power supply
+> - IR receiver
+> - 5V DC power supply
 > 
 > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 > ---
 > Changes for v2:
-> - Add emmc node
+> - Remove http link from commit message
+> - Re-arrange nodes in ascending order
 > 
 >  arch/arm64/boot/dts/allwinner/Makefile             |  1 +
->  .../allwinner/sun50i-h5-orangepi-zero-plus2.dts    | 98 ++++++++++++++++++++++
->  2 files changed, 99 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+>  .../boot/dts/allwinner/sun50i-a64-orangepi-win.dts | 97 ++++++++++++++++++++++
+>  2 files changed, 98 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
 > 
 > diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-> index 1ea7709..8adba9c 100644
+> index 8adba9c..2fb5057 100644
 > --- a/arch/arm64/boot/dts/allwinner/Makefile
 > +++ b/arch/arm64/boot/dts/allwinner/Makefile
 > @@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
 >  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
 >  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
 >  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
-> +dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus2.dtb
+> +dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-orangepi-win.dtb
+>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus2.dtb
 >  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo2.dtb
 >  
->  always		:= $(dtb-y)
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
 > new file mode 100644
-> index 0000000..6136a3f
+> index 0000000..31166b5
 > --- /dev/null
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
-> @@ -0,0 +1,98 @@
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
+> @@ -0,0 +1,97 @@
 > +/*
 > + * Copyright (C) 2017 Jagan Teki <jteki@openedev.com>
 > + *
@@ -95,13 +99,13 @@ On Sat, Jun 10, 2017 at 06:27:54PM +0530, Jagan Teki wrote:
 > +
 > +/dts-v1/;
 > +
-> +#include "sun50i-h5.dtsi"
+> +#include "sun50i-a64.dtsi"
 > +
 > +#include <dt-bindings/gpio/gpio.h>
 > +
 > +/ {
-> +	model = "OrangePi Zero Plus2";
-> +	compatible = "xunlong,orangepi-zero-plus2", "allwinner,sun50i-h5";
+> +	model = "OrangePi Win/Win Plus";
+> +	compatible = "xunlong,orangepi-win", "allwinner,sun50i-a64";
 > +
 > +	aliases {
 > +		serial0 = &uart0;
@@ -111,16 +115,9 @@ On Sat, Jun 10, 2017 at 06:27:54PM +0530, Jagan Teki wrote:
 > +		stdout-path = "serial0:115200n8";
 > +	};
 > +
-> +	memory {
-> +		reg = <0x40000000 0x20000000>;
-> +	};
-
-You don't need the memory node, it will be added at runtime.
-
-> +
 > +	soc {
 
-Why is it under /soc ?
+Same thing here, it doesn't need to be in that node.
 
 Maxime
 
@@ -134,4 +131,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170612/41934da4/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170612/1d45bc4d/attachment-0001.sig>
