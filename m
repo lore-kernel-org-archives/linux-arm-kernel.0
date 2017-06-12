@@ -1,42 +1,52 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 12 Jun 2017 10:59:05 -0400 (EDT)
-Subject: [PATCH v2] net: phy: Make phy_ethtool_ksettings_get return void
-In-Reply-To: <20170612.102525.1159274040679939960.davem@davemloft.net>
-References: <20170612141508.29229-1-yuval.shaia@oracle.com>
- <20170612.102525.1159274040679939960.davem@davemloft.net>
-Message-ID: <20170612.105905.1031273319008486521.davem@davemloft.net>
+From: chunkeey@googlemail.com (Christian Lamparter)
+Date: Mon, 12 Jun 2017 17:07:46 +0200
+Subject: [PATCH] qcom: ipq4019: add second i2c
+Message-ID: <20170612150746.25297-1-chunkeey@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Miller <davem@davemloft.net>
-Date: Mon, 12 Jun 2017 10:25:25 -0400 (EDT)
+This patch adds the second i2c block to the IPQ4019 platform.
+The second i2c has been successfully tested on the
+Cisco Meraki MR33.
 
-> From: Yuval Shaia <yuval.shaia@oracle.com>
-> Date: Mon, 12 Jun 2017 17:15:08 +0300
-> 
->> Make return value void since function never return meaningfull value
->> 
->> Signed-off-by: Yuval Shaia <yuval.shaia@oracle.com>
->> Acked-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->> ---
->> v0 ->v1:
->> 	* These files were missing in v0
->> 		* drivers/net/ethernet/renesas/ravb_main.c
->> 		* drivers/net/ethernet/renesas/sh_eth.c
->> 		* drivers/net/ethernet/ti/netcp_ethss.c
->> 	* Add Acked-by: Sergei Shtylyov
->> v1 -> v2:
->> 	* Adjust to net-next tree
-> 
-> Applied, thank you.
+Cc: Chris Blake <chrisrblake93@gmail.com>
+Cc: Matthew McClintock <msm-oss@mcclintock.net>
+Signed-off-by: Christian Lamparter <chunkeey@googlemail.com>
+---
+ arch/arm/boot/dts/qcom-ipq4019.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-Reverted, please test your build properly:
-
-drivers/net/ethernet/apm/xgene/xgene_enet_ethtool.c: In function ?xgene_get_link_ksettings?:
-drivers/net/ethernet/apm/xgene/xgene_enet_ethtool.c:134:10: error: void value not ignored as it ought to be
-   return phy_ethtool_ksettings_get(phydev, cmd);
-          ^
-drivers/net/ethernet/apm/xgene/xgene_enet_ethtool.c:140:11: error: void value not ignored as it ought to be
-    return phy_ethtool_ksettings_get(phydev, cmd);
-           ^
-scripts/Makefile.build:302: recipe for target 'drivers/net/ethernet/apm/xgene/xgene_enet_ethtool.o' failed
+diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+index 4b7d97275c62..d8c87faa0124 100644
+--- a/arch/arm/boot/dts/qcom-ipq4019.dtsi
++++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+@@ -26,6 +26,7 @@
+ 	aliases {
+ 		spi0 = &spi_0;
+ 		i2c0 = &i2c_0;
++		i2c1 = &i2c_1;
+ 	};
+ 
+ 	cpus {
+@@ -164,6 +165,19 @@
+ 			status = "disabled";
+ 		};
+ 
++		i2c_1: i2c at 78b8000 {
++			compatible = "qcom,i2c-qup-v2.2.1";
++			reg = <0x78b8000 0x600>;
++			interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
++				 <&gcc GCC_BLSP1_QUP2_I2C_APPS_CLK>;
++			clock-names = "iface", "core";
++			dmas = <&blsp_dma 11>, <&blsp_dma 10>;
++			dma-names = "rx", "tx";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
+ 
+ 		cryptobam: dma at 8e04000 {
+ 			compatible = "qcom,bam-v1.7.0";
+-- 
+2.11.0
