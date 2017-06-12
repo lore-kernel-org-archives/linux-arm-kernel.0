@@ -1,38 +1,57 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 12 Jun 2017 11:49:33 +0200
-Subject: [PATCH 1/1] ARM: dts: stm32: Add missing reset-cells node in
- stm32f476
-In-Reply-To: <1495034156-19593-1-git-send-email-lionel.debieve@st.com>
-References: <1495034156-19593-1-git-send-email-lionel.debieve@st.com>
-Message-ID: <9be06459-773b-efd0-4ee3-a191d9613ae3@st.com>
+From: zhangshaokun@hisilicon.com (Zhangshaokun)
+Date: Mon, 12 Jun 2017 17:49:37 +0800
+Subject: [PATCH v3 0/4] Add support for ThunderX2 pmu events using json
+ files
+In-Reply-To: <1494923619-18687-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+References: <1494923619-18687-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+Message-ID: <ee7fedb0-a981-1f06-06fa-8e76ef502fa2@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lionel,
+Hi Ganapat
 
-On 05/17/2017 05:15 PM, Lionel Debieve wrote:
-> rcc node must include reset-cells node.
-> 
-> Signed-off-by: Lionel Debieve <lionel.debieve@st.com>
-> ---
->   arch/arm/boot/dts/stm32f746.dtsi | 1 +
->   1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/stm32f746.dtsi b/arch/arm/boot/dts/stm32f746.dtsi
-> index c2765ce..b5a04f1 100644
-> --- a/arch/arm/boot/dts/stm32f746.dtsi
-> +++ b/arch/arm/boot/dts/stm32f746.dtsi
-> @@ -336,6 +336,7 @@
->   		};
->   
->   		rcc: rcc at 40023800 {
-> +			#reset-cells = <1>;
->   			#clock-cells = <2>;
->   			compatible = "st,stm32f746-rcc", "st,stm32-rcc";
->   			reg = <0x40023800 0x400>;
-> 
+This patchset has been tested on Hisilicon's hip08 board for implementation defined PMU events:
+(1)perf list command is ok;
+(2)perf stat command -e event_name:
+When event number is less than 0x3ff, it is ok;
+if event number is more than 0x3ff, it should be added this patch:
+https://www.spinics.net/lists/arm-kernel/msg583222.html
 
-Applied on stm32-dt-for-v4.13
+Thanks.
+Shaokun
 
-Thanks
-Alex
+On 2017/5/16 16:33, Ganapatrao Kulkarni wrote:
+> Extending json/jevent framework for parsing arm64 event files.
+> Adding jevents for ThunderX2 implementation defined PMU events.
+> 
+> v3:
+>    - Addressed comments from Will Deacon and Jayachandran C.
+>    - Rebased to 4.12-rc1
+> 
+> v2:
+>    - Updated as per Mark Rutland's suggestions.
+>    - Added provision for get_cpuid_str to get cpu id string
+>      from associated cpus of pmu core device.
+> 
+> v1: Initial patchset.
+> 
+> Ganapatrao Kulkarni (4):
+>   perf utils: passing pmu as a parameter to function get_cpuid_str
+>   perf tools arm64: Add support for get_cpuid_str function.
+>   perf utils: Add helper function is_pmu_core to detect PMU CORE devices
+>   perf vendor events arm64: Add ThunderX2 implementation defined pmu
+>     core events
+> 
+>  tools/perf/arch/arm64/util/Build                   |  1 +
+>  tools/perf/arch/arm64/util/header.c                | 59 ++++++++++++++++++++
+>  tools/perf/arch/powerpc/util/header.c              |  2 +-
+>  tools/perf/arch/x86/util/header.c                  |  2 +-
+>  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
+>  .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
+>  tools/perf/util/header.h                           |  3 +-
+>  tools/perf/util/pmu.c                              | 53 +++++++++++++++---
+>  8 files changed, 186 insertions(+), 11 deletions(-)
+>  create mode 100644 tools/perf/arch/arm64/util/header.c
+>  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
+>  create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+> 
