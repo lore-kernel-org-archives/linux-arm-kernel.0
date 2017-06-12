@@ -1,69 +1,105 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 12 Jun 2017 10:22:52 +0200
-Subject: [PATCH v2] KVM: ARM64: fix phy counter access failure in guest.
-In-Reply-To: <20170612143748.37278-1-huhuajun@huawei.com>
-References: <20170612143748.37278-1-huhuajun@huawei.com>
-Message-ID: <20170612082252.GA14808@cbox>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 12 Jun 2017 11:23:49 +0300
+Subject: [PATCH 2/3] ARM: OMAP4: hwmod data: add aes
+In-Reply-To: <20170609231206.19798-3-sre@kernel.org>
+References: <20170609231206.19798-1-sre@kernel.org>
+ <20170609231206.19798-3-sre@kernel.org>
+Message-ID: <b900d03c-943a-9073-fea5-3c8fa0f0c0ca@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Jun 12, 2017 at 10:37:48PM +0800, Hu Huajun wrote:
-> When reading the cntpct_el0 in guest with VHE (Virtual Host Extension)
-> enabled in host, the "Unsupported guest sys_reg access" error reported.
-> The reason is cnthctl_el2.EL1PCTEN is not enabled, which is expected
-> to be done in kvm_timer_init_vhe(). The problem is kvm_timer_init_vhe
-> is called by cpu_init_hyp_mode, and which is called when VHE is disabled.
-> This patch remove the incorrect call to kvm_timer_init_vhe() from
-> cpu_init_hyp_mode(), and calls kvm_timer_init_vhe() to enable
-> cnthctl_el2.EL1PCTEN in cpu_hyp_reinit().
+On 10/06/17 02:12, Sebastian Reichel wrote:
+> This fixes the following error during kernel boot:
 > 
-> Changes from v1:
-> * According to Christoffer Dall's comment, remove the incocrrect call
-> to kvm_timer_init_vhe() in cpu_init_hyp_mode().
-
-In the future please put the changelog after the '---' delimeter,
-because it doesn't have to be part of the commit log.
-
-I can fix this up when applying though.
-
+> platform 4b501000.aes: Cannot lookup hwmod 'aes'
 > 
-> Signed-off-by: Hu Huajun <huhuajun@huawei.com>
-
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
-
-Applied.
-
-Thanks,
--Christoffer
-
+> Unfortunately the AES module is only documented partly
+> in the OMAP4430 TRM. I found an old patch from Joel,
+> which I took over and updated for currently mainline.
+> 
+> Signed-off-by: Joel Fernandes <joelf@ti.com>
+> Signed-off-by: Sebastian Reichel <sre@kernel.org>
 > ---
->  virt/kvm/arm/arm.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
+>   arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 41 ++++++++++++++++++++++++++++++
+>   1 file changed, 41 insertions(+)
 > 
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index 3417e18..a430125 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -1115,9 +1115,6 @@ static void cpu_init_hyp_mode(void *dummy)
->  	__cpu_init_hyp_mode(pgd_ptr, hyp_stack_ptr, vector_ptr);
->  	__cpu_init_stage2();
->  
-> -	if (is_kernel_in_hyp_mode())
-> -		kvm_timer_init_vhe();
-> -
->  	kvm_arm_init_debug();
->  }
->  
-> @@ -1137,6 +1134,7 @@ static void cpu_hyp_reinit(void)
->  		 * event was cancelled before the CPU was reset.
->  		 */
->  		__cpu_init_stage2();
-> +		kvm_timer_init_vhe();
->  	} else {
->  		cpu_init_hyp_mode(NULL);
->  	}
-> -- 
-> 2.10.1
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> index 94f09c720f29..18feb49e813b 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> @@ -953,6 +953,46 @@ static struct omap_hwmod omap44xx_emif2_hwmod = {
+>   };
+>   
+>   /*
+> +    Crypto modules AES0/1 belong to:
+> +	PD_L4_PER power domain
+> +	CD_L4_SEC clock domain
+> +	On the L3, the AES modules are mapped to
+> +	L3_CLK2: Peripherals and multimedia sub clock domain
+> +*/
+> +static struct omap_hwmod_class_sysconfig omap44xx_aes1_sysc = {
+> +	.rev_offs	= 0x80,
+> +	.sysc_offs	= 0x84,
+> +	.syss_offs	= 0x88,
+> +	.sysc_flags	= SYSS_HAS_RESET_STATUS,
+> +};
+> +
+> +static struct omap_hwmod_class omap44xx_aes1_hwmod_class = {
+> +	.name		= "aes1",
+> +	.sysc		= &omap44xx_aes1_sysc,
+> +};
+
+Change the names of above from aes1 to aes, the parameters are common 
+for both aes instances.
+
+> +
+> +static struct omap_hwmod omap44xx_aes1_hwmod = {
+> +	.name		= "aes",
+
+This should be aes1.
+
+> +	.class		= &omap44xx_aes1_hwmod_class,
+> +	.clkdm_name	= "l4_secure_clkdm",
+> +	.main_clk	= "aes1_fck",
+
+Change the aes1_fck to l3_div_ck. aes{1,2}_fck should be removed from 
+the dts clock data also to avoid conflicts.
+
+> +	.prcm		= {
+> +		.omap4	= {
+> +			.context_offs	= OMAP4_RM_L4SEC_AES1_CONTEXT_OFFSET,
+> +			.clkctrl_offs	= OMAP4_CM_L4SEC_AES1_CLKCTRL_OFFSET,
+> +			.modulemode	= MODULEMODE_SWCTRL,
+> +		},
+> +	},
+> +};
+> +
+> +static struct omap_hwmod_ocp_if omap44xx_l3_main_2__aes1 = {
+> +	.master		= &omap44xx_l4_per_hwmod,
+> +	.slave		= &omap44xx_aes1_hwmod,
+> +	.clk		= "l4_div_ck",
+
+l3_div_ck.
+
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+> +/*
+>    * 'fdif' class
+>    * face detection hw accelerator module
+>    */
+> @@ -4793,6 +4833,7 @@ static struct omap_hwmod_ocp_if *omap44xx_hwmod_ocp_ifs[] __initdata = {
+>   	&omap44xx_l4_abe__wd_timer3_dma,
+>   	&omap44xx_mpu__emif1,
+>   	&omap44xx_mpu__emif2,
+> +	&omap44xx_l3_main_2__aes1,
+>   	NULL,
+>   };
+>   
 > 
+
+How about aes2 instance? Please note that the DTS data should be fixed 
+also (I have patch available for this I can post if you want to pick it 
+up as part of this series.)
+
+-Tero
