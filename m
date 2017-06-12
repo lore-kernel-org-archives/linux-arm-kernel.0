@@ -1,59 +1,59 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 12 Jun 2017 15:36:46 +0100
-Subject: [PATCH 07/12] coresight replicator: Expose replicator management
- registers
+Date: Mon, 12 Jun 2017 15:36:47 +0100
+Subject: [PATCH 08/12] coresight tmc: Handle configuration types properly
 In-Reply-To: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
 References: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1497278211-5001-8-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1497278211-5001-9-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Expose the idfilter* registers of the programmable replicator.
+Coresight SoC 600 defines a new configuration for TMC, Embedded Trace
+Streamer (ETS), indicated by 0x3 in MODE:CONFIG_TYPE. Make sure
+the driver handles the new type properly.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- .../hwtracing/coresight/coresight-replicator-qcom.c | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ drivers/hwtracing/coresight/coresight-tmc.c | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-replicator-qcom.c b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
-index b029a5f..4dd18e0 100644
---- a/drivers/hwtracing/coresight/coresight-replicator-qcom.c
-+++ b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
-@@ -95,6 +95,26 @@ static const struct coresight_ops replicator_cs_ops = {
- 	.link_ops	= &replicator_link_ops,
- };
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+index fd5a2e0..7152656 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.c
++++ b/drivers/hwtracing/coresight/coresight-tmc.c
+@@ -358,11 +358,13 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
+ 	desc.dev = dev;
+ 	desc.groups = coresight_tmc_groups;
  
-+coresight_simple_func(struct replicator_state, NULL, idfilter0,
-+				 REPLICATOR_IDFILTER0);
-+coresight_simple_func(struct replicator_state, NULL, idfilter1,
-+				REPLICATOR_IDFILTER1);
-+static struct attribute *replicator_mgmt_attrs[] = {
-+	&dev_attr_idfilter0.attr,
-+	&dev_attr_idfilter1.attr,
-+	NULL,
-+};
-+
-+static const struct attribute_group replicator_mgmt_group = {
-+	.attrs = replicator_mgmt_attrs,
-+	.name = "mgmt",
-+};
-+
-+static const struct attribute_group *replicator_groups[] = {
-+	&replicator_mgmt_group,
-+	NULL,
-+};
-+
- static int replicator_probe(struct amba_device *adev, const struct amba_id *id)
- {
- 	int ret;
-@@ -139,6 +159,7 @@ static int replicator_probe(struct amba_device *adev, const struct amba_id *id)
- 	desc.ops = &replicator_cs_ops;
- 	desc.pdata = adev->dev.platform_data;
- 	desc.dev = &adev->dev;
-+	desc.groups = replicator_groups;
+-	if (drvdata->config_type == TMC_CONFIG_TYPE_ETB) {
++	switch (drvdata->config_type) {
++	case TMC_CONFIG_TYPE_ETB:
+ 		desc.type = CORESIGHT_DEV_TYPE_SINK;
+ 		desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
+ 		desc.ops = &tmc_etb_cs_ops;
+-	} else if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
++		break;
++	case TMC_CONFIG_TYPE_ETR:
+ 		desc.type = CORESIGHT_DEV_TYPE_SINK;
+ 		desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
+ 		desc.ops = &tmc_etr_cs_ops;
+@@ -373,10 +375,16 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
+ 		ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(40));
+ 		if (ret)
+ 			goto out;
+-	} else {
++		break;
++	case TMC_CONFIG_TYPE_ETF:
+ 		desc.type = CORESIGHT_DEV_TYPE_LINKSINK;
+ 		desc.subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_FIFO;
+ 		desc.ops = &tmc_etf_cs_ops;
++		break;
++	default:
++		pr_err("%s: Unsupported TMC config\n", pdata->name);
++		ret = -EINVAL;
++		goto out;
+ 	}
+ 
  	drvdata->csdev = coresight_register(&desc);
- 	if (IS_ERR(drvdata->csdev))
- 		return PTR_ERR(drvdata->csdev);
 -- 
 2.7.4
