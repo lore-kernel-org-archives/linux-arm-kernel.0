@@ -1,91 +1,62 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 12 Jun 2017 11:16:30 +0300
-Subject: [PATCH 3/3] ARM: OMAP4: hwmod data: add des
-In-Reply-To: <20170609231206.19798-4-sre@kernel.org>
-References: <20170609231206.19798-1-sre@kernel.org>
- <20170609231206.19798-4-sre@kernel.org>
-Message-ID: <32931694-b7ec-9678-92b6-f6b43558090a@ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 12 Jun 2017 10:18:06 +0200
+Subject: [PATCH 1/2] spi: rockchip: add support for "cs-gpios" dts property
+In-Reply-To: <dfe87919-b2cc-37e8-1598-6b3c730ff356@rock-chips.com>
+References: <1497248057-16550-1-git-send-email-jeffy.chen@rock-chips.com>
+ <dfe87919-b2cc-37e8-1598-6b3c730ff356@rock-chips.com>
+Message-ID: <CAMuHMdUDjtSNRiBxcBnAMdUEaCZbioPoRE1h=p9=BqHMGmQaEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/06/17 02:12, Sebastian Reichel wrote:
-> This fixes the following error during kernel boot:
-> 
-> platform 480a5000.des: Cannot lookup hwmod 'des'
-> 
-> Unfortunately the DES module is only documented partly
-> in the OMAP4430 TRM. I found an old patch from Joel,
-> which I took over and updated for currently mainline.
-> 
-> Signed-off-by: Joel Fernandes <joelf@ti.com>
-> Signed-off-by: Sebastian Reichel <sre@kernel.org>
-> ---
->   arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 37 ++++++++++++++++++++++++++++++
->   1 file changed, 37 insertions(+)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> index 18feb49e813b..f2f13c678cfb 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> @@ -993,6 +993,42 @@ static struct omap_hwmod_ocp_if omap44xx_l3_main_2__aes1 = {
->   };
->   
->   /*
-> + * 'des' class for DES3DES module
-> + */
-> +static struct omap_hwmod_class_sysconfig omap44xx_des_sysc = {
-> +	.rev_offs	= 0x30,
-> +	.sysc_offs	= 0x34,
-> +	.syss_offs	= 0x38,
-> +	.sysc_flags	= SYSS_HAS_RESET_STATUS,
-> +};
-> +
-> +static struct omap_hwmod_class omap44xx_des_hwmod_class = {
-> +	.name		= "des",
-> +	.sysc		= &omap44xx_des_sysc,
-> +};
-> +
-> +static struct omap_hwmod omap44xx_des_hwmod = {
-> +	.name		= "des",
-> +	.class		= &omap44xx_des_hwmod_class,
-> +	.clkdm_name	= "l4_secure_clkdm",
-> +	.main_clk	= "des_fck",
+On Mon, Jun 12, 2017 at 9:15 AM, Shawn Lin <shawn.lin@rock-chips.com> wrote:
+> On 2017/6/12 14:14, Jeffy Chen wrote:
+>>
+>> Support using "cs-gpios" property to specify cs gpios.
+>>
+>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 
-Change the above to l3_div_ck.
+>> index 83da493..02171b2 100644
+>> --- a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+>> +++ b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+>> @@ -17,6 +17,7 @@ Required Properties:
+>>          region.
+>>   - interrupts: The interrupt number to the cpu. The interrupt specifier
+>> format
+>>                 depends on the interrupt controller.
+>> +- cs-gpios : Specifies the gpio pins to be used for chipselects.
+>
+> It's not a required property, otherwise how other boards work as your
+> patch 2 only add this for rk3399-gru.
 
-> +	.prcm		= {
-> +		.omap4	= {
-> +			.context_offs	= OMAP4_RM_L4SEC_DES3DES_CONTEXT_OFFSET,
-> +			.clkctrl_offs	= OMAP4_CM_L4SEC_DES3DES_CLKCTRL_OFFSET,
-> +			.modulemode	= MODULEMODE_SWCTRL,
-> +		},
-> +	},
-> +};
-> +
-> +struct omap_hwmod_ocp_if omap44xx_l4_per__des = {
-> +	.master		= &omap44xx_l4_per_hwmod,
-> +	.slave		= &omap44xx_des_hwmod,
-> +	.clk		= "des_fck",
+>> --- a/drivers/spi/spi-rockchip.c
+>> +++ b/drivers/spi/spi-rockchip.c
 
-l3_div_ck.
+>> @@ -297,6 +302,50 @@ static void rockchip_spi_set_cs(struct spi_device
+>> *spi, bool enable)
+>>         pm_runtime_put_sync(rs->dev);
+>>   }
+>>   +static int rockchip_spi_setup(struct spi_device *spi)
+>> +{
+>> +       int ret = 0;
+>> +       unsigned long flags = (spi->mode & SPI_CS_HIGH) ?
+>> +                             GPIOF_OUT_INIT_LOW : GPIOF_OUT_INIT_HIGH;
+>> +       struct rockchip_spi_data *data = spi_get_ctldata(spi);
+>> +
+>> +       if (!gpio_is_valid(spi->cs_gpio))
+>> +               return 0;
 
-> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> +};
+> return -EINVAL?
 
-l4_per is wrong interconnect for this module. It is actually connected 
-to l3_main_2.
+Isn't this check meant to fall back to hardware CS if no cs-gpios property
+is present?
 
-> +
-> +/*
->    * 'fdif' class
->    * face detection hw accelerator module
->    */
-> @@ -4834,6 +4870,7 @@ static struct omap_hwmod_ocp_if *omap44xx_hwmod_ocp_ifs[] __initdata = {
->   	&omap44xx_mpu__emif1,
->   	&omap44xx_mpu__emif2,
->   	&omap44xx_l3_main_2__aes1,
-> +	&omap44xx_l4_per__des,
->   	NULL,
->   };
->   
-> 
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
