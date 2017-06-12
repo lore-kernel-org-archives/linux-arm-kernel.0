@@ -1,15 +1,16 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 12 Jun 2017 12:31:47 +0200
-Subject: [GIT PULL] ARM: Medaitek armv7 DTS for v4.13
-Message-ID: <5056d433-90b3-a3ca-4df7-9ff02ab6027b@gmail.com>
+Date: Mon, 12 Jun 2017 12:34:58 +0200
+Subject: [GIT PULL] ARM: mediatek: armv8 DTS for v4.13
+Message-ID: <a6d19346-24a8-b130-607c-9116c34b673b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+Hi Olof and Arnd,
 
-Please find below my merge request for armv7 device tree changes.
+Please find below the relevant branch with updates for arm64 device tree 
+files and device tree bindings for v4.13.
 
-Regards,
+Thanks a lot,
 Matthias
 
 ---
@@ -20,83 +21,69 @@ The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 
 are available in the git repository at:
 
-   https://github.com/mbgg/linux-mediatek.git tags/v4.12-next-dts32
+   https://github.com/mbgg/linux-mediatek.git tags/v4.12-next-dts64
 
-for you to fetch changes up to aac5e972d4c7bc728df605f5427d9c2458c34ea9:
+for you to fetch changes up to 5f0047466e3c653ffc95fe72e1ea19b1f9927e48:
 
-   arm: dts: mediatek: Add audio driver node for MT2701 (2017-06-07 
-10:47:25 +0200)
+   dt-bindings: mediatek: add bindings for MediaTek MT7622 SoC 
+(2017-06-08 15:27:16 +0200)
 
 ----------------------------------------------------------------
 Add device tree nodes for
-mt7623:
-- clocks
-- power domain
-- pmic-wrapper
-- pinctrl
-- i2c
-- spi
-- nand
-- mmc
-- usb
-- pwm
-- ethernet
-- crypto engine
-- infared remote control
-- audio controller
-- ADC
-- efuse
-- thermal driver
-- HW random generator
+mt8173:
+- split USB SuperSpeed port in HighSpeed and SuperSpeed ports.
+- move USB phy clocks up in hierarchy to met new bindings description
+- move MDP nodes up in hierarchy to met new bindings description
 
-mt2701:
-- NOR flash
-- JPEG decoder
-- i2c
-- audio controller
+mt6797:
+- add basic SoC support
+- add clock driver
+- add power domain
+
+dt-bindings:
+- clean-up i2c binding description
+- add binding for mt2701 i2c node
+- add fallback compatible to scpsys binding description
+- add bindings description for mt7622 and mt6796
 
 ----------------------------------------------------------------
-Garlic Tseng (1):
-       arm: dts: mediatek: Add audio driver node for MT2701
-
-Guochun Mao (1):
-       arm: dts: mt2701: add nor flash node
-
-John Crispin (9):
-       arm: dts: mt7623: add clock controller device nodes
-       arm: dts: mt7623: add subsystem clock controller device nodes
-       arm: dts: mt7623: add power domain controller device node
-       arm: dts: mt7623: add pinctrl nodes to the mt7623 dtsi file
-       arm: dts: mt7623: add pmic wrapper nodes to the mt7623 dtsi file
-       arm: dts: mt7623: add i2c nodes to the mt7623.dtsi file
-       arm: dts: mt7623: add nand nodes to the mt7623.dtsi file
-       arm: dts: mt7623: add mmc nodes to the mt7623.dtsi file
-       arm: dts: mt7623: add usb nodes to the mt7623.dtsi file
+Daniel Kurtz (1):
+       arm64: dts: mt8173: Fix mdp device tree
 
 Jun Gao (1):
-       arm: dts: Add Mediatek MT2701 i2c device node
+       dt-bindings: i2c: Add Mediatek MT2701 i2c binding
 
-Rick Chang (1):
-       arm: dts: mt2701: Add node for Mediatek JPEG Decoder
+Mars Cheng (4):
+       dt-bindings: mediatek: Add bindings for mediatek MT6797 Platform
+       arm64: dts: mediatek: add mt6797 support
+       dt-bindings: mediatek: add MT6797 power dt-bindings
+       arm64: dts: mediatek: add clk and scp nodes for MT6797
 
-Sean Wang (11):
-       arm: dts: mt7623: add spi nodes to the mt7623.dtsi file
-       arm: dts: mt7623: add pwm nodes to the mt7623.dtsi file
-       arm: dts: mt7623: add ethernet nodes to the mt7623.dtsi file
-       arm: dts: mt7623: add crypto engine nodes to the mt7623.dtsi file
-       arm: dts: mt7623: add ir nodes to the mt7623.dtsi file
-       arm: dts: mt7623: add afe nodes to the mt7623.dtsi file
-       arm: dts: mt7623: add rng nodes to the mt7623.dtsi file
-       arm: dts: mt7623: add auxadc nodes to the mt7623.dtsi file
-       arm: dts: mt7623: add efuse nodes to the mt7623.dtsi file
-       arm: dts: mt7623: add thermal nodes to the mt7623.dtsi file
-       arm: dts: mt7623: add Sean as one of authors for mt7623.dtsi files
+Matthias Brugger (4):
+       dt-bindings: mtk-sysirq: Correct bindings for supported SoCs
+       dt-bindings: i2c-mt6577: Rename file to reflect bindings
+       dt-bindings: i2c-mtk: Delete bindings
+       dt-bindings: i2c-mtk: Add mt7623 binding
 
-Youlin Pei (1):
-       ARM: dts: mt2701: Add mtk-cirq node for mt2701
+Sean Wang (1):
+       dt-bindings: mediatek: add bindings for MediaTek MT7622 SoC
 
-  arch/arm/boot/dts/mt2701-evb.dts | 132 ++++++++++
-  arch/arm/boot/dts/mt2701.dtsi    | 179 ++++++++++++-
-  arch/arm/boot/dts/mt7623.dtsi    | 546 
-++++++++++++++++++++++++++++++++++++++-
-  3 files changed, 846 insertions(+), 11 deletions(-)
+chunfeng.yun at mediatek.com (2):
+       arm64: dts: mt8173: split usb SuperSpeed port into two ports
+       arm64: dts: mt8173: move clock from phy node into port nodes
+
+  Documentation/devicetree/bindings/arm/mediatek.txt |   8 +
+  .../bindings/i2c/{i2c-mt6577.txt => i2c-mtk.txt}   |  10 +-
+  .../interrupt-controller/mediatek,sysirq.txt       |  28 +--
+  .../devicetree/bindings/serial/mtk-uart.txt        |   2 +
+  .../devicetree/bindings/soc/mediatek/scpsys.txt    |   6 +-
+  arch/arm64/boot/dts/mediatek/Makefile              |   1 +
+  arch/arm64/boot/dts/mediatek/mt6797-evb.dts        |  36 +++
+  arch/arm64/boot/dts/mediatek/mt6797.dtsi           | 245 
++++++++++++++++++++++
+  arch/arm64/boot/dts/mediatek/mt8173.dtsi           | 153 ++++++-------
+  9 files changed, 396 insertions(+), 93 deletions(-)
+  rename Documentation/devicetree/bindings/i2c/{i2c-mt6577.txt => 
+i2c-mtk.txt} (77%)
+  create mode 100644 arch/arm64/boot/dts/mediatek/mt6797-evb.dts
+  create mode 100644 arch/arm64/boot/dts/mediatek/mt6797.dtsi
