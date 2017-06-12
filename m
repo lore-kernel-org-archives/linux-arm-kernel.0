@@ -1,55 +1,72 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 12 Jun 2017 10:42:02 +0200
-Subject: [PATCH 4/4] drm/bridge: dw-hdmi: add cec driver
-In-Reply-To: <db1f1785-930b-0f32-d71a-79ae8e053b2c@xs4all.nl>
-References: <20170530142218.GS22219@n2100.armlinux.org.uk>
- <E1dFi3P-0004lv-2K@rmk-PC.armlinux.org.uk>
- <db1f1785-930b-0f32-d71a-79ae8e053b2c@xs4all.nl>
-Message-ID: <c8046a4f-d04e-a2f4-375e-2ff53fabe68e@xs4all.nl>
+From: jeffy.chen@rock-chips.com (jeffy)
+Date: Mon, 12 Jun 2017 16:48:51 +0800
+Subject: [PATCH 1/2] spi: rockchip: add support for "cs-gpios" dts property
+In-Reply-To: <CAMuHMdUDjtSNRiBxcBnAMdUEaCZbioPoRE1h=p9=BqHMGmQaEQ@mail.gmail.com>
+References: <1497248057-16550-1-git-send-email-jeffy.chen@rock-chips.com>
+ <dfe87919-b2cc-37e8-1598-6b3c730ff356@rock-chips.com>
+ <CAMuHMdUDjtSNRiBxcBnAMdUEaCZbioPoRE1h=p9=BqHMGmQaEQ@mail.gmail.com>
+Message-ID: <593E5573.90202@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2017 10:31 AM, Hans Verkuil wrote:
-> Hi Russell,
-> 
-> First a few top-level questions:
-> 
-> 1) What was the reason for using the cec-notifier here? Isn't this
->     tightly integrated into the main dw-hdmi block? For the tda driver
->     it is clearly required, but for tightly coupled HDMI & CEC HW I
->     just create the adapter from the HDMI driver. As a small bonus it
->     avoids adding the cec-notifier code and the control flow is a bit
->     easier to trace.
-> 
-> 2) I may have asked this before, apologies if I repeat myself: does
->     this CEC implementation support CEC monitoring (aka snooping)? If
->     it does, then I recommend that it is implemented since it is very
->     useful.
-> 
-> 3) Is the CEC still active if there is no hotplug signal? Or is it
->     powered off in that case? Ideally it should still be possible to
->     send CEC messages even if there is no hotplug. This is explicitly
->     allowed by the CEC 2.0 spec to wake up displays that turn off the
->     HPD, but that still have a working CEC controller.
-> 
->     If this is not possible, then you need to use the CEC_CAP_NEEDS_HPD
->     capability. See: https://patchwork.linuxtv.org/patch/41478/
-> 
->     This will almost certainly be merged for 4.13 since other CEC drivers
->     need this as well.
+Hi Geert,
 
-FYI: I tested your patch series with my cubox-i and CEC doesn't work if there
-is no HPD. I fiddles around a bit in dw_hdmi.c to prevent it from powering off
-the HDMI and PHY, but without any luck. It could be a hardware issue on the
-cubox-i (e.g. a level-shifter that powers off when the HPD goes low, although
-I don't see anything like that in the schematics), or it can be a driver issue
-or a Synopsys IP issue. I really can't tell.
+On 06/12/2017 04:18 PM, Geert Uytterhoeven wrote:
+> On Mon, Jun 12, 2017 at 9:15 AM, Shawn Lin <shawn.lin@rock-chips.com> wrote:
+>> On 2017/6/12 14:14, Jeffy Chen wrote:
+>>>
+>>> Support using "cs-gpios" property to specify cs gpios.
+>>>
+>>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+>
+>>> index 83da493..02171b2 100644
+>>> --- a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+>>> +++ b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+>>> @@ -17,6 +17,7 @@ Required Properties:
+>>>           region.
+>>>    - interrupts: The interrupt number to the cpu. The interrupt specifier
+>>> format
+>>>                  depends on the interrupt controller.
+>>> +- cs-gpios : Specifies the gpio pins to be used for chipselects.
+>>
+>> It's not a required property, otherwise how other boards work as your
+>> patch 2 only add this for rk3399-gru.
+>
+>>> --- a/drivers/spi/spi-rockchip.c
+>>> +++ b/drivers/spi/spi-rockchip.c
+>
+>>> @@ -297,6 +302,50 @@ static void rockchip_spi_set_cs(struct spi_device
+>>> *spi, bool enable)
+>>>          pm_runtime_put_sync(rs->dev);
+>>>    }
+>>>    +static int rockchip_spi_setup(struct spi_device *spi)
+>>> +{
+>>> +       int ret = 0;
+>>> +       unsigned long flags = (spi->mode & SPI_CS_HIGH) ?
+>>> +                             GPIOF_OUT_INIT_LOW : GPIOF_OUT_INIT_HIGH;
+>>> +       struct rockchip_spi_data *data = spi_get_ctldata(spi);
+>>> +
+>>> +       if (!gpio_is_valid(spi->cs_gpio))
+>>> +               return 0;
+>
+>> return -EINVAL?
+>
+> Isn't this check meant to fall back to hardware CS if no cs-gpios property
+> is present?
 
-I added text in my status document (https://hverkuil.home.xs4all.nl/cec-status.txt)
-at the end on how to test this.
-
-Otherwise the CEC support on the cubox-i was working very well.
-
-Regards,
-
-	Hans
+Thanks for your comment, and yes it is. I'll add a comment in the code 
+to explain it :)
+>
+> Gr{oetje,eeting}s,
+>
+>                          Geert
+>
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                  -- Linus Torvalds
+>
+>
+>
