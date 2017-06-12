@@ -1,81 +1,42 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 12 Jun 2017 11:23:37 +0200
-Subject: [PATCH 1/2] spi: rockchip: add support for "cs-gpios" dts property
-In-Reply-To: <593E5AF8.1080404@rock-chips.com>
-References: <1497248057-16550-1-git-send-email-jeffy.chen@rock-chips.com>
- <4418523.E0t9k04HOG@diego> <593E5AF8.1080404@rock-chips.com>
-Message-ID: <2280770.UMxRo5IhGO@diego>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 12 Jun 2017 11:27:22 +0200
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Fixes for v4.12
+Message-ID: <cover.1497259417.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 12. Juni 2017, 17:12:24 CEST schrieb jeffy:
-> Hi Heiko,
-> 
-> thanx for your comments.
-> 
-> On 06/12/2017 04:36 PM, Heiko St?bner wrote:
-> > Am Montag, 12. Juni 2017, 16:26:07 CEST schrieb jeffy:
-> >> Hi Shawn,
-> >> 
-> >> On 06/12/2017 03:15 PM, Shawn Lin wrote:
-> >>> Hi Jeffy,
-> >>> 
-> >>> On 2017/6/12 14:14, Jeffy Chen wrote:
-> >>>> Support using "cs-gpios" property to specify cs gpios.
-> >>>> 
-> >>>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> >>>> ---
-> >>>> 
-> >>>>    .../devicetree/bindings/spi/spi-rockchip.txt       |  2 +
-> >>>>    drivers/spi/spi-rockchip.c                         | 52
-> >>>> 
-> >>>> ++++++++++++++++++++++
-> >>>> 
-> >>>>    2 files changed, 54 insertions(+)
-> >>>> 
-> >>>> diff --git a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-> >>>> b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-> >>>> index 83da493..02171b2 100644
-> >>>> --- a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-> >>>> +++ b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-> >>> 
-> >>> The changes for doc should be another patch, and...
-> >> 
-> >> but i saw others didn't separate them:
-> >> cf9e478 spi: sh-msiof: Add slave mode support
-> >> 23e291c spi: rockchip: support "sleep" pin configuration
-> > 
-> > it sometimes falls through the cracks, but having dt-binding patches
-> > separate is meant to make it easier on DT-Maintainers to find
-> > patches they need to look at.
-> 
-> ok, will do.
-> 
-> >>>> +    if (!data->cs_gpio_requested) {
-> >>>> +        ret = gpio_request_one(spi->cs_gpio, flags,
-> >>>> +                       dev_name(&spi->dev));
-> >>>> +        if (!ret)
-> >>>> +            data->cs_gpio_requested = 1;
-> >>>> +    } else
-> >>>> +        ret = gpio_direction_output(spi->cs_gpio, flags);
-> >>> 
-> >>> need brace around 'else' statement. Also I don't see data used
-> >>> elsewhere, so you need these code above.
-> >> 
-> >> ok.
-> >> and the cs_gpio_requested is to mark cs_gpio requested, because the
-> >> setup func might be called multiple times, we only need to request gpio
-> >> at the first time.
-> > 
-> > Aren't the gpiod* functions meant to be used for new things?
-> > Also you might actually do a bit of error handling there, especially
-> > EPROBE_DEFER.
-> 
-> so you are suggesting to use gpiod* functions here to replace gpio_*
-> functions right?
+Hi Olof, Hi Kevin, Hi Arnd,
 
-correct. And handle errors that may get returned, especially EPROBE_DEFER,
-but also other errors may indicate that your spi won't function as expected.
+Please consider these second round of Renesas ARM based SoC fixes for v4.12.
+
+It splits LCD mux and gpio into separate nodes as different values
+for the output-high property are required.
+
+This pull request is based on the previous round of
+such requests, tagged as renesas-fixes-for-v4.12,
+which I have already sent a pull-request for.
 
 
-Heiko
+The following changes since commit 7b4ccb3c466f62bbf2f4dd5d6a143d945a6f3051:
+
+  soc: renesas: Provide dummy rcar_rst_read_mode_pins() for compile-testing (2017-04-28 10:07:36 +0200)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes2-for-v4.12
+
+for you to fetch changes up to 13132b3f44d3600983aceb7e9920b8ebb55a7cf8:
+
+  ARM: dts: armadillo800eva: Split LCD mux and gpio (2017-06-08 15:44:55 +0200)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC Fixes for v4.12
+
+* Split LCD mux and gpio on armadillo800eva board
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      ARM: dts: armadillo800eva: Split LCD mux and gpio
+
+ arch/arm/boot/dts/r8a7740-armadillo800eva.dts | 2 ++
+ 1 file changed, 2 insertions(+)
