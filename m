@@ -1,50 +1,86 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Mon, 12 Jun 2017 11:23:53 -0700
-Subject: [PATCH 00/11] ARM: dts: imx6qdl: video capture support
-Message-ID: <1497291844-14632-1-git-send-email-steve_longerbeam@mentor.com>
+Date: Mon, 12 Jun 2017 11:23:54 -0700
+Subject: [PATCH 01/11] ARM: dts: imx6qdl: add multiplexer controls
+In-Reply-To: <1497291844-14632-1-git-send-email-steve_longerbeam@mentor.com>
+References: <1497291844-14632-1-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1497291844-14632-2-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series defines the i.MX6 internal video multiplexers and MIPI CSI-2
-receiver device nodes, and their connections to eachother and the i.MX6
-IPU CSI ports.
+From: Philipp Zabel <p.zabel@pengutronix.de>
 
-It also implements video capture support on the SabreLite, SabreSD, and
-SabreAuto reference platforms, by defining the video sensor nodes on those
-platforms, and their connections to the video muxes and MIPI CSI-2 receiver.
+The IOMUXC General Purpose Register space contains various bitfields
+that control video bus multiplexers. Describe them using a mmio-mux
+node. The placement of the IPU CSI video mux controls differs between
+i.MX6D/Q and i.MX6S/DL.
 
-There should not be much of anything controversial in this series. The
-imx-media driver is set to be merged in time for 4.13, so please accept
-this series soon.
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ arch/arm/boot/dts/imx6dl.dtsi  | 10 ++++++++++
+ arch/arm/boot/dts/imx6q.dtsi   | 10 ++++++++++
+ arch/arm/boot/dts/imx6qdl.dtsi |  7 ++++++-
+ 3 files changed, 26 insertions(+), 1 deletion(-)
 
-
-Philipp Zabel (2):
-  ARM: dts: imx6qdl: add multiplexer controls
-  ARM: dts: imx6qdl: Add video multiplexers, mipi_csi, and their
-    connections
-
-Steve Longerbeam (9):
-  ARM: dts: imx6qdl: Add compatible, clocks, irqs to MIPI CSI-2 node
-  ARM: dts: imx6qdl: add capture-subsystem device
-  ARM: dts: imx6qdl-sabrelite: remove erratum ERR006687 workaround
-  ARM: dts: imx6-sabrelite: add OV5642 and OV5640 camera sensors
-  ARM: dts: imx6-sabresd: add OV5642 and OV5640 camera sensors
-  ARM: dts: imx6-sabreauto: create i2cmux for i2c3
-  ARM: dts: imx6-sabreauto: add reset-gpios property for max7310_b
-  ARM: dts: imx6-sabreauto: add pinctrl for gpt input capture
-  ARM: dts: imx6-sabreauto: add the ADV7180 video decoder
-
- arch/arm/boot/dts/imx6dl-sabrelite.dts   |   5 +
- arch/arm/boot/dts/imx6dl-sabresd.dts     |   5 +
- arch/arm/boot/dts/imx6dl.dtsi            | 189 +++++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx6q-sabrelite.dts    |   5 +
- arch/arm/boot/dts/imx6q-sabresd.dts      |   5 +
- arch/arm/boot/dts/imx6q.dtsi             | 125 ++++++++++++++++++++
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 131 +++++++++++++++++----
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 152 ++++++++++++++++++++++++-
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi   | 114 ++++++++++++++++++-
- arch/arm/boot/dts/imx6qdl.dtsi           |  20 +++-
- 10 files changed, 724 insertions(+), 27 deletions(-)
-
+diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+index 7aa120f..10bc9d1 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsi
++++ b/arch/arm/boot/dts/imx6dl.dtsi
+@@ -181,6 +181,16 @@
+ 		      "di0", "di1";
+ };
+ 
++&mux {
++	mux-reg-masks = <0x34 0x00000007>, /* IPU_CSI0_MUX */
++			<0x34 0x00000038>, /* IPU_CSI1_MUX */
++			<0x0c 0x0000000c>, /* HDMI_MUX_CTL */
++			<0x0c 0x000000c0>, /* LVDS0_MUX_CTL */
++			<0x0c 0x00000300>, /* LVDS1_MUX_CTL */
++			<0x28 0x00000003>, /* DCIC1_MUX_CTL */
++			<0x28 0x0000000c>; /* DCIC2_MUX_CTL */
++};
++
+ &vpu {
+ 	compatible = "fsl,imx6dl-vpu", "cnm,coda960";
+ };
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index e9a5d0b..a6962be 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -332,6 +332,16 @@
+ 	};
+ };
+ 
++&mux {
++	mux-reg-masks = <0x04 0x00080000>, /* MIPI_IPU1_MUX */
++			<0x04 0x00100000>, /* MIPI_IPU2_MUX */
++			<0x0c 0x0000000c>, /* HDMI_MUX_CTL */
++			<0x0c 0x000000c0>, /* LVDS0_MUX_CTL */
++			<0x0c 0x00000300>, /* LVDS1_MUX_CTL */
++			<0x28 0x00000003>, /* DCIC1_MUX_CTL */
++			<0x28 0x0000000c>; /* DCIC2_MUX_CTL */
++};
++
+ &vpu {
+ 	compatible = "fsl,imx6q-vpu", "cnm,coda960";
+ };
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index e426faa..50534dd 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -808,8 +808,13 @@
+ 			};
+ 
+ 			gpr: iomuxc-gpr at 020e0000 {
+-				compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
++				compatible = "fsl,imx6q-iomuxc-gpr", "syscon", "simple-mfd";
+ 				reg = <0x020e0000 0x38>;
++
++				mux: mux-controller {
++					compatible = "mmio-mux";
++					#mux-control-cells = <1>;
++				};
+ 			};
+ 
+ 			iomuxc: iomuxc at 020e0000 {
 -- 
 2.7.4
