@@ -1,69 +1,42 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 13 Jun 2017 00:48:03 +0900
-Subject: [GIT PULL] arm64: dts: uniphier: UniPhier DT updates (64bit) for v4.13
-Message-ID: <CAK7LNATOnBVcxSu58gJzp6NpHd3R7z1cs9W+8SkqS2BAxgpt6w@mail.gmail.com>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Mon, 12 Jun 2017 23:37:25 +0800
+Subject: [PATCH V3 4/7] dt-bindings: serial: fsl-lpuart: add i.MX7ULP support
+In-Reply-To: <1497281848-12995-1-git-send-email-aisheng.dong@nxp.com>
+References: <1497281848-12995-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1497281848-12995-5-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+The lpuart of imx7ulp is basically the same as ls1021a. It's also
+32 bit width register, but unlike ls1021a, it's little endian.
+Besides that, imx7ulp lpuart has a minor different register layout
+from ls1021a.
 
-Here are UniPhier DT (64bit) updates for the v4.13 merge window.
-Please pull!
+Cc: devicetree at vger.kernel.org
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Jiri Slaby <jslaby@suse.com>
+Cc: Stefan Agner <stefan@agner.ch>
+Cc: Mingkai Hu <Mingkai.Hu@nxp.com>
+Cc: Yangbo Lu <yangbo.lu@nxp.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Fugang Duan <fugang.duan@nxp.com>
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+---
+ Documentation/devicetree/bindings/serial/fsl-lpuart.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
-
-  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
-tags/uniphier-dt64-v4.13
-
-for you to fetch changes up to 1b6d58acdb26de8995f854cbf8b0d7214eefd884:
-
-  arm64: dts: uniphier: add support for LD20 Global board (2017-06-13
-00:00:17 +0900)
-
-----------------------------------------------------------------
-UniPhier ARM64 SoC DT updates for v4.13
-
-- specify timing delay properties of eMMC
-- fix W=1 build warnings
-- increase memory reserve size
-- use SPDX License Identifier
-- add new board support (LD11/LD20 global)
-
-----------------------------------------------------------------
-Kunihiko Hayashi (2):
-      arm64: dts: uniphier: add support for LD11 Global board
-      arm64: dts: uniphier: add support for LD20 Global board
-
-Masahiro Yamada (5):
-      arm64: dts: uniphier: add input-delay properties to Cadence eMMC node
-      arm64: dts: uniphier: add cdns, phy-dll-delay-sdclk(-hsmmc) for eMMC
-      arm64: dts: uniphier: fix simple-bus unit address format error
-      arm64: dts: uniphier: reserve more memory for LD11/LD20
-      arm64: dts: uniphier: use SPDX-License-Identifier
-
-Viresh Kumar (1):
-      arm64: dts: uniphier: Use - instead of @ for DT OPP entries
-
- arch/arm64/boot/dts/socionext/Makefile                 |  2 +
- arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts | 70
-+++++++++++++++++++++++++++
- arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts    | 38 +--------------
- arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi       | 61
-++++++------------------
- arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts | 52
-++++++++++++++++++++
- arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts    | 38 +--------------
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi       | 79
-++++++++++---------------------
- 7 files changed, 165 insertions(+), 175 deletions(-)
- create mode 100644 arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts
- create mode 100644 arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts
-m
-
+diff --git a/Documentation/devicetree/bindings/serial/fsl-lpuart.txt b/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
+index c95005e..a1252a0 100644
+--- a/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
++++ b/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
+@@ -6,6 +6,8 @@ Required properties:
+     on Vybrid vf610 SoC with 8-bit register organization
+   - "fsl,ls1021a-lpuart" for lpuart compatible with the one integrated
+     on LS1021A SoC with 32-bit big-endian register organization
++  - "fsl,imx7ulp-lpuart" for lpuart compatible with the one integrated
++    on i.MX7ULP SoC with 32-bit little-endian register organization
+ - reg : Address and length of the register set for the device
+ - interrupts : Should contain uart interrupt
+ - clocks : phandle + clock specifier pairs, one for each entry in clock-names
 -- 
-Best Regards
-Masahiro Yamada
+2.7.4
