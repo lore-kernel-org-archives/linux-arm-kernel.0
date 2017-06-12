@@ -1,86 +1,192 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 12 Jun 2017 18:49:24 -0500
-Subject: [PATCH v2 1/1] PCI: imx6: Add pcie compliance test option
-In-Reply-To: <1496835374-13053-1-git-send-email-stefan.schoefegger@ginzinger.com>
-References: <1472121518-9340-1-git-send-email-stefan.schoefegger@ginzinger.com>
- <1496835374-13053-1-git-send-email-stefan.schoefegger@ginzinger.com>
-Message-ID: <20170612234924.GE4379@bhelgaas-glaptop.roam.corp.google.com>
+Date: Mon, 12 Jun 2017 18:51:04 -0500
+Subject: [PATCH] PCI: dwc: Constify dw_pcie_host_ops structures
+In-Reply-To: <20170605085346.3732-1-jszhang@marvell.com>
+References: <20170605085346.3732-1-jszhang@marvell.com>
+Message-ID: <20170612235104.GF4379@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 07, 2017 at 01:36:11PM +0200, Stefan Schoefegger wrote:
-> Link speed must not be limited to gen1 during link test for compliance
-> tests
+On Mon, Jun 05, 2017 at 04:53:46PM +0800, Jisheng Zhang wrote:
+> The dw_pcie_host_ops structures are never modified. Constify these
+> structures such that these can be write-protected.
 > 
-> Signed-off-by: Stefan Schoefegger <stefan.schoefegger@ginzinger.com>
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+
+Applied with Jingoo's ack to pci/host-designware for v4.13, thanks!
+
 > ---
+>  drivers/pci/dwc/pci-dra7xx.c           | 2 +-
+>  drivers/pci/dwc/pci-exynos.c           | 2 +-
+>  drivers/pci/dwc/pci-imx6.c             | 2 +-
+>  drivers/pci/dwc/pci-keystone.c         | 2 +-
+>  drivers/pci/dwc/pci-layerscape.c       | 6 +++---
+>  drivers/pci/dwc/pcie-armada8k.c        | 2 +-
+>  drivers/pci/dwc/pcie-artpec6.c         | 2 +-
+>  drivers/pci/dwc/pcie-designware-plat.c | 2 +-
+>  drivers/pci/dwc/pcie-designware.h      | 2 +-
+>  drivers/pci/dwc/pcie-qcom.c            | 2 +-
+>  drivers/pci/dwc/pcie-spear13xx.c       | 2 +-
+>  11 files changed, 13 insertions(+), 13 deletions(-)
 > 
-> Changes since v1:
->  - pci-imx6.c moved to dwc directory
-> 
->  drivers/pci/dwc/Kconfig    | 10 ++++++++++
->  drivers/pci/dwc/pci-imx6.c | 21 ++++++++++++---------
->  2 files changed, 22 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/pci/dwc/Kconfig b/drivers/pci/dwc/Kconfig
-> index b7e15526d676..b6e9ced5a45d 100644
-> --- a/drivers/pci/dwc/Kconfig
-> +++ b/drivers/pci/dwc/Kconfig
-> @@ -77,6 +77,16 @@ config PCI_IMX6
->  	select PCIEPORTBUS
->  	select PCIE_DW_HOST
+> diff --git a/drivers/pci/dwc/pci-dra7xx.c b/drivers/pci/dwc/pci-dra7xx.c
+> index 8decf46cf525..e4166032b3c6 100644
+> --- a/drivers/pci/dwc/pci-dra7xx.c
+> +++ b/drivers/pci/dwc/pci-dra7xx.c
+> @@ -208,7 +208,7 @@ static void dra7xx_pcie_host_init(struct pcie_port *pp)
+>  	dra7xx_pcie_enable_interrupts(dra7xx);
+>  }
 >  
-> +config PCI_IMX6_COMPLIANCE_TEST
-> +	bool "Enable pcie compliance tests on imx6"
-> +	depends on PCI_IMX6
-> +	default n
-> +	help
-> +	  Enables support for pcie compliance test on FSL iMX SoCs.
-> +	  The link speed wouldn't be limited to gen1 when enabled.
-> +	  Enable only during compliance tests, otherwise
-> +	  link detection will fail on some peripherals.
-
-I'm puzzled about why we would want to merge this patch.  It looks
-like we're trying to game the system to make the device pass
-compliance testing when it isn't really compliant.  Is this config
-option useful to users, or is it only useful during internal
-development of iMX SoCs?
-
->  config PCIE_SPEAR13XX
->  	bool "STMicroelectronics SPEAr PCIe controller"
->  	depends on PCI
+> -static struct dw_pcie_host_ops dra7xx_pcie_host_ops = {
+> +static const struct dw_pcie_host_ops dra7xx_pcie_host_ops = {
+>  	.host_init = dra7xx_pcie_host_init,
+>  };
+>  
+> diff --git a/drivers/pci/dwc/pci-exynos.c b/drivers/pci/dwc/pci-exynos.c
+> index 546082ad5a3f..c78c06552590 100644
+> --- a/drivers/pci/dwc/pci-exynos.c
+> +++ b/drivers/pci/dwc/pci-exynos.c
+> @@ -590,7 +590,7 @@ static void exynos_pcie_host_init(struct pcie_port *pp)
+>  	exynos_pcie_enable_interrupts(ep);
+>  }
+>  
+> -static struct dw_pcie_host_ops exynos_pcie_host_ops = {
+> +static const struct dw_pcie_host_ops exynos_pcie_host_ops = {
+>  	.rd_own_conf = exynos_pcie_rd_own_conf,
+>  	.wr_own_conf = exynos_pcie_wr_own_conf,
+>  	.host_init = exynos_pcie_host_init,
 > diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
-> index 19a289b8cc94..b0fbe52e25b0 100644
+> index a98cba55c7f0..fb4816088a7a 100644
 > --- a/drivers/pci/dwc/pci-imx6.c
 > +++ b/drivers/pci/dwc/pci-imx6.c
-> @@ -533,15 +533,18 @@ static int imx6_pcie_establish_link(struct imx6_pcie *imx6_pcie)
->  	u32 tmp;
->  	int ret;
+> @@ -602,7 +602,7 @@ static int imx6_pcie_link_up(struct dw_pcie *pci)
+>  			PCIE_PHY_DEBUG_R1_XMLH_LINK_UP;
+>  }
 >  
-> -	/*
-> -	 * Force Gen1 operation when starting the link.  In case the link is
-> -	 * started in Gen2 mode, there is a possibility the devices on the
-> -	 * bus will not be detected at all.  This happens with PCIe switches.
-> -	 */
-> -	tmp = dw_pcie_readl_dbi(pci, PCIE_RC_LCR);
-> -	tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
-> -	tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1;
-> -	dw_pcie_writel_dbi(pci, PCIE_RC_LCR, tmp);
-> +	if (!IS_ENABLED(CONFIG_PCI_IMX6_COMPLIANCE_TEST)) {
-> +		/*
-> +		 * Force Gen1 operation when starting the link.  In case the
-> +		 * link is started in Gen2 mode, there is a possibility the
-> +		 * devices on the bus will not be detected at all.  This
-> +		 * happens with PCIe switches.
-> +		 */
-> +		tmp = dw_pcie_readl_dbi(pci, PCIE_RC_LCR);
-> +		tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
-> +		tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1;
-> +		dw_pcie_writel_dbi(pci, PCIE_RC_LCR, tmp);
-> +	}
+> -static struct dw_pcie_host_ops imx6_pcie_host_ops = {
+> +static const struct dw_pcie_host_ops imx6_pcie_host_ops = {
+>  	.host_init = imx6_pcie_host_init,
+>  };
 >  
->  	/* Start LTSSM. */
->  	if (imx6_pcie->variant == IMX7D)
+> diff --git a/drivers/pci/dwc/pci-keystone.c b/drivers/pci/dwc/pci-keystone.c
+> index fcc9723bad6e..4783cec1f78d 100644
+> --- a/drivers/pci/dwc/pci-keystone.c
+> +++ b/drivers/pci/dwc/pci-keystone.c
+> @@ -291,7 +291,7 @@ static void __init ks_pcie_host_init(struct pcie_port *pp)
+>  			"Asynchronous external abort");
+>  }
+>  
+> -static struct dw_pcie_host_ops keystone_pcie_host_ops = {
+> +static const struct dw_pcie_host_ops keystone_pcie_host_ops = {
+>  	.rd_other_conf = ks_dw_pcie_rd_other_conf,
+>  	.wr_other_conf = ks_dw_pcie_wr_other_conf,
+>  	.host_init = ks_pcie_host_init,
+> diff --git a/drivers/pci/dwc/pci-layerscape.c b/drivers/pci/dwc/pci-layerscape.c
+> index 27d638c4e134..fd861289ad8b 100644
+> --- a/drivers/pci/dwc/pci-layerscape.c
+> +++ b/drivers/pci/dwc/pci-layerscape.c
+> @@ -39,7 +39,7 @@ struct ls_pcie_drvdata {
+>  	u32 lut_offset;
+>  	u32 ltssm_shift;
+>  	u32 lut_dbg;
+> -	struct dw_pcie_host_ops *ops;
+> +	const struct dw_pcie_host_ops *ops;
+>  	const struct dw_pcie_ops *dw_pcie_ops;
+>  };
+>  
+> @@ -185,12 +185,12 @@ static int ls_pcie_msi_host_init(struct pcie_port *pp,
+>  	return 0;
+>  }
+>  
+> -static struct dw_pcie_host_ops ls1021_pcie_host_ops = {
+> +static const struct dw_pcie_host_ops ls1021_pcie_host_ops = {
+>  	.host_init = ls1021_pcie_host_init,
+>  	.msi_host_init = ls_pcie_msi_host_init,
+>  };
+>  
+> -static struct dw_pcie_host_ops ls_pcie_host_ops = {
+> +static const struct dw_pcie_host_ops ls_pcie_host_ops = {
+>  	.host_init = ls_pcie_host_init,
+>  	.msi_host_init = ls_pcie_msi_host_init,
+>  };
+> diff --git a/drivers/pci/dwc/pcie-armada8k.c b/drivers/pci/dwc/pcie-armada8k.c
+> index 495b023042b3..ea8f34af6a85 100644
+> --- a/drivers/pci/dwc/pcie-armada8k.c
+> +++ b/drivers/pci/dwc/pcie-armada8k.c
+> @@ -160,7 +160,7 @@ static irqreturn_t armada8k_pcie_irq_handler(int irq, void *arg)
+>  	return IRQ_HANDLED;
+>  }
+>  
+> -static struct dw_pcie_host_ops armada8k_pcie_host_ops = {
+> +static const struct dw_pcie_host_ops armada8k_pcie_host_ops = {
+>  	.host_init = armada8k_pcie_host_init,
+>  };
+>  
+> diff --git a/drivers/pci/dwc/pcie-artpec6.c b/drivers/pci/dwc/pcie-artpec6.c
+> index 82a04acc42fd..01c6f7823672 100644
+> --- a/drivers/pci/dwc/pcie-artpec6.c
+> +++ b/drivers/pci/dwc/pcie-artpec6.c
+> @@ -184,7 +184,7 @@ static void artpec6_pcie_host_init(struct pcie_port *pp)
+>  	artpec6_pcie_enable_interrupts(artpec6_pcie);
+>  }
+>  
+> -static struct dw_pcie_host_ops artpec6_pcie_host_ops = {
+> +static const struct dw_pcie_host_ops artpec6_pcie_host_ops = {
+>  	.host_init = artpec6_pcie_host_init,
+>  };
+>  
+> diff --git a/drivers/pci/dwc/pcie-designware-plat.c b/drivers/pci/dwc/pcie-designware-plat.c
+> index a9865d91b43c..091b4e7ad059 100644
+> --- a/drivers/pci/dwc/pcie-designware-plat.c
+> +++ b/drivers/pci/dwc/pcie-designware-plat.c
+> @@ -46,7 +46,7 @@ static void dw_plat_pcie_host_init(struct pcie_port *pp)
+>  		dw_pcie_msi_init(pp);
+>  }
+>  
+> -static struct dw_pcie_host_ops dw_plat_pcie_host_ops = {
+> +static const struct dw_pcie_host_ops dw_plat_pcie_host_ops = {
+>  	.host_init = dw_plat_pcie_host_init,
+>  };
+>  
+> diff --git a/drivers/pci/dwc/pcie-designware.h b/drivers/pci/dwc/pcie-designware.h
+> index c6a840575796..b4d2a89f8e58 100644
+> --- a/drivers/pci/dwc/pcie-designware.h
+> +++ b/drivers/pci/dwc/pcie-designware.h
+> @@ -162,7 +162,7 @@ struct pcie_port {
+>  	struct resource		*mem;
+>  	struct resource		*busn;
+>  	int			irq;
+> -	struct dw_pcie_host_ops	*ops;
+> +	const struct dw_pcie_host_ops *ops;
+>  	int			msi_irq;
+>  	struct irq_domain	*irq_domain;
+>  	unsigned long		msi_data;
+> diff --git a/drivers/pci/dwc/pcie-qcom.c b/drivers/pci/dwc/pcie-qcom.c
+> index 96ee527c1ed2..39e8c0095715 100644
+> --- a/drivers/pci/dwc/pcie-qcom.c
+> +++ b/drivers/pci/dwc/pcie-qcom.c
+> @@ -634,7 +634,7 @@ static int qcom_pcie_rd_own_conf(struct pcie_port *pp, int where, int size,
+>  	return dw_pcie_read(pci->dbi_base + where, size, val);
+>  }
+>  
+> -static struct dw_pcie_host_ops qcom_pcie_dw_ops = {
+> +static const struct dw_pcie_host_ops qcom_pcie_dw_ops = {
+>  	.host_init = qcom_pcie_host_init,
+>  	.rd_own_conf = qcom_pcie_rd_own_conf,
+>  };
+> diff --git a/drivers/pci/dwc/pcie-spear13xx.c b/drivers/pci/dwc/pcie-spear13xx.c
+> index 8ff36b3dbbdf..80897291e0fb 100644
+> --- a/drivers/pci/dwc/pcie-spear13xx.c
+> +++ b/drivers/pci/dwc/pcie-spear13xx.c
+> @@ -186,7 +186,7 @@ static void spear13xx_pcie_host_init(struct pcie_port *pp)
+>  	spear13xx_pcie_enable_interrupts(spear13xx_pcie);
+>  }
+>  
+> -static struct dw_pcie_host_ops spear13xx_pcie_host_ops = {
+> +static const struct dw_pcie_host_ops spear13xx_pcie_host_ops = {
+>  	.host_init = spear13xx_pcie_host_init,
+>  };
+>  
 > -- 
 > 2.11.0
 > 
