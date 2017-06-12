@@ -1,106 +1,127 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Mon, 12 Jun 2017 15:07:38 +0900
-Subject: [PATCH v2 1/2] arm64: dts: uniphier: add support for LD11 Global board
-In-Reply-To: <1497247659-1610-1-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1497247659-1610-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <1497247659-1610-2-git-send-email-hayashi.kunihiko@socionext.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Mon, 12 Jun 2017 14:14:15 +0800
+Subject: [PATCH 1/2] spi: rockchip: add support for "cs-gpios" dts property
+Message-ID: <1497248057-16550-1-git-send-email-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial device tree support for LD11 Global board.
+Support using "cs-gpios" property to specify cs gpios.
 
-Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 ---
- arch/arm64/boot/dts/socionext/Makefile             |  1 +
- .../boot/dts/socionext/uniphier-ld11-global.dts    | 70 ++++++++++++++++++++++
- 2 files changed, 71 insertions(+)
- create mode 100644 arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts
 
-diff --git a/arch/arm64/boot/dts/socionext/Makefile b/arch/arm64/boot/dts/socionext/Makefile
-index 5538598..8d07ee3 100644
---- a/arch/arm64/boot/dts/socionext/Makefile
-+++ b/arch/arm64/boot/dts/socionext/Makefile
-@@ -1,4 +1,5 @@
- dtb-$(CONFIG_ARCH_UNIPHIER) += \
-+	uniphier-ld11-global.dtb \
- 	uniphier-ld11-ref.dtb \
- 	uniphier-ld20-ref.dtb
+ .../devicetree/bindings/spi/spi-rockchip.txt       |  2 +
+ drivers/spi/spi-rockchip.c                         | 52 ++++++++++++++++++++++
+ 2 files changed, 54 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/spi/spi-rockchip.txt b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+index 83da493..02171b2 100644
+--- a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
++++ b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+@@ -17,6 +17,7 @@ Required Properties:
+        region.
+ - interrupts: The interrupt number to the cpu. The interrupt specifier format
+               depends on the interrupt controller.
++- cs-gpios : Specifies the gpio pins to be used for chipselects.
+ - clocks: Must contain an entry for each entry in clock-names.
+ - clock-names: Shall be "spiclk" for the transfer-clock, and "apb_pclk" for
+ 			   the peripheral clock.
+@@ -48,6 +49,7 @@ Example:
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
++		cs-gpios = <&gpio2 23 GPIO_ACTIVE_HIGH>;
+ 		clocks = <&cru SCLK_SPI0>, <&cru PCLK_SPI0>;
+ 		clock-names = "spiclk", "apb_pclk";
+ 		pinctrl-0 = <&spi1_pins>;
+diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
+index acf31f3..04694e1 100644
+--- a/drivers/spi/spi-rockchip.c
++++ b/drivers/spi/spi-rockchip.c
+@@ -15,6 +15,7 @@
  
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts b/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts
-new file mode 100644
-index 0000000..1153570
---- /dev/null
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts
-@@ -0,0 +1,70 @@
-+/*
-+ * Device Tree Source for UniPhier LD11 Global Board
-+ *
-+ * Copyright (C) 2016-2017 Socionext Inc.
-+ *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
-+ *           Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+ */
-+
-+/dts-v1/;
-+/include/ "uniphier-ld11.dtsi"
-+
-+/ {
-+	model = "UniPhier LD11 Global Board (REF_LD11_GP)";
-+	compatible = "socionext,uniphier-ld11-global",
-+		     "socionext,uniphier-ld11";
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	aliases {
-+		serial0 = &serial0;
-+		serial1 = &serial1;
-+		serial2 = &serial2;
-+		serial3 = &serial3;
-+		i2c0 = &i2c0;
-+		i2c1 = &i2c1;
-+		i2c2 = &i2c2;
-+		i2c3 = &i2c3;
-+		i2c4 = &i2c4;
-+		i2c5 = &i2c5;
-+	};
-+
-+	memory at 80000000 {
-+		device_type = "memory";
-+		reg = <0 0x80000000 0 0x40000000>;
-+	};
+ #include <linux/clk.h>
+ #include <linux/dmaengine.h>
++#include <linux/gpio.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/pinctrl/consumer.h>
+@@ -201,6 +202,10 @@ struct rockchip_spi {
+ 	struct dma_slave_caps dma_caps;
+ };
+ 
++struct rockchip_spi_data {
++	bool cs_gpio_requested;
 +};
 +
-+&serial0 {
-+	status = "okay";
-+};
+ static inline void spi_enable_chip(struct rockchip_spi *rs, int enable)
+ {
+ 	writel_relaxed((enable ? 1 : 0), rs->regs + ROCKCHIP_SPI_SSIENR);
+@@ -297,6 +302,50 @@ static void rockchip_spi_set_cs(struct spi_device *spi, bool enable)
+ 	pm_runtime_put_sync(rs->dev);
+ }
+ 
++static int rockchip_spi_setup(struct spi_device *spi)
++{
++	int ret = 0;
++	unsigned long flags = (spi->mode & SPI_CS_HIGH) ?
++			      GPIOF_OUT_INIT_LOW : GPIOF_OUT_INIT_HIGH;
++	struct rockchip_spi_data *data = spi_get_ctldata(spi);
 +
-+&serial1 {
-+	status = "okay";
-+};
++	if (!gpio_is_valid(spi->cs_gpio))
++		return 0;
 +
-+&i2c0 {
-+	status = "okay";
++	if (!data) {
++		data = kzalloc(sizeof(*data), GFP_KERNEL);
++		if (!data)
++			return -ENOMEM;
++		spi_set_ctldata(spi, data);
++	}
 +
-+	eeprom at 50 {
-+		compatible = "st,24c64", "atmel,24c64";
-+		reg = <0x50>;
-+		pagesize = <32>;
-+	};
-+};
++	if (!data->cs_gpio_requested) {
++		ret = gpio_request_one(spi->cs_gpio, flags,
++				       dev_name(&spi->dev));
++		if (!ret)
++			data->cs_gpio_requested = 1;
++	} else
++		ret = gpio_direction_output(spi->cs_gpio, flags);
 +
-+&usb0 {
-+	status = "okay";
-+};
++	if (ret < 0)
++		dev_err(&spi->dev, "Failed to setup cs gpio(%d): %d\n",
++			spi->cs_gpio, ret);
 +
-+&usb1 {
-+	status = "okay";
-+};
++	return ret;
++}
 +
-+&usb2 {
-+	status = "okay";
-+};
++static void rockchip_spi_cleanup(struct spi_device *spi)
++{
++	struct rockchip_spi_data *data = spi_get_ctldata(spi);
++
++	if (data) {
++		if (data->cs_gpio_requested)
++			gpio_free(spi->cs_gpio);
++		kfree(data);
++		spi_set_ctldata(spi, NULL);
++	}
++}
++
+ static int rockchip_spi_prepare_message(struct spi_master *master,
+ 					struct spi_message *msg)
+ {
+@@ -744,11 +793,14 @@ static int rockchip_spi_probe(struct platform_device *pdev)
+ 	master->bits_per_word_mask = SPI_BPW_MASK(16) | SPI_BPW_MASK(8);
+ 
+ 	master->set_cs = rockchip_spi_set_cs;
++	master->setup = rockchip_spi_setup;
++	master->cleanup = rockchip_spi_cleanup;
+ 	master->prepare_message = rockchip_spi_prepare_message;
+ 	master->unprepare_message = rockchip_spi_unprepare_message;
+ 	master->transfer_one = rockchip_spi_transfer_one;
+ 	master->max_transfer_size = rockchip_spi_max_transfer_size;
+ 	master->handle_err = rockchip_spi_handle_err;
++	master->flags = SPI_MASTER_GPIO_SS;
+ 
+ 	rs->dma_tx.ch = dma_request_chan(rs->dev, "tx");
+ 	if (IS_ERR(rs->dma_tx.ch)) {
 -- 
-2.7.4
+2.1.4
