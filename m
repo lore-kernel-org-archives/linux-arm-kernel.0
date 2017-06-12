@@ -1,164 +1,66 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 12 Jun 2017 11:40:14 +0200
-Subject: [PATCH v4 3/7] ARM64: dts: meson-gx: use stable UART bindings
- with correct gate clock
-In-Reply-To: <1497001756-942-4-git-send-email-narmstrong@baylibre.com>
+Date: Mon, 12 Jun 2017 11:42:57 +0200
+Subject: [PATCH v4 5/7] ARM: dts: meson6: switch to new bindings for
+ UART nodes
+In-Reply-To: <1497001756-942-6-git-send-email-narmstrong@baylibre.com>
 References: <1497001756-942-1-git-send-email-narmstrong@baylibre.com>
- <1497001756-942-4-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1497260414.3086.9.camel@baylibre.com>
+ <1497001756-942-6-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1497260577.3086.11.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 2017-06-09 at 11:49 +0200, Neil Armstrong wrote:
-> From: Helmut Klein <hgkr.klein@gmail.com>
+> Switch to the stable UART bindings by adding a XTAL node and using the
+> proper compatible strings.
 > 
-> This patch switches to the stable UART bindings but also add the correct
-> gate clock to the non-AO UART nodes for GXBB and GXL SoCs.
-> 
-> Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
 > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
-Looks Good
+Shouldn't this patch be squashed with patch 4 ?
 
-Acked-by: Jerome Brunet <jbrunet@baylibre.com>
 
 > ---
-> ?arch/arm64/boot/dts/amlogic/meson-gx.dtsi???| 12 +++++-------
-> ?arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 25 +++++++++++++++++++++++++
-> ?arch/arm64/boot/dts/amlogic/meson-gxl.dtsi??| 25 +++++++++++++++++++++++++
-> ?3 files changed, 55 insertions(+), 7 deletions(-)
+> ?arch/arm/boot/dts/meson6.dtsi | 28 ++++++++++++++++++++++++++++
+> ?1 file changed, 28 insertions(+)
 > 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-> b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-> index 436b875..d2b8d52 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-> @@ -225,7 +225,7 @@
-> ?			};
+> diff --git a/arch/arm/boot/dts/meson6.dtsi b/arch/arm/boot/dts/meson6.dtsi
+> index b0fc91f..a334fbe 100644
+> --- a/arch/arm/boot/dts/meson6.dtsi
+> +++ b/arch/arm/boot/dts/meson6.dtsi
+> @@ -70,9 +70,37 @@
+> ?		};
+> ?	};
 > ?
-> ?			uart_A: serial at 84c0 {
-> -				compatible = "amlogic,meson-uart";
-> +				compatible = "amlogic,meson-gx-uart";
-> ?				reg = <0x0 0x84c0 0x0 0x14>;
-> ?				interrupts = <GIC_SPI 26
-> IRQ_TYPE_EDGE_RISING>;
-> ?				clocks = <&xtal>;
-> @@ -233,7 +233,7 @@
-> ?			};
-> ?
-> ?			uart_B: serial at 84dc {
-> -				compatible = "amlogic,meson-uart";
-> +				compatible = "amlogic,meson-gx-uart";
-> ?				reg = <0x0 0x84dc 0x0 0x14>;
-> ?				interrupts = <GIC_SPI 75
-> IRQ_TYPE_EDGE_RISING>;
-> ?				clocks = <&xtal>;
-> @@ -279,7 +279,7 @@
-> ?			};
-> ?
-> ?			uart_C: serial at 8700 {
-> -				compatible = "amlogic,meson-uart";
-> +				compatible = "amlogic,meson-gx-uart";
-> ?				reg = <0x0 0x8700 0x0 0x14>;
-> ?				interrupts = <GIC_SPI 93
-> IRQ_TYPE_EDGE_RISING>;
-> ?				clocks = <&xtal>;
-> @@ -366,18 +366,16 @@
-> ?			};
-> ?
-> ?			uart_AO: serial at 4c0 {
-> -				compatible = "amlogic,meson-uart";
-> +				compatible = "amlogic,meson-gx-uart",
-> "amlogic,meson-ao-uart";
-> ?				reg = <0x0 0x004c0 0x0 0x14>;
-> ?				interrupts = <GIC_SPI 193
-> IRQ_TYPE_EDGE_RISING>;
-> -				clocks = <&xtal>;
-> ?				status = "disabled";
-> ?			};
-> ?
-> ?			uart_AO_B: serial at 4e0 {
-> -				compatible = "amlogic,meson-uart";
-> +				compatible = "amlogic,meson-gx-uart",
-> "amlogic,meson-ao-uart";
-> ?				reg = <0x0 0x004e0 0x0 0x14>;
-> ?				interrupts = <GIC_SPI 197
-> IRQ_TYPE_EDGE_RISING>;
-> -				clocks = <&xtal>;
-> ?				status = "disabled";
-> ?			};
-> ?
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> index dbd300f..1ae8da7 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> @@ -675,6 +675,31 @@
-> ?	clocks = <&clkc CLKID_SPI>;
-> ?};
-> ?
-> +&uart_A {
-> +	clocks = <&xtal>, <&clkc CLKID_UART0>, <&xtal>;
-> +	clock-names = "xtal", "pclk", "baud";
-> +};
+> +	xtal: xtal-clk {
+> +		compatible = "fixed-clock";
+> +		clock-frequency = <24000000>;
+> +		clock-output-names = "xtal";
+> +		#clock-cells = <0>;
+> +	};
+> +
+> ?	clk81: clk at 0 {
+> ?		#clock-cells = <0>;
+> ?		compatible = "fixed-clock";
+> ?		clock-frequency = <200000000>;
+> ?	};
+> ?}; /* end of / */
+> +
 > +
 > +&uart_AO {
-> +	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
+> +	clocks = <&xtal>, <&clk81>, <&clk81>;
 > +	clock-names = "xtal", "pclk", "baud";
 > +};
 > +
-> +&uart_AO_B {
-> +	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
+> +&uart_A {
+> +	clocks = <&xtal>, <&clk81>, <&clk81>;
 > +	clock-names = "xtal", "pclk", "baud";
 > +};
 > +
 > +&uart_B {
-> +	clocks = <&xtal>, <&clkc CLKID_UART1>, <&xtal>;
-> +	clock-names = "xtal", "core", "baud";
-> +};
-> +
-> +&uart_C {
-> +	clocks = <&xtal>, <&clkc CLKID_UART2>, <&xtal>;
-> +	clock-names = "xtal", "core", "baud";
-> +};
-> +
-> ?&vpu {
-> ?	compatible = "amlogic,meson-gxbb-vpu", "amlogic,meson-gx-vpu";
-> ?};
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-> b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-> index 4dfc22b..0c601f8 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-> @@ -616,6 +616,31 @@
-> ?	clocks = <&clkc CLKID_SPI>;
-> ?};
-> ?
-> +&uart_A {
-> +	clocks = <&xtal>, <&clkc CLKID_UART0>, <&xtal>;
-> +	clock-names = "xtal", "core", "baud";
-> +};
-> +
-> +&uart_AO {
-> +	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
+> +	clocks = <&xtal>, <&clk81>, <&clk81>;
 > +	clock-names = "xtal", "pclk", "baud";
 > +};
 > +
-> +&uart_AO_B {
-> +	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
+> +&uart_C {
+> +	clocks = <&xtal>, <&clk81>, <&clk81>;
 > +	clock-names = "xtal", "pclk", "baud";
 > +};
-> +
-> +&uart_B {
-> +	clocks = <&xtal>, <&clkc CLKID_UART1>, <&xtal>;
-> +	clock-names = "xtal", "core", "baud";
-> +};
-> +
-> +&uart_C {
-> +	clocks = <&xtal>, <&clkc CLKID_UART2>, <&xtal>;
-> +	clock-names = "xtal", "core", "baud";
-> +};
-> +
-> ?&vpu {
-> ?	compatible = "amlogic,meson-gxl-vpu", "amlogic,meson-gx-vpu";
-> ?};
