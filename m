@@ -1,135 +1,78 @@
-From: jun.gao@mediatek.com (Jun Gao)
-Date: Mon, 12 Jun 2017 19:54:28 +0800
-Subject: [PATCH v4 2/2] arm: dts: Add Mediatek MT2701 i2c device node
-In-Reply-To: <1495784107-6711-3-git-send-email-jun.gao@mediatek.com>
-References: <1495784107-6711-1-git-send-email-jun.gao@mediatek.com>
- <1495784107-6711-3-git-send-email-jun.gao@mediatek.com>
-Message-ID: <1497268468.930.26.camel@mhfsdcap03>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Mon, 12 Jun 2017 13:54:35 +0200
+Subject: [PATCH v3 7/9] net: mvmdio: add xmdio xsmi support
+In-Reply-To: <20170612101739.GA4902@n2100.armlinux.org.uk>
+References: <20170612095745.11300-1-antoine.tenart@free-electrons.com>
+ <20170612095745.11300-8-antoine.tenart@free-electrons.com>
+ <20170612101739.GA4902@n2100.armlinux.org.uk>
+Message-ID: <20170612115435.GC22312@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-05-26 at 15:35 +0800, Jun Gao wrote:
-> From: Jun Gao <jun.gao@mediatek.com>
-> 
-> Add MT2701 i2c device node.
-> 
-> Signed-off-by: Jun Gao <jun.gao@mediatek.com>
-> ---
->  arch/arm/boot/dts/mt2701-evb.dts | 42 ++++++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/mt2701.dtsi    | 42 ++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 84 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
-> index a483798..3f5a96c 100644
-> --- a/arch/arm/boot/dts/mt2701-evb.dts
-> +++ b/arch/arm/boot/dts/mt2701-evb.dts
-> @@ -28,7 +28,49 @@
->  	status = "okay";
->  };
->  
-> +&i2c0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c0_pins_a>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c1_pins_a>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c2_pins_a>;
-> +	status = "okay";
-> +};
-> +
->  &pio {
-> +	i2c0_pins_a: i2c0 at 0 {
-> +		pins1 {
-> +			pinmux = <MT2701_PIN_75_SDA0__FUNC_SDA0>,
-> +				 <MT2701_PIN_76_SCL0__FUNC_SCL0>;
-> +			bias-disable;
-> +		};
-> +	};
-> +
-> +	i2c1_pins_a: i2c1 at 0 {
-> +		pins1 {
-> +			pinmux = <MT2701_PIN_57_SDA1__FUNC_SDA1>,
-> +				 <MT2701_PIN_58_SCL1__FUNC_SCL1>;
-> +			bias-disable;
-> +		};
-> +	};
-> +
-> +	i2c2_pins_a: i2c2 at 0 {
-> +		pins1 {
-> +			pinmux = <MT2701_PIN_77_SDA2__FUNC_SDA2>,
-> +				 <MT2701_PIN_78_SCL2__FUNC_SCL2>;
-> +			bias-disable;
-> +		};
-> +	};
-> +
->  	spi_pins_a: spi0 at 0 {
->  		pins_spi {
->  			pinmux = <MT2701_PIN_53_SPI0_CSN__FUNC_SPI0_CS>,
-> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-> index 8037210..1b6157e 100644
-> --- a/arch/arm/boot/dts/mt2701.dtsi
-> +++ b/arch/arm/boot/dts/mt2701.dtsi
-> @@ -286,6 +286,48 @@
->  		status = "disabled";
->  	};
->  
-> +	i2c0: i2c at 11007000 {
-> +		compatible = "mediatek,mt2701-i2c",
-> +			     "mediatek,mt6577-i2c";
-> +		reg = <0 0x11007000 0 0x70>,
-> +		      <0 0x11000200 0 0x80>;
-> +		interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_LOW>;
-> +		clock-div = <16>;
-> +		clocks = <&pericfg CLK_PERI_I2C0>, <&pericfg CLK_PERI_AP_DMA>;
-> +		clock-names = "main", "dma";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		status = "disabled";
-> +	};
-> +
-> +	i2c1: i2c at 11008000 {
-> +		compatible = "mediatek,mt2701-i2c",
-> +			     "mediatek,mt6577-i2c";
-> +		reg = <0 0x11008000 0 0x70>,
-> +		      <0 0x11000280 0 0x80>;
-> +		interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_LOW>;
-> +		clock-div = <16>;
-> +		clocks = <&pericfg CLK_PERI_I2C1>, <&pericfg CLK_PERI_AP_DMA>;
-> +		clock-names = "main", "dma";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		status = "disabled";
-> +	};
-> +
-> +	i2c2: i2c at 11009000 {
-> +		compatible = "mediatek,mt2701-i2c",
-> +			     "mediatek,mt6577-i2c";
-> +		reg = <0 0x11009000 0 0x70>,
-> +		      <0 0x11000300 0 0x80>;
-> +		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_LOW>;
-> +		clock-div = <16>;
-> +		clocks = <&pericfg CLK_PERI_I2C2>, <&pericfg CLK_PERI_AP_DMA>;
-> +		clock-names = "main", "dma";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		status = "disabled";
-> +	};
-> +
->  	spi0: spi at 1100a000 {
->  		compatible = "mediatek,mt2701-spi";
->  		#address-cells = <1>;
+Hi Russell,
 
-Dear Matthias,
+On Mon, Jun 12, 2017 at 11:17:39AM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jun 12, 2017 at 11:57:43AM +0200, Antoine Tenart wrote:
+> > +static const struct orion_mdio_ops *orion_mdio_get_ops(struct orion_mdio_dev *dev,
+> > +						       int regnum)
+> > +{
+> > +	if (dev->bus_type == BUS_TYPE_XSMI && (regnum & MII_ADDR_C45))
+> > +		return &orion_mdio_xsmi_ops;
+> > +	else if (dev->bus_type == BUS_TYPE_SMI)
+> > +		return &orion_mdio_smi_ops;
+> > +
+> > +	return ERR_PTR(-EOPNOTSUPP);
+> > +}
+> 
+> Oh, this is where you're doing it - I'm not sure having this complexity
+> is really necessary - there is no dynamic choice between the two.  This
+> seems to be way over-engineered.
 
-Could you take this patch together with 
-[PATCH v4 1/2]dt-bindings: i2c: Add Mediatek MT2701 i2c binding ?
+You're right, there is no dynamic choice between the two. The advantage
+is the logic of the read/write operations are not duplicated.
+
+> You might as well make the SMI operations fail if MII_ADDR_C45 is set,
+> and the XSMI operations fail if MII_ADDR_C45 is not set.
+
+This check is already done for xSMI operations. But this should also be
+the case for SMI ones, you're right.
+
+> 1. the mdio read/write functions implement their own locking.
+> 
+>    At the MDIO level, there is already locking in the form of a per-bus
+>    lock "bus->mdio_lock" which will be taken whenever either of these
+>    functions is called.  So the driver's "dev->lock" is redundant.
+
+OK, that's a good rework to add in the series.
+
+> 2. with the redundant locking removed, orion_mdio_write() becomes a
+>    call to orion_mdio_wait_ready() followed by a call to dev->ops->write.
+>    It seems that orion_mdio_wait_ready() could be a library function
+>    shared between a SMI version of orion_mdio_write() and a XSMI version.
+> 
+> 3. the same is really true of orion_mdio_read(), although that function
+>    is a little more complex in itself, the result would actually end up
+>    being simpler.
+
+I'm not completely convinced as the read and write functions end up
+being duplicated. One for SMI operations and one for xSMI. But I don't
+really care, if you think this is better let's go for it.
+
+Should I add your first patch in my series and squash the second one in
+patch 7/9? (I'll also remove the bus_type member from the private
+struct, as well as the one line it's used in the probe).
 
 Thanks!
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170612/9488ca0c/attachment.sig>
