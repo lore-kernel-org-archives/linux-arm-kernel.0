@@ -1,57 +1,64 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 12 Jun 2017 09:38:55 +0200
-Subject: [PATCH] ARM: dts: meson8: fix the IR receiver pins
-In-Reply-To: <20170609222039.25191-1-martin.blumenstingl@googlemail.com>
-References: <20170609222039.25191-1-martin.blumenstingl@googlemail.com>
-Message-ID: <e4347b01-e221-2242-9bb9-bc1e93da06fb@baylibre.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 12 Jun 2017 09:58:49 +0200
+Subject: [PATCH] ARM: dts: omap3-overo: Remove "vqmmc-supply" property
+ from MMC dt node
+In-Reply-To: <20170609084141.15582-1-kishon@ti.com>
+References: <20170609084141.15582-1-kishon@ti.com>
+Message-ID: <CAPDyKFqN97jdF+WNbO8dRZofgL8OmLP-d=oUTV7Px=4Tg1BF=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2017 12:20 AM, Martin Blumenstingl wrote:
-> The IR receiver pins are currently defined in the CBUS pin-controller.
-> However the pins are in the AO region, which is controlled by the AOBUS
-> pin-controller. Move the pins to pinctrl_aobus so they can actually be
-> used.
-> 
-> Fixes: b60e1157d8fa ("ARM: dts: amlogic: Split pinctrl device for Meson8 / Meson8b")
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+On 9 June 2017 at 10:41, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> commit 94647a30124e2c7 ("ARM: dts: omap3-overo: Enable WiFi/BT combo")
+> while enabling WiFi/BT combo added regulator to trigger the nReset
+> signal of the Bluetooth module in vqmmc-supply. However BT should be
+> handled by UART. Moreover "vqmmc" is not a defined binding for
+> omap_hsmmc. While "vqmmc" in mmc2 hasn't caused any issues so far,
+> mmc2 will start to mis-behave once omap_hsmmc defines "vqmmc"
+> binding.
+>
+> Remove "vqmmc-supply" property in mmc2 here.
+>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+
+Thanks, applied for next!
+
+Kind regards
+Uffe
+
 > ---
->  arch/arm/boot/dts/meson8.dtsi | 14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/meson8.dtsi b/arch/arm/boot/dts/meson8.dtsi
-> index 9b0b3ddbb17e..e4f7357b4b31 100644
-> --- a/arch/arm/boot/dts/meson8.dtsi
-> +++ b/arch/arm/boot/dts/meson8.dtsi
-> @@ -116,6 +116,13 @@
->  				function = "i2c_mst_ao";
->  			};
->  		};
-> +
-> +		ir_recv_pins: remote {
-> +			mux {
-> +				groups = "remote_input";
-> +				function = "remote";
-> +			};
-> +		};
->  	};
->  };
->  
-> @@ -151,13 +158,6 @@
->  			};
->  		};
->  
-> -		ir_recv_pins: remote {
-> -			mux {
-> -				groups = "remote_input";
-> -				function = "remote";
-> -			};
-> -		};
+>  arch/arm/boot/dts/omap3-overo-base.dtsi | 11 -----------
+>  1 file changed, 11 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/omap3-overo-base.dtsi b/arch/arm/boot/dts/omap3-overo-base.dtsi
+> index 401fae838fe9..cd220342a805 100644
+> --- a/arch/arm/boot/dts/omap3-overo-base.dtsi
+> +++ b/arch/arm/boot/dts/omap3-overo-base.dtsi
+> @@ -74,16 +74,6 @@
+>                 gpio = <&gpio1 16 GPIO_ACTIVE_HIGH>;            /* gpio_16: WiFi nReset */
+>                 startup-delay-us = <10000>;
+>         };
 > -
->  		eth_pins: ethernet {
->  			mux {
->  				groups = "eth_tx_clk_50m", "eth_tx_en",
-> 
-
-
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+> -       /* Regulator to trigger the nReset signal of the Bluetooth module */
+> -       w3cbw003c_bt_nreset: regulator-w3cbw003c-bt-nreset {
+> -               compatible = "regulator-fixed";
+> -               regulator-name = "regulator-w3cbw003c-bt-nreset";
+> -               regulator-min-microvolt = <3300000>;
+> -               regulator-max-microvolt = <3300000>;
+> -               gpio = <&gpio6 4 GPIO_ACTIVE_HIGH>;             /* gpio_164: BT nReset */
+> -               startup-delay-us = <10000>;
+> -       };
+>  };
+>
+>  &omap3_pmx_core {
+> @@ -191,7 +181,6 @@
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&mmc2_pins>;
+>         vmmc-supply = <&w3cbw003c_npoweron>;
+> -       vqmmc-supply = <&w3cbw003c_bt_nreset>;
+>         vmmc_aux-supply = <&w3cbw003c_wifi_nreset>;
+>         bus-width = <4>;
+>         cap-sdio-irq;
+> --
+> 2.11.0
+>
