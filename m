@@ -1,89 +1,49 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 12 Jun 2017 15:36:50 +0100
-Subject: [PATCH 11/12] coresight tmc: Add support for Coresight SoC 600 TMC
-In-Reply-To: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
-References: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1497278211-5001-12-git-send-email-suzuki.poulose@arm.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon, 12 Jun 2017 16:31:52 +0200
+Subject: [PATCH 4/6] arm: wire cpu-invariant accounting support up to the
+ task scheduler
+In-Reply-To: <20170608075513.12475-5-dietmar.eggemann@arm.com>
+References: <20170608075513.12475-1-dietmar.eggemann@arm.com>
+ <20170608075513.12475-5-dietmar.eggemann@arm.com>
+Message-ID: <CAKfTPtDminixSd+KKt4tRWUBF3ere8oQdzP-XOKpmmmkCAhX6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The coresight SoC 600 supports ETR save-restore and also supports
-a new mode, SWFIFO2, which helps to streaming the trace data through
-a functional I/O (e.g, USB).
+On 8 June 2017 at 09:55, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
+> Commit 8cd5601c5060 ("sched/fair: Convert arch_scale_cpu_capacity() from
+> weak function to #define") changed the wiring which now has to be done
+> by associating arch_scale_cpu_capacity with the actual implementation
+> provided by the architecture.
+>
+> Define arch_scale_cpu_capacity to use the arch_topology "driver"
+> function topology_get_cpu_scale() for the task scheduler's cpu-invariant
+> accounting instead of the default arch_scale_cpu_capacity() in
+> kernel/sched/sched.h.
+>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Juri Lelli <juri.lelli@arm.com>
+> Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
 
-Also, TMCs have different PIDs in different configurations (ETF,
-ETB & ETR), unlike the previous generation.
+Acked-by: Vincent Guittot <vincent.guittot@linaro.org>
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- drivers/hwtracing/coresight/coresight-tmc.c | 20 ++++++++++++++++++++
- drivers/hwtracing/coresight/coresight-tmc.h |  8 ++++++++
- 2 files changed, 28 insertions(+)
-
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index e88f2f3..03cafa7 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -409,6 +409,10 @@ static struct tmc_caps coresight_soc_400_tmc_caps = {
- 	.caps = CORESIGHT_SOC_400_TMC_CAPS,
- };
- 
-+static struct tmc_caps coresight_soc_600_etr_caps = {
-+	.caps = CORESIGHT_SOC_600_ETR_CAPS,
-+};
-+
- static struct amba_id tmc_ids[] = {
- 	{
- 		/* Coresight SoC 400 TMC */
-@@ -416,6 +420,22 @@ static struct amba_id tmc_ids[] = {
- 		.mask   = 0x000fffff,
- 		.data	= &coresight_soc_400_tmc_caps,
- 	},
-+	{
-+		/* Coresight SoC 600 TMC-ETR/ETS */
-+		.id	= 0x000bb9e8,
-+		.mask	= 0x000fffff,
-+		.data	= &coresight_soc_600_etr_caps,
-+	},
-+	{
-+		/* Coresight SoC 600 TMC-ETB */
-+		.id	= 0x000bb9e9,
-+		.mask	= 0x000fffff,
-+	},
-+	{
-+		/* Coresight SoC 600 TMC-ETF */
-+		.id	= 0x000bb9ea,
-+		.mask	= 0x000fffff,
-+	},
- 	{},
- };
- 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-index d5ef51e..8c74e1e 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.h
-+++ b/drivers/hwtracing/coresight/coresight-tmc.h
-@@ -98,6 +98,12 @@ enum tmc_mem_intf_width {
-  * value.
-  */
- #define TMC_CAP_ETR_SAVE_RESTORE	(1U << 1)
-+/*
-+ * TMC_CAP_ETR_SWFIFO2_MODE - ETR supports a new mode, SWFIFO2, which
-+ * allows streaming the trace data with optionally raising an interrupt
-+ * when the buffer fill level reaches a programmed watermark.
-+ */
-+#define TMC_CAP_ETR_SWFIFO2_MODE	(1U << 2)
- 
- /**
-  * struct tmc_cap - Describes the capabilities of the TMC.
-@@ -108,6 +114,8 @@ struct tmc_caps {
- };
- 
- #define CORESIGHT_SOC_400_TMC_CAPS	(TMC_CAP_ETR_SG_UNIT)
-+#define CORESIGHT_SOC_600_ETR_CAPS	(TMC_CAP_ETR_SAVE_RESTORE | \
-+					 TMC_CAP_ETR_SWFIFO2_MODE)
- 
- /**
-  * struct tmc_drvdata - specifics associated to an TMC component
--- 
-2.7.4
+> ---
+>  arch/arm/include/asm/topology.h | 3 +++
+>  1 file changed, 3 insertions(+)
+>
+> diff --git a/arch/arm/include/asm/topology.h b/arch/arm/include/asm/topology.h
+> index a56a9e24f4c0..b713e7223bc4 100644
+> --- a/arch/arm/include/asm/topology.h
+> +++ b/arch/arm/include/asm/topology.h
+> @@ -29,6 +29,9 @@ const struct cpumask *cpu_coregroup_mask(int cpu);
+>  /* Replace task scheduler's default frequency-invariant accounting */
+>  #define arch_scale_freq_capacity topology_get_freq_scale
+>
+> +/* Replace task scheduler's default cpu-invariant accounting */
+> +#define arch_scale_cpu_capacity topology_get_cpu_scale
+> +
+>  #else
+>
+>  static inline void init_cpu_topology(void) { }
+> --
+> 2.11.0
+>
