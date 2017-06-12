@@ -1,134 +1,55 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 12 Jun 2017 10:38:38 +0200
-Subject: [PATCH v2] arm64: allwinner: a64: Add initial Orangepi
- Win/WinPlus support
-In-Reply-To: <1497172565-13125-1-git-send-email-jteki@openedev.com>
-References: <1497172565-13125-1-git-send-email-jteki@openedev.com>
-Message-ID: <20170612083838.e7gynimxjjzk3zxg@flea.home>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 12 Jun 2017 10:42:02 +0200
+Subject: [PATCH 4/4] drm/bridge: dw-hdmi: add cec driver
+In-Reply-To: <db1f1785-930b-0f32-d71a-79ae8e053b2c@xs4all.nl>
+References: <20170530142218.GS22219@n2100.armlinux.org.uk>
+ <E1dFi3P-0004lv-2K@rmk-PC.armlinux.org.uk>
+ <db1f1785-930b-0f32-d71a-79ae8e053b2c@xs4all.nl>
+Message-ID: <c8046a4f-d04e-a2f4-375e-2ff53fabe68e@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 11, 2017 at 02:46:05PM +0530, Jagan Teki wrote:
-> From: Jagan Teki <jagan@amarulasolutions.com>
+On 06/01/2017 10:31 AM, Hans Verkuil wrote:
+> Hi Russell,
 > 
-> Orangepi Win/WinPlus is an open-source single-board computer
-> using the Allwinner A64 SOC.
+> First a few top-level questions:
 > 
-> A64 Orangepi Win/WinPlus has
-> - A64 Quad-core Cortex-A53 64bit
-> - 1GB(Win)/2GB(Win Plus) DDR3 SDRAM
-> - Debug TTL UART
-> - Four USB 2.0
-> - HDMI
-> - LCD
-> - Audio and MIC
-> - Wifi + BT
-> - IR receiver
-> - 5V DC power supply
+> 1) What was the reason for using the cec-notifier here? Isn't this
+>     tightly integrated into the main dw-hdmi block? For the tda driver
+>     it is clearly required, but for tightly coupled HDMI & CEC HW I
+>     just create the adapter from the HDMI driver. As a small bonus it
+>     avoids adding the cec-notifier code and the control flow is a bit
+>     easier to trace.
 > 
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
-> Changes for v2:
-> - Remove http link from commit message
-> - Re-arrange nodes in ascending order
+> 2) I may have asked this before, apologies if I repeat myself: does
+>     this CEC implementation support CEC monitoring (aka snooping)? If
+>     it does, then I recommend that it is implemented since it is very
+>     useful.
 > 
->  arch/arm64/boot/dts/allwinner/Makefile             |  1 +
->  .../boot/dts/allwinner/sun50i-a64-orangepi-win.dts | 97 ++++++++++++++++++++++
->  2 files changed, 98 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
+> 3) Is the CEC still active if there is no hotplug signal? Or is it
+>     powered off in that case? Ideally it should still be possible to
+>     send CEC messages even if there is no hotplug. This is explicitly
+>     allowed by the CEC 2.0 spec to wake up displays that turn off the
+>     HPD, but that still have a working CEC controller.
 > 
-> diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-> index 8adba9c..2fb5057 100644
-> --- a/arch/arm64/boot/dts/allwinner/Makefile
-> +++ b/arch/arm64/boot/dts/allwinner/Makefile
-> @@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
->  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
->  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
->  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
-> +dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-orangepi-win.dtb
->  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus2.dtb
->  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo2.dtb
->  
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-> new file mode 100644
-> index 0000000..31166b5
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-> @@ -0,0 +1,97 @@
-> +/*
-> + * Copyright (C) 2017 Jagan Teki <jteki@openedev.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "sun50i-a64.dtsi"
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +
-> +/ {
-> +	model = "OrangePi Win/Win Plus";
-> +	compatible = "xunlong,orangepi-win", "allwinner,sun50i-a64";
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> +	soc {
+>     If this is not possible, then you need to use the CEC_CAP_NEEDS_HPD
+>     capability. See: https://patchwork.linuxtv.org/patch/41478/
+> 
+>     This will almost certainly be merged for 4.13 since other CEC drivers
+>     need this as well.
 
-Same thing here, it doesn't need to be in that node.
+FYI: I tested your patch series with my cubox-i and CEC doesn't work if there
+is no HPD. I fiddles around a bit in dw_hdmi.c to prevent it from powering off
+the HDMI and PHY, but without any luck. It could be a hardware issue on the
+cubox-i (e.g. a level-shifter that powers off when the HPD goes low, although
+I don't see anything like that in the schematics), or it can be a driver issue
+or a Synopsys IP issue. I really can't tell.
 
-Maxime
+I added text in my status document (https://hverkuil.home.xs4all.nl/cec-status.txt)
+at the end on how to test this.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170612/1d45bc4d/attachment-0001.sig>
+Otherwise the CEC support on the cubox-i was working very well.
+
+Regards,
+
+	Hans
