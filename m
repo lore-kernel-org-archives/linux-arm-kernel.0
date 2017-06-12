@@ -1,53 +1,26 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 12 Jun 2017 16:10:26 -0700
-Subject: [PATCH 0/4] ARM: dts: bcm2835-rpi-zero: Enable OTG mode
-In-Reply-To: <6a45fcd8-0d88-bc17-6432-d38fe771dc80@i2se.com>
-References: <1495385079-3697-1-git-send-email-stefan.wahren@i2se.com>
- <542130487.90500.1496306283902@email.1und1.de>
- <6a45fcd8-0d88-bc17-6432-d38fe771dc80@i2se.com>
-Message-ID: <87lgowajkt.fsf@eliezer.anholt.net>
+From: daniel@iogearbox.net (Daniel Borkmann)
+Date: Tue, 13 Jun 2017 01:17:14 +0200
+Subject: [PATCH v2] arm: eBPF JIT compiler
+In-Reply-To: <CAHgaXd+DW2bggto=2S9hOdMrtPTvhD2QN4rPf2V8iHewQpg-YA@mail.gmail.com>
+References: <1495754003-21099-1-git-send-email-illusionist.neo@gmail.com>
+ <CAGXu5jKmLNMR+uhM9Ov2XPW6kCjip_SjScgEH0fTFp6fQtKFiA@mail.gmail.com>
+ <593E6B0F.8070901@iogearbox.net>
+ <CAHgaXd+DW2bggto=2S9hOdMrtPTvhD2QN4rPf2V8iHewQpg-YA@mail.gmail.com>
+Message-ID: <593F20FA.6010505@iogearbox.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
-
-> Am 01.06.2017 um 10:38 schrieb Stefan Wahren:
->>> Stefan Wahren <stefan.wahren@i2se.com> hat am 21. Mai 2017 um 18:44 geschrieben:
->>>
->>>
->>> This patch series enable OTG mode for Raspberry Pi Zero because dwc2 driver
->>> has been fixed now.
->>>
->>> Patch 1 adds a new dtsi file to setup OTG mode (could also be used for boards
->>> like RPi Zero W or the Compute Module). The second patch adds the USB PHY and
->>> was part of Raspberry Pi Zero support patch series before split up [1].
->>> The enabling of OTG mode of RPi Zero is done by patch number 3. The last patch
->>> updates the BCM2835 defconfig.
->>>
->>> [1] - http://lists.infradead.org/pipermail/linux-rpi-kernel/2016-July/004153.html
->>>
->>> Stefan Wahren (4):
->>>   ARM: dts: bcm283x: Add dtsi for OTG mode
->>>   ARM: dts: bcm283x: Add generic USB PHY
->>>   ARM: dts: bcm2835-rpi-zero: Enable OTG mode
->>>   ARM: bcm2835_defconfig: Enable serial & ethernet USB gadget support
->>>
->> No comments to this patch series?
->>
->> Regards
->> Stefan
+On 06/12/2017 05:40 PM, Shubham Bansal wrote:
+[...]
+>> Did you manage to get tail calls tested as well (I assume so since you
+>> implemented emit_bpf_tail_call() in the patch but just out of curiosity)?
 >
-> @Eric
->
-> Should i merge them?
+> I didn't try it exclusively, I thought test_bpf must have tested it. Doesn't it?
 
-I would have rebased my local branch on them, but I've merged them now.
-Waiting for -next testing to come back, then I've got PR text ready to
-send out.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170612/8c103534/attachment.sig>
+In samples/bpf/ there's sockex3* that would exercise it, or
+alternatively in iproute2 repo under examples/bpf/ there's
+bpf_cyclic.c and bpf_tailcall.c as a prog.
+
+Hm, generally, we should really add a test case also to BPF
+selftest suite to facilitate that. I'll likely do that for
+the next batch of BPF patches.
