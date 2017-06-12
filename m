@@ -1,42 +1,69 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 12 Jun 2017 13:29:04 +0100
-Subject: [PATCH] arm64/dma-mapping: Fix null-pointer check
-In-Reply-To: <20170610194110.27712-1-ohaugan@codeaurora.org>
-References: <20170610194110.27712-1-ohaugan@codeaurora.org>
-Message-ID: <20170612122903.GC24187@e104818-lin.cambridge.arm.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Mon, 12 Jun 2017 14:29:26 +0200
+Subject: [PATCH 1/3] dt-bindings: Add support for samsung s6e63j0x03 panel
+ binding
+In-Reply-To: <1496984354-5271-2-git-send-email-hoegeun.kwon@samsung.com>
+References: <1496984354-5271-1-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170609045938epcas5p2025914487ca22a0a2d419824402e89e9@epcas5p2.samsung.com>
+ <1496984354-5271-2-git-send-email-hoegeun.kwon@samsung.com>
+Message-ID: <70e32f55-431b-fcf2-0d98-8c12ac01794b@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 10, 2017 at 12:41:10PM -0700, Olav Haugan wrote:
-> @@ -149,6 +140,11 @@ static void *__dma_alloc(struct device *dev, size_t size,
->  	bool coherent = is_device_dma_coherent(dev);
->  	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, false);
->  
-> +	if (!dev) {
-> +		WARN_ONCE(1, "Use an actual device structure for DMA allocation\n");
-> +		return NULL;
-> +	}
+Hi Hoegeun,
+
+On 09.06.2017 06:59, Hoegeun Kwon wrote:
+> The Samsung s6e63j0x03 is a 1.63" 320x320 AMOLED panel connected using
+> MIPI-DSI interfaces.
+>
+> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
+> ---
+>  .../bindings/display/panel/samsung,s6e63j0x03.txt  | 24 ++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/panel/samsung,s6e63j0x03.txt
+>
+> diff --git a/Documentation/devicetree/bindings/display/panel/samsung,s6e63j0x03.txt b/Documentation/devicetree/bindings/display/panel/samsung,s6e63j0x03.txt
+> new file mode 100644
+> index 0000000..34b6e2a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/panel/samsung,s6e63j0x03.txt
+> @@ -0,0 +1,24 @@
+> +Samsung S6E63J0X03 1.63" 320x320 AMOLED panel
+
+Maybe it would be good to add info about interface, "MIPI DSI command
+mode" I suppose.
+
 > +
->  	size = PAGE_ALIGN(size);
->  
->  	if (!coherent && !gfpflags_allow_blocking(flags)) {
-> @@ -192,8 +188,13 @@ static void __dma_free(struct device *dev, size_t size,
->  		       void *vaddr, dma_addr_t dma_handle,
->  		       unsigned long attrs)
->  {
-> -	void *swiotlb_addr = phys_to_virt(dma_to_phys(dev, dma_handle));
-> +	void *swiotlb_addr;
->  
-> +	if (!dev) {
-> +		WARN_ONCE(1, "Use an actual device structure for DMA free\n");
-> +		return;
-> +	}
-> +	swiotlb_addr = phys_to_virt(dma_to_phys(dev, dma_handle));
+> +Required properties:
+> +  - compatible: "samsung,s6e63j0x03"
+> +  - reg: the virtual channel number of a DSI peripheral
+> +  - vdd3-supply: I/O voltage supply
+> +  - vci-supply: voltage supply for analog circuits
+> +  - reset-gpios: a GPIO spec for the reset pin (active high)
 
-I don't think we need the checks anymore. With commit 1dccb598df54
-("arm64: simplify dma_get_ops") __generic_dma_ops() returns
-dummy_dma_ops when dev == NULL, so the above __dma_alloc/__dma_free
-functions would not be called.
+Usually reset gpios is active low, also driver code suggests it, if it
+is true please fix example also.
 
--- 
-Catalin
+With above comments addressed:
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+
+ --
+Regards
+Andrzej
+
+> +  - te-gpios: a GPIO spec for the tearing effect synchronization signal
+> +    gpio pin (active high)
+> +
+> +Example:
+> +&dsi {
+> +	...
+> +
+> +	panel at 0 {
+> +		compatible = "samsung,s6e63j0x03";
+> +		reg = <0>;
+> +		vdd3-supply = <&ldo16_reg>;
+> +		vci-supply = <&ldo20_reg>;
+> +		reset-gpios = <&gpe0 1 GPIO_ACTIVE_HIGH>;
+> +		te-gpios = <&gpx0 6 GPIO_ACTIVE_HIGH>;
+> +	};
+> +};
