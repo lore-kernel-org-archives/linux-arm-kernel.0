@@ -1,35 +1,31 @@
-From: jeremy.lefaure@lse.epita.fr (=?UTF-8?q?J=C3=A9r=C3=A9my=20Lefaure?=)
-Date: Mon, 12 Jun 2017 13:09:33 -0400
-Subject: [PATCH 1/2] arm: nommu: remove unused KTHREAD_SIZE definition
-Message-ID: <20170612170937.2969-1-jeremy.lefaure@lse.epita.fr>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 12 Jun 2017 10:31:05 -0700
+Subject: [GIT PULL 1/5] Broadcom soc changes for 4.13
+Message-ID: <20170612173109.11188-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I didn't find any use of this macro in the current kernel tree (with git
-grep). KTHREAD_SIZE is no longer used for a very very long time. So
-let's remove this definition.
+The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 
-Signed-off-by: J?r?my Lefaure <jeremy.lefaure@lse.epita.fr>
----
- arch/arm/include/asm/page-nommu.h | 6 ------
- 1 file changed, 6 deletions(-)
+  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 
-diff --git a/arch/arm/include/asm/page-nommu.h b/arch/arm/include/asm/page-nommu.h
-index 503f488053de..8f2c47bec375 100644
---- a/arch/arm/include/asm/page-nommu.h
-+++ b/arch/arm/include/asm/page-nommu.h
-@@ -11,12 +11,6 @@
- #ifndef _ASMARM_PAGE_NOMMU_H
- #define _ASMARM_PAGE_NOMMU_H
- 
--#if !defined(CONFIG_SMALL_TASKS) && PAGE_SHIFT < 13
--#define KTHREAD_SIZE (8192)
--#else
--#define KTHREAD_SIZE PAGE_SIZE
--#endif
-- 
- #define clear_page(page)	memset((page), 0, PAGE_SIZE)
- #define copy_page(to,from)	memcpy((to), (from), PAGE_SIZE)
- 
--- 
-2.13.1
+are available in the git repository at:
+
+  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.13/soc
+
+for you to fetch changes up to 27d9fa06c122b135ad7552fa3138c3b47e5776c5:
+
+  ARM: BCM: Enable thermal support for NSP SoCs (2017-05-19 11:30:25 -0700)
+
+----------------------------------------------------------------
+This pull request contains Broadcom ARM-based SoCs (non Device Tree) changes:
+
+- Jon updates the Kconfig entry for Northstar Plus to have THERMAL and THERMAL_OF
+  selected in order to get the NS/NSP thermal driver dependencies to be satistfied
+
+----------------------------------------------------------------
+Jon Mason (1):
+      ARM: BCM: Enable thermal support for NSP SoCs
+
+ arch/arm/mach-bcm/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
