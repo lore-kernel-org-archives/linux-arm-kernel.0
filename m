@@ -1,60 +1,102 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 12 Jun 2017 15:36:39 +0100
-Subject: [PATCH 00/12] coresight: Support for ARM Coresight SoC-600
-Message-ID: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
+Date: Mon, 12 Jun 2017 15:36:40 +0100
+Subject: [PATCH 01/12] coresight replicator: Cleanup programmable replicator
+ naming
+In-Reply-To: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
+References: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1497278211-5001-2-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for ARM Coresight SoC-600 IP, which implements
-Coresight V3 architecture. It also does some clean up of the replicator
-driver namings used in the driver to prevent confusions to the user.
+The Linux coresight drivers define the programmable ATB replicator as
+Qualcom replicator, while this is designed by ARM. This can cause confusion
+to a user selecting the driver. Cleanup all references to make it
+ explicitly clear. This patch :
 
-The SoC-600 comes with an improved TMC which supports new features,
-including Save-Restore and Software FIFO2 mode (for streaming the trace
-data over functional I/O like USB/PCI).
-This series only supports Save-Restore feature of the new ETR by reusing
-the driver to perform additional setups required in case we are dealing
-with an IP which supports it. Towards this, we add a capability
-description to the IP listings to make it easier.
+ 1) Adds a new compatible string for the same, retaining the old one for
+    compatibility.
+ 2) Changes the Kconfig symbol (since this is not part of any defconfigs)
+	 CORESIGHT_QCOM_REPLICATOR => CORESIGHT_DYNAMIC_REPLICATOR
+ 3) Improves the help message in the Kconfig.
+ 4) Changes the name of the driver :
+	coresight-replicator-qcom => coresight-dynamic-replicator
 
-Patches 1-8 contains general cleanups, introduction of some helper
-routines.
-Patch 9 introduces the capability tracking for TMCs.
-Patch 10 adds the support for Save-Restore feature in ETR.
-Patch 11 adds support for the Coresight SoC 600 TMC
-Patch 12 adds the support for other components in SoC 600.
+Cc: Pratik Patel <pratikp@codeaurora.org>
+Cc: Ivan T. Ivanov <ivan.ivanov@linaro.org>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: devicetree at vger.kernel.org
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ Documentation/devicetree/bindings/arm/coresight.txt     |  4 +++-
+ drivers/hwtracing/coresight/Kconfig                     | 10 +++++-----
+ drivers/hwtracing/coresight/Makefile                    |  2 +-
+ drivers/hwtracing/coresight/coresight-replicator-qcom.c |  2 +-
+ 4 files changed, 10 insertions(+), 8 deletions(-)
 
-Tested on Juno (with Coresight SoC 400) and an FPGA based system
-for SoC 600.
-
-Suzuki K Poulose (12):
-  coresight replicator: Cleanup programmable replicator naming
-  arm64: dts: juno: Use the new coresight replicator string
-  coresight: Extend the PIDR mask to cover relevant bits in PIDR2
-  coresight: Add support for reading 64bit registers
-  coresight tmc: Add helpers for accessing 64bit registers
-  coresight tmc: Expose DBA and AXICTL
-  coresight replicator: Expose replicator management registers
-  coresight tmc: Handle configuration types properly
-  coresight tmc: Add capability information
-  coresight tmc: Support for save-restore in ETR
-  coresight tmc: Add support for Coresight SoC 600 TMC
-  coresight: Add support for Coresight SoC 600 components
-
- .../devicetree/bindings/arm/coresight.txt          |  4 +-
- arch/arm64/boot/dts/arm/juno-base.dtsi             |  2 +-
- drivers/hwtracing/coresight/Kconfig                | 10 ++--
- drivers/hwtracing/coresight/Makefile               |  2 +-
- drivers/hwtracing/coresight/coresight-funnel.c     |  9 +++-
- drivers/hwtracing/coresight/coresight-priv.h       | 35 +++++++++++--
- .../coresight/coresight-replicator-qcom.c          | 33 ++++++++++--
- drivers/hwtracing/coresight/coresight-stm.c        |  8 +--
- drivers/hwtracing/coresight/coresight-tmc-etf.c    |  8 +--
- drivers/hwtracing/coresight/coresight-tmc-etr.c    | 21 ++++++--
- drivers/hwtracing/coresight/coresight-tmc.c        | 58 ++++++++++++++++++----
- drivers/hwtracing/coresight/coresight-tmc.h        | 53 ++++++++++++++++++++
- drivers/hwtracing/coresight/coresight-tpiu.c       |  9 +++-
- 13 files changed, 210 insertions(+), 42 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
+index fcbae6a..f77329f 100644
+--- a/Documentation/devicetree/bindings/arm/coresight.txt
++++ b/Documentation/devicetree/bindings/arm/coresight.txt
+@@ -34,7 +34,9 @@ its hardware characteristcs.
+ 		- Embedded Trace Macrocell (version 4.x):
+ 			"arm,coresight-etm4x", "arm,primecell";
+ 
+-		- Qualcomm Configurable Replicator (version 1.x):
++		- Coresight programmable Replicator (version 1.x):
++			"arm,coresight-dynamic-replicator", "arm,primecell";
++				OR
+ 			"qcom,coresight-replicator1x", "arm,primecell";
+ 
+ 		- System Trace Macrocell:
+diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
+index 8d55d6d..e50ea56 100644
+--- a/drivers/hwtracing/coresight/Kconfig
++++ b/drivers/hwtracing/coresight/Kconfig
+@@ -70,13 +70,13 @@ config CORESIGHT_SOURCE_ETM4X
+ 	  for instruction level tracing. Depending on the implemented version
+ 	  data tracing may also be available.
+ 
+-config CORESIGHT_QCOM_REPLICATOR
+-	bool "Qualcomm CoreSight Replicator driver"
++config CORESIGHT_DYNAMIC_REPLICATOR
++	bool "Programmable CoreSight Replicator driver"
+ 	depends on CORESIGHT_LINKS_AND_SINKS
+ 	help
+-	  This enables support for Qualcomm CoreSight link driver. The
+-	  programmable ATB replicator sends the ATB trace stream from the
+-	  ETB/ETF to the TPIUi and ETR.
++	  This enables support for dynamic CoreSight replicator link driver.
++	  The programmable ATB replicator allows independent filtering of the
++	  trace data based on the traceid.
+ 
+ config CORESIGHT_STM
+ 	bool "CoreSight System Trace Macrocell driver"
+diff --git a/drivers/hwtracing/coresight/Makefile b/drivers/hwtracing/coresight/Makefile
+index 433d590..c7638d4 100644
+--- a/drivers/hwtracing/coresight/Makefile
++++ b/drivers/hwtracing/coresight/Makefile
+@@ -14,6 +14,6 @@ obj-$(CONFIG_CORESIGHT_SOURCE_ETM3X) += coresight-etm3x.o coresight-etm-cp14.o \
+ 					coresight-etm3x-sysfs.o
+ obj-$(CONFIG_CORESIGHT_SOURCE_ETM4X) += coresight-etm4x.o \
+ 					coresight-etm4x-sysfs.o
+-obj-$(CONFIG_CORESIGHT_QCOM_REPLICATOR) += coresight-replicator-qcom.o
++obj-$(CONFIG_CORESIGHT_DYNAMIC_REPLICATOR) += coresight-replicator-qcom.o
+ obj-$(CONFIG_CORESIGHT_STM) += coresight-stm.o
+ obj-$(CONFIG_CORESIGHT_CPU_DEBUG) += coresight-cpu-debug.o
+diff --git a/drivers/hwtracing/coresight/coresight-replicator-qcom.c b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
+index 0a3d15f..b7e44d1 100644
+--- a/drivers/hwtracing/coresight/coresight-replicator-qcom.c
++++ b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
+@@ -186,7 +186,7 @@ static struct amba_id replicator_ids[] = {
+ 
+ static struct amba_driver replicator_driver = {
+ 	.drv = {
+-		.name	= "coresight-replicator-qcom",
++		.name	= "coresight-dynamic-replicator",
+ 		.pm	= &replicator_dev_pm_ops,
+ 		.suppress_bind_attrs = true,
+ 	},
 -- 
 2.7.4
