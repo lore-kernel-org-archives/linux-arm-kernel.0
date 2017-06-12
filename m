@@ -1,171 +1,104 @@
-From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Mon, 12 Jun 2017 12:54:57 +0530
-Subject: [PATCH RFC] arm64: allwinner: a64: Add A64-OLinuXino initial support
-Message-ID: <1497252297-23398-1-git-send-email-jteki@openedev.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 12 Jun 2017 09:27:23 +0200
+Subject: [PATCH v4 6/7] ARM: dts: meson8: switch to new bindings for UART
+ nodes
+In-Reply-To: <CAFBinCBNhRtt8jiY+19_B-9_mNmB800rvD+rwBzYNfB5pXM53Q@mail.gmail.com>
+References: <1497001756-942-1-git-send-email-narmstrong@baylibre.com>
+ <1497001756-942-7-git-send-email-narmstrong@baylibre.com>
+ <CAFBinCD6_nGdqBSOJwyj0XQe8H05nw-r52pctY7ADJu0EqMb2A@mail.gmail.com>
+ <CAFBinCBNhRtt8jiY+19_B-9_mNmB800rvD+rwBzYNfB5pXM53Q@mail.gmail.com>
+Message-ID: <4a53855c-3e72-243d-6d74-2ccc5cbdc706@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jagan Teki <jagan@amarulasolutions.com>
+On 06/11/2017 10:18 PM, Martin Blumenstingl wrote:
+> On Sat, Jun 10, 2017 at 12:37 AM, Martin Blumenstingl
+> <martin.blumenstingl@googlemail.com> wrote:
+>> Hi Neil,
+>>
+>> On Fri, Jun 9, 2017 at 11:49 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+>>> Switch to the stable UART bindings by adding a XTAL node and using the
+>>> proper compatible strings.
+>> unfortunately this won't apply now that Kevin has merged my "ARM: dts:
+>> meson8: add and use the real clock controller"
+>> on the other hand this will make the patch easier as you can now do
+>> the same changes as in meson8b.dtsi
+> Neil, if you want you could also drop this from your series and let me
+> handle this (just let me know). I would even go one step further and
+> export the CLKID_UART0, CLKID_UART1 and CLKID_UART2 gates and pass
+> them as "pclk" for uart_{A,B,C}
+> I'll even *try* to test if this works on real hardware (my Meson8m2
+> board has a RTL8723BS SDIO wifi + bluetooth chip - wifi driver support
+> has been pretty bad so far - but I'll try to see if I can get and
+> messages out of the bluetooth part)
+> just let me know if you want me to handle this patch for you
 
-OLimex A64-OLinuXino is an open-source hardware board
-using the Allwinner A64 SOC.
 
-A64 Orangepi Win/WinPlus has
-- A64 Quad-core Cortex-A53 64bit
-- 1GB or 2GB RAM DDR3L @ 672Mhz
-- microSD slot and 16GB eMMC
-- Debug TTL UART
-- HDMI
-- LCD
-- IR receiver
-- 5V DC power supply
+No in fact it was just a "PoC" to show how to handle it on non-gx DTS.
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Note:
-- Need to test on hardware.
+I'm ok to leave it to you when the UART code is merged.
 
- arch/arm64/boot/dts/allwinner/Makefile             |   1 +
- .../boot/dts/allwinner/sun50i-a64-olinuxino.dts    | 120 +++++++++++++++++++++
- 2 files changed, 121 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
+Neil
 
-diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-index c997b5c..19c3fbd 100644
---- a/arch/arm64/boot/dts/allwinner/Makefile
-+++ b/arch/arm64/boot/dts/allwinner/Makefile
-@@ -1,5 +1,6 @@
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-nanopi-a64.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-olinuxino.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-orangepi-win.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
-new file mode 100644
-index 0000000..bd6d676
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
-@@ -0,0 +1,120 @@
-+/*
-+ * Copyright (C) 2017 Jagan Teki <jteki@openedev.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "sun50i-a64.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	model = "Olimex A64-Olinuxino";
-+	compatible = "olimex,a64-olinuxino", "allwinner,sun50i-a64";
-+
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	reg_vcc3v3: vcc3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins>;
-+	status = "okay";
-+};
-+
-+&i2c1_pins {
-+	bias-pull-up;
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
-+	cd-inverted;
-+	disable-wp;
-+	bus-width = <4>;
-+	status = "okay";
-+};
-+
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+&mmc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_pins>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <8>;
-+	non-removable;
-+	cap-mmc-hw-reset;
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
-+	status = "okay";
-+};
--- 
-2.7.4
+> 
+>>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>>> ---
+>>>  arch/arm/boot/dts/meson8.dtsi | 23 +++++++++++++++++++----
+>>>  1 file changed, 19 insertions(+), 4 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/meson8.dtsi b/arch/arm/boot/dts/meson8.dtsi
+>>> index 6993077..a2ea112 100644
+>>> --- a/arch/arm/boot/dts/meson8.dtsi
+>>> +++ b/arch/arm/boot/dts/meson8.dtsi
+>>> @@ -83,6 +83,13 @@
+>>>                 };
+>>>         };
+>>>
+>>> +       xtal: xtal-clk {
+>>> +               compatible = "fixed-clock";
+>>> +               clock-frequency = <24000000>;
+>>> +               clock-output-names = "xtal";
+>>> +               #clock-cells = <0>;
+>>> +       };
+>>> +
+>>>         clk81: clk at 0 {
+>>>                 #clock-cells = <0>;
+>>>                 compatible = "fixed-clock";
+>>> @@ -199,17 +206,25 @@
+>>>  };
+>>>
+>>>  &uart_AO {
+>>> -       clocks = <&clk81>;
+>>> +       compatible = "amlogic,meson8-uart", "amlogic,meson-ao-uart";
+>>> +       clocks = <&xtal>, <&clk81>, <&clk81>;
+>>> +       clock-names = "xtal", "pclk", "baud";
+>>>  };
+>>>
+>>>  &uart_A {
+>>> -       clocks = <&clk81>;
+>>> +       compatible = "amlogic,meson8-uart";
+>>> +       clocks = <&xtal>, <&clk81>, <&clk81>;
+>>> +       clock-names = "xtal", "pclk", "baud";
+>>>  };
+>>>
+>>>  &uart_B {
+>>> -       clocks = <&clk81>;
+>>> +       compatible = "amlogic,meson8-uart";
+>>> +       clocks = <&xtal>, <&clk81>, <&clk81>;
+>>> +       clock-names = "xtal", "pclk", "baud";
+>>>  };
+>>>
+>>>  &uart_C {
+>>> -       clocks = <&clk81>;
+>>> +       compatible = "amlogic,meson8-uart";
+>>> +       clocks = <&xtal>, <&clk81>, <&clk81>;
+>>> +       clock-names = "xtal", "pclk", "baud";
+>>>  };
+>>> --
+>>> 1.9.1
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-amlogic mailing list
+>>> linux-amlogic at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-amlogic
