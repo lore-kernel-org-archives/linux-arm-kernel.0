@@ -1,402 +1,446 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Mon, 12 Jun 2017 12:12:17 +1000
-Subject: [PATCH] drm/sun4i: hdmi: Implement I2C adapter for A10s DDC bus
-Message-ID: <20170612021217.27064-1-net147@gmail.com>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Mon, 12 Jun 2017 03:07:20 +0000
+Subject: [RFC PATCH 7/7] EDAC: Add driver for the Marvell Armada XP SDRAM
+ controller
+References: <20170609083123.6539-1-jlu@pengutronix.de>
+ <20170609083123.6539-8-jlu@pengutronix.de>
+Message-ID: <bb70023ef0e84dd686bd74302aed41d9@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The drm_get_edid function should be used instead of drm_do_get_edid by
-exposing the DDC bus as an I2C adapter. Implement this for A10s.
+On 09/06/17 20:53, Jan Luebbe wrote:
+> Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+> ---
+>   drivers/edac/Kconfig             |   7 +
+>   drivers/edac/Makefile            |   1 +
+>   drivers/edac/armada_xp_mc_edac.c | 366 +++++++++++++++++++++++++++++++++++++++
+>   3 files changed, 374 insertions(+)
+>   create mode 100644 drivers/edac/armada_xp_mc_edac.c
+> 
+> diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
+> index 8d9f680c8545..4189061489af 100644
+> --- a/drivers/edac/Kconfig
+> +++ b/drivers/edac/Kconfig
+> @@ -443,6 +443,13 @@ config EDAC_ALTERA_SDMMC
+>   	  Support for error detection and correction on the
+>   	  Altera SDMMC FIFO Memory for Altera SoCs.
+>   
+> +config EDAC_ARMADA_XP
+> +	bool "Marvell Armada XP Memory Controller ECC"
+> +	depends on ARCH_MVEBU
+> +	help
+> +	  Support for error correction and detection on the Marvell Aramada XP
+> +	  memory controller.
+> +
+>   config EDAC_AURORA_L2
+>   	bool "Marvell AURORA L2 Cache ECC"
+>   	depends on ARCH_MVEBU
+> diff --git a/drivers/edac/Makefile b/drivers/edac/Makefile
+> index 04654da04fc9..3497404e6d97 100644
+> --- a/drivers/edac/Makefile
+> +++ b/drivers/edac/Makefile
+> @@ -76,6 +76,7 @@ obj-$(CONFIG_EDAC_OCTEON_PCI)		+= octeon_edac-pci.o
+>   obj-$(CONFIG_EDAC_THUNDERX)		+= thunderx_edac.o
+>   
+>   obj-$(CONFIG_EDAC_ALTERA)		+= altera_edac.o
+> +obj-$(CONFIG_EDAC_ARMADA_XP)		+= armada_xp_mc_edac.o
+>   obj-$(CONFIG_EDAC_AURORA_L2)		+= aurora_l2_edac.o
+>   obj-$(CONFIG_EDAC_SYNOPSYS)		+= synopsys_edac.o
+>   obj-$(CONFIG_EDAC_XGENE)		+= xgene_edac.o
+> diff --git a/drivers/edac/armada_xp_mc_edac.c b/drivers/edac/armada_xp_mc_edac.c
+> new file mode 100644
+> index 000000000000..2ac298227d9c
+> --- /dev/null
+> +++ b/drivers/edac/armada_xp_mc_edac.c
+> @@ -0,0 +1,366 @@
+> +/*
+> + * Copyright (C) 2017 Pengutronix, Jan Luebbe <kernel@pengutronix.de>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/edac.h>
+> +#include <linux/of_platform.h>
+> +
+> +#include "edac_mc.h"
+> +#include "edac_module.h"
+> +
+> +#define SDRAM_NUM_CS 4
+> +
+> +#define SDRAM_CONFIG_REG 0x0
+> +#define SDRAM_CONFIG_ECC_MASK        BIT(18)
+> +#define SDRAM_CONFIG_REGISTERED_MASK BIT(17)
+> +#define SDRAM_CONFIG_BUS_WIDTH_MASK  BIT(15)
+> +
+> +#define SDRAM_ADDR_CTRL_REG 0x10
+> +#define SDRAM_ADDR_CTRL_SIZE_HIGH_OFFSET(cs)   (20+cs)
+> +#define SDRAM_ADDR_CTRL_SIZE_HIGH_MASK(cs)           \
+> +	(0x1 << SDRAM_ADDR_CTRL_SIZE_HIGH_OFFSET(cs))
+> +#define SDRAM_ADDR_CTRL_ADDR_SEL_MASK(cs)   BIT(16+cs)
+> +#define SDRAM_ADDR_CTRL_SIZE_LOW_OFFSET(cs)   (cs*4+2)
+> +#define SDRAM_ADDR_CTRL_SIZE_LOW_MASK(cs)            \
+> +	(0x3 << SDRAM_ADDR_CTRL_SIZE_LOW_OFFSET(cs))
+> +#define SDRAM_ADDR_CTRL_STRUCT_OFFSET(cs)       (cs*4)
+> +#define SDRAM_ADDR_CTRL_STRUCT_MASK(cs)              \
+> +	(0x3 << SDRAM_ADDR_CTRL_STRUCT_OFFSET(cs))
+> +
+> +#define SDRAM_ERR_DATA_H_REG 0x40
+> +#define SDRAM_ERR_DATA_L_REG 0x44
+> +
+> +#define SDRAM_ERR_RECV_ECC_REG 0x48
+> +#define SDRAM_ERR_RECV_ECC_VALUE_MASK 0xff
+> +
+> +#define SDRAM_ERR_CALC_ECC_REG 0x4c
+> +#define SDRAM_ERR_CALC_ECC_ROW_OFFSET             8
+> +#define SDRAM_ERR_CALC_ECC_ROW_MASK               \
+> +	(0xffff << SDRAM_ERR_CALC_ECC_ROW_OFFSET)
+> +#define SDRAM_ERR_CALC_ECC_VALUE_MASK          0xff
+> +
+> +#define SDRAM_ERR_ADDR_REG 0x50
+> +#define SDRAM_ERR_ADDR_BANK_OFFSET           23
+> +#define SDRAM_ERR_ADDR_BANK_MASK              \
+> +	(0x7 << SDRAM_ERR_ADDR_BANK_OFFSET)
+> +#define SDRAM_ERR_ADDR_COL_OFFSET             8
+> +#define SDRAM_ERR_ADDR_COL_MASK               \
+> +	(0x7fff << SDRAM_ERR_ADDR_COL_OFFSET)
+> +#define SDRAM_ERR_ADDR_CS_OFFSET              1
+> +#define SDRAM_ERR_ADDR_CS_MASK                \
+> +	(0x3 << SDRAM_ERR_ADDR_CS_OFFSET)
+> +#define SDRAM_ERR_ADDR_TYPE_MASK         BIT(0)
+> +
+> +#define SDRAM_ERR_CTRL_REG 0x54
+> +#define SDRAM_ERR_CTRL_ERR_THR_OFFSET          16
+> +#define SDRAM_ERR_CTRL_ERR_THR_MASK             \
+> +	(0xff << SDRAM_ERR_CTRL_ERR_THR_OFFSET)
+> +#define SDRAM_ERR_CTRL_ERR_PROP_MASK       BIT(9)
+> +
+> +#define SDRAM_ERR_SBE_COUNT_REG 0x58
+> +#define SDRAM_ERR_DBE_COUNT_REG 0x5c
+> +
+> +#define SDRAM_ERR_CAUSE_ERR_REG 0xd0
+> +#define SDRAM_ERR_CAUSE_MSG_REG 0xd8
+> +#define SDRAM_ERR_CAUSE_DBE_MASK BIT(1)
+> +#define SDRAM_ERR_CAUSE_SBE_MASK BIT(0)
+> +
+> +#define SDRAM_RANK_CTRL_REG 0x1e0
+> +#define SDRAM_RANK_CTRL_EXIST_MASK(cs) BIT(cs)
+> +
+> +struct armada_xp_mc_edac_drvdata {
+> +	void __iomem *base;
+> +
+> +	bool full_width; /* 32 or 64 bit */
+> +	bool cs_addr_sel[SDRAM_NUM_CS]; /* bank interleaving */
+> +
+> +	char msg[128];
+> +};
+> +
+> +/* derived from "DRAM Address Multiplexing" in the ARAMDA XP Functonal Spec */
 
-Signed-off-by: Jonathan Liu <net147@gmail.com>
----
- drivers/gpu/drm/sun4i/Makefile         |   1 +
- drivers/gpu/drm/sun4i/sun4i_hdmi.h     |  11 ++-
- drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c |  96 +++----------------
- drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c | 166 +++++++++++++++++++++++++++++++++
- 4 files changed, 190 insertions(+), 84 deletions(-)
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c
+s/Functonal/Functional/
 
-diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
-index e29fd3a2ba9c..43c753cafc88 100644
---- a/drivers/gpu/drm/sun4i/Makefile
-+++ b/drivers/gpu/drm/sun4i/Makefile
-@@ -2,6 +2,7 @@ sun4i-drm-y += sun4i_drv.o
- sun4i-drm-y += sun4i_framebuffer.o
- 
- sun4i-drm-hdmi-y += sun4i_hdmi_enc.o
-+sun4i-drm-hdmi-y += sun4i_hdmi_i2c.o
- sun4i-drm-hdmi-y += sun4i_hdmi_ddc_clk.o
- sun4i-drm-hdmi-y += sun4i_hdmi_tmds_clk.o
- 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi.h b/drivers/gpu/drm/sun4i/sun4i_hdmi.h
-index 2589bc92be59..8e7a70f67f04 100644
---- a/drivers/gpu/drm/sun4i/sun4i_hdmi.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_hdmi.h
-@@ -100,6 +100,7 @@
- #define SUN4I_HDMI_DDC_CTRL_START_CMD		BIT(30)
- #define SUN4I_HDMI_DDC_CTRL_FIFO_DIR_MASK	BIT(8)
- #define SUN4I_HDMI_DDC_CTRL_FIFO_DIR_READ	(0 << 8)
-+#define SUN4I_HDMI_DDC_CTRL_FIFO_DIR_WRITE	(1 << 8)
- #define SUN4I_HDMI_DDC_CTRL_RESET		BIT(0)
- 
- #define SUN4I_HDMI_DDC_ADDR_REG		0x504
-@@ -108,6 +109,10 @@
- #define SUN4I_HDMI_DDC_ADDR_OFFSET(off)		(((off) & 0xff) << 8)
- #define SUN4I_HDMI_DDC_ADDR_SLAVE(addr)		((addr) & 0xff)
- 
-+#define SUN4I_HDMI_DDC_INTERRUPT_STATUS_REG	0x50c
-+#define SUN4I_HDMI_DDC_INTERRUPT_STATUS_FIFO_REQUEST	BIT(4)
-+#define SUN4I_HDMI_DDC_INTERRUPT_STATUS_TRANSFER_COMPLETE	BIT(0)
-+
- #define SUN4I_HDMI_DDC_FIFO_CTRL_REG	0x510
- #define SUN4I_HDMI_DDC_FIFO_CTRL_CLEAR		BIT(31)
- 
-@@ -115,7 +120,8 @@
- #define SUN4I_HDMI_DDC_BYTE_COUNT_REG	0x51c
- 
- #define SUN4I_HDMI_DDC_CMD_REG		0x520
--#define SUN4I_HDMI_DDC_CMD_EXPLICIT_EDDC_READ	6
-+#define SUN4I_HDMI_DDC_CMD_IMPLICIT_WRITE	3
-+#define SUN4I_HDMI_DDC_CMD_IMPLICIT_READ	5
- 
- #define SUN4I_HDMI_DDC_CLK_REG		0x528
- #define SUN4I_HDMI_DDC_CLK_M(m)			(((m) & 0x7) << 3)
-@@ -181,6 +187,8 @@ struct sun4i_hdmi {
- 	struct clk		*ddc_clk;
- 	struct clk		*tmds_clk;
- 
-+	struct i2c_adapter	*i2c;
-+
- 	struct sun4i_drv	*drv;
- 
- 	bool			hdmi_monitor;
-@@ -192,5 +200,6 @@ int sun4i_ddc_create(struct sun4i_hdmi *hdmi, struct clk *clk);
- int sun6i_ddc_create(struct sun4i_hdmi *hdmi, struct clk *clk);
- int sun4i_tmds_create(struct sun4i_hdmi *hdmi);
- int sun6i_tmds_create(struct sun4i_hdmi *hdmi);
-+int sun4i_hdmi_i2c_create(struct sun4i_hdmi *hdmi);
- 
- #endif /* _SUN4I_HDMI_H_ */
-diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
-index e9abf93eb41c..6c9b11c4cf68 100644
---- a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
-@@ -186,93 +186,13 @@ static const struct drm_encoder_funcs sun4i_hdmi_funcs = {
- 	.destroy	= drm_encoder_cleanup,
- };
- 
--static int sun4i_hdmi_read_sub_block(struct sun4i_hdmi *hdmi,
--				     unsigned int blk, unsigned int offset,
--				     u8 *buf, unsigned int count)
--{
--	unsigned long reg;
--	int i;
--
--	reg = readl(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
--	reg &= ~SUN4I_HDMI_DDC_CTRL_FIFO_DIR_MASK;
--	writel(reg | SUN4I_HDMI_DDC_CTRL_FIFO_DIR_READ,
--	       hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
--
--	writel(SUN4I_HDMI_DDC_ADDR_SEGMENT(offset >> 8) |
--	       SUN4I_HDMI_DDC_ADDR_EDDC(DDC_SEGMENT_ADDR << 1) |
--	       SUN4I_HDMI_DDC_ADDR_OFFSET(offset) |
--	       SUN4I_HDMI_DDC_ADDR_SLAVE(DDC_ADDR),
--	       hdmi->base + SUN4I_HDMI_DDC_ADDR_REG);
--
--	reg = readl(hdmi->base + SUN4I_HDMI_DDC_FIFO_CTRL_REG);
--	writel(reg | SUN4I_HDMI_DDC_FIFO_CTRL_CLEAR,
--	       hdmi->base + SUN4I_HDMI_DDC_FIFO_CTRL_REG);
--
--	writel(count, hdmi->base + SUN4I_HDMI_DDC_BYTE_COUNT_REG);
--	writel(SUN4I_HDMI_DDC_CMD_EXPLICIT_EDDC_READ,
--	       hdmi->base + SUN4I_HDMI_DDC_CMD_REG);
--
--	reg = readl(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
--	writel(reg | SUN4I_HDMI_DDC_CTRL_START_CMD,
--	       hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
--
--	if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG, reg,
--			       !(reg & SUN4I_HDMI_DDC_CTRL_START_CMD),
--			       100, 100000))
--		return -EIO;
--
--	for (i = 0; i < count; i++)
--		buf[i] = readb(hdmi->base + SUN4I_HDMI_DDC_FIFO_DATA_REG);
--
--	return 0;
--}
--
--static int sun4i_hdmi_read_edid_block(void *data, u8 *buf, unsigned int blk,
--				      size_t length)
--{
--	struct sun4i_hdmi *hdmi = data;
--	int retry = 2, i;
--
--	do {
--		for (i = 0; i < length; i += SUN4I_HDMI_DDC_FIFO_SIZE) {
--			unsigned char offset = blk * EDID_LENGTH + i;
--			unsigned int count = min((unsigned int)SUN4I_HDMI_DDC_FIFO_SIZE,
--						 length - i);
--			int ret;
--
--			ret = sun4i_hdmi_read_sub_block(hdmi, blk, offset,
--							buf + i, count);
--			if (ret)
--				return ret;
--		}
--	} while (!drm_edid_block_valid(buf, blk, true, NULL) && (retry--));
--
--	return 0;
--}
--
- static int sun4i_hdmi_get_modes(struct drm_connector *connector)
- {
- 	struct sun4i_hdmi *hdmi = drm_connector_to_sun4i_hdmi(connector);
--	unsigned long reg;
- 	struct edid *edid;
- 	int ret;
- 
--	/* Reset i2c controller */
--	writel(SUN4I_HDMI_DDC_CTRL_ENABLE | SUN4I_HDMI_DDC_CTRL_RESET,
--	       hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
--	if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG, reg,
--			       !(reg & SUN4I_HDMI_DDC_CTRL_RESET),
--			       100, 2000))
--		return -EIO;
--
--	writel(SUN4I_HDMI_DDC_LINE_CTRL_SDA_ENABLE |
--	       SUN4I_HDMI_DDC_LINE_CTRL_SCL_ENABLE,
--	       hdmi->base + SUN4I_HDMI_DDC_LINE_CTRL_REG);
--
--	clk_prepare_enable(hdmi->ddc_clk);
--	clk_set_rate(hdmi->ddc_clk, 100000);
--
--	edid = drm_do_get_edid(connector, sun4i_hdmi_read_edid_block, hdmi);
-+	edid = drm_get_edid(connector, hdmi->i2c);
- 	if (!edid)
- 		return 0;
- 
-@@ -284,8 +204,6 @@ static int sun4i_hdmi_get_modes(struct drm_connector *connector)
- 	ret = drm_add_edid_modes(connector, edid);
- 	kfree(edid);
- 
--	clk_disable_unprepare(hdmi->ddc_clk);
--
- 	return ret;
- }
- 
-@@ -424,6 +342,7 @@ struct sun4i_hdmi_variant {
- 	const struct drm_connector_helper_funcs *connector_helpers;
- 	int (*ddc_create)(struct sun4i_hdmi *hdmi, struct clk *clk);
- 	int (*tmds_create)(struct sun4i_hdmi *hdmi);
-+	int (*hdmi_i2c_create)(struct sun4i_hdmi *hdmi);
- 	bool has_ddc_parent_clk;
- 	bool has_reset_control;
- 
-@@ -439,6 +358,7 @@ static const struct sun4i_hdmi_variant sun5i_variant = {
- 	.connector_helpers	= &sun4i_hdmi_connector_helper_funcs,
- 	.ddc_create		= sun4i_ddc_create,
- 	.tmds_create		= sun4i_tmds_create,
-+	.hdmi_i2c_create	= sun4i_hdmi_i2c_create,
- 	.has_ddc_parent_clk	= false,
- 	.has_reset_control	= false,
- 	.pad_ctrl0_init_val	= SUN4I_HDMI_PAD_CTRL0_TXEN |
-@@ -622,6 +542,14 @@ static int sun4i_hdmi_bind(struct device *dev, struct device *master,
- 		goto err_disable_mod_clk;
- 	}
- 
-+	if (hdmi->variant->hdmi_i2c_create) {
-+		ret = hdmi->variant->hdmi_i2c_create(hdmi);
-+		if (ret) {
-+			dev_err(dev, "Couldn't create the HDMI I2C adapter\n");
-+			goto err_disable_mod_clk;
-+		}
-+	}
-+
- 	drm_encoder_helper_add(&hdmi->encoder,
- 			       &sun4i_hdmi_helper_funcs);
- 	ret = drm_encoder_init(drm,
-@@ -676,6 +604,8 @@ static void sun4i_hdmi_unbind(struct device *dev, struct device *master,
- 
- 	drm_connector_cleanup(&hdmi->connector);
- 	drm_encoder_cleanup(&hdmi->encoder);
-+	if (hdmi->i2c)
-+		i2c_del_adapter(hdmi->i2c);
- 	clk_disable_unprepare(hdmi->mod_clk);
- 	clk_disable_unprepare(hdmi->bus_clk);
- }
-diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c
-new file mode 100644
-index 000000000000..c33fa13cc668
---- /dev/null
-+++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c
-@@ -0,0 +1,166 @@
-+/*
-+ * Copyright (C) 2017 Jonathan Liu
-+ *
-+ * Jonathan Liu <net147@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of
-+ * the License, or (at your option) any later version.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/module.h>
-+#include <linux/errno.h>
-+#include <linux/clk.h>
-+#include <linux/i2c.h>
-+#include <linux/iopoll.h>
-+
-+#include "sun4i_hdmi.h"
-+
-+static int xfer_msg_chunk(struct sun4i_hdmi *hdmi, struct i2c_msg *msg)
-+{
-+	u32 count = min_t(u32, msg->len, SUN4I_HDMI_DDC_FIFO_SIZE);
-+	u32 reg;
-+	int i;
-+
-+	reg = readl(hdmi->base + SUN4I_HDMI_DDC_FIFO_CTRL_REG);
-+	writel(reg | SUN4I_HDMI_DDC_FIFO_CTRL_CLEAR,
-+	       hdmi->base + SUN4I_HDMI_DDC_FIFO_CTRL_REG);
-+
-+	writel(count, hdmi->base
-+	       + SUN4I_HDMI_DDC_BYTE_COUNT_REG);
-+	writel(msg->flags & I2C_M_RD
-+	       ? SUN4I_HDMI_DDC_CMD_IMPLICIT_READ
-+	       : SUN4I_HDMI_DDC_CMD_IMPLICIT_WRITE,
-+	       hdmi->base + SUN4I_HDMI_DDC_CMD_REG);
-+
-+	reg = readl(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
-+	writel(reg | SUN4I_HDMI_DDC_CTRL_START_CMD,
-+	       hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
-+
-+	if (!(msg->flags & I2C_M_RD)) {
-+		for (i = 0; i < count; i++) {
-+			writeb(*msg->buf++, hdmi->base
-+			       + SUN4I_HDMI_DDC_FIFO_DATA_REG);
-+			--msg->len;
-+		}
-+	}
-+
-+	if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG,
-+			       reg,
-+			       !(reg & SUN4I_HDMI_DDC_CTRL_START_CMD),
-+			       100, 100000))
-+		return -EIO;
-+
-+	reg = readl(hdmi->base + SUN4I_HDMI_DDC_INTERRUPT_STATUS_REG);
-+	reg &= ~SUN4I_HDMI_DDC_INTERRUPT_STATUS_FIFO_REQUEST;
-+
-+	if (reg != SUN4I_HDMI_DDC_INTERRUPT_STATUS_TRANSFER_COMPLETE)
-+		return -EIO;
-+
-+	if (msg->flags & I2C_M_RD) {
-+		for (i = 0; i < count; i++) {
-+			*msg->buf++ = readb(hdmi->base
-+					    + SUN4I_HDMI_DDC_FIFO_DATA_REG);
-+			--msg->len;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static int xfer_msg(struct sun4i_hdmi *hdmi, struct i2c_msg *msg)
-+{
-+	u32 reg;
-+	int ret;
-+
-+	if (!msg->len)
-+		return -EIO;
-+
-+	while (msg->len) {
-+		reg = readl(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
-+		reg &= ~SUN4I_HDMI_DDC_CTRL_FIFO_DIR_MASK;
-+
-+		writel(reg | (msg->flags & I2C_M_RD
-+			      ? SUN4I_HDMI_DDC_CTRL_FIFO_DIR_READ
-+			      : SUN4I_HDMI_DDC_CTRL_FIFO_DIR_WRITE),
-+		       hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
-+
-+		writel(SUN4I_HDMI_DDC_ADDR_SLAVE(msg->addr),
-+		       hdmi->base + SUN4I_HDMI_DDC_ADDR_REG);
-+
-+		ret = xfer_msg_chunk(hdmi, msg);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int sun4i_hdmi_i2c_xfer(struct i2c_adapter *adap,
-+			       struct i2c_msg *msgs, int num)
-+{
-+	struct sun4i_hdmi *hdmi = i2c_get_adapdata(adap);
-+	u32 reg;
-+	int err, ret = num;
-+	int i;
-+
-+	/* Reset i2c controller */
-+	writel(SUN4I_HDMI_DDC_CTRL_ENABLE | SUN4I_HDMI_DDC_CTRL_RESET,
-+	       hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
-+	if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG, reg,
-+			       !(reg & SUN4I_HDMI_DDC_CTRL_RESET),
-+			       100, 2000))
-+		return -EIO;
-+
-+	writel(SUN4I_HDMI_DDC_LINE_CTRL_SDA_ENABLE |
-+	       SUN4I_HDMI_DDC_LINE_CTRL_SCL_ENABLE,
-+	       hdmi->base + SUN4I_HDMI_DDC_LINE_CTRL_REG);
-+
-+	clk_prepare_enable(hdmi->ddc_clk);
-+	clk_set_rate(hdmi->ddc_clk, 100000);
-+
-+	for (i = 0; i < num; i++) {
-+		err = xfer_msg(hdmi, &msgs[i]);
-+		if (err) {
-+			ret = err;
-+			break;
-+		}
-+	}
-+
-+	clk_disable_unprepare(hdmi->ddc_clk);
-+	return ret;
-+}
-+
-+static u32 sun4i_hdmi_i2c_func(struct i2c_adapter *adap)
-+{
-+	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
-+}
-+
-+static const struct i2c_algorithm sun4i_hdmi_i2c_algorithm = {
-+	.master_xfer	= sun4i_hdmi_i2c_xfer,
-+	.functionality	= sun4i_hdmi_i2c_func,
-+};
-+
-+static struct i2c_adapter sun4i_hdmi_i2c_adapter = {
-+	.owner	= THIS_MODULE,
-+	.class	= I2C_CLASS_DDC,
-+	.algo	= &sun4i_hdmi_i2c_algorithm,
-+	.name	= "sun4i_hdmi_i2c adapter",
-+};
-+
-+int sun4i_hdmi_i2c_create(struct sun4i_hdmi *hdmi)
-+{
-+	int ret = 0;
-+
-+	i2c_set_adapdata(&sun4i_hdmi_i2c_adapter, hdmi);
-+
-+	ret = i2c_add_adapter(&sun4i_hdmi_i2c_adapter);
-+	if (ret)
-+		return ret;
-+
-+	hdmi->i2c = &sun4i_hdmi_i2c_adapter;
-+
-+	return ret;
-+}
--- 
-2.12.2
+> +static uint32_t armada_xp_mc_edac_calc_address(struct armada_xp_mc_edac_drvdata
+> +					       *drvdata, uint8_t cs,
+> +					       uint8_t bank, uint16_t row,
+> +					       uint16_t col)
+> +{
+> +	if (drvdata->full_width) { /* 64 bit */
+> +		if (drvdata->cs_addr_sel[cs]) /* bank interleaved */
+> +			return (((row & 0xfff8) << 16) |
+> +				((bank & 0x7) << 16) |
+> +				((row & 0x7) << 13) |
+> +				((col & 0x3ff) << 3));
+> +		else
+> +			return (((row & 0xffff << 16) |
+> +				 ((bank & 0x7) << 13) |
+> +				 ((col & 0x3ff)) << 3));
+> +	} else { /* 32 bit */
+> +		if (drvdata->cs_addr_sel[cs]) /* bank interleaved */
+> +			return (((row & 0xfff0) << 15) |
+> +				((bank & 0x7) << 16) |
+> +				((row & 0xf) << 12) |
+> +				((col & 0x3ff) << 2));
+> +		else
+> +			return (((row & 0xffff << 15) |
+> +				 ((bank & 0x7) << 12) |
+> +				 ((col & 0x3ff)) << 2));
+> +	}
+
+Here's my version for the 16-bit interface from the 98X3236 Control and 
+Management Functional Spec
+
+	/* 16 bit */
+	if (drvdata->cs_addr_sel[cs]) /* bank interleaved */
+		return (((row & 0xffe0) << 14) |
+			((bank & 0x7) << 16) |
+			((row & 0x1f) << 11) |
+			((col & 0x3ff) << 1));
+	else
+		return (((row & 0xffff << 14) |
+			 ((bank & 0x7) << 11) |
+			 ((col & 0x3ff)) << 1));
+
+I think I followed your derivation against the Armada XP spec. I can 
+provide the relevant tables off-line if you want to double-check them.
+		
+> +}
+> +
+> +static void armada_xp_mc_edac_check(struct mem_ctl_info *mci)
+> +{
+> +	struct armada_xp_mc_edac_drvdata *drvdata = mci->pvt_info;
+> +	uint32_t data_h, data_l, recv_ecc, calc_ecc, addr;
+> +	uint32_t cnt_sbe, cnt_dbe, cause_err, cause_msg;
+> +	uint32_t row_val, col_val, bank_val, addr_val;
+> +	uint8_t syndrome_val, cs_val;
+> +	char *msg = drvdata->msg;
+> +
+> +	data_h = readl(drvdata->base + SDRAM_ERR_DATA_H_REG);
+> +	data_l = readl(drvdata->base + SDRAM_ERR_DATA_L_REG);
+> +	recv_ecc = readl(drvdata->base + SDRAM_ERR_RECV_ECC_REG);
+> +	calc_ecc = readl(drvdata->base + SDRAM_ERR_CALC_ECC_REG);
+> +	addr = readl(drvdata->base + SDRAM_ERR_ADDR_REG);
+> +	cnt_sbe = readl(drvdata->base + SDRAM_ERR_SBE_COUNT_REG);
+> +	cnt_dbe = readl(drvdata->base + SDRAM_ERR_DBE_COUNT_REG);
+> +	cause_err = readl(drvdata->base + SDRAM_ERR_CAUSE_ERR_REG);
+> +	cause_msg = readl(drvdata->base + SDRAM_ERR_CAUSE_MSG_REG);
+> +
+> +	/* clear cause registers */
+> +	writel(~(SDRAM_ERR_CAUSE_DBE_MASK | SDRAM_ERR_CAUSE_SBE_MASK),
+> +	       drvdata->base + SDRAM_ERR_CAUSE_ERR_REG);
+> +	writel(~(SDRAM_ERR_CAUSE_DBE_MASK | SDRAM_ERR_CAUSE_SBE_MASK),
+> +	       drvdata->base + SDRAM_ERR_CAUSE_MSG_REG);
+> +
+> +	/* clear error counter registers */
+> +	if (cnt_sbe)
+> +		writel(0, drvdata->base + SDRAM_ERR_SBE_COUNT_REG);
+> +	if (cnt_dbe)
+> +		writel(0, drvdata->base + SDRAM_ERR_DBE_COUNT_REG);
+> +
+> +	if (!cnt_sbe && !cnt_dbe)
+> +		return;
+> +
+> +	if ((addr & SDRAM_ERR_ADDR_TYPE_MASK) == 0) {
+> +		if (cnt_sbe)
+> +			cnt_sbe--;
+> +		else
+> +			dev_warn(mci->pdev, "inconsistent SBE count detected");
+> +	} else {
+> +		if (cnt_dbe)
+> +			cnt_dbe--;
+> +		else
+> +			dev_warn(mci->pdev, "inconsistent DBE count detected");
+> +	}
+> +
+> +	/* report earlier errors */
+> +	if (cnt_sbe)
+> +		edac_mc_handle_error(HW_EVENT_ERR_CORRECTED, mci, cnt_sbe, /* error count */
+> +				     0, 0, 0, /* pfn, offset, syndrome */
+> +				     -1, -1, -1, /* top, mid, low layer */
+> +				     mci->ctl_name,
+> +				     "details unavailable (multiple errors)");
+> +	if (cnt_dbe)
+> +		edac_mc_handle_error(HW_EVENT_ERR_UNCORRECTED, mci, cnt_sbe, /* error count */
+> +				     0, 0, 0, /* pfn, offset, syndrome */
+> +				     -1, -1, -1, /* top, mid, low layer */
+> +				     mci->ctl_name,
+> +				     "details unavailable (multiple errors)");
+> +
+> +	/* report details for most recent error */
+> +	cs_val = (addr & SDRAM_ERR_ADDR_CS_MASK)
+> +	    >> SDRAM_ERR_ADDR_CS_OFFSET;
+> +	bank_val = (addr & SDRAM_ERR_ADDR_BANK_MASK)
+> +	    >> SDRAM_ERR_ADDR_BANK_OFFSET;
+> +	row_val = (calc_ecc & SDRAM_ERR_CALC_ECC_ROW_MASK)
+> +	    >> SDRAM_ERR_CALC_ECC_ROW_OFFSET;
+> +	col_val = (addr & SDRAM_ERR_ADDR_COL_MASK)
+> +	    >> SDRAM_ERR_ADDR_COL_OFFSET;
+> +	syndrome_val = (recv_ecc ^ calc_ecc) & 0xff;
+> +	addr_val = armada_xp_mc_edac_calc_address(drvdata, cs_val, bank_val,
+> +						  row_val, col_val);
+> +	msg += sprintf(msg, "row=0x%04x ", row_val); /* 11 chars */
+> +	msg += sprintf(msg, "bank=0x%x ", bank_val); /*  9 chars */
+> +	msg += sprintf(msg, "col=0x%04x ", col_val); /* 11 chars */
+> +	msg += sprintf(msg, "cs=%d", cs_val);	     /*  4 chars */
+> +
+> +	if ((addr & SDRAM_ERR_ADDR_TYPE_MASK) == 0) {
+> +		edac_mc_handle_error(HW_EVENT_ERR_CORRECTED, mci,
+> +				     1,	/* error count */
+> +				     addr_val >> PAGE_SHIFT,
+> +				     addr_val & ~PAGE_MASK,
+> +				     syndrome_val,
+> +				     cs_val, -1, -1, /* top, mid, low layer */
+> +				     mci->ctl_name, drvdata->msg);
+> +	} else {
+> +		edac_mc_handle_error(HW_EVENT_ERR_UNCORRECTED, mci,
+> +				     1,	/* error count */
+> +				     addr_val >> PAGE_SHIFT,
+> +				     addr_val & ~PAGE_MASK,
+> +				     syndrome_val,
+> +				     cs_val, -1, -1, /* top, mid, low layer */
+> +				     mci->ctl_name, drvdata->msg);
+> +	}
+> +}
+> +
+> +static const struct of_device_id armada_xp_mc_edac_of_match[] = {
+> +	{.compatible = "marvell,armada-xp-sdram-controller",},
+> +	{},
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, armada_xp_mc_edac_of_match);
+> +
+> +static int armada_xp_mc_edac_read_config(struct mem_ctl_info *mci)
+> +{
+> +	struct armada_xp_mc_edac_drvdata *drvdata = mci->pvt_info;
+> +	struct dimm_info *dimm;
+> +	unsigned int i, cs_struct, cs_size;
+> +	uint32_t config, addr_ctrl, rank_ctrl;
+> +
+> +	config = readl(drvdata->base + SDRAM_CONFIG_REG);
+> +	if (!(config & SDRAM_CONFIG_ECC_MASK))
+> +		dev_warn(mci->pdev, "SDRAM ECC is not enabled");
+> +
+> +	if (mci->tot_dimms != SDRAM_NUM_CS) {
+> +		dev_err(mci->pdev, "Invaild number of DIMMs");
+> +		return -EINVAL;
+> +	}
+> +
+> +	drvdata->full_width = !!(config & SDRAM_CONFIG_BUS_WIDTH_MASK);
+> +
+> +	addr_ctrl = readl(drvdata->base + SDRAM_ADDR_CTRL_REG);
+> +	rank_ctrl = readl(drvdata->base + SDRAM_RANK_CTRL_REG);
+> +	for (i = 0; i < SDRAM_NUM_CS; i++) {
+> +		dimm = mci->dimms[i];
+> +
+> +		if (!(rank_ctrl & SDRAM_RANK_CTRL_EXIST_MASK(i)))
+> +			continue;
+> +
+> +		drvdata->cs_addr_sel[i] =
+> +			!!(addr_ctrl & SDRAM_ADDR_CTRL_ADDR_SEL_MASK(i));
+> +
+> +		cs_struct = (addr_ctrl & SDRAM_ADDR_CTRL_STRUCT_MASK(i)) >>
+> +			SDRAM_ADDR_CTRL_STRUCT_OFFSET(i);
+> +		cs_size = ((addr_ctrl & SDRAM_ADDR_CTRL_SIZE_HIGH_MASK(i)) >>
+> +			   (SDRAM_ADDR_CTRL_SIZE_HIGH_OFFSET(i) - 2) |
+> +			   (addr_ctrl & SDRAM_ADDR_CTRL_SIZE_LOW_MASK(i) >>
+> +			    SDRAM_ADDR_CTRL_SIZE_LOW_OFFSET(i)));
+> +		switch (cs_size) {
+> +		case 0: /* 2GBit */
+> +			dimm->nr_pages = (0x80000000ULL >> PAGE_SHIFT);
+> +			break;
+> +		case 1: /* 256MBit */
+> +			dimm->nr_pages = (0x10000000ULL >> PAGE_SHIFT);
+> +			break;
+> +		case 2: /* 512MBit */
+> +			dimm->nr_pages = (0x20000000ULL >> PAGE_SHIFT);
+> +			break;
+> +		case 3: /* 1GBit */
+> +			dimm->nr_pages = (0x40000000ULL >> PAGE_SHIFT);
+> +			break;
+> +		case 4: /* 4GBit */
+> +			dimm->nr_pages = (0x100000000ULL >> PAGE_SHIFT);
+> +			break;
+> +		case 5: /* 8GBit */
+> +			dimm->nr_pages = (0x200000000ULL >> PAGE_SHIFT);
+> +			break;
+> +		}
+> +		dimm->grain = 8;
+> +		dimm->dtype = cs_struct ? DEV_X16 : DEV_X8;
+> +		dimm->mtype = (config & SDRAM_CONFIG_REGISTERED_MASK) ? MEM_RDDR3 : MEM_DDR3;
+> +		dimm->edac_mode = EDAC_SECDED;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int armada_xp_mc_edac_probe(struct platform_device *pdev)
+> +{
+> +	const struct of_device_id *id;
+> +	struct mem_ctl_info *mci;
+> +	struct edac_mc_layer layers[1];
+> +	struct armada_xp_mc_edac_drvdata *drvdata;
+> +	struct resource *r;
+> +
+> +	layers[0].type = EDAC_MC_LAYER_CHIP_SELECT;
+> +	layers[0].size = SDRAM_NUM_CS;
+> +	layers[0].is_virt_csrow = true;
+> +
+> +	mci = devm_edac_mc_alloc(&pdev->dev, 0, ARRAY_SIZE(layers), layers,
+> +				 sizeof(*drvdata));
+> +	if (!mci)
+> +		return -ENOMEM;
+> +
+> +	drvdata = mci->pvt_info;
+> +	mci->pdev = &pdev->dev;
+> +	platform_set_drvdata(pdev, mci);
+> +
+> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!r) {
+> +		dev_err(&pdev->dev, "Unable to get mem resource\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	drvdata->base = devm_ioremap_resource(&pdev->dev, r);
+> +	if (IS_ERR(drvdata->base)) {
+> +		dev_err(&pdev->dev, "Unable to map regs\n");
+> +		return PTR_ERR(drvdata->base);
+> +	}
+> +
+> +	id = of_match_device(armada_xp_mc_edac_of_match, &pdev->dev);
+> +	mci->edac_check = armada_xp_mc_edac_check;
+> +	mci->mtype_cap = MEM_FLAG_DDR3;
+> +	mci->edac_cap = EDAC_FLAG_SECDED;
+> +	mci->mod_name = pdev->dev.driver->name;
+> +	mci->ctl_name = id ? id->compatible : "unknown";
+> +	mci->dev_name = dev_name(&pdev->dev);
+> +	mci->scrub_mode = SCRUB_NONE;
+> +
+> +	if (armada_xp_mc_edac_read_config(mci))
+> +		return -EINVAL;
+> +
+> +	/* configure SBE threshold */
+> +	/* it seems that SBEs are not captured otherwise */
+> +	writel(1 << SDRAM_ERR_CTRL_ERR_THR_OFFSET,
+> +	       drvdata->base + SDRAM_ERR_CTRL_REG);
+> +
+> +	/* clear cause registers */
+> +	writel(~(SDRAM_ERR_CAUSE_DBE_MASK | SDRAM_ERR_CAUSE_SBE_MASK),
+> +	       drvdata->base + SDRAM_ERR_CAUSE_ERR_REG);
+> +	writel(~(SDRAM_ERR_CAUSE_DBE_MASK | SDRAM_ERR_CAUSE_SBE_MASK),
+> +	       drvdata->base + SDRAM_ERR_CAUSE_MSG_REG);
+> +
+> +	/* clear counter registers */
+> +	writel(0, drvdata->base + SDRAM_ERR_SBE_COUNT_REG);
+> +	writel(0, drvdata->base + SDRAM_ERR_DBE_COUNT_REG);
+> +
+> +	if (devm_edac_mc_add_mc(&pdev->dev, mci))
+> +		return -EINVAL;
+> +	edac_op_state = EDAC_OPSTATE_POLL;
+> +
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver armada_xp_mc_edac_driver = {
+> +	.probe = armada_xp_mc_edac_probe,
+> +	.driver = {
+> +		.name = "armada_xp_mc_edac",
+> +		.of_match_table = armada_xp_mc_edac_of_match,
+
+	.of_match_table = of_match_ptr(armada_xp_mc_edac_of_match),
+
+> +	},
+> +};
+> +
+> +module_platform_driver(armada_xp_mc_edac_driver);
+> +
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_AUTHOR("Pengutronix");
+> +MODULE_DESCRIPTION("EDAC Driver for Marvell Armada XP SDRAM Controller");
+> 
