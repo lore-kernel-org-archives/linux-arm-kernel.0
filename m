@@ -1,118 +1,44 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 12 Jun 2017 15:36:42 +0100
-Subject: [PATCH 03/12] coresight: Extend the PIDR mask to cover relevant bits
- in PIDR2
+Date: Mon, 12 Jun 2017 15:36:45 +0100
+Subject: [PATCH 06/12] coresight tmc: Expose DBA and AXICTL
 In-Reply-To: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
 References: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1497278211-5001-4-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1497278211-5001-7-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As per coresight standards, PIDR2 register has the following format :
-
- [2-0]	- JEP106_bits6to4
- [3]	- JEDEC, designer ID is specified by JEDEC.
-
-However some of the drivers only use mask of 0x3 for the PIDR2 leaving
-bits [3-2] unchecked, which could potentially match the component for
-a different device altogether. This patch fixes the mask and the
-corresponding id bits for the existing devices.
+Expose DBALO,DBAHI and AXICTL registers
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
-I have not touched the TPIU ids for Ux500 (see commit: 4339b699),
-as I don't have a platform to fix/correct the ids.
----
- drivers/hwtracing/coresight/coresight-funnel.c          | 4 ++--
- drivers/hwtracing/coresight/coresight-replicator-qcom.c | 4 ++--
- drivers/hwtracing/coresight/coresight-stm.c             | 8 ++++----
- drivers/hwtracing/coresight/coresight-tmc.c             | 4 ++--
- drivers/hwtracing/coresight/coresight-tpiu.c            | 4 ++--
- 5 files changed, 12 insertions(+), 12 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
-index 860fe6e..6f7f3d3 100644
---- a/drivers/hwtracing/coresight/coresight-funnel.c
-+++ b/drivers/hwtracing/coresight/coresight-funnel.c
-@@ -248,8 +248,8 @@ static const struct dev_pm_ops funnel_dev_pm_ops = {
- 
- static struct amba_id funnel_ids[] = {
- 	{
--		.id     = 0x0003b908,
--		.mask   = 0x0003ffff,
-+		.id     = 0x000bb908,
-+		.mask   = 0x000fffff,
- 	},
- 	{ 0, 0},
- };
-diff --git a/drivers/hwtracing/coresight/coresight-replicator-qcom.c b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
-index b7e44d1..b029a5f 100644
---- a/drivers/hwtracing/coresight/coresight-replicator-qcom.c
-+++ b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
-@@ -177,8 +177,8 @@ static const struct dev_pm_ops replicator_dev_pm_ops = {
- 
- static struct amba_id replicator_ids[] = {
- 	{
--		.id     = 0x0003b909,
--		.mask   = 0x0003ffff,
-+		.id     = 0x000bb909,
-+		.mask   = 0x000bffff,
- 		.data	= "REPLICATOR 1.0",
- 	},
- 	{ 0, 0 },
-diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-index 93fc26f..1bcda80 100644
---- a/drivers/hwtracing/coresight/coresight-stm.c
-+++ b/drivers/hwtracing/coresight/coresight-stm.c
-@@ -916,13 +916,13 @@ static const struct dev_pm_ops stm_dev_pm_ops = {
- 
- static struct amba_id stm_ids[] = {
- 	{
--		.id     = 0x0003b962,
--		.mask   = 0x0003ffff,
-+		.id     = 0x000bb962,
-+		.mask   = 0x000fffff,
- 		.data	= "STM32",
- 	},
- 	{
--		.id	= 0x0003b963,
--		.mask	= 0x0003ffff,
-+		.id	= 0x000bb963,
-+		.mask	= 0x000fffff,
- 		.data	= "STM500",
- 	},
- 	{ 0, 0},
 diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index 8644887..eb0c7b3 100644
+index 7025982..fd5a2e0 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc.c
 +++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -393,8 +393,8 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
+@@ -228,9 +228,11 @@ coresight_tmc_simple_func(ffcr, TMC_FFCR);
+ coresight_tmc_simple_func(mode, TMC_MODE);
+ coresight_tmc_simple_func(pscr, TMC_PSCR);
+ coresight_tmc_simple_func(devid, CORESIGHT_DEVID);
++coresight_tmc_simple_func(axictl, TMC_AXICTL);
  
- static struct amba_id tmc_ids[] = {
- 	{
--		.id     = 0x0003b961,
--		.mask   = 0x0003ffff,
-+		.id     = 0x000bb961,
-+		.mask   = 0x000fffff,
- 	},
- 	{ 0, 0},
+ coresight_simple_reg64(struct tmc_drvdata, rrp, TMC_RRP, TMC_RRPHI);
+ coresight_simple_reg64(struct tmc_drvdata, rwp, TMC_RWP, TMC_RWPHI);
++coresight_simple_reg64(struct tmc_drvdata, dba, TMC_DBALO, TMC_DBAHI);
+ 
+ static struct attribute *coresight_tmc_mgmt_attrs[] = {
+ 	&dev_attr_rsz.attr,
+@@ -244,6 +246,8 @@ static struct attribute *coresight_tmc_mgmt_attrs[] = {
+ 	&dev_attr_mode.attr,
+ 	&dev_attr_pscr.attr,
+ 	&dev_attr_devid.attr,
++	&dev_attr_dba.attr,
++	&dev_attr_axictl.attr,
+ 	NULL,
  };
-diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
-index 0673baf..59c1510 100644
---- a/drivers/hwtracing/coresight/coresight-tpiu.c
-+++ b/drivers/hwtracing/coresight/coresight-tpiu.c
-@@ -194,8 +194,8 @@ static const struct dev_pm_ops tpiu_dev_pm_ops = {
  
- static struct amba_id tpiu_ids[] = {
- 	{
--		.id	= 0x0003b912,
--		.mask	= 0x0003ffff,
-+		.id	= 0x000bb912,
-+		.mask	= 0x000fffff,
- 	},
- 	{
- 		.id	= 0x0004b912,
 -- 
 2.7.4
