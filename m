@@ -1,54 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 12 Jun 2017 08:21:20 +0200
-Subject: [PATCH 2/2 v4] clk: Add Gemini SoC clock controller
-In-Reply-To: <CACRpkdbya9xaN-i7AkG0bTyuFYfZc59sSTYhWB43=9btSKfPpQ@mail.gmail.com>
-References: <20170524082044.8473-1-linus.walleij@linaro.org>
- <20170601070208.GO20170@codeaurora.org>
- <CACRpkdZv8MzXVecEXVdJ+P0MxVscYSy=MxC-yQAR0S4yQ6-rwQ@mail.gmail.com>
- <20170605195812.GH20170@codeaurora.org>
- <CACRpkdbya9xaN-i7AkG0bTyuFYfZc59sSTYhWB43=9btSKfPpQ@mail.gmail.com>
-Message-ID: <CACRpkdapAgHix2vw-woDFi4sh+H3_EX7w-5q=opBGMyegFrXbA@mail.gmail.com>
+From: huhuajun@huawei.com (Hu Huajun)
+Date: Mon, 12 Jun 2017 22:37:48 +0800
+Subject: [PATCH v2] KVM: ARM64: fix phy counter access failure in guest.
+Message-ID: <20170612143748.37278-1-huhuajun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 8, 2017 at 2:18 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+When reading the cntpct_el0 in guest with VHE (Virtual Host Extension)
+enabled in host, the "Unsupported guest sys_reg access" error reported.
+The reason is cnthctl_el2.EL1PCTEN is not enabled, which is expected
+to be done in kvm_timer_init_vhe(). The problem is kvm_timer_init_vhe
+is called by cpu_init_hyp_mode, and which is called when VHE is disabled.
+This patch remove the incorrect call to kvm_timer_init_vhe() from
+cpu_init_hyp_mode(), and calls kvm_timer_init_vhe() to enable
+cnthctl_el2.EL1PCTEN in cpu_hyp_reinit().
 
-> I think the timer may be more of an issue...
->
-> It is using CLOCKSOURCE_OF_DECLARE(), at least last time
-> I checked there was no such thing as clocksources retrying their
-> calls, and that cannot be regular probes because of, yeah device
-> core is using the timer, I think.
->
-> Yeah I looked in:
-> drivers/clocksource/clksrc-probe.c
->
-> It will just fail if it can't initialize the clocksource.
->
-> I don't understand what platforms can actually get their timers
-> up at all without the clock framework? Those hardcoding the
-> clock frequency in the device tree, or things like the ARM
-> TWD which has it encoded in hardware perhaps?
+Changes from v1:
+* According to Christoffer Dall's comment, remove the incocrrect call
+to kvm_timer_init_vhe() in cpu_init_hyp_mode().
 
-I just confirmed this to be the problem using a scratch patch for
-a platform device init and some earlydebug prints:
+Signed-off-by: Hu Huajun <huhuajun@huawei.com>
+---
+ virt/kvm/arm/arm.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-Uncompressing Linux... done, booting the kernel.
- Booting Linux on physical CPU 0x0
-start_kernel
-(...)
- NR_IRQS:16 nr_irqs:16 16
- could not get PCLK
-Failed to initialize '/soc/timer at 43000000': -517
- clocksource_probe: no matching clocksources found
- sched_clock: 32 bits at 100 Hz, resolution 10000000ns, wraps every
-21474836475000000ns
- Console: colour dummy device 80x30
- Calibrating delay loop...
-
-So the deferred clock makes the whole platform hang because the timer
-needs it. Without a clocksource, the delay loop cannot be calibrated, so
-it hangs there.
-
-Yours,
-Linus Walleij
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 3417e18..a430125 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -1115,9 +1115,6 @@ static void cpu_init_hyp_mode(void *dummy)
+ 	__cpu_init_hyp_mode(pgd_ptr, hyp_stack_ptr, vector_ptr);
+ 	__cpu_init_stage2();
+ 
+-	if (is_kernel_in_hyp_mode())
+-		kvm_timer_init_vhe();
+-
+ 	kvm_arm_init_debug();
+ }
+ 
+@@ -1137,6 +1134,7 @@ static void cpu_hyp_reinit(void)
+ 		 * event was cancelled before the CPU was reset.
+ 		 */
+ 		__cpu_init_stage2();
++		kvm_timer_init_vhe();
+ 	} else {
+ 		cpu_init_hyp_mode(NULL);
+ 	}
+-- 
+2.10.1
