@@ -1,83 +1,32 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 12 Jun 2017 14:49:45 +0200
-Subject: [PATCH v4 6/7] ARM: dts: meson8: switch to new bindings for UART
- nodes
-In-Reply-To: <1497258823.3086.6.camel@baylibre.com>
-References: <1497001756-942-1-git-send-email-narmstrong@baylibre.com>
- <1497001756-942-7-git-send-email-narmstrong@baylibre.com>
- <1497258823.3086.6.camel@baylibre.com>
-Message-ID: <bec2573f-ff71-8c69-9581-e74cdd80a551@baylibre.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 12 Jun 2017 14:06:55 +0100
+Subject: [PATCH 5/6] arm64: wire frequency-invariant accounting support
+ up to the task scheduler
+In-Reply-To: <20170608075513.12475-6-dietmar.eggemann@arm.com>
+References: <20170608075513.12475-1-dietmar.eggemann@arm.com>
+ <20170608075513.12475-6-dietmar.eggemann@arm.com>
+Message-ID: <20170612130655.GD24187@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/2017 11:13 AM, Jerome Brunet wrote:
-> On Fri, 2017-06-09 at 11:49 +0200, Neil Armstrong wrote:
->> Switch to the stable UART bindings by adding a XTAL node and using the
->> proper compatible strings.
->>
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->> ---
->>  arch/arm/boot/dts/meson8.dtsi | 23 +++++++++++++++++++----
->>  1 file changed, 19 insertions(+), 4 deletions(-)
+On Thu, Jun 08, 2017 at 08:55:12AM +0100, Dietmar Eggemann wrote:
+> Commit dfbca41f3479 ("sched: Optimize freq invariant accounting")
+> changed the wiring which now has to be done by associating
+> arch_scale_freq_capacity with the actual implementation provided
+> by the architecture.
 > 
-> I think this is clashing with the recent change from Martin on meson8 clock
-> driver. Kevin just applied it : 
+> Define arch_scale_freq_capacity to use the arch_topology "driver"
+> function topology_get_freq_scale() for the task scheduler's
+> frequency-invariant accounting instead of the default
+> arch_scale_freq_capacity() in kernel/sched/sched.h.
 > 
-> https://lkml.kernel.org/r/m2d1ad9g38.fsf at baylibre.com
-> 
-> <&clk81> no longer exists ...
-> 
->>
->> diff --git a/arch/arm/boot/dts/meson8.dtsi b/arch/arm/boot/dts/meson8.dtsi
->> index 6993077..a2ea112 100644
->> --- a/arch/arm/boot/dts/meson8.dtsi
->> +++ b/arch/arm/boot/dts/meson8.dtsi
->> @@ -83,6 +83,13 @@
->>  		};
->>  	};
->>  
->> +	xtal: xtal-clk {
->> +		compatible = "fixed-clock";
->> +		clock-frequency = <24000000>;
->> +		clock-output-names = "xtal";
->> +		#clock-cells = <0>;
->> +	};
->> +
->>  	clk81: clk at 0 {
->>  		#clock-cells = <0>;
->>  		compatible = "fixed-clock";
->> @@ -199,17 +206,25 @@
->>  };
->>  
->>  &uart_AO {
->> -	clocks = <&clk81>;
->> +	compatible = "amlogic,meson8-uart", "amlogic,meson-ao-uart";
->> +	clocks = <&xtal>, <&clk81>, <&clk81>;
->> +	clock-names = "xtal", "pclk", "baud";
->>  };
->>  
->>  &uart_A {
->> -	clocks = <&clk81>;
->> +	compatible = "amlogic,meson8-uart";
->> +	clocks = <&xtal>, <&clk81>, <&clk81>;
->> +	clock-names = "xtal", "pclk", "baud";
->>  };
->>  
->>  &uart_B {
->> -	clocks = <&clk81>;
->> +	compatible = "amlogic,meson8-uart";
->> +	clocks = <&xtal>, <&clk81>, <&clk81>;
->> +	clock-names = "xtal", "pclk", "baud";
->>  };
->>  
->>  &uart_C {
->> -	clocks = <&clk81>;
->> +	compatible = "amlogic,meson8-uart";
->> +	clocks = <&xtal>, <&clk81>, <&clk81>;
->> +	clock-names = "xtal", "pclk", "baud";
->>  };
-> 
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Juri Lelli <juri.lelli@arm.com>
+> Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
+> ---
+>  arch/arm64/include/asm/topology.h | 5 +++++
+>  arch/arm64/kernel/topology.c      | 1 -
+>  2 files changed, 5 insertions(+), 1 deletion(-)
 
-I will drop this until martin has a better version, and tested !
-
-Neil
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
