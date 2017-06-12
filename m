@@ -1,103 +1,118 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 12 Jun 2017 12:26:58 +0900
-Subject: [PATCH 04/27] arm64: move generic-y of exported headers to
- uapi/asm/Kbuild
-In-Reply-To: <1497238041-7011-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1497238041-7011-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1497238041-7011-5-git-send-email-yamada.masahiro@socionext.com>
+Date: Mon, 12 Jun 2017 12:26:54 +0900
+Subject: [PATCH 00/27] kbuild, arch: complete UAPI de-coupling and cleanup
+ scripts/Makefile.headersinst
+Message-ID: <1497238041-7011-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit fcc8487d477a ("uapi: export all headers under uapi
-directories"), all (and only) headers under uapi directories are
-exported, but asm-generic wrappers are still exceptions.
 
-scripts/Makefile.headersinst still need to deal with old-kbuild-file
-for headers listed in arch/*/include/asm/Kbuild, but actually exported.
+In v4.12-rc1, we had a big progress for headers_install.
+All (and only) headers under UAPI directories are exported.
+However, asm-generic wrappers are still exceptions because
+most of arch/*/include/asm/Kbuild include "generic-y" for
+exported headers.  As a result, many of generic-wrappers to be
+exported are generated outside UAPI directories.
 
-As the last work to finish de-coupling the uapi from kernel headers,
-move generic-y of exported headers to uapi/asm/Kbuild.
+To finish de-coupling UAPI, "generic-y" for exported headers
+should be moved to arch/*/include/uapi/asm/Kbuild.
 
-For arm64, "generic-y += kvm_para.h" is doubled in asm/Kbuild and
-uapi/asm/Kbuild.  So, the one in the former can be simply removed.
+With those cleanups, the logic of headers_install will become
+even simpler.  UAPI will be completely self-contained.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+This series is based on v4.12-rc2 tag.
 
- arch/arm64/include/asm/Kbuild      | 17 -----------------
- arch/arm64/include/uapi/asm/Kbuild | 16 ++++++++++++++++
- 2 files changed, 16 insertions(+), 17 deletions(-)
+This series touches Kbuild files under arch/.  We have two options
+to merge this series.
 
-diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
-index a7a97a608033..f81c7b685fc6 100644
---- a/arch/arm64/include/asm/Kbuild
-+++ b/arch/arm64/include/asm/Kbuild
-@@ -6,41 +6,24 @@ generic-y += dma.h
- generic-y += dma-contiguous.h
- generic-y += early_ioremap.h
- generic-y += emergency-restart.h
--generic-y += errno.h
- generic-y += hw_irq.h
--generic-y += ioctl.h
--generic-y += ioctls.h
--generic-y += ipcbuf.h
- generic-y += irq_regs.h
- generic-y += kdebug.h
- generic-y += kmap_types.h
--generic-y += kvm_para.h
- generic-y += local.h
- generic-y += local64.h
- generic-y += mcs_spinlock.h
- generic-y += mm-arch-hooks.h
--generic-y += mman.h
--generic-y += msgbuf.h
- generic-y += msi.h
--generic-y += poll.h
- generic-y += preempt.h
--generic-y += resource.h
- generic-y += rwsem.h
- generic-y += segment.h
--generic-y += sembuf.h
- generic-y += serial.h
- generic-y += set_memory.h
--generic-y += shmbuf.h
- generic-y += simd.h
- generic-y += sizes.h
--generic-y += socket.h
--generic-y += sockios.h
--generic-y += swab.h
- generic-y += switch_to.h
--generic-y += termbits.h
--generic-y += termios.h
- generic-y += trace_clock.h
--generic-y += types.h
- generic-y += unaligned.h
- generic-y += user.h
- generic-y += vga.h
-diff --git a/arch/arm64/include/uapi/asm/Kbuild b/arch/arm64/include/uapi/asm/Kbuild
-index 13a97aa2285f..fc28bd95c6d3 100644
---- a/arch/arm64/include/uapi/asm/Kbuild
-+++ b/arch/arm64/include/uapi/asm/Kbuild
-@@ -1,4 +1,20 @@
- # UAPI Header export list
- include include/uapi/asm-generic/Kbuild.asm
- 
-+generic-y += errno.h
-+generic-y += ioctl.h
-+generic-y += ioctls.h
-+generic-y += ipcbuf.h
- generic-y += kvm_para.h
-+generic-y += mman.h
-+generic-y += msgbuf.h
-+generic-y += poll.h
-+generic-y += resource.h
-+generic-y += sembuf.h
-+generic-y += shmbuf.h
-+generic-y += socket.h
-+generic-y += sockios.h
-+generic-y += swab.h
-+generic-y += termbits.h
-+generic-y += termios.h
-+generic-y += types.h
+[1] I will collect Acked-by from arch maintainers, then apply the
+    whole series to the Kbuild tree.
+
+[2] I will ask arch maintainers to pick up arch changes (for v4.13),
+    then apply Makefile changes to the Kbuild tree (for v4.14).
+
+[1] will finish this work by v4.13, but need to deal with some conflicts.
+[2] will allow us to reduce conflicts (still a bit conflicts),
+    but take more time to finish this work.
+
+If arch maintainers ack [1], I can manage conflicts
+before sending a pull request to Linus.
+
+
+
+Masahiro Yamada (27):
+  kbuild: remove useless $(gen) variable in Makefile.headersinst
+  kbuild: fix comment about dst of headers_{install,check}_all
+  kbuild: pass dst= to Makefile.headersinst from top Makefile
+  arm64: move generic-y of exported headers to uapi/asm/Kbuild
+  ARM: move generic-y of exported headers to uapi/asm/Kbuild
+  arc: move generic-y of exported headers to uapi/asm/Kbuild
+  blackfin: move generic-y of exported headers to uapi/asm/Kbuild
+  c6x: move generic-y of exported headers to uapi/asm/Kbuild
+  cris: move generic-y of exported headers to uapi/asm/Kbuild
+  h8300: move generic-y of exported headers to uapi/asm/Kbuild
+  hexagon: move generic-y of exported headers to uapi/asm/Kbuild
+  ia64: move generic-y of exported headers to uapi/asm/Kbuild
+  m32r: move generic-y of exported headers to uapi/asm/Kbuild
+  m68k: move generic-y of exported headers to uapi/asm/Kbuild
+  metag: move generic-y of exported headers to uapi/asm/Kbuild
+  nios2: remove unneeded arch/nios2/include/(generated/)asm/signal.h
+  nios2: move generic-y of exported headers to uapi/asm/Kbuild
+  openrisc: move generic-y of exported headers to uapi/asm/Kbuild
+  parisc: move generic-y of exported headers to uapi/asm/Kbuild
+  sh: move generic-y of exported headers to uapi/asm/Kbuild
+  sparc: move generic-y of exported headers to uapi/asm/Kbuild
+  tile: move generic-y of exported headers to uapi/asm/Kbuild
+  unicore32: move generic-y of exported headers to uapi/asm/Kbuild
+  xtensa: move generic-y of exported headers to uapi/asm/Kbuild
+  kbuild: do not include old-kbuild-file from Makefile.headersinst
+  kbuild: split exported generic header creation into uapi-asm-generic
+  kbuild: remove wrapper files handling from Makefile.headersinst
+
+ Makefile                               | 13 +++++++------
+ arch/arc/include/asm/Kbuild            | 25 -------------------------
+ arch/arc/include/uapi/asm/Kbuild       | 26 ++++++++++++++++++++++++++
+ arch/arm/include/asm/Kbuild            | 17 -----------------
+ arch/arm/include/uapi/asm/Kbuild       | 16 ++++++++++++++++
+ arch/arm64/include/asm/Kbuild          | 17 -----------------
+ arch/arm64/include/uapi/asm/Kbuild     | 16 ++++++++++++++++
+ arch/blackfin/include/asm/Kbuild       | 22 ----------------------
+ arch/blackfin/include/uapi/asm/Kbuild  | 22 ++++++++++++++++++++++
+ arch/c6x/include/asm/Kbuild            | 27 ---------------------------
+ arch/c6x/include/uapi/asm/Kbuild       | 26 ++++++++++++++++++++++++++
+ arch/cris/include/asm/Kbuild           | 18 ------------------
+ arch/cris/include/uapi/asm/Kbuild      | 19 +++++++++++++++++++
+ arch/h8300/include/asm/Kbuild          | 27 ---------------------------
+ arch/h8300/include/uapi/asm/Kbuild     | 28 ++++++++++++++++++++++++++++
+ arch/hexagon/include/asm/Kbuild        | 23 -----------------------
+ arch/hexagon/include/uapi/asm/Kbuild   | 24 ++++++++++++++++++++++++
+ arch/ia64/include/asm/Kbuild           |  2 --
+ arch/m32r/include/asm/Kbuild           |  2 --
+ arch/m32r/include/uapi/asm/Kbuild      |  2 ++
+ arch/m68k/include/asm/Kbuild           | 12 ------------
+ arch/m68k/include/uapi/asm/Kbuild      | 11 +++++++++++
+ arch/metag/include/asm/Kbuild          | 24 ------------------------
+ arch/metag/include/uapi/asm/Kbuild     | 24 ++++++++++++++++++++++++
+ arch/nios2/include/asm/Kbuild          | 25 -------------------------
+ arch/nios2/include/asm/signal.h        | 22 ----------------------
+ arch/nios2/include/uapi/asm/Kbuild     | 24 ++++++++++++++++++++++++
+ arch/openrisc/include/asm/Kbuild       | 28 ----------------------------
+ arch/openrisc/include/uapi/asm/Kbuild  | 29 +++++++++++++++++++++++++++++
+ arch/parisc/include/asm/Kbuild         |  5 -----
+ arch/parisc/include/uapi/asm/Kbuild    |  4 ++++
+ arch/sh/include/asm/Kbuild             | 20 --------------------
+ arch/sh/include/uapi/asm/Kbuild        | 20 ++++++++++++++++++++
+ arch/sparc/include/asm/Kbuild          |  1 -
+ arch/sparc/include/uapi/asm/Kbuild     |  2 ++
+ arch/tile/include/asm/Kbuild           | 19 -------------------
+ arch/tile/include/uapi/asm/Kbuild      | 19 +++++++++++++++++++
+ arch/unicore32/include/asm/Kbuild      | 31 +------------------------------
+ arch/unicore32/include/uapi/asm/Kbuild | 28 ++++++++++++++++++++++++++++
+ arch/xtensa/include/asm/Kbuild         |  9 ---------
+ arch/xtensa/include/uapi/asm/Kbuild    | 10 ++++++++++
+ scripts/Makefile.headersinst           | 28 ++++------------------------
+ 42 files changed, 362 insertions(+), 405 deletions(-)
+ delete mode 100644 arch/nios2/include/asm/signal.h
+
 -- 
 2.7.4
