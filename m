@@ -1,33 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 12 Jun 2017 13:09:24 +0100
-Subject: [PATCH 04/27] arm64: move generic-y of exported headers to
- uapi/asm/Kbuild
-In-Reply-To: <1497238041-7011-5-git-send-email-yamada.masahiro@socionext.com>
-References: <1497238041-7011-1-git-send-email-yamada.masahiro@socionext.com>
- <1497238041-7011-5-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20170612120923.GB24187@e104818-lin.cambridge.arm.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Mon, 12 Jun 2017 14:11:37 +0200
+Subject: [GIT PULL] STM32 defconfig changes for v4.13 #1
+Message-ID: <a644e854-4b54-50dc-3779-8df6e3a8b02b@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 12, 2017 at 12:26:58PM +0900, Masahiro Yamada wrote:
-> Since commit fcc8487d477a ("uapi: export all headers under uapi
-> directories"), all (and only) headers under uapi directories are
-> exported, but asm-generic wrappers are still exceptions.
-> 
-> scripts/Makefile.headersinst still need to deal with old-kbuild-file
-> for headers listed in arch/*/include/asm/Kbuild, but actually exported.
-> 
-> As the last work to finish de-coupling the uapi from kernel headers,
-> move generic-y of exported headers to uapi/asm/Kbuild.
-> 
-> For arm64, "generic-y += kvm_para.h" is doubled in asm/Kbuild and
-> uapi/asm/Kbuild.  So, the one in the former can be simply removed.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
-> 
->  arch/arm64/include/asm/Kbuild      | 17 -----------------
->  arch/arm64/include/uapi/asm/Kbuild | 16 ++++++++++++++++
->  2 files changed, 16 insertions(+), 17 deletions(-)
+Hi Olof, Arnd and Kevin,
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Please consider this first round of STM32 defconfig updates for v4.13:
+
+The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+
+   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+
+are available in the git repository at:
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git 
+tags/stm32-defconfig-for-v4.13-1
+
+for you to fetch changes up to d81cd7d72f6441df759c3db7adc69f4ad8d54fc4:
+
+   ARM: configs: stm32: STMPE1600 GPIO expander (2017-06-08 14:59:05 +0200)
+
+----------------------------------------------------------------
+STM32 defconfig updates for v4.13, round 1
+
+Highlights:
+----------
+  - Enable STMPE1600 IO expander
+  - Enable Watchdog support
+
+----------------------------------------------------------------
+Hugues Fruchet (1):
+       ARM: configs: stm32: STMPE1600 GPIO expander
+
+Yannick Fertre (1):
+       ARM: configs: stm32: Add watchdog support in STM32 defconfig
+
+  arch/arm/configs/stm32_defconfig | 3 +++
+  1 file changed, 3 insertions(+)
