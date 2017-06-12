@@ -1,73 +1,81 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 12 Jun 2017 11:20:01 +0200
-Subject: [PATCH v2] KVM: ARM64: fix phy counter access failure in guest.
-In-Reply-To: <71600c75-79e0-1043-2b75-2c96a6e24c58@arm.com>
-References: <20170612143748.37278-1-huhuajun@huawei.com>
- <71600c75-79e0-1043-2b75-2c96a6e24c58@arm.com>
-Message-ID: <20170612092001.GA25891@cbox>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 12 Jun 2017 11:23:37 +0200
+Subject: [PATCH 1/2] spi: rockchip: add support for "cs-gpios" dts property
+In-Reply-To: <593E5AF8.1080404@rock-chips.com>
+References: <1497248057-16550-1-git-send-email-jeffy.chen@rock-chips.com>
+ <4418523.E0t9k04HOG@diego> <593E5AF8.1080404@rock-chips.com>
+Message-ID: <2280770.UMxRo5IhGO@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 12, 2017 at 10:08:16AM +0100, Marc Zyngier wrote:
-> Nit: Please fix the time on your machine. It ended up in my Spam folder
-> because it comes from the future...
+Am Montag, 12. Juni 2017, 17:12:24 CEST schrieb jeffy:
+> Hi Heiko,
 > 
-> On 12/06/17 15:37, Hu Huajun wrote:
-> > When reading the cntpct_el0 in guest with VHE (Virtual Host Extension)
-> > enabled in host, the "Unsupported guest sys_reg access" error reported.
-> > The reason is cnthctl_el2.EL1PCTEN is not enabled, which is expected
-> > to be done in kvm_timer_init_vhe(). The problem is kvm_timer_init_vhe
-> > is called by cpu_init_hyp_mode, and which is called when VHE is disabled.
-> > This patch remove the incorrect call to kvm_timer_init_vhe() from
-> > cpu_init_hyp_mode(), and calls kvm_timer_init_vhe() to enable
-> > cnthctl_el2.EL1PCTEN in cpu_hyp_reinit().
-> > 
-> > Changes from v1:
-> > * According to Christoffer Dall's comment, remove the incocrrect call
-> > to kvm_timer_init_vhe() in cpu_init_hyp_mode().
-> > 
-> > Signed-off-by: Hu Huajun <huhuajun@huawei.com>
-> > ---
-> >  virt/kvm/arm/arm.c | 4 +---
-> >  1 file changed, 1 insertion(+), 3 deletions(-)
-> > 
-> > diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> > index 3417e18..a430125 100644
-> > --- a/virt/kvm/arm/arm.c
-> > +++ b/virt/kvm/arm/arm.c
-> > @@ -1115,9 +1115,6 @@ static void cpu_init_hyp_mode(void *dummy)
-> >  	__cpu_init_hyp_mode(pgd_ptr, hyp_stack_ptr, vector_ptr);
-> >  	__cpu_init_stage2();
-> >  
-> > -	if (is_kernel_in_hyp_mode())
-> > -		kvm_timer_init_vhe();
-> > -
-> >  	kvm_arm_init_debug();
-> >  }
-> >  
-> > @@ -1137,6 +1134,7 @@ static void cpu_hyp_reinit(void)
-> >  		 * event was cancelled before the CPU was reset.
-> >  		 */
-> >  		__cpu_init_stage2();
-> > +		kvm_timer_init_vhe();
-> >  	} else {
-> >  		cpu_init_hyp_mode(NULL);
-> >  	}
-> > 
+> thanx for your comments.
 > 
-> How about:
+> On 06/12/2017 04:36 PM, Heiko St?bner wrote:
+> > Am Montag, 12. Juni 2017, 16:26:07 CEST schrieb jeffy:
+> >> Hi Shawn,
+> >> 
+> >> On 06/12/2017 03:15 PM, Shawn Lin wrote:
+> >>> Hi Jeffy,
+> >>> 
+> >>> On 2017/6/12 14:14, Jeffy Chen wrote:
+> >>>> Support using "cs-gpios" property to specify cs gpios.
+> >>>> 
+> >>>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> >>>> ---
+> >>>> 
+> >>>>    .../devicetree/bindings/spi/spi-rockchip.txt       |  2 +
+> >>>>    drivers/spi/spi-rockchip.c                         | 52
+> >>>> 
+> >>>> ++++++++++++++++++++++
+> >>>> 
+> >>>>    2 files changed, 54 insertions(+)
+> >>>> 
+> >>>> diff --git a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+> >>>> b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+> >>>> index 83da493..02171b2 100644
+> >>>> --- a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+> >>>> +++ b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+> >>> 
+> >>> The changes for doc should be another patch, and...
+> >> 
+> >> but i saw others didn't separate them:
+> >> cf9e478 spi: sh-msiof: Add slave mode support
+> >> 23e291c spi: rockchip: support "sleep" pin configuration
+> > 
+> > it sometimes falls through the cracks, but having dt-binding patches
+> > separate is meant to make it easier on DT-Maintainers to find
+> > patches they need to look at.
 > 
-> Cc: stable at vger.kernel.org
-> Fixes: 488f94d7212b ("KVM: arm64: Access CNTHCTL_EL2 bit fields
-> correctly on VHE systems")
+> ok, will do.
+> 
+> >>>> +    if (!data->cs_gpio_requested) {
+> >>>> +        ret = gpio_request_one(spi->cs_gpio, flags,
+> >>>> +                       dev_name(&spi->dev));
+> >>>> +        if (!ret)
+> >>>> +            data->cs_gpio_requested = 1;
+> >>>> +    } else
+> >>>> +        ret = gpio_direction_output(spi->cs_gpio, flags);
+> >>> 
+> >>> need brace around 'else' statement. Also I don't see data used
+> >>> elsewhere, so you need these code above.
+> >> 
+> >> ok.
+> >> and the cs_gpio_requested is to mark cs_gpio requested, because the
+> >> setup func might be called multiple times, we only need to request gpio
+> >> at the first time.
+> > 
+> > Aren't the gpiod* functions meant to be used for new things?
+> > Also you might actually do a bit of error handling there, especially
+> > EPROBE_DEFER.
+> 
+> so you are suggesting to use gpiod* functions here to replace gpio_*
+> functions right?
 
-Yes, definitely. I've added this.
+correct. And handle errors that may get returned, especially EPROBE_DEFER,
+but also other errors may indicate that your spi won't function as expected.
 
-> 
-> Otherwise:
-> 
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
 
-Thanks,
--Christoffer
+Heiko
