@@ -1,122 +1,60 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 12 Jun 2017 15:36:12 +0100
-Subject: [PATCH v4.1 4/8] mm,
- gup: Ensure real head page is ref-counted when using hugepages
-In-Reply-To: <20170605125112.19530-1-punit.agrawal@arm.com> (Punit Agrawal's
- message of "Mon, 5 Jun 2017 13:51:12 +0100")
-References: <20170524115409.31309-5-punit.agrawal@arm.com>
- <20170605125112.19530-1-punit.agrawal@arm.com>
-Message-ID: <87r2ypz31f.fsf@e105922-lin.cambridge.arm.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 12 Jun 2017 15:36:39 +0100
+Subject: [PATCH 00/12] coresight: Support for ARM Coresight SoC-600
+Message-ID: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Punit Agrawal <punit.agrawal@arm.com> writes:
+This series adds support for ARM Coresight SoC-600 IP, which implements
+Coresight V3 architecture. It also does some clean up of the replicator
+driver namings used in the driver to prevent confusions to the user.
 
-> When speculatively taking references to a hugepage using
-> page_cache_add_speculative() in gup_huge_pmd(), it is assumed that the
-> page returned by pmd_page() is the head page. Although normally true,
-> this assumption doesn't hold when the hugepage comprises of successive
-> page table entries such as when using contiguous bit on arm64 at PTE or
-> PMD levels.
->
-> This can be addressed by ensuring that the page passed to
-> page_cache_add_speculative() is the real head or by de-referencing the
-> head page within the function.
->
-> We take the first approach to keep the usage pattern aligned with
-> page_cache_get_speculative() where users already pass the appropriate
-> page, i.e., the de-referenced head.
->
-> Apply the same logic to fix gup_huge_[pud|pgd]() as well.
->
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Steve Capper <steve.capper@arm.com>
-> Cc: Michal Hocko <mhocko@suse.com>
-> Cc: "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>
-> Cc: Aneesh Kumar K.V <aneesh.kumar@linux.vnet.ibm.com>
-> ---
->
-> Hi Andrew,
->
-> Please update the patch in your queue with this version.
->
-> It fixes the ltp failures reported by Yury[0]. The original patch led
-> to incorrect ref-count on certain pages due to taking a referencing on
-> the following page in some instances. Should be fixed with this
-> version.
+The SoC-600 comes with an improved TMC which supports new features,
+including Save-Restore and Software FIFO2 mode (for streaming the trace
+data over functional I/O like USB/PCI).
+This series only supports Save-Restore feature of the new ETR by reusing
+the driver to perform additional setups required in case we are dealing
+with an IP which supports it. Towards this, we add a capability
+description to the IP listings to make it easier.
 
-Gentle ping!
+Patches 1-8 contains general cleanups, introduction of some helper
+routines.
+Patch 9 introduces the capability tracking for TMCs.
+Patch 10 adds the support for Save-Restore feature in ETR.
+Patch 11 adds support for the Coresight SoC 600 TMC
+Patch 12 adds the support for other components in SoC 600.
 
-Andrew, please update to this version of the patch - it fixes a breakage
-on arm64.
+Tested on Juno (with Coresight SoC 400) and an FPGA based system
+for SoC 600.
 
-Alternately, if you're OK with it, we could take the whole series via
-the arm64 tree.
+Suzuki K Poulose (12):
+  coresight replicator: Cleanup programmable replicator naming
+  arm64: dts: juno: Use the new coresight replicator string
+  coresight: Extend the PIDR mask to cover relevant bits in PIDR2
+  coresight: Add support for reading 64bit registers
+  coresight tmc: Add helpers for accessing 64bit registers
+  coresight tmc: Expose DBA and AXICTL
+  coresight replicator: Expose replicator management registers
+  coresight tmc: Handle configuration types properly
+  coresight tmc: Add capability information
+  coresight tmc: Support for save-restore in ETR
+  coresight tmc: Add support for Coresight SoC 600 TMC
+  coresight: Add support for Coresight SoC 600 components
 
->
-> Thanks,
-> Punit
->
-> [0] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-June/510318.html
->
->  mm/gup.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
->
-> diff --git a/mm/gup.c b/mm/gup.c
-> index e74e0b5a0c7c..6bd39264d0e7 100644
-> --- a/mm/gup.c
-> +++ b/mm/gup.c
-> @@ -1354,8 +1354,7 @@ static int gup_huge_pmd(pmd_t orig, pmd_t *pmdp, unsigned long addr,
->  		return __gup_device_huge_pmd(orig, addr, end, pages, nr);
->  
->  	refs = 0;
-> -	head = pmd_page(orig);
-> -	page = head + ((addr & ~PMD_MASK) >> PAGE_SHIFT);
-> +	page = pmd_page(orig) + ((addr & ~PMD_MASK) >> PAGE_SHIFT);
->  	do {
->  		pages[*nr] = page;
->  		(*nr)++;
-> @@ -1363,6 +1362,7 @@ static int gup_huge_pmd(pmd_t orig, pmd_t *pmdp, unsigned long addr,
->  		refs++;
->  	} while (addr += PAGE_SIZE, addr != end);
->  
-> +	head = compound_head(pmd_page(orig));
->  	if (!page_cache_add_speculative(head, refs)) {
->  		*nr -= refs;
->  		return 0;
-> @@ -1392,8 +1392,7 @@ static int gup_huge_pud(pud_t orig, pud_t *pudp, unsigned long addr,
->  		return __gup_device_huge_pud(orig, addr, end, pages, nr);
->  
->  	refs = 0;
-> -	head = pud_page(orig);
-> -	page = head + ((addr & ~PUD_MASK) >> PAGE_SHIFT);
-> +	page = pud_page(orig) + ((addr & ~PUD_MASK) >> PAGE_SHIFT);
->  	do {
->  		pages[*nr] = page;
->  		(*nr)++;
-> @@ -1401,6 +1400,7 @@ static int gup_huge_pud(pud_t orig, pud_t *pudp, unsigned long addr,
->  		refs++;
->  	} while (addr += PAGE_SIZE, addr != end);
->  
-> +	head = compound_head(pud_page(orig));
->  	if (!page_cache_add_speculative(head, refs)) {
->  		*nr -= refs;
->  		return 0;
-> @@ -1429,8 +1429,7 @@ static int gup_huge_pgd(pgd_t orig, pgd_t *pgdp, unsigned long addr,
->  
->  	BUILD_BUG_ON(pgd_devmap(orig));
->  	refs = 0;
-> -	head = pgd_page(orig);
-> -	page = head + ((addr & ~PGDIR_MASK) >> PAGE_SHIFT);
-> +	page = pgd_page(orig) + ((addr & ~PGDIR_MASK) >> PAGE_SHIFT);
->  	do {
->  		pages[*nr] = page;
->  		(*nr)++;
-> @@ -1438,6 +1437,7 @@ static int gup_huge_pgd(pgd_t orig, pgd_t *pgdp, unsigned long addr,
->  		refs++;
->  	} while (addr += PAGE_SIZE, addr != end);
->  
-> +	head = compound_head(pgd_page(orig));
->  	if (!page_cache_add_speculative(head, refs)) {
->  		*nr -= refs;
->  		return 0;
+ .../devicetree/bindings/arm/coresight.txt          |  4 +-
+ arch/arm64/boot/dts/arm/juno-base.dtsi             |  2 +-
+ drivers/hwtracing/coresight/Kconfig                | 10 ++--
+ drivers/hwtracing/coresight/Makefile               |  2 +-
+ drivers/hwtracing/coresight/coresight-funnel.c     |  9 +++-
+ drivers/hwtracing/coresight/coresight-priv.h       | 35 +++++++++++--
+ .../coresight/coresight-replicator-qcom.c          | 33 ++++++++++--
+ drivers/hwtracing/coresight/coresight-stm.c        |  8 +--
+ drivers/hwtracing/coresight/coresight-tmc-etf.c    |  8 +--
+ drivers/hwtracing/coresight/coresight-tmc-etr.c    | 21 ++++++--
+ drivers/hwtracing/coresight/coresight-tmc.c        | 58 ++++++++++++++++++----
+ drivers/hwtracing/coresight/coresight-tmc.h        | 53 ++++++++++++++++++++
+ drivers/hwtracing/coresight/coresight-tpiu.c       |  9 +++-
+ 13 files changed, 210 insertions(+), 42 deletions(-)
+
+-- 
+2.7.4
