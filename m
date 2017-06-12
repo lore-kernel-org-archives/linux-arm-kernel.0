@@ -1,69 +1,42 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Mon, 12 Jun 2017 17:26:27 +0200
-Subject: [PATCH 46/58] clocksource/drivers: Add a new driver for the Atmel
- ARM TC blocks
-In-Reply-To: <4c2a5425-acb4-c639-7f54-1dd933c44d03@linaro.org>
-References: <20170530215139.9983-47-alexandre.belloni@free-electrons.com>
- <20170606152104.GC2345@mai> <20170606180559.pkrr7ux2qqnmsd6y@piout.net>
- <20170607141735.GH2345@mai> <20170607152750.tksmyf5p3oajbsac@piout.net>
- <20170607210848.GJ2345@mai> <20170607231715.ns2vcxza2eexnzjs@piout.net>
- <20170608074236.62924f01@bbrezillon> <20170608074446.GM2345@mai>
- <20170608101334.4e60aa4c@bbrezillon> <20170608084026.GB2244@mai>
- <eada48f9-55b5-859d-d37e-4c9e938bc29d@microchip.com>
- <4c2a5425-acb4-c639-7f54-1dd933c44d03@linaro.org>
-Message-ID: <cd8c34e1-de72-c5e4-ec80-67628b037aa4@microchip.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 12 Jun 2017 17:34:54 +0200
+Subject: [PATCH v3 3/9] pinctrl: avoid PLAT_ORION dependency
+In-Reply-To: <cover.d003a5e862e6d732d901a61d1765a349c9a89eef.1497281623.git-series.gregory.clement@free-electrons.com>
+References: <cover.d003a5e862e6d732d901a61d1765a349c9a89eef.1497281623.git-series.gregory.clement@free-electrons.com>
+Message-ID: <58b227242d015c9a9db62bfd331be351037b1054.1497281623.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 12/06/2017 ? 15:25, Daniel Lezcano a ?crit :
-> On 12/06/2017 14:54, Nicolas Ferre wrote:
-> 
-> [ ... ]
-> 
->>> I like the 'chosen' approach with the nodes you are proposing below. Thanks for
->>> the constructive suggestion. The binding description matches perfectly what we
->>> are trying to achieve.
->>>
->>> Rob? what do you think?
->>
->> I'm following this work from a distance but as we've just celebrated the
->> 1st anniversary for this patch series (11 June 2016), I propose that we
->> now make up our mind quickly. Everybody seem to be on the same page and
->> willing to make this rework move forward.
->>
->> In Microchip/Atmel we would like to actually use this TCB rework both
->> internally and in our mainline work to avoid having to rely on our own
->> out-of-tree implementation.
->>
->> The newly-added samv7 cortex-M can't boot without this series and a use
->> of our current cortex-A SoCs with TrustZone in Secure World (SWd) is not
->> possible with current mainline code only. On these two examples, the
->> current timer on which we rely, the PIT, is not present.
->>
->> So you probably understand that more than one year without real progress
->> begins to be a little bit frustrating for the AT91 users...
-> 
-> Nicolas,
-> 
-> who are you exactly blaming?
-> 
-> Are you surprised a 58 patches series, with a gazillion of Cc'ed people
-> posted awhile ago, is ignored?
+From: Russell King <rmk+kernel@armlinux.org.uk>
 
-Daniel,
+Armada 8040 also needs orion pinctrl, and as these symbols are only
+selected, there's no need to make them depend on PLAT_ORION.
 
-Well, I'm talking about the only patch about DT bindings here, not the
-other (large number) of soc/board dts changes.
-Note that Alexandre tried to extract this discussion from the other
-patches without coming to a conclusion either ("[PATCH v3] ARM: at91:
-Document new TCB bindings", for instance).
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/pinctrl/mvebu/Kconfig | 4 ----
+ 1 file changed, 4 deletions(-)
 
-I had the feeling that this email thread was about to be fading out on a
-DT binding discussion, as it had done a couple of times during the last
-months... Both you and me produced "ping" messages to make this
-discussion progress with no real success so far... This is why I was a
-little worried.
-
-Regards,
+diff --git a/drivers/pinctrl/mvebu/Kconfig b/drivers/pinctrl/mvebu/Kconfig
+index 5bade32d3089..8cb444b60ae9 100644
+--- a/drivers/pinctrl/mvebu/Kconfig
++++ b/drivers/pinctrl/mvebu/Kconfig
+@@ -1,5 +1,3 @@
+-if PLAT_ORION
+-
+ config PINCTRL_MVEBU
+ 	bool
+ 	select PINMUX
+@@ -38,8 +36,6 @@ config PINCTRL_ORION
+ 	bool
+ 	select PINCTRL_MVEBU
+ 
+-endif
+-
+ config PINCTRL_ARMADA_37XX
+        bool
+        select GENERIC_PINCONF
 -- 
-Nicolas Ferre
+git-series 0.9.1
