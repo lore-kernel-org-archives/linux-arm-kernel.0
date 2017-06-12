@@ -1,147 +1,55 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 12 Jun 2017 09:30:31 +0200
-Subject: [PATCH 2/2] drivers/clocksource/fttmr010: Implement delay timer
-In-Reply-To: <20170611212617.6906-2-linus.walleij@linaro.org>
-References: <20170611212617.6906-1-linus.walleij@linaro.org>
- <20170611212617.6906-2-linus.walleij@linaro.org>
-Message-ID: <20170612073031.GA2261@mai>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 12 Jun 2017 00:32:27 -0700
+Subject: [PATCH RFC 2/5] ARM: dts: am335x-baltos: use IRQ_TYPE_* to
+ specify irq flags
+In-Reply-To: <CAGm1_kuKxVOetzMLdnVO+xQ7egX+paqOHLS+ckz6nFwKD5QBuQ@mail.gmail.com>
+References: <20170526180609.2699-1-uwe@kleine-koenig.org>
+ <20170526180609.2699-2-uwe@kleine-koenig.org>
+ <20170531171932.GH3730@atomide.com>
+ <CAGm1_ktJp+3t9ExuFJhKTmbM63yt-82PGP26KkEHGqK-tnfWRg@mail.gmail.com>
+ <CAGm1_kuKxVOetzMLdnVO+xQ7egX+paqOHLS+ckz6nFwKD5QBuQ@mail.gmail.com>
+Message-ID: <20170612073227.GS3730@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 11, 2017 at 11:26:17PM +0200, Linus Walleij wrote:
-> This timer is often used on the ARM architecture, so as with so
-> many siblings, we can implement delay timers, removing the need
-> for the system to calibrate jiffys at boot, and potentially
-> handling CPU frequency scaling on targets.
+* Yegor Yefremov <yegorslists@googlemail.com> [170606 07:37]:
+> On Wed, May 31, 2017 at 7:22 PM, Yegor Yefremov
+> <yegorslists@googlemail.com> wrote:
+> > Hi Uwe, Tony,
+> >
+> > On Wed, May 31, 2017 at 7:19 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >> * Uwe Kleine-K?nig <uwe@kleine-koenig.org> [170526 11:09]:
+> >>> According to the binding documentation and the source code the omap-gpio
+> >>> controller takes IRQ_TYPE_* as its flags values, not GPIO_ACTIVE_*.
+> >>>
+> >>> This patch uses the right variable type which yields the same result
+> >>> when compiled. Note that this might be wrong and actually
+> >>> IRQ_TYPE_LEVEL_LOW is intended by the dt author.
+> >>>
+> >>> Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+> >>> ---
+> >>> Hello,
+> >>>
+> >>> can somebody with the hardware or it's documentation please check which
+> >>> flag is the right one?
+> >>
+> >> I'll wait on this one until we have somebody test it.
+> >
+> > I'll look at it this week.
 > 
-> We cannot just protect the Kconfig with a "depends on ARM" because
-> it is already known that different architectures are using Faraday
-> IP blocks, so it is better to make things open-ended and use
+> This is what works for me (at least it doesn't produce "irq 88: nobody
+> cared (try booting with the "irqpoll" option)").
 > 
-> Result on boot dmesg:
+> As for tca6416 it is working with all possible settings (from
+> IRQ_TYPE_EDGE_RISING till IRQ_TYPE_LEVEL_LOW). "cat /proc/interrupts"
+> always shows Level type:
 > 
-> Switching to timer-based delay loop, resolution 40n
-> Calibrating delay loop (skipped), value calculated using
->   timer frequency.. 50.00 BogoMIPS (lpj=250000)
-> 
-> This is accurately the timer frequency, 250MHz on the APB
-> bus.
-> 
-> Cc: Andrew Jeffery <andrew@aj.id.au>
-> Cc: Joel Stanley <joel@jms.id.au>
-> Cc: Jonas Jensen <jonas.jensen@gmail.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/clocksource/timer-fttmr010.c | 35 ++++++++++++++++++++++++++++++++++-
->  1 file changed, 34 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clocksource/timer-fttmr010.c b/drivers/clocksource/timer-fttmr010.c
-> index 5e82469995cb..0074d89cd2ce 100644
-> --- a/drivers/clocksource/timer-fttmr010.c
-> +++ b/drivers/clocksource/timer-fttmr010.c
-> @@ -17,6 +17,7 @@
->  #include <linux/clk.h>
->  #include <linux/slab.h>
->  #include <linux/bitops.h>
-> +#include <linux/delay.h>
->  
->  /*
->   * Register definitions for the timers
-> @@ -81,9 +82,15 @@ struct fttmr010 {
->  	bool count_down;
->  	u32 t1_enable_val;
->  	struct clock_event_device clkevt;
-> +#ifdef CONFIG_ARM
-> +	struct delay_timer delay_timer;
-> +#endif
->  };
->  
-> -/* A local singleton used by sched_clock, which is stateless */
-> +/*
-> + * A local singleton used by sched_clock and delay timer reads, which are
-> + * fast and stateless
-> + */
->  static struct fttmr010 *local_fttmr;
->  
->  static inline struct fttmr010 *to_fttmr010(struct clock_event_device *evt)
-> @@ -101,6 +108,20 @@ static u64 notrace fttmr010_read_sched_clock_down(void)
->  	return ~readl(local_fttmr->base + TIMER2_COUNT);
->  }
->  
-> +#ifdef CONFIG_ARM
-> +
-> +static unsigned long fttmr010_read_current_timer_up(void)
-> +{
-> +	return readl(local_fttmr->base + TIMER2_COUNT);
-> +}
-> +
-> +static unsigned long fttmr010_read_current_timer_down(void)
-> +{
-> +	return ~readl(local_fttmr->base + TIMER2_COUNT);
-> +}
-> +
-> +#endif
-> +
+> 47:          5  44e07000.gpio  20 Level     1-0020
 
-These functions are duplicated with fttmr010_read_sched_clock_down() /
-fttmr010_read_sched_clock_up().
+OK, can you please send a proper patch with description
+and Signed-off-by? That is unless Uwe cares to update his
+patch. Otherwise add Reported-by for Uwe :)
 
-Could you factor them out?
+Regards,
 
-eg.
-
-static inline unsigned long fttmr010_read_current_timer_up(void)
-{
-	return readl(local_fttmr->base + TIMER2_COUNT);
-}
-
-static inline unsigned long fttmr010_read_current_timer_down(void)
-{
-	return ~readl(local_fttmr->base + TIMER2_COUNT);
-}
-
-static u64 notrace fttmr010_read_sched_clock_down(void)
-{
-	return fttmr010_read_current_timer_down()
-}
-
-static u64 notrace fttmr010_read_sched_clock_up(void)
-{
-	return fttmr010_read_current_timer_up();
-}
-
-So we get rid of these CONFIG_ARM section above.
-
->  static int fttmr010_timer_set_next_event(unsigned long cycles,
->  				       struct clock_event_device *evt)
->  {
-> @@ -349,6 +370,18 @@ static int __init fttmr010_timer_init(struct device_node *np)
->  					fttmr010->tick_rate,
->  					1, 0xffffffff);
->  
-> +#ifdef CONFIG_ARM
-> +	/* Also use this timer for delays */
-> +	if (fttmr010->count_down)
-> +		fttmr010->delay_timer.read_current_timer =
-> +			fttmr010_read_current_timer_down;
-> +	else
-> +		fttmr010->delay_timer.read_current_timer =
-> +			fttmr010_read_current_timer_up;
-> +	fttmr010->delay_timer.freq = fttmr010->tick_rate;
-> +	register_current_timer_delay(&fttmr010->delay_timer);
-> +#endif
-> +
->  	return 0;
->  
->  out_unmap:
-> -- 
-> 2.9.4
-> 
-
--- 
-
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Tony
