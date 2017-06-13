@@ -1,142 +1,59 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Tue, 13 Jun 2017 10:18:14 -0700
-Subject: [RFT PATCH v2 02/42] drivers: pci: host: iproc: Convert link
- check to raw PCI config accessors
-In-Reply-To: <CAMSpPPdDLjRURZowWAzSvagmmhmojwYFYoHVu3xYcH6i-guviQ@mail.gmail.com>
-References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
- <20170608141342.2018-3-lorenzo.pieralisi@arm.com>
- <0eb77019-9945-592c-375d-e2de742b3237@broadcom.com>
- <20170608163614.GB2216@red-moon>
- <CAMSpPPe6bXfu=ntMedrt0w4UfqJLy1a9ZBu_kXy1j4B63x1Nww@mail.gmail.com>
- <20170612161358.GA32043@red-moon>
- <CAMSpPPc0uwV0JZYkegrCaemuoJ-wfWwkSXd7TMtFwENoLRXdBQ@mail.gmail.com>
- <403daa9b-c0f6-971d-9312-ef103460d738@broadcom.com>
- <CAMSpPPdDLjRURZowWAzSvagmmhmojwYFYoHVu3xYcH6i-guviQ@mail.gmail.com>
-Message-ID: <3d90daa1-7090-337a-b5c1-967b7eaeb2d9@broadcom.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 14 Jun 2017 01:24:49 +0800
+Subject: [PATCH v2 2/4] spi: rockchip: add support for "cs-gpios" dts
+ property
+In-Reply-To: <1497331543-8565-2-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <201706140136.LWVD2FnX%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oza/Lorenzo,
+Hi Jeffy,
 
-On 6/13/17 1:22 AM, Oza Oza wrote:
-> On Tue, Jun 13, 2017 at 12:22 AM, Ray Jui <ray.jui@broadcom.com> wrote:
->>
->>
->> On 6/12/17 10:40 AM, Oza Oza wrote:
->>> On Mon, Jun 12, 2017 at 9:43 PM, Lorenzo Pieralisi
->>> <lorenzo.pieralisi@arm.com> wrote:
->>>> On Sun, Jun 11, 2017 at 09:42:34AM +0530, Oza Oza wrote:
->>>>> On Thu, Jun 8, 2017 at 10:06 PM, Lorenzo Pieralisi
->>>>> <lorenzo.pieralisi@arm.com> wrote:
->>>>>> [dropped rock-chips maintainers, email bounces]
->>>>>>
->>>>>> On Thu, Jun 08, 2017 at 08:56:05AM -0700, Ray Jui wrote:
->>>>>>> Hi Lorenzo,
->>>>>>>
->>>>>>> Thanks, I'll try my best to find time to test this along 15/42 and
->>>>>>> 33/42 patches. Hopefully I can get to that some time next week.
->>>>>>>
->>>>>>> I have not yet reviewed these patches in details. Do they have
->>>>>>> dependency on other patches to the generic framework code you
->>>>>>> changed?
->>>>>>>
->>>>>>> If so, is there a repo I can pull them?
->>>>>>
->>>>>> I added it in the cover letter but anyway here it is:
->>>>>>
->>>>>> git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git pci/pci-fixup-irqs-removal-v2
->>>>>
->>>>> Hi Lorenzo,
->>>>>
->>>>> I picked up your changes, and tested on iproc based SOC,
->>>>> and ran basic fio data transfer.. and it looks okay.
->>>>
->>>> Thank you. If you could also check it is all OK from a legacy
->>>> IRQ allocation (ie same as before applying series) I'd be grateful.
->>>>
->>>
->>> I disabled msi and it should default to legacy IRQ, looks like there
->>> is a problem, if I missed any change !
->>>
->>> before applying series:  cat /proc/interrupts
->>> 377:        168          0          0          0          0          0
->>>          0          0     dummy   1 Edge      nvme0q0, nvme0q1
->>>
->>> after applying series:
->>> root at bcm958742k:~# dmesg | grep nvme
->>> [    3.855466] nvme 0000:01:00.0: assign irq: got 0
->>> [    3.855469] nvme 0000:01:00.0: assigning IRQ 00
->>> [    3.855515] nvme nvme0: pci function 0000:01:00.0
->>> [    4.270850] nvme 0000:01:00.0: enabling device (0000 -> 0002)
->>> [    4.276787] nvme 0000:01:00.0: enabling bus mastering
->>> [    4.276817] nvme nvme0: Removing after probe failure status: -22
->>>
->>> here is my git status of your series, let me know if I am missing any
->>> change with respect to legacy IRQ ?
->>>
->>>  modified:   arch/arm/include/asm/mach/pci.h
->>>         modified:   arch/arm/kernel/bios32.c
->>>         modified:   arch/arm/mach-dove/pcie.c
->>>         modified:   arch/arm/mach-iop13xx/pci.c
->>>         modified:   arch/arm/mach-iop13xx/pci.h
->>>         modified:   arch/arm/mach-mv78xx0/pcie.c
->>>         modified:   arch/arm/mach-orion5x/common.h
->>>         modified:   arch/arm/mach-orion5x/pci.c
->>>         modified:   arch/arm64/kernel/pci.c
->>>         modified:   drivers/of/of_pci_irq.c
->>>         modified:   drivers/pci/Makefile
->>>         modified:   drivers/pci/host/pci-aardvark.c
->>>         modified:   drivers/pci/host/pci-ftpci100.c
->>>         modified:   drivers/pci/host/pci-host-common.c
->>>         modified:   drivers/pci/host/pci-tegra.c
->>>         modified:   drivers/pci/host/pci-versatile.c
->>>         modified:   drivers/pci/host/pci-xgene.c
->>>         modified:   drivers/pci/host/pcie-altera.c
->>>         modified:   drivers/pci/host/pcie-iproc-bcma.c
->>>         modified:   drivers/pci/host/pcie-iproc-platform.c
->>>         modified:   drivers/pci/host/pcie-iproc.c
->>>         modified:   drivers/pci/host/pcie-iproc.h
->>>         modified:   drivers/pci/host/pcie-rcar.c
->>>         modified:   drivers/pci/host/pcie-rockchip.c
->>>         modified:   drivers/pci/host/pcie-xilinx-nwl.c
->>>         modified:   drivers/pci/host/pcie-xilinx.c
->>>         modified:   drivers/pci/pci-driver.c
->>>         modified:   drivers/pci/probe.c
->>>         modified:   drivers/pci/setup-irq.c
->>>         modified:   include/linux/pci.h
->>>
->>
->> Did you test with or without my change in bcm/master to emulate legacy
->> interrupt through dummy IRQ domain?
->>
->> Thanks,
->>
->> Ray
->>
->>
-> 
-> Hi Ray,
-> yes irqdomain was missing, and with that legacy IRQ are fine now.
-> please mainline those changes.
-> 
-> Hi Lorenzo,
-> 
-> Legacy IRQ is working fine as well wiht your patches.
-> 
-> cat /proc/interrupts
-> 122:        160          0          0          0          0          0
->          0          0     dummy   1 Edge      nvme0q0, nvme0q1
-> 
-> NVMe data transfer is also fine.
-> 
-> Regards,
-> Oza.
-> 
+[auto build test ERROR on rockchip/for-next]
+[also build test ERROR on v4.12-rc5 next-20170613]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Okay, so I take this as Lorenzo's changes on iProc PCIe driver have been
-sanity tested for link detection and legacy interrupt support. No
-regression is seen. Thanks, Oza.
+url:    https://github.com/0day-ci/linux/commits/Jeffy-Chen/spi-rockchip-fix-error-handling-when-probe/20170613-172725
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git for-next
+config: x86_64-randconfig-s5-06132355 (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-I'll send out the INTx irqdomain support patch when I have time.
+All errors (new ones prefixed by >>):
 
-Ray
+   drivers/spi/spi-rockchip.c: In function 'rockchip_spi_setup_cs_gpios':
+>> drivers/spi/spi-rockchip.c:678:13: error: implicit declaration of function 'devm_gpiod_get_index_optional' [-Werror=implicit-function-declaration]
+      cs_gpio = devm_gpiod_get_index_optional(dev, "cs",
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+>> drivers/spi/spi-rockchip.c:679:11: error: 'GPIOD_ASIS' undeclared (first use in this function)
+           i, GPIOD_ASIS);
+              ^~~~~~~~~~
+   drivers/spi/spi-rockchip.c:679:11: note: each undeclared identifier is reported only once for each function it appears in
+   cc1: some warnings being treated as errors
+
+vim +/devm_gpiod_get_index_optional +678 drivers/spi/spi-rockchip.c
+
+   672		if (!np)
+   673			return 0;
+   674	
+   675		nb = of_gpio_named_count(np, "cs-gpios");
+   676		for (i = 0; i < nb; i++) {
+   677			/* We support both GPIO CS and HW CS */
+ > 678			cs_gpio = devm_gpiod_get_index_optional(dev, "cs",
+ > 679								i, GPIOD_ASIS);
+   680			if (IS_ERR(cs_gpio))
+   681				return PTR_ERR(cs_gpio);
+   682		}
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 21781 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170614/12e03c32/attachment-0001.gz>
