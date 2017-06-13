@@ -1,27 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 13 Jun 2017 00:19:10 -0700
-Subject: [PATCH 1/2] arm:omap2+: put omap_uart_phys/virt/lsr in .text
- section when ZIMAGE is true
-In-Reply-To: <20170610102018.GX4902@n2100.armlinux.org.uk>
-References: <1496888232-30764-1-git-send-email-hoeun.ryu@gmail.com>
- <6C915D66-C962-4264-89C1-C75A0530A2A1@gmail.com>
- <20170610102018.GX4902@n2100.armlinux.org.uk>
-Message-ID: <20170613071910.GZ3730@atomide.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 13 Jun 2017 09:20:14 +0200
+Subject: [PATCH v3] arm64: allwinner: a64: Add initial Orangepi
+ Win/WinPlus support
+In-Reply-To: <1497261194-28815-1-git-send-email-jteki@openedev.com>
+References: <1497261194-28815-1-git-send-email-jteki@openedev.com>
+Message-ID: <20170613072014.kq3znsh77mncsfyb@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@armlinux.org.uk> [170610 03:24]:
-> On Sat, Jun 10, 2017 at 01:44:00PM +0900, Hoeun Ryu wrote:
-> > Hello, Russell.
-> > 
-> > Would you please review this patch ?
+On Mon, Jun 12, 2017 at 03:23:13PM +0530, Jagan Teki wrote:
+> From: Jagan Teki <jagan@amarulasolutions.com>
 > 
-> It's really up to Tony Lindgren, who is the OMAP maintainer.
+> Orangepi Win/WinPlus is an open-source single-board computer
+> using the Allwinner A64 SOC.
+> 
+> A64 Orangepi Win/WinPlus has
+> - A64 Quad-core Cortex-A53 64bit
+> - 1GB(Win)/2GB(Win Plus) DDR3 SDRAM
+> - Debug TTL UART
+> - Four USB 2.0
+> - HDMI
+> - LCD
+> - Audio and MIC
+> - Wifi + BT
+> - IR receiver
+> - 5V DC power supply
+> 
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 
-I'll take a look today. I think we can simplify things quite
-a bit as we no longer use machine type for configuring the
-UART.
+You had whitespaces errors in your patch.
 
-Regards,
+I've fixed it, and applied.
 
-Tony
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170613/5f3d36ae/attachment.sig>
