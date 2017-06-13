@@ -1,38 +1,53 @@
-From: mika.westerberg@linux.intel.com (Mika Westerberg)
-Date: Tue, 13 Jun 2017 11:48:31 +0300
-Subject: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO devices
- before scanning
-In-Reply-To: <20170612155700.GA31930@red-moon>
-References: <1495712248-5232-1-git-send-email-gabriele.paoloni@huawei.com>
- <1495712248-5232-6-git-send-email-gabriele.paoloni@huawei.com>
- <20170530132408.GA2556@red-moon>
- <EE11001F9E5DDD47B7634E2F8A612F2E40A7B677@FRAEML521-MBX.china.huawei.com>
- <20170606085553.GA20085@red-moon> <20170612155700.GA31930@red-moon>
-Message-ID: <20170613084831.GP3187@lahna.fi.intel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 13 Jun 2017 10:03:28 +0100
+Subject: [PATCH] arm64/dma-mapping: Fix null-pointer check
+In-Reply-To: <20170612205028.y7a652hd46dakxdu@codeaurora.org>
+References: <20170610194110.27712-1-ohaugan@codeaurora.org>
+ <20170612122903.GC24187@e104818-lin.cambridge.arm.com>
+ <20170612205028.y7a652hd46dakxdu@codeaurora.org>
+Message-ID: <20170613090328.GA3302@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 12, 2017 at 04:57:00PM +0100, Lorenzo Pieralisi wrote:
-> I had a more in-depth look at this series and from my understanding
-> the problem are the following to manage the LPC bindings in ACPI.
+On Mon, Jun 12, 2017 at 01:50:28PM -0700, Olav Haugan wrote:
+> On 17-06-12 13:29:04, Catalin Marinas wrote:
+> > On Sat, Jun 10, 2017 at 12:41:10PM -0700, Olav Haugan wrote:
+> > > @@ -149,6 +140,11 @@ static void *__dma_alloc(struct device *dev, size_t size,
+> > >  	bool coherent = is_device_dma_coherent(dev);
+> > >  	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, false);
+> > >  
+> > > +	if (!dev) {
+> > > +		WARN_ONCE(1, "Use an actual device structure for DMA allocation\n");
+> > > +		return NULL;
+> > > +	}
+> > > +
+> > >  	size = PAGE_ALIGN(size);
+> > >  
+> > >  	if (!coherent && !gfpflags_allow_blocking(flags)) {
+> > > @@ -192,8 +188,13 @@ static void __dma_free(struct device *dev, size_t size,
+> > >  		       void *vaddr, dma_addr_t dma_handle,
+> > >  		       unsigned long attrs)
+> > >  {
+> > > -	void *swiotlb_addr = phys_to_virt(dma_to_phys(dev, dma_handle));
+> > > +	void *swiotlb_addr;
+> > >  
+> > > +	if (!dev) {
+> > > +		WARN_ONCE(1, "Use an actual device structure for DMA free\n");
+> > > +		return;
+> > > +	}
+> > > +	swiotlb_addr = phys_to_virt(dma_to_phys(dev, dma_handle));
+> > 
+> > I don't think we need the checks anymore. With commit 1dccb598df54
+> > ("arm64: simplify dma_get_ops") __generic_dma_ops() returns
+> > dummy_dma_ops when dev == NULL, so the above __dma_alloc/__dma_free
+> > functions would not be called.
 > 
-> (1) Child devices of an LPC controller require special handling when
->     filling their resources (ie they need to be translated - in DT
->     that's guaranteed by the "isa" binding, in ACPI it has to be
->     done by new code)
-> (2) In DT systems, LPC child devices are created by the LPC bus
->     controller driver through an of_platform_populate() call with
->     the LPC controller node as the fwnode root. For ACPI to work
->     the same way there must be a way to prevent LPC children to
->     be enumerated in acpi_default_enumeration() something like
->     I2C does (and then the LPC driver would enumerate its children as
->     DT does)
-> 
-> I am not sure how (1) and (2) can be managed with current ACPI bindings
-> and kernel code - I suspect it may be done by mirroring what's done
-> for I2C but I am not sure, that's why I CC'ed Mika (ie the LPC adapter
-> is matched as a platform device and it takes care of enumerating its
-> children - problem though is preventing enumeration from core ACPI code).
+> We don't need the check in is_device_dma_coherent() either then right?
 
-Is there an example ASL showing how these LPC devices are
-currently presented in ACPI?
+Right. The only user of this function outside
+arch/arm64/mm/dma-mapping.c is Xen (shared with arm32 under
+arch/arm/xen/) but since arm32 doesn't do this NULL check either, we
+should be fine.
+
+-- 
+Catalin
