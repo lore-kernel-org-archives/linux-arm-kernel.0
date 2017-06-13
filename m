@@ -1,70 +1,37 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Tue, 13 Jun 2017 11:46:17 +0200
-Subject: [PATCHv2] ARM: OMAP: PM: stop early on systems without twl
-In-Reply-To: <20170612102527.GX3730@atomide.com>
-References: <20170612102527.GX3730@atomide.com>
-Message-ID: <20170613094617.29166-1-sre@kernel.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 13 Jun 2017 11:52:06 +0200
+Subject: [PATCH] ARM: at91: fix at91_suspend_entering_slow_clock link error
+In-Reply-To: <20170609101821.2776168-1-arnd@arndb.de>
+References: <20170609101821.2776168-1-arnd@arndb.de>
+Message-ID: <20170613095205.atkoxbqjytjllnzj@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+On 09/06/2017 at 12:18:02 +0200, Arnd Bergmann wrote:
+> When CONFIG_ARCH_AT91 is enabled, but none of the specific SoC support
+> is in use, some at91 specific drivers fail to link:
+> 
+> drivers/tty/serial/atmel_serial.o: In function `atmel_serial_suspend':
+> atmel_serial.c:(.text.atmel_serial_suspend+0x1e): undefined reference to `at91_suspend_entering_slow_clock'
+> drivers/usb/host/ohci-at91.o: In function `ohci_hcd_at91_drv_suspend':
+> ohci-at91.c:(.text.ohci_hcd_at91_drv_suspend+0x12): undefined reference to `at91_suspend_entering_slow_clock'
+> drivers/usb/gadget/udc/at91_udc.o: In function `at91udc_suspend':
+> at91_udc.c:(.text.at91udc_suspend+0x26): undefined reference to `at91_suspend_entering_slow_clock'
+> 
+> This changes the at91_suspend_entering_slow_clock hack once more, adding
+> an alternative inline implementation that is used exactly in those cases
+> that don't provide the normal implementation.
+> 
+> Fixes: c1892c2379d2 ("ARM: at91: handle CONFIG_PM for armv7m configurations")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/mach-at91/samv7.c          | 9 ---------
+>  include/linux/platform_data/atmel.h | 7 +++++++
+>  2 files changed, 7 insertions(+), 9 deletions(-)
+> 
+Applied, thanks.
 
-Motorola Droid 4 has an OMAP4, but no TWL6030. It currently
-complains verbosely about this during boot:
-
-twl: not initialized
-twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
-twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
-twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
-twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
-twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
-twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
-twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1410000 Vs max 1316660
-omap2_set_init_voltage: unable to find boot up OPP for vdd_core
-omap2_set_init_voltage: unable to set vdd_core
-omap2_set_init_voltage: unable to find boot up OPP for vdd_iva
-omap2_set_init_voltage: unable to set vdd_iva
-
-While proper support for CPCAP should be added at some point,
-let's exit early in omap2_common_pm_late_init() until that
-has been implemented to avoid the above errors. There is still
-a reminder about missing PM in dmesg:
-
-Missing OMAP4 PM for this platform!
-
-Signed-off-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
----
-Changes since PATCHv1:
- * actually add the message about missing PM support
- * check if TWL is enabled at all
----
- arch/arm/mach-omap2/pm.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-index 63027e60cc20..92e335decc61 100644
---- a/arch/arm/mach-omap2/pm.c
-+++ b/arch/arm/mach-omap2/pm.c
-@@ -240,6 +240,10 @@ omap_postcore_initcall(omap2_common_pm_init);
- 
- int __init omap2_common_pm_late_init(void)
- {
-+#if IS_BUILTIN(CONFIG_TWL6040_CORE) || IS_BUILTIN(CONFIG_TWL4030_CORE)
-+	if (!twl_rev())
-+		goto no_twl;
-+
- 	/* Init the voltage layer */
- 	omap3_twl_init();
- 	omap4_twl_init();
-@@ -253,4 +257,9 @@ int __init omap2_common_pm_late_init(void)
- 	omap_devinit_smartreflex();
- 
- 	return 0;
-+
-+no_twl:
-+#endif
-+	pr_err("OMAP4 PM not supported!\n");
-+	return -ENODEV;
- }
 -- 
-2.11.0
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
