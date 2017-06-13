@@ -1,127 +1,55 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Tue, 13 Jun 2017 19:01:38 +0000
-Subject: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO
- devices before scanning
-In-Reply-To: <20170613151013.GT3187@lahna.fi.intel.com>
-References: <1495712248-5232-1-git-send-email-gabriele.paoloni@huawei.com>
- <1495712248-5232-6-git-send-email-gabriele.paoloni@huawei.com>
- <20170530132408.GA2556@red-moon>
- <EE11001F9E5DDD47B7634E2F8A612F2E40A7B677@FRAEML521-MBX.china.huawei.com>
- <20170606085553.GA20085@red-moon> <20170612155700.GA31930@red-moon>
- <20170613084831.GP3187@lahna.fi.intel.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40AAE3DA@FRAEML521-MBX.china.huawei.com>
- <20170613151013.GT3187@lahna.fi.intel.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E40AAF0BF@FRAEML521-MBX.china.huawei.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 13 Jun 2017 13:06:05 -0600
+Subject: [PATCH 03/12] coresight: Extend the PIDR mask to cover relevant
+ bits in PIDR2
+In-Reply-To: <e6c64a07-1354-b513-349e-242380f5fb59@arm.com>
+References: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
+ <1497278211-5001-4-git-send-email-suzuki.poulose@arm.com>
+ <20170613175336.GC6392@xps15>
+ <e6c64a07-1354-b513-349e-242380f5fb59@arm.com>
+Message-ID: <CANLsYkz3sEogjAaeHW6KYnV5nrgu-7NYs3N+ML0jtWSN+vu+7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mika
+On 13 June 2017 at 11:55, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 13/06/17 18:53, Mathieu Poirier wrote:
+>>
+>> On Mon, Jun 12, 2017 at 03:36:42PM +0100, Suzuki K Poulose wrote:
+>>>
+>>> As per coresight standards, PIDR2 register has the following format :
+>>>
+>>>  [2-0]  - JEP106_bits6to4
+>>>  [3]    - JEDEC, designer ID is specified by JEDEC.
+>>>
+>>> However some of the drivers only use mask of 0x3 for the PIDR2 leaving
+>>> bits [3-2] unchecked, which could potentially match the component for
+>>> a different device altogether. This patch fixes the mask and the
+>>> corresponding id bits for the existing devices.
+>>>
+>>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>> ---
+>>> I have not touched the TPIU ids for Ux500 (see commit: 4339b699),
+>>> as I don't have a platform to fix/correct the ids.
+>>> ---
+>>>  drivers/hwtracing/coresight/coresight-funnel.c          | 4 ++--
+>>>  drivers/hwtracing/coresight/coresight-replicator-qcom.c | 4 ++--
+>>>  drivers/hwtracing/coresight/coresight-stm.c             | 8 ++++----
+>>>  drivers/hwtracing/coresight/coresight-tmc.c             | 4 ++--
+>>>  drivers/hwtracing/coresight/coresight-tpiu.c            | 4 ++--
+>>
+>>
+>> Any reason for not adding ETMv3 to the list?  From what I see in the
+>> documentation bit [2-0] need to 0b011 and the JEDEC bit is always 1.
+>
+>
+> I don't have a platform to test it easily. Hence the exclusion. Same for
+> etbv10.
 
-> -----Original Message-----
-> From: Mika Westerberg [mailto:mika.westerberg at linux.intel.com]
-> Sent: 13 June 2017 16:10
-> To: Gabriele Paoloni
-> Cc: Lorenzo Pieralisi; rafael at kernel.org; Rafael J. Wysocki;
-> catalin.marinas at arm.com; will.deacon at arm.com; robh+dt at kernel.org;
-> frowand.list at gmail.com; bhelgaas at google.com; arnd at arndb.de; linux-arm-
-> kernel at lists.infradead.org; mark.rutland at arm.com;
-> brian.starkey at arm.com; olof at lixom.net; benh at kernel.crashing.org; linux-
-> kernel at vger.kernel.org; linux-acpi at vger.kernel.org; Linuxarm; linux-
-> pci at vger.kernel.org; minyard at acm.org; John Garry; xuwei (O)
-> Subject: Re: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO
-> devices before scanning
-> 
-> On Tue, Jun 13, 2017 at 02:38:26PM +0000, Gabriele Paoloni wrote:
-> > > Is there an example ASL showing how these LPC devices are
-> > > currently presented in ACPI?
-> >
-> > Please find below the asl sketch for our LPC and IPMI
-> >
-> > //
-> > // LPC
-> > //
-> >
-> > Scope(_SB) {
-> >   Device (LPC0) {
-> >     Name (_HID, "HISI0191")  // HiSi LPC
-> >     Name (_CRS, ResourceTemplate () {
-> >       Memory32Fixed (ReadWrite, 0xa01b0000, 0x1000)
-> >     })
-> >   }
-> >
-> >   Device (LPC0.IPMI) {
-> >     Name (_HID, "IPI0001")
-> >     Method (_IFT) {
-> >       Return (0x03)
-> >     }
-> >     Name (LORS, ResourceTemplate() {
-> >       QWordIO (
-> >         ResourceConsumer,
-> > 	MinNotFixed,     // _MIF
-> > 	MaxNotFixed,     // _MAF
-> > 	PosDecode,
-> > 	EntireRange,
-> > 	0x0,             // _GRA
-> > 	0xe4,            // _MIN
-> > 	0x3fff,          // _MAX
-> > 	0x0,             // _TRA
-> > 	0x04,            // _LEN
-> > 	, ,
-> > 	BTIO
-> >       )
-> >     })
-> >     CreateQWordField (LORS, BTIO._MIN, CMIN)
-> >     CreateQWordField (LORS, BTIO._MAX, CMAX)
-> >     CreateQWordField (LORS, BTIO._LEN, CLEN)
-> >
-> >     Method (_PRS, 0) {
-> >       Return (LORS)
-> >     }
-> >
-> >     Method (_CRS, 0) {
-> >       Return (LORS)
-> >     }
-> >     Method (_SRS, 1) {
-> >       CreateQWordField (Arg0, \_SB.LPC0.IPMI.BTIO._MIN, IMIN)
-> >       Store (IMIN, CMIN)
-> >       CreateQWordField (Arg0, \_SB.LPC0.IPMI.BTIO._MAX, IMAX)
-> >       Store (IMAX, CMAX)
-> >     }
-> >   }
-> > [...]
-> > }
-> 
-> Thanks. So this looks pretty much like normal Linux MFD device which we
-> already have support for adding ACPI bindings to child devices. It
-> should also support splitting resources to child devices IIRC.
+I have a TC2 - add them in and I'll test it.
 
-I am not very familiar with Linux MFD however the main issue here is that
-1) for IPMI we want to re-use the standard IPMI driver without touching it:
-   see 
-
-   static const struct acpi_device_id acpi_ipmi_match[] = {
-         { "IPI0001", 0 },
-         { },
-   };
-
-   in "drivers/char/ipmi/ipmi_si_intf.c" (and in general any standard driver
-   of an LPC child)
-
-2) We need a way to guarantee that all LPC children are not enumerated
-   by acpi_default_enumeration() (so for example if an ipmi node is an LPC#
-   child it should not be enumerated, otherwise it should be)
-   Currently acpi_default_enumeration() skips spi/i2c slaves by checking:
-   1) if the acpi resource type is a serial bus
-   2) if the type of serial bus descriptor is I2C or SPI
-
-   For LPC we cannot leverage on any ACPI property to "recognize" that our
-   devices are LPC children; hence before I proposed for acpi_default_enumeration()
-   to skip devices that have already been enumerated (by calling 
-   acpi_device_enumerated() ).
-
-So in the current scenario, how do you think that MFD can help?
-Do you see any possible solution?
-
-Many thanks
-Gab
-  
+>
+>
+> Suzuki
+>
