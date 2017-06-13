@@ -1,50 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 14 Jun 2017 00:05:08 +0200
-Subject: [GIT PULL] Gemini DTS additions
-Message-ID: <CACRpkdYtj2JtBXZeHNJjf8QS1_FWvKbVUMXZJ9jvtQ3zEWVX+g@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 13 Jun 2017 17:18:31 -0500
+Subject: [PATCH v2 1/5] of: Add vendor prefix for iWave Systems
+ Technologies Pvt. Ltd
+In-Reply-To: <1496761818-62126-2-git-send-email-biju.das@bp.renesas.com>
+References: <1496420523-23506-4-git-send-email-biju.das@bp.renesas.com>
+ <1496761818-62126-1-git-send-email-biju.das@bp.renesas.com>
+ <1496761818-62126-2-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <20170613221831.f3oakmgowl7x262b@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Gemini DMA controller and PATA/SATA drivers
-have been merged by respective subsystem maintainers.
+On Tue, Jun 06, 2017 at 04:10:14PM +0100, Biju Das wrote:
+> This patch adds vendor prefix for iWave Systems Technologies Pvt. Ltd.
+> Website: http://www.iwavesystems.com/
+> 
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
-This adds the DMA and PATA/SATA DTS entries with
-numerical values for clocks and resets, which will be
-augmented to #defines after -rc1.
+Now applied to DT tree to avoid conflicts.
 
-The tag is based on top of the previous Gemini DTS
-tag for v4.13, so goes into the same branch I guess.
-
-Please pull it in!
-
-Yours,
-Linus Walleij
-
-
-The following changes since commit 664ed4e283926d753e876a1347b7729135a3f6b8:
-
-  ARM: dts: Add clocks to the Gemini SoC (2017-05-24 10:50:22 +0200)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
-tags/gemini-v4.13-dts-2
-
-for you to fetch changes up to 0d7a2c35d11e974b98a6396cd24b39b0f3f5bb7b:
-
-  ARM: dts: add Gemini PATA/SATA support (2017-06-13 23:58:00 +0200)
-
-----------------------------------------------------------------
-Gemini DTS patches for v4.13, take 2:
-- Add DMA controller
-- Add PATA controller and SATA bridge
-
-----------------------------------------------------------------
-Linus Walleij (2):
-      ARM: dts: Add Gemini DMA controller
-      ARM: dts: add Gemini PATA/SATA support
-
- arch/arm/boot/dts/gemini-nas4220b.dts | 10 +++++++
- arch/arm/boot/dts/gemini-sq201.dts    | 10 +++++++
- arch/arm/boot/dts/gemini.dtsi         | 52 +++++++++++++++++++++++++++++++++++
- 3 files changed, 72 insertions(+)
+Rob
