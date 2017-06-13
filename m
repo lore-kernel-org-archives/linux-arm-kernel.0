@@ -1,213 +1,58 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 13 Jun 2017 15:40:38 +0200
-Subject: [PATCH 2/2] tty/serial: atmel: make the driver DT only
-In-Reply-To: <20170613134038.5545-1-alexandre.belloni@free-electrons.com>
-References: <20170613134038.5545-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170613134038.5545-2-alexandre.belloni@free-electrons.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 13 Jun 2017 15:42:00 +0200
+Subject: [RFC v2 1/3] interconnect: Add generic interconnect controller API
+In-Reply-To: <20170612141359.26117-2-georgi.djakov@linaro.org>
+References: <20170612141359.26117-1-georgi.djakov@linaro.org>
+ <20170612141359.26117-2-georgi.djakov@linaro.org>
+Message-ID: <20170613134200.GA4769@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that AVR32 is gone, platform_data are not used to initialize the driver
-anymore, remove that path from the driver. Also remove the now unused
-struct atmel_uart_data.
+On Mon, Jun 12, 2017 at 05:13:57PM +0300, Georgi Djakov wrote:
+> This patch introduce a new API to get the requirement and configure the
+> interconnect buses across the entire chipset to fit with the current demand.
+> 
+> The API is using a consumer/provider-based model, where the providers are
+> the interconnect controllers and the consumers could be various drivers.
+> The consumers request interconnect resources (path) to an endpoint and set
+> the desired constraints on this data flow path. The provider(s) receive
+> requests from consumers and aggregate these requests for all master-slave
+> pairs on that path. Then the providers configure each participating in the
+> topology node according to the requested data flow path, physical links and
+> constraints. The topology could be complicated and multi-tiered and is SoC
+> specific.
+> 
+> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+> ---
+>  Documentation/interconnect/interconnect.txt |  65 +++++
+>  drivers/Kconfig                             |   2 +
+>  drivers/Makefile                            |   1 +
+>  drivers/interconnect/Kconfig                |  10 +
+>  drivers/interconnect/Makefile               |   1 +
+>  drivers/interconnect/interconnect.c         | 376 ++++++++++++++++++++++++++++
+>  include/linux/interconnect-consumer.h       |  72 ++++++
+>  include/linux/interconnect-provider.h       | 120 +++++++++
+>  8 files changed, 647 insertions(+)
+>  create mode 100644 Documentation/interconnect/interconnect.txt
+>  create mode 100644 drivers/interconnect/Kconfig
+>  create mode 100644 drivers/interconnect/Makefile
+>  create mode 100644 drivers/interconnect/interconnect.c
+>  create mode 100644 include/linux/interconnect-consumer.h
+>  create mode 100644 include/linux/interconnect-provider.h
+> 
+> diff --git a/Documentation/interconnect/interconnect.txt b/Documentation/interconnect/interconnect.txt
+> new file mode 100644
+> index 000000000000..f761a2fb553c
+> --- /dev/null
+> +++ b/Documentation/interconnect/interconnect.txt
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/tty/serial/atmel_serial.c   | 97 +++++++++++++------------------------
- include/linux/platform_data/atmel.h | 11 -----
- 2 files changed, 33 insertions(+), 75 deletions(-)
+.rst for new Documenation files please, and hook it up to the larger
+documentation build process at the same time.
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 906e2b91bf57..1210a2632846 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -1655,72 +1655,55 @@ static void atmel_init_property(struct atmel_uart_port *atmel_port,
- 				struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
--	struct atmel_uart_data *pdata = dev_get_platdata(&pdev->dev);
--
--	if (np) {
--		/* DMA/PDC usage specification */
--		if (of_property_read_bool(np, "atmel,use-dma-rx")) {
--			if (of_property_read_bool(np, "dmas")) {
--				atmel_port->use_dma_rx  = true;
--				atmel_port->use_pdc_rx  = false;
--			} else {
--				atmel_port->use_dma_rx  = false;
--				atmel_port->use_pdc_rx  = true;
--			}
-+
-+	/* DMA/PDC usage specification */
-+	if (of_property_read_bool(np, "atmel,use-dma-rx")) {
-+		if (of_property_read_bool(np, "dmas")) {
-+			atmel_port->use_dma_rx  = true;
-+			atmel_port->use_pdc_rx  = false;
- 		} else {
- 			atmel_port->use_dma_rx  = false;
--			atmel_port->use_pdc_rx  = false;
-+			atmel_port->use_pdc_rx  = true;
- 		}
-+	} else {
-+		atmel_port->use_dma_rx  = false;
-+		atmel_port->use_pdc_rx  = false;
-+	}
- 
--		if (of_property_read_bool(np, "atmel,use-dma-tx")) {
--			if (of_property_read_bool(np, "dmas")) {
--				atmel_port->use_dma_tx  = true;
--				atmel_port->use_pdc_tx  = false;
--			} else {
--				atmel_port->use_dma_tx  = false;
--				atmel_port->use_pdc_tx  = true;
--			}
-+	if (of_property_read_bool(np, "atmel,use-dma-tx")) {
-+		if (of_property_read_bool(np, "dmas")) {
-+			atmel_port->use_dma_tx  = true;
-+			atmel_port->use_pdc_tx  = false;
- 		} else {
- 			atmel_port->use_dma_tx  = false;
--			atmel_port->use_pdc_tx  = false;
-+			atmel_port->use_pdc_tx  = true;
- 		}
--
- 	} else {
--		atmel_port->use_pdc_rx  = pdata->use_dma_rx;
--		atmel_port->use_pdc_tx  = pdata->use_dma_tx;
--		atmel_port->use_dma_rx  = false;
- 		atmel_port->use_dma_tx  = false;
-+		atmel_port->use_pdc_tx  = false;
- 	}
--
- }
- 
- static void atmel_init_rs485(struct uart_port *port,
- 				struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
--	struct atmel_uart_data *pdata = dev_get_platdata(&pdev->dev);
--
--	if (np) {
--		struct serial_rs485 *rs485conf = &port->rs485;
--		u32 rs485_delay[2];
--		/* rs485 properties */
--		if (of_property_read_u32_array(np, "rs485-rts-delay",
--					rs485_delay, 2) == 0) {
--			rs485conf->delay_rts_before_send = rs485_delay[0];
--			rs485conf->delay_rts_after_send = rs485_delay[1];
--			rs485conf->flags = 0;
--		}
--
--		if (of_get_property(np, "rs485-rx-during-tx", NULL))
--			rs485conf->flags |= SER_RS485_RX_DURING_TX;
- 
--		if (of_get_property(np, "linux,rs485-enabled-at-boot-time",
--								NULL))
--			rs485conf->flags |= SER_RS485_ENABLED;
--	} else {
--		port->rs485       = pdata->rs485;
-+	struct serial_rs485 *rs485conf = &port->rs485;
-+	u32 rs485_delay[2];
-+	/* rs485 properties */
-+	if (of_property_read_u32_array(np, "rs485-rts-delay",
-+				       rs485_delay, 2) == 0) {
-+		rs485conf->delay_rts_before_send = rs485_delay[0];
-+		rs485conf->delay_rts_after_send = rs485_delay[1];
-+		rs485conf->flags = 0;
- 	}
- 
-+	if (of_get_property(np, "rs485-rx-during-tx", NULL))
-+		rs485conf->flags |= SER_RS485_RX_DURING_TX;
-+
-+	if (of_get_property(np, "linux,rs485-enabled-at-boot-time", NULL))
-+		rs485conf->flags |= SER_RS485_ENABLED;
- }
- 
- static void atmel_set_ops(struct uart_port *port)
-@@ -2402,7 +2385,6 @@ static int atmel_init_port(struct atmel_uart_port *atmel_port,
- {
- 	int ret;
- 	struct uart_port *port = &atmel_port->uart;
--	struct atmel_uart_data *pdata = dev_get_platdata(&pdev->dev);
- 
- 	atmel_init_property(atmel_port, pdev);
- 	atmel_set_ops(port);
-@@ -2410,24 +2392,17 @@ static int atmel_init_port(struct atmel_uart_port *atmel_port,
- 	atmel_init_rs485(port, pdev);
- 
- 	port->iotype		= UPIO_MEM;
--	port->flags		= UPF_BOOT_AUTOCONF;
-+	port->flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP;
- 	port->ops		= &atmel_pops;
- 	port->fifosize		= 1;
- 	port->dev		= &pdev->dev;
- 	port->mapbase	= pdev->resource[0].start;
- 	port->irq	= pdev->resource[1].start;
- 	port->rs485_config	= atmel_config_rs485;
-+	port->membase	= NULL;
- 
- 	memset(&atmel_port->rx_ring, 0, sizeof(atmel_port->rx_ring));
- 
--	if (pdata && pdata->regs) {
--		/* Already mapped by setup code */
--		port->membase = pdata->regs;
--	} else {
--		port->flags	|= UPF_IOREMAP;
--		port->membase	= NULL;
--	}
--
- 	/* for console, the clock could already be configured */
- 	if (!atmel_port->clk) {
- 		atmel_port->clk = clk_get(&pdev->dev, "usart");
-@@ -2761,19 +2736,13 @@ static int atmel_serial_probe(struct platform_device *pdev)
- {
- 	struct atmel_uart_port *atmel_port;
- 	struct device_node *np = pdev->dev.of_node;
--	struct atmel_uart_data *pdata = dev_get_platdata(&pdev->dev);
- 	void *data;
- 	int ret = -ENODEV;
- 	bool rs485_enabled;
- 
- 	BUILD_BUG_ON(ATMEL_SERIAL_RINGSIZE & (ATMEL_SERIAL_RINGSIZE - 1));
- 
--	if (np)
--		ret = of_alias_get_id(np, "serial");
--	else
--		if (pdata)
--			ret = pdata->num;
--
-+	ret = of_alias_get_id(np, "serial");
- 	if (ret < 0)
- 		/* port id not found in platform data nor device-tree aliases:
- 		 * auto-enumerate it */
-diff --git a/include/linux/platform_data/atmel.h b/include/linux/platform_data/atmel.h
-index 70c5c766628e..cdceb4d4ef9d 100644
---- a/include/linux/platform_data/atmel.h
-+++ b/include/linux/platform_data/atmel.h
-@@ -7,8 +7,6 @@
- #ifndef __ATMEL_H__
- #define __ATMEL_H__
- 
--#include <linux/serial.h>
--
-  /* Compact Flash */
- struct at91_cf_data {
- 	int	irq_pin;		/* I/O IRQ */
-@@ -21,15 +19,6 @@ struct at91_cf_data {
- #define AT91_IDE_SWAP_A0_A2	0x02
- };
- 
-- /* Serial */
--struct atmel_uart_data {
--	int			num;		/* port num */
--	short			use_dma_tx;	/* use transmit DMA? */
--	short			use_dma_rx;	/* use receive DMA? */
--	void __iomem		*regs;		/* virt. base address, if any */
--	struct serial_rs485	rs485;		/* rs485 settings */
--};
--
- /* FIXME: this needs a better location, but gets stuff building again */
- #ifdef CONFIG_ATMEL_PM
- extern int at91_suspend_entering_slow_clock(void);
--- 
-2.11.0
+And why are these RFC patches?  Don't you feel they are ready to be
+reviewed?  I know I ignore RFC patches for the most part as obviously
+the author does not think they are ready :)
+
+thanks,
+
+greg k-h
