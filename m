@@ -1,160 +1,79 @@
-From: al.cooper@broadcom.com (Al Cooper)
-Date: Tue, 13 Jun 2017 10:55:21 -0400
-Subject: [PATCH v2 4/4] phy: usb: phy-brcm-usb: Add ability to force DRD mode
- to host or device
-In-Reply-To: <1497365721-31188-1-git-send-email-al.cooper@broadcom.com>
-References: <1497365721-31188-1-git-send-email-al.cooper@broadcom.com>
-Message-ID: <1497365721-31188-5-git-send-email-al.cooper@broadcom.com>
+From: mika.westerberg@linux.intel.com (Mika Westerberg)
+Date: Tue, 13 Jun 2017 18:10:13 +0300
+Subject: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO devices
+ before scanning
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E40AAE3DA@FRAEML521-MBX.china.huawei.com>
+References: <1495712248-5232-1-git-send-email-gabriele.paoloni@huawei.com>
+ <1495712248-5232-6-git-send-email-gabriele.paoloni@huawei.com>
+ <20170530132408.GA2556@red-moon>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40A7B677@FRAEML521-MBX.china.huawei.com>
+ <20170606085553.GA20085@red-moon> <20170612155700.GA31930@red-moon>
+ <20170613084831.GP3187@lahna.fi.intel.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40AAE3DA@FRAEML521-MBX.china.huawei.com>
+Message-ID: <20170613151013.GT3187@lahna.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the usb phy device mode is set to "drd", the USB port will
-switch between device and host modes depending on what's plugged
-into the port. Customers have asked for the ability to force
-host or device mode from software. This commit adds sysfs
-entries to the phy device that allow this. The sysfs for the phy
-device can be found at:
-/sys/bus/platform/drivers/brcmstb-usb-phy/*.usb-phy
+On Tue, Jun 13, 2017 at 02:38:26PM +0000, Gabriele Paoloni wrote:
+> > Is there an example ASL showing how these LPC devices are
+> > currently presented in ACPI?
+> 
+> Please find below the asl sketch for our LPC and IPMI
+> 
+> //
+> // LPC
+> //
+> 
+> Scope(_SB) {
+>   Device (LPC0) {
+>     Name (_HID, "HISI0191")  // HiSi LPC
+>     Name (_CRS, ResourceTemplate () {
+>       Memory32Fixed (ReadWrite, 0xa01b0000, 0x1000)
+>     })
+>   }
+> 
+>   Device (LPC0.IPMI) {
+>     Name (_HID, "IPI0001")
+>     Method (_IFT) {
+>       Return (0x03)
+>     }
+>     Name (LORS, ResourceTemplate() {
+>       QWordIO (
+>         ResourceConsumer,
+> 	MinNotFixed,     // _MIF
+> 	MaxNotFixed,     // _MAF
+> 	PosDecode,
+> 	EntireRange,
+> 	0x0,             // _GRA
+> 	0xe4,            // _MIN
+> 	0x3fff,          // _MAX
+> 	0x0,             // _TRA
+> 	0x04,            // _LEN
+> 	, ,
+> 	BTIO
+>       )
+>     })
+>     CreateQWordField (LORS, BTIO._MIN, CMIN)
+>     CreateQWordField (LORS, BTIO._MAX, CMAX)
+>     CreateQWordField (LORS, BTIO._LEN, CLEN)
+> 
+>     Method (_PRS, 0) {
+>       Return (LORS)
+>     }
+> 
+>     Method (_CRS, 0) {
+>       Return (LORS)
+>     }
+>     Method (_SRS, 1) {
+>       CreateQWordField (Arg0, \_SB.LPC0.IPMI.BTIO._MIN, IMIN)
+>       Store (IMIN, CMIN)
+>       CreateQWordField (Arg0, \_SB.LPC0.IPMI.BTIO._MAX, IMAX)
+>       Store (IMAX, CMAX)
+>     }
+>   } 
+> [...]
+> }
 
-The following sysfs entries were added:
-- "dr_mode" (RO) - The current phy "dr_mode" setting.
-  It will be set to one of the following values:
-  - "host" - host mode
-  - "peripheral " - device mode
-  - "drd" - switch between device and host mode based on
-    installed device
-  - "typec-pd" - device/host mode is controller by the USB
-    Type-C PD protocol.
-
-If "dr_mode" is "drd"
-- "drd_select" (RW) -
-  It will be set to one of the following values:
-  - "host" - force host mode
-  - "device" - force device mode
-  - "auto" - allow normal auto selection of host/device based on
-    inserted USB device
-
-Signed-off-by: Al Cooper <alcooperx@gmail.com>
----
- drivers/phy/broadcom/phy-brcm-usb.c | 85 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 85 insertions(+)
-
-diff --git a/drivers/phy/broadcom/phy-brcm-usb.c b/drivers/phy/broadcom/phy-brcm-usb.c
-index cd18616..e30fde8 100644
---- a/drivers/phy/broadcom/phy-brcm-usb.c
-+++ b/drivers/phy/broadcom/phy-brcm-usb.c
-@@ -27,6 +27,8 @@
- 
- #include "phy-brcm-usb-init.h"
- 
-+static DEFINE_MUTEX(sysfs_lock);
-+
- enum brcm_usb_phy_id {
- 	BRCM_USB_PHY_2_0 = 0,
- 	BRCM_USB_PHY_3_0,
-@@ -45,6 +47,12 @@ struct value_to_name_map {
- 	{ USB_CTLR_MODE_TYPEC_PD, "typec-pd" }
- };
- 
-+static struct value_to_name_map brcm_dual_mode_to_name[] = {
-+	{ 0, "host" },
-+	{ 1, "device" },
-+	{ 2, "auto" },
-+};
-+
- struct brcm_usb_phy {
- 	struct phy *phy;
- 	unsigned int id;
-@@ -156,6 +164,73 @@ static int name_to_value(struct value_to_name_map *table, int count,
- 	return -EINVAL;
- }
- 
-+static const char *value_to_name(struct value_to_name_map *table, int count,
-+				int value)
-+{
-+	if (value >= count)
-+		return "unknown";
-+	return table[value].name;
-+}
-+
-+static ssize_t dr_mode_show(struct device *dev,
-+				struct device_attribute *attr,
-+				char *buf)
-+{
-+	struct brcm_usb_phy_data *priv = dev_get_drvdata(dev);
-+
-+	return sprintf(buf, "%s\n",
-+		value_to_name(&brcm_dr_mode_to_name[0],
-+			ARRAY_SIZE(brcm_dr_mode_to_name),
-+			priv->ini.mode));
-+}
-+static DEVICE_ATTR_RO(dr_mode);
-+
-+static ssize_t dual_select_store(struct device *dev,
-+				struct device_attribute *attr,
-+				const char *buf, size_t len)
-+{
-+	struct brcm_usb_phy_data *priv = dev_get_drvdata(dev);
-+	int value;
-+	int res;
-+
-+	mutex_lock(&sysfs_lock);
-+	res = name_to_value(&brcm_dual_mode_to_name[0],
-+			ARRAY_SIZE(brcm_dual_mode_to_name), buf, &value);
-+	if (!res) {
-+		brcm_usb_init_set_dual_select(&priv->ini, value);
-+		res = len;
-+	}
-+	mutex_unlock(&sysfs_lock);
-+	return res;
-+}
-+
-+static ssize_t dual_select_show(struct device *dev,
-+				struct device_attribute *attr,
-+				char *buf)
-+{
-+	struct brcm_usb_phy_data *priv = dev_get_drvdata(dev);
-+	int value;
-+
-+	mutex_lock(&sysfs_lock);
-+	value = brcm_usb_init_get_dual_select(&priv->ini);
-+	mutex_unlock(&sysfs_lock);
-+	return sprintf(buf, "%s\n",
-+		value_to_name(&brcm_dual_mode_to_name[0],
-+			ARRAY_SIZE(brcm_dual_mode_to_name),
-+			value));
-+}
-+static DEVICE_ATTR_RW(dual_select);
-+
-+static struct attribute *brcm_usb_phy_attrs[] = {
-+	&dev_attr_dr_mode.attr,
-+	&dev_attr_dual_select.attr,
-+	NULL
-+};
-+
-+static const struct attribute_group brcm_usb_phy_group = {
-+	.attrs = brcm_usb_phy_attrs,
-+};
-+
- static int brcm_usb_phy_probe(struct platform_device *pdev)
- {
- 	struct resource *res;
-@@ -262,6 +337,16 @@ static int brcm_usb_phy_probe(struct platform_device *pdev)
- 
- 	brcm_usb_init_ipp(&priv->ini);
- 
-+	/*
-+	 * Create sysfs entries for mode.
-+	 * Remove "dual_select" attribute if not in dual mode
-+	 */
-+	if (priv->ini.mode != USB_CTLR_MODE_DRD)
-+		brcm_usb_phy_attrs[1] = NULL;
-+	err = sysfs_create_group(&dev->kobj, &brcm_usb_phy_group);
-+	if (err)
-+		dev_warn(&pdev->dev, "Error creating sysfs attributes\n");
-+
- 	/* start with everything off */
- 	if (priv->has_xhci)
- 		brcm_usb_uninit_xhci(&priv->ini);
--- 
-1.9.0.138.g2de3478
+Thanks. So this looks pretty much like normal Linux MFD device which we
+already have support for adding ACPI bindings to child devices. It
+should also support splitting resources to child devices IIRC.
