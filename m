@@ -1,39 +1,40 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 13 Jun 2017 12:37:22 -0700
-Subject: [GIT PULL 1/4] bcm2835-defconfig-next-2017-06-12
-In-Reply-To: <20170613174356.22426-1-eric@anholt.net>
-References: <20170613174356.22426-1-eric@anholt.net>
-Message-ID: <c9488391-18ae-5d4e-9e7b-b73aec0ed7d5@gmail.com>
+Date: Tue, 13 Jun 2017 12:37:55 -0700
+Subject: [GIT PULL 1/5] Broadcom soc changes for 4.13
+In-Reply-To: <20170612173109.11188-1-f.fainelli@gmail.com>
+References: <20170612173109.11188-1-f.fainelli@gmail.com>
+Message-ID: <6529bf30-2127-b8a9-c064-0f5326ff4017@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/13/2017 10:43 AM, Eric Anholt wrote:
+On 06/12/2017 10:31 AM, Florian Fainelli wrote:
 > The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 > 
 >   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://github.com/anholt/linux tags/bcm2835-defconfig-next-2017-06-12
+>   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.13/soc
 > 
-> for you to fetch changes up to 3e9aaaf1d814586404dc93461ec955dd90dc8934:
+> for you to fetch changes up to 27d9fa06c122b135ad7552fa3138c3b47e5776c5:
 > 
->   ARM: bcm2835_defconfig: Enable serial & ethernet USB gadget support (2017-06-12 14:07:38 -0700)
-> 
-> ----------------------------------------------------------------
-> This pull request enables USB OTG mode in the Pi 0/1 defconfig.
+>   ARM: BCM: Enable thermal support for NSP SoCs (2017-05-19 11:30:25 -0700)
 > 
 > ----------------------------------------------------------------
-> Stefan Wahren (1):
->       ARM: bcm2835_defconfig: Enable serial & ethernet USB gadget support
-
-Merged, thanks Eric!
-
+> This pull request contains Broadcom ARM-based SoCs (non Device Tree) changes:
 > 
->  arch/arm/configs/bcm2835_defconfig | 8 ++++++++
->  1 file changed, 8 insertions(+)
+> - Jon updates the Kconfig entry for Northstar Plus to have THERMAL and THERMAL_OF
+>   selected in order to get the NS/NSP thermal driver dependencies to be satistfied
 > 
+> ----------------------------------------------------------------
+> Jon Mason (1):
+>       ARM: BCM: Enable thermal support for NSP SoCs
 
+Arnd, Olof, Kevin,
 
+Eric sent me his pull requests this morning, so I will be re-submitting
+these shortly along with his changes, sorry for the delay.
+
+Thanks!
 -- 
 Florian
