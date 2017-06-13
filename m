@@ -1,70 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 13 Jun 2017 10:02:01 +0200
-Subject: [linux-sunxi] Re: [PATCH v2 10/11] ARM: sun8i: h3: add display
- engine pipeline for TVE
-In-Reply-To: <87bf6e8c54286fd0630bd876ec0c6c56@aosc.io>
-References: <20170604160149.30230-1-icenowy@aosc.io>
- <20170604160149.30230-11-icenowy@aosc.io>
- <20170607094241.65dcm42aacrn4eev@flea.lan>
- <87bf6e8c54286fd0630bd876ec0c6c56@aosc.io>
-Message-ID: <20170613080201.pezlmcggfnfziiat@flea.lan>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 13 Jun 2017 10:04:33 +0200
+Subject: [nomadik:gemini-dir-685-tve200 31/31]
+ drivers/gpu//drm/panel/panel-ilitek-ili9322.c:230:16:
+ warning: format '%d' expects argument of type 'int', but argument 4 has type
+ 'size_t {aka long unsigned int}'
+In-Reply-To: <201706130958.G1TIEx5u%fengguang.wu@intel.com>
+References: <201706130958.G1TIEx5u%fengguang.wu@intel.com>
+Message-ID: <CAK8P3a14RUw9Z_PARdE7P_h=Gsc9tC8O67rw2B1oLUude4k13A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 11, 2017 at 02:58:47PM +0800, icenowy at aosc.io wrote:
-> ? 2017-06-07 17:42?Maxime Ripard ???
-> > On Mon, Jun 05, 2017 at 12:01:48AM +0800, Icenowy Zheng wrote:
-> > > +	soc {
-> > > +		display_clocks: clock at 1000000 {
-> > > +			compatible = "allwinner,sun8i-a83t-de2-clk";
-> > > +			reg = <0x01000000 0x100000>;
-> > > +			clocks = <&ccu CLK_BUS_DE>,
-> > > +				 <&ccu CLK_DE>;
-> > > +			clock-names = "bus",
-> > > +				      "mod";
-> > > +			resets = <&ccu RST_BUS_DE>;
-> > > +			#clock-cells = <1>;
-> > > +			#reset-cells = <1>;
-> > > +			assigned-clocks = <&ccu CLK_DE>;
-> > > +			assigned-clock-parents = <&ccu CLK_PLL_DE>;
-> > > +			assigned-clock-rates = <432000000>;
-> > > +		};
-> > 
-> > We discussed that already a few times, but there's no reason to do
-> > so. If you need a downstream clock at a particular rate, call
-> > clk_set_rate on it, period.
-> > 
-> > Whether its parent will be coming from PLL_DE or some other more
-> > appriopriate clock is not relevant and doesn't make any difference.
-> 
-> The clock framework is not so smart to deal with these infomations:
-> - CLK_PLL_PERIPH should always be 600MHz
-> - CLK_TVE should always be 216MHz
-> - CLK_DE (in fact CLK_MIXER{0,1}) should be larger than 300MHz (for 4K)
+On Tue, Jun 13, 2017 at 3:48 AM, kbuild test robot
+<fengguang.wu@intel.com> wrote:
+> tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git gemini-dir-685-tve200
+> head:   454df5dcbcb83585bb77898eea3a0afa6288e441
+> commit: 454df5dcbcb83585bb77898eea3a0afa6288e441 [31/31] stab
+> config: sparc64-allyesconfig (attached as .config)
+> compiler: sparc64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+> reproduce:
+>         wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         git checkout 454df5dcbcb83585bb77898eea3a0afa6288e441
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=sparc64
+>
+> All warnings (new ones prefixed by >>):
+>
+>    In file included from include/linux/cdev.h:7:0,
+>                     from include/drm/drmP.h:36,
+>                     from drivers/gpu//drm/panel/panel-ilitek-ili9322.c:20:
+>    drivers/gpu//drm/panel/panel-ilitek-ili9322.c: In function 'ili9322_regmap_spi_read':
+>>> drivers/gpu//drm/panel/panel-ilitek-ili9322.c:230:16: warning: format '%d' expects argument of type 'int', but argument 4 has type 'size_t {aka long unsigned int}' [-Wformat=]
+>      dev_info(dev, "READ: %02x reg size = %d, val size = %d\n",
+>    227
+>    228          /* Set bit 7 to 1 to read */
+>    229          memcpy(buf, reg, 1);
+>  > 230          dev_info(dev, "READ: %02x reg size = %d, val size = %d\n",
+>    231                   buf[0], reg_size, val_size);
+>    232          buf[0] |= 0x80;
 
-None of what you're doing guarantees what you state above, so I'm not
-really sure what your point is.
+You want "%zd" instead.
 
-> So we have to specify CLK_DE to be 432MHz, and then it will set
-> CLK_PLL_DE to this value, then the CLK_TVE can be set to 216MHz with
-> divider 2.
-
-Yes, but it works by accident. Any clock change somewhere in the same
-clock-tree might break whatever you have set in the DT.
-
-Hence why you want to do it within the clock framework and your
-driver, not here.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170613/095e1b7d/attachment.sig>
+      Arnd
