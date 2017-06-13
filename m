@@ -1,119 +1,121 @@
-From: Stefan.Schoefegger@ginzinger.com (=?iso-8859-1?Q?Sch=F6fegger_Stefan?=)
-Date: Tue, 13 Jun 2017 05:55:09 +0000
-Subject: [PATCH v2 1/1] PCI: imx6: Add pcie compliance test option
-In-Reply-To: <AM5PR0402MB285053130F4B1FCBF67C31998CC20@AM5PR0402MB2850.eurprd04.prod.outlook.com>
-References: <1472121518-9340-1-git-send-email-stefan.schoefegger@ginzinger.com>
- <20170612234924.GE4379@bhelgaas-glaptop.roam.corp.google.com>
- <AM5PR0402MB285053130F4B1FCBF67C31998CC20@AM5PR0402MB2850.eurprd04.prod.outlook.com>
-Message-ID: <1782110.RW4F1b4ZIY@en-pc05>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Tue, 13 Jun 2017 15:40:46 +0930
+Subject: [PATCH 2/2] drivers/clocksource/fttmr010: Implement delay timer
+In-Reply-To: <20170611212617.6906-2-linus.walleij@linaro.org>
+References: <20170611212617.6906-1-linus.walleij@linaro.org>
+ <20170611212617.6906-2-linus.walleij@linaro.org>
+Message-ID: <1497334246.11158.4.camel@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, June 13, 2017 2:00:16 AM CEST Richard Zhu wrote:
-> > -----Original Message-----
-> > From: Bjorn Helgaas [mailto:helgaas at kernel.org]
-> > Sent: Tuesday, June 13, 2017 7:49 AM
-> > To: Stefan Schoefegger <stefan.schoefegger@ginzinger.com>
-> > Cc: linux-pci at vger.kernel.org; Richard Zhu <hongxing.zhu@nxp.com>; Arnd
-> > Bergmann <arnd@arndb.de>; open list <linux-kernel@vger.kernel.org>;
-> > Kishon Vijay Abraham I <kishon@ti.com>; Jingoo Han
-> > <jingoohan1@gmail.com>; Bjorn Helgaas <bhelgaas@google.com>;
-> > moderated list:PCI DRIVER FOR IMX6 <linux-arm-kernel@lists.infradead.org>;
-> > Lucas Stach <l.stach@pengutronix.de>
-> > Subject: Re: [PATCH v2 1/1] PCI: imx6: Add pcie compliance test option
-> > 
-> > On Wed, Jun 07, 2017 at 01:36:11PM +0200, Stefan Schoefegger wrote:
-> > > Link speed must not be limited to gen1 during link test for compliance
-> > > tests
-> > > 
-> > > Signed-off-by: Stefan Schoefegger <stefan.schoefegger@ginzinger.com>
-> > > ---
-> > > 
-> > > Changes since v1:
-> > >  - pci-imx6.c moved to dwc directory
-> > >  
-> > >  drivers/pci/dwc/Kconfig    | 10 ++++++++++
-> > >  drivers/pci/dwc/pci-imx6.c | 21 ++++++++++++---------
-> > >  2 files changed, 22 insertions(+), 9 deletions(-)
-> > > 
-> > > diff --git a/drivers/pci/dwc/Kconfig b/drivers/pci/dwc/Kconfig index
-> > > b7e15526d676..b6e9ced5a45d 100644
-> > > --- a/drivers/pci/dwc/Kconfig
-> > > +++ b/drivers/pci/dwc/Kconfig
-> > > @@ -77,6 +77,16 @@ config PCI_IMX6
-> > > 
-> > >  	select PCIEPORTBUS
-> > >  	select PCIE_DW_HOST
-> > > 
-> > > +config PCI_IMX6_COMPLIANCE_TEST
-> > > +	bool "Enable pcie compliance tests on imx6"
-> > > +	depends on PCI_IMX6
-> > > +	default n
-> > > +	help
-> > > +	  Enables support for pcie compliance test on FSL iMX SoCs.
-> > > +	  The link speed wouldn't be limited to gen1 when enabled.
-> > > +	  Enable only during compliance tests, otherwise
-> > > +	  link detection will fail on some peripherals.
-> > 
-> > I'm puzzled about why we would want to merge this patch.  It looks like
-> > we're trying to game the system to make the device pass compliance testing
-> > when it isn't really compliant.  Is this config option useful to users, or
-> > is it only useful during internal development of iMX SoCs?
+On Sun, 2017-06-11 at 23:26 +0200, Linus Walleij wrote:
+> This timer is often used on the ARM architecture, so as with so
+> many siblings, we can implement delay timers, removing the need
+> for the system to calibrate jiffys at boot, and potentially
+> handling CPU frequency scaling on targets.
 > 
-> [Zhu hongxing] Agree with Bjorn. These modifications shouldn't be merged.
-> They are used for the boards used to pass the PCIe RC certification, when
-> one Standalone external OSC is used as PCIe reference clock source in the
-> boards design.
-Yes, passing gen2 compliance test is only possible with external clk. But this 
-is a errata of imx6 pci phy of PCIe clk jitter. Why should we not be able to 
-do gen2 tests? I think it is useful to do other gen2 tests (signal integrity) 
-during board design.
-> > >  config PCIE_SPEAR13XX
-> > >  
-> > >  	bool "STMicroelectronics SPEAr PCIe controller"
-> > >  	depends on PCI
-> > > 
-> > > diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
-> > > index 19a289b8cc94..b0fbe52e25b0 100644
-> > > --- a/drivers/pci/dwc/pci-imx6.c
-> > > +++ b/drivers/pci/dwc/pci-imx6.c
-> > > @@ -533,15 +533,18 @@ static int imx6_pcie_establish_link(struct
-> > 
-> > imx6_pcie *imx6_pcie)
-> > 
-> > >  	u32 tmp;
-> > >  	int ret;
-> > > 
-> > > -	/*
-> > > -	 * Force Gen1 operation when starting the link.  In case the link is
-> > > -	 * started in Gen2 mode, there is a possibility the devices on the
-> > > -	 * bus will not be detected at all.  This happens with PCIe switches.
-> > > -	 */
-> > > -	tmp = dw_pcie_readl_dbi(pci, PCIE_RC_LCR);
-> > > -	tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
-> > > -	tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1;
-> > > -	dw_pcie_writel_dbi(pci, PCIE_RC_LCR, tmp);
-> > > +	if (!IS_ENABLED(CONFIG_PCI_IMX6_COMPLIANCE_TEST)) {
-> > > +		/*
-> > > +		 * Force Gen1 operation when starting the link.  In case the
-> > > +		 * link is started in Gen2 mode, there is a possibility the
-> > > +		 * devices on the bus will not be detected at all.  This
-> > > +		 * happens with PCIe switches.
-> > > +		 */
-> > > +		tmp = dw_pcie_readl_dbi(pci, PCIE_RC_LCR);
-> > > +		tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
-> > > +		tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1;
-> > > +		dw_pcie_writel_dbi(pci, PCIE_RC_LCR, tmp);
-> > > +	}
-> > > 
-> > >  	/* Start LTSSM. */
-> > >  	if (imx6_pcie->variant == IMX7D)
-> > > 
-> > > --
-> > > 2.11.0
-> > > 
-> > > 
-> > > _______________________________________________
-> > > linux-arm-kernel mailing list
-> > > linux-arm-kernel at lists.infradead.org
-> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> We cannot just protect the Kconfig with a "depends on ARM" because
+> it is already known that different architectures are using Faraday
+> IP blocks, so it is better to make things open-ended and use
+
+Seems like we're missing the end of the sentence?
+
+> 
+> Result on boot dmesg:
+> 
+> Switching to timer-based delay loop, resolution 40n
+> Calibrating delay loop (skipped), value calculated using
+> ? timer frequency.. 50.00 BogoMIPS (lpj=250000)
+> 
+> This is accurately the timer frequency, 250MHz on the APB
+> bus.
+> 
+> > Cc: Andrew Jeffery <andrew@aj.id.au>
+> > Cc: Joel Stanley <joel@jms.id.au>
+> > Cc: Jonas Jensen <jonas.jensen@gmail.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+
+Tried both patches on an AST2500, everything worked as suggested.
+
+Tested-by: Andrew Jeffery <andrew@aj.id.au>
+
+> ---
+> ?drivers/clocksource/timer-fttmr010.c | 35 ++++++++++++++++++++++++++++++++++-
+> ?1 file changed, 34 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clocksource/timer-fttmr010.c b/drivers/clocksource/timer-fttmr010.c
+> index 5e82469995cb..0074d89cd2ce 100644
+> --- a/drivers/clocksource/timer-fttmr010.c
+> +++ b/drivers/clocksource/timer-fttmr010.c
+> @@ -17,6 +17,7 @@
+> ?#include <linux/clk.h>
+> ?#include <linux/slab.h>
+> ?#include <linux/bitops.h>
+> +#include <linux/delay.h>
+> ?
+> ?/*
+> ? * Register definitions for the timers
+> @@ -81,9 +82,15 @@ struct fttmr010 {
+> > ?	bool count_down;
+> > ?	u32 t1_enable_val;
+> > ?	struct clock_event_device clkevt;
+> +#ifdef CONFIG_ARM
+> > +	struct delay_timer delay_timer;
+> +#endif
+> ?};
+> ?
+> -/* A local singleton used by sched_clock, which is stateless */
+> +/*
+> + * A local singleton used by sched_clock and delay timer reads, which are
+> + * fast and stateless
+> + */
+> ?static struct fttmr010 *local_fttmr;
+> ?
+> ?static inline struct fttmr010 *to_fttmr010(struct clock_event_device *evt)
+> @@ -101,6 +108,20 @@ static u64 notrace fttmr010_read_sched_clock_down(void)
+> > ?	return ~readl(local_fttmr->base + TIMER2_COUNT);
+> ?}
+> ?
+> +#ifdef CONFIG_ARM
+> +
+> +static unsigned long fttmr010_read_current_timer_up(void)
+> +{
+> > +	return readl(local_fttmr->base + TIMER2_COUNT);
+> +}
+> +
+> +static unsigned long fttmr010_read_current_timer_down(void)
+> +{
+> > +	return ~readl(local_fttmr->base + TIMER2_COUNT);
+> +}
+> +
+> +#endif
+> +
+> ?static int fttmr010_timer_set_next_event(unsigned long cycles,
+> > ?				???????struct clock_event_device *evt)
+> ?{
+> @@ -349,6 +370,18 @@ static int __init fttmr010_timer_init(struct device_node *np)
+> > ?					fttmr010->tick_rate,
+> > ?					1, 0xffffffff);
+> ?
+> +#ifdef CONFIG_ARM
+> > +	/* Also use this timer for delays */
+> > +	if (fttmr010->count_down)
+> > +		fttmr010->delay_timer.read_current_timer =
+> > +			fttmr010_read_current_timer_down;
+> > +	else
+> > +		fttmr010->delay_timer.read_current_timer =
+> > +			fttmr010_read_current_timer_up;
+> > +	fttmr010->delay_timer.freq = fttmr010->tick_rate;
+> > +	register_current_timer_delay(&fttmr010->delay_timer);
+> +#endif
+> +
+> > ?	return 0;
+> ?
+> ?out_unmap:
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170613/6d7644bf/attachment.sig>
