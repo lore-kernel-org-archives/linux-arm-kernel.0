@@ -1,56 +1,29 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 13 Jun 2017 14:54:00 +0200
-Subject: [PATCH] ARM: at91: remove atmel_nand_data
-Message-ID: <20170613125400.12774-1-alexandre.belloni@free-electrons.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Tue, 13 Jun 2017 14:56:21 +0200
+Subject: [PATCH 1/4] arm64: dts: marvell: armada-3720-db: Sort the dts
+ node alphabetically
+In-Reply-To: <20170608165125.27630-2-gregory.clement@free-electrons.com>
+References: <20170608165125.27630-1-gregory.clement@free-electrons.com>
+ <20170608165125.27630-2-gregory.clement@free-electrons.com>
+Message-ID: <c255562e-e691-bdfb-afdc-51a86652f717@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since AVR32 is gone and the driver rework, struct atmel_nand_data is not
-used anywhere.
+Am 08.06.2017 um 18:51 schrieb Gregory CLEMENT:
+> Sort the reference nodes in alphabetical order to ease the merge of
+> future nodes.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm64/boot/dts/marvell/armada-3720-db.dts | 83 +++++++++++++-------------
+>  1 file changed, 41 insertions(+), 42 deletions(-)
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- include/linux/platform_data/atmel.h | 21 ---------------------
- 1 file changed, 21 deletions(-)
+Reviewed-by: Andreas F?rber <afaerber@suse.de>
 
-diff --git a/include/linux/platform_data/atmel.h b/include/linux/platform_data/atmel.h
-index 7b6dce7d6d33..70c5c766628e 100644
---- a/include/linux/platform_data/atmel.h
-+++ b/include/linux/platform_data/atmel.h
-@@ -7,8 +7,6 @@
- #ifndef __ATMEL_H__
- #define __ATMEL_H__
- 
--#include <linux/mtd/nand.h>
--#include <linux/mtd/partitions.h>
- #include <linux/serial.h>
- 
-  /* Compact Flash */
-@@ -23,25 +21,6 @@ struct at91_cf_data {
- #define AT91_IDE_SWAP_A0_A2	0x02
- };
- 
-- /* NAND / SmartMedia */
--struct atmel_nand_data {
--	int		enable_pin;		/* chip enable */
--	int		det_pin;		/* card detect */
--	int		rdy_pin;		/* ready/busy */
--	u8		rdy_pin_active_low;	/* rdy_pin value is inverted */
--	u8		ale;			/* address line number connected to ALE */
--	u8		cle;			/* address line number connected to CLE */
--	u8		bus_width_16;		/* buswidth is 16 bit */
--	u8		ecc_mode;		/* ecc mode */
--	u8		on_flash_bbt;		/* bbt on flash */
--	struct mtd_partition *parts;
--	unsigned int	num_parts;
--	bool		has_dma;		/* support dma transfer */
--
--	/* default is false, only for at32ap7000 chip is true */
--	bool		need_reset_workaround;
--};
--
-  /* Serial */
- struct atmel_uart_data {
- 	int			num;		/* port num */
+Regards,
+Andreas
+
 -- 
-2.11.0
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
