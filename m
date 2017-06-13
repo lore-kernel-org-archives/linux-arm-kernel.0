@@ -1,68 +1,69 @@
 From: al.cooper@broadcom.com (Al Cooper)
-Date: Tue, 13 Jun 2017 10:55:18 -0400
-Subject: [PATCH v2 1/4] soc: brcmstb: Add Product ID and Family ID helper
- functions
+Date: Tue, 13 Jun 2017 10:55:19 -0400
+Subject: [PATCH v2 2/4] dt-bindings: Add Broadcom STB USB PHY binding document
 In-Reply-To: <1497365721-31188-1-git-send-email-al.cooper@broadcom.com>
 References: <1497365721-31188-1-git-send-email-al.cooper@broadcom.com>
-Message-ID: <1497365721-31188-2-git-send-email-al.cooper@broadcom.com>
+Message-ID: <1497365721-31188-3-git-send-email-al.cooper@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Al Cooper <alcooperx@gmail.com>
 
+Add DT bindings document for Broadcom STB USB PHYs
+
 Signed-off-by: Al Cooper <alcooperx@gmail.com>
 ---
- drivers/soc/bcm/brcmstb/common.c    | 12 ++++++++++++
- include/linux/soc/brcmstb/brcmstb.h | 10 ++++++++++
- 2 files changed, 22 insertions(+)
+ .../bindings/phy/brcm,brcmstb-usb-phy.txt          | 42 ++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/brcm,brcmstb-usb-phy.txt
 
-diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
-index b6195fd..184dbf5 100644
---- a/drivers/soc/bcm/brcmstb/common.c
-+++ b/drivers/soc/bcm/brcmstb/common.c
-@@ -40,6 +40,18 @@ bool soc_is_brcmstb(void)
- 	return of_match_node(brcmstb_machine_match, root) != NULL;
- }
- 
-+u32 brcmstb_get_family_id(void)
-+{
-+	return family_id;
-+}
-+EXPORT_SYMBOL(brcmstb_get_family_id);
+diff --git a/Documentation/devicetree/bindings/phy/brcm,brcmstb-usb-phy.txt b/Documentation/devicetree/bindings/phy/brcm,brcmstb-usb-phy.txt
+new file mode 100644
+index 0000000..bde0f5f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/brcm,brcmstb-usb-phy.txt
+@@ -0,0 +1,42 @@
++Broadcom STB USB PHY
 +
-+u32 brcmstb_get_product_id(void)
-+{
-+	return product_id;
-+}
-+EXPORT_SYMBOL(brcmstb_get_product_id);
++Required properties:
++ - compatible: brcm,brcmstb-usb-phy
++ - reg: two offset and length pairs.
++	The first pair specifies a manditory set of memory mapped
++	registers used for general control of the PHY.
++	The second pair specifies optional registers used by some of
++	the SoCs that support USB 3.x
++ - #phy-cells: Shall be 1 as it expects one argument for setting
++	       the type of the PHY. Possible values are:
++	       - PHY_TYPE_USB2 for USB1.1/2.0 PHY
++	       - PHY_TYPE_USB3 for USB3.x PHY
 +
- static const struct of_device_id sun_top_ctrl_match[] = {
- 	{ .compatible = "brcm,bcm7125-sun-top-ctrl", },
- 	{ .compatible = "brcm,bcm7346-sun-top-ctrl", },
-diff --git a/include/linux/soc/brcmstb/brcmstb.h b/include/linux/soc/brcmstb/brcmstb.h
-index 337ce41..23e4dc9 100644
---- a/include/linux/soc/brcmstb/brcmstb.h
-+++ b/include/linux/soc/brcmstb/brcmstb.h
-@@ -1,10 +1,20 @@
- #ifndef __BRCMSTB_SOC_H
- #define __BRCMSTB_SOC_H
- 
-+#define BRCM_ID(reg)	((u32)reg >> 28 ? (u32)reg >> 16 : (u32)reg >> 8)
-+#define BRCM_REV(reg)	((u32)reg & 0xff)
++Optional Properties:
++- clocks : clock phandles.
++- clock-names: String, clock name.
++- brcm,ipp: Boolean, Invert Port Power.
++  Possible values are: 0 (Don't invert), 1 (Invert)
++- brcm,ioc: Boolean, Invert Over Current detection.
++  Possible values are: 0 (Don't invert), 1 (Invert)
++- brcm,has-xhci: Boolean indicating an optional 3.x only XHCI controller.
++- brcm,has-xhci-only: Boolean indicating an XHCI controller that supports
++  1.1, 2.0 and 3.0 devices
++- dr_mode: String, PHY Device mode.
++  Possible values are: "host", "peripheral ", "drd" or "typec-pd"
++  If this property is not defined, the phy will default to "host" mode.
 +
- /*
-  * Bus Interface Unit control register setup, must happen early during boot,
-  * before SMP is brought up, called by machine entry point.
-  */
- void brcmstb_biuctrl_init(void);
- 
-+/*
-+ * Helper functions for getting family or product id from the
-+ * SoC driver.
-+ */
-+u32 brcmstb_get_family_id(void);
-+u32 brcmstb_get_product_id(void);
++Example:
 +
- #endif /* __BRCMSTB_SOC_H */
++usbphy_0: usb-phy at f0470200 {
++	reg = <0xf0470200 0xb8>,
++		<0xf0471940 0x6c0>;
++	compatible = "brcm,brcmstb-usb-phy";
++	#phy-cells = <1>;
++	dr_mode = "host"
++	brcm,ioc = <1>;
++	brcm,ipp = <1>;
++	brcm,has-xhci;
++	clocks = <&usb20>, <&usb30>;
++	clock-names = "sw_usb", "sw_usb3";
++};
 -- 
 1.9.0.138.g2de3478
