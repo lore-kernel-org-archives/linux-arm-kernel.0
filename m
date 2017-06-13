@@ -1,32 +1,45 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Tue, 13 Jun 2017 17:18:26 +0800
-Subject: [PATCH V3 0/3] clk: introduce clk_bulk_get accessories
-In-Reply-To: <20170602224034.GX20170@codeaurora.org>
-References: <1495201746-31841-1-git-send-email-aisheng.dong@nxp.com>
- <20170602224034.GX20170@codeaurora.org>
-Message-ID: <CAA+hA=ROWfUD3LCxj=POs4QPeqKF0MjKQMeC2WMbVbGiRwL9vQ@mail.gmail.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Tue, 13 Jun 2017 18:25:50 +0900
+Subject: [PATCH] drm/exynos/dsi: Remove error handling for bridge_node
+ DT parsing
+In-Reply-To: <1497000180-30669-1-git-send-email-hoegeun.kwon@samsung.com>
+References: <CGME20170609092307epcas5p3a7851f80bd799626782941a640824521@epcas5p3.samsung.com>
+ <1497000180-30669-1-git-send-email-hoegeun.kwon@samsung.com>
+Message-ID: <593FAF9E.1040406@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
 
-On Sat, Jun 3, 2017 at 6:40 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 05/19, Dong Aisheng wrote:
->> These helper function allows drivers to get several clk consumers in
->> one operation.  If any of the clk cannot be acquired then any clks
->> that were got will be put before returning to the caller.
->>
->
-> I've merged the first two into a stable branch and merged to
-> clk-next. The third one can go via cpufreq.
->
 
-Thanks.
-I will resend the third once the first two hit mainline.
+2017? 06? 09? 18:23? Hoegeun Kwon ?(?) ? ?:
+> The bridge_node is unnecessary between FIMD and DSIM. If don't remove
+> error handling, it will not work between FIMD and DSIM. So remove
+> error handling.
 
-Regards
-Dong Aisheng
+Please make sure to describe why bridge_node is unnecessary.
+For example,
+In case of Exynos SoC, a bridge device such as mDNIe and MIC could be placed between Display Controller and MIPI DSI device but the bridge device is required optionally.
 
-> --
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+Thanks,
+Inki Dae
+
+> 
+> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
+> ---
+>  drivers/gpu/drm/exynos/exynos_drm_dsi.c | 2 --
+>  1 file changed, 2 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> index a11b795..6ee0dac 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> @@ -1651,8 +1651,6 @@ static int exynos_dsi_parse_dt(struct exynos_dsi *dsi)
+>  		return ret;
+>  
+>  	dsi->bridge_node = of_graph_get_remote_node(node, DSI_PORT_IN, 0);
+> -	if (!dsi->bridge_node)
+> -		return -EINVAL;
+>  
+>  	return 0;
+>  }
+> 
