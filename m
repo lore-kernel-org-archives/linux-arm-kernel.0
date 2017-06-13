@@ -1,69 +1,56 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 13 Jun 2017 14:52:38 +0200
-Subject: [PATCH v4 2/2] arm: dts: Add Mediatek MT2701 i2c device node
-In-Reply-To: <1497349452.930.36.camel@mhfsdcap03>
-References: <1495784107-6711-1-git-send-email-jun.gao@mediatek.com>
- <1495784107-6711-3-git-send-email-jun.gao@mediatek.com>
- <1497268468.930.26.camel@mhfsdcap03>
- <dbfcfd5b-8812-8df2-40dc-42e889577c9a@gmail.com>
- <1497349452.930.36.camel@mhfsdcap03>
-Message-ID: <ba658a59-7ef9-2340-57fa-3bcefa3f47ed@gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 13 Jun 2017 14:54:00 +0200
+Subject: [PATCH] ARM: at91: remove atmel_nand_data
+Message-ID: <20170613125400.12774-1-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Since AVR32 is gone and the driver rework, struct atmel_nand_data is not
+used anywhere.
 
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ include/linux/platform_data/atmel.h | 21 ---------------------
+ 1 file changed, 21 deletions(-)
 
-On 13/06/17 12:24, Jun Gao wrote:
-> On Tue, 2017-06-13 at 11:36 +0200, Matthias Brugger wrote:
->>
->> On 12/06/17 13:54, Jun Gao wrote:
->>> On Fri, 2017-05-26 at 15:35 +0800, Jun Gao wrote:
->>>> From: Jun Gao <jun.gao@mediatek.com>
->>>>
->>>> Add MT2701 i2c device node.
->>>>
->>>> Signed-off-by: Jun Gao <jun.gao@mediatek.com>
->>>> ---
->>>>    arch/arm/boot/dts/mt2701-evb.dts | 42 ++++++++++++++++++++++++++++++++++++++++
->>>>    arch/arm/boot/dts/mt2701.dtsi    | 42 ++++++++++++++++++++++++++++++++++++++++
->>>>    2 files changed, 84 insertions(+)
->> [...]
->>>
->>> Dear Matthias,
->>>
->>> Could you take this patch together with
->>> [PATCH v4 1/2]dt-bindings: i2c: Add Mediatek MT2701 i2c binding ?
->>>
->>> Thanks!
->>>
->>
->> They are both included in the pull request I send [1] [2], or do I miss
->> something?
->>
->> Regards,
->> Matthias
->>
->> [1]
->> https://github.com/mbgg/linux-mediatek/commit/729b7f8dbdaff270c53052897ea06486221a49a2
->> [2]
->> https://github.com/mbgg/linux-mediatek/commit/c6c301d3ff7531894257acc4f4a73928a109bda1
-> 
-> Dear Matthias,
-> 
-> Would you mind to use the same style as follows in i2c-mtk.txt of [2]?
-> 
-> "mediatek,mt2701-i2c", "mediatek,mt6577-i2c": for Mediatek MT2701
-> "mediatek,mt6577-i2c": for Mediatek MT6577
-> "mediatek,mt6589-i2c": for Mediatek MT6589
-> "mediatek,mt7623-i2c", "mediatek,mt6577-i2c": for Mediatek MT7623
-> "mediatek,mt8173-i2c": for Mediatek MT8173
-> 
-> 
-> Thanks!
-> 
-
-You mean I should fix-up the patch to fit to the new binding 
-description? Or do you mean it should be MTxxxx instead of mtxxxx?
-
-Regards,
-Matthias
+diff --git a/include/linux/platform_data/atmel.h b/include/linux/platform_data/atmel.h
+index 7b6dce7d6d33..70c5c766628e 100644
+--- a/include/linux/platform_data/atmel.h
++++ b/include/linux/platform_data/atmel.h
+@@ -7,8 +7,6 @@
+ #ifndef __ATMEL_H__
+ #define __ATMEL_H__
+ 
+-#include <linux/mtd/nand.h>
+-#include <linux/mtd/partitions.h>
+ #include <linux/serial.h>
+ 
+  /* Compact Flash */
+@@ -23,25 +21,6 @@ struct at91_cf_data {
+ #define AT91_IDE_SWAP_A0_A2	0x02
+ };
+ 
+- /* NAND / SmartMedia */
+-struct atmel_nand_data {
+-	int		enable_pin;		/* chip enable */
+-	int		det_pin;		/* card detect */
+-	int		rdy_pin;		/* ready/busy */
+-	u8		rdy_pin_active_low;	/* rdy_pin value is inverted */
+-	u8		ale;			/* address line number connected to ALE */
+-	u8		cle;			/* address line number connected to CLE */
+-	u8		bus_width_16;		/* buswidth is 16 bit */
+-	u8		ecc_mode;		/* ecc mode */
+-	u8		on_flash_bbt;		/* bbt on flash */
+-	struct mtd_partition *parts;
+-	unsigned int	num_parts;
+-	bool		has_dma;		/* support dma transfer */
+-
+-	/* default is false, only for at32ap7000 chip is true */
+-	bool		need_reset_workaround;
+-};
+-
+  /* Serial */
+ struct atmel_uart_data {
+ 	int			num;		/* port num */
+-- 
+2.11.0
