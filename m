@@ -1,39 +1,85 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Tue, 13 Jun 2017 15:16:01 -0500
-Subject: [PATCH] dt-bindings: Drop k2g genpd device ID macros
-In-Reply-To: <20170531162850.mf6giowmxj5vetxq@rob-hp-laptop>
-References: <20170522183737.24946-1-d-gerlach@ti.com>
- <20170531162850.mf6giowmxj5vetxq@rob-hp-laptop>
-Message-ID: <ca91000a-627b-a655-4304-b64b78bbcf9a@ti.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 13 Jun 2017 22:24:38 +0200
+Subject: [PATCH v2 1/2] tty/serial: atmel: remove atmel_default_console_device
+ handling
+Message-ID: <20170613202439.26369-1-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh,
-On 05/31/2017 11:28 AM, Rob Herring wrote:
-> On Mon, May 22, 2017 at 01:37:37PM -0500, Dave Gerlach wrote:
->> Commit 7cc119f29b19 ("dt-bindings: Add TI SCI PM Domains") introduced a
->> number of K2G_DEV_x macros to represent each device ID available on the
->> K2G platform for use by the genpd, clock, and reset drivers. Rather than
->> use these macros, which are only used in the device tree for property
->> values and not actually used by the drivers, let's just use the device
->> ID number directly in the device tree to avoid macro bloat.
->>
->> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->> ---
->> Based on discussion here [1] it was agreed that these macros are not needed
->> and it is better to just use the device IDs directly in dt.
->>
->> [1] https://www.spinics.net/lists/arm-kernel/msg577079.html
->>
->>  .../devicetree/bindings/soc/ti/sci-pm-domain.txt   |  5 +-
->>  include/dt-bindings/genpd/k2g.h                    | 90 ----------------------
->>  2 files changed, 3 insertions(+), 92 deletions(-)
->>  delete mode 100644 include/dt-bindings/genpd/k2g.h
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
-> 
+atmel_default_console_device was only used by AVR32, in particular
+arch/avr32/mach-at32ap/at32ap700x.c which is now gone. Remove it from the
+driver.
 
-Gentle ping on this. If you're OK with the patch any chance you can pick it up?
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
 
-Regards,
-Dave
+Changes in v2:
+ - added an empty line as suggested by Andy
+ - properly based the patch on v4.12-rc1
+
+ drivers/tty/serial/atmel_serial.c | 43 ---------------------------------------
+ 1 file changed, 43 deletions(-)
+
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index c355ac9abafc..906e2b91bf57 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -2460,8 +2460,6 @@ static int atmel_init_port(struct atmel_uart_port *atmel_port,
+ 	return 0;
+ }
+ 
+-struct platform_device *atmel_default_console_device;	/* the serial console device */
+-
+ #ifdef CONFIG_SERIAL_ATMEL_CONSOLE
+ static void atmel_console_putchar(struct uart_port *port, int ch)
+ {
+@@ -2594,47 +2592,6 @@ static struct console atmel_console = {
+ 
+ #define ATMEL_CONSOLE_DEVICE	(&atmel_console)
+ 
+-/*
+- * Early console initialization (before VM subsystem initialized).
+- */
+-static int __init atmel_console_init(void)
+-{
+-	int ret;
+-	if (atmel_default_console_device) {
+-		struct atmel_uart_data *pdata =
+-			dev_get_platdata(&atmel_default_console_device->dev);
+-		int id = pdata->num;
+-		struct atmel_uart_port *atmel_port = &atmel_ports[id];
+-
+-		atmel_port->backup_imr = 0;
+-		atmel_port->uart.line = id;
+-
+-		add_preferred_console(ATMEL_DEVICENAME, id, NULL);
+-		ret = atmel_init_port(atmel_port, atmel_default_console_device);
+-		if (ret)
+-			return ret;
+-		register_console(&atmel_console);
+-	}
+-
+-	return 0;
+-}
+-
+-console_initcall(atmel_console_init);
+-
+-/*
+- * Late console initialization.
+- */
+-static int __init atmel_late_console_init(void)
+-{
+-	if (atmel_default_console_device
+-	    && !(atmel_console.flags & CON_ENABLED))
+-		register_console(&atmel_console);
+-
+-	return 0;
+-}
+-
+-core_initcall(atmel_late_console_init);
+-
+ static inline bool atmel_is_console_port(struct uart_port *port)
+ {
+ 	return port->cons && port->cons->index == port->line;
+-- 
+2.11.0
