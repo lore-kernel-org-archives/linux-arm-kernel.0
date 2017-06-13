@@ -1,111 +1,127 @@
-From: jacek.anaszewski@gmail.com (Jacek Anaszewski)
-Date: Tue, 13 Jun 2017 20:44:50 +0200
-Subject: [[PATCH]] Revert "leds: handle suspend/resume in heartbeat
- trigger"
-In-Reply-To: <1497321560-46817-1-git-send-email-bo.zhang@nxp.com>
-References: <1497321560-46817-1-git-send-email-bo.zhang@nxp.com>
-Message-ID: <8be98820-a9cf-23e3-c041-9db698d3b54e@gmail.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Tue, 13 Jun 2017 19:01:38 +0000
+Subject: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO
+ devices before scanning
+In-Reply-To: <20170613151013.GT3187@lahna.fi.intel.com>
+References: <1495712248-5232-1-git-send-email-gabriele.paoloni@huawei.com>
+ <1495712248-5232-6-git-send-email-gabriele.paoloni@huawei.com>
+ <20170530132408.GA2556@red-moon>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40A7B677@FRAEML521-MBX.china.huawei.com>
+ <20170606085553.GA20085@red-moon> <20170612155700.GA31930@red-moon>
+ <20170613084831.GP3187@lahna.fi.intel.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40AAE3DA@FRAEML521-MBX.china.huawei.com>
+ <20170613151013.GT3187@lahna.fi.intel.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E40AAF0BF@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bo,
+Hi Mika
 
-On 06/13/2017 04:39 AM, Zhang Bo wrote:
-> This reverts commit 5ab92a7cb82c66bf30685583a38a18538e3807db.
+> -----Original Message-----
+> From: Mika Westerberg [mailto:mika.westerberg at linux.intel.com]
+> Sent: 13 June 2017 16:10
+> To: Gabriele Paoloni
+> Cc: Lorenzo Pieralisi; rafael at kernel.org; Rafael J. Wysocki;
+> catalin.marinas at arm.com; will.deacon at arm.com; robh+dt at kernel.org;
+> frowand.list at gmail.com; bhelgaas at google.com; arnd at arndb.de; linux-arm-
+> kernel at lists.infradead.org; mark.rutland at arm.com;
+> brian.starkey at arm.com; olof at lixom.net; benh at kernel.crashing.org; linux-
+> kernel at vger.kernel.org; linux-acpi at vger.kernel.org; Linuxarm; linux-
+> pci at vger.kernel.org; minyard at acm.org; John Garry; xuwei (O)
+> Subject: Re: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO
+> devices before scanning
 > 
-> System cannot enter suspend mode because of heartbeat led trigger.
-> In autosleep_wq, try_to_suspend function will try to enter suspend
-> mode in specific period. it will get wakeup_count then call pm_notifier
-> chain callback function and freeze processes.
-> Heartbeat_pm_notifier is called and it call led_trigger_unregister to
-> change the trigger of led device to none. It will send uevent message
-> and the wakeup source count changed. As wakeup_count changed, suspend
-> will abort.
+> On Tue, Jun 13, 2017 at 02:38:26PM +0000, Gabriele Paoloni wrote:
+> > > Is there an example ASL showing how these LPC devices are
+> > > currently presented in ACPI?
+> >
+> > Please find below the asl sketch for our LPC and IPMI
+> >
+> > //
+> > // LPC
+> > //
+> >
+> > Scope(_SB) {
+> >   Device (LPC0) {
+> >     Name (_HID, "HISI0191")  // HiSi LPC
+> >     Name (_CRS, ResourceTemplate () {
+> >       Memory32Fixed (ReadWrite, 0xa01b0000, 0x1000)
+> >     })
+> >   }
+> >
+> >   Device (LPC0.IPMI) {
+> >     Name (_HID, "IPI0001")
+> >     Method (_IFT) {
+> >       Return (0x03)
+> >     }
+> >     Name (LORS, ResourceTemplate() {
+> >       QWordIO (
+> >         ResourceConsumer,
+> > 	MinNotFixed,     // _MIF
+> > 	MaxNotFixed,     // _MAF
+> > 	PosDecode,
+> > 	EntireRange,
+> > 	0x0,             // _GRA
+> > 	0xe4,            // _MIN
+> > 	0x3fff,          // _MAX
+> > 	0x0,             // _TRA
+> > 	0x04,            // _LEN
+> > 	, ,
+> > 	BTIO
+> >       )
+> >     })
+> >     CreateQWordField (LORS, BTIO._MIN, CMIN)
+> >     CreateQWordField (LORS, BTIO._MAX, CMAX)
+> >     CreateQWordField (LORS, BTIO._LEN, CLEN)
+> >
+> >     Method (_PRS, 0) {
+> >       Return (LORS)
+> >     }
+> >
+> >     Method (_CRS, 0) {
+> >       Return (LORS)
+> >     }
+> >     Method (_SRS, 1) {
+> >       CreateQWordField (Arg0, \_SB.LPC0.IPMI.BTIO._MIN, IMIN)
+> >       Store (IMIN, CMIN)
+> >       CreateQWordField (Arg0, \_SB.LPC0.IPMI.BTIO._MAX, IMAX)
+> >       Store (IMAX, CMAX)
+> >     }
+> >   }
+> > [...]
+> > }
 > 
-> Signed-off-by: Zhang Bo <bo.zhang@nxp.com>
-> ---
->  drivers/leds/trigger/ledtrig-heartbeat.c | 31 -------------------------------
->  1 file changed, 31 deletions(-)
-> 
-> diff --git a/drivers/leds/trigger/ledtrig-heartbeat.c b/drivers/leds/trigger/ledtrig-heartbeat.c
-> index afa3b40..e95ea65 100644
-> --- a/drivers/leds/trigger/ledtrig-heartbeat.c
-> +++ b/drivers/leds/trigger/ledtrig-heartbeat.c
-> @@ -20,7 +20,6 @@
->  #include <linux/sched/loadavg.h>
->  #include <linux/leds.h>
->  #include <linux/reboot.h>
-> -#include <linux/suspend.h>
->  #include "../leds.h"
->  
->  static int panic_heartbeats;
-> @@ -163,30 +162,6 @@ static void heartbeat_trig_deactivate(struct led_classdev *led_cdev)
->  	.deactivate = heartbeat_trig_deactivate,
->  };
->  
-> -static int heartbeat_pm_notifier(struct notifier_block *nb,
-> -				 unsigned long pm_event, void *unused)
-> -{
-> -	int rc;
-> -
-> -	switch (pm_event) {
-> -	case PM_SUSPEND_PREPARE:
-> -	case PM_HIBERNATION_PREPARE:
-> -	case PM_RESTORE_PREPARE:
-> -		led_trigger_unregister(&heartbeat_led_trigger);
-> -		break;
-> -	case PM_POST_SUSPEND:
-> -	case PM_POST_HIBERNATION:
-> -	case PM_POST_RESTORE:
-> -		rc = led_trigger_register(&heartbeat_led_trigger);
-> -		if (rc)
-> -			pr_err("could not re-register heartbeat trigger\n");
-> -		break;
-> -	default:
-> -		break;
-> -	}
-> -	return NOTIFY_DONE;
-> -}
-> -
->  static int heartbeat_reboot_notifier(struct notifier_block *nb,
->  				     unsigned long code, void *unused)
->  {
-> @@ -201,10 +176,6 @@ static int heartbeat_panic_notifier(struct notifier_block *nb,
->  	return NOTIFY_DONE;
->  }
->  
-> -static struct notifier_block heartbeat_pm_nb = {
-> -	.notifier_call = heartbeat_pm_notifier,
-> -};
-> -
->  static struct notifier_block heartbeat_reboot_nb = {
->  	.notifier_call = heartbeat_reboot_notifier,
->  };
-> @@ -221,14 +192,12 @@ static int __init heartbeat_trig_init(void)
->  		atomic_notifier_chain_register(&panic_notifier_list,
->  					       &heartbeat_panic_nb);
->  		register_reboot_notifier(&heartbeat_reboot_nb);
-> -		register_pm_notifier(&heartbeat_pm_nb);
->  	}
->  	return rc;
->  }
->  
->  static void __exit heartbeat_trig_exit(void)
->  {
-> -	unregister_pm_notifier(&heartbeat_pm_nb);
->  	unregister_reboot_notifier(&heartbeat_reboot_nb);
->  	atomic_notifier_chain_unregister(&panic_notifier_list,
->  					 &heartbeat_panic_nb);
-> 
+> Thanks. So this looks pretty much like normal Linux MFD device which we
+> already have support for adding ACPI bindings to child devices. It
+> should also support splitting resources to child devices IIRC.
 
-Thanks for the patch.
+I am not very familiar with Linux MFD however the main issue here is that
+1) for IPMI we want to re-use the standard IPMI driver without touching it:
+   see 
 
-Added tag:
+   static const struct acpi_device_id acpi_ipmi_match[] = {
+         { "IPI0001", 0 },
+         { },
+   };
 
- Fixes: 5ab92a7cb82c ("leds: handle suspend/resume in heartbeat trigger")
+   in "drivers/char/ipmi/ipmi_si_intf.c" (and in general any standard driver
+   of an LPC child)
 
-and applied to the fixes-for-4.12-rc6 branch of linux-leds.git.
+2) We need a way to guarantee that all LPC children are not enumerated
+   by acpi_default_enumeration() (so for example if an ipmi node is an LPC#
+   child it should not be enumerated, otherwise it should be)
+   Currently acpi_default_enumeration() skips spi/i2c slaves by checking:
+   1) if the acpi resource type is a serial bus
+   2) if the type of serial bus descriptor is I2C or SPI
 
--- 
-Best regards,
-Jacek Anaszewski
+   For LPC we cannot leverage on any ACPI property to "recognize" that our
+   devices are LPC children; hence before I proposed for acpi_default_enumeration()
+   to skip devices that have already been enumerated (by calling 
+   acpi_device_enumerated() ).
+
+So in the current scenario, how do you think that MFD can help?
+Do you see any possible solution?
+
+Many thanks
+Gab
+  
