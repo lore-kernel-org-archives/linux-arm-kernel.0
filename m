@@ -1,117 +1,118 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Tue, 13 Jun 2017 14:38:26 +0000
-Subject: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO
- devices before scanning
-In-Reply-To: <20170613084831.GP3187@lahna.fi.intel.com>
-References: <1495712248-5232-1-git-send-email-gabriele.paoloni@huawei.com>
- <1495712248-5232-6-git-send-email-gabriele.paoloni@huawei.com>
- <20170530132408.GA2556@red-moon>
- <EE11001F9E5DDD47B7634E2F8A612F2E40A7B677@FRAEML521-MBX.china.huawei.com>
- <20170606085553.GA20085@red-moon> <20170612155700.GA31930@red-moon>
- <20170613084831.GP3187@lahna.fi.intel.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E40AAE3DA@FRAEML521-MBX.china.huawei.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Tue, 13 Jun 2017 16:47:18 +0200
+Subject: [PATCH v6 3/3] PCI: Add tango MSI controller support
+In-Reply-To: <d39b5b3a-48be-7aaa-b7dd-28d4ae1d2083@arm.com>
+References: <741766e5-cff2-db5f-d40b-6866e08fd966@sigmadesigns.com>
+ <e868f9b8-39e3-4501-a8c6-64bd28a4be8b@sigmadesigns.com>
+ <9975fa6c-f426-519b-6b3e-a2d102d36fd5@arm.com>
+ <82d6bf37-96b9-cd9d-134b-f01638fa2b1b@sigmadesigns.com>
+ <d39b5b3a-48be-7aaa-b7dd-28d4ae1d2083@arm.com>
+Message-ID: <49b4138d-0030-1e8c-6a14-0e9151b63d24@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mika
-
-> -----Original Message-----
-> From: Mika Westerberg [mailto:mika.westerberg at linux.intel.com]
-> Sent: 13 June 2017 09:49
-> To: Lorenzo Pieralisi
-> Cc: Gabriele Paoloni; rafael at kernel.org; Rafael J. Wysocki;
-> catalin.marinas at arm.com; will.deacon at arm.com; robh+dt at kernel.org;
-> frowand.list at gmail.com; bhelgaas at google.com; arnd at arndb.de; linux-arm-
-> kernel at lists.infradead.org; mark.rutland at arm.com;
-> brian.starkey at arm.com; olof at lixom.net; benh at kernel.crashing.org; linux-
-> kernel at vger.kernel.org; linux-acpi at vger.kernel.org; Linuxarm; linux-
-> pci at vger.kernel.org; minyard at acm.org; John Garry; xuwei (O)
-> Subject: Re: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO
-> devices before scanning
+On 13/06/2017 16:22, Marc Zyngier wrote:
+> On 13/06/17 15:01, Marc Gonzalez wrote:
+>> The MSI controller in Tango supports 256 message-signaled interrupts,
+>> and a single doorbell address.
+>>
+>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>> ---
+>> Changes from v5 to v6
+>> o Rename 'used' bitmap to 'used_msi'
+>> o Rename 'lock' spinlock to 'used_msi_lock'
+>> o Take lock in interrupt handler
+>> o Remove irq_dom in error path
+>> ---
+>>  drivers/pci/host/pcie-tango.c | 225 ++++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 225 insertions(+)
+>>
+>> diff --git a/drivers/pci/host/pcie-tango.c b/drivers/pci/host/pcie-tango.c
+>> index 67aaadcc1c5e..b06446b23bc8 100644
+>> --- a/drivers/pci/host/pcie-tango.c
+>> +++ b/drivers/pci/host/pcie-tango.c
+>> @@ -1,16 +1,228 @@
+>> +#include <linux/irqchip/chained_irq.h>
+>> +#include <linux/irqdomain.h>
+>>  #include <linux/pci-ecam.h>
+>>  #include <linux/delay.h>
+>> +#include <linux/msi.h>
+>>  #include <linux/of.h>
+>>  
+>>  #define MSI_MAX 256
+>>  
+>>  #define SMP8759_MUX		0x48
+>>  #define SMP8759_TEST_OUT	0x74
+>> +#define SMP8759_STATUS		0x80
+>> +#define SMP8759_ENABLE		0xa0
+>> +#define SMP8759_DOORBELL	0xa002e07c
+>>  
+>>  struct tango_pcie {
+>> +	DECLARE_BITMAP(used_msi, MSI_MAX);
+>> +	spinlock_t used_msi_lock;
+>>  	void __iomem *mux;
+>> +	void __iomem *msi_status;
+>> +	void __iomem *msi_enable;
+>> +	phys_addr_t msi_doorbell;
+>> +	struct irq_domain *irq_dom;
+>> +	struct irq_domain *msi_dom;
+>> +	int irq;
+>>  };
+>>  
+>> +/*** MSI CONTROLLER SUPPORT ***/
+>> +
+>> +static void tango_msi_isr(struct irq_desc *desc)
+>> +{
+>> +	struct irq_chip *chip = irq_desc_get_chip(desc);
+>> +	struct tango_pcie *pcie = irq_desc_get_handler_data(desc);
+>> +	unsigned long flags, status, base, virq, idx, pos = 0;
+>> +
+>> +	chained_irq_enter(chip, desc);
+>> +	spin_lock_irqsave(&pcie->used_msi_lock, flags);
 > 
-> On Mon, Jun 12, 2017 at 04:57:00PM +0100, Lorenzo Pieralisi wrote:
-> > I had a more in-depth look at this series and from my understanding
-> > the problem are the following to manage the LPC bindings in ACPI.
-> >
-> > (1) Child devices of an LPC controller require special handling when
-> >     filling their resources (ie they need to be translated - in DT
-> >     that's guaranteed by the "isa" binding, in ACPI it has to be
-> >     done by new code)
-> > (2) In DT systems, LPC child devices are created by the LPC bus
-> >     controller driver through an of_platform_populate() call with
-> >     the LPC controller node as the fwnode root. For ACPI to work
-> >     the same way there must be a way to prevent LPC children to
-> >     be enumerated in acpi_default_enumeration() something like
-> >     I2C does (and then the LPC driver would enumerate its children as
-> >     DT does)
-> >
-> > I am not sure how (1) and (2) can be managed with current ACPI
-> bindings
-> > and kernel code - I suspect it may be done by mirroring what's done
-> > for I2C but I am not sure, that's why I CC'ed Mika (ie the LPC
-> adapter
-> > is matched as a platform device and it takes care of enumerating its
-> > children - problem though is preventing enumeration from core ACPI
-> code).
+> You're already in interrupt context, so there is no need to disable
+> interrupts any further. spin_lock() should do the trick
+
+Thanks for the hint.
+
+I am confused, because Documentation/locking/spinlocks.txt states:
+
+> If you have a case where you have to protect a data structure across
+> several CPU's and you want to use spinlocks you can potentially use
+> cheaper versions of the spinlocks. IFF you know that the spinlocks are
+> never used in interrupt handlers, you can use the non-irq versions:
 > 
-> Is there an example ASL showing how these LPC devices are
-> currently presented in ACPI?
+> 	spin_lock(&lock);
+> 	...
+> 	spin_unlock(&lock);
+> 
+> (and the equivalent read-write versions too, of course). The spinlock will
+> guarantee the same kind of exclusive access, and it will be much faster.
+> This is useful if you know that the data in question is only ever
+> manipulated from a "process context", ie no interrupts involved.
+> 
+> The reasons you mustn't use these versions if you have interrupts that
+> play with the spinlock is that you can get deadlocks:
+> 
+> 	spin_lock(&lock);
+> 	...
+> 		<- interrupt comes in:
+> 			spin_lock(&lock);
+> 
+> where an interrupt tries to lock an already locked variable. This is ok if
+> the other interrupt happens on another CPU, but it is _not_ ok if the
+> interrupt happens on the same CPU that already holds the lock, because the
+> lock will obviously never be released (because the interrupt is waiting
+> for the lock, and the lock-holder is interrupted by the interrupt and will
+> not continue until the interrupt has been processed).
+> 
+> (This is also the reason why the irq-versions of the spinlocks only need
+> to disable the _local_ interrupts - it's ok to use spinlocks in interrupts
+> on other CPU's, because an interrupt on another CPU doesn't interrupt the
+> CPU that holds the lock, so the lock-holder can continue and eventually
+> releases the lock).
 
-Please find below the asl sketch for our LPC and IPMI
+Isn't this saying that it is not safe to call spin_lock() from
+the interrupt handler? (Sorry if I misunderstood.)
 
-//
-// LPC
-//
-
-Scope(_SB) {
-  Device (LPC0) {
-    Name (_HID, "HISI0191")  // HiSi LPC
-    Name (_CRS, ResourceTemplate () {
-      Memory32Fixed (ReadWrite, 0xa01b0000, 0x1000)
-    })
-  }
-
-  Device (LPC0.IPMI) {
-    Name (_HID, "IPI0001")
-    Method (_IFT) {
-      Return (0x03)
-    }
-    Name (LORS, ResourceTemplate() {
-      QWordIO (
-        ResourceConsumer,
-	MinNotFixed,     // _MIF
-	MaxNotFixed,     // _MAF
-	PosDecode,
-	EntireRange,
-	0x0,             // _GRA
-	0xe4,            // _MIN
-	0x3fff,          // _MAX
-	0x0,             // _TRA
-	0x04,            // _LEN
-	, ,
-	BTIO
-      )
-    })
-    CreateQWordField (LORS, BTIO._MIN, CMIN)
-    CreateQWordField (LORS, BTIO._MAX, CMAX)
-    CreateQWordField (LORS, BTIO._LEN, CLEN)
-
-    Method (_PRS, 0) {
-      Return (LORS)
-    }
-
-    Method (_CRS, 0) {
-      Return (LORS)
-    }
-    Method (_SRS, 1) {
-      CreateQWordField (Arg0, \_SB.LPC0.IPMI.BTIO._MIN, IMIN)
-      Store (IMIN, CMIN)
-      CreateQWordField (Arg0, \_SB.LPC0.IPMI.BTIO._MAX, IMAX)
-      Store (IMAX, CMAX)
-    }
-  } 
-[...]
-}
-
-Many thanks
-Gab
+Regards.
