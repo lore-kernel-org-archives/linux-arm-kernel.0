@@ -1,50 +1,115 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Tue, 13 Jun 2017 11:30:54 +0800
-Subject: [nomadik:gemini-dir-685-clktest 28/29] init/main.c:500: undefined
- reference to `printascii'
-Message-ID: <201706131152.3aDNjz9o%fengguang.wu@intel.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Tue, 13 Jun 2017 03:32:37 +0000
+Subject: [PATCH V3 5/7] tty: serial: lpuart: add imx7ulp support
+In-Reply-To: <AM4PR0401MB22607CE9EE3909A7A0B9451AFFC20@AM4PR0401MB2260.eurprd04.prod.outlook.com>
+References: <1497281848-12995-1-git-send-email-aisheng.dong@nxp.com>
+ <1497281848-12995-6-git-send-email-aisheng.dong@nxp.com>
+ <AM4PR0401MB22607CE9EE3909A7A0B9451AFFC20@AM4PR0401MB2260.eurprd04.prod.outlook.com>
+Message-ID: <AM3PR04MB306E486BD19CD88813A3B4480C20@AM3PR04MB306.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git gemini-dir-685-clktest
-head:   bf2d6e77266d68cf2c5bbee1bd4419f4c90ebaaf
-commit: d750f1a49f2c0a88e4eac22a536532239af4735b [28/29] uglyhack printascii
-config: arm-efm32_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout d750f1a49f2c0a88e4eac22a536532239af4735b
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+> -----Original Message-----
+> From: Andy Duan
+> Sent: Tuesday, June 13, 2017 11:02 AM
+> To: A.s. Dong; linux-serial at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> gregkh at linuxfoundation.org; jslaby at suse.com; stefan at agner.ch; Mingkai Hu;
+> Y.b. Lu; nikita.yoush at cogentembedded.com; andy.shevchenko at gmail.com;
+> dongas86 at gmail.com; A.s. Dong
+> Subject: RE: [PATCH V3 5/7] tty: serial: lpuart: add imx7ulp support
+> 
+> From: Dong Aisheng <aisheng.dong@nxp.com> Sent: Monday, June 12, 2017
+> 11:37 PM
+> >The lpuart of imx7ulp is basically the same as ls1021a. It's also
+> >32 bit width register, but unlike ls1021a, it's little endian.
+> >Besides that, imx7ulp lpuart has a minor different register layout from
+> >ls1021a that it has four extra registers (verid, param, global,
+> >pincfg) located at the beginning of register map, which are currently
+> >not used by the driver and less to be used later.
+> >
+> >To ease the register difference handling, we add a reg_off member in
+> >lpuart_soc_data structure to represent if the normal
+> >lpuart32_{read|write} requires plus a offset to hide the issue.
+> >
+> >Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> >Cc: Jiri Slaby <jslaby@suse.com>
+> >Cc: Stefan Agner <stefan@agner.ch>
+> >Cc: Mingkai Hu <Mingkai.Hu@nxp.com>
+> >Cc: Yangbo Lu <yangbo.lu@nxp.com>
+> >Cc: Fugang Duan <fugang.duan@nxp.com>
+> >Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> >
+> >---
+> >ChangeLog:
+> >v2->v3:
+> > * use standard port->iotype to represent the endians.
+> >v1->v2:
+> > * remove lpuart_reg_off according to Stefan's suggestion
+> >---
+> > drivers/tty/serial/fsl_lpuart.c | 10 ++++++++++
+> > 1 file changed, 10 insertions(+)
+> >
+> >diff --git a/drivers/tty/serial/fsl_lpuart.c
+> >b/drivers/tty/serial/fsl_lpuart.c index
+> >bbf47a0..9d05e53 100644
+> >--- a/drivers/tty/serial/fsl_lpuart.c
+> >+++ b/drivers/tty/serial/fsl_lpuart.c
+> >@@ -231,6 +231,9 @@
+> > #define DEV_NAME	"ttyLP"
+> > #define UART_NR		6
+> >
+> >+/* IMX lpuart has four extra unused regs located at the beginning */
+> >+#define IMX_REG_OFF	0x10
+> >+
+> > struct lpuart_port {
+> > 	struct uart_port	port;
+> > 	struct clk		*clk;
+> >@@ -259,6 +262,7 @@ struct lpuart_port {
+> >
+> > struct lpuart_soc_data {
+> > 	char	iotype;
+> >+	u8	reg_off;
+> > };
+> >
+> > static const struct lpuart_soc_data vf_data = { @@ -267,12 +271,17 @@
+> >static const struct lpuart_soc_data vf_data = {
+> >
+> > static const struct lpuart_soc_data ls_data = {
+> > 	.iotype = UPIO_MEM32BE,
+> >+};
+> >
+> >+static struct lpuart_soc_data imx_data = {
+> >+	.iotype = UPIO_MEM32,
+> >+	.reg_off = IMX_REG_OFF,
+> > };
+> >
+> > static const struct of_device_id lpuart_dt_ids[] = {
+> > 	{ .compatible = "fsl,vf610-lpuart",	.data = &vf_data, },
+> > 	{ .compatible = "fsl,ls1021a-lpuart",	.data = &ls_data, },
+> >+	{ .compatible = "fsl,imx7ulp-lpuart",	.data = &imx_data, },
+> > 	{ /* sentinel */ }
+> > };
+> > MODULE_DEVICE_TABLE(of, lpuart_dt_ids); @@ -2020,6 +2029,7 @@ static
+> >int lpuart_probe(struct platform_device *pdev)
+> > 	if (IS_ERR(sport->port.membase))
+> > 		return PTR_ERR(sport->port.membase);
+> >
+> >+	sport->port.membase += sdata->reg_off;
+> > 	sport->port.mapbase = res->start;
+> 
+> Also update the mapbase.
+> 
 
-All errors (new ones prefixed by >>):
+The idea behind is only do the quirk for io remapped address.
+Mapbase(physical address) is not needed for lpuart32 currently.
 
-   init/built-in.o: In function `start_kernel':
->> init/main.c:500: undefined reference to `printascii'
-   kernel/built-in.o: In function `vprintk_emit':
->> kernel/printk/printk.c:1733: undefined reference to `printascii'
+Probably it could be changed when lpuart32 DMA function is added.
 
-vim +500 init/main.c
+Regards
+Dong Aisheng
 
-   494		smp_setup_processor_id();
-   495		debug_objects_early_init();
-   496	
-   497	#ifdef CONFIG_ARM
-   498		{
-   499		  extern void printascii(char *);
- > 500		  printascii("start_kernel\n");
-   501		}
-   502	#endif
-   503		/*
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 11336 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170613/6b5d7ea8/attachment-0001.gz>
+> > 	sport->port.dev = &pdev->dev;
+> > 	sport->port.type = PORT_LPUART;
+> >--
+> >2.7.4
