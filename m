@@ -1,36 +1,84 @@
 From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
-Date: Tue, 13 Jun 2017 11:28:42 +0200
-Subject: [PATCHv2 0/5] OMAP4: crypto support
-Message-ID: <20170613092847.16732-1-sebastian.reichel@collabora.co.uk>
+Date: Tue, 13 Jun 2017 11:28:45 +0200
+Subject: [PATCHv2 3/5] ARM: OMAP4: hwmod data: add aes1
+In-Reply-To: <20170613092847.16732-1-sebastian.reichel@collabora.co.uk>
+References: <20170613092847.16732-1-sebastian.reichel@collabora.co.uk>
+Message-ID: <20170613092847.16732-4-sebastian.reichel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This fixes the following error during kernel boot:
 
-This adds crypto support for OMAP4, which was missing for some reason.
-This fixes error about missing hwmod on Droid 4. IP-Cores for AES and
-DES are working according to selftest.
+platform 4b501000.aes: Cannot lookup hwmod 'aes1'
 
-Changes since PATCHv1:
- * remove patch adding des_fck to DT
- * add patch removing aes[12]_fck from DT
- * add patch renaming hwmod aes to aes1 in DT
- * update hwmod patches according to feedback from Tero
- * add patch for aes2 hwmod
+Unfortunately the AES module is only documented partly
+in the OMAP4430 TRM. I found an old patch from Joel,
+which I took over and updated for currently mainline.
 
--- Sebastian
+Signed-off-by: Joel Fernandes <joelf@ti.com>
+Signed-off-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+---
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 41 ++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
-Sebastian Reichel (5):
-  ARM: dts: omap4: Fix aes entry
-  ARM: dts: omap4.dtsi: remove aes[12]_fck
-  ARM: OMAP4: hwmod data: add aes1
-  ARM: OMAP4: hwmod data: add aes2
-  ARM: OMAP4: hwmod data: add des
-
- arch/arm/boot/dts/omap4.dtsi               |   4 +-
- arch/arm/boot/dts/omap44xx-clocks.dtsi     |  16 -----
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 100 +++++++++++++++++++++++++++++
- 3 files changed, 102 insertions(+), 18 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 94f09c720f29..0aff064d6469 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -953,6 +953,46 @@ static struct omap_hwmod omap44xx_emif2_hwmod = {
+ };
+ 
+ /*
++    Crypto modules AES0/1 belong to:
++	PD_L4_PER power domain
++	CD_L4_SEC clock domain
++	On the L3, the AES modules are mapped to
++	L3_CLK2: Peripherals and multimedia sub clock domain
++*/
++static struct omap_hwmod_class_sysconfig omap44xx_aes_sysc = {
++	.rev_offs	= 0x80,
++	.sysc_offs	= 0x84,
++	.syss_offs	= 0x88,
++	.sysc_flags	= SYSS_HAS_RESET_STATUS,
++};
++
++static struct omap_hwmod_class omap44xx_aes_hwmod_class = {
++	.name		= "aes",
++	.sysc		= &omap44xx_aes_sysc,
++};
++
++static struct omap_hwmod omap44xx_aes1_hwmod = {
++	.name		= "aes1",
++	.class		= &omap44xx_aes_hwmod_class,
++	.clkdm_name	= "l4_secure_clkdm",
++	.main_clk	= "l3_div_ck",
++	.prcm		= {
++		.omap4	= {
++			.context_offs	= OMAP4_RM_L4SEC_AES1_CONTEXT_OFFSET,
++			.clkctrl_offs	= OMAP4_CM_L4SEC_AES1_CLKCTRL_OFFSET,
++			.modulemode	= MODULEMODE_SWCTRL,
++		},
++	},
++};
++
++static struct omap_hwmod_ocp_if omap44xx_l3_main_2__aes1 = {
++	.master		= &omap44xx_l4_per_hwmod,
++	.slave		= &omap44xx_aes1_hwmod,
++	.clk		= "l3_div_ck",
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++/*
+  * 'fdif' class
+  * face detection hw accelerator module
+  */
+@@ -4793,6 +4833,7 @@ static struct omap_hwmod_ocp_if *omap44xx_hwmod_ocp_ifs[] __initdata = {
+ 	&omap44xx_l4_abe__wd_timer3_dma,
+ 	&omap44xx_mpu__emif1,
+ 	&omap44xx_mpu__emif2,
++	&omap44xx_l3_main_2__aes1,
+ 	NULL,
+ };
+ 
 -- 
 2.11.0
