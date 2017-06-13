@@ -1,53 +1,53 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 13 Jun 2017 10:03:28 +0100
-Subject: [PATCH] arm64/dma-mapping: Fix null-pointer check
-In-Reply-To: <20170612205028.y7a652hd46dakxdu@codeaurora.org>
-References: <20170610194110.27712-1-ohaugan@codeaurora.org>
- <20170612122903.GC24187@e104818-lin.cambridge.arm.com>
- <20170612205028.y7a652hd46dakxdu@codeaurora.org>
-Message-ID: <20170613090328.GA3302@e104818-lin.cambridge.arm.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 13 Jun 2017 10:05:00 +0100
+Subject: [PATCH 0/7] ARM: NOMMU: MPU updates
+Message-ID: <1497344707-14446-1-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 12, 2017 at 01:50:28PM -0700, Olav Haugan wrote:
-> On 17-06-12 13:29:04, Catalin Marinas wrote:
-> > On Sat, Jun 10, 2017 at 12:41:10PM -0700, Olav Haugan wrote:
-> > > @@ -149,6 +140,11 @@ static void *__dma_alloc(struct device *dev, size_t size,
-> > >  	bool coherent = is_device_dma_coherent(dev);
-> > >  	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, false);
-> > >  
-> > > +	if (!dev) {
-> > > +		WARN_ONCE(1, "Use an actual device structure for DMA allocation\n");
-> > > +		return NULL;
-> > > +	}
-> > > +
-> > >  	size = PAGE_ALIGN(size);
-> > >  
-> > >  	if (!coherent && !gfpflags_allow_blocking(flags)) {
-> > > @@ -192,8 +188,13 @@ static void __dma_free(struct device *dev, size_t size,
-> > >  		       void *vaddr, dma_addr_t dma_handle,
-> > >  		       unsigned long attrs)
-> > >  {
-> > > -	void *swiotlb_addr = phys_to_virt(dma_to_phys(dev, dma_handle));
-> > > +	void *swiotlb_addr;
-> > >  
-> > > +	if (!dev) {
-> > > +		WARN_ONCE(1, "Use an actual device structure for DMA free\n");
-> > > +		return;
-> > > +	}
-> > > +	swiotlb_addr = phys_to_virt(dma_to_phys(dev, dma_handle));
-> > 
-> > I don't think we need the checks anymore. With commit 1dccb598df54
-> > ("arm64: simplify dma_get_ops") __generic_dma_ops() returns
-> > dummy_dma_ops when dev == NULL, so the above __dma_alloc/__dma_free
-> > functions would not be called.
-> 
-> We don't need the check in is_device_dma_coherent() either then right?
+Hi,
 
-Right. The only user of this function outside
-arch/arm64/mm/dma-mapping.c is Xen (shared with arm32 under
-arch/arm/xen/) but since arm32 doesn't do this NULL check either, we
-should be fine.
+This is an update of the existent MPU code which consist set of
+clean-ups and enhancements. The most significant changes are in the way
+how MPU settings sync-up for secondaries (PATCH 3/7) and more flexible
+layout for memory (PATCH 7/7). Since there is no in-tree user of MPU,
+support for M-class has been added (PATCH 6/7).
+
+Thanks!
+
+Changelog:
+
+        RFC v2 -> v1
+               - dropped RFC tag
+	       - Tested-by from Andr?s
+	       - rebased on 4.12-rc5
+
+           RFC -> RFC v2
+	       - fixed MPU enable for v7m (PATCH 6/7)
+
+Vladimir Murzin (7):
+  ARM: NOMMU: Move out MPU setup in separate module
+  ARM: NOMMU: Update MPU accessors to use cp15 helpers
+  ARM: NOMMU: Rework MPU to be mostly done in C
+  ARM: NOMMU: Disallow MPU for XIP
+  ARM: Kconfig: Kill CONFIG_VECTORS_BASE
+  ARM: V7M: Add support for MPU to M-class
+  ARM: NOMMU: Use more MPU regions to cover memory
+
+ arch/arm/Kconfig               |   9 -
+ arch/arm/Kconfig-nommu         |   4 +-
+ arch/arm/include/asm/cputype.h |  10 +
+ arch/arm/include/asm/mpu.h     |  23 ++-
+ arch/arm/include/asm/smp.h     |   2 +-
+ arch/arm/include/asm/v7m.h     |  10 +
+ arch/arm/kernel/asm-offsets.c  |  11 +
+ arch/arm/kernel/head-nommu.S   | 128 +++++++++---
+ arch/arm/kernel/smp.c          |   2 +-
+ arch/arm/mm/Makefile           |   1 +
+ arch/arm/mm/nommu.c            | 254 +----------------------
+ arch/arm/mm/pmsa-v7.c          | 445 +++++++++++++++++++++++++++++++++++++++++
+ 12 files changed, 598 insertions(+), 301 deletions(-)
+ create mode 100644 arch/arm/mm/pmsa-v7.c
 
 -- 
-Catalin
+2.0.0
