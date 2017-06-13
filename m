@@ -1,94 +1,83 @@
-From: bo.zhang@nxp.com (Zhang Bo)
-Date: Tue, 13 Jun 2017 10:39:20 +0800
-Subject: [[PATCH]] Revert "leds: handle suspend/resume in heartbeat trigger"
-Message-ID: <1497321560-46817-1-git-send-email-bo.zhang@nxp.com>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Tue, 13 Jun 2017 09:59:25 +0800
+Subject: [PATCH v15 6/7] ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB
+ property
+In-Reply-To: <1497319166-17287-1-git-send-email-peter.chen@nxp.com>
+References: <1497319166-17287-1-git-send-email-peter.chen@nxp.com>
+Message-ID: <1497319166-17287-7-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 5ab92a7cb82c66bf30685583a38a18538e3807db.
+The current dts describes USB HUB's property at USB controller's
+entry, it is improper. The USB HUB should be the child node
+under USB controller, and power sequence properties are under
+it. Besides, using gpio pinctrl setting for USB2415's reset pin.
 
-System cannot enter suspend mode because of heartbeat led trigger.
-In autosleep_wq, try_to_suspend function will try to enter suspend
-mode in specific period. it will get wakeup_count then call pm_notifier
-chain callback function and freeze processes.
-Heartbeat_pm_notifier is called and it call led_trigger_unregister to
-change the trigger of led device to none. It will send uevent message
-and the wakeup source count changed. As wakeup_count changed, suspend
-will abort.
-
-Signed-off-by: Zhang Bo <bo.zhang@nxp.com>
+Signed-off-by: Peter Chen <peter.chen@nxp.com>
+Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
+Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
 ---
- drivers/leds/trigger/ledtrig-heartbeat.c | 31 -------------------------------
- 1 file changed, 31 deletions(-)
+ arch/arm/boot/dts/imx6qdl-udoo.dtsi | 26 ++++++++++++--------------
+ 1 file changed, 12 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/leds/trigger/ledtrig-heartbeat.c b/drivers/leds/trigger/ledtrig-heartbeat.c
-index afa3b40..e95ea65 100644
---- a/drivers/leds/trigger/ledtrig-heartbeat.c
-+++ b/drivers/leds/trigger/ledtrig-heartbeat.c
-@@ -20,7 +20,6 @@
- #include <linux/sched/loadavg.h>
- #include <linux/leds.h>
- #include <linux/reboot.h>
--#include <linux/suspend.h>
- #include "../leds.h"
+diff --git a/arch/arm/boot/dts/imx6qdl-udoo.dtsi b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
+index c96c91d..a173de2 100644
+--- a/arch/arm/boot/dts/imx6qdl-udoo.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
+@@ -9,6 +9,8 @@
+  *
+  */
  
- static int panic_heartbeats;
-@@ -163,30 +162,6 @@ static void heartbeat_trig_deactivate(struct led_classdev *led_cdev)
- 	.deactivate = heartbeat_trig_deactivate,
++#include <dt-bindings/gpio/gpio.h>
++
+ / {
+ 	aliases {
+ 		backlight = &backlight;
+@@ -58,17 +60,6 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 
+-		reg_usb_h1_vbus: regulator at 0 {
+-			compatible = "regulator-fixed";
+-			reg = <0>;
+-			regulator-name = "usb_h1_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-			enable-active-high;
+-			startup-delay-us = <2>; /* USB2415 requires a POR of 1 us minimum */
+-			gpio = <&gpio7 12 0>;
+-		};
+-
+ 		reg_panel: regulator at 1 {
+ 			compatible = "regulator-fixed";
+ 			reg = <1>;
+@@ -188,7 +179,7 @@
+ 
+ 		pinctrl_usbh: usbhgrp {
+ 			fsl,pins = <
+-				MX6QDL_PAD_GPIO_17__GPIO7_IO12 0x80000000
++				MX6QDL_PAD_GPIO_17__GPIO7_IO12	0x1b0b0
+ 				MX6QDL_PAD_NANDF_CS2__CCM_CLKO2 0x130b0
+ 			>;
+ 		};
+@@ -259,9 +250,16 @@
+ &usbh1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_usbh>;
+-	vbus-supply = <&reg_usb_h1_vbus>;
+-	clocks = <&clks IMX6QDL_CLK_CKO>;
+ 	status = "okay";
++
++	usb2415: hub at 1 {
++		compatible = "usb424,2514";
++		reg = <1>;
++
++		clocks = <&clks IMX6QDL_CLK_CKO>;
++		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
++		reset-duration-us = <3000>;
++	};
  };
  
--static int heartbeat_pm_notifier(struct notifier_block *nb,
--				 unsigned long pm_event, void *unused)
--{
--	int rc;
--
--	switch (pm_event) {
--	case PM_SUSPEND_PREPARE:
--	case PM_HIBERNATION_PREPARE:
--	case PM_RESTORE_PREPARE:
--		led_trigger_unregister(&heartbeat_led_trigger);
--		break;
--	case PM_POST_SUSPEND:
--	case PM_POST_HIBERNATION:
--	case PM_POST_RESTORE:
--		rc = led_trigger_register(&heartbeat_led_trigger);
--		if (rc)
--			pr_err("could not re-register heartbeat trigger\n");
--		break;
--	default:
--		break;
--	}
--	return NOTIFY_DONE;
--}
--
- static int heartbeat_reboot_notifier(struct notifier_block *nb,
- 				     unsigned long code, void *unused)
- {
-@@ -201,10 +176,6 @@ static int heartbeat_panic_notifier(struct notifier_block *nb,
- 	return NOTIFY_DONE;
- }
- 
--static struct notifier_block heartbeat_pm_nb = {
--	.notifier_call = heartbeat_pm_notifier,
--};
--
- static struct notifier_block heartbeat_reboot_nb = {
- 	.notifier_call = heartbeat_reboot_notifier,
- };
-@@ -221,14 +192,12 @@ static int __init heartbeat_trig_init(void)
- 		atomic_notifier_chain_register(&panic_notifier_list,
- 					       &heartbeat_panic_nb);
- 		register_reboot_notifier(&heartbeat_reboot_nb);
--		register_pm_notifier(&heartbeat_pm_nb);
- 	}
- 	return rc;
- }
- 
- static void __exit heartbeat_trig_exit(void)
- {
--	unregister_pm_notifier(&heartbeat_pm_nb);
- 	unregister_reboot_notifier(&heartbeat_reboot_nb);
- 	atomic_notifier_chain_unregister(&panic_notifier_list,
- 					 &heartbeat_panic_nb);
+ &usdhc3 {
 -- 
-1.9.1
+2.7.4
