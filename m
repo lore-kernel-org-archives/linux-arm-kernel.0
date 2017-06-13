@@ -1,51 +1,34 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Tue, 13 Jun 2017 17:47:49 +0300
-Subject: [PATCH] Staging: vc04_services: bcm2835-audio: bcm2835-ctl.c:
- Fixed alignment to match open parenthesis.
-In-Reply-To: <CAB3L5oxNorqu6_WiseTjkr7N9i-doy=_4gxtwonCVcxQA3Nfrw@mail.gmail.com>
-References: <1497042442-3620-1-git-send-email-srishtishar@gmail.com>
- <20170613130006.GA15978@kroah.com>
- <CAB3L5oxNorqu6_WiseTjkr7N9i-doy=_4gxtwonCVcxQA3Nfrw@mail.gmail.com>
-Message-ID: <20170613144749.yn6z7yecumrfaayk@mwanda>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Tue, 13 Jun 2017 17:50:25 +0300
+Subject: [PATCH 2/2] tty/serial: atmel: make the driver DT only
+In-Reply-To: <20170613134038.5545-2-alexandre.belloni@free-electrons.com>
+References: <20170613134038.5545-1-alexandre.belloni@free-electrons.com>
+ <20170613134038.5545-2-alexandre.belloni@free-electrons.com>
+Message-ID: <CAHp75VdQu=mm3hPb32+3osbx+wugH4iTFqAnz8-2GDmsYV8ViA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 13, 2017 at 08:07:14PM +0530, srishti sharma wrote:
-> On Tue, Jun 13, 2017 at 6:30 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> > On Sat, Jun 10, 2017 at 02:37:22AM +0530, srishti sharma wrote:
-> >> Fixed alignment so that it matched open parenthesis.
-> >>
-> >> Signed-off-by: srishti sharma <srishtishar@gmail.com>
-> >> ---
-> >>  drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
-> >> index f484bb0..2148ed0 100644
-> >> --- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
-> >> +++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
-> >> @@ -105,7 +105,7 @@ static int snd_bcm2835_ctl_get(struct snd_kcontrol *kcontrol,
-> >>  }
-> >>
-> >>  static int snd_bcm2835_ctl_put(struct snd_kcontrol *kcontrol,
-> >> -                             struct snd_ctl_elem_value *ucontrol)
-> >> +                            struct snd_ctl_elem_value *ucontrol)
-> >>  {
-> >>       struct bcm2835_chip *chip = snd_kcontrol_chip(kcontrol);
-> >>       int changed = 0;
-> >
-> > This patch is corrupted and can not be applied :(
-> 
-> 
-> Why is this corrupted ?
+On Tue, Jun 13, 2017 at 4:40 PM, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
+> Now that AVR32 is gone, platform_data are not used to initialize the driver
+> anymore, remove that path from the driver. Also remove the now unused
+> struct atmel_uart_data.
 
-Try applying it with `git am`.  There should be space characters at the
-start of these lines but your email client deleted them:
+Nitpicks, not insisting on them at all, just a side comment.
 
-	struct bcm2835_chip *chip = snd_kcontrol_chip(kcontrol);
-	int changed = 0;
+> +       struct serial_rs485 *rs485conf = &port->rs485;
+> +       u32 rs485_delay[2];
 
-Read Documentation/process/email-clients.rst
++ empty line?
 
-regards,
-dan carpenter
+> +       /* rs485 properties */
+
+> +       if (of_property_read_u32_array(np, "rs485-rts-delay",
+> +                                      rs485_delay, 2) == 0) {
+
+Now it can be one line I suppose (taking into account ...() == 0 ->
+!...() change)
+
+-- 
+With Best Regards,
+Andy Shevchenko
