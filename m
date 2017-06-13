@@ -1,28 +1,58 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 13 Jun 2017 08:28:21 +0800
-Subject: [PATCH V3 3/7] tty: serial: lpuart: add little endian 32 bit
- register support
-In-Reply-To: <1497281848-12995-4-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <201706130841.YZhbOH9x%fengguang.wu@intel.com>
+From: hoeun.ryu@gmail.com (Hoeun Ryu)
+Date: Tue, 13 Jun 2017 10:09:48 +0900
+Subject: [RESEND PATCH 1/2] arm:omap2+: put omap_uart_phys/virt/lsr in .text
+ section when ZIMAGE is true
+Message-ID: <1497316206-11110-1-git-send-email-hoeun.ryu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dong,
+ omap_uart_phys, omap_uart_virt and omap_uart_lsr reside in .data section
+and it's right implementation. But because of this, we cannot enable
+CONFIG_DEBUG_UNCOMPRESS. LL_DEBUG and DEBUG_UNCOMPRESS are very useful tools
+for debugging early boot stage when something goes wrong if you don't have
+any hardware based debugging tools like a JTAG debugger.
+ This patch is to put the variables into .text section instead only when the
+DEBUG_LL_INCLUDE file is included in the kernel decompressor, which is only
+when ZIMAGE is defined.
+ This patch does not change anything when DEBUG_LL_INCLUDE is included in
+the other kernel parts like arch/arm/kernel/*
 
-[auto build test WARNING on tty/tty-testing]
-[also build test WARNING on v4.12-rc5 next-20170609]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Dong-Aisheng/tty-serial-lpuart-add-imx7ulp-support/20170613-045714
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git tty-testing
-
-
-coccinelle warnings: (new ones prefixed by >>)
-
->> drivers/tty/serial/fsl_lpuart.c:305:2-3: Unneeded semicolon
-
-Please review and possibly fold the followup patch.
-
+Signed-off-by: Hoeun Ryu <hoeun.ryu@gmail.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+ * to mail to relevant recipients, no respond yet from them
+   - TO=Tony Lindgren <tony@atomide.com>
+   - CC=linux-omap at vger.kernel.org
+ * indentical to previous patch
+
+ arch/arm/include/debug/omap2plus.S | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/arch/arm/include/debug/omap2plus.S b/arch/arm/include/debug/omap2plus.S
+index 6d867ae..6ce6ef9 100644
+--- a/arch/arm/include/debug/omap2plus.S
++++ b/arch/arm/include/debug/omap2plus.S
+@@ -58,11 +58,22 @@
+ 
+ #define UART_OFFSET(addr)	((addr) & 0x00ffffff)
+ 
++/*
++ * Definition of ZIMAGE is in arch/arm/boot/compressed/Makefile.
++ * Place the following block in .text section only when this file is
++ * included by arch/arm/boot/compressed/* to make it possible to
++ * enable CONFIG_DEBUG_UNCOMPRESS and DEBUG in arch/arm/boot/compressed/head.S
++ * on OMAP2+ SoCs.
++ */
++#ifndef ZIMAGE
+ 		.pushsection .data
++#endif
+ omap_uart_phys:	.word	0
+ omap_uart_virt:	.word	0
+ omap_uart_lsr:	.word	0
++#ifndef ZIMAGE
+ 		.popsection
++#endif
+ 
+ 		.macro	addruart, rp, rv, tmp
+ 
+-- 
+2.7.4
