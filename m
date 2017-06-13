@@ -1,102 +1,69 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 13 Jun 2017 14:48:53 +0200
-Subject: [PATCH] ARM64: Kconfig: Fix the missing hi655x common clk
-In-Reply-To: <CAK8P3a1DbjovHF3QX9OuPA1q4XAEj1KackgKqGvceDWL3f1cJg@mail.gmail.com>
-References: <CALAqxLVn9r9R-wnrZbrFqYfwqZD-tegbJrZLsUeBjjBc4_Q89w@mail.gmail.com>
- <1496686434-13181-1-git-send-email-daniel.lezcano@linaro.org>
- <CAPDyKFqWptneK2V7wCR8LGbgU7=U9kBCKkHrtgGmZKmNQJ4s7g@mail.gmail.com>
- <20170609154652.GG2244@mai>
- <CAK8P3a1PsFcqLC95rSQf6EdkqhQ6sE3OXC9gDQ8TLp2mTVO3pw@mail.gmail.com>
- <CALAqxLXtLc16zT9AFaHXbbQp-Vf3GNOJ1nb7PoUJgj22rh=X-w@mail.gmail.com>
- <CAK8P3a0L6QNAJf6DB876DFHf7aGcD=uwxOUB36LKr-AX67VYAA@mail.gmail.com>
- <20170612093853.GB2261@mai>
- <CAK8P3a1DbjovHF3QX9OuPA1q4XAEj1KackgKqGvceDWL3f1cJg@mail.gmail.com>
-Message-ID: <3df69681-202b-1426-0a35-de943bc14ed1@linaro.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 13 Jun 2017 14:52:38 +0200
+Subject: [PATCH v4 2/2] arm: dts: Add Mediatek MT2701 i2c device node
+In-Reply-To: <1497349452.930.36.camel@mhfsdcap03>
+References: <1495784107-6711-1-git-send-email-jun.gao@mediatek.com>
+ <1495784107-6711-3-git-send-email-jun.gao@mediatek.com>
+ <1497268468.930.26.camel@mhfsdcap03>
+ <dbfcfd5b-8812-8df2-40dc-42e889577c9a@gmail.com>
+ <1497349452.930.36.camel@mhfsdcap03>
+Message-ID: <ba658a59-7ef9-2340-57fa-3bcefa3f47ed@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/06/2017 23:12, Arnd Bergmann wrote:
-> On Mon, Jun 12, 2017 at 11:38 AM, Daniel Lezcano
-> <daniel.lezcano@linaro.org> wrote:
->> On Fri, Jun 09, 2017 at 10:48:13PM +0200, Arnd Bergmann wrote:
->>> On Fri, Jun 9, 2017 at 10:15 PM, John Stultz <john.stultz@linaro.org> wrote:
->>>> On Fri, Jun 9, 2017 at 1:06 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->>>>> On Fri, Jun 9, 2017 at 5:46 PM, Daniel Lezcano
->>>>> <daniel.lezcano@linaro.org> wrote:
->>>>>
->>>>> Yes, but I'm not sure this is the right patch either. We tend to not
->>>>> use 'select' for user-visible drivers, and most hisilicon platforms
->>>>> won't need this driver.
->>>>>
->>>>> I think it would be more consistent to add this to the defconfig
->>>>> and regard it as a user error when the driver is disabled on a
->>>>> machine that needs it.
+
+
+On 13/06/17 12:24, Jun Gao wrote:
+> On Tue, 2017-06-13 at 11:36 +0200, Matthias Brugger wrote:
+>>
+>> On 12/06/17 13:54, Jun Gao wrote:
+>>> On Fri, 2017-05-26 at 15:35 +0800, Jun Gao wrote:
+>>>> From: Jun Gao <jun.gao@mediatek.com>
 >>>>
->>>> Maybe the select is not exactly in the right place, but I don't really
->>>> feel like a pmic on an SoC is a "user-visible driver". I deal with the
->>>> board often and when the new dependency was made on the clk, I would
->>>> have never have found it on my own w/o Ulf and Daniel pointing out
->>>> what I needed to enable.
+>>>> Add MT2701 i2c device node.
+>>>>
+>>>> Signed-off-by: Jun Gao <jun.gao@mediatek.com>
+>>>> ---
+>>>>    arch/arm/boot/dts/mt2701-evb.dts | 42 ++++++++++++++++++++++++++++++++++++++++
+>>>>    arch/arm/boot/dts/mt2701.dtsi    | 42 ++++++++++++++++++++++++++++++++++++++++
+>>>>    2 files changed, 84 insertions(+)
+>> [...]
 >>>
->>> What I meant is that the Kconfig option is user-visible. On a very high
->>> level, this is a result of arch/arm64/Kconfig.platforms listing only
->>> very broad categories of SoCs, in many cases only the manufacturers
->>> of very different chip families, which then control the visibility of the
->>> individual Kconfig items for things like pinctrl or clk.
+>>> Dear Matthias,
 >>>
->>> I now see that MFD_HI655X_PMIC is the top-level driver that you
->>> have to select before enabling COMMON_CLK_HI655X, so the
->>> patch is actually broken unless it actually selects both.
+>>> Could you take this patch together with
+>>> [PATCH v4 1/2]dt-bindings: i2c: Add Mediatek MT2701 i2c binding ?
 >>>
->>> How about simply adding a 'default MFD_HI655X_PMIC' to
->>> COMMON_CLK_HI655X to enable it unless it is explicitly
->>> turned off?
+>>> Thanks!
+>>>
 >>
->> Actually, I share John's opinion.
+>> They are both included in the pull request I send [1] [2], or do I miss
+>> something?
 >>
->> Ideally when we choose a platform, all the relevants devices configuration
->> options should be selected automatically from a single topmost node of a tree
->> (platform selection) to all the nodes corresponding to the devices, leaving the
->> user to select one simple option without knowledge of the SoC hardware
->> internals.
+>> Regards,
+>> Matthias
 >>
->> If the user is expert in the platform and knows exactly what he does, then he
->> can select an _EXPERT_ like option and be able to disable some drivers.
->>
->> It is how I tend to write the Kconfig options, so the 'default MFD_HI655X_PMIC'
->> is confusing for me. Wouldn't make sense to select COMMON_CLK_HI655X when
->> MFD_HI655X_PMIC is enabled?
+>> [1]
+>> https://github.com/mbgg/linux-mediatek/commit/729b7f8dbdaff270c53052897ea06486221a49a2
+>> [2]
+>> https://github.com/mbgg/linux-mediatek/commit/c6c301d3ff7531894257acc4f4a73928a109bda1
 > 
-> I don't think it's that easy. When you do that, MFD_HI655X_PMIC gains
-> a dependency on COMMON_CLK and will again cause a warning on
-> machines that disable that during compile testing.
-
-This issue is related to the missing stubs in the includes.
-
-> Using 'select' for user-selectable options generally leads to problems,
-> and you are better off avoiding it. If you want to make the symbol impossible
-> to turn off for non-EXPERT configurations, you can write it like
+> Dear Matthias,
 > 
-> config COMMON_CLK_HI655X
->         tristate "Clock driver for Hi655x" if EXPERT
->         depends on (MFD_HI655X_PMIC || COMPILE_TEST)
->         depends on REGMAP
->         default MFD_HI655X_PMIC
+> Would you mind to use the same style as follows in i2c-mtk.txt of [2]?
 > 
-> That way the option is completely hidden for non-EXPERT,
-> but still has the right default otherwise, and the dependencies
-> are tracked right for compile-testing.
+> "mediatek,mt2701-i2c", "mediatek,mt6577-i2c": for Mediatek MT2701
+> "mediatek,mt6577-i2c": for Mediatek MT6577
+> "mediatek,mt6589-i2c": for Mediatek MT6589
+> "mediatek,mt7623-i2c", "mediatek,mt6577-i2c": for Mediatek MT7623
+> "mediatek,mt8173-i2c": for Mediatek MT8173
+> 
+> 
+> Thanks!
+> 
 
-Ok.
+You mean I should fix-up the patch to fit to the new binding 
+description? Or do you mean it should be MTxxxx instead of mtxxxx?
 
-Thanks!
-
-  -- Daniel
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Regards,
+Matthias
