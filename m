@@ -1,35 +1,45 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 13 Jun 2017 12:39:25 -0700
-Subject: [GIT PULL 2/4] bcm2835-maintainers-next-2017-06-08
-In-Reply-To: <20170613174356.22426-2-eric@anholt.net>
+Date: Tue, 13 Jun 2017 12:39:40 -0700
+Subject: [GIT PULL 3/4] bcm2835-dt-next-2017-06-12
+In-Reply-To: <20170613174356.22426-3-eric@anholt.net>
 References: <20170613174356.22426-1-eric@anholt.net>
- <20170613174356.22426-2-eric@anholt.net>
-Message-ID: <8cd3f87a-f911-dc5f-3f2a-544baa1e6c0c@gmail.com>
+ <20170613174356.22426-3-eric@anholt.net>
+Message-ID: <c3d7b024-af02-e629-2c57-53a2a726b3e4@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 06/13/2017 10:43 AM, Eric Anholt wrote:
-> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+> The following changes since commit 1f8216e7f78c2e55b07117c77887a314bc36f690:
 > 
->   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+>   Merge tag 'bcm2835-dt-next-2017-03-30' into devicetree/next (2017-05-13 20:22:59 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://github.com/anholt/linux tags/bcm2835-maintainers-next-2017-06-08
+>   git://github.com/anholt/linux tags/bcm2835-dt-next-2017-06-12
 > 
-> for you to fetch changes up to c5c168b66f5b3cb77bf57d84bf624ce412f0976e:
+> for you to fetch changes up to 9c53535a15b63218204f2bab2c279b3e64c61c0e:
 > 
->   MAINTAINERS: Remove Lee Jones from bcm2835. (2017-05-15 14:39:57 -0700)
+>   ARM: dts: bcm2835-rpi-zero: Enable OTG mode (2017-06-12 13:28:50 -0700)
 > 
 > ----------------------------------------------------------------
-> This pull request drops Lee Jones from bcm2835 maintainership, who has
-> been inactive for over a year.
+> This pull request brings in installation of the RPi3 DT in 32-bit
+> mode, the new thermal nodes, switches to the faster sdhost controller
+> for MMC, and enables USB OTG mode on the Pi 0.
 > 
 > ----------------------------------------------------------------
 > Eric Anholt (1):
->       MAINTAINERS: Remove Lee Jones from bcm2835.
-
+>       ARM: dts: Add devicetree for the Raspberry Pi 3, for arm32 (v6)
+> 
+> Gerd Hoffmann (1):
+>       ARM: dts: bcm283x: switch from &sdhci to &sdhost
+> 
+> Stefan Wahren (4):
+>       ARM: dts: bcm283x: Add CPU thermal zone with 1 trip point
+>       ARM: dts: bcm283x: Add dtsi for OTG mode
+>       ARM: dts: bcm283x: Add generic USB PHY
+>       ARM: dts: bcm2835-rpi-zero: Enable OTG mode
 
 Merged, thanks Eric!
---
+-- 
+-- 
 Florian
