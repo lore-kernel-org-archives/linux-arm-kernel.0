@@ -1,58 +1,86 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 13 Jun 2017 15:42:00 +0200
-Subject: [RFC v2 1/3] interconnect: Add generic interconnect controller API
-In-Reply-To: <20170612141359.26117-2-georgi.djakov@linaro.org>
-References: <20170612141359.26117-1-georgi.djakov@linaro.org>
- <20170612141359.26117-2-georgi.djakov@linaro.org>
-Message-ID: <20170613134200.GA4769@kroah.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 13 Jun 2017 15:45:30 +0200
+Subject: [PATCH v4 2/2] arm: dts: Add Mediatek MT2701 i2c device node
+In-Reply-To: <1497360189.930.42.camel@mhfsdcap03>
+References: <1495784107-6711-1-git-send-email-jun.gao@mediatek.com>
+ <1495784107-6711-3-git-send-email-jun.gao@mediatek.com>
+ <1497268468.930.26.camel@mhfsdcap03>
+ <dbfcfd5b-8812-8df2-40dc-42e889577c9a@gmail.com>
+ <1497349452.930.36.camel@mhfsdcap03>
+ <ba658a59-7ef9-2340-57fa-3bcefa3f47ed@gmail.com>
+ <1497360189.930.42.camel@mhfsdcap03>
+Message-ID: <8c0e441c-a3d9-9cfd-dbf9-556ad852a072@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 12, 2017 at 05:13:57PM +0300, Georgi Djakov wrote:
-> This patch introduce a new API to get the requirement and configure the
-> interconnect buses across the entire chipset to fit with the current demand.
+
+
+On 13/06/17 15:23, Jun Gao wrote:
+> On Tue, 2017-06-13 at 14:52 +0200, Matthias Brugger wrote:
+>>
+>> On 13/06/17 12:24, Jun Gao wrote:
+>>> On Tue, 2017-06-13 at 11:36 +0200, Matthias Brugger wrote:
+>>>>
+>>>> On 12/06/17 13:54, Jun Gao wrote:
+>>>>> On Fri, 2017-05-26 at 15:35 +0800, Jun Gao wrote:
+>>>>>> From: Jun Gao <jun.gao@mediatek.com>
+>>>>>>
+>>>>>> Add MT2701 i2c device node.
+>>>>>>
+>>>>>> Signed-off-by: Jun Gao <jun.gao@mediatek.com>
+>>>>>> ---
+>>>>>>     arch/arm/boot/dts/mt2701-evb.dts | 42 ++++++++++++++++++++++++++++++++++++++++
+>>>>>>     arch/arm/boot/dts/mt2701.dtsi    | 42 ++++++++++++++++++++++++++++++++++++++++
+>>>>>>     2 files changed, 84 insertions(+)
+>>>> [...]
+>>>>>
+>>>>> Dear Matthias,
+>>>>>
+>>>>> Could you take this patch together with
+>>>>> [PATCH v4 1/2]dt-bindings: i2c: Add Mediatek MT2701 i2c binding ?
+>>>>>
+>>>>> Thanks!
+>>>>>
+>>>>
+>>>> They are both included in the pull request I send [1] [2], or do I miss
+>>>> something?
+>>>>
+>>>> Regards,
+>>>> Matthias
+>>>>
+>>>> [1]
+>>>> https://github.com/mbgg/linux-mediatek/commit/729b7f8dbdaff270c53052897ea06486221a49a2
+>>>> [2]
+>>>> https://github.com/mbgg/linux-mediatek/commit/c6c301d3ff7531894257acc4f4a73928a109bda1
+>>>
+>>> Dear Matthias,
+>>>
+>>> Would you mind to use the same style as follows in i2c-mtk.txt of [2]?
+>>>
+>>> "mediatek,mt2701-i2c", "mediatek,mt6577-i2c": for Mediatek MT2701
+>>> "mediatek,mt6577-i2c": for Mediatek MT6577
+>>> "mediatek,mt6589-i2c": for Mediatek MT6589
+>>> "mediatek,mt7623-i2c", "mediatek,mt6577-i2c": for Mediatek MT7623
+>>> "mediatek,mt8173-i2c": for Mediatek MT8173
+>>>
+>>>
+>>> Thanks!
+>>>
+>>
+>> You mean I should fix-up the patch to fit to the new binding
+>> description? Or do you mean it should be MTxxxx instead of mtxxxx?
+>>
+>> Regards,
+>> Matthias
 > 
-> The API is using a consumer/provider-based model, where the providers are
-> the interconnect controllers and the consumers could be various drivers.
-> The consumers request interconnect resources (path) to an endpoint and set
-> the desired constraints on this data flow path. The provider(s) receive
-> requests from consumers and aggregate these requests for all master-slave
-> pairs on that path. Then the providers configure each participating in the
-> topology node according to the requested data flow path, physical links and
-> constraints. The topology could be complicated and multi-tiered and is SoC
-> specific.
+> Dear Matthias,
 > 
-> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
-> ---
->  Documentation/interconnect/interconnect.txt |  65 +++++
->  drivers/Kconfig                             |   2 +
->  drivers/Makefile                            |   1 +
->  drivers/interconnect/Kconfig                |  10 +
->  drivers/interconnect/Makefile               |   1 +
->  drivers/interconnect/interconnect.c         | 376 ++++++++++++++++++++++++++++
->  include/linux/interconnect-consumer.h       |  72 ++++++
->  include/linux/interconnect-provider.h       | 120 +++++++++
->  8 files changed, 647 insertions(+)
->  create mode 100644 Documentation/interconnect/interconnect.txt
->  create mode 100644 drivers/interconnect/Kconfig
->  create mode 100644 drivers/interconnect/Makefile
->  create mode 100644 drivers/interconnect/interconnect.c
->  create mode 100644 include/linux/interconnect-consumer.h
->  create mode 100644 include/linux/interconnect-provider.h
+> I mean fix-up the patch to fit to the new binding description. Is it OK?
 > 
-> diff --git a/Documentation/interconnect/interconnect.txt b/Documentation/interconnect/interconnect.txt
-> new file mode 100644
-> index 000000000000..f761a2fb553c
-> --- /dev/null
-> +++ b/Documentation/interconnect/interconnect.txt
 
-.rst for new Documenation files please, and hook it up to the larger
-documentation build process at the same time.
+Then I can't see the difference between what you are asking for and what 
+is already pushed to the repository. Please send a patch, that will make 
+things clearer.
 
-And why are these RFC patches?  Don't you feel they are ready to be
-reviewed?  I know I ignore RFC patches for the most part as obviously
-the author does not think they are ready :)
-
-thanks,
-
-greg k-h
+Regards,
+Matthias
