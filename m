@@ -1,24 +1,30 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 13 Jun 2017 12:41:00 -0700
-Subject: [GIT PULL 4/4] bcm2835-dt-64-next-2017-06-08
-In-Reply-To: <20170613174356.22426-4-eric@anholt.net>
-References: <20170613174356.22426-1-eric@anholt.net>
- <20170613174356.22426-4-eric@anholt.net>
-Message-ID: <ce06aff6-ef2b-0d6f-1aaf-dfc55dacf11f@gmail.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Tue, 13 Jun 2017 15:48:24 -0400
+Subject: [GIT PULL] Qualcomm ARM64 Defconfig updates for 4.13
+Message-ID: <1497383309-14226-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/13/2017 10:43 AM, Eric Anholt wrote:
-> Hi Florian,
-> 
-> Here's the last pull request in this series.  I've based this summary
-> on the bcm2835-dt-next tag, to clarify what's in this patch series,
-> but it does require being careful since it involves a cross-merge
-> between branches.
+The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 
-Merged, thanks, I will make sure this is also promoted to my pull
-request tag.
+  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 
-Thanks!
--- 
-Florian
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-defconfig-for-4.13
+
+for you to fetch changes up to 28fc880f3e0087ca84acf5217a226fe9b4bc57d8:
+
+  arm64: defconfig: Switch to the correct Qualcomm SMD driver (2017-06-05 21:56:20 -0500)
+
+----------------------------------------------------------------
+Qualcomm ARM64 Based defconfig Updates for v4.13
+
+* Switch to use the SMD RPMSG driver
+
+----------------------------------------------------------------
+Georgi Djakov (1):
+      arm64: defconfig: Switch to the correct Qualcomm SMD driver
+
+ arch/arm64/configs/defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
