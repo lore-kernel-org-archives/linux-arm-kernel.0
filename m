@@ -1,46 +1,45 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 13 Jun 2017 15:57:09 +0200
-Subject: [PATCH v3 4/6] arm64: dts: marvell: armada-37xx: Use angle bracket
- for each register set
-In-Reply-To: <20170613135711.7622-1-gregory.clement@free-electrons.com>
-References: <20170613135711.7622-1-gregory.clement@free-electrons.com>
-Message-ID: <20170613135711.7622-5-gregory.clement@free-electrons.com>
+Date: Tue, 13 Jun 2017 15:57:05 +0200
+Subject: [PATCH v3 0/6] Update device tree for Armada 3720 DB
+Message-ID: <20170613135711.7622-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When several groups of register address and size are used with reg, then
-surround each one by angle bracket.
+Hi,
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+the main purpose of this short series is to add the support of the
+second SDHCI controller on the Armada 3720 DB board (and on the Armada
+37xx SoC).
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-index c1076fd0bd9e..65562319770b 100644
---- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -281,8 +281,8 @@
- 
- 			xor at 60900 {
- 				compatible = "marvell,armada-3700-xor";
--				reg = <0x60900 0x100
--				       0x60b00 0x100>;
-+				reg = <0x60900 0x100>,
-+				      <0x60b00 0x100>;
- 
- 				xor10 {
- 					interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
-@@ -295,8 +295,8 @@
- 			sdhci0: sdhci at d8000 {
- 				compatible = "marvell,armada-3700-sdhci",
- 					     "marvell,sdhci-xenon";
--				reg = <0xd8000 0x300
--				       0x17808 0x4>;
-+				reg = <0xd8000 0x300>,
-+				      <0x17808 0x4>;
- 				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&nb_periph_clk 0>;
- 				clock-names = "core";
+This series also adds some improvement to the device tree of the the
+Armada 3720 DB board and the last patch allow using higher speed on
+the SD card by adding the vqmmc regulator.
+
+In the v3, I use the angle bracket for each set of register. And I
+added the reviewed by flag from Andreas F?rber.
+
+In the v2, I added a patch aligning the compatible string and fix the
+patch " arm64: dts: marvell: Enable second SDHCI controller in Armada
+37xx" too.
+
+Gregory
+
+
+Gregory CLEMENT (5):
+  arm64: dts: marvell: armada-3720-db: Sort the dts node alphabetically
+  arm64: dts: marvell: armada-3720-db: Add information about the V2
+    board
+  arm64: dts: marvell: armada-37xx: Align the compatible string
+  arm64: dts: marvell: armada-37xx: Use angle bracket for each register
+    set
+  arm64: dts: marvell: armada-3720-db: Add vqmmc regulator for SD slot
+
+Konstantin Porotchkin (1):
+  arm64: dts: marvell: Enable second SDHCI controller in Armada 37xx
+
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts | 120 ++++++++++++++++---------
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi   |  25 ++++--
+ 2 files changed, 94 insertions(+), 51 deletions(-)
+
 -- 
 2.11.0
