@@ -1,36 +1,40 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Tue, 13 Jun 2017 13:32:19 -0700
-Subject: [PATCH] dt-bindings: Drop k2g genpd device ID macros
-In-Reply-To: <ca91000a-627b-a655-4304-b64b78bbcf9a@ti.com>
-References: <20170522183737.24946-1-d-gerlach@ti.com>
- <20170531162850.mf6giowmxj5vetxq@rob-hp-laptop>
- <ca91000a-627b-a655-4304-b64b78bbcf9a@ti.com>
-Message-ID: <fc503960-d225-895c-c993-974ba6c5a92d@oracle.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 13 Jun 2017 22:35:09 +0200
+Subject: [PATCH] tty/serial: Kconfig: remove AVR32
+Message-ID: <20170613203509.32026-1-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/13/2017 1:16 PM, Dave Gerlach wrote:
-> Santosh,
-> On 05/31/2017 11:28 AM, Rob Herring wrote:
->> On Mon, May 22, 2017 at 01:37:37PM -0500, Dave Gerlach wrote:
-[...]
+AVR32 is now removed from the kernel, removed the config symbol that
+doesn't exist anymore. Also take the opportunity to reword the help to
+include sama5.
 
->>> [1] https://www.spinics.net/lists/arm-kernel/msg577079.html
->>>
->>>   .../devicetree/bindings/soc/ti/sci-pm-domain.txt   |  5 +-
->>>   include/dt-bindings/genpd/k2g.h                    | 90 ----------------------
->>>   2 files changed, 3 insertions(+), 92 deletions(-)
->>>   delete mode 100644 include/dt-bindings/genpd/k2g.h
->>
->> Acked-by: Rob Herring <robh@kernel.org>
->>
-> 
-> Gentle ping on this. If you're OK with the patch any chance you can pick it up?
-> 
-Sorry Dave I missed to pick this one in pull request for 4.13. Will pick 
-this
-one along with what Suman and Tero have been working for following merge
-window. Thanks for reminding about this one.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/tty/serial/Kconfig | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Regards,
-Santosh
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index 5c8850f7a2a0..063c71e8de41 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -114,14 +114,14 @@ config SERIAL_SB1250_DUART_CONSOLE
+ 	  If unsure, say Y.
+ 
+ config SERIAL_ATMEL
+-	bool "AT91 / AT32 on-chip serial port support"
++	bool "Atmel on-chip serial port support"
+ 	depends on HAS_DMA
+-	depends on ARCH_AT91 || AVR32 || COMPILE_TEST
++	depends on ARCH_AT91 || COMPILE_TEST
+ 	select SERIAL_CORE
+ 	select SERIAL_MCTRL_GPIO if GPIOLIB
+ 	help
+ 	  This enables the driver for the on-chip UARTs of the Atmel
+-	  AT91 and AT32 processors.
++	  ARM processors.
+ 
+ config SERIAL_ATMEL_CONSOLE
+ 	bool "Support for console on AT91 / AT32 serial port"
+-- 
+2.11.0
