@@ -1,78 +1,97 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 13 Jun 2017 15:22:39 +0100
-Subject: [PATCH v6 3/3] PCI: Add tango MSI controller support
-In-Reply-To: <82d6bf37-96b9-cd9d-134b-f01638fa2b1b@sigmadesigns.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 13 Jun 2017 09:23:55 -0500
+Subject: [PATCH v5 1/3] PCI: Add DT binding for tango PCIe controller
+In-Reply-To: <e8cd62fb-f48e-c72a-f960-4794badfce70@free.fr>
 References: <741766e5-cff2-db5f-d40b-6866e08fd966@sigmadesigns.com>
- <e868f9b8-39e3-4501-a8c6-64bd28a4be8b@sigmadesigns.com>
- <9975fa6c-f426-519b-6b3e-a2d102d36fd5@arm.com>
- <82d6bf37-96b9-cd9d-134b-f01638fa2b1b@sigmadesigns.com>
-Message-ID: <d39b5b3a-48be-7aaa-b7dd-28d4ae1d2083@arm.com>
+ <69f3ffe7-3c39-fa94-71f8-91744a869cc9@sigmadesigns.com>
+ <20170607212907.2wr3hqbokjb74kj3@rob-hp-laptop>
+ <e8cd62fb-f48e-c72a-f960-4794badfce70@free.fr>
+Message-ID: <CAL_Jsq+n=sUg1MyDW7qY1a0kwSJJD00h7VztyTXK0eh_Uh2wmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/06/17 15:01, Marc Gonzalez wrote:
-> The MSI controller in Tango supports 256 message-signaled interrupts,
-> and a single doorbell address.
-> 
-> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
-> ---
-> Changes from v5 to v6
-> o Rename 'used' bitmap to 'used_msi'
-> o Rename 'lock' spinlock to 'used_msi_lock'
-> o Take lock in interrupt handler
-> o Remove irq_dom in error path
-> ---
->  drivers/pci/host/pcie-tango.c | 225 ++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 225 insertions(+)
-> 
-> diff --git a/drivers/pci/host/pcie-tango.c b/drivers/pci/host/pcie-tango.c
-> index 67aaadcc1c5e..b06446b23bc8 100644
-> --- a/drivers/pci/host/pcie-tango.c
-> +++ b/drivers/pci/host/pcie-tango.c
-> @@ -1,16 +1,228 @@
-> +#include <linux/irqchip/chained_irq.h>
-> +#include <linux/irqdomain.h>
->  #include <linux/pci-ecam.h>
->  #include <linux/delay.h>
-> +#include <linux/msi.h>
->  #include <linux/of.h>
->  
->  #define MSI_MAX 256
->  
->  #define SMP8759_MUX		0x48
->  #define SMP8759_TEST_OUT	0x74
-> +#define SMP8759_STATUS		0x80
-> +#define SMP8759_ENABLE		0xa0
-> +#define SMP8759_DOORBELL	0xa002e07c
->  
->  struct tango_pcie {
-> +	DECLARE_BITMAP(used_msi, MSI_MAX);
-> +	spinlock_t used_msi_lock;
->  	void __iomem *mux;
-> +	void __iomem *msi_status;
-> +	void __iomem *msi_enable;
-> +	phys_addr_t msi_doorbell;
-> +	struct irq_domain *irq_dom;
-> +	struct irq_domain *msi_dom;
-> +	int irq;
->  };
->  
-> +/*** MSI CONTROLLER SUPPORT ***/
-> +
-> +static void tango_msi_isr(struct irq_desc *desc)
-> +{
-> +	struct irq_chip *chip = irq_desc_get_chip(desc);
-> +	struct tango_pcie *pcie = irq_desc_get_handler_data(desc);
-> +	unsigned long flags, status, base, virq, idx, pos = 0;
-> +
-> +	chained_irq_enter(chip, desc);
-> +	spin_lock_irqsave(&pcie->used_msi_lock, flags);
+On Wed, Jun 7, 2017 at 5:34 PM, Mason <slash.tmp@free.fr> wrote:
+> Hello Rob,
+>
+> On 07/06/2017 23:29, Rob Herring wrote:
+>> On Wed, May 31, 2017 at 03:30:26PM +0200, Marc Gonzalez wrote:
+>>> Binding for the Sigma Designs SMP8759 SoC.
+>>>
+>>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>>> ---
+>>>  Documentation/devicetree/bindings/pci/tango-pcie.txt | 30 ++++++++++++++++++++++++++++++
+>>>  1 file changed, 30 insertions(+)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/pci/tango-pcie.txt b/Documentation/devicetree/bindings/pci/tango-pcie.txt
+>>> new file mode 100644
+>>> index 000000000000..35ef2c811a27
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/pci/tango-pcie.txt
+>>> @@ -0,0 +1,30 @@
+>>> +Sigma Designs Tango PCIe controller
+>>> +
+>>> +Required properties:
+>>> +
+>>> +- compatible: "sigma,smp8759-pcie"
+>>> +- reg: address/size of PCI configuration space, address/size of register area
+>>> +- device_type: "pci"
+>>> +- #size-cells: <2>
+>>> +- #address-cells: <3>
+>>> +- msi-controller
+>>> +- ranges: translation from system to bus addresses
+>>> +- interrupts: spec for misc interrupts, spec for MSI
+>>> +
+>>> +http://elinux.org/Device_Tree_Usage#PCI_Address_Translation
+>>> +http://elinux.org/Device_Tree_Usage#Advanced_Interrupt_Mapping
+>>
+>> Why are these here?
+>
+> I found these references very helpful when writing the node.
 
-You're already in interrupt context, so there is no need to disable
-interrupts any further. spin_lock() should do the trick
+Yes, I refer to them regularly.
 
-Thanks,
+> Where would you put them? In the example?
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+They are useful to every PCI binding. That doesn't mean we should link
+to them in for every single PCI host binding doc. They belong in a DT
+howto or something if not there already.
+
+Rob
+
+>
+>> There's several standard properties you are missing like bus-range.
+>
+> My reasoning for omitting "bus-range" was that the PCI core computes
+> it by itself (1M per "bus" so SZ_4M => 4 devices). I thought redundant
+> information was bad form?
+>
+>> Build your dts with "W=2". dtc recently gained some checks for PCI
+>> bindings.
+>
+> I'll give it a try. Did v4.9 already support it?
+
+No, v4.12.
+
+>
+>>> +Example:
+>>> +
+>>> +    pcie at 2e000 {
+>>> +            compatible = "sigma,smp8759-pcie";
+>>> +            reg = <0x50000000 SZ_4M>, <0x2e000 0x100>;
+>>> +            device_type = "pci";
+>>> +            #size-cells = <2>;
+>>> +            #address-cells = <3>;
+>>> +            msi-controller;
+>>> +            ranges = <0x02000000 0x0 0x00400000  0x50400000  0x0 SZ_60M>;
+>>
+>> I don't think SZ_60M exists or is available to dts files. Just put the
+>> number in.
+>
+> I #defined it at the top of my DTS.
+> Using symbolic constants in DTS is not acceptable?
+
+We generally don't use them here (i.e. for reg). The main use is for
+things also used by drivers like GPIO flags or IDs such as clock IDs.
+So please drop these.
+
+Rob
