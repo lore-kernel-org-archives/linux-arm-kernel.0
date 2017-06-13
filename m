@@ -1,168 +1,79 @@
 From: peter.chen@nxp.com (Peter Chen)
-Date: Tue, 13 Jun 2017 09:59:23 +0800
-Subject: [PATCH v15 4/7] usb: core: add power sequence handling for USB devices
+Date: Tue, 13 Jun 2017 09:59:26 +0800
+Subject: [PATCH v15 7/7] ARM: dts: imx6q-evi: Fix onboard hub reset line
 In-Reply-To: <1497319166-17287-1-git-send-email-peter.chen@nxp.com>
 References: <1497319166-17287-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1497319166-17287-5-git-send-email-peter.chen@nxp.com>
+Message-ID: <1497319166-17287-8-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some hard-wired USB devices need to do power sequence to let the
-device work normally, the typical power sequence like: enable USB
-PHY clock, toggle reset pin, etc. But current Linux USB driver
-lacks of such code to do it, it may cause some hard-wired USB devices
-works abnormal or can't be recognized by controller at all.
+From: Joshua Clayton <stillcompiling@gmail.com>
 
-In this patch, it calls power sequence library APIs to finish
-the power sequence events. It will do power on sequence at hub's
-probe for all devices under this hub (includes root hub).
-At hub_disconnect, it will do power off sequence which is at powered
-on list.
+Previously the onboard hub was made to work by treating its
+reset gpio as a regulator enable.
+Get rid of that kludge now that pwseq has added reset gpio support
+Move pin muxing the hub reset pin into the usbh1 group
 
+Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
 Signed-off-by: Peter Chen <peter.chen@nxp.com>
-Tested-by Joshua Clayton <stillcompiling@gmail.com>
-Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
-Reviewed-by: Vaibhav Hiremath <hvaibhav.linux@gmail.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
 ---
- drivers/usb/Kconfig    |  1 +
- drivers/usb/core/hub.c | 49 +++++++++++++++++++++++++++++++++++++++++++++----
- drivers/usb/core/hub.h |  1 +
- 3 files changed, 47 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/imx6q-evi.dts | 25 +++++++------------------
+ 1 file changed, 7 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/usb/Kconfig b/drivers/usb/Kconfig
-index 939a63b..b6f626e 100644
---- a/drivers/usb/Kconfig
-+++ b/drivers/usb/Kconfig
-@@ -39,6 +39,7 @@ config USB
- 	tristate "Support for Host-side USB"
- 	depends on USB_ARCH_HAS_HCD
- 	select USB_COMMON
-+	select POWER_SEQUENCE
- 	select NLS  # for UTF-8 strings
- 	---help---
- 	  Universal Serial Bus (USB) is a specification for a serial bus
-diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
-index 9dca59e..0439d4f 100644
---- a/drivers/usb/core/hub.c
-+++ b/drivers/usb/core/hub.c
-@@ -28,6 +28,7 @@
- #include <linux/mutex.h>
- #include <linux/random.h>
- #include <linux/pm_qos.h>
-+#include <linux/power/pwrseq.h>
+diff --git a/arch/arm/boot/dts/imx6q-evi.dts b/arch/arm/boot/dts/imx6q-evi.dts
+index fd2220a..24fe093 100644
+--- a/arch/arm/boot/dts/imx6q-evi.dts
++++ b/arch/arm/boot/dts/imx6q-evi.dts
+@@ -54,18 +54,6 @@
+ 		reg = <0x10000000 0x40000000>;
+ 	};
  
- #include <linux/uaccess.h>
- #include <asm/byteorder.h>
-@@ -1619,6 +1620,7 @@ static void hub_disconnect(struct usb_interface *intf)
- 	hub->error = 0;
- 	hub_quiesce(hub, HUB_DISCONNECT);
- 
-+	of_pwrseq_off_list(&hub->pwrseq_list);
- 	mutex_lock(&usb_port_peer_mutex);
- 
- 	/* Avoid races with recursively_mark_NOTATTACHED() */
-@@ -1646,12 +1648,42 @@ static void hub_disconnect(struct usb_interface *intf)
- 	kref_put(&hub->kref, hub_release);
- }
- 
-+#ifdef CONFIG_OF
-+static int hub_of_pwrseq_on(struct usb_hub *hub)
-+{
-+	struct device *parent;
-+	struct usb_device *hdev = hub->hdev;
-+	struct device_node *np;
-+	int ret;
-+
-+	if (hdev->parent)
-+		parent = &hdev->dev;
-+	else
-+		parent = bus_to_hcd(hdev->bus)->self.sysdev;
-+
-+	for_each_child_of_node(parent->of_node, np) {
-+		ret = of_pwrseq_on_list(np, &hub->pwrseq_list);
-+		/* Maybe no power sequence library is chosen */
-+		if (ret && ret != -ENOENT)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+#else
-+static int hub_of_pwrseq_on(struct usb_hub *hub)
-+{
-+	return 0;
-+}
-+#endif
-+
- static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
- {
- 	struct usb_host_interface *desc;
- 	struct usb_endpoint_descriptor *endpoint;
- 	struct usb_device *hdev;
- 	struct usb_hub *hub;
-+	int ret = -ENODEV;
- 
- 	desc = intf->cur_altsetting;
- 	hdev = interface_to_usbdev(intf);
-@@ -1756,6 +1788,7 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
- 	INIT_DELAYED_WORK(&hub->leds, led_work);
- 	INIT_DELAYED_WORK(&hub->init_work, NULL);
- 	INIT_WORK(&hub->events, hub_event);
-+	INIT_LIST_HEAD(&hub->pwrseq_list);
- 	usb_get_intf(intf);
- 	usb_get_dev(hdev);
- 
-@@ -1769,11 +1802,14 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
- 	if (id->driver_info & HUB_QUIRK_CHECK_PORT_AUTOSUSPEND)
- 		hub->quirk_check_port_auto_suspend = 1;
- 
--	if (hub_configure(hub, endpoint) >= 0)
--		return 0;
-+	if (hub_configure(hub, endpoint) >= 0) {
-+		ret = hub_of_pwrseq_on(hub);
-+		if (!ret)
-+			return 0;
-+	}
- 
- 	hub_disconnect(intf);
--	return -ENODEV;
-+	return ret;
- }
- 
- static int
-@@ -3593,14 +3629,19 @@ static int hub_suspend(struct usb_interface *intf, pm_message_t msg)
- 
- 	/* stop hub_wq and related activity */
- 	hub_quiesce(hub, HUB_SUSPEND);
--	return 0;
-+	return pwrseq_suspend_list(&hub->pwrseq_list);
- }
- 
- static int hub_resume(struct usb_interface *intf)
- {
- 	struct usb_hub *hub = usb_get_intfdata(intf);
-+	int ret;
- 
- 	dev_dbg(&intf->dev, "%s\n", __func__);
-+	ret = pwrseq_resume_list(&hub->pwrseq_list);
-+	if (ret)
-+		return ret;
-+
- 	hub_activate(hub, HUB_RESUME);
- 	return 0;
- }
-diff --git a/drivers/usb/core/hub.h b/drivers/usb/core/hub.h
-index 34c1a7e..27f56a6 100644
---- a/drivers/usb/core/hub.h
-+++ b/drivers/usb/core/hub.h
-@@ -78,6 +78,7 @@ struct usb_hub {
- 	struct delayed_work	init_work;
- 	struct work_struct      events;
- 	struct usb_port		**ports;
-+	struct list_head	pwrseq_list; /* powered pwrseq node list */
+-	reg_usbh1_vbus: regulator-usbhubreset {
+-		compatible = "regulator-fixed";
+-		regulator-name = "usbh1_vbus";
+-		regulator-min-microvolt = <5000000>;
+-		regulator-max-microvolt = <5000000>;
+-		enable-active-high;
+-		startup-delay-us = <2>;
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_usbh1_hubreset>;
+-		gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
+-	};
+-
+ 	reg_usb_otg_vbus: regulator-usbotgvbus {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "usb_otg_vbus";
+@@ -204,12 +192,18 @@
  };
  
- /**
+ &usbh1 {
+-	vbus-supply = <&reg_usbh1_vbus>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_usbh1>;
+ 	dr_mode = "host";
+ 	disable-over-current;
+ 	status = "okay";
++
++	usb2415host: hub at 1 {
++		compatible = "usb424,2513";
++		reg = <1>;
++		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
++		reset-duration-us = <3000>;
++	};
+ };
+ 
+ &usbotg {
+@@ -465,11 +459,6 @@
+ 			MX6QDL_PAD_GPIO_3__USB_H1_OC 0x1b0b0
+ 			/* usbh1_b OC */
+ 			MX6QDL_PAD_GPIO_0__GPIO1_IO00 0x1b0b0
+-		>;
+-	};
+-
+-	pinctrl_usbh1_hubreset: usbh1hubresetgrp {
+-		fsl,pins = <
+ 			MX6QDL_PAD_GPIO_17__GPIO7_IO12 0x1b0b0
+ 		>;
+ 	};
 -- 
 2.7.4
