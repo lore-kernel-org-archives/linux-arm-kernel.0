@@ -1,34 +1,80 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 13 Jun 2017 15:36:44 +0200
-Subject: [PATCH 2/2] ASoC: tegra: remove Whistler machine driver
-In-Reply-To: <20170413185559.1939-2-swarren@wwwdotorg.org>
-References: <20170413185559.1939-1-swarren@wwwdotorg.org>
- <20170413185559.1939-2-swarren@wwwdotorg.org>
-Message-ID: <20170613133644.GF16758@ulmo.fritz.box>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 13 Jun 2017 15:40:37 +0200
+Subject: [PATCH 1/2] tty/serial: atmel: remove atmel_default_console_device
+ handling
+Message-ID: <20170613134038.5545-1-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 13, 2017 at 12:55:59PM -0600, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> The previous patch removed Whistler board support. There's no need to
-> keep around a Whistler-specific ASoC machine driver.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
->  .../bindings/sound/nvidia,tegra-audio-wm8753.txt   |  40 ----
->  sound/soc/tegra/Kconfig                            |  10 -
->  sound/soc/tegra/Makefile                           |   4 +-
->  sound/soc/tegra/tegra_wm8753.c                     | 219 ---------------------
->  4 files changed, 1 insertion(+), 272 deletions(-)
->  delete mode 100644 Documentation/devicetree/bindings/sound/nvidia,tegra-audio-wm8753.txt
->  delete mode 100644 sound/soc/tegra/tegra_wm8753.c
+atmel_default_console_device was only used by AVR32, in particular
+arch/avr32/mach-at32ap/at32ap700x.c which is now gone. Remove it from the
+driver.
 
-Acked-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170613/d8b63d2c/attachment.sig>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/tty/serial/atmel_serial.c | 43 ---------------------------------------
+ 1 file changed, 43 deletions(-)
+
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index c355ac9abafc..906e2b91bf57 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -2460,8 +2460,6 @@ static int atmel_init_port(struct atmel_uart_port *atmel_port,
+ 	return 0;
+ }
+ 
+-struct platform_device *atmel_default_console_device;	/* the serial console device */
+-
+ #ifdef CONFIG_SERIAL_ATMEL_CONSOLE
+ static void atmel_console_putchar(struct uart_port *port, int ch)
+ {
+@@ -2594,47 +2592,6 @@ static struct console atmel_console = {
+ 
+ #define ATMEL_CONSOLE_DEVICE	(&atmel_console)
+ 
+-/*
+- * Early console initialization (before VM subsystem initialized).
+- */
+-static int __init atmel_console_init(void)
+-{
+-	int ret;
+-	if (atmel_default_console_device) {
+-		struct atmel_uart_data *pdata =
+-			dev_get_platdata(&atmel_default_console_device->dev);
+-		int id = pdata->num;
+-		struct atmel_uart_port *atmel_port = &atmel_ports[id];
+-
+-		atmel_port->backup_imr = 0;
+-		atmel_port->uart.line = id;
+-
+-		add_preferred_console(ATMEL_DEVICENAME, id, NULL);
+-		ret = atmel_init_port(atmel_port, atmel_default_console_device);
+-		if (ret)
+-			return ret;
+-		register_console(&atmel_console);
+-	}
+-
+-	return 0;
+-}
+-
+-console_initcall(atmel_console_init);
+-
+-/*
+- * Late console initialization.
+- */
+-static int __init atmel_late_console_init(void)
+-{
+-	if (atmel_default_console_device
+-	    && !(atmel_console.flags & CON_ENABLED))
+-		register_console(&atmel_console);
+-
+-	return 0;
+-}
+-
+-core_initcall(atmel_late_console_init);
+-
+ static inline bool atmel_is_console_port(struct uart_port *port)
+ {
+ 	return port->cons && port->cons->index == port->line;
+-- 
+2.11.0
