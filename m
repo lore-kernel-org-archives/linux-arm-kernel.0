@@ -1,39 +1,46 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 13 Jun 2017 18:35:08 +0200
-Subject: [Merge tag 'pci-v4.12-changes' of git] 857f864014: BUG: unable
- to handle kernel NULL pointer dereference at 00000000000000a8
-In-Reply-To: <8462abee-0a7f-00fb-6111-1f78362ea3f7@deltatee.com>
-References: <5933fe2d.V33ODGPU9noDVuyF%fengguang.wu@intel.com>
- <20170606175552.GA12672@bhelgaas-glaptop.roam.corp.google.com>
- <fe0543c1-cba6-02bb-36eb-395910bd5012@deltatee.com>
- <20170612200852.GA28578@bhelgaas-glaptop.roam.corp.google.com>
- <61e11e67-6c1b-ef1e-5fb8-a7c9efb17666@deltatee.com>
- <20170613041842.GA13308@kroah.com>
- <f6322f70-7ca7-abf6-b947-4cbbfd598948@deltatee.com>
- <20170613043416.GB14217@kroah.com>
- <20170613043518.GA14621@kroah.com>
- <8462abee-0a7f-00fb-6111-1f78362ea3f7@deltatee.com>
-Message-ID: <20170613163508.GA31961@kroah.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 13 Jun 2017 09:39:59 -0700
+Subject: [PATCH] bus: SIMPLE_PM_BUS does not depend on ARCH_RENESAS
+In-Reply-To: <20170613130430.4272-1-robdclark@gmail.com>
+References: <20170613130430.4272-1-robdclark@gmail.com>
+Message-ID: <20170613163959.GU12920@tuxbook>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 13, 2017 at 10:25:40AM -0600, Logan Gunthorpe wrote:
-> 
-> 
-> On 12/06/17 10:35 PM, Greg Kroah-Hartman wrote:
-> > Or better yet, just turn all char major allocations into dynamic, which
-> > would be really good for test systems.  I thought someone proposed
-> > patches for that a long time ago, but I can't find them anymore.  That
-> > would be the simplest solution here.
-> 
-> Would people not complain about that? I would not be surprised if some
-> crazy application is using hard coded major numbers in userspace. So
-> such a change could potentially break userspace...
++cc Geert, Simon, linux-pm
 
-For char devices, I doubt it, but we can't take the chance, which is why
-you make it an option.  Then, it's enabled for 'allmodconfig' builds,
-which helps testers out.
+On Tue 13 Jun 06:04 PDT 2017, Rob Clark wrote:
 
-thanks,
+> In fact, it is needed for PCI to work on msm8996 (and probably other
+> things).  No idea why it was depending on renesas but that doesn't make
+> any sense.  So drop the dependency.
+> 
 
-greg k-h
+This is in line with Geert's previous comments on how to utilize
+simple-pm-bus to describe this hardware.
+
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+
+Regards,
+Bjorn
+
+> Signed-off-by: Rob Clark <robdclark@gmail.com>
+> ---
+>  drivers/bus/Kconfig | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+> index 0a52da4..b83c535 100644
+> --- a/drivers/bus/Kconfig
+> +++ b/drivers/bus/Kconfig
+> @@ -121,7 +121,6 @@ config QCOM_EBI2
+>  config SIMPLE_PM_BUS
+>  	bool "Simple Power-Managed Bus Driver"
+>  	depends on OF && PM
+> -	depends on ARCH_RENESAS || COMPILE_TEST
+>  	help
+>  	  Driver for transparent busses that don't need a real driver, but
+>  	  where the bus controller is part of a PM domain, or under the control
+> -- 
+> 2.9.4
+> 
