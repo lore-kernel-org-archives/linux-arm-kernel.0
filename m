@@ -1,87 +1,67 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 13 Jun 2017 15:57:07 +0200
-Subject: [PATCH v3 2/6] arm64: dts: marvell: armada-3720-db: Add information
- about the V2 board
-In-Reply-To: <20170613135711.7622-1-gregory.clement@free-electrons.com>
-References: <20170613135711.7622-1-gregory.clement@free-electrons.com>
-Message-ID: <20170613135711.7622-3-gregory.clement@free-electrons.com>
+From: jolsa@redhat.com (Jiri Olsa)
+Date: Tue, 13 Jun 2017 16:06:20 +0200
+Subject: [PATCH 0/2] arm64: fix crash when reading /proc/kcore
+In-Reply-To: <CAKv+Gu_GqUPDjie0kqV32fs8ZobXe7T2KcdBmE3RuqSYaz6f1Q@mail.gmail.com>
+References: <20170608194139.9250-1-ard.biesheuvel@linaro.org>
+ <593F4721.7000501@huawei.com>
+ <CAKv+Gu_GqUPDjie0kqV32fs8ZobXe7T2KcdBmE3RuqSYaz6f1Q@mail.gmail.com>
+Message-ID: <20170613140620.GA10107@krava>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The initial device tree file was for the board V1.4. Now the V2.0 board
-is also available. The same dtb will work for both, but the CON number
-have changed, so update the comment in the dts to reflect this.
+On Tue, Jun 13, 2017 at 09:17:49AM +0200, Ard Biesheuvel wrote:
+> On 13 June 2017 at 04:00, Tan Xiaojun <tanxiaojun@huawei.com> wrote:
+> > On 2017/6/9 3:41, Ard Biesheuvel wrote:
+> >> This is a follow-up to patches from zhonjiang [0] and myself [1] that aim
+> >> to solve a problem in the kcore code, which gets confused by the presence
+> >> of block mappings in the vmalloc region.
+> >>
+> >> While fixing the crash is quite straight forward [2], we need to tweak
+> >> the kcore code itself to ensure that it operates correctly on arm64.
+> >> Fortunately, we can achieve this with two very simple changes:
+> >>
+> >> - replace a call to is_vmalloc_or_module_addr() in read_kcore() with a
+> >>   comparison of the kclist type field (#1)
+> >> - enable CONFIG_ARCH_PROC_KCORE_TEXT for arm64 (#2)
+> >>
+> >> [0] http://marc.info/?l=linux-mm&m=149632393629295&w=2
+> >> [1] http://marc.info/?l=linux-mm&m=149685966530180&w=2
+> >> [2] http://marc.info/?l=linux-mm&m=149694975123959&w=2
+> >>
+> >> Ard Biesheuvel (2):
+> >>   fs/proc: kcore: use kcore_list type to check for vmalloc/module
+> >>     address
+> >>   arm64: mm: select CONFIG_ARCH_PROC_KCORE_TEXT
+> >>
+> >>  arch/arm64/Kconfig | 3 +++
+> >>  fs/proc/kcore.c    | 2 +-
+> >>  2 files changed, 4 insertions(+), 1 deletion(-)
+> >>
+> >
+> > Reported-by: Tan Xiaojun <tanxiaojun@huawei.com>
+> > Tested-by: Tan Xiaojun <tanxiaojun@huawei.com>
+> >
+> > Thank you for working on this problem which I reported two months ago.
+> >
+> > https://patchwork.kernel.org/patch/9687319/
+> >
+> > I tested, and it really solved the problem in Hisilicon D02/D03/D05.
+> >
+> 
+> Thank you.
+> 
+> fs/proc/kcore.c does not have a maintainer according to
+> get_maintainer.pl but it would be nice if we could get an ack on patch
+> #1 from someone who is not a usual ARM suspect.
+> 
+> Patch #1 is here:
+> http://marc.info/?l=linux-kernel&m=149695092424288&w=2
+> 
+> Ingo, Andrew, Jiri, any objections?
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm64/boot/dts/marvell/armada-3720-db.dts | 17 +++++++++++++----
- 1 file changed, 13 insertions(+), 4 deletions(-)
+hi,
+pretty straightforward.. looks ok to me
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-index d6f12fafac6c..3ee920ac0015 100644
---- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-@@ -42,6 +42,10 @@
-  *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-  *     OTHER DEALINGS IN THE SOFTWARE.
-+ *
-+ * This file is compatible with the version 1.4 and the version 2.0 of
-+ * the board, however the CON numbers are different between the 2
-+ * version
-  */
- 
- /dts-v1/;
-@@ -78,6 +82,7 @@
- 	};
- };
- 
-+/* Gigabit module on CON19(V2.0)/CON21(V1.4) */
- &eth0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&rgmii_pins>;
-@@ -86,6 +91,7 @@
- 	status = "okay";
- };
- 
-+/* Gigabit module on CON18(V2.0)/CON20(V1.4) */
- &eth1 {
- 	phy-mode = "sgmii";
- 	phy = <&phy1>;
-@@ -133,7 +139,7 @@
- 	};
- };
- 
--/* CON17 (PCIe) / CON12 (mini-PCIe) */
-+/* CON15(V2.0)/CON17(V1.4) : PCIe / CON15(V2.0)/CON12(V1.4) :mini-PCIe */
- &pcie0 {
- 	status = "okay";
- };
-@@ -184,19 +190,22 @@
- 	};
- };
- 
--/* Exported on the micro USB connector CON32 through an FTDI */
-+/*
-+ * Exported on the micro USB connector CON30(V2.0)/CON32(V1.4) through
-+ * an FTDI
-+ */
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart1_pins>;
- 	status = "okay";
- };
- 
--/* CON27 */
-+/* CON27(V2.0)/CON29(V1.4) */
- &usb2 {
- 	status = "okay";
- };
- 
--/* CON31 */
-+/* CON29(V2.0)/CON31(V1.4) */
- &usb3 {
- 	status = "okay";
- 	usb-phy = <&usb3_phy>;
--- 
-2.11.0
+Reviewed-by: Jiri Olsa <jolsa@kernel.org>
+
+jirka
