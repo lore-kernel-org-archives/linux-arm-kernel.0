@@ -1,83 +1,62 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Tue, 13 Jun 2017 09:59:25 +0800
-Subject: [PATCH v15 6/7] ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB
- property
-In-Reply-To: <1497319166-17287-1-git-send-email-peter.chen@nxp.com>
-References: <1497319166-17287-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1497319166-17287-7-git-send-email-peter.chen@nxp.com>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Tue, 13 Jun 2017 10:55:47 +0800
+Subject: [PATCH V4 0/7]  tty: serial: lpuart: add imx7ulp support
+Message-ID: <1497322554-24463-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current dts describes USB HUB's property at USB controller's
-entry, it is improper. The USB HUB should be the child node
-under USB controller, and power sequence properties are under
-it. Besides, using gpio pinctrl setting for USB2415's reset pin.
+The lpuart in imx7ulp is basically the same as ls1021a. It's also
+32 bit width register, but unlike ls1021a, it's little endian.
+Besides that, imx7ulp lpuart has a minor different register layout
+from ls1021a that it has four extra registers (verid, param, global,
+pincfg) located at the beginning of register map, which are currently
+not used by the driver and less to be used later.
 
-Signed-off-by: Peter Chen <peter.chen@nxp.com>
-Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
-Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
----
- arch/arm/boot/dts/imx6qdl-udoo.dtsi | 26 ++++++++++++--------------
- 1 file changed, 12 insertions(+), 14 deletions(-)
+Furthermore, this patch serial also add a new more accurate baud rate
+calculation method as MX7ULP can't divide a suitable baud rate
+with the default setting.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-udoo.dtsi b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-index c96c91d..a173de2 100644
---- a/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-@@ -9,6 +9,8 @@
-  *
-  */
- 
-+#include <dt-bindings/gpio/gpio.h>
-+
- / {
- 	aliases {
- 		backlight = &backlight;
-@@ -58,17 +60,6 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		reg_usb_h1_vbus: regulator at 0 {
--			compatible = "regulator-fixed";
--			reg = <0>;
--			regulator-name = "usb_h1_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			enable-active-high;
--			startup-delay-us = <2>; /* USB2415 requires a POR of 1 us minimum */
--			gpio = <&gpio7 12 0>;
--		};
--
- 		reg_panel: regulator at 1 {
- 			compatible = "regulator-fixed";
- 			reg = <1>;
-@@ -188,7 +179,7 @@
- 
- 		pinctrl_usbh: usbhgrp {
- 			fsl,pins = <
--				MX6QDL_PAD_GPIO_17__GPIO7_IO12 0x80000000
-+				MX6QDL_PAD_GPIO_17__GPIO7_IO12	0x1b0b0
- 				MX6QDL_PAD_NANDF_CS2__CCM_CLKO2 0x130b0
- 			>;
- 		};
-@@ -259,9 +250,16 @@
- &usbh1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usbh>;
--	vbus-supply = <&reg_usb_h1_vbus>;
--	clocks = <&clks IMX6QDL_CLK_CKO>;
- 	status = "okay";
-+
-+	usb2415: hub at 1 {
-+		compatible = "usb424,2514";
-+		reg = <1>;
-+
-+		clocks = <&clks IMX6QDL_CLK_CKO>;
-+		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
-+		reset-duration-us = <3000>;
-+	};
- };
- 
- &usdhc3 {
+Currently the new baud rate calculation is only enabled on MX7ULP.
+However, i guess the Layerscape may also be able to use it as there
+seems to be no difference in baud rate setting register after checking
+the Layerscape Reference Manual.
+
+As i don't have Layerscape boards, i can't test it, so i only enable it
+for MX7ULP by default to avoid a potential break.
+
+I copied LayerScape guys in this series and hope they can help test later.
+If it works on Layerscape as well, then they can switch to the new setting
+too and totally remove the old stuff.
+
+ChangeLog:
+v3->v4:
+ * Minor changes.
+   1) Remove one duplicated blank line
+   2) Removed on unneeded semicolon in switch catched by 0day Robot
+v2->v3:
+ * Remove global lpuart_is_be.
+   Instead use struct uart_port's iotype member.
+   lpuart32_read/write API prototype is also updated to use the iotype to
+   distingush the endians. And most importantly, this way also works with
+   earlycon.
+
+v1->v2:
+ * Patch 2/4/5 chagned, other no changes.
+   See individuals for details.
+
+Dong Aisheng (7):
+  tty: serial: lpuart: introduce lpuart_soc_data to represent SoC
+    property
+  tty: serial: lpuart: refactor lpuart32_{read|write} prototype
+  tty: serial: lpuart: add little endian 32 bit register support
+  dt-bindings: serial: fsl-lpuart: add i.MX7ULP support
+  tty: serial: lpuart: add imx7ulp support
+  tty: serial: lpuart: add earlycon support for imx7ulp
+  tty: serial: lpuart: add a more accurate baud rate calculation method
+
+ .../devicetree/bindings/serial/fsl-lpuart.txt      |   2 +
+ drivers/tty/serial/fsl_lpuart.c                    | 286 ++++++++++++++-------
+ 2 files changed, 201 insertions(+), 87 deletions(-)
+
 -- 
 2.7.4
