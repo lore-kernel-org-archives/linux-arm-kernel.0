@@ -1,91 +1,56 @@
-From: illusionist.neo@gmail.com (Shubham Bansal)
-Date: Tue, 13 Jun 2017 12:26:47 +0530
-Subject: [PATCH v2] arm: eBPF JIT compiler
-In-Reply-To: <CAHgaXd+DW2bggto=2S9hOdMrtPTvhD2QN4rPf2V8iHewQpg-YA@mail.gmail.com>
-References: <1495754003-21099-1-git-send-email-illusionist.neo@gmail.com>
- <CAGXu5jKmLNMR+uhM9Ov2XPW6kCjip_SjScgEH0fTFp6fQtKFiA@mail.gmail.com>
- <593E6B0F.8070901@iogearbox.net>
- <CAHgaXd+DW2bggto=2S9hOdMrtPTvhD2QN4rPf2V8iHewQpg-YA@mail.gmail.com>
-Message-ID: <CAHgaXdJrvKdzr3fJ1TMkC4foeVsZJDSVEwhDOeZGxQVsmoK2cQ@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 13 Jun 2017 10:06:12 +0300
+Subject: [PATCHv4 2/2] clk: keystone: Add sci-clk driver support
+In-Reply-To: <20170613020455.GQ20170@codeaurora.org>
+References: <1495458113-7366-1-git-send-email-t-kristo@ti.com>
+ <1495458113-7366-3-git-send-email-t-kristo@ti.com>
+ <20170613020455.GQ20170@codeaurora.org>
+Message-ID: <0b4a0ee6-0769-2112-d3dc-7c219eb9bbcc@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel, Kees, David, Russel,
+On 13/06/17 05:04, Stephen Boyd wrote:
+> On 05/22, Tero Kristo wrote:
+>> +
+>> +/**
+>> + * ti_sci_clk_probe - Probe function for the TI SCI clock driver
+>> + * @pdev: platform device pointer to be probed
+>> + *
+>> + * Probes the TI SCI clock device. Allocates a new clock provider
+>> + * and registers this to the common clock framework. Also applies
+>> + * any required flags to the identified clocks via clock lists
+>> + * supplied from DT. Returns 0 for success, negative error value
+>> + * for failure.
+>> + */
+>> +static int ti_sci_clk_probe(struct platform_device *pdev)
+>> +{
+>> +	struct device *dev = &pdev->dev;
+>> +	struct device_node *np = dev->of_node;
+>> +	struct sci_clk_provider *provider;
+>> +	const struct ti_sci_handle *handle;
+>> +	struct sci_clk_data *data;
+>> +	int ret;
+>> +
+>> +	data = (struct sci_clk_data *)of_device_get_match_data(dev);
+> 
+> It would be nice to avoid this cast, and also check for NULL
+> here. I tried to do it in a few minutes but then that caused a
+> problem with throwing away const on sci_clk_data. Can this be
+> resolved? We probably shouldn't be assigning the
+> sci_clk_data::clocks member anyway if the structure is const
+> assuming it goes into the read-only section. It may cause some
+> restructuring of the code though.
 
->> Any plans to implement above especially BPF_JMP | BPF_CALL in near future?
->> Reason why I'm asking is that i) currently the arm32 cBPF JIT implements
->> all of the cBPF extensions (except SKF_AD_RANDOM and SKF_AD_VLAN_TPID).
->> Some of the programs that were JITed before e.g. using SKF_AD_CPU would now
->> fall back to the eBPF interpreter due to lack of translation in JIT, but
->> also ii) that probably most (if not all) of eBPF programs use BPF helper
->> calls heavily, which will still redirect them to the interpreter right now
->> due to lack of BPF_JMP | BPF_CALL support, so it's really quite essential
->> to have it implemented.
->
-> I can try for BPF_JMP | BPF_CALL. I didn't do it last time because I
-> thought, it would make the code look messy and become pain to get it
-> through the review.
-> For this, I have to map eBPF arguments with arm ABI arguments and move
-> ebpf arguments to corresponding arm ABI arguments, as eBPF arguments
-> doesn't match with arm ABI arguments.
-> Let me try that if its possible.
+Yeah, thats a good catch. I just cooked up a fix for that, will post v5 
+of this patch alone in a bit.
 
-Okay. I looked at it, tried few different solutions also. There is a
-problem with implementing BPF_JMP | BPF_CALL.
-Problem is transition between 4 byte and 8 byte arguments. Lets take a
-look a the following example to get a more clear look at the problem.
+Basically I moved the sci_clk_data->clocks to the provider itself so the 
+sci_clk_data can remain const.
 
-Lets consider this function :
-CASE 1:                            foo(int a, int b, long long c, int d)
-For calling this function in arm 32 arch, I have to pass the arguments
-as following:
-                                         a -> r0
-                                         b -> r1
-                                         c -> r2, r3
-                                         d -> stack_top
+-Tero
 
-Now consider an another example function :
-CASE 2:                           bar(int a, int b, int c, int d)
-For calling this function in arm32 arch, I have to pass the arguments
-as following:
-                                       a -> r0
-                                       b -> r1
-                                       c -> r2
-                                       d -> r3
-
-So, you can clearly see the problem with it. There is no way of
-knowing which of the above way to pass the arguments. There are
-solutions possible:
-
-1. One thing I can do is look at the address of the function to call
-and pass the argument accordingly but thats not really a robust
-solution as we have to change the arm32 JIT each time we add any new
-BPF helper function.
-
-2. Another solution is, if any of you guys can assure/confirm me that
-there will be only 4 byte argument passed to BPF helper functions in
-arm32 as of now and in future including the pointer as well, then I
-can just assume that each argument is passed as 4 byte value and my
-trimming the 8byte arguments to 4 bytes arguments wouldn't be a
-problem. In that case, arguments for CASE 1 and CASE 2 will be passed
-in the same way, i.e.
-                                       a -> r0
-                                       b -> r1
-                                       c -> r2
-                                       d -> r3
-
-Let me know what you think. I don't think I can find the solution to
-this problem other than those mentioned above. Would love to here any
-ideas from you guys.
-
->> Did you also manage to get the BPF selftest suite running in the meantime
->> (tools/testing/selftests/bpf/)? There are a couple of programs that clang
->> will compile (test_pkt_access.o, test_xdp.o, test_l4lb.o, test_tcp_estats.o)
->> and then test run.
-I will run these tests tonight. Hopefully I will be able to run them.
-
-Any comments are welcome. Would love to here what you think about my
-solutions above.
-
-Thanks.
-Shubham
+> 
+>> +
+>> +	handle = devm_ti_sci_get_handle(dev);
+>> +	if (IS_ERR(handle))
+>> +		return PTR_ERR(handle);
