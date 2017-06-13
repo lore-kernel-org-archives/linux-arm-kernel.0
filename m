@@ -1,47 +1,67 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 13 Jun 2017 08:37:20 +0100
-Subject: [PATCH 1/2] arm: nommu: remove unused KTHREAD_SIZE definition
-In-Reply-To: <20170612170937.2969-1-jeremy.lefaure@lse.epita.fr>
-References: <20170612170937.2969-1-jeremy.lefaure@lse.epita.fr>
-Message-ID: <331b6524-acd6-37ec-df72-9b8b2f3eec97@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 13 Jun 2017 09:41:28 +0200
+Subject: [linux-sunxi] Re: [PATCH v2 01/11] dt-bindings: update the
+ binding for Allwinner H3 TVE support
+In-Reply-To: <53E8FC74-8AC0-461A-B875-812EE4A3267E@aosc.io>
+References: <20170604160149.30230-1-icenowy@aosc.io>
+ <20170604160149.30230-2-icenowy@aosc.io>
+ <20170607084544.kgclybyxxttfk3ko@flea.lan>
+ <092D4797-0034-4C39-A30A-92CFAB23AAF8@aosc.io>
+ <20170609164915.enap3epreg5vr2gy@flea.home>
+ <53E8FC74-8AC0-461A-B875-812EE4A3267E@aosc.io>
+Message-ID: <20170613074128.q4mhf46gogn6jhvl@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/06/17 18:09, J?r?my Lefaure wrote:
-> I didn't find any use of this macro in the current kernel tree (with git
-> grep). KTHREAD_SIZE is no longer used for a very very long time. So
-> let's remove this definition.
+On Sat, Jun 10, 2017 at 12:51:02AM +0800, Icenowy Zheng wrote:
 > 
-> Signed-off-by: J?r?my Lefaure <jeremy.lefaure@lse.epita.fr>
-> ---
->  arch/arm/include/asm/page-nommu.h | 6 ------
->  1 file changed, 6 deletions(-)
 > 
-> diff --git a/arch/arm/include/asm/page-nommu.h b/arch/arm/include/asm/page-nommu.h
-> index 503f488053de..8f2c47bec375 100644
-> --- a/arch/arm/include/asm/page-nommu.h
-> +++ b/arch/arm/include/asm/page-nommu.h
-> @@ -11,12 +11,6 @@
->  #ifndef _ASMARM_PAGE_NOMMU_H
->  #define _ASMARM_PAGE_NOMMU_H
->  
-> -#if !defined(CONFIG_SMALL_TASKS) && PAGE_SHIFT < 13
-> -#define KTHREAD_SIZE (8192)
-> -#else
-> -#define KTHREAD_SIZE PAGE_SIZE
-> -#endif
-> - 
->  #define clear_page(page)	memset((page), 0, PAGE_SIZE)
->  #define copy_page(to,from)	memcpy((to), (from), PAGE_SIZE)
->  
+> ? 2017?6?10? GMT+08:00 ??12:49:15, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
+> >On Wed, Jun 07, 2017 at 04:48:50PM +0800, Icenowy Zheng wrote:
+> >> >> @@ -189,6 +211,8 @@ supported.
+> >> >>  Required properties:
+> >> >>    - compatible: value must be one of:
+> >> >>      * allwinner,sun8i-v3s-de2-mixer
+> >> >> +    * allwinner,sun8i-h3-de2-mixer0
+> >> >> +    * allwinner,sun8i-h3-de2-mixer1
+> >> >
+> >> >Again, please explain why we need to have different compatibles
+> >> >here. If it's only about the number of planes, this should be dealt
+> >> >with a property, not a compatible.
+> >> 
+> >> Only mixer0 has "VEP" and write-back support, at least on H3.
+> >
+> >What is that VEP? writeback support can also be expressed by a
+> >property.
 > 
+> I don't know what VEP is...
 
-Even more, CONFIG_SMALL_TASKS has gone and only page size we support is 4K.
+Ok. Let's forget about it at the moment then, especially if it's
+optional, we can add support for it later.
 
-It looks like that similar patch has been submitted several times by different
-people but never got merged, so if it helps:
+> But we are really facing different cores, like sun50i-a64-mmc
+> and sun50i-a64-emmc.
 
-Reviewed-by: Vladimir Murzin <vladimir.murzin@arm.com>
+Not really. The eMMC and MMC controllers are *very* different. They
+behave (slightly) differently, the eMMC controller has more signals
+(8-bit bus, data strobe), can run at a higher frequency. You cannot
+have exactly the same driver (or rather code path) to handle
+both. Therefore the need for some other compatible.
 
-Cheers
-Vladimir
+This is not the case for the mixer here. The thing that differs
+between instances is not behaviour but data. And we provide most of
+the data through DT.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170613/d698086e/attachment.sig>
