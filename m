@@ -1,52 +1,36 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 13 Jun 2017 22:25:17 +0200
-Subject: [PATCH] tty/serial: remove AVR32 specific access wrappers
-Message-ID: <20170613202517.26558-1-alexandre.belloni@free-electrons.com>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Tue, 13 Jun 2017 13:32:19 -0700
+Subject: [PATCH] dt-bindings: Drop k2g genpd device ID macros
+In-Reply-To: <ca91000a-627b-a655-4304-b64b78bbcf9a@ti.com>
+References: <20170522183737.24946-1-d-gerlach@ti.com>
+ <20170531162850.mf6giowmxj5vetxq@rob-hp-laptop>
+ <ca91000a-627b-a655-4304-b64b78bbcf9a@ti.com>
+Message-ID: <fc503960-d225-895c-c993-974ba6c5a92d@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that AVR32 is gone, the specific wrappers for that architecture are
-unnecessary and will not be compiled anymore.
+On 6/13/2017 1:16 PM, Dave Gerlach wrote:
+> Santosh,
+> On 05/31/2017 11:28 AM, Rob Herring wrote:
+>> On Mon, May 22, 2017 at 01:37:37PM -0500, Dave Gerlach wrote:
+[...]
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/tty/serial/atmel_serial.c | 17 -----------------
- 1 file changed, 17 deletions(-)
+>>> [1] https://www.spinics.net/lists/arm-kernel/msg577079.html
+>>>
+>>>   .../devicetree/bindings/soc/ti/sci-pm-domain.txt   |  5 +-
+>>>   include/dt-bindings/genpd/k2g.h                    | 90 ----------------------
+>>>   2 files changed, 3 insertions(+), 92 deletions(-)
+>>>   delete mode 100644 include/dt-bindings/genpd/k2g.h
+>>
+>> Acked-by: Rob Herring <robh@kernel.org>
+>>
+> 
+> Gentle ping on this. If you're OK with the patch any chance you can pick it up?
+> 
+Sorry Dave I missed to pick this one in pull request for 4.13. Will pick 
+this
+one along with what Suman and Tero have been working for following merge
+window. Thanks for reminding about this one.
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 937d67f22fba..8bfc566df2da 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -228,21 +228,6 @@ static inline void atmel_uart_writel(struct uart_port *port, u32 reg, u32 value)
- 	__raw_writel(value, port->membase + reg);
- }
- 
--#ifdef CONFIG_AVR32
--
--/* AVR32 cannot handle 8 or 16bit I/O accesses but only 32bit I/O accesses */
--static inline u8 atmel_uart_read_char(struct uart_port *port)
--{
--	return __raw_readl(port->membase + ATMEL_US_RHR);
--}
--
--static inline void atmel_uart_write_char(struct uart_port *port, u8 value)
--{
--	__raw_writel(value, port->membase + ATMEL_US_THR);
--}
--
--#else
--
- static inline u8 atmel_uart_read_char(struct uart_port *port)
- {
- 	return __raw_readb(port->membase + ATMEL_US_RHR);
-@@ -253,8 +238,6 @@ static inline void atmel_uart_write_char(struct uart_port *port, u8 value)
- 	__raw_writeb(value, port->membase + ATMEL_US_THR);
- }
- 
--#endif
--
- #ifdef CONFIG_SERIAL_ATMEL_PDC
- static bool atmel_use_pdc_rx(struct uart_port *port)
- {
--- 
-2.11.0
+Regards,
+Santosh
