@@ -1,76 +1,34 @@
-From: jun.gao@mediatek.com (Jun Gao)
-Date: Tue, 13 Jun 2017 21:23:09 +0800
-Subject: [PATCH v4 2/2] arm: dts: Add Mediatek MT2701 i2c device node
-In-Reply-To: <ba658a59-7ef9-2340-57fa-3bcefa3f47ed@gmail.com>
-References: <1495784107-6711-1-git-send-email-jun.gao@mediatek.com>
- <1495784107-6711-3-git-send-email-jun.gao@mediatek.com>
- <1497268468.930.26.camel@mhfsdcap03>
- <dbfcfd5b-8812-8df2-40dc-42e889577c9a@gmail.com>
- <1497349452.930.36.camel@mhfsdcap03>
- <ba658a59-7ef9-2340-57fa-3bcefa3f47ed@gmail.com>
-Message-ID: <1497360189.930.42.camel@mhfsdcap03>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 13 Jun 2017 15:36:33 +0200
+Subject: [PATCH 1/2] ARM: tegra: remove Whistler support
+In-Reply-To: <20170413185559.1939-1-swarren@wwwdotorg.org>
+References: <20170413185559.1939-1-swarren@wwwdotorg.org>
+Message-ID: <20170613133633.GE16758@ulmo.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-06-13 at 14:52 +0200, Matthias Brugger wrote:
+On Thu, Apr 13, 2017 at 12:55:58PM -0600, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> On 13/06/17 12:24, Jun Gao wrote:
-> > On Tue, 2017-06-13 at 11:36 +0200, Matthias Brugger wrote:
-> >>
-> >> On 12/06/17 13:54, Jun Gao wrote:
-> >>> On Fri, 2017-05-26 at 15:35 +0800, Jun Gao wrote:
-> >>>> From: Jun Gao <jun.gao@mediatek.com>
-> >>>>
-> >>>> Add MT2701 i2c device node.
-> >>>>
-> >>>> Signed-off-by: Jun Gao <jun.gao@mediatek.com>
-> >>>> ---
-> >>>>    arch/arm/boot/dts/mt2701-evb.dts | 42 ++++++++++++++++++++++++++++++++++++++++
-> >>>>    arch/arm/boot/dts/mt2701.dtsi    | 42 ++++++++++++++++++++++++++++++++++++++++
-> >>>>    2 files changed, 84 insertions(+)
-> >> [...]
-> >>>
-> >>> Dear Matthias,
-> >>>
-> >>> Could you take this patch together with
-> >>> [PATCH v4 1/2]dt-bindings: i2c: Add Mediatek MT2701 i2c binding ?
-> >>>
-> >>> Thanks!
-> >>>
-> >>
-> >> They are both included in the pull request I send [1] [2], or do I miss
-> >> something?
-> >>
-> >> Regards,
-> >> Matthias
-> >>
-> >> [1]
-> >> https://github.com/mbgg/linux-mediatek/commit/729b7f8dbdaff270c53052897ea06486221a49a2
-> >> [2]
-> >> https://github.com/mbgg/linux-mediatek/commit/c6c301d3ff7531894257acc4f4a73928a109bda1
-> > 
-> > Dear Matthias,
-> > 
-> > Would you mind to use the same style as follows in i2c-mtk.txt of [2]?
-> > 
-> > "mediatek,mt2701-i2c", "mediatek,mt6577-i2c": for Mediatek MT2701
-> > "mediatek,mt6577-i2c": for Mediatek MT6577
-> > "mediatek,mt6589-i2c": for Mediatek MT6589
-> > "mediatek,mt7623-i2c", "mediatek,mt6577-i2c": for Mediatek MT7623
-> > "mediatek,mt8173-i2c": for Mediatek MT8173
-> > 
-> > 
-> > Thanks!
-> > 
+> Whistler is an ancient Tegra 2 reference board. I may have been the only
+> person who ever used it with upstream software, and I've just recycled
+> the board hardware. Hence, it makes sense to remove support from software.
 > 
-> You mean I should fix-up the patch to fit to the new binding 
-> description? Or do you mean it should be MTxxxx instead of mtxxxx?
-> 
-> Regards,
-> Matthias
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+>  Documentation/devicetree/bindings/arm/tegra.txt |   1 -
+>  arch/arm/boot/dts/Makefile                      |   3 +-
+>  arch/arm/boot/dts/tegra20-whistler.dts          | 636 ------------------------
+>  3 files changed, 1 insertion(+), 639 deletions(-)
+>  delete mode 100644 arch/arm/boot/dts/tegra20-whistler.dts
 
-Dear Matthias,
+Applied, thanks.
 
-I mean fix-up the patch to fit to the new binding description. Is it OK?
-
-Thanks!
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170613/af140a24/attachment.sig>
