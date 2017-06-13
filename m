@@ -1,32 +1,65 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 13 Jun 2017 14:21:10 +0200
-Subject: [PATCH v2] clockevents/tcb_clksrc: implement suspend/resume
-In-Reply-To: <20170512182251.23948-1-alexandre.belloni@free-electrons.com>
-References: <20170512182251.23948-1-alexandre.belloni@free-electrons.com>
-Message-ID: <926f790a-3041-69fb-1501-2c8137f1ba65@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 13 Jun 2017 14:22:50 +0200
+Subject: [PATCH 3/4] arm64: dts: marvell: Enable second SDHCI controller
+ in Armada 37xx
+In-Reply-To: <20170613132547.5176af18@windsurf.lan> (Thomas Petazzoni's
+ message of "Tue, 13 Jun 2017 13:25:47 +0200")
+References: <20170608165125.27630-1-gregory.clement@free-electrons.com>
+ <20170608165125.27630-4-gregory.clement@free-electrons.com>
+ <20170608211702.27a7b560@free-electrons.com>
+ <87tw3k8aga.fsf@free-electrons.com>
+ <20170613132547.5176af18@windsurf.lan>
+Message-ID: <87poe884bp.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2017 20:22, Alexandre Belloni wrote:
-> On sama5d2, power to the core may be cut while entering suspend mode. It is
-> necessary to save and restore the TCB registers.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Hi Thomas,
+ 
+ On mar., juin 13 2017, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-The context will be saved/restored on all the platforms (other than
-sama5d2) using this timer even if the clock is not powered down. Is that ok?
+> Hello,
+>
+> On Tue, 13 Jun 2017 12:10:29 +0200, Gregory CLEMENT wrote:
+>
+>> >> +				reg = <0xd0000 0x300
+>> >> +				       0x1e808 0x4>;  
+>> >
+>> > I'd prefer:
+>> >
+>> > 				reg = <0xd0000 0x300>, <0x1e808 0x4>;  
+>> 
+>> For this one I think it is a matter of taste. I had a look on the other
+>> files and it seems more common to put them on multi lines that on one
+>> single line. And personally I prefer it, for me it seems more visible
+>> that we use 2 set of registers.
+>
+> I'm not talking about multiple lines vs. one line. I'm talking about:
+>
+> 	reg = <X Y
+> 	       A B>;
+>
+> vs.
+>
+> 	reg = <X Y>,
+> 	      <A B>;
 
-Should it be tagged for stable@?
+OK, this case I agree! And I also have to fix this file for the existing
+sdhci and xor node.
 
-Side note: the config option is in drivers/misc, any particular reason
-to have it there and not in the clocksource's Kconfig?
+Gregory
 
 
-
+>
+> Best regards,
+>
+> Thomas
+> -- 
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
