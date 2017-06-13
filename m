@@ -1,38 +1,48 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 13 Jun 2017 16:45:49 +0300
-Subject: [PATCH 2/3] ARM: dts: omap4: add SHAM node
-In-Reply-To: <1497361550-4735-1-git-send-email-t-kristo@ti.com>
-References: <1497361550-4735-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1497361550-4735-3-git-send-email-t-kristo@ti.com>
+Date: Tue, 13 Jun 2017 16:49:18 +0300
+Subject: [PATCHv2 0/5] OMAP4: crypto support
+In-Reply-To: <20170613092847.16732-1-sebastian.reichel@collabora.co.uk>
+References: <20170613092847.16732-1-sebastian.reichel@collabora.co.uk>
+Message-ID: <ab778bfd-9397-4cb0-0741-557da57bba83@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SHAM crypto accelerator.
+On 13/06/17 12:28, Sebastian Reichel wrote:
+> Hi,
+> 
+> This adds crypto support for OMAP4, which was missing for some reason.
+> This fixes error about missing hwmod on Droid 4. IP-Cores for AES and
+> DES are working according to selftest.
+> 
+> Changes since PATCHv1:
+>   * remove patch adding des_fck to DT
+>   * add patch removing aes[12]_fck from DT
+>   * add patch renaming hwmod aes to aes1 in DT
+>   * update hwmod patches according to feedback from Tero
+>   * add patch for aes2 hwmod
+> 
+> -- Sebastian
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/boot/dts/omap4.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+I just posted a few extra patches on top of this series, for adding the 
+missing dts data for aes2 and adding sham accelerator also. The dts data 
+should be applied first if you want to avoid any issues with hwmod core 
+complaining about missing DT data, so the sequencing of this series and 
+mine need to be done carefully.
 
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 00e7656..64d00f5 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -927,6 +927,15 @@
- 			dma-names = "tx", "rx";
- 		};
- 
-+		sham: sham at 4b100000 {
-+			compatible = "ti,omap4-sham";
-+			ti,hwmods = "sham";
-+			reg = <0x4b100000 0x300>;
-+			interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
-+			dmas = <&sdma 119>;
-+			dma-names = "rx";
-+		};
-+
- 		abb_mpu: regulator-abb-mpu {
- 			compatible = "ti,abb-v2";
- 			regulator-name = "abb_mpu";
--- 
-1.9.1
+The patches themselves in this series look fine now, so:
+
+Acked-by: Tero Kristo <t-kristo@ti.com>
+
+> 
+> Sebastian Reichel (5):
+>    ARM: dts: omap4: Fix aes entry
+>    ARM: dts: omap4.dtsi: remove aes[12]_fck
+>    ARM: OMAP4: hwmod data: add aes1
+>    ARM: OMAP4: hwmod data: add aes2
+>    ARM: OMAP4: hwmod data: add des
+> 
+>   arch/arm/boot/dts/omap4.dtsi               |   4 +-
+>   arch/arm/boot/dts/omap44xx-clocks.dtsi     |  16 -----
+>   arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 100 +++++++++++++++++++++++++++++
+>   3 files changed, 102 insertions(+), 18 deletions(-)
+> 
