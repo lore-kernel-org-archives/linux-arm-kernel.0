@@ -1,65 +1,40 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 13 Jun 2017 14:22:50 +0200
-Subject: [PATCH 3/4] arm64: dts: marvell: Enable second SDHCI controller
- in Armada 37xx
-In-Reply-To: <20170613132547.5176af18@windsurf.lan> (Thomas Petazzoni's
- message of "Tue, 13 Jun 2017 13:25:47 +0200")
-References: <20170608165125.27630-1-gregory.clement@free-electrons.com>
- <20170608165125.27630-4-gregory.clement@free-electrons.com>
- <20170608211702.27a7b560@free-electrons.com>
- <87tw3k8aga.fsf@free-electrons.com>
- <20170613132547.5176af18@windsurf.lan>
-Message-ID: <87poe884bp.fsf@free-electrons.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 13 Jun 2017 14:28:00 +0200
+Subject: [PATCH v2] clockevents/tcb_clksrc: implement suspend/resume
+In-Reply-To: <926f790a-3041-69fb-1501-2c8137f1ba65@linaro.org>
+References: <20170512182251.23948-1-alexandre.belloni@free-electrons.com>
+ <926f790a-3041-69fb-1501-2c8137f1ba65@linaro.org>
+Message-ID: <20170613122800.tic2c5c2p7nqz6dq@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On mar., juin 13 2017, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+On 13/06/2017 at 14:21:10 +0200, Daniel Lezcano wrote:
+> On 12/05/2017 20:22, Alexandre Belloni wrote:
+> > On sama5d2, power to the core may be cut while entering suspend mode. It is
+> > necessary to save and restore the TCB registers.
+> > 
+> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> 
+> The context will be saved/restored on all the platforms (other than
+> sama5d2) using this timer even if the clock is not powered down. Is that ok?
+> 
 
-> Hello,
->
-> On Tue, 13 Jun 2017 12:10:29 +0200, Gregory CLEMENT wrote:
->
->> >> +				reg = <0xd0000 0x300
->> >> +				       0x1e808 0x4>;  
->> >
->> > I'd prefer:
->> >
->> > 				reg = <0xd0000 0x300>, <0x1e808 0x4>;  
->> 
->> For this one I think it is a matter of taste. I had a look on the other
->> files and it seems more common to put them on multi lines that on one
->> single line. And personally I prefer it, for me it seems more visible
->> that we use 2 set of registers.
->
-> I'm not talking about multiple lines vs. one line. I'm talking about:
->
-> 	reg = <X Y
-> 	       A B>;
->
-> vs.
->
-> 	reg = <X Y>,
-> 	      <A B>;
+Yes, that is fine. There is not much we can do here until we can
+determine what is the target suspend state from the drivers.
 
-OK, this case I agree! And I also have to fix this file for the existing
-sdhci and xor node.
+> Should it be tagged for stable@?
+> 
 
-Gregory
+No because support for this suspend mode is not yet upstream.
 
+> Side note: the config option is in drivers/misc, any particular reason
+> to have it there and not in the clocksource's Kconfig?
+> 
 
->
-> Best regards,
->
-> Thomas
-> -- 
-> Thomas Petazzoni, CTO, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+Mostly historical, this is changed in the other series.
+
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
 http://free-electrons.com
