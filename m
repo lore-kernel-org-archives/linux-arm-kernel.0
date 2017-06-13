@@ -1,29 +1,30 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 13 Jun 2017 21:35:27 +0100
-Subject: [PATCH v6 5/8] regulator: hi6421v530: add driver for hi6421v530
- voltage regulator
-In-Reply-To: <20170608220841.26531-6-guodong.xu@linaro.org>
-References: <20170608220841.26531-1-guodong.xu@linaro.org>
- <20170608220841.26531-6-guodong.xu@linaro.org>
-Message-ID: <20170613203527.ecykjzzpvkrzl7zz@sirena.org.uk>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Tue, 13 Jun 2017 16:48:41 -0400
+Subject: [PATCH] bus: SIMPLE_PM_BUS does not depend on ARCH_RENESAS
+In-Reply-To: <20170613130430.4272-1-robdclark@gmail.com>
+References: <20170613130430.4272-1-robdclark@gmail.com>
+Message-ID: <20170613204841.GG19546@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 09, 2017 at 06:08:38AM +0800, Guodong Xu wrote:
-> From: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
+On Tue, Jun 13, 2017 at 09:04:30AM -0400, Rob Clark wrote:
+> In fact, it is needed for PCI to work on msm8996 (and probably other
+> things).  No idea why it was depending on renesas but that doesn't make
+> any sense.  So drop the dependency.
 > 
-> add the driver for hi6421v530 voltage regulator
+> Signed-off-by: Rob Clark <robdclark@gmail.com>
+> ---
+>  drivers/bus/Kconfig | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+> index 0a52da4..b83c535 100644
+> --- a/drivers/bus/Kconfig
+> +++ b/drivers/bus/Kconfig
+> @@ -121,7 +121,6 @@ config QCOM_EBI2
+>  config SIMPLE_PM_BUS
+>  	bool "Simple Power-Managed Bus Driver"
+>  	depends on OF && PM
+> -	depends on ARCH_RENESAS || COMPILE_TEST
 
-Please don't resubmit patches that have already been applied, you should
-submit patches against current code in the tree you're expecting things
-to be applied to.  If any updates are needed to a patch that's already
-been applied you should submit incremental patches which make those
-updates.  This avoids having to change published git commits which could
-cause problems for people working against git.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170613/f88b3ca0/attachment.sig>
+Do you really want to drop COMPILE_TEST?
