@@ -1,123 +1,74 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Tue, 13 Jun 2017 16:17:12 -0500
-Subject: [PATCH 00/17] coresight: next v4.12-rc4
-In-Reply-To: <CANLsYky8XLbOwinxVc2xKaNzhkpUOX0NsNxrFF4=MsjzC3iY1g@mail.gmail.com>
-References: <1496693718-9191-1-git-send-email-mathieu.poirier@linaro.org>
- <20170609175339.28d1d4d5a6c91a9e16c16bf7@arm.com>
- <CANLsYky8XLbOwinxVc2xKaNzhkpUOX0NsNxrFF4=MsjzC3iY1g@mail.gmail.com>
-Message-ID: <20170613161712.f1f3cac734939d8728c7ed77@arm.com>
+From: srishtishar@gmail.com (srishti sharma)
+Date: Wed, 14 Jun 2017 03:15:11 +0530
+Subject: [PATCH] Staging: vc04_services: bcm2835-audio: bcm2835-ctl.c:
+ Fixed alignment to match open parenthesis.
+In-Reply-To: <20170613144749.yn6z7yecumrfaayk@mwanda>
+References: <1497042442-3620-1-git-send-email-srishtishar@gmail.com>
+ <20170613130006.GA15978@kroah.com>
+ <CAB3L5oxNorqu6_WiseTjkr7N9i-doy=_4gxtwonCVcxQA3Nfrw@mail.gmail.com>
+ <20170613144749.yn6z7yecumrfaayk@mwanda>
+Message-ID: <CAB3L5oysSGvLBycn2u=ZqEB2YawCCnuCsTY1pnUqpesU75y5dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Jun 2017 10:50:43 -0600
-Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
+On Tue, Jun 13, 2017 at 8:17 PM, Dan Carpenter <dan.carpenter@oracle.com> wrote:
+> On Tue, Jun 13, 2017 at 08:07:14PM +0530, srishti sharma wrote:
+>> On Tue, Jun 13, 2017 at 6:30 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
+>> > On Sat, Jun 10, 2017 at 02:37:22AM +0530, srishti sharma wrote:
+>> >> Fixed alignment so that it matched open parenthesis.
+>> >>
+>> >> Signed-off-by: srishti sharma <srishtishar@gmail.com>
+>> >> ---
+>> >>  drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c | 2 +-
+>> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+>> >>
+>> >> diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
+>> >> index f484bb0..2148ed0 100644
+>> >> --- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
+>> >> +++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
+>> >> @@ -105,7 +105,7 @@ static int snd_bcm2835_ctl_get(struct snd_kcontrol *kcontrol,
+>> >>  }
+>> >>
+>> >>  static int snd_bcm2835_ctl_put(struct snd_kcontrol *kcontrol,
+>> >> -                             struct snd_ctl_elem_value *ucontrol)
+>> >> +                            struct snd_ctl_elem_value *ucontrol)
+>> >>  {
+>> >>       struct bcm2835_chip *chip = snd_kcontrol_chip(kcontrol);
+>> >>       int changed = 0;
+>> >
+>> > This patch is corrupted and can not be applied :(
+>>
+>>
+>> Why is this corrupted ?
+>
+> Try applying it with `git am`.  There should be space characters at the
+> start of these lines but your email client deleted them:
+>
+>         struct bcm2835_chip *chip = snd_kcontrol_chip(kcontrol);
+>         int changed = 0;
+>
+> Read Documentation/process/email-clients.rst
+>
+> regards,
+> dan carpenter
 
-Hi Mathieu,
 
-> On 9 June 2017 at 16:53, Kim Phillips <kim.phillips@arm.com> wrote:
-> 
-> > On Mon,  5 Jun 2017 14:15:01 -0600
-> > Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
-> >
-> > Hi Mathieu,
-> >
-> > > Please consider for inclusion in the 4.13 cycle.  Of particular interest
-> > is
-> > > patch 15/17, which adds a new driver under the CoreSight umbrella.
-> >
-> > After applying the patchseries, the devices now have self-named
-> > subdirectories under them:
-> >
-> > $ find /sys/devices/ -name \*sink\*
-> > /sys/devices/platform/20140000.etf/20140000.etf/enable_sink
-> > /sys/devices/platform/20070000.etr/20070000.etr/enable_sink
-> > /sys/devices/platform/20030000.tpiu/20030000.tpiu/enable_sink
-> > /sys/devices/platform/20010000.etf/20010000.etf/enable_sink
-> > $
-> >
-> 
-> This is the expected behaviour.  CoreSight devices are found on the AMBA
-> bus and like other AMBA devices they will show up under
-> /sys/devices/platform/.
+Hello,
 
-right, but there are subdevices of themselves, e.g.,
-20010000.etf/20010000.etf:
+I tried applying it with ' git am ' and it was giving me this error:
 
-kim at juno platform$ find /sys/devices/ -name \*etf\*
-/sys/devices/platform/20140000.etf
-/sys/devices/platform/20140000.etf/20140000.etf    <- THIS
-/sys/devices/platform/20010000.etf
-/sys/devices/platform/20010000.etf/20010000.etf    <- and this
-/sys/devices/virtual/misc/20140000.etf
-/sys/devices/virtual/misc/20010000.etf
+fatal: corrupt patch at line XX
 
-'tree' output:
+I think this was produced because of running ./scripts/cleanfile on the patch .
+I was using this to fix trailing whitespaces . So, I used a different
+method to remove them and didn't get that error.
 
-??? 20010000.etf
-??? ??? 20010000.etf
-??? ??? ??? enable_sink
-??? ??? ??? mgmt
-??? ??? ??? ??? ctl
-??? ??? ??? ??? devid
-??? ??? ??? ??? ffcr
-??? ??? ??? ??? ffsr
-??? ??? ??? ??? mode
-??? ??? ??? ??? pscr
-??? ??? ??? ??? rrp
-??? ??? ??? ??? rsz
-??? ??? ??? ??? rwp
-??? ??? ??? ??? sts
-??? ??? ??? ??? trg
-??? ??? ??? power
-??? ??? ??? ??? autosuspend_delay_ms
-??? ??? ??? ??? control
-??? ??? ??? ??? runtime_active_time
-??? ??? ??? ??? runtime_status
-??? ??? ??? ??? runtime_suspended_time
-??? ??? ??? subsystem -> ../../../../bus/coresight
-??? ??? ??? trigger_cntr
-??? ??? ??? uevent
-??? ??? driver -> ../../../bus/amba/drivers/coresight-tmc
-??? ??? driver_override
-??? ??? id
-??? ??? of_node -> ../../../firmware/devicetree/base/etf at 20010000
-??? ??? power
-??? ??? ??? autosuspend_delay_ms
-??? ??? ??? control
-??? ??? ??? runtime_active_time
-??? ??? ??? runtime_status
-??? ??? ??? runtime_suspended_time
-??? ??? resource
-??? ??? subsystem -> ../../../bus/amba
-??? ??? uevent
+But now when I run 'git am' I get a different error:
 
-so things like power/ are duplicated, driver pointers missing from the
-sub-node, etc.  I tried reading the documentation to find the reasoning
-behind it, and didn't see any, but I may have missed it.  Normally each
-platform device gets its own single node, and doesn't create a node
-under itself with the same name.
+error: patch failed:
+drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:105
 
-If the subsystem pointer is of use, then I would have
-thought 'bus/coresight' would have registered itself as a 'bus/amba'
-node? 
+Why am I getting this error ?
 
-> > Which doesn't match the coresight.txt usage documentation...
-> 
-> When operating CoreSight from the sysFS interface there is nothing
-> preventing people from using the entries under /sys/devices/platform should
-> they wish to.  It is simply easier to use /sys/bus/coresight/devices/, and
-> that is well documented in coresight.txt.
-> 
-> > Also, do the current juno platforms not have CPU debug modules?  I'd
-> > like to test the new driver.
-> 
-> By all means - Leo pointed out the patch adding the CPU debug entries in
-> the DT  file for Juno.
-
-Thanks, I applied it, was able to
-toggle /sys/kernel/debug/coresight_cpu_debug/enable, but wasn't sure
-how to trigger the cpu debug output...
-
-Thanks,
-
-Kim
+Regards,
+Srishti
