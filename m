@@ -1,39 +1,137 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 13 Jun 2017 12:44:07 +0200
-Subject: [PATCH v2 0/5] Update device tree for Armada 3720 DB
-Message-ID: <20170613104412.1616-1-gregory.clement@free-electrons.com>
+Date: Tue, 13 Jun 2017 12:44:08 +0200
+Subject: [PATCH v2 1/5] arm64: dts: marvell: armada-3720-db: Sort the dts node
+ alphabetically
+In-Reply-To: <20170613104412.1616-1-gregory.clement@free-electrons.com>
+References: <20170613104412.1616-1-gregory.clement@free-electrons.com>
+Message-ID: <20170613104412.1616-2-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Sort the reference nodes in alphabetical order to ease the merge of
+future nodes.
 
-the main purpose of this short series is to add the support of the
-second SDHCI controller on the Armada 3720 DB board (and on the Armada
-37xx SoC).
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts | 83 +++++++++++++-------------
+ 1 file changed, 41 insertions(+), 42 deletions(-)
 
-This series also adds some improvement to the device tree of the the
-Armada 3720 DB board and the last patch allow using higher speed on
-the SD card by adding the vqmmc regulator.
-
-In this v2, I added a patch aligning the compatible string and fix the
-patch " arm64: dts: marvell: Enable second SDHCI controller in Armada
-37xx" too.
-
-Gregory
-
-Gregory CLEMENT (4):
-  arm64: dts: marvell: armada-3720-db: Sort the dts node alphabetically
-  arm64: dts: marvell: armada-3720-db: Add information about the V2
-    board
-  arm64: dts: marvell: armada-37xx: Align the compatible string
-  arm64: dts: marvell: armada-3720-db: Add vqmmc regulator for SD slot
-
-Konstantin Porotchkin (1):
-  arm64: dts: marvell: Enable second SDHCI controller in Armada 37xx
-
- arch/arm64/boot/dts/marvell/armada-3720-db.dts | 120 ++++++++++++++++---------
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi   |  17 +++-
- 2 files changed, 90 insertions(+), 47 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+index a89855f57091..d6f12fafac6c 100644
+--- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+@@ -78,6 +78,20 @@
+ 	};
+ };
+ 
++&eth0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&rgmii_pins>;
++	phy-mode = "rgmii-id";
++	phy = <&phy0>;
++	status = "okay";
++};
++
++&eth1 {
++	phy-mode = "sgmii";
++	phy = <&phy1>;
++	status = "okay";
++};
++
+ &i2c0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c1_pins>;
+@@ -108,11 +122,36 @@
+ 	};
+ };
+ 
++&mdio {
++	status = "okay";
++	phy0: ethernet-phy at 0 {
++		reg = <0>;
++	};
++
++	phy1: ethernet-phy at 1 {
++		reg = <1>;
++	};
++};
++
++/* CON17 (PCIe) / CON12 (mini-PCIe) */
++&pcie0 {
++	status = "okay";
++};
++
+ /* CON3 */
+ &sata {
+ 	status = "okay";
+ };
+ 
++&sdhci0 {
++	non-removable;
++	bus-width = <8>;
++	mmc-ddr-1_8v;
++	mmc-hs400-1_8v;
++	marvell,pad-type = "fixed-1-8v";
++	status = "okay";
++};
++
+ &spi0 {
+ 	status = "okay";
+ 	pinctrl-names = "default";
+@@ -152,12 +191,8 @@
+ 	status = "okay";
+ };
+ 
+-&sdhci0 {
+-	non-removable;
+-	bus-width = <8>;
+-	mmc-ddr-1_8v;
+-	mmc-hs400-1_8v;
+-	marvell,pad-type = "fixed-1-8v";
++/* CON27 */
++&usb2 {
+ 	status = "okay";
+ };
+ 
+@@ -166,39 +201,3 @@
+ 	status = "okay";
+ 	usb-phy = <&usb3_phy>;
+ };
+-
+-/* CON17 (PCIe) / CON12 (mini-PCIe) */
+-&pcie0 {
+-	status = "okay";
+-};
+-
+-/* CON27 */
+-&usb2 {
+-	status = "okay";
+-};
+-
+-
+-&mdio {
+-	status = "okay";
+-	phy0: ethernet-phy at 0 {
+-		reg = <0>;
+-	};
+-
+-	phy1: ethernet-phy at 1 {
+-		reg = <1>;
+-	};
+-};
+-
+-&eth0 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&rgmii_pins>;
+-	phy-mode = "rgmii-id";
+-	phy = <&phy0>;
+-	status = "okay";
+-};
+-
+-&eth1 {
+-	phy-mode = "sgmii";
+-	phy = <&phy1>;
+-	status = "okay";
+-};
 -- 
 2.11.0
