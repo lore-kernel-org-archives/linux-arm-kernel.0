@@ -1,44 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Jun 2017 10:04:33 +0200
-Subject: [nomadik:gemini-dir-685-tve200 31/31]
- drivers/gpu//drm/panel/panel-ilitek-ili9322.c:230:16:
- warning: format '%d' expects argument of type 'int', but argument 4 has type
- 'size_t {aka long unsigned int}'
-In-Reply-To: <201706130958.G1TIEx5u%fengguang.wu@intel.com>
-References: <201706130958.G1TIEx5u%fengguang.wu@intel.com>
-Message-ID: <CAK8P3a14RUw9Z_PARdE7P_h=Gsc9tC8O67rw2B1oLUude4k13A@mail.gmail.com>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Tue, 13 Jun 2017 10:19:47 +0200
+Subject: [PATCH V2 2/2] timer: imx-tpm: add imx tpm timer support
+In-Reply-To: <1497340725-26594-3-git-send-email-aisheng.dong@nxp.com>
+References: <1497340725-26594-1-git-send-email-aisheng.dong@nxp.com>
+ <1497340725-26594-3-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <2318694.E4xdUbedMD@ws-stein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 13, 2017 at 3:48 AM, kbuild test robot
-<fengguang.wu@intel.com> wrote:
-> tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git gemini-dir-685-tve200
-> head:   454df5dcbcb83585bb77898eea3a0afa6288e441
-> commit: 454df5dcbcb83585bb77898eea3a0afa6288e441 [31/31] stab
-> config: sparc64-allyesconfig (attached as .config)
-> compiler: sparc64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-> reproduce:
->         wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         git checkout 454df5dcbcb83585bb77898eea3a0afa6288e441
->         # save the attached .config to linux build tree
->         make.cross ARCH=sparc64
->
-> All warnings (new ones prefixed by >>):
->
->    In file included from include/linux/cdev.h:7:0,
->                     from include/drm/drmP.h:36,
->                     from drivers/gpu//drm/panel/panel-ilitek-ili9322.c:20:
->    drivers/gpu//drm/panel/panel-ilitek-ili9322.c: In function 'ili9322_regmap_spi_read':
->>> drivers/gpu//drm/panel/panel-ilitek-ili9322.c:230:16: warning: format '%d' expects argument of type 'int', but argument 4 has type 'size_t {aka long unsigned int}' [-Wformat=]
->      dev_info(dev, "READ: %02x reg size = %d, val size = %d\n",
->    227
->    228          /* Set bit 7 to 1 to read */
->    229          memcpy(buf, reg, 1);
->  > 230          dev_info(dev, "READ: %02x reg size = %d, val size = %d\n",
->    231                   buf[0], reg_size, val_size);
->    232          buf[0] |= 0x80;
+On Tuesday 13 June 2017 15:58:45, Dong Aisheng wrote:
+> diff --git a/drivers/clocksource/timer-imx-tpm.c
+> b/drivers/clocksource/timer-imx-tpm.c new file mode 100644
+> index 0000000..940a4f75
+> --- /dev/null
+> +++ b/drivers/clocksource/timer-imx-tpm.c
+> @@ -0,0 +1,227 @@
+> [...]
+> +static int tpm_set_next_event(unsigned long delta,
+> +				struct clock_event_device *evt)
+> +{
+> +	unsigned long next, now;
+> +
+> +	next = readl(timer_base + TPM_CNT) + delta;
+> +	writel(next, timer_base + TPM_C0V);
+> +	now = readl(timer_base + TPM_CNT);
 
-You want "%zd" instead.
+What about:
+> now = readl(timer_base + TPM_CNT);
+> next = now + delta;
+> writel(next, timer_base + TPM_C0V);
+> return 0;
 
-      Arnd
+> +	return (int)((next - now) <= 0) ? -ETIME : 0;
+
+Can this error actually happen, even with your implementation?
+
+Best regards,
+Alexander
