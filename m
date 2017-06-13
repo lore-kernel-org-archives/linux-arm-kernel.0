@@ -1,29 +1,29 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Tue, 13 Jun 2017 14:56:21 +0200
-Subject: [PATCH 1/4] arm64: dts: marvell: armada-3720-db: Sort the dts
- node alphabetically
-In-Reply-To: <20170608165125.27630-2-gregory.clement@free-electrons.com>
-References: <20170608165125.27630-1-gregory.clement@free-electrons.com>
- <20170608165125.27630-2-gregory.clement@free-electrons.com>
-Message-ID: <c255562e-e691-bdfb-afdc-51a86652f717@suse.de>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 13 Jun 2017 14:58:42 +0200
+Subject: [PATCH] mtd: nand: atmel_nand: drop unused include
+Message-ID: <20170613125842.16422-1-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 08.06.2017 um 18:51 schrieb Gregory CLEMENT:
-> Sort the reference nodes in alphabetical order to ease the merge of
-> future nodes.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  arch/arm64/boot/dts/marvell/armada-3720-db.dts | 83 +++++++++++++-------------
->  1 file changed, 41 insertions(+), 42 deletions(-)
+The Atmel NAND driver doesn't used anything from
+linux/platform_data/atmel.h, stop including it.
 
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/mtd/nand/atmel/nand-controller.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-Regards,
-Andreas
-
+diff --git a/drivers/mtd/nand/atmel/nand-controller.c b/drivers/mtd/nand/atmel/nand-controller.c
+index 3b2446896147..6bd61acfc2c8 100644
+--- a/drivers/mtd/nand/atmel/nand-controller.c
++++ b/drivers/mtd/nand/atmel/nand-controller.c
+@@ -64,7 +64,6 @@
+ #include <linux/of_platform.h>
+ #include <linux/iopoll.h>
+ #include <linux/platform_device.h>
+-#include <linux/platform_data/atmel.h>
+ #include <linux/regmap.h>
+ 
+ #include "pmecc.h"
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+2.11.0
