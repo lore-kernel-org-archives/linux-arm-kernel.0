@@ -1,137 +1,51 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 13 Jun 2017 12:44:08 +0200
-Subject: [PATCH v2 1/5] arm64: dts: marvell: armada-3720-db: Sort the dts node
- alphabetically
+Date: Tue, 13 Jun 2017 12:44:10 +0200
+Subject: [PATCH v2 3/5] arm64: dts: marvell: armada-37xx: Align the compatible
+ string
 In-Reply-To: <20170613104412.1616-1-gregory.clement@free-electrons.com>
 References: <20170613104412.1616-1-gregory.clement@free-electrons.com>
-Message-ID: <20170613104412.1616-2-gregory.clement@free-electrons.com>
+Message-ID: <20170613104412.1616-4-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sort the reference nodes in alphabetical order to ease the merge of
-future nodes.
+This cosmetic patch aligns the compatible string when there are on
+several lines.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm64/boot/dts/marvell/armada-3720-db.dts | 83 +++++++++++++-------------
- 1 file changed, 41 insertions(+), 42 deletions(-)
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-index a89855f57091..d6f12fafac6c 100644
---- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-@@ -78,6 +78,20 @@
- 	};
- };
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index 4d495ec39202..c1076fd0bd9e 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -163,7 +163,7 @@
  
-+&eth0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&rgmii_pins>;
-+	phy-mode = "rgmii-id";
-+	phy = <&phy0>;
-+	status = "okay";
-+};
-+
-+&eth1 {
-+	phy-mode = "sgmii";
-+	phy = <&phy1>;
-+	status = "okay";
-+};
-+
- &i2c0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c1_pins>;
-@@ -108,11 +122,36 @@
- 	};
- };
+ 			pinctrl_nb: pinctrl at 13800 {
+ 				compatible = "marvell,armada3710-nb-pinctrl",
+-				"syscon", "simple-mfd";
++					     "syscon", "simple-mfd";
+ 				reg = <0x13800 0x100>, <0x13C00 0x20>;
+ 				gpionb: gpio {
+ 					#gpio-cells = <2>;
+@@ -219,7 +219,7 @@
  
-+&mdio {
-+	status = "okay";
-+	phy0: ethernet-phy at 0 {
-+		reg = <0>;
-+	};
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+	};
-+};
-+
-+/* CON17 (PCIe) / CON12 (mini-PCIe) */
-+&pcie0 {
-+	status = "okay";
-+};
-+
- /* CON3 */
- &sata {
- 	status = "okay";
- };
+ 			pinctrl_sb: pinctrl at 18800 {
+ 				compatible = "marvell,armada3710-sb-pinctrl",
+-				"syscon", "simple-mfd";
++					     "syscon", "simple-mfd";
+ 				reg = <0x18800 0x100>, <0x18C00 0x20>;
+ 				gpiosb: gpio {
+ 					#gpio-cells = <2>;
+@@ -294,7 +294,7 @@
  
-+&sdhci0 {
-+	non-removable;
-+	bus-width = <8>;
-+	mmc-ddr-1_8v;
-+	mmc-hs400-1_8v;
-+	marvell,pad-type = "fixed-1-8v";
-+	status = "okay";
-+};
-+
- &spi0 {
- 	status = "okay";
- 	pinctrl-names = "default";
-@@ -152,12 +191,8 @@
- 	status = "okay";
- };
- 
--&sdhci0 {
--	non-removable;
--	bus-width = <8>;
--	mmc-ddr-1_8v;
--	mmc-hs400-1_8v;
--	marvell,pad-type = "fixed-1-8v";
-+/* CON27 */
-+&usb2 {
- 	status = "okay";
- };
- 
-@@ -166,39 +201,3 @@
- 	status = "okay";
- 	usb-phy = <&usb3_phy>;
- };
--
--/* CON17 (PCIe) / CON12 (mini-PCIe) */
--&pcie0 {
--	status = "okay";
--};
--
--/* CON27 */
--&usb2 {
--	status = "okay";
--};
--
--
--&mdio {
--	status = "okay";
--	phy0: ethernet-phy at 0 {
--		reg = <0>;
--	};
--
--	phy1: ethernet-phy at 1 {
--		reg = <1>;
--	};
--};
--
--&eth0 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&rgmii_pins>;
--	phy-mode = "rgmii-id";
--	phy = <&phy0>;
--	status = "okay";
--};
--
--&eth1 {
--	phy-mode = "sgmii";
--	phy = <&phy1>;
--	status = "okay";
--};
+ 			sdhci0: sdhci at d8000 {
+ 				compatible = "marvell,armada-3700-sdhci",
+-				"marvell,sdhci-xenon";
++					     "marvell,sdhci-xenon";
+ 				reg = <0xd8000 0x300
+ 				       0x17808 0x4>;
+ 				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
 -- 
 2.11.0
