@@ -1,26 +1,35 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 13 Jun 2017 18:57:08 +0100
-Subject: [PATCH 04/12] coresight: Add support for reading 64bit registers
-In-Reply-To: <20170613174558.GB6392@xps15>
-References: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
- <1497278211-5001-5-git-send-email-suzuki.poulose@arm.com>
- <20170613174558.GB6392@xps15>
-Message-ID: <f9c064ac-fd4d-30cc-bf1f-e4aa75e7c0d3@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 13 Jun 2017 19:16:03 +0100
+Subject: [PATCH 2/2] arm64: Export save_stack_trace_tsk()
+In-Reply-To: <20170613174406.GH9184@arm.com>
+References: <20170613085029.GA5374@arm.com>
+ <20170613173308.6653-1-dustinb@codeaurora.org>
+ <20170613173308.6653-2-dustinb@codeaurora.org>
+ <20170613174406.GH9184@arm.com>
+Message-ID: <20170613181603.GE4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/06/17 18:45, Mathieu Poirier wrote:
-> On Mon, Jun 12, 2017 at 03:36:43PM +0100, Suzuki K Poulose wrote:
->> Add support for reading a lower and upper 32bits of a register
->> as a single 64bit register.
->>
->> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->
-> Just a few cosmetic details...
+On Tue, Jun 13, 2017 at 06:44:06PM +0100, Will Deacon wrote:
+> On Tue, Jun 13, 2017 at 10:33:08AM -0700, Dustin Brown wrote:
+> > To aid in debugging driver modules, export save_stack_trace_tsk() for
+> > the ARM64 architecture.
+> > ---
+> >  arch/arm64/kernel/stacktrace.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> 
+> Please can you repost with your Signed-off-by line added to the patch? I
+> can't merge anything from you without that.
 
-Will fix all of them in the next version.
+I think it would also be a good thing to have a little more information
+about how this is being used in driver modules.
 
-Thanks for the review.
+If it's for ad-hoc debugging, then I see no reason for it to be merged
+into mainline kernels just for the utility of people adding code to
+drivers to perform that debug - they might as well temporarily add the
+export at the same time IMHO.
 
-Suzuki
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
