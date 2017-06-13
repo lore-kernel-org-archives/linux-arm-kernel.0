@@ -1,127 +1,292 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 13 Jun 2017 08:58:47 -0500
-Subject: [PATCH v2 1/1] PCI: imx6: Add pcie compliance test option
-In-Reply-To: <2668097.SlerkO2uVy@en-pc05>
-References: <1472121518-9340-1-git-send-email-stefan.schoefegger@ginzinger.com>
- <1496835374-13053-1-git-send-email-stefan.schoefegger@ginzinger.com>
- <20170612234924.GE4379@bhelgaas-glaptop.roam.corp.google.com>
- <2668097.SlerkO2uVy@en-pc05>
-Message-ID: <20170613135847.GA7128@bhelgaas-glaptop.roam.corp.google.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Tue, 13 Jun 2017 16:01:14 +0200
+Subject: [PATCH v6 3/3] PCI: Add tango MSI controller support
+In-Reply-To: <9975fa6c-f426-519b-6b3e-a2d102d36fd5@arm.com>
+References: <741766e5-cff2-db5f-d40b-6866e08fd966@sigmadesigns.com>
+ <e868f9b8-39e3-4501-a8c6-64bd28a4be8b@sigmadesigns.com>
+ <9975fa6c-f426-519b-6b3e-a2d102d36fd5@arm.com>
+Message-ID: <82d6bf37-96b9-cd9d-134b-f01638fa2b1b@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 13, 2017 at 05:43:14AM +0000, Sch?fegger Stefan wrote:
-> On Monday, June 12, 2017 6:49:24 PM CEST Bjorn Helgaas wrote:
-> > On Wed, Jun 07, 2017 at 01:36:11PM +0200, Stefan Schoefegger wrote:
-> > > Link speed must not be limited to gen1 during link test for compliance
-> > > tests
-> > > 
-> > > Signed-off-by: Stefan Schoefegger <stefan.schoefegger@ginzinger.com>
-> > > ---
-> > > 
-> > > Changes since v1:
-> > >  - pci-imx6.c moved to dwc directory
-> > >  
-> > >  drivers/pci/dwc/Kconfig    | 10 ++++++++++
-> > >  drivers/pci/dwc/pci-imx6.c | 21 ++++++++++++---------
-> > >  2 files changed, 22 insertions(+), 9 deletions(-)
-> > > 
-> > > diff --git a/drivers/pci/dwc/Kconfig b/drivers/pci/dwc/Kconfig
-> > > index b7e15526d676..b6e9ced5a45d 100644
-> > > --- a/drivers/pci/dwc/Kconfig
-> > > +++ b/drivers/pci/dwc/Kconfig
-> > > @@ -77,6 +77,16 @@ config PCI_IMX6
-> > > 
-> > >  	select PCIEPORTBUS
-> > >  	select PCIE_DW_HOST
-> > > 
-> > > +config PCI_IMX6_COMPLIANCE_TEST
-> > > +	bool "Enable pcie compliance tests on imx6"
-> > > +	depends on PCI_IMX6
-> > > +	default n
-> > > +	help
-> > > +	  Enables support for pcie compliance test on FSL iMX SoCs.
-> > > +	  The link speed wouldn't be limited to gen1 when enabled.
-> > > +	  Enable only during compliance tests, otherwise
-> > > +	  link detection will fail on some peripherals.
-> > 
-> > I'm puzzled about why we would want to merge this patch.  It looks
-> > like we're trying to game the system to make the device pass
-> > compliance testing when it isn't really compliant.  Is this config
-> > option useful to users, or is it only useful during internal
-> > development of iMX SoCs?
-> 
-> It's not for passing compliance tests, it is necessary to do the compliance 
-> tests. Without this patch only gen 1 speed is possible to test. Also i.mx6 is 
-> not fully gen2 compliant (withour external clk) we should have the option to 
-> do gen2 tests. Switching from gen1 to gen2 is done with a 100MHz (1ms) clk 
-> pulse on the receiver. Without this patch link speed is forced to gen1 
-> afterwards.
+The MSI controller in Tango supports 256 message-signaled interrupts,
+and a single doorbell address.
 
-I don't understand the purpose of this yet, so maybe all we need is a
-better description.
+Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+---
+Changes from v5 to v6
+o Rename 'used' bitmap to 'used_msi'
+o Rename 'lock' spinlock to 'used_msi_lock'
+o Take lock in interrupt handler
+o Remove irq_dom in error path
+---
+ drivers/pci/host/pcie-tango.c | 225 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 225 insertions(+)
 
-"It's not for passing compliance testing, it is necessary to do the
-compliance tests" doesn't make sense to me -- it seems
-self-contradictory.
-
-The Kconfig text says "enable only for testing because it makes link
-detection fail."  To me that means this option is not useful for
-users.  We need some justification for why it should be in the
-mainline kernel, where users and distros may enable it.
-
-If you can only support gen2 in certain board configurations, maybe
-you should add a config option that can always be enabled for those
-boards.
-
-> Yes it is only useful for board setup, it is comparable to 
-> CONFIG_USB_EHSET_TEST_FIXTURE for usb (ok, this is more general and not host 
-> specific).
-
-USB_EHSET_TEST_FIXTURE (added by 1353aa53851e ("usb: misc: EHSET Test
-Fixture device driver for host compliance")) looks like just another
-driver in the sense that it's always safe to enable it and it doesn't
-hurt anything if you enable it without having the hardware.
-
-This patch doesn't seem comparable to USB_EHSET_TEST_FIXTURE because
-this new option apparently breaks link detection in some cases.
-
-> > >  config PCIE_SPEAR13XX
-> > >  
-> > >  	bool "STMicroelectronics SPEAr PCIe controller"
-> > >  	depends on PCI
-> > > 
-> > > diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
-> > > index 19a289b8cc94..b0fbe52e25b0 100644
-> > > --- a/drivers/pci/dwc/pci-imx6.c
-> > > +++ b/drivers/pci/dwc/pci-imx6.c
-> > > @@ -533,15 +533,18 @@ static int imx6_pcie_establish_link(struct imx6_pcie
-> > > *imx6_pcie)> 
-> > >  	u32 tmp;
-> > >  	int ret;
-> > > 
-> > > -	/*
-> > > -	 * Force Gen1 operation when starting the link.  In case the link is
-> > > -	 * started in Gen2 mode, there is a possibility the devices on the
-> > > -	 * bus will not be detected at all.  This happens with PCIe switches.
-> > > -	 */
-> > > -	tmp = dw_pcie_readl_dbi(pci, PCIE_RC_LCR);
-> > > -	tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
-> > > -	tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1;
-> > > -	dw_pcie_writel_dbi(pci, PCIE_RC_LCR, tmp);
-> > > +	if (!IS_ENABLED(CONFIG_PCI_IMX6_COMPLIANCE_TEST)) {
-> > > +		/*
-> > > +		 * Force Gen1 operation when starting the link.  In case the
-> > > +		 * link is started in Gen2 mode, there is a possibility the
-> > > +		 * devices on the bus will not be detected at all.  This
-> > > +		 * happens with PCIe switches.
-> > > +		 */
-> > > +		tmp = dw_pcie_readl_dbi(pci, PCIE_RC_LCR);
-> > > +		tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
-> > > +		tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1;
-> > > +		dw_pcie_writel_dbi(pci, PCIE_RC_LCR, tmp);
-> > > +	}
-> > > 
-> > >  	/* Start LTSSM. */
-> > >  	if (imx6_pcie->variant == IMX7D)
-> 
+diff --git a/drivers/pci/host/pcie-tango.c b/drivers/pci/host/pcie-tango.c
+index 67aaadcc1c5e..b06446b23bc8 100644
+--- a/drivers/pci/host/pcie-tango.c
++++ b/drivers/pci/host/pcie-tango.c
+@@ -1,16 +1,228 @@
++#include <linux/irqchip/chained_irq.h>
++#include <linux/irqdomain.h>
+ #include <linux/pci-ecam.h>
+ #include <linux/delay.h>
++#include <linux/msi.h>
+ #include <linux/of.h>
+ 
+ #define MSI_MAX 256
+ 
+ #define SMP8759_MUX		0x48
+ #define SMP8759_TEST_OUT	0x74
++#define SMP8759_STATUS		0x80
++#define SMP8759_ENABLE		0xa0
++#define SMP8759_DOORBELL	0xa002e07c
+ 
+ struct tango_pcie {
++	DECLARE_BITMAP(used_msi, MSI_MAX);
++	spinlock_t used_msi_lock;
+ 	void __iomem *mux;
++	void __iomem *msi_status;
++	void __iomem *msi_enable;
++	phys_addr_t msi_doorbell;
++	struct irq_domain *irq_dom;
++	struct irq_domain *msi_dom;
++	int irq;
+ };
+ 
++/*** MSI CONTROLLER SUPPORT ***/
++
++static void tango_msi_isr(struct irq_desc *desc)
++{
++	struct irq_chip *chip = irq_desc_get_chip(desc);
++	struct tango_pcie *pcie = irq_desc_get_handler_data(desc);
++	unsigned long flags, status, base, virq, idx, pos = 0;
++
++	chained_irq_enter(chip, desc);
++	spin_lock_irqsave(&pcie->used_msi_lock, flags);
++
++	while ((pos = find_next_bit(pcie->used_msi, MSI_MAX, pos)) < MSI_MAX) {
++		base = round_down(pos, 32);
++		status = readl_relaxed(pcie->msi_status + base / 8);
++		for_each_set_bit(idx, &status, 32) {
++			virq = irq_find_mapping(pcie->irq_dom, base + idx);
++			generic_handle_irq(virq);
++		}
++		pos = base + 32;
++	}
++
++	spin_unlock_irqrestore(&pcie->used_msi_lock, flags);
++	chained_irq_exit(chip, desc);
++}
++
++static void tango_ack(struct irq_data *d)
++{
++	struct tango_pcie *pcie = d->chip_data;
++	u32 offset = (d->hwirq / 32) * 4;
++	u32 bit = BIT(d->hwirq % 32);
++
++	writel_relaxed(bit, pcie->msi_status + offset);
++}
++
++static void update_msi_enable(struct irq_data *d, bool unmask)
++{
++	unsigned long flags;
++	struct tango_pcie *pcie = d->chip_data;
++	u32 offset = (d->hwirq / 32) * 4;
++	u32 bit = BIT(d->hwirq % 32);
++	u32 val;
++
++	spin_lock_irqsave(&pcie->used_msi_lock, flags);
++	val = readl_relaxed(pcie->msi_enable + offset);
++	val = unmask ? val | bit : val & ~bit;
++	writel_relaxed(val, pcie->msi_enable + offset);
++	spin_unlock_irqrestore(&pcie->used_msi_lock, flags);
++}
++
++static void tango_mask(struct irq_data *d)
++{
++	update_msi_enable(d, false);
++}
++
++static void tango_unmask(struct irq_data *d)
++{
++	update_msi_enable(d, true);
++}
++
++static int tango_set_affinity(struct irq_data *d,
++		const struct cpumask *mask, bool force)
++{
++	return -EINVAL;
++}
++
++static void tango_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
++{
++	struct tango_pcie *pcie = d->chip_data;
++	msg->address_lo = lower_32_bits(pcie->msi_doorbell);
++	msg->address_hi = upper_32_bits(pcie->msi_doorbell);
++	msg->data = d->hwirq;
++}
++
++static struct irq_chip tango_chip = {
++	.irq_ack		= tango_ack,
++	.irq_mask		= tango_mask,
++	.irq_unmask		= tango_unmask,
++	.irq_set_affinity	= tango_set_affinity,
++	.irq_compose_msi_msg	= tango_compose_msi_msg,
++};
++
++static void msi_ack(struct irq_data *d)
++{
++	irq_chip_ack_parent(d);
++}
++
++static void msi_mask(struct irq_data *d)
++{
++	pci_msi_mask_irq(d);
++	irq_chip_mask_parent(d);
++}
++
++static void msi_unmask(struct irq_data *d)
++{
++	pci_msi_unmask_irq(d);
++	irq_chip_unmask_parent(d);
++}
++
++static struct irq_chip msi_chip = {
++	.name = "MSI",
++	.irq_ack = msi_ack,
++	.irq_mask = msi_mask,
++	.irq_unmask = msi_unmask,
++};
++
++static struct msi_domain_info msi_dom_info = {
++	.flags	= MSI_FLAG_PCI_MSIX
++		| MSI_FLAG_USE_DEF_DOM_OPS
++		| MSI_FLAG_USE_DEF_CHIP_OPS,
++	.chip	= &msi_chip,
++};
++
++static int tango_irq_domain_alloc(struct irq_domain *dom,
++		unsigned int virq, unsigned int nr_irqs, void *args)
++{
++	unsigned long flags;
++	int pos, err = -ENOSPC;
++	struct tango_pcie *pcie = dom->host_data;
++
++	spin_lock_irqsave(&pcie->used_msi_lock, flags);
++	pos = find_first_zero_bit(pcie->used_msi, MSI_MAX);
++	if (pos < MSI_MAX) {
++		err = 0;
++		__set_bit(pos, pcie->used_msi);
++		irq_domain_set_info(dom, virq, pos,
++				&tango_chip, pcie, handle_edge_irq, NULL, NULL);
++	}
++	spin_unlock_irqrestore(&pcie->used_msi_lock, flags);
++
++	return err;
++}
++
++static void tango_irq_domain_free(struct irq_domain *dom,
++		unsigned int virq, unsigned int nr_irqs)
++{
++	unsigned long flags;
++	struct irq_data *d = irq_domain_get_irq_data(dom, virq);
++	struct tango_pcie *pcie = d->chip_data;
++
++	spin_lock_irqsave(&pcie->used_msi_lock, flags);
++	__clear_bit(d->hwirq, pcie->used_msi);
++	spin_unlock_irqrestore(&pcie->used_msi_lock, flags);
++}
++
++static const struct irq_domain_ops irq_dom_ops = {
++	.alloc	= tango_irq_domain_alloc,
++	.free	= tango_irq_domain_free,
++};
++
++static int tango_msi_remove(struct platform_device *pdev)
++{
++	struct tango_pcie *pcie = platform_get_drvdata(pdev);
++
++	irq_set_chained_handler_and_data(pcie->irq, NULL, NULL);
++	irq_domain_remove(pcie->msi_dom);
++	irq_domain_remove(pcie->irq_dom);
++
++	return 0;
++}
++
++static int tango_msi_probe(struct platform_device *pdev, struct tango_pcie *pcie)
++{
++	int i, virq;
++	struct irq_domain *msi_dom, *irq_dom;
++	struct fwnode_handle *fwnode = of_node_to_fwnode(pdev->dev.of_node);
++
++	spin_lock_init(&pcie->used_msi_lock);
++	for (i = 0; i < MSI_MAX / 32; ++i)
++		writel_relaxed(0, pcie->msi_enable + i * 4);
++
++	virq = platform_get_irq(pdev, 1);
++	if (virq <= 0) {
++		pr_err("Failed to map IRQ\n");
++		return -ENXIO;
++	}
++
++	irq_dom = irq_domain_create_linear(fwnode, MSI_MAX, &irq_dom_ops, pcie);
++	if (!irq_dom) {
++		pr_err("Failed to create IRQ domain\n");
++		return -ENOMEM;
++	}
++
++	msi_dom = pci_msi_create_irq_domain(fwnode, &msi_dom_info, irq_dom);
++	if (!msi_dom) {
++		pr_err("Failed to create MSI domain\n");
++		irq_domain_remove(irq_dom);
++		return -ENOMEM;
++	}
++
++	pcie->irq_dom = irq_dom;
++	pcie->msi_dom = msi_dom;
++	pcie->irq = virq;
++
++	irq_set_chained_handler_and_data(virq, tango_msi_isr, pcie);
++
++	return 0;
++}
++
+ /*** HOST BRIDGE SUPPORT ***/
+ 
+ static int smp8759_config_read(struct pci_bus *bus,
+@@ -88,6 +300,9 @@ static int tango_check_pcie_link(void __iomem *test_out)
+ static int smp8759_init(struct tango_pcie *pcie, void __iomem *base)
+ {
+ 	pcie->mux		= base + SMP8759_MUX;
++	pcie->msi_status	= base + SMP8759_STATUS;
++	pcie->msi_enable	= base + SMP8759_ENABLE;
++	pcie->msi_doorbell	= SMP8759_DOORBELL;
+ 
+ 	return tango_check_pcie_link(base + SMP8759_TEST_OUT);
+ }
+@@ -121,11 +336,21 @@ static int tango_pcie_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
++	ret = tango_msi_probe(pdev, pcie);
++	if (ret)
++		return ret;
++
+ 	return pci_host_common_probe(pdev, &smp8759_ecam_ops);
+ }
+ 
++static int tango_pcie_remove(struct platform_device *pdev)
++{
++	return tango_msi_remove(pdev);
++}
++
+ static struct platform_driver tango_pcie_driver = {
+ 	.probe	= tango_pcie_probe,
++	.remove	= tango_pcie_remove,
+ 	.driver	= {
+ 		.name = KBUILD_MODNAME,
+ 		.of_match_table = tango_pcie_ids,
+-- 
+2.11.0
