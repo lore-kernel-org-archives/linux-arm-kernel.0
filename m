@@ -1,41 +1,79 @@
-From: srishtishar@gmail.com (srishti sharma)
-Date: Tue, 13 Jun 2017 20:07:14 +0530
-Subject: [PATCH] Staging: vc04_services: bcm2835-audio: bcm2835-ctl.c:
- Fixed alignment to match open parenthesis.
-In-Reply-To: <20170613130006.GA15978@kroah.com>
-References: <1497042442-3620-1-git-send-email-srishtishar@gmail.com>
- <20170613130006.GA15978@kroah.com>
-Message-ID: <CAB3L5oxNorqu6_WiseTjkr7N9i-doy=_4gxtwonCVcxQA3Nfrw@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 13 Jun 2017 09:29:58 -0500
+Subject: [PATCH linux-next v4 2/4] spi: imx: add selection for iMX53 and
+ iMX6 controller
+In-Reply-To: <a4d5d8e2-c50d-4856-e14f-34ead774824e@mentor.com>
+References: <20170608051603.16070-1-jiada_wang@mentor.com>
+ <20170608051603.16070-3-jiada_wang@mentor.com>
+ <20170612155345.qtgaq4wjj2vidohd@rob-hp-laptop>
+ <a4d5d8e2-c50d-4856-e14f-34ead774824e@mentor.com>
+Message-ID: <CAL_JsqJeh=M0qB2m6DPLo1_WJsUKowvS0FpUgsmEuF5KuKPTRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 13, 2017 at 6:30 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> On Sat, Jun 10, 2017 at 02:37:22AM +0530, srishti sharma wrote:
->> Fixed alignment so that it matched open parenthesis.
->>
->> Signed-off-by: srishti sharma <srishtishar@gmail.com>
->> ---
->>  drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
->> index f484bb0..2148ed0 100644
->> --- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
->> +++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
->> @@ -105,7 +105,7 @@ static int snd_bcm2835_ctl_get(struct snd_kcontrol *kcontrol,
->>  }
->>
->>  static int snd_bcm2835_ctl_put(struct snd_kcontrol *kcontrol,
->> -                             struct snd_ctl_elem_value *ucontrol)
->> +                            struct snd_ctl_elem_value *ucontrol)
->>  {
->>       struct bcm2835_chip *chip = snd_kcontrol_chip(kcontrol);
->>       int changed = 0;
+On Tue, Jun 13, 2017 at 12:28 AM, Jiada Wang <jiada_wang@mentor.com> wrote:
+> Hello Rob
 >
-> This patch is corrupted and can not be applied :(
+>
+> On 06/13/2017 12:53 AM, Rob Herring wrote:
+>>
+>> On Thu, Jun 08, 2017 at 02:16:01PM +0900, Jiada Wang wrote:
+>>>
+>>> ECSPI contorller for iMX53 and iMX6 has few hardware issues
+>>> comparing to iMX51.
+>>> The change add possibility to detect which controller is used
+>>> to apply possible workaround and limitations.
+>>>
+>>> Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
+>>> ---
+>>>  .../devicetree/bindings/spi/fsl-imx-cspi.txt       |  1 +
+>>>  drivers/spi/spi-imx.c                              | 26
+>>> ++++++++++++++++++++--
+>>>  2 files changed, 25 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
+>>> b/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
+>>> index 31b5b21..5bf1396 100644
+>>> --- a/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
+>>> +++ b/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
+>>> @@ -9,6 +9,7 @@ Required properties:
+>>>    - "fsl,imx31-cspi" for SPI compatible with the one integrated on
+>>> i.MX31
+>>>    - "fsl,imx35-cspi" for SPI compatible with the one integrated on
+>>> i.MX35
+>>>    - "fsl,imx51-ecspi" for SPI compatible with the one integrated on
+>>> i.MX51
+>>> +  - "fsl,imx53-ecspi" for SPI compatible with the one integrated on
+>>> i.MX53 and later Soc
+>>>  - reg : Offset and length of the register set for the device
+>>>  - interrupts : Should contain CSPI/eCSPI interrupt
+>>>  - cs-gpios : Specifies the gpio pins to be used for chipselects.
+>>> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+>>> index 4469121..8e6f339 100644
+>>> --- a/drivers/spi/spi-imx.c
+>>> +++ b/drivers/spi/spi-imx.c
+>>> @@ -63,7 +63,8 @@ enum spi_imx_devtype {
+>>>         IMX27_CSPI,
+>>>         IMX31_CSPI,
+>>>         IMX35_CSPI,     /* CSPI on all i.mx except above */
+>>> -       IMX51_ECSPI,    /* ECSPI on i.mx51 and later */
+>>> +       IMX51_ECSPI,    /* ECSPI on i.mx51 */
+>>> +       IMX53_ECSPI,    /* ECSPI on i.mx53 and later */
+>>
+>>
+>> Looks like i.MX51 and i.MX53 are the same. While the DT should have
+>> different compatibles (with fallbacks), the driver should map them to
+>> the same type until there's some difference found.
+>>
+> the difference between i.MX51 and i.MX53 is introduced in the
+> 4th patch "spi: imx: Add support for SPI Slave mode" in this patch set
 
+Okay, I missed that.
 
-Why is this corrupted ?
+> do you think, I need to merge the two patches into one?
 
-Regards,
-Srishti
+No, not necessary.
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+Rob
