@@ -1,56 +1,43 @@
-From: psodagud@codeaurora.org (Sodagudi Prasad)
-Date: Tue, 13 Jun 2017 15:39:37 -0700
-Subject: Using __always_inline attribute
-Message-ID: <2a762f1f3b355e71c5bca6a6e00bffe0@codeaurora.org>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 13 Jun 2017 18:45:10 -0500
+Subject: [PATCH v3 0/3] Add Keystone2 Remoteproc driver
+Message-ID: <20170613234513.7624-1-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Bjorn,
 
-Hi All,
+This is v3 of the patchset that adds the DT binding and the driver for
+loading and booting the DSP devices present on various Keystone2 SoC families.
+The binding and driver patches have already been acked by Rob Herring and Santosh
+Shilimkar respectively, and this is just a minor refresh with one small comment
+from Rob addressed in the binding (Patch 1). There are no code changes in remaining
+patches. I have picked up their Acks in all the relevant patches.
 
-With a variant of a CLANG(based on 4.0) following errors observed on 
-Linux 4.12-rc5 tag.
+Appreciate it if you can pick up the series for v4.13.
 
-net/built-in.o: In function `__xchg_mb':
-arch/arm64/include/asm/cmpxchg.h:99: \
-                     undefined reference to `__compiletime_assert_99'
-arch/arm64/include/asm/cmpxchg.h:99: \
-                     undefined reference to `__compiletime_assert_99
+v2:
+http://marc.info/?l=linux-kernel&m=149688154304565&w=2
+v1:
+http://marc.info/?t=149581802500004&r=1&w=2
 
-Clang does not seems to be marking this macro as inline and causing 
-above compilation issue due to BUILD_BUG().
+regards
+Suman
 
-We added  __always_inline attribute to this macro as shown below, so 
-that clang forces this macro to be always inline.
-Based on definition of __xchg##sfx, it should always be inline.  Can we 
-force this macro to be __always_inline ?
+Andrew F. Davis (1):
+  remoteproc/keystone: Ensure the DSPs are in reset in probe
 
+Suman Anna (2):
+  dt-bindings: remoteproc: Add Keystone DSP remoteproc binding
+  remoteproc/keystone: Add a remoteproc driver for Keystone 2 DSPs
 
-diff --git a/arch/arm64/include/asm/cmpxchg.h 
-b/arch/arm64/include/asm/cmpxchg.h
-index ae852ad..ce57cec 100644
---- a/arch/arm64/include/asm/cmpxchg.h
-+++ b/arch/arm64/include/asm/cmpxchg.h
-@@ -73,7 +73,7 @@
-  #undef __XCHG_CASE
-
-  #define __XCHG_GEN(sfx)                                                 
-        \
--static inline unsigned long __xchg##sfx(unsigned long x,               
-\
-+static __always_inline unsigned long __xchg##sfx(unsigned long x,       
-        \
-                                         volatile void *ptr,             
-\
-                                         int size)                       
-\
-  {                                                                      
-\
-
-
--Thanks, Prasad
+ .../bindings/remoteproc/ti,keystone-rproc.txt      | 133 ++++++
+ drivers/remoteproc/Kconfig                         |  13 +
+ drivers/remoteproc/Makefile                        |   1 +
+ drivers/remoteproc/keystone_remoteproc.c           | 525 +++++++++++++++++++++
+ 4 files changed, 672 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/remoteproc/ti,keystone-rproc.txt
+ create mode 100644 drivers/remoteproc/keystone_remoteproc.c
 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
-Forum,
-Linux Foundation Collaborative Project
+2.13.1
