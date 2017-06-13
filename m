@@ -1,55 +1,37 @@
-From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
-Date: Tue, 13 Jun 2017 16:24:58 +0200
-Subject: [PATCHv2 0/5] OMAP4: crypto support
-In-Reply-To: <ab778bfd-9397-4cb0-0741-557da57bba83@ti.com>
-References: <20170613092847.16732-1-sebastian.reichel@collabora.co.uk>
- <ab778bfd-9397-4cb0-0741-557da57bba83@ti.com>
-Message-ID: <20170613142458.32g3iqcijc4ij4b7@earth>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 13 Jun 2017 15:28:35 +0100
+Subject: [PATCH v2 3/5] ARM: Make CONFIG_CPU_V7 valid for 32bit ARMv8
+ implementations
+In-Reply-To: <20170613142837.29738-1-marc.zyngier@arm.com>
+References: <20170613142837.29738-1-marc.zyngier@arm.com>
+Message-ID: <20170613142837.29738-4-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+ARMv8 is a superset of ARMv7, and all the ARMv8 features are
+discoverable with a set of ID registers. It means that we can
+use CPU_V7 to guard ARMv8 features at compile time.
 
-On Tue, Jun 13, 2017 at 04:49:18PM +0300, Tero Kristo wrote:
-> On 13/06/17 12:28, Sebastian Reichel wrote:
-> > This adds crypto support for OMAP4, which was missing for some reason.
-> > This fixes error about missing hwmod on Droid 4. IP-Cores for AES and
-> > DES are working according to selftest.
-> > 
-> > Changes since PATCHv1:
-> >   * remove patch adding des_fck to DT
-> >   * add patch removing aes[12]_fck from DT
-> >   * add patch renaming hwmod aes to aes1 in DT
-> >   * update hwmod patches according to feedback from Tero
-> >   * add patch for aes2 hwmod
-> > 
-> > -- Sebastian
-> 
-> I just posted a few extra patches on top of this series, for adding
-> the missing dts data for aes2 and adding sham accelerator also.
+This commit simply amends the CPU_V7 configuration symbol comment
+to reflect that CPU_V7 also covers ARMv8.
 
-Thanks :)
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/mm/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> The dts data should be applied first if you want to avoid any
-> issues with hwmod core complaining about missing DT data, so the
-> sequencing of this series and mine need to be done carefully.
-
-There is also a warning printed if DT references a missing hwmod
-entry (that's how I noticed this in the first place). It's less
-noisy, though. Since kernel builds and boots with any order and
-crypto hardware does not work at the moment there is no real
-problem with bisect. I suggest to merge the DTS patches normally
-through the separate dt branch.
-
-> The patches themselves in this series look fine now, so:
-> 
-> Acked-by: Tero Kristo <t-kristo@ti.com>
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170613/ab6c3789/attachment.sig>
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index c6c4c9c8824b..2c8adf6203a0 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -401,7 +401,7 @@ config CPU_V6K
+ 	select CPU_THUMB_CAPABLE
+ 	select CPU_TLB_V6 if MMU
+ 
+-# ARMv7
++# ARMv7 and ARMv8 architectures
+ config CPU_V7
+ 	bool
+ 	select CPU_32v6K
+-- 
+2.11.0
