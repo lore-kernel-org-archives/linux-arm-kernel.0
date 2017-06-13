@@ -1,128 +1,58 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 13 Jun 2017 12:22:42 +0200
-Subject: [PATCH 1/1] ARM: imx: Enable REGMAP_MMIO per default
-In-Reply-To: <20170607064316.2766-1-alexander.stein@systec-electronic.com>
-References: <20170607064316.2766-1-alexander.stein@systec-electronic.com>
-Message-ID: <20170613102242.adtnoxznpvknw5rb@pengutronix.de>
+From: jun.gao@mediatek.com (Jun Gao)
+Date: Tue, 13 Jun 2017 18:24:12 +0800
+Subject: [PATCH v4 2/2] arm: dts: Add Mediatek MT2701 i2c device node
+In-Reply-To: <dbfcfd5b-8812-8df2-40dc-42e889577c9a@gmail.com>
+References: <1495784107-6711-1-git-send-email-jun.gao@mediatek.com>
+ <1495784107-6711-3-git-send-email-jun.gao@mediatek.com>
+ <1497268468.930.26.camel@mhfsdcap03>
+ <dbfcfd5b-8812-8df2-40dc-42e889577c9a@gmail.com>
+Message-ID: <1497349452.930.36.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wed, Jun 07, 2017 at 08:43:16AM +0200, Alexander Stein wrote:
-> If unset, the gpc drivers fails to link with this error:
-> drivers/built-in.o: In function `imx_gpc_probe':
-> core.c:(.text+0x1e16c): undefined reference to
->  `__devm_regmap_init_mmio_clk'
+On Tue, 2017-06-13 at 11:36 +0200, Matthias Brugger wrote:
 > 
-> As the gpc driver is built when ARCH_MXC is set, enable REGMAP_MMIO in
-> this case too.
+> On 12/06/17 13:54, Jun Gao wrote:
+> > On Fri, 2017-05-26 at 15:35 +0800, Jun Gao wrote:
+> >> From: Jun Gao <jun.gao@mediatek.com>
+> >>
+> >> Add MT2701 i2c device node.
+> >>
+> >> Signed-off-by: Jun Gao <jun.gao@mediatek.com>
+> >> ---
+> >>   arch/arm/boot/dts/mt2701-evb.dts | 42 ++++++++++++++++++++++++++++++++++++++++
+> >>   arch/arm/boot/dts/mt2701.dtsi    | 42 ++++++++++++++++++++++++++++++++++++++++
+> >>   2 files changed, 84 insertions(+)
+> [...]
+> > 
+> > Dear Matthias,
+> > 
+> > Could you take this patch together with
+> > [PATCH v4 1/2]dt-bindings: i2c: Add Mediatek MT2701 i2c binding ?
+> > 
+> > Thanks!
+> > 
 > 
-> Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
-> Fixes: 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
-> ---
->  arch/arm/mach-imx/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
+> They are both included in the pull request I send [1] [2], or do I miss 
+> something?
 > 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 936c59d0e18b..1b8eead0d113 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -7,6 +7,7 @@ menuconfig ARCH_MXC
->  	select GPIOLIB
->  	select PINCTRL
->  	select PM_OPP if PM
-> +	select REGMAP_MMIO
->  	select SOC_BUS
->  	select SRAM
->  	help
+> Regards,
+> Matthias
+> 
+> [1] 
+> https://github.com/mbgg/linux-mediatek/commit/729b7f8dbdaff270c53052897ea06486221a49a2
+> [2] 
+> https://github.com/mbgg/linux-mediatek/commit/c6c301d3ff7531894257acc4f4a73928a109bda1
 
-I wonder if this should be selected nearer to the gpc driver. Something
-like:
+Dear Matthias,
 
-------->8---------
-From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Subject: [PATCH] soc: imx: Introduce Kconfig symbol for gpc driver selecting regmap-mmio
+Would you mind to use the same style as follows in i2c-mtk.txt of [2]?
 
-This fixes a build failure if REGMAP_MMIO and REGMAP are not enabled:
+"mediatek,mt2701-i2c", "mediatek,mt6577-i2c": for Mediatek MT2701
+"mediatek,mt6577-i2c": for Mediatek MT6577
+"mediatek,mt6589-i2c": for Mediatek MT6589
+"mediatek,mt7623-i2c", "mediatek,mt6577-i2c": for Mediatek MT7623
+"mediatek,mt8173-i2c": for Mediatek MT8173
 
-	  CC      drivers/soc/imx/gpc.o
-	drivers/soc/imx/gpc.c:306:21: error: variable 'imx_gpc_regmap_config' has initializer but incomplete type
-	 static const struct regmap_config imx_gpc_regmap_config = {
-			     ^
-	drivers/soc/imx/gpc.c:307:2: error: unknown field 'reg_bits' specified in initializer
-	  .reg_bits = 32,
-	  ^
-	drivers/soc/imx/gpc.c:307:14: warning: excess elements in struct initializer
-	  .reg_bits = 32,
-		      ^
-	drivers/soc/imx/gpc.c:307:14: note: (near initialization for 'imx_gpc_regmap_config')
-	drivers/soc/imx/gpc.c:308:2: error: unknown field 'val_bits' specified in initializer
-	  .val_bits = 32,
-	  ^
-	drivers/soc/imx/gpc.c:308:14: warning: excess elements in struct initializer
-	  .val_bits = 32,
-		      ^
-	drivers/soc/imx/gpc.c:308:14: note: (near initialization for 'imx_gpc_regmap_config')
-	drivers/soc/imx/gpc.c:309:2: error: unknown field 'reg_stride' specified in initializer
-	  .reg_stride = 4,
-	  ^
-	drivers/soc/imx/gpc.c:309:16: warning: excess elements in struct initializer
-	  .reg_stride = 4,
-			^
-	drivers/soc/imx/gpc.c:309:16: note: (near initialization for 'imx_gpc_regmap_config')
-	drivers/soc/imx/gpc.c:310:2: error: unknown field 'max_register' specified in initializer
-	  .max_register = 0x2ac,
-	  ^
-	drivers/soc/imx/gpc.c:310:18: warning: excess elements in struct initializer
-	  .max_register = 0x2ac,
-			  ^
-	drivers/soc/imx/gpc.c:310:18: note: (near initialization for 'imx_gpc_regmap_config')
-	drivers/soc/imx/gpc.c: In function 'imx_gpc_probe':
-	drivers/soc/imx/gpc.c:390:11: error: implicit declaration of function 'devm_regmap_init_mmio_clk' [-Werror=implicit-function-declaration]
-	  regmap = devm_regmap_init_mmio_clk(&pdev->dev, NULL, base,
-		   ^
-	drivers/soc/imx/gpc.c:390:9: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-	  regmap = devm_regmap_init_mmio_clk(&pdev->dev, NULL, base,
-		 ^
-	cc1: some warnings being treated as errors
 
-As an added bonus this symbol is only enabled on imx6 builds as other
-mxc SoC don't make use of this driver.
-
-Fixes: 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- drivers/soc/imx/Kconfig  | 5 +++++
- drivers/soc/imx/Makefile | 2 +-
- 2 files changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/soc/imx/Kconfig b/drivers/soc/imx/Kconfig
-index a5b86a28f343..49f95d8c371f 100644
---- a/drivers/soc/imx/Kconfig
-+++ b/drivers/soc/imx/Kconfig
-@@ -1,5 +1,10 @@
- menu "i.MX SoC drivers"
- 
-+config IMX6_PM_DOMAINS
-+	bool
-+	default y if SOC_IMX6
-+	select REGMAP_MMIO
-+
- config IMX7_PM_DOMAINS
- 	bool "i.MX7 PM domains"
- 	depends on SOC_IMX7D || (COMPILE_TEST && OF)
-diff --git a/drivers/soc/imx/Makefile b/drivers/soc/imx/Makefile
-index 5b6e396c1121..ee6857673089 100644
---- a/drivers/soc/imx/Makefile
-+++ b/drivers/soc/imx/Makefile
-@@ -1,2 +1,2 @@
--obj-y += gpc.o
-+obj-$(CONFIG_IMX6_PM_DOMAINS) += gpc.o
- obj-$(CONFIG_IMX7_PM_DOMAINS) += gpcv2.o
--- 
-2.11.0
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks!
