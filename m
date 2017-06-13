@@ -1,9 +1,9 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 13 Jun 2017 13:10:43 -0700
-Subject: [GIT PULL 6/7] Broadcom defconfig-arm64 changes for 4.13 (v2)
+Date: Tue, 13 Jun 2017 13:10:44 -0700
+Subject: [GIT PULL 7/7] Broadcom drivers changes for 4.13 (v2)
 In-Reply-To: <20170613201044.9808-1-f.fainelli@gmail.com>
 References: <20170613201044.9808-1-f.fainelli@gmail.com>
-Message-ID: <20170613201044.9808-6-f.fainelli@gmail.com>
+Message-ID: <20170613201044.9808-7-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,21 +13,38 @@ The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 
 are available in the git repository at:
 
-  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.13/defconfig-arm64
+  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.13/drivers
 
-for you to fetch changes up to 747868aeb03b44ae4818c8fd3956fb606b09e58d:
+for you to fetch changes up to 1f6ab20f5527a2483d666d2ce996c51368d1b617:
 
-  arm64: defconfig: Enable ARCH_BRCMSTB (2017-06-08 13:45:54 -0700)
-
-----------------------------------------------------------------
-This pull request contains ARM64 defconfig changes for 4.13, please pull the
-following:
-
-- Florian enables ARCH_BRCMSTB in the arm64 defconfig to get more build coverage
+  soc: brcmstb: enable drivers for ARM64 and BMIPS (2017-06-12 10:25:16 -0700)
 
 ----------------------------------------------------------------
-Florian Fainelli (1):
-      arm64: defconfig: Enable ARCH_BRCMSTB
+This pull request contains Broadcom ARM/ARM64 SoCs specific driver changes for
+4.13, please pull the following:
 
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+- Doug adds support for the latest generation GISB bus arbiter (v7), he starts by
+  fixing two issues in how registers are written, and how 64-bit addresses are captured
+  and then he simplifies the error interception by using notifiers, which allows him
+  to add support for ARM64
+
+- Markus updates the SOC_BRCMSTB Kconfig depends to cover ARM64 and BMIPS_GENERIC
+  systems where this code is now also used
+
+----------------------------------------------------------------
+Doug Berger (6):
+      bus: brcmstb_gisb: Use register offsets with writes too
+      bus: brcmstb_gisb: correct support for 64-bit address output
+      bus: brcmstb_gisb: add notifier handling
+      bus: brcmstb_gisb: remove low-level ARM hooks
+      bus: brcmstb_gisb: enable driver for ARM64 architecture
+      bus: brcmstb_gisb: update to support new revision
+
+Markus Mayer (1):
+      soc: brcmstb: enable drivers for ARM64 and BMIPS
+
+ .../devicetree/bindings/bus/brcm,gisb-arb.txt      |   3 +-
+ drivers/bus/Kconfig                                |   2 +-
+ drivers/bus/brcmstb_gisb.c                         | 121 ++++++++++++---------
+ drivers/soc/bcm/Kconfig                            |   2 +-
+ 4 files changed, 76 insertions(+), 52 deletions(-)
