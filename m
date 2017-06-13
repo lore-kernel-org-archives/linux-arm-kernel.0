@@ -1,121 +1,74 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Tue, 13 Jun 2017 15:40:46 +0930
-Subject: [PATCH 2/2] drivers/clocksource/fttmr010: Implement delay timer
-In-Reply-To: <20170611212617.6906-2-linus.walleij@linaro.org>
-References: <20170611212617.6906-1-linus.walleij@linaro.org>
- <20170611212617.6906-2-linus.walleij@linaro.org>
-Message-ID: <1497334246.11158.4.camel@aj.id.au>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Tue, 13 Jun 2017 14:42:11 +0800
+Subject: [PATCH 0/9] clk: add imx7ulp clk support
+In-Reply-To: <1494856763-6543-1-git-send-email-aisheng.dong@nxp.com>
+References: <1494856763-6543-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20170613064211.GC15770@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2017-06-11 at 23:26 +0200, Linus Walleij wrote:
-> This timer is often used on the ARM architecture, so as with so
-> many siblings, we can implement delay timers, removing the need
-> for the system to calibrate jiffys at boot, and potentially
-> handling CPU frequency scaling on targets.
+On Mon, May 15, 2017 at 09:59:14PM +0800, Dong Aisheng wrote:
+> This patch series intends to add imx7ulp clk support.
 > 
-> We cannot just protect the Kconfig with a "depends on ARM" because
-> it is already known that different architectures are using Faraday
-> IP blocks, so it is better to make things open-ended and use
+> i.MX7ULP Clock functions are under joint control of the System
+> Clock Generation (SCG) modules, Peripheral Clock Control (PCC)
+> modules, and Core Mode Controller (CMC)1 blocks
+> 
+> The clocking scheme provides clear separation between M4 domain
+> and A7 domain. Except for a few clock sources shared between two
+> domains, such as the System Oscillator clock, the Slow IRC (SIRC),
+> and and the Fast IRC clock (FIRCLK), clock sources and clock
+> management are separated and contained within each domain.
+> 
+> M4 clock management consists of SCG0, PCC0, PCC1, and CMC0 modules.
+> A7 clock management consists of SCG1, PCC2, PCC3, and CMC1 modules.
+> 
+> Note: this series only adds A7 clock domain support as M4 clock
+> domain will be handled by M4 seperately.
+> 
+> Dong Aisheng (9):
+>   clk: clk-divider: add CLK_DIVIDER_ZERO_GATE clk support
+>   clk: reparent orphans after critical clocks enabled
+>   clk: fractional-divider: add CLK_FRAC_DIVIDER_ZERO_BASED flag support
+>   clk: imx: add pllv4 support
+>   clk: imx: add pfdv2 support
+>   clk: imx: add composite clk support
+>   dt-bindings: clock: add imx7ulp clock binding doc
+>   clk: imx: make mux parent strings const
+>   clk: imx: add imx7ulp clk driver
+> 
 
-Seems like we're missing the end of the sentence?
+Ping.
 
-> 
-> Result on boot dmesg:
-> 
-> Switching to timer-based delay loop, resolution 40n
-> Calibrating delay loop (skipped), value calculated using
-> ? timer frequency.. 50.00 BogoMIPS (lpj=250000)
-> 
-> This is accurately the timer frequency, 250MHz on the APB
-> bus.
-> 
-> > Cc: Andrew Jeffery <andrew@aj.id.au>
-> > Cc: Joel Stanley <joel@jms.id.au>
-> > Cc: Jonas Jensen <jonas.jensen@gmail.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Regards
+Dong Aisheng
 
-Tried both patches on an AST2500, everything worked as suggested.
-
-Tested-by: Andrew Jeffery <andrew@aj.id.au>
-
-> ---
-> ?drivers/clocksource/timer-fttmr010.c | 35 ++++++++++++++++++++++++++++++++++-
-> ?1 file changed, 34 insertions(+), 1 deletion(-)
+>  .../devicetree/bindings/clock/imx7ulp-clock.txt    |  62 +++++++
+>  drivers/clk/clk-divider.c                          |   2 +
+>  drivers/clk/clk-fractional-divider.c               |  10 ++
+>  drivers/clk/clk.c                                  |  39 ++--
+>  drivers/clk/imx/Makefile                           |   6 +-
+>  drivers/clk/imx/clk-busy.c                         |   2 +-
+>  drivers/clk/imx/clk-composite.c                    |  93 ++++++++++
+>  drivers/clk/imx/clk-fixup-mux.c                    |   2 +-
+>  drivers/clk/imx/clk-imx7ulp.c                      | 171 ++++++++++++++++++
+>  drivers/clk/imx/clk-pfdv2.c                        | 199 +++++++++++++++++++++
+>  drivers/clk/imx/clk-pllv4.c                        | 196 ++++++++++++++++++++
+>  drivers/clk/imx/clk.h                              |  31 +++-
+>  include/dt-bindings/clock/imx7ulp-clock.h          | 108 +++++++++++
+>  include/linux/clk-provider.h                       |  11 ++
+>  14 files changed, 902 insertions(+), 30 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/imx7ulp-clock.txt
+>  create mode 100644 drivers/clk/imx/clk-composite.c
+>  create mode 100644 drivers/clk/imx/clk-imx7ulp.c
+>  create mode 100644 drivers/clk/imx/clk-pfdv2.c
+>  create mode 100644 drivers/clk/imx/clk-pllv4.c
+>  create mode 100644 include/dt-bindings/clock/imx7ulp-clock.h
 > 
-> diff --git a/drivers/clocksource/timer-fttmr010.c b/drivers/clocksource/timer-fttmr010.c
-> index 5e82469995cb..0074d89cd2ce 100644
-> --- a/drivers/clocksource/timer-fttmr010.c
-> +++ b/drivers/clocksource/timer-fttmr010.c
-> @@ -17,6 +17,7 @@
-> ?#include <linux/clk.h>
-> ?#include <linux/slab.h>
-> ?#include <linux/bitops.h>
-> +#include <linux/delay.h>
-> ?
-> ?/*
-> ? * Register definitions for the timers
-> @@ -81,9 +82,15 @@ struct fttmr010 {
-> > ?	bool count_down;
-> > ?	u32 t1_enable_val;
-> > ?	struct clock_event_device clkevt;
-> +#ifdef CONFIG_ARM
-> > +	struct delay_timer delay_timer;
-> +#endif
-> ?};
-> ?
-> -/* A local singleton used by sched_clock, which is stateless */
-> +/*
-> + * A local singleton used by sched_clock and delay timer reads, which are
-> + * fast and stateless
-> + */
-> ?static struct fttmr010 *local_fttmr;
-> ?
-> ?static inline struct fttmr010 *to_fttmr010(struct clock_event_device *evt)
-> @@ -101,6 +108,20 @@ static u64 notrace fttmr010_read_sched_clock_down(void)
-> > ?	return ~readl(local_fttmr->base + TIMER2_COUNT);
-> ?}
-> ?
-> +#ifdef CONFIG_ARM
-> +
-> +static unsigned long fttmr010_read_current_timer_up(void)
-> +{
-> > +	return readl(local_fttmr->base + TIMER2_COUNT);
-> +}
-> +
-> +static unsigned long fttmr010_read_current_timer_down(void)
-> +{
-> > +	return ~readl(local_fttmr->base + TIMER2_COUNT);
-> +}
-> +
-> +#endif
-> +
-> ?static int fttmr010_timer_set_next_event(unsigned long cycles,
-> > ?				???????struct clock_event_device *evt)
-> ?{
-> @@ -349,6 +370,18 @@ static int __init fttmr010_timer_init(struct device_node *np)
-> > ?					fttmr010->tick_rate,
-> > ?					1, 0xffffffff);
-> ?
-> +#ifdef CONFIG_ARM
-> > +	/* Also use this timer for delays */
-> > +	if (fttmr010->count_down)
-> > +		fttmr010->delay_timer.read_current_timer =
-> > +			fttmr010_read_current_timer_down;
-> > +	else
-> > +		fttmr010->delay_timer.read_current_timer =
-> > +			fttmr010_read_current_timer_up;
-> > +	fttmr010->delay_timer.freq = fttmr010->tick_rate;
-> > +	register_current_timer_delay(&fttmr010->delay_timer);
-> +#endif
-> +
-> > ?	return 0;
-> ?
-> ?out_unmap:
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170613/6d7644bf/attachment.sig>
+> -- 
+> 2.7.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
