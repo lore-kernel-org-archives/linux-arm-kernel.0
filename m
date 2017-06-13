@@ -1,67 +1,67 @@
-From: jolsa@redhat.com (Jiri Olsa)
-Date: Tue, 13 Jun 2017 16:06:20 +0200
-Subject: [PATCH 0/2] arm64: fix crash when reading /proc/kcore
-In-Reply-To: <CAKv+Gu_GqUPDjie0kqV32fs8ZobXe7T2KcdBmE3RuqSYaz6f1Q@mail.gmail.com>
-References: <20170608194139.9250-1-ard.biesheuvel@linaro.org>
- <593F4721.7000501@huawei.com>
- <CAKv+Gu_GqUPDjie0kqV32fs8ZobXe7T2KcdBmE3RuqSYaz6f1Q@mail.gmail.com>
-Message-ID: <20170613140620.GA10107@krava>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Tue, 13 Jun 2017 17:12:48 +0300
+Subject: [RFC v2 1/3] interconnect: Add generic interconnect controller API
+In-Reply-To: <20170613134200.GA4769@kroah.com>
+References: <20170612141359.26117-1-georgi.djakov@linaro.org>
+ <20170612141359.26117-2-georgi.djakov@linaro.org>
+ <20170613134200.GA4769@kroah.com>
+Message-ID: <b827c5f0-9e28-e14d-a531-83a3559a06c3@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 13, 2017 at 09:17:49AM +0200, Ard Biesheuvel wrote:
-> On 13 June 2017 at 04:00, Tan Xiaojun <tanxiaojun@huawei.com> wrote:
-> > On 2017/6/9 3:41, Ard Biesheuvel wrote:
-> >> This is a follow-up to patches from zhonjiang [0] and myself [1] that aim
-> >> to solve a problem in the kcore code, which gets confused by the presence
-> >> of block mappings in the vmalloc region.
-> >>
-> >> While fixing the crash is quite straight forward [2], we need to tweak
-> >> the kcore code itself to ensure that it operates correctly on arm64.
-> >> Fortunately, we can achieve this with two very simple changes:
-> >>
-> >> - replace a call to is_vmalloc_or_module_addr() in read_kcore() with a
-> >>   comparison of the kclist type field (#1)
-> >> - enable CONFIG_ARCH_PROC_KCORE_TEXT for arm64 (#2)
-> >>
-> >> [0] http://marc.info/?l=linux-mm&m=149632393629295&w=2
-> >> [1] http://marc.info/?l=linux-mm&m=149685966530180&w=2
-> >> [2] http://marc.info/?l=linux-mm&m=149694975123959&w=2
-> >>
-> >> Ard Biesheuvel (2):
-> >>   fs/proc: kcore: use kcore_list type to check for vmalloc/module
-> >>     address
-> >>   arm64: mm: select CONFIG_ARCH_PROC_KCORE_TEXT
-> >>
-> >>  arch/arm64/Kconfig | 3 +++
-> >>  fs/proc/kcore.c    | 2 +-
-> >>  2 files changed, 4 insertions(+), 1 deletion(-)
-> >>
-> >
-> > Reported-by: Tan Xiaojun <tanxiaojun@huawei.com>
-> > Tested-by: Tan Xiaojun <tanxiaojun@huawei.com>
-> >
-> > Thank you for working on this problem which I reported two months ago.
-> >
-> > https://patchwork.kernel.org/patch/9687319/
-> >
-> > I tested, and it really solved the problem in Hisilicon D02/D03/D05.
-> >
+On 06/13/2017 04:42 PM, Greg KH wrote:
+> On Mon, Jun 12, 2017 at 05:13:57PM +0300, Georgi Djakov wrote:
+>> This patch introduce a new API to get the requirement and configure the
+>> interconnect buses across the entire chipset to fit with the current demand.
+>>
+>> The API is using a consumer/provider-based model, where the providers are
+>> the interconnect controllers and the consumers could be various drivers.
+>> The consumers request interconnect resources (path) to an endpoint and set
+>> the desired constraints on this data flow path. The provider(s) receive
+>> requests from consumers and aggregate these requests for all master-slave
+>> pairs on that path. Then the providers configure each participating in the
+>> topology node according to the requested data flow path, physical links and
+>> constraints. The topology could be complicated and multi-tiered and is SoC
+>> specific.
+>>
+>> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+>> ---
+>>  Documentation/interconnect/interconnect.txt |  65 +++++
+>>  drivers/Kconfig                             |   2 +
+>>  drivers/Makefile                            |   1 +
+>>  drivers/interconnect/Kconfig                |  10 +
+>>  drivers/interconnect/Makefile               |   1 +
+>>  drivers/interconnect/interconnect.c         | 376 ++++++++++++++++++++++++++++
+>>  include/linux/interconnect-consumer.h       |  72 ++++++
+>>  include/linux/interconnect-provider.h       | 120 +++++++++
+>>  8 files changed, 647 insertions(+)
+>>  create mode 100644 Documentation/interconnect/interconnect.txt
+>>  create mode 100644 drivers/interconnect/Kconfig
+>>  create mode 100644 drivers/interconnect/Makefile
+>>  create mode 100644 drivers/interconnect/interconnect.c
+>>  create mode 100644 include/linux/interconnect-consumer.h
+>>  create mode 100644 include/linux/interconnect-provider.h
+>>
+>> diff --git a/Documentation/interconnect/interconnect.txt b/Documentation/interconnect/interconnect.txt
+>> new file mode 100644
+>> index 000000000000..f761a2fb553c
+>> --- /dev/null
+>> +++ b/Documentation/interconnect/interconnect.txt
 > 
-> Thank you.
-> 
-> fs/proc/kcore.c does not have a maintainer according to
-> get_maintainer.pl but it would be nice if we could get an ack on patch
-> #1 from someone who is not a usual ARM suspect.
-> 
-> Patch #1 is here:
-> http://marc.info/?l=linux-kernel&m=149695092424288&w=2
-> 
-> Ingo, Andrew, Jiri, any objections?
+> .rst for new Documenation files please, and hook it up to the larger
+> documentation build process at the same time.
 
-hi,
-pretty straightforward.. looks ok to me
+Ah right, will convert it to rst!
 
-Reviewed-by: Jiri Olsa <jolsa@kernel.org>
+> 
+> And why are these RFC patches?  Don't you feel they are ready to be
+> reviewed?  I know I ignore RFC patches for the most part as obviously
+> the author does not think they are ready :)
 
-jirka
+I'm trying to raise a discussion around this topic and get more comments
+whether this is moving into the right direction and are there any big
+concerns left. Its RFC because its not ready to be applied yet, but sure
+i will make it a "patch" next time. Reviewing is very welcome!
+
+Thanks,
+Georgi
