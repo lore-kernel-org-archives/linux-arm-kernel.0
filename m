@@ -1,115 +1,28 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Tue, 13 Jun 2017 03:32:37 +0000
-Subject: [PATCH V3 5/7] tty: serial: lpuart: add imx7ulp support
-In-Reply-To: <AM4PR0401MB22607CE9EE3909A7A0B9451AFFC20@AM4PR0401MB2260.eurprd04.prod.outlook.com>
-References: <1497281848-12995-1-git-send-email-aisheng.dong@nxp.com>
- <1497281848-12995-6-git-send-email-aisheng.dong@nxp.com>
- <AM4PR0401MB22607CE9EE3909A7A0B9451AFFC20@AM4PR0401MB2260.eurprd04.prod.outlook.com>
-Message-ID: <AM3PR04MB306E486BD19CD88813A3B4480C20@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 13 Jun 2017 06:18:42 +0200
+Subject: [Merge tag 'pci-v4.12-changes' of git] 857f864014: BUG: unable
+ to handle kernel NULL pointer dereference at 00000000000000a8
+In-Reply-To: <61e11e67-6c1b-ef1e-5fb8-a7c9efb17666@deltatee.com>
+References: <5933fe2d.V33ODGPU9noDVuyF%fengguang.wu@intel.com>
+ <20170606175552.GA12672@bhelgaas-glaptop.roam.corp.google.com>
+ <fe0543c1-cba6-02bb-36eb-395910bd5012@deltatee.com>
+ <20170612200852.GA28578@bhelgaas-glaptop.roam.corp.google.com>
+ <61e11e67-6c1b-ef1e-5fb8-a7c9efb17666@deltatee.com>
+Message-ID: <20170613041842.GA13308@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Andy Duan
-> Sent: Tuesday, June 13, 2017 11:02 AM
-> To: A.s. Dong; linux-serial at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> gregkh at linuxfoundation.org; jslaby at suse.com; stefan at agner.ch; Mingkai Hu;
-> Y.b. Lu; nikita.yoush at cogentembedded.com; andy.shevchenko at gmail.com;
-> dongas86 at gmail.com; A.s. Dong
-> Subject: RE: [PATCH V3 5/7] tty: serial: lpuart: add imx7ulp support
-> 
-> From: Dong Aisheng <aisheng.dong@nxp.com> Sent: Monday, June 12, 2017
-> 11:37 PM
-> >The lpuart of imx7ulp is basically the same as ls1021a. It's also
-> >32 bit width register, but unlike ls1021a, it's little endian.
-> >Besides that, imx7ulp lpuart has a minor different register layout from
-> >ls1021a that it has four extra registers (verid, param, global,
-> >pincfg) located at the beginning of register map, which are currently
-> >not used by the driver and less to be used later.
-> >
-> >To ease the register difference handling, we add a reg_off member in
-> >lpuart_soc_data structure to represent if the normal
-> >lpuart32_{read|write} requires plus a offset to hide the issue.
-> >
-> >Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> >Cc: Jiri Slaby <jslaby@suse.com>
-> >Cc: Stefan Agner <stefan@agner.ch>
-> >Cc: Mingkai Hu <Mingkai.Hu@nxp.com>
-> >Cc: Yangbo Lu <yangbo.lu@nxp.com>
-> >Cc: Fugang Duan <fugang.duan@nxp.com>
-> >Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> >
-> >---
-> >ChangeLog:
-> >v2->v3:
-> > * use standard port->iotype to represent the endians.
-> >v1->v2:
-> > * remove lpuart_reg_off according to Stefan's suggestion
-> >---
-> > drivers/tty/serial/fsl_lpuart.c | 10 ++++++++++
-> > 1 file changed, 10 insertions(+)
-> >
-> >diff --git a/drivers/tty/serial/fsl_lpuart.c
-> >b/drivers/tty/serial/fsl_lpuart.c index
-> >bbf47a0..9d05e53 100644
-> >--- a/drivers/tty/serial/fsl_lpuart.c
-> >+++ b/drivers/tty/serial/fsl_lpuart.c
-> >@@ -231,6 +231,9 @@
-> > #define DEV_NAME	"ttyLP"
-> > #define UART_NR		6
-> >
-> >+/* IMX lpuart has four extra unused regs located at the beginning */
-> >+#define IMX_REG_OFF	0x10
-> >+
-> > struct lpuart_port {
-> > 	struct uart_port	port;
-> > 	struct clk		*clk;
-> >@@ -259,6 +262,7 @@ struct lpuart_port {
-> >
-> > struct lpuart_soc_data {
-> > 	char	iotype;
-> >+	u8	reg_off;
-> > };
-> >
-> > static const struct lpuart_soc_data vf_data = { @@ -267,12 +271,17 @@
-> >static const struct lpuart_soc_data vf_data = {
-> >
-> > static const struct lpuart_soc_data ls_data = {
-> > 	.iotype = UPIO_MEM32BE,
-> >+};
-> >
-> >+static struct lpuart_soc_data imx_data = {
-> >+	.iotype = UPIO_MEM32,
-> >+	.reg_off = IMX_REG_OFF,
-> > };
-> >
-> > static const struct of_device_id lpuart_dt_ids[] = {
-> > 	{ .compatible = "fsl,vf610-lpuart",	.data = &vf_data, },
-> > 	{ .compatible = "fsl,ls1021a-lpuart",	.data = &ls_data, },
-> >+	{ .compatible = "fsl,imx7ulp-lpuart",	.data = &imx_data, },
-> > 	{ /* sentinel */ }
-> > };
-> > MODULE_DEVICE_TABLE(of, lpuart_dt_ids); @@ -2020,6 +2029,7 @@ static
-> >int lpuart_probe(struct platform_device *pdev)
-> > 	if (IS_ERR(sport->port.membase))
-> > 		return PTR_ERR(sport->port.membase);
-> >
-> >+	sport->port.membase += sdata->reg_off;
-> > 	sport->port.mapbase = res->start;
-> 
-> Also update the mapbase.
-> 
+On Mon, Jun 12, 2017 at 05:34:59PM -0600, Logan Gunthorpe wrote:
+> 1) The test we are looking at is overrunning the dynamic char dev major
+> numbers by a lot. On a successful run, it gets down to 216 where the
+> limit is 234. Thus, there are 18 too many major numbers assigned and the
+> fact that this test used to work is really just luck. (I've cc'd
+> developers from 49db08c3 for this issue.)
 
-The idea behind is only do the quirk for io remapped address.
-Mapbase(physical address) is not needed for lpuart32 currently.
+What test causes so many major numbers to be allocated?  Is this
+in-kernel test code?  Do you really have a system that requires so many
+different drivers that all want a dynamic char major?
 
-Probably it could be changed when lpuart32 DMA function is added.
+thanks,
 
-Regards
-Dong Aisheng
-
-> > 	sport->port.dev = &pdev->dev;
-> > 	sport->port.type = PORT_LPUART;
-> >--
-> >2.7.4
+gre gk-h
