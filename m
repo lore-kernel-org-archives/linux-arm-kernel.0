@@ -1,22 +1,21 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 13 Jun 2017 10:30:14 +0200
-Subject: [PATCH v6 3/5] arm64: marvell: dts: add dma-mask in crypto nodes
- for 7k/8k
-In-Reply-To: <20170524141035.21031-4-antoine.tenart@free-electrons.com>
- (Antoine Tenart's message of "Wed, 24 May 2017 16:10:33 +0200")
-References: <20170524141035.21031-1-antoine.tenart@free-electrons.com>
- <20170524141035.21031-4-antoine.tenart@free-electrons.com>
-Message-ID: <87fuf49tnt.fsf@free-electrons.com>
+Date: Tue, 13 Jun 2017 10:41:02 +0200
+Subject: [PATCH 1/2] arm64: dts: marvell: explicitly enable the mdio nodes
+ for 7k/8k DB
+In-Reply-To: <20170608100455.15769-1-antoine.tenart@free-electrons.com>
+ (Antoine Tenart's message of "Thu, 8 Jun 2017 12:04:54 +0200")
+References: <20170608100455.15769-1-antoine.tenart@free-electrons.com>
+Message-ID: <87bmps9t5t.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Antoine,
  
- On mer., mai 24 2017, Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
+ On jeu., juin 08 2017, Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
 
-> The EIP197 cryptographic engine supports 64 bits address width but is
-> limited to 40 bits on 7k/8k. Add a dma-mask property in the
-> cryptographic engine nodes to reflect this.
+> Explicitly enable the MDIO nodes in the Marvell Armada 7k DB and Marvell
+> Armada 8k DB. This is needed as the MDIO nodes will be disabled in the
+> CP 110 slave and master dtsi by a following up patch.
 >
 > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 
@@ -27,34 +26,45 @@ Thanks,
 Gregory
 
 > ---
->  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 1 +
->  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 1 +
->  2 files changed, 2 insertions(+)
+>  arch/arm64/boot/dts/marvell/armada-7040-db.dts | 2 ++
+>  arch/arm64/boot/dts/marvell/armada-8040-db.dts | 4 ++++
+>  2 files changed, 6 insertions(+)
 >
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> index b4bc42ece754..434d8a806ffa 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> @@ -240,6 +240,7 @@
->  				interrupt-names = "mem", "ring0", "ring1",
->  				"ring2", "ring3", "eip";
->  				clocks = <&cpm_syscon0 1 26>;
-> +				dma-mask = <0xff 0xffffffff>;
->  				status = "disabled";
->  			};
->  		};
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> index 6e2058847ddc..17ca94a5d6b4 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> @@ -230,6 +230,7 @@
->  				interrupt-names = "mem", "ring0", "ring1",
->  						  "ring2", "ring3", "eip";
->  				clocks = <&cps_syscon0 1 26>;
-> +				dma-mask = <0xff 0xffffffff>;
->  				status = "disabled";
->  			};
->  		};
+> diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+> index 12442329b80f..771311051421 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+> +++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+> @@ -162,6 +162,8 @@
+>  };
+>  
+>  &cpm_mdio {
+> +	status = "okay";
+> +
+>  	phy0: ethernet-phy at 0 {
+>  		reg = <0>;
+>  	};
+> diff --git a/arch/arm64/boot/dts/marvell/armada-8040-db.dts b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+> index 3cde649f96e4..6af3c39bbb99 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+> +++ b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+> @@ -125,6 +125,8 @@
+>  };
+>  
+>  &cpm_mdio {
+> +	status = "okay";
+> +
+>  	phy1: ethernet-phy at 1 {
+>  		reg = <1>;
+>  	};
+> @@ -170,6 +172,8 @@
+>  };
+>  
+>  &cps_mdio {
+> +	status = "okay";
+> +
+>  	phy0: ethernet-phy at 0 {
+>  		reg = <0>;
+>  	};
 > -- 
 > 2.9.4
 >
