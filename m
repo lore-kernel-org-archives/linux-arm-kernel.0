@@ -1,138 +1,46 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 13 Jun 2017 15:57:06 +0200
-Subject: [PATCH v3 1/6] arm64: dts: marvell: armada-3720-db: Sort the dts node
- alphabetically
+Date: Tue, 13 Jun 2017 15:57:09 +0200
+Subject: [PATCH v3 4/6] arm64: dts: marvell: armada-37xx: Use angle bracket
+ for each register set
 In-Reply-To: <20170613135711.7622-1-gregory.clement@free-electrons.com>
 References: <20170613135711.7622-1-gregory.clement@free-electrons.com>
-Message-ID: <20170613135711.7622-2-gregory.clement@free-electrons.com>
+Message-ID: <20170613135711.7622-5-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sort the reference nodes in alphabetical order to ease the merge of
-future nodes.
+When several groups of register address and size are used with reg, then
+surround each one by angle bracket.
 
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm64/boot/dts/marvell/armada-3720-db.dts | 83 +++++++++++++-------------
- 1 file changed, 41 insertions(+), 42 deletions(-)
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-index a89855f57091..d6f12fafac6c 100644
---- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-@@ -78,6 +78,20 @@
- 	};
- };
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index c1076fd0bd9e..65562319770b 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -281,8 +281,8 @@
  
-+&eth0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&rgmii_pins>;
-+	phy-mode = "rgmii-id";
-+	phy = <&phy0>;
-+	status = "okay";
-+};
-+
-+&eth1 {
-+	phy-mode = "sgmii";
-+	phy = <&phy1>;
-+	status = "okay";
-+};
-+
- &i2c0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c1_pins>;
-@@ -108,11 +122,36 @@
- 	};
- };
+ 			xor at 60900 {
+ 				compatible = "marvell,armada-3700-xor";
+-				reg = <0x60900 0x100
+-				       0x60b00 0x100>;
++				reg = <0x60900 0x100>,
++				      <0x60b00 0x100>;
  
-+&mdio {
-+	status = "okay";
-+	phy0: ethernet-phy at 0 {
-+		reg = <0>;
-+	};
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+	};
-+};
-+
-+/* CON17 (PCIe) / CON12 (mini-PCIe) */
-+&pcie0 {
-+	status = "okay";
-+};
-+
- /* CON3 */
- &sata {
- 	status = "okay";
- };
- 
-+&sdhci0 {
-+	non-removable;
-+	bus-width = <8>;
-+	mmc-ddr-1_8v;
-+	mmc-hs400-1_8v;
-+	marvell,pad-type = "fixed-1-8v";
-+	status = "okay";
-+};
-+
- &spi0 {
- 	status = "okay";
- 	pinctrl-names = "default";
-@@ -152,12 +191,8 @@
- 	status = "okay";
- };
- 
--&sdhci0 {
--	non-removable;
--	bus-width = <8>;
--	mmc-ddr-1_8v;
--	mmc-hs400-1_8v;
--	marvell,pad-type = "fixed-1-8v";
-+/* CON27 */
-+&usb2 {
- 	status = "okay";
- };
- 
-@@ -166,39 +201,3 @@
- 	status = "okay";
- 	usb-phy = <&usb3_phy>;
- };
--
--/* CON17 (PCIe) / CON12 (mini-PCIe) */
--&pcie0 {
--	status = "okay";
--};
--
--/* CON27 */
--&usb2 {
--	status = "okay";
--};
--
--
--&mdio {
--	status = "okay";
--	phy0: ethernet-phy at 0 {
--		reg = <0>;
--	};
--
--	phy1: ethernet-phy at 1 {
--		reg = <1>;
--	};
--};
--
--&eth0 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&rgmii_pins>;
--	phy-mode = "rgmii-id";
--	phy = <&phy0>;
--	status = "okay";
--};
--
--&eth1 {
--	phy-mode = "sgmii";
--	phy = <&phy1>;
--	status = "okay";
--};
+ 				xor10 {
+ 					interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
+@@ -295,8 +295,8 @@
+ 			sdhci0: sdhci at d8000 {
+ 				compatible = "marvell,armada-3700-sdhci",
+ 					     "marvell,sdhci-xenon";
+-				reg = <0xd8000 0x300
+-				       0x17808 0x4>;
++				reg = <0xd8000 0x300>,
++				      <0x17808 0x4>;
+ 				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&nb_periph_clk 0>;
+ 				clock-names = "core";
 -- 
 2.11.0
