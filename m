@@ -1,79 +1,47 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Tue, 13 Jun 2017 09:59:26 +0800
-Subject: [PATCH v15 7/7] ARM: dts: imx6q-evi: Fix onboard hub reset line
-In-Reply-To: <1497319166-17287-1-git-send-email-peter.chen@nxp.com>
-References: <1497319166-17287-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1497319166-17287-8-git-send-email-peter.chen@nxp.com>
+From: tanxiaojun@huawei.com (Tan Xiaojun)
+Date: Tue, 13 Jun 2017 10:00:01 +0800
+Subject: [PATCH 0/2] arm64: fix crash when reading /proc/kcore
+In-Reply-To: <20170608194139.9250-1-ard.biesheuvel@linaro.org>
+References: <20170608194139.9250-1-ard.biesheuvel@linaro.org>
+Message-ID: <593F4721.7000501@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joshua Clayton <stillcompiling@gmail.com>
+On 2017/6/9 3:41, Ard Biesheuvel wrote:
+> This is a follow-up to patches from zhonjiang [0] and myself [1] that aim
+> to solve a problem in the kcore code, which gets confused by the presence
+> of block mappings in the vmalloc region.
+> 
+> While fixing the crash is quite straight forward [2], we need to tweak
+> the kcore code itself to ensure that it operates correctly on arm64.
+> Fortunately, we can achieve this with two very simple changes:
+> 
+> - replace a call to is_vmalloc_or_module_addr() in read_kcore() with a
+>   comparison of the kclist type field (#1)
+> - enable CONFIG_ARCH_PROC_KCORE_TEXT for arm64 (#2)
+> 
+> [0] http://marc.info/?l=linux-mm&m=149632393629295&w=2
+> [1] http://marc.info/?l=linux-mm&m=149685966530180&w=2
+> [2] http://marc.info/?l=linux-mm&m=149694975123959&w=2
+> 
+> Ard Biesheuvel (2):
+>   fs/proc: kcore: use kcore_list type to check for vmalloc/module
+>     address
+>   arm64: mm: select CONFIG_ARCH_PROC_KCORE_TEXT
+> 
+>  arch/arm64/Kconfig | 3 +++
+>  fs/proc/kcore.c    | 2 +-
+>  2 files changed, 4 insertions(+), 1 deletion(-)
+> 
 
-Previously the onboard hub was made to work by treating its
-reset gpio as a regulator enable.
-Get rid of that kludge now that pwseq has added reset gpio support
-Move pin muxing the hub reset pin into the usbh1 group
+Reported-by: Tan Xiaojun <tanxiaojun@huawei.com>
+Tested-by: Tan Xiaojun <tanxiaojun@huawei.com>
 
-Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
-Signed-off-by: Peter Chen <peter.chen@nxp.com>
----
- arch/arm/boot/dts/imx6q-evi.dts | 25 +++++++------------------
- 1 file changed, 7 insertions(+), 18 deletions(-)
+Thank you for working on this problem which I reported two months ago.
 
-diff --git a/arch/arm/boot/dts/imx6q-evi.dts b/arch/arm/boot/dts/imx6q-evi.dts
-index fd2220a..24fe093 100644
---- a/arch/arm/boot/dts/imx6q-evi.dts
-+++ b/arch/arm/boot/dts/imx6q-evi.dts
-@@ -54,18 +54,6 @@
- 		reg = <0x10000000 0x40000000>;
- 	};
- 
--	reg_usbh1_vbus: regulator-usbhubreset {
--		compatible = "regulator-fixed";
--		regulator-name = "usbh1_vbus";
--		regulator-min-microvolt = <5000000>;
--		regulator-max-microvolt = <5000000>;
--		enable-active-high;
--		startup-delay-us = <2>;
--		pinctrl-names = "default";
--		pinctrl-0 = <&pinctrl_usbh1_hubreset>;
--		gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
--	};
--
- 	reg_usb_otg_vbus: regulator-usbotgvbus {
- 		compatible = "regulator-fixed";
- 		regulator-name = "usb_otg_vbus";
-@@ -204,12 +192,18 @@
- };
- 
- &usbh1 {
--	vbus-supply = <&reg_usbh1_vbus>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usbh1>;
- 	dr_mode = "host";
- 	disable-over-current;
- 	status = "okay";
-+
-+	usb2415host: hub at 1 {
-+		compatible = "usb424,2513";
-+		reg = <1>;
-+		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
-+		reset-duration-us = <3000>;
-+	};
- };
- 
- &usbotg {
-@@ -465,11 +459,6 @@
- 			MX6QDL_PAD_GPIO_3__USB_H1_OC 0x1b0b0
- 			/* usbh1_b OC */
- 			MX6QDL_PAD_GPIO_0__GPIO1_IO00 0x1b0b0
--		>;
--	};
--
--	pinctrl_usbh1_hubreset: usbh1hubresetgrp {
--		fsl,pins = <
- 			MX6QDL_PAD_GPIO_17__GPIO7_IO12 0x1b0b0
- 		>;
- 	};
--- 
-2.7.4
+https://patchwork.kernel.org/patch/9687319/
+
+I tested, and it really solved the problem in Hisilicon D02/D03/D05.
+
+Thanks.
+Xiaojun.
