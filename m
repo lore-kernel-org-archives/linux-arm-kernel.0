@@ -1,39 +1,111 @@
-From: dustinb@codeaurora.org (Dustin Brown)
-Date: Tue, 13 Jun 2017 11:40:56 -0700
-Subject: [PATCH 2/2] arm64: Export save_stack_trace_tsk()
-In-Reply-To: <20170613184056.23433-1-dustinb@codeaurora.org>
-References: <20170613181603.GE4902@n2100.armlinux.org.uk>
- <20170613184056.23433-1-dustinb@codeaurora.org>
-Message-ID: <20170613184056.23433-2-dustinb@codeaurora.org>
+From: jacek.anaszewski@gmail.com (Jacek Anaszewski)
+Date: Tue, 13 Jun 2017 20:44:50 +0200
+Subject: [[PATCH]] Revert "leds: handle suspend/resume in heartbeat
+ trigger"
+In-Reply-To: <1497321560-46817-1-git-send-email-bo.zhang@nxp.com>
+References: <1497321560-46817-1-git-send-email-bo.zhang@nxp.com>
+Message-ID: <8be98820-a9cf-23e3-c041-9db698d3b54e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel watchdog is a great debugging tool for finding tasks that
-consume a disproportionate amount of CPU time in contiguous chunks. One
-can imagine building a similar watchdog for arbitrary driver threads
-using save_stack_trace_tsk() and print_stack_trace(). However, this is
-not viable for dynamically loaded driver modules on ARM platforms
-because save_stack_trace_tsk() is not exported for those architectures.
-Export save_stack_trace_tsk() for the ARM64 architecture to align with
-x86 and support various debugging use cases such as arbitrary driver
-thread watchdog timers.
+Hi Bo,
 
-Signed-off-by: Dustin Brown <dustinb@codeaurora.org>
----
- arch/arm64/kernel/stacktrace.c | 1 +
- 1 file changed, 1 insertion(+)
+On 06/13/2017 04:39 AM, Zhang Bo wrote:
+> This reverts commit 5ab92a7cb82c66bf30685583a38a18538e3807db.
+> 
+> System cannot enter suspend mode because of heartbeat led trigger.
+> In autosleep_wq, try_to_suspend function will try to enter suspend
+> mode in specific period. it will get wakeup_count then call pm_notifier
+> chain callback function and freeze processes.
+> Heartbeat_pm_notifier is called and it call led_trigger_unregister to
+> change the trigger of led device to none. It will send uevent message
+> and the wakeup source count changed. As wakeup_count changed, suspend
+> will abort.
+> 
+> Signed-off-by: Zhang Bo <bo.zhang@nxp.com>
+> ---
+>  drivers/leds/trigger/ledtrig-heartbeat.c | 31 -------------------------------
+>  1 file changed, 31 deletions(-)
+> 
+> diff --git a/drivers/leds/trigger/ledtrig-heartbeat.c b/drivers/leds/trigger/ledtrig-heartbeat.c
+> index afa3b40..e95ea65 100644
+> --- a/drivers/leds/trigger/ledtrig-heartbeat.c
+> +++ b/drivers/leds/trigger/ledtrig-heartbeat.c
+> @@ -20,7 +20,6 @@
+>  #include <linux/sched/loadavg.h>
+>  #include <linux/leds.h>
+>  #include <linux/reboot.h>
+> -#include <linux/suspend.h>
+>  #include "../leds.h"
+>  
+>  static int panic_heartbeats;
+> @@ -163,30 +162,6 @@ static void heartbeat_trig_deactivate(struct led_classdev *led_cdev)
+>  	.deactivate = heartbeat_trig_deactivate,
+>  };
+>  
+> -static int heartbeat_pm_notifier(struct notifier_block *nb,
+> -				 unsigned long pm_event, void *unused)
+> -{
+> -	int rc;
+> -
+> -	switch (pm_event) {
+> -	case PM_SUSPEND_PREPARE:
+> -	case PM_HIBERNATION_PREPARE:
+> -	case PM_RESTORE_PREPARE:
+> -		led_trigger_unregister(&heartbeat_led_trigger);
+> -		break;
+> -	case PM_POST_SUSPEND:
+> -	case PM_POST_HIBERNATION:
+> -	case PM_POST_RESTORE:
+> -		rc = led_trigger_register(&heartbeat_led_trigger);
+> -		if (rc)
+> -			pr_err("could not re-register heartbeat trigger\n");
+> -		break;
+> -	default:
+> -		break;
+> -	}
+> -	return NOTIFY_DONE;
+> -}
+> -
+>  static int heartbeat_reboot_notifier(struct notifier_block *nb,
+>  				     unsigned long code, void *unused)
+>  {
+> @@ -201,10 +176,6 @@ static int heartbeat_panic_notifier(struct notifier_block *nb,
+>  	return NOTIFY_DONE;
+>  }
+>  
+> -static struct notifier_block heartbeat_pm_nb = {
+> -	.notifier_call = heartbeat_pm_notifier,
+> -};
+> -
+>  static struct notifier_block heartbeat_reboot_nb = {
+>  	.notifier_call = heartbeat_reboot_notifier,
+>  };
+> @@ -221,14 +192,12 @@ static int __init heartbeat_trig_init(void)
+>  		atomic_notifier_chain_register(&panic_notifier_list,
+>  					       &heartbeat_panic_nb);
+>  		register_reboot_notifier(&heartbeat_reboot_nb);
+> -		register_pm_notifier(&heartbeat_pm_nb);
+>  	}
+>  	return rc;
+>  }
+>  
+>  static void __exit heartbeat_trig_exit(void)
+>  {
+> -	unregister_pm_notifier(&heartbeat_pm_nb);
+>  	unregister_reboot_notifier(&heartbeat_reboot_nb);
+>  	atomic_notifier_chain_unregister(&panic_notifier_list,
+>  					 &heartbeat_panic_nb);
+> 
 
-diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-index feac80c22f61..09d37d66b630 100644
---- a/arch/arm64/kernel/stacktrace.c
-+++ b/arch/arm64/kernel/stacktrace.c
-@@ -210,6 +210,7 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
- 
- 	put_task_stack(tsk);
- }
-+EXPORT_SYMBOL_GPL(save_stack_trace_tsk);
- 
- void save_stack_trace(struct stack_trace *trace)
- {
+Thanks for the patch.
+
+Added tag:
+
+ Fixes: 5ab92a7cb82c ("leds: handle suspend/resume in heartbeat trigger")
+
+and applied to the fixes-for-4.12-rc6 branch of linux-leds.git.
+
 -- 
-2.12.2
+Best regards,
+Jacek Anaszewski
