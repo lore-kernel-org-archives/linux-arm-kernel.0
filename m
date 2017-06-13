@@ -1,120 +1,200 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 13 Jun 2017 11:45:58 -0600
-Subject: [PATCH 04/12] coresight: Add support for reading 64bit registers
-In-Reply-To: <1497278211-5001-5-git-send-email-suzuki.poulose@arm.com>
-References: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
- <1497278211-5001-5-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20170613174558.GB6392@xps15>
+From: logang@deltatee.com (Logan Gunthorpe)
+Date: Tue, 13 Jun 2017 11:47:30 -0600
+Subject: [Merge tag 'pci-v4.12-changes' of git] 857f864014: BUG: unable to
+ handle kernel NULL pointer dereference at 00000000000000a8
+In-Reply-To: <20170613163508.GA31961@kroah.com>
+References: <5933fe2d.V33ODGPU9noDVuyF%fengguang.wu@intel.com>
+ <20170606175552.GA12672@bhelgaas-glaptop.roam.corp.google.com>
+ <fe0543c1-cba6-02bb-36eb-395910bd5012@deltatee.com>
+ <20170612200852.GA28578@bhelgaas-glaptop.roam.corp.google.com>
+ <61e11e67-6c1b-ef1e-5fb8-a7c9efb17666@deltatee.com>
+ <20170613041842.GA13308@kroah.com>
+ <f6322f70-7ca7-abf6-b947-4cbbfd598948@deltatee.com>
+ <20170613043416.GB14217@kroah.com> <20170613043518.GA14621@kroah.com>
+ <8462abee-0a7f-00fb-6111-1f78362ea3f7@deltatee.com>
+ <20170613163508.GA31961@kroah.com>
+Message-ID: <f848a5fb-096c-a025-cc3b-314cc3899f9e@deltatee.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 12, 2017 at 03:36:43PM +0100, Suzuki K Poulose wrote:
-> Add support for reading a lower and upper 32bits of a register
-> as a single 64bit register.
-> 
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Just a few cosmetic details...
 
-> ---
->  drivers/hwtracing/coresight/coresight-priv.h | 27 ++++++++++++++++++++++-----
->  drivers/hwtracing/coresight/coresight-tmc.c  |  6 +++---
->  2 files changed, 25 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-> index 5f662d8..b62dc6a 100644
-> --- a/drivers/hwtracing/coresight/coresight-priv.h
-> +++ b/drivers/hwtracing/coresight/coresight-priv.h
-> @@ -39,23 +39,29 @@
->  #define ETM_MODE_EXCL_USER	BIT(31)
->  
->  typedef u32 (*coresight_read_fn)(const struct device *, u32 offset);
-> -#define coresight_simple_func(type, func, name, offset)			\
-> +#define __coresight_simple_func(type, func, name, lo_off, hi_off)	\
->  static ssize_t name##_show(struct device *_dev,				\
->  			   struct device_attribute *attr, char *buf)	\
->  {									\
->  	type *drvdata = dev_get_drvdata(_dev->parent);			\
->  	coresight_read_fn fn = func;					\
-> -	u32 val;							\
-> +	u64 val;							\
->  	pm_runtime_get_sync(_dev->parent);				\
->  	if (fn)								\
-> -		val = fn(_dev->parent, offset);				\
-> +		val = (u64)fn(_dev->parent, lo_off);			\
->  	else								\
-> -		val = readl_relaxed(drvdata->base + offset);		\
-> +		val = coresight_read_reg_pair(drvdata->base,		\
-> +						 lo_off, hi_off);	\
->  	pm_runtime_put_sync(_dev->parent);				\
-> -	return scnprintf(buf, PAGE_SIZE, "0x%x\n", val);		\
-> +	return scnprintf(buf, PAGE_SIZE, "0x%llx\n", val);		\
->  }									\
->  static DEVICE_ATTR_RO(name)
->  
-> +#define coresight_simple_func(type, func, name, offset)			\
-> +	__coresight_simple_func(type, func, name, offset, -1)
-> +#define coresight_simple_reg64(type, name, lo_off, hi_off)		\
-> +	__coresight_simple_func(type, NULL, name, lo_off, hi_off)
-> +
->  enum etm_addr_type {
->  	ETM_ADDR_TYPE_NONE,
->  	ETM_ADDR_TYPE_SINGLE,
-> @@ -106,6 +112,17 @@ static inline void CS_UNLOCK(void __iomem *addr)
->  	} while (0);
->  }
->  
-> +static inline u64
-> +coresight_read_reg_pair(void __iomem *addr, s32 lo_offset, s32 hi_offset)
-> +{
-> +	u64 val;
-> +
-> +	val = readl_relaxed(addr + lo_offset);
-> +	val |= (hi_offset < 0) ? 0 :
-> +		(u64)readl_relaxed(addr + hi_offset) << 32;
+On 13/06/17 10:35 AM, Greg Kroah-Hartman wrote:
+> For char devices, I doubt it, but we can't take the chance, which is why
+> you make it an option.  Then, it's enabled for 'allmodconfig' builds,
+> which helps testers out.
 
-This should probably be aligned with the other '('.
+Well I took a look at this and it looks like a lot of work to modify all
+the drivers to support a possible dynamic allocation and I'm not really
+able to do all that right now.
 
-> +	return val;
-> +}
-> +
->  void coresight_disable_path(struct list_head *path);
->  int coresight_enable_path(struct list_head *path, u32 mode);
->  struct coresight_device *coresight_get_sink(struct list_head *path);
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-> index eb0c7b3..7025982 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc.c
-> @@ -219,11 +219,8 @@ static enum tmc_mem_intf_width tmc_get_memwidth(u32 devid)
->  
->  #define coresight_tmc_simple_func(name, offset)			\
->  	coresight_simple_func(struct tmc_drvdata, NULL, name, offset)
-> -
+However, correct me if I'm missing something, but it looks fairly
+straightforward to extend the dynamic region above 256 in cases like
+this. There are already fixed major numbers above 255 and the
+infrastructure appears to support it. So what are your thoughts on the
+change below? I'd be happy to clean it up into a proper patch if you
+agree it's a workable option.
 
-Please restore.
+Thanks,
 
->  coresight_tmc_simple_func(rsz, TMC_RSZ);
->  coresight_tmc_simple_func(sts, TMC_STS);
-> -coresight_tmc_simple_func(rrp, TMC_RRP);
-> -coresight_tmc_simple_func(rwp, TMC_RWP);
->  coresight_tmc_simple_func(trg, TMC_TRG);
->  coresight_tmc_simple_func(ctl, TMC_CTL);
->  coresight_tmc_simple_func(ffsr, TMC_FFSR);
-> @@ -232,6 +229,9 @@ coresight_tmc_simple_func(mode, TMC_MODE);
->  coresight_tmc_simple_func(pscr, TMC_PSCR);
->  coresight_tmc_simple_func(devid, CORESIGHT_DEVID);
->  
+Logan
 
-No need for a new line here.  In fact I would put the following two lines in
-place of the ones you've replaced above.
 
-> +coresight_simple_reg64(struct tmc_drvdata, rrp, TMC_RRP, TMC_RRPHI);
-> +coresight_simple_reg64(struct tmc_drvdata, rwp, TMC_RWP, TMC_RWPHI);
-> +
->  static struct attribute *coresight_tmc_mgmt_attrs[] = {
->  	&dev_attr_rsz.attr,
->  	&dev_attr_sts.attr,
-> -- 
-> 2.7.4
-> 
+
+diff --git a/fs/char_dev.c b/fs/char_dev.c
+index fb8507f521b2..539352425d95 100644
+--- a/fs/char_dev.c
++++ b/fs/char_dev.c
+@@ -59,6 +59,29 @@ void chrdev_show(struct seq_file *f, off_t offset)
+
+ #endif /* CONFIG_PROC_FS */
+
++static int find_dynamic_major(void)
++{
++	int i;
++	struct char_device_struct **cp;
++
++	for (i = ARRAY_SIZE(chrdevs)-1; i > CHRDEV_MAJOR_DYN_END; i--) {
++		if (chrdevs[i] == NULL)
++			return i;
++	}
++
++	for (i = CHRDEV_MAJOR_DYN_EXT_START;
++	     i > CHRDEV_MAJOR_DYN_EXT_END; i--) {
++		for (cp = &chrdevs[major_to_index(i)]; *cp; cp = &(*cp)->next)
++			if ((*cp)->major == i)
++				break;
++
++		if (*cp == NULL || (*cp)->major != i)
++			return i;
++	}
++
++	return -EBUSY;
++}
++
+ /*
+  * Register a single major with a specified minor range.
+  *
+@@ -84,22 +107,11 @@ __register_chrdev_region(unsigned int major,
+unsigned int baseminor,
+
+ 	mutex_lock(&chrdevs_lock);
+
+-	/* temporary */
+ 	if (major == 0) {
+-		for (i = ARRAY_SIZE(chrdevs)-1; i > 0; i--) {
+-			if (chrdevs[i] == NULL)
+-				break;
+-		}
+-
+-		if (i < CHRDEV_MAJOR_DYN_END)
+-			pr_warn("CHRDEV \"%s\" major number %d goes below the dynamic
+allocation range\n",
+-				name, i);
+-
+-		if (i == 0) {
+-			ret = -EBUSY;
++		ret = find_dynamic_major();
++		if (ret < 0)
+ 			goto out;
+-		}
+-		major = i;
++		major = ret;
+ 	}
+
+ 	cd->major = major;
+diff --git a/include/linux/fs.h b/include/linux/fs.h
+index 249dad4e8d26..5780d69034ca 100644
+--- a/include/linux/fs.h
++++ b/include/linux/fs.h
+@@ -2448,6 +2448,9 @@ static inline void bd_unlink_disk_holder(struct
+block_device *bdev,
+ #define CHRDEV_MAJOR_HASH_SIZE	255
+ /* Marks the bottom of the first segment of free char majors */
+ #define CHRDEV_MAJOR_DYN_END 234
++#define CHRDEV_MAJOR_DYN_EXT_START 511
++#define CHRDEV_MAJOR_DYN_EXT_END 384
++
+ extern int alloc_chrdev_region(dev_t *, unsigned, unsigned, const char *);
+ extern int register_chrdev_region(dev_t, unsigned, const char *);
+ extern int __register_chrdev(unsigned int major, unsigned int baseminor,
+
+
+
+----
+
+This results in char devices like this (another patch might be prudent
+to fix the ordering):
+
+Character devices:
+510 ttySLM
+  1 mem
+511 noz
+  4 /dev/vc/0
+  4 tty
+  4 ttyS
+  5 /dev/tty
+  5 /dev/console
+  5 /dev/ptmx
+  7 vcs
+  9 st
+ 10 misc
+ 13 input
+ 21 sg
+ 29 fb
+ 43 ttyI
+ 45 isdn
+ 68 capi20
+ 86 ch
+ 90 mtd
+ 99 ppdev
+108 ppp
+128 ptm
+136 pts
+152 aoechr
+153 spi
+161 ircomm
+172 ttyMX
+174 ttyMI
+202 cpu/msr
+203 cpu/cpuid
+204 ttyJ
+204 ttyMAX
+206 osst
+226 drm
+235 ttyS
+236 ttyRP
+237 ttyARC
+238 ttyPS
+239 ttyIFX
+494 rio_cm
+240 ttySC
+495 cros_ec
+241 ipmidev
+496 hidraw
+242 rio_mport
+497 ttySDIO
+243 xz_dec_test
+498 uio
+244 bsg
+499 firewire
+245 pvfs2-req
+500 nvme
+246 watchdog
+501 aac
+247 iio
+502 mei
+248 ptp
+503 phantom
+249 pps
+504 aux
+250 dax
+505 cmx
+251 dimmctl
+506 cmm
+252 ndctl
+507 ttySLP
+253 tpm
+508 ttyIPWp
+254 gpiochip
+509 ttySL
