@@ -1,50 +1,39 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 13 Jun 2017 13:10:44 -0700
-Subject: [GIT PULL 7/7] Broadcom drivers changes for 4.13 (v2)
-In-Reply-To: <20170613201044.9808-1-f.fainelli@gmail.com>
-References: <20170613201044.9808-1-f.fainelli@gmail.com>
-Message-ID: <20170613201044.9808-7-f.fainelli@gmail.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Tue, 13 Jun 2017 15:16:01 -0500
+Subject: [PATCH] dt-bindings: Drop k2g genpd device ID macros
+In-Reply-To: <20170531162850.mf6giowmxj5vetxq@rob-hp-laptop>
+References: <20170522183737.24946-1-d-gerlach@ti.com>
+ <20170531162850.mf6giowmxj5vetxq@rob-hp-laptop>
+Message-ID: <ca91000a-627b-a655-4304-b64b78bbcf9a@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+Santosh,
+On 05/31/2017 11:28 AM, Rob Herring wrote:
+> On Mon, May 22, 2017 at 01:37:37PM -0500, Dave Gerlach wrote:
+>> Commit 7cc119f29b19 ("dt-bindings: Add TI SCI PM Domains") introduced a
+>> number of K2G_DEV_x macros to represent each device ID available on the
+>> K2G platform for use by the genpd, clock, and reset drivers. Rather than
+>> use these macros, which are only used in the device tree for property
+>> values and not actually used by the drivers, let's just use the device
+>> ID number directly in the device tree to avoid macro bloat.
+>>
+>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>> ---
+>> Based on discussion here [1] it was agreed that these macros are not needed
+>> and it is better to just use the device IDs directly in dt.
+>>
+>> [1] https://www.spinics.net/lists/arm-kernel/msg577079.html
+>>
+>>  .../devicetree/bindings/soc/ti/sci-pm-domain.txt   |  5 +-
+>>  include/dt-bindings/genpd/k2g.h                    | 90 ----------------------
+>>  2 files changed, 3 insertions(+), 92 deletions(-)
+>>  delete mode 100644 include/dt-bindings/genpd/k2g.h
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
+> 
 
-  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+Gentle ping on this. If you're OK with the patch any chance you can pick it up?
 
-are available in the git repository at:
-
-  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.13/drivers
-
-for you to fetch changes up to 1f6ab20f5527a2483d666d2ce996c51368d1b617:
-
-  soc: brcmstb: enable drivers for ARM64 and BMIPS (2017-06-12 10:25:16 -0700)
-
-----------------------------------------------------------------
-This pull request contains Broadcom ARM/ARM64 SoCs specific driver changes for
-4.13, please pull the following:
-
-- Doug adds support for the latest generation GISB bus arbiter (v7), he starts by
-  fixing two issues in how registers are written, and how 64-bit addresses are captured
-  and then he simplifies the error interception by using notifiers, which allows him
-  to add support for ARM64
-
-- Markus updates the SOC_BRCMSTB Kconfig depends to cover ARM64 and BMIPS_GENERIC
-  systems where this code is now also used
-
-----------------------------------------------------------------
-Doug Berger (6):
-      bus: brcmstb_gisb: Use register offsets with writes too
-      bus: brcmstb_gisb: correct support for 64-bit address output
-      bus: brcmstb_gisb: add notifier handling
-      bus: brcmstb_gisb: remove low-level ARM hooks
-      bus: brcmstb_gisb: enable driver for ARM64 architecture
-      bus: brcmstb_gisb: update to support new revision
-
-Markus Mayer (1):
-      soc: brcmstb: enable drivers for ARM64 and BMIPS
-
- .../devicetree/bindings/bus/brcm,gisb-arb.txt      |   3 +-
- drivers/bus/Kconfig                                |   2 +-
- drivers/bus/brcmstb_gisb.c                         | 121 ++++++++++++---------
- drivers/soc/bcm/Kconfig                            |   2 +-
- 4 files changed, 76 insertions(+), 52 deletions(-)
+Regards,
+Dave
