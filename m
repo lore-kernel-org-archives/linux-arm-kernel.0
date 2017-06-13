@@ -1,74 +1,91 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Tue, 13 Jun 2017 14:42:11 +0800
-Subject: [PATCH 0/9] clk: add imx7ulp clk support
-In-Reply-To: <1494856763-6543-1-git-send-email-aisheng.dong@nxp.com>
-References: <1494856763-6543-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20170613064211.GC15770@b29396-OptiPlex-7040>
+From: illusionist.neo@gmail.com (Shubham Bansal)
+Date: Tue, 13 Jun 2017 12:26:47 +0530
+Subject: [PATCH v2] arm: eBPF JIT compiler
+In-Reply-To: <CAHgaXd+DW2bggto=2S9hOdMrtPTvhD2QN4rPf2V8iHewQpg-YA@mail.gmail.com>
+References: <1495754003-21099-1-git-send-email-illusionist.neo@gmail.com>
+ <CAGXu5jKmLNMR+uhM9Ov2XPW6kCjip_SjScgEH0fTFp6fQtKFiA@mail.gmail.com>
+ <593E6B0F.8070901@iogearbox.net>
+ <CAHgaXd+DW2bggto=2S9hOdMrtPTvhD2QN4rPf2V8iHewQpg-YA@mail.gmail.com>
+Message-ID: <CAHgaXdJrvKdzr3fJ1TMkC4foeVsZJDSVEwhDOeZGxQVsmoK2cQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 15, 2017 at 09:59:14PM +0800, Dong Aisheng wrote:
-> This patch series intends to add imx7ulp clk support.
-> 
-> i.MX7ULP Clock functions are under joint control of the System
-> Clock Generation (SCG) modules, Peripheral Clock Control (PCC)
-> modules, and Core Mode Controller (CMC)1 blocks
-> 
-> The clocking scheme provides clear separation between M4 domain
-> and A7 domain. Except for a few clock sources shared between two
-> domains, such as the System Oscillator clock, the Slow IRC (SIRC),
-> and and the Fast IRC clock (FIRCLK), clock sources and clock
-> management are separated and contained within each domain.
-> 
-> M4 clock management consists of SCG0, PCC0, PCC1, and CMC0 modules.
-> A7 clock management consists of SCG1, PCC2, PCC3, and CMC1 modules.
-> 
-> Note: this series only adds A7 clock domain support as M4 clock
-> domain will be handled by M4 seperately.
-> 
-> Dong Aisheng (9):
->   clk: clk-divider: add CLK_DIVIDER_ZERO_GATE clk support
->   clk: reparent orphans after critical clocks enabled
->   clk: fractional-divider: add CLK_FRAC_DIVIDER_ZERO_BASED flag support
->   clk: imx: add pllv4 support
->   clk: imx: add pfdv2 support
->   clk: imx: add composite clk support
->   dt-bindings: clock: add imx7ulp clock binding doc
->   clk: imx: make mux parent strings const
->   clk: imx: add imx7ulp clk driver
-> 
+Hi Daniel, Kees, David, Russel,
 
-Ping.
+>> Any plans to implement above especially BPF_JMP | BPF_CALL in near future?
+>> Reason why I'm asking is that i) currently the arm32 cBPF JIT implements
+>> all of the cBPF extensions (except SKF_AD_RANDOM and SKF_AD_VLAN_TPID).
+>> Some of the programs that were JITed before e.g. using SKF_AD_CPU would now
+>> fall back to the eBPF interpreter due to lack of translation in JIT, but
+>> also ii) that probably most (if not all) of eBPF programs use BPF helper
+>> calls heavily, which will still redirect them to the interpreter right now
+>> due to lack of BPF_JMP | BPF_CALL support, so it's really quite essential
+>> to have it implemented.
+>
+> I can try for BPF_JMP | BPF_CALL. I didn't do it last time because I
+> thought, it would make the code look messy and become pain to get it
+> through the review.
+> For this, I have to map eBPF arguments with arm ABI arguments and move
+> ebpf arguments to corresponding arm ABI arguments, as eBPF arguments
+> doesn't match with arm ABI arguments.
+> Let me try that if its possible.
 
-Regards
-Dong Aisheng
+Okay. I looked at it, tried few different solutions also. There is a
+problem with implementing BPF_JMP | BPF_CALL.
+Problem is transition between 4 byte and 8 byte arguments. Lets take a
+look a the following example to get a more clear look at the problem.
 
->  .../devicetree/bindings/clock/imx7ulp-clock.txt    |  62 +++++++
->  drivers/clk/clk-divider.c                          |   2 +
->  drivers/clk/clk-fractional-divider.c               |  10 ++
->  drivers/clk/clk.c                                  |  39 ++--
->  drivers/clk/imx/Makefile                           |   6 +-
->  drivers/clk/imx/clk-busy.c                         |   2 +-
->  drivers/clk/imx/clk-composite.c                    |  93 ++++++++++
->  drivers/clk/imx/clk-fixup-mux.c                    |   2 +-
->  drivers/clk/imx/clk-imx7ulp.c                      | 171 ++++++++++++++++++
->  drivers/clk/imx/clk-pfdv2.c                        | 199 +++++++++++++++++++++
->  drivers/clk/imx/clk-pllv4.c                        | 196 ++++++++++++++++++++
->  drivers/clk/imx/clk.h                              |  31 +++-
->  include/dt-bindings/clock/imx7ulp-clock.h          | 108 +++++++++++
->  include/linux/clk-provider.h                       |  11 ++
->  14 files changed, 902 insertions(+), 30 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/imx7ulp-clock.txt
->  create mode 100644 drivers/clk/imx/clk-composite.c
->  create mode 100644 drivers/clk/imx/clk-imx7ulp.c
->  create mode 100644 drivers/clk/imx/clk-pfdv2.c
->  create mode 100644 drivers/clk/imx/clk-pllv4.c
->  create mode 100644 include/dt-bindings/clock/imx7ulp-clock.h
-> 
-> -- 
-> 2.7.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Lets consider this function :
+CASE 1:                            foo(int a, int b, long long c, int d)
+For calling this function in arm 32 arch, I have to pass the arguments
+as following:
+                                         a -> r0
+                                         b -> r1
+                                         c -> r2, r3
+                                         d -> stack_top
+
+Now consider an another example function :
+CASE 2:                           bar(int a, int b, int c, int d)
+For calling this function in arm32 arch, I have to pass the arguments
+as following:
+                                       a -> r0
+                                       b -> r1
+                                       c -> r2
+                                       d -> r3
+
+So, you can clearly see the problem with it. There is no way of
+knowing which of the above way to pass the arguments. There are
+solutions possible:
+
+1. One thing I can do is look at the address of the function to call
+and pass the argument accordingly but thats not really a robust
+solution as we have to change the arm32 JIT each time we add any new
+BPF helper function.
+
+2. Another solution is, if any of you guys can assure/confirm me that
+there will be only 4 byte argument passed to BPF helper functions in
+arm32 as of now and in future including the pointer as well, then I
+can just assume that each argument is passed as 4 byte value and my
+trimming the 8byte arguments to 4 bytes arguments wouldn't be a
+problem. In that case, arguments for CASE 1 and CASE 2 will be passed
+in the same way, i.e.
+                                       a -> r0
+                                       b -> r1
+                                       c -> r2
+                                       d -> r3
+
+Let me know what you think. I don't think I can find the solution to
+this problem other than those mentioned above. Would love to here any
+ideas from you guys.
+
+>> Did you also manage to get the BPF selftest suite running in the meantime
+>> (tools/testing/selftests/bpf/)? There are a couple of programs that clang
+>> will compile (test_pkt_access.o, test_xdp.o, test_l4lb.o, test_tcp_estats.o)
+>> and then test run.
+I will run these tests tonight. Hopefully I will be able to run them.
+
+Any comments are welcome. Would love to here what you think about my
+solutions above.
+
+Thanks.
+Shubham
