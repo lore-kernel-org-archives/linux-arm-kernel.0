@@ -1,32 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 13 Jun 2017 15:28:37 +0100
-Subject: [PATCH v2 5/5] ARM: mach-virt: Select PMUv3 driver by default
-In-Reply-To: <20170613142837.29738-1-marc.zyngier@arm.com>
-References: <20170613142837.29738-1-marc.zyngier@arm.com>
-Message-ID: <20170613142837.29738-6-marc.zyngier@arm.com>
+From: srishtishar@gmail.com (srishti sharma)
+Date: Tue, 13 Jun 2017 20:07:14 +0530
+Subject: [PATCH] Staging: vc04_services: bcm2835-audio: bcm2835-ctl.c:
+ Fixed alignment to match open parenthesis.
+In-Reply-To: <20170613130006.GA15978@kroah.com>
+References: <1497042442-3620-1-git-send-email-srishtishar@gmail.com>
+ <20170613130006.GA15978@kroah.com>
+Message-ID: <CAB3L5oxNorqu6_WiseTjkr7N9i-doy=_4gxtwonCVcxQA3Nfrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since 32bit guests are not unlikely to run on an ARMv8 host,
-let's select the PMUv3 driver, which allows the PMU to be used
-on such systems.
+On Tue, Jun 13, 2017 at 6:30 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
+> On Sat, Jun 10, 2017 at 02:37:22AM +0530, srishti sharma wrote:
+>> Fixed alignment so that it matched open parenthesis.
+>>
+>> Signed-off-by: srishti sharma <srishtishar@gmail.com>
+>> ---
+>>  drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
+>> index f484bb0..2148ed0 100644
+>> --- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
+>> +++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
+>> @@ -105,7 +105,7 @@ static int snd_bcm2835_ctl_get(struct snd_kcontrol *kcontrol,
+>>  }
+>>
+>>  static int snd_bcm2835_ctl_put(struct snd_kcontrol *kcontrol,
+>> -                             struct snd_ctl_elem_value *ucontrol)
+>> +                            struct snd_ctl_elem_value *ucontrol)
+>>  {
+>>       struct bcm2835_chip *chip = snd_kcontrol_chip(kcontrol);
+>>       int changed = 0;
+>
+> This patch is corrupted and can not be applied :(
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 4c1a35f15838..711a426cbb0d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -702,6 +702,7 @@ config ARCH_VIRT
- 	select ARM_GIC_V3
- 	select ARM_GIC_V3_ITS if PCI
- 	select ARM_PSCI
-+	select ARM_PMUV3 if PERF_EVENTS
- 	select HAVE_ARM_ARCH_TIMER
- 
- #
--- 
-2.11.0
+Why is this corrupted ?
+
+Regards,
+Srishti
