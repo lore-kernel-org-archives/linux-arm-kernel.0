@@ -1,33 +1,62 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 13 Jun 2017 15:00:06 +0200
-Subject: [PATCH] Staging: vc04_services: bcm2835-audio: bcm2835-ctl.c:
- Fixed alignment to match open parenthesis.
-In-Reply-To: <1497042442-3620-1-git-send-email-srishtishar@gmail.com>
-References: <1497042442-3620-1-git-send-email-srishtishar@gmail.com>
-Message-ID: <20170613130006.GA15978@kroah.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 13 Jun 2017 15:02:02 +0200
+Subject: [PATCH] ARM: at91: remove atmel_nand_data
+In-Reply-To: <20170613125400.12774-1-alexandre.belloni@free-electrons.com>
+References: <20170613125400.12774-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20170613150202.7e0241f9@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 10, 2017 at 02:37:22AM +0530, srishti sharma wrote:
-> Fixed alignment so that it matched open parenthesis.
-> 
-> Signed-off-by: srishti sharma <srishtishar@gmail.com>
-> ---
->  drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
-> index f484bb0..2148ed0 100644
-> --- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
-> +++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
-> @@ -105,7 +105,7 @@ static int snd_bcm2835_ctl_get(struct snd_kcontrol *kcontrol,
->  }
-> 
->  static int snd_bcm2835_ctl_put(struct snd_kcontrol *kcontrol,
-> -				struct snd_ctl_elem_value *ucontrol)
-> +			       struct snd_ctl_elem_value *ucontrol)
->  {
-> 	struct bcm2835_chip *chip = snd_kcontrol_chip(kcontrol);
-> 	int changed = 0;
+On Tue, 13 Jun 2017 14:54:00 +0200
+Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
 
-This patch is corrupted and can not be applied :(
+> Since AVR32 is gone and the driver rework, struct atmel_nand_data is not
+> used anywhere.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
+> ---
+>  include/linux/platform_data/atmel.h | 21 ---------------------
+>  1 file changed, 21 deletions(-)
+> 
+> diff --git a/include/linux/platform_data/atmel.h b/include/linux/platform_data/atmel.h
+> index 7b6dce7d6d33..70c5c766628e 100644
+> --- a/include/linux/platform_data/atmel.h
+> +++ b/include/linux/platform_data/atmel.h
+> @@ -7,8 +7,6 @@
+>  #ifndef __ATMEL_H__
+>  #define __ATMEL_H__
+>  
+> -#include <linux/mtd/nand.h>
+> -#include <linux/mtd/partitions.h>
+>  #include <linux/serial.h>
+>  
+>   /* Compact Flash */
+> @@ -23,25 +21,6 @@ struct at91_cf_data {
+>  #define AT91_IDE_SWAP_A0_A2	0x02
+>  };
+>  
+> - /* NAND / SmartMedia */
+> -struct atmel_nand_data {
+> -	int		enable_pin;		/* chip enable */
+> -	int		det_pin;		/* card detect */
+> -	int		rdy_pin;		/* ready/busy */
+> -	u8		rdy_pin_active_low;	/* rdy_pin value is inverted */
+> -	u8		ale;			/* address line number connected to ALE */
+> -	u8		cle;			/* address line number connected to CLE */
+> -	u8		bus_width_16;		/* buswidth is 16 bit */
+> -	u8		ecc_mode;		/* ecc mode */
+> -	u8		on_flash_bbt;		/* bbt on flash */
+> -	struct mtd_partition *parts;
+> -	unsigned int	num_parts;
+> -	bool		has_dma;		/* support dma transfer */
+> -
+> -	/* default is false, only for at32ap7000 chip is true */
+> -	bool		need_reset_workaround;
+> -};
+> -
+>   /* Serial */
+>  struct atmel_uart_data {
+>  	int			num;		/* port num */
