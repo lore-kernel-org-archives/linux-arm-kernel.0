@@ -1,99 +1,99 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 13 Jun 2017 09:14:00 -0700
-Subject: [PATCH 4/4] ARM: multi_v7_defconfig: Switch AXP20x driver from
- module to built-in
-In-Reply-To: <20170610161714.wiztqlnwz5qu73fz@flea.home> (Maxime Ripard's
- message of "Sat, 10 Jun 2017 18:17:14 +0200")
-References: <937914a68e4e7d6db2d12540cc6253b200978e2d.1486590875.git.rask@formelder.dk>
- <49ad3e66452bd78da7b9e581129f76633c56e609.1486590875.git.rask@formelder.dk>
- <20170210084213.uzf25soh7bl73a6g@lukather>
- <CAOi56cV=UBEFQ6V4LLNrHDaDJgb33mrCA6Z+vj_3VziOpkRcvQ@mail.gmail.com>
- <CAOi56cXLo5LaT8CgfwB991gq+gCv4OY3VNkGWviooq43=6Wayg@mail.gmail.com>
- <20170522074414.3qz2wpw4cs2btkhv@flea.lan>
- <CAOi56cW8jimRGkFMAf3daL_SLBGr=TmxFnE-MKCnogci7Kr=oQ@mail.gmail.com>
- <20170610161714.wiztqlnwz5qu73fz@flea.home>
-Message-ID: <m2d1a750hj.fsf@baylibre.com>
+From: logang@deltatee.com (Logan Gunthorpe)
+Date: Tue, 13 Jun 2017 10:16:44 -0600
+Subject: [Merge tag 'pci-v4.12-changes' of git] 857f864014: BUG: unable to
+ handle kernel NULL pointer dereference at 00000000000000a8
+In-Reply-To: <1497354494.5693.1.camel@linux.intel.com>
+References: <5933fe2d.V33ODGPU9noDVuyF%fengguang.wu@intel.com>
+ <20170606175552.GA12672@bhelgaas-glaptop.roam.corp.google.com>
+ <fe0543c1-cba6-02bb-36eb-395910bd5012@deltatee.com>
+ <20170612200852.GA28578@bhelgaas-glaptop.roam.corp.google.com>
+ <61e11e67-6c1b-ef1e-5fb8-a7c9efb17666@deltatee.com>
+ <1497354494.5693.1.camel@linux.intel.com>
+Message-ID: <633b81ff-2152-1ac0-cbcf-1fa621abf261@deltatee.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maxime Ripard <maxime.ripard@free-electrons.com> writes:
 
-> On Tue, Jun 06, 2017 at 12:45:17PM -0700, Kevin Hilman wrote:
->> On Mon, May 22, 2017 at 12:44 AM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > Hi Kevin,
->> >
->> > On Thu, May 18, 2017 at 11:59:50AM -0700, Kevin Hilman wrote:
->> >> On Fri, Mar 17, 2017 at 10:39 AM, Kevin Hilman <khilman@baylibre.com> wrote:
->> >> > On Fri, Feb 10, 2017 at 12:42 AM, Maxime Ripard
->> >> > <maxime.ripard@free-electrons.com> wrote:
->> >> >> On Wed, Feb 08, 2017 at 11:09:31PM +0100, Rask Ingemann Lambertsen wrote:
->> >> >>> The AXP20X regulator support is currently built as a module, which means
->> >> >>> it's not available until the root fs has been mounted, but the boot loader
->> >> >>> might not have enabled the required regulators, so build their drivers
->> >> >>> into the kernel.
->> >> >>>
->> >> >>> Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
->> >> >>
->> >> >> Queued for 4.12.
->> >> >
->> >> > Hello, kernelci.org is reporting boot failures on sun5i-r8-chip in
->> >> > linux-next[1]  for a few days and with a variety of defconfigs. I
->> >> > bisected it[2] down to this patch.
->> >> >
->> >> > I verified that reverting this patch on top of next-20170310 makes my
->> >> > chip board boot again.
->> >>
->> >> FYI... this board is still broken in linux-next (and now in mainline),
->> >> and reverting $SUBJECT patch still makes it work.
->> >>
->> >> Is nobody else using mainline on this board?
->> >
->> > I thought about that during the weekend, and it might just be a
->> > symptom.
->> >
->> > The CHIP has brown out issues, especially when you enable the WiFi
->> > chip, which should happen around the time of the failure when the PMIC
->> > regulator support is compiled as a module.
->> >
->> > We mitigate that in upstream's U-Boot by enabling the two regulators
->> > for the WiFi chip in U-boot, which levels a bit the current over the
->> > boot.
->> >
->> > You have a few ways to prevent that from happening. Having a better
->> > power supply / cable will help, I'm not sure how reasonable that is.
->> >
->> > Another thing that can work is, if your USB plugs can take it, to
->> > increase the overcurrent trigger in the PMIC, ideally in U-Boot.
->> >
->> > The last, and probably cleaner one, would be to just power it through
->> > the 5v input on its header, and not the USB. There's not current
->> > limitation there, so it shouldn't cause any problems anymore.
->> 
->> I'm now powering the board via the header (5V to the CHG-IN pin) and
->> it doesn't change anything.  Still fails in the same way, and
->> reverting $SUBJECT defconfig patch makes it work again.
->
-> I tried it today with sunxi_defconfig that has AXP20X_REGULATOR
-> built-in as well. It can boot fine on my CHIP here.
 
-What about multi_v7_defconfig?
+On 13/06/17 05:48 AM, Alan Cox wrote:
+> If you dump the list of majors and drivers do they all look valid or is
+> there any corruption or repetition that looks odd (wondering if we've
+> got too many devices or a leak) ?
 
-> After looking at your failed boot example (1), I'm a bit
-> puzzled. Where is supposed to be your filesystem?
->
-> You have a ubi rootfs, but we don't have the NAND enabled in mainline,
-> so that cannot work. And you seem to load an initramfs earlier in
-> U-Boot, but you don't pass it is your bootz call.
+They look valid to me.
 
-Ah, I suppose that isn't terribly clear from the log.
+Logan
 
-My scripts don't rely on uboot for the ramdisk because because (believe
-it or not) many vendor uboots don't enable the ATAGs for initrd in
-uboot.
 
-So, I modify the DT to add the linux,initrd-start and linux,initrd-end
-properties to the chosen node poining to where the initrd is loaded in
-memory.  This also avoids the need to add a uimage header to the ramdisk.
-
-Kevin
+Character devices:
+  1 mem
+  4 /dev/vc/0
+  4 tty
+  4 ttyS
+  5 /dev/tty
+  5 /dev/console
+  5 /dev/ptmx
+  7 vcs
+  9 st
+ 10 misc
+ 13 input
+ 21 sg
+ 29 fb
+ 43 ttyI
+ 45 isdn
+ 68 capi20
+ 86 ch
+ 90 mtd
+ 99 ppdev
+108 ppp
+128 ptm
+136 pts
+152 aoechr
+153 spi
+161 ircomm
+172 ttyMX
+174 ttyMI
+202 cpu/msr
+203 cpu/cpuid
+204 ttyJ
+204 ttyMAX
+206 osst
+216 rio_cm
+217 cros_ec
+218 hidraw
+219 ttySDIO
+220 uio
+221 firewire
+222 nvme
+223 aac
+224 mei
+225 phantom
+226 drm
+227 aux
+228 cmx
+229 cmm
+230 ttySLP
+231 ttyIPWp
+232 ttySL
+233 ttySLM
+234 noz
+235 ttyS
+236 ttyRP
+237 ttyARC
+238 ttyPS
+239 ttyIFX
+240 ttySC
+241 ipmidev
+242 rio_mport
+243 xz_dec_test
+244 bsg
+245 pvfs2-req
+246 watchdog
+247 iio
+248 ptp
+249 pps
+250 dax
+251 dimmctl
+252 ndctl
+253 tpm
+254 gpiochip
