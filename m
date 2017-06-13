@@ -1,43 +1,35 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 13 Jun 2017 06:35:18 +0200
-Subject: [Merge tag 'pci-v4.12-changes' of git] 857f864014: BUG: unable
- to handle kernel NULL pointer dereference at 00000000000000a8
-In-Reply-To: <20170613043416.GB14217@kroah.com>
-References: <5933fe2d.V33ODGPU9noDVuyF%fengguang.wu@intel.com>
- <20170606175552.GA12672@bhelgaas-glaptop.roam.corp.google.com>
- <fe0543c1-cba6-02bb-36eb-395910bd5012@deltatee.com>
- <20170612200852.GA28578@bhelgaas-glaptop.roam.corp.google.com>
- <61e11e67-6c1b-ef1e-5fb8-a7c9efb17666@deltatee.com>
- <20170613041842.GA13308@kroah.com>
- <f6322f70-7ca7-abf6-b947-4cbbfd598948@deltatee.com>
- <20170613043416.GB14217@kroah.com>
-Message-ID: <20170613043518.GA14621@kroah.com>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Tue, 13 Jun 2017 10:22:32 +0530
+Subject: [PATCH] reset: zx2967: constify zx2967_reset_ops.
+Message-ID: <c082e132c282634a7185ea99c50c8d671965534a.1497329415.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 13, 2017 at 06:34:16AM +0200, Greg Kroah-Hartman wrote:
-> On Mon, Jun 12, 2017 at 10:29:20PM -0600, Logan Gunthorpe wrote:
-> > 
-> > 
-> > On 12/06/17 10:18 PM, Greg Kroah-Hartman wrote:
-> > > What test causes so many major numbers to be allocated?  Is this
-> > > in-kernel test code?  Do you really have a system that requires so many
-> > > different drivers that all want a dynamic char major?
-> > 
-> > This is a 0day kernel robot test. I'm not sure the motivations of its
-> > design but it seems to be similar to an allyesconfig. So all/most
-> > modules are compiled in and allocating their char device regions on boot
-> > of a qemu instance.
-> 
-> Ah, that makes sense.  Well, someone can always work on expanding the
-> range of dynamic char major numbers if they are running out of them on a
-> real system, I'll gladly take patches for that :)
+File size before:
+   text	   data	    bss	    dec	    hex	filename
+    794	    232	      0	   1026	    402	drivers/reset/reset-zx2967.o
 
-Or better yet, just turn all char major allocations into dynamic, which
-would be really good for test systems.  I thought someone proposed
-patches for that a long time ago, but I can't find them anymore.  That
-would be the simplest solution here.
+File size After adding 'const':
+   text	   data	    bss	    dec	    hex	filename
+    842	    184	      0	   1026	    402	drivers/reset/reset-zx2967.o
 
-thnaks,
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+---
+ drivers/reset/reset-zx2967.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-greg k-h
+diff --git a/drivers/reset/reset-zx2967.c b/drivers/reset/reset-zx2967.c
+index 4dabb9e..4f319f7 100644
+--- a/drivers/reset/reset-zx2967.c
++++ b/drivers/reset/reset-zx2967.c
+@@ -55,7 +55,7 @@ static int zx2967_reset_deassert(struct reset_controller_dev *rcdev,
+ 	return zx2967_reset_act(rcdev, id, false);
+ }
+ 
+-static struct reset_control_ops zx2967_reset_ops = {
++static const struct reset_control_ops zx2967_reset_ops = {
+ 	.assert		= zx2967_reset_assert,
+ 	.deassert	= zx2967_reset_deassert,
+ };
+-- 
+1.9.1
