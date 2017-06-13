@@ -1,50 +1,35 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 13 Jun 2017 12:24:42 +0200
-Subject: [PATCH v15 2/7] power: add power sequence library
-In-Reply-To: <1497319166-17287-3-git-send-email-peter.chen@nxp.com>
-References: <1497319166-17287-1-git-send-email-peter.chen@nxp.com>
- <1497319166-17287-3-git-send-email-peter.chen@nxp.com>
-Message-ID: <CAPDyKFpOQWTPpdd__OBP1DcW58CbqnygGAOxiEFq5kqqvCm0QA@mail.gmail.com>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Tue, 13 Jun 2017 15:58:30 +0530
+Subject: [PATCH] iommu/io-pgtable-arm-v7s: constify dummy_tlb_ops.
+Message-ID: <897ee913564b40242149e464c1f3d7d8df393056.1497349602.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+File size before:
+   text	   data	    bss	    dec	    hex	filename
+   6146	     56	      9	   6211	   1843	drivers/iommu/io-pgtable-arm-v7s.o
 
-> +
-> +/**
-> + * of_pwrseq_on - Carry out power sequence on for device node
-> + *
-> + * @np: the device node would like to power on
-> + *
-> + * Carry out a single device power on.  If multiple devices
-> + * need to be handled, use of_pwrseq_on_list() instead.
-> + *
-> + * Return a pointer to the power sequence instance on success,
-> + * or an error code otherwise.
-> + */
-> +struct pwrseq *of_pwrseq_on(struct device_node *np)
-> +{
-> +       struct pwrseq *pwrseq;
-> +       int ret;
-> +
-> +       pwrseq = pwrseq_find_available_instance(np);
-> +       if (!pwrseq)
-> +               return ERR_PTR(-ENOENT);
+File size After adding 'const':
+   text	   data	    bss	    dec	    hex	filename
+   6170	     24	      9	   6203	   183b	drivers/iommu/io-pgtable-arm-v7s.o
 
-In case the pwrseq instance hasn't been registered yet, then there is
-no way to deal with -EPROBE_DEFER properly here.
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+---
+ drivers/iommu/io-pgtable-arm-v7s.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I haven't been following the discussions in-depth during all
-iterations, so perhaps you have already discussed why doing it like
-this.
-
-Anyway, that means all pwrseq instances needs to be registered an
-early boot level, to be safe. To me, that seems like poor design
-choice.
-
-[...]
-
-Otherwise I think this looks okay to me.
-
-Kind regards
-Uffe
+diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
+index 8d6ca28..f886995 100644
+--- a/drivers/iommu/io-pgtable-arm-v7s.c
++++ b/drivers/iommu/io-pgtable-arm-v7s.c
+@@ -749,7 +749,7 @@ static void dummy_tlb_sync(void *cookie)
+ 	WARN_ON(cookie != cfg_cookie);
+ }
+ 
+-static struct iommu_gather_ops dummy_tlb_ops = {
++static const struct iommu_gather_ops dummy_tlb_ops = {
+ 	.tlb_flush_all	= dummy_tlb_flush_all,
+ 	.tlb_add_flush	= dummy_tlb_add_flush,
+ 	.tlb_sync	= dummy_tlb_sync,
+-- 
+1.9.1
