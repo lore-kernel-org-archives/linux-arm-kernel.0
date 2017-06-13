@@ -1,45 +1,73 @@
 From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 13 Jun 2017 18:55:23 +0100
-Subject: [PATCH 03/12] coresight: Extend the PIDR mask to cover relevant
- bits in PIDR2
-In-Reply-To: <20170613175336.GC6392@xps15>
+Date: Tue, 13 Jun 2017 18:56:31 +0100
+Subject: [PATCH 01/12] coresight replicator: Cleanup programmable
+ replicator naming
+In-Reply-To: <20170613165528.GA6392@xps15>
 References: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
- <1497278211-5001-4-git-send-email-suzuki.poulose@arm.com>
- <20170613175336.GC6392@xps15>
-Message-ID: <e6c64a07-1354-b513-349e-242380f5fb59@arm.com>
+ <1497278211-5001-2-git-send-email-suzuki.poulose@arm.com>
+ <20170613165528.GA6392@xps15>
+Message-ID: <92dd4d1f-171c-905c-13a3-80cd9663bbbf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/06/17 18:53, Mathieu Poirier wrote:
-> On Mon, Jun 12, 2017 at 03:36:42PM +0100, Suzuki K Poulose wrote:
->> As per coresight standards, PIDR2 register has the following format :
+On 13/06/17 17:55, Mathieu Poirier wrote:
+> On Mon, Jun 12, 2017 at 03:36:40PM +0100, Suzuki K Poulose wrote:
+>> The Linux coresight drivers define the programmable ATB replicator as
+>> Qualcom replicator, while this is designed by ARM. This can cause confusion
+>> to a user selecting the driver. Cleanup all references to make it
+>>  explicitly clear. This patch :
 >>
->>  [2-0]	- JEP106_bits6to4
->>  [3]	- JEDEC, designer ID is specified by JEDEC.
+>>  1) Adds a new compatible string for the same, retaining the old one for
+>>     compatibility.
+>>  2) Changes the Kconfig symbol (since this is not part of any defconfigs)
+>> 	 CORESIGHT_QCOM_REPLICATOR => CORESIGHT_DYNAMIC_REPLICATOR
+>>  3) Improves the help message in the Kconfig.
+>>  4) Changes the name of the driver :
+>> 	coresight-replicator-qcom => coresight-dynamic-replicator
 >>
->> However some of the drivers only use mask of 0x3 for the PIDR2 leaving
->> bits [3-2] unchecked, which could potentially match the component for
->> a different device altogether. This patch fixes the mask and the
->> corresponding id bits for the existing devices.
->>
+>> Cc: Pratik Patel <pratikp@codeaurora.org>
+>> Cc: Ivan T. Ivanov <ivan.ivanov@linaro.org>
 >> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
+>> Cc: devicetree at vger.kernel.org
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
 >> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->> I have not touched the TPIU ids for Ux500 (see commit: 4339b699),
->> as I don't have a platform to fix/correct the ids.
->> ---
->>  drivers/hwtracing/coresight/coresight-funnel.c          | 4 ++--
->>  drivers/hwtracing/coresight/coresight-replicator-qcom.c | 4 ++--
->>  drivers/hwtracing/coresight/coresight-stm.c             | 8 ++++----
->>  drivers/hwtracing/coresight/coresight-tmc.c             | 4 ++--
->>  drivers/hwtracing/coresight/coresight-tpiu.c            | 4 ++--
 >
-> Any reason for not adding ETMv3 to the list?  From what I see in the
-> documentation bit [2-0] need to 0b011 and the JEDEC bit is always 1.
+> Hi Suzuki,
+>
+>> ---
+>>  Documentation/devicetree/bindings/arm/coresight.txt     |  4 +++-
+>>  drivers/hwtracing/coresight/Kconfig                     | 10 +++++-----
+>>  drivers/hwtracing/coresight/Makefile                    |  2 +-
+>>  drivers/hwtracing/coresight/coresight-replicator-qcom.c |  2 +-
+>>  4 files changed, 10 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
+>> index fcbae6a..f77329f 100644
+>> --- a/Documentation/devicetree/bindings/arm/coresight.txt
+>> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
+>> @@ -34,7 +34,9 @@ its hardware characteristcs.
+>>  		- Embedded Trace Macrocell (version 4.x):
+>>  			"arm,coresight-etm4x", "arm,primecell";
+>>
+>> -		- Qualcomm Configurable Replicator (version 1.x):
+>> +		- Coresight programmable Replicator (version 1.x):
+>> +			"arm,coresight-dynamic-replicator", "arm,primecell";
+>> +				OR
+>>  			"qcom,coresight-replicator1x", "arm,primecell";
+>
+> Rob, what's your view on keeping the old binding around?  We could simply change
+> the two occurences we find in the DTs (Juno and 410c) to the new name and be
+> done with the old one.
 
-I don't have a platform to test it easily. Hence the exclusion. Same for
-etbv10.
+...
 
+>> --- a/drivers/hwtracing/coresight/coresight-replicator-qcom.c
+>> +++ b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
+>
+> While at it, I would also change the name of the file.
 
+Sure, will do.
+
+Thanks
 Suzuki
