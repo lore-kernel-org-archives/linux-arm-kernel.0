@@ -1,26 +1,48 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 13 Jun 2017 17:18:31 -0500
-Subject: [PATCH v2 1/5] of: Add vendor prefix for iWave Systems
- Technologies Pvt. Ltd
-In-Reply-To: <1496761818-62126-2-git-send-email-biju.das@bp.renesas.com>
-References: <1496420523-23506-4-git-send-email-biju.das@bp.renesas.com>
- <1496761818-62126-1-git-send-email-biju.das@bp.renesas.com>
- <1496761818-62126-2-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <20170613221831.f3oakmgowl7x262b@rob-hp-laptop>
+From: code@mmayer.net (Markus Mayer)
+Date: Tue, 13 Jun 2017 15:37:08 -0700
+Subject: [PATCH v2 0/2] SoC driver for Broadcom STB DPFE
+Message-ID: <20170613223710.31719-1-code@mmayer.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 06, 2017 at 04:10:14PM +0100, Biju Das wrote:
-> This patch adds vendor prefix for iWave Systems Technologies Pvt. Ltd.
-> Website: http://www.iwavesystems.com/
-> 
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
-> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
+From: Markus Mayer <mmayer@broadcom.com>
 
-Now applied to DT tree to avoid conflicts.
+This series introduces a driver to interact with the Broadcom STB DDR
+PHY Front End (DPFE), specifically to communicate with the DCPU that is
+part of the DDR PHY and which is running its own firmware.
 
-Rob
+The DCPU provides information such as DRAM refresh rate, which can be
+used as indirect indicator for the DRAM temperature (the higher the
+refresh rate, the hotter the RAM).
+
+The series was previously submitted as HWMON driver[1]. It has been
+removed from that subsystem, because it doesn't provide any standard
+HWMON data due to hardware design properties, and is now implemented as
+SoC driver.
+
+Changes since v1:
+  - binding simplified to use one node with three memory regions
+    instead of three nodes with one region
+  - no longer part of the HWMON subsystem
+  - better error handling and error reporting to userland
+  - uses [readl|writel]_relaxed() directly, since there is no need for
+    wrappers doing endian conversion
+  - re-download firmware upon "resume"
+  - minor changes to improve clarity
+
+[1] https://lkml.org/lkml/2017/4/18/640
+
+Markus Mayer (2):
+  dt/bindings: Add bindings for Broadcom STB DRAM Sensors
+  soc: brcmstb: Add driver for DPFE
+
+ .../devicetree/bindings/soc/bcm/brcm,dpfe-cpu.txt  |  27 +
+ MAINTAINERS                                        |   8 +
+ drivers/soc/bcm/brcmstb/Makefile                   |   2 +-
+ drivers/soc/bcm/brcmstb/dpfe.c                     | 689 +++++++++++++++++++++
+ 4 files changed, 725 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/soc/bcm/brcm,dpfe-cpu.txt
+ create mode 100644 drivers/soc/bcm/brcmstb/dpfe.c
+
+-- 
+2.7.4
