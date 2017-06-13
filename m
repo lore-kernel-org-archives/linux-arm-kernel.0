@@ -1,93 +1,47 @@
-From: sugar.zhang@rock-chips.com (Sugar Zhang)
-Date: Tue, 13 Jun 2017 15:27:47 +0800
-Subject: [PATCH v1 2/2] arm64: dts: rk3328: add pdm node
-In-Reply-To: <1497338867-52684-1-git-send-email-sugar.zhang@rock-chips.com>
-References: <1497338867-52684-1-git-send-email-sugar.zhang@rock-chips.com>
-Message-ID: <1497338867-52684-3-git-send-email-sugar.zhang@rock-chips.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 13 Jun 2017 08:37:20 +0100
+Subject: [PATCH 1/2] arm: nommu: remove unused KTHREAD_SIZE definition
+In-Reply-To: <20170612170937.2969-1-jeremy.lefaure@lse.epita.fr>
+References: <20170612170937.2969-1-jeremy.lefaure@lse.epita.fr>
+Message-ID: <331b6524-acd6-37ec-df72-9b8b2f3eec97@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add pdm controller device node for rk3328.
+On 12/06/17 18:09, J?r?my Lefaure wrote:
+> I didn't find any use of this macro in the current kernel tree (with git
+> grep). KTHREAD_SIZE is no longer used for a very very long time. So
+> let's remove this definition.
+> 
+> Signed-off-by: J?r?my Lefaure <jeremy.lefaure@lse.epita.fr>
+> ---
+>  arch/arm/include/asm/page-nommu.h | 6 ------
+>  1 file changed, 6 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/page-nommu.h b/arch/arm/include/asm/page-nommu.h
+> index 503f488053de..8f2c47bec375 100644
+> --- a/arch/arm/include/asm/page-nommu.h
+> +++ b/arch/arm/include/asm/page-nommu.h
+> @@ -11,12 +11,6 @@
+>  #ifndef _ASMARM_PAGE_NOMMU_H
+>  #define _ASMARM_PAGE_NOMMU_H
+>  
+> -#if !defined(CONFIG_SMALL_TASKS) && PAGE_SHIFT < 13
+> -#define KTHREAD_SIZE (8192)
+> -#else
+> -#define KTHREAD_SIZE PAGE_SIZE
+> -#endif
+> - 
+>  #define clear_page(page)	memset((page), 0, PAGE_SIZE)
+>  #define copy_page(to,from)	memcpy((to), (from), PAGE_SIZE)
+>  
+> 
 
-Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
+Even more, CONFIG_SMALL_TASKS has gone and only page size we support is 4K.
 
----
+It looks like that similar patch has been submitted several times by different
+people but never got merged, so if it helps:
 
- arch/arm64/boot/dts/rockchip/rk3328.dtsi | 55 ++++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
+Reviewed-by: Vladimir Murzin <vladimir.murzin@arm.com>
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-index 7e69f1f..2435044 100644
---- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-@@ -156,6 +156,25 @@
- 		clock-output-names = "xin24m";
- 	};
- 
-+	pdm: pdm at ff040000 {
-+		compatible = "rockchip,pdm";
-+		reg = <0x0 0xff040000 0x0 0x1000>;
-+		clocks = <&cru SCLK_PDM>, <&cru HCLK_PDM>;
-+		clock-names = "pdm_clk", "pdm_hclk";
-+		dmas = <&dmac 16>;
-+		#dma-cells = <1>;
-+		dma-names = "rx";
-+		pinctrl-names = "default", "sleep";
-+		pinctrl-0 = <&pdmm0_clk
-+			     &pdmm0_fsync
-+			     &pdmm0_sdi0
-+			     &pdmm0_sdi1
-+			     &pdmm0_sdi2
-+			     &pdmm0_sdi3>;
-+		pinctrl-1 = <&pdmm0_sleep>;
-+		status = "disabled";
-+	};
-+
- 	grf: syscon at ff100000 {
- 		compatible = "rockchip,rk3328-grf", "syscon", "simple-mfd";
- 		reg = <0x0 0xff100000 0x0 0x1000>;
-@@ -701,6 +720,42 @@
- 			};
- 		};
- 
-+		pdm-0 {
-+			pdmm0_clk: pdmm0-clk {
-+				rockchip,pins = <2 RK_PC2 2 &pcfg_pull_none>;
-+			};
-+
-+			pdmm0_fsync: pdmm0-fsync {
-+				rockchip,pins = <2 RK_PC7 2 &pcfg_pull_none>;
-+			};
-+
-+			pdmm0_sdi0: pdmm0-sdi0 {
-+				rockchip,pins = <2 RK_PC3 2 &pcfg_pull_none>;
-+			};
-+
-+			pdmm0_sdi1: pdmm0-sdi1 {
-+				rockchip,pins = <2 RK_PC4 2 &pcfg_pull_none>;
-+			};
-+
-+			pdmm0_sdi2: pdmm0-sdi2 {
-+				rockchip,pins = <2 RK_PC5 2 &pcfg_pull_none>;
-+			};
-+
-+			pdmm0_sdi3: pdmm0-sdi3 {
-+				rockchip,pins = <2 RK_PC6 2 &pcfg_pull_none>;
-+			};
-+
-+			pdmm0_sleep: pdmm0-sleep {
-+				rockchip,pins =
-+					<2 RK_PC2 RK_FUNC_GPIO &pcfg_input_high>,
-+					<2 RK_PC3 RK_FUNC_GPIO &pcfg_input_high>,
-+					<2 RK_PC4 RK_FUNC_GPIO &pcfg_input_high>,
-+					<2 RK_PC5 RK_FUNC_GPIO &pcfg_input_high>,
-+					<2 RK_PC6 RK_FUNC_GPIO &pcfg_input_high>,
-+					<2 RK_PC7 RK_FUNC_GPIO &pcfg_input_high>;
-+			};
-+		};
-+
- 		i2s1 {
- 			i2s1_mclk: i2s1-mclk {
- 				rockchip,pins = <2 RK_PB7 1 &pcfg_pull_none>;
--- 
-1.9.1
+Cheers
+Vladimir
