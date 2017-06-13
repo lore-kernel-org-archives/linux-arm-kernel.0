@@ -1,214 +1,536 @@
-From: shameerali.kolothum.thodi@huawei.com (shameer)
-Date: Tue, 13 Jun 2017 12:48:28 +0100
-Subject: [PATCH 1/2] acpi:iort: Add an IORT helper function to reserve HW ITS
- address regions for IOMMU drivers
-In-Reply-To: <20170613114829.188036-1-shameerali.kolothum.thodi@huawei.com>
-References: <20170613114829.188036-1-shameerali.kolothum.thodi@huawei.com>
-Message-ID: <20170613114829.188036-2-shameerali.kolothum.thodi@huawei.com>
+From: net147@gmail.com (Jonathan Liu)
+Date: Tue, 13 Jun 2017 21:53:31 +1000
+Subject: [PATCH v2] drm/sun4i: hdmi: Implement I2C adapter for A10s DDC bus
+In-Reply-To: <20170613111505.afyh4iotxdz5kceh@flea.lan>
+References: <20170612055235.31019-1-net147@gmail.com>
+ <20170613111505.afyh4iotxdz5kceh@flea.lan>
+Message-ID: <CANwerB0eXxAwihwt-xZuUm6DD6JSJt8nQdyxnp5TVYyU1yf9xA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The helper function retrieves ITS address regions through IORT
-device <-> ITS mappings and reserves it so that these regions
-will not be translated by IOMMU and will be excluded from IOVA
-allocations. IOMMU drivers can use this to implement their
-.get_resv_regions callback.
+Hi Maxime,
 
-Signed-off-by: shameer <shameerali.kolothum.thodi@huawei.com>
----
- drivers/acpi/arm64/iort.c        | 92 ++++++++++++++++++++++++++++++++++++++--
- drivers/irqchip/irq-gic-v3-its.c |  3 +-
- include/linux/acpi_iort.h        |  7 ++-
- 3 files changed, 97 insertions(+), 5 deletions(-)
+On 13 June 2017 at 21:15, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Mon, Jun 12, 2017 at 03:52:35PM +1000, Jonathan Liu wrote:
+>> The drm_get_edid function should be used instead of drm_do_get_edid by
+>> exposing the DDC bus as an I2C adapter. Implement this for A10s.
+>>
+>> Signed-off-by: Jonathan Liu <net147@gmail.com>
+>
+> Your commit log should explain *why* that function should be used
+> instead, and why it's better to expose it as an i2c adadpter.
+Ok.
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index c5fecf9..0ee9965 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -34,6 +34,7 @@
- struct iort_its_msi_chip {
- 	struct list_head	list;
- 	struct fwnode_handle	*fw_node;
-+	phys_addr_t		base_addr;
- 	u32			translation_id;
- };
- 
-@@ -131,14 +132,16 @@ typedef acpi_status (*iort_find_node_callback)
- static DEFINE_SPINLOCK(iort_msi_chip_lock);
- 
- /**
-- * iort_register_domain_token() - register domain token and related ITS ID
-- * to the list from where we can get it back later on.
-+ * iort_register_domain_token() - register domain token along with related
-+ * ITS ID and base address to the list from where we can get it back later on.
-  * @trans_id: ITS ID.
-+ * @base: ITS base address.
-  * @fw_node: Domain token.
-  *
-  * Returns: 0 on success, -ENOMEM if no memory when allocating list element
-  */
--int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
-+int iort_register_domain_token(int trans_id, phys_addr_t base,
-+			       struct fwnode_handle *fw_node)
- {
- 	struct iort_its_msi_chip *its_msi_chip;
- 
-@@ -148,6 +151,7 @@ int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
- 
- 	its_msi_chip->fw_node = fw_node;
- 	its_msi_chip->translation_id = trans_id;
-+	its_msi_chip->base_addr = base;
- 
- 	spin_lock(&iort_msi_chip_lock);
- 	list_add(&its_msi_chip->list, &iort_msi_chip_list);
-@@ -491,6 +495,24 @@ int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id)
- 	return -ENODEV;
- }
- 
-+static int iort_find_its_base(u32 its_id, phys_addr_t *base)
-+{
-+	struct iort_its_msi_chip *its_msi_chip;
-+	bool match = false;
-+
-+	spin_lock(&iort_msi_chip_lock);
-+	list_for_each_entry(its_msi_chip, &iort_msi_chip_list, list) {
-+		if (its_msi_chip->translation_id == its_id) {
-+			*base = its_msi_chip->base_addr;
-+			match = true;
-+			break;
-+		}
-+	}
-+	spin_unlock(&iort_msi_chip_lock);
-+
-+	return match ? 0 : -ENODEV;
-+}
-+
- /**
-  * iort_dev_find_its_id() - Find the ITS identifier for a device
-  * @dev: The device.
-@@ -649,6 +671,68 @@ int iort_add_device_replay(const struct iommu_ops *ops, struct device *dev)
- 
- 	return err;
- }
-+
-+/**
-+ * iort_iommu_its_get_resv_regions - Reserved region driver helper
-+ * @dev: Device from iommu_get_resv_regions()
-+ * @list: Reserved region list from iommu_get_resv_regions()
-+ *
-+ * Returns: 0 on at least one ITS address region reservation,
-+ *          appropriate error value otherwise.
-+ *
-+ * IOMMU drivers can use this to implement their .get_resv_regions callback
-+ * for reserving the HW ITS address regions.
-+ */
-+int iort_iommu_its_get_resv_regions(struct device *dev, struct list_head *head)
-+{
-+	int i;
-+	struct acpi_iort_node *node;
-+	struct acpi_iort_its_group *its;
-+	bool resv = false;
-+
-+	node = iort_find_dev_node(dev);
-+	if (!node)
-+		return -ENODEV;
-+
-+	if (dev_is_pci(dev)) {
-+		u32 rid;
-+
-+		pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid, &rid);
-+		node = iort_node_map_id(node, rid, NULL, IORT_MSI_TYPE);
-+
-+	} else {
-+		for (i = 0; i < node->mapping_count; i++) {
-+			node = iort_node_map_platform_id(node, NULL,
-+							 IORT_MSI_TYPE, i);
-+			if (node)
-+				break;
-+		}
-+	}
-+
-+	if (!node)
-+		return -ENODEV;
-+
-+	/* Move to ITS specific data */
-+	its = (struct acpi_iort_its_group *)node->node_data;
-+
-+	for (i = 0; i < its->its_count; i++) {
-+		phys_addr_t base;
-+
-+		if (!iort_find_its_base(its->identifiers[i], &base)) {
-+			int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
-+			struct iommu_resv_region *region;
-+
-+			region = iommu_alloc_resv_region(base, SZ_128K, prot,
-+							 IOMMU_RESV_MSI);
-+			if (region) {
-+				list_add_tail(&region->list, head);
-+				resv = true;
-+			}
-+		}
-+	}
-+
-+	return resv ? 0 : -ENODEV;
-+}
- #else
- static inline
- const struct iommu_ops *iort_fwspec_iommu_ops(struct iommu_fwspec *fwspec)
-@@ -656,6 +740,8 @@ const struct iommu_ops *iort_fwspec_iommu_ops(struct iommu_fwspec *fwspec)
- static inline
- int iort_add_device_replay(const struct iommu_ops *ops, struct device *dev)
- { return 0; }
-+int iort_iommu_its_get_resv_regions(struct device *dev, struct list_head *head)
-+{ return -ENODEV; }
- #endif
- 
- static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 45ea1933..c45a2ad 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -1854,7 +1854,8 @@ static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
- 		return -ENOMEM;
- 	}
- 
--	err = iort_register_domain_token(its_entry->translation_id, dom_handle);
-+	err = iort_register_domain_token(its_entry->translation_id, res.start,
-+					 dom_handle);
- 	if (err) {
- 		pr_err("ITS@%pa: Unable to register GICv3 ITS domain token (ITS ID %d) to IORT\n",
- 		       &res.start, its_entry->translation_id);
-diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
-index 3ff9ace..35cf45c 100644
---- a/include/linux/acpi_iort.h
-+++ b/include/linux/acpi_iort.h
-@@ -26,7 +26,8 @@
- #define IORT_IRQ_MASK(irq)		(irq & 0xffffffffULL)
- #define IORT_IRQ_TRIGGER_MASK(irq)	((irq >> 32) & 0xffffffffULL)
- 
--int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node);
-+int iort_register_domain_token(int trans_id, phys_addr_t base,
-+			       struct fwnode_handle *fw_node);
- void iort_deregister_domain_token(int trans_id);
- struct fwnode_handle *iort_find_domain_token(int trans_id);
- #ifdef CONFIG_ACPI_IORT
-@@ -39,6 +40,7 @@
- /* IOMMU interface */
- void iort_set_dma_mask(struct device *dev);
- const struct iommu_ops *iort_iommu_configure(struct device *dev);
-+int iort_iommu_its_get_resv_regions(struct device *dev, struct list_head *head);
- #else
- static inline void acpi_iort_init(void) { }
- static inline bool iort_node_match(u8 type) { return false; }
-@@ -53,6 +55,9 @@ static inline void iort_set_dma_mask(struct device *dev) { }
- static inline
- const struct iommu_ops *iort_iommu_configure(struct device *dev)
- { return NULL; }
-+static inline
-+int iort_iommu_its_get_resv_regions(struct device *dev, struct list_head *head)
-+{ return -ENODEV; }
- #endif
- 
- #endif /* __ACPI_IORT_H__ */
--- 
-1.9.1
+>
+>> ---
+>> Changes for v2:
+>>  - Rebased against Maxime's sunxi-drm/for-next branch
+>>  - Fix up error paths in sun4i_hdmi_bind so that the I2C adapter is deleted if
+>>    any of the calls after the I2C adapter is created fails
+>>  - Remove unnecessary includes in sun4i_hdmi_i2c.c
+>>
+>>  drivers/gpu/drm/sun4i/Makefile         |   1 +
+>>  drivers/gpu/drm/sun4i/sun4i_hdmi.h     |  11 ++-
+>>  drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c | 103 +++------------------
+>>  drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c | 163 +++++++++++++++++++++++++++++++++
+>>  4 files changed, 189 insertions(+), 89 deletions(-)
+>>  create mode 100644 drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c
+>>
+>> diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
+>> index e29fd3a2ba9c..43c753cafc88 100644
+>> --- a/drivers/gpu/drm/sun4i/Makefile
+>> +++ b/drivers/gpu/drm/sun4i/Makefile
+>> @@ -2,6 +2,7 @@ sun4i-drm-y += sun4i_drv.o
+>>  sun4i-drm-y += sun4i_framebuffer.o
+>>
+>>  sun4i-drm-hdmi-y += sun4i_hdmi_enc.o
+>> +sun4i-drm-hdmi-y += sun4i_hdmi_i2c.o
+>>  sun4i-drm-hdmi-y += sun4i_hdmi_ddc_clk.o
+>>  sun4i-drm-hdmi-y += sun4i_hdmi_tmds_clk.o
+>
+> You probably also need to depend on the I2C framework in order to
+> work, right?
+In Kconfig, DRM_SUN4I depends on DRM which depends on I2C already.
+Is there anything else I need to do here?
+
+>
+>>
+>> diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi.h b/drivers/gpu/drm/sun4i/sun4i_hdmi.h
+>> index 2f2f2ff1ea63..4c01dbe89cd9 100644
+>> --- a/drivers/gpu/drm/sun4i/sun4i_hdmi.h
+>> +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi.h
+>> @@ -97,6 +97,7 @@
+>>  #define SUN4I_HDMI_DDC_CTRL_START_CMD                BIT(30)
+>>  #define SUN4I_HDMI_DDC_CTRL_FIFO_DIR_MASK    BIT(8)
+>>  #define SUN4I_HDMI_DDC_CTRL_FIFO_DIR_READ    (0 << 8)
+>> +#define SUN4I_HDMI_DDC_CTRL_FIFO_DIR_WRITE   (1 << 8)
+>
+> All the other bit defines are ordered by descending orders, please
+> keep it consistent.
+Ok.
+
+>
+>>  #define SUN4I_HDMI_DDC_CTRL_RESET            BIT(0)
+>>
+>>  #define SUN4I_HDMI_DDC_ADDR_REG              0x504
+>> @@ -105,6 +106,10 @@
+>>  #define SUN4I_HDMI_DDC_ADDR_OFFSET(off)              (((off) & 0xff) << 8)
+>>  #define SUN4I_HDMI_DDC_ADDR_SLAVE(addr)              ((addr) & 0xff)
+>>
+>> +#define SUN4I_HDMI_DDC_INTERRUPT_STATUS_REG  0x50c
+>
+> It is called INT_STATUS in the datasheet
+>
+>> +#define SUN4I_HDMI_DDC_INTERRUPT_STATUS_FIFO_REQUEST BIT(4)
+>> +#define SUN4I_HDMI_DDC_INTERRUPT_STATUS_TRANSFER_COMPLETE    BIT(0)
+>> +
+>>  #define SUN4I_HDMI_DDC_FIFO_CTRL_REG 0x510
+>>  #define SUN4I_HDMI_DDC_FIFO_CTRL_CLEAR               BIT(31)
+>>
+>> @@ -112,7 +117,8 @@
+>>  #define SUN4I_HDMI_DDC_BYTE_COUNT_REG        0x51c
+>>
+>>  #define SUN4I_HDMI_DDC_CMD_REG               0x520
+>> -#define SUN4I_HDMI_DDC_CMD_EXPLICIT_EDDC_READ        6
+>> +#define SUN4I_HDMI_DDC_CMD_IMPLICIT_WRITE    3
+>> +#define SUN4I_HDMI_DDC_CMD_IMPLICIT_READ     5
+>
+> Same remark here, and why do you remove the old one?
+Ok, I will not remove any old macros.
+
+>
+>>
+>>  #define SUN4I_HDMI_DDC_CLK_REG               0x528
+>>  #define SUN4I_HDMI_DDC_CLK_M(m)                      (((m) & 0x7) << 3)
+>> @@ -146,6 +152,8 @@ struct sun4i_hdmi {
+>>       struct clk              *ddc_clk;
+>>       struct clk              *tmds_clk;
+>>
+>> +     struct i2c_adapter      *i2c;
+>> +
+>>       struct sun4i_drv        *drv;
+>>
+>>       bool                    hdmi_monitor;
+>> @@ -153,5 +161,6 @@ struct sun4i_hdmi {
+>>
+>>  int sun4i_ddc_create(struct sun4i_hdmi *hdmi, struct clk *clk);
+>>  int sun4i_tmds_create(struct sun4i_hdmi *hdmi);
+>> +int sun4i_hdmi_i2c_create(struct sun4i_hdmi *hdmi);
+>>
+>>  #endif /* _SUN4I_HDMI_H_ */
+>> diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+>> index d3398f6250ef..2a8c0b14eabc 100644
+>> --- a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+>> +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+>> @@ -29,8 +29,6 @@
+>>  #include "sun4i_hdmi.h"
+>>  #include "sun4i_tcon.h"
+>>
+>> -#define DDC_SEGMENT_ADDR     0x30
+>> -
+>>  static inline struct sun4i_hdmi *
+>>  drm_encoder_to_sun4i_hdmi(struct drm_encoder *encoder)
+>>  {
+>> @@ -184,93 +182,13 @@ static const struct drm_encoder_funcs sun4i_hdmi_funcs = {
+>>       .destroy        = drm_encoder_cleanup,
+>>  };
+>>
+>> -static int sun4i_hdmi_read_sub_block(struct sun4i_hdmi *hdmi,
+>> -                                  unsigned int blk, unsigned int offset,
+>> -                                  u8 *buf, unsigned int count)
+>> -{
+>> -     unsigned long reg;
+>> -     int i;
+>> -
+>> -     reg = readl(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+>> -     reg &= ~SUN4I_HDMI_DDC_CTRL_FIFO_DIR_MASK;
+>> -     writel(reg | SUN4I_HDMI_DDC_CTRL_FIFO_DIR_READ,
+>> -            hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+>> -
+>> -     writel(SUN4I_HDMI_DDC_ADDR_SEGMENT(offset >> 8) |
+>> -            SUN4I_HDMI_DDC_ADDR_EDDC(DDC_SEGMENT_ADDR << 1) |
+>> -            SUN4I_HDMI_DDC_ADDR_OFFSET(offset) |
+>> -            SUN4I_HDMI_DDC_ADDR_SLAVE(DDC_ADDR),
+>> -            hdmi->base + SUN4I_HDMI_DDC_ADDR_REG);
+>> -
+>> -     reg = readl(hdmi->base + SUN4I_HDMI_DDC_FIFO_CTRL_REG);
+>> -     writel(reg | SUN4I_HDMI_DDC_FIFO_CTRL_CLEAR,
+>> -            hdmi->base + SUN4I_HDMI_DDC_FIFO_CTRL_REG);
+>> -
+>> -     writel(count, hdmi->base + SUN4I_HDMI_DDC_BYTE_COUNT_REG);
+>> -     writel(SUN4I_HDMI_DDC_CMD_EXPLICIT_EDDC_READ,
+>> -            hdmi->base + SUN4I_HDMI_DDC_CMD_REG);
+>> -
+>> -     reg = readl(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+>> -     writel(reg | SUN4I_HDMI_DDC_CTRL_START_CMD,
+>> -            hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+>> -
+>> -     if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG, reg,
+>> -                            !(reg & SUN4I_HDMI_DDC_CTRL_START_CMD),
+>> -                            100, 100000))
+>> -             return -EIO;
+>> -
+>> -     for (i = 0; i < count; i++)
+>> -             buf[i] = readb(hdmi->base + SUN4I_HDMI_DDC_FIFO_DATA_REG);
+>> -
+>> -     return 0;
+>> -}
+>> -
+>> -static int sun4i_hdmi_read_edid_block(void *data, u8 *buf, unsigned int blk,
+>> -                                   size_t length)
+>> -{
+>> -     struct sun4i_hdmi *hdmi = data;
+>> -     int retry = 2, i;
+>> -
+>> -     do {
+>> -             for (i = 0; i < length; i += SUN4I_HDMI_DDC_FIFO_SIZE) {
+>> -                     unsigned char offset = blk * EDID_LENGTH + i;
+>> -                     unsigned int count = min((unsigned int)SUN4I_HDMI_DDC_FIFO_SIZE,
+>> -                                              length - i);
+>> -                     int ret;
+>> -
+>> -                     ret = sun4i_hdmi_read_sub_block(hdmi, blk, offset,
+>> -                                                     buf + i, count);
+>> -                     if (ret)
+>> -                             return ret;
+>> -             }
+>> -     } while (!drm_edid_block_valid(buf, blk, true, NULL) && (retry--));
+>> -
+>> -     return 0;
+>> -}
+>> -
+>>  static int sun4i_hdmi_get_modes(struct drm_connector *connector)
+>>  {
+>>       struct sun4i_hdmi *hdmi = drm_connector_to_sun4i_hdmi(connector);
+>> -     unsigned long reg;
+>>       struct edid *edid;
+>>       int ret;
+>>
+>> -     /* Reset i2c controller */
+>> -     writel(SUN4I_HDMI_DDC_CTRL_ENABLE | SUN4I_HDMI_DDC_CTRL_RESET,
+>> -            hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+>> -     if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG, reg,
+>> -                            !(reg & SUN4I_HDMI_DDC_CTRL_RESET),
+>> -                            100, 2000))
+>> -             return -EIO;
+>> -
+>> -     writel(SUN4I_HDMI_DDC_LINE_CTRL_SDA_ENABLE |
+>> -            SUN4I_HDMI_DDC_LINE_CTRL_SCL_ENABLE,
+>> -            hdmi->base + SUN4I_HDMI_DDC_LINE_CTRL_REG);
+>> -
+>> -     clk_prepare_enable(hdmi->ddc_clk);
+>> -     clk_set_rate(hdmi->ddc_clk, 100000);
+>> -
+>> -     edid = drm_do_get_edid(connector, sun4i_hdmi_read_edid_block, hdmi);
+>> +     edid = drm_get_edid(connector, hdmi->i2c);
+>>       if (!edid)
+>>               return 0;
+>>
+>> @@ -282,8 +200,6 @@ static int sun4i_hdmi_get_modes(struct drm_connector *connector)
+>>       ret = drm_add_edid_modes(connector, edid);
+>>       kfree(edid);
+>>
+>> -     clk_disable_unprepare(hdmi->ddc_clk);
+>> -
+>>       return ret;
+>>  }
+>>
+>> @@ -413,6 +329,12 @@ static int sun4i_hdmi_bind(struct device *dev, struct device *master,
+>>               return ret;
+>>       }
+>>
+>> +     ret = sun4i_hdmi_i2c_create(hdmi);
+>> +     if (ret) {
+>> +             dev_err(dev, "Couldn't create the HDMI I2C adapter\n");
+>> +             return ret;
+>> +     }
+>> +
+>>       drm_encoder_helper_add(&hdmi->encoder,
+>>                              &sun4i_hdmi_helper_funcs);
+>>       ret = drm_encoder_init(drm,
+>> @@ -422,13 +344,15 @@ static int sun4i_hdmi_bind(struct device *dev, struct device *master,
+>>                              NULL);
+>>       if (ret) {
+>>               dev_err(dev, "Couldn't initialise the HDMI encoder\n");
+>> -             return ret;
+>> +             goto err_del_i2c_adapter;
+>>       }
+>>
+>>       hdmi->encoder.possible_crtcs = drm_of_find_possible_crtcs(drm,
+>>                                                                 dev->of_node);
+>> -     if (!hdmi->encoder.possible_crtcs)
+>> -             return -EPROBE_DEFER;
+>> +     if (!hdmi->encoder.possible_crtcs) {
+>> +             ret = -EPROBE_DEFER;
+>> +             goto err_del_i2c_adapter;
+>> +     }
+>>
+>>       drm_connector_helper_add(&hdmi->connector,
+>>                                &sun4i_hdmi_connector_helper_funcs);
+>> @@ -451,6 +375,8 @@ static int sun4i_hdmi_bind(struct device *dev, struct device *master,
+>>
+>>  err_cleanup_connector:
+>>       drm_encoder_cleanup(&hdmi->encoder);
+>> +err_del_i2c_adapter:
+>> +     i2c_del_adapter(hdmi->i2c);
+>>       return ret;
+>>  }
+>>
+>> @@ -461,6 +387,7 @@ static void sun4i_hdmi_unbind(struct device *dev, struct device *master,
+>>
+>>       drm_connector_cleanup(&hdmi->connector);
+>>       drm_encoder_cleanup(&hdmi->encoder);
+>> +     i2c_del_adapter(hdmi->i2c);
+>>  }
+>>
+>>  static const struct component_ops sun4i_hdmi_ops = {
+>> diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c
+>> new file mode 100644
+>> index 000000000000..389b770be09b
+>> --- /dev/null
+>> +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c
+>> @@ -0,0 +1,163 @@
+>> +/*
+>> + * Copyright (C) 2017 Jonathan Liu
+>> + *
+>> + * Jonathan Liu <net147@gmail.com>
+>
+> Is it?
+
+I could add you to the copyright since you did the old one. But the
+implementation is different.
+I intend to rework this I2C driver to use the FIFO more to avoid
+splitting larger transfers > 16 bytes and do the transfer in a single
+command. Would you like to be added to the copyright?
+
+>
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> + * modify it under the terms of the GNU General Public License as
+>> + * published by the Free Software Foundation; either version 2 of
+>> + * the License, or (at your option) any later version.
+>> + */
+>> +
+>> +#include <linux/clk.h>
+>> +#include <linux/i2c.h>
+>> +#include <linux/iopoll.h>
+>> +
+>> +#include "sun4i_hdmi.h"
+>> +
+>> +static int xfer_msg_chunk(struct sun4i_hdmi *hdmi, struct i2c_msg *msg)
+>> +{
+>> +     u32 count = min_t(u32, msg->len, SUN4I_HDMI_DDC_FIFO_SIZE);
+>> +     u32 reg;
+>> +     int i;
+>> +
+>> +     reg = readl(hdmi->base + SUN4I_HDMI_DDC_FIFO_CTRL_REG);
+>> +     writel(reg | SUN4I_HDMI_DDC_FIFO_CTRL_CLEAR,
+>> +            hdmi->base + SUN4I_HDMI_DDC_FIFO_CTRL_REG);
+>> +
+>> +     writel(count, hdmi->base
+>> +            + SUN4I_HDMI_DDC_BYTE_COUNT_REG);
+>
+> It's pretty much everywhere in that file, but the operator should be
+> at the end of the first line, not the beginning of the second.
+>
+> (and you don't really need to wrap that one do you?)
+Ok.
+
+>
+>> +     writel(msg->flags & I2C_M_RD
+>
+> Parenthesis around the condition would make it easier to read.
+Ok.
+
+>
+>> +            ? SUN4I_HDMI_DDC_CMD_IMPLICIT_READ
+>> +            : SUN4I_HDMI_DDC_CMD_IMPLICIT_WRITE,
+>> +            hdmi->base + SUN4I_HDMI_DDC_CMD_REG);
+>> +
+>> +     reg = readl(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+>> +     writel(reg | SUN4I_HDMI_DDC_CTRL_START_CMD,
+>> +            hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+>> +
+>> +     if (!(msg->flags & I2C_M_RD)) {
+>> +             for (i = 0; i < count; i++) {
+>> +                     writeb(*msg->buf++, hdmi->base
+>> +                            + SUN4I_HDMI_DDC_FIFO_DATA_REG);
+>
+> writesb?
+I intend to rework the FIFO handling so will need to continue using writeb.
+
+>
+>> +                     --msg->len;
+>> +             }
+>> +     }
+>> +
+>> +     if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG,
+>> +                            reg,
+>> +                            !(reg & SUN4I_HDMI_DDC_CTRL_START_CMD),
+>> +                            100, 100000))
+>> +             return -EIO;
+>> +
+>> +     reg = readl(hdmi->base + SUN4I_HDMI_DDC_INTERRUPT_STATUS_REG);
+>> +     reg &= ~SUN4I_HDMI_DDC_INTERRUPT_STATUS_FIFO_REQUEST;
+I want to check all the other bits that are set if there are errors.
+
+>
+> You don't need to use that mask.
+>
+>> +     if (reg != SUN4I_HDMI_DDC_INTERRUPT_STATUS_TRANSFER_COMPLETE)
+>> +             return -EIO;
+>
+> !(reg & SUN4I_HDMI_DDC_INTERRUPT_STATUS_TRANSFER_COMPLETE) would be enough.
+I want to check all the other bits that are set if there are errors.
+
+>
+>> +
+>> +     if (msg->flags & I2C_M_RD) {
+>> +             for (i = 0; i < count; i++) {
+>> +                     *msg->buf++ = readb(hdmi->base
+>> +                                         + SUN4I_HDMI_DDC_FIFO_DATA_REG);
+>
+> readsb ?
+I am reworking the FIFO handling so I will need to continue to use readb.
+
+>
+>> +                     --msg->len;
+>
+> You shouldn't modify that length.
+Ok.
+
+>
+>> +             }
+>> +     }
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static int xfer_msg(struct sun4i_hdmi *hdmi, struct i2c_msg *msg)
+>> +{
+>> +     u32 reg;
+>> +     int ret;
+>> +
+>> +     if (!msg->len)
+>> +             return -EIO;
+>> +
+>> +     while (msg->len) {
+>> +             reg = readl(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+>> +             reg &= ~SUN4I_HDMI_DDC_CTRL_FIFO_DIR_MASK;
+>> +
+>> +             writel(reg | (msg->flags & I2C_M_RD
+>> +                           ? SUN4I_HDMI_DDC_CTRL_FIFO_DIR_READ
+>> +                           : SUN4I_HDMI_DDC_CTRL_FIFO_DIR_WRITE),
+>
+> You can put that in a separate assignment after the mask has been
+> applied, it will be easier to read.
+Ok.
+
+>
+>> +                    hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+>> +
+>> +             writel(SUN4I_HDMI_DDC_ADDR_SLAVE(msg->addr),
+>> +                    hdmi->base + SUN4I_HDMI_DDC_ADDR_REG);
+>
+> What about the segment, offset and eddc addresses?
+They are not used. E-DDC implementation is handled by the I2C framework.
+
+>
+>> +
+>> +             ret = xfer_msg_chunk(hdmi, msg);
+>> +             if (ret)
+>> +                     return ret;
+>> +     }
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static int sun4i_hdmi_i2c_xfer(struct i2c_adapter *adap,
+>> +                            struct i2c_msg *msgs, int num)
+>> +{
+>> +     struct sun4i_hdmi *hdmi = i2c_get_adapdata(adap);
+>> +     u32 reg;
+>> +     int err, ret = num;
+>> +     int i;
+>> +
+>> +     /* Reset i2c controller */
+>> +     writel(SUN4I_HDMI_DDC_CTRL_ENABLE | SUN4I_HDMI_DDC_CTRL_RESET,
+>> +            hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+>> +     if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG, reg,
+>> +                            !(reg & SUN4I_HDMI_DDC_CTRL_RESET),
+>> +                            100, 2000))
+>> +             return -EIO;
+>> +
+>> +     writel(SUN4I_HDMI_DDC_LINE_CTRL_SDA_ENABLE |
+>> +            SUN4I_HDMI_DDC_LINE_CTRL_SCL_ENABLE,
+>> +            hdmi->base + SUN4I_HDMI_DDC_LINE_CTRL_REG);
+>> +
+>> +     clk_prepare_enable(hdmi->ddc_clk);
+>> +     clk_set_rate(hdmi->ddc_clk, 100000);
+>> +
+>> +     for (i = 0; i < num; i++) {
+>> +             err = xfer_msg(hdmi, &msgs[i]);
+>> +             if (err) {
+>> +                     ret = err;
+>> +                     break;
+>> +             }
+>> +     }
+>> +
+>> +     clk_disable_unprepare(hdmi->ddc_clk);
+>> +     return ret;
+>> +}
+>> +
+>> +static u32 sun4i_hdmi_i2c_func(struct i2c_adapter *adap)
+>> +{
+>> +     return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
+>> +}
+>> +
+>> +static const struct i2c_algorithm sun4i_hdmi_i2c_algorithm = {
+>> +     .master_xfer    = sun4i_hdmi_i2c_xfer,
+>> +     .functionality  = sun4i_hdmi_i2c_func,
+>> +};
+>> +
+>> +static struct i2c_adapter sun4i_hdmi_i2c_adapter = {
+>
+> const?
+Ok.
+
+>
+>> +     .owner  = THIS_MODULE,
+>> +     .class  = I2C_CLASS_DDC,
+>> +     .algo   = &sun4i_hdmi_i2c_algorithm,
+>> +     .name   = "sun4i_hdmi_i2c adapter",
+>> +};
+>> +
+>> +int sun4i_hdmi_i2c_create(struct sun4i_hdmi *hdmi)
+>> +{
+>> +     int ret = 0;
+>> +
+>> +     i2c_set_adapdata(&sun4i_hdmi_i2c_adapter, hdmi);
+>> +
+>> +     ret = i2c_add_adapter(&sun4i_hdmi_i2c_adapter);
+>> +     if (ret)
+>> +             return ret;
+>
+> It should probably create the DDC clock too.
+Ok.
+
+>
+> I'd also like to have this patch split. First converting the current
+> code to a i2c (read-only) dirver, and then adding write support.
+This is not possible. I2C by its nature requires both. For example, if
+you want to read from offset 0x10, you would write 0x10, followed by
+read.
+
+>
+> Thanks!
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+
+Regards,
+Jonathan
