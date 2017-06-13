@@ -1,32 +1,112 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 13 Jun 2017 09:19:44 +0200
-Subject: [PATCH v3] arm64: allwinner: h5: Add initial Orangepi Zero Plus
- 2 support
-In-Reply-To: <1497261194-28815-2-git-send-email-jteki@openedev.com>
-References: <1497261194-28815-1-git-send-email-jteki@openedev.com>
- <1497261194-28815-2-git-send-email-jteki@openedev.com>
-Message-ID: <20170613071944.d5u5peieg6pczuud@flea.lan>
+Date: Tue, 13 Jun 2017 09:44:32 +0200
+Subject: [PATCH v2 07/11] drm: sun4i: add support for the TV encoder in
+ H3 SoC
+In-Reply-To: <362bb72d74cd7181ae02dbf73b0e724e@aosc.io>
+References: <20170604160149.30230-1-icenowy@aosc.io>
+ <20170604160149.30230-8-icenowy@aosc.io>
+ <20170607093845.cu5kk55nj72roysf@flea.lan>
+ <362bb72d74cd7181ae02dbf73b0e724e@aosc.io>
+Message-ID: <20170613074432.btwgc4e7pndtsvbf@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 12, 2017 at 03:23:14PM +0530, Jagan Teki wrote:
-> From: Jagan Teki <jagan@amarulasolutions.com>
+On Sun, Jun 11, 2017 at 02:43:42PM +0800, icenowy at aosc.io wrote:
+> ? 2017-06-07 17:38?Maxime Ripard ???
+> > On Mon, Jun 05, 2017 at 12:01:45AM +0800, Icenowy Zheng wrote:
+> > > Allwinner H3 features a TV encoder similar to the one in earlier SoCs,
+> > > but has a internal fixed clock divider that divides the TCON1 clock
+> > > (called TVE clock in datasheet) by 11.
+> > > 
+> > > Add support for it.
+> > > 
+> > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> > > ---
+> > > Changes in v2:
+> > > - Quirk part rewritten.
+> > > 
+> > >  drivers/gpu/drm/sun4i/sun4i_tv.c | 35
+> > > ++++++++++++++++++++++++++++++++++-
+> > >  1 file changed, 34 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c
+> > > b/drivers/gpu/drm/sun4i/sun4i_tv.c
+> > > index 338b9e5bb2a3..b9ff6d5ea67a 100644
+> > > --- a/drivers/gpu/drm/sun4i/sun4i_tv.c
+> > > +++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
+> > > @@ -13,6 +13,7 @@
+> > >  #include <linux/clk.h>
+> > >  #include <linux/component.h>
+> > >  #include <linux/of_address.h>
+> > > +#include <linux/of_device.h>
+> > >  #include <linux/regmap.h>
+> > >  #include <linux/reset.h>
+> > > 
+> > > @@ -169,14 +170,21 @@ struct tv_mode {
+> > >  	const struct resync_parameters	*resync_params;
+> > >  };
+> > > 
+> > > +struct sun4i_tv_quirks {
+> > > +	int fixed_divider;
+> > > +};
+> > > +
+> > >  struct sun4i_tv {
+> > >  	struct drm_connector	connector;
+> > >  	struct drm_encoder	encoder;
+> > > 
+> > >  	struct clk		*clk;
+> > > +	struct clk		*mod_clk;
+> > >  	struct regmap		*regs;
+> > >  	struct reset_control	*reset;
+> > > 
+> > > +	const struct sun4i_tv_quirks *quirks;
+> > > +
+> > >  	struct sun4i_drv	*drv;
+> > >  };
+> > > 
+> > > @@ -391,6 +399,12 @@ static void sun4i_tv_mode_set(struct
+> > > drm_encoder *encoder,
+> > >  	struct sun4i_tcon *tcon = crtc->tcon;
+> > >  	const struct tv_mode *tv_mode = sun4i_tv_find_tv_by_mode(mode);
+> > > 
+> > > +	if (tv->quirks->fixed_divider) {
+> > > +		DRM_DEBUG_DRIVER("Applying fixed divider %d on TVE clock\n",
+> > > +				 tv->quirks->fixed_divider);
+> > > +		mode->crtc_clock *= tv->quirks->fixed_divider;
+> > > +	}
+> > > +
+> > 
+> > You're not allowed to change the mode in mode_set, and you shouldn't
+> > even change it. The output pixel clock is still 27MHz.
+> > 
+> > You should implement that using the states, as we discussed already.
 > 
-> Orangepi Zero Plus 2 is an open-source single-board computer
-> using the Allwinner h5 SOC.
+> After reading the comments at include/drm/drm_modeset_helper_vtables.h,
+> I think the atomic_check function is allowed to directly change
+> the adjust_mode of crtc_state.
 > 
-> H5 Orangepi Zero Plus 2 has
-> - Quad-core Cortex-A53
-> - 512MB DDR3
-> - micrSD slot and 8GB eMMC
-> - Debug TTL UART
-> - HDMI
-> - Wifi + BT
-> - OTG+power supply
+> And according to other comments at include/drm/drm_modes.h, the
+> crtc_clock in adjust_mode should be the clock to be really feed
+> to the hardware.
 > 
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> So I think I can just change this in atomic_check.
+> 
+> However, the mode_set function of sun4i_tv seems to be not
+> regarding adjusted_mode and still use original mode.
+> 
+> So my current design is:
+> - Multiply adjusted_mode in atomic_check.
+> - Feed adjust_mode to TCON code in mode_set function.
+> 
+> Is this proper?
+> 
+> (From my own understanding to the comments I think so.)
 
-Applied, thanks
+No, it's not. The pixel clock in the mode is the pixel clock output
+physically by the connector. You want to use it for an intermediate
+clock in your pipeline.
+
+This is not the same clock, and not the same frequency.
 
 Maxime
 
@@ -40,4 +120,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170613/2b331ecc/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170613/902491de/attachment.sig>
