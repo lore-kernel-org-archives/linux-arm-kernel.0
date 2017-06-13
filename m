@@ -1,47 +1,48 @@
-From: tanxiaojun@huawei.com (Tan Xiaojun)
-Date: Tue, 13 Jun 2017 10:00:01 +0800
-Subject: [PATCH 0/2] arm64: fix crash when reading /proc/kcore
-In-Reply-To: <20170608194139.9250-1-ard.biesheuvel@linaro.org>
-References: <20170608194139.9250-1-ard.biesheuvel@linaro.org>
-Message-ID: <593F4721.7000501@huawei.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 12 Jun 2017 19:04:55 -0700
+Subject: [PATCHv4 2/2] clk: keystone: Add sci-clk driver support
+In-Reply-To: <1495458113-7366-3-git-send-email-t-kristo@ti.com>
+References: <1495458113-7366-1-git-send-email-t-kristo@ti.com>
+ <1495458113-7366-3-git-send-email-t-kristo@ti.com>
+Message-ID: <20170613020455.GQ20170@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/6/9 3:41, Ard Biesheuvel wrote:
-> This is a follow-up to patches from zhonjiang [0] and myself [1] that aim
-> to solve a problem in the kcore code, which gets confused by the presence
-> of block mappings in the vmalloc region.
-> 
-> While fixing the crash is quite straight forward [2], we need to tweak
-> the kcore code itself to ensure that it operates correctly on arm64.
-> Fortunately, we can achieve this with two very simple changes:
-> 
-> - replace a call to is_vmalloc_or_module_addr() in read_kcore() with a
->   comparison of the kclist type field (#1)
-> - enable CONFIG_ARCH_PROC_KCORE_TEXT for arm64 (#2)
-> 
-> [0] http://marc.info/?l=linux-mm&m=149632393629295&w=2
-> [1] http://marc.info/?l=linux-mm&m=149685966530180&w=2
-> [2] http://marc.info/?l=linux-mm&m=149694975123959&w=2
-> 
-> Ard Biesheuvel (2):
->   fs/proc: kcore: use kcore_list type to check for vmalloc/module
->     address
->   arm64: mm: select CONFIG_ARCH_PROC_KCORE_TEXT
-> 
->  arch/arm64/Kconfig | 3 +++
->  fs/proc/kcore.c    | 2 +-
->  2 files changed, 4 insertions(+), 1 deletion(-)
-> 
+On 05/22, Tero Kristo wrote:
+> +
+> +/**
+> + * ti_sci_clk_probe - Probe function for the TI SCI clock driver
+> + * @pdev: platform device pointer to be probed
+> + *
+> + * Probes the TI SCI clock device. Allocates a new clock provider
+> + * and registers this to the common clock framework. Also applies
+> + * any required flags to the identified clocks via clock lists
+> + * supplied from DT. Returns 0 for success, negative error value
+> + * for failure.
+> + */
+> +static int ti_sci_clk_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct device_node *np = dev->of_node;
+> +	struct sci_clk_provider *provider;
+> +	const struct ti_sci_handle *handle;
+> +	struct sci_clk_data *data;
+> +	int ret;
+> +
+> +	data = (struct sci_clk_data *)of_device_get_match_data(dev);
 
-Reported-by: Tan Xiaojun <tanxiaojun@huawei.com>
-Tested-by: Tan Xiaojun <tanxiaojun@huawei.com>
+It would be nice to avoid this cast, and also check for NULL
+here. I tried to do it in a few minutes but then that caused a
+problem with throwing away const on sci_clk_data. Can this be
+resolved? We probably shouldn't be assigning the
+sci_clk_data::clocks member anyway if the structure is const
+assuming it goes into the read-only section. It may cause some
+restructuring of the code though.
 
-Thank you for working on this problem which I reported two months ago.
-
-https://patchwork.kernel.org/patch/9687319/
-
-I tested, and it really solved the problem in Hisilicon D02/D03/D05.
-
-Thanks.
-Xiaojun.
+> +
+> +	handle = devm_ti_sci_get_handle(dev);
+> +	if (IS_ERR(handle))
+> +		return PTR_ERR(handle);
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
