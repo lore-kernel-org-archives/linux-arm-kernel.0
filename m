@@ -1,72 +1,58 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 14 Jun 2017 17:37:13 +0100
-Subject: [PATCH 2/2] ACPI/IORT: Remove iort_node_match()
-In-Reply-To: <20170614163713.14574-1-lorenzo.pieralisi@arm.com>
-References: <20170614163713.14574-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170614163713.14574-2-lorenzo.pieralisi@arm.com>
+Date: Wed, 14 Jun 2017 17:37:12 +0100
+Subject: [PATCH 1/2] ARM64/irqchip: Update ACPI_IORT symbol selection logic
+Message-ID: <20170614163713.14574-1-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 316ca8804ea8 ("ACPI/IORT: Remove linker section for IORT entries
-probing") removed the linker section for IORT entries probing.
+ACPI IORT is an ACPI addendum to describe the connection topology of
+devices with IOMMUs and interrupt controllers on ARM64 ACPI systems.
 
-Since those IORT entries were the only iort_node_match() interface
-users, the iort_node_match() became obsolete and can then be removed.
+Currently the ACPI IORT Kbuild symbol is selected whenever the Kbuild
+symbol ARM_GIC_V3_ITS is enabled, which in turn is selected by ARM64
+Kbuild defaults. This makes the logic behind ACPI_IORT selection a bit
+twisted and not easy to follow. On ARM64 systems enabling ACPI the
+kbuild symbol ACPI_IORT should always be selected in that it is a kernel
+layer provided to the ARM64 arch code to parse and enable ACPI firmware
+bindings.
 
-Remove the ACPI IORT iort_node_match() interface from the kernel.
+Make the ACPI_IORT selection explicit in ARM64 Kbuild and remove the
+selection from ARM_GIC_V3_ITS entry, making the ACPI_IORT selection
+logic clearer to follow.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 Cc: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/acpi/arm64/iort.c | 15 ---------------
- include/linux/acpi_iort.h |  2 --
- 2 files changed, 17 deletions(-)
+ arch/arm64/Kconfig      | 1 +
+ drivers/irqchip/Kconfig | 1 -
+ 2 files changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 797b28d..d048f72 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -234,21 +234,6 @@ static struct acpi_iort_node *iort_scan_node(enum acpi_iort_node_type type,
- 	return NULL;
- }
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index b2024db..2424fb4 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -3,6 +3,7 @@ config ARM64
+ 	select ACPI_CCA_REQUIRED if ACPI
+ 	select ACPI_GENERIC_GSI if ACPI
+ 	select ACPI_GTDT if ACPI
++	select ACPI_IORT if ACPI
+ 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
+ 	select ACPI_MCFG if ACPI
+ 	select ACPI_SPCR_TABLE if ACPI
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index 478f8ac..4a57b8f 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -39,7 +39,6 @@ config ARM_GIC_V3_ITS
+ 	bool
+ 	depends on PCI
+ 	depends on PCI_MSI
+-	select ACPI_IORT if ACPI
  
--static acpi_status
--iort_match_type_callback(struct acpi_iort_node *node, void *context)
--{
--	return AE_OK;
--}
--
--bool iort_node_match(u8 type)
--{
--	struct acpi_iort_node *node;
--
--	node = iort_scan_node(type, iort_match_type_callback, NULL);
--
--	return node != NULL;
--}
--
- static acpi_status iort_match_node_callback(struct acpi_iort_node *node,
- 					    void *context)
- {
-diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
-index 3ff9ace..8379d40 100644
---- a/include/linux/acpi_iort.h
-+++ b/include/linux/acpi_iort.h
-@@ -31,7 +31,6 @@ void iort_deregister_domain_token(int trans_id);
- struct fwnode_handle *iort_find_domain_token(int trans_id);
- #ifdef CONFIG_ACPI_IORT
- void acpi_iort_init(void);
--bool iort_node_match(u8 type);
- u32 iort_msi_map_rid(struct device *dev, u32 req_id);
- struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
- void acpi_configure_pmsi_domain(struct device *dev);
-@@ -41,7 +40,6 @@ void iort_set_dma_mask(struct device *dev);
- const struct iommu_ops *iort_iommu_configure(struct device *dev);
- #else
- static inline void acpi_iort_init(void) { }
--static inline bool iort_node_match(u8 type) { return false; }
- static inline u32 iort_msi_map_rid(struct device *dev, u32 req_id)
- { return req_id; }
- static inline struct irq_domain *iort_get_device_domain(struct device *dev,
+ config ARM_NVIC
+ 	bool
 -- 
 2.10.0
