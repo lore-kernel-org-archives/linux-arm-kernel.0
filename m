@@ -1,26 +1,42 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 14 Jun 2017 13:38:44 -0500
-Subject: [PATCH v3 3/3] drm/rockchip: dw_hdmi: introduce the pclk for grf
-In-Reply-To: <1496992247-10727-1-git-send-email-mark.yao@rock-chips.com>
-References: <1496992228-10582-1-git-send-email-mark.yao@rock-chips.com>
- <1496992247-10727-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <20170614183844.hd6ckfhtvn4x3eg2@rob-hp-laptop>
+From: joe@perches.com (Joe Perches)
+Date: Wed, 14 Jun 2017 11:59:34 -0700
+Subject: [PATCH] Staging: vc04_services: bcm2835-audio: bcm2835-ctl.c:
+ Fixed alignment to match open paranthesis.
+In-Reply-To: <1497449172-3904-1-git-send-email-srishtishar@gmail.com>
+References: <1497449172-3904-1-git-send-email-srishtishar@gmail.com>
+Message-ID: <1497466774.18751.64.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 09, 2017 at 03:10:46PM +0800, Mark Yao wrote:
-> For RK3399's GRF module, if we want to operate the graphic related grf
-> registers, we need to enable the pclk_vio_grf which supply power for VIO
-> GRF IOs, so it's better to introduce an optional grf clock in driver.
-> 
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-> ---
-> Changes in v3: none
-> Changes in v2: describe grf on Documentation.
-> 
->  .../bindings/display/rockchip/dw_hdmi-rockchip.txt     |  1 +
->  drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c            | 18 ++++++++++++++++++
->  2 files changed, 19 insertions(+)
+On Wed, 2017-06-14 at 19:36 +0530, srishti sharma wrote:
+> Fixed alignment so that it matched open paranthesis.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Please try to avoid typos in your commit message and as
+well try to do all of alignment warnings in a single patch.
+
+Ideally, all the files in a driver would be modified.
+
+$ ./scripts/checkpatch.pl -f drivers/staging/vc04_services/bcm2835-audio/*.[ch]??--types=parenthesis_alignment --terse
+drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:108: CHECK: Alignment should match open parenthesis
+drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:188: CHECK: Alignment should match open parenthesis
+drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:196: CHECK: Alignment should match open parenthesis
+drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:213: CHECK: Alignment should match open parenthesis
+drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:233: CHECK: Alignment should match open parenthesis
+drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:241: CHECK: Alignment should match open parenthesis
+drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:252: CHECK: Alignment should match open parenthesis
+drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:260: CHECK: Alignment should match open parenthesis
+drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:277: CHECK: Alignment should match open parenthesis
+total: 0 errors, 0 warnings, 9 checks, 426 lines checked
+drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:70: CHECK: Alignment should match open parenthesis
+drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:85: CHECK: Alignment should match open parenthesis
+drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:256: CHECK: Alignment should match open parenthesis
+drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:305: CHECK: Alignment should match open parenthesis
+drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:328: CHECK: Alignment should match open parenthesis
+drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:336: CHECK: Alignment should match open parenthesis
+drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:371: CHECK: Alignment should match open parenthesis
+drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:378: CHECK: Alignment should match open parenthesis
+drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:421: CHECK: Alignment should match open parenthesis
+drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:431: CHECK: Alignment should match open parenthesis
+drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:436: CHECK: Alignment should match open parenthesis
+drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:525: CHECK: Alignment should match open parenthesis
+total: 0 errors, 0 warnings, 12 checks, 567 lines checked
