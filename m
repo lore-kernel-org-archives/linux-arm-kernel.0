@@ -1,149 +1,39 @@
-From: Stefan.Schoefegger@ginzinger.com (=?iso-8859-1?Q?Sch=F6fegger_Stefan?=)
-Date: Wed, 14 Jun 2017 05:52:58 +0000
-Subject: [PATCH v2 1/1] PCI: imx6: Add pcie compliance test option
-In-Reply-To: <20170613135847.GA7128@bhelgaas-glaptop.roam.corp.google.com>
-References: <1472121518-9340-1-git-send-email-stefan.schoefegger@ginzinger.com>
- <2668097.SlerkO2uVy@en-pc05>
- <20170613135847.GA7128@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <1923573.HjpiSnITgW@en-pc05>
+From: logang@deltatee.com (Logan Gunthorpe)
+Date: Tue, 13 Jun 2017 23:55:37 -0600
+Subject: [Merge tag 'pci-v4.12-changes' of git] 857f864014: BUG: unable to
+ handle kernel NULL pointer dereference at 00000000000000a8
+In-Reply-To: <20170614050049.GA11630@kroah.com>
+References: <fe0543c1-cba6-02bb-36eb-395910bd5012@deltatee.com>
+ <20170612200852.GA28578@bhelgaas-glaptop.roam.corp.google.com>
+ <61e11e67-6c1b-ef1e-5fb8-a7c9efb17666@deltatee.com>
+ <20170613041842.GA13308@kroah.com>
+ <f6322f70-7ca7-abf6-b947-4cbbfd598948@deltatee.com>
+ <20170613043416.GB14217@kroah.com> <20170613043518.GA14621@kroah.com>
+ <8462abee-0a7f-00fb-6111-1f78362ea3f7@deltatee.com>
+ <20170613163508.GA31961@kroah.com>
+ <f848a5fb-096c-a025-cc3b-314cc3899f9e@deltatee.com>
+ <20170614050049.GA11630@kroah.com>
+Message-ID: <541d1104-6139-c902-ec91-943ec1e8a881@deltatee.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, June 13, 2017 8:58:47 AM CEST Bjorn Helgaas wrote:
-> On Tue, Jun 13, 2017 at 05:43:14AM +0000, Sch?fegger Stefan wrote:
-> > On Monday, June 12, 2017 6:49:24 PM CEST Bjorn Helgaas wrote:
-> > > On Wed, Jun 07, 2017 at 01:36:11PM +0200, Stefan Schoefegger wrote:
-> > > > Link speed must not be limited to gen1 during link test for compliance
-> > > > tests
-> > > > 
-> > > > Signed-off-by: Stefan Schoefegger <stefan.schoefegger@ginzinger.com>
-> > > > ---
-> > > > 
-> > > > Changes since v1:
-> > > >  - pci-imx6.c moved to dwc directory
-> > > >  
-> > > >  drivers/pci/dwc/Kconfig    | 10 ++++++++++
-> > > >  drivers/pci/dwc/pci-imx6.c | 21 ++++++++++++---------
-> > > >  2 files changed, 22 insertions(+), 9 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/pci/dwc/Kconfig b/drivers/pci/dwc/Kconfig
-> > > > index b7e15526d676..b6e9ced5a45d 100644
-> > > > --- a/drivers/pci/dwc/Kconfig
-> > > > +++ b/drivers/pci/dwc/Kconfig
-> > > > @@ -77,6 +77,16 @@ config PCI_IMX6
-> > > > 
-> > > >  	select PCIEPORTBUS
-> > > >  	select PCIE_DW_HOST
-> > > > 
-> > > > +config PCI_IMX6_COMPLIANCE_TEST
-> > > > +	bool "Enable pcie compliance tests on imx6"
-> > > > +	depends on PCI_IMX6
-> > > > +	default n
-> > > > +	help
-> > > > +	  Enables support for pcie compliance test on FSL iMX SoCs.
-> > > > +	  The link speed wouldn't be limited to gen1 when enabled.
-> > > > +	  Enable only during compliance tests, otherwise
-> > > > +	  link detection will fail on some peripherals.
-> > > 
-> > > I'm puzzled about why we would want to merge this patch.  It looks
-> > > like we're trying to game the system to make the device pass
-> > > compliance testing when it isn't really compliant.  Is this config
-> > > option useful to users, or is it only useful during internal
-> > > development of iMX SoCs?
-> > 
-> > It's not for passing compliance tests, it is necessary to do the
-> > compliance
-> > tests. Without this patch only gen 1 speed is possible to test. Also i.mx6
-> > is not fully gen2 compliant (withour external clk) we should have the
-> > option to do gen2 tests. Switching from gen1 to gen2 is done with a
-> > 100MHz (1ms) clk pulse on the receiver. Without this patch link speed is
-> > forced to gen1 afterwards.
-> 
-> I don't understand the purpose of this yet, so maybe all we need is a
-> better description.
 
-This patch enabled compliance tests for pcie gen2 published by pci-sig. 
-(Signal level, signal timing, jitter and rise/fall times on tx lines). Special 
-hardware is needed to do this tests (compliance load board, oszilloscope with 
-about 10GHz bandwith). The pcie phy switches in a complinace test state where 
-the phy outputs a special test pattern (without having a real link to a 
-device). The bitrate and de-emphasis must be switched. The driver (without 
-this patches) does not allow to switch to gen2 because it falls back to gen1. 
-It is impossible to generate the gen2 test pattern.
-The patch now removes the forced gen1 start to allow generating gen2 test 
-pattern. gen1 / gen2 switch is done through signals generated on the 
-compliance load board (which triggers switching in the phy).
-> 
-> "It's not for passing compliance testing, it is necessary to do the
-> compliance tests" doesn't make sense to me -- it seems
-> self-contradictory.
-> 
-> The Kconfig text says "enable only for testing because it makes link
-> detection fail."  To me that means this option is not useful for
-> users.  We need some justification for why it should be in the
-> mainline kernel, where users and distros may enable it.
 
-It use useless for users and distros. Only board designer want this option. If 
-this is not a reason for applying it's ok for me.
-> 
-> If you can only support gen2 in certain board configurations, maybe
-> you should add a config option that can always be enabled for those
-> boards.
-> 
-> > Yes it is only useful for board setup, it is comparable to
-> > CONFIG_USB_EHSET_TEST_FIXTURE for usb (ok, this is more general and not
-> > host specific).
-> 
-> USB_EHSET_TEST_FIXTURE (added by 1353aa53851e ("usb: misc: EHSET Test
-> Fixture device driver for host compliance")) looks like just another
-> driver in the sense that it's always safe to enable it and it doesn't
-> hurt anything if you enable it without having the hardware.
-> 
-> This patch doesn't seem comparable to USB_EHSET_TEST_FIXTURE because
-> this new option apparently breaks link detection in some cases.
+On 13/06/17 11:00 PM, Greg Kroah-Hartman wrote:
+> No, don't modify any drivers, do this in the core chardev code.
 
-This depends on the point of view (Black box vs. white box) :-) Both are for 
-doing compliance tests on signal level. But I think we don't need to discuss 
-this further.
-> 
-> > > >  config PCIE_SPEAR13XX
-> > > >  
-> > > >  	bool "STMicroelectronics SPEAr PCIe controller"
-> > > >  	depends on PCI
-> > > > 
-> > > > diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
-> > > > index 19a289b8cc94..b0fbe52e25b0 100644
-> > > > --- a/drivers/pci/dwc/pci-imx6.c
-> > > > +++ b/drivers/pci/dwc/pci-imx6.c
-> > > > @@ -533,15 +533,18 @@ static int imx6_pcie_establish_link(struct
-> > > > imx6_pcie
-> > > > *imx6_pcie)>
-> > > > 
-> > > >  	u32 tmp;
-> > > >  	int ret;
-> > > > 
-> > > > -	/*
-> > > > -	 * Force Gen1 operation when starting the link.  In case the link is
-> > > > -	 * started in Gen2 mode, there is a possibility the devices on the
-> > > > -	 * bus will not be detected at all.  This happens with PCIe
-> > > > switches.
-> > > > -	 */
-> > > > -	tmp = dw_pcie_readl_dbi(pci, PCIE_RC_LCR);
-> > > > -	tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
-> > > > -	tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1;
-> > > > -	dw_pcie_writel_dbi(pci, PCIE_RC_LCR, tmp);
-> > > > +	if (!IS_ENABLED(CONFIG_PCI_IMX6_COMPLIANCE_TEST)) {
-> > > > +		/*
-> > > > +		 * Force Gen1 operation when starting the link.  In case the
-> > > > +		 * link is started in Gen2 mode, there is a possibility the
-> > > > +		 * devices on the bus will not be detected at all.  This
-> > > > +		 * happens with PCIe switches.
-> > > > +		 */
-> > > > +		tmp = dw_pcie_readl_dbi(pci, PCIE_RC_LCR);
-> > > > +		tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
-> > > > +		tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1;
-> > > > +		dw_pcie_writel_dbi(pci, PCIE_RC_LCR, tmp);
-> > > > +	}
-> > > > 
-> > > >  	/* Start LTSSM. */
-> > > >  	if (imx6_pcie->variant == IMX7D)
+Ok, well then maybe I misunderstood what you originally asked for
+because I don't see how you can change a fixed allocation to a dynamic
+one without touching the driver code which needs to know the major that
+was assigned in the end.
+
+> At quick glance, looks good to me, care to clean it up and make it behind
+> a config option?
+
+Sure. However, is a config option really necessary here? As is, the
+extended dynamic region will only be used if there are too many chardev
+majors and it shouldn't have _any_ effect on users that have a small
+number. So it seems like not selecting that option is just telling the
+kernel to be broken for no obvious trade-off.
+
+Logan
