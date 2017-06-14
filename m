@@ -1,47 +1,62 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 14 Jun 2017 14:39:35 +0200
-Subject: [PATCH 14/23] clocksource/drivers: Rename CLOCKSOURCE_ACPI_DECLARE to
- TIMER_ACPI_DECLARE
-In-Reply-To: <1497443984-12371-1-git-send-email-daniel.lezcano@linaro.org>
-References: <20170614123800.GH2261@mai>
- <1497443984-12371-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1497443984-12371-14-git-send-email-daniel.lezcano@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 14 Jun 2017 08:05:52 -0500
+Subject: [PATCH v2 3/7] includes: dt-bindings: Rename STM32F429 pinctrl DT
+ bindings
+In-Reply-To: <832cd436-0704-3709-ba2c-2c1f6db48615@st.com>
+References: <1491568984-20169-1-git-send-email-alexandre.torgue@st.com>
+ <1491568984-20169-4-git-send-email-alexandre.torgue@st.com>
+ <20170410202736.zy7naw74hvrdmfzk@rob-hp-laptop>
+ <800a68a4-d6ce-212b-5849-56c9d32f891a@st.com>
+ <832cd436-0704-3709-ba2c-2c1f6db48615@st.com>
+Message-ID: <CAL_JsqJHFmamtr_o852fsbzq2S6V0i+xWi62=3HJ0w5F=3SG6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The macro name is now renamed to 'TIMER_ACPI_DECLARE' for consistency
-with the CLOCKSOURCE_OF_DECLARE => TIMER_OF_DECLARE change.
+On Wed, Jun 7, 2017 at 11:35 AM, Alexandre Torgue
+<alexandre.torgue@st.com> wrote:
+> Hi Rob,
+>
+> Gentle ping.
+>
+> On 04/12/2017 03:31 PM, Alexandre Torgue wrote:
+>>
+>> Hi Rob,
+>>
+>> On 04/10/2017 10:27 PM, Rob Herring wrote:
+>>>
+>>> On Fri, Apr 07, 2017 at 02:43:00PM +0200, Alexandre TORGUE wrote:
+>>>>
+>>>> STM32F4 MCU series is composed of several SOC (STM32F429, STM32F469,
+>>>> ...).
+>>>> Most of muxing definition are identical. So to avoid to duplicate
+>>>> bindings
+>>>> definition, this patch create common definitions.
+>>>
+>>>
+>>> This is a lot of churn. Some confirmation that the resultant dtb is the
+>>> same before and after would be nice. Perhaps the script you used to
+>>> convert this as well.
+>>
+>>
+>> I tried to use fdtdump but it seems bugged. So I used directly dtc
+>> binary to (re)generate dts files (before and after apply the series) and
+>> I compared "pinmux" field in both case.
+>>
+>> Example on stm32f469-disco:
+>>
+>> ./scripts/dtc/dtc -I dtb -O dts -o stm32f469-disco-after.dts
+>> stm32f469-disco-after.dtb
+>>
+>> ./scripts/dtc/dtc -I dtb -O dts -o stm32f469-disco-before.dts
+>> stm32f469-disco-before.dtb
+>>
+>> cat stm32f469-disco-after.dts | grep pinmux
+>> cat stm32f469-disco-before.dts | grep pinmux
+>>
+>
+> Do you agree with verifications ?
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/clocksource/arm_arch_timer.c | 2 +-
- include/linux/clocksource.h          | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+I would expect you do "diff -u stm32f469-disco-before.dts
+stm32f469-disco-after.dts".
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index bc60cd7..a89d41c 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -1516,5 +1516,5 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- 
- 	return arch_timer_common_init();
- }
--CLOCKSOURCE_ACPI_DECLARE(arch_timer, ACPI_SIG_GTDT, arch_timer_acpi_init);
-+TIMER_ACPI_DECLARE(arch_timer, ACPI_SIG_GTDT, arch_timer_acpi_init);
- #endif
-diff --git a/include/linux/clocksource.h b/include/linux/clocksource.h
-index 010bb9f..e43f37f 100644
---- a/include/linux/clocksource.h
-+++ b/include/linux/clocksource.h
-@@ -258,7 +258,7 @@ extern void timer_probe(void);
- static inline void timer_probe(void) {}
- #endif
- 
--#define CLOCKSOURCE_ACPI_DECLARE(name, table_id, fn)		\
-+#define TIMER_ACPI_DECLARE(name, table_id, fn)		\
- 	ACPI_DECLARE_PROBE_ENTRY(clksrc, name, table_id, 0, NULL, 0, fn)
- 
- #endif /* _LINUX_CLOCKSOURCE_H */
--- 
-2.7.4
+Rob
