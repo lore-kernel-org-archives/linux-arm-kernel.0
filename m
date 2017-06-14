@@ -1,63 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 14 Jun 2017 11:42:30 +0100
-Subject: [PATCH v8 6/9] drivers: perf: hisi: Add support for Hisilicon
- Djtag driver
-In-Reply-To: <20170614100658.GE16190@arm.com>
-References: <1495457312-237127-1-git-send-email-zhangshaokun@hisilicon.com>
- <20170608163519.GA19643@leverpostej>
- <8666a0fa-126d-e4a3-ac4b-7962f5d79942@huawei.com>
- <20170609143050.GM13955@arm.com>
- <0fbf57f0-9ff7-4fd4-07c7-c5e86028a7d2@huawei.com>
- <20170614100658.GE16190@arm.com>
-Message-ID: <20170614104230.GC6085@leverpostej>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 14 Jun 2017 12:43:53 +0200
+Subject: [PATCH v2 0/2] arm64: fix crash when reading /proc/kcore
+Message-ID: <1497437035-11979-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 14, 2017 at 11:06:58AM +0100, Will Deacon wrote:
-> Apologies, I misunderstood your algorithm (I thought step (a) was on one CPU
-> and step (b) was on another). Still, I don't understand the need for the
-> timeout. If you instead read back the flag immediately, wouldn't it still
-> work? e.g.
->
->
-> lock:
->   Readl_relaxed flag
->   if (locked)
->     goto lock;
->
->   Writel_relaxed unique ID to flag
->   Readl flag
->   if (locked by somebody else)
->     goto lock;
->
-> <critical section>
->
-> unlock:
->   Writel unlocked value to flag
->
->
-> Given that we're dealing with iomem, I think it will work, but I could be
-> missing something obvious.
+This is a follow-up to patches from zhonjiang [0] and myself [1] that aim
+to solve a problem in the kcore code, which gets confused by the presence
+of block mappings in the vmalloc region.
 
-Don't we have the race below where both threads can enter the critical
-section?
+While fixing the crash is quite straight forward [2], we need to tweak
+the kcore code itself to ensure that it operates correctly on arm64.
+Fortunately, we can achieve this with two very simple changes:
 
-        // flag f initial zero (unlocked)
+- replace a call to is_vmalloc_or_module_addr() in read_kcore() with a
+  comparison of the kclist type field (#1)
+- enable CONFIG_ARCH_PROC_KCORE_TEXT for arm64 (#2)
 
-        // t1, flag 1                   // t2, flag 2
-        readl(f); // reads 0            l = readl(f); // reads 0
+[0] http://marc.info/?l=linux-mm&m=149632393629295&w=2
+[1] http://marc.info/?l=linux-mm&m=149685966530180&w=2
+[2] http://marc.info/?l=linux-mm&m=149694975123959&w=2
 
-        <thinks lock is free>           <thinks lock is free>
+v2: add acks only, no code changes
 
-        writel(1, f);
-        readl(f); // reads 1
-        <thinks lock owned>
-                                        writel(2, f);
-                                        readl(f) // reads 2
-                                        <thinks lock owned>
+Will, Catalin, could you queue these for v4.13 please?
 
-        <crticial section>              <critical section>
+Ard Biesheuvel (2):
+  fs/proc: kcore: use kcore_list type to check for vmalloc/module
+    address
+  arm64: mm: select CONFIG_ARCH_PROC_KCORE_TEXT
 
-Thanks,
-Mark.
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+ arch/arm64/Kconfig | 3 +++
+ fs/proc/kcore.c    | 2 +-
+ 2 files changed, 4 insertions(+), 1 deletion(-)
+
+-- 
+2.7.4
