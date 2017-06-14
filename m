@@ -1,49 +1,72 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 14 Jun 2017 18:35:37 +0200
-Subject: [PATCH v4 10/11] dt-bindings: orion-mdio: document the new xmdio
- compatible
-In-Reply-To: <20170614154911.14510-11-antoine.tenart@free-electrons.com>
-References: <20170614154911.14510-1-antoine.tenart@free-electrons.com>
- <20170614154911.14510-11-antoine.tenart@free-electrons.com>
-Message-ID: <20170614163537.GO15847@lunn.ch>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 14 Jun 2017 17:37:13 +0100
+Subject: [PATCH 2/2] ACPI/IORT: Remove iort_node_match()
+In-Reply-To: <20170614163713.14574-1-lorenzo.pieralisi@arm.com>
+References: <20170614163713.14574-1-lorenzo.pieralisi@arm.com>
+Message-ID: <20170614163713.14574-2-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 14, 2017 at 05:49:10PM +0200, Antoine Tenart wrote:
-> A new compatible for Marvell xMDIO interfaces was added into the Marvell
-> MDIO driver. Document this new compatible.
-> 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/net/marvell-orion-mdio.txt | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt b/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt
-> index ccdabdcc8618..b93a5b5a0472 100644
-> --- a/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt
-> +++ b/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt
-> @@ -1,12 +1,12 @@
->  * Marvell MDIO Ethernet Controller interface
->  
->  The Ethernet controllers of the Marvel Kirkwood, Dove, Orion5x,
-> -MV78xx0, Armada 370 and Armada XP have an identical unit that provides
-> -an interface with the MDIO bus. This driver handles this MDIO
-> -interface.
-> +MV78xx0, Armada 370, Armada XP, Armada 7k and Armada 8k have an
-> +identical unit that provides an interface with the MDIO bus or
-> +with the xMDIO bus. This driver handles these interfaces.
+Commit 316ca8804ea8 ("ACPI/IORT: Remove linker section for IORT entries
+probing") removed the linker section for IORT entries probing.
 
-Hi Antoine
+Since those IORT entries were the only iort_node_match() interface
+users, the iort_node_match() became obsolete and can then be removed.
 
-This patches is looking good now. One nit. The description above
-suggests Kirkwood, Dove, Orion5x, MV78xx0, Armada 370 and Armada XP
-all have xmdio. Maybe better wording would be:
+Remove the ACPI IORT iort_node_match() interface from the kernel.
 
-The Ethernet controllers of the Marvel Kirkwood, Dove, Orion5x,
-MV78xx0, Armada 370, Armada XP, Armada 7k and Armada 8k have an
-identical unit that provides an interface with the MDIO bus.
-Additionally, Armada 7k and Armada 8k has a second unit which
-provides an interface with the xMDIO bus. This driver handles
-these interfaces.
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Hanjun Guo <hanjun.guo@linaro.org>
+---
+ drivers/acpi/arm64/iort.c | 15 ---------------
+ include/linux/acpi_iort.h |  2 --
+ 2 files changed, 17 deletions(-)
 
-      Andrew
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index 797b28d..d048f72 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -234,21 +234,6 @@ static struct acpi_iort_node *iort_scan_node(enum acpi_iort_node_type type,
+ 	return NULL;
+ }
+ 
+-static acpi_status
+-iort_match_type_callback(struct acpi_iort_node *node, void *context)
+-{
+-	return AE_OK;
+-}
+-
+-bool iort_node_match(u8 type)
+-{
+-	struct acpi_iort_node *node;
+-
+-	node = iort_scan_node(type, iort_match_type_callback, NULL);
+-
+-	return node != NULL;
+-}
+-
+ static acpi_status iort_match_node_callback(struct acpi_iort_node *node,
+ 					    void *context)
+ {
+diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
+index 3ff9ace..8379d40 100644
+--- a/include/linux/acpi_iort.h
++++ b/include/linux/acpi_iort.h
+@@ -31,7 +31,6 @@ void iort_deregister_domain_token(int trans_id);
+ struct fwnode_handle *iort_find_domain_token(int trans_id);
+ #ifdef CONFIG_ACPI_IORT
+ void acpi_iort_init(void);
+-bool iort_node_match(u8 type);
+ u32 iort_msi_map_rid(struct device *dev, u32 req_id);
+ struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
+ void acpi_configure_pmsi_domain(struct device *dev);
+@@ -41,7 +40,6 @@ void iort_set_dma_mask(struct device *dev);
+ const struct iommu_ops *iort_iommu_configure(struct device *dev);
+ #else
+ static inline void acpi_iort_init(void) { }
+-static inline bool iort_node_match(u8 type) { return false; }
+ static inline u32 iort_msi_map_rid(struct device *dev, u32 req_id)
+ { return req_id; }
+ static inline struct irq_domain *iort_get_device_domain(struct device *dev,
+-- 
+2.10.0
