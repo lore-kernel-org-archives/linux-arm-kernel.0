@@ -1,57 +1,32 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Wed, 14 Jun 2017 16:23:27 +0800
-Subject: [PATCH v3 10/21] arm64: dts: hi3660: add power key dts node
+Date: Wed, 14 Jun 2017 16:23:36 +0800
+Subject: [PATCH v3 19/21] dt-bindings: mmc: dw_mmc-k3: add document of hi3660
+ mmc
 In-Reply-To: <20170614082338.15673-1-guodong.xu@linaro.org>
 References: <20170614082338.15673-1-guodong.xu@linaro.org>
-Message-ID: <20170614082338.15673-11-guodong.xu@linaro.org>
+Message-ID: <20170614082338.15673-20-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chen Jun <chenjun14@huawei.com>
+Add bindings for hi3660 mmc support
 
-We use gpio_034 as power key on hikey960, and set gpio with pull-up
-state, when key press the voltage on the gpio will come to lower, and
-power key event will be reported.
-
-Signed-off-by: Chen Jun <chenjun14@huawei.com>
-Signed-off-by: John Stultz <john.stultz@linaro.org>
+Signed-off-by: Li Wei <liwei213@huawei.com>
 Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
 ---
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-index c25fff9..7aac35b 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-@@ -10,6 +10,8 @@
- #include "hi3660.dtsi"
- #include "hikey960-pinctrl.dtsi"
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
+diff --git a/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
+index df37058..8af1afc 100644
+--- a/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
++++ b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
+@@ -12,6 +12,7 @@ extensions to the Synopsys Designware Mobile Storage Host Controller.
+ Required Properties:
  
- / {
- 	model = "HiKey960";
-@@ -34,6 +36,19 @@
- 		/* rewrite this at bootloader */
- 		reg = <0x0 0x0 0x0 0x0>;
- 	};
-+
-+	keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwr_key_pmx_func &pwr_key_cfg_func>;
-+
-+		power {
-+			wakeup-source;
-+			gpios = <&gpio4 2 GPIO_ACTIVE_LOW>;
-+			label = "GPIO Power";
-+			linux,code = <KEY_POWER>;
-+		};
-+	};
- };
+ * compatible: should be one of the following.
++  - "hisilicon,hi3660-dw-mshc": for controllers with hi3660 specific extensions.
+   - "hisilicon,hi4511-dw-mshc": for controllers with hi4511 specific extensions.
+   - "hisilicon,hi6220-dw-mshc": for controllers with hi6220 specific extensions.
  
- &i2c0 {
 -- 
 2.10.2
