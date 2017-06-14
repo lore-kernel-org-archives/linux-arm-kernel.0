@@ -1,42 +1,56 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Jun 2017 00:31:17 -0700
-Subject: [PATCH 6/7] ARM: debug: Update port descriptions for omap variants
-In-Reply-To: <20170614073118.28246-1-tony@atomide.com>
-References: <20170614073118.28246-1-tony@atomide.com>
-Message-ID: <20170614073118.28246-7-tony@atomide.com>
+From: guy.shapiro@mobi-wize.com (Guy Shapiro)
+Date: Wed, 14 Jun 2017 10:35:12 +0300
+Subject: [PATCH v5 1/3] nvmem: dt: document SNVS LPGPR binding
+In-Reply-To: <20170609125730.25502-2-o.rempel@pengutronix.de>
+References: <20170609125730.25502-1-o.rempel@pengutronix.de>
+ <20170609125730.25502-2-o.rempel@pengutronix.de>
+Message-ID: <442e0336-fbd3-f92c-ab6a-0622c710e232@mobi-wize.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks like we're still missing omap4-sdk naming that Russell
-already pointed out long time ago. And we're also missing
-am437x that works with the am335x port. And omap5-uevm naming
-is wrong.
+On 09/06/2017 15:57, Oleksij Rempel wrote:
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/Kconfig.debug | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> Documentation bindings for the Low Power General Purpose Register
+> available on i.MX6 SoCs in the Secure Non-Volatile Storage.
+>
+> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+> ---
+>  .../devicetree/bindings/nvmem/snvs-lpgpr.txt          | 19
+> +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
+>
+> diff --git a/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
+> b/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
+> new file mode 100644
+> index 000000000000..21910fb3159f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
+> @@ -0,0 +1,19 @@
+> +Device tree bindings for Low Power General Purpose Register found in
+> i.MX6Q/D
+> +Secure Non-Volatile Storage.
+> +
+> +This DT node should be represented as a sub-node of a "syscon",
+> +"simple-mfd" node.
+> +
+> +Required properties:
+> +- compatible: should be:
+> +	"fsl,imx6q-snvs-lpgpr" for Freescale i.MX6Q/D/DL/S
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -671,7 +671,7 @@ choice
- 		  and 3517evm.
- 
- 	config DEBUG_OMAP4UART3
--		bool "Kernel low-level debugging messages via OMAP4/5 UART3 (omap4 blaze, panda, omap5 sevm)"
-+		bool "Kernel low-level debugging messages via OMAP4/5 UART3 (omap4-evm, blaze, panda, omap5-uevm)"
- 		depends on ARCH_OMAP2PLUS
- 		select DEBUG_UART_8250
- 
-@@ -725,7 +725,7 @@ choice
- 		select DEBUG_UART_8250
- 
- 	config DEBUG_AM33XXUART1
--		bool "Kernel low-level debugging messages via AM33XX UART1"
-+		bool "Kernel low-level debugging messages via AM33XX/AM437X UART1"
- 		depends on ARCH_OMAP2PLUS
- 		select DEBUG_UART_8250
- 
--- 
-2.13.0
+I've tested the basic functionality on i.MX6UL. It seems to work as is.
+Please add "/UL" on the next version.
+
+Regards,
+Guy
+
+> +
+> +Example:
+> +snvs: snvs at 020cc000 {
+> +	compatible = "fsl,sec-v4.0-mon", "syscon", "simple-mfd";
+> +	reg = <0x020cc000 0x4000>;
+> +
+> +	snvs_lpgpr: snvs-lpgpr {
+> +		compatible = "fsl,imx6q-snvs-lpgpr";
+> +	};
+> +};
