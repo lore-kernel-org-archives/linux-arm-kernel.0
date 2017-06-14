@@ -1,58 +1,49 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 14 Jun 2017 17:37:12 +0100
-Subject: [PATCH 1/2] ARM64/irqchip: Update ACPI_IORT symbol selection logic
-Message-ID: <20170614163713.14574-1-lorenzo.pieralisi@arm.com>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Wed, 14 Jun 2017 09:45:43 -0700
+Subject: [PATCH 00/11] ARM: dts: imx6qdl: video capture support
+In-Reply-To: <20170614150938.GB30112@dragon>
+References: <1497291844-14632-1-git-send-email-steve_longerbeam@mentor.com>
+ <20170614150938.GB30112@dragon>
+Message-ID: <c88b7808-7387-4702-dc51-960a691feb40@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ACPI IORT is an ACPI addendum to describe the connection topology of
-devices with IOMMUs and interrupt controllers on ARM64 ACPI systems.
 
-Currently the ACPI IORT Kbuild symbol is selected whenever the Kbuild
-symbol ARM_GIC_V3_ITS is enabled, which in turn is selected by ARM64
-Kbuild defaults. This makes the logic behind ACPI_IORT selection a bit
-twisted and not easy to follow. On ARM64 systems enabling ACPI the
-kbuild symbol ACPI_IORT should always be selected in that it is a kernel
-layer provided to the ARM64 arch code to parse and enable ACPI firmware
-bindings.
 
-Make the ACPI_IORT selection explicit in ARM64 Kbuild and remove the
-selection from ARM_GIC_V3_ITS entry, making the ACPI_IORT selection
-logic clearer to follow.
+On 06/14/2017 08:09 AM, Shawn Guo wrote:
+> On Mon, Jun 12, 2017 at 11:23:53AM -0700, Steve Longerbeam wrote:
+>> This series defines the i.MX6 internal video multiplexers and MIPI CSI-2
+>> receiver device nodes, and their connections to eachother and the i.MX6
+>> IPU CSI ports.
+>>
+>> It also implements video capture support on the SabreLite, SabreSD, and
+>> SabreAuto reference platforms, by defining the video sensor nodes on those
+>> platforms, and their connections to the video muxes and MIPI CSI-2 receiver.
+>>
+>> There should not be much of anything controversial in this series. The
+>> imx-media driver is set to be merged in time for 4.13, so please accept
+>> this series soon.
+>>
+>>
+>> Philipp Zabel (2):
+>>    ARM: dts: imx6qdl: add multiplexer controls
+>>    ARM: dts: imx6qdl: Add video multiplexers, mipi_csi, and their
+>>      connections
+>>
+>> Steve Longerbeam (9):
+>>    ARM: dts: imx6qdl: Add compatible, clocks, irqs to MIPI CSI-2 node
+>>    ARM: dts: imx6qdl: add capture-subsystem device
+>>    ARM: dts: imx6qdl-sabrelite: remove erratum ERR006687 workaround
+>>    ARM: dts: imx6-sabrelite: add OV5642 and OV5640 camera sensors
+>>    ARM: dts: imx6-sabresd: add OV5642 and OV5640 camera sensors
+>>    ARM: dts: imx6-sabreauto: create i2cmux for i2c3
+>>    ARM: dts: imx6-sabreauto: add reset-gpios property for max7310_b
+>>    ARM: dts: imx6-sabreauto: add pinctrl for gpt input capture
+>>    ARM: dts: imx6-sabreauto: add the ADV7180 video decoder
+> 
+> Applied all, thanks.
+> 
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/Kconfig      | 1 +
- drivers/irqchip/Kconfig | 1 -
- 2 files changed, 1 insertion(+), 1 deletion(-)
+Thanks Shawn!
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index b2024db..2424fb4 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -3,6 +3,7 @@ config ARM64
- 	select ACPI_CCA_REQUIRED if ACPI
- 	select ACPI_GENERIC_GSI if ACPI
- 	select ACPI_GTDT if ACPI
-+	select ACPI_IORT if ACPI
- 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
- 	select ACPI_MCFG if ACPI
- 	select ACPI_SPCR_TABLE if ACPI
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index 478f8ac..4a57b8f 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -39,7 +39,6 @@ config ARM_GIC_V3_ITS
- 	bool
- 	depends on PCI
- 	depends on PCI_MSI
--	select ACPI_IORT if ACPI
- 
- config ARM_NVIC
- 	bool
--- 
-2.10.0
+Steve
