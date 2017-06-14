@@ -1,77 +1,81 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 14 Jun 2017 11:50:58 +0100
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 14 Jun 2017 11:48:07 +0100
 Subject: [PATCH v8 6/9] drivers: perf: hisi: Add support for Hisilicon
  Djtag driver
-In-Reply-To: <20170614104230.GC6085@leverpostej>
+In-Reply-To: <20170614100658.GE16190@arm.com>
 References: <1495457312-237127-1-git-send-email-zhangshaokun@hisilicon.com>
  <20170608163519.GA19643@leverpostej>
  <8666a0fa-126d-e4a3-ac4b-7962f5d79942@huawei.com>
  <20170609143050.GM13955@arm.com>
  <0fbf57f0-9ff7-4fd4-07c7-c5e86028a7d2@huawei.com>
  <20170614100658.GE16190@arm.com>
- <20170614104230.GC6085@leverpostej>
-Message-ID: <20170614105057.GA7236@leverpostej>
+Message-ID: <20170614104806.GF4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 14, 2017 at 11:42:30AM +0100, Mark Rutland wrote:
-> On Wed, Jun 14, 2017 at 11:06:58AM +0100, Will Deacon wrote:
-> > Apologies, I misunderstood your algorithm (I thought step (a) was on one CPU
-> > and step (b) was on another). Still, I don't understand the need for the
-> > timeout. If you instead read back the flag immediately, wouldn't it still
-> > work? e.g.
-> >
-> >
-> > lock:
-> >   Readl_relaxed flag
-> >   if (locked)
-> >     goto lock;
-> >
-> >   Writel_relaxed unique ID to flag
-> >   Readl flag
-> >   if (locked by somebody else)
-> >     goto lock;
-> >
-> > <critical section>
-> >
-> > unlock:
-> >   Writel unlocked value to flag
-> >
-> >
-> > Given that we're dealing with iomem, I think it will work, but I could be
-> > missing something obvious.
+On Wed, Jun 14, 2017 at 11:06:58AM +0100, Will Deacon wrote:
+> Apologies, I misunderstood your algorithm (I thought step (a) was on one CPU
+> and step (b) was on another). Still, I don't understand the need for the
+> timeout. If you instead read back the flag immediately, wouldn't it still
+> work? e.g.
 > 
-> Don't we have the race below where both threads can enter the critical
-> section?
 > 
->         // flag f initial zero (unlocked)
+> lock:
+>   Readl_relaxed flag
+>   if (locked)
+>     goto lock;
 > 
->         // t1, flag 1                   // t2, flag 2
->         readl(f); // reads 0            l = readl(f); // reads 0
+>   Writel_relaxed unique ID to flag
+>   Readl flag
+>   if (locked by somebody else)
+>     goto lock;
 > 
->         <thinks lock is free>           <thinks lock is free>
+> <critical section>
 > 
->         writel(1, f);
->         readl(f); // reads 1
->         <thinks lock owned>
->                                         writel(2, f);
->                                         readl(f) // reads 2
->                                         <thinks lock owned>
-> 
->         <crticial section>              <critical section>
-> 
-> Thanks,
-> Mark.
+> unlock:
+>   Writel unlocked value to flag
 
-> IMPORTANT NOTICE: The contents of this email and any attachments are
-> confidential and may also be privileged. If you are not the intended
-> recipient, please notify the sender immediately and do not disclose
-> the contents to any other person, use it for any purpose, or store or
-> copy the information in any medium. Thank you.
+I think the delay is to counter this:
 
-Please ignore the disclaimer on this mail; my client was mis-configured.
+	Agent 1			Agent 2
+	read flag
+	not locked
+				read flag
+				not locked
+	write unique ID
+	read back
+	not locked by someone else
+				write unique ID
+				read back
+				not locked by someone else
 
-I will ensure I avoid sending bogus disclaimers in future.
+With the delay present, this becomes:
 
-Thanks,
-Mark.
+	Agent 1			Agent 2
+	read flag
+	not locked
+				read flag
+				not locked
+	write unique ID
+	delay
+				write unique ID
+				delay
+	read back
+	locked by agent 2
+				read back
+				not locked by someone else
+
+For this to work, the delay has to be guaranteed to be greater than
+the maximum duration that any agent takes between the initial read
+and the write of its unique ID.  The delay doesn't even have to be
+identical between each agent, it just has to satisfy that condition.
+
+The key thing though is that the reads and writes must happen when
+the program intends them to, so I don't think the _relaxed variants
+should be used here.  If they're buffered, then the delay doesn't
+have the desired effect.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
