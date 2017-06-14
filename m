@@ -1,79 +1,50 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Wed, 14 Jun 2017 16:23:32 +0800
-Subject: [PATCH v3 15/21] dt-bindings: PCI: hisi: Add document for PCIe of
- Kirin SoCs
+Date: Wed, 14 Jun 2017 16:23:30 +0800
+Subject: [PATCH v3 13/21] arm64: dts: hi3660: add sp804 timer node
 In-Reply-To: <20170614082338.15673-1-guodong.xu@linaro.org>
 References: <20170614082338.15673-1-guodong.xu@linaro.org>
-Message-ID: <20170614082338.15673-16-guodong.xu@linaro.org>
+Message-ID: <20170614082338.15673-14-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xiaowei Song <songxiaowei@hisilicon.com>
+From: Leo Yan <leo.yan@linaro.org>
 
-This patch adds document for PCIe of Kirin SoC series.
+The Hi3660 SoC comes with the sp804 timer in addition to the
+architecture timers. These ones are shutdown when reaching a deep idle
+states and a backup timer is needed. The sp804 belongs to another power
+domain and can fulfill the purpose of replacing temporarily an
+architecture timer when the CPU is idle.
 
-Signed-off-by: Xiaowei Song <songxiaowei@hisilicon.com>
-Acked-by: Rob Herring <robh@kernel.org>
+Describe it in the device tree, so it can be enabled at boot time.
+
+Suggested-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
 ---
- .../devicetree/bindings/pci/kirin-pcie.txt         | 50 ++++++++++++++++++++++
- 1 file changed, 50 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pci/kirin-pcie.txt
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pci/kirin-pcie.txt b/Documentation/devicetree/bindings/pci/kirin-pcie.txt
-new file mode 100644
-index 0000000..68ffa0f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pci/kirin-pcie.txt
-@@ -0,0 +1,50 @@
-+HiSilicon Kirin SoCs PCIe host DT description
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+index a6b91f1..e138973 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+@@ -186,6 +186,17 @@
+ 			#reset-cells = <2>;
+ 		};
+ 
++		dual_timer0: timer at fff14000 {
++			compatible = "arm,sp804", "arm,primecell";
++			reg = <0x0 0xfff14000 0x0 0x1000>;
++			interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&crg_ctrl HI3660_OSC32K>,
++				 <&crg_ctrl HI3660_OSC32K>,
++				 <&crg_ctrl HI3660_OSC32K>;
++			clock-names = "timer1", "timer2", "apb_pclk";
++		};
 +
-+Kirin PCIe host controller is based on Designware PCI core.
-+It shares common functions with PCIe Designware core driver
-+and inherits common properties defined in
-+Documentation/devicetree/bindings/pci/designware-pci.txt.
-+
-+Additional properties are described here:
-+
-+Required properties
-+- compatible:
-+	"hisilicon,kirin960-pcie" for PCIe of Kirin960 SoC
-+- reg: Should contain rc_dbi, apb, phy, config registers location and length.
-+- reg-names: Must include the following entries:
-+  "dbi": controller configuration registers;
-+  "apb": apb Ctrl register defined by Kirin;
-+  "phy": apb PHY register defined by Kirin;
-+  "config": PCIe configuration space registers.
-+- reset-gpios: The gpio to generate PCIe perst assert and deassert signal.
-+
-+Optional properties:
-+
-+Example based on kirin960:
-+
-+	pcie at f4000000 {
-+		compatible = "hisilicon,kirin-pcie";
-+		reg = <0x0 0xf4000000 0x0 0x1000>, <0x0 0xff3fe000 0x0 0x1000>,
-+		      <0x0 0xf3f20000 0x0 0x40000>, <0x0 0xF4000000 0 0x2000>;
-+		reg-names = "dbi","apb","phy", "config";
-+		bus-range = <0x0  0x1>;
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		device_type = "pci";
-+		ranges = <0x02000000 0x0 0x00000000 0x0 0xf5000000 0x0 0x2000000>;
-+		num-lanes = <1>;
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0xf800 0 0 7>;
-+		interrupt-map = <0x0 0 0 1 &gic 0 0 0  282 4>,
-+				<0x0 0 0 2 &gic 0 0 0  283 4>,
-+				<0x0 0 0 3 &gic 0 0 0  284 4>,
-+				<0x0 0 0 4 &gic 0 0 0  285 4>;
-+		clocks = <&crg_ctrl HI3660_PCIEPHY_REF>,
-+			 <&crg_ctrl HI3660_CLK_GATE_PCIEAUX>,
-+			 <&crg_ctrl HI3660_PCLK_GATE_PCIE_PHY>,
-+			 <&crg_ctrl HI3660_PCLK_GATE_PCIE_SYS>,
-+			 <&crg_ctrl HI3660_ACLK_GATE_PCIE>;
-+		clock-names = "pcie_phy_ref", "pcie_aux",
-+			      "pcie_apb_phy", "pcie_apb_sys", "pcie_aclk";
-+		reset-gpios = <&gpio11 1 0 >;
-+	};
+ 		i2c0: i2c at ffd71000 {
+ 			compatible = "snps,designware-i2c";
+ 			reg = <0x0 0xffd71000 0x0 0x1000>;
 -- 
 2.10.2
