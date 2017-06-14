@@ -1,48 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Jun 2017 13:59:43 +0200
-Subject: [PATCH] tee: add forward declaration for struct device
-In-Reply-To: <8f026b3a-9b5f-f819-817e-db812a02c129@linaro.org>
-References: <6344683a299d05692ed64ddb963343ea9547add4.1496229347.git.jerome.forissier@linaro.org>
- <2bcbf7b0-7dba-7e72-72fd-4da922e442bb@linaro.org> <20170614094610.GA12598@jax>
- <CAK8P3a05K_POUxrNcyA7LVGB5qGBKmzvp-++TcLVFB2JWDdseA@mail.gmail.com>
- <8f026b3a-9b5f-f819-817e-db812a02c129@linaro.org>
-Message-ID: <CAK8P3a1--+tTbe3TXLjdBP2e85_3294_MTDUy2Y5ceQ7eOOHnQ@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed, 14 Jun 2017 14:05:44 +0200
+Subject: [PATCH v3 1/3] dt-bindings: arm: amlogic: Add SoC information bindings
+In-Reply-To: <1497441946-24379-1-git-send-email-narmstrong@baylibre.com>
+References: <1497441946-24379-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1497441946-24379-2-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 14, 2017 at 1:06 PM, Jerome Forissier
-<jerome.forissier@linaro.org> wrote:
-> On 06/14/2017 01:01 PM, Arnd Bergmann wrote:
->> On Wed, Jun 14, 2017 at 11:46 AM, Jens Wiklander
->> <jens.wiklander@linaro.org> wrote:
->>> On Wed, Jun 14, 2017 at 11:39:50AM +0200, Jerome Forissier wrote:
->>>> [+Arnd]
->>>>
->>>> Ping?
->>>>
->>>> Thanks,
->>>> --
->>>> Jerome
->>>>
->>>> On 05/31/2017 01:21 PM, Jerome Forissier wrote:
->>>>> tee_drv.h references struct device, but does not include device.h nor
->>>>> platform_device.h. Therefore, if tee_drv.h is included by some file
->>>>> that does not pull device.h nor platform_device.h beforehand, we have a
->>>>> compile warning. Fix this by adding a forward declaration.
->>>>>
->>>>> Signed-off-by: Jerome Forissier <jerome.forissier@linaro.org>
->>
->> Acked-by: Arnd Bergmann <arnd@arndb.de>
->>
->> Do we need this to fix a warning in mainline, in linux-next, or only
->> in combination with some other patches?
->
-> Only with some other patches.
+Add bindings for the SoC information register of the Amlogic SoCs.
 
-Ok, in that case, Jens can just queue up the patch in his tree now,
-and it will be there in time when other patches get applied on top,
-no need to have this in arm-soc by itself.
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ Documentation/devicetree/bindings/arm/amlogic.txt | 29 +++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-Thanks,
-
-        Arnd
+diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
+index 5c01e65..a6d8754 100644
+--- a/Documentation/devicetree/bindings/arm/amlogic.txt
++++ b/Documentation/devicetree/bindings/arm/amlogic.txt
+@@ -60,3 +60,32 @@ Board compatible values (alphabetically, grouped by SoC):
+   - "amlogic,q201" (Meson gxm s912)
+   - "kingnovel,r-box-pro" (Meson gxm S912)
+   - "nexbox,a1" (Meson gxm s912)
++
++Amlogic Meson Firmware registers Interface
++------------------------------------------
++
++The Meson SoCs have a register bank with status and data shared with the
++secure firmware.
++
++Required properties:
++ - compatible: For Meson GX SoCs, must be "amlogic,meson-gx-ao-secure", "syscon"
++
++Properties should indentify components of this register interface :
++
++Meson GX SoC Information
++------------------------
++A firmware register encodes the SoC type, package and revision information on
++the Meson GX SoCs.
++If present, the following property should be added :
++
++Optional properties:
++  - has-chip-id: If present, the interface gives the current SoC version.
++
++Example
++-------
++
++ao-secure at 140 {
++	compatible = "amlogic,meson-gx-ao-secure", "syscon";
++	reg = <0x0 0x140 0x0 0x140>;
++	has-chip-id;
++};
+-- 
+1.9.1
