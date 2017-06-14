@@ -1,25 +1,38 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 14 Jun 2017 11:00:48 +0200
-Subject: [PATCH 0/2] arm64: dts: renesas: Add reset control properties
- for audio
-In-Reply-To: <1497259937-9387-1-git-send-email-geert+renesas@glider.be>
-References: <1497259937-9387-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20170614090047.GE26958@verge.net.au>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 14 Jun 2017 11:04:39 +0200
+Subject: [linux-sunxi] Re: [PATCH 1/2] dmaengine: sun6i: make gate bit in
+ sun8i's DMA engines a common quirk
+In-Reply-To: <20170614084529.GL13020@localhost>
+References: <20170605123348.26137-1-icenowy@aosc.io>
+ <20170605123348.26137-2-icenowy@aosc.io>
+ <20170614083252.GK13020@localhost>
+ <AD656BCC-5064-454F-9576-FA59283E0C45@aosc.io>
+ <20170614084529.GL13020@localhost>
+Message-ID: <20170614090439.rkdaoo3uqzjqwuxq@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 12, 2017 at 11:32:15AM +0200, Geert Uytterhoeven wrote:
-> 	Hi Simon, Magnus, Morimoto-san,
+On Wed, Jun 14, 2017 at 02:15:29PM +0530, Vinod Koul wrote:
+> > SoC info is in compatible, so there's no reason to make it a property.
 > 
-> This patch series describes all resets wired to the audio modules on
-> R-Car Gen3 SoCs, following the DT binding update in commit
-> 5f440c48c5d5a11f ("ASoC: rsnd: Document optional reset properties") in
-> sound-asoc/for-next.
-> 
-> Thanks!
-> 
-> Geert Uytterhoeven (2):
->   arm64: dts: r8a7795: Add reset control properties for audio
->   arm64: dts: r8a7796: Add reset control properties for audio
+> that's why it would need to be optional for the SoC's that needs these..
 
-Thanks, I have queued these up for v4.13.
+There's nothing optional about that behaviour, it's mandatory for the
+SoC that need it, and useless on the SoC that don't.
+
+Plus, that would require changing the DT binding, which isn't
+something we can do.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170614/803c9893/attachment.sig>
