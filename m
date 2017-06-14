@@ -1,43 +1,73 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 14 Jun 2017 08:48:10 +0800
-Subject: [PATCH v2 3/4] phy: usb: phy-brcm-usb: Add Broadcom STB USB phy
- driver
-In-Reply-To: <1497365721-31188-4-git-send-email-al.cooper@broadcom.com>
-Message-ID: <201706140818.8gkXWnCM%fengguang.wu@intel.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 13 Jun 2017 17:50:05 -0700
+Subject: [PATCH v2 1/4] soc: brcmstb: Add Product ID and Family ID helper
+ functions
+In-Reply-To: <1497365721-31188-2-git-send-email-al.cooper@broadcom.com>
+References: <1497365721-31188-1-git-send-email-al.cooper@broadcom.com>
+ <1497365721-31188-2-git-send-email-al.cooper@broadcom.com>
+Message-ID: <b8906b0f-1ff4-0eca-c452-2579cd160416@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Al,
+On 06/13/2017 07:55 AM, Al Cooper wrote:
+> From: Al Cooper <alcooperx@gmail.com>
+> 
+> Signed-off-by: Al Cooper <alcooperx@gmail.com>
+> ---
+>  drivers/soc/bcm/brcmstb/common.c    | 12 ++++++++++++
+>  include/linux/soc/brcmstb/brcmstb.h | 10 ++++++++++
+>  2 files changed, 22 insertions(+)
+> 
+> diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
+> index b6195fd..184dbf5 100644
+> --- a/drivers/soc/bcm/brcmstb/common.c
+> +++ b/drivers/soc/bcm/brcmstb/common.c
+> @@ -40,6 +40,18 @@ bool soc_is_brcmstb(void)
+>  	return of_match_node(brcmstb_machine_match, root) != NULL;
+>  }
+>  
+> +u32 brcmstb_get_family_id(void)
+> +{
+> +	return family_id;
+> +}
+> +EXPORT_SYMBOL(brcmstb_get_family_id);
+> +
+> +u32 brcmstb_get_product_id(void)
+> +{
+> +	return product_id;
+> +}
+> +EXPORT_SYMBOL(brcmstb_get_product_id);
+> +
+>  static const struct of_device_id sun_top_ctrl_match[] = {
+>  	{ .compatible = "brcm,bcm7125-sun-top-ctrl", },
+>  	{ .compatible = "brcm,bcm7346-sun-top-ctrl", },
+> diff --git a/include/linux/soc/brcmstb/brcmstb.h b/include/linux/soc/brcmstb/brcmstb.h
+> index 337ce41..23e4dc9 100644
+> --- a/include/linux/soc/brcmstb/brcmstb.h
+> +++ b/include/linux/soc/brcmstb/brcmstb.h
+> @@ -1,10 +1,20 @@
+>  #ifndef __BRCMSTB_SOC_H
+>  #define __BRCMSTB_SOC_H
+>  
+> +#define BRCM_ID(reg)	((u32)reg >> 28 ? (u32)reg >> 16 : (u32)reg >> 8)
+> +#define BRCM_REV(reg)	((u32)reg & 0xff)
+> +
+>  /*
+>   * Bus Interface Unit control register setup, must happen early during boot,
+>   * before SMP is brought up, called by machine entry point.
+>   */
+>  void brcmstb_biuctrl_init(void);
+>  
+> +/*
+> + * Helper functions for getting family or product id from the
+> + * SoC driver.
+> + */
+> +u32 brcmstb_get_family_id(void);
+> +u32 brcmstb_get_product_id(void);
 
-[auto build test ERROR on phy/next]
-[also build test ERROR on next-20170613]
-[cannot apply to linus/master v4.12-rc5]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+As spotted by the kbuild robot, you need to add empty stubs when
+CONFIG_SOC_BRCMSTB is not defined.
 
-url:    https://github.com/0day-ci/linux/commits/Al-Cooper/Add-Broadcom-STB-USB-phy-driver/20170614-070044
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git next
-config: ia64-allmodconfig (attached as .config)
-compiler: ia64-linux-gcc (GCC) 6.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=ia64 
-
-All errors (new ones prefixed by >>):
-
-   ERROR: "ia64_delay_loop" [drivers/spi/spi-thunderx.ko] undefined!
->> ERROR: "brcmstb_get_family_id" [drivers/phy/broadcom/phy-brcm-usb-dvr.ko] undefined!
->> ERROR: "brcmstb_get_product_id" [drivers/phy/broadcom/phy-brcm-usb-dvr.ko] undefined!
-   ERROR: "ia64_delay_loop" [drivers/net/phy/mdio-cavium.ko] undefined!
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 47749 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170614/906c19ec/attachment-0001.gz>
+Thanks!
+-- 
+Florian
