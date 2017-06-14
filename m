@@ -1,80 +1,79 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Wed, 14 Jun 2017 16:23:35 +0800
-Subject: [PATCH v3 18/21] arm64: dts: hikey960: add device node for pmic and
- regulators
+Date: Wed, 14 Jun 2017 16:23:32 +0800
+Subject: [PATCH v3 15/21] dt-bindings: PCI: hisi: Add document for PCIe of
+ Kirin SoCs
 In-Reply-To: <20170614082338.15673-1-guodong.xu@linaro.org>
 References: <20170614082338.15673-1-guodong.xu@linaro.org>
-Message-ID: <20170614082338.15673-19-guodong.xu@linaro.org>
+Message-ID: <20170614082338.15673-16-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
+From: Xiaowei Song <songxiaowei@hisilicon.com>
 
-add device node for hi6421 pmic core and hi6421v530
-voltage regulator,include LDO(1,3,9,11,15,16)
+This patch adds document for PCIe of Kirin SoC series.
 
-Signed-off-by: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+Signed-off-by: Xiaowei Song <songxiaowei@hisilicon.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 46 +++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
+ .../devicetree/bindings/pci/kirin-pcie.txt         | 50 ++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/kirin-pcie.txt
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-index ca448f0..e579333 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-@@ -97,6 +97,52 @@
- 			default-state = "off";
- 		};
- 	};
+diff --git a/Documentation/devicetree/bindings/pci/kirin-pcie.txt b/Documentation/devicetree/bindings/pci/kirin-pcie.txt
+new file mode 100644
+index 0000000..68ffa0f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pci/kirin-pcie.txt
+@@ -0,0 +1,50 @@
++HiSilicon Kirin SoCs PCIe host DT description
 +
-+	pmic: pmic at fff34000 {
-+		compatible = "hisilicon,hi6421v530-pmic";
-+		reg = <0x0 0xfff34000 0x0 0x1000>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
++Kirin PCIe host controller is based on Designware PCI core.
++It shares common functions with PCIe Designware core driver
++and inherits common properties defined in
++Documentation/devicetree/bindings/pci/designware-pci.txt.
 +
-+		regulators {
-+			ldo3: LDO3 { /* HDMI */
-+				regulator-name = "VOUT3_1V85";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <2200000>;
-+				regulator-enable-ramp-delay = <120>;
-+			};
++Additional properties are described here:
 +
-+			ldo9: LDO9 { /* SDCARD I/O */
-+				regulator-name = "VOUT9_1V8_2V95";
-+				regulator-min-microvolt = <1750000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <240>;
-+			};
++Required properties
++- compatible:
++	"hisilicon,kirin960-pcie" for PCIe of Kirin960 SoC
++- reg: Should contain rc_dbi, apb, phy, config registers location and length.
++- reg-names: Must include the following entries:
++  "dbi": controller configuration registers;
++  "apb": apb Ctrl register defined by Kirin;
++  "phy": apb PHY register defined by Kirin;
++  "config": PCIe configuration space registers.
++- reset-gpios: The gpio to generate PCIe perst assert and deassert signal.
 +
-+			ldo11: LDO11 { /* Low Speed Connector */
-+				regulator-name = "VOUT11_1V8_2V95";
-+				regulator-min-microvolt = <1750000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <240>;
-+			};
++Optional properties:
 +
-+			ldo15: LDO15 { /* UFS VCC */
-+				regulator-name = "VOUT15_3V0";
-+				regulator-min-microvolt = <1750000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-enable-ramp-delay = <120>;
-+			};
++Example based on kirin960:
 +
-+			ldo16: LDO16 { /* SD VDD */
-+				regulator-name = "VOUT16_2V95";
-+				regulator-min-microvolt = <1750000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-enable-ramp-delay = <360>;
-+			};
-+		};
++	pcie at f4000000 {
++		compatible = "hisilicon,kirin-pcie";
++		reg = <0x0 0xf4000000 0x0 0x1000>, <0x0 0xff3fe000 0x0 0x1000>,
++		      <0x0 0xf3f20000 0x0 0x40000>, <0x0 0xF4000000 0 0x2000>;
++		reg-names = "dbi","apb","phy", "config";
++		bus-range = <0x0  0x1>;
++		#address-cells = <3>;
++		#size-cells = <2>;
++		device_type = "pci";
++		ranges = <0x02000000 0x0 0x00000000 0x0 0xf5000000 0x0 0x2000000>;
++		num-lanes = <1>;
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0xf800 0 0 7>;
++		interrupt-map = <0x0 0 0 1 &gic 0 0 0  282 4>,
++				<0x0 0 0 2 &gic 0 0 0  283 4>,
++				<0x0 0 0 3 &gic 0 0 0  284 4>,
++				<0x0 0 0 4 &gic 0 0 0  285 4>;
++		clocks = <&crg_ctrl HI3660_PCIEPHY_REF>,
++			 <&crg_ctrl HI3660_CLK_GATE_PCIEAUX>,
++			 <&crg_ctrl HI3660_PCLK_GATE_PCIE_PHY>,
++			 <&crg_ctrl HI3660_PCLK_GATE_PCIE_SYS>,
++			 <&crg_ctrl HI3660_ACLK_GATE_PCIE>;
++		clock-names = "pcie_phy_ref", "pcie_aux",
++			      "pcie_apb_phy", "pcie_apb_sys", "pcie_aclk";
++		reset-gpios = <&gpio11 1 0 >;
 +	};
- };
- 
- &i2c0 {
 -- 
 2.10.2
