@@ -1,40 +1,27 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 14 Jun 2017 08:55:23 -0700
-Subject: [PATCH 2/2 v4] clk: Add Gemini SoC clock controller
-In-Reply-To: <CACRpkdbF4syppZsFv2hbB1JxHvnndbS53yY8Pkbz2zoq5Jjzjw@mail.gmail.com>
-References: <20170524082044.8473-1-linus.walleij@linaro.org>
- <20170601070208.GO20170@codeaurora.org>
- <CACRpkdZv8MzXVecEXVdJ+P0MxVscYSy=MxC-yQAR0S4yQ6-rwQ@mail.gmail.com>
- <20170605195812.GH20170@codeaurora.org>
- <CACRpkdbya9xaN-i7AkG0bTyuFYfZc59sSTYhWB43=9btSKfPpQ@mail.gmail.com>
- <CACRpkdapAgHix2vw-woDFi4sh+H3_EX7w-5q=opBGMyegFrXbA@mail.gmail.com>
- <20170612210248.GP20170@codeaurora.org>
- <CACRpkdbF4syppZsFv2hbB1JxHvnndbS53yY8Pkbz2zoq5Jjzjw@mail.gmail.com>
-Message-ID: <20170614155523.GX20170@codeaurora.org>
+Date: Wed, 14 Jun 2017 09:05:34 -0700
+Subject: [PATCHv5 2/2] clk: keystone: Add sci-clk driver support
+In-Reply-To: <1497337767-10218-1-git-send-email-t-kristo@ti.com>
+References: <1497337767-10218-1-git-send-email-t-kristo@ti.com>
+Message-ID: <20170614160534.GZ20170@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14, Linus Walleij wrote:
-> On Mon, Jun 12, 2017 at 11:02 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > On 06/12, Linus Walleij wrote:
+On 06/13, Tero Kristo wrote:
+> In K2G, the clock handling is done through firmware executing on a
+> separate core. Linux kernel needs to communicate to the firmware
+> through TI system control interface to access any power management
+> related resources, including clocks.
 > 
-> >> So the deferred clock makes the whole platform hang because the timer
-> >> needs it. Without a clocksource, the delay loop cannot be calibrated, so
-> >> it hangs there.
-> >
-> > Ok. So can the certain clks that are required to get the timer
-> > going be put into CLK_OF_DECLARE_DRIVER() and then have a regular
-> > platform driver for the rest of the clks that aren't required for
-> > early boot? We've been doing this sort of hybrid design lately,
-> > so hopefully that works here too.
+> The keystone sci-clk driver does this, by communicating to the
+> firmware through the TI SCI driver. The driver adds support for
+> registering clocks through DT, and basic required clock operations
+> like prepare/get_rate, etc.
 > 
-> Sure I will give it a spin!
-> 
-> Is there a best-in-class driver doing this I can use as inspiration?
-> 
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> ---
 
-Great. I suppose drivers/clk/nxp/clk-lpc18xx-creg.c or
-drivers/clk/axis/clk-artpec6.c would be good examples.
+Applied to clk-next + made ti_sci_init_clocks() static
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
