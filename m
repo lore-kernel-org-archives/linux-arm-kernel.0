@@ -1,116 +1,56 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Wed, 14 Jun 2017 09:55:44 +0200
-Subject: [PATCH 2/6] drivers base/arch_topology: frequency-invariant
- load-tracking support
-In-Reply-To: <CAKfTPtDB=5mQnJfzES+iU-nmNjVDM48f_iKuc7WefkRVWW4JOQ@mail.gmail.com>
-References: <20170608075513.12475-1-dietmar.eggemann@arm.com>
- <20170608075513.12475-3-dietmar.eggemann@arm.com>
- <CAKfTPtDB=5mQnJfzES+iU-nmNjVDM48f_iKuc7WefkRVWW4JOQ@mail.gmail.com>
-Message-ID: <9716a48d-8198-a1d8-9450-de6386338665@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 Jun 2017 00:57:51 -0700
+Subject: [PATCHv2 0/5] OMAP4: crypto support
+In-Reply-To: <027b40b6-1961-275b-7b7e-00a51e86e8f3@ti.com>
+References: <20170613092847.16732-1-sebastian.reichel@collabora.co.uk>
+ <ab778bfd-9397-4cb0-0741-557da57bba83@ti.com>
+ <20170613142458.32g3iqcijc4ij4b7@earth>
+ <027b40b6-1961-275b-7b7e-00a51e86e8f3@ti.com>
+Message-ID: <20170614075750.GG3730@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/2017 04:27 PM, Vincent Guittot wrote:
-> On 8 June 2017 at 09:55, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
-
-Hi Vincent,
-
-Thanks for the review!
-
-[...]
-
->> @@ -225,8 +265,14 @@ static int __init register_cpufreq_notifier(void)
->>
->>          cpumask_copy(cpus_to_visit, cpu_possible_mask);
->>
->> -       return cpufreq_register_notifier(&init_cpu_capacity_notifier,
->> -                                        CPUFREQ_POLICY_NOTIFIER);
->> +       ret = cpufreq_register_notifier(&init_cpu_capacity_notifier,
->> +                                       CPUFREQ_POLICY_NOTIFIER);
->> +
->> +       if (ret)
+* Tero Kristo <t-kristo@ti.com> [170613 07:46]:
+> On 13/06/17 17:24, Sebastian Reichel wrote:
+> > Hi,
+> > 
+> > On Tue, Jun 13, 2017 at 04:49:18PM +0300, Tero Kristo wrote:
+> > > On 13/06/17 12:28, Sebastian Reichel wrote:
+> > > > This adds crypto support for OMAP4, which was missing for some reason.
+> > > > This fixes error about missing hwmod on Droid 4. IP-Cores for AES and
+> > > > DES are working according to selftest.
+> > > > 
+> > > > Changes since PATCHv1:
+> > > >    * remove patch adding des_fck to DT
+> > > >    * add patch removing aes[12]_fck from DT
+> > > >    * add patch renaming hwmod aes to aes1 in DT
+> > > >    * update hwmod patches according to feedback from Tero
+> > > >    * add patch for aes2 hwmod
+> > > > 
+> > > > -- Sebastian
+> > > 
+> > > I just posted a few extra patches on top of this series, for adding
+> > > the missing dts data for aes2 and adding sham accelerator also.
+> > 
+> > Thanks :)
+> > 
+> > > The dts data should be applied first if you want to avoid any
+> > > issues with hwmod core complaining about missing DT data, so the
+> > > sequencing of this series and mine need to be done carefully.
+> > 
+> > There is also a warning printed if DT references a missing hwmod
+> > entry (that's how I noticed this in the first place). It's less
+> > noisy, though. Since kernel builds and boots with any order and
+> > crypto hardware does not work at the moment there is no real
+> > problem with bisect. I suggest to merge the DTS patches normally
+> > through the separate dt branch.
 > 
-> Don't you have to free memory allocated for cpus_to_visit in case of
-> errot ? it was not done before your patch as well
+> Yeah thats actually true also. Up to Tony to decide how he wants to handle
+> these. The huge warning is mainly an annoyance.
 
-Yes, we should free cpus_to_visit if the policy notifier registration
-fails. But IMHO also, once the parsing of the capacity-dmips-mhz property
-is done. free cpus_to_visit is only used in the notifier call 
-init_cpu_capacity_callback() after being allocated and initialized in
-register_cpufreq_notifier().
+Applying patches from both Sebastian's and Tero's sets into
+split into omap-for-v4.13/dt and omap-for-v4.13/soc-v4 branches.
 
-We could add something like this as the first patch of this set. Only
-mildly tested on Juno. Juri, what do you think?
+Thanks,
 
-Author: Dietmar Eggemann <dietmar.eggemann@arm.com>
-Date:   Tue Jun 13 23:21:59 2017 +0100
-
-    drivers base/arch_topology: free cpumask cpus_to_visit
-    
-    Free cpumask cpus_to_visit in case registering
-    init_cpu_capacity_notifier has failed or the parsing of the cpu
-    capacity-dmips-mhz property is done. The cpumask cpus_to_visit is
-    only used inside the notifier call init_cpu_capacity_callback.
-    
-    Reported-by: Vincent Guittot <vincent.guittot@linaro.org>
-    Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
-
-diff --git a/drivers/base/arch_topology.c b/drivers/base/arch_topology.c
-index d1c33a85059e..f4832c662762 100644
---- a/drivers/base/arch_topology.c
-+++ b/drivers/base/arch_topology.c
-@@ -206,6 +206,8 @@ static struct notifier_block init_cpu_capacity_notifier = {
- 
- static int __init register_cpufreq_notifier(void)
- {
-+       int ret;
-+
-        /*
-         * on ACPI-based systems we need to use the default cpu capacity
-         * until we have the necessary code to parse the cpu capacity, so
-@@ -221,13 +223,19 @@ static int __init register_cpufreq_notifier(void)
- 
-        cpumask_copy(cpus_to_visit, cpu_possible_mask);
- 
--       return cpufreq_register_notifier(&init_cpu_capacity_notifier,
--                                        CPUFREQ_POLICY_NOTIFIER);
-+       ret = cpufreq_register_notifier(&init_cpu_capacity_notifier,
-+                                       CPUFREQ_POLICY_NOTIFIER);
-+
-+       if (ret)
-+               free_cpumask_var(cpus_to_visit);
-+
-+       return ret;
- }
- core_initcall(register_cpufreq_notifier);
- 
- static void parsing_done_workfn(struct work_struct *work)
- {
-+       free_cpumask_var(cpus_to_visit);
-        cpufreq_unregister_notifier(&init_cpu_capacity_notifier,
-                                         CPUFREQ_POLICY_NOTIFIER);
- }
-
->> +               return ret;
->> +
->> +       return cpufreq_register_notifier(&set_freq_scale_notifier,
->> +                                        CPUFREQ_TRANSITION_NOTIFIER);
-> 
-> Don't you have to unregister the other cpufreq notifier if an error is
-> returned and free the mem allocated for cpus_to_visit ?
-
-IMHO, that's not necessary.
-
-The transition notifier works completely independent from the policy
-notifier. In case the latter gets registered correctly and the registration
-of the former fails, the notifier call of the policy notifier still parses
-the capacity-dmips-mhz property information and sets per_cpu(max_freq, cpu).
-
-The notifier call set_freq_scale_callback() of the transition notifier will
-not be called so that frequency invariance always returns
-SCHED_CAPACITY_SCALE.
-
-After the policy notifier has finished its work, it schedules
-parsing_done_work() in which it gets unregistered.
-
-[...]
+Tony
