@@ -1,41 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 14 Jun 2017 09:04:16 +0100
-Subject: [PATCH v2 4/5] ARM: perf: Allow the use of the PMUv3 driver on
- 32bit ARM
-In-Reply-To: <3598f402-172d-b901-f4b8-1f0050abcd24@arm.com>
-References: <20170613142837.29738-1-marc.zyngier@arm.com>
- <20170613142837.29738-5-marc.zyngier@arm.com>
- <3598f402-172d-b901-f4b8-1f0050abcd24@arm.com>
-Message-ID: <a0ec870f-4c7b-7064-2904-ece7ef1ba733@arm.com>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Wed, 14 Jun 2017 16:13:04 +0800
+Subject: [PATCH v6 5/8] regulator: hi6421v530: add driver for hi6421v530
+ voltage regulator
+In-Reply-To: <20170613203527.ecykjzzpvkrzl7zz@sirena.org.uk>
+References: <20170608220841.26531-1-guodong.xu@linaro.org>
+ <20170608220841.26531-6-guodong.xu@linaro.org>
+ <20170613203527.ecykjzzpvkrzl7zz@sirena.org.uk>
+Message-ID: <CAFGCpxxU8FJi20rUVw6G+Add9A2XqhNULsnKNU5T78Eq9V7HxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/06/17 16:40, Vladimir Murzin wrote:
-> Hi Marc,
-> 
-> On 13/06/17 15:28, Marc Zyngier wrote:
->> +static inline int read_pmuver(void)
->> +{
->> +	u32 dfr0 = read_sysreg(ID_DFR0);
->> +	int vers = (s8)((dfr0 >> 24) & 0xff);
->> +
->> +	if (vers < 3)
->> +		vers = -1;
->> +
->> +	return vers;
->> +}
-> 
-> Alternatively, PMU version can be extracted with existent helper:
-> 
-> int vers = cpuid_feature_extract(CPUID_EXT_DFR0, 24);
-> 
-> Not sure which of these two is preferred...
+On Wed, Jun 14, 2017 at 4:35 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Fri, Jun 09, 2017 at 06:08:38AM +0800, Guodong Xu wrote:
+>> From: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
+>>
+>> add the driver for hi6421v530 voltage regulator
+>
+> Please don't resubmit patches that have already been applied, you should
+> submit patches against current code in the tree you're expecting things
+> to be applied to.  If any updates are needed to a patch that's already
+> been applied you should submit incremental patches which make those
+> updates.  This avoids having to change published git commits which could
+> cause problems for people working against git.
 
-Clearly, your solution looks much better than my open-coded version.
-I'll use that in the next round.
+ok. I see your point. Sorry about this submission. Before sending out
+v6, I did see your email notification about inclusion of v5 patchset
+into regulator -next tree.
 
-Thanks,
+I will send incremental patch.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+-Guodong
