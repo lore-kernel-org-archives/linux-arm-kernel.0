@@ -1,52 +1,91 @@
-From: hoeun.ryu@gmail.com (Hoeun Ryu)
-Date: Wed, 14 Jun 2017 17:12:09 +0900
-Subject: [PATCH 0/7] Clean-up for debug_ll for omap variants
-In-Reply-To: <20170614073118.28246-1-tony@atomide.com>
-References: <20170614073118.28246-1-tony@atomide.com>
-Message-ID: <1497427929.1935.6.camel@gmail.com>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Wed, 14 Jun 2017 16:23:17 +0800
+Subject: [PATCH v3 00/21] arm64: dts: hi3660: add device nodes
+Message-ID: <20170614082338.15673-1-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-06-14 at 00:31 -0700, Tony Lindgren wrote:
-> Hi all,
-> 
-> Inspired by earlier patches to remove DEBUG_OMAP2PLUS_UART dependency
-> to DEBUG_UNCOMPRESS by Hoeun Ryu <hoeun.ryu@gmail.com>, I converted
-> all mach-omap2 to use generic 8250 debug_ll code.
+This patchset adds various devices nodes for hi3660 and hikey960.
 
-Great! Thank you.
+HiKey960 is one of 96boards. For details information about it, please
+refer to [1].
 
-> 
-> I've tested this on omap2/3/4/5, ti81xx and am437x so far and things
-> seem to work as expected.
-> 
-> Regards,
-> 
-> Tony
-> 
-> Tony Lindgren (7):
-> ? ARM: debug: Use generic 8250 debug_ll for omap2 and omap3/4/5
-> common
-> ????uarts
-> ? ARM: debug: Use generic 8250 debug_ll for omap3/4/5
-> ? ARM: debug: Use generic 8250 debug_ll for ti81xx
-> ? ARM: debug: Use generic 8250 debug_ll for am3517 and am335x
-> ? ARM: debug: Use generic 8250 debug_ll for omap zoom
-> ? ARM: debug: Update port descriptions for omap variants
-> ? ARM: OMAP2+: Drop unused serial.h
-> 
-> ?arch/arm/Kconfig.debug?????????????????????????????|??60 ++++---
-> ?arch/arm/include/debug/omap2plus.S?????????????????| 190 ---------
-> ------------
-> ?arch/arm/mach-omap2/common.h???????????????????????|???1 -
-> ?arch/arm/mach-omap2/include/mach/serial.h??????????|??66 -------
-> ?arch/arm/mach-omap2/io.c???????????????????????????|???1 -
-> ?arch/arm/mach-omap2/omap_hwmod_2420_data.c?????????|???1 -
-> ?.../mach-omap2/omap_hwmod_2xxx_interconnect_data.c |???1 -
-> ?arch/arm/mach-omap2/omap_hwmod_3xxx_data.c?????????|???1 -
-> ?arch/arm/mach-omap2/serial.h???????????????????????|???1 -
-> ?9 files changed, 40 insertions(+), 282 deletions(-)
-> ?delete mode 100644 arch/arm/include/debug/omap2plus.S
-> ?delete mode 100644 arch/arm/mach-omap2/include/mach/serial.h
-> ?delete mode 100644 arch/arm/mach-omap2/serial.h
-> 
+In v3,
+* nothing is changed for patches already exists in v2.
+* added 9 more dts patches. Most of them already were reviewed with their
+    corresponding driver patchset. For purpose of easy integration for
+    platform maintainer, I copied them here, including threads [2], [3],
+    and [4].
+* four patches, this is the first time they are sent out for review.
+v3-0014-arm64-dts-hi3660-enable-idle-states.patch
+v3-0019-dt-bindings-mmc-dw_mmc-k3-add-document-of-hi3660-.patch
+v3-0020-arm64-dts-hi3660-add-sd-sdio-device-nodes.patch
+v3-0021-arm64-dts-hi3660-hikey960-add-nodes-for-WiFi.patch
+    mmc driver is under review in [5].
+
+In v2, incorporated review comments from Rob Herring <robh@kernel.org>
+* uart4: max-speed should be in slave device bluetooth node
+* LEDs:	- bt_active triggered by 'hci0-power'
+	- move out of SoC level
+* pinctrl: update dts to use #pinctrl-cells
+* uart: add pinctrl information into uart nodes; add label strings.
+* chosen: update stdout-path. serial6 is used.
+* i2c: add label strings. change reg address to lower case.
+* remove unnecessary status="ok"
+* gpio-keys: move out of SoC level.
+
+[1] https://github.com/96boards/documentation/tree/master/ConsumerEdition/HiKey960
+[2] sp804 timer: https://www.spinics.net/lists/kernel/msg2513025.html
+[3] PCIe: https://www.spinics.net/lists/kernel/msg2520677.html
+[4] mfd and regulator: https://www.spinics.net/lists/arm-kernel/msg586147.html
+[5] mmc: https://patchwork.kernel.org/patch/9783273/
+
+Chen Feng (2):
+  arm64: dts: hi3660: Add uarts nodes
+  arm64: dts: hi3660: Add pl031 rtc node
+
+Chen Jun (1):
+  arm64: dts: hi3660: add power key dts node
+
+Guodong Xu (7):
+  dt-bindings: arm: hisilicon: add bindings for HiKey960 board
+  arm64: dts: hisilicon: update compatible string for hikey960
+  arm64: dts: hikey960: add WL1837 Bluetooth device node
+  arm64: dts: hikey960: add LED nodes
+  dt-bindings: mfd: hi6421: Add hi6421v530 compatible string
+  dt-bindings: mmc: dw_mmc-k3: add document of hi3660 mmc
+  arm64: dts: hi3660-hikey960: add nodes for WiFi
+
+Leo Yan (2):
+  arm64: dts: hi3660: add sp804 timer node
+  arm64: dts: hi3660: enable idle states
+
+Li Wei (1):
+  arm64: dts: hi3660: add sd/sdio device nodes
+
+Wang Xiaoyin (4):
+  arm64: dts: hikey960: pinctrl: add more pinmux and pinconfig
+  arm64: dts: hi3660: add gpio dtsi file for Hisilicon Hi3660 SOC
+  arm64: dts: hi3660: add spi device nodes
+  arm64: dts: hikey960: add device node for pmic and regulators
+
+Xiaowei Song (2):
+  dt-bindings: PCI: hisi: Add document for PCIe of Kirin SoCs
+  arm64: dts: hisi: add kirin pcie node
+
+Zhangfei Gao (2):
+  arm64: dts: hi3660: add resources for clock and reset
+  arm64: dts: Add I2C nodes for Hi3660
+
+ .../bindings/arm/hisilicon/hisilicon.txt           |   4 +
+ Documentation/devicetree/bindings/mfd/hi6421.txt   |   4 +-
+ .../devicetree/bindings/mmc/k3-dw-mshc.txt         |   1 +
+ .../devicetree/bindings/pci/kirin-pcie.txt         |  50 ++
+ arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts  | 217 +++++-
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi          | 765 +++++++++++++++++++-
+ .../arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi | 778 +++++++++++++++++++--
+ 7 files changed, 1744 insertions(+), 75 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pci/kirin-pcie.txt
+
+-- 
+2.10.2
