@@ -1,73 +1,46 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 13 Jun 2017 17:50:05 -0700
-Subject: [PATCH v2 1/4] soc: brcmstb: Add Product ID and Family ID helper
- functions
-In-Reply-To: <1497365721-31188-2-git-send-email-al.cooper@broadcom.com>
-References: <1497365721-31188-1-git-send-email-al.cooper@broadcom.com>
- <1497365721-31188-2-git-send-email-al.cooper@broadcom.com>
-Message-ID: <b8906b0f-1ff4-0eca-c452-2579cd160416@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 13 Jun 2017 21:55:02 -0300
+Subject: [PATCH 00/11] ARM: dts: imx6qdl: video capture support
+In-Reply-To: <1497291844-14632-1-git-send-email-steve_longerbeam@mentor.com>
+References: <1497291844-14632-1-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <CAOMZO5BqOYhuP_2F-bEPjsoKmeiZi+qxFfJuaS0RSQ-bxDwM8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/13/2017 07:55 AM, Al Cooper wrote:
-> From: Al Cooper <alcooperx@gmail.com>
-> 
-> Signed-off-by: Al Cooper <alcooperx@gmail.com>
-> ---
->  drivers/soc/bcm/brcmstb/common.c    | 12 ++++++++++++
->  include/linux/soc/brcmstb/brcmstb.h | 10 ++++++++++
->  2 files changed, 22 insertions(+)
-> 
-> diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
-> index b6195fd..184dbf5 100644
-> --- a/drivers/soc/bcm/brcmstb/common.c
-> +++ b/drivers/soc/bcm/brcmstb/common.c
-> @@ -40,6 +40,18 @@ bool soc_is_brcmstb(void)
->  	return of_match_node(brcmstb_machine_match, root) != NULL;
->  }
->  
-> +u32 brcmstb_get_family_id(void)
-> +{
-> +	return family_id;
-> +}
-> +EXPORT_SYMBOL(brcmstb_get_family_id);
-> +
-> +u32 brcmstb_get_product_id(void)
-> +{
-> +	return product_id;
-> +}
-> +EXPORT_SYMBOL(brcmstb_get_product_id);
-> +
->  static const struct of_device_id sun_top_ctrl_match[] = {
->  	{ .compatible = "brcm,bcm7125-sun-top-ctrl", },
->  	{ .compatible = "brcm,bcm7346-sun-top-ctrl", },
-> diff --git a/include/linux/soc/brcmstb/brcmstb.h b/include/linux/soc/brcmstb/brcmstb.h
-> index 337ce41..23e4dc9 100644
-> --- a/include/linux/soc/brcmstb/brcmstb.h
-> +++ b/include/linux/soc/brcmstb/brcmstb.h
-> @@ -1,10 +1,20 @@
->  #ifndef __BRCMSTB_SOC_H
->  #define __BRCMSTB_SOC_H
->  
-> +#define BRCM_ID(reg)	((u32)reg >> 28 ? (u32)reg >> 16 : (u32)reg >> 8)
-> +#define BRCM_REV(reg)	((u32)reg & 0xff)
-> +
->  /*
->   * Bus Interface Unit control register setup, must happen early during boot,
->   * before SMP is brought up, called by machine entry point.
->   */
->  void brcmstb_biuctrl_init(void);
->  
-> +/*
-> + * Helper functions for getting family or product id from the
-> + * SoC driver.
-> + */
-> +u32 brcmstb_get_family_id(void);
-> +u32 brcmstb_get_product_id(void);
+Hi Steve,
 
-As spotted by the kbuild robot, you need to add empty stubs when
-CONFIG_SOC_BRCMSTB is not defined.
+On Mon, Jun 12, 2017 at 3:23 PM, Steve Longerbeam <slongerbeam@gmail.com> wrote:
+> This series defines the i.MX6 internal video multiplexers and MIPI CSI-2
+> receiver device nodes, and their connections to eachother and the i.MX6
+> IPU CSI ports.
+>
+> It also implements video capture support on the SabreLite, SabreSD, and
+> SabreAuto reference platforms, by defining the video sensor nodes on those
+> platforms, and their connections to the video muxes and MIPI CSI-2 receiver.
+>
+> There should not be much of anything controversial in this series. The
+> imx-media driver is set to be merged in time for 4.13, so please accept
+> this series soon.
+>
+>
+> Philipp Zabel (2):
+>   ARM: dts: imx6qdl: add multiplexer controls
+>   ARM: dts: imx6qdl: Add video multiplexers, mipi_csi, and their
+>     connections
+>
+> Steve Longerbeam (9):
+>   ARM: dts: imx6qdl: Add compatible, clocks, irqs to MIPI CSI-2 node
+>   ARM: dts: imx6qdl: add capture-subsystem device
+>   ARM: dts: imx6qdl-sabrelite: remove erratum ERR006687 workaround
+>   ARM: dts: imx6-sabrelite: add OV5642 and OV5640 camera sensors
+>   ARM: dts: imx6-sabresd: add OV5642 and OV5640 camera sensors
+>   ARM: dts: imx6-sabreauto: create i2cmux for i2c3
+>   ARM: dts: imx6-sabreauto: add reset-gpios property for max7310_b
+>   ARM: dts: imx6-sabreauto: add pinctrl for gpt input capture
+>   ARM: dts: imx6-sabreauto: add the ADV7180 video decoder
 
-Thanks!
--- 
-Florian
+For the series:
+
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+
+Thanks for your hard work!
