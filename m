@@ -1,67 +1,45 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 14 Jun 2017 11:59:16 -0600
-Subject: [PATCH 08/12] coresight tmc: Handle configuration types properly
-In-Reply-To: <1497278211-5001-9-git-send-email-suzuki.poulose@arm.com>
-References: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
- <1497278211-5001-9-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20170614175916.GD22030@xps15>
+From: spjoshi@codeaurora.org (Sarangdhar Joshi)
+Date: Wed, 14 Jun 2017 11:06:56 -0700
+Subject: [PATCH 2/2] remoteproc: qcom: Register segments with remoteproc
+In-Reply-To: <1497463616-19868-1-git-send-email-spjoshi@codeaurora.org>
+References: <1497463616-19868-1-git-send-email-spjoshi@codeaurora.org>
+Message-ID: <1497463616-19868-2-git-send-email-spjoshi@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 12, 2017 at 03:36:47PM +0100, Suzuki K Poulose wrote:
-> Coresight SoC 600 defines a new configuration for TMC, Embedded Trace
-> Streamer (ETS), indicated by 0x3 in MODE:CONFIG_TYPE. Make sure
-> the driver handles the new type properly.
+Register the firmware segments with remoteproc framework to ensure
+that the coredumps can be collected in the event of fatal failures.
 
->From what I see below this patch only improves readability by moving the if/else
-compound to a case statement - there is no trace of the new ETS block.
-Readability enhancement are good but the changelog must match the code.
+Signed-off-by: Sarangdhar Joshi <spjoshi@codeaurora.org>
+---
+ drivers/remoteproc/qcom_adsp_pil.c | 1 +
+ drivers/remoteproc/qcom_wcnss.c    | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/drivers/remoteproc/qcom_adsp_pil.c b/drivers/remoteproc/qcom_adsp_pil.c
+index 335066e..f6d5ceac 100644
+--- a/drivers/remoteproc/qcom_adsp_pil.c
++++ b/drivers/remoteproc/qcom_adsp_pil.c
+@@ -86,6 +86,7 @@ static int adsp_load(struct rproc *rproc, const struct firmware *fw)
+ static const struct rproc_fw_ops adsp_fw_ops = {
+ 	.find_rsc_table = qcom_mdt_find_rsc_table,
+ 	.load = adsp_load,
++	.register_segments = qcom_register_dump_segments,
+ };
  
-> 
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  drivers/hwtracing/coresight/coresight-tmc.c | 14 +++++++++++---
->  1 file changed, 11 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-> index fd5a2e0..7152656 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc.c
-> @@ -358,11 +358,13 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
->  	desc.dev = dev;
->  	desc.groups = coresight_tmc_groups;
->  
-> -	if (drvdata->config_type == TMC_CONFIG_TYPE_ETB) {
-> +	switch (drvdata->config_type) {
-> +	case TMC_CONFIG_TYPE_ETB:
->  		desc.type = CORESIGHT_DEV_TYPE_SINK;
->  		desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
->  		desc.ops = &tmc_etb_cs_ops;
-> -	} else if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
-> +		break;
-> +	case TMC_CONFIG_TYPE_ETR:
->  		desc.type = CORESIGHT_DEV_TYPE_SINK;
->  		desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
->  		desc.ops = &tmc_etr_cs_ops;
-> @@ -373,10 +375,16 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
->  		ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(40));
->  		if (ret)
->  			goto out;
-> -	} else {
-> +		break;
-> +	case TMC_CONFIG_TYPE_ETF:
->  		desc.type = CORESIGHT_DEV_TYPE_LINKSINK;
->  		desc.subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_FIFO;
->  		desc.ops = &tmc_etf_cs_ops;
-> +		break;
-> +	default:
-> +		pr_err("%s: Unsupported TMC config\n", pdata->name);
-> +		ret = -EINVAL;
-> +		goto out;
->  	}
->  
->  	drvdata->csdev = coresight_register(&desc);
-> -- 
-> 2.7.4
-> 
+ static int adsp_start(struct rproc *rproc)
+diff --git a/drivers/remoteproc/qcom_wcnss.c b/drivers/remoteproc/qcom_wcnss.c
+index 253f152e..efa295f 100644
+--- a/drivers/remoteproc/qcom_wcnss.c
++++ b/drivers/remoteproc/qcom_wcnss.c
+@@ -160,6 +160,7 @@ static int wcnss_load(struct rproc *rproc, const struct firmware *fw)
+ static const struct rproc_fw_ops wcnss_fw_ops = {
+ 	.find_rsc_table = qcom_mdt_find_rsc_table,
+ 	.load = wcnss_load,
++	.register_segments = qcom_register_dump_segments,
+ };
+ 
+ static void wcnss_indicate_nv_download(struct qcom_wcnss *wcnss)
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
