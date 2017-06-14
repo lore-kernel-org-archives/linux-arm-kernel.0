@@ -1,46 +1,114 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 13 Jun 2017 21:55:02 -0300
-Subject: [PATCH 00/11] ARM: dts: imx6qdl: video capture support
-In-Reply-To: <1497291844-14632-1-git-send-email-steve_longerbeam@mentor.com>
-References: <1497291844-14632-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <CAOMZO5BqOYhuP_2F-bEPjsoKmeiZi+qxFfJuaS0RSQ-bxDwM8w@mail.gmail.com>
+From: jun.gao@mediatek.com (Jun Gao)
+Date: Wed, 14 Jun 2017 09:11:49 +0800
+Subject: [PATCH v4 2/2] arm: dts: Add Mediatek MT2701 i2c device node
+In-Reply-To: <8c0e441c-a3d9-9cfd-dbf9-556ad852a072@gmail.com>
+References: <1495784107-6711-1-git-send-email-jun.gao@mediatek.com>
+ <1495784107-6711-3-git-send-email-jun.gao@mediatek.com>
+ <1497268468.930.26.camel@mhfsdcap03>
+ <dbfcfd5b-8812-8df2-40dc-42e889577c9a@gmail.com>
+ <1497349452.930.36.camel@mhfsdcap03>
+ <ba658a59-7ef9-2340-57fa-3bcefa3f47ed@gmail.com>
+ <1497360189.930.42.camel@mhfsdcap03>
+ <8c0e441c-a3d9-9cfd-dbf9-556ad852a072@gmail.com>
+Message-ID: <1497402709.930.48.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
+On Tue, 2017-06-13 at 15:45 +0200, Matthias Brugger wrote:
+> 
+> On 13/06/17 15:23, Jun Gao wrote:
+> > On Tue, 2017-06-13 at 14:52 +0200, Matthias Brugger wrote:
+> >>
+> >> On 13/06/17 12:24, Jun Gao wrote:
+> >>> On Tue, 2017-06-13 at 11:36 +0200, Matthias Brugger wrote:
+> >>>>
+> >>>> On 12/06/17 13:54, Jun Gao wrote:
+> >>>>> On Fri, 2017-05-26 at 15:35 +0800, Jun Gao wrote:
+> >>>>>> From: Jun Gao <jun.gao@mediatek.com>
+> >>>>>>
+> >>>>>> Add MT2701 i2c device node.
+> >>>>>>
+> >>>>>> Signed-off-by: Jun Gao <jun.gao@mediatek.com>
+> >>>>>> ---
+> >>>>>>     arch/arm/boot/dts/mt2701-evb.dts | 42 ++++++++++++++++++++++++++++++++++++++++
+> >>>>>>     arch/arm/boot/dts/mt2701.dtsi    | 42 ++++++++++++++++++++++++++++++++++++++++
+> >>>>>>     2 files changed, 84 insertions(+)
+> >>>> [...]
+> >>>>>
+> >>>>> Dear Matthias,
+> >>>>>
+> >>>>> Could you take this patch together with
+> >>>>> [PATCH v4 1/2]dt-bindings: i2c: Add Mediatek MT2701 i2c binding ?
+> >>>>>
+> >>>>> Thanks!
+> >>>>>
+> >>>>
+> >>>> They are both included in the pull request I send [1] [2], or do I miss
+> >>>> something?
+> >>>>
+> >>>> Regards,
+> >>>> Matthias
+> >>>>
+> >>>> [1]
+> >>>> https://github.com/mbgg/linux-mediatek/commit/729b7f8dbdaff270c53052897ea06486221a49a2
+> >>>> [2]
+> >>>> https://github.com/mbgg/linux-mediatek/commit/c6c301d3ff7531894257acc4f4a73928a109bda1
+> >>>
+> >>> Dear Matthias,
+> >>>
+> >>> Would you mind to use the same style as follows in i2c-mtk.txt of [2]?
+> >>>
+> >>> "mediatek,mt2701-i2c", "mediatek,mt6577-i2c": for Mediatek MT2701
+> >>> "mediatek,mt6577-i2c": for Mediatek MT6577
+> >>> "mediatek,mt6589-i2c": for Mediatek MT6589
+> >>> "mediatek,mt7623-i2c", "mediatek,mt6577-i2c": for Mediatek MT7623
+> >>> "mediatek,mt8173-i2c": for Mediatek MT8173
+> >>>
+> >>>
+> >>> Thanks!
+> >>>
+> >>
+> >> You mean I should fix-up the patch to fit to the new binding
+> >> description? Or do you mean it should be MTxxxx instead of mtxxxx?
+> >>
+> >> Regards,
+> >> Matthias
+> > 
+> > Dear Matthias,
+> > 
+> > I mean fix-up the patch to fit to the new binding description. Is it OK?
+> > 
+> 
+> Then I can't see the difference between what you are asking for and what 
+> is already pushed to the repository. Please send a patch, that will make 
+> things clearer.
+> 
+> Regards,
+> Matthias
 
-On Mon, Jun 12, 2017 at 3:23 PM, Steve Longerbeam <slongerbeam@gmail.com> wrote:
-> This series defines the i.MX6 internal video multiplexers and MIPI CSI-2
-> receiver device nodes, and their connections to eachother and the i.MX6
-> IPU CSI ports.
->
-> It also implements video capture support on the SabreLite, SabreSD, and
-> SabreAuto reference platforms, by defining the video sensor nodes on those
-> platforms, and their connections to the video muxes and MIPI CSI-2 receiver.
->
-> There should not be much of anything controversial in this series. The
-> imx-media driver is set to be merged in time for 4.13, so please accept
-> this series soon.
->
->
-> Philipp Zabel (2):
->   ARM: dts: imx6qdl: add multiplexer controls
->   ARM: dts: imx6qdl: Add video multiplexers, mipi_csi, and their
->     connections
->
-> Steve Longerbeam (9):
->   ARM: dts: imx6qdl: Add compatible, clocks, irqs to MIPI CSI-2 node
->   ARM: dts: imx6qdl: add capture-subsystem device
->   ARM: dts: imx6qdl-sabrelite: remove erratum ERR006687 workaround
->   ARM: dts: imx6-sabrelite: add OV5642 and OV5640 camera sensors
->   ARM: dts: imx6-sabresd: add OV5642 and OV5640 camera sensors
->   ARM: dts: imx6-sabreauto: create i2cmux for i2c3
->   ARM: dts: imx6-sabreauto: add reset-gpios property for max7310_b
->   ARM: dts: imx6-sabreauto: add pinctrl for gpt input capture
->   ARM: dts: imx6-sabreauto: add the ADV7180 video decoder
+Dear Matthias,
 
-For the series:
+like this:
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+diff:
+ Required properties:
+   - compatible: value should be either of the following.
+-      (a) "mediatek,mt6577-i2c", for i2c compatible with mt6577 i2c.
+-      (b) "mediatek,mt6589-i2c", for i2c compatible with mt6589 i2c.
+-      (c) "mediatek,mt8127-i2c", for i2c compatible with mt8127 i2c.
+-      (d) "mediatek,mt8135-i2c", for i2c compatible with mt8135 i2c.
+-      (e) "mediatek,mt8173-i2c", for i2c compatible with mt8173 i2c.
++       "mediatek,mt2701-i2c", "mediatek,mt6577-i2c": for Mediatek
+MT2701
++       "mediatek,mt6577-i2c": for Mediatek MT6577
++       "mediatek,mt6589-i2c": for Mediatek MT6589
++       "mediatek,mt7623-i2c", "mediatek,mt6577-i2c": for Mediatek
+MT7623
++       "mediatek,mt8173-i2c": for Mediatek MT8173
+   - reg: physical base address of the controller and dma base, length
+of memory
+     mapped region.
+   - interrupts: interrupt number to the cpu.
 
-Thanks for your hard work!
+
+Thanks!
