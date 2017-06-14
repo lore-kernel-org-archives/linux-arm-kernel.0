@@ -1,19 +1,35 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 14 Jun 2017 23:11:47 +0800
-Subject: [PATCH v6 0/3] ARM: dts: imx7: add NAND support
-In-Reply-To: <cover.9fab78eaa869dbad4c9ad7e8578c9cef3e49daa8.1496961128.git-series.stefan@agner.ch>
-References: <cover.9fab78eaa869dbad4c9ad7e8578c9cef3e49daa8.1496961128.git-series.stefan@agner.ch>
-Message-ID: <20170614151146.GC30112@dragon>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Wed, 14 Jun 2017 17:13:14 +0200
+Subject: [PATCH v2 1/3] dt-bindings: mfd: update STM32 timers clock names
+In-Reply-To: <1497453196-31470-1-git-send-email-fabrice.gasnier@st.com>
+References: <1497453196-31470-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1497453196-31470-2-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 08, 2017 at 03:34:46PM -0700, Stefan Agner wrote:
-> Stefan Agner (3):
->   clk: imx7d: create clocks behind rawnand clock gate
->   ARM: dts: imx7: add GPMI NAND and APBH DMA
->   ARM: dts: imx7-colibri: add NAND support
+Clock name has been updated during driver/DT binding review:
+https://lkml.org/lkml/2016/12/13/718
+Update DT binding doc to reflect this.
 
-Both dts patches look good to me.  Please ping me after the clk patch
-lands on mainline.
+Fixes: 8f9359c6c6a0 (dt-bindings: mfd: Add bindings for STM32 Timers driver)
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Acked-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+---
+ Documentation/devicetree/bindings/mfd/stm32-timers.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Shawn
+diff --git a/Documentation/devicetree/bindings/mfd/stm32-timers.txt b/Documentation/devicetree/bindings/mfd/stm32-timers.txt
+index bbd083f..1db6e00 100644
+--- a/Documentation/devicetree/bindings/mfd/stm32-timers.txt
++++ b/Documentation/devicetree/bindings/mfd/stm32-timers.txt
+@@ -31,7 +31,7 @@ Example:
+ 		compatible = "st,stm32-timers";
+ 		reg = <0x40010000 0x400>;
+ 		clocks = <&rcc 0 160>;
+-		clock-names = "clk_int";
++		clock-names = "int";
+ 
+ 		pwm {
+ 			compatible = "st,stm32-pwm";
+-- 
+1.9.1
