@@ -1,50 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 14 Jun 2017 10:32:24 +0100
-Subject: [PATCH v7 3/3] PCI: Add tango MSI controller support
-In-Reply-To: <870f833b-6bff-b3b1-6591-7d46e374de66@sigmadesigns.com>
-References: <741766e5-cff2-db5f-d40b-6866e08fd966@sigmadesigns.com>
- <e868f9b8-39e3-4501-a8c6-64bd28a4be8b@sigmadesigns.com>
- <9975fa6c-f426-519b-6b3e-a2d102d36fd5@arm.com>
- <82d6bf37-96b9-cd9d-134b-f01638fa2b1b@sigmadesigns.com>
- <d39b5b3a-48be-7aaa-b7dd-28d4ae1d2083@arm.com>
- <49b4138d-0030-1e8c-6a14-0e9151b63d24@sigmadesigns.com>
- <1588fa00-92c6-046d-ccfc-9a2deae61486@arm.com>
- <08d84ce3-5345-dc69-bbc3-37372a3df22b@sigmadesigns.com>
- <870f833b-6bff-b3b1-6591-7d46e374de66@sigmadesigns.com>
-Message-ID: <a714b871-dd6c-4db0-3539-aabf7274938a@arm.com>
+From: jerome.forissier@linaro.org (Jerome Forissier)
+Date: Wed, 14 Jun 2017 11:39:50 +0200
+Subject: [PATCH] tee: add forward declaration for struct device
+In-Reply-To: <6344683a299d05692ed64ddb963343ea9547add4.1496229347.git.jerome.forissier@linaro.org>
+References: <6344683a299d05692ed64ddb963343ea9547add4.1496229347.git.jerome.forissier@linaro.org>
+Message-ID: <2bcbf7b0-7dba-7e72-72fd-4da922e442bb@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/06/17 10:19, Marc Gonzalez wrote:
-> On 14/06/2017 11:00, Marc Gonzalez wrote:
-> 
->> The MSI controller in Tango supports 256 message-signaled interrupts,
->> and a single doorbell address.
->>
->> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
->> ---
->> Changes from v6 to v7
->> o Call spin_lock() not spin_lock_irqsave() in the ISR
->> ---
->>  drivers/pci/host/pcie-tango.c | 225 ++++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 225 insertions(+)
-> 
-> Someone on IRC suggested testing the driver with LOCKDEP.
-> 
-> If I understand the warning below correctly, I am not supposed
-> to call irq_domain_set_info() while holding used_msi_lock?
+[+Arnd]
 
-Indeed. This creates an AB/BA situation, which will eventually deadlock.
-Once again, lockdep saves the day.
+Ping?
 
-> NB: in probe, my driver calls
-> 
-> 	add_taint(TAINT_FIRMWARE_WORKAROUND, LOCKDEP_STILL_OK);
-> 
-> This should not break LOCKDEP analysis, right?
-
-It doesn't. The code is provably wrong, and lockdep proved that it is wrong.
-
-	M.
+Thanks,
 -- 
-Jazz is not dead. It just smells funny...
+Jerome
+
+On 05/31/2017 01:21 PM, Jerome Forissier wrote:
+> tee_drv.h references struct device, but does not include device.h nor
+> platform_device.h. Therefore, if tee_drv.h is included by some file
+> that does not pull device.h nor platform_device.h beforehand, we have a
+> compile warning. Fix this by adding a forward declaration.
+> 
+> Signed-off-by: Jerome Forissier <jerome.forissier@linaro.org>
+> ---
+>  include/linux/tee_drv.h | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/include/linux/tee_drv.h b/include/linux/tee_drv.h
+> index 8614713..07bd226 100644
+> --- a/include/linux/tee_drv.h
+> +++ b/include/linux/tee_drv.h
+> @@ -29,6 +29,7 @@
+>  #define TEE_SHM_DMA_BUF		BIT(1)	/* Memory with dma-buf handle */
+>  #define TEE_SHM_EXT_DMA_BUF	BIT(2)	/* Memory with dma-buf handle */
+>  
+> +struct device;
+>  struct tee_device;
+>  struct tee_shm;
+>  struct tee_shm_pool;
+> 
