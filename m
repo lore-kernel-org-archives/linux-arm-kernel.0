@@ -1,40 +1,126 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 14 Jun 2017 21:23:07 +0200
-Subject: linux-next: build failure after merge of the arm tree
-In-Reply-To: <20170421234315.GO17774@n2100.armlinux.org.uk>
-References: <20170421084033.5c987e13@canb.auug.org.au>
- <9858a4ed-bdd9-bd6c-d8a4-e9e6bd539904@free.fr>
- <20170421181230.05dcf937@canb.auug.org.au>
- <20170421234315.GO17774@n2100.armlinux.org.uk>
-Message-ID: <b5189473-bfdd-4e4e-711f-0f48ac9da5c8@free.fr>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 14 Jun 2017 21:26:17 +0200
+Subject: [GIT PULL] Allwinner clock changes for 4.13
+Message-ID: <20170614192617.bsp5pjxrphlk36sk@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/04/2017 01:43, Russell King - ARM Linux wrote:
-> On Fri, Apr 21, 2017 at 06:12:30PM +1000, Stephen Rothwell wrote:
->> Hi Mason,
->>
->> On Fri, 21 Apr 2017 09:58:58 +0200 Mason <slash.tmp@free.fr> wrote:
->>>
->>> Anyway, the fix is trivial.
->>>
->>> The "pchans_used" field is an unsigned long array.
->>> for_each_clear_bit_from() expects an unsigned long pointer,
->>> not an array address.
->>>
->>> I'll send a patch to the drivers/dma maintainers.
->>
->> The fix really needs to go into the arm tree (as well?) since that is
->> the tree that has the patch that causes the build to break (even if the
->> actual bug was preexisting).
-> 
-> Or I drop the offending patch (done) and we get the DMA subsystem fixed
-> first.  Given how long it's been this way, I doubt there's any hurry to
-> get this change in for the next merge window.
+Hi Mike, Stephen,
 
-Hello Russell,
+Here is the patches for 4.13 for the Allwinner SoCs.
 
-Is it safe to apply the patch now?
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8679/1
+In order to reduce the conflicts, this is based on the fixes tag I
+sent a PR for a few minutes ago.
 
-Regards.
+Thanks!
+Maxime
+
+The following changes since commit d85da227c3ae43d9ca513d60f244213cb4e55485:
+
+  clk: sunxi-ng: a64: Export PLL_PERIPH0 clock for the PRCM (2017-05-31 21:57:30 +0200)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-for-4.13
+
+for you to fetch changes up to 06e226c7fb233f676b01b144d0b321ebe510fdcd:
+
+  clk: sunxi-ng: Move all clock types to a library (2017-06-07 15:33:39 +0200)
+
+----------------------------------------------------------------
+Allwinner clock patches for 4.13
+
+Some new clock units are supported, for the display clocks unsed in the
+newer SoCs, and the A83T PRCM.
+
+There is also a bunch of minor fixes for clocks that are not used by
+anyone, and reworks needed by drivers that will land in 4.13.
+
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      clk: sunxi-ng: select SUNXI_CCU_MULT for sun8i-a83t
+
+Chen-Yu Tsai (7):
+      dt-bindings: clock: sunxi-ccu: Add compatible string for A83T CCU
+      clk: sunxi-ng: Support multiple variable pre-dividers
+      clk: sunxi-ng: Add driver for A83T CCU
+      clk: sunxi-ng: a83t: Fix PLL lock status register offset
+      clk: sunxi-ng: a83t: Fix audio PLL divider offset
+      dt-bindings: clock: sunxi-ccu: Add compatible string for A83T PRCM
+      clk: sunxi-ng: a83t: Add support for A83T's PRCM
+
+Icenowy Zheng (2):
+      dt-bindings: add binding for the Allwinner DE2 CCU
+      clk: sunxi-ng: add support for DE2 CCU
+
+Maxime Ripard (8):
+      clk: divider: Make divider_round_rate take the parent clock
+      clk: sunxi-ng: Pass the parent and a pointer to the clocks round rate
+      clk: sunxi-ng: div: Switch to divider_round_rate
+      clk: sunxi-ng: mux: Don't just rely on the parent for CLK_SET_RATE_PARENT
+      clk: sunxi-ng: mux: split out the pre-divider computation code
+      clk: sunxi-ng: mux: Change pre-divider application function prototype
+      clk: sunxi-ng: mux: Re-adjust parent rate
+      clk: sunxi-ng: sun5i: Export video PLLs
+
+Stephen Boyd (1):
+      clk: sunxi-ng: Move all clock types to a library
+
+Tobias Klauser (1):
+      clk: sunxi-ng: explicitly include linux/spinlock.h
+
+Wei Yongjun (1):
+      clk: sunxi-ng: de2: fix wrong pointer passed to PTR_ERR()
+
+ .../devicetree/bindings/clock/sun8i-de2.txt        |  31 +
+ .../devicetree/bindings/clock/sunxi-ccu.txt        |   5 +-
+ drivers/clk/clk-divider.c                          |  19 +-
+ drivers/clk/sunxi-ng/Kconfig                       | 116 +--
+ drivers/clk/sunxi-ng/Makefile                      |  37 +-
+ drivers/clk/sunxi-ng/ccu-sun50i-a64.c              |  10 +-
+ drivers/clk/sunxi-ng/ccu-sun5i.h                   |   6 +-
+ drivers/clk/sunxi-ng/ccu-sun6i-a31.c               |  10 +-
+ drivers/clk/sunxi-ng/ccu-sun8i-a23.c               |  10 +-
+ drivers/clk/sunxi-ng/ccu-sun8i-a33.c               |  10 +-
+ drivers/clk/sunxi-ng/ccu-sun8i-a83t.c              | 922 +++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu-sun8i-a83t.h              |  64 ++
+ drivers/clk/sunxi-ng/ccu-sun8i-de2.c               | 260 ++++++
+ drivers/clk/sunxi-ng/ccu-sun8i-de2.h               |  28 +
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.c                |  10 +-
+ drivers/clk/sunxi-ng/ccu-sun8i-r.c                 | 117 ++-
+ drivers/clk/sunxi-ng/ccu-sun8i-v3s.c               |  10 +-
+ drivers/clk/sunxi-ng/ccu_div.c                     |  38 +-
+ drivers/clk/sunxi-ng/ccu_mp.c                      |  15 +-
+ drivers/clk/sunxi-ng/ccu_mult.c                    |  19 +-
+ drivers/clk/sunxi-ng/ccu_mux.c                     | 108 ++-
+ drivers/clk/sunxi-ng/ccu_mux.h                     |  24 +-
+ drivers/clk/sunxi-ng/ccu_nkm.c                     |   7 +-
+ drivers/clk/sunxi-ng/ccu_reset.h                   |   1 +
+ include/dt-bindings/clock/sun5i-ccu.h              |   3 +
+ include/dt-bindings/clock/sun8i-a83t-ccu.h         | 140 ++++
+ include/dt-bindings/clock/sun8i-de2.h              |  18 +
+ include/dt-bindings/reset/sun8i-a83t-ccu.h         |  98 +++
+ include/dt-bindings/reset/sun8i-de2.h              |  14 +
+ include/linux/clk-provider.h                       |  16 +-
+ 30 files changed, 1893 insertions(+), 273 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/sun8i-de2.txt
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-a83t.h
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-de2.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-de2.h
+ create mode 100644 include/dt-bindings/clock/sun8i-a83t-ccu.h
+ create mode 100644 include/dt-bindings/clock/sun8i-de2.h
+ create mode 100644 include/dt-bindings/reset/sun8i-a83t-ccu.h
+ create mode 100644 include/dt-bindings/reset/sun8i-de2.h
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170614/2a1b7c1e/attachment-0001.sig>
