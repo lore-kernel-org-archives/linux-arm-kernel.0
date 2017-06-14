@@ -1,66 +1,154 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 14 Jun 2017 10:29:13 +0200
-Subject: [PATCH v5 0/4] tty/serial: meson_uart: add support for core clock
- handling
-Message-ID: <1497428957-19942-1-git-send-email-narmstrong@baylibre.com>
+Date: Wed, 14 Jun 2017 10:29:15 +0200
+Subject: [PATCH v5 2/4] tty/serial: meson_uart: update to stable bindings
+In-Reply-To: <1497428957-19942-1-git-send-email-narmstrong@baylibre.com>
+References: <1497428957-19942-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1497428957-19942-3-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset is a re-spin of Helmut Klein's v3 patchset at [0] and the v4 patchset at [1].
+From: Helmut Klein <hgkr.klein@gmail.com>
 
-Initially, the original patchset was made to enable usage on the non-AO UARTS
-not enabled by the Bootloader (uart_B and uart_C), but the patchset needed
-an overall change to have clean and stable DT bindings.
+This patch handle the stable UART bindings but also keeps compatibility
+with the legacy non-stable bindings until all boards uses them.
 
-The Amlogic Meson UART Driver did not have stable DT bindings and mismatched
-clock handling on non-AO UARTs since these "EE" UARTs needs a clock gate to
-be ungated to works correctly.
-In the same way, the AO UARTs does not need gating and can be used as
-Early Consoles.
+Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
+Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ drivers/tty/serial/meson_uart.c | 90 ++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 84 insertions(+), 6 deletions(-)
 
-In the same time, the UART Interfaces can take clock input for the baudrate
-generate from either the external Xtal or the internal Bus Clock (clk81).
-
-So new bindings was necessary to meet these requirements and the DT
-maintainers requirements.
-
-The "legacy" binding actually used in the driver is left until all the DT
-files are switched to the new bindings.
-
-The GX DT has been tested, but the last 4 Meson6/Meson8/b are only
-compile-tested, and testing is welcome.
-Thus only the first 3 patches can be merged until the Meson6/Meson8/b are
-formally tested.
-
-It must be noted that the meson6 cannot work today except using an early
-console since the UART driver could not probe without a clocks property.
-
-Changes since v4 at [1]:
- - Droped meson8/meson8b DT patches
- - Fixes copy/paste error in patch 2
- - Refactored clock probing in patch 2
- - merged meson6 patches together to avoid breaking bisect
-
-[0] http://lkml.kernel.org/r/20170331165437.26227-1-hgkr.klein at gmail.com
-[1] http://lkml.kernel.org/r/1497001756-942-1-git-send-email-narmstrong at baylibre.com
-
-Helmut Klein (3):
-  dt-bindings: serial: Add bindings for the Amlogic Meson UARTs
-  tty/serial: meson_uart: update to stable bindings
-  ARM64: dts: meson-gx: use stable UART bindings with correct gate clock
-
-Neil Armstrong (1):
-  ARM: dts: meson6: use stable UART bindings
-
- .../bindings/serial/amlogic,meson-uart.txt         | 38 +++++++++
- arch/arm/boot/dts/meson.dtsi                       |  8 +-
- arch/arm/boot/dts/meson6.dtsi                      | 28 +++++++
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi          | 12 ++-
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 25 ++++++
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         | 25 ++++++
- drivers/tty/serial/meson_uart.c                    | 90 ++++++++++++++++++++--
- 7 files changed, 209 insertions(+), 17 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/serial/amlogic,meson-uart.txt
-
+diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
+index 60f1679..82e0709 100644
+--- a/drivers/tty/serial/meson_uart.c
++++ b/drivers/tty/serial/meson_uart.c
+@@ -579,8 +579,12 @@ static void meson_serial_early_console_write(struct console *co,
+ 	device->con->write = meson_serial_early_console_write;
+ 	return 0;
+ }
++/* Legacy bindings, should be removed when no more used */
+ OF_EARLYCON_DECLARE(meson, "amlogic,meson-uart",
+ 		    meson_serial_early_console_setup);
++/* Stable bindings */
++OF_EARLYCON_DECLARE(meson, "amlogic,meson-ao-uart",
++		    meson_serial_early_console_setup);
+ 
+ #define MESON_SERIAL_CONSOLE	(&meson_serial_console)
+ #else
+@@ -595,11 +599,76 @@ static void meson_serial_early_console_write(struct console *co,
+ 	.cons		= MESON_SERIAL_CONSOLE,
+ };
+ 
++static inline struct clk *meson_uart_probe_clock(struct device *dev,
++						 const char *id)
++{
++	struct clk *clk = NULL;
++	int ret;
++
++	clk = devm_clk_get(dev, id);
++	if (IS_ERR(clk))
++		return clk;
++
++	ret = clk_prepare_enable(clk);
++	if (ret) {
++		dev_err(dev, "couldn't enable clk\n");
++		return ERR_PTR(ret);
++	}
++
++	devm_add_action_or_reset(dev,
++			(void(*)(void *))clk_disable_unprepare,
++			clk);
++
++	return clk;
++}
++
++/*
++ * This function gets clocks in the legacy non-stable DT bindings.
++ * This code will be remove once all the platforms switch to the
++ * new DT bindings.
++ */
++static int meson_uart_probe_clocks_legacy(struct platform_device *pdev,
++					  struct uart_port *port)
++{
++	struct clk *clk = NULL;
++
++	clk = meson_uart_probe_clock(&pdev->dev, NULL);
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
++
++	port->uartclk = clk_get_rate(clk);
++
++	return 0;
++}
++
++static int meson_uart_probe_clocks(struct platform_device *pdev,
++				   struct uart_port *port)
++{
++	struct clk *clk_xtal = NULL;
++	struct clk *clk_pclk = NULL;
++	struct clk *clk_baud = NULL;
++
++	clk_pclk = meson_uart_probe_clock(&pdev->dev, "pclk");
++	if (IS_ERR(clk_pclk))
++		return PTR_ERR(clk_pclk);
++
++	clk_xtal = meson_uart_probe_clock(&pdev->dev, "xtal");
++	if (IS_ERR(clk_xtal))
++		return PTR_ERR(clk_xtal);
++
++	clk_baud = meson_uart_probe_clock(&pdev->dev, "baud");
++	if (IS_ERR(clk_baud))
++		return PTR_ERR(clk_baud);
++
++	port->uartclk = clk_get_rate(clk_baud);
++
++	return 0;
++}
++
+ static int meson_uart_probe(struct platform_device *pdev)
+ {
+ 	struct resource *res_mem, *res_irq;
+ 	struct uart_port *port;
+-	struct clk *clk;
+ 	int ret = 0;
+ 
+ 	if (pdev->dev.of_node)
+@@ -625,11 +694,15 @@ static int meson_uart_probe(struct platform_device *pdev)
+ 	if (!port)
+ 		return -ENOMEM;
+ 
+-	clk = clk_get(&pdev->dev, NULL);
+-	if (IS_ERR(clk))
+-		return PTR_ERR(clk);
++	/* Use legacy way until all platforms switch to new bindings */
++	if (of_device_is_compatible(pdev->dev.of_node, "amlogic,meson-uart"))
++		ret = meson_uart_probe_clocks_legacy(pdev, port);
++	else
++		ret = meson_uart_probe_clocks(pdev, port);
++
++	if (ret)
++		return ret;
+ 
+-	port->uartclk = clk_get_rate(clk);
+ 	port->iotype = UPIO_MEM;
+ 	port->mapbase = res_mem->start;
+ 	port->irq = res_irq->start;
+@@ -668,9 +741,14 @@ static int meson_uart_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-
+ static const struct of_device_id meson_uart_dt_match[] = {
++	/* Legacy bindings, should be removed when no more used */
+ 	{ .compatible = "amlogic,meson-uart" },
++	/* Stable bindings */
++	{ .compatible = "amlogic,meson6-uart" },
++	{ .compatible = "amlogic,meson8-uart" },
++	{ .compatible = "amlogic,meson8b-uart" },
++	{ .compatible = "amlogic,meson-gx-uart" },
+ 	{ /* sentinel */ },
+ };
+ MODULE_DEVICE_TABLE(of, meson_uart_dt_match);
 -- 
 1.9.1
