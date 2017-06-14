@@ -1,45 +1,84 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 14 Jun 2017 17:49:01 +0200
-Subject: [PATCH v4 01/11] net: mvmdio: reorder headers alphabetically
+Date: Wed, 14 Jun 2017 17:49:04 +0200
+Subject: [PATCH v4 04/11] net: mvmdio: remove duplicate locking
 In-Reply-To: <20170614154911.14510-1-antoine.tenart@free-electrons.com>
 References: <20170614154911.14510-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170614154911.14510-2-antoine.tenart@free-electrons.com>
+Message-ID: <20170614154911.14510-5-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cosmetic fix reordering headers alphabetically.
+From: Russell King <rmk+kernel@armlinux.org.uk>
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+The MDIO layer already provides per-bus locking, so there's no need for
+MDIO bus drivers to do their own internal locking.  Remove this.
+
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/net/ethernet/marvell/mvmdio.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/net/ethernet/marvell/mvmdio.c | 10 ----------
+ 1 file changed, 10 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
-index 90a60b98c28e..109a2bff334d 100644
+index 583f1c5753c2..eab625752b12 100644
 --- a/drivers/net/ethernet/marvell/mvmdio.c
 +++ b/drivers/net/ethernet/marvell/mvmdio.c
-@@ -17,16 +17,16 @@
-  * warranty of any kind, whether express or implied.
-  */
- 
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
+@@ -23,7 +23,6 @@
+ #include <linux/io.h>
  #include <linux/kernel.h>
  #include <linux/module.h>
- #include <linux/mutex.h>
-+#include <linux/of_mdio.h>
+-#include <linux/mutex.h>
+ #include <linux/of_mdio.h>
  #include <linux/phy.h>
--#include <linux/interrupt.h>
  #include <linux/platform_device.h>
--#include <linux/delay.h>
--#include <linux/io.h>
--#include <linux/clk.h>
--#include <linux/of_mdio.h>
- #include <linux/sched.h>
- #include <linux/wait.h>
+@@ -51,7 +50,6 @@
+ #define MVMDIO_SMI_POLL_INTERVAL_MAX	55
  
+ struct orion_mdio_dev {
+-	struct mutex lock;
+ 	void __iomem *regs;
+ 	struct clk *clk[3];
+ 	/*
+@@ -116,8 +114,6 @@ static int orion_mdio_read(struct mii_bus *bus, int mii_id,
+ 	u32 val;
+ 	int ret;
+ 
+-	mutex_lock(&dev->lock);
+-
+ 	ret = orion_mdio_wait_ready(bus);
+ 	if (ret < 0)
+ 		goto out;
+@@ -140,7 +136,6 @@ static int orion_mdio_read(struct mii_bus *bus, int mii_id,
+ 
+ 	ret = val & GENMASK(15, 0);
+ out:
+-	mutex_unlock(&dev->lock);
+ 	return ret;
+ }
+ 
+@@ -150,8 +145,6 @@ static int orion_mdio_write(struct mii_bus *bus, int mii_id,
+ 	struct orion_mdio_dev *dev = bus->priv;
+ 	int ret;
+ 
+-	mutex_lock(&dev->lock);
+-
+ 	ret = orion_mdio_wait_ready(bus);
+ 	if (ret < 0)
+ 		goto out;
+@@ -163,7 +156,6 @@ static int orion_mdio_write(struct mii_bus *bus, int mii_id,
+ 	       dev->regs);
+ 
+ out:
+-	mutex_unlock(&dev->lock);
+ 	return ret;
+ }
+ 
+@@ -244,8 +236,6 @@ static int orion_mdio_probe(struct platform_device *pdev)
+ 		return -EPROBE_DEFER;
+ 	}
+ 
+-	mutex_init(&dev->lock);
+-
+ 	if (pdev->dev.of_node)
+ 		ret = of_mdiobus_register(bus, pdev->dev.of_node);
+ 	else
 -- 
 2.9.4
