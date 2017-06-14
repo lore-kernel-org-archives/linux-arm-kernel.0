@@ -1,47 +1,57 @@
-From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Wed, 14 Jun 2017 15:33:40 +0900
-Subject: [PATCH v2] drm/exynos/dsi: Remove error handling for bridge_node DT
- parsing
-References: <CGME20170614063359epcas5p46658bba447468cd367d0684bd9485bf8@epcas5p4.samsung.com>
-Message-ID: <1497422020-8810-1-git-send-email-hoegeun.kwon@samsung.com>
+From: hoeun.ryu@gmail.com (Hoeun Ryu)
+Date: Wed, 14 Jun 2017 15:48:46 +0900
+Subject: [RESEND PATCH 1/2] arm:omap2+: put omap_uart_phys/virt/lsr in
+ .text section when ZIMAGE is true
+In-Reply-To: <20170614052750.GC3730@atomide.com>
+References: <1497316206-11110-1-git-send-email-hoeun.ryu@gmail.com>
+ <20170614052750.GC3730@atomide.com>
+Message-ID: <1497422926.1935.4.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the error handling of bridge_node because the bridge_node is
-required optionally.
+On Tue, 2017-06-13 at 22:27 -0700, Tony Lindgren wrote:
+> Hi,
+> 
+> * Hoeun Ryu <hoeun.ryu@gmail.com> [170612 18:18]:
+> > 
+> > --- a/arch/arm/include/debug/omap2plus.S
+> > +++ b/arch/arm/include/debug/omap2plus.S
+> > @@ -58,11 +58,22 @@
+> > ?
+> > ?#define UART_OFFSET(addr)	((addr) & 0x00ffffff)
+> > ?
+> > +/*
+> > + * Definition of ZIMAGE is in arch/arm/boot/compressed/Makefile.
+> > + * Place the following block in .text section only when this file
+> > is
+> > + * included by arch/arm/boot/compressed/* to make it possible to
+> > + * enable CONFIG_DEBUG_UNCOMPRESS and DEBUG in
+> > arch/arm/boot/compressed/head.S
+> > + * on OMAP2+ SoCs.
+> > + */
+> > +#ifndef ZIMAGE
+> > ?		.pushsection .data
+> > +#endif
+> > ?omap_uart_phys:	.word	0
+> > ?omap_uart_virt:	.word	0
+> > ?omap_uart_lsr:	.word	0
+> > +#ifndef ZIMAGE
+> > ?		.popsection
+> > +#endif
+> So I converted all these to use the 8250 debug_ll yesterday
+> which should solve the DEBUG_UNCOMPRESS issue for you and
+> allows us to remove this file. Will post the series shortly
+> for testing with you in Cc after I've done a bit more testing
+> here.
 
-For example, In case of Exynos SoC, a bridge device such as mDNIe and
-MIC could be placed between Display Controller and MIPI DSI device but
-the bridge device is required optionally.
+It sounds good.
+patch 01 is dropped though, are you using the second patch ?
+"[PATCH 2/2] arm:omap2+: drop dependence on DEBUG_OMAP2PLUS_UART for
+DEBUG_UNCOMPRESS"
 
-Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
----
+Thank you.
 
-Hi Inki and Tobias,
-
-Thanks for your review.
-
-Changes for V2:
-- Modified the commit message in more detail than before.
-
-Best Regards,
-Hoegeun
-
- drivers/gpu/drm/exynos/exynos_drm_dsi.c | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-index a11b795..6ee0dac 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-@@ -1651,8 +1651,6 @@ static int exynos_dsi_parse_dt(struct exynos_dsi *dsi)
- 		return ret;
- 
- 	dsi->bridge_node = of_graph_get_remote_node(node, DSI_PORT_IN, 0);
--	if (!dsi->bridge_node)
--		return -EINVAL;
- 
- 	return 0;
- }
--- 
-1.9.1
+> 
+> Regards,
+> 
+> Tony
