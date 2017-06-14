@@ -1,20 +1,18 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 14 Jun 2017 10:01:03 -0700
-Subject: [PATCH v4 04/11] net: mvmdio: remove duplicate locking
-In-Reply-To: <20170614154911.14510-5-antoine.tenart@free-electrons.com>
+Date: Wed, 14 Jun 2017 10:02:03 -0700
+Subject: [PATCH v4 05/11] net: mvmdio: introduce an ops structure
+In-Reply-To: <20170614154911.14510-6-antoine.tenart@free-electrons.com>
 References: <20170614154911.14510-1-antoine.tenart@free-electrons.com>
- <20170614154911.14510-5-antoine.tenart@free-electrons.com>
-Message-ID: <b7b5f716-9553-40fc-dc19-b016ed9cf2d9@gmail.com>
+ <20170614154911.14510-6-antoine.tenart@free-electrons.com>
+Message-ID: <cb758687-8516-3f7e-b28a-2b2400464f4f@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 06/14/2017 08:49 AM, Antoine Tenart wrote:
-> From: Russell King <rmk+kernel@armlinux.org.uk>
+> Introduce an ops structure to add an indirection on the is_done
+> function, as this is needed to add the xMDIO support later.
 > 
-> The MDIO layer already provides per-bus locking, so there's no need for
-> MDIO bus drivers to do their own internal locking.  Remove this.
-> 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 
 Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 -- 
