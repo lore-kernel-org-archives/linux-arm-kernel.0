@@ -1,33 +1,47 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Wed, 14 Jun 2017 14:22:29 +0800
-Subject: [PATCH 00/17] coresight: next v4.12-rc4
-In-Reply-To: <20170613161712.f1f3cac734939d8728c7ed77@arm.com>
-References: <1496693718-9191-1-git-send-email-mathieu.poirier@linaro.org>
- <20170609175339.28d1d4d5a6c91a9e16c16bf7@arm.com>
- <CANLsYky8XLbOwinxVc2xKaNzhkpUOX0NsNxrFF4=MsjzC3iY1g@mail.gmail.com>
- <20170613161712.f1f3cac734939d8728c7ed77@arm.com>
-Message-ID: <20170614062229.GA28496@leoy-ThinkPad-T440>
+From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
+Date: Wed, 14 Jun 2017 15:33:40 +0900
+Subject: [PATCH v2] drm/exynos/dsi: Remove error handling for bridge_node DT
+ parsing
+References: <CGME20170614063359epcas5p46658bba447468cd367d0684bd9485bf8@epcas5p4.samsung.com>
+Message-ID: <1497422020-8810-1-git-send-email-hoegeun.kwon@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kim,
+Remove the error handling of bridge_node because the bridge_node is
+required optionally.
 
-On Tue, Jun 13, 2017 at 04:17:12PM -0500, Kim Phillips wrote:
+For example, In case of Exynos SoC, a bridge device such as mDNIe and
+MIC could be placed between Display Controller and MIPI DSI device but
+the bridge device is required optionally.
 
-[...]
+Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
+---
 
-> > > Also, do the current juno platforms not have CPU debug modules?  I'd
-> > > like to test the new driver.
-> > 
-> > By all means - Leo pointed out the patch adding the CPU debug entries in
-> > the DT  file for Juno.
-> 
-> Thanks, I applied it, was able to
-> toggle /sys/kernel/debug/coresight_cpu_debug/enable, but wasn't sure
-> how to trigger the cpu debug output...
+Hi Inki and Tobias,
 
-You could trigger panic flow with command, then can see CPU debug output:
-echo c > /proc/sysrq-trigger
+Thanks for your review.
 
-Thanks,
-Leo Yan
+Changes for V2:
+- Modified the commit message in more detail than before.
+
+Best Regards,
+Hoegeun
+
+ drivers/gpu/drm/exynos/exynos_drm_dsi.c | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+index a11b795..6ee0dac 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+@@ -1651,8 +1651,6 @@ static int exynos_dsi_parse_dt(struct exynos_dsi *dsi)
+ 		return ret;
+ 
+ 	dsi->bridge_node = of_graph_get_remote_node(node, DSI_PORT_IN, 0);
+-	if (!dsi->bridge_node)
+-		return -EINVAL;
+ 
+ 	return 0;
+ }
+-- 
+1.9.1
