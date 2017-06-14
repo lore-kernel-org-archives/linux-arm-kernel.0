@@ -1,61 +1,53 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 14 Jun 2017 14:32:54 -0700
-Subject: [PATCH v2 2/2] soc: brcmstb: Add driver for DPFE
-In-Reply-To: <CANEuBv6N3TTNzSuDQXk-eiEV_fvGtVJZhdWUO_XdgPj6+j7q5A@mail.gmail.com>
-References: <20170613223710.31719-1-code@mmayer.net>
- <20170613223710.31719-3-code@mmayer.net>
- <5b79dee6-bb84-30b3-1bb2-287b24d42534@gmail.com>
- <CANEuBv6N3TTNzSuDQXk-eiEV_fvGtVJZhdWUO_XdgPj6+j7q5A@mail.gmail.com>
-Message-ID: <79cb33fc-cc6a-e79c-5e5c-af632e20dc76@gmail.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Wed, 14 Jun 2017 23:36:11 +0200
+Subject: [PATCH 0/3] Meson (32-bit) multi_v7_defconfig updates
+In-Reply-To: <888ef3fd-d8aa-d09c-dace-8662a7fd9c5a@baylibre.com>
+References: <20170611100343.25868-1-martin.blumenstingl@googlemail.com>
+ <888ef3fd-d8aa-d09c-dace-8662a7fd9c5a@baylibre.com>
+Message-ID: <CAFBinCD8fO6TxCCVcr5idNA+G1wVdA5aWTdvewMFtj9+Kg-4xQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14/2017 09:34 AM, Markus Mayer wrote:
-> On 13 June 2017 at 17:03, Florian Fainelli <f.fainelli@gmail.com> wrote:
->> Hi Markus,
->>
->> On 06/13/2017 03:37 PM, Markus Mayer wrote:
->>> From: Markus Mayer <mmayer@broadcom.com>
->>>
->>> This driver allows access to DRAM properties, such as the refresh rate,
->>> via the Broadcom STB DDR PHY Front End (DPFE). The refresh rate can be
->>> used as indirect indicator of the DRAM temperature.
->>>
->>> The driver also allows setting of the sampling interval.
->>>
->>> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
->>> ---
->>>  MAINTAINERS                      |   8 +
->>>  drivers/soc/bcm/brcmstb/Makefile |   2 +-
->>>  drivers/soc/bcm/brcmstb/dpfe.c   | 689 +++++++++++++++++++++++++++++++++++++++
->>>  3 files changed, 698 insertions(+), 1 deletion(-)
->>>  create mode 100644 drivers/soc/bcm/brcmstb/dpfe.c
->>>
->>> diff --git a/MAINTAINERS b/MAINTAINERS
->>> index f7d568b..04f0be6 100644
->>> --- a/MAINTAINERS
->>> +++ b/MAINTAINERS
->>> @@ -2864,6 +2864,14 @@ S:     Maintained
->>>  F:   Documentation/devicetree/bindings/cpufreq/brcm,stb-avs-cpu-freq.txt
->>>  F:   drivers/cpufreq/brcmstb*
->>>
->>> +BROADCOM STB SOC DPFE DRIVER
->>> +M:   Markus Mayer <mmayer@broadcom.com>
->>> +M:   bcm-kernel-feedback-list at broadcom.com
->>> +L:   linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->>> +S:   Maintained
->>> +F:   Documentation/devicetree/bindings/soc/bcm/brcm,dpfe-cpu.txt
->>> +F:   drivers/misc/brcmstb-dpfe.c
->>
->> Just one nit: this should be drivers/soc/bcm/brcmstb/dpfe.c, other than
->> that, I just need an Ack from Rob on the binding, and I will queue this
->> up, thanks!
-> 
-> Oops. Thanks for catching that. Would you like me to re-send or will
-> you fix up that path on your end?
+Hi Neil,
 
-I can fix it up if Rob is happy with the current binding, if you need to
-resubmit, please fix that as well. Thanks!
--- 
--- 
-Florian
+On Mon, Jun 12, 2017 at 9:38 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+> On 06/11/2017 12:03 PM, Martin Blumenstingl wrote:
+>> This enables the following drivers which are supported on Meson8 and
+>> Meson8b (as well as Meson8m2):
+>> - Meson USB2 PHY driver (USB controller support is provided by dwc2,
+>>   which is already enabled)
+>> - Meson PWM driver (used to dim LEDs and generate the 32.768 kHz LPO
+>>   clock for the SDIO wifi modules)
+>> - the generic PWM clock driver (for the 32.768 kHz LPO clock for the
+>>   SDIO wifi modules)
+>>
+>>
+>> I am not sure if these patches will go through Kevin's Amlogic tree
+>> or through some other tree. However, these should be independent from
+>> anything else, so it's just a matter of preference through which tree
+>> they go.
+>>
+>>
+>> Martin Blumenstingl (3):
+>>   ARM: multi_v7_defconfig: enable the Amlogic Meson USB2 PHY driver
+>>   ARM: multi_v7_defconfig: enable the Meson PWM controller
+>>   ARM: multi_v7_defconfig: enable the PWM clock driver
+>>
+>>  arch/arm/configs/multi_v7_defconfig | 3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>
+>
+> Hi Martin,
+>
+> Isn't it better to have these as modules like for the ARM64 counterpart ?
+indeed, I will look into this - thanks for the hint
+
+PS: I will also re-check if enabling CONFIG_PHY_MESON8B_USB2 is
+requires, since it defaults to ARCH_MESON (which means it should
+default to "y" automatically, which is also why we don't have it in
+arch/arm64/configs/defconfig)
+
+
+Regards,
+Martin
