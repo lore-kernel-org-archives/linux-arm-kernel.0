@@ -1,62 +1,109 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Wed, 14 Jun 2017 09:53:39 +0800
-Subject: [PATCH v15 2/7] power: add power sequence library
-In-Reply-To: <CAPDyKFpOQWTPpdd__OBP1DcW58CbqnygGAOxiEFq5kqqvCm0QA@mail.gmail.com>
-References: <1497319166-17287-1-git-send-email-peter.chen@nxp.com>
- <1497319166-17287-3-git-send-email-peter.chen@nxp.com>
- <CAPDyKFpOQWTPpdd__OBP1DcW58CbqnygGAOxiEFq5kqqvCm0QA@mail.gmail.com>
-Message-ID: <20170614015338.GA4635@b29397-desktop>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 14 Jun 2017 09:57:04 +0800
+Subject: [PATCH v2 3/4] phy: usb: phy-brcm-usb: Add Broadcom STB USB phy
+ driver
+In-Reply-To: <1497365721-31188-4-git-send-email-al.cooper@broadcom.com>
+Message-ID: <201706140920.gV3HAiz4%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 13, 2017 at 12:24:42PM +0200, Ulf Hansson wrote:
-> [...]
-> 
-> > +
-> > +/**
-> > + * of_pwrseq_on - Carry out power sequence on for device node
-> > + *
-> > + * @np: the device node would like to power on
-> > + *
-> > + * Carry out a single device power on.  If multiple devices
-> > + * need to be handled, use of_pwrseq_on_list() instead.
-> > + *
-> > + * Return a pointer to the power sequence instance on success,
-> > + * or an error code otherwise.
-> > + */
-> > +struct pwrseq *of_pwrseq_on(struct device_node *np)
-> > +{
-> > +       struct pwrseq *pwrseq;
-> > +       int ret;
-> > +
-> > +       pwrseq = pwrseq_find_available_instance(np);
-> > +       if (!pwrseq)
-> > +               return ERR_PTR(-ENOENT);
-> 
-> In case the pwrseq instance hasn't been registered yet, then there is
-> no way to deal with -EPROBE_DEFER properly here.
-> 
-> I haven't been following the discussions in-depth during all
-> iterations, so perhaps you have already discussed why doing it like
-> this.
+Hi Al,
 
-Yes, it has been discussed. In order to compare with compatible string
-at dts, we need to have one registered pwrseq instance for each
-pwrseq library, this pre-registered one is allocated using
-postcore_initcall, and the new (eg, second) instance is registered
-after pwrseq_get has succeeded.
+[auto build test ERROR on phy/next]
+[also build test ERROR on next-20170613]
+[cannot apply to linus/master v4.12-rc5]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Peter
+url:    https://github.com/0day-ci/linux/commits/Al-Cooper/Add-Broadcom-STB-USB-phy-driver/20170614-070044
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git next
+config: blackfin-allmodconfig (attached as .config)
+compiler: bfin-uclinux-gcc (GCC) 6.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=blackfin 
 
-> 
-> Anyway, that means all pwrseq instances needs to be registered an
-> early boot level, to be safe. To me, that seems like poor design
-> choice.
-> 
-> Otherwise I think this looks okay to me.
-> 
+All error/warnings (new ones prefixed by >>):
 
--- 
+   drivers/phy//broadcom/phy-brcm-usb-init.c: In function 'brcmusb_usb_phy_ldo_fix':
+>> drivers/phy//broadcom/phy-brcm-usb-init.c:139:49: error: 'USB_CTRL_0xFFC00000' undeclared (first use in this function)
+    #define USB_CTRL_REG(base, reg) ((void *)base + USB_CTRL_##reg)
+                                                    ^
+>> drivers/phy//broadcom/phy-brcm-usb-init.c:157:31: note: in expansion of macro 'USB_CTRL_REG'
+     brcmusb_writel(brcmusb_readl(USB_CTRL_REG(base, reg)) &  \
+                                  ^~~~~~~~~~~~
+>> drivers/phy//broadcom/phy-brcm-usb-init.c:569:2: note: in expansion of macro 'USB_CTRL_UNSET'
+     USB_CTRL_UNSET(ctrl_base, PLL_CTL, PLL_RESETB);
+     ^~~~~~~~~~~~~~
+   drivers/phy//broadcom/phy-brcm-usb-init.c:139:49: note: each undeclared identifier is reported only once for each function it appears in
+    #define USB_CTRL_REG(base, reg) ((void *)base + USB_CTRL_##reg)
+                                                    ^
+>> drivers/phy//broadcom/phy-brcm-usb-init.c:157:31: note: in expansion of macro 'USB_CTRL_REG'
+     brcmusb_writel(brcmusb_readl(USB_CTRL_REG(base, reg)) &  \
+                                  ^~~~~~~~~~~~
+>> drivers/phy//broadcom/phy-brcm-usb-init.c:569:2: note: in expansion of macro 'USB_CTRL_UNSET'
+     USB_CTRL_UNSET(ctrl_base, PLL_CTL, PLL_RESETB);
+     ^~~~~~~~~~~~~~
+   drivers/phy//broadcom/phy-brcm-usb-init.c: In function 'brcmusb_init_common':
+>> drivers/phy//broadcom/phy-brcm-usb-init.c:139:49: error: 'USB_CTRL_0xFFC00000' undeclared (first use in this function)
+    #define USB_CTRL_REG(base, reg) ((void *)base + USB_CTRL_##reg)
+                                                    ^
+   drivers/phy//broadcom/phy-brcm-usb-init.c:154:31: note: in expansion of macro 'USB_CTRL_REG'
+     brcmusb_writel(brcmusb_readl(USB_CTRL_REG(base, reg)) |  \
+                                  ^~~~~~~~~~~~
+>> drivers/phy//broadcom/phy-brcm-usb-init.c:962:2: note: in expansion of macro 'USB_CTRL_SET'
+     USB_CTRL_SET(ctrl, PLL_CTL, PLL_SUSPEND_EN);
+     ^~~~~~~~~~~~
+   drivers/phy//broadcom/phy-brcm-usb-init.c: In function 'brcmusb_init_common_mips':
+>> drivers/phy//broadcom/phy-brcm-usb-init.c:139:49: error: 'USB_CTRL_0xFFC00000' undeclared (first use in this function)
+    #define USB_CTRL_REG(base, reg) ((void *)base + USB_CTRL_##reg)
+                                                    ^
+   drivers/phy//broadcom/phy-brcm-usb-init.c:154:31: note: in expansion of macro 'USB_CTRL_REG'
+     brcmusb_writel(brcmusb_readl(USB_CTRL_REG(base, reg)) |  \
+                                  ^~~~~~~~~~~~
+   drivers/phy//broadcom/phy-brcm-usb-init.c:1097:2: note: in expansion of macro 'USB_CTRL_SET'
+     USB_CTRL_SET(ctrl, PLL_CTL, PLL_SUSPEND_EN);
+     ^~~~~~~~~~~~
 
-Best Regards,
-Peter Chen
+vim +/USB_CTRL_REG +157 drivers/phy//broadcom/phy-brcm-usb-init.c
+
+   133		USB_CTRL_SETUP_STRAP_CC_DRD_MODE_ENABLE_SEL_SELECTOR,
+   134		USB_CTRL_USB_PM_USB20_HC_RESETB_SELECTOR,
+   135		USB_CTRL_SETUP_ENDIAN_SELECTOR,
+   136		USB_CTRL_SELECTOR_COUNT,
+   137	};
+   138	
+ > 139	#define USB_CTRL_REG(base, reg)	((void *)base + USB_CTRL_##reg)
+   140	#define USB_XHCI_EC_REG(base, reg) ((void *)base + USB_XHCI_EC_##reg)
+   141	#define USB_CTRL_MASK(reg, field) \
+   142		USB_CTRL_##reg##_##field##_MASK
+   143	#define USB_CTRL_MASK_FAMILY(params, reg, field)			\
+   144		(params->usb_reg_bits_map[USB_CTRL_##reg##_##field##_SELECTOR])
+   145	
+   146	#define USB_CTRL_SET_FAMILY(params, reg, field)	\
+   147		usb_ctrl_set_family(params, USB_CTRL_##reg,	\
+   148				USB_CTRL_##reg##_##field##_SELECTOR)
+   149	#define USB_CTRL_UNSET_FAMILY(params, reg, field)	\
+   150		usb_ctrl_unset_family(params, USB_CTRL_##reg,	\
+   151			USB_CTRL_##reg##_##field##_SELECTOR)
+   152	
+   153	#define USB_CTRL_SET(base, reg, field)	\
+   154		brcmusb_writel(brcmusb_readl(USB_CTRL_REG(base, reg)) |		\
+   155			USB_CTRL_##reg##_##field##_MASK, USB_CTRL_REG(base, reg))
+   156	#define USB_CTRL_UNSET(base, reg, field)	\
+ > 157		brcmusb_writel(brcmusb_readl(USB_CTRL_REG(base, reg)) &		\
+   158			~USB_CTRL_##reg##_##field##_MASK, USB_CTRL_REG(base, reg))
+   159	
+   160	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 44856 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170614/cc70bbad/attachment-0001.gz>
