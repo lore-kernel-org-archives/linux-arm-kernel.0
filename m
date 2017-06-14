@@ -1,56 +1,49 @@
-From: code@mmayer.net (Markus Mayer)
-Date: Wed, 14 Jun 2017 09:34:11 -0700
-Subject: [PATCH v2 2/2] soc: brcmstb: Add driver for DPFE
-In-Reply-To: <5b79dee6-bb84-30b3-1bb2-287b24d42534@gmail.com>
-References: <20170613223710.31719-1-code@mmayer.net>
- <20170613223710.31719-3-code@mmayer.net>
- <5b79dee6-bb84-30b3-1bb2-287b24d42534@gmail.com>
-Message-ID: <CANEuBv6N3TTNzSuDQXk-eiEV_fvGtVJZhdWUO_XdgPj6+j7q5A@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 14 Jun 2017 18:35:37 +0200
+Subject: [PATCH v4 10/11] dt-bindings: orion-mdio: document the new xmdio
+ compatible
+In-Reply-To: <20170614154911.14510-11-antoine.tenart@free-electrons.com>
+References: <20170614154911.14510-1-antoine.tenart@free-electrons.com>
+ <20170614154911.14510-11-antoine.tenart@free-electrons.com>
+Message-ID: <20170614163537.GO15847@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 June 2017 at 17:03, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> Hi Markus,
->
-> On 06/13/2017 03:37 PM, Markus Mayer wrote:
->> From: Markus Mayer <mmayer@broadcom.com>
->>
->> This driver allows access to DRAM properties, such as the refresh rate,
->> via the Broadcom STB DDR PHY Front End (DPFE). The refresh rate can be
->> used as indirect indicator of the DRAM temperature.
->>
->> The driver also allows setting of the sampling interval.
->>
->> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
->> ---
->>  MAINTAINERS                      |   8 +
->>  drivers/soc/bcm/brcmstb/Makefile |   2 +-
->>  drivers/soc/bcm/brcmstb/dpfe.c   | 689 +++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 698 insertions(+), 1 deletion(-)
->>  create mode 100644 drivers/soc/bcm/brcmstb/dpfe.c
->>
->> diff --git a/MAINTAINERS b/MAINTAINERS
->> index f7d568b..04f0be6 100644
->> --- a/MAINTAINERS
->> +++ b/MAINTAINERS
->> @@ -2864,6 +2864,14 @@ S:     Maintained
->>  F:   Documentation/devicetree/bindings/cpufreq/brcm,stb-avs-cpu-freq.txt
->>  F:   drivers/cpufreq/brcmstb*
->>
->> +BROADCOM STB SOC DPFE DRIVER
->> +M:   Markus Mayer <mmayer@broadcom.com>
->> +M:   bcm-kernel-feedback-list at broadcom.com
->> +L:   linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->> +S:   Maintained
->> +F:   Documentation/devicetree/bindings/soc/bcm/brcm,dpfe-cpu.txt
->> +F:   drivers/misc/brcmstb-dpfe.c
->
-> Just one nit: this should be drivers/soc/bcm/brcmstb/dpfe.c, other than
-> that, I just need an Ack from Rob on the binding, and I will queue this
-> up, thanks!
+On Wed, Jun 14, 2017 at 05:49:10PM +0200, Antoine Tenart wrote:
+> A new compatible for Marvell xMDIO interfaces was added into the Marvell
+> MDIO driver. Document this new compatible.
+> 
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/net/marvell-orion-mdio.txt | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt b/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt
+> index ccdabdcc8618..b93a5b5a0472 100644
+> --- a/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt
+> +++ b/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt
+> @@ -1,12 +1,12 @@
+>  * Marvell MDIO Ethernet Controller interface
+>  
+>  The Ethernet controllers of the Marvel Kirkwood, Dove, Orion5x,
+> -MV78xx0, Armada 370 and Armada XP have an identical unit that provides
+> -an interface with the MDIO bus. This driver handles this MDIO
+> -interface.
+> +MV78xx0, Armada 370, Armada XP, Armada 7k and Armada 8k have an
+> +identical unit that provides an interface with the MDIO bus or
+> +with the xMDIO bus. This driver handles these interfaces.
 
-Oops. Thanks for catching that. Would you like me to re-send or will
-you fix up that path on your end?
+Hi Antoine
 
-> --
-> Florian
+This patches is looking good now. One nit. The description above
+suggests Kirkwood, Dove, Orion5x, MV78xx0, Armada 370 and Armada XP
+all have xmdio. Maybe better wording would be:
+
+The Ethernet controllers of the Marvel Kirkwood, Dove, Orion5x,
+MV78xx0, Armada 370, Armada XP, Armada 7k and Armada 8k have an
+identical unit that provides an interface with the MDIO bus.
+Additionally, Armada 7k and Armada 8k has a second unit which
+provides an interface with the xMDIO bus. This driver handles
+these interfaces.
+
+      Andrew
