@@ -1,46 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 14 Jun 2017 11:59:29 +0200
-Subject: [Merge tag 'pci-v4.12-changes' of git] 857f864014: BUG: unable to
- handle kernel NULL pointer dereference at 00000000000000a8
-In-Reply-To: <20170613043416.GB14217@kroah.com>
-References: <5933fe2d.V33ODGPU9noDVuyF%fengguang.wu@intel.com>
- <20170606175552.GA12672@bhelgaas-glaptop.roam.corp.google.com>
- <fe0543c1-cba6-02bb-36eb-395910bd5012@deltatee.com>
- <20170612200852.GA28578@bhelgaas-glaptop.roam.corp.google.com>
- <61e11e67-6c1b-ef1e-5fb8-a7c9efb17666@deltatee.com>
- <20170613041842.GA13308@kroah.com>
- <f6322f70-7ca7-abf6-b947-4cbbfd598948@deltatee.com>
- <20170613043416.GB14217@kroah.com>
-Message-ID: <CACRpkdZyup+dH6Yp747yLyaC8DSbA8bEnk37gJKnmnjBvjn=-A@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 14 Jun 2017 11:06:41 +0100
+Subject: Using __always_inline attribute
+In-Reply-To: <2a762f1f3b355e71c5bca6a6e00bffe0@codeaurora.org>
+References: <2a762f1f3b355e71c5bca6a6e00bffe0@codeaurora.org>
+Message-ID: <20170614100641.GB16190@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 13, 2017 at 6:34 AM, Greg Kroah-Hartman
-<gregkh@linuxfoundation.org> wrote:
+Hi Prasad,
 
-> Ah, that makes sense.  Well, someone can always work on expanding the
-> range of dynamic char major numbers if they are running out of them on a
-> real system, I'll gladly take patches for that :)
+On Tue, Jun 13, 2017 at 03:39:37PM -0700, Sodagudi Prasad wrote:
+> With a variant of a CLANG(based on 4.0) following errors observed on Linux
+> 4.12-rc5 tag.
 
-I started to take a stab at it at one point and incorporated some feedback
-from Torvalds etc, it's here:
-https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git/commit/?h=chrdev-warn&id=65e5b1e9eb3f777ab7535b74b490e882eeec79d7
+How are you building the kernel with clang, btw? I'd be keen to try the same
+thing, but I thought the LLVMLinux project was largely dead at his point. Do
+you still need build system patches, or is this now integrated with Kbuild?
 
-It tries to use all "holes" in the chardev major map to shun in a bit
-more devices when we run out of the high dynamic major range.
+> net/built-in.o: In function `__xchg_mb':
+> arch/arm64/include/asm/cmpxchg.h:99: \
+>                     undefined reference to `__compiletime_assert_99'
+> arch/arm64/include/asm/cmpxchg.h:99: \
+>                     undefined reference to `__compiletime_assert_99
+> 
+> Clang does not seems to be marking this macro as inline and causing above
+> compilation issue due to BUILD_BUG().
 
-Making them all dynamic seemed dangerous because I was afraid
-of userspace ABI breakage because of old userlands with
-static mknod:s.
+The only BUILD_BUG I see around here is if the size parameter (which is
+calculated using sizeof) is not known to be 1,2,4 or 8 at compile time. It
+would be interesting to know which call site is confusing clang in this way
+and what code is actually being emitted here.
 
-I lost interest when it turned out that the zeroday QEMU stuff was
-generating random machines that have no counterpart in the real
-world, and then the exercise seemed a bit academic.
+If it's just that __xchg_mb isn't being inlined into the __xchg_wrapper
+macro, then your patch should be ok, but I'd like to be sure it's not
+something else. I'm also surprised you haven't see this crop up in other
+places.
 
-The last failures were due to (AFAICT) some relationship between
-major and minor numbers that I didn't untangle.
-
-If there is interest I could try to revive it.
-
-Yours,
-Linus Walleij
+Will
