@@ -1,43 +1,62 @@
-From: logang@deltatee.com (Logan Gunthorpe)
-Date: Wed, 14 Jun 2017 09:49:52 -0600
-Subject: [Merge tag 'pci-v4.12-changes' of git] 857f864014: BUG: unable to
- handle kernel NULL pointer dereference at 00000000000000a8
-In-Reply-To: <CACRpkdZyup+dH6Yp747yLyaC8DSbA8bEnk37gJKnmnjBvjn=-A@mail.gmail.com>
-References: <5933fe2d.V33ODGPU9noDVuyF%fengguang.wu@intel.com>
- <20170606175552.GA12672@bhelgaas-glaptop.roam.corp.google.com>
- <fe0543c1-cba6-02bb-36eb-395910bd5012@deltatee.com>
- <20170612200852.GA28578@bhelgaas-glaptop.roam.corp.google.com>
- <61e11e67-6c1b-ef1e-5fb8-a7c9efb17666@deltatee.com>
- <20170613041842.GA13308@kroah.com>
- <f6322f70-7ca7-abf6-b947-4cbbfd598948@deltatee.com>
- <20170613043416.GB14217@kroah.com>
- <CACRpkdZyup+dH6Yp747yLyaC8DSbA8bEnk37gJKnmnjBvjn=-A@mail.gmail.com>
-Message-ID: <c3148aca-5707-1858-d889-af004321b140@deltatee.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Wed, 14 Jun 2017 17:49:02 +0200
+Subject: [PATCH v4 02/11] net: mvmdio: use tabs for defines
+In-Reply-To: <20170614154911.14510-1-antoine.tenart@free-electrons.com>
+References: <20170614154911.14510-1-antoine.tenart@free-electrons.com>
+Message-ID: <20170614154911.14510-3-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Cosmetic patch replacing spaces by tabs for defined values.
 
-On 14/06/17 03:59 AM, Linus Walleij wrote:
-> I started to take a stab at it at one point and incorporated some feedback
-> from Torvalds etc, it's here:
-> https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git/commit/?h=chrdev-warn&id=65e5b1e9eb3f777ab7535b74b490e882eeec79d7
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ drivers/net/ethernet/marvell/mvmdio.c | 26 +++++++++++++-------------
+ 1 file changed, 13 insertions(+), 13 deletions(-)
 
-Yes, thanks, I did find your work after a google search. However, seeing
-it seems to recover only a handful of numbers with some significant
-complexity required it seemed like a stopgap solution anyway. I posted a
-proposal in this thread that simply extends the dynamic range into a
-region above 256 which seems to work well. This means regular
-configurations won't be affected an any configuration requiring more
-than 20 dynamic majors will simply end up with high numbers.
-
-So unless anyone can think of a reason why this won't work, it's my
-preferred direction.
-
-> Making them all dynamic seemed dangerous because I was afraid
-> of userspace ABI breakage because of old userlands with
-> static mknod:s.
-
-I agree.
-
-Logan
+diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
+index 109a2bff334d..17b518b13ae3 100644
+--- a/drivers/net/ethernet/marvell/mvmdio.c
++++ b/drivers/net/ethernet/marvell/mvmdio.c
+@@ -30,25 +30,25 @@
+ #include <linux/sched.h>
+ #include <linux/wait.h>
+ 
+-#define MVMDIO_SMI_DATA_SHIFT              0
+-#define MVMDIO_SMI_PHY_ADDR_SHIFT          16
+-#define MVMDIO_SMI_PHY_REG_SHIFT           21
+-#define MVMDIO_SMI_READ_OPERATION          BIT(26)
+-#define MVMDIO_SMI_WRITE_OPERATION         0
+-#define MVMDIO_SMI_READ_VALID              BIT(27)
+-#define MVMDIO_SMI_BUSY                    BIT(28)
+-#define MVMDIO_ERR_INT_CAUSE		   0x007C
+-#define  MVMDIO_ERR_INT_SMI_DONE	   0x00000010
+-#define MVMDIO_ERR_INT_MASK		   0x0080
++#define MVMDIO_SMI_DATA_SHIFT		0
++#define MVMDIO_SMI_PHY_ADDR_SHIFT	16
++#define MVMDIO_SMI_PHY_REG_SHIFT	21
++#define MVMDIO_SMI_READ_OPERATION	BIT(26)
++#define MVMDIO_SMI_WRITE_OPERATION	0
++#define MVMDIO_SMI_READ_VALID		BIT(27)
++#define MVMDIO_SMI_BUSY			BIT(28)
++#define MVMDIO_ERR_INT_CAUSE		0x007C
++#define  MVMDIO_ERR_INT_SMI_DONE	0x00000010
++#define MVMDIO_ERR_INT_MASK		0x0080
+ 
+ /*
+  * SMI Timeout measurements:
+  * - Kirkwood 88F6281 (Globalscale Dreamplug): 45us to 95us (Interrupt)
+  * - Armada 370       (Globalscale Mirabox):   41us to 43us (Polled)
+  */
+-#define MVMDIO_SMI_TIMEOUT		   1000 /* 1000us = 1ms */
+-#define MVMDIO_SMI_POLL_INTERVAL_MIN	   45
+-#define MVMDIO_SMI_POLL_INTERVAL_MAX	   55
++#define MVMDIO_SMI_TIMEOUT		1000 /* 1000us = 1ms */
++#define MVMDIO_SMI_POLL_INTERVAL_MIN	45
++#define MVMDIO_SMI_POLL_INTERVAL_MAX	55
+ 
+ struct orion_mdio_dev {
+ 	struct mutex lock;
+-- 
+2.9.4
