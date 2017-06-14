@@ -1,49 +1,25 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Wed, 14 Jun 2017 11:38:03 +0800
-Subject: [PATCH v3 3/3] arm64: dts: rockchip: use cs-gpios for cros_ec_spi
-In-Reply-To: <1497411483-23377-1-git-send-email-jeffy.chen@rock-chips.com>
-References: <1497411483-23377-1-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <1497411483-23377-3-git-send-email-jeffy.chen@rock-chips.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Wed, 14 Jun 2017 11:24:17 +0800
+Subject: [PATCH v2 2/3] clk: hi3660: add clocks for video encoder, decoder
+ and ISP
+In-Reply-To: <20170526073821.25971-3-guodong.xu@linaro.org>
+References: <20170526073821.25971-1-guodong.xu@linaro.org>
+ <20170526073821.25971-3-guodong.xu@linaro.org>
+Message-ID: <b01e4d37-1e5d-eccf-3206-d08c3b6e7deb@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cros_ec requires CS line to be active after last message. But the CS
-would be toggled when powering off/on rockchip spi, which breaks ec xfer.
-Use GPIO CS to prevent that.
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
----
 
-Changes in v3: None
-Changes in v2:
-Fix wrong pinconf for spi5_cs0.
-
- arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-index eb50593..b34a51d 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-@@ -790,6 +790,8 @@ ap_i2c_audio: &i2c8 {
- &spi5 {
- 	status = "okay";
- 
-+	cs-gpios = <&gpio2 23 GPIO_ACTIVE_HIGH>;
-+
- 	cros_ec: ec at 0 {
- 		compatible = "google,cros-ec-spi";
- 		reg = <0>;
-@@ -813,6 +815,10 @@ ap_i2c_audio: &i2c8 {
- 	};
- };
- 
-+&spi5_cs0 {
-+	rockchip,pins = <RK_GPIO2 23 RK_FUNC_GPIO &pcfg_output_high>;
-+};
-+
- &tsadc {
- 	status = "okay";
- 
--- 
-2.1.4
+On 2017?05?26? 15:38, Guodong Xu wrote:
+> From: Chen Jun <chenjun14@huawei.com>
+>
+> This patch adds more clocks for hi3660, including:
+>   - video encoder and decoder
+>   - ISP (Image Signal Processing)
+>
+> Signed-off-by: Chen Jun <chenjun14@huawei.com>
+> Signed-off-by: Zhong Kaihua <zhongkaihua@huawei.com>
+> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+> Reviewed-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+Acked-by: Zhangfei Gao <zhangfei.gao@linaro.org>
