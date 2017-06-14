@@ -1,120 +1,42 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 14 Jun 2017 09:07:12 +0200
-Subject: [PATCH 4/4] ARM: multi_v7_defconfig: Switch AXP20x driver from
- module to built-in
-In-Reply-To: <m2d1a750hj.fsf@baylibre.com>
-References: <937914a68e4e7d6db2d12540cc6253b200978e2d.1486590875.git.rask@formelder.dk>
- <49ad3e66452bd78da7b9e581129f76633c56e609.1486590875.git.rask@formelder.dk>
- <20170210084213.uzf25soh7bl73a6g@lukather>
- <CAOi56cV=UBEFQ6V4LLNrHDaDJgb33mrCA6Z+vj_3VziOpkRcvQ@mail.gmail.com>
- <CAOi56cXLo5LaT8CgfwB991gq+gCv4OY3VNkGWviooq43=6Wayg@mail.gmail.com>
- <20170522074414.3qz2wpw4cs2btkhv@flea.lan>
- <CAOi56cW8jimRGkFMAf3daL_SLBGr=TmxFnE-MKCnogci7Kr=oQ@mail.gmail.com>
- <20170610161714.wiztqlnwz5qu73fz@flea.home>
- <m2d1a750hj.fsf@baylibre.com>
-Message-ID: <20170614070712.yos54lelz5adrlq6@flea.lan>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 14 Jun 2017 10:07:23 +0300
+Subject: [PATCH] dt-bindings: Drop k2g genpd device ID macros
+In-Reply-To: <fc503960-d225-895c-c993-974ba6c5a92d@oracle.com>
+References: <20170522183737.24946-1-d-gerlach@ti.com>
+ <20170531162850.mf6giowmxj5vetxq@rob-hp-laptop>
+ <ca91000a-627b-a655-4304-b64b78bbcf9a@ti.com>
+ <fc503960-d225-895c-c993-974ba6c5a92d@oracle.com>
+Message-ID: <3de2ed22-2de9-101a-5ee6-0077fe523ce2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 13, 2017 at 09:14:00AM -0700, Kevin Hilman wrote:
-> Maxime Ripard <maxime.ripard@free-electrons.com> writes:
+On 13/06/17 23:32, Santosh Shilimkar wrote:
+> On 6/13/2017 1:16 PM, Dave Gerlach wrote:
+>> Santosh,
+>> On 05/31/2017 11:28 AM, Rob Herring wrote:
+>>> On Mon, May 22, 2017 at 01:37:37PM -0500, Dave Gerlach wrote:
+> [...]
 > 
-> > On Tue, Jun 06, 2017 at 12:45:17PM -0700, Kevin Hilman wrote:
-> >> On Mon, May 22, 2017 at 12:44 AM, Maxime Ripard
-> >> <maxime.ripard@free-electrons.com> wrote:
-> >> > Hi Kevin,
-> >> >
-> >> > On Thu, May 18, 2017 at 11:59:50AM -0700, Kevin Hilman wrote:
-> >> >> On Fri, Mar 17, 2017 at 10:39 AM, Kevin Hilman <khilman@baylibre.com> wrote:
-> >> >> > On Fri, Feb 10, 2017 at 12:42 AM, Maxime Ripard
-> >> >> > <maxime.ripard@free-electrons.com> wrote:
-> >> >> >> On Wed, Feb 08, 2017 at 11:09:31PM +0100, Rask Ingemann Lambertsen wrote:
-> >> >> >>> The AXP20X regulator support is currently built as a module, which means
-> >> >> >>> it's not available until the root fs has been mounted, but the boot loader
-> >> >> >>> might not have enabled the required regulators, so build their drivers
-> >> >> >>> into the kernel.
-> >> >> >>>
-> >> >> >>> Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
-> >> >> >>
-> >> >> >> Queued for 4.12.
-> >> >> >
-> >> >> > Hello, kernelci.org is reporting boot failures on sun5i-r8-chip in
-> >> >> > linux-next[1]  for a few days and with a variety of defconfigs. I
-> >> >> > bisected it[2] down to this patch.
-> >> >> >
-> >> >> > I verified that reverting this patch on top of next-20170310 makes my
-> >> >> > chip board boot again.
-> >> >>
-> >> >> FYI... this board is still broken in linux-next (and now in mainline),
-> >> >> and reverting $SUBJECT patch still makes it work.
-> >> >>
-> >> >> Is nobody else using mainline on this board?
-> >> >
-> >> > I thought about that during the weekend, and it might just be a
-> >> > symptom.
-> >> >
-> >> > The CHIP has brown out issues, especially when you enable the WiFi
-> >> > chip, which should happen around the time of the failure when the PMIC
-> >> > regulator support is compiled as a module.
-> >> >
-> >> > We mitigate that in upstream's U-Boot by enabling the two regulators
-> >> > for the WiFi chip in U-boot, which levels a bit the current over the
-> >> > boot.
-> >> >
-> >> > You have a few ways to prevent that from happening. Having a better
-> >> > power supply / cable will help, I'm not sure how reasonable that is.
-> >> >
-> >> > Another thing that can work is, if your USB plugs can take it, to
-> >> > increase the overcurrent trigger in the PMIC, ideally in U-Boot.
-> >> >
-> >> > The last, and probably cleaner one, would be to just power it through
-> >> > the 5v input on its header, and not the USB. There's not current
-> >> > limitation there, so it shouldn't cause any problems anymore.
-> >> 
-> >> I'm now powering the board via the header (5V to the CHG-IN pin) and
-> >> it doesn't change anything.  Still fails in the same way, and
-> >> reverting $SUBJECT defconfig patch makes it work again.
-> >
-> > I tried it today with sunxi_defconfig that has AXP20X_REGULATOR
-> > built-in as well. It can boot fine on my CHIP here.
-> 
-> What about multi_v7_defconfig?
+>>>> [1] https://www.spinics.net/lists/arm-kernel/msg577079.html
+>>>>
+>>>>   .../devicetree/bindings/soc/ti/sci-pm-domain.txt   |  5 +-
+>>>>   include/dt-bindings/genpd/k2g.h                    | 90 
+>>>> ----------------------
+>>>>   2 files changed, 3 insertions(+), 92 deletions(-)
+>>>>   delete mode 100644 include/dt-bindings/genpd/k2g.h
+>>>
+>>> Acked-by: Rob Herring <robh@kernel.org>
+>>>
+>>
+>> Gentle ping on this. If you're OK with the patch any chance you can 
+>> pick it up?
+>>
+> Sorry Dave I missed to pick this one in pull request for 4.13. Will pick 
+> this
+> one along with what Suman and Tero have been working for following merge
+> window. Thanks for reminding about this one.
 
-It seems to work in our farm.
+I think Stephen will probably be picking up the clock part directly by 
+himself.
 
-It's lagging behind at the moment, so it hasn't been published yet,
-but here is the last multi_v7 boot.
-http://code.bulix.org/a43kkf-147625?raw
-
-> > After looking at your failed boot example (1), I'm a bit
-> > puzzled. Where is supposed to be your filesystem?
-> >
-> > You have a ubi rootfs, but we don't have the NAND enabled in mainline,
-> > so that cannot work. And you seem to load an initramfs earlier in
-> > U-Boot, but you don't pass it is your bootz call.
-> 
-> Ah, I suppose that isn't terribly clear from the log.
-> 
-> My scripts don't rely on uboot for the ramdisk because because (believe
-> it or not) many vendor uboots don't enable the ATAGs for initrd in
-> uboot.
-> 
-> So, I modify the DT to add the linux,initrd-start and linux,initrd-end
-> properties to the chosen node poining to where the initrd is loaded in
-> memory.  This also avoids the need to add a uimage header to the ramdisk.
-
-Ok, good :)
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170614/2e9aa581/attachment-0001.sig>
+-Tero
