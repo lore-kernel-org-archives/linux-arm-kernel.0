@@ -1,68 +1,38 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Wed, 14 Jun 2017 11:08:28 +0800
-Subject: [PATCH 1/3] arm: dts: mt2701: Add ethernet device node
-In-Reply-To: <d0a1217b-7761-fea6-888a-da06573400b8@gmail.com>
-References: <1496297324-21091-1-git-send-email-erin.lo@mediatek.com>
- <1496297324-21091-2-git-send-email-erin.lo@mediatek.com>
- <d0a1217b-7761-fea6-888a-da06573400b8@gmail.com>
-Message-ID: <1497409708.21216.2.camel@mtkswgap22>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Wed, 14 Jun 2017 11:20:58 +0800
+Subject: [PATCH v2 0/3] clk: hi3660: add more clocks and fix bugs
+In-Reply-To: <20170526073821.25971-1-guodong.xu@linaro.org>
+References: <20170526073821.25971-1-guodong.xu@linaro.org>
+Message-ID: <CAFGCpxxtrqCNXCM44XfoEON22jjKcCtNkA+bvOMU-38gXTkX6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-06-09 at 10:22 +0200, Matthias Brugger wrote:
-> 
-> On 01/06/17 08:08, Erin Lo wrote:
-> > From: Sean Wang <sean.wang@mediatek.com>
-> > 
-> > Add ethernet device node for MT2701
-> > 
-> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> > Signed-off-by: Erin Lo <erin.lo@mediatek.com>
-> > ---
-> >   arch/arm/boot/dts/mt2701.dtsi | 20 ++++++++++++++++++++
-> >   1 file changed, 20 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-> > index 8037210..de88bd7 100644
-> > --- a/arch/arm/boot/dts/mt2701.dtsi
-> > +++ b/arch/arm/boot/dts/mt2701.dtsi
-> > @@ -420,6 +420,26 @@
-> >   		#clock-cells = <1>;
-> >   	};
-> >   
-> > +	eth: ethernet at 1b100000 {
-> > +		compatible = "mediatek,mt2701-eth", "syscon";
-> > +		reg = <0 0x1b100000 0 0x20000>;
-> > +		interrupts = <GIC_SPI 200 IRQ_TYPE_LEVEL_LOW>,
-> > +			     <GIC_SPI 199 IRQ_TYPE_LEVEL_LOW>,
-> > +			     <GIC_SPI 198 IRQ_TYPE_LEVEL_LOW>;
-> > +		clocks = <&topckgen CLK_TOP_ETHIF_SEL>,
-> > +			 <&ethsys CLK_ETHSYS_ESW>,
-> > +			 <&ethsys CLK_ETHSYS_GP1>,
-> > +			 <&ethsys CLK_ETHSYS_GP2>,
-> > +			 <&apmixedsys CLK_APMIXED_TRGPLL>;
-> > +		clock-names = "ethif", "esw", "gp1", "gp2", "trgpll";
-> > +		power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
-> > +		mediatek,ethsys = <&ethsys>;
-> > +		mediatek,pctl = <&syscfg_pctl_a>;
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +		status = "disabled";
-> > +	};
-> > +
-> 
-> I'm missing the reset properties.
+Hi, Stephen, Mike
 
+May I get your review opinion and comments on this patchset?
 
-Hi Matthias,
+Thanks you.
 
-Appreciate your careful reviewing, 
+-Guodong Xu
 
-I'll add it for the missing which causes binding violation. 
-
-
-	Sean
-
-> 
-> Regards,
-> Matthias
+On Fri, May 26, 2017 at 3:38 PM, Guodong Xu <guodong.xu@linaro.org> wrote:
+> This patchset adds more clocks for hi3660, video encoder/decoder, ISP. It
+> includes also bug fixes.
+>
+> v2 update:
+>  - added ISP clocks into patch 2.
+>
+> Chen Jun (2):
+>   clk: hi3660: fix wrong parent name of clk_mux_sysbus
+>   clk: hi3660: add clocks for video encoder, decoder and ISP
+>
+> Zhong Kaihua (1):
+>   clk: hi3660: Set PPLL2 to 2880M
+>
+>  drivers/clk/hisilicon/clk-hi3660.c       | 50 +++++++++++++++++++++++++++++---
+>  include/dt-bindings/clock/hi3660-clock.h | 17 +++++++++++
+>  2 files changed, 63 insertions(+), 4 deletions(-)
+>
+> --
+> 2.10.2
+>
