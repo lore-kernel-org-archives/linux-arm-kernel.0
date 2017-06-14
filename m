@@ -1,60 +1,45 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 14 Jun 2017 17:49:11 +0200
-Subject: [PATCH v4 11/11] arm64: marvell: dts: add xmdio nodes for 7k/8k
+Date: Wed, 14 Jun 2017 17:49:07 +0200
+Subject: [PATCH v4 07/11] net: mvmdio: check the MII_ADDR_C45 bit is not set
+ for smi operations
 In-Reply-To: <20170614154911.14510-1-antoine.tenart@free-electrons.com>
 References: <20170614154911.14510-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170614154911.14510-12-antoine.tenart@free-electrons.com>
+Message-ID: <20170614154911.14510-8-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the description of the xMDIO bus for the Marvell Armada 7k and
-Marvell Armada 8k; for both CP110 slave and master. This bus is found
-on Marvell Ethernet controllers and provides an interface with the
-xMDIO bus.
+Add a check for the read and write smi operations, to ensure the
+MII_ADDR_C45 bit isn't set. This will be needed as soon as the xSMI
+support is added to the mvmdio driver.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 8 ++++++++
- arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 8 ++++++++
- 2 files changed, 16 insertions(+)
+ drivers/net/ethernet/marvell/mvmdio.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-index 576e825585c9..8b512b75aea9 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-@@ -97,6 +97,14 @@
- 				clocks = <&cpm_syscon0 1 9>, <&cpm_syscon0 1 5>;
- 			};
+diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
+index e4aa8e2d2e8a..fe6072aae0a6 100644
+--- a/drivers/net/ethernet/marvell/mvmdio.c
++++ b/drivers/net/ethernet/marvell/mvmdio.c
+@@ -126,6 +126,9 @@ static int orion_mdio_read(struct mii_bus *bus, int mii_id,
+ 	u32 val;
+ 	int ret;
  
-+			cpm_xmdio: mdio at 12a600 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "marvell,xmdio";
-+				reg = <0x12a600 0x10>;
-+				status = "disabled";
-+			};
++	if (regnum & MII_ADDR_C45)
++		return -EOPNOTSUPP;
 +
- 			cpm_syscon0: system-controller at 440000 {
- 				compatible = "marvell,cp110-system-controller0",
- 					     "syscon";
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-index 797208a11f9d..bd0c0e03edd2 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-@@ -104,6 +104,14 @@
- 				clocks = <&cps_syscon0 1 9>, <&cps_syscon0 1 5>;
- 			};
+ 	ret = orion_mdio_wait_ready(&orion_mdio_smi_ops, bus);
+ 	if (ret < 0)
+ 		goto out;
+@@ -157,6 +160,9 @@ static int orion_mdio_write(struct mii_bus *bus, int mii_id,
+ 	struct orion_mdio_dev *dev = bus->priv;
+ 	int ret;
  
-+			cps_xmdio: mdio at 12a600 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "marvell,xmdio";
-+				reg = <0x12a600 0x10>;
-+				status = "disabled";
-+			};
++	if (regnum & MII_ADDR_C45)
++		return -EOPNOTSUPP;
 +
- 			cps_syscon0: system-controller at 440000 {
- 				compatible = "marvell,cp110-system-controller0",
- 					     "syscon";
+ 	ret = orion_mdio_wait_ready(&orion_mdio_smi_ops, bus);
+ 	if (ret < 0)
+ 		goto out;
 -- 
 2.9.4
