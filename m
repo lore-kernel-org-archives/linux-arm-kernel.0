@@ -1,49 +1,40 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Wed, 14 Jun 2017 20:17:04 +0530
-Subject: [PATCH v3 1/9] ARM: dts: imx6ul-isiot: Add Sound card with codec
- node
-In-Reply-To: <20170407131649.GH16503@dragon>
-References: <1491501735-1649-1-git-send-email-jagan@openedev.com>
- <1491501735-1649-2-git-send-email-jagan@openedev.com>
- <20170407131649.GH16503@dragon>
-Message-ID: <CAMty3ZDj3XgeZwUTXTTX2svoXaNWJ3GJtbNAt9+jj+n8Z4640w@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 14 Jun 2017 23:09:39 +0800
+Subject: [PATCH 00/11] ARM: dts: imx6qdl: video capture support
+In-Reply-To: <1497291844-14632-1-git-send-email-steve_longerbeam@mentor.com>
+References: <1497291844-14632-1-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <20170614150938.GB30112@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 7, 2017 at 6:46 PM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Thu, Apr 06, 2017 at 11:32:07PM +0530, Jagan Teki wrote:
->> From: Jagan Teki <jagan@amarulasolutions.com>
->>
->> Add support for Sound card and related codec(via i2c1) nodes
->> on Engicam Is.IoT MX6UL variant module boards.
->>
->> Cc: Shawn Guo <shawnguo@kernel.org>
->> Cc: Matteo Lisi <matteo.lisi@engicam.com>
->> Cc: Michael Trimarchi <michael@amarulasolutions.com>
->> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
->> ---
->> Changes for v3:
->> - Replace fsl,imx-audio-sgtl5000 and use simple-audio-card
->> Changes for v2:
->> - Use proper [label:] node-name[@unit-address] for codec
->> - Remove incorrect codec property 'wlf,shared-lrclk'
->> - Remove 'gpr' from sound card node
->>
->>  arch/arm/boot/dts/imx6ul-isiot-common.dtsi | 10 +++++++
->>  arch/arm/boot/dts/imx6ul-isiot.dtsi        | 44 ++++++++++++++++++++++++++++++
->
-> Can you help me understand how these two files are related?  Why is
-> sgtl5000 added into one and sound node added into the other?
+On Mon, Jun 12, 2017 at 11:23:53AM -0700, Steve Longerbeam wrote:
+> This series defines the i.MX6 internal video multiplexers and MIPI CSI-2
+> receiver device nodes, and their connections to eachother and the i.MX6
+> IPU CSI ports.
+> 
+> It also implements video capture support on the SabreLite, SabreSD, and
+> SabreAuto reference platforms, by defining the video sensor nodes on those
+> platforms, and their connections to the video muxes and MIPI CSI-2 receiver.
+> 
+> There should not be much of anything controversial in this series. The
+> imx-media driver is set to be merged in time for 4.13, so please accept
+> this series soon.
+> 
+> 
+> Philipp Zabel (2):
+>   ARM: dts: imx6qdl: add multiplexer controls
+>   ARM: dts: imx6qdl: Add video multiplexers, mipi_csi, and their
+>     connections
+> 
+> Steve Longerbeam (9):
+>   ARM: dts: imx6qdl: Add compatible, clocks, irqs to MIPI CSI-2 node
+>   ARM: dts: imx6qdl: add capture-subsystem device
+>   ARM: dts: imx6qdl-sabrelite: remove erratum ERR006687 workaround
+>   ARM: dts: imx6-sabrelite: add OV5642 and OV5640 camera sensors
+>   ARM: dts: imx6-sabresd: add OV5642 and OV5640 camera sensors
+>   ARM: dts: imx6-sabreauto: create i2cmux for i2c3
+>   ARM: dts: imx6-sabreauto: add reset-gpios property for max7310_b
+>   ARM: dts: imx6-sabreauto: add pinctrl for gpt input capture
+>   ARM: dts: imx6-sabreauto: add the ADV7180 video decoder
 
-lcdif, ts and sound card which may differ based on the base-board
-connected with SOM, So I moved these stuff which are related to
-Starter kit supported once's and used with SOM dts files. if some
-other board with same SOM can have different lcdif and etc so they can
-define locally to dts.
-
-thanks!
--- 
-Jagan Teki
-Senior Linux Kernel Engineer | Amarula Solutions
-U-Boot, Linux | Upstream Maintainer
-Hyderabad, India.
+Applied all, thanks.
