@@ -1,28 +1,27 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 14 Jun 2017 15:27:23 +0200
+Date: Wed, 14 Jun 2017 15:32:59 +0200
 Subject: [PATCH] tty/serial: remove AVR32 specific access wrappers
-In-Reply-To: <CAHp75VcMrhG0K-=dtkF1T5siAAmmLYdmCxcLdo_vvH8dLjLh=A@mail.gmail.com>
+In-Reply-To: <20170614104929.GA11313@kroah.com>
 References: <20170613202517.26558-1-alexandre.belloni@free-electrons.com>
- <CAHp75VcMrhG0K-=dtkF1T5siAAmmLYdmCxcLdo_vvH8dLjLh=A@mail.gmail.com>
-Message-ID: <20170614132723.2duxhpjq4odchcw2@piout.net>
+ <20170614104929.GA11313@kroah.com>
+Message-ID: <20170614133259.y6jjonyi66qeb7r2@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/06/2017 at 12:43:40 +0300, Andy Shevchenko wrote:
-> On Tue, Jun 13, 2017 at 11:25 PM, Alexandre Belloni
-> <alexandre.belloni@free-electrons.com> wrote:
+On 14/06/2017 at 12:49:29 +0200, Greg Kroah-Hartman wrote:
+> On Tue, Jun 13, 2017 at 10:25:17PM +0200, Alexandre Belloni wrote:
 > > Now that AVR32 is gone, the specific wrappers for that architecture are
 > > unnecessary and will not be compiled anymore.
-> >
+> > 
+> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > ---
+> >  drivers/tty/serial/atmel_serial.c | 17 -----------------
+> >  1 file changed, 17 deletions(-)
 > 
-> Can you rebase this on top of tty-next?
-> 
-> I'm pretty sure this patch will gone.
+> Does not apply to my tty-next tree at all :(
 > 
 
-So you avoided most of the bikeshedding by not copying any of the
-maintainers, nice...
-
+That's fine, as Andy pointed out, he did the job.
 
 -- 
 Alexandre Belloni, Free Electrons
