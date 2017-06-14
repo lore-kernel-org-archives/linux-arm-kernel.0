@@ -1,50 +1,73 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 14 Jun 2017 07:01:12 +0200
-Subject: [Merge tag 'pci-v4.12-changes' of git] 857f864014: BUG: unable
- to handle kernel NULL pointer dereference at 00000000000000a8
-In-Reply-To: <alpine.DEB.2.20.1706132106410.11042@aurora.sdinet.de>
-References: <fe0543c1-cba6-02bb-36eb-395910bd5012@deltatee.com>
- <20170612200852.GA28578@bhelgaas-glaptop.roam.corp.google.com>
- <61e11e67-6c1b-ef1e-5fb8-a7c9efb17666@deltatee.com>
- <20170613041842.GA13308@kroah.com>
- <f6322f70-7ca7-abf6-b947-4cbbfd598948@deltatee.com>
- <20170613043416.GB14217@kroah.com>
- <20170613043518.GA14621@kroah.com>
- <8462abee-0a7f-00fb-6111-1f78362ea3f7@deltatee.com>
- <20170613163508.GA31961@kroah.com>
- <alpine.DEB.2.20.1706132106410.11042@aurora.sdinet.de>
-Message-ID: <20170614050112.GB11630@kroah.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 14 Jun 2017 07:09:43 +0200
+Subject: [PATCH] Staging: vc04_services: bcm2835-audio: bcm2835-ctl.c:
+ Fixed alignment to match open parenthesis.
+In-Reply-To: <CAB3L5oysSGvLBycn2u=ZqEB2YawCCnuCsTY1pnUqpesU75y5dg@mail.gmail.com>
+References: <1497042442-3620-1-git-send-email-srishtishar@gmail.com>
+ <20170613130006.GA15978@kroah.com>
+ <CAB3L5oxNorqu6_WiseTjkr7N9i-doy=_4gxtwonCVcxQA3Nfrw@mail.gmail.com>
+ <20170613144749.yn6z7yecumrfaayk@mwanda>
+ <CAB3L5oysSGvLBycn2u=ZqEB2YawCCnuCsTY1pnUqpesU75y5dg@mail.gmail.com>
+Message-ID: <20170614050943.GC11953@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 13, 2017 at 09:13:32PM +0200, Sven-Haegar Koch wrote:
-> On Tue, 13 Jun 2017, Greg Kroah-Hartman wrote:
+On Wed, Jun 14, 2017 at 03:15:11AM +0530, srishti sharma wrote:
+> On Tue, Jun 13, 2017 at 8:17 PM, Dan Carpenter <dan.carpenter@oracle.com> wrote:
+> > On Tue, Jun 13, 2017 at 08:07:14PM +0530, srishti sharma wrote:
+> >> On Tue, Jun 13, 2017 at 6:30 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
+> >> > On Sat, Jun 10, 2017 at 02:37:22AM +0530, srishti sharma wrote:
+> >> >> Fixed alignment so that it matched open parenthesis.
+> >> >>
+> >> >> Signed-off-by: srishti sharma <srishtishar@gmail.com>
+> >> >> ---
+> >> >>  drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c | 2 +-
+> >> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >> >>
+> >> >> diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
+> >> >> index f484bb0..2148ed0 100644
+> >> >> --- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
+> >> >> +++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
+> >> >> @@ -105,7 +105,7 @@ static int snd_bcm2835_ctl_get(struct snd_kcontrol *kcontrol,
+> >> >>  }
+> >> >>
+> >> >>  static int snd_bcm2835_ctl_put(struct snd_kcontrol *kcontrol,
+> >> >> -                             struct snd_ctl_elem_value *ucontrol)
+> >> >> +                            struct snd_ctl_elem_value *ucontrol)
+> >> >>  {
+> >> >>       struct bcm2835_chip *chip = snd_kcontrol_chip(kcontrol);
+> >> >>       int changed = 0;
+> >> >
+> >> > This patch is corrupted and can not be applied :(
+> >>
+> >>
+> >> Why is this corrupted ?
+> >
+> > Try applying it with `git am`.  There should be space characters at the
+> > start of these lines but your email client deleted them:
+> >
+> >         struct bcm2835_chip *chip = snd_kcontrol_chip(kcontrol);
+> >         int changed = 0;
+> >
+> > Read Documentation/process/email-clients.rst
+> >
+> > regards,
+> > dan carpenter
 > 
-> > On Tue, Jun 13, 2017 at 10:25:40AM -0600, Logan Gunthorpe wrote:
-> > > 
-> > > On 12/06/17 10:35 PM, Greg Kroah-Hartman wrote:
-> > > > Or better yet, just turn all char major allocations into dynamic, which
-> > > > would be really good for test systems.  I thought someone proposed
-> > > > patches for that a long time ago, but I can't find them anymore.  That
-> > > > would be the simplest solution here.
-> > > 
-> > > Would people not complain about that? I would not be surprised if some
-> > > crazy application is using hard coded major numbers in userspace. So
-> > > such a change could potentially break userspace...
-> > 
-> > For char devices, I doubt it, but we can't take the chance, which is why
-> > you make it an option.  Then, it's enabled for 'allmodconfig' builds,
-> > which helps testers out.
 > 
-> At least for /dev/null, /dev/zero, and perhaps /dev/tty it would 
-> definitely break things if the major+minor number is not static. I have 
-> multiple chroot environments having only some minimal needed static 
-> /dev subdir, with naturally no daemons or filesystem creating those 
-> on-demand. For the main /dev I use whatever the system sets up, so 
-> devtmpfs with udev.
+> Hello,
+> 
+> I tried applying it with ' git am ' and it was giving me this error:
+> 
+> fatal: corrupt patch at line XX
 
-No, it wouldn't be required, it would be an option for those people
-using devtmpfs.
+Exactly.
+
+> I think this was produced because of running ./scripts/cleanfile on the patch .
+
+Why would you do that?  By doing that you corrupted the patch file :(
+
+Just use the proper output of 'git format-patch' and all will be fine.
 
 thanks,
 
