@@ -1,43 +1,49 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Wed, 14 Jun 2017 11:38:02 +0800
-Subject: [PATCH v3 2/3] dt-bindings: spi/rockchip: add "cs-gpios" optional
- property
+Date: Wed, 14 Jun 2017 11:38:03 +0800
+Subject: [PATCH v3 3/3] arm64: dts: rockchip: use cs-gpios for cros_ec_spi
 In-Reply-To: <1497411483-23377-1-git-send-email-jeffy.chen@rock-chips.com>
 References: <1497411483-23377-1-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <1497411483-23377-2-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <1497411483-23377-3-git-send-email-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update document devicetree bindings to support "cs-gpios" property.
+The cros_ec requires CS line to be active after last message. But the CS
+would be toggled when powering off/on rockchip spi, which breaks ec xfer.
+Use GPIO CS to prevent that.
 
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 ---
 
 Changes in v3: None
-Changes in v2: None
+Changes in v2:
+Fix wrong pinconf for spi5_cs0.
 
- Documentation/devicetree/bindings/spi/spi-rockchip.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-rockchip.txt b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-index 83da493..d0be2e6 100644
---- a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-@@ -25,6 +25,7 @@ Required Properties:
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+index eb50593..b34a51d 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+@@ -790,6 +790,8 @@ ap_i2c_audio: &i2c8 {
+ &spi5 {
+ 	status = "okay";
  
- Optional Properties:
++	cs-gpios = <&gpio2 23 GPIO_ACTIVE_HIGH>;
++
+ 	cros_ec: ec at 0 {
+ 		compatible = "google,cros-ec-spi";
+ 		reg = <0>;
+@@ -813,6 +815,10 @@ ap_i2c_audio: &i2c8 {
+ 	};
+ };
  
-+- cs-gpios : Specifies the gpio pins to be used for chipselects.
- - dmas: DMA specifiers for tx and rx dma. See the DMA client binding,
- 		Documentation/devicetree/bindings/dma/dma.txt
- - dma-names: DMA request names should include "tx" and "rx" if present.
-@@ -48,6 +49,7 @@ Example:
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
-+		cs-gpios = <&gpio2 23 GPIO_ACTIVE_HIGH>;
- 		clocks = <&cru SCLK_SPI0>, <&cru PCLK_SPI0>;
- 		clock-names = "spiclk", "apb_pclk";
- 		pinctrl-0 = <&spi1_pins>;
++&spi5_cs0 {
++	rockchip,pins = <RK_GPIO2 23 RK_FUNC_GPIO &pcfg_output_high>;
++};
++
+ &tsadc {
+ 	status = "okay";
+ 
 -- 
 2.1.4
