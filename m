@@ -1,300 +1,46 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Wed, 14 Jun 2017 15:23:17 +0530
-Subject: [PATCH 2/2] acpi, gicv3-its, numa: Adding numa node mapping for
- gic-its units
-In-Reply-To: <20170612105335.GA30594@red-moon>
-References: <1496753787-27735-1-git-send-email-ganapatrao.kulkarni@cavium.com>
- <1496753787-27735-3-git-send-email-ganapatrao.kulkarni@cavium.com>
- <20170612105335.GA30594@red-moon>
-Message-ID: <CAFpQJXVFGnfMeHRGfsvxZAR_CQBLU6tgLsCuTrW8giQekgndvw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 14 Jun 2017 11:59:29 +0200
+Subject: [Merge tag 'pci-v4.12-changes' of git] 857f864014: BUG: unable to
+ handle kernel NULL pointer dereference at 00000000000000a8
+In-Reply-To: <20170613043416.GB14217@kroah.com>
+References: <5933fe2d.V33ODGPU9noDVuyF%fengguang.wu@intel.com>
+ <20170606175552.GA12672@bhelgaas-glaptop.roam.corp.google.com>
+ <fe0543c1-cba6-02bb-36eb-395910bd5012@deltatee.com>
+ <20170612200852.GA28578@bhelgaas-glaptop.roam.corp.google.com>
+ <61e11e67-6c1b-ef1e-5fb8-a7c9efb17666@deltatee.com>
+ <20170613041842.GA13308@kroah.com>
+ <f6322f70-7ca7-abf6-b947-4cbbfd598948@deltatee.com>
+ <20170613043416.GB14217@kroah.com>
+Message-ID: <CACRpkdZyup+dH6Yp747yLyaC8DSbA8bEnk37gJKnmnjBvjn=-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+On Tue, Jun 13, 2017 at 6:34 AM, Greg Kroah-Hartman
+<gregkh@linuxfoundation.org> wrote:
 
-On Mon, Jun 12, 2017 at 4:23 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Tue, Jun 06, 2017 at 06:26:27PM +0530, Ganapatrao Kulkarni wrote:
->> Add code to parse SRAT ITS Affinity sub table as defined in ACPI 6.2
->> Later in driver probe, its devices are mapped to numa node
->
-> Nit: Capitalize "its".
+> Ah, that makes sense.  Well, someone can always work on expanding the
+> range of dynamic char major numbers if they are running out of them on a
+> real system, I'll gladly take patches for that :)
 
-ok.
->
->> using its id to proximity domain mapping.
->
-> Ditto.
->
->> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->> ---
->>  arch/arm64/include/asm/acpi.h    |  2 ++
->>  arch/arm64/kernel/acpi_numa.c    | 59 ++++++++++++++++++++++++++++++++++++++++
->>  drivers/acpi/numa.c              | 32 +++++++++++++++++++++-
->>  drivers/irqchip/irq-gic-v3-its.c |  3 +-
->>  include/linux/acpi.h             |  3 ++
->>  5 files changed, 97 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
->> index 0e99978..60ea7d1 100644
->> --- a/arch/arm64/include/asm/acpi.h
->> +++ b/arch/arm64/include/asm/acpi.h
->> @@ -143,9 +143,11 @@ static inline void arch_apei_flush_tlb_one(unsigned long addr)
->>  #ifdef CONFIG_ACPI_NUMA
->>  int arm64_acpi_numa_init(void);
->>  int acpi_numa_get_nid(unsigned int cpu, u64 hwid);
->> +int acpi_numa_get_its_nid(u32 its_id);
->>  #else
->>  static inline int arm64_acpi_numa_init(void) { return -ENOSYS; }
->>  static inline int acpi_numa_get_nid(unsigned int cpu, u64 hwid) { return NUMA_NO_NODE; }
->> +static inline int acpi_numa_get_its_nid(u32 its_id) { return NUMA_NO_NODE; }
->>  #endif /* CONFIG_ACPI_NUMA */
->>
->>  #define ACPI_TABLE_UPGRADE_MAX_PHYS MEMBLOCK_ALLOC_ACCESSIBLE
->> diff --git a/arch/arm64/kernel/acpi_numa.c b/arch/arm64/kernel/acpi_numa.c
->> index f01fab6..f7b2ea6 100644
->> --- a/arch/arm64/kernel/acpi_numa.c
->> +++ b/arch/arm64/kernel/acpi_numa.c
->> @@ -29,15 +29,24 @@
->>  #include <asm/numa.h>
->>
->>  static int cpus_in_srat;
->> +static int its_in_srat;
->>
->>  struct __node_cpu_hwid {
->>       u32 node_id;    /* logical node containing this CPU */
->>       u64 cpu_hwid;   /* MPIDR for this CPU */
->>  };
->>
->> +struct __node_its_id {
->> +     u32 node_id;    /* numa node id */
->> +     u32 its_id ;   /* GIC ITS ID */
->                   ^
-> Remove space.
+I started to take a stab at it at one point and incorporated some feedback
+from Torvalds etc, it's here:
+https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git/commit/?h=chrdev-warn&id=65e5b1e9eb3f777ab7535b74b490e882eeec79d7
 
-ok, thanks.
->
->> +};
->> +
->>  static struct __node_cpu_hwid early_node_cpu_hwid[NR_CPUS] = {
->>  [0 ... NR_CPUS - 1] = {NUMA_NO_NODE, PHYS_CPUID_INVALID} };
->>
->> +static struct __node_its_id early_node_its_id[MAX_NUMNODES] = {
->
-> Mind explaining to us where does MAX_NUMNODES as an array size limit
-> stem from here ?
+It tries to use all "holes" in the chardev major map to shun in a bit
+more devices when we run out of the high dynamic major range.
 
-this is heuristic!
-AFAIK, there is no limit on ITS devices per socket, however almost all
-SoC designs has one ITS device per socket,
-IMHO, assuming max ITS count to MAX_NUMNODES to init static array
-should be reasonable i guess?
+Making them all dynamic seemed dangerous because I was afraid
+of userspace ABI breakage because of old userlands with
+static mknod:s.
 
->
->> +[0 ... MAX_NUMNODES - 1] = {NUMA_NO_NODE, UINT_MAX} };
->> +
->>  int acpi_numa_get_nid(unsigned int cpu, u64 hwid)
->>  {
->>       int i;
->> @@ -50,6 +59,18 @@ int acpi_numa_get_nid(unsigned int cpu, u64 hwid)
->>       return NUMA_NO_NODE;
->>  }
->>
->> +int acpi_numa_get_its_nid(u32 its_id)
->> +{
->> +     int i;
->> +
->> +     for (i = 0; i < its_in_srat; i++) {
->> +             if (its_id == early_node_its_id[i].its_id)
->> +                     return early_node_its_id[i].node_id;
->> +     }
->> +
->> +     return NUMA_NO_NODE;
->> +}
->> +
->>  /* Callback for Proximity Domain -> ACPI processor UID mapping */
->>  void __init acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa)
->>  {
->> @@ -100,6 +121,44 @@ void __init acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa)
->>               pxm, mpidr, node);
->>  }
->>
->> +/* Callback for ITS ACPI Proximity Domain mapping */
->> +void __init acpi_numa_its_affinity_init(struct acpi_srat_its_affinity *pa)
->> +{
->> +     int pxm, node;
->> +
->> +     if (srat_disabled())
->> +             return;
->> +
->> +     if (pa->header.length < sizeof(struct acpi_srat_its_affinity)) {
->> +             pr_err("SRAT: Invalid SRAT header length: %d\n",
->> +                     pa->header.length);
->> +             bad_srat();
->> +             return;
->> +     }
->> +
->> +     if (its_in_srat >= MAX_NUMNODES) {
->
-> I do not understand why maxcount == MAX_NUMNODES in the first place.
->
->> +             pr_warn_once("SRAT: its count exceeding max count[%d]\n",
->> +                          MAX_NUMNODES);
->> +             return;
->> +     }
->> +
->> +     pxm = pa->proximity_domain;
->> +     node = acpi_map_pxm_to_node(pxm);
->> +
->> +     if (node == NUMA_NO_NODE || node >= MAX_NUMNODES) {
->> +             pr_err("SRAT: Too many proximity domains %d\n", pxm);
->
-> Wrong error log message or at least inconsistent (yes, GICC code
-> where you copied this code from needs patching too).
->
+I lost interest when it turned out that the zeroday QEMU stuff was
+generating random machines that have no counterpart in the real
+world, and then the exercise seemed a bit academic.
 
-ok, i will update.
->> +             bad_srat();
->> +             return;
->> +     }
->> +
->> +     early_node_its_id[its_in_srat].node_id = node;
->> +     early_node_its_id[its_in_srat].its_id =  its_in_srat;
->                                                ^
-> One space is enough (again - that's through for GICC code too).
+The last failures were due to (AFAICT) some relationship between
+major and minor numbers that I didn't untangle.
 
-ok, thanks
->
->> +     node_set(node, numa_nodes_parsed);
->> +     pr_info("SRAT: PXM %d -> ITS %d -> Node %d\n",
->> +             pxm, its_in_srat, node);
->> +     its_in_srat++;
->> +}
->> +
->>  int __init arm64_acpi_numa_init(void)
->>  {
->>       int ret;
->> diff --git a/drivers/acpi/numa.c b/drivers/acpi/numa.c
->> index edb0c79..9c04dba 100644
->> --- a/drivers/acpi/numa.c
->> +++ b/drivers/acpi/numa.c
->> @@ -182,6 +182,16 @@ int acpi_map_pxm_to_online_node(int pxm)
->>               }
->>               break;
->>
->> +     case ACPI_SRAT_TYPE_GIC_ITS_AFFINITY:
->> +             {
->> +                     struct acpi_srat_its_affinity *p =
->> +                         (struct acpi_srat_its_affinity *)header;
->> +                     pr_debug("SRAT ITS [0x%04x]) in proximity domain %d\n",
->> +                              p->its_id,
->> +                              p->proximity_domain);
->> +             }
->> +             break;
->> +
->>       default:
->>               pr_warn("Found unsupported SRAT entry (type = 0x%x)\n",
->>                       header->type);
->> @@ -390,6 +400,24 @@ static int __init acpi_parse_slit(struct acpi_table_header *table)
->>       return 0;
->>  }
->>
->> +static int __init
->> +acpi_parse_its_affinity(struct acpi_subtable_header *header,
->> +                      const unsigned long end)
->> +{
->> +     struct acpi_srat_its_affinity *its_affinity;
->> +
->> +     its_affinity = (struct acpi_srat_its_affinity *)header;
->> +     if (!its_affinity)
->> +             return -EINVAL;
->> +
->> +     acpi_table_print_srat_entry(header);
->> +
->> +     /* let architecture-dependent part to do it */
->> +     acpi_numa_its_affinity_init(its_affinity);
->> +
->> +     return 0;
->> +}
->> +
->>  static int __initdata parsed_numa_memblks;
->>
->>  static int __init
->> @@ -445,7 +473,7 @@ int __init acpi_numa_init(void)
->>
->>       /* SRAT: Static Resource Affinity Table */
->>       if (!acpi_table_parse(ACPI_SIG_SRAT, acpi_parse_srat)) {
->> -             struct acpi_subtable_proc srat_proc[3];
->> +             struct acpi_subtable_proc srat_proc[4];
->>
->>               memset(srat_proc, 0, sizeof(srat_proc));
->>               srat_proc[0].id = ACPI_SRAT_TYPE_CPU_AFFINITY;
->> @@ -454,6 +482,8 @@ int __init acpi_numa_init(void)
->>               srat_proc[1].handler = acpi_parse_x2apic_affinity;
->>               srat_proc[2].id = ACPI_SRAT_TYPE_GICC_AFFINITY;
->>               srat_proc[2].handler = acpi_parse_gicc_affinity;
->> +             srat_proc[3].id = ACPI_SRAT_TYPE_GIC_ITS_AFFINITY;
->> +             srat_proc[3].handler = acpi_parse_its_affinity;
->>
->>               acpi_table_parse_entries_array(ACPI_SIG_SRAT,
->>                                       sizeof(struct acpi_table_srat),
->> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
->> index 45ea1933..84936da 100644
->> --- a/drivers/irqchip/irq-gic-v3-its.c
->> +++ b/drivers/irqchip/irq-gic-v3-its.c
->> @@ -1861,7 +1861,8 @@ static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
->>               goto dom_err;
->>       }
->>
->> -     err = its_probe_one(&res, dom_handle, NUMA_NO_NODE);
->> +     err = its_probe_one(&res, dom_handle,
->> +                     acpi_numa_get_its_nid(its_entry->translation_id));
->
-> If that's the only usage I wonder whether we really need all arm64
-> arch code/data, instead of parsing the SRAT in ITS code driver straight
-> away at probe, retrieve its node and be done with this.
->
-> I understand you replicated what x86/GICC does with APIC code, I would
-> like to understand though if we see a reason why (or better, why we keep
-> the relevant stashed data in arch/arm64 instead of the ITS driver).
+If there is interest I could try to revive it.
 
-it is been thought to do ITS sub table parse along with other SRAT tables.
-and use the mapping later when ITS devices are initialised/probed.
-IMO, it is more appropriate to keep all SRAT sub table parsing to same
-function/place
-rather than moving to driver.
-
->
-> Thanks,
-> Lorenzo
->
->>       if (!err)
->>               return 0;
->>
->> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
->> index 137e4a3..e5e8ae3 100644
->> --- a/include/linux/acpi.h
->> +++ b/include/linux/acpi.h
->> @@ -260,9 +260,12 @@ int acpi_table_parse_madt(enum acpi_madt_type id,
->>
->>  #ifdef CONFIG_ARM64
->>  void acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa);
->> +void acpi_numa_its_affinity_init(struct acpi_srat_its_affinity *pa);
->>  #else
->>  static inline void
->>  acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa) { }
->> +static inline void
->> +acpi_numa_its_affinity_init(struct acpi_srat_its_affinity *pa) { }
->>  #endif
->>
->>  int acpi_numa_memory_affinity_init (struct acpi_srat_mem_affinity *ma);
->> --
->> 1.8.1.4
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-thanks
-Ganapat
+Yours,
+Linus Walleij
