@@ -1,20 +1,77 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 14 Jun 2017 12:49:45 +0200
-Subject: [PATCH] tty/serial: Kconfig: remove AVR32
-In-Reply-To: <20170613203509.32026-1-alexandre.belloni@free-electrons.com>
-References: <20170613203509.32026-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170614104945.GA11354@kroah.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 14 Jun 2017 11:50:58 +0100
+Subject: [PATCH v8 6/9] drivers: perf: hisi: Add support for Hisilicon
+ Djtag driver
+In-Reply-To: <20170614104230.GC6085@leverpostej>
+References: <1495457312-237127-1-git-send-email-zhangshaokun@hisilicon.com>
+ <20170608163519.GA19643@leverpostej>
+ <8666a0fa-126d-e4a3-ac4b-7962f5d79942@huawei.com>
+ <20170609143050.GM13955@arm.com>
+ <0fbf57f0-9ff7-4fd4-07c7-c5e86028a7d2@huawei.com>
+ <20170614100658.GE16190@arm.com>
+ <20170614104230.GC6085@leverpostej>
+Message-ID: <20170614105057.GA7236@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 13, 2017 at 10:35:09PM +0200, Alexandre Belloni wrote:
-> AVR32 is now removed from the kernel, removed the config symbol that
-> doesn't exist anymore. Also take the opportunity to reword the help to
-> include sama5.
+On Wed, Jun 14, 2017 at 11:42:30AM +0100, Mark Rutland wrote:
+> On Wed, Jun 14, 2017 at 11:06:58AM +0100, Will Deacon wrote:
+> > Apologies, I misunderstood your algorithm (I thought step (a) was on one CPU
+> > and step (b) was on another). Still, I don't understand the need for the
+> > timeout. If you instead read back the flag immediately, wouldn't it still
+> > work? e.g.
+> >
+> >
+> > lock:
+> >   Readl_relaxed flag
+> >   if (locked)
+> >     goto lock;
+> >
+> >   Writel_relaxed unique ID to flag
+> >   Readl flag
+> >   if (locked by somebody else)
+> >     goto lock;
+> >
+> > <critical section>
+> >
+> > unlock:
+> >   Writel unlocked value to flag
+> >
+> >
+> > Given that we're dealing with iomem, I think it will work, but I could be
+> > missing something obvious.
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  drivers/tty/serial/Kconfig | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+> Don't we have the race below where both threads can enter the critical
+> section?
+> 
+>         // flag f initial zero (unlocked)
+> 
+>         // t1, flag 1                   // t2, flag 2
+>         readl(f); // reads 0            l = readl(f); // reads 0
+> 
+>         <thinks lock is free>           <thinks lock is free>
+> 
+>         writel(1, f);
+>         readl(f); // reads 1
+>         <thinks lock owned>
+>                                         writel(2, f);
+>                                         readl(f) // reads 2
+>                                         <thinks lock owned>
+> 
+>         <crticial section>              <critical section>
+> 
+> Thanks,
+> Mark.
 
-Does not apply to tty-next at all :(
+> IMPORTANT NOTICE: The contents of this email and any attachments are
+> confidential and may also be privileged. If you are not the intended
+> recipient, please notify the sender immediately and do not disclose
+> the contents to any other person, use it for any purpose, or store or
+> copy the information in any medium. Thank you.
+
+Please ignore the disclaimer on this mail; my client was mis-configured.
+
+I will ensure I avoid sending bogus disclaimers in future.
+
+Thanks,
+Mark.
