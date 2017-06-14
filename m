@@ -1,48 +1,40 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Wed, 14 Jun 2017 16:23:25 +0800
-Subject: [PATCH v3 08/21] arm64: dts: hikey960: add WL1837 Bluetooth device
- node
+Date: Wed, 14 Jun 2017 16:23:26 +0800
+Subject: [PATCH v3 09/21] arm64: dts: hi3660: Add pl031 rtc node
 In-Reply-To: <20170614082338.15673-1-guodong.xu@linaro.org>
 References: <20170614082338.15673-1-guodong.xu@linaro.org>
-Message-ID: <20170614082338.15673-9-guodong.xu@linaro.org>
+Message-ID: <20170614082338.15673-10-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the serial slave device for the WL1837 Bluetooth interface.
+From: Chen Feng <puck.chen@hisilicon.com>
 
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+Add dts node to enable pl031 rtc.
+
+Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-index 0a3f2e0..c25fff9 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-@@ -9,6 +9,7 @@
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+index 7a90c92..3b2a3a7 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+@@ -326,6 +326,14 @@
+ 			status = "disabled";
+ 		};
  
- #include "hi3660.dtsi"
- #include "hikey960-pinctrl.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	model = "HiKey960";
-@@ -63,6 +64,16 @@
- 	status = "okay";
- };
- 
-+&uart4 {
-+	status = "okay";
++		rtc0: rtc at fff04000 {
++			compatible = "arm,pl031", "arm,primecell";
++			reg = <0x0 0Xfff04000 0x0 0x1000>;
++			interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&crg_ctrl HI3660_PCLK>;
++			clock-names = "apb_pclk";
++		};
 +
-+	bluetooth {
-+		compatible = "ti,wl1837-st";
-+		enable-gpios = <&gpio15 6 GPIO_ACTIVE_HIGH>;
-+		max-speed = <921600>;
-+	};
-+};
-+
- &uart6 {
- 	/* On Low speed expansion */
- 	label = "LS-UART1";
+ 		gpio0: gpio at e8a0b000 {
+ 			compatible = "arm,pl061", "arm,primecell";
+ 			reg = <0 0xe8a0b000 0 0x1000>;
 -- 
 2.10.2
