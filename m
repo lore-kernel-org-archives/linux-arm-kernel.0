@@ -1,34 +1,87 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 14 Jun 2017 13:31:55 +0200
-Subject: [PATCH 2/2 v4] clk: Add Gemini SoC clock controller
-In-Reply-To: <20170612210248.GP20170@codeaurora.org>
-References: <20170524082044.8473-1-linus.walleij@linaro.org>
- <20170601070208.GO20170@codeaurora.org>
- <CACRpkdZv8MzXVecEXVdJ+P0MxVscYSy=MxC-yQAR0S4yQ6-rwQ@mail.gmail.com>
- <20170605195812.GH20170@codeaurora.org>
- <CACRpkdbya9xaN-i7AkG0bTyuFYfZc59sSTYhWB43=9btSKfPpQ@mail.gmail.com>
- <CACRpkdapAgHix2vw-woDFi4sh+H3_EX7w-5q=opBGMyegFrXbA@mail.gmail.com>
- <20170612210248.GP20170@codeaurora.org>
-Message-ID: <CACRpkdbF4syppZsFv2hbB1JxHvnndbS53yY8Pkbz2zoq5Jjzjw@mail.gmail.com>
+From: john.garry@huawei.com (John Garry)
+Date: Wed, 14 Jun 2017 12:35:07 +0100
+Subject: [PATCH v8 6/9] drivers: perf: hisi: Add support for Hisilicon
+ Djtag driver
+In-Reply-To: <20170614110141.GL16190@arm.com>
+References: <1495457312-237127-1-git-send-email-zhangshaokun@hisilicon.com>
+ <20170608163519.GA19643@leverpostej>
+ <8666a0fa-126d-e4a3-ac4b-7962f5d79942@huawei.com>
+ <20170609143050.GM13955@arm.com>
+ <0fbf57f0-9ff7-4fd4-07c7-c5e86028a7d2@huawei.com>
+ <20170614100658.GE16190@arm.com> <20170614104230.GC6085@leverpostej>
+ <20170614110141.GL16190@arm.com>
+Message-ID: <53af9b5b-ac93-eaf9-8551-75fb25a243aa@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 12, 2017 at 11:02 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 06/12, Linus Walleij wrote:
-
->> So the deferred clock makes the whole platform hang because the timer
->> needs it. Without a clocksource, the delay loop cannot be calibrated, so
->> it hangs there.
+On 14/06/2017 12:01, Will Deacon wrote:
+> On Wed, Jun 14, 2017 at 11:42:30AM +0100, Mark Rutland wrote:
+>> On Wed, Jun 14, 2017 at 11:06:58AM +0100, Will Deacon wrote:
+>>> Apologies, I misunderstood your algorithm (I thought step (a) was on one CPU
+>>> and step (b) was on another). Still, I don't understand the need for the
+>>> timeout. If you instead read back the flag immediately, wouldn't it still
+>>> work? e.g.
+>>>
+>>>
+>>> lock:
+>>>   Readl_relaxed flag
+>>>   if (locked)
+>>>     goto lock;
+>>>
+>>>   Writel_relaxed unique ID to flag
+>>>   Readl flag
+>>>   if (locked by somebody else)
+>>>     goto lock;
+>>>
+>>> <critical section>
+>>>
+>>> unlock:
+>>>   Writel unlocked value to flag
+>>>
+>>>
+>>> Given that we're dealing with iomem, I think it will work, but I could be
+>>> missing something obvious.
+>>
+>> Don't we have the race below where both threads can enter the critical
+>> section?
+>>
+>> 	// flag f initial zero (unlocked)
+>>
+>> 	// t1, flag 1			// t2, flag 2
+>> 	readl(f); // reads 0		l = readl(f); // reads 0
+>>
+>> 	<thinks lock is free>		<thinks lock is free>
+>>
+>> 	writel(1, f);
+>> 	readl(f); // reads 1
+>> 	<thinks lock owned>
+>> 					writel(2, f);
+>> 					readl(f) // reads 2
+>> 					<thinks lock owned>
+>>
+>> 	<crticial section>		<critical section>
 >
-> Ok. So can the certain clks that are required to get the timer
-> going be put into CLK_OF_DECLARE_DRIVER() and then have a regular
-> platform driver for the rest of the clks that aren't required for
-> early boot? We've been doing this sort of hybrid design lately,
-> so hopefully that works here too.
+> Urgh, yeah, of course and *that's* what the udelay is trying to avoid,
+> by "ensuring" that the <thinks lock is free> time and subsequent write
+> propagation is all over before we re-read the flag.
+>
+> John -- how much space do you have on this device? Do you have, e.g. a byte
+> for each CPU?
 
-Sure I will give it a spin!
+Hi Will,
 
-Is there a best-in-class driver doing this I can use as inspiration?
+To be clear, the agents in our case are the kernel and UEFI. Within the 
+kernel, we use a kernel spinlock to lock the same djtag between threads, 
+for these reasons:
+- kernel has a native spinlock
+- we are limited in locking values, as the lock flag is only a 8b field 
+in v2 hw (called module select)
 
-Yours,
-Linus Walleij
+Thanks,
+John
+
+>
+> Will
+>
+> .
+>
