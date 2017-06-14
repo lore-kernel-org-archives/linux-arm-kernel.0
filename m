@@ -1,55 +1,50 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Wed, 14 Jun 2017 11:29:42 +0200
-Subject: [PATCH] tty/serial: Kconfig: remove AVR32
-In-Reply-To: <20170613203509.32026-1-alexandre.belloni@free-electrons.com>
-References: <20170613203509.32026-1-alexandre.belloni@free-electrons.com>
-Message-ID: <7700c2bd-9a54-af44-28a1-693b704bec91@microchip.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 14 Jun 2017 10:32:24 +0100
+Subject: [PATCH v7 3/3] PCI: Add tango MSI controller support
+In-Reply-To: <870f833b-6bff-b3b1-6591-7d46e374de66@sigmadesigns.com>
+References: <741766e5-cff2-db5f-d40b-6866e08fd966@sigmadesigns.com>
+ <e868f9b8-39e3-4501-a8c6-64bd28a4be8b@sigmadesigns.com>
+ <9975fa6c-f426-519b-6b3e-a2d102d36fd5@arm.com>
+ <82d6bf37-96b9-cd9d-134b-f01638fa2b1b@sigmadesigns.com>
+ <d39b5b3a-48be-7aaa-b7dd-28d4ae1d2083@arm.com>
+ <49b4138d-0030-1e8c-6a14-0e9151b63d24@sigmadesigns.com>
+ <1588fa00-92c6-046d-ccfc-9a2deae61486@arm.com>
+ <08d84ce3-5345-dc69-bbc3-37372a3df22b@sigmadesigns.com>
+ <870f833b-6bff-b3b1-6591-7d46e374de66@sigmadesigns.com>
+Message-ID: <a714b871-dd6c-4db0-3539-aabf7274938a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 13/06/2017 ? 22:35, Alexandre Belloni a ?crit :
-> AVR32 is now removed from the kernel, removed the config symbol that
-> doesn't exist anymore. Also take the opportunity to reword the help to
-> include sama5.
+On 14/06/17 10:19, Marc Gonzalez wrote:
+> On 14/06/2017 11:00, Marc Gonzalez wrote:
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  drivers/tty/serial/Kconfig | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+>> The MSI controller in Tango supports 256 message-signaled interrupts,
+>> and a single doorbell address.
+>>
+>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>> ---
+>> Changes from v6 to v7
+>> o Call spin_lock() not spin_lock_irqsave() in the ISR
+>> ---
+>>  drivers/pci/host/pcie-tango.c | 225 ++++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 225 insertions(+)
 > 
-> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> index 5c8850f7a2a0..063c71e8de41 100644
-> --- a/drivers/tty/serial/Kconfig
-> +++ b/drivers/tty/serial/Kconfig
-> @@ -114,14 +114,14 @@ config SERIAL_SB1250_DUART_CONSOLE
->  	  If unsure, say Y.
->  
->  config SERIAL_ATMEL
-> -	bool "AT91 / AT32 on-chip serial port support"
-> +	bool "Atmel on-chip serial port support"
-
-Now, I would add something like "Microchip/Atmel", it's more future-proof.
-
->  	depends on HAS_DMA
-> -	depends on ARCH_AT91 || AVR32 || COMPILE_TEST
-> +	depends on ARCH_AT91 || COMPILE_TEST
->  	select SERIAL_CORE
->  	select SERIAL_MCTRL_GPIO if GPIOLIB
->  	help
->  	  This enables the driver for the on-chip UARTs of the Atmel
-
-Here as well...
-
-> -	  AT91 and AT32 processors.
-> +	  ARM processors.
->  
->  config SERIAL_ATMEL_CONSOLE
->  	bool "Support for console on AT91 / AT32 serial port"
-
-What about removing AT32 here as well ^ ?
-
+> Someone on IRC suggested testing the driver with LOCKDEP.
 > 
+> If I understand the warning below correctly, I am not supposed
+> to call irq_domain_set_info() while holding used_msi_lock?
 
+Indeed. This creates an AB/BA situation, which will eventually deadlock.
+Once again, lockdep saves the day.
 
+> NB: in probe, my driver calls
+> 
+> 	add_taint(TAINT_FIRMWARE_WORKAROUND, LOCKDEP_STILL_OK);
+> 
+> This should not break LOCKDEP analysis, right?
+
+It doesn't. The code is provably wrong, and lockdep proved that it is wrong.
+
+	M.
 -- 
-Nicolas Ferre
+Jazz is not dead. It just smells funny...
