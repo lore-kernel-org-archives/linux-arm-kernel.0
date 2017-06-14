@@ -1,80 +1,60 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 14 Jun 2017 17:49:00 +0200
-Subject: [PATCH v4 00/11] net: mvmdio: add xMDIO xSMI support
-Message-ID: <20170614154911.14510-1-antoine.tenart@free-electrons.com>
+Date: Wed, 14 Jun 2017 17:49:11 +0200
+Subject: [PATCH v4 11/11] arm64: marvell: dts: add xmdio nodes for 7k/8k
+In-Reply-To: <20170614154911.14510-1-antoine.tenart@free-electrons.com>
+References: <20170614154911.14510-1-antoine.tenart@free-electrons.com>
+Message-ID: <20170614154911.14510-12-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Add the description of the xMDIO bus for the Marvell Armada 7k and
+Marvell Armada 8k; for both CP110 slave and master. This bus is found
+on Marvell Ethernet controllers and provides an interface with the
+xMDIO bus.
 
-This series aims to add the xSMI support on the xMDIO bus to the
-mvmdio driver. The xSMI interface complies with the IEEE 802.3 clause 45
-and is used by 10GbE devices. On 7k and 8k (as of now), such an
-interface is found and is used by Ethernet controllers.
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 8 ++++++++
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 8 ++++++++
+ 2 files changed, 16 insertions(+)
 
-Patches 1-4 and 9 are cosmetic cleanups.
-
-Patches 5-7 are prerequisites to the xSMI support.
-
-Patches 8 and 10-11 add the xSMI support to the mvmdio driver, and a
-node is added both in the cp110 slave and master device trees.
-
-This was tested on an Armada 8040 mcbin, as well as on both the
-Armada 7040 DB and the Armada 8040 DB to ensure the SMI interface
-was still working.
-
-@Dave: patch 11 should go through the mvebu tree as asked by Gregory,
-thanks!
-
-Thanks,
-Antoine
-
-Since v3:
-  - Added a patch from Russell King removing locks, as there is already
-    per bus locking in the MDIO layer.
-  - Russell suggested another approach to add the xSMI support, by having
-    two different read/write functions. Reworked the series to take this
-    into account. (This also lead to the removal of some patches, and the
-    introduction of some others).
-
-Since v2:
-  - Brought back the marvell,xmdio compatible and updated the driver
-    accordingly. The ops (smi, xsmi) are chosen based on the compatible.
-  - Now return -EOPNOTSUPP when the MII_ADDR_C45 bit is wrongly set.
-  - Mask dev_addr with GENMASK(4, 0).
-  - Moved bit definitions under their register definition.
-  - Fixed the write operation shift.
-  - Added one space before the second parameter of GENMASK.
-
-Since v1:
-  - Instead of using the smi/xsmi helpers based on the compatible, now
-    check if the MII_ADDR_C45 bit is set.
-  - Removed the marvell,xmdio compatible addition.
-  - Fixed the is_read_valid logic.
-  - Updated to use static const variables for ops.
-  - Added 3 Reviewed-by tags from Florian (I dropped another one as the
-    patch changed in v2).
-
-Antoine Tenart (10):
-  net: mvmdio: reorder headers alphabetically
-  net: mvmdio: use tabs for defines
-  net: mvmdio: use GENMASK for masks
-  net: mvmdio: introduce an ops structure
-  net: mvmdio: put the poll intervals in the ops structure
-  net: mvmdio: check the MII_ADDR_C45 bit is not set for smi operations
-  net: mvmdio: add xmdio xsmi support
-  net: mvmdio: simplify the smi read and write error paths
-  dt-bindings: orion-mdio: document the new xmdio compatible
-  arm64: marvell: dts: add xmdio nodes for 7k/8k
-
-Russell King (1):
-  net: mvmdio: remove duplicate locking
-
- .../devicetree/bindings/net/marvell-orion-mdio.txt |   8 +-
- .../boot/dts/marvell/armada-cp110-master.dtsi      |   8 +
- .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi |   8 +
- drivers/net/ethernet/marvell/mvmdio.c              | 214 +++++++++++++++------
- 4 files changed, 178 insertions(+), 60 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+index 576e825585c9..8b512b75aea9 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+@@ -97,6 +97,14 @@
+ 				clocks = <&cpm_syscon0 1 9>, <&cpm_syscon0 1 5>;
+ 			};
+ 
++			cpm_xmdio: mdio at 12a600 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "marvell,xmdio";
++				reg = <0x12a600 0x10>;
++				status = "disabled";
++			};
++
+ 			cpm_syscon0: system-controller at 440000 {
+ 				compatible = "marvell,cp110-system-controller0",
+ 					     "syscon";
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+index 797208a11f9d..bd0c0e03edd2 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+@@ -104,6 +104,14 @@
+ 				clocks = <&cps_syscon0 1 9>, <&cps_syscon0 1 5>;
+ 			};
+ 
++			cps_xmdio: mdio at 12a600 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "marvell,xmdio";
++				reg = <0x12a600 0x10>;
++				status = "disabled";
++			};
++
+ 			cps_syscon0: system-controller at 440000 {
+ 				compatible = "marvell,cp110-system-controller0",
+ 					     "syscon";
 -- 
 2.9.4
