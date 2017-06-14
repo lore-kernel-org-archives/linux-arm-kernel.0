@@ -1,31 +1,38 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 14 Jun 2017 10:47:28 -0700
-Subject: [GIT PULL] Amlogic defconfig updates for v4.13
-Message-ID: <7hzidabgwf.fsf@baylibre.com>
+Date: Wed, 14 Jun 2017 10:48:26 -0700
+Subject: [GIT PULL] Amlogic 32-bit DT updates for v4.13
+Message-ID: <7htw3ibgut.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 08332893e37af6ae779367e78e444f8f9571511d:
+The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 
-  Linux 4.12-rc2 (2017-05-21 19:30:23 -0700)
+  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-defconfig
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt
 
-for you to fetch changes up to b4cb6f0ab7b0c4dd7f5ba546abcc960caa57aa72:
+for you to fetch changes up to 2c323c43a3d619d67bffa57dc7480cfae4c53300:
 
-  ARM64: defconfig: enable meson SPICC as module (2017-06-14 10:25:16 -0700)
-
-----------------------------------------------------------------
-Amlogic arm64 defconfig changes for v4.13
-- enable meson SPICC as module
-- enable IR core, decoders and Meson IR device
+  ARM: dts: meson8: add and use the real clock controller (2017-06-09 11:21:21 -0700)
 
 ----------------------------------------------------------------
-Neil Armstrong (2):
-      ARM64: defconfig: enable IR core, decoders and Meson IR device
-      ARM64: defconfig: enable meson SPICC as module
+Amlogic 32-bit DT changes for v4.13:
+- minor reorganization to support different busses
+- add/use real clock controller
 
- arch/arm64/configs/defconfig | 7 +++++++
- 1 file changed, 7 insertions(+)
+----------------------------------------------------------------
+Carlo Caione (1):
+      ARM: dts: meson: Extend L2 cache controller node for Meson8 and Meson8b
+
+Martin Blumenstingl (3):
+      ARM: dts: meson: organize devices in their corresponding busses
+      ARM: dts: meson8b: inherit meson.dtsi from meson8b.dtsi
+      ARM: dts: meson8: add and use the real clock controller
+
+ arch/arm/boot/dts/meson.dtsi   | 178 ++++++++++++++++++++++++++++++++++++++++-------------------------------------
+ arch/arm/boot/dts/meson6.dtsi  |   2 -
+ arch/arm/boot/dts/meson8.dtsi  | 138 ++++++++++++++++++++++++++++++++++++++++--------------------
+ arch/arm/boot/dts/meson8b.dtsi | 214 +++++++++++++++++++++++++++++++++++++++------------------------------------------------------
+ 4 files changed, 273 insertions(+), 259 deletions(-)
