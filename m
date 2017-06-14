@@ -1,40 +1,37 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 14 Jun 2017 23:09:39 +0800
-Subject: [PATCH 00/11] ARM: dts: imx6qdl: video capture support
-In-Reply-To: <1497291844-14632-1-git-send-email-steve_longerbeam@mentor.com>
-References: <1497291844-14632-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <20170614150938.GB30112@dragon>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Wed, 14 Jun 2017 23:11:06 +0800
+Subject: [PATCH] regulator: hi6421v530: Describe consumed platform device
+Message-ID: <20170614151106.11423-1-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 12, 2017 at 11:23:53AM -0700, Steve Longerbeam wrote:
-> This series defines the i.MX6 internal video multiplexers and MIPI CSI-2
-> receiver device nodes, and their connections to eachother and the i.MX6
-> IPU CSI ports.
-> 
-> It also implements video capture support on the SabreLite, SabreSD, and
-> SabreAuto reference platforms, by defining the video sensor nodes on those
-> platforms, and their connections to the video muxes and MIPI CSI-2 receiver.
-> 
-> There should not be much of anything controversial in this series. The
-> imx-media driver is set to be merged in time for 4.13, so please accept
-> this series soon.
-> 
-> 
-> Philipp Zabel (2):
->   ARM: dts: imx6qdl: add multiplexer controls
->   ARM: dts: imx6qdl: Add video multiplexers, mipi_csi, and their
->     connections
-> 
-> Steve Longerbeam (9):
->   ARM: dts: imx6qdl: Add compatible, clocks, irqs to MIPI CSI-2 node
->   ARM: dts: imx6qdl: add capture-subsystem device
->   ARM: dts: imx6qdl-sabrelite: remove erratum ERR006687 workaround
->   ARM: dts: imx6-sabrelite: add OV5642 and OV5640 camera sensors
->   ARM: dts: imx6-sabresd: add OV5642 and OV5640 camera sensors
->   ARM: dts: imx6-sabreauto: create i2cmux for i2c3
->   ARM: dts: imx6-sabreauto: add reset-gpios property for max7310_b
->   ARM: dts: imx6-sabreauto: add pinctrl for gpt input capture
->   ARM: dts: imx6-sabreauto: add the ADV7180 video decoder
+The hi6421v530-regulator driver consumes a similarly named platform device.
+Adding that to the module device table, allows modprobe to locate this
+driver once the device is created.
 
-Applied all, thanks.
+Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+---
+ drivers/regulator/hi6421v530-regulator.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/drivers/regulator/hi6421v530-regulator.c b/drivers/regulator/hi6421v530-regulator.c
+index 46bbba9..c09bc71 100644
+--- a/drivers/regulator/hi6421v530-regulator.c
++++ b/drivers/regulator/hi6421v530-regulator.c
+@@ -194,7 +194,14 @@ static int hi6421v530_regulator_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct platform_device_id hi6421v530_regulator_table[] = {
++	{ .name = "hi6421v530-regulator" },
++	{},
++};
++MODULE_DEVICE_TABLE(platform, hi6421v530_regulator_table);
++
+ static struct platform_driver hi6421v530_regulator_driver = {
++	.id_table = hi6421v530_regulator_table,
+ 	.driver = {
+ 		.name	= "hi6421v530-regulator",
+ 	},
+-- 
+2.10.2
