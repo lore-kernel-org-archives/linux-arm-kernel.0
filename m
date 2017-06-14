@@ -1,41 +1,68 @@
-From: jerome.forissier@linaro.org (Jerome Forissier)
-Date: Wed, 14 Jun 2017 11:39:50 +0200
-Subject: [PATCH] tee: add forward declaration for struct device
-In-Reply-To: <6344683a299d05692ed64ddb963343ea9547add4.1496229347.git.jerome.forissier@linaro.org>
-References: <6344683a299d05692ed64ddb963343ea9547add4.1496229347.git.jerome.forissier@linaro.org>
-Message-ID: <2bcbf7b0-7dba-7e72-72fd-4da922e442bb@linaro.org>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 14 Jun 2017 12:43:40 +0300
+Subject: [PATCH] tty/serial: remove AVR32 specific access wrappers
+In-Reply-To: <20170613202517.26558-1-alexandre.belloni@free-electrons.com>
+References: <20170613202517.26558-1-alexandre.belloni@free-electrons.com>
+Message-ID: <CAHp75VcMrhG0K-=dtkF1T5siAAmmLYdmCxcLdo_vvH8dLjLh=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+Arnd]
+On Tue, Jun 13, 2017 at 11:25 PM, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
+> Now that AVR32 is gone, the specific wrappers for that architecture are
+> unnecessary and will not be compiled anymore.
+>
 
-Ping?
+Can you rebase this on top of tty-next?
 
-Thanks,
--- 
-Jerome
+I'm pretty sure this patch will gone.
 
-On 05/31/2017 01:21 PM, Jerome Forissier wrote:
-> tee_drv.h references struct device, but does not include device.h nor
-> platform_device.h. Therefore, if tee_drv.h is included by some file
-> that does not pull device.h nor platform_device.h beforehand, we have a
-> compile warning. Fix this by adding a forward declaration.
-> 
-> Signed-off-by: Jerome Forissier <jerome.forissier@linaro.org>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > ---
->  include/linux/tee_drv.h | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/include/linux/tee_drv.h b/include/linux/tee_drv.h
-> index 8614713..07bd226 100644
-> --- a/include/linux/tee_drv.h
-> +++ b/include/linux/tee_drv.h
-> @@ -29,6 +29,7 @@
->  #define TEE_SHM_DMA_BUF		BIT(1)	/* Memory with dma-buf handle */
->  #define TEE_SHM_EXT_DMA_BUF	BIT(2)	/* Memory with dma-buf handle */
->  
-> +struct device;
->  struct tee_device;
->  struct tee_shm;
->  struct tee_shm_pool;
-> 
+>  drivers/tty/serial/atmel_serial.c | 17 -----------------
+>  1 file changed, 17 deletions(-)
+>
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index 937d67f22fba..8bfc566df2da 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -228,21 +228,6 @@ static inline void atmel_uart_writel(struct uart_port *port, u32 reg, u32 value)
+>         __raw_writel(value, port->membase + reg);
+>  }
+>
+> -#ifdef CONFIG_AVR32
+> -
+> -/* AVR32 cannot handle 8 or 16bit I/O accesses but only 32bit I/O accesses */
+> -static inline u8 atmel_uart_read_char(struct uart_port *port)
+> -{
+> -       return __raw_readl(port->membase + ATMEL_US_RHR);
+> -}
+> -
+> -static inline void atmel_uart_write_char(struct uart_port *port, u8 value)
+> -{
+> -       __raw_writel(value, port->membase + ATMEL_US_THR);
+> -}
+> -
+> -#else
+> -
+>  static inline u8 atmel_uart_read_char(struct uart_port *port)
+>  {
+>         return __raw_readb(port->membase + ATMEL_US_RHR);
+> @@ -253,8 +238,6 @@ static inline void atmel_uart_write_char(struct uart_port *port, u8 value)
+>         __raw_writeb(value, port->membase + ATMEL_US_THR);
+>  }
+>
+> -#endif
+> -
+>  #ifdef CONFIG_SERIAL_ATMEL_PDC
+>  static bool atmel_use_pdc_rx(struct uart_port *port)
+>  {
+> --
+> 2.11.0
+>
+
+
+
+-- 
+With Best Regards,
+Andy Shevchenko
