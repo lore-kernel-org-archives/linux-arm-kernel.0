@@ -1,53 +1,41 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 14 Jun 2017 17:49:06 +0200
-Subject: [PATCH v4 06/11] net: mvmdio: put the poll intervals in the ops
- structure
-In-Reply-To: <20170614154911.14510-1-antoine.tenart@free-electrons.com>
-References: <20170614154911.14510-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170614154911.14510-7-antoine.tenart@free-electrons.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 14 Jun 2017 08:55:23 -0700
+Subject: [PATCH 2/2 v4] clk: Add Gemini SoC clock controller
+In-Reply-To: <CACRpkdbF4syppZsFv2hbB1JxHvnndbS53yY8Pkbz2zoq5Jjzjw@mail.gmail.com>
+References: <20170524082044.8473-1-linus.walleij@linaro.org>
+ <20170601070208.GO20170@codeaurora.org>
+ <CACRpkdZv8MzXVecEXVdJ+P0MxVscYSy=MxC-yQAR0S4yQ6-rwQ@mail.gmail.com>
+ <20170605195812.GH20170@codeaurora.org>
+ <CACRpkdbya9xaN-i7AkG0bTyuFYfZc59sSTYhWB43=9btSKfPpQ@mail.gmail.com>
+ <CACRpkdapAgHix2vw-woDFi4sh+H3_EX7w-5q=opBGMyegFrXbA@mail.gmail.com>
+ <20170612210248.GP20170@codeaurora.org>
+ <CACRpkdbF4syppZsFv2hbB1JxHvnndbS53yY8Pkbz2zoq5Jjzjw@mail.gmail.com>
+Message-ID: <20170614155523.GX20170@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Put the two poll intervals (min and max) in the driver's ops
-structure. This is needed to add the xmdio support later.
+On 06/14, Linus Walleij wrote:
+> On Mon, Jun 12, 2017 at 11:02 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > On 06/12, Linus Walleij wrote:
+> 
+> >> So the deferred clock makes the whole platform hang because the timer
+> >> needs it. Without a clocksource, the delay loop cannot be calibrated, so
+> >> it hangs there.
+> >
+> > Ok. So can the certain clks that are required to get the timer
+> > going be put into CLK_OF_DECLARE_DRIVER() and then have a regular
+> > platform driver for the rest of the clks that aren't required for
+> > early boot? We've been doing this sort of hybrid design lately,
+> > so hopefully that works here too.
+> 
+> Sure I will give it a spin!
+> 
+> Is there a best-in-class driver doing this I can use as inspiration?
+> 
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
- drivers/net/ethernet/marvell/mvmdio.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+Great. I suppose drivers/clk/nxp/clk-lpc18xx-creg.c or
+drivers/clk/axis/clk-artpec6.c would be good examples.
 
-diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
-index 2a8efc77f5fe..e4aa8e2d2e8a 100644
---- a/drivers/net/ethernet/marvell/mvmdio.c
-+++ b/drivers/net/ethernet/marvell/mvmdio.c
-@@ -64,6 +64,8 @@ struct orion_mdio_dev {
- 
- struct orion_mdio_ops {
- 	int (*is_done)(struct orion_mdio_dev *);
-+	unsigned int poll_interval_min;
-+	unsigned int poll_interval_max;
- };
- 
- /* Wait for the SMI unit to be ready for another operation
-@@ -83,8 +85,8 @@ static int orion_mdio_wait_ready(const struct orion_mdio_ops *ops,
- 			break;
- 
- 	        if (dev->err_interrupt <= 0) {
--			usleep_range(MVMDIO_SMI_POLL_INTERVAL_MIN,
--				     MVMDIO_SMI_POLL_INTERVAL_MAX);
-+			usleep_range(ops->poll_interval_min,
-+				     ops->poll_interval_max);
- 
- 			if (time_is_before_jiffies(end))
- 				++timedout;
-@@ -113,6 +115,8 @@ static int orion_mdio_smi_is_done(struct orion_mdio_dev *dev)
- 
- static const struct orion_mdio_ops orion_mdio_smi_ops = {
- 	.is_done = orion_mdio_smi_is_done,
-+	.poll_interval_min = MVMDIO_SMI_POLL_INTERVAL_MIN,
-+	.poll_interval_max = MVMDIO_SMI_POLL_INTERVAL_MAX,
- };
- 
- static int orion_mdio_read(struct mii_bus *bus, int mii_id,
 -- 
-2.9.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
