@@ -1,69 +1,56 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Thu, 15 Jun 2017 00:11:31 +0800
-Subject: [PATCH v4 2/2] arm64: dts: mt7622: add dts file for MT7622 reference
- board variant 1
-In-Reply-To: <cover.1497455465.git.sean.wang@mediatek.com>
-References: <cover.1497455465.git.sean.wang@mediatek.com>
-Message-ID: <1f0a32da95e1d70c62e7f67564cfda01d7abd79a.1497455465.git.sean.wang@mediatek.com>
+From: code@mmayer.net (Markus Mayer)
+Date: Wed, 14 Jun 2017 09:34:11 -0700
+Subject: [PATCH v2 2/2] soc: brcmstb: Add driver for DPFE
+In-Reply-To: <5b79dee6-bb84-30b3-1bb2-287b24d42534@gmail.com>
+References: <20170613223710.31719-1-code@mmayer.net>
+ <20170613223710.31719-3-code@mmayer.net>
+ <5b79dee6-bb84-30b3-1bb2-287b24d42534@gmail.com>
+Message-ID: <CANEuBv6N3TTNzSuDQXk-eiEV_fvGtVJZhdWUO_XdgPj6+j7q5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+On 13 June 2017 at 17:03, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> Hi Markus,
+>
+> On 06/13/2017 03:37 PM, Markus Mayer wrote:
+>> From: Markus Mayer <mmayer@broadcom.com>
+>>
+>> This driver allows access to DRAM properties, such as the refresh rate,
+>> via the Broadcom STB DDR PHY Front End (DPFE). The refresh rate can be
+>> used as indirect indicator of the DRAM temperature.
+>>
+>> The driver also allows setting of the sampling interval.
+>>
+>> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
+>> ---
+>>  MAINTAINERS                      |   8 +
+>>  drivers/soc/bcm/brcmstb/Makefile |   2 +-
+>>  drivers/soc/bcm/brcmstb/dpfe.c   | 689 +++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 698 insertions(+), 1 deletion(-)
+>>  create mode 100644 drivers/soc/bcm/brcmstb/dpfe.c
+>>
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+>> index f7d568b..04f0be6 100644
+>> --- a/MAINTAINERS
+>> +++ b/MAINTAINERS
+>> @@ -2864,6 +2864,14 @@ S:     Maintained
+>>  F:   Documentation/devicetree/bindings/cpufreq/brcm,stb-avs-cpu-freq.txt
+>>  F:   drivers/cpufreq/brcmstb*
+>>
+>> +BROADCOM STB SOC DPFE DRIVER
+>> +M:   Markus Mayer <mmayer@broadcom.com>
+>> +M:   bcm-kernel-feedback-list at broadcom.com
+>> +L:   linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>> +S:   Maintained
+>> +F:   Documentation/devicetree/bindings/soc/bcm/brcm,dpfe-cpu.txt
+>> +F:   drivers/misc/brcmstb-dpfe.c
+>
+> Just one nit: this should be drivers/soc/bcm/brcmstb/dpfe.c, other than
+> that, I just need an Ack from Rob on the binding, and I will queue this
+> up, thanks!
 
-Add the support for the MT7622 reference board variant 1 from
-MediaTek.
+Oops. Thanks for catching that. Would you like me to re-send or will
+you fix up that path on your end?
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/Makefile        |  1 +
- arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts | 27 +++++++++++++++++++++++++++
- 2 files changed, 28 insertions(+)
- create mode 100644 arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-
-diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
-index 015eb07..89371be 100644
---- a/arch/arm64/boot/dts/mediatek/Makefile
-+++ b/arch/arm64/boot/dts/mediatek/Makefile
-@@ -1,6 +1,7 @@
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-evb.dtb
-+dtb-$(CONFIG_ARCH_MEDIATEK) += mt7622-rfb1.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
- 
- always		:= $(dtb-y)
-diff --git a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-new file mode 100644
-index 0000000..c08309d
---- /dev/null
-+++ b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-@@ -0,0 +1,27 @@
-+/*
-+ * Copyright (c) 2017 MediaTek Inc.
-+ * Author: Ming Huang <ming.huang@mediatek.com>
-+ *	   Sean Wang <sean.wang@mediatek.com>
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+ */
-+
-+/dts-v1/;
-+#include "mt7622.dtsi"
-+
-+/ {
-+	model = "MediaTek MT7622 RFB1 board";
-+	compatible = "mediatek,mt7622-rfb1", "mediatek,mt7622";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200n1";
-+	};
-+
-+	memory {
-+		reg = <0 0x40000000 0 0x3F000000>;
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
--- 
-2.7.4
+> --
+> Florian
