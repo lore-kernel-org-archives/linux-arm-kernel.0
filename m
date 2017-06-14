@@ -1,39 +1,43 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 14 Jun 2017 11:06:41 +0100
-Subject: Using __always_inline attribute
-In-Reply-To: <2a762f1f3b355e71c5bca6a6e00bffe0@codeaurora.org>
-References: <2a762f1f3b355e71c5bca6a6e00bffe0@codeaurora.org>
-Message-ID: <20170614100641.GB16190@arm.com>
+Date: Wed, 14 Jun 2017 11:06:37 +0100
+Subject: [PATCH 2/2] arm64: Export save_stack_trace_tsk()
+In-Reply-To: <20170613181603.GE4902@n2100.armlinux.org.uk>
+References: <20170613085029.GA5374@arm.com>
+ <20170613173308.6653-1-dustinb@codeaurora.org>
+ <20170613173308.6653-2-dustinb@codeaurora.org>
+ <20170613174406.GH9184@arm.com>
+ <20170613181603.GE4902@n2100.armlinux.org.uk>
+Message-ID: <20170614100636.GA16190@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Prasad,
-
-On Tue, Jun 13, 2017 at 03:39:37PM -0700, Sodagudi Prasad wrote:
-> With a variant of a CLANG(based on 4.0) following errors observed on Linux
-> 4.12-rc5 tag.
-
-How are you building the kernel with clang, btw? I'd be keen to try the same
-thing, but I thought the LLVMLinux project was largely dead at his point. Do
-you still need build system patches, or is this now integrated with Kbuild?
-
-> net/built-in.o: In function `__xchg_mb':
-> arch/arm64/include/asm/cmpxchg.h:99: \
->                     undefined reference to `__compiletime_assert_99'
-> arch/arm64/include/asm/cmpxchg.h:99: \
->                     undefined reference to `__compiletime_assert_99
+On Tue, Jun 13, 2017 at 07:16:03PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Jun 13, 2017 at 06:44:06PM +0100, Will Deacon wrote:
+> > On Tue, Jun 13, 2017 at 10:33:08AM -0700, Dustin Brown wrote:
+> > > To aid in debugging driver modules, export save_stack_trace_tsk() for
+> > > the ARM64 architecture.
+> > > ---
+> > >  arch/arm64/kernel/stacktrace.c | 1 +
+> > >  1 file changed, 1 insertion(+)
+> > 
+> > Please can you repost with your Signed-off-by line added to the patch? I
+> > can't merge anything from you without that.
 > 
-> Clang does not seems to be marking this macro as inline and causing above
-> compilation issue due to BUILD_BUG().
+> I think it would also be a good thing to have a little more information
+> about how this is being used in driver modules.
 
-The only BUILD_BUG I see around here is if the size parameter (which is
-calculated using sizeof) is not known to be 1,2,4 or 8 at compile time. It
-would be interesting to know which call site is confusing clang in this way
-and what code is actually being emitted here.
+That would certainly help to motivate the change; I was just going by the
+fact that most other architectures export this symbol and therefore it is
+assumedly useful to somebody.
 
-If it's just that __xchg_mb isn't being inlined into the __xchg_wrapper
-macro, then your patch should be ok, but I'd like to be sure it's not
-something else. I'm also surprised you haven't see this crop up in other
-places.
+> If it's for ad-hoc debugging, then I see no reason for it to be merged
+> into mainline kernels just for the utility of people adding code to
+> drivers to perform that debug - they might as well temporarily add the
+> export at the same time IMHO.
+
+A quick look at the Debian archive suggests that it's used by "systemtap"
+(although this seems to be part of an autoconf helper) and "kpatch".
+
+Dustin -- do you have another use-case behind this?
 
 Will
