@@ -1,56 +1,30 @@
-From: guy.shapiro@mobi-wize.com (Guy Shapiro)
-Date: Wed, 14 Jun 2017 10:35:12 +0300
-Subject: [PATCH v5 1/3] nvmem: dt: document SNVS LPGPR binding
-In-Reply-To: <20170609125730.25502-2-o.rempel@pengutronix.de>
-References: <20170609125730.25502-1-o.rempel@pengutronix.de>
- <20170609125730.25502-2-o.rempel@pengutronix.de>
-Message-ID: <442e0336-fbd3-f92c-ab6a-0622c710e232@mobi-wize.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Wed, 14 Jun 2017 09:40:33 +0200
+Subject: [PATCH v2 1/2] tty/serial: atmel: remove
+ atmel_default_console_device handling
+In-Reply-To: <20170613202439.26369-1-alexandre.belloni@free-electrons.com>
+References: <20170613202439.26369-1-alexandre.belloni@free-electrons.com>
+Message-ID: <0bb0be06-ef27-7bb5-af8d-1e25ec9f1534@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/06/2017 15:57, Oleksij Rempel wrote:
-
-> Documentation bindings for the Low Power General Purpose Register
-> available on i.MX6 SoCs in the Secure Non-Volatile Storage.
->
-> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+On 13/06/2017 22:24, Alexandre Belloni wrote:
+> atmel_default_console_device was only used by AVR32, in particular
+> arch/avr32/mach-at32ap/at32ap700x.c which is now gone. Remove it from the
+> driver.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > ---
->  .../devicetree/bindings/nvmem/snvs-lpgpr.txt          | 19
-> +++++++++++++++++++
->  1 file changed, 19 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
->
-> diff --git a/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
-> b/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
-> new file mode 100644
-> index 000000000000..21910fb3159f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
-> @@ -0,0 +1,19 @@
-> +Device tree bindings for Low Power General Purpose Register found in
-> i.MX6Q/D
-> +Secure Non-Volatile Storage.
-> +
-> +This DT node should be represented as a sub-node of a "syscon",
-> +"simple-mfd" node.
-> +
-> +Required properties:
-> +- compatible: should be:
-> +	"fsl,imx6q-snvs-lpgpr" for Freescale i.MX6Q/D/DL/S
+> 
+> Changes in v2:
+>  - added an empty line as suggested by Andy
+>  - properly based the patch on v4.12-rc1
+> 
+>  drivers/tty/serial/atmel_serial.c | 43 ---------------------------------------
+>  1 file changed, 43 deletions(-)
+> 
 
-I've tested the basic functionality on i.MX6UL. It seems to work as is.
-Please add "/UL" on the next version.
+Acked-by: Richard Genoud <richard.genoud@gmail.com>
 
-Regards,
-Guy
 
-> +
-> +Example:
-> +snvs: snvs at 020cc000 {
-> +	compatible = "fsl,sec-v4.0-mon", "syscon", "simple-mfd";
-> +	reg = <0x020cc000 0x4000>;
-> +
-> +	snvs_lpgpr: snvs-lpgpr {
-> +		compatible = "fsl,imx6q-snvs-lpgpr";
-> +	};
-> +};
+Thanks !
