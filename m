@@ -1,62 +1,134 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 14 Jun 2017 08:05:52 -0500
-Subject: [PATCH v2 3/7] includes: dt-bindings: Rename STM32F429 pinctrl DT
- bindings
-In-Reply-To: <832cd436-0704-3709-ba2c-2c1f6db48615@st.com>
-References: <1491568984-20169-1-git-send-email-alexandre.torgue@st.com>
- <1491568984-20169-4-git-send-email-alexandre.torgue@st.com>
- <20170410202736.zy7naw74hvrdmfzk@rob-hp-laptop>
- <800a68a4-d6ce-212b-5849-56c9d32f891a@st.com>
- <832cd436-0704-3709-ba2c-2c1f6db48615@st.com>
-Message-ID: <CAL_JsqJHFmamtr_o852fsbzq2S6V0i+xWi62=3HJ0w5F=3SG6g@mail.gmail.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed, 14 Jun 2017 15:08:48 +0200
+Subject: [PATCH 2/6] drivers base/arch_topology: frequency-invariant
+ load-tracking support
+In-Reply-To: <9716a48d-8198-a1d8-9450-de6386338665@arm.com>
+References: <20170608075513.12475-1-dietmar.eggemann@arm.com>
+ <20170608075513.12475-3-dietmar.eggemann@arm.com>
+ <CAKfTPtDB=5mQnJfzES+iU-nmNjVDM48f_iKuc7WefkRVWW4JOQ@mail.gmail.com>
+ <9716a48d-8198-a1d8-9450-de6386338665@arm.com>
+Message-ID: <CAKfTPtBnUWyAWTMJ2H8C+SPT+fVj-NkAs_pdOu+_a1zJ=VXZdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 7, 2017 at 11:35 AM, Alexandre Torgue
-<alexandre.torgue@st.com> wrote:
-> Hi Rob,
+On 14 June 2017 at 09:55, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
 >
-> Gentle ping.
+> On 06/12/2017 04:27 PM, Vincent Guittot wrote:
+> > On 8 June 2017 at 09:55, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
 >
-> On 04/12/2017 03:31 PM, Alexandre Torgue wrote:
->>
->> Hi Rob,
->>
->> On 04/10/2017 10:27 PM, Rob Herring wrote:
->>>
->>> On Fri, Apr 07, 2017 at 02:43:00PM +0200, Alexandre TORGUE wrote:
->>>>
->>>> STM32F4 MCU series is composed of several SOC (STM32F429, STM32F469,
->>>> ...).
->>>> Most of muxing definition are identical. So to avoid to duplicate
->>>> bindings
->>>> definition, this patch create common definitions.
->>>
->>>
->>> This is a lot of churn. Some confirmation that the resultant dtb is the
->>> same before and after would be nice. Perhaps the script you used to
->>> convert this as well.
->>
->>
->> I tried to use fdtdump but it seems bugged. So I used directly dtc
->> binary to (re)generate dts files (before and after apply the series) and
->> I compared "pinmux" field in both case.
->>
->> Example on stm32f469-disco:
->>
->> ./scripts/dtc/dtc -I dtb -O dts -o stm32f469-disco-after.dts
->> stm32f469-disco-after.dtb
->>
->> ./scripts/dtc/dtc -I dtb -O dts -o stm32f469-disco-before.dts
->> stm32f469-disco-before.dtb
->>
->> cat stm32f469-disco-after.dts | grep pinmux
->> cat stm32f469-disco-before.dts | grep pinmux
->>
+> Hi Vincent,
 >
-> Do you agree with verifications ?
+> Thanks for the review!
+>
+> [...]
+>
+> >> @@ -225,8 +265,14 @@ static int __init register_cpufreq_notifier(void)
+> >>
+> >>          cpumask_copy(cpus_to_visit, cpu_possible_mask);
+> >>
+> >> -       return cpufreq_register_notifier(&init_cpu_capacity_notifier,
+> >> -                                        CPUFREQ_POLICY_NOTIFIER);
+> >> +       ret = cpufreq_register_notifier(&init_cpu_capacity_notifier,
+> >> +                                       CPUFREQ_POLICY_NOTIFIER);
+> >> +
+> >> +       if (ret)
+> >
+> > Don't you have to free memory allocated for cpus_to_visit in case of
+> > errot ? it was not done before your patch as well
+>
+> Yes, we should free cpus_to_visit if the policy notifier registration
+> fails. But IMHO also, once the parsing of the capacity-dmips-mhz property
+> is done. free cpus_to_visit is only used in the notifier call
+> init_cpu_capacity_callback() after being allocated and initialized in
+> register_cpufreq_notifier().
+>
+> We could add something like this as the first patch of this set. Only
+> mildly tested on Juno. Juri, what do you think?
+>
+> Author: Dietmar Eggemann <dietmar.eggemann@arm.com>
+> Date:   Tue Jun 13 23:21:59 2017 +0100
+>
+>     drivers base/arch_topology: free cpumask cpus_to_visit
+>
+>     Free cpumask cpus_to_visit in case registering
+>     init_cpu_capacity_notifier has failed or the parsing of the cpu
+>     capacity-dmips-mhz property is done. The cpumask cpus_to_visit is
+>     only used inside the notifier call init_cpu_capacity_callback.
+>
+>     Reported-by: Vincent Guittot <vincent.guittot@linaro.org>
+>     Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
 
-I would expect you do "diff -u stm32f469-disco-before.dts
-stm32f469-disco-after.dts".
+your proposal for freeing cpus_to_visit looks good for me
 
-Rob
+Acked-by: Vincent Guittot <vincent.guittot@linaro.org>
+
+>
+> diff --git a/drivers/base/arch_topology.c b/drivers/base/arch_topology.c
+> index d1c33a85059e..f4832c662762 100644
+> --- a/drivers/base/arch_topology.c
+> +++ b/drivers/base/arch_topology.c
+> @@ -206,6 +206,8 @@ static struct notifier_block init_cpu_capacity_notifier = {
+>
+>  static int __init register_cpufreq_notifier(void)
+>  {
+> +       int ret;
+> +
+>         /*
+>          * on ACPI-based systems we need to use the default cpu capacity
+>          * until we have the necessary code to parse the cpu capacity, so
+> @@ -221,13 +223,19 @@ static int __init register_cpufreq_notifier(void)
+>
+>         cpumask_copy(cpus_to_visit, cpu_possible_mask);
+>
+> -       return cpufreq_register_notifier(&init_cpu_capacity_notifier,
+> -                                        CPUFREQ_POLICY_NOTIFIER);
+> +       ret = cpufreq_register_notifier(&init_cpu_capacity_notifier,
+> +                                       CPUFREQ_POLICY_NOTIFIER);
+> +
+> +       if (ret)
+> +               free_cpumask_var(cpus_to_visit);
+> +
+> +       return ret;
+>  }
+>  core_initcall(register_cpufreq_notifier);
+>
+>  static void parsing_done_workfn(struct work_struct *work)
+>  {
+> +       free_cpumask_var(cpus_to_visit);
+>         cpufreq_unregister_notifier(&init_cpu_capacity_notifier,
+>                                          CPUFREQ_POLICY_NOTIFIER);
+>  }
+>
+> >> +               return ret;
+> >> +
+> >> +       return cpufreq_register_notifier(&set_freq_scale_notifier,
+> >> +                                        CPUFREQ_TRANSITION_NOTIFIER);
+> >
+> > Don't you have to unregister the other cpufreq notifier if an error is
+> > returned and free the mem allocated for cpus_to_visit ?
+>
+> IMHO, that's not necessary.
+>
+> The transition notifier works completely independent from the policy
+> notifier. In case the latter gets registered correctly and the registration
+> of the former fails, the notifier call of the policy notifier still parses
+> the capacity-dmips-mhz property information and sets per_cpu(max_freq, cpu).
+>
+> The notifier call set_freq_scale_callback() of the transition notifier will
+> not be called so that frequency invariance always returns
+> SCHED_CAPACITY_SCALE.
+>
+> After the policy notifier has finished its work, it schedules
+> parsing_done_work() in which it gets unregistered.
+
+Ok so IIUC, the transition notifier is somehow optional and we still
+have the cpu invariance.
+In this case, you should not return the error code of
+cpufreq_register_notifier(&set_freq_scale_notifier,
+CPUFREQ_TRANSITION_NOTIFIER) as the error code of the
+register_cpufreq_notifier function.
+you should better print a warning like " failed to init frequency
+invariance" and return 0 for register_cpufreq_notifier()
+
+>
+> [...]
