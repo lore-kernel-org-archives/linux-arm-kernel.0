@@ -1,74 +1,109 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 14 Jun 2017 22:28:29 +0200
-Subject: [GIT PULL] Allwinner H5 changes for 4.13
-Message-ID: <20170614202829.us4uiajxb54bavh2@flea>
+From: daniel@iogearbox.net (Daniel Borkmann)
+Date: Wed, 14 Jun 2017 22:31:26 +0200
+Subject: [PATCH v2] arm: eBPF JIT compiler
+In-Reply-To: <CAHgaXdJrvKdzr3fJ1TMkC4foeVsZJDSVEwhDOeZGxQVsmoK2cQ@mail.gmail.com>
+References: <1495754003-21099-1-git-send-email-illusionist.neo@gmail.com>
+ <CAGXu5jKmLNMR+uhM9Ov2XPW6kCjip_SjScgEH0fTFp6fQtKFiA@mail.gmail.com>
+ <593E6B0F.8070901@iogearbox.net>
+ <CAHgaXd+DW2bggto=2S9hOdMrtPTvhD2QN4rPf2V8iHewQpg-YA@mail.gmail.com>
+ <CAHgaXdJrvKdzr3fJ1TMkC4foeVsZJDSVEwhDOeZGxQVsmoK2cQ@mail.gmail.com>
+Message-ID: <59419D1E.2060303@iogearbox.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On 06/13/2017 08:56 AM, Shubham Bansal wrote:
+> Hi Daniel, Kees, David, Russel,
+>
+>>> Any plans to implement above especially BPF_JMP | BPF_CALL in near future?
+>>> Reason why I'm asking is that i) currently the arm32 cBPF JIT implements
+>>> all of the cBPF extensions (except SKF_AD_RANDOM and SKF_AD_VLAN_TPID).
+>>> Some of the programs that were JITed before e.g. using SKF_AD_CPU would now
+>>> fall back to the eBPF interpreter due to lack of translation in JIT, but
+>>> also ii) that probably most (if not all) of eBPF programs use BPF helper
+>>> calls heavily, which will still redirect them to the interpreter right now
+>>> due to lack of BPF_JMP | BPF_CALL support, so it's really quite essential
+>>> to have it implemented.
+>>
+>> I can try for BPF_JMP | BPF_CALL. I didn't do it last time because I
+>> thought, it would make the code look messy and become pain to get it
+>> through the review.
+>> For this, I have to map eBPF arguments with arm ABI arguments and move
+>> ebpf arguments to corresponding arm ABI arguments, as eBPF arguments
+>> doesn't match with arm ABI arguments.
+>> Let me try that if its possible.
+>
+> Okay. I looked at it, tried few different solutions also. There is a
+> problem with implementing BPF_JMP | BPF_CALL.
+> Problem is transition between 4 byte and 8 byte arguments. Lets take a
+> look a the following example to get a more clear look at the problem.
+>
+> Lets consider this function :
+> CASE 1:                            foo(int a, int b, long long c, int d)
+> For calling this function in arm 32 arch, I have to pass the arguments
+> as following:
+>                                           a -> r0
+>                                           b -> r1
+>                                           c -> r2, r3
+>                                           d -> stack_top
+>
+> Now consider an another example function :
+> CASE 2:                           bar(int a, int b, int c, int d)
+> For calling this function in arm32 arch, I have to pass the arguments
+> as following:
+>                                         a -> r0
+>                                         b -> r1
+>                                         c -> r2
+>                                         d -> r3
+>
+> So, you can clearly see the problem with it. There is no way of
+> knowing which of the above way to pass the arguments. There are
+> solutions possible:
 
-Just like the H3 PR, this one is built on a common branch (up to
-0eba511a3cac), but this part should go through arm64.
+Right.
 
-Thanks!
-Maxime
+> 1. One thing I can do is look at the address of the function to call
+> and pass the argument accordingly but thats not really a robust
+> solution as we have to change the arm32 JIT each time we add any new
+> BPF helper function.
 
-The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+Yeah, that would be rather ugly.
 
-  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+> 2. Another solution is, if any of you guys can assure/confirm me that
+> there will be only 4 byte argument passed to BPF helper functions in
+> arm32 as of now and in future including the pointer as well, then I
+> can just assume that each argument is passed as 4 byte value and my
+> trimming the 8byte arguments to 4 bytes arguments wouldn't be a
+> problem. In that case, arguments for CASE 1 and CASE 2 will be passed
+> in the same way, i.e.
+>                                         a -> r0
+>                                         b -> r1
+>                                         c -> r2
+>                                         d -> r3
+>
+> Let me know what you think. I don't think I can find the solution to
+> this problem other than those mentioned above. Would love to here any
+> ideas from you guys.
 
-are available in the git repository at:
+Not all of the helpers have 4 or less byte arguments only, there are a
+few with 8 byte arguments, so making that general assumption wouldn't
+work. I guess what could be done is that helpers have a flag in struct
+bpf_func_proto which indicates for JITs that all args are 4 byte on 32bit
+so you could probably use convention similar to case2 for them. Presumably
+for that information to process, the JIT might need to be reworked to
+extract that via bpf_analyzer() that does a verifier run to re-analyze
+the program like in nfp JIT case.
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-dt-h5-for-4.13
+The other option could perhaps be to check the interpreter disasm of
+___bpf_prog_run() with regards to how it handles BPF_JMP | BPF_CALL
+helper call and do something similarly generic in the JIT as well.
 
-for you to fetch changes up to ea43d9b85acf66eac16ec89dc0fb84751f50f088:
+>>> Did you also manage to get the BPF selftest suite running in the meantime
+>>> (tools/testing/selftests/bpf/)? There are a couple of programs that clang
+>>> will compile (test_pkt_access.o, test_xdp.o, test_l4lb.o, test_tcp_estats.o)
+>>> and then test run.
+> I will run these tests tonight. Hopefully I will be able to run them.
 
-  arm64: allwinner: h5: Add initial Orangepi Zero Plus 2 support (2017-06-13 09:18:31 +0200)
+Ok.
 
-----------------------------------------------------------------
-Allwinner H5 DT changes for 4.13
-
-Just like the H3, this is mostly about enabling the EMAC on the H5, and
-also has a new board, the Orange Pi Zero Plus 2
-
-----------------------------------------------------------------
-Chen-Yu Tsai (1):
-      ARM: sunxi: h3-h5: Convert R_CCU raw numbers to macros
-
-Corentin Labbe (3):
-      arm: sun8i: sunxi-h3-h5: Add dt node for the syscon control module
-      arm: sun8i: sunxi-h3-h5: add dwmac-sun8i ethernet driver
-      arm64: allwinner: orangepi-pc2: Enable dwmac-sun8i
-
-Icenowy Zheng (5):
-      arm64: allwinner: h5: add support for Orange Pi Prime board
-      arm64: allwinner: h5: add support for NanoPi NEO2 board
-      arm64: allwinner: h5: sort the device nodes in / part for some boards
-      arm64: allwinner: h5: enable dwmac-sun8i for Orange Pi Prime
-      arm64: allwinner: h5: enable dwmac-sun8i for Nano Pi NEO2
-
-Jagan Teki (1):
-      arm64: allwinner: h5: Add initial Orangepi Zero Plus 2 support
-
- arch/arm/boot/dts/sunxi-h3-h5.dtsi                 |  48 ++++-
- arch/arm64/boot/dts/allwinner/Makefile             |   3 +
- .../boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts   | 161 ++++++++++++++
- .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  |  27 +++
- .../dts/allwinner/sun50i-h5-orangepi-prime.dts     | 232 +++++++++++++++++++++
- .../allwinner/sun50i-h5-orangepi-zero-plus2.dts    |  92 ++++++++
- 6 files changed, 560 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170614/f84c5e86/attachment.sig>
+> Any comments are welcome. Would love to here what you think about my
+> solutions above.
