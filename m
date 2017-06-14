@@ -1,30 +1,24 @@
-From: srishtishar@gmail.com (srishti sharma)
-Date: Wed, 14 Jun 2017 19:36:12 +0530
-Subject: [PATCH] Staging: vc04_services: bcm2835-audio: bcm2835-ctl.c: Fixed
- alignment to match open paranthesis.
-Message-ID: <1497449172-3904-1-git-send-email-srishtishar@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 14 Jun 2017 11:12:21 -0300
+Subject: FEC data corruption?
+In-Reply-To: <VI1PR0701MB27524436487BAFAF14AC92C5F8C30@VI1PR0701MB2752.eurprd07.prod.outlook.com>
+References: <VI1PR0701MB27524436487BAFAF14AC92C5F8C30@VI1PR0701MB2752.eurprd07.prod.outlook.com>
+Message-ID: <CAOMZO5AVNBCTSABjXhk-WJCXYhONex59swtwcAHQfoc8H45G2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixed alignment so that it matched open paranthesis.
+On Wed, Jun 14, 2017 at 10:43 AM, Vanhauwaert Wouter
+<W.Vanhauwaert@televic.com> wrote:
+> Hello
+> I'm trying to do a long-term network test on 2 platforms.
+> One is based on imx6q, the other on imx6ul.
+> imx6q is using linux-fslc, imx6ul is using linux-imx For that, I enabled the busybox inetd service with the echo protocol enabled. I'm flooding the device with echo requests of 12kiB (0x3000B) Most of the time that goes well, but at certain points, the data returned by the platform is corrupted. After some research, it looks like the data returned is copied from memory address 0 instead of the correct data address. Any idea what can cause this?
+> Here you'll find a screenshot of wireshark showing this behavior: https://snag.gy/S7cBRl.jpg
 
-Signed-off-by: srishti sharma <srishtishar@gmail.com>
----
- drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Does the problem happen if you run kernel 4.11.5 or 4.12-rc?
 
-diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
-index f484bb0..2148ed0 100644
---- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
-+++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
-@@ -105,7 +105,7 @@ static int snd_bcm2835_ctl_get(struct snd_kcontrol *kcontrol,
- }
+If it does, then please also include the netdev mailing list.
 
- static int snd_bcm2835_ctl_put(struct snd_kcontrol *kcontrol,
--				struct snd_ctl_elem_value *ucontrol)
-+			       struct snd_ctl_elem_value *ucontrol)
- {
- 	struct bcm2835_chip *chip = snd_kcontrol_chip(kcontrol);
- 	int changed = 0;
---
-2.7.4
+Regards,
+
+Fabio Estevam
