@@ -1,121 +1,55 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 14 Jun 2017 11:24:57 +0200
-Subject: [PATCH v4 2/2] arm: dts: Add Mediatek MT2701 i2c device node
-In-Reply-To: <1497402709.930.48.camel@mhfsdcap03>
-References: <1495784107-6711-1-git-send-email-jun.gao@mediatek.com>
- <1495784107-6711-3-git-send-email-jun.gao@mediatek.com>
- <1497268468.930.26.camel@mhfsdcap03>
- <dbfcfd5b-8812-8df2-40dc-42e889577c9a@gmail.com>
- <1497349452.930.36.camel@mhfsdcap03>
- <ba658a59-7ef9-2340-57fa-3bcefa3f47ed@gmail.com>
- <1497360189.930.42.camel@mhfsdcap03>
- <8c0e441c-a3d9-9cfd-dbf9-556ad852a072@gmail.com>
- <1497402709.930.48.camel@mhfsdcap03>
-Message-ID: <d63b8cfc-145f-7b2d-b85f-9ff5c18b3e65@gmail.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Wed, 14 Jun 2017 11:29:42 +0200
+Subject: [PATCH] tty/serial: Kconfig: remove AVR32
+In-Reply-To: <20170613203509.32026-1-alexandre.belloni@free-electrons.com>
+References: <20170613203509.32026-1-alexandre.belloni@free-electrons.com>
+Message-ID: <7700c2bd-9a54-af44-28a1-693b704bec91@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Le 13/06/2017 ? 22:35, Alexandre Belloni a ?crit :
+> AVR32 is now removed from the kernel, removed the config symbol that
+> doesn't exist anymore. Also take the opportunity to reword the help to
+> include sama5.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  drivers/tty/serial/Kconfig | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+> index 5c8850f7a2a0..063c71e8de41 100644
+> --- a/drivers/tty/serial/Kconfig
+> +++ b/drivers/tty/serial/Kconfig
+> @@ -114,14 +114,14 @@ config SERIAL_SB1250_DUART_CONSOLE
+>  	  If unsure, say Y.
+>  
+>  config SERIAL_ATMEL
+> -	bool "AT91 / AT32 on-chip serial port support"
+> +	bool "Atmel on-chip serial port support"
 
+Now, I would add something like "Microchip/Atmel", it's more future-proof.
 
-On 14/06/17 03:11, Jun Gao wrote:
-> On Tue, 2017-06-13 at 15:45 +0200, Matthias Brugger wrote:
->>
->> On 13/06/17 15:23, Jun Gao wrote:
->>> On Tue, 2017-06-13 at 14:52 +0200, Matthias Brugger wrote:
->>>>
->>>> On 13/06/17 12:24, Jun Gao wrote:
->>>>> On Tue, 2017-06-13 at 11:36 +0200, Matthias Brugger wrote:
->>>>>>
->>>>>> On 12/06/17 13:54, Jun Gao wrote:
->>>>>>> On Fri, 2017-05-26 at 15:35 +0800, Jun Gao wrote:
->>>>>>>> From: Jun Gao <jun.gao@mediatek.com>
->>>>>>>>
->>>>>>>> Add MT2701 i2c device node.
->>>>>>>>
->>>>>>>> Signed-off-by: Jun Gao <jun.gao@mediatek.com>
->>>>>>>> ---
->>>>>>>>      arch/arm/boot/dts/mt2701-evb.dts | 42 ++++++++++++++++++++++++++++++++++++++++
->>>>>>>>      arch/arm/boot/dts/mt2701.dtsi    | 42 ++++++++++++++++++++++++++++++++++++++++
->>>>>>>>      2 files changed, 84 insertions(+)
->>>>>> [...]
->>>>>>>
->>>>>>> Dear Matthias,
->>>>>>>
->>>>>>> Could you take this patch together with
->>>>>>> [PATCH v4 1/2]dt-bindings: i2c: Add Mediatek MT2701 i2c binding ?
->>>>>>>
->>>>>>> Thanks!
->>>>>>>
->>>>>>
->>>>>> They are both included in the pull request I send [1] [2], or do I miss
->>>>>> something?
->>>>>>
->>>>>> Regards,
->>>>>> Matthias
->>>>>>
->>>>>> [1]
->>>>>> https://github.com/mbgg/linux-mediatek/commit/729b7f8dbdaff270c53052897ea06486221a49a2
->>>>>> [2]
->>>>>> https://github.com/mbgg/linux-mediatek/commit/c6c301d3ff7531894257acc4f4a73928a109bda1
->>>>>
->>>>> Dear Matthias,
->>>>>
->>>>> Would you mind to use the same style as follows in i2c-mtk.txt of [2]?
->>>>>
->>>>> "mediatek,mt2701-i2c", "mediatek,mt6577-i2c": for Mediatek MT2701
->>>>> "mediatek,mt6577-i2c": for Mediatek MT6577
->>>>> "mediatek,mt6589-i2c": for Mediatek MT6589
->>>>> "mediatek,mt7623-i2c", "mediatek,mt6577-i2c": for Mediatek MT7623
->>>>> "mediatek,mt8173-i2c": for Mediatek MT8173
->>>>>
->>>>>
->>>>> Thanks!
->>>>>
->>>>
->>>> You mean I should fix-up the patch to fit to the new binding
->>>> description? Or do you mean it should be MTxxxx instead of mtxxxx?
->>>>
->>>> Regards,
->>>> Matthias
->>>
->>> Dear Matthias,
->>>
->>> I mean fix-up the patch to fit to the new binding description. Is it OK?
->>>
->>
->> Then I can't see the difference between what you are asking for and what
->> is already pushed to the repository. Please send a patch, that will make
->> things clearer.
->>
->> Regards,
->> Matthias
-> 
-> Dear Matthias,
-> 
-> like this:
-> 
-> diff:
->   Required properties:
->     - compatible: value should be either of the following.
-> -      (a) "mediatek,mt6577-i2c", for i2c compatible with mt6577 i2c.
-> -      (b) "mediatek,mt6589-i2c", for i2c compatible with mt6589 i2c.
-> -      (c) "mediatek,mt8127-i2c", for i2c compatible with mt8127 i2c.
-> -      (d) "mediatek,mt8135-i2c", for i2c compatible with mt8135 i2c.
-> -      (e) "mediatek,mt8173-i2c", for i2c compatible with mt8173 i2c.
-> +       "mediatek,mt2701-i2c", "mediatek,mt6577-i2c": for Mediatek
-> MT2701
-> +       "mediatek,mt6577-i2c": for Mediatek MT6577
-> +       "mediatek,mt6589-i2c": for Mediatek MT6589
-> +       "mediatek,mt7623-i2c", "mediatek,mt6577-i2c": for Mediatek
-> MT7623
-> +       "mediatek,mt8173-i2c": for Mediatek MT8173
->     - reg: physical base address of the controller and dma base, length
-> of memory
->       mapped region.
->     - interrupts: interrupt number to the cpu.
+>  	depends on HAS_DMA
+> -	depends on ARCH_AT91 || AVR32 || COMPILE_TEST
+> +	depends on ARCH_AT91 || COMPILE_TEST
+>  	select SERIAL_CORE
+>  	select SERIAL_MCTRL_GPIO if GPIOLIB
+>  	help
+>  	  This enables the driver for the on-chip UARTs of the Atmel
+
+Here as well...
+
+> -	  AT91 and AT32 processors.
+> +	  ARM processors.
+>  
+>  config SERIAL_ATMEL_CONSOLE
+>  	bool "Support for console on AT91 / AT32 serial port"
+
+What about removing AT32 here as well ^ ?
+
 > 
 
-Please look at [2], this is already staged.
 
-[2] 
-https://github.com/mbgg/linux-mediatek/commit/c6c301d3ff7531894257acc4f4a73928a109bda1
+-- 
+Nicolas Ferre
