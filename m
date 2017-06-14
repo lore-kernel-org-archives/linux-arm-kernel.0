@@ -1,109 +1,122 @@
-From: daniel@iogearbox.net (Daniel Borkmann)
-Date: Wed, 14 Jun 2017 22:31:26 +0200
-Subject: [PATCH v2] arm: eBPF JIT compiler
-In-Reply-To: <CAHgaXdJrvKdzr3fJ1TMkC4foeVsZJDSVEwhDOeZGxQVsmoK2cQ@mail.gmail.com>
-References: <1495754003-21099-1-git-send-email-illusionist.neo@gmail.com>
- <CAGXu5jKmLNMR+uhM9Ov2XPW6kCjip_SjScgEH0fTFp6fQtKFiA@mail.gmail.com>
- <593E6B0F.8070901@iogearbox.net>
- <CAHgaXd+DW2bggto=2S9hOdMrtPTvhD2QN4rPf2V8iHewQpg-YA@mail.gmail.com>
- <CAHgaXdJrvKdzr3fJ1TMkC4foeVsZJDSVEwhDOeZGxQVsmoK2cQ@mail.gmail.com>
-Message-ID: <59419D1E.2060303@iogearbox.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 14 Jun 2017 22:39:34 +0200
+Subject: [GIT PULL] sun4i-drm changes for 4.13
+Message-ID: <20170614203934.hf5ilhmovuuhhk2r@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/13/2017 08:56 AM, Shubham Bansal wrote:
-> Hi Daniel, Kees, David, Russel,
->
->>> Any plans to implement above especially BPF_JMP | BPF_CALL in near future?
->>> Reason why I'm asking is that i) currently the arm32 cBPF JIT implements
->>> all of the cBPF extensions (except SKF_AD_RANDOM and SKF_AD_VLAN_TPID).
->>> Some of the programs that were JITed before e.g. using SKF_AD_CPU would now
->>> fall back to the eBPF interpreter due to lack of translation in JIT, but
->>> also ii) that probably most (if not all) of eBPF programs use BPF helper
->>> calls heavily, which will still redirect them to the interpreter right now
->>> due to lack of BPF_JMP | BPF_CALL support, so it's really quite essential
->>> to have it implemented.
->>
->> I can try for BPF_JMP | BPF_CALL. I didn't do it last time because I
->> thought, it would make the code look messy and become pain to get it
->> through the review.
->> For this, I have to map eBPF arguments with arm ABI arguments and move
->> ebpf arguments to corresponding arm ABI arguments, as eBPF arguments
->> doesn't match with arm ABI arguments.
->> Let me try that if its possible.
->
-> Okay. I looked at it, tried few different solutions also. There is a
-> problem with implementing BPF_JMP | BPF_CALL.
-> Problem is transition between 4 byte and 8 byte arguments. Lets take a
-> look a the following example to get a more clear look at the problem.
->
-> Lets consider this function :
-> CASE 1:                            foo(int a, int b, long long c, int d)
-> For calling this function in arm 32 arch, I have to pass the arguments
-> as following:
->                                           a -> r0
->                                           b -> r1
->                                           c -> r2, r3
->                                           d -> stack_top
->
-> Now consider an another example function :
-> CASE 2:                           bar(int a, int b, int c, int d)
-> For calling this function in arm32 arch, I have to pass the arguments
-> as following:
->                                         a -> r0
->                                         b -> r1
->                                         c -> r2
->                                         d -> r3
->
-> So, you can clearly see the problem with it. There is no way of
-> knowing which of the above way to pass the arguments. There are
-> solutions possible:
+Hi David,
 
-Right.
+Here is the pull request for the sun4i-drm driver for 4.13.
 
-> 1. One thing I can do is look at the address of the function to call
-> and pass the argument accordingly but thats not really a robust
-> solution as we have to change the arm32 JIT each time we add any new
-> BPF helper function.
+Thanks!
+Maxime
 
-Yeah, that would be rather ugly.
+The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 
-> 2. Another solution is, if any of you guys can assure/confirm me that
-> there will be only 4 byte argument passed to BPF helper functions in
-> arm32 as of now and in future including the pointer as well, then I
-> can just assume that each argument is passed as 4 byte value and my
-> trimming the 8byte arguments to 4 bytes arguments wouldn't be a
-> problem. In that case, arguments for CASE 1 and CASE 2 will be passed
-> in the same way, i.e.
->                                         a -> r0
->                                         b -> r1
->                                         c -> r2
->                                         d -> r3
->
-> Let me know what you think. I don't think I can find the solution to
-> this problem other than those mentioned above. Would love to here any
-> ideas from you guys.
+  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 
-Not all of the helpers have 4 or less byte arguments only, there are a
-few with 8 byte arguments, so making that general assumption wouldn't
-work. I guess what could be done is that helpers have a flag in struct
-bpf_func_proto which indicates for JITs that all args are 4 byte on 32bit
-so you could probably use convention similar to case2 for them. Presumably
-for that information to process, the JIT might need to be reworked to
-extract that via bpf_analyzer() that does a verifier run to re-analyze
-the program like in nfp JIT case.
+are available in the git repository at:
 
-The other option could perhaps be to check the interpreter disasm of
-___bpf_prog_run() with regards to how it handles BPF_JMP | BPF_CALL
-helper call and do something similarly generic in the JIT as well.
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-drm-for-4.13
 
->>> Did you also manage to get the BPF selftest suite running in the meantime
->>> (tools/testing/selftests/bpf/)? There are a couple of programs that clang
->>> will compile (test_pkt_access.o, test_xdp.o, test_l4lb.o, test_tcp_estats.o)
->>> and then test run.
-> I will run these tests tonight. Hopefully I will be able to run them.
+for you to fetch changes up to 110d33dd428ea49b9482bcb780fb096dfb4dcd3e:
 
-Ok.
+  drm/sun4i: Add compatible for the A10s pipeline (2017-06-01 09:50:01 +0200)
 
-> Any comments are welcome. Would love to here what you think about my
-> solutions above.
+----------------------------------------------------------------
+sun4i-drm changes for 4.13
+
+An unusually big pull request for this merge window, with three notable
+features:
+  - V3s display engine support. This is especially notable because it uses
+    a different display engine used on the newer Allwinner SoCs (H3, A64
+    and the likes) that will be quite easily supported now.
+  - HDMI support for the old Allwinner SoCs. This is enabled only on the
+    A10s for now, but should be really easy to extend to deal with A10, A20
+    and A31
+  - Preliminary work to deal with dual-pipeline SoCs (A10, A20, A31, H3,
+    etc.). It currently ignores the second pipeline, but we can use the
+    dual-pipelines bindings. This will be useful to enable the display
+    pipeline while we work on the dual-pipeline.
+
+----------------------------------------------------------------
+Chen-Yu Tsai (9):
+      dt-bindings: display: sun4i: Add component endpoint ID numbering scheme
+      drm/sun4i: Use lists to track registered display backends and TCONs
+      drm/sun4i: backend: Drop trailing 0 from backend in error message
+      drm/sun4i: backend: Fetch backend ID from device tree
+      drm/sun4i: backend: Save pointer to device tree node
+      drm/sun4i: tcon: Find matching display backend by device node matching
+      drm/sun4i: tcon: Copy ID from associated backend
+      drm/sun4i: Set TCON clock inside sun4i_tconX_mode_set
+      drm/sun4i: backend: Clarify sun4i_backend_layer_enable debug message
+
+Icenowy Zheng (7):
+      dt-bindings: add bindings for DE2 on V3s SoC
+      drm/sun4i: return only planes for layers created
+      drm/sun4i: abstract a engine type
+      drm/sun4i: add a Kconfig option for sun4i-backend
+      drm/sun4i: add support for Allwinner DE2 mixers
+      drm/sun4i: Add compatible string for V3s display engine
+      drm/sun4i: tcon: add support for V3s TCON
+
+Maxime Ripard (11):
+      drm/sun4i: tcon: Add channel debug
+      drm/sun4i: tcon: Move the muxing out of the mode set function
+      drm/sun4i: tcon: Switch mux on only for composite
+      drm/sun4i: tcon: Fix tcon channel 1 backporch calculation
+      drm/sun4i: tcon: Change vertical total size computation inconsistency
+      drm/sun4i: tcon: multiply the vtotal when not in interlace
+      drm/sun4i: Ignore the generic connectors for components
+      dt-bindings: display: sun4i: Add HDMI display bindings
+      dt-bindings: display: sun4i: Add allwinner,tcon-channel property
+      drm/sun4i: Add HDMI support
+      drm/sun4i: Add compatible for the A10s pipeline
+
+ .../bindings/display/sunxi/sun4i-drm.txt           | 127 +++++-
+ drivers/gpu/drm/sun4i/Kconfig                      |  28 ++
+ drivers/gpu/drm/sun4i/Makefile                     |  14 +-
+ drivers/gpu/drm/sun4i/sun4i_backend.c              | 122 +++--
+ drivers/gpu/drm/sun4i/sun4i_backend.h              |  15 +-
+ drivers/gpu/drm/sun4i/sun4i_crtc.c                 |  32 +-
+ drivers/gpu/drm/sun4i/sun4i_crtc.h                 |   5 +-
+ drivers/gpu/drm/sun4i/sun4i_drv.c                  |  19 +-
+ drivers/gpu/drm/sun4i/sun4i_drv.h                  |   5 +-
+ drivers/gpu/drm/sun4i/sun4i_hdmi.h                 | 157 +++++++
+ drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c         | 127 ++++++
+ drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c             | 501 +++++++++++++++++++++
+ drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c        | 225 +++++++++
+ drivers/gpu/drm/sun4i/sun4i_layer.c                |  21 +-
+ drivers/gpu/drm/sun4i/sun4i_layer.h                |   6 +-
+ drivers/gpu/drm/sun4i/sun4i_rgb.c                  |   3 +-
+ drivers/gpu/drm/sun4i/sun4i_tcon.c                 | 142 +++++-
+ drivers/gpu/drm/sun4i/sun4i_tcon.h                 |  10 +-
+ drivers/gpu/drm/sun4i/sun4i_tv.c                   |  12 +-
+ drivers/gpu/drm/sun4i/sun8i_layer.c                | 134 ++++++
+ drivers/gpu/drm/sun4i/sun8i_layer.h                |  36 ++
+ drivers/gpu/drm/sun4i/sun8i_mixer.c                | 414 +++++++++++++++++
+ drivers/gpu/drm/sun4i/sun8i_mixer.h                | 137 ++++++
+ drivers/gpu/drm/sun4i/sunxi_engine.h               |  98 ++++
+ 24 files changed, 2285 insertions(+), 105 deletions(-)
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_hdmi.h
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun8i_layer.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun8i_layer.h
+ create mode 100644 drivers/gpu/drm/sun4i/sun8i_mixer.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun8i_mixer.h
+ create mode 100644 drivers/gpu/drm/sun4i/sunxi_engine.h
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170614/f28bb9ea/attachment.sig>
