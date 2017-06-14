@@ -1,66 +1,52 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 14 Jun 2017 11:10:43 +0200
-Subject: [PATCH 2/2] clocksource: Explicitly include linux/clocksource.h when
- needed
-In-Reply-To: <1497431443-14634-1-git-send-email-daniel.lezcano@linaro.org>
-References: <20170614091021.GG2261@mai>
- <1497431443-14634-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1497431443-14634-2-git-send-email-daniel.lezcano@linaro.org>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Wed, 14 Jun 2017 19:17:27 +1000
+Subject: [PATCH 21/44] powerpc: implement ->mapping_error
+In-Reply-To: <20170608132609.32662-22-hch@lst.de>
+References: <20170608132609.32662-1-hch@lst.de>
+ <20170608132609.32662-22-hch@lst.de>
+Message-ID: <87vanz2ajc.fsf@concordia.ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Rothwell <sfr@canb.auug.org.au>
+Christoph Hellwig <hch@lst.de> writes:
 
-The kbuild test robot reported errors in these files when doing an ia64
-allmodconfig build.
+> DMA_ERROR_CODE is going to go away, so don't rely on it.  Instead
+> define a ->mapping_error method for all IOMMU based dma operation
+> instances.  The direct ops don't ever return an error and don't
+> need a ->mapping_error method.
+>
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> ---
+>  arch/powerpc/include/asm/dma-mapping.h |  4 ----
+>  arch/powerpc/include/asm/iommu.h       |  4 ++++
+>  arch/powerpc/kernel/dma-iommu.c        |  6 ++++++
+>  arch/powerpc/kernel/iommu.c            | 28 ++++++++++++++--------------
+>  arch/powerpc/platforms/cell/iommu.c    |  1 +
+>  arch/powerpc/platforms/pseries/vio.c   |  3 ++-
+>  6 files changed, 27 insertions(+), 19 deletions(-)
 
-drivers/clocksource/timer-sun5i.c:52:21: error: field 'clksrc' has incomplete type
-   struct clocksource clksrc;
-                      ^~~~~~
-drivers/clocksource/cadence_ttc_timer.c:92:21: error: field 'cs' has incomplete type
-   struct clocksource cs;
-                      ^~
+I also see:
 
-(and many more errors for these files)
+  arch/powerpc/kernel/dma.c:const struct dma_map_ops dma_direct_ops = {
 
-Cc: Michal Simek <michal.simek@xilinx.com>
-Cc: "S?ren Brinkmann" <soren.brinkmann@xilinx.com>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Chen-Yu Tsai <wens@csie.org>
-Reported-by: kbuild test robot <fengguang.wu@intel.com>
-Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
-Acked-by: Michal Simek <michal.simek@xilinx.com>
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- drivers/clocksource/cadence_ttc_timer.c | 1 +
- drivers/clocksource/timer-sun5i.c       | 1 +
- 2 files changed, 2 insertions(+)
+Which you mentioned can't fail.
 
-diff --git a/drivers/clocksource/cadence_ttc_timer.c b/drivers/clocksource/cadence_ttc_timer.c
-index 44e5e95..8e64b84 100644
---- a/drivers/clocksource/cadence_ttc_timer.c
-+++ b/drivers/clocksource/cadence_ttc_timer.c
-@@ -18,6 +18,7 @@
- #include <linux/clk.h>
- #include <linux/interrupt.h>
- #include <linux/clockchips.h>
-+#include <linux/clocksource.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
- #include <linux/slab.h>
-diff --git a/drivers/clocksource/timer-sun5i.c b/drivers/clocksource/timer-sun5i.c
-index 2e9c830..c4656c4 100644
---- a/drivers/clocksource/timer-sun5i.c
-+++ b/drivers/clocksource/timer-sun5i.c
-@@ -12,6 +12,7 @@
- 
- #include <linux/clk.h>
- #include <linux/clockchips.h>
-+#include <linux/clocksource.h>
- #include <linux/delay.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
--- 
-2.7.4
+  arch/powerpc/platforms/pseries/ibmebus.c:static const struct dma_map_ops ibmebus_dma_ops = {
+
+Which can't fail.
+
+And:
+
+  arch/powerpc/platforms/powernv/npu-dma.c:static const struct dma_map_ops dma_npu_ops = {
+  arch/powerpc/platforms/ps3/system-bus.c:static const struct dma_map_ops ps3_sb_dma_ops = {
+  arch/powerpc/platforms/ps3/system-bus.c:static const struct dma_map_ops ps3_ioc0_dma_ops = {
+
+All of which look like they definitely can fail, but return 0 on error
+and don't implement ->mapping_error.
+
+So I guess I'm acking this and adding a TODO to fix up the NPU code at
+least, the ps3 code is probably better left alone these days.
+
+Acked-by: Michael Ellerman <mpe@ellerman.id.au>
+
+cheers
