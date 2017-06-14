@@ -1,35 +1,40 @@
-From: W.Vanhauwaert@TELEVIC.com (Vanhauwaert Wouter)
-Date: Wed, 14 Jun 2017 14:25:17 +0000
-Subject: FEC data corruption?
-In-Reply-To: <CAOMZO5AVNBCTSABjXhk-WJCXYhONex59swtwcAHQfoc8H45G2A@mail.gmail.com>
-References: <VI1PR0701MB27524436487BAFAF14AC92C5F8C30@VI1PR0701MB2752.eurprd07.prod.outlook.com>
- <CAOMZO5AVNBCTSABjXhk-WJCXYhONex59swtwcAHQfoc8H45G2A@mail.gmail.com>
-Message-ID: <VI1PR0701MB2752FF97FA5B892CA6B2D834F8C30@VI1PR0701MB2752.eurprd07.prod.outlook.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 14 Jun 2017 16:26:22 +0200
+Subject: [PATCH] tty/serial: remove AVR32 specific access wrappers
+In-Reply-To: <CAHp75Vd8osYbgxhOe3vxLFsCuDk0p+MWz+UQQWz+uX9+bvkZmw@mail.gmail.com>
+References: <20170613202517.26558-1-alexandre.belloni@free-electrons.com>
+ <CAHp75VcMrhG0K-=dtkF1T5siAAmmLYdmCxcLdo_vvH8dLjLh=A@mail.gmail.com>
+ <20170614132723.2duxhpjq4odchcw2@piout.net>
+ <CAHp75Vd8osYbgxhOe3vxLFsCuDk0p+MWz+UQQWz+uX9+bvkZmw@mail.gmail.com>
+Message-ID: <20170614142622.vqqanjg7ucpt2ovi@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Well, I'm on 4.1.38 now
-Will see if I can easily move to 4.11+
+On 14/06/2017 at 17:15:32 +0300, Andy Shevchenko wrote:
+> On Wed, Jun 14, 2017 at 4:27 PM, Alexandre Belloni
+> <alexandre.belloni@free-electrons.com> wrote:
+> > On 14/06/2017 at 12:43:40 +0300, Andy Shevchenko wrote:
+> >> On Tue, Jun 13, 2017 at 11:25 PM, Alexandre Belloni
+> >> <alexandre.belloni@free-electrons.com> wrote:
+> >> > Now that AVR32 is gone, the specific wrappers for that architecture are
+> >> > unnecessary and will not be compiled anymore.
+> >> >
+> >>
+> >> Can you rebase this on top of tty-next?
+> >>
+> >> I'm pretty sure this patch will gone.
+> >>
+> >
+> > So you avoided most of the bikeshedding by not copying any of the
+> > maintainers, nice...
+> 
+> Wait, what? I used get_maintainer.pl script and I took its output + Greg.
+> 
 
------Original Message-----
-From: Fabio Estevam [mailto:festevam at gmail.com] 
-Sent: woensdag 14 juni 2017 16:12
-To: Vanhauwaert Wouter
-Cc: linux-arm-kernel at lists.infradead.org
-Subject: Re: FEC data corruption?
+Yeah, get_maintainer is not ideal but that's fine. Probably the lakml
+should be added.
 
-On Wed, Jun 14, 2017 at 10:43 AM, Vanhauwaert Wouter <W.Vanhauwaert@televic.com> wrote:
-> Hello
-> I'm trying to do a long-term network test on 2 platforms.
-> One is based on imx6q, the other on imx6ul.
-> imx6q is using linux-fslc, imx6ul is using linux-imx For that, I enabled the busybox inetd service with the echo protocol enabled. I'm flooding the device with echo requests of 12kiB (0x3000B) Most of the time that goes well, but at certain points, the data returned by the platform is corrupted. After some research, it looks like the data returned is copied from memory address 0 instead of the correct data address. Any idea what can cause this?
-> Here you'll find a screenshot of wireshark showing this behavior: 
-> https://snag.gy/S7cBRl.jpg
-
-Does the problem happen if you run kernel 4.11.5 or 4.12-rc?
-
-If it does, then please also include the netdev mailing list.
-
-Regards,
-
-Fabio Estevam
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
