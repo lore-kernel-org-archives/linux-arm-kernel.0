@@ -1,90 +1,152 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 14 Jun 2017 12:40:39 +0100
-Subject: [PATCH v8 6/9] drivers: perf: hisi: Add support for Hisilicon
- Djtag driver
-In-Reply-To: <53af9b5b-ac93-eaf9-8551-75fb25a243aa@huawei.com>
-References: <1495457312-237127-1-git-send-email-zhangshaokun@hisilicon.com>
- <20170608163519.GA19643@leverpostej>
- <8666a0fa-126d-e4a3-ac4b-7962f5d79942@huawei.com>
- <20170609143050.GM13955@arm.com>
- <0fbf57f0-9ff7-4fd4-07c7-c5e86028a7d2@huawei.com>
- <20170614100658.GE16190@arm.com>
- <20170614104230.GC6085@leverpostej>
- <20170614110141.GL16190@arm.com>
- <53af9b5b-ac93-eaf9-8551-75fb25a243aa@huawei.com>
-Message-ID: <20170614114039.GN16190@arm.com>
+From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
+Date: Wed, 14 Jun 2017 14:40:36 +0300
+Subject: [PATCH 3/5] clk: qcom: gdsc: Add support to control associated
+ clks
+In-Reply-To: <1490076923-20194-4-git-send-email-rnayak@codeaurora.org>
+References: <1490076923-20194-1-git-send-email-rnayak@codeaurora.org>
+ <1490076923-20194-4-git-send-email-rnayak@codeaurora.org>
+Message-ID: <95d69901-fad5-9a2d-138e-ed5eb9dbc4e2@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 14, 2017 at 12:35:07PM +0100, John Garry wrote:
-> On 14/06/2017 12:01, Will Deacon wrote:
-> >On Wed, Jun 14, 2017 at 11:42:30AM +0100, Mark Rutland wrote:
-> >>On Wed, Jun 14, 2017 at 11:06:58AM +0100, Will Deacon wrote:
-> >>>Apologies, I misunderstood your algorithm (I thought step (a) was on one CPU
-> >>>and step (b) was on another). Still, I don't understand the need for the
-> >>>timeout. If you instead read back the flag immediately, wouldn't it still
-> >>>work? e.g.
-> >>>
-> >>>
-> >>>lock:
-> >>>  Readl_relaxed flag
-> >>>  if (locked)
-> >>>    goto lock;
-> >>>
-> >>>  Writel_relaxed unique ID to flag
-> >>>  Readl flag
-> >>>  if (locked by somebody else)
-> >>>    goto lock;
-> >>>
-> >>><critical section>
-> >>>
-> >>>unlock:
-> >>>  Writel unlocked value to flag
-> >>>
-> >>>
-> >>>Given that we're dealing with iomem, I think it will work, but I could be
-> >>>missing something obvious.
-> >>
-> >>Don't we have the race below where both threads can enter the critical
-> >>section?
-> >>
-> >>	// flag f initial zero (unlocked)
-> >>
-> >>	// t1, flag 1			// t2, flag 2
-> >>	readl(f); // reads 0		l = readl(f); // reads 0
-> >>
-> >>	<thinks lock is free>		<thinks lock is free>
-> >>
-> >>	writel(1, f);
-> >>	readl(f); // reads 1
-> >>	<thinks lock owned>
-> >>					writel(2, f);
-> >>					readl(f) // reads 2
-> >>					<thinks lock owned>
-> >>
-> >>	<crticial section>		<critical section>
-> >
-> >Urgh, yeah, of course and *that's* what the udelay is trying to avoid,
-> >by "ensuring" that the <thinks lock is free> time and subsequent write
-> >propagation is all over before we re-read the flag.
-> >
-> >John -- how much space do you have on this device? Do you have, e.g. a byte
-> >for each CPU?
+Hi Rajendra,
+
+Thanks for the patches!
+
+On 03/21/2017 08:15 AM, Rajendra Nayak wrote:
+> The devices within a gdsc power domain, quite often have additional
+> clocks to be turned on/off along with the power domain itself.
+> Add support for this by specifying a list of clk_hw pointers
+> per gdsc which would be the clocks turned on/off along with the
+> powerdomain on/off callbacks.
 > 
-> Hi Will,
+> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+> ---
+>  drivers/clk/qcom/gdsc.c | 48 ++++++++++++++++++++++++++++++++++++++++++++++--
+>  drivers/clk/qcom/gdsc.h |  8 ++++++++
+>  2 files changed, 54 insertions(+), 2 deletions(-)
 > 
-> To be clear, the agents in our case are the kernel and UEFI. Within the
-> kernel, we use a kernel spinlock to lock the same djtag between threads, for
-> these reasons:
-> - kernel has a native spinlock
+> diff --git a/drivers/clk/qcom/gdsc.c b/drivers/clk/qcom/gdsc.c
+> index a4f3580..e9e7442 100644
+> --- a/drivers/clk/qcom/gdsc.c
+> +++ b/drivers/clk/qcom/gdsc.c
+> @@ -12,15 +12,19 @@
+>   */
+>  
+>  #include <linux/bitops.h>
+> +#include <linux/clk.h>
+> +#include <linux/clk-provider.h>
+>  #include <linux/delay.h>
+>  #include <linux/err.h>
+>  #include <linux/jiffies.h>
+>  #include <linux/kernel.h>
+>  #include <linux/ktime.h>
+> +#include <linux/pm_clock.h>
 
-If we only have to effectively deal with two threads, then we might be able
-to use something like Dekker's.
+this is not needed
 
-> - we are limited in locking values, as the lock flag is only a 8b field in
-> v2 hw (called module select)
+>  #include <linux/pm_domain.h>
+>  #include <linux/regmap.h>
+>  #include <linux/reset-controller.h>
+>  #include <linux/slab.h>
+> +#include "common.h"
+>  #include "gdsc.h"
+>  
+>  #define PWR_ON_MASK		BIT(31)
+> @@ -166,6 +170,27 @@ static inline void gdsc_assert_clamp_io(struct gdsc *sc)
+>  			   GMEM_CLAMP_IO_MASK, 1);
+>  }
+>  
+> +static int gdsc_clk_enable(struct gdsc *sc)
+> +{
+> +	int i, ret;
+> +
+> +	for (i = 0; i < sc->clk_count; i++) {
+> +		ret = clk_prepare_enable(sc->clks[i]);
+> +		if (ret)
+> +			pr_err("Failed to enable clock: %s\n",
+> +			       __clk_get_name(sc->clks[i]));
+		
+I think the error message can be removed. And the already enabled clocks
+should be disabled on error.
 
-By 8b do you mean 8 bits or 8 bytes? If the latter, does it support sub-word
-accesses?
+> +	}
+> +	return ret;
+> +}
+> +
+> +static void gdsc_clk_disable(struct gdsc *sc)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < sc->clk_count; i++)
+> +		clk_disable_unprepare(sc->clks[i]);
+> +}
+> +
+>  static int gdsc_enable(struct generic_pm_domain *domain)
+>  {
+>  	struct gdsc *sc = domain_to_gdsc(domain);
+> @@ -193,6 +218,9 @@ static int gdsc_enable(struct generic_pm_domain *domain)
+>  	 */
+>  	udelay(1);
+>  
+> +	if (sc->clk_count)
+> +		gdsc_clk_enable(sc);
 
-Will
+could you add error handling.
+
+> +
+>  	/* Turn on HW trigger mode if supported */
+>  	if (sc->flags & HW_CTRL) {
+>  		ret = gdsc_hwctrl(sc, true);
+> @@ -241,6 +269,9 @@ static int gdsc_disable(struct generic_pm_domain *domain)
+>  			return ret;
+>  	}
+>  
+> +	if (sc->clk_count)
+> +		gdsc_clk_disable(sc);
+
+IMO sc->clk_count check could be moved in gdsc_clk_disable. This is also
+valid for all clk_count checks.
+
+> +
+>  	if (sc->pwrsts & PWRSTS_OFF)
+>  		gdsc_clear_mem_on(sc);
+>  
+> @@ -254,7 +285,7 @@ static int gdsc_disable(struct generic_pm_domain *domain)
+>  	return 0;
+>  }
+>  
+> -static int gdsc_init(struct gdsc *sc)
+> +static int gdsc_init(struct device *dev, struct gdsc *sc)
+>  {
+>  	u32 mask, val;
+>  	int on, ret;
+> @@ -284,6 +315,19 @@ static int gdsc_init(struct gdsc *sc)
+>  	if (on < 0)
+>  		return on;
+>  
+> +	if (sc->clk_count) {
+> +		int i;
+> +
+> +		sc->clks = devm_kcalloc(dev, sc->clk_count, sizeof(*sc->clks),
+> +					GFP_KERNEL);
+> +		if (!sc->clks)
+> +			return -ENOMEM;
+> +
+> +		for (i = 0; i < sc->clk_count; i++)
+> +			sc->clks[i] = devm_clk_hw_get_clk(dev, sc->clk_hws[i],
+> +							  NULL);
+
+error handling?
+
+Also I think it will be more readable if you above chunk in separate
+function like gdsc_clk_get and call it unconditionally?
+
+> +	}
+> +
+
+<snip>
+
+-- 
+regards,
+Stan
