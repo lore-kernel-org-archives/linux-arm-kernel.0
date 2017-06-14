@@ -1,42 +1,19 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 14 Jun 2017 12:43:55 +0200
-Subject: [PATCH v2 2/2] arm64: mm: select CONFIG_ARCH_PROC_KCORE_TEXT
-In-Reply-To: <1497437035-11979-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1497437035-11979-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1497437035-11979-3-git-send-email-ard.biesheuvel@linaro.org>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 14 Jun 2017 12:49:29 +0200
+Subject: [PATCH] tty/serial: remove AVR32 specific access wrappers
+In-Reply-To: <20170613202517.26558-1-alexandre.belloni@free-electrons.com>
+References: <20170613202517.26558-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20170614104929.GA11313@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To avoid issues with the /proc/kcore code getting confused about the
-kernels block mappings in the VMALLOC region, enable the existing
-facility that describes the [_text, _end) interval as a separate
-KCORE_TEXT region, which supersedes the KCORE_VMALLOC region that
-it intersects with on arm64.
+On Tue, Jun 13, 2017 at 10:25:17PM +0200, Alexandre Belloni wrote:
+> Now that AVR32 is gone, the specific wrappers for that architecture are
+> unnecessary and will not be compiled anymore.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  drivers/tty/serial/atmel_serial.c | 17 -----------------
+>  1 file changed, 17 deletions(-)
 
-Reported-by: Tan Xiaojun <tanxiaojun@huawei.com>
-Tested-by: Tan Xiaojun <tanxiaojun@huawei.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Laura Abbott <labbott@redhat.com>
-Reviewed-by: Jiri Olsa <jolsa@kernel.org>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/Kconfig | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index b2024db225a9..233611abffb2 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -244,6 +244,9 @@ config PGTABLE_LEVELS
- config ARCH_SUPPORTS_UPROBES
- 	def_bool y
- 
-+config ARCH_PROC_KCORE_TEXT
-+	def_bool y
-+
- source "init/Kconfig"
- 
- source "kernel/Kconfig.freezer"
--- 
-2.7.4
+Does not apply to my tty-next tree at all :(
