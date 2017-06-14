@@ -1,17 +1,49 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 14 Jun 2017 22:43:32 +0800
-Subject: [PATCH 1/2] dt-bindings: ahci-fsl-qoriq: add ls1088a chip name
- to the list
-In-Reply-To: <1496817168-26567-1-git-send-email-andy.tang@nxp.com>
-References: <1496817168-26567-1-git-send-email-andy.tang@nxp.com>
-Message-ID: <20170614144330.GA30112@dragon>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Wed, 14 Jun 2017 20:17:04 +0530
+Subject: [PATCH v3 1/9] ARM: dts: imx6ul-isiot: Add Sound card with codec
+ node
+In-Reply-To: <20170407131649.GH16503@dragon>
+References: <1491501735-1649-1-git-send-email-jagan@openedev.com>
+ <1491501735-1649-2-git-send-email-jagan@openedev.com>
+ <20170407131649.GH16503@dragon>
+Message-ID: <CAMty3ZDj3XgeZwUTXTTX2svoXaNWJ3GJtbNAt9+jj+n8Z4640w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 07, 2017 at 02:32:47PM +0800, Yuantian Tang wrote:
-> Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
-> ---
->  Documentation/devicetree/bindings/ata/ahci-fsl-qoriq.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On Fri, Apr 7, 2017 at 6:46 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+> On Thu, Apr 06, 2017 at 11:32:07PM +0530, Jagan Teki wrote:
+>> From: Jagan Teki <jagan@amarulasolutions.com>
+>>
+>> Add support for Sound card and related codec(via i2c1) nodes
+>> on Engicam Is.IoT MX6UL variant module boards.
+>>
+>> Cc: Shawn Guo <shawnguo@kernel.org>
+>> Cc: Matteo Lisi <matteo.lisi@engicam.com>
+>> Cc: Michael Trimarchi <michael@amarulasolutions.com>
+>> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+>> ---
+>> Changes for v3:
+>> - Replace fsl,imx-audio-sgtl5000 and use simple-audio-card
+>> Changes for v2:
+>> - Use proper [label:] node-name[@unit-address] for codec
+>> - Remove incorrect codec property 'wlf,shared-lrclk'
+>> - Remove 'gpr' from sound card node
+>>
+>>  arch/arm/boot/dts/imx6ul-isiot-common.dtsi | 10 +++++++
+>>  arch/arm/boot/dts/imx6ul-isiot.dtsi        | 44 ++++++++++++++++++++++++++++++
+>
+> Can you help me understand how these two files are related?  Why is
+> sgtl5000 added into one and sound node added into the other?
 
-Applied both, thanks.
+lcdif, ts and sound card which may differ based on the base-board
+connected with SOM, So I moved these stuff which are related to
+Starter kit supported once's and used with SOM dts files. if some
+other board with same SOM can have different lcdif and etc so they can
+define locally to dts.
+
+thanks!
+-- 
+Jagan Teki
+Senior Linux Kernel Engineer | Amarula Solutions
+U-Boot, Linux | Upstream Maintainer
+Hyderabad, India.
