@@ -1,109 +1,48 @@
-From: john.garry@huawei.com (John Garry)
-Date: Wed, 14 Jun 2017 12:59:00 +0100
-Subject: [PATCH v8 6/9] drivers: perf: hisi: Add support for Hisilicon
- Djtag driver
-In-Reply-To: <20170614114039.GN16190@arm.com>
-References: <1495457312-237127-1-git-send-email-zhangshaokun@hisilicon.com>
- <20170608163519.GA19643@leverpostej>
- <8666a0fa-126d-e4a3-ac4b-7962f5d79942@huawei.com>
- <20170609143050.GM13955@arm.com>
- <0fbf57f0-9ff7-4fd4-07c7-c5e86028a7d2@huawei.com>
- <20170614100658.GE16190@arm.com> <20170614104230.GC6085@leverpostej>
- <20170614110141.GL16190@arm.com>
- <53af9b5b-ac93-eaf9-8551-75fb25a243aa@huawei.com>
- <20170614114039.GN16190@arm.com>
-Message-ID: <7162e895-6a0f-8d83-85fb-f0618c33f4c3@huawei.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Jun 2017 13:59:43 +0200
+Subject: [PATCH] tee: add forward declaration for struct device
+In-Reply-To: <8f026b3a-9b5f-f819-817e-db812a02c129@linaro.org>
+References: <6344683a299d05692ed64ddb963343ea9547add4.1496229347.git.jerome.forissier@linaro.org>
+ <2bcbf7b0-7dba-7e72-72fd-4da922e442bb@linaro.org> <20170614094610.GA12598@jax>
+ <CAK8P3a05K_POUxrNcyA7LVGB5qGBKmzvp-++TcLVFB2JWDdseA@mail.gmail.com>
+ <8f026b3a-9b5f-f819-817e-db812a02c129@linaro.org>
+Message-ID: <CAK8P3a1--+tTbe3TXLjdBP2e85_3294_MTDUy2Y5ceQ7eOOHnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/06/2017 12:40, Will Deacon wrote:
-> On Wed, Jun 14, 2017 at 12:35:07PM +0100, John Garry wrote:
->> On 14/06/2017 12:01, Will Deacon wrote:
->>> On Wed, Jun 14, 2017 at 11:42:30AM +0100, Mark Rutland wrote:
->>>> On Wed, Jun 14, 2017 at 11:06:58AM +0100, Will Deacon wrote:
->>>>> Apologies, I misunderstood your algorithm (I thought step (a) was on one CPU
->>>>> and step (b) was on another). Still, I don't understand the need for the
->>>>> timeout. If you instead read back the flag immediately, wouldn't it still
->>>>> work? e.g.
->>>>>
->>>>>
->>>>> lock:
->>>>>  Readl_relaxed flag
->>>>>  if (locked)
->>>>>    goto lock;
->>>>>
->>>>>  Writel_relaxed unique ID to flag
->>>>>  Readl flag
->>>>>  if (locked by somebody else)
->>>>>    goto lock;
->>>>>
->>>>> <critical section>
->>>>>
->>>>> unlock:
->>>>>  Writel unlocked value to flag
->>>>>
->>>>>
->>>>> Given that we're dealing with iomem, I think it will work, but I could be
->>>>> missing something obvious.
+On Wed, Jun 14, 2017 at 1:06 PM, Jerome Forissier
+<jerome.forissier@linaro.org> wrote:
+> On 06/14/2017 01:01 PM, Arnd Bergmann wrote:
+>> On Wed, Jun 14, 2017 at 11:46 AM, Jens Wiklander
+>> <jens.wiklander@linaro.org> wrote:
+>>> On Wed, Jun 14, 2017 at 11:39:50AM +0200, Jerome Forissier wrote:
+>>>> [+Arnd]
 >>>>
->>>> Don't we have the race below where both threads can enter the critical
->>>> section?
+>>>> Ping?
 >>>>
->>>> 	// flag f initial zero (unlocked)
+>>>> Thanks,
+>>>> --
+>>>> Jerome
 >>>>
->>>> 	// t1, flag 1			// t2, flag 2
->>>> 	readl(f); // reads 0		l = readl(f); // reads 0
->>>>
->>>> 	<thinks lock is free>		<thinks lock is free>
->>>>
->>>> 	writel(1, f);
->>>> 	readl(f); // reads 1
->>>> 	<thinks lock owned>
->>>> 					writel(2, f);
->>>> 					readl(f) // reads 2
->>>> 					<thinks lock owned>
->>>>
->>>> 	<crticial section>		<critical section>
->>>
->>> Urgh, yeah, of course and *that's* what the udelay is trying to avoid,
->>> by "ensuring" that the <thinks lock is free> time and subsequent write
->>> propagation is all over before we re-read the flag.
->>>
->>> John -- how much space do you have on this device? Do you have, e.g. a byte
->>> for each CPU?
+>>>> On 05/31/2017 01:21 PM, Jerome Forissier wrote:
+>>>>> tee_drv.h references struct device, but does not include device.h nor
+>>>>> platform_device.h. Therefore, if tee_drv.h is included by some file
+>>>>> that does not pull device.h nor platform_device.h beforehand, we have a
+>>>>> compile warning. Fix this by adding a forward declaration.
+>>>>>
+>>>>> Signed-off-by: Jerome Forissier <jerome.forissier@linaro.org>
 >>
->> Hi Will,
+>> Acked-by: Arnd Bergmann <arnd@arndb.de>
 >>
->> To be clear, the agents in our case are the kernel and UEFI. Within the
->> kernel, we use a kernel spinlock to lock the same djtag between threads, for
->> these reasons:
->> - kernel has a native spinlock
+>> Do we need this to fix a warning in mainline, in linux-next, or only
+>> in combination with some other patches?
 >
-> If we only have to effectively deal with two threads, then we might be able
-> to use something like Dekker's.
->
->> - we are limited in locking values, as the lock flag is only a 8b field in
->> v2 hw (called module select)
->
-> By 8b do you mean 8 bits or 8 bytes? If the latter, does it support sub-word
-> accesses?
+> Only with some other patches.
 
-8 bits
-
-So the size depends: on v1 hw is a 6-bit field in a 32-bit register 
-(recent news to me), and on v2 hw it is a 8-bit field in a 32-bit register.
-
-So for reading and writing the flag, we use readl/writel and also 
-necessary shifts+masks. Obviously this is not atomic, but the whole 
-process of write-and-check is not atomic - hence the delay.
-
-I am not sure if sub-word access is required.
+Ok, in that case, Jens can just queue up the patch in his tree now,
+and it will be there in time when other patches get applied on top,
+no need to have this in arm-soc by itself.
 
 Thanks,
-John
 
->
-> Will
->
-> .
->
+        Arnd
