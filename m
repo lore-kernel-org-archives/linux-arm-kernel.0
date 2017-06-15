@@ -1,36 +1,66 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Thu, 15 Jun 2017 11:04:13 +0800
-Subject: [PATCH v4 16/20] dt-bindings: mfd: hi6421: Add hi6421v530 compatible
- string
+Date: Thu, 15 Jun 2017 11:04:17 +0800
+Subject: [PATCH v4 20/20] arm64: dts: hi3660-hikey960: add nodes for WiFi
 In-Reply-To: <20170615030417.14059-1-guodong.xu@linaro.org>
 References: <20170615030417.14059-1-guodong.xu@linaro.org>
-Message-ID: <20170615030417.14059-17-guodong.xu@linaro.org>
+Message-ID: <20170615030417.14059-21-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add compatible string for HiSilicon Hi6421v530 PMIC.
+Add nodes for WiFi. HiKey960 is using TI WL1837MOD module.
 
 Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
-Acked-for-mfd-by: Lee Jones <lee.jones@linaro.org>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- Documentation/devicetree/bindings/mfd/hi6421.txt | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 33 +++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mfd/hi6421.txt b/Documentation/devicetree/bindings/mfd/hi6421.txt
-index 0d5a446..22da96d 100644
---- a/Documentation/devicetree/bindings/mfd/hi6421.txt
-+++ b/Documentation/devicetree/bindings/mfd/hi6421.txt
-@@ -1,7 +1,9 @@
- * HI6421 Multi-Functional Device (MFD), by HiSilicon Ltd.
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+index cec0b60..6609b0f 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+@@ -145,6 +145,20 @@
+ 			};
+ 		};
+ 	};
++
++	wlan_en: wlan-en-1-8v {
++		compatible = "regulator-fixed";
++		regulator-name = "wlan-en-regulator";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++
++		/* GPIO_051_WIFI_EN */
++		gpio = <&gpio6 3 0>;
++
++		/* WLAN card specific delay */
++		startup-delay-us = <70000>;
++		enable-active-high;
++	};
+ };
  
- Required parent device properties:
--- compatible	: contains "hisilicon,hi6421-pmic";
-+- compatible    : One of the following chip-specific strings:
-+	"hisilicon,hi6421-pmic";
-+	"hisilicon,hi6421v530-pmic";
- - reg		: register range space of hi6421;
- 
- Supported Hi6421 sub-devices include:
+ &i2c0 {
+@@ -208,3 +222,22 @@
+ 	vqmmc-supply = <&ldo9>;
+ 	status = "okay";
+ };
++
++&dwmmc2 { /* WIFI */
++	broken-cd;
++	/* WL_EN */
++	vmmc-supply = <&wlan_en>;
++	ti,non-removable;
++	non-removable;
++	#address-cells = <0x1>;
++	#size-cells = <0x0>;
++	status = "ok";
++
++	wlcore: wlcore at 2 {
++		compatible = "ti,wl1837";
++		reg = <2>;      /* sdio func num */
++		/* WL_IRQ, GPIO_179_WL_WAKEUP_AP */
++		interrupt-parent = <&gpio22>;
++		interrupts = <3 IRQ_TYPE_EDGE_RISING>;
++	};
++};
 -- 
 2.10.2
