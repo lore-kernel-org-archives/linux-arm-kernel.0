@@ -1,133 +1,109 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Thu, 15 Jun 2017 12:36:02 +0200
-Subject: [PATCH v5 3/3] perf: cavium: Support transmit-link PMU counters
-In-Reply-To: <20170602163937.GN28299@leverpostej>
-References: <20170517083122.5050-1-jglauber@cavium.com>
- <20170517083122.5050-4-jglauber@cavium.com>
- <20170602163937.GN28299@leverpostej>
-Message-ID: <20170615103602.GB13427@hc>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 15 Jun 2017 11:43:06 +0100
+Subject: [PATCH 2/2] acpi, gicv3-its, numa: Adding numa node mapping for
+ gic-its units
+In-Reply-To: <20170615103508.GA15815@red-moon>
+References: <1496753787-27735-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <1496753787-27735-3-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <20170612105335.GA30594@red-moon>
+ <CAFpQJXVFGnfMeHRGfsvxZAR_CQBLU6tgLsCuTrW8giQekgndvw@mail.gmail.com>
+ <20170615103508.GA15815@red-moon>
+Message-ID: <889cbfe3-e381-2805-7925-11dca09aaa2a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 02, 2017 at 05:39:38PM +0100, Mark Rutland wrote:
-> On Wed, May 17, 2017 at 10:31:22AM +0200, Jan Glauber wrote:
-> > Add support for the transmit-link (TLK) PMU counters found
-> > on Caviums SOCs with an interconnect.
-> > 
-> > Signed-off-by: Jan Glauber <jglauber@cavium.com>
-> > ---
-> >  drivers/edac/thunderx_edac.c    |   7 ++
-> >  drivers/perf/cavium_pmu.c       | 223 +++++++++++++++++++++++++++++++++++++++-
-> >  include/linux/perf/cavium_pmu.h |   1 +
-> >  3 files changed, 230 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/edac/thunderx_edac.c b/drivers/edac/thunderx_edac.c
-> > index 8de4faf..d3da6d3 100644
-> > --- a/drivers/edac/thunderx_edac.c
-> > +++ b/drivers/edac/thunderx_edac.c
-> > @@ -1496,6 +1496,10 @@ static int thunderx_ocx_probe(struct pci_dev *pdev,
-> >  
-> >  	writeq(OCX_COM_INT_ENA_ALL, ocx->regs + OCX_COM_INT_ENA_W1S);
-> >  
-> > +	if (IS_ENABLED(CONFIG_CAVIUM_PMU))
-> > +		ocx->pmu_data = cvm_pmu_probe(pdev, ocx->regs,
-> > +					      CVM_PMU_TLK);
-> > +
-> >  	return 0;
-> >  err_free:
-> >  	edac_device_free_ctl_info(edac_dev);
-> > @@ -1509,6 +1513,9 @@ static void thunderx_ocx_remove(struct pci_dev *pdev)
-> >  	struct thunderx_ocx *ocx = edac_dev->pvt_info;
-> >  	int i;
-> >  
-> > +	if (IS_ENABLED(CONFIG_CAVIUM_PMU))
-> > +		cvm_pmu_remove(pdev, ocx->pmu_data, CVM_PMU_TLK);
-> > +
-> 
-> As with the prior patch, I don't think we can handle the PMU like this.
-> 
+On 15/06/17 11:35, Lorenzo Pieralisi wrote:
+> On Wed, Jun 14, 2017 at 03:23:17PM +0530, Ganapatrao Kulkarni wrote:
 > 
 > [...]
 > 
-> > +static int cvm_pmu_tlk_add(struct perf_event *event, int flags)
-> > +{
-> > +	struct hw_perf_event *hwc = &event->hw;
-> > +
-> > +	return cvm_pmu_add(event, flags, TLK_STAT_CTL_OFFSET,
-> > +			   TLK_STAT_OFFSET + hwc->config * 8);
-> > +}
+>>>> +static int __init
+>>>> +acpi_parse_its_affinity(struct acpi_subtable_header *header,
+>>>> +                      const unsigned long end)
+>>>> +{
+>>>> +     struct acpi_srat_its_affinity *its_affinity;
+>>>> +
+>>>> +     its_affinity = (struct acpi_srat_its_affinity *)header;
+>>>> +     if (!its_affinity)
+>>>> +             return -EINVAL;
+>>>> +
+>>>> +     acpi_table_print_srat_entry(header);
 > 
-> > +static void *cvm_pmu_tlk_probe_unit(struct pci_dev *pdev, void __iomem *regs,
-> > +				    int nr)
-> > +{
-> > +	struct cvm_pmu_dev *tlk;
-> > +	int ret = -ENOMEM;
-> > +	char name[12];
-> > +
-> > +	tlk = kzalloc(sizeof(*tlk), GFP_KERNEL);
-> > +	if (!tlk)
-> > +		goto fail_nomem;
-> > +
-> > +	memset(name, 0, 12);
-> > +	snprintf(name, 12, "ocx_tlk%d", nr);
+> You can leave this info printing but see below.
 > 
-> Please kasprintf() the name and pass it to perf_pmu_register().
+>>>> +
+>>>> +     /* let architecture-dependent part to do it */
+>>>> +     acpi_numa_its_affinity_init(its_affinity);
+>>>> +
+>>>> +     return 0;
+>>>> +}
+>>>> +
+>>>>  static int __initdata parsed_numa_memblks;
+>>>>
+>>>>  static int __init
+>>>> @@ -445,7 +473,7 @@ int __init acpi_numa_init(void)
+>>>>
+>>>>       /* SRAT: Static Resource Affinity Table */
+>>>>       if (!acpi_table_parse(ACPI_SIG_SRAT, acpi_parse_srat)) {
+>>>> -             struct acpi_subtable_proc srat_proc[3];
+>>>> +             struct acpi_subtable_proc srat_proc[4];
+>>>>
+>>>>               memset(srat_proc, 0, sizeof(srat_proc));
+>>>>               srat_proc[0].id = ACPI_SRAT_TYPE_CPU_AFFINITY;
+>>>> @@ -454,6 +482,8 @@ int __init acpi_numa_init(void)
+>>>>               srat_proc[1].handler = acpi_parse_x2apic_affinity;
+>>>>               srat_proc[2].id = ACPI_SRAT_TYPE_GICC_AFFINITY;
+>>>>               srat_proc[2].handler = acpi_parse_gicc_affinity;
+>>>> +             srat_proc[3].id = ACPI_SRAT_TYPE_GIC_ITS_AFFINITY;
+>>>> +             srat_proc[3].handler = acpi_parse_its_affinity;
+>>>>
+>>>>               acpi_table_parse_entries_array(ACPI_SIG_SRAT,
+>>>>                                       sizeof(struct acpi_table_srat),
+>>>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>>>> index 45ea1933..84936da 100644
+>>>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>>>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>>>> @@ -1861,7 +1861,8 @@ static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
+>>>>               goto dom_err;
+>>>>       }
+>>>>
+>>>> -     err = its_probe_one(&res, dom_handle, NUMA_NO_NODE);
+>>>> +     err = its_probe_one(&res, dom_handle,
+>>>> +                     acpi_numa_get_its_nid(its_entry->translation_id));
+>>>
+>>> If that's the only usage I wonder whether we really need all arm64
+>>> arch code/data, instead of parsing the SRAT in ITS code driver straight
+>>> away at probe, retrieve its node and be done with this.
+>>>
+>>> I understand you replicated what x86/GICC does with APIC code, I would
+>>> like to understand though if we see a reason why (or better, why we keep
+>>> the relevant stashed data in arch/arm64 instead of the ITS driver).
+>>
+>> it is been thought to do ITS sub table parse along with other SRAT
+>> tables.  and use the mapping later when ITS devices are
+>> initialised/probed.  IMO, it is more appropriate to keep all SRAT sub
+>> table parsing to same function/place rather than moving to driver.
 > 
-> AFAICT, pmu::name is a char *, and perf_pmu_register() doesn't make a copy, so
-> this isn't safe.
+> I do not follow. If it is just used in ITS driver code to set the ITS
+> affinity node what's the point of stashing data and adding callbacks
+> when you can simply parse the SRAT and be done with it ?
+> 
+> Or you have something on top of these patches that require ITS node
+> information and the calls you added ? If so post the code please.
+> 
+> Regardless, it's ITS specific information, ITS is managed through an
+> irqchip driver on ARM64 so even if you decided to stash the SRAT ITS
+> information it does not belong in arch/arm64 IMO, you can implement
+> acpi_numa_its_affinity_init() in the ITS driver but AFAICS for the time
+> being it would be just useless that's the point I am making.
 
-OK, will use kasprintf and embedd the char name * into cvm_pmu_dev so I
-can free it on remove.
+Agreed. As long as there is only the ITS as a consumer of that
+information, there is no need to pollute the rest of the kernel with it.
+Once we have another consumer, we can look at making that code common.
+In the meantime, keeping it in the ITS code is the right thing to do.
 
-> > +
-> > +	list_add(&tlk->entry, &cvm_pmu_tlks);
-> 
-> As withthe prio patch, please add the element to the list after
-> handling the failure cases.
+Thanks,
 
-OK.
-
-> > +
-> > +	tlk->pdev = pdev;
-> > +	tlk->map = regs + TLK_START_ADDR + nr * TLK_UNIT_OFFSET;
-> > +	tlk->num_counters = ARRAY_SIZE(cvm_pmu_tlk_events_attr) - 1;
-> > +	tlk->pmu = (struct pmu) {
-> > +		.name		= name,
-> > +		.task_ctx_nr    = perf_invalid_context,
-> > +		.pmu_enable	= cvm_pmu_tlk_enable_pmu,
-> > +		.pmu_disable	= cvm_pmu_tlk_disable_pmu,
-> > +		.event_init	= cvm_pmu_event_init,
-> > +		.add		= cvm_pmu_tlk_add,
-> > +		.del		= cvm_pmu_del,
-> > +		.start		= cvm_pmu_start,
-> > +		.stop		= cvm_pmu_stop,
-> > +		.read		= cvm_pmu_read,
-> > +		.attr_groups	= cvm_pmu_tlk_attr_groups,
-> > +	};
-> > +
-> > +	cpuhp_state_add_instance_nocalls(CPUHP_AP_PERF_ARM_CVM_ONLINE,
-> > +					 &tlk->cpuhp_node);
-> > +
-> > +	/*
-> > +	 * perf PMU is CPU dependent so pick a random CPU and migrate away
-> > +	 * if it goes offline.
-> > +	 */
-> > +	cpumask_set_cpu(smp_processor_id(), &tlk->active_mask);
-> > +
-> > +	ret = perf_pmu_register(&tlk->pmu, tlk->pmu.name, -1);
-> > +	if (ret)
-> > +		goto fail_hp;
-> > +
-> > +	tlk->event_valid = cvm_pmu_tlk_event_valid;
-> > +	return tlk;
-> > +
-> > +fail_hp:
-> > +	cpuhp_state_remove_instance(CPUHP_AP_PERF_ARM_CVM_ONLINE,
-> > +				    &tlk->cpuhp_node);
-> > +	kfree(tlk);
-> > +fail_nomem:
-> > +	return ERR_PTR(ret);
-> > +}
-> 
-> Thanks,
-> Mark.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
