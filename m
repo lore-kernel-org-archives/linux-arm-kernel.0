@@ -1,49 +1,39 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 15 Jun 2017 17:28:36 +0200
-Subject: [RFT 1/2] pinctrl: samsung: Fix NULL pointer exception on
- external interrupts on S3C24xx
-In-Reply-To: <44ca46f9-0607-d750-4f26-eab717518fd9@163.com>
-References: <20170614131828.28683-1-krzk@kernel.org>
- <44ca46f9-0607-d750-4f26-eab717518fd9@163.com>
-Message-ID: <20170615152836.j6y4k4ydkterifii@kozik-lap>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 15 Jun 2017 17:30:20 +0200
+Subject: [PATCH net-next v5 00/11] net: mvmdio: add xMDIO xSMI support
+In-Reply-To: <20170615144326.24463-1-antoine.tenart@free-electrons.com>
+References: <20170615144326.24463-1-antoine.tenart@free-electrons.com>
+Message-ID: <20170615153020.GC3786@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 15, 2017 at 10:42:30PM +0800, Yao Lihua wrote:
-> Hi Krzysztof,
+On Thu, Jun 15, 2017 at 04:43:15PM +0200, Antoine Tenart wrote:
+> Hello,
 > 
-> Another Oops on S3C6410.
+> This series aims to add the xSMI support on the xMDIO bus to the
+> mvmdio driver. The xSMI interface complies with the IEEE 802.3 clause 45
+> and is used by 10GbE devices. On 7k and 8k (as of now), such an
+> interface is found and is used by Ethernet controllers.
+> 
+> Patches 1-4 and 9 are cosmetic cleanups.
+> 
+> Patches 5-7 are prerequisites to the xSMI support.
+> 
+> Patches 8 and 10-11 add the xSMI support to the mvmdio driver, and a
+> node is added both in the cp110 slave and master device trees.
+> 
+> This was tested on an Armada 8040 mcbin, as well as on both the
+> Armada 7040 DB and the Armada 8040 DB to ensure the SMI interface
+> was still working.
+> 
+> @Dave: patch 11 should go through the mvebu tree as asked by Gregory,
+> thanks!
+> 
+> Thanks,
+> Antoine
 
-(...)
+Looks good.
 
- > diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
-> > index f542642eed8d..a25c3ffae25c 100644
-> > --- a/drivers/pinctrl/samsung/pinctrl-samsung.c
-> > +++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
-> > @@ -1013,6 +1013,11 @@ samsung_pinctrl_get_soc_data(struct samsung_pinctrl_drv_data *d,
-> >   		bank->eint_base = virt_base[0];
-> >   		bank->pctl_base = virt_base[bdata->pctl_res_idx];
-> >   	}
-> > +	/*
-> > +	 * For legacy platforms which need to access IO memory through
-> > +	 * samsung_pinctrl_drv_data:
-> > +	 */
-> > +	d->virt_base = virt_base[bdata->pctl_res_idx];
-> > 
->     for (i = 0; i < ctrl->nr_banks; ++i, ++bdata, ++bank) {
->         ......
->     }
->     /*
->      * For legacy platforms which need to access IO memory through
->      * samsung_pinctrl_drv_data:
->      */
->     d->virt_base = virt_base[bdata->pctl_res_idx];
->                                                     ^
->                                                      **bdata** is invalid here.
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-Ah, of course, apparently it worked in my case by coincidence. Thanks
-for spotting this.
-
-
-Best regards,
-Krzysztof
+    Andrew
