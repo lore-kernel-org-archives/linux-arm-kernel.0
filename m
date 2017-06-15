@@ -1,69 +1,29 @@
 From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 15 Jun 2017 11:19:40 +0100
-Subject: [PATCH 06/12] coresight tmc: Expose DBA and AXICTL
-In-Reply-To: <20170614175042.GB22030@xps15>
+Date: Thu, 15 Jun 2017 11:23:26 +0100
+Subject: [PATCH 07/12] coresight replicator: Expose replicator management
+ registers
+In-Reply-To: <20170614175454.GC22030@xps15>
 References: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
- <1497278211-5001-7-git-send-email-suzuki.poulose@arm.com>
- <20170614175042.GB22030@xps15>
-Message-ID: <b72bb2fa-7bbc-cee0-caaf-018b5552cad7@arm.com>
+ <1497278211-5001-8-git-send-email-suzuki.poulose@arm.com>
+ <20170614175454.GC22030@xps15>
+Message-ID: <79fb2dd7-c756-97aa-645f-126206bf8879@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/06/17 18:50, Mathieu Poirier wrote:
-> On Mon, Jun 12, 2017 at 03:36:45PM +0100, Suzuki K Poulose wrote:
->> Expose DBALO,DBAHI and AXICTL registers
+On 14/06/17 18:54, Mathieu Poirier wrote:
+> On Mon, Jun 12, 2017 at 03:36:46PM +0100, Suzuki K Poulose wrote:
+>> Expose the idfilter* registers of the programmable replicator.
 >
-> Why is this needed?  I fear we are exposing internal kernel information.
->
+> Is this for SoC600 only?  If so we need to make sure these are not visible when
+> operating an SoC400 replicator.  Otherwise simply disregard my statement.
 
-Mathieu,
+No, this is for the existing dynamic replicator, which is also compatible with the
+one in SoC-600. In the future, we may be able to support multiple trace sessions
+(i.e, distinct source-sink pairs using a shared dynamic replicator to filter the
+data based on the trace-id). Right now we simple switch off the other side of the
+replicator, when we enable the port connected to the sink.
 
-These are useful to analyse/debug the trace session. e.g, we could compare
-RRP/RWP with DBA to see if the trace is actually generated or not.
-As such, we already expose RRP/RWP. Exposing DBA doesn't expose
-more information than we do already. Also, when we add SG support
-this will be useful, as DBA will never match (or be in the range of) RRP/RWP.
-
-The AXICTL may not be of any significance right now, but will be
-useful once we add scatter gather support, to check which mode
-are we operating in.
-
-Let me know if you still have concerns.
+I found these useful while debugging trace generation issue on one of the
+platforms.
 
 Suzuki
-
->>
->> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->>  drivers/hwtracing/coresight/coresight-tmc.c | 4 ++++
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
->> index 7025982..fd5a2e0 100644
->> --- a/drivers/hwtracing/coresight/coresight-tmc.c
->> +++ b/drivers/hwtracing/coresight/coresight-tmc.c
->> @@ -228,9 +228,11 @@ coresight_tmc_simple_func(ffcr, TMC_FFCR);
->>  coresight_tmc_simple_func(mode, TMC_MODE);
->>  coresight_tmc_simple_func(pscr, TMC_PSCR);
->>  coresight_tmc_simple_func(devid, CORESIGHT_DEVID);
->> +coresight_tmc_simple_func(axictl, TMC_AXICTL);
->>
->>  coresight_simple_reg64(struct tmc_drvdata, rrp, TMC_RRP, TMC_RRPHI);
->>  coresight_simple_reg64(struct tmc_drvdata, rwp, TMC_RWP, TMC_RWPHI);
->> +coresight_simple_reg64(struct tmc_drvdata, dba, TMC_DBALO, TMC_DBAHI);
->>
->>  static struct attribute *coresight_tmc_mgmt_attrs[] = {
->>  	&dev_attr_rsz.attr,
->> @@ -244,6 +246,8 @@ static struct attribute *coresight_tmc_mgmt_attrs[] = {
->>  	&dev_attr_mode.attr,
->>  	&dev_attr_pscr.attr,
->>  	&dev_attr_devid.attr,
->> +	&dev_attr_dba.attr,
->> +	&dev_attr_axictl.attr,
->>  	NULL,
->>  };
->>
->> --
->> 2.7.4
->>
