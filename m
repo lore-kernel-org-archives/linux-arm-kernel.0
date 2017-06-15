@@ -1,75 +1,117 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 15 Jun 2017 15:02:21 +0100
-Subject: [PATCH 00/17] coresight: next v4.12-rc4
-In-Reply-To: <20170615084006.e72662514e1d5b85e7af8ada@arm.com>
-References: <1496693718-9191-1-git-send-email-mathieu.poirier@linaro.org>
- <20170609175339.28d1d4d5a6c91a9e16c16bf7@arm.com>
- <CANLsYky8XLbOwinxVc2xKaNzhkpUOX0NsNxrFF4=MsjzC3iY1g@mail.gmail.com>
- <20170613161712.f1f3cac734939d8728c7ed77@arm.com>
- <20170614062229.GA28496@leoy-ThinkPad-T440>
- <cc812b9a-4c8a-93d9-5233-74edd475f8aa@arm.com>
- <20170615084006.e72662514e1d5b85e7af8ada@arm.com>
-Message-ID: <c2c93e59-09d0-83f3-0c91-17f1f13bc28c@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 15 Jun 2017 15:03:37 +0100
+Subject: [PATCH 0/5] arm64: signal: Signal frame expansion support
+Message-ID: <1497535442-11586-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/06/17 14:40, Kim Phillips wrote:
-> On Thu, 15 Jun 2017 14:08:09 +0100
-> Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
->
->> On 14/06/17 07:22, Leo Yan wrote:
->>> Hi Kim,
->>>
->>> On Tue, Jun 13, 2017 at 04:17:12PM -0500, Kim Phillips wrote:
->>>
->>> [...]
->>>
->>>>>> Also, do the current juno platforms not have CPU debug modules?  I'd
->>>>>> like to test the new driver.
->>>>>
->>>>> By all means - Leo pointed out the patch adding the CPU debug entries in
->>>>> the DT  file for Juno.
->>>>
->>>> Thanks, I applied it, was able to
->>>> toggle /sys/kernel/debug/coresight_cpu_debug/enable, but wasn't sure
->>>> how to trigger the cpu debug output...
->>>
->>> You could trigger panic flow with command, then can see CPU debug output:
->>> echo c > /proc/sysrq-trigger
->>
->> I think, may be we should provide a handle to trigger the CPU debug dump
->> manually, rather than using it only for panic. Something like :
->>
->> echo 1 > /sys/kernel/debug/coresight_cpu_debug/trigger
->>
->> Thoughts ?
->
-> what's the use-case?  I just wanted to do a simple test, and although
-> it halted my machine, the sysrq-trigger switch did the job.
+This series supersedes a prior RFC [1].
 
-Get the CPU dump without crashing the system, when the CPU is looping
-indefinitely (with interrupts disabled) ? sysrq-t doesn't tell you where
-the task/CPU is at if it is in running state. This can augment the details
-by providing the PC. Sure, you can also do this by crashing the system
-as above. But it doesn't hurt to provide the same without the crash.
+This series refactors the arm64 signal handling implementation in order
+to make it easier to add support for new CPU architecture extensions,
+which may require new records in the signal frame and may require the
+signal frame to grow beyond its current size.
+
+This series provides infrastructure that will be needed in order to
+support the Scalable Vector Extension (SVE) [2] (patches to be posted
+separately).
+
+LTP testing is ongoing -- I will ping this series when I have results.
 
 
->
-> I'm personally not a huge fan of adding more switches, rather for doing
-> the right thing on behalf of the user in the first place.  E.g., in the
-> case of cpu debug, if configured =y, I don't think it would necessarily
-> harm the simple user to have it always be enabled, at boot time and
-> beyond, thereby doing away with the .../coresight_cpu_debug/enable
+Changes since RFC v2:
 
-The reasoning behind this is to avoid keeping the debug power domain on
-until someone really wants it enabled, so that one can use a single kernel
-image in production/development and be able to switch things on at runtime.
+ * The frame link record has been moved back to the end of the full
+   signal frame, instead of fixing its position at the end of
+   __reserved[], after Catalin raised concerns about the space otherwise
+   wasted by putting the extended signal frame data after it.
 
-> switch and kernel command line option.  If there are users that want to
-> turn it on and off dynamically, that can be done by loading and
-> unloading the module.
+   Previous versions of the series had this behaviour, but concerns were
+   expressed by reviewers about the potential ABI impact.
 
-Sure, if someone is building it as a module, they have the luxury. But
-this may not be always useful, e.g, crashes at early boot.
+   This change has been informally tested for ABI impacts using the
+   libgcc unwinder (exercised by throwing exceptions from a signal
+   handler with g++ -fnon-call-exceptions) and gdb backtracing, neither
+   of which showed any problem.  Review of the libgcc and libunwind
+   implementations and discussion with gdb developers suggest that no
+   breakage is expected as a result of the change.
 
-Suzuki
+   (See patch 1 of this posting.)
+
+ * Patches 4 (Allocate extra sigcontext space as needed) and 5 (Parse
+   extra_context during sigreturn) of RFC v2 have been merged, since
+   they are not fully bisectable and make more sense as a single patch.
+
+ * Patch 6 (Report signal frame size to userspace via auxv) of RFC v2
+   has been dropped from the series, because this creates ABI that we
+   don't need yet, and can benefit from further discussion.  This patch
+   will become relevant when merging support for SVE.
+
+ * struct extra_context is explicitly padded up to a multiple of 16 bytes.
+   This fixes a bug whereby a non-extra_context-aware unwinder would
+   skip the wrong amount of data after extra_context and miss the
+   terminator record.
+
+   There is a de facto assumption that unwinders do not need to round
+   _aarch64_ctx.size up to a multiple of 16 when stepping through the
+   records in the signal frame, though this isn't documented anywhere.
+
+
+Original blurb:
+
+An architecture advertises the maximum possible signal frame size via
+the MINSIGSTKSZ #define (mandated by POSIX).
+
+However, CPU architecture extensions may increase the amount of space
+required to store the interrupted context when a signal is delivered.
+
+
+Eventually the amount of space needed in the signal frame may exceed
+MINSIGSTKSZ -- whether and when this happens is largely a matter of
+luck, depending on the initial guess for MINSIGSTKSZ and the evolution
+of that particular CPU architecture.  Unfortunately MINSIGSTKSZ cannot
+be changed without an ABI break, and POSIX provides no mechanism for
+migration.
+
+arm64 initially reserved 4KB of space in the signal frame for
+extensions, of which about 0.5KB is allocated to the FP/SIMD registers
+initially.
+
+Depending on the vector length supported by the hardware, SVE requires
+up to around 8KB of space to store the full SIMD register context, which
+is too large to fit in the existing frame.
+
+This series adds a mechanism for optionally enlarging the signal frame
+(patches 4-5) and reporting the actual maximum signal frame size to
+userspace (patch 6).  Patches 1-3 do some refactoring to support this
+change by abstracting the way signal frame records are allocated onto
+the user stack.
+
+Full backwards compatibility is not possible -- there is no way to hide
+the fact that the signal frame has grown -- so it is expected that
+support for new architecture extensions that can cause the signal frame
+to grow will be opt-in for userspace, in addition to using the extension
+mechanism defined by this series.
+
+
+[1] [RFC PATCH v2 0/6] Signal frame expansion support
+http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/501163.html
+
+[2] ARM Scalable Vector Extension
+https://community.arm.com/groups/processors/blog/2016/08/22/technology-update-the-scalable-vector-extension-sve-for-the-armv8-a-architecture
+https://developer.arm.com/docs/ddi0584/latest/arm-architecture-reference-manual-supplement-the-scalable-vector-extension-sve-for-armv8-a
+
+
+Dave Martin (5):
+  arm64: signal: split frame link record from sigcontext structure
+  arm64: signal: Refactor sigcontext parsing in rt_sigreturn
+  arm64: signal: factor frame layout and population into separate passes
+  arm64: signal: factor out signal frame record allocation
+  arm64: signal: Allow expansion of the signal frame
+
+ arch/arm64/include/uapi/asm/sigcontext.h |  55 +++++
+ arch/arm64/kernel/signal.c               | 408 ++++++++++++++++++++++++++++---
+ 2 files changed, 427 insertions(+), 36 deletions(-)
+
+-- 
+2.1.4
