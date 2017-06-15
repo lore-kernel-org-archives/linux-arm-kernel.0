@@ -1,110 +1,93 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Thu, 15 Jun 2017 23:50:54 +0800
-Subject: [PATCH 00/17] coresight: next v4.12-rc4
-In-Reply-To: <20170615092246.bc4fb71637e482a118199864@arm.com>
-References: <1496693718-9191-1-git-send-email-mathieu.poirier@linaro.org>
- <20170609175339.28d1d4d5a6c91a9e16c16bf7@arm.com>
- <CANLsYky8XLbOwinxVc2xKaNzhkpUOX0NsNxrFF4=MsjzC3iY1g@mail.gmail.com>
- <20170613161712.f1f3cac734939d8728c7ed77@arm.com>
- <20170614062229.GA28496@leoy-ThinkPad-T440>
- <20170614223453.3357117a7f25ee68924a071c@arm.com>
- <d9b1121b-6e04-dfe7-b75b-9fbc6129a907@arm.com>
- <20170615092246.bc4fb71637e482a118199864@arm.com>
-Message-ID: <20170615155054.GN28496@leoy-ThinkPad-T440>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 15 Jun 2017 16:54:40 +0100
+Subject: Using __always_inline attribute
+In-Reply-To: <9198053a46999b0b46dcab992527d0d7@codeaurora.org>
+References: <2a762f1f3b355e71c5bca6a6e00bffe0@codeaurora.org>
+ <20170614100641.GB16190@arm.com>
+ <9198053a46999b0b46dcab992527d0d7@codeaurora.org>
+Message-ID: <20170615155440.GC26471@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kim,
+Hi,
 
-On Thu, Jun 15, 2017 at 09:22:46AM -0500, Kim Phillips wrote:
-> On Thu, 15 Jun 2017 09:41:22 +0100
-> Sudeep Holla <sudeep.holla@arm.com> wrote:
-> 
-> > On 15/06/17 04:34, Kim Phillips wrote:
-> > [...]
-> > > How does one tell whether writes to /dev/cpu_dma_latency are effective?
-> > > 
-> > Watch /sys/devices/system/cpu/cpu*/cpuidle/state*/{usage,time}, they
-> > shouldn't tick based on the value set to cpu_dma_latency.
-> > 
-> > E.g. a value of 0 should stop entering all the idle states.
-> 
-> I see all states following the same pattern whether 0 or not:
-> 
-> root at juno:~# cat show2.sh 
-> show()
-> {
-> 	echo $1 > /dev/cpu_dma_latency
-> 	echo === $1:
-> 	cat /sys/devices/system/cpu/cpu2/cpuidle/state*/{usage,time}
-> 	echo ---
-> 	sleep 10
-> 	cat /sys/devices/system/cpu/cpu2/cpuidle/state*/{usage,time}
-> }
-> 
-> show 0
-> show 1500
-> show 0
-> root at juno:~# taskset -c 2 bash ./show2.sh
-> === 0:
-> 1893
-> 894
-> 5417
-> 1398675
-> 65997648
-> 3818880750
-> ---
-> 1895
-> 905
-> 5434
-> 1401721
-> 68076867
-> 3826795502
-> === 1500:
-> 1895
-> 905
-> 5434
-> 1401721
-> 68076867
-> 3826795502
-> ---
-> 1895
-> 918
-> 5447
-> 1401721
-> 69403510
-> 3835466081
-> === 0:
-> 1895
-> 918
-> 5447
-> 1401721
-> 69403510
-> 3835466081
-> ---
-> 1896
-> 929
-> 5463
-> 1403577
-> 71454839
-> 3843409979
-> 
-> googling suggests the /dev/cpu_dma_latency file should be *kept* open,
-> and written a 32-bit binary number:
-> 
-> https://access.redhat.com/articles/65410
-> 
-> If so (I don't have time to test), this cpu debug documentation is very
-> deceptive.
+On Wed, Jun 14, 2017 at 03:33:59PM -0700, Sodagudi Prasad wrote:
+> On 2017-06-14 03:06, Will Deacon wrote:
+> >On Tue, Jun 13, 2017 at 03:39:37PM -0700, Sodagudi Prasad wrote:
+> >>With a variant of a CLANG(based on 4.0) following errors
+> >>observed on Linux
+> >>4.12-rc5 tag.
 
-Looked into the code, and I must apologize I have not verified the
-command when wrote the doc. As you pointed out, the closing file
-operation releases the constraint for PM QoS.
+> >>net/built-in.o: In function `__xchg_mb':
+> >>arch/arm64/include/asm/cmpxchg.h:99: \
+> >>                    undefined reference to `__compiletime_assert_99'
+> >>arch/arm64/include/asm/cmpxchg.h:99: \
+> >>                    undefined reference to `__compiletime_assert_99
+> >>
+> >>Clang does not seems to be marking this macro as inline and
+> >>causing above
+> >>compilation issue due to BUILD_BUG().
+> >
+> >The only BUILD_BUG I see around here is if the size parameter (which
+> >is calculated using sizeof) is not known to be 1,2,4 or 8 at compile
+> >time. It would be interesting to know which call site is confusing
+> >clang in this way and what code is actually being emitted here.
+> >
+> >If it's just that __xchg_mb isn't being inlined into the
+> >__xchg_wrapper macro, then your patch should be ok, but I'd like to
+> >be sure it's not something else. I'm also surprised you haven't see
+> >this crop up in other places.
+> >
+> After digging further, we observed that inline definition was
+> changed recently and causing this issue.
+> Here is missing part of inline macro definition __attribute__((unused)).
+> 
+> Commit abb2ea7dfd82 ("compiler, clang: suppress warning for unused
+> static inline functions") have redefined the inline macro as below
+> #define inline inline __attribute__((unused))
+> 
+> But actual definition of inline macro defined compiler-gcc.h file as
+> shown below.
+> #define inline          inline
+> __attribute__((always_inline)) notrace
 
-Below command can work (I tested):
-exec 3<> /dev/cpu_dma_latency; echo 0 >&3
+FWIW, this happesn to be true for arm64 today, but it's not always the
+case. When ARCH_SUPPORTS_OPTIMIZED_INLINING && OPTIMIZE_INLINING, inline
+is not equivalent to __always_inline.
 
-Will commit one patch for this.
+It looks like x86 has ARCH_SUPPORTS_OPTIMIZED_INLINING and selects
+OPTIMIZE_INLINING in its defconfigs, so core code should be clean, and
+presumably the option is a net win on x86.
+
+It mgiht be worth taking a look if this would be beneficial for arm64,
+even if we have to apply a few s/inline/__always_inline/ fixups as with
+this case.
+
+> As always_inline attribute is missing in inline definition, compile
+> may not inline macros __xchg_mb in
+> arch/arm64/include/asm/cmpxchg.h file and leading to error.
+> 
+> Some compilers may not honor inline as inline if always_inline
+> attribute is removed because of
+> -inline-threshold compiler options.
+> 
+> Here is the change to fix this issue-
+> diff --git a/include/linux/compiler-clang.h
+> b/include/linux/compiler-clang.h
+> index d614c5e..a0e6433 100644
+> --- a/include/linux/compiler-clang.h
+> +++ b/include/linux/compiler-clang.h
+> @@ -22,4 +22,4 @@
+>   * directives.  Suppress the warning in clang as well.
+>   */
+>  #undef inline
+> -#define inline inline __attribute__((unused)) notrace
+> +#define inline __attribute__((always_inline))
+> __attribute__((unused)) notrace
+
+Assuming this has the same gaurds for ARCH_SUPPORTS_OPTIMIZED_INLINING
+&& OPTIMIZE_INLINING, it looks fine to me. Otherwise, I suspect this may
+be overly pessimistic.
 
 Thanks,
-Leo Yan
+Mark.
