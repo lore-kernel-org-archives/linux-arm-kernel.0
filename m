@@ -1,36 +1,110 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 15 Jun 2017 10:01:50 +0200
-Subject: [PATCH] arm64: dts: marvell: enable the cpm crypto engine on the mcbin
-Message-ID: <20170615080150.27534-1-antoine.tenart@free-electrons.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 15 Jun 2017 10:11:45 +0200
+Subject: [PATCH v15 2/7] power: add power sequence library
+In-Reply-To: <20170615065854.GA24157@b29397-desktop>
+References: <1497319166-17287-1-git-send-email-peter.chen@nxp.com>
+ <1497319166-17287-3-git-send-email-peter.chen@nxp.com>
+ <CAPDyKFpOQWTPpdd__OBP1DcW58CbqnygGAOxiEFq5kqqvCm0QA@mail.gmail.com>
+ <20170614015338.GA4635@b29397-desktop>
+ <CAPDyKFrLL10TY1JZAhF44_0+qGETLNtFc6ujKVUu7Ay=O8+M5A@mail.gmail.com>
+ <20170615065854.GA24157@b29397-desktop>
+Message-ID: <CAPDyKFpc8GRKK8bafMU_HPaqWNrger3grPSd5rWWCTYhUGHZLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the cpm crypto engine on the mcbin.
+On 15 June 2017 at 08:58, Peter Chen <hzpeterchen@gmail.com> wrote:
+> On Wed, Jun 14, 2017 at 10:53:29AM +0200, Ulf Hansson wrote:
+>> On 14 June 2017 at 03:53, Peter Chen <hzpeterchen@gmail.com> wrote:
+>> > On Tue, Jun 13, 2017 at 12:24:42PM +0200, Ulf Hansson wrote:
+>> >> [...]
+>> >>
+>> >> > +
+>> >> > +/**
+>> >> > + * of_pwrseq_on - Carry out power sequence on for device node
+>> >> > + *
+>> >> > + * @np: the device node would like to power on
+>> >> > + *
+>> >> > + * Carry out a single device power on.  If multiple devices
+>> >> > + * need to be handled, use of_pwrseq_on_list() instead.
+>> >> > + *
+>> >> > + * Return a pointer to the power sequence instance on success,
+>> >> > + * or an error code otherwise.
+>> >> > + */
+>> >> > +struct pwrseq *of_pwrseq_on(struct device_node *np)
+>> >> > +{
+>> >> > +       struct pwrseq *pwrseq;
+>> >> > +       int ret;
+>> >> > +
+>> >> > +       pwrseq = pwrseq_find_available_instance(np);
+>> >> > +       if (!pwrseq)
+>> >> > +               return ERR_PTR(-ENOENT);
+>> >>
+>> >> In case the pwrseq instance hasn't been registered yet, then there is
+>> >> no way to deal with -EPROBE_DEFER properly here.
+>> >>
+>> >> I haven't been following the discussions in-depth during all
+>> >> iterations, so perhaps you have already discussed why doing it like
+>> >> this.
+>> >
+>> > Yes, it has been discussed. In order to compare with compatible string
+>> > at dts, we need to have one registered pwrseq instance for each
+>> > pwrseq library, this pre-registered one is allocated using
+>> > postcore_initcall, and the new (eg, second) instance is registered
+>> > after pwrseq_get has succeeded.
+>>
+>> I understand you need one compatible per pwrseq library, but how does
+>> that have anything to do with -EPROBE_DEFER?
+>>
+>> My point is that, if a driver calls of_pwrseq_on() (which calls
+>> pwrseq_find_available_instance()), but the corresponding pwrseq
+>> library and instance has not yet been registered for that device. Then
+>> how will you handle -EPROBE_DEFER? I guess you simply can't, which is
+>> why *all* pwrseq libraries needs to be registered in early boot phase,
+>> like at postcore_initcall(). Right?
+>>
+>> If that is the case, I really don't like it.
+>>
+>
+> Yes, you are right. This is the limitation for this power sequence
+> library, the registration for the 1st power sequence instance must
+> be finished before device driver uses it. I am appreciated that
+> you can supply some suggestions for it.
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
+In general this kind of problems is solved by first parsing the DTB,
+which means you will find out whether there is a resource (a pwrseq)
+required for the device. Then you try to fetch that resource, and if
+that fails, it means the resource is not yet available, and hence you
+want to retry later and should return -EPROBE_DEFER.
 
-Hi Gregory,
+In this case, of_pwrseq_on() needs to be converted to start looking
+for a pwrseq compatible in it's child node - I guess. Then if that is
+found, you try to fetch the instance of the corresponding library.
+Failing to fetch the library instance should then cause a return
+-EPROBE_DEFER.
 
-This patch applies on top of today's mvebu/dt64 branch.
+>
+>> Moreover, I have found yet another severe problem but reviewing the code:
+>> In the struct pwrseq, you have a "bool used", which you are setting to
+>> "true" once the pwrseq has been hooked up with the device, when a
+>> driver calls of_pwrseq_on(). Setting that variable to true, will also
+>> prevent another driver from using the same instance of the pwrseq for
+>> its device. So, to cope with multiple users, you register a new
+>> instance of the same pwrseq library that got hooked up, once the
+>> ->get() callback is about to complete.
+>>
+>> The problem the occurs, when there is another driver calling
+>> of_pwrseq_on() in between, meaning that the new instance has not yet
+>> been registered. This will simply fail, won't it?
+>
+> Yes, you are right, thanks for pointing that, I will add mutex_lock for
+> of_pwrseq_on.
 
-Thanks!
-Antoine
+Another option is to entirely skip to two step approach.
 
- arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+In other words, make the library to cope with multiple users via the
+same registered library instance.
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-index fe56efcfcefe..2556c8268b40 100644
---- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-@@ -176,3 +176,7 @@
- 	usb-phy = <&usb3h0_phy>;
- 	status = "okay";
- };
-+
-+&cpm_crypto {
-+	status = "okay";
-+};
--- 
-2.9.4
+[...]
+
+Kind regards
+Uffe
