@@ -1,10 +1,10 @@
 From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 15 Jun 2017 20:54:08 +0200
-Subject: [RESEND PATCH v5 06/16] ARM: dts: r7s72100: Add generic compatible
+Date: Thu, 15 Jun 2017 20:54:11 +0200
+Subject: [RESEND PATCH v5 09/16] ARM: dts: uniphier: Add generic compatible
  string for I2C EEPROM
 In-Reply-To: <20170615185418.13980-1-javier@dowhile0.org>
 References: <20170615185418.13980-1-javier@dowhile0.org>
-Message-ID: <20170615185418.13980-7-javier@dowhile0.org>
+Message-ID: <20170615185418.13980-10-javier@dowhile0.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,7 +20,6 @@ So add this generic fallback to the device node compatible string to make
 the device to match the driver using the OF device ID table.
 
 Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
 ---
 
@@ -31,26 +30,52 @@ Changes in v4:
 - Only use the atmel manufacturer in the compatible string instead of
   keeping the deprecated ones (Rob Herring).
 
-Changes in v3:
-- Add Geert Uytterhoeven reviewed-by tag.
-
+Changes in v3: None
 Changes in v2: None
 
- arch/arm/boot/dts/r7s72100-genmai.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/uniphier-pro4-ace.dts    | 2 +-
+ arch/arm/boot/dts/uniphier-pro4-sanji.dts  | 2 +-
+ arch/arm/boot/dts/uniphier-pxs2-gentil.dts | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r7s72100-genmai.dts b/arch/arm/boot/dts/r7s72100-genmai.dts
-index 52a7b586bac7..b0db621ff176 100644
---- a/arch/arm/boot/dts/r7s72100-genmai.dts
-+++ b/arch/arm/boot/dts/r7s72100-genmai.dts
-@@ -57,7 +57,7 @@
- 	clock-frequency = <400000>;
+diff --git a/arch/arm/boot/dts/uniphier-pro4-ace.dts b/arch/arm/boot/dts/uniphier-pro4-ace.dts
+index fefc89149234..b9a4919d7c93 100644
+--- a/arch/arm/boot/dts/uniphier-pro4-ace.dts
++++ b/arch/arm/boot/dts/uniphier-pro4-ace.dts
+@@ -88,7 +88,7 @@
+ 	status = "okay";
  
- 	eeprom at 50 {
--		compatible = "renesas,24c128";
-+		compatible = "renesas,24c128", "atmel,24c128";
- 		reg = <0x50>;
- 		pagesize = <64>;
+ 	eeprom at 54 {
+-		compatible = "st,24c64";
++		compatible = "st,24c64", "atmel,24c64";
+ 		reg = <0x54>;
+ 		pagesize = <32>;
+ 	};
+diff --git a/arch/arm/boot/dts/uniphier-pro4-sanji.dts b/arch/arm/boot/dts/uniphier-pro4-sanji.dts
+index 6c63c8bad825..3950baa8d55d 100644
+--- a/arch/arm/boot/dts/uniphier-pro4-sanji.dts
++++ b/arch/arm/boot/dts/uniphier-pro4-sanji.dts
+@@ -83,7 +83,7 @@
+ 	status = "okay";
+ 
+ 	eeprom at 54 {
+-		compatible = "st,24c64";
++		compatible = "st,24c64", "atmel,24c64";
+ 		reg = <0x54>;
+ 		pagesize = <32>;
+ 	};
+diff --git a/arch/arm/boot/dts/uniphier-pxs2-gentil.dts b/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
+index cccc86658d20..afba587ffbbc 100644
+--- a/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
++++ b/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
+@@ -80,7 +80,7 @@
+ 	status = "okay";
+ 
+ 	eeprom at 54 {
+-		compatible = "st,24c64";
++		compatible = "st,24c64", "atmel,24c64";
+ 		reg = <0x54>;
+ 		pagesize = <32>;
  	};
 -- 
 2.9.3
