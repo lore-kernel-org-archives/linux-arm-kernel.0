@@ -1,55 +1,94 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 15 Jun 2017 17:12:15 +0200
-Subject: [PATCH] nvmem: rockchip-efuse: add support for rk322x-efuse
-In-Reply-To: <1494557060-105230-1-git-send-email-finley.xiao@rock-chips.com>
-References: <1494557060-105230-1-git-send-email-finley.xiao@rock-chips.com>
-Message-ID: <2703081.pOfGv2HUEs@phil>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Thu, 15 Jun 2017 16:01:05 +0100
+Subject: [PATCH v6 7/8] arm64: dts: hikey960: add device node for pmic and
+ regulators
+In-Reply-To: <20170608220841.26531-8-guodong.xu@linaro.org>
+References: <20170608220841.26531-1-guodong.xu@linaro.org>
+ <20170608220841.26531-8-guodong.xu@linaro.org>
+Message-ID: <5942A131.9020607@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 12. Mai 2017, 10:44:20 CEST schrieb Finley Xiao:
-> This adds the necessary data for handling eFuse on the rk322x.
+Hi Guodong,
+
+On 2017/6/8 23:08, Guodong Xu wrote:
+> From: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
 > 
-> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+> add device node for hi6421 pmic core and hi6421v530
+> voltage regulator,include LDO(1,3,9,11,15,16)
+> 
+> Signed-off-by: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
+> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+Thanks!
+Acked-by: Wei Xu <xuwei5@hisilicon.com>
+
+So the whole patch set can be picked up by the Lee
+to avoid dependence issue.
+
+BR,
+Wei
+
 > ---
->  Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt | 1 +
->  drivers/nvmem/rockchip-efuse.c                             | 4 ++++
->  2 files changed, 5 insertions(+)
+>  arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 46 +++++++++++++++++++++++
+>  1 file changed, 46 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt b/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
-> index 94aeeea..194926f 100644
-> --- a/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
-> +++ b/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
-> @@ -4,6 +4,7 @@ Required properties:
->  - compatible: Should be one of the following.
->    - "rockchip,rk3066a-efuse" - for RK3066a SoCs.
->    - "rockchip,rk3188-efuse" - for RK3188 SoCs.
-> +  - "rockchip,rk322x-efuse" - for RK322x SoCs.
-
-should be rockchip,rk3228-efuse.
-
-While rk3228 and rk3229 are pratically the same soc, the compatible still
-shouldn't contain placeholders.
-
-
-Heiko
-
->    - "rockchip,rk3288-efuse" - for RK3288 SoCs.
->    - "rockchip,rk3399-efuse" - for RK3399 SoCs.
->  - reg: Should contain the registers location and exact eFuse size
-> diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
-> index 423907b..a0d4ede 100644
-> --- a/drivers/nvmem/rockchip-efuse.c
-> +++ b/drivers/nvmem/rockchip-efuse.c
-> @@ -170,6 +170,10 @@ static const struct of_device_id rockchip_efuse_match[] = {
->  		.data = (void *)&rockchip_rk3288_efuse_read,
->  	},
->  	{
-> +		.compatible = "rockchip,rk322x-efuse",
-> +		.data = (void *)&rockchip_rk3288_efuse_read,
-> +	},
-> +	{
->  		.compatible = "rockchip,rk3288-efuse",
->  		.data = (void *)&rockchip_rk3288_efuse_read,
->  	},
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+> index ca448f0..e579333 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+> +++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+> @@ -97,6 +97,52 @@
+>  			default-state = "off";
+>  		};
+>  	};
+> +
+> +	pmic: pmic at fff34000 {
+> +		compatible = "hisilicon,hi6421v530-pmic";
+> +		reg = <0x0 0xfff34000 0x0 0x1000>;
+> +		interrupt-controller;
+> +		#interrupt-cells = <2>;
+> +
+> +		regulators {
+> +			ldo3: LDO3 { /* HDMI */
+> +				regulator-name = "VOUT3_1V85";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <2200000>;
+> +				regulator-enable-ramp-delay = <120>;
+> +			};
+> +
+> +			ldo9: LDO9 { /* SDCARD I/O */
+> +				regulator-name = "VOUT9_1V8_2V95";
+> +				regulator-min-microvolt = <1750000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-enable-ramp-delay = <240>;
+> +			};
+> +
+> +			ldo11: LDO11 { /* Low Speed Connector */
+> +				regulator-name = "VOUT11_1V8_2V95";
+> +				regulator-min-microvolt = <1750000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-enable-ramp-delay = <240>;
+> +			};
+> +
+> +			ldo15: LDO15 { /* UFS VCC */
+> +				regulator-name = "VOUT15_3V0";
+> +				regulator-min-microvolt = <1750000>;
+> +				regulator-max-microvolt = <3000000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +				regulator-enable-ramp-delay = <120>;
+> +			};
+> +
+> +			ldo16: LDO16 { /* SD VDD */
+> +				regulator-name = "VOUT16_2V95";
+> +				regulator-min-microvolt = <1750000>;
+> +				regulator-max-microvolt = <3000000>;
+> +				regulator-enable-ramp-delay = <360>;
+> +			};
+> +		};
+> +	};
+>  };
+>  
+>  &i2c0 {
 > 
