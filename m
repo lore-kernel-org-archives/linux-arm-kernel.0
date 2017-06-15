@@ -1,94 +1,49 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Thu, 15 Jun 2017 16:01:05 +0100
-Subject: [PATCH v6 7/8] arm64: dts: hikey960: add device node for pmic and
- regulators
-In-Reply-To: <20170608220841.26531-8-guodong.xu@linaro.org>
-References: <20170608220841.26531-1-guodong.xu@linaro.org>
- <20170608220841.26531-8-guodong.xu@linaro.org>
-Message-ID: <5942A131.9020607@hisilicon.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 15 Jun 2017 17:28:36 +0200
+Subject: [RFT 1/2] pinctrl: samsung: Fix NULL pointer exception on
+ external interrupts on S3C24xx
+In-Reply-To: <44ca46f9-0607-d750-4f26-eab717518fd9@163.com>
+References: <20170614131828.28683-1-krzk@kernel.org>
+ <44ca46f9-0607-d750-4f26-eab717518fd9@163.com>
+Message-ID: <20170615152836.j6y4k4ydkterifii@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guodong,
-
-On 2017/6/8 23:08, Guodong Xu wrote:
-> From: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
+On Thu, Jun 15, 2017 at 10:42:30PM +0800, Yao Lihua wrote:
+> Hi Krzysztof,
 > 
-> add device node for hi6421 pmic core and hi6421v530
-> voltage regulator,include LDO(1,3,9,11,15,16)
-> 
-> Signed-off-by: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
-> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Another Oops on S3C6410.
 
-Thanks!
-Acked-by: Wei Xu <xuwei5@hisilicon.com>
+(...)
 
-So the whole patch set can be picked up by the Lee
-to avoid dependence issue.
+ > diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
+> > index f542642eed8d..a25c3ffae25c 100644
+> > --- a/drivers/pinctrl/samsung/pinctrl-samsung.c
+> > +++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
+> > @@ -1013,6 +1013,11 @@ samsung_pinctrl_get_soc_data(struct samsung_pinctrl_drv_data *d,
+> >   		bank->eint_base = virt_base[0];
+> >   		bank->pctl_base = virt_base[bdata->pctl_res_idx];
+> >   	}
+> > +	/*
+> > +	 * For legacy platforms which need to access IO memory through
+> > +	 * samsung_pinctrl_drv_data:
+> > +	 */
+> > +	d->virt_base = virt_base[bdata->pctl_res_idx];
+> > 
+>     for (i = 0; i < ctrl->nr_banks; ++i, ++bdata, ++bank) {
+>         ......
+>     }
+>     /*
+>      * For legacy platforms which need to access IO memory through
+>      * samsung_pinctrl_drv_data:
+>      */
+>     d->virt_base = virt_base[bdata->pctl_res_idx];
+>                                                     ^
+>                                                      **bdata** is invalid here.
 
-BR,
-Wei
+Ah, of course, apparently it worked in my case by coincidence. Thanks
+for spotting this.
 
-> ---
->  arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 46 +++++++++++++++++++++++
->  1 file changed, 46 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-> index ca448f0..e579333 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-> +++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-> @@ -97,6 +97,52 @@
->  			default-state = "off";
->  		};
->  	};
-> +
-> +	pmic: pmic at fff34000 {
-> +		compatible = "hisilicon,hi6421v530-pmic";
-> +		reg = <0x0 0xfff34000 0x0 0x1000>;
-> +		interrupt-controller;
-> +		#interrupt-cells = <2>;
-> +
-> +		regulators {
-> +			ldo3: LDO3 { /* HDMI */
-> +				regulator-name = "VOUT3_1V85";
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <2200000>;
-> +				regulator-enable-ramp-delay = <120>;
-> +			};
-> +
-> +			ldo9: LDO9 { /* SDCARD I/O */
-> +				regulator-name = "VOUT9_1V8_2V95";
-> +				regulator-min-microvolt = <1750000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-enable-ramp-delay = <240>;
-> +			};
-> +
-> +			ldo11: LDO11 { /* Low Speed Connector */
-> +				regulator-name = "VOUT11_1V8_2V95";
-> +				regulator-min-microvolt = <1750000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-enable-ramp-delay = <240>;
-> +			};
-> +
-> +			ldo15: LDO15 { /* UFS VCC */
-> +				regulator-name = "VOUT15_3V0";
-> +				regulator-min-microvolt = <1750000>;
-> +				regulator-max-microvolt = <3000000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +				regulator-enable-ramp-delay = <120>;
-> +			};
-> +
-> +			ldo16: LDO16 { /* SD VDD */
-> +				regulator-name = "VOUT16_2V95";
-> +				regulator-min-microvolt = <1750000>;
-> +				regulator-max-microvolt = <3000000>;
-> +				regulator-enable-ramp-delay = <360>;
-> +			};
-> +		};
-> +	};
->  };
->  
->  &i2c0 {
-> 
+
+Best regards,
+Krzysztof
