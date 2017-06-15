@@ -1,87 +1,98 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Wed, 14 Jun 2017 22:34:53 -0500
-Subject: [PATCH 00/17] coresight: next v4.12-rc4
-In-Reply-To: <20170614062229.GA28496@leoy-ThinkPad-T440>
-References: <1496693718-9191-1-git-send-email-mathieu.poirier@linaro.org>
- <20170609175339.28d1d4d5a6c91a9e16c16bf7@arm.com>
- <CANLsYky8XLbOwinxVc2xKaNzhkpUOX0NsNxrFF4=MsjzC3iY1g@mail.gmail.com>
- <20170613161712.f1f3cac734939d8728c7ed77@arm.com>
- <20170614062229.GA28496@leoy-ThinkPad-T440>
-Message-ID: <20170614223453.3357117a7f25ee68924a071c@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 15 Jun 2017 11:38:52 +0800
+Subject: [PATCH 1/2] RFC: ARM: dts: imx7d-sdb: remove 100k pull-down on
+ USDHCx clock
+In-Reply-To: <1496857542-32200-1-git-send-email-troy.kisky@boundarydevices.com>
+References: <1496857542-32200-1-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <20170615033851.GA5902@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 Jun 2017 14:22:29 +0800
-Leo Yan <leo.yan@linaro.org> wrote:
-
-> Hi Kim,
+On Wed, Jun 07, 2017 at 10:45:41AM -0700, Troy Kisky wrote:
+> No i.mx6q board uses a 100k pull-down on clock, why should i.mx7d ?
 > 
-> On Tue, Jun 13, 2017 at 04:17:12PM -0500, Kim Phillips wrote:
+> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+
+Add Dong and Frank who may help to confirm.
+
+Shawn
+
+> ---
+>  arch/arm/boot/dts/imx7d-sdb.dts | 14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
 > 
-> [...]
+> diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+> index 54c4540..cab9208 100644
+> --- a/arch/arm/boot/dts/imx7d-sdb.dts
+> +++ b/arch/arm/boot/dts/imx7d-sdb.dts
+> @@ -591,7 +591,7 @@
+>  		pinctrl_usdhc1: usdhc1grp {
+>  			fsl,pins = <
+>  				MX7D_PAD_SD1_CMD__SD1_CMD		0x59
+> -				MX7D_PAD_SD1_CLK__SD1_CLK		0x19
+> +				MX7D_PAD_SD1_CLK__SD1_CLK		0x09
+>  				MX7D_PAD_SD1_DATA0__SD1_DATA0		0x59
+>  				MX7D_PAD_SD1_DATA1__SD1_DATA1		0x59
+>  				MX7D_PAD_SD1_DATA2__SD1_DATA2		0x59
+> @@ -605,7 +605,7 @@
+>  		pinctrl_usdhc2: usdhc2grp {
+>  			fsl,pins = <
+>  				MX7D_PAD_SD2_CMD__SD2_CMD		0x59
+> -				MX7D_PAD_SD2_CLK__SD2_CLK		0x19
+> +				MX7D_PAD_SD2_CLK__SD2_CLK		0x09
+>  				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x59
+>  				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x59
+>  				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x59
+> @@ -616,7 +616,7 @@
+>  		pinctrl_usdhc2_100mhz: usdhc2grp_100mhz {
+>  			fsl,pins = <
+>  				MX7D_PAD_SD2_CMD__SD2_CMD		0x5a
+> -				MX7D_PAD_SD2_CLK__SD2_CLK		0x1a
+> +				MX7D_PAD_SD2_CLK__SD2_CLK		0x0a
+>  				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x5a
+>  				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x5a
+>  				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x5a
+> @@ -627,7 +627,7 @@
+>  		pinctrl_usdhc2_200mhz: usdhc2grp_200mhz {
+>  			fsl,pins = <
+>  				MX7D_PAD_SD2_CMD__SD2_CMD		0x5b
+> -				MX7D_PAD_SD2_CLK__SD2_CLK		0x1b
+> +				MX7D_PAD_SD2_CLK__SD2_CLK		0x0b
+>  				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x5b
+>  				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x5b
+>  				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x5b
+> @@ -639,7 +639,7 @@
+>  		pinctrl_usdhc3: usdhc3grp {
+>  			fsl,pins = <
+>  				MX7D_PAD_SD3_CMD__SD3_CMD		0x59
+> -				MX7D_PAD_SD3_CLK__SD3_CLK		0x19
+> +				MX7D_PAD_SD3_CLK__SD3_CLK		0x09
+>  				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x59
+>  				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x59
+>  				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x59
+> @@ -655,7 +655,7 @@
+>  		pinctrl_usdhc3_100mhz: usdhc3grp_100mhz {
+>  			fsl,pins = <
+>  				MX7D_PAD_SD3_CMD__SD3_CMD		0x5a
+> -				MX7D_PAD_SD3_CLK__SD3_CLK		0x1a
+> +				MX7D_PAD_SD3_CLK__SD3_CLK		0x0a
+>  				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x5a
+>  				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x5a
+>  				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x5a
+> @@ -671,7 +671,7 @@
+>  		pinctrl_usdhc3_200mhz: usdhc3grp_200mhz {
+>  			fsl,pins = <
+>  				MX7D_PAD_SD3_CMD__SD3_CMD		0x5b
+> -				MX7D_PAD_SD3_CLK__SD3_CLK		0x1b
+> +				MX7D_PAD_SD3_CLK__SD3_CLK		0x0b
+>  				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x5b
+>  				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x5b
+>  				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x5b
+> -- 
+> 2.7.4
 > 
-> > > > Also, do the current juno platforms not have CPU debug modules?  I'd
-> > > > like to test the new driver.
-> > > 
-> > > By all means - Leo pointed out the patch adding the CPU debug entries in
-> > > the DT  file for Juno.
-> > 
-> > Thanks, I applied it, was able to
-> > toggle /sys/kernel/debug/coresight_cpu_debug/enable, but wasn't sure
-> > how to trigger the cpu debug output...
 > 
-> You could trigger panic flow with command, then can see CPU debug output:
-> echo c > /proc/sysrq-trigger
-
-That worked, thanks.
-
-The coresight CPU debug documentation states:
-
-> At the runtime you can disable idle states with below methods:
-> 
-> Set latency request to /dev/cpu_dma_latency to disable all CPUs specific idle
-> states (if latency = 0uS then disable all idle states):
-> # echo "what_ever_latency_you_need_in_uS" > /dev/cpu_dma_latency
-> 
-> Disable specific CPU's specific idle state:
-> # echo 1 > /sys/devices/system/cpu/cpu$cpu/cpuidle/state$state/disable
-
-So I tried two values in /dev/cpu_dma_latency and expected a difference
-in the per-cpu latency files, but didn't observe it:
-
-root at juno:~# echo 0 > /dev/cpu_dma_latency
-root at juno:~# more /sys/devices/system/cpu/cpu2/cpuidle*/state*/*laten*
-::::::::::::::
-/sys/devices/system/cpu/cpu2/cpuidle/state0/latency
-::::::::::::::
-1
-::::::::::::::
-/sys/devices/system/cpu/cpu2/cpuidle/state1/latency
-::::::::::::::
-1500
-::::::::::::::
-/sys/devices/system/cpu/cpu2/cpuidle/state2/latency
-::::::::::::::
-1600
-root at juno:~# echo 1500 > /dev/cpu_dma_latency
-root at juno:~# more /sys/devices/system/cpu/cpu2/cpuidle*/state*/*laten*
-::::::::::::::
-/sys/devices/system/cpu/cpu2/cpuidle/state0/latency
-::::::::::::::
-1
-::::::::::::::
-/sys/devices/system/cpu/cpu2/cpuidle/state1/latency
-::::::::::::::
-1500
-::::::::::::::
-/sys/devices/system/cpu/cpu2/cpuidle/state2/latency
-::::::::::::::
-1600
-root at juno:~# cat /sys/kernel/debug/coresight_cpu_debug/enable
-1
-
-How does one tell whether writes to /dev/cpu_dma_latency are effective?
-
-Thanks,
-
-Kim
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
