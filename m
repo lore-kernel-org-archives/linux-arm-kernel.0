@@ -1,53 +1,56 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 15 Jun 2017 22:52:59 +0200
-Subject: [PATCH] clockevents/tcb_clksrc: implement suspend/resume
-In-Reply-To: <20170615194044.6x6c6icnsrxgpscv@piout.net>
-References: <20170411154826.5883-1-alexandre.belloni@free-electrons.com>
- <7100599f-529a-7d56-f43f-01513293d313@linaro.org>
- <20170615194044.6x6c6icnsrxgpscv@piout.net>
-Message-ID: <77f1998e-03c5-f1ca-b1c3-ece2f3052683@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 15 Jun 2017 14:00:20 -0700
+Subject: [PATCH 2/2 v4] clk: Add Gemini SoC clock controller
+In-Reply-To: <CACRpkdY+aSyec9PZaoXErzsRefWg2zzw1xihQt_whmote-jBBw@mail.gmail.com>
+References: <20170524082044.8473-1-linus.walleij@linaro.org>
+ <20170601070208.GO20170@codeaurora.org>
+ <CACRpkdZv8MzXVecEXVdJ+P0MxVscYSy=MxC-yQAR0S4yQ6-rwQ@mail.gmail.com>
+ <20170605195812.GH20170@codeaurora.org>
+ <CACRpkdbya9xaN-i7AkG0bTyuFYfZc59sSTYhWB43=9btSKfPpQ@mail.gmail.com>
+ <CACRpkdapAgHix2vw-woDFi4sh+H3_EX7w-5q=opBGMyegFrXbA@mail.gmail.com>
+ <20170612210248.GP20170@codeaurora.org>
+ <CACRpkdaZJbzC0-xg_go=-o+0cQ-JOY3mUe27HUnwQ+DnZYbyMA@mail.gmail.com>
+ <CAMuHMdXdYNTLCUfQ9rdj8Fffff5G6fGREcHs5-E5LbwPU9yyLw@mail.gmail.com>
+ <CACRpkdY+aSyec9PZaoXErzsRefWg2zzw1xihQt_whmote-jBBw@mail.gmail.com>
+Message-ID: <20170615210020.GG20170@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/06/2017 21:40, Alexandre Belloni wrote:
-> On 14/04/2017 at 21:13:36 +0200, Daniel Lezcano wrote:
->>> +void tc_clksrc_resume(struct clocksource *cs)
->>> +{
->>> +	int i;
->>> +
->>> +	for (i = 0; i < 3; i++) {
->>
->> s/3/ARRAY_SIZE(tcb_cache)/
->>
->>> +		__raw_writel(tcb_cache[i].cmr, tcaddr + ATMEL_TC_REG(i, CMR));
->>
->> Why __raw_writel?
->>
+On 06/15, Linus Walleij wrote:
+> On Thu, Jun 15, 2017 at 10:55 AM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
 > 
-> Ok, I got to the bottom of that question and I think it is worth
-> answering it. __raw_{read,write}l were necessary to make the driver work
-> on AVR32, because its core is BE and the IP LE and the regular
-> readl/writel are (were) not doing the proper conversion.
+> > If clocks and resets are provided by the same hardware module, you can
+> > have a single (platform) driver registering both the clock and reset
+> > controllers.
+> > Cfr. drivers/clk/renesas/renesas-cpg-mssr.c.
 > 
-> This was supposed to be changed in a patch that was never applied:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/331775.html
+> That is indeed an option.
 > 
-> But everything is fine, as AVR32 is now removed from the kernel. I think
-> I'll switch the driver to regular readl/writel, using the _relaxed
-> version in the hot path. Is that fine for you?
+> So I would say, clk & reset maintainers: would you prefer that I merge the
+> reset control into the clock driver as well, ask Philipp to drop the pending
+> reset control patches from his subsystem tree and have you manage the
+> combined driver and bindings?
+> 
+> It seems to me as very ugly from a divide & conquer subsystem and file
+> split point of view.
+> 
+> I seems elegant from the "make clocks a platform device" point of view.
+> 
+> I am happy with either approach as long as it works.
+> 
+> I guess it is up to the taste of the subsystem maintainers, especially
+> clk.
+> 
+> If I get some time I might just hack this up and send the patches so
+> it is on the table as an alternative to the current v5 patch. Certainly it is
+> better than going back and augmenting the DT bindings.
+> 
 
-Yes.
-
-> I'll also do so in the rework if at some point we can agree on some
-> bindings, I'll try to address that soon too.
-
-Ok, thanks.
-
-  -- Daniel
+We have quite a few clock and reset controllers that put their
+drivers into the clk directory. I don't see any problem with that
+approach.
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
