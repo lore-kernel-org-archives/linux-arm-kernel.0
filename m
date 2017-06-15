@@ -1,103 +1,504 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Thu, 15 Jun 2017 18:01:02 +0000
-Subject: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO
- devices before scanning
-In-Reply-To: <20170613200339.GX3187@lahna.fi.intel.com>
-References: <1495712248-5232-1-git-send-email-gabriele.paoloni@huawei.com>
- <1495712248-5232-6-git-send-email-gabriele.paoloni@huawei.com>
- <20170530132408.GA2556@red-moon>
- <EE11001F9E5DDD47B7634E2F8A612F2E40A7B677@FRAEML521-MBX.china.huawei.com>
- <20170606085553.GA20085@red-moon> <20170612155700.GA31930@red-moon>
- <20170613084831.GP3187@lahna.fi.intel.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40AAE3DA@FRAEML521-MBX.china.huawei.com>
- <20170613151013.GT3187@lahna.fi.intel.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40AAF0BF@FRAEML521-MBX.china.huawei.com>
- <20170613200339.GX3187@lahna.fi.intel.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E40AB537A@FRAEML521-MBX.china.huawei.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Thu, 15 Jun 2017 13:48:21 -0500
+Subject: [PATCH 1/2] remoteproc: Add remote processor coredump support
+In-Reply-To: <1497463616-19868-1-git-send-email-spjoshi@codeaurora.org>
+References: <1497463616-19868-1-git-send-email-spjoshi@codeaurora.org>
+Message-ID: <0c2fe4e0-2aee-fcf4-0a49-5651241e1f9e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mika
+Hi Sarangdhar,
 
-> -----Original Message-----
-> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
-> owner at vger.kernel.org] On Behalf Of Mika Westerberg
-> Sent: 13 June 2017 21:04
-> To: Gabriele Paoloni
-> Cc: Lorenzo Pieralisi; rafael at kernel.org; Rafael J. Wysocki;
-> catalin.marinas at arm.com; will.deacon at arm.com; robh+dt at kernel.org;
-> frowand.list at gmail.com; bhelgaas at google.com; arnd at arndb.de; linux-arm-
-> kernel at lists.infradead.org; mark.rutland at arm.com;
-> brian.starkey at arm.com; olof at lixom.net; benh at kernel.crashing.org; linux-
-> kernel at vger.kernel.org; linux-acpi at vger.kernel.org; Linuxarm; linux-
-> pci at vger.kernel.org; minyard at acm.org; John Garry; xuwei (O)
-> Subject: Re: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO
-> devices before scanning
+On 06/14/2017 01:06 PM, Sarangdhar Joshi wrote:
+> The remoteproc framework shuts down and immediately restarts the
+> remote processor after fatal events (such as when remote crashes)
+> during the recovery path. 
+
+This is the case in production systems, but your statement is not 
+entirely accurate. Have you looked at the remoteproc debugfs 'recovery' 
+variable? You can actually halt the recovery and can do some debugging 
+analysis at the point of failure.
+
+ > This makes it lose the state of the
+> remote firmware at the point of failure, making it harder to debug
+> such events.
 > 
-> On Tue, Jun 13, 2017 at 07:01:38PM +0000, Gabriele Paoloni wrote:
-> > I am not very familiar with Linux MFD however the main issue here is
-> that
-> > 1) for IPMI we want to re-use the standard IPMI driver without
-> touching it:
-> >    see
-> >
-> >    static const struct acpi_device_id acpi_ipmi_match[] = {
-> >          { "IPI0001", 0 },
-> >          { },
-> >    };
-> >
-> >    in "drivers/char/ipmi/ipmi_si_intf.c" (and in general any standard
-> driver
-> >    of an LPC child)
-> >
-> > 2) We need a way to guarantee that all LPC children are not
-> enumerated
-> >    by acpi_default_enumeration() (so for example if an ipmi node is
-> an LPC#
-> >    child it should not be enumerated, otherwise it should be)
-> >    Currently acpi_default_enumeration() skips spi/i2c slaves by
-> checking:
-> >    1) if the acpi resource type is a serial bus
-> >    2) if the type of serial bus descriptor is I2C or SPI
-> >
-> >    For LPC we cannot leverage on any ACPI property to "recognize"
-> that our
-> >    devices are LPC children; hence before I proposed for
-> acpi_default_enumeration()
-> >    to skip devices that have already been enumerated (by calling
-> >    acpi_device_enumerated() ).
-> >
-> > So in the current scenario, how do you think that MFD can help?
+> This patch introduces a mechanism for extracting the memory
+> contents(where the firmware was loaded) after the remote has stopped
+> and before the restart sequence has begun in the recovery path. The
+> remoteproc framework stores the dump segments information and uses
+> devcoredump interface to read the memory contents for each of the
+> segments.
 > 
-> If you look at Documentation/acpi/enumeration.txt there is a chapter
-> "MFD devices". I think it pretty much maches what you have here. An LPC
-> device (MFD device) and bunch of child devices. The driver for your LPC
-> device can specify _HID for each child device. Those are then mached by
-> the MFD ACPI code to the corresponding ACPI nodes from which platform
-> devices are created including "IPI0001".
+> The devcoredump device provides a sysfs interface
+> /sys/class/remoteproc/remoteproc*/devcoredump/data that could be used
+> to read this memory contents. This device will be removed either by
+> writing to the data node or after a timeout of 5 minutes as defined in
+> the devcoredump.c. This feature could be disabled by writing 1 to the
+> disabled file under /sys/class/devcoredump/.
 
-So I guess here in the LPC driver I would have an MFD cell for IPMI. I.e.:
-
-	static struct mfd_cell_acpi_match hisi_lpc_ipmi_acpi_match = {
-		.pnpid = "IPI0001",
-	};
-
-correct?
+Nice concept using the devcoredump, but need some changes to be generic. 
+Please see below based on my quick review.
 
 > 
-> It causes acpi_default_enumeration() to be called but it should be fine
-> as we are dealing with platform device anyway.
+> Signed-off-by: Sarangdhar Joshi <spjoshi@codeaurora.org>
+> ---
+>   drivers/remoteproc/qcom_common.c         |  42 ++++++++
+>   drivers/remoteproc/qcom_common.h         |   2 +
+>   drivers/remoteproc/remoteproc_core.c     | 168 +++++++++++++++++++++++++++++++
+>   drivers/remoteproc/remoteproc_internal.h |  11 ++
+>   drivers/soc/qcom/mdt_loader.c            |   3 +-
+>   include/linux/remoteproc.h               |  21 ++++
+>   include/linux/soc/qcom/mdt_loader.h      |   1 +
 
-I do not quite understand how declaring such MFD cell above would make sure
-that the LPC probe is called before the IPMI device is enumerated...
+Please add a cover-letter and summarize your changes when submitting 
+multiple patches. Also, split this patch to add the framework to 
+remoteproc core first and then adding the support to your platform 
+driver in separate patch(es).
 
-Could you point me to the code that does this?
-
-Many Thanks
-Gab
-
+>   7 files changed, 247 insertions(+), 1 deletion(-)
 > 
-> Once the platform device is created your ipmi driver will be probed by
-> the driver core.
+> diff --git a/drivers/remoteproc/qcom_common.c b/drivers/remoteproc/qcom_common.c
+> index bb90481..c68368a 100644
+> --- a/drivers/remoteproc/qcom_common.c
+> +++ b/drivers/remoteproc/qcom_common.c
+> @@ -20,6 +20,7 @@
+>   #include <linux/module.h>
+>   #include <linux/remoteproc.h>
+>   #include <linux/rpmsg/qcom_smd.h>
+> +#include <linux/soc/qcom/mdt_loader.h>
+>   
+>   #include "remoteproc_internal.h"
+>   #include "qcom_common.h"
+> @@ -45,6 +46,47 @@ struct resource_table *qcom_mdt_find_rsc_table(struct rproc *rproc,
+>   }
+>   EXPORT_SYMBOL_GPL(qcom_mdt_find_rsc_table);
+>   
+> +/**
+> + * qcom_register_dump_segments() - register segments with remoteproc
+> + * framework for coredump collection
+> + *
+> + * @rproc:	remoteproc handle
+> + * @fw:		firmware header
+> + *
+> + * returns 0 on success, negative error code otherwise.
+> + */
+> +int qcom_register_dump_segments(struct rproc *rproc,
+> +				const struct firmware *fw)
+> +{
+> +	struct rproc_dump_segment *segment;
+> +	const struct elf32_phdr *phdrs;
+> +	const struct elf32_phdr *phdr;
+> +	const struct elf32_hdr *ehdr;
+> +	int i;
+> +
+> +	ehdr = (struct elf32_hdr *)fw->data;
+> +	phdrs = (struct elf32_phdr *)(ehdr + 1);
+> +
+> +	for (i = 0; i < ehdr->e_phnum; i++) {
+> +		phdr = &phdrs[i];
+> +
+> +		if (!mdt_phdr_valid(phdr))
+> +			continue;
+> +
+> +		segment = kzalloc(sizeof(*segment), GFP_KERNEL);
+> +		if (!segment)
+> +			return -ENOMEM;
+> +
+> +		segment->da = phdr->p_paddr;
+> +		segment->size = phdr->p_memsz;
+> +
+> +		list_add_tail(&segment->node, &rproc->dump_segments);
+> +	}
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(qcom_register_dump_segments);
+> +
+>   static int smd_subdev_probe(struct rproc_subdev *subdev)
+>   {
+>   	struct qcom_rproc_subdev *smd = to_smd_subdev(subdev);
+> diff --git a/drivers/remoteproc/qcom_common.h b/drivers/remoteproc/qcom_common.h
+> index db5c826..f658da9 100644
+> --- a/drivers/remoteproc/qcom_common.h
+> +++ b/drivers/remoteproc/qcom_common.h
+> @@ -16,6 +16,8 @@ struct resource_table *qcom_mdt_find_rsc_table(struct rproc *rproc,
+>   					       const struct firmware *fw,
+>   					       int *tablesz);
+>   
+> +int qcom_register_dump_segments(struct rproc *rproc, const struct firmware *fw);
+> +
+>   void qcom_add_smd_subdev(struct rproc *rproc, struct qcom_rproc_subdev *smd);
+>   void qcom_remove_smd_subdev(struct rproc *rproc, struct qcom_rproc_subdev *smd);
+>   
+> diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+> index 369ba0f..23bf452 100644
+> --- a/drivers/remoteproc/remoteproc_core.c
+> +++ b/drivers/remoteproc/remoteproc_core.c
+> @@ -33,6 +33,7 @@
+>   #include <linux/firmware.h>
+>   #include <linux/string.h>
+>   #include <linux/debugfs.h>
+> +#include <linux/devcoredump.h>
+>   #include <linux/remoteproc.h>
+>   #include <linux/iommu.h>
+>   #include <linux/idr.h>
+> @@ -93,6 +94,21 @@ static int rproc_iommu_fault(struct iommu_domain *domain, struct device *dev,
+>   	return -ENOSYS;
+>   }
+>   
+> +/**
+> + * rproc_unregister_segments() - clean up the segment entries from
+> + * dump_segments list
+> + * @rproc: the remote processor handle
+> + */
+> +static void rproc_unregister_segments(struct rproc *rproc)
+> +{
+> +	struct rproc_dump_segment *entry, *tmp;
+> +
+> +	list_for_each_entry_safe(entry, tmp, &rproc->dump_segments, node) {
+> +		list_del(&entry->node);
+> +		kfree(entry);
+> +	}
+> +}
+> +
+>   static int rproc_enable_iommu(struct rproc *rproc)
+>   {
+>   	struct iommu_domain *domain;
+> @@ -867,6 +883,12 @@ static int rproc_start(struct rproc *rproc, const struct firmware *fw)
+>   		return ret;
+>   	}
+>   
+> +	ret = rproc_register_segments(rproc, fw);
+> +	if (ret) {
+> +		dev_err(dev, "Failed to register coredump segments: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+>   	/*
+>   	 * The starting device has been given the rproc->cached_table as the
+>   	 * resource table. The address of the vring along with the other
+> @@ -975,6 +997,7 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
+>   	rproc->cached_table = NULL;
+>   	rproc->table_ptr = NULL;
+>   
+> +	rproc_unregister_segments(rproc);
+>   	rproc_disable_iommu(rproc);
+>   	return ret;
+>   }
+> @@ -1039,6 +1062,139 @@ static int rproc_stop(struct rproc *rproc)
+>   	return 0;
+>   }
+>   
+> +static ssize_t rproc_coredump_dump(char *buffer, loff_t offset, size_t count,
+> +				   void *data, size_t datalen)
+> +{
+> +	struct rproc *rproc = (struct rproc *)data;
+> +	struct rproc_dump_segment *segment;
+> +	char *header = rproc->dump_header;
+> +	bool out_of_range = true;
+> +	size_t adj_offset;
+> +	void *ptr;
+> +
+> +	if (!count)
+> +		return 0;
+> +
+> +	if (offset < rproc->dump_header_size) {
+> +		if (count > rproc->dump_header_size - offset)
+> +			count = rproc->dump_header_size - offset;
+> +
+> +		memcpy(buffer, header + offset, count);
+> +		return count;
+> +	}
+> +
+> +	adj_offset = offset - rproc->dump_header_size;
+> +
+> +	list_for_each_entry(segment, &rproc->dump_segments, node) {
+> +		if (adj_offset < segment->size) {
+> +			out_of_range = false;
+> +			break;
+> +		}
+> +		adj_offset -= segment->size;
+> +	}
+> +
+> +	/* check whether it's the end of the list */
+> +	if (out_of_range) {
+> +		dev_info(&rproc->dev, "read offset out of range\n");
+> +		return 0;
+> +	}
+> +
+> +	if (count > (segment->size - adj_offset))
+> +		count = segment->size - adj_offset;
+> +
+> +	ptr = rproc_da_to_va(rproc, segment->da, segment->size);
+> +	if (!ptr) {
+> +		dev_err(&rproc->dev, "segment addr outside memory range\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	memcpy(buffer, ptr + adj_offset, count);
+> +	return count;
+> +}
+> +
+> +/**
+> + * rproc_coredump_free() - complete the dump_complete completion
+> + * @data:	rproc handle
+> + *
+> + * This callback will be called when there occurs a write to the
+> + * data node on devcoredump or after the devcoredump timeout.
+> + */
+> +static void rproc_coredump_free(void *data)
+> +{
+> +	struct rproc *rproc = (struct rproc *)data;
+> +
+> +	complete_all(&rproc->dump_complete);
+> +
+> +	/*
+> +	 *  We do not need to free the dump_header data here.
+> +	 *  We already do it after completing dump_complete
+> +	 */
+> +}
+> +
+> +/**
+> + * rproc_coredump_add_header() - add the coredump header information
+> + * @rproc:	rproc handle
+> + *
+> + * Returns 0 on success, negative errno otherwise.
+> + *
+> + * This function creates a devcoredump device associated with rproc
+> + * and registers the read() and free() callbacks with this device.
+> + */
+> +static int rproc_coredump_add_header(struct rproc *rproc)
+> +{
+> +	struct rproc_dump_segment *entry;
+> +	struct elf32_phdr *phdr;
+> +	struct elf32_hdr *ehdr;
+> +	int nsegments = 0;
+> +	size_t offset;
+> +
+> +	list_for_each_entry(entry, &rproc->dump_segments, node)
+> +		nsegments++;
+> +
+> +	rproc->dump_header_size = sizeof(*ehdr) + sizeof(*phdr) * nsegments;
+> +	ehdr = kzalloc(rproc->dump_header_size, GFP_KERNEL);
+> +	rproc->dump_header = (char *)ehdr;
+> +	if (!rproc->dump_header)
+> +		return -ENOMEM;
+> +
+> +	memcpy(ehdr->e_ident, ELFMAG, SELFMAG);
+> +	ehdr->e_ident[EI_CLASS] = ELFCLASS32;
+> +	ehdr->e_ident[EI_DATA] = ELFDATA2LSB;
+> +	ehdr->e_ident[EI_VERSION] = EV_CURRENT;
+> +	ehdr->e_ident[EI_OSABI] = ELFOSABI_NONE;
+> +	ehdr->e_type = ET_CORE;
+> +	ehdr->e_version = EV_CURRENT;
+> +	ehdr->e_phoff = sizeof(*ehdr);
+> +	ehdr->e_ehsize = sizeof(*ehdr);
+> +	ehdr->e_phentsize = sizeof(*phdr);
+> +	ehdr->e_phnum = nsegments;
+> +
+> +	offset = rproc->dump_header_size;
+> +	phdr = (struct elf32_phdr *)(ehdr + 1);
+> +	list_for_each_entry(entry, &rproc->dump_segments, node) {
+> +		phdr->p_type = PT_LOAD;
+> +		phdr->p_offset = offset;
+> +		phdr->p_vaddr = phdr->p_paddr = entry->da;
+> +		phdr->p_filesz = phdr->p_memsz = entry->size;
+> +		phdr->p_flags = PF_R | PF_W | PF_X;
+> +		phdr->p_align = 0;
+> +		offset += phdr->p_filesz;
+> +		phdr++;
+> +	}
+> +
+> +	dev_coredumpm(&rproc->dev, NULL, (void *)rproc, rproc->dump_header_size,
+
+Why are you passing NULL for the owner?
+
+> +		      GFP_KERNEL, rproc_coredump_dump, rproc_coredump_free);
+> +
+> +	wait_for_completion_interruptible(&rproc->dump_complete);
+
+Hmm, is this holding up the recovery? I see this is signaled only in 
+rproc_coredump_free()? You are doing this inline during the recovery or 
+am I missing something?
+
+> +
+> +	/* clean up the resources */
+> +	kfree(rproc->dump_header);
+> +	rproc->dump_header = NULL;
+> +	rproc_unregister_segments(rproc);
+> +
+> +	return 0;
+> +}
+
+This is not generic, remoteproc core can support non-ELF images, and the 
+choice of fw_ops is left to individual platform drivers. The dump logic 
+is dependent on the particular format being used, and so whatever ELF 
+coredump support you are adding should be added through a fw_ops. You 
+can add a default one for regular ELFs, and platform drivers can always 
+customized based on thier own fw_ops.
+
+> +
+>   /**
+>    * rproc_trigger_recovery() - recover a remoteproc
+>    * @rproc: the remote processor
+> @@ -1057,6 +1213,7 @@ int rproc_trigger_recovery(struct rproc *rproc)
+>   
+>   	dev_err(dev, "recovering %s\n", rproc->name);
+>   
+> +	init_completion(&rproc->dump_complete);
+>   	init_completion(&rproc->crash_comp);
+>   
+>   	ret = mutex_lock_interruptible(&rproc->lock);
+> @@ -1070,6 +1227,13 @@ int rproc_trigger_recovery(struct rproc *rproc)
+>   	/* wait until there is no more rproc users */
+>   	wait_for_completion(&rproc->crash_comp);
+>   
+> +	/* set up the coredump */
+> +	ret = rproc_coredump_add_header(rproc);
+> +	if (ret) {
+> +		dev_err(dev, "setting up the coredump failed: %d\n", ret);
+> +		goto unlock_mutex;
+> +	}
+> +
+>   	/* load firmware */
+>   	ret = request_firmware(&firmware_p, rproc->firmware, dev);
+>   	if (ret < 0) {
+> @@ -1234,6 +1398,8 @@ void rproc_shutdown(struct rproc *rproc)
+>   	/* clean up all acquired resources */
+>   	rproc_resource_cleanup(rproc);
+>   
+> +	rproc_unregister_segments(rproc);
+> +
+>   	rproc_disable_iommu(rproc);
+>   
+>   	/* Free the copy of the resource table */
+> @@ -1465,8 +1631,10 @@ struct rproc *rproc_alloc(struct device *dev, const char *name,
+>   	INIT_LIST_HEAD(&rproc->traces);
+>   	INIT_LIST_HEAD(&rproc->rvdevs);
+>   	INIT_LIST_HEAD(&rproc->subdevs);
+> +	INIT_LIST_HEAD(&rproc->dump_segments);
+>   
+>   	INIT_WORK(&rproc->crash_handler, rproc_crash_handler_work);
+> +	init_completion(&rproc->dump_complete);
+>   	init_completion(&rproc->crash_comp);
+>   
+>   	rproc->state = RPROC_OFFLINE;
+> diff --git a/drivers/remoteproc/remoteproc_internal.h b/drivers/remoteproc/remoteproc_internal.h
+> index 1e9e5b3..273b111 100644
+> --- a/drivers/remoteproc/remoteproc_internal.h
+> +++ b/drivers/remoteproc/remoteproc_internal.h
+> @@ -43,6 +43,8 @@ struct rproc_fw_ops {
+>   	int (*load)(struct rproc *rproc, const struct firmware *fw);
+>   	int (*sanity_check)(struct rproc *rproc, const struct firmware *fw);
+>   	u32 (*get_boot_addr)(struct rproc *rproc, const struct firmware *fw);
+> +	int (*register_segments)(struct rproc *rproc,
+> +				 const struct firmware *fw);
+>   };
+>   
+>   /* from remoteproc_core.c */
+> @@ -94,6 +96,15 @@ u32 rproc_get_boot_addr(struct rproc *rproc, const struct firmware *fw)
+>   }
+>   
+>   static inline
+> +int rproc_register_segments(struct rproc *rproc, const struct firmware *fw)
+> +{
+> +	if (rproc->fw_ops->register_segments)
+> +		return rproc->fw_ops->register_segments(rproc, fw);
+> +
+> +	return 0;
+> +}
+> +
+> +static inline
+>   int rproc_load_segments(struct rproc *rproc, const struct firmware *fw)
+>   {
+>   	if (rproc->fw_ops->load)
+> diff --git a/drivers/soc/qcom/mdt_loader.c b/drivers/soc/qcom/mdt_loader.c
+> index b4a30fc..bd227bb 100644
+> --- a/drivers/soc/qcom/mdt_loader.c
+> +++ b/drivers/soc/qcom/mdt_loader.c
+> @@ -25,7 +25,7 @@
+>   #include <linux/slab.h>
+>   #include <linux/soc/qcom/mdt_loader.h>
+>   
+> -static bool mdt_phdr_valid(const struct elf32_phdr *phdr)
+> +bool mdt_phdr_valid(const struct elf32_phdr *phdr)
+>   {
+>   	if (phdr->p_type != PT_LOAD)
+>   		return false;
+> @@ -38,6 +38,7 @@ static bool mdt_phdr_valid(const struct elf32_phdr *phdr)
+>   
+>   	return true;
+>   }
+> +EXPORT_SYMBOL_GPL(mdt_phdr_valid);
+>   
+>   /**
+>    * qcom_mdt_get_size() - acquire size of the memory region needed to load mdt
+> diff --git a/include/linux/remoteproc.h b/include/linux/remoteproc.h
+> index 81da495..73c2f69 100644
+> --- a/include/linux/remoteproc.h
+> +++ b/include/linux/remoteproc.h
+> @@ -382,6 +382,19 @@ enum rproc_crash_type {
+>   };
+>   
+>   /**
+> + * struct rproc_dump_segment - segment info from ELF header
+
+remoteproc core does have support for non-ELF firmwares as well.
+
+> + * @node: list node related to the rproc segment list
+> + * @da	: address of the segment from the header
+
+additional whitepace/tab not required
+
+> + * @size: size of the segment from the header
+> + */
+> +struct rproc_dump_segment {
+> +	struct list_head node;
+> +
+
+no need of the blank line.
+
+> +	phys_addr_t da;
+> +	phys_addr_t size;
+> +};
+> +
+> +/**
+>    * struct rproc - represents a physical remote processor device
+>    * @node: list node of this rproc object
+>    * @domain: iommu domain
+> @@ -412,6 +425,10 @@ enum rproc_crash_type {
+>    * @table_ptr: pointer to the resource table in effect
+>    * @cached_table: copy of the resource table
+>    * @has_iommu: flag to indicate if remote processor is behind an MMU
+> + * @dump_segments: list of segments in the firmware
+> + * @dump_header: memory location that points to the header information
+> + * @dump_header_size: size of the allocated memory for header
+> + * @dump_complete: completion to track memory dump of segments
+>    */
+>   struct rproc {
+>   	struct list_head node;
+> @@ -444,6 +461,10 @@ struct rproc {
+>   	struct resource_table *cached_table;
+>   	bool has_iommu;
+>   	bool auto_boot;
+> +	struct list_head dump_segments;
+> +	void *dump_header;
+> +	size_t dump_header_size;
+> +	struct completion dump_complete;
+>   };
+>   
+>   /**
+> diff --git a/include/linux/soc/qcom/mdt_loader.h b/include/linux/soc/qcom/mdt_loader.h
+> index ea021b3..33ea322 100644
+> --- a/include/linux/soc/qcom/mdt_loader.h
+> +++ b/include/linux/soc/qcom/mdt_loader.h
+> @@ -10,6 +10,7 @@
+>   struct device;
+>   struct firmware;
+>   
+> +bool mdt_phdr_valid(const struct elf32_phdr *phdr);
+>   ssize_t qcom_mdt_get_size(const struct firmware *fw);
+>   int qcom_mdt_load(struct device *dev, const struct firmware *fw,
+>   		  const char *fw_name, int pas_id, void *mem_region,
 > 
-> Does that make sense?
