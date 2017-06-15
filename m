@@ -1,93 +1,137 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 15 Jun 2017 11:38:52 +0800
-Subject: [PATCH 1/2] RFC: ARM: dts: imx7d-sdb: remove 100k pull-down on
- USDHCx clock
-In-Reply-To: <1496857542-32200-1-git-send-email-troy.kisky@boundarydevices.com>
+Date: Thu, 15 Jun 2017 11:39:36 +0800
+Subject: [PATCH 2/2] RFC: ARM: dts: imx7d-sdb: swap pad settings for
+ USDHCx 50Mhz and 100Mhz
+In-Reply-To: <1496857542-32200-2-git-send-email-troy.kisky@boundarydevices.com>
 References: <1496857542-32200-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <20170615033851.GA5902@dragon>
+ <1496857542-32200-2-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <20170615033935.GB5902@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 07, 2017 at 10:45:41AM -0700, Troy Kisky wrote:
-> No i.mx6q board uses a 100k pull-down on clock, why should i.mx7d ?
+On Wed, Jun 07, 2017 at 10:45:42AM -0700, Troy Kisky wrote:
+> It does not make sense that 100 Mhz pad settings would use a x2
+> setting and 50 Mhz would use a x4 setting, so swap.
 > 
 > Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 
-Add Dong and Frank who may help to confirm.
+Add Dong and Frank for this one as well.
 
 Shawn
 
 > ---
->  arch/arm/boot/dts/imx7d-sdb.dts | 14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
+>  arch/arm/boot/dts/imx7d-sdb.dts | 72 ++++++++++++++++++++---------------------
+>  1 file changed, 36 insertions(+), 36 deletions(-)
 > 
 > diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
-> index 54c4540..cab9208 100644
+> index cab9208..70dcbf4 100644
 > --- a/arch/arm/boot/dts/imx7d-sdb.dts
 > +++ b/arch/arm/boot/dts/imx7d-sdb.dts
-> @@ -591,7 +591,7 @@
+> @@ -590,31 +590,20 @@
+>  
 >  		pinctrl_usdhc1: usdhc1grp {
 >  			fsl,pins = <
->  				MX7D_PAD_SD1_CMD__SD1_CMD		0x59
-> -				MX7D_PAD_SD1_CLK__SD1_CLK		0x19
-> +				MX7D_PAD_SD1_CLK__SD1_CLK		0x09
->  				MX7D_PAD_SD1_DATA0__SD1_DATA0		0x59
->  				MX7D_PAD_SD1_DATA1__SD1_DATA1		0x59
->  				MX7D_PAD_SD1_DATA2__SD1_DATA2		0x59
-> @@ -605,7 +605,7 @@
+> -				MX7D_PAD_SD1_CMD__SD1_CMD		0x59
+> -				MX7D_PAD_SD1_CLK__SD1_CLK		0x09
+> -				MX7D_PAD_SD1_DATA0__SD1_DATA0		0x59
+> -				MX7D_PAD_SD1_DATA1__SD1_DATA1		0x59
+> -				MX7D_PAD_SD1_DATA2__SD1_DATA2		0x59
+> -				MX7D_PAD_SD1_DATA3__SD1_DATA3		0x59
+> -				MX7D_PAD_SD1_CD_B__GPIO5_IO0		0x59 /* CD */
+> -				MX7D_PAD_SD1_WP__GPIO5_IO1		0x59 /* WP */
+> -				MX7D_PAD_SD1_RESET_B__GPIO5_IO2		0x59 /* vmmc */
+> +				MX7D_PAD_SD1_CMD__SD1_CMD		0x5a
+> +				MX7D_PAD_SD1_CLK__SD1_CLK		0x0a
+> +				MX7D_PAD_SD1_DATA0__SD1_DATA0		0x5a
+> +				MX7D_PAD_SD1_DATA1__SD1_DATA1		0x5a
+> +				MX7D_PAD_SD1_DATA2__SD1_DATA2		0x5a
+> +				MX7D_PAD_SD1_DATA3__SD1_DATA3		0x5a
+> +				MX7D_PAD_SD1_CD_B__GPIO5_IO0		0x5a /* CD */
+> +				MX7D_PAD_SD1_WP__GPIO5_IO1		0x5a /* WP */
+> +				MX7D_PAD_SD1_RESET_B__GPIO5_IO2		0x5a /* vmmc */
+>  			>;
+>  		};
+>  
 >  		pinctrl_usdhc2: usdhc2grp {
 >  			fsl,pins = <
->  				MX7D_PAD_SD2_CMD__SD2_CMD		0x59
-> -				MX7D_PAD_SD2_CLK__SD2_CLK		0x19
-> +				MX7D_PAD_SD2_CLK__SD2_CLK		0x09
->  				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x59
->  				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x59
->  				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x59
-> @@ -616,7 +616,7 @@
->  		pinctrl_usdhc2_100mhz: usdhc2grp_100mhz {
->  			fsl,pins = <
+> -				MX7D_PAD_SD2_CMD__SD2_CMD		0x59
+> -				MX7D_PAD_SD2_CLK__SD2_CLK		0x09
+> -				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x59
+> -				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x59
+> -				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x59
+> -				MX7D_PAD_SD2_DATA3__SD2_DATA3		0x59
+> -			>;
+> -		};
+> -
+> -		pinctrl_usdhc2_100mhz: usdhc2grp_100mhz {
+> -			fsl,pins = <
 >  				MX7D_PAD_SD2_CMD__SD2_CMD		0x5a
-> -				MX7D_PAD_SD2_CLK__SD2_CLK		0x1a
-> +				MX7D_PAD_SD2_CLK__SD2_CLK		0x0a
+>  				MX7D_PAD_SD2_CLK__SD2_CLK		0x0a
 >  				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x5a
->  				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x5a
->  				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x5a
-> @@ -627,7 +627,7 @@
+> @@ -624,6 +613,17 @@
+>  			>;
+>  		};
+>  
+> +		pinctrl_usdhc2_100mhz: usdhc2grp_100mhz {
+> +			fsl,pins = <
+> +				MX7D_PAD_SD2_CMD__SD2_CMD		0x59
+> +				MX7D_PAD_SD2_CLK__SD2_CLK		0x09
+> +				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x59
+> +				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x59
+> +				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x59
+> +				MX7D_PAD_SD2_DATA3__SD2_DATA3		0x59
+> +			>;
+> +		};
+> +
 >  		pinctrl_usdhc2_200mhz: usdhc2grp_200mhz {
 >  			fsl,pins = <
 >  				MX7D_PAD_SD2_CMD__SD2_CMD		0x5b
-> -				MX7D_PAD_SD2_CLK__SD2_CLK		0x1b
-> +				MX7D_PAD_SD2_CLK__SD2_CLK		0x0b
->  				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x5b
->  				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x5b
->  				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x5b
-> @@ -639,7 +639,7 @@
+> @@ -638,22 +638,6 @@
+>  
 >  		pinctrl_usdhc3: usdhc3grp {
 >  			fsl,pins = <
->  				MX7D_PAD_SD3_CMD__SD3_CMD		0x59
-> -				MX7D_PAD_SD3_CLK__SD3_CLK		0x19
-> +				MX7D_PAD_SD3_CLK__SD3_CLK		0x09
->  				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x59
->  				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x59
->  				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x59
-> @@ -655,7 +655,7 @@
->  		pinctrl_usdhc3_100mhz: usdhc3grp_100mhz {
->  			fsl,pins = <
+> -				MX7D_PAD_SD3_CMD__SD3_CMD		0x59
+> -				MX7D_PAD_SD3_CLK__SD3_CLK		0x09
+> -				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x59
+> -				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x59
+> -				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x59
+> -				MX7D_PAD_SD3_DATA3__SD3_DATA3		0x59
+> -				MX7D_PAD_SD3_DATA4__SD3_DATA4		0x59
+> -				MX7D_PAD_SD3_DATA5__SD3_DATA5		0x59
+> -				MX7D_PAD_SD3_DATA6__SD3_DATA6		0x59
+> -				MX7D_PAD_SD3_DATA7__SD3_DATA7		0x59
+> -				MX7D_PAD_SD3_STROBE__SD3_STROBE		0x19
+> -			>;
+> -		};
+> -
+> -		pinctrl_usdhc3_100mhz: usdhc3grp_100mhz {
+> -			fsl,pins = <
 >  				MX7D_PAD_SD3_CMD__SD3_CMD		0x5a
-> -				MX7D_PAD_SD3_CLK__SD3_CLK		0x1a
-> +				MX7D_PAD_SD3_CLK__SD3_CLK		0x0a
+>  				MX7D_PAD_SD3_CLK__SD3_CLK		0x0a
 >  				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x5a
->  				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x5a
->  				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x5a
-> @@ -671,7 +671,7 @@
+> @@ -668,6 +652,22 @@
+>  			>;
+>  		};
+>  
+> +		pinctrl_usdhc3_100mhz: usdhc3grp_100mhz {
+> +			fsl,pins = <
+> +				MX7D_PAD_SD3_CMD__SD3_CMD		0x59
+> +				MX7D_PAD_SD3_CLK__SD3_CLK		0x09
+> +				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x59
+> +				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x59
+> +				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x59
+> +				MX7D_PAD_SD3_DATA3__SD3_DATA3		0x59
+> +				MX7D_PAD_SD3_DATA4__SD3_DATA4		0x59
+> +				MX7D_PAD_SD3_DATA5__SD3_DATA5		0x59
+> +				MX7D_PAD_SD3_DATA6__SD3_DATA6		0x59
+> +				MX7D_PAD_SD3_DATA7__SD3_DATA7		0x59
+> +				MX7D_PAD_SD3_STROBE__SD3_STROBE		0x19
+> +			>;
+> +		};
+> +
 >  		pinctrl_usdhc3_200mhz: usdhc3grp_200mhz {
 >  			fsl,pins = <
 >  				MX7D_PAD_SD3_CMD__SD3_CMD		0x5b
-> -				MX7D_PAD_SD3_CLK__SD3_CLK		0x1b
-> +				MX7D_PAD_SD3_CLK__SD3_CLK		0x0b
->  				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x5b
->  				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x5b
->  				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x5b
 > -- 
 > 2.7.4
 > 
