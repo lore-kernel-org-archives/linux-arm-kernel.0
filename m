@@ -1,57 +1,96 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Thu, 15 Jun 2017 08:40:06 -0500
-Subject: [PATCH 00/17] coresight: next v4.12-rc4
-In-Reply-To: <cc812b9a-4c8a-93d9-5233-74edd475f8aa@arm.com>
-References: <1496693718-9191-1-git-send-email-mathieu.poirier@linaro.org>
- <20170609175339.28d1d4d5a6c91a9e16c16bf7@arm.com>
- <CANLsYky8XLbOwinxVc2xKaNzhkpUOX0NsNxrFF4=MsjzC3iY1g@mail.gmail.com>
- <20170613161712.f1f3cac734939d8728c7ed77@arm.com>
- <20170614062229.GA28496@leoy-ThinkPad-T440>
- <cc812b9a-4c8a-93d9-5233-74edd475f8aa@arm.com>
-Message-ID: <20170615084006.e72662514e1d5b85e7af8ada@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 15 Jun 2017 14:46:03 +0100
+Subject: [PATCH v3 2/2] acpi/iort: numa: Add numa node mapping for smmuv3
+ devices
+In-Reply-To: <1496897059-8272-3-git-send-email-ganapatrao.kulkarni@cavium.com>
+References: <1496897059-8272-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <1496897059-8272-3-git-send-email-ganapatrao.kulkarni@cavium.com>
+Message-ID: <20170615134603.GA16292@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Jun 2017 14:08:09 +0100
-Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+Hi,
 
-> On 14/06/17 07:22, Leo Yan wrote:
-> > Hi Kim,
-> >
-> > On Tue, Jun 13, 2017 at 04:17:12PM -0500, Kim Phillips wrote:
-> >
-> > [...]
-> >
-> >>>> Also, do the current juno platforms not have CPU debug modules?  I'd
-> >>>> like to test the new driver.
-> >>>
-> >>> By all means - Leo pointed out the patch adding the CPU debug entries in
-> >>> the DT  file for Juno.
-> >>
-> >> Thanks, I applied it, was able to
-> >> toggle /sys/kernel/debug/coresight_cpu_debug/enable, but wasn't sure
-> >> how to trigger the cpu debug output...
-> >
-> > You could trigger panic flow with command, then can see CPU debug output:
-> > echo c > /proc/sysrq-trigger
+On Thu, Jun 08, 2017 at 10:14:19AM +0530, Ganapatrao Kulkarni wrote:
+> Add code to parse proximity domain in SMMUv3 IORT table to
+> set numa node mapping for smmuv3 devices.
 > 
-> I think, may be we should provide a handle to trigger the CPU debug dump
-> manually, rather than using it only for panic. Something like :
+> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> ---
+>  drivers/acpi/arm64/iort.c | 28 ++++++++++++++++++++++++++--
+>  1 file changed, 26 insertions(+), 2 deletions(-)
+
+I am happy to take this but I want to know what we shall do with
+patch 1 and related ACPICA changes first.
+
+Thanks,
+Lorenzo
+
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> index bba2b59..e804386 100644
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -882,6 +882,23 @@ static bool __init arm_smmu_v3_is_coherent(struct acpi_iort_node *node)
+>  	return smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE;
+>  }
+>  
+> +/*
+> + * set numa proximity domain for smmuv3 device
+> + */
+> +static void  __init arm_smmu_v3_set_proximity(struct acpi_iort_node *node,
+> +		struct device *dev)
+> +{
+> +	struct acpi_iort_smmu_v3 *smmu;
+> +
+> +	smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
+> +	if (smmu->flags & ACPI_IORT_SMMU_V3_PXM_VALID) {
+> +		set_dev_node(dev, acpi_map_pxm_to_node(smmu->pxm));
+> +		pr_info("SMMUV3[%llx] Mapped to Proximity domain %d\n",
+> +			smmu->base_address,
+> +			smmu->pxm);
+> +	}
+> +}
+> +
+>  static int __init arm_smmu_count_resources(struct acpi_iort_node *node)
+>  {
+>  	struct acpi_iort_smmu *smmu;
+> @@ -951,20 +968,24 @@ struct iort_iommu_config {
+>  	int (*iommu_count_resources)(struct acpi_iort_node *node);
+>  	void (*iommu_init_resources)(struct resource *res,
+>  				     struct acpi_iort_node *node);
+> +	void (*iommu_set_proximity)(struct acpi_iort_node *node,
+> +				     struct device *dev);
+>  };
+>  
+>  static const struct iort_iommu_config iort_arm_smmu_v3_cfg __initconst = {
+>  	.name = "arm-smmu-v3",
+>  	.iommu_is_coherent = arm_smmu_v3_is_coherent,
+>  	.iommu_count_resources = arm_smmu_v3_count_resources,
+> -	.iommu_init_resources = arm_smmu_v3_init_resources
+> +	.iommu_init_resources = arm_smmu_v3_init_resources,
+> +	.iommu_set_proximity = arm_smmu_v3_set_proximity
+>  };
+>  
+>  static const struct iort_iommu_config iort_arm_smmu_cfg __initconst = {
+>  	.name = "arm-smmu",
+>  	.iommu_is_coherent = arm_smmu_is_coherent,
+>  	.iommu_count_resources = arm_smmu_count_resources,
+> -	.iommu_init_resources = arm_smmu_init_resources
+> +	.iommu_init_resources = arm_smmu_init_resources,
+> +	.iommu_set_proximity = NULL
+>  };
+>  
+>  static __init
+> @@ -1002,6 +1023,9 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
+>  	if (!pdev)
+>  		return -ENOMEM;
+>  
+> +	if (ops->iommu_set_proximity)
+> +		ops->iommu_set_proximity(node, &pdev->dev);
+> +
+>  	count = ops->iommu_count_resources(node);
+>  
+>  	r = kcalloc(count, sizeof(*r), GFP_KERNEL);
+> -- 
+> 1.8.1.4
 > 
-> echo 1 > /sys/kernel/debug/coresight_cpu_debug/trigger
-> 
-> Thoughts ?
-
-what's the use-case?  I just wanted to do a simple test, and although
-it halted my machine, the sysrq-trigger switch did the job.
-
-I'm personally not a huge fan of adding more switches, rather for doing
-the right thing on behalf of the user in the first place.  E.g., in the
-case of cpu debug, if configured =y, I don't think it would necessarily
-harm the simple user to have it always be enabled, at boot time and
-beyond, thereby doing away with the .../coresight_cpu_debug/enable
-switch and kernel command line option.  If there are users that want to
-turn it on and off dynamically, that can be done by loading and
-unloading the module.
-
-Kim
