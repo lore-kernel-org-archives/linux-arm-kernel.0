@@ -1,48 +1,76 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 15 Jun 2017 08:27:06 +0200
-Subject: [GIT PULL] pxa for v4.13
-Message-ID: <87mv99u5ol.fsf@belgarion.home>
+From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
+Date: Thu, 15 Jun 2017 14:29:26 +0800
+Subject: [PATCH v2] [media] mtk-mdp: Fix g_/s_selection capture/compose
+ logic
+In-Reply-To: <1494556970-12278-1-git-send-email-minghsiu.tsai@mediatek.com>
+References: <1494556970-12278-1-git-send-email-minghsiu.tsai@mediatek.com>
+Message-ID: <1497508166.3384.5.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd, Kevin, Olof,
+Hi, Hans,
 
-Please consider this pull request for pxa 4.13 cycle, nothing very fancy either
-this cycle.
+Would you have time to review this patch v2?
+The patch v1 violates v4l2 spec. I have fixed it in v2.
 
-The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 
-  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+Sincerely,
+Ming Hsiu
 
-are available in the git repository at:
-
-  https://github.com/rjarzmik/linux.git tags/pxa-for-4.13
-
-for you to fetch changes up to ce3de60ff92ba5e4d65f1c1ce07460795e3a6157:
-
-  ARM: pxa: Delete an error message for a failed memory allocation in pxa3xx_u2d_probe() (2017-06-14 08:32:21 +0200)
-
-----------------------------------------------------------------
-This is the pxa changes for v4.13 cycle.
-
-This cycle is a minor fixes one, with :
- - Coccinelle found improvements
- - magician getting touchscreen driver support.
-
-----------------------------------------------------------------
-Markus Elfring (3):
-      ARM: pxa: Delete an error message for a failed memory allocation in pxa_pm_init()
-      ARM: pxa: Improve a size determination in pxa3xx_u2d_probe()
-      ARM: pxa: Delete an error message for a failed memory allocation in pxa3xx_u2d_probe()
-
-Petr Cvek (1):
-      ARM: pxa: magician: Add support for ADS7846 touchscreen
-
- arch/arm/mach-pxa/include/mach/magician.h |  1 +
- arch/arm/mach-pxa/magician.c              | 84 ++++++++++++++++++++++++++++++-
- arch/arm/mach-pxa/pm.c                    |  4 +-
- arch/arm/mach-pxa/pxa3xx-ulpi.c           |  6 +--
- 4 files changed, 87 insertions(+), 8 deletions(-)
-
--- 
-Robert
+On Fri, 2017-05-12 at 10:42 +0800, Minghsiu Tsai wrote:
+> From: Daniel Kurtz <djkurtz@chromium.org>
+> 
+> Experiments show that the:
+>  (1) mtk-mdp uses the _MPLANE form of CAPTURE/OUTPUT
+>  (2) CAPTURE types use CROP targets, and OUTPUT types use COMPOSE targets
+> 
+> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+> Signed-off-by: Houlong Wei <houlong.wei@mediatek.com>
+> 
+> ---
+> Changes in v2:
+> . Can not use *_MPLANE type in g_/s_selection 
+> ---
+>  drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+> index 13afe48..e18ac626 100644
+> --- a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+> +++ b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+> @@ -838,10 +838,10 @@ static int mtk_mdp_m2m_g_selection(struct file *file, void *fh,
+>  	bool valid = false;
+>  
+>  	if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+> -		if (mtk_mdp_is_target_compose(s->target))
+> +		if (mtk_mdp_is_target_crop(s->target))
+>  			valid = true;
+>  	} else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+> -		if (mtk_mdp_is_target_crop(s->target))
+> +		if (mtk_mdp_is_target_compose(s->target))
+>  			valid = true;
+>  	}
+>  	if (!valid) {
+> @@ -908,10 +908,10 @@ static int mtk_mdp_m2m_s_selection(struct file *file, void *fh,
+>  	bool valid = false;
+>  
+>  	if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+> -		if (s->target == V4L2_SEL_TGT_COMPOSE)
+> +		if (s->target == V4L2_SEL_TGT_CROP)
+>  			valid = true;
+>  	} else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+> -		if (s->target == V4L2_SEL_TGT_CROP)
+> +		if (s->target == V4L2_SEL_TGT_COMPOSE)
+>  			valid = true;
+>  	}
+>  	if (!valid) {
+> @@ -925,7 +925,7 @@ static int mtk_mdp_m2m_s_selection(struct file *file, void *fh,
+>  	if (ret)
+>  		return ret;
+>  
+> -	if (mtk_mdp_is_target_crop(s->target))
+> +	if (mtk_mdp_is_target_compose(s->target))
+>  		frame = &ctx->s_frame;
+>  	else
+>  		frame = &ctx->d_frame;
