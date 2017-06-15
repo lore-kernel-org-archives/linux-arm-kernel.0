@@ -1,76 +1,66 @@
-From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
-Date: Thu, 15 Jun 2017 14:29:26 +0800
-Subject: [PATCH v2] [media] mtk-mdp: Fix g_/s_selection capture/compose
- logic
-In-Reply-To: <1494556970-12278-1-git-send-email-minghsiu.tsai@mediatek.com>
-References: <1494556970-12278-1-git-send-email-minghsiu.tsai@mediatek.com>
-Message-ID: <1497508166.3384.5.camel@mtksdaap41>
+From: akurz@blala.de (Alexander Kurz)
+Date: Thu, 15 Jun 2017 08:41:10 +0200
+Subject: [PATCH] ARM: dts: imx6qdl-wandboard: enable USB OTG
+Message-ID: <1497508870-4028-1-git-send-email-akurz@blala.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Hans,
+Enable USB OTG (dual-role) on the Wandboard.
+Note, that the USB_OTG_VBUS current is quite limited due to a 22R resistor
+in the power line. Hence, the overcurrent signal of 1A will never be
+triggered on this board.
 
-Would you have time to review this patch v2?
-The patch v1 violates v4l2 spec. I have fixed it in v2.
+Signed-off-by: Alexander Kurz <akurz@blala.de>
+---
+ arch/arm/boot/dts/imx6qdl-wandboard.dtsi | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
 
-
-Sincerely,
-Ming Hsiu
-
-On Fri, 2017-05-12 at 10:42 +0800, Minghsiu Tsai wrote:
-> From: Daniel Kurtz <djkurtz@chromium.org>
-> 
-> Experiments show that the:
->  (1) mtk-mdp uses the _MPLANE form of CAPTURE/OUTPUT
->  (2) CAPTURE types use CROP targets, and OUTPUT types use COMPOSE targets
-> 
-> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
-> Signed-off-by: Houlong Wei <houlong.wei@mediatek.com>
-> 
-> ---
-> Changes in v2:
-> . Can not use *_MPLANE type in g_/s_selection 
-> ---
->  drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
-> index 13afe48..e18ac626 100644
-> --- a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
-> +++ b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
-> @@ -838,10 +838,10 @@ static int mtk_mdp_m2m_g_selection(struct file *file, void *fh,
->  	bool valid = false;
->  
->  	if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
-> -		if (mtk_mdp_is_target_compose(s->target))
-> +		if (mtk_mdp_is_target_crop(s->target))
->  			valid = true;
->  	} else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
-> -		if (mtk_mdp_is_target_crop(s->target))
-> +		if (mtk_mdp_is_target_compose(s->target))
->  			valid = true;
->  	}
->  	if (!valid) {
-> @@ -908,10 +908,10 @@ static int mtk_mdp_m2m_s_selection(struct file *file, void *fh,
->  	bool valid = false;
->  
->  	if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
-> -		if (s->target == V4L2_SEL_TGT_COMPOSE)
-> +		if (s->target == V4L2_SEL_TGT_CROP)
->  			valid = true;
->  	} else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
-> -		if (s->target == V4L2_SEL_TGT_CROP)
-> +		if (s->target == V4L2_SEL_TGT_COMPOSE)
->  			valid = true;
->  	}
->  	if (!valid) {
-> @@ -925,7 +925,7 @@ static int mtk_mdp_m2m_s_selection(struct file *file, void *fh,
->  	if (ret)
->  		return ret;
->  
-> -	if (mtk_mdp_is_target_crop(s->target))
-> +	if (mtk_mdp_is_target_compose(s->target))
->  		frame = &ctx->s_frame;
->  	else
->  		frame = &ctx->d_frame;
+diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+index 82dc5744..cbf69ae 100644
+--- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+@@ -34,6 +34,16 @@
+ 			regulator-max-microvolt = <3300000>;
+ 			regulator-always-on;
+ 		};
++
++		reg_usb_otg_vbus: usb_otg_vbus {
++			compatible = "regulator-fixed";
++			regulator-name = "usb_otg_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_usbotgvbus>;
++			gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
++		};
+ 	};
+ 
+ 	sound {
+@@ -169,6 +179,12 @@
+ 			>;
+ 		};
+ 
++		pinctrl_usbotgvbus: usbotgvbusgrp {
++			fsl,pins = <
++				MX6QDL_PAD_EIM_D22__GPIO3_IO22		0x130b0
++			>;
++		};
++
+ 		pinctrl_usdhc1: usdhc1grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD1_CMD__SD1_CMD		0x17059
+@@ -243,10 +259,11 @@
+ };
+ 
+ &usbotg {
++	vbus-supply = <&reg_usb_otg_vbus>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_usbotg>;
+ 	disable-over-current;
+-	dr_mode = "peripheral";
++	dr_mode = "otg";
+ 	status = "okay";
+ };
+ 
+-- 
+2.1.4
