@@ -1,33 +1,126 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 15 Jun 2017 18:42:32 +0100
-Subject: [PATCH 5/5] arm64: signal: Allow expansion of the signal frame
-In-Reply-To: <1497535442-11586-6-git-send-email-Dave.Martin@arm.com>
-References: <1497535442-11586-1-git-send-email-Dave.Martin@arm.com>
- <1497535442-11586-6-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20170615174231.GE17424@e104818-lin.cambridge.arm.com>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Thu, 15 Jun 2017 10:46:26 -0700
+Subject: [PATCH 1/2] RFC: ARM: dts: imx7d-sdb: remove 100k pull-down on
+ USDHCx clock
+In-Reply-To: <AM3PR04MB306DAC69AE94A872373206280C00@AM3PR04MB306.eurprd04.prod.outlook.com>
+References: <1496857542-32200-1-git-send-email-troy.kisky@boundarydevices.com>
+ <20170615033851.GA5902@dragon>
+ <AM3PR04MB306DAC69AE94A872373206280C00@AM3PR04MB306.eurprd04.prod.outlook.com>
+Message-ID: <c69c5ffb-1142-74fa-4be4-1112c49ae67c@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 15, 2017 at 03:03:42PM +0100, Dave P Martin wrote:
-> This patch defines an extra_context signal frame record that can be
-> used to describe an expanded signal frame, and modifies the context
-> block allocator and signal frame setup and parsing code to create,
-> populate, parse and decode this block as necessary.
+On 6/14/2017 9:31 PM, A.s. Dong wrote:
+> Hi Troy,
 > 
-> To avoid abuse by userspace, parse_user_sigframe() attempts to
-> ensure that:
+>> -----Original Message-----
+>> From: Shawn Guo [mailto:shawnguo at kernel.org]
+>> Sent: Thursday, June 15, 2017 11:39 AM
+>> To: Troy Kisky; A.s. Dong; Frank Li
+>> Cc: shawn.guo at linaro.org; Fabio Estevam; gary.bisson at boundarydevices.com;
+>> linux-arm-kernel at lists.infradead.org
+>> Subject: Re: [PATCH 1/2] RFC: ARM: dts: imx7d-sdb: remove 100k pull-down
+>> on USDHCx clock
+>>
+>> On Wed, Jun 07, 2017 at 10:45:41AM -0700, Troy Kisky wrote:
+>>> No i.mx6q board uses a 100k pull-down on clock, why should i.mx7d ?
+>>>
 > 
->  * no more than one extra_context is accepted;
->  * the extra context data is a sensible size, and properly placed
->    and aligned.
-> 
-> The extra_context data is required to start at the first 16-byte
-> aligned address immediately after the dummy terminator record
-> following extra_context in rt_sigframe.__reserved[] (as ensured
-> during signal delivery).  This serves as a sanity-check that the
-> signal frame has not been moved or copied without taking the extra
-> data into account.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> I saw the mx7d evk clk resistor pull-down is DNP,
+> then why we disable internal pad pull-down?
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+
+That sounds like a very good reason to disable to me.
+Why rely on a DNP? Also, consistency with imx6 is nice.
+
+
+> 
+> Regards
+> Dong Aisheng
+> 
+>>> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+>>
+>> Add Dong and Frank who may help to confirm.
+>>
+>> Shawn
+>>
+>>> ---
+>>>  arch/arm/boot/dts/imx7d-sdb.dts | 14 +++++++-------
+>>>  1 file changed, 7 insertions(+), 7 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/imx7d-sdb.dts
+>>> b/arch/arm/boot/dts/imx7d-sdb.dts index 54c4540..cab9208 100644
+>>> --- a/arch/arm/boot/dts/imx7d-sdb.dts
+>>> +++ b/arch/arm/boot/dts/imx7d-sdb.dts
+>>> @@ -591,7 +591,7 @@
+>>>  		pinctrl_usdhc1: usdhc1grp {
+>>>  			fsl,pins = <
+>>>  				MX7D_PAD_SD1_CMD__SD1_CMD		0x59
+>>> -				MX7D_PAD_SD1_CLK__SD1_CLK		0x19
+>>> +				MX7D_PAD_SD1_CLK__SD1_CLK		0x09
+>>>  				MX7D_PAD_SD1_DATA0__SD1_DATA0		0x59
+>>>  				MX7D_PAD_SD1_DATA1__SD1_DATA1		0x59
+>>>  				MX7D_PAD_SD1_DATA2__SD1_DATA2		0x59
+>>> @@ -605,7 +605,7 @@
+>>>  		pinctrl_usdhc2: usdhc2grp {
+>>>  			fsl,pins = <
+>>>  				MX7D_PAD_SD2_CMD__SD2_CMD		0x59
+>>> -				MX7D_PAD_SD2_CLK__SD2_CLK		0x19
+>>> +				MX7D_PAD_SD2_CLK__SD2_CLK		0x09
+>>>  				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x59
+>>>  				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x59
+>>>  				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x59
+>>> @@ -616,7 +616,7 @@
+>>>  		pinctrl_usdhc2_100mhz: usdhc2grp_100mhz {
+>>>  			fsl,pins = <
+>>>  				MX7D_PAD_SD2_CMD__SD2_CMD		0x5a
+>>> -				MX7D_PAD_SD2_CLK__SD2_CLK		0x1a
+>>> +				MX7D_PAD_SD2_CLK__SD2_CLK		0x0a
+>>>  				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x5a
+>>>  				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x5a
+>>>  				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x5a
+>>> @@ -627,7 +627,7 @@
+>>>  		pinctrl_usdhc2_200mhz: usdhc2grp_200mhz {
+>>>  			fsl,pins = <
+>>>  				MX7D_PAD_SD2_CMD__SD2_CMD		0x5b
+>>> -				MX7D_PAD_SD2_CLK__SD2_CLK		0x1b
+>>> +				MX7D_PAD_SD2_CLK__SD2_CLK		0x0b
+>>>  				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x5b
+>>>  				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x5b
+>>>  				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x5b
+>>> @@ -639,7 +639,7 @@
+>>>  		pinctrl_usdhc3: usdhc3grp {
+>>>  			fsl,pins = <
+>>>  				MX7D_PAD_SD3_CMD__SD3_CMD		0x59
+>>> -				MX7D_PAD_SD3_CLK__SD3_CLK		0x19
+>>> +				MX7D_PAD_SD3_CLK__SD3_CLK		0x09
+>>>  				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x59
+>>>  				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x59
+>>>  				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x59
+>>> @@ -655,7 +655,7 @@
+>>>  		pinctrl_usdhc3_100mhz: usdhc3grp_100mhz {
+>>>  			fsl,pins = <
+>>>  				MX7D_PAD_SD3_CMD__SD3_CMD		0x5a
+>>> -				MX7D_PAD_SD3_CLK__SD3_CLK		0x1a
+>>> +				MX7D_PAD_SD3_CLK__SD3_CLK		0x0a
+>>>  				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x5a
+>>>  				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x5a
+>>>  				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x5a
+>>> @@ -671,7 +671,7 @@
+>>>  		pinctrl_usdhc3_200mhz: usdhc3grp_200mhz {
+>>>  			fsl,pins = <
+>>>  				MX7D_PAD_SD3_CMD__SD3_CMD		0x5b
+>>> -				MX7D_PAD_SD3_CLK__SD3_CLK		0x1b
+>>> +				MX7D_PAD_SD3_CLK__SD3_CLK		0x0b
+>>>  				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x5b
+>>>  				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x5b
+>>>  				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x5b
+>>> --
+>>> 2.7.4
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
