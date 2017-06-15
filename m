@@ -1,117 +1,77 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Thu, 15 Jun 2017 04:31:46 +0000
-Subject: [PATCH 1/2] RFC: ARM: dts: imx7d-sdb: remove 100k pull-down on
- USDHCx clock
-In-Reply-To: <20170615033851.GA5902@dragon>
-References: <1496857542-32200-1-git-send-email-troy.kisky@boundarydevices.com>
- <20170615033851.GA5902@dragon>
-Message-ID: <AM3PR04MB306DAC69AE94A872373206280C00@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Thu, 15 Jun 2017 10:21:43 +0530
+Subject: [PATCH v3 1/9] ARM: dts: imx6ul-isiot: Add Sound card with codec
+ node
+In-Reply-To: <20170615022024.GE30112@dragon>
+References: <1491501735-1649-1-git-send-email-jagan@openedev.com>
+ <1491501735-1649-2-git-send-email-jagan@openedev.com>
+ <20170407131649.GH16503@dragon>
+ <CAMty3ZDj3XgeZwUTXTTX2svoXaNWJ3GJtbNAt9+jj+n8Z4640w@mail.gmail.com>
+ <20170615022024.GE30112@dragon>
+Message-ID: <CAMty3ZAUK37JYnPwVRuBA6B67QV+S_BYQ6f=k6_rjw__ypTxBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Troy,
+On Thu, Jun 15, 2017 at 7:50 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> On Wed, Jun 14, 2017 at 08:17:04PM +0530, Jagan Teki wrote:
+>> On Fri, Apr 7, 2017 at 6:46 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+>> > On Thu, Apr 06, 2017 at 11:32:07PM +0530, Jagan Teki wrote:
+>> >> From: Jagan Teki <jagan@amarulasolutions.com>
+>> >>
+>> >> Add support for Sound card and related codec(via i2c1) nodes
+>> >> on Engicam Is.IoT MX6UL variant module boards.
+>> >>
+>> >> Cc: Shawn Guo <shawnguo@kernel.org>
+>> >> Cc: Matteo Lisi <matteo.lisi@engicam.com>
+>> >> Cc: Michael Trimarchi <michael@amarulasolutions.com>
+>> >> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+>> >> ---
+>> >> Changes for v3:
+>> >> - Replace fsl,imx-audio-sgtl5000 and use simple-audio-card
+>> >> Changes for v2:
+>> >> - Use proper [label:] node-name[@unit-address] for codec
+>> >> - Remove incorrect codec property 'wlf,shared-lrclk'
+>> >> - Remove 'gpr' from sound card node
+>> >>
+>> >>  arch/arm/boot/dts/imx6ul-isiot-common.dtsi | 10 +++++++
+>> >>  arch/arm/boot/dts/imx6ul-isiot.dtsi        | 44 ++++++++++++++++++++++++++++++
+>> >
+>> > Can you help me understand how these two files are related?  Why is
+>> > sgtl5000 added into one and sound node added into the other?
+>>
+>> lcdif, ts and sound card which may differ based on the base-board
+>> connected with SOM, So I moved these stuff which are related to
+>> Starter kit supported once's and used with SOM dts files. if some
+>> other board with same SOM can have different lcdif and etc so they can
+>> define locally to dts.
+>
+> I do not follow how these stuff are organized.  So far we have the
+> following isiot dts files.
+>
+>  - imx6ul-isiot-common.dtsi
+>  - imx6ul-isiot.dtsi
+>  - imx6ul-isiot-emmc.dts and imx6ul-isiot-nand.dts
+>
+> How are they mapping to SoM and base-board?
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Thursday, June 15, 2017 11:39 AM
-> To: Troy Kisky; A.s. Dong; Frank Li
-> Cc: shawn.guo at linaro.org; Fabio Estevam; gary.bisson at boundarydevices.com;
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/2] RFC: ARM: dts: imx7d-sdb: remove 100k pull-down
-> on USDHCx clock
-> 
-> On Wed, Jun 07, 2017 at 10:45:41AM -0700, Troy Kisky wrote:
-> > No i.mx6q board uses a 100k pull-down on clock, why should i.mx7d ?
-> >
+isiot is a modules class, with that emmc and nand are two separate
+SOM's. the current support is for mounting these SOM's on Development
+base board[1]. So, for isiot module class we have imx6ul-isiot.dtsi
+and emmc and nand SOM's have imx6ul-isiot-emmc.dts and
+imx6ul-isiot-nand.dts. There are some Carrier boards[1] which were
+used with different lcdif and other changes, So
+imx6ul-isiot-common.dtsi have changes common across emmc and nand,
+instead of adding them into individual dts files I moved in
+-common.dtsi.  So in future if isiot SOM mounted on carrier board
+which should have a separate dts and which may or may not use
+imx6ul-isiot-common.dtsi
 
-I saw the mx7d evk clk resistor pull-down is DNP,
-then why we disable internal pad pull-down?
+[1] https://www.engicam.com/vis-prod/101142
+[2] https://www.engicam.com/vis-prod/101128
 
-Regards
-Dong Aisheng
-
-> > Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-> 
-> Add Dong and Frank who may help to confirm.
-> 
-> Shawn
-> 
-> > ---
-> >  arch/arm/boot/dts/imx7d-sdb.dts | 14 +++++++-------
-> >  1 file changed, 7 insertions(+), 7 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/imx7d-sdb.dts
-> > b/arch/arm/boot/dts/imx7d-sdb.dts index 54c4540..cab9208 100644
-> > --- a/arch/arm/boot/dts/imx7d-sdb.dts
-> > +++ b/arch/arm/boot/dts/imx7d-sdb.dts
-> > @@ -591,7 +591,7 @@
-> >  		pinctrl_usdhc1: usdhc1grp {
-> >  			fsl,pins = <
-> >  				MX7D_PAD_SD1_CMD__SD1_CMD		0x59
-> > -				MX7D_PAD_SD1_CLK__SD1_CLK		0x19
-> > +				MX7D_PAD_SD1_CLK__SD1_CLK		0x09
-> >  				MX7D_PAD_SD1_DATA0__SD1_DATA0		0x59
-> >  				MX7D_PAD_SD1_DATA1__SD1_DATA1		0x59
-> >  				MX7D_PAD_SD1_DATA2__SD1_DATA2		0x59
-> > @@ -605,7 +605,7 @@
-> >  		pinctrl_usdhc2: usdhc2grp {
-> >  			fsl,pins = <
-> >  				MX7D_PAD_SD2_CMD__SD2_CMD		0x59
-> > -				MX7D_PAD_SD2_CLK__SD2_CLK		0x19
-> > +				MX7D_PAD_SD2_CLK__SD2_CLK		0x09
-> >  				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x59
-> >  				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x59
-> >  				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x59
-> > @@ -616,7 +616,7 @@
-> >  		pinctrl_usdhc2_100mhz: usdhc2grp_100mhz {
-> >  			fsl,pins = <
-> >  				MX7D_PAD_SD2_CMD__SD2_CMD		0x5a
-> > -				MX7D_PAD_SD2_CLK__SD2_CLK		0x1a
-> > +				MX7D_PAD_SD2_CLK__SD2_CLK		0x0a
-> >  				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x5a
-> >  				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x5a
-> >  				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x5a
-> > @@ -627,7 +627,7 @@
-> >  		pinctrl_usdhc2_200mhz: usdhc2grp_200mhz {
-> >  			fsl,pins = <
-> >  				MX7D_PAD_SD2_CMD__SD2_CMD		0x5b
-> > -				MX7D_PAD_SD2_CLK__SD2_CLK		0x1b
-> > +				MX7D_PAD_SD2_CLK__SD2_CLK		0x0b
-> >  				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x5b
-> >  				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x5b
-> >  				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x5b
-> > @@ -639,7 +639,7 @@
-> >  		pinctrl_usdhc3: usdhc3grp {
-> >  			fsl,pins = <
-> >  				MX7D_PAD_SD3_CMD__SD3_CMD		0x59
-> > -				MX7D_PAD_SD3_CLK__SD3_CLK		0x19
-> > +				MX7D_PAD_SD3_CLK__SD3_CLK		0x09
-> >  				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x59
-> >  				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x59
-> >  				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x59
-> > @@ -655,7 +655,7 @@
-> >  		pinctrl_usdhc3_100mhz: usdhc3grp_100mhz {
-> >  			fsl,pins = <
-> >  				MX7D_PAD_SD3_CMD__SD3_CMD		0x5a
-> > -				MX7D_PAD_SD3_CLK__SD3_CLK		0x1a
-> > +				MX7D_PAD_SD3_CLK__SD3_CLK		0x0a
-> >  				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x5a
-> >  				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x5a
-> >  				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x5a
-> > @@ -671,7 +671,7 @@
-> >  		pinctrl_usdhc3_200mhz: usdhc3grp_200mhz {
-> >  			fsl,pins = <
-> >  				MX7D_PAD_SD3_CMD__SD3_CMD		0x5b
-> > -				MX7D_PAD_SD3_CLK__SD3_CLK		0x1b
-> > +				MX7D_PAD_SD3_CLK__SD3_CLK		0x0b
-> >  				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x5b
-> >  				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x5b
-> >  				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x5b
-> > --
-> > 2.7.4
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+thanks!
+-- 
+Jagan Teki
+Senior Linux Kernel Engineer | Amarula Solutions
+U-Boot, Linux | Upstream Maintainer
+Hyderabad, India.
