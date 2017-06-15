@@ -1,67 +1,103 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 15 Jun 2017 08:24:14 -0600
-Subject: [PATCH 05/12] coresight tmc: Add helpers for accessing 64bit
- registers
-In-Reply-To: <f9f02bdd-ebfd-16b1-0f3d-03989f47ddf7@arm.com>
+Date: Thu, 15 Jun 2017 08:33:24 -0600
+Subject: [PATCH 08/12] coresight tmc: Handle configuration types properly
+In-Reply-To: <5f2354c7-2561-2419-b633-8804babf2279@arm.com>
 References: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
- <1497278211-5001-6-git-send-email-suzuki.poulose@arm.com>
- <20170614174904.GA22030@xps15>
- <f9f02bdd-ebfd-16b1-0f3d-03989f47ddf7@arm.com>
-Message-ID: <CANLsYkzNQyMKwiRMb5DhDQHJA8yJptuDAqQXFKqAs6pkKQi_Jg@mail.gmail.com>
+ <1497278211-5001-9-git-send-email-suzuki.poulose@arm.com>
+ <20170614175916.GD22030@xps15>
+ <5f2354c7-2561-2419-b633-8804babf2279@arm.com>
+Message-ID: <CANLsYkz_WLDNHS1jhZbfm7iUPt3kUhiMV1Ti0Aig30Un9evx=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 June 2017 at 04:13, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
-> On 14/06/17 18:49, Mathieu Poirier wrote:
+On 15 June 2017 at 04:25, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 14/06/17 18:59, Mathieu Poirier wrote:
 >>
->> On Mon, Jun 12, 2017 at 03:36:44PM +0100, Suzuki K Poulose wrote:
+>> On Mon, Jun 12, 2017 at 03:36:47PM +0100, Suzuki K Poulose wrote:
 >>>
->>> Coresight TMC splits 64bit registers into a pair of 32bit registers
->>> (e.g DBA, RRP, RWP). Provide helpers to read/write to these registers.
+>>> Coresight SoC 600 defines a new configuration for TMC, Embedded Trace
+>>> Streamer (ETS), indicated by 0x3 in MODE:CONFIG_TYPE. Make sure
+>>> the driver handles the new type properly.
 >>
 >>
->> I'm good with this patch but please specify these changes are to support
->> the
->> SoC-600 suite.  That way when we look back at this set in a couple of
->> years we
->> don't loose hair thinking we've been carrying bugs all this time.
+>> From what I see below this patch only improves readability by moving the
+>> if/else
+>> compound to a case statement - there is no trace of the new ETS block.
+>> Readability enhancement are good but the changelog must match the code.
 >
 >
-> To be honest, these are not necessarily just for the support of SoC-600.
-> It is applies to the current driver with SoC-400, as you could see below,
-> where we have always assumed that the RRP/RWP/DBA HI bits are always
-> 0. Technically, the TMC supports upto 40bits and hence we have been doing
-> it wrong.
+> Mathieu,
+>
+> Not really. It fixes an issue with the current code. We check for ETB and
+> ETR,
+> if it doesn't match either of those, we assume it is ETF which is fine with
+> SoC-400.
+> But with SoC-600, we could have an ETS with id 0x3 and the driver could
+> treat it
+> as an ETF and go on with the initialisation. This patch makes sure that we
+> do check for the ETF and report that ETS is not a supported configuration.
 
-I just had another look at the documentation and you are correct -
-disregard my comment for this patch.
+That is the description that should go in the changelog - it reflects
+exactly what this patch is doing.
 
->
->>> -       read_ptr = readl_relaxed(drvdata->base + TMC_RRP);
->>> -       write_ptr = readl_relaxed(drvdata->base + TMC_RWP);
->>> +       read_ptr = tmc_read_rrp(drvdata);
->>> +       write_ptr = tmc_read_rwp(drvdata);
->
->
->
->
->>> -               writel_relaxed(read_ptr, drvdata->base + TMC_RRP);
->>> +               tmc_write_rrp(drvdata, read_ptr);
->>>                 perf_aux_output_flag(handle, PERF_AUX_FLAG_TRUNCATED);
->
->
->>>         writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
->>> +       tmc_write_dba(drvdata, drvdata->paddr);
->>>
->>> -       writel_relaxed(drvdata->paddr, drvdata->base + TMC_DBALO);
->>> -       writel_relaxed(0x0, drvdata->base + TMC_DBAHI);
->
->
->>>
->>> -       rwp = readl_relaxed(drvdata->base + TMC_RWP);
->>> +       rwp = tmc_read_rwp(drvdata);
->>>         val = readl_relaxed(drvdata->base + TMC_STS);
->>>
->
+Mathieu.
+
 >
 > Suzuki
+>
+>>
+>>>
+>>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>> ---
+>>>  drivers/hwtracing/coresight/coresight-tmc.c | 14 +++++++++++---
+>>>  1 file changed, 11 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/drivers/hwtracing/coresight/coresight-tmc.c
+>>> b/drivers/hwtracing/coresight/coresight-tmc.c
+>>> index fd5a2e0..7152656 100644
+>>> --- a/drivers/hwtracing/coresight/coresight-tmc.c
+>>> +++ b/drivers/hwtracing/coresight/coresight-tmc.c
+>>> @@ -358,11 +358,13 @@ static int tmc_probe(struct amba_device *adev,
+>>> const struct amba_id *id)
+>>>         desc.dev = dev;
+>>>         desc.groups = coresight_tmc_groups;
+>>>
+>>> -       if (drvdata->config_type == TMC_CONFIG_TYPE_ETB) {
+>>> +       switch (drvdata->config_type) {
+>>> +       case TMC_CONFIG_TYPE_ETB:
+>>>                 desc.type = CORESIGHT_DEV_TYPE_SINK;
+>>>                 desc.subtype.sink_subtype =
+>>> CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
+>>>                 desc.ops = &tmc_etb_cs_ops;
+>>> -       } else if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
+>>> +               break;
+>>> +       case TMC_CONFIG_TYPE_ETR:
+>>>                 desc.type = CORESIGHT_DEV_TYPE_SINK;
+>>>                 desc.subtype.sink_subtype =
+>>> CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
+>>>                 desc.ops = &tmc_etr_cs_ops;
+>>> @@ -373,10 +375,16 @@ static int tmc_probe(struct amba_device *adev,
+>>> const struct amba_id *id)
+>>>                 ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(40));
+>>>                 if (ret)
+>>>                         goto out;
+>>> -       } else {
+>>> +               break;
+>>> +       case TMC_CONFIG_TYPE_ETF:
+>>>                 desc.type = CORESIGHT_DEV_TYPE_LINKSINK;
+>>>                 desc.subtype.link_subtype =
+>>> CORESIGHT_DEV_SUBTYPE_LINK_FIFO;
+>>>                 desc.ops = &tmc_etf_cs_ops;
+>>> +               break;
+>>> +       default:
+>>> +               pr_err("%s: Unsupported TMC config\n", pdata->name);
+>>> +               ret = -EINVAL;
+>>> +               goto out;
+>>>         }
+>>>
+>>>         drvdata->csdev = coresight_register(&desc);
+>>> --
+>>> 2.7.4
+>>>
+>
