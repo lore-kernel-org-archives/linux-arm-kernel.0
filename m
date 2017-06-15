@@ -1,163 +1,103 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Thu, 15 Jun 2017 04:52:43 +0000
-Subject: [PATCH 2/2] RFC: ARM: dts: imx7d-sdb: swap pad settings for
- USDHCx 50Mhz and 100Mhz
-In-Reply-To: <20170615033935.GB5902@dragon>
-References: <1496857542-32200-1-git-send-email-troy.kisky@boundarydevices.com>
- <1496857542-32200-2-git-send-email-troy.kisky@boundarydevices.com>
- <20170615033935.GB5902@dragon>
-Message-ID: <AM3PR04MB306D408040CC246D4CB3FBD80C00@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: weiqing.kong@mediatek.com (Weiqing Kong)
+Date: Thu, 15 Jun 2017 13:34:41 +0800
+Subject: [PATCH 2/3] arm: dts: mt2701: Add display bls related nodes for
+ MT2701
+In-Reply-To: <82c8b877-ec34-bd37-7428-8af86191a66e@gmail.com>
+References: <1496297324-21091-1-git-send-email-erin.lo@mediatek.com>
+ <1496297324-21091-3-git-send-email-erin.lo@mediatek.com>
+ <82c8b877-ec34-bd37-7428-8af86191a66e@gmail.com>
+Message-ID: <1497504881.25398.9.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Thursday, June 15, 2017 11:40 AM
-> To: Troy Kisky; A.s. Dong; Frank Li
-> Cc: shawn.guo at linaro.org; Fabio Estevam; gary.bisson at boundarydevices.com;
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 2/2] RFC: ARM: dts: imx7d-sdb: swap pad settings for
-> USDHCx 50Mhz and 100Mhz
+On Fri, 2017-06-09 at 10:12 +0200, Matthias Brugger wrote:
 > 
-> On Wed, Jun 07, 2017 at 10:45:42AM -0700, Troy Kisky wrote:
-> > It does not make sense that 100 Mhz pad settings would use a x2
-> > setting and 50 Mhz would use a x4 setting, so swap.
-> >
-> > Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> On 01/06/17 08:08, Erin Lo wrote:
+> > From: YT Shen <yt.shen@mediatek.com>
 > 
-> Add Dong and Frank for this one as well.
+> I miss the Singed-off-by from YT Shen.
 > 
-
-I'm ok with this one.
-
-But you need double check PATCH 1/2 as CLK part in this one depends on it.
-
-Regards
-Dong Aisheng
-
-> Shawn
-> 
+> > 
+> > This patch adds the device node of display backlight for MT2701
+> > 
+> > Signed-off-by: Weiqing Kong <weiqing.kong@mediatek.com>
+> > Signed-off-by: Erin Lo <erin.lo@mediatek.com>
 > > ---
-> >  arch/arm/boot/dts/imx7d-sdb.dts | 72
-> > ++++++++++++++++++++---------------------
-> >  1 file changed, 36 insertions(+), 36 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/imx7d-sdb.dts
-> > b/arch/arm/boot/dts/imx7d-sdb.dts index cab9208..70dcbf4 100644
-> > --- a/arch/arm/boot/dts/imx7d-sdb.dts
-> > +++ b/arch/arm/boot/dts/imx7d-sdb.dts
-> > @@ -590,31 +590,20 @@
-> >
-> >  		pinctrl_usdhc1: usdhc1grp {
-> >  			fsl,pins = <
-> > -				MX7D_PAD_SD1_CMD__SD1_CMD		0x59
-> > -				MX7D_PAD_SD1_CLK__SD1_CLK		0x09
-> > -				MX7D_PAD_SD1_DATA0__SD1_DATA0		0x59
-> > -				MX7D_PAD_SD1_DATA1__SD1_DATA1		0x59
-> > -				MX7D_PAD_SD1_DATA2__SD1_DATA2		0x59
-> > -				MX7D_PAD_SD1_DATA3__SD1_DATA3		0x59
-> > -				MX7D_PAD_SD1_CD_B__GPIO5_IO0		0x59 /* CD */
-> > -				MX7D_PAD_SD1_WP__GPIO5_IO1		0x59 /* WP */
-> > -				MX7D_PAD_SD1_RESET_B__GPIO5_IO2		0x59 /*
-> vmmc */
-> > +				MX7D_PAD_SD1_CMD__SD1_CMD		0x5a
-> > +				MX7D_PAD_SD1_CLK__SD1_CLK		0x0a
-> > +				MX7D_PAD_SD1_DATA0__SD1_DATA0		0x5a
-> > +				MX7D_PAD_SD1_DATA1__SD1_DATA1		0x5a
-> > +				MX7D_PAD_SD1_DATA2__SD1_DATA2		0x5a
-> > +				MX7D_PAD_SD1_DATA3__SD1_DATA3		0x5a
-> > +				MX7D_PAD_SD1_CD_B__GPIO5_IO0		0x5a /* CD */
-> > +				MX7D_PAD_SD1_WP__GPIO5_IO1		0x5a /* WP */
-> > +				MX7D_PAD_SD1_RESET_B__GPIO5_IO2		0x5a /*
-> vmmc */
-> >  			>;
-> >  		};
-> >
-> >  		pinctrl_usdhc2: usdhc2grp {
-> >  			fsl,pins = <
-> > -				MX7D_PAD_SD2_CMD__SD2_CMD		0x59
-> > -				MX7D_PAD_SD2_CLK__SD2_CLK		0x09
-> > -				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x59
-> > -				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x59
-> > -				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x59
-> > -				MX7D_PAD_SD2_DATA3__SD2_DATA3		0x59
-> > -			>;
-> > -		};
-> > -
-> > -		pinctrl_usdhc2_100mhz: usdhc2grp_100mhz {
-> > -			fsl,pins = <
-> >  				MX7D_PAD_SD2_CMD__SD2_CMD		0x5a
-> >  				MX7D_PAD_SD2_CLK__SD2_CLK		0x0a
-> >  				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x5a
-> > @@ -624,6 +613,17 @@
-> >  			>;
-> >  		};
-> >
-> > +		pinctrl_usdhc2_100mhz: usdhc2grp_100mhz {
-> > +			fsl,pins = <
-> > +				MX7D_PAD_SD2_CMD__SD2_CMD		0x59
-> > +				MX7D_PAD_SD2_CLK__SD2_CLK		0x09
-> > +				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x59
-> > +				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x59
-> > +				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x59
-> > +				MX7D_PAD_SD2_DATA3__SD2_DATA3		0x59
-> > +			>;
-> > +		};
+> >   arch/arm/boot/dts/mt2701-evb.dts | 29 +++++++++++++++++++++++++++++
+> >   arch/arm/boot/dts/mt2701.dtsi    |  9 +++++++++
+> >   2 files changed, 38 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
+> > index a483798..e49c2b7 100644
+> > --- a/arch/arm/boot/dts/mt2701-evb.dts
+> > +++ b/arch/arm/boot/dts/mt2701-evb.dts
+> > @@ -22,6 +22,35 @@
+> >   	memory {
+> >   		reg = <0 0x80000000 0 0x40000000>;
+> >   	};
 > > +
-> >  		pinctrl_usdhc2_200mhz: usdhc2grp_200mhz {
-> >  			fsl,pins = <
-> >  				MX7D_PAD_SD2_CMD__SD2_CMD		0x5b
-> > @@ -638,22 +638,6 @@
-> >
-> >  		pinctrl_usdhc3: usdhc3grp {
-> >  			fsl,pins = <
-> > -				MX7D_PAD_SD3_CMD__SD3_CMD		0x59
-> > -				MX7D_PAD_SD3_CLK__SD3_CLK		0x09
-> > -				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x59
-> > -				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x59
-> > -				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x59
-> > -				MX7D_PAD_SD3_DATA3__SD3_DATA3		0x59
-> > -				MX7D_PAD_SD3_DATA4__SD3_DATA4		0x59
-> > -				MX7D_PAD_SD3_DATA5__SD3_DATA5		0x59
-> > -				MX7D_PAD_SD3_DATA6__SD3_DATA6		0x59
-> > -				MX7D_PAD_SD3_DATA7__SD3_DATA7		0x59
-> > -				MX7D_PAD_SD3_STROBE__SD3_STROBE		0x19
-> > -			>;
-> > -		};
-> > -
-> > -		pinctrl_usdhc3_100mhz: usdhc3grp_100mhz {
-> > -			fsl,pins = <
-> >  				MX7D_PAD_SD3_CMD__SD3_CMD		0x5a
-> >  				MX7D_PAD_SD3_CLK__SD3_CLK		0x0a
-> >  				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x5a
-> > @@ -668,6 +652,22 @@
-> >  			>;
-> >  		};
-> >
-> > +		pinctrl_usdhc3_100mhz: usdhc3grp_100mhz {
-> > +			fsl,pins = <
-> > +				MX7D_PAD_SD3_CMD__SD3_CMD		0x59
-> > +				MX7D_PAD_SD3_CLK__SD3_CLK		0x09
-> > +				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x59
-> > +				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x59
-> > +				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x59
-> > +				MX7D_PAD_SD3_DATA3__SD3_DATA3		0x59
-> > +				MX7D_PAD_SD3_DATA4__SD3_DATA4		0x59
-> > +				MX7D_PAD_SD3_DATA5__SD3_DATA5		0x59
-> > +				MX7D_PAD_SD3_DATA6__SD3_DATA6		0x59
-> > +				MX7D_PAD_SD3_DATA7__SD3_DATA7		0x59
-> > +				MX7D_PAD_SD3_STROBE__SD3_STROBE		0x19
-> > +			>;
-> > +		};
+> > +	backlight_lcd: backlight_lcd {
+> > +		compatible = "pwm-backlight";
+> > +		pwms = <&bls 0 100000>;
+> > +		brightness-levels = <
+> > +			  0  16  32  48  64  80  96 112
+> > +			128 144 160 176 192 208 224 240
+> > +			255
+> > +		>;
+> > +		default-brightness-level = <9>;
+> > +		pinctrl-names = "default";
+> > +		pinctrl-0 = <&pwm_bls_gpio>;
+> > +	};
+> > +};
 > > +
-> >  		pinctrl_usdhc3_200mhz: usdhc3grp_200mhz {
-> >  			fsl,pins = <
-> >  				MX7D_PAD_SD3_CMD__SD3_CMD		0x5b
-> > --
-> > 2.7.4
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > +&bls {
+> > +	status = "okay";
+> > +};
+> > +
+> > +&mmsys {
+> > +	status = "okay";
+> > +};
+> > +
+> > +&pio {
+> > +	pwm_bls_gpio: pwm_bls_gpio {
+> > +		pins_cmd_dat {
+> > +			pinmux = <MT2701_PIN_208_AUD_EXT_CK1__FUNC_DISP_PWM>;
+> > +		};
+> > +	};
+> >   };
+> >   
+> >   &auxadc {
+> > diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+> > index de88bd7..4f110d5 100644
+> > --- a/arch/arm/boot/dts/mt2701.dtsi
+> > +++ b/arch/arm/boot/dts/mt2701.dtsi
+> > @@ -366,6 +366,15 @@
+> >   		#clock-cells = <1>;
+> >   	};
+> >   
+> > +	bls: bls at 1400a000 {
+> > +		compatible = "mediatek,mt2701-disp-pwm";
+> > +		reg = <0 0x1400a000 0 0x1000>;
+> > +		#pwm-cells = <2>;
+> > +		clocks = <&mmsys CLK_MM_MDP_BLS_26M>, <&mmsys CLK_MM_DISP_BLS>;
+> > +		clock-names = "main", "mm";
+> > +		status = "disabled";
+> > +	};
+> > +
+> 
+> Can you make this a new patch please. It's preferred to have one patch 
+> for the dtsi and another one for the actual board.
+> 
+> Thanks,
+> Matthias
+
+OK, I will split it into two patches.
+
+Thanks,
+Weiqing Kong
+
+> 
+> >   	larb0: larb at 14010000 {
+> >   		compatible = "mediatek,mt2701-smi-larb";
+> >   		reg = <0 0x14010000 0 0x1000>;
+> > 
