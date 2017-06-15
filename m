@@ -1,95 +1,153 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Thu, 15 Jun 2017 21:13:55 +0100
-Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.13
-Message-ID: <5942EA83.6040907@hisilicon.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 15 Jun 2017 13:51:36 -0700
+Subject: [PATCH v3] misc: sram-exec: Use aligned fncpy instead of memcpy
+In-Reply-To: <20170518150706.9235-1-d-gerlach@ti.com>
+References: <20170518150706.9235-1-d-gerlach@ti.com>
+Message-ID: <48cd8ef0-1d66-2cfd-2d7e-8ff2089d3c02@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof, Hi Kevin,
+On 05/18/2017 08:07 AM, Dave Gerlach wrote:
+> Currently the sram-exec functionality, which allows allocation of
+> executable memory and provides an API to move code to it, is only
+> selected in configs for the ARM architecture. Based on commit
+> 5756e9dd0de6 ("ARM: 6640/1: Thumb-2: Symbol manipulation macros for
+> function body copying") simply copying a C function pointer address
+> using memcpy without consideration of alignment and Thumb is unsafe on
+> ARM platforms.
+> 
+> The aforementioned patch introduces the fncpy macro which is a safe way
+> to copy executable code on ARM platforms, so let's make use of that here
+> rather than the unsafe plain memcpy that was previously used by
+> sram_exec_copy. Now sram_exec_copy will move the code to "dst" and
+> return an address that is guaranteed to be safely callable.
+> 
+> In the future, architectures hoping to make use of the sram-exec
+> functionality must define an fncpy macro just as ARM has done to
+> guarantee or check for safe copying to executable memory before allowing
+> the arch to select CONFIG_SRAM_EXEC.
+> 
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+> Reviewed-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 
-Please help to pull the following changes.
+It would be nice if this could be applied to an upcoming v4.12-rc pull
+request.
+
 Thanks!
 
-And the patch "arm64: dts: hi6220: Add k3-dma and i2s/hdmi audio support"
-depends on audio-graph-card that will be landed on 4.13.
-But the dts part is checked without warning and can be compiled.
+> ---
+> 
+> v3 changes: Rebase on v4.12-rc1 and added Acks from v2.
+> v2: https://www.spinics.net/lists/kernel/msg2485366.html
+> v1: http://www.spinics.net/lists/linux-omap/msg136517.html
+> 
+> 
+>  drivers/misc/sram-exec.c | 27 ++++++++++++++++++++-------
+>  include/linux/sram.h     |  8 ++++----
+>  2 files changed, 24 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/misc/sram-exec.c b/drivers/misc/sram-exec.c
+> index 3d528a13b8fc..426ad912b441 100644
+> --- a/drivers/misc/sram-exec.c
+> +++ b/drivers/misc/sram-exec.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/mm.h>
+>  #include <linux/sram.h>
+>  
+> +#include <asm/fncpy.h>
+>  #include <asm/set_memory.h>
+>  
+>  #include "sram.h"
+> @@ -58,20 +59,32 @@ int sram_add_protect_exec(struct sram_partition *part)
+>   * @src: Source address for the data to copy
+>   * @size: Size of copy to perform, which starting from dst, must reside in pool
+>   *
+> + * Return: Address for copied data that can safely be called through function
+> + *	   pointer, or NULL if problem.
+> + *
+>   * This helper function allows sram driver to act as central control location
+>   * of 'protect-exec' pools which are normal sram pools but are always set
+>   * read-only and executable except when copying data to them, at which point
+>   * they are set to read-write non-executable, to make sure no memory is
+>   * writeable and executable at the same time. This region must be page-aligned
+>   * and is checked during probe, otherwise page attribute manipulation would
+> - * not be possible.
+> + * not be possible. Care must be taken to only call the returned address as
+> + * dst address is not guaranteed to be safely callable.
+> + *
+> + * NOTE: This function uses the fncpy macro to move code to the executable
+> + * region. Some architectures have strict requirements for relocating
+> + * executable code, so fncpy is a macro that must be defined by any arch
+> + * making use of this functionality that guarantees a safe copy of exec
+> + * data and returns a safe address that can be called as a C function
+> + * pointer.
+>   */
+> -int sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
+> -		   size_t size)
+> +void *sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
+> +		     size_t size)
+>  {
+>  	struct sram_partition *part = NULL, *p;
+>  	unsigned long base;
+>  	int pages;
+> +	void *dst_cpy;
+>  
+>  	mutex_lock(&exec_pool_list_mutex);
+>  	list_for_each_entry(p, &exec_pool_list, list) {
+> @@ -81,10 +94,10 @@ int sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
+>  	mutex_unlock(&exec_pool_list_mutex);
+>  
+>  	if (!part)
+> -		return -EINVAL;
+> +		return NULL;
+>  
+>  	if (!addr_in_gen_pool(pool, (unsigned long)dst, size))
+> -		return -EINVAL;
+> +		return NULL;
+>  
+>  	base = (unsigned long)part->base;
+>  	pages = PAGE_ALIGN(size) / PAGE_SIZE;
+> @@ -94,13 +107,13 @@ int sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
+>  	set_memory_nx((unsigned long)base, pages);
+>  	set_memory_rw((unsigned long)base, pages);
+>  
+> -	memcpy(dst, src, size);
+> +	dst_cpy = fncpy(dst, src, size);
+>  
+>  	set_memory_ro((unsigned long)base, pages);
+>  	set_memory_x((unsigned long)base, pages);
+>  
+>  	mutex_unlock(&part->lock);
+>  
+> -	return 0;
+> +	return dst_cpy;
+>  }
+>  EXPORT_SYMBOL_GPL(sram_exec_copy);
+> diff --git a/include/linux/sram.h b/include/linux/sram.h
+> index c97dcbe8ce25..4fb405fb0480 100644
+> --- a/include/linux/sram.h
+> +++ b/include/linux/sram.h
+> @@ -16,12 +16,12 @@
+>  struct gen_pool;
+>  
+>  #ifdef CONFIG_SRAM_EXEC
+> -int sram_exec_copy(struct gen_pool *pool, void *dst, void *src, size_t size);
+> +void *sram_exec_copy(struct gen_pool *pool, void *dst, void *src, size_t size);
+>  #else
+> -static inline int sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
+> -				 size_t size)
+> +static inline void *sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
+> +				   size_t size)
+>  {
+> -	return -ENODEV;
+> +	return NULL;
+>  }
+>  #endif /* CONFIG_SRAM_EXEC */
+>  #endif /* __LINUX_SRAM_H__ */
+> 
 
-Best Regards,
-Wei
 
----
-
-The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
-
-  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
-
-are available in the git repository at:
-
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.13
-
-for you to fetch changes up to 1f3df90e764c65ea1019b5d403c1cdbd49c118ec:
-
-  arm64: dts: hi6220: Add k3-dma and i2s/hdmi audio support (2017-06-15 15:37:37 +0100)
-
-----------------------------------------------------------------
-ARM64: DT: Hisilicon SoC DT updates for 4.13
-
-- Add and update Hi3660-Hikey960 board, Hi3660 PCIe RC, Hi6421v530 MFD and
-  Hi3660 MMC binding
-- Add and refine devices support for Hi3660-Hikey 960 including clock, reset,
-  I2C, GPIO, UART, Bluetooth, RTC, Power Key, LED, SPI, timer, PMIC, regulator,
-  sd/sdio and WiFi
-- Add k3-dma and i2s/hdmi audio support based on audio-card-graph method for
-  Hikey board
-
-----------------------------------------------------------------
-Chen Feng (2):
-      arm64: dts: hi3660: Add uarts nodes
-      arm64: dts: hi3660: Add pl031 rtc node
-
-Chen Jun (1):
-      arm64: dts: hi3660: add power key dts node
-
-Guodong Xu (7):
-      dt-bindings: arm: hisilicon: add bindings for HiKey960 board
-      arm64: dts: hisilicon: update compatible string for hikey960
-      arm64: dts: hikey960: add WL1837 Bluetooth device node
-      arm64: dts: hikey960: add LED nodes
-      dt-bindings: mfd: hi6421: Add hi6421v530 compatible string
-      dt-bindings: mmc: dw_mmc-k3: add document of hi3660 mmc
-      arm64: dts: hi3660-hikey960: add nodes for WiFi
-
-John Stultz (1):
-      arm64: dts: hi6220: Add k3-dma and i2s/hdmi audio support
-
-Leo Yan (1):
-      arm64: dts: hi3660: add sp804 timer node
-
-Li Wei (1):
-      arm64: dts: hi3660: add sd/sdio device nodes
-
-Wang Xiaoyin (4):
-      arm64: dts: hikey960: pinctrl: add more pinmux and pinconfig
-      arm64: dts: hi3660: add gpio dtsi file for Hisilicon Hi3660 SOC
-      arm64: dts: hi3660: add spi device nodes
-      arm64: dts: hikey960: add device node for pmic and regulators
-
-Xiaowei Song (2):
-      dt-bindings: PCI: hisi: Add document for PCIe of Kirin SoCs
-      arm64: dts: hisi: add kirin pcie node
-
-Zhangfei Gao (2):
-      arm64: dts: hi3660: add resources for clock and reset
-      arm64: dts: Add I2C nodes for Hi3660
-
- .../bindings/arm/hisilicon/hisilicon.txt           |   4 +
- Documentation/devicetree/bindings/mfd/hi6421.txt   |   4 +-
- .../devicetree/bindings/mmc/k3-dw-mshc.txt         |   1 +
- .../devicetree/bindings/pci/kirin-pcie.txt         |  50 ++
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts  | 217 +++++-
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi          | 702 ++++++++++++++++++-
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |  34 +-
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  26 +
- .../arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi | 778 +++++++++++++++++++--
- 9 files changed, 1738 insertions(+), 78 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pci/kirin-pcie.txt
+-- 
+Florian
