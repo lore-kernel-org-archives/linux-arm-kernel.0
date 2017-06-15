@@ -1,78 +1,69 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 15 Jun 2017 11:16:34 +0100
-Subject: [PATCH v2 1/3] arm64: mm: print out correct page table entries
-In-Reply-To: <20170615101230.z4fqj5ofxsmnagnq@yury-thinkpad>
-References: <1497022554-1451-1-git-send-email-kristina.martsenko@arm.com>
- <20170609202236.t75jejhvhksqmkw3@yury-thinkpad>
- <20170615100051.GC20308@arm.com>
- <20170615101230.z4fqj5ofxsmnagnq@yury-thinkpad>
-Message-ID: <20170615101633.GD20308@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 15 Jun 2017 11:19:40 +0100
+Subject: [PATCH 06/12] coresight tmc: Expose DBA and AXICTL
+In-Reply-To: <20170614175042.GB22030@xps15>
+References: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
+ <1497278211-5001-7-git-send-email-suzuki.poulose@arm.com>
+ <20170614175042.GB22030@xps15>
+Message-ID: <b72bb2fa-7bbc-cee0-caaf-018b5552cad7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 15, 2017 at 01:12:30PM +0300, Yury Norov wrote:
-> On Thu, Jun 15, 2017 at 11:00:51AM +0100, Will Deacon wrote:
-> > On Fri, Jun 09, 2017 at 11:22:36PM +0300, Yury Norov wrote:
-> > > On Fri, Jun 09, 2017 at 04:35:52PM +0100, Kristina Martsenko wrote:
-> > > > diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> > > > index c3f2b1048f83..a9dfb37c87a2 100644
-> > > > --- a/arch/arm64/mm/fault.c
-> > > > +++ b/arch/arm64/mm/fault.c
-> > > > @@ -80,14 +80,24 @@ static inline int notify_page_fault(struct pt_regs *regs, unsigned int esr)
-> > > >  #endif
-> > > >  
-> > > >  /*
-> > > > - * Dump out the page tables associated with 'addr' in mm 'mm'.
-> > > > + * Dump out the page tables associated with 'addr' in the currently active mm.
-> > > >   */
-> > > > -void show_pte(struct mm_struct *mm, unsigned long addr)
-> > > > +void show_pte(unsigned long addr)
-> > > >  {
-> > > > +	struct mm_struct *mm;
-> > > >  	pgd_t *pgd;
-> > > >  
-> > > > -	if (!mm)
-> > > > +	if (addr < TASK_SIZE) {
-> > > > +		/* TTBR0 */
-> > > > +		mm = current->active_mm;
-> > > > +	} else if (addr >= VA_START) {
-> > > > +		/* TTBR1 */
-> > > >  		mm = &init_mm;
-> > > > +	} else {
-> > > > +		pr_alert("[%08lx] address between user and kernel address ranges\n",
-> > > > +			 addr);
-> > > > +		return;
-> > > > +	}
-> > > >  
-> > > >  	pr_alert("pgd = %p\n", mm->pgd);
-> > > >  	pgd = pgd_offset(mm, addr);
-> > > 
-> > > Is there any reason to change the prototype of the function?
-> > > You say nothing about it in patch description. The show_pte()
-> > > is implemented in several arches, and everywhere it takes mm_struct
-> > > as 1st argument. For me, if you don't need to change the prototype,
-> > > you'd better leave things as is. The patch will get much shorter
-> > > and expressive with it.
-> > > 
-> > > If you really need to change the prototype, it would be better to do
-> > > it in separated patch and give clear explanations - what for?
-> > 
-> > The mm is unused and this isn't a core interface. In fact, it's only
-> > available on architectures that started off by copying from arch/arm/.
-> > 
-> > We can always add the mm back if we need it in future.
-> 
-> OK, understood that. But I still think it should be done in separeted
-> patch, and it would be also good to revise sh and unicore32. It seems
-> that sh may be easily switched to the proposed interface, and the
-> unicore32 most probably too.
+On 14/06/17 18:50, Mathieu Poirier wrote:
+> On Mon, Jun 12, 2017 at 03:36:45PM +0100, Suzuki K Poulose wrote:
+>> Expose DBALO,DBAHI and AXICTL registers
+>
+> Why is this needed?  I fear we are exposing internal kernel information.
+>
 
-Why? This is the patch that removes the usage of the paramater, so it should
-also remove the parameter. This function isn't called by anybody outside of
-arm64, so there's no "proposed interface" to speak of.
+Mathieu,
 
-If this was a core function with lots of tree-wide callers, then I'd agree
-with you: remove use of the thing, fix the callers, then remove the
-parameter. But that's not the case here.
+These are useful to analyse/debug the trace session. e.g, we could compare
+RRP/RWP with DBA to see if the trace is actually generated or not.
+As such, we already expose RRP/RWP. Exposing DBA doesn't expose
+more information than we do already. Also, when we add SG support
+this will be useful, as DBA will never match (or be in the range of) RRP/RWP.
 
-Will
+The AXICTL may not be of any significance right now, but will be
+useful once we add scatter gather support, to check which mode
+are we operating in.
+
+Let me know if you still have concerns.
+
+Suzuki
+
+>>
+>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>>  drivers/hwtracing/coresight/coresight-tmc.c | 4 ++++
+>>  1 file changed, 4 insertions(+)
+>>
+>> diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+>> index 7025982..fd5a2e0 100644
+>> --- a/drivers/hwtracing/coresight/coresight-tmc.c
+>> +++ b/drivers/hwtracing/coresight/coresight-tmc.c
+>> @@ -228,9 +228,11 @@ coresight_tmc_simple_func(ffcr, TMC_FFCR);
+>>  coresight_tmc_simple_func(mode, TMC_MODE);
+>>  coresight_tmc_simple_func(pscr, TMC_PSCR);
+>>  coresight_tmc_simple_func(devid, CORESIGHT_DEVID);
+>> +coresight_tmc_simple_func(axictl, TMC_AXICTL);
+>>
+>>  coresight_simple_reg64(struct tmc_drvdata, rrp, TMC_RRP, TMC_RRPHI);
+>>  coresight_simple_reg64(struct tmc_drvdata, rwp, TMC_RWP, TMC_RWPHI);
+>> +coresight_simple_reg64(struct tmc_drvdata, dba, TMC_DBALO, TMC_DBAHI);
+>>
+>>  static struct attribute *coresight_tmc_mgmt_attrs[] = {
+>>  	&dev_attr_rsz.attr,
+>> @@ -244,6 +246,8 @@ static struct attribute *coresight_tmc_mgmt_attrs[] = {
+>>  	&dev_attr_mode.attr,
+>>  	&dev_attr_pscr.attr,
+>>  	&dev_attr_devid.attr,
+>> +	&dev_attr_dba.attr,
+>> +	&dev_attr_axictl.attr,
+>>  	NULL,
+>>  };
+>>
+>> --
+>> 2.7.4
+>>
