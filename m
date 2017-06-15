@@ -1,74 +1,54 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu, 15 Jun 2017 18:18:04 +0200
-Subject: [PATCH v3 6/6] ARM64: dts: meson-gx: add gpio interrupt controller
-In-Reply-To: <20170615161804.32658-1-jbrunet@baylibre.com>
-References: <20170615161804.32658-1-jbrunet@baylibre.com>
-Message-ID: <20170615161804.32658-7-jbrunet@baylibre.com>
+From: srishtishar@gmail.com (srishti sharma)
+Date: Thu, 15 Jun 2017 21:49:34 +0530
+Subject: [PATCH] Staging: vc04_services: bcm2835-audio: bcm2835-ctl.c:
+ Fixed alignment to match open paranthesis.
+In-Reply-To: <1497466774.18751.64.camel@perches.com>
+References: <1497449172-3904-1-git-send-email-srishtishar@gmail.com>
+ <1497466774.18751.64.camel@perches.com>
+Message-ID: <CAB3L5oxWBeN-YPWp94p7htH+D+ZpLomzVx2aMePMwApCPZiWUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add gpio interrupt controller to Amlogic GX family SoCs
+On Thu, Jun 15, 2017 at 12:29 AM, Joe Perches <joe@perches.com> wrote:
+> On Wed, 2017-06-14 at 19:36 +0530, srishti sharma wrote:
+>> Fixed alignment so that it matched open paranthesis.
+>
+> Please try to avoid typos in your commit message and as
+> well try to do all of alignment warnings in a single patch.
+>
+> Ideally, all the files in a driver would be modified.
+>
+> $ ./scripts/checkpatch.pl -f drivers/staging/vc04_services/bcm2835-audio/*.[ch]  --types=parenthesis_alignment --terse
+> drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:108: CHECK: Alignment should match open parenthesis
+> drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:188: CHECK: Alignment should match open parenthesis
+> drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:196: CHECK: Alignment should match open parenthesis
+> drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:213: CHECK: Alignment should match open parenthesis
+> drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:233: CHECK: Alignment should match open parenthesis
+> drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:241: CHECK: Alignment should match open parenthesis
+> drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:252: CHECK: Alignment should match open parenthesis
+> drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:260: CHECK: Alignment should match open parenthesis
+> drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:277: CHECK: Alignment should match open parenthesis
+> total: 0 errors, 0 warnings, 9 checks, 426 lines checked
+> drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:70: CHECK: Alignment should match open parenthesis
+> drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:85: CHECK: Alignment should match open parenthesis
+> drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:256: CHECK: Alignment should match open parenthesis
+> drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:305: CHECK: Alignment should match open parenthesis
+> drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:328: CHECK: Alignment should match open parenthesis
+> drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:336: CHECK: Alignment should match open parenthesis
+> drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:371: CHECK: Alignment should match open parenthesis
+> drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:378: CHECK: Alignment should match open parenthesis
+> drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:421: CHECK: Alignment should match open parenthesis
+> drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:431: CHECK: Alignment should match open parenthesis
+> drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:436: CHECK: Alignment should match open parenthesis
+> drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:525: CHECK: Alignment should match open parenthesis
+> total: 0 errors, 0 warnings, 12 checks, 567 lines checked
+>
+>
 
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi   | 9 +++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 6 ++++++
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 6 ++++++
- 3 files changed, 21 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-index 603491df9f0f..95d4f4c60b4f 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-@@ -218,6 +218,15 @@
- 			#size-cells = <2>;
- 			ranges = <0x0 0x0 0x0 0xc1100000 0x0 0x100000>;
- 
-+			gpio_intc: interrupt-controller at 9880 {
-+				compatible = "amlogic,meson-gpio-intc";
-+				reg = <0x0 0x9880 0x0 0x10>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				amlogic,upstream-interrupts = <64 65 66 67 68 69 70 71>;
-+				status = "disabled";
-+			};
-+
- 			reset: reset-controller at 4404 {
- 				compatible = "amlogic,meson-gx-reset", "amlogic,meson-gxbb-reset";
- 				reg = <0x0 0x04404 0x0 0x20>;
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-index dbd300fffa8a..b6f3561c803c 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -314,6 +314,12 @@
- 	clock-names = "stmmaceth", "clkin0", "clkin1";
- };
- 
-+&gpio_intc {
-+	compatible = "amlogic,meson-gpio-intc",
-+		     "amlogic,meson-gxbb-gpio-intc";
-+	status = "okay";
-+};
-+
- &hdmi_tx {
- 	compatible = "amlogic,meson-gxbb-dw-hdmi", "amlogic,meson-gx-dw-hdmi";
- 	resets = <&reset RESET_HDMITX_CAPB3>,
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-index 4dfc22b07bf0..08268cedd965 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-@@ -207,6 +207,12 @@
- 	};
- };
- 
-+&gpio_intc {
-+	compatible = "amlogic,meson-gpio-intc",
-+		     "amlogic,meson-gxl-gpio-intc";
-+	status = "okay";
-+};
-+
- &hdmi_tx {
- 	compatible = "amlogic,meson-gxl-dw-hdmi", "amlogic,meson-gx-dw-hdmi";
- 	resets = <&reset RESET_HDMITX_CAPB3>,
--- 
-2.9.4
+Hey,
+
+Thanks for this , I have re-sent the patch .
+
+Regards,
+srishti
