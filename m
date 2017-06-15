@@ -1,33 +1,34 @@
 From: frank.wang@rock-chips.com (Frank Wang)
-Date: Thu, 15 Jun 2017 15:16:14 +0800
-Subject: [PATCH 0/6] add some device nodes support for rk322x SoC
-Message-ID: <1497510980-23207-1-git-send-email-frank.wang@rock-chips.com>
+Date: Thu, 15 Jun 2017 15:16:16 +0800
+Subject: [PATCH 2/6] Documentation: rockchip-dw-mshc: add description for
+ rk3228
+In-Reply-To: <1497510980-23207-1-git-send-email-frank.wang@rock-chips.com>
+References: <1497510980-23207-1-git-send-email-frank.wang@rock-chips.com>
+Message-ID: <1497510980-23207-3-git-send-email-frank.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These series add sdmmc, sdio, and other device nodes support for
-rk322x SoCs, and also introduce rk3229 basic dtsi file specifically.
+From: Shawn Lin <shawn.lin@rock-chips.com>
 
-David Wu (1):
-  ARM: dts: rockchip: Add io-domain node for rk3228
+Add "rockchip,rk3228-dw-mshc", "rockchip,rk3288-dw-mshc" for
+dwmmc on rk322x platform.
 
-Finley Xiao (1):
-  ARM: dts: rockchip: add efuse device node for rk3228
+Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+---
+ Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Frank Wang (1):
-  ARM: dts: rockchip: add basic dtsi file for RK3229 SoC
-
-Shawn Lin (3):
-  Documentation: rockchip-dw-mshc: add description for rk3228
-  ARM: dts: rockchip: fix compatible string for eMMC node of rk3228 SoC
-  ARM: dts: rockchip: add sdmmc and sdio nodes for rk3228 SoC
-
- .../devicetree/bindings/mmc/rockchip-dw-mshc.txt   |   1 +
- arch/arm/boot/dts/rk3229-evb.dts                   |   2 +-
- arch/arm/boot/dts/rk3229.dtsi                      | 110 +++++++++++++++++++++
- arch/arm/boot/dts/rk322x.dtsi                      |  84 +++++++++++++++-
- 4 files changed, 195 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/boot/dts/rk3229.dtsi
-
+diff --git a/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
+index 520d61d..ce30dff 100644
+--- a/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
++++ b/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
+@@ -15,6 +15,7 @@ Required Properties:
+ 	- "rockchip,rk3288-dw-mshc": for Rockchip RK3288
+ 	- "rockchip,rv1108-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RV1108
+ 	- "rockchip,rk3036-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RK3036
++	- "rockchip,rk3228-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RK322X
+ 	- "rockchip,rk3368-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RK3368
+ 	- "rockchip,rk3399-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RK3399
+ 
 -- 
 2.0.0
