@@ -1,39 +1,48 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Thu, 15 Jun 2017 15:33:37 +0300
-Subject: arm64: next-20170614 panics on boot
-In-Reply-To: <20170615120840.ce7v4hxflueu4s7o@yury-thinkpad>
-References: <20170615120840.ce7v4hxflueu4s7o@yury-thinkpad>
-Message-ID: <20170615123337.5qkrh72vt53jnwnf@yury-thinkpad>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 15 Jun 2017 14:57:53 +0200
+Subject: [PATCH 2/2 v4] clk: Add Gemini SoC clock controller
+In-Reply-To: <CAMuHMdXdYNTLCUfQ9rdj8Fffff5G6fGREcHs5-E5LbwPU9yyLw@mail.gmail.com>
+References: <20170524082044.8473-1-linus.walleij@linaro.org>
+ <20170601070208.GO20170@codeaurora.org>
+ <CACRpkdZv8MzXVecEXVdJ+P0MxVscYSy=MxC-yQAR0S4yQ6-rwQ@mail.gmail.com>
+ <20170605195812.GH20170@codeaurora.org>
+ <CACRpkdbya9xaN-i7AkG0bTyuFYfZc59sSTYhWB43=9btSKfPpQ@mail.gmail.com>
+ <CACRpkdapAgHix2vw-woDFi4sh+H3_EX7w-5q=opBGMyegFrXbA@mail.gmail.com>
+ <20170612210248.GP20170@codeaurora.org>
+ <CACRpkdaZJbzC0-xg_go=-o+0cQ-JOY3mUe27HUnwQ+DnZYbyMA@mail.gmail.com>
+ <CAMuHMdXdYNTLCUfQ9rdj8Fffff5G6fGREcHs5-E5LbwPU9yyLw@mail.gmail.com>
+Message-ID: <CACRpkdY+aSyec9PZaoXErzsRefWg2zzw1xihQt_whmote-jBBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 15, 2017 at 03:08:40PM +0300, Yury Norov wrote:
-> Hi all,
-> 
-> Today's linux next falls into panic in init_IRQ():
-> arch/arm64/kernel/irq.c:
->  53 void __init init_IRQ(void)
->  54 {
->  55         irqchip_init();
->  56         if (!handle_arch_irq)
->  57                 panic("No interrupt controller found.");
->  58 }
-> 
-> 
-> Bisecting points to the patch 6fedb069def034 ("of: Provide dummy
-> of_device_compatible_match() for compile-testing"), but reverting it
-> doesn't help. It seems like yesterday's linux-next also hangs.  Right
-> now I cannot continue with debugging, but if nothing will get clear,
-> I'll back to it at this evening.
+On Thu, Jun 15, 2017 at 10:55 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
 
-Sorry, forgot to attach the config. This is it. Also, I run arm64 on
-qemu.
+> If clocks and resets are provided by the same hardware module, you can
+> have a single (platform) driver registering both the clock and reset
+> controllers.
+> Cfr. drivers/clk/renesas/renesas-cpg-mssr.c.
 
-Yury
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: config.gz
-Type: application/gzip
-Size: 35566 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170615/cc62b34e/attachment-0001.gz>
+That is indeed an option.
+
+So I would say, clk & reset maintainers: would you prefer that I merge the
+reset control into the clock driver as well, ask Philipp to drop the pending
+reset control patches from his subsystem tree and have you manage the
+combined driver and bindings?
+
+It seems to me as very ugly from a divide & conquer subsystem and file
+split point of view.
+
+I seems elegant from the "make clocks a platform device" point of view.
+
+I am happy with either approach as long as it works.
+
+I guess it is up to the taste of the subsystem maintainers, especially
+clk.
+
+If I get some time I might just hack this up and send the patches so
+it is on the table as an alternative to the current v5 patch. Certainly it is
+better than going back and augmenting the DT bindings.
+
+Yours,
+Linus Walleij
