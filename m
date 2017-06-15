@@ -1,35 +1,48 @@
-From: bshah@kde.org (Bhushan Shah)
-Date: Thu, 15 Jun 2017 11:45:21 +0530
-Subject: [PATCH] ARM: qcom_defconfig: enable RPMSG_QCOM_SMD
-Message-ID: <20170615061521.21292-1-bshah@kde.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 15 Jun 2017 08:27:06 +0200
+Subject: [GIT PULL] pxa for v4.13
+Message-ID: <87mv99u5ol.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As of commit 5052de8deff56, QCOM_SMD_RPM and various other config
-options enabled in the qcom_defconfig depends on the RPMSG. If
-QCOM_SMD_RPM config option is not selected it disables the
-REGULATOR_QCOM_SMD_RPM and other essential config options.
+Hello Arnd, Kevin, Olof,
 
-Signed-off-by: Bhushan Shah <bshah@kde.org>
----
-I believe this patch should be included in the current rc version as well
-otherwise boards that depend on pm8941 are not functional (for example   
-msm8974-hamerhead had emmc not working).                                 
+Please consider this pull request for pxa 4.13 cycle, nothing very fancy either
+this cycle.
 
- arch/arm/configs/qcom_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 
-diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
-index 07666a7a9de5..65356a3a9253 100644
---- a/arch/arm/configs/qcom_defconfig
-+++ b/arch/arm/configs/qcom_defconfig
-@@ -173,6 +173,7 @@ CONFIG_LEDS_GPIO=y
- CONFIG_LEDS_PM8058=y
- CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+CONFIG_RPMSG_QCOM_SMD=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_PM8XXX=y
- CONFIG_DMADEVICES=y
+  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+
+are available in the git repository at:
+
+  https://github.com/rjarzmik/linux.git tags/pxa-for-4.13
+
+for you to fetch changes up to ce3de60ff92ba5e4d65f1c1ce07460795e3a6157:
+
+  ARM: pxa: Delete an error message for a failed memory allocation in pxa3xx_u2d_probe() (2017-06-14 08:32:21 +0200)
+
+----------------------------------------------------------------
+This is the pxa changes for v4.13 cycle.
+
+This cycle is a minor fixes one, with :
+ - Coccinelle found improvements
+ - magician getting touchscreen driver support.
+
+----------------------------------------------------------------
+Markus Elfring (3):
+      ARM: pxa: Delete an error message for a failed memory allocation in pxa_pm_init()
+      ARM: pxa: Improve a size determination in pxa3xx_u2d_probe()
+      ARM: pxa: Delete an error message for a failed memory allocation in pxa3xx_u2d_probe()
+
+Petr Cvek (1):
+      ARM: pxa: magician: Add support for ADS7846 touchscreen
+
+ arch/arm/mach-pxa/include/mach/magician.h |  1 +
+ arch/arm/mach-pxa/magician.c              | 84 ++++++++++++++++++++++++++++++-
+ arch/arm/mach-pxa/pm.c                    |  4 +-
+ arch/arm/mach-pxa/pxa3xx-ulpi.c           |  6 +--
+ 4 files changed, 87 insertions(+), 8 deletions(-)
+
 -- 
-2.13.0
+Robert
