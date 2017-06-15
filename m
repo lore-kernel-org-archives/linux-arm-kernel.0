@@ -1,47 +1,70 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 15 Jun 2017 11:53:34 +0800
-Subject: [linux-sunxi] Re: [PATCH 1/2] dmaengine: sun6i: make gate bit in
- sun8i's DMA engines a common quirk
-In-Reply-To: <20170615035407.GM13020@localhost>
-References: <20170605123348.26137-1-icenowy@aosc.io>
- <20170605123348.26137-2-icenowy@aosc.io> <20170614083252.GK13020@localhost>
- <AD656BCC-5064-454F-9576-FA59283E0C45@aosc.io>
- <20170614084529.GL13020@localhost> <20170614090439.rkdaoo3uqzjqwuxq@flea.lan>
- <20170615035407.GM13020@localhost>
-Message-ID: <29B06690-5F41-4417-8894-7B09ECAA578B@aosc.io>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 15 Jun 2017 11:59:59 +0800
+Subject: [PATCH 1/2] ARM64/irqchip: Update ACPI_IORT symbol selection logic
+In-Reply-To: <20170614163713.14574-1-lorenzo.pieralisi@arm.com>
+References: <20170614163713.14574-1-lorenzo.pieralisi@arm.com>
+Message-ID: <a5733e34-22f7-2ae9-b873-fee222a3f1c0@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2017/6/15 0:37, Lorenzo Pieralisi wrote:
+> ACPI IORT is an ACPI addendum to describe the connection topology of
+> devices with IOMMUs and interrupt controllers on ARM64 ACPI systems.
+> 
+> Currently the ACPI IORT Kbuild symbol is selected whenever the Kbuild
+> symbol ARM_GIC_V3_ITS is enabled, which in turn is selected by ARM64
+> Kbuild defaults. This makes the logic behind ACPI_IORT selection a bit
+> twisted and not easy to follow. On ARM64 systems enabling ACPI the
+> kbuild symbol ACPI_IORT should always be selected in that it is a kernel
+> layer provided to the ARM64 arch code to parse and enable ACPI firmware
+> bindings.
+> 
+> Make the ACPI_IORT selection explicit in ARM64 Kbuild and remove the
+> selection from ARM_GIC_V3_ITS entry, making the ACPI_IORT selection
+> logic clearer to follow.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>   arch/arm64/Kconfig      | 1 +
+>   drivers/irqchip/Kconfig | 1 -
+>   2 files changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index b2024db..2424fb4 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -3,6 +3,7 @@ config ARM64
+>   	select ACPI_CCA_REQUIRED if ACPI
+>   	select ACPI_GENERIC_GSI if ACPI
+>   	select ACPI_GTDT if ACPI
+> +	select ACPI_IORT if ACPI
+>   	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
+>   	select ACPI_MCFG if ACPI
+>   	select ACPI_SPCR_TABLE if ACPI
+> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+> index 478f8ac..4a57b8f 100644
+> --- a/drivers/irqchip/Kconfig
+> +++ b/drivers/irqchip/Kconfig
+> @@ -39,7 +39,6 @@ config ARM_GIC_V3_ITS
+>   	bool
+>   	depends on PCI
+>   	depends on PCI_MSI
+> -	select ACPI_IORT if ACPI
 
+Make sense to me, IORT also describe SMMU+IO topology. I
+give this patch a light test with CONFIG combination compile
+test, and see no issues,
 
-? 2017?6?15? GMT+08:00 ??11:54:08, Vinod Koul <vinod.koul@intel.com> ??:
->On Wed, Jun 14, 2017 at 11:04:39AM +0200, Maxime Ripard wrote:
->> On Wed, Jun 14, 2017 at 02:15:29PM +0530, Vinod Koul wrote:
->> > > SoC info is in compatible, so there's no reason to make it a
->property.
->> > 
->> > that's why it would need to be optional for the SoC's that needs
->these..
->> 
->> There's nothing optional about that behaviour, it's mandatory for the
->> SoC that need it, and useless on the SoC that don't.
->
->And why should kernel put strings for each hw behaviour. I am expecting
->DT
->to tell me if this SoC is a special case or not and kernel shall handle
->accordingly
+Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-I don't think this kind of behavior should be described in DT.
+Thanks
+Hanjun
 
-Rob, do you agree?
-
->
->> Plus, that would require changing the DT binding, which isn't
->> something we can do.
->
->Any reason why bindings can't change..? I though this was support for
->new
->SoC...
-
-This is a behavior that exists on a SoC that is already
-supported (A23/A33).
+>   
+>   config ARM_NVIC
+>   	bool
+> 
