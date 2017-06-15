@@ -1,41 +1,80 @@
 From: david.daney@cavium.com (David Daney)
-Date: Thu, 15 Jun 2017 15:35:42 -0700
-Subject: [PATCH RFC 2/3] samples/bpf: Add define __EMITTING_BPF__ when
- building BPF
+Date: Thu, 15 Jun 2017 15:35:43 -0700
+Subject: [PATCH RFC 3/3] MIPS: Include file changes to enable building BPF
+ code with llvm
 In-Reply-To: <20170615223543.22867-1-david.daney@cavium.com>
 References: <20170615223543.22867-1-david.daney@cavium.com>
-Message-ID: <20170615223543.22867-3-david.daney@cavium.com>
+Message-ID: <20170615223543.22867-4-david.daney@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-... this allows gating of inline assembly code that causes llvm to
-fail when emitting BPF.
+When building for the eBPF target archecture. Inline asm cannot be
+used as MIPS instructions are fundamentally incompatible with eBPF
+bytecode.  The preprocessor symbol __EMITTING_BPF__ is used to gate
+the inclusion of inline asm in constructs used the by the BPF
+programs.
+
+Also make the Makefile symbol LINUXINCLUDE contain the
+asm/mach-MACHINE directory so that the BPF compilation process can
+pull in the necessary include files.
 
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- samples/bpf/Makefile | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/mips/Makefile                | 1 +
+ arch/mips/cavium-octeon/Platform  | 3 +++
+ arch/mips/include/asm/checksum.h  | 2 +-
+ arch/mips/include/uapi/asm/swab.h | 2 +-
+ 4 files changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/samples/bpf/Makefile b/samples/bpf/Makefile
-index a0561dc762fe..4979e6b56662 100644
---- a/samples/bpf/Makefile
-+++ b/samples/bpf/Makefile
-@@ -193,12 +193,12 @@ $(src)/*.c: verify_target_bpf
+diff --git a/arch/mips/Makefile b/arch/mips/Makefile
+index 02a1787c888c..ca968415597f 100644
+--- a/arch/mips/Makefile
++++ b/arch/mips/Makefile
+@@ -247,6 +247,7 @@ entry-y				= 0x$(shell $(NM) vmlinux 2>/dev/null \
+ 					| grep "\bkernel_entry\b" | cut -f1 -d \ )
  
- $(obj)/tracex5_kern.o: $(obj)/syscall_nrs.h
+ cflags-y			+= -I$(srctree)/arch/mips/include/asm/mach-generic
++LINUXINCLUDE			+= -I$(srctree)/arch/mips/include/asm/mach-generic
+ drivers-$(CONFIG_PCI)		+= arch/mips/pci/
  
--# asm/sysreg.h - inline assembly used by it is incompatible with llvm.
--# But, there is no easy way to fix it, so just exclude it since it is
--# useless for BPF samples.
-+# __EMITTING_BPF__ used to exclude inline assembly, which cannot be
-+# emitted in BPF code.
- $(obj)/%.o: $(src)/%.c
- 	$(CLANG) $(NOSTDINC_FLAGS) $(LINUXINCLUDE) $(EXTRA_CFLAGS) \
--		-D__KERNEL__ -D__ASM_SYSREG_H -Wno-unused-value -Wno-pointer-sign \
-+		-D__KERNEL__ -D__EMITTING_BPF__ \
-+		-Wno-unused-value -Wno-pointer-sign \
- 		-Wno-compare-distinct-pointer-types \
- 		-Wno-gnu-variable-sized-type-not-at-end \
- 		-Wno-address-of-packed-member -Wno-tautological-compare \
+ #
+diff --git a/arch/mips/cavium-octeon/Platform b/arch/mips/cavium-octeon/Platform
+index 45be853700e6..9ef3e4074099 100644
+--- a/arch/mips/cavium-octeon/Platform
++++ b/arch/mips/cavium-octeon/Platform
+@@ -4,4 +4,7 @@
+ platform-$(CONFIG_CAVIUM_OCTEON_SOC)	+= cavium-octeon/
+ cflags-$(CONFIG_CAVIUM_OCTEON_SOC)	+=				\
+ 		-I$(srctree)/arch/mips/include/asm/mach-cavium-octeon
++ifdef CONFIG_CAVIUM_OCTEON_SOC
++LINUXINCLUDE	+= -I$(srctree)/arch/mips/include/asm/mach-cavium-octeon
++endif
+ load-$(CONFIG_CAVIUM_OCTEON_SOC)	+= 0xffffffff81100000
+diff --git a/arch/mips/include/asm/checksum.h b/arch/mips/include/asm/checksum.h
+index 77cad232a1c6..f8fff2ced216 100644
+--- a/arch/mips/include/asm/checksum.h
++++ b/arch/mips/include/asm/checksum.h
+@@ -12,7 +12,7 @@
+ #ifndef _ASM_CHECKSUM_H
+ #define _ASM_CHECKSUM_H
+ 
+-#ifdef CONFIG_GENERIC_CSUM
++#if defined(CONFIG_GENERIC_CSUM) || defined(__EMITTING_BPF__)
+ #include <asm-generic/checksum.h>
+ #else
+ 
+diff --git a/arch/mips/include/uapi/asm/swab.h b/arch/mips/include/uapi/asm/swab.h
+index 23cd9b118c9e..42ed70015c70 100644
+--- a/arch/mips/include/uapi/asm/swab.h
++++ b/arch/mips/include/uapi/asm/swab.h
+@@ -13,7 +13,7 @@
+ 
+ #define __SWAB_64_THRU_32__
+ 
+-#if !defined(__mips16) &&					\
++#if !defined(__mips16) && !defined(__EMITTING_BPF__) &&			\
+ 	((defined(__mips_isa_rev) && (__mips_isa_rev >= 2)) ||	\
+ 	 defined(_MIPS_ARCH_LOONGSON3A))
+ 
 -- 
 2.11.0
