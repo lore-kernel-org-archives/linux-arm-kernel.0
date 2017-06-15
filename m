@@ -1,62 +1,43 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 15 Jun 2017 16:11:30 -0500
-Subject: [PATCH] PCI: mediatek: fix error handling in
- mtk_pcie_parse_and_add_res()
-In-Reply-To: <1496644078-27122-1-git-send-email-ryder.lee@mediatek.com>
-References: <1496644078-27122-1-git-send-email-ryder.lee@mediatek.com>
-Message-ID: <20170615211130.GF12735@bhelgaas-glaptop.roam.corp.google.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Thu, 15 Jun 2017 23:13:07 +0200
+Subject: [PATCH] watchdog: meson-wdt: add support for the watchdog on
+ Meson8 and Meson8m2
+In-Reply-To: <20170615172510.GA7549@roeck-us.net>
+References: <20170611095219.22095-1-martin.blumenstingl@googlemail.com>
+ <20170615172510.GA7549@roeck-us.net>
+Message-ID: <CAFBinCCyqX=TGwTyhxXZPP2noUvJ1v=xNs+Vs17Gg4z2uDgjEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 05, 2017 at 02:27:58PM +0800, Ryder Lee wrote:
-> The 'linkup' variable would always increment by one whether the link
-> status is true or not. Therefore, this patch fixes the return value in
-> mtk_pcie_parse_and_add_res() and removes unnecessary 'linkup' variable.
-> 
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+On Thu, Jun 15, 2017 at 7:25 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> On Sun, Jun 11, 2017 at 11:52:19AM +0200, Martin Blumenstingl wrote:
+>> The watchdog IP block on Meson8 and Meson8m2 is already supported by the
+>> existing meson-wdt driver. Meson8 uses the same register bits as Meson6,
+>> while the newer Meson8m2 SoC uses the same register bits as Meson8b.
+>>
+>> Currently watchdog support on Meson8 SoC already works because
+>> meson8.dtsi simply uses the "amlogic,meson6-wdt" compatible. Adding a
+>> separate compatible for Meson8 makes this more explicit though.
+>>
+>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>
+> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+thank you!
+is there anything holding you up from taking this patch (for example:
+are you still missing any specific Signed-off-by / Acked-by)?
 
-I folded this into pci/host-mediatek for v4.13, thanks!
+> In general, changes like this are not necessary, though. The dts file
+> is supposed to reference both generic and specific compatible strings.
+I thought about skipping this patch, but I find that it looks strange without.
 
-I just noticed that we didn't get a MAINTAINERS update for this driver.
-Can you send me that, too, please?
+the hierarchy and the corresponding compatible strings would be:
+meson.dtsi / compatible = "amlogic,meson6-wdt";
+|- meson8.dtsi / compatible = "amlogic,meson8-wdt", "amlogic,meson6-wdt";
+   |- meson8m2.dtsi (upcoming) / compatible = "amlogic,meson8m2-wdt",
+"amlogic,meson8b-wdt";
+|- meson8b.dtsi / compatible = "amlogic,meson8b-wdt";
 
-> ---
->  drivers/pci/host/pcie-mediatek.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-> index 8ec8fa8..3baafa8 100644
-> --- a/drivers/pci/host/pcie-mediatek.c
-> +++ b/drivers/pci/host/pcie-mediatek.c
-> @@ -373,7 +373,7 @@ static int mtk_pcie_parse_and_add_res(struct mtk_pcie *pcie)
->  	struct of_pci_range_parser parser;
->  	struct of_pci_range range;
->  	struct resource res;
-> -	int err, linkup = 0;
-> +	int err;
->  
->  	/* parse shared resources */
->  	err = mtk_pcie_handle_shared_resource(pcie);
-> @@ -444,11 +444,11 @@ static int mtk_pcie_parse_and_add_res(struct mtk_pcie *pcie)
->  
->  		/* enable each port, and then check link status */
->  		err = mtk_pcie_enable_ports(port);
-> -		if (!err)
-> -			linkup++;
-> +		if (err)
-> +			return err;
->  	}
->  
-> -	return !linkup;
-> +	return 0;
->  }
->  
->  static int mtk_pcie_request_resources(struct mtk_pcie *pcie)
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+instead of this seemingly random mixup of compatible strings I decided
+to introduce separate ones for each SoC.
+
+Martin
