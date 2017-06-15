@@ -1,10 +1,10 @@
 From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 15 Jun 2017 20:54:06 +0200
-Subject: [RESEND PATCH v5 04/16] ARM: dts: keystone: Add generic compatible
+Date: Thu, 15 Jun 2017 20:54:09 +0200
+Subject: [RESEND PATCH v5 07/16] ARM: dts: koelsch: Add generic compatible
  string for I2C EEPROM
 In-Reply-To: <20170615185418.13980-1-javier@dowhile0.org>
 References: <20170615185418.13980-1-javier@dowhile0.org>
-Message-ID: <20170615185418.13980-5-javier@dowhile0.org>
+Message-ID: <20170615185418.13980-8-javier@dowhile0.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,60 +20,37 @@ So add this generic fallback to the device node compatible string to make
 the device to match the driver using the OF device ID table.
 
 Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
 ---
 
-Changes in v5: None
+Changes in v5:
+- Only replace atmel variant but keep other EEPROM vendors (Geert Uytterhoeven).
+
 Changes in v4:
 - Only use the atmel manufacturer in the compatible string instead of
   keeping the deprecated ones (Rob Herring).
 
-Changes in v3: None
+Changes in v3:
+- Add Geert Uytterhoeven reviewed-by tag.
+
 Changes in v2: None
 
- arch/arm/boot/dts/keystone-k2e-evm.dts  | 2 +-
- arch/arm/boot/dts/keystone-k2hk-evm.dts | 2 +-
- arch/arm/boot/dts/keystone-k2l-evm.dts  | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/keystone-k2e-evm.dts b/arch/arm/boot/dts/keystone-k2e-evm.dts
-index ae1ebe7ee021..c8d45e6cd9e6 100644
---- a/arch/arm/boot/dts/keystone-k2e-evm.dts
-+++ b/arch/arm/boot/dts/keystone-k2e-evm.dts
-@@ -69,7 +69,7 @@
- 
- &i2c0 {
- 	dtt at 50 {
--		compatible = "at,24c1024";
-+		compatible = "atmel,24c1024";
- 		reg = <0x50>;
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index 001e6116c47c..dc8ed02de707 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -702,7 +702,7 @@
  	};
- };
-diff --git a/arch/arm/boot/dts/keystone-k2hk-evm.dts b/arch/arm/boot/dts/keystone-k2hk-evm.dts
-index 2156ff92d08f..69af3a950da6 100644
---- a/arch/arm/boot/dts/keystone-k2hk-evm.dts
-+++ b/arch/arm/boot/dts/keystone-k2hk-evm.dts
-@@ -145,7 +145,7 @@
  
- &i2c0 {
- 	dtt at 50 {
--		compatible = "at,24c1024";
-+		compatible = "atmel,24c1024";
+ 	eeprom at 50 {
+-		compatible = "renesas,24c02";
++		compatible = "renesas,24c02", "atmel,24c02";
  		reg = <0x50>;
+ 		pagesize = <16>;
  	};
- };
-diff --git a/arch/arm/boot/dts/keystone-k2l-evm.dts b/arch/arm/boot/dts/keystone-k2l-evm.dts
-index 056b42f99d7a..402190e55e40 100644
---- a/arch/arm/boot/dts/keystone-k2l-evm.dts
-+++ b/arch/arm/boot/dts/keystone-k2l-evm.dts
-@@ -42,7 +42,7 @@
- 
- &i2c0 {
- 	dtt at 50 {
--		compatible = "at,24c1024";
-+		compatible = "atmel,24c1024";
- 		reg = <0x50>;
- 	};
- };
 -- 
 2.9.3
