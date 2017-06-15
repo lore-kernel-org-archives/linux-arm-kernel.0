@@ -1,74 +1,30 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Thu, 15 Jun 2017 09:28:10 +0100
-Subject: [PATCH 2/6] drivers base/arch_topology: frequency-invariant
- load-tracking support
-In-Reply-To: <CAKfTPtBnUWyAWTMJ2H8C+SPT+fVj-NkAs_pdOu+_a1zJ=VXZdA@mail.gmail.com>
-References: <20170608075513.12475-1-dietmar.eggemann@arm.com>
- <20170608075513.12475-3-dietmar.eggemann@arm.com>
- <CAKfTPtDB=5mQnJfzES+iU-nmNjVDM48f_iKuc7WefkRVWW4JOQ@mail.gmail.com>
- <9716a48d-8198-a1d8-9450-de6386338665@arm.com>
- <CAKfTPtBnUWyAWTMJ2H8C+SPT+fVj-NkAs_pdOu+_a1zJ=VXZdA@mail.gmail.com>
-Message-ID: <20170615082810.mhdjklnshxt3azcb@e106622-lin>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 15 Jun 2017 09:41:22 +0100
+Subject: [PATCH 00/17] coresight: next v4.12-rc4
+In-Reply-To: <20170614223453.3357117a7f25ee68924a071c@arm.com>
+References: <1496693718-9191-1-git-send-email-mathieu.poirier@linaro.org>
+ <20170609175339.28d1d4d5a6c91a9e16c16bf7@arm.com>
+ <CANLsYky8XLbOwinxVc2xKaNzhkpUOX0NsNxrFF4=MsjzC3iY1g@mail.gmail.com>
+ <20170613161712.f1f3cac734939d8728c7ed77@arm.com>
+ <20170614062229.GA28496@leoy-ThinkPad-T440>
+ <20170614223453.3357117a7f25ee68924a071c@arm.com>
+Message-ID: <d9b1121b-6e04-dfe7-b75b-9fbc6129a907@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On 14/06/17 15:08, Vincent Guittot wrote:
-> On 14 June 2017 at 09:55, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
-> >
-> > On 06/12/2017 04:27 PM, Vincent Guittot wrote:
-> > > On 8 June 2017 at 09:55, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
-> >
-> > Hi Vincent,
-> >
-> > Thanks for the review!
-> >
-> > [...]
-> >
-> > >> @@ -225,8 +265,14 @@ static int __init register_cpufreq_notifier(void)
-> > >>
-> > >>          cpumask_copy(cpus_to_visit, cpu_possible_mask);
-> > >>
-> > >> -       return cpufreq_register_notifier(&init_cpu_capacity_notifier,
-> > >> -                                        CPUFREQ_POLICY_NOTIFIER);
-> > >> +       ret = cpufreq_register_notifier(&init_cpu_capacity_notifier,
-> > >> +                                       CPUFREQ_POLICY_NOTIFIER);
-> > >> +
-> > >> +       if (ret)
-> > >
-> > > Don't you have to free memory allocated for cpus_to_visit in case of
-> > > errot ? it was not done before your patch as well
-> >
-> > Yes, we should free cpus_to_visit if the policy notifier registration
-> > fails. But IMHO also, once the parsing of the capacity-dmips-mhz property
-> > is done. free cpus_to_visit is only used in the notifier call
-> > init_cpu_capacity_callback() after being allocated and initialized in
-> > register_cpufreq_notifier().
-> >
-> > We could add something like this as the first patch of this set. Only
-> > mildly tested on Juno. Juri, what do you think?
-> >
-> > Author: Dietmar Eggemann <dietmar.eggemann@arm.com>
-> > Date:   Tue Jun 13 23:21:59 2017 +0100
-> >
-> >     drivers base/arch_topology: free cpumask cpus_to_visit
-> >
-> >     Free cpumask cpus_to_visit in case registering
-> >     init_cpu_capacity_notifier has failed or the parsing of the cpu
-> >     capacity-dmips-mhz property is done. The cpumask cpus_to_visit is
-> >     only used inside the notifier call init_cpu_capacity_callback.
-> >
-> >     Reported-by: Vincent Guittot <vincent.guittot@linaro.org>
-> >     Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
+
+On 15/06/17 04:34, Kim Phillips wrote:
+[...]
+
 > 
-> your proposal for freeing cpus_to_visit looks good for me
+> How does one tell whether writes to /dev/cpu_dma_latency are effective?
 > 
-> Acked-by: Vincent Guittot <vincent.guittot@linaro.org>
-> 
+Watch /sys/devices/system/cpu/cpu*/cpuidle/state*/{usage,time}, they
+shouldn't tick based on the value set to cpu_dma_latency.
 
-Yep, looks good to me too. Thanks for fixing!
+E.g. a value of 0 should stop entering all the idle states.
 
-Best,
-
-- Juri
+-- 
+Regards,
+Sudeep
