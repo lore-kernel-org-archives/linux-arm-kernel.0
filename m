@@ -1,56 +1,54 @@
-From: jeffy.chen@rock-chips.com (jeffy)
-Date: Thu, 15 Jun 2017 10:40:29 +0800
-Subject: [PATCH v3 1/3] spi: rockchip: add support for "cs-gpios" dts
- property
-In-Reply-To: <201706141616.khtJ942K%fengguang.wu@intel.com>
-References: <201706141616.khtJ942K%fengguang.wu@intel.com>
-Message-ID: <5941F39D.2090503@rock-chips.com>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Thu, 15 Jun 2017 10:55:07 +0800
+Subject: [PATCH v3 14/21] arm64: dts: hi3660: enable idle states
+In-Reply-To: <20170615002358.GD28496@leoy-ThinkPad-T440>
+References: <20170614082338.15673-1-guodong.xu@linaro.org>
+ <20170614082338.15673-15-guodong.xu@linaro.org>
+ <20170615002358.GD28496@leoy-ThinkPad-T440>
+Message-ID: <CAFGCpxyxUnML7E_vszXAX=sHOgHFEBcYkXxY=tfNK5YC9NariA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys(and Robot(^.^)),
+On Thu, Jun 15, 2017 at 8:23 AM, Leo Yan <leo.yan@linaro.org> wrote:
+> On Wed, Jun 14, 2017 at 04:23:31PM +0800, Guodong Xu wrote:
+>> From: Leo Yan <leo.yan@linaro.org>
+>>
+>> On Hi3660 there have two clusters, one is CA53 cluster and another is
+>> CA73 cluster. This two clusters have different idle states separately.
+>> With Daniel Lezcano's patch (ARM: cpuidle: Support asymmetric idle
+>> definition), now ARM idle driver can support different clusters with
+>> different idle states.
+>>
+>> Base on this, this patch is to bind two clusters idle states on Hi3660.
+>> Except the "WFI" states are enabled by default for all CPUs, this patch
+>> also binds below extra idle states:
+>>
+>> - CA53 CPUs have two more states:
+>>   CPU_SLEEP:       CPU power off state
+>>   CLUSTER_SLEEP_0: Cluster power off state
+>>
+>> - CA73 CPUs have three more states:
+>>   CPU_NAP:         CPU retention state
+>>   CPU_SLEEP:       CPU power off state
+>>   CLUSTER_SLEEP_1: Cluster power off state
+>
+> Hi Guodong, Wei and all,
+>
+> As Daniel reminded, this patch is dependent on patch (ARM: cpuidle:
+> Support asymmetric idle definition) [1] but his patch has not been
+> finally merged yet. So let us hold on this patch for Daniel's patch
+> is picked up firstly.
+>
+> At the meantime welcome the review and comment for this patch ahead.
+>
 
-this is because i drop this patch:
-9783131 New          [v2,1/4] spi: rockchip: fix error handling when probe
+Ok, so, I will drop this patch, and resend my patchset as v4.
 
-which is applied at 6/14, so not on v4.12-rc5 next-20170613.
+-Guodong
 
-On 06/14/2017 05:04 PM, kbuild test robot wrote:
-> Hi Jeffy,
+> [1] https://patchwork.kernel.org/patch/9781869/
 >
-> [auto build test ERROR on rockchip/for-next]
-> [also build test ERROR on v4.12-rc5 next-20170613]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> [...]
 >
-> url:    https://github.com/0day-ci/linux/commits/Jeffy-Chen/spi-rockchip-add-support-for-cs-gpios-dts-property/20170614-160238
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git for-next
-> config: x86_64-randconfig-x012-201724 (attached as .config)
-> compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-> reproduce:
->          # save the attached .config to linux build tree
->          make ARCH=x86_64
->
-> All errors (new ones prefixed by >>):
->
->     drivers//spi/spi-rockchip.c: In function 'rockchip_spi_probe':
->>> drivers//spi/spi-rockchip.c:812:3: error: label 'err_free_dma_rx' used but not defined
->        goto err_free_dma_rx;
->        ^~~~
->
-> vim +/err_free_dma_rx +812 drivers//spi/spi-rockchip.c
->
->     806			master->dma_rx = rs->dma_rx.ch;
->     807		}
->     808	
->     809		ret = rockchip_spi_setup_cs_gpios(&pdev->dev);
->     810		if (ret) {
->     811			dev_err(&pdev->dev, "Failed to setup cs gpios\n");
->   > 812			goto err_free_dma_rx;
->     813		}
->     814	
->     815		ret = devm_spi_register_master(&pdev->dev, master);
->
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
->
+> Thanks,
+> Leo Yan
