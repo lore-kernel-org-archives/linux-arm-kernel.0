@@ -1,54 +1,85 @@
-From: srishtishar@gmail.com (srishti sharma)
-Date: Thu, 15 Jun 2017 21:49:34 +0530
-Subject: [PATCH] Staging: vc04_services: bcm2835-audio: bcm2835-ctl.c:
- Fixed alignment to match open paranthesis.
-In-Reply-To: <1497466774.18751.64.camel@perches.com>
-References: <1497449172-3904-1-git-send-email-srishtishar@gmail.com>
- <1497466774.18751.64.camel@perches.com>
-Message-ID: <CAB3L5oxWBeN-YPWp94p7htH+D+ZpLomzVx2aMePMwApCPZiWUg@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 15 Jun 2017 18:24:12 +0200
+Subject: [PATCH v3 0/6] Update device tree for Armada 3720 DB
+In-Reply-To: <87mv996xj5.fsf@free-electrons.com> (Gregory CLEMENT's message of
+ "Thu, 15 Jun 2017 18:11:42 +0200")
+References: <20170613135711.7622-1-gregory.clement@free-electrons.com>
+ <87mv996xj5.fsf@free-electrons.com>
+Message-ID: <87injx6wyb.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 15, 2017 at 12:29 AM, Joe Perches <joe@perches.com> wrote:
-> On Wed, 2017-06-14 at 19:36 +0530, srishti sharma wrote:
->> Fixed alignment so that it matched open paranthesis.
->
-> Please try to avoid typos in your commit message and as
-> well try to do all of alignment warnings in a single patch.
->
-> Ideally, all the files in a driver would be modified.
->
-> $ ./scripts/checkpatch.pl -f drivers/staging/vc04_services/bcm2835-audio/*.[ch]  --types=parenthesis_alignment --terse
-> drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:108: CHECK: Alignment should match open parenthesis
-> drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:188: CHECK: Alignment should match open parenthesis
-> drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:196: CHECK: Alignment should match open parenthesis
-> drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:213: CHECK: Alignment should match open parenthesis
-> drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:233: CHECK: Alignment should match open parenthesis
-> drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:241: CHECK: Alignment should match open parenthesis
-> drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:252: CHECK: Alignment should match open parenthesis
-> drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:260: CHECK: Alignment should match open parenthesis
-> drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c:277: CHECK: Alignment should match open parenthesis
-> total: 0 errors, 0 warnings, 9 checks, 426 lines checked
-> drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:70: CHECK: Alignment should match open parenthesis
-> drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:85: CHECK: Alignment should match open parenthesis
-> drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:256: CHECK: Alignment should match open parenthesis
-> drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:305: CHECK: Alignment should match open parenthesis
-> drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:328: CHECK: Alignment should match open parenthesis
-> drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:336: CHECK: Alignment should match open parenthesis
-> drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:371: CHECK: Alignment should match open parenthesis
-> drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:378: CHECK: Alignment should match open parenthesis
-> drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:421: CHECK: Alignment should match open parenthesis
-> drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:431: CHECK: Alignment should match open parenthesis
-> drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:436: CHECK: Alignment should match open parenthesis
-> drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:525: CHECK: Alignment should match open parenthesis
-> total: 0 errors, 0 warnings, 12 checks, 567 lines checked
->
->
+Hi,
+ 
+ On jeu., juin 15 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
+> Hi,
+>  
+>  On mar., juin 13 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+>
+>> Hi,
+>>
+>> the main purpose of this short series is to add the support of the
+>> second SDHCI controller on the Armada 3720 DB board (and on the Armada
+>> 37xx SoC).
+>>
+>> This series also adds some improvement to the device tree of the the
+>> Armada 3720 DB board and the last patch allow using higher speed on
+>> the SD card by adding the vqmmc regulator.
+>>
+>> In the v3, I use the angle bracket for each set of register. And I
+>> added the reviewed by flag from Andreas F?rber.
+>>
+>> In the v2, I added a patch aligning the compatible string and fix the
+>> patch " arm64: dts: marvell: Enable second SDHCI controller in Armada
+>> 37xx" too.
+>>
+>> Gregory
+>>
+>>
+>> Gregory CLEMENT (5):
+>>   arm64: dts: marvell: armada-3720-db: Sort the dts node alphabetically
+>>   arm64: dts: marvell: armada-3720-db: Add information about the V2
+>>     board
+>>   arm64: dts: marvell: armada-37xx: Align the compatible string
+>>   arm64: dts: marvell: armada-37xx: Use angle bracket for each register
+>>     set
+>>   arm64: dts: marvell: armada-3720-db: Add vqmmc regulator for SD slot
+>>
+>> Konstantin Porotchkin (1):
+>>   arm64: dts: marvell: Enable second SDHCI controller in Armada 37xx
+>
+> All series applided on mvebu/dt
 
-Hey,
+And now applied on the correct tree:  mvebu/dt64
 
-Thanks for this , I have re-sent the patch .
+Gregory
 
-Regards,
-srishti
+>
+> Gregory
+>
+>>
+>>  arch/arm64/boot/dts/marvell/armada-3720-db.dts | 120 ++++++++++++++++---------
+>>  arch/arm64/boot/dts/marvell/armada-37xx.dtsi   |  25 ++++--
+>>  2 files changed, 94 insertions(+), 51 deletions(-)
+>>
+>> -- 
+>> 2.11.0
+>>
+>
+> -- 
+> Gregory Clement, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
