@@ -1,47 +1,36 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 15 Jun 2017 09:51:59 +0200
-Subject: [PATCH 2/6] Documentation: rockchip-dw-mshc: add description for
- rk3228
-In-Reply-To: <1497510980-23207-3-git-send-email-frank.wang@rock-chips.com>
-References: <1497510980-23207-1-git-send-email-frank.wang@rock-chips.com>
- <1497510980-23207-3-git-send-email-frank.wang@rock-chips.com>
-Message-ID: <2961285.cLXt8uGUMN@diego>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Thu, 15 Jun 2017 10:01:50 +0200
+Subject: [PATCH] arm64: dts: marvell: enable the cpm crypto engine on the mcbin
+Message-ID: <20170615080150.27534-1-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Frank,
+This patch enables the cpm crypto engine on the mcbin.
 
-Am Donnerstag, 15. Juni 2017, 15:16:16 CEST schrieb Frank Wang:
-> From: Shawn Lin <shawn.lin@rock-chips.com>
-> 
-> Add "rockchip,rk3228-dw-mshc", "rockchip,rk3288-dw-mshc" for
-> dwmmc on rk322x platform.
-> 
-> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
-> ---
->  Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
-> b/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt index
-> 520d61d..ce30dff 100644
-> --- a/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
-> @@ -15,6 +15,7 @@ Required Properties:
->  	- "rockchip,rk3288-dw-mshc": for Rockchip RK3288
->  	- "rockchip,rv1108-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip
-> RV1108 - "rockchip,rk3036-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip
-> RK3036 +	- "rockchip,rk3228-dw-mshc", "rockchip,rk3288-dw-mshc": for
-> Rockchip RK322X - "rockchip,rk3368-dw-mshc", "rockchip,rk3288-dw-mshc": for
-> Rockchip RK3368 - "rockchip,rk3399-dw-mshc", "rockchip,rk3288-dw-mshc": for
-> Rockchip RK3399
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
 
-you might want to rebase this patch on top of Ulfs next branch [0],
-as there is also the support for the rk3328 in there now.
+Hi Gregory,
 
-Otherwise looks good to me, so
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+This patch applies on top of today's mvebu/dt64 branch.
 
+Thanks!
+Antoine
 
+ arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-[0] https://git.kernel.org/pub/scm/linux/kernel/git/ulfh/mmc.git/log/?h=next
+diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+index fe56efcfcefe..2556c8268b40 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
++++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+@@ -176,3 +176,7 @@
+ 	usb-phy = <&usb3h0_phy>;
+ 	status = "okay";
+ };
++
++&cpm_crypto {
++	status = "okay";
++};
+-- 
+2.9.4
