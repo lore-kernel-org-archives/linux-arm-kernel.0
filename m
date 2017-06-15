@@ -1,10 +1,10 @@
 From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 15 Jun 2017 20:54:11 +0200
-Subject: [RESEND PATCH v5 09/16] ARM: dts: uniphier: Add generic compatible
- string for I2C EEPROM
+Date: Thu, 15 Jun 2017 20:54:13 +0200
+Subject: [RESEND PATCH v5 11/16] arm64: zynqmp: Add generic compatible string
+ for I2C EEPROM
 In-Reply-To: <20170615185418.13980-1-javier@dowhile0.org>
 References: <20170615185418.13980-1-javier@dowhile0.org>
-Message-ID: <20170615185418.13980-10-javier@dowhile0.org>
+Message-ID: <20170615185418.13980-12-javier@dowhile0.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,9 +23,7 @@ Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
 
 ---
 
-Changes in v5:
-- Only replace atmel variant but keep other EEPROM vendors (Geert Uytterhoeven).
-
+Changes in v5: None
 Changes in v4:
 - Only use the atmel manufacturer in the compatible string instead of
   keeping the deprecated ones (Rob Herring).
@@ -33,49 +31,30 @@ Changes in v4:
 Changes in v3: None
 Changes in v2: None
 
- arch/arm/boot/dts/uniphier-pro4-ace.dts    | 2 +-
- arch/arm/boot/dts/uniphier-pro4-sanji.dts  | 2 +-
- arch/arm/boot/dts/uniphier-pxs2-gentil.dts | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/uniphier-pro4-ace.dts b/arch/arm/boot/dts/uniphier-pro4-ace.dts
-index fefc89149234..b9a4919d7c93 100644
---- a/arch/arm/boot/dts/uniphier-pro4-ace.dts
-+++ b/arch/arm/boot/dts/uniphier-pro4-ace.dts
-@@ -88,7 +88,7 @@
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+index ef1b9e573af0..53907b7a7fd9 100644
+--- a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
++++ b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+@@ -55,7 +55,7 @@
  	status = "okay";
- 
+ 	clock-frequency = <400000>;
  	eeprom at 54 {
--		compatible = "st,24c64";
-+		compatible = "st,24c64", "atmel,24c64";
+-		compatible = "at,24c64";
++		compatible = "atmel,24c64";
  		reg = <0x54>;
- 		pagesize = <32>;
  	};
-diff --git a/arch/arm/boot/dts/uniphier-pro4-sanji.dts b/arch/arm/boot/dts/uniphier-pro4-sanji.dts
-index 6c63c8bad825..3950baa8d55d 100644
---- a/arch/arm/boot/dts/uniphier-pro4-sanji.dts
-+++ b/arch/arm/boot/dts/uniphier-pro4-sanji.dts
-@@ -83,7 +83,7 @@
+ };
+@@ -64,7 +64,7 @@
  	status = "okay";
- 
- 	eeprom at 54 {
--		compatible = "st,24c64";
-+		compatible = "st,24c64", "atmel,24c64";
- 		reg = <0x54>;
- 		pagesize = <32>;
+ 	clock-frequency = <400000>;
+ 	eeprom at 55 {
+-		compatible = "at,24c64";
++		compatible = "atmel,24c64";
+ 		reg = <0x55>;
  	};
-diff --git a/arch/arm/boot/dts/uniphier-pxs2-gentil.dts b/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
-index cccc86658d20..afba587ffbbc 100644
---- a/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
-+++ b/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
-@@ -80,7 +80,7 @@
- 	status = "okay";
- 
- 	eeprom at 54 {
--		compatible = "st,24c64";
-+		compatible = "st,24c64", "atmel,24c64";
- 		reg = <0x54>;
- 		pagesize = <32>;
- 	};
+ };
 -- 
 2.9.3
