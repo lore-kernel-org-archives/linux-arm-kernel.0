@@ -1,87 +1,37 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Thu, 15 Jun 2017 10:45:10 +0200
-Subject: [PATCH v2] [media] mtk-mdp: Fix g_/s_selection capture/compose
- logic
-In-Reply-To: <1497508166.3384.5.camel@mtksdaap41>
-References: <1494556970-12278-1-git-send-email-minghsiu.tsai@mediatek.com>
- <1497508166.3384.5.camel@mtksdaap41>
-Message-ID: <74fd208e-b3d4-6d39-66b2-4fe1ee28be27@xs4all.nl>
+From: ruxandra.radulescu@nxp.com (Ioana Radulescu)
+Date: Thu, 15 Jun 2017 03:55:06 -0500
+Subject: [PATCH] staging: fsl-mc/dpio: Propagate error code
+Message-ID: <20170615085506.31784-1-ruxandra.radulescu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/15/17 08:29, Minghsiu Tsai wrote:
-> Hi, Hans,
-> 
-> Would you have time to review this patch v2?
-> The patch v1 violates v4l2 spec. I have fixed it in v2.
+dpaa2_io_service_register() returns zero even if
+qbman_swp_CDAN_set() encountered an error. Fix this
+by propagating the error code so the caller is informed
+data availability notifications are not properly set
+for a channel.
 
-I plan to review it Friday or Monday.
+Signed-off-by: Ioana Radulescu <ruxandra.radulescu@nxp.com>
+---
+ drivers/staging/fsl-mc/bus/dpio/dpio-service.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Regards,
-
-	Hans
-
-> 
-> 
-> Sincerely,
-> Ming Hsiu
-> 
-> On Fri, 2017-05-12 at 10:42 +0800, Minghsiu Tsai wrote:
->> From: Daniel Kurtz <djkurtz@chromium.org>
->>
->> Experiments show that the:
->>  (1) mtk-mdp uses the _MPLANE form of CAPTURE/OUTPUT
->>  (2) CAPTURE types use CROP targets, and OUTPUT types use COMPOSE targets
->>
->> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
->> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
->> Signed-off-by: Houlong Wei <houlong.wei@mediatek.com>
->>
->> ---
->> Changes in v2:
->> . Can not use *_MPLANE type in g_/s_selection 
->> ---
->>  drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c | 10 +++++-----
->>  1 file changed, 5 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
->> index 13afe48..e18ac626 100644
->> --- a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
->> +++ b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
->> @@ -838,10 +838,10 @@ static int mtk_mdp_m2m_g_selection(struct file *file, void *fh,
->>  	bool valid = false;
->>  
->>  	if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
->> -		if (mtk_mdp_is_target_compose(s->target))
->> +		if (mtk_mdp_is_target_crop(s->target))
->>  			valid = true;
->>  	} else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
->> -		if (mtk_mdp_is_target_crop(s->target))
->> +		if (mtk_mdp_is_target_compose(s->target))
->>  			valid = true;
->>  	}
->>  	if (!valid) {
->> @@ -908,10 +908,10 @@ static int mtk_mdp_m2m_s_selection(struct file *file, void *fh,
->>  	bool valid = false;
->>  
->>  	if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
->> -		if (s->target == V4L2_SEL_TGT_COMPOSE)
->> +		if (s->target == V4L2_SEL_TGT_CROP)
->>  			valid = true;
->>  	} else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
->> -		if (s->target == V4L2_SEL_TGT_CROP)
->> +		if (s->target == V4L2_SEL_TGT_COMPOSE)
->>  			valid = true;
->>  	}
->>  	if (!valid) {
->> @@ -925,7 +925,7 @@ static int mtk_mdp_m2m_s_selection(struct file *file, void *fh,
->>  	if (ret)
->>  		return ret;
->>  
->> -	if (mtk_mdp_is_target_crop(s->target))
->> +	if (mtk_mdp_is_target_compose(s->target))
->>  		frame = &ctx->s_frame;
->>  	else
->>  		frame = &ctx->d_frame;
-> 
-> 
+diff --git a/drivers/staging/fsl-mc/bus/dpio/dpio-service.c b/drivers/staging/fsl-mc/bus/dpio/dpio-service.c
+index e5d66749614c..762f045f53f7 100644
+--- a/drivers/staging/fsl-mc/bus/dpio/dpio-service.c
++++ b/drivers/staging/fsl-mc/bus/dpio/dpio-service.c
+@@ -260,9 +260,9 @@ int dpaa2_io_service_register(struct dpaa2_io *d,
+ 
+ 	/* Enable the generation of CDAN notifications */
+ 	if (ctx->is_cdan)
+-		qbman_swp_CDAN_set_context_enable(d->swp,
+-						  (u16)ctx->id,
+-						  ctx->qman64);
++		return qbman_swp_CDAN_set_context_enable(d->swp,
++							 (u16)ctx->id,
++							 ctx->qman64);
+ 	return 0;
+ }
+ EXPORT_SYMBOL(dpaa2_io_service_register);
+-- 
+2.11.0
