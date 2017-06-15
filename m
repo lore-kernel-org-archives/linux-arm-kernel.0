@@ -1,142 +1,36 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 15 Jun 2017 11:39:36 +0800
-Subject: [PATCH 2/2] RFC: ARM: dts: imx7d-sdb: swap pad settings for
- USDHCx 50Mhz and 100Mhz
-In-Reply-To: <1496857542-32200-2-git-send-email-troy.kisky@boundarydevices.com>
-References: <1496857542-32200-1-git-send-email-troy.kisky@boundarydevices.com>
- <1496857542-32200-2-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <20170615033935.GB5902@dragon>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 15 Jun 2017 09:24:08 +0530
+Subject: [linux-sunxi] Re: [PATCH 1/2] dmaengine: sun6i: make gate bit in
+ sun8i's DMA engines a common quirk
+In-Reply-To: <20170614090439.rkdaoo3uqzjqwuxq@flea.lan>
+References: <20170605123348.26137-1-icenowy@aosc.io>
+ <20170605123348.26137-2-icenowy@aosc.io>
+ <20170614083252.GK13020@localhost>
+ <AD656BCC-5064-454F-9576-FA59283E0C45@aosc.io>
+ <20170614084529.GL13020@localhost>
+ <20170614090439.rkdaoo3uqzjqwuxq@flea.lan>
+Message-ID: <20170615035407.GM13020@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 07, 2017 at 10:45:42AM -0700, Troy Kisky wrote:
-> It does not make sense that 100 Mhz pad settings would use a x2
-> setting and 50 Mhz would use a x4 setting, so swap.
+On Wed, Jun 14, 2017 at 11:04:39AM +0200, Maxime Ripard wrote:
+> On Wed, Jun 14, 2017 at 02:15:29PM +0530, Vinod Koul wrote:
+> > > SoC info is in compatible, so there's no reason to make it a property.
+> > 
+> > that's why it would need to be optional for the SoC's that needs these..
 > 
-> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> There's nothing optional about that behaviour, it's mandatory for the
+> SoC that need it, and useless on the SoC that don't.
 
-Add Dong and Frank for this one as well.
+And why should kernel put strings for each hw behaviour. I am expecting DT
+to tell me if this SoC is a special case or not and kernel shall handle
+accordingly
 
-Shawn
+> Plus, that would require changing the DT binding, which isn't
+> something we can do.
 
-> ---
->  arch/arm/boot/dts/imx7d-sdb.dts | 72 ++++++++++++++++++++---------------------
->  1 file changed, 36 insertions(+), 36 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
-> index cab9208..70dcbf4 100644
-> --- a/arch/arm/boot/dts/imx7d-sdb.dts
-> +++ b/arch/arm/boot/dts/imx7d-sdb.dts
-> @@ -590,31 +590,20 @@
->  
->  		pinctrl_usdhc1: usdhc1grp {
->  			fsl,pins = <
-> -				MX7D_PAD_SD1_CMD__SD1_CMD		0x59
-> -				MX7D_PAD_SD1_CLK__SD1_CLK		0x09
-> -				MX7D_PAD_SD1_DATA0__SD1_DATA0		0x59
-> -				MX7D_PAD_SD1_DATA1__SD1_DATA1		0x59
-> -				MX7D_PAD_SD1_DATA2__SD1_DATA2		0x59
-> -				MX7D_PAD_SD1_DATA3__SD1_DATA3		0x59
-> -				MX7D_PAD_SD1_CD_B__GPIO5_IO0		0x59 /* CD */
-> -				MX7D_PAD_SD1_WP__GPIO5_IO1		0x59 /* WP */
-> -				MX7D_PAD_SD1_RESET_B__GPIO5_IO2		0x59 /* vmmc */
-> +				MX7D_PAD_SD1_CMD__SD1_CMD		0x5a
-> +				MX7D_PAD_SD1_CLK__SD1_CLK		0x0a
-> +				MX7D_PAD_SD1_DATA0__SD1_DATA0		0x5a
-> +				MX7D_PAD_SD1_DATA1__SD1_DATA1		0x5a
-> +				MX7D_PAD_SD1_DATA2__SD1_DATA2		0x5a
-> +				MX7D_PAD_SD1_DATA3__SD1_DATA3		0x5a
-> +				MX7D_PAD_SD1_CD_B__GPIO5_IO0		0x5a /* CD */
-> +				MX7D_PAD_SD1_WP__GPIO5_IO1		0x5a /* WP */
-> +				MX7D_PAD_SD1_RESET_B__GPIO5_IO2		0x5a /* vmmc */
->  			>;
->  		};
->  
->  		pinctrl_usdhc2: usdhc2grp {
->  			fsl,pins = <
-> -				MX7D_PAD_SD2_CMD__SD2_CMD		0x59
-> -				MX7D_PAD_SD2_CLK__SD2_CLK		0x09
-> -				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x59
-> -				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x59
-> -				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x59
-> -				MX7D_PAD_SD2_DATA3__SD2_DATA3		0x59
-> -			>;
-> -		};
-> -
-> -		pinctrl_usdhc2_100mhz: usdhc2grp_100mhz {
-> -			fsl,pins = <
->  				MX7D_PAD_SD2_CMD__SD2_CMD		0x5a
->  				MX7D_PAD_SD2_CLK__SD2_CLK		0x0a
->  				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x5a
-> @@ -624,6 +613,17 @@
->  			>;
->  		};
->  
-> +		pinctrl_usdhc2_100mhz: usdhc2grp_100mhz {
-> +			fsl,pins = <
-> +				MX7D_PAD_SD2_CMD__SD2_CMD		0x59
-> +				MX7D_PAD_SD2_CLK__SD2_CLK		0x09
-> +				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x59
-> +				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x59
-> +				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x59
-> +				MX7D_PAD_SD2_DATA3__SD2_DATA3		0x59
-> +			>;
-> +		};
-> +
->  		pinctrl_usdhc2_200mhz: usdhc2grp_200mhz {
->  			fsl,pins = <
->  				MX7D_PAD_SD2_CMD__SD2_CMD		0x5b
-> @@ -638,22 +638,6 @@
->  
->  		pinctrl_usdhc3: usdhc3grp {
->  			fsl,pins = <
-> -				MX7D_PAD_SD3_CMD__SD3_CMD		0x59
-> -				MX7D_PAD_SD3_CLK__SD3_CLK		0x09
-> -				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x59
-> -				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x59
-> -				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x59
-> -				MX7D_PAD_SD3_DATA3__SD3_DATA3		0x59
-> -				MX7D_PAD_SD3_DATA4__SD3_DATA4		0x59
-> -				MX7D_PAD_SD3_DATA5__SD3_DATA5		0x59
-> -				MX7D_PAD_SD3_DATA6__SD3_DATA6		0x59
-> -				MX7D_PAD_SD3_DATA7__SD3_DATA7		0x59
-> -				MX7D_PAD_SD3_STROBE__SD3_STROBE		0x19
-> -			>;
-> -		};
-> -
-> -		pinctrl_usdhc3_100mhz: usdhc3grp_100mhz {
-> -			fsl,pins = <
->  				MX7D_PAD_SD3_CMD__SD3_CMD		0x5a
->  				MX7D_PAD_SD3_CLK__SD3_CLK		0x0a
->  				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x5a
-> @@ -668,6 +652,22 @@
->  			>;
->  		};
->  
-> +		pinctrl_usdhc3_100mhz: usdhc3grp_100mhz {
-> +			fsl,pins = <
-> +				MX7D_PAD_SD3_CMD__SD3_CMD		0x59
-> +				MX7D_PAD_SD3_CLK__SD3_CLK		0x09
-> +				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x59
-> +				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x59
-> +				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x59
-> +				MX7D_PAD_SD3_DATA3__SD3_DATA3		0x59
-> +				MX7D_PAD_SD3_DATA4__SD3_DATA4		0x59
-> +				MX7D_PAD_SD3_DATA5__SD3_DATA5		0x59
-> +				MX7D_PAD_SD3_DATA6__SD3_DATA6		0x59
-> +				MX7D_PAD_SD3_DATA7__SD3_DATA7		0x59
-> +				MX7D_PAD_SD3_STROBE__SD3_STROBE		0x19
-> +			>;
-> +		};
-> +
->  		pinctrl_usdhc3_200mhz: usdhc3grp_200mhz {
->  			fsl,pins = <
->  				MX7D_PAD_SD3_CMD__SD3_CMD		0x5b
-> -- 
-> 2.7.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Any reason why bindings can't change..? I though this was support for new
+SoC...
+
+-- 
+~Vinod
