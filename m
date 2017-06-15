@@ -1,86 +1,50 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Thu, 15 Jun 2017 11:04:09 +0800
-Subject: [PATCH v4 12/20] arm64: dts: hi3660: add spi device nodes
+Date: Thu, 15 Jun 2017 11:04:10 +0800
+Subject: [PATCH v4 13/20] arm64: dts: hi3660: add sp804 timer node
 In-Reply-To: <20170615030417.14059-1-guodong.xu@linaro.org>
 References: <20170615030417.14059-1-guodong.xu@linaro.org>
-Message-ID: <20170615030417.14059-13-guodong.xu@linaro.org>
+Message-ID: <20170615030417.14059-14-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
+From: Leo Yan <leo.yan@linaro.org>
 
-Add spi2 and spi3 device nodes for hi3660, and enable them for hikey960.
+The Hi3660 SoC comes with the sp804 timer in addition to the
+architecture timers. These ones are shutdown when reaching a deep idle
+states and a backup timer is needed. The sp804 belongs to another power
+domain and can fulfill the purpose of replacing temporarily an
+architecture timer when the CPU is idle.
 
-On HiKey960:
- - SPI2 is wired out through low speed expansion connector.
- - SPI3 is wired out through high speed expansion connector.
+Describe it in the device tree, so it can be enabled at boot time.
 
-Signed-off-by: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+Suggested-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
 ---
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 12 +++++++++
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi         | 30 +++++++++++++++++++++++
- 2 files changed, 42 insertions(+)
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-index 9ecf6c6..ca448f0 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-@@ -142,3 +142,15 @@
- 	label = "LS-UART1";
- 	status = "okay";
- };
-+
-+&spi2 {
-+	/* On Low speed expansion */
-+	label = "LS-SPI0";
-+	status = "okay";
-+};
-+
-+&spi3 {
-+	/* On High speed expansion */
-+	label = "HS-SPI1";
-+	status = "okay";
-+};
 diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index 3b2a3a7..a6b91f1 100644
+index a6b91f1..e138973 100644
 --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
 +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -713,5 +713,35 @@
- 			clocks = <&sctrl HI3660_PCLK_AO_GPIO6>;
- 			clock-names = "apb_pclk";
+@@ -186,6 +186,17 @@
+ 			#reset-cells = <2>;
  		};
-+
-+		spi2: spi at ffd68000 {
-+			compatible = "arm,pl022", "arm,primecell";
-+			reg = <0x0 0xffd68000 0x0 0x1000>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&crg_ctrl HI3660_CLK_GATE_SPI2>;
-+			clock-names = "apb_pclk";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&spi2_pmx_func>;
-+			num-cs = <1>;
-+			cs-gpios = <&gpio27 2 0>;
-+			status = "disabled";
+ 
++		dual_timer0: timer at fff14000 {
++			compatible = "arm,sp804", "arm,primecell";
++			reg = <0x0 0xfff14000 0x0 0x1000>;
++			interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&crg_ctrl HI3660_OSC32K>,
++				 <&crg_ctrl HI3660_OSC32K>,
++				 <&crg_ctrl HI3660_OSC32K>;
++			clock-names = "timer1", "timer2", "apb_pclk";
 +		};
 +
-+		spi3: spi at ff3b3000 {
-+			compatible = "arm,pl022", "arm,primecell";
-+			reg = <0x0 0xff3b3000 0x0 0x1000>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			interrupts = <GIC_SPI 312 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&crg_ctrl HI3660_CLK_GATE_SPI3>;
-+			clock-names = "apb_pclk";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&spi3_pmx_func>;
-+			num-cs = <1>;
-+			cs-gpios = <&gpio18 5 0>;
-+			status = "disabled";
-+		};
- 	};
- };
+ 		i2c0: i2c at ffd71000 {
+ 			compatible = "snps,designware-i2c";
+ 			reg = <0x0 0xffd71000 0x0 0x1000>;
 -- 
 2.10.2
