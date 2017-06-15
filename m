@@ -1,50 +1,26 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 15 Jun 2017 14:22:48 -0700
-Subject: [PATCH] watchdog: meson-wdt: add support for the watchdog on
- Meson8 and Meson8m2
-In-Reply-To: <CAFBinCCyqX=TGwTyhxXZPP2noUvJ1v=xNs+Vs17Gg4z2uDgjEA@mail.gmail.com>
-References: <20170611095219.22095-1-martin.blumenstingl@googlemail.com>
- <20170615172510.GA7549@roeck-us.net>
- <CAFBinCCyqX=TGwTyhxXZPP2noUvJ1v=xNs+Vs17Gg4z2uDgjEA@mail.gmail.com>
-Message-ID: <20170615212248.GA30058@roeck-us.net>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 15 Jun 2017 14:24:39 -0700
+Subject: [PATCH v5] mm: huge-vmap: fail gracefully on unexpected huge
+ vmap mappings
+In-Reply-To: <20170609082226.26152-1-ard.biesheuvel@linaro.org>
+References: <20170609082226.26152-1-ard.biesheuvel@linaro.org>
+Message-ID: <20170615142439.7a431065465c5b4691aed1cc@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 15, 2017 at 11:13:07PM +0200, Martin Blumenstingl wrote:
-> On Thu, Jun 15, 2017 at 7:25 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> > On Sun, Jun 11, 2017 at 11:52:19AM +0200, Martin Blumenstingl wrote:
-> >> The watchdog IP block on Meson8 and Meson8m2 is already supported by the
-> >> existing meson-wdt driver. Meson8 uses the same register bits as Meson6,
-> >> while the newer Meson8m2 SoC uses the same register bits as Meson8b.
-> >>
-> >> Currently watchdog support on Meson8 SoC already works because
-> >> meson8.dtsi simply uses the "amlogic,meson6-wdt" compatible. Adding a
-> >> separate compatible for Meson8 makes this more explicit though.
-> >>
-> >> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> >
-> > Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-> thank you!
-> is there anything holding you up from taking this patch (for example:
-> are you still missing any specific Signed-off-by / Acked-by)?
-> 
+On Fri,  9 Jun 2017 08:22:26 +0000 Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
 
->From Rob.
+> Existing code that uses vmalloc_to_page() may assume that any
+> address for which is_vmalloc_addr() returns true may be passed
+> into vmalloc_to_page() to retrieve the associated struct page.
+> 
+> This is not un unreasonable assumption to make, but on architectures
+> that have CONFIG_HAVE_ARCH_HUGE_VMAP=y, it no longer holds, and we
+> need to ensure that vmalloc_to_page() does not go off into the weeds
+> trying to dereference huge PUDs or PMDs as table entries.
+> 
+> Given that vmalloc() and vmap() themselves never create huge
+> mappings or deal with compound pages at all, there is no correct
+> answer in this case, so return NULL instead, and issue a warning.
 
-Guenter
-
-> > In general, changes like this are not necessary, though. The dts file
-> > is supposed to reference both generic and specific compatible strings.
-> I thought about skipping this patch, but I find that it looks strange without.
-> 
-> the hierarchy and the corresponding compatible strings would be:
-> meson.dtsi / compatible = "amlogic,meson6-wdt";
-> |- meson8.dtsi / compatible = "amlogic,meson8-wdt", "amlogic,meson6-wdt";
->    |- meson8m2.dtsi (upcoming) / compatible = "amlogic,meson8m2-wdt",
-> "amlogic,meson8b-wdt";
-> |- meson8b.dtsi / compatible = "amlogic,meson8b-wdt";
-> 
-> instead of this seemingly random mixup of compatible strings I decided
-> to introduce separate ones for each SoC.
-> 
-> Martin
+Is this patch known to fix any current user-visible problem?
