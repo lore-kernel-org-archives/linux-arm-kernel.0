@@ -1,50 +1,35 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 15 Jun 2017 14:57:30 -0700
-Subject: [PATCH v3] ARM: dts: da850-evm: drop VPIF endpoints
-Message-ID: <20170615215730.28585-1-khilman@baylibre.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 16 Jun 2017 00:11:53 +0200
+Subject: [PATCH v5] mm: huge-vmap: fail gracefully on unexpected huge vmap
+ mappings
+In-Reply-To: <20170615142439.7a431065465c5b4691aed1cc@linux-foundation.org>
+References: <20170609082226.26152-1-ard.biesheuvel@linaro.org>
+ <20170615142439.7a431065465c5b4691aed1cc@linux-foundation.org>
+Message-ID: <BE70CA51-B790-456E-B31C-399632B4DCD1@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop the unused endpoints.  They should only be used when there is
-an actual remote-endpoint connected.
 
-Signed-off-by: Kevin Hilman <khilman@baylibre.com>
----
-Since v2: actually CC DT maintainers
-Since v1: attempt to Cc DT maintainers :(
 
- arch/arm/boot/dts/da850-evm.dts | 21 ---------------------
- 1 file changed, 21 deletions(-)
+> On 15 Jun 2017, at 23:24, Andrew Morton <akpm@linux-foundation.org> wrote:
+> 
+>> On Fri,  9 Jun 2017 08:22:26 +0000 Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> 
+>> Existing code that uses vmalloc_to_page() may assume that any
+>> address for which is_vmalloc_addr() returns true may be passed
+>> into vmalloc_to_page() to retrieve the associated struct page.
+>> 
+>> This is not un unreasonable assumption to make, but on architectures
+>> that have CONFIG_HAVE_ARCH_HUGE_VMAP=y, it no longer holds, and we
+>> need to ensure that vmalloc_to_page() does not go off into the weeds
+>> trying to dereference huge PUDs or PMDs as table entries.
+>> 
+>> Given that vmalloc() and vmap() themselves never create huge
+>> mappings or deal with compound pages at all, there is no correct
+>> answer in this case, so return NULL instead, and issue a warning.
+> 
+> Is this patch known to fix any current user-visible problem?
 
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index a423e8ebfb37..67e72bc72e80 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -301,25 +301,4 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&vpif_capture_pins>, <&vpif_display_pins>;
- 	status = "okay";
--
--	/* VPIF capture port */
--	port at 0 {
--		vpif_input_ch0: endpoint at 0 {
--			reg = <0>;
--			bus-width = <8>;
--		};
--
--		vpif_input_ch1: endpoint at 1 {
--			reg = <1>;
--			bus-width = <8>;
--			data-shift = <8>;
--		};
--	};
--
--	/* VPIF display port */
--	port at 1 {
--		vpif_output_ch0: endpoint {
--			bus-width = <8>;
--		};
--	};
- };
--- 
-2.9.3
+Yes. When reading /proc/kcore on arm64, you will hit an oops as soon as you hit the huge mappings used for the various segments that make up the mapping of vmlinux. With this patch applied, you will no longer hit the oops, but the kcore contents willl be incorrect (these regions will be zeroed out)
+
+We are fixing this for kcore specifically, so it avoids vread() for  those regions. At least one other problematic user exists, i.e., /dev/kmem, but that is currently broken on arm64 for other reasons.
