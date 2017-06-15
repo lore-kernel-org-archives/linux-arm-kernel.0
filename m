@@ -1,86 +1,60 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 15 Jun 2017 16:48:40 -0500
-Subject: [PATCH] PCI: rockchip: Handle return value of clk_prepare_enable
-In-Reply-To: <4ebfc69644f9d6e9e5ff0cfc82e9efa5c476be0e.1496312348.git.arvind.yadav.cs@gmail.com>
-References: <4ebfc69644f9d6e9e5ff0cfc82e9efa5c476be0e.1496312348.git.arvind.yadav.cs@gmail.com>
-Message-ID: <20170615214840.GI12735@bhelgaas-glaptop.roam.corp.google.com>
+From: pza@pengutronix.de (Philipp Zabel)
+Date: Thu, 15 Jun 2017 23:55:50 +0200
+Subject: [PATCH 2/2 v4] clk: Add Gemini SoC clock controller
+In-Reply-To: <CACRpkdY+aSyec9PZaoXErzsRefWg2zzw1xihQt_whmote-jBBw@mail.gmail.com>
+References: <20170524082044.8473-1-linus.walleij@linaro.org>
+ <20170601070208.GO20170@codeaurora.org>
+ <CACRpkdZv8MzXVecEXVdJ+P0MxVscYSy=MxC-yQAR0S4yQ6-rwQ@mail.gmail.com>
+ <20170605195812.GH20170@codeaurora.org>
+ <CACRpkdbya9xaN-i7AkG0bTyuFYfZc59sSTYhWB43=9btSKfPpQ@mail.gmail.com>
+ <CACRpkdapAgHix2vw-woDFi4sh+H3_EX7w-5q=opBGMyegFrXbA@mail.gmail.com>
+ <20170612210248.GP20170@codeaurora.org>
+ <CACRpkdaZJbzC0-xg_go=-o+0cQ-JOY3mUe27HUnwQ+DnZYbyMA@mail.gmail.com>
+ <CAMuHMdXdYNTLCUfQ9rdj8Fffff5G6fGREcHs5-E5LbwPU9yyLw@mail.gmail.com>
+ <CACRpkdY+aSyec9PZaoXErzsRefWg2zzw1xihQt_whmote-jBBw@mail.gmail.com>
+Message-ID: <20170615215550.z4ypeh345gopd2pg@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 01, 2017 at 03:51:45PM +0530, Arvind Yadav wrote:
-> clk_prepare_enable() can fail here and we must check its return value.
+Hi Linus,
+
+On Thu, Jun 15, 2017 at 02:57:53PM +0200, Linus Walleij wrote:
+> On Thu, Jun 15, 2017 at 10:55 AM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
 > 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-
-Applied with ack/reviewed-by from Shawn and Heiko to pci/host-rockchip for
-v4.13, thanks!
-
-I had to apply it manually because of other changes in the same area, so it
-would be good if you could check it over.
-
-https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git/commit/?h=pci/host-rockchip&id=45f8ce937bc2e06e040f1118f64783b54ade7363
-
-> ---
->  drivers/pci/host/pcie-rockchip.c | 34 ++++++++++++++++++++++++++++------
->  1 file changed, 28 insertions(+), 6 deletions(-)
+> > If clocks and resets are provided by the same hardware module, you can
+> > have a single (platform) driver registering both the clock and reset
+> > controllers.
+> > Cfr. drivers/clk/renesas/renesas-cpg-mssr.c.
 > 
-> diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
-> index 0e020b6..0a248cd 100644
-> --- a/drivers/pci/host/pcie-rockchip.c
-> +++ b/drivers/pci/host/pcie-rockchip.c
-> @@ -1259,24 +1259,46 @@ static int __maybe_unused rockchip_pcie_resume_noirq(struct device *dev)
->  	struct rockchip_pcie *rockchip = dev_get_drvdata(dev);
->  	int err;
->  
-> -	clk_prepare_enable(rockchip->clk_pcie_pm);
-> -	clk_prepare_enable(rockchip->hclk_pcie);
-> -	clk_prepare_enable(rockchip->aclk_perf_pcie);
-> -	clk_prepare_enable(rockchip->aclk_pcie);
-> +	err = clk_prepare_enable(rockchip->clk_pcie_pm);
-> +	if (err)
-> +		goto err_pcie_pm;
-> +
-> +	err = clk_prepare_enable(rockchip->hclk_pcie);
-> +	if (err)
-> +		goto err_hclk_pcie;
-> +
-> +	err = clk_prepare_enable(rockchip->aclk_perf_pcie);
-> +	if (err)
-> +		goto err_aclk_perf_pcie;
-> +
-> +	err = clk_prepare_enable(rockchip->aclk_pcie);
-> +	if (err)
-> +		goto err_aclk_pcie;
->  
->  	err = rockchip_pcie_init_port(rockchip);
->  	if (err)
-> -		return err;
-> +		goto err_pcie_resume;
->  
->  	err = rockchip_cfg_atu(rockchip);
->  	if (err)
-> -		return err;
-> +		goto err_pcie_resume;
->  
->  	/* Need this to enter L1 again */
->  	rockchip_pcie_update_txcredit_mui(rockchip);
->  	rockchip_pcie_enable_interrupts(rockchip);
->  
->  	return 0;
-> +
-> +err_pcie_resume:
-> +	clk_disable_unprepare(rockchip->aclk_pcie);
-> +err_aclk_pcie:
-> +	clk_disable_unprepare(rockchip->aclk_perf_pcie);
-> +err_aclk_perf_pcie:
-> +	clk_disable_unprepare(rockchip->hclk_pcie);
-> +err_hclk_pcie:
-> +	clk_disable_unprepare(rockchip->clk_pcie_pm);
-> +err_pcie_pm:
-> +	return err;
->  }
->  
->  static int rockchip_pcie_probe(struct platform_device *pdev)
-> -- 
-> 1.9.1
+> That is indeed an option.
 > 
+> So I would say, clk & reset maintainers: would you prefer that I merge the
+> reset control into the clock driver as well, ask Philipp to drop the pending
+> reset control patches from his subsystem tree and have you manage the
+> combined driver and bindings?
+
+The reset/next pull requests are not merged into the arm-soc tree yet.
+I suppose I could retract the pull requests and drop the Gemini reset
+patches, if the patches in arm-soc/gemeni/dts are also dropped from
+arm-soc/for-next.
+
+> It seems to me as very ugly from a divide & conquer subsystem and file
+> split point of view.
+>
+> I seems elegant from the "make clocks a platform device" point of view.
+> 
+> I am happy with either approach as long as it works.
+> 
+> I guess it is up to the taste of the subsystem maintainers, especially
+> clk.
+>
+> If I get some time I might just hack this up and send the patches so
+> it is on the table as an alternative to the current v5 patch. Certainly it is
+> better than going back and augmenting the DT bindings.
+
+I have a slight preference for keeping the DT bindings simple, even if
+that means merging the reset controller into the clock driver.
+
+regards
+Philipp
