@@ -1,102 +1,81 @@
 From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Thu, 15 Jun 2017 17:33:38 +0530
-Subject: [PATCH v4 2/3] ARM: dts: imx6ul-isiot: Add Sound card with codec node
+Date: Thu, 15 Jun 2017 17:33:39 +0530
+Subject: [PATCH v4 3/3] ARM: dts: imx6ul-isiot: Add FEC node support
 In-Reply-To: <1497528219-20396-1-git-send-email-jteki@openedev.com>
 References: <1497528219-20396-1-git-send-email-jteki@openedev.com>
-Message-ID: <1497528219-20396-2-git-send-email-jteki@openedev.com>
+Message-ID: <1497528219-20396-3-git-send-email-jteki@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jagan Teki <jagan@amarulasolutions.com>
 
-Add support for Sound card and related codec(via i2c1) nodes
-on Engicam Is.IoT MX6UL variant module boards.
+Add support for fec1 node on Engicam Is.IoT variant boards.
 
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Matteo Lisi <matteo.lisi@engicam.com>
+Cc: Michael Trimarchi <michael@amarulasolutions.com>
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
 Changes for v4:
-- Move i2c1 into imx6ul-isiot.dtsi
+- rebase with previous patch changes
 Changes for v3:
-- Replace fsl,imx-audio-sgtl5000 and use simple-audio-card
+- none
 Changes for v2:
-- Use proper [label:] node-name[@unit-address] for codec
-- Remove incorrect codec property 'wlf,shared-lrclk'
-- Remove 'gpr' from sound card node
+- Newly added patch
 
- arch/arm/boot/dts/imx6ul-isiot.dtsi | 54 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 54 insertions(+)
+ arch/arm/boot/dts/imx6ul-isiot.dtsi | 33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6ul-isiot.dtsi b/arch/arm/boot/dts/imx6ul-isiot.dtsi
-index 3c442f6..e2dacdc 100644
+index e2dacdc..950fb28 100644
 --- a/arch/arm/boot/dts/imx6ul-isiot.dtsi
 +++ b/arch/arm/boot/dts/imx6ul-isiot.dtsi
-@@ -69,6 +69,50 @@
- 				    100>;
- 		default-brightness-level = <100>;
+@@ -115,6 +115,24 @@
  	};
-+
-+	reg_1p8v: regulator-1p8v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "1P8V";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
-+
-+	reg_3p3v: regulator-3p3v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "3P3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
-+
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "imx6ul-isiot-sgtl5000";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,bitclock-master = <&dailink_master>;
-+		simple-audio-card,frame-master = <&dailink_master>;
-+		simple-audio-card,widgets =
-+			"Microphone", "Mic Jack",
-+			"Line", "Line In",
-+			"Line", "Line Out",
-+			"Headphone", "Headphone Jack";
-+		simple-audio-card,routing =
-+			"MIC_IN", "Mic Jack",
-+			"Mic Jack", "Mic Bias",
-+			"Headphone Jack", "HP_OUT";
-+
-+		simple-audio-card,cpu {
-+			sound-dai = <&sai2>;
-+		};
-+
-+		dailink_master: simple-audio-card,codec {
-+			sound-dai = <&sgtl5000>;
-+			clocks = <&clks IMX6UL_CLK_SAI2>;
-+		};
-+	};
  };
  
++&fec1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet1>;
++	phy-mode = "rmii";
++	phy-handle = <&ethphy0>;
++	status = "okay";
++
++	mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ethphy0: ethernet-phy at 0 {
++			compatible = "ethernet-phy-ieee802.3-c22";
++			reg = <0>;
++		};
++	};
++};
++
  &i2c1 {
-@@ -77,6 +121,16 @@
- 	pinctrl-0 = <&pinctrl_i2c1>;
- 	status = "okay";
+ 	clock-frequency = <100000>;
+ 	pinctrl-names = "default";
+@@ -227,6 +245,21 @@
+ };
  
-+	sgtl5000: codec at a {
-+		compatible = "fsl,sgtl5000";
-+		reg = <0x0a>;
-+		clocks = <&clks IMX6UL_CLK_OSC>;
-+		clock-names = "mclk";
-+		VDDA-supply = <&reg_3p3v>;
-+		VDDIO-supply = <&reg_3p3v>;
-+		VDDD-supply = <&reg_1p8v>;
+ &iomuxc {
++	pinctrl_enet1: enet1grp {
++		fsl,pins = <
++			MX6UL_PAD_ENET2_RX_DATA0__ENET1_MDIO	0x1b0b0
++			MX6UL_PAD_ENET2_RX_DATA1__ENET1_MDC	0x1b0b0
++			MX6UL_PAD_ENET1_RX_EN__ENET1_RX_EN	0x1b0b0
++			MX6UL_PAD_ENET1_RX_DATA0__ENET1_RDATA00	0x1b0b0
++			MX6UL_PAD_ENET1_RX_DATA1__ENET1_RDATA01	0x1b0b0
++			MX6UL_PAD_ENET1_TX_EN__ENET1_TX_EN	0x1b0b0
++			MX6UL_PAD_ENET1_TX_DATA0__ENET1_TDATA00	0x1b0b0
++			MX6UL_PAD_ENET1_TX_DATA1__ENET1_TDATA01	0x1b0b0
++			MX6UL_PAD_ENET1_TX_CLK__ENET1_REF_CLK1	0x4001b031
++			MX6UL_PAD_ENET2_RX_EN__GPIO2_IO10	0x1b0b0
++		>;
 +	};
 +
- 	stmpe811: gpio-expander at 44 {
- 		compatible = "st,stmpe811";
- 		reg = <0x44>;
+ 	pinctrl_i2c1: i2c1grp {
+ 		fsl,pins = <
+ 			MX6UL_PAD_UART4_TX_DATA__I2C1_SCL 0x4001b8b0
 -- 
 2.7.4
