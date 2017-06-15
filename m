@@ -1,33 +1,153 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 15 Jun 2017 18:33:14 +0100
-Subject: [PATCH 4/5] arm64: signal: factor out signal frame record
- allocation
-In-Reply-To: <1497535442-11586-5-git-send-email-Dave.Martin@arm.com>
-References: <1497535442-11586-1-git-send-email-Dave.Martin@arm.com>
- <1497535442-11586-5-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20170615173313.GD17424@e104818-lin.cambridge.arm.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Fri, 16 Jun 2017 01:39:26 +0800
+Subject: [PATCH v4 1/2] arm64: dts: mt7622: add basic nodes to the
+ mt7622.dtsi file
+In-Reply-To: <37f67b23-7995-3b93-2ee0-c04b34428bd9@gmail.com>
+References: <cover.1497455465.git.sean.wang@mediatek.com>
+ <4d7c2a58fb2bd68cc5c17a313ee426e0d4233ca0.1497455465.git.sean.wang@mediatek.com>
+ <37f67b23-7995-3b93-2ee0-c04b34428bd9@gmail.com>
+Message-ID: <1497548366.4975.3.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 15, 2017 at 03:03:41PM +0100, Dave P Martin wrote:
-> This patch factors out the allocator for signal frame optional
-> records into a separate function, to ensure consistency and
-> facilitate later expansion.
+On Thu, 2017-06-15 at 18:04 +0200, Matthias Brugger wrote:
 > 
-> No overrun checking is currently done, because the allocation is in
-> user memory and anyway the kernel never tries to allocate enough
-> space in the signal frame yet for an overrun to occur.  This
-> behaviour will be refined in future patches.
+> On 14/06/17 18:11, sean.wang at mediatek.com wrote:
+> > From: Sean Wang <sean.wang@mediatek.com>
+> > 
+> > add basic nodes into the mt7622.dtsi for the system
+> > bring-up which includes ARM CPU, GIC, timer, MediaTek
+> > UART, SYSIRQ and one reserved memory region for ATF.
+> > 
+> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> > ---
+> >   arch/arm64/boot/dts/mediatek/mt7622.dtsi | 104 +++++++++++++++++++++++++++++++
+> >   1 file changed, 104 insertions(+)
+> >   create mode 100644 arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> > 
+> > diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> > new file mode 100644
+> > index 0000000..239b9b3
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> > @@ -0,0 +1,104 @@
+> > +/*
+> > + * Copyright (c) 2017 MediaTek Inc.
+> > + * Author: Ming Huang <ming.huang@mediatek.com>
+> > + *	   Sean Wang <sean.wang@mediatek.com>
+> > + *
+> > + * SPDX-License-Identifier: (GPL-2.0 OR MIT)
+> > + */
+> > +
+> > +#include <dt-bindings/interrupt-controller/irq.h>
+> > +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> > +
+> > +/ {
+> > +	compatible = "mediatek,mt7622";
+> > +	interrupt-parent = <&sysirq>;
+> > +	#address-cells = <2>;
+> > +	#size-cells = <2>;
+> > +
+> > +	cpus {
+> > +		#address-cells = <2>;
+> > +		#size-cells = <0>;
+> > +
+> > +		cpu0: cpu at 0 {
+> > +			device_type = "cpu";
+> > +			compatible = "arm,cortex-a53", "arm,armv8";
+> > +			reg = <0x0 0x0>;
+> > +			enable-method = "psci";
+> > +			clock-frequency = <1300000000>;
+> > +		};
+> > +
+> > +		cpu1: cpu at 1 {
+> > +			device_type = "cpu";
+> > +			compatible = "arm,cortex-a53", "arm,armv8";
+> > +			reg = <0x0 0x1>;
+> > +			enable-method = "psci";
+> > +			clock-frequency = <1300000000>;
+> > +		};
+> > +	};
+> > +
+> > +	uart_clk: dummy25m {
+> > +		compatible = "fixed-clock";
+> > +		#clock-cells = <0>;
+> > +		clock-frequency = <25000000>;
+> > +	};
+> > +
+> > +	psci {
+> > +		compatible  = "arm,psci-0.2";
+> > +		method      = "smc";
+> > +	};
+> > +
+> > +	reserved-memory {
+> > +		#address-cells = <2>;
+> > +		#size-cells = <2>;
+> > +		ranges;
+> > +
+> > +		/* 192 KiB reserved for ARM Trusted Firmware (BL31) */
+> > +		secmon_reserved: secmon at 43000000 {
+> > +			reg = <0 0x43000000 0 0x30000>;
+> > +			no-map;
+> > +		};
+> > +	};
+> > +
+> > +	timer {
+> > +		compatible = "arm,armv8-timer";
+> > +		interrupt-parent = <&gic>;
+> > +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
+> > +			      IRQ_TYPE_LEVEL_HIGH)>,
+> > +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) |
+> > +			      IRQ_TYPE_LEVEL_HIGH)>,
+> > +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) |
+> > +			      IRQ_TYPE_LEVEL_HIGH)>,
+> > +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) |
+> > +			      IRQ_TYPE_LEVEL_HIGH)>;
+> > +	};
+> > +
+> > +	sysirq: interrupt-controller at 10200620 {
+> > +		compatible = "mediatek,mt7622-sysirq",
+> > +			     "mediatek,mt6577-sysirq";
+> > +		interrupt-controller;
+> > +		#interrupt-cells = <3>;
+> > +		interrupt-parent = <&gic>;
+> > +		reg = <0 0x10200620 0 0x20>;
+> > +	};
+> > +
+> > +	gic: interrupt-controller at 10300000 {
+> > +		compatible = "arm,gic-400";
+> > +		interrupt-controller;
+> > +		#interrupt-cells = <3>;
+> > +		interrupt-parent = <&gic>;
+> > +		reg = <0 0x10310000 0 0x1000>,
+> > +		      <0 0x10320000 0 0x1000>,
+> > +		      <0 0x10340000 0 0x2000>,
+> > +		      <0 0x10360000 0 0x2000>;
+> > +	};
+> > +
+> > +	uart0: serial at 11002000 {
+> > +		compatible = "mediatek,mt7622-uart",
+> > +			     "mediatek,mt6577-uart";
+> > +		reg = <0 0x11002000 0 0x400>;
+> > +		interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>;
+> > +		clocks = <&uart_clk>, <&uart_clk>;
 > 
-> The approach taken in this patch to allocation of the terminator
-> record is not very clean: this will also be replaced in subsequent
-> patches.
+> Please add a dummy clock node with the correct frequency, as done in 
+> other chips as well.
 > 
-> For future extension, a comment is added in sigcontext.h
-> documenting the current static allocations in __reserved[].  This
-> will be important for determining under what circumstances
-> userspace may or may not see an expanded signal frame.
+> Thanks,
+> Matthias
 > 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Okay, the uart clock should be 50MHz, and bus clock should be 280MHz
+from AXI bus
+
+I will update in the next version .
+	
+	Sean 
+
+> > +		clock-names = "baud", "bus";
+> > +		status = "disabled";
+> > +	};
+> > +};
+> > 
