@@ -1,81 +1,74 @@
-From: mike.leach@linaro.org (Mike Leach)
-Date: Thu, 15 Jun 2017 14:29:25 +0100
-Subject: [PATCH 05/12] coresight tmc: Add helpers for accessing 64bit
- registers
-In-Reply-To: <f9f02bdd-ebfd-16b1-0f3d-03989f47ddf7@arm.com>
-References: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
- <1497278211-5001-6-git-send-email-suzuki.poulose@arm.com>
- <20170614174904.GA22030@xps15>
- <f9f02bdd-ebfd-16b1-0f3d-03989f47ddf7@arm.com>
-Message-ID: <CAJ9a7ViXN6HzMZmHee56=77fGimhysgAqb1MfN7e8n=3tBo5sA@mail.gmail.com>
+From: eugen.hristev@microchip.com (Eugen Hristev)
+Date: Thu, 15 Jun 2017 16:24:53 +0300
+Subject: [PATCH v5 0/4] iio: adc: sama5d2_adc hw triggers and buffers
+Message-ID: <1497533097-12052-1-git-send-email-eugen.hristev@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Part of the perf / ETR SG work I have been doing use the HI bits -
-which makes these additions useful for that too.
-I'd be aiming to use these as part of the re-spin
-Mike
+This patch implements the hardware triggers support and buffer management
+for sama5d2.
+The DT modifications ( [PATCH v5 1/4] ARM: dts: at91: sama5d2_xplained:
+enable ADTRG pin) are for demonstration purposes of the feature,
+setting the pinctrl for the ADC hw trigger pin,should go through
+at91 maintainers.
+As discussed on the mailing list, since we have a single external trigger
+namely the ADTRG, but three different possible edges that can trigger it,
+will have a single trigger in the IIO subsystem and three possible edges
+which can be selected from the device tree.
+Thus I created new bindings in the device tree for having the possible
+edge types for the ADTRG pin.
+The documentation for the bindings is in the patch
+[PATCH v5 2/4] Documentation: dt: iio: at91-sama5d2_adc: add adtrg
+ trigger binding
+The modifications in the DT are in the patch
+[PATCH v5 3/4] ARM: dts: at91: sama5d2: add ADC hw trigger
+The new property must be set with the values from interrupt edge types, as this
+pin is effectively an internal interrupt.
 
-On 15 June 2017 at 11:13, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
-> On 14/06/17 18:49, Mathieu Poirier wrote:
->>
->> On Mon, Jun 12, 2017 at 03:36:44PM +0100, Suzuki K Poulose wrote:
->>>
->>> Coresight TMC splits 64bit registers into a pair of 32bit registers
->>> (e.g DBA, RRP, RWP). Provide helpers to read/write to these registers.
->>
->>
->> I'm good with this patch but please specify these changes are to support
->> the
->> SoC-600 suite.  That way when we look back at this set in a couple of
->> years we
->> don't loose hair thinking we've been carrying bugs all this time.
->
->
-> To be honest, these are not necessarily just for the support of SoC-600.
-> It is applies to the current driver with SoC-400, as you could see below,
-> where we have always assumed that the RRP/RWP/DBA HI bits are always
-> 0. Technically, the TMC supports upto 40bits and hence we have been doing
-> it wrong.
->
->>> -       read_ptr = readl_relaxed(drvdata->base + TMC_RRP);
->>> -       write_ptr = readl_relaxed(drvdata->base + TMC_RWP);
->>> +       read_ptr = tmc_read_rrp(drvdata);
->>> +       write_ptr = tmc_read_rwp(drvdata);
->
->
->
->
->>> -               writel_relaxed(read_ptr, drvdata->base + TMC_RRP);
->>> +               tmc_write_rrp(drvdata, read_ptr);
->>>                 perf_aux_output_flag(handle, PERF_AUX_FLAG_TRUNCATED);
->
->
->>>         writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
->>> +       tmc_write_dba(drvdata, drvdata->paddr);
->>>
->>> -       writel_relaxed(drvdata->paddr, drvdata->base + TMC_DBALO);
->>> -       writel_relaxed(0x0, drvdata->base + TMC_DBAHI);
->
->
->>>
->>> -       rwp = readl_relaxed(drvdata->base + TMC_RWP);
->>> +       rwp = tmc_read_rwp(drvdata);
->>>         val = readl_relaxed(drvdata->base + TMC_STS);
->>>
->
->
-> Suzuki
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+  Changes in v5:
+ - Moved DRDY ack in tryreenable function
+ - Used PTR_ERR to pass error code to probe
+
+  Changes in v4:
+ - Modified bindings to be similar with interrupts
+ - Used iio claim direct to make sure buffer is not enabled when someone might
+   try to use a software triggered conversion
+
+  Changes in v3:
+ - No longer have all three possible triggers registered in the subsystem and
+   available in the sysfs. Only registering one trigger, and the possible edge
+   is being read from the device tree. In the device tree, any possible edge
+   can be set. There are three already made nodes for each possible edge which
+   can be selected.
+ - Fixed a bug where software triggered conversion could be started even if
+   the hardware trigger was enabled.
+ - Preallocate enough space for the buffer, considering all the channels
+   and timestamp
 
 
+
+  Changes in v2:
+ - Moved buffer allocation and freeing into the preenable and postdisable
+   callbacks.
+   We have a total of scan bytes that can vary a lot depending on each channel
+   enabled at a certain point.
+ - made the at91 trigger list part of state structure
+ - made the iio trigger list preallocated in state structure
+ - moved irq enabling/disabling into the try_reenable callback
+ - on trigger disable must write disable registries as well
+ - Modified trigger name length to 64
+
+Eugen Hristev (4):
+  ARM: dts: at91: sama5d2_xplained: enable ADTRG pin
+  Documentation: dt: iio: at91-sama5d2_adc: add hw trigger edge binding
+  ARM: dts: at91: sama5d2: add ADC hw trigger edge type
+  iio: adc: at91-sama5d2_adc: add hw trigger and buffer support
+
+ .../bindings/iio/adc/at91-sama5d2_adc.txt          |   6 +
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts        |  16 +-
+ arch/arm/boot/dts/sama5d2.dtsi                     |   1 +
+ drivers/iio/adc/at91-sama5d2_adc.c                 | 237 ++++++++++++++++++++-
+ 4 files changed, 254 insertions(+), 6 deletions(-)
 
 -- 
-Mike Leach
-Principal Engineer, ARM Ltd.
-Blackburn Design Centre. UK
+2.7.4
