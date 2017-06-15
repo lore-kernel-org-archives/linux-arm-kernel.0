@@ -1,85 +1,86 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 15 Jun 2017 16:43:19 +0200
-Subject: [PATCH net-next v5 04/11] net: mvmdio: remove duplicate locking
-In-Reply-To: <20170615144326.24463-1-antoine.tenart@free-electrons.com>
-References: <20170615144326.24463-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170615144326.24463-5-antoine.tenart@free-electrons.com>
+Date: Thu, 15 Jun 2017 16:43:15 +0200
+Subject: [PATCH net-next v5 00/11] net: mvmdio: add xMDIO xSMI support
+Message-ID: <20170615144326.24463-1-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King <rmk+kernel@armlinux.org.uk>
+Hello,
 
-The MDIO layer already provides per-bus locking, so there's no need for
-MDIO bus drivers to do their own internal locking.  Remove this.
+This series aims to add the xSMI support on the xMDIO bus to the
+mvmdio driver. The xSMI interface complies with the IEEE 802.3 clause 45
+and is used by 10GbE devices. On 7k and 8k (as of now), such an
+interface is found and is used by Ethernet controllers.
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
----
- drivers/net/ethernet/marvell/mvmdio.c | 10 ----------
- 1 file changed, 10 deletions(-)
+Patches 1-4 and 9 are cosmetic cleanups.
 
-diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
-index 583f1c5753c2..eab625752b12 100644
---- a/drivers/net/ethernet/marvell/mvmdio.c
-+++ b/drivers/net/ethernet/marvell/mvmdio.c
-@@ -23,7 +23,6 @@
- #include <linux/io.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
--#include <linux/mutex.h>
- #include <linux/of_mdio.h>
- #include <linux/phy.h>
- #include <linux/platform_device.h>
-@@ -51,7 +50,6 @@
- #define MVMDIO_SMI_POLL_INTERVAL_MAX	55
- 
- struct orion_mdio_dev {
--	struct mutex lock;
- 	void __iomem *regs;
- 	struct clk *clk[3];
- 	/*
-@@ -116,8 +114,6 @@ static int orion_mdio_read(struct mii_bus *bus, int mii_id,
- 	u32 val;
- 	int ret;
- 
--	mutex_lock(&dev->lock);
--
- 	ret = orion_mdio_wait_ready(bus);
- 	if (ret < 0)
- 		goto out;
-@@ -140,7 +136,6 @@ static int orion_mdio_read(struct mii_bus *bus, int mii_id,
- 
- 	ret = val & GENMASK(15, 0);
- out:
--	mutex_unlock(&dev->lock);
- 	return ret;
- }
- 
-@@ -150,8 +145,6 @@ static int orion_mdio_write(struct mii_bus *bus, int mii_id,
- 	struct orion_mdio_dev *dev = bus->priv;
- 	int ret;
- 
--	mutex_lock(&dev->lock);
--
- 	ret = orion_mdio_wait_ready(bus);
- 	if (ret < 0)
- 		goto out;
-@@ -163,7 +156,6 @@ static int orion_mdio_write(struct mii_bus *bus, int mii_id,
- 	       dev->regs);
- 
- out:
--	mutex_unlock(&dev->lock);
- 	return ret;
- }
- 
-@@ -244,8 +236,6 @@ static int orion_mdio_probe(struct platform_device *pdev)
- 		return -EPROBE_DEFER;
- 	}
- 
--	mutex_init(&dev->lock);
--
- 	if (pdev->dev.of_node)
- 		ret = of_mdiobus_register(bus, pdev->dev.of_node);
- 	else
+Patches 5-7 are prerequisites to the xSMI support.
+
+Patches 8 and 10-11 add the xSMI support to the mvmdio driver, and a
+node is added both in the cp110 slave and master device trees.
+
+This was tested on an Armada 8040 mcbin, as well as on both the
+Armada 7040 DB and the Armada 8040 DB to ensure the SMI interface
+was still working.
+
+@Dave: patch 11 should go through the mvebu tree as asked by Gregory,
+thanks!
+
+Thanks,
+Antoine
+
+Since v4:
+  - Reworded the documentation of the mvmdio bindings with Andrew's
+    suggestion.
+  - Added Reviewed-by tags from Florian.
+  - Use the net-next tag now.
+
+Since v3:
+  - Added a patch from Russell King removing locks, as there is already
+    per bus locking in the MDIO layer.
+  - Russell suggested another approach to add the xSMI support, by having
+    two different read/write functions. Reworked the series to take this
+    into account. (This also lead to the removal of some patches, and the
+    introduction of some others).
+
+Since v2:
+  - Brought back the marvell,xmdio compatible and updated the driver
+    accordingly. The ops (smi, xsmi) are chosen based on the compatible.
+  - Now return -EOPNOTSUPP when the MII_ADDR_C45 bit is wrongly set.
+  - Mask dev_addr with GENMASK(4, 0).
+  - Moved bit definitions under their register definition.
+  - Fixed the write operation shift.
+  - Added one space before the second parameter of GENMASK.
+
+Since v1:
+  - Instead of using the smi/xsmi helpers based on the compatible, now
+    check if the MII_ADDR_C45 bit is set.
+  - Removed the marvell,xmdio compatible addition.
+  - Fixed the is_read_valid logic.
+  - Updated to use static const variables for ops.
+  - Added 3 Reviewed-by tags from Florian (I dropped another one as the
+    patch changed in v2).
+
+Antoine Tenart (10):
+  net: mvmdio: reorder headers alphabetically
+  net: mvmdio: use tabs for defines
+  net: mvmdio: use GENMASK for masks
+  net: mvmdio: introduce an ops structure
+  net: mvmdio: put the poll intervals in the ops structure
+  net: mvmdio: check the MII_ADDR_C45 bit is not set for smi operations
+  net: mvmdio: add xmdio xsmi support
+  net: mvmdio: simplify the smi read and write error paths
+  dt-bindings: orion-mdio: document the new xmdio compatible
+  arm64: marvell: dts: add xmdio nodes for 7k/8k
+
+Russell King (1):
+  net: mvmdio: remove duplicate locking
+
+ .../devicetree/bindings/net/marvell-orion-mdio.txt |  10 +-
+ .../boot/dts/marvell/armada-cp110-master.dtsi      |   8 +
+ .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi |   8 +
+ drivers/net/ethernet/marvell/mvmdio.c              | 214 +++++++++++++++------
+ 4 files changed, 180 insertions(+), 60 deletions(-)
+
 -- 
 2.9.4
