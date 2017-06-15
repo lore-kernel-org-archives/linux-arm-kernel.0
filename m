@@ -1,44 +1,99 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 15 Jun 2017 07:56:12 +0100
-Subject: [PATCH v2 1/3] dt-bindings: mfd: update STM32 timers clock names
-In-Reply-To: <1497453196-31470-2-git-send-email-fabrice.gasnier@st.com>
-References: <1497453196-31470-1-git-send-email-fabrice.gasnier@st.com>
- <1497453196-31470-2-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20170615065612.qv4ce7tzvn2uhqds@dell>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Thu, 15 Jun 2017 14:58:54 +0800
+Subject: [PATCH v15 2/7] power: add power sequence library
+In-Reply-To: <CAPDyKFrLL10TY1JZAhF44_0+qGETLNtFc6ujKVUu7Ay=O8+M5A@mail.gmail.com>
+References: <1497319166-17287-1-git-send-email-peter.chen@nxp.com>
+ <1497319166-17287-3-git-send-email-peter.chen@nxp.com>
+ <CAPDyKFpOQWTPpdd__OBP1DcW58CbqnygGAOxiEFq5kqqvCm0QA@mail.gmail.com>
+ <20170614015338.GA4635@b29397-desktop>
+ <CAPDyKFrLL10TY1JZAhF44_0+qGETLNtFc6ujKVUu7Ay=O8+M5A@mail.gmail.com>
+Message-ID: <20170615065854.GA24157@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 Jun 2017, Fabrice Gasnier wrote:
-
-> Clock name has been updated during driver/DT binding review:
-> https://lkml.org/lkml/2016/12/13/718
-> Update DT binding doc to reflect this.
+On Wed, Jun 14, 2017 at 10:53:29AM +0200, Ulf Hansson wrote:
+> On 14 June 2017 at 03:53, Peter Chen <hzpeterchen@gmail.com> wrote:
+> > On Tue, Jun 13, 2017 at 12:24:42PM +0200, Ulf Hansson wrote:
+> >> [...]
+> >>
+> >> > +
+> >> > +/**
+> >> > + * of_pwrseq_on - Carry out power sequence on for device node
+> >> > + *
+> >> > + * @np: the device node would like to power on
+> >> > + *
+> >> > + * Carry out a single device power on.  If multiple devices
+> >> > + * need to be handled, use of_pwrseq_on_list() instead.
+> >> > + *
+> >> > + * Return a pointer to the power sequence instance on success,
+> >> > + * or an error code otherwise.
+> >> > + */
+> >> > +struct pwrseq *of_pwrseq_on(struct device_node *np)
+> >> > +{
+> >> > +       struct pwrseq *pwrseq;
+> >> > +       int ret;
+> >> > +
+> >> > +       pwrseq = pwrseq_find_available_instance(np);
+> >> > +       if (!pwrseq)
+> >> > +               return ERR_PTR(-ENOENT);
+> >>
+> >> In case the pwrseq instance hasn't been registered yet, then there is
+> >> no way to deal with -EPROBE_DEFER properly here.
+> >>
+> >> I haven't been following the discussions in-depth during all
+> >> iterations, so perhaps you have already discussed why doing it like
+> >> this.
+> >
+> > Yes, it has been discussed. In order to compare with compatible string
+> > at dts, we need to have one registered pwrseq instance for each
+> > pwrseq library, this pre-registered one is allocated using
+> > postcore_initcall, and the new (eg, second) instance is registered
+> > after pwrseq_get has succeeded.
 > 
-> Fixes: 8f9359c6c6a0 (dt-bindings: mfd: Add bindings for STM32 Timers driver)
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> Acked-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-> ---
->  Documentation/devicetree/bindings/mfd/stm32-timers.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> I understand you need one compatible per pwrseq library, but how does
+> that have anything to do with -EPROBE_DEFER?
+> 
+> My point is that, if a driver calls of_pwrseq_on() (which calls
+> pwrseq_find_available_instance()), but the corresponding pwrseq
+> library and instance has not yet been registered for that device. Then
+> how will you handle -EPROBE_DEFER? I guess you simply can't, which is
+> why *all* pwrseq libraries needs to be registered in early boot phase,
+> like at postcore_initcall(). Right?
+> 
+> If that is the case, I really don't like it.
+> 
 
-Applied, thanks.
+Yes, you are right. This is the limitation for this power sequence
+library, the registration for the 1st power sequence instance must
+be finished before device driver uses it. I am appreciated that
+you can supply some suggestions for it.
 
-> diff --git a/Documentation/devicetree/bindings/mfd/stm32-timers.txt b/Documentation/devicetree/bindings/mfd/stm32-timers.txt
-> index bbd083f..1db6e00 100644
-> --- a/Documentation/devicetree/bindings/mfd/stm32-timers.txt
-> +++ b/Documentation/devicetree/bindings/mfd/stm32-timers.txt
-> @@ -31,7 +31,7 @@ Example:
->  		compatible = "st,stm32-timers";
->  		reg = <0x40010000 0x400>;
->  		clocks = <&rcc 0 160>;
-> -		clock-names = "clk_int";
-> +		clock-names = "int";
->  
->  		pwm {
->  			compatible = "st,stm32-pwm";
+> Moreover, I have found yet another severe problem but reviewing the code:
+> In the struct pwrseq, you have a "bool used", which you are setting to
+> "true" once the pwrseq has been hooked up with the device, when a
+> driver calls of_pwrseq_on(). Setting that variable to true, will also
+> prevent another driver from using the same instance of the pwrseq for
+> its device. So, to cope with multiple users, you register a new
+> instance of the same pwrseq library that got hooked up, once the
+> ->get() callback is about to complete.
+> 
+> The problem the occurs, when there is another driver calling
+> of_pwrseq_on() in between, meaning that the new instance has not yet
+> been registered. This will simply fail, won't it?
+
+Yes, you are right, thanks for pointing that, I will add mutex_lock for
+of_pwrseq_on.
+
+> 
+> Sorry for jumping in late, however to me it seems like there is still
+> some pieces missing to make this work.
+> 
+> [...]
+> 
+> Kind regards
+> Uffe
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+
+Best Regards,
+Peter Chen
