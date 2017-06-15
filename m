@@ -1,38 +1,80 @@
-From: W.Vanhauwaert@TELEVIC.com (Vanhauwaert Wouter)
-Date: Thu, 15 Jun 2017 09:34:51 +0000
-Subject: FEC data corruption?
-In-Reply-To: <CAOMZO5AVNBCTSABjXhk-WJCXYhONex59swtwcAHQfoc8H45G2A@mail.gmail.com>
-References: <VI1PR0701MB27524436487BAFAF14AC92C5F8C30@VI1PR0701MB2752.eurprd07.prod.outlook.com>
- <CAOMZO5AVNBCTSABjXhk-WJCXYhONex59swtwcAHQfoc8H45G2A@mail.gmail.com>
-Message-ID: <VI1PR0701MB275293D40C902C4297D14E77F8C00@VI1PR0701MB2752.eurprd07.prod.outlook.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 15 Jun 2017 11:35:20 +0200
+Subject: [PATCH v15 2/7] power: add power sequence library
+In-Reply-To: <20170615091131.GB24157@b29397-desktop>
+References: <1497319166-17287-1-git-send-email-peter.chen@nxp.com>
+ <1497319166-17287-3-git-send-email-peter.chen@nxp.com>
+ <CAPDyKFpOQWTPpdd__OBP1DcW58CbqnygGAOxiEFq5kqqvCm0QA@mail.gmail.com>
+ <20170614015338.GA4635@b29397-desktop>
+ <CAPDyKFrLL10TY1JZAhF44_0+qGETLNtFc6ujKVUu7Ay=O8+M5A@mail.gmail.com>
+ <20170615065854.GA24157@b29397-desktop>
+ <CAPDyKFpc8GRKK8bafMU_HPaqWNrger3grPSd5rWWCTYhUGHZLA@mail.gmail.com>
+ <20170615091131.GB24157@b29397-desktop>
+Message-ID: <CAPDyKFrZoyoYCQA1rnRbz9tmT9vJigzSb+xyTZpJjhd=5eFA5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Fabio Estevam [mailto:festevam at gmail.com]
-> Sent: woensdag 14 juni 2017 16:12
-> To: Vanhauwaert Wouter
-> Cc: linux-arm-kernel at lists.infradead.org
-> Subject: Re: FEC data corruption?
-> 
-> On Wed, Jun 14, 2017 at 10:43 AM, Vanhauwaert Wouter
-> <W.Vanhauwaert@televic.com> wrote:
-> > Hello
-> > I'm trying to do a long-term network test on 2 platforms.
-> > One is based on imx6q, the other on imx6ul.
-> > imx6q is using linux-fslc, imx6ul is using linux-imx For that, I enabled the
-> busybox inetd service with the echo protocol enabled. I'm flooding the
-> device with echo requests of 12kiB (0x3000B) Most of the time that goes
-> well, but at certain points, the data returned by the platform is corrupted.
-> After some research, it looks like the data returned is copied from memory
-> address 0 instead of the correct data address. Any idea what can cause this?
-> > Here you'll find a screenshot of wireshark showing this behavior:
-> > https://snag.gy/S7cBRl.jpg
-> 
-> Does the problem happen if you run kernel 4.11.5 or 4.12-rc?
-> 
+On 15 June 2017 at 11:11, Peter Chen <hzpeterchen@gmail.com> wrote:
+> On Thu, Jun 15, 2017 at 10:11:45AM +0200, Ulf Hansson wrote:
+>> > Yes, you are right. This is the limitation for this power sequence
+>> > library, the registration for the 1st power sequence instance must
+>> > be finished before device driver uses it. I am appreciated that
+>> > you can supply some suggestions for it.
+>>
+>> In general this kind of problems is solved by first parsing the DTB,
+>> which means you will find out whether there is a resource (a pwrseq)
+>> required for the device. Then you try to fetch that resource, and if
+>> that fails, it means the resource is not yet available, and hence you
+>> want to retry later and should return -EPROBE_DEFER.
+>>
+>> In this case, of_pwrseq_on() needs to be converted to start looking
+>> for a pwrseq compatible in it's child node - I guess. Then if that is
+>> found, you try to fetch the instance of the corresponding library.
+>> Failing to fetch the library instance should then cause a return
+>> -EPROBE_DEFER.
+>
+> The most difficulty for this is we can't know whether the requested
+> pwrseq instance will be registered or not, the kernel configuration
+> for this pwrseq library may not be chosen at all.
 
-At the moment, I'm running the test on the imx6q on kernel 4.11.4 (also linux-fslc repo)
-And it seems to run without problems... (I'm already beyond 1 000 000 successful packages, still running).
-Do you have any idea which commit would influence this?
+In such case it is still correct to return -EPROBE_DEFER, because the
+driver that tries to probe its device will fail unless it can run the
+needed pwrseq. Right?
 
-Wouter
+>
+>>
+>> >
+>> >> Moreover, I have found yet another severe problem but reviewing the code:
+>> >> In the struct pwrseq, you have a "bool used", which you are setting to
+>> >> "true" once the pwrseq has been hooked up with the device, when a
+>> >> driver calls of_pwrseq_on(). Setting that variable to true, will also
+>> >> prevent another driver from using the same instance of the pwrseq for
+>> >> its device. So, to cope with multiple users, you register a new
+>> >> instance of the same pwrseq library that got hooked up, once the
+>> >> ->get() callback is about to complete.
+>> >>
+>> >> The problem the occurs, when there is another driver calling
+>> >> of_pwrseq_on() in between, meaning that the new instance has not yet
+>> >> been registered. This will simply fail, won't it?
+>> >
+>> > Yes, you are right, thanks for pointing that, I will add mutex_lock for
+>> > of_pwrseq_on.
+>>
+>> Another option is to entirely skip to two step approach.
+>>
+>> In other words, make the library to cope with multiple users via the
+>> same registered library instance.
+>>
+>
+> No, the pwrseq instance stores dtb information (clock, gpio, etc), it
+> needs to be per device.
+
+I think you misunderstood my suggestion here. Of course you need to
+allocate one pwrseq data per device.
+
+However, my point is that you shouldn't need more than one instance of
+the library functions to be registered in the list of available pwrseq
+libraries.
+
+Kind regards
+Uffe
