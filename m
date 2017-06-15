@@ -1,140 +1,127 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Wed, 14 Jun 2017 17:40:30 -0700
-Subject: [PATCH 0/8] io-pgtable lock removal
-In-Reply-To: <458ad41d-6679-eeca-3c0f-13ccb6c933b6@codeaurora.org>
-References: <cover.1496921366.git.robin.murphy@arm.com>
- <458ad41d-6679-eeca-3c0f-13ccb6c933b6@codeaurora.org>
-Message-ID: <b7830be1-9a78-e29f-a29c-4798aaa28c0a@broadcom.com>
+From: psodagud@codeaurora.org (Sodagudi Prasad)
+Date: Wed, 14 Jun 2017 17:50:26 -0700
+Subject: Using __always_inline attribute
+In-Reply-To: <9198053a46999b0b46dcab992527d0d7@codeaurora.org>
+References: <2a762f1f3b355e71c5bca6a6e00bffe0@codeaurora.org>
+ <20170614100641.GB16190@arm.com>
+ <9198053a46999b0b46dcab992527d0d7@codeaurora.org>
+Message-ID: <e77e6745b60629315b1b4f0e4fddd4bf@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
-
-I have applied this patch series on top of v4.12-rc4, and ran various
-Ethernet and NVMf target throughput tests on it.
-
-To give you some background of my setup:
-
-The system is a ARMv8 based system with 8 cores. It has various PCIe
-root complexes that can be used to connect to PCIe endpoint devices
-including NIC cards and NVMe SSDs.
-
-I'm particularly interested in the performance of the PCIe root complex
-that connects to the NIC card, and during my test, IOMMU is
-enabled/disabled against that particular PCIe root complex. The root
-complexes connected to NVMe SSDs remain unchanged (i.e., without IOMMU).
-
-For the Ethernet throughput out of 50G link:
-
-Note during the multiple TCP session test, each session will be spread
-to different CPU cores for optimized performance
-
-Without IOMMU:
-
-TX TCP x1 - 29.7 Gbps
-TX TCP x4 - 30.5 Gbps
-TX TCP x8 - 28 Gbps
-
-RX TCP x1 - 15 Gbps
-RX TCP x4 - 33.7 Gbps
-RX TCP x8 - 36 Gbps
-
-With IOMMU, but without your latest patch:
-
-TX TCP x1 - 15.2 Gbps
-TX TCP x4 - 14.3 Gbps
-TX TCP x8 - 13 Gbps
-
-RX TCP x1 - 7.88 Gbps
-RX TCP x4 - 13.2 Gbps
-RX TCP x8 - 12.6 Gbps
-
-With IOMMU and your latest patch:
-
-TX TCP x1 - 21.4 Gbps
-TX TCP x4 - 30.5 Gbps
-TX TCP x8 - 21.3 Gbps
-
-RX TCP x1 - 7.7 Gbps
-RX TCP x4 - 20.1 Gbps
-RX TCP x8 - 27.1 Gbps
-
-With the NVMf target test with 4 SSDs, fio based test, random read, 4k,
-8 jobs:
-
-Without IOMMU:
-
-IOPS = 1080K
-
-With IOMMU, but without your latest patch:
-
-IOPS = 520K
-
-With IOMMU and your latest patch:
-
-IOPS = 500K ~ 850K (a lot of variation observed during the same test run)
-
-As you can see, performance has improved significantly with this patch
-series! That is very impressive!
-
-However, it is still off, compared to the test runs without the IOMMU.
-I'm wondering if more improvement is expected.
-
-In addition, a much larger throughput variation is observed in the tests
-with these latest patches, when multiple CPUs are involved. I'm
-wondering if that is caused by some remaining lock in the driver?
-
-Also, in a few occasions, I observed the following message during the
-test, when multiple cores are involved:
-
-arm-smmu 64000000.mmu: TLB sync timed out -- SMMU may be deadlocked
-
-Thanks,
-
-Ray
-
-On 6/9/17 12:28 PM, Nate Watterson wrote:
-> Hi Robin,
+On 2017-06-14 15:33, Sodagudi Prasad wrote:
+> On 2017-06-14 03:06, Will Deacon wrote:
+>> Hi Prasad,
+>> 
+>> On Tue, Jun 13, 2017 at 03:39:37PM -0700, Sodagudi Prasad wrote:
+>>> With a variant of a CLANG(based on 4.0) following errors observed on 
+>>> Linux
+>>> 4.12-rc5 tag.
+>> 
+>> How are you building the kernel with clang, btw? I'd be keen to try 
+>> the same
+>> thing, but I thought the LLVMLinux project was largely dead at his 
+>> point. Do
+>> you still need build system patches, or is this now integrated with 
+>> Kbuild?
+> Hi Will,
+> Trying clang patches from below tree -
+> https://android.googlesource.com/kernel/common/+/experimental/android-4.4-llvm
 > 
-> On 6/8/2017 7:51 AM, Robin Murphy wrote:
->> Hi all,
->>
->> Here's the cleaned up nominally-final version of the patches everybody's
->> keen to see. #1 is just a non-critical thing-I-spotted-in-passing fix,
->> #2-#4 do some preparatory work (and bid farewell to everyone's least
->> favourite bit of code, hooray!), and #5-#8 do the dirty deed itself.
->>
->> The branch I've previously shared has been updated too:
->>
->>    git://linux-arm.org/linux-rm  iommu/pgtable
->>
->> All feedback welcome, as I'd really like to land this for 4.13.
->>
+>> 
+>>> net/built-in.o: In function `__xchg_mb':
+>>> arch/arm64/include/asm/cmpxchg.h:99: \
+>>>                     undefined reference to `__compiletime_assert_99'
+>>> arch/arm64/include/asm/cmpxchg.h:99: \
+>>>                     undefined reference to `__compiletime_assert_99
+>>> 
+>>> Clang does not seems to be marking this macro as inline and causing 
+>>> above
+>>> compilation issue due to BUILD_BUG().
+>> 
+>> The only BUILD_BUG I see around here is if the size parameter (which 
+>> is
+>> calculated using sizeof) is not known to be 1,2,4 or 8 at compile 
+>> time. It
+>> would be interesting to know which call site is confusing clang in 
+>> this way
+>> and what code is actually being emitted here.
+>> 
+>> If it's just that __xchg_mb isn't being inlined into the 
+>> __xchg_wrapper
+>> macro, then your patch should be ok, but I'd like to be sure it's not
+>> something else. I'm also surprised you haven't see this crop up in 
+>> other
+>> places.
+> After digging further, we observed that inline definition was changed
+> recently and causing this issue.
+> Here is missing part of inline macro definition 
+> __attribute__((unused)).
 > 
-> I tested the series on a QDF2400 development platform and see notable
-> performance improvements particularly in workloads that make concurrent
-> accesses to a single iommu_domain.
+> Commit abb2ea7dfd82 ("compiler, clang: suppress warning for unused
+> static inline functions") have redefined the inline macro as below
+> #define inline inline __attribute__((unused))
 > 
->> Robin.
->>
->>
->> Robin Murphy (8):
->>    iommu/io-pgtable-arm-v7s: Check table PTEs more precisely
->>    iommu/io-pgtable-arm: Improve split_blk_unmap
->>    iommu/io-pgtable-arm-v7s: Refactor split_blk_unmap
->>    iommu/io-pgtable: Introduce explicit coherency
->>    iommu/io-pgtable-arm: Support lockless operation
->>    iommu/io-pgtable-arm-v7s: Support lockless operation
->>    iommu/arm-smmu: Remove io-pgtable spinlock
->>    iommu/arm-smmu-v3: Remove io-pgtable spinlock
->>
->>   drivers/iommu/arm-smmu-v3.c        |  36 ++-----
->>   drivers/iommu/arm-smmu.c           |  48 ++++------
->>   drivers/iommu/io-pgtable-arm-v7s.c | 173
->> +++++++++++++++++++++------------
->>   drivers/iommu/io-pgtable-arm.c     | 190
->> ++++++++++++++++++++++++-------------
->>   drivers/iommu/io-pgtable.h         |   6 ++
->>   5 files changed, 268 insertions(+), 185 deletions(-)
->>
+> But actual definition of inline macro defined compiler-gcc.h file as
+> shown below.
+> #define inline          inline          __attribute__((always_inline)) 
+> notrace
 > 
+> As always_inline attribute is missing in inline definition, compile
+> may not inline macros __xchg_mb in
+> arch/arm64/include/asm/cmpxchg.h file and leading to error.
+> 
+> Some compilers may not honor inline as inline if always_inline
+> attribute is removed because of
+> -inline-threshold compiler options.
+> 
+> Here is the change to fix this issue-
+> diff --git a/include/linux/compiler-clang.h 
+> b/include/linux/compiler-clang.h
+> index d614c5e..a0e6433 100644
+> --- a/include/linux/compiler-clang.h
+> +++ b/include/linux/compiler-clang.h
+> @@ -22,4 +22,4 @@
+>   * directives.  Suppress the warning in clang as well.
+>   */
+>  #undef inline
+> -#define inline inline __attribute__((unused)) notrace
+> +#define inline __attribute__((always_inline)) __attribute__((unused)) 
+> notrace
+> 
+> -Thanks, Prasad
+
+Hi Will,
+
+Here is the proper patch -
+     compiler, clang: Add always_inline attribute to inline
+
+     Commit abb2ea7dfd82 ("compiler, clang: suppress warning for unused
+     static inline functions") re-defining the 'inline' macro but
+     __attribute__((always_inline)) is missing. Some compilers may
+     not honor inline hint if always_iniline attribute is not there.
+     So add always_inline attribute to inline as done by
+     compiler-gcc.h file.
+
+diff --git a/include/linux/compiler-clang.h 
+b/include/linux/compiler-clang.h
+index d614c5e..400b0cd 100644
+--- a/include/linux/compiler-clang.h
++++ b/include/linux/compiler-clang.h
+@@ -22,4 +22,4 @@
+   * directives.  Suppress the warning in clang as well.
+   */
+  #undef inline
+-#define inline inline __attribute__((unused)) notrace
++#define inline inline __attribute__((always_inline)) 
+__attribute__((unused)) notrace
+
+-Thanks, Prasad
+
+>> 
+>> Will
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
+Forum,
+Linux Foundation Collaborative Project
