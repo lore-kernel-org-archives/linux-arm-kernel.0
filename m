@@ -1,47 +1,53 @@
 From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 15 Jun 2017 20:49:28 +0200
-Subject: [RESEND PATCH v6 8/8] ARM: ux500: Add vendor prefix to tps61052 node
-In-Reply-To: <20170615184928.12007-1-javier@dowhile0.org>
-References: <20170615184928.12007-1-javier@dowhile0.org>
-Message-ID: <20170615184928.12007-9-javier@dowhile0.org>
+Date: Thu, 15 Jun 2017 20:54:05 +0200
+Subject: [RESEND PATCH v5 03/16] ARM: dts: efm32: Add generic compatible
+ string for I2C EEPROM
+In-Reply-To: <20170615185418.13980-1-javier@dowhile0.org>
+References: <20170615185418.13980-1-javier@dowhile0.org>
+Message-ID: <20170615185418.13980-4-javier@dowhile0.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tps61052 device node doesn't have a vendor prefix
-in its compatible string, fix it by adding one.
+The at24 driver allows to register I2C EEPROM chips using different vendor
+and devices, but the I2C subsystem does not take the vendor into account
+when matching using the I2C table since it only has device entries.
+
+But when matching using an OF table, both the vendor and device has to be
+taken into account so the driver defines only a set of compatible strings
+using the "atmel" vendor as a generic fallback for compatible I2C devices.
+
+So add this generic fallback to the device node compatible string to make
+the device to match the driver using the OF device ID table.
 
 Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: Tony Lindgren <tony@atomide.com>
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-
 
 ---
 
-Changes in v6: None
 Changes in v5:
-- Add Rob Herring's Acked-by tag.
-- Add Acked-by: Tony Lindgren <tony@atomide.com>'s Acked-by tag.
+- Only replace atmel variant but keep other EEPROM vendors (Geert Uytterhoeven).
 
-Changes in v4: None
+Changes in v4:
+- Only use the atmel manufacturer in the compatible string instead of
+  keeping the deprecated ones (Rob Herring).
+
 Changes in v3: None
 Changes in v2: None
 
- arch/arm/boot/dts/ste-hrefprev60.dtsi | 2 +-
+ arch/arm/boot/dts/efm32gg-dk3750.dts | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/ste-hrefprev60.dtsi b/arch/arm/boot/dts/ste-hrefprev60.dtsi
-index 5882a2606ac3..3f14b4df69b4 100644
---- a/arch/arm/boot/dts/ste-hrefprev60.dtsi
-+++ b/arch/arm/boot/dts/ste-hrefprev60.dtsi
-@@ -30,7 +30,7 @@
- 
- 		i2c at 80004000 {
- 			tps61052 at 33 {
--				compatible = "tps61052";
-+				compatible = "ti,tps61052";
- 				reg = <0x33>;
+diff --git a/arch/arm/boot/dts/efm32gg-dk3750.dts b/arch/arm/boot/dts/efm32gg-dk3750.dts
+index 98fc667d22c7..84f0a9abc290 100644
+--- a/arch/arm/boot/dts/efm32gg-dk3750.dts
++++ b/arch/arm/boot/dts/efm32gg-dk3750.dts
+@@ -36,7 +36,7 @@
  			};
  
+ 			eeprom at 50 {
+-				compatible = "microchip,24c02";
++				compatible = "microchip,24c02", "atmel,24c02";
+ 				reg = <0x50>;
+ 				pagesize = <16>;
+ 			};
 -- 
 2.9.3
