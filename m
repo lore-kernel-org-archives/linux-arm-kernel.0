@@ -1,62 +1,85 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 15 Jun 2017 16:43:17 +0200
-Subject: [PATCH net-next v5 02/11] net: mvmdio: use tabs for defines
+Date: Thu, 15 Jun 2017 16:43:19 +0200
+Subject: [PATCH net-next v5 04/11] net: mvmdio: remove duplicate locking
 In-Reply-To: <20170615144326.24463-1-antoine.tenart@free-electrons.com>
 References: <20170615144326.24463-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170615144326.24463-3-antoine.tenart@free-electrons.com>
+Message-ID: <20170615144326.24463-5-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cosmetic patch replacing spaces by tabs for defined values.
+From: Russell King <rmk+kernel@armlinux.org.uk>
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+The MDIO layer already provides per-bus locking, so there's no need for
+MDIO bus drivers to do their own internal locking.  Remove this.
+
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- drivers/net/ethernet/marvell/mvmdio.c | 26 +++++++++++++-------------
- 1 file changed, 13 insertions(+), 13 deletions(-)
+ drivers/net/ethernet/marvell/mvmdio.c | 10 ----------
+ 1 file changed, 10 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
-index 109a2bff334d..17b518b13ae3 100644
+index 583f1c5753c2..eab625752b12 100644
 --- a/drivers/net/ethernet/marvell/mvmdio.c
 +++ b/drivers/net/ethernet/marvell/mvmdio.c
-@@ -30,25 +30,25 @@
- #include <linux/sched.h>
- #include <linux/wait.h>
- 
--#define MVMDIO_SMI_DATA_SHIFT              0
--#define MVMDIO_SMI_PHY_ADDR_SHIFT          16
--#define MVMDIO_SMI_PHY_REG_SHIFT           21
--#define MVMDIO_SMI_READ_OPERATION          BIT(26)
--#define MVMDIO_SMI_WRITE_OPERATION         0
--#define MVMDIO_SMI_READ_VALID              BIT(27)
--#define MVMDIO_SMI_BUSY                    BIT(28)
--#define MVMDIO_ERR_INT_CAUSE		   0x007C
--#define  MVMDIO_ERR_INT_SMI_DONE	   0x00000010
--#define MVMDIO_ERR_INT_MASK		   0x0080
-+#define MVMDIO_SMI_DATA_SHIFT		0
-+#define MVMDIO_SMI_PHY_ADDR_SHIFT	16
-+#define MVMDIO_SMI_PHY_REG_SHIFT	21
-+#define MVMDIO_SMI_READ_OPERATION	BIT(26)
-+#define MVMDIO_SMI_WRITE_OPERATION	0
-+#define MVMDIO_SMI_READ_VALID		BIT(27)
-+#define MVMDIO_SMI_BUSY			BIT(28)
-+#define MVMDIO_ERR_INT_CAUSE		0x007C
-+#define  MVMDIO_ERR_INT_SMI_DONE	0x00000010
-+#define MVMDIO_ERR_INT_MASK		0x0080
- 
- /*
-  * SMI Timeout measurements:
-  * - Kirkwood 88F6281 (Globalscale Dreamplug): 45us to 95us (Interrupt)
-  * - Armada 370       (Globalscale Mirabox):   41us to 43us (Polled)
-  */
--#define MVMDIO_SMI_TIMEOUT		   1000 /* 1000us = 1ms */
--#define MVMDIO_SMI_POLL_INTERVAL_MIN	   45
--#define MVMDIO_SMI_POLL_INTERVAL_MAX	   55
-+#define MVMDIO_SMI_TIMEOUT		1000 /* 1000us = 1ms */
-+#define MVMDIO_SMI_POLL_INTERVAL_MIN	45
-+#define MVMDIO_SMI_POLL_INTERVAL_MAX	55
+@@ -23,7 +23,6 @@
+ #include <linux/io.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+-#include <linux/mutex.h>
+ #include <linux/of_mdio.h>
+ #include <linux/phy.h>
+ #include <linux/platform_device.h>
+@@ -51,7 +50,6 @@
+ #define MVMDIO_SMI_POLL_INTERVAL_MAX	55
  
  struct orion_mdio_dev {
- 	struct mutex lock;
+-	struct mutex lock;
+ 	void __iomem *regs;
+ 	struct clk *clk[3];
+ 	/*
+@@ -116,8 +114,6 @@ static int orion_mdio_read(struct mii_bus *bus, int mii_id,
+ 	u32 val;
+ 	int ret;
+ 
+-	mutex_lock(&dev->lock);
+-
+ 	ret = orion_mdio_wait_ready(bus);
+ 	if (ret < 0)
+ 		goto out;
+@@ -140,7 +136,6 @@ static int orion_mdio_read(struct mii_bus *bus, int mii_id,
+ 
+ 	ret = val & GENMASK(15, 0);
+ out:
+-	mutex_unlock(&dev->lock);
+ 	return ret;
+ }
+ 
+@@ -150,8 +145,6 @@ static int orion_mdio_write(struct mii_bus *bus, int mii_id,
+ 	struct orion_mdio_dev *dev = bus->priv;
+ 	int ret;
+ 
+-	mutex_lock(&dev->lock);
+-
+ 	ret = orion_mdio_wait_ready(bus);
+ 	if (ret < 0)
+ 		goto out;
+@@ -163,7 +156,6 @@ static int orion_mdio_write(struct mii_bus *bus, int mii_id,
+ 	       dev->regs);
+ 
+ out:
+-	mutex_unlock(&dev->lock);
+ 	return ret;
+ }
+ 
+@@ -244,8 +236,6 @@ static int orion_mdio_probe(struct platform_device *pdev)
+ 		return -EPROBE_DEFER;
+ 	}
+ 
+-	mutex_init(&dev->lock);
+-
+ 	if (pdev->dev.of_node)
+ 		ret = of_mdiobus_register(bus, pdev->dev.of_node);
+ 	else
 -- 
 2.9.4
