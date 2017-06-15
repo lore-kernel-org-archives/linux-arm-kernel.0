@@ -1,66 +1,53 @@
-From: akurz@blala.de (Alexander Kurz)
-Date: Thu, 15 Jun 2017 08:41:10 +0200
-Subject: [PATCH] ARM: dts: imx6qdl-wandboard: enable USB OTG
-Message-ID: <1497508870-4028-1-git-send-email-akurz@blala.de>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Thu, 15 Jun 2017 08:55:26 +0200
+Subject: [PATCH v4 10/11] dt-bindings: orion-mdio: document the new xmdio
+ compatible
+In-Reply-To: <20170614163537.GO15847@lunn.ch>
+References: <20170614154911.14510-1-antoine.tenart@free-electrons.com>
+ <20170614154911.14510-11-antoine.tenart@free-electrons.com>
+ <20170614163537.GO15847@lunn.ch>
+Message-ID: <20170615065526.GA4773@kwain.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable USB OTG (dual-role) on the Wandboard.
-Note, that the USB_OTG_VBUS current is quite limited due to a 22R resistor
-in the power line. Hence, the overcurrent signal of 1A will never be
-triggered on this board.
+Hi Andrew,
 
-Signed-off-by: Alexander Kurz <akurz@blala.de>
----
- arch/arm/boot/dts/imx6qdl-wandboard.dtsi | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+On Wed, Jun 14, 2017 at 06:35:37PM +0200, Andrew Lunn wrote:
+> On Wed, Jun 14, 2017 at 05:49:10PM +0200, Antoine Tenart wrote:
+> >  
+> >  The Ethernet controllers of the Marvel Kirkwood, Dove, Orion5x,
+> > -MV78xx0, Armada 370 and Armada XP have an identical unit that provides
+> > -an interface with the MDIO bus. This driver handles this MDIO
+> > -interface.
+> > +MV78xx0, Armada 370, Armada XP, Armada 7k and Armada 8k have an
+> > +identical unit that provides an interface with the MDIO bus or
+> > +with the xMDIO bus. This driver handles these interfaces.
+> 
+> This patches is looking good now. One nit. The description above
+> suggests Kirkwood, Dove, Orion5x, MV78xx0, Armada 370 and Armada XP
+> all have xmdio. Maybe better wording would be:
+> 
+> The Ethernet controllers of the Marvel Kirkwood, Dove, Orion5x,
+> MV78xx0, Armada 370, Armada XP, Armada 7k and Armada 8k have an
+> identical unit that provides an interface with the MDIO bus.
+> Additionally, Armada 7k and Armada 8k has a second unit which
+> provides an interface with the xMDIO bus. This driver handles
+> these interfaces.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-index 82dc5744..cbf69ae 100644
---- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-@@ -34,6 +34,16 @@
- 			regulator-max-microvolt = <3300000>;
- 			regulator-always-on;
- 		};
-+
-+		reg_usb_otg_vbus: usb_otg_vbus {
-+			compatible = "regulator-fixed";
-+			regulator-name = "usb_otg_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usbotgvbus>;
-+			gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
-+		};
- 	};
- 
- 	sound {
-@@ -169,6 +179,12 @@
- 			>;
- 		};
- 
-+		pinctrl_usbotgvbus: usbotgvbusgrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_EIM_D22__GPIO3_IO22		0x130b0
-+			>;
-+		};
-+
- 		pinctrl_usdhc1: usdhc1grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD1_CMD__SD1_CMD		0x17059
-@@ -243,10 +259,11 @@
- };
- 
- &usbotg {
-+	vbus-supply = <&reg_usb_otg_vbus>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usbotg>;
- 	disable-over-current;
--	dr_mode = "peripheral";
-+	dr_mode = "otg";
- 	status = "okay";
- };
- 
+Agreed, your description is better :)
+I'll respin this patch only, if there is no other comment.
+
+Thanks!
+Antoine
+
 -- 
-2.1.4
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170615/b4fb6e80/attachment.sig>
