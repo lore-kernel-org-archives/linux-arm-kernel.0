@@ -1,10 +1,10 @@
 From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 15 Jun 2017 20:54:07 +0200
-Subject: [RESEND PATCH v5 05/16] ARM: dts: lpc18xx: Add generic compatible
+Date: Thu, 15 Jun 2017 20:54:06 +0200
+Subject: [RESEND PATCH v5 04/16] ARM: dts: keystone: Add generic compatible
  string for I2C EEPROM
 In-Reply-To: <20170615185418.13980-1-javier@dowhile0.org>
 References: <20170615185418.13980-1-javier@dowhile0.org>
-Message-ID: <20170615185418.13980-6-javier@dowhile0.org>
+Message-ID: <20170615185418.13980-5-javier@dowhile0.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,9 +23,7 @@ Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
 
 ---
 
-Changes in v5:
-- Only replace atmel variant but keep other EEPROM vendors (Geert Uytterhoeven).
-
+Changes in v5: None
 Changes in v4:
 - Only use the atmel manufacturer in the compatible string instead of
   keeping the deprecated ones (Rob Herring).
@@ -33,60 +31,48 @@ Changes in v4:
 Changes in v3: None
 Changes in v2: None
 
- arch/arm/boot/dts/lpc4337-ciaa.dts          | 6 +++---
- arch/arm/boot/dts/lpc4350-hitex-eval.dts    | 2 +-
- arch/arm/boot/dts/lpc4357-ea4357-devkit.dts | 2 +-
- 3 files changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/keystone-k2e-evm.dts  | 2 +-
+ arch/arm/boot/dts/keystone-k2hk-evm.dts | 2 +-
+ arch/arm/boot/dts/keystone-k2l-evm.dts  | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/lpc4337-ciaa.dts b/arch/arm/boot/dts/lpc4337-ciaa.dts
-index 7c16d639a1b4..beddaba85393 100644
---- a/arch/arm/boot/dts/lpc4337-ciaa.dts
-+++ b/arch/arm/boot/dts/lpc4337-ciaa.dts
-@@ -174,17 +174,17 @@
- 	clock-frequency = <400000>;
+diff --git a/arch/arm/boot/dts/keystone-k2e-evm.dts b/arch/arm/boot/dts/keystone-k2e-evm.dts
+index ae1ebe7ee021..c8d45e6cd9e6 100644
+--- a/arch/arm/boot/dts/keystone-k2e-evm.dts
++++ b/arch/arm/boot/dts/keystone-k2e-evm.dts
+@@ -69,7 +69,7 @@
  
- 	eeprom at 50 {
--		compatible = "microchip,24c512";
-+		compatible = "microchip,24c512", "atmel,24c512";
+ &i2c0 {
+ 	dtt at 50 {
+-		compatible = "at,24c1024";
++		compatible = "atmel,24c1024";
  		reg = <0x50>;
- 	};
- 
- 	eeprom at 51 {
--		compatible = "microchip,24c02";
-+		compatible = "microchip,24c02", "atmel,24c02";
- 		reg = <0x51>;
- 	};
- 
- 	eeprom at 54 {
--		compatible = "microchip,24c512";
-+		compatible = "microchip,24c512", "atmel,24c512";
- 		reg = <0x54>;
  	};
  };
-diff --git a/arch/arm/boot/dts/lpc4350-hitex-eval.dts b/arch/arm/boot/dts/lpc4350-hitex-eval.dts
-index 874c75d44013..8b973f537d3a 100644
---- a/arch/arm/boot/dts/lpc4350-hitex-eval.dts
-+++ b/arch/arm/boot/dts/lpc4350-hitex-eval.dts
-@@ -429,7 +429,7 @@
- 	};
+diff --git a/arch/arm/boot/dts/keystone-k2hk-evm.dts b/arch/arm/boot/dts/keystone-k2hk-evm.dts
+index 2156ff92d08f..69af3a950da6 100644
+--- a/arch/arm/boot/dts/keystone-k2hk-evm.dts
++++ b/arch/arm/boot/dts/keystone-k2hk-evm.dts
+@@ -145,7 +145,7 @@
  
- 	eeprom at 50 {
--		compatible = "nxp,24c02";
-+		compatible = "nxp,24c02", "atmel,24c02";
+ &i2c0 {
+ 	dtt at 50 {
+-		compatible = "at,24c1024";
++		compatible = "atmel,24c1024";
  		reg = <0x50>;
  	};
+ };
+diff --git a/arch/arm/boot/dts/keystone-k2l-evm.dts b/arch/arm/boot/dts/keystone-k2l-evm.dts
+index 056b42f99d7a..402190e55e40 100644
+--- a/arch/arm/boot/dts/keystone-k2l-evm.dts
++++ b/arch/arm/boot/dts/keystone-k2l-evm.dts
+@@ -42,7 +42,7 @@
  
-diff --git a/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts b/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
-index 9b5fad622522..02b23fa29d75 100644
---- a/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
-+++ b/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
-@@ -490,7 +490,7 @@
- 	};
- 
- 	eeprom at 57 {
--		compatible = "microchip,24c64";
-+		compatible = "microchip,24c64", "atmel,24c64";
- 		reg = <0x57>;
+ &i2c0 {
+ 	dtt at 50 {
+-		compatible = "at,24c1024";
++		compatible = "atmel,24c1024";
+ 		reg = <0x50>;
  	};
  };
 -- 
