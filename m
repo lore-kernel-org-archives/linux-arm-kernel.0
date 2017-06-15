@@ -1,46 +1,43 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 15 Jun 2017 16:43:22 +0200
-Subject: [PATCH net-next v5 07/11] net: mvmdio: check the MII_ADDR_C45 bit is
- not set for smi operations
+Date: Thu, 15 Jun 2017 16:43:25 +0200
+Subject: [PATCH net-next v5 10/11] dt-bindings: orion-mdio: document the new
+ xmdio compatible
 In-Reply-To: <20170615144326.24463-1-antoine.tenart@free-electrons.com>
 References: <20170615144326.24463-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170615144326.24463-8-antoine.tenart@free-electrons.com>
+Message-ID: <20170615144326.24463-11-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a check for the read and write smi operations, to ensure the
-MII_ADDR_C45 bit isn't set. This will be needed as soon as the xSMI
-support is added to the mvmdio driver.
+A new compatible for Marvell xMDIO interfaces was added into the Marvell
+MDIO driver. Document this new compatible.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- drivers/net/ethernet/marvell/mvmdio.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ Documentation/devicetree/bindings/net/marvell-orion-mdio.txt | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
-index e4aa8e2d2e8a..fe6072aae0a6 100644
---- a/drivers/net/ethernet/marvell/mvmdio.c
-+++ b/drivers/net/ethernet/marvell/mvmdio.c
-@@ -126,6 +126,9 @@ static int orion_mdio_read(struct mii_bus *bus, int mii_id,
- 	u32 val;
- 	int ret;
+diff --git a/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt b/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt
+index ccdabdcc8618..42cd81090a2c 100644
+--- a/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt
++++ b/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt
+@@ -1,12 +1,14 @@
+ * Marvell MDIO Ethernet Controller interface
  
-+	if (regnum & MII_ADDR_C45)
-+		return -EOPNOTSUPP;
-+
- 	ret = orion_mdio_wait_ready(&orion_mdio_smi_ops, bus);
- 	if (ret < 0)
- 		goto out;
-@@ -157,6 +160,9 @@ static int orion_mdio_write(struct mii_bus *bus, int mii_id,
- 	struct orion_mdio_dev *dev = bus->priv;
- 	int ret;
+ The Ethernet controllers of the Marvel Kirkwood, Dove, Orion5x,
+-MV78xx0, Armada 370 and Armada XP have an identical unit that provides
+-an interface with the MDIO bus. This driver handles this MDIO
+-interface.
++MV78xx0, Armada 370, Armada XP, Armada 7k and Armada 8k have an
++identical unit that provides an interface with the MDIO bus.
++Additionally, Armada 7k and Armada 8k has a second unit which
++provides an interface with the xMDIO bus. This driver handles
++these interfaces.
  
-+	if (regnum & MII_ADDR_C45)
-+		return -EOPNOTSUPP;
-+
- 	ret = orion_mdio_wait_ready(&orion_mdio_smi_ops, bus);
- 	if (ret < 0)
- 		goto out;
+ Required properties:
+-- compatible: "marvell,orion-mdio"
++- compatible: "marvell,orion-mdio" or "marvell,xmdio"
+ - reg: address and length of the MDIO registers.  When an interrupt is
+   not present, the length is the size of the SMI register (4 bytes)
+   otherwise it must be 0x84 bytes to cover the interrupt control
 -- 
 2.9.4
