@@ -1,103 +1,123 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 15 Jun 2017 08:33:24 -0600
-Subject: [PATCH 08/12] coresight tmc: Handle configuration types properly
-In-Reply-To: <5f2354c7-2561-2419-b633-8804babf2279@arm.com>
+Date: Thu, 15 Jun 2017 08:37:09 -0600
+Subject: [PATCH 09/12] coresight tmc: Add capability information
+In-Reply-To: <f6440fa4-91e1-773f-8ca9-a5424ba8e672@arm.com>
 References: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
- <1497278211-5001-9-git-send-email-suzuki.poulose@arm.com>
- <20170614175916.GD22030@xps15>
- <5f2354c7-2561-2419-b633-8804babf2279@arm.com>
-Message-ID: <CANLsYkz_WLDNHS1jhZbfm7iUPt3kUhiMV1Ti0Aig30Un9evx=w@mail.gmail.com>
+ <1497278211-5001-10-git-send-email-suzuki.poulose@arm.com>
+ <20170614182251.GE22030@xps15> <f6440fa4-91e1-773f-8ca9-a5424ba8e672@arm.com>
+Message-ID: <CANLsYkzKaB1zcb22D3TqWPDBd-ABzu_0TygSeod30k9CcTOKfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 June 2017 at 04:25, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
-> On 14/06/17 18:59, Mathieu Poirier wrote:
+On 15 June 2017 at 04:30, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 14/06/17 19:22, Mathieu Poirier wrote:
 >>
->> On Mon, Jun 12, 2017 at 03:36:47PM +0100, Suzuki K Poulose wrote:
+>> On Mon, Jun 12, 2017 at 03:36:48PM +0100, Suzuki K Poulose wrote:
 >>>
->>> Coresight SoC 600 defines a new configuration for TMC, Embedded Trace
->>> Streamer (ETS), indicated by 0x3 in MODE:CONFIG_TYPE. Make sure
->>> the driver handles the new type properly.
->>
->>
->> From what I see below this patch only improves readability by moving the
->> if/else
->> compound to a case statement - there is no trace of the new ETS block.
->> Readability enhancement are good but the changelog must match the code.
->
->
-> Mathieu,
->
-> Not really. It fixes an issue with the current code. We check for ETB and
-> ETR,
-> if it doesn't match either of those, we assume it is ETF which is fine with
-> SoC-400.
-> But with SoC-600, we could have an ETS with id 0x3 and the driver could
-> treat it
-> as an ETF and go on with the initialisation. This patch makes sure that we
-> do check for the ETF and report that ETS is not a supported configuration.
-
-That is the description that should go in the changelog - it reflects
-exactly what this patch is doing.
-
-Mathieu.
-
->
-> Suzuki
->
->>
+>>> This patch adds description of the capabilities of a given TMC.
+>>> This will help us to handle different versions of the TMC in the
+>>> same driver by checking the capabilities.
 >>>
 >>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 >>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 >>> ---
->>>  drivers/hwtracing/coresight/coresight-tmc.c | 14 +++++++++++---
->>>  1 file changed, 11 insertions(+), 3 deletions(-)
+>>>  drivers/hwtracing/coresight/coresight-tmc.c | 10 +++++++++-
+>>>  drivers/hwtracing/coresight/coresight-tmc.h | 18 ++++++++++++++++++
+>>>  2 files changed, 27 insertions(+), 1 deletion(-)
 >>>
 >>> diff --git a/drivers/hwtracing/coresight/coresight-tmc.c
 >>> b/drivers/hwtracing/coresight/coresight-tmc.c
->>> index fd5a2e0..7152656 100644
+>>> index 7152656..e88f2f3 100644
 >>> --- a/drivers/hwtracing/coresight/coresight-tmc.c
 >>> +++ b/drivers/hwtracing/coresight/coresight-tmc.c
->>> @@ -358,11 +358,13 @@ static int tmc_probe(struct amba_device *adev,
+>>> @@ -399,16 +399,24 @@ static int tmc_probe(struct amba_device *adev,
 >>> const struct amba_id *id)
->>>         desc.dev = dev;
->>>         desc.groups = coresight_tmc_groups;
+>>>         ret = misc_register(&drvdata->miscdev);
+>>>         if (ret)
+>>>                 coresight_unregister(drvdata->csdev);
+>>> +       else if (id->data)
+>>> +               drvdata->caps = *(struct tmc_caps *)id->data;
+>>>  out:
+>>>         return ret;
+>>>  }
 >>>
->>> -       if (drvdata->config_type == TMC_CONFIG_TYPE_ETB) {
->>> +       switch (drvdata->config_type) {
->>> +       case TMC_CONFIG_TYPE_ETB:
->>>                 desc.type = CORESIGHT_DEV_TYPE_SINK;
->>>                 desc.subtype.sink_subtype =
->>> CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
->>>                 desc.ops = &tmc_etb_cs_ops;
->>> -       } else if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
->>> +               break;
->>> +       case TMC_CONFIG_TYPE_ETR:
->>>                 desc.type = CORESIGHT_DEV_TYPE_SINK;
->>>                 desc.subtype.sink_subtype =
->>> CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
->>>                 desc.ops = &tmc_etr_cs_ops;
->>> @@ -373,10 +375,16 @@ static int tmc_probe(struct amba_device *adev,
->>> const struct amba_id *id)
->>>                 ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(40));
->>>                 if (ret)
->>>                         goto out;
->>> -       } else {
->>> +               break;
->>> +       case TMC_CONFIG_TYPE_ETF:
->>>                 desc.type = CORESIGHT_DEV_TYPE_LINKSINK;
->>>                 desc.subtype.link_subtype =
->>> CORESIGHT_DEV_SUBTYPE_LINK_FIFO;
->>>                 desc.ops = &tmc_etf_cs_ops;
->>> +               break;
->>> +       default:
->>> +               pr_err("%s: Unsupported TMC config\n", pdata->name);
->>> +               ret = -EINVAL;
->>> +               goto out;
->>>         }
->>>
->>>         drvdata->csdev = coresight_register(&desc);
->>> --
->>> 2.7.4
->>>
+>>> +static struct tmc_caps coresight_soc_400_tmc_caps = {
+>>> +       .caps = CORESIGHT_SOC_400_TMC_CAPS,
+>>> +};
+>>> +
+>>>  static struct amba_id tmc_ids[] = {
+>>>         {
+>>> +               /* Coresight SoC 400 TMC */
+>>>                 .id     = 0x000bb961,
+>>>                 .mask   = 0x000fffff,
+>>> +               .data   = &coresight_soc_400_tmc_caps,
+>>
+>>
+>> Do we need this?  I don't see anywhere a check for TMC_CAP_ETR_SG_UNIT.
+>> And
+>> I also suppose that the SoC600 suite also supports scatter-gather - is
+>> there a
+>> need to differenciate both that may not be implemented in this set?
 >
+>
+> Yes, the coresight SoC-600 doesn't come with an in built Scatter Gather
+> unit.
+> Instead there is a dedicated component (Coresight Address Translation UNIT,
+> CATU)
+> to do the Scatter Gather, which needs a driver. This is to make sure that if
+> somebody wants to use the SG, they should check it in the caps.
+>
+>
+>>
+>> I'm also wondering if capabilities for SoC600 could not be retrieved from
+>> HW
+>> registers rather than hard coded?
+>
+>
+> Unfortunately, no. There is no hardware description for the feature. So, we
+> need
+> to depend on the PIDs to detect the features.
+
+I suspected that much - thanks for the clarification.
+
+>
+>>> +#define TMC_CAP_ETR_SG_UNIT                    (1U << 0)
+>>> +
+>>> +/**
+>>> + * struct tmc_cap - Describes the capabilities of the TMC.
+>>> + * @caps:      - Bitmask of the capacities
+>>> + */
+>>> +struct tmc_caps {
+>>> +       u32     caps;
+>>> +};
+>>> +
+>>> +#define CORESIGHT_SOC_400_TMC_CAPS     (TMC_CAP_ETR_SG_UNIT)
+>>> +
+>>>  /**
+>>>   * struct tmc_drvdata - specifics associated to an TMC component
+>>>   * @base:      memory mapped base address for this component.
+>>> @@ -110,6 +122,7 @@ struct tmc_drvdata {
+>>>         void __iomem            *base;
+>>>         struct device           *dev;
+>>>         struct coresight_device *csdev;
+>>> +       struct tmc_caps         caps;
+>>
+>>
+>> A simple u32 is probably best here rather than introducing a new
+>> structure.  If
+>> capabilites can't be retrieved from HW and have to be declared statically,
+>> a
+>> *u32 referencing ->data is sufficient rather than copying memory.
+>
+>
+> I think eventually the compiler may be able to do a register move to copy a
+> 32bit
+> data. We could potentially add more fields there (e.g, whether a CATU is
+> connected
+> to the device or not etc). Hence the abstraction.
+
+Ok
+
+>
+>
+> Suzuki
