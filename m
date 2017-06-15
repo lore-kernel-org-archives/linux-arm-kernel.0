@@ -1,68 +1,31 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Thu, 15 Jun 2017 17:11:31 +0800
-Subject: [PATCH v15 2/7] power: add power sequence library
-In-Reply-To: <CAPDyKFpc8GRKK8bafMU_HPaqWNrger3grPSd5rWWCTYhUGHZLA@mail.gmail.com>
-References: <1497319166-17287-1-git-send-email-peter.chen@nxp.com>
- <1497319166-17287-3-git-send-email-peter.chen@nxp.com>
- <CAPDyKFpOQWTPpdd__OBP1DcW58CbqnygGAOxiEFq5kqqvCm0QA@mail.gmail.com>
- <20170614015338.GA4635@b29397-desktop>
- <CAPDyKFrLL10TY1JZAhF44_0+qGETLNtFc6ujKVUu7Ay=O8+M5A@mail.gmail.com>
- <20170615065854.GA24157@b29397-desktop>
- <CAPDyKFpc8GRKK8bafMU_HPaqWNrger3grPSd5rWWCTYhUGHZLA@mail.gmail.com>
-Message-ID: <20170615091131.GB24157@b29397-desktop>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Thu, 15 Jun 2017 14:55:37 +0530
+Subject: [PATCH] arm: perf: make of_device_ids const
+Message-ID: <7b4609967722cb047484394b91ebbc307b8a3d40.1497518589.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 15, 2017 at 10:11:45AM +0200, Ulf Hansson wrote:
-> > Yes, you are right. This is the limitation for this power sequence
-> > library, the registration for the 1st power sequence instance must
-> > be finished before device driver uses it. I am appreciated that
-> > you can supply some suggestions for it.
-> 
-> In general this kind of problems is solved by first parsing the DTB,
-> which means you will find out whether there is a resource (a pwrseq)
-> required for the device. Then you try to fetch that resource, and if
-> that fails, it means the resource is not yet available, and hence you
-> want to retry later and should return -EPROBE_DEFER.
-> 
-> In this case, of_pwrseq_on() needs to be converted to start looking
-> for a pwrseq compatible in it's child node - I guess. Then if that is
-> found, you try to fetch the instance of the corresponding library.
-> Failing to fetch the library instance should then cause a return
-> -EPROBE_DEFER.
+of_device_ids are not supposed to change at runtime. All functions
+working with of_device_ids provided by <linux/of.h> work with const
+of_device_ids. So mark the non-const structs as const.
 
-The most difficulty for this is we can't know whether the requested
-pwrseq instance will be registered or not, the kernel configuration
-for this pwrseq library may not be chosen at all.
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+---
+ arch/arm/kernel/perf_event_v6.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> 
-> >
-> >> Moreover, I have found yet another severe problem but reviewing the code:
-> >> In the struct pwrseq, you have a "bool used", which you are setting to
-> >> "true" once the pwrseq has been hooked up with the device, when a
-> >> driver calls of_pwrseq_on(). Setting that variable to true, will also
-> >> prevent another driver from using the same instance of the pwrseq for
-> >> its device. So, to cope with multiple users, you register a new
-> >> instance of the same pwrseq library that got hooked up, once the
-> >> ->get() callback is about to complete.
-> >>
-> >> The problem the occurs, when there is another driver calling
-> >> of_pwrseq_on() in between, meaning that the new instance has not yet
-> >> been registered. This will simply fail, won't it?
-> >
-> > Yes, you are right, thanks for pointing that, I will add mutex_lock for
-> > of_pwrseq_on.
-> 
-> Another option is to entirely skip to two step approach.
-> 
-> In other words, make the library to cope with multiple users via the
-> same registered library instance.
-> 
-
-No, the pwrseq instance stores dtb information (clock, gpio, etc), it
-needs to be per device.
-
+diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
+index 96b7a47..8226d0b 100644
+--- a/arch/arm/kernel/perf_event_v6.c
++++ b/arch/arm/kernel/perf_event_v6.c
+@@ -552,7 +552,7 @@ static int armv6mpcore_pmu_init(struct arm_pmu *cpu_pmu)
+ 	return 0;
+ }
+ 
+-static struct of_device_id armv6_pmu_of_device_ids[] = {
++static const struct of_device_id armv6_pmu_of_device_ids[] = {
+ 	{.compatible = "arm,arm11mpcore-pmu",	.data = armv6mpcore_pmu_init},
+ 	{.compatible = "arm,arm1176-pmu",	.data = armv6_1176_pmu_init},
+ 	{.compatible = "arm,arm1136-pmu",	.data = armv6_1136_pmu_init},
 -- 
-
-Best Regards,
-Peter Chen
+1.9.1
