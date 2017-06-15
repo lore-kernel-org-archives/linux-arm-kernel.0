@@ -1,43 +1,105 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 15 Jun 2017 21:40:44 +0200
-Subject: [PATCH] clockevents/tcb_clksrc: implement suspend/resume
-In-Reply-To: <7100599f-529a-7d56-f43f-01513293d313@linaro.org>
-References: <20170411154826.5883-1-alexandre.belloni@free-electrons.com>
- <7100599f-529a-7d56-f43f-01513293d313@linaro.org>
-Message-ID: <20170615194044.6x6c6icnsrxgpscv@piout.net>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Thu, 15 Jun 2017 20:49:15 +0100
+Subject: [PATCH v4 00/20] arm64: dts: hi3660: add device nodes
+In-Reply-To: <20170615030417.14059-1-guodong.xu@linaro.org>
+References: <20170615030417.14059-1-guodong.xu@linaro.org>
+Message-ID: <5942E4BB.4000002@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/04/2017 at 21:13:36 +0200, Daniel Lezcano wrote:
-> > +void tc_clksrc_resume(struct clocksource *cs)
-> > +{
-> > +	int i;
-> > +
-> > +	for (i = 0; i < 3; i++) {
+Hi Guodong,
+
+On 2017/6/15 4:03, Guodong Xu wrote:
+> This patchset adds various devices nodes for hi3660 and hikey960.
 > 
-> s/3/ARRAY_SIZE(tcb_cache)/
+> HiKey960 is one of 96boards. For details information about it, please
+> refer to [1].
 > 
-> > +		__raw_writel(tcb_cache[i].cmr, tcaddr + ATMEL_TC_REG(i, CMR));
+> In v4, I removed cpuidle patch
+> * (v3-0014-arm64-dts-hi3660-enable-idle-states.patch)
+>   , since we are not sure yet whether the corresponding driver can get
+>   into mainline. Sorry about the noise.
+> * Other patches are not changed.
 > 
-> Why __raw_writel?
+> In v3,
+> * nothing is changed for patches already exists in v2.
+> * added 9 more dts patches. Most of them already were reviewed with their
+>     corresponding driver patchset. For purpose of easy integration for
+>     platform maintainer, I copied them here, including threads [2], [3],
+>     and [4].
+> * four patches, this is the first time they are sent out for review.
+> v3-0014-arm64-dts-hi3660-enable-idle-states.patch
+> v3-0019-dt-bindings-mmc-dw_mmc-k3-add-document-of-hi3660-.patch
+> v3-0020-arm64-dts-hi3660-add-sd-sdio-device-nodes.patch
+> v3-0021-arm64-dts-hi3660-hikey960-add-nodes-for-WiFi.patch
+>     mmc driver is under review in [5].
+> 
+> In v2, incorporated review comments from Rob Herring <robh@kernel.org>
+> * uart4: max-speed should be in slave device bluetooth node
+> * LEDs:	- bt_active triggered by 'hci0-power'
+> 	- move out of SoC level
+> * pinctrl: update dts to use #pinctrl-cells
+> * uart: add pinctrl information into uart nodes; add label strings.
+> * chosen: update stdout-path. serial6 is used.
+> * i2c: add label strings. change reg address to lower case.
+> * remove unnecessary status="ok"
+> * gpio-keys: move out of SoC level.
+> 
+> [1] https://github.com/96boards/documentation/tree/master/ConsumerEdition/HiKey960
+> [2] sp804 timer: https://www.spinics.net/lists/kernel/msg2513025.html
+> [3] PCIe: https://www.spinics.net/lists/kernel/msg2520677.html
+> [4] mfd and regulator: https://www.spinics.net/lists/arm-kernel/msg586147.html
+> [5] mmc: https://patchwork.kernel.org/patch/9783273/
+> 
+> Chen Feng (2):
+>   arm64: dts: hi3660: Add uarts nodes
+>   arm64: dts: hi3660: Add pl031 rtc node
+> 
+> Chen Jun (1):
+>   arm64: dts: hi3660: add power key dts node
+> 
+> Guodong Xu (7):
+>   dt-bindings: arm: hisilicon: add bindings for HiKey960 board
+>   arm64: dts: hisilicon: update compatible string for hikey960
+>   arm64: dts: hikey960: add WL1837 Bluetooth device node
+>   arm64: dts: hikey960: add LED nodes
+>   dt-bindings: mfd: hi6421: Add hi6421v530 compatible string
+>   dt-bindings: mmc: dw_mmc-k3: add document of hi3660 mmc
+>   arm64: dts: hi3660-hikey960: add nodes for WiFi
+> 
+> Leo Yan (1):
+>   arm64: dts: hi3660: add sp804 timer node
+> 
+> Li Wei (1):
+>   arm64: dts: hi3660: add sd/sdio device nodes
+> 
+> Wang Xiaoyin (4):
+>   arm64: dts: hikey960: pinctrl: add more pinmux and pinconfig
+>   arm64: dts: hi3660: add gpio dtsi file for Hisilicon Hi3660 SOC
+>   arm64: dts: hi3660: add spi device nodes
+>   arm64: dts: hikey960: add device node for pmic and regulators
+> 
+> Xiaowei Song (2):
+>   dt-bindings: PCI: hisi: Add document for PCIe of Kirin SoCs
+>   arm64: dts: hisi: add kirin pcie node
+> 
+> Zhangfei Gao (2):
+>   arm64: dts: hi3660: add resources for clock and reset
+>   arm64: dts: Add I2C nodes for Hi3660
+> 
+>  .../bindings/arm/hisilicon/hisilicon.txt           |   4 +
+>  Documentation/devicetree/bindings/mfd/hi6421.txt   |   4 +-
+>  .../devicetree/bindings/mmc/k3-dw-mshc.txt         |   1 +
+>  .../devicetree/bindings/pci/kirin-pcie.txt         |  50 ++
+>  arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts  | 217 +++++-
+>  arch/arm64/boot/dts/hisilicon/hi3660.dtsi          | 702 ++++++++++++++++++-
+>  .../arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi | 778 +++++++++++++++++++--
+>  7 files changed, 1681 insertions(+), 75 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/pci/kirin-pcie.txt
 > 
 
-Ok, I got to the bottom of that question and I think it is worth
-answering it. __raw_{read,write}l were necessary to make the driver work
-on AVR32, because its core is BE and the IP LE and the regular
-readl/writel are (were) not doing the proper conversion.
+Series applied to hisilicon arm64 dt tree.
+Thanks!
 
-This was supposed to be changed in a patch that was never applied:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/331775.html
-
-But everything is fine, as AVR32 is now removed from the kernel. I think
-I'll switch the driver to regular readl/writel, using the _relaxed
-version in the hot path. Is that fine for you?
-
-I'll also do so in the rework if at some point we can agree on some
-bindings, I'll try to address that soon too.
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+BR,
+Wei
