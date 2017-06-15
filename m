@@ -1,54 +1,37 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Thu, 15 Jun 2017 18:45:32 +0530
-Subject: [PATCH v3 1/9] ARM: dts: imx6ul-isiot: Add Sound card with codec
- node
-In-Reply-To: <20170615075059.GD5902@dragon>
-References: <1491501735-1649-1-git-send-email-jagan@openedev.com>
- <1491501735-1649-2-git-send-email-jagan@openedev.com>
- <20170407131649.GH16503@dragon>
- <CAMty3ZDj3XgeZwUTXTTX2svoXaNWJ3GJtbNAt9+jj+n8Z4640w@mail.gmail.com>
- <20170615022024.GE30112@dragon>
- <CAMty3ZAUK37JYnPwVRuBA6B67QV+S_BYQ6f=k6_rjw__ypTxBg@mail.gmail.com>
- <20170615071529.GC5902@dragon>
- <CAMty3ZCwkP=EaFcSdA--yQNN9ebjE9JptfwWjQpceXqDq-xkyA@mail.gmail.com>
- <20170615075059.GD5902@dragon>
-Message-ID: <CAMty3ZCXQ1bTzQPAFoTrbtfFZoC7Umnpj=UBs3y47wBQzq63TQ@mail.gmail.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Thu, 15 Jun 2017 15:22:43 +0200
+Subject: [PATCH v4 10/11] dt-bindings: orion-mdio: document the new xmdio
+ compatible
+In-Reply-To: <20170615131232.GC31952@lunn.ch>
+References: <20170614154911.14510-1-antoine.tenart@free-electrons.com>
+ <20170614154911.14510-11-antoine.tenart@free-electrons.com>
+ <20170614163537.GO15847@lunn.ch> <20170615065526.GA4773@kwain.lan>
+ <20170615131232.GC31952@lunn.ch>
+Message-ID: <20170615132243.GD4773@kwain.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 15, 2017 at 1:21 PM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Thu, Jun 15, 2017 at 01:01:22PM +0530, Jagan Teki wrote:
->> > I feel the abstraction is wrong from the beginning.  Ideally, we should
->> > have something like below.
->> >
->> >  - imx6ul-isiot.dtsi
->> >  - imx6ul-isiot-kit.dts and imx6ul-isiot-carrier.dts
->> >
->> > The -isiot should have everything on SoM and common stuff between -kit
->> > and -carrier boards, while -kit and -carrier include -isiot and contains
->> > the base-board specific things.  The -isiot can have both emmc and nand
->> > devices with "disabled" status, and let firmware turn device on per SoM
->> > it boots.  In that case, the abstraction level can be less and clearer.
->> >
->> > Thoughts?
->>
->> So,even the common stuff (lcdif, ts and etc) should be in -isiot.dtsi
->
-> Yes, anything common can be in -isiot.dtsi.
->
->> and make it "disabled" and let them enabled on respective dts. this
->> what you mentioned here?
->
-> It doesn't matter.  If the lcd/touch is same on -kit and -carrier, you
-> can even have them enabled by default in -isiot.dtsi.  The -kit.dts and
-> -carrier.dts are there to accommodate base-board specific differences.
+Hi Andrew,
 
-OK, thanks for the help. I'll resolve and send v4 changes by breaking
-this series for each respective modules.
+On Thu, Jun 15, 2017 at 03:12:32PM +0200, Andrew Lunn wrote:
+> > Agreed, your description is better :)
+> > I'll respin this patch only, if there is no other comment.
+> 
+> I assume these patches are going via net-next? Dave will not like a
+> respin of a single patch. You need to post them all again.
 
-thanks!
+OK, I'll respin the whole series with the net-next tag.
+
+Antoine
+
 -- 
-Jagan Teki
-Senior Linux Kernel Engineer | Amarula Solutions
-U-Boot, Linux | Upstream Maintainer
-Hyderabad, India.
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170615/d9bfe5d0/attachment.sig>
