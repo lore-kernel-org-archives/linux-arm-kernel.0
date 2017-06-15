@@ -1,38 +1,74 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 15 Jun 2017 10:20:53 +0200
-Subject: [PATCH] arm64: dts: marvell: enable the cpm crypto engine on the
- mcbin
-In-Reply-To: <87zid97jk1.fsf@free-electrons.com>
-References: <20170615080150.27534-1-antoine.tenart@free-electrons.com>
- <87zid97jk1.fsf@free-electrons.com>
-Message-ID: <20170615082053.GC4773@kwain.lan>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Thu, 15 Jun 2017 09:28:10 +0100
+Subject: [PATCH 2/6] drivers base/arch_topology: frequency-invariant
+ load-tracking support
+In-Reply-To: <CAKfTPtBnUWyAWTMJ2H8C+SPT+fVj-NkAs_pdOu+_a1zJ=VXZdA@mail.gmail.com>
+References: <20170608075513.12475-1-dietmar.eggemann@arm.com>
+ <20170608075513.12475-3-dietmar.eggemann@arm.com>
+ <CAKfTPtDB=5mQnJfzES+iU-nmNjVDM48f_iKuc7WefkRVWW4JOQ@mail.gmail.com>
+ <9716a48d-8198-a1d8-9450-de6386338665@arm.com>
+ <CAKfTPtBnUWyAWTMJ2H8C+SPT+fVj-NkAs_pdOu+_a1zJ=VXZdA@mail.gmail.com>
+Message-ID: <20170615082810.mhdjklnshxt3azcb@e106622-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+Hi,
 
-On Thu, Jun 15, 2017 at 10:15:58AM +0200, Gregory CLEMENT wrote:
->  On jeu., juin 15 2017, Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
+On 14/06/17 15:08, Vincent Guittot wrote:
+> On 14 June 2017 at 09:55, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
+> >
+> > On 06/12/2017 04:27 PM, Vincent Guittot wrote:
+> > > On 8 June 2017 at 09:55, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
+> >
+> > Hi Vincent,
+> >
+> > Thanks for the review!
+> >
+> > [...]
+> >
+> > >> @@ -225,8 +265,14 @@ static int __init register_cpufreq_notifier(void)
+> > >>
+> > >>          cpumask_copy(cpus_to_visit, cpu_possible_mask);
+> > >>
+> > >> -       return cpufreq_register_notifier(&init_cpu_capacity_notifier,
+> > >> -                                        CPUFREQ_POLICY_NOTIFIER);
+> > >> +       ret = cpufreq_register_notifier(&init_cpu_capacity_notifier,
+> > >> +                                       CPUFREQ_POLICY_NOTIFIER);
+> > >> +
+> > >> +       if (ret)
+> > >
+> > > Don't you have to free memory allocated for cpus_to_visit in case of
+> > > errot ? it was not done before your patch as well
+> >
+> > Yes, we should free cpus_to_visit if the policy notifier registration
+> > fails. But IMHO also, once the parsing of the capacity-dmips-mhz property
+> > is done. free cpus_to_visit is only used in the notifier call
+> > init_cpu_capacity_callback() after being allocated and initialized in
+> > register_cpufreq_notifier().
+> >
+> > We could add something like this as the first patch of this set. Only
+> > mildly tested on Juno. Juri, what do you think?
+> >
+> > Author: Dietmar Eggemann <dietmar.eggemann@arm.com>
+> > Date:   Tue Jun 13 23:21:59 2017 +0100
+> >
+> >     drivers base/arch_topology: free cpumask cpus_to_visit
+> >
+> >     Free cpumask cpus_to_visit in case registering
+> >     init_cpu_capacity_notifier has failed or the parsing of the cpu
+> >     capacity-dmips-mhz property is done. The cpumask cpus_to_visit is
+> >     only used inside the notifier call init_cpu_capacity_callback.
+> >
+> >     Reported-by: Vincent Guittot <vincent.guittot@linaro.org>
+> >     Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
 > 
-> > This patch enables the cpm crypto engine on the mcbin.
+> your proposal for freeing cpus_to_visit looks good for me
 > 
-> as this controller is always present and dot not depend on any
-> pinmux configuration, could you enable it at SoC level?
+> Acked-by: Vincent Guittot <vincent.guittot@linaro.org>
+> 
 
-That's right. I'll send a new version enabling this at SoC level (and
-cleaning up dts files that already enable it).
+Yep, looks good to me too. Thanks for fixing!
 
-Thanks!
-Antoine
+Best,
 
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170615/c0dd4898/attachment.sig>
+- Juri
