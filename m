@@ -1,43 +1,33 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 15 Jun 2017 18:33:16 +0200
-Subject: [PATCH 2/2] pinctrl: samsung: Consistently use unsigned instead of
- u32 for nr_banks
-In-Reply-To: <20170615163316.6444-1-krzk@kernel.org>
-References: <20170615163316.6444-1-krzk@kernel.org>
-Message-ID: <20170615163316.6444-2-krzk@kernel.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 15 Jun 2017 17:37:47 +0100
+Subject: [PATCH 1/5] arm64: signal: split frame link record from
+ sigcontext structure
+In-Reply-To: <1497535442-11586-2-git-send-email-Dave.Martin@arm.com>
+References: <1497535442-11586-1-git-send-email-Dave.Martin@arm.com>
+ <1497535442-11586-2-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20170615163747.GA17424@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unlike for other countable members, the driver used u32 for number of
-banks (nr_banks).  There is no specific need for using fixed-width
-integer in this particular place.  Make it consistent.
+On Thu, Jun 15, 2017 at 03:03:38PM +0100, Dave P Martin wrote:
+> In order to be able to increase the amount of the data currently
+> written to the __reserved[] array in the signal frame, it is
+> necessary to overwrite the locations currently occupied by the
+> {fp,lr} frame link record pushed at the top of the signal stack.
+> 
+> In order for this to work, this patch detaches the frame link
+> record from struct rt_sigframe and places it separately at the top
+> of the signal stack.  This will allow subsequent patches to insert
+> data between it and __reserved[].
+> 
+> This change relies on the non-ABI status of the placement of the
+> frame record with respect to struct sigframe: this status is
+> undocumented, but the placement is not declared or described in the
+> user headers, and known unwinder implementations (libgcc,
+> libunwind, gdb) appear not to rely on it.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- drivers/pinctrl/samsung/pinctrl-samsung.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+I'm fine with this approach:
 
-diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.h b/drivers/pinctrl/samsung/pinctrl-samsung.h
-index 49a05f4fc37d..9af07af6cad6 100644
---- a/drivers/pinctrl/samsung/pinctrl-samsung.h
-+++ b/drivers/pinctrl/samsung/pinctrl-samsung.h
-@@ -230,7 +230,7 @@ struct samsung_retention_data {
-  */
- struct samsung_pin_ctrl {
- 	const struct samsung_pin_bank_data *pin_banks;
--	u32		nr_banks;
-+	unsigned int	nr_banks;
- 	unsigned int	nr_ext_resources;
- 	const struct samsung_retention_data *retention_data;
- 
-@@ -275,7 +275,7 @@ struct samsung_pinctrl_drv_data {
- 	unsigned int			nr_functions;
- 
- 	struct samsung_pin_bank		*pin_banks;
--	u32				nr_banks;
-+	unsigned int			nr_banks;
- 	unsigned int			pin_base;
- 	unsigned int			nr_pins;
- 
--- 
-2.9.3
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
