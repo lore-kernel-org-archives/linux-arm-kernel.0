@@ -1,84 +1,27 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 15 Jun 2017 18:35:45 +0200
-Subject: [PATCH net-next v5 11/11] arm64: marvell: dts: add xmdio nodes
- for 7k/8k
-In-Reply-To: <20170615144326.24463-12-antoine.tenart@free-electrons.com>
- (Antoine Tenart's message of "Thu, 15 Jun 2017 16:43:26 +0200")
-References: <20170615144326.24463-1-antoine.tenart@free-electrons.com>
- <20170615144326.24463-12-antoine.tenart@free-electrons.com>
-Message-ID: <87y3st5hum.fsf@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 15 Jun 2017 18:01:30 +0100
+Subject: [PATCH 2/5] arm64: signal: Refactor sigcontext parsing in
+ rt_sigreturn
+In-Reply-To: <1497535442-11586-3-git-send-email-Dave.Martin@arm.com>
+References: <1497535442-11586-1-git-send-email-Dave.Martin@arm.com>
+ <1497535442-11586-3-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20170615170130.GB17424@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antoine,
- 
- On jeu., juin 15 2017, Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
+On Thu, Jun 15, 2017 at 03:03:39PM +0100, Dave P Martin wrote:
+> Currently, rt_sigreturn does very limited checking on the
+> sigcontext coming from userspace.
+> 
+> Future additions to the sigcontext data will increase the potential
+> for surprises.  Also, it is not clear whether the sigcontext
+> extension records are supposed to occur in a particular order.
+> 
+> To allow the parsing code to be extended more easily, this patch
+> factors out the sigcontext parsing into a separate function, and
+> adds extra checks to validate the well-formedness of the sigcontext
+> structure.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
-> Add the description of the xMDIO bus for the Marvell Armada 7k and
-> Marvell Armada 8k; for both CP110 slave and master. This bus is found
-> on Marvell Ethernet controllers and provides an interface with the
-> xMDIO bus.
->
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-
-Applied on mvebu/dt64
-
-Thanks,
-
-Gregory
-
-> ---
->
-> @Dave: this patch should go through the mvebu tree as asked by Gregory, thanks!
->
->  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 8 ++++++++
->  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 8 ++++++++
->  2 files changed, 16 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> index 576e825585c9..8b512b75aea9 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> @@ -97,6 +97,14 @@
->  				clocks = <&cpm_syscon0 1 9>, <&cpm_syscon0 1 5>;
->  			};
->  
-> +			cpm_xmdio: mdio at 12a600 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "marvell,xmdio";
-> +				reg = <0x12a600 0x10>;
-> +				status = "disabled";
-> +			};
-> +
->  			cpm_syscon0: system-controller at 440000 {
->  				compatible = "marvell,cp110-system-controller0",
->  					     "syscon";
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> index 797208a11f9d..bd0c0e03edd2 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> @@ -104,6 +104,14 @@
->  				clocks = <&cps_syscon0 1 9>, <&cps_syscon0 1 5>;
->  			};
->  
-> +			cps_xmdio: mdio at 12a600 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "marvell,xmdio";
-> +				reg = <0x12a600 0x10>;
-> +				status = "disabled";
-> +			};
-> +
->  			cps_syscon0: system-controller at 440000 {
->  				compatible = "marvell,cp110-system-controller0",
->  					     "syscon";
-> -- 
-> 2.9.4
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
