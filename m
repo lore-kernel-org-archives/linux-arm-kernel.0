@@ -1,53 +1,44 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 15 Jun 2017 08:55:26 +0200
-Subject: [PATCH v4 10/11] dt-bindings: orion-mdio: document the new xmdio
- compatible
-In-Reply-To: <20170614163537.GO15847@lunn.ch>
-References: <20170614154911.14510-1-antoine.tenart@free-electrons.com>
- <20170614154911.14510-11-antoine.tenart@free-electrons.com>
- <20170614163537.GO15847@lunn.ch>
-Message-ID: <20170615065526.GA4773@kwain.lan>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 15 Jun 2017 07:56:12 +0100
+Subject: [PATCH v2 1/3] dt-bindings: mfd: update STM32 timers clock names
+In-Reply-To: <1497453196-31470-2-git-send-email-fabrice.gasnier@st.com>
+References: <1497453196-31470-1-git-send-email-fabrice.gasnier@st.com>
+ <1497453196-31470-2-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20170615065612.qv4ce7tzvn2uhqds@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+On Wed, 14 Jun 2017, Fabrice Gasnier wrote:
 
-On Wed, Jun 14, 2017 at 06:35:37PM +0200, Andrew Lunn wrote:
-> On Wed, Jun 14, 2017 at 05:49:10PM +0200, Antoine Tenart wrote:
-> >  
-> >  The Ethernet controllers of the Marvel Kirkwood, Dove, Orion5x,
-> > -MV78xx0, Armada 370 and Armada XP have an identical unit that provides
-> > -an interface with the MDIO bus. This driver handles this MDIO
-> > -interface.
-> > +MV78xx0, Armada 370, Armada XP, Armada 7k and Armada 8k have an
-> > +identical unit that provides an interface with the MDIO bus or
-> > +with the xMDIO bus. This driver handles these interfaces.
+> Clock name has been updated during driver/DT binding review:
+> https://lkml.org/lkml/2016/12/13/718
+> Update DT binding doc to reflect this.
 > 
-> This patches is looking good now. One nit. The description above
-> suggests Kirkwood, Dove, Orion5x, MV78xx0, Armada 370 and Armada XP
-> all have xmdio. Maybe better wording would be:
-> 
-> The Ethernet controllers of the Marvel Kirkwood, Dove, Orion5x,
-> MV78xx0, Armada 370, Armada XP, Armada 7k and Armada 8k have an
-> identical unit that provides an interface with the MDIO bus.
-> Additionally, Armada 7k and Armada 8k has a second unit which
-> provides an interface with the xMDIO bus. This driver handles
-> these interfaces.
+> Fixes: 8f9359c6c6a0 (dt-bindings: mfd: Add bindings for STM32 Timers driver)
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> Acked-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/mfd/stm32-timers.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Agreed, your description is better :)
-I'll respin this patch only, if there is no other comment.
+Applied, thanks.
 
-Thanks!
-Antoine
+> diff --git a/Documentation/devicetree/bindings/mfd/stm32-timers.txt b/Documentation/devicetree/bindings/mfd/stm32-timers.txt
+> index bbd083f..1db6e00 100644
+> --- a/Documentation/devicetree/bindings/mfd/stm32-timers.txt
+> +++ b/Documentation/devicetree/bindings/mfd/stm32-timers.txt
+> @@ -31,7 +31,7 @@ Example:
+>  		compatible = "st,stm32-timers";
+>  		reg = <0x40010000 0x400>;
+>  		clocks = <&rcc 0 160>;
+> -		clock-names = "clk_int";
+> +		clock-names = "int";
+>  
+>  		pwm {
+>  			compatible = "st,stm32-pwm";
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170615/b4fb6e80/attachment.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
