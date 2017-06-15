@@ -1,35 +1,43 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 15 Jun 2017 20:12:53 +0100
-Subject: Applied "ASoC: rockchip: Fix an error handling in
- 'rockchip_i2s_probe'" to the asoc tree
-In-Reply-To: <77af69fd-3135-36d6-385b-82d044c32f44@wanadoo.fr>
-References: <20170615055311.8049-1-christophe.jaillet@wanadoo.fr>
- <E1dLYRz-0001l4-SZ@debutante>
- <77af69fd-3135-36d6-385b-82d044c32f44@wanadoo.fr>
-Message-ID: <20170615191253.ffuz3jay2fothn37@sirena.org.uk>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 15 Jun 2017 21:40:44 +0200
+Subject: [PATCH] clockevents/tcb_clksrc: implement suspend/resume
+In-Reply-To: <7100599f-529a-7d56-f43f-01513293d313@linaro.org>
+References: <20170411154826.5883-1-alexandre.belloni@free-electrons.com>
+ <7100599f-529a-7d56-f43f-01513293d313@linaro.org>
+Message-ID: <20170615194044.6x6c6icnsrxgpscv@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 15, 2017 at 07:32:53PM +0200, Christophe JAILLET wrote:
-> Le 15/06/2017 ? 19:20, Mark Brown a ?crit :
+On 14/04/2017 at 21:13:36 +0200, Daniel Lezcano wrote:
+> > +void tc_clksrc_resume(struct clocksource *cs)
+> > +{
+> > +	int i;
+> > +
+> > +	for (i = 0; i < 3; i++) {
+> 
+> s/3/ARRAY_SIZE(tcb_cache)/
+> 
+> > +		__raw_writel(tcb_cache[i].cmr, tcaddr + ATMEL_TC_REG(i, CMR));
+> 
+> Why __raw_writel?
+> 
 
-> > -	memcpy(soc_dai, &rockchip_i2s_dai, sizeof(*soc_dai));
-> >   	if (!of_property_read_u32(node, "rockchip,playback-channels", &val)) {
-> >   		if (val >= 2 && val <= 8)
-> >   			soc_dai->playback.channels_max = val;
+Ok, I got to the bottom of that question and I think it is worth
+answering it. __raw_{read,write}l were necessary to make the driver work
+on AVR32, because its core is BE and the IP LE and the regular
+readl/writel are (were) not doing the proper conversion.
 
-> Thanks for taking the patch, but there is a typo in it. A comma is missing
-> as spotted by the kbuild test robot.
+This was supposed to be changed in a patch that was never applied:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/331775.html
 
-> I hope that you have seen it and fixed it before applying.
+But everything is fine, as AVR32 is now removed from the kernel. I think
+I'll switch the driver to regular readl/writel, using the _relaxed
+version in the hot path. Is that fine for you?
 
-Ugh, no.  Like the mail says this is the patch that got applied.  The
-kbuild tests were against the rockchip tree not mine so i thought this
-was something else...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170615/a4b58d5b/attachment.sig>
+I'll also do so in the rework if at some point we can agree on some
+bindings, I'll try to address that soon too.
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
