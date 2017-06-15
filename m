@@ -1,59 +1,46 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 15 Jun 2017 18:27:17 +0200
-Subject: [PATCH v2 3/3] arm64: dts: marvell: add a comment on the cp110
- slave node status
-In-Reply-To: <20170615121004.32257-3-antoine.tenart@free-electrons.com>
- (Antoine Tenart's message of "Thu, 15 Jun 2017 14:10:04 +0200")
-References: <20170615121004.32257-1-antoine.tenart@free-electrons.com>
- <20170615121004.32257-3-antoine.tenart@free-electrons.com>
-Message-ID: <8760fx6wt6.fsf@free-electrons.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 15 Jun 2017 18:33:15 +0200
+Subject: [PATCH 1/2] pinctrl: samsung: Use unsigned int for number of
+ controller IO mem resources
+Message-ID: <20170615163316.6444-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antoine,
+Number of IO memory resources cannot be negative obviously and the
+driver depends silently on this (by iterating from 0 to
+nr_ext_resources+1).  Make this requirement explicit.
+
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+---
+ drivers/pinctrl/samsung/pinctrl-samsung.c | 2 +-
+ drivers/pinctrl/samsung/pinctrl-samsung.h | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
+index 86c98c1dec3a..c7ac2b944f57 100644
+--- a/drivers/pinctrl/samsung/pinctrl-samsung.c
++++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
+@@ -960,7 +960,7 @@ samsung_pinctrl_get_soc_data(struct samsung_pinctrl_drv_data *d,
+ 	struct samsung_pin_bank *bank;
+ 	struct resource *res;
+ 	void __iomem *virt_base[SAMSUNG_PINCTRL_NUM_RESOURCES];
+-	int i;
++	unsigned int i;
  
- On jeu., juin 15 2017, Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
-
-> The cryptographic engine found on the cp110 slave is disabled by default
-> because of some known limitations. Add a comment to explain why it is
-> disabled by default.
->
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-
-
-Applied on mvebu/dt64
-
-Thanks,
-
-Gregory
-> ---
->  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 7 +++++++
->  1 file changed, 7 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> index 7e98c155cc6a..385ac30d6012 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> @@ -234,6 +234,13 @@
->  						  "ring2", "ring3", "eip";
->  				clocks = <&cps_syscon0 1 26>;
->  				dma-mask = <0xff 0xffffffff>;
-> +				/*
-> +				 * The cryptographic engine found on the cp110
-> +				 * master is enabled by default at the SoC
-> +				 * level. Because it is not possible as of now
-> +				 * to enable two cryptographic engines in
-> +				 * parallel, disable this one by default.
-> +				 */
->  				status = "disabled";
->  			};
->  		};
-> -- 
-> 2.9.4
->
-
+ 	id = of_alias_get_id(node, "pinctrl");
+ 	if (id < 0) {
+diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.h b/drivers/pinctrl/samsung/pinctrl-samsung.h
+index 15b26c786b1e..49a05f4fc37d 100644
+--- a/drivers/pinctrl/samsung/pinctrl-samsung.h
++++ b/drivers/pinctrl/samsung/pinctrl-samsung.h
+@@ -231,7 +231,7 @@ struct samsung_retention_data {
+ struct samsung_pin_ctrl {
+ 	const struct samsung_pin_bank_data *pin_banks;
+ 	u32		nr_banks;
+-	int		nr_ext_resources;
++	unsigned int	nr_ext_resources;
+ 	const struct samsung_retention_data *retention_data;
+ 
+ 	int		(*eint_gpio_init)(struct samsung_pinctrl_drv_data *);
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.9.3
