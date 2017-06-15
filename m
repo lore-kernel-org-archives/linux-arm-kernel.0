@@ -1,99 +1,92 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Thu, 15 Jun 2017 14:58:54 +0800
-Subject: [PATCH v15 2/7] power: add power sequence library
-In-Reply-To: <CAPDyKFrLL10TY1JZAhF44_0+qGETLNtFc6ujKVUu7Ay=O8+M5A@mail.gmail.com>
-References: <1497319166-17287-1-git-send-email-peter.chen@nxp.com>
- <1497319166-17287-3-git-send-email-peter.chen@nxp.com>
- <CAPDyKFpOQWTPpdd__OBP1DcW58CbqnygGAOxiEFq5kqqvCm0QA@mail.gmail.com>
- <20170614015338.GA4635@b29397-desktop>
- <CAPDyKFrLL10TY1JZAhF44_0+qGETLNtFc6ujKVUu7Ay=O8+M5A@mail.gmail.com>
-Message-ID: <20170615065854.GA24157@b29397-desktop>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 15 Jun 2017 15:15:31 +0800
+Subject: [PATCH v3 1/9] ARM: dts: imx6ul-isiot: Add Sound card with codec
+ node
+In-Reply-To: <CAMty3ZAUK37JYnPwVRuBA6B67QV+S_BYQ6f=k6_rjw__ypTxBg@mail.gmail.com>
+References: <1491501735-1649-1-git-send-email-jagan@openedev.com>
+ <1491501735-1649-2-git-send-email-jagan@openedev.com>
+ <20170407131649.GH16503@dragon>
+ <CAMty3ZDj3XgeZwUTXTTX2svoXaNWJ3GJtbNAt9+jj+n8Z4640w@mail.gmail.com>
+ <20170615022024.GE30112@dragon>
+ <CAMty3ZAUK37JYnPwVRuBA6B67QV+S_BYQ6f=k6_rjw__ypTxBg@mail.gmail.com>
+Message-ID: <20170615071529.GC5902@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 14, 2017 at 10:53:29AM +0200, Ulf Hansson wrote:
-> On 14 June 2017 at 03:53, Peter Chen <hzpeterchen@gmail.com> wrote:
-> > On Tue, Jun 13, 2017 at 12:24:42PM +0200, Ulf Hansson wrote:
-> >> [...]
+On Thu, Jun 15, 2017 at 10:21:43AM +0530, Jagan Teki wrote:
+> On Thu, Jun 15, 2017 at 7:50 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> > On Wed, Jun 14, 2017 at 08:17:04PM +0530, Jagan Teki wrote:
+> >> On Fri, Apr 7, 2017 at 6:46 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+> >> > On Thu, Apr 06, 2017 at 11:32:07PM +0530, Jagan Teki wrote:
+> >> >> From: Jagan Teki <jagan@amarulasolutions.com>
+> >> >>
+> >> >> Add support for Sound card and related codec(via i2c1) nodes
+> >> >> on Engicam Is.IoT MX6UL variant module boards.
+> >> >>
+> >> >> Cc: Shawn Guo <shawnguo@kernel.org>
+> >> >> Cc: Matteo Lisi <matteo.lisi@engicam.com>
+> >> >> Cc: Michael Trimarchi <michael@amarulasolutions.com>
+> >> >> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> >> >> ---
+> >> >> Changes for v3:
+> >> >> - Replace fsl,imx-audio-sgtl5000 and use simple-audio-card
+> >> >> Changes for v2:
+> >> >> - Use proper [label:] node-name[@unit-address] for codec
+> >> >> - Remove incorrect codec property 'wlf,shared-lrclk'
+> >> >> - Remove 'gpr' from sound card node
+> >> >>
+> >> >>  arch/arm/boot/dts/imx6ul-isiot-common.dtsi | 10 +++++++
+> >> >>  arch/arm/boot/dts/imx6ul-isiot.dtsi        | 44 ++++++++++++++++++++++++++++++
+> >> >
+> >> > Can you help me understand how these two files are related?  Why is
+> >> > sgtl5000 added into one and sound node added into the other?
 > >>
-> >> > +
-> >> > +/**
-> >> > + * of_pwrseq_on - Carry out power sequence on for device node
-> >> > + *
-> >> > + * @np: the device node would like to power on
-> >> > + *
-> >> > + * Carry out a single device power on.  If multiple devices
-> >> > + * need to be handled, use of_pwrseq_on_list() instead.
-> >> > + *
-> >> > + * Return a pointer to the power sequence instance on success,
-> >> > + * or an error code otherwise.
-> >> > + */
-> >> > +struct pwrseq *of_pwrseq_on(struct device_node *np)
-> >> > +{
-> >> > +       struct pwrseq *pwrseq;
-> >> > +       int ret;
-> >> > +
-> >> > +       pwrseq = pwrseq_find_available_instance(np);
-> >> > +       if (!pwrseq)
-> >> > +               return ERR_PTR(-ENOENT);
-> >>
-> >> In case the pwrseq instance hasn't been registered yet, then there is
-> >> no way to deal with -EPROBE_DEFER properly here.
-> >>
-> >> I haven't been following the discussions in-depth during all
-> >> iterations, so perhaps you have already discussed why doing it like
-> >> this.
+> >> lcdif, ts and sound card which may differ based on the base-board
+> >> connected with SOM, So I moved these stuff which are related to
+> >> Starter kit supported once's and used with SOM dts files. if some
+> >> other board with same SOM can have different lcdif and etc so they can
+> >> define locally to dts.
 > >
-> > Yes, it has been discussed. In order to compare with compatible string
-> > at dts, we need to have one registered pwrseq instance for each
-> > pwrseq library, this pre-registered one is allocated using
-> > postcore_initcall, and the new (eg, second) instance is registered
-> > after pwrseq_get has succeeded.
+> > I do not follow how these stuff are organized.  So far we have the
+> > following isiot dts files.
+> >
+> >  - imx6ul-isiot-common.dtsi
+> >  - imx6ul-isiot.dtsi
+> >  - imx6ul-isiot-emmc.dts and imx6ul-isiot-nand.dts
+> >
+> > How are they mapping to SoM and base-board?
 > 
-> I understand you need one compatible per pwrseq library, but how does
-> that have anything to do with -EPROBE_DEFER?
-> 
-> My point is that, if a driver calls of_pwrseq_on() (which calls
-> pwrseq_find_available_instance()), but the corresponding pwrseq
-> library and instance has not yet been registered for that device. Then
-> how will you handle -EPROBE_DEFER? I guess you simply can't, which is
-> why *all* pwrseq libraries needs to be registered in early boot phase,
-> like at postcore_initcall(). Right?
-> 
-> If that is the case, I really don't like it.
-> 
+> isiot is a modules class, with that emmc and nand are two separate
+> SOM's. the current support is for mounting these SOM's on Development
+> base board[1]. So, for isiot module class we have imx6ul-isiot.dtsi
+> and emmc and nand SOM's have imx6ul-isiot-emmc.dts and
+> imx6ul-isiot-nand.dts. There are some Carrier boards[1] which were
+> used with different lcdif and other changes, So
+> imx6ul-isiot-common.dtsi have changes common across emmc and nand,
+> instead of adding them into individual dts files I moved in
+> -common.dtsi.  So in future if isiot SOM mounted on carrier board
+> which should have a separate dts and which may or may not use
+> imx6ul-isiot-common.dtsi
 
-Yes, you are right. This is the limitation for this power sequence
-library, the registration for the 1st power sequence instance must
-be finished before device driver uses it. I am appreciated that
-you can supply some suggestions for it.
+So you are not sure if imx6ul-isiot-common.dtsi will be used by carrier
+board.  Then what's the point to have it now?
 
-> Moreover, I have found yet another severe problem but reviewing the code:
-> In the struct pwrseq, you have a "bool used", which you are setting to
-> "true" once the pwrseq has been hooked up with the device, when a
-> driver calls of_pwrseq_on(). Setting that variable to true, will also
-> prevent another driver from using the same instance of the pwrseq for
-> its device. So, to cope with multiple users, you register a new
-> instance of the same pwrseq library that got hooked up, once the
-> ->get() callback is about to complete.
-> 
-> The problem the occurs, when there is another driver calling
-> of_pwrseq_on() in between, meaning that the new instance has not yet
-> been registered. This will simply fail, won't it?
+You are saying imx6ul-isiot-common.dtsi is created to accommodate the
+common things across emmc and nand SoMs, but it actually contains LCD
+and Touch such base-board level of stuff.  Confusing.
 
-Yes, you are right, thanks for pointing that, I will add mutex_lock for
-of_pwrseq_on.
+I feel the abstraction is wrong from the beginning.  Ideally, we should
+have something like below.
 
-> 
-> Sorry for jumping in late, however to me it seems like there is still
-> some pieces missing to make this work.
-> 
-> [...]
-> 
-> Kind regards
-> Uffe
+ - imx6ul-isiot.dtsi
+ - imx6ul-isiot-kit.dts and imx6ul-isiot-carrier.dts
 
--- 
+The -isiot should have everything on SoM and common stuff between -kit
+and -carrier boards, while -kit and -carrier include -isiot and contains
+the base-board specific things.  The -isiot can have both emmc and nand
+devices with "disabled" status, and let firmware turn device on per SoM
+it boots.  In that case, the abstraction level can be less and clearer.
 
-Best Regards,
-Peter Chen
+Thoughts?
+
+Shawn
