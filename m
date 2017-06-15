@@ -1,43 +1,47 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 14 Jun 2017 16:50:42 -0700
-Subject: [GIT PULL] Allwinner clock fixes for 4.12
-In-Reply-To: <20170614192119.xktlt4o5puje2pdu@flea.home>
-References: <20170614192119.xktlt4o5puje2pdu@flea.home>
-Message-ID: <20170614235042.GF20170@codeaurora.org>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Thu, 15 Jun 2017 08:23:58 +0800
+Subject: [PATCH v3 14/21] arm64: dts: hi3660: enable idle states
+In-Reply-To: <20170614082338.15673-15-guodong.xu@linaro.org>
+References: <20170614082338.15673-1-guodong.xu@linaro.org>
+ <20170614082338.15673-15-guodong.xu@linaro.org>
+Message-ID: <20170615002358.GD28496@leoy-ThinkPad-T440>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14, Maxime Ripard wrote:
-> Hi Mike, Stephen,
+On Wed, Jun 14, 2017 at 04:23:31PM +0800, Guodong Xu wrote:
+> From: Leo Yan <leo.yan@linaro.org>
 > 
-> Please pull the following patches for 4.12
+> On Hi3660 there have two clusters, one is CA53 cluster and another is
+> CA73 cluster. This two clusters have different idle states separately.
+> With Daniel Lezcano's patch (ARM: cpuidle: Support asymmetric idle
+> definition), now ARM idle driver can support different clusters with
+> different idle states.
 > 
-> Thanks!
-> Maxime
+> Base on this, this patch is to bind two clusters idle states on Hi3660.
+> Except the "WFI" states are enabled by default for all CPUs, this patch
+> also binds below extra idle states:
 > 
-> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+> - CA53 CPUs have two more states:
+>   CPU_SLEEP:       CPU power off state
+>   CLUSTER_SLEEP_0: Cluster power off state
 > 
->   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
-> 
-> are available in the git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-fixes-for-4.12
-> 
-> for you to fetch changes up to d85da227c3ae43d9ca513d60f244213cb4e55485:
-> 
->   clk: sunxi-ng: a64: Export PLL_PERIPH0 clock for the PRCM (2017-05-31 21:57:30 +0200)
-> 
-> ----------------------------------------------------------------
-> Allwinner clock fixes for 4.12
-> 
-> Some fixes that fix some bindings that went in 4.12, fix a few reset and
-> clock offsets and a build error fix
-> 
+> - CA73 CPUs have three more states:
+>   CPU_NAP:         CPU retention state
+>   CPU_SLEEP:       CPU power off state
+>   CLUSTER_SLEEP_1: Cluster power off state
 
-The last few don't have any Fixes: tag. Is that because they
-aren't fixes for anything in the tree? I pulled it, but I'm
-second guessing it all.
+Hi Guodong, Wei and all,
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+As Daniel reminded, this patch is dependent on patch (ARM: cpuidle:
+Support asymmetric idle definition) [1] but his patch has not been
+finally merged yet. So let us hold on this patch for Daniel's patch
+is picked up firstly.
+
+At the meantime welcome the review and comment for this patch ahead.
+
+[1] https://patchwork.kernel.org/patch/9781869/
+
+[...]
+
+Thanks,
+Leo Yan
