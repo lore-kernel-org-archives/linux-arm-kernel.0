@@ -1,52 +1,78 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 15 Jun 2017 11:13:15 +0100
-Subject: [PATCH 05/12] coresight tmc: Add helpers for accessing 64bit
- registers
-In-Reply-To: <20170614174904.GA22030@xps15>
-References: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
- <1497278211-5001-6-git-send-email-suzuki.poulose@arm.com>
- <20170614174904.GA22030@xps15>
-Message-ID: <f9f02bdd-ebfd-16b1-0f3d-03989f47ddf7@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 15 Jun 2017 11:16:34 +0100
+Subject: [PATCH v2 1/3] arm64: mm: print out correct page table entries
+In-Reply-To: <20170615101230.z4fqj5ofxsmnagnq@yury-thinkpad>
+References: <1497022554-1451-1-git-send-email-kristina.martsenko@arm.com>
+ <20170609202236.t75jejhvhksqmkw3@yury-thinkpad>
+ <20170615100051.GC20308@arm.com>
+ <20170615101230.z4fqj5ofxsmnagnq@yury-thinkpad>
+Message-ID: <20170615101633.GD20308@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/06/17 18:49, Mathieu Poirier wrote:
-> On Mon, Jun 12, 2017 at 03:36:44PM +0100, Suzuki K Poulose wrote:
->> Coresight TMC splits 64bit registers into a pair of 32bit registers
->> (e.g DBA, RRP, RWP). Provide helpers to read/write to these registers.
->
-> I'm good with this patch but please specify these changes are to support the
-> SoC-600 suite.  That way when we look back at this set in a couple of years we
-> don't loose hair thinking we've been carrying bugs all this time.
+On Thu, Jun 15, 2017 at 01:12:30PM +0300, Yury Norov wrote:
+> On Thu, Jun 15, 2017 at 11:00:51AM +0100, Will Deacon wrote:
+> > On Fri, Jun 09, 2017 at 11:22:36PM +0300, Yury Norov wrote:
+> > > On Fri, Jun 09, 2017 at 04:35:52PM +0100, Kristina Martsenko wrote:
+> > > > diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> > > > index c3f2b1048f83..a9dfb37c87a2 100644
+> > > > --- a/arch/arm64/mm/fault.c
+> > > > +++ b/arch/arm64/mm/fault.c
+> > > > @@ -80,14 +80,24 @@ static inline int notify_page_fault(struct pt_regs *regs, unsigned int esr)
+> > > >  #endif
+> > > >  
+> > > >  /*
+> > > > - * Dump out the page tables associated with 'addr' in mm 'mm'.
+> > > > + * Dump out the page tables associated with 'addr' in the currently active mm.
+> > > >   */
+> > > > -void show_pte(struct mm_struct *mm, unsigned long addr)
+> > > > +void show_pte(unsigned long addr)
+> > > >  {
+> > > > +	struct mm_struct *mm;
+> > > >  	pgd_t *pgd;
+> > > >  
+> > > > -	if (!mm)
+> > > > +	if (addr < TASK_SIZE) {
+> > > > +		/* TTBR0 */
+> > > > +		mm = current->active_mm;
+> > > > +	} else if (addr >= VA_START) {
+> > > > +		/* TTBR1 */
+> > > >  		mm = &init_mm;
+> > > > +	} else {
+> > > > +		pr_alert("[%08lx] address between user and kernel address ranges\n",
+> > > > +			 addr);
+> > > > +		return;
+> > > > +	}
+> > > >  
+> > > >  	pr_alert("pgd = %p\n", mm->pgd);
+> > > >  	pgd = pgd_offset(mm, addr);
+> > > 
+> > > Is there any reason to change the prototype of the function?
+> > > You say nothing about it in patch description. The show_pte()
+> > > is implemented in several arches, and everywhere it takes mm_struct
+> > > as 1st argument. For me, if you don't need to change the prototype,
+> > > you'd better leave things as is. The patch will get much shorter
+> > > and expressive with it.
+> > > 
+> > > If you really need to change the prototype, it would be better to do
+> > > it in separated patch and give clear explanations - what for?
+> > 
+> > The mm is unused and this isn't a core interface. In fact, it's only
+> > available on architectures that started off by copying from arch/arm/.
+> > 
+> > We can always add the mm back if we need it in future.
+> 
+> OK, understood that. But I still think it should be done in separeted
+> patch, and it would be also good to revise sh and unicore32. It seems
+> that sh may be easily switched to the proposed interface, and the
+> unicore32 most probably too.
 
-To be honest, these are not necessarily just for the support of SoC-600.
-It is applies to the current driver with SoC-400, as you could see below,
-where we have always assumed that the RRP/RWP/DBA HI bits are always
-0. Technically, the TMC supports upto 40bits and hence we have been doing
-it wrong.
+Why? This is the patch that removes the usage of the paramater, so it should
+also remove the parameter. This function isn't called by anybody outside of
+arm64, so there's no "proposed interface" to speak of.
 
->> -	read_ptr = readl_relaxed(drvdata->base + TMC_RRP);
->> -	write_ptr = readl_relaxed(drvdata->base + TMC_RWP);
->> +	read_ptr = tmc_read_rrp(drvdata);
->> +	write_ptr = tmc_read_rwp(drvdata);
+If this was a core function with lots of tree-wide callers, then I'd agree
+with you: remove use of the thing, fix the callers, then remove the
+parameter. But that's not the case here.
 
-
-
->> -		writel_relaxed(read_ptr, drvdata->base + TMC_RRP);
->> +		tmc_write_rrp(drvdata, read_ptr);
->>  		perf_aux_output_flag(handle, PERF_AUX_FLAG_TRUNCATED);
-
->>  	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
->> +	tmc_write_dba(drvdata, drvdata->paddr);
->>
->> -	writel_relaxed(drvdata->paddr, drvdata->base + TMC_DBALO);
->> -	writel_relaxed(0x0, drvdata->base + TMC_DBAHI);
-
->>
->> -	rwp = readl_relaxed(drvdata->base + TMC_RWP);
->> +	rwp = tmc_read_rwp(drvdata);
->>  	val = readl_relaxed(drvdata->base + TMC_STS);
->>
-
-
-Suzuki
+Will
