@@ -1,55 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Jun 2017 15:30:57 +0200
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Bindings Updates
- for v4.13
-Message-ID: <cover.1497617896.git.horms+renesas@verge.net.au>
+Date: Fri, 16 Jun 2017 15:30:55 +0200
+Subject: [PATCH 2/5] ARM: shmobile: document iW-RainboW-G20M-Qseven-RZG1M
+ system on module
+In-Reply-To: <cover.1497617896.git.horms+renesas@verge.net.au>
+References: <cover.1497617896.git.horms+renesas@verge.net.au>
+Message-ID: <427bc40375df765b6146ce917d5a3d3832482935.1497617896.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Biju Das <biju.das@bp.renesas.com>
 
-Please consider these second round of Renesas ARM based SoC DT bindings
-updates for v4.13.
+Document the iW-RainboW-G20M-Qseven-RZG1M device tree bindings,
+listing it as a supported system on module.
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-dt-bindings-for-v4.13,
-which I you have already pulled.
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ Documentation/devicetree/bindings/arm/shmobile.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-
-The following changes since commit 40c9bbea140e64a4257b794969e759c2c481c399:
-
-  ARM: dts: r7s72100: add USB bit definitions (2017-05-15 09:02:37 +0200)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-bindings2-for-v4.13
-
-for you to fetch changes up to 521ec12e2f56b16e6a0b4e7ef97a666bd3de4ff5:
-
-  ARM: shmobile: Document Renesas H3-based Salvator-XS board DT bindings (2017-06-12 11:59:07 +0200)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM Based SoC DT Bindings Updates for v4.13
-
-* Document:
-  - Add Renesas H3-based Salvator-XS board DT bindings
-  - Add iW-RainboW-G20D-Qseven-RZG1M board
-  - Add iW-RainboW-G20M-Qseven-RZG1M system on module
-  - Update R-Car Gen3 ULCB board part numbers
-* Add clock bit definitions for r7s72100 SoC
-
-----------------------------------------------------------------
-Biju Das (2):
-      ARM: shmobile: document iW-RainboW-G20M-Qseven-RZG1M system on module
-      ARM: shmobile: document iW-RainboW-G20D-Qseven-RZG1M board
-
-Chris Brandt (1):
-      ARM: dts: r7s72100: add clock bit definitions
-
-Geert Uytterhoeven (2):
-      ARM: shmobile: Update R-Car Gen3 ULCB board part numbers
-      ARM: shmobile: Document Renesas H3-based Salvator-XS board DT bindings
-
- Documentation/devicetree/bindings/arm/shmobile.txt | 11 ++++-
- include/dt-bindings/clock/r7s72100-clock.h         | 51 ++++++++++++++++++++++
- 2 files changed, 60 insertions(+), 2 deletions(-)
+diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+index 170fe0562c63..fe850ef98dd8 100644
+--- a/Documentation/devicetree/bindings/arm/shmobile.txt
++++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -61,6 +61,8 @@ Boards:
+     compatible = "renesas,h3ulcb", "renesas,r8a7795";
+   - Henninger
+     compatible = "renesas,henninger", "renesas,r8a7791"
++  - iWave Systems RZ/G1M Qseven System On Module (iW-RainboW-G20M-Qseven)
++    compatible = "iwave,g20m", "renesas,r8a7743"
+   - Koelsch (RTP0RC7791SEB00010S)
+     compatible = "renesas,koelsch", "renesas,r8a7791"
+   - Kyoto Microcomputer Co. KZM-A9-Dual
+-- 
+2.1.4
