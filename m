@@ -1,9 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 16 Jun 2017 10:13:05 +0200
-Subject: [GIT PULL 3/4] ARM: tegra: Device tree changes for v4.13-rc1
+Date: Fri, 16 Jun 2017 10:13:06 +0200
+Subject: [GIT PULL 4/4] arm64: tegra: Device tree changes for v4.13-rc1
 In-Reply-To: <20170616081306.11505-1-thierry.reding@gmail.com>
 References: <20170616081306.11505-1-thierry.reding@gmail.com>
-Message-ID: <20170616081306.11505-3-thierry.reding@gmail.com>
+Message-ID: <20170616081306.11505-4-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,48 +15,34 @@ The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.13-arm-dt
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.13-arm64-dt
 
-for you to fetch changes up to 508d690e94218d306ab2092d6ee95ca75f9fa98b:
+for you to fetch changes up to 475d99fc216f4b2aed7021734838c9b578338598:
 
-  ARM: dts: tegra: fix PCI bus dtc warnings (2017-06-13 16:49:57 +0200)
+  arm64: dts: nvidia: fix PCI bus dtc warnings (2017-06-13 16:50:48 +0200)
 
 Thanks,
 Thierry
 
 ----------------------------------------------------------------
-ARM: tegra: Device tree changes for v4.13-rc1
+arm64: tegra: Device tree changes for v4.13-rc1
 
-This removes support for the Whistler board, which only a handful of
-people ever had access to and which doesn't provide any features over
-other Tegra20 devices that we support.
+This adds the CCPLEX cluster on Tegra186, which is used to initiate CPU
+frequency and voltage transitions.
 
-Also this cleans up some PCI related device tree content in preparation
-for a future DTC release that has additional checks for the PCI bus.
+Also included is a bit of cleanup for PCI related device tree content,
+in preparation for a future DTC release that has additional checks for
+the PCI bus.
 
 ----------------------------------------------------------------
+Mikko Perttunen (1):
+      arm64: tegra: Add CCPLEX_CLUSTER area in Tegra186
+
 Rob Herring (1):
-      ARM: dts: tegra: fix PCI bus dtc warnings
+      arm64: dts: nvidia: fix PCI bus dtc warnings
 
-Stephen Warren (1):
-      ARM: tegra: remove Whistler support
-
- Documentation/devicetree/bindings/arm/tegra.txt |   1 -
- arch/arm/boot/dts/Makefile                      |   3 +-
- arch/arm/boot/dts/tegra124-apalis-eval.dts      |   2 +-
- arch/arm/boot/dts/tegra124-apalis.dtsi          |   2 +-
- arch/arm/boot/dts/tegra124-jetson-tk1.dts       |   2 +-
- arch/arm/boot/dts/tegra124.dtsi                 |   4 +-
- arch/arm/boot/dts/tegra20-harmony.dts           |   2 +-
- arch/arm/boot/dts/tegra20-tamonten.dtsi         |   2 +-
- arch/arm/boot/dts/tegra20-tec.dts               |   2 +-
- arch/arm/boot/dts/tegra20-trimslice.dts         |   2 +-
- arch/arm/boot/dts/tegra20-whistler.dts          | 636 ------------------------
- arch/arm/boot/dts/tegra20.dtsi                  |   4 +-
- arch/arm/boot/dts/tegra30-apalis-eval.dts       |   2 +-
- arch/arm/boot/dts/tegra30-apalis.dtsi           |   2 +-
- arch/arm/boot/dts/tegra30-beaver.dts            |   2 +-
- arch/arm/boot/dts/tegra30-cardhu.dtsi           |   2 +-
- arch/arm/boot/dts/tegra30.dtsi                  |   5 +-
- 17 files changed, 22 insertions(+), 653 deletions(-)
- delete mode 100644 arch/arm/boot/dts/tegra20-whistler.dts
+ arch/arm64/boot/dts/nvidia/tegra132.dtsi           | 4 +++-
+ arch/arm64/boot/dts/nvidia/tegra186.dtsi           | 7 +++++++
+ arch/arm64/boot/dts/nvidia/tegra210-p2371-2180.dts | 2 +-
+ arch/arm64/boot/dts/nvidia/tegra210.dtsi           | 4 +++-
+ 4 files changed, 14 insertions(+), 3 deletions(-)
