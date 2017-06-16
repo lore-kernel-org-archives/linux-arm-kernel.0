@@ -1,39 +1,45 @@
-From: olivier.moysan@st.com (olivier moysan)
-Date: Fri, 16 Jun 2017 14:15:32 +0200
-Subject: [PATCH 5/7] ASoC: stm32: sai: change stop sequence
-In-Reply-To: <1497615334-7156-1-git-send-email-olivier.moysan@st.com>
-References: <1497615334-7156-1-git-send-email-olivier.moysan@st.com>
-Message-ID: <1497615334-7156-6-git-send-email-olivier.moysan@st.com>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Fri, 16 Jun 2017 17:46:51 +0530
+Subject: [PATCH] soc: ti: knav: Fix compilation warning.
+Message-ID: <c08b7f37152f2b550dcb90d03a6dc38df6c24575.1497615042.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Disable SAI before stopping DMA data transfers.
+Replace '%d' by '%zu' to fix the following compilation warning:-
 
-Signed-off-by: olivier moysan <olivier.moysan@st.com>
+drivers/soc/ti/knav_qmss_queue.c: In function ?knav_queue_setup_link_ram?:
+drivers/soc/ti/knav_qmss_queue.c:1166:3: warning: format ?%x? expects argument of type ?unsigned int?, but argument 6 has type ?size_t? [-Wformat=]
+   dev_dbg(kdev->dev, "linkram0: dma:%pad, virt:%p, size:%x\n",
+   ^
+drivers/soc/ti/knav_qmss_queue.c:1175:3: warning: format ?%x? expects argument of type ?unsigned int?, but argument 6 has type ?size_t? [-Wformat=]
+   dev_dbg(kdev->dev, "linkram1: dma:%pad, virt:%p, size:%x\n",
+
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
- sound/soc/stm/stm32_sai_sub.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/soc/ti/knav_qmss_queue.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/sound/soc/stm/stm32_sai_sub.c b/sound/soc/stm/stm32_sai_sub.c
-index 24b8874..97b69a3 100644
---- a/sound/soc/stm/stm32_sai_sub.c
-+++ b/sound/soc/stm/stm32_sai_sub.c
-@@ -629,12 +629,12 @@ static int stm32_sai_trigger(struct snd_pcm_substream *substream, int cmd,
- 		dev_dbg(cpu_dai->dev, "Disable DMA and SAI\n");
+diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
+index 279e7c5..2ec3536 100644
+--- a/drivers/soc/ti/knav_qmss_queue.c
++++ b/drivers/soc/ti/knav_qmss_queue.c
+@@ -1163,7 +1163,7 @@ static int knav_queue_setup_link_ram(struct knav_device *kdev)
  
- 		regmap_update_bits(sai->regmap, STM_SAI_CR1_REGX,
--				   SAI_XCR1_DMAEN,
--				   (unsigned int)~SAI_XCR1_DMAEN);
-+				   SAI_XCR1_SAIEN,
-+				   (unsigned int)~SAI_XCR1_SAIEN);
+ 	for_each_qmgr(kdev, qmgr) {
+ 		block = &kdev->link_rams[0];
+-		dev_dbg(kdev->dev, "linkram0: dma:%pad, virt:%p, size:%x\n",
++		dev_dbg(kdev->dev, "linkram0: dma:%pad, virt:%p, size:%zu\n",
+ 			&block->dma, block->virt, block->size);
+ 		writel_relaxed((u32)block->dma, &qmgr->reg_config->link_ram_base0);
+ 		writel_relaxed(block->size, &qmgr->reg_config->link_ram_size0);
+@@ -1172,7 +1172,7 @@ static int knav_queue_setup_link_ram(struct knav_device *kdev)
+ 		if (!block->size)
+ 			continue;
  
- 		ret = regmap_update_bits(sai->regmap, STM_SAI_CR1_REGX,
--					 SAI_XCR1_SAIEN,
--					 (unsigned int)~SAI_XCR1_SAIEN);
-+					 SAI_XCR1_DMAEN,
-+					 (unsigned int)~SAI_XCR1_DMAEN);
- 		if (ret < 0)
- 			dev_err(cpu_dai->dev, "Failed to update CR1 register\n");
- 		break;
+-		dev_dbg(kdev->dev, "linkram1: dma:%pad, virt:%p, size:%x\n",
++		dev_dbg(kdev->dev, "linkram1: dma:%pad, virt:%p, size:%zu\n",
+ 			&block->dma, block->virt, block->size);
+ 		writel_relaxed(block->dma, &qmgr->reg_config->link_ram_base1);
+ 	}
 -- 
 1.9.1
