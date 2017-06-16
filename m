@@ -1,44 +1,37 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 16 Jun 2017 15:16:43 +0200
-Subject: [GIT PULL] ARM: at91: defconfig for 4.13
-Message-ID: <20170616131643.3aebid7p33x7aott@piout.net>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 16 Jun 2017 15:30:01 +0200
+Subject: [PATCH] arm64: defconfig: enable Simple Sound Card support
+In-Reply-To: <cover.1497616974.git.horms+renesas@verge.net.au>
+References: <cover.1497616974.git.horms+renesas@verge.net.au>
+Message-ID: <b27866e91efb69d2ae335f130b5c9762272b918e.1497616974.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-A few defconfig updates for 4.13
+commit 7fa72cca39a0 ("ASoC: rsnd: add HDMI output support")
+exchanged Renesas Sound driver's Kconfig selection
+from SND_SIMPLE_CARD to SND_SIMPLE_CARD_UTILS, because of this,
+defconfig doesn't select SND_SIMPLE_CARD today.
+All Renesas platform needs SND_SIMPLE_CARD, Let's select it.
 
-The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.13-defconfig
-
-for you to fetch changes up to 0f286c4cb620c18206659d9ee91cf0f51d8839b6:
-
-  ARM: configs: at91: add MCAN driver to sama5_defconfig (2017-05-15 12:18:56 +0200)
-
-----------------------------------------------------------------
-defconfig for 4.13:
-
- - Switch sama5 to be tickless in idle and enable hrtimer
- - Add MCAN
-
-----------------------------------------------------------------
-Quentin Schulz (2):
-      ARM: configs: at91: make system tickless when idle
-      ARM: configs: at91: enable HIGH_RES_TIMERS
-
-Wenyou Yang (1):
-      ARM: configs: at91: add MCAN driver to sama5_defconfig
-
- arch/arm/configs/sama5_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
-
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index ce072859e3b2..1bbac74a0c44 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -369,6 +369,7 @@ CONFIG_SND_BCM2835_SOC_I2S=m
+ CONFIG_SND_SOC_RCAR=y
+ CONFIG_SND_SOC_SAMSUNG=y
+ CONFIG_SND_SOC_AK4613=y
++CONFIG_SND_SIMPLE_CARD=y
+ CONFIG_USB=y
+ CONFIG_USB_OTG=y
+ CONFIG_USB_XHCI_HCD=y
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.1.4
