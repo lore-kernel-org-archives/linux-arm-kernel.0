@@ -1,425 +1,165 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Fri, 16 Jun 2017 10:23:40 +0200
-Subject: [PATCH] psci: add debugfs for runtime instrumentation
-Message-ID: <1497601420-8783-1-git-send-email-vincent.guittot@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 16 Jun 2017 10:30:37 +0200
+Subject: [PATCH] ARM: dts: at91: add support DT for AC97 driver for
+ at91sam9g45
+In-Reply-To: <20170612194314.19289-1-dmitry.rezvanov@yandex.ru>
+References: <20170612194314.19289-1-dmitry.rezvanov@yandex.ru>
+Message-ID: <20170616083037.3bquzlke7mtofgyd@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add debugfs to display runtime instrumentation results that can be collected
-by PSCI firmware.
 
-Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
----
- drivers/firmware/Kconfig |   8 ++
- drivers/firmware/psci.c  | 366 +++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 374 insertions(+)
+Hi,
 
-diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
-index 6e4ed5a..4431504 100644
---- a/drivers/firmware/Kconfig
-+++ b/drivers/firmware/Kconfig
-@@ -8,6 +8,14 @@ menu "Firmware Drivers"
- config ARM_PSCI_FW
- 	bool
- 
-+config ARM_PSCI_INSTRUMENTATION
-+	bool "ARM PSCI Run Time Instrumentation"
-+	depends on ARM_PSCI_FW && CPU_IDLE && DEBUG_FS
-+	help
-+	  Enable debugfs interface for PSCI FW in which you can retrieve
-+	  runtime instrumentation values of the PSCI firmware like time to
-+	  enter or leave a cpu suspend state or time to flush cache.
-+
- config ARM_PSCI_CHECKER
- 	bool "ARM PSCI checker"
- 	depends on ARM_PSCI_FW && HOTPLUG_CPU && !TORTURE_TEST
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index 493a56a..c86253c 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -386,6 +386,8 @@ static int psci_suspend_finisher(unsigned long index)
- 				    __pa_symbol(cpu_resume));
- }
- 
-+static void psci_update_all_rt_instr_this_cpu(int cache);
-+
- int psci_cpu_suspend_enter(unsigned long index)
- {
- 	int ret;
-@@ -402,6 +404,8 @@ int psci_cpu_suspend_enter(unsigned long index)
- 	else
- 		ret = cpu_suspend(index, psci_suspend_finisher);
- 
-+	psci_update_all_rt_instr_this_cpu(1);
-+
- 	return ret;
- }
- 
-@@ -659,3 +663,365 @@ int __init psci_acpi_init(void)
- 	return psci_probe();
- }
- #endif
-+
-+
-+/***        debugfs support        ***/
-+
-+#ifdef CONFIG_ARM_PSCI_INSTRUMENTATION
-+#include <linux/clocksource.h>
-+#include <linux/debugfs.h>
-+#include <linux/seq_file.h>
-+
-+#define PMF_SMC_GET_TIMESTAMP_64	0xC2000010
-+
-+#define PMF_ARM_TIF_IMPL_ID		0x41
-+
-+#define PMF_RT_INSTR_SVC_ID		1
-+
-+#define RT_INSTR_ENTER_PSCI		0
-+#define RT_INSTR_EXIT_PSCI		1
-+#define RT_INSTR_ENTER_HW_LOW_PWR	2
-+#define RT_INSTR_EXIT_HW_LOW_PWR	3
-+#define RT_INSTR_ENTER_CFLUSH		4
-+#define RT_INSTR_EXIT_CFLUSH		5
-+#define RT_INSTR_TOTAL_IDS		6
-+
-+#define PMF_TID_SHIFT			0
-+#define PMF_TID_MASK			(0xFF << PMF_TID_SHIFT)
-+#define PMF_SVC_ID_SHIFT		10
-+#define PMF_SVC_ID_MASK			(0x3F << PMF_SVC_ID_SHIFT)
-+#define PMF_IMPL_ID_SHIFT		24
-+#define PMF_IMPL_ID_MASK		(0xFFU << PMF_IMPL_ID_SHIFT)
-+
-+struct rt_inst_stats {
-+	unsigned long min;
-+	unsigned long max;
-+	unsigned long avg;
-+	unsigned long count;
-+};
-+
-+static struct dentry *psci_debugfs_dir;
-+
-+/* meaningful instrumentation name */
-+char *rt_inst_name[RT_INSTR_TOTAL_IDS/2] = {
-+	"enter",
-+	"leave",
-+	"cache"
-+};
-+
-+/* timstamp index to use to compute the delta */
-+int rt_inst_delta_idx[RT_INSTR_TOTAL_IDS/2][2] = {
-+	/* Start -->			End */
-+	{RT_INSTR_ENTER_PSCI,		RT_INSTR_ENTER_HW_LOW_PWR},
-+	{RT_INSTR_EXIT_HW_LOW_PWR,	RT_INSTR_EXIT_PSCI},
-+	{RT_INSTR_ENTER_CFLUSH,		RT_INSTR_EXIT_CFLUSH}
-+};
-+
-+DEFINE_PER_CPU(struct rt_inst_stats[RT_INSTR_TOTAL_IDS/2], rt_inst_summary);
-+int rt_track_enable;
-+
-+u32 rt_inst_shift;
-+u32 rt_inst_mult = 1;
-+
-+static bool psci_rt_instr_enable(void)
-+{
-+	int ret, tid;
-+	int cpu_mpidr = cpu_logical_map(0);
-+	struct arm_smccc_res res;
-+
-+	tid = PMF_ARM_TIF_IMPL_ID << PMF_IMPL_ID_SHIFT;
-+	tid |= PMF_RT_INSTR_SVC_ID << PMF_SVC_ID_SHIFT | RT_INSTR_ENTER_PSCI;
-+
-+	arm_smccc_smc(PMF_SMC_GET_TIMESTAMP_64, tid, cpu_mpidr,
-+			0, 0, 0, 0, 0, &res);
-+
-+	ret = psci_to_linux_errno(res.a0);
-+
-+	if (ret)
-+		return false;
-+
-+	return true;
-+}
-+
-+static long long psci_get_one_rt_instr_cpu(int id, int cpu, int cache)
-+{
-+	int ret, tid;
-+	int cpu_mpidr = cpu_logical_map(cpu);
-+	struct arm_smccc_res res;
-+
-+	tid = PMF_ARM_TIF_IMPL_ID << PMF_IMPL_ID_SHIFT;
-+	tid |= PMF_RT_INSTR_SVC_ID << PMF_SVC_ID_SHIFT | id;
-+
-+	arm_smccc_smc(PMF_SMC_GET_TIMESTAMP_64, tid, cpu_mpidr, cache,
-+			0, 0, 0, 0, &res);
-+
-+	ret = psci_to_linux_errno(res.a0);
-+
-+	if (ret)
-+		return (long long)(ret);
-+
-+	return res.a1;
-+}
-+
-+static int psci_get_all_rt_instr_cpu(int cpu, int cache, long long timestamp[])
-+{
-+	int i;
-+
-+	for (i = 0; i < RT_INSTR_TOTAL_IDS; i++) {
-+		timestamp[i] = psci_get_one_rt_instr_cpu(i, cpu, cache);
-+		if (timestamp[i] < 0)
-+			return (int)(timestamp[i]);
-+	}
-+
-+	return 0;
-+}
-+
-+static void psci_update_all_rt_instr(int cpu, int cache)
-+{
-+	long long tmp_rt_inst[RT_INSTR_TOTAL_IDS];
-+	long tmp_delta[RT_INSTR_TOTAL_IDS/2];
-+	struct rt_inst_stats *my_stats = per_cpu(rt_inst_summary, cpu);
-+	long long start_ts;
-+	int i;
-+
-+	/* Get all RT statistics of the cpu*/
-+	if (psci_get_all_rt_instr_cpu(cpu, cache, tmp_rt_inst))
-+		/* An error happens while getting timestamp */
-+		return;
-+
-+	/* Get start time */
-+	start_ts = tmp_rt_inst[0];
-+
-+	/* Compute delta time */
-+	for (i = 0; i < RT_INSTR_TOTAL_IDS/2; i++) {
-+		long long start = tmp_rt_inst[rt_inst_delta_idx[i][0]];
-+		long long end = tmp_rt_inst[rt_inst_delta_idx[i][1]];
-+
-+		/*
-+		 * If time is before start time, discard the value which come
-+		 * from a previous call
-+		 */
-+		if ((start >= start_ts) && (end >= start))
-+			tmp_delta[i] = end - start;
-+		else
-+			tmp_delta[i] = -1;
-+	}
-+
-+	for (i = 0; i < RT_INSTR_TOTAL_IDS/2; i++) {
-+		if (tmp_delta[i] < 0)
-+			continue;
-+
-+		if (tmp_delta[i] > my_stats[i].max) {
-+			/* New max value */
-+			my_stats[i].max = tmp_delta[i];
-+		}
-+		if (tmp_delta[i] < my_stats[i].min) {
-+			/* New min value */
-+			my_stats[i].min = tmp_delta[i];
-+		}
-+	}
-+
-+	/* Update avg */
-+	for (i = 0; i < RT_INSTR_TOTAL_IDS/2; i++) {
-+		unsigned long avg;
-+
-+		if (tmp_delta[i] < 0)
-+			continue;
-+
-+		avg = my_stats[i].avg*my_stats[i].count + tmp_delta[i];
-+
-+		my_stats[i].avg = avg / (my_stats[i].count + 1);
-+
-+		my_stats[i].count++;
-+	}
-+}
-+
-+static void psci_update_all_rt_instr_this_cpu(int cache)
-+{
-+	if (!rt_track_enable)
-+		return;
-+
-+	psci_update_all_rt_instr(raw_smp_processor_id(), cache);
-+}
-+
-+/* Show latency summary all CPUs */
-+static int psci_summary_show(struct seq_file *s, void *data)
-+{
-+	int cpu, i, ret = 0;
-+
-+	for_each_online_cpu(cpu) {
-+		struct rt_inst_stats *my_stats = per_cpu(rt_inst_summary, cpu);
-+
-+		seq_printf(s, "CPU%-2d  step      min     avg     max   count\n", cpu);
-+
-+		for (i = 0; i < RT_INSTR_TOTAL_IDS/2; i++) {
-+			seq_printf(s, "       %5s %7lu %7lu %7lu %7lu\n",
-+				rt_inst_name[i],
-+				(my_stats[i].min * rt_inst_mult) >> rt_inst_shift,
-+				(my_stats[i].avg * rt_inst_mult) >> rt_inst_shift,
-+				(my_stats[i].max * rt_inst_mult) >> rt_inst_shift,
-+				my_stats[i].count);
-+		}
-+	}
-+
-+	return ret;
-+}
-+
-+static int psci_summary_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, psci_summary_show, NULL);
-+}
-+
-+static const struct file_operations psci_summary_fops = {
-+	.open = psci_summary_open,
-+	.read = seq_read,
-+	.llseek = seq_lseek,
-+	.release = single_release,
-+};
-+
-+
-+/* Enable tracking runtime stats*/
-+static int psci_enable_show(struct seq_file *s, void *data)
-+{
-+	seq_printf(s, "%d\n", rt_track_enable);
-+
-+	return 0;
-+}
-+
-+static int psci_enable_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, psci_enable_show, NULL);
-+}
-+
-+static ssize_t psci_enable_store(struct file *file,
-+	const char __user *user_buf, size_t count, loff_t *ppos)
-+{
-+	unsigned long val;
-+	int i, cpu, ret;
-+
-+	ret = kstrtoul_from_user(user_buf, count, 10, &val);
-+	if (ret)
-+		return ret;
-+
-+	rt_track_enable = !!val;
-+
-+	if (rt_track_enable)
-+		for_each_online_cpu(cpu) {
-+			struct rt_inst_stats *my_stats = per_cpu(rt_inst_summary, cpu);
-+
-+			for (i = 0; i < RT_INSTR_TOTAL_IDS/2; i++) {
-+				my_stats[i].min = -1;
-+				my_stats[i].max = 0;
-+				my_stats[i].avg = 0;
-+				my_stats[i].count = 0;
-+			}
-+		}
-+
-+	return count;
-+}
-+
-+static const struct file_operations psci_enable_fops = {
-+	.open = psci_enable_open,
-+	.write = psci_enable_store,
-+	.read = seq_read,
-+	.llseek = seq_lseek,
-+	.release = single_release,
-+};
-+
-+/* Show current timestamp of all CPUs */
-+static int psci_current_show(struct seq_file *s, void *data)
-+{
-+	int cpu, i, ret = 0;
-+
-+	seq_puts(s, "CPU  INSTR ID  Timestamp\n");
-+
-+	for_each_online_cpu(cpu)
-+		for (i = 0; i < RT_INSTR_TOTAL_IDS; i++) {
-+			unsigned long long ts;
-+
-+			ts = (psci_get_one_rt_instr_cpu(i, cpu, 1) * rt_inst_mult)
-+					>> rt_inst_shift,
-+			seq_printf(s, "CPU%-2d  INSTR%d timestamp %llu\n",
-+					cpu, i, ts);
-+		}
-+
-+	return ret;
-+}
-+
-+static int psci_current_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, psci_current_show, NULL);
-+}
-+
-+static const struct file_operations psci_current_fops = {
-+	.open = psci_current_open,
-+	.read = seq_read,
-+	.llseek = seq_lseek,
-+	.release = single_release,
-+};
-+
-+static int __init psci_debug_init(void)
-+{
-+	u64 sec = GENMASK_ULL((56) - 1, 0);
-+	u32 freq;
-+
-+	/* Test if runtime instrumentation is enable */
-+	if (!psci_rt_instr_enable()) {
-+		pr_info("PSCI RunTime Instrumentation not supported\n");
-+		return 0;
-+	}
-+
-+	/*
-+	 * PSCI instrumentation uses same timer ip as arm_arch_timer to count
-+	 * clock cycle so we reuse some clocksource helpers to translate cycle
-+	 * into ns
-+	 */
-+
-+	/* Get counter frequency */
-+	freq = read_sysreg(cntfrq_el0);
-+
-+	/* Compute max run time */
-+	do_div(sec, freq);
-+
-+	/*
-+	 * Compute mul and shift values that will be used to convert cycle in
-+	 * ns thanks to the formula ns = (cyc * mult) >> shift
-+	 */
-+	clocks_calc_mult_shift(&rt_inst_mult, &rt_inst_shift, freq,
-+				       NSEC_PER_SEC, sec);
-+
-+	/* Create debugfs entries */
-+	psci_debugfs_dir = debugfs_create_dir("psci", NULL);
-+
-+	if (!psci_debugfs_dir)
-+		return -ENOMEM;
-+
-+	if (!debugfs_create_file("latency_current", 0444,
-+			psci_debugfs_dir, NULL, &psci_current_fops))
-+		goto error;
-+
-+	if (!debugfs_create_file("enable", 0644,
-+			psci_debugfs_dir, NULL, &psci_enable_fops))
-+		goto error;
-+
-+	if (!debugfs_create_file("latency_summary", 0444,
-+			psci_debugfs_dir, NULL, &psci_summary_fops))
-+		goto error;
-+
-+	return 0;
-+
-+error:
-+	debugfs_remove_recursive(psci_debugfs_dir);
-+	return -ENOMEM;
-+}
-+late_initcall(psci_debug_init);
-+
-+static void __exit psci_debug_exit(void)
-+{
-+	debugfs_remove_recursive(psci_debugfs_dir);
-+}
-+__exitcall(psci_debug_exit);
-+
-+#elif defined(CONFIG_CPU_IDLE)
-+static void psci_update_all_rt_instr_this_cpu(int cache) {}
-+#endif
+Thank you for your work.
+
+I have few comments. First, you only sent that patch to the linux arm
+kernel mailing list and no maintainers so it could have been completely
+missed. You can use the get_maintainer.pl script to know who you should
+send the patch to (this would have pointed to me).
+
+All patches have to include a commit message, could you add one? (It can
+be simple).
+
+Please, also use the checkpatch.pl script that will detect trailing
+spaces for example.
+
+On 13/06/2017 at 04:43:14 +0900, Dmitry Rezvanov wrote:
+> Signed-off-by: Dmitry Rezvanov <dmitry.rezvanov@yandex.ru>
+> ---
+>  arch/arm/boot/dts/at91sam9g45.dtsi     | 23 +++++++++++++++++++++--
+>  arch/arm/boot/dts/at91sam9m10g45ek.dts | 10 +++++++---
+>  sound/atmel/ac97c.c                    |  3 ++-
+
+Changes in sound/atmel/ac97c.c have to be in a separate patch 
+
+>  3 files changed, 30 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+> index e567d5fd3f9d..3e9b17935fb3 100644
+> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+> @@ -715,7 +715,15 @@
+>  							 AT91_PIOD 15 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PD15 periph A */
+>  					};
+>  				};
+> -
+
+Don't remove that blank line
+
+> +				ac97 {
+> +					pinctrl_ac97: ac97-0 {
+> +						atmel,pins =
+> +							<AT91_PIOD 6 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PD6 periph A AC97RX pin */
+> +							 AT91_PIOD 7 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PD7 periph A AC97TX pin */
+> +							 AT91_PIOD 8 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PD8 periph A AC97FS pin */
+> +							 AT91_PIOD 9 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PD9 periph A AC97CK pin */
+> +					};
+> +				};
+
+missing blank line. Also, the nodes in the pinctrl node are ordered
+alphabetically.
+
+>  				spi0 {
+>  					pinctrl_spi0: spi0-0 {
+>  						atmel,pins =
+> @@ -1028,7 +1036,7 @@
+>  				clock-names = "pclk";
+>  				status = "disabled";
+>  			};
+> -
+> +			
+
+Unnecessary change
+
+
+>  			adc0: adc at fffb0000 {
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+> @@ -1154,6 +1162,17 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			ac97: sound at fffac000 {
+> +				compatible = "atmel,at91sam9g45-ac97c";
+> +				reg = <0xfffac000 0x4000>;
+> +				interrupts = <24 IRQ_TYPE_LEVEL_HIGH 4>;
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_ac97>;
+> +				clocks = <&ac97_clk>;
+> +				clock-names = "ac97_clk";
+> +				status = "disabled";
+> +			};
+> +
+
+Those nodes are (somewhat) ordered by addresses, this should go just
+before the adc node
+
+>  			usb2: gadget at fff78000 {
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+> diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+> index 2400c99134f7..1f4173a1a90b 100644
+> --- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
+> +++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+> @@ -151,7 +151,7 @@
+>  				};
+>  			};
+>  
+> -			spi0: spi at fffa4000{
+> +			spi0: spi at fffa4000 {
+
+Unrelated change.
+
+>  				status = "okay";
+>  				cs-gpios = <&pioB 3 0>, <0>, <0>, <0>;
+>  				mtd_dataflash at 0 {
+> @@ -161,11 +161,15 @@
+>  				};
+>  			};
+>  
+> +			ac97: sound at fffac000 {
+> +				status = "okay";
+> +			};
+> +
+>  			usb2: gadget at fff78000 {
+>  				atmel,vbus-gpio = <&pioB 19 GPIO_ACTIVE_HIGH>;
+>  				status = "okay";
+>  			};
+> -
+> +			
+>  			adc0: adc at fffb0000 {
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <
+> @@ -306,7 +310,7 @@
+>  			linux,default-trigger = "mmc0";
+>  		};
+>  	};
+> -
+> +	
+
+Unrelated change.
+
+>  	gpio_keys {
+>  		compatible = "gpio-keys";
+>  
+> diff --git a/sound/atmel/ac97c.c b/sound/atmel/ac97c.c
+> index 6dad042630d8..8ffb3744e435 100644
+> --- a/sound/atmel/ac97c.c
+> +++ b/sound/atmel/ac97c.c
+> @@ -908,7 +908,8 @@ static void atmel_ac97c_reset(struct atmel_ac97c *chip)
+>  #ifdef CONFIG_OF
+>  static const struct of_device_id atmel_ac97c_dt_ids[] = {
+>  	{ .compatible = "atmel,at91sam9263-ac97c", },
+> -	{ }
+> +	{ .compatible = "atmel,at91sam9g45-ac97c"},
+> +	{}
+
+As you don't have any other change in the driver, can't you simply use
+the "atmel,at91sam9263-ac97c" compatible string in the sam9g45 dtsi ?
+
+
 -- 
-2.7.4
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
