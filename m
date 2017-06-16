@@ -1,124 +1,69 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Jun 2017 15:30:54 +0200
-Subject: [PATCH 1/5] ARM: dts: r7s72100: add clock bit definitions
-In-Reply-To: <cover.1497617896.git.horms+renesas@verge.net.au>
-References: <cover.1497617896.git.horms+renesas@verge.net.au>
-Message-ID: <fe811e1de389c373ddf0671888e32f9ad973c969.1497617896.git.horms+renesas@verge.net.au>
+Date: Fri, 16 Jun 2017 15:30:45 +0200
+Subject: [PATCH 5/6] ARM: dts: iwg20d-q7: Add support for iWave G20D-Q7 board
+ based on RZ/G1M
+In-Reply-To: <cover.1497618353.git.horms+renesas@verge.net.au>
+References: <cover.1497618353.git.horms+renesas@verge.net.au>
+Message-ID: <ad2c0558d0494b420cadd6e887ddab2cd4e27e48.1497618353.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Brandt <chris.brandt@renesas.com>
+From: Biju Das <biju.das@bp.renesas.com>
 
-Add the remaining bit locations for the module stop clock registers.
+Add support for iWave RainboW-G20D-Qseven board based on RZ/G1M.
 
-Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- include/dt-bindings/clock/r7s72100-clock.h | 51 ++++++++++++++++++++++++++++++
- 1 file changed, 51 insertions(+)
+ arch/arm/boot/dts/Makefile              |  1 +
+ arch/arm/boot/dts/r8a7743-iwg20d-q7.dts | 25 +++++++++++++++++++++++++
+ 2 files changed, 26 insertions(+)
+ create mode 100644 arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
 
-diff --git a/include/dt-bindings/clock/r7s72100-clock.h b/include/dt-bindings/clock/r7s72100-clock.h
-index dcd2072151fc..7dd8bc0c3cd0 100644
---- a/include/dt-bindings/clock/r7s72100-clock.h
-+++ b/include/dt-bindings/clock/r7s72100-clock.h
-@@ -12,8 +12,18 @@
- 
- #define R7S72100_CLK_PLL	0
- 
-+/* MSTP2 */
-+#define R7S72100_CLK_CORESIGHT	0
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 9d64197f3e91..77d7e2db2513 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -705,6 +705,7 @@ dtb-$(CONFIG_ARCH_RENESAS) += \
+ 	r7s72100-rskrza1.dtb \
+ 	r8a73a4-ape6evm.dtb \
+ 	r8a7740-armadillo800eva.dtb \
++	r8a7743-iwg20d-q7.dtb \
+ 	r8a7743-sk-rzg1m.dtb \
+ 	r8a7745-sk-rzg1e.dtb \
+ 	r8a7778-bockw.dtb \
+diff --git a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
+new file mode 100644
+index 000000000000..9b54783cc2a5
+--- /dev/null
++++ b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
+@@ -0,0 +1,25 @@
++/*
++ * Device Tree Source for the iWave-RZG1M Qseven carrier board
++ *
++ * Copyright (C) 2017 Renesas Electronics Corp.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
 +
- /* MSTP3 */
-+#define R7S72100_CLK_IEBUS	7
-+#define R7S72100_CLK_IRDA	6
-+#define R7S72100_CLK_LIN0	5
-+#define R7S72100_CLK_LIN1	4
- #define R7S72100_CLK_MTU2	3
-+#define R7S72100_CLK_CAN	2
-+#define R7S72100_CLK_ADCPWR	1
-+#define R7S72100_CLK_PWM	0
- 
- /* MSTP4 */
- #define R7S72100_CLK_SCIF0	7
-@@ -26,25 +36,51 @@
- #define R7S72100_CLK_SCIF7	0
- 
- /* MSTP5 */
-+#define R7S72100_CLK_SCI0	7
-+#define R7S72100_CLK_SCI1	6
-+#define R7S72100_CLK_SG0	5
-+#define R7S72100_CLK_SG1	4
-+#define R7S72100_CLK_SG2	3
-+#define R7S72100_CLK_SG3	2
- #define R7S72100_CLK_OSTM0	1
- #define R7S72100_CLK_OSTM1	0
- 
- /* MSTP6 */
-+#define R7S72100_CLK_ADC	7
-+#define R7S72100_CLK_CEU	6
-+#define R7S72100_CLK_DOC0	5
-+#define R7S72100_CLK_DOC1	4
-+#define R7S72100_CLK_DRC0	3
-+#define R7S72100_CLK_DRC1	2
-+#define R7S72100_CLK_JCU	1
- #define R7S72100_CLK_RTC	0
- 
- /* MSTP7 */
-+#define R7S72100_CLK_VDEC0	7
-+#define R7S72100_CLK_VDEC1	6
- #define R7S72100_CLK_ETHER	4
-+#define R7S72100_CLK_NAND	3
- #define R7S72100_CLK_USB0	1
- #define R7S72100_CLK_USB1	0
- 
- /* MSTP8 */
-+#define R7S72100_CLK_IMR0	7
-+#define R7S72100_CLK_IMR1	6
-+#define R7S72100_CLK_IMRDISP	5
- #define R7S72100_CLK_MMCIF	4
-+#define R7S72100_CLK_MLB	3
-+#define R7S72100_CLK_ETHAVB	2
-+#define R7S72100_CLK_SCUX	1
- 
- /* MSTP9 */
- #define R7S72100_CLK_I2C0	7
- #define R7S72100_CLK_I2C1	6
- #define R7S72100_CLK_I2C2	5
- #define R7S72100_CLK_I2C3	4
-+#define R7S72100_CLK_SPIBSC0	3
-+#define R7S72100_CLK_SPIBSC1	2
-+#define R7S72100_CLK_VDC50	1	/* and LVDS */
-+#define R7S72100_CLK_VDC51	0
- 
- /* MSTP10 */
- #define R7S72100_CLK_SPI0	7
-@@ -52,6 +88,17 @@
- #define R7S72100_CLK_SPI2	5
- #define R7S72100_CLK_SPI3	4
- #define R7S72100_CLK_SPI4	3
-+#define R7S72100_CLK_CDROM	2
-+#define R7S72100_CLK_SPDIF	1
-+#define R7S72100_CLK_RGPVG2	0
++/dts-v1/;
++#include "r8a7743-iwg20m.dtsi"
 +
-+/* MSTP11 */
-+#define R7S72100_CLK_SSI0	5
-+#define R7S72100_CLK_SSI1	4
-+#define R7S72100_CLK_SSI2	3
-+#define R7S72100_CLK_SSI3	2
-+#define R7S72100_CLK_SSI4	1
-+#define R7S72100_CLK_SSI5	0
- 
- /* MSTP12 */
- #define R7S72100_CLK_SDHI00	3
-@@ -59,4 +106,8 @@
- #define R7S72100_CLK_SDHI10	1
- #define R7S72100_CLK_SDHI11	0
- 
-+/* MSTP13 */
-+#define R7S72100_CLK_PIX1	2
-+#define R7S72100_CLK_PIX0	1
++/ {
++	model = "iWave Systems RainboW-G20D-Qseven board based on RZ/G1M";
++	compatible = "iwave,g20d", "iwave,g20m", "renesas,r8a7743";
 +
- #endif /* __DT_BINDINGS_CLOCK_R7S72100_H__ */
++	aliases {
++		serial0 = &scif0;
++	};
++};
++
++&scif0 {
++	status = "okay";
++};
 -- 
 2.1.4
