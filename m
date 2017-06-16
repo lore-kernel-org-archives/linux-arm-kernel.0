@@ -1,57 +1,52 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 16 Jun 2017 10:38:12 +0200
-Subject: [PATCH v5] mm: huge-vmap: fail gracefully on unexpected huge vmap
- mappings
-In-Reply-To: <F0D43B2F-6811-4FEA-9152-75BD0792BD83@linaro.org>
-References: <20170609082226.26152-1-ard.biesheuvel@linaro.org>
- <20170615142439.7a431065465c5b4691aed1cc@linux-foundation.org>
- <BE70CA51-B790-456E-B31C-399632B4DCD1@linaro.org>
- <20170615151637.77babb9a1b65c878f4235f65@linux-foundation.org>
- <F0D43B2F-6811-4FEA-9152-75BD0792BD83@linaro.org>
-Message-ID: <CAKv+Gu_Uhrh_bE4aWKEkyJNsbH693d77tTi+fQYysof_oMzYEw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 16 Jun 2017 10:38:14 +0200
+Subject: [PATCH 2/2 v4] clk: Add Gemini SoC clock controller
+In-Reply-To: <20170615215550.z4ypeh345gopd2pg@pengutronix.de>
+References: <20170524082044.8473-1-linus.walleij@linaro.org>
+ <20170601070208.GO20170@codeaurora.org>
+ <CACRpkdZv8MzXVecEXVdJ+P0MxVscYSy=MxC-yQAR0S4yQ6-rwQ@mail.gmail.com>
+ <20170605195812.GH20170@codeaurora.org>
+ <CACRpkdbya9xaN-i7AkG0bTyuFYfZc59sSTYhWB43=9btSKfPpQ@mail.gmail.com>
+ <CACRpkdapAgHix2vw-woDFi4sh+H3_EX7w-5q=opBGMyegFrXbA@mail.gmail.com>
+ <20170612210248.GP20170@codeaurora.org>
+ <CACRpkdaZJbzC0-xg_go=-o+0cQ-JOY3mUe27HUnwQ+DnZYbyMA@mail.gmail.com>
+ <CAMuHMdXdYNTLCUfQ9rdj8Fffff5G6fGREcHs5-E5LbwPU9yyLw@mail.gmail.com>
+ <CACRpkdY+aSyec9PZaoXErzsRefWg2zzw1xihQt_whmote-jBBw@mail.gmail.com>
+ <20170615215550.z4ypeh345gopd2pg@pengutronix.de>
+Message-ID: <CACRpkdbBOnzw5Ww-2TesvDzSV6eiV2y0WyJW-wtLeAszZE-2HQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 June 2017 at 00:29, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->
->> On 16 Jun 2017, at 00:16, Andrew Morton <akpm@linux-foundation.org> wrote:
->>
->>> On Fri, 16 Jun 2017 00:11:53 +0200 Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>>
->>>
->>>
->>>>> On 15 Jun 2017, at 23:24, Andrew Morton <akpm@linux-foundation.org> wrote:
->>>>>
->>>>> On Fri,  9 Jun 2017 08:22:26 +0000 Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>>>>
->>>>> Existing code that uses vmalloc_to_page() may assume that any
->>>>> address for which is_vmalloc_addr() returns true may be passed
->>>>> into vmalloc_to_page() to retrieve the associated struct page.
->>>>>
->>>>> This is not un unreasonable assumption to make, but on architectures
->>>>> that have CONFIG_HAVE_ARCH_HUGE_VMAP=y, it no longer holds, and we
->>>>> need to ensure that vmalloc_to_page() does not go off into the weeds
->>>>> trying to dereference huge PUDs or PMDs as table entries.
->>>>>
->>>>> Given that vmalloc() and vmap() themselves never create huge
->>>>> mappings or deal with compound pages at all, there is no correct
->>>>> answer in this case, so return NULL instead, and issue a warning.
->>>>
->>>> Is this patch known to fix any current user-visible problem?
->>>
->>> Yes. When reading /proc/kcore on arm64, you will hit an oops as soon as you hit the huge mappings used for the various segments that make up the mapping of vmlinux. With this patch applied, you will no longer hit the oops, but the kcore contents willl be incorrect (these regions will be zeroed out)
->>>
->>> We are fixing this for kcore specifically, so it avoids vread() for  those regions. At least one other problematic user exists, i.e., /dev/kmem, but that is currently broken on arm64 for other reasons.
->>>
->>
->> Do you have any suggestions regarding which kernel version(s) should
->> get this patch?
->>
->
-> Good question. v4.6 was the first one to enable the huge vmap feature on arm64 iirc, but that does not necessarily mean it needs to be backported at all imo. What is kcore used for? Production grade stuff?
+On Thu, Jun 15, 2017 at 11:55 PM, Philipp Zabel <pza@pengutronix.de> wrote:
+> On Thu, Jun 15, 2017 at 02:57:53PM +0200, Linus Walleij wrote:
 
-In any case, could you perhaps simply queue it for v4.13? If it needs
-to go into -stable, we can always do it later.
+>> So I would say, clk & reset maintainers: would you prefer that I merge the
+>> reset control into the clock driver as well, ask Philipp to drop the pending
+>> reset control patches from his subsystem tree and have you manage the
+>> combined driver and bindings?
+>
+> The reset/next pull requests are not merged into the arm-soc tree yet.
+> I suppose I could retract the pull requests and drop the Gemini reset
+> patches,
 
-Thanks,
-Ard.
+There is no need. You can simply revert the patches, it's OK that the
+drivers bounce in and out of the kernel.
+
+The clock driver will just probe instead of the reset driver (due to being
+earlier in the link order... OK fragile but it works), so there
+will not even be a runtime conflict.
+
+> if the patches in arm-soc/gemeni/dts are also dropped from
+> arm-soc/for-next.
+
+There is no need for that, the bindings do not change with this approach.
+
+> I have a slight preference for keeping the DT bindings simple, even if
+> that means merging the reset controller into the clock driver.
+
+OK then that is what we're gonna do.
+
+I'm onto it!
+
+Yours,
+Linus Walleij
