@@ -1,52 +1,44 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Jun 2017 15:30:30 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC Drivers Updates for v4.13
-Message-ID: <cover.1497617480.git.horms+renesas@verge.net.au>
+Date: Fri, 16 Jun 2017 15:30:18 +0200
+Subject: [PATCH 10/11] arm64: dts: r8a7795: Add reset control properties for
+ audio
+In-Reply-To: <cover.1497617276.git.horms+renesas@verge.net.au>
+References: <cover.1497617276.git.horms+renesas@verge.net.au>
+Message-ID: <161a19106f4a7d089de05c93bbf2e493fec25f2c.1497617276.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Renesas ARM based SoC drivers updates for v4.13.
+Note that the audio module has resets for the Serial Sound Interfaces
+only.
 
-This pull request is based on
-"[GIT PULL] Renesas ARM Based SoC Fixes for v4.12",
-tagged as renesas-fixes-for-v4.12,
-which you have already pulled and is present in v4.12-rc2.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-This base was used to supply a dependency. It is one patch away from
-v4.11-rc1.  I could also have based the series on v4.12-rc2 but I wanted to
-avoid basing (any of my branches for v4.13) on something more recent than
-v4.12-rc1 unless strictly necessary. Nonetheless I'm happy to rebase if you
-prefer.
-
-
-The following changes since commit 7b4ccb3c466f62bbf2f4dd5d6a143d945a6f3051:
-
-  soc: renesas: Provide dummy rcar_rst_read_mode_pins() for compile-testing (2017-04-28 10:07:36 +0200)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-drivers-for-v4.13
-
-for you to fetch changes up to 8be381a131c29c4737aed44e7e5f90cb77bb4a7e:
-
-  soc: renesas: Rework Kconfig and Makefile logic (2017-06-12 11:31:07 +0200)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Drivers Updates for v4.13
-
-* Rework Kconfig and Makefile logic
-
-----------------------------------------------------------------
-Geert Uytterhoeven (1):
-      soc: renesas: Rework Kconfig and Makefile logic
-
- drivers/soc/Kconfig                  |  1 +
- drivers/soc/Makefile                 |  2 +-
- drivers/soc/renesas/Kconfig          | 63 ++++++++++++++++++++++++++++++++++++
- drivers/soc/renesas/Makefile         | 31 +++++++++---------
- drivers/soc/renesas/rcar-sysc.c      | 24 +++++++-------
- include/linux/soc/renesas/rcar-rst.h |  3 +-
- 6 files changed, 92 insertions(+), 32 deletions(-)
- create mode 100644 drivers/soc/renesas/Kconfig
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index a4ca0f5bb762..e31c1b660b3f 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -1120,6 +1120,16 @@
+ 				      "dvc.0", "dvc.1",
+ 				      "clk_a", "clk_b", "clk_c", "clk_i";
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 1005>,
++				 <&cpg 1006>, <&cpg 1007>,
++				 <&cpg 1008>, <&cpg 1009>,
++				 <&cpg 1010>, <&cpg 1011>,
++				 <&cpg 1012>, <&cpg 1013>,
++				 <&cpg 1014>, <&cpg 1015>;
++			reset-names = "ssi-all",
++				      "ssi.9", "ssi.8", "ssi.7", "ssi.6",
++				      "ssi.5", "ssi.4", "ssi.3", "ssi.2",
++				      "ssi.1", "ssi.0";
+ 			status = "disabled";
+ 
+ 			rcar_sound,dvc {
+-- 
+2.1.4
