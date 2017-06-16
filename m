@@ -1,35 +1,66 @@
 From: butao@hisilicon.com (Bu Tao)
-Date: Fri, 16 Jun 2017 14:51:18 +0800
-Subject: [PATCH v2 4/5] arm64: defconfig: enable configs for hi3660 ufs
+Date: Fri, 16 Jun 2017 14:51:17 +0800
+Subject: [PATCH v2 3/5] arm64: dts: Add ufs dts node
 In-Reply-To: <20170616065119.10704-1-butao@hisilicon.com>
 References: <20170616065119.10704-1-butao@hisilicon.com>
-Message-ID: <20170616065119.10704-5-butao@hisilicon.com>
+Message-ID: <20170616065119.10704-4-butao@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enable configs for Hi3660 UFS driver.
+arm64: dts: add ufs node for hi3660
 
-Reviewed-by: Chen Feng <puck.chen@hisilicon.com>
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-Signed-off-by: Chen Jun <chenjun14@huawei.com>
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+Signed-off-by: Bu Tao <butao@hisilicon.com>
 ---
- arch/arm64/configs/defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts |  9 +++++++++
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi         | 19 +++++++++++++++++++
+ 2 files changed, 28 insertions(+)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 65cdd878cfbd..379c942fe114 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -158,6 +158,9 @@ CONFIG_EEPROM_AT25=m
- CONFIG_BLK_DEV_SD=y
- CONFIG_SCSI_SAS_ATA=y
- CONFIG_SCSI_HISI_SAS=y
-+CONFIG_SCSI_UFSHCD=y
-+CONFIG_SCSI_UFSHCD_PLATFORM=y
-+CONFIG_SCSI_UFS_HI3660=y
- CONFIG_ATA=y
- CONFIG_SATA_AHCI=y
- CONFIG_SATA_AHCI_PLATFORM=y
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+index 186251ffc6b2..5dbe642f3c66 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+@@ -32,3 +32,12 @@
+ &uart5 {
+ 	status = "okay";
+ };
++
++&ufs {
++	ufs-hi3660-use-rate-B;
++	ufs-hi3660-broken-fastauto;
++	ufs-hi3660-use-HS-GEAR3;
++	ufs-hi3660-broken-clk-gate-bypass;
++	reset-gpio = <&gpio18 1 0>;
++	status = "okay";
++}
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+index 3983086bd67b..e688fdb0a939 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+@@ -141,6 +141,25 @@
+ 		#size-cells = <2>;
+ 		ranges;
+ 
++		ufs: ufs at ff3b0000 {
++			compatible = "jedec,ufs-1.1", "hisilicon,hi3660-ufs";
++			/* 0: HCI standard */
++			/* 1: UFS SYS CTRL */
++			reg = <0x0 0xff3b0000 0x0 0x1000>,
++				<0x0 0xff3b1000 0x0 0x1000>;
++			interrupt-parent = <&gic>;
++			interrupts = <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&crg_ctrl HI3660_CLK_GATE_UFSIO_REF>,
++				<&crg_ctrl HI3660_CLK_GATE_UFSPHY_CFG>;
++			clock-names = "clk_ref", "clk_phy";
++			freq-table-hz = <0 0>, <0 0>;
++			/* offset: 0x84; bit: 12 */
++			/* offset: 0x84; bit: 7  */
++			resets = <&crg_rst 0x84 12>,
++				<&crg_rst 0x84 7>;
++			reset-names = "rst", "assert";
++		};
++
+ 		fixed_uart5: fixed_19_2M {
+ 			compatible = "fixed-clock";
+ 			#clock-cells = <0>;
 -- 
 2.11.GIT
