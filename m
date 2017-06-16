@@ -1,69 +1,46 @@
-From: yt.shen@mediatek.com (YT Shen)
-Date: Fri, 16 Jun 2017 21:45:20 +0800
-Subject: [PATCH v3 1/2] dt-bindings: arm: Add bindings for Mediatek MT2712 SoC
- Platform
-In-Reply-To: <1497620721-61444-1-git-send-email-yt.shen@mediatek.com>
-References: <1497620721-61444-1-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1497620721-61444-2-git-send-email-yt.shen@mediatek.com>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Fri, 16 Jun 2017 14:32:24 +0100
+Subject: [PATCH] gpio: rcar: Add R8A7743 (RZ/G1M) support
+Message-ID: <1497619944-61410-1-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds dt-binding documentation for Mediatek MT2712.
-Only include very basic items: cpu, gic and uart.
+Renesas RZ/G1M (R8A7743 SoC) GPIO blocks are identical to the R-Car Gen2
+family. Add support for its GPIO controllers.
 
-Signed-off-by: YT Shen <yt.shen@mediatek.com>
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
 ---
- Documentation/devicetree/bindings/arm/mediatek.txt                    | 4 ++++
- .../devicetree/bindings/interrupt-controller/mediatek,sysirq.txt      | 1 +
- Documentation/devicetree/bindings/serial/mtk-uart.txt                 | 1 +
- 3 files changed, 6 insertions(+)
+ Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt | 1 +
+ drivers/gpio/gpio-rcar.c                                     | 4 ++++
+ 2 files changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
-index c860b24..3161651 100644
---- a/Documentation/devicetree/bindings/arm/mediatek.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek.txt
-@@ -7,6 +7,7 @@ Required root node property:
- 
- compatible: Must contain one of
-    "mediatek,mt2701"
-+   "mediatek,mt2712"
-    "mediatek,mt6580"
-    "mediatek,mt6589"
-    "mediatek,mt6592"
-@@ -23,6 +24,9 @@ Supported boards:
- - Evaluation board for MT2701:
-     Required root node properties:
-       - compatible = "mediatek,mt2701-evb", "mediatek,mt2701";
-+- Evaluation board for MT2712:
-+    Required root node properties:
-+      - compatible = "mediatek,mt2712-evb", "mediatek,mt2712";
- - Evaluation board for MT6580:
-     Required root node properties:
-       - compatible = "mediatek,mt6580-evbp1", "mediatek,mt6580";
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt b/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
-index a89c03b..653adb5 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
-@@ -16,6 +16,7 @@ Required properties:
- 	"mediatek,mt6580-sysirq"
- 	"mediatek,mt6577-sysirq"
- 	"mediatek,mt2701-sysirq"
-+	"mediatek,mt2712-sysirq"
- - interrupt-controller : Identifies the node as an interrupt controller
- - #interrupt-cells : Use the same format as specified by GIC in arm,gic.txt.
- - interrupt-parent: phandle of irq parent for sysirq. The parent must
-diff --git a/Documentation/devicetree/bindings/serial/mtk-uart.txt b/Documentation/devicetree/bindings/serial/mtk-uart.txt
-index 0015c72..5f88e0d 100644
---- a/Documentation/devicetree/bindings/serial/mtk-uart.txt
-+++ b/Documentation/devicetree/bindings/serial/mtk-uart.txt
+diff --git a/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt b/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
+index 7c1ab3b..1cc3cfe 100644
+--- a/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
++++ b/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
 @@ -3,6 +3,7 @@
- Required properties:
- - compatible should contain:
-   * "mediatek,mt2701-uart" for MT2701 compatible UARTS
-+  * "mediatek,mt2712-uart" for MT2712 compatible UARTS
-   * "mediatek,mt6580-uart" for MT6580 compatible UARTS
-   * "mediatek,mt6582-uart" for MT6582 compatible UARTS
-   * "mediatek,mt6589-uart" for MT6589 compatible UARTS
+ Required Properties:
+ 
+   - compatible: should contain one of the following.
++    - "renesas,gpio-r8a7743": for R8A7743 (RZ-G1M) compatible GPIO controller.
+     - "renesas,gpio-r8a7778": for R8A7778 (R-Mobile M1) compatible GPIO controller.
+     - "renesas,gpio-r8a7779": for R8A7779 (R-Car H1) compatible GPIO controller.
+     - "renesas,gpio-r8a7790": for R8A7790 (R-Car H2) compatible GPIO controller.
+diff --git a/drivers/gpio/gpio-rcar.c b/drivers/gpio/gpio-rcar.c
+index 31ad288..4a1536a 100644
+--- a/drivers/gpio/gpio-rcar.c
++++ b/drivers/gpio/gpio-rcar.c
+@@ -344,6 +344,10 @@ struct gpio_rcar_info {
+ 
+ static const struct of_device_id gpio_rcar_of_table[] = {
+ 	{
++		.compatible = "renesas,gpio-r8a7743",
++		/* RZ/G1 GPIO is identical to R-Car Gen2. */
++		.data = &gpio_rcar_info_gen2,
++	}, {
+ 		.compatible = "renesas,gpio-r8a7790",
+ 		.data = &gpio_rcar_info_gen2,
+ 	}, {
 -- 
 1.9.1
