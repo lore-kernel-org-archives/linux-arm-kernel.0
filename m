@@ -1,29 +1,57 @@
-From: mika.westerberg@linux.intel.com (Mika Westerberg)
-Date: Fri, 16 Jun 2017 15:00:48 +0300
-Subject: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO devices
- before scanning
-In-Reply-To: <CAJZ5v0gWGL=M1+T2DxFfwAi=gCbBBnLFVyp4u+1EVem-mcSNQg@mail.gmail.com>
-References: <20170606085553.GA20085@red-moon> <20170612155700.GA31930@red-moon>
- <20170613084831.GP3187@lahna.fi.intel.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40AAE3DA@FRAEML521-MBX.china.huawei.com>
- <20170613151013.GT3187@lahna.fi.intel.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40AAF0BF@FRAEML521-MBX.china.huawei.com>
- <20170613200339.GX3187@lahna.fi.intel.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40AB537A@FRAEML521-MBX.china.huawei.com>
- <20170616083313.GY3187@lahna.fi.intel.com>
- <CAJZ5v0gWGL=M1+T2DxFfwAi=gCbBBnLFVyp4u+1EVem-mcSNQg@mail.gmail.com>
-Message-ID: <20170616120048.GC629@lahna.fi.intel.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 16 Jun 2017 17:24:39 +0530
+Subject: [PATCH 12/12] ARM: dts: dra71-evm: Add pinmux configuration for MMC
+In-Reply-To: <20170616115439.8508-1-kishon@ti.com>
+References: <20170616115439.8508-1-kishon@ti.com>
+Message-ID: <20170616115439.8508-13-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 16, 2017 at 01:24:32PM +0200, Rafael J. Wysocki wrote:
-> > In fact it may be that it is not sufficient in this case because the
-> > ACPI core might enumerate child devices before the LPC driver even gets
-> > a chance to probe so you would need to add also scan handler to the
-> > child devices and mark them already enumerated or something like that.
-> 
-> Or extend the special I2C/SPI handling to them.
+Include dra72x-mmc-iodelay.dtsi which has pinmux and IODelay
+configuration values for the various MMC modes for dra72 SoC
+and use it in the pinctrl properties of MMC devicetree
+nodes present in dra71-evm.dts.
 
-Sure but those have I2c/SpiSerialBus() resources which we can use to
-identify them but for the ipmi thing there is nothing else than _HID so
-we would need to keep a list of such devices in ACPI core.
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/boot/dts/dra71-evm.dts | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/arch/arm/boot/dts/dra71-evm.dts b/arch/arm/boot/dts/dra71-evm.dts
+index 02c11e658810..7ef50929efc1 100644
+--- a/arch/arm/boot/dts/dra71-evm.dts
++++ b/arch/arm/boot/dts/dra71-evm.dts
+@@ -7,6 +7,7 @@
+  */
+ 
+ #include "dra72-evm-common.dtsi"
++#include "dra72x-mmc-iodelay.dtsi"
+ #include <dt-bindings/net/ti-dp83867.h>
+ 
+ / {
+@@ -172,10 +173,23 @@
+ };
+ 
+ &mmc1 {
++	pinctrl-names = "default", "hs", "sdr12", "sdr25", "sdr50", "ddr50", "sdr104";
++	pinctrl-0 = <&mmc1_pins_default>;
++	pinctrl-1 = <&mmc1_pins_hs>;
++	pinctrl-2 = <&mmc1_pins_sdr12>;
++	pinctrl-3 = <&mmc1_pins_sdr25>;
++	pinctrl-4 = <&mmc1_pins_sdr50>;
++	pinctrl-5 = <&mmc1_pins_ddr50_rev20 &mmc1_iodelay_ddr50_conf>;
++	pinctrl-6 = <&mmc1_pins_sdr104 &mmc1_iodelay_sdr104_rev20_conf>;
+ 	vqmmc-supply = <&vpo_sd_1v8_3v3>;
+ };
+ 
+ &mmc2 {
++	pinctrl-names = "default", "hs", "ddr_1_8v", "hs200_1_8v";
++	pinctrl-0 = <&mmc2_pins_default>;
++	pinctrl-1 = <&mmc2_pins_hs>;
++	pinctrl-2 = <&mmc2_pins_ddr_rev20 &mmc2_iodelay_ddr_conf>;
++	pinctrl-3 = <&mmc2_pins_hs200 &mmc2_iodelay_hs200_rev20_conf>;
+ 	vmmc-supply = <&evm_1v8_sw>;
+ };
+ 
+-- 
+2.11.0
