@@ -1,21 +1,35 @@
 From: scott.branden@broadcom.com (Scott Branden)
-Date: Thu, 15 Jun 2017 23:39:11 -0700
-Subject: [PATCH RESEND 0/2] Add support for ARM CCN-502 interconnect
-Message-ID: <1497595153-18908-1-git-send-email-scott.branden@broadcom.com>
+Date: Thu, 15 Jun 2017 23:39:12 -0700
+Subject: [PATCH RESEND 1/2] dt-bindings: arm-ccn: Add bindings info for
+ CCN-502 compatible string
+In-Reply-To: <1497595153-18908-1-git-send-email-scott.branden@broadcom.com>
+References: <1497595153-18908-1-git-send-email-scott.branden@broadcom.com>
+Message-ID: <1497595153-18908-2-git-send-email-scott.branden@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add compatible string for ARM CCN-502 interconnect.
-CCN-502 interconnect is already compatible with the 
-existing ARM CCN driver, which supports CCN-504.
+From: Velibor Markovski <velibor.markovski@broadcom.com>
 
-Velibor Markovski (2):
-  dt-bindings: arm-ccn: Add bindings info for CCN-502 compatible string
-  bus: arm-ccn: Enable stats for CCN-502 interconnect
+Add CCN-502 to the list of supported devices by ARM CCN PMU driver.
 
+Signed-off-by: Velibor Markovski <velibor.markovski@broadcom.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Scott Branden <scott.branden@broadcom.com>
+---
  Documentation/devicetree/bindings/arm/ccn.txt | 1 +
- drivers/bus/arm-ccn.c                         | 1 +
- 2 files changed, 2 insertions(+)
+ 1 file changed, 1 insertion(+)
 
+diff --git a/Documentation/devicetree/bindings/arm/ccn.txt b/Documentation/devicetree/bindings/arm/ccn.txt
+index b100d38..2980145 100644
+--- a/Documentation/devicetree/bindings/arm/ccn.txt
++++ b/Documentation/devicetree/bindings/arm/ccn.txt
+@@ -3,6 +3,7 @@
+ Required properties:
+ 
+ - compatible: (standard compatible string) should be one of:
++	"arm,ccn-502"
+ 	"arm,ccn-504"
+ 	"arm,ccn-508"
+ 
 -- 
 2.5.0
