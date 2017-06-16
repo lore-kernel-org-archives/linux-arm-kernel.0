@@ -1,36 +1,72 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 16 Jun 2017 16:08:13 +0200
-Subject: [RFT 2/2] pinctrl: samsung: Fix invalid register offset used
- for Exynos5433 external interrupts
-In-Reply-To: <20170614131828.28683-2-krzk@kernel.org>
-References: <20170614131828.28683-1-krzk@kernel.org>
- <CGME20170614131847epcas3p4755a0ad1e25550134ddfcf0db9aff06b@epcas3p4.samsung.com>
- <20170614131828.28683-2-krzk@kernel.org>
-Message-ID: <0cfe358a-c050-aae0-5755-819c7b25ef28@samsung.com>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Fri, 16 Jun 2017 22:13:22 +0800
+Subject: [PATCH v5 15/20] arm64: dts: hisi: add kirin pcie node
+In-Reply-To: <20170615030417.14059-16-guodong.xu@linaro.org>
+References: <20170615030417.14059-16-guodong.xu@linaro.org>
+Message-ID: <20170616141322.30466-1-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14/2017 03:18 PM, Krzysztof Kozlowski wrote:
-> When setting the pin function for external interrupts, the driver used
-> wrong IO memory address base.  The pin function register is always under
-> pctl_base, not the eint_base.
-> 
-> By updating wrong register, the external interrupts for chosen GPIO
-> would not work at all and some other GPIO might be configured to wrong
-> value.
-> 
-> Platforms other than Exynos5433 should not be affected as eint_base
-> equals pctl_base in such case.
-> 
-> Fixes: 8b1bd11c1f8f ("pinctrl: samsung: Add the support the multiple IORESOURCE_MEM for one pin-bank")
-> Cc:<stable@vger.kernel.org>
-> Reported-by: Tomasz Figa<tomasz.figa@gmail.com>
-> Signed-off-by: Krzysztof Kozlowski<krzk@kernel.org>
+From: Xiaowei Song <songxiaowei@hisilicon.com>
 
-The patch looks good to me, I'll try to test it later today.
+Add PCIe node for hi3660
 
-Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Cc: Guodong Xu <guodong.xu@linaro.org>
+Signed-off-by: Xiaowei Song <songxiaowei@hisilicon.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
+Changes in v5:
+ * fix interrupt-map, to conform to gic's #address-cells = <0>
+ * remove redundant status = "ok"
+---
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 36 +++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+index e138973..8183d71 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+@@ -754,5 +754,41 @@
+ 			cs-gpios = <&gpio18 5 0>;
+ 			status = "disabled";
+ 		};
++
++		pcie at f4000000 {
++			compatible = "hisilicon,kirin960-pcie";
++			reg = <0x0 0xf4000000 0x0 0x1000>,
++			      <0x0 0xff3fe000 0x0 0x1000>,
++			      <0x0 0xf3f20000 0x0 0x40000>,
++			      <0x0 0xf5000000 0x0 0x2000>;
++			reg-names = "dbi", "apb", "phy", "config";
++			bus-range = <0x0  0x1>;
++			#address-cells = <3>;
++			#size-cells = <2>;
++			device_type = "pci";
++			ranges = <0x02000000 0x0 0x00000000
++				  0x0 0xf6000000
++				  0x0 0x02000000>;
++			num-lanes = <1>;
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0xf800 0 0 7>;
++			interrupt-map = <0x0 0 0 1
++					 &gic GIC_SPI 282 IRQ_TYPE_LEVEL_HIGH>,
++					<0x0 0 0 2
++					 &gic GIC_SPI 283 IRQ_TYPE_LEVEL_HIGH>,
++					<0x0 0 0 3
++					 &gic GIC_SPI 284 IRQ_TYPE_LEVEL_HIGH>,
++					<0x0 0 0 4
++					 &gic GIC_SPI 285 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&crg_ctrl HI3660_PCIEPHY_REF>,
++				 <&crg_ctrl HI3660_CLK_GATE_PCIEAUX>,
++				 <&crg_ctrl HI3660_PCLK_GATE_PCIE_PHY>,
++				 <&crg_ctrl HI3660_PCLK_GATE_PCIE_SYS>,
++				 <&crg_ctrl HI3660_ACLK_GATE_PCIE>;
++			clock-names = "pcie_phy_ref", "pcie_aux",
++				      "pcie_apb_phy", "pcie_apb_sys",
++				      "pcie_aclk";
++			reset-gpios = <&gpio11 1 0 >;
++		};
+ 	};
+ };
 -- 
-Thanks,
-Sylwester
+2.10.2
