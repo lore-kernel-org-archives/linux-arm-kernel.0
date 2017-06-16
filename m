@@ -1,98 +1,73 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Fri, 16 Jun 2017 12:42:22 +0200
-Subject: [PATCH v2] [media] mtk-mdp: Fix g_/s_selection capture/compose
- logic
-In-Reply-To: <1494556970-12278-1-git-send-email-minghsiu.tsai@mediatek.com>
-References: <1494556970-12278-1-git-send-email-minghsiu.tsai@mediatek.com>
-Message-ID: <a180f2fc-1dce-3630-ed48-25c247eff79a@xs4all.nl>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 16 Jun 2017 11:47:41 +0100
+Subject: [PATCH 5/5] arm64: signal: Allow expansion of the signal frame
+In-Reply-To: <1497535442-11586-6-git-send-email-Dave.Martin@arm.com>
+References: <1497535442-11586-1-git-send-email-Dave.Martin@arm.com>
+ <1497535442-11586-6-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20170616104740.GA31526@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/17 04:42, Minghsiu Tsai wrote:
-> From: Daniel Kurtz <djkurtz@chromium.org>
-> 
-> Experiments show that the:
->  (1) mtk-mdp uses the _MPLANE form of CAPTURE/OUTPUT
-
-Please drop this, since this no longer applies to this patch.
-
->  (2) CAPTURE types use CROP targets, and OUTPUT types use COMPOSE targets
-
-Are you really certain about this?
-
-For m2m devices the output (i.e. memory to hardware) typically crops from memory
-and the capture side (hardware to memory) composes into memory.
-
-I.e.: for the output side you crop the part of the memory buffer that you want
-to process and on the capture side you compose the result into a memory buffer:
-i.e. the memory buffer might be 1920x1080, but you compose the decoder output
-into a rectangle of 640x480 at offset 128x128 within that buffer (just an example).
-
-CAPTURE using crop would be if, before the data is DMAed, the hardware decoder
-output is cropped. E.g. if the stream fed to the decoder is 1920x1080, but you
-want to only DMA a subselection of that, then that would be cropping, and it
-would go to a memory buffer of the size of the crop selection.
-
-OUTPUT using compose is highly unlikely: that means that the frame you give
-is composed in a larger internal buffer with generated border data around it.
-Very rare and really only something that a compositor of some sort would do.
-
-What exactly does the hardware do? Both for the encoder and for the decoder
-case. Perhaps if I knew exactly what that is, then I can advise.
-
-Regards,
-
-	Hans
-
-> 
-> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
-> Signed-off-by: Houlong Wei <houlong.wei@mediatek.com>
-> 
-> ---
-> Changes in v2:
-> . Can not use *_MPLANE type in g_/s_selection 
-> ---
->  drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
-> index 13afe48..e18ac626 100644
-> --- a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
-> +++ b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
-> @@ -838,10 +838,10 @@ static int mtk_mdp_m2m_g_selection(struct file *file, void *fh,
->  	bool valid = false;
+On Thu, Jun 15, 2017 at 03:03:42PM +0100, Dave P Martin wrote:
+> --- a/arch/arm64/include/uapi/asm/sigcontext.h
+> +++ b/arch/arm64/include/uapi/asm/sigcontext.h
+> @@ -41,9 +41,10 @@ struct sigcontext {
+>   *
+>   *	0x210		fpsimd_context
+>   *	 0x10		esr_context
+> + *	 0x20		extra_context (optional)
+>   *	 0x10		terminator (null _aarch64_ctx)
+>   *
+> - *	0xdd0		(reserved for future allocation)
+> + *	0xdb0		(reserved for future allocation)
+>   *
+>   * New records that can exceed this space need to be opt-in for userspace, so
+>   * that an expanded signal frame is not generated unexpectedly.  The mechanism
+> @@ -80,4 +81,39 @@ struct esr_context {
+>  	__u64 esr;
+>  };
 >  
->  	if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
-> -		if (mtk_mdp_is_target_compose(s->target))
-> +		if (mtk_mdp_is_target_crop(s->target))
->  			valid = true;
->  	} else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
-> -		if (mtk_mdp_is_target_crop(s->target))
-> +		if (mtk_mdp_is_target_compose(s->target))
->  			valid = true;
->  	}
->  	if (!valid) {
-> @@ -908,10 +908,10 @@ static int mtk_mdp_m2m_s_selection(struct file *file, void *fh,
->  	bool valid = false;
->  
->  	if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
-> -		if (s->target == V4L2_SEL_TGT_COMPOSE)
-> +		if (s->target == V4L2_SEL_TGT_CROP)
->  			valid = true;
->  	} else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
-> -		if (s->target == V4L2_SEL_TGT_CROP)
-> +		if (s->target == V4L2_SEL_TGT_COMPOSE)
->  			valid = true;
->  	}
->  	if (!valid) {
-> @@ -925,7 +925,7 @@ static int mtk_mdp_m2m_s_selection(struct file *file, void *fh,
->  	if (ret)
->  		return ret;
->  
-> -	if (mtk_mdp_is_target_crop(s->target))
-> +	if (mtk_mdp_is_target_compose(s->target))
->  		frame = &ctx->s_frame;
->  	else
->  		frame = &ctx->d_frame;
-> 
+> +/*
+> + * extra_context: describes extra space in the signal frame for
+> + * additional structures that don't fit in sigcontext.__reserved[].
+> + *
+> + * Note:
+> + *
+> + * 1) fpsimd_context, esr_context and extra_context must be placed in
+> + * sigcontext.__reserved[] if present.  They cannot be placed in the
+> + * extra space.  Any other record can be placed either in the extra
+> + * space or in sigcontext.__reserved[], unless otherwise specified in
+> + * this file.
+> + *
+> + * 2) There must not be more than one extra_context.
+> + *
+> + * 3) If extra_context is present, it must be followed immediately in
+> + * sigcontext.__reserved[] by the terminating null _aarch64_ctx.
+> + *
+> + * 4) The extra space to which data points must start at the first
+> + * 16-byte aligned address immediately after the terminating null
+> + * _aarch64_ctx that follows the extra_context structure in
+> + * __reserved[].  The extra space may overrun the end of __reserved[],
+> + * as indicated by a sufficiently large value for the size field.
+> + *
+> + * 5) The extra space must itself be terminated with a null
+> + * _aarch64_ctx.
+> + */
+> +#define EXTRA_MAGIC	0x45585401
+> +
+> +struct extra_context {
+> +	struct _aarch64_ctx head;
+> +	void __user *data;	/* 16-byte aligned pointer to extra space */
+> +	__u32 size;		/* size in bytes of the extra space */
+> +	__u32 __reserved[3];
+> +};
+
+Some more thoughts on the type of "data" above. It's the first time we
+introduce pointers in sigcontext and wonder whether __u64 would make
+more sense (invariable size with the ABI).
+
+Also for discussion - whether using an offset vs absolute address would
+be better.
+
+-- 
+Catalin
