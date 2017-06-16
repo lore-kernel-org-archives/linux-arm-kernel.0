@@ -1,124 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Jun 2017 15:30:41 +0200
-Subject: [PATCH 1/6] ARM: dts: gose: add HDMI input
-In-Reply-To: <cover.1497618353.git.horms+renesas@verge.net.au>
-References: <cover.1497618353.git.horms+renesas@verge.net.au>
-Message-ID: <bc63cd87f3ce924f02e575ffb12f8c10cd7d3780.1497618353.git.horms+renesas@verge.net.au>
+Date: Fri, 16 Jun 2017 15:30:56 +0200
+Subject: [PATCH 3/5] ARM: shmobile: document iW-RainboW-G20D-Qseven-RZG1M board
+In-Reply-To: <cover.1497617896.git.horms+renesas@verge.net.au>
+References: <cover.1497617896.git.horms+renesas@verge.net.au>
+Message-ID: <9086120f8b883034940e5228c83824ed21999537.1497617896.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+From: Biju Das <biju.das@bp.renesas.com>
 
-Identical to the setup on Koelsch.
+Document the iW-RainboW-G20D-Qseven-RZG1M device tree bindings,
+listing it as a supported board.
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7793-gose.dts | 68 ++++++++++++++++++++++++++++++++++++--
- 1 file changed, 66 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/arm/shmobile.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-index 95e51b79c1d7..30f083528468 100644
---- a/arch/arm/boot/dts/r8a7793-gose.dts
-+++ b/arch/arm/boot/dts/r8a7793-gose.dts
-@@ -253,12 +253,23 @@
- 		};
- 	};
- 
-+	hdmi-in {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_con_in: endpoint {
-+				remote-endpoint = <&adv7612_in>;
-+			};
-+		};
-+	};
-+
- 	hdmi-out {
- 		compatible = "hdmi-connector";
- 		type = "a";
- 
- 		port {
--			hdmi_con: endpoint {
-+			hdmi_con_out: endpoint {
- 				remote-endpoint = <&adv7511_out>;
- 			};
- 		};
-@@ -395,6 +406,11 @@
- 		groups = "audio_clk_a";
- 		function = "audio_clk";
- 	};
-+
-+	vin0_pins: vin0 {
-+		groups = "vin0_data24", "vin0_sync", "vin0_clkenb", "vin0_clk";
-+		function = "vin0";
-+	};
- };
- 
- &ether {
-@@ -552,7 +568,34 @@
- 			port at 1 {
- 				reg = <1>;
- 				adv7511_out: endpoint {
--					remote-endpoint = <&hdmi_con>;
-+					remote-endpoint = <&hdmi_con_out>;
-+				};
-+			};
-+		};
-+	};
-+
-+	hdmi-in at 4c {
-+		compatible = "adi,adv7612";
-+		reg = <0x4c>;
-+		interrupt-parent = <&gpio4>;
-+		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
-+		default-input = <0>;
-+
-+		port {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				adv7612_in: endpoint {
-+					remote-endpoint = <&hdmi_con_in>;
-+				};
-+			};
-+
-+			port at 2 {
-+				reg = <2>;
-+				adv7612_out: endpoint {
-+					remote-endpoint = <&vin0ep2>;
- 				};
- 			};
- 		};
-@@ -606,3 +649,24 @@
- &ssi1 {
- 	shared-pin;
- };
-+
-+/* HDMI video input */
-+&vin0 {
-+	status = "okay";
-+	pinctrl-0 = <&vin0_pins>;
-+	pinctrl-names = "default";
-+
-+	port {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		vin0ep2: endpoint {
-+			remote-endpoint = <&adv7612_out>;
-+			bus-width = <24>;
-+			hsync-active = <0>;
-+			vsync-active = <0>;
-+			pclk-sample = <1>;
-+			data-active = <1>;
-+		};
-+	};
-+};
+diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+index fe850ef98dd8..c9c8e40c2ce5 100644
+--- a/Documentation/devicetree/bindings/arm/shmobile.txt
++++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -61,6 +61,8 @@ Boards:
+     compatible = "renesas,h3ulcb", "renesas,r8a7795";
+   - Henninger
+     compatible = "renesas,henninger", "renesas,r8a7791"
++  - iWave Systems RZ/G1M Qseven Development Platform (iW-RainboW-G20D-Qseven)
++    compatible = "iwave,g20d", "iwave,g20m", "renesas,r8a7743"
+   - iWave Systems RZ/G1M Qseven System On Module (iW-RainboW-G20M-Qseven)
+     compatible = "iwave,g20m", "renesas,r8a7743"
+   - Koelsch (RTP0RC7791SEB00010S)
 -- 
 2.1.4
