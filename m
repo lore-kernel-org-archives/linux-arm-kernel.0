@@ -1,40 +1,50 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 16 Jun 2017 13:23:56 +0530
-Subject: [PATCH V2 0/5] phy: bcm-ns-usb3: add MDIO driver
-In-Reply-To: <20170608200428.9187-1-zajec5@gmail.com>
-References: <20170511132925.14564-1-zajec5@gmail.com>
- <20170608200428.9187-1-zajec5@gmail.com>
-Message-ID: <dab533dc-a21c-807d-6688-f8aae4a03f61@ti.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 16 Jun 2017 10:13:03 +0200
+Subject: [GIT PULL 1/4] soc/tegra: Changes for v4.13-rc1
+Message-ID: <20170616081306.11505-1-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi ARM SoC maintainers,
 
+The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 
-On Friday 09 June 2017 01:34 AM, Rafa? Mi?ecki wrote:
-> From: Rafa? Mi?ecki <rafal@milecki.pl>
-> 
-> As explained in the commit 9200c6f177638 ("Revert "phy: Add USB3 PHY support
-> for Broadcom NSP SoC"") this module should be modified to use MDIO bus as
-> this is how PHY is really attached.
-> 
-> This should allow reusing this driver on NSP and any other platform with
-> MDIO bus and this particular PHY.
-> 
-> V2: Rebase and update 4/5 and 5/5.
+  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 
-merged, thanks!
+are available in the git repository at:
 
--Kishon
-> 
-> Rafa? Mi?ecki (5):
->   phy: bcm-ns-usb3: always wait for idle after writing to the PHY reg
->   phy: bcm-ns-usb3: use pointer for PHY writing function
->   phy: bcm-ns-usb3: enable MDIO in the platform specific code
->   dt-bindings: phy: Modify Broadcom NS USB 3.0 PHY binding to use MDIO
->   phy: bcm-ns-usb3: add MDIO driver using proper bus layer
-> 
->  .../devicetree/bindings/phy/bcm-ns-usb3-phy.txt    |  27 ++-
->  drivers/phy/broadcom/Kconfig                       |   1 +
->  drivers/phy/broadcom/phy-bcm-ns-usb3.c             | 230 +++++++++++++++------
->  3 files changed, 186 insertions(+), 72 deletions(-)
-> 
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.13-soc
+
+for you to fetch changes up to da1dbec1be2b54c16649e33e479708a55156e311:
+
+  soc/tegra: flowctrl: Fix error handling (2017-06-13 16:47:44 +0200)
+
+Thanks,
+Thierry
+
+----------------------------------------------------------------
+soc/tegra: Changes for v4.13-rc1
+
+This contains an implementation of generic PM domains for Tegra186,
+based on the BPMP powergate request.
+
+----------------------------------------------------------------
+Christophe Jaillet (1):
+      soc/tegra: flowctrl: Fix error handling
+
+Thierry Reding (3):
+      PM / Domains: Allow overriding the ->xlate() callback
+      soc/tegra: bpmp: Update ABI header
+      soc/tegra: bpmp: Implement generic PM domains
+
+ drivers/base/power/domain.c        |   8 +-
+ drivers/firmware/tegra/bpmp.c      |   4 +
+ drivers/soc/tegra/Kconfig          |   5 +
+ drivers/soc/tegra/Makefile         |   1 +
+ drivers/soc/tegra/flowctrl.c       |   2 +-
+ drivers/soc/tegra/powergate-bpmp.c | 359 +++++++++++++++++++++++++++++++
+ include/linux/pm_domain.h          |   4 +
+ include/soc/tegra/bpmp-abi.h       | 418 ++++++++++++++++++++++++++++++++++++-
+ include/soc/tegra/bpmp.h           |  12 ++
+ 9 files changed, 798 insertions(+), 15 deletions(-)
+ create mode 100644 drivers/soc/tegra/powergate-bpmp.c
