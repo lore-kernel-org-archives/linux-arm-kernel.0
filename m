@@ -1,52 +1,60 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Jun 2017 15:30:57 +0200
-Subject: [PATCH 4/5] ARM: shmobile: Update R-Car Gen3 ULCB board part numbers
-In-Reply-To: <cover.1497617896.git.horms+renesas@verge.net.au>
-References: <cover.1497617896.git.horms+renesas@verge.net.au>
-Message-ID: <fa5b2e749c99e6dbcca9c067a59b2ce17b3ac82e.1497617896.git.horms+renesas@verge.net.au>
+Date: Fri, 16 Jun 2017 15:30:44 +0200
+Subject: [PATCH 4/6] ARM: dts: iwg20m: Add iWave RZG1M Qseven SOM
+In-Reply-To: <cover.1497618353.git.horms+renesas@verge.net.au>
+References: <cover.1497618353.git.horms+renesas@verge.net.au>
+Message-ID: <aabf13bac0046a1add4a3c39881ffb0abe692542.1497618353.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Biju Das <biju.das@bp.renesas.com>
 
-The board part numbers for the R-Car H3 and M3 ULCB boards corresponded
-to versions predating mass production.  Update them for mass production.
+Add support for iWave RZG1M Qseven System On Module.
+http://www.iwavesystems.com/rz-g1m-qseven-module.html
 
-Note that the H3 ULCB board can be equipped with either revision ES1.1
-or ES2.0 of the R-Car H3 SoC.  While these have different board part
-numbers, no new compatible values are needed, as the revision can be
-detected at runtime using the PRR register.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Vladimir Barinov <vladimir.barinov+renesas@cogentembedded.com>
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- Documentation/devicetree/bindings/arm/shmobile.txt | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a7743-iwg20m.dtsi | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+ create mode 100644 arch/arm/boot/dts/r8a7743-iwg20m.dtsi
 
-diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-index c9c8e40c2ce5..433f25afe288 100644
---- a/Documentation/devicetree/bindings/arm/shmobile.txt
-+++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -57,7 +57,8 @@ Boards:
-     compatible = "renesas,genmai", "renesas,r7s72100"
-   - Gose (RTP0RC7793SEB00010S)
-     compatible = "renesas,gose", "renesas,r8a7793"
--  - H3ULCB (R-Car Starter Kit Premier, RTP0RC7795SKB00010S)
-+  - H3ULCB (R-Car Starter Kit Premier, RTP0RC7795SKBX0010SA00 (H3 ES1.1))
-+    H3ULCB (R-Car Starter Kit Premier, RTP0RC77951SKBX010SA00 (H3 ES2.0))
-     compatible = "renesas,h3ulcb", "renesas,r8a7795";
-   - Henninger
-     compatible = "renesas,henninger", "renesas,r8a7791"
-@@ -73,7 +74,7 @@ Boards:
-     compatible = "renesas,kzm9g", "renesas,sh73a0"
-   - Lager (RTP0RC7790SEB00010S)
-     compatible = "renesas,lager", "renesas,r8a7790"
--  - M3ULCB (R-Car Starter Kit Pro, RTP0RC7796SKB00010S)
-+  - M3ULCB (R-Car Starter Kit Pro, RTP0RC7796SKBX0010SA09 (M3 ES1.0))
-     compatible = "renesas,m3ulcb", "renesas,r8a7796";
-   - Marzen (R0P7779A00010S)
-     compatible = "renesas,marzen", "renesas,r8a7779"
+diff --git a/arch/arm/boot/dts/r8a7743-iwg20m.dtsi b/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
+new file mode 100644
+index 000000000000..001ca9144f4b
+--- /dev/null
++++ b/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
+@@ -0,0 +1,29 @@
++/*
++ * Device Tree Source for the iWave-RZG1M-20M Qseven SOM
++ *
++ * Copyright (C) 2017 Renesas Electronics Corp.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++#include "r8a7743.dtsi"
++
++/ {
++	compatible = "iwave,g20m", "renesas,r8a7743";
++
++	memory at 40000000 {
++		device_type = "memory";
++		reg = <0 0x40000000 0 0x20000000>;
++	};
++
++	memory at 200000000 {
++		device_type = "memory";
++		reg = <2 0x00000000 0 0x20000000>;
++	};
++};
++
++&extal_clk {
++	clock-frequency = <20000000>;
++};
 -- 
 2.1.4
