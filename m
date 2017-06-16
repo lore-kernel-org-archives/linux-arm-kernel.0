@@ -1,165 +1,116 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 16 Jun 2017 13:12:48 +0200
-Subject: [PATCH] clocksource/drivers/tcb_clksrc: make IO endian agnostic
-Message-ID: <20170616111248.27312-1-alexandre.belloni@free-electrons.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 16 Jun 2017 12:17:29 +0100
+Subject: [PATCH 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
+ erratum 161010801
+In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA83836B212@FRAEML521-MBX.china.huawei.com>
+References: <20170613114829.188036-1-shameerali.kolothum.thodi@huawei.com>
+ <20170613114829.188036-3-shameerali.kolothum.thodi@huawei.com>
+ <20170613131317.GB2868@red-moon>
+ <5FC3163CFD30C246ABAA99954A238FA838368BC6@FRAEML521-MBX.china.huawei.com>
+ <5FC3163CFD30C246ABAA99954A238FA83836B212@FRAEML521-MBX.china.huawei.com>
+Message-ID: <20170616111729.GB22323@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that AVR32 is gone, we can use the proper IO accessors that are
-correctly handling endianness.
+On Fri, Jun 16, 2017 at 09:43:52AM +0000, Shameerali Kolothum Thodi wrote:
+> Hi Lorenzo,
+> 
+> > -----Original Message-----
+> > From: linuxarm-bounces at huawei.com [mailto:linuxarm-
+> > bounces at huawei.com] On Behalf Of Shameerali Kolothum Thodi
+> > Sent: Tuesday, June 13, 2017 3:53 PM
+> > To: Lorenzo Pieralisi
+> > Cc: marc.zyngier at arm.com; will.deacon at arm.com; Linuxarm; linux-
+> > acpi at vger.kernel.org; iommu at lists.linux-foundation.org;
+> > hanjun.guo at linaro.org; sudeep.holla at arm.com; robin.murphy at arm.com;
+> > linux-arm-kernel at lists.infradead.org; devel at acpica.org
+> > Subject: RE: [PATCH 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
+> > erratum 161010801
+> 
+> [...]
+>  > > > ---
+> > > >  drivers/iommu/arm-smmu-v3.c | 27 ++++++++++++++++++++++-----
+> > > >  1 file changed, 22 insertions(+), 5 deletions(-)
+> > > >
+> > > > diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-
+> > > v3.c
+> > > > index abe4b88..2636c85 100644
+> > > > --- a/drivers/iommu/arm-smmu-v3.c
+> > > > +++ b/drivers/iommu/arm-smmu-v3.c
+> > > > @@ -597,6 +597,7 @@ struct arm_smmu_device {
+> > > >  	u32				features;
+> > > >
+> > > >  #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
+> > > > +#define ARM_SMMU_OPT_RESV_HW_MSI	(1 << 1)
+> > > >  	u32				options;
+> > > >
+> > > >  	struct arm_smmu_cmdq		cmdq;
+> > > > @@ -1904,14 +1905,29 @@ static void
+> > arm_smmu_get_resv_regions(struct
+> > > device *dev,
+> > > >  				      struct list_head *head)
+> > > >  {
+> > > >  	struct iommu_resv_region *region;
+> > > > +	struct arm_smmu_device *smmu;
+> > > > +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
+> > > >  	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
+> > > >
+> > > > -	region = iommu_alloc_resv_region(MSI_IOVA_BASE,
+> > > MSI_IOVA_LENGTH,
+> > > > -					 prot, IOMMU_RESV_SW_MSI);
+> > > > -	if (!region)
+> > > > -		return;
+> > > > +	smmu = arm_smmu_get_by_fwnode(fwspec->iommu_fwnode);
+> > > >
+> > > > -	list_add_tail(&region->list, head);
+> > > > +	if (smmu && (smmu->options & ARM_SMMU_OPT_RESV_HW_MSI)
+> > > &&
+> > > > +		      dev_is_pci(dev)) {
+> > > > +		int ret;
+> > > > +
+> > > > +		ret = iort_iommu_its_get_resv_regions(dev, head);
+> > >
+> > > This should be made fwnode dependent, it makes precious little sense to
+> > call
+> > > IORT to reserve regions on a DT based platforms (I know the
+> > > ARM_SMMU_OPT_RESV_HW_MSI option is only selected in ACPI (?) but
+> > > comment applies regardless - have you prototyped a DT version too ?).
+> > 
+> > Ok. I will add a check here. 
+> 
+> This is what I have in mind. Please take a look and let me know. I will send out
+> a v2 of this series soon.
+> ....
+> if (smmu && (smmu->options & ARM_SMMU_OPT_RESV_HW_MSI) &&
+> 			dev_is_pci(dev)) {
+> 	int ret = -EINVAL;
+> 
+> 	if (!is_of_node(smmu->dev->fwnode))
+> 		ret = iort_iommu_its_get_resv_regions(dev, head);
+> 
+> 	if (ret) {
+> 		dev_warn(dev, "HW MSI region resv failed: %d\n", ret);
+> 		return;
+> 	}
+> } else {
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/clocksource/tcb_clksrc.c | 58 ++++++++++++++++++++--------------------
- 1 file changed, 29 insertions(+), 29 deletions(-)
+The fwnode handling is fine, I do not like much the:
 
-diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
-index d4ca9962a759..85102f91f408 100644
---- a/drivers/clocksource/tcb_clksrc.c
-+++ b/drivers/clocksource/tcb_clksrc.c
-@@ -48,9 +48,9 @@ static u64 tc_get_cycles(struct clocksource *cs)
- 
- 	raw_local_irq_save(flags);
- 	do {
--		upper = __raw_readl(tcaddr + ATMEL_TC_REG(1, CV));
--		lower = __raw_readl(tcaddr + ATMEL_TC_REG(0, CV));
--	} while (upper != __raw_readl(tcaddr + ATMEL_TC_REG(1, CV)));
-+		upper = readl_relaxed(tcaddr + ATMEL_TC_REG(1, CV));
-+		lower = readl_relaxed(tcaddr + ATMEL_TC_REG(0, CV));
-+	} while (upper != readl_relaxed(tcaddr + ATMEL_TC_REG(1, CV)));
- 
- 	raw_local_irq_restore(flags);
- 	return (upper << 16) | lower;
-@@ -58,7 +58,7 @@ static u64 tc_get_cycles(struct clocksource *cs)
- 
- static u64 tc_get_cycles32(struct clocksource *cs)
- {
--	return __raw_readl(tcaddr + ATMEL_TC_REG(0, CV));
-+	return readl_relaxed(tcaddr + ATMEL_TC_REG(0, CV));
- }
- 
- static struct clocksource clksrc = {
-@@ -96,8 +96,8 @@ static int tc_shutdown(struct clock_event_device *d)
- 	struct tc_clkevt_device *tcd = to_tc_clkevt(d);
- 	void __iomem		*regs = tcd->regs;
- 
--	__raw_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
--	__raw_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
-+	writel(0xff, regs + ATMEL_TC_REG(2, IDR));
-+	writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
- 	if (!clockevent_state_detached(d))
- 		clk_disable(tcd->clk);
- 
-@@ -115,9 +115,9 @@ static int tc_set_oneshot(struct clock_event_device *d)
- 	clk_enable(tcd->clk);
- 
- 	/* slow clock, count up to RC, then irq and stop */
--	__raw_writel(timer_clock | ATMEL_TC_CPCSTOP | ATMEL_TC_WAVE |
-+	writel(timer_clock | ATMEL_TC_CPCSTOP | ATMEL_TC_WAVE |
- 		     ATMEL_TC_WAVESEL_UP_AUTO, regs + ATMEL_TC_REG(2, CMR));
--	__raw_writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
-+	writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
- 
- 	/* set_next_event() configures and starts the timer */
- 	return 0;
-@@ -137,25 +137,25 @@ static int tc_set_periodic(struct clock_event_device *d)
- 	clk_enable(tcd->clk);
- 
- 	/* slow clock, count up to RC, then irq and restart */
--	__raw_writel(timer_clock | ATMEL_TC_WAVE | ATMEL_TC_WAVESEL_UP_AUTO,
-+	writel(timer_clock | ATMEL_TC_WAVE | ATMEL_TC_WAVESEL_UP_AUTO,
- 		     regs + ATMEL_TC_REG(2, CMR));
--	__raw_writel((32768 + HZ / 2) / HZ, tcaddr + ATMEL_TC_REG(2, RC));
-+	writel((32768 + HZ / 2) / HZ, tcaddr + ATMEL_TC_REG(2, RC));
- 
- 	/* Enable clock and interrupts on RC compare */
--	__raw_writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
-+	writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
- 
- 	/* go go gadget! */
--	__raw_writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG, regs +
-+	writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG, regs +
- 		     ATMEL_TC_REG(2, CCR));
- 	return 0;
- }
- 
- static int tc_next_event(unsigned long delta, struct clock_event_device *d)
- {
--	__raw_writel(delta, tcaddr + ATMEL_TC_REG(2, RC));
-+	writel(delta, tcaddr + ATMEL_TC_REG(2, RC));
- 
- 	/* go go gadget! */
--	__raw_writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG,
-+	writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG,
- 			tcaddr + ATMEL_TC_REG(2, CCR));
- 	return 0;
- }
-@@ -179,7 +179,7 @@ static irqreturn_t ch2_irq(int irq, void *handle)
- 	struct tc_clkevt_device	*dev = handle;
- 	unsigned int		sr;
- 
--	sr = __raw_readl(dev->regs + ATMEL_TC_REG(2, SR));
-+	sr = readl_relaxed(dev->regs + ATMEL_TC_REG(2, SR));
- 	if (sr & ATMEL_TC_CPCS) {
- 		dev->clkevt.event_handler(&dev->clkevt);
- 		return IRQ_HANDLED;
-@@ -239,43 +239,43 @@ static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
- static void __init tcb_setup_dual_chan(struct atmel_tc *tc, int mck_divisor_idx)
- {
- 	/* channel 0:  waveform mode, input mclk/8, clock TIOA0 on overflow */
--	__raw_writel(mck_divisor_idx			/* likely divide-by-8 */
-+	writel(mck_divisor_idx			/* likely divide-by-8 */
- 			| ATMEL_TC_WAVE
- 			| ATMEL_TC_WAVESEL_UP		/* free-run */
- 			| ATMEL_TC_ACPA_SET		/* TIOA0 rises at 0 */
- 			| ATMEL_TC_ACPC_CLEAR,		/* (duty cycle 50%) */
- 			tcaddr + ATMEL_TC_REG(0, CMR));
--	__raw_writel(0x0000, tcaddr + ATMEL_TC_REG(0, RA));
--	__raw_writel(0x8000, tcaddr + ATMEL_TC_REG(0, RC));
--	__raw_writel(0xff, tcaddr + ATMEL_TC_REG(0, IDR));	/* no irqs */
--	__raw_writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(0, CCR));
-+	writel(0x0000, tcaddr + ATMEL_TC_REG(0, RA));
-+	writel(0x8000, tcaddr + ATMEL_TC_REG(0, RC));
-+	writel(0xff, tcaddr + ATMEL_TC_REG(0, IDR));	/* no irqs */
-+	writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(0, CCR));
- 
- 	/* channel 1:  waveform mode, input TIOA0 */
--	__raw_writel(ATMEL_TC_XC1			/* input: TIOA0 */
-+	writel(ATMEL_TC_XC1			/* input: TIOA0 */
- 			| ATMEL_TC_WAVE
- 			| ATMEL_TC_WAVESEL_UP,		/* free-run */
- 			tcaddr + ATMEL_TC_REG(1, CMR));
--	__raw_writel(0xff, tcaddr + ATMEL_TC_REG(1, IDR));	/* no irqs */
--	__raw_writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(1, CCR));
-+	writel(0xff, tcaddr + ATMEL_TC_REG(1, IDR));	/* no irqs */
-+	writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(1, CCR));
- 
- 	/* chain channel 0 to channel 1*/
--	__raw_writel(ATMEL_TC_TC1XC1S_TIOA0, tcaddr + ATMEL_TC_BMR);
-+	writel(ATMEL_TC_TC1XC1S_TIOA0, tcaddr + ATMEL_TC_BMR);
- 	/* then reset all the timers */
--	__raw_writel(ATMEL_TC_SYNC, tcaddr + ATMEL_TC_BCR);
-+	writel(ATMEL_TC_SYNC, tcaddr + ATMEL_TC_BCR);
- }
- 
- static void __init tcb_setup_single_chan(struct atmel_tc *tc, int mck_divisor_idx)
- {
- 	/* channel 0:  waveform mode, input mclk/8 */
--	__raw_writel(mck_divisor_idx			/* likely divide-by-8 */
-+	writel(mck_divisor_idx			/* likely divide-by-8 */
- 			| ATMEL_TC_WAVE
- 			| ATMEL_TC_WAVESEL_UP,		/* free-run */
- 			tcaddr + ATMEL_TC_REG(0, CMR));
--	__raw_writel(0xff, tcaddr + ATMEL_TC_REG(0, IDR));	/* no irqs */
--	__raw_writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(0, CCR));
-+	writel(0xff, tcaddr + ATMEL_TC_REG(0, IDR));	/* no irqs */
-+	writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(0, CCR));
- 
- 	/* then reset all the timers */
--	__raw_writel(ATMEL_TC_SYNC, tcaddr + ATMEL_TC_BCR);
-+	writel(ATMEL_TC_SYNC, tcaddr + ATMEL_TC_BCR);
- }
- 
- static int __init tcb_clksrc_init(void)
--- 
-2.11.0
+dev_is_pci()
+
+check because it relies on implicit knowledge of the platform and
+the quirks you need (ie you know that it is _just_ a PCI RC quirk
+implicitly), the logic behind reserving the regions is a bit
+convoluted and not easy to understand at all.
+
+Let me try to rephrase it: you know, through an SMMU model number,
+that your PCI RC handles MSI in a specific way, but by reading the
+code above this is not clear at all, at least to me. This is a PCI
+RC quirk but it does not depend on any PCI RC specific firmware binding
+whatsoever, that's what is a bit hard to understand.
+
+Anyway you can post the patches and we will take it from there to
+see if there is a way to improve it.
+
+Thanks,
+Lorenzo
