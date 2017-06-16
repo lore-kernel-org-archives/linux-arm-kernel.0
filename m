@@ -1,67 +1,124 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Jun 2017 15:30:45 +0200
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for v4.13
-Message-ID: <cover.1497618353.git.horms+renesas@verge.net.au>
+Date: Fri, 16 Jun 2017 15:30:54 +0200
+Subject: [PATCH 1/5] ARM: dts: r7s72100: add clock bit definitions
+In-Reply-To: <cover.1497617896.git.horms+renesas@verge.net.au>
+References: <cover.1497617896.git.horms+renesas@verge.net.au>
+Message-ID: <fe811e1de389c373ddf0671888e32f9ad973c969.1497617896.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Chris Brandt <chris.brandt@renesas.com>
 
-Please consider these second round of Renesas ARM based SoC DT updates for v4.13.
+Add the remaining bit locations for the module stop clock registers.
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-dt-for-v4.13,
-which you have already merged.
+Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ include/dt-bindings/clock/r7s72100-clock.h | 51 ++++++++++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
 
-
-The following changes since commit 2ae0fcc57e00c11fae80678e2a9fabbeec82a185:
-
-  ARM: dts: renesas: Switch to panel-lvds bindings for Mitsubishi panels (2017-05-15 11:14:39 +0200)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt2-for-v4.13
-
-for you to fetch changes up to f7d569c1e6a6fa731fc34083a9f0191b7360eeb1:
-
-  ARM: dts: r8a779x: Fix PCI bus dtc warnings (2017-06-12 11:18:30 +0200)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM Based SoC DT Updates for v4.13
-
-Cleanup:
-* Correct PCI bus dtc warnings for r8a779x SoCs
-
-Enhancements:
-* Add support for iWave G20D-Q7 board based on RZ/G1M SoC
-* Add support for GR-Peach board based on r7s72100 SoC
-* Add composite video and HDMI input to gose board
-
-----------------------------------------------------------------
-Biju Das (2):
-      ARM: dts: iwg20m: Add iWave RZG1M Qseven SOM
-      ARM: dts: iwg20d-q7: Add support for iWave G20D-Q7 board based on RZ/G1M
-
-Jacopo Mondi (1):
-      ARM: dts: r7s72100: Add support for GR-Peach
-
-Rob Herring (1):
-      ARM: dts: r8a779x: Fix PCI bus dtc warnings
-
-Ulrich Hecht (2):
-      ARM: dts: gose: add HDMI input
-      ARM: dts: gose: add composite video input
-
- Documentation/devicetree/bindings/arm/shmobile.txt |   2 +
- arch/arm/boot/dts/Makefile                         |   2 +
- arch/arm/boot/dts/r7s72100-gr-peach.dts            |  66 +++++++++++
- arch/arm/boot/dts/r8a7743-iwg20d-q7.dts            |  25 ++++
- arch/arm/boot/dts/r8a7743-iwg20m.dtsi              |  29 +++++
- arch/arm/boot/dts/r8a7790.dtsi                     |  16 +--
- arch/arm/boot/dts/r8a7791.dtsi                     |  16 +--
- arch/arm/boot/dts/r8a7793-gose.dts                 | 127 ++++++++++++++++++++-
- arch/arm/boot/dts/r8a7794.dtsi                     |  16 +--
- 9 files changed, 267 insertions(+), 32 deletions(-)
- create mode 100644 arch/arm/boot/dts/r7s72100-gr-peach.dts
- create mode 100644 arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
- create mode 100644 arch/arm/boot/dts/r8a7743-iwg20m.dtsi
+diff --git a/include/dt-bindings/clock/r7s72100-clock.h b/include/dt-bindings/clock/r7s72100-clock.h
+index dcd2072151fc..7dd8bc0c3cd0 100644
+--- a/include/dt-bindings/clock/r7s72100-clock.h
++++ b/include/dt-bindings/clock/r7s72100-clock.h
+@@ -12,8 +12,18 @@
+ 
+ #define R7S72100_CLK_PLL	0
+ 
++/* MSTP2 */
++#define R7S72100_CLK_CORESIGHT	0
++
+ /* MSTP3 */
++#define R7S72100_CLK_IEBUS	7
++#define R7S72100_CLK_IRDA	6
++#define R7S72100_CLK_LIN0	5
++#define R7S72100_CLK_LIN1	4
+ #define R7S72100_CLK_MTU2	3
++#define R7S72100_CLK_CAN	2
++#define R7S72100_CLK_ADCPWR	1
++#define R7S72100_CLK_PWM	0
+ 
+ /* MSTP4 */
+ #define R7S72100_CLK_SCIF0	7
+@@ -26,25 +36,51 @@
+ #define R7S72100_CLK_SCIF7	0
+ 
+ /* MSTP5 */
++#define R7S72100_CLK_SCI0	7
++#define R7S72100_CLK_SCI1	6
++#define R7S72100_CLK_SG0	5
++#define R7S72100_CLK_SG1	4
++#define R7S72100_CLK_SG2	3
++#define R7S72100_CLK_SG3	2
+ #define R7S72100_CLK_OSTM0	1
+ #define R7S72100_CLK_OSTM1	0
+ 
+ /* MSTP6 */
++#define R7S72100_CLK_ADC	7
++#define R7S72100_CLK_CEU	6
++#define R7S72100_CLK_DOC0	5
++#define R7S72100_CLK_DOC1	4
++#define R7S72100_CLK_DRC0	3
++#define R7S72100_CLK_DRC1	2
++#define R7S72100_CLK_JCU	1
+ #define R7S72100_CLK_RTC	0
+ 
+ /* MSTP7 */
++#define R7S72100_CLK_VDEC0	7
++#define R7S72100_CLK_VDEC1	6
+ #define R7S72100_CLK_ETHER	4
++#define R7S72100_CLK_NAND	3
+ #define R7S72100_CLK_USB0	1
+ #define R7S72100_CLK_USB1	0
+ 
+ /* MSTP8 */
++#define R7S72100_CLK_IMR0	7
++#define R7S72100_CLK_IMR1	6
++#define R7S72100_CLK_IMRDISP	5
+ #define R7S72100_CLK_MMCIF	4
++#define R7S72100_CLK_MLB	3
++#define R7S72100_CLK_ETHAVB	2
++#define R7S72100_CLK_SCUX	1
+ 
+ /* MSTP9 */
+ #define R7S72100_CLK_I2C0	7
+ #define R7S72100_CLK_I2C1	6
+ #define R7S72100_CLK_I2C2	5
+ #define R7S72100_CLK_I2C3	4
++#define R7S72100_CLK_SPIBSC0	3
++#define R7S72100_CLK_SPIBSC1	2
++#define R7S72100_CLK_VDC50	1	/* and LVDS */
++#define R7S72100_CLK_VDC51	0
+ 
+ /* MSTP10 */
+ #define R7S72100_CLK_SPI0	7
+@@ -52,6 +88,17 @@
+ #define R7S72100_CLK_SPI2	5
+ #define R7S72100_CLK_SPI3	4
+ #define R7S72100_CLK_SPI4	3
++#define R7S72100_CLK_CDROM	2
++#define R7S72100_CLK_SPDIF	1
++#define R7S72100_CLK_RGPVG2	0
++
++/* MSTP11 */
++#define R7S72100_CLK_SSI0	5
++#define R7S72100_CLK_SSI1	4
++#define R7S72100_CLK_SSI2	3
++#define R7S72100_CLK_SSI3	2
++#define R7S72100_CLK_SSI4	1
++#define R7S72100_CLK_SSI5	0
+ 
+ /* MSTP12 */
+ #define R7S72100_CLK_SDHI00	3
+@@ -59,4 +106,8 @@
+ #define R7S72100_CLK_SDHI10	1
+ #define R7S72100_CLK_SDHI11	0
+ 
++/* MSTP13 */
++#define R7S72100_CLK_PIX1	2
++#define R7S72100_CLK_PIX0	1
++
+ #endif /* __DT_BINDINGS_CLOCK_R7S72100_H__ */
+-- 
+2.1.4
