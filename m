@@ -1,96 +1,58 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Fri, 16 Jun 2017 09:43:52 +0000
-Subject: [PATCH 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
- erratum 161010801
-In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA838368BC6@FRAEML521-MBX.china.huawei.com>
-References: <20170613114829.188036-1-shameerali.kolothum.thodi@huawei.com>
- <20170613114829.188036-3-shameerali.kolothum.thodi@huawei.com>
- <20170613131317.GB2868@red-moon>
- <5FC3163CFD30C246ABAA99954A238FA838368BC6@FRAEML521-MBX.china.huawei.com>
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA83836B212@FRAEML521-MBX.china.huawei.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Fri, 16 Jun 2017 12:51:44 +0300
+Subject: arm64: next-20170614 panics on boot
+In-Reply-To: <20170615123337.5qkrh72vt53jnwnf@yury-thinkpad>
+References: <20170615120840.ce7v4hxflueu4s7o@yury-thinkpad>
+ <20170615123337.5qkrh72vt53jnwnf@yury-thinkpad>
+Message-ID: <20170616095144.nb43ur6fukkfen5c@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+(CC irqchip maintainers)
 
-> -----Original Message-----
-> From: linuxarm-bounces at huawei.com [mailto:linuxarm-
-> bounces at huawei.com] On Behalf Of Shameerali Kolothum Thodi
-> Sent: Tuesday, June 13, 2017 3:53 PM
-> To: Lorenzo Pieralisi
-> Cc: marc.zyngier at arm.com; will.deacon at arm.com; Linuxarm; linux-
-> acpi at vger.kernel.org; iommu at lists.linux-foundation.org;
-> hanjun.guo at linaro.org; sudeep.holla at arm.com; robin.murphy at arm.com;
-> linux-arm-kernel at lists.infradead.org; devel at acpica.org
-> Subject: RE: [PATCH 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
-> erratum 161010801
-
-[...]
- > > > ---
-> > >  drivers/iommu/arm-smmu-v3.c | 27 ++++++++++++++++++++++-----
-> > >  1 file changed, 22 insertions(+), 5 deletions(-)
-> > >
-> > > diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-
-> > v3.c
-> > > index abe4b88..2636c85 100644
-> > > --- a/drivers/iommu/arm-smmu-v3.c
-> > > +++ b/drivers/iommu/arm-smmu-v3.c
-> > > @@ -597,6 +597,7 @@ struct arm_smmu_device {
-> > >  	u32				features;
-> > >
-> > >  #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-> > > +#define ARM_SMMU_OPT_RESV_HW_MSI	(1 << 1)
-> > >  	u32				options;
-> > >
-> > >  	struct arm_smmu_cmdq		cmdq;
-> > > @@ -1904,14 +1905,29 @@ static void
-> arm_smmu_get_resv_regions(struct
-> > device *dev,
-> > >  				      struct list_head *head)
-> > >  {
-> > >  	struct iommu_resv_region *region;
-> > > +	struct arm_smmu_device *smmu;
-> > > +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
-> > >  	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
-> > >
-> > > -	region = iommu_alloc_resv_region(MSI_IOVA_BASE,
-> > MSI_IOVA_LENGTH,
-> > > -					 prot, IOMMU_RESV_SW_MSI);
-> > > -	if (!region)
-> > > -		return;
-> > > +	smmu = arm_smmu_get_by_fwnode(fwspec->iommu_fwnode);
-> > >
-> > > -	list_add_tail(&region->list, head);
-> > > +	if (smmu && (smmu->options & ARM_SMMU_OPT_RESV_HW_MSI)
-> > &&
-> > > +		      dev_is_pci(dev)) {
-> > > +		int ret;
-> > > +
-> > > +		ret = iort_iommu_its_get_resv_regions(dev, head);
-> >
-> > This should be made fwnode dependent, it makes precious little sense to
-> call
-> > IORT to reserve regions on a DT based platforms (I know the
-> > ARM_SMMU_OPT_RESV_HW_MSI option is only selected in ACPI (?) but
-> > comment applies regardless - have you prototyped a DT version too ?).
+On Thu, Jun 15, 2017 at 03:33:37PM +0300, Yury Norov wrote:
+> On Thu, Jun 15, 2017 at 03:08:40PM +0300, Yury Norov wrote:
+> > Hi all,
+> > 
+> > Today's linux next falls into panic in init_IRQ():
+> > arch/arm64/kernel/irq.c:
+> >  53 void __init init_IRQ(void)
+> >  54 {
+> >  55         irqchip_init();
+> >  56         if (!handle_arch_irq)
+> >  57                 panic("No interrupt controller found.");
+> >  58 }
+> > 
+> > 
+> > Bisecting points to the patch 6fedb069def034 ("of: Provide dummy
+> > of_device_compatible_match() for compile-testing"), but reverting it
+> > doesn't help. It seems like yesterday's linux-next also hangs.  Right
+> > now I cannot continue with debugging, but if nothing will get clear,
+> > I'll back to it at this evening.
 > 
-> Ok. I will add a check here. 
+> Sorry, forgot to attach the config. This is it. Also, I run arm64 on
+> qemu.
 
-This is what I have in mind. Please take a look and let me know. I will send out
-a v2 of this series soon.
-....
-if (smmu && (smmu->options & ARM_SMMU_OPT_RESV_HW_MSI) &&
-			dev_is_pci(dev)) {
-	int ret = -EINVAL;
+The next-20170616 boots well for me. I didn't manage to bisect the
+source of problem - it points to different commmits, and reverting
+them doesn't help. The source of the problem is that irqchip_init()
+doesn't set the handle_arch_irq. It should be done in 
+of_irq_init() at the line
 
-	if (!is_of_node(smmu->dev->fwnode))
-		ret = iort_iommu_its_get_resv_regions(dev, head);
+drivers/of/irq.c:
+542         while (!list_empty(&intc_desc_list)) {
+        ...
+561                         ret = desc->irq_init_cb(desc->dev,
+562                                                 desc->interrupt_parent);
+        ...
+586         }
 
-	if (ret) {
-		dev_warn(dev, "HW MSI region resv failed: %d\n", ret);
-		return;
-	}
-} else {
----
-Many thanks,
-Shameer
+On next-20170614 and 15 intc_desc_list is empty at the point. It
+should be populated earlier in the loop
+510         for_each_matching_node_and_match(np, matches, &match)
+
+But np becomes 0 at the 1st iteration, and so the program doesn't enter the
+loop. At the first glance there's no recent changes in related code. Maybe it's dts
+issue?..
+
+Yury
