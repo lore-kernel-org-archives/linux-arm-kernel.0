@@ -1,25 +1,26 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 16 Jun 2017 07:59:32 +0800
-Subject: [PATCH v3 2/2] arm64: dts: add sp804 timer node for Hi3660
-In-Reply-To: <5942E77A.8080500@hisilicon.com>
-References: <1495428748-11153-1-git-send-email-leo.yan@linaro.org>
- <1495428748-11153-3-git-send-email-leo.yan@linaro.org>
- <5942E77A.8080500@hisilicon.com>
-Message-ID: <20170615235932.GP28496@leoy-ThinkPad-T440>
+From: rkuo@codeaurora.org (Richard Kuo)
+Date: Thu, 15 Jun 2017 19:19:11 -0500
+Subject: [PATCH 17/44] hexagon: switch to use ->mapping_error for error
+ reporting
+In-Reply-To: <20170608132609.32662-18-hch@lst.de>
+References: <20170608132609.32662-1-hch@lst.de>
+ <20170608132609.32662-18-hch@lst.de>
+Message-ID: <20170616001911.GA7343@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 15, 2017 at 09:00:58PM +0100, Wei Xu wrote:
-
-[...]
-
-> Since the dts part is not depended on the driver and Guodong has put this into another
-> patch set[1], I will pick up that one.
-> Thanks!
+On Thu, Jun 08, 2017 at 03:25:42PM +0200, Christoph Hellwig wrote:
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> ---
+>  arch/hexagon/include/asm/dma-mapping.h |  2 --
+>  arch/hexagon/kernel/dma.c              | 12 +++++++++---
+>  arch/hexagon/kernel/hexagon_ksyms.c    |  1 -
+>  3 files changed, 9 insertions(+), 6 deletions(-)
 > 
-> [1]: https://lkml.org/lkml/2017/6/14/1049
 
-Yeah, thanks for picking up from Guodong's patch set.
+Acked-by: Richard Kuo <rkuo@codeaurora.org>
 
-Thanks,
-Leo Yan
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum, 
+a Linux Foundation Collaborative Project
