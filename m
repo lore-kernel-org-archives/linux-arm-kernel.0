@@ -1,56 +1,45 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Fri, 16 Jun 2017 16:17:45 +0800
-Subject: [PATCH] soc: rockchip: disable jtag switching for RK3328 Soc
-In-Reply-To: <1495699104-137633-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1495699104-137633-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <b11e5b39-dc90-ded5-f767-4058dffa85a8@rock-chips.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 16 Jun 2017 01:22:38 -0700
+Subject: [PATCH] ARM/hw_breakpoint: Fix possible recursive locking for
+ arch_hw_breakpoint_init
+Message-ID: <20170616082238.15553-1-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+Recent change to use cpuhp_setup_state_cpuslocked() with commit
+fe2a5cd8aa03 ("ARM/hw_breakpoint: Use cpuhp_setup_state_cpuslocked()")
+missed to change the related paired cpuhp_remove_state_nocalls_cpuslocked().
 
-Ping.... :)
+Now if arch_hw_breakpoint_init() fails, we get "WARNING: possible recursive
+locking detected" on the exit path.
 
-On 2017/5/25 15:58, Shawn Lin wrote:
-> Disable IO function switching between sdmmc and jtag
-> for RK3328 Soc.
-> 
-> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
-> ---
-> 
->   drivers/soc/rockchip/grf.c | 14 ++++++++++++++
->   1 file changed, 14 insertions(+)
-> 
-> diff --git a/drivers/soc/rockchip/grf.c b/drivers/soc/rockchip/grf.c
-> index d61db34..15e71fd 100644
-> --- a/drivers/soc/rockchip/grf.c
-> +++ b/drivers/soc/rockchip/grf.c
-> @@ -54,6 +54,17 @@ struct rockchip_grf_info {
->   	.num_values = ARRAY_SIZE(rk3288_defaults),
->   };
->   
-> +#define RK3328_GRF_SOC_CON4		0x410
-> +
-> +static const struct rockchip_grf_value rk3328_defaults[] __initconst = {
-> +	{ "jtag switching", RK3328_GRF_SOC_CON4, HIWORD_UPDATE(0, 1, 12) },
-> +};
-> +
-> +static const struct rockchip_grf_info rk3328_grf __initconst = {
-> +	.values = rk3328_defaults,
-> +	.num_values = ARRAY_SIZE(rk3328_defaults),
-> +};
-> +
->   #define RK3368_GRF_SOC_CON15		0x43c
->   
->   static const struct rockchip_grf_value rk3368_defaults[] __initconst = {
-> @@ -84,6 +95,9 @@ struct rockchip_grf_info {
->   		.compatible = "rockchip,rk3288-grf",
->   		.data = (void *)&rk3288_grf,
->   	}, {
-> +		.compatible = "rockchip,rk3328-grf",
-> +		.data = (void *)&rk3328_grf,
-> +	}, {
->   		.compatible = "rockchip,rk3368-grf",
->   		.data = (void *)&rk3368_grf,
->   	}, {
-> 
+Fixes: fe2a5cd8aa03 ("ARM/hw_breakpoint: Use
+cpuhp_setup_state_cpuslocked()")
+Cc: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Cc: Ingo Molnar <mingo@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Steven Rostedt <rostedt@goodmis.org>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/kernel/hw_breakpoint.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+--- a/arch/arm/kernel/hw_breakpoint.c
++++ b/arch/arm/kernel/hw_breakpoint.c
+@@ -1106,7 +1106,7 @@ static int __init arch_hw_breakpoint_init(void)
+ 		core_num_brps = 0;
+ 		core_num_wrps = 0;
+ 		if (ret > 0)
+-			cpuhp_remove_state_nocalls(ret);
++			cpuhp_remove_state_nocalls_cpuslocked(ret);
+ 		cpus_read_unlock();
+ 		return 0;
+ 	}
+-- 
+2.13.0
