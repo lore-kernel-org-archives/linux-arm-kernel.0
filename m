@@ -1,57 +1,30 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 16 Jun 2017 17:24:39 +0530
-Subject: [PATCH 12/12] ARM: dts: dra71-evm: Add pinmux configuration for MMC
-In-Reply-To: <20170616115439.8508-1-kishon@ti.com>
-References: <20170616115439.8508-1-kishon@ti.com>
-Message-ID: <20170616115439.8508-13-kishon@ti.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Fri, 16 Jun 2017 14:06:46 +0200
+Subject: [PATCH 1/3] dt-bindings: add Imprecision Systems vendor prefix
+In-Reply-To: <20170616120648.23320-1-jbrunet@baylibre.com>
+References: <20170616120648.23320-1-jbrunet@baylibre.com>
+Message-ID: <20170616120648.23320-2-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Include dra72x-mmc-iodelay.dtsi which has pinmux and IODelay
-configuration values for the various MMC modes for dra72 SoC
-and use it in the pinctrl properties of MMC devicetree
-nodes present in dra71-evm.dts.
+Imprecision System LLC is a single board computer manufacturer
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- arch/arm/boot/dts/dra71-evm.dts | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/dra71-evm.dts b/arch/arm/boot/dts/dra71-evm.dts
-index 02c11e658810..7ef50929efc1 100644
---- a/arch/arm/boot/dts/dra71-evm.dts
-+++ b/arch/arm/boot/dts/dra71-evm.dts
-@@ -7,6 +7,7 @@
-  */
- 
- #include "dra72-evm-common.dtsi"
-+#include "dra72x-mmc-iodelay.dtsi"
- #include <dt-bindings/net/ti-dp83867.h>
- 
- / {
-@@ -172,10 +173,23 @@
- };
- 
- &mmc1 {
-+	pinctrl-names = "default", "hs", "sdr12", "sdr25", "sdr50", "ddr50", "sdr104";
-+	pinctrl-0 = <&mmc1_pins_default>;
-+	pinctrl-1 = <&mmc1_pins_hs>;
-+	pinctrl-2 = <&mmc1_pins_sdr12>;
-+	pinctrl-3 = <&mmc1_pins_sdr25>;
-+	pinctrl-4 = <&mmc1_pins_sdr50>;
-+	pinctrl-5 = <&mmc1_pins_ddr50_rev20 &mmc1_iodelay_ddr50_conf>;
-+	pinctrl-6 = <&mmc1_pins_sdr104 &mmc1_iodelay_sdr104_rev20_conf>;
- 	vqmmc-supply = <&vpo_sd_1v8_3v3>;
- };
- 
- &mmc2 {
-+	pinctrl-names = "default", "hs", "ddr_1_8v", "hs200_1_8v";
-+	pinctrl-0 = <&mmc2_pins_default>;
-+	pinctrl-1 = <&mmc2_pins_hs>;
-+	pinctrl-2 = <&mmc2_pins_ddr_rev20 &mmc2_iodelay_ddr_conf>;
-+	pinctrl-3 = <&mmc2_pins_hs200 &mmc2_iodelay_hs200_rev20_conf>;
- 	vmmc-supply = <&evm_1v8_sw>;
- };
- 
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index ee2e10f2ae41..0c1083990b7f 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -145,6 +145,7 @@ ibm	International Business Machines (IBM)
+ idt	Integrated Device Technologies, Inc.
+ ifi	Ingenieurburo Fur Ic-Technologie (I/F/I)
+ img	Imagination Technologies Ltd.
++imprecision	Imprecision Systems LLC
+ infineon Infineon Technologies
+ inforce	Inforce Computing
+ ingenic	Ingenic Semiconductor
 -- 
-2.11.0
+2.9.4
