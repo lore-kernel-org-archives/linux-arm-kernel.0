@@ -1,44 +1,78 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 16 Jun 2017 18:15:39 +0530
-Subject: [PATCH 11/16] mmc: host: omap_hsmmc: Fix error path sequence
+Date: Fri, 16 Jun 2017 18:15:38 +0530
+Subject: [PATCH 10/16] mmc: host: omap_hsmmc: Add new compatible string to
+ support dra7
 In-Reply-To: <20170616124544.15046-1-kishon@ti.com>
 References: <20170616124544.15046-1-kishon@ti.com>
-Message-ID: <20170616124544.15046-12-kishon@ti.com>
+Message-ID: <20170616124544.15046-11-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the error path sequence so that clk_disable, runtime_disable etc
-are done in the reverse order of how they were enabled.
+Add a new compatible string "ti,dra7-hsmmc" to support
+dra7 and dra72 controllers. Also create a new controller flag
+"OMAP_HSMMC_REQUIRE_IODELAY" to specify all controllers that use
+"ti,dra7-hsmmc" require iodealy configuration to be set.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/mmc/host/omap_hsmmc.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt |  1 +
+ drivers/mmc/host/omap_hsmmc.c                           | 10 ++++++++++
+ include/linux/platform_data/hsmmc-omap.h                |  1 +
+ 3 files changed, 12 insertions(+)
 
+diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+index 74166a0d460d..258e25af10f7 100644
+--- a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
++++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+@@ -12,6 +12,7 @@ Required properties:
+  Should be "ti,omap3-hsmmc", for OMAP3 controllers
+  Should be "ti,omap3-pre-es3-hsmmc" for OMAP3 controllers pre ES3.0
+  Should be "ti,omap4-hsmmc", for OMAP4 controllers
++ Should be "ti,dra7-hsmmc", for dra7 and dra72 controllers
+  Should be "ti,am33xx-hsmmc", for AM335x controllers
+ - ti,hwmods: Must be "mmc<n>", n is controller instance starting 1
+ 
 diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index 9d59fe611498..967b7c7d4bd5 100644
+index d797224152ac..9d59fe611498 100644
 --- a/drivers/mmc/host/omap_hsmmc.c
 +++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -2591,16 +2591,16 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
- err_slot_name:
- 	mmc_remove_host(mmc);
- err_irq:
--	device_init_wakeup(&pdev->dev, false);
- 	if (!IS_ERR_OR_NULL(host->tx_chan))
- 		dma_release_channel(host->tx_chan);
- 	if (!IS_ERR_OR_NULL(host->rx_chan))
- 		dma_release_channel(host->rx_chan);
-+	if (host->dbclk)
-+		clk_disable_unprepare(host->dbclk);
- 	pm_runtime_dont_use_autosuspend(host->dev);
- 	pm_runtime_put_sync(host->dev);
- 	pm_runtime_disable(host->dev);
--	if (host->dbclk)
--		clk_disable_unprepare(host->dbclk);
-+	device_init_wakeup(&pdev->dev, false);
- err1:
- err_gpio:
- 	mmc_free_host(mmc);
+@@ -2302,6 +2302,12 @@ static const struct omap_mmc_of_data am33xx_mmc_of_data = {
+ 	.controller_flags = OMAP_HSMMC_SWAKEUP_MISSING,
+ };
+ 
++static const struct omap_mmc_of_data dra7_mmc_of_data = {
++	.reg_offset = 0x100,
++	.controller_flags = OMAP_HSMMC_SWAKEUP_MISSING |
++			    OMAP_HSMMC_REQUIRE_IODELAY,
++};
++
+ static const struct of_device_id omap_mmc_of_match[] = {
+ 	{
+ 		.compatible = "ti,omap2-hsmmc",
+@@ -2321,6 +2327,10 @@ static const struct of_device_id omap_mmc_of_match[] = {
+ 		.compatible = "ti,am33xx-hsmmc",
+ 		.data = &am33xx_mmc_of_data,
+ 	},
++	{
++		.compatible = "ti,dra7-hsmmc",
++		.data = &dra7_mmc_of_data,
++	},
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, omap_mmc_of_match);
+diff --git a/include/linux/platform_data/hsmmc-omap.h b/include/linux/platform_data/hsmmc-omap.h
+index 67bded22eae4..8e771851e07a 100644
+--- a/include/linux/platform_data/hsmmc-omap.h
++++ b/include/linux/platform_data/hsmmc-omap.h
+@@ -27,6 +27,7 @@
+ #define OMAP_HSMMC_SUPPORTS_DUAL_VOLT		BIT(0)
+ #define OMAP_HSMMC_BROKEN_MULTIBLOCK_READ	BIT(1)
+ #define OMAP_HSMMC_SWAKEUP_MISSING		BIT(2)
++#define OMAP_HSMMC_REQUIRE_IODELAY		BIT(3)
+ 
+ struct omap_hsmmc_dev_attr {
+ 	u8 flags;
 -- 
 2.11.0
