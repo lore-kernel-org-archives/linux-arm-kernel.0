@@ -1,143 +1,75 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Fri, 16 Jun 2017 11:31:06 +0000
-Subject: [PATCH 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
- erratum 161010801
-In-Reply-To: <20170616111729.GB22323@red-moon>
-References: <20170613114829.188036-1-shameerali.kolothum.thodi@huawei.com>
- <20170613114829.188036-3-shameerali.kolothum.thodi@huawei.com>
- <20170613131317.GB2868@red-moon>
- <5FC3163CFD30C246ABAA99954A238FA838368BC6@FRAEML521-MBX.china.huawei.com>
- <5FC3163CFD30C246ABAA99954A238FA83836B212@FRAEML521-MBX.china.huawei.com>
- <20170616111729.GB22323@red-moon>
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA83836B2DC@FRAEML521-MBX.china.huawei.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 16 Jun 2017 13:30:18 +0200
+Subject: [PATCH] usb: gadget: udc: atmel: Remove unnecessary macros
+Message-ID: <20170616113018.32009-1-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+commit 46ddd79e893b ("usb: gadget: udc: atmel: Remove AVR32 bits from the
+driver") left the accessor macros introduced by commit a3dd3befd7cb ("usb:
+gadget: atmel_usba: use endian agnostic IO on ARM"). They can now be
+removed.
 
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/usb/gadget/udc/atmel_usba_udc.c |  4 ++--
+ drivers/usb/gadget/udc/atmel_usba_udc.h | 16 ++++++----------
+ 2 files changed, 8 insertions(+), 12 deletions(-)
 
-> -----Original Message-----
-> From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
-> Sent: Friday, June 16, 2017 12:17 PM
-> To: Shameerali Kolothum Thodi
-> Cc: marc.zyngier at arm.com; will.deacon at arm.com; Linuxarm; linux-
-> acpi at vger.kernel.org; iommu at lists.linux-foundation.org;
-> hanjun.guo at linaro.org; sudeep.holla at arm.com; robin.murphy at arm.com;
-> linux-arm-kernel at lists.infradead.org; devel at acpica.org
-> Subject: Re: [PATCH 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
-> erratum 161010801
-> 
-> On Fri, Jun 16, 2017 at 09:43:52AM +0000, Shameerali Kolothum Thodi wrote:
-> > Hi Lorenzo,
-> >
-> > > -----Original Message-----
-> > > From: linuxarm-bounces at huawei.com [mailto:linuxarm-
-> > > bounces at huawei.com] On Behalf Of Shameerali Kolothum Thodi
-> > > Sent: Tuesday, June 13, 2017 3:53 PM
-> > > To: Lorenzo Pieralisi
-> > > Cc: marc.zyngier at arm.com; will.deacon at arm.com; Linuxarm; linux-
-> > > acpi at vger.kernel.org; iommu at lists.linux-foundation.org;
-> > > hanjun.guo at linaro.org; sudeep.holla at arm.com;
-> robin.murphy at arm.com;
-> > > linux-arm-kernel at lists.infradead.org; devel at acpica.org
-> > > Subject: RE: [PATCH 2/2] iommu/arm-smmu-v3:Enable ACPI based
-> HiSilicon
-> > > erratum 161010801
-> >
-> > [...]
-> >  > > > ---
-> > > > >  drivers/iommu/arm-smmu-v3.c | 27 ++++++++++++++++++++++----
-> -
-> > > > >  1 file changed, 22 insertions(+), 5 deletions(-)
-> > > > >
-> > > > > diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-
-> smmu-
-> > > > v3.c
-> > > > > index abe4b88..2636c85 100644
-> > > > > --- a/drivers/iommu/arm-smmu-v3.c
-> > > > > +++ b/drivers/iommu/arm-smmu-v3.c
-> > > > > @@ -597,6 +597,7 @@ struct arm_smmu_device {
-> > > > >  	u32				features;
-> > > > >
-> > > > >  #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-> > > > > +#define ARM_SMMU_OPT_RESV_HW_MSI	(1 << 1)
-> > > > >  	u32				options;
-> > > > >
-> > > > >  	struct arm_smmu_cmdq		cmdq;
-> > > > > @@ -1904,14 +1905,29 @@ static void
-> > > arm_smmu_get_resv_regions(struct
-> > > > device *dev,
-> > > > >  				      struct list_head *head)
-> > > > >  {
-> > > > >  	struct iommu_resv_region *region;
-> > > > > +	struct arm_smmu_device *smmu;
-> > > > > +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
-> > > > >  	int prot = IOMMU_WRITE | IOMMU_NOEXEC |
-> IOMMU_MMIO;
-> > > > >
-> > > > > -	region = iommu_alloc_resv_region(MSI_IOVA_BASE,
-> > > > MSI_IOVA_LENGTH,
-> > > > > -					 prot,
-> IOMMU_RESV_SW_MSI);
-> > > > > -	if (!region)
-> > > > > -		return;
-> > > > > +	smmu = arm_smmu_get_by_fwnode(fwspec-
-> >iommu_fwnode);
-> > > > >
-> > > > > -	list_add_tail(&region->list, head);
-> > > > > +	if (smmu && (smmu->options &
-> ARM_SMMU_OPT_RESV_HW_MSI)
-> > > > &&
-> > > > > +		      dev_is_pci(dev)) {
-> > > > > +		int ret;
-> > > > > +
-> > > > > +		ret = iort_iommu_its_get_resv_regions(dev, head);
-> > > >
-> > > > This should be made fwnode dependent, it makes precious little sense
-> to
-> > > call
-> > > > IORT to reserve regions on a DT based platforms (I know the
-> > > > ARM_SMMU_OPT_RESV_HW_MSI option is only selected in ACPI (?)
-> but
-> > > > comment applies regardless - have you prototyped a DT version too ?).
-> > >
-> > > Ok. I will add a check here.
-> >
-> > This is what I have in mind. Please take a look and let me know. I will send
-> out
-> > a v2 of this series soon.
-> > ....
-> > if (smmu && (smmu->options & ARM_SMMU_OPT_RESV_HW_MSI) &&
-> > 			dev_is_pci(dev)) {
-> > 	int ret = -EINVAL;
-> >
-> > 	if (!is_of_node(smmu->dev->fwnode))
-> > 		ret = iort_iommu_its_get_resv_regions(dev, head);
-> >
-> > 	if (ret) {
-> > 		dev_warn(dev, "HW MSI region resv failed: %d\n", ret);
-> > 		return;
-> > 	}
-> > } else {
-> 
-> The fwnode handling is fine, I do not like much the:
-> 
-> dev_is_pci()
-> 
-> check because it relies on implicit knowledge of the platform and
-> the quirks you need (ie you know that it is _just_ a PCI RC quirk
-> implicitly), the logic behind reserving the regions is a bit
-> convoluted and not easy to understand at all.
-> 
-> Let me try to rephrase it: you know, through an SMMU model number,
-> that your PCI RC handles MSI in a specific way, but by reading the
-> code above this is not clear at all, at least to me. This is a PCI
-> RC quirk but it does not depend on any PCI RC specific firmware binding
-> whatsoever, that's what is a bit hard to understand.
-
-Right.  I had a thought of limiting the iort_iommu_its_get_resv_regions
-to pci devices only. Just like the way iommu_dma_get_resv_regions()
-does now. But not sure there will ever be a platform which requires this
-for non-pci devices as well.
-
-Thanks,
-Shameer
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+index 3ccc34176a5a..98d71400f8a1 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.c
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+@@ -152,7 +152,7 @@ static int regs_dbg_open(struct inode *inode, struct file *file)
+ 
+ 	spin_lock_irq(&udc->lock);
+ 	for (i = 0; i < inode->i_size / 4; i++)
+-		data[i] = usba_io_readl(udc->regs + i * 4);
++		data[i] = readl_relaxed(udc->regs + i * 4);
+ 	spin_unlock_irq(&udc->lock);
+ 
+ 	file->private_data = data;
+@@ -1369,7 +1369,7 @@ static int handle_ep0_setup(struct usba_udc *udc, struct usba_ep *ep,
+ 		if (crq->wLength != cpu_to_le16(sizeof(status)))
+ 			goto stall;
+ 		ep->state = DATA_STAGE_IN;
+-		usba_io_writew(status, ep->fifo);
++		writew_relaxed(status, ep->fifo);
+ 		usba_ep_writel(ep, SET_STA, USBA_TX_PK_RDY);
+ 		break;
+ 	}
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.h b/drivers/usb/gadget/udc/atmel_usba_udc.h
+index 433bed0c481e..f8ebe0389bd4 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.h
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.h
+@@ -186,22 +186,18 @@
+ 	 | USBA_BF(name, value))
+ 
+ /* Register access macros */
+-#define usba_io_readl	readl_relaxed
+-#define usba_io_writel	writel_relaxed
+-#define usba_io_writew	writew_relaxed
+-
+ #define usba_readl(udc, reg)					\
+-	usba_io_readl((udc)->regs + USBA_##reg)
++	readl_relaxed((udc)->regs + USBA_##reg)
+ #define usba_writel(udc, reg, value)				\
+-	usba_io_writel((value), (udc)->regs + USBA_##reg)
++	writel_relaxed((value), (udc)->regs + USBA_##reg)
+ #define usba_ep_readl(ep, reg)					\
+-	usba_io_readl((ep)->ep_regs + USBA_EPT_##reg)
++	readl_relaxed((ep)->ep_regs + USBA_EPT_##reg)
+ #define usba_ep_writel(ep, reg, value)				\
+-	usba_io_writel((value), (ep)->ep_regs + USBA_EPT_##reg)
++	writel_relaxed((value), (ep)->ep_regs + USBA_EPT_##reg)
+ #define usba_dma_readl(ep, reg)					\
+-	usba_io_readl((ep)->dma_regs + USBA_DMA_##reg)
++	readl_relaxed((ep)->dma_regs + USBA_DMA_##reg)
+ #define usba_dma_writel(ep, reg, value)				\
+-	usba_io_writel((value), (ep)->dma_regs + USBA_DMA_##reg)
++	writel_relaxed((value), (ep)->dma_regs + USBA_DMA_##reg)
+ 
+ /* Calculate base address for a given endpoint or DMA controller */
+ #define USBA_EPT_BASE(x)	(0x100 + (x) * 0x20)
+-- 
+2.11.0
