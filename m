@@ -1,14 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Fri, 16 Jun 2017 18:49:55 +0100
-Subject: Applied "ASoC: stm32: sai: fix clock management" to the asoc tree
-In-Reply-To: <1497615334-7156-7-git-send-email-olivier.moysan@st.com>
-Message-ID: <E1dLvNb-0005cn-L3@debutante>
+Date: Fri, 16 Jun 2017 18:50:03 +0100
+Subject: Applied "ASoC: stm32: sai: remove spurious trace" to the asoc tree
+In-Reply-To: <1497615334-7156-5-git-send-email-olivier.moysan@st.com>
+Message-ID: <E1dLvNj-0005fS-1u@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: stm32: sai: fix clock management
+   ASoC: stm32: sai: remove spurious trace
 
 has been applied to the asoc tree at
 
@@ -33,33 +33,32 @@ to this mail.
 Thanks,
 Mark
 
->From 77dc2255f4859b814d4d8713a91ab41114996d4e Mon Sep 17 00:00:00 2001
+>From e0588cb6e3fee423553c34b10e9c83b6adb7c16e Mon Sep 17 00:00:00 2001
 From: olivier moysan <olivier.moysan@st.com>
-Date: Fri, 16 Jun 2017 14:15:33 +0200
-Subject: [PATCH] ASoC: stm32: sai: fix clock management
+Date: Fri, 16 Jun 2017 14:15:31 +0200
+Subject: [PATCH] ASoC: stm32: sai: remove spurious trace
 
-Allow peripheral clock enable/disable on regmap accesses.
+Remove spurious trace in sai driver.
 
 Signed-off-by: olivier moysan <olivier.moysan@st.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/stm/stm32_sai_sub.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ sound/soc/stm/stm32_sai_sub.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
 diff --git a/sound/soc/stm/stm32_sai_sub.c b/sound/soc/stm/stm32_sai_sub.c
-index 97b69a3ab46e..2466af0343db 100644
+index d7aeed3ec3c8..24b8874cfe5f 100644
 --- a/sound/soc/stm/stm32_sai_sub.c
 +++ b/sound/soc/stm/stm32_sai_sub.c
-@@ -766,8 +766,8 @@ static int stm32_sai_sub_parse_of(struct platform_device *pdev,
+@@ -761,9 +761,6 @@ static int stm32_sai_sub_parse_of(struct platform_device *pdev,
+ 		return -ENODEV;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-
+-	dev_err(&pdev->dev, "res %pr\n", res);
+-
+ 	base = devm_ioremap_resource(&pdev->dev, res);
+ 	if (IS_ERR(base))
  		return PTR_ERR(base);
- 
- 	sai->phys_addr = res->start;
--	sai->regmap = devm_regmap_init_mmio(&pdev->dev, base,
--					    &stm32_sai_sub_regmap_config);
-+	sai->regmap = devm_regmap_init_mmio_clk(&pdev->dev, "sai_ck", base,
-+						&stm32_sai_sub_regmap_config);
- 
- 	/* Get direction property */
- 	if (of_property_match_string(np, "dma-names", "tx") >= 0) {
 -- 
 2.11.0
