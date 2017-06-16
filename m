@@ -1,14 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Fri, 16 Jun 2017 18:50:10 +0100
-Subject: Applied "dt-bindings: stm32: sai: fix DT example" to the asoc tree
-In-Reply-To: <1497615334-7156-2-git-send-email-olivier.moysan@st.com>
-Message-ID: <E1dLvNq-0005iB-7G@debutante>
+Date: Fri, 16 Jun 2017 18:49:51 +0100
+Subject: Applied "ASoC: stm32: sai: manage master clock" to the asoc tree
+In-Reply-To: <1497615334-7156-8-git-send-email-olivier.moysan@st.com>
+Message-ID: <E1dLvNX-0005bY-5x@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   dt-bindings: stm32: sai: fix DT example
+   ASoC: stm32: sai: manage master clock
 
 has been applied to the asoc tree at
 
@@ -33,75 +33,60 @@ to this mail.
 Thanks,
 Mark
 
->From 4c1458584c9a5ac3f9e174e80a986fe5a2bfd07b Mon Sep 17 00:00:00 2001
+>From 12093366981de5060379ad7fa173a1d459c49572 Mon Sep 17 00:00:00 2001
 From: olivier moysan <olivier.moysan@st.com>
-Date: Fri, 16 Jun 2017 14:15:28 +0200
-Subject: [PATCH] dt-bindings: stm32: sai: fix DT example
+Date: Fri, 16 Jun 2017 14:15:34 +0200
+Subject: [PATCH] ASoC: stm32: sai: manage master clock
 
-Correct the device tree example.
+Disable master clock by default, and activate
+it only when requested.
 
 Signed-off-by: olivier moysan <olivier.moysan@st.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- .../devicetree/bindings/sound/st,stm32-sai.txt     | 25 +++++++++-------------
- 1 file changed, 10 insertions(+), 15 deletions(-)
+ sound/soc/stm/stm32_sai_sub.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/sound/st,stm32-sai.txt b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
-index c59a3d779e06..a0feeed1710e 100644
---- a/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
-+++ b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
-@@ -36,6 +36,10 @@ SAI subnodes required properties:
-   - pinctrl-names: should contain only value "default"
-   - pinctrl-0: see Documentation/devicetree/bindings/pinctrl/pinctrl-stm32.txt
+diff --git a/sound/soc/stm/stm32_sai_sub.c b/sound/soc/stm/stm32_sai_sub.c
+index 2466af0343db..ce48c02db051 100644
+--- a/sound/soc/stm/stm32_sai_sub.c
++++ b/sound/soc/stm/stm32_sai_sub.c
+@@ -220,8 +220,15 @@ static int stm32_sai_set_sysclk(struct snd_soc_dai *cpu_dai,
+ 				int clk_id, unsigned int freq, int dir)
+ {
+ 	struct stm32_sai_sub_data *sai = snd_soc_dai_get_drvdata(cpu_dai);
++	int ret;
  
-+The device node should contain one 'port' child node with one child 'endpoint'
-+node, according to the bindings defined in Documentation/devicetree/bindings/
-+graph.txt.
+ 	if ((dir == SND_SOC_CLOCK_OUT) && sai->master) {
++		ret = regmap_update_bits(sai->regmap, STM_SAI_CR1_REGX,
++					 SAI_XCR1_NODIV,
++					 (unsigned int)~SAI_XCR1_NODIV);
++		if (ret < 0)
++			return ret;
 +
- Example:
- sound_card {
- 	compatible = "audio-graph-card";
-@@ -46,16 +50,15 @@ sai1: sai1 at 40015800 {
- 	compatible = "st,stm32f4-sai";
- 	#address-cells = <1>;
- 	#size-cells = <1>;
--	ranges;
-+	ranges = <0 0x40015800 0x400>;
- 	reg = <0x40015800 0x4>;
- 	clocks = <&rcc 1 CLK_SAIQ_PDIV>, <&rcc 1 CLK_I2SQ_PDIV>;
- 	clock-names = "x8k", "x11k";
- 	interrupts = <87>;
+ 		sai->mclk_rate = freq;
+ 		dev_dbg(cpu_dai->dev, "SAI MCLK frequency is %uHz\n", freq);
+ 	}
+@@ -356,6 +363,10 @@ static int stm32_sai_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
+ 	}
+ 	cr1_mask |= SAI_XCR1_SLAVE;
  
- 	sai1b: audio-controller at 40015824 {
--		#sound-dai-cells = <0>;
- 		compatible = "st,stm32-sai-sub-b";
--		reg = <0x40015824 0x1C>;
-+		reg = <0x24 0x1C>;
- 		clocks = <&rcc 1 CLK_SAI2>;
- 		clock-names = "sai_ck";
- 		dmas = <&dma2 5 0 0x400 0x0>;
-@@ -63,18 +66,10 @@ sai1: sai1 at 40015800 {
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_sai1b>;
++	/* do not generate master by default */
++	cr1 |= SAI_XCR1_NODIV;
++	cr1_mask |= SAI_XCR1_NODIV;
++
+ 	ret = regmap_update_bits(sai->regmap, STM_SAI_CR1_REGX, cr1_mask, cr1);
+ 	if (ret < 0) {
+ 		dev_err(cpu_dai->dev, "Failed to update CR1 register\n");
+@@ -652,6 +663,9 @@ static void stm32_sai_shutdown(struct snd_pcm_substream *substream,
  
--		ports {
--			#address-cells = <1>;
--			#size-cells = <0>;
--
--			sai1b_port: port at 0 {
--				reg = <0>;
--				cpu_endpoint: endpoint {
--					remote-endpoint = <&codec_endpoint>;
--					audio-graph-card,format = "i2s";
--					audio-graph-card,bitclock-master = <&codec_endpoint>;
--					audio-graph-card,frame-master = <&codec_endpoint>;
--				};
-+		sai1b_port: port {
-+			cpu_endpoint: endpoint {
-+				remote-endpoint = <&codec_endpoint>;
-+				format = "i2s";
- 			};
- 		};
- 	};
+ 	regmap_update_bits(sai->regmap, STM_SAI_IMR_REGX, SAI_XIMR_MASK, 0);
+ 
++	regmap_update_bits(sai->regmap, STM_SAI_CR1_REGX, SAI_XCR1_NODIV,
++			   SAI_XCR1_NODIV);
++
+ 	clk_disable_unprepare(sai->sai_ck);
+ 	sai->substream = NULL;
+ }
 -- 
 2.11.0
