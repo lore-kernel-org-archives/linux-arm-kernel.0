@@ -1,32 +1,57 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Fri, 16 Jun 2017 20:10:30 +0200
-Subject: [PATCH 15/44] xtensa: remove DMA_ERROR_CODE
+Date: Fri, 16 Jun 2017 20:10:31 +0200
+Subject: [PATCH 16/44] arm64: remove DMA_ERROR_CODE
 In-Reply-To: <20170616181059.19206-1-hch@lst.de>
 References: <20170616181059.19206-1-hch@lst.de>
-Message-ID: <20170616181059.19206-16-hch@lst.de>
+Message-ID: <20170616181059.19206-17-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-xtensa already implements the mapping_error method for its only
-dma_map_ops instance.
+The dma alloc interface returns an error by return NULL, and the
+mapping interfaces rely on the mapping_error method, which the dummy
+ops already implement correctly.
+
+Thus remove the DMA_ERROR_CODE define.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 ---
- arch/xtensa/include/asm/dma-mapping.h | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm64/include/asm/dma-mapping.h | 1 -
+ arch/arm64/mm/dma-mapping.c          | 3 +--
+ 2 files changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/arch/xtensa/include/asm/dma-mapping.h b/arch/xtensa/include/asm/dma-mapping.h
-index c6140fa8c0be..269738dc9d1d 100644
---- a/arch/xtensa/include/asm/dma-mapping.h
-+++ b/arch/xtensa/include/asm/dma-mapping.h
-@@ -16,8 +16,6 @@
- #include <linux/mm.h>
- #include <linux/scatterlist.h>
+diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+index 5392dbeffa45..cf8fc8f05580 100644
+--- a/arch/arm64/include/asm/dma-mapping.h
++++ b/arch/arm64/include/asm/dma-mapping.h
+@@ -24,7 +24,6 @@
+ #include <xen/xen.h>
+ #include <asm/xen/hypervisor.h>
  
--#define DMA_ERROR_CODE		(~(dma_addr_t)0x0)
--
- extern const struct dma_map_ops xtensa_dma_map_ops;
+-#define DMA_ERROR_CODE	(~(dma_addr_t)0)
+ extern const struct dma_map_ops dummy_dma_ops;
  
  static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index 3216e098c058..147fbb907a2f 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -184,7 +184,6 @@ static void *__dma_alloc(struct device *dev, size_t size,
+ no_map:
+ 	__dma_free_coherent(dev, size, ptr, *dma_handle, attrs);
+ no_mem:
+-	*dma_handle = DMA_ERROR_CODE;
+ 	return NULL;
+ }
+ 
+@@ -487,7 +486,7 @@ static dma_addr_t __dummy_map_page(struct device *dev, struct page *page,
+ 				   enum dma_data_direction dir,
+ 				   unsigned long attrs)
+ {
+-	return DMA_ERROR_CODE;
++	return 0;
+ }
+ 
+ static void __dummy_unmap_page(struct device *dev, dma_addr_t dev_addr,
 -- 
 2.11.0
