@@ -1,126 +1,261 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 16 Jun 2017 17:24:33 +0530
-Subject: [PATCH 06/12] ARM: dts: am57xx-beagle-x15: Add pinmux configuration
- for MMC
-In-Reply-To: <20170616115439.8508-1-kishon@ti.com>
-References: <20170616115439.8508-1-kishon@ti.com>
-Message-ID: <20170616115439.8508-7-kishon@ti.com>
+Date: Fri, 16 Jun 2017 18:15:36 +0530
+Subject: [PATCH 08/16] mmc: host: omap_hsmmc: Add software timer when timeout
+ greater than hardware capablility
+In-Reply-To: <20170616124544.15046-1-kishon@ti.com>
+References: <20170616124544.15046-1-kishon@ti.com>
+Message-ID: <20170616124544.15046-9-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Include dra74x-mmc-iodelay.dtsi which has pinmux and IODelay
-configuration values for the various MMC modes for dra74 SoC
-and use it in the pinctrl properties of MMC devicetree
-nodes present in am57xx-beagle-x15/am57xx-beagle-x15-revb1.
+From: Mugunthan V N <mugunthanvnm@ti.com>
 
+DRA7 Errata No i834: When using high speed HS200 and SDR104
+cards, the functional clock for MMC module will be 192MHz.
+At this frequency, the maximum obtainable timeout (DTO =0xE)
+in hardware is (1/192MHz)*2^27 = 700ms. Commands taking longer
+than 700ms will be affected by this small window frame and
+will be timing out frequently even without a genune timeout
+from the card. Workarround for this errata is use a software
+timer instead of hardware timer to provide the delay requested
+by the upper layer
+
+So adding a software timer as a work around for the errata.
+Instead of using software timeout only for larger delays requested
+when using HS200/SDR104 cards which results in hardware and
+software timer race conditions, so move all the timeout request
+to use software timer when HS200/SDR104 card is connected and
+use hardware timer when other type cards are connected.
+
+Also start the software timer after queueing to DMA to ensure
+we are more likely to expire within correct limits. To be ever
+more sure that we won't expire this soft timer too early, we're
+adding a 1000000ns slack to the data timeout requested by the
+upper layer.
+
+[rk at ti.com: fix compiler warning in sw timeout function and
+use sw timeout for busy timeout]
+Signed-off-by: Ravikumar Kattekola <rk@ti.com>
+Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+[kishon at ti.com: Fix the timeout value to account for the entire
+transfer to complete here.]
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 ---
- arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi | 29 +------------------------
- arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts   | 15 +++++++++++++
- arch/arm/boot/dts/am57xx-beagle-x15.dts         | 11 ++++++++++
- 3 files changed, 27 insertions(+), 28 deletions(-)
+ drivers/mmc/host/omap_hsmmc.c | 126 ++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 109 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi b/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi
-index 585d792a8fdd..064755e6fac5 100644
---- a/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi
-+++ b/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi
-@@ -9,6 +9,7 @@
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index f1d5e8385591..3676ffa72929 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -185,6 +185,11 @@
+ #define PSTATE_DLEV		(0xF << 20)
+ #define PSTATE_DLEV_DAT0	(0x1 << 20)
  
- #include "dra74x.dtsi"
- #include "am57xx-commercial-grade.dtsi"
-+#include "dra74x-mmc-iodelay.dtsi"
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- 
-@@ -166,34 +167,6 @@
- 	};
- };
- 
--&dra7_pmx_core {
--	mmc1_pins_default: mmc1_pins_default {
--		pinctrl-single,pins = <
--			DRA7XX_CORE_IOPAD(0x376c, PIN_INPUT | MUX_MODE14)	/* mmc1sdcd.gpio219 */
--			DRA7XX_CORE_IOPAD(0x3754, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_clk.clk */
--			DRA7XX_CORE_IOPAD(0x3758, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_cmd.cmd */
--			DRA7XX_CORE_IOPAD(0x375c, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat0.dat0 */
--			DRA7XX_CORE_IOPAD(0x3760, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat1.dat1 */
--			DRA7XX_CORE_IOPAD(0x3764, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat2.dat2 */
--			DRA7XX_CORE_IOPAD(0x3768, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat3.dat3 */
--		>;
--	};
--
--	mmc2_pins_default: mmc2_pins_default {
--		pinctrl-single,pins = <
--			DRA7XX_CORE_IOPAD(0x349c, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a23.mmc2_clk */
--			DRA7XX_CORE_IOPAD(0x34b0, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_cs1.mmc2_cmd */
--			DRA7XX_CORE_IOPAD(0x34a0, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a24.mmc2_dat0 */
--			DRA7XX_CORE_IOPAD(0x34a4, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a25.mmc2_dat1 */
--			DRA7XX_CORE_IOPAD(0x34a8, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a26.mmc2_dat2 */
--			DRA7XX_CORE_IOPAD(0x34ac, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a27.mmc2_dat3 */
--			DRA7XX_CORE_IOPAD(0x348c, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a19.mmc2_dat4 */
--			DRA7XX_CORE_IOPAD(0x3490, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a20.mmc2_dat5 */
--			DRA7XX_CORE_IOPAD(0x3494, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a21.mmc2_dat6 */
--			DRA7XX_CORE_IOPAD(0x3498, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a22.mmc2_dat7 */
--		>;
--	};
--};
- &i2c1 {
- 	status = "okay";
- 	clock-frequency = <400000>;
-diff --git a/arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts b/arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts
-index 578398c781b1..5a77b334923d 100644
---- a/arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts
-+++ b/arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts
-@@ -19,10 +19,25 @@
- };
- 
- &mmc1 {
-+	pinctrl-names = "default", "hs", "sdr12", "sdr25", "sdr50", "ddr50", "sdr104";
-+	pinctrl-0 = <&mmc1_pins_default>;
-+	pinctrl-1 = <&mmc1_pins_hs>;
-+	pinctrl-2 = <&mmc1_pins_sdr12>;
-+	pinctrl-3 = <&mmc1_pins_sdr25>;
-+	pinctrl-4 = <&mmc1_pins_sdr50>;
-+	pinctrl-5 = <&mmc1_pins_ddr50 &mmc1_iodelay_ddr_rev11_conf>;
-+	pinctrl-6 = <&mmc1_pins_sdr104 &mmc1_iodelay_sdr104_rev11_conf>;
- 	vmmc-supply = <&vdd_3v3>;
- 	vqmmc-supply = <&ldo1_reg>;
- };
- 
-+&mmc2 {
-+	pinctrl-names = "default", "hs", "ddr_1_8v";
-+	pinctrl-0 = <&mmc2_pins_default>;
-+	pinctrl-1 = <&mmc2_pins_hs>;
-+	pinctrl-2 = <&mmc2_pins_ddr_3_3v_rev11 &mmc2_iodelay_ddr_3_3v_rev11_conf>;
-+};
++#define MMC_BLOCK_TRANSFER_TIME_NS(blksz, bus_width, freq)		\
++				   ((unsigned long long)		\
++				   (2 * (((blksz) * NSEC_PER_SEC *	\
++				   (8 / (bus_width))) / (freq))))
 +
- /* errata i880 "Ethernet RGMII2 Limited to 10/100 Mbps" */
- &phy1 {
- 	max-speed = <100>;
-diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-index 19a60a11c198..d6689106d2a8 100644
---- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
-+++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-@@ -20,9 +20,20 @@
- };
+ /*
+  * One controller can have multiple slots, like on some omap boards using
+  * omap.c controller driver. Luckily this is not currently done on any known
+@@ -250,6 +255,8 @@ struct omap_hsmmc_host {
+ 	struct	omap_hsmmc_platform_data	*pdata;
  
- &mmc1 {
-+	pinctrl-names = "default", "hs";
-+	pinctrl-0 = <&mmc1_pins_default>;
-+	pinctrl-1 = <&mmc1_pins_hs>;
-+
- 	vmmc-supply = <&ldo1_reg>;
- };
+ 	bool			is_tuning;
++	struct timer_list	timer;
++	unsigned long long	data_timeout;
  
-+&mmc2 {
-+	pinctrl-names = "default", "hs", "ddr_1_8v";
-+	pinctrl-0 = <&mmc2_pins_default>;
-+	pinctrl-1 = <&mmc2_pins_hs>;
-+	pinctrl-2 = <&mmc2_pins_ddr_3_3v_rev11 &mmc2_iodelay_ddr_3_3v_rev11_conf>;
-+};
+ 	/* return MMC cover switch state, can be NULL if not supported.
+ 	 *
+@@ -631,8 +638,8 @@ static void omap_hsmmc_enable_irq(struct omap_hsmmc_host *host,
+ 	if (host->use_dma)
+ 		irq_mask &= ~(BRR_EN | BWR_EN);
+ 
+-	/* Disable timeout for erases */
+-	if (cmd->opcode == MMC_ERASE)
++	/* Disable timeout for erases or when using software timeout */
++	if (cmd && (cmd->opcode == MMC_ERASE || host->data_timeout))
+ 		irq_mask &= ~DTO_EN;
+ 
+ 	if (host->flags & CLKEXTFREE_ENABLED)
+@@ -1239,8 +1246,16 @@ static void omap_hsmmc_do_irq(struct omap_hsmmc_host *host, int status)
+ 	}
+ 
+ 	OMAP_HSMMC_WRITE(host->base, STAT, status);
+-	if (end_cmd || ((status & CC_EN) && host->cmd))
++	if (end_cmd || ((status & CC_EN) && host->cmd)) {
+ 		omap_hsmmc_cmd_done(host, host->cmd);
++		if (host->data_timeout) {
++			unsigned long timeout;
 +
- /* errata i880 "Ethernet RGMII2 Limited to 10/100 Mbps" */
- &phy1 {
- 	max-speed = <100>;
++			timeout = jiffies +
++				  nsecs_to_jiffies(host->data_timeout);
++			mod_timer(&host->timer, timeout);
++		}
++	}
+ 	if ((end_trans || (status & TC_EN)) && host->mrq)
+ 		omap_hsmmc_xfer_done(host, data);
+ }
+@@ -1254,7 +1269,19 @@ static irqreturn_t omap_hsmmc_irq(int irq, void *dev_id)
+ 	int status;
+ 
+ 	status = OMAP_HSMMC_READ(host->base, STAT);
++
+ 	while (status & (INT_EN_MASK | CIRQ_EN)) {
++		/*
++		 * During a successful bulk data transfer command-completion
++		 * interrupt and transfer-completion interrupt will be
++		 * generated, but software-timeout timer should be deleted
++		 * only on non-cc interrupts (transfer complete or error)
++		 */
++		if (host->data_timeout && (status & (~CC_EN))) {
++			del_timer(&host->timer);
++			host->data_timeout = 0;
++		}
++
+ 		if (host->req_in_progress)
+ 			omap_hsmmc_do_irq(host, status);
+ 
+@@ -1268,6 +1295,25 @@ static irqreturn_t omap_hsmmc_irq(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
++static void omap_hsmmc_soft_timeout(unsigned long data)
++{
++	struct omap_hsmmc_host *host = (struct omap_hsmmc_host *)data;
++	bool end_trans = false;
++
++	omap_hsmmc_disable_irq(host);
++	if (host->data || host->response_busy) {
++		host->response_busy = 0;
++		end_trans = true;
++	}
++
++	hsmmc_command_incomplete(host, -ETIMEDOUT, 0);
++	if (end_trans && host->mrq)
++		omap_hsmmc_xfer_done(host, host->data);
++	else if (host->cmd)
++		omap_hsmmc_cmd_done(host, host->cmd);
++	host->data_timeout = 0;
++}
++
+ static void set_sd_bus_power(struct omap_hsmmc_host *host)
+ {
+ 	unsigned long i;
+@@ -1462,6 +1508,9 @@ static void set_data_timeout(struct omap_hsmmc_host *host,
+ 	unsigned long long timeout = timeout_ns;
+ 	unsigned int cycle_ns;
+ 	uint32_t reg, clkd, dto = 0;
++	struct mmc_ios *ios = &host->mmc->ios;
++	struct mmc_data *data = host->mrq->data;
++	struct mmc_command *cmd = host->mrq->cmd;
+ 
+ 	reg = OMAP_HSMMC_READ(host->base, SYSCTL);
+ 	clkd = (reg & CLKD_MASK) >> CLKD_SHIFT;
+@@ -1471,23 +1520,60 @@ static void set_data_timeout(struct omap_hsmmc_host *host,
+ 	cycle_ns = 1000000000 / (host->clk_rate / clkd);
+ 	do_div(timeout, cycle_ns);
+ 	timeout += timeout_clks;
+-	if (timeout) {
+-		while ((timeout & 0x80000000) == 0) {
+-			dto += 1;
+-			timeout <<= 1;
+-		}
+-		dto = 31 - dto;
++
++	if (!timeout)
++		goto out;
++
++	while ((timeout & 0x80000000) == 0) {
++		dto += 1;
+ 		timeout <<= 1;
+-		if (timeout && dto)
+-			dto += 1;
+-		if (dto >= 13)
+-			dto -= 13;
+-		else
+-			dto = 0;
+-		if (dto > 14)
+-			dto = 14;
++	}
++	dto = 31 - dto;
++	timeout <<= 1;
++	if (timeout && dto)
++		dto += 1;
++	if (dto >= 13)
++		dto -= 13;
++	else
++		dto = 0;
++	if (dto > 14) {
++		/*
++		 * DRA7 Errata No i834: When using high speed HS200 and
++		 * SDR104 cards, the functional clock for MMC module
++		 * will be 192MHz. At this frequency, the maximum
++		 * obtainable timeout (DTO =0xE) in hardware is
++		 * (1/192MHz)*2^27 = 700ms. Commands taking longer than
++		 * 700ms will be affected by this small window frame
++		 * and will be timing out frequently even without a
++		 * genuine timeout from the card. Workaround for
++		 * this errata is use a software timer instead of
++		 * hardware timer to provide the timeout requested
++		 * by the upper layer.
++		 *
++		 * The timeout from the upper layer denotes the delay
++		 * between the end bit of the read command and the
++		 * start bit of the data block and in the case of
++		 * multiple-read operation, they also define the
++		 * typical delay between the end bit of a data
++		 * block and the start bit of next data block.
++		 *
++		 * Calculate the total timeout value for the entire
++		 * transfer to complete from the timeout value given
++		 * by the upper layer.
++		 */
++		if (data)
++			host->data_timeout = (data->blocks *
++					      (timeout_ns +
++					      MMC_BLOCK_TRANSFER_TIME_NS(
++					      data->blksz, ios->bus_width,
++					      ios->clock)));
++		else if (cmd->flags & MMC_RSP_BUSY)
++			host->data_timeout = timeout_ns;
++
++		dto = 14;
+ 	}
+ 
++out:
+ 	reg &= ~DTO_MASK;
+ 	reg |= dto << DTO_SHIFT;
+ 	OMAP_HSMMC_WRITE(host->base, SYSCTL, reg);
+@@ -2347,6 +2433,8 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+ 	mmc->ops	= &omap_hsmmc_ops;
+ 
+ 	spin_lock_init(&host->irq_lock);
++	setup_timer(&host->timer, omap_hsmmc_soft_timeout,
++		    (unsigned long)host);
+ 
+ 	host->fclk = devm_clk_get(&pdev->dev, "fck");
+ 	if (IS_ERR(host->fclk)) {
+@@ -2511,6 +2599,8 @@ static int omap_hsmmc_remove(struct platform_device *pdev)
+ 	dma_release_channel(host->tx_chan);
+ 	dma_release_channel(host->rx_chan);
+ 
++	del_timer_sync(&host->timer);
++
+ 	pm_runtime_dont_use_autosuspend(host->dev);
+ 	pm_runtime_put_sync(host->dev);
+ 	pm_runtime_disable(host->dev);
+@@ -2544,6 +2634,8 @@ static int omap_hsmmc_suspend(struct device *dev)
+ 	if (host->dbclk)
+ 		clk_disable_unprepare(host->dbclk);
+ 
++	del_timer_sync(&host->timer);
++
+ 	pm_runtime_put_sync(host->dev);
+ 	return 0;
+ }
 -- 
 2.11.0
