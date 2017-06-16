@@ -1,33 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 16 Jun 2017 11:29:22 +0200
-Subject: [PATCH v3 8/9] gpio: mvebu: Add support for the Armada 7K/8K SoCs
-In-Reply-To: <b6357b8b179d66aab45548e693193054942e7dcc.1497281623.git-series.gregory.clement@free-electrons.com>
-References: <cover.d003a5e862e6d732d901a61d1765a349c9a89eef.1497281623.git-series.gregory.clement@free-electrons.com>
- <b6357b8b179d66aab45548e693193054942e7dcc.1497281623.git-series.gregory.clement@free-electrons.com>
-Message-ID: <CACRpkdYm7OYJ6ufzUtYqb6dJFEOMLdiw8zJ2Et1uEhxe7ARH9A@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave P Martin)
+Date: Fri, 16 Jun 2017 10:30:50 +0100
+Subject: [PATCH 1/5] arm64: signal: split frame link record from
+ sigcontext structure
+In-Reply-To: <20170615163747.GA17424@e104818-lin.cambridge.arm.com>
+References: <1497535442-11586-1-git-send-email-Dave.Martin@arm.com>
+ <1497535442-11586-2-git-send-email-Dave.Martin@arm.com>
+ <20170615163747.GA17424@e104818-lin.cambridge.arm.com>
+Message-ID: <20170616093050.GH9227@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 12, 2017 at 5:34 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-
-> The Armada 7K and 8K SoCs use the same gpio controller as most of the
-> other mvebu SoCs. However, the main difference is that the GPIO
-> controller is part of a bigger system controller, and a syscon is used to
-> control the overall system controller. Therefore, the driver needs to be
-> adjusted to retrieve the regmap of the syscon to access registers, and
-> account for the fact that registers are located at a certain offset
-> within the regmap.
+On Thu, Jun 15, 2017 at 05:37:47PM +0100, Catalin Marinas wrote:
+> On Thu, Jun 15, 2017 at 03:03:38PM +0100, Dave P Martin wrote:
+> > In order to be able to increase the amount of the data currently
+> > written to the __reserved[] array in the signal frame, it is
+> > necessary to overwrite the locations currently occupied by the
+> > {fp,lr} frame link record pushed at the top of the signal stack.
+> >
+> > In order for this to work, this patch detaches the frame link
+> > record from struct rt_sigframe and places it separately at the top
+> > of the signal stack.  This will allow subsequent patches to insert
+> > data between it and __reserved[].
+> >
+> > This change relies on the non-ABI status of the placement of the
+> > frame record with respect to struct sigframe: this status is
+> > undocumented, but the placement is not declared or described in the
+> > user headers, and known unwinder implementations (libgcc,
+> > libunwind, gdb) appear not to rely on it.
+> >
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 >
-> This commit add the support of the syscon and introduce a new variant for
-> this case.
+> I'm fine with this approach:
 >
-> It was based on the preliminary work of Thomas Petazzoni.
->
-> Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Patch applied.
+Thanks for the review.
+Final testing should be complete early next week.
 
-Yours,
-Linus Walleij
+Cheers
+---Dave
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
