@@ -1,131 +1,144 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 16 Jun 2017 18:15:41 +0530
-Subject: [PATCH 13/16] mmc: host: omap_hsmmc: Remove *use_dma* member
+Date: Fri, 16 Jun 2017 18:15:29 +0530
+Subject: [PATCH 01/16] mmc: host: omap_hsmmc: Support pbias and vmmc_aux to
+ switch to 1.8v
 In-Reply-To: <20170616124544.15046-1-kishon@ti.com>
 References: <20170616124544.15046-1-kishon@ti.com>
-Message-ID: <20170616124544.15046-14-kishon@ti.com>
+Message-ID: <20170616124544.15046-2-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap_hsmmc doesn't support polled I/O. So remove *use_dma*
-which is always set to '1'.
+Add support for vmmc_aux to switch to 1.8v. Also use "iov" instead of
+"vdd" to indicate io voltage. This is in preparation for adding support
+for io signal voltage switch.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 ---
- drivers/mmc/host/omap_hsmmc.c | 37 ++++++++++++++++---------------------
- 1 file changed, 16 insertions(+), 21 deletions(-)
+ drivers/mmc/host/omap_hsmmc.c | 50 ++++++++++++++++++++++++++++---------------
+ 1 file changed, 33 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index 0887da4f1ff6..f47bade0d6fe 100644
+index 7c12f3715676..48bb06788d9f 100644
 --- a/drivers/mmc/host/omap_hsmmc.c
 +++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -238,7 +238,7 @@ struct omap_hsmmc_host {
- 	u32			capa;
- 	int			irq;
- 	int			wake_irq;
--	int			use_dma, dma_ch;
-+	int			dma_ch;
- 	struct dma_chan		*tx_chan;
- 	struct dma_chan		*rx_chan;
- 	int			response_busy;
-@@ -647,8 +647,8 @@ static void omap_hsmmc_enable_irq(struct omap_hsmmc_host *host,
- 		 */
- 		irq_mask &= ~(DCRC_EN | DEB_EN);
- 
--	if (host->use_dma)
--		irq_mask &= ~(BRR_EN | BWR_EN);
-+	/* BRR and BWR need not be enabled for DMA */
-+	irq_mask &= ~(BRR_EN | BWR_EN);
- 
- 	/* Disable timeout for erases or when using software timeout */
- 	if (cmd && (cmd->opcode == MMC_ERASE || host->data_timeout))
-@@ -1001,8 +1001,7 @@ omap_hsmmc_start_command(struct omap_hsmmc_host *host, struct mmc_command *cmd,
- 	    (cmd->opcode == MMC_SEND_TUNING_BLOCK_HS200))
- 		cmdreg |= DP_SELECT | DDIR;
- 
--	if (host->use_dma)
--		cmdreg |= DMAE;
-+	cmdreg |= DMAE;
- 
- 	host->req_in_progress = 1;
- 	host->last_cmd = cmd->opcode;
-@@ -1029,7 +1028,7 @@ static void omap_hsmmc_request_done(struct omap_hsmmc_host *host, struct mmc_req
- 
- 	omap_hsmmc_disable_irq(host);
- 	/* Do not complete the request if DMA is still in progress */
--	if (mrq->data && host->use_dma && dma_ch != -1)
-+	if (mrq->data && dma_ch != -1)
- 		return;
- 	host->mrq = NULL;
- 	mmc_request_done(host->mmc, mrq);
-@@ -1116,7 +1115,7 @@ static void omap_hsmmc_dma_cleanup(struct omap_hsmmc_host *host, int errno)
- 	host->dma_ch = -1;
- 	spin_unlock_irqrestore(&host->irq_lock, flags);
- 
--	if (host->use_dma && dma_ch != -1) {
-+	if (dma_ch != -1) {
- 		struct dma_chan *chan = omap_hsmmc_get_dma_chan(host, host->data);
- 
- 		dmaengine_terminate_all(chan);
-@@ -1634,12 +1633,10 @@ omap_hsmmc_prepare_data(struct omap_hsmmc_host *host, struct mmc_request *req)
- 		return 0;
- 	}
- 
--	if (host->use_dma) {
--		ret = omap_hsmmc_setup_dma_transfer(host, req);
--		if (ret != 0) {
--			dev_err(mmc_dev(host->mmc), "MMC start dma failure\n");
--			return ret;
--		}
-+	ret = omap_hsmmc_setup_dma_transfer(host, req);
-+	if (ret != 0) {
-+		dev_err(mmc_dev(host->mmc), "MMC start dma failure\n");
-+		return ret;
- 	}
- 	return 0;
+@@ -244,11 +244,12 @@ static int omap_hsmmc_get_cover_state(struct device *dev)
+ 	return mmc_gpio_get_cd(host->mmc);
  }
-@@ -1650,7 +1647,7 @@ static void omap_hsmmc_post_req(struct mmc_host *mmc, struct mmc_request *mrq,
- 	struct omap_hsmmc_host *host = mmc_priv(mmc);
- 	struct mmc_data *data = mrq->data;
  
--	if (host->use_dma && data->host_cookie) {
-+	if (data->host_cookie) {
- 		struct dma_chan *c = omap_hsmmc_get_dma_chan(host, data);
- 
- 		dma_unmap_sg(c->device->dev, data->sg, data->sg_len,
-@@ -1662,19 +1659,18 @@ static void omap_hsmmc_post_req(struct mmc_host *mmc, struct mmc_request *mrq,
- static void omap_hsmmc_pre_req(struct mmc_host *mmc, struct mmc_request *mrq)
+-static int omap_hsmmc_enable_supply(struct mmc_host *mmc)
++static int omap_hsmmc_enable_supply(struct mmc_host *mmc, int iov)
  {
+ 	int ret;
  	struct omap_hsmmc_host *host = mmc_priv(mmc);
-+	struct dma_chan *c = NULL;
+ 	struct mmc_ios *ios = &mmc->ios;
++	int uvoltage;
  
- 	if (mrq->data->host_cookie) {
- 		mrq->data->host_cookie = 0;
- 		return ;
+ 	if (!IS_ERR(mmc->supply.vmmc)) {
+ 		ret = mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, ios->vdd);
+@@ -257,7 +258,25 @@ static int omap_hsmmc_enable_supply(struct mmc_host *mmc)
  	}
  
--	if (host->use_dma) {
--		struct dma_chan *c = omap_hsmmc_get_dma_chan(host, mrq->data);
-+	c = omap_hsmmc_get_dma_chan(host, mrq->data);
- 
--		if (omap_hsmmc_pre_dma_transfer(host, mrq->data,
--						&host->next_data, c))
--			mrq->data->host_cookie = 0;
--	}
-+	if (omap_hsmmc_pre_dma_transfer(host, mrq->data,
-+					&host->next_data, c))
-+		mrq->data->host_cookie = 0;
+ 	/* Enable interface voltage rail, if needed */
+-	if (!IS_ERR(mmc->supply.vqmmc) && !host->vqmmc_enabled) {
++	if (!IS_ERR(mmc->supply.vqmmc)) {
++		if (host->vqmmc_enabled) {
++			ret = regulator_disable(mmc->supply.vqmmc);
++			if (ret) {
++				dev_err(mmc_dev(mmc),
++					"vmmc_aux reg disable failed\n");
++				goto err_vqmmc;
++			}
++			host->vqmmc_enabled = 0;
++		}
++
++		uvoltage = (iov == VDD_165_195) ? VDD_1V8 : VDD_3V0;
++		ret = regulator_set_voltage(mmc->supply.vqmmc, uvoltage,
++					    uvoltage);
++		if (ret) {
++			dev_err(mmc_dev(mmc), "vmmc_aux set voltage failed\n");
++			goto err_vqmmc;
++		}
++
+ 		ret = regulator_enable(mmc->supply.vqmmc);
+ 		if (ret) {
+ 			dev_err(mmc_dev(mmc), "vmmc_aux reg enable failed\n");
+@@ -309,22 +328,19 @@ static int omap_hsmmc_disable_supply(struct mmc_host *mmc)
  }
  
- /*
-@@ -2563,7 +2559,6 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
- 	host->mmc	= mmc;
- 	host->pdata	= pdata;
- 	host->dev	= &pdev->dev;
--	host->use_dma	= 1;
- 	host->dma_ch	= -1;
- 	host->irq	= irq;
- 	host->mapbase	= res->start + pdata->reg_offset;
+ static int omap_hsmmc_set_pbias(struct omap_hsmmc_host *host, bool power_on,
+-				int vdd)
++				int iov)
+ {
+ 	int ret;
++	int uvoltage;
+ 
+ 	if (IS_ERR(host->pbias))
+ 		return 0;
+ 
+ 	if (power_on) {
+-		if (vdd <= VDD_165_195)
+-			ret = regulator_set_voltage(host->pbias, VDD_1V8,
+-						    VDD_1V8);
+-		else
+-			ret = regulator_set_voltage(host->pbias, VDD_3V0,
+-						    VDD_3V0);
+-		if (ret < 0) {
+-			dev_err(host->dev, "pbias set voltage fail\n");
++		uvoltage = (iov <= VDD_165_195) ? VDD_1V8 : VDD_3V0;
++		ret = regulator_set_voltage(host->pbias, uvoltage, uvoltage);
++		if (ret) {
++			dev_err(host->dev, "pbias set voltage failed\n");
+ 			return ret;
+ 		}
+ 
+@@ -351,13 +367,13 @@ static int omap_hsmmc_set_pbias(struct omap_hsmmc_host *host, bool power_on,
+ }
+ 
+ static int omap_hsmmc_set_power(struct omap_hsmmc_host *host, int power_on,
+-				int vdd)
++				int iov)
+ {
+ 	struct mmc_host *mmc = host->mmc;
+ 	int ret = 0;
+ 
+ 	if (mmc_pdata(host)->set_power)
+-		return mmc_pdata(host)->set_power(host->dev, power_on, vdd);
++		return mmc_pdata(host)->set_power(host->dev, power_on, iov);
+ 
+ 	/*
+ 	 * If we don't see a Vcc regulator, assume it's a fixed
+@@ -367,7 +383,7 @@ static int omap_hsmmc_set_power(struct omap_hsmmc_host *host, int power_on,
+ 		return 0;
+ 
+ 	if (mmc_pdata(host)->before_set_reg)
+-		mmc_pdata(host)->before_set_reg(host->dev, power_on, vdd);
++		mmc_pdata(host)->before_set_reg(host->dev, power_on, iov);
+ 
+ 	ret = omap_hsmmc_set_pbias(host, false, 0);
+ 	if (ret)
+@@ -387,11 +403,11 @@ static int omap_hsmmc_set_power(struct omap_hsmmc_host *host, int power_on,
+ 	 * chips/cards need an interface voltage rail too.
+ 	 */
+ 	if (power_on) {
+-		ret = omap_hsmmc_enable_supply(mmc);
++		ret = omap_hsmmc_enable_supply(mmc, iov);
+ 		if (ret)
+ 			return ret;
+ 
+-		ret = omap_hsmmc_set_pbias(host, true, vdd);
++		ret = omap_hsmmc_set_pbias(host, true, iov);
+ 		if (ret)
+ 			goto err_set_voltage;
+ 	} else {
+@@ -401,7 +417,7 @@ static int omap_hsmmc_set_power(struct omap_hsmmc_host *host, int power_on,
+ 	}
+ 
+ 	if (mmc_pdata(host)->after_set_reg)
+-		mmc_pdata(host)->after_set_reg(host->dev, power_on, vdd);
++		mmc_pdata(host)->after_set_reg(host->dev, power_on, iov);
+ 
+ 	return 0;
+ 
 -- 
 2.11.0
