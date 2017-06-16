@@ -1,73 +1,68 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 16 Jun 2017 11:47:41 +0100
-Subject: [PATCH 5/5] arm64: signal: Allow expansion of the signal frame
-In-Reply-To: <1497535442-11586-6-git-send-email-Dave.Martin@arm.com>
-References: <1497535442-11586-1-git-send-email-Dave.Martin@arm.com>
- <1497535442-11586-6-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20170616104740.GA31526@e104818-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 16 Jun 2017 11:53:57 +0100
+Subject: arm64: next-20170614 panics on boot
+In-Reply-To: <20170616095144.nb43ur6fukkfen5c@yury-thinkpad>
+References: <20170615120840.ce7v4hxflueu4s7o@yury-thinkpad>
+ <20170615123337.5qkrh72vt53jnwnf@yury-thinkpad>
+ <20170616095144.nb43ur6fukkfen5c@yury-thinkpad>
+Message-ID: <05383817-d6a6-9e1d-8866-8a8cbed2507e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 15, 2017 at 03:03:42PM +0100, Dave P Martin wrote:
-> --- a/arch/arm64/include/uapi/asm/sigcontext.h
-> +++ b/arch/arm64/include/uapi/asm/sigcontext.h
-> @@ -41,9 +41,10 @@ struct sigcontext {
->   *
->   *	0x210		fpsimd_context
->   *	 0x10		esr_context
-> + *	 0x20		extra_context (optional)
->   *	 0x10		terminator (null _aarch64_ctx)
->   *
-> - *	0xdd0		(reserved for future allocation)
-> + *	0xdb0		(reserved for future allocation)
->   *
->   * New records that can exceed this space need to be opt-in for userspace, so
->   * that an expanded signal frame is not generated unexpectedly.  The mechanism
-> @@ -80,4 +81,39 @@ struct esr_context {
->  	__u64 esr;
->  };
->  
-> +/*
-> + * extra_context: describes extra space in the signal frame for
-> + * additional structures that don't fit in sigcontext.__reserved[].
-> + *
-> + * Note:
-> + *
-> + * 1) fpsimd_context, esr_context and extra_context must be placed in
-> + * sigcontext.__reserved[] if present.  They cannot be placed in the
-> + * extra space.  Any other record can be placed either in the extra
-> + * space or in sigcontext.__reserved[], unless otherwise specified in
-> + * this file.
-> + *
-> + * 2) There must not be more than one extra_context.
-> + *
-> + * 3) If extra_context is present, it must be followed immediately in
-> + * sigcontext.__reserved[] by the terminating null _aarch64_ctx.
-> + *
-> + * 4) The extra space to which data points must start at the first
-> + * 16-byte aligned address immediately after the terminating null
-> + * _aarch64_ctx that follows the extra_context structure in
-> + * __reserved[].  The extra space may overrun the end of __reserved[],
-> + * as indicated by a sufficiently large value for the size field.
-> + *
-> + * 5) The extra space must itself be terminated with a null
-> + * _aarch64_ctx.
-> + */
-> +#define EXTRA_MAGIC	0x45585401
-> +
-> +struct extra_context {
-> +	struct _aarch64_ctx head;
-> +	void __user *data;	/* 16-byte aligned pointer to extra space */
-> +	__u32 size;		/* size in bytes of the extra space */
-> +	__u32 __reserved[3];
-> +};
+On 16/06/17 10:51, Yury Norov wrote:
+> (CC irqchip maintainers)
+> 
+> On Thu, Jun 15, 2017 at 03:33:37PM +0300, Yury Norov wrote:
+>> On Thu, Jun 15, 2017 at 03:08:40PM +0300, Yury Norov wrote:
+>>> Hi all,
+>>>
+>>> Today's linux next falls into panic in init_IRQ():
+>>> arch/arm64/kernel/irq.c:
+>>>  53 void __init init_IRQ(void)
+>>>  54 {
+>>>  55         irqchip_init();
+>>>  56         if (!handle_arch_irq)
+>>>  57                 panic("No interrupt controller found.");
+>>>  58 }
+>>>
+>>>
+>>> Bisecting points to the patch 6fedb069def034 ("of: Provide dummy
+>>> of_device_compatible_match() for compile-testing"), but reverting it
+>>> doesn't help. It seems like yesterday's linux-next also hangs.  Right
+>>> now I cannot continue with debugging, but if nothing will get clear,
+>>> I'll back to it at this evening.
+>>
+>> Sorry, forgot to attach the config. This is it. Also, I run arm64 on
+>> qemu.
+> 
+> The next-20170616 boots well for me. I didn't manage to bisect the
+> source of problem - it points to different commmits, and reverting
+> them doesn't help. The source of the problem is that irqchip_init()
+> doesn't set the handle_arch_irq. It should be done in 
+> of_irq_init() at the line
+> 
+> drivers/of/irq.c:
+> 542         while (!list_empty(&intc_desc_list)) {
+>         ...
+> 561                         ret = desc->irq_init_cb(desc->dev,
+> 562                                                 desc->interrupt_parent);
+>         ...
+> 586         }
+> 
+> On next-20170614 and 15 intc_desc_list is empty at the point. It
+> should be populated earlier in the loop
+> 510         for_each_matching_node_and_match(np, matches, &match)
+> 
+> But np becomes 0 at the 1st iteration, and so the program doesn't enter the
+> loop. At the first glance there's no recent changes in related code. Maybe it's dts
+> issue?..
 
-Some more thoughts on the type of "data" above. It's the first time we
-introduce pointers in sigcontext and wonder whether __u64 would make
-more sense (invariable size with the ABI).
+Dunno. I'm booting -next as of today in various arm64 VMs, and
+everything seems fine. Even 20170614 boots fine in the same
+configuration. You'll have to investigate a bit more, I'm afraid.
 
-Also for discussion - whether using an offset vs absolute address would
-be better.
+Thanks,
 
+	M.
 -- 
-Catalin
+Jazz is not dead. It just smells funny...
