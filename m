@@ -1,32 +1,23 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 16 Jun 2017 14:28:08 -0700
-Subject: [PATCH v2 4/4] misc: sram: Allow ARM64 to select SRAM_EXEC
-In-Reply-To: <20170616212808.19073-1-f.fainelli@gmail.com>
-References: <20170616212808.19073-1-f.fainelli@gmail.com>
-Message-ID: <20170616212808.19073-5-f.fainelli@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Jun 2017 23:33:01 +0200
+Subject: [PATCH] bus: SIMPLE_PM_BUS does not depend on ARCH_RENESAS
+In-Reply-To: <20170613130430.4272-1-robdclark@gmail.com>
+References: <20170613130430.4272-1-robdclark@gmail.com>
+Message-ID: <CAK8P3a1v=3X3t9VE_my1jBH0Wo14FYMF9+ijFw8kHLDVjZ4meQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that ARM64 also has a fncpy() implementation, allow selection
-SRAM_EXEC for ARM64 as well.
+On Tue, Jun 13, 2017 at 3:04 PM, Rob Clark <robdclark@gmail.com> wrote:
+> In fact, it is needed for PCI to work on msm8996 (and probably other
+> things).  No idea why it was depending on renesas but that doesn't make
+> any sense.  So drop the dependency.
+>
+> Signed-off-by: Rob Clark <robdclark@gmail.com>
+> ---
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- drivers/misc/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I also couldn't find a reason why this was strictly limited, but it in
+the device
+tree sources we ship in the kernel, it is so far only used for Renesas machines,
+so it's not currently a bug either.
 
-diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
-index 07bbd4cc1852..ac8779278c0c 100644
---- a/drivers/misc/Kconfig
-+++ b/drivers/misc/Kconfig
-@@ -464,7 +464,7 @@ config SRAM
- 	bool "Generic on-chip SRAM driver"
- 	depends on HAS_IOMEM
- 	select GENERIC_ALLOCATOR
--	select SRAM_EXEC if ARM
-+	select SRAM_EXEC if ARM || ARM64
- 	help
- 	  This driver allows you to declare a memory region to be managed by
- 	  the genalloc API. It is supposed to be used for small on-chip SRAM
--- 
-2.9.3
+Acked-by: Arnd Bergmann <arnd@arndb.de>
