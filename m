@@ -1,55 +1,105 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 16 Jun 2017 14:37:00 -0700
-Subject: [PATCH 2/5] soc: bcm: brcmstb: Add Kconfig entry point for power
- management
+Date: Fri, 16 Jun 2017 14:37:02 -0700
+Subject: [PATCH 4/5] dt-bindings: Document MIPS Broadcom STB power management
+ nodes
 In-Reply-To: <20170616213703.21487-1-f.fainelli@gmail.com>
 References: <20170616213703.21487-1-f.fainelli@gmail.com>
-Message-ID: <20170616213703.21487-3-f.fainelli@gmail.com>
+Message-ID: <20170616213703.21487-5-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the necessary pluming to select and build CONFIG_BRCMSTB_PM.
-Functional code is not added yet.
+Document the different nodes required for supporting S2/S3/S5 suspend
+states on MIPS-based Broadcom STB SoCs.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- drivers/soc/bcm/Kconfig          | 2 ++
- drivers/soc/bcm/brcmstb/Kconfig  | 8 ++++++++
- drivers/soc/bcm/brcmstb/Makefile | 1 +
- 3 files changed, 11 insertions(+)
- create mode 100644 drivers/soc/bcm/brcmstb/Kconfig
+ .../devicetree/bindings/mips/brcm/soc.txt          | 77 ++++++++++++++++++++++
+ 1 file changed, 77 insertions(+)
 
-diff --git a/drivers/soc/bcm/Kconfig b/drivers/soc/bcm/Kconfig
-index 49f1e2a75d61..055a845ed979 100644
---- a/drivers/soc/bcm/Kconfig
-+++ b/drivers/soc/bcm/Kconfig
-@@ -20,4 +20,6 @@ config SOC_BRCMSTB
+diff --git a/Documentation/devicetree/bindings/mips/brcm/soc.txt b/Documentation/devicetree/bindings/mips/brcm/soc.txt
+index e4e1cd91fb1f..f7413168d938 100644
+--- a/Documentation/devicetree/bindings/mips/brcm/soc.txt
++++ b/Documentation/devicetree/bindings/mips/brcm/soc.txt
+@@ -11,3 +11,80 @@ Required properties:
  
- 	  If unsure, say N.
- 
-+source "drivers/soc/bcm/brcmstb/Kconfig"
+ The experimental -viper variants are for running Linux on the 3384's
+ BMIPS4355 cable modem CPU instead of the BMIPS5000 application processor.
 +
- endmenu
-diff --git a/drivers/soc/bcm/brcmstb/Kconfig b/drivers/soc/bcm/brcmstb/Kconfig
-new file mode 100644
-index 000000000000..996a75db015e
---- /dev/null
-+++ b/drivers/soc/bcm/brcmstb/Kconfig
-@@ -0,0 +1,8 @@
-+if SOC_BRCMSTB
++Power management
++----------------
 +
-+config BRCMSTB_PM
-+        bool "Support suspend/resume for STB platforms"
-+        default y
-+        depends on PM
++For power management (particularly, S2/S3/S5 system suspend), the following SoC
++components are needed:
 +
-+endif # SOC_BRCMSTB
-diff --git a/drivers/soc/bcm/brcmstb/Makefile b/drivers/soc/bcm/brcmstb/Makefile
-index 9120b2715d3e..ee5b4de741b8 100644
---- a/drivers/soc/bcm/brcmstb/Makefile
-+++ b/drivers/soc/bcm/brcmstb/Makefile
-@@ -1 +1,2 @@
- obj-y				+= common.o biuctrl.o
-+obj-y				+= pm/
++= Always-On control block (AON CTRL)
++
++This hardware provides control registers for the "always-on" (even in low-power
++modes) hardware, such as the Power Management State Machine (PMSM).
++
++Required properties:
++- compatible     : should contain "brcm,brcmstb-aon-ctrl"
++- reg            : the register start and length for the AON CTRL block
++
++Example:
++
++aon-ctrl at 410000 {
++	compatible = "brcm,brcmstb-aon-ctrl";
++	reg = <0x410000 0x400>;
++};
++
++= Memory controllers
++
++A Broadcom STB SoC typically has a number of independent memory controllers,
++each of which may have several associated hardware blocks, which are versioned
++independently (control registers, DDR PHYs, etc.). One might consider
++describing these controllers as a parent "memory controllers" block, which
++contains N sub-nodes (one for each controller in the system), each of which is
++associated with a number of hardware register resources (e.g., its PHY). See
++the example device tree snippet below.
++
++== MEMC (MEMory Controller)
++
++Represents a single memory controller instance.
++
++Required properties:
++- compatible     : should contain "brcm,brcmstb-memc" and "simple-bus"
++
++Should contain subnodes for any of the following relevant hardware resources:
++
++== DDR PHY control
++
++Control registers for this memory controller's DDR PHY.
++
++Required properties:
++- compatible     : should contain one of these
++	"brcm,brcmstb-ddr-phy-v64.5"
++	"brcm,brcmstb-ddr-phy"
++
++- reg            : the DDR PHY register range
++
++== MEMC Arbiter
++
++The memory controller arbiter is responsible for memory clients allocation
++(bandwidth, priorities etc.) and needs to have its contents restored during
++deep sleep states (S3).
++
++Required properties:
++
++- compatible	: should contain one of these
++	"brcm,brcmstb-memc-arb-v10.0.0.0"
++	"brcm,brcmstb-memc-arb"
++
++- reg		: the DDR Arbiter register range
++
++== Timers
++
++The Broadcom STB chips contain a timer block with several general purpose
++timers that can be used.
++
++Required properties:
++
++- compatible	: should contain "brcm,brcmstb-timers"
++- reg		: the timers register range
++
 -- 
 2.9.3
