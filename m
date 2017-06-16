@@ -1,107 +1,523 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Fri, 16 Jun 2017 13:24:32 +0200
-Subject: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO devices
- before scanning
-In-Reply-To: <20170616083313.GY3187@lahna.fi.intel.com>
-References: <20170530132408.GA2556@red-moon>
- <EE11001F9E5DDD47B7634E2F8A612F2E40A7B677@FRAEML521-MBX.china.huawei.com>
- <20170606085553.GA20085@red-moon> <20170612155700.GA31930@red-moon>
- <20170613084831.GP3187@lahna.fi.intel.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40AAE3DA@FRAEML521-MBX.china.huawei.com>
- <20170613151013.GT3187@lahna.fi.intel.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40AAF0BF@FRAEML521-MBX.china.huawei.com>
- <20170613200339.GX3187@lahna.fi.intel.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40AB537A@FRAEML521-MBX.china.huawei.com>
- <20170616083313.GY3187@lahna.fi.intel.com>
-Message-ID: <CAJZ5v0gWGL=M1+T2DxFfwAi=gCbBBnLFVyp4u+1EVem-mcSNQg@mail.gmail.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Fri, 16 Jun 2017 16:54:44 +0530
+Subject: [PATCH v3 2/2] perf: ThunderX2: Add Cavium Thunderx2 SoC UNCORE
+ PMU driver
+In-Reply-To: <20170609152326.GG10665@leverpostej>
+References: <1496645464-26062-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <1496645464-26062-3-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <20170609152326.GG10665@leverpostej>
+Message-ID: <CAFpQJXXTkbBcoXkzX6mBaEYtxDe9VUh0t7A568Z220wGEKVisQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 16, 2017 at 10:33 AM, Mika Westerberg
-<mika.westerberg@linux.intel.com> wrote:
-> On Thu, Jun 15, 2017 at 06:01:02PM +0000, Gabriele Paoloni wrote:
->> Hi Mika
->>
->> > -----Original Message-----
->> > From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
->> > owner at vger.kernel.org] On Behalf Of Mika Westerberg
->> > Sent: 13 June 2017 21:04
->> > To: Gabriele Paoloni
->> > Cc: Lorenzo Pieralisi; rafael at kernel.org; Rafael J. Wysocki;
->> > catalin.marinas at arm.com; will.deacon at arm.com; robh+dt at kernel.org;
->> > frowand.list at gmail.com; bhelgaas at google.com; arnd at arndb.de; linux-arm-
->> > kernel at lists.infradead.org; mark.rutland at arm.com;
->> > brian.starkey at arm.com; olof at lixom.net; benh at kernel.crashing.org; linux-
->> > kernel at vger.kernel.org; linux-acpi at vger.kernel.org; Linuxarm; linux-
->> > pci at vger.kernel.org; minyard at acm.org; John Garry; xuwei (O)
->> > Subject: Re: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO
->> > devices before scanning
->> >
->> > On Tue, Jun 13, 2017 at 07:01:38PM +0000, Gabriele Paoloni wrote:
->> > > I am not very familiar with Linux MFD however the main issue here is
->> > that
->> > > 1) for IPMI we want to re-use the standard IPMI driver without
->> > touching it:
->> > >    see
->> > >
->> > >    static const struct acpi_device_id acpi_ipmi_match[] = {
->> > >          { "IPI0001", 0 },
->> > >          { },
->> > >    };
->> > >
->> > >    in "drivers/char/ipmi/ipmi_si_intf.c" (and in general any standard
->> > driver
->> > >    of an LPC child)
->> > >
->> > > 2) We need a way to guarantee that all LPC children are not
->> > enumerated
->> > >    by acpi_default_enumeration() (so for example if an ipmi node is
->> > an LPC#
->> > >    child it should not be enumerated, otherwise it should be)
->> > >    Currently acpi_default_enumeration() skips spi/i2c slaves by
->> > checking:
->> > >    1) if the acpi resource type is a serial bus
->> > >    2) if the type of serial bus descriptor is I2C or SPI
->> > >
->> > >    For LPC we cannot leverage on any ACPI property to "recognize"
->> > that our
->> > >    devices are LPC children; hence before I proposed for
->> > acpi_default_enumeration()
->> > >    to skip devices that have already been enumerated (by calling
->> > >    acpi_device_enumerated() ).
->> > >
->> > > So in the current scenario, how do you think that MFD can help?
->> >
->> > If you look at Documentation/acpi/enumeration.txt there is a chapter
->> > "MFD devices". I think it pretty much maches what you have here. An LPC
->> > device (MFD device) and bunch of child devices. The driver for your LPC
->> > device can specify _HID for each child device. Those are then mached by
->> > the MFD ACPI code to the corresponding ACPI nodes from which platform
->> > devices are created including "IPI0001".
->>
->> So I guess here in the LPC driver I would have an MFD cell for IPMI. I.e.:
->>
->>       static struct mfd_cell_acpi_match hisi_lpc_ipmi_acpi_match = {
->>               .pnpid = "IPI0001",
->>       };
->>
->> correct?
->
-> Yes.
->
->> >
->> > It causes acpi_default_enumeration() to be called but it should be fine
->> > as we are dealing with platform device anyway.
->>
->> I do not quite understand how declaring such MFD cell above would make sure
->> that the LPC probe is called before the IPMI device is enumerated...
->
-> In fact it may be that it is not sufficient in this case because the
-> ACPI core might enumerate child devices before the LPC driver even gets
-> a chance to probe so you would need to add also scan handler to the
-> child devices and mark them already enumerated or something like that.
+Hi Mark,
 
-Or extend the special I2C/SPI handling to them.
+thanks for the comments.
 
-Thanks,
-Rafael
+On Fri, Jun 9, 2017 at 8:53 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Mon, Jun 05, 2017 at 12:21:04PM +0530, Ganapatrao Kulkarni wrote:
+>> This patch adds a perf driver for the PMU UNCORE devices DDR4 Memory
+>> Controller(DMC) and Level 3 Cache(L3C).
+>
+> Can you elaborate a bit on this please? At minimum, it would be worht
+> mentioning:
+
+ok, i will add some of this information in Documentation patch
+[PATCH v3 1/2] perf: uncore: Adding documentation for ThunderX2 pmu
+uncore driver
+
+>
+> * Whether the PMU has an overflow interrupt
+
+no, timers are used to sample the counters periodically.
+
+> * whether counters are programmable, or fixed-purpose
+all counters/channels are programmable.
+
+> * whether counters are free-running
+
+no, counters are enabled and disabled,
+once enabled, the counter counts the specific pmu events.
+
+> * whethar a single PMU cover the DMC & L3c, or if those are separate
+
+There are separate blocks,  DMC supports 8 channels and each channel
+has 4 counters,
+each counter can be set to specific event and can be started and
+stopped independently.
+it is like 32 DMC (8*4) independent counters can be used simultaneous
+to count specific events.
+
+like wise, L3C also has similar channels and counters, however
+channels of L3c is 16
+so L3c can have 64(16*4) independent counters that can be used
+simultaneous to count specific events.
+
+> * whether there can be multiple instances
+
+yes, perf list shows 8 DMC and 16 L3c PMUs per socket.
+>
+> [...]
+>
+>> +#define UNCORE_MAX_COUNTERS          4
+>> +#define UNCORE_L3_MAX_TILES          16
+>> +#define UNCORE_DMC_MAX_CHANNELS              8
+>> +
+>> +#define UNCORE_HRTIMER_INTERVAL              (2 * NSEC_PER_SEC)
+>
+> Please mention the lack of an overflow interrupt in the commit message.
+
+sure, i will add
+>
+> Can you please add a comment explaining why 2 seconds is necessary
+> and/or sufficient?
+>
+> What's the maximum rate that a counter can increment (in theory), and
+
+The counters of DMC and L3c are 32 bit, the time it takes to overflow
+is ~3 seconds, considering DMC and L3c clock settings.
+So we are sampling at every 2 Seconds before overflow.
+
+> how long would it take to overflow given that rate?
+
+it is event specific, the maximum rate being related to clock rate of
+DMC and L3C.
+
+>
+>> +#define GET_EVENTID(ev)                      ((ev->hw.config) & 0x1ff)
+>> +#define GET_COUNTERID(ev)            ((ev->hw.idx) & 0xf)
+>> +#define GET_CHANNELID(pmu_uncore)    (pmu_uncore->channel)
+>> +
+>> +#define DMC_COUNTER_CTL                      0x234
+>> +#define DMC_COUNTER_DATA             0x240
+>> +#define L3C_COUNTER_CTL                      0xA8
+>> +#define L3C_COUNTER_DATA             0xAC
+>> +
+>> +#define SELECT_CHANNEL                       0xC
+>> +#define THUNDERX2_SMC_ID             0xC200FF00
+>> +#define THUNDERX2_SMC_READ           0xB004
+>> +#define THUNDERX2_SMC_WRITE          0xB005
+>> +
+>> +enum thunderx2_uncore_l3_events {
+>> +     L3_EVENT_NBU_CANCEL = 1,
+>
+> What does zero mean?
+zero means, counter is disabled.
+>
+> L3_EVENT_NONE, perhaps?
+
+ok, i can add as L3_EVENT_DISABLE and can be used whenever it is being disabled.
+>
+>> +     L3_EVENT_DIB_RETRY,
+>> +     L3_EVENT_DOB_RETRY,
+>> +     L3_EVENT_DIB_CREDIT_RETRY,
+>> +     L3_EVENT_DOB_CREDIT_RETRY,
+>> +     L3_EVENT_FORCE_RETRY,
+>> +     L3_EVENT_IDX_CONFLICT_RETRY,
+>> +     L3_EVENT_EVICT_CONFLICT_RETRY,
+>> +     L3_EVENT_BANK_CONFLICT_RETRY,
+>> +     L3_EVENT_FILL_ENTRY_RETRY,
+>> +     L3_EVENT_EVICT_NOT_READY_RETRY,
+>> +     L3_EVENT_L3_RETRY,
+>> +     L3_EVENT_READ_REQ,
+>> +     L3_EVENT_WRITE_BACK_REQ,
+>> +     L3_EVENT_INVALIDATE_NWRITE_REQ,
+>> +     L3_EVENT_INV_REQ,
+>> +     L3_EVENT_SELF_REQ,
+>> +     L3_EVENT_REQ,
+>> +     L3_EVENT_EVICT_REQ,
+>> +     L3_EVENT_INVALIDATE_NWRITE_HIT,
+>> +     L3_EVENT_INVALIDATE_HIT,
+>> +     L3_EVENT_SELF_HIT,
+>> +     L3_EVENT_READ_HIT,
+>> +     L3_EVENT_MAX,
+>> +};
+>> +
+>> +enum thunderx2_uncore_dmc_events {
+>
+> Likewise, DMC_EVENT_NONE?
+
+ok, as said above.
+>
+>> +     DMC_EVENT_COUNT_CYCLES = 1,
+>> +     DMC_EVENT_RES2,
+>> +     DMC_EVENT_RES3,
+>> +     DMC_EVENT_RES4,
+>> +     DMC_EVENT_RES5,
+>> +     DMC_EVENT_RES6,
+>> +     DMC_EVENT_RES7,
+>> +     DMC_EVENT_RES8,
+>> +     DMC_EVENT_READ_64B,
+>> +     DMC_EVENT_READ_LESS_THAN_64B,
+>> +     DMC_EVENT_WRITE,
+>> +     DMC_EVENT_TXN_CYCLES,
+>> +     DMC_EVENT_DATA_TXFERED,
+>> +     DMC_EVENT_CANCELLED_READ_TXN,
+>> +     DMC_EVENT_READ_TXN_CONSUMED,
+>> +     DMC_EVENT_MAX,
+>> +};
+>> +
+>> +enum thunderx2_uncore_type {
+>> +     PMU_TYPE_INVALID,
+>> +     PMU_TYPE_L3C,
+>> +     PMU_TYPE_DMC,
+>> +};
+>> +
+>> +struct active_timer {
+>> +     struct perf_event *event;
+>> +     struct hrtimer hrtimer;
+>> +};
+>> +
+>> +/*
+>> + * pmu on each socket has 2 uncore devices(dmc and l3),
+>> + * each uncore device has up to 16 channels, each channel can sample
+>> + * events independently with counters up to 4.
+>> + *
+>> + * struct thunderx2_pmu_uncore_channel created per channel.
+>> + * struct thunderx2_pmu_uncore_dev per uncore device.
+>> + * struct thunderx2_pmu created per socket.
+>> + */
+>> +struct thunderx2_pmu_uncore_channel {
+>> +     struct thunderx2_pmu_uncore_dev *uncore_dev;
+>> +     struct pmu pmu;
+>> +     int counter;
+>> +     int channel;
+>> +     DECLARE_BITMAP(counter_mask, UNCORE_MAX_COUNTERS);
+>> +     struct active_timer *active_timers;
+>
+> Do we really need a timer per-event? Can't have a single timer
+> per-channel, at least?
+
+as explained above, all 4 counters are independent per channel.
+>
+> If we do need this, it would be better to make this an array within
+> thunderx2_pmu_uncore_channel. UNCORE_MAX_COUNTERS is small.
+
+yes, but we want to support to run all counters of each channel simultaneously.
+i.e we can sample up to 4 events per/all channels simultaneously.
+
+>
+>> +     /* to sync counter alloc/release */
+>> +     raw_spinlock_t lock;
+>> +};
+>
+> [...]
+>
+>> +static struct attribute *l3c_pmu_events_attrs[] = {
+>> +     EVENT_ATTR(nbu_cancel,                  L3_EVENT_NBU_CANCEL),
+>> +     EVENT_ATTR(dib_retry,                   L3_EVENT_DIB_RETRY),
+>> +     EVENT_ATTR(dob_retry,                   L3_EVENT_DOB_RETRY),
+>> +     EVENT_ATTR(dib_credit_retry,            L3_EVENT_DIB_CREDIT_RETRY),
+>> +     EVENT_ATTR(dob_credit_retry,            L3_EVENT_DOB_CREDIT_RETRY),
+>> +     EVENT_ATTR(force_retry,                 L3_EVENT_FORCE_RETRY),
+>> +     EVENT_ATTR(idx_conflict_retry,          L3_EVENT_IDX_CONFLICT_RETRY),
+>> +     EVENT_ATTR(evict_conflict_retry,        L3_EVENT_EVICT_CONFLICT_RETRY),
+>> +     EVENT_ATTR(bank_conflict_retry,         L3_EVENT_BANK_CONFLICT_RETRY),
+>> +     EVENT_ATTR(fill_entry_retry,            L3_EVENT_FILL_ENTRY_RETRY),
+>> +     EVENT_ATTR(evict_not_ready_retry,       L3_EVENT_EVICT_NOT_READY_RETRY),
+>> +     EVENT_ATTR(l3_retry,                    L3_EVENT_L3_RETRY),
+>> +     EVENT_ATTR(read_requests,               L3_EVENT_READ_REQ),
+>> +     EVENT_ATTR(write_back_requests,         L3_EVENT_WRITE_BACK_REQ),
+>> +     EVENT_ATTR(inv_nwrite_requests,         L3_EVENT_INVALIDATE_NWRITE_REQ),
+>> +     EVENT_ATTR(inv_requests,                L3_EVENT_INV_REQ),
+>> +     EVENT_ATTR(self_requests,               L3_EVENT_SELF_REQ),
+>> +     EVENT_ATTR(requests,                    L3_EVENT_REQ),
+>> +     EVENT_ATTR(evict_requests,              L3_EVENT_EVICT_REQ),
+>> +     EVENT_ATTR(inv_nwrite_hit,              L3_EVENT_INVALIDATE_NWRITE_HIT),
+>> +     EVENT_ATTR(inv_hit,                     L3_EVENT_INVALIDATE_HIT),
+>> +     EVENT_ATTR(self_hit,                    L3_EVENT_SELF_HIT),
+>> +     EVENT_ATTR(read_hit,                    L3_EVENT_READ_HIT),
+>> +     NULL,
+>> +};
+>
+> Some of these are plural, while others are not. Please be consistent
+
+ok
+>
+>> +static struct attribute *dmc_pmu_events_attrs[] = {
+>> +     EVENT_ATTR(cnt_cycles,                  DMC_EVENT_COUNT_CYCLES),
+>> +     EVENT_ATTR(read_64b_txns,               DMC_EVENT_READ_64B),
+>> +     EVENT_ATTR(read_less_than_64b_txns,     DMC_EVENT_READ_LESS_THAN_64B),
+>> +     EVENT_ATTR(write_txns,                  DMC_EVENT_WRITE),
+>> +     EVENT_ATTR(txn_cycles,                  DMC_EVENT_TXN_CYCLES),
+>> +     EVENT_ATTR(data_txfered,                DMC_EVENT_DATA_TXFERED),
+>> +     EVENT_ATTR(cancelled_read_txn,          DMC_EVENT_CANCELLED_READ_TXN),
+>> +     EVENT_ATTR(read_txn_consumed,           DMC_EVENT_READ_TXN_CONSUMED),
+>> +     NULL,
+>> +};
+>
+> Likewise.
+
+ok
+>
+> [...]
+>
+>> +static void secure_write_reg(uint32_t value, uint64_t pa)
+>> +{
+>> +     struct arm_smccc_res res;
+>> +
+>> +     arm_smccc_smc(THUNDERX2_SMC_ID, THUNDERX2_SMC_WRITE,
+>> +                     0, pa, value, 0, 0, 0, &res);
+>> +}
+>> +
+>> +static uint32_t secure_read_reg(uint64_t pa)
+>> +{
+>> +     struct arm_smccc_res res;
+>> +
+>> +     arm_smccc_smc(THUNDERX2_SMC_ID, THUNDERX2_SMC_READ,
+>> +                     0, pa, 0, 0, 0, 0,  &res);
+>> +     return res.a0;
+>> +}
+>
+> These sounds *very* unsafe.
+
+firmware/ATF validates the register being requested to
+read/write and allows only few registers.
+
+>
+> How exactly does the secure side handle these?
+
+This smc call is to read and write to channel select register which is
+by design a secure register.
+as explained above, we have 8 DMC and 16 L3C channels, however
+registers which are interfaced
+to set event and sample counter values are multiplexed between channels.
+this register is used to select the channel for event setting and counter read.
+
+>
+> [...]
+>
+>> +static void init_cntr_base_l3c(struct perf_event *event,
+>> +             struct thunderx2_pmu_uncore_dev *uncore_dev) {
+>> +
+>> +     struct hw_perf_event *hwc = &event->hw;
+>> +
+>> +     /* counter ctrl/data reg offset at 8 */
+>> +     hwc->config_base = uncore_dev->base
+>> +             + L3C_COUNTER_CTL + (8 * GET_COUNTERID(event));
+>> +     hwc->event_base =  uncore_dev->base
+>> +             + L3C_COUNTER_DATA + (8 * GET_COUNTERID(event));
+>> +}
+>
+> Surely we can calculate this as required?
+>
+> That way we can kill off reg_{readl,writel}, and use {readl,writel}
+> directly.
+
+these helper functions added to take care type casting at one place.
+
+>
+> [...]
+>
+>> +static void thunderx2_uncore_update(struct perf_event *event)
+>> +{
+>> +     s64 prev, new = 0;
+>> +     u64 delta;
+>> +     struct hw_perf_event *hwc = &event->hw;
+>> +     struct thunderx2_pmu_uncore_channel *pmu_uncore;
+>> +     enum thunderx2_uncore_type type;
+>> +
+>> +     pmu_uncore = pmu_to_thunderx2_pmu_uncore(event->pmu);
+>> +     type = pmu_uncore->uncore_dev->type;
+>> +
+>> +     if (pmu_uncore->uncore_dev->select_channel)
+>> +             pmu_uncore->uncore_dev->select_channel(event);
+>> +
+>> +     new = reg_readl(hwc->event_base);
+>> +     prev = local64_xchg(&hwc->prev_count, new);
+>> +
+>> +     /* handle rollover of counters */
+>> +     if (new < prev)
+>> +             delta = (((1UL << 32) - prev) + new);
+>> +     else
+>> +             delta = new - prev;
+>
+> We should be able to handle this without an explicit check, by doing
+> arithmetic on an unsigned 32-bit type.
+
+ok, will change.
+>
+> [...]
+>
+>> +     /* Pick one core from the node to use for cpumask attributes */
+>> +     event->cpu = cpumask_first(
+>> +                     cpumask_of_node(pmu_uncore->uncore_dev->node));
+>
+> Use uncore_dev->cpu_mask.
+
+cpu_mask is set at init time, however setting cpu from the current available
+online cpus is more appropriate. similarly, i will update
+thunderx2_pmu_cpumask_show.
+cpu_mask variable shall be removed.
+
+>
+> [...]
+>
+>> +     /*
+>> +      * We must NOT create groups containing mixed PMUs,
+>> +      * although software events are acceptable
+>> +      */
+>> +     if (event->group_leader->pmu != event->pmu &&
+>> +                     !is_software_event(event->group_leader))
+>> +             return -EINVAL;
+>> +
+>> +     list_for_each_entry(sibling, &event->group_leader->sibling_list,
+>> +                     group_entry)
+>> +             if (sibling->pmu != event->pmu &&
+>> +                             !is_software_event(sibling))
+>> +                     return -EINVAL;
+>
+> Please also check that the group doesn't require more counters than the
+> PMU has. Such groups can never be scheduled, and we should reject them
+> early.
+
+ok
+>
+> [...]
+>
+>> +static void thunderx2_uncore_start(struct perf_event *event, int flags)
+>> +{
+>> +     struct hw_perf_event *hwc = &event->hw;
+>> +     struct thunderx2_pmu_uncore_channel *pmu_uncore;
+>> +     struct thunderx2_pmu_uncore_dev *uncore_dev;
+>> +     unsigned long irqflags;
+>> +     struct active_timer *active_timer;
+>> +
+>> +     hwc->state = 0;
+>> +     pmu_uncore = pmu_to_thunderx2_pmu_uncore(event->pmu);
+>> +     uncore_dev = pmu_uncore->uncore_dev;
+>> +
+>> +     raw_spin_lock_irqsave(&uncore_dev->lock, irqflags);
+>> +
+>> +     if (uncore_dev->select_channel)
+>> +             uncore_dev->select_channel(event);
+>> +     uncore_dev->start_event(event, flags);
+>> +     raw_spin_unlock_irqrestore(&uncore_dev->lock, irqflags);
+>> +
+>> +     perf_event_update_userpage(event);
+>> +     active_timer = &pmu_uncore->active_timers[GET_COUNTERID(event)];
+>> +     active_timer->event = event;
+>> +
+>> +     if (!hrtimer_active(&active_timer->hrtimer))
+>
+> This looks dubious. we should balance starting/stopping the timer such
+> that we don't need to check if it's already running.
+
+ok, I will try to make it symmetric.
+
+>
+>> +             hrtimer_start(&active_timer->hrtimer,
+>> +                     ns_to_ktime(uncore_dev->hrtimer_interval),
+>> +                     HRTIMER_MODE_REL_PINNED);
+>> +}
+>> +
+>> +static void thunderx2_uncore_stop(struct perf_event *event, int flags)
+>> +{
+>> +     struct hw_perf_event *hwc = &event->hw;
+>> +     struct thunderx2_pmu_uncore_channel *pmu_uncore;
+>> +     struct thunderx2_pmu_uncore_dev *uncore_dev;
+>> +     unsigned long irqflags;
+>> +
+>> +     if (hwc->state & PERF_HES_UPTODATE)
+>> +             return;
+>> +
+>> +     pmu_uncore = pmu_to_thunderx2_pmu_uncore(event->pmu);
+>> +     uncore_dev = pmu_uncore->uncore_dev;
+>> +
+>> +     raw_spin_lock_irqsave(&uncore_dev->lock, irqflags);
+>> +
+>> +     if (uncore_dev->select_channel)
+>> +             uncore_dev->select_channel(event);
+>> +     uncore_dev->stop_event(event);
+>> +
+>> +     WARN_ON_ONCE(hwc->state & PERF_HES_STOPPED);
+>> +     hwc->state |= PERF_HES_STOPPED;
+>> +     if ((flags & PERF_EF_UPDATE) && !(hwc->state & PERF_HES_UPTODATE)) {
+>> +             thunderx2_uncore_update(event);
+>> +             hwc->state |= PERF_HES_UPTODATE;
+>> +     }
+>> +     raw_spin_unlock_irqrestore(&uncore_dev->lock, irqflags);
+>> +}
+>> +
+>> +static int thunderx2_uncore_add(struct perf_event *event, int flags)
+>> +{
+>> +     struct hw_perf_event *hwc = &event->hw;
+>> +     struct thunderx2_pmu_uncore_channel *pmu_uncore;
+>> +     struct thunderx2_pmu_uncore_dev *uncore_dev;
+>> +
+>> +     pmu_uncore = pmu_to_thunderx2_pmu_uncore(event->pmu);
+>> +     uncore_dev = pmu_uncore->uncore_dev;
+>> +
+>> +     /* Allocate a free counter */
+>> +     hwc->idx  = alloc_counter(pmu_uncore);
+>> +     if (hwc->idx < 0)
+>> +             return -EAGAIN;
+>> +
+>> +     /* set counter control and data registers base address */
+>> +     uncore_dev->init_cntr_base(event, uncore_dev);
+>> +
+>> +     hwc->state = PERF_HES_UPTODATE | PERF_HES_STOPPED;
+>> +     if (flags & PERF_EF_START)
+>> +             thunderx2_uncore_start(event, PERF_EF_RELOAD);
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static void thunderx2_uncore_del(struct perf_event *event, int flags)
+>> +{
+>> +     struct thunderx2_pmu_uncore_channel *pmu_uncore =
+>> +                     pmu_to_thunderx2_pmu_uncore(event->pmu);
+>> +     struct hw_perf_event *hwc = &event->hw;
+>> +
+>> +     thunderx2_uncore_stop(event, PERF_EF_UPDATE);
+>> +
+>> +     hrtimer_cancel(
+>> +             &pmu_uncore->active_timers[GET_COUNTERID(event)].hrtimer);
+>
+> This doesn't pair with add, where we didn't touch the hrtimer at all.
+>
+> Either add/del should poke the hrtimer, or start/stop should.
+
+ok
+>
+> [...]
+>
+>> +     /* we can run up to (max_counters * max_channels) events simultaneously.
+>> +      * allocate hrtimers per channel.
+>> +      */
+>> +     pmu_uncore->active_timers = devm_kzalloc(dev,
+>> +                     sizeof(struct active_timer) * uncore_dev->max_counters,
+>> +                     GFP_KERNEL);
+>
+> As mentioned above, I think we can fold these into the channel
+> structure, and don't need to allocate it separately.
+
+explained above.
+>
+> [...]
+>
+>> +     /* Pick one core from the node to use for cpumask attributes */
+>> +     cpumask_set_cpu(cpumask_first(cpumask_of_node(uncore_dev->node)),
+>> +                     &uncore_dev->cpu_mask);
+>
+> What about !CONFIG_NUMA? cpu_mask_of_node() will be cpu_online_mask.
+>
+> ... so surely that will result in erroneous behaviour from the driver?
+
+for single node, there should not be any issue if you are using
+non-numa kernel, however multinode, it is expected to boot with numa kernel.
+
+>
+> We should have the FW describe the affinity explicitly rather than
+> trying to infer it via Linux's internal (advisory) abstractions.
+
+yes, firmeware/ACPI is defining the _PXM, it is being parsed in
+thunderx2_uncore_probe function.
+i hope i have understood your question correctly!
+
+>
+> Thanks,
+> Mark.
+
+thanks,
+Ganapat
