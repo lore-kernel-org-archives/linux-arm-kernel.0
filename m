@@ -1,32 +1,89 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 16 Jun 2017 10:18:56 +0100
-Subject: Applied "ASoC: rockchip: Fix an error handling in
- 'rockchip_i2s_probe'" to the asoc tree
-In-Reply-To: <e92fef8d-5ce1-0b7d-d130-0246d2cb7f91@wanadoo.fr>
-References: <20170615055311.8049-1-christophe.jaillet@wanadoo.fr>
- <E1dLYRz-0001l4-SZ@debutante>
- <e92fef8d-5ce1-0b7d-d130-0246d2cb7f91@wanadoo.fr>
-Message-ID: <20170616091856.jz5d4trm5jz2ugan@sirena.org.uk>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 16 Jun 2017 11:35:12 +0200
+Subject: [PATCH 6/6] ARM: dts: rockchip: add efuse device node for rk3228
+In-Reply-To: <da5fbd76-c9a1-a16f-3ed8-adfd2b1c346f@rock-chips.com>
+References: <1497510980-23207-1-git-send-email-frank.wang@rock-chips.com>
+ <2537345.MJmYY2BcSn@phil>
+ <da5fbd76-c9a1-a16f-3ed8-adfd2b1c346f@rock-chips.com>
+Message-ID: <2264017.eLNdPIXHd9@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 16, 2017 at 06:57:30AM +0200, Christophe JAILLET wrote:
-> Le 15/06/2017 ? 19:20, Mark Brown a ?crit :
+Am Freitag, 16. Juni 2017, 17:24:23 CEST schrieb Frank Wang:
+> Hi Heiko,
+> 
+> On 2017/6/15 23:10, Heiko Stuebner wrote:
+> > Hi Frank,
+> > 
+> > Am Donnerstag, 15. Juni 2017, 15:23:16 CEST schrieb Frank Wang:
+> >> From: Finley Xiao <finley.xiao@rock-chips.com>
+> >> 
+> >> Add a efuse node in the device tree for the rk3228 SoC.
+> >> 
+> >> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+> >> ---
+> >> 
+> >>   arch/arm/boot/dts/rk322x.dtsi | 17 +++++++++++++++++
+> >>   1 file changed, 17 insertions(+)
+> >> 
+> >> diff --git a/arch/arm/boot/dts/rk322x.dtsi
+> >> b/arch/arm/boot/dts/rk322x.dtsi
+> >> index c2a78f4..dad195e 100644
+> >> --- a/arch/arm/boot/dts/rk322x.dtsi
+> >> +++ b/arch/arm/boot/dts/rk322x.dtsi
+> >> @@ -314,6 +314,23 @@
+> >> 
+> >>   		status = "disabled";
+> >>   	
+> >>   	};
+> >> 
+> >> +	efuse: efuse at 11040000 {
+> >> +		compatible = "rockchip,rk322x-efuse";
+> > 
+> > was this binding included already? Simply because compatibles should
+> > not contain placeholders, so rockchip,rk3228-efuse please - same for
+> > the driver side.
+> 
+> Actually, I always remember it should be without placeholders from the
+> first time you commented :-)
+> but I saw that the binding and driver (rockchip,rk322x-efuse) have
+> already been applied, so I send this one keep the same with driver side.
+> Shall I resend a new patch to correct both of them to
+> 'rockchip,rk3228-efuse' ?
 
-> >   	if (!of_property_read_u32(node, "rockchip,playback-channels", &val)) {
-> >   		if (val >= 2 && val <= 8)
-> >   			soc_dai->playback.channels_max = val;
+Yes please :-) .
 
-> ... and 'err' should be 'ret'...
+As it was probably applied for 4.13, changing the compatible shouldn't be
+a problem.
 
-> I'm really confused for such a ugly proposal !
 
-In a situation like this it's generally best to send a patch, I'll fix
-though.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170616/09fc6b51/attachment.sig>
+Thanks
+Heiko
+
+> 
+> 
+> BR.
+> Frank
+> 
+> > Heiko
+> > 
+> >> +		reg = <0x11040000 0x20>;
+> >> +		#address-cells = <1>;
+> >> +		#size-cells = <1>;
+> >> +		clocks = <&cru PCLK_EFUSE_256>;
+> >> +		clock-names = "pclk_efuse";
+> >> +
+> >> +		/* Data cells */
+> >> +		efuse_id: id at 7 {
+> >> +			reg = <0x7 0x10>;
+> >> +		};
+> >> +		cpu_leakage: cpu_leakage at 17 {
+> >> +			reg = <0x17 0x1>;
+> >> +		};
+> >> +	};
+> >> +
+> >> 
+> >>   	i2c0: i2c at 11050000 {
+> >>   	
+> >>   		compatible = "rockchip,rk3228-i2c";
+> >>   		reg = <0x11050000 0x1000>;
