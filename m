@@ -1,43 +1,55 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 16 Jun 2017 14:36:59 -0700
-Subject: [PATCH 1/5] dt-bindings: Update Broadcom STB binding
+Date: Fri, 16 Jun 2017 14:37:00 -0700
+Subject: [PATCH 2/5] soc: bcm: brcmstb: Add Kconfig entry point for power
+ management
 In-Reply-To: <20170616213703.21487-1-f.fainelli@gmail.com>
 References: <20170616213703.21487-1-f.fainelli@gmail.com>
-Message-ID: <20170616213703.21487-2-f.fainelli@gmail.com>
+Message-ID: <20170616213703.21487-3-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the Broadcom STB binding document with new compatible strings for
-the DDR PHY and memory controller found on newer chips.
+Add the necessary pluming to select and build CONFIG_BRCMSTB_PM.
+Functional code is not added yet.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ drivers/soc/bcm/Kconfig          | 2 ++
+ drivers/soc/bcm/brcmstb/Kconfig  | 8 ++++++++
+ drivers/soc/bcm/brcmstb/Makefile | 1 +
+ 3 files changed, 11 insertions(+)
+ create mode 100644 drivers/soc/bcm/brcmstb/Kconfig
 
-diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
-index 0d0c1ae81bed..790e6b0b8306 100644
---- a/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
-+++ b/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
-@@ -164,6 +164,8 @@ Control registers for this memory controller's DDR PHY.
+diff --git a/drivers/soc/bcm/Kconfig b/drivers/soc/bcm/Kconfig
+index 49f1e2a75d61..055a845ed979 100644
+--- a/drivers/soc/bcm/Kconfig
++++ b/drivers/soc/bcm/Kconfig
+@@ -20,4 +20,6 @@ config SOC_BRCMSTB
  
- Required properties:
- - compatible     : should contain one of these
-+	"brcm,brcmstb-ddr-phy-v71.1"
-+	"brcm,brcmstb-ddr-phy-v72.0"
- 	"brcm,brcmstb-ddr-phy-v225.1"
- 	"brcm,brcmstb-ddr-phy-v240.1"
- 	"brcm,brcmstb-ddr-phy-v240.2"
-@@ -184,7 +186,9 @@ Sequencer DRAM parameters and control registers. Used for Self-Refresh
- Power-Down (SRPD), among other things.
+ 	  If unsure, say N.
  
- Required properties:
--- compatible     : should contain "brcm,brcmstb-memc-ddr"
-+- compatible     : should contain one of these
-+	"brcm,brcmstb-memc-ddr-rev-b.2.2"
-+	"brcm,brcmstb-memc-ddr"
- - reg            : the MEMC DDR register range
- 
- Example:
++source "drivers/soc/bcm/brcmstb/Kconfig"
++
+ endmenu
+diff --git a/drivers/soc/bcm/brcmstb/Kconfig b/drivers/soc/bcm/brcmstb/Kconfig
+new file mode 100644
+index 000000000000..996a75db015e
+--- /dev/null
++++ b/drivers/soc/bcm/brcmstb/Kconfig
+@@ -0,0 +1,8 @@
++if SOC_BRCMSTB
++
++config BRCMSTB_PM
++        bool "Support suspend/resume for STB platforms"
++        default y
++        depends on PM
++
++endif # SOC_BRCMSTB
+diff --git a/drivers/soc/bcm/brcmstb/Makefile b/drivers/soc/bcm/brcmstb/Makefile
+index 9120b2715d3e..ee5b4de741b8 100644
+--- a/drivers/soc/bcm/brcmstb/Makefile
++++ b/drivers/soc/bcm/brcmstb/Makefile
+@@ -1 +1,2 @@
+ obj-y				+= common.o biuctrl.o
++obj-y				+= pm/
 -- 
 2.9.3
