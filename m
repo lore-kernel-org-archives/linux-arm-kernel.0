@@ -1,28 +1,134 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Fri, 16 Jun 2017 10:43:28 +0200
-Subject: [PATCH 25/44] arm: implement ->mapping_error
-In-Reply-To: <20170608144313.GL4902@n2100.armlinux.org.uk>
-References: <20170608132609.32662-1-hch@lst.de>
- <20170608132609.32662-26-hch@lst.de>
- <20170608144313.GL4902@n2100.armlinux.org.uk>
-Message-ID: <20170616084328.GC10582@lst.de>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Fri, 16 Jun 2017 11:43:09 +0300
+Subject: [PATCH v2] [media] davinci: vpif: adaptions for DT support
+In-Reply-To: <20170609161026.7582-1-khilman@baylibre.com>
+References: <20170609161026.7582-1-khilman@baylibre.com>
+Message-ID: <20170616084309.GI12407@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 08, 2017 at 03:43:14PM +0100, Russell King - ARM Linux wrote:
-> BOn Thu, Jun 08, 2017 at 03:25:50PM +0200, Christoph Hellwig wrote:
-> > +static int dmabounce_mapping_error(struct device *dev, dma_addr_t dma_addr)
-> > +{
-> > +	if (dev->archdata.dmabounce)
-> > +		return 0;
-> 
-> I'm not convinced that we need this check here:
-> 
->         dev->archdata.dmabounce = device_info;
->         set_dma_ops(dev, &dmabounce_ops);
-> 
-> There shouldn't be any chance of dev->archdata.dmabounce being NULL if
-> the dmabounce_ops has been set as the current device DMA ops.  So I
-> think that test can be killed.
+Hi Kevin,
 
-Ok, I'll fix it up.
+On Fri, Jun 09, 2017 at 09:10:26AM -0700, Kevin Hilman wrote:
+> The davinci VPIF is a single hardware block, but the existing driver
+> is broken up into a common library (vpif.c), output (vpif_display.c) and
+> intput (vpif_capture.c).
+> 
+> When migrating to DT, to better model the hardware, and because
+> registers, interrupts, etc. are all common,it was decided to
+> have a single VPIF hardware node[1].
+> 
+> Because davinci uses legacy, non-DT boot on several SoCs still, the
+> platform_drivers need to remain.  But they are also needed in DT boot.
+> Since there are no DT nodes for the display/capture parts in DT
+> boot (there is a single node for the parent/common device) we need to
+> create platform_devices somewhere to instansiate the platform_drivers.
+> 
+> When VPIF display/capture are needed for a DT boot, the VPIF node
+> will have endpoints defined for its subdevs.  Therefore, vpif_probe()
+> checks for the presence of endpoints, and if detected manually creates
+> the platform_devices for the display and capture platform_drivers.
+> 
+> [1] Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+> 
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+> ---
+> Changes since v1:
+> - added proper error checking to kzalloc calls
+> - rebased onto media/master
+> 
+>  drivers/media/platform/davinci/vpif.c | 57 ++++++++++++++++++++++++++++++++++-
+>  1 file changed, 56 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/media/platform/davinci/vpif.c b/drivers/media/platform/davinci/vpif.c
+> index 1b02a6363f77..c2d214dfaa3e 100644
+> --- a/drivers/media/platform/davinci/vpif.c
+> +++ b/drivers/media/platform/davinci/vpif.c
+> @@ -26,6 +26,7 @@
+>  #include <linux/pm_runtime.h>
+>  #include <linux/spinlock.h>
+>  #include <linux/v4l2-dv-timings.h>
+> +#include <linux/of_graph.h>
+>  
+>  #include "vpif.h"
+>  
+> @@ -423,7 +424,9 @@ EXPORT_SYMBOL(vpif_channel_getfid);
+>  
+>  static int vpif_probe(struct platform_device *pdev)
+>  {
+> -	static struct resource	*res;
+> +	static struct resource	*res, *res_irq;
+> +	struct platform_device *pdev_capture, *pdev_display;
+> +	struct device_node *endpoint = NULL;
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	vpif_base = devm_ioremap_resource(&pdev->dev, res);
+> @@ -435,6 +438,58 @@ static int vpif_probe(struct platform_device *pdev)
+>  
+>  	spin_lock_init(&vpif_lock);
+>  	dev_info(&pdev->dev, "vpif probe success\n");
+> +
+> +	/*
+> +	 * If VPIF Node has endpoints, assume "new" DT support,
+> +	 * where capture and display drivers don't have DT nodes
+> +	 * so their devices need to be registered manually here
+> +	 * for their legacy platform_drivers to work.
+> +	 */
+> +	endpoint = of_graph_get_next_endpoint(pdev->dev.of_node,
+> +					      endpoint);
+> +	if (!endpoint) 
+> +		return 0;
+> +
+> +	/*
+> +	 * For DT platforms, manually create platform_devices for
+> +	 * capture/display drivers.
+> +	 */
+> +	res_irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+> +	if (!res_irq) {
+> +		dev_warn(&pdev->dev, "Missing IRQ resource.\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	pdev_capture = devm_kzalloc(&pdev->dev, sizeof(*pdev_capture),
+> +				    GFP_KERNEL);
+> +	if (pdev_capture) {
+> +		pdev_capture->name = "vpif_capture";
+> +		pdev_capture->id = -1;
+> +		pdev_capture->resource = res_irq;
+> +		pdev_capture->num_resources = 1;
+> +		pdev_capture->dev.dma_mask = pdev->dev.dma_mask;
+> +		pdev_capture->dev.coherent_dma_mask = pdev->dev.coherent_dma_mask;
+> +		pdev_capture->dev.parent = &pdev->dev;
+> +		platform_device_register(pdev_capture);
+
+Don't both of these (vpif_capture and vpif_display) depend on platform data?
+Or do I miss something?
+
+> +	} else {
+> +		dev_warn(&pdev->dev, "Unable to allocate memory for pdev_capture.\n");
+> +	}
+> +
+> +	pdev_display = devm_kzalloc(&pdev->dev, sizeof(*pdev_display),
+> +				    GFP_KERNEL);
+> +	if (pdev_display) {
+> +		pdev_display->name = "vpif_display";
+> +		pdev_display->id = -1;
+> +		pdev_display->resource = res_irq;
+> +		pdev_display->num_resources = 1;
+> +		pdev_display->dev.dma_mask = pdev->dev.dma_mask;
+> +		pdev_display->dev.coherent_dma_mask = pdev->dev.coherent_dma_mask;
+> +		pdev_display->dev.parent = &pdev->dev;
+> +		platform_device_register(pdev_display);
+> +	} else {
+> +		dev_warn(&pdev->dev, "Unable to allocate memory for pdev_display.\n");
+> +	}
+> +
+>  	return 0;
+>  }
+>  
+
+-- 
+Regards,
+
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
