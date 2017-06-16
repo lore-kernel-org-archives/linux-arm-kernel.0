@@ -1,46 +1,242 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Fri, 16 Jun 2017 14:32:24 +0100
-Subject: [PATCH] gpio: rcar: Add R8A7743 (RZ/G1M) support
-Message-ID: <1497619944-61410-1-git-send-email-biju.das@bp.renesas.com>
+From: yt.shen@mediatek.com (YT Shen)
+Date: Fri, 16 Jun 2017 21:45:21 +0800
+Subject: [PATCH v3 2/2] arm64: dts: Add Mediatek SoC MT2712 and evaluation
+ board dts and Makefile
+In-Reply-To: <1497620721-61444-1-git-send-email-yt.shen@mediatek.com>
+References: <1497620721-61444-1-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1497620721-61444-3-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Renesas RZ/G1M (R8A7743 SoC) GPIO blocks are identical to the R-Car Gen2
-family. Add support for its GPIO controllers.
+This adds basic chip support for Mediatek 2712
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+Signed-off-by: YT Shen <yt.shen@mediatek.com>
 ---
- Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt | 1 +
- drivers/gpio/gpio-rcar.c                                     | 4 ++++
- 2 files changed, 5 insertions(+)
+ arch/arm64/boot/dts/mediatek/Makefile       |   1 +
+ arch/arm64/boot/dts/mediatek/mt2712-evb.dts |  32 ++++++
+ arch/arm64/boot/dts/mediatek/mt2712e.dtsi   | 166 ++++++++++++++++++++++++++++
+ 3 files changed, 199 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt2712-evb.dts
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt2712e.dtsi
 
-diff --git a/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt b/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
-index 7c1ab3b..1cc3cfe 100644
---- a/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
-+++ b/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
-@@ -3,6 +3,7 @@
- Required Properties:
- 
-   - compatible: should contain one of the following.
-+    - "renesas,gpio-r8a7743": for R8A7743 (RZ-G1M) compatible GPIO controller.
-     - "renesas,gpio-r8a7778": for R8A7778 (R-Mobile M1) compatible GPIO controller.
-     - "renesas,gpio-r8a7779": for R8A7779 (R-Car H1) compatible GPIO controller.
-     - "renesas,gpio-r8a7790": for R8A7790 (R-Car H2) compatible GPIO controller.
-diff --git a/drivers/gpio/gpio-rcar.c b/drivers/gpio/gpio-rcar.c
-index 31ad288..4a1536a 100644
---- a/drivers/gpio/gpio-rcar.c
-+++ b/drivers/gpio/gpio-rcar.c
-@@ -344,6 +344,10 @@ struct gpio_rcar_info {
- 
- static const struct of_device_id gpio_rcar_of_table[] = {
- 	{
-+		.compatible = "renesas,gpio-r8a7743",
-+		/* RZ/G1 GPIO is identical to R-Car Gen2. */
-+		.data = &gpio_rcar_info_gen2,
-+	}, {
- 		.compatible = "renesas,gpio-r8a7790",
- 		.data = &gpio_rcar_info_gen2,
- 	}, {
+diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
+index 9fbfd32..fcc0604 100644
+--- a/arch/arm64/boot/dts/mediatek/Makefile
++++ b/arch/arm64/boot/dts/mediatek/Makefile
+@@ -1,3 +1,4 @@
++dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
+ dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
+ dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
+ dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
+diff --git a/arch/arm64/boot/dts/mediatek/mt2712-evb.dts b/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
+new file mode 100644
+index 0000000..8c804df
+--- /dev/null
++++ b/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
+@@ -0,0 +1,32 @@
++/*
++ * Copyright (c) 2017 MediaTek Inc.
++ * Author: YT Shen <yt.shen@mediatek.com>
++ *
++ * SPDX-License-Identifier: (GPL-2.0 OR MIT)
++ */
++
++/dts-v1/;
++#include "mt2712e.dtsi"
++
++/ {
++	model = "MediaTek MT2712 evaluation board";
++	compatible = "mediatek,mt2712-evb", "mediatek,mt2712";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	memory at 40000000 {
++		device_type = "memory";
++		reg = <0 0x40000000 0 0x80000000>;
++	};
++
++	chosen {
++		stdout-path = "serial0:921600n8";
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
++
+diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+new file mode 100644
+index 0000000..65cdd4a
+--- /dev/null
++++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+@@ -0,0 +1,166 @@
++/*
++ * Copyright (c) 2017 MediaTek Inc.
++ * Author: YT Shen <yt.shen@mediatek.com>
++ *
++ * SPDX-License-Identifier: (GPL-2.0 OR MIT)
++ */
++
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
++/ {
++	compatible = "mediatek,mt2712";
++	interrupt-parent = <&sysirq>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu-map {
++			cluster0 {
++				core0 {
++					cpu = <&cpu0>;
++				};
++				core1 {
++					cpu = <&cpu1>;
++				};
++			};
++
++			cluster1 {
++				core0 {
++					cpu = <&cpu2>;
++				};
++			};
++		};
++
++		cpu0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a35";
++			reg = <0x000>;
++		};
++
++		cpu1: cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a35";
++			reg = <0x001>;
++			enable-method = "psci";
++		};
++
++		cpu2: cpu at 200 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a72";
++			reg = <0x200>;
++			enable-method = "psci";
++		};
++	};
++
++	psci {
++		compatible = "arm,psci-0.2";
++		method = "smc";
++	};
++
++	uart_clk: dummy26m {
++		compatible = "fixed-clock";
++		clock-frequency = <26000000>;
++		#clock-cells = <0>;
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupt-parent = <&gic>;
++		interrupts = <GIC_PPI 13
++			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 14
++			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 11
++			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 10
++			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>;
++	};
++
++	soc {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		compatible = "simple-bus";
++		ranges;
++
++		uart5: serial at 1000f000 {
++			compatible = "mediatek,mt2712-uart",
++				     "mediatek,mt6577-uart";
++			reg = <0 0x1000f000 0 0x400>;
++			interrupts = <GIC_SPI 127 IRQ_TYPE_LEVEL_LOW>;
++			clocks = <&uart_clk>;
++			status = "disabled";
++		};
++
++		sysirq: interrupt-controller at 10220a80 {
++			compatible = "mediatek,mt2712-sysirq",
++				     "mediatek,mt6577-sysirq";
++			interrupt-controller;
++			#interrupt-cells = <3>;
++			interrupt-parent = <&gic>;
++			reg = <0 0x10220a80 0 0x40>;
++		};
++
++		gic: interrupt-controller at 10510000 {
++			compatible = "arm,gic-400";
++			#interrupt-cells = <3>;
++			interrupt-parent = <&gic>;
++			interrupt-controller;
++			reg = <0 0x10510000 0 0x10000>,
++			      <0 0x10520000 0 0x20000>,
++			      <0 0x10540000 0 0x20000>,
++			      <0 0x10560000 0 0x20000>;
++			interrupts = <GIC_PPI 9
++				(GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_HIGH)>;
++		};
++
++		uart0: serial at 11002000 {
++			compatible = "mediatek,mt2712-uart",
++				     "mediatek,mt6577-uart";
++			reg = <0 0x11002000 0 0x400>;
++			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>;
++			clocks = <&uart_clk>;
++			status = "disabled";
++		};
++
++		uart1: serial at 11003000 {
++			compatible = "mediatek,mt2712-uart",
++				     "mediatek,mt6577-uart";
++			reg = <0 0x11003000 0 0x400>;
++			interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_LOW>;
++			clocks = <&uart_clk>;
++			status = "disabled";
++		};
++
++		uart2: serial at 11004000 {
++			compatible = "mediatek,mt2712-uart",
++				     "mediatek,mt6577-uart";
++			reg = <0 0x11004000 0 0x400>;
++			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_LOW>;
++			clocks = <&uart_clk>;
++			status = "disabled";
++		};
++
++		uart3: serial at 11005000 {
++			compatible = "mediatek,mt2712-uart",
++				     "mediatek,mt6577-uart";
++			reg = <0 0x11005000 0 0x400>;
++			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_LOW>;
++			clocks = <&uart_clk>;
++			status = "disabled";
++		};
++
++		uart4: serial at 11019000 {
++			compatible = "mediatek,mt2712-uart",
++				     "mediatek,mt6577-uart";
++			reg = <0 0x11019000 0 0x400>;
++			interrupts = <GIC_SPI 126 IRQ_TYPE_LEVEL_LOW>;
++			clocks = <&uart_clk>;
++			status = "disabled";
++		};
++	};
++};
++
 -- 
 1.9.1
