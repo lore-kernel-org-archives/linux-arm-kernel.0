@@ -1,39 +1,38 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Fri, 16 Jun 2017 20:10:15 +0200
-Subject: clean up and modularize arch dma_mapping interface V2
-Message-ID: <20170616181059.19206-1-hch@lst.de>
+Date: Fri, 16 Jun 2017 20:10:16 +0200
+Subject: [PATCH 01/44] firmware/ivc: use dma_mapping_error
+In-Reply-To: <20170616181059.19206-1-hch@lst.de>
+References: <20170616181059.19206-1-hch@lst.de>
+Message-ID: <20170616181059.19206-2-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+DMA_ERROR_CODE is not supposed to be used by drivers.
 
-for a while we have a generic implementation of the dma mapping routines
-that call into per-arch or per-device operations.  But right now there
-still are various bits in the interfaces where don't clearly operate
-on these ops.  This series tries to clean up a lot of those (but not all
-yet, but the series is big enough).  It gets rid of the DMA_ERROR_CODE
-way of signaling failures of the mapping routines from the
-implementations to the generic code (and cleans up various drivers that
-were incorrectly using it), and gets rid of the ->set_dma_mask routine
-in favor of relying on the ->dma_capable method that can be used in
-the same way, but which requires less code duplication.
+Signed-off-by: Christoph Hellwig <hch@lst.de>
+Acked-by: Thierry Reding <treding@nvidia.com>
+---
+ drivers/firmware/tegra/ivc.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-I've got a good number of reviews last time, but a few are still missing.
-I'd love to not have to re-spam everyone with this patchbomb, so early
-ACKs (or complaints) are welcome.
-
-I plan to create a new dma-mapping tree to collect all this work.
-Any volunteers for co-maintainers, especially from the iommu gang?
-
-The whole series is also available in git:
-
-    git://git.infradead.org/users/hch/misc.git dma-map
-
-Gitweb:
-
-    http://git.infradead.org/users/hch/misc.git/shortlog/refs/heads/dma-map
-
-Changes since V1:
- - remove two lines of code from arm dmabounce
- - a few commit message tweaks
- - lots of ACKs
+diff --git a/drivers/firmware/tegra/ivc.c b/drivers/firmware/tegra/ivc.c
+index 29ecfd815320..a01461d63f68 100644
+--- a/drivers/firmware/tegra/ivc.c
++++ b/drivers/firmware/tegra/ivc.c
+@@ -646,12 +646,12 @@ int tegra_ivc_init(struct tegra_ivc *ivc, struct device *peer, void *rx,
+ 	if (peer) {
+ 		ivc->rx.phys = dma_map_single(peer, rx, queue_size,
+ 					      DMA_BIDIRECTIONAL);
+-		if (ivc->rx.phys == DMA_ERROR_CODE)
++		if (dma_mapping_error(peer, ivc->rx.phys))
+ 			return -ENOMEM;
+ 
+ 		ivc->tx.phys = dma_map_single(peer, tx, queue_size,
+ 					      DMA_BIDIRECTIONAL);
+-		if (ivc->tx.phys == DMA_ERROR_CODE) {
++		if (dma_mapping_error(peer, ivc->tx.phys)) {
+ 			dma_unmap_single(peer, ivc->rx.phys, queue_size,
+ 					 DMA_BIDIRECTIONAL);
+ 			return -ENOMEM;
+-- 
+2.11.0
