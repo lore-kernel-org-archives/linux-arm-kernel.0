@@ -1,1288 +1,407 @@
-From: olivier.moysan@st.com (olivier moysan)
-Date: Fri, 16 Jun 2017 15:57:32 +0200
-Subject: [PATCH 2/2] ASoC: stm32: Add SPDIFRX support
-In-Reply-To: <1497621452-615-1-git-send-email-olivier.moysan@st.com>
-References: <1497621452-615-1-git-send-email-olivier.moysan@st.com>
-Message-ID: <1497621452-615-3-git-send-email-olivier.moysan@st.com>
+From: yt.shen@mediatek.com (YT Shen)
+Date: Fri, 16 Jun 2017 22:02:16 +0800
+Subject: [PATCH v2] drm/mediatek: separate color module to fixup error memory
+ reallocation
+Message-ID: <1497621736-63799-1-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SPDIFRX support to STM32.
+Previous patch (c5f228ef6c drm/mediatek: add *driver_data for different
+hardware settings) calls devm_kfree() and then devm_kzalloc() to
+reallocate color module data structure.  But this reallocation cannnot
+guarantee the new address is unchanged, but the caller will use the
+old address, which is wrong.
 
-Signed-off-by: olivier moysan <olivier.moysan@st.com>
+Fix it by separate color module from general components, this patch
+separate color module to independent files, like mtk_disp_ovl.c and
+mtk_disp_rdma.c do
+
+Signed-off-by: YT Shen <yt.shen@mediatek.com>
 ---
- sound/soc/stm/Kconfig         |  10 +
- sound/soc/stm/Makefile        |   4 +
- sound/soc/stm/stm32_spdifrx.c | 998 ++++++++++++++++++++++++++++++++++++++++++
- sound/soc/stm/stm32_spdifrx.h | 224 ++++++++++
- 4 files changed, 1236 insertions(+)
- create mode 100644 sound/soc/stm/stm32_spdifrx.c
- create mode 100644 sound/soc/stm/stm32_spdifrx.h
+ drivers/gpu/drm/mediatek/Makefile           |   3 +-
+ drivers/gpu/drm/mediatek/mtk_disp_color.c   | 176 ++++++++++++++++++++++++++++
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |  80 +------------
+ drivers/gpu/drm/mediatek/mtk_drm_drv.c      |   6 +-
+ drivers/gpu/drm/mediatek/mtk_drm_drv.h      |   1 +
+ 5 files changed, 185 insertions(+), 81 deletions(-)
+ create mode 100644 drivers/gpu/drm/mediatek/mtk_disp_color.c
 
-diff --git a/sound/soc/stm/Kconfig b/sound/soc/stm/Kconfig
-index d747993..45c05a3 100644
---- a/sound/soc/stm/Kconfig
-+++ b/sound/soc/stm/Kconfig
-@@ -9,4 +9,14 @@ config SND_SOC_STM32_SAI
- 	help
- 	  Say Y if you want to enable SAI for STM32
- 
-+config SND_SOC_STM32_SPDIFRX
-+	tristate "STM32 S/PDIF receiver (SPDIFRX) support"
-+	depends on ARCH_STM32 || COMPILE_TEST
-+	depends on SND_SOC
-+	select SND_SOC_GENERIC_DMAENGINE_PCM
-+	select REGMAP_MMIO
-+	select SND_SOC_SPDIF
-+	help
-+	  Say Y if you want to enable S/PDIF capture for STM32
-+
- endmenu
-diff --git a/sound/soc/stm/Makefile b/sound/soc/stm/Makefile
-index 386ce4b..c6a8e72 100644
---- a/sound/soc/stm/Makefile
-+++ b/sound/soc/stm/Makefile
-@@ -4,3 +4,7 @@ obj-$(CONFIG_SND_SOC_STM32_SAI) += snd-soc-stm32-sai-sub.o
- 
- snd-soc-stm32-sai-objs := stm32_sai.o
- obj-$(CONFIG_SND_SOC_STM32_SAI) += snd-soc-stm32-sai.o
-+
-+# SPDIFRX
-+snd-soc-stm32-spdifrx-objs := stm32_spdifrx.o
-+obj-$(CONFIG_SND_SOC_STM32_SPDIFRX) += snd-soc-stm32-spdifrx.o
-diff --git a/sound/soc/stm/stm32_spdifrx.c b/sound/soc/stm/stm32_spdifrx.c
+diff --git a/drivers/gpu/drm/mediatek/Makefile b/drivers/gpu/drm/mediatek/Makefile
+index bf2e5be..e37b55a 100644
+--- a/drivers/gpu/drm/mediatek/Makefile
++++ b/drivers/gpu/drm/mediatek/Makefile
+@@ -1,4 +1,5 @@
+-mediatek-drm-y := mtk_disp_ovl.o \
++mediatek-drm-y := mtk_disp_color.o \
++		  mtk_disp_ovl.o \
+ 		  mtk_disp_rdma.o \
+ 		  mtk_drm_crtc.o \
+ 		  mtk_drm_ddp.o \
+diff --git a/drivers/gpu/drm/mediatek/mtk_disp_color.c b/drivers/gpu/drm/mediatek/mtk_disp_color.c
 new file mode 100644
-index 0000000..4e4250b
+index 0000000..ef79a6d
 --- /dev/null
-+++ b/sound/soc/stm/stm32_spdifrx.c
-@@ -0,0 +1,998 @@
++++ b/drivers/gpu/drm/mediatek/mtk_disp_color.c
+@@ -0,0 +1,176 @@
 +/*
-+ * STM32 ALSA SoC Digital Audio Interface (SPDIF-rx) driver.
++ * Copyright (c) 2017 MediaTek Inc.
 + *
-+ * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
-+ * Author(s): Olivier Moysan <olivier.moysan@st.com> for STMicroelectronics.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + *
-+ * License terms: GPL V2.0.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
-+ * details.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
 +
++#include <drm/drmP.h>
 +#include <linux/clk.h>
-+#include <linux/completion.h>
-+#include <linux/delay.h>
-+#include <linux/module.h>
-+#include <linux/of_platform.h>
-+#include <linux/regmap.h>
-+#include <linux/reset.h>
++#include <linux/component.h>
++#include <linux/of_device.h>
++#include <linux/of_irq.h>
++#include <linux/platform_device.h>
 +
-+#include <sound/dmaengine_pcm.h>
-+#include <sound/pcm_params.h>
++#include "mtk_drm_crtc.h"
++#include "mtk_drm_ddp_comp.h"
 +
-+/* SPDIF-rx Register Map */
-+#define STM32_SPDIFRX_CR	0x00
-+#define STM32_SPDIFRX_IMR	0x04
-+#define STM32_SPDIFRX_SR	0x08
-+#define STM32_SPDIFRX_IFCR	0x0C
-+#define STM32_SPDIFRX_DR	0x10
-+#define STM32_SPDIFRX_CSR	0x14
-+#define STM32_SPDIFRX_DIR	0x18
++#define DISP_COLOR_CFG_MAIN			0x0400
++#define DISP_COLOR_START_MT2701			0x0f00
++#define DISP_COLOR_START_MT8173			0x0c00
++#define DISP_COLOR_START(comp)			((comp)->data->color_offset)
++#define DISP_COLOR_WIDTH(comp)			(DISP_COLOR_START(comp) + 0x50)
++#define DISP_COLOR_HEIGHT(comp)			(DISP_COLOR_START(comp) + 0x54)
 +
-+/* Bit definition for SPDIF_CR register */
-+#define SPDIFRX_CR_SPDIFEN_SHIFT	0
-+#define SPDIFRX_CR_SPDIFEN_MASK	GENMASK(1, SPDIFRX_CR_SPDIFEN_SHIFT)
-+#define SPDIFRX_CR_SPDIFENSET(x)	((x) << SPDIFRX_CR_SPDIFEN_SHIFT)
++#define COLOR_BYPASS_ALL			BIT(7)
++#define COLOR_SEQ_SEL				BIT(13)
 +
-+#define SPDIFRX_CR_RXDMAEN	BIT(2)
-+#define SPDIFRX_CR_RXSTEO	BIT(3)
-+
-+#define SPDIFRX_CR_DRFMT_SHIFT	4
-+#define SPDIFRX_CR_DRFMT_MASK	GENMASK(5, SPDIFRX_CR_DRFMT_SHIFT)
-+#define SPDIFRX_CR_DRFMTSET(x)	((x) << SPDIFRX_CR_DRFMT_SHIFT)
-+
-+#define SPDIFRX_CR_PMSK		BIT(6)
-+#define SPDIFRX_CR_VMSK		BIT(7)
-+#define SPDIFRX_CR_CUMSK	BIT(8)
-+#define SPDIFRX_CR_PTMSK	BIT(9)
-+#define SPDIFRX_CR_CBDMAEN	BIT(10)
-+#define SPDIFRX_CR_CHSEL_SHIFT	11
-+#define SPDIFRX_CR_CHSEL	BIT(SPDIFRX_CR_CHSEL_SHIFT)
-+
-+#define SPDIFRX_CR_NBTR_SHIFT	12
-+#define SPDIFRX_CR_NBTR_MASK	GENMASK(13, SPDIFRX_CR_NBTR_SHIFT)
-+#define SPDIFRX_CR_NBTRSET(x)	((x) << SPDIFRX_CR_NBTR_SHIFT)
-+
-+#define SPDIFRX_CR_WFA		BIT(14)
-+
-+#define SPDIFRX_CR_INSEL_SHIFT	16
-+#define SPDIFRX_CR_INSEL_MASK	GENMASK(18, PDIFRX_CR_INSEL_SHIFT)
-+#define SPDIFRX_CR_INSELSET(x)	((x) << SPDIFRX_CR_INSEL_SHIFT)
-+
-+#define SPDIFRX_CR_CKSEN_SHIFT	20
-+#define SPDIFRX_CR_CKSEN	BIT(20)
-+#define SPDIFRX_CR_CKSBKPEN	BIT(21)
-+
-+/* Bit definition for SPDIFRX_IMR register */
-+#define SPDIFRX_IMR_RXNEI	BIT(0)
-+#define SPDIFRX_IMR_CSRNEIE	BIT(1)
-+#define SPDIFRX_IMR_PERRIE	BIT(2)
-+#define SPDIFRX_IMR_OVRIE	BIT(3)
-+#define SPDIFRX_IMR_SBLKIE	BIT(4)
-+#define SPDIFRX_IMR_SYNCDIE	BIT(5)
-+#define SPDIFRX_IMR_IFEIE	BIT(6)
-+
-+#define SPDIFRX_XIMR_MASK	GENMASK(6, 0)
-+
-+/* Bit definition for SPDIFRX_SR register */
-+#define SPDIFRX_SR_RXNE		BIT(0)
-+#define SPDIFRX_SR_CSRNE	BIT(1)
-+#define SPDIFRX_SR_PERR		BIT(2)
-+#define SPDIFRX_SR_OVR		BIT(3)
-+#define SPDIFRX_SR_SBD		BIT(4)
-+#define SPDIFRX_SR_SYNCD	BIT(5)
-+#define SPDIFRX_SR_FERR		BIT(6)
-+#define SPDIFRX_SR_SERR		BIT(7)
-+#define SPDIFRX_SR_TERR		BIT(8)
-+
-+#define SPDIFRX_SR_WIDTH5_SHIFT	16
-+#define SPDIFRX_SR_WIDTH5_MASK	GENMASK(30, PDIFRX_SR_WIDTH5_SHIFT)
-+#define SPDIFRX_SR_WIDTH5SET(x)	((x) << SPDIFRX_SR_WIDTH5_SHIFT)
-+
-+/* Bit definition for SPDIFRX_IFCR register */
-+#define SPDIFRX_IFCR_PERRCF	BIT(2)
-+#define SPDIFRX_IFCR_OVRCF	BIT(3)
-+#define SPDIFRX_IFCR_SBDCF	BIT(4)
-+#define SPDIFRX_IFCR_SYNCDCF	BIT(5)
-+
-+#define SPDIFRX_XIFCR_MASK	GENMASK(5, 2)
-+
-+/* Bit definition for SPDIFRX_DR register (DRFMT = 0b00) */
-+#define SPDIFRX_DR0_DR_SHIFT	0
-+#define SPDIFRX_DR0_DR_MASK	GENMASK(23, SPDIFRX_DR0_DR_SHIFT)
-+#define SPDIFRX_DR0_DRSET(x)	((x) << SPDIFRX_DR0_DR_SHIFT)
-+
-+#define SPDIFRX_DR0_PE		BIT(24)
-+
-+#define SPDIFRX_DR0_V		BIT(25)
-+#define SPDIFRX_DR0_U		BIT(26)
-+#define SPDIFRX_DR0_C		BIT(27)
-+
-+#define SPDIFRX_DR0_PT_SHIFT	28
-+#define SPDIFRX_DR0_PT_MASK	GENMASK(29, SPDIFRX_DR0_PT_SHIFT)
-+#define SPDIFRX_DR0_PTSET(x)	((x) << SPDIFRX_DR0_PT_SHIFT)
-+
-+/* Bit definition for SPDIFRX_DR register (DRFMT = 0b01) */
-+#define  SPDIFRX_DR1_PE		BIT(0)
-+#define  SPDIFRX_DR1_V		BIT(1)
-+#define  SPDIFRX_DR1_U		BIT(2)
-+#define  SPDIFRX_DR1_C		BIT(3)
-+
-+#define  SPDIFRX_DR1_PT_SHIFT	4
-+#define  SPDIFRX_DR1_PT_MASK	GENMASK(5, SPDIFRX_DR1_PT_SHIFT)
-+#define  SPDIFRX_DR1_PTSET(x)	((x) << SPDIFRX_DR1_PT_SHIFT)
-+
-+#define SPDIFRX_DR1_DR_SHIFT	8
-+#define SPDIFRX_DR1_DR_MASK	GENMASK(31, SPDIFRX_DR1_DR_SHIFT)
-+#define SPDIFRX_DR1_DRSET(x)	((x) << SPDIFRX_DR1_DR_SHIFT)
-+
-+/* Bit definition for SPDIFRX_DR register (DRFMT = 0b10) */
-+#define SPDIFRX_DR1_DRNL1_SHIFT	0
-+#define SPDIFRX_DR1_DRNL1_MASK	GENMASK(15, SPDIFRX_DR1_DRNL1_SHIFT)
-+#define SPDIFRX_DR1_DRNL1SET(x)	((x) << SPDIFRX_DR1_DRNL1_SHIFT)
-+
-+#define SPDIFRX_DR1_DRNL2_SHIFT	16
-+#define SPDIFRX_DR1_DRNL2_MASK	GENMASK(31, SPDIFRX_DR1_DRNL2_SHIFT)
-+#define SPDIFRX_DR1_DRNL2SET(x)	((x) << SPDIFRX_DR1_DRNL2_SHIFT)
-+
-+/* Bit definition for SPDIFRX_CSR register */
-+#define SPDIFRX_CSR_USR_SHIFT	0
-+#define SPDIFRX_CSR_USR_MASK	GENMASK(15, SPDIFRX_CSR_USR_SHIFT)
-+#define SPDIFRX_CSR_USRGET(x)	(((x) & SPDIFRX_CSR_USR_MASK)\
-+				>> SPDIFRX_CSR_USR_SHIFT)
-+
-+#define SPDIFRX_CSR_CS_SHIFT	16
-+#define SPDIFRX_CSR_CS_MASK	GENMASK(23, SPDIFRX_CSR_CS_SHIFT)
-+#define SPDIFRX_CSR_CSGET(x)	(((x) & SPDIFRX_CSR_CS_MASK)\
-+				>> SPDIFRX_CSR_CS_SHIFT)
-+
-+#define SPDIFRX_CSR_SOB		BIT(24)
-+
-+/* Bit definition for SPDIFRX_DIR register */
-+#define SPDIFRX_DIR_THI_SHIFT	0
-+#define SPDIFRX_DIR_THI_MASK	GENMASK(12, SPDIFRX_DIR_THI_SHIFT)
-+#define SPDIFRX_DIR_THI_SET(x)	((x) << SPDIFRX_DIR_THI_SHIFT)
-+
-+#define SPDIFRX_DIR_TLO_SHIFT	16
-+#define SPDIFRX_DIR_TLO_MASK	GENMASK(28, SPDIFRX_DIR_TLO_SHIFT)
-+#define SPDIFRX_DIR_TLO_SET(x)	((x) << SPDIFRX_DIR_TLO_SHIFT)
-+
-+#define SPDIFRX_SPDIFEN_DISABLE	0x0
-+#define SPDIFRX_SPDIFEN_SYNC	0x1
-+#define SPDIFRX_SPDIFEN_ENABLE	0x3
-+
-+#define SPDIFRX_IN1		0x1
-+#define SPDIFRX_IN2		0x2
-+#define SPDIFRX_IN3		0x3
-+#define SPDIFRX_IN4		0x4
-+#define SPDIFRX_IN5		0x5
-+#define SPDIFRX_IN6		0x6
-+#define SPDIFRX_IN7		0x7
-+#define SPDIFRX_IN8		0x8
-+
-+#define SPDIFRX_NBTR_NONE	0x0
-+#define SPDIFRX_NBTR_3		0x1
-+#define SPDIFRX_NBTR_15		0x2
-+#define SPDIFRX_NBTR_63		0x3
-+
-+#define SPDIFRX_DRFMT_RIGHT	0x0
-+#define SPDIFRX_DRFMT_LEFT	0x1
-+#define SPDIFRX_DRFMT_PACKED	0x2
-+
-+/* 192 CS bits in S/PDIF frame. i.e 24 CS bytes */
-+#define SPDIFRX_CS_BYTES_NB	24
-+#define SPDIFRX_UB_BYTES_NB	48
-+
-+/*
-+ * CSR register is retrieved as a 32 bits word
-+ * It contains 1 channel status byte and 2 user data bytes
-+ * 2 S/PDIF frames are acquired to get all CS/UB bits
-+ */
-+#define SPDIFRX_CSR_BUF_LENGTH	(SPDIFRX_CS_BYTES_NB * 4 * 2)
++struct mtk_disp_color_data {
++	unsigned int color_offset;
++};
 +
 +/**
-+ * struct stm32_spdifrx_data - private data of SPDIFRX
-+ * @pdev: device data pointer
-+ * @base: mmio register base virtual address
-+ * @regmap: SPDIFRX register map pointer
-+ * @regmap_conf: SPDIFRX register map configuration pointer
-+ * @cs_completion: channel status retrieving completion
-+ * @kclk: kernel clock feeding the SPDIFRX clock generator
-+ * @dma_params: dma configuration data for rx channel
-+ * @substream: PCM substream data pointer
-+ * @dmab: dma buffer info pointer
-+ * @ctrl_chan: dma channel for S/PDIF control bits
-+ * @desc:dma async transaction descriptor
-+ * @slave_config: dma slave channel runtime config pointer
-+ * @phys_addr: SPDIFRX registers physical base address
-+ * @lock: synchronization enabling lock
-+ * @cs: channel status buffer
-+ * @ub: user data buffer
-+ * @irq: SPDIFRX interrupt line
-+ * @refcount: keep count of opened DMA channels
++ * struct mtk_disp_color - DISP_COLOR driver structure
++ * @ddp_comp - structure containing type enum and hardware resources
++ * @crtc - associated crtc to report irq events to
 + */
-+struct stm32_spdifrx_data {
-+	struct platform_device *pdev;
-+	void __iomem *base;
-+	struct regmap *regmap;
-+	const struct regmap_config *regmap_conf;
-+	struct completion cs_completion;
-+	struct clk *kclk;
-+	struct snd_dmaengine_dai_dma_data dma_params;
-+	struct snd_pcm_substream *substream;
-+	struct snd_dma_buffer *dmab;
-+	struct dma_chan *ctrl_chan;
-+	struct dma_async_tx_descriptor *desc;
-+	struct dma_slave_config slave_config;
-+	dma_addr_t phys_addr;
-+	spinlock_t lock;  /* Sync enabling lock */
-+	unsigned char cs[SPDIFRX_CS_BYTES_NB];
-+	unsigned char ub[SPDIFRX_UB_BYTES_NB];
-+	int irq;
-+	int refcount;
++struct mtk_disp_color {
++	struct mtk_ddp_comp			ddp_comp;
++	struct drm_crtc				*crtc;
++	const struct mtk_disp_color_data	*data;
 +};
 +
-+static void stm32_spdifrx_dma_complete(void *data)
++static inline struct mtk_disp_color *comp_to_color(struct mtk_ddp_comp *comp)
 +{
-+	struct stm32_spdifrx_data *spdifrx = (struct stm32_spdifrx_data *)data;
-+	struct platform_device *pdev = spdifrx->pdev;
-+	u32 *p_start = (u32 *)spdifrx->dmab->area;
-+	u32 *p_end = p_start + (2 * SPDIFRX_CS_BYTES_NB) - 1;
-+	u32 *ptr = p_start;
-+	u16 *ub_ptr = (short *)spdifrx->ub;
-+	int i = 0;
-+
-+	regmap_update_bits(spdifrx->regmap, STM32_SPDIFRX_CR,
-+			   SPDIFRX_CR_CBDMAEN,
-+			   (unsigned int)~SPDIFRX_CR_CBDMAEN);
-+
-+	if (!spdifrx->dmab->area)
-+		return;
-+
-+	while (ptr <= p_end) {
-+		if (*ptr & SPDIFRX_CSR_SOB)
-+			break;
-+		ptr++;
-+	}
-+
-+	if (ptr > p_end) {
-+		dev_err(&pdev->dev, "Start of S/PDIF block not found\n");
-+		return;
-+	}
-+
-+	while (i < SPDIFRX_CS_BYTES_NB) {
-+		spdifrx->cs[i] = (unsigned char)SPDIFRX_CSR_CSGET(*ptr);
-+		*ub_ptr++ = SPDIFRX_CSR_USRGET(*ptr++);
-+		if (ptr > p_end) {
-+			dev_err(&pdev->dev, "Failed to get channel status\n");
-+			return;
-+		}
-+		i++;
-+	}
-+
-+	complete(&spdifrx->cs_completion);
++	return container_of(comp, struct mtk_disp_color, ddp_comp);
 +}
 +
-+static int stm32_spdifrx_dma_ctrl_start(struct stm32_spdifrx_data *spdifrx)
++static void mtk_color_config(struct mtk_ddp_comp *comp, unsigned int w,
++			     unsigned int h, unsigned int vrefresh,
++			     unsigned int bpc)
 +{
-+	dma_cookie_t cookie;
-+	int err;
++	struct mtk_disp_color *color = comp_to_color(comp);
 +
-+	spdifrx->desc = dmaengine_prep_slave_single(spdifrx->ctrl_chan,
-+						    spdifrx->dmab->addr,
-+						    SPDIFRX_CSR_BUF_LENGTH,
-+						    DMA_DEV_TO_MEM,
-+						    DMA_CTRL_ACK);
-+	if (!spdifrx->desc)
-+		return -EINVAL;
++	writel(w, comp->regs + DISP_COLOR_WIDTH(color));
++	writel(h, comp->regs + DISP_COLOR_HEIGHT(color));
++}
 +
-+	spdifrx->desc->callback = stm32_spdifrx_dma_complete;
-+	spdifrx->desc->callback_param = spdifrx;
-+	cookie = dmaengine_submit(spdifrx->desc);
-+	err = dma_submit_error(cookie);
-+	if (err)
-+		return -EINVAL;
++static void mtk_color_start(struct mtk_ddp_comp *comp)
++{
++	struct mtk_disp_color *color = comp_to_color(comp);
 +
-+	dma_async_issue_pending(spdifrx->ctrl_chan);
++	writel(COLOR_BYPASS_ALL | COLOR_SEQ_SEL,
++	       comp->regs + DISP_COLOR_CFG_MAIN);
++	writel(0x1, comp->regs + DISP_COLOR_START(color));
++}
++
++static const struct mtk_ddp_comp_funcs mtk_disp_color_funcs = {
++	.config = mtk_color_config,
++	.start = mtk_color_start,
++};
++
++static int mtk_disp_color_bind(struct device *dev, struct device *master,
++			       void *data)
++{
++	struct mtk_disp_color *priv = dev_get_drvdata(dev);
++	struct drm_device *drm_dev = data;
++	int ret;
++
++	ret = mtk_ddp_comp_register(drm_dev, &priv->ddp_comp);
++	if (ret < 0) {
++		dev_err(dev, "Failed to register component %s: %d\n",
++			dev->of_node->full_name, ret);
++		return ret;
++	}
 +
 +	return 0;
 +}
 +
-+static void stm32_spdifrx_dma_ctrl_stop(struct stm32_spdifrx_data *spdifrx)
++static void mtk_disp_color_unbind(struct device *dev, struct device *master,
++				  void *data)
 +{
-+	dmaengine_terminate_async(spdifrx->ctrl_chan);
++	struct mtk_disp_color *priv = dev_get_drvdata(dev);
++	struct drm_device *drm_dev = data;
++
++	mtk_ddp_comp_unregister(drm_dev, &priv->ddp_comp);
 +}
 +
-+static int stm32_spdifrx_start_sync(struct stm32_spdifrx_data *spdifrx)
++static const struct component_ops mtk_disp_color_component_ops = {
++	.bind	= mtk_disp_color_bind,
++	.unbind = mtk_disp_color_unbind,
++};
++
++static int mtk_disp_color_probe(struct platform_device *pdev)
 +{
-+	int cr, cr_mask, imr, ret;
-+
-+	/* Enable IRQs */
-+	imr = SPDIFRX_IMR_IFEIE | SPDIFRX_IMR_SYNCDIE | SPDIFRX_IMR_PERRIE;
-+	ret = regmap_update_bits(spdifrx->regmap, STM32_SPDIFRX_IMR, imr, imr);
-+	if (ret)
-+		return ret;
-+
-+	spin_lock(&spdifrx->lock);
-+
-+	spdifrx->refcount++;
-+
-+	regmap_read(spdifrx->regmap, STM32_SPDIFRX_CR, &cr);
-+
-+	if (!(cr & SPDIFRX_CR_SPDIFEN_MASK)) {
-+		/*
-+		 * Start sync if SPDIFRX is still in idle state.
-+		 * SPDIFRX reception enabled when sync done
-+		 */
-+		dev_dbg(&spdifrx->pdev->dev, "start synchronization\n");
-+
-+		/*
-+		 * SPDIFRX configuration:
-+		 * Wait for activity before starting sync process. This avoid
-+		 * to issue sync errors when spdif signal is missing on input.
-+		 * Preamble, CS, user, validity and parity error bits not copied
-+		 * to DR register.
-+		 */
-+		cr = SPDIFRX_CR_WFA | SPDIFRX_CR_PMSK | SPDIFRX_CR_VMSK |
-+		     SPDIFRX_CR_CUMSK | SPDIFRX_CR_PTMSK | SPDIFRX_CR_RXSTEO;
-+		cr_mask = cr;
-+
-+		cr |= SPDIFRX_CR_SPDIFENSET(SPDIFRX_SPDIFEN_SYNC);
-+		cr_mask |= SPDIFRX_CR_SPDIFEN_MASK;
-+		ret = regmap_update_bits(spdifrx->regmap, STM32_SPDIFRX_CR,
-+					 cr_mask, cr);
-+		if (ret < 0)
-+			dev_err(&spdifrx->pdev->dev,
-+				"Failed to start synchronization\n");
-+	}
-+
-+	spin_unlock(&spdifrx->lock);
-+
-+	return ret;
-+}
-+
-+static void stm32_spdifrx_stop(struct stm32_spdifrx_data *spdifrx)
-+{
-+	int cr, cr_mask, reg;
-+
-+	spin_lock(&spdifrx->lock);
-+
-+	if (--spdifrx->refcount) {
-+		spin_unlock(&spdifrx->lock);
-+		return;
-+	}
-+
-+	cr = SPDIFRX_CR_SPDIFENSET(SPDIFRX_SPDIFEN_DISABLE);
-+	cr_mask = SPDIFRX_CR_SPDIFEN_MASK | SPDIFRX_CR_RXDMAEN;
-+
-+	regmap_update_bits(spdifrx->regmap, STM32_SPDIFRX_CR, cr_mask, cr);
-+
-+	regmap_update_bits(spdifrx->regmap, STM32_SPDIFRX_IMR,
-+			   SPDIFRX_XIMR_MASK, 0);
-+
-+	regmap_update_bits(spdifrx->regmap, STM32_SPDIFRX_IFCR,
-+			   SPDIFRX_XIFCR_MASK, SPDIFRX_XIFCR_MASK);
-+
-+	/* dummy read to clear CSRNE and RXNE in status register */
-+	regmap_read(spdifrx->regmap, STM32_SPDIFRX_DR, &reg);
-+	regmap_read(spdifrx->regmap, STM32_SPDIFRX_CSR, &reg);
-+
-+	spin_unlock(&spdifrx->lock);
-+}
-+
-+static int stm32_spdifrx_dma_ctrl_register(struct device *dev,
-+					   struct stm32_spdifrx_data *spdifrx)
-+{
++	struct device *dev = &pdev->dev;
++	struct mtk_disp_color *priv;
++	int comp_id;
 +	int ret;
 +
-+	spdifrx->dmab = devm_kzalloc(dev, sizeof(struct snd_dma_buffer),
-+				     GFP_KERNEL);
-+	if (!spdifrx->dmab)
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
 +		return -ENOMEM;
 +
-+	spdifrx->dmab->dev.type = SNDRV_DMA_TYPE_DEV_IRAM;
-+	spdifrx->dmab->dev.dev = dev;
-+	ret = snd_dma_alloc_pages(spdifrx->dmab->dev.type, dev,
-+				  SPDIFRX_CSR_BUF_LENGTH, spdifrx->dmab);
-+	if (ret < 0) {
-+		dev_err(dev, "snd_dma_alloc_pages returned error %d\n", ret);
-+		return ret;
++	comp_id = mtk_ddp_comp_get_id(dev->of_node, MTK_DISP_COLOR);
++	if (comp_id < 0) {
++		dev_err(dev, "Failed to identify by alias: %d\n", comp_id);
++		return comp_id;
 +	}
 +
-+	spdifrx->ctrl_chan = dma_request_chan(dev, "rx-ctrl");
-+	if (!spdifrx->ctrl_chan) {
-+		dev_err(dev, "dma_request_slave_channel failed\n");
-+		return -EINVAL;
-+	}
-+
-+	spdifrx->slave_config.direction = DMA_DEV_TO_MEM;
-+	spdifrx->slave_config.src_addr = (dma_addr_t)(spdifrx->phys_addr +
-+					 STM32_SPDIFRX_CSR);
-+	spdifrx->slave_config.dst_addr = spdifrx->dmab->addr;
-+	spdifrx->slave_config.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-+	spdifrx->slave_config.src_maxburst = 1;
-+
-+	ret = dmaengine_slave_config(spdifrx->ctrl_chan,
-+				     &spdifrx->slave_config);
-+	if (ret < 0) {
-+		dev_err(dev, "dmaengine_slave_config returned error %d\n", ret);
-+		dma_release_channel(spdifrx->ctrl_chan);
-+		spdifrx->ctrl_chan = NULL;
-+	}
-+
-+	return ret;
-+};
-+
-+static const char * const spdifrx_enum_input[] = {
-+	"in0", "in1", "in2", "in3"
-+};
-+
-+/*  By default CS bits are retrieved from channel A */
-+static const char * const spdifrx_enum_cs_channel[] = {
-+	"A", "B"
-+};
-+
-+static SOC_ENUM_SINGLE_DECL(ctrl_enum_input,
-+			    STM32_SPDIFRX_CR, SPDIFRX_CR_INSEL_SHIFT,
-+			    spdifrx_enum_input);
-+
-+static SOC_ENUM_SINGLE_DECL(ctrl_enum_cs_channel,
-+			    STM32_SPDIFRX_CR, SPDIFRX_CR_CHSEL_SHIFT,
-+			    spdifrx_enum_cs_channel);
-+
-+static int stm32_spdifrx_info(struct snd_kcontrol *kcontrol,
-+			      struct snd_ctl_elem_info *uinfo)
-+{
-+	uinfo->type = SNDRV_CTL_ELEM_TYPE_IEC958;
-+	uinfo->count = 1;
-+
-+	return 0;
-+}
-+
-+static int stm32_spdifrx_ub_info(struct snd_kcontrol *kcontrol,
-+				 struct snd_ctl_elem_info *uinfo)
-+{
-+	uinfo->type = SNDRV_CTL_ELEM_TYPE_IEC958;
-+	uinfo->count = 1;
-+
-+	return 0;
-+}
-+
-+static int stm32_spdifrx_get_ctrl_data(struct stm32_spdifrx_data *spdifrx)
-+{
-+	int ret = 0;
-+
-+	memset(spdifrx->cs, 0, SPDIFRX_CS_BYTES_NB);
-+	memset(spdifrx->ub, 0, SPDIFRX_UB_BYTES_NB);
-+
-+	ret = stm32_spdifrx_dma_ctrl_start(spdifrx);
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = clk_prepare_enable(spdifrx->kclk);
++	ret = mtk_ddp_comp_init(dev, dev->of_node, &priv->ddp_comp, comp_id,
++				&mtk_disp_color_funcs);
 +	if (ret) {
-+		dev_err(&spdifrx->pdev->dev, "Enable kclk failed: %d\n", ret);
++		dev_err(dev, "Failed to initialize component: %d\n", ret);
 +		return ret;
 +	}
 +
-+	ret = regmap_update_bits(spdifrx->regmap, STM32_SPDIFRX_CR,
-+				 SPDIFRX_CR_CBDMAEN, SPDIFRX_CR_CBDMAEN);
-+	if (ret < 0)
-+		goto end;
++	priv->data = of_device_get_match_data(dev);
 +
-+	ret = stm32_spdifrx_start_sync(spdifrx);
-+	if (ret < 0)
-+		goto end;
++	platform_set_drvdata(pdev, priv);
 +
-+	if (wait_for_completion_interruptible_timeout(&spdifrx->cs_completion,
-+						      msecs_to_jiffies(100))
-+						      <= 0) {
-+		dev_err(&spdifrx->pdev->dev, "Failed to get control data\n");
-+		ret = -EAGAIN;
-+	}
-+
-+	stm32_spdifrx_stop(spdifrx);
-+	stm32_spdifrx_dma_ctrl_stop(spdifrx);
-+
-+end:
-+	clk_disable_unprepare(spdifrx->kclk);
++	ret = component_add(dev, &mtk_disp_color_component_ops);
++	if (ret)
++		dev_err(dev, "Failed to add component: %d\n", ret);
 +
 +	return ret;
 +}
 +
-+static int stm32_spdifrx_capture_get(struct snd_kcontrol *kcontrol,
-+				     struct snd_ctl_elem_value *ucontrol)
++static int mtk_disp_color_remove(struct platform_device *pdev)
 +{
-+	struct snd_soc_dai *cpu_dai = snd_kcontrol_chip(kcontrol);
-+	struct stm32_spdifrx_data *spdifrx = snd_soc_dai_get_drvdata(cpu_dai);
-+
-+	stm32_spdifrx_get_ctrl_data(spdifrx);
-+
-+	ucontrol->value.iec958.status[0] = spdifrx->cs[0];
-+	ucontrol->value.iec958.status[1] = spdifrx->cs[1];
-+	ucontrol->value.iec958.status[2] = spdifrx->cs[2];
-+	ucontrol->value.iec958.status[3] = spdifrx->cs[3];
-+	ucontrol->value.iec958.status[4] = spdifrx->cs[4];
++	component_del(&pdev->dev, &mtk_disp_color_component_ops);
 +
 +	return 0;
 +}
 +
-+static int stm32_spdif_user_bits_get(struct snd_kcontrol *kcontrol,
-+				     struct snd_ctl_elem_value *ucontrol)
-+{
-+	struct snd_soc_dai *cpu_dai = snd_kcontrol_chip(kcontrol);
-+	struct stm32_spdifrx_data *spdifrx = snd_soc_dai_get_drvdata(cpu_dai);
++static const struct mtk_disp_color_data mt2701_color_driver_data = {
++	.color_offset = DISP_COLOR_START_MT2701,
++};
 +
-+	stm32_spdifrx_get_ctrl_data(spdifrx);
++static const struct mtk_disp_color_data mt8173_color_driver_data = {
++	.color_offset = DISP_COLOR_START_MT8173,
++};
 +
-+	ucontrol->value.iec958.status[0] = spdifrx->ub[0];
-+	ucontrol->value.iec958.status[1] = spdifrx->ub[1];
-+	ucontrol->value.iec958.status[2] = spdifrx->ub[2];
-+	ucontrol->value.iec958.status[3] = spdifrx->ub[3];
-+	ucontrol->value.iec958.status[4] = spdifrx->ub[4];
++static const struct of_device_id mtk_disp_color_driver_dt_match[] = {
++	{ .compatible = "mediatek,mt2701-disp-color",
++	  .data = &mt2701_color_driver_data},
++	{ .compatible = "mediatek,mt8173-disp-color",
++	  .data = &mt8173_color_driver_data},
++	{},
++};
++MODULE_DEVICE_TABLE(of, mtk_disp_color_driver_dt_match);
 +
-+	return 0;
-+}
-+
-+static struct snd_kcontrol_new stm32_spdifrx_iec_ctrls[] = {
-+	/* Channel status control */
-+	{
-+		.iface = SNDRV_CTL_ELEM_IFACE_PCM,
-+		.name = SNDRV_CTL_NAME_IEC958("", CAPTURE, DEFAULT),
-+		.access = SNDRV_CTL_ELEM_ACCESS_READ |
-+			  SNDRV_CTL_ELEM_ACCESS_VOLATILE,
-+		.info = stm32_spdifrx_info,
-+		.get = stm32_spdifrx_capture_get,
-+	},
-+	/* User bits control */
-+	{
-+		.iface = SNDRV_CTL_ELEM_IFACE_PCM,
-+		.name = "IEC958 User Bit Capture Default",
-+		.access = SNDRV_CTL_ELEM_ACCESS_READ |
-+			  SNDRV_CTL_ELEM_ACCESS_VOLATILE,
-+		.info = stm32_spdifrx_ub_info,
-+		.get = stm32_spdif_user_bits_get,
++struct platform_driver mtk_disp_color_driver = {
++	.probe		= mtk_disp_color_probe,
++	.remove		= mtk_disp_color_remove,
++	.driver		= {
++		.name	= "mediatek-disp-color",
++		.owner	= THIS_MODULE,
++		.of_match_table = mtk_disp_color_driver_dt_match,
 +	},
 +};
-+
-+static struct snd_kcontrol_new stm32_spdifrx_ctrls[] = {
-+	SOC_ENUM("SPDIFRX input", ctrl_enum_input),
-+	SOC_ENUM("SPDIFRX CS channel", ctrl_enum_cs_channel),
-+};
-+
-+static int stm32_spdifrx_dai_register_ctrls(struct snd_soc_dai *cpu_dai)
-+{
-+	int ret;
-+
-+	ret = snd_soc_add_dai_controls(cpu_dai, stm32_spdifrx_iec_ctrls,
-+				       ARRAY_SIZE(stm32_spdifrx_iec_ctrls));
-+	if (ret < 0)
-+		return ret;
-+
-+	return snd_soc_add_component_controls(cpu_dai->component,
-+					      stm32_spdifrx_ctrls,
-+					      ARRAY_SIZE(stm32_spdifrx_ctrls));
-+}
-+
-+static int stm32_spdifrx_dai_probe(struct snd_soc_dai *cpu_dai)
-+{
-+	struct stm32_spdifrx_data *spdifrx = dev_get_drvdata(cpu_dai->dev);
-+
-+	spdifrx->dma_params.addr = (dma_addr_t)(spdifrx->phys_addr +
-+				   STM32_SPDIFRX_DR);
-+	spdifrx->dma_params.maxburst = 1;
-+
-+	snd_soc_dai_init_dma_data(cpu_dai, NULL, &spdifrx->dma_params);
-+
-+	return stm32_spdifrx_dai_register_ctrls(cpu_dai);
-+}
-+
-+static bool stm32_spdifrx_readable_reg(struct device *dev, unsigned int reg)
-+{
-+	switch (reg) {
-+	case STM32_SPDIFRX_CR:
-+	case STM32_SPDIFRX_IMR:
-+	case STM32_SPDIFRX_SR:
-+	case STM32_SPDIFRX_IFCR:
-+	case STM32_SPDIFRX_DR:
-+	case STM32_SPDIFRX_CSR:
-+	case STM32_SPDIFRX_DIR:
-+		return true;
-+	default:
-+		return false;
-+	}
-+}
-+
-+static bool stm32_spdifrx_volatile_reg(struct device *dev, unsigned int reg)
-+{
-+	if (reg == STM32_SPDIFRX_DR)
-+		return true;
-+
-+	return false;
-+}
-+
-+static bool stm32_spdifrx_writeable_reg(struct device *dev, unsigned int reg)
-+{
-+	switch (reg) {
-+	case STM32_SPDIFRX_CR:
-+	case STM32_SPDIFRX_IMR:
-+	case STM32_SPDIFRX_IFCR:
-+		return true;
-+	default:
-+		return false;
-+	}
-+}
-+
-+static const struct regmap_config stm32_h7_spdifrx_regmap_conf = {
-+	.reg_bits = 32,
-+	.reg_stride = 4,
-+	.val_bits = 32,
-+	.max_register = STM32_SPDIFRX_DIR,
-+	.readable_reg = stm32_spdifrx_readable_reg,
-+	.volatile_reg = stm32_spdifrx_volatile_reg,
-+	.writeable_reg = stm32_spdifrx_writeable_reg,
-+	.fast_io = true,
-+};
-+
-+static irqreturn_t stm32_spdifrx_isr(int irq, void *devid)
-+{
-+	struct stm32_spdifrx_data *spdifrx = (struct stm32_spdifrx_data *)devid;
-+	struct snd_pcm_substream *substream = spdifrx->substream;
-+	struct platform_device *pdev = spdifrx->pdev;
-+	unsigned int cr, mask, sr, imr;
-+	unsigned int flags;
-+	int err = 0, err_xrun = 0;
-+
-+	regmap_read(spdifrx->regmap, STM32_SPDIFRX_SR, &sr);
-+	regmap_read(spdifrx->regmap, STM32_SPDIFRX_IMR, &imr);
-+
-+	mask = imr & SPDIFRX_XIMR_MASK;
-+	/* SERR, TERR, FERR IRQs are generated if IFEIE is set */
-+	if (mask & SPDIFRX_IMR_IFEIE)
-+		mask |= (SPDIFRX_IMR_IFEIE << 1) | (SPDIFRX_IMR_IFEIE << 2);
-+
-+	flags = sr & mask;
-+	if (!flags) {
-+		dev_err(&pdev->dev, "Unexpected IRQ. rflags=%#x, imr=%#x\n",
-+			sr, imr);
-+		return IRQ_NONE;
-+	}
-+
-+	/* Clear IRQs */
-+	regmap_update_bits(spdifrx->regmap, STM32_SPDIFRX_IFCR,
-+			   SPDIFRX_XIFCR_MASK, flags);
-+
-+	if (flags & SPDIFRX_SR_PERR) {
-+		dev_dbg(&pdev->dev, "Parity error\n");
-+		err_xrun = 1;
-+	}
-+
-+	if (flags & SPDIFRX_SR_OVR) {
-+		dev_dbg(&pdev->dev, "Overrun error\n");
-+		err_xrun = 1;
-+	}
-+
-+	if (flags & SPDIFRX_SR_SBD)
-+		dev_dbg(&pdev->dev, "Synchronization block detected\n");
-+
-+	if (flags & SPDIFRX_SR_SYNCD) {
-+		dev_dbg(&pdev->dev, "Synchronization done\n");
-+
-+		/* Enable spdifrx */
-+		cr = SPDIFRX_CR_SPDIFENSET(SPDIFRX_SPDIFEN_ENABLE);
-+		regmap_update_bits(spdifrx->regmap, STM32_SPDIFRX_CR,
-+				   SPDIFRX_CR_SPDIFEN_MASK, cr);
-+	}
-+
-+	if (flags & SPDIFRX_SR_FERR) {
-+		dev_dbg(&pdev->dev, "Frame error\n");
-+		err = 1;
-+	}
-+
-+	if (flags & SPDIFRX_SR_SERR) {
-+		dev_dbg(&pdev->dev, "Synchronization error\n");
-+		err = 1;
-+	}
-+
-+	if (flags & SPDIFRX_SR_TERR) {
-+		dev_dbg(&pdev->dev, "Timeout error\n");
-+		err = 1;
-+	}
-+
-+	if (err) {
-+		/* SPDIFRX in STATE_STOP. Disable SPDIFRX to clear errors */
-+		cr = SPDIFRX_CR_SPDIFENSET(SPDIFRX_SPDIFEN_DISABLE);
-+		regmap_update_bits(spdifrx->regmap, STM32_SPDIFRX_CR,
-+				   SPDIFRX_CR_SPDIFEN_MASK, cr);
-+
-+		if (substream)
-+			snd_pcm_stop(substream, SNDRV_PCM_STATE_DISCONNECTED);
-+
-+		return IRQ_HANDLED;
-+	}
-+
-+	if (err_xrun && substream)
-+		snd_pcm_stop_xrun(substream);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int stm32_spdifrx_startup(struct snd_pcm_substream *substream,
-+				 struct snd_soc_dai *cpu_dai)
-+{
-+	struct stm32_spdifrx_data *spdifrx = snd_soc_dai_get_drvdata(cpu_dai);
-+	int ret;
-+
-+	spdifrx->substream = substream;
-+
-+	ret = clk_prepare_enable(spdifrx->kclk);
-+	if (ret)
-+		dev_err(&spdifrx->pdev->dev, "Enable kclk failed: %d\n", ret);
-+
-+	return ret;
-+}
-+
-+static int stm32_spdifrx_hw_params(struct snd_pcm_substream *substream,
-+				   struct snd_pcm_hw_params *params,
-+				   struct snd_soc_dai *cpu_dai)
-+{
-+	struct stm32_spdifrx_data *spdifrx = snd_soc_dai_get_drvdata(cpu_dai);
-+	int data_size = params_width(params);
-+	int fmt;
-+
-+	switch (data_size) {
-+	case 16:
-+		fmt = SPDIFRX_DRFMT_PACKED;
-+		spdifrx->dma_params.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
-+		break;
-+	case 32:
-+		fmt = SPDIFRX_DRFMT_LEFT;
-+		spdifrx->dma_params.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-+		break;
-+	default:
-+		dev_err(&spdifrx->pdev->dev, "Unexpected data format\n");
-+		return -EINVAL;
-+	}
-+
-+	snd_soc_dai_init_dma_data(cpu_dai, NULL, &spdifrx->dma_params);
-+
-+	return regmap_update_bits(spdifrx->regmap, STM32_SPDIFRX_CR,
-+				  SPDIFRX_CR_DRFMT_MASK,
-+				  SPDIFRX_CR_DRFMTSET(fmt));
-+}
-+
-+static int stm32_spdifrx_trigger(struct snd_pcm_substream *substream, int cmd,
-+				 struct snd_soc_dai *cpu_dai)
-+{
-+	struct stm32_spdifrx_data *spdifrx = snd_soc_dai_get_drvdata(cpu_dai);
-+	int ret = 0;
-+
-+	switch (cmd) {
-+	case SNDRV_PCM_TRIGGER_START:
-+	case SNDRV_PCM_TRIGGER_RESUME:
-+	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-+		regmap_update_bits(spdifrx->regmap, STM32_SPDIFRX_IMR,
-+				   SPDIFRX_IMR_OVRIE, SPDIFRX_IMR_OVRIE);
-+
-+		regmap_update_bits(spdifrx->regmap, STM32_SPDIFRX_CR,
-+				   SPDIFRX_CR_RXDMAEN, SPDIFRX_CR_RXDMAEN);
-+
-+		ret = stm32_spdifrx_start_sync(spdifrx);
-+		break;
-+	case SNDRV_PCM_TRIGGER_SUSPEND:
-+	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-+	case SNDRV_PCM_TRIGGER_STOP:
-+		stm32_spdifrx_stop(spdifrx);
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	return ret;
-+}
-+
-+static void stm32_spdifrx_shutdown(struct snd_pcm_substream *substream,
-+				   struct snd_soc_dai *cpu_dai)
-+{
-+	struct stm32_spdifrx_data *spdifrx = snd_soc_dai_get_drvdata(cpu_dai);
-+
-+	spdifrx->substream = NULL;
-+	clk_disable_unprepare(spdifrx->kclk);
-+}
-+
-+static const struct snd_soc_dai_ops stm32_spdifrx_pcm_dai_ops = {
-+	.startup	= stm32_spdifrx_startup,
-+	.hw_params	= stm32_spdifrx_hw_params,
-+	.trigger	= stm32_spdifrx_trigger,
-+	.shutdown	= stm32_spdifrx_shutdown,
-+};
-+
-+static struct snd_soc_dai_driver stm32_spdifrx_dai[] = {
-+	{
-+		.name = "spdifrx-capture-cpu-dai",
-+		.probe = stm32_spdifrx_dai_probe,
-+		.capture = {
-+			.stream_name = "CPU-Capture",
-+			.channels_min = 1,
-+			.channels_max = 2,
-+			.rates = SNDRV_PCM_RATE_8000_192000,
-+			.formats = SNDRV_PCM_FMTBIT_S32_LE |
-+				   SNDRV_PCM_FMTBIT_S16_LE,
-+		},
-+		.ops = &stm32_spdifrx_pcm_dai_ops,
-+	}
-+};
-+
-+static const struct snd_pcm_hardware stm32_spdifrx_pcm_hw = {
-+	.info = SNDRV_PCM_INFO_INTERLEAVED | SNDRV_PCM_INFO_MMAP,
-+	.buffer_bytes_max = 8 * PAGE_SIZE,
-+	.period_bytes_max = 2048, /* MDMA constraint */
-+	.periods_min = 2,
-+	.periods_max = 8,
-+};
-+
-+static const struct snd_soc_component_driver stm32_spdifrx_component = {
-+	.name = "stm32-spdifrx",
-+};
-+
-+static const struct snd_dmaengine_pcm_config stm32_spdifrx_pcm_config = {
-+	.pcm_hardware = &stm32_spdifrx_pcm_hw,
-+	.prepare_slave_config = snd_dmaengine_pcm_prepare_slave_config,
-+};
-+
-+static const struct of_device_id stm32_spdifrx_ids[] = {
-+	{
-+		.compatible = "st,stm32h7-spdifrx",
-+		.data = &stm32_h7_spdifrx_regmap_conf
-+	},
-+	{}
-+};
-+
-+static int stm_spdifrx_parse_of(struct platform_device *pdev,
-+				struct stm32_spdifrx_data *spdifrx)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	const struct of_device_id *of_id;
-+	struct resource *res;
-+
-+	if (!np)
-+		return -ENODEV;
-+
-+	of_id = of_match_device(stm32_spdifrx_ids, &pdev->dev);
-+	if (of_id)
-+		spdifrx->regmap_conf =
-+			(const struct regmap_config *)of_id->data;
-+	else
-+		return -EINVAL;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	spdifrx->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(spdifrx->base))
-+		return PTR_ERR(spdifrx->base);
-+
-+	spdifrx->phys_addr = res->start;
-+
-+	spdifrx->kclk = devm_clk_get(&pdev->dev, "kclk");
-+	if (IS_ERR(spdifrx->kclk)) {
-+		dev_err(&pdev->dev, "Could not get kclk\n");
-+		return PTR_ERR(spdifrx->kclk);
-+	}
-+
-+	spdifrx->irq = platform_get_irq(pdev, 0);
-+	if (spdifrx->irq < 0) {
-+		dev_err(&pdev->dev, "No irq for node %s\n", pdev->name);
-+		return spdifrx->irq;
-+	}
-+
-+	return 0;
-+}
-+
-+static int stm32_spdifrx_probe(struct platform_device *pdev)
-+{
-+	struct stm32_spdifrx_data *spdifrx;
-+	struct reset_control *rst;
-+	const struct snd_dmaengine_pcm_config *pcm_config = NULL;
-+	int ret;
-+
-+	spdifrx = devm_kzalloc(&pdev->dev, sizeof(*spdifrx), GFP_KERNEL);
-+	if (!spdifrx)
-+		return -ENOMEM;
-+
-+	spdifrx->pdev = pdev;
-+	init_completion(&spdifrx->cs_completion);
-+	spin_lock_init(&spdifrx->lock);
-+
-+	platform_set_drvdata(pdev, spdifrx);
-+
-+	ret = stm_spdifrx_parse_of(pdev, spdifrx);
-+	if (ret)
-+		return ret;
-+
-+	spdifrx->regmap = devm_regmap_init_mmio_clk(&pdev->dev, "kclk",
-+						    spdifrx->base,
-+						    spdifrx->regmap_conf);
-+	if (IS_ERR(spdifrx->regmap)) {
-+		dev_err(&pdev->dev, "Regmap init failed\n");
-+		return PTR_ERR(spdifrx->regmap);
-+	}
-+
-+	ret = devm_request_irq(&pdev->dev, spdifrx->irq, stm32_spdifrx_isr, 0,
-+			       dev_name(&pdev->dev), spdifrx);
-+	if (ret) {
-+		dev_err(&pdev->dev, "IRQ request returned %d\n", ret);
-+		return ret;
-+	}
-+
-+	rst = devm_reset_control_get(&pdev->dev, NULL);
-+	if (!IS_ERR(rst)) {
-+		reset_control_assert(rst);
-+		udelay(2);
-+		reset_control_deassert(rst);
-+	}
-+
-+	ret = devm_snd_soc_register_component(&pdev->dev,
-+					      &stm32_spdifrx_component,
-+					      stm32_spdifrx_dai,
-+					      ARRAY_SIZE(stm32_spdifrx_dai));
-+	if (ret)
-+		return ret;
-+
-+	ret = stm32_spdifrx_dma_ctrl_register(&pdev->dev, spdifrx);
-+	if (ret)
-+		goto error;
-+
-+	pcm_config = &stm32_spdifrx_pcm_config;
-+	ret = devm_snd_dmaengine_pcm_register(&pdev->dev, pcm_config, 0);
-+	if (ret) {
-+		dev_err(&pdev->dev, "PCM DMA register returned %d\n", ret);
-+		goto error;
-+	}
-+
-+	return 0;
-+
-+error:
-+	if (spdifrx->ctrl_chan)
-+		dma_release_channel(spdifrx->ctrl_chan);
-+	if (spdifrx->dmab)
-+		snd_dma_free_pages(spdifrx->dmab);
-+
-+	return ret;
-+}
-+
-+static int stm32_spdifrx_remove(struct platform_device *pdev)
-+{
-+	struct stm32_spdifrx_data *spdifrx = platform_get_drvdata(pdev);
-+
-+	if (spdifrx->ctrl_chan)
-+		dma_release_channel(spdifrx->ctrl_chan);
-+
-+	if (spdifrx->dmab)
-+		snd_dma_free_pages(spdifrx->dmab);
-+
-+	return 0;
-+}
-+
-+MODULE_DEVICE_TABLE(of, stm32_spdifrx_ids);
-+
-+static struct platform_driver stm32_spdifrx_driver = {
-+	.driver = {
-+		.name = "st,stm32-spdifrx",
-+		.of_match_table = stm32_spdifrx_ids,
-+	},
-+	.probe = stm32_spdifrx_probe,
-+	.remove = stm32_spdifrx_remove,
-+};
-+
-+module_platform_driver(stm32_spdifrx_driver);
-+
-+MODULE_DESCRIPTION("STM32 Soc spdifrx Interface");
-+MODULE_AUTHOR("Olivier Moysan, <olivier.moysan@st.com>");
-+MODULE_ALIAS("platform:stm32-spdifrx");
-+MODULE_LICENSE("GPL v2");
-diff --git a/sound/soc/stm/stm32_spdifrx.h b/sound/soc/stm/stm32_spdifrx.h
-new file mode 100644
-index 0000000..0f0d43c
---- /dev/null
-+++ b/sound/soc/stm/stm32_spdifrx.h
-@@ -0,0 +1,224 @@
-+/*
-+ * STM32 ALSA SoC Digital Audio Interface (SPDIF-rx) driver.
-+ *
-+ * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
-+ * Author(s): Olivier Moysan <olivier.moysan@st.com> for STMicroelectronics.
-+ *
-+ * License terms: GPL V2.0.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
-+ * details.
-+ */
-+
-+/* SPDIF-rx Register Map */
-+#define STM32_SPDIFRX_CR	0x00
-+#define STM32_SPDIFRX_IMR	0x04
-+#define STM32_SPDIFRX_SR	0x08
-+#define STM32_SPDIFRX_IFCR	0x0C
-+#define STM32_SPDIFRX_DR	0x10
-+#define STM32_SPDIFRX_CSR	0x14
-+#define STM32_SPDIFRX_DIR	0x18
-+
-+/* Bit definition for SPDIF_CR register */
-+#define SPDIFRX_CR_SPDIFEN_SHIFT	0
-+#define SPDIFRX_CR_SPDIFEN_MASK	GENMASK(1, SPDIFRX_CR_SPDIFEN_SHIFT)
-+#define SPDIFRX_CR_SPDIFENSET(x)	((x) << SPDIFRX_CR_SPDIFEN_SHIFT)
-+
-+#define SPDIFRX_CR_RXDMAEN	BIT(2)
-+#define SPDIFRX_CR_RXSTEO	BIT(3)
-+
-+#define SPDIFRX_CR_DRFMT_SHIFT	4
-+#define SPDIFRX_CR_DRFMT_MASK	GENMASK(5, SPDIFRX_CR_DRFMT_SHIFT)
-+#define SPDIFRX_CR_DRFMTSET(x)	((x) << SPDIFRX_CR_DRFMT_SHIFT)
-+
-+#define SPDIFRX_CR_PMSK		BIT(6)
-+#define SPDIFRX_CR_VMSK		BIT(7)
-+#define SPDIFRX_CR_CUMSK	BIT(8)
-+#define SPDIFRX_CR_PTMSK	BIT(9)
-+#define SPDIFRX_CR_CBDMAEN	BIT(10)
-+#define SPDIFRX_CR_CHSEL_SHIFT	11
-+#define SPDIFRX_CR_CHSEL	BIT(SPDIFRX_CR_CHSEL_SHIFT)
-+
-+#define SPDIFRX_CR_NBTR_SHIFT	12
-+#define SPDIFRX_CR_NBTR_MASK	GENMASK(13, SPDIFRX_CR_NBTR_SHIFT)
-+#define SPDIFRX_CR_NBTRSET(x)	((x) << SPDIFRX_CR_NBTR_SHIFT)
-+
-+#define SPDIFRX_CR_WFA		BIT(14)
-+
-+#define SPDIFRX_CR_INSEL_SHIFT	16
-+#define SPDIFRX_CR_INSEL_MASK	GENMASK(18, PDIFRX_CR_INSEL_SHIFT)
-+#define SPDIFRX_CR_INSELSET(x)	((x) << SPDIFRX_CR_INSEL_SHIFT)
-+
-+#define SPDIFRX_CR_CKSEN_SHIFT	20
-+#define SPDIFRX_CR_CKSEN	BIT(20)
-+#define SPDIFRX_CR_CKSBKPEN	BIT(21)
-+
-+/* Bit definition for SPDIFRX_IMR register */
-+#define SPDIFRX_IMR_RXNEI	BIT(0)
-+#define SPDIFRX_IMR_CSRNEIE	BIT(1)
-+#define SPDIFRX_IMR_PERRIE	BIT(2)
-+#define SPDIFRX_IMR_OVRIE	BIT(3)
-+#define SPDIFRX_IMR_SBLKIE	BIT(4)
-+#define SPDIFRX_IMR_SYNCDIE	BIT(5)
-+#define SPDIFRX_IMR_IFEIE	BIT(6)
-+
-+#define SPDIFRX_XIMR_MASK	GENMASK(6, 0)
-+
-+/* Bit definition for SPDIFRX_SR register */
-+#define SPDIFRX_SR_RXNE		BIT(0)
-+#define SPDIFRX_SR_CSRNE	BIT(1)
-+#define SPDIFRX_SR_PERR		BIT(2)
-+#define SPDIFRX_SR_OVR		BIT(3)
-+#define SPDIFRX_SR_SBD		BIT(4)
-+#define SPDIFRX_SR_SYNCD	BIT(5)
-+#define SPDIFRX_SR_FERR		BIT(6)
-+#define SPDIFRX_SR_SERR		BIT(7)
-+#define SPDIFRX_SR_TERR		BIT(8)
-+
-+#define SPDIFRX_SR_WIDTH5_SHIFT	16
-+#define SPDIFRX_SR_WIDTH5_MASK	GENMASK(30, PDIFRX_SR_WIDTH5_SHIFT)
-+#define SPDIFRX_SR_WIDTH5SET(x)	((x) << SPDIFRX_SR_WIDTH5_SHIFT)
-+
-+/* Bit definition for SPDIFRX_IFCR register */
-+#define SPDIFRX_IFCR_PERRCF	BIT(2)
-+#define SPDIFRX_IFCR_OVRCF	BIT(3)
-+#define SPDIFRX_IFCR_SBDCF	BIT(4)
-+#define SPDIFRX_IFCR_SYNCDCF	BIT(5)
-+
-+#define SPDIFRX_XIFCR_MASK	GENMASK(5, 2)
-+
-+/* Bit definition for SPDIFRX_DR register (DRFMT = 0b00) */
-+#define SPDIFRX_DR0_DR_SHIFT	0
-+#define SPDIFRX_DR0_DR_MASK	GENMASK(23, SPDIFRX_DR0_DR_SHIFT)
-+#define SPDIFRX_DR0_DRSET(x)	((x) << SPDIFRX_DR0_DR_SHIFT)
-+
-+#define SPDIFRX_DR0_PE		BIT(24)
-+
-+#define SPDIFRX_DR0_V		BIT(25)
-+#define SPDIFRX_DR0_U		BIT(26)
-+#define SPDIFRX_DR0_C		BIT(27)
-+
-+#define SPDIFRX_DR0_PT_SHIFT	28
-+#define SPDIFRX_DR0_PT_MASK	GENMASK(29, SPDIFRX_DR0_PT_SHIFT)
-+#define SPDIFRX_DR0_PTSET(x)	((x) << SPDIFRX_DR0_PT_SHIFT)
-+
-+/* Bit definition for SPDIFRX_DR register (DRFMT = 0b01) */
-+#define  SPDIFRX_DR1_PE		BIT(0)
-+#define  SPDIFRX_DR1_V		BIT(1)
-+#define  SPDIFRX_DR1_U		BIT(2)
-+#define  SPDIFRX_DR1_C		BIT(3)
-+
-+#define  SPDIFRX_DR1_PT_SHIFT	4
-+#define  SPDIFRX_DR1_PT_MASK	GENMASK(5, SPDIFRX_DR1_PT_SHIFT)
-+#define  SPDIFRX_DR1_PTSET(x)	((x) << SPDIFRX_DR1_PT_SHIFT)
-+
-+#define SPDIFRX_DR1_DR_SHIFT	8
-+#define SPDIFRX_DR1_DR_MASK	GENMASK(31, SPDIFRX_DR1_DR_SHIFT)
-+#define SPDIFRX_DR1_DRSET(x)	((x) << SPDIFRX_DR1_DR_SHIFT)
-+
-+/* Bit definition for SPDIFRX_DR register (DRFMT = 0b10) */
-+#define SPDIFRX_DR1_DRNL1_SHIFT	0
-+#define SPDIFRX_DR1_DRNL1_MASK	GENMASK(15, SPDIFRX_DR1_DRNL1_SHIFT)
-+#define SPDIFRX_DR1_DRNL1SET(x)	((x) << SPDIFRX_DR1_DRNL1_SHIFT)
-+
-+#define SPDIFRX_DR1_DRNL2_SHIFT	16
-+#define SPDIFRX_DR1_DRNL2_MASK	GENMASK(31, SPDIFRX_DR1_DRNL2_SHIFT)
-+#define SPDIFRX_DR1_DRNL2SET(x)	((x) << SPDIFRX_DR1_DRNL2_SHIFT)
-+
-+/* Bit definition for SPDIFRX_CSR register */
-+#define SPDIFRX_CSR_USR_SHIFT	0
-+#define SPDIFRX_CSR_USR_MASK	GENMASK(15, SPDIFRX_CSR_USR_SHIFT)
-+#define SPDIFRX_CSR_USRGET(x)	(((x) & SPDIFRX_CSR_USR_MASK)\
-+				>> SPDIFRX_CSR_USR_SHIFT)
-+
-+#define SPDIFRX_CSR_CS_SHIFT	16
-+#define SPDIFRX_CSR_CS_MASK	GENMASK(23, SPDIFRX_CSR_CS_SHIFT)
-+#define SPDIFRX_CSR_CSGET(x)	(((x) & SPDIFRX_CSR_CS_MASK)\
-+				>> SPDIFRX_CSR_CS_SHIFT)
-+
-+#define SPDIFRX_CSR_SOB		BIT(24)
-+
-+/* Bit definition for SPDIFRX_DIR register */
-+#define SPDIFRX_DIR_THI_SHIFT	0
-+#define SPDIFRX_DIR_THI_MASK	GENMASK(12, SPDIFRX_DIR_THI_SHIFT)
-+#define SPDIFRX_DIR_THI_SET(x)	((x) << SPDIFRX_DIR_THI_SHIFT)
-+
-+#define SPDIFRX_DIR_TLO_SHIFT	16
-+#define SPDIFRX_DIR_TLO_MASK	GENMASK(28, SPDIFRX_DIR_TLO_SHIFT)
-+#define SPDIFRX_DIR_TLO_SET(x)	((x) << SPDIFRX_DIR_TLO_SHIFT)
-+
-+#define SPDIFRX_SPDIFEN_DISABLE	0x0
-+#define SPDIFRX_SPDIFEN_SYNC	0x1
-+#define SPDIFRX_SPDIFEN_ENABLE	0x3
-+
-+#define SPDIFRX_IN1		0x1
-+#define SPDIFRX_IN2		0x2
-+#define SPDIFRX_IN3		0x3
-+#define SPDIFRX_IN4		0x4
-+#define SPDIFRX_IN5		0x5
-+#define SPDIFRX_IN6		0x6
-+#define SPDIFRX_IN7		0x7
-+#define SPDIFRX_IN8		0x8
-+
-+#define SPDIFRX_NBTR_NONE	0x0
-+#define SPDIFRX_NBTR_3		0x1
-+#define SPDIFRX_NBTR_15		0x2
-+#define SPDIFRX_NBTR_63		0x3
-+
-+#define SPDIFRX_DRFMT_RIGHT	0x0
-+#define SPDIFRX_DRFMT_LEFT	0x1
-+#define SPDIFRX_DRFMT_PACKED	0x2
-+
-+/* 192 CS bits in S/PDIF frame. i.e 24 CS bytes */
-+#define SPDIFRX_CS_BYTES_NB	24
-+/* CS byte is retrieved in 32b words */
-+#define SPDIFRX_CS_BUF_LENGTH	(SPDIFRX_CS_BYTES_NB * 4)
-+#define SPDIFRX_UB_BYTES_NB	(SPDIFRX_CS_BYTES_NB * 2)
-+
-+/**
-+ * struct stm32_spdifrx_data - private data of SPDIFRX
-+ * @pdev: device data pointer
-+ * @base: mmio register base virtual address
-+ * @regmap: SPDIFRX register map pointer
-+ * @regmap_conf: SPDIFRX register map configuration pointer
-+ * @cs_completion: channel status retrieving completion
-+ * @kclk: kernel clock feeding the SPDIFRX clock generator
-+ * @pclk: peripheral clock driving bus interface
-+ * @dma_params: dma configuration data for rx channel
-+ * @substream: PCM substream data pointer
-+ * @dmab: dma buffer info pointer
-+ * @ctrl_chan: dma channel for S/PDIF control bits
-+ * @desc:dma async transaction descriptor
-+ * @slave_config: dma slave channel runtime config pointer
-+ * @phys_addr: SPDIFRX registers physical base address
-+ * @lock: synchronization enabling lock
-+ * @cs: channel status buffer
-+ * @ub: user data buffer
-+ * @irq: SPDIFRX interrupt line
-+ */
-+struct stm32_spdifrx_data {
-+	struct platform_device *pdev;
-+	void __iomem *base;
-+	struct regmap *regmap;
-+	const struct regmap_config *regmap_conf;
-+	struct completion cs_completion;
-+	struct clk *kclk;
-+	struct clk *pclk;
-+	struct snd_dmaengine_dai_dma_data dma_params;
-+	struct snd_pcm_substream *substream;
-+	struct snd_dma_buffer *dmab;
-+	struct dma_chan *ctrl_chan;
-+	struct dma_async_tx_descriptor *desc;
-+	struct dma_slave_config slave_config;
-+	dma_addr_t phys_addr;
-+	spinlock_t lock;  /* sync enabling lock */
-+	unsigned char cs[SPDIFRX_CS_BYTES_NB];
-+	unsigned char ub[SPDIFRX_UB_BYTES_NB];
-+	int irq;
-+};
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+index 8b52416..07d7ea2 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+@@ -38,13 +38,6 @@
+ 
+ #define DISP_REG_UFO_START			0x0000
+ 
+-#define DISP_COLOR_CFG_MAIN			0x0400
+-#define DISP_COLOR_START_MT2701			0x0f00
+-#define DISP_COLOR_START_MT8173			0x0c00
+-#define DISP_COLOR_START(comp)			((comp)->data->color_offset)
+-#define DISP_COLOR_WIDTH(comp)			(DISP_COLOR_START(comp) + 0x50)
+-#define DISP_COLOR_HEIGHT(comp)			(DISP_COLOR_START(comp) + 0x54)
+-
+ #define DISP_AAL_EN				0x0000
+ #define DISP_AAL_SIZE				0x0030
+ 
+@@ -55,9 +48,6 @@
+ 
+ #define LUT_10BIT_MASK				0x03ff
+ 
+-#define COLOR_BYPASS_ALL			BIT(7)
+-#define COLOR_SEQ_SEL				BIT(13)
+-
+ #define OD_RELAYMODE				BIT(0)
+ 
+ #define UFO_BYPASS				BIT(2)
+@@ -82,20 +72,6 @@
+ #define DITHER_ADD_LSHIFT_G(x)			(((x) & 0x7) << 4)
+ #define DITHER_ADD_RSHIFT_G(x)			(((x) & 0x7) << 0)
+ 
+-struct mtk_disp_color_data {
+-	unsigned int color_offset;
+-};
+-
+-struct mtk_disp_color {
+-	struct mtk_ddp_comp			ddp_comp;
+-	const struct mtk_disp_color_data	*data;
+-};
+-
+-static inline struct mtk_disp_color *comp_to_color(struct mtk_ddp_comp *comp)
+-{
+-	return container_of(comp, struct mtk_disp_color, ddp_comp);
+-}
+-
+ void mtk_dither_set(struct mtk_ddp_comp *comp, unsigned int bpc,
+ 		    unsigned int CFG)
+ {
+@@ -119,25 +95,6 @@ void mtk_dither_set(struct mtk_ddp_comp *comp, unsigned int bpc,
+ 	}
+ }
+ 
+-static void mtk_color_config(struct mtk_ddp_comp *comp, unsigned int w,
+-			     unsigned int h, unsigned int vrefresh,
+-			     unsigned int bpc)
+-{
+-	struct mtk_disp_color *color = comp_to_color(comp);
+-
+-	writel(w, comp->regs + DISP_COLOR_WIDTH(color));
+-	writel(h, comp->regs + DISP_COLOR_HEIGHT(color));
+-}
+-
+-static void mtk_color_start(struct mtk_ddp_comp *comp)
+-{
+-	struct mtk_disp_color *color = comp_to_color(comp);
+-
+-	writel(COLOR_BYPASS_ALL | COLOR_SEQ_SEL,
+-	       comp->regs + DISP_COLOR_CFG_MAIN);
+-	writel(0x1, comp->regs + DISP_COLOR_START(color));
+-}
+-
+ static void mtk_od_config(struct mtk_ddp_comp *comp, unsigned int w,
+ 			  unsigned int h, unsigned int vrefresh,
+ 			  unsigned int bpc)
+@@ -229,11 +186,6 @@ static void mtk_gamma_set(struct mtk_ddp_comp *comp,
+ 	.stop = mtk_gamma_stop,
+ };
+ 
+-static const struct mtk_ddp_comp_funcs ddp_color = {
+-	.config = mtk_color_config,
+-	.start = mtk_color_start,
+-};
+-
+ static const struct mtk_ddp_comp_funcs ddp_od = {
+ 	.config = mtk_od_config,
+ 	.start = mtk_od_start,
+@@ -268,8 +220,8 @@ struct mtk_ddp_comp_match {
+ static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
+ 	[DDP_COMPONENT_AAL]	= { MTK_DISP_AAL,	0, &ddp_aal },
+ 	[DDP_COMPONENT_BLS]	= { MTK_DISP_BLS,	0, NULL },
+-	[DDP_COMPONENT_COLOR0]	= { MTK_DISP_COLOR,	0, &ddp_color },
+-	[DDP_COMPONENT_COLOR1]	= { MTK_DISP_COLOR,	1, &ddp_color },
++	[DDP_COMPONENT_COLOR0]	= { MTK_DISP_COLOR,	0, NULL },
++	[DDP_COMPONENT_COLOR1]	= { MTK_DISP_COLOR,	1, NULL },
+ 	[DDP_COMPONENT_DPI0]	= { MTK_DPI,		0, NULL },
+ 	[DDP_COMPONENT_DSI0]	= { MTK_DSI,		0, NULL },
+ 	[DDP_COMPONENT_DSI1]	= { MTK_DSI,		1, NULL },
+@@ -286,22 +238,6 @@ struct mtk_ddp_comp_match {
+ 	[DDP_COMPONENT_WDMA1]	= { MTK_DISP_WDMA,	1, NULL },
+ };
+ 
+-static const struct mtk_disp_color_data mt2701_color_driver_data = {
+-	.color_offset = DISP_COLOR_START_MT2701,
+-};
+-
+-static const struct mtk_disp_color_data mt8173_color_driver_data = {
+-	.color_offset = DISP_COLOR_START_MT8173,
+-};
+-
+-static const struct of_device_id mtk_disp_color_driver_dt_match[] = {
+-	{ .compatible = "mediatek,mt2701-disp-color",
+-	  .data = &mt2701_color_driver_data},
+-	{ .compatible = "mediatek,mt8173-disp-color",
+-	  .data = &mt8173_color_driver_data},
+-	{},
+-};
+-
+ int mtk_ddp_comp_get_id(struct device_node *node,
+ 			enum mtk_ddp_comp_type comp_type)
+ {
+@@ -324,23 +260,11 @@ int mtk_ddp_comp_init(struct device *dev, struct device_node *node,
+ 	enum mtk_ddp_comp_type type;
+ 	struct device_node *larb_node;
+ 	struct platform_device *larb_pdev;
+-	const struct of_device_id *match;
+-	struct mtk_disp_color *color;
+ 
+ 	if (comp_id < 0 || comp_id >= DDP_COMPONENT_ID_MAX)
+ 		return -EINVAL;
+ 
+ 	type = mtk_ddp_matches[comp_id].type;
+-	if (type == MTK_DISP_COLOR) {
+-		devm_kfree(dev, comp);
+-		color = devm_kzalloc(dev, sizeof(*color), GFP_KERNEL);
+-		if (!color)
+-			return -ENOMEM;
+-
+-		match = of_match_node(mtk_disp_color_driver_dt_match, node);
+-		color->data = match->data;
+-		comp = &color->ddp_comp;
+-	}
+ 
+ 	comp->id = comp_id;
+ 	comp->funcs = funcs ?: mtk_ddp_matches[comp_id].funcs;
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+index f6c8ec4..9287fba 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+@@ -439,11 +439,12 @@ static int mtk_drm_probe(struct platform_device *pdev)
+ 		private->comp_node[comp_id] = of_node_get(node);
+ 
+ 		/*
+-		 * Currently only the OVL, RDMA, DSI, and DPI blocks have
++		 * Currently only the COLOR, OVL, RDMA, DSI, and DPI blocks have
+ 		 * separate component platform drivers and initialize their own
+ 		 * DDP component structure. The others are initialized here.
+ 		 */
+-		if (comp_type == MTK_DISP_OVL ||
++		if (comp_type == MTK_DISP_COLOR ||
++		    comp_type == MTK_DISP_OVL ||
+ 		    comp_type == MTK_DISP_RDMA ||
+ 		    comp_type == MTK_DSI ||
+ 		    comp_type == MTK_DPI) {
+@@ -566,6 +567,7 @@ static SIMPLE_DEV_PM_OPS(mtk_drm_pm_ops, mtk_drm_sys_suspend,
+ 
+ static struct platform_driver * const mtk_drm_drivers[] = {
+ 	&mtk_ddp_driver,
++	&mtk_disp_color_driver,
+ 	&mtk_disp_ovl_driver,
+ 	&mtk_disp_rdma_driver,
+ 	&mtk_dpi_driver,
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+index aef8747..c3378c4 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
++++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+@@ -59,6 +59,7 @@ struct mtk_drm_private {
+ };
+ 
+ extern struct platform_driver mtk_ddp_driver;
++extern struct platform_driver mtk_disp_color_driver;
+ extern struct platform_driver mtk_disp_ovl_driver;
+ extern struct platform_driver mtk_disp_rdma_driver;
+ extern struct platform_driver mtk_dpi_driver;
 -- 
 1.9.1
