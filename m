@@ -1,425 +1,289 @@
-From: yt.shen@mediatek.com (YT Shen)
-Date: Fri, 16 Jun 2017 21:58:20 +0800
-Subject: [PATCH] drm/mediatek: fixup error memory reallocation
-In-Reply-To: <1497403189.1581.11.camel@mtksdaap41>
-References: <1497251744-31644-1-git-send-email-yt.shen@mediatek.com>
- <1497403189.1581.11.camel@mtksdaap41>
-Message-ID: <1497621500.29558.3.camel@mtksdaap41>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 16 Jun 2017 18:15:40 +0530
+Subject: [PATCH 12/16] mmc: host: omap_hsmmc: Add support to set IODELAY values
+In-Reply-To: <20170616124544.15046-1-kishon@ti.com>
+References: <20170616124544.15046-1-kishon@ti.com>
+Message-ID: <20170616124544.15046-13-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-06-14 at 09:19 +0800, CK Hu wrote:
-> On Mon, 2017-06-12 at 15:15 +0800, YT Shen wrote:
-> > Previous patch (c5f228ef6c drm/mediatek: add *driver_data for different
-> > hardware settings) calls devm_kfree() and then devm_kzalloc() to
-> > reallocate color module data structure.  But this reallocation cannnot
-> > guarantee the new address is unchanged, but the caller will use the
-> > old address, which is wrong.
-> > 
-> > Fix it by separate color module from general components, this patch
-> > separate color module to independent files, like mtk_disp_ovl.c and
-> > mtk_disp_rdma.c do
-> > 
-> 
-> Hi, YT:
-> 
-> I would like the title to be something like 'separate color module to
-> fixup error memory reallocation' because this is a large modification
-> and its major is separating color module.
-> 
-> Regards,
-> CK
-OK, I will update the title and send again, thanks.
+The data manual of J6/J6 Eco recommends to set different IODELAY values
+depending on the mode in which the MMC/SD is enumerated in order to
+ensure IO timings are met.
 
-yt.shen
+Add support to set the IODELAY values depending on the various MMC
+modes using the pinctrl APIs.
 
-> 
-> > Signed-off-by: YT Shen <yt.shen@mediatek.com>
-> > ---
-> >  drivers/gpu/drm/mediatek/Makefile           |   3 +-
-> >  drivers/gpu/drm/mediatek/mtk_disp_color.c   | 176 ++++++++++++++++++++++++++++
-> >  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |  80 +------------
-> >  drivers/gpu/drm/mediatek/mtk_drm_drv.c      |   6 +-
-> >  drivers/gpu/drm/mediatek/mtk_drm_drv.h      |   1 +
-> >  5 files changed, 185 insertions(+), 81 deletions(-)
-> >  create mode 100644 drivers/gpu/drm/mediatek/mtk_disp_color.c
-> > 
-> > diff --git a/drivers/gpu/drm/mediatek/Makefile b/drivers/gpu/drm/mediatek/Makefile
-> > index bf2e5be..e37b55a 100644
-> > --- a/drivers/gpu/drm/mediatek/Makefile
-> > +++ b/drivers/gpu/drm/mediatek/Makefile
-> > @@ -1,4 +1,5 @@
-> > -mediatek-drm-y := mtk_disp_ovl.o \
-> > +mediatek-drm-y := mtk_disp_color.o \
-> > +		  mtk_disp_ovl.o \
-> >  		  mtk_disp_rdma.o \
-> >  		  mtk_drm_crtc.o \
-> >  		  mtk_drm_ddp.o \
-> > diff --git a/drivers/gpu/drm/mediatek/mtk_disp_color.c b/drivers/gpu/drm/mediatek/mtk_disp_color.c
-> > new file mode 100644
-> > index 0000000..ef79a6d
-> > --- /dev/null
-> > +++ b/drivers/gpu/drm/mediatek/mtk_disp_color.c
-> > @@ -0,0 +1,176 @@
-> > +/*
-> > + * Copyright (c) 2017 MediaTek Inc.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +#include <drm/drmP.h>
-> > +#include <linux/clk.h>
-> > +#include <linux/component.h>
-> > +#include <linux/of_device.h>
-> > +#include <linux/of_irq.h>
-> > +#include <linux/platform_device.h>
-> > +
-> > +#include "mtk_drm_crtc.h"
-> > +#include "mtk_drm_ddp_comp.h"
-> > +
-> > +#define DISP_COLOR_CFG_MAIN			0x0400
-> > +#define DISP_COLOR_START_MT2701			0x0f00
-> > +#define DISP_COLOR_START_MT8173			0x0c00
-> > +#define DISP_COLOR_START(comp)			((comp)->data->color_offset)
-> > +#define DISP_COLOR_WIDTH(comp)			(DISP_COLOR_START(comp) + 0x50)
-> > +#define DISP_COLOR_HEIGHT(comp)			(DISP_COLOR_START(comp) + 0x54)
-> > +
-> > +#define COLOR_BYPASS_ALL			BIT(7)
-> > +#define COLOR_SEQ_SEL				BIT(13)
-> > +
-> > +struct mtk_disp_color_data {
-> > +	unsigned int color_offset;
-> > +};
-> > +
-> > +/**
-> > + * struct mtk_disp_color - DISP_COLOR driver structure
-> > + * @ddp_comp - structure containing type enum and hardware resources
-> > + * @crtc - associated crtc to report irq events to
-> > + */
-> > +struct mtk_disp_color {
-> > +	struct mtk_ddp_comp			ddp_comp;
-> > +	struct drm_crtc				*crtc;
-> > +	const struct mtk_disp_color_data	*data;
-> > +};
-> > +
-> > +static inline struct mtk_disp_color *comp_to_color(struct mtk_ddp_comp *comp)
-> > +{
-> > +	return container_of(comp, struct mtk_disp_color, ddp_comp);
-> > +}
-> > +
-> > +static void mtk_color_config(struct mtk_ddp_comp *comp, unsigned int w,
-> > +			     unsigned int h, unsigned int vrefresh,
-> > +			     unsigned int bpc)
-> > +{
-> > +	struct mtk_disp_color *color = comp_to_color(comp);
-> > +
-> > +	writel(w, comp->regs + DISP_COLOR_WIDTH(color));
-> > +	writel(h, comp->regs + DISP_COLOR_HEIGHT(color));
-> > +}
-> > +
-> > +static void mtk_color_start(struct mtk_ddp_comp *comp)
-> > +{
-> > +	struct mtk_disp_color *color = comp_to_color(comp);
-> > +
-> > +	writel(COLOR_BYPASS_ALL | COLOR_SEQ_SEL,
-> > +	       comp->regs + DISP_COLOR_CFG_MAIN);
-> > +	writel(0x1, comp->regs + DISP_COLOR_START(color));
-> > +}
-> > +
-> > +static const struct mtk_ddp_comp_funcs mtk_disp_color_funcs = {
-> > +	.config = mtk_color_config,
-> > +	.start = mtk_color_start,
-> > +};
-> > +
-> > +static int mtk_disp_color_bind(struct device *dev, struct device *master,
-> > +			       void *data)
-> > +{
-> > +	struct mtk_disp_color *priv = dev_get_drvdata(dev);
-> > +	struct drm_device *drm_dev = data;
-> > +	int ret;
-> > +
-> > +	ret = mtk_ddp_comp_register(drm_dev, &priv->ddp_comp);
-> > +	if (ret < 0) {
-> > +		dev_err(dev, "Failed to register component %s: %d\n",
-> > +			dev->of_node->full_name, ret);
-> > +		return ret;
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static void mtk_disp_color_unbind(struct device *dev, struct device *master,
-> > +				  void *data)
-> > +{
-> > +	struct mtk_disp_color *priv = dev_get_drvdata(dev);
-> > +	struct drm_device *drm_dev = data;
-> > +
-> > +	mtk_ddp_comp_unregister(drm_dev, &priv->ddp_comp);
-> > +}
-> > +
-> > +static const struct component_ops mtk_disp_color_component_ops = {
-> > +	.bind	= mtk_disp_color_bind,
-> > +	.unbind = mtk_disp_color_unbind,
-> > +};
-> > +
-> > +static int mtk_disp_color_probe(struct platform_device *pdev)
-> > +{
-> > +	struct device *dev = &pdev->dev;
-> > +	struct mtk_disp_color *priv;
-> > +	int comp_id;
-> > +	int ret;
-> > +
-> > +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> > +	if (!priv)
-> > +		return -ENOMEM;
-> > +
-> > +	comp_id = mtk_ddp_comp_get_id(dev->of_node, MTK_DISP_COLOR);
-> > +	if (comp_id < 0) {
-> > +		dev_err(dev, "Failed to identify by alias: %d\n", comp_id);
-> > +		return comp_id;
-> > +	}
-> > +
-> > +	ret = mtk_ddp_comp_init(dev, dev->of_node, &priv->ddp_comp, comp_id,
-> > +				&mtk_disp_color_funcs);
-> > +	if (ret) {
-> > +		dev_err(dev, "Failed to initialize component: %d\n", ret);
-> > +		return ret;
-> > +	}
-> > +
-> > +	priv->data = of_device_get_match_data(dev);
-> > +
-> > +	platform_set_drvdata(pdev, priv);
-> > +
-> > +	ret = component_add(dev, &mtk_disp_color_component_ops);
-> > +	if (ret)
-> > +		dev_err(dev, "Failed to add component: %d\n", ret);
-> > +
-> > +	return ret;
-> > +}
-> > +
-> > +static int mtk_disp_color_remove(struct platform_device *pdev)
-> > +{
-> > +	component_del(&pdev->dev, &mtk_disp_color_component_ops);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static const struct mtk_disp_color_data mt2701_color_driver_data = {
-> > +	.color_offset = DISP_COLOR_START_MT2701,
-> > +};
-> > +
-> > +static const struct mtk_disp_color_data mt8173_color_driver_data = {
-> > +	.color_offset = DISP_COLOR_START_MT8173,
-> > +};
-> > +
-> > +static const struct of_device_id mtk_disp_color_driver_dt_match[] = {
-> > +	{ .compatible = "mediatek,mt2701-disp-color",
-> > +	  .data = &mt2701_color_driver_data},
-> > +	{ .compatible = "mediatek,mt8173-disp-color",
-> > +	  .data = &mt8173_color_driver_data},
-> > +	{},
-> > +};
-> > +MODULE_DEVICE_TABLE(of, mtk_disp_color_driver_dt_match);
-> > +
-> > +struct platform_driver mtk_disp_color_driver = {
-> > +	.probe		= mtk_disp_color_probe,
-> > +	.remove		= mtk_disp_color_remove,
-> > +	.driver		= {
-> > +		.name	= "mediatek-disp-color",
-> > +		.owner	= THIS_MODULE,
-> > +		.of_match_table = mtk_disp_color_driver_dt_match,
-> > +	},
-> > +};
-> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> > index 8b52416..07d7ea2 100644
-> > --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> > @@ -38,13 +38,6 @@
-> >  
-> >  #define DISP_REG_UFO_START			0x0000
-> >  
-> > -#define DISP_COLOR_CFG_MAIN			0x0400
-> > -#define DISP_COLOR_START_MT2701			0x0f00
-> > -#define DISP_COLOR_START_MT8173			0x0c00
-> > -#define DISP_COLOR_START(comp)			((comp)->data->color_offset)
-> > -#define DISP_COLOR_WIDTH(comp)			(DISP_COLOR_START(comp) + 0x50)
-> > -#define DISP_COLOR_HEIGHT(comp)			(DISP_COLOR_START(comp) + 0x54)
-> > -
-> >  #define DISP_AAL_EN				0x0000
-> >  #define DISP_AAL_SIZE				0x0030
-> >  
-> > @@ -55,9 +48,6 @@
-> >  
-> >  #define LUT_10BIT_MASK				0x03ff
-> >  
-> > -#define COLOR_BYPASS_ALL			BIT(7)
-> > -#define COLOR_SEQ_SEL				BIT(13)
-> > -
-> >  #define OD_RELAYMODE				BIT(0)
-> >  
-> >  #define UFO_BYPASS				BIT(2)
-> > @@ -82,20 +72,6 @@
-> >  #define DITHER_ADD_LSHIFT_G(x)			(((x) & 0x7) << 4)
-> >  #define DITHER_ADD_RSHIFT_G(x)			(((x) & 0x7) << 0)
-> >  
-> > -struct mtk_disp_color_data {
-> > -	unsigned int color_offset;
-> > -};
-> > -
-> > -struct mtk_disp_color {
-> > -	struct mtk_ddp_comp			ddp_comp;
-> > -	const struct mtk_disp_color_data	*data;
-> > -};
-> > -
-> > -static inline struct mtk_disp_color *comp_to_color(struct mtk_ddp_comp *comp)
-> > -{
-> > -	return container_of(comp, struct mtk_disp_color, ddp_comp);
-> > -}
-> > -
-> >  void mtk_dither_set(struct mtk_ddp_comp *comp, unsigned int bpc,
-> >  		    unsigned int CFG)
-> >  {
-> > @@ -119,25 +95,6 @@ void mtk_dither_set(struct mtk_ddp_comp *comp, unsigned int bpc,
-> >  	}
-> >  }
-> >  
-> > -static void mtk_color_config(struct mtk_ddp_comp *comp, unsigned int w,
-> > -			     unsigned int h, unsigned int vrefresh,
-> > -			     unsigned int bpc)
-> > -{
-> > -	struct mtk_disp_color *color = comp_to_color(comp);
-> > -
-> > -	writel(w, comp->regs + DISP_COLOR_WIDTH(color));
-> > -	writel(h, comp->regs + DISP_COLOR_HEIGHT(color));
-> > -}
-> > -
-> > -static void mtk_color_start(struct mtk_ddp_comp *comp)
-> > -{
-> > -	struct mtk_disp_color *color = comp_to_color(comp);
-> > -
-> > -	writel(COLOR_BYPASS_ALL | COLOR_SEQ_SEL,
-> > -	       comp->regs + DISP_COLOR_CFG_MAIN);
-> > -	writel(0x1, comp->regs + DISP_COLOR_START(color));
-> > -}
-> > -
-> >  static void mtk_od_config(struct mtk_ddp_comp *comp, unsigned int w,
-> >  			  unsigned int h, unsigned int vrefresh,
-> >  			  unsigned int bpc)
-> > @@ -229,11 +186,6 @@ static void mtk_gamma_set(struct mtk_ddp_comp *comp,
-> >  	.stop = mtk_gamma_stop,
-> >  };
-> >  
-> > -static const struct mtk_ddp_comp_funcs ddp_color = {
-> > -	.config = mtk_color_config,
-> > -	.start = mtk_color_start,
-> > -};
-> > -
-> >  static const struct mtk_ddp_comp_funcs ddp_od = {
-> >  	.config = mtk_od_config,
-> >  	.start = mtk_od_start,
-> > @@ -268,8 +220,8 @@ struct mtk_ddp_comp_match {
-> >  static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
-> >  	[DDP_COMPONENT_AAL]	= { MTK_DISP_AAL,	0, &ddp_aal },
-> >  	[DDP_COMPONENT_BLS]	= { MTK_DISP_BLS,	0, NULL },
-> > -	[DDP_COMPONENT_COLOR0]	= { MTK_DISP_COLOR,	0, &ddp_color },
-> > -	[DDP_COMPONENT_COLOR1]	= { MTK_DISP_COLOR,	1, &ddp_color },
-> > +	[DDP_COMPONENT_COLOR0]	= { MTK_DISP_COLOR,	0, NULL },
-> > +	[DDP_COMPONENT_COLOR1]	= { MTK_DISP_COLOR,	1, NULL },
-> >  	[DDP_COMPONENT_DPI0]	= { MTK_DPI,		0, NULL },
-> >  	[DDP_COMPONENT_DSI0]	= { MTK_DSI,		0, NULL },
-> >  	[DDP_COMPONENT_DSI1]	= { MTK_DSI,		1, NULL },
-> > @@ -286,22 +238,6 @@ struct mtk_ddp_comp_match {
-> >  	[DDP_COMPONENT_WDMA1]	= { MTK_DISP_WDMA,	1, NULL },
-> >  };
-> >  
-> > -static const struct mtk_disp_color_data mt2701_color_driver_data = {
-> > -	.color_offset = DISP_COLOR_START_MT2701,
-> > -};
-> > -
-> > -static const struct mtk_disp_color_data mt8173_color_driver_data = {
-> > -	.color_offset = DISP_COLOR_START_MT8173,
-> > -};
-> > -
-> > -static const struct of_device_id mtk_disp_color_driver_dt_match[] = {
-> > -	{ .compatible = "mediatek,mt2701-disp-color",
-> > -	  .data = &mt2701_color_driver_data},
-> > -	{ .compatible = "mediatek,mt8173-disp-color",
-> > -	  .data = &mt8173_color_driver_data},
-> > -	{},
-> > -};
-> > -
-> >  int mtk_ddp_comp_get_id(struct device_node *node,
-> >  			enum mtk_ddp_comp_type comp_type)
-> >  {
-> > @@ -324,23 +260,11 @@ int mtk_ddp_comp_init(struct device *dev, struct device_node *node,
-> >  	enum mtk_ddp_comp_type type;
-> >  	struct device_node *larb_node;
-> >  	struct platform_device *larb_pdev;
-> > -	const struct of_device_id *match;
-> > -	struct mtk_disp_color *color;
-> >  
-> >  	if (comp_id < 0 || comp_id >= DDP_COMPONENT_ID_MAX)
-> >  		return -EINVAL;
-> >  
-> >  	type = mtk_ddp_matches[comp_id].type;
-> > -	if (type == MTK_DISP_COLOR) {
-> > -		devm_kfree(dev, comp);
-> > -		color = devm_kzalloc(dev, sizeof(*color), GFP_KERNEL);
-> > -		if (!color)
-> > -			return -ENOMEM;
-> > -
-> > -		match = of_match_node(mtk_disp_color_driver_dt_match, node);
-> > -		color->data = match->data;
-> > -		comp = &color->ddp_comp;
-> > -	}
-> >  
-> >  	comp->id = comp_id;
-> >  	comp->funcs = funcs ?: mtk_ddp_matches[comp_id].funcs;
-> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> > index f6c8ec4..9287fba 100644
-> > --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> > @@ -439,11 +439,12 @@ static int mtk_drm_probe(struct platform_device *pdev)
-> >  		private->comp_node[comp_id] = of_node_get(node);
-> >  
-> >  		/*
-> > -		 * Currently only the OVL, RDMA, DSI, and DPI blocks have
-> > +		 * Currently only the COLOR, OVL, RDMA, DSI, and DPI blocks have
-> >  		 * separate component platform drivers and initialize their own
-> >  		 * DDP component structure. The others are initialized here.
-> >  		 */
-> > -		if (comp_type == MTK_DISP_OVL ||
-> > +		if (comp_type == MTK_DISP_COLOR ||
-> > +		    comp_type == MTK_DISP_OVL ||
-> >  		    comp_type == MTK_DISP_RDMA ||
-> >  		    comp_type == MTK_DSI ||
-> >  		    comp_type == MTK_DPI) {
-> > @@ -566,6 +567,7 @@ static SIMPLE_DEV_PM_OPS(mtk_drm_pm_ops, mtk_drm_sys_suspend,
-> >  
-> >  static struct platform_driver * const mtk_drm_drivers[] = {
-> >  	&mtk_ddp_driver,
-> > +	&mtk_disp_color_driver,
-> >  	&mtk_disp_ovl_driver,
-> >  	&mtk_disp_rdma_driver,
-> >  	&mtk_dpi_driver,
-> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> > index aef8747..c3378c4 100644
-> > --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> > @@ -59,6 +59,7 @@ struct mtk_drm_private {
-> >  };
-> >  
-> >  extern struct platform_driver mtk_ddp_driver;
-> > +extern struct platform_driver mtk_disp_color_driver;
-> >  extern struct platform_driver mtk_disp_ovl_driver;
-> >  extern struct platform_driver mtk_disp_rdma_driver;
-> >  extern struct platform_driver mtk_dpi_driver;
-> 
-> 
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+---
+ .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |   5 +
+ drivers/mmc/host/omap_hsmmc.c                      | 152 ++++++++++++++++++++-
+ 2 files changed, 154 insertions(+), 3 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+index 258e25af10f7..dcf0b777c031 100644
+--- a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
++++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+@@ -20,6 +20,11 @@ Optional properties:
+ ti,dual-volt: boolean, supports dual voltage cards
+ <supply-name>-supply: phandle to the regulator device tree node
+ "supply-name" examples are "vmmc", "vmmc_aux" etc
++pinctrl-names: Should be a list of pinctrl state names and can be "sdr104",
++"hs200_1_8v", "ddr50", "sdr50", "sdr25", "sdr12", "hs", "ddr_1_8v" or
++"default".
++pinctrl-<num>: Phandle referencing pin configuration of the sd/emmc controller.
++See: Documentation/devicetree/bindings/pinctrl/pinctrl-binding.txt
+ ti,non-removable: non-removable slot (like eMMC)
+ ti,needs-special-reset: Requires a special softreset sequence
+ ti,needs-special-hs-handling: HSMMC IP needs special setting for handling High Speed
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 967b7c7d4bd5..0887da4f1ff6 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -258,6 +258,18 @@ struct omap_hsmmc_host {
+ 	struct timer_list	timer;
+ 	unsigned long long	data_timeout;
+ 
++	struct pinctrl		*pinctrl;
++	struct pinctrl_state	*pinctrl_state;
++	struct pinctrl_state	*default_pinctrl_state;
++	struct pinctrl_state	*sdr104_pinctrl_state;
++	struct pinctrl_state	*hs200_1_8v_pinctrl_state;
++	struct pinctrl_state	*ddr50_pinctrl_state;
++	struct pinctrl_state	*sdr50_pinctrl_state;
++	struct pinctrl_state	*sdr25_pinctrl_state;
++	struct pinctrl_state	*sdr12_pinctrl_state;
++	struct pinctrl_state	*hs_pinctrl_state;
++	struct pinctrl_state	*ddr_1_8v_pinctrl_state;
++
+ 	/* return MMC cover switch state, can be NULL if not supported.
+ 	 *
+ 	 * possible return values:
+@@ -1718,6 +1730,8 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
+ static void omap_hsmmc_set_timing(struct omap_hsmmc_host *host)
+ {
+ 	u32 val;
++	int ret;
++	struct pinctrl_state *pinctrl_state;
+ 	struct mmc_ios *ios = &host->mmc->ios;
+ 
+ 	omap_hsmmc_stop_clock(host);
+@@ -1727,35 +1741,54 @@ static void omap_hsmmc_set_timing(struct omap_hsmmc_host *host)
+ 	switch (ios->timing) {
+ 	case MMC_TIMING_UHS_SDR104:
+ 		val |= AC12_UHSMC_SDR104;
++		pinctrl_state = host->sdr104_pinctrl_state;
+ 		break;
+ 	case MMC_TIMING_MMC_HS200:
+ 		val |= AC12_UHSMC_SDR104;
++		pinctrl_state = host->hs200_1_8v_pinctrl_state;
+ 		break;
+ 	case MMC_TIMING_UHS_DDR50:
+ 		val |= AC12_UHSMC_DDR50;
++		pinctrl_state = host->ddr50_pinctrl_state;
+ 		break;
+ 	case MMC_TIMING_UHS_SDR50:
+ 		val |= AC12_UHSMC_SDR50;
++		pinctrl_state = host->sdr50_pinctrl_state;
+ 		break;
+ 	case MMC_TIMING_UHS_SDR25:
+ 		val |= AC12_UHSMC_SDR25;
++		pinctrl_state = host->sdr25_pinctrl_state;
+ 		break;
+ 	case MMC_TIMING_UHS_SDR12:
+ 		val |= AC12_UHSMC_SDR12;
++		pinctrl_state = host->sdr12_pinctrl_state;
+ 		break;
+ 	case MMC_TIMING_SD_HS:
+ 	case MMC_TIMING_MMC_HS:
+ 		val |= AC12_UHSMC_RES;
++		pinctrl_state = host->hs_pinctrl_state;
+ 		break;
+ 	case MMC_TIMING_MMC_DDR52:
+ 		val |= AC12_UHSMC_RES;
++		pinctrl_state = host->ddr_1_8v_pinctrl_state;
+ 		break;
+ 	default:
+ 		val |= AC12_UHSMC_RES;
++		pinctrl_state = host->default_pinctrl_state;
+ 		break;
+ 	}
+ 	OMAP_HSMMC_WRITE(host->base, AC12, val);
+ 
++	if (host->pdata->controller_flags & OMAP_HSMMC_REQUIRE_IODELAY) {
++		ret = pinctrl_select_state(host->pinctrl, pinctrl_state);
++		if (ret) {
++			dev_err(mmc_dev(host->mmc),
++				"failed to select pinctrl state\n");
++			return;
++		}
++		host->pinctrl_state = pinctrl_state;
++	}
++
+ 	omap_hsmmc_start_clock(host);
+ }
+ 
+@@ -2345,8 +2378,14 @@ static struct omap_hsmmc_platform_data *of_get_hsmmc_pdata(struct device *dev)
+ 		return ERR_PTR(-ENOMEM); /* out of memory */
+ 
+ 	legacy = dev_get_platdata(dev);
+-	if (legacy && legacy->name)
+-		pdata->name = legacy->name;
++	if (legacy) {
++		if (legacy->name)
++			pdata->name = legacy->name;
++		if (legacy->version)
++			pdata->version = legacy->version;
++		if (legacy->max_freq > 0)
++			pdata->max_freq = legacy->max_freq;
++	}
+ 
+ 	if (of_find_property(np, "ti,dual-volt", NULL))
+ 		pdata->controller_flags |= OMAP_HSMMC_SUPPORTS_DUAL_VOLT;
+@@ -2376,6 +2415,101 @@ static inline struct omap_hsmmc_platform_data
+ }
+ #endif
+ 
++static struct pinctrl_state
++*omap_hsmmc_iodelay_pinctrl_state(struct omap_hsmmc_host *host, char *mode,
++				  u32 *caps, u32 capmask)
++{
++	struct pinctrl_state *pinctrl_state = ERR_PTR(-ENODEV);
++	char *version = host->pdata->version;
++	char str[20];
++
++	if (!(*caps & capmask))
++		goto ret;
++
++	if (version) {
++		sprintf(str, "%s-%s", mode, version);
++		pinctrl_state = pinctrl_lookup_state(host->pinctrl, str);
++	}
++
++	if (IS_ERR(pinctrl_state))
++		pinctrl_state = pinctrl_lookup_state(host->pinctrl, mode);
++
++	if (IS_ERR(pinctrl_state)) {
++		dev_err(host->dev, "no pinctrl state for %s mode", mode);
++		*caps &= ~capmask;
++	}
++
++ret:
++	return pinctrl_state;
++}
++
++static int omap_hsmmc_config_iodelay_pinctrl_state(struct omap_hsmmc_host *host)
++{
++	struct mmc_host *mmc = host->mmc;
++	struct pinctrl_state *state;
++
++	if (!(host->pdata->controller_flags & OMAP_HSMMC_REQUIRE_IODELAY))
++		return 0;
++
++	host->pinctrl = devm_pinctrl_get(host->dev);
++	if (IS_ERR(host->pinctrl)) {
++		dev_err(host->dev, "Cannot get pinctrl\n");
++		return PTR_ERR(host->pinctrl);
++	}
++
++	state = pinctrl_lookup_state(host->pinctrl, "default");
++	if (IS_ERR(state)) {
++		dev_err(host->dev, "no pinctrl state for default mode\n");
++		return PTR_ERR(state);
++	}
++	host->default_pinctrl_state = state;
++
++	state = omap_hsmmc_iodelay_pinctrl_state(host, "sdr104", &mmc->caps,
++						 MMC_CAP_UHS_SDR104);
++	if (!IS_ERR(state))
++		host->sdr104_pinctrl_state = state;
++
++	state = omap_hsmmc_iodelay_pinctrl_state(host, "ddr50", &mmc->caps,
++						 MMC_CAP_UHS_DDR50);
++	if (!IS_ERR(state))
++		host->ddr50_pinctrl_state = state;
++
++	state = omap_hsmmc_iodelay_pinctrl_state(host, "sdr50", &mmc->caps,
++						 MMC_CAP_UHS_SDR50);
++	if (!IS_ERR(state))
++		host->sdr50_pinctrl_state = state;
++
++	state = omap_hsmmc_iodelay_pinctrl_state(host, "sdr25", &mmc->caps,
++						 MMC_CAP_UHS_SDR25);
++	if (!IS_ERR(state))
++		host->sdr25_pinctrl_state = state;
++
++	state = omap_hsmmc_iodelay_pinctrl_state(host, "sdr12", &mmc->caps,
++						 MMC_CAP_UHS_SDR12);
++	if (!IS_ERR(state))
++		host->sdr12_pinctrl_state = state;
++
++	state = omap_hsmmc_iodelay_pinctrl_state(host, "ddr_1_8v", &mmc->caps,
++						 MMC_CAP_1_8V_DDR);
++	if (!IS_ERR(state))
++		host->ddr_1_8v_pinctrl_state = state;
++
++	state = omap_hsmmc_iodelay_pinctrl_state(host, "hs", &mmc->caps,
++						 MMC_CAP_MMC_HIGHSPEED |
++						 MMC_CAP_SD_HIGHSPEED);
++	if (!IS_ERR(state))
++		host->hs_pinctrl_state = state;
++
++	state = omap_hsmmc_iodelay_pinctrl_state(host, "hs200_1_8v",
++						 &mmc->caps2,
++						 MMC_CAP2_HS200_1_8V_SDR);
++	if (!IS_ERR(state))
++		host->hs200_1_8v_pinctrl_state = state;
++
++	host->pinctrl_state = host->default_pinctrl_state;
++	return 0;
++}
++
+ static int omap_hsmmc_probe(struct platform_device *pdev)
+ {
+ 	struct omap_hsmmc_platform_data *pdata = pdev->dev.platform_data;
+@@ -2523,6 +2657,10 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+ 
+ 	omap_hsmmc_set_capabilities(host);
+ 
++	ret = omap_hsmmc_config_iodelay_pinctrl_state(host);
++	if (ret)
++		goto err_pinctrl;
++
+ 	host->rx_chan = dma_request_chan(&pdev->dev, "rx");
+ 	if (IS_ERR(host->rx_chan)) {
+ 		dev_err(mmc_dev(host->mmc), "RX DMA channel request failed\n");
+@@ -2595,6 +2733,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+ 		dma_release_channel(host->tx_chan);
+ 	if (!IS_ERR_OR_NULL(host->rx_chan))
+ 		dma_release_channel(host->rx_chan);
++err_pinctrl:
+ 	if (host->dbclk)
+ 		clk_disable_unprepare(host->dbclk);
+ 	pm_runtime_dont_use_autosuspend(host->dev);
+@@ -2730,6 +2869,7 @@ static int omap_hsmmc_runtime_resume(struct device *dev)
+ {
+ 	struct omap_hsmmc_host *host;
+ 	unsigned long flags;
++	int ret;
+ 
+ 	host = platform_get_drvdata(to_platform_device(dev));
+ 	omap_hsmmc_context_restore(host);
+@@ -2746,7 +2886,13 @@ static int omap_hsmmc_runtime_resume(struct device *dev)
+ 		OMAP_HSMMC_WRITE(host->base, ISE, CIRQ_EN);
+ 		OMAP_HSMMC_WRITE(host->base, IE, CIRQ_EN);
+ 	} else {
+-		pinctrl_pm_select_default_state(host->dev);
++		if (host->pinctrl) {
++			ret = pinctrl_select_state(host->pinctrl,
++						   host->pinctrl_state);
++			if (ret)
++				dev_err(mmc_dev(host->mmc),
++					"failed to activate pinctrl state\n");
++		}
+ 	}
+ 	spin_unlock_irqrestore(&host->irq_lock, flags);
+ 	return 0;
+-- 
+2.11.0
