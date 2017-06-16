@@ -1,30 +1,53 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 16 Jun 2017 11:40:34 -0700
-Subject: [PATCH] ARM: dts: meson8: fix the IR receiver pins
-In-Reply-To: <e4347b01-e221-2242-9bb9-bc1e93da06fb@baylibre.com> (Neil
- Armstrong's message of "Mon, 12 Jun 2017 09:38:55 +0200")
-References: <20170609222039.25191-1-martin.blumenstingl@googlemail.com>
- <e4347b01-e221-2242-9bb9-bc1e93da06fb@baylibre.com>
-Message-ID: <m2k24bg4il.fsf@baylibre.com>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Fri, 16 Jun 2017 14:59:07 -0500
+Subject: [PATCH] [perf/core branch] perf coresight: Fix ARM builds caused by
+ misplaced __printf
+Message-ID: <20170616145907.baba73eda242efe194e072d0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
+Trailing __printf attributes work for function declarations, but not
+definitions.  This patch fixes arm32/64 builds by placing __printf
+before the declarator.  Otherwise this happens:
 
-> On 06/10/2017 12:20 AM, Martin Blumenstingl wrote:
->> The IR receiver pins are currently defined in the CBUS pin-controller.
->> However the pins are in the AO region, which is controlled by the AOBUS
->> pin-controller. Move the pins to pinctrl_aobus so they can actually be
->> used.
->> 
->> Fixes: b60e1157d8fa ("ARM: dts: amlogic: Split pinctrl device for Meson8 / Meson8b")
->> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+arch/arm64/util/../../arm/util/cs-etm.c:586:1: error: attributes should be specified before the declarator in a function definition
+ static int cs_device__print_file(const char *name, const char *fmt, ...) __printf(2, 3)
+ ^~~~~~
+arch/arm64/util/../../arm/util/cs-etm.c: In function ?cs_etm_set_drv_config?:
+arch/arm64/util/../../arm/util/cs-etm.c:610:8: error: implicit declaration of function ?cs_device__print_file? [-Werror=implicit-function-declaration]
+  ret = cs_device__print_file(enable_sink, "%d", 1);
+        ^~~~~~~~~~~~~~~~~~~~~
+arch/arm64/util/../../arm/util/cs-etm.c:610:2: error: nested extern declaration of ?cs_device__print_file? [-Werror=nested-externs]
+  ret = cs_device__print_file(enable_sink, "%d", 1);
+  ^~~
+At top level:
+arch/arm64/util/../../arm/util/cs-etm.c:566:14: error: ?cs_device__open_file? defined but not used [-Werror=unused-function]
+ static FILE *cs_device__open_file(const char *name)
+              ^~~~~~~~~~~~~~~~~~~~
+cc1: all warnings being treated as errors
 
-[..]
+Fixes: 2ee261d962ac "tools: Adopt __printf from kernel sources"
+Cc: Arnaldo Carvalho de Melo <acme@redhat.com>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Kim Phillips <kim.phillips@arm.com>
+---
+Applies to acme's perf/core branch
 
-> Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+ tools/perf/arch/arm/util/cs-etm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Applied to v4.13/dt with Neil's ack, will go in round 2 of pull requests
-to arm-soc.
-
-Kevin
+diff --git a/tools/perf/arch/arm/util/cs-etm.c b/tools/perf/arch/arm/util/cs-etm.c
+index 90a6f42ba904..7ce3d1a25133 100644
+--- a/tools/perf/arch/arm/util/cs-etm.c
++++ b/tools/perf/arch/arm/util/cs-etm.c
+@@ -583,7 +583,7 @@ static FILE *cs_device__open_file(const char *name)
+ 
+ }
+ 
+-static int cs_device__print_file(const char *name, const char *fmt, ...) __printf(2, 3)
++static int __printf(2, 3) cs_device__print_file(const char *name, const char *fmt, ...)
+ {
+ 	va_list args;
+ 	FILE *file;
+-- 
+2.11.0
