@@ -1,74 +1,33 @@
-From: frank.wang@rock-chips.com (Frank Wang)
-Date: Fri, 16 Jun 2017 17:24:23 +0800
-Subject: [PATCH 6/6] ARM: dts: rockchip: add efuse device node for rk3228
-In-Reply-To: <2537345.MJmYY2BcSn@phil>
-References: <1497510980-23207-1-git-send-email-frank.wang@rock-chips.com>
- <1497511396-23308-1-git-send-email-frank.wang@rock-chips.com>
- <2537345.MJmYY2BcSn@phil>
-Message-ID: <da5fbd76-c9a1-a16f-3ed8-adfd2b1c346f@rock-chips.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 16 Jun 2017 11:29:22 +0200
+Subject: [PATCH v3 8/9] gpio: mvebu: Add support for the Armada 7K/8K SoCs
+In-Reply-To: <b6357b8b179d66aab45548e693193054942e7dcc.1497281623.git-series.gregory.clement@free-electrons.com>
+References: <cover.d003a5e862e6d732d901a61d1765a349c9a89eef.1497281623.git-series.gregory.clement@free-electrons.com>
+ <b6357b8b179d66aab45548e693193054942e7dcc.1497281623.git-series.gregory.clement@free-electrons.com>
+Message-ID: <CACRpkdYm7OYJ6ufzUtYqb6dJFEOMLdiw8zJ2Et1uEhxe7ARH9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On Mon, Jun 12, 2017 at 5:34 PM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
 
-On 2017/6/15 23:10, Heiko Stuebner wrote:
-> Hi Frank,
+> The Armada 7K and 8K SoCs use the same gpio controller as most of the
+> other mvebu SoCs. However, the main difference is that the GPIO
+> controller is part of a bigger system controller, and a syscon is used to
+> control the overall system controller. Therefore, the driver needs to be
+> adjusted to retrieve the regmap of the syscon to access registers, and
+> account for the fact that registers are located at a certain offset
+> within the regmap.
 >
-> Am Donnerstag, 15. Juni 2017, 15:23:16 CEST schrieb Frank Wang:
->> From: Finley Xiao <finley.xiao@rock-chips.com>
->>
->> Add a efuse node in the device tree for the rk3228 SoC.
->>
->> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
->> ---
->>   arch/arm/boot/dts/rk322x.dtsi | 17 +++++++++++++++++
->>   1 file changed, 17 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
->> index c2a78f4..dad195e 100644
->> --- a/arch/arm/boot/dts/rk322x.dtsi
->> +++ b/arch/arm/boot/dts/rk322x.dtsi
->> @@ -314,6 +314,23 @@
->>   		status = "disabled";
->>   	};
->>   
->> +	efuse: efuse at 11040000 {
->> +		compatible = "rockchip,rk322x-efuse";
-> was this binding included already? Simply because compatibles should
-> not contain placeholders, so rockchip,rk3228-efuse please - same for
-> the driver side.
-
-Actually, I always remember it should be without placeholders from the 
-first time you commented :-)
-but I saw that the binding and driver (rockchip,rk322x-efuse) have 
-already been applied, so I send this one keep the same with driver side.
-Shall I resend a new patch to correct both of them to 
-'rockchip,rk3228-efuse' ?
-
-
-BR.
-Frank
-
+> This commit add the support of the syscon and introduce a new variant for
+> this case.
 >
-> Heiko
+> It was based on the preliminary work of Thomas Petazzoni.
 >
->
->> +		reg = <0x11040000 0x20>;
->> +		#address-cells = <1>;
->> +		#size-cells = <1>;
->> +		clocks = <&cru PCLK_EFUSE_256>;
->> +		clock-names = "pclk_efuse";
->> +
->> +		/* Data cells */
->> +		efuse_id: id at 7 {
->> +			reg = <0x7 0x10>;
->> +		};
->> +		cpu_leakage: cpu_leakage at 17 {
->> +			reg = <0x17 0x1>;
->> +		};
->> +	};
->> +
->>   	i2c0: i2c at 11050000 {
->>   		compatible = "rockchip,rk3228-i2c";
->>   		reg = <0x11050000 0x1000>;
->>
+> Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+Patch applied.
+
+Yours,
+Linus Walleij
