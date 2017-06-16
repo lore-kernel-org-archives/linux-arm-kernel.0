@@ -1,380 +1,101 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Fri, 16 Jun 2017 11:20:45 -0500
-Subject: [RFC PATCH 2/3] remoteproc: imx_rproc: add a NXP/Freescale imx
- rproc driver
-In-Reply-To: <96edc898-ad2b-c781-b7eb-0645902837df@ti.com>
-References: <20170614204855.18347-1-o.rempel@pengutronix.de>
- <20170614204855.18347-3-o.rempel@pengutronix.de>
- <96edc898-ad2b-c781-b7eb-0645902837df@ti.com>
-Message-ID: <f0a5eb12-9612-8be7-00fa-8d79905e7be8@ti.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 16 Jun 2017 18:26:08 +0200
+Subject: [GIT PULL] ARM: at91: DT for 4.13
+Message-ID: <20170616162608.ucjxtqpvjhdj77gy@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/15/2017 02:01 PM, Suman Anna wrote:
-> Hi Oleksij,
-> 
-> On 06/14/2017 03:48 PM, Oleksij Rempel wrote:
->> From: Oleksij Rempel <linux@rempel-privat.de>
->>
->> this driver was tested on NXP imx7d but should work on
->> imx6sx as well.
->> It will upload firmware to OCRAM, which shared memory between
->> Cortex A7 and Cortex M4, then turn M4 on.
-> 
-> Mostly looks fine, need to address few comments. I take it that you
-> haven't added the binding since this is just an RFC.
-> 
->>
->> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
->> ---
->>   drivers/remoteproc/Kconfig     |   8 ++
->>   drivers/remoteproc/Makefile    |   1 +
->>   drivers/remoteproc/imx_rproc.c | 264
->> +++++++++++++++++++++++++++++++++++++++++
->>   3 files changed, 273 insertions(+)
->>   create mode 100644 drivers/remoteproc/imx_rproc.c
->>
->> diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
->> index faad69a1a597..8d33bff4f530 100644
->> --- a/drivers/remoteproc/Kconfig
->> +++ b/drivers/remoteproc/Kconfig
->> @@ -130,6 +130,14 @@ config ST_SLIM_REMOTEPROC
->>       tristate
->>       depends on REMOTEPROC
->>   +config IMX_REMOTEPROC
->> +    tristate "IMX6/7 remoteproc support"
->> +    depends on SOC_IMX6SX || SOC_IMX7D
->> +    depends on REMOTEPROC
->> +    help
->> +      TODO, write some thing here
->> +      This can be either built-in or a loadable module.
->> +
->>   endif # REMOTEPROC
->>     endmenu
->> diff --git a/drivers/remoteproc/Makefile b/drivers/remoteproc/Makefile
->> index ffc5e430df27..d351c25cdb4e 100644
->> --- a/drivers/remoteproc/Makefile
->> +++ b/drivers/remoteproc/Makefile
->> @@ -19,3 +19,4 @@ qcom_wcnss_pil-y            += qcom_wcnss.o
->>   qcom_wcnss_pil-y            += qcom_wcnss_iris.o
->>   obj-$(CONFIG_ST_REMOTEPROC)        += st_remoteproc.o
->>   obj-$(CONFIG_ST_SLIM_REMOTEPROC)    += st_slim_rproc.o
->> +obj-$(CONFIG_IMX_REMOTEPROC)        += imx_rproc.o
->> diff --git a/drivers/remoteproc/imx_rproc.c
->> b/drivers/remoteproc/imx_rproc.c
->> new file mode 100644
->> index 000000000000..6bef85237a27
->> --- /dev/null
->> +++ b/drivers/remoteproc/imx_rproc.c
->> @@ -0,0 +1,264 @@
->> +/*
->> + * Oleksij Rempel <o.rempel@pengutronix.de>
-> 
-> Please add a blank line here.
-> 
->> + * This program is free software; you can redistribute it and/or
->> + * modify it under the terms of the GNU General Public License
->> + * version 2 as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/clk.h>
->> +#include <linux/err.h>
->> +#include <linux/interrupt.h>
->> +#include <linux/kernel.h>
->> +#include <linux/module.h>
->> +#include <linux/of_device.h>
->> +#include <linux/of_address.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/remoteproc.h>
->> +#include <linux/regmap.h>
->> +#include <linux/mfd/syscon.h>
->> +
->> +#define IMX7D_ENABLE_M4            BIT(3)
->> +#define IMX7D_SW_M4P_RST        BIT(2)
->> +#define IMX7D_SW_M4C_RST        BIT(1)
->> +#define IMX7D_SW_M4C_NON_SCLR_RST    BIT(0)
->> +
->> +#define IMX7D_M4_RST_MASK        0xf
->> +
->> +
->> +#define IMX7D_RPROC_MEM_MAX        2
->> +enum {
->> +    IMX7D_RPROC_IMEM,
->> +    IMX7D_RPROC_DMEM,
->> +};
->> +
->> +static const char *mem_names[IMX7D_RPROC_MEM_MAX] = {
->> +    [IMX7D_RPROC_IMEM]    = "imem",
->> +    [IMX7D_RPROC_DMEM]    = "dmem",
->> +};
-> 
-> Do you really need these to be globally defined? You only need them in
-> the addr_init function, they can be made local to that function.
-> 
->> +
->> +/**
->> + * struct imx_rproc_mem - slim internal memory structure
->> + * @cpu_addr: MPU virtual address of the memory region
->> + * @bus_addr: Bus address used to access the memory region
->> + * @size: Size of the memory region
->> + */
->> +struct imx_rproc_mem {
->> +    void __iomem *cpu_addr;
->> +    phys_addr_t bus_addr;
-> 
-> Are the rproc-view of these regions same as the bus addresses or
-> do they have their own local addresses? If latter, images that are built
-> for those will be using those addresses in which case you need some
-> offset calculation in the da_to_va ops?
-> 
->> +    size_t size;
->> +};
->> +
->> +struct imx_rproc_dcfg {
->> +    int offset;
->> +};
->> +
->> +struct imx_rproc {
->> +    struct device            *dev;
->> +    struct regmap            *regmap;
->> +    struct rproc            *rproc;
->> +    const struct imx_rproc_dcfg    *dcfg;
-> 
-> No need of aligning the variables, you can get rid of the additional
-> whitespaces and maintain consistent style.
-> 
->> +    struct imx_rproc_mem mem[IMX7D_RPROC_MEM_MAX];
->> +    struct clk        *clk;
->> +};
->> +
->> +static const struct imx_rproc_dcfg imx_rproc_cfg_imx7d = {
->> +    .offset = 0xc,
->> +};
->> +
->> +static int imx_rproc_start(struct rproc *rproc)
->> +{
->> +    struct imx_rproc *priv = rproc->priv;
->> +    const struct imx_rproc_dcfg *dcfg = priv->dcfg;
->> +    struct device *dev = priv->dev;
->> +    int ret;
->> +
->> +    ret = clk_enable(priv->clk);
->> +    if (ret) {
->> +        dev_err(&rproc->dev, "Failed to enable clock\n");
->> +        return ret;
->> +    }
->> +
->> +    ret = regmap_update_bits(priv->regmap, dcfg->offset,
->> +                 IMX7D_M4_RST_MASK,
->> +                 IMX7D_SW_M4C_RST | IMX7D_SW_M4P_RST | IMX7D_ENABLE_M4);
->> +    if (ret) {
->> +        dev_err(dev, "Filed to enable M4!\n");
+Arnd, Olof,
 
-typo for failed..
+Here is the DT pull request, switching most platform the the new EBI and
+NAND bindings.
 
->> +        clk_disable(priv->clk);
->> +    }
->> +
->> +    return ret;
->> +}
->> +
->> +static int imx_rproc_stop(struct rproc *rproc)
->> +{
->> +    struct imx_rproc *priv = rproc->priv;
->> +    const struct imx_rproc_dcfg *dcfg = priv->dcfg;
->> +    struct device *dev = priv->dev;
->> +    int ret;
->> +
->> +    ret = regmap_update_bits(priv->regmap, dcfg->offset,
->> +                 IMX7D_M4_RST_MASK,
->> +                 IMX7D_SW_M4C_NON_SCLR_RST);
->> +    if (ret)
->> +        dev_err(dev, "Filed to stop M4!\n");
->> +
->> +    clk_disable(priv->clk);
->> +
->> +    return ret;
->> +}
->> +
->> +static void *imx_rproc_da_to_va(struct rproc *rproc, u64 da, int len)
->> +{
->> +    struct imx_rproc *priv = rproc->priv;
->> +    void *va = NULL;
->> +    int i;
->> +
->> +    for (i = 0; i < IMX7D_RPROC_MEM_MAX; i++) {
->> +        if (da != priv->mem[i].bus_addr)
->> +            continue;
->> +
->> +        if (len <= priv->mem[i].size) {
->> +            /* __force to make sparse happy with type conversion */
->> +            va = (__force void *)priv->mem[i].cpu_addr;
->> +            break;
->> +        }
+The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 
-missed this yesterday, but this implementation is wrong, you need to be
-doing a range check and translate here accordingly. See for an example a
-patch on a driver I submitted recently,
-https://patchwork.kernel.org/patch/9773687/
+  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 
-regards
-Suman
+are available in the git repository at:
 
->> +    }
->> +
->> +    dev_dbg(&rproc->dev, "da = 0x%llx len = 0x%x va = 0x%p\n", da,
->> len, va);
->> +
->> +    return va;
->> +}
->> +
->> +static const struct rproc_ops imx_rproc_ops = {
->> +    .start        = imx_rproc_start,
->> +    .stop        = imx_rproc_stop,
->> +    .da_to_va       = imx_rproc_da_to_va,
->> +};
->> +
->> +static const struct of_device_id imx_rproc_of_match[] = {
->> +    { .compatible = "fsl,imx7d-rproc", .data = &imx_rproc_cfg_imx7d },
->> +    {},
->> +};
->> +MODULE_DEVICE_TABLE(of, imx_rproc_of_match);
->> +
->> +static int imx_rproc_addr_init(struct imx_rproc *priv,
->> +                   struct platform_device *pdev)
->> +{
->> +    int i, err;
->> +    struct resource *res;
->> +
->> +    /* get imem and dmem */
->> +    for (i = 0; i < ARRAY_SIZE(mem_names); i++) {
->> +        res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
->> +                        mem_names[i]);
->> +        if (!res)
->> +            continue;
->> +
->> +        priv->mem[i].cpu_addr = devm_ioremap_resource(&pdev->dev, res);
->> +        if (IS_ERR(priv->mem[i].cpu_addr)) {
->> +            dev_err(&pdev->dev, "devm_ioremap_resource failed\n");
->> +            err = PTR_ERR(priv->mem[i].cpu_addr);
->> +            return err;
->> +        }
->> +        priv->mem[i].bus_addr = res->start & 0xffff;
->> +        priv->mem[i].size = resource_size(res);
->> +    }
->> +
->> +    return 0;
->> +}
->> +
->> +static int imx_rproc_probe(struct platform_device *pdev)
->> +{
->> +    struct device *dev = &pdev->dev;
->> +    struct device_node *np = dev->of_node;
->> +    struct imx_rproc *priv;
->> +    struct rproc *rproc;
->> +    struct regmap_config config = { .name = "imx_rproc" };
->> +    const struct imx_rproc_dcfg *dcfg;
->> +    struct regmap *regmap;
->> +    int ret;
->> +
->> +    regmap = syscon_regmap_lookup_by_phandle(np, "syscon");
->> +    if (IS_ERR(regmap)) {
->> +        dev_err(dev, "failed to find syscon\n");
->> +        return PTR_ERR(regmap);
->> +    }
->> +        regmap_attach_dev(dev, regmap, &config);
->> +
->> +    /* set some other name then imx */
->> +    rproc = rproc_alloc(dev, "imx_rproc", &imx_rproc_ops, NULL,
->> sizeof(*priv));
->> +    if (!rproc) {
->> +        ret = -ENOMEM;
->> +        goto err;
->> +    }
->> +
->> +    dcfg = of_device_get_match_data(dev);
->> +    if (!dcfg)
->> +        return -EINVAL;
-> 
-> move this up to the beginning of the function. You can avoid the cleanup
-> (you are missing an rproc_free() here)
-> 
->> +
->> +    priv = rproc->priv;
->> +    priv->rproc = rproc;
->> +    priv->regmap = regmap;
->> +    priv->dcfg = dcfg;
->> +
->> +    dev_set_drvdata(dev, rproc);
->> +
->> +    ret = imx_rproc_addr_init(priv, pdev);
->> +    if (ret) {
->> +        dev_err(dev, "filed on imx_rproc_addr_init\n");
->> +        goto err_put_rproc;
->> +    }
->> +
->> +    priv->clk = devm_clk_get(dev, NULL);
->> +    if (IS_ERR(priv->clk)) {
->> +        dev_err(dev, "Failed to get clock\n");
->> +        return PTR_ERR(priv->clk);
->> +    }
->> +
->> +    ret = rproc_add(rproc);
->> +    if (ret) {
->> +        dev_err(dev, "rproc_add failed\n");
->> +        goto err_put_rproc;
->> +    }
->> +
->> +    ret = clk_prepare(priv->clk);
->> +    if (ret)
->> +        dev_err(dev, "failed to get clock\n");
-> 
-> How are your internal memories clocked? If they need the same clock,
-> rproc_add() would need the clock to be enabled for loading section data
-> into those regions as part of rproc_boot(), and your current enable in
-> imx_rproc_start() will be too late. Also, do not see a balancing
-> clk_unprepare() call in remove, and a missing rproc_del() on failure here.
-> 
-> regards
-> Suman
-> 
->> +
->> +    return ret;
->> +
->> +err_put_rproc:
->> +    rproc_free(rproc);
->> +err:
->> +    return ret;
->> +}
->> +
->> +static int imx_rproc_remove(struct platform_device *pdev)
->> +{
->> +    struct rproc *rproc = platform_get_drvdata(pdev);
->> +
->> +    rproc_del(rproc);
->> +    rproc_free(rproc);
->> +
->> +    return 0;
->> +}
->> +
->> +static struct platform_driver imx_rproc_driver = {
->> +    .probe = imx_rproc_probe,
->> +    .remove = imx_rproc_remove,
->> +    .driver = {
->> +        .name = "imx_rproc",
->> +        .of_match_table = imx_rproc_of_match,
->> +    },
->> +};
->> +
->> +module_platform_driver(imx_rproc_driver);
->> +
->> +MODULE_LICENSE("GPL v2");
->> +MODULE_DESCRIPTION("IMX6/7 remote processor control driver");
->> +MODULE_AUTHOR("Oleksij Rempel <o.rempel@pengutronix.de>");
->>
-> 
+  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.13-dt
+
+for you to fetch changes up to bc03ce08396786c92d6591a81682c7da7accbfc8:
+
+  ARM: dts: at91: sama5d2_xplained: remove wrong memory node (2017-06-08 23:49:17 +0200)
+
+----------------------------------------------------------------
+DT for 4.13
+
+ - Switch to the new NAND binding
+ - A few non urgent fixes
+
+----------------------------------------------------------------
+Baruch Siach (1):
+      ARM: dts: at91: sama5d2_xplained: remove wrong memory node
+
+Boris Brezillon (4):
+      dt-bindings: mtd: atmel-nand: Document the nfc-io bindings
+      ARM: dts: at91: Declare EBI/NAND controllers
+      ARM: dts: at91: Switch to the new NAND bindings
+      ARM: dts: at91: Add the NOR flash available on sama5d3 dev kits
+
+Claudiu Beznea (1):
+      ARM: dts: at91: sama5d2_xplained: add pwm controller
+
+Javier Martinez Canillas (1):
+      ARM: dts: at91: Add generic compatible string for I2C EEPROM
+
+Uwe Kleine-K?nig (2):
+      dts: gpio_atmel: adapt binding doc to reality
+      ARM: dts: at91-sama5d4: use IRQ_TYPE_* to specify irq flags
+
+Wenyou Yang (1):
+      ARM: dts: at91: sama5d2: add m_can nodes
+
+ .../devicetree/bindings/gpio/gpio_atmel.txt        |  10 +-
+ .../devicetree/bindings/mtd/atmel-nand.txt         |  14 ++
+ arch/arm/boot/dts/aks-cdu.dts                      |  56 ++++---
+ arch/arm/boot/dts/animeo_ip.dts                    |  53 ++++--
+ arch/arm/boot/dts/at91-cosino.dtsi                 |  83 ++++++----
+ arch/arm/boot/dts/at91-kizbox.dts                  |  42 +++--
+ arch/arm/boot/dts/at91-kizbox2.dts                 |  45 ++++--
+ arch/arm/boot/dts/at91-kizboxmini.dts              |  52 ++++--
+ arch/arm/boot/dts/at91-linea.dtsi                  |  27 +++-
+ arch/arm/boot/dts/at91-qil_a9260.dts               | 103 +++++++-----
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts        |  32 +++-
+ arch/arm/boot/dts/at91-sama5d3_xplained.dts        |  97 ++++++-----
+ arch/arm/boot/dts/at91-sama5d4_ma5d4.dtsi          |   4 +-
+ arch/arm/boot/dts/at91-sama5d4_xplained.dts        |  83 ++++++----
+ arch/arm/boot/dts/at91-sama5d4ek.dts               |  83 ++++++----
+ arch/arm/boot/dts/at91-tse850-3.dts                |  72 +++++----
+ arch/arm/boot/dts/at91sam9260.dtsi                 |  65 +++++---
+ arch/arm/boot/dts/at91sam9261.dtsi                 |  48 ++++--
+ arch/arm/boot/dts/at91sam9261ek.dts                |  83 ++++++----
+ arch/arm/boot/dts/at91sam9263.dtsi                 |  89 ++++++++---
+ arch/arm/boot/dts/at91sam9263ek.dts                | 103 +++++++-----
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi        | 103 +++++++-----
+ arch/arm/boot/dts/at91sam9g45.dtsi                 |  64 +++++---
+ arch/arm/boot/dts/at91sam9m10g45ek.dts             |  49 ++++--
+ arch/arm/boot/dts/at91sam9n12.dtsi                 |  74 ++++++---
+ arch/arm/boot/dts/at91sam9n12ek.dts                |  26 ++-
+ arch/arm/boot/dts/at91sam9rl.dtsi                  |  69 +++++---
+ arch/arm/boot/dts/at91sam9rlek.dts                 |  85 ++++++----
+ arch/arm/boot/dts/at91sam9x5.dtsi                  | 134 ++++++++++------
+ arch/arm/boot/dts/at91sam9x5cm.dtsi                |  83 ++++++----
+ arch/arm/boot/dts/ethernut5.dts                    |  47 ++++--
+ arch/arm/boot/dts/ge863-pro3.dtsi                  |  41 +++--
+ arch/arm/boot/dts/pm9g45.dts                       |  99 ++++++------
+ arch/arm/boot/dts/sama5d2.dtsi                     | 117 ++++++++++++++
+ arch/arm/boot/dts/sama5d3.dtsi                     | 131 ++++++++++++---
+ arch/arm/boot/dts/sama5d3xcm.dtsi                  |  97 +++++++----
+ arch/arm/boot/dts/sama5d3xcm_cmp.dtsi              |  77 +++++----
+ arch/arm/boot/dts/sama5d4.dtsi                     | 177 ++++++++++++++++++---
+ arch/arm/boot/dts/tny_a9260_common.dtsi            |  89 +++++++----
+ arch/arm/boot/dts/tny_a9263.dts                    | 103 +++++++-----
+ arch/arm/boot/dts/usb_a9260_common.dtsi            | 103 +++++++-----
+ arch/arm/boot/dts/usb_a9263.dts                    | 103 +++++++-----
+ 42 files changed, 2096 insertions(+), 1019 deletions(-)
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
