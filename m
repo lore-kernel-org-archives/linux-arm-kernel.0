@@ -1,53 +1,54 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Fri, 16 Jun 2017 14:59:07 -0500
-Subject: [PATCH] [perf/core branch] perf coresight: Fix ARM builds caused by
- misplaced __printf
-Message-ID: <20170616145907.baba73eda242efe194e072d0@arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 16 Jun 2017 22:01:41 +0200
+Subject: [PATCH] bus: SIMPLE_PM_BUS does not depend on ARCH_RENESAS
+In-Reply-To: <20170613163959.GU12920@tuxbook>
+References: <20170613130430.4272-1-robdclark@gmail.com>
+ <20170613163959.GU12920@tuxbook>
+Message-ID: <20170616200141.GC16189@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Trailing __printf attributes work for function declarations, but not
-definitions.  This patch fixes arm32/64 builds by placing __printf
-before the declarator.  Otherwise this happens:
+On Tue, Jun 13, 2017 at 09:39:59AM -0700, Bjorn Andersson wrote:
+> +cc Geert, Simon, linux-pm
+> 
+> On Tue 13 Jun 06:04 PDT 2017, Rob Clark wrote:
+> 
+> > In fact, it is needed for PCI to work on msm8996 (and probably other
+> > things).  No idea why it was depending on renesas but that doesn't make
+> > any sense.  So drop the dependency.
+> > 
+> 
+> This is in line with Geert's previous comments on how to utilize
+> simple-pm-bus to describe this hardware.
+> 
+> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 
-arch/arm64/util/../../arm/util/cs-etm.c:586:1: error: attributes should be specified before the declarator in a function definition
- static int cs_device__print_file(const char *name, const char *fmt, ...) __printf(2, 3)
- ^~~~~~
-arch/arm64/util/../../arm/util/cs-etm.c: In function ?cs_etm_set_drv_config?:
-arch/arm64/util/../../arm/util/cs-etm.c:610:8: error: implicit declaration of function ?cs_device__print_file? [-Werror=implicit-function-declaration]
-  ret = cs_device__print_file(enable_sink, "%d", 1);
-        ^~~~~~~~~~~~~~~~~~~~~
-arch/arm64/util/../../arm/util/cs-etm.c:610:2: error: nested extern declaration of ?cs_device__print_file? [-Werror=nested-externs]
-  ret = cs_device__print_file(enable_sink, "%d", 1);
-  ^~~
-At top level:
-arch/arm64/util/../../arm/util/cs-etm.c:566:14: error: ?cs_device__open_file? defined but not used [-Werror=unused-function]
- static FILE *cs_device__open_file(const char *name)
-              ^~~~~~~~~~~~~~~~~~~~
-cc1: all warnings being treated as errors
+No objection here,
 
-Fixes: 2ee261d962ac "tools: Adopt __printf from kernel sources"
-Cc: Arnaldo Carvalho de Melo <acme@redhat.com>
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Kim Phillips <kim.phillips@arm.com>
----
-Applies to acme's perf/core branch
+Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
 
- tools/perf/arch/arm/util/cs-etm.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/tools/perf/arch/arm/util/cs-etm.c b/tools/perf/arch/arm/util/cs-etm.c
-index 90a6f42ba904..7ce3d1a25133 100644
---- a/tools/perf/arch/arm/util/cs-etm.c
-+++ b/tools/perf/arch/arm/util/cs-etm.c
-@@ -583,7 +583,7 @@ static FILE *cs_device__open_file(const char *name)
- 
- }
- 
--static int cs_device__print_file(const char *name, const char *fmt, ...) __printf(2, 3)
-+static int __printf(2, 3) cs_device__print_file(const char *name, const char *fmt, ...)
- {
- 	va_list args;
- 	FILE *file;
--- 
-2.11.0
+> 
+> Regards,
+> Bjorn
+> 
+> > Signed-off-by: Rob Clark <robdclark@gmail.com>
+> > ---
+> >  drivers/bus/Kconfig | 1 -
+> >  1 file changed, 1 deletion(-)
+> > 
+> > diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+> > index 0a52da4..b83c535 100644
+> > --- a/drivers/bus/Kconfig
+> > +++ b/drivers/bus/Kconfig
+> > @@ -121,7 +121,6 @@ config QCOM_EBI2
+> >  config SIMPLE_PM_BUS
+> >  	bool "Simple Power-Managed Bus Driver"
+> >  	depends on OF && PM
+> > -	depends on ARCH_RENESAS || COMPILE_TEST
+> >  	help
+> >  	  Driver for transparent busses that don't need a real driver, but
+> >  	  where the bus controller is part of a PM domain, or under the control
+> > -- 
+> > 2.9.4
+> > 
+> 
