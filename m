@@ -1,23 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Jun 2017 23:33:01 +0200
-Subject: [PATCH] bus: SIMPLE_PM_BUS does not depend on ARCH_RENESAS
-In-Reply-To: <20170613130430.4272-1-robdclark@gmail.com>
-References: <20170613130430.4272-1-robdclark@gmail.com>
-Message-ID: <CAK8P3a1v=3X3t9VE_my1jBH0Wo14FYMF9+ijFw8kHLDVjZ4meQ@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 16 Jun 2017 14:36:58 -0700
+Subject: [PATCH 0/5] Broadcom STB S2/S3/S5 support for ARM and MIPS
+Message-ID: <20170616213703.21487-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 13, 2017 at 3:04 PM, Rob Clark <robdclark@gmail.com> wrote:
-> In fact, it is needed for PCI to work on msm8996 (and probably other
-> things).  No idea why it was depending on renesas but that doesn't make
-> any sense.  So drop the dependency.
->
-> Signed-off-by: Rob Clark <robdclark@gmail.com>
-> ---
+Hi,
 
-I also couldn't find a reason why this was strictly limited, but it in
-the device
-tree sources we ship in the kernel, it is so far only used for Renesas machines,
-so it's not currently a bug either.
+This patch series adds support for S2/S3/S5 suspend/resume states on
+ARM and MIPS based Broadcom STB SoCs.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+This was submitted a long time ago by Brian, and I am now picking this
+up and trying to get this included with support for our latest chips.
+
+Provided that I can collect the necessary Acks from Rob (DT) and other
+people (Rafael?) I would probably take this via the Broadcom ARM SoC
+pull requests.
+
+Thank you!
+
+Brian Norris (1):
+  soc: bcm: brcmstb: Add support for S2/S3/S5 suspend states (ARM)
+
+Florian Fainelli (3):
+  dt-bindings: Update Broadcom STB binding
+  soc: bcm: brcmstb: Add Kconfig entry point for power management
+  dt-bindings: Document MIPS Broadcom STB power management nodes
+
+Justin Chen (1):
+  soc bcm: brcmstb: Add support for S2/S3/S5 suspend states (MIPS)
+
+ .../devicetree/bindings/arm/bcm/brcm,brcmstb.txt   |   6 +-
+ .../devicetree/bindings/mips/brcm/soc.txt          |  77 ++
+ drivers/soc/bcm/Kconfig                            |   2 +
+ drivers/soc/bcm/brcmstb/Kconfig                    |   9 +
+ drivers/soc/bcm/brcmstb/Makefile                   |   1 +
+ drivers/soc/bcm/brcmstb/pm/Makefile                |   2 +
+ drivers/soc/bcm/brcmstb/pm/aon_defs.h              | 113 +++
+ drivers/soc/bcm/brcmstb/pm/pm-arm.c                | 836 +++++++++++++++++++++
+ drivers/soc/bcm/brcmstb/pm/pm-mips.c               | 461 ++++++++++++
+ drivers/soc/bcm/brcmstb/pm/pm.h                    |  89 +++
+ drivers/soc/bcm/brcmstb/pm/s2-arm.S                |  76 ++
+ drivers/soc/bcm/brcmstb/pm/s2-mips.S               | 200 +++++
+ drivers/soc/bcm/brcmstb/pm/s3-mips.S               | 146 ++++
+ 13 files changed, 2017 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/soc/bcm/brcmstb/Kconfig
+ create mode 100644 drivers/soc/bcm/brcmstb/pm/Makefile
+ create mode 100644 drivers/soc/bcm/brcmstb/pm/aon_defs.h
+ create mode 100644 drivers/soc/bcm/brcmstb/pm/pm-arm.c
+ create mode 100644 drivers/soc/bcm/brcmstb/pm/pm-mips.c
+ create mode 100644 drivers/soc/bcm/brcmstb/pm/pm.h
+ create mode 100644 drivers/soc/bcm/brcmstb/pm/s2-arm.S
+ create mode 100644 drivers/soc/bcm/brcmstb/pm/s2-mips.S
+ create mode 100644 drivers/soc/bcm/brcmstb/pm/s3-mips.S
+
+-- 
+2.9.3
