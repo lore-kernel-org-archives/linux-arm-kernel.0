@@ -1,142 +1,326 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 16 Jun 2017 18:15:44 +0530
-Subject: [PATCH 16/16] ARM: dts: dra7: Add supported MMC/SD modes in MMC dt
- nodes
-In-Reply-To: <20170616124544.15046-1-kishon@ti.com>
-References: <20170616124544.15046-1-kishon@ti.com>
-Message-ID: <20170616124544.15046-17-kishon@ti.com>
+From: olivier.moysan@st.com (olivier moysan)
+Date: Fri, 16 Jun 2017 14:16:24 +0200
+Subject: [PATCH 2/2] ASoC: stm32: sai: add h7 support
+In-Reply-To: <1497615384-7407-1-git-send-email-olivier.moysan@st.com>
+References: <1497615384-7407-1-git-send-email-olivier.moysan@st.com>
+Message-ID: <1497615384-7407-3-git-send-email-olivier.moysan@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On DRA7 family SoCs, MMC1 controller supports SDR104,
-SDR50, DDR50, SDR25 and SDR12 UHS modes (These UHS modes
-are not supported in beagle-x15 because it's not possible
-to switch IO lines supply voltage to 1.8v).
+Add support of SAI on STM32H7 family.
 
-MMC2 controller supports HS200 and DDR modes. (Since some of the
-boards like am57xx-evm reva3, beagle-x15 and am57xx idk has
-3.3v line connected to IO lines, HS200 cannot be supported
-in these boards).
-
-MMC3 controller supports SDR12, SDR25 and SDR50 modes.
-
-MMC4 controller supports SDR12 and SDR25 modes.
-
-Add these supported modes in device-tree file.
-
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+Signed-off-by: olivier moysan <olivier.moysan@st.com>
 ---
- arch/arm/boot/dts/am571x-idk.dts              |  1 +
- arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts |  1 +
- arch/arm/boot/dts/am57xx-beagle-x15.dts       |  6 ++++++
- arch/arm/boot/dts/am57xx-idk-common.dtsi      |  1 +
- arch/arm/boot/dts/dra7.dtsi                   | 14 ++++++++++++++
- 5 files changed, 23 insertions(+)
+ sound/soc/stm/stm32_sai.c     | 13 +++++-
+ sound/soc/stm/stm32_sai.h     | 72 ++++++++++++++++++++++++++++++---
+ sound/soc/stm/stm32_sai_sub.c | 92 ++++++++++++++++++++++++++++++++++++-------
+ 3 files changed, 155 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am571x-idk.dts b/arch/arm/boot/dts/am571x-idk.dts
-index 875291d1bdd7..bdf39d47948f 100644
---- a/arch/arm/boot/dts/am571x-idk.dts
-+++ b/arch/arm/boot/dts/am571x-idk.dts
-@@ -90,4 +90,5 @@
- 	pinctrl-0 = <&mmc2_pins_default>;
- 	pinctrl-1 = <&mmc2_pins_hs>;
- 	pinctrl-2 = <&mmc2_pins_ddr_rev20 &mmc2_iodelay_ddr_conf>;
-+	/delete-property/ mmc-hs200-1_8v;
- };
-diff --git a/arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts b/arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts
-index 5a77b334923d..17a25a74a005 100644
---- a/arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts
-+++ b/arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts
-@@ -36,6 +36,7 @@
- 	pinctrl-0 = <&mmc2_pins_default>;
- 	pinctrl-1 = <&mmc2_pins_hs>;
- 	pinctrl-2 = <&mmc2_pins_ddr_3_3v_rev11 &mmc2_iodelay_ddr_3_3v_rev11_conf>;
-+	/delete-property/ mmc-hs200-1_8v;
- };
+diff --git a/sound/soc/stm/stm32_sai.c b/sound/soc/stm/stm32_sai.c
+index 6159d66..f771331 100644
+--- a/sound/soc/stm/stm32_sai.c
++++ b/sound/soc/stm/stm32_sai.c
+@@ -27,8 +27,17 @@
  
- /* errata i880 "Ethernet RGMII2 Limited to 10/100 Mbps" */
-diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-index d6689106d2a8..8d9bdf10a7be 100644
---- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
-+++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-@@ -25,6 +25,11 @@
- 	pinctrl-1 = <&mmc1_pins_hs>;
+ #include "stm32_sai.h"
  
- 	vmmc-supply = <&ldo1_reg>;
-+	/delete-property/ sd-uhs-sdr104;
-+	/delete-property/ sd-uhs-sdr50;
-+	/delete-property/ sd-uhs-ddr50;
-+	/delete-property/ sd-uhs-sdr25;
-+	/delete-property/ sd-uhs-sdr12;
++static const struct stm32_sai_conf stm32_sai_conf_f4 = {
++	.version = SAI_STM32F4,
++};
++
++static const struct stm32_sai_conf stm32_sai_conf_h7 = {
++	.version = SAI_STM32H7,
++};
++
+ static const struct of_device_id stm32_sai_ids[] = {
+-	{ .compatible = "st,stm32f4-sai", .data = (void *)SAI_STM32F4 },
++	{ .compatible = "st,stm32f4-sai", .data = (void *)&stm32_sai_conf_f4 },
++	{ .compatible = "st,stm32h7-sai", .data = (void *)&stm32_sai_conf_h7 },
+ 	{}
  };
  
- &mmc2 {
-@@ -32,6 +37,7 @@
- 	pinctrl-0 = <&mmc2_pins_default>;
- 	pinctrl-1 = <&mmc2_pins_hs>;
- 	pinctrl-2 = <&mmc2_pins_ddr_3_3v_rev11 &mmc2_iodelay_ddr_3_3v_rev11_conf>;
-+	/delete-property/ mmc-hs200-1_8v;
+@@ -52,7 +61,7 @@ static int stm32_sai_probe(struct platform_device *pdev)
+ 
+ 	of_id = of_match_device(stm32_sai_ids, &pdev->dev);
+ 	if (of_id)
+-		sai->version = (enum stm32_sai_version)of_id->data;
++		sai->conf = (struct stm32_sai_conf *)of_id->data;
+ 	else
+ 		return -EINVAL;
+ 
+diff --git a/sound/soc/stm/stm32_sai.h b/sound/soc/stm/stm32_sai.h
+index 270be93..889974dc 100644
+--- a/sound/soc/stm/stm32_sai.h
++++ b/sound/soc/stm/stm32_sai.h
+@@ -31,6 +31,10 @@
+ #define STM_SAI_CLRFR_REGX	0x18
+ #define STM_SAI_DR_REGX		0x1C
+ 
++/* Sub-block A registers, relative to sub-block A address */
++#define STM_SAI_PDMCR_REGX	0x40
++#define STM_SAI_PDMLY_REGX	0x44
++
+ /******************** Bit definition for SAI_GCR register *******************/
+ #define SAI_GCR_SYNCIN_SHIFT	0
+ #define SAI_GCR_SYNCIN_MASK	GENMASK(1, SAI_GCR_SYNCIN_SHIFT)
+@@ -75,10 +79,11 @@
+ #define SAI_XCR1_NODIV		BIT(SAI_XCR1_NODIV_SHIFT)
+ 
+ #define SAI_XCR1_MCKDIV_SHIFT	20
+-#define SAI_XCR1_MCKDIV_WIDTH	4
+-#define SAI_XCR1_MCKDIV_MASK	GENMASK(24, SAI_XCR1_MCKDIV_SHIFT)
++#define SAI_XCR1_MCKDIV_WIDTH(x)	(((x) == SAI_STM32F4) ? 4 : 6)
++#define SAI_XCR1_MCKDIV_MASK(x) GENMASK((SAI_XCR1_MCKDIV_SHIFT + (x) - 1),\
++				SAI_XCR1_MCKDIV_SHIFT)
+ #define SAI_XCR1_MCKDIV_SET(x)	((x) << SAI_XCR1_MCKDIV_SHIFT)
+-#define SAI_XCR1_MCKDIV_MAX	((1 << SAI_XCR1_MCKDIV_WIDTH) - 1)
++#define SAI_XCR1_MCKDIV_MAX(x)	((1 << SAI_XCR1_MCKDIV_WIDTH(x)) - 1)
+ 
+ #define SAI_XCR1_OSR_SHIFT	26
+ #define SAI_XCR1_OSR		BIT(SAI_XCR1_OSR_SHIFT)
+@@ -178,8 +183,65 @@
+ #define SAI_XCLRFR_SHIFT	0
+ #define SAI_XCLRFR_MASK		GENMASK(6, SAI_XCLRFR_SHIFT)
+ 
++/****************** Bit definition for SAI_PDMCR register ******************/
++#define SAI_PDMCR_PDMEN		BIT(0)
++
++#define SAI_PDMCR_MICNBR_SHIFT	4
++#define SAI_PDMCR_MICNBR_MASK	GENMASK(5, SAI_PDMCR_MICNBR_SHIFT)
++#define SAI_PDMCR_MICNBR_SET(x)	((x) << SAI_PDMCR_MICNBR_SHIFT)
++
++#define SAI_PDMCR_CKEN1		BIT(8)
++#define SAI_PDMCR_CKEN2		BIT(9)
++#define SAI_PDMCR_CKEN3		BIT(10)
++#define SAI_PDMCR_CKEN4		BIT(11)
++
++/****************** Bit definition for (SAI_PDMDLY register ****************/
++#define SAI_PDMDLY_1L_SHIFT	0
++#define SAI_PDMDLY_1L_MASK	GENMASK(2, SAI_PDMDLY_1L_SHIFT)
++#define SAI_PDMDLY_1L_WIDTH	3
++
++#define SAI_PDMDLY_1R_SHIFT	4
++#define SAI_PDMDLY_1R_MASK	GENMASK(6, SAI_PDMDLY_1R_SHIFT)
++#define SAI_PDMDLY_1R_WIDTH	3
++
++#define SAI_PDMDLY_2L_SHIFT	8
++#define SAI_PDMDLY_2L_MASK	GENMASK(10, SAI_PDMDLY_2L_SHIFT)
++#define SAI_PDMDLY_2L_WIDTH	3
++
++#define SAI_PDMDLY_2R_SHIFT	12
++#define SAI_PDMDLY_2R_MASK	GENMASK(14, SAI_PDMDLY_2R_SHIFT)
++#define SAI_PDMDLY_2R_WIDTH	3
++
++#define SAI_PDMDLY_3L_SHIFT	16
++#define SAI_PDMDLY_3L_MASK	GENMASK(18, SAI_PDMDLY_3L_SHIFT)
++#define SAI_PDMDLY_3L_WIDTH	3
++
++#define SAI_PDMDLY_3R_SHIFT	20
++#define SAI_PDMDLY_3R_MASK	GENMASK(22, SAI_PDMDLY_3R_SHIFT)
++#define SAI_PDMDLY_3R_WIDTH	3
++
++#define SAI_PDMDLY_4L_SHIFT	24
++#define SAI_PDMDLY_4L_MASK	GENMASK(26, SAI_PDMDLY_4L_SHIFT)
++#define SAI_PDMDLY_4L_WIDTH	3
++
++#define SAI_PDMDLY_4R_SHIFT	28
++#define SAI_PDMDLY_4R_MASK	GENMASK(30, SAI_PDMDLY_4R_SHIFT)
++#define SAI_PDMDLY_4R_WIDTH	3
++
++#define STM_SAI_IS_F4(ip)	((ip)->conf->version == SAI_STM32F4)
++#define STM_SAI_IS_H7(ip)	((ip)->conf->version == SAI_STM32H7)
++
+ enum stm32_sai_version {
+-	SAI_STM32F4
++	SAI_STM32F4,
++	SAI_STM32H7
++};
++
++/**
++ * struct stm32_sai_conf - SAI configuration
++ * @version: SAI version
++ */
++struct stm32_sai_conf {
++	int version;
  };
  
- /* errata i880 "Ethernet RGMII2 Limited to 10/100 Mbps" */
-diff --git a/arch/arm/boot/dts/am57xx-idk-common.dtsi b/arch/arm/boot/dts/am57xx-idk-common.dtsi
-index 47b5b384809f..bf5bf8f52c79 100644
---- a/arch/arm/boot/dts/am57xx-idk-common.dtsi
-+++ b/arch/arm/boot/dts/am57xx-idk-common.dtsi
-@@ -413,6 +413,7 @@
- 	bus-width = <8>;
- 	ti,non-removable;
- 	max-frequency = <96000000>;
-+	/delete-property/ mmc-hs200-1_8v;
+ /**
+@@ -194,6 +256,6 @@ struct stm32_sai_data {
+ 	struct platform_device *pdev;
+ 	struct clk *clk_x8k;
+ 	struct clk *clk_x11k;
+-	int version;
++	struct stm32_sai_conf *conf;
+ 	int irq;
+ };
+diff --git a/sound/soc/stm/stm32_sai_sub.c b/sound/soc/stm/stm32_sai_sub.c
+index ce48c02..ba3fdc7 100644
+--- a/sound/soc/stm/stm32_sai_sub.c
++++ b/sound/soc/stm/stm32_sai_sub.c
+@@ -51,12 +51,15 @@
+ #define STM_SAI_A_ID		0x0
+ #define STM_SAI_B_ID		0x1
+ 
++#define STM_SAI_IS_SUB_A(x)	((x)->id == STM_SAI_A_ID)
++#define STM_SAI_IS_SUB_B(x)	((x)->id == STM_SAI_B_ID)
+ #define STM_SAI_BLOCK_NAME(x)	(((x)->id == STM_SAI_A_ID) ? "A" : "B")
+ 
+ /**
+  * struct stm32_sai_sub_data - private data of SAI sub block (block A or B)
+  * @pdev: device data pointer
+  * @regmap: SAI register map pointer
++ * @regmap_config: SAI sub block register map configuration pointer
+  * @dma_params: dma configuration data for rx or tx channel
+  * @cpu_dai_drv: DAI driver data pointer
+  * @cpu_dai: DAI runtime data pointer
+@@ -79,6 +82,7 @@
+ struct stm32_sai_sub_data {
+ 	struct platform_device *pdev;
+ 	struct regmap *regmap;
++	const struct regmap_config *regmap_config;
+ 	struct snd_dmaengine_dai_dma_data dma_params;
+ 	struct snd_soc_dai_driver *cpu_dai_drv;
+ 	struct snd_soc_dai *cpu_dai;
+@@ -118,6 +122,8 @@ static bool stm32_sai_sub_readable_reg(struct device *dev, unsigned int reg)
+ 	case STM_SAI_SR_REGX:
+ 	case STM_SAI_CLRFR_REGX:
+ 	case STM_SAI_DR_REGX:
++	case STM_SAI_PDMCR_REGX:
++	case STM_SAI_PDMLY_REGX:
+ 		return true;
+ 	default:
+ 		return false;
+@@ -145,13 +151,15 @@ static bool stm32_sai_sub_writeable_reg(struct device *dev, unsigned int reg)
+ 	case STM_SAI_SR_REGX:
+ 	case STM_SAI_CLRFR_REGX:
+ 	case STM_SAI_DR_REGX:
++	case STM_SAI_PDMCR_REGX:
++	case STM_SAI_PDMLY_REGX:
+ 		return true;
+ 	default:
+ 		return false;
+ 	}
+ }
+ 
+-static const struct regmap_config stm32_sai_sub_regmap_config = {
++static const struct regmap_config stm32_sai_sub_regmap_config_f4 = {
+ 	.reg_bits = 32,
+ 	.reg_stride = 4,
+ 	.val_bits = 32,
+@@ -162,6 +170,17 @@ static bool stm32_sai_sub_writeable_reg(struct device *dev, unsigned int reg)
+ 	.fast_io = true,
  };
  
- &dcan1 {
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 52ce3fab483f..22b0ade96237 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1046,6 +1046,11 @@
- 			status = "disabled";
- 			pbias-supply = <&pbias_mmc_reg>;
- 			max-frequency = <192000000>;
-+			sd-uhs-sdr104;
-+			sd-uhs-sdr50;
-+			sd-uhs-ddr50;
-+			sd-uhs-sdr25;
-+			sd-uhs-sdr12;
- 		};
++static const struct regmap_config stm32_sai_sub_regmap_config_h7 = {
++	.reg_bits = 32,
++	.reg_stride = 4,
++	.val_bits = 32,
++	.max_register = STM_SAI_PDMLY_REGX,
++	.readable_reg = stm32_sai_sub_readable_reg,
++	.volatile_reg = stm32_sai_sub_volatile_reg,
++	.writeable_reg = stm32_sai_sub_writeable_reg,
++	.fast_io = true,
++};
++
+ static irqreturn_t stm32_sai_isr(int irq, void *devid)
+ {
+ 	struct stm32_sai_sub_data *sai = (struct stm32_sai_sub_data *)devid;
+@@ -551,7 +570,8 @@ static int stm32_sai_configure_clock(struct snd_soc_dai *cpu_dai,
+ {
+ 	struct stm32_sai_sub_data *sai = snd_soc_dai_get_drvdata(cpu_dai);
+ 	int cr1, mask, div = 0;
+-	int sai_clk_rate, ret;
++	int sai_clk_rate, mclk_ratio, den, ret;
++	int version = sai->pdata->conf->version;
  
- 		mmc2: mmc at 480b4000 {
-@@ -1058,6 +1063,10 @@
- 			dma-names = "tx", "rx";
- 			status = "disabled";
- 			max-frequency = <192000000>;
-+			sd-uhs-sdr25;
-+			sd-uhs-sdr12;
-+			mmc-hs200-1_8v;
-+			mmc-ddr-1_8v;
- 		};
+ 	if (!sai->mclk_rate) {
+ 		dev_err(cpu_dai->dev, "Mclk rate is null\n");
+@@ -564,22 +584,54 @@ static int stm32_sai_configure_clock(struct snd_soc_dai *cpu_dai,
+ 		clk_set_parent(sai->sai_ck, sai->pdata->clk_x8k);
+ 	sai_clk_rate = clk_get_rate(sai->sai_ck);
  
- 		mmc3: mmc at 480ad000 {
-@@ -1071,6 +1080,9 @@
- 			status = "disabled";
- 			/* Errata i887 limits max-frequency of MMC3 to 64 MHz */
- 			max-frequency = <64000000>;
-+			sd-uhs-sdr12;
-+			sd-uhs-sdr25;
-+			sd-uhs-sdr50;
- 		};
+-	/*
+-	 * mclk_rate = 256 * fs
+-	 * MCKDIV = 0 if sai_ck < 3/2 * mclk_rate
+-	 * MCKDIV = sai_ck / (2 * mclk_rate) otherwise
+-	 */
+-	if (2 * sai_clk_rate >= 3 * sai->mclk_rate)
+-		div = DIV_ROUND_CLOSEST(sai_clk_rate, 2 * sai->mclk_rate);
+-
+-	if (div > SAI_XCR1_MCKDIV_MAX) {
++	if (STM_SAI_IS_F4(sai->pdata)) {
++		/*
++		 * mclk_rate = 256 * fs
++		 * MCKDIV = 0 if sai_ck < 3/2 * mclk_rate
++		 * MCKDIV = sai_ck / (2 * mclk_rate) otherwise
++		 */
++		if (2 * sai_clk_rate >= 3 * sai->mclk_rate)
++			div = DIV_ROUND_CLOSEST(sai_clk_rate,
++						2 * sai->mclk_rate);
++	} else {
++		/*
++		 * TDM mode :
++		 *   mclk on
++		 *      MCKDIV = sai_ck / (ws x 256)	(NOMCK=0. OSR=0)
++		 *      MCKDIV = sai_ck / (ws x 512)	(NOMCK=0. OSR=1)
++		 *   mclk off
++		 *      MCKDIV = sai_ck / (frl x ws)	(NOMCK=1)
++		 * Note: NOMCK/NODIV correspond to same bit.
++		 */
++		if (sai->mclk_rate) {
++			mclk_ratio = sai->mclk_rate / params_rate(params);
++			if (mclk_ratio != 256) {
++				if (mclk_ratio == 512) {
++					mask = SAI_XCR1_OSR;
++					cr1 = SAI_XCR1_OSR;
++				} else {
++					dev_err(cpu_dai->dev,
++						"Wrong mclk ratio %d\n",
++						mclk_ratio);
++					return -EINVAL;
++				}
++			}
++			div = DIV_ROUND_CLOSEST(sai_clk_rate, sai->mclk_rate);
++		} else {
++			/* mclk-fs not set, master clock not active. NOMCK=1 */
++			den = sai->fs_length * params_rate(params);
++			div = DIV_ROUND_CLOSEST(sai_clk_rate, den);
++		}
++	}
++
++	if (div > SAI_XCR1_MCKDIV_MAX(version)) {
+ 		dev_err(cpu_dai->dev, "Divider %d out of range\n", div);
+ 		return -EINVAL;
+ 	}
+ 	dev_dbg(cpu_dai->dev, "SAI clock %d, divider %d\n", sai_clk_rate, div);
  
- 		mmc4: mmc at 480d1000 {
-@@ -1083,6 +1095,8 @@
- 			dma-names = "tx", "rx";
- 			status = "disabled";
- 			max-frequency = <192000000>;
-+			sd-uhs-sdr12;
-+			sd-uhs-sdr25;
- 		};
+-	mask = SAI_XCR1_MCKDIV_MASK;
+-	cr1 = SAI_XCR1_MCKDIV_SET(div);
++	mask = SAI_XCR1_MCKDIV_MASK(SAI_XCR1_MCKDIV_WIDTH(version));
++				    cr1 = SAI_XCR1_MCKDIV_SET(div);
+ 	ret = regmap_update_bits(sai->regmap, STM_SAI_CR1_REGX, mask, cr1);
+ 	if (ret < 0) {
+ 		dev_err(cpu_dai->dev, "Failed to update CR1 register\n");
+@@ -780,8 +832,18 @@ static int stm32_sai_sub_parse_of(struct platform_device *pdev,
+ 		return PTR_ERR(base);
  
- 		mmu0_dsp1: mmu at 40d01000 {
+ 	sai->phys_addr = res->start;
+-	sai->regmap = devm_regmap_init_mmio_clk(&pdev->dev, "sai_ck", base,
+-						&stm32_sai_sub_regmap_config);
++
++	sai->regmap_config = &stm32_sai_sub_regmap_config_f4;
++	/* Note: PDM registers not available for H7 sub-block B */
++	if (STM_SAI_IS_H7(sai->pdata) && STM_SAI_IS_SUB_A(sai))
++		sai->regmap_config = &stm32_sai_sub_regmap_config_h7;
++
++	sai->regmap = devm_regmap_init_mmio_clk(&pdev->dev, "sai_ck",
++						base, sai->regmap_config);
++	if (IS_ERR(sai->regmap)) {
++		dev_err(&pdev->dev, "Failed to initialize MMIO\n");
++		return PTR_ERR(sai->regmap);
++	}
+ 
+ 	/* Get direction property */
+ 	if (of_property_match_string(np, "dma-names", "tx") >= 0) {
 -- 
-2.11.0
+1.9.1
