@@ -1,42 +1,32 @@
-From: Dave.Martin@arm.com (Dave P Martin)
-Date: Fri, 16 Jun 2017 10:30:50 +0100
-Subject: [PATCH 1/5] arm64: signal: split frame link record from
- sigcontext structure
-In-Reply-To: <20170615163747.GA17424@e104818-lin.cambridge.arm.com>
-References: <1497535442-11586-1-git-send-email-Dave.Martin@arm.com>
- <1497535442-11586-2-git-send-email-Dave.Martin@arm.com>
- <20170615163747.GA17424@e104818-lin.cambridge.arm.com>
-Message-ID: <20170616093050.GH9227@e103592.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 16 Jun 2017 10:18:56 +0100
+Subject: Applied "ASoC: rockchip: Fix an error handling in
+ 'rockchip_i2s_probe'" to the asoc tree
+In-Reply-To: <e92fef8d-5ce1-0b7d-d130-0246d2cb7f91@wanadoo.fr>
+References: <20170615055311.8049-1-christophe.jaillet@wanadoo.fr>
+ <E1dLYRz-0001l4-SZ@debutante>
+ <e92fef8d-5ce1-0b7d-d130-0246d2cb7f91@wanadoo.fr>
+Message-ID: <20170616091856.jz5d4trm5jz2ugan@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 15, 2017 at 05:37:47PM +0100, Catalin Marinas wrote:
-> On Thu, Jun 15, 2017 at 03:03:38PM +0100, Dave P Martin wrote:
-> > In order to be able to increase the amount of the data currently
-> > written to the __reserved[] array in the signal frame, it is
-> > necessary to overwrite the locations currently occupied by the
-> > {fp,lr} frame link record pushed at the top of the signal stack.
-> >
-> > In order for this to work, this patch detaches the frame link
-> > record from struct rt_sigframe and places it separately at the top
-> > of the signal stack.  This will allow subsequent patches to insert
-> > data between it and __reserved[].
-> >
-> > This change relies on the non-ABI status of the placement of the
-> > frame record with respect to struct sigframe: this status is
-> > undocumented, but the placement is not declared or described in the
-> > user headers, and known unwinder implementations (libgcc,
-> > libunwind, gdb) appear not to rely on it.
-> >
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
->
-> I'm fine with this approach:
->
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+On Fri, Jun 16, 2017 at 06:57:30AM +0200, Christophe JAILLET wrote:
+> Le 15/06/2017 ? 19:20, Mark Brown a ?crit :
 
-Thanks for the review.
-Final testing should be complete early next week.
+> >   	if (!of_property_read_u32(node, "rockchip,playback-channels", &val)) {
+> >   		if (val >= 2 && val <= 8)
+> >   			soc_dai->playback.channels_max = val;
 
-Cheers
----Dave
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+> ... and 'err' should be 'ret'...
+
+> I'm really confused for such a ugly proposal !
+
+In a situation like this it's generally best to send a patch, I'll fix
+though.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170616/09fc6b51/attachment.sig>
