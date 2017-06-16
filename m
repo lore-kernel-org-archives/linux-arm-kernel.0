@@ -1,116 +1,107 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 16 Jun 2017 12:17:29 +0100
-Subject: [PATCH 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
- erratum 161010801
-In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA83836B212@FRAEML521-MBX.china.huawei.com>
-References: <20170613114829.188036-1-shameerali.kolothum.thodi@huawei.com>
- <20170613114829.188036-3-shameerali.kolothum.thodi@huawei.com>
- <20170613131317.GB2868@red-moon>
- <5FC3163CFD30C246ABAA99954A238FA838368BC6@FRAEML521-MBX.china.huawei.com>
- <5FC3163CFD30C246ABAA99954A238FA83836B212@FRAEML521-MBX.china.huawei.com>
-Message-ID: <20170616111729.GB22323@red-moon>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Fri, 16 Jun 2017 13:24:32 +0200
+Subject: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO devices
+ before scanning
+In-Reply-To: <20170616083313.GY3187@lahna.fi.intel.com>
+References: <20170530132408.GA2556@red-moon>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40A7B677@FRAEML521-MBX.china.huawei.com>
+ <20170606085553.GA20085@red-moon> <20170612155700.GA31930@red-moon>
+ <20170613084831.GP3187@lahna.fi.intel.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40AAE3DA@FRAEML521-MBX.china.huawei.com>
+ <20170613151013.GT3187@lahna.fi.intel.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40AAF0BF@FRAEML521-MBX.china.huawei.com>
+ <20170613200339.GX3187@lahna.fi.intel.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40AB537A@FRAEML521-MBX.china.huawei.com>
+ <20170616083313.GY3187@lahna.fi.intel.com>
+Message-ID: <CAJZ5v0gWGL=M1+T2DxFfwAi=gCbBBnLFVyp4u+1EVem-mcSNQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 16, 2017 at 09:43:52AM +0000, Shameerali Kolothum Thodi wrote:
-> Hi Lorenzo,
-> 
-> > -----Original Message-----
-> > From: linuxarm-bounces at huawei.com [mailto:linuxarm-
-> > bounces at huawei.com] On Behalf Of Shameerali Kolothum Thodi
-> > Sent: Tuesday, June 13, 2017 3:53 PM
-> > To: Lorenzo Pieralisi
-> > Cc: marc.zyngier at arm.com; will.deacon at arm.com; Linuxarm; linux-
-> > acpi at vger.kernel.org; iommu at lists.linux-foundation.org;
-> > hanjun.guo at linaro.org; sudeep.holla at arm.com; robin.murphy at arm.com;
-> > linux-arm-kernel at lists.infradead.org; devel at acpica.org
-> > Subject: RE: [PATCH 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
-> > erratum 161010801
-> 
-> [...]
->  > > > ---
-> > > >  drivers/iommu/arm-smmu-v3.c | 27 ++++++++++++++++++++++-----
-> > > >  1 file changed, 22 insertions(+), 5 deletions(-)
-> > > >
-> > > > diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-
-> > > v3.c
-> > > > index abe4b88..2636c85 100644
-> > > > --- a/drivers/iommu/arm-smmu-v3.c
-> > > > +++ b/drivers/iommu/arm-smmu-v3.c
-> > > > @@ -597,6 +597,7 @@ struct arm_smmu_device {
-> > > >  	u32				features;
-> > > >
-> > > >  #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-> > > > +#define ARM_SMMU_OPT_RESV_HW_MSI	(1 << 1)
-> > > >  	u32				options;
-> > > >
-> > > >  	struct arm_smmu_cmdq		cmdq;
-> > > > @@ -1904,14 +1905,29 @@ static void
-> > arm_smmu_get_resv_regions(struct
-> > > device *dev,
-> > > >  				      struct list_head *head)
-> > > >  {
-> > > >  	struct iommu_resv_region *region;
-> > > > +	struct arm_smmu_device *smmu;
-> > > > +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
-> > > >  	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
-> > > >
-> > > > -	region = iommu_alloc_resv_region(MSI_IOVA_BASE,
-> > > MSI_IOVA_LENGTH,
-> > > > -					 prot, IOMMU_RESV_SW_MSI);
-> > > > -	if (!region)
-> > > > -		return;
-> > > > +	smmu = arm_smmu_get_by_fwnode(fwspec->iommu_fwnode);
-> > > >
-> > > > -	list_add_tail(&region->list, head);
-> > > > +	if (smmu && (smmu->options & ARM_SMMU_OPT_RESV_HW_MSI)
-> > > &&
-> > > > +		      dev_is_pci(dev)) {
-> > > > +		int ret;
-> > > > +
-> > > > +		ret = iort_iommu_its_get_resv_regions(dev, head);
-> > >
-> > > This should be made fwnode dependent, it makes precious little sense to
-> > call
-> > > IORT to reserve regions on a DT based platforms (I know the
-> > > ARM_SMMU_OPT_RESV_HW_MSI option is only selected in ACPI (?) but
-> > > comment applies regardless - have you prototyped a DT version too ?).
-> > 
-> > Ok. I will add a check here. 
-> 
-> This is what I have in mind. Please take a look and let me know. I will send out
-> a v2 of this series soon.
-> ....
-> if (smmu && (smmu->options & ARM_SMMU_OPT_RESV_HW_MSI) &&
-> 			dev_is_pci(dev)) {
-> 	int ret = -EINVAL;
-> 
-> 	if (!is_of_node(smmu->dev->fwnode))
-> 		ret = iort_iommu_its_get_resv_regions(dev, head);
-> 
-> 	if (ret) {
-> 		dev_warn(dev, "HW MSI region resv failed: %d\n", ret);
-> 		return;
-> 	}
-> } else {
+On Fri, Jun 16, 2017 at 10:33 AM, Mika Westerberg
+<mika.westerberg@linux.intel.com> wrote:
+> On Thu, Jun 15, 2017 at 06:01:02PM +0000, Gabriele Paoloni wrote:
+>> Hi Mika
+>>
+>> > -----Original Message-----
+>> > From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
+>> > owner at vger.kernel.org] On Behalf Of Mika Westerberg
+>> > Sent: 13 June 2017 21:04
+>> > To: Gabriele Paoloni
+>> > Cc: Lorenzo Pieralisi; rafael at kernel.org; Rafael J. Wysocki;
+>> > catalin.marinas at arm.com; will.deacon at arm.com; robh+dt at kernel.org;
+>> > frowand.list at gmail.com; bhelgaas at google.com; arnd at arndb.de; linux-arm-
+>> > kernel at lists.infradead.org; mark.rutland at arm.com;
+>> > brian.starkey at arm.com; olof at lixom.net; benh at kernel.crashing.org; linux-
+>> > kernel at vger.kernel.org; linux-acpi at vger.kernel.org; Linuxarm; linux-
+>> > pci at vger.kernel.org; minyard at acm.org; John Garry; xuwei (O)
+>> > Subject: Re: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO
+>> > devices before scanning
+>> >
+>> > On Tue, Jun 13, 2017 at 07:01:38PM +0000, Gabriele Paoloni wrote:
+>> > > I am not very familiar with Linux MFD however the main issue here is
+>> > that
+>> > > 1) for IPMI we want to re-use the standard IPMI driver without
+>> > touching it:
+>> > >    see
+>> > >
+>> > >    static const struct acpi_device_id acpi_ipmi_match[] = {
+>> > >          { "IPI0001", 0 },
+>> > >          { },
+>> > >    };
+>> > >
+>> > >    in "drivers/char/ipmi/ipmi_si_intf.c" (and in general any standard
+>> > driver
+>> > >    of an LPC child)
+>> > >
+>> > > 2) We need a way to guarantee that all LPC children are not
+>> > enumerated
+>> > >    by acpi_default_enumeration() (so for example if an ipmi node is
+>> > an LPC#
+>> > >    child it should not be enumerated, otherwise it should be)
+>> > >    Currently acpi_default_enumeration() skips spi/i2c slaves by
+>> > checking:
+>> > >    1) if the acpi resource type is a serial bus
+>> > >    2) if the type of serial bus descriptor is I2C or SPI
+>> > >
+>> > >    For LPC we cannot leverage on any ACPI property to "recognize"
+>> > that our
+>> > >    devices are LPC children; hence before I proposed for
+>> > acpi_default_enumeration()
+>> > >    to skip devices that have already been enumerated (by calling
+>> > >    acpi_device_enumerated() ).
+>> > >
+>> > > So in the current scenario, how do you think that MFD can help?
+>> >
+>> > If you look at Documentation/acpi/enumeration.txt there is a chapter
+>> > "MFD devices". I think it pretty much maches what you have here. An LPC
+>> > device (MFD device) and bunch of child devices. The driver for your LPC
+>> > device can specify _HID for each child device. Those are then mached by
+>> > the MFD ACPI code to the corresponding ACPI nodes from which platform
+>> > devices are created including "IPI0001".
+>>
+>> So I guess here in the LPC driver I would have an MFD cell for IPMI. I.e.:
+>>
+>>       static struct mfd_cell_acpi_match hisi_lpc_ipmi_acpi_match = {
+>>               .pnpid = "IPI0001",
+>>       };
+>>
+>> correct?
+>
+> Yes.
+>
+>> >
+>> > It causes acpi_default_enumeration() to be called but it should be fine
+>> > as we are dealing with platform device anyway.
+>>
+>> I do not quite understand how declaring such MFD cell above would make sure
+>> that the LPC probe is called before the IPMI device is enumerated...
+>
+> In fact it may be that it is not sufficient in this case because the
+> ACPI core might enumerate child devices before the LPC driver even gets
+> a chance to probe so you would need to add also scan handler to the
+> child devices and mark them already enumerated or something like that.
 
-The fwnode handling is fine, I do not like much the:
-
-dev_is_pci()
-
-check because it relies on implicit knowledge of the platform and
-the quirks you need (ie you know that it is _just_ a PCI RC quirk
-implicitly), the logic behind reserving the regions is a bit
-convoluted and not easy to understand at all.
-
-Let me try to rephrase it: you know, through an SMMU model number,
-that your PCI RC handles MSI in a specific way, but by reading the
-code above this is not clear at all, at least to me. This is a PCI
-RC quirk but it does not depend on any PCI RC specific firmware binding
-whatsoever, that's what is a bit hard to understand.
-
-Anyway you can post the patches and we will take it from there to
-see if there is a way to improve it.
+Or extend the special I2C/SPI handling to them.
 
 Thanks,
-Lorenzo
+Rafael
