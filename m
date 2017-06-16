@@ -1,60 +1,30 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Fri, 16 Jun 2017 20:10:59 +0200
-Subject: [PATCH 44/44] powerpc: merge __dma_set_mask into dma_set_mask
-In-Reply-To: <20170616181059.19206-1-hch@lst.de>
-References: <20170616181059.19206-1-hch@lst.de>
-Message-ID: <20170616181059.19206-45-hch@lst.de>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 16 Jun 2017 11:40:34 -0700
+Subject: [PATCH] ARM: dts: meson8: fix the IR receiver pins
+In-Reply-To: <e4347b01-e221-2242-9bb9-bc1e93da06fb@baylibre.com> (Neil
+ Armstrong's message of "Mon, 12 Jun 2017 09:38:55 +0200")
+References: <20170609222039.25191-1-martin.blumenstingl@googlemail.com>
+ <e4347b01-e221-2242-9bb9-bc1e93da06fb@baylibre.com>
+Message-ID: <m2k24bg4il.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Christoph Hellwig <hch@lst.de>
----
- arch/powerpc/include/asm/dma-mapping.h |  1 -
- arch/powerpc/kernel/dma.c              | 13 ++++---------
- 2 files changed, 4 insertions(+), 10 deletions(-)
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-diff --git a/arch/powerpc/include/asm/dma-mapping.h b/arch/powerpc/include/asm/dma-mapping.h
-index 73aedbe6c977..eaece3d3e225 100644
---- a/arch/powerpc/include/asm/dma-mapping.h
-+++ b/arch/powerpc/include/asm/dma-mapping.h
-@@ -112,7 +112,6 @@ static inline void set_dma_offset(struct device *dev, dma_addr_t off)
- #define HAVE_ARCH_DMA_SET_MASK 1
- extern int dma_set_mask(struct device *dev, u64 dma_mask);
- 
--extern int __dma_set_mask(struct device *dev, u64 dma_mask);
- extern u64 __dma_get_required_mask(struct device *dev);
- 
- static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
-diff --git a/arch/powerpc/kernel/dma.c b/arch/powerpc/kernel/dma.c
-index 466c9f07b288..4194bbbbdb10 100644
---- a/arch/powerpc/kernel/dma.c
-+++ b/arch/powerpc/kernel/dma.c
-@@ -314,14 +314,6 @@ EXPORT_SYMBOL(dma_set_coherent_mask);
- 
- #define PREALLOC_DMA_DEBUG_ENTRIES (1 << 16)
- 
--int __dma_set_mask(struct device *dev, u64 dma_mask)
--{
--	if (!dev->dma_mask || !dma_supported(dev, dma_mask))
--		return -EIO;
--	*dev->dma_mask = dma_mask;
--	return 0;
--}
--
- int dma_set_mask(struct device *dev, u64 dma_mask)
- {
- 	if (ppc_md.dma_set_mask)
-@@ -334,7 +326,10 @@ int dma_set_mask(struct device *dev, u64 dma_mask)
- 			return phb->controller_ops.dma_set_mask(pdev, dma_mask);
- 	}
- 
--	return __dma_set_mask(dev, dma_mask);
-+	if (!dev->dma_mask || !dma_supported(dev, dma_mask))
-+		return -EIO;
-+	*dev->dma_mask = dma_mask;
-+	return 0;
- }
- EXPORT_SYMBOL(dma_set_mask);
- 
--- 
-2.11.0
+> On 06/10/2017 12:20 AM, Martin Blumenstingl wrote:
+>> The IR receiver pins are currently defined in the CBUS pin-controller.
+>> However the pins are in the AO region, which is controlled by the AOBUS
+>> pin-controller. Move the pins to pinctrl_aobus so they can actually be
+>> used.
+>> 
+>> Fixes: b60e1157d8fa ("ARM: dts: amlogic: Split pinctrl device for Meson8 / Meson8b")
+>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+
+[..]
+
+> Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+
+Applied to v4.13/dt with Neil's ack, will go in round 2 of pull requests
+to arm-soc.
+
+Kevin
