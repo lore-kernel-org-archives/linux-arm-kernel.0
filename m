@@ -1,98 +1,83 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Fri, 16 Jun 2017 11:47:11 +0800
-Subject: [PATCH v6 7/8] arm64: dts: hikey960: add device node for pmic and
- regulators
-In-Reply-To: <5942E633.9040908@hisilicon.com>
-References: <20170608220841.26531-1-guodong.xu@linaro.org>
- <20170608220841.26531-8-guodong.xu@linaro.org>
- <5942E633.9040908@hisilicon.com>
-Message-ID: <CAFGCpxx=vPP-Wcby+kz63gB5rp+CHrwSPNYAfyv15nmy_Tvq_Q@mail.gmail.com>
+From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
+Date: Fri, 16 Jun 2017 06:57:30 +0200
+Subject: Applied "ASoC: rockchip: Fix an error handling in
+ 'rockchip_i2s_probe'" to the asoc tree
+In-Reply-To: <E1dLYRz-0001l4-SZ@debutante>
+References: <20170615055311.8049-1-christophe.jaillet@wanadoo.fr>
+ <E1dLYRz-0001l4-SZ@debutante>
+Message-ID: <e92fef8d-5ce1-0b7d-d130-0246d2cb7f91@wanadoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks, Wei.
+Le 15/06/2017 ? 19:20, Mark Brown a ?crit :
+> The patch
+>
+>     ASoC: rockchip: Fix an error handling in 'rockchip_i2s_probe'
+>
+> has been applied to the asoc tree at
+>
+>     git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git
+>
+> All being well this means that it will be integrated into the linux-next
+> tree (usually sometime in the next 24 hours) and sent to Linus during
+> the next merge window (or sooner if it is a bug fix), however if
+> problems are discovered then the patch may be dropped or reverted.
+>
+> You may get further e-mails resulting from automated or manual testing
+> and review of the tree, please engage with people reporting problems and
+> send followup patches addressing any issues that are reported if needed.
+>
+> If any updates are required or you are submitting further changes they
+> should be sent as incremental updates against current git, existing
+> patches will not be replaced.
+>
+> Please add any relevant lists and maintainers to the CCs when replying
+> to this mail.
+>
+> Thanks,
+> Mark
+>
+>  From c3a3d3c41b74b05267bab6173f2a8224a1443ba6 Mon Sep 17 00:00:00 2001
+> From: Christophe Jaillet <christophe.jaillet@wanadoo.fr>
+> Date: Thu, 15 Jun 2017 07:53:11 +0200
+> Subject: [PATCH] ASoC: rockchip: Fix an error handling in 'rockchip_i2s_probe'
+>
+> If this memory allocation fail, we must disable what has been enabled.
+> Do not return immediately but go thrue the error handling path instead.
+>
+> Also use 'devm_kmemdup' instead of 'devm_kzalloc+memcpy' to simplify code.
+>
+> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+> Signed-off-by: Mark Brown <broonie@kernel.org>
+> ---
+>   sound/soc/rockchip/rockchip_i2s.c | 9 +++++----
+>   1 file changed, 5 insertions(+), 4 deletions(-)
+>
+> diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
+> index 66a26c56c658..ce09dee2202e 100644
+> --- a/sound/soc/rockchip/rockchip_i2s.c
+> +++ b/sound/soc/rockchip/rockchip_i2s.c
+> @@ -641,12 +641,13 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
+>   			goto err_pm_disable;
+>   	}
+>   
+> -	soc_dai = devm_kzalloc(&pdev->dev,
+> +	soc_dai = devm_kmemdup(&pdev->dev, &rockchip_i2s_dai
+>   			       sizeof(*soc_dai), GFP_KERNEL);
+> -	if (!soc_dai)
+> -		return -ENOMEM;
+> +	if (!soc_dai) {
+> +		err = -ENOMEM;
+> +		goto err_pm_disable;
+> +	}
+>   
+> -	memcpy(soc_dai, &rockchip_i2s_dai, sizeof(*soc_dai));
+>   	if (!of_property_read_u32(node, "rockchip,playback-channels", &val)) {
+>   		if (val >= 2 && val <= 8)
+>   			soc_dai->playback.channels_max = val;
 
-On Fri, Jun 16, 2017 at 3:55 AM, Wei Xu <xuwei5@hisilicon.com> wrote:
-> Hi Guodong,
->
-> On 2017/6/8 23:08, Guodong Xu wrote:
->> From: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
->>
->> add device node for hi6421 pmic core and hi6421v530
->> voltage regulator,include LDO(1,3,9,11,15,16)
->>
->> Signed-off-by: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
->> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
->> Acked-by: Arnd Bergmann <arnd@arndb.de>
->> ---
->>  arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 46 +++++++++++++++++++++++
->>  1 file changed, 46 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
->> index ca448f0..e579333 100644
->> --- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
->> +++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
->> @@ -97,6 +97,52 @@
->>                       default-state = "off";
->>               };
->>       };
->> +
->> +     pmic: pmic at fff34000 {
->> +             compatible = "hisilicon,hi6421v530-pmic";
->> +             reg = <0x0 0xfff34000 0x0 0x1000>;
->> +             interrupt-controller;
->> +             #interrupt-cells = <2>;
->> +
->> +             regulators {
->> +                     ldo3: LDO3 { /* HDMI */
->> +                             regulator-name = "VOUT3_1V85";
->> +                             regulator-min-microvolt = <1800000>;
->> +                             regulator-max-microvolt = <2200000>;
->> +                             regulator-enable-ramp-delay = <120>;
->> +                     };
->> +
->> +                     ldo9: LDO9 { /* SDCARD I/O */
->> +                             regulator-name = "VOUT9_1V8_2V95";
->> +                             regulator-min-microvolt = <1750000>;
->> +                             regulator-max-microvolt = <3300000>;
->> +                             regulator-enable-ramp-delay = <240>;
->> +                     };
->> +
->> +                     ldo11: LDO11 { /* Low Speed Connector */
->> +                             regulator-name = "VOUT11_1V8_2V95";
->> +                             regulator-min-microvolt = <1750000>;
->> +                             regulator-max-microvolt = <3300000>;
->> +                             regulator-enable-ramp-delay = <240>;
->> +                     };
->> +
->> +                     ldo15: LDO15 { /* UFS VCC */
->> +                             regulator-name = "VOUT15_3V0";
->> +                             regulator-min-microvolt = <1750000>;
->> +                             regulator-max-microvolt = <3000000>;
->> +                             regulator-boot-on;
->> +                             regulator-always-on;
->> +                             regulator-enable-ramp-delay = <120>;
->> +                     };
->> +
->> +                     ldo16: LDO16 { /* SD VDD */
->> +                             regulator-name = "VOUT16_2V95";
->> +                             regulator-min-microvolt = <1750000>;
->> +                             regulator-max-microvolt = <3000000>;
->> +                             regulator-enable-ramp-delay = <360>;
->> +                     };
->> +             };
->> +     };
->>  };
->>
->>  &i2c0 {
->>
->
-> Since you put the dts part into another patch set[1] and the driver part has been applied.
-> I will pick up [1].
-> Thanks!
->
-> [1]: https://lkml.org/lkml/2017/6/14/1052
->
-> BR,
-> Wei
->
+... and 'err' should be 'ret'...
+
+I'm really confused for such a ugly proposal !
+
+CJ
