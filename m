@@ -1,158 +1,172 @@
-From: hongxing.zhu@nxp.com (Richard Zhu)
-Date: Fri, 16 Jun 2017 00:49:40 +0000
-Subject: [PATCH] PCI: imx6: add regulator support
-In-Reply-To: <20170615210544.GE12735@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170608080742.3910-1-quentin.schulz@free-electrons.com>
- <20170615210544.GE12735@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <AM5PR0402MB28503902575D87F934F890E38CC10@AM5PR0402MB2850.eurprd04.prod.outlook.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Fri, 16 Jun 2017 09:10:50 +0800
+Subject: [PATCH v4 2/3] PCI: Enable PCIe Relaxed Ordering if supported
+In-Reply-To: <CAKgT0UfMCTjRWVnYiz-7BaV6NxK+kHm9PppgVp+_sNhfVgKviQ@mail.gmail.com>
+References: <1497265525-4752-1-git-send-email-dingtianhong@huawei.com>
+ <1497265525-4752-3-git-send-email-dingtianhong@huawei.com>
+ <CAKgT0UfMCTjRWVnYiz-7BaV6NxK+kHm9PppgVp+_sNhfVgKviQ@mail.gmail.com>
+Message-ID: <5854930e-af6a-4274-2822-cf38e5967da3@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> -----Original Message-----
-> From: Bjorn Helgaas [mailto:helgaas at kernel.org]
-> Sent: Friday, June 16, 2017 5:06 AM
-> To: Quentin Schulz <quentin.schulz@free-electrons.com>
-> Cc: Richard Zhu <hongxing.zhu@nxp.com>; l.stach at pengutronix.de;
-> bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com;
-> thomas.petazzoni at free-electrons.com; devicetree at vger.kernel.org; linux-
-> pci at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH] PCI: imx6: add regulator support
+
+On 2017/6/13 5:28, Alexander Duyck wrote:
+> On Mon, Jun 12, 2017 at 4:05 AM, Ding Tianhong <dingtianhong@huawei.com> wrote:
+...
+>>  /**
+>> + * pcie_clear_relaxed_ordering - clear PCI Express relaxed ordering bit
+>> + * @dev: PCI device to query
+>> + *
+>> + * If possible clear relaxed ordering
+>> + */
+>> +int pcie_clear_relaxed_ordering(struct pci_dev *dev)
+>> +{
+>> +       return pcie_capability_clear_word(dev, PCI_EXP_DEVCTL,
+>> +                                         PCI_EXP_DEVCTL_RELAX_EN);
+>> +}
+>> +EXPORT_SYMBOL(pcie_clear_relaxed_ordering);
+>> +
+>> +/**
+>> + * pcie_relaxed_ordering_supported - Probe for PCIe relexed ordering support
+>> + * @dev: PCI device to query
+>> + *
+>> + * Returns true if the device support relaxed ordering attribute.
+>> + */
+>> +bool pcie_relaxed_ordering_supported(struct pci_dev *dev)
+>> +{
+>> +       bool ro_supported = false;
+>> +       u16 v;
+>> +
+>> +       pcie_capability_read_word(dev, PCI_EXP_DEVCTL, &v);
+>> +       if ((v & PCI_EXP_DEVCTL_RELAX_EN) >> 4)
+>> +               ro_supported = true;
 > 
-> On Thu, Jun 08, 2017 at 10:07:42AM +0200, Quentin Schulz wrote:
-> > Some boards might require to control a regulator to power the PCIe port.
-> >
-> > This adds support for an optional regulator defined in Device Tree
-> > linked in the PCIe controller under `vpcie-supply`. If present, the
-> > regulator will be disabled and then enabled as part of the PCIe host
-> > initialization process and will be disabled when shutting down.
-> >
-> > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> Instead of "return ro_supported" why not just "return !!(v &
+> PCIE_EXP_DEVCTL_RELAX_EN)"? You can cut out the extra steps and save
+> yourself some extra steps this way since the shift by 4 shouldn't even
+> really be needed since you are just testing for a bit anyway.
 > 
-> Waiting for ack from Richard or Lucas.
-[Zhu hongxing] Sorry to replay late.
-This patch is okay for me.
+
+OK.
+
+>> +
+>> +       return ro_supported;
+>> +}
+>> +EXPORT_SYMBOL(pcie_relaxed_ordering_supported);
+>> +
+>> +/**
+>>   * pcie_get_minimum_link - determine minimum link settings of a PCI device
+>>   * @dev: PCI device to query
+>>   * @speed: storage for minimum speed
+>> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+>> index 19c8950..ed1f717 100644
+>> --- a/drivers/pci/probe.c
+>> +++ b/drivers/pci/probe.c
+>> @@ -1701,6 +1701,46 @@ static void pci_configure_extended_tags(struct pci_dev *dev)
+>>                                          PCI_EXP_DEVCTL_EXT_TAG);
+>>  }
+>>
+>> +/**
+>> + * pci_dev_should_disable_relaxed_ordering - check if the PCI device
+>> + * should disable the relaxed ordering attribute.
+>> + * @dev: PCI device
+>> + *
+>> + * Return true if any of the PCI devices above us do not support
+>> + * relaxed ordering.
+>> + */
+>> +static bool pci_dev_should_disable_relaxed_ordering(struct pci_dev *dev)
+>> +{
+>> +       bool ro_disabled = false;
+>> +
+>> +       while (dev) {
+>> +               if (dev->dev_flags & PCI_DEV_FLAGS_NO_RELAXED_ORDERING) {
+>> +                       ro_disabled = true;
+>> +                       break;
+>> +               }
+>> +               dev = dev->bus->self;
+>> +       }
+>> +
+>> +       return ro_disabled;
+> 
+> Same thing here. I would suggest just returning either true or false,
+> and drop the ro_disabled value. It will return the lines of code and
+> make things a bit bit more direct.
+> 
+
+OK.
+
+>> +}
+>> +
+>> +static void pci_configure_relaxed_ordering(struct pci_dev *dev)
+>> +{
+>> +       struct pci_dev *bridge = pci_upstream_bridge(dev);
+>> +
+>> +       if (!pci_is_pcie(dev) || !bridge || !pci_is_pcie(bridge))
+>> +               return;
+> 
+> The pci_is_pcie check is actually redundant based on the
+> pcie_relaxed_ordering_supported check using pcie_capability_read_word.
+>
+
+Yes, pcie_capability_read_word already check it, thanks.
+
+
+> Also I am not sure what the point is of the pci_upstream_bridge()
+> check is, it seems like you should be able to catch all the same stuff
+> in your pci_dev_should_disable_relaxed_ordering() call. Though it did
+> give me a thought. I don't think we can alter this for a VF, so you
+> might want to add a check for dev->is_virtfn to the list of checks and
+> if it is a virtual function just return since I don't think there are
+> any VFs that would let you alter this bit anyway.
+> 
+If the upstream device is null, does it mean that it is in a guest OS device? maybe I miss something.
+also I will check the dev->is_virtfn to avoid trying to change the configuration space for VF.
+
+Another question: Because it looks like that maybe the Casey is too busy these days, should we
+delay the modification of the cxgb4 and instead to update the ixgbe? what do you think about it. :)
+
 Thanks.
-Acked-by: Richard Zhu <hongxing.zhu@nxp.com>
+Ding
+
+>> +       /* If the releaxed ordering enable bit is not set, do nothing. */
+>> +       if (!pcie_relaxed_ordering_supported(dev))
+>> +               return;
+>> +
+>> +       if (pci_dev_should_disable_relaxed_ordering(dev)) {
+>> +               pcie_clear_relaxed_ordering(dev);
+>> +               dev_info(&dev->dev, "Disable Relaxed Ordering\n");
+>> +       }
+>> +}
+>> +
+>>  static void pci_configure_device(struct pci_dev *dev)
+>>  {
+>>         struct hotplug_params hpp;
+>> @@ -1708,6 +1748,7 @@ static void pci_configure_device(struct pci_dev *dev)
+>>
+>>         pci_configure_mps(dev);
+>>         pci_configure_extended_tags(dev);
+>> +       pci_configure_relaxed_ordering(dev);
+>>
+>>         memset(&hpp, 0, sizeof(hpp));
+>>         ret = pci_get_hp_params(dev, &hpp);
+>> diff --git a/include/linux/pci.h b/include/linux/pci.h
+>> index e1e8428..9870781 100644
+>> --- a/include/linux/pci.h
+>> +++ b/include/linux/pci.h
+>> @@ -1105,6 +1105,8 @@ int __pci_enable_wake(struct pci_dev *dev, pci_power_t state,
+>>  void pci_pme_wakeup_bus(struct pci_bus *bus);
+>>  void pci_d3cold_enable(struct pci_dev *dev);
+>>  void pci_d3cold_disable(struct pci_dev *dev);
+>> +int pcie_clear_relaxed_ordering(struct pci_dev *dev);
+>> +bool pcie_relaxed_ordering_supported(struct pci_dev *dev);
+>>
+>>  static inline int pci_enable_wake(struct pci_dev *dev, pci_power_t state,
+>>                                   bool enable)
+>> --
+>> 1.9.0
+>>
+>>
 > 
-> > ---
-> >  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  4 +++
-> >  drivers/pci/dwc/pci-imx6.c                         | 34 +++++++++++++++++++++-
-> >  2 files changed, 37 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> > b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> > index e3d5680875b1..cf92d3ba5a26 100644
-> > --- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> > +++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> > @@ -33,6 +33,10 @@ Optional properties:
-> >  - reset-gpio-active-high: If present then the reset sequence using the
-> GPIO
-> >    specified in the "reset-gpio" property is reversed (H=reset state,
-> >    L=operation state).
-> > +- vpcie-supply: Should specify the regulator in charge of PCIe port power.
-> > +  The regulator will be enabled when initializing the PCIe host and
-> > +  disabled either as part of the init process or when shutting down
-> > +the
-> > +  host.
-> >
-> >  Additional required properties for imx6sx-pcie:
-> >  - clock names: Must include the following additional entries:
-> > diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
-> > index 19a289b8cc94..f9b7500c9aff 100644
-> > --- a/drivers/pci/dwc/pci-imx6.c
-> > +++ b/drivers/pci/dwc/pci-imx6.c
-> > @@ -24,6 +24,7 @@
-> >  #include <linux/pci.h>
-> >  #include <linux/platform_device.h>
-> >  #include <linux/regmap.h>
-> > +#include <linux/regulator/consumer.h>
-> >  #include <linux/resource.h>
-> >  #include <linux/signal.h>
-> >  #include <linux/types.h>
-> > @@ -59,6 +60,7 @@ struct imx6_pcie {
-> >  	u32			tx_swing_full;
-> >  	u32			tx_swing_low;
-> >  	int			link_gen;
-> > +	struct regulator	*vpcie;
-> >  };
-> >
-> >  /* Parameters for the waiting for PCIe PHY PLL to lock on i.MX7 */ @@
-> > -310,6 +312,13 @@ static void imx6_pcie_assert_core_reset(struct
-> imx6_pcie *imx6_pcie)
-> >  				   IMX6Q_GPR1_PCIE_REF_CLK_EN, 0 << 16);
-> >  		break;
-> >  	}
-> > +
-> > +	if (imx6_pcie->vpcie && regulator_is_enabled(imx6_pcie->vpcie) > 0)
-> {
-> > +		int ret = regulator_disable(imx6_pcie->vpcie);
-> > +
-> > +		if (ret)
-> > +			pr_err("failed to disable vpcie regulator: %d\n", ret);
-> > +	}
-> >  }
-> >
-> >  static int imx6_pcie_enable_ref_clk(struct imx6_pcie *imx6_pcie) @@
-> > -376,10 +385,19 @@ static void imx6_pcie_deassert_core_reset(struct
-> imx6_pcie *imx6_pcie)
-> >  	struct device *dev = pci->dev;
-> >  	int ret;
-> >
-> > +	if (imx6_pcie->vpcie && !regulator_is_enabled(imx6_pcie->vpcie)) {
-> > +		ret = regulator_enable(imx6_pcie->vpcie);
-> > +		if (ret) {
-> > +			dev_err(dev, "failed to enable vpcie regulator: %d\n",
-> > +				ret);
-> > +			return;
-> > +		}
-> > +	}
-> > +
-> >  	ret = clk_prepare_enable(imx6_pcie->pcie_phy);
-> >  	if (ret) {
-> >  		dev_err(dev, "unable to enable pcie_phy clock\n");
-> > -		return;
-> > +		goto err_pcie_phy;
-> >  	}
-> >
-> >  	ret = clk_prepare_enable(imx6_pcie->pcie_bus);
-> > @@ -439,6 +457,13 @@ static void imx6_pcie_deassert_core_reset(struct
-> imx6_pcie *imx6_pcie)
-> >  	clk_disable_unprepare(imx6_pcie->pcie_bus);
-> >  err_pcie_bus:
-> >  	clk_disable_unprepare(imx6_pcie->pcie_phy);
-> > +err_pcie_phy:
-> > +	if (imx6_pcie->vpcie && regulator_is_enabled(imx6_pcie->vpcie) > 0)
-> {
-> > +		ret = regulator_disable(imx6_pcie->vpcie);
-> > +		if (ret)
-> > +			dev_err(dev, "failed to disable vpcie regulator: %d\n",
-> > +				ret);
-> > +	}
-> >  }
-> >
-> >  static void imx6_pcie_init_phy(struct imx6_pcie *imx6_pcie) @@ -802,6
-> > +827,13 @@ static int imx6_pcie_probe(struct platform_device *pdev)
-> >  	if (ret)
-> >  		imx6_pcie->link_gen = 1;
-> >
-> > +	imx6_pcie->vpcie = devm_regulator_get_optional(&pdev->dev,
-> "vpcie");
-> > +	if (IS_ERR(imx6_pcie->vpcie)) {
-> > +		if (PTR_ERR(imx6_pcie->vpcie) == -EPROBE_DEFER)
-> > +			return -EPROBE_DEFER;
-> > +		imx6_pcie->vpcie = NULL;
-> > +	}
-> > +
-> >  	platform_set_drvdata(pdev, imx6_pcie);
-> >
-> >  	ret = imx6_add_pcie_port(imx6_pcie, pdev);
-> > --
-> > 2.11.0
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> .
+> 
