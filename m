@@ -1,40 +1,37 @@
-From: butao@hisilicon.com (Bu Tao)
-Date: Fri, 16 Jun 2017 14:51:14 +0800
-Subject: [PATCH v2 0/5] scsi: ufs: add ufs driver code for Hi3660 SoC
-Message-ID: <20170616065119.10704-1-butao@hisilicon.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 16 Jun 2017 08:59:13 +0200
+Subject: linux-next: bad commit in the mvebu tree
+In-Reply-To: <20170616055732.4114daed@canb.auug.org.au> (Stephen Rothwell's
+ message of "Fri, 16 Jun 2017 05:57:32 +1000")
+References: <20170616055732.4114daed@canb.auug.org.au>
+Message-ID: <87tw3g5sfy.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds driver support for UFS for Hi3660 SoC. It is verified on HiKey960 board
+Hi Stephen,
+ 
+ On jeu., juin 15 2017, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
 
-In v2
-The dts ufs node patch, v2-0003-arm64-dts-Add-ufs-dts-node-for-Hisilicon-Hi3660-S.patch,
-is dependent on the patch below:
+> Hi all,
+>
+> I noticed that commit
+>
+>   c6f4e66bd0f4 ("arm64: marvell: dts: add xmdio nodes for 7k/8k")
+>
+> has no Signed-off-by for its comitter.
 
->From Guodong Xu <guodong.xu@xxxxxxxxxx>
-https://www.spinics.net/lists/arm-kernel/msg588232.html
+Thanks for the warning, I fix it right now.
 
-Bu Tao (3):
-  scsi: ufs: add hi3660 ufs driver code
-  scsi: ufs: add ufs node document for hi3660
-  arm64: dts: Add ufs dts node for Hisilicon Hi3660 SoC
+Gregory
 
-Zhangfei Gao(2):
-  rm64: defconfig: enable configs for hi3660 ufs
-  arm64: defconfig: enable f2fs and squashfs
 
- .../devicetree/bindings/ufs/hi3660-ufs.txt         |  58 ++
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts  |   9 +
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi          |  19 +
- arch/arm64/configs/defconfig                       |  11 +
- drivers/scsi/ufs/Kconfig                           |   8 +
- drivers/scsi/ufs/Makefile                          |   1 +
- drivers/scsi/ufs/ufs-hi3660.c                      | 727 +++++++++++++++++++++
- drivers/scsi/ufs/ufs-hi3660.h                      | 173 +++++
- 8 files changed, 1006 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/ufs/hi3660-ufs.txt
- create mode 100644 drivers/scsi/ufs/ufs-hi3660.c
- create mode 100644 drivers/scsi/ufs/ufs-hi3660.h
+>
+> -- 
+> Cheers,
+> Stephen Rothwell
 
 -- 
-2.11.GIT
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
