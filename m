@@ -1,34 +1,48 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Thu, 15 Jun 2017 23:39:13 -0700
-Subject: [PATCH RESEND 2/2] bus: arm-ccn: Enable stats for CCN-502 interconnect
-In-Reply-To: <1497595153-18908-1-git-send-email-scott.branden@broadcom.com>
-References: <1497595153-18908-1-git-send-email-scott.branden@broadcom.com>
-Message-ID: <1497595153-18908-3-git-send-email-scott.branden@broadcom.com>
+From: butao@hisilicon.com (Bu Tao)
+Date: Fri, 16 Jun 2017 14:51:19 +0800
+Subject: [PATCH v2 5/5] arm64: defconfig: enable f2fs and squashfs
+In-Reply-To: <20170616065119.10704-1-butao@hisilicon.com>
+References: <20170616065119.10704-1-butao@hisilicon.com>
+Message-ID: <20170616065119.10704-6-butao@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Velibor Markovski <velibor.markovski@broadcom.com>
+Partitions in HiKey960 are formatted as f2fs and squashfs.
+f2fs is for userdata; squashfs is for system. Both partitions are required
+by Android.
 
-Add compatible string for the ARM CCN-502 interconnect
-
-Signed-off-by: Velibor Markovski <velibor.markovski@broadcom.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Scott Branden <scott.branden@broadcom.com>
+Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+Signed-off-by: Chen Jun <chenjun14@huawei.com>
+Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
 ---
- drivers/bus/arm-ccn.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/configs/defconfig | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
-index 4d6a2b7..98a6995 100644
---- a/drivers/bus/arm-ccn.c
-+++ b/drivers/bus/arm-ccn.c
-@@ -1544,6 +1544,7 @@ static int arm_ccn_remove(struct platform_device *pdev)
- }
- 
- static const struct of_device_id arm_ccn_match[] = {
-+	{ .compatible = "arm,ccn-502", },
- 	{ .compatible = "arm,ccn-504", },
- 	{},
- };
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 379c942fe114..d73351fa0c9a 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -494,6 +494,7 @@ CONFIG_RASPBERRYPI_FIRMWARE=y
+ CONFIG_ACPI=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
++CONFIG_F2FS_FS=y
+ CONFIG_EXT4_FS_POSIX_ACL=y
+ CONFIG_BTRFS_FS=m
+ CONFIG_BTRFS_FS_POSIX_ACL=y
+@@ -509,6 +510,13 @@ CONFIG_HUGETLBFS=y
+ CONFIG_CONFIGFS_FS=y
+ CONFIG_EFIVAR_FS=y
+ CONFIG_SQUASHFS=y
++CONFIG_SQUASHFS_FILE_DIRECT=y
++CONFIG_SQUASHFS_DECOMP_MULTI_PERCPU=y
++CONFIG_SQUASHFS_XATTR=y
++CONFIG_SQUASHFS_LZ4=y
++CONFIG_SQUASHFS_LZO=y
++CONFIG_SQUASHFS_XZ=y
++CONFIG_SQUASHFS_4K_DEVBLK_SIZE=y
+ CONFIG_NFS_FS=y
+ CONFIG_NFS_V4=y
+ CONFIG_NFS_V4_1=y
 -- 
-2.5.0
+2.11.GIT
