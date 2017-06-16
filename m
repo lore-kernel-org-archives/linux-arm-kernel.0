@@ -1,84 +1,40 @@
-From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Fri, 16 Jun 2017 12:34:40 +0530
-Subject: [PATCH v4 4/4] ARM: dts: imx6ul-geam: Add Sound card with codec node
-In-Reply-To: <1497596680-3186-1-git-send-email-jteki@openedev.com>
-References: <1497596680-3186-1-git-send-email-jteki@openedev.com>
-Message-ID: <1497596680-3186-4-git-send-email-jteki@openedev.com>
+From: rafal@milecki.pl (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Fri, 16 Jun 2017 09:14:36 +0200
+Subject: [PATCH V2 0/5] phy: bcm-ns-usb3: add MDIO driver
+In-Reply-To: <a28bd799-abc2-8f4e-c3db-b9f82f35295a@ti.com>
+References: <20170511132925.14564-1-zajec5@gmail.com>
+ <20170608200428.9187-1-zajec5@gmail.com>
+ <a28bd799-abc2-8f4e-c3db-b9f82f35295a@ti.com>
+Message-ID: <30100fc8-7538-fd30-0a6a-665019b38c38@milecki.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jagan Teki <jagan@amarulasolutions.com>
+On 06/16/2017 08:36 AM, Kishon Vijay Abraham I wrote:
+> On Friday 09 June 2017 01:34 AM, Rafa? Mi?ecki wrote:
+>> From: Rafa? Mi?ecki <rafal@milecki.pl>
+>>
+>> As explained in the commit 9200c6f177638 ("Revert "phy: Add USB3 PHY support
+>> for Broadcom NSP SoC"") this module should be modified to use MDIO bus as
+>> this is how PHY is really attached.
+>>
+>> This should allow reusing this driver on NSP and any other platform with
+>> MDIO bus and this particular PHY.
+>
+> can you run checkpatch and fix all warnings in this series?
 
-Add support for Sound card and related codec(via i2c1) nodes
-on Engicam GEAM6UL variant module boards.
+I always check my patches before sending. For this set the only warning I
+get is:
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Changes for v4:
-- keep sound and related i2c1 on dts
-Changes for v3:
-- Replace fsl,imx-audio-sgtl5000 and use simple-audio-card
-Changes for v2:
-- Use proper [label:] node-name[@unit-address] for codec
-- Remove incorrect codec property 'wlf,shared-lrclk'
-- Remove 'gpr' from sound card node
+WARNING: line over 80 characters
+#117: FILE: drivers/phy/broadcom/phy-bcm-ns-usb3.c:224:
++                                   usecs_to_jiffies(BCM_NS_USB3_MII_MNG_TIMEOUT_US));
 
- arch/arm/boot/dts/imx6ul-geam.dts | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+I've problem finding a nice way of fixing this.
+1) I can't break the line between arguments as there is only 1 argument
+2) I shouldn't use small indention as it would misalign this line
+3) Using tmp var for BCM_NS_USB3_MII_MNG_TIMEOUT_US sounds a bit pointless
 
-diff --git a/arch/arm/boot/dts/imx6ul-geam.dts b/arch/arm/boot/dts/imx6ul-geam.dts
-index e251ad2..571eea7 100644
---- a/arch/arm/boot/dts/imx6ul-geam.dts
-+++ b/arch/arm/boot/dts/imx6ul-geam.dts
-@@ -92,6 +92,32 @@
- 		regulator-always-on;
- 		regulator-boot-on;
- 	};
-+
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "imx6ul-geam-sgtl5000";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,bitclock-master = <&dailink_master>;
-+		simple-audio-card,frame-master = <&dailink_master>;
-+		simple-audio-card,widgets =
-+			"Microphone", "Mic Jack",
-+			"Line", "Line In",
-+			"Line", "Line Out",
-+			"Headphone", "Headphone Jack";
-+		simple-audio-card,routing =
-+			"MIC_IN", "Mic Jack",
-+			"Mic Jack", "Mic Bias",
-+			"Headphone Jack", "HP_OUT";
-+
-+		simple-audio-card,cpu {
-+			sound-dai = <&sai2>;
-+		};
-+
-+		dailink_master: simple-audio-card,codec {
-+			sound-dai = <&sgtl5000>;
-+			clocks = <&clks IMX6UL_CLK_SAI2>;
-+		};
-+	};
- };
- 
- &can1 {
-@@ -151,6 +177,16 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_i2c1>;
- 	status = "okay";
-+
-+	sgtl5000: codec at a {
-+		compatible = "fsl,sgtl5000";
-+		reg = <0x0a>;
-+		clocks = <&clks IMX6UL_CLK_OSC>;
-+		clock-names = "mclk";
-+		VDDA-supply = <&reg_3p3v>;
-+		VDDIO-supply = <&reg_3p3v>;
-+		VDDD-supply = <&reg_1p8v>;
-+	};
- };
- 
- &i2c2 {
--- 
-2.7.4
+According to the coding-style.rst having 80+ chars lines is acceptable if it
+"significantly increases readability and does not hide information". Maybe
+we can just live with this single line like that? Isn't this a bit bike
+shedding in this case?
