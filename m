@@ -1,109 +1,67 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Jun 2017 15:30:43 +0200
-Subject: [PATCH 3/6] ARM: dts: gose: add composite video input
-In-Reply-To: <cover.1497618353.git.horms+renesas@verge.net.au>
-References: <cover.1497618353.git.horms+renesas@verge.net.au>
-Message-ID: <8cae359049a88b75217b1c93774cfe3c3e610304.1497618353.git.horms+renesas@verge.net.au>
+Date: Fri, 16 Jun 2017 15:30:45 +0200
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for v4.13
+Message-ID: <cover.1497618353.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Adds VIN, decoder and connector.
+Please consider these second round of Renesas ARM based SoC DT updates for v4.13.
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7793-gose.dts | 59 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
+This pull request is based on the previous round of
+such requests, tagged as renesas-dt-for-v4.13,
+which you have already merged.
 
-diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-index 30f083528468..76e3aca2029e 100644
---- a/arch/arm/boot/dts/r8a7793-gose.dts
-+++ b/arch/arm/boot/dts/r8a7793-gose.dts
-@@ -275,6 +275,16 @@
- 		};
- 	};
- 
-+	composite-in {
-+		compatible = "composite-video-connector";
-+
-+		port {
-+			composite_con_in: endpoint {
-+				remote-endpoint = <&adv7180_in>;
-+			};
-+		};
-+	};
-+
- 	x2_clk: x2-clock {
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
-@@ -411,6 +421,11 @@
- 		groups = "vin0_data24", "vin0_sync", "vin0_clkenb", "vin0_clk";
- 		function = "vin0";
- 	};
-+
-+	vin1_pins: vin1 {
-+		groups = "vin1_data8", "vin1_clk";
-+		function = "vin1";
-+	};
- };
- 
- &ether {
-@@ -542,6 +557,32 @@
- 		reg = <0x12>;
- 	};
- 
-+	composite-in at 20 {
-+		compatible = "adi,adv7180cp";
-+		reg = <0x20>;
-+		remote = <&vin1>;
-+
-+		port {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				adv7180_in: endpoint {
-+					remote-endpoint = <&composite_con_in>;
-+				};
-+			};
-+
-+			port at 3 {
-+				reg = <3>;
-+				adv7180_out: endpoint {
-+					bus-width = <8>;
-+					remote-endpoint = <&vin1ep>;
-+				};
-+			};
-+		};
-+	};
-+
- 	hdmi at 39 {
- 		compatible = "adi,adv7511w";
- 		reg = <0x39>;
-@@ -670,3 +711,21 @@
- 		};
- 	};
- };
-+
-+/* composite video input */
-+&vin1 {
-+	pinctrl-0 = <&vin1_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+
-+	port {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		vin1ep: endpoint {
-+			remote-endpoint = <&adv7180_out>;
-+			bus-width = <8>;
-+		};
-+	};
-+};
--- 
-2.1.4
+
+The following changes since commit 2ae0fcc57e00c11fae80678e2a9fabbeec82a185:
+
+  ARM: dts: renesas: Switch to panel-lvds bindings for Mitsubishi panels (2017-05-15 11:14:39 +0200)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt2-for-v4.13
+
+for you to fetch changes up to f7d569c1e6a6fa731fc34083a9f0191b7360eeb1:
+
+  ARM: dts: r8a779x: Fix PCI bus dtc warnings (2017-06-12 11:18:30 +0200)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC DT Updates for v4.13
+
+Cleanup:
+* Correct PCI bus dtc warnings for r8a779x SoCs
+
+Enhancements:
+* Add support for iWave G20D-Q7 board based on RZ/G1M SoC
+* Add support for GR-Peach board based on r7s72100 SoC
+* Add composite video and HDMI input to gose board
+
+----------------------------------------------------------------
+Biju Das (2):
+      ARM: dts: iwg20m: Add iWave RZG1M Qseven SOM
+      ARM: dts: iwg20d-q7: Add support for iWave G20D-Q7 board based on RZ/G1M
+
+Jacopo Mondi (1):
+      ARM: dts: r7s72100: Add support for GR-Peach
+
+Rob Herring (1):
+      ARM: dts: r8a779x: Fix PCI bus dtc warnings
+
+Ulrich Hecht (2):
+      ARM: dts: gose: add HDMI input
+      ARM: dts: gose: add composite video input
+
+ Documentation/devicetree/bindings/arm/shmobile.txt |   2 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/r7s72100-gr-peach.dts            |  66 +++++++++++
+ arch/arm/boot/dts/r8a7743-iwg20d-q7.dts            |  25 ++++
+ arch/arm/boot/dts/r8a7743-iwg20m.dtsi              |  29 +++++
+ arch/arm/boot/dts/r8a7790.dtsi                     |  16 +--
+ arch/arm/boot/dts/r8a7791.dtsi                     |  16 +--
+ arch/arm/boot/dts/r8a7793-gose.dts                 | 127 ++++++++++++++++++++-
+ arch/arm/boot/dts/r8a7794.dtsi                     |  16 +--
+ 9 files changed, 267 insertions(+), 32 deletions(-)
+ create mode 100644 arch/arm/boot/dts/r7s72100-gr-peach.dts
+ create mode 100644 arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
+ create mode 100644 arch/arm/boot/dts/r8a7743-iwg20m.dtsi
