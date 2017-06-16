@@ -1,88 +1,75 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 16 Jun 2017 14:37:01 -0700
-Subject: [PATCH 3/5] soc: bcm: brcmstb: Add support for S2/S3/S5 suspend
- states (ARM)
+Date: Fri, 16 Jun 2017 14:37:03 -0700
+Subject: [PATCH 5/5] soc bcm: brcmstb: Add support for S2/S3/S5 suspend states
+ (MIPS)
 In-Reply-To: <20170616213703.21487-1-f.fainelli@gmail.com>
 References: <20170616213703.21487-1-f.fainelli@gmail.com>
-Message-ID: <20170616213703.21487-4-f.fainelli@gmail.com>
+Message-ID: <20170616213703.21487-6-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Brian Norris <computersforpeace@gmail.com>
+From: Justin Chen <justinpopo6@gmail.com>
 
-This commit adds support for the Broadcom STB S2/S3/S5 suspend states on
-ARM based SoCs.
+This commit adds support for the Broadcom STB S2/S3/S5 suspend
+states on MIPS based SoCs.
 
-This requires quite a lot of code in order to deal with the different HW
-blocks that need to be quiesced during suspend:
+This requires quite a lot of code in order to deal with the
+different HW blocks that need to be quiesced during suspend:
 
-- DDR PHY SHIM
-- DDR memory controller and sequencer
+- DDR PHY
+- DDR memory controller and arbiter
 - control processor
 
-The final steps of the suspend execute in an on-chip SRAM and there is a
-little bit of assembly code in order to shut down the DDR PHY PLL and
-then go into a wfi loop until a wake-up even occurs. Conversely the
-resume part involves waiting for the DDR PHY PLL to come back up and
-resume executions where we left.
+The final steps of the suspend execute in cache and there is is a little
+bit of assembly code in order to shut down the DDR PHY PLL and then go
+into a wait loop until a wake-up even occurs. Conversely the resume part
+involves waiting for the DDR PHY PLL to come back up and resume
+executions where we left.
 
-For S3, because of our memory hashing (actual hashing code not included
-for simplicity, and is bypassed) we need to relocate the writable
-variables (stack) into SRAM shortly before suspending in order to leave
-the DRAM untouched and create a reliable hash of its contents.
-
-This code has been contributed by Brian Norris initially and has been
-incrementally fixed and updated to support new chips by a lot of people.
-
-Signed-off-by: Brian Norris <computersforpeace@gmail.com>
-Signed-off-by: Markus Mayer <mmayer@broadcom.com>
 Signed-off-by: Justin Chen <justinpopo6@gmail.com>
-Signed-off-by: Gareth Powell <gpowell@broadcom.com>
-Signed-off-by: Doug Berger <opendmb@gmail.com>
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- drivers/soc/bcm/brcmstb/Kconfig       |   1 +
- drivers/soc/bcm/brcmstb/pm/Makefile   |   1 +
- drivers/soc/bcm/brcmstb/pm/aon_defs.h | 113 +++++
- drivers/soc/bcm/brcmstb/pm/pm-arm.c   | 836 ++++++++++++++++++++++++++++++++++
- drivers/soc/bcm/brcmstb/pm/pm.h       |  78 ++++
- drivers/soc/bcm/brcmstb/pm/s2-arm.S   |  76 ++++
- 6 files changed, 1105 insertions(+)
- create mode 100644 drivers/soc/bcm/brcmstb/pm/Makefile
- create mode 100644 drivers/soc/bcm/brcmstb/pm/aon_defs.h
- create mode 100644 drivers/soc/bcm/brcmstb/pm/pm-arm.c
- create mode 100644 drivers/soc/bcm/brcmstb/pm/pm.h
- create mode 100644 drivers/soc/bcm/brcmstb/pm/s2-arm.S
+ drivers/soc/bcm/brcmstb/Kconfig      |   2 +-
+ drivers/soc/bcm/brcmstb/pm/Makefile  |   1 +
+ drivers/soc/bcm/brcmstb/pm/pm-mips.c | 461 +++++++++++++++++++++++++++++++++++
+ drivers/soc/bcm/brcmstb/pm/pm.h      |  13 +-
+ drivers/soc/bcm/brcmstb/pm/s2-mips.S | 200 +++++++++++++++
+ drivers/soc/bcm/brcmstb/pm/s3-mips.S | 146 +++++++++++
+ 6 files changed, 821 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/soc/bcm/brcmstb/pm/pm-mips.c
+ create mode 100644 drivers/soc/bcm/brcmstb/pm/s2-mips.S
+ create mode 100644 drivers/soc/bcm/brcmstb/pm/s3-mips.S
 
 diff --git a/drivers/soc/bcm/brcmstb/Kconfig b/drivers/soc/bcm/brcmstb/Kconfig
-index 996a75db015e..246fc0f30515 100644
+index 246fc0f30515..7ab04f10dbe7 100644
 --- a/drivers/soc/bcm/brcmstb/Kconfig
 +++ b/drivers/soc/bcm/brcmstb/Kconfig
-@@ -3,6 +3,7 @@ if SOC_BRCMSTB
+@@ -3,7 +3,7 @@ if SOC_BRCMSTB
  config BRCMSTB_PM
          bool "Support suspend/resume for STB platforms"
          default y
-+	depends on ARM
+-	depends on ARM
++	depends on ARM || BMIPS_GENERIC
          depends on PM
  
  endif # SOC_BRCMSTB
 diff --git a/drivers/soc/bcm/brcmstb/pm/Makefile b/drivers/soc/bcm/brcmstb/pm/Makefile
-new file mode 100644
-index 000000000000..66a4f7e43ad5
---- /dev/null
+index 66a4f7e43ad5..d524ce9644ba 100644
+--- a/drivers/soc/bcm/brcmstb/pm/Makefile
 +++ b/drivers/soc/bcm/brcmstb/pm/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_ARM)		+= s2-arm.o pm-arm.o
-diff --git a/drivers/soc/bcm/brcmstb/pm/aon_defs.h b/drivers/soc/bcm/brcmstb/pm/aon_defs.h
+@@ -1 +1,2 @@
+ obj-$(CONFIG_ARM)		+= s2-arm.o pm-arm.o
++obj-$(CONFIG_BMIPS_GENERIC)	+= s2-mips.o s3-mips.o pm-mips.o
+diff --git a/drivers/soc/bcm/brcmstb/pm/pm-mips.c b/drivers/soc/bcm/brcmstb/pm/pm-mips.c
 new file mode 100644
-index 000000000000..fb936abd847d
+index 000000000000..5037b2dc6be9
 --- /dev/null
-+++ b/drivers/soc/bcm/brcmstb/pm/aon_defs.h
-@@ -0,0 +1,113 @@
++++ b/drivers/soc/bcm/brcmstb/pm/pm-mips.c
+@@ -0,0 +1,461 @@
 +/*
-+ * Always ON (AON) register interface between bootloader and Linux
++ * MIPS-specific support for Broadcom STB S2/S3/S5 power management
 + *
-+ * Copyright ? 2014-2017 Broadcom
++ * Copyright (C) 2016-2017 Broadcom
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -94,629 +81,301 @@ index 000000000000..fb936abd847d
 + * GNU General Public License for more details.
 + */
 +
-+#ifndef __BRCMSTB_AON_DEFS_H__
-+#define __BRCMSTB_AON_DEFS_H__
-+
-+#include <linux/compiler.h>
-+
-+/* Magic number in upper 16-bits */
-+#define BRCMSTB_S3_MAGIC_MASK                   0xffff0000
-+#define BRCMSTB_S3_MAGIC_SHORT                  0x5AFE0000
-+
-+enum {
-+	/* Restore random key for AES memory verification (off = fixed key) */
-+	S3_FLAG_LOAD_RANDKEY		= (1 << 0),
-+
-+	/* Scratch buffer page table is present */
-+	S3_FLAG_SCRATCH_BUFFER_TABLE	= (1 << 1),
-+
-+	/* Skip all memory verification */
-+	S3_FLAG_NO_MEM_VERIFY		= (1 << 2),
-+
-+	/*
-+	 * Modification of this bit reserved for bootloader only.
-+	 * 1=PSCI started Linux, 0=Direct jump to Linux.
-+	 */
-+	S3_FLAG_PSCI_BOOT		= (1 << 3),
-+
-+	/*
-+	 * Modification of this bit reserved for bootloader only.
-+	 * 1=64 bit boot, 0=32 bit boot.
-+	 */
-+	S3_FLAG_BOOTED64		= (1 << 4),
-+};
-+
-+#define BRCMSTB_HASH_LEN			(128 / 8) /* 128-bit hash */
-+
-+#define AON_REG_MAGIC_FLAGS			0x00
-+#define AON_REG_CONTROL_LOW			0x04
-+#define AON_REG_CONTROL_HIGH			0x08
-+#define AON_REG_S3_HASH				0x0c /* hash of S3 params */
-+#define AON_REG_CONTROL_HASH_LEN		0x1c
-+#define AON_REG_PANIC				0x20
-+
-+#define BRCMSTB_S3_MAGIC		0x5AFEB007
-+#define BRCMSTB_PANIC_MAGIC		0x512E115E
-+#define BOOTLOADER_SCRATCH_SIZE		64
-+#define BRCMSTB_DTU_STATE_MAP_ENTRIES	(8*1024)
-+#define BRCMSTB_DTU_CONFIG_ENTRIES	(512)
-+#define BRCMSTB_DTU_COUNT		(2)
-+
-+#define IMAGE_DESCRIPTORS_BUFSIZE	(2 * 1024)
-+#define S3_BOOTLOADER_RESERVED		(S3_FLAG_PSCI_BOOT | S3_FLAG_BOOTED64)
-+
-+struct brcmstb_bootloader_dtu_table {
-+	uint32_t	dtu_state_map[BRCMSTB_DTU_STATE_MAP_ENTRIES];
-+	uint32_t	dtu_config[BRCMSTB_DTU_CONFIG_ENTRIES];
-+};
-+
-+/*
-+ * Bootloader utilizes a custom parameter block left in DRAM for handling S3
-+ * warm resume
-+ */
-+struct brcmstb_s3_params {
-+	/* scratch memory for bootloader */
-+	uint8_t scratch[BOOTLOADER_SCRATCH_SIZE];
-+
-+	uint32_t magic; /* BRCMSTB_S3_MAGIC */
-+	uint64_t reentry; /* PA */
-+
-+	/* descriptors */
-+	uint32_t hash[BRCMSTB_HASH_LEN / 4];
-+
-+	/*
-+	 * If 0, then ignore this parameter (there is only one set of
-+	 *   descriptors)
-+	 *
-+	 * If non-0, then a second set of descriptors is stored at:
-+	 *
-+	 *   descriptors + desc_offset_2
-+	 *
-+	 * The MAC result of both descriptors is XOR'd and stored in @hash
-+	 */
-+	uint32_t desc_offset_2;
-+
-+	/*
-+	 * (Physical) address of a brcmstb_bootloader_scratch_table, for
-+	 * providing a large DRAM buffer to the bootloader
-+	 */
-+	uint64_t buffer_table;
-+
-+	uint32_t spare[70];
-+
-+	uint8_t descriptors[IMAGE_DESCRIPTORS_BUFSIZE];
-+	/*
-+	 * Must be last member of struct. See brcmstb_pm_s3_finish() for reason.
-+	 */
-+	struct brcmstb_bootloader_dtu_table dtu[BRCMSTB_DTU_COUNT];
-+} __packed;
-+
-+#endif /* __BRCMSTB_AON_DEFS_H__ */
-diff --git a/drivers/soc/bcm/brcmstb/pm/pm-arm.c b/drivers/soc/bcm/brcmstb/pm/pm-arm.c
-new file mode 100644
-index 000000000000..4b7e6c297b23
---- /dev/null
-+++ b/drivers/soc/bcm/brcmstb/pm/pm-arm.c
-@@ -0,0 +1,836 @@
-+/*
-+ * ARM-specific support for Broadcom STB S2/S3/S5 power management
-+ *
-+ * S2: clock gate CPUs and as many peripherals as possible
-+ * S3: power off all of the chip except the Always ON (AON) island; keep DDR is
-+ *     self-refresh
-+ * S5: (a.k.a. S3 cold boot) much like S3, except DDR is powered down, so we
-+ *     treat this mode like a soft power-off, with wakeup allowed from AON
-+ *
-+ * Copyright ? 2014-2017 Broadcom
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#define pr_fmt(fmt) "brcmstb-pm: " fmt
-+
-+#include <linux/bitops.h>
-+#include <linux/compiler.h>
-+#include <linux/delay.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/ioport.h>
-+#include <linux/kconfig.h>
 +#include <linux/kernel.h>
-+#include <linux/memblock.h>
-+#include <linux/module.h>
-+#include <linux/notifier.h>
++#include <linux/printk.h>
++#include <linux/io.h>
 +#include <linux/of.h>
 +#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm.h>
-+#include <linux/printk.h>
-+#include <linux/proc_fs.h>
-+#include <linux/sizes.h>
-+#include <linux/slab.h>
-+#include <linux/sort.h>
++#include <linux/delay.h>
 +#include <linux/suspend.h>
-+#include <linux/types.h>
-+#include <linux/uaccess.h>
-+#include <linux/soc/brcmstb/brcmstb.h>
-+
-+#include <asm/fncpy.h>
-+#include <asm/setup.h>
-+#include <asm/suspend.h>
++#include <asm/bmips.h>
++#include <asm/tlbflush.h>
 +
 +#include "pm.h"
-+#include "aon_defs.h"
 +
-+#define SHIMPHY_DDR_PAD_CNTRL		0x8c
++#define S2_NUM_PARAMS		6
++#define MAX_NUM_MEMC		3
 +
-+/* Method #0 */
-+#define SHIMPHY_PAD_PLL_SEQUENCE	BIT(8)
-+#define SHIMPHY_PAD_GATE_PLL_S3		BIT(9)
++/* S3 constants */
++#define MAX_GP_REGS		16
++#define MAX_CP0_REGS		32
++#define NUM_MEMC_CLIENTS	128
++#define AON_CTRL_RAM_SIZE	128
++#define BRCMSTB_S3_MAGIC	0x5AFEB007
 +
-+/* Method #1 */
-+#define PWRDWN_SEQ_NO_SEQUENCING	0
-+#define PWRDWN_SEQ_HOLD_CHANNEL		1
-+#define	PWRDWN_SEQ_RESET_PLL		2
-+#define PWRDWN_SEQ_POWERDOWN_PLL	3
++#define CLEAR_RESET_MASK	0x01
 +
-+#define SHIMPHY_PAD_S3_PWRDWN_SEQ_MASK	0x00f00000
-+#define SHIMPHY_PAD_S3_PWRDWN_SEQ_SHIFT	20
-+
-+#define	DDR_FORCE_CKE_RST_N		BIT(3)
-+#define	DDR_PHY_RST_N			BIT(2)
-+#define	DDR_PHY_CKE			BIT(1)
-+
-+#define	DDR_PHY_NO_CHANNEL		0xffffffff
-+
-+#define MAX_NUM_MEMC			3
++/* Index each CP0 register that needs to be saved */
++#define CONTEXT		0
++#define USER_LOCAL	1
++#define PGMK		2
++#define HWRENA		3
++#define COMPARE		4
++#define STATUS		5
++#define CONFIG		6
++#define MODE		7
++#define EDSP		8
++#define BOOT_VEC	9
++#define EBASE		10
 +
 +struct brcmstb_memc {
 +	void __iomem *ddr_phy_base;
-+	void __iomem *ddr_shimphy_base;
-+	void __iomem *ddr_ctrl;
++	void __iomem *arb_base;
 +};
 +
 +struct brcmstb_pm_control {
 +	void __iomem *aon_ctrl_base;
-+	void __iomem *aon_sram;
++	void __iomem *aon_sram_base;
++	void __iomem *timers_base;
 +	struct brcmstb_memc memcs[MAX_NUM_MEMC];
-+
-+	void __iomem *boot_sram;
-+	size_t boot_sram_len;
-+
-+	bool support_warm_boot;
-+	size_t pll_status_offset;
 +	int num_memc;
-+
-+	struct brcmstb_s3_params *s3_params;
-+	dma_addr_t s3_params_pa;
-+	int s3entry_method;
-+	u32 warm_boot_offset;
-+	u32 phy_a_standby_ctrl_offs;
-+	u32 phy_b_standby_ctrl_offs;
-+	bool needs_ddr_pad;
-+	struct platform_device *pdev;
 +};
 +
-+enum bsp_initiate_command {
-+	BSP_CLOCK_STOP		= 0x00,
-+	BSP_GEN_RANDOM_KEY	= 0x4A,
-+	BSP_RESTORE_RANDOM_KEY	= 0x55,
-+	BSP_GEN_FIXED_KEY	= 0x63,
++struct brcm_pm_s3_context {
++	u32			cp0_regs[MAX_CP0_REGS];
++	u32			memc0_rts[NUM_MEMC_CLIENTS];
++	u32			sc_boot_vec;
 +};
 +
++struct brcmstb_mem_transfer;
++
++struct brcmstb_mem_transfer {
++	struct brcmstb_mem_transfer	*next;
++	void				*src;
++	void				*dst;
++	dma_addr_t			pa_src;
++	dma_addr_t			pa_dst;
++	u32				len;
++	u8				key;
++	u8				mode;
++	u8				src_remapped;
++	u8				dst_remapped;
++	u8				src_dst_remapped;
++};
++
++#define AON_SAVE_SRAM(base, idx, val) \
++	__raw_writel(val, base + (idx << 2))
++
++/* Used for saving registers in asm */
++u32 gp_regs[MAX_GP_REGS];
++
++#define	BSP_CLOCK_STOP		0x00
 +#define PM_INITIATE		0x01
-+#define PM_INITIATE_SUCCESS	0x00
-+#define PM_INITIATE_FAIL	0xfe
 +
 +static struct brcmstb_pm_control ctrl;
 +
-+static int (*brcmstb_pm_do_s2_sram)(void __iomem *aon_ctrl_base,
-+		void __iomem *ddr_phy_pll_status);
-+
-+static int brcmstb_init_sram(struct device_node *dn)
++static void brcm_pm_save_cp0_context(struct brcm_pm_s3_context *ctx)
 +{
-+	void __iomem *sram;
-+	struct resource res;
-+	int ret;
++	/* Generic MIPS */
++	ctx->cp0_regs[CONTEXT] = read_c0_context();
++	ctx->cp0_regs[USER_LOCAL] = read_c0_userlocal();
++	ctx->cp0_regs[PGMK] = read_c0_pagemask();
++	ctx->cp0_regs[HWRENA] = read_c0_cache();
++	ctx->cp0_regs[COMPARE] = read_c0_compare();
++	ctx->cp0_regs[STATUS] = read_c0_status();
 +
-+	ret = of_address_to_resource(dn, 0, &res);
-+	if (ret)
-+		return ret;
++	/* Broadcom specific */
++	ctx->cp0_regs[CONFIG] = read_c0_brcm_config();
++	ctx->cp0_regs[MODE] = read_c0_brcm_mode();
++	ctx->cp0_regs[EDSP] = read_c0_brcm_edsp();
++	ctx->cp0_regs[BOOT_VEC] = read_c0_brcm_bootvec();
++	ctx->cp0_regs[EBASE] = read_c0_ebase();
 +
-+	/* Cached, executable remapping of SRAM */
-+#ifdef CONFIG_ARM
-+	sram = __arm_ioremap_exec(res.start, resource_size(&res), true);
-+#else
-+	sram = __ioremap(res.start, resource_size(&res), PAGE_KERNEL_EXEC);
-+#endif
-+	if (!sram)
-+		return -ENOMEM;
-+
-+	ctrl.boot_sram = sram;
-+	ctrl.boot_sram_len = resource_size(&res);
-+
-+	return 0;
++	ctx->sc_boot_vec = bmips_read_zscm_reg(0xa0);
 +}
 +
-+static const struct of_device_id sram_dt_ids[] = {
-+	{ .compatible = "mmio-sram" },
-+	{ /* sentinel */ }
-+};
-+
-+static int do_bsp_initiate_command(enum bsp_initiate_command cmd)
++static void brcm_pm_restore_cp0_context(struct brcm_pm_s3_context *ctx)
 +{
-+	void __iomem *base = ctrl.aon_ctrl_base;
-+	int ret;
-+	int timeo = 1000 * 1000; /* 1 second */
++	/* Restore cp0 state */
++	bmips_write_zscm_reg(0xa0, ctx->sc_boot_vec);
 +
-+	writel_relaxed(0, base + AON_CTRL_PM_INITIATE);
-+	(void)readl_relaxed(base + AON_CTRL_PM_INITIATE);
++	/* Generic MIPS */
++	write_c0_context(ctx->cp0_regs[CONTEXT]);
++	write_c0_userlocal(ctx->cp0_regs[USER_LOCAL]);
++	write_c0_pagemask(ctx->cp0_regs[PGMK]);
++	write_c0_cache(ctx->cp0_regs[HWRENA]);
++	write_c0_compare(ctx->cp0_regs[COMPARE]);
++	write_c0_status(ctx->cp0_regs[STATUS]);
 +
-+	/* Go! */
-+	writel_relaxed((cmd << 1) | PM_INITIATE, base + AON_CTRL_PM_INITIATE);
-+
-+	/*
-+	 * If firmware doesn't support the 'ack', then just assume it's done
-+	 * after 10ms. Note that this only works for command 0, BSP_CLOCK_STOP
-+	 */
-+	if (of_machine_is_compatible("brcm,bcm74371a0")) {
-+		(void)readl_relaxed(base + AON_CTRL_PM_INITIATE);
-+		mdelay(10);
-+		return 0;
-+	}
-+
-+	for (;;) {
-+		ret = readl_relaxed(base + AON_CTRL_PM_INITIATE);
-+		if (!(ret & PM_INITIATE))
-+			break;
-+		if (timeo <= 0) {
-+			pr_err("error: timeout waiting for BSP (%x)\n", ret);
-+			break;
-+		}
-+		timeo -= 50;
-+		udelay(50);
-+	}
-+
-+	return (ret & 0xff) != PM_INITIATE_SUCCESS;
++	/* Broadcom specific */
++	write_c0_brcm_config(ctx->cp0_regs[CONFIG]);
++	write_c0_brcm_mode(ctx->cp0_regs[MODE]);
++	write_c0_brcm_edsp(ctx->cp0_regs[EDSP]);
++	write_c0_brcm_bootvec(ctx->cp0_regs[BOOT_VEC]);
++	write_c0_ebase(ctx->cp0_regs[EBASE]);
 +}
 +
-+static int brcmstb_pm_handshake(void)
++static void  brcmstb_pm_handshake(void)
 +{
 +	void __iomem *base = ctrl.aon_ctrl_base;
 +	u32 tmp;
-+	int ret;
 +
 +	/* BSP power handshake, v1 */
-+	tmp = readl_relaxed(base + AON_CTRL_HOST_MISC_CMDS);
++	tmp = __raw_readl(base + AON_CTRL_HOST_MISC_CMDS);
 +	tmp &= ~1UL;
-+	writel_relaxed(tmp, base + AON_CTRL_HOST_MISC_CMDS);
-+	(void)readl_relaxed(base + AON_CTRL_HOST_MISC_CMDS);
++	__raw_writel(tmp, base + AON_CTRL_HOST_MISC_CMDS);
++	(void)__raw_readl(base + AON_CTRL_HOST_MISC_CMDS);
 +
-+	ret = do_bsp_initiate_command(BSP_CLOCK_STOP);
-+	if (ret)
-+		pr_err("BSP handshake failed\n");
-+
++	__raw_writel(0, base + AON_CTRL_PM_INITIATE);
++	(void)__raw_readl(base + AON_CTRL_PM_INITIATE);
++	__raw_writel(BSP_CLOCK_STOP | PM_INITIATE,
++		     base + AON_CTRL_PM_INITIATE);
 +	/*
 +	 * HACK: BSP may have internal race on the CLOCK_STOP command.
 +	 * Avoid touching the BSP for a few milliseconds.
 +	 */
 +	mdelay(3);
-+
-+	return ret;
 +}
 +
-+static inline void shimphy_set(u32 value, u32 mask)
-+{
-+	int i;
-+
-+	if (!ctrl.needs_ddr_pad)
-+		return;
-+
-+	for (i = 0; i < ctrl.num_memc; i++) {
-+		u32 tmp;
-+
-+		tmp = readl_relaxed(ctrl.memcs[i].ddr_shimphy_base +
-+			SHIMPHY_DDR_PAD_CNTRL);
-+		tmp = value | (tmp & mask);
-+		writel_relaxed(tmp, ctrl.memcs[i].ddr_shimphy_base +
-+			SHIMPHY_DDR_PAD_CNTRL);
-+	}
-+	wmb(); /* Complete sequence in order. */
-+}
-+
-+static inline void ddr_ctrl_set(bool warmboot)
-+{
-+	int i;
-+
-+	for (i = 0; i < ctrl.num_memc; i++) {
-+		u32 tmp;
-+
-+		tmp = readl_relaxed(ctrl.memcs[i].ddr_ctrl +
-+				ctrl.warm_boot_offset);
-+		if (warmboot)
-+			tmp |= 1;
-+		else
-+			tmp &= ~1; /* Cold boot */
-+		writel_relaxed(tmp, ctrl.memcs[i].ddr_ctrl +
-+				ctrl.warm_boot_offset);
-+	}
-+	/* Complete sequence in order */
-+	wmb();
-+}
-+
-+static inline void s3entry_method0(void)
-+{
-+	shimphy_set(SHIMPHY_PAD_GATE_PLL_S3 | SHIMPHY_PAD_PLL_SEQUENCE,
-+		    0xffffffff);
-+}
-+
-+static inline void s3entry_method1(void)
-+{
-+	/*
-+	 * S3 Entry Sequence
-+	 * -----------------
-+	 * Step 1: SHIMPHY_ADDR_CNTL_0_DDR_PAD_CNTRL [ S3_PWRDWN_SEQ ] = 3
-+	 * Step 2: MEMC_DDR_0_WARM_BOOT [ WARM_BOOT ] = 1
-+	 */
-+	shimphy_set((PWRDWN_SEQ_POWERDOWN_PLL <<
-+		    SHIMPHY_PAD_S3_PWRDWN_SEQ_SHIFT),
-+		    ~SHIMPHY_PAD_S3_PWRDWN_SEQ_MASK);
-+
-+	ddr_ctrl_set(true);
-+}
-+
-+static inline void s5entry_method1(void)
-+{
-+	int i;
-+
-+	/*
-+	 * S5 Entry Sequence
-+	 * -----------------
-+	 * Step 1: SHIMPHY_ADDR_CNTL_0_DDR_PAD_CNTRL [ S3_PWRDWN_SEQ ] = 3
-+	 * Step 2: MEMC_DDR_0_WARM_BOOT [ WARM_BOOT ] = 0
-+	 * Step 3: DDR_PHY_CONTROL_REGS_[AB]_0_STANDBY_CONTROL[ CKE ] = 0
-+	 *	   DDR_PHY_CONTROL_REGS_[AB]_0_STANDBY_CONTROL[ RST_N ] = 0
-+	 */
-+	shimphy_set((PWRDWN_SEQ_POWERDOWN_PLL <<
-+		    SHIMPHY_PAD_S3_PWRDWN_SEQ_SHIFT),
-+		    ~SHIMPHY_PAD_S3_PWRDWN_SEQ_MASK);
-+
-+	ddr_ctrl_set(false);
-+
-+	for (i = 0; i < ctrl.num_memc; i++) {
-+		u32 tmp;
-+
-+		/* Step 3: Channel A (RST_N = CKE = 0) */
-+		tmp = readl_relaxed(ctrl.memcs[i].ddr_phy_base +
-+				  ctrl.phy_a_standby_ctrl_offs);
-+		tmp &= ~(DDR_PHY_RST_N | DDR_PHY_RST_N);
-+		writel_relaxed(tmp, ctrl.memcs[i].ddr_phy_base +
-+			     ctrl.phy_a_standby_ctrl_offs);
-+
-+		/* Step 3: Channel B? */
-+		if (ctrl.phy_b_standby_ctrl_offs != DDR_PHY_NO_CHANNEL) {
-+			tmp = readl_relaxed(ctrl.memcs[i].ddr_phy_base +
-+					  ctrl.phy_b_standby_ctrl_offs);
-+			tmp &= ~(DDR_PHY_RST_N | DDR_PHY_RST_N);
-+			writel_relaxed(tmp, ctrl.memcs[i].ddr_phy_base +
-+				     ctrl.phy_b_standby_ctrl_offs);
-+		}
-+	}
-+	/* Must complete */
-+	wmb();
-+}
-+
-+/*
-+ * Run a Power Management State Machine (PMSM) shutdown command and put the CPU
-+ * into a low-power mode
-+ */
-+static void brcmstb_do_pmsm_power_down(unsigned long base_cmd, bool onewrite)
++static void brcmstb_pm_s5(void)
 +{
 +	void __iomem *base = ctrl.aon_ctrl_base;
 +
-+	if ((ctrl.s3entry_method == 1) && (base_cmd == PM_COLD_CONFIG))
-+		s5entry_method1();
-+
-+	/* pm_start_pwrdn transition 0->1 */
-+	writel_relaxed(base_cmd, base + AON_CTRL_PM_CTRL);
-+
-+	if (!onewrite) {
-+		(void)readl_relaxed(base + AON_CTRL_PM_CTRL);
-+
-+		writel_relaxed(base_cmd | PM_PWR_DOWN, base + AON_CTRL_PM_CTRL);
-+		(void)readl_relaxed(base + AON_CTRL_PM_CTRL);
-+	}
-+	wfi();
-+}
-+
-+/* Support S5 cold boot out of "poweroff" */
-+static void brcmstb_pm_poweroff(void)
-+{
 +	brcmstb_pm_handshake();
 +
-+	/* Clear magic S3 warm-boot value */
-+	writel_relaxed(0, ctrl.aon_sram + AON_REG_MAGIC_FLAGS);
-+	(void)readl_relaxed(ctrl.aon_sram + AON_REG_MAGIC_FLAGS);
++	/* Clear magic s3 warm-boot value */
++	AON_SAVE_SRAM(ctrl.aon_sram_base, 0, 0);
 +
-+	/* Skip wait-for-interrupt signal; just use a countdown */
-+	writel_relaxed(0x10, ctrl.aon_ctrl_base + AON_CTRL_PM_CPU_WAIT_COUNT);
-+	(void)readl_relaxed(ctrl.aon_ctrl_base + AON_CTRL_PM_CPU_WAIT_COUNT);
++	/* Set the countdown */
++	__raw_writel(0x10, base + AON_CTRL_PM_CPU_WAIT_COUNT);
++	(void)__raw_readl(base + AON_CTRL_PM_CPU_WAIT_COUNT);
 +
-+	if (ctrl.s3entry_method == 1) {
-+		shimphy_set((PWRDWN_SEQ_POWERDOWN_PLL <<
-+			     SHIMPHY_PAD_S3_PWRDWN_SEQ_SHIFT),
-+			     ~SHIMPHY_PAD_S3_PWRDWN_SEQ_MASK);
-+		ddr_ctrl_set(false);
-+		brcmstb_do_pmsm_power_down(M1_PM_COLD_CONFIG, true);
-+		return; /* We should never actually get here */
-+	}
++	/* Prepare to S5 cold boot */
++	__raw_writel(PM_COLD_CONFIG, base + AON_CTRL_PM_CTRL);
++	(void)__raw_readl(base + AON_CTRL_PM_CTRL);
 +
-+	brcmstb_do_pmsm_power_down(PM_COLD_CONFIG, false);
-+}
++	__raw_writel((PM_COLD_CONFIG | PM_PWR_DOWN), base +
++		      AON_CTRL_PM_CTRL);
++	(void)__raw_readl(base + AON_CTRL_PM_CTRL);
 +
-+static void *brcmstb_pm_copy_to_sram(void *fn, size_t len)
-+{
-+	unsigned int size = ALIGN(len, FNCPY_ALIGN);
-+
-+	if (ctrl.boot_sram_len < size) {
-+		pr_err("standby code will not fit in SRAM\n");
-+		return NULL;
-+	}
-+
-+	return fncpy(ctrl.boot_sram, fn, size);
-+}
-+
-+/*
-+ * S2 suspend/resume picks up where we left off, so we must execute carefully
-+ * from SRAM, in order to allow DDR to come back up safely before we continue.
-+ */
-+static int brcmstb_pm_s2(void)
-+{
-+	/* A previous S3 can set a value hazardous to S2, so make sure. */
-+	if (ctrl.s3entry_method == 1) {
-+		shimphy_set((PWRDWN_SEQ_NO_SEQUENCING <<
-+			    SHIMPHY_PAD_S3_PWRDWN_SEQ_SHIFT),
-+			    ~SHIMPHY_PAD_S3_PWRDWN_SEQ_MASK);
-+		ddr_ctrl_set(false);
-+	}
-+
-+	brcmstb_pm_do_s2_sram = brcmstb_pm_copy_to_sram(&brcmstb_pm_do_s2,
-+			brcmstb_pm_do_s2_sz);
-+	if (!brcmstb_pm_do_s2_sram)
-+		return -EINVAL;
-+
-+	return brcmstb_pm_do_s2_sram(ctrl.aon_ctrl_base,
-+			ctrl.memcs[0].ddr_phy_base +
-+			ctrl.pll_status_offset);
-+}
-+
-+/*
-+ * This function is called on a new stack, so don't allow inlining (which will
-+ * generate stack references on the old stack)
-+ */
-+static noinline int brcmstb_pm_s3_finish(void)
-+{
-+	struct brcmstb_s3_params *params = ctrl.s3_params;
-+	dma_addr_t params_pa = ctrl.s3_params_pa;
-+	phys_addr_t reentry = virt_to_phys(&cpu_resume);
-+	enum bsp_initiate_command cmd;
-+	u32 flags;
-+
-+	/*
-+	 * Clear parameter structure, but not DTU area, which has already been
-+	 * filled in. We know DTU is a the end, so we can just subtract its
-+	 * size.
-+	 */
-+	memset(params, 0, sizeof(*params) - sizeof(params->dtu));
-+
-+	flags = readl_relaxed(ctrl.aon_sram + AON_REG_MAGIC_FLAGS);
-+
-+	flags &= S3_BOOTLOADER_RESERVED;
-+	flags |= S3_FLAG_NO_MEM_VERIFY;
-+	flags |= S3_FLAG_LOAD_RANDKEY;
-+
-+	/* Load random / fixed key */
-+	if (flags & S3_FLAG_LOAD_RANDKEY)
-+		cmd = BSP_GEN_RANDOM_KEY;
-+	else
-+		cmd = BSP_GEN_FIXED_KEY;
-+	if (do_bsp_initiate_command(cmd)) {
-+		pr_info("key loading failed\n");
-+		return -EIO;
-+	}
-+
-+	params->magic = BRCMSTB_S3_MAGIC;
-+	params->reentry = reentry;
-+
-+	/* No more writes to DRAM */
-+	flush_cache_all();
-+
-+	flags |= BRCMSTB_S3_MAGIC_SHORT;
-+
-+	writel_relaxed(flags, ctrl.aon_sram + AON_REG_MAGIC_FLAGS);
-+	writel_relaxed(lower_32_bits(params_pa),
-+		       ctrl.aon_sram + AON_REG_CONTROL_LOW);
-+	writel_relaxed(upper_32_bits(params_pa),
-+		       ctrl.aon_sram + AON_REG_CONTROL_HIGH);
-+
-+	switch (ctrl.s3entry_method) {
-+	case 0:
-+		s3entry_method0();
-+		brcmstb_do_pmsm_power_down(PM_WARM_CONFIG, false);
-+		break;
-+	case 1:
-+		s3entry_method1();
-+		brcmstb_do_pmsm_power_down(M1_PM_WARM_CONFIG, true);
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	/* Must have been interrupted from wfi()? */
-+	return -EINTR;
-+}
-+
-+#define SWAP_STACK(new_sp, saved_sp) \
-+	__asm__ __volatile__ ( \
-+		 "mov	%[save], sp\n" \
-+		 "mov	sp, %[new]\n" \
-+		 : [save] "=&r" (saved_sp) \
-+		 : [new] "r" (new_sp) \
-+		)
-+
-+/*
-+ * S3 mode resume to the bootloader before jumping back to Linux, so we can be
-+ * a little less careful about running from DRAM.
-+ */
-+static int brcmstb_pm_do_s3(unsigned long sp)
-+{
-+	unsigned long save_sp;
-+	int ret;
-+
-+	/* Move to a new stack */
-+	SWAP_STACK(sp, save_sp);
-+
-+	/* should not return */
-+	ret = brcmstb_pm_s3_finish();
-+
-+	SWAP_STACK(save_sp, sp);
-+
-+	pr_err("Could not enter S3\n");
-+
-+	return ret;
++	__asm__ __volatile__(
++	"	wait\n"
++	: : : "memory");
 +}
 +
 +static int brcmstb_pm_s3(void)
 +{
-+	void __iomem *sp = ctrl.boot_sram + ctrl.boot_sram_len;
++	struct brcm_pm_s3_context s3_context;
++	void __iomem *memc_arb_base;
++	unsigned long flags;
++	u32 tmp;
++	int i;
 +
-+	return cpu_suspend((unsigned long)sp, brcmstb_pm_do_s3);
++	/* Prepare for s3 */
++	AON_SAVE_SRAM(ctrl.aon_sram_base, 0, BRCMSTB_S3_MAGIC);
++	AON_SAVE_SRAM(ctrl.aon_sram_base, 1, (u32)&s3_reentry);
++	AON_SAVE_SRAM(ctrl.aon_sram_base, 2, 0);
++
++	/* Clear RESET_HISTORY */
++	tmp = __raw_readl(ctrl.aon_ctrl_base + AON_CTRL_RESET_CTRL);
++	tmp &= ~CLEAR_RESET_MASK;
++	__raw_writel(tmp, ctrl.aon_ctrl_base + AON_CTRL_RESET_CTRL);
++
++	local_irq_save(flags);
++
++	/* Inhibit DDR_RSTb pulse for both MMCs*/
++	for (i = 0; i < ctrl.num_memc; i++) {
++		tmp = __raw_readl(ctrl.memcs[i].ddr_phy_base +
++			DDR40_PHY_CONTROL_REGS_0_STANDBY_CTRL);
++
++		tmp &= ~0x0f;
++		__raw_writel(tmp, ctrl.memcs[i].ddr_phy_base +
++			DDR40_PHY_CONTROL_REGS_0_STANDBY_CTRL);
++		tmp |= (0x05 | BIT(5));
++		__raw_writel(tmp, ctrl.memcs[i].ddr_phy_base +
++			DDR40_PHY_CONTROL_REGS_0_STANDBY_CTRL);
++	}
++
++	/* Save CP0 context */
++	brcm_pm_save_cp0_context(&s3_context);
++
++	/* Save RTS(skip debug register) */
++	memc_arb_base = ctrl.memcs[0].arb_base + 4;
++	for (i = 0; i < NUM_MEMC_CLIENTS; i++) {
++		s3_context.memc0_rts[i] = __raw_readl(memc_arb_base);
++		memc_arb_base += 4;
++	}
++
++	/* Save I/O context */
++	local_flush_tlb_all();
++	_dma_cache_wback_inv(0, ~0);
++
++	brcm_pm_do_s3(ctrl.aon_ctrl_base, current_cpu_data.dcache.linesz);
++
++	/* CPU reconfiguration */
++	local_flush_tlb_all();
++	bmips_cpu_setup();
++	cpumask_clear(&bmips_booted_mask);
++
++	/* Restore RTS (skip debug register) */
++	memc_arb_base = ctrl.memcs[0].arb_base + 4;
++	for (i = 0; i < NUM_MEMC_CLIENTS; i++) {
++		__raw_writel(s3_context.memc0_rts[i], memc_arb_base);
++		memc_arb_base += 4;
++	}
++
++	/* restore CP0 context */
++	brcm_pm_restore_cp0_context(&s3_context);
++
++	local_irq_restore(flags);
++
++	return 0;
++}
++
++static int brcmstb_pm_s2(void)
++{
++	/*
++	 * We need to pass 6 arguments to an assembly function. Lets avoid
++	 * the stack and pass arguments in a explicit 4 byte array. The
++	 * assembly code assumes all arguements are 4 bytes and arguments
++	 * are ordered like so:
++	 *
++	 * 0: AON_CTRl base register
++	 * 1: DDR_PHY base register
++	 * 2: TIMERS base resgister
++	 * 3: I-Cache line size
++	 * 4: Restart vector address
++	 * 5: Restart vector size
++	 */
++	u32 s2_params[6];
++
++	/* Prepare s2 parameters */
++	s2_params[0] = (u32)ctrl.aon_ctrl_base;
++	s2_params[1] = (u32)ctrl.memcs[0].ddr_phy_base;
++	s2_params[2] = (u32)ctrl.timers_base;
++	s2_params[3] = (u32)current_cpu_data.icache.linesz;
++	s2_params[4] = (u32)BMIPS_WARM_RESTART_VEC;
++	s2_params[5] = (u32)(bmips_smp_int_vec_end -
++		bmips_smp_int_vec);
++
++	/* Drop to standby */
++	brcm_pm_do_s2(s2_params);
++
++	return 0;
 +}
 +
 +static int brcmstb_pm_standby(bool deep_standby)
 +{
-+	int ret;
++	brcmstb_pm_handshake();
 +
-+	if (brcmstb_pm_handshake())
-+		return -EIO;
++	/* Send IRQs to BMIPS_WARM_RESTART_VEC */
++	clear_c0_cause(CAUSEF_IV);
++	irq_disable_hazard();
++	set_c0_status(ST0_BEV);
++	irq_disable_hazard();
 +
 +	if (deep_standby)
-+		ret = brcmstb_pm_s3();
++		brcmstb_pm_s3();
 +	else
-+		ret = brcmstb_pm_s2();
-+	if (ret)
-+		pr_err("%s: standby failed\n", __func__);
++		brcmstb_pm_s2();
 +
-+	return ret;
++	/* Send IRQs to normal runtime vectors */
++	clear_c0_status(ST0_BEV);
++	irq_disable_hazard();
++	set_c0_cause(CAUSEF_IV);
++	irq_disable_hazard();
++
++	return 0;
 +}
 +
 +static int brcmstb_pm_enter(suspend_state_t state)
@@ -741,7 +400,7 @@ index 000000000000..4b7e6c297b23
 +	case PM_SUSPEND_STANDBY:
 +		return true;
 +	case PM_SUSPEND_MEM:
-+		return ctrl.support_warm_boot;
++		return true;
 +	default:
 +		return false;
 +	}
@@ -754,103 +413,29 @@ index 000000000000..4b7e6c297b23
 +
 +static const struct of_device_id aon_ctrl_dt_ids[] = {
 +	{ .compatible = "brcm,brcmstb-aon-ctrl" },
-+	{}
-+};
-+
-+struct ddr_phy_ofdata {
-+	bool supports_warm_boot;
-+	size_t pll_status_offset;
-+	int s3entry_method;
-+	u32 warm_boot_offset;
-+	u32 phy_a_standby_ctrl_offs;
-+	u32 phy_b_standby_ctrl_offs;
-+};
-+
-+static struct ddr_phy_ofdata ddr_phy_71_1 = {
-+	.supports_warm_boot = true,
-+	.pll_status_offset = 0x0c,
-+	.s3entry_method = 1,
-+	.warm_boot_offset = 0x2c,
-+	.phy_a_standby_ctrl_offs = 0x198,
-+	.phy_b_standby_ctrl_offs = DDR_PHY_NO_CHANNEL
-+};
-+
-+static struct ddr_phy_ofdata ddr_phy_72_0 = {
-+	.supports_warm_boot = true,
-+	.pll_status_offset = 0x10,
-+	.s3entry_method = 1,
-+	.warm_boot_offset = 0x40,
-+	.phy_a_standby_ctrl_offs = 0x2a4,
-+	.phy_b_standby_ctrl_offs = 0x8a4
-+};
-+
-+static struct ddr_phy_ofdata ddr_phy_225_1 = {
-+	.supports_warm_boot = false,
-+	.pll_status_offset = 0x4,
-+	.s3entry_method = 0
-+};
-+
-+static struct ddr_phy_ofdata ddr_phy_240_1 = {
-+	.supports_warm_boot = true,
-+	.pll_status_offset = 0x4,
-+	.s3entry_method = 0
++	{ /* sentinel */ }
 +};
 +
 +static const struct of_device_id ddr_phy_dt_ids[] = {
-+	{
-+		.compatible = "brcm,brcmstb-ddr-phy-v71.1",
-+		.data = &ddr_phy_71_1,
-+	},
-+	{
-+		.compatible = "brcm,brcmstb-ddr-phy-v72.0",
-+		.data = &ddr_phy_72_0,
-+	},
-+	{
-+		.compatible = "brcm,brcmstb-ddr-phy-v225.1",
-+		.data = &ddr_phy_225_1,
-+	},
-+	{
-+		.compatible = "brcm,brcmstb-ddr-phy-v240.1",
-+		.data = &ddr_phy_240_1,
-+	},
-+	{
-+		/* Same as v240.1, for the registers we care about */
-+		.compatible = "brcm,brcmstb-ddr-phy-v240.2",
-+		.data = &ddr_phy_240_1,
-+	},
-+	{}
++	{ .compatible = "brcm,brcmstb-ddr-phy" },
++	{ /* sentinel */ }
 +};
 +
-+struct ddr_seq_ofdata {
-+	bool needs_ddr_pad;
-+	u32 warm_boot_offset;
++static const struct of_device_id arb_dt_ids[] = {
++	{ .compatible = "brcm,brcmstb-memc-arb" },
++	{ /* sentinel */ }
 +};
 +
-+static const struct ddr_seq_ofdata ddr_seq_b22 = {
-+	.needs_ddr_pad = false,
-+	.warm_boot_offset = 0x2c,
++static const struct of_device_id timers_ids[] = {
++	{ .compatible = "brcm,brcmstb-timers" },
++	{ /* sentinel */ }
 +};
 +
-+static const struct ddr_seq_ofdata ddr_seq = {
-+	.needs_ddr_pad = true,
-+};
-+
-+static const struct of_device_id ddr_shimphy_dt_ids[] = {
-+	{ .compatible = "brcm,brcmstb-ddr-shimphy-v1.0" },
-+	{}
-+};
-+
-+static const struct of_device_id brcmstb_memc_of_match[] = {
-+	{
-+		.compatible = "brcm,brcmstb-memc-ddr-rev-b.2.2",
-+		.data = &ddr_seq_b22,
-+	},
-+	{
-+		.compatible = "brcm,brcmstb-memc-ddr",
-+		.data = &ddr_seq,
-+	},
-+	{},
-+};
++static inline void __iomem *brcmstb_ioremap_node(struct device_node *dn,
++						 int index)
++{
++	return of_io_request_and_map(dn, index, dn->full_name);
++}
 +
 +static void __iomem *brcmstb_ioremap_match(const struct of_device_id *matches,
 +					   int index, const void **ofdata)
@@ -865,267 +450,117 @@ index 000000000000..4b7e6c297b23
 +	if (ofdata)
 +		*ofdata = match->data;
 +
-+	return of_io_request_and_map(dn, index, dn->full_name);
++	return brcmstb_ioremap_node(dn, index);
 +}
 +
-+static int brcmstb_pm_panic_notify(struct notifier_block *nb,
-+		unsigned long action, void *data)
++static int brcmstb_pm_init(void)
 +{
-+	writel_relaxed(BRCMSTB_PANIC_MAGIC, ctrl.aon_sram + AON_REG_PANIC);
-+
-+	return NOTIFY_DONE;
-+}
-+
-+static struct notifier_block brcmstb_pm_panic_nb = {
-+	.notifier_call = brcmstb_pm_panic_notify,
-+};
-+
-+static int brcmstb_pm_probe(struct platform_device *pdev)
-+{
-+	const struct ddr_phy_ofdata *ddr_phy_data;
-+	const struct ddr_seq_ofdata *ddr_seq_data;
-+	const struct of_device_id *of_id = NULL;
 +	struct device_node *dn;
 +	void __iomem *base;
-+	int ret, i;
++	int i;
 +
 +	/* AON ctrl registers */
 +	base = brcmstb_ioremap_match(aon_ctrl_dt_ids, 0, NULL);
 +	if (IS_ERR(base)) {
 +		pr_err("error mapping AON_CTRL\n");
-+		return PTR_ERR(base);
++		goto aon_err;
 +	}
 +	ctrl.aon_ctrl_base = base;
 +
 +	/* AON SRAM registers */
 +	base = brcmstb_ioremap_match(aon_ctrl_dt_ids, 1, NULL);
 +	if (IS_ERR(base)) {
-+		/* Assume standard offset */
-+		ctrl.aon_sram = ctrl.aon_ctrl_base +
-+				     AON_CTRL_SYSTEM_DATA_RAM_OFS;
-+	} else {
-+		ctrl.aon_sram = base;
++		pr_err("error mapping AON_SRAM\n");
++		goto sram_err;
 +	}
++	ctrl.aon_sram_base = base;
 +
-+	writel_relaxed(0, ctrl.aon_sram + AON_REG_PANIC);
-+
-+	/* DDR PHY registers */
-+	base = brcmstb_ioremap_match(ddr_phy_dt_ids, 0,
-+				     (const void **)&ddr_phy_data);
-+	if (IS_ERR(base)) {
-+		pr_err("error mapping DDR PHY\n");
-+		return PTR_ERR(base);
-+	}
-+	ctrl.support_warm_boot = ddr_phy_data->supports_warm_boot;
-+	ctrl.pll_status_offset = ddr_phy_data->pll_status_offset;
-+	/* Only need DDR PHY 0 for now? */
-+	ctrl.memcs[0].ddr_phy_base = base;
-+	ctrl.s3entry_method = ddr_phy_data->s3entry_method;
-+	ctrl.phy_a_standby_ctrl_offs = ddr_phy_data->phy_a_standby_ctrl_offs;
-+	ctrl.phy_b_standby_ctrl_offs = ddr_phy_data->phy_b_standby_ctrl_offs;
-+	/*
-+	 * Slightly grosss to use the phy ver to get a memc,
-+	 * offset but that is the only versioned things so far
-+	 * we can test for.
-+	 */
-+	ctrl.warm_boot_offset = ddr_phy_data->warm_boot_offset;
-+
-+	/* DDR SHIM-PHY registers */
-+	for_each_matching_node(dn, ddr_shimphy_dt_ids) {
++	ctrl.num_memc = 0;
++	/* Map MEMC DDR PHY registers */
++	for_each_matching_node(dn, ddr_phy_dt_ids) {
 +		i = ctrl.num_memc;
 +		if (i >= MAX_NUM_MEMC) {
-+			pr_warn("too many MEMCs (max %d)\n", MAX_NUM_MEMC);
++			pr_warn("Too many MEMCs (max %d)\n", MAX_NUM_MEMC);
 +			break;
 +		}
++		base = brcmstb_ioremap_node(dn, 0);
++		if (IS_ERR(base))
++			goto ddr_err;
 +
-+		base = of_io_request_and_map(dn, 0, dn->full_name);
-+		if (IS_ERR(base)) {
-+			if (!ctrl.support_warm_boot)
-+				break;
-+
-+			pr_err("error mapping DDR SHIMPHY %d\n", i);
-+			return PTR_ERR(base);
-+		}
-+		ctrl.memcs[i].ddr_shimphy_base = base;
++		ctrl.memcs[i].ddr_phy_base = base;
 +		ctrl.num_memc++;
 +	}
 +
-+	/* Sequencer DRAM Param and Control Registers */
-+	i = 0;
-+	for_each_matching_node(dn, brcmstb_memc_of_match) {
-+		base = of_iomap(dn, 0);
-+		if (!base) {
-+			pr_err("error mapping DDR Sequencer %d\n", i);
-+			return -ENOMEM;
-+		}
-+
-+		of_id = of_match_node(brcmstb_memc_of_match, dn);
-+		if (!of_id) {
-+			iounmap(base);
-+			return -EINVAL;
-+		}
-+
-+		ddr_seq_data = of_id->data;
-+		ctrl.needs_ddr_pad = ddr_seq_data->needs_ddr_pad;
-+		/* Adjust warm boot offset based on the DDR sequencer */
-+		if (ddr_seq_data->warm_boot_offset)
-+			ctrl.warm_boot_offset = ddr_seq_data->warm_boot_offset;
-+
-+		ctrl.memcs[i].ddr_ctrl = base;
-+		i++;
++	/* MEMC ARB registers */
++	base = brcmstb_ioremap_match(arb_dt_ids, 0, NULL);
++	if (IS_ERR(base)) {
++		pr_err("error mapping MEMC ARB\n");
++		goto ddr_err;
 +	}
++	ctrl.memcs[0].arb_base = base;
 +
-+	pr_debug("PM: supports warm boot:%d, method:%d, wboffs:%x\n",
-+		ctrl.support_warm_boot, ctrl.s3entry_method,
-+		ctrl.warm_boot_offset);
-+
-+	dn = of_find_matching_node(NULL, sram_dt_ids);
-+	if (!dn) {
-+		pr_err("SRAM not found\n");
-+		return -EINVAL;
++	/* Timer registers */
++	base = brcmstb_ioremap_match(timers_ids, 0, NULL);
++	if (IS_ERR(base)) {
++		pr_err("error mapping timers\n");
++		goto tmr_err;
 +	}
++	ctrl.timers_base = base;
 +
-+	ret = brcmstb_init_sram(dn);
-+	if (ret) {
-+		pr_err("error setting up SRAM for PM\n");
-+		return ret;
-+	}
++	/* s3 cold boot aka s5 */
++	pm_power_off = brcmstb_pm_s5;
 +
-+	ctrl.pdev = pdev;
-+
-+	ctrl.s3_params = kmalloc(sizeof(*ctrl.s3_params), GFP_KERNEL);
-+	if (!ctrl.s3_params)
-+		return -ENOMEM;
-+	ctrl.s3_params_pa = dma_map_single(&pdev->dev, ctrl.s3_params,
-+					   sizeof(*ctrl.s3_params),
-+					   DMA_TO_DEVICE);
-+	if (dma_mapping_error(&pdev->dev, ctrl.s3_params_pa)) {
-+		pr_err("error mapping DMA memory\n");
-+		ret = -ENOMEM;
-+		goto out;
-+	}
-+
-+	atomic_notifier_chain_register(&panic_notifier_list,
-+				       &brcmstb_pm_panic_nb);
-+
-+	pm_power_off = brcmstb_pm_poweroff;
 +	suspend_set_ops(&brcmstb_pm_ops);
 +
 +	return 0;
 +
-+out:
-+	kfree(ctrl.s3_params);
++tmr_err:
++	iounmap(ctrl.memcs[0].arb_base);
++ddr_err:
++	for (i = 0; i < ctrl.num_memc; i++)
++		iounmap(ctrl.memcs[i].ddr_phy_base);
 +
-+	pr_warn("PM: initialization failed with code %d\n", ret);
-+
-+	return ret;
++	iounmap(ctrl.aon_sram_base);
++sram_err:
++	iounmap(ctrl.aon_ctrl_base);
++aon_err:
++	return PTR_ERR(base);
 +}
-+
-+static struct platform_driver brcmstb_pm_driver = {
-+	.driver = {
-+		.name	= "brcmstb-pm",
-+		.of_match_table = aon_ctrl_dt_ids,
-+	},
-+};
-+
-+static int __init brcmstb_pm_init(void)
-+{
-+	return platform_driver_probe(&brcmstb_pm_driver,
-+				     brcmstb_pm_probe);
-+}
-+module_init(brcmstb_pm_init);
++arch_initcall(brcmstb_pm_init);
 diff --git a/drivers/soc/bcm/brcmstb/pm/pm.h b/drivers/soc/bcm/brcmstb/pm/pm.h
-new file mode 100644
-index 000000000000..142519fdb8f8
---- /dev/null
+index 142519fdb8f8..b7d35ac70e60 100644
+--- a/drivers/soc/bcm/brcmstb/pm/pm.h
 +++ b/drivers/soc/bcm/brcmstb/pm/pm.h
-@@ -0,0 +1,78 @@
-+/*
-+ * Definitions for Broadcom STB power management / Always ON (AON) block
-+ *
-+ * Copyright ? 2016-2017 Broadcom
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ */
+@@ -70,9 +70,20 @@
+ 
+ #ifndef __ASSEMBLY__
+ 
++#ifndef CONFIG_MIPS
+ extern const unsigned long brcmstb_pm_do_s2_sz;
+ extern asmlinkage int brcmstb_pm_do_s2(void __iomem *aon_ctrl_base,
+ 		void __iomem *ddr_phy_pll_status);
+-#endif
++#else
++/* s2 asm */
++extern asmlinkage int brcm_pm_do_s2(u32 *s2_params);
 +
-+#ifndef __BRCMSTB_PM_H__
-+#define __BRCMSTB_PM_H__
++/* s3 asm */
++extern asmlinkage int brcm_pm_do_s3(void __iomem *aon_ctrl_base,
++		int dcache_linesz);
++extern int s3_reentry;
++#endif /* CONFIG_MIPS */
 +
-+#define AON_CTRL_RESET_CTRL		0x00
-+#define AON_CTRL_PM_CTRL		0x04
-+#define AON_CTRL_PM_STATUS		0x08
-+#define AON_CTRL_PM_CPU_WAIT_COUNT	0x10
-+#define AON_CTRL_PM_INITIATE		0x88
-+#define AON_CTRL_HOST_MISC_CMDS		0x8c
-+#define AON_CTRL_SYSTEM_DATA_RAM_OFS	0x200
-+
-+/* MIPS PM constants */
-+/* MEMC0 offsets */
-+#define DDR40_PHY_CONTROL_REGS_0_PLL_STATUS	0x10
-+#define DDR40_PHY_CONTROL_REGS_0_STANDBY_CTRL	0xa4
-+
-+/* TIMER offsets */
-+#define TIMER_TIMER1_CTRL		0x0c
-+#define TIMER_TIMER1_STAT		0x1c
-+
-+/* TIMER defines */
-+#define RESET_TIMER			0x0
-+#define START_TIMER			0xbfffffff
-+#define TIMER_MASK			0x3fffffff
-+
-+/* PM_CTRL bitfield (Method #0) */
-+#define PM_FAST_PWRDOWN			(1 << 6)
-+#define PM_WARM_BOOT			(1 << 5)
-+#define PM_DEEP_STANDBY			(1 << 4)
-+#define PM_CPU_PWR			(1 << 3)
-+#define PM_USE_CPU_RDY			(1 << 2)
-+#define PM_PLL_PWRDOWN			(1 << 1)
-+#define PM_PWR_DOWN			(1 << 0)
-+
-+/* PM_CTRL bitfield (Method #1) */
-+#define PM_DPHY_STANDBY_CLEAR		(1 << 20)
-+#define PM_MIN_S3_WIDTH_TIMER_BYPASS	(1 << 7)
-+
-+#define PM_S2_COMMAND	(PM_PLL_PWRDOWN | PM_USE_CPU_RDY | PM_PWR_DOWN)
-+
-+/* Method 0 bitmasks */
-+#define PM_COLD_CONFIG	(PM_PLL_PWRDOWN | PM_DEEP_STANDBY)
-+#define PM_WARM_CONFIG	(PM_COLD_CONFIG | PM_USE_CPU_RDY | PM_WARM_BOOT)
-+
-+/* Method 1 bitmask */
-+#define M1_PM_WARM_CONFIG (PM_DPHY_STANDBY_CLEAR | \
-+			   PM_MIN_S3_WIDTH_TIMER_BYPASS | \
-+			   PM_WARM_BOOT | PM_DEEP_STANDBY | \
-+			   PM_PLL_PWRDOWN | PM_PWR_DOWN)
-+
-+#define M1_PM_COLD_CONFIG (PM_DPHY_STANDBY_CLEAR | \
-+			   PM_MIN_S3_WIDTH_TIMER_BYPASS | \
-+			   PM_DEEP_STANDBY | \
-+			   PM_PLL_PWRDOWN | PM_PWR_DOWN)
-+
-+#ifndef __ASSEMBLY__
-+
-+extern const unsigned long brcmstb_pm_do_s2_sz;
-+extern asmlinkage int brcmstb_pm_do_s2(void __iomem *aon_ctrl_base,
-+		void __iomem *ddr_phy_pll_status);
-+#endif
-+
-+#endif /* __BRCMSTB_PM_H__ */
-diff --git a/drivers/soc/bcm/brcmstb/pm/s2-arm.S b/drivers/soc/bcm/brcmstb/pm/s2-arm.S
++#endif 
+ 
+ #endif /* __BRCMSTB_PM_H__ */
+diff --git a/drivers/soc/bcm/brcmstb/pm/s2-mips.S b/drivers/soc/bcm/brcmstb/pm/s2-mips.S
 new file mode 100644
-index 000000000000..1d472d564638
+index 000000000000..27a14bc46043
 --- /dev/null
-+++ b/drivers/soc/bcm/brcmstb/pm/s2-arm.S
-@@ -0,0 +1,76 @@
++++ b/drivers/soc/bcm/brcmstb/pm/s2-mips.S
+@@ -0,0 +1,200 @@
 +/*
-+ * Copyright ? 2014-2017 Broadcom
++ * Copyright (C) 2016 Broadcom Corporation
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -1137,68 +572,344 @@ index 000000000000..1d472d564638
 + * GNU General Public License for more details.
 + */
 +
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
++#include <asm/asm.h>
++#include <asm/regdef.h>
++#include <asm/mipsregs.h>
++#include <asm/stackframe.h>
 +
 +#include "pm.h"
 +
 +	.text
-+	.align	3
-+
-+#define AON_CTRL_REG		r10
-+#define DDR_PHY_STATUS_REG	r11
++	.set	noreorder
++	.align	5
 +
 +/*
-+ * r0: AON_CTRL base address
-+ * r1: DDRY PHY PLL status register address
++ * a0: u32 params array
 + */
-+ENTRY(brcmstb_pm_do_s2)
-+	stmfd	sp!, {r4-r11, lr}
-+	mov	AON_CTRL_REG, r0
-+	mov	DDR_PHY_STATUS_REG, r1
++LEAF(brcm_pm_do_s2)
 +
-+	/* Flush memory transactions */
-+	dsb
++	subu	sp, 64
++	sw	ra, 0(sp)
++	sw	s0, 4(sp)
++	sw	s1, 8(sp)
++	sw	s2, 12(sp)
++	sw	s3, 16(sp)
++	sw	s4, 20(sp)
++	sw	s5, 24(sp)
++	sw	s6, 28(sp)
++	sw	s7, 32(sp)
 +
-+	/* Cache DDR_PHY_STATUS_REG translation */
-+	ldr	r0, [DDR_PHY_STATUS_REG]
++	/*
++	 * Dereference the params array
++	 * s0: AON_CTRL base register
++	 * s1: DDR_PHY base register
++	 * s2: TIMERS base register
++	 * s3: I-Cache line size
++	 * s4: Restart vector address
++	 * s5: Restart vector size
++	 */
++	move	t0, a0
 +
-+	/* power down request */
-+	ldr	r0, =PM_S2_COMMAND
-+	ldr	r1, =0
-+	str	r1, [AON_CTRL_REG, #AON_CTRL_PM_CTRL]
-+	ldr	r1, [AON_CTRL_REG, #AON_CTRL_PM_CTRL]
-+	str	r0, [AON_CTRL_REG, #AON_CTRL_PM_CTRL]
-+	ldr	r0, [AON_CTRL_REG, #AON_CTRL_PM_CTRL]
++	lw	s0, 0(t0)
++	lw	s1, 4(t0)
++	lw	s2, 8(t0)
++	lw	s3, 12(t0)
++	lw	s4, 16(t0)
++	lw	s5, 20(t0)
 +
-+	/* Wait for interrupt */
-+	wfi
++	/* Lock this asm section into the I-cache */
++	addiu	t1, s3, -1
++	not	t1
++
++	la	t0, brcm_pm_do_s2
++	and	t0, t1
++
++	la	t2, asm_end
++	and	t2, t1
++
++1:	cache	0x1c, 0(t0)
++	bne	t0, t2, 1b
++	addu	t0, s3
++
++	/* Lock the interrupt vector into the I-cache */
++	move	t0, zero
++
++2:	move	t1, s4
++	cache 	0x1c, 0(t1)
++	addu	t1, s3
++	addu	t0, s3
++	ble	t0, s5, 2b
 +	nop
 +
-+	/* Bring MEMC back up */
-+1:	ldr	r0, [DDR_PHY_STATUS_REG]
-+	ands	r0, #1
-+	beq	1b
++	sync
 +
-+	/* Power-up handshake */
-+	ldr	r0, =1
-+	str	r0, [AON_CTRL_REG, #AON_CTRL_HOST_MISC_CMDS]
-+	ldr	r0, [AON_CTRL_REG, #AON_CTRL_HOST_MISC_CMDS]
++	/* Power down request */
++	li	t0, PM_S2_COMMAND
++	sw	zero, AON_CTRL_PM_CTRL(s0)
++	lw	zero, AON_CTRL_PM_CTRL(s0)
++	sw	t0, AON_CTRL_PM_CTRL(s0)
++	lw	t0, AON_CTRL_PM_CTRL(s0)
 +
-+	ldr	r0, =0
-+	str	r0, [AON_CTRL_REG, #AON_CTRL_PM_CTRL]
-+	ldr	r0, [AON_CTRL_REG, #AON_CTRL_PM_CTRL]
++	/* Enable CP0 interrupt 2 and wait for interrupt */
++	mfc0	t0, CP0_STATUS
++	/* Save cp0 sr for restoring later */
++	move	s6, t0
++
++	li	t1, ~(ST0_IM | ST0_IE)
++	and	t0, t1
++	ori	t0, STATUSF_IP2
++	mtc0	t0, CP0_STATUS
++	nop
++	nop
++	nop
++	ori	t0, ST0_IE
++	mtc0	t0, CP0_STATUS
++
++	/* Wait for interrupt */
++	wait
++	nop
++
++	/* Wait for memc0 */
++1:	lw	t0, DDR40_PHY_CONTROL_REGS_0_PLL_STATUS(s1)
++	andi	t0, 1
++	beqz	t0, 1b
++	nop
++
++	/* 1ms delay needed for stable recovery */
++	/* Use TIMER1 to count 1 ms */
++	li	t0, RESET_TIMER
++	sw	t0, TIMER_TIMER1_CTRL(s2)
++	lw	t0, TIMER_TIMER1_CTRL(s2)
++
++	li	t0, START_TIMER
++	sw	t0, TIMER_TIMER1_CTRL(s2)
++	lw	t0, TIMER_TIMER1_CTRL(s2)
++
++	/* Prepare delay */
++	li	t0, TIMER_MASK
++	lw	t1, TIMER_TIMER1_STAT(s2)
++	and	t1, t0
++	/* 1ms delay */
++	addi	t1, 27000
++
++	/* Wait for the timer value to exceed t1 */
++1:	lw	t0, TIMER_TIMER1_STAT(s2)
++	sgtu	t2, t1, t0
++	bnez	t2, 1b
++	nop
++
++	/* Power back up */
++	li	t1, 1
++	sw	t1, AON_CTRL_HOST_MISC_CMDS(s0)
++	lw	t1, AON_CTRL_HOST_MISC_CMDS(s0)
++
++	sw	zero, AON_CTRL_PM_CTRL(s0)
++	lw	zero, AON_CTRL_PM_CTRL(s0)
++
++	/* Unlock I-cache */
++	addiu	t1, s3, -1
++	not	t1
++
++	la	t0, brcm_pm_do_s2
++	and 	t0, t1
++
++	la	t2, asm_end
++	and	t2, t1
++
++1:	cache	0x00, 0(t0)
++	bne	t0, t2, 1b
++	addu	t0, s3
++
++	/* Unlock interrupt vector */
++	move	t0, zero
++
++2:	move	t1, s4
++	cache 	0x00, 0(t1)
++	addu	t1, s3
++	addu	t0, s3
++	ble	t0, s5, 2b
++	nop
++
++	/* Restore cp0 sr */
++	sync
++	nop
++	mtc0	s6, CP0_STATUS
++	nop
++
++	/* Set return value to success */
++	li	v0, 0
 +
 +	/* Return to caller */
-+	ldr	r0, =0
-+	ldmfd	sp!, {r4-r11, pc}
++	lw	s7, 32(sp)
++	lw	s6, 28(sp)
++	lw	s5, 24(sp)
++	lw	s4, 20(sp)
++	lw	s3, 16(sp)
++	lw	s2, 12(sp)
++	lw	s1, 8(sp)
++	lw	s0, 4(sp)
++	lw	ra, 0(sp)
++	addiu	sp, 64
 +
-+	ENDPROC(brcmstb_pm_do_s2)
++	jr ra
++	nop
++END(brcm_pm_do_s2)
 +
-+	/* Place literal pool here */
-+	.ltorg
++	.globl asm_end
++asm_end:
++	nop
 +
-+ENTRY(brcmstb_pm_do_s2_sz)
-+	.word   . - brcmstb_pm_do_s2
+diff --git a/drivers/soc/bcm/brcmstb/pm/s3-mips.S b/drivers/soc/bcm/brcmstb/pm/s3-mips.S
+new file mode 100644
+index 000000000000..1242308a8868
+--- /dev/null
++++ b/drivers/soc/bcm/brcmstb/pm/s3-mips.S
+@@ -0,0 +1,146 @@
++/*
++ * Copyright (C) 2016 Broadcom Corporation
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ */
++
++#include <asm/asm.h>
++#include <asm/regdef.h>
++#include <asm/mipsregs.h>
++#include <asm/bmips.h>
++
++#include "pm.h"
++
++	.text
++	.set		noreorder
++	.align		5
++	.global		s3_reentry
++
++/*
++ * a0: AON_CTRL base register
++ * a1: D-Cache line size
++ */
++LEAF(brcm_pm_do_s3)
++
++	/* Get the address of s3_context */
++	la	t0, gp_regs
++	sw	ra, 0(t0)
++	sw	s0, 4(t0)
++	sw	s1, 8(t0)
++	sw	s2, 12(t0)
++	sw	s3, 16(t0)
++	sw	s4, 20(t0)
++	sw	s5, 24(t0)
++	sw	s6, 28(t0)
++	sw	s7, 32(t0)
++	sw	gp, 36(t0)
++	sw	sp, 40(t0)
++	sw	fp, 44(t0)
++
++	/* Save CP0 Status */
++	mfc0	t1, CP0_STATUS
++	sw	t1, 48(t0)
++
++	/* Write-back gp registers - cache will be gone */
++	addiu	t1, a1, -1
++	not	t1
++	and	t0, t1
++
++	/* Flush at least 64 bytes */
++	addiu	t2, t0, 64
++	and	t2, t1
++
++1:	cache	0x17, 0(t0)
++	bne	t0, t2, 1b
++	addu	t0, a1
++
++	/* Drop to deep standby */
++	li	t1, PM_WARM_CONFIG
++	sw	zero, AON_CTRL_PM_CTRL(a0)
++	lw	zero, AON_CTRL_PM_CTRL(a0)
++	sw	t1, AON_CTRL_PM_CTRL(a0)
++	lw	t1, AON_CTRL_PM_CTRL(a0)
++
++	li	t1, (PM_WARM_CONFIG | PM_PWR_DOWN)
++	sw	t1, AON_CTRL_PM_CTRL(a0)
++	lw	t1, AON_CTRL_PM_CTRL(a0)
++
++	/* Enable CP0 interrupt 2 and wait for interrupt */
++	mfc0	t0, CP0_STATUS
++
++	li	t1, ~(ST0_IM | ST0_IE)
++	and	t0, t1
++	ori	t0, STATUSF_IP2
++	mtc0	t0, CP0_STATUS
++	nop
++	nop
++	nop
++	ori	t0, ST0_IE
++	mtc0	t0, CP0_STATUS
++
++        /* Wait for interrupt */
++        wait
++        nop
++
++s3_reentry:
++
++	/* Clear call/return stack */
++	li	t0, (0x06 << 16)
++	mtc0	t0, $22, 2
++	ssnop
++	ssnop
++	ssnop
++
++	/* Clear jump target buffer */
++	li	t0, (0x04 << 16)
++	mtc0	t0, $22, 2
++	ssnop
++	ssnop
++	ssnop
++
++	sync
++	nop
++
++	/* Setup mmu defaults */
++	mtc0	zero, CP0_WIRED
++	mtc0	zero, CP0_ENTRYHI
++	li	k0, PM_DEFAULT_MASK
++	mtc0	k0, CP0_PAGEMASK
++
++	li	sp, BMIPS_WARM_RESTART_VEC
++	la	k0, plat_wired_tlb_setup
++	jalr	k0
++	nop
++
++	/* Restore general purpose registers */
++	la	t0, gp_regs
++	lw	fp, 44(t0)
++	lw	sp, 40(t0)
++	lw	gp, 36(t0)
++	lw	s7, 32(t0)
++	lw	s6, 28(t0)
++	lw	s5, 24(t0)
++	lw	s4, 20(t0)
++	lw	s3, 16(t0)
++	lw	s2, 12(t0)
++	lw	s1, 8(t0)
++	lw	s0, 4(t0)
++	lw	ra, 0(t0)
++
++	/* Restore CP0 status */
++	lw	t1, 48(t0)
++	mtc0	t1, CP0_STATUS
++
++	/* Return to caller */
++	li	v0, 0
++	jr      ra
++	nop
++
++END(brcm_pm_do_s3)
 -- 
 2.9.3
