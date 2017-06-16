@@ -1,67 +1,36 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Fri, 16 Jun 2017 16:03:53 +0200
-Subject: [PATCH 3/3] rtc: st-lpc: make it robust against y2038/2106 bug
-In-Reply-To: <1497621833-9942-1-git-send-email-benjamin.gaignard@linaro.org>
-References: <1497621833-9942-1-git-send-email-benjamin.gaignard@linaro.org>
-Message-ID: <1497621833-9942-4-git-send-email-benjamin.gaignard@linaro.org>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 16 Jun 2017 16:08:13 +0200
+Subject: [RFT 2/2] pinctrl: samsung: Fix invalid register offset used
+ for Exynos5433 external interrupts
+In-Reply-To: <20170614131828.28683-2-krzk@kernel.org>
+References: <20170614131828.28683-1-krzk@kernel.org>
+ <CGME20170614131847epcas3p4755a0ad1e25550134ddfcf0db9aff06b@epcas3p4.samsung.com>
+ <20170614131828.28683-2-krzk@kernel.org>
+Message-ID: <0cfe358a-c050-aae0-5755-819c7b25ef28@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make driver use u64 variables and functions to be sure that
-it will support dates after year 2038.
+On 06/14/2017 03:18 PM, Krzysztof Kozlowski wrote:
+> When setting the pin function for external interrupts, the driver used
+> wrong IO memory address base.  The pin function register is always under
+> pctl_base, not the eint_base.
+> 
+> By updating wrong register, the external interrupts for chosen GPIO
+> would not work at all and some other GPIO might be configured to wrong
+> value.
+> 
+> Platforms other than Exynos5433 should not be affected as eint_base
+> equals pctl_base in such case.
+> 
+> Fixes: 8b1bd11c1f8f ("pinctrl: samsung: Add the support the multiple IORESOURCE_MEM for one pin-bank")
+> Cc:<stable@vger.kernel.org>
+> Reported-by: Tomasz Figa<tomasz.figa@gmail.com>
+> Signed-off-by: Krzysztof Kozlowski<krzk@kernel.org>
 
-Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
----
- drivers/rtc/rtc-st-lpc.c | 19 ++++++++-----------
- 1 file changed, 8 insertions(+), 11 deletions(-)
+The patch looks good to me, I'll try to test it later today.
 
-diff --git a/drivers/rtc/rtc-st-lpc.c b/drivers/rtc/rtc-st-lpc.c
-index 74c0a33..82b0af1 100644
---- a/drivers/rtc/rtc-st-lpc.c
-+++ b/drivers/rtc/rtc-st-lpc.c
-@@ -99,7 +99,7 @@ static int st_rtc_read_time(struct device *dev, struct rtc_time *tm)
- 
- 	lpt = ((unsigned long long)lpt_msb << 32) | lpt_lsb;
- 	do_div(lpt, rtc->clkrate);
--	rtc_time_to_tm(lpt, tm);
-+	rtc_time64_to_tm(lpt, tm);
- 
- 	return 0;
- }
-@@ -107,13 +107,10 @@ static int st_rtc_read_time(struct device *dev, struct rtc_time *tm)
- static int st_rtc_set_time(struct device *dev, struct rtc_time *tm)
- {
- 	struct st_rtc *rtc = dev_get_drvdata(dev);
--	unsigned long long lpt;
--	unsigned long secs, flags;
--	int ret;
-+	unsigned long long lpt, secs;
-+	unsigned long flags;
- 
--	ret = rtc_tm_to_time(tm, &secs);
--	if (ret)
--		return ret;
-+	secs = rtc_tm_to_time64(tm);
- 
- 	lpt = (unsigned long long)secs * rtc->clkrate;
- 
-@@ -161,13 +158,13 @@ static int st_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *t)
- {
- 	struct st_rtc *rtc = dev_get_drvdata(dev);
- 	struct rtc_time now;
--	unsigned long now_secs;
--	unsigned long alarm_secs;
-+	unsigned long long now_secs;
-+	unsigned long long alarm_secs;
- 	unsigned long long lpa;
- 
- 	st_rtc_read_time(dev, &now);
--	rtc_tm_to_time(&now, &now_secs);
--	rtc_tm_to_time(&t->time, &alarm_secs);
-+	now_secs = rtc_tm_to_time64(&now);
-+	alarm_secs = rtc_tm_to_time64(&t->time);
- 
- 	/* Invalid alarm time */
- 	if (now_secs > alarm_secs)
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+
 -- 
-1.9.1
+Thanks,
+Sylwester
