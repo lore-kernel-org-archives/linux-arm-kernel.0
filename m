@@ -1,27 +1,44 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 16 Jun 2017 15:36:56 +0200
-Subject: [RESEND PATCH v5 07/16] ARM: dts: koelsch: Add generic
- compatible string for I2C EEPROM
-In-Reply-To: <20170615185418.13980-8-javier@dowhile0.org>
-References: <20170615185418.13980-1-javier@dowhile0.org>
- <20170615185418.13980-8-javier@dowhile0.org>
-Message-ID: <20170616133653.GB26834@verge.net.au>
+From: yt.shen@mediatek.com (YT Shen)
+Date: Fri, 16 Jun 2017 21:45:19 +0800
+Subject: [PATCH v3 0/2] Add basic support for Mediatek MT2712 SoC
+Message-ID: <1497620721-61444-1-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 15, 2017 at 08:54:09PM +0200, Javier Martinez Canillas wrote:
-> The at24 driver allows to register I2C EEPROM chips using different vendor
-> and devices, but the I2C subsystem does not take the vendor into account
-> when matching using the I2C table since it only has device entries.
-> 
-> But when matching using an OF table, both the vendor and device has to be
-> taken into account so the driver defines only a set of compatible strings
-> using the "atmel" vendor as a generic fallback for compatible I2C devices.
-> 
-> So add this generic fallback to the device node compatible string to make
-> the device to match the driver using the OF device ID table.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+MT2712 is a SoC based on 64bit ARMv8 architecture.
+MT2712 share many HW IP with MT8173.  This patchset was tested on MT2712
+evaluation board, and boot to shell ok.
 
-Thanks, I have queued this up in the renesas tree for v4.14. 
+This series contains document bindings, device tree including interrupt
+and uart.
+
+Changes compared to v2:
+- remove alias from serial1 to serial5
+- remove initrd-start and initrd-end
+- change GIC_CPU_MASK_SIMPLE(6) to GIC_CPU_MASK_RAW(0x13)
+- change gic-400 reg range
+
+Changes compared to v1:
+- change subject prefix for bindings
+- change device tree license to SPDX tag.
+- change bootargs parameter to DT usage.
+- change intpol-controller to interrupt-controller
+
+
+YT Shen (2):
+  dt-bindings: arm: Add bindings for Mediatek MT2712 SoC Platform
+  arm64: dts: Add Mediatek SoC MT2712 and evaluation board dts and
+    Makefile
+
+ Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
+ .../interrupt-controller/mediatek,sysirq.txt       |   1 +
+ .../devicetree/bindings/serial/mtk-uart.txt        |   1 +
+ arch/arm64/boot/dts/mediatek/Makefile              |   1 +
+ arch/arm64/boot/dts/mediatek/mt2712-evb.dts        |  32 ++++
+ arch/arm64/boot/dts/mediatek/mt2712e.dtsi          | 166 +++++++++++++++++++++
+ 6 files changed, 205 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt2712-evb.dts
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+
+-- 
+1.9.1
