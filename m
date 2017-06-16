@@ -1,69 +1,41 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Sat, 17 Jun 2017 01:06:27 +0800
-Subject: [PATCH v5 2/2] arm64: dts: mt7622: add dts file for MT7622 reference
- board variant 1
-In-Reply-To: <cover.1497631953.git.sean.wang@mediatek.com>
-References: <cover.1497631953.git.sean.wang@mediatek.com>
-Message-ID: <89b858d84d42b857a47588c489c55cca06603ae8.1497631953.git.sean.wang@mediatek.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 16 Jun 2017 20:24:56 +0300
+Subject: [PATCH] gpio: rcar: Add R8A7743 (RZ/G1M) support
+In-Reply-To: <1497619944-61410-1-git-send-email-biju.das@bp.renesas.com>
+References: <1497619944-61410-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <d7242a3b-bf30-1683-29e0-90c847ce8eaf@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+Hello!
 
-Add the support for the MT7622 reference board variant 1 from
-MediaTek.
+On 06/16/2017 04:32 PM, Biju Das wrote:
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/Makefile        |  1 +
- arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts | 27 +++++++++++++++++++++++++++
- 2 files changed, 28 insertions(+)
- create mode 100644 arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
+> Renesas RZ/G1M (R8A7743 SoC) GPIO blocks are identical to the R-Car Gen2
 
-diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
-index 015eb07..89371be 100644
---- a/arch/arm64/boot/dts/mediatek/Makefile
-+++ b/arch/arm64/boot/dts/mediatek/Makefile
-@@ -1,6 +1,7 @@
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-evb.dtb
-+dtb-$(CONFIG_ARCH_MEDIATEK) += mt7622-rfb1.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
- 
- always		:= $(dtb-y)
-diff --git a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-new file mode 100644
-index 0000000..c08309d
---- /dev/null
-+++ b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-@@ -0,0 +1,27 @@
-+/*
-+ * Copyright (c) 2017 MediaTek Inc.
-+ * Author: Ming Huang <ming.huang@mediatek.com>
-+ *	   Sean Wang <sean.wang@mediatek.com>
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+ */
-+
-+/dts-v1/;
-+#include "mt7622.dtsi"
-+
-+/ {
-+	model = "MediaTek MT7622 RFB1 board";
-+	compatible = "mediatek,mt7622-rfb1", "mediatek,mt7622";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200n1";
-+	};
-+
-+	memory {
-+		reg = <0 0x40000000 0 0x3F000000>;
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
--- 
-2.7.4
+    SoC should be outside the parens.
+
+> family. Add support for its GPIO controllers.
+>
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+> ---
+>  Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt | 1 +
+>  drivers/gpio/gpio-rcar.c                                     | 4 ++++
+>  2 files changed, 5 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt b/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
+> index 7c1ab3b..1cc3cfe 100644
+> --- a/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
+> +++ b/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
+> @@ -3,6 +3,7 @@
+>  Required Properties:
+>
+>    - compatible: should contain one of the following.
+> +    - "renesas,gpio-r8a7743": for R8A7743 (RZ-G1M) compatible GPIO controller.
+
+    Not RZ/G1M?
+
+[...]
+
+MBR, Sergei
