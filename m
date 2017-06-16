@@ -1,10 +1,10 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 16 Jun 2017 11:24:33 +0200
+Date: Fri, 16 Jun 2017 11:26:08 +0200
 Subject: [PATCH v3 6/9] pinctrl: mvebu: add driver for Armada CP110 pinctrl
 In-Reply-To: <2d71d93a22ed24c45b7ce7b52fa066cc0a14a69f.1497281623.git-series.gregory.clement@free-electrons.com>
 References: <cover.d003a5e862e6d732d901a61d1765a349c9a89eef.1497281623.git-series.gregory.clement@free-electrons.com>
  <2d71d93a22ed24c45b7ce7b52fa066cc0a14a69f.1497281623.git-series.gregory.clement@free-electrons.com>
-Message-ID: <CACRpkdb6i+O1okCb2tbSECdzjzsyBsff-q-2UQ16gX7yW+Xu8Q@mail.gmail.com>
+Message-ID: <CACRpkdb+D+a9S4UCjex_P1YEATj9RhSu4i0fy50AopAJ1MOzXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -24,6 +24,34 @@ On Mon, Jun 12, 2017 at 5:34 PM, Gregory CLEMENT
 >
 > Signed-off-by: Hanna Hawa <hannah@marvell.com>
 > Reviewed-by: Shadi Ammouri <shadi@marvell.com>
+>
+> [updated for mvebu pinctrl and 4.9 changes:
+>  - converted to simple_mmio
+>  - converted to syscon/regmap
+>  - removed unimplemented .remove function
+>  - dropped DTS changes
+>  - defered gpio ranges to DT
+>  - fixed warning
+>  - properly set soc->nmodes
+>  -- rmk]
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+>
+> [ add missing MPP[61:56] function 14 (SDIO)
+> -- Konstantin Porotchkin]
+> Signed-off-by: Konstantin Porotchkin <kostap@marvell.com>
+>
+> [ allow to properly register more then one instance of this driver
+> -- Grzegorz Jaszczyk]
+> Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
+>
+> [ - rebased on 4.12-rc1
+>   - fixed the 80 character limit for mvebu_mpp_mode array
+>   - aligned the compatible name on the ones already used
+>   - fixed the MPP table for CP110: some MPP are not available on Armada 7K
+> -- Gregory CLEMENT]
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>
+> Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
 Patch applied.
 
