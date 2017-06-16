@@ -1,97 +1,41 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 16 Jun 2017 15:51:25 +0100
-Subject: [GIT PULL v2] arm64: dts: hisilicon dts updates for v4.13
-In-Reply-To: <5942EA83.6040907@hisilicon.com>
-References: <5942EA83.6040907@hisilicon.com>
-Message-ID: <5943F06D.7000305@hisilicon.com>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Fri, 16 Jun 2017 15:57:29 +0100
+Subject: [PATCH] ARM: dts: iwg20d-q7: Add pinctl support for scif0
+Message-ID: <1497625049-46802-1-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof, Hi Kevin,
+Adding pinctrl support for scif0 interface.
 
-Please help to pull the following changes.
-Thanks!
-
-And the patch "arm64: dts: hi6220: Add k3-dma and i2s/hdmi audio support"
-depends on audio-graph-card that will be landed on 4.13.
-But the dts part is checked without any warning and can be compiled.
-
-Best Regards,
-Wei
-
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
 ---
+This patch is been tested against linux-next tag next-20170616.
+It depends upon the patch "[PATCH v2 1/3] ARM: dts: r8a7743: add PFC support"
+https://www.spinics.net/lists/arm-kernel/msg577301.html
 
-The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+ arch/arm/boot/dts/r8a7743-iwg20d-q7.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
-
-are available in the git repository at:
-
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.13-v2
-
-for you to fetch changes up to 0cf6a8e2fb8413b581fc0d960f7831b0e7583406:
-
-  arm64: dts: hi6220: Add k3-dma and i2s/hdmi audio support (2017-06-16 15:31:21 +0100)
-
-----------------------------------------------------------------
-ARM64: DT: Hisilicon SoC DT updates for 4.13
-
-- Add and update Hi3660-Hikey960 board, Hi3660 PCIe RC, Hi6421v530 MFD and
-  Hi3660 MMC binding
-- Add and refine devices support for Hi3660-Hikey 960 including clock, reset,
-  I2C, GPIO, UART, Bluetooth, RTC, Power Key, LED, SPI, timer, PMIC, regulator,
-  sd/sdio and WiFi
-- Add k3-dma and i2s/hdmi audio support based on audio-card-graph method for
-  Hikey board
-
-----------------------------------------------------------------
-Chen Feng (2):
-      arm64: dts: hi3660: Add uarts nodes
-      arm64: dts: hi3660: Add pl031 rtc node
-
-Chen Jun (1):
-      arm64: dts: hi3660: add power key dts node
-
-Guodong Xu (7):
-      dt-bindings: arm: hisilicon: add bindings for HiKey960 board
-      arm64: dts: hisilicon: update compatible string for hikey960
-      arm64: dts: hikey960: add WL1837 Bluetooth device node
-      arm64: dts: hikey960: add LED nodes
-      dt-bindings: mfd: hi6421: Add hi6421v530 compatible string
-      dt-bindings: mmc: dw_mmc-k3: add document of hi3660 mmc
-      arm64: dts: hi3660-hikey960: add nodes for WiFi
-
-John Stultz (1):
-      arm64: dts: hi6220: Add k3-dma and i2s/hdmi audio support
-
-Leo Yan (1):
-      arm64: dts: hi3660: add sp804 timer node
-
-Li Wei (1):
-      arm64: dts: hi3660: add sd/sdio device nodes
-
-Wang Xiaoyin (4):
-      arm64: dts: hikey960: pinctrl: add more pinmux and pinconfig
-      arm64: dts: hi3660: add gpio dtsi file for Hisilicon Hi3660 SOC
-      arm64: dts: hi3660: add spi device nodes
-      arm64: dts: hikey960: add device node for pmic and regulators
-
-Xiaowei Song (2):
-      dt-bindings: PCI: hisi: Add document for PCIe of Kirin SoCs
-      arm64: dts: hisi: add kirin pcie node
-
-Zhangfei Gao (2):
-      arm64: dts: hi3660: add resources for clock and reset
-      arm64: dts: Add I2C nodes for Hi3660
-
- .../bindings/arm/hisilicon/hisilicon.txt           |   4 +
- Documentation/devicetree/bindings/mfd/hi6421.txt   |   4 +-
- .../devicetree/bindings/mmc/k3-dw-mshc.txt         |   1 +
- .../devicetree/bindings/pci/kirin-pcie.txt         |  50 ++
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts  | 217 +++++-
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi          | 706 ++++++++++++++++++-
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |  34 +-
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  26 +
- .../arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi | 778 +++++++++++++++++++--
- 9 files changed, 1742 insertions(+), 78 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pci/kirin-pcie.txt
+diff --git a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
+index 9b54783..497aec0 100644
+--- a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
++++ b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
+@@ -20,6 +20,16 @@
+ 	};
+ };
+ 
++&pfc {
++	scif0_pins: scif0 {
++		groups = "scif0_data_d";
++		function = "scif0";
++	};
++};
++
+ &scif0 {
++	pinctrl-0 = <&scif0_pins>;
++	pinctrl-names = "default";
++
+ 	status = "okay";
+ };
+-- 
+1.9.1
