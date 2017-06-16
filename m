@@ -1,53 +1,44 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 16 Jun 2017 18:15:37 +0530
-Subject: [PATCH 09/16] mmc: host: omap_hsmmc: Prepare *set_timing() to be used
- for iodelay setting
+Date: Fri, 16 Jun 2017 18:15:39 +0530
+Subject: [PATCH 11/16] mmc: host: omap_hsmmc: Fix error path sequence
 In-Reply-To: <20170616124544.15046-1-kishon@ti.com>
 References: <20170616124544.15046-1-kishon@ti.com>
-Message-ID: <20170616124544.15046-10-kishon@ti.com>
+Message-ID: <20170616124544.15046-12-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No functional change. Add separate case statements for certain timing
-like MMC_TIMING_SD_HS and MMC_TIMING_MMC_HS even though AC12_UHSMC_RES
-has to be written to the AC12 register (same as for default modes).
-Also have separate case sections for MMC_TIMING_UHS_SDR104 and
-MMC_TIMING_UHS_HS200 even though the same UHSMC value has to be written
-to the AC12 register. This is in preparation for setting iodelay
-values.
+Fix the error path sequence so that clk_disable, runtime_disable etc
+are done in the reverse order of how they were enabled.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 ---
- drivers/mmc/host/omap_hsmmc.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/mmc/host/omap_hsmmc.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index 3676ffa72929..d797224152ac 100644
+index 9d59fe611498..967b7c7d4bd5 100644
 --- a/drivers/mmc/host/omap_hsmmc.c
 +++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -1726,6 +1726,8 @@ static void omap_hsmmc_set_timing(struct omap_hsmmc_host *host)
- 	val &= ~AC12_UHSMC_MASK;
- 	switch (ios->timing) {
- 	case MMC_TIMING_UHS_SDR104:
-+		val |= AC12_UHSMC_SDR104;
-+		break;
- 	case MMC_TIMING_MMC_HS200:
- 		val |= AC12_UHSMC_SDR104;
- 		break;
-@@ -1741,6 +1743,13 @@ static void omap_hsmmc_set_timing(struct omap_hsmmc_host *host)
- 	case MMC_TIMING_UHS_SDR12:
- 		val |= AC12_UHSMC_SDR12;
- 		break;
-+	case MMC_TIMING_SD_HS:
-+	case MMC_TIMING_MMC_HS:
-+		val |= AC12_UHSMC_RES;
-+		break;
-+	case MMC_TIMING_MMC_DDR52:
-+		val |= AC12_UHSMC_RES;
-+		break;
- 	default:
- 		val |= AC12_UHSMC_RES;
- 		break;
+@@ -2591,16 +2591,16 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+ err_slot_name:
+ 	mmc_remove_host(mmc);
+ err_irq:
+-	device_init_wakeup(&pdev->dev, false);
+ 	if (!IS_ERR_OR_NULL(host->tx_chan))
+ 		dma_release_channel(host->tx_chan);
+ 	if (!IS_ERR_OR_NULL(host->rx_chan))
+ 		dma_release_channel(host->rx_chan);
++	if (host->dbclk)
++		clk_disable_unprepare(host->dbclk);
+ 	pm_runtime_dont_use_autosuspend(host->dev);
+ 	pm_runtime_put_sync(host->dev);
+ 	pm_runtime_disable(host->dev);
+-	if (host->dbclk)
+-		clk_disable_unprepare(host->dbclk);
++	device_init_wakeup(&pdev->dev, false);
+ err1:
+ err_gpio:
+ 	mmc_free_host(mmc);
 -- 
 2.11.0
