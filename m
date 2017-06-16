@@ -1,57 +1,31 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 16 Jun 2017 17:24:38 +0530
-Subject: [PATCH 11/12] ARM: dts: dra72-evm-revc: Add pinmux configuration for
- MMC
-In-Reply-To: <20170616115439.8508-1-kishon@ti.com>
-References: <20170616115439.8508-1-kishon@ti.com>
-Message-ID: <20170616115439.8508-12-kishon@ti.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 16 Jun 2017 12:58:34 +0100
+Subject: [PATCH 1/3] ARM: Generalize fncpy implementation
+In-Reply-To: <20170615232117.29727-2-f.fainelli@gmail.com>
+References: <20170615232117.29727-1-f.fainelli@gmail.com>
+ <20170615232117.29727-2-f.fainelli@gmail.com>
+Message-ID: <20170616115834.GZ23750@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Include dra72x-mmc-iodelay.dtsi which has pinmux and IODelay
-configuration values for the various MMC modes for dra72 SoC
-and use it in the pinctrl properties of MMC devicetree
-nodes present in dra72-evm-revc.dts.
+On Thu, Jun 15, 2017 at 04:21:15PM -0700, Florian Fainelli wrote:
+> ARM's fncpy implementation is actually suitable for a large number of
+> platforms since the only assumption it makes is just the function's
+> alignment (8 bytes) which also happens to fulfil other architectures,
+> including but not limited to ARM64.
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/boot/dts/dra72-evm-revc.dts | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+NAK.  This is really not "generic" because the whole point of this is
+that it encapsulates architecture specific knowledge - in the case of
+ARM, the fact that bit 1 is used to indicate whether the code is to be
+run in Thumb mode or ARM mode.
 
-diff --git a/arch/arm/boot/dts/dra72-evm-revc.dts b/arch/arm/boot/dts/dra72-evm-revc.dts
-index 5532309971ae..670c9c3e6cf0 100644
---- a/arch/arm/boot/dts/dra72-evm-revc.dts
-+++ b/arch/arm/boot/dts/dra72-evm-revc.dts
-@@ -6,6 +6,7 @@
-  * published by the Free Software Foundation.
-  */
- #include "dra72-evm-common.dtsi"
-+#include "dra72x-mmc-iodelay.dtsi"
- #include <dt-bindings/net/ti-dp83867.h>
- 
- / {
-@@ -94,9 +95,22 @@
- };
- 
- &mmc1 {
-+	pinctrl-names = "default", "hs", "sdr12", "sdr25", "sdr50", "ddr50", "sdr104";
-+	pinctrl-0 = <&mmc1_pins_default>;
-+	pinctrl-1 = <&mmc1_pins_hs>;
-+	pinctrl-2 = <&mmc1_pins_sdr12>;
-+	pinctrl-3 = <&mmc1_pins_sdr25>;
-+	pinctrl-4 = <&mmc1_pins_sdr50>;
-+	pinctrl-5 = <&mmc1_pins_ddr50_rev20 &mmc1_iodelay_ddr50_conf>;
-+	pinctrl-6 = <&mmc1_pins_sdr104 &mmc1_iodelay_sdr104_rev20_conf>;
- 	vqmmc-supply = <&ldo1_reg>;
- };
- 
- &mmc2 {
-+	pinctrl-names = "default", "hs", "ddr_1_8v", "hs200_1_8v";
-+	pinctrl-0 = <&mmc2_pins_default>;
-+	pinctrl-1 = <&mmc2_pins_hs>;
-+	pinctrl-2 = <&mmc2_pins_ddr_rev20 &mmc2_iodelay_ddr_conf>;
-+	pinctrl-3 = <&mmc2_pins_hs200 &mmc2_iodelay_hs200_rev20_conf>;
- 	vmmc-supply = <&evm_1v8_sw>;
- };
+That clearly does not belong in an asm-generic version of this.
+
+I'm not saying "don't provide an asm-generic" version, I'm saying don't
+use the ARM version as an asm-generic implementation, because it is
+nothing of the sort.
+
 -- 
-2.11.0
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
