@@ -1,91 +1,47 @@
-From: alexander.duyck@gmail.com (Alexander Duyck)
-Date: Fri, 16 Jun 2017 13:40:24 -0700
-Subject: [PATCH 03/44] dmaengine: ioat: don't use DMA_ERROR_CODE
-In-Reply-To: <20170616181059.19206-4-hch@lst.de>
-References: <20170616181059.19206-1-hch@lst.de>
- <20170616181059.19206-4-hch@lst.de>
-Message-ID: <CAKgT0UdxrimWrxNVsLMQ9G6ABBJZwfWHTcP18qqd4rT0Fa-KWg@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 16 Jun 2017 13:57:51 -0700
+Subject: [PATCH v5 3/4] ARM64: dts: meson-gx: use stable UART bindings
+ with correct gate clock
+In-Reply-To: <1497428957-19942-4-git-send-email-narmstrong@baylibre.com> (Neil
+ Armstrong's message of "Wed, 14 Jun 2017 10:29:16 +0200")
+References: <1497428957-19942-1-git-send-email-narmstrong@baylibre.com>
+ <1497428957-19942-4-git-send-email-narmstrong@baylibre.com>
+Message-ID: <m2vanvejlc.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 16, 2017 at 11:10 AM, Christoph Hellwig <hch@lst.de> wrote:
-> DMA_ERROR_CODE is not a public API and will go away.  Instead properly
-> unwind based on the loop counter.
+Neil Armstrong <narmstrong@baylibre.com> writes:
+
+> From: Helmut Klein <hgkr.klein@gmail.com>
 >
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-> Acked-by: Dave Jiang <dave.jiang@intel.com>
-> Acked-By: Vinod Koul <vinod.koul@intel.com>
+> This patch switches to the stable UART bindings but also add the correct
+> gate clock to the non-AO UART nodes for GXBB and GXL SoCs.
+>
+> Acked-by: Jerome Brunet <jbrunet@baylibre.com>
+> Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 > ---
->  drivers/dma/ioat/init.c | 24 +++++++-----------------
->  1 file changed, 7 insertions(+), 17 deletions(-)
+>  arch/arm64/boot/dts/amlogic/meson-gx.dtsi   | 12 +++++-------
+>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 25 +++++++++++++++++++++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 25 +++++++++++++++++++++++++
+>  3 files changed, 55 insertions(+), 7 deletions(-)
 >
-> diff --git a/drivers/dma/ioat/init.c b/drivers/dma/ioat/init.c
-> index 6ad4384b3fa8..ed8ed1192775 100644
-> --- a/drivers/dma/ioat/init.c
-> +++ b/drivers/dma/ioat/init.c
-> @@ -839,8 +839,6 @@ static int ioat_xor_val_self_test(struct ioatdma_device *ioat_dma)
->                 goto free_resources;
->         }
->
-> -       for (i = 0; i < IOAT_NUM_SRC_TEST; i++)
-> -               dma_srcs[i] = DMA_ERROR_CODE;
->         for (i = 0; i < IOAT_NUM_SRC_TEST; i++) {
->                 dma_srcs[i] = dma_map_page(dev, xor_srcs[i], 0, PAGE_SIZE,
->                                            DMA_TO_DEVICE);
-> @@ -910,8 +908,6 @@ static int ioat_xor_val_self_test(struct ioatdma_device *ioat_dma)
->
->         xor_val_result = 1;
->
-> -       for (i = 0; i < IOAT_NUM_SRC_TEST + 1; i++)
-> -               dma_srcs[i] = DMA_ERROR_CODE;
->         for (i = 0; i < IOAT_NUM_SRC_TEST + 1; i++) {
->                 dma_srcs[i] = dma_map_page(dev, xor_val_srcs[i], 0, PAGE_SIZE,
->                                            DMA_TO_DEVICE);
-> @@ -965,8 +961,6 @@ static int ioat_xor_val_self_test(struct ioatdma_device *ioat_dma)
->         op = IOAT_OP_XOR_VAL;
->
->         xor_val_result = 0;
-> -       for (i = 0; i < IOAT_NUM_SRC_TEST + 1; i++)
-> -               dma_srcs[i] = DMA_ERROR_CODE;
->         for (i = 0; i < IOAT_NUM_SRC_TEST + 1; i++) {
->                 dma_srcs[i] = dma_map_page(dev, xor_val_srcs[i], 0, PAGE_SIZE,
->                                            DMA_TO_DEVICE);
-> @@ -1017,18 +1011,14 @@ static int ioat_xor_val_self_test(struct ioatdma_device *ioat_dma)
->         goto free_resources;
->  dma_unmap:
->         if (op == IOAT_OP_XOR) {
-> -               if (dest_dma != DMA_ERROR_CODE)
-> -                       dma_unmap_page(dev, dest_dma, PAGE_SIZE,
-> -                                      DMA_FROM_DEVICE);
-> -               for (i = 0; i < IOAT_NUM_SRC_TEST; i++)
-> -                       if (dma_srcs[i] != DMA_ERROR_CODE)
-> -                               dma_unmap_page(dev, dma_srcs[i], PAGE_SIZE,
-> -                                              DMA_TO_DEVICE);
-> +               while (--i >= 0)
-> +                       dma_unmap_page(dev, dma_srcs[i], PAGE_SIZE,
-> +                                      DMA_TO_DEVICE);
-> +               dma_unmap_page(dev, dest_dma, PAGE_SIZE, DMA_FROM_DEVICE);
->         } else if (op == IOAT_OP_XOR_VAL) {
-> -               for (i = 0; i < IOAT_NUM_SRC_TEST + 1; i++)
-> -                       if (dma_srcs[i] != DMA_ERROR_CODE)
-> -                               dma_unmap_page(dev, dma_srcs[i], PAGE_SIZE,
-> -                                              DMA_TO_DEVICE);
-> +               while (--i >= 0)
-> +                       dma_unmap_page(dev, dma_srcs[i], PAGE_SIZE,
-> +                                      DMA_TO_DEVICE);
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+> index 603491d..86a4018 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+> @@ -225,7 +225,7 @@
+>  			};
+>  
+>  			uart_A: serial at 84c0 {
+> -				compatible = "amlogic,meson-uart";
+> +				compatible = "amlogic,meson-gx-uart";
 
-Wouldn't it make more sense to pull out the while loop and just call
-dma_unmap_page on dest_dma if "op == IOAT_OP_XOR"? Odds are it is what
-the compiler is already generating and will save a few lines of code
-so what you end up with is something like:
-    while (--i >= 0)
-        dma_unmap_page(dev, dma_srcs[i], PAGE_SIZE, DMA_TO_DEVICE);
-    if (op == IOAT_OP_XOR)
-        dma_unmap_page(dev, dest_dma, PAGE_SIZE, DMA_FROM_DEVICE);
+IMO, we should keep both compatibles (the more specific one first.)
+That would allow new DTs to continue to run on older kernels.
 
->         }
->  free_resources:
->         dma->device_free_chan_resources(dma_chan);
-> --
-> 2.11.0
->
+It would also allow this DT change to be completely independent of the
+driver changes.  Otherwise, if I merge this before the driver change are
+merged, we'll have a bunch of boards with no more serial console output.
+
+Kevin
