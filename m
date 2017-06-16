@@ -1,70 +1,63 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 16 Jun 2017 16:19:21 +0200
-Subject: [PATCH v3 4/6] irqchip: irq-mvebu-icu: new driver for Marvell ICU
+Date: Fri, 16 Jun 2017 16:19:20 +0200
+Subject: [PATCH v3 3/6] irqchip: irq-mvebu-gicp: new driver for Marvell GICP
 In-Reply-To: <20170616141923.31226-1-thomas.petazzoni@free-electrons.com>
 References: <20170616141923.31226-1-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170616141923.31226-5-thomas.petazzoni@free-electrons.com>
+Message-ID: <20170616141923.31226-4-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell ICU unit is found in the CP110 block of the Marvell Armada
-7K and 8K SoCs. It collects the wired interrupts of the devices located
-in the CP110 and turns them into SPI interrupts in the GIC located in
-the AP806 side of the SoC, by using a memory transaction.
-
-Until now, the ICU was configured in a static fashion by the firmware,
-and Linux was relying on this static configuration. By having Linux
-configure the ICU, we are more flexible, and we can allocate dynamically
-the GIC SPI interrupts only for devices that are actually in use.
-
-The driver was initially written by Hanna Hawa <hannah@marvell.com>.
+This commit adds a simple driver for the Marvell GICP, a hardware unit
+that converts memory writes into GIC SPI interrupts. The driver provides
+a number of functions to the ICU driver to allocate GICP interrupts, and
+get the physical addresses that the ICUs should write to to set/clear
+interrupts.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/irqchip/Kconfig                            |   3 +
- drivers/irqchip/Makefile                           |   1 +
- drivers/irqchip/irq-mvebu-icu.c                    | 299 +++++++++++++++++++++
- .../dt-bindings/interrupt-controller/mvebu-icu.h   |  15 ++
- 4 files changed, 318 insertions(+)
- create mode 100644 drivers/irqchip/irq-mvebu-icu.c
- create mode 100644 include/dt-bindings/interrupt-controller/mvebu-icu.h
+ drivers/irqchip/Kconfig          |   3 +
+ drivers/irqchip/Makefile         |   1 +
+ drivers/irqchip/irq-mvebu-gicp.c | 268 +++++++++++++++++++++++++++++++++++++++
+ drivers/irqchip/irq-mvebu-gicp.h |  10 ++
+ 4 files changed, 282 insertions(+)
+ create mode 100644 drivers/irqchip/irq-mvebu-gicp.c
+ create mode 100644 drivers/irqchip/irq-mvebu-gicp.h
 
 diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index e527ee5..676232a 100644
+index 478f8ac..e527ee5 100644
 --- a/drivers/irqchip/Kconfig
 +++ b/drivers/irqchip/Kconfig
-@@ -271,6 +271,9 @@ config IRQ_MXS
- config MVEBU_GICP
- 	bool
+@@ -268,6 +268,9 @@ config IRQ_MXS
+ 	select IRQ_DOMAIN
+ 	select STMP_DEVICE
  
-+config MVEBU_ICU
++config MVEBU_GICP
 +	bool
 +
  config MVEBU_ODMI
  	bool
  	select GENERIC_MSI_IRQ_DOMAIN
 diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index 11eb858..18fa5fa 100644
+index b64c59b..11eb858 100644
 --- a/drivers/irqchip/Makefile
 +++ b/drivers/irqchip/Makefile
-@@ -70,6 +70,7 @@ obj-$(CONFIG_INGENIC_IRQ)		+= irq-ingenic.o
+@@ -69,6 +69,7 @@ obj-$(CONFIG_ARCH_SA1100)		+= irq-sa11x0.o
+ obj-$(CONFIG_INGENIC_IRQ)		+= irq-ingenic.o
  obj-$(CONFIG_IMX_GPCV2)			+= irq-imx-gpcv2.o
  obj-$(CONFIG_PIC32_EVIC)		+= irq-pic32-evic.o
- obj-$(CONFIG_MVEBU_GICP)		+= irq-mvebu-gicp.o
-+obj-$(CONFIG_MVEBU_ICU)			+= irq-mvebu-icu.o
++obj-$(CONFIG_MVEBU_GICP)		+= irq-mvebu-gicp.o
  obj-$(CONFIG_MVEBU_ODMI)		+= irq-mvebu-odmi.o
  obj-$(CONFIG_MVEBU_PIC)			+= irq-mvebu-pic.o
  obj-$(CONFIG_LS_SCFG_MSI)		+= irq-ls-scfg-msi.o
-diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
+diff --git a/drivers/irqchip/irq-mvebu-gicp.c b/drivers/irqchip/irq-mvebu-gicp.c
 new file mode 100644
-index 0000000..6b33998
+index 0000000..18ef728
 --- /dev/null
-+++ b/drivers/irqchip/irq-mvebu-icu.c
-@@ -0,0 +1,299 @@
++++ b/drivers/irqchip/irq-mvebu-gicp.c
+@@ -0,0 +1,268 @@
 +/*
 + * Copyright (C) 2017 Marvell
 + *
-+ * Hanna Hawa <hannah@marvell.com>
 + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 + *
 + * This file is licensed under the terms of the GNU General Public
@@ -72,314 +65,279 @@ index 0000000..6b33998
 + * warranty of any kind, whether express or implied.
 + */
 +
-+#include <linux/interrupt.h>
++#include <linux/io.h>
 +#include <linux/irq.h>
-+#include <linux/irqchip.h>
 +#include <linux/irqdomain.h>
-+#include <linux/kernel.h>
 +#include <linux/msi.h>
++#include <linux/of.h>
 +#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
 +#include <linux/platform_device.h>
 +
-+#include <dt-bindings/interrupt-controller/mvebu-icu.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
 +
 +#include "irq-mvebu-gicp.h"
 +
-+/* ICU registers */
-+#define ICU_SETSPI_NSR_AL	0x10
-+#define ICU_SETSPI_NSR_AH	0x14
-+#define ICU_CLRSPI_NSR_AL	0x18
-+#define ICU_CLRSPI_NSR_AH	0x1c
-+#define ICU_INT_CFG(x)          (0x100 + 4 * (x))
-+#define   ICU_INT_ENABLE	BIT(24)
-+#define   ICU_IS_EDGE		BIT(28)
-+#define   ICU_GROUP_SHIFT	29
++#define GICP_SETSPI_NSR_OFFSET	0x0
++#define GICP_CLRSPI_NSR_OFFSET	0x8
 +
-+/* ICU definitions */
-+#define ICU_MAX_IRQS		207
-+#define ICU_SATA0_ICU_ID	109
-+#define ICU_SATA1_ICU_ID	107
-+
-+struct mvebu_icu {
-+	struct irq_chip irq_chip;
-+	void __iomem *base;
-+	struct irq_domain *domain;
-+	struct device *dev;
-+	struct mvebu_gicp *gicp;
++struct mvebu_gicp_spi_range {
++	unsigned int start;
++	unsigned int count;
 +};
 +
-+struct mvebu_icu_irq_data {
-+	struct mvebu_icu *icu;
-+	unsigned int icu_group;
-+	unsigned int type;
-+};
-+
-+static void mvebu_icu_write_msg(struct msi_desc *desc, struct msi_msg *msg)
-+{
-+	struct irq_data *d = irq_get_irq_data(desc->irq);
-+	struct mvebu_icu_irq_data *icu_irqd = d->chip_data;
-+	struct mvebu_icu *icu = icu_irqd->icu;
-+	unsigned int icu_int;
-+
-+	if (msg->address_lo) {
-+		/* Configure the ICU with irq number & type */
-+		icu_int = msg->data | ICU_INT_ENABLE;
-+		if (icu_irqd->type & IRQ_TYPE_EDGE_RISING)
-+			icu_int |= ICU_IS_EDGE;
-+		icu_int |= icu_irqd->icu_group << ICU_GROUP_SHIFT;
-+	} else {
-+		/* De-configure the ICU */
-+		icu_int = 0;
-+	}
-+
-+	writel_relaxed(icu_int, icu->base + ICU_INT_CFG(d->hwirq));
-+
-+	/*
-+	 * The SATA unit has 2 ports, and a dedicated ICU entry per
-+	 * port. The ahci sata driver supports only one irq interrupt
-+	 * per SATA unit. To solve this conflict, we configure the 2
-+	 * SATA wired interrupts in the south bridge into 1 GIC
-+	 * interrupt in the north bridge. Even if only a single port
-+	 * is enabled, if sata node is enabled, both interrupts are
-+	 * configured (regardless of which port is actually in use).
-+	 */
-+	if (d->hwirq == ICU_SATA0_ICU_ID || d->hwirq == ICU_SATA1_ICU_ID) {
-+		writel_relaxed(icu_int,
-+			       icu->base + ICU_INT_CFG(ICU_SATA0_ICU_ID));
-+		writel_relaxed(icu_int,
-+			       icu->base + ICU_INT_CFG(ICU_SATA1_ICU_ID));
-+	}
-+}
-+
-+static int
-+mvebu_icu_irq_domain_translate(struct irq_domain *d, struct irq_fwspec *fwspec,
-+			       unsigned long *hwirq, unsigned int *type)
-+{
-+	struct mvebu_icu *icu = d->host_data;
-+	unsigned int icu_group;
-+
-+	/* Check the count of the parameters in dt */
-+	if (WARN_ON(fwspec->param_count < 3)) {
-+		dev_err(icu->dev, "wrong ICU parameter count %d\n",
-+			fwspec->param_count);
-+		return -EINVAL;
-+	}
-+
-+	/* Only ICU group type is handled */
-+	icu_group = fwspec->param[0];
-+	if (icu_group != ICU_GRP_NSR && icu_group != ICU_GRP_SR &&
-+	    icu_group != ICU_GRP_SEI && icu_group != ICU_GRP_REI) {
-+		dev_err(icu->dev, "wrong ICU group type %x\n", icu_group);
-+		return -EINVAL;
-+	}
-+
-+	*hwirq = fwspec->param[1];
-+	if (*hwirq < 0 || *hwirq >= ICU_MAX_IRQS) {
-+		dev_err(icu->dev, "invalid interrupt number %ld\n", *hwirq);
-+		return -EINVAL;
-+	}
-+
-+	/* Mask the type to prevent wrong DT configuration */
-+	*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
-+
-+	return 0;
-+}
-+
-+static int
-+mvebu_icu_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
-+			   unsigned int nr_irqs, void *args)
-+{
-+	int err;
-+	unsigned long hwirq;
-+	struct irq_fwspec *fwspec = args;
-+	struct mvebu_icu *icu = platform_msi_get_host_data(domain);
-+	struct mvebu_icu_irq_data *icu_irqd;
-+
-+	icu_irqd = kmalloc(sizeof(*icu_irqd), GFP_KERNEL);
-+	if (!icu_irqd)
-+		return -ENOMEM;
-+
-+	err = mvebu_icu_irq_domain_translate(domain, fwspec, &hwirq,
-+					     &icu_irqd->type);
-+	if (err) {
-+		dev_err(icu->dev, "failed to translate ICU parameters\n");
-+		goto free_irqd;
-+	}
-+
-+	icu_irqd->icu_group = fwspec->param[0];
-+	icu_irqd->icu = icu;
-+
-+	err = platform_msi_domain_alloc(domain, virq, nr_irqs);
-+	if (err) {
-+		dev_err(icu->dev, "failed to allocate ICU interrupt in parent domain\n");
-+		goto free_irqd;
-+	}
-+
-+	/* Make sure there is no interrupt left pending by the firmware */
-+	err = irq_set_irqchip_state(virq, IRQCHIP_STATE_PENDING, false);
-+	if (err)
-+		goto free_msi;
-+
-+	err = irq_domain_set_hwirq_and_chip(domain, virq, hwirq,
-+					    &icu->irq_chip, icu_irqd);
-+	if (err) {
-+		dev_err(icu->dev, "failed to set the data to IRQ domain\n");
-+		goto free_msi;
-+	}
-+
-+	return 0;
-+
-+free_msi:
-+	platform_msi_domain_free(domain, virq, nr_irqs);
-+free_irqd:
-+	kfree(icu_irqd);
-+	return err;
-+}
-+
-+static void
-+mvebu_icu_irq_domain_free(struct irq_domain *domain, unsigned int virq,
-+			  unsigned int nr_irqs)
-+{
-+	struct irq_data *d = irq_get_irq_data(virq);
-+	struct mvebu_icu_irq_data *icu_irqd = d->chip_data;
-+
-+	kfree(icu_irqd);
-+
-+	platform_msi_domain_free(domain, virq, nr_irqs);
-+}
-+
-+static const struct irq_domain_ops mvebu_icu_domain_ops = {
-+	.translate = mvebu_icu_irq_domain_translate,
-+	.alloc     = mvebu_icu_irq_domain_alloc,
-+	.free      = mvebu_icu_irq_domain_free,
-+};
-+
-+static int mvebu_icu_probe(struct platform_device *pdev)
-+{
-+	struct mvebu_icu *icu;
-+	struct device_node *node = pdev->dev.of_node;
-+	struct platform_device *gicp_pdev;
-+	struct device_node *gicp_dn;
++struct mvebu_gicp {
++	struct mvebu_gicp_spi_range *spi_ranges;
++	unsigned int spi_ranges_cnt;
++	unsigned int spi_cnt;
++	unsigned long *spi_bitmap;
++	spinlock_t spi_lock;
 +	struct resource *res;
-+	phys_addr_t setspi, clrspi;
-+	u32 i, icu_int;
++	struct device *dev;
++};
 +
-+	icu = devm_kzalloc(&pdev->dev, sizeof(struct mvebu_icu),
-+			   GFP_KERNEL);
-+	if (!icu)
-+		return -ENOMEM;
++static int gicp_idx_to_spi(struct mvebu_gicp *gicp, int idx)
++{
++	int i;
 +
-+	icu->dev = &pdev->dev;
++	for (i = 0; i < gicp->spi_ranges_cnt; i++) {
++		struct mvebu_gicp_spi_range *r = &gicp->spi_ranges[i];
 +
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	icu->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(icu->base)) {
-+		dev_err(&pdev->dev, "Failed to map icu base address.\n");
-+		return PTR_ERR(icu->base);
++		if (idx < r->count)
++			return r->start + idx;
++
++		idx -= r->count;
 +	}
 +
-+	icu->irq_chip.name = devm_kasprintf(&pdev->dev, GFP_KERNEL,
-+					    "ICU.%x",
-+					    (unsigned int)res->start);
-+	if (!icu->irq_chip.name)
++	return -EINVAL;
++}
++
++phys_addr_t mvebu_gicp_setspi_phys_addr(struct mvebu_gicp *gicp)
++{
++	return gicp->res->start + GICP_SETSPI_NSR_OFFSET;
++}
++
++phys_addr_t mvebu_gicp_clrspi_phys_addr(struct mvebu_gicp *gicp)
++{
++	return gicp->res->start + GICP_CLRSPI_NSR_OFFSET;
++}
++
++static void gicp_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
++{
++	struct mvebu_gicp *gicp = data->chip_data;
++	phys_addr_t setspi = gicp->res->start + GICP_SETSPI_NSR_OFFSET;
++
++	msg->data = data->hwirq;
++	msg->address_lo = lower_32_bits(setspi);
++	msg->address_hi = upper_32_bits(setspi);
++}
++
++static struct irq_chip gicp_irq_chip = {
++	.name			= "GICP",
++	.irq_mask		= irq_chip_mask_parent,
++	.irq_unmask		= irq_chip_unmask_parent,
++	.irq_eoi		= irq_chip_eoi_parent,
++	.irq_set_affinity	= irq_chip_set_affinity_parent,
++	.irq_set_type		= irq_chip_set_type_parent,
++	.irq_compose_msi_msg	= gicp_compose_msi_msg,
++};
++
++static int gicp_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
++				 unsigned int nr_irqs, void *args)
++{
++	struct mvebu_gicp *gicp = domain->host_data;
++	struct irq_fwspec fwspec;
++	unsigned int hwirq;
++	int ret;
++
++	spin_lock(&gicp->spi_lock);
++	hwirq = find_first_zero_bit(gicp->spi_bitmap, gicp->spi_cnt);
++	if (hwirq == gicp->spi_cnt) {
++		spin_unlock(&gicp->spi_lock);
++		return -ENOSPC;
++	}
++	__set_bit(hwirq, gicp->spi_bitmap);
++	spin_unlock(&gicp->spi_lock);
++
++	fwspec.fwnode = domain->parent->fwnode;
++	fwspec.param_count = 3;
++	fwspec.param[0] = GIC_SPI;
++	fwspec.param[1] = gicp_idx_to_spi(gicp, hwirq) - 32;
++	/*
++	 * Assume edge rising for now, it will be properly set when
++	 * ->set_type() is called
++	 */
++	fwspec.param[2] = IRQ_TYPE_EDGE_RISING;
++
++	ret = irq_domain_alloc_irqs_parent(domain, virq, 1, &fwspec);
++	if (ret) {
++		dev_err(gicp->dev, "Cannot allocate parent IRQ\n");
++		goto free_hwirq;
++	}
++
++	ret = irq_domain_set_hwirq_and_chip(domain, virq, hwirq,
++					    &gicp_irq_chip, gicp);
++	if (ret)
++		goto free_irqs_parent;
++
++	return 0;
++
++free_irqs_parent:
++	irq_domain_free_irqs_parent(domain, virq, nr_irqs);
++free_hwirq:
++	spin_lock(&gicp->spi_lock);
++	__clear_bit(hwirq, gicp->spi_bitmap);
++	spin_unlock(&gicp->spi_lock);
++	return ret;
++}
++
++static void gicp_irq_domain_free(struct irq_domain *domain,
++				 unsigned int virq, unsigned int nr_irqs)
++{
++	struct mvebu_gicp *gicp = domain->host_data;
++	struct irq_data *d = irq_domain_get_irq_data(domain, virq);
++
++	if (d->hwirq >= gicp->spi_cnt) {
++		dev_err(gicp->dev, "Invalid hwirq %lu\n", d->hwirq);
++		return;
++	}
++
++	irq_domain_free_irqs_parent(domain, virq, nr_irqs);
++
++	spin_lock(&gicp->spi_lock);
++	__clear_bit(d->hwirq, gicp->spi_bitmap);
++	spin_unlock(&gicp->spi_lock);
++}
++
++static const struct irq_domain_ops gicp_domain_ops = {
++	.alloc	= gicp_irq_domain_alloc,
++	.free	= gicp_irq_domain_free,
++};
++
++static struct irq_chip gicp_msi_irq_chip = {
++	.name		= "GICP",
++	.irq_set_type	= irq_chip_set_type_parent,
++};
++
++static struct msi_domain_ops gicp_msi_ops = {
++};
++
++static struct msi_domain_info gicp_msi_domain_info = {
++	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS),
++	.ops	= &gicp_msi_ops,
++	.chip	= &gicp_msi_irq_chip,
++};
++
++static int mvebu_gicp_probe(struct platform_device *pdev)
++{
++	struct mvebu_gicp *gicp;
++	struct irq_domain *inner_domain, *plat_domain, *parent_domain;
++	struct device_node *node = pdev->dev.of_node;
++	struct device_node *irq_parent_dn;
++	int ret, i;
++
++	gicp = devm_kzalloc(&pdev->dev, sizeof(*gicp), GFP_KERNEL);
++	if (!gicp)
 +		return -ENOMEM;
 +
-+	icu->irq_chip.irq_mask = irq_chip_mask_parent;
-+	icu->irq_chip.irq_unmask = irq_chip_unmask_parent;
-+	icu->irq_chip.irq_eoi = irq_chip_eoi_parent;
-+	icu->irq_chip.irq_set_type = irq_chip_set_type_parent;
-+#ifdef CONFIG_SMP
-+	icu->irq_chip.irq_set_affinity = irq_chip_set_affinity_parent;
-+#endif
++	gicp->dev = &pdev->dev;
 +
-+	/*
-+	 * We're probed after MSI domains have been resolved, so force
-+	 * resolution here.
-+	 */
-+	pdev->dev.msi_domain = of_msi_get_domain(&pdev->dev, node,
-+						 DOMAIN_BUS_PLATFORM_MSI);
-+	if (!pdev->dev.msi_domain)
-+		return -EPROBE_DEFER;
++	gicp->res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!gicp->res)
++		return -ENODEV;
 +
-+	gicp_dn = of_parse_phandle(node, "msi-parent", 0);
-+	if (!gicp_dn) {
-+		dev_err(&pdev->dev, "Missing marvell,gicp property.\n");
++	ret = of_property_count_u32_elems(node, "marvell,spi-ranges");
++	if (ret < 0)
++		return ret;
++
++	gicp->spi_ranges_cnt = ret / 2;
++
++	gicp->spi_ranges =
++		devm_kzalloc(&pdev->dev,
++			     gicp->spi_ranges_cnt *
++			     sizeof(struct mvebu_gicp_spi_range),
++			     GFP_KERNEL);
++	if (!gicp->spi_ranges)
++		return -ENOMEM;
++
++	for (i = 0; i < gicp->spi_ranges_cnt; i++) {
++		of_property_read_u32_index(node, "marvell,spi-ranges",
++					   i * 2,
++					   &gicp->spi_ranges[i].start);
++
++		of_property_read_u32_index(node, "marvell,spi-ranges",
++					   i * 2 + 1,
++					   &gicp->spi_ranges[i].count);
++
++		gicp->spi_cnt += gicp->spi_ranges[i].count;
++	}
++
++	gicp->spi_bitmap = devm_kzalloc(&pdev->dev,
++					BITS_TO_LONGS(gicp->spi_cnt),
++					GFP_KERNEL);
++	if (!gicp->spi_bitmap)
++		return -ENOMEM;
++
++	irq_parent_dn = of_irq_find_parent(node);
++	if (!irq_parent_dn) {
++		dev_err(&pdev->dev, "failed to find parent IRQ node\n");
 +		return -ENODEV;
 +	}
 +
-+	gicp_pdev = of_find_device_by_node(gicp_dn);
-+	if (!gicp_pdev) {
-+		dev_err(&pdev->dev, "Cannot find gicp device.\n");
++	parent_domain = irq_find_host(irq_parent_dn);
++	if (!parent_domain) {
++		dev_err(&pdev->dev, "failed to find parent IRQ domain\n");
 +		return -ENODEV;
 +	}
 +
-+	icu->gicp = platform_get_drvdata(gicp_pdev);
++	inner_domain = irq_domain_create_hierarchy(parent_domain, 0,
++						   gicp->spi_cnt,
++						   of_node_to_fwnode(node),
++						   &gicp_domain_ops, gicp);
++	if (!inner_domain)
++		return -ENOMEM;
 +
-+	/* Set Clear/Set ICU SPI message address in AP */
-+	setspi = mvebu_gicp_setspi_phys_addr(icu->gicp);
-+	writel_relaxed(upper_32_bits(setspi), icu->base + ICU_SETSPI_NSR_AH);
-+	writel_relaxed(lower_32_bits(setspi), icu->base + ICU_SETSPI_NSR_AL);
-+	clrspi = mvebu_gicp_clrspi_phys_addr(icu->gicp);
-+	writel_relaxed(upper_32_bits(clrspi), icu->base + ICU_CLRSPI_NSR_AH);
-+	writel_relaxed(lower_32_bits(clrspi), icu->base + ICU_CLRSPI_NSR_AL);
 +
-+	/*
-+	 * Clean all ICU interrupts with type SPI_NSR, required to
-+	 * avoid unpredictable SPI assignments done by firmware.
-+	 */
-+	for (i = 0 ; i < ICU_MAX_IRQS ; i++) {
-+		icu_int = readl(icu->base + ICU_INT_CFG(i));
-+		if ((icu_int >> ICU_GROUP_SHIFT) == ICU_GRP_NSR)
-+			writel_relaxed(0x0, icu->base + ICU_INT_CFG(i));
-+	}
-+
-+	icu->domain =
-+		platform_msi_create_device_domain(&pdev->dev, ICU_MAX_IRQS,
-+						  mvebu_icu_write_msg,
-+						  &mvebu_icu_domain_ops, icu);
-+	if (!icu->domain) {
-+		dev_err(&pdev->dev, "Failed to create ICU domain\n");
-+		put_device(&gicp_pdev->dev);
++	plat_domain = platform_msi_create_irq_domain(of_node_to_fwnode(node),
++						     &gicp_msi_domain_info,
++						     inner_domain);
++	if (!plat_domain) {
++		irq_domain_remove(inner_domain);
 +		return -ENOMEM;
 +	}
++
++	platform_set_drvdata(pdev, gicp);
 +
 +	return 0;
 +}
 +
-+static const struct of_device_id mvebu_icu_of_match[] = {
-+	{ .compatible = "marvell,cp110-icu", },
++static const struct of_device_id mvebu_gicp_of_match[] = {
++	{ .compatible = "marvell,ap806-gicp", },
 +	{},
 +};
 +
-+static struct platform_driver mvebu_icu_driver = {
-+	.probe  = mvebu_icu_probe,
++static struct platform_driver mvebu_gicp_driver = {
++	.probe  = mvebu_gicp_probe,
 +	.driver = {
-+		.name = "mvebu-icu",
-+		.of_match_table = mvebu_icu_of_match,
++		.name = "mvebu-gicp",
++		.of_match_table = mvebu_gicp_of_match,
 +	},
 +};
-+builtin_platform_driver(mvebu_icu_driver);
-diff --git a/include/dt-bindings/interrupt-controller/mvebu-icu.h b/include/dt-bindings/interrupt-controller/mvebu-icu.h
++builtin_platform_driver(mvebu_gicp_driver);
+diff --git a/drivers/irqchip/irq-mvebu-gicp.h b/drivers/irqchip/irq-mvebu-gicp.h
 new file mode 100644
-index 0000000..8249558
+index 0000000..f4adc30
 --- /dev/null
-+++ b/include/dt-bindings/interrupt-controller/mvebu-icu.h
-@@ -0,0 +1,15 @@
-+/*
-+ * This header provides constants for the MVEBU ICU driver.
-+ */
++++ b/drivers/irqchip/irq-mvebu-gicp.h
+@@ -0,0 +1,10 @@
++#ifndef __MVEBU_GICP_H__
++#define __MVEBU_GICP_H__
 +
-+#ifndef _DT_BINDINGS_INTERRUPT_CONTROLLER_MVEBU_ICU_H
-+#define _DT_BINDINGS_INTERRUPT_CONTROLLER_MVEBU_ICU_H
++struct mvebu_gicp;
 +
-+/* interrupt specifier cell 0 */
++phys_addr_t mvebu_gicp_setspi_phys_addr(struct mvebu_gicp *gicp);
++phys_addr_t mvebu_gicp_clrspi_phys_addr(struct mvebu_gicp *gicp);
 +
-+#define ICU_GRP_NSR		0x0
-+#define ICU_GRP_SR		0x1
-+#define ICU_GRP_SEI		0x4
-+#define ICU_GRP_REI		0x5
++#endif /* __MVEBU_GICP_H__ */
 +
-+#endif
 -- 
 2.9.4
