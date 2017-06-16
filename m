@@ -1,81 +1,142 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 16 Jun 2017 18:15:30 +0530
-Subject: [PATCH 02/16] mmc: host: omap_hsmmc: Separate setting voltage
- capabilities from bus power
+Date: Fri, 16 Jun 2017 18:15:44 +0530
+Subject: [PATCH 16/16] ARM: dts: dra7: Add supported MMC/SD modes in MMC dt
+ nodes
 In-Reply-To: <20170616124544.15046-1-kishon@ti.com>
 References: <20170616124544.15046-1-kishon@ti.com>
-Message-ID: <20170616124544.15046-3-kishon@ti.com>
+Message-ID: <20170616124544.15046-17-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a separate function to set the voltage capabilities of the host
-controller. Voltage capabilities should be set only once during
-controller initialization but bus power can be changed every time there
-is a voltage switch and whenever a different card is inserted.
-This allows omap_hsmmc_conf_bus_power to be invoked every time there
-is a voltage switch.
+On DRA7 family SoCs, MMC1 controller supports SDR104,
+SDR50, DDR50, SDR25 and SDR12 UHS modes (These UHS modes
+are not supported in beagle-x15 because it's not possible
+to switch IO lines supply voltage to 1.8v).
+
+MMC2 controller supports HS200 and DDR modes. (Since some of the
+boards like am57xx-evm reva3, beagle-x15 and am57xx idk has
+3.3v line connected to IO lines, HS200 cannot be supported
+in these boards).
+
+MMC3 controller supports SDR12, SDR25 and SDR50 modes.
+
+MMC4 controller supports SDR12 and SDR25 modes.
+
+Add these supported modes in device-tree file.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 ---
- drivers/mmc/host/omap_hsmmc.c | 28 +++++++++++++++++++---------
- 1 file changed, 19 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/am571x-idk.dts              |  1 +
+ arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts |  1 +
+ arch/arm/boot/dts/am57xx-beagle-x15.dts       |  6 ++++++
+ arch/arm/boot/dts/am57xx-idk-common.dtsi      |  1 +
+ arch/arm/boot/dts/dra7.dtsi                   | 14 ++++++++++++++
+ 5 files changed, 23 insertions(+)
 
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index 48bb06788d9f..c9ea41bb4e3a 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -1799,25 +1799,34 @@ static int omap_hsmmc_configure_wake_irq(struct omap_hsmmc_host *host)
- 	return ret;
- }
+diff --git a/arch/arm/boot/dts/am571x-idk.dts b/arch/arm/boot/dts/am571x-idk.dts
+index 875291d1bdd7..bdf39d47948f 100644
+--- a/arch/arm/boot/dts/am571x-idk.dts
++++ b/arch/arm/boot/dts/am571x-idk.dts
+@@ -90,4 +90,5 @@
+ 	pinctrl-0 = <&mmc2_pins_default>;
+ 	pinctrl-1 = <&mmc2_pins_hs>;
+ 	pinctrl-2 = <&mmc2_pins_ddr_rev20 &mmc2_iodelay_ddr_conf>;
++	/delete-property/ mmc-hs200-1_8v;
+ };
+diff --git a/arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts b/arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts
+index 5a77b334923d..17a25a74a005 100644
+--- a/arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts
++++ b/arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts
+@@ -36,6 +36,7 @@
+ 	pinctrl-0 = <&mmc2_pins_default>;
+ 	pinctrl-1 = <&mmc2_pins_hs>;
+ 	pinctrl-2 = <&mmc2_pins_ddr_3_3v_rev11 &mmc2_iodelay_ddr_3_3v_rev11_conf>;
++	/delete-property/ mmc-hs200-1_8v;
+ };
  
-+static void omap_hsmmc_set_capabilities(struct omap_hsmmc_host *host)
-+{
-+	u32 val;
-+
-+	val = OMAP_HSMMC_READ(host->base, CAPA);
-+
-+	/* Only MMC1 supports 3.0V */
-+	if (host->pdata->controller_flags & OMAP_HSMMC_SUPPORTS_DUAL_VOLT)
-+		val |= (VS30 | VS18);
-+	else
-+		val |= VS18;
-+
-+	OMAP_HSMMC_WRITE(host->base, CAPA, val);
-+}
-+
- static void omap_hsmmc_conf_bus_power(struct omap_hsmmc_host *host)
- {
--	u32 hctl, capa, value;
-+	u32 hctl, value;
+ /* errata i880 "Ethernet RGMII2 Limited to 10/100 Mbps" */
+diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+index d6689106d2a8..8d9bdf10a7be 100644
+--- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
++++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+@@ -25,6 +25,11 @@
+ 	pinctrl-1 = <&mmc1_pins_hs>;
  
- 	/* Only MMC1 supports 3.0V */
--	if (host->pdata->controller_flags & OMAP_HSMMC_SUPPORTS_DUAL_VOLT) {
-+	if (host->pdata->controller_flags & OMAP_HSMMC_SUPPORTS_DUAL_VOLT)
- 		hctl = SDVS30;
--		capa = VS30 | VS18;
--	} else {
-+	else
- 		hctl = SDVS18;
--		capa = VS18;
--	}
+ 	vmmc-supply = <&ldo1_reg>;
++	/delete-property/ sd-uhs-sdr104;
++	/delete-property/ sd-uhs-sdr50;
++	/delete-property/ sd-uhs-ddr50;
++	/delete-property/ sd-uhs-sdr25;
++	/delete-property/ sd-uhs-sdr12;
+ };
  
- 	value = OMAP_HSMMC_READ(host->base, HCTL) & ~SDVS_MASK;
- 	OMAP_HSMMC_WRITE(host->base, HCTL, value | hctl);
+ &mmc2 {
+@@ -32,6 +37,7 @@
+ 	pinctrl-0 = <&mmc2_pins_default>;
+ 	pinctrl-1 = <&mmc2_pins_hs>;
+ 	pinctrl-2 = <&mmc2_pins_ddr_3_3v_rev11 &mmc2_iodelay_ddr_3_3v_rev11_conf>;
++	/delete-property/ mmc-hs200-1_8v;
+ };
  
--	value = OMAP_HSMMC_READ(host->base, CAPA);
--	OMAP_HSMMC_WRITE(host->base, CAPA, value | capa);
--
- 	/* Set SD bus power bit */
- 	set_sd_bus_power(host);
- }
-@@ -2124,6 +2133,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+ /* errata i880 "Ethernet RGMII2 Limited to 10/100 Mbps" */
+diff --git a/arch/arm/boot/dts/am57xx-idk-common.dtsi b/arch/arm/boot/dts/am57xx-idk-common.dtsi
+index 47b5b384809f..bf5bf8f52c79 100644
+--- a/arch/arm/boot/dts/am57xx-idk-common.dtsi
++++ b/arch/arm/boot/dts/am57xx-idk-common.dtsi
+@@ -413,6 +413,7 @@
+ 	bus-width = <8>;
+ 	ti,non-removable;
+ 	max-frequency = <96000000>;
++	/delete-property/ mmc-hs200-1_8v;
+ };
  
- 	mmc->pm_caps |= mmc_pdata(host)->pm_caps;
+ &dcan1 {
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 52ce3fab483f..22b0ade96237 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -1046,6 +1046,11 @@
+ 			status = "disabled";
+ 			pbias-supply = <&pbias_mmc_reg>;
+ 			max-frequency = <192000000>;
++			sd-uhs-sdr104;
++			sd-uhs-sdr50;
++			sd-uhs-ddr50;
++			sd-uhs-sdr25;
++			sd-uhs-sdr12;
+ 		};
  
-+	omap_hsmmc_set_capabilities(host);
- 	omap_hsmmc_conf_bus_power(host);
+ 		mmc2: mmc at 480b4000 {
+@@ -1058,6 +1063,10 @@
+ 			dma-names = "tx", "rx";
+ 			status = "disabled";
+ 			max-frequency = <192000000>;
++			sd-uhs-sdr25;
++			sd-uhs-sdr12;
++			mmc-hs200-1_8v;
++			mmc-ddr-1_8v;
+ 		};
  
- 	host->rx_chan = dma_request_chan(&pdev->dev, "rx");
+ 		mmc3: mmc at 480ad000 {
+@@ -1071,6 +1080,9 @@
+ 			status = "disabled";
+ 			/* Errata i887 limits max-frequency of MMC3 to 64 MHz */
+ 			max-frequency = <64000000>;
++			sd-uhs-sdr12;
++			sd-uhs-sdr25;
++			sd-uhs-sdr50;
+ 		};
+ 
+ 		mmc4: mmc at 480d1000 {
+@@ -1083,6 +1095,8 @@
+ 			dma-names = "tx", "rx";
+ 			status = "disabled";
+ 			max-frequency = <192000000>;
++			sd-uhs-sdr12;
++			sd-uhs-sdr25;
+ 		};
+ 
+ 		mmu0_dsp1: mmu at 40d01000 {
 -- 
 2.11.0
