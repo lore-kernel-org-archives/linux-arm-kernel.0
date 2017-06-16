@@ -1,59 +1,74 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 16 Jun 2017 11:26:08 +0200
-Subject: [PATCH v3 6/9] pinctrl: mvebu: add driver for Armada CP110 pinctrl
-In-Reply-To: <2d71d93a22ed24c45b7ce7b52fa066cc0a14a69f.1497281623.git-series.gregory.clement@free-electrons.com>
-References: <cover.d003a5e862e6d732d901a61d1765a349c9a89eef.1497281623.git-series.gregory.clement@free-electrons.com>
- <2d71d93a22ed24c45b7ce7b52fa066cc0a14a69f.1497281623.git-series.gregory.clement@free-electrons.com>
-Message-ID: <CACRpkdb+D+a9S4UCjex_P1YEATj9RhSu4i0fy50AopAJ1MOzXA@mail.gmail.com>
+From: frank.wang@rock-chips.com (Frank Wang)
+Date: Fri, 16 Jun 2017 17:24:23 +0800
+Subject: [PATCH 6/6] ARM: dts: rockchip: add efuse device node for rk3228
+In-Reply-To: <2537345.MJmYY2BcSn@phil>
+References: <1497510980-23207-1-git-send-email-frank.wang@rock-chips.com>
+ <1497511396-23308-1-git-send-email-frank.wang@rock-chips.com>
+ <2537345.MJmYY2BcSn@phil>
+Message-ID: <da5fbd76-c9a1-a16f-3ed8-adfd2b1c346f@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 12, 2017 at 5:34 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
+Hi Heiko,
 
-> From: Hanna Hawa <hannah@marvell.com>
+On 2017/6/15 23:10, Heiko Stuebner wrote:
+> Hi Frank,
 >
-> This commit adds a pinctrl driver for the CP110 part of the Marvell
-> Armada 7K and 8K SoCs. The Armada 7K has a single CP110, where almost all
-> the MPP pins are available. On the other side, the Armada 8K has two
-> CP110, and the available MPPs are split between the master CP110 (MPPs 32
-> to 62) and the slave CP110 (MPPs 0 to 31).
->
-> The register interface to control the MPPs is however the same as all
-> other mvebu SoCs, so we can reuse the common pinctrl-mvebu.c logic.
->
-> Signed-off-by: Hanna Hawa <hannah@marvell.com>
-> Reviewed-by: Shadi Ammouri <shadi@marvell.com>
->
-> [updated for mvebu pinctrl and 4.9 changes:
->  - converted to simple_mmio
->  - converted to syscon/regmap
->  - removed unimplemented .remove function
->  - dropped DTS changes
->  - defered gpio ranges to DT
->  - fixed warning
->  - properly set soc->nmodes
->  -- rmk]
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
->
-> [ add missing MPP[61:56] function 14 (SDIO)
-> -- Konstantin Porotchkin]
-> Signed-off-by: Konstantin Porotchkin <kostap@marvell.com>
->
-> [ allow to properly register more then one instance of this driver
-> -- Grzegorz Jaszczyk]
-> Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
->
-> [ - rebased on 4.12-rc1
->   - fixed the 80 character limit for mvebu_mpp_mode array
->   - aligned the compatible name on the ones already used
->   - fixed the MPP table for CP110: some MPP are not available on Armada 7K
-> -- Gregory CLEMENT]
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->
-> Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Am Donnerstag, 15. Juni 2017, 15:23:16 CEST schrieb Frank Wang:
+>> From: Finley Xiao <finley.xiao@rock-chips.com>
+>>
+>> Add a efuse node in the device tree for the rk3228 SoC.
+>>
+>> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+>> ---
+>>   arch/arm/boot/dts/rk322x.dtsi | 17 +++++++++++++++++
+>>   1 file changed, 17 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
+>> index c2a78f4..dad195e 100644
+>> --- a/arch/arm/boot/dts/rk322x.dtsi
+>> +++ b/arch/arm/boot/dts/rk322x.dtsi
+>> @@ -314,6 +314,23 @@
+>>   		status = "disabled";
+>>   	};
+>>   
+>> +	efuse: efuse at 11040000 {
+>> +		compatible = "rockchip,rk322x-efuse";
+> was this binding included already? Simply because compatibles should
+> not contain placeholders, so rockchip,rk3228-efuse please - same for
+> the driver side.
 
-Patch applied.
+Actually, I always remember it should be without placeholders from the 
+first time you commented :-)
+but I saw that the binding and driver (rockchip,rk322x-efuse) have 
+already been applied, so I send this one keep the same with driver side.
+Shall I resend a new patch to correct both of them to 
+'rockchip,rk3228-efuse' ?
 
-Yours,
-Linus Walleij
+
+BR.
+Frank
+
+>
+> Heiko
+>
+>
+>> +		reg = <0x11040000 0x20>;
+>> +		#address-cells = <1>;
+>> +		#size-cells = <1>;
+>> +		clocks = <&cru PCLK_EFUSE_256>;
+>> +		clock-names = "pclk_efuse";
+>> +
+>> +		/* Data cells */
+>> +		efuse_id: id at 7 {
+>> +			reg = <0x7 0x10>;
+>> +		};
+>> +		cpu_leakage: cpu_leakage at 17 {
+>> +			reg = <0x17 0x1>;
+>> +		};
+>> +	};
+>> +
+>>   	i2c0: i2c at 11050000 {
+>>   		compatible = "rockchip,rk3228-i2c";
+>>   		reg = <0x11050000 0x1000>;
+>>
