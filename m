@@ -1,37 +1,40 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 16 Jun 2017 08:59:13 +0200
-Subject: linux-next: bad commit in the mvebu tree
-In-Reply-To: <20170616055732.4114daed@canb.auug.org.au> (Stephen Rothwell's
- message of "Fri, 16 Jun 2017 05:57:32 +1000")
-References: <20170616055732.4114daed@canb.auug.org.au>
-Message-ID: <87tw3g5sfy.fsf@free-electrons.com>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Fri, 16 Jun 2017 12:34:37 +0530
+Subject: [PATCH v4 1/4] ARM: dts: imx6ul-geam-kit: Remove re-enabled usdhc1
+Message-ID: <1497596680-3186-1-git-send-email-jteki@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+From: Jagan Teki <jagan@amarulasolutions.com>
+
+usdhc1 is enabled and assigned pinctrl-0 on imx6ul-geam.dtsi
+but same thing done on imx6ul-geam-kit.dts, so remove this
+re-enabled node from the same.
+
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+Changes for v4:
+- New patch
+
+ arch/arm/boot/dts/imx6ul-geam-kit.dts | 6 ------
+ 1 file changed, 6 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6ul-geam-kit.dts b/arch/arm/boot/dts/imx6ul-geam-kit.dts
+index 142e60c..40de2d7 100644
+--- a/arch/arm/boot/dts/imx6ul-geam-kit.dts
++++ b/arch/arm/boot/dts/imx6ul-geam-kit.dts
+@@ -88,12 +88,6 @@
+ 	};
+ };
  
- On jeu., juin 15 2017, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-
-> Hi all,
->
-> I noticed that commit
->
->   c6f4e66bd0f4 ("arm64: marvell: dts: add xmdio nodes for 7k/8k")
->
-> has no Signed-off-by for its comitter.
-
-Thanks for the warning, I fix it right now.
-
-Gregory
-
-
->
-> -- 
-> Cheers,
-> Stephen Rothwell
-
+-&usdhc1 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_usdhc1>;
+-	status = "okay";
+-};
+-
+ &tsc {
+ 	measure-delay-time = <0x1ffff>;
+ 	pre-charge-time = <0x1fff>;
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.7.4
