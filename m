@@ -1,106 +1,27 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Jun 2017 15:31:09 +0200
-Subject: [PATCH] soc: renesas: rcar-sysc: Use GENPD_FLAG_ALWAYS_ON
-In-Reply-To: <cover.1497619041.git.horms+renesas@verge.net.au>
-References: <cover.1497619041.git.horms+renesas@verge.net.au>
-Message-ID: <980532a5dda319eeafadc5c590376626ad178f4f.1497619041.git.horms+renesas@verge.net.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 16 Jun 2017 15:36:44 +0200
+Subject: [RESEND PATCH v5 06/16] ARM: dts: r7s72100: Add generic
+ compatible string for I2C EEPROM
+In-Reply-To: <20170615185418.13980-7-javier@dowhile0.org>
+References: <20170615185418.13980-1-javier@dowhile0.org>
+ <20170615185418.13980-7-javier@dowhile0.org>
+Message-ID: <20170616133644.GA26834@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+On Thu, Jun 15, 2017 at 08:54:08PM +0200, Javier Martinez Canillas wrote:
+> The at24 driver allows to register I2C EEPROM chips using different vendor
+> and devices, but the I2C subsystem does not take the vendor into account
+> when matching using the I2C table since it only has device entries.
+> 
+> But when matching using an OF table, both the vendor and device has to be
+> taken into account so the driver defines only a set of compatible strings
+> using the "atmel" vendor as a generic fallback for compatible I2C devices.
+> 
+> So add this generic fallback to the device node compatible string to make
+> the device to match the driver using the OF device ID table.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Improve handling of always-on PM domains by using the
-GENPD_FLAG_ALWAYS_ON flag introduced in commit ffaa42e8a40b7f10 ("PM /
-Domains: Enable users of genpd to specify always on PM domains").
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- drivers/soc/renesas/rcar-sysc.c | 28 ++++------------------------
- drivers/soc/renesas/rcar-sysc.h |  2 --
- 2 files changed, 4 insertions(+), 26 deletions(-)
-
-diff --git a/drivers/soc/renesas/rcar-sysc.c b/drivers/soc/renesas/rcar-sysc.c
-index 528a13742aeb..d86bc6c84ea4 100644
---- a/drivers/soc/renesas/rcar-sysc.c
-+++ b/drivers/soc/renesas/rcar-sysc.c
-@@ -181,17 +181,6 @@ static int rcar_sysc_pd_power_off(struct generic_pm_domain *genpd)
- 	struct rcar_sysc_pd *pd = to_rcar_pd(genpd);
- 
- 	pr_debug("%s: %s\n", __func__, genpd->name);
--
--	if (pd->flags & PD_NO_CR) {
--		pr_debug("%s: Cannot control %s\n", __func__, genpd->name);
--		return -EBUSY;
--	}
--
--	if (pd->flags & PD_BUSY) {
--		pr_debug("%s: %s busy\n", __func__, genpd->name);
--		return -EBUSY;
--	}
--
- 	return rcar_sysc_power_down(&pd->ch);
- }
- 
-@@ -200,12 +189,6 @@ static int rcar_sysc_pd_power_on(struct generic_pm_domain *genpd)
- 	struct rcar_sysc_pd *pd = to_rcar_pd(genpd);
- 
- 	pr_debug("%s: %s\n", __func__, genpd->name);
--
--	if (pd->flags & PD_NO_CR) {
--		pr_debug("%s: Cannot control %s\n", __func__, genpd->name);
--		return 0;
--	}
--
- 	return rcar_sysc_power_up(&pd->ch);
- }
- 
-@@ -223,8 +206,7 @@ static void __init rcar_sysc_pd_setup(struct rcar_sysc_pd *pd)
- 		 * only be turned off if the CPU is not in use.
- 		 */
- 		pr_debug("PM domain %s contains %s\n", name, "CPU");
--		pd->flags |= PD_BUSY;
--		gov = &pm_domain_always_on_gov;
-+		genpd->flags |= GENPD_FLAG_ALWAYS_ON;
- 	} else if (pd->flags & PD_SCU) {
- 		/*
- 		 * This domain contains an SCU and cache-controller, and
-@@ -232,19 +214,17 @@ static void __init rcar_sysc_pd_setup(struct rcar_sysc_pd *pd)
- 		 * not in use.
- 		 */
- 		pr_debug("PM domain %s contains %s\n", name, "SCU");
--		pd->flags |= PD_BUSY;
--		gov = &pm_domain_always_on_gov;
-+		genpd->flags |= GENPD_FLAG_ALWAYS_ON;
- 	} else if (pd->flags & PD_NO_CR) {
- 		/*
- 		 * This domain cannot be turned off.
- 		 */
--		pd->flags |= PD_BUSY;
--		gov = &pm_domain_always_on_gov;
-+		genpd->flags |= GENPD_FLAG_ALWAYS_ON;
- 	}
- 
- 	if (!(pd->flags & (PD_CPU | PD_SCU))) {
- 		/* Enable Clock Domain for I/O devices */
--		genpd->flags = GENPD_FLAG_PM_CLK;
-+		genpd->flags |= GENPD_FLAG_PM_CLK;
- 		if (has_cpg_mstp) {
- 			genpd->attach_dev = cpg_mstp_attach_dev;
- 			genpd->detach_dev = cpg_mstp_detach_dev;
-diff --git a/drivers/soc/renesas/rcar-sysc.h b/drivers/soc/renesas/rcar-sysc.h
-index 07edb049a401..1a5bebaf54ba 100644
---- a/drivers/soc/renesas/rcar-sysc.h
-+++ b/drivers/soc/renesas/rcar-sysc.h
-@@ -20,8 +20,6 @@
- #define PD_SCU		BIT(1)	/* Area contains SCU and L2 cache */
- #define PD_NO_CR	BIT(2)	/* Area lacks PWR{ON,OFF}CR registers */
- 
--#define PD_BUSY		BIT(3)	/* Busy, for internal use only */
--
- #define PD_CPU_CR	PD_CPU		  /* CPU area has CR (R-Car H1) */
- #define PD_CPU_NOCR	PD_CPU | PD_NO_CR /* CPU area lacks CR (R-Car Gen2/3) */
- #define PD_ALWAYS_ON	PD_NO_CR	  /* Always-on area */
--- 
-2.1.4
+Thanks, I have queued this up in the renesas tree for v4.14.
