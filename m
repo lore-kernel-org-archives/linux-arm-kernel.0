@@ -1,163 +1,124 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Jun 2017 15:30:46 +0200
-Subject: [PATCH 6/6] ARM: dts: r8a779x: Fix PCI bus dtc warnings
+Date: Fri, 16 Jun 2017 15:30:41 +0200
+Subject: [PATCH 1/6] ARM: dts: gose: add HDMI input
 In-Reply-To: <cover.1497618353.git.horms+renesas@verge.net.au>
 References: <cover.1497618353.git.horms+renesas@verge.net.au>
-Message-ID: <f7d569c1e6a6fa731fc34083a9f0191b7360eeb1.1497618353.git.horms+renesas@verge.net.au>
+Message-ID: <bc63cd87f3ce924f02e575ffb12f8c10cd7d3780.1497618353.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <robh@kernel.org>
+From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 
-The bogus 'device_type = "pci"' confuses dtc, causing lots of totally
-unrelated warnings.  After fixing that, real warnings like
+Identical to the setup on Koelsch.
 
-    arch/arm/boot/dts/r8a7790-lager.dtb: Warning (pci_device_reg): Node /pci at ee090000/usb at 0,1 PCI unit address format error, expected "1,0"
-
-are left.  Correct the unit-addresses and reg properties of the subnodes
-to fix these.
-
-Signed-off-by: Rob Herring <robh@kernel.org>
-[geert: Improve description]
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 16 ++++++----------
- arch/arm/boot/dts/r8a7791.dtsi | 16 ++++++----------
- arch/arm/boot/dts/r8a7794.dtsi | 16 ++++++----------
- 3 files changed, 18 insertions(+), 30 deletions(-)
+ arch/arm/boot/dts/r8a7793-gose.dts | 68 ++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 66 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 416956a42c93..2805a8608d4b 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -1602,16 +1602,14 @@
- 				 0x0800 0 0 1 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH
- 				 0x1000 0 0 2 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
- 
--		usb at 0,1 {
-+		usb at 1,0 {
- 			reg = <0x800 0 0 0 0>;
--			device_type = "pci";
- 			phys = <&usb0 0>;
- 			phy-names = "usb";
+diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
+index 95e51b79c1d7..30f083528468 100644
+--- a/arch/arm/boot/dts/r8a7793-gose.dts
++++ b/arch/arm/boot/dts/r8a7793-gose.dts
+@@ -253,12 +253,23 @@
  		};
+ 	};
  
--		usb at 0,2 {
-+		usb at 2,0 {
- 			reg = <0x1000 0 0 0 0>;
--			device_type = "pci";
- 			phys = <&usb0 0>;
- 			phy-names = "usb";
- 		};
-@@ -1658,16 +1656,14 @@
- 				 0x0800 0 0 1 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
- 				 0x1000 0 0 2 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
++	hdmi-in {
++		compatible = "hdmi-connector";
++		type = "a";
++
++		port {
++			hdmi_con_in: endpoint {
++				remote-endpoint = <&adv7612_in>;
++			};
++		};
++	};
++
+ 	hdmi-out {
+ 		compatible = "hdmi-connector";
+ 		type = "a";
  
--		usb at 0,1 {
--			reg = <0x800 0 0 0 0>;
--			device_type = "pci";
-+		usb at 1,0 {
-+			reg = <0x20800 0 0 0 0>;
- 			phys = <&usb2 0>;
- 			phy-names = "usb";
+ 		port {
+-			hdmi_con: endpoint {
++			hdmi_con_out: endpoint {
+ 				remote-endpoint = <&adv7511_out>;
+ 			};
  		};
+@@ -395,6 +406,11 @@
+ 		groups = "audio_clk_a";
+ 		function = "audio_clk";
+ 	};
++
++	vin0_pins: vin0 {
++		groups = "vin0_data24", "vin0_sync", "vin0_clkenb", "vin0_clk";
++		function = "vin0";
++	};
+ };
  
--		usb at 0,2 {
--			reg = <0x1000 0 0 0 0>;
--			device_type = "pci";
-+		usb at 2,0 {
-+			reg = <0x21000 0 0 0 0>;
- 			phys = <&usb2 0>;
- 			phy-names = "usb";
+ &ether {
+@@ -552,7 +568,34 @@
+ 			port at 1 {
+ 				reg = <1>;
+ 				adv7511_out: endpoint {
+-					remote-endpoint = <&hdmi_con>;
++					remote-endpoint = <&hdmi_con_out>;
++				};
++			};
++		};
++	};
++
++	hdmi-in at 4c {
++		compatible = "adi,adv7612";
++		reg = <0x4c>;
++		interrupt-parent = <&gpio4>;
++		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
++		default-input = <0>;
++
++		port {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				adv7612_in: endpoint {
++					remote-endpoint = <&hdmi_con_in>;
++				};
++			};
++
++			port at 2 {
++				reg = <2>;
++				adv7612_out: endpoint {
++					remote-endpoint = <&vin0ep2>;
+ 				};
+ 			};
  		};
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index b730c889a404..bd93f699ad84 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -1613,16 +1613,14 @@
- 				 0x0800 0 0 1 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH
- 				 0x1000 0 0 2 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
- 
--		usb at 0,1 {
-+		usb at 1,0 {
- 			reg = <0x800 0 0 0 0>;
--			device_type = "pci";
- 			phys = <&usb0 0>;
- 			phy-names = "usb";
- 		};
- 
--		usb at 0,2 {
-+		usb at 2,0 {
- 			reg = <0x1000 0 0 0 0>;
--			device_type = "pci";
- 			phys = <&usb0 0>;
- 			phy-names = "usb";
- 		};
-@@ -1648,16 +1646,14 @@
- 				 0x0800 0 0 1 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
- 				 0x1000 0 0 2 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
- 
--		usb at 0,1 {
--			reg = <0x800 0 0 0 0>;
--			device_type = "pci";
-+		usb at 1,0 {
-+			reg = <0x10800 0 0 0 0>;
- 			phys = <&usb2 0>;
- 			phy-names = "usb";
- 		};
- 
--		usb at 0,2 {
--			reg = <0x1000 0 0 0 0>;
--			device_type = "pci";
-+		usb at 2,0 {
-+			reg = <0x11000 0 0 0 0>;
- 			phys = <&usb2 0>;
- 			phy-names = "usb";
- 		};
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index a19b884fb258..7d9a81d970d8 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -820,16 +820,14 @@
- 				 0x0800 0 0 1 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH
- 				 0x1000 0 0 2 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
- 
--		usb at 0,1 {
-+		usb at 1,0 {
- 			reg = <0x800 0 0 0 0>;
--			device_type = "pci";
- 			phys = <&usb0 0>;
- 			phy-names = "usb";
- 		};
- 
--		usb at 0,2 {
-+		usb at 2,0 {
- 			reg = <0x1000 0 0 0 0>;
--			device_type = "pci";
- 			phys = <&usb0 0>;
- 			phy-names = "usb";
- 		};
-@@ -855,16 +853,14 @@
- 				 0x0800 0 0 1 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
- 				 0x1000 0 0 2 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
- 
--		usb at 0,1 {
--			reg = <0x800 0 0 0 0>;
--			device_type = "pci";
-+		usb at 1,0 {
-+			reg = <0x10800 0 0 0 0>;
- 			phys = <&usb2 0>;
- 			phy-names = "usb";
- 		};
- 
--		usb at 0,2 {
--			reg = <0x1000 0 0 0 0>;
--			device_type = "pci";
-+		usb at 2,0 {
-+			reg = <0x11000 0 0 0 0>;
- 			phys = <&usb2 0>;
- 			phy-names = "usb";
- 		};
+@@ -606,3 +649,24 @@
+ &ssi1 {
+ 	shared-pin;
+ };
++
++/* HDMI video input */
++&vin0 {
++	status = "okay";
++	pinctrl-0 = <&vin0_pins>;
++	pinctrl-names = "default";
++
++	port {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		vin0ep2: endpoint {
++			remote-endpoint = <&adv7612_out>;
++			bus-width = <24>;
++			hsync-active = <0>;
++			vsync-active = <0>;
++			pclk-sample = <1>;
++			data-active = <1>;
++		};
++	};
++};
 -- 
 2.1.4
