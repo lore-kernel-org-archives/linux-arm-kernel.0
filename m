@@ -1,7 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 16 Jun 2017 10:13:03 +0200
-Subject: [GIT PULL 1/4] soc/tegra: Changes for v4.13-rc1
-Message-ID: <20170616081306.11505-1-thierry.reding@gmail.com>
+Date: Fri, 16 Jun 2017 10:13:04 +0200
+Subject: [GIT PULL 2/4] firmware: tegra: Changes for v4.13-rc1
+In-Reply-To: <20170616081306.11505-1-thierry.reding@gmail.com>
+References: <20170616081306.11505-1-thierry.reding@gmail.com>
+Message-ID: <20170616081306.11505-2-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,38 +15,24 @@ The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.13-soc
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.13-firmware
 
-for you to fetch changes up to da1dbec1be2b54c16649e33e479708a55156e311:
+for you to fetch changes up to cd307124ad9bb01019920c2053696218d161f4a1:
 
-  soc/tegra: flowctrl: Fix error handling (2017-06-13 16:47:44 +0200)
+  firmware: tegra: Fix locking bugs in BPMP (2017-06-14 17:17:32 +0200)
 
 Thanks,
 Thierry
 
 ----------------------------------------------------------------
-soc/tegra: Changes for v4.13-rc1
+firmware: tegra: Changes for v4.13-rc1
 
-This contains an implementation of generic PM domains for Tegra186,
-based on the BPMP powergate request.
+This contains a fix for missing semaphore release in error paths as well
+as a bogus error code return in the BPMP firmware implementation.
 
 ----------------------------------------------------------------
-Christophe Jaillet (1):
-      soc/tegra: flowctrl: Fix error handling
+Dan Carpenter (1):
+      firmware: tegra: Fix locking bugs in BPMP
 
-Thierry Reding (3):
-      PM / Domains: Allow overriding the ->xlate() callback
-      soc/tegra: bpmp: Update ABI header
-      soc/tegra: bpmp: Implement generic PM domains
-
- drivers/base/power/domain.c        |   8 +-
- drivers/firmware/tegra/bpmp.c      |   4 +
- drivers/soc/tegra/Kconfig          |   5 +
- drivers/soc/tegra/Makefile         |   1 +
- drivers/soc/tegra/flowctrl.c       |   2 +-
- drivers/soc/tegra/powergate-bpmp.c | 359 +++++++++++++++++++++++++++++++
- include/linux/pm_domain.h          |   4 +
- include/soc/tegra/bpmp-abi.h       | 418 ++++++++++++++++++++++++++++++++++++-
- include/soc/tegra/bpmp.h           |  12 ++
- 9 files changed, 798 insertions(+), 15 deletions(-)
- create mode 100644 drivers/soc/tegra/powergate-bpmp.c
+ drivers/firmware/tegra/bpmp.c | 28 ++++++++++++++++++----------
+ 1 file changed, 18 insertions(+), 10 deletions(-)
