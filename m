@@ -1,109 +1,83 @@
 From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 16 Jun 2017 15:47:47 +0100
-Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.13
-In-Reply-To: <5942EA83.6040907@hisilicon.com>
-References: <5942EA83.6040907@hisilicon.com>
-Message-ID: <5943EF93.7020203@hisilicon.com>
+Date: Fri, 16 Jun 2017 15:43:05 +0100
+Subject: [PATCH v5 15/20] arm64: dts: hisi: add kirin pcie node
+In-Reply-To: <20170616141322.30466-1-guodong.xu@linaro.org>
+References: <20170615030417.14059-16-guodong.xu@linaro.org>
+ <20170616141322.30466-1-guodong.xu@linaro.org>
+Message-ID: <5943EE79.1050505@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof, Hi Kevin,
+Hi Guodong,
 
-Please ignore this pull request because of the PCIe dts bugfix.
-I will send v2.
-Sorry for the noise.
+On 2017/6/16 15:13, Guodong Xu wrote:
+> From: Xiaowei Song <songxiaowei@hisilicon.com>
+> 
+> Add PCIe node for hi3660
+> 
+> Cc: Guodong Xu <guodong.xu@linaro.org>
+> Signed-off-by: Xiaowei Song <songxiaowei@hisilicon.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> Changes in v5:
+>  * fix interrupt-map, to conform to gic's #address-cells = <0>
+>  * remove redundant status = "ok"
+> ---
+
 Thanks!
+Applied v5 and dropped the v4 in the hisilicon arm64 dt tree.
 
-Best Regards,
+BR,
 Wei
 
-On 2017/6/15 21:13, Wei Xu wrote:
-> Hi Arnd, Hi Olof, Hi Kevin,
+
+>  arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 36 +++++++++++++++++++++++++++++++
+>  1 file changed, 36 insertions(+)
 > 
-> Please help to pull the following changes.
-> Thanks!
-> 
-> And the patch "arm64: dts: hi6220: Add k3-dma and i2s/hdmi audio support"
-> depends on audio-graph-card that will be landed on 4.13.
-> But the dts part is checked without warning and can be compiled.
-> 
-> Best Regards,
-> Wei
-> 
-> ---
-> 
-> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
-> 
->   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.13
-> 
-> for you to fetch changes up to 1f3df90e764c65ea1019b5d403c1cdbd49c118ec:
-> 
->   arm64: dts: hi6220: Add k3-dma and i2s/hdmi audio support (2017-06-15 15:37:37 +0100)
-> 
-> ----------------------------------------------------------------
-> ARM64: DT: Hisilicon SoC DT updates for 4.13
-> 
-> - Add and update Hi3660-Hikey960 board, Hi3660 PCIe RC, Hi6421v530 MFD and
->   Hi3660 MMC binding
-> - Add and refine devices support for Hi3660-Hikey 960 including clock, reset,
->   I2C, GPIO, UART, Bluetooth, RTC, Power Key, LED, SPI, timer, PMIC, regulator,
->   sd/sdio and WiFi
-> - Add k3-dma and i2s/hdmi audio support based on audio-card-graph method for
->   Hikey board
-> 
-> ----------------------------------------------------------------
-> Chen Feng (2):
->       arm64: dts: hi3660: Add uarts nodes
->       arm64: dts: hi3660: Add pl031 rtc node
-> 
-> Chen Jun (1):
->       arm64: dts: hi3660: add power key dts node
-> 
-> Guodong Xu (7):
->       dt-bindings: arm: hisilicon: add bindings for HiKey960 board
->       arm64: dts: hisilicon: update compatible string for hikey960
->       arm64: dts: hikey960: add WL1837 Bluetooth device node
->       arm64: dts: hikey960: add LED nodes
->       dt-bindings: mfd: hi6421: Add hi6421v530 compatible string
->       dt-bindings: mmc: dw_mmc-k3: add document of hi3660 mmc
->       arm64: dts: hi3660-hikey960: add nodes for WiFi
-> 
-> John Stultz (1):
->       arm64: dts: hi6220: Add k3-dma and i2s/hdmi audio support
-> 
-> Leo Yan (1):
->       arm64: dts: hi3660: add sp804 timer node
-> 
-> Li Wei (1):
->       arm64: dts: hi3660: add sd/sdio device nodes
-> 
-> Wang Xiaoyin (4):
->       arm64: dts: hikey960: pinctrl: add more pinmux and pinconfig
->       arm64: dts: hi3660: add gpio dtsi file for Hisilicon Hi3660 SOC
->       arm64: dts: hi3660: add spi device nodes
->       arm64: dts: hikey960: add device node for pmic and regulators
-> 
-> Xiaowei Song (2):
->       dt-bindings: PCI: hisi: Add document for PCIe of Kirin SoCs
->       arm64: dts: hisi: add kirin pcie node
-> 
-> Zhangfei Gao (2):
->       arm64: dts: hi3660: add resources for clock and reset
->       arm64: dts: Add I2C nodes for Hi3660
-> 
->  .../bindings/arm/hisilicon/hisilicon.txt           |   4 +
->  Documentation/devicetree/bindings/mfd/hi6421.txt   |   4 +-
->  .../devicetree/bindings/mmc/k3-dw-mshc.txt         |   1 +
->  .../devicetree/bindings/pci/kirin-pcie.txt         |  50 ++
->  arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts  | 217 +++++-
->  arch/arm64/boot/dts/hisilicon/hi3660.dtsi          | 702 ++++++++++++++++++-
->  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |  34 +-
->  arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  26 +
->  .../arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi | 778 +++++++++++++++++++--
->  9 files changed, 1738 insertions(+), 78 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/pci/kirin-pcie.txt
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+> index e138973..8183d71 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+> @@ -754,5 +754,41 @@
+>  			cs-gpios = <&gpio18 5 0>;
+>  			status = "disabled";
+>  		};
+> +
+> +		pcie at f4000000 {
+> +			compatible = "hisilicon,kirin960-pcie";
+> +			reg = <0x0 0xf4000000 0x0 0x1000>,
+> +			      <0x0 0xff3fe000 0x0 0x1000>,
+> +			      <0x0 0xf3f20000 0x0 0x40000>,
+> +			      <0x0 0xf5000000 0x0 0x2000>;
+> +			reg-names = "dbi", "apb", "phy", "config";
+> +			bus-range = <0x0  0x1>;
+> +			#address-cells = <3>;
+> +			#size-cells = <2>;
+> +			device_type = "pci";
+> +			ranges = <0x02000000 0x0 0x00000000
+> +				  0x0 0xf6000000
+> +				  0x0 0x02000000>;
+> +			num-lanes = <1>;
+> +			#interrupt-cells = <1>;
+> +			interrupt-map-mask = <0xf800 0 0 7>;
+> +			interrupt-map = <0x0 0 0 1
+> +					 &gic GIC_SPI 282 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0x0 0 0 2
+> +					 &gic GIC_SPI 283 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0x0 0 0 3
+> +					 &gic GIC_SPI 284 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0x0 0 0 4
+> +					 &gic GIC_SPI 285 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&crg_ctrl HI3660_PCIEPHY_REF>,
+> +				 <&crg_ctrl HI3660_CLK_GATE_PCIEAUX>,
+> +				 <&crg_ctrl HI3660_PCLK_GATE_PCIE_PHY>,
+> +				 <&crg_ctrl HI3660_PCLK_GATE_PCIE_SYS>,
+> +				 <&crg_ctrl HI3660_ACLK_GATE_PCIE>;
+> +			clock-names = "pcie_phy_ref", "pcie_aux",
+> +				      "pcie_apb_phy", "pcie_apb_sys",
+> +				      "pcie_aclk";
+> +			reset-gpios = <&gpio11 1 0 >;
+> +		};
+>  	};
+>  };
 > 
