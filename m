@@ -1,36 +1,134 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Sat, 17 Jun 2017 00:31:01 +0800
-Subject: [PATCH] arm64: dts: mt6797: fixup build breakage from no such file
-Message-ID: <df54b5e599b47ca9a73a0b6f5f9ca2e4139a4a7f.1497630282.git.sean.wang@mediatek.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 16 Jun 2017 11:58:18 -0500
+Subject: [PATCH] PCI: imx6: add regulator support
+In-Reply-To: <20170608080742.3910-1-quentin.schulz@free-electrons.com>
+References: <20170608080742.3910-1-quentin.schulz@free-electrons.com>
+Message-ID: <20170616165818.GC11129@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+On Thu, Jun 08, 2017 at 10:07:42AM +0200, Quentin Schulz wrote:
+> Some boards might require to control a regulator to power the PCIe port.
+> 
+> This adds support for an optional regulator defined in Device Tree
+> linked in the PCIe controller under `vpcie-supply`. If present, the
+> regulator will be disabled and then enabled as part of the PCIe host
+> initialization process and will be disabled when shutting down.
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 
-fixup build error from no such file as the following complains
-from branch v4.12-next/dts64 in linux mediatek tree
+Applied with acks from Rob & Richard to pci/host-imx6 for v4.13, thanks!
 
-arch/arm64/boot/dts/mediatek/mt6797.dtsi:15:44: fatal error:
-dt-bindings/power/mt6797-power.h: No such file or directory
- #include <dt-bindings/power/mt6797-power.h>
+I converted the pr_err() in imx6_pcie_assert_core_reset() to a dev_err().
 
-Fixes: 003f5d0c3462 ("arm64: dts: mediatek: add clk and scp nodes for MT6797")
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/mt6797.dtsi | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm64/boot/dts/mediatek/mt6797.dtsi b/arch/arm64/boot/dts/mediatek/mt6797.dtsi
-index 3512c8e..31088a9f 100644
---- a/arch/arm64/boot/dts/mediatek/mt6797.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt6797.dtsi
-@@ -12,7 +12,6 @@
-  */
- 
- #include <dt-bindings/clock/mt6797-clk.h>
--#include <dt-bindings/power/mt6797-power.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- 
--- 
-2.7.4
+> ---
+>  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  4 +++
+>  drivers/pci/dwc/pci-imx6.c                         | 34 +++++++++++++++++++++-
+>  2 files changed, 37 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> index e3d5680875b1..cf92d3ba5a26 100644
+> --- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> +++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> @@ -33,6 +33,10 @@ Optional properties:
+>  - reset-gpio-active-high: If present then the reset sequence using the GPIO
+>    specified in the "reset-gpio" property is reversed (H=reset state,
+>    L=operation state).
+> +- vpcie-supply: Should specify the regulator in charge of PCIe port power.
+> +  The regulator will be enabled when initializing the PCIe host and
+> +  disabled either as part of the init process or when shutting down the
+> +  host.
+>  
+>  Additional required properties for imx6sx-pcie:
+>  - clock names: Must include the following additional entries:
+> diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
+> index 19a289b8cc94..f9b7500c9aff 100644
+> --- a/drivers/pci/dwc/pci-imx6.c
+> +++ b/drivers/pci/dwc/pci-imx6.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/pci.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/regmap.h>
+> +#include <linux/regulator/consumer.h>
+>  #include <linux/resource.h>
+>  #include <linux/signal.h>
+>  #include <linux/types.h>
+> @@ -59,6 +60,7 @@ struct imx6_pcie {
+>  	u32			tx_swing_full;
+>  	u32			tx_swing_low;
+>  	int			link_gen;
+> +	struct regulator	*vpcie;
+>  };
+>  
+>  /* Parameters for the waiting for PCIe PHY PLL to lock on i.MX7 */
+> @@ -310,6 +312,13 @@ static void imx6_pcie_assert_core_reset(struct imx6_pcie *imx6_pcie)
+>  				   IMX6Q_GPR1_PCIE_REF_CLK_EN, 0 << 16);
+>  		break;
+>  	}
+> +
+> +	if (imx6_pcie->vpcie && regulator_is_enabled(imx6_pcie->vpcie) > 0) {
+> +		int ret = regulator_disable(imx6_pcie->vpcie);
+> +
+> +		if (ret)
+> +			pr_err("failed to disable vpcie regulator: %d\n", ret);
+> +	}
+>  }
+>  
+>  static int imx6_pcie_enable_ref_clk(struct imx6_pcie *imx6_pcie)
+> @@ -376,10 +385,19 @@ static void imx6_pcie_deassert_core_reset(struct imx6_pcie *imx6_pcie)
+>  	struct device *dev = pci->dev;
+>  	int ret;
+>  
+> +	if (imx6_pcie->vpcie && !regulator_is_enabled(imx6_pcie->vpcie)) {
+> +		ret = regulator_enable(imx6_pcie->vpcie);
+> +		if (ret) {
+> +			dev_err(dev, "failed to enable vpcie regulator: %d\n",
+> +				ret);
+> +			return;
+> +		}
+> +	}
+> +
+>  	ret = clk_prepare_enable(imx6_pcie->pcie_phy);
+>  	if (ret) {
+>  		dev_err(dev, "unable to enable pcie_phy clock\n");
+> -		return;
+> +		goto err_pcie_phy;
+>  	}
+>  
+>  	ret = clk_prepare_enable(imx6_pcie->pcie_bus);
+> @@ -439,6 +457,13 @@ static void imx6_pcie_deassert_core_reset(struct imx6_pcie *imx6_pcie)
+>  	clk_disable_unprepare(imx6_pcie->pcie_bus);
+>  err_pcie_bus:
+>  	clk_disable_unprepare(imx6_pcie->pcie_phy);
+> +err_pcie_phy:
+> +	if (imx6_pcie->vpcie && regulator_is_enabled(imx6_pcie->vpcie) > 0) {
+> +		ret = regulator_disable(imx6_pcie->vpcie);
+> +		if (ret)
+> +			dev_err(dev, "failed to disable vpcie regulator: %d\n",
+> +				ret);
+> +	}
+>  }
+>  
+>  static void imx6_pcie_init_phy(struct imx6_pcie *imx6_pcie)
+> @@ -802,6 +827,13 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+>  	if (ret)
+>  		imx6_pcie->link_gen = 1;
+>  
+> +	imx6_pcie->vpcie = devm_regulator_get_optional(&pdev->dev, "vpcie");
+> +	if (IS_ERR(imx6_pcie->vpcie)) {
+> +		if (PTR_ERR(imx6_pcie->vpcie) == -EPROBE_DEFER)
+> +			return -EPROBE_DEFER;
+> +		imx6_pcie->vpcie = NULL;
+> +	}
+> +
+>  	platform_set_drvdata(pdev, imx6_pcie);
+>  
+>  	ret = imx6_add_pcie_port(imx6_pcie, pdev);
+> -- 
+> 2.11.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
