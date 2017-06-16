@@ -1,35 +1,52 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Jun 2017 15:30:12 +0200
-Subject: [PATCH 04/11] arm64: dts: r8a7796: add DMA for IIC_DVFS
-In-Reply-To: <cover.1497617276.git.horms+renesas@verge.net.au>
-References: <cover.1497617276.git.horms+renesas@verge.net.au>
-Message-ID: <54068ae5906a1683668f2d8a7fa2a42545079166.1497617276.git.horms+renesas@verge.net.au>
+Date: Fri, 16 Jun 2017 15:30:30 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC Drivers Updates for v4.13
+Message-ID: <cover.1497617480.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Tested with a Salvator-X.
+Please consider these Renesas ARM based SoC drivers updates for v4.13.
 
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+This pull request is based on
+"[GIT PULL] Renesas ARM Based SoC Fixes for v4.12",
+tagged as renesas-fixes-for-v4.12,
+which you have already pulled and is present in v4.12-rc2.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index b418a66f4cec..d63acd3e00b2 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -392,6 +392,8 @@
- 			clocks = <&cpg CPG_MOD 926>;
- 			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
- 			resets = <&cpg 926>;
-+			dmas = <&dmac0 0x11>, <&dmac0 0x10>;
-+			dma-names = "tx", "rx";
- 			status = "disabled";
- 		};
- 
--- 
-2.1.4
+This base was used to supply a dependency. It is one patch away from
+v4.11-rc1.  I could also have based the series on v4.12-rc2 but I wanted to
+avoid basing (any of my branches for v4.13) on something more recent than
+v4.12-rc1 unless strictly necessary. Nonetheless I'm happy to rebase if you
+prefer.
+
+
+The following changes since commit 7b4ccb3c466f62bbf2f4dd5d6a143d945a6f3051:
+
+  soc: renesas: Provide dummy rcar_rst_read_mode_pins() for compile-testing (2017-04-28 10:07:36 +0200)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-drivers-for-v4.13
+
+for you to fetch changes up to 8be381a131c29c4737aed44e7e5f90cb77bb4a7e:
+
+  soc: renesas: Rework Kconfig and Makefile logic (2017-06-12 11:31:07 +0200)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Drivers Updates for v4.13
+
+* Rework Kconfig and Makefile logic
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      soc: renesas: Rework Kconfig and Makefile logic
+
+ drivers/soc/Kconfig                  |  1 +
+ drivers/soc/Makefile                 |  2 +-
+ drivers/soc/renesas/Kconfig          | 63 ++++++++++++++++++++++++++++++++++++
+ drivers/soc/renesas/Makefile         | 31 +++++++++---------
+ drivers/soc/renesas/rcar-sysc.c      | 24 +++++++-------
+ include/linux/soc/renesas/rcar-rst.h |  3 +-
+ 6 files changed, 92 insertions(+), 32 deletions(-)
+ create mode 100644 drivers/soc/renesas/Kconfig
