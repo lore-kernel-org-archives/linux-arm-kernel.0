@@ -1,32 +1,39 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 16 Jun 2017 17:50:29 +0530
-Subject: [GIT PULL 2/2] DaVinci defconfig updates for v4.13 (part 2)
-In-Reply-To: <20170616122029.27623-1-nsekhar@ti.com>
-References: <20170616122029.27623-1-nsekhar@ti.com>
-Message-ID: <20170616122029.27623-2-nsekhar@ti.com>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Fri, 16 Jun 2017 17:50:34 +0530
+Subject: [PATCH] soc: ti: knav: make of_device_ids const.
+Message-ID: <754c97ef359882e602affee9f6709dcd687a2234.1497615578.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 0b997c8c9562dd61733dfeb9e1a5962730338e6e:
+of_device_ids are not supposed to change at runtime. All functions
+working with of_device_ids provided by <linux/of.h> work with const
+of_device_ids. So mark the non-const structs as const.
 
-  ARM: davinci_all_defconfig: Enable CPPI 4.1 USB OTG DMA (2017-05-30 16:12:51 +0530)
+File size before:
+   text	   data	    bss	    dec	    hex	filename
+   5369	    720	      8	   6097	   17d1	drivers/soc/ti/knav_qmss_queue.o
 
-are available in the git repository at:
+File size after constify keystone_qmss_of_match.
+   text	   data	    bss	    dec	    hex	filename
+   5785	    304	      8	   6097	   17d1	drivers/soc/ti/knav_qmss_queue.o
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.13/defconfig-2
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+---
+ drivers/soc/ti/knav_qmss_queue.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-for you to fetch changes up to 82cc56ccf127899cde1d74a0380c29814ceb1b71:
-
-  ARM: davinci_all_defconfig: enable USB CDC NCM gadget (2017-06-16 13:38:42 +0530)
-
-----------------------------------------------------------------
-Enable mtdtests and USB NCM gadget in DaVinci kernel
-(as modules).
-
-----------------------------------------------------------------
-Sekhar Nori (2):
-      ARM: davinci_all_defconfig: enable mtdtests
-      ARM: davinci_all_defconfig: enable USB CDC NCM gadget
-
- arch/arm/configs/davinci_all_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
+index 2ec3536..740639c 100644
+--- a/drivers/soc/ti/knav_qmss_queue.c
++++ b/drivers/soc/ti/knav_qmss_queue.c
+@@ -1813,7 +1813,7 @@ static int knav_queue_remove(struct platform_device *pdev)
+ }
+ 
+ /* Match table for of_platform binding */
+-static struct of_device_id keystone_qmss_of_match[] = {
++static const struct of_device_id keystone_qmss_of_match[] = {
+ 	{ .compatible = "ti,keystone-navigator-qmss", },
+ 	{},
+ };
+-- 
+1.9.1
