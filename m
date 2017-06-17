@@ -1,108 +1,31 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Sun, 18 Jun 2017 06:50:27 +1000
-Subject: [PATCH 42/44] powerpc/cell: use the dma_supported method for
- ops switching
-In-Reply-To: <20170616181059.19206-43-hch@lst.de>
-References: <20170616181059.19206-1-hch@lst.de>
- <20170616181059.19206-43-hch@lst.de>
-Message-ID: <1497732627.2897.128.camel@kernel.crashing.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 17 Jun 2017 18:02:54 -0300
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select CONFIG_IMX7D_ADC
+Message-ID: <1497733374-14977-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-06-16 at 20:10 +0200, Christoph Hellwig wrote:
-> Besides removing the last instance of the set_dma_mask method this also
-> reduced the code duplication.
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-What is your rationale here ? (I have missed patch 0 it seems).
+Select CONFIG_IMX7D_ADC so that the i.MX7 ADC driver can be
+built by default.
 
-dma_supported() was supposed to be pretty much a "const" function
-simply informing whether a given setup is possible. Having it perform
-an actual switch of ops seems to be pushing it...
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-What if a driver wants to test various dma masks and then pick one ?
-
-Where does the API documents that if a driver calls dma_supported() it
-then *must* set the corresponding mask and use that ?
-
-I don't like a function that is a "boolean query" like this one to have
-such a major side effect.
-
->From an API standpoint, dma_set_mask() is when the mask is established,
-and thus when the ops switch should happen.
-
-Ben.
-
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-> ---
->  arch/powerpc/platforms/cell/iommu.c | 25 +++++++++----------------
->  1 file changed, 9 insertions(+), 16 deletions(-)
-> 
-> diff --git a/arch/powerpc/platforms/cell/iommu.c b/arch/powerpc/platforms/cell/iommu.c
-> index 497bfbdbd967..29d4f96ed33e 100644
-> --- a/arch/powerpc/platforms/cell/iommu.c
-> +++ b/arch/powerpc/platforms/cell/iommu.c
-> @@ -644,20 +644,14 @@ static void dma_fixed_unmap_sg(struct device *dev, struct scatterlist *sg,
->  				   direction, attrs);
->  }
->  
-> -static int dma_fixed_dma_supported(struct device *dev, u64 mask)
-> -{
-> -	return mask == DMA_BIT_MASK(64);
-> -}
-> -
-> -static int dma_set_mask_and_switch(struct device *dev, u64 dma_mask);
-> +static int dma_suported_and_switch(struct device *dev, u64 dma_mask);
->  
->  static const struct dma_map_ops dma_iommu_fixed_ops = {
->  	.alloc          = dma_fixed_alloc_coherent,
->  	.free           = dma_fixed_free_coherent,
->  	.map_sg         = dma_fixed_map_sg,
->  	.unmap_sg       = dma_fixed_unmap_sg,
-> -	.dma_supported  = dma_fixed_dma_supported,
-> -	.set_dma_mask   = dma_set_mask_and_switch,
-> +	.dma_supported  = dma_suported_and_switch,
->  	.map_page       = dma_fixed_map_page,
->  	.unmap_page     = dma_fixed_unmap_page,
->  	.mapping_error	= dma_iommu_mapping_error,
-> @@ -952,11 +946,8 @@ static u64 cell_iommu_get_fixed_address(struct device *dev)
->  	return dev_addr;
->  }
->  
-> -static int dma_set_mask_and_switch(struct device *dev, u64 dma_mask)
-> +static int dma_suported_and_switch(struct device *dev, u64 dma_mask)
->  {
-> -	if (!dev->dma_mask || !dma_supported(dev, dma_mask))
-> -		return -EIO;
-> -
->  	if (dma_mask == DMA_BIT_MASK(64) &&
->  	    cell_iommu_get_fixed_address(dev) != OF_BAD_ADDR) {
->  		u64 addr = cell_iommu_get_fixed_address(dev) +
-> @@ -965,14 +956,16 @@ static int dma_set_mask_and_switch(struct device *dev, u64 dma_mask)
->  		dev_dbg(dev, "iommu: fixed addr = %llx\n", addr);
->  		set_dma_ops(dev, &dma_iommu_fixed_ops);
->  		set_dma_offset(dev, addr);
-> -	} else {
-> +		return 1;
-> +	}
-> +
-> +	if (dma_iommu_dma_supported(dev, dma_mask)) {
->  		dev_dbg(dev, "iommu: not 64-bit, using default ops\n");
->  		set_dma_ops(dev, get_pci_dma_ops());
->  		cell_dma_dev_setup(dev);
-> +		return 1;
->  	}
->  
-> -	*dev->dma_mask = dma_mask;
-> -
->  	return 0;
->  }
->  
-> @@ -1127,7 +1120,7 @@ static int __init cell_iommu_fixed_mapping_init(void)
->  		cell_iommu_setup_window(iommu, np, dbase, dsize, 0);
->  	}
->  
-> -	dma_iommu_ops.set_dma_mask = dma_set_mask_and_switch;
-> +	dma_iommu_ops.dma_supported = dma_suported_and_switch;
->  	set_pci_dma_ops(&dma_iommu_ops);
->  
->  	return 0;
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 2dbbc52..e74de69 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -345,6 +345,7 @@ CONFIG_IMX_SDMA=y
+ CONFIG_MXS_DMA=y
+ CONFIG_STAGING=y
+ CONFIG_IIO=y
++CONFIG_IMX7D_ADC=y
+ CONFIG_VF610_ADC=y
+ CONFIG_MPL3115=y
+ CONFIG_PWM=y
+-- 
+2.7.4
