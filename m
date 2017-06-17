@@ -1,120 +1,37 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 16 Jun 2017 17:07:42 -0700
-Subject: [PATCH v3 2/4] asm-generic: Provide a fncpy() implementation
-In-Reply-To: <20170617000744.22158-1-f.fainelli@gmail.com>
-References: <20170617000744.22158-1-f.fainelli@gmail.com>
-Message-ID: <20170617000744.22158-3-f.fainelli@gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Sat, 17 Jun 2017 08:46:29 +0200
+Subject: [GIT PULL] ARM: mvebu: defconfig for v4.13 (#1)
+Message-ID: <87shiz5cxm.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define a generic fncpy() implementation largely based on the ARM version
-that requires an 8 bytes alignment for the destination address where to
-copy this function as well as the function's own address.
+Hi,
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- include/asm-generic/fncpy.h | 93 +++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 93 insertions(+)
- create mode 100644 include/asm-generic/fncpy.h
+Here is the first pull request for defconfig for mvebu for v4.13.
 
-diff --git a/include/asm-generic/fncpy.h b/include/asm-generic/fncpy.h
-new file mode 100644
-index 000000000000..ec03b83b8535
---- /dev/null
-+++ b/include/asm-generic/fncpy.h
-@@ -0,0 +1,93 @@
-+/*
-+ * include/asm-generic/fncpy.h - helper macros for function body copying
-+ *
-+ * Copyright (C) 2011 Linaro Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-+ */
-+
-+/*
-+ * These macros are intended for use when there is a need to copy a low-level
-+ * function body into special memory.
-+ *
-+ * For example, when reconfiguring the SDRAM controller, the code doing the
-+ * reconfiguration may need to run from SRAM.
-+ *
-+ * NOTE: that the copied function body must be entirely self-contained and
-+ * position-independent in order for this to work properly.
-+ *
-+ * NOTE: in order for embedded literals and data to get referenced correctly,
-+ * the alignment of functions must be preserved when copying.  To ensure this,
-+ * the source and destination addresses for fncpy() must be aligned to a
-+ * multiple of 8 bytes: you will be get a BUG() if this condition is not met.
-+ * You will typically need a ".align 3" directive in the assembler where the
-+ * function to be copied is defined, and ensure that your allocator for the
-+ * destination buffer returns 8-byte-aligned pointers.
-+ *
-+ * Typical usage example:
-+ *
-+ * extern int f(args);
-+ * extern uint32_t size_of_f;
-+ * int (*copied_f)(args);
-+ * void *sram_buffer;
-+ *
-+ * copied_f = fncpy(sram_buffer, &f, size_of_f);
-+ *
-+ * ... later, call the function: ...
-+ *
-+ * copied_f(args);
-+ *
-+ * The size of the function to be copied can't be determined from C:
-+ * this must be determined by other means, such as adding assmbler directives
-+ * in the file where f is defined.
-+ */
-+
-+#ifndef __ASM_FNCPY_H
-+#define __ASM_FNCPY_H
-+
-+#include <linux/types.h>
-+#include <linux/string.h>
-+
-+#include <asm/bug.h>
-+#include <asm/cacheflush.h>
-+
-+/*
-+ * Minimum alignment requirement for the source and destination addresses
-+ * for function copying.
-+ */
-+#define FNCPY_ALIGN 8
-+
-+#define fncpy(dest_buf, funcp, size) ({					\
-+	uintptr_t __funcp_address;					\
-+	typeof(funcp) __result;						\
-+									\
-+	asm("" : "=r" (__funcp_address) : "0" (funcp));			\
-+									\
-+	/*								\
-+	 * Ensure alignment of source and destination addresses.	\
-+	 */								\
-+	BUG_ON((uintptr_t)(dest_buf) & (FNCPY_ALIGN - 1) ||		\
-+		(__funcp_address & (FNCPY_ALIGN - 1)));			\
-+									\
-+	memcpy(dest_buf, (void const *)__funcp_address, size);		\
-+	flush_icache_range((unsigned long)(dest_buf),			\
-+		(unsigned long)(dest_buf) + (size));			\
-+									\
-+	asm("" : "=r" (__result)					\
-+		: "0" ((uintptr_t)(dest_buf)));				\
-+									\
-+	__result;							\
-+})
-+
-+#endif /* !__ASM_FNCPY_H */
--- 
-2.9.3
+Gregory
+
+The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+
+  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig-4.13-1
+
+for you to fetch changes up to 4cdcf1efcc2623c7a5358d38d71aecc8bed32b7e:
+
+  ARM: mvebu: Enable SENSORS_PWM_FAN in defconfig (2017-06-17 08:14:10 +0200)
+
+----------------------------------------------------------------
+mvebu defconfig for 4.13
+
+Enable the SENSORS_PWM_FAN in mvebu_v7_defconfig support by gpio
+driver since the previous release
+
+----------------------------------------------------------------
+Andrew Lunn (1):
+      ARM: mvebu: Enable SENSORS_PWM_FAN in defconfig
+
+ arch/arm/configs/mvebu_v7_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
