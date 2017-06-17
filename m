@@ -1,80 +1,40 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sat, 17 Jun 2017 08:47:25 +0200
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.13 (#1)
-Message-ID: <87poe35cw2.fsf@free-electrons.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Sat, 17 Jun 2017 08:58:32 +0200
+Subject: [PATCH v2] [media] davinci: vpif: adaptions for DT support
+In-Reply-To: <20170609161026.7582-1-khilman@baylibre.com>
+References: <20170609161026.7582-1-khilman@baylibre.com>
+ <CGME20170617065837epcas5p49ffbc2fd9831b822ab6e368b86049025@epcas5p4.samsung.com>
+Message-ID: <5085c24d-fec8-7ff0-e97f-ecbce1fbbe01@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 06/09/2017 06:10 PM, Kevin Hilman wrote:
+> The davinci VPIF is a single hardware block, but the existing driver
+> is broken up into a common library (vpif.c), output (vpif_display.c) and
+> intput (vpif_capture.c).
+> 
+> When migrating to DT, to better model the hardware, and because
+> registers, interrupts, etc. are all common,it was decided to
+> have a single VPIF hardware node[1].
+> 
+> Because davinci uses legacy, non-DT boot on several SoCs still, the
+> platform_drivers need to remain.  But they are also needed in DT boot.
+> Since there are no DT nodes for the display/capture parts in DT
+> boot (there is a single node for the parent/common device) we need to
+> create platform_devices somewhere to instansiate the platform_drivers.
+> 
+> When VPIF display/capture are needed for a DT boot, the VPIF node
+> will have endpoints defined for its subdevs.  Therefore, vpif_probe()
+> checks for the presence of endpoints, and if detected manually creates
+> the platform_devices for the display and capture platform_drivers.
+> 
+> [1] Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+> 
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 
-Here is the first pull request for dt64 for mvebu for v4.13.
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-Gregory
 
-The following changes since commit 08332893e37af6ae779367e78e444f8f9571511d:
-
-  Linux 4.12-rc2 (2017-05-21 19:30:23 -0700)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.13-1
-
-for you to fetch changes up to f66b2aff46eaf0825dbe1560e28fcb845dd2a215:
-
-  arm64: dts: marvell: add xmdio nodes for 7k/8k (2017-06-17 08:19:29 +0200)
-
-----------------------------------------------------------------
-mvebu dt64 for 4.13 (part 1)
-
-- Improve the mcbin support (Armada 8040 based board): add sdhci and
-  the second 1G port
-- Improve crypro nodes description on Aramda 7K/8K
-- Use new binding for ap806 clocks
-- Improve mdio nodes and add xmdio on Aramda 7K/8K
-- Add second SGCI node on Armada 37xx
-- Improve the description of the Armada 3720 DB board
-
-----------------------------------------------------------------
-Antoine Tenart (7):
-      arm64: dts: marvell: add dma-mask in crypto nodes for 7k/8k
-      arm64: dts: marvell: explicitly enable the mdio nodes for 7k/8k DB
-      arm64: dts: marvell: disable the mdio nodes by default
-      arm64: dts: marvell: cp110: enable the crypto engine at the SoC level
-      arm64: dts: marvell: remove cpm crypto nodes from dts files
-      arm64: dts: marvell: add a comment on the cp110 slave node status
-      arm64: dts: marvell: add xmdio nodes for 7k/8k
-
-Gregory CLEMENT (7):
-      arm64: dts: marvell: remove clock-output-names on ap806
-      arm64: dts: marvell: use new binding for the system controller on ap806
-      arm64: dts: marvell: armada-3720-db: Sort the dts node alphabetically
-      arm64: dts: marvell: armada-3720-db: Add information about the V2 board
-      arm64: dts: marvell: armada-37xx: Align the compatible string
-      arm64: dts: marvell: armada-37xx: Use angle bracket for each register set
-      arm64: dts: marvell: armada-3720-db: Add vqmmc regulator for SD slot
-
-Konstantin Porotchkin (1):
-      arm64: dts: marvell: Enable second SDHCI controller in Armada 37xx
-
-Marc Zyngier (1):
-      arm64: dts: marvell: 8040-mcbin: Enable 1GB Ethernet
-
-Marcin Wojtas (1):
-      arm64: dts: marvell: add second 1G port on the Armada 8040 DB
-
-Russell King (2):
-      arm64: dts: marvell: mcbin: add sdhci
-      arm64: dts: marvell: cp110: add required clocks for mdio interface
-
-Thomas Petazzoni (1):
-      arm64: dts: marvell: add clocks for Armada AP806 XOR engines
-
- arch/arm64/boot/dts/marvell/armada-3720-db.dts     | 120 +++++++++++++--------
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |  25 +++--
- arch/arm64/boot/dts/marvell/armada-7040-db.dts     |   6 +-
- arch/arm64/boot/dts/marvell/armada-8040-db.dts     |  24 ++++-
- arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts  |  40 +++++++
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi      |  27 ++---
- .../boot/dts/marvell/armada-cp110-master.dtsi      |  12 ++-
- .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi |  18 ++++
- 8 files changed, 200 insertions(+), 72 deletions(-)
+-- 
+Regards,
+Sylwester
