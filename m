@@ -1,168 +1,51 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 17 Jun 2017 13:35:20 +0200
-Subject: [PATCH v2] clocksource/drivers/tcb_clksrc: make IO endian agnostic
-Message-ID: <20170617113520.23221-1-alexandre.belloni@free-electrons.com>
+From: illusionist.neo@gmail.com (Shubham Bansal)
+Date: Sat, 17 Jun 2017 17:53:07 +0530
+Subject: [PATCH v2] arm: eBPF JIT compiler
+In-Reply-To: <59419D1E.2060303@iogearbox.net>
+References: <1495754003-21099-1-git-send-email-illusionist.neo@gmail.com>
+ <CAGXu5jKmLNMR+uhM9Ov2XPW6kCjip_SjScgEH0fTFp6fQtKFiA@mail.gmail.com>
+ <593E6B0F.8070901@iogearbox.net>
+ <CAHgaXd+DW2bggto=2S9hOdMrtPTvhD2QN4rPf2V8iHewQpg-YA@mail.gmail.com>
+ <CAHgaXdJrvKdzr3fJ1TMkC4foeVsZJDSVEwhDOeZGxQVsmoK2cQ@mail.gmail.com>
+ <59419D1E.2060303@iogearbox.net>
+Message-ID: <CAHgaXdKMbFPgy-kKF0iDSAYo4CqLn9FRu9HwM+OfM-JWb9fNRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that AVR32 is gone, we can use the proper IO accessors that are
-correctly handling endianness.
+Hi Daniel,
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
-Changes in v2:
- - Also use the _relaxed version in tc_next_event as this is working fine.
+>
+> Not all of the helpers have 4 or less byte arguments only, there are a
+> few with 8 byte arguments, so making that general assumption wouldn't
+> work. I guess what could be done is that helpers have a flag in struct
+> bpf_func_proto which indicates for JITs that all args are 4 byte on 32bit
+> so you could probably use convention similar to case2 for them. Presumably
+> for that information to process, the JIT might need to be reworked to
+> extract that via bpf_analyzer() that does a verifier run to re-analyze
+> the program like in nfp JIT case.
 
- drivers/clocksource/tcb_clksrc.c | 58 ++++++++++++++++++++--------------------
- 1 file changed, 29 insertions(+), 29 deletions(-)
+Let me try a better solution which can be used to support both 4 byte
+and 8 byte arguments. I hope it would work out. Are you sure this
+patch can pass if it only supports 4 byte arguments though?
+Let me list out what I have to do, so that you can tell me if I am
+thinking in a wrong way :-
 
-diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
-index d4ca9962a759..fc410b5b409d 100644
---- a/drivers/clocksource/tcb_clksrc.c
-+++ b/drivers/clocksource/tcb_clksrc.c
-@@ -48,9 +48,9 @@ static u64 tc_get_cycles(struct clocksource *cs)
- 
- 	raw_local_irq_save(flags);
- 	do {
--		upper = __raw_readl(tcaddr + ATMEL_TC_REG(1, CV));
--		lower = __raw_readl(tcaddr + ATMEL_TC_REG(0, CV));
--	} while (upper != __raw_readl(tcaddr + ATMEL_TC_REG(1, CV)));
-+		upper = readl_relaxed(tcaddr + ATMEL_TC_REG(1, CV));
-+		lower = readl_relaxed(tcaddr + ATMEL_TC_REG(0, CV));
-+	} while (upper != readl_relaxed(tcaddr + ATMEL_TC_REG(1, CV)));
- 
- 	raw_local_irq_restore(flags);
- 	return (upper << 16) | lower;
-@@ -58,7 +58,7 @@ static u64 tc_get_cycles(struct clocksource *cs)
- 
- static u64 tc_get_cycles32(struct clocksource *cs)
- {
--	return __raw_readl(tcaddr + ATMEL_TC_REG(0, CV));
-+	return readl_relaxed(tcaddr + ATMEL_TC_REG(0, CV));
- }
- 
- static struct clocksource clksrc = {
-@@ -96,8 +96,8 @@ static int tc_shutdown(struct clock_event_device *d)
- 	struct tc_clkevt_device *tcd = to_tc_clkevt(d);
- 	void __iomem		*regs = tcd->regs;
- 
--	__raw_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
--	__raw_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
-+	writel(0xff, regs + ATMEL_TC_REG(2, IDR));
-+	writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
- 	if (!clockevent_state_detached(d))
- 		clk_disable(tcd->clk);
- 
-@@ -115,9 +115,9 @@ static int tc_set_oneshot(struct clock_event_device *d)
- 	clk_enable(tcd->clk);
- 
- 	/* slow clock, count up to RC, then irq and stop */
--	__raw_writel(timer_clock | ATMEL_TC_CPCSTOP | ATMEL_TC_WAVE |
-+	writel(timer_clock | ATMEL_TC_CPCSTOP | ATMEL_TC_WAVE |
- 		     ATMEL_TC_WAVESEL_UP_AUTO, regs + ATMEL_TC_REG(2, CMR));
--	__raw_writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
-+	writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
- 
- 	/* set_next_event() configures and starts the timer */
- 	return 0;
-@@ -137,25 +137,25 @@ static int tc_set_periodic(struct clock_event_device *d)
- 	clk_enable(tcd->clk);
- 
- 	/* slow clock, count up to RC, then irq and restart */
--	__raw_writel(timer_clock | ATMEL_TC_WAVE | ATMEL_TC_WAVESEL_UP_AUTO,
-+	writel(timer_clock | ATMEL_TC_WAVE | ATMEL_TC_WAVESEL_UP_AUTO,
- 		     regs + ATMEL_TC_REG(2, CMR));
--	__raw_writel((32768 + HZ / 2) / HZ, tcaddr + ATMEL_TC_REG(2, RC));
-+	writel((32768 + HZ / 2) / HZ, tcaddr + ATMEL_TC_REG(2, RC));
- 
- 	/* Enable clock and interrupts on RC compare */
--	__raw_writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
-+	writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
- 
- 	/* go go gadget! */
--	__raw_writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG, regs +
-+	writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG, regs +
- 		     ATMEL_TC_REG(2, CCR));
- 	return 0;
- }
- 
- static int tc_next_event(unsigned long delta, struct clock_event_device *d)
- {
--	__raw_writel(delta, tcaddr + ATMEL_TC_REG(2, RC));
-+	writel_relaxed(delta, tcaddr + ATMEL_TC_REG(2, RC));
- 
- 	/* go go gadget! */
--	__raw_writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG,
-+	writel_relaxed(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG,
- 			tcaddr + ATMEL_TC_REG(2, CCR));
- 	return 0;
- }
-@@ -179,7 +179,7 @@ static irqreturn_t ch2_irq(int irq, void *handle)
- 	struct tc_clkevt_device	*dev = handle;
- 	unsigned int		sr;
- 
--	sr = __raw_readl(dev->regs + ATMEL_TC_REG(2, SR));
-+	sr = readl_relaxed(dev->regs + ATMEL_TC_REG(2, SR));
- 	if (sr & ATMEL_TC_CPCS) {
- 		dev->clkevt.event_handler(&dev->clkevt);
- 		return IRQ_HANDLED;
-@@ -239,43 +239,43 @@ static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
- static void __init tcb_setup_dual_chan(struct atmel_tc *tc, int mck_divisor_idx)
- {
- 	/* channel 0:  waveform mode, input mclk/8, clock TIOA0 on overflow */
--	__raw_writel(mck_divisor_idx			/* likely divide-by-8 */
-+	writel(mck_divisor_idx			/* likely divide-by-8 */
- 			| ATMEL_TC_WAVE
- 			| ATMEL_TC_WAVESEL_UP		/* free-run */
- 			| ATMEL_TC_ACPA_SET		/* TIOA0 rises at 0 */
- 			| ATMEL_TC_ACPC_CLEAR,		/* (duty cycle 50%) */
- 			tcaddr + ATMEL_TC_REG(0, CMR));
--	__raw_writel(0x0000, tcaddr + ATMEL_TC_REG(0, RA));
--	__raw_writel(0x8000, tcaddr + ATMEL_TC_REG(0, RC));
--	__raw_writel(0xff, tcaddr + ATMEL_TC_REG(0, IDR));	/* no irqs */
--	__raw_writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(0, CCR));
-+	writel(0x0000, tcaddr + ATMEL_TC_REG(0, RA));
-+	writel(0x8000, tcaddr + ATMEL_TC_REG(0, RC));
-+	writel(0xff, tcaddr + ATMEL_TC_REG(0, IDR));	/* no irqs */
-+	writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(0, CCR));
- 
- 	/* channel 1:  waveform mode, input TIOA0 */
--	__raw_writel(ATMEL_TC_XC1			/* input: TIOA0 */
-+	writel(ATMEL_TC_XC1			/* input: TIOA0 */
- 			| ATMEL_TC_WAVE
- 			| ATMEL_TC_WAVESEL_UP,		/* free-run */
- 			tcaddr + ATMEL_TC_REG(1, CMR));
--	__raw_writel(0xff, tcaddr + ATMEL_TC_REG(1, IDR));	/* no irqs */
--	__raw_writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(1, CCR));
-+	writel(0xff, tcaddr + ATMEL_TC_REG(1, IDR));	/* no irqs */
-+	writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(1, CCR));
- 
- 	/* chain channel 0 to channel 1*/
--	__raw_writel(ATMEL_TC_TC1XC1S_TIOA0, tcaddr + ATMEL_TC_BMR);
-+	writel(ATMEL_TC_TC1XC1S_TIOA0, tcaddr + ATMEL_TC_BMR);
- 	/* then reset all the timers */
--	__raw_writel(ATMEL_TC_SYNC, tcaddr + ATMEL_TC_BCR);
-+	writel(ATMEL_TC_SYNC, tcaddr + ATMEL_TC_BCR);
- }
- 
- static void __init tcb_setup_single_chan(struct atmel_tc *tc, int mck_divisor_idx)
- {
- 	/* channel 0:  waveform mode, input mclk/8 */
--	__raw_writel(mck_divisor_idx			/* likely divide-by-8 */
-+	writel(mck_divisor_idx			/* likely divide-by-8 */
- 			| ATMEL_TC_WAVE
- 			| ATMEL_TC_WAVESEL_UP,		/* free-run */
- 			tcaddr + ATMEL_TC_REG(0, CMR));
--	__raw_writel(0xff, tcaddr + ATMEL_TC_REG(0, IDR));	/* no irqs */
--	__raw_writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(0, CCR));
-+	writel(0xff, tcaddr + ATMEL_TC_REG(0, IDR));	/* no irqs */
-+	writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(0, CCR));
- 
- 	/* then reset all the timers */
--	__raw_writel(ATMEL_TC_SYNC, tcaddr + ATMEL_TC_BCR);
-+	writel(ATMEL_TC_SYNC, tcaddr + ATMEL_TC_BCR);
- }
- 
- static int __init tcb_clksrc_init(void)
--- 
-2.11.0
+* I will add a bit flag in bpf_func_proto to represent whether
+different arguments in a function call are 4 bytes or 8 bytes. If lsb
+of bit flag is set then first argument is 8 byte, otherwise its not. I
+think I can handle this flag properly in build_insn() in my code. Does
+this sound okay?
+
+I don't understand second part of your solution, i.e.
+
+> Presumably
+> for that information to process, the JIT might need to be reworked to
+> extract that via bpf_analyzer() that does a verifier run to re-analyze
+> the program like in nfp JIT case.
+
+Please explain what are you suggesting and how can I extract bit flag
+from bpf_func_proto().
+
+Please reply asap, as I would like to finish it over the weekend. Please.
+
+-Shubham
