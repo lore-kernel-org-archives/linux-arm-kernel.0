@@ -1,42 +1,31 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 16 Jun 2017 17:07:41 -0700
-Subject: [PATCH v3 1/4] ARM: fncpy: Rename include guards
+Date: Fri, 16 Jun 2017 17:07:43 -0700
+Subject: [PATCH v3 3/4] arm64: Provide a fncpy implementation
 In-Reply-To: <20170617000744.22158-1-f.fainelli@gmail.com>
 References: <20170617000744.22158-1-f.fainelli@gmail.com>
-Message-ID: <20170617000744.22158-2-f.fainelli@gmail.com>
+Message-ID: <20170617000744.22158-4-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for allowing a generic fncpy() implementation to live
-under include/asm-generic/fncpy.h, rename the current include guards to
-be __ASM_ARM_FNCPY_H, this also makes the header file more consistent
-with other headers in the same directory.
+Utilize the asm-generic/fncpy.h implementation for ARM64 to allow the
+use of drivers/misc/sram*.c on these platforms as well.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm/include/asm/fncpy.h | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/Kbuild | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/include/asm/fncpy.h b/arch/arm/include/asm/fncpy.h
-index de5354746924..86a8fc14cde9 100644
---- a/arch/arm/include/asm/fncpy.h
-+++ b/arch/arm/include/asm/fncpy.h
-@@ -53,8 +53,8 @@
-  * in the file where f is defined.
-  */
- 
--#ifndef __ASM_FNCPY_H
--#define __ASM_FNCPY_H
-+#ifndef __ASM_ARM_FNCPY_H
-+#define __ASM_ARM_FNCPY_H
- 
- #include <linux/types.h>
- #include <linux/string.h>
-@@ -91,4 +91,4 @@
- 	__result;							\
- })
- 
--#endif /* !__ASM_FNCPY_H */
-+#endif /* !__ASM_ARM_FNCPY_H */
+diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
+index a7a97a608033..5cfd822d3256 100644
+--- a/arch/arm64/include/asm/Kbuild
++++ b/arch/arm64/include/asm/Kbuild
+@@ -7,6 +7,7 @@ generic-y += dma-contiguous.h
+ generic-y += early_ioremap.h
+ generic-y += emergency-restart.h
+ generic-y += errno.h
++generic-y += fncpy.h
+ generic-y += hw_irq.h
+ generic-y += ioctl.h
+ generic-y += ioctls.h
 -- 
 2.9.3
