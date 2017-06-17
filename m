@@ -1,32 +1,42 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Fri, 16 Jun 2017 16:56:59 -0600
-Subject: [PATCH] drm: exynos: dsi: fix to return -ENODEV when DSI_PORT_OUT is
- not found
-Message-ID: <20170616225659.23569-1-shuahkh@osg.samsung.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 16 Jun 2017 17:07:40 -0700
+Subject: [PATCH v3 0/4] Generalize fncpy availability
+Message-ID: <20170617000744.22158-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix exynos_dsi_parse_dt() to return -ENODEV when of_graph_get_remote_node()
-doesn't find DSI_PORT_OUT. -ENODEV is the correct error code to return and
-this change makes exynos behavior consistent with rest of the drm drivers.
+Hi all,
 
-Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
----
- drivers/gpu/drm/exynos/exynos_drm_dsi.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This patch series makes ARM's fncpy() implementation more generic (dropping the
+Thumb-specifics) and available in an asm-generic header file.
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-index e337cd2..cb99e82 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-@@ -1652,7 +1652,7 @@ static int exynos_dsi_parse_dt(struct exynos_dsi *dsi)
- 
- 	dsi->bridge_node = of_graph_get_remote_node(node, DSI_PORT_OUT, 0);
- 	if (!dsi->bridge_node)
--		return -EINVAL;
-+		return -ENODEV;
- 
- 	return 0;
- }
+Tested on a Broadcom ARM64 STB platform with code that is written to SRAM.
+
+Changes in v3 (thanks Doug!):
+- correct include guard names in asm-generic/fncpy.h to __ASM_FNCPY_H
+- utilize Kbuild to provide the fncpy.h header on ARM64
+
+Changes in v2:
+- leave the ARM implementation where it is
+- make the generic truly generic (no)
+
+This is helpful in making SoC-specific power management code become true drivers
+that can be shared between different architectures.
+
+Thanks!
+
+Florian Fainelli (4):
+  ARM: fncpy: Rename include guards
+  asm-generic: Provide a fncpy() implementation
+  arm64: Provide a fncpy implementation
+  misc: sram: Allow ARM64 to select SRAM_EXEC
+
+ arch/arm/include/asm/fncpy.h  |  6 +--
+ arch/arm64/include/asm/Kbuild |  1 +
+ drivers/misc/Kconfig          |  2 +-
+ include/asm-generic/fncpy.h   | 93 +++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 98 insertions(+), 4 deletions(-)
+ create mode 100644 include/asm-generic/fncpy.h
+
 -- 
-2.7.4
+2.9.3
