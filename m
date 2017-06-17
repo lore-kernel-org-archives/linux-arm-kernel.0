@@ -1,37 +1,24 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 17 Jun 2017 22:09:32 +0800
-Subject: [PATCH 0/2] Add ZTE ZTE zx-aud96p22 audio codec driver
-Message-ID: <1497708574-22380-1-git-send-email-shawnguo@kernel.org>
+Date: Sat, 17 Jun 2017 22:32:06 +0800
+Subject: [PATCH] ARM: dts: imx6q-cm-fx6: add sdio wifi/bt nodes
+In-Reply-To: <20170617132329.GE5902@dragon>
+References: <1a13681b84564bc18937eb54b8345957@rwthex-s1-b.rwth-ad.de>
+ <3c63d7014b0b4bb596f328ea8018a4cb@rwthex-w1-a.rwth-ad.de>
+ <5c93344d-392e-1c2a-4605-11b57fa3f1c4@rwth-aachen.de>
+ <20170617132329.GE5902@dragon>
+Message-ID: <20170617143205.GF5902@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Guo <shawn.guo@linaro.org>
+On Sat, Jun 17, 2017 at 09:23:31PM +0800, Shawn Guo wrote:
+> On Thu, Jun 15, 2017 at 11:23:46PM +0200, Christopher Spinrath wrote:
+> > > Hi Valentin, Igor,
+> > > 
+> > > Are you guys fine with the patch?
+> > 
+> > Do you have a specific question here?
+> 
+> No, I don't.  I just wanted to hear the voice of Compulab people.  Okay,
+> we haven't waited for time enough, so I just applied patch.
 
-This is a pick-up of Baoyou's zx-aud96p22 audio codec driver
-submission [1], with quite some significant rework as below.
-
- - Instead of hard-coding the GPIO used to control external amplifier,
-   use generic devm_gpiod_get_optional() call to retrieve the GPIO
-   defined in device tree.
- - Rather than directly using I2C bus calls, use REGMAP_I2C interface
-   which is more common for accessing codec register via I2C bus.
- - Use snd_kcontrol_new infrastructural for Volume and Mute control.
- - Use DAPM widget and route for various power bits control.
- - A lot of code cleanups
-
-[1] https://lkml.org/lkml/2017/2/15/170
-
-Baoyou Xie (2):
-  ASoC: add bindings for ZTE zx-aud96p22 audio codec
-  ASoC: zx_aud96p22: add ZTE ZX AUD96P22 codec driver
-
- .../devicetree/bindings/sound/zte,zx-aud96p22.txt  |  28 ++
- sound/soc/codecs/Kconfig                           |   5 +
- sound/soc/codecs/Makefile                          |   2 +
- sound/soc/codecs/zx_aud96p22.c                     | 425 +++++++++++++++++++++
- 4 files changed, 460 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/zte,zx-aud96p22.txt
- create mode 100644 sound/soc/codecs/zx_aud96p22.c
-
--- 
-1.9.1
+s/haven't/have
