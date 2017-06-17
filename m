@@ -1,38 +1,65 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 17 Jun 2017 21:23:31 +0800
-Subject: [PATCH] ARM: dts: imx6q-cm-fx6: add sdio wifi/bt nodes
-In-Reply-To: <5c93344d-392e-1c2a-4605-11b57fa3f1c4@rwth-aachen.de>
-References: <1a13681b84564bc18937eb54b8345957@rwthex-s1-b.rwth-ad.de>
- <3c63d7014b0b4bb596f328ea8018a4cb@rwthex-w1-a.rwth-ad.de>
- <5c93344d-392e-1c2a-4605-11b57fa3f1c4@rwth-aachen.de>
-Message-ID: <20170617132329.GE5902@dragon>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Sat, 17 Jun 2017 19:07:16 +0530
+Subject: [PATCH] dmaengine: qcom-bam: Process multiple pending descriptors
+In-Reply-To: <004fa3c7-afb9-f56c-8a57-abc0117638eb@codeaurora.org>
+References: <1496838547-15092-1-git-send-email-sricharan@codeaurora.org>
+ <20170615041011.GN13020@localhost>
+ <004fa3c7-afb9-f56c-8a57-abc0117638eb@codeaurora.org>
+Message-ID: <20170617133716.GG19154@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 15, 2017 at 11:23:46PM +0200, Christopher Spinrath wrote:
-> > Hi Valentin, Igor,
+On Thu, Jun 15, 2017 at 08:19:48PM +0530, Sricharan R wrote:
+
+> > I am not sure why suppressing callback helps? I think you should still
+> > continue filling up FIFO but also ensure interrupt so that callback can be
+> > invoked, user thread maybe waiting on that
 > > 
-> > Are you guys fine with the patch?
+> > FWIW waiting for interrupt and submitting is extremely inefficient and
+> > shouldn't be done, so that part of this is good.
+> > 
 > 
-> Do you have a specific question here?
-
-No, I don't.  I just wanted to hear the voice of Compulab people.  Okay,
-we haven't waited for time enough, so I just applied patch.
-
+>  Thanks for the review.
+>  
+>  So one part is, adding desc to the FIFO till its full, so the BAM dmaengine is
+>  busy  when there are pending descriptors without waiting for interrupt.
 > 
-> The devicetree additions are mostly identical to their counterparts in
-> the BSP devicetree. The only real exception being that the usdhc1
-> regulators have been replaced by the sd8787 power sequence, which allows
-> the mmc core to reset the wifi/bt chip (which is not possible with the
-> regulator setup). Note that the sd8787 power sequence binding/driver has
-> only recently been added to Linux (v4.11) and is not present in the BSP
-> kernel.
+>  Another part is, currently, the driver signals the completion of the each
+>  descriptor with a interrupt, even though the client has not requested
+>  a DMA_PREP_INTERRUPT/registered a callback. Instead if the client has
+>  not requested for a interrupt for the completion of a descriptor, then
+>  generate a interrupt only for descriptor for which it was requested and
+>  also complete all the previous descriptors in that interrupt (means call
+>  all callbacks). So we still call all callbacks but at the end of a
+>  group of descriptors.
+
+okay that sounds sane, but somehow I was getting the impression that we
+might be suppressing, so you might want to update comments
+
+> >>  	async_desc->num_desc = num_alloc;
+> >>  	async_desc->curr_desc = async_desc->desc;
+> >> @@ -680,13 +684,18 @@ static struct dma_async_tx_descriptor *bam_prep_slave_sg(struct dma_chan *chan,
+> >>  static int bam_dma_terminate_all(struct dma_chan *chan)
+> >>  {
+> >>  	struct bam_chan *bchan = to_bam_chan(chan);
+> >> +	struct bam_async_desc *async_desc;
+> >>  	unsigned long flag;
+> >>  	LIST_HEAD(head);
+> >>  
+> >>  	/* remove all transactions, including active transaction */
+> >>  	spin_lock_irqsave(&bchan->vc.lock, flag);
+> >>  	if (bchan->curr_txd) {
+> >> -		list_add(&bchan->curr_txd->vd.node, &bchan->vc.desc_issued);
+> >> +		list_for_each_entry(async_desc, &bchan->desc_list, desc_node) {
+> >> +			bchan->curr_txd = async_desc;
+> >> +			list_add(&bchan->curr_txd->vd.node,
+> >> +				 &bchan->vc.desc_issued);
+> > 
+> > that is wrong, terminated should not add to issued list
 > 
-> Furthermore, the Bluetooth AMP function is disabled in the BSP kernel
-> by CompuLab [1] for the same reason we do not enable the usdhc1 node in
-> this patch. (We cannot disable it in the driver because, as explained in
-> the commit message, this would yield a regression.)
+>  hmm, since it was already done like that, i added the same for list of descriptors now.
 
-Thanks for the comments.
+Sounds like you should fix existing behaviour too :)
 
-Shawn
+-- 
+~Vinod
