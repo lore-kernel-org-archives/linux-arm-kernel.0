@@ -1,60 +1,168 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sat, 17 Jun 2017 09:09:30 +0200
-Subject: [PATCH] ARM: dts: kirkwood: Fix Openblock A6 nand partition
- overlap
-In-Reply-To: <20170616123957.17111-1-peter@korsgaard.com> (Peter Korsgaard's
- message of "Fri, 16 Jun 2017 14:39:57 +0200")
-References: <20170616123957.17111-1-peter@korsgaard.com>
-Message-ID: <87lgor5bv9.fsf@free-electrons.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sat, 17 Jun 2017 13:35:20 +0200
+Subject: [PATCH v2] clocksource/drivers/tcb_clksrc: make IO endian agnostic
+Message-ID: <20170617113520.23221-1-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Now that AVR32 is gone, we can use the proper IO accessors that are
+correctly handling endianness.
+
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+Changes in v2:
+ - Also use the _relaxed version in tc_next_event as this is working fine.
+
+ drivers/clocksource/tcb_clksrc.c | 58 ++++++++++++++++++++--------------------
+ 1 file changed, 29 insertions(+), 29 deletions(-)
+
+diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+index d4ca9962a759..fc410b5b409d 100644
+--- a/drivers/clocksource/tcb_clksrc.c
++++ b/drivers/clocksource/tcb_clksrc.c
+@@ -48,9 +48,9 @@ static u64 tc_get_cycles(struct clocksource *cs)
  
- On ven., juin 16 2017, Peter Korsgaard <peter@korsgaard.com> wrote:
-
-> The "test" and "conf" nand partitions partly overlap:
->
-> Creating 6 MTD partitions on "orion_nand":
-> 0x000000000000-0x000000090000 : "uboot"
-> 0x000000090000-0x0000000d4000 : "env"
-> 0x0000000d4000-0x0000000f8000 : "test"
-> 0x0000000f4000-0x0000004f4000 : "conf"
->
-> That is unlikely to be desired, and not matching the partition map used in
-> u-boot - So adjust the test partition size to fix this.
->
-> Signed-off-by: Peter Korsgaard <peter@korsgaard.com>
-
-Applied on mvebu/fixes
-
-Thanks,
-
-Gregory
-
-> ---
->  arch/arm/boot/dts/kirkwood-openblocks_a6.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-> index 94e49f32d5f9..c75da5f0ca48 100644
-> --- a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-> +++ b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-> @@ -141,7 +141,7 @@
->  
->  	partition at d4000 {
->  		label = "test";
-> -		reg = <0xd4000 0x24000>;
-> +		reg = <0xd4000 0x20000>;
->  	};
->  
->  	partition at f4000 {
-> -- 
-> 2.11.0
->
-
+ 	raw_local_irq_save(flags);
+ 	do {
+-		upper = __raw_readl(tcaddr + ATMEL_TC_REG(1, CV));
+-		lower = __raw_readl(tcaddr + ATMEL_TC_REG(0, CV));
+-	} while (upper != __raw_readl(tcaddr + ATMEL_TC_REG(1, CV)));
++		upper = readl_relaxed(tcaddr + ATMEL_TC_REG(1, CV));
++		lower = readl_relaxed(tcaddr + ATMEL_TC_REG(0, CV));
++	} while (upper != readl_relaxed(tcaddr + ATMEL_TC_REG(1, CV)));
+ 
+ 	raw_local_irq_restore(flags);
+ 	return (upper << 16) | lower;
+@@ -58,7 +58,7 @@ static u64 tc_get_cycles(struct clocksource *cs)
+ 
+ static u64 tc_get_cycles32(struct clocksource *cs)
+ {
+-	return __raw_readl(tcaddr + ATMEL_TC_REG(0, CV));
++	return readl_relaxed(tcaddr + ATMEL_TC_REG(0, CV));
+ }
+ 
+ static struct clocksource clksrc = {
+@@ -96,8 +96,8 @@ static int tc_shutdown(struct clock_event_device *d)
+ 	struct tc_clkevt_device *tcd = to_tc_clkevt(d);
+ 	void __iomem		*regs = tcd->regs;
+ 
+-	__raw_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
+-	__raw_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
++	writel(0xff, regs + ATMEL_TC_REG(2, IDR));
++	writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
+ 	if (!clockevent_state_detached(d))
+ 		clk_disable(tcd->clk);
+ 
+@@ -115,9 +115,9 @@ static int tc_set_oneshot(struct clock_event_device *d)
+ 	clk_enable(tcd->clk);
+ 
+ 	/* slow clock, count up to RC, then irq and stop */
+-	__raw_writel(timer_clock | ATMEL_TC_CPCSTOP | ATMEL_TC_WAVE |
++	writel(timer_clock | ATMEL_TC_CPCSTOP | ATMEL_TC_WAVE |
+ 		     ATMEL_TC_WAVESEL_UP_AUTO, regs + ATMEL_TC_REG(2, CMR));
+-	__raw_writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
++	writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
+ 
+ 	/* set_next_event() configures and starts the timer */
+ 	return 0;
+@@ -137,25 +137,25 @@ static int tc_set_periodic(struct clock_event_device *d)
+ 	clk_enable(tcd->clk);
+ 
+ 	/* slow clock, count up to RC, then irq and restart */
+-	__raw_writel(timer_clock | ATMEL_TC_WAVE | ATMEL_TC_WAVESEL_UP_AUTO,
++	writel(timer_clock | ATMEL_TC_WAVE | ATMEL_TC_WAVESEL_UP_AUTO,
+ 		     regs + ATMEL_TC_REG(2, CMR));
+-	__raw_writel((32768 + HZ / 2) / HZ, tcaddr + ATMEL_TC_REG(2, RC));
++	writel((32768 + HZ / 2) / HZ, tcaddr + ATMEL_TC_REG(2, RC));
+ 
+ 	/* Enable clock and interrupts on RC compare */
+-	__raw_writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
++	writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
+ 
+ 	/* go go gadget! */
+-	__raw_writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG, regs +
++	writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG, regs +
+ 		     ATMEL_TC_REG(2, CCR));
+ 	return 0;
+ }
+ 
+ static int tc_next_event(unsigned long delta, struct clock_event_device *d)
+ {
+-	__raw_writel(delta, tcaddr + ATMEL_TC_REG(2, RC));
++	writel_relaxed(delta, tcaddr + ATMEL_TC_REG(2, RC));
+ 
+ 	/* go go gadget! */
+-	__raw_writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG,
++	writel_relaxed(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG,
+ 			tcaddr + ATMEL_TC_REG(2, CCR));
+ 	return 0;
+ }
+@@ -179,7 +179,7 @@ static irqreturn_t ch2_irq(int irq, void *handle)
+ 	struct tc_clkevt_device	*dev = handle;
+ 	unsigned int		sr;
+ 
+-	sr = __raw_readl(dev->regs + ATMEL_TC_REG(2, SR));
++	sr = readl_relaxed(dev->regs + ATMEL_TC_REG(2, SR));
+ 	if (sr & ATMEL_TC_CPCS) {
+ 		dev->clkevt.event_handler(&dev->clkevt);
+ 		return IRQ_HANDLED;
+@@ -239,43 +239,43 @@ static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
+ static void __init tcb_setup_dual_chan(struct atmel_tc *tc, int mck_divisor_idx)
+ {
+ 	/* channel 0:  waveform mode, input mclk/8, clock TIOA0 on overflow */
+-	__raw_writel(mck_divisor_idx			/* likely divide-by-8 */
++	writel(mck_divisor_idx			/* likely divide-by-8 */
+ 			| ATMEL_TC_WAVE
+ 			| ATMEL_TC_WAVESEL_UP		/* free-run */
+ 			| ATMEL_TC_ACPA_SET		/* TIOA0 rises at 0 */
+ 			| ATMEL_TC_ACPC_CLEAR,		/* (duty cycle 50%) */
+ 			tcaddr + ATMEL_TC_REG(0, CMR));
+-	__raw_writel(0x0000, tcaddr + ATMEL_TC_REG(0, RA));
+-	__raw_writel(0x8000, tcaddr + ATMEL_TC_REG(0, RC));
+-	__raw_writel(0xff, tcaddr + ATMEL_TC_REG(0, IDR));	/* no irqs */
+-	__raw_writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(0, CCR));
++	writel(0x0000, tcaddr + ATMEL_TC_REG(0, RA));
++	writel(0x8000, tcaddr + ATMEL_TC_REG(0, RC));
++	writel(0xff, tcaddr + ATMEL_TC_REG(0, IDR));	/* no irqs */
++	writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(0, CCR));
+ 
+ 	/* channel 1:  waveform mode, input TIOA0 */
+-	__raw_writel(ATMEL_TC_XC1			/* input: TIOA0 */
++	writel(ATMEL_TC_XC1			/* input: TIOA0 */
+ 			| ATMEL_TC_WAVE
+ 			| ATMEL_TC_WAVESEL_UP,		/* free-run */
+ 			tcaddr + ATMEL_TC_REG(1, CMR));
+-	__raw_writel(0xff, tcaddr + ATMEL_TC_REG(1, IDR));	/* no irqs */
+-	__raw_writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(1, CCR));
++	writel(0xff, tcaddr + ATMEL_TC_REG(1, IDR));	/* no irqs */
++	writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(1, CCR));
+ 
+ 	/* chain channel 0 to channel 1*/
+-	__raw_writel(ATMEL_TC_TC1XC1S_TIOA0, tcaddr + ATMEL_TC_BMR);
++	writel(ATMEL_TC_TC1XC1S_TIOA0, tcaddr + ATMEL_TC_BMR);
+ 	/* then reset all the timers */
+-	__raw_writel(ATMEL_TC_SYNC, tcaddr + ATMEL_TC_BCR);
++	writel(ATMEL_TC_SYNC, tcaddr + ATMEL_TC_BCR);
+ }
+ 
+ static void __init tcb_setup_single_chan(struct atmel_tc *tc, int mck_divisor_idx)
+ {
+ 	/* channel 0:  waveform mode, input mclk/8 */
+-	__raw_writel(mck_divisor_idx			/* likely divide-by-8 */
++	writel(mck_divisor_idx			/* likely divide-by-8 */
+ 			| ATMEL_TC_WAVE
+ 			| ATMEL_TC_WAVESEL_UP,		/* free-run */
+ 			tcaddr + ATMEL_TC_REG(0, CMR));
+-	__raw_writel(0xff, tcaddr + ATMEL_TC_REG(0, IDR));	/* no irqs */
+-	__raw_writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(0, CCR));
++	writel(0xff, tcaddr + ATMEL_TC_REG(0, IDR));	/* no irqs */
++	writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(0, CCR));
+ 
+ 	/* then reset all the timers */
+-	__raw_writel(ATMEL_TC_SYNC, tcaddr + ATMEL_TC_BCR);
++	writel(ATMEL_TC_SYNC, tcaddr + ATMEL_TC_BCR);
+ }
+ 
+ static int __init tcb_clksrc_init(void)
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.11.0
