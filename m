@@ -1,65 +1,35 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Sat, 17 Jun 2017 19:07:16 +0530
-Subject: [PATCH] dmaengine: qcom-bam: Process multiple pending descriptors
-In-Reply-To: <004fa3c7-afb9-f56c-8a57-abc0117638eb@codeaurora.org>
-References: <1496838547-15092-1-git-send-email-sricharan@codeaurora.org>
- <20170615041011.GN13020@localhost>
- <004fa3c7-afb9-f56c-8a57-abc0117638eb@codeaurora.org>
-Message-ID: <20170617133716.GG19154@localhost>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sat, 17 Jun 2017 22:07:33 +0800
+Subject: [PATCH 0/4] net-next: stmmac: dwmac-sun8i: add support for V3s
+Message-ID: <20170617140737.41951-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 15, 2017 at 08:19:48PM +0530, Sricharan R wrote:
+Allwinner V3s features an EMAC like the on in H3, but without external MII
+interfaces, so being not able really to use RMII/RGMII.
 
-> > I am not sure why suppressing callback helps? I think you should still
-> > continue filling up FIFO but also ensure interrupt so that callback can be
-> > invoked, user thread maybe waiting on that
-> > 
-> > FWIW waiting for interrupt and submitting is extremely inefficient and
-> > shouldn't be done, so that part of this is good.
-> > 
-> 
->  Thanks for the review.
->  
->  So one part is, adding desc to the FIFO till its full, so the BAM dmaengine is
->  busy  when there are pending descriptors without waiting for interrupt.
-> 
->  Another part is, currently, the driver signals the completion of the each
->  descriptor with a interrupt, even though the client has not requested
->  a DMA_PREP_INTERRUPT/registered a callback. Instead if the client has
->  not requested for a interrupt for the completion of a descriptor, then
->  generate a interrupt only for descriptor for which it was requested and
->  also complete all the previous descriptors in that interrupt (means call
->  all callbacks). So we still call all callbacks but at the end of a
->  group of descriptors.
+And it has a different default value of syscon (0x38000 instead of 0x58000
+on H3), which shows a problem that the EMAC clock freq should be 24MHz.
+(Both H3 and V3s SoCs doesn't have extra xtal input for EPHY, and the
+main xtal is 24MHz. The default value of H3 is set to 24MHz, but the V3s
+default value is set to 25MHz).
 
-okay that sounds sane, but somehow I was getting the impression that we
-might be suppressing, so you might want to update comments
+First two patches are device tree binding patches, the third forces
+the frequency to 24MHz and the fourth really add the V3s support.
 
-> >>  	async_desc->num_desc = num_alloc;
-> >>  	async_desc->curr_desc = async_desc->desc;
-> >> @@ -680,13 +684,18 @@ static struct dma_async_tx_descriptor *bam_prep_slave_sg(struct dma_chan *chan,
-> >>  static int bam_dma_terminate_all(struct dma_chan *chan)
-> >>  {
-> >>  	struct bam_chan *bchan = to_bam_chan(chan);
-> >> +	struct bam_async_desc *async_desc;
-> >>  	unsigned long flag;
-> >>  	LIST_HEAD(head);
-> >>  
-> >>  	/* remove all transactions, including active transaction */
-> >>  	spin_lock_irqsave(&bchan->vc.lock, flag);
-> >>  	if (bchan->curr_txd) {
-> >> -		list_add(&bchan->curr_txd->vd.node, &bchan->vc.desc_issued);
-> >> +		list_for_each_entry(async_desc, &bchan->desc_list, desc_node) {
-> >> +			bchan->curr_txd = async_desc;
-> >> +			list_add(&bchan->curr_txd->vd.node,
-> >> +				 &bchan->vc.desc_issued);
-> > 
-> > that is wrong, terminated should not add to issued list
-> 
->  hmm, since it was already done like that, i added the same for list of descriptors now.
+Icenowy Zheng (4):
+  dt-bindings: net-next: Add DT bindings documentation for Allwinner V3s
+    EMAC
+  dt-bindings: syscon: Add DT bindings documentation for Allwinner V3s
+    syscon
+  net-next: stmmac: dwmac-sun8i: force EPHY clock freq to 24MHz
+  net-next: stmmac: dwmac-sun8i: add support for V3s EMAC
 
-Sounds like you should fix existing behaviour too :)
+ Documentation/devicetree/bindings/misc/allwinner,syscon.txt |  1 +
+ Documentation/devicetree/bindings/net/dwmac-sun8i.txt       | 10 ++++++++--
+ drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c           | 12 ++++++++++++
+ drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c       |  1 +
+ 4 files changed, 22 insertions(+), 2 deletions(-)
 
 -- 
-~Vinod
+2.13.0
