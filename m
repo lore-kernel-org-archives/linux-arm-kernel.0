@@ -1,120 +1,166 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 17 Jun 2017 20:05:53 +0200
-Subject: [PATCH v1 2/2] arm64: dts: rk3328: add pdm node
-In-Reply-To: <1497338867-52684-3-git-send-email-sugar.zhang@rock-chips.com>
-References: <1497338867-52684-1-git-send-email-sugar.zhang@rock-chips.com>
- <1497338867-52684-3-git-send-email-sugar.zhang@rock-chips.com>
-Message-ID: <8940631.X8XUXX2eL4@phil>
+Date: Sat, 17 Jun 2017 20:12:19 +0200
+Subject: [PATCH 1/6] ARM: dts: rockchip: add basic dtsi file for RK3229 SoC
+In-Reply-To: <1497510980-23207-2-git-send-email-frank.wang@rock-chips.com>
+References: <1497510980-23207-1-git-send-email-frank.wang@rock-chips.com>
+ <1497510980-23207-2-git-send-email-frank.wang@rock-chips.com>
+Message-ID: <18070472.si2qlgbqtt@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Am Dienstag, 13. Juni 2017, 15:27:47 CEST schrieb Sugar Zhang:
-> This patch add pdm controller device node for rk3328.
+Am Donnerstag, 15. Juni 2017, 15:16:15 CEST schrieb Frank Wang:
+> Due to some tiny differences between RK3228 and RK3229, this patch
+> adds a basic dtsi file which includes a new CPU opp table and PSCI
+> brought up support for RK3229.
 > 
-> Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
-
-please make the subject
-	"arm64: dts: rockchip: add rk3328 pdm node"
-
-> 
+> Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
 > ---
+>  arch/arm/boot/dts/rk3229-evb.dts |   2 +-
+>  arch/arm/boot/dts/rk3229.dtsi    | 110 +++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 111 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/rk3229.dtsi
 > 
->  arch/arm64/boot/dts/rockchip/rk3328.dtsi | 55 ++++++++++++++++++++++++++++++++
->  1 file changed, 55 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-> index 7e69f1f..2435044 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-> @@ -156,6 +156,25 @@
->  		clock-output-names = "xin24m";
->  	};
+> diff --git a/arch/arm/boot/dts/rk3229-evb.dts b/arch/arm/boot/dts/rk3229-evb.dts
+> index 1b55192..82e8a53 100644
+> --- a/arch/arm/boot/dts/rk3229-evb.dts
+> +++ b/arch/arm/boot/dts/rk3229-evb.dts
+> @@ -40,7 +40,7 @@
 >  
-> +	pdm: pdm at ff040000 {
-> +		compatible = "rockchip,pdm";
-> +		reg = <0x0 0xff040000 0x0 0x1000>;
-> +		clocks = <&cru SCLK_PDM>, <&cru HCLK_PDM>;
-> +		clock-names = "pdm_clk", "pdm_hclk";
-> +		dmas = <&dmac 16>;
-> +		#dma-cells = <1>;
-
-please drop #dma-cells, this is not a dma-controller and only
-a dma-client. #dma-cells is a property of dma-controllers.
-
-
-> +		dma-names = "rx";
-> +		pinctrl-names = "default", "sleep";
-> +		pinctrl-0 = <&pdmm0_clk
-> +			     &pdmm0_fsync
-> +			     &pdmm0_sdi0
-> +			     &pdmm0_sdi1
-> +			     &pdmm0_sdi2
-> +			     &pdmm0_sdi3>;
-> +		pinctrl-1 = <&pdmm0_sleep>;
-
-pinctrl doesn't match up. default pins are all separate, sleep pins are
-all in one entry. So what is the use-case for the pins being separate?
-
-I guess you always need clk, fsync and then one or more of the sdiX pins?
-Can these be used independently [like sdi2 only] or is it something like
-sdio pins and one of {1}, {1,2,3,4} or so?
-
-So in general the groupings should match for all pinctrl states, because
-if you for example do not use sdi3 and reuse it as gpio or so the sleep
-pinctrl state would fail, as there would be conflict then.
-
-
-Heiko
-
-> +		status = "disabled";
+>  /dts-v1/;
+>  
+> -#include "rk322x.dtsi"
+> +#include "rk3229.dtsi"
+>  
+>  / {
+>  	model = "Rockchip RK3229 Evaluation board";
+> diff --git a/arch/arm/boot/dts/rk3229.dtsi b/arch/arm/boot/dts/rk3229.dtsi
+> new file mode 100644
+> index 0000000..d43d133
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/rk3229.dtsi
+> @@ -0,0 +1,110 @@
+> +/*
+> + * Copyright (c) 2017 Fuzhou Rockchip Electronics Co., Ltd
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This library is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This library is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + *  Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +#include "rk322x.dtsi"
+> +
+> +/ {
+> +	compatible = "rockchip,rk3229";
+> +
+> +	/delete-node/ opp-table0;
+> +
+> +	cpu0_opp_table: opp_table0 {
+> +		compatible = "operating-points-v2";
+> +		opp-shared;
+> +
+> +		opp-408000000 {
+> +			opp-hz = /bits/ 64 <408000000>;
+> +			opp-microvolt = <950000>;
+> +			clock-latency-ns = <40000>;
+> +			opp-suspend;
+> +		};
+> +		opp-600000000 {
+> +			opp-hz = /bits/ 64 <600000000>;
+> +			opp-microvolt = <975000>;
+> +		};
+> +		opp-816000000 {
+> +			opp-hz = /bits/ 64 <816000000>;
+> +			opp-microvolt = <1000000>;
+> +		};
+> +		opp-1008000000 {
+> +			opp-hz = /bits/ 64 <1008000000>;
+> +			opp-microvolt = <1175000>;
+> +		};
+> +		opp-1200000000 {
+> +			opp-hz = /bits/ 64 <1200000000>;
+> +			opp-microvolt = <1275000>;
+> +		};
+> +		opp-1296000000 {
+> +			opp-hz = /bits/ 64 <1296000000>;
+> +			opp-microvolt = <1325000>;
+> +		};
+> +		opp-1392000000 {
+> +			opp-hz = /bits/ 64 <1392000000>;
+> +			opp-microvolt = <1375000>;
+> +		};
+> +		opp-1464000000 {
+> +			opp-hz = /bits/ 64 <1464000000>;
+> +			opp-microvolt = <1400000>;
+> +		};
 > +	};
 > +
->  	grf: syscon at ff100000 {
->  		compatible = "rockchip,rk3328-grf", "syscon", "simple-mfd";
->  		reg = <0x0 0xff100000 0x0 0x1000>;
-> @@ -701,6 +720,42 @@
->  			};
->  		};
->  
-> +		pdm-0 {
-> +			pdmm0_clk: pdmm0-clk {
-> +				rockchip,pins = <2 RK_PC2 2 &pcfg_pull_none>;
-> +			};
+> +	psci {
+> +		compatible = "arm,psci-1.0", "arm,psci-0.2";
+> +		method = "smc";
+> +	};
+> +};
 > +
-> +			pdmm0_fsync: pdmm0-fsync {
-> +				rockchip,pins = <2 RK_PC7 2 &pcfg_pull_none>;
-> +			};
+> +&cpu0 {
+> +	enable-method = "psci";
+> +};
+
+Hmm, I don't really understand this.
+What method of core-bringup does the rk3228 use? In the current
+rk322x.dtsi there is no enable-method at all defined.
+
+So is the rk3228 firmware using a different method than the rk3229?
+
+And out of curiosity as this is a arm32 without atf, is the psci
+implementation (for uboot?) you're using available somewhere?
+
+
+Thanks
+Heiko
+
 > +
-> +			pdmm0_sdi0: pdmm0-sdi0 {
-> +				rockchip,pins = <2 RK_PC3 2 &pcfg_pull_none>;
-> +			};
+> +&cpu1 {
+> +	enable-method = "psci";
+> +};
 > +
-> +			pdmm0_sdi1: pdmm0-sdi1 {
-> +				rockchip,pins = <2 RK_PC4 2 &pcfg_pull_none>;
-> +			};
+> +&cpu2 {
+> +	enable-method = "psci";
+> +};
 > +
-> +			pdmm0_sdi2: pdmm0-sdi2 {
-> +				rockchip,pins = <2 RK_PC5 2 &pcfg_pull_none>;
-> +			};
-> +
-> +			pdmm0_sdi3: pdmm0-sdi3 {
-> +				rockchip,pins = <2 RK_PC6 2 &pcfg_pull_none>;
-> +			};
-> +
-> +			pdmm0_sleep: pdmm0-sleep {
-> +				rockchip,pins =
-> +					<2 RK_PC2 RK_FUNC_GPIO &pcfg_input_high>,
-> +					<2 RK_PC3 RK_FUNC_GPIO &pcfg_input_high>,
-> +					<2 RK_PC4 RK_FUNC_GPIO &pcfg_input_high>,
-> +					<2 RK_PC5 RK_FUNC_GPIO &pcfg_input_high>,
-> +					<2 RK_PC6 RK_FUNC_GPIO &pcfg_input_high>,
-> +					<2 RK_PC7 RK_FUNC_GPIO &pcfg_input_high>;
-> +			};
-> +		};
-> +
->  		i2s1 {
->  			i2s1_mclk: i2s1-mclk {
->  				rockchip,pins = <2 RK_PB7 1 &pcfg_pull_none>;
+> +&cpu3 {
+> +	enable-method = "psci";
+> +};
 > 
