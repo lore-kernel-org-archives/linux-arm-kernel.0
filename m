@@ -1,166 +1,108 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 17 Jun 2017 20:12:19 +0200
-Subject: [PATCH 1/6] ARM: dts: rockchip: add basic dtsi file for RK3229 SoC
-In-Reply-To: <1497510980-23207-2-git-send-email-frank.wang@rock-chips.com>
-References: <1497510980-23207-1-git-send-email-frank.wang@rock-chips.com>
- <1497510980-23207-2-git-send-email-frank.wang@rock-chips.com>
-Message-ID: <18070472.si2qlgbqtt@phil>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Sun, 18 Jun 2017 06:50:27 +1000
+Subject: [PATCH 42/44] powerpc/cell: use the dma_supported method for
+ ops switching
+In-Reply-To: <20170616181059.19206-43-hch@lst.de>
+References: <20170616181059.19206-1-hch@lst.de>
+ <20170616181059.19206-43-hch@lst.de>
+Message-ID: <1497732627.2897.128.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 15. Juni 2017, 15:16:15 CEST schrieb Frank Wang:
-> Due to some tiny differences between RK3228 and RK3229, this patch
-> adds a basic dtsi file which includes a new CPU opp table and PSCI
-> brought up support for RK3229.
-> 
-> Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
+On Fri, 2017-06-16 at 20:10 +0200, Christoph Hellwig wrote:
+> Besides removing the last instance of the set_dma_mask method this also
+> reduced the code duplication.
+
+What is your rationale here ? (I have missed patch 0 it seems).
+
+dma_supported() was supposed to be pretty much a "const" function
+simply informing whether a given setup is possible. Having it perform
+an actual switch of ops seems to be pushing it...
+
+What if a driver wants to test various dma masks and then pick one ?
+
+Where does the API documents that if a driver calls dma_supported() it
+then *must* set the corresponding mask and use that ?
+
+I don't like a function that is a "boolean query" like this one to have
+such a major side effect.
+
+>From an API standpoint, dma_set_mask() is when the mask is established,
+and thus when the ops switch should happen.
+
+Ben.
+
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
 > ---
->  arch/arm/boot/dts/rk3229-evb.dts |   2 +-
->  arch/arm/boot/dts/rk3229.dtsi    | 110 +++++++++++++++++++++++++++++++++++++++
->  2 files changed, 111 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/rk3229.dtsi
+>  arch/powerpc/platforms/cell/iommu.c | 25 +++++++++----------------
+>  1 file changed, 9 insertions(+), 16 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/rk3229-evb.dts b/arch/arm/boot/dts/rk3229-evb.dts
-> index 1b55192..82e8a53 100644
-> --- a/arch/arm/boot/dts/rk3229-evb.dts
-> +++ b/arch/arm/boot/dts/rk3229-evb.dts
-> @@ -40,7 +40,7 @@
+> diff --git a/arch/powerpc/platforms/cell/iommu.c b/arch/powerpc/platforms/cell/iommu.c
+> index 497bfbdbd967..29d4f96ed33e 100644
+> --- a/arch/powerpc/platforms/cell/iommu.c
+> +++ b/arch/powerpc/platforms/cell/iommu.c
+> @@ -644,20 +644,14 @@ static void dma_fixed_unmap_sg(struct device *dev, struct scatterlist *sg,
+>  				   direction, attrs);
+>  }
 >  
->  /dts-v1/;
+> -static int dma_fixed_dma_supported(struct device *dev, u64 mask)
+> -{
+> -	return mask == DMA_BIT_MASK(64);
+> -}
+> -
+> -static int dma_set_mask_and_switch(struct device *dev, u64 dma_mask);
+> +static int dma_suported_and_switch(struct device *dev, u64 dma_mask);
 >  
-> -#include "rk322x.dtsi"
-> +#include "rk3229.dtsi"
+>  static const struct dma_map_ops dma_iommu_fixed_ops = {
+>  	.alloc          = dma_fixed_alloc_coherent,
+>  	.free           = dma_fixed_free_coherent,
+>  	.map_sg         = dma_fixed_map_sg,
+>  	.unmap_sg       = dma_fixed_unmap_sg,
+> -	.dma_supported  = dma_fixed_dma_supported,
+> -	.set_dma_mask   = dma_set_mask_and_switch,
+> +	.dma_supported  = dma_suported_and_switch,
+>  	.map_page       = dma_fixed_map_page,
+>  	.unmap_page     = dma_fixed_unmap_page,
+>  	.mapping_error	= dma_iommu_mapping_error,
+> @@ -952,11 +946,8 @@ static u64 cell_iommu_get_fixed_address(struct device *dev)
+>  	return dev_addr;
+>  }
 >  
->  / {
->  	model = "Rockchip RK3229 Evaluation board";
-> diff --git a/arch/arm/boot/dts/rk3229.dtsi b/arch/arm/boot/dts/rk3229.dtsi
-> new file mode 100644
-> index 0000000..d43d133
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/rk3229.dtsi
-> @@ -0,0 +1,110 @@
-> +/*
-> + * Copyright (c) 2017 Fuzhou Rockchip Electronics Co., Ltd
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + *  Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
+> -static int dma_set_mask_and_switch(struct device *dev, u64 dma_mask)
+> +static int dma_suported_and_switch(struct device *dev, u64 dma_mask)
+>  {
+> -	if (!dev->dma_mask || !dma_supported(dev, dma_mask))
+> -		return -EIO;
+> -
+>  	if (dma_mask == DMA_BIT_MASK(64) &&
+>  	    cell_iommu_get_fixed_address(dev) != OF_BAD_ADDR) {
+>  		u64 addr = cell_iommu_get_fixed_address(dev) +
+> @@ -965,14 +956,16 @@ static int dma_set_mask_and_switch(struct device *dev, u64 dma_mask)
+>  		dev_dbg(dev, "iommu: fixed addr = %llx\n", addr);
+>  		set_dma_ops(dev, &dma_iommu_fixed_ops);
+>  		set_dma_offset(dev, addr);
+> -	} else {
+> +		return 1;
+> +	}
 > +
-> +#include "rk322x.dtsi"
-> +
-> +/ {
-> +	compatible = "rockchip,rk3229";
-> +
-> +	/delete-node/ opp-table0;
-> +
-> +	cpu0_opp_table: opp_table0 {
-> +		compatible = "operating-points-v2";
-> +		opp-shared;
-> +
-> +		opp-408000000 {
-> +			opp-hz = /bits/ 64 <408000000>;
-> +			opp-microvolt = <950000>;
-> +			clock-latency-ns = <40000>;
-> +			opp-suspend;
-> +		};
-> +		opp-600000000 {
-> +			opp-hz = /bits/ 64 <600000000>;
-> +			opp-microvolt = <975000>;
-> +		};
-> +		opp-816000000 {
-> +			opp-hz = /bits/ 64 <816000000>;
-> +			opp-microvolt = <1000000>;
-> +		};
-> +		opp-1008000000 {
-> +			opp-hz = /bits/ 64 <1008000000>;
-> +			opp-microvolt = <1175000>;
-> +		};
-> +		opp-1200000000 {
-> +			opp-hz = /bits/ 64 <1200000000>;
-> +			opp-microvolt = <1275000>;
-> +		};
-> +		opp-1296000000 {
-> +			opp-hz = /bits/ 64 <1296000000>;
-> +			opp-microvolt = <1325000>;
-> +		};
-> +		opp-1392000000 {
-> +			opp-hz = /bits/ 64 <1392000000>;
-> +			opp-microvolt = <1375000>;
-> +		};
-> +		opp-1464000000 {
-> +			opp-hz = /bits/ 64 <1464000000>;
-> +			opp-microvolt = <1400000>;
-> +		};
-> +	};
-> +
-> +	psci {
-> +		compatible = "arm,psci-1.0", "arm,psci-0.2";
-> +		method = "smc";
-> +	};
-> +};
-> +
-> +&cpu0 {
-> +	enable-method = "psci";
-> +};
-
-Hmm, I don't really understand this.
-What method of core-bringup does the rk3228 use? In the current
-rk322x.dtsi there is no enable-method at all defined.
-
-So is the rk3228 firmware using a different method than the rk3229?
-
-And out of curiosity as this is a arm32 without atf, is the psci
-implementation (for uboot?) you're using available somewhere?
-
-
-Thanks
-Heiko
-
-> +
-> +&cpu1 {
-> +	enable-method = "psci";
-> +};
-> +
-> +&cpu2 {
-> +	enable-method = "psci";
-> +};
-> +
-> +&cpu3 {
-> +	enable-method = "psci";
-> +};
-> 
+> +	if (dma_iommu_dma_supported(dev, dma_mask)) {
+>  		dev_dbg(dev, "iommu: not 64-bit, using default ops\n");
+>  		set_dma_ops(dev, get_pci_dma_ops());
+>  		cell_dma_dev_setup(dev);
+> +		return 1;
+>  	}
+>  
+> -	*dev->dma_mask = dma_mask;
+> -
+>  	return 0;
+>  }
+>  
+> @@ -1127,7 +1120,7 @@ static int __init cell_iommu_fixed_mapping_init(void)
+>  		cell_iommu_setup_window(iommu, np, dbase, dsize, 0);
+>  	}
+>  
+> -	dma_iommu_ops.set_dma_mask = dma_set_mask_and_switch;
+> +	dma_iommu_ops.dma_supported = dma_suported_and_switch;
+>  	set_pci_dma_ops(&dma_iommu_ops);
+>  
+>  	return 0;
