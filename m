@@ -1,154 +1,128 @@
 From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Sun, 18 Jun 2017 09:58:52 +0800
-Subject: [PATCH V1 6/9] clk: sprd: add composite clock support
+Date: Sun, 18 Jun 2017 09:58:55 +0800
+Subject: [PATCH V1 9/9] arm64: dts: add ccu for SC9860
 In-Reply-To: <20170618015855.27738-1-chunyan.zhang@spreadtrum.com>
 References: <20170618015855.27738-1-chunyan.zhang@spreadtrum.com>
-Message-ID: <20170618015855.27738-7-chunyan.zhang@spreadtrum.com>
+Message-ID: <20170618015855.27738-10-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduced composite driver whose functions are simply
-consisted of divider and mux clocks.
+Now we have clock driver, so add clock dt for SC9860 platform.
+This patch also removed "ext-26m" from whale2.dtsi since it
+is described in sc9860-ccu.dtsi.
 
-Original-by: Xiaolong Zhang <xiaolong.zhang@spreadtrum.com>
 Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
 ---
- drivers/clk/sprd/Makefile        |  2 +-
- drivers/clk/sprd/ccu_composite.c | 62 ++++++++++++++++++++++++++++++++++++++++
- drivers/clk/sprd/ccu_composite.h | 47 ++++++++++++++++++++++++++++++
- 3 files changed, 110 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/sprd/ccu_composite.c
- create mode 100644 drivers/clk/sprd/ccu_composite.h
+ arch/arm64/boot/dts/sprd/sc9860-ccu.dtsi | 67 ++++++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/sprd/sc9860.dtsi     |  2 +
+ arch/arm64/boot/dts/sprd/whale2.dtsi     |  8 ----
+ 3 files changed, 69 insertions(+), 8 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/sprd/sc9860-ccu.dtsi
 
-diff --git a/drivers/clk/sprd/Makefile b/drivers/clk/sprd/Makefile
-index d129c0a8..83232e5 100644
---- a/drivers/clk/sprd/Makefile
-+++ b/drivers/clk/sprd/Makefile
-@@ -1,3 +1,3 @@
- ifneq ($(CONFIG_OF),)
--obj-y	+= ccu_common.o ccu_gate.o ccu_mux.o ccu_div.o
-+obj-y	+= ccu_common.o ccu_gate.o ccu_mux.o ccu_div.o ccu_composite.o
- endif
-diff --git a/drivers/clk/sprd/ccu_composite.c b/drivers/clk/sprd/ccu_composite.c
+diff --git a/arch/arm64/boot/dts/sprd/sc9860-ccu.dtsi b/arch/arm64/boot/dts/sprd/sc9860-ccu.dtsi
 new file mode 100644
-index 0000000..6a64fb1
+index 0000000..e15bf2d
 --- /dev/null
-+++ b/drivers/clk/sprd/ccu_composite.c
-@@ -0,0 +1,62 @@
++++ b/arch/arm64/boot/dts/sprd/sc9860-ccu.dtsi
+@@ -0,0 +1,67 @@
 +/*
-+ * Spreadtrum composite clock driver
++ * Spreadtrum SC9860 SoC CCU
 + *
-+ * Copyright (C) 2017 Spreadtrum, Inc.
++ * Copyright (C) 2017, Spreadtrum Communications Inc.
 + *
-+ * SPDX-License-Identifier: GPL-2.0
++ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 + */
 +
-+#include <linux/clk-provider.h>
++&soc {
++	ext_26m: ext-26m {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <26000000>;
++		clock-output-names = "ext-26m";
++	};
 +
-+#include "ccu_composite.h"
++	ext_32m_sine0: ext-32m-sine0 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <32000000>;
++		clock-output-names = "ext-32m-sine0";
++	};
 +
-+DEFINE_SPINLOCK(comp_lock);
++	ext_32m_sine1: ext-32m-sine1 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <32000000>;
++		clock-output-names = "ext-32m-sine1";
++	};
 +
-+static long ccu_comp_round_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long *parent_rate)
-+{
-+	struct ccu_comp *cc = hw_to_ccu_comp(hw);
++	ext_rco_100m: ext-rco-100m {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <100000000>;
++		clock-output-names = "ext-rco-100m";
++	};
 +
-+	return ccu_div_helper_round_rate(&cc->common, &cc->div,
-+					 rate, parent_rate);
-+}
++	ext_32k: ext-32k {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <32768>;
++		clock-output-names = "ext-32k";
++	};
 +
-+static unsigned long ccu_comp_recalc_rate(struct clk_hw *hw,
-+					  unsigned long parent_rate)
-+{
-+	struct ccu_comp *cc = hw_to_ccu_comp(hw);
-+
-+	return ccu_div_helper_recalc_rate(&cc->common, &cc->div, parent_rate);
-+}
-+
-+static int ccu_comp_set_rate(struct clk_hw *hw, unsigned long rate,
-+			     unsigned long parent_rate)
-+{
-+	struct ccu_comp *cc = hw_to_ccu_comp(hw);
-+
-+	return ccu_div_helper_set_rate(&cc->common, &cc->div,
-+				       rate, parent_rate);
-+}
-+
-+static u8 ccu_comp_get_parent(struct clk_hw *hw)
-+{
-+	struct ccu_comp *cc = hw_to_ccu_comp(hw);
-+
-+	return ccu_mux_helper_get_parent(&cc->common, &cc->mux);
-+}
-+
-+static int ccu_comp_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	struct ccu_comp *cc = hw_to_ccu_comp(hw);
-+
-+	return ccu_mux_helper_set_parent(&cc->common, &cc->mux, index);
-+}
-+
-+const struct clk_ops ccu_comp_ops = {
-+	.get_parent	= ccu_comp_get_parent,
-+	.set_parent	= ccu_comp_set_parent,
-+
-+	.round_rate	= ccu_comp_round_rate,
-+	.recalc_rate	= ccu_comp_recalc_rate,
-+	.set_rate	= ccu_comp_set_rate,
++	ccu: clk {
++		compatible = "sprd,sc9860-ccu";
++		#clock-cells = <1>;
++		reg = <0 0x20000000 0 0x400>,
++		      <0 0x20210000 0 0x3000>,
++		      <0 0x402b0000 0 0x4000>,
++		      <0 0x402d0000 0 0x400>,
++		      <0 0x402e0000 0 0x4000>,
++		      <0 0x40400000 0 0x400>,
++		      <0 0x40880000 0 0x400>,
++		      <0 0x415e0000 0 0x400>,
++		      <0 0x60200000 0 0x400>,
++		      <0 0x61000000 0 0x400>,
++		      <0 0x61100000 0 0x3000>,
++		      <0 0x62000000 0 0x4000>,
++		      <0 0x62100000 0 0x4000>,
++		      <0 0x63000000 0 0x400>,
++		      <0 0x63100000 0 0x3000>,
++		      <0 0x70b00000 0 0x3000>;
++		clocks = <&ext_26m>, <&ext_rco_100m>, <&ext_32k>;
++		clock-names = "ext-26m", "ext-rco-100m", "ext-32k";
++	};
 +};
-diff --git a/drivers/clk/sprd/ccu_composite.h b/drivers/clk/sprd/ccu_composite.h
-new file mode 100644
-index 0000000..c99c919
---- /dev/null
-+++ b/drivers/clk/sprd/ccu_composite.h
-@@ -0,0 +1,47 @@
-+/*
-+ * Spreadtrum composite clock driver
-+ *
-+ * Copyright (C) 2017 Spreadtrum, Inc.
-+ *
-+ * SPDX-License-Identifier: GPL-2.0
-+ */
-+
-+#ifndef _CCU_COMPOSITE_H_
-+#define _CCU_COMPOSITE_H_
-+
-+#include "ccu_common.h"
-+#include "ccu_mux.h"
-+#include "ccu_div.h"
-+
-+struct ccu_comp {
-+	struct ccu_mux_internal	mux;
-+	struct ccu_div_internal	div;
-+	struct ccu_common	common;
-+};
-+
-+#define SPRD_CCU_COMP(_struct, _name, _parent, _reg, _table,		\
-+			_mshift, _mwidth, _dshift, _dwidth, _flags)	\
-+	struct ccu_comp _struct = {					\
-+		.mux	= _SPRD_CCU_MUX(_mshift, _mwidth, _table),	\
-+		.div	= _SPRD_CCU_DIV(_dshift, _dwidth),		\
-+		.common = {						\
-+			 .reg		= _reg,				\
-+			 .lock		= &comp_lock,			\
-+			 .hw.init	= CLK_HW_INIT_PARENTS(_name,	\
-+							      _parent,	\
-+							&ccu_comp_ops,	\
-+							      _flags),	\
-+			 }						\
-+	}
-+
-+static inline struct ccu_comp *hw_to_ccu_comp(struct clk_hw *hw)
-+{
-+	struct ccu_common *common = hw_to_ccu_common(hw);
-+
-+	return container_of(common, struct ccu_comp, common);
-+}
-+
-+extern const struct clk_ops ccu_comp_ops;
-+extern spinlock_t comp_lock;
-+
-+#endif /* _CCU_COMPOSITE_H_ */
+diff --git a/arch/arm64/boot/dts/sprd/sc9860.dtsi b/arch/arm64/boot/dts/sprd/sc9860.dtsi
+index 7b7d8ce..10ff7c6 100644
+--- a/arch/arm64/boot/dts/sprd/sc9860.dtsi
++++ b/arch/arm64/boot/dts/sprd/sc9860.dtsi
+@@ -7,7 +7,9 @@
+  */
+ 
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/clock/sc9860-ccu.h>
+ #include "whale2.dtsi"
++#include "sc9860-ccu.dtsi"
+ 
+ / {
+ 	cpus {
+diff --git a/arch/arm64/boot/dts/sprd/whale2.dtsi b/arch/arm64/boot/dts/sprd/whale2.dtsi
+index 7c217c5..9d69b84 100644
+--- a/arch/arm64/boot/dts/sprd/whale2.dtsi
++++ b/arch/arm64/boot/dts/sprd/whale2.dtsi
+@@ -59,13 +59,5 @@
+ 				status = "disabled";
+ 			};
+ 		};
+-
+-	};
+-
+-	ext_26m: ext-26m {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <26000000>;
+-		clock-output-names = "ext_26m";
+ 	};
+ };
 -- 
 2.7.4
