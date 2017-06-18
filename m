@@ -1,23 +1,27 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 18 Jun 2017 09:04:45 -0500
-Subject: [PATCH v2 1/3] dt-bindings: rng: add MediaTek MT7622 Hardware
- Random Generator bindings
-In-Reply-To: <89b9b682ff9e294df7cda75787c1439c95ffc992.1497280813.git.sean.wang@mediatek.com>
-References: <cover.1497280813.git.sean.wang@mediatek.com>
- <89b9b682ff9e294df7cda75787c1439c95ffc992.1497280813.git.sean.wang@mediatek.com>
-Message-ID: <20170618140445.54uxdqtgi4mlsrpr@rob-hp-laptop>
+Date: Sun, 18 Jun 2017 09:05:01 -0500
+Subject: [PATCH v6 1/3] PCI: Add DT binding for tango PCIe controller
+In-Reply-To: <3790db8d-6a4c-5c74-9ca2-431715a712a7@sigmadesigns.com>
+References: <741766e5-cff2-db5f-d40b-6866e08fd966@sigmadesigns.com>
+ <69f3ffe7-3c39-fa94-71f8-91744a869cc9@sigmadesigns.com>
+ <20170607212907.2wr3hqbokjb74kj3@rob-hp-laptop>
+ <3790db8d-6a4c-5c74-9ca2-431715a712a7@sigmadesigns.com>
+Message-ID: <20170618140501.mu3zrr5dw4fstshd@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 12, 2017 at 11:56:54PM +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
+On Tue, Jun 13, 2017 at 03:51:32PM +0200, Marc Gonzalez wrote:
+> Binding for the Sigma Designs SMP8759 SoC.
 > 
-> Document the bindings used by MediaTek MT7622 SoC hardware random number
-> generator.
-> 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
 > ---
->  Documentation/devicetree/bindings/rng/mtk-rng.txt | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+> Changes from v5 to v6
+> o Delete links to elinux.org
+> o Use explicit hex numbers instead of symbolic constants for sizes (in the example)
+> o Add bus-range to "Required properties"
+> ---
+>  .../devicetree/bindings/pci/tango-pcie.txt         | 29 ++++++++++++++++++++++
+>  1 file changed, 29 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/tango-pcie.txt
 
 Acked-by: Rob Herring <robh@kernel.org>
