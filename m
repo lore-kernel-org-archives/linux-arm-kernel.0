@@ -1,40 +1,72 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 18 Jun 2017 08:31:19 +0800
-Subject: [PATCH v2 3/5] arm64: dts: Add ufs dts node
-In-Reply-To: <20170616065119.10704-4-butao@hisilicon.com>
-Message-ID: <201706180814.Kte2462z%fengguang.wu@intel.com>
+From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
+Date: Sun, 18 Jun 2017 09:58:47 +0800
+Subject: [PATCH V1 1/9] dt-bindings: Add Spreadtrum CCU binding documentation
+In-Reply-To: <20170618015855.27738-1-chunyan.zhang@spreadtrum.com>
+References: <20170618015855.27738-1-chunyan.zhang@spreadtrum.com>
+Message-ID: <20170618015855.27738-2-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bu,
+Introduce a new binding with its documentation for Spreadtrum clock
+sub-framework.
 
-[auto build test ERROR on mkp-scsi/for-next]
-[also build test ERROR on v4.12-rc5 next-20170616]
-[cannot apply to robh/for-next]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Bu-Tao/scsi-ufs-add-ufs-driver-code-for-Hi3660-SoC/20170618-045141
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/mkp/scsi.git for-next
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
-
-All errors (new ones prefixed by >>):
-
->> Error: arch/arm64/boot/dts/hisilicon/hi3660.dtsi:152.24-25 syntax error
-   FATAL ERROR: Unable to parse input tree
-
+Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 35380 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170618/2225e152/attachment-0001.gz>
+ .../devicetree/bindings/clock/sprd-ccu.txt         | 46 ++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/sprd-ccu.txt
+
+diff --git a/Documentation/devicetree/bindings/clock/sprd-ccu.txt b/Documentation/devicetree/bindings/clock/sprd-ccu.txt
+new file mode 100644
+index 0000000..7a1aa4c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/sprd-ccu.txt
+@@ -0,0 +1,46 @@
++Spreadtrum Clock Control Unit Binding
++------------------------------------
++
++This binding uses the common clock binding[1].
++
++Required properties:
++- compatible: must contain the following compatible:
++                - "sprd,sc9860-ccu" (only support SC9860 for the time being)
++
++- reg:	Must contain the registers base address and length.
++	Clocks on most of Spreadtrum's SoCs were designed to locate in a few
++	different address areas, so there would be more than one items under
++	this property.
++
++- clock-names:	Must contain the following clock names:
++		- "ext-26m", "ext-rco-100m", "ext-32k"
++- #clock-cells: must be 1
++
++Example:
++
++ccu: clk {
++	compatible = "sprd,sc9860-ccu";
++	#clock-cells = <1>;
++	reg = <0 0x20000000 0 0x400>,
++	      <0 0x20210000 0 0x3000>,
++	      <0 0x402b0000 0 0x4000>,
++	      <0 0x402d0000 0 0x400>,
++	      <0 0x402e0000 0 0x4000>,
++	      <0 0x40400000 0 0x400>,
++	      <0 0x40880000 0 0x400>,
++	      <0 0x415e0000 0 0x400>,
++	      <0 0x60200000 0 0x400>,
++	      <0 0x61000000 0 0x400>,
++	      <0 0x61100000 0 0x3000>,
++	      <0 0x62000000 0 0x4000>,
++	      <0 0x62100000 0 0x4000>,
++	      <0 0x63000000 0 0x400>,
++	      <0 0x63100000 0 0x3000>,
++	      <0 0x70b00000 0 0x3000>;
++	clocks = <&ext_26m>, <&ext_rco_100m>, <&ext_32k>;
++	clock-names = "ext-26m", "ext-rco-100m", "ext-32k";
++};
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++
+-- 
+2.7.4
