@@ -1,51 +1,49 @@
 From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Mon, 19 Jun 2017 00:40:20 +0200
-Subject: [PATCH v4 14/28] ARM64: dts: Add Actions Semi S900 and
- Bubblegum-96
-In-Reply-To: <20170606005426.26446-15-afaerber@suse.de>
+Date: Mon, 19 Jun 2017 00:49:20 +0200
+Subject: [PATCH v4 15/28] MAINTAINERS: Add Actions Semi Owl section
+In-Reply-To: <20170606005426.26446-16-afaerber@suse.de>
 References: <20170606005426.26446-1-afaerber@suse.de>
- <20170606005426.26446-15-afaerber@suse.de>
-Message-ID: <ad4b07e9-bafe-80bc-fc68-3541c914dabf@suse.de>
+ <20170606005426.26446-16-afaerber@suse.de>
+Message-ID: <c68b8edf-9609-0147-6eeb-83793dc3adef@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Am 06.06.2017 um 02:54 schrieb Andreas F?rber:
-> UART0/1/4/6 interrupts are guesses.
-> 
-> Cc: 96boards at ucrobotics.com
 > Signed-off-by: Andreas F?rber <afaerber@suse.de>
 > ---
->  v3 -> v4:
->  * Adopted lower-case timer interrupt-names (Mark)
+>  v2 -> v3 -> v4: unchanged
 >  
->  v2 -> v3:
->  * Added remaining UART nodes -- some interrupts are guesses
->  * Added timer node -- only TIMER1 interrupt known
+>  v2: new
 >  
->  v1 -> v2:
->  * Reworded subject
->  * Added memory at 0 node for Bubblegum-96 (Mark)
->  * Filled in reserved-memory sub-node for Bubblegum-96 (Mark)
->  * Added arm-pmu interrupt-affinity property (Mark)
->  * Changed second GIC reg size 0x1000 -> 0x2000 for Bubblegum-96 (Mark)
->  * Updated ARCH_OWL to ARCH_ACTIONS (Arnd)
->  * Renamed s900-bubblegum96.dts to s900-bubblegum-96.dts
->  * Adopted "actions" vendor prefix
->  * Dropped irq.h include
->  * Adopted SPDX-License-Identifier (Rob)
+>  MAINTAINERS | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index f17ffa17abef..a9faa30def9c 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1036,6 +1036,16 @@ S:	Maintained
+>  F:	drivers/amba/
+>  F:	include/linux/amba/bus.h
 >  
->  arch/arm64/boot/dts/Makefile                      |   1 +
->  arch/arm64/boot/dts/actions/Makefile              |   5 +
->  arch/arm64/boot/dts/actions/s900-bubblegum-96.dts |  35 +++++
->  arch/arm64/boot/dts/actions/s900.dtsi             | 164 ++++++++++++++++++++++
->  4 files changed, 205 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/actions/Makefile
->  create mode 100644 arch/arm64/boot/dts/actions/s900-bubblegum-96.dts
->  create mode 100644 arch/arm64/boot/dts/actions/s900.dtsi
+> +ARM/ACTIONS SEMI ARCHITECTURE
+> +M:	Andreas F?rber <afaerber@suse.de>> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> +S:	Maintained
+> +N:	owl
+> +F:	arch/arm/mach-actions/
+> +F:	arch/arm/boot/dts/s500*
 
-Applying (with extended commit message) to linux-actions.git v4.13/dt64:
+This will need to be updated for owl-s500*
 
-https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.13/dt64
+> +F:	arch/arm64/boot/dts/actions/
+> +F:	Documentation/devicetree/bindings/arm/actions.txt
+
+This is lacking the two clocksource files.
+
+> +
+>  ARM/ADS SPHERE MACHINE SUPPORT
+>  M:	Lennert Buytenhek <kernel@wantstofly.org>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
 
 Regards,
 Andreas
