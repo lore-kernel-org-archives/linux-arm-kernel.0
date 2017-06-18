@@ -1,52 +1,75 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 18 Jun 2017 23:45:28 +0200
-Subject: [PATCH v4 09/28] tty: serial: Add Actions Semi Owl UART earlycon
-In-Reply-To: <20170606005426.26446-10-afaerber@suse.de>
-References: <20170606005426.26446-1-afaerber@suse.de>
- <20170606005426.26446-10-afaerber@suse.de>
-Message-ID: <55059fdd-5c54-ee6c-3e63-b5a9035c1745@suse.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 18 Jun 2017 23:55:48 +0200
+Subject: [PATCH 1/3 v6] reset: add DT bindings header for Gemini reset
+ controller
+Message-ID: <20170618215550.29216-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg,
+This adds the DT binding macros used by the reset controller.
 
-Am 06.06.2017 um 02:54 schrieb Andreas F?rber:
-> This implements an earlycon for Actions Semi S500/S900 SoCs.
-> 
-> Based on LeMaker linux-actions tree.
-> 
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  v3 -> v4: Unchanged
->  
->  v2 -> v3:
->  * Adopted BIT() macro
->  
->  v1 -> v2:
->  * Extended Kconfig help to mention earlycon (Arnd)
->  * Spelled out Actions Semiconductor in Kconfig help
->  * Adopted "actions" vendor prefix
->  
->  drivers/tty/serial/Kconfig    |  19 ++++++
->  drivers/tty/serial/Makefile   |   1 +
->  drivers/tty/serial/owl-uart.c | 135 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 155 insertions(+)
->  create mode 100644 drivers/tty/serial/owl-uart.c
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+Please merge this into the clk tree with the rest of the
+patches when ready. The same patch might come in from the
+reset tree but that is harmless and a necessary evil in
+this case.
 
-The DT vendor prefix is applied to my linux-actions.git tree now, and
-the serial binding has been ack'ed by Rob.
+ChangeLog v4->v6:
+- No changes just including with the clock driver series.
+ChangeLog v1->v4:
+- New file to merge the macros in isolation from the
+  DT bindings and implementation.
 
-Is there anything keeping you from adding this patch, the preceding DT
-binding (08/28) and the following documentation patch (10/28) to your
-tree for 4.13?
+The bindings themselves will be merged as part of the DTS updates
+through the ARM SoC tree.
+---
+ include/dt-bindings/reset/cortina,gemini-reset.h | 36 ++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+ create mode 100644 include/dt-bindings/reset/cortina,gemini-reset.h
 
-The full serial driver (16/28) needs another spin and may miss 4.13, but
-earlycon would prove the rest is working.
-
-Thanks,
-Andreas
-
+diff --git a/include/dt-bindings/reset/cortina,gemini-reset.h b/include/dt-bindings/reset/cortina,gemini-reset.h
+new file mode 100644
+index 000000000000..0b886aee65e3
+--- /dev/null
++++ b/include/dt-bindings/reset/cortina,gemini-reset.h
+@@ -0,0 +1,36 @@
++#ifndef _DT_BINDINGS_RESET_CORTINA_GEMINI_H
++#define _DT_BINDINGS_RESET_CORTINA_GEMINI_H
++
++#define GEMINI_RESET_DRAM	0
++#define GEMINI_RESET_FLASH	1
++#define GEMINI_RESET_IDE	2
++#define GEMINI_RESET_RAID	3
++#define GEMINI_RESET_SECURITY	4
++#define GEMINI_RESET_GMAC0	5
++#define GEMINI_RESET_GMAC1	6
++#define GEMINI_RESET_PCI	7
++#define GEMINI_RESET_USB0	8
++#define GEMINI_RESET_USB1	9
++#define GEMINI_RESET_DMAC	10
++#define GEMINI_RESET_APB	11
++#define GEMINI_RESET_LPC	12
++#define GEMINI_RESET_LCD	13
++#define GEMINI_RESET_INTCON0	14
++#define GEMINI_RESET_INTCON1	15
++#define GEMINI_RESET_RTC	16
++#define GEMINI_RESET_TIMER	17
++#define GEMINI_RESET_UART	18
++#define GEMINI_RESET_SSP	19
++#define GEMINI_RESET_GPIO0	20
++#define GEMINI_RESET_GPIO1	21
++#define GEMINI_RESET_GPIO2	22
++#define GEMINI_RESET_WDOG	23
++#define GEMINI_RESET_EXTERN	24
++#define GEMINI_RESET_CIR	25
++#define GEMINI_RESET_SATA0	26
++#define GEMINI_RESET_SATA1	27
++#define GEMINI_RESET_TVC	28
++#define GEMINI_RESET_CPU1	30
++#define GEMINI_RESET_GLOBAL	31
++
++#endif
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+2.9.4
