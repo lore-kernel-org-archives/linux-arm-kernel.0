@@ -1,29 +1,47 @@
 From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 18 Jun 2017 22:50:42 +0200
-Subject: [PATCH v4 05/28] clocksource: owl: Add S900 support
-In-Reply-To: <20170606163453.GE2345@mai>
+Date: Sun, 18 Jun 2017 23:21:07 +0200
+Subject: [PATCH v4 06/28] ARM: Prepare Actions Semi S500
+In-Reply-To: <20170606005426.26446-7-afaerber@suse.de>
 References: <20170606005426.26446-1-afaerber@suse.de>
- <20170606005426.26446-6-afaerber@suse.de> <20170606163453.GE2345@mai>
-Message-ID: <dbd8600a-d04a-d679-1c59-81a00602ea77@suse.de>
+ <20170606005426.26446-7-afaerber@suse.de>
+Message-ID: <e36c9060-66fa-1893-fc19-bb0d44e37c4c@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 06.06.2017 um 18:34 schrieb Daniel Lezcano:
-> On Tue, Jun 06, 2017 at 02:54:03AM +0200, Andreas F?rber wrote:
->> The Actions Semi S900 SoC provides four 32-bit timers, TIMER0/1/2/3,
->> but no 2Hz timers.
->>
->> An S900 datasheet can be found in 96Boards documentation:
->> https://github.com/96boards/documentation/blob/master/ConsumerEdition/Bubblegum-96/HardwareDocs/SoC_bubblegum96.pdf
->>
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->> ---
+Am 06.06.2017 um 02:54 schrieb Andreas F?rber:
+> Add ARCH_ACTIONS and mach-actions/owl.c for "actions,s500".
 > 
-> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  v3 -> v4: Unchanged
+>  
+>  v2 -> v3:
+>  * Selected AMBA, global timer, TWD drivers
+>  * Fixed copy&paste in machine definition (Alberto)
+>  
+>  v1 -> v2:
+>  * Renamed ARCH_OWL to ARCH_ACTION (Arnd)
+>  * Renamed mach-owl to mach-actions, leaving owl.c
+>  * Adopted "actions" vendor prefix
+>  * Selected new clocksource driver
+>  
+>  arch/arm/Kconfig               |  2 ++
+>  arch/arm/Makefile              |  1 +
+>  arch/arm/mach-actions/Kconfig  | 15 +++++++++++++++
+>  arch/arm/mach-actions/Makefile |  1 +
+>  arch/arm/mach-actions/owl.c    | 28 ++++++++++++++++++++++++++++
+>  5 files changed, 47 insertions(+)
+>  create mode 100644 arch/arm/mach-actions/Kconfig
+>  create mode 100644 arch/arm/mach-actions/Makefile
+>  create mode 100644 arch/arm/mach-actions/owl.c
 
-Thanks, applied to linux-actions.git v4.13/soc branch:
+Applied to linux-actions.git v4.13/arm branch:
 
-https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.13/soc
+https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.13/arm
+
+There have been no more comments - I believe we could simplify it with a
+Makefile hack as seen in mach-uniphier, but since no one asked for
+dropping owl.c in 4 patch revisions, I'll consider that as follow-up.
 
 Regards,
 Andreas
