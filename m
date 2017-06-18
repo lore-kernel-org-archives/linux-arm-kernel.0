@@ -1,33 +1,31 @@
 From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 18 Jun 2017 20:46:33 +0200
-Subject: [PATCH v4 01/28] dt-bindings: Add vendor prefix for Actions Semi
-In-Reply-To: <20170606005426.26446-2-afaerber@suse.de>
+Date: Sun, 18 Jun 2017 20:48:03 +0200
+Subject: [PATCH v4 02/28] dt-bindings: arm: Document Actions Semi S500
+In-Reply-To: <20170606005426.26446-3-afaerber@suse.de>
 References: <20170606005426.26446-1-afaerber@suse.de>
- <20170606005426.26446-2-afaerber@suse.de>
-Message-ID: <73b532f1-2339-c660-53fe-2bb25a265c22@suse.de>
+ <20170606005426.26446-3-afaerber@suse.de>
+Message-ID: <45ba483d-e359-7a70-3278-bd737a00ad11@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 06.06.2017 um 02:53 schrieb Andreas F?rber:
-> Actions Semiconductor was listed on NASDAQ as ACTS until Dec 16, 2016.
+Am 06.06.2017 um 02:54 schrieb Andreas F?rber:
+> The Actions Semi S500 is a quad-core ARM Cortex-A9 SoC.
+> The LeMaker Guitar is an SODIMM-format module with that SoC.
 > 
-> Cc: mp-cs at actions-semi.com
 > Acked-by: Rob Herring <robh@kernel.org>
 > Signed-off-by: Andreas F?rber <afaerber@suse.de>
 > ---
->  v3 -> v4: Unchanged
->  
->  v2 -> v3:
->  * Fixed sort order after rename
+>  v2 -> v3 -> v4: unchanged
 >  
 >  v1 -> v2:
->  * Reverted from "acts" to "actions" (cf. IAP140 "mrvl" vs. "marvell")
+>  * Adopted "actions" vendor prefix
+>  * Extended text
 >  
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
+>  Documentation/devicetree/bindings/arm/actions.txt | 24 +++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/actions.txt
 
-With still no Acked-by or other reply from Actions, I have now applied
-this patch to linux-actions.git v4.13/dt branch:
+Thanks, applied:
 
 https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.13/dt
 
