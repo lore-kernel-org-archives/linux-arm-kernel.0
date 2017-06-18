@@ -1,37 +1,35 @@
 From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 18 Jun 2017 22:18:39 +0200
-Subject: [PATCH v4 03/28] dt-bindings: timer: Document Owl timer
-In-Reply-To: <20170606005426.26446-4-afaerber@suse.de>
+Date: Sun, 18 Jun 2017 22:43:51 +0200
+Subject: [PATCH v4 04/28] clocksource: Add Owl timer
+In-Reply-To: <20170606163355.GD2345@mai>
 References: <20170606005426.26446-1-afaerber@suse.de>
- <20170606005426.26446-4-afaerber@suse.de>
-Message-ID: <ec380c22-c902-80e7-3672-f4a11ceecc3a@suse.de>
+ <20170606005426.26446-5-afaerber@suse.de> <20170606163355.GD2345@mai>
+Message-ID: <b2af603d-0a7c-1bcd-c661-9a20ce63994c@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 06.06.2017 um 02:54 schrieb Andreas F?rber:
-> The Actions Semi S500 SoC contains a timer block with two 2 Hz and two
-> 32-bit timers. The S900 SoC timer block has four 32-bit timers.
+Am 06.06.2017 um 18:33 schrieb Daniel Lezcano:
+> On Tue, Jun 06, 2017 at 02:54:02AM +0200, Andreas F?rber wrote:
+>> The Actions Semi S500 SoC provides four timers, 2Hz0/1 and 32-bit TIMER0/1.
+>>
+>> Use TIMER0 as clocksource and TIMER1 as clockevents.
+>>
+>> Based on LeMaker linux-actions tree.
+>>
+>> An S500 datasheet can be found on the LeMaker Guitar pages:
+>> http://www.lemaker.org/product-guitar-download-29.html
+>>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>> ---
 > 
-> Acked-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  v3 -> v4:
->  * Changed interrupt names to lower-case (Mark)
->  
->  v2 -> v3:
->  * Adopted interrupt-names
->  * Changed compatible for S500
->  * Added S900 compatible and interrupt names
->  
->  v2: new
->  
->  .../devicetree/bindings/timer/actions,owl-timer.txt  | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/timer/actions,owl-timer.txt
+> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Thanks, applied to linux-actions.git v4.13/dt branch:
+Thanks. It seems this is not going through a central clocksource tree,
+so I'm applying it to a new linux-actions.git v4.13/soc branch:
 
-https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.13/dt
+https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.13/soc
+
+Let me know if you intend to take it through some other tree instead.
 
 Regards,
 Andreas
