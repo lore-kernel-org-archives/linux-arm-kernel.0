@@ -1,25 +1,20 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 18 Jun 2017 09:04:33 -0500
-Subject: [PATCH 1/4] ARM: shmobile: Document Renesas H3-based Salvator-XS
- board DT bindings
-In-Reply-To: <1497008629-3974-2-git-send-email-geert+renesas@glider.be>
-References: <1497008629-3974-1-git-send-email-geert+renesas@glider.be>
- <1497008629-3974-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <20170618140433.xeqzggrrtcy2muoa@rob-hp-laptop>
+Date: Sun, 18 Jun 2017 09:04:36 -0500
+Subject: [PATCH v4 4/6] regulator: pfuze100: add fsl,pmic-stby-poweroff
+ property
+In-Reply-To: <20170609140739.15726-5-o.rempel@pengutronix.de>
+References: <20170609140739.15726-1-o.rempel@pengutronix.de>
+ <20170609140739.15726-5-o.rempel@pengutronix.de>
+Message-ID: <20170618140436.a2owbfsij5k4vmvt@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 09, 2017 at 01:43:46PM +0200, Geert Uytterhoeven wrote:
-> The Renesas Salvator-XS (Salvator-X 2nd version) development board can
-> be equipped with either an R-Car H3 ES2.0 or M3-W ES1.x SiP, which are
-> pin-compatible.
+On Fri, Jun 09, 2017 at 04:07:37PM +0200, Oleksij Rempel wrote:
+> Document the new optional "fsl,pmic-stby-poweroff" property.
 > 
-> Document board part number and compatible values for the version with
-> R-Car H3.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
 > ---
->  Documentation/devicetree/bindings/arm/shmobile.txt | 2 ++
->  1 file changed, 2 insertions(+)
+>  Documentation/devicetree/bindings/regulator/pfuze100.txt | 7 +++++++
+>  1 file changed, 7 insertions(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
