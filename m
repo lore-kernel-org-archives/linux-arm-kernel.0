@@ -1,62 +1,128 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 Jun 2017 07:33:39 -0700
-Subject: [PATCH 12/16] mmc: host: omap_hsmmc: Add support to set IODELAY
- values
-In-Reply-To: <3149f88d-c33f-0d3e-aabe-ac6f840bb41c@ti.com>
-References: <20170616124544.15046-1-kishon@ti.com>
- <20170616124544.15046-13-kishon@ti.com>
- <20170619060256.GK3730@atomide.com>
- <810fba3e-a488-fa0d-5639-47f1c76ea2b6@ti.com>
- <20170619072523.GL3730@atomide.com>
- <3149f88d-c33f-0d3e-aabe-ac6f840bb41c@ti.com>
-Message-ID: <20170619143338.GN3730@atomide.com>
+From: ore@pengutronix.de (Oleksij Rempel)
+Date: Mon, 19 Jun 2017 16:33:55 +0200
+Subject: [PATCH v5 2/3] nvmem: add snvs_lpgpr driver
+In-Reply-To: <2b309881-0134-c3f8-2037-b0e106719a64@i2se.com>
+References: <20170609125730.25502-1-o.rempel@pengutronix.de>
+ <20170609125730.25502-3-o.rempel@pengutronix.de>
+ <2b309881-0134-c3f8-2037-b0e106719a64@i2se.com>
+Message-ID: <20170619143355.2qeuetsx2pbvlgng@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kishon Vijay Abraham I <kishon@ti.com> [170619 00:55]:
-> Hi Tony,
+Hi Stefan,
+
+On Fri, Jun 09, 2017 at 05:01:09PM +0200, Stefan Wahren wrote:
+> Hi Oleksij,
 > 
-> On Monday 19 June 2017 12:55 PM, Tony Lindgren wrote:
-> > * Kishon Vijay Abraham I <kishon@ti.com> [170618 23:37]:
-> >> Hi Tony,
-> >>
-> >> On Monday 19 June 2017 11:32 AM, Tony Lindgren wrote:
-> >>> * Kishon Vijay Abraham I <kishon@ti.com> [170616 05:47]:
-> >>>> The data manual of J6/J6 Eco recommends to set different IODELAY values
-> >>>> depending on the mode in which the MMC/SD is enumerated in order to
-> >>>> ensure IO timings are met.
-> >>>>
-> >>>> Add support to set the IODELAY values depending on the various MMC
-> >>>> modes using the pinctrl APIs.
-> >>>
-> >>> This does not seem to apply against Linux next for me for
-> >>> the binding. Fixing that, compile fails for me with:
-> >>>
-> >>> drivers/mmc/host/omap_hsmmc.c:2384:13: error:
-> >>> 'struct omap_hsmmc_platform_data' has no member named 'version'
-> >>
-> >> This series has a dependency with
-> >> https://www.spinics.net/lists/arm-kernel/msg586215.html series
-> >>
-> >> *version* member is added in patch with $subject
-> >> "ARM: OMAP2+: Add pdata-quirks for MMC/SD on DRA74x EVM"
-> > 
-> > Ah sorry I keep forgetting that. Looks like the only thing
-> > pending with that series is that you were going to send
-> > an update for omap3-overo-base.
+> please add the NXP guys in CC in order to give them a chance to review.
 > 
-> I've sent that as a separate patch [1]. But I can resend the entire series if
-> that's what you'd prefer.
+> Am 09.06.2017 um 14:57 schrieb Oleksij Rempel:
+> > This is a driver for Low Power General Purpose Register (LPGPR)
+> > available on i.MX6 SoCs in Secure Non-Volatile Storage (SNVS)
+> > of this chip.
+> >
+> > It is a 32-bit read/write register located in the low power domain.
+> > Since LPGPR is located in the battery-backed power domain, LPGPR can
+> > be used by any application for retaining data during an SoC power-down
+> > mode.
+> >
+> > Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+> > ---
+> >  drivers/nvmem/Kconfig      |  10 ++++
+> >  drivers/nvmem/Makefile     |   2 +
+> >  drivers/nvmem/snvs_lpgpr.c | 138 +++++++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 150 insertions(+)
+> >  create mode 100644 drivers/nvmem/snvs_lpgpr.c
+> >
+> > diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
+> > index 101ced4c84be..ea3044c5d6ee 100644
+> > --- a/drivers/nvmem/Kconfig
+> > +++ b/drivers/nvmem/Kconfig
+> > @@ -144,4 +144,14 @@ config MESON_EFUSE
+> >  	  This driver can also be built as a module. If so, the module
+> >  	  will be called nvmem_meson_efuse.
+> >  
+> > +config NVMEM_SNVS_LPGPR
+> > +	tristate "Support for Low Power General Purpose Register"
+> > +	depends on SOC_IMX6 || COMPILE_TEST
+> > +	help
+> > +	  This is a driver for Low Power General Purpose Register (LPGPR) available on
+> > +	  i.MX6 SoCs in Secure Non-Volatile Storage (SNVS) of this chip.
+> > +
+> > +	  This driver can also be built as a module. If so, the module
+> > +	  will be called nvmem-snvs-lpgpr.
+> > +
+> >  endif
+> > diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
+> > index 173140658693..4c589184acee 100644
+> > --- a/drivers/nvmem/Makefile
+> > +++ b/drivers/nvmem/Makefile
+> > @@ -30,3 +30,5 @@ obj-$(CONFIG_NVMEM_VF610_OCOTP)	+= nvmem-vf610-ocotp.o
+> >  nvmem-vf610-ocotp-y		:= vf610-ocotp.o
+> >  obj-$(CONFIG_MESON_EFUSE)	+= nvmem_meson_efuse.o
+> >  nvmem_meson_efuse-y		:= meson-efuse.o
+> > +obj-$(CONFIG_NVMEM_SNVS_LPGPR)	+= nvmem_snvs_lpgpr.o
+> > +nvmem_snvs_lpgpr-y		:= snvs_lpgpr.o
+> > diff --git a/drivers/nvmem/snvs_lpgpr.c b/drivers/nvmem/snvs_lpgpr.c
+> > new file mode 100644
+> > index 000000000000..acb3ddc0d990
+> > --- /dev/null
+> > +++ b/drivers/nvmem/snvs_lpgpr.c
+> > @@ -0,0 +1,138 @@
+> > +/*
+> > + * Copyright (c) 2015 Pengutronix, Steffen Trumtrar <kernel@pengutronix.de>
+> > + * Copyright (c) 2017 Pengutronix, Oleksij Rempel <kernel@pengutronix.de>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2
+> > + * as published by the Free Software Foundation.
+> > + */
+> > +
+> > +#include <linux/mfd/syscon.h>
+> > +#include <linux/module.h>
+> > +#include <linux/nvmem-provider.h>
+> > +#include <linux/of_device.h>
+> > +#include <linux/regmap.h>
+> > +
+> > +struct snvs_lpgpr_cfg {
+> > +	int offset;
+> > +};
+> > +
+> > +struct snvs_lpgpr_priv {
+> > +	struct device_d			*dev;
+> > +	struct regmap			*regmap;
+> > +	struct nvmem_config		cfg;
+> > +	const struct snvs_lpgpr_cfg	*dcfg;
+> > +};
+> > +
+> > +static const struct snvs_lpgpr_cfg snvs_lpgpr_cfg_imx6q = {
+> > +	.offset = 0x68,
+> > +};
+> > +
+> > +static int snvs_lpgpr_write(void *context, unsigned int offset, void *_val,
+> > +			    size_t bytes)
+> > +{
+> > +	struct snvs_lpgpr_priv *priv = context;
+> > +	const struct snvs_lpgpr_cfg *dcfg = priv->dcfg;
+> > +	const u32 *val = _val;
+> > +	int i = 0, words = bytes / 4;
+> > +
+> > +	while (words--)
+> > +		regmap_write(priv->regmap, dcfg->offset + offset + (i++ * 4),
+> > +			     *val++);
+> 
+> according to the reference manual "57.9.14 SNVS_LP General Purpose
+> Register (SNVS_LPGPR)":
+> 
+>     When GPR_SL or GPR_HL bit is set, the register cannot be programmed.
+> 
+> I think the driver should handle this error case properly.
 
-Oh sorry I had already untagged that thread, I probably did
-not notice your updated patch. It's best to resend that series
-right after -rc1 so we get it to Linux next for few weeks
-of testing. Right now there's a dependency to the related
-MMC patches, and patch 8/8 conflicts with the unused regulator
-removal patch.
+good point,
+I'll update it.
 
-Regards,
-
-Tony
-
-> [1] -> http://www.spinics.net/lists/devicetree/msg180747.html
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
