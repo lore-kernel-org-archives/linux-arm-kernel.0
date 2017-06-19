@@ -1,34 +1,79 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 19 Jun 2017 10:42:18 +0200
-Subject: [PATCH] ARM: dts: iwg20d-q7: Add pinctl support for scif0
-In-Reply-To: <1497625049-46802-1-git-send-email-biju.das@bp.renesas.com>
-References: <1497625049-46802-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <CAMuHMdVe7sRcGohSPvSUrryNMetddomoMbN7ffOtq9Y3DBt=zQ@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 19 Jun 2017 10:43:05 +0200
+Subject: [PATCH v5 0/4] tty/serial: meson_uart: add support for core clock
+ handling
+In-Reply-To: <1497428957-19942-1-git-send-email-narmstrong@baylibre.com>
+References: <1497428957-19942-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <f4179b26-54fc-30ee-2d8d-7659349ccb74@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Biju,
+On 06/14/2017 10:29 AM, Neil Armstrong wrote:
+> This patchset is a re-spin of Helmut Klein's v3 patchset at [0] and the v4 patchset at [1].
+> 
+> Initially, the original patchset was made to enable usage on the non-AO UARTS
+> not enabled by the Bootloader (uart_B and uart_C), but the patchset needed
+> an overall change to have clean and stable DT bindings.
+> 
+> The Amlogic Meson UART Driver did not have stable DT bindings and mismatched
+> clock handling on non-AO UARTs since these "EE" UARTs needs a clock gate to
+> be ungated to works correctly.
+> In the same way, the AO UARTs does not need gating and can be used as
+> Early Consoles.
+> 
+> In the same time, the UART Interfaces can take clock input for the baudrate
+> generate from either the external Xtal or the internal Bus Clock (clk81).
+> 
+> So new bindings was necessary to meet these requirements and the DT
+> maintainers requirements.
+> 
+> The "legacy" binding actually used in the driver is left until all the DT
+> files are switched to the new bindings.
+> 
+> The GX DT has been tested, but the last 4 Meson6/Meson8/b are only
+> compile-tested, and testing is welcome.
+> Thus only the first 3 patches can be merged until the Meson6/Meson8/b are
+> formally tested.
+> 
+> It must be noted that the meson6 cannot work today except using an early
+> console since the UART driver could not probe without a clocks property.
+> 
+> Changes since v4 at [1]:
+>  - Droped meson8/meson8b DT patches
+>  - Fixes copy/paste error in patch 2
+>  - Refactored clock probing in patch 2
+>  - merged meson6 patches together to avoid breaking bisect
+> 
+> [0] http://lkml.kernel.org/r/20170331165437.26227-1-hgkr.klein at gmail.com
+> [1] http://lkml.kernel.org/r/1497001756-942-1-git-send-email-narmstrong at baylibre.com
+> 
+> Helmut Klein (3):
+>   dt-bindings: serial: Add bindings for the Amlogic Meson UARTs
+>   tty/serial: meson_uart: update to stable bindings
+>   ARM64: dts: meson-gx: use stable UART bindings with correct gate clock
+> 
+> Neil Armstrong (1):
+>   ARM: dts: meson6: use stable UART bindings
+> 
+>  .../bindings/serial/amlogic,meson-uart.txt         | 38 +++++++++
+>  arch/arm/boot/dts/meson.dtsi                       |  8 +-
+>  arch/arm/boot/dts/meson6.dtsi                      | 28 +++++++
+>  arch/arm64/boot/dts/amlogic/meson-gx.dtsi          | 12 ++-
+>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 25 ++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         | 25 ++++++
+>  drivers/tty/serial/meson_uart.c                    | 90 ++++++++++++++++++++--
+>  7 files changed, 209 insertions(+), 17 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/serial/amlogic,meson-uart.txt
+> 
 
-On Fri, Jun 16, 2017 at 4:57 PM, Biju Das <biju.das@bp.renesas.com> wrote:
-> Adding pinctrl support for scif0 interface.
->
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
 
-The patch looks good to me, but without schematics, we cannot verify the
-actual pins used.
+Hi Greg,
 
-Are the schematics somewhere available? Having access to them would allow us
-doing a better job reviewing your DTS patches.
+Patches 3 & 4 will need a respin to avoid breaking compatibility with old kernel
+like the tty patch does by keeping the legacy compatible string.
+I will re-send then in a separate thread and Kevin will handle them.
 
-Thanks!
+Patches 1 & 2 can be taken if they are OK for you.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+Neil
