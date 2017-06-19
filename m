@@ -1,55 +1,54 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 22:49:13 -0700
-Subject: [GIT PULL] Renesas ARM Based SoC Drivers Updates for v4.13
-In-Reply-To: <cover.1497617480.git.horms+renesas@verge.net.au>
-References: <cover.1497617480.git.horms+renesas@verge.net.au>
-Message-ID: <20170619054913.GI7703@localhost>
+Date: Sun, 18 Jun 2017 22:44:20 -0700
+Subject: [GIT PULL] Second Round of Renesas ARM64 Based SoC DT Updates
+ for v4.13
+In-Reply-To: <cover.1497617276.git.horms+renesas@verge.net.au>
+References: <cover.1497617276.git.horms+renesas@verge.net.au>
+Message-ID: <20170619054420.GH7703@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 16, 2017 at 03:30:30PM +0200, Simon Horman wrote:
+Hi Simon,
+
+On Fri, Jun 16, 2017 at 03:30:17PM +0200, Simon Horman wrote:
 > Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Please consider these Renesas ARM based SoC drivers updates for v4.13.
+> Please consider these second round of Renesas ARM64 based SoC DT updates
+> for v4.13.
 > 
-> This pull request is based on
-> "[GIT PULL] Renesas ARM Based SoC Fixes for v4.12",
-> tagged as renesas-fixes-for-v4.12,
-> which you have already pulled and is present in v4.12-rc2.
-> 
-> This base was used to supply a dependency. It is one patch away from
-> v4.11-rc1.  I could also have based the series on v4.12-rc2 but I wanted to
-> avoid basing (any of my branches for v4.13) on something more recent than
-> v4.12-rc1 unless strictly necessary. Nonetheless I'm happy to rebase if you
-> prefer.
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-arm64-dt-for-v4.13,
+> which you have already pulled.
 > 
 > 
-> The following changes since commit 7b4ccb3c466f62bbf2f4dd5d6a143d945a6f3051:
+> The following changes since commit 0b03c32db03d63de695c1e0ab1950eb12b135fa7:
 > 
->   soc: renesas: Provide dummy rcar_rst_read_mode_pins() for compile-testing (2017-04-28 10:07:36 +0200)
+>   arm64: dts: r8a7795: salvator-x: Add support for R-Car H3 ES2.0 (2017-05-22 14:54:57 +0200)
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-drivers-for-v4.13
+>   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt2-for-v4.13
 > 
-> for you to fetch changes up to 8be381a131c29c4737aed44e7e5f90cb77bb4a7e:
+> for you to fetch changes up to 4d1255ebefb6838eab4f652107433438bea0051f:
 > 
->   soc: renesas: Rework Kconfig and Makefile logic (2017-06-12 11:31:07 +0200)
+>   arm64: dts: r8a7796: Add reset control properties for audio (2017-06-14 11:00:29 +0200)
 > 
 > ----------------------------------------------------------------
-> Renesas ARM Based SoC Drivers Updates for v4.13
+> Second Round of Renesas ARM64 Based SoC DT Updates for v4.13
 > 
-> * Rework Kconfig and Makefile logic
+> * Add reset control properties for audio to r9a779[56] SoCs
+> * Add add DMA for IIC_DVFS to r9a779[56] SoCs
+> * Add support for Salvator-XS and H3ULCB with R-Car H3 (r8a7795) ES2
+> * Add missing index to PWM pinctrl subnode name to Salvator-X board
+> * Add 12288000 for sound ADG to Salvator-X and ULCB boards
 
-There's little point it just enumerating the patches in this pull request:
-That's obvious from the shortlog. Instead, please provide context and the
-"why".
+This doesn't mean anything to me. Even if I happened to know what ADG is,
+I'm not sure what ADG+12288000 is!?
 
-Why is Kconfig and Makefile logic reworked here? Geert wrote a great commit
-message about it that you could distill to a shorter tag description.
+Looking at the patch, it adds a 12288000 clock to the audio block to be able to
+play 48k audio. Maybe that's what you meant to say here?
 
-(I've commented on the patch on the list just now, but I've also merged this so
-see that as room for incremental improvement).
+Merged anyway this time.
 
 
 -Olof
