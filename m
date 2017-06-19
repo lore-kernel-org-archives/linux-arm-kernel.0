@@ -1,30 +1,29 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 19:06:02 -0700
-Subject: [GIT PULL 3/3] DaVinci defconfig updates for v4.13
-In-Reply-To: <20170608112350.1602-3-nsekhar@ti.com>
+Date: Sun, 18 Jun 2017 19:05:00 -0700
+Subject: [GIT PULL 1/3] DaVinci SoC updates for v4.13
+In-Reply-To: <20170608112350.1602-1-nsekhar@ti.com>
 References: <20170608112350.1602-1-nsekhar@ti.com>
- <20170608112350.1602-3-nsekhar@ti.com>
-Message-ID: <20170619020602.GJ30022@localhost>
+Message-ID: <20170619020500.GH30022@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 08, 2017 at 04:53:50PM +0530, Sekhar Nori wrote:
+On Thu, Jun 08, 2017 at 04:53:48PM +0530, Sekhar Nori wrote:
 > The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 > 
 >   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.13/defconfig
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.13/soc
 > 
-> for you to fetch changes up to 0b997c8c9562dd61733dfeb9e1a5962730338e6e:
+> for you to fetch changes up to 14ff86bc76be9b5c96f06ce141c8bdd612dafd64:
 > 
->   ARM: davinci_all_defconfig: Enable CPPI 4.1 USB OTG DMA (2017-05-30 16:12:51 +0530)
+>   ARM: davinci: da8xx: Add DSP internal RAM memories as IOMEM resources (2017-05-22 14:47:44 +0530)
 > 
 > ----------------------------------------------------------------
-> Re-sync of davinci_all_defconfig with savedefconfig and enable
-> CPPI 4.1 DMA for MUSB, some commonly used USB devices, and
-> Lego Mindstorms EV3 battery driver.
+> DaVinci SoC support updates enhancing DSP remoteproc
+> support for DA850 SoC. This lays the foundation for
+> DT conversion of da8xx remoteproc driver.
 
 Merged, thanks.
 
