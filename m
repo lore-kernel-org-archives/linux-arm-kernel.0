@@ -1,25 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 19:14:38 -0700
-Subject: Fwd: [PATCH] ARM: prima2: remove redundant select CPU_V7
-In-Reply-To: <CAK7LNASAUDsBOLvmrKjX1+36HESg2SK3AE3e_18YaLF-8sQmPg@mail.gmail.com>
-References: <1488078449-3902-1-git-send-email-yamada.masahiro@socionext.com>
- <CAK7LNASAUDsBOLvmrKjX1+36HESg2SK3AE3e_18YaLF-8sQmPg@mail.gmail.com>
-Message-ID: <20170619021438.GS30022@localhost>
+Date: Sun, 18 Jun 2017 19:15:13 -0700
+Subject: [GIT PULL] ARM: Keystone DTS for v4.13
+In-Reply-To: <1497238933-5379-1-git-send-email-ssantosh@kernel.org>
+References: <1497238933-5379-1-git-send-email-ssantosh@kernel.org>
+Message-ID: <20170619021513.GT30022@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 12, 2017 at 10:28:13AM +0900, Masahiro Yamada wrote:
-> Hi Arnd, Olof,
+On Sun, Jun 11, 2017 at 08:42:13PM -0700, Santosh Shilimkar wrote:
+> The following changes since commit 08332893e37af6ae779367e78e444f8f9571511d:
 > 
+>   Linux 4.12-rc2 (2017-05-21 19:30:23 -0700)
 > 
-> It has been more than 3 months since this patch was posted,
-> but the maintainer of prima2 did not respond.
-> (I guess mach-prima2 is not maintained.)
+> are available in the git repository at:
 > 
-> This is a minor clean-up,
-> but could you consider picking it up to ARM-SOC tree?
+>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_dts_for_4.13
+> 
+> for you to fetch changes up to 84e00e244176baec37c66b1cbee6b8a2f7dbd76f:
+> 
+>   ARM: dts: keystone: Add minimum support for K2G ICE evm (2017-05-21 22:47:49 -0700)
+> 
+> ----------------------------------------------------------------
+> ARM: dts: Keystone K2G ICE EVM support for v4.13
 
-Sure, applied now.
-
-
--Olof
+Merged, thanks.
