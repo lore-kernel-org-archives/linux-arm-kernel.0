@@ -1,81 +1,145 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 19 Jun 2017 18:01:43 +0100
-Subject: [PATCH v5 6/8] mm/hugetlb: Allow architectures to override
- huge_pte_clear()
-In-Reply-To: <20170619170145.25577-1-punit.agrawal@arm.com>
-References: <20170619170145.25577-1-punit.agrawal@arm.com>
-Message-ID: <20170619170145.25577-7-punit.agrawal@arm.com>
+From: philippe.cornu@st.com (Philippe CORNU)
+Date: Mon, 19 Jun 2017 16:58:36 +0000
+Subject: [PATCH v3 5/6] dt-bindings: display: stm32: Add DSI host driver
+In-Reply-To: <20170608171244.twgn4xmqd5pstb2i@rob-hp-laptop>
+References: <1496414235-20098-1-git-send-email-philippe.cornu@st.com>
+ <1496414235-20098-6-git-send-email-philippe.cornu@st.com>
+ <20170608171244.twgn4xmqd5pstb2i@rob-hp-laptop>
+Message-ID: <537eaaa2-fb16-9b6a-6705-5f3b1ace8154@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When unmapping a hugepage range, huge_pte_clear() is used to clear the
-page table entries that are marked as not present. huge_pte_clear()
-internally just ends up calling pte_clear() which does not correctly
-deal with hugepages consisting of contiguous page table entries.
 
-Add a size argument to address this issue and allow architectures to
-override huge_pte_clear() by wrapping it in a #ifndef block.
 
-Update s390 implementation with the size parameter as well.
+On 06/08/2017 07:12 PM, Rob Herring wrote:
+> On Fri, Jun 02, 2017 at 04:37:14PM +0200, Philippe CORNU wrote:
+>> This patch adds documentation of device tree bindings for the STM32
+>> DSI host driver based on the Synopsys DW MIPI DSI bridge driver.
+>> ---
+>>   .../devicetree/bindings/display/st,stm32-ltdc.txt  | 83 +++++++++++++++++++++-
+>>   1 file changed, 82 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+>> index 90a8459..4cd32bd 100644
+>> --- a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+>> +++ b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+>> @@ -12,8 +12,39 @@
+>>     Required nodes:
+>>       - Video port for RGB output.
+>>   
+>> -Example:
+>> +* STMicroelectronics STM32 dsi specific extensions to Synopsys DesignWare MIPI
+>> +  DSI host controller
+>>   
+>> +The STMicroelectronics STM32 dsi driver uses the Synopsys DesignWare MIPI
+>> +DSI host controller driver (related documentation in [5]).
+>> +
+>> +Required properties:
+>> +- #address-cells: Should be <1>.
+>> +- #size-cells: Should be <0>.
+>> +- compatible: "st,stm32-dsi".
+>> +- reg: Memory mapped base address and length of the DWC MIPI DSI registers.
+>> +- clocks: References to all the clocks specified in the clock-names property
+>> +  as specified in [1].
+>> +- clock-names:
+>> +  - peripheral clock string name, must be "pclk".
+>> +  - phy pll reference clock string name, must be "ref".
+> 
+> I still have the same comment as v1.
+> 
+Hi Rob,
+I added the "reference to [5]" just few lines above (before the required 
+properties) and I though it was enough : )
+In the v4 version I have just sent, I have tried to be more explicit 
+regarding this reference to [5] (what is optional and what is mandatory...).
+Many thanks for your help,
 
-Note that the change only affects huge_pte_clear() - the other generic
-hugetlb functions don't need any change.
+>> +- resets: References to all the resets specified in the reset-names property
+>> +  as specified in [2].
+>> +- reset-names: string reset name, must be "apb".
+>> +
+>> +Required nodes:
+>> +- dsi input port node: connected to the ltdc rgb output port, see [3] & [4].
+>> +- panel or bridge node: see [6].
+> 
+> Need to be explicit here. Port 0 is ... Port 1 is ...
+> 
+Done in v4, many thanks for your comment.
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Martin Schwidefsky <schwidefsky@de.ibm.com>
-Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-Cc: "Aneesh Kumar K.V" <aneesh.kumar@linux.vnet.ibm.com>
-Cc: Mike Kravetz <mike.kravetz@oracle.com>
----
- arch/s390/include/asm/hugetlb.h | 2 +-
- include/asm-generic/hugetlb.h   | 4 +++-
- mm/hugetlb.c                    | 2 +-
- 3 files changed, 5 insertions(+), 3 deletions(-)
+>> +
+>> +Note: You can find more documentation
+>> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+>> +[2] Documentation/devicetree/bindings/reset/reset.txt
+>> +[3] Documentation/devicetree/bindings/media/video-interfaces.txt
+>> +[4] Documentation/devicetree/bindings/graph.txt
+>> +[5] Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
+>> +[6] Documentation/devicetree/bindings/display/mipi-dsi-bus.txt
+>> +
+>> +Example 1: RGB panel
+>>   / {
+>>   	...
+>>   	soc {
+>> @@ -33,3 +64,53 @@ Example:
+>>   		};
+>>   	};
+>>   };
+>> +
+>> +Example 2: DSI panel
+>> +
+>> +/ {
+>> +	...
+>> +	soc {
+>> +	...
+>> +		ltdc: display-controller at 40016800 {
+>> +			compatible = "st,stm32-ltdc";
+>> +			reg = <0x40016800 0x200>;
+>> +			interrupts = <88>, <89>;
+>> +			resets = <&rcc STM32F4_APB2_RESET(LTDC)>;
+>> +			clocks = <&rcc 1 CLK_LCD>;
+>> +			clock-names = "lcd";
+>> +
+>> +			port {
+>> +				ltdc_out_dsi: endpoint {
+>> +					remote-endpoint = <&dsi_in>;
+>> +				};
+>> +			};
+>> +		};
+>> +
+>> +
+>> +		dsi: dsi at 40016c00 {
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +			compatible = "st,stm32-dsi";
+>> +			reg = <0x40016c00 0x800>;
+>> +			clocks = <&rcc 1 CLK_F469_DSI>, <&clk_hse>;
+>> +			clock-names = "ref", "pclk";
+>> +			resets = <&rcc STM32F4_APB2_RESET(DSI)>;
+>> +			reset-names = "apb";
+>> +
+>> +			port {
+>> +				dsi_in: endpoint {
+>> +					remote-endpoint = <&ltdc_out_dsi>;
+>> +				};
+>> +			};
+>> +
+>> +			panel-dsi at 0 {
+> 
+> This should use graph binding instead. Or at least we should allow that
+> and be clear above that we do.
+> 
+Done in v4, many thanks for your comment.
+Philippe
 
-diff --git a/arch/s390/include/asm/hugetlb.h b/arch/s390/include/asm/hugetlb.h
-index cd546a245c68..c0443500baec 100644
---- a/arch/s390/include/asm/hugetlb.h
-+++ b/arch/s390/include/asm/hugetlb.h
-@@ -39,7 +39,7 @@ static inline int prepare_hugepage_range(struct file *file,
- #define arch_clear_hugepage_flags(page)		do { } while (0)
- 
- static inline void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
--				  pte_t *ptep)
-+				  pte_t *ptep, unsigned long sz)
- {
- 	if ((pte_val(*ptep) & _REGION_ENTRY_TYPE_MASK) == _REGION_ENTRY_TYPE_R3)
- 		pte_val(*ptep) = _REGION3_ENTRY_EMPTY;
-diff --git a/include/asm-generic/hugetlb.h b/include/asm-generic/hugetlb.h
-index 99b490b4d05a..540354f94f83 100644
---- a/include/asm-generic/hugetlb.h
-+++ b/include/asm-generic/hugetlb.h
-@@ -31,10 +31,12 @@ static inline pte_t huge_pte_modify(pte_t pte, pgprot_t newprot)
- 	return pte_modify(pte, newprot);
- }
- 
-+#ifndef huge_pte_clear
- static inline void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
--				  pte_t *ptep)
-+		    pte_t *ptep, unsigned long sz)
- {
- 	pte_clear(mm, addr, ptep);
- }
-+#endif
- 
- #endif /* _ASM_GENERIC_HUGETLB_H */
-diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-index d9f9e4b7381c..b20620ff3751 100644
---- a/mm/hugetlb.c
-+++ b/mm/hugetlb.c
-@@ -3338,7 +3338,7 @@ void __unmap_hugepage_range(struct mmu_gather *tlb, struct vm_area_struct *vma,
- 		 * unmapped and its refcount is dropped, so just clear pte here.
- 		 */
- 		if (unlikely(!pte_present(pte))) {
--			huge_pte_clear(mm, address, ptep);
-+			huge_pte_clear(mm, address, ptep, sz);
- 			spin_unlock(ptl);
- 			continue;
- 		}
--- 
-2.11.0
+>> +				reg = <0>; /* dsi virtual channel (0..3) */
+>> +				compatible = ...;
+>> +				enable-gpios = ...;
+>> +
+>> +			};
+>> +
+>> +		};
+>> +
+>> +	};
+>> +};
+>> -- 
+>> 1.9.1
+>>
