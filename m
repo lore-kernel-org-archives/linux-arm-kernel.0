@@ -1,91 +1,193 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 19 Jun 2017 16:48:55 +0100
-Subject: [RFC PATCH 15/33] irqchip/gic-v4: Add management structure
- definitions
-In-Reply-To: <d5ebd612-96f0-943e-df01-28251c77c327@redhat.com>
-References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
- <1484648454-21216-16-git-send-email-marc.zyngier@arm.com>
- <d5ebd612-96f0-943e-df01-28251c77c327@redhat.com>
-Message-ID: <829aa384-f6cc-4906-27a2-7d4c3c42726a@arm.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Mon, 19 Jun 2017 18:49:43 +0300
+Subject: [PATCH v8 00/20] ILP32 for ARM64
+Message-ID: <20170619155003.13218-1-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/03/17 08:58, Auger Eric wrote:
-> Hi,
-> 
-> On 17/01/2017 11:20, Marc Zyngier wrote:
->> Add a bunch of GICv4-specific data structures that will get used in
->> subsequent patches.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  include/linux/irqchip/arm-gic-v4.h | 92 ++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 92 insertions(+)
->>  create mode 100644 include/linux/irqchip/arm-gic-v4.h
->>
->> diff --git a/include/linux/irqchip/arm-gic-v4.h b/include/linux/irqchip/arm-gic-v4.h
->> new file mode 100644
->> index 0000000..6e9c2b3
->> --- /dev/null
->> +++ b/include/linux/irqchip/arm-gic-v4.h
->> @@ -0,0 +1,92 @@
->> +/*
->> + * Copyright (C) 2016 ARM Limited, All Rights Reserved.
->> + * Author: Marc Zyngier <marc.zyngier@arm.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#ifndef __LINUX_IRQCHIP_ARM_GIC_V4_H
->> +#define __LINUX_IRQCHIP_ARM_GIC_V4_H
->> +
->> +/* Embedded in kvm.arch */
->> +struct its_vm {
->> +	struct irq_domain	*domain;
->> +	struct page		*vprop_page;
->> +	irq_hw_number_t		db_lpi_base;
->> +	unsigned long		*db_bitmap;
->> +	int			nr_db_lpis;
->> +};
->> +
->> +/* Embedded in kvm_vcpu.arch */
->> +struct its_vpe {
->> +	struct page 		*vpt_page;
->> +	struct its_vm		*its_vm;
->> +	irq_hw_number_t		vpe_db_lpi;
->> +	u16			col_idx;
-> the role of the collection id remains obscure to me. Are collections
-> still used for VLPIs? On VMAPTI the vPE is directly provided whereas on
-> MAPTI we used the collection indirection to the actual PE, right? So
-> what is it used for?
+This series enables aarch64 with ilp32 mode.
 
-Nothing to do with VMAPTI. With VMAPP, you need to provide the target
-address (either the processor number or the redist base address). Since
-I don't really want to expose these gory details, I've settled on using
-the collection id as an identifier for the target address (see how VMAPP
-is implemented).
+As supporting work, it introduces ARCH_32BIT_OFF_T configuration
+option that is enabled for existing 32-bit architectures but disabled
+for new arches (so 64-bit off_t userspace type is used by new userspace).
+Also it deprecates getrlimit and setrlimit syscalls prior to prlimit64.
 
->> +	u16			vpe_id;
->> +	bool			idai;
->> +	bool			pending_last;
-> where is it used?
+This version is based on linux-next from 2017-06-16. It works with
+glibc-2.25, and tested with LTP, glibc testsuite, trinity, lmbench,
+CPUSpec.
 
-That's to be used in the hypervisor to indicate that an interrupt is
-actually pending when scheduling the vPE out. This can also be updated
-by KVM itself when receiving a doorbell interrupt.
+Patches 1, 2, 3 and 8 are general, and may be applied separately.
 
-Thanks,
+Kernel, GLIBC and OpenSUSE-based distro:
+https://github.com/norov/linux/tree/ilp32-20170616.0
+https://github.com/norov/glibc/tree/dev9
+https://build.opensuse.org/project/show/devel:ARM:Factory:Contrib:ILP32
 
-	M.
+(GLIBC patches are managed by Steve Ellcey, so my tree is only for
+reference.)
+
+Changes:
+v3: https://lkml.org/lkml/2014/9/3/704
+v4: https://lkml.org/lkml/2015/4/13/691
+v5: https://lkml.org/lkml/2015/9/29/911
+v6: https://lkml.org/lkml/2016/5/23/661
+v7: https://lkml.org/lkml/2017/1/9/213
+v8: - off_t referred in patches 2 and 13 stands for userspace type which is
+      underlined in corresponding patch comments and ARCH_32BIT_OFF_T config
+      option description;
+    - __IGNORE_getrlimit and __IGNORE_setrlimit are added to
+      scripts/checksyscalls.sh (patch 3);
+    - for CONFIG_COMPAT, bool changed to def_bool y and 'select COMPAT' is
+      dropped for AARCH32_EL0 and ARM64_ILP32 optiond (patches 5 and 20);
+    - x19 register is used to load TSK_TI_FLAGS in svc path in
+      arch/arm64/kernel/entry.S to avoid register clobbering (patch 14).
+    - ilp32 vdso-related files are syncronized wirh lp64 ones, mostly Makefiles
+      (patch 19);
+    - in arch/arm64/mm/mmap.c, arch_mmap_rnd() swithed to use is_compat_task()
+      (patch 9);
+    - rebased on next-20170616.
+
+Andrew Pinski (6):
+  arm64: rename COMPAT to AARCH32_EL0 in Kconfig
+  arm64: ensure the kernel is compiled for LP64
+  arm64:uapi: set __BITS_PER_LONG correctly for ILP32 and LP64
+  arm64: ilp32: add sys_ilp32.c and a separate table (in entry.S) to use
+    it
+  arm64: ilp32: introduce ilp32-specific handlers for sigframe and
+    ucontext
+  arm64:ilp32: add ARM64_ILP32 to Kconfig
+
+Philipp Tomsich (1):
+  arm64:ilp32: add vdso-ilp32 and use for signal return
+
+Yury Norov (13):
+  compat ABI: use non-compat openat and open_by_handle_at variants
+  32-bit userspace ABI: introduce ARCH_32BIT_OFF_T config option
+  asm-generic: Drop getrlimit and setrlimit syscalls from default list
+  arm64: ilp32: add documentation on the ILP32 ABI for ARM64
+  thread: move thread bits accessors to separated file
+  arm64: introduce is_a32_task and is_a32_thread (for AArch32 compat)
+  arm64: ilp32: add is_ilp32_compat_{task,thread} and TIF_32BIT_AARCH64
+  arm64: introduce binfmt_elf32.c
+  arm64: ilp32: introduce binfmt_ilp32.c
+  arm64: ilp32: share aarch32 syscall handlers
+  arm64: signal: share lp64 signal routines to ilp32
+  arm64: signal32: move ilp32 and aarch32 common code to separated file
+  arm64: ptrace: handle ptrace_request differently for aarch32 and ilp32
+
+ Documentation/arm64/ilp32.txt                 |  45 +++++++
+ arch/Kconfig                                  |  15 +++
+ arch/arc/Kconfig                              |   1 +
+ arch/arc/include/uapi/asm/unistd.h            |   1 +
+ arch/arm/Kconfig                              |   1 +
+ arch/arm64/Kconfig                            |  17 ++-
+ arch/arm64/Makefile                           |   8 ++
+ arch/arm64/include/asm/compat.h               |  19 +--
+ arch/arm64/include/asm/elf.h                  |  40 ++----
+ arch/arm64/include/asm/fpsimd.h               |   2 +-
+ arch/arm64/include/asm/ftrace.h               |   2 +-
+ arch/arm64/include/asm/hwcap.h                |   6 +-
+ arch/arm64/include/asm/is_compat.h            |  90 ++++++++++++++
+ arch/arm64/include/asm/memory.h               |   5 +-
+ arch/arm64/include/asm/processor.h            |  11 +-
+ arch/arm64/include/asm/ptrace.h               |   2 +-
+ arch/arm64/include/asm/seccomp.h              |   2 +-
+ arch/arm64/include/asm/signal32.h             |   9 +-
+ arch/arm64/include/asm/signal32_common.h      |  27 ++++
+ arch/arm64/include/asm/signal_common.h        |  33 +++++
+ arch/arm64/include/asm/signal_ilp32.h         |  38 ++++++
+ arch/arm64/include/asm/syscall.h              |   2 +-
+ arch/arm64/include/asm/thread_info.h          |   4 +-
+ arch/arm64/include/asm/unistd.h               |   6 +-
+ arch/arm64/include/asm/vdso.h                 |   6 +
+ arch/arm64/include/uapi/asm/bitsperlong.h     |   9 +-
+ arch/arm64/include/uapi/asm/unistd.h          |  13 ++
+ arch/arm64/kernel/Makefile                    |   8 +-
+ arch/arm64/kernel/asm-offsets.c               |   9 +-
+ arch/arm64/kernel/binfmt_elf32.c              |  37 ++++++
+ arch/arm64/kernel/binfmt_ilp32.c              |  85 +++++++++++++
+ arch/arm64/kernel/cpufeature.c                |   8 +-
+ arch/arm64/kernel/cpuinfo.c                   |   8 +-
+ arch/arm64/kernel/entry.S                     |  34 +++++-
+ arch/arm64/kernel/entry32.S                   |  80 ------------
+ arch/arm64/kernel/entry32_common.S            | 107 ++++++++++++++++
+ arch/arm64/kernel/entry_ilp32.S               |  22 ++++
+ arch/arm64/kernel/head.S                      |   2 +-
+ arch/arm64/kernel/hw_breakpoint.c             |   8 +-
+ arch/arm64/kernel/perf_regs.c                 |   2 +-
+ arch/arm64/kernel/process.c                   |   7 +-
+ arch/arm64/kernel/ptrace.c                    |  80 ++++++++++--
+ arch/arm64/kernel/signal.c                    | 102 ++++++++++------
+ arch/arm64/kernel/signal32.c                  | 107 ----------------
+ arch/arm64/kernel/signal32_common.c           | 135 ++++++++++++++++++++
+ arch/arm64/kernel/signal_ilp32.c              | 170 ++++++++++++++++++++++++++
+ arch/arm64/kernel/sys_ilp32.c                 | 100 +++++++++++++++
+ arch/arm64/kernel/traps.c                     |   5 +-
+ arch/arm64/kernel/vdso-ilp32/.gitignore       |   2 +
+ arch/arm64/kernel/vdso-ilp32/Makefile         |  80 ++++++++++++
+ arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S     |  33 +++++
+ arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S |  95 ++++++++++++++
+ arch/arm64/kernel/vdso.c                      |  63 ++++++++--
+ arch/arm64/kernel/vdso/gettimeofday.S         |  20 ++-
+ arch/arm64/kernel/vdso/vdso.S                 |   6 +-
+ arch/arm64/mm/mmap.c                          |   2 +-
+ arch/blackfin/Kconfig                         |   1 +
+ arch/c6x/include/uapi/asm/unistd.h            |   1 +
+ arch/cris/Kconfig                             |   1 +
+ arch/frv/Kconfig                              |   1 +
+ arch/h8300/Kconfig                            |   1 +
+ arch/h8300/include/uapi/asm/unistd.h          |   1 +
+ arch/hexagon/Kconfig                          |   1 +
+ arch/hexagon/include/uapi/asm/unistd.h        |   1 +
+ arch/m32r/Kconfig                             |   1 +
+ arch/m68k/Kconfig                             |   1 +
+ arch/metag/Kconfig                            |   1 +
+ arch/metag/include/uapi/asm/unistd.h          |   1 +
+ arch/microblaze/Kconfig                       |   1 +
+ arch/mips/Kconfig                             |   1 +
+ arch/mn10300/Kconfig                          |   1 +
+ arch/nios2/Kconfig                            |   1 +
+ arch/nios2/include/uapi/asm/unistd.h          |   1 +
+ arch/openrisc/Kconfig                         |   1 +
+ arch/openrisc/include/uapi/asm/unistd.h       |   1 +
+ arch/parisc/Kconfig                           |   1 +
+ arch/powerpc/Kconfig                          |   1 +
+ arch/score/Kconfig                            |   1 +
+ arch/score/include/uapi/asm/unistd.h          |   1 +
+ arch/sh/Kconfig                               |   1 +
+ arch/sparc/Kconfig                            |   1 +
+ arch/tile/Kconfig                             |   1 +
+ arch/tile/include/uapi/asm/unistd.h           |   1 +
+ arch/tile/kernel/compat.c                     |   3 +
+ arch/unicore32/Kconfig                        |   1 +
+ arch/unicore32/include/uapi/asm/unistd.h      |   1 +
+ arch/x86/Kconfig                              |   1 +
+ arch/x86/um/Kconfig                           |   1 +
+ arch/xtensa/Kconfig                           |   1 +
+ drivers/clocksource/arm_arch_timer.c          |   2 +-
+ include/linux/fcntl.h                         |   2 +-
+ include/linux/thread_bits.h                   |  63 ++++++++++
+ include/linux/thread_info.h                   |  65 ++--------
+ include/uapi/asm-generic/unistd.h             |  10 +-
+ scripts/checksyscalls.sh                      |   5 +
+ 95 files changed, 1606 insertions(+), 407 deletions(-)
+ create mode 100644 Documentation/arm64/ilp32.txt
+ create mode 100644 arch/arm64/include/asm/is_compat.h
+ create mode 100644 arch/arm64/include/asm/signal32_common.h
+ create mode 100644 arch/arm64/include/asm/signal_common.h
+ create mode 100644 arch/arm64/include/asm/signal_ilp32.h
+ create mode 100644 arch/arm64/kernel/binfmt_elf32.c
+ create mode 100644 arch/arm64/kernel/binfmt_ilp32.c
+ create mode 100644 arch/arm64/kernel/entry32_common.S
+ create mode 100644 arch/arm64/kernel/entry_ilp32.S
+ create mode 100644 arch/arm64/kernel/signal32_common.c
+ create mode 100644 arch/arm64/kernel/signal_ilp32.c
+ create mode 100644 arch/arm64/kernel/sys_ilp32.c
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/.gitignore
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/Makefile
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
+ create mode 100644 include/linux/thread_bits.h
+
 -- 
-Jazz is not dead. It just smells funny...
+2.11.0
