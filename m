@@ -1,17 +1,28 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 20:48:30 -0700
-Subject: [GIT PULL] pxa for v4.13
-In-Reply-To: <87mv99u5ol.fsf@belgarion.home>
-References: <87mv99u5ol.fsf@belgarion.home>
-Message-ID: <20170619034830.GY30022@localhost>
+Date: Sun, 18 Jun 2017 20:45:01 -0700
+Subject: [GIT PULL] Allwinner H3 changes for 4.13
+In-Reply-To: <20170614202316.3tsepyo52tb4spw6@flea.home>
+References: <20170614202316.3tsepyo52tb4spw6@flea.home>
+Message-ID: <20170619034501.GV30022@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 15, 2017 at 08:27:06AM +0200, Robert Jarzmik wrote:
-> Hello Arnd, Kevin, Olof,
+On Wed, Jun 14, 2017 at 10:23:16PM +0200, Maxime Ripard wrote:
+> Hi Arnd, Olof,
 > 
-> Please consider this pull request for pxa 4.13 cycle, nothing very fancy either
-> this cycle.
+> This time again, due to the shared DTSI between the H3 and H5, we had
+> to create a common branch shared by both arm and arm64 (commits up to
+> 0eba511a3cac).
+> 
+> This one is built on top of that common branch and the H5 will be
+> built the same way.
+
+Ok, that works well for us. We might just fold the two dt branches in our tree
+at some point, but not yet.
+
+> 
+> Thanks!
+> Maxime
 > 
 > The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 > 
@@ -19,20 +30,40 @@ On Thu, Jun 15, 2017 at 08:27:06AM +0200, Robert Jarzmik wrote:
 > 
 > are available in the git repository at:
 > 
->   https://github.com/rjarzmik/linux.git tags/pxa-for-4.13
+>   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-dt-h3-for-4.13
 > 
-> for you to fetch changes up to ce3de60ff92ba5e4d65f1c1ce07460795e3a6157:
+> for you to fetch changes up to 7a78ef92cdc5813cab2c3a8ca2334eaaedc6818c:
 > 
->   ARM: pxa: Delete an error message for a failed memory allocation in pxa3xx_u2d_probe() (2017-06-14 08:32:21 +0200)
+>   ARM: sun8i: h3: Enable EMAC with external PHY on Orange Pi Plus 2E (2017-06-10 11:24:39 +0200)
 > 
 > ----------------------------------------------------------------
-> This is the pxa changes for v4.13 cycle.
+> Allwinner H3 changes for 4.13
 > 
-> This cycle is a minor fixes one, with :
->  - Coccinelle found improvements
->  - magician getting touchscreen driver support.
+> This tag is about bringing the EMAC support to the H3 boards.
 
-Merged, thanks!
+Merged, thanks.
+
+
+> ----------------------------------------------------------------
+> Chen-Yu Tsai (2):
+>       ARM: sunxi: h3-h5: Convert R_CCU raw numbers to macros
+>       ARM: sun8i: h3: Enable EMAC with external PHY on Orange Pi Plus 2E
+> 
+> Corentin Labbe (10):
+>       arm: sun8i: sunxi-h3-h5: Add dt node for the syscon control module
+>       arm: sun8i: sunxi-h3-h5: add dwmac-sun8i ethernet driver
+>       arm: sun8i: orangepi-pc: Enable dwmac-sun8i
+>       arm: sun8i: orangepi-one: Enable dwmac-sun8i
+>       arm: sun8i: orangepi-2: Enable dwmac-sun8i
+>       arm: sun8i: orangepi-pc-plus: Set EMAC activity LEDs to active high
+>       arm: sun8i: nanopi-neo: Enable dwmac-sun8i
+>       ARM: sun8i: orangepi-plus: Enable dwmac-sun8i
+>       ARM: sun8i: bananapi-m2-plus: Enable dwmac-sun8i
+>       arm: sun8i: orangepi-zero: Enable dwmac-sun8i
+
+Nit: We tend to use ARM: dts: for prefix, and it seems like the
+dwmac-sun8i could just as well have been folded into one or just a
+few patches.
 
 
 -Olof
