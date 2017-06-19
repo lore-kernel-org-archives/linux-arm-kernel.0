@@ -1,59 +1,74 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 19 Jun 2017 12:42:18 -0700
-Subject: [PATCH v2] spi/bcm63xx: Fix checkpatch warnings
-In-Reply-To: <1497896268-5613-1-git-send-email-aravind.thk@gmail.com>
-References: <1497896268-5613-1-git-send-email-aravind.thk@gmail.com>
-Message-ID: <1497901338.8495.50.camel@perches.com>
+From: acme@kernel.org (Arnaldo Carvalho de Melo)
+Date: Mon, 19 Jun 2017 16:52:22 -0300
+Subject: [PATCH] [perf/core branch] perf coresight: Fix ARM builds caused
+ by misplaced __printf
+In-Reply-To: <20170619142633.51d138db0c0b8befa0542bf6@arm.com>
+References: <20170616145907.baba73eda242efe194e072d0@arm.com>
+ <CANLsYkyG3E9xiOyJz_5EA0B0oQGsSCy2oW7i1iY5YUxU1imKng@mail.gmail.com>
+ <20170619184209.GB13640@kernel.org>
+ <20170619142633.51d138db0c0b8befa0542bf6@arm.com>
+Message-ID: <20170619195222.GD13640@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-06-19 at 23:47 +0530, Aravind Thokala wrote:
-> This patch fixes the checkpatch.pl warnings on the driver
-> file.
-[]
-> diff --git a/drivers/spi/spi-bcm63xx.c b/drivers/spi/spi-bcm63xx.c
-[]
-> @@ -191,7 +191,7 @@ static inline void bcm_spi_writew(struct bcm63xx_spi *bs,
->  #endif
->  }
->  
-> -static const unsigned bcm63xx_spi_freq_table[SPI_CLK_MASK][2] = {
-> +static const unsigned int bcm63xx_spi_freq_table[SPI_CLK_MASK][2] = {
->  	{ 20000000, SPI_CLK_20MHZ },
->  	{ 12500000, SPI_CLK_12_50MHZ },
->  	{  6250000, SPI_CLK_6_250MHZ },
+Em Mon, Jun 19, 2017 at 02:26:33PM -0500, Kim Phillips escreveu:
+> On Mon, 19 Jun 2017 15:42:09 -0300
+> Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
+> 
+> > Em Mon, Jun 19, 2017 at 11:51:20AM -0600, Mathieu Poirier escreveu:
+> > > On 16 June 2017 at 13:59, Kim Phillips <kim.phillips@arm.com> wrote:
+> > > > -static int cs_device__print_file(const char *name, const char *fmt, ...) __printf(2, 3)
+> > > > +static int __printf(2, 3) cs_device__print_file(const char *name, const char *fmt, ...)
+> > > >  {
+> > > >         va_list args;
+> > > >         FILE *file;
+> > > 
+> > > I just tested Kim's solution on my side.
+> > > 
+> > > Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> > 
+> > Thanks for checking, since I haven't pushed this to Ingo I just squashed
+> > Kim's fix into the buggy cset.
+> > 
+> > Now I'm trying to build it with lots of cross build containers to see if
+> > there are any other problems before push this up to Ingo.
+> 
+> Thanks, I'm still trying to learn the submission process...
+> 
+> Slightly off-topic, but when you push kernel.org/.../acme/linux.git, do
+> you push --tags?
 
-It's probably better to change this array into a struct
-to make the indexing more obvious.
+I usually just do:
 
-Also the SPI_CLK_MASK uses are a bit obscure.
+git push acme.korg perf/urgent
 
-Perhaps:
----
-diff --git a/drivers/spi/spi-bcm63xx.c b/drivers/spi/spi-bcm63xx.c
-index 247f71b02235..3cb8d92ee870 100644
---- a/drivers/spi/spi-bcm63xx.c
-+++ b/drivers/spi/spi-bcm63xx.c
-@@ -191,7 +191,10 @@ static inline void bcm_spi_writew(struct bcm63xx_spi *bs,
-?#endif
-?}
-?
--static const unsigned bcm63xx_spi_freq_table[SPI_CLK_MASK][2] = {
-+static const struct {
-+	unsigned int speed;
-+	unsigned int index;
-+} bcm63xx_spi_freq_table[] = {
-?	{ 20000000, SPI_CLK_20MHZ },
-?	{ 12500000, SPI_CLK_12_50MHZ },
-?	{??6250000, SPI_CLK_6_250MHZ },
-@@ -213,8 +216,8 @@ static void bcm63xx_spi_setup_transfer(struct spi_device *spi,
-?
-?	/* Find the closest clock configuration */
-?	for (i = 0; i < SPI_CLK_MASK; i++) {
--		if (t->speed_hz >= bcm63xx_spi_freq_table[i][0]) {
--			clk_cfg = bcm63xx_spi_freq_table[i][1];
-+		if (t->speed_hz >= bcm63xx_spi_freq_table[i].speed) {
-+			clk_cfg = bcm63xx_spi_freq_table[i].index;
-?			break;
-?		}
-?	}
+or
+
+git push acme.korg perf/urgent
+
+[acme at jouet linux]$ git remote -v | grep korg
+acme.korg	gitolite at gitolite.kernel.org:/pub/scm/linux/kernel/git/acme/linux.git (fetch)
+acme.korg	gitolite at gitolite.kernel.org:/pub/scm/linux/kernel/git/acme/linux.git (push)
+[acme at jouet linux]$ 
+
+Or some other branch, acme/master isn't updated. I guess I should do
+like tip/master, and always have acme/master with acme/perf/core merged
+with acme/perf/urgent, but for now, just consider acme/perf/urgent and
+acme/perf/core.
+ 
+> If I do a fresh clone, checkout perf/core or urgent, build perf,
+> PERF-VERSION-GEN first uses git to find the version number, then the
+> Makefile.  But in acme/linux.git, the latest version tag looks to match
+> the master branch version: 3.2: so I get a 3.2-reporting version on
+> what should be 4.12-rc4 (perf/core's current Makefile):
+> 
+> $ tools/perf/perf --version
+> perf version 3.2.gd15e591
+> 
+> Is this an acme/linux.git tree maintenance issue, or should
+> PERF-VERSION-GEN be modified to compare versions gotten from git vs.
+> the Makefile, and just use the higher one?
+> 
+> Thanks,
+> 
+> Kim
