@@ -1,426 +1,97 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 19 Jun 2017 18:40:53 +0100
-Subject: [PATCH v3 4/6] irqchip: irq-mvebu-icu: new driver for Marvell ICU
-In-Reply-To: <20170616141923.31226-5-thomas.petazzoni@free-electrons.com>
-References: <20170616141923.31226-1-thomas.petazzoni@free-electrons.com>
- <20170616141923.31226-5-thomas.petazzoni@free-electrons.com>
-Message-ID: <2934dbf3-e1f0-3997-ba70-3b6a7a2973d9@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 19 Jun 2017 18:41:49 +0100
+Subject: [PATCH v2 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
+ erratum 161010801
+In-Reply-To: <20170619154500.92336-3-shameerali.kolothum.thodi@huawei.com>
+References: <20170619154500.92336-1-shameerali.kolothum.thodi@huawei.com>
+ <20170619154500.92336-3-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <311de3aa-aec9-f403-d9a8-48b3e3de54c3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/06/17 15:19, Thomas Petazzoni wrote:
-> The Marvell ICU unit is found in the CP110 block of the Marvell Armada
-> 7K and 8K SoCs. It collects the wired interrupts of the devices located
-> in the CP110 and turns them into SPI interrupts in the GIC located in
-> the AP806 side of the SoC, by using a memory transaction.
+On 19/06/17 16:45, shameer wrote:
+> The HiSilicon erratum 161010801 describes the limitation of HiSilicon
+> platforms Hip06/Hip07 to support the SMMU mappings for MSI transactions.
 > 
-> Until now, the ICU was configured in a static fashion by the firmware,
-> and Linux was relying on this static configuration. By having Linux
-> configure the ICU, we are more flexible, and we can allocate dynamically
-> the GIC SPI interrupts only for devices that are actually in use.
+> On these platforms GICv3 ITS translator is presented with the deviceID
+> by extending the MSI payload data to 64 bits to include the deviceID.
+> Hence, the PCIe controller on this platforms has to differentiate the
+> MSI payload against other DMA payload and has to modify the MSI payload.
+> This basically makes it difficult for this platforms to have a SMMU
+> translation for MSI.
 > 
-> The driver was initially written by Hanna Hawa <hannah@marvell.com>.
+> This patch implements a ACPI table based quirk to reserve the hw msi
+> regions in the smmu-v3 driver which means these address regions will
+> not be translated and will be excluded from iova allocations.
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Signed-off-by: shameer <shameerali.kolothum.thodi@huawei.com>
 > ---
->  drivers/irqchip/Kconfig                            |   3 +
->  drivers/irqchip/Makefile                           |   1 +
->  drivers/irqchip/irq-mvebu-icu.c                    | 299 +++++++++++++++++++++
->  .../dt-bindings/interrupt-controller/mvebu-icu.h   |  15 ++
->  4 files changed, 318 insertions(+)
->  create mode 100644 drivers/irqchip/irq-mvebu-icu.c
->  create mode 100644 include/dt-bindings/interrupt-controller/mvebu-icu.h
+>  drivers/iommu/arm-smmu-v3.c | 29 ++++++++++++++++++++++++-----
+>  1 file changed, 24 insertions(+), 5 deletions(-)
 > 
-> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-> index e527ee5..676232a 100644
-> --- a/drivers/irqchip/Kconfig
-> +++ b/drivers/irqchip/Kconfig
-> @@ -271,6 +271,9 @@ config IRQ_MXS
->  config MVEBU_GICP
->  	bool
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index abe4b88..f03c63b 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -597,6 +597,7 @@ struct arm_smmu_device {
+>  	u32				features;
 >  
-> +config MVEBU_ICU
-> +	bool
+>  #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
+> +#define ARM_SMMU_OPT_RESV_HW_MSI	(1 << 1)
+>  	u32				options;
+>  
+>  	struct arm_smmu_cmdq		cmdq;
+> @@ -1904,14 +1905,31 @@ static void arm_smmu_get_resv_regions(struct device *dev,
+>  				      struct list_head *head)
+>  {
+>  	struct iommu_resv_region *region;
+> +	struct arm_smmu_device *smmu;
+> +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
+>  	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
+>  
+> -	region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
+> -					 prot, IOMMU_RESV_SW_MSI);
+> -	if (!region)
+> -		return;
+> +	smmu = arm_smmu_get_by_fwnode(fwspec->iommu_fwnode);
 > +
->  config MVEBU_ODMI
->  	bool
->  	select GENERIC_MSI_IRQ_DOMAIN
-> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-> index 11eb858..18fa5fa 100644
-> --- a/drivers/irqchip/Makefile
-> +++ b/drivers/irqchip/Makefile
-> @@ -70,6 +70,7 @@ obj-$(CONFIG_INGENIC_IRQ)		+= irq-ingenic.o
->  obj-$(CONFIG_IMX_GPCV2)			+= irq-imx-gpcv2.o
->  obj-$(CONFIG_PIC32_EVIC)		+= irq-pic32-evic.o
->  obj-$(CONFIG_MVEBU_GICP)		+= irq-mvebu-gicp.o
-> +obj-$(CONFIG_MVEBU_ICU)			+= irq-mvebu-icu.o
->  obj-$(CONFIG_MVEBU_ODMI)		+= irq-mvebu-odmi.o
->  obj-$(CONFIG_MVEBU_PIC)			+= irq-mvebu-pic.o
->  obj-$(CONFIG_LS_SCFG_MSI)		+= irq-ls-scfg-msi.o
-> diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
-> new file mode 100644
-> index 0000000..6b33998
-> --- /dev/null
-> +++ b/drivers/irqchip/irq-mvebu-icu.c
-> @@ -0,0 +1,299 @@
-> +/*
-> + * Copyright (C) 2017 Marvell
-> + *
-> + * Hanna Hawa <hannah@marvell.com>
-> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/interrupt.h>
-> +#include <linux/irq.h>
-> +#include <linux/irqchip.h>
-> +#include <linux/irqdomain.h>
-> +#include <linux/kernel.h>
-> +#include <linux/msi.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/platform_device.h>
-> +
-> +#include <dt-bindings/interrupt-controller/mvebu-icu.h>
-> +
-> +#include "irq-mvebu-gicp.h"
-> +
-> +/* ICU registers */
-> +#define ICU_SETSPI_NSR_AL	0x10
-> +#define ICU_SETSPI_NSR_AH	0x14
-> +#define ICU_CLRSPI_NSR_AL	0x18
-> +#define ICU_CLRSPI_NSR_AH	0x1c
-> +#define ICU_INT_CFG(x)          (0x100 + 4 * (x))
-> +#define   ICU_INT_ENABLE	BIT(24)
-> +#define   ICU_IS_EDGE		BIT(28)
-> +#define   ICU_GROUP_SHIFT	29
-> +
-> +/* ICU definitions */
-> +#define ICU_MAX_IRQS		207
-> +#define ICU_SATA0_ICU_ID	109
-> +#define ICU_SATA1_ICU_ID	107
-> +
-> +struct mvebu_icu {
-> +	struct irq_chip irq_chip;
-> +	void __iomem *base;
-> +	struct irq_domain *domain;
-> +	struct device *dev;
-> +	struct mvebu_gicp *gicp;
-> +};
-> +
-> +struct mvebu_icu_irq_data {
-> +	struct mvebu_icu *icu;
-> +	unsigned int icu_group;
-> +	unsigned int type;
-> +};
-> +
-> +static void mvebu_icu_write_msg(struct msi_desc *desc, struct msi_msg *msg)
-> +{
-> +	struct irq_data *d = irq_get_irq_data(desc->irq);
-> +	struct mvebu_icu_irq_data *icu_irqd = d->chip_data;
-> +	struct mvebu_icu *icu = icu_irqd->icu;
-> +	unsigned int icu_int;
-> +
-> +	if (msg->address_lo) {
+> +	if (smmu && (smmu->options & ARM_SMMU_OPT_RESV_HW_MSI) &&
 
-This should probably test both _lo and _hi.
+AFAICS, iommu_get_resv_regions is only ever called on devices which are
+at least already part of an iommu_group, so smmu should never
+legitimately be NULL. I'd say if you really want to be robust against
+flagrant API misuse, at least WARN_ON and bail out immediately.
 
-> +		/* Configure the ICU with irq number & type */
-> +		icu_int = msg->data | ICU_INT_ENABLE;
-> +		if (icu_irqd->type & IRQ_TYPE_EDGE_RISING)
-> +			icu_int |= ICU_IS_EDGE;
-> +		icu_int |= icu_irqd->icu_group << ICU_GROUP_SHIFT;
+Robin.
+
+> +		      dev_is_pci(dev)) {
+> +		int ret = -EINVAL;
+> +
+> +		if (!is_of_node(smmu->dev->fwnode))
+> +			ret = iort_iommu_its_get_resv_regions(dev, head);
+>  
+> -	list_add_tail(&region->list, head);
+> +		if (ret) {
+> +			dev_warn(dev, "HW MSI region resv failed: %d\n", ret);
+> +			return;
+> +		}
 > +	} else {
-> +		/* De-configure the ICU */
-> +		icu_int = 0;
+> +		region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
+> +						 prot, IOMMU_RESV_SW_MSI);
+> +		if (!region)
+> +			return;
+> +
+> +		list_add_tail(&region->list, head);
 > +	}
-> +
-> +	writel_relaxed(icu_int, icu->base + ICU_INT_CFG(d->hwirq));
-> +
-> +	/*
-> +	 * The SATA unit has 2 ports, and a dedicated ICU entry per
-> +	 * port. The ahci sata driver supports only one irq interrupt
-> +	 * per SATA unit. To solve this conflict, we configure the 2
-> +	 * SATA wired interrupts in the south bridge into 1 GIC
-> +	 * interrupt in the north bridge. Even if only a single port
-> +	 * is enabled, if sata node is enabled, both interrupts are
-> +	 * configured (regardless of which port is actually in use).
-> +	 */
-> +	if (d->hwirq == ICU_SATA0_ICU_ID || d->hwirq == ICU_SATA1_ICU_ID) {
-> +		writel_relaxed(icu_int,
-> +			       icu->base + ICU_INT_CFG(ICU_SATA0_ICU_ID));
-> +		writel_relaxed(icu_int,
-> +			       icu->base + ICU_INT_CFG(ICU_SATA1_ICU_ID));
-> +	}
-> +}
-> +
-> +static int
-> +mvebu_icu_irq_domain_translate(struct irq_domain *d, struct irq_fwspec *fwspec,
-> +			       unsigned long *hwirq, unsigned int *type)
-> +{
-> +	struct mvebu_icu *icu = d->host_data;
-> +	unsigned int icu_group;
-> +
-> +	/* Check the count of the parameters in dt */
-> +	if (WARN_ON(fwspec->param_count < 3)) {
-> +		dev_err(icu->dev, "wrong ICU parameter count %d\n",
-> +			fwspec->param_count);
-> +		return -EINVAL;
-> +	}
-> +
-> +	/* Only ICU group type is handled */
-> +	icu_group = fwspec->param[0];
-> +	if (icu_group != ICU_GRP_NSR && icu_group != ICU_GRP_SR &&
-> +	    icu_group != ICU_GRP_SEI && icu_group != ICU_GRP_REI) {
-> +		dev_err(icu->dev, "wrong ICU group type %x\n", icu_group);
-> +		return -EINVAL;
-> +	}
-> +
-> +	*hwirq = fwspec->param[1];
-> +	if (*hwirq < 0 || *hwirq >= ICU_MAX_IRQS) {
-
-*hwirq is unlikely to become negative...
-
-> +		dev_err(icu->dev, "invalid interrupt number %ld\n", *hwirq);
-> +		return -EINVAL;
-> +	}
-> +
-> +	/* Mask the type to prevent wrong DT configuration */
-> +	*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
-> +
-> +	return 0;
-> +}
-> +
-> +static int
-> +mvebu_icu_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
-> +			   unsigned int nr_irqs, void *args)
-> +{
-> +	int err;
-> +	unsigned long hwirq;
-> +	struct irq_fwspec *fwspec = args;
-> +	struct mvebu_icu *icu = platform_msi_get_host_data(domain);
-> +	struct mvebu_icu_irq_data *icu_irqd;
-> +
-> +	icu_irqd = kmalloc(sizeof(*icu_irqd), GFP_KERNEL);
-> +	if (!icu_irqd)
-> +		return -ENOMEM;
-> +
-> +	err = mvebu_icu_irq_domain_translate(domain, fwspec, &hwirq,
-> +					     &icu_irqd->type);
-> +	if (err) {
-> +		dev_err(icu->dev, "failed to translate ICU parameters\n");
-> +		goto free_irqd;
-> +	}
-> +
-> +	icu_irqd->icu_group = fwspec->param[0];
-> +	icu_irqd->icu = icu;
-> +
-> +	err = platform_msi_domain_alloc(domain, virq, nr_irqs);
-> +	if (err) {
-> +		dev_err(icu->dev, "failed to allocate ICU interrupt in parent domain\n");
-> +		goto free_irqd;
-> +	}
-> +
-> +	/* Make sure there is no interrupt left pending by the firmware */
-> +	err = irq_set_irqchip_state(virq, IRQCHIP_STATE_PENDING, false);
-> +	if (err)
-> +		goto free_msi;
-> +
-> +	err = irq_domain_set_hwirq_and_chip(domain, virq, hwirq,
-> +					    &icu->irq_chip, icu_irqd);
-> +	if (err) {
-> +		dev_err(icu->dev, "failed to set the data to IRQ domain\n");
-> +		goto free_msi;
-> +	}
-
-I think you may want to issue a irq_set_type here, because it is not
-completely clear to me if the core code will be doing it by default for
-you...
-
-> +
-> +	return 0;
-> +
-> +free_msi:
-> +	platform_msi_domain_free(domain, virq, nr_irqs);
-> +free_irqd:
-> +	kfree(icu_irqd);
-> +	return err;
-> +}
-> +
-> +static void
-> +mvebu_icu_irq_domain_free(struct irq_domain *domain, unsigned int virq,
-> +			  unsigned int nr_irqs)
-> +{
-> +	struct irq_data *d = irq_get_irq_data(virq);
-> +	struct mvebu_icu_irq_data *icu_irqd = d->chip_data;
-> +
-> +	kfree(icu_irqd);
-> +
-> +	platform_msi_domain_free(domain, virq, nr_irqs);
-> +}
-> +
-> +static const struct irq_domain_ops mvebu_icu_domain_ops = {
-> +	.translate = mvebu_icu_irq_domain_translate,
-> +	.alloc     = mvebu_icu_irq_domain_alloc,
-> +	.free      = mvebu_icu_irq_domain_free,
-> +};
-> +
-> +static int mvebu_icu_probe(struct platform_device *pdev)
-> +{
-> +	struct mvebu_icu *icu;
-> +	struct device_node *node = pdev->dev.of_node;
-> +	struct platform_device *gicp_pdev;
-> +	struct device_node *gicp_dn;
-> +	struct resource *res;
-> +	phys_addr_t setspi, clrspi;
-> +	u32 i, icu_int;
-> +
-> +	icu = devm_kzalloc(&pdev->dev, sizeof(struct mvebu_icu),
-> +			   GFP_KERNEL);
-> +	if (!icu)
-> +		return -ENOMEM;
-> +
-> +	icu->dev = &pdev->dev;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	icu->base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(icu->base)) {
-> +		dev_err(&pdev->dev, "Failed to map icu base address.\n");
-> +		return PTR_ERR(icu->base);
-> +	}
-> +
-> +	icu->irq_chip.name = devm_kasprintf(&pdev->dev, GFP_KERNEL,
-> +					    "ICU.%x",
-> +					    (unsigned int)res->start);
-> +	if (!icu->irq_chip.name)
-> +		return -ENOMEM;
-> +
-> +	icu->irq_chip.irq_mask = irq_chip_mask_parent;
-> +	icu->irq_chip.irq_unmask = irq_chip_unmask_parent;
-> +	icu->irq_chip.irq_eoi = irq_chip_eoi_parent;
-> +	icu->irq_chip.irq_set_type = irq_chip_set_type_parent;
-> +#ifdef CONFIG_SMP
-> +	icu->irq_chip.irq_set_affinity = irq_chip_set_affinity_parent;
-> +#endif
-> +
-> +	/*
-> +	 * We're probed after MSI domains have been resolved, so force
-> +	 * resolution here.
-> +	 */
-> +	pdev->dev.msi_domain = of_msi_get_domain(&pdev->dev, node,
-> +						 DOMAIN_BUS_PLATFORM_MSI);
-> +	if (!pdev->dev.msi_domain)
-> +		return -EPROBE_DEFER;
-> +
-> +	gicp_dn = of_parse_phandle(node, "msi-parent", 0);
-> +	if (!gicp_dn) {
-> +		dev_err(&pdev->dev, "Missing marvell,gicp property.\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	gicp_pdev = of_find_device_by_node(gicp_dn);
-> +	if (!gicp_pdev) {
-> +		dev_err(&pdev->dev, "Cannot find gicp device.\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	icu->gicp = platform_get_drvdata(gicp_pdev);
-> +
-> +	/* Set Clear/Set ICU SPI message address in AP */
-> +	setspi = mvebu_gicp_setspi_phys_addr(icu->gicp);
-
-
-I must say that I find this quite horrible. The idea of digging into the
-internals of another driver and forcing it to blindly dereference a
-pointer feels just wrong.
-
-Instead, why don't you directly pass the device node, and kindly ask the
-GICP driver to give you the two addresses? Something along the lines of:
-
-	err = mvebu_gicp_get_doorbells(gicp_dn, &setspi, &clrspi);
-	if (err)
-		[...]
-
-which at least gives a the GICP driver chance to check that this is
-something it knows about. And you can then drop the icu->gicp field.
-
-> +	writel_relaxed(upper_32_bits(setspi), icu->base + ICU_SETSPI_NSR_AH);
-> +	writel_relaxed(lower_32_bits(setspi), icu->base + ICU_SETSPI_NSR_AL);
-> +	clrspi = mvebu_gicp_clrspi_phys_addr(icu->gicp);
-> +	writel_relaxed(upper_32_bits(clrspi), icu->base + ICU_CLRSPI_NSR_AH);
-> +	writel_relaxed(lower_32_bits(clrspi), icu->base + ICU_CLRSPI_NSR_AL);
-> +
-> +	/*
-> +	 * Clean all ICU interrupts with type SPI_NSR, required to
-> +	 * avoid unpredictable SPI assignments done by firmware.
-> +	 */
-> +	for (i = 0 ; i < ICU_MAX_IRQS ; i++) {
-> +		icu_int = readl(icu->base + ICU_INT_CFG(i));
-> +		if ((icu_int >> ICU_GROUP_SHIFT) == ICU_GRP_NSR)
-> +			writel_relaxed(0x0, icu->base + ICU_INT_CFG(i));
-> +	}
-
-I had questions about the safety of this in a previous review. Do you
-have any update? Also, shouldn't you check that same thing in the
-translate callback (so that you detect clashes between firmware and DT)?
-
-> +
-> +	icu->domain =
-> +		platform_msi_create_device_domain(&pdev->dev, ICU_MAX_IRQS,
-> +						  mvebu_icu_write_msg,
-> +						  &mvebu_icu_domain_ops, icu);
-> +	if (!icu->domain) {
-> +		dev_err(&pdev->dev, "Failed to create ICU domain\n");
-> +		put_device(&gicp_pdev->dev);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id mvebu_icu_of_match[] = {
-> +	{ .compatible = "marvell,cp110-icu", },
-> +	{},
-> +};
-> +
-> +static struct platform_driver mvebu_icu_driver = {
-> +	.probe  = mvebu_icu_probe,
-> +	.driver = {
-> +		.name = "mvebu-icu",
-> +		.of_match_table = mvebu_icu_of_match,
-> +	},
-> +};
-> +builtin_platform_driver(mvebu_icu_driver);
-> diff --git a/include/dt-bindings/interrupt-controller/mvebu-icu.h b/include/dt-bindings/interrupt-controller/mvebu-icu.h
-> new file mode 100644
-> index 0000000..8249558
-> --- /dev/null
-> +++ b/include/dt-bindings/interrupt-controller/mvebu-icu.h
-> @@ -0,0 +1,15 @@
-> +/*
-> + * This header provides constants for the MVEBU ICU driver.
-> + */
-> +
-> +#ifndef _DT_BINDINGS_INTERRUPT_CONTROLLER_MVEBU_ICU_H
-> +#define _DT_BINDINGS_INTERRUPT_CONTROLLER_MVEBU_ICU_H
-> +
-> +/* interrupt specifier cell 0 */
-> +
-> +#define ICU_GRP_NSR		0x0
-> +#define ICU_GRP_SR		0x1
-> +#define ICU_GRP_SEI		0x4
-> +#define ICU_GRP_REI		0x5
-> +
-> +#endif
+>  
+>  	iommu_dma_get_resv_regions(dev, head);
+>  }
+> @@ -2611,6 +2629,7 @@ static void parse_driver_acpi_options(struct acpi_iort_smmu_v3 *iort_smmu,
+>  	switch (iort_smmu->model) {
+>  	case ACPI_IORT_SMMU_HISILICON_HI161X:
+>  		smmu->options |= ARM_SMMU_OPT_SKIP_PREFETCH;
+> +		smmu->options |= ARM_SMMU_OPT_RESV_HW_MSI;
+>  		break;
+>  	default:
+>  		break;
 > 
-
-Otherwise looking pretty neat.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
