@@ -1,62 +1,66 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 19 Jun 2017 11:51:20 -0600
-Subject: [PATCH] [perf/core branch] perf coresight: Fix ARM builds caused
- by misplaced __printf
-In-Reply-To: <20170616145907.baba73eda242efe194e072d0@arm.com>
-References: <20170616145907.baba73eda242efe194e072d0@arm.com>
-Message-ID: <CANLsYkyG3E9xiOyJz_5EA0B0oQGsSCy2oW7i1iY5YUxU1imKng@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 19 Jun 2017 18:54:52 +0100
+Subject: [PATCH v3 1/2] acpica: iort: Update SMMUv3 header for proximity
+ domain mapping
+In-Reply-To: <1496897059-8272-2-git-send-email-ganapatrao.kulkarni@cavium.com>
+References: <1496897059-8272-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <1496897059-8272-2-git-send-email-ganapatrao.kulkarni@cavium.com>
+Message-ID: <0d0d6cb6-7674-5751-d780-af5114ddd569@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 June 2017 at 13:59, Kim Phillips <kim.phillips@arm.com> wrote:
-> Trailing __printf attributes work for function declarations, but not
-> definitions.  This patch fixes arm32/64 builds by placing __printf
-> before the declarator.  Otherwise this happens:
->
-> arch/arm64/util/../../arm/util/cs-etm.c:586:1: error: attributes should be specified before the declarator in a function definition
->  static int cs_device__print_file(const char *name, const char *fmt, ...) __printf(2, 3)
->  ^~~~~~
-> arch/arm64/util/../../arm/util/cs-etm.c: In function ?cs_etm_set_drv_config?:
-> arch/arm64/util/../../arm/util/cs-etm.c:610:8: error: implicit declaration of function ?cs_device__print_file? [-Werror=implicit-function-declaration]
->   ret = cs_device__print_file(enable_sink, "%d", 1);
->         ^~~~~~~~~~~~~~~~~~~~~
-> arch/arm64/util/../../arm/util/cs-etm.c:610:2: error: nested extern declaration of ?cs_device__print_file? [-Werror=nested-externs]
->   ret = cs_device__print_file(enable_sink, "%d", 1);
->   ^~~
-> At top level:
-> arch/arm64/util/../../arm/util/cs-etm.c:566:14: error: ?cs_device__open_file? defined but not used [-Werror=unused-function]
->  static FILE *cs_device__open_file(const char *name)
->               ^~~~~~~~~~~~~~~~~~~~
-> cc1: all warnings being treated as errors
->
-> Fixes: 2ee261d962ac "tools: Adopt __printf from kernel sources"
-> Cc: Arnaldo Carvalho de Melo <acme@redhat.com>
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Kim Phillips <kim.phillips@arm.com>
+On 08/06/17 05:44, Ganapatrao Kulkarni wrote:
+> ARM IORT specification (rev. C) has added two new fields to define
+> proximity domain for the SMMUv3 node in the IORT table.
+> 
+> Proximity Domain Valid:
+> 	Set to 1 if the value provided in the Proximity Domain field is
+> 	valid. Set to 0 otherwise.
+> 
+> Proximity domain:
+> 	If the Proximity Domain Valid flag is set to 1, this entry
+> 	provides the proximity domain to which this SMMU
+> 	instance belongs.
+> 
+> Update header file to reflect this.
+> 
+> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 > ---
-> Applies to acme's perf/core branch
->
->  tools/perf/arch/arm/util/cs-etm.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/tools/perf/arch/arm/util/cs-etm.c b/tools/perf/arch/arm/util/cs-etm.c
-> index 90a6f42ba904..7ce3d1a25133 100644
-> --- a/tools/perf/arch/arm/util/cs-etm.c
-> +++ b/tools/perf/arch/arm/util/cs-etm.c
-> @@ -583,7 +583,7 @@ static FILE *cs_device__open_file(const char *name)
->
->  }
->
-> -static int cs_device__print_file(const char *name, const char *fmt, ...) __printf(2, 3)
-> +static int __printf(2, 3) cs_device__print_file(const char *name, const char *fmt, ...)
->  {
->         va_list args;
->         FILE *file;
+>  include/acpi/actbl2.h | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
+> index 4b306a6..389e91f 100644
+> --- a/include/acpi/actbl2.h
+> +++ b/include/acpi/actbl2.h
+> @@ -805,6 +805,9 @@ struct acpi_iort_smmu_v3 {
+>  	u32 pri_gsiv;
+>  	u32 gerr_gsiv;
+>  	u32 sync_gsiv;
+> +	u8 pxm;
+> +	u8 reserved1;
+> +	u16 reserved2;
 
-I just tested Kim's solution on my side.
+Why add the padding if you're not also adding the following field that
+it aligns? (side note: could it not just be a u8[3]?)
 
-Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+If the actual structure definition is changing, do there not need to be
+corresponding IASL changes too?
 
-> --
-> 2.11.0
->
+>  };
+>  
+>  /* Values for Model field above */
+> @@ -817,6 +820,7 @@ struct acpi_iort_smmu_v3 {
+>  
+>  #define ACPI_IORT_SMMU_V3_COHACC_OVERRIDE   (1)
+>  #define ACPI_IORT_SMMU_V3_HTTU_OVERRIDE     (1<<1)
+> +#define ACPI_IORT_SMMU_V3_PXM_VALID         (1<<3)
+
+Maybe it's just me, but "PXM" seems incredibly cryptic.
+
+Robin.
+
+>  
+>  /*******************************************************************************
+>   *
+> 
