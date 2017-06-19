@@ -1,78 +1,38 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 20:14:13 -0700
-Subject: [GIT PULL] arm64: dts: uniphier: UniPhier DT updates (64bit) for
- v4.13
-In-Reply-To: <CAK7LNATOnBVcxSu58gJzp6NpHd3R7z1cs9W+8SkqS2BAxgpt6w@mail.gmail.com>
-References: <CAK7LNATOnBVcxSu58gJzp6NpHd3R7z1cs9W+8SkqS2BAxgpt6w@mail.gmail.com>
-Message-ID: <20170619031413.GB30022@localhost>
+Date: Sun, 18 Jun 2017 20:29:09 -0700
+Subject: [GIT PULL 4/7] Broadcom maintainers changes for 4.13 (v2)
+In-Reply-To: <20170613201044.9808-4-f.fainelli@gmail.com>
+References: <20170613201044.9808-1-f.fainelli@gmail.com>
+ <20170613201044.9808-4-f.fainelli@gmail.com>
+Message-ID: <20170619032909.GH30022@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 13, 2017 at 12:48:03AM +0900, Masahiro Yamada wrote:
-> Hi Arnd, Olof,
-> 
-> Here are UniPhier DT (64bit) updates for the v4.13 merge window.
-> Please pull!
-> 
+On Tue, Jun 13, 2017 at 01:10:41PM -0700, Florian Fainelli wrote:
 > The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 > 
 >   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
-> tags/uniphier-dt64-v4.13
+>   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.13/maintainers
 > 
-> for you to fetch changes up to 1b6d58acdb26de8995f854cbf8b0d7214eefd884:
+> for you to fetch changes up to a6adb15fc87f22e3c19dcfd0b0ff4ddc2dd4b4a1:
 > 
->   arm64: dts: uniphier: add support for LD20 Global board (2017-06-13
-> 00:00:17 +0900)
+>   Merge tag 'bcm2835-maintainers-next-2017-06-08' into maintainers/next (2017-06-13 12:38:10 -0700)
 > 
 > ----------------------------------------------------------------
-> UniPhier ARM64 SoC DT updates for v4.13
+> This pull request contains Broadcom ARM-based SoCs MAINTAINERS file updates for
+> 4.13, please pull the following:
 > 
-> - specify timing delay properties of eMMC
-> - fix W=1 build warnings
-> - increase memory reserve size
-> - use SPDX License Identifier
-> - add new board support (LD11/LD20 global)
+> - Eric updates the BCM283X section and removes Lee Jones who has not been active for
+>   over a year in the Raspberry Pi kernel development
 
-Merged, thanks!
+It's a bit unusual to not get an ack on removal from someone who is otherwise
+active on the lists, but I suppose that's also a signal. If circumstances
+change this can easily be reinstated, etc.
 
-> ----------------------------------------------------------------
-> Kunihiko Hayashi (2):
->       arm64: dts: uniphier: add support for LD11 Global board
->       arm64: dts: uniphier: add support for LD20 Global board
-> 
-> Masahiro Yamada (5):
->       arm64: dts: uniphier: add input-delay properties to Cadence eMMC node
->       arm64: dts: uniphier: add cdns, phy-dll-delay-sdclk(-hsmmc) for eMMC
->       arm64: dts: uniphier: fix simple-bus unit address format error
->       arm64: dts: uniphier: reserve more memory for LD11/LD20
->       arm64: dts: uniphier: use SPDX-License-Identifier
-> 
-> Viresh Kumar (1):
->       arm64: dts: uniphier: Use - instead of @ for DT OPP entries
-> 
->  arch/arm64/boot/dts/socionext/Makefile                 |  2 +
->  arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts | 70
-> +++++++++++++++++++++++++++
->  arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts    | 38 +--------------
->  arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi       | 61
-> ++++++------------------
->  arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts | 52
-> ++++++++++++++++++++
->  arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts    | 38 +--------------
->  arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi       | 79
-> ++++++++++---------------------
->  7 files changed, 165 insertions(+), 175 deletions(-)
->  create mode 100644 arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts
->  create mode 100644 arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts
-
-Tip:
-
-If you pipe your request-pull through cat, or redirect it to a file, it'll use
-shorter lines for the diffstat to make them fit in email without linewrap.
+Merged.
 
 
 -Olof
