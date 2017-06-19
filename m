@@ -1,40 +1,38 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Mon, 19 Jun 2017 06:12:41 +0200
-Subject: [PATCH v4 27/28] soc: actions: owl-sps: Factor out
- owl_sps_set_pg() for power-gating
-In-Reply-To: <20170606005426.26446-28-afaerber@suse.de>
-References: <20170606005426.26446-1-afaerber@suse.de>
- <20170606005426.26446-28-afaerber@suse.de>
-Message-ID: <95ca3ef8-dff6-e32e-acf4-80feecceac52@suse.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 18 Jun 2017 20:10:13 -0700
+Subject: [GIT PULL] STM32 defconfig changes for v4.13 #1
+In-Reply-To: <a644e854-4b54-50dc-3779-8df6e3a8b02b@st.com>
+References: <a644e854-4b54-50dc-3779-8df6e3a8b02b@st.com>
+Message-ID: <20170619031013.GY30022@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 06.06.2017 um 02:54 schrieb Andreas F?rber:
-> Allow the SMP code to reuse PM domain code for CPU2/CPU3 wakeup.
+On Mon, Jun 12, 2017 at 02:11:37PM +0200, Alexandre Torgue wrote:
+> Hi Olof, Arnd and Kevin,
 > 
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  v4: new
->  
->  drivers/soc/actions/Kconfig          |  4 +++
->  drivers/soc/actions/Makefile         |  1 +
->  drivers/soc/actions/owl-sps-helper.c | 51 ++++++++++++++++++++++++++++++++++++
->  drivers/soc/actions/owl-sps.c        | 34 +++---------------------
->  include/linux/soc/actions/owl-sps.h  | 11 ++++++++
->  5 files changed, 70 insertions(+), 31 deletions(-)
->  create mode 100644 drivers/soc/actions/owl-sps-helper.c
->  create mode 100644 include/linux/soc/actions/owl-sps.h
+> Please consider this first round of STM32 defconfig updates for v4.13:
+> 
+> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+> 
+>   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git
+> tags/stm32-defconfig-for-v4.13-1
+> 
+> for you to fetch changes up to d81cd7d72f6441df759c3db7adc69f4ad8d54fc4:
+> 
+>   ARM: configs: stm32: STMPE1600 GPIO expander (2017-06-08 14:59:05 +0200)
+> 
+> ----------------------------------------------------------------
+> STM32 defconfig updates for v4.13, round 1
+> 
+> Highlights:
+> ----------
+>  - Enable STMPE1600 IO expander
+>  - Enable Watchdog support
 
-Applied to linux-actions.git v4.13/soc branch:
+Thanks, merged.
 
-https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.13/soc
-
-Needs to get merged first so that arm branch can start using it.
-
-Regards,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+-Olof
