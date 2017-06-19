@@ -1,17 +1,17 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 22:52:28 -0700
-Subject: [GIT PULL] Renesas ARM Based SoC Updates for v4.13
-In-Reply-To: <cover.1497619609.git.horms+renesas@verge.net.au>
-References: <cover.1497619609.git.horms+renesas@verge.net.au>
-Message-ID: <20170619055228.GM7703@localhost>
+Date: Sun, 18 Jun 2017 22:56:19 -0700
+Subject: [GIT PULL] ARM: at91: DT for 4.13
+In-Reply-To: <20170616162608.ucjxtqpvjhdj77gy@piout.net>
+References: <20170616162608.ucjxtqpvjhdj77gy@piout.net>
+Message-ID: <20170619055619.GO7703@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 16, 2017 at 03:31:16PM +0200, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Fri, Jun 16, 2017 at 06:26:08PM +0200, Alexandre Belloni wrote:
+> Arnd, Olof,
 > 
-> Please consider these Renesas ARM based SoC updates for v4.13.
-> 
+> Here is the DT pull request, switching most platform the the new EBI and
+> NAND bindings.
 > 
 > The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 > 
@@ -19,20 +19,40 @@ On Fri, Jun 16, 2017 at 03:31:16PM +0200, Simon Horman wrote:
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v4.13
+>   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.13-dt
 > 
-> for you to fetch changes up to fd8cf827d8a635df3dad46773ad828ce4c93d95b:
+> for you to fetch changes up to bc03ce08396786c92d6591a81682c7da7accbfc8:
 > 
->   ARM: shmobile: pm-rmobile: Use GENPD_FLAG_ALWAYS_ON (2017-06-14 10:58:48 +0200)
-> 
-> ----------------------------------------------------------------
-> Renesas ARM Based SoC Updates for v4.13
-> 
-> * Use GENPD_FLAG_ALWAYS_ON in pm-rmobile
+>   ARM: dts: at91: sama5d2_xplained: remove wrong memory node (2017-06-08 23:49:17 +0200)
 > 
 > ----------------------------------------------------------------
-> Geert Uytterhoeven (1):
->       ARM: shmobile: pm-rmobile: Use GENPD_FLAG_ALWAYS_ON
+> DT for 4.13
+> 
+>  - Switch to the new NAND binding
+>  - A few non urgent fixes
+> 
+> ----------------------------------------------------------------
+> Baruch Siach (1):
+>       ARM: dts: at91: sama5d2_xplained: remove wrong memory node
+> 
+> Boris Brezillon (4):
+>       dt-bindings: mtd: atmel-nand: Document the nfc-io bindings
+>       ARM: dts: at91: Declare EBI/NAND controllers
+>       ARM: dts: at91: Switch to the new NAND bindings
+>       ARM: dts: at91: Add the NOR flash available on sama5d3 dev kits
+> 
+> Claudiu Beznea (1):
+>       ARM: dts: at91: sama5d2_xplained: add pwm controller
+> 
+> Javier Martinez Canillas (1):
+>       ARM: dts: at91: Add generic compatible string for I2C EEPROM
+> 
+> Uwe Kleine-K?nig (2):
+>       dts: gpio_atmel: adapt binding doc to reality
+>       ARM: dts: at91-sama5d4: use IRQ_TYPE_* to specify irq flags
+> 
+> Wenyou Yang (1):
+>       ARM: dts: at91: sama5d2: add m_can nodes
 
 Merged, thanks.
 
