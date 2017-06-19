@@ -1,37 +1,67 @@
-From: leoyang.li@nxp.com (Leo Li)
-Date: Mon, 19 Jun 2017 17:00:16 +0000
-Subject: [GIT PULL v2] updates to qbman (soc drivers) to support arm/arm64
-In-Reply-To: <20170619020710.GK30022@localhost>
-References: <1496955428-17440-1-git-send-email-leoyang.li@nxp.com>
- <20170619020710.GK30022@localhost>
-Message-ID: <AM4PR0401MB16993E977E2BD93BC28B9A708FC40@AM4PR0401MB1699.eurprd04.prod.outlook.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Mon, 19 Jun 2017 18:01:37 +0100
+Subject: [PATCH v5 0/8] Support for contiguous pte hugepages
+Message-ID: <20170619170145.25577-1-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Andrew,
 
-> -----Original Message-----
-> From: Olof Johansson [mailto:olof at lixom.net]
-> Sent: Sunday, June 18, 2017 9:07 PM
-> To: Leo Li <leoyang.li@nxp.com>
-> Cc: arm at kernel.org; Arnd Bergmann <arnd@arndb.de>; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [GIT PULL v2] updates to qbman (soc drivers) to support
-> arm/arm64
-> 
-> On Thu, Jun 08, 2017 at 03:57:08PM -0500, Li Yang wrote:
-> > v2: Removed the patches for MAINTAINERS file as they are already
-> > picked up by powerpc tree.
-> 
-> Same comment as before, seems to be missing signed tag ref in the pull
-> request.
-> 
-> If you revisit a pull request, please reply to the previous one. We often
-> process the list sequentially, and might not notice the later one before we
-> have either replied or pulled the first one.
+This is v5 of the patchset to update the hugetlb code to support
+contiguous hugepages. Previous version of the patchset can be found at
+[0].
 
-Thanks Olof,
+The main changes in this version are updating Patch 4 and 7 due to
+issues highlighted in the previous postings (ltp and build failure).
 
-Will regenerate the pull request with signature and use the same email thread for the updated pull request.
+Please update the patches in your queue with this version.
 
-Regards,
-Leo
+Thanks,
+Punit
+
+Changes since v4:
+
+* Patch 4 updated to fix arm64 ltp failure (pth_str01, pth_str03) [1]
+* Patch 7 update to fix build failure when CONFIG_HUGETLB_PAGE is disabled
+
+[0] https://lkml.org/lkml/2017/5/24/463
+[1] https://lkml.org/lkml/2017/6/5/332
+
+Punit Agrawal (5):
+  mm, gup: Ensure real head page is ref-counted when using hugepages
+  mm/hugetlb: add size parameter to huge_pte_offset()
+  mm/hugetlb: Allow architectures to override huge_pte_clear()
+  mm/hugetlb: Introduce set_huge_swap_pte_at() helper
+  mm: rmap: Use correct helper when poisoning hugepages
+
+Steve Capper (2):
+  arm64: hugetlb: Refactor find_num_contig
+  arm64: hugetlb: Remove spurious calls to huge_ptep_offset
+
+Will Deacon (1):
+  mm, gup: Remove broken VM_BUG_ON_PAGE compound check for hugepages
+
+ arch/arm64/mm/hugetlbpage.c     | 53 +++++++++++++++++------------------------
+ arch/ia64/mm/hugetlbpage.c      |  4 ++--
+ arch/metag/mm/hugetlbpage.c     |  3 ++-
+ arch/mips/mm/hugetlbpage.c      |  3 ++-
+ arch/parisc/mm/hugetlbpage.c    |  3 ++-
+ arch/powerpc/mm/hugetlbpage.c   |  2 +-
+ arch/s390/include/asm/hugetlb.h |  2 +-
+ arch/s390/mm/hugetlbpage.c      |  3 ++-
+ arch/sh/mm/hugetlbpage.c        |  3 ++-
+ arch/sparc/mm/hugetlbpage.c     |  3 ++-
+ arch/tile/mm/hugetlbpage.c      |  3 ++-
+ arch/x86/mm/hugetlbpage.c       |  2 +-
+ fs/userfaultfd.c                |  7 ++++--
+ include/asm-generic/hugetlb.h   |  4 +++-
+ include/linux/hugetlb.h         | 18 ++++++++++++--
+ mm/gup.c                        | 15 +++++-------
+ mm/hugetlb.c                    | 33 +++++++++++++++----------
+ mm/page_vma_mapped.c            |  3 ++-
+ mm/pagewalk.c                   |  3 ++-
+ mm/rmap.c                       |  7 ++++--
+ 20 files changed, 100 insertions(+), 74 deletions(-)
+
+-- 
+2.11.0
