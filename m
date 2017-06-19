@@ -1,93 +1,77 @@
-From: dsafonov@virtuozzo.com (Dmitry Safonov)
-Date: Mon, 19 Jun 2017 17:50:23 +0300
-Subject: [PATCHv2] ARM32: Support mremap() for sigpage/vDSO
-In-Reply-To: <CALCETrV9khCCCAu4G0nfttKV1ZfrxH6dkeSqsqwrngs-WYbpog@mail.gmail.com>
-References: <20170414132529.8337-1-dsafonov@virtuozzo.com>
- <871579ef-ee9a-c321-80e4-47836bb0e472@virtuozzo.com>
- <bebbe3ce-12ed-419a-248a-55f41d74d9da@virtuozzo.com>
- <20170523200946.GG22219@n2100.armlinux.org.uk>
- <7dc84202-9f12-4f0e-a925-e050974e17b9@virtuozzo.com>
- <CALCETrV9khCCCAu4G0nfttKV1ZfrxH6dkeSqsqwrngs-WYbpog@mail.gmail.com>
-Message-ID: <7dd80420-0f3f-42e2-80e4-e47990f3b20b@virtuozzo.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 19 Jun 2017 15:52:57 +0100
+Subject: [RFC PATCH 17/33] irqchip/gic-v3-its: Add VLPI configuration hook
+In-Reply-To: <a5783b6c-8276-0bc3-227d-7bf74465dae8@codeaurora.org>
+References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
+ <1484648454-21216-18-git-send-email-marc.zyngier@arm.com>
+ <a5783b6c-8276-0bc3-227d-7bf74465dae8@codeaurora.org>
+Message-ID: <6355cf70-dd8d-f8b0-7861-a32bc6007647@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/24/2017 07:44 PM, Andy Lutomirski wrote:
-> On Wed, May 24, 2017 at 3:09 AM, Dmitry Safonov <dsafonov@virtuozzo.com> wrote:
->> + Adding back to CC x86 guys - as I've removed in ping messages.
->>
->> On 05/23/2017 11:09 PM, Russell King - ARM Linux wrote:
->>>
->>> On Thu, May 18, 2017 at 02:13:29PM +0300, Dmitry Safonov wrote:
->>>>
->>>> On 04/25/2017 08:18 PM, Dmitry Safonov wrote:
->>>>>
->>>>> On 04/14/2017 04:25 PM, Dmitry Safonov wrote:
->>>>>>
->>>>>> CRIU restores application mappings on the same place where they
->>>>>> were before Checkpoint. That means, that we need to move vDSO
->>>>>> and sigpage during restore on exactly the same place where
->>>>>> they were before C/R.
->>>>>>
->>>>>> Make mremap() code update mm->context.{sigpage,vdso} pointers
->>>>>> during VMA move. Sigpage is used for landing after handling
->>>>>> a signal - if the pointer is not updated during moving, the
->>>>>> application might crash on any signal after mremap().
->>>>>>
->>>>>> vDSO pointer on ARM32 is used only for setting auxv at this moment,
->>>>>> update it during mremap() in case of future usage.
->>>>>>
->>>>>> Without those updates, current work of CRIU on ARM32 is not reliable.
->>>>>> Historically, we error Checkpointing if we find vDSO page on ARM32
->>>>>> and suggest user to disable CONFIG_VDSO.
->>>>>> But that's not correct - it goes from x86 where signal processing
->>>>>> is ended in vDSO blob. For arm32 it's sigpage, which is not disabled
->>>>>> with `CONFIG_VDSO=n'.
->>>>>>
->>>>>> Looks like C/R was working by luck - because userspace on ARM32 at
->>>>>> this moment always sets SA_RESTORER.
->>>>>>
->>>>>> Cc: linux-arm-kernel at lists.infradead.org
->>>>>> Cc: Russell King <linux@armlinux.org.uk>
->>>>>> Cc: Will Deacon <will.deacon@arm.com>
->>>>>> Cc: Andy Lutomirski <luto@amacapital.net>
->>>>>> Cc: Thomas Gleixner <tglx@linutronix.de>
->>>>>> Cc: Cyrill Gorcunov <gorcunov@openvz.org>
->>>>>> Cc: Pavel Emelyanov <xemul@virtuozzo.com>
->>>>>> Cc: Christopher Covington <cov@codeaurora.org>
->>>>>> Signed-off-by: Dmitry Safonov <dsafonov@virtuozzo.com>
->>>>>> ---
->>>>>> v2: (buildbot) Fix (unsinged long) to (void*) cast warning.
->>>>>>
->>>>>>    arch/arm/kernel/process.c |  8 ++++++++
->>>>>>    arch/arm/kernel/vdso.c    | 18 ++++++++++++++++++
->>>>>>    arch/x86/entry/vdso/vma.c |  3 ---
->>>>>>    mm/mmap.c                 |  4 ++++
->>>>>>    4 files changed, 30 insertions(+), 3 deletions(-)
->>>>>
->>>>>
->>>>> Ping?
->>>>
->>>>
->>>> Ping?
->>>
->>>
->>> I'm mostly happy with the ARM bits, but I can't take the patch without
->>> acks from others because it touches other architectures/generic code.
->>>
->>
->> Fair enough, thanks.
->>
->> Andy, does moving of this WARN_ON() looks good to you?
->> I've done it to reuse it over arches and between vdso/sigpage mappings,
->> reducing code duplication.
+On 13/02/17 23:07, Shanker Donthineni wrote:
 > 
-> Acked-by: Andy Lutomirski <luto@kernel.org> # For the x86 bit
+> 
+> On 01/17/2017 04:20 AM, Marc Zyngier wrote:
+>> Add the skeleton irq_set_vcpu_affinity method that will be used
+>> to configure VLPIs.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>   drivers/irqchip/irq-gic-v3-its.c | 33 +++++++++++++++++++++++++++++++++
+>>   1 file changed, 33 insertions(+)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3-its.c
+>> b/drivers/irqchip/irq-gic-v3-its.c
+>> index 0dbc8b0..1bd78ca 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>> @@ -36,6 +36,7 @@
+>>   
+>>   #include <linux/irqchip.h>
+>>   #include <linux/irqchip/arm-gic-v3.h>
+>> +#include <linux/irqchip/arm-gic-v4.h>
+>>   
+>>   #include <asm/cputype.h>
+>>   #include <asm/exception.h>
+>> @@ -771,6 +772,37 @@ static int its_irq_set_irqchip_state(struct irq_data
+>> *d,
+>>   	return 0;
+>>   }
+>>   
+>> +static int its_irq_set_vcpu_affinity(struct irq_data *d, void *vcpu_info)
+>> +{
+>> +	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
+>> +	struct its_cmd_info *info = vcpu_info;
+>> +	u32 event = its_get_event_id(d);
+>> +
+>> +	/* Need a v4 ITS */
+>> +	if (!its_dev->its->is_v4 || !info)
+>> +		return -EINVAL;
+>> +
+>> +	switch (info->cmd_type) {
+>> +	case MAP_VLPI:
+>> +	{
+>> +		return 0;
+>> +	}
+>> +
+>> +	case UNMAP_VLPI:
+>> +	{
+>> +		return 0;
+>> +	}
+>> +
+>> +	case PROP_UPDATE_VLPI:
+>> +	{
+>> +		return 0;
+>> +	}
+>> +
+>> +	default:
+>> +		return -EINVAL;
+>> +	}
+> Missing a return statement.
 
-Hi Russell,
+What's wrong with this default: statement?
 
-Should I resend this with ack, or send it to your patch system,
-or you'll take it from mail?
-
-Thanks,
-              Dmitry
+	M.
+-- 
+Jazz is not dead. It just smells funny...
