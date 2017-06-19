@@ -1,398 +1,223 @@
 From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Mon, 19 Jun 2017 10:40:45 +0530
-Subject: [Patch v5 02/12] [media] s5p-mfc: Adding initial support for MFC
- v10.10
+Date: Mon, 19 Jun 2017 10:40:47 +0530
+Subject: [Patch v5 04/12] [media] s5p-mfc: Support MFCv10.10 buffer
+ requirements
 In-Reply-To: <1497849055-26583-1-git-send-email-smitha.t@samsung.com>
 References: <1497849055-26583-1-git-send-email-smitha.t@samsung.com>
- <CGME20170619052458epcas5p3ffbe45cb390e87df6bb11980cd7498aa@epcas5p3.samsung.com>
-Message-ID: <1497849055-26583-3-git-send-email-smitha.t@samsung.com>
+ <CGME20170619052502epcas1p41e0ba072755ca63278f2d4cfdc03ed06@epcas1p4.samsung.com>
+Message-ID: <1497849055-26583-5-git-send-email-smitha.t@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding the support for MFC v10.10, with new register file and
-necessary hw control, decoder, encoder and structural changes.
+Aligning the luma_dpb_size, chroma_dpb_size, mv_size and me_buffer_size
+for MFCv10.10.
 
-CC: Rob Herring <robh+dt@kernel.org>
-CC: devicetree at vger.kernel.org
 Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
 Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/media/s5p-mfc.txt          |  1 +
- drivers/media/platform/s5p-mfc/regs-mfc-v10.h      | 36 ++++++++++++++++++++++
- drivers/media/platform/s5p-mfc/s5p_mfc.c           | 25 +++++++++++++++
- drivers/media/platform/s5p-mfc/s5p_mfc_common.h    |  9 +++++-
- drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c      |  4 +++
- drivers/media/platform/s5p-mfc/s5p_mfc_dec.c       | 32 ++++++++-----------
- drivers/media/platform/s5p-mfc/s5p_mfc_enc.c       | 16 ++++------
- drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c    |  9 ++++--
- drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h    |  2 ++
- 9 files changed, 101 insertions(+), 33 deletions(-)
- create mode 100644 drivers/media/platform/s5p-mfc/regs-mfc-v10.h
+ drivers/media/platform/s5p-mfc/regs-mfc-v10.h   | 19 +++++
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c | 95 +++++++++++++++++++------
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h |  2 +
+ 3 files changed, 95 insertions(+), 21 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/media/s5p-mfc.txt b/Documentation/devicetree/bindings/media/s5p-mfc.txt
-index d3404b5..aa54c81 100644
---- a/Documentation/devicetree/bindings/media/s5p-mfc.txt
-+++ b/Documentation/devicetree/bindings/media/s5p-mfc.txt
-@@ -13,6 +13,7 @@ Required properties:
- 	(c) "samsung,mfc-v7" for MFC v7 present in Exynos5420 SoC
- 	(d) "samsung,mfc-v8" for MFC v8 present in Exynos5800 SoC
- 	(e) "samsung,exynos5433-mfc" for MFC v8 present in Exynos5433 SoC
-+	(f) "samsung,mfc-v10" for MFC v10 present in Exynos7880 SoC
- 
-   - reg : Physical base address of the IP registers and length of memory
- 	  mapped region.
 diff --git a/drivers/media/platform/s5p-mfc/regs-mfc-v10.h b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
-new file mode 100644
-index 0000000..1ca09d6
---- /dev/null
+index 1ca09d6..3f0dab3 100644
+--- a/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
 +++ b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
-@@ -0,0 +1,36 @@
-+/*
-+ * Register definition file for Samsung MFC V10.x Interface (FIMV) driver
-+ *
-+ * Copyright (c) 2017 Samsung Electronics Co., Ltd.
-+ *     http://www.samsung.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef _REGS_MFC_V10_H
-+#define _REGS_MFC_V10_H
-+
-+#include <linux/sizes.h>
-+#include "regs-mfc-v8.h"
-+
-+/* MFCv10 register definitions*/
-+#define S5P_FIMV_MFC_CLOCK_OFF_V10			0x7120
-+#define S5P_FIMV_MFC_STATE_V10				0x7124
-+
-+/* MFCv10 Context buffer sizes */
-+#define MFC_CTX_BUF_SIZE_V10		(30 * SZ_1K)
-+#define MFC_H264_DEC_CTX_BUF_SIZE_V10	(2 * SZ_1M)
-+#define MFC_OTHER_DEC_CTX_BUF_SIZE_V10	(20 * SZ_1K)
-+#define MFC_H264_ENC_CTX_BUF_SIZE_V10	(100 * SZ_1K)
-+#define MFC_OTHER_ENC_CTX_BUF_SIZE_V10	(15 * SZ_1K)
-+
-+/* MFCv10 variant defines */
-+#define MAX_FW_SIZE_V10		(SZ_1M)
-+#define MAX_CPB_SIZE_V10	(3 * SZ_1M)
-+#define MFC_VERSION_V10		0xA0
-+#define MFC_NUM_PORTS_V10	1
-+
-+#endif /*_REGS_MFC_V10_H*/
-+
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-index 43ca572..1b032f8 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-@@ -1614,6 +1614,28 @@ static struct s5p_mfc_variant mfc_drvdata_v8_5433 = {
- 	.num_clocks	= 3,
- };
+@@ -32,5 +32,24 @@
+ #define MFC_VERSION_V10		0xA0
+ #define MFC_NUM_PORTS_V10	1
  
-+static struct s5p_mfc_buf_size_v6 mfc_buf_size_v10 = {
-+	.dev_ctx        = MFC_CTX_BUF_SIZE_V10,
-+	.h264_dec_ctx   = MFC_H264_DEC_CTX_BUF_SIZE_V10,
-+	.other_dec_ctx  = MFC_OTHER_DEC_CTX_BUF_SIZE_V10,
-+	.h264_enc_ctx   = MFC_H264_ENC_CTX_BUF_SIZE_V10,
-+	.other_enc_ctx  = MFC_OTHER_ENC_CTX_BUF_SIZE_V10,
-+};
++/* MFCv10 codec defines*/
++#define S5P_FIMV_CODEC_HEVC_ENC         26
 +
-+static struct s5p_mfc_buf_size buf_size_v10 = {
-+	.fw     = MAX_FW_SIZE_V10,
-+	.cpb    = MAX_CPB_SIZE_V10,
-+	.priv   = &mfc_buf_size_v10,
-+};
++/* Encoder buffer size for MFC v10.0 */
++#define ENC_V100_BASE_SIZE(x, y) \
++	(((x + 3) * (y + 3) * 8) \
++	+  ((y * 64) + 1280) * DIV_ROUND_UP(x, 8))
 +
-+static struct s5p_mfc_variant mfc_drvdata_v10 = {
-+	.version        = MFC_VERSION_V10,
-+	.version_bit    = MFC_V10_BIT,
-+	.port_num       = MFC_NUM_PORTS_V10,
-+	.buf_size       = &buf_size_v10,
-+	.fw_name[0]     = "s5p-mfc-v10.fw",
-+};
++#define ENC_V100_H264_ME_SIZE(x, y) \
++	(ENC_V100_BASE_SIZE(x, y) \
++	+ (DIV_ROUND_UP(x * y, 64) * 32))
 +
- static const struct of_device_id exynos_mfc_match[] = {
- 	{
- 		.compatible = "samsung,mfc-v5",
-@@ -1630,6 +1652,9 @@ static const struct of_device_id exynos_mfc_match[] = {
- 	}, {
- 		.compatible = "samsung,exynos5433-mfc",
- 		.data = &mfc_drvdata_v8_5433,
-+	}, {
-+		.compatible = "samsung,mfc-v10",
-+		.data = &mfc_drvdata_v10,
- 	},
- 	{},
- };
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-index 5fb2684..eb0cf5e 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-@@ -23,7 +23,7 @@
- #include <media/v4l2-ioctl.h>
- #include <media/videobuf2-v4l2.h>
- #include "regs-mfc.h"
--#include "regs-mfc-v8.h"
-+#include "regs-mfc-v10.h"
- 
- #define S5P_MFC_NAME		"s5p-mfc"
- 
-@@ -712,11 +712,18 @@ void s5p_mfc_cleanup_queue(struct list_head *lh, struct vb2_queue *vq);
- #define IS_MFCV6_PLUS(dev)	(dev->variant->version >= 0x60 ? 1 : 0)
- #define IS_MFCV7_PLUS(dev)	(dev->variant->version >= 0x70 ? 1 : 0)
- #define IS_MFCV8_PLUS(dev)	(dev->variant->version >= 0x80 ? 1 : 0)
-+#define IS_MFCV10(dev)		(dev->variant->version >= 0xA0 ? 1 : 0)
- 
- #define MFC_V5_BIT	BIT(0)
- #define MFC_V6_BIT	BIT(1)
- #define MFC_V7_BIT	BIT(2)
- #define MFC_V8_BIT	BIT(3)
-+#define MFC_V10_BIT	BIT(5)
- 
-+#define MFC_V5PLUS_BITS		(MFC_V5_BIT | MFC_V6_BIT | MFC_V7_BIT | \
-+					MFC_V8_BIT | MFC_V10_BIT)
-+#define MFC_V6PLUS_BITS		(MFC_V6_BIT | MFC_V7_BIT | MFC_V8_BIT | \
-+					MFC_V10_BIT)
-+#define MFC_V7PLUS_BITS		(MFC_V7_BIT | MFC_V8_BIT | MFC_V10_BIT)
- 
- #endif /* S5P_MFC_COMMON_H_ */
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c b/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
-index 3769d22..3a3dd6d 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
-@@ -239,6 +239,10 @@ int s5p_mfc_init_hw(struct s5p_mfc_dev *dev)
- 	}
- 	else
- 		mfc_write(dev, 0x3ff, S5P_FIMV_SW_RESET);
++#define ENC_V100_MPEG4_ME_SIZE(x, y) \
++	(ENC_V100_BASE_SIZE(x, y) \
++	+ (DIV_ROUND_UP(x * y, 128) * 16))
 +
-+	if (IS_MFCV10(dev))
-+		mfc_write(dev, 0x0, S5P_FIMV_MFC_CLOCK_OFF_V10);
++#define ENC_V100_VP8_ME_SIZE(x, y) \
++	ENC_V100_BASE_SIZE(x, y)
 +
- 	mfc_debug(2, "Will now wait for completion of firmware transfer\n");
- 	if (s5p_mfc_wait_for_done_dev(dev, S5P_MFC_R2H_CMD_FW_STATUS_RET)) {
- 		mfc_err("Failed to load firmware\n");
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-index 42e9351..81de3029 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-@@ -54,7 +54,7 @@ static struct s5p_mfc_fmt formats[] = {
- 		.codec_mode	= S5P_MFC_CODEC_NONE,
- 		.type		= MFC_FMT_RAW,
- 		.num_planes	= 2,
--		.versions	= MFC_V6_BIT | MFC_V7_BIT | MFC_V8_BIT,
-+		.versions	= MFC_V6PLUS_BITS,
- 	},
- 	{
- 		.name		= "4:2:0 2 Planes Y/CrCb",
-@@ -62,7 +62,7 @@ static struct s5p_mfc_fmt formats[] = {
- 		.codec_mode	= S5P_MFC_CODEC_NONE,
- 		.type		= MFC_FMT_RAW,
- 		.num_planes	= 2,
--		.versions	= MFC_V6_BIT | MFC_V7_BIT | MFC_V8_BIT,
-+		.versions	= MFC_V6PLUS_BITS,
- 	},
- 	{
- 		.name		= "H264 Encoded Stream",
-@@ -70,8 +70,7 @@ static struct s5p_mfc_fmt formats[] = {
- 		.codec_mode	= S5P_MFC_CODEC_H264_DEC,
- 		.type		= MFC_FMT_DEC,
- 		.num_planes	= 1,
--		.versions	= MFC_V5_BIT | MFC_V6_BIT | MFC_V7_BIT |
--								MFC_V8_BIT,
-+		.versions	= MFC_V5PLUS_BITS,
- 	},
- 	{
- 		.name		= "H264/MVC Encoded Stream",
-@@ -79,7 +78,7 @@ static struct s5p_mfc_fmt formats[] = {
- 		.codec_mode	= S5P_MFC_CODEC_H264_MVC_DEC,
- 		.type		= MFC_FMT_DEC,
- 		.num_planes	= 1,
--		.versions	= MFC_V6_BIT | MFC_V7_BIT | MFC_V8_BIT,
-+		.versions	= MFC_V6PLUS_BITS,
- 	},
- 	{
- 		.name		= "H263 Encoded Stream",
-@@ -87,8 +86,7 @@ static struct s5p_mfc_fmt formats[] = {
- 		.codec_mode	= S5P_MFC_CODEC_H263_DEC,
- 		.type		= MFC_FMT_DEC,
- 		.num_planes	= 1,
--		.versions	= MFC_V5_BIT | MFC_V6_BIT | MFC_V7_BIT |
--								MFC_V8_BIT,
-+		.versions	= MFC_V5PLUS_BITS,
- 	},
- 	{
- 		.name		= "MPEG1 Encoded Stream",
-@@ -96,8 +94,7 @@ static struct s5p_mfc_fmt formats[] = {
- 		.codec_mode	= S5P_MFC_CODEC_MPEG2_DEC,
- 		.type		= MFC_FMT_DEC,
- 		.num_planes	= 1,
--		.versions	= MFC_V5_BIT | MFC_V6_BIT | MFC_V7_BIT |
--								MFC_V8_BIT,
-+		.versions	= MFC_V5PLUS_BITS,
- 	},
- 	{
- 		.name		= "MPEG2 Encoded Stream",
-@@ -105,8 +102,7 @@ static struct s5p_mfc_fmt formats[] = {
- 		.codec_mode	= S5P_MFC_CODEC_MPEG2_DEC,
- 		.type		= MFC_FMT_DEC,
- 		.num_planes	= 1,
--		.versions	= MFC_V5_BIT | MFC_V6_BIT | MFC_V7_BIT |
--								MFC_V8_BIT,
-+		.versions	= MFC_V5PLUS_BITS,
- 	},
- 	{
- 		.name		= "MPEG4 Encoded Stream",
-@@ -114,8 +110,7 @@ static struct s5p_mfc_fmt formats[] = {
- 		.codec_mode	= S5P_MFC_CODEC_MPEG4_DEC,
- 		.type		= MFC_FMT_DEC,
- 		.num_planes	= 1,
--		.versions	= MFC_V5_BIT | MFC_V6_BIT | MFC_V7_BIT |
--								MFC_V8_BIT,
-+		.versions	= MFC_V5PLUS_BITS,
- 	},
- 	{
- 		.name		= "XviD Encoded Stream",
-@@ -123,8 +118,7 @@ static struct s5p_mfc_fmt formats[] = {
- 		.codec_mode	= S5P_MFC_CODEC_MPEG4_DEC,
- 		.type		= MFC_FMT_DEC,
- 		.num_planes	= 1,
--		.versions	= MFC_V5_BIT | MFC_V6_BIT | MFC_V7_BIT |
--								MFC_V8_BIT,
-+		.versions	= MFC_V5PLUS_BITS,
- 	},
- 	{
- 		.name		= "VC1 Encoded Stream",
-@@ -132,8 +126,7 @@ static struct s5p_mfc_fmt formats[] = {
- 		.codec_mode	= S5P_MFC_CODEC_VC1_DEC,
- 		.type		= MFC_FMT_DEC,
- 		.num_planes	= 1,
--		.versions	= MFC_V5_BIT | MFC_V6_BIT | MFC_V7_BIT |
--								MFC_V8_BIT,
-+		.versions	= MFC_V5PLUS_BITS,
- 	},
- 	{
- 		.name		= "VC1 RCV Encoded Stream",
-@@ -141,8 +134,7 @@ static struct s5p_mfc_fmt formats[] = {
- 		.codec_mode	= S5P_MFC_CODEC_VC1RCV_DEC,
- 		.type		= MFC_FMT_DEC,
- 		.num_planes	= 1,
--		.versions	= MFC_V5_BIT | MFC_V6_BIT | MFC_V7_BIT |
--								MFC_V8_BIT,
-+		.versions	= MFC_V5PLUS_BITS,
- 	},
- 	{
- 		.name		= "VP8 Encoded Stream",
-@@ -150,7 +142,7 @@ static struct s5p_mfc_fmt formats[] = {
- 		.codec_mode	= S5P_MFC_CODEC_VP8_DEC,
- 		.type		= MFC_FMT_DEC,
- 		.num_planes	= 1,
--		.versions	= MFC_V6_BIT | MFC_V7_BIT | MFC_V8_BIT,
-+		.versions	= MFC_V6PLUS_BITS,
- 	},
- };
- 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-index 2a5fd7c..64b6b6d 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-@@ -57,8 +57,7 @@ static struct s5p_mfc_fmt formats[] = {
- 		.codec_mode	= S5P_MFC_CODEC_NONE,
- 		.type		= MFC_FMT_RAW,
- 		.num_planes	= 2,
--		.versions	= MFC_V5_BIT | MFC_V6_BIT | MFC_V7_BIT |
--								MFC_V8_BIT,
-+		.versions	= MFC_V5PLUS_BITS,
- 	},
- 	{
- 		.name		= "4:2:0 2 Planes Y/CrCb",
-@@ -66,7 +65,7 @@ static struct s5p_mfc_fmt formats[] = {
- 		.codec_mode	= S5P_MFC_CODEC_NONE,
- 		.type		= MFC_FMT_RAW,
- 		.num_planes	= 2,
--		.versions	= MFC_V6_BIT | MFC_V7_BIT | MFC_V8_BIT,
-+		.versions	= MFC_V6PLUS_BITS,
- 	},
- 	{
- 		.name		= "H264 Encoded Stream",
-@@ -74,8 +73,7 @@ static struct s5p_mfc_fmt formats[] = {
- 		.codec_mode	= S5P_MFC_CODEC_H264_ENC,
- 		.type		= MFC_FMT_ENC,
- 		.num_planes	= 1,
--		.versions	= MFC_V5_BIT | MFC_V6_BIT | MFC_V7_BIT |
--								MFC_V8_BIT,
-+		.versions	= MFC_V5PLUS_BITS,
- 	},
- 	{
- 		.name		= "MPEG4 Encoded Stream",
-@@ -83,8 +81,7 @@ static struct s5p_mfc_fmt formats[] = {
- 		.codec_mode	= S5P_MFC_CODEC_MPEG4_ENC,
- 		.type		= MFC_FMT_ENC,
- 		.num_planes	= 1,
--		.versions	= MFC_V5_BIT | MFC_V6_BIT | MFC_V7_BIT |
--								MFC_V8_BIT,
-+		.versions	= MFC_V5PLUS_BITS,
- 	},
- 	{
- 		.name		= "H263 Encoded Stream",
-@@ -92,8 +89,7 @@ static struct s5p_mfc_fmt formats[] = {
- 		.codec_mode	= S5P_MFC_CODEC_H263_ENC,
- 		.type		= MFC_FMT_ENC,
- 		.num_planes	= 1,
--		.versions	= MFC_V5_BIT | MFC_V6_BIT | MFC_V7_BIT |
--								MFC_V8_BIT,
-+		.versions	= MFC_V5PLUS_BITS,
- 	},
- 	{
- 		.name		= "VP8 Encoded Stream",
-@@ -101,7 +97,7 @@ static struct s5p_mfc_fmt formats[] = {
- 		.codec_mode	= S5P_MFC_CODEC_VP8_ENC,
- 		.type		= MFC_FMT_ENC,
- 		.num_planes	= 1,
--		.versions	= MFC_V7_BIT | MFC_V8_BIT,
-+		.versions	= MFC_V7PLUS_BITS,
- 	},
- };
+ #endif /*_REGS_MFC_V10_H*/
  
 diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-index fe14479..2041d81 100644
+index f1a8c53..83ea733 100644
 --- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
 +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-@@ -356,6 +356,7 @@ static int calc_plane(int width, int height)
- 
- static void s5p_mfc_dec_calc_dpb_size_v6(struct s5p_mfc_ctx *ctx)
+@@ -64,6 +64,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
  {
-+	struct s5p_mfc_dev *dev = ctx->dev;
- 	ctx->buf_width = ALIGN(ctx->img_width, S5P_FIMV_NV12MT_HALIGN_V6);
- 	ctx->buf_height = ALIGN(ctx->img_height, S5P_FIMV_NV12MT_VALIGN_V6);
- 	mfc_debug(2, "SEQ Done: Movie dimensions %dx%d,\n"
-@@ -372,8 +373,12 @@ static void s5p_mfc_dec_calc_dpb_size_v6(struct s5p_mfc_ctx *ctx)
+ 	struct s5p_mfc_dev *dev = ctx->dev;
+ 	unsigned int mb_width, mb_height;
++	unsigned int lcu_width = 0, lcu_height = 0;
+ 	int ret;
+ 
+ 	mb_width = MB_WIDTH(ctx->img_width);
+@@ -74,7 +75,9 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+ 			  ctx->luma_size, ctx->chroma_size, ctx->mv_size);
+ 		mfc_debug(2, "Totals bufs: %d\n", ctx->total_dpb_count);
+ 	} else if (ctx->type == MFCINST_ENCODER) {
+-		if (IS_MFCV8_PLUS(dev))
++		if (IS_MFCV10(dev)) {
++			ctx->tmv_buffer_size = 0;
++		} else if (IS_MFCV8_PLUS(dev))
+ 			ctx->tmv_buffer_size = S5P_FIMV_NUM_TMV_BUFFERS_V6 *
+ 			ALIGN(S5P_FIMV_TMV_BUFFER_SIZE_V8(mb_width, mb_height),
+ 			S5P_FIMV_TMV_BUFFER_ALIGN_V6);
+@@ -82,13 +85,36 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+ 			ctx->tmv_buffer_size = S5P_FIMV_NUM_TMV_BUFFERS_V6 *
+ 			ALIGN(S5P_FIMV_TMV_BUFFER_SIZE_V6(mb_width, mb_height),
+ 			S5P_FIMV_TMV_BUFFER_ALIGN_V6);
+-
+-		ctx->luma_dpb_size = ALIGN((mb_width * mb_height) *
+-				S5P_FIMV_LUMA_MB_TO_PIXEL_V6,
+-				S5P_FIMV_LUMA_DPB_BUFFER_ALIGN_V6);
+-		ctx->chroma_dpb_size = ALIGN((mb_width * mb_height) *
+-				S5P_FIMV_CHROMA_MB_TO_PIXEL_V6,
+-				S5P_FIMV_CHROMA_DPB_BUFFER_ALIGN_V6);
++		if (IS_MFCV10(dev)) {
++			lcu_width = enc_lcu_width(ctx->img_width);
++			lcu_height = enc_lcu_height(ctx->img_height);
++			if (ctx->codec_mode != S5P_FIMV_CODEC_HEVC_ENC) {
++				ctx->luma_dpb_size =
++					ALIGN((mb_width * 16), 64)
++					* ALIGN((mb_height * 16), 32)
++						+ 64;
++				ctx->chroma_dpb_size =
++					ALIGN((mb_width * 16), 64)
++							* (mb_height * 8)
++							+ 64;
++			} else {
++				ctx->luma_dpb_size =
++					ALIGN((lcu_width * 32), 64)
++					* ALIGN((lcu_height * 32), 32)
++						+ 64;
++				ctx->chroma_dpb_size =
++					ALIGN((lcu_width * 32), 64)
++							* (lcu_height * 16)
++							+ 64;
++			}
++		} else {
++			ctx->luma_dpb_size = ALIGN((mb_width * mb_height) *
++					S5P_FIMV_LUMA_MB_TO_PIXEL_V6,
++					S5P_FIMV_LUMA_DPB_BUFFER_ALIGN_V6);
++			ctx->chroma_dpb_size = ALIGN((mb_width * mb_height) *
++					S5P_FIMV_CHROMA_MB_TO_PIXEL_V6,
++					S5P_FIMV_CHROMA_DPB_BUFFER_ALIGN_V6);
++		}
+ 		if (IS_MFCV8_PLUS(dev))
+ 			ctx->me_buffer_size = ALIGN(S5P_FIMV_ME_BUFFER_SIZE_V8(
+ 						ctx->img_width, ctx->img_height,
+@@ -197,6 +223,8 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+ 	case S5P_MFC_CODEC_H264_ENC:
+ 		if (IS_MFCV10(dev)) {
+ 			mfc_debug(2, "Use min scratch buffer size\n");
++			ctx->me_buffer_size =
++			ALIGN(ENC_V100_H264_ME_SIZE(mb_width, mb_height), 16);
+ 		} else if (IS_MFCV8_PLUS(dev))
+ 			ctx->scratch_buf_size =
+ 				S5P_FIMV_SCRATCH_BUF_SIZE_H264_ENC_V8(
+@@ -219,6 +247,9 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+ 	case S5P_MFC_CODEC_H263_ENC:
+ 		if (IS_MFCV10(dev)) {
+ 			mfc_debug(2, "Use min scratch buffer size\n");
++			ctx->me_buffer_size =
++				ALIGN(ENC_V100_MPEG4_ME_SIZE(mb_width,
++							mb_height), 16);
+ 		} else
+ 			ctx->scratch_buf_size =
+ 				S5P_FIMV_SCRATCH_BUF_SIZE_MPEG4_ENC_V6(
+@@ -235,7 +266,10 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+ 	case S5P_MFC_CODEC_VP8_ENC:
+ 		if (IS_MFCV10(dev)) {
+ 			mfc_debug(2, "Use min scratch buffer size\n");
+-			} else if (IS_MFCV8_PLUS(dev))
++			ctx->me_buffer_size =
++				ALIGN(ENC_V100_VP8_ME_SIZE(mb_width, mb_height),
++						16);
++		} else if (IS_MFCV8_PLUS(dev))
+ 			ctx->scratch_buf_size =
+ 				S5P_FIMV_SCRATCH_BUF_SIZE_VP8_ENC_V8(
+ 					mb_width,
+@@ -393,13 +427,13 @@ static void s5p_mfc_dec_calc_dpb_size_v6(struct s5p_mfc_ctx *ctx)
  
  	if (ctx->codec_mode == S5P_MFC_CODEC_H264_DEC ||
  			ctx->codec_mode == S5P_MFC_CODEC_H264_MVC_DEC) {
--		ctx->mv_size = S5P_MFC_DEC_MV_SIZE_V6(ctx->img_width,
--				ctx->img_height);
-+		if (IS_MFCV10(dev))
-+			ctx->mv_size = S5P_MFC_DEC_MV_SIZE_V10(ctx->img_width,
-+					ctx->img_height);
-+		else
-+			ctx->mv_size = S5P_MFC_DEC_MV_SIZE_V6(ctx->img_width,
-+					ctx->img_height);
- 		ctx->mv_size = ALIGN(ctx->mv_size, 16);
+-		if (IS_MFCV10(dev))
++		if (IS_MFCV10(dev)) {
+ 			ctx->mv_size = S5P_MFC_DEC_MV_SIZE_V10(ctx->img_width,
+ 					ctx->img_height);
+-		else
++		} else {
+ 			ctx->mv_size = S5P_MFC_DEC_MV_SIZE_V6(ctx->img_width,
+ 					ctx->img_height);
+-		ctx->mv_size = ALIGN(ctx->mv_size, 16);
++		}
  	} else {
  		ctx->mv_size = 0;
+ 	}
+@@ -596,15 +630,34 @@ static int s5p_mfc_set_enc_ref_buffer_v6(struct s5p_mfc_ctx *ctx)
+ 
+ 	mfc_debug(2, "Buf1: %p (%d)\n", (void *)buf_addr1, buf_size1);
+ 
+-	for (i = 0; i < ctx->pb_count; i++) {
+-		writel(buf_addr1, mfc_regs->e_luma_dpb + (4 * i));
+-		buf_addr1 += ctx->luma_dpb_size;
+-		writel(buf_addr1, mfc_regs->e_chroma_dpb + (4 * i));
+-		buf_addr1 += ctx->chroma_dpb_size;
+-		writel(buf_addr1, mfc_regs->e_me_buffer + (4 * i));
+-		buf_addr1 += ctx->me_buffer_size;
+-		buf_size1 -= (ctx->luma_dpb_size + ctx->chroma_dpb_size +
+-			ctx->me_buffer_size);
++	if (IS_MFCV10(dev)) {
++		/* start address of per buffer is aligned */
++		for (i = 0; i < ctx->pb_count; i++) {
++			writel(buf_addr1, mfc_regs->e_luma_dpb + (4 * i));
++			buf_addr1 += ctx->luma_dpb_size;
++			buf_size1 -= ctx->luma_dpb_size;
++		}
++		for (i = 0; i < ctx->pb_count; i++) {
++			writel(buf_addr1, mfc_regs->e_chroma_dpb + (4 * i));
++			buf_addr1 += ctx->chroma_dpb_size;
++			buf_size1 -= ctx->chroma_dpb_size;
++		}
++		for (i = 0; i < ctx->pb_count; i++) {
++			writel(buf_addr1, mfc_regs->e_me_buffer + (4 * i));
++			buf_addr1 += ctx->me_buffer_size;
++			buf_size1 -= ctx->me_buffer_size;
++		}
++	} else {
++		for (i = 0; i < ctx->pb_count; i++) {
++			writel(buf_addr1, mfc_regs->e_luma_dpb + (4 * i));
++			buf_addr1 += ctx->luma_dpb_size;
++			writel(buf_addr1, mfc_regs->e_chroma_dpb + (4 * i));
++			buf_addr1 += ctx->chroma_dpb_size;
++			writel(buf_addr1, mfc_regs->e_me_buffer + (4 * i));
++			buf_addr1 += ctx->me_buffer_size;
++			buf_size1 -= (ctx->luma_dpb_size + ctx->chroma_dpb_size
++					+ ctx->me_buffer_size);
++		}
+ 	}
+ 
+ 	writel(buf_addr1, mfc_regs->e_scratch_buffer_addr);
 diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h
-index 8055848..021b8db 100644
+index 021b8db..975bbc5 100644
 --- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h
 +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h
-@@ -24,6 +24,8 @@
- #define MB_HEIGHT(y_size)		DIV_ROUND_UP(y_size, 16)
- #define S5P_MFC_DEC_MV_SIZE_V6(x, y)	(MB_WIDTH(x) * \
+@@ -26,6 +26,8 @@
  					(((MB_HEIGHT(y)+1)/2)*2) * 64 + 128)
-+#define S5P_MFC_DEC_MV_SIZE_V10(x, y)	(MB_WIDTH(x) * \
-+					(((MB_HEIGHT(y)+1)/2)*2) * 64 + 512)
+ #define S5P_MFC_DEC_MV_SIZE_V10(x, y)	(MB_WIDTH(x) * \
+ 					(((MB_HEIGHT(y)+1)/2)*2) * 64 + 512)
++#define enc_lcu_width(x_size)		DIV_ROUND_UP(x_size, 32)
++#define enc_lcu_height(y_size)		DIV_ROUND_UP(y_size, 32)
  
  /* Definition */
  #define ENC_MULTI_SLICE_MB_MAX		((1 << 30) - 1)
