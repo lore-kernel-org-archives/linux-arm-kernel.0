@@ -1,47 +1,113 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Mon, 19 Jun 2017 23:36:39 +0800
-Subject: [PATCH V2 2/2] timer: imx-tpm: add imx tpm timer support
-In-Reply-To: <2318694.E4xdUbedMD@ws-stein>
-References: <1497340725-26594-1-git-send-email-aisheng.dong@nxp.com>
- <1497340725-26594-3-git-send-email-aisheng.dong@nxp.com>
- <2318694.E4xdUbedMD@ws-stein>
-Message-ID: <20170619153638.GB8913@b29396-OptiPlex-7040>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 19 Jun 2017 16:38:32 +0100
+Subject: [RFC PATCH 07/33] irqchip/gic-v3-its: Macro-ize
+ its_send_single_command
+In-Reply-To: <44927f3a-a1db-f7b8-b9d6-53f0dd7a4ac0@redhat.com>
+References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
+ <1484648454-21216-8-git-send-email-marc.zyngier@arm.com>
+ <44927f3a-a1db-f7b8-b9d6-53f0dd7a4ac0@redhat.com>
+Message-ID: <87b7d718-6550-8ffd-38c6-d1ed990f0f5e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 13, 2017 at 10:19:47AM +0200, Alexander Stein wrote:
-> On Tuesday 13 June 2017 15:58:45, Dong Aisheng wrote:
-> > diff --git a/drivers/clocksource/timer-imx-tpm.c
-> > b/drivers/clocksource/timer-imx-tpm.c new file mode 100644
-> > index 0000000..940a4f75
-> > --- /dev/null
-> > +++ b/drivers/clocksource/timer-imx-tpm.c
-> > @@ -0,0 +1,227 @@
-> > [...]
-> > +static int tpm_set_next_event(unsigned long delta,
-> > +				struct clock_event_device *evt)
-> > +{
-> > +	unsigned long next, now;
-> > +
-> > +	next = readl(timer_base + TPM_CNT) + delta;
-> > +	writel(next, timer_base + TPM_C0V);
-> > +	now = readl(timer_base + TPM_CNT);
+On 17/02/17 06:15, Auger Eric wrote:
 > 
-> What about:
-> > now = readl(timer_base + TPM_CNT);
-> > next = now + delta;
-> > writel(next, timer_base + TPM_C0V);
-> > return 0;
 > 
-> > +	return (int)((next - now) <= 0) ? -ETIME : 0;
-> 
-> Can this error actually happen, even with your implementation?
+> On 17/01/2017 11:20, Marc Zyngier wrote:
+>> Most ITS commands do operate on a collection object, and require
+>> a SYNC command to be performed on that collection in order to
+>> guarantee the execution of the first command.
+>>
+>> With GICv4 ITS, another set of commands perform similar operations
+>> on a VPE object, and a VSYNC operations must be executed to guarantee
+>> their execution.
+>>
+>> Given the similarities (post a command, perform a synchronization
+>> operation on a sync object), it makes sense to reuse the same
+>> mechanism for both class of commands.
+>>
+>> Let's start with turning its_send_single_command into a huge macro
+>> that performs the bulk of the work, and a set of helpers that
+>> make this macro useeable for the GICv3 ITS commands.
+> s/useeable/usable
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  drivers/irqchip/irq-gic-v3-its.c | 82 ++++++++++++++++++++++------------------
+>>  1 file changed, 45 insertions(+), 37 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>> index 99f6130..520b764 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>> @@ -484,43 +484,51 @@ static void its_wait_for_range_completion(struct its_node *its,
+>>  	}
+>>  }
+>>  
+>> -static void its_send_single_command(struct its_node *its,
+>> -				    its_cmd_builder_t builder,
+>> -				    struct its_cmd_desc *desc)
+>> -{
+>> -	struct its_cmd_block *cmd, *sync_cmd, *next_cmd;
+>> -	struct its_collection *sync_col;
+>> -	unsigned long flags;
+>> -
+>> -	raw_spin_lock_irqsave(&its->lock, flags);
+>> -
+>> -	cmd = its_allocate_entry(its);
+>> -	if (!cmd) {		/* We're soooooo screewed... */
+>> -		pr_err_ratelimited("ITS can't allocate, dropping command\n");
+>> -		raw_spin_unlock_irqrestore(&its->lock, flags);
+>> -		return;
+>> -	}
+>> -	sync_col = builder(cmd, desc);
+>> -	its_flush_cmd(its, cmd);
+>> -
+>> -	if (sync_col) {
+>> -		sync_cmd = its_allocate_entry(its);
+>> -		if (!sync_cmd) {
+>> -			pr_err_ratelimited("ITS can't SYNC, skipping\n");
+>> -			goto post;
+>> -		}
+>> -		its_encode_cmd(sync_cmd, GITS_CMD_SYNC);
+>> -		its_encode_target(sync_cmd, sync_col->target_address);
+>> -		its_fixup_cmd(sync_cmd);
+>> -		its_flush_cmd(its, sync_cmd);
+>> -	}
+>> -
+>> -post:
+>> -	next_cmd = its_post_commands(its);
+>> -	raw_spin_unlock_irqrestore(&its->lock, flags);
+>> -
+>> -	its_wait_for_range_completion(its, cmd, next_cmd);
+>> -}
+>> +#define __its_send_single_cmd(name, buildtype, synctype, buildfn)	\
+>> +void name(struct its_node *its,						\
+>> +	  buildtype builder,						\
+>> +	  struct its_cmd_desc *desc)					\
+>> +{									\
+>> +	struct its_cmd_block *cmd, *sync_cmd, *next_cmd;		\
+>> +	synctype *sync_obj;						\
+>> +	unsigned long flags;						\
+>> +									\
+>> +	raw_spin_lock_irqsave(&its->lock, flags);			\
+>> +									\
+>> +	cmd = its_allocate_entry(its);					\
+> Not related to this patch but I see that its_allocate_entry can spin for
+> up to 1s waiting for the ITS queue to drain. What are the circumstances
+> that can cause this? Also isn't it an issue in that case to hold the
+> spinlock for so long?
 
-Yes, i did observe some -ETIME when testing with nanosleep or
-hrtimer during programing min_delta event, especially when system
-is high loading. e.g. run GPU stress test.
+here's how this can happen: SW has filled the queue with commands, and
+the queue doesn't drain. This is either the result of illegal commands
+(and the queue has stalled), or a HW bug (and the queue has stalled).
 
-Please also refer to another mail for details i just replied to Daniel.
+In either cases, there is not much you can do to rescue your system
+(although we could start to support the new stall model once actual
+implementations are available).
 
-Regards
-Dong Aisheng
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
