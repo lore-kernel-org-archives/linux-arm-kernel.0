@@ -1,106 +1,48 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 19 Jun 2017 12:10:52 +0200
-Subject: [PATCH v2] [media] mtk-mdp: Fix g_/s_selection capture/compose
- logic
-In-Reply-To: <1497866607.25194.14.camel@mtksdaap41>
-References: <1494556970-12278-1-git-send-email-minghsiu.tsai@mediatek.com>
- <a180f2fc-1dce-3630-ed48-25c247eff79a@xs4all.nl>
- <1497866607.25194.14.camel@mtksdaap41>
-Message-ID: <74fa6870-fc5e-13b2-a111-cf9f2e83034c@xs4all.nl>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Mon, 19 Jun 2017 12:11:23 +0200
+Subject: [PATCH] drm: exynos: hdmi: make of_device_ids const.
+In-Reply-To: <6012220ff3c7dad339686f411ff372e7897e60c4.1497863911.git.arvind.yadav.cs@gmail.com>
+References: <CGME20170619092447epcas2p39a32ae59d05f1bd14cd43b8bcd6f2463@epcas2p3.samsung.com>
+ <6012220ff3c7dad339686f411ff372e7897e60c4.1497863911.git.arvind.yadav.cs@gmail.com>
+Message-ID: <84a58fd2-989d-a982-66e9-c97e9d61c2f4@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/19/2017 12:03 PM, Minghsiu Tsai wrote:
-> Hi, Hans,
-> 
-> On Fri, 2017-06-16 at 12:42 +0200, Hans Verkuil wrote:
->> On 05/12/17 04:42, Minghsiu Tsai wrote:
->>> From: Daniel Kurtz <djkurtz@chromium.org>
->>>
->>> Experiments show that the:
->>>   (1) mtk-mdp uses the _MPLANE form of CAPTURE/OUTPUT
->>
->> Please drop this, since this no longer applies to this patch.
->>
-> 
-> I will remove it next version
-> 
-> 
->>>   (2) CAPTURE types use CROP targets, and OUTPUT types use COMPOSE targets
->>
->> Are you really certain about this?
->>
->> For m2m devices the output (i.e. memory to hardware) typically crops from memory
->> and the capture side (hardware to memory) composes into memory.
->>
->> I.e.: for the output side you crop the part of the memory buffer that you want
->> to process and on the capture side you compose the result into a memory buffer:
->> i.e. the memory buffer might be 1920x1080, but you compose the decoder output
->> into a rectangle of 640x480 at offset 128x128 within that buffer (just an example).
->>
->> CAPTURE using crop would be if, before the data is DMAed, the hardware decoder
->> output is cropped. E.g. if the stream fed to the decoder is 1920x1080, but you
->> want to only DMA a subselection of that, then that would be cropping, and it
->> would go to a memory buffer of the size of the crop selection.
->>
->> OUTPUT using compose is highly unlikely: that means that the frame you give
->> is composed in a larger internal buffer with generated border data around it.
->> Very rare and really only something that a compositor of some sort would do.
->>
-> 
-> That's strange. In v4l2-ioctl.c, v4l_g_crop()
-> OUTPUT is using COMPOSE
-> CAPTURE is using CROP
+On 19.06.2017 11:24, Arvind Yadav wrote:
+> of_device_ids are not supposed to change at runtime. All functions
+> working with of_device_ids provided by <linux/of.h> work with const
+> of_device_ids. So mark the non-const structs as const.
+>
+> File size before:
+>    text	   data	    bss	    dec	    hex	filename
+>   12294	   1192	      0	  13486	   34ae	drivers/gpu/drm/exynos/exynos_hdmi.o
+>
+> File size after constify hdmi_match_types.
+>    text	   data	    bss	    dec	    hex	filename
+>   13318	    176	      0	  13494	   34b6	drivers/gpu/drm/exynos/exynos_hdmi.o
+>
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 
-The old crop API can't be used with most (all?) codec drivers. Codec drivers do
-exactly the opposite of what the old crop API did.
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 
-It is the reason the selection API was created.
+ --
+Regards
+Andrzej
 
-The old crop API was written for SDTV receivers where the hardware would crop
-the received video. For output (rarely used) the hardware would compose the
-image into a larger (PAL or NTSC sizes) frame.
-
-Applications have to use the selection API to work with codec drivers. Just
-ignore the old crop ioctls, they are not suitable for such hardware.
-
-> 
-> static int v4l_g_crop(const struct v4l2_ioctl_ops *ops,
-> 				struct file *file, void *fh, void *arg)
-> ...
-> 	/* crop means compose for output devices */
-> 	if (V4L2_TYPE_IS_OUTPUT(p->type))
-> 		s.target = V4L2_SEL_TGT_COMPOSE_ACTIVE;
-> 	else
-> 		s.target = V4L2_SEL_TGT_CROP_ACTIVE;
-> 
-> 	ret = ops->vidioc_g_selection(file, fh, &s);
-> 
-> 
->> What exactly does the hardware do? Both for the encoder and for the decoder
->> case. Perhaps if I knew exactly what that is, then I can advise.
->>
-> 
-> NV12M/YUV420M/MT21 -> MDP -> NV12M/YUV420M
-> 
-> The usage would be like this:
-> For decoder:
-> decoder -> MT21 -> MDP -> NV12M/YUV420M
-> 
-> For encoder:
-> NV12M/YUV420M -> MDP -> NV12M/YUV420M -> encoder
-
-That doesn't help. Where in these two chains does the cropping (encoder) or
-composing (decoder) take place? I assume it is the DMA engine that read from
-a rectangle in the source buffer (encoder) or writes to a rectangle in the
-destination buffer (decoder).
-
-And in that case the current driver is correct.
-
-I wonder if the g/s_crop description in the V4L2 Specification should get a
-big fat warning that it doesn't apply to codec drivers and that the selection
-API should be used instead. A patch for that is welcome!
-
-Regards,
-
-	Hans
+> ---
+>  drivers/gpu/drm/exynos/exynos_hdmi.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
+> index 1ff6ab6..624c48d 100644
+> --- a/drivers/gpu/drm/exynos/exynos_hdmi.c
+> +++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
+> @@ -1683,7 +1683,7 @@ static int hdmi_resources_init(struct hdmi_context *hdata)
+>  	return hdmi_bridge_init(hdata);
+>  }
+>  
+> -static struct of_device_id hdmi_match_types[] = {
+> +static const struct of_device_id hdmi_match_types[] = {
+>  	{
+>  		.compatible = "samsung,exynos4210-hdmi",
+>  		.data = &exynos4210_hdmi_driver_data,
