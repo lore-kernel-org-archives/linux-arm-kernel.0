@@ -1,46 +1,39 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 22:37:07 -0700
-Subject: [GIT PULL] Qualcomm Driver updates for 4.13
-In-Reply-To: <1497383309-14226-4-git-send-email-andy.gross@linaro.org>
+Date: Sun, 18 Jun 2017 22:29:46 -0700
+Subject: [GIT PULL] Qualcomm Defconfig updates for 4.13
+In-Reply-To: <1497383309-14226-3-git-send-email-andy.gross@linaro.org>
 References: <1497383309-14226-1-git-send-email-andy.gross@linaro.org>
- <1497383309-14226-4-git-send-email-andy.gross@linaro.org>
-Message-ID: <20170619053707.GC7703@localhost>
+ <1497383309-14226-3-git-send-email-andy.gross@linaro.org>
+Message-ID: <20170619052946.GB7703@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
-
-On Tue, Jun 13, 2017 at 03:48:27PM -0400, Andy Gross wrote:
+On Tue, Jun 13, 2017 at 03:48:26PM -0400, Andy Gross wrote:
 > The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 > 
 >   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-4.13
+>   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-defconfig-for-4.13
 > 
-> for you to fetch changes up to d4348b43bbcadb6d5faee36024245944b6600d25:
+> for you to fetch changes up to 1d917530c9ed2585cf3ed7db933e85a41b45141f:
 > 
->   firmware: qcom_scm: Fix to allow COMPILE_TEST-ing (2017-06-09 16:15:10 -0500)
-> 
-> ----------------------------------------------------------------
-> Qualcomm ARM Based Driver Updates for v4.13
-> 
-> * Fix COMPILE_TEST flag for QCOM SCM
-> * Improve QCOM SMSM error handling
+>   ARM: qcom_defconfig: Enable IPQ4019 clock and pinctrl (2017-06-05 22:00:30 -0500)
 > 
 > ----------------------------------------------------------------
-> Jonathan Neusch??fer (1):
->       soc: qcom: smsm: Improve error handling, quiesce probe deferral
+> Qualcomm ARM Based defconfig Updates for v4.13
 > 
-> Stanimir Varbanov (1):
->       firmware: qcom_scm: Fix to allow COMPILE_TEST-ing
+> * Enable IPQ4019 clock and pinctrl
+> 
+> ----------------------------------------------------------------
+> Abhishek Sahu (1):
+>       ARM: qcom_defconfig: Enable IPQ4019 clock and pinctrl
+> 
+>  arch/arm/configs/qcom_defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
 
-This patch doesn't seem like it's doing the right thing -- I've replied to it
-on the list with comments.
-
-Not merged. Let me know if you want me to cherry-pick the other patch (or send
-a new pull request with just that one).
+Merged, thanks.
 
 
 -Olof
