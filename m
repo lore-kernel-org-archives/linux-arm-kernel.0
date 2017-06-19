@@ -1,31 +1,32 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 18:55:35 -0700
-Subject: [GIT PULL] two omap fixes for v4.12-rc cycle
-In-Reply-To: <5937f02e.1766ca0a.9ddce.eb58SMTPIN_ADDED_BROKEN@mx.google.com>
-References: <5937f02e.1766ca0a.9ddce.eb58SMTPIN_ADDED_BROKEN@mx.google.com>
-Message-ID: <20170619015535.GB30022@localhost>
+Date: Sun, 18 Jun 2017 18:56:21 -0700
+Subject: [GIT PULL 1/2] omap gpmc changes for v4.13
+In-Reply-To: <5937f0c8.4debca0a.53849.e49dSMTPIN_ADDED_BROKEN@mx.google.com>
+References: <5937f0c8.4debca0a.53849.e49dSMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <20170619015621.GC30022@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 07, 2017 at 05:23:01AM -0700, Tony Lindgren wrote:
-> The following changes since commit bca5238816939436d72ae6bab124c4b0641a3a99:
+On Wed, Jun 07, 2017 at 05:25:24AM -0700, Tony Lindgren wrote:
+> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 > 
->   ARM: dts: dra7: Reduce cpu thermal shutdown temperature (2017-05-17 06:51:38 -0700)
+>   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.12/fixes-sl50
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.13/gpmc-signed
 > 
-> for you to fetch changes up to db145db99f5bf30acc12d7450b9ad0707072a7be:
+> for you to fetch changes up to c9eabf40d91b4fe954efe380d88590d933baa06d:
 > 
->   ARM: dts: am335x-sl50: Fix cannot claim requested pins for spi0 (2017-05-26 08:25:42 -0700)
+>   memory: omap-gpmc: add error message if bank-width property is absent (2017-05-31 10:08:10 -0700)
 > 
 > ----------------------------------------------------------------
-> Two fixes for am335x-sl50 to fix a boot time error
-> for claiming SPI pins, and to fix a SDIO card detect
-> pin for production version of the device.
+> Few improvments for GPMC (General Purpose Memory Controller)
+> found on TI SoCs to produce an error for missing bank-width
+> and to make the bootloader timing debug output usable for
+> device tree timings.
 
-Thanks, merged.
+Thanks, merged into next/drivers.
 
 
 -Olof
