@@ -1,15 +1,17 @@
 From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Mon, 19 Jun 2017 04:09:49 +0200
-Subject: [PATCH v4 21/28] ARM: dts: s500: Set CPU enable-method
-In-Reply-To: <20170606005426.26446-22-afaerber@suse.de>
+Date: Mon, 19 Jun 2017 04:11:12 +0200
+Subject: [PATCH v4 20/28] ARM: owl: Implement CPU enable-method for S500
+In-Reply-To: <20170606005426.26446-21-afaerber@suse.de>
 References: <20170606005426.26446-1-afaerber@suse.de>
- <20170606005426.26446-22-afaerber@suse.de>
-Message-ID: <f5904acc-7d23-39c0-d6bc-8077e9884915@suse.de>
+ <20170606005426.26446-21-afaerber@suse.de>
+Message-ID: <318d4687-64e6-764b-92e4-614ef056cc88@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Am 06.06.2017 um 02:54 schrieb Andreas F?rber:
-> Use a custom S500 enable-method for all CPUs.
+> Allow to bring up CPU1.
+> 
+> Based on LeMaker linux-actions tree.
 > 
 > Signed-off-by: Andreas F?rber <afaerber@suse.de>
 > ---
@@ -17,12 +19,16 @@ Am 06.06.2017 um 02:54 schrieb Andreas F?rber:
 >  
 >  v3: new
 >  
->  arch/arm/boot/dts/s500.dtsi | 4 ++++
->  1 file changed, 4 insertions(+)
+>  arch/arm/mach-actions/Makefile  |   3 +
+>  arch/arm/mach-actions/headsmp.S |  68 ++++++++++++++++
+>  arch/arm/mach-actions/platsmp.c | 166 ++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 237 insertions(+)
+>  create mode 100644 arch/arm/mach-actions/headsmp.S
+>  create mode 100644 arch/arm/mach-actions/platsmp.c
 
-Applied to linux-actions.git v4.13/dt branch:
+Applied to linux-actions.git v4.13/arm branch:
 
-https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.13/dt
+https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.13/arm
 
 Regards,
 Andreas
