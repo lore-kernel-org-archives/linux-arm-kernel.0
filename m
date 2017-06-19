@@ -1,82 +1,57 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 19 Jun 2017 18:31:10 +0200
-Subject: [PATCH 2/2] drm/exynos/decon: Move headers from global to local place
-In-Reply-To: <20170619163110.28173-1-krzk@kernel.org>
-References: <20170619163110.28173-1-krzk@kernel.org>
-Message-ID: <20170619163110.28173-2-krzk@kernel.org>
+From: philippe.cornu@st.com (Philippe CORNU)
+Date: Mon, 19 Jun 2017 18:28:01 +0200
+Subject: [PATCH v4 2/6] dt-bindings: display: Add Synopsys DW MIPI DSI DRM
+ bridge driver
+In-Reply-To: <1497889685-27349-1-git-send-email-philippe.cornu@st.com>
+References: <1497889685-27349-1-git-send-email-philippe.cornu@st.com>
+Message-ID: <1497889685-27349-3-git-send-email-philippe.cornu@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DECON headers contain only defines for registers.  There are no
-other drivers using them so this should be put locally to the Exynos DRM
-driver.  Keeping headers local helps managing the code.
+This patch adds documentation of device tree bindings for the
+Synopsys DesignWare MIPI DSI host DRM bridge driver.
 
-Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
 ---
- drivers/gpu/drm/exynos/exynos5433_drm_decon.c                          | 3 +--
- drivers/gpu/drm/exynos/exynos7_drm_decon.c                             | 2 +-
- .../exynos5433_decon.h => drivers/gpu/drm/exynos/regs-decon5433.h      | 0
- include/video/exynos7_decon.h => drivers/gpu/drm/exynos/regs-decon7.h  | 3 +--
- 4 files changed, 3 insertions(+), 5 deletions(-)
- rename include/video/exynos5433_decon.h => drivers/gpu/drm/exynos/regs-decon5433.h (100%)
- rename include/video/exynos7_decon.h => drivers/gpu/drm/exynos/regs-decon7.h (99%)
+ .../bindings/display/bridge/dw_mipi_dsi.txt        | 30 ++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
 
-diff --git a/drivers/gpu/drm/exynos/exynos5433_drm_decon.c b/drivers/gpu/drm/exynos/exynos5433_drm_decon.c
-index 5792ca88ab7a..5aca8c16f2bc 100644
---- a/drivers/gpu/drm/exynos/exynos5433_drm_decon.c
-+++ b/drivers/gpu/drm/exynos/exynos5433_drm_decon.c
-@@ -19,13 +19,12 @@
- #include <linux/pm_runtime.h>
- #include <linux/regmap.h>
- 
--#include <video/exynos5433_decon.h>
--
- #include "exynos_drm_drv.h"
- #include "exynos_drm_crtc.h"
- #include "exynos_drm_fb.h"
- #include "exynos_drm_plane.h"
- #include "exynos_drm_iommu.h"
-+#include "regs-decon5433.h"
- 
- #define DSD_CFG_MUX 0x1004
- #define DSD_CFG_MUX_TE_UNMASK_GLOBAL BIT(13)
-diff --git a/drivers/gpu/drm/exynos/exynos7_drm_decon.c b/drivers/gpu/drm/exynos/exynos7_drm_decon.c
-index 3e88269fdc2e..387e436c97d2 100644
---- a/drivers/gpu/drm/exynos/exynos7_drm_decon.c
-+++ b/drivers/gpu/drm/exynos/exynos7_drm_decon.c
-@@ -25,13 +25,13 @@
- 
- #include <video/of_display_timing.h>
- #include <video/of_videomode.h>
--#include <video/exynos7_decon.h>
- 
- #include "exynos_drm_crtc.h"
- #include "exynos_drm_plane.h"
- #include "exynos_drm_drv.h"
- #include "exynos_drm_fb.h"
- #include "exynos_drm_iommu.h"
-+#include "regs-decon7.h"
- 
- /*
-  * DECON stands for Display and Enhancement controller.
-diff --git a/include/video/exynos5433_decon.h b/drivers/gpu/drm/exynos/regs-decon5433.h
-similarity index 100%
-rename from include/video/exynos5433_decon.h
-rename to drivers/gpu/drm/exynos/regs-decon5433.h
-diff --git a/include/video/exynos7_decon.h b/drivers/gpu/drm/exynos/regs-decon7.h
-similarity index 99%
-rename from include/video/exynos7_decon.h
-rename to drivers/gpu/drm/exynos/regs-decon7.h
-index d28829659a17..8fe4c44f12f3 100644
---- a/include/video/exynos7_decon.h
-+++ b/drivers/gpu/drm/exynos/regs-decon7.h
-@@ -1,5 +1,4 @@
--/* include/video/exynos7_decon.h
-- *
-+/*
-  * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-  * Author: Ajay Kumar <ajaykumar.rs@samsung.com>
-  *
+diff --git a/Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt b/Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
+new file mode 100644
+index 0000000..0ba2eb9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
+@@ -0,0 +1,30 @@
++Synopsys DesignWare MIPI DSI host controller
++============================================
++
++This document defines device tree properties for the Synopsys DesignWare MIPI
++DSI host controller. It doesn't constitue a device tree binding specification
++by itself but is meant to be referenced by platform-specific device tree
++bindings.
++
++When referenced from platform device tree bindings the properties defined in
++this document are defined as follows. The platform device tree bindings are
++responsible for defining whether each optional property is used or not.
++
++- reg: Memory mapped base address and length of the DesignWare MIPI DSI
++  host controller registers. (mandatory)
++
++- clocks: References to all the clocks specified in the clock-names property
++  as specified in [1]. (mandatory)
++
++- clock-names: "pclk" is peripheral clock for either AHB and APB. (mandatory)
++
++- resets: References to all the resets specified in the reset-names property
++  as specified in [2]. (optional)
++
++- reset-names: string reset name, must be "apb" if used. (optional)
++
++- panel or bridge node: see [3]. (mandatory)
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++[2] Documentation/devicetree/bindings/reset/reset.txt
++[3] Documentation/devicetree/bindings/display/mipi-dsi-bus.txt
 -- 
-2.9.3
+1.9.1
