@@ -1,79 +1,69 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 19 Jun 2017 10:43:05 +0200
-Subject: [PATCH v5 0/4] tty/serial: meson_uart: add support for core clock
- handling
-In-Reply-To: <1497428957-19942-1-git-send-email-narmstrong@baylibre.com>
-References: <1497428957-19942-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <f4179b26-54fc-30ee-2d8d-7659349ccb74@baylibre.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Mon, 19 Jun 2017 09:33:49 +0100
+Subject: [GIT PULL v2] arm64: dts: hisilicon dts updates for v4.13
+In-Reply-To: <20170619035739.GC30022@localhost>
+References: <5942EA83.6040907@hisilicon.com> <5943F06D.7000305@hisilicon.com>
+ <20170619035739.GC30022@localhost>
+Message-ID: <59478C6D.6070702@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14/2017 10:29 AM, Neil Armstrong wrote:
-> This patchset is a re-spin of Helmut Klein's v3 patchset at [0] and the v4 patchset at [1].
-> 
-> Initially, the original patchset was made to enable usage on the non-AO UARTS
-> not enabled by the Bootloader (uart_B and uart_C), but the patchset needed
-> an overall change to have clean and stable DT bindings.
-> 
-> The Amlogic Meson UART Driver did not have stable DT bindings and mismatched
-> clock handling on non-AO UARTs since these "EE" UARTs needs a clock gate to
-> be ungated to works correctly.
-> In the same way, the AO UARTs does not need gating and can be used as
-> Early Consoles.
-> 
-> In the same time, the UART Interfaces can take clock input for the baudrate
-> generate from either the external Xtal or the internal Bus Clock (clk81).
-> 
-> So new bindings was necessary to meet these requirements and the DT
-> maintainers requirements.
-> 
-> The "legacy" binding actually used in the driver is left until all the DT
-> files are switched to the new bindings.
-> 
-> The GX DT has been tested, but the last 4 Meson6/Meson8/b are only
-> compile-tested, and testing is welcome.
-> Thus only the first 3 patches can be merged until the Meson6/Meson8/b are
-> formally tested.
-> 
-> It must be noted that the meson6 cannot work today except using an early
-> console since the UART driver could not probe without a clocks property.
-> 
-> Changes since v4 at [1]:
->  - Droped meson8/meson8b DT patches
->  - Fixes copy/paste error in patch 2
->  - Refactored clock probing in patch 2
->  - merged meson6 patches together to avoid breaking bisect
-> 
-> [0] http://lkml.kernel.org/r/20170331165437.26227-1-hgkr.klein at gmail.com
-> [1] http://lkml.kernel.org/r/1497001756-942-1-git-send-email-narmstrong at baylibre.com
-> 
-> Helmut Klein (3):
->   dt-bindings: serial: Add bindings for the Amlogic Meson UARTs
->   tty/serial: meson_uart: update to stable bindings
->   ARM64: dts: meson-gx: use stable UART bindings with correct gate clock
-> 
-> Neil Armstrong (1):
->   ARM: dts: meson6: use stable UART bindings
-> 
->  .../bindings/serial/amlogic,meson-uart.txt         | 38 +++++++++
->  arch/arm/boot/dts/meson.dtsi                       |  8 +-
->  arch/arm/boot/dts/meson6.dtsi                      | 28 +++++++
->  arch/arm64/boot/dts/amlogic/meson-gx.dtsi          | 12 ++-
->  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 25 ++++++
->  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         | 25 ++++++
->  drivers/tty/serial/meson_uart.c                    | 90 ++++++++++++++++++++--
->  7 files changed, 209 insertions(+), 17 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/serial/amlogic,meson-uart.txt
-> 
+Hi Olof,
 
+On 2017/6/19 4:57, Olof Johansson wrote:
+> On Fri, Jun 16, 2017 at 03:51:25PM +0100, Wei Xu wrote:
+>> Hi Arnd, Hi Olof, Hi Kevin,
+>>
+>> Please help to pull the following changes.
+>> Thanks!
+>>
+>> And the patch "arm64: dts: hi6220: Add k3-dma and i2s/hdmi audio support"
+>> depends on audio-graph-card that will be landed on 4.13.
+>> But the dts part is checked without any warning and can be compiled.
+>>
+>> Best Regards,
+>> Wei
+>>
+>> ---
+>>
+>> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+>>
+>>   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.13-v2
+>>
+>> for you to fetch changes up to 0cf6a8e2fb8413b581fc0d960f7831b0e7583406:
+>>
+>>   arm64: dts: hi6220: Add k3-dma and i2s/hdmi audio support (2017-06-16 15:31:21 +0100)
+>>
+>> ----------------------------------------------------------------
+>> ARM64: DT: Hisilicon SoC DT updates for 4.13
+>>
+>> - Add and update Hi3660-Hikey960 board, Hi3660 PCIe RC, Hi6421v530 MFD and
+>>   Hi3660 MMC binding
+>> - Add and refine devices support for Hi3660-Hikey 960 including clock, reset,
+>>   I2C, GPIO, UART, Bluetooth, RTC, Power Key, LED, SPI, timer, PMIC, regulator,
+>>   sd/sdio and WiFi
+>> - Add k3-dma and i2s/hdmi audio support based on audio-card-graph method for
+>>   Hikey board
+> 
+> Merged, thanks!
 
-Hi Greg,
+Thanks!
 
-Patches 3 & 4 will need a respin to avoid breaking compatibility with old kernel
-like the tty patch does by keeping the legacy compatible string.
-I will re-send then in a separate thread and Kevin will handle them.
+Best Regards,
+Wei
 
-Patches 1 & 2 can be taken if they are OK for you.
-
-Thanks,
-Neil
+> 
+> 
+> -Olof
+> 
+> _______________________________________________
+> linuxarm mailing list
+> linuxarm at huawei.com
+> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
+> 
+> .
+> 
