@@ -1,96 +1,64 @@
-From: maitysanchayan@gmail.com (Sanchayan)
-Date: Mon, 19 Jun 2017 10:43:38 +0530
-Subject: [RFC PATCH 0/3] provide imx rproc driver
-In-Reply-To: <20170614204855.18347-1-o.rempel@pengutronix.de>
-References: <20170614204855.18347-1-o.rempel@pengutronix.de>
-Message-ID: <20170619051338.GA3064@Sanchayan-Arch>
+From: smitha.t@samsung.com (Smitha T Murthy)
+Date: Mon, 19 Jun 2017 10:40:43 +0530
+Subject: [Patch v5 00/12] Add MFC v10.10 support
+References: <CGME20170619052453epcas1p426ebca32768cee57390f39b53d835e81@epcas1p4.samsung.com>
+Message-ID: <1497849055-26583-1-git-send-email-smitha.t@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Oleksij,
+This patch series adds MFC v10.10 support. MFC v10.10 is used in some  
+of Exynos7 variants.
 
-On 17-06-14 22:48:52, Oleksij Rempel wrote:
-> Hallo all,
-> 
-> this is RFC patchset to provide remoteproc functionality on
-> imx7d SoC.
-> Since current kernel do not have devicetrees for board which
-> I used for testing, this RFC patchset includes this too.
-> 
-> For testing I used this simple counter written in ASM:
-> ======================================
->         .syntax unified
->         .text
->         .thumb
->         .int 0x10020000                 @ Initial SP value
->         .int reset + 1
-> 
-> reset:
-> 
->         mov     r0, #0x55
->         ldr     r1, =(0x40)
-> 1:
->         str     r0, [r1]
->         add     r0, 1
->         b       1b
-> 
->         /* Dummy data, required by remoteproc loader */
->         /* Please FIXME, this part seem to be incorrect */
->         .data
->         .section .resource_table, "aw"
->         .word   1, 0, 0, 0      /* struct resource_table base */
->         .word   0               /* uint32_t offset[1] */
-> ============================================================
-> compiled with:
-> ${CROSS}as -o imx7m4.o imx7m4.S
-> ${CROSS}ld -Ttext=0x0 -o imx7m4.elf imx7m4.o
-> cp imx7m4.elf /srv/nfs/sid-armhf/lib/firmware/rproc-imx_rproc-fw
-> 
-> Functionality was confirmed with current OpenOCD master.
-> OpenOCD cfg file can be found here:
-> https://github.com/olerem/openocd/blob/imx7-2017.06.14/tcl/target/imx7.cfg
-> 
-> Comment and suggestions are welcome.
+This adds support for following:
 
-Have you by chance also tried testing this with FreeRTOS code running on the
-M4 side?
+* Add support for HEVC encoder and decoder
+* Add support for VP9 decoder
+* Update Documentation for control id definitions
+* Update computation of min scratch buffer size requirement for V8 onwards
 
-Regards,
-Sanchayan.
+Changes since v4:
+ - Addressed review comments by Sylwester Nawrocki.
+ - Addressed review comments by Hans Verkuil.
+ - Rebased on latest git://linuxtv.org/snawrocki/samsung.git
+   for-v4.13/media/next and for-v4.12/media/next-2 branches,
+   the same series of patches applies on both branches.
+ - Applied r-o-b from Andrzej on respective patches.
+ - Built and checked the Documentation.
 
-> 
-> Regards,
-> Oleksij
-> 
-> Oleksij Rempel (3):
->   ARM: dts: imx7d: add imx7d-phyboard-zeta
->   remoteproc: imx_rproc: add a NXP/Freescale imx rproc driver
->   ARM: dts: imx7s: add rproc node
-> 
->  arch/arm/boot/dts/Makefile                |   1 +
->  arch/arm/boot/dts/imx7d-pba-c-09.dtsi     | 272 ++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/imx7d-peb-av-02.dtsi    | 104 ++++++++++++
->  arch/arm/boot/dts/imx7d-peb-eval-02.dtsi  | 130 ++++++++++++++
->  arch/arm/boot/dts/imx7d-phyboard-zeta.dts | 144 ++++++++++++++++
->  arch/arm/boot/dts/imx7d-phycore-som.dtsi  | 272 ++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/imx7d-pinfunc-lpsr.h    |  76 +++++++++
->  arch/arm/boot/dts/imx7s.dtsi              |   9 +
->  drivers/remoteproc/Kconfig                |   8 +
->  drivers/remoteproc/Makefile               |   1 +
->  drivers/remoteproc/imx_rproc.c            | 264 +++++++++++++++++++++++++++++
->  11 files changed, 1281 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx7d-pba-c-09.dtsi
->  create mode 100644 arch/arm/boot/dts/imx7d-peb-av-02.dtsi
->  create mode 100644 arch/arm/boot/dts/imx7d-peb-eval-02.dtsi
->  create mode 100644 arch/arm/boot/dts/imx7d-phyboard-zeta.dts
->  create mode 100644 arch/arm/boot/dts/imx7d-phycore-som.dtsi
->  create mode 100644 arch/arm/boot/dts/imx7d-pinfunc-lpsr.h
->  create mode 100644 drivers/remoteproc/imx_rproc.c
-> 
-> -- 
-> 2.11.0
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-remoteproc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Smitha T Murthy (12):
+  [media] s5p-mfc: Rename IS_MFCV8 macro
+  [media] s5p-mfc: Adding initial support for MFC v10.10
+  [media] s5p-mfc: Use min scratch buffer size as provided by F/W
+  [media] s5p-mfc: Support MFCv10.10 buffer requirements
+  [media] videodev2.h: Add v4l2 definition for HEVC
+  [media] v4l2-ioctl: add HEVC format description
+  Documentation: v4l: Documentation for HEVC v4l2 definition
+  [media] s5p-mfc: Add support for HEVC decoder
+  [media] s5p-mfc: Add VP9 decoder support
+  [media] v4l2: Add v4l2 control IDs for HEVC encoder
+  [media] s5p-mfc: Add support for HEVC encoder
+  Documention: v4l: Documentation for HEVC CIDs
+
+ .../devicetree/bindings/media/s5p-mfc.txt          |   1 +
+ Documentation/media/uapi/v4l/extended-controls.rst | 364 ++++++++++++++
+ Documentation/media/uapi/v4l/pixfmt-013.rst        |   5 +
+ drivers/media/platform/s5p-mfc/regs-mfc-v10.h      |  88 ++++
+ drivers/media/platform/s5p-mfc/regs-mfc-v8.h       |   2 +
+ drivers/media/platform/s5p-mfc/s5p_mfc.c           |  28 ++
+ drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c    |   9 +
+ drivers/media/platform/s5p-mfc/s5p_mfc_common.h    |  67 ++-
+ drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c      |   6 +-
+ drivers/media/platform/s5p-mfc/s5p_mfc_dec.c       |  48 +-
+ drivers/media/platform/s5p-mfc/s5p_mfc_enc.c       | 542 ++++++++++++++++++++-
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr.h       |  14 +
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c    | 383 +++++++++++++--
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h    |  15 +
+ drivers/media/v4l2-core/v4l2-ctrls.c               | 103 ++++
+ drivers/media/v4l2-core/v4l2-ioctl.c               |   1 +
+ include/uapi/linux/v4l2-controls.h                 |  84 ++++
+ include/uapi/linux/videodev2.h                     |   1 +
+ 18 files changed, 1684 insertions(+), 77 deletions(-)
+ create mode 100644 drivers/media/platform/s5p-mfc/regs-mfc-v10.h
+
+-- 
+2.7.4
