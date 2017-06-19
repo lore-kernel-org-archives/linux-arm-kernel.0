@@ -1,72 +1,39 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Mon, 19 Jun 2017 07:02:41 +0200
-Subject: [PATCH v5 2/6] ARM: imx6: register pm_power_off handler if "fsl,
- pmic-stby-poweroff" is set
-In-Reply-To: <20170619050245.2632-1-o.rempel@pengutronix.de>
-References: <20170619050245.2632-1-o.rempel@pengutronix.de>
-Message-ID: <20170619050245.2632-3-o.rempel@pengutronix.de>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Mon, 19 Jun 2017 10:38:54 +0530
+Subject: [PATCH] soc: ti: knav_dma: make of_device_ids const.
+Message-ID: <1045459264f851ecf3ea8d21bc1594dec79eb337.1497848604.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One of the Freescale recommended sequences for power off with external
-PMIC is the following:
-...
-3.  SoC is programming PMIC for power off when standby is asserted.
-4.  In CCM STOP mode, Standby is asserted, PMIC gates SoC supplies.
+of_device_ids are not supposed to change at runtime. All functions
+working with of_device_ids provided by <linux/of.h> work with const
+of_device_ids. So mark the non-const structs as const.
 
-See:
-http://www.nxp.com/assets/documents/data/en/reference-manuals/IMX6DQRM.pdf
-page 5083
+File size before:
+   text	   data	    bss	    dec	    hex	filename
+   2234	    608	      8	   2850	    b22	drivers/soc/ti/knav_dma.o
 
-This patch implements step 4. of this sequence.
+File size after constify keystone_qmss_of_match.
+   text	   data	    bss	    dec	    hex	filename
+   2650	    192	      8	   2850	    b22	drivers/soc/ti/knav_dma.o
 
-Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
- arch/arm/mach-imx/pm-imx6.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ drivers/soc/ti/knav_dma.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
-index e61b1d1027e1..cb76832935f0 100644
---- a/arch/arm/mach-imx/pm-imx6.c
-+++ b/arch/arm/mach-imx/pm-imx6.c
-@@ -602,6 +602,28 @@ static void __init imx6_pm_common_init(const struct imx6_pm_socdata
- 				   IMX6Q_GPR1_GINT);
+diff --git a/drivers/soc/ti/knav_dma.c b/drivers/soc/ti/knav_dma.c
+index ecebe2e..c8d1e3c 100644
+--- a/drivers/soc/ti/knav_dma.c
++++ b/drivers/soc/ti/knav_dma.c
+@@ -791,7 +791,7 @@ static int knav_dma_remove(struct platform_device *pdev)
+ 	return 0;
  }
  
-+static void imx6_pm_poweroff(void)
-+{
-+	imx6_set_lpm(STOP_POWER_OFF);
-+	cpu_suspend(0, imx6q_suspend_finish);
-+
-+	mdelay(1000);
-+
-+	pr_emerg("Unable to poweroff system\n");
-+}
-+
-+static int imx6_pm_poweroff_probe(void)
-+{
-+	if (pm_power_off) {
-+		pr_warn("%s: pm_power_off already claimed  %p %pf!\n",
-+			__func__, pm_power_off, pm_power_off);
-+		return -EBUSY;
-+	}
-+
-+	pm_power_off = imx6_pm_poweroff;
-+	return 0;
-+}
-+
- void __init imx6_pm_ccm_init(const char *ccm_compat)
- {
- 	struct device_node *np;
-@@ -618,6 +640,9 @@ void __init imx6_pm_ccm_init(const char *ccm_compat)
- 	val = readl_relaxed(ccm_base + CLPCR);
- 	val &= ~BM_CLPCR_LPM;
- 	writel_relaxed(val, ccm_base + CLPCR);
-+
-+	if (of_property_read_bool(np, "fsl,pmic-stby-poweroff"))
-+		imx6_pm_poweroff_probe();
- }
- 
- void __init imx6q_pm_init(void)
+-static struct of_device_id of_match[] = {
++static const struct of_device_id of_match[] = {
+ 	{ .compatible = "ti,keystone-navigator-dma", },
+ 	{},
+ };
 -- 
-2.11.0
+1.9.1
