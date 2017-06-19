@@ -1,35 +1,40 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 19:08:57 -0700
-Subject: [GIT PULL 3/3] Rockchip soc32 updates for 4.13 part1
-In-Reply-To: <6711954.Z0p86Q0GiD@phil>
-References: <2090243.QTRV0U63fj@phil>
- <6711954.Z0p86Q0GiD@phil>
-Message-ID: <20170619020857.GN30022@localhost>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Mon, 19 Jun 2017 05:57:59 +0200
+Subject: [PATCH v5 20/26] dt-bindings: power: Add Owl SPS power domains
+In-Reply-To: <20170619033626.5583-1-afaerber@suse.de>
+References: <20170606005426.26446-23-afaerber@suse.de>
+ <20170619033626.5583-1-afaerber@suse.de>
+Message-ID: <4a4cd31c-1d10-21d4-5f44-aa167dfab23c@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 09, 2017 at 12:15:36PM +0200, Heiko Stuebner wrote:
-> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+Am 19.06.2017 um 05:36 schrieb Andreas F?rber:
+> Define power domains for all non-reserved S500 power gates.
 > 
->   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.13-rockchip-soc32-1
-> 
-> for you to fetch changes up to 51f6bfc78beaaa4c42bd2ab394e2550285caab0c:
-> 
->   ARM: rockchip: enable support for RV1108 SoC (2017-05-14 00:38:27 +0200)
-> 
-> ----------------------------------------------------------------
-> Add support for the RV1108 and its debug uart
-> 
-> ----------------------------------------------------------------
-> Andy Yan (2):
->       ARM: debug: add low level debug uart for rv1108
->       ARM: rockchip: enable support for RV1108 SoC
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  v4 -> v5:
+>  * Renamed header file with owl- prefix for uniqueness
+>  
+>  v3 -> v4: Unchanged
+>  
+>  v3: new
+>  
+>  .../devicetree/bindings/power/actions,owl-sps.txt     | 17 +++++++++++++++++
+>  include/dt-bindings/power/owl-s500-powergate.h        | 19 +++++++++++++++++++
+>  2 files changed, 36 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/power/actions,owl-sps.txt
+>  create mode 100644 include/dt-bindings/power/owl-s500-powergate.h
 
-Merged, thanks.
+Due to include dependency applying to linux-actions.git v4.13/soc:
 
+https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.13/soc
 
--Olof
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
