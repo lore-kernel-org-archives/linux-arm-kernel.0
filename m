@@ -1,29 +1,78 @@
 From: thor.thayer@linux.intel.com (thor.thayer at linux.intel.com)
-Date: Mon, 19 Jun 2017 15:36:55 -0500
-Subject: [PATCHv4 0/3] Add Altera I2C Controller Driver
-Message-ID: <1497904618-27010-1-git-send-email-thor.thayer@linux.intel.com>
+Date: Mon, 19 Jun 2017 15:36:57 -0500
+Subject: [PATCHv4 2/3] dt-bindings: i2c: Add Altera I2C Controller
+In-Reply-To: <1497904618-27010-1-git-send-email-thor.thayer@linux.intel.com>
+References: <1497904618-27010-1-git-send-email-thor.thayer@linux.intel.com>
+Message-ID: <1497904618-27010-3-git-send-email-thor.thayer@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thor Thayer <thor.thayer@linux.intel.com>
 
-This patch series adds the Altera I2C Controller driver for use in FPGAs.
-The device tree patch was removed in this version because this I2C is not
-the default I2C master.
+Add the documentation to support the Altera synthesizable
+logic I2C Controller in FPGA.
 
-Thor Thayer (3):
-  MAINTAINERS: Add Altera I2C Controller Driver
-  dt-bindings: i2c: Add Altera I2C Controller
-  i2c: altera: Add Altera I2C Controller driver
-
- .../devicetree/bindings/i2c/i2c-altera.txt         |  39 ++
- MAINTAINERS                                        |   5 +
- drivers/i2c/busses/Kconfig                         |  10 +
- drivers/i2c/busses/Makefile                        |   1 +
- drivers/i2c/busses/i2c-altera.c                    | 511 +++++++++++++++++++++
- 5 files changed, 566 insertions(+)
+Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+v2  Change the subject to identify dt-bindings
+    Add synthesizable logic to description.
+    Change compatible string to "altr,softip-i2c"
+    Make description of clock phandle singular since 1 clock.
+    Remove altr, from fifo-size
+    Specify fifo-size is in bytes.
+v3  Add version to compatible string "altr,softip-i2c-v1.0"
+    Add for use in FPGA in description.
+v4  No Change - Add Acked-by
+---
+ .../devicetree/bindings/i2c/i2c-altera.txt         | 39 ++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-altera.txt
- create mode 100644 drivers/i2c/busses/i2c-altera.c
 
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-altera.txt b/Documentation/devicetree/bindings/i2c/i2c-altera.txt
+new file mode 100644
+index 0000000..767664f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/i2c/i2c-altera.txt
+@@ -0,0 +1,39 @@
++* Altera I2C Controller
++* This is Altera's synthesizable logic block I2C Controller for use
++* in Altera's FPGAs.
++
++Required properties :
++ - compatible : should be "altr,softip-i2c-v1.0"
++ - reg        : Offset and length of the register set for the device
++ - interrupts : <IRQ> where IRQ is the interrupt number.
++ - clocks     : phandle to input clock.
++ - #address-cells = <1>;
++ - #size-cells = <0>;
++
++Recommended properties :
++ - clock-frequency : desired I2C bus clock frequency in Hz.
++
++Optional properties :
++ - fifo-size : Size of the RX and TX FIFOs in bytes.
++ - Child nodes conforming to i2c bus binding
++
++Example :
++
++	i2c at 100080000 {
++		compatible = "altr,softip-i2c-v1.0";
++		reg = <0x00000001 0x00080000 0x00000040>;
++		interrupt-parent = <&intc>;
++		interrupts = <0 43 4>;
++		clocks = <&clk_0>;
++		clock-frequency = <100000>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		fifo-size = <4>;
++
++		eeprom at 51 {
++			compatible = "atmel,24c32";
++			reg = <0x51>;
++			pagesize = <32>;
++		};
++	};
++
 -- 
 2.7.4
