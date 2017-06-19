@@ -1,159 +1,49 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Mon, 19 Jun 2017 02:51:08 +0300
-Subject: [PATCH v3 2/4] asm-generic: Provide a fncpy() implementation
-In-Reply-To: <20170617000744.22158-3-f.fainelli@gmail.com>
-References: <20170617000744.22158-1-f.fainelli@gmail.com>
- <20170617000744.22158-3-f.fainelli@gmail.com>
-Message-ID: <20170618235108.peaxdi367jpkt542@yury-thinkpad>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 19 Jun 2017 08:13:26 +0800
+Subject: [PATCH V1 6/9] clk: sprd: add composite clock support
+In-Reply-To: <20170618015855.27738-7-chunyan.zhang@spreadtrum.com>
+Message-ID: <201706190809.LMVHxP1c%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+Hi Chunyan,
 
-Some questions and thoughts inline.
+[auto build test ERROR on clk/clk-next]
+[also build test ERROR on v4.12-rc5 next-20170616]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Yury
+url:    https://github.com/0day-ci/linux/commits/Chunyan-Zhang/add-clock-driver-for-Spreadtrum-platforms/20170619-031614
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
+config: arm64-allmodconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-On Fri, Jun 16, 2017 at 05:07:42PM -0700, Florian Fainelli wrote:
-> Define a generic fncpy() implementation largely based on the ARM version
-> that requires an 8 bytes alignment for the destination address where to
-> copy this function as well as the function's own address.
-> 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
->  include/asm-generic/fncpy.h | 93 +++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 93 insertions(+)
->  create mode 100644 include/asm-generic/fncpy.h
-> 
-> diff --git a/include/asm-generic/fncpy.h b/include/asm-generic/fncpy.h
-> new file mode 100644
-> index 000000000000..ec03b83b8535
-> --- /dev/null
-> +++ b/include/asm-generic/fncpy.h
-> @@ -0,0 +1,93 @@
-> +/*
-> + * include/asm-generic/fncpy.h - helper macros for function body copying
-> + *
-> + * Copyright (C) 2011 Linaro Limited
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-> + */
-> +
-> +/*
-> + * These macros are intended for use when there is a need to copy a low-level
-> + * function body into special memory.
-> + *
-> + * For example, when reconfiguring the SDRAM controller, the code doing the
-> + * reconfiguration may need to run from SRAM.
-> + *
-> + * NOTE: that the copied function body must be entirely self-contained and
-> + * position-independent in order for this to work properly.
-> + *
-> + * NOTE: in order for embedded literals and data to get referenced correctly,
-> + * the alignment of functions must be preserved when copying.  To ensure this,
-> + * the source and destination addresses for fncpy() must be aligned to a
-> + * multiple of 8 bytes: you will be get a BUG() if this condition is not met.
-> + * You will typically need a ".align 3" directive in the assembler where the
-> + * function to be copied is defined, and ensure that your allocator for the
-> + * destination buffer returns 8-byte-aligned pointers.
-> + *
-> + * Typical usage example:
-> + *
-> + * extern int f(args);
-> + * extern uint32_t size_of_f;
-> + * int (*copied_f)(args);
-> + * void *sram_buffer;
-> + *
-> + * copied_f = fncpy(sram_buffer, &f, size_of_f);
-> + *
-> + * ... later, call the function: ...
-> + *
-> + * copied_f(args);
-> + *
-> + * The size of the function to be copied can't be determined from C:
-> + * this must be determined by other means, such as adding assmbler directives
-> + * in the file where f is defined.
-> + */
-> +
-> +#ifndef __ASM_FNCPY_H
-> +#define __ASM_FNCPY_H
-> +
-> +#include <linux/types.h>
-> +#include <linux/string.h>
-> +
-> +#include <asm/bug.h>
-> +#include <asm/cacheflush.h>
-> +
-> +/*
-> + * Minimum alignment requirement for the source and destination addresses
-> + * for function copying.
-> + */
-> +#define FNCPY_ALIGN 8
+All errors (new ones prefixed by >>):
 
->From now this is not arm-only, and it's possible that some architectures
-might want to redefine it in their arch/xxx/include/asm/fncpy.h files.
-So it will be easier for them if you'll wrap FNCPY_ALIGN here with #ifdef
-guards.
+>> drivers/clk/sunxi-ng/built-in.o:(.rodata+0x16080): multiple definition of `ccu_gate_ops'
+   drivers/clk/sprd/built-in.o:(.rodata+0x160): first defined here
+   drivers/clk/sunxi-ng/built-in.o: In function `ccu_mux_helper_set_parent':
+>> ccu_frac.c:(.text+0x2ac8): multiple definition of `ccu_mux_helper_set_parent'
+   drivers/clk/sprd/built-in.o:ccu_composite.c:(.text+0x810): first defined here
+>> drivers/clk/sunxi-ng/built-in.o:(.rodata+0x162c0): multiple definition of `ccu_mux_ops'
+   drivers/clk/sprd/built-in.o:(.rodata+0x260): first defined here
+   drivers/clk/sunxi-ng/built-in.o: In function `ccu_mux_helper_get_parent':
+>> ccu_frac.c:(.text+0x2950): multiple definition of `ccu_mux_helper_get_parent'
+   drivers/clk/sprd/built-in.o:ccu_composite.c:(.text+0x650): first defined here
+>> drivers/clk/sunxi-ng/built-in.o:(.rodata+0x15fc0): multiple definition of `ccu_div_ops'
+   drivers/clk/sprd/built-in.o:(.rodata+0x360): first defined here
 
-By the way, compiler already has an information on the proper alignment.
-Maybe it's better to use it as the default value here instead of the
-hardcoded value?
-
-#ifndef FNCPY_ALIGN
-#define FNCPY_ALIGN ({void foo(); __alignof__(&foo);})
-#endif
-
-> +
-> +#define fncpy(dest_buf, funcp, size) ({					\
-
-Do you really need to check types inside the macro? If not, you can
-declare it as function, which is better in general, with the memcpy-like
-prototype.
-
-> +	uintptr_t __funcp_address;					\
-> +	typeof(funcp) __result;						\
-> +									\
-> +	asm("" : "=r" (__funcp_address) : "0" (funcp));			\
-> +									\
-> +	/*								\
-> +	 * Ensure alignment of source and destination addresses.	\
-> +	 */								\
-> +	BUG_ON((uintptr_t)(dest_buf) & (FNCPY_ALIGN - 1) ||		\
-
-People don't like new BUG_ONs. Maybe it's better to use BUILD_BUG_ON()
-at compile time and WARN_ON() at runtime?
-
-> +		(__funcp_address & (FNCPY_ALIGN - 1)));			\
-
-There is IS_ALIGNED() macro for things like this.
-
-And I frankly don't understand the 2nd check. One can imagine the
-situation when someone wants copy the function from the packed blob or
-some intermediate location were the function is unaligned, and it's
-impossible with the current implementation.
-
-> +									\
-> +	memcpy(dest_buf, (void const *)__funcp_address, size);		\
-> +	flush_icache_range((unsigned long)(dest_buf),			\
-> +		(unsigned long)(dest_buf) + (size));			\
-> +									\
-> +	asm("" : "=r" (__result)					\
-> +		: "0" ((uintptr_t)(dest_buf)));				\
-> +									\
-> +	__result;							\
-> +})
-> +
-> +#endif /* !__ASM_FNCPY_H */
-> -- 
-> 2.9.3
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 55798 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170619/198be1bd/attachment-0001.gz>
