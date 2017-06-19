@@ -1,17 +1,20 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 20:53:45 -0700
-Subject: [GIT PULL] pxa for v4.13
-In-Reply-To: <87mv99u5ol.fsf@belgarion.home>
-References: <87mv99u5ol.fsf@belgarion.home>
-Message-ID: <20170619035345.GZ30022@localhost>
+Date: Sun, 18 Jun 2017 20:45:43 -0700
+Subject: [GIT PULL] Allwinner H5 changes for 4.13
+In-Reply-To: <20170614202829.us4uiajxb54bavh2@flea>
+References: <20170614202829.us4uiajxb54bavh2@flea>
+Message-ID: <20170619034543.GW30022@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 15, 2017 at 08:27:06AM +0200, Robert Jarzmik wrote:
-> Hello Arnd, Kevin, Olof,
+On Wed, Jun 14, 2017 at 10:28:29PM +0200, Maxime Ripard wrote:
+> Hi Arnd, Olof,
 > 
-> Please consider this pull request for pxa 4.13 cycle, nothing very fancy either
-> this cycle.
+> Just like the H3 PR, this one is built on a common branch (up to
+> 0eba511a3cac), but this part should go through arm64.
+> 
+> Thanks!
+> Maxime
 > 
 > The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 > 
@@ -19,20 +22,19 @@ On Thu, Jun 15, 2017 at 08:27:06AM +0200, Robert Jarzmik wrote:
 > 
 > are available in the git repository at:
 > 
->   https://github.com/rjarzmik/linux.git tags/pxa-for-4.13
+>   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-dt-h5-for-4.13
 > 
-> for you to fetch changes up to ce3de60ff92ba5e4d65f1c1ce07460795e3a6157:
+> for you to fetch changes up to ea43d9b85acf66eac16ec89dc0fb84751f50f088:
 > 
->   ARM: pxa: Delete an error message for a failed memory allocation in pxa3xx_u2d_probe() (2017-06-14 08:32:21 +0200)
+>   arm64: allwinner: h5: Add initial Orangepi Zero Plus 2 support (2017-06-13 09:18:31 +0200)
 > 
 > ----------------------------------------------------------------
-> This is the pxa changes for v4.13 cycle.
+> Allwinner H5 DT changes for 4.13
 > 
-> This cycle is a minor fixes one, with :
->  - Coccinelle found improvements
->  - magician getting touchscreen driver support.
+> Just like the H3, this is mostly about enabling the EMAC on the H5, and
+> also has a new board, the Orange Pi Zero Plus 2
 
-Thanks, merged!
+Merged, thanks!
 
 
 -Olof
