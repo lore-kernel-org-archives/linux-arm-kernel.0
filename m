@@ -1,33 +1,38 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Mon, 19 Jun 2017 14:43:09 +0800
-Subject: [PATCH v3 00/13] ARM: sun5i: cryptographic engine support
-In-Reply-To: <20170601193905.28829-1-antoine.tenart@free-electrons.com>
-References: <20170601193905.28829-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170619064309.GC13800@gondor.apana.org.au>
+From: Stefan.Schoefegger@ginzinger.com (=?iso-8859-1?Q?Sch=F6fegger_Stefan?=)
+Date: Mon, 19 Jun 2017 06:43:58 +0000
+Subject: [PATCH v2 1/1] PCI: imx6: Add pcie compliance test option
+In-Reply-To: <CAOMZO5C03MwGkQSrJr-AeG98q84iyWnKj2GSvveJ6xKL+Y-9EQ@mail.gmail.com>
+References: <1472121518-9340-1-git-send-email-stefan.schoefegger@ginzinger.com>
+ <1923573.HjpiSnITgW@en-pc05>
+ <CAOMZO5C03MwGkQSrJr-AeG98q84iyWnKj2GSvveJ6xKL+Y-9EQ@mail.gmail.com>
+Message-ID: <1552752.riIkOpKaxW@en-pc05>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 01, 2017 at 09:38:52PM +0200, Antoine Tenart wrote:
-> Hello,
+On Wednesday, June 14, 2017 4:11:29 PM CEST Fabio Estevam wrote:
+> On Wed, Jun 14, 2017 at 2:52 AM, Sch?fegger Stefan
 > 
-> This series adds the cryptographic engine support to sun5i SoCs. This is
-> based on top of v4.12-rc1 and was tested on a CHIP. The series begins
-> with fixes and improvements. The series is available at:
-> https://github.com/atenart/linux v4.12-rc1/sun5i-crypto
+> <Stefan.Schoefegger@ginzinger.com> wrote:
+> > device). The bitrate and de-emphasis must be switched. The driver (without
+> > this patches) does not allow to switch to gen2 because it falls back to
+> > gen1. It is impossible to generate the gen2 test pattern.
 > 
-> The 8 first patches are reworks and cosmetic improvements.
+> If you pass 'fsl,max-link-speed = <2>;' in your device tree, then it
+> will allow gen2.
 > 
-> Patch 9 moves the cipher part of the sun4i-ss driver from the ablkcipher
-> API to the newer skcipher API.
+> From Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt:
 > 
-> Patch 10 adds the CRYPTO_ALG_KERN_DRIVER_ONLY flag for ciphers exposed
-> by the sun4i-ss driver.
+> "- fsl,max-link-speed: Specify PCI gen for link capability. Must be '2' for
+>   gen2, otherwise will default to gen1. Note that the IMX6 LVDS clock
+> outputs do not meet gen2 jitter requirements and thus for gen2 capability a
+> gen2 compliant clock generator should be used and configured."
 > 
-> Patch 11 fixes the crypto framework selftests on the CHIP. It might fix
-> other users too.
+> Wouldn't this solve the problem?
 
-Patches 1-11 applied.  Thanks.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+No, it only sets the maximum allowed link speed but it is forced to gen1 
+before.
+
+During compliance test there is no real link established and there is no link 
+speed negotiation, the phy is in a special compliance test state.
+
+Stefan
