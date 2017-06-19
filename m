@@ -1,57 +1,62 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Mon, 19 Jun 2017 16:31:18 +0200
-Subject: [PATCH v4 04/28] clocksource: Add Owl timer
-In-Reply-To: <132a457f-603d-9e1d-4c09-bb434738b352@linaro.org>
-References: <20170606005426.26446-1-afaerber@suse.de>
- <20170606005426.26446-5-afaerber@suse.de> <20170606163355.GD2345@mai>
- <b2af603d-0a7c-1bcd-c661-9a20ce63994c@suse.de>
- <132a457f-603d-9e1d-4c09-bb434738b352@linaro.org>
-Message-ID: <6f887428-217f-8d1c-27a6-91504ce1609d@suse.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 19 Jun 2017 07:33:39 -0700
+Subject: [PATCH 12/16] mmc: host: omap_hsmmc: Add support to set IODELAY
+ values
+In-Reply-To: <3149f88d-c33f-0d3e-aabe-ac6f840bb41c@ti.com>
+References: <20170616124544.15046-1-kishon@ti.com>
+ <20170616124544.15046-13-kishon@ti.com>
+ <20170619060256.GK3730@atomide.com>
+ <810fba3e-a488-fa0d-5639-47f1c76ea2b6@ti.com>
+ <20170619072523.GL3730@atomide.com>
+ <3149f88d-c33f-0d3e-aabe-ac6f840bb41c@ti.com>
+Message-ID: <20170619143338.GN3730@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 19.06.2017 um 15:53 schrieb Daniel Lezcano:
-> On 18/06/2017 22:43, Andreas F?rber wrote:
->> Am 06.06.2017 um 18:33 schrieb Daniel Lezcano:
->>> On Tue, Jun 06, 2017 at 02:54:02AM +0200, Andreas F?rber wrote:
->>>> The Actions Semi S500 SoC provides four timers, 2Hz0/1 and 32-bit TIMER0/1.
->>>>
->>>> Use TIMER0 as clocksource and TIMER1 as clockevents.
->>>>
->>>> Based on LeMaker linux-actions tree.
->>>>
->>>> An S500 datasheet can be found on the LeMaker Guitar pages:
->>>> http://www.lemaker.org/product-guitar-download-29.html
->>>>
->>>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->>>
->>> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->>
->> Thanks. It seems this is not going through a central clocksource tree,
->> so I'm applying it to a new linux-actions.git v4.13/soc branch:
->>
->> https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.13/soc
->>
->> Let me know if you intend to take it through some other tree instead.
+* Kishon Vijay Abraham I <kishon@ti.com> [170619 00:55]:
+> Hi Tony,
 > 
-> No, it is ok. In the future, submit for the clocksource tree
-> (tip/timers/core).
+> On Monday 19 June 2017 12:55 PM, Tony Lindgren wrote:
+> > * Kishon Vijay Abraham I <kishon@ti.com> [170618 23:37]:
+> >> Hi Tony,
+> >>
+> >> On Monday 19 June 2017 11:32 AM, Tony Lindgren wrote:
+> >>> * Kishon Vijay Abraham I <kishon@ti.com> [170616 05:47]:
+> >>>> The data manual of J6/J6 Eco recommends to set different IODELAY values
+> >>>> depending on the mode in which the MMC/SD is enumerated in order to
+> >>>> ensure IO timings are met.
+> >>>>
+> >>>> Add support to set the IODELAY values depending on the various MMC
+> >>>> modes using the pinctrl APIs.
+> >>>
+> >>> This does not seem to apply against Linux next for me for
+> >>> the binding. Fixing that, compile fails for me with:
+> >>>
+> >>> drivers/mmc/host/omap_hsmmc.c:2384:13: error:
+> >>> 'struct omap_hsmmc_platform_data' has no member named 'version'
+> >>
+> >> This series has a dependency with
+> >> https://www.spinics.net/lists/arm-kernel/msg586215.html series
+> >>
+> >> *version* member is added in patch with $subject
+> >> "ARM: OMAP2+: Add pdata-quirks for MMC/SD on DRA74x EVM"
+> > 
+> > Ah sorry I keep forgetting that. Looks like the only thing
+> > pending with that series is that you were going to send
+> > an update for omap3-overo-base.
+> 
+> I've sent that as a separate patch [1]. But I can resend the entire series if
+> that's what you'd prefer.
 
-Hm, I did see that tree in MAINTAINERS, but it specifically said
-"CLOCKSOURCE CORE" and it does not have any
-F:	drivers/clocksource/
-or
-F:	Documentation/devicetree/bindings/timer/
-entries, therefore I added the files to Actions like other SoCs did...
+Oh sorry I had already untagged that thread, I probably did
+not notice your updated patch. It's best to resend that series
+right after -rc1 so we get it to Linux next for few weeks
+of testing. Right now there's a dependency to the related
+MMC patches, and patch 8/8 conflicts with the unused regulator
+removal patch.
 
-I can easily unqueue the patches - what does submit for the clocksource
-tree mean? Just CC the two maintainers on resend or anything else?
-I intend to rename my branch to v4.13/drivers on Olof's feedback anyway.
+Regards,
 
-Sorry,
-Andreas
+Tony
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+> [1] -> http://www.spinics.net/lists/devicetree/msg180747.html
