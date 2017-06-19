@@ -1,63 +1,394 @@
 From: ore@pengutronix.de (Oleksij Rempel)
-Date: Mon, 19 Jun 2017 09:31:03 +0200
-Subject: [RFC PATCH 0/3] provide imx rproc driver
-In-Reply-To: <20170619051338.GA3064@Sanchayan-Arch>
+Date: Mon, 19 Jun 2017 09:43:51 +0200
+Subject: [RFC PATCH 2/3] remoteproc: imx_rproc: add a NXP/Freescale imx
+ rproc driver
+In-Reply-To: <96edc898-ad2b-c781-b7eb-0645902837df@ti.com>
 References: <20170614204855.18347-1-o.rempel@pengutronix.de>
- <20170619051338.GA3064@Sanchayan-Arch>
-Message-ID: <544aa538-b9b6-1ed5-ffea-919fa4ebd644@pengutronix.de>
+ <20170614204855.18347-3-o.rempel@pengutronix.de>
+ <96edc898-ad2b-c781-b7eb-0645902837df@ti.com>
+Message-ID: <f146c11f-1cca-68db-325b-036b0f614963@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sanchayan,
+Hi,
 
-On 19.06.2017 07:13, Sanchayan wrote:
-> Hello Oleksij,
->
-> On 17-06-14 22:48:52, Oleksij Rempel wrote:
->> Hallo all,
->>
->> this is RFC patchset to provide remoteproc functionality on
->> imx7d SoC.
->> Since current kernel do not have devicetrees for board which
->> I used for testing, this RFC patchset includes this too.
->>
->> For testing I used this simple counter written in ASM:
->> ======================================
->>         .syntax unified
->>         .text
->>         .thumb
->>         .int 0x10020000                 @ Initial SP value
->>         .int reset + 1
->>
->> reset:
->>
->>         mov     r0, #0x55
->>         ldr     r1, =(0x40)
->> 1:
->>         str     r0, [r1]
->>         add     r0, 1
->>         b       1b
->>
->>         /* Dummy data, required by remoteproc loader */
->>         /* Please FIXME, this part seem to be incorrect */
->>         .data
->>         .section .resource_table, "aw"
->>         .word   1, 0, 0, 0      /* struct resource_table base */
->>         .word   0               /* uint32_t offset[1] */
->> ============================================================
->> compiled with:
->> ${CROSS}as -o imx7m4.o imx7m4.S
->> ${CROSS}ld -Ttext=0x0 -o imx7m4.elf imx7m4.o
->> cp imx7m4.elf /srv/nfs/sid-armhf/lib/firmware/rproc-imx_rproc-fw
->>
->> Functionality was confirmed with current OpenOCD master.
->> OpenOCD cfg file can be found here:
->> https://github.com/olerem/openocd/blob/imx7-2017.06.14/tcl/target/imx7.cfg
->>
->> Comment and suggestions are welcome.
->
-> Have you by chance also tried testing this with FreeRTOS code running on the
-> M4 side?
+Thank you for your review!
 
-no, currently my priority is to provide basic functionality with easy 
-understandable target code and dependencies.
+On 15.06.2017 21:01, Suman Anna wrote:
+> Hi Oleksij,
+>
+> On 06/14/2017 03:48 PM, Oleksij Rempel wrote:
+>> From: Oleksij Rempel <linux@rempel-privat.de>
+>>
+>> this driver was tested on NXP imx7d but should work on
+>> imx6sx as well.
+>> It will upload firmware to OCRAM, which shared memory between
+>> Cortex A7 and Cortex M4, then turn M4 on.
+>
+> Mostly looks fine, need to address few comments. I take it that you
+> haven't added the binding since this is just an RFC.
+>
+>>
+>> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+>> ---
+>>   drivers/remoteproc/Kconfig     |   8 ++
+>>   drivers/remoteproc/Makefile    |   1 +
+>>   drivers/remoteproc/imx_rproc.c | 264
+>> +++++++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 273 insertions(+)
+>>   create mode 100644 drivers/remoteproc/imx_rproc.c
+>>
+>> diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
+>> index faad69a1a597..8d33bff4f530 100644
+>> --- a/drivers/remoteproc/Kconfig
+>> +++ b/drivers/remoteproc/Kconfig
+>> @@ -130,6 +130,14 @@ config ST_SLIM_REMOTEPROC
+>>       tristate
+>>       depends on REMOTEPROC
+>>   +config IMX_REMOTEPROC
+>> +    tristate "IMX6/7 remoteproc support"
+>> +    depends on SOC_IMX6SX || SOC_IMX7D
+>> +    depends on REMOTEPROC
+>> +    help
+>> +      TODO, write some thing here
+>> +      This can be either built-in or a loadable module.
+>> +
+>>   endif # REMOTEPROC
+>>     endmenu
+>> diff --git a/drivers/remoteproc/Makefile b/drivers/remoteproc/Makefile
+>> index ffc5e430df27..d351c25cdb4e 100644
+>> --- a/drivers/remoteproc/Makefile
+>> +++ b/drivers/remoteproc/Makefile
+>> @@ -19,3 +19,4 @@ qcom_wcnss_pil-y            += qcom_wcnss.o
+>>   qcom_wcnss_pil-y            += qcom_wcnss_iris.o
+>>   obj-$(CONFIG_ST_REMOTEPROC)        += st_remoteproc.o
+>>   obj-$(CONFIG_ST_SLIM_REMOTEPROC)    += st_slim_rproc.o
+>> +obj-$(CONFIG_IMX_REMOTEPROC)        += imx_rproc.o
+>> diff --git a/drivers/remoteproc/imx_rproc.c
+>> b/drivers/remoteproc/imx_rproc.c
+>> new file mode 100644
+>> index 000000000000..6bef85237a27
+>> --- /dev/null
+>> +++ b/drivers/remoteproc/imx_rproc.c
+>> @@ -0,0 +1,264 @@
+>> +/*
+>> + * Oleksij Rempel <o.rempel@pengutronix.de>
+>
+> Please add a blank line here.
+>
+>> + * This program is free software; you can redistribute it and/or
+>> + * modify it under the terms of the GNU General Public License
+>> + * version 2 as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include <linux/clk.h>
+>> +#include <linux/err.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of_device.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/remoteproc.h>
+>> +#include <linux/regmap.h>
+>> +#include <linux/mfd/syscon.h>
+>> +
+>> +#define IMX7D_ENABLE_M4            BIT(3)
+>> +#define IMX7D_SW_M4P_RST        BIT(2)
+>> +#define IMX7D_SW_M4C_RST        BIT(1)
+>> +#define IMX7D_SW_M4C_NON_SCLR_RST    BIT(0)
+>> +
+>> +#define IMX7D_M4_RST_MASK        0xf
+>> +
+>> +
+>> +#define IMX7D_RPROC_MEM_MAX        2
+>> +enum {
+>> +    IMX7D_RPROC_IMEM,
+>> +    IMX7D_RPROC_DMEM,
+>> +};
+>> +
+>> +static const char *mem_names[IMX7D_RPROC_MEM_MAX] = {
+>> +    [IMX7D_RPROC_IMEM]    = "imem",
+>> +    [IMX7D_RPROC_DMEM]    = "dmem",
+>> +};
+>
+> Do you really need these to be globally defined? You only need them in
+> the addr_init function, they can be made local to that function.
+
+I don't needed. At least not with my testing remote code.
+It is mostly copy/paste from existing drivers.
+
+But according to this page, there are multiple memory regions, with 
+different mapping for data and code.
+http://developer.toradex.com/knowledge-base/freertos-on-the-cortex-m4-of-a-colibri-imx7#Memory_areas
+
+"The Cortex-M4 CPU has two buses connected to the main interconnect 
+(modified Harvard architecture). One bus is meant to fetch data (system 
+bus) whereas the other bus is meant to fetch instructions (code bus). To 
+get optimal performance, the program code should be located and linked 
+for a region which is going to be fetched through the code bus, while 
+the data area (e.g. bss or data section) should be located in a region 
+which is fetched through the system bus. There are multiple example 
+linker files in the platform/devices/MCIMX7D/linker/ sub directory which 
+can be used and/or modified. All example firmware below use the 
+MCIMX7D_M4_tcm.ld linker file (TCML region for code, and the TCMU region 
+for data)."
+
+What is the proper way to implement it with remoteproc?
+
+>> +
+>> +/**
+>> + * struct imx_rproc_mem - slim internal memory structure
+>> + * @cpu_addr: MPU virtual address of the memory region
+>> + * @bus_addr: Bus address used to access the memory region
+>> + * @size: Size of the memory region
+>> + */
+>> +struct imx_rproc_mem {
+>> +    void __iomem *cpu_addr;
+>> +    phys_addr_t bus_addr;
+>
+> Are the rproc-view of these regions same as the bus addresses or
+> do they have their own local addresses? If latter, images that are built
+> for those will be using those addresses in which case you need some
+> offset calculation in the da_to_va ops?
+>
+>> +    size_t size;
+>> +};
+>> +
+>> +struct imx_rproc_dcfg {
+>> +    int offset;
+>> +};
+>> +
+>> +struct imx_rproc {
+>> +    struct device            *dev;
+>> +    struct regmap            *regmap;
+>> +    struct rproc            *rproc;
+>> +    const struct imx_rproc_dcfg    *dcfg;
+>
+> No need of aligning the variables, you can get rid of the additional
+> whitespaces and maintain consistent style.
+>
+>> +    struct imx_rproc_mem mem[IMX7D_RPROC_MEM_MAX];
+>> +    struct clk        *clk;
+>> +};
+>> +
+>> +static const struct imx_rproc_dcfg imx_rproc_cfg_imx7d = {
+>> +    .offset = 0xc,
+>> +};
+>> +
+>> +static int imx_rproc_start(struct rproc *rproc)
+>> +{
+>> +    struct imx_rproc *priv = rproc->priv;
+>> +    const struct imx_rproc_dcfg *dcfg = priv->dcfg;
+>> +    struct device *dev = priv->dev;
+>> +    int ret;
+>> +
+>> +    ret = clk_enable(priv->clk);
+>> +    if (ret) {
+>> +        dev_err(&rproc->dev, "Failed to enable clock\n");
+>> +        return ret;
+>> +    }
+>> +
+>> +    ret = regmap_update_bits(priv->regmap, dcfg->offset,
+>> +                 IMX7D_M4_RST_MASK,
+>> +                 IMX7D_SW_M4C_RST | IMX7D_SW_M4P_RST | IMX7D_ENABLE_M4);
+>> +    if (ret) {
+>> +        dev_err(dev, "Filed to enable M4!\n");
+>> +        clk_disable(priv->clk);
+>> +    }
+>> +
+>> +    return ret;
+>> +}
+>> +
+>> +static int imx_rproc_stop(struct rproc *rproc)
+>> +{
+>> +    struct imx_rproc *priv = rproc->priv;
+>> +    const struct imx_rproc_dcfg *dcfg = priv->dcfg;
+>> +    struct device *dev = priv->dev;
+>> +    int ret;
+>> +
+>> +    ret = regmap_update_bits(priv->regmap, dcfg->offset,
+>> +                 IMX7D_M4_RST_MASK,
+>> +                 IMX7D_SW_M4C_NON_SCLR_RST);
+>> +    if (ret)
+>> +        dev_err(dev, "Filed to stop M4!\n");
+>> +
+>> +    clk_disable(priv->clk);
+>> +
+>> +    return ret;
+>> +}
+>> +
+>> +static void *imx_rproc_da_to_va(struct rproc *rproc, u64 da, int len)
+>> +{
+>> +    struct imx_rproc *priv = rproc->priv;
+>> +    void *va = NULL;
+>> +    int i;
+>> +
+>> +    for (i = 0; i < IMX7D_RPROC_MEM_MAX; i++) {
+>> +        if (da != priv->mem[i].bus_addr)
+>> +            continue;
+>> +
+>> +        if (len <= priv->mem[i].size) {
+>> +            /* __force to make sparse happy with type conversion */
+>> +            va = (__force void *)priv->mem[i].cpu_addr;
+>> +            break;
+>> +        }
+>> +    }
+>> +
+>> +    dev_dbg(&rproc->dev, "da = 0x%llx len = 0x%x va = 0x%p\n", da,
+>> len, va);
+>> +
+>> +    return va;
+>> +}
+>> +
+>> +static const struct rproc_ops imx_rproc_ops = {
+>> +    .start        = imx_rproc_start,
+>> +    .stop        = imx_rproc_stop,
+>> +    .da_to_va       = imx_rproc_da_to_va,
+>> +};
+>> +
+>> +static const struct of_device_id imx_rproc_of_match[] = {
+>> +    { .compatible = "fsl,imx7d-rproc", .data = &imx_rproc_cfg_imx7d },
+>> +    {},
+>> +};
+>> +MODULE_DEVICE_TABLE(of, imx_rproc_of_match);
+>> +
+>> +static int imx_rproc_addr_init(struct imx_rproc *priv,
+>> +                   struct platform_device *pdev)
+>> +{
+>> +    int i, err;
+>> +    struct resource *res;
+>> +
+>> +    /* get imem and dmem */
+>> +    for (i = 0; i < ARRAY_SIZE(mem_names); i++) {
+>> +        res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+>> +                        mem_names[i]);
+>> +        if (!res)
+>> +            continue;
+>> +
+>> +        priv->mem[i].cpu_addr = devm_ioremap_resource(&pdev->dev, res);
+>> +        if (IS_ERR(priv->mem[i].cpu_addr)) {
+>> +            dev_err(&pdev->dev, "devm_ioremap_resource failed\n");
+>> +            err = PTR_ERR(priv->mem[i].cpu_addr);
+>> +            return err;
+>> +        }
+>> +        priv->mem[i].bus_addr = res->start & 0xffff;
+>> +        priv->mem[i].size = resource_size(res);
+>> +    }
+>> +
+>> +    return 0;
+>> +}
+>> +
+>> +static int imx_rproc_probe(struct platform_device *pdev)
+>> +{
+>> +    struct device *dev = &pdev->dev;
+>> +    struct device_node *np = dev->of_node;
+>> +    struct imx_rproc *priv;
+>> +    struct rproc *rproc;
+>> +    struct regmap_config config = { .name = "imx_rproc" };
+>> +    const struct imx_rproc_dcfg *dcfg;
+>> +    struct regmap *regmap;
+>> +    int ret;
+>> +
+>> +    regmap = syscon_regmap_lookup_by_phandle(np, "syscon");
+>> +    if (IS_ERR(regmap)) {
+>> +        dev_err(dev, "failed to find syscon\n");
+>> +        return PTR_ERR(regmap);
+>> +    }
+>> +        regmap_attach_dev(dev, regmap, &config);
+>> +
+>> +    /* set some other name then imx */
+>> +    rproc = rproc_alloc(dev, "imx_rproc", &imx_rproc_ops, NULL,
+>> sizeof(*priv));
+>> +    if (!rproc) {
+>> +        ret = -ENOMEM;
+>> +        goto err;
+>> +    }
+>> +
+>> +    dcfg = of_device_get_match_data(dev);
+>> +    if (!dcfg)
+>> +        return -EINVAL;
+>
+> move this up to the beginning of the function. You can avoid the cleanup
+> (you are missing an rproc_free() here)
+>
+>> +
+>> +    priv = rproc->priv;
+>> +    priv->rproc = rproc;
+>> +    priv->regmap = regmap;
+>> +    priv->dcfg = dcfg;
+>> +
+>> +    dev_set_drvdata(dev, rproc);
+>> +
+>> +    ret = imx_rproc_addr_init(priv, pdev);
+>> +    if (ret) {
+>> +        dev_err(dev, "filed on imx_rproc_addr_init\n");
+>> +        goto err_put_rproc;
+>> +    }
+>> +
+>> +    priv->clk = devm_clk_get(dev, NULL);
+>> +    if (IS_ERR(priv->clk)) {
+>> +        dev_err(dev, "Failed to get clock\n");
+>> +        return PTR_ERR(priv->clk);
+>> +    }
+>> +
+>> +    ret = rproc_add(rproc);
+>> +    if (ret) {
+>> +        dev_err(dev, "rproc_add failed\n");
+>> +        goto err_put_rproc;
+>> +    }
+>> +
+>> +    ret = clk_prepare(priv->clk);
+>> +    if (ret)
+>> +        dev_err(dev, "failed to get clock\n");
+>
+> How are your internal memories clocked? If they need the same clock,
+> rproc_add() would need the clock to be enabled for loading section data
+> into those regions as part of rproc_boot(), and your current enable in
+> imx_rproc_start() will be too late. Also, do not see a balancing
+> clk_unprepare() call in remove, and a missing rproc_del() on failure here.
+>
+> regards
+> Suman
+>
+>> +
+>> +    return ret;
+>> +
+>> +err_put_rproc:
+>> +    rproc_free(rproc);
+>> +err:
+>> +    return ret;
+>> +}
+>> +
+>> +static int imx_rproc_remove(struct platform_device *pdev)
+>> +{
+>> +    struct rproc *rproc = platform_get_drvdata(pdev);
+>> +
+>> +    rproc_del(rproc);
+>> +    rproc_free(rproc);
+>> +
+>> +    return 0;
+>> +}
+>> +
+>> +static struct platform_driver imx_rproc_driver = {
+>> +    .probe = imx_rproc_probe,
+>> +    .remove = imx_rproc_remove,
+>> +    .driver = {
+>> +        .name = "imx_rproc",
+>> +        .of_match_table = imx_rproc_of_match,
+>> +    },
+>> +};
+>> +
+>> +module_platform_driver(imx_rproc_driver);
+>> +
+>> +MODULE_LICENSE("GPL v2");
+>> +MODULE_DESCRIPTION("IMX6/7 remote processor control driver");
+>> +MODULE_AUTHOR("Oleksij Rempel <o.rempel@pengutronix.de>");
+>>
+>
+>
