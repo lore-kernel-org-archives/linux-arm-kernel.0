@@ -1,60 +1,83 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Mon, 19 Jun 2017 15:42:42 +0530
-Subject: [PATCH] drm: exynos: constify mixer_match_types and *_mxr_drv_data.
-Message-ID: <28c361b34389bfc40fbca6250f6ff24f5f7afe97.1497866987.git.arvind.yadav.cs@gmail.com>
+From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
+Date: Mon, 19 Jun 2017 18:03:27 +0800
+Subject: [PATCH v2] [media] mtk-mdp: Fix g_/s_selection capture/compose
+ logic
+In-Reply-To: <a180f2fc-1dce-3630-ed48-25c247eff79a@xs4all.nl>
+References: <1494556970-12278-1-git-send-email-minghsiu.tsai@mediatek.com>
+ <a180f2fc-1dce-3630-ed48-25c247eff79a@xs4all.nl>
+Message-ID: <1497866607.25194.14.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-File size before:
-   text	   data	    bss	    dec	    hex	filename
-   9983	   1424	      0	  11407	   2c8f	drivers/gpu/drm/exynos/exynos_mixer.o
+Hi, Hans,
 
-File size after constify:
-   text	   data	    bss	    dec	    hex	filename
-  11231	    176	      0	  11407	   2c8f	drivers/gpu/drm/exynos/exynos_mixer.o
+On Fri, 2017-06-16 at 12:42 +0200, Hans Verkuil wrote:
+> On 05/12/17 04:42, Minghsiu Tsai wrote:
+> > From: Daniel Kurtz <djkurtz@chromium.org>
+> > 
+> > Experiments show that the:
+> >  (1) mtk-mdp uses the _MPLANE form of CAPTURE/OUTPUT
+> 
+> Please drop this, since this no longer applies to this patch.
+> 
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
----
- drivers/gpu/drm/exynos/exynos_mixer.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+I will remove it next version
 
-diff --git a/drivers/gpu/drm/exynos/exynos_mixer.c b/drivers/gpu/drm/exynos/exynos_mixer.c
-index 25edb63..778cae2 100644
---- a/drivers/gpu/drm/exynos/exynos_mixer.c
-+++ b/drivers/gpu/drm/exynos/exynos_mixer.c
-@@ -1097,28 +1097,28 @@ static int mixer_atomic_check(struct exynos_drm_crtc *crtc,
- 	.atomic_check		= mixer_atomic_check,
- };
- 
--static struct mixer_drv_data exynos5420_mxr_drv_data = {
-+static const struct mixer_drv_data exynos5420_mxr_drv_data = {
- 	.version = MXR_VER_128_0_0_184,
- 	.is_vp_enabled = 0,
- };
- 
--static struct mixer_drv_data exynos5250_mxr_drv_data = {
-+static const struct mixer_drv_data exynos5250_mxr_drv_data = {
- 	.version = MXR_VER_16_0_33_0,
- 	.is_vp_enabled = 0,
- };
- 
--static struct mixer_drv_data exynos4212_mxr_drv_data = {
-+static const struct mixer_drv_data exynos4212_mxr_drv_data = {
- 	.version = MXR_VER_0_0_0_16,
- 	.is_vp_enabled = 1,
- };
- 
--static struct mixer_drv_data exynos4210_mxr_drv_data = {
-+static const struct mixer_drv_data exynos4210_mxr_drv_data = {
- 	.version = MXR_VER_0_0_0_16,
- 	.is_vp_enabled = 1,
- 	.has_sclk = 1,
- };
- 
--static struct of_device_id mixer_match_types[] = {
-+static const struct of_device_id mixer_match_types[] = {
- 	{
- 		.compatible = "samsung,exynos4210-mixer",
- 		.data	= &exynos4210_mxr_drv_data,
--- 
-1.9.1
+
+> >  (2) CAPTURE types use CROP targets, and OUTPUT types use COMPOSE targets
+> 
+> Are you really certain about this?
+> 
+> For m2m devices the output (i.e. memory to hardware) typically crops from memory
+> and the capture side (hardware to memory) composes into memory.
+> 
+> I.e.: for the output side you crop the part of the memory buffer that you want
+> to process and on the capture side you compose the result into a memory buffer:
+> i.e. the memory buffer might be 1920x1080, but you compose the decoder output
+> into a rectangle of 640x480 at offset 128x128 within that buffer (just an example).
+> 
+> CAPTURE using crop would be if, before the data is DMAed, the hardware decoder
+> output is cropped. E.g. if the stream fed to the decoder is 1920x1080, but you
+> want to only DMA a subselection of that, then that would be cropping, and it
+> would go to a memory buffer of the size of the crop selection.
+> 
+> OUTPUT using compose is highly unlikely: that means that the frame you give
+> is composed in a larger internal buffer with generated border data around it.
+> Very rare and really only something that a compositor of some sort would do.
+> 
+
+That's strange. In v4l2-ioctl.c, v4l_g_crop()
+OUTPUT is using COMPOSE
+CAPTURE is using CROP
+
+static int v4l_g_crop(const struct v4l2_ioctl_ops *ops,
+				struct file *file, void *fh, void *arg)
+...
+	/* crop means compose for output devices */
+	if (V4L2_TYPE_IS_OUTPUT(p->type))
+		s.target = V4L2_SEL_TGT_COMPOSE_ACTIVE;
+	else
+		s.target = V4L2_SEL_TGT_CROP_ACTIVE;
+
+	ret = ops->vidioc_g_selection(file, fh, &s);
+
+
+> What exactly does the hardware do? Both for the encoder and for the decoder
+> case. Perhaps if I knew exactly what that is, then I can advise.
+> 
+
+NV12M/YUV420M/MT21 -> MDP -> NV12M/YUV420M
+
+The usage would be like this:
+For decoder:
+decoder -> MT21 -> MDP -> NV12M/YUV420M
+
+For encoder:
+NV12M/YUV420M -> MDP -> NV12M/YUV420M -> encoder
+
+
+
+> Regards,
+> 
+> 	Hans
+> 
