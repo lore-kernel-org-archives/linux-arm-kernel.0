@@ -1,90 +1,47 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Mon, 19 Jun 2017 14:53:57 +0800
-Subject: [PATCH v5 1/3] PCI: Add new PCIe Fabric End Node flag,
- PCI_DEV_FLAGS_NO_RELAXED_ORDERING
-In-Reply-To: <1497855239-18560-1-git-send-email-dingtianhong@huawei.com>
-References: <1497855239-18560-1-git-send-email-dingtianhong@huawei.com>
-Message-ID: <1497855239-18560-2-git-send-email-dingtianhong@huawei.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 19 Jun 2017 00:25:23 -0700
+Subject: [PATCH 12/16] mmc: host: omap_hsmmc: Add support to set IODELAY
+ values
+In-Reply-To: <810fba3e-a488-fa0d-5639-47f1c76ea2b6@ti.com>
+References: <20170616124544.15046-1-kishon@ti.com>
+ <20170616124544.15046-13-kishon@ti.com>
+ <20170619060256.GK3730@atomide.com>
+ <810fba3e-a488-fa0d-5639-47f1c76ea2b6@ti.com>
+Message-ID: <20170619072523.GL3730@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Casey Leedom <leedom@chelsio.com>
+* Kishon Vijay Abraham I <kishon@ti.com> [170618 23:37]:
+> Hi Tony,
+> 
+> On Monday 19 June 2017 11:32 AM, Tony Lindgren wrote:
+> > * Kishon Vijay Abraham I <kishon@ti.com> [170616 05:47]:
+> >> The data manual of J6/J6 Eco recommends to set different IODELAY values
+> >> depending on the mode in which the MMC/SD is enumerated in order to
+> >> ensure IO timings are met.
+> >>
+> >> Add support to set the IODELAY values depending on the various MMC
+> >> modes using the pinctrl APIs.
+> > 
+> > This does not seem to apply against Linux next for me for
+> > the binding. Fixing that, compile fails for me with:
+> > 
+> > drivers/mmc/host/omap_hsmmc.c:2384:13: error:
+> > 'struct omap_hsmmc_platform_data' has no member named 'version'
+> 
+> This series has a dependency with
+> https://www.spinics.net/lists/arm-kernel/msg586215.html series
+> 
+> *version* member is added in patch with $subject
+> "ARM: OMAP2+: Add pdata-quirks for MMC/SD on DRA74x EVM"
 
-The new flag PCI_DEV_FLAGS_NO_RELAXED_ORDERING indicates that the Relaxed
-Ordering Attribute should not be used on Transaction Layer Packets destined
-for the PCIe End Node so flagged.  Initially flagged this way are Intel
-E5-26xx Root Complex Ports which suffer from a Flow Control Credit
-Performance Problem and AMD A1100 ARM ("SEATTLE") Root Complex Ports which
-don't obey PCIe 3.0 ordering rules which can lead to Data Corruption.
+Ah sorry I keep forgetting that. Looks like the only thing
+pending with that series is that you were going to send
+an update for omap3-overo-base.
 
-Signed-off-by: Casey Leedom <leedom@chelsio.com>
-Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
----
- drivers/pci/quirks.c | 38 ++++++++++++++++++++++++++++++++++++++
- include/linux/pci.h  |  2 ++
- 2 files changed, 40 insertions(+)
+BTW, we really should get rid of the mach-omap2/hsmmc.c,
+I think overo is the only user for it now.
 
-diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-index 085fb78..58bdd23 100644
---- a/drivers/pci/quirks.c
-+++ b/drivers/pci/quirks.c
-@@ -3999,6 +3999,44 @@ static void quirk_tw686x_class(struct pci_dev *pdev)
- 			      quirk_tw686x_class);
- 
- /*
-+ * Some devices have problems with Transaction Layer Packets with the Relaxed
-+ * Ordering Attribute set.  Such devices should mark themselves and other
-+ * Device Drivers should check before sending TLPs with RO set.
-+ */
-+static void quirk_relaxedordering_disable(struct pci_dev *dev)
-+{
-+	dev->dev_flags |= PCI_DEV_FLAGS_NO_RELAXED_ORDERING;
-+}
-+
-+/*
-+ * Intel E5-26xx Root Complex has a Flow Control Credit issue which can
-+ * cause performance problems with Upstream Transaction Layer Packets with
-+ * Relaxed Ordering set.
-+ */
-+DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f02, PCI_CLASS_NOT_DEFINED, 8,
-+			      quirk_relaxedordering_disable);
-+DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f04, PCI_CLASS_NOT_DEFINED, 8,
-+			      quirk_relaxedordering_disable);
-+DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f08, PCI_CLASS_NOT_DEFINED, 8,
-+			      quirk_relaxedordering_disable);
-+
-+/*
-+ * The AMD ARM A1100 (AKA "SEATTLE") SoC has a bug in its PCIe Root Complex
-+ * where Upstream Transaction Layer Packets with the Relaxed Ordering
-+ * Attribute clear are allowed to bypass earlier TLPs with Relaxed Ordering
-+ * set.  This is a violation of the PCIe 3.0 Transaction Ordering Rules
-+ * outlined in Section 2.4.1 (PCI Express(r) Base Specification Revision 3.0
-+ * November 10, 2010).  As a result, on this platform we can't use Relaxed
-+ * Ordering for Upstream TLPs.
-+ */
-+DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_AMD, 0x1a00, PCI_CLASS_NOT_DEFINED, 8,
-+			      quirk_relaxedordering_disable);
-+DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_AMD, 0x1a01, PCI_CLASS_NOT_DEFINED, 8,
-+			      quirk_relaxedordering_disable);
-+DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_AMD, 0x1a02, PCI_CLASS_NOT_DEFINED, 8,
-+			      quirk_relaxedordering_disable);
-+
-+/*
-  * Per PCIe r3.0, sec 2.2.9, "Completion headers must supply the same
-  * values for the Attribute as were supplied in the header of the
-  * corresponding Request, except as explicitly allowed when IDO is used."
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 8039f9f..ce77690 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -188,6 +188,8 @@ enum pci_dev_flags {
- 	 * the direct_complete optimization.
- 	 */
- 	PCI_DEV_FLAGS_NEEDS_RESUME = (__force pci_dev_flags_t) (1 << 11),
-+	/* Don't use Relaxed Ordering for TLPs directed@this device */
-+	PCI_DEV_FLAGS_NO_RELAXED_ORDERING = (__force pci_dev_flags_t) (1 << 12),
- };
- 
- enum pci_irq_reroute_variant {
--- 
-1.9.0
+Regards,
+
+Tony
