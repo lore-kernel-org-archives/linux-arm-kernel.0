@@ -1,38 +1,41 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 20:29:09 -0700
-Subject: [GIT PULL 4/7] Broadcom maintainers changes for 4.13 (v2)
-In-Reply-To: <20170613201044.9808-4-f.fainelli@gmail.com>
+Date: Sun, 18 Jun 2017 20:29:55 -0700
+Subject: [GIT PULL 5/7] Broadcom defconfig changes for 4.13 (v2)
+In-Reply-To: <20170613201044.9808-5-f.fainelli@gmail.com>
 References: <20170613201044.9808-1-f.fainelli@gmail.com>
- <20170613201044.9808-4-f.fainelli@gmail.com>
-Message-ID: <20170619032909.GH30022@localhost>
+ <20170613201044.9808-5-f.fainelli@gmail.com>
+Message-ID: <20170619032955.GI30022@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 13, 2017 at 01:10:41PM -0700, Florian Fainelli wrote:
+On Tue, Jun 13, 2017 at 01:10:42PM -0700, Florian Fainelli wrote:
 > The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 > 
 >   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 > 
 > are available in the git repository at:
 > 
->   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.13/maintainers
+>   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.13/defconfig
 > 
-> for you to fetch changes up to a6adb15fc87f22e3c19dcfd0b0ff4ddc2dd4b4a1:
+> for you to fetch changes up to e4269eb4bebec3e42e386ceeadcb8a581936f18c:
 > 
->   Merge tag 'bcm2835-maintainers-next-2017-06-08' into maintainers/next (2017-06-13 12:38:10 -0700)
+>   Merge tag 'bcm2835-defconfig-next-2017-06-12' into defconfig/next (2017-06-13 12:36:49 -0700)
 > 
 > ----------------------------------------------------------------
-> This pull request contains Broadcom ARM-based SoCs MAINTAINERS file updates for
-> 4.13, please pull the following:
+> This pull request contains Broadcom ARM-based SoCs defconfig updates for 4.13,
+> please pull the following:
 > 
-> - Eric updates the BCM283X section and removes Lee Jones who has not been active for
->   over a year in the Raspberry Pi kernel development
+> - Stefan updates the bcm2835_defconfig to include serial, Ethernet and USB
+>   gadget support which is needed for the Raspberry Pi Zero OTG changes
+> 
+> ----------------------------------------------------------------
+> Florian Fainelli (1):
+>       Merge tag 'bcm2835-defconfig-next-2017-06-12' into defconfig/next
+> 
+> Stefan Wahren (1):
+>       ARM: bcm2835_defconfig: Enable serial & ethernet USB gadget support
 
-It's a bit unusual to not get an ack on removal from someone who is otherwise
-active on the lists, but I suppose that's also a signal. If circumstances
-change this can easily be reinstated, etc.
-
-Merged.
+Thanks, merged.
 
 
 -Olof
