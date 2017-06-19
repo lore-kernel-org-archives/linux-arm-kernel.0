@@ -1,38 +1,50 @@
-From: Stefan.Schoefegger@ginzinger.com (=?iso-8859-1?Q?Sch=F6fegger_Stefan?=)
-Date: Mon, 19 Jun 2017 06:43:58 +0000
-Subject: [PATCH v2 1/1] PCI: imx6: Add pcie compliance test option
-In-Reply-To: <CAOMZO5C03MwGkQSrJr-AeG98q84iyWnKj2GSvveJ6xKL+Y-9EQ@mail.gmail.com>
-References: <1472121518-9340-1-git-send-email-stefan.schoefegger@ginzinger.com>
- <1923573.HjpiSnITgW@en-pc05>
- <CAOMZO5C03MwGkQSrJr-AeG98q84iyWnKj2GSvveJ6xKL+Y-9EQ@mail.gmail.com>
-Message-ID: <1552752.riIkOpKaxW@en-pc05>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 18 Jun 2017 23:10:02 -0700
+Subject: [GIT PULL 5/5] i.MX defconfig updates for 4.13
+In-Reply-To: <1497801323-6389-5-git-send-email-shawnguo@kernel.org>
+References: <1497801323-6389-1-git-send-email-shawnguo@kernel.org>
+ <1497801323-6389-5-git-send-email-shawnguo@kernel.org>
+Message-ID: <20170619061002.GH13137@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 14, 2017 4:11:29 PM CEST Fabio Estevam wrote:
-> On Wed, Jun 14, 2017 at 2:52 AM, Sch?fegger Stefan
+On Sun, Jun 18, 2017 at 11:55:23PM +0800, Shawn Guo wrote:
+> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 > 
-> <Stefan.Schoefegger@ginzinger.com> wrote:
-> > device). The bitrate and de-emphasis must be switched. The driver (without
-> > this patches) does not allow to switch to gen2 because it falls back to
-> > gen1. It is impossible to generate the gen2 test pattern.
+>   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 > 
-> If you pass 'fsl,max-link-speed = <2>;' in your device tree, then it
-> will allow gen2.
+> are available in the git repository at:
 > 
-> From Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-defconfig-4.13
 > 
-> "- fsl,max-link-speed: Specify PCI gen for link capability. Must be '2' for
->   gen2, otherwise will default to gen1. Note that the IMX6 LVDS clock
-> outputs do not meet gen2 jitter requirements and thus for gen2 capability a
-> gen2 compliant clock generator should be used and configured."
+> for you to fetch changes up to 6db53373884327f0457d90aa665d249a11461b07:
 > 
-> Wouldn't this solve the problem?
+>   ARM: imx_v6_v7_defconfig: Select CONFIG_IMX7D_ADC (2017-06-18 07:32:01 +0800)
+> 
+> ----------------------------------------------------------------
+> The i.MX defconfig updates for 4.13:
+>  - Enable i.MX7 ADC driver support.
+>  - Enable THERMAL_WRITABLE_TRIPS, so that i.MX thermal driver can set
+>    trip points for testing.
+>  - CONFIG_DEBUG_FS gets lost by accident because of a change around
+>    CONFIG_RCU_TRACE.  Re-enable it explicitly.
+>  - Enable MXS LRADC driver and CONFIG_CGROUPS for mxs_defconfig.
+>  - Enable more common cpufreq governors to help test cpufreq driver.
+> 
+> ----------------------------------------------------------------
+> Fabio Estevam (1):
+>       ARM: imx_v6_v7_defconfig: Select CONFIG_IMX7D_ADC
+> 
+> Leonard Crestez (3):
+>       ARM: imx_v6_v7_defconfig: Enable cpufreq governors
+>       ARM: imx_v6_v7_defconfig: Explicitly restore CONFIG_DEBUG_FS
+>       ARM: imx_v6_v7_defconfig: Set THERMAL_WRITABLE_TRIPS=y for testing
+> 
+> Stefan Wahren (2):
+>       ARM: mxs_defconfig: Enable CONFIG_CGROUPS
+>       ARM: mxs_defconfig: Re-enable MXS LRADC
 
-No, it only sets the maximum allowed link speed but it is forced to gen1 
-before.
+Merged, thanks!
 
-During compliance test there is no real link established and there is no link 
-speed negotiation, the phy is in a special compliance test state.
 
-Stefan
+-Olof
