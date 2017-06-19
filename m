@@ -1,41 +1,29 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 23:00:01 -0700
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.13 (#1)
-In-Reply-To: <87poe35cw2.fsf@free-electrons.com>
-References: <87poe35cw2.fsf@free-electrons.com>
-Message-ID: <20170619060001.GB13137@localhost>
+Date: Sun, 18 Jun 2017 23:05:47 -0700
+Subject: [GIT PULL 1/5] i.MX driver changes for 4.13
+In-Reply-To: <1497801323-6389-1-git-send-email-shawnguo@kernel.org>
+References: <1497801323-6389-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <20170619060547.GD13137@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 17, 2017 at 08:47:25AM +0200, Gregory CLEMENT wrote:
-> Hi,
+On Sun, Jun 18, 2017 at 11:55:19PM +0800, Shawn Guo wrote:
+> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 > 
-> Here is the first pull request for dt64 for mvebu for v4.13.
-> 
-> Gregory
-> 
-> The following changes since commit 08332893e37af6ae779367e78e444f8f9571511d:
-> 
->   Linux 4.12-rc2 (2017-05-21 19:30:23 -0700)
+>   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.13-1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-drivers-4.13
 > 
-> for you to fetch changes up to f66b2aff46eaf0825dbe1560e28fcb845dd2a215:
+> for you to fetch changes up to c465a32fdde67c029ba8880f2878491042b72524:
 > 
->   arm64: dts: marvell: add xmdio nodes for 7k/8k (2017-06-17 08:19:29 +0200)
+>   soc: imx: gpc: build gpc only if hardware has gpc (2017-05-15 10:22:25 +0800)
 > 
 > ----------------------------------------------------------------
-> mvebu dt64 for 4.13 (part 1)
-> 
-> - Improve the mcbin support (Armada 8040 based board): add sdhci and
->   the second 1G port
-> - Improve crypro nodes description on Aramda 7K/8K
-> - Use new binding for ap806 clocks
-> - Improve mdio nodes and add xmdio on Aramda 7K/8K
-> - Add second SGCI node on Armada 37xx
-> - Improve the description of the Armada 3720 DB board
+> The i.MX drivers update for 4.13:
+>  - Add CONFIG_HAVE_IMX_GPC to control the build of GPC driver, so that
+>    it doesn't build for platforms that do not have it.
 
 Merged, thanks.
 
