@@ -1,55 +1,54 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 19 Jun 2017 16:42:15 +0100
-Subject: [RFC PATCH 09/33] irqchip/gic-v3-its: Split out property table
- allocation
-In-Reply-To: <c98bf0f6-884a-3851-aefc-571b0cbce703@redhat.com>
-References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
- <1484648454-21216-10-git-send-email-marc.zyngier@arm.com>
- <c98bf0f6-884a-3851-aefc-571b0cbce703@redhat.com>
-Message-ID: <a0fe6356-72fc-edb9-6751-0494d2d53321@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 19 Jun 2017 17:36:42 +0200
+Subject: [GIT PULL] Improve cp110 clk support on Marvell Armada 7K/8K
+Message-ID: <pull.28a1be390fb082d60e88c3234dd7d76fb61438b6.1497886602.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/02/17 06:15, Auger Eric wrote:
-> Hi Marc,
-> On 17/01/2017 11:20, Marc Zyngier wrote:
->> Move the LPI property table allocation into its own function, as
->> this is going to be required for those associated with VMs in
->> the future.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  drivers/irqchip/irq-gic-v3-its.c | 28 ++++++++++++++++++----------
->>  1 file changed, 18 insertions(+), 10 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
->> index b28fb19..c92ff4d 100644
->> --- a/drivers/irqchip/irq-gic-v3-its.c
->> +++ b/drivers/irqchip/irq-gic-v3-its.c
->> @@ -889,15 +889,31 @@ static void its_lpi_free(struct event_lpi_map *map)
->>  	kfree(map->col_map);
->>  }
->>  
->> +static struct page *its_allocate_prop_table(gfp_t gfp_flags)
->> +{
->> +	struct page *prop_page;
->> +
->> +	prop_page = alloc_pages(gfp_flags, get_order(LPI_PROPBASE_SZ));
->> +	if (!prop_page)
->> +		return NULL;
->> +
->> +	/* Priority 0xa0, Group-1, disabled */
->> +	memset(page_address(prop_page),
->> +	       LPI_PROP_DEFAULT_PRIO | LPI_PROP_GROUP1,
->> +	       LPI_PROPBASE_SZ);
->> +
->> +	/* Make sure the GIC will observe the written configuration */
->> +	gic_flush_dcache_to_poc(page_address(gic_rdists->prop_page), LPI_PROPBASE_SZ);
-> s/gic_rdists->prop_page/prop_page.
 
-Yeah, this doesn't hit on the model, bizarrely. Oh well... Thanks for
-spotting this.
+Hi Mike, Stephen,
 
-	M.
+This time I turned the series in a pull request so I removed the
+device tree binding part which will be in an other series for Rob
+Herring and I also removed the dt part that I will take care of once
+you will have pulled this one.
+
+I hope this will be easier for you to apply this way.
+
+Thanks!
+
+Gregory
+
+The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+
+  Linux 4.12-rc1 (Sat, 13 May 2017 13:19:49 -0700)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git refs/heads/clk-cp110
+
+for you to fetch changes up to a45af6d3a98b4d8a2746de13a8db52fb4123bb56:
+
+  clk: mvebu: cp110: add sdio clock to cp-110 system controller (Wed, 31 May 2017 15:19:15 +0200)
+
+----------------------------------------------------------------
+Improve cp110 clk support on Marvell Armada 7K/8K
+
+We got more information about the clock controllers and the clock tree
+of the CP110 part that we find in the Marvell Armada 7K/8K SoCs. The
+clk driver is modified accordingly from this new information.
+
+----------------------------------------------------------------
+Gregory CLEMENT (3):
+  clk: mvebu: cp110: make failure labels more meaningful
+  clk: mvebu: cp110: do not depend anymore of the *-clock-output-names
+  clk: mvebu: cp110: introduce a new binding
+
+Konstantin Porotchkin (1):
+  clk: mvebu: cp110: add sdio clock to cp-110 system controller
+
+ drivers/clk/mvebu/cp110-system-controller.c | 200 ++++++++++++++-------
+ 1 file changed, 138 insertions(+), 62 deletions(-)
+
 -- 
-Jazz is not dead. It just smells funny...
+git-series 0.9.1
