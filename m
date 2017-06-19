@@ -1,15 +1,14 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 21:00:45 -0700
-Subject: [GIT PULL 1/4] soc/tegra: Changes for v4.13-rc1
-In-Reply-To: <20170616081306.11505-1-thierry.reding@gmail.com>
+Date: Sun, 18 Jun 2017 21:02:32 -0700
+Subject: [GIT PULL 4/4] arm64: tegra: Device tree changes for v4.13-rc1
+In-Reply-To: <20170616081306.11505-4-thierry.reding@gmail.com>
 References: <20170616081306.11505-1-thierry.reding@gmail.com>
-Message-ID: <20170619040045.GD30022@localhost>
+ <20170616081306.11505-4-thierry.reding@gmail.com>
+Message-ID: <20170619040232.GG30022@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Jun 16, 2017 at 10:13:03AM +0200, Thierry Reding wrote:
+On Fri, Jun 16, 2017 at 10:13:06AM +0200, Thierry Reding wrote:
 > Hi ARM SoC maintainers,
 > 
 > The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
@@ -18,44 +17,26 @@ On Fri, Jun 16, 2017 at 10:13:03AM +0200, Thierry Reding wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.13-soc
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.13-arm64-dt
 > 
-> for you to fetch changes up to da1dbec1be2b54c16649e33e479708a55156e311:
+> for you to fetch changes up to 475d99fc216f4b2aed7021734838c9b578338598:
 > 
->   soc/tegra: flowctrl: Fix error handling (2017-06-13 16:47:44 +0200)
+>   arm64: dts: nvidia: fix PCI bus dtc warnings (2017-06-13 16:50:48 +0200)
 > 
 > Thanks,
 > Thierry
 > 
 > ----------------------------------------------------------------
-> soc/tegra: Changes for v4.13-rc1
+> arm64: tegra: Device tree changes for v4.13-rc1
 > 
-> This contains an implementation of generic PM domains for Tegra186,
-> based on the BPMP powergate request.
+> This adds the CCPLEX cluster on Tegra186, which is used to initiate CPU
+> frequency and voltage transitions.
 > 
-> ----------------------------------------------------------------
-> Christophe Jaillet (1):
->       soc/tegra: flowctrl: Fix error handling
-> 
-> Thierry Reding (3):
->       PM / Domains: Allow overriding the ->xlate() callback
->       soc/tegra: bpmp: Update ABI header
->       soc/tegra: bpmp: Implement generic PM domains
-> 
->  drivers/base/power/domain.c        |   8 +-
->  drivers/firmware/tegra/bpmp.c      |   4 +
->  drivers/soc/tegra/Kconfig          |   5 +
->  drivers/soc/tegra/Makefile         |   1 +
->  drivers/soc/tegra/flowctrl.c       |   2 +-
->  drivers/soc/tegra/powergate-bpmp.c | 359 +++++++++++++++++++++++++++++++
->  include/linux/pm_domain.h          |   4 +
->  include/soc/tegra/bpmp-abi.h       | 418 ++++++++++++++++++++++++++++++++++++-
->  include/soc/tegra/bpmp.h           |  12 ++
+> Also included is a bit of cleanup for PCI related device tree content,
+> in preparation for a future DTC release that has additional checks for
+> the PCI bus.
 
-Merged, but does the bpmp-abi.h really belong in include/soc? Seems like most
-of it is internal ABI for whatever abstraction communicates with bpmp, in this
-case powergate. Locating it as a headerfile under drivers/soc/tegra/ seems to
-make more sense. Care to move it?
+Merged, thanks.
 
 
 -Olof
