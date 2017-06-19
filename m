@@ -1,99 +1,421 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 19 Jun 2017 16:26:54 +0100
-Subject: [RFC PATCH 01/33] irqchip/gic-v3: Add redistributor iterator
-In-Reply-To: <22a9cb20-f5f0-20e7-e34c-f14847a35e5e@redhat.com>
-References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
- <1484648454-21216-2-git-send-email-marc.zyngier@arm.com>
- <22a9cb20-f5f0-20e7-e34c-f14847a35e5e@redhat.com>
-Message-ID: <7c317604-3161-3650-f736-8638f4ff1a5a@arm.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Mon, 19 Jun 2017 23:34:04 +0800
+Subject: [PATCH V2 2/2] timer: imx-tpm: add imx tpm timer support
+In-Reply-To: <7851bcef-8194-3150-7ff3-90920c3e8420@linaro.org>
+References: <1497340725-26594-1-git-send-email-aisheng.dong@nxp.com>
+ <1497340725-26594-3-git-send-email-aisheng.dong@nxp.com>
+ <7851bcef-8194-3150-7ff3-90920c3e8420@linaro.org>
+Message-ID: <20170619153404.GA8913@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/02/17 12:47, Auger Eric wrote:
-> Hi Marc,
+On Tue, Jun 13, 2017 at 03:54:24PM +0200, Daniel Lezcano wrote:
+> On 13/06/2017 09:58, Dong Aisheng wrote:
+> > IMX Timer/PWM Module (TPM) supports both timer and pwm function while
+> > this patch only adds the timer support. PWM would be added later.
+> > 
+> > The TPM counter, compare and capture registers are clocked by an
+> > asynchronous clock that can remain enabled in low power modes.
+> > 
+> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > Cc: Shawn Guo <shawnguo@kernel.org>
+> > Cc: Anson Huang <Anson.Huang@nxp.com>
+> > Cc: Bai Ping <ping.bai@nxp.com>
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > 
+> > ---
 > 
-> On 17/01/2017 11:20, Marc Zyngier wrote:
->> In order to discover the VLPI properties, we need to iterate over
->> the redistributor regions. As we already have code that does this,
->> let's factor it out and make it slightly more generic.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  drivers/irqchip/irq-gic-v3.c | 77 ++++++++++++++++++++++++++++++++------------
->>  1 file changed, 56 insertions(+), 21 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
->> index c132f29..5cadec0 100644
->> --- a/drivers/irqchip/irq-gic-v3.c
->> +++ b/drivers/irqchip/irq-gic-v3.c
->> @@ -421,24 +421,15 @@ static void __init gic_dist_init(void)
->>  		gic_write_irouter(affinity, base + GICD_IROUTER + i * 8);
->>  }
->>  
->> -static int gic_populate_rdist(void)
->> +static int gic_scan_rdist_properties(int (*fn)(struct redist_region *,
->> +					       void __iomem *))
->>  {
->> -	unsigned long mpidr = cpu_logical_map(smp_processor_id());
->> -	u64 typer;
->> -	u32 aff;
->> +	int ret = 0;
-> in case
-> if (reg != GIC_PIDR2_ARCH_GICv3 &&
-> 		    reg != GIC_PIDR2_ARCH_GICv4) is true you now return 0. Don' you
-> want to return -ENODEV as before?
+> nitpicking comments below.
+> 
+> Other than that sounds ok for me.
+> 
+> > ChangeLog:
+> > v1->v2:
+> >  * change to readl/writel from __raw_readl/writel according to Arnd's
+> >    suggestion to avoid endian issue
+> >  * add help information in Kconfig
+> >  * add more error checking
+> > ---
+> >  drivers/clocksource/Kconfig         |   8 ++
+> >  drivers/clocksource/Makefile        |   1 +
+> >  drivers/clocksource/timer-imx-tpm.c | 227 ++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 236 insertions(+)
+> >  create mode 100644 drivers/clocksource/timer-imx-tpm.c
+> > 
+> > diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> > index 545d541..33b4d31 100644
+> > --- a/drivers/clocksource/Kconfig
+> > +++ b/drivers/clocksource/Kconfig
+> > @@ -603,6 +603,14 @@ config CLKSRC_IMX_GPT
+> >  	depends on ARM && CLKDEV_LOOKUP
+> >  	select CLKSRC_MMIO
+> >  
+> > +config CLKSRC_IMX_TPM
+> > +	bool "Clocksource using i.MX TPM" if COMPILE_TEST
+> > +	depends on ARM && CLKDEV_LOOKUP && GENERIC_CLOCKEVENTS
+> > +	select CLKSRC_MMIO
+> > +	help
+> > +	  Enable this option to use IMX Timer/PWM Module (TPM) timer as
+> > +	  clocksource.
+> > +
+> >  config CLKSRC_ST_LPC
+> >  	bool "Low power clocksource found in the LPC" if COMPILE_TEST
+> >  	select CLKSRC_OF if OF
+> > diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+> > index 2b5b56a..9fdf8da0 100644
+> > --- a/drivers/clocksource/Makefile
+> > +++ b/drivers/clocksource/Makefile
+> > @@ -67,6 +67,7 @@ obj-$(CONFIG_CLKSRC_VERSATILE)		+= versatile.o
+> >  obj-$(CONFIG_CLKSRC_MIPS_GIC)		+= mips-gic-timer.o
+> >  obj-$(CONFIG_CLKSRC_TANGO_XTAL)		+= tango_xtal.o
+> >  obj-$(CONFIG_CLKSRC_IMX_GPT)		+= timer-imx-gpt.o
+> > +obj-$(CONFIG_CLKSRC_IMX_TPM)		+= timer-imx-tpm.o
+> >  obj-$(CONFIG_ASM9260_TIMER)		+= asm9260_timer.o
+> >  obj-$(CONFIG_H8300_TMR8)		+= h8300_timer8.o
+> >  obj-$(CONFIG_H8300_TMR16)		+= h8300_timer16.o
+> > diff --git a/drivers/clocksource/timer-imx-tpm.c b/drivers/clocksource/timer-imx-tpm.c
+> > new file mode 100644
+> > index 0000000..940a4f75
+> > --- /dev/null
+> > +++ b/drivers/clocksource/timer-imx-tpm.c
+> > @@ -0,0 +1,227 @@
+> > +/*
+> > + * Copyright 2016 Freescale Semiconductor, Inc.
+> > + * Copyright 2017 NXP
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > + * modify it under the terms of the GNU General Public License
+> > + * as published by the Free Software Foundation; either version 2
+> > + * of the License, or (at your option) any later version.
+> > + */
+> > +
+> > +#include <linux/clk.h>
+> > +#include <linux/clockchips.h>
+> > +#include <linux/clocksource.h>
+> > +#include <linux/delay.h>
+> > +#include <linux/interrupt.h>
+> > +#include <linux/of_address.h>
+> > +#include <linux/of_irq.h>
+> > +#include <linux/sched_clock.h>
+> > +
+> > +#define TPM_SC				0x10
+> > +#define TPM_SC_CMOD_INC_PER_CNT		(0x1 << 3)
+> > +#define TPM_SC_CMOD_DIV_DEFAULT		0x3
+> > +#define TPM_CNT				0x14
+> > +#define TPM_MOD				0x18
+> > +#define TPM_STATUS			0x1c
+> > +#define TPM_STATUS_CH0F			BIT(0)
+> > +#define TPM_C0SC			0x20
+> > +#define TPM_C0SC_CHIE			BIT(6)
+> > +#define TPM_C0SC_MODE_SHIFT		2
+> > +#define TPM_C0SC_MODE_MASK		0x3c
+> > +#define TPM_C0SC_MODE_SW_COMPARE	0x4
+> > +#define TPM_C0V				0x24
+> > +
+> > +static void __iomem *timer_base;
+> > +static struct clock_event_device clockevent_tpm;
+> > +
+> > +static inline void tpm_timer_disable(void)
+> > +{
+> > +	unsigned int val;
+> > +
+> > +	/* channel disable */
+> > +	val = readl(timer_base + TPM_C0SC);
+> > +	val &= ~(TPM_C0SC_MODE_MASK | TPM_C0SC_CHIE);
+> > +	writel(val, timer_base + TPM_C0SC);
+> > +}
+> > +
+> > +static inline void tpm_timer_enable(void)
+> > +{
+> > +	unsigned int val;
+> > +
+> > +	/* channel enabled in sw compare mode */
+> > +	val = readl(timer_base + TPM_C0SC);
+> > +	val |= (TPM_C0SC_MODE_SW_COMPARE << TPM_C0SC_MODE_SHIFT) |
+> > +	       TPM_C0SC_CHIE;
+> > +	writel(val, timer_base + TPM_C0SC);
+> > +}
+> > +
+> > +static inline void tpm_irq_acknowledge(void)
+> > +{
+> > +	writel(TPM_STATUS_CH0F, timer_base + TPM_STATUS);
+> > +}
+> > +
+> > +static struct delay_timer tpm_delay_timer;
+> 
+> static inline unsigned long tpm_read_counter(void)
+> {
+> 	readl(timer_base + TPM_CNT);
+> }
+> 
+> static unsigned long tpm_read_current_timer(void)
+> {
+> 	return tpm_read_counter();
+> }
+> 
+> static u64 notrace tpm_read_sched_clock(void)
+> {
+> 	return tpm_read_counter();
+> }
+> 
+
+Looks good to me
+
+> > +
+> > +static unsigned long tpm_read_current_timer(void)
+> > +{
+> > +	return readl(timer_base + TPM_CNT);
+> > +}
+> > +
+> > +static u64 notrace tpm_read_sched_clock(void)
+> > +{
+> > +	return readl(timer_base + TPM_CNT);
+> > +}
+> > +
+> > +static int __init tpm_clocksource_init(unsigned long rate)
+> > +{
+> > +	tpm_delay_timer.read_current_timer = &tpm_read_current_timer;
+> > +	tpm_delay_timer.freq = rate;
+> > +	register_current_timer_delay(&tpm_delay_timer);
+> > +
+> > +	sched_clock_register(tpm_read_sched_clock, 32, rate);
+> > +
+> > +	return clocksource_mmio_init(timer_base + TPM_CNT, "imx-tpm",
+> > +				     rate, 200, 32, clocksource_mmio_readl_up);
+> > +}
+> > +
+> > +static int tpm_set_next_event(unsigned long delta,
+> > +				struct clock_event_device *evt)
+> > +{
+> > +	unsigned long next, now;
+> > +
+> > +	next = readl(timer_base + TPM_CNT) + delta;
+> > +	writel(next, timer_base + TPM_C0V);
+> > +	now = readl(timer_base + TPM_CNT);
+> 
+> s/readl(..)/tpm_read_counter()/
+> 
+> > +
+> > +	return (int)((next - now) <= 0) ? -ETIME : 0;
+> 
+> Are you sure about this?
+> 
+
+Why we have -ETIME check here is because we have encountered a system
+hang issue before when doing GPU stress test and finally proved to
+be a timer event missing issue.
+
+> The following thread will help to sort it out:
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/397287.html
+> 
+> A simple program with a nanosleep with a very small delta should spot
+> the issue immediately.
+> 
+
+Yes, TPM seems have a similar issue as vt8550 as you pointed out in above URL.
+
+I've done some further debug and showed that the counter register write
+may sometimes take tens of cycles to complete, although mostly are
+only 1~3 cycles.
+
+The sample code is as follows:
+static int tpm_set_next_event(unsigned long delta,
+                                struct clock_event_device *evt)
+{
+        unsigned long next, now, ret;
+
+        now = __raw_readl(timer_base + TPM_CNT);
+        next = now + delta;
+        __raw_writel(next, timer_base + TPM_C0V);
+        now = __raw_readl(timer_base + TPM_CNT);
+
+        ret = next - now;
+        
+        if (ret > delta)
+                printk("%s: overflow ret %d delta %lu\n", __func__, (int)ret, delta);
+
+        return 0;
+}
+
+Below log is observed in some rare time:
+tpm_set_next_event: overflow ret -38 delta 3
+
+I guess it might be related to the SoC bus and fabric design where TPM
+module is connected, but still not sure.
+Will double check it with our IP owner later.
+
+That's why we have -ETIME check.
+
+BTW, since the MX7ULP A7 core is not fast (about 500Mhz) and i
+observed hundreds of microsecond CPU execution delay from the upper
+__hrtimer_start_range_ns to underlying expire checking in
+clockevents_program_event() when system is a bit busy, probably we
+should change the min_delta to a bigger value to reduce the event
+reprogram. e.g. 300.
+
+Last one question is in which situation we should add ETIME check?
+I saw different users in kernel with either ETIME check or no ETIME
+check, both are many.
+
+I looked at Russel's detailed explaination in above URL,
+it looks to me like users should specify a sufficient min_delta
+to avoid -ETIME issue, is that right?
+
+But we don't sure about that value as it varies when system running.
+That's why i would keep both ETIME check and increase min_delta to 300.
+
+May i know your suggestion?
+
+Regards
+Dong Aisheng
+
+> > +}
+> > +
+> > +static int tpm_set_state_oneshot(struct clock_event_device *evt)
+> > +{
+> > +	tpm_timer_enable();
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int tpm_set_state_shutdown(struct clock_event_device *evt)
+> > +{
+> > +	tpm_timer_disable();
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static irqreturn_t tpm_timer_interrupt(int irq, void *dev_id)
+> > +{
+> > +	struct clock_event_device *evt = &clockevent_tpm;
+> 
+> 	struct clock_event_device *evt = dev_id;
+> 
+> > +
+> > +	tpm_irq_acknowledge();
+> > +
+> > +	evt->event_handler(evt);
+> > +
+> > +	return IRQ_HANDLED;
+> > +}
+> > +
+> > +static struct clock_event_device clockevent_tpm = {
+> > +	.name			= "i.MX7ULP TPM Timer",
+> > +	.features		= CLOCK_EVT_FEAT_ONESHOT,
+> > +	.set_state_oneshot	= tpm_set_state_oneshot,
+> > +	.set_next_event		= tpm_set_next_event,
+> > +	.set_state_shutdown	= tpm_set_state_shutdown,
+> > +	.rating			= 200,
+> > +};
+> > +
+> > +static struct irqaction tpm_timer_irq = {
+> > +	.name		= "i.MX7ULP TPM Timer",
+> > +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+> > +	.handler	= tpm_timer_interrupt,
+> > +	.dev_id		= &clockevent_tpm,
+> > +};
+> > +
+> > +static int __init tpm_clockevent_init(unsigned long rate, int irq)
+> > +{
+> > +	setup_irq(irq, &tpm_timer_irq);
+> > +
+> > +	clockevent_tpm.cpumask = cpumask_of(0);
+> > +	clockevent_tpm.irq = irq;
+> > +	clockevents_config_and_register(&clockevent_tpm,
+> > +					rate, 0xff, 0xfffffffe);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int __init tpm_timer_init(struct device_node *np)
+> > +{
+> > +	struct clk *ipg, *per;
+> > +	int irq, ret;
+> > +	u32 rate;
+> > +
+> > +	timer_base = of_iomap(np, 0);
+> > +	if (!timer_base) {
+> > +		pr_err("tpm: failed to get base address\n");
+> > +		return -ENXIO;
+> > +	}
+> > +
+> > +	irq = irq_of_parse_and_map(np, 0);
+> > +	if (!irq) {
+> > +		pr_err("tpm: failed to get irq\n");
+> > +		ret = -ENOENT;
+> > +		goto err_iomap;
+> > +	}
+> > +
+> > +	ipg = of_clk_get_by_name(np, "ipg");
+> > +	per = of_clk_get_by_name(np, "per");
+> > +	if (IS_ERR(ipg) || IS_ERR(per)) {
+> > +		pr_err("tpm: failed to get igp or per clk\n");
+> > +		ret = -ENODEV;
+> > +		goto err_clk_get;
+> > +	}
+> > +
+> > +	/* enable clk before accessing registers */
+> > +	ret = clk_prepare_enable(ipg);
+> > +	if (ret) {
+> > +		pr_err("tpm: ipg clock enable failed (%d)\n", ret);
+> > +		goto err_ipg_clk_enable;
+> > +	}
+> > +
+> > +	ret = clk_prepare_enable(per);
+> > +	if (ret) {
+> > +		pr_err("tpm: per clock enable failed (%d)\n", ret);
+> > +		goto err_per_clk_enable;
+> > +	}
+> > +
+> > +	/*
+> > +	 * Initialize tpm module to a known state
+> > +	 * 1) Counter disabled
+> > +	 * 2) TPM counter operates in up counting mode
+> > +	 * 3) Timer Overflow Interrupt disabled
+> > +	 * 4) Channel0 disabled
+> > +	 * 5) DMA transfers disabled
+> > +	 */
+> > +	writel(0, timer_base + TPM_SC);
+> > +	writel(0, timer_base + TPM_CNT);
+> > +	writel(0, timer_base + TPM_C0SC);
+> > +
+> > +	/* increase per cnt, div 8 by default */
+> > +	writel(TPM_SC_CMOD_INC_PER_CNT | TPM_SC_CMOD_DIV_DEFAULT,
+> > +		     timer_base + TPM_SC);
+> > +
+> > +	/* set MOD register to maximum for free running mode */
+> > +	writel(0xffffffff, timer_base + TPM_MOD);
+> > +
+> > +	rate = clk_get_rate(per) / 8;
+> 
+> 	rate = clk_get_rate(per) >> 3;
+> 
+> > +	tpm_clocksource_init(rate);
+> > +	tpm_clockevent_init(rate, irq);
+> > +
+> > +	return 0;
+> > +
+> > +err_per_clk_enable:
+> > +	clk_disable_unprepare(ipg);
+> > +err_ipg_clk_enable:
+> > +err_clk_get:
+> > +	clk_put(per);
+> > +	clk_put(ipg);
+> > +err_iomap:
+> > +	iounmap(timer_base);
+> > +	return ret;
+> > +}
+> > +CLOCKSOURCE_OF_DECLARE(imx7ulp, "fsl,imx7ulp-tpm", tpm_timer_init);
+> > 
 > 
 > 
->>  	int i;
->>  
->> -	/*
->> -	 * Convert affinity to a 32bit value that can be matched to
->> -	 * GICR_TYPER bits [63:32].
->> -	 */
->> -	aff = (MPIDR_AFFINITY_LEVEL(mpidr, 3) << 24 |
->> -	       MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16 |
->> -	       MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8 |
->> -	       MPIDR_AFFINITY_LEVEL(mpidr, 0));
->> -
->>  	for (i = 0; i < gic_data.nr_redist_regions; i++) {
->>  		void __iomem *ptr = gic_data.redist_regions[i].redist_base;
->> +		u64 typer;
->>  		u32 reg;
->>  
->>  		reg = readl_relaxed(ptr + GICR_PIDR2) & GIC_PIDR2_ARCH_MASK;
->> @@ -450,14 +441,14 @@ static int gic_populate_rdist(void)
->>  
->>  		do {
->>  			typer = gic_read_typer(ptr + GICR_TYPER);
->> -			if ((typer >> 32) == aff) {
->> -				u64 offset = ptr - gic_data.redist_regions[i].redist_base;
->> -				gic_data_rdist_rd_base() = ptr;
->> -				gic_data_rdist()->phys_base = gic_data.redist_regions[i].phys_base + offset;
->> -				pr_info("CPU%d: found redistributor %lx region %d:%pa\n",
->> -					smp_processor_id(), mpidr, i,
->> -					&gic_data_rdist()->phys_base);
->> +			ret = fn(gic_data.redist_regions + i, ptr);
->> +			switch (ret) {
->> +			case 0:
->>  				return 0;
->> +			case -1:
->> +				break;
->> +			default:
->> +				ret = 0;
->>  			}
->>  
->>  			if (gic_data.redist_regions[i].single_redist)
->> @@ -473,9 +464,53 @@ static int gic_populate_rdist(void)
->>  		} while (!(typer & GICR_TYPER_LAST));
->>  	}
-> Assuming you don't find the TYPER that matches the cpu (I don't know if
-> it is possible), last fn() call will return 1 and the function will
-> return 0. Before it returned -ENODEV I think.
-
-Yeah, the whole thing was quite messy. I've (hopefully) fixed it now.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> -- 
+>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+> 
+> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter |
+> <http://www.linaro.org/linaro-blog/> Blog
+> 
