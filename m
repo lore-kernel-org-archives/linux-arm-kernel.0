@@ -1,71 +1,55 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 19 Jun 2017 16:41:56 +0100
-Subject: [PATCH v3] iommu/arm-smmu: Plumb in new ACPI identifiers
-Message-ID: <063a50cff2942c96dc6f24d4f8c8a854a4a6cc30.1497886335.git.robin.murphy@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 19 Jun 2017 16:42:15 +0100
+Subject: [RFC PATCH 09/33] irqchip/gic-v3-its: Split out property table
+ allocation
+In-Reply-To: <c98bf0f6-884a-3851-aefc-571b0cbce703@redhat.com>
+References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
+ <1484648454-21216-10-git-send-email-marc.zyngier@arm.com>
+ <c98bf0f6-884a-3851-aefc-571b0cbce703@redhat.com>
+Message-ID: <a0fe6356-72fc-edb9-6751-0494d2d53321@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Revision C of IORT now allows us to identify ARM MMU-401 and the Cavium
-ThunderX implementation. Wire them up so that we can probe these models
-once firmware starts using the new codes in place of generic ones, and
-so that the appropriate features and quirks get enabled when we do.
+On 17/02/17 06:15, Auger Eric wrote:
+> Hi Marc,
+> On 17/01/2017 11:20, Marc Zyngier wrote:
+>> Move the LPI property table allocation into its own function, as
+>> this is going to be required for those associated with VMs in
+>> the future.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  drivers/irqchip/irq-gic-v3-its.c | 28 ++++++++++++++++++----------
+>>  1 file changed, 18 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>> index b28fb19..c92ff4d 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>> @@ -889,15 +889,31 @@ static void its_lpi_free(struct event_lpi_map *map)
+>>  	kfree(map->col_map);
+>>  }
+>>  
+>> +static struct page *its_allocate_prop_table(gfp_t gfp_flags)
+>> +{
+>> +	struct page *prop_page;
+>> +
+>> +	prop_page = alloc_pages(gfp_flags, get_order(LPI_PROPBASE_SZ));
+>> +	if (!prop_page)
+>> +		return NULL;
+>> +
+>> +	/* Priority 0xa0, Group-1, disabled */
+>> +	memset(page_address(prop_page),
+>> +	       LPI_PROP_DEFAULT_PRIO | LPI_PROP_GROUP1,
+>> +	       LPI_PROPBASE_SZ);
+>> +
+>> +	/* Make sure the GIC will observe the written configuration */
+>> +	gic_flush_dcache_to_poc(page_address(gic_rdists->prop_page), LPI_PROPBASE_SZ);
+> s/gic_rdists->prop_page/prop_page.
 
-For the sake of backports and mitigating sychronisation problems with
-the ACPICA headers, we'll carry a backup copy of the new definitions
-locally for the short term to make life simpler.
+Yeah, this doesn't hit on the model, bizarrely. Oh well... Thanks for
+spotting this.
 
-CC: stable at vger.kernel.org # 4.10
-Acked-by: Robert Richter <rrichter@cavium.com>
-Tested-by: Robert Richter <rrichter@cavium.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
-
-v3: The patch that actually landed in ACPICA was slightly tweaked for
-    self-consistency, so s/CAVIUM_SMMUV2/CAVIUM_THUNDERX/ to match.
-
- drivers/iommu/arm-smmu.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
-
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 7ec30b08b3bd..7ecd1a0b8419 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -312,6 +312,14 @@ enum arm_smmu_implementation {
- 	CAVIUM_SMMUV2,
- };
- 
-+/* Until ACPICA headers cover IORT rev. C */
-+#ifndef ACPI_IORT_SMMU_CORELINK_MMU401
-+#define ACPI_IORT_SMMU_CORELINK_MMU401	0x4
-+#endif
-+#ifndef ACPI_IORT_SMMU_CAVIUM_THUNDERX
-+#define ACPI_IORT_SMMU_CAVIUM_THUNDERX	0x5
-+#endif
-+
- struct arm_smmu_s2cr {
- 	struct iommu_group		*group;
- 	int				count;
-@@ -2073,6 +2081,10 @@ static int acpi_smmu_get_data(u32 model, struct arm_smmu_device *smmu)
- 		smmu->version = ARM_SMMU_V1;
- 		smmu->model = GENERIC_SMMU;
- 		break;
-+	case ACPI_IORT_SMMU_CORELINK_MMU401:
-+		smmu->version = ARM_SMMU_V1_64K;
-+		smmu->model = GENERIC_SMMU;
-+		break;
- 	case ACPI_IORT_SMMU_V2:
- 		smmu->version = ARM_SMMU_V2;
- 		smmu->model = GENERIC_SMMU;
-@@ -2081,6 +2093,10 @@ static int acpi_smmu_get_data(u32 model, struct arm_smmu_device *smmu)
- 		smmu->version = ARM_SMMU_V2;
- 		smmu->model = ARM_MMU500;
- 		break;
-+	case ACPI_IORT_SMMU_CAVIUM_THUNDERX:
-+		smmu->version = ARM_SMMU_V2;
-+		smmu->model = CAVIUM_SMMUV2;
-+		break;
- 	default:
- 		ret = -ENODEV;
- 	}
+	M.
 -- 
-2.12.2.dirty
+Jazz is not dead. It just smells funny...
