@@ -1,88 +1,91 @@
-From: shameerali.kolothum.thodi@huawei.com (shameer)
-Date: Mon, 19 Jun 2017 16:45:00 +0100
-Subject: [PATCH v2 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon erratum
- 161010801
-In-Reply-To: <20170619154500.92336-1-shameerali.kolothum.thodi@huawei.com>
-References: <20170619154500.92336-1-shameerali.kolothum.thodi@huawei.com>
-Message-ID: <20170619154500.92336-3-shameerali.kolothum.thodi@huawei.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 19 Jun 2017 16:48:55 +0100
+Subject: [RFC PATCH 15/33] irqchip/gic-v4: Add management structure
+ definitions
+In-Reply-To: <d5ebd612-96f0-943e-df01-28251c77c327@redhat.com>
+References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
+ <1484648454-21216-16-git-send-email-marc.zyngier@arm.com>
+ <d5ebd612-96f0-943e-df01-28251c77c327@redhat.com>
+Message-ID: <829aa384-f6cc-4906-27a2-7d4c3c42726a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The HiSilicon erratum 161010801 describes the limitation of HiSilicon
-platforms Hip06/Hip07 to support the SMMU mappings for MSI transactions.
+On 16/03/17 08:58, Auger Eric wrote:
+> Hi,
+> 
+> On 17/01/2017 11:20, Marc Zyngier wrote:
+>> Add a bunch of GICv4-specific data structures that will get used in
+>> subsequent patches.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  include/linux/irqchip/arm-gic-v4.h | 92 ++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 92 insertions(+)
+>>  create mode 100644 include/linux/irqchip/arm-gic-v4.h
+>>
+>> diff --git a/include/linux/irqchip/arm-gic-v4.h b/include/linux/irqchip/arm-gic-v4.h
+>> new file mode 100644
+>> index 0000000..6e9c2b3
+>> --- /dev/null
+>> +++ b/include/linux/irqchip/arm-gic-v4.h
+>> @@ -0,0 +1,92 @@
+>> +/*
+>> + * Copyright (C) 2016 ARM Limited, All Rights Reserved.
+>> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +
+>> +#ifndef __LINUX_IRQCHIP_ARM_GIC_V4_H
+>> +#define __LINUX_IRQCHIP_ARM_GIC_V4_H
+>> +
+>> +/* Embedded in kvm.arch */
+>> +struct its_vm {
+>> +	struct irq_domain	*domain;
+>> +	struct page		*vprop_page;
+>> +	irq_hw_number_t		db_lpi_base;
+>> +	unsigned long		*db_bitmap;
+>> +	int			nr_db_lpis;
+>> +};
+>> +
+>> +/* Embedded in kvm_vcpu.arch */
+>> +struct its_vpe {
+>> +	struct page 		*vpt_page;
+>> +	struct its_vm		*its_vm;
+>> +	irq_hw_number_t		vpe_db_lpi;
+>> +	u16			col_idx;
+> the role of the collection id remains obscure to me. Are collections
+> still used for VLPIs? On VMAPTI the vPE is directly provided whereas on
+> MAPTI we used the collection indirection to the actual PE, right? So
+> what is it used for?
 
-On these platforms GICv3 ITS translator is presented with the deviceID
-by extending the MSI payload data to 64 bits to include the deviceID.
-Hence, the PCIe controller on this platforms has to differentiate the
-MSI payload against other DMA payload and has to modify the MSI payload.
-This basically makes it difficult for this platforms to have a SMMU
-translation for MSI.
+Nothing to do with VMAPTI. With VMAPP, you need to provide the target
+address (either the processor number or the redist base address). Since
+I don't really want to expose these gory details, I've settled on using
+the collection id as an identifier for the target address (see how VMAPP
+is implemented).
 
-This patch implements a ACPI table based quirk to reserve the hw msi
-regions in the smmu-v3 driver which means these address regions will
-not be translated and will be excluded from iova allocations.
+>> +	u16			vpe_id;
+>> +	bool			idai;
+>> +	bool			pending_last;
+> where is it used?
 
-Signed-off-by: shameer <shameerali.kolothum.thodi@huawei.com>
----
- drivers/iommu/arm-smmu-v3.c | 29 ++++++++++++++++++++++++-----
- 1 file changed, 24 insertions(+), 5 deletions(-)
+That's to be used in the hypervisor to indicate that an interrupt is
+actually pending when scheduling the vPE out. This can also be updated
+by KVM itself when receiving a doorbell interrupt.
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index abe4b88..f03c63b 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -597,6 +597,7 @@ struct arm_smmu_device {
- 	u32				features;
- 
- #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-+#define ARM_SMMU_OPT_RESV_HW_MSI	(1 << 1)
- 	u32				options;
- 
- 	struct arm_smmu_cmdq		cmdq;
-@@ -1904,14 +1905,31 @@ static void arm_smmu_get_resv_regions(struct device *dev,
- 				      struct list_head *head)
- {
- 	struct iommu_resv_region *region;
-+	struct arm_smmu_device *smmu;
-+	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
- 	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
- 
--	region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
--					 prot, IOMMU_RESV_SW_MSI);
--	if (!region)
--		return;
-+	smmu = arm_smmu_get_by_fwnode(fwspec->iommu_fwnode);
-+
-+	if (smmu && (smmu->options & ARM_SMMU_OPT_RESV_HW_MSI) &&
-+		      dev_is_pci(dev)) {
-+		int ret = -EINVAL;
-+
-+		if (!is_of_node(smmu->dev->fwnode))
-+			ret = iort_iommu_its_get_resv_regions(dev, head);
- 
--	list_add_tail(&region->list, head);
-+		if (ret) {
-+			dev_warn(dev, "HW MSI region resv failed: %d\n", ret);
-+			return;
-+		}
-+	} else {
-+		region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
-+						 prot, IOMMU_RESV_SW_MSI);
-+		if (!region)
-+			return;
-+
-+		list_add_tail(&region->list, head);
-+	}
- 
- 	iommu_dma_get_resv_regions(dev, head);
- }
-@@ -2611,6 +2629,7 @@ static void parse_driver_acpi_options(struct acpi_iort_smmu_v3 *iort_smmu,
- 	switch (iort_smmu->model) {
- 	case ACPI_IORT_SMMU_HISILICON_HI161X:
- 		smmu->options |= ARM_SMMU_OPT_SKIP_PREFETCH;
-+		smmu->options |= ARM_SMMU_OPT_RESV_HW_MSI;
- 		break;
- 	default:
- 		break;
+Thanks,
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
