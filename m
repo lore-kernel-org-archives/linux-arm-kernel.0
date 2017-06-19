@@ -1,124 +1,45 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 20:47:06 -0700
-Subject: [GIT PULL 2/2] soc changes for omaps for v4.13
-In-Reply-To: <59421e32.86e1540a.1a7d5.12e5SMTPIN_ADDED_BROKEN@mx.google.com>
-References: <pull-1497505275-391662>
- <59421e32.86e1540a.1a7d5.12e5SMTPIN_ADDED_BROKEN@mx.google.com>
-Message-ID: <20170619034706.GX30022@localhost>
+Date: Sun, 18 Jun 2017 20:55:21 -0700
+Subject: [GIT PULL] firmware: arm_scpi: updates for v4.13
+In-Reply-To: <56eb6b7c-decb-ade3-2d74-d03f7d35c25d@arm.com>
+References: <56eb6b7c-decb-ade3-2d74-d03f7d35c25d@arm.com>
+Message-ID: <20170619035521.GA30022@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 14, 2017 at 10:42:03PM -0700, Tony Lindgren wrote:
+On Thu, Jun 15, 2017 at 12:28:59PM +0100, Sudeep Holla wrote:
+> Hi ARM-SoC,
+> 
+> The cpufreq change is acked by maintainer and Rafael agreed to take it
+> via ARM-SoC[1]. Please pull !
+> 
+> Regards,
+> Sudeep
+> 
+> --
+> 
 > The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 > 
 >   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.13/soc-v4-signed
+>   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
+> tags/scpi-updates-4.13
 > 
-> for you to fetch changes up to 1df5eaa6bced2d8a9de305d4a5f587adf57ddf35:
+> for you to fetch changes up to c0f2e21953324def9e2f8394406b557d7cb5af64:
 > 
->   ARM: OMAP4: hwmod_data: add SHAM crypto accelerator (2017-06-14 00:53:51 -0700)
-> 
-> ----------------------------------------------------------------
-> SoC changes for omap variants for v4.13 merge window:
-> 
-> - PM clean-up in preparation of adding am335x/am437x PM support
-> 
-> - Fixes for issues found by Coccinelle
-> 
-> - Legacy code removal now that everything boots in device
->   tree only mode
-> 
-> - Interconnect changes in preparation of moving clkctrl clocks
->   to be managed by clkctrl clock driver
-> 
-> - Interconnect changes to add omap4 crypto acceclerator
->   support
+>   cpufreq: scpi: use new scpi_ops functions to remove duplicate code
+> (2017-06-05 11:14:35 +0100)
 > 
 > ----------------------------------------------------------------
-> Dave Gerlach (3):
->       ARM: OMAP: Wakeupgen: Add context save/restore for AM43XX
->       ARM: OMAP2+: timer: Add suspend-resume callbacks for clkevent device
->       ARM: OMAP2+: pm: Remove __init from omap_pm_clkdms_setup
+> SCPI update for v4.13
 > 
-> Markus Elfring (4):
->       ARM: OMAP2+: Delete an error message for a failed memory allocation in two functions
->       ARM: OMAP2+: Improve a size determination in sr_dev_init()
->       ARM: OMAP2+: Use kcalloc() in sr_set_nvalues()
->       ARM: OMAP2+: SmartReflex: Delete an error message for a failed memory allocation in two functions
-> 
-> Sebastian Reichel (3):
->       ARM: OMAP4: hwmod data: add aes1
->       ARM: OMAP4: hwmod data: add aes2
->       ARM: OMAP4: hwmod data: add des
-> 
-> Tero Kristo (7):
->       ARM: OMAP2+: timer: add support for fetching fck handle from DT
->       ARM: OMAP4: hwmod_data: add opt clks for dss_hdmi and dss_venc
->       ARM: OMAP2+: PRCM: store also physical addresses for instances
->       ARM: omap2+: clockdomain: add clkdm_xlate_address
->       ARM: OMAP4: cminst: add support for clkdm_xlate_address
->       ARM: OMAP2+: hwmod: populate clkctrl clocks for hwmods if available
->       ARM: OMAP4: hwmod_data: add SHAM crypto accelerator
-> 
-> Tony Lindgren (12):
->       ARM: OMAP2+: Remove unused legacy code for timer
->       ARM: OMAP2+: Remove unused legacy code for opp
->       ARM: OMAP2+: Remove unused legacy code for PMU
->       ARM: OMAP2+: Remove unused legacy code for device init
->       ARM: OMAP2+: Remove unused legacy code for McBSP
->       ARM: OMAP2+: Remove unused legacy code for io.c
->       ARM: OMAP2+: Remove unused legacy code for PRM
->       ARM: OMAP2+: Remove unused legacy code for interconnects
->       ARM: OMAP2+: Remove unused legacy code for watchdog
->       ARM: OMAP2+: Remove unused legacy code for n8x0
->       Merge branch 'omap-for-v4.13/legacy-v2' into omap-for-v4.13/soc-v3
->       Merge branch 'omap-for-v4.13/clkctrl' into omap-for-v4.13/soc-v4
-> 
->  arch/arm/mach-omap2/Makefile               |   4 -
->  arch/arm/mach-omap2/board-n8x0.c           |  14 +-
->  arch/arm/mach-omap2/clockdomain.c          |   8 ++
->  arch/arm/mach-omap2/clockdomain.h          |   2 +
->  arch/arm/mach-omap2/cm.h                   |   7 +-
->  arch/arm/mach-omap2/cm2xxx_3xxx.h          |   4 +-
->  arch/arm/mach-omap2/cm33xx.c               |   4 +-
->  arch/arm/mach-omap2/cm3xxx.c               |   3 +-
->  arch/arm/mach-omap2/cm_common.c            |  31 +++--
->  arch/arm/mach-omap2/cminst44xx.c           |  29 +++--
->  arch/arm/mach-omap2/devices.c              | 175 -------------------------
->  arch/arm/mach-omap2/hsmmc.c                |   5 +-
->  arch/arm/mach-omap2/io.c                   |  59 ++-------
->  arch/arm/mach-omap2/mcbsp.c                |  70 ----------
->  arch/arm/mach-omap2/omap-wakeupgen.c       |  68 +++++++++-
->  arch/arm/mach-omap2/omap_device.c          |   5 +-
->  arch/arm/mach-omap2/omap_hwmod.c           | 168 ++++++++++++++++++++----
->  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   3 +-
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 146 ++++++++++++++++++++-
->  arch/arm/mach-omap2/opp.c                  | 104 ---------------
->  arch/arm/mach-omap2/opp3xxx_data.c         |  86 -------------
->  arch/arm/mach-omap2/opp4xxx_data.c         |  79 ------------
->  arch/arm/mach-omap2/pm.c                   |   2 +-
->  arch/arm/mach-omap2/pmu.c                  |  97 --------------
->  arch/arm/mach-omap2/prcm-common.h          |   7 +
->  arch/arm/mach-omap2/prcm_mpu44xx.c         |   4 +-
->  arch/arm/mach-omap2/prcm_mpu_44xx_54xx.h   |   4 +-
->  arch/arm/mach-omap2/prm.h                  |   2 +-
->  arch/arm/mach-omap2/prm2xxx_3xxx.h         |   4 +-
->  arch/arm/mach-omap2/prm33xx.c              |   4 +-
->  arch/arm/mach-omap2/prm3xxx.c              |  19 ++-
->  arch/arm/mach-omap2/prm44xx.c              |  63 +--------
->  arch/arm/mach-omap2/prm_common.c           |  32 ++---
->  arch/arm/mach-omap2/prminst44xx.c          |  16 ++-
->  arch/arm/mach-omap2/sr_device.c            |  15 +--
->  arch/arm/mach-omap2/timer.c                | 200 ++++++++---------------------
->  arch/arm/mach-omap2/wd_timer.c             |  28 ----
->  37 files changed, 537 insertions(+), 1034 deletions(-)
->  delete mode 100644 arch/arm/mach-omap2/opp.c
->  delete mode 100644 arch/arm/mach-omap2/pmu.c
+> Adds support to get DVFS transition latency and OPP for any device whose
+> DVFS are managed by SCPI. This avoids code duplication in both cpufreq
+> and devfreq SCPI drivers.
 
-Merged, thanks. Nice cleanup!
+Merged, thanks.
 
 
 -Olof
