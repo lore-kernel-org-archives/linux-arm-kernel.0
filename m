@@ -1,65 +1,62 @@
-From: aravind.thk@gmail.com (Aravind Thokala)
-Date: Mon, 19 Jun 2017 23:15:27 +0530
-Subject: [PATCH] mips: bcm63xx: spi: Fix checkpatch.pl warnings
-In-Reply-To: <2d01bbe8-33bd-9aea-8906-0fe54bb2c334@gmail.com>
-References: <1497890980-4334-1-git-send-email-aravind.thk@gmail.com>
- <2d01bbe8-33bd-9aea-8906-0fe54bb2c334@gmail.com>
-Message-ID: <CAAUiYHd8TrD7HuLU9SpmSXUB-Aph8qToCkDBpqWyqks2fwnF7g@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 19 Jun 2017 11:51:20 -0600
+Subject: [PATCH] [perf/core branch] perf coresight: Fix ARM builds caused
+ by misplaced __printf
+In-Reply-To: <20170616145907.baba73eda242efe194e072d0@arm.com>
+References: <20170616145907.baba73eda242efe194e072d0@arm.com>
+Message-ID: <CANLsYkyG3E9xiOyJz_5EA0B0oQGsSCy2oW7i1iY5YUxU1imKng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
-
-On 19 June 2017 at 22:51, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> On 06/19/2017 09:49 AM, Aravind Thokala wrote:
->> This patch fixes the checkpatch.pl warnings on the driver
->> file.
->>
->> Signed-off-by: Aravind Thokala <aravind.thk@gmail.com>
+On 16 June 2017 at 13:59, Kim Phillips <kim.phillips@arm.com> wrote:
+> Trailing __printf attributes work for function declarations, but not
+> definitions.  This patch fixes arm32/64 builds by placing __printf
+> before the declarator.  Otherwise this happens:
 >
-> The subject should be spi/bcm63xx: Fix checkpatch warnings to be
-> consistent with previous submissions done to that file.
-
-Thanks, I will send v2 patch with the change in subject.
-
+> arch/arm64/util/../../arm/util/cs-etm.c:586:1: error: attributes should be specified before the declarator in a function definition
+>  static int cs_device__print_file(const char *name, const char *fmt, ...) __printf(2, 3)
+>  ^~~~~~
+> arch/arm64/util/../../arm/util/cs-etm.c: In function ?cs_etm_set_drv_config?:
+> arch/arm64/util/../../arm/util/cs-etm.c:610:8: error: implicit declaration of function ?cs_device__print_file? [-Werror=implicit-function-declaration]
+>   ret = cs_device__print_file(enable_sink, "%d", 1);
+>         ^~~~~~~~~~~~~~~~~~~~~
+> arch/arm64/util/../../arm/util/cs-etm.c:610:2: error: nested extern declaration of ?cs_device__print_file? [-Werror=nested-externs]
+>   ret = cs_device__print_file(enable_sink, "%d", 1);
+>   ^~~
+> At top level:
+> arch/arm64/util/../../arm/util/cs-etm.c:566:14: error: ?cs_device__open_file? defined but not used [-Werror=unused-function]
+>  static FILE *cs_device__open_file(const char *name)
+>               ^~~~~~~~~~~~~~~~~~~~
+> cc1: all warnings being treated as errors
 >
-> With that:
+> Fixes: 2ee261d962ac "tools: Adopt __printf from kernel sources"
+> Cc: Arnaldo Carvalho de Melo <acme@redhat.com>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Kim Phillips <kim.phillips@arm.com>
+> ---
+> Applies to acme's perf/core branch
 >
-> Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+>  tools/perf/arch/arm/util/cs-etm.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/tools/perf/arch/arm/util/cs-etm.c b/tools/perf/arch/arm/util/cs-etm.c
+> index 90a6f42ba904..7ce3d1a25133 100644
+> --- a/tools/perf/arch/arm/util/cs-etm.c
+> +++ b/tools/perf/arch/arm/util/cs-etm.c
+> @@ -583,7 +583,7 @@ static FILE *cs_device__open_file(const char *name)
+>
+>  }
+>
+> -static int cs_device__print_file(const char *name, const char *fmt, ...) __printf(2, 3)
+> +static int __printf(2, 3) cs_device__print_file(const char *name, const char *fmt, ...)
+>  {
+>         va_list args;
+>         FILE *file;
 
-Thank you for reviewing the patch.
+I just tested Kim's solution on my side.
 
-Aravind.
+Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 
->
->> ---
->>  drivers/spi/spi-bcm63xx.c | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/spi/spi-bcm63xx.c b/drivers/spi/spi-bcm63xx.c
->> index 247f71b..84c7356 100644
->> --- a/drivers/spi/spi-bcm63xx.c
->> +++ b/drivers/spi/spi-bcm63xx.c
->> @@ -147,7 +147,7 @@ struct bcm63xx_spi {
->>
->>       /* Platform data */
->>       const unsigned long     *reg_offsets;
->> -     unsigned                fifo_size;
->> +     unsigned int            fifo_size;
->>       unsigned int            msg_type_shift;
->>       unsigned int            msg_ctl_width;
->>
->> @@ -191,7 +191,7 @@ static inline void bcm_spi_writew(struct bcm63xx_spi *bs,
->>  #endif
->>  }
->>
->> -static const unsigned bcm63xx_spi_freq_table[SPI_CLK_MASK][2] = {
->> +static const unsigned int bcm63xx_spi_freq_table[SPI_CLK_MASK][2] = {
->>       { 20000000, SPI_CLK_20MHZ },
->>       { 12500000, SPI_CLK_12_50MHZ },
->>       {  6250000, SPI_CLK_6_250MHZ },
->>
->
->
 > --
-> Florian
+> 2.11.0
+>
