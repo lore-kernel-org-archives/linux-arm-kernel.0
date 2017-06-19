@@ -1,62 +1,97 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 19 Jun 2017 17:16:21 +0100
-Subject: [PATCH v5 2/3] PCI: Add tango PCIe host bridge support
-In-Reply-To: <e45533a7-e469-7faf-4b30-acf6889b982c@sigmadesigns.com>
-References: <741766e5-cff2-db5f-d40b-6866e08fd966@sigmadesigns.com>
- <1802aae0-f97b-c437-c00e-5fa7c867286d@sigmadesigns.com>
- <654acba8-68b9-fb4c-4681-35af94b6bd74@sigmadesigns.com>
- <6abfe9ce-5c32-9be0-e276-ed14253aa773@sigmadesigns.com>
- <7d9bfb52-b33a-79ea-dccf-fff1f849bd15@arm.com>
- <e45533a7-e469-7faf-4b30-acf6889b982c@sigmadesigns.com>
-Message-ID: <0d84a5fc-9549-5fef-837b-4102d2e1f1d2@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 19 Jun 2017 17:16:42 +0100
+Subject: [PATCH 16/20] arm64: signal32: move ilp32 and aarch32 common
+ code to separated file
+In-Reply-To: <20170604120009.342-17-ynorov@caviumnetworks.com>
+References: <20170604120009.342-1-ynorov@caviumnetworks.com>
+ <20170604120009.342-17-ynorov@caviumnetworks.com>
+Message-ID: <5947F8EA.9000209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/06/17 17:01, Marc Gonzalez wrote:
-> On 19/06/2017 17:58, Marc Zyngier wrote:
->> On 19/06/17 15:50, Marc Gonzalez wrote:
->>> On 07/06/2017 10:19, Marc Gonzalez wrote:
->>>
->>>> On 31/05/2017 15:33, Marc Gonzalez wrote:
->>>>
->>>>> +static int tango_pcie_probe(struct platform_device *pdev)
->>>>> +{
->>>>> +	int ret = -EINVAL;
->>>>> +	void __iomem *base;
->>>>> +	struct resource *res;
->>>>> +	struct tango_pcie *pcie;
->>>>> +	struct device *dev = &pdev->dev;
->>>>> +
->>>>> +	pr_err("MAJOR ISSUE: PCIe config and mem spaces are muxed\n");
->>>>> +	pr_err("Tainting kernel... Use driver at your own risk\n");
->>>>> +	add_taint(TAINT_FIRMWARE_WORKAROUND, LOCKDEP_STILL_OK);
->>>>
->>>> Hello Bjorn,
->>>>
->>>> In v4, your only comment was
->>>> "[muxing config and mem spaces] is a major issue and possibly even
->>>> a security problem [which requires at least an error message and a
->>>> kernel taint].
->>>>
->>>> Were there any other issues with the host bridge support?
->>>
->>> Hello Bjorn,
->>>
->>> I imagine you are now only waiting for Marc Z's Ack of patch 3/3 ?
->>> (AFAIU, all issues have been addressed as of v8 3/3.)
->>
->> Posting partial series is really not ideal, specially as you posted 3 of
->> them in less than 24 hours (and the latest was only 5 days ago).
->>
->> The maintainer is not going to chase you about potentially missing
->> patches...
-> 
-> So the best course would be posting a new series with all patches
-> bumped to v8 then?
+Hi Yury,
 
-No, because there is still the ambiguity of *which* v8 that is. Post a
-v9 that supersedes all the previously posted patches.
+On 04/06/17 13:00, Yury Norov wrote:
+> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Can I offer a body for the commit message:
+ILP32 needs to mix 32bit struct siginfo and 64bit sigframe for its signal
+handlers. Move the existing compat code for copying siginfo to user space and
+manipulating signal masks into signal32_common.c so it can be used to deliver
+aarch32 and ilp32 signals.
+
+
+> diff --git a/arch/arm64/include/asm/signal32.h b/arch/arm64/include/asm/signal32.h
+> index e68fcce538e1..1c4ede717bd2 100644
+> --- a/arch/arm64/include/asm/signal32.h
+> +++ b/arch/arm64/include/asm/signal32.h
+> @@ -13,6 +13,9 @@
+>   * You should have received a copy of the GNU General Public License
+>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
+> +
+> +#include <asm/signal32_common.h>
+> +
+>  #ifndef __ASM_SIGNAL32_H
+>  #define __ASM_SIGNAL32_H
+
+Nit: This should go inside the guard.
+
+
+> diff --git a/arch/arm64/kernel/signal32_common.c b/arch/arm64/kernel/signal32_common.c
+> new file mode 100644
+> index 000000000000..5bddc25dca12
+> --- /dev/null
+> +++ b/arch/arm64/kernel/signal32_common.c
+> @@ -0,0 +1,135 @@
+[...]
+> +#include <linux/compat.h>
+> +#include <linux/signal.h>
+> +#include <linux/ratelimit.h>
+
+What do you need ratelimit.h for?
+
+
+> +#include <linux/uaccess.h>
+> +
+> +#include <asm/esr.h>
+
+I can't see anything using these ESR_ macros in here...
+
+
+> +#include <asm/fpsimd.h>
+
+This was for the VFP save/restore code, which you didn't move...
+
+
+> +#include <asm/signal32_common.h>
+> +#include <asm/unistd.h>
+
+[...]
+
+
+> +int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
+[...]
+> +	case __SI_FAULT:
+> +		err |= __put_user((compat_uptr_t)(unsigned long)from->si_addr,
+> +				  &to->si_addr);
+
+This looks tricky. si_addr comes from FAR_EL1 when user-space touches something
+it shouldn't. This could be a 64bit value as ilp32 processes can still branch to
+64bit addresses in registers and generate loads that cross the invisible 4GB
+boundary. Here you truncate the 64bit address.
+Obviously this can't happen at all with aarch32, and for C programs its into
+undefined-behaviour territory, but it doesn't feel right to pass an address to
+user-space that we know is wrong... but we don't have an alternative.
+
+This looks like a class of problem particular to ilp32/x32: 'accessed an address
+you can't encode with a signal'. After a quick dig in x86's x32 code, it looks
+like they only pass the first 32bits of si_addr too.
+
+One option is to mint a new si_code to go with SIGBUS meaning something like
+'address overflowed si_addr'. Alternatively we could just kill tasks that do this.
+
+
+Thanks,
+
+James
