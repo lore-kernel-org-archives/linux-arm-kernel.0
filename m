@@ -1,15 +1,17 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 21:02:32 -0700
-Subject: [GIT PULL 4/4] arm64: tegra: Device tree changes for v4.13-rc1
-In-Reply-To: <20170616081306.11505-4-thierry.reding@gmail.com>
-References: <20170616081306.11505-1-thierry.reding@gmail.com>
- <20170616081306.11505-4-thierry.reding@gmail.com>
-Message-ID: <20170619040232.GG30022@localhost>
+Date: Sun, 18 Jun 2017 20:53:45 -0700
+Subject: [GIT PULL] pxa for v4.13
+In-Reply-To: <87mv99u5ol.fsf@belgarion.home>
+References: <87mv99u5ol.fsf@belgarion.home>
+Message-ID: <20170619035345.GZ30022@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 16, 2017 at 10:13:06AM +0200, Thierry Reding wrote:
-> Hi ARM SoC maintainers,
+On Thu, Jun 15, 2017 at 08:27:06AM +0200, Robert Jarzmik wrote:
+> Hello Arnd, Kevin, Olof,
+> 
+> Please consider this pull request for pxa 4.13 cycle, nothing very fancy either
+> this cycle.
 > 
 > The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 > 
@@ -17,26 +19,20 @@ On Fri, Jun 16, 2017 at 10:13:06AM +0200, Thierry Reding wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.13-arm64-dt
+>   https://github.com/rjarzmik/linux.git tags/pxa-for-4.13
 > 
-> for you to fetch changes up to 475d99fc216f4b2aed7021734838c9b578338598:
+> for you to fetch changes up to ce3de60ff92ba5e4d65f1c1ce07460795e3a6157:
 > 
->   arm64: dts: nvidia: fix PCI bus dtc warnings (2017-06-13 16:50:48 +0200)
-> 
-> Thanks,
-> Thierry
+>   ARM: pxa: Delete an error message for a failed memory allocation in pxa3xx_u2d_probe() (2017-06-14 08:32:21 +0200)
 > 
 > ----------------------------------------------------------------
-> arm64: tegra: Device tree changes for v4.13-rc1
+> This is the pxa changes for v4.13 cycle.
 > 
-> This adds the CCPLEX cluster on Tegra186, which is used to initiate CPU
-> frequency and voltage transitions.
-> 
-> Also included is a bit of cleanup for PCI related device tree content,
-> in preparation for a future DTC release that has additional checks for
-> the PCI bus.
+> This cycle is a minor fixes one, with :
+>  - Coccinelle found improvements
+>  - magician getting touchscreen driver support.
 
-Merged, thanks.
+Thanks, merged!
 
 
 -Olof
