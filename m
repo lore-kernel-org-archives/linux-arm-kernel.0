@@ -1,47 +1,187 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Mon, 19 Jun 2017 18:49:50 +0300
-Subject: [PATCH 07/20] arm64:uapi: set __BITS_PER_LONG correctly for ILP32 and
- LP64
+Date: Mon, 19 Jun 2017 18:49:51 +0300
+Subject: [PATCH 08/20] thread: move thread bits accessors to separated file
 In-Reply-To: <20170619155003.13218-1-ynorov@caviumnetworks.com>
 References: <20170619155003.13218-1-ynorov@caviumnetworks.com>
-Message-ID: <20170619155003.13218-8-ynorov@caviumnetworks.com>
+Message-ID: <20170619155003.13218-9-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Pinski <apinski@cavium.com>
+They may be accessed from low-level code, so isolating is a measure to
+avoid circular dependencies in header files.
 
-Define __BITS_PER_LONG depending on the ABI used (i.e. check whether
-__ILP32__ or __LP64__ is defined).  This is necessary for glibc to
-determine the appropriate type definitions for the system call interface.
+The exact reason for circular dependency is WARN_ON() macro added in patch
+edd63a27 "set_restore_sigmask() is never called without SIGPENDING (and
+never should be)"
 
-Signed-off-by: Andrew Pinski <apinski@cavium.com>
-Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-Reviewed-by: David Daney <ddaney@caviumnetworks.com>
 ---
- arch/arm64/include/uapi/asm/bitsperlong.h | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ include/linux/thread_bits.h | 63 +++++++++++++++++++++++++++++++++++++++++++
+ include/linux/thread_info.h | 65 +++++++++------------------------------------
+ 2 files changed, 75 insertions(+), 53 deletions(-)
+ create mode 100644 include/linux/thread_bits.h
 
-diff --git a/arch/arm64/include/uapi/asm/bitsperlong.h b/arch/arm64/include/uapi/asm/bitsperlong.h
-index fce9c2924fa3..4265243e326f 100644
---- a/arch/arm64/include/uapi/asm/bitsperlong.h
-+++ b/arch/arm64/include/uapi/asm/bitsperlong.h
-@@ -16,7 +16,14 @@
- #ifndef __ASM_BITSPERLONG_H
- #define __ASM_BITSPERLONG_H
- 
--#define __BITS_PER_LONG 64
-+#if defined(__LP64__)
-+/* Assuming __LP64__ will be defined for native ELF64's and not for ILP32. */
-+#  define __BITS_PER_LONG 64
-+#elif defined(__ILP32__)
-+#  define __BITS_PER_LONG 32
-+#else
-+#  error "Neither LP64 nor ILP32: unsupported ABI in asm/bitsperlong.h"
+diff --git a/include/linux/thread_bits.h b/include/linux/thread_bits.h
+new file mode 100644
+index 000000000000..87354331bc7b
+--- /dev/null
++++ b/include/linux/thread_bits.h
+@@ -0,0 +1,63 @@
++/* thread_bits.h: common low-level thread bits accessors */
++
++#ifndef _LINUX_THREAD_BITS_H
++#define _LINUX_THREAD_BITS_H
++
++#ifndef __ASSEMBLY__
++
++#include <linux/bitops.h>
++#include <asm/thread_info.h>
++
++#ifdef CONFIG_THREAD_INFO_IN_TASK
++/*
++ * For CONFIG_THREAD_INFO_IN_TASK kernels we need <asm/current.h> for the
++ * definition of current, but for !CONFIG_THREAD_INFO_IN_TASK kernels,
++ * including <asm/current.h> can cause a circular dependency on some platforms.
++ */
++#include <asm/current.h>
++#define current_thread_info() ((struct thread_info *)current)
 +#endif
++
++/*
++ * flag set/clear/test wrappers
++ * - pass TIF_xxxx constants to these functions
++ */
++
++static inline void set_ti_thread_flag(struct thread_info *ti, int flag)
++{
++	set_bit(flag, (unsigned long *)&ti->flags);
++}
++
++static inline void clear_ti_thread_flag(struct thread_info *ti, int flag)
++{
++	clear_bit(flag, (unsigned long *)&ti->flags);
++}
++
++static inline int test_and_set_ti_thread_flag(struct thread_info *ti, int flag)
++{
++	return test_and_set_bit(flag, (unsigned long *)&ti->flags);
++}
++
++static inline int test_and_clear_ti_thread_flag(struct thread_info *ti, int flag)
++{
++	return test_and_clear_bit(flag, (unsigned long *)&ti->flags);
++}
++
++static inline int test_ti_thread_flag(struct thread_info *ti, int flag)
++{
++	return test_bit(flag, (unsigned long *)&ti->flags);
++}
++
++#define set_thread_flag(flag) \
++	set_ti_thread_flag(current_thread_info(), flag)
++#define clear_thread_flag(flag) \
++	clear_ti_thread_flag(current_thread_info(), flag)
++#define test_and_set_thread_flag(flag) \
++	test_and_set_ti_thread_flag(current_thread_info(), flag)
++#define test_and_clear_thread_flag(flag) \
++	test_and_clear_ti_thread_flag(current_thread_info(), flag)
++#define test_thread_flag(flag) \
++	test_ti_thread_flag(current_thread_info(), flag)
++
++#endif /* !__ASSEMBLY__ */
++#endif /* _LINUX_THREAD_BITS_H */
+diff --git a/include/linux/thread_info.h b/include/linux/thread_info.h
+index d7d3ea637dd0..c40a89357329 100644
+--- a/include/linux/thread_info.h
++++ b/include/linux/thread_info.h
+@@ -7,9 +7,21 @@
+ #ifndef _LINUX_THREAD_INFO_H
+ #define _LINUX_THREAD_INFO_H
  
- #include <asm-generic/bitsperlong.h>
++/*
++ * For per-arch arch_within_stack_frames() implementations, defined in
++ * asm/thread_info.h.
++ */
++enum {
++	BAD_STACK = -1,
++	NOT_STACK = 0,
++	GOOD_FRAME,
++	GOOD_STACK,
++};
++
+ #include <linux/types.h>
+ #include <linux/bug.h>
+ #include <linux/restart_block.h>
++#include <linux/thread_bits.h>
  
+ #ifdef CONFIG_THREAD_INFO_IN_TASK
+ /*
+@@ -22,18 +34,6 @@
+ #endif
+ 
+ #include <linux/bitops.h>
+-
+-/*
+- * For per-arch arch_within_stack_frames() implementations, defined in
+- * asm/thread_info.h.
+- */
+-enum {
+-	BAD_STACK = -1,
+-	NOT_STACK = 0,
+-	GOOD_FRAME,
+-	GOOD_STACK,
+-};
+-
+ #include <asm/thread_info.h>
+ 
+ #ifdef __KERNEL__
+@@ -45,47 +45,6 @@ enum {
+ # define THREADINFO_GFP		(GFP_KERNEL_ACCOUNT | __GFP_NOTRACK)
+ #endif
+ 
+-/*
+- * flag set/clear/test wrappers
+- * - pass TIF_xxxx constants to these functions
+- */
+-
+-static inline void set_ti_thread_flag(struct thread_info *ti, int flag)
+-{
+-	set_bit(flag, (unsigned long *)&ti->flags);
+-}
+-
+-static inline void clear_ti_thread_flag(struct thread_info *ti, int flag)
+-{
+-	clear_bit(flag, (unsigned long *)&ti->flags);
+-}
+-
+-static inline int test_and_set_ti_thread_flag(struct thread_info *ti, int flag)
+-{
+-	return test_and_set_bit(flag, (unsigned long *)&ti->flags);
+-}
+-
+-static inline int test_and_clear_ti_thread_flag(struct thread_info *ti, int flag)
+-{
+-	return test_and_clear_bit(flag, (unsigned long *)&ti->flags);
+-}
+-
+-static inline int test_ti_thread_flag(struct thread_info *ti, int flag)
+-{
+-	return test_bit(flag, (unsigned long *)&ti->flags);
+-}
+-
+-#define set_thread_flag(flag) \
+-	set_ti_thread_flag(current_thread_info(), flag)
+-#define clear_thread_flag(flag) \
+-	clear_ti_thread_flag(current_thread_info(), flag)
+-#define test_and_set_thread_flag(flag) \
+-	test_and_set_ti_thread_flag(current_thread_info(), flag)
+-#define test_and_clear_thread_flag(flag) \
+-	test_and_clear_ti_thread_flag(current_thread_info(), flag)
+-#define test_thread_flag(flag) \
+-	test_ti_thread_flag(current_thread_info(), flag)
+-
+ #define tif_need_resched() test_thread_flag(TIF_NEED_RESCHED)
+ 
+ #ifndef CONFIG_HAVE_ARCH_WITHIN_STACK_FRAMES
 -- 
 2.11.0
