@@ -1,39 +1,42 @@
-From: code@mmayer.net (Markus Mayer)
-Date: Mon, 19 Jun 2017 10:26:49 -0700
-Subject: [PATCH v2 1/2] dt/bindings: Add bindings for Broadcom STB DRAM
- Sensors
-In-Reply-To: <20170618140529.wtqffjuilrkarzvd@rob-hp-laptop>
-References: <20170613223710.31719-1-code@mmayer.net>
- <20170613223710.31719-2-code@mmayer.net>
- <20170618140529.wtqffjuilrkarzvd@rob-hp-laptop>
-Message-ID: <CANEuBv6YEoTBBzPA5fkrveD05RZNtTBTak-qmxz7BvnrED5pbg@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 19 Jun 2017 10:27:33 -0700
+Subject: [PATCH v3 2/4] asm-generic: Provide a fncpy() implementation
+In-Reply-To: <20170619151818.pvjygbdvm6arvarq@yury-thinkpad>
+References: <20170617000744.22158-1-f.fainelli@gmail.com>
+ <20170617000744.22158-3-f.fainelli@gmail.com>
+ <20170618235108.peaxdi367jpkt542@yury-thinkpad>
+ <20170619151818.pvjygbdvm6arvarq@yury-thinkpad>
+Message-ID: <f9839beb-ea66-18c3-c541-b78080b560b3@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 June 2017 at 07:05, Rob Herring <robh@kernel.org> wrote:
-> On Tue, Jun 13, 2017 at 03:37:09PM -0700, Markus Mayer wrote:
->> From: Markus Mayer <mmayer@broadcom.com>
+On 06/19/2017 08:18 AM, Yury Norov wrote:
+> On Mon, Jun 19, 2017 at 02:51:08AM +0300, Yury Norov wrote:
+>> Hi Florian,
 >>
->> Provide bindings for the Broadcom STB DDR PHY Front End (DPFE).
+>> Some questions and thoughts inline.
 >>
->> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
->> ---
->>  .../devicetree/bindings/soc/bcm/brcm,dpfe-cpu.txt  | 27 ++++++++++++++++++++++
->>  1 file changed, 27 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/soc/bcm/brcm,dpfe-cpu.txt
->
-> Acked-by: Rob Herring <robh@kernel.org>
+>> Yury
+>>
+>> On Fri, Jun 16, 2017 at 05:07:42PM -0700, Florian Fainelli wrote:
+>>> Define a generic fncpy() implementation largely based on the ARM version
+>>> that requires an 8 bytes alignment for the destination address where to
+>>> copy this function as well as the function's own address.
+>>>
+>>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+>>> ---
+>>>  include/asm-generic/fncpy.h | 93 +++++++++++++++++++++++++++++++++++++++++++++
+>>>  1 file changed, 93 insertions(+)
+>>>  create mode 100644 include/asm-generic/fncpy.h
+> 
+> One else thing I forgot to ask - now you have the generic
+> implementation for fncpy(), so do you really need to save arm
+> version of it?
 
-Thanks, Rob.
+Yes, it needs to deal with the Thumb bit, and there is no point in
+making the generic implementation extremely flexible to support that
+special case.
 
-To bring up the previous discussion regarding enumerating multiple
-nodes (so far we need two dpfe nodes for some platforms), how should
-we go about this? We were originally proposing to use "cell-index",
-but you said this was OpenFirmware only and couldn't be used in device
-tree. See https://lkml.org/lkml/2017/4/27/574.
-
-We do need to use something, because the driver needs to know if it
-should be accessing dpfe0 or dpfe1. What should we use?
-
-Thanks,
--Markus
+Thanks
+-- 
+Florian
