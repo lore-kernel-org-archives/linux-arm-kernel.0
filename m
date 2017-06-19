@@ -1,49 +1,75 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 19 Jun 2017 16:03:23 +0100
-Subject: [PATCH v2] drivers/kmem: disable on arm64
-In-Reply-To: <1497883044-1276-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1497883044-1276-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20170619150323.GB9291@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 19 Jun 2017 16:03:36 +0100
+Subject: [RFC PATCH 23/33] irqchip/gic-v3-its: Add VPENDBASER/VPROPBASER
+ accessors
+In-Reply-To: <29ab17b1-40c3-205b-cb6a-ea6fdbc96ac9@codeaurora.org>
+References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
+ <1484648454-21216-24-git-send-email-marc.zyngier@arm.com>
+ <29ab17b1-40c3-205b-cb6a-ea6fdbc96ac9@codeaurora.org>
+Message-ID: <cdcdfc76-a914-49f2-3744-c711710ee868@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 19, 2017 at 04:37:24PM +0200, Ard Biesheuvel wrote:
-> On arm64, the /dev/kmem driver barely works, given that it assumes that
-> VMALLOC_START > PAGE_OFFSET, which is not the case on arm64. Due to the
+On 13/02/17 23:39, Shanker Donthineni wrote:
+> Hi Marc,
+> 
+> 
+> On 01/17/2017 04:20 AM, Marc Zyngier wrote:
+>> V{PEND,PROP}BASER being 64bit registers, they need some ad-hoc
+>> accessors on 32bit, specially given that VPENDBASER contains
+>> a Valid bit, making the access a bit convoluted.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>   arch/arm/include/asm/arch_gicv3.h   | 28 ++++++++++++++++++++++++++++
+>>   arch/arm64/include/asm/arch_gicv3.h |  5 +++++
+>>   2 files changed, 33 insertions(+)
+>>
+>> diff --git a/arch/arm/include/asm/arch_gicv3.h
+>> b/arch/arm/include/asm/arch_gicv3.h
+>> index 2747590..3f18832 100644
+>> --- a/arch/arm/include/asm/arch_gicv3.h
+>> +++ b/arch/arm/include/asm/arch_gicv3.h
+>> @@ -291,5 +291,33 @@ static inline u64 __gic_readq_nonatomic(const
+>> volatile void __iomem *addr)
+>>    */
+>>   #define gits_write_cwriter(v, c)	__gic_writeq_nonatomic(v, c)
+>>   
+>> +/*
+>> + * GITS_VPROPBASER - hi and lo bits may be accessed independently.
+>> + */
+>> +#define gits_write_vpropbaser(v, c)	__gic_writeq_nonatomic(v, c)
+>> +
+>> +/*
+>> + * GITS_VPENDBASER - the Valid bit must be cleared before changing
+>> + * anything else.
+>> + */
+>> +static inline void gits_write_vpendbaser(u64 val, void * __iomem addr)
+>> +{
+>> +	u32 tmp;
+>> +
+>> +	tmp = readl_relaxed(addr + 4);
+>> +	if (tmp & GICR_PENDBASER_Valid) {
+>> +		tmp &= ~GICR_PENDBASER_Valid;
+>> +		writel_relaxed(tmp, addr + 4);
+>> +	}
+>> +
+>> +	/*
+>> +	 * Use the fact that __gic_writeq_nonatomic writes the second
+>> +	 * half of the 64bit quantity after the first.
+>> +	 */
+>> +	__gic_writeq_nonatomic(val, addr);
+> I'm not sure whether software has to check a register write pending bit 
+> GICR_CTLR.RWP or not. GICv3 spec says, the effect of a write to 
+> GICR_VPENDBASER register is not guaranteed to be visible throughout the 
+> affinity hierarchy,as indicated by GICR_CTLR.RWP == 0.
 
-Probably worth being explicit about the failure mode here (the commit
-message you had in your RFC was much better ;).
+Yeah, that's a bit odd, and I've raised this internally. GICR_CTLR.RWP
+doesn't mention anything about GICR_VPENDBASER at all, and this makes me
+think that it could be a leftover from an earlier spec...
 
-Will
+Thanks,
 
-> dubious value of kmem on an architecture such as arm64, which is fairly
-> new and is not as forgiving as other architectures when it comes to
-> userland accesses to kernel memory using mismatched attributes*, let's
-> disable it altogether if CONFIG_ARM64=y.
-> 
-> * Mappings in the vmalloc region will be accessed using vread/vwrite when
->   reading/writing to/from /dev/kmem, which will perform these accesses by
->   kmap()'ing each page using writeback cacheable attributes. This will be
->   correct in most cases, but this is not guaranteed.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  drivers/char/Kconfig | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/char/Kconfig b/drivers/char/Kconfig
-> index 31adbebf812e..8102ee7b3247 100644
-> --- a/drivers/char/Kconfig
-> +++ b/drivers/char/Kconfig
-> @@ -17,6 +17,8 @@ config DEVMEM
->  
->  config DEVKMEM
->  	bool "/dev/kmem virtual device support"
-> +	# On arm64, VMALLOC_START < PAGE_OFFSET, which confuses kmem read/write
-> +	depends on !ARM64
->  	help
->  	  Say Y here if you want to support the /dev/kmem device. The
->  	  /dev/kmem device is rarely used, but can be used for certain
-> -- 
-> 2.7.4
-> 
+	M.
+-- 
+Jazz is not dead. It just smells funny...
