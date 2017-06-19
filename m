@@ -1,43 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 20:32:14 -0700
-Subject: [GIT PULL] Gemini DTS additions
-In-Reply-To: <CACRpkdYtj2JtBXZeHNJjf8QS1_FWvKbVUMXZJ9jvtQ3zEWVX+g@mail.gmail.com>
-References: <CACRpkdYtj2JtBXZeHNJjf8QS1_FWvKbVUMXZJ9jvtQ3zEWVX+g@mail.gmail.com>
-Message-ID: <20170619033214.GL30022@localhost>
+Date: Sun, 18 Jun 2017 20:32:58 -0700
+Subject: [GIT PULL] clean-up for omap1 for v4.13
+In-Reply-To: <594110d3.05159d0a.1eb5a.5f93SMTPIN_ADDED_BROKEN@mx.google.com>
+References: <594110d3.05159d0a.1eb5a.5f93SMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <20170619033258.GM30022@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 14, 2017 at 12:05:08AM +0200, Linus Walleij wrote:
-> The Gemini DMA controller and PATA/SATA drivers
-> have been merged by respective subsystem maintainers.
+On Wed, Jun 14, 2017 at 03:32:44AM -0700, Tony Lindgren wrote:
+> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 > 
-> This adds the DMA and PATA/SATA DTS entries with
-> numerical values for clocks and resets, which will be
-> augmented to #defines after -rc1.
-> 
-> The tag is based on top of the previous Gemini DTS
-> tag for v4.13, so goes into the same branch I guess.
-> 
-> Please pull it in!
-> 
-> Yours,
-> Linus Walleij
-> 
-> 
-> The following changes since commit 664ed4e283926d753e876a1347b7729135a3f6b8:
-> 
->   ARM: dts: Add clocks to the Gemini SoC (2017-05-24 10:50:22 +0200)
+>   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
-> tags/gemini-v4.13-dts-2
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.13/omap1-signed
 > 
-> for you to fetch changes up to 0d7a2c35d11e974b98a6396cd24b39b0f3f5bb7b:
+> for you to fetch changes up to 764e4ef0a8871339eeddaf27ccc47aeeea28b974:
 > 
->   ARM: dts: add Gemini PATA/SATA support (2017-06-13 23:58:00 +0200)
+>   ARM: OMAP1: Fix a typo in a comment line (2017-06-06 23:54:13 -0700)
+> 
+> ----------------------------------------------------------------
+> A series of omap1 changes for issues found by Coccinelle.
+> 
+> ----------------------------------------------------------------
+> Markus Elfring (5):
+>       ARM: OMAP1: DMA: Improve a size determination in omap1_system_dma_init()
+>       ARM: OMAP1: DMA: Delete an error message for a failed memory allocation in omap1_system_dma_init()
+>       ARM: OMAP1: DMA: Delete an unnecessary return statement in omap1_show_dma_caps()
+>       ARM: OMAP1: Delete an error message for a failed memory allocation in omap1_dm_timer_init()
+>       ARM: OMAP1: Fix a typo in a comment line
 
-Merged, thanks!
+Thanks, merged into next/soc.
 
 
 -Olof
