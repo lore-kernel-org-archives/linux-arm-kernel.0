@@ -1,126 +1,80 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 19 Jun 2017 12:44:16 +0100
-Subject: [PATCH] psci: add debugfs for runtime instrumentation
-In-Reply-To: <CAKfTPtBj3RBd+d_LERYdUxoQ706L6wrs5+L+MOTL7aoZmAkZ8w@mail.gmail.com>
-References: <1497601420-8783-1-git-send-email-vincent.guittot@linaro.org>
- <20170616114737.GM20092@leverpostej>
- <CAKfTPtBj3RBd+d_LERYdUxoQ706L6wrs5+L+MOTL7aoZmAkZ8w@mail.gmail.com>
-Message-ID: <20170619114415.GI10246@leverpostej>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 19 Jun 2017 13:50:39 +0200
+Subject: [RFC 2/2] mmc: meson-mx-sdio: Add a driver for the Amlogic Meson8
+ and Meson8b SoCs
+In-Reply-To: <CAFBinCD=uH=oQmWAcsMpxtbJCnJZernZx3XoNaPixUUQ7pk76w@mail.gmail.com>
+References: <20170506171857.16492-1-martin.blumenstingl@googlemail.com>
+ <20170506171857.16492-3-martin.blumenstingl@googlemail.com>
+ <CAPDyKFrrSLCjbXO9R4VqPpabiFsbE6_RqR=U7otVF4Ncv0jHjQ@mail.gmail.com>
+ <CAFBinCD3modyyOpi3OY5XLhjX0UCuV+WPY2Z=mdvwdMCyeGoqg@mail.gmail.com>
+ <CAPDyKFptXRPk7mVUiRHf=hECDbeyhTxuf3K1M6NkZcVEF0Enww@mail.gmail.com>
+ <CAFBinCD=uH=oQmWAcsMpxtbJCnJZernZx3XoNaPixUUQ7pk76w@mail.gmail.com>
+Message-ID: <CAPDyKFrbxMpgDrZXKmrN4fyJWJ_ZML3jPxBs+YDEz=L1kA-BaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 16, 2017 at 04:26:20PM +0200, Vincent Guittot wrote:
-> On 16 June 2017 at 13:47, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Fri, Jun 16, 2017 at 10:23:40AM +0200, Vincent Guittot wrote:
-> >> Add debugfs to display runtime instrumentation results that can be collected
-> >> by PSCI firmware.
-> >
-> > Could you elaborate on this please? e.g.
-> 
-> yes sorry. I should have given more details about it
-> 
-> >
-> > * What is instrumented?
-> 
-> The ARM Trusted Firwware that implements PSCI, also has a Performance
-> Measurement Framework (PMF) that can be used to save some timetamps
-> when running psci firmware. On top of PMF, serveral services have been
-> implemented like the PSCI residency stats and the runtime
-> instrumentation service. The latter saves timestamp when a PSCI
-> service is entered and then leaved or when cache maintenance is
-> executed durign psci call. With these timestamps, we can measure the
-> duration of some part of code of the PSCI firmware.
+>
+>> [...]
+>>
+>>>>> +       if (!(cmd->flags & MMC_RSP_CRC))
+>>>>> +               send |= MESON_MX_SDIO_SEND_RESP_WITHOUT_CRC7;
+>>>>> +
+>>>>> +       if (cmd->flags & MMC_RSP_BUSY)
+>>>>> +               send |= MESON_MX_SDIO_SEND_CHECK_DAT0_BUSY;
+>>>>
+>>>> In case the controller has HW support of busy detection, please
+>>>> consider to enable MMC_CAP_WAIT_WHILE_BUSY for this driver. Then also
+>>>> assign host->max_busy_timeout a good value.
+>>> the IRQS register has bit 4 (CMD_BUSY) - but apart from that there is
+>>> no other documentation (about timeout values, etc.). the vendor driver
+>>> also neither uses MMC_CAP_WAIT_WHILE_BUSY nor host->max_busy_timeout
+>>> should I leave this as it is?
+>>
+>> Please don't just leave it as is. This is an important thing to get right.
+>>
+>> You should be able to explore this area and see how the controller
+>> behaves without too much of documentation. Regarding timeouts, it may
+>> very well be that the controller don't have a timeout, which is why
+>> you need a software timeout. That's not so uncommon actually.
+> during my experiments I've never seen an interrupt when a command
+> timed out (nor could I find information about a timeout register in
+> the documentation). do you have any pointers (like a previous mail
+> where you've explained) how I can "explore the controller's timeout
+> behavior"?
 
-Ok. So PMF is an ATF concept, and not a PSCI concept (as it's not
-defined by the PSCI spec).
+Sorry, I don't have an pointers.
 
-[...]
+Anyway. If you do a big erase operation on an SD card, the card should
+signal busy on DAT0 for a rather long time.
 
-> > * On which platforms is this available, and when?
-> 
-> The code that save the timestamp is generic and as result available
-> for all platforms that implement PSCI. Nevertheless, each platfrom has
-> to enable the SMC service. At now, juno and hikey has enable the
-> service and hikey960 should some soon as well
+You could probably explore how long it takes for the card to respond
+under those circumstances, and try both with and without
+MESON_MX_SDIO_SEND_CHECK_DAT0_BUSY.
 
-Ok. So this is available on a subset of platforms using ATF.
-
-[...]
-
-> >> +config ARM_PSCI_INSTRUMENTATION
-> >> +     bool "ARM PSCI Run Time Instrumentation"
-> >> +     depends on ARM_PSCI_FW && CPU_IDLE && DEBUG_FS
-> >> +     help
-> >> +       Enable debugfs interface for PSCI FW in which you can retrieve
-> >> +       runtime instrumentation values of the PSCI firmware like time to
-> >> +       enter or leave a cpu suspend state or time to flush cache.
-> >
-> > Looking at the latest published spec (ARM DEN 0022D), PSCI doesn't
-> > provide such information, as there's only PSCI_STAT_{COUNT,RESIDENCY}.
-> 
-> This use the same Performance Measurement Framework as
-> PSCI_STAT_{COUNT,RESIDENCY}
-
-Sure, but that's an ATF implementation detail, and not something defined
-by the PSCI spec.
-
-FWIW, I'm more than happy to add support for PSCI_STAT_{COUNT,RESIDENCY}
-since these are in the spec.
-
-> > What mechanisms are you using here?
-> 
-> More details can be founded here
-> https://github.com/ARM-software/arm-trusted-firmware/blob/master/docs/firmware-design.md#13--performance-measurement-framework
-
-Thanks. This all sounds IMP DEF, with platforms able to provide their
-own monitors.
-
-> > As far as I can tell, these are not part of the PSCI standard, and I'm
-> > not aware of any documentation.
-> >
-> > I'm very much not keen on using IMPLEMENTATION DEFINED functionality in
-> > the PSCI driver, as IMP DEF stuff always creates long-term maintenance
-> > problems. You'll need to convince me that this is worth supporting.
-> 
-> I will try.
-> 
-> I have put it in psci.c as it is really about measurement latenccy of
-> psci firmware but it can probably be put somewhere else if it is more
-> relevant. The only link between current psci driver and this feature
-> is the call to psci_update_all_rt_instr() in psci_cpu_suspend_enter()
-> to make sure that we have coherent timestamp
-> Thinking a bit more about this, we can probably use the cpu_pm_exit
-
-To be honest, the more I think about this, the less keen I am on having
-it in the kernel.
-
-It's all IMP DEF, and will need additional info in DT or ACPI to be safe
-to invoke (even ignoring usable), and has subtle interactions with the
-PSCI driver. It's of limited utility to a very small number of
-developers.
+Of course you also need to try with and without
+MMC_CAP_WAIT_WHILE_BUSY, as the core may sometimes convert R1B to R1
+responses depending on that cap.
 
 [...]
 
-> >> +     /* Test if runtime instrumentation is enable */
-> >> +     if (!psci_rt_instr_enable()) {
-> >
-> > This is an unconditional initcall, so this simply is not safe.
-> 
-> you're right, it should be called only if/when psci driver has been probed
+>>
+>> It shouldn't be that hard to implement, although I strongly recommend
+>> you to address this in a second step. In other words, I suggest you to
+>> drop the entire multiple slot support in the first step, then we can
+>> deal with that on top instead.
+> many thanks for the detailed explanation again!
+> I would be fine with dropping multiple slot support for the moment
+> *if* we can agree on the fact that the devicetree binding can support
+> multiple slots in theory (my idea here is: keep the child-nodes with
+> compatible = "mmc-slot" mandatory - but only allow one such child node
+> for now). I don't want to break DT compatibility after a few
+> weeks/months for a new driver. is that OK for you as well?
 
-Even where PSCI is present, I don't believe it's safe to invoke this.
-It's a SiP call, which a vendor may have used for any other purpose.
+That's fine! We already have such a binding available for some other
+mmc controllers. We could even consider to make that binding a generic
+mmc binding.
 
-So at minimum, we'd need a description in the DT in order to know that
-we can invoke this. Since it's all IMP DEF, we'd need all the monitors
-described too, and at that point it's complex enough, and so tailored to
-ATF's internals that I really don't want this in the kernel.
+[...]
 
-So sorry, but given all of the above, I have to NAK support for this ATF
-feature.
-
-If we can get some more useful performance monitors into the PSCI spec,
-I am more than happy to support those.
-
-Thanks,
-Mark.
+Kind regards
+Uffe
