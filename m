@@ -1,16 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 20:42:41 -0700
-Subject: [GIT PULL] Allwinner fixes for 4.12
-In-Reply-To: <20170614201549.psaamipvsvy5swbt@flea.home>
-References: <20170614201549.psaamipvsvy5swbt@flea.home>
-Message-ID: <20170619034241.GU30022@localhost>
+Date: Sun, 18 Jun 2017 20:41:22 -0700
+Subject: [GIT PULL] Allwinner DT changes for 4.13
+In-Reply-To: <20170614194815.on43pqxdocd76jvc@flea.home>
+References: <20170614194815.on43pqxdocd76jvc@flea.home>
+Message-ID: <20170619034122.GS30022@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 14, 2017 at 10:15:49PM +0200, Maxime Ripard wrote:
+On Wed, Jun 14, 2017 at 09:48:15PM +0200, Maxime Ripard wrote:
 > Hi Arnd, Olof,
 > 
-> Here is a few fixes we should merge for 4.12
+> Here is our usual PR for the arm DT we have.
 > 
 > Thanks!
 > Maxime
@@ -21,19 +21,22 @@ On Wed, Jun 14, 2017 at 10:15:49PM +0200, Maxime Ripard wrote:
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-fixes-for-4.12
+>   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-dt-for-4.13
 > 
-> for you to fetch changes up to f74994a94063bc85ac1d6ad677ed06b5279c101f:
+> for you to fetch changes up to d5e9edfd37fc32098349b7753637bc1c80a16003:
 > 
->   arm64: allwinner: a64: Add PLL_PERIPH0 clock to the R_CCU (2017-06-03 10:04:49 +0800)
+>   ARM: sun6i: a31s: primo81: Enable battery power supply (2017-06-14 21:27:19 +0200)
 > 
 > ----------------------------------------------------------------
-> Allwinner fixes for 4.12
+> Allwinner DT changes for 4.13
 > 
-> A few fixes around the PRCM support that got in 4.12 with a wrong
-> compatible, and a missing clock in the binding.
+> The usual chunk of patches. The most notable improvements are the power
+> supplies improvements (battery and AC-IN), crypto support for the sun5i
+> family, HDMI support for the A10s, plus a lot of new things for the V3S and
+> the A83T.
+> 
 
-Merged, thanks.
+Merged, thanks!
 
 
 -Olof
