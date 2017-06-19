@@ -1,61 +1,49 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 19 Jun 2017 13:07:07 -0700
-Subject: [PATCH v2] spi/bcm63xx: Fix checkpatch warnings
-In-Reply-To: <1497901338.8495.50.camel@perches.com>
-References: <1497896268-5613-1-git-send-email-aravind.thk@gmail.com>
- <1497901338.8495.50.camel@perches.com>
-Message-ID: <1497902827.8495.52.camel@perches.com>
+From: rientjes@google.com (David Rientjes)
+Date: Mon, 19 Jun 2017 13:25:22 -0700 (PDT)
+Subject: [PATCH] compiler, clang: Add always_inline attribute to inline
+In-Reply-To: <1497887596-8731-1-git-send-email-psodagud@codeaurora.org>
+References: <20170615155440.GC26471@leverpostej>
+ <1497887596-8731-1-git-send-email-psodagud@codeaurora.org>
+Message-ID: <alpine.DEB.2.10.1706191322590.95967@chino.kir.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-06-19 at 12:42 -0700, Joe Perches wrote:
-> On Mon, 2017-06-19 at 23:47 +0530, Aravind Thokala wrote:
-> > This patch fixes the checkpatch.pl warnings on the driver
-> > file.
-> []
-> > diff --git a/drivers/spi/spi-bcm63xx.c b/drivers/spi/spi-bcm63xx.c
+On Mon, 19 Jun 2017, Prasad Sodagudi wrote:
+
+> Commit abb2ea7dfd82 ("compiler, clang: suppress warning for unused
+> static inline functions") re-defining the 'inline' macro but
+> __attribute__((always_inline)) is missing. Some compilers may
+> not honor inline hint if always_iniline attribute not there.
+> So add always_inline attribute to inline as done by
+> compiler-gcc.h file.
 > 
-> []
-> > @@ -191,7 +191,7 @@ static inline void bcm_spi_writew(struct bcm63xx_spi *bs,
-> >  #endif
-> >  }
-> >  
-> > -static const unsigned bcm63xx_spi_freq_table[SPI_CLK_MASK][2] = {
-> > +static const unsigned int bcm63xx_spi_freq_table[SPI_CLK_MASK][2] = {
-> >  	{ 20000000, SPI_CLK_20MHZ },
-> >  	{ 12500000, SPI_CLK_12_50MHZ },
-> >  	{  6250000, SPI_CLK_6_250MHZ },
-> 
-> It's probably better to change this array into a struct
-> to make the indexing more obvious.
-> 
-> Also the SPI_CLK_MASK uses are a bit obscure.
-> 
-> Perhaps:
+
+IIUC, __attribute__((always_inline)) was only needed for gcc versions < 4 
+and that the inlining decision making is improved in >= 4.  To make a 
+change like this, I would think that we would need to show that clang is 
+making suboptimal decisions.  I don't think there's a downside to making 
+CONFIG_OPTIMIZE_INLINING specific only to gcc.
+
+If it is shown that __attribute__((always_inline)) is needed for clang as 
+well, this should be done as part of compiler-gcc.h to avoid duplicated 
+code.
+
+> Signed-off-by: Prasad Sodagudi <psodagud@codeaurora.org>
 > ---
-> diff --git a/drivers/spi/spi-bcm63xx.c b/drivers/spi/spi-bcm63xx.c
-[]
-> -static const unsigned bcm63xx_spi_freq_table[SPI_CLK_MASK][2] = {
-> +static const struct {
-> +	unsigned int speed;
-> +	unsigned int index;
-
-Maybe index should be u8 as the one use
-it's assigned to is also u8
-
-> +} bcm63xx_spi_freq_table[] = {
-> ?	{ 20000000, SPI_CLK_20MHZ },
-> ?	{ 12500000, SPI_CLK_12_50MHZ },
-> ?	{??6250000, SPI_CLK_6_250MHZ },
-> @@ -213,8 +216,8 @@ static void bcm63xx_spi_setup_transfer(struct spi_device *spi,
-> ?
-> ?	/* Find the closest clock configuration */
-> ?	for (i = 0; i < SPI_CLK_MASK; i++) {
-> -		if (t->speed_hz >= bcm63xx_spi_freq_table[i][0]) {
-> -			clk_cfg = bcm63xx_spi_freq_table[i][1];
-> +		if (t->speed_hz >= bcm63xx_spi_freq_table[i].speed) {
-> +			clk_cfg = bcm63xx_spi_freq_table[i].index;
-> ?			break;
-> ?		}
-> ?	}
+>  include/linux/compiler-clang.h | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
+> diff --git a/include/linux/compiler-clang.h b/include/linux/compiler-clang.h
+> index d614c5e..deb65b3 100644
+> --- a/include/linux/compiler-clang.h
+> +++ b/include/linux/compiler-clang.h
+> @@ -22,4 +22,9 @@
+>   * directives.  Suppress the warning in clang as well.
+>   */
+>  #undef inline
+> +#if !defined(CONFIG_ARCH_SUPPORTS_OPTIMIZED_INLINING) ||		\
+> +    !defined(CONFIG_OPTIMIZE_INLINING)
+> +#define inline inline __attribute__((always_inline)) __attribute__((unused)) notrace
+> +#else
+>  #define inline inline __attribute__((unused)) notrace
+> +#endif
