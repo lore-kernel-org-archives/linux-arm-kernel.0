@@ -1,17 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 20:55:21 -0700
-Subject: [GIT PULL] firmware: arm_scpi: updates for v4.13
-In-Reply-To: <56eb6b7c-decb-ade3-2d74-d03f7d35c25d@arm.com>
-References: <56eb6b7c-decb-ade3-2d74-d03f7d35c25d@arm.com>
-Message-ID: <20170619035521.GA30022@localhost>
+Date: Sun, 18 Jun 2017 20:56:07 -0700
+Subject: [GIT PULL] arm64: dts: juno: updates for v4.13
+In-Reply-To: <e2f52cbd-7c6d-6a4e-1690-aa7e27f15805@arm.com>
+References: <e2f52cbd-7c6d-6a4e-1690-aa7e27f15805@arm.com>
+Message-ID: <20170619035607.GB30022@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 15, 2017 at 12:28:59PM +0100, Sudeep Holla wrote:
-> Hi ARM-SoC,
+On Thu, Jun 15, 2017 at 12:34:11PM +0100, Sudeep Holla wrote:
+> Hi ARM-SoC team,
 > 
-> The cpufreq change is acked by maintainer and Rafael agreed to take it
-> via ARM-SoC[1]. Please pull !
+> Please pull!
 > 
 > Regards,
 > Sudeep
@@ -25,19 +24,19 @@ On Thu, Jun 15, 2017 at 12:28:59PM +0100, Sudeep Holla wrote:
 > are available in the git repository at:
 > 
 >   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
-> tags/scpi-updates-4.13
+> tags/juno-updates-4.13
 > 
-> for you to fetch changes up to c0f2e21953324def9e2f8394406b557d7cb5af64:
+> for you to fetch changes up to 6806f2c70cfe145b3b6809242c8e1254071c1cf3:
 > 
->   cpufreq: scpi: use new scpi_ops functions to remove duplicate code
-> (2017-06-05 11:14:35 +0100)
+>   arm64: dts: juno: enable some SMMUs (2017-05-19 14:38:16 +0100)
 > 
 > ----------------------------------------------------------------
-> SCPI update for v4.13
+> ARMv8 Vexpress/Juno DT updates for v4.13
 > 
-> Adds support to get DVFS transition latency and OPP for any device whose
-> DVFS are managed by SCPI. This avoids code duplication in both cpufreq
-> and devfreq SCPI drivers.
+> 1. Adds support for Coresight CPU debug MMIO interface on all Juno variants.
+> 
+> 2. Enables support for few SMMUs on Juno which were previously disabled
+>    waiting for IOMMU-backed DMA API support to be stabilised.
 
 Merged, thanks.
 
