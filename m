@@ -1,31 +1,32 @@
 From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Mon, 19 Jun 2017 10:40:49 +0530
-Subject: [Patch v5 06/12] [media] v4l2-ioctl: add HEVC format description
+Date: Mon, 19 Jun 2017 10:40:48 +0530
+Subject: [Patch v5 05/12] [media] videodev2.h: Add v4l2 definition for HEVC
 In-Reply-To: <1497849055-26583-1-git-send-email-smitha.t@samsung.com>
 References: <1497849055-26583-1-git-send-email-smitha.t@samsung.com>
- <CGME20170619052507epcas1p406fa9f6d84baa9c11050b1998021788a@epcas1p4.samsung.com>
-Message-ID: <1497849055-26583-7-git-send-email-smitha.t@samsung.com>
+ <CGME20170619052505epcas5p33a78ee709263cc9ae33cd9383794ca06@epcas5p3.samsung.com>
+Message-ID: <1497849055-26583-6-git-send-email-smitha.t@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HEVC is a video coding format
+Add V4L2 definition for HEVC compressed format
 
 Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 ---
- drivers/media/v4l2-core/v4l2-ioctl.c | 1 +
+ include/uapi/linux/videodev2.h | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/drivers/media/v4l2-core/v4l2-ioctl.c b/drivers/media/v4l2-core/v4l2-ioctl.c
-index e5a2187..4f6f8d9 100644
---- a/drivers/media/v4l2-core/v4l2-ioctl.c
-+++ b/drivers/media/v4l2-core/v4l2-ioctl.c
-@@ -1257,6 +1257,7 @@ static void v4l_fill_fmtdesc(struct v4l2_fmtdesc *fmt)
- 		case V4L2_PIX_FMT_VC1_ANNEX_L:	descr = "VC-1 (SMPTE 412M Annex L)"; break;
- 		case V4L2_PIX_FMT_VP8:		descr = "VP8"; break;
- 		case V4L2_PIX_FMT_VP9:		descr = "VP9"; break;
-+		case V4L2_PIX_FMT_HEVC:		descr = "HEVC"; break;
- 		case V4L2_PIX_FMT_CPIA1:	descr = "GSPCA CPiA YUV"; break;
- 		case V4L2_PIX_FMT_WNVA:		descr = "WNVA"; break;
- 		case V4L2_PIX_FMT_SN9C10X:	descr = "GSPCA SN9C10X"; break;
+diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+index 2b8feb8..488de3d 100644
+--- a/include/uapi/linux/videodev2.h
++++ b/include/uapi/linux/videodev2.h
+@@ -629,6 +629,7 @@ struct v4l2_pix_format {
+ #define V4L2_PIX_FMT_VC1_ANNEX_L v4l2_fourcc('V', 'C', '1', 'L') /* SMPTE 421M Annex L compliant stream */
+ #define V4L2_PIX_FMT_VP8      v4l2_fourcc('V', 'P', '8', '0') /* VP8 */
+ #define V4L2_PIX_FMT_VP9      v4l2_fourcc('V', 'P', '9', '0') /* VP9 */
++#define V4L2_PIX_FMT_HEVC     v4l2_fourcc('H', 'E', 'V', 'C') /* HEVC */
+ 
+ /*  Vendor-specific formats   */
+ #define V4L2_PIX_FMT_CPIA1    v4l2_fourcc('C', 'P', 'I', 'A') /* cpia1 YUV */
 -- 
 2.7.4
