@@ -1,128 +1,39 @@
-From: ore@pengutronix.de (Oleksij Rempel)
-Date: Mon, 19 Jun 2017 16:33:55 +0200
-Subject: [PATCH v5 2/3] nvmem: add snvs_lpgpr driver
-In-Reply-To: <2b309881-0134-c3f8-2037-b0e106719a64@i2se.com>
-References: <20170609125730.25502-1-o.rempel@pengutronix.de>
- <20170609125730.25502-3-o.rempel@pengutronix.de>
- <2b309881-0134-c3f8-2037-b0e106719a64@i2se.com>
-Message-ID: <20170619143355.2qeuetsx2pbvlgng@pengutronix.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 19 Jun 2017 16:37:24 +0200
+Subject: [PATCH v2] drivers/kmem: disable on arm64
+Message-ID: <1497883044-1276-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+On arm64, the /dev/kmem driver barely works, given that it assumes that
+VMALLOC_START > PAGE_OFFSET, which is not the case on arm64. Due to the
+dubious value of kmem on an architecture such as arm64, which is fairly
+new and is not as forgiving as other architectures when it comes to
+userland accesses to kernel memory using mismatched attributes*, let's
+disable it altogether if CONFIG_ARM64=y.
 
-On Fri, Jun 09, 2017 at 05:01:09PM +0200, Stefan Wahren wrote:
-> Hi Oleksij,
-> 
-> please add the NXP guys in CC in order to give them a chance to review.
-> 
-> Am 09.06.2017 um 14:57 schrieb Oleksij Rempel:
-> > This is a driver for Low Power General Purpose Register (LPGPR)
-> > available on i.MX6 SoCs in Secure Non-Volatile Storage (SNVS)
-> > of this chip.
-> >
-> > It is a 32-bit read/write register located in the low power domain.
-> > Since LPGPR is located in the battery-backed power domain, LPGPR can
-> > be used by any application for retaining data during an SoC power-down
-> > mode.
-> >
-> > Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> > ---
-> >  drivers/nvmem/Kconfig      |  10 ++++
-> >  drivers/nvmem/Makefile     |   2 +
-> >  drivers/nvmem/snvs_lpgpr.c | 138 +++++++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 150 insertions(+)
-> >  create mode 100644 drivers/nvmem/snvs_lpgpr.c
-> >
-> > diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-> > index 101ced4c84be..ea3044c5d6ee 100644
-> > --- a/drivers/nvmem/Kconfig
-> > +++ b/drivers/nvmem/Kconfig
-> > @@ -144,4 +144,14 @@ config MESON_EFUSE
-> >  	  This driver can also be built as a module. If so, the module
-> >  	  will be called nvmem_meson_efuse.
-> >  
-> > +config NVMEM_SNVS_LPGPR
-> > +	tristate "Support for Low Power General Purpose Register"
-> > +	depends on SOC_IMX6 || COMPILE_TEST
-> > +	help
-> > +	  This is a driver for Low Power General Purpose Register (LPGPR) available on
-> > +	  i.MX6 SoCs in Secure Non-Volatile Storage (SNVS) of this chip.
-> > +
-> > +	  This driver can also be built as a module. If so, the module
-> > +	  will be called nvmem-snvs-lpgpr.
-> > +
-> >  endif
-> > diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
-> > index 173140658693..4c589184acee 100644
-> > --- a/drivers/nvmem/Makefile
-> > +++ b/drivers/nvmem/Makefile
-> > @@ -30,3 +30,5 @@ obj-$(CONFIG_NVMEM_VF610_OCOTP)	+= nvmem-vf610-ocotp.o
-> >  nvmem-vf610-ocotp-y		:= vf610-ocotp.o
-> >  obj-$(CONFIG_MESON_EFUSE)	+= nvmem_meson_efuse.o
-> >  nvmem_meson_efuse-y		:= meson-efuse.o
-> > +obj-$(CONFIG_NVMEM_SNVS_LPGPR)	+= nvmem_snvs_lpgpr.o
-> > +nvmem_snvs_lpgpr-y		:= snvs_lpgpr.o
-> > diff --git a/drivers/nvmem/snvs_lpgpr.c b/drivers/nvmem/snvs_lpgpr.c
-> > new file mode 100644
-> > index 000000000000..acb3ddc0d990
-> > --- /dev/null
-> > +++ b/drivers/nvmem/snvs_lpgpr.c
-> > @@ -0,0 +1,138 @@
-> > +/*
-> > + * Copyright (c) 2015 Pengutronix, Steffen Trumtrar <kernel@pengutronix.de>
-> > + * Copyright (c) 2017 Pengutronix, Oleksij Rempel <kernel@pengutronix.de>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2
-> > + * as published by the Free Software Foundation.
-> > + */
-> > +
-> > +#include <linux/mfd/syscon.h>
-> > +#include <linux/module.h>
-> > +#include <linux/nvmem-provider.h>
-> > +#include <linux/of_device.h>
-> > +#include <linux/regmap.h>
-> > +
-> > +struct snvs_lpgpr_cfg {
-> > +	int offset;
-> > +};
-> > +
-> > +struct snvs_lpgpr_priv {
-> > +	struct device_d			*dev;
-> > +	struct regmap			*regmap;
-> > +	struct nvmem_config		cfg;
-> > +	const struct snvs_lpgpr_cfg	*dcfg;
-> > +};
-> > +
-> > +static const struct snvs_lpgpr_cfg snvs_lpgpr_cfg_imx6q = {
-> > +	.offset = 0x68,
-> > +};
-> > +
-> > +static int snvs_lpgpr_write(void *context, unsigned int offset, void *_val,
-> > +			    size_t bytes)
-> > +{
-> > +	struct snvs_lpgpr_priv *priv = context;
-> > +	const struct snvs_lpgpr_cfg *dcfg = priv->dcfg;
-> > +	const u32 *val = _val;
-> > +	int i = 0, words = bytes / 4;
-> > +
-> > +	while (words--)
-> > +		regmap_write(priv->regmap, dcfg->offset + offset + (i++ * 4),
-> > +			     *val++);
-> 
-> according to the reference manual "57.9.14 SNVS_LP General Purpose
-> Register (SNVS_LPGPR)":
-> 
->     When GPR_SL or GPR_HL bit is set, the register cannot be programmed.
-> 
-> I think the driver should handle this error case properly.
+* Mappings in the vmalloc region will be accessed using vread/vwrite when
+  reading/writing to/from /dev/kmem, which will perform these accesses by
+  kmap()'ing each page using writeback cacheable attributes. This will be
+  correct in most cases, but this is not guaranteed.
 
-good point,
-I'll update it.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ drivers/char/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
+diff --git a/drivers/char/Kconfig b/drivers/char/Kconfig
+index 31adbebf812e..8102ee7b3247 100644
+--- a/drivers/char/Kconfig
++++ b/drivers/char/Kconfig
+@@ -17,6 +17,8 @@ config DEVMEM
+ 
+ config DEVKMEM
+ 	bool "/dev/kmem virtual device support"
++	# On arm64, VMALLOC_START < PAGE_OFFSET, which confuses kmem read/write
++	depends on !ARM64
+ 	help
+ 	  Say Y here if you want to support the /dev/kmem device. The
+ 	  /dev/kmem device is rarely used, but can be used for certain
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.7.4
