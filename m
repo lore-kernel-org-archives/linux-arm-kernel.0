@@ -1,40 +1,51 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Mon, 19 Jun 2017 04:11:05 +0300
-Subject: [PATCH v3 2/4] asm-generic: Provide a fncpy() implementation
-In-Reply-To: <20170618235108.peaxdi367jpkt542@yury-thinkpad>
-References: <20170617000744.22158-1-f.fainelli@gmail.com>
- <20170617000744.22158-3-f.fainelli@gmail.com>
- <20170618235108.peaxdi367jpkt542@yury-thinkpad>
-Message-ID: <20170619011105.gjkisjrrtzlmgk6s@yury-thinkpad>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 19 Jun 2017 09:16:27 +0800
+Subject: [PATCH v4 09/28] tty: serial: Add Actions Semi Owl UART earlycon
+In-Reply-To: <55059fdd-5c54-ee6c-3e63-b5a9035c1745@suse.de>
+References: <20170606005426.26446-1-afaerber@suse.de>
+ <20170606005426.26446-10-afaerber@suse.de>
+ <55059fdd-5c54-ee6c-3e63-b5a9035c1745@suse.de>
+Message-ID: <20170619011627.GB11287@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > +/*
-> > + * Minimum alignment requirement for the source and destination addresses
-> > + * for function copying.
-> > + */
-> > +#define FNCPY_ALIGN 8
+On Sun, Jun 18, 2017 at 11:45:28PM +0200, Andreas F?rber wrote:
+> Greg,
 > 
-> >From now this is not arm-only, and it's possible that some architectures
-> might want to redefine it in their arch/xxx/include/asm/fncpy.h files.
-> So it will be easier for them if you'll wrap FNCPY_ALIGN here with #ifdef
-> guards.
+> Am 06.06.2017 um 02:54 schrieb Andreas F?rber:
+> > This implements an earlycon for Actions Semi S500/S900 SoCs.
+> > 
+> > Based on LeMaker linux-actions tree.
+> > 
+> > Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> > ---
+> >  v3 -> v4: Unchanged
+> >  
+> >  v2 -> v3:
+> >  * Adopted BIT() macro
+> >  
+> >  v1 -> v2:
+> >  * Extended Kconfig help to mention earlycon (Arnd)
+> >  * Spelled out Actions Semiconductor in Kconfig help
+> >  * Adopted "actions" vendor prefix
+> >  
+> >  drivers/tty/serial/Kconfig    |  19 ++++++
+> >  drivers/tty/serial/Makefile   |   1 +
+> >  drivers/tty/serial/owl-uart.c | 135 ++++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 155 insertions(+)
+> >  create mode 100644 drivers/tty/serial/owl-uart.c
 > 
-> By the way, compiler already has an information on the proper alignment.
-> Maybe it's better to use it as the default value here instead of the
-> hardcoded value?
+> The DT vendor prefix is applied to my linux-actions.git tree now, and
+> the serial binding has been ack'ed by Rob.
 > 
-> #ifndef FNCPY_ALIGN
-> #define FNCPY_ALIGN ({void foo(); __alignof__(&foo);})
-> #endif
+> Is there anything keeping you from adding this patch, the preceding DT
+> binding (08/28) and the following documentation patch (10/28) to your
+> tree for 4.13?
 
-Ah sorry, at first it should be like this:
-#define FNCPY_ALIGN ({void foo(); __alignof__(foo);})
+Yeah, I don't have it in my queue anymore :)
 
-And at second, the correct version returns 1 always.
+Can you resend it just as a single patch?
 
-Even if I pass falign-functions=4096 to gcc, and I see that functions
-are aligned accordingly in elf file, the macro returns 1 anyway. So if 
-it doesn't work, the hardcoded '8' is the only option.
+thanks,
 
-Yury
+greg k-h
