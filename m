@@ -1,42 +1,77 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Mon, 19 Jun 2017 11:18:02 +0530
-Subject: [PATCH v2] soc: ti: knav_dma: make of_device_ids const.
-Message-ID: <1045459264f851ecf3ea8d21bc1594dec79eb337.1497851119.git.arvind.yadav.cs@gmail.com>
+From: cyndis@kapsi.fi (Mikko Perttunen)
+Date: Mon, 19 Jun 2017 08:59:11 +0300
+Subject: [GIT PULL 1/4] soc/tegra: Changes for v4.13-rc1
+In-Reply-To: <20170619040045.GD30022@localhost>
+References: <20170616081306.11505-1-thierry.reding@gmail.com>
+ <20170619040045.GD30022@localhost>
+Message-ID: <7de8de14-b0ad-883c-58ec-847789be118b@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_device_ids are not supposed to change at runtime. All functions
-working with of_device_ids provided by <linux/of.h> work with const
-of_device_ids. So mark the non-const structs as const.
+On 06/19/2017 07:00 AM, Olof Johansson wrote:
+> Hi,
+> 
+> On Fri, Jun 16, 2017 at 10:13:03AM +0200, Thierry Reding wrote:
+>> Hi ARM SoC maintainers,
+>>
+>> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+>>
+>>    Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>    git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.13-soc
+>>
+>> for you to fetch changes up to da1dbec1be2b54c16649e33e479708a55156e311:
+>>
+>>    soc/tegra: flowctrl: Fix error handling (2017-06-13 16:47:44 +0200)
+>>
+>> Thanks,
+>> Thierry
+>>
+>> ----------------------------------------------------------------
+>> soc/tegra: Changes for v4.13-rc1
+>>
+>> This contains an implementation of generic PM domains for Tegra186,
+>> based on the BPMP powergate request.
+>>
+>> ----------------------------------------------------------------
+>> Christophe Jaillet (1):
+>>        soc/tegra: flowctrl: Fix error handling
+>>
+>> Thierry Reding (3):
+>>        PM / Domains: Allow overriding the ->xlate() callback
+>>        soc/tegra: bpmp: Update ABI header
+>>        soc/tegra: bpmp: Implement generic PM domains
+>>
+>>   drivers/base/power/domain.c        |   8 +-
+>>   drivers/firmware/tegra/bpmp.c      |   4 +
+>>   drivers/soc/tegra/Kconfig          |   5 +
+>>   drivers/soc/tegra/Makefile         |   1 +
+>>   drivers/soc/tegra/flowctrl.c       |   2 +-
+>>   drivers/soc/tegra/powergate-bpmp.c | 359 +++++++++++++++++++++++++++++++
+>>   include/linux/pm_domain.h          |   4 +
+>>   include/soc/tegra/bpmp-abi.h       | 418 ++++++++++++++++++++++++++++++++++++-
+>>   include/soc/tegra/bpmp.h           |  12 ++
+> 
+> Merged, but does the bpmp-abi.h really belong in include/soc? Seems like most
+> of it is internal ABI for whatever abstraction communicates with bpmp, in this
+> case powergate. Locating it as a headerfile under drivers/soc/tegra/ seems to
+> make more sense. Care to move it?
 
-File size before:
-   text	   data	    bss	    dec	    hex	filename
-   2234	    608	      8	   2850	    b22	drivers/soc/ti/knav_dma.o
+The header is used by all drivers that communicate with the BPMP, and 
+they are scattered around the tree in their corresponding modules - e.g. 
+drivers/clk/tegra/clk-bpmp.c, or the upcoming 
+drivers/thermal/tegra/bpmp-thermal.c.
 
-File size after constify keystone_qmss_of_match.
-   text	   data	    bss	    dec	    hex	filename
-   2650	    192	      8	   2850	    b22	drivers/soc/ti/knav_dma.o
+Cheers,
+Mikko
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
----
-Changes in v1:
-              Subject was wrong. It should be constify of_match.
-
- drivers/soc/ti/knav_dma.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/soc/ti/knav_dma.c b/drivers/soc/ti/knav_dma.c
-index ecebe2e..c8d1e3c 100644
---- a/drivers/soc/ti/knav_dma.c
-+++ b/drivers/soc/ti/knav_dma.c
-@@ -791,7 +791,7 @@ static int knav_dma_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--static struct of_device_id of_match[] = {
-+static const struct of_device_id of_match[] = {
- 	{ .compatible = "ti,keystone-navigator-dma", },
- 	{},
- };
--- 
-1.9.1
+> 
+> 
+> -Olof
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
