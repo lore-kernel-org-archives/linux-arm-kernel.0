@@ -1,39 +1,68 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Mon, 19 Jun 2017 14:54:03 +0530
-Subject: [PATCH] drm: exynos: hdmi: make of_device_ids const.
-Message-ID: <6012220ff3c7dad339686f411ff372e7897e60c4.1497863911.git.arvind.yadav.cs@gmail.com>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Mon, 19 Jun 2017 11:25:13 +0200
+Subject: [PATCH v2 12/12] ASoC: Fix use-after-free at card unregistration
+In-Reply-To: <1497857229-12049-13-git-send-email-robert.jarzmik@free.fr>
+References: <1497857229-12049-1-git-send-email-robert.jarzmik@free.fr>
+ <1497857229-12049-13-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <s5hefug72iu.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_device_ids are not supposed to change at runtime. All functions
-working with of_device_ids provided by <linux/of.h> work with const
-of_device_ids. So mark the non-const structs as const.
+On Mon, 19 Jun 2017 09:27:09 +0200,
+Robert Jarzmik wrote:
+> 
+> From: Takashi Iwai <tiwai@suse.de>
+> 
+> soc_cleanup_card_resources() call snd_card_free() at the last of its
+> procedure.  This turned out to lead to a use-after-free.
+> PCM runtimes have been already removed via soc_remove_pcm_runtimes(),
+> while it's dereferenced later in soc_pcm_free() called via
+> snd_card_free().
+> 
+> The fix is simple: just move the snd_card_free() call to the beginning
+> of the whole procedure.  This also gives another benefit: it
+> guarantees that all operations have been shut down before actually
+> releasing the resources, which was racy until now.
+> 
+> Reported-and-tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> Cc: <stable@vger.kernel.org>
+> Signed-off-by: Takashi Iwai <tiwai@suse.de>
 
-File size before:
-   text	   data	    bss	    dec	    hex	filename
-  12294	   1192	      0	  13486	   34ae	drivers/gpu/drm/exynos/exynos_hdmi.o
+This patch must be superfluous :)
 
-File size after constify hdmi_match_types.
-   text	   data	    bss	    dec	    hex	filename
-  13318	    176	      0	  13494	   34b6	drivers/gpu/drm/exynos/exynos_hdmi.o
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
----
- drivers/gpu/drm/exynos/exynos_hdmi.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Takashi
 
-diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
-index 1ff6ab6..624c48d 100644
---- a/drivers/gpu/drm/exynos/exynos_hdmi.c
-+++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
-@@ -1683,7 +1683,7 @@ static int hdmi_resources_init(struct hdmi_context *hdata)
- 	return hdmi_bridge_init(hdata);
- }
- 
--static struct of_device_id hdmi_match_types[] = {
-+static const struct of_device_id hdmi_match_types[] = {
- 	{
- 		.compatible = "samsung,exynos4210-hdmi",
- 		.data = &exynos4210_hdmi_driver_data,
--- 
-1.9.1
+
+> ---
+>  sound/soc/soc-core.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/sound/soc/soc-core.c b/sound/soc/soc-core.c
+> index 2722bb0c5573..98d60f471c5d 100644
+> --- a/sound/soc/soc-core.c
+> +++ b/sound/soc/soc-core.c
+> @@ -2286,6 +2286,9 @@ static int soc_cleanup_card_resources(struct snd_soc_card *card)
+>  	list_for_each_entry(rtd, &card->rtd_list, list)
+>  		flush_delayed_work(&rtd->delayed_work);
+>  
+> +	/* free the ALSA card at first; this syncs with pending operations */
+> +	snd_card_free(card->snd_card);
+> +
+>  	/* remove and free each DAI */
+>  	soc_remove_dai_links(card);
+>  	soc_remove_pcm_runtimes(card);
+> @@ -2300,9 +2303,7 @@ static int soc_cleanup_card_resources(struct snd_soc_card *card)
+>  	if (card->remove)
+>  		card->remove(card);
+>  
+> -	snd_card_free(card->snd_card);
+>  	return 0;
+> -
+>  }
+>  
+>  /* removes a socdev */
+> -- 
+> 2.1.4
+> 
+> 
