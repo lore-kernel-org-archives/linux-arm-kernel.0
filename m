@@ -1,114 +1,39 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Mon, 19 Jun 2017 17:59:59 +0800
-Subject: [PATCH 2/3] PCI: mediatek: turn off subsys power if no link up
- detected
-In-Reply-To: <1497866400-41844-1-git-send-email-ryder.lee@mediatek.com>
-References: <1497866400-41844-1-git-send-email-ryder.lee@mediatek.com>
-Message-ID: <1497866400-41844-3-git-send-email-ryder.lee@mediatek.com>
+From: mika.westerberg@linux.intel.com (Mika Westerberg)
+Date: Mon, 19 Jun 2017 13:02:09 +0300
+Subject: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO devices
+ before scanning
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E40ACFB8D@FRAEML521-MBX.china.huawei.com>
+References: <EE11001F9E5DDD47B7634E2F8A612F2E40AAE3DA@FRAEML521-MBX.china.huawei.com>
+ <20170613151013.GT3187@lahna.fi.intel.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40AAF0BF@FRAEML521-MBX.china.huawei.com>
+ <20170613200339.GX3187@lahna.fi.intel.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40AB537A@FRAEML521-MBX.china.huawei.com>
+ <20170616083313.GY3187@lahna.fi.intel.com>
+ <CAJZ5v0gWGL=M1+T2DxFfwAi=gCbBBnLFVyp4u+1EVem-mcSNQg@mail.gmail.com>
+ <20170616120048.GC629@lahna.fi.intel.com>
+ <CAJZ5v0g+qVui6RU=Hy3c_3qAAWngqaAu6B3JxGOpqF06kitbzA@mail.gmail.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E40ACFB8D@FRAEML521-MBX.china.huawei.com>
+Message-ID: <20170619100209.GC629@lahna.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to keep controller power on if slots are all empty,
-so a check is added to turn it off. Besides, host controllers may not
-need PM domain in some SoCs, thus we add dev->pm_domain to check that.
+On Mon, Jun 19, 2017 at 09:50:49AM +0000, Gabriele Paoloni wrote:
+> Many thanks for your response and your help here.
+> 
+> I guess that as conclusion with respect to the current v9 patchset we can
+> disregard the idea of MFD and modify the current v9 so that it doesn't
+> touch directly ACPI resources.
+> Instead as I proposed before we can have the scan handler to enumerate
+> the children devices and translate its addresses filling dev->resources[] and
+> at the same time we can modify acpi_default_enumeration to check
+> acpi_device_enumerated() before continuing with device enumeration...?
+> 
+> Do you think it as a viable solution?
 
-Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
----
- drivers/pci/host/pcie-mediatek.c | 40 ++++++++++++++++++++++++++++------------
- 1 file changed, 28 insertions(+), 12 deletions(-)
+No, I think MFD + scan handler inside the MFD driver is the way to go.
+We don't want to trash ACPI core with stuff that does not belong there
+IMHO.
 
-diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-index 165d82d..d256263 100644
---- a/drivers/pci/host/pcie-mediatek.c
-+++ b/drivers/pci/host/pcie-mediatek.c
-@@ -118,6 +118,18 @@ static inline bool mtk_pcie_link_is_up(struct mtk_pcie_port *port)
- 	return !!(readl(port->base + PCIE_LINK_STATUS) & PCIE_PORT_LINKUP);
- }
- 
-+static void mtk_pcie_subsys_powerdown(struct mtk_pcie *pcie)
-+{
-+	struct device *dev = pcie->dev;
-+
-+	clk_disable_unprepare(pcie->free_ck);
-+
-+	if (dev->pm_domain) {
-+		pm_runtime_put_sync(dev);
-+		pm_runtime_disable(dev);
-+	}
-+}
-+
- static void mtk_pcie_port_free(struct mtk_pcie_port *port)
- {
- 	struct mtk_pcie *pcie = port->pcie;
-@@ -130,7 +142,6 @@ static void mtk_pcie_port_free(struct mtk_pcie_port *port)
- 
- static void mtk_pcie_put_resources(struct mtk_pcie *pcie)
- {
--	struct device *dev = pcie->dev;
- 	struct mtk_pcie_port *port, *tmp;
- 
- 	list_for_each_entry_safe(port, tmp, &pcie->ports, list) {
-@@ -139,9 +150,7 @@ static void mtk_pcie_put_resources(struct mtk_pcie *pcie)
- 		mtk_pcie_port_free(port);
- 	}
- 
--	clk_disable_unprepare(pcie->free_ck);
--	pm_runtime_put_sync(dev);
--	pm_runtime_disable(dev);
-+	mtk_pcie_subsys_powerdown(pcie);
- }
- 
- static void __iomem *mtk_pcie_map_bus(struct pci_bus *bus,
-@@ -340,10 +349,10 @@ static int mtk_pcie_subsys_powerup(struct mtk_pcie *pcie)
- 		return PTR_ERR(pcie->free_ck);
- 	}
- 
--	pm_runtime_enable(dev);
--	err = pm_runtime_get_sync(dev);
--	if (err)
--		goto err_pm;
-+	if (dev->pm_domain) {
-+		pm_runtime_enable(dev);
-+		pm_runtime_get_sync(dev);
-+	}
- 
- 	/* enable top level clock */
- 	err = clk_prepare_enable(pcie->free_ck);
-@@ -355,9 +364,10 @@ static int mtk_pcie_subsys_powerup(struct mtk_pcie *pcie)
- 	return 0;
- 
- err_free_ck:
--	pm_runtime_put_sync(dev);
--err_pm:
--	pm_runtime_disable(dev);
-+	if (dev->pm_domain) {
-+		pm_runtime_put_sync(dev);
-+		pm_runtime_disable(dev);
-+	}
- 
- 	return err;
- }
-@@ -439,6 +449,10 @@ static int mtk_pcie_setup(struct mtk_pcie *pcie)
- 	list_for_each_entry_safe(port, tmp, &pcie->ports, list)
- 		mtk_pcie_enable_ports(port);
- 
-+	/* power down PCIe subsys if slots are all empty(link down) */
-+	if (list_empty(&pcie->ports))
-+		mtk_pcie_subsys_powerdown(pcie);
-+
- 	return 0;
- }
- 
-@@ -522,7 +536,9 @@ static int mtk_pcie_probe(struct platform_device *pdev)
- 	return 0;
- 
- put_resources:
--	mtk_pcie_put_resources(pcie);
-+	if (!list_empty(&pcie->ports))
-+		mtk_pcie_put_resources(pcie);
-+
- 	return err;
- }
- 
--- 
-1.9.1
+Also you don't need to modify acpi_default_enumeration() because you can
+mark your device enumerated in the MFD driver. So all the dirty details
+will be in the MFD driver and not in ACPI core.
