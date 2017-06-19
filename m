@@ -1,34 +1,40 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 21:03:23 -0700
-Subject: [GIT PULL 2/2] DaVinci defconfig updates for v4.13 (part 2)
-In-Reply-To: <20170616122029.27623-2-nsekhar@ti.com>
-References: <20170616122029.27623-1-nsekhar@ti.com>
- <20170616122029.27623-2-nsekhar@ti.com>
-Message-ID: <20170619040323.GI30022@localhost>
+Date: Sun, 18 Jun 2017 21:01:54 -0700
+Subject: [GIT PULL 3/4] ARM: tegra: Device tree changes for v4.13-rc1
+In-Reply-To: <20170616081306.11505-3-thierry.reding@gmail.com>
+References: <20170616081306.11505-1-thierry.reding@gmail.com>
+ <20170616081306.11505-3-thierry.reding@gmail.com>
+Message-ID: <20170619040154.GF30022@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 16, 2017 at 05:50:29PM +0530, Sekhar Nori wrote:
-> The following changes since commit 0b997c8c9562dd61733dfeb9e1a5962730338e6e:
+On Fri, Jun 16, 2017 at 10:13:05AM +0200, Thierry Reding wrote:
+> Hi ARM SoC maintainers,
 > 
->   ARM: davinci_all_defconfig: Enable CPPI 4.1 USB OTG DMA (2017-05-30 16:12:51 +0530)
+> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+> 
+>   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.13/defconfig-2
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.13-arm-dt
 > 
-> for you to fetch changes up to 82cc56ccf127899cde1d74a0380c29814ceb1b71:
+> for you to fetch changes up to 508d690e94218d306ab2092d6ee95ca75f9fa98b:
 > 
->   ARM: davinci_all_defconfig: enable USB CDC NCM gadget (2017-06-16 13:38:42 +0530)
+>   ARM: dts: tegra: fix PCI bus dtc warnings (2017-06-13 16:49:57 +0200)
+> 
+> Thanks,
+> Thierry
 > 
 > ----------------------------------------------------------------
-> Enable mtdtests and USB NCM gadget in DaVinci kernel
-> (as modules).
+> ARM: tegra: Device tree changes for v4.13-rc1
 > 
-> ----------------------------------------------------------------
-> Sekhar Nori (2):
->       ARM: davinci_all_defconfig: enable mtdtests
->       ARM: davinci_all_defconfig: enable USB CDC NCM gadget
+> This removes support for the Whistler board, which only a handful of
+> people ever had access to and which doesn't provide any features over
+> other Tegra20 devices that we support.
+> 
+> Also this cleans up some PCI related device tree content in preparation
+> for a future DTC release that has additional checks for the PCI bus.
 
 Merged, thanks.
 
