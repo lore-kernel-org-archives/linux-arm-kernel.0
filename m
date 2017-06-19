@@ -1,70 +1,55 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 19 Jun 2017 12:03:47 +0100
-Subject: [PATCH 5/5] arm64: signal: Allow expansion of the signal frame
-In-Reply-To: <20170619101204.GA8543@e103592.cambridge.arm.com>
-References: <1497535442-11586-1-git-send-email-Dave.Martin@arm.com>
- <1497535442-11586-6-git-send-email-Dave.Martin@arm.com>
- <20170616104740.GA31526@e104818-lin.cambridge.arm.com>
- <20170619101204.GA8543@e103592.cambridge.arm.com>
-Message-ID: <20170619110346.GB3024@e104818-lin.cambridge.arm.com>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Mon, 19 Jun 2017 11:17:30 +0000
+Subject: [PATCH] gpio: rcar: Add R8A7743 (RZ/G1M) support
+In-Reply-To: <d7242a3b-bf30-1683-29e0-90c847ce8eaf@cogentembedded.com>
+References: <1497619944-61410-1-git-send-email-biju.das@bp.renesas.com>
+ <d7242a3b-bf30-1683-29e0-90c847ce8eaf@cogentembedded.com>
+Message-ID: <KL1PR06MB170245DC49AB2DF041FC97E9B8C40@KL1PR06MB1702.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 19, 2017 at 11:12:29AM +0100, Dave P Martin wrote:
-> On Fri, Jun 16, 2017 at 11:47:41AM +0100, Catalin Marinas wrote:
-> > On Thu, Jun 15, 2017 at 03:03:42PM +0100, Dave P Martin wrote:
-> > > +struct extra_context {
-> > > +	struct _aarch64_ctx head;
-> > > +	void __user *data;	/* 16-byte aligned pointer to extra space */
-> > > +	__u32 size;		/* size in bytes of the extra space */
-> > > +	__u32 __reserved[3];
-> > > +};
-> > 
-> > Some more thoughts on the type of "data" above. It's the first time we
-> > introduce pointers in sigcontext and wonder whether __u64 would make
-> > more sense (invariable size with the ABI).
-> 
-> I'm happy to change this if you want -- it can be a __u64 without
-> impacting the semantics.
+> Subject: Re: [PATCH] gpio: rcar: Add R8A7743 (RZ/G1M) support
+>
+> Hello!
+>
+> On 06/16/2017 04:32 PM, Biju Das wrote:
+>
+> > Renesas RZ/G1M (R8A7743 SoC) GPIO blocks are identical to the R-Car
+> Gen2
+>
+>     SoC should be outside the parens.
 
-I was thinking in the context of ILP32 but we can address this
-separately for the exported kernel headers and glibc definitions.
-Looking at this structure from an LP64 perspective, it indeed makes
-sense to keep it as void *. We have other UAPI structures with user
-pointers already.
+Thanks. I will correct it.
 
-> > Also for discussion - whether using an offset vs absolute address would
-> > be better.
-> 
-> My rationale here related to the ucontext semantics associated with
-> the signal frame, rather than signal handling itself.
-> 
-> Consider:
-> 
-> void signal_handler(int n, siginfo_t *si, void *uc)
-> {
-> 	*signal_context = *(ucontext_t *)uc;
-> }
-> 
-> Will this "work"?  On most machines, yes it will. 
-> 
-> With an expanded signal frame on arm64, it won't work: the copied
-> context will be truncated at the end of __reserved[].  If extra_data
-> uses an offset to locate the additional data then someone parsing
-> *signal_context won't be able to detect the error and will overrun:
-> this includes rt_sigreturn (if that is run on a stack that has the
-> copied context).
-> 
-> If a pointer is used in extra_context, this provides some chance of
-> handling this: naive code like the above will result in a ucontext_t
-> whose extra_context data pointer is "wrong": extra_context aware
-> parsers can detect that and error out or ignore the remaining data.
-> extra_context aware code that wants to copy the signal context can walk
-> the signal frame to determine its true size, allocate memory, copy, and
-> then update the extra_context data pointer in the new copy.
+>
+> > family. Add support for its GPIO controllers.
+> >
+> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> > Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+> > ---
+> >  Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt | 1 +
+> >  drivers/gpio/gpio-rcar.c                                     | 4 ++++
+> >  2 files changed, 5 insertions(+)
+> >
+> > diff --git a/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
+> b/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
+> > index 7c1ab3b..1cc3cfe 100644
+> > --- a/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
+> > +++ b/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
+> > @@ -3,6 +3,7 @@
+> >  Required Properties:
+> >
+> >    - compatible: should contain one of the following.
+> > +    - "renesas,gpio-r8a7743": for R8A7743 (RZ-G1M) compatible GPIO
+> controller.
+>
+>     Not RZ/G1M?
 
-Thanks for the explanation, it makes sense to keep an absolute pointer
-here rather than offset. So no further changes needed to this patch.
+I will change this to RZ/G1M and will push V2.
 
--- 
-Catalin
+Regards,
+Biju
+
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
