@@ -1,17 +1,20 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 22:56:19 -0700
-Subject: [GIT PULL] ARM: at91: DT for 4.13
-In-Reply-To: <20170616162608.ucjxtqpvjhdj77gy@piout.net>
-References: <20170616162608.ucjxtqpvjhdj77gy@piout.net>
-Message-ID: <20170619055619.GO7703@localhost>
+Date: Sun, 18 Jun 2017 22:53:48 -0700
+Subject: [GIT PULL] ARM: at91: SoC for 4.13
+In-Reply-To: <20170616161951.c4gwpk3wgpic7kpp@piout.net>
+References: <20170616161951.c4gwpk3wgpic7kpp@piout.net>
+Message-ID: <20170619055348.GN7703@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 16, 2017 at 06:26:08PM +0200, Alexandre Belloni wrote:
+On Fri, Jun 16, 2017 at 06:19:51PM +0200, Alexandre Belloni wrote:
+> Hi,
+> 
 > Arnd, Olof,
 > 
-> Here is the DT pull request, switching most platform the the new EBI and
-> NAND bindings.
+> Our now unusually large update for AT91 SoCs, introducing surpport for
+> three new families of SoCs, cortex M7 based and a new deep suspend mode
+> for sama5d2.
 > 
 > The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 > 
@@ -19,42 +22,19 @@ On Fri, Jun 16, 2017 at 06:26:08PM +0200, Alexandre Belloni wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.13-dt
+>   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.13-soc
 > 
-> for you to fetch changes up to bc03ce08396786c92d6591a81682c7da7accbfc8:
+> for you to fetch changes up to 8a3d809373c6790b3958f74fa5640aedd4e804dd:
 > 
->   ARM: dts: at91: sama5d2_xplained: remove wrong memory node (2017-06-08 23:49:17 +0200)
-> 
-> ----------------------------------------------------------------
-> DT for 4.13
-> 
->  - Switch to the new NAND binding
->  - A few non urgent fixes
+>   ARM: at91: remove atmel_nand_data (2017-06-13 15:41:28 +0200)
 > 
 > ----------------------------------------------------------------
-> Baruch Siach (1):
->       ARM: dts: at91: sama5d2_xplained: remove wrong memory node
+> SoC for 4.13:
 > 
-> Boris Brezillon (4):
->       dt-bindings: mtd: atmel-nand: Document the nfc-io bindings
->       ARM: dts: at91: Declare EBI/NAND controllers
->       ARM: dts: at91: Switch to the new NAND bindings
->       ARM: dts: at91: Add the NOR flash available on sama5d3 dev kits
-> 
-> Claudiu Beznea (1):
->       ARM: dts: at91: sama5d2_xplained: add pwm controller
-> 
-> Javier Martinez Canillas (1):
->       ARM: dts: at91: Add generic compatible string for I2C EEPROM
-> 
-> Uwe Kleine-K?nig (2):
->       dts: gpio_atmel: adapt binding doc to reality
->       ARM: dts: at91-sama5d4: use IRQ_TYPE_* to specify irq flags
-> 
-> Wenyou Yang (1):
->       ARM: dts: at91: sama5d2: add m_can nodes
+>  - New suspend/resume mode for sama5d2
+>  - Initial support for armv7m based SoCs
 
-Merged, thanks.
+Merged, thanks!
 
 
 -Olof
