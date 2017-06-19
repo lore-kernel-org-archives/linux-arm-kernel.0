@@ -1,97 +1,48 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 19 Jun 2017 18:41:49 +0100
-Subject: [PATCH v2 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
- erratum 161010801
-In-Reply-To: <20170619154500.92336-3-shameerali.kolothum.thodi@huawei.com>
-References: <20170619154500.92336-1-shameerali.kolothum.thodi@huawei.com>
- <20170619154500.92336-3-shameerali.kolothum.thodi@huawei.com>
-Message-ID: <311de3aa-aec9-f403-d9a8-48b3e3de54c3@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 19 Jun 2017 18:43:48 +0100
+Subject: [PATCH v3 2/4] asm-generic: Provide a fncpy() implementation
+In-Reply-To: <20170619151818.pvjygbdvm6arvarq@yury-thinkpad>
+References: <20170617000744.22158-1-f.fainelli@gmail.com>
+ <20170617000744.22158-3-f.fainelli@gmail.com>
+ <20170618235108.peaxdi367jpkt542@yury-thinkpad>
+ <20170619151818.pvjygbdvm6arvarq@yury-thinkpad>
+Message-ID: <20170619174348.GA23750@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/06/17 16:45, shameer wrote:
-> The HiSilicon erratum 161010801 describes the limitation of HiSilicon
-> platforms Hip06/Hip07 to support the SMMU mappings for MSI transactions.
-> 
-> On these platforms GICv3 ITS translator is presented with the deviceID
-> by extending the MSI payload data to 64 bits to include the deviceID.
-> Hence, the PCIe controller on this platforms has to differentiate the
-> MSI payload against other DMA payload and has to modify the MSI payload.
-> This basically makes it difficult for this platforms to have a SMMU
-> translation for MSI.
-> 
-> This patch implements a ACPI table based quirk to reserve the hw msi
-> regions in the smmu-v3 driver which means these address regions will
-> not be translated and will be excluded from iova allocations.
-> 
-> Signed-off-by: shameer <shameerali.kolothum.thodi@huawei.com>
-> ---
->  drivers/iommu/arm-smmu-v3.c | 29 ++++++++++++++++++++++++-----
->  1 file changed, 24 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index abe4b88..f03c63b 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -597,6 +597,7 @@ struct arm_smmu_device {
->  	u32				features;
->  
->  #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-> +#define ARM_SMMU_OPT_RESV_HW_MSI	(1 << 1)
->  	u32				options;
->  
->  	struct arm_smmu_cmdq		cmdq;
-> @@ -1904,14 +1905,31 @@ static void arm_smmu_get_resv_regions(struct device *dev,
->  				      struct list_head *head)
->  {
->  	struct iommu_resv_region *region;
-> +	struct arm_smmu_device *smmu;
-> +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
->  	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
->  
-> -	region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
-> -					 prot, IOMMU_RESV_SW_MSI);
-> -	if (!region)
-> -		return;
-> +	smmu = arm_smmu_get_by_fwnode(fwspec->iommu_fwnode);
-> +
-> +	if (smmu && (smmu->options & ARM_SMMU_OPT_RESV_HW_MSI) &&
+On Mon, Jun 19, 2017 at 06:18:18PM +0300, Yury Norov wrote:
+> One else thing I forgot to ask - now you have the generic
+> implementation for fncpy(), so do you really need to save arm
+> version of it?
 
-AFAICS, iommu_get_resv_regions is only ever called on devices which are
-at least already part of an iommu_group, so smmu should never
-legitimately be NULL. I'd say if you really want to be robust against
-flagrant API misuse, at least WARN_ON and bail out immediately.
+This was covered in the review of v1, which took the ARM version
+and incorrectly used it as an asm-generic implementation.
 
-Robin.
+I explicitly asked Florian _not_ to copy the ARM fncpy() version
+to asm-generic because it has (surprise surprise) ARM specific
+behaviours that do not belong in a cross-architecture generic
+version.
 
-> +		      dev_is_pci(dev)) {
-> +		int ret = -EINVAL;
-> +
-> +		if (!is_of_node(smmu->dev->fwnode))
-> +			ret = iort_iommu_its_get_resv_regions(dev, head);
->  
-> -	list_add_tail(&region->list, head);
-> +		if (ret) {
-> +			dev_warn(dev, "HW MSI region resv failed: %d\n", ret);
-> +			return;
-> +		}
-> +	} else {
-> +		region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
-> +						 prot, IOMMU_RESV_SW_MSI);
-> +		if (!region)
-> +			return;
-> +
-> +		list_add_tail(&region->list, head);
-> +	}
->  
->  	iommu_dma_get_resv_regions(dev, head);
->  }
-> @@ -2611,6 +2629,7 @@ static void parse_driver_acpi_options(struct acpi_iort_smmu_v3 *iort_smmu,
->  	switch (iort_smmu->model) {
->  	case ACPI_IORT_SMMU_HISILICON_HI161X:
->  		smmu->options |= ARM_SMMU_OPT_SKIP_PREFETCH;
-> +		smmu->options |= ARM_SMMU_OPT_RESV_HW_MSI;
->  		break;
->  	default:
->  		break;
-> 
+Namely, the ARM specific behaviour that bit 0 of a code address is
+used to signal whether the code should be executed as ARM code or
+as Thumb code.
+
+This behaviour has no meaning on other architectures (eg, x86)
+where code addresses are not 32-bit aligned.
+
+So, suggesting that the ARM fncpy() should be used as an asm-generic
+version is completely absurd, and just because we have an asm-generic
+version also does not mean ARM should use it.
+
+Florian's approach to providing an asm-generic version, leaving the
+ARM specific version is entirely correct and appropriate.
+
+So, in answer to your question, yes, we need _both_ an ARM specific
+version and an asm-generic version, where the ARM specific version is
+different from the asm-generic version.  Purely because it needs
+architecture specific details.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
