@@ -1,48 +1,65 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 19 Jun 2017 18:43:48 +0100
-Subject: [PATCH v3 2/4] asm-generic: Provide a fncpy() implementation
-In-Reply-To: <20170619151818.pvjygbdvm6arvarq@yury-thinkpad>
-References: <20170617000744.22158-1-f.fainelli@gmail.com>
- <20170617000744.22158-3-f.fainelli@gmail.com>
- <20170618235108.peaxdi367jpkt542@yury-thinkpad>
- <20170619151818.pvjygbdvm6arvarq@yury-thinkpad>
-Message-ID: <20170619174348.GA23750@n2100.armlinux.org.uk>
+From: aravind.thk@gmail.com (Aravind Thokala)
+Date: Mon, 19 Jun 2017 23:15:27 +0530
+Subject: [PATCH] mips: bcm63xx: spi: Fix checkpatch.pl warnings
+In-Reply-To: <2d01bbe8-33bd-9aea-8906-0fe54bb2c334@gmail.com>
+References: <1497890980-4334-1-git-send-email-aravind.thk@gmail.com>
+ <2d01bbe8-33bd-9aea-8906-0fe54bb2c334@gmail.com>
+Message-ID: <CAAUiYHd8TrD7HuLU9SpmSXUB-Aph8qToCkDBpqWyqks2fwnF7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 19, 2017 at 06:18:18PM +0300, Yury Norov wrote:
-> One else thing I forgot to ask - now you have the generic
-> implementation for fncpy(), so do you really need to save arm
-> version of it?
+Hi Florian,
 
-This was covered in the review of v1, which took the ARM version
-and incorrectly used it as an asm-generic implementation.
+On 19 June 2017 at 22:51, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> On 06/19/2017 09:49 AM, Aravind Thokala wrote:
+>> This patch fixes the checkpatch.pl warnings on the driver
+>> file.
+>>
+>> Signed-off-by: Aravind Thokala <aravind.thk@gmail.com>
+>
+> The subject should be spi/bcm63xx: Fix checkpatch warnings to be
+> consistent with previous submissions done to that file.
 
-I explicitly asked Florian _not_ to copy the ARM fncpy() version
-to asm-generic because it has (surprise surprise) ARM specific
-behaviours that do not belong in a cross-architecture generic
-version.
+Thanks, I will send v2 patch with the change in subject.
 
-Namely, the ARM specific behaviour that bit 0 of a code address is
-used to signal whether the code should be executed as ARM code or
-as Thumb code.
+>
+> With that:
+>
+> Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 
-This behaviour has no meaning on other architectures (eg, x86)
-where code addresses are not 32-bit aligned.
+Thank you for reviewing the patch.
 
-So, suggesting that the ARM fncpy() should be used as an asm-generic
-version is completely absurd, and just because we have an asm-generic
-version also does not mean ARM should use it.
+Aravind.
 
-Florian's approach to providing an asm-generic version, leaving the
-ARM specific version is entirely correct and appropriate.
-
-So, in answer to your question, yes, we need _both_ an ARM specific
-version and an asm-generic version, where the ARM specific version is
-different from the asm-generic version.  Purely because it needs
-architecture specific details.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>
+>> ---
+>>  drivers/spi/spi-bcm63xx.c | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/spi/spi-bcm63xx.c b/drivers/spi/spi-bcm63xx.c
+>> index 247f71b..84c7356 100644
+>> --- a/drivers/spi/spi-bcm63xx.c
+>> +++ b/drivers/spi/spi-bcm63xx.c
+>> @@ -147,7 +147,7 @@ struct bcm63xx_spi {
+>>
+>>       /* Platform data */
+>>       const unsigned long     *reg_offsets;
+>> -     unsigned                fifo_size;
+>> +     unsigned int            fifo_size;
+>>       unsigned int            msg_type_shift;
+>>       unsigned int            msg_ctl_width;
+>>
+>> @@ -191,7 +191,7 @@ static inline void bcm_spi_writew(struct bcm63xx_spi *bs,
+>>  #endif
+>>  }
+>>
+>> -static const unsigned bcm63xx_spi_freq_table[SPI_CLK_MASK][2] = {
+>> +static const unsigned int bcm63xx_spi_freq_table[SPI_CLK_MASK][2] = {
+>>       { 20000000, SPI_CLK_20MHZ },
+>>       { 12500000, SPI_CLK_12_50MHZ },
+>>       {  6250000, SPI_CLK_6_250MHZ },
+>>
+>
+>
+> --
+> Florian
