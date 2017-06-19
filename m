@@ -1,16 +1,18 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 20:06:59 -0700
-Subject: [GIT PULL] STM32 DT changes for v4.13 #1
-In-Reply-To: <2b77deee-6816-d58f-bc75-07cfd10e011e@st.com>
-References: <2b77deee-6816-d58f-bc75-07cfd10e011e@st.com>
-Message-ID: <20170619030659.GX30022@localhost>
+Date: Sun, 18 Jun 2017 20:12:24 -0700
+Subject: [GIT PULL] ARM: dts: uniphier: UniPhier DT updates for v4.13
+In-Reply-To: <CAK7LNASkEJOdbpOu7rf9WYZsTbbfnW=hyiHxV9w8jOD=WMmCew@mail.gmail.com>
+References: <CAK7LNASkEJOdbpOu7rf9WYZsTbbfnW=hyiHxV9w8jOD=WMmCew@mail.gmail.com>
+Message-ID: <20170619031224.GA30022@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 12, 2017 at 02:08:21PM +0200, Alexandre Torgue wrote:
-> Hi Olof, Arnd and Kevin,
+On Tue, Jun 13, 2017 at 12:41:04AM +0900, Masahiro Yamada wrote:
+> Hi Arnd, Olof,
 > 
-> Please consider this first round of STM32 DT updates for v4.13:
+> Here are UniPhier DT (32bit) updates for the v4.13 merge window.
+> Please pull!
+> 
 > 
 > The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 > 
@@ -18,28 +20,22 @@ On Mon, Jun 12, 2017 at 02:08:21PM +0200, Alexandre Torgue wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git
-> tags/stm32-dt-for-v4.13-1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
+> tags/uniphier-dt-v4.13
 > 
-> for you to fetch changes up to 437074645873d77e8958be4f7eeec66a69cf0077:
+> for you to fetch changes up to 73f9de0c7f5dd9eae6949135a7b316cb02365519:
 > 
->   ARM: dts: stm32: Add stm32h743i-disco board (2017-06-09 16:38:42 +0200)
+>   ARM: dts: uniphier: Add generic compatible string for I2C EEPROM
+> (2017-06-10 01:10:41 +0900)
 > 
 > ----------------------------------------------------------------
-> STM32 DT updates for v4.13, round 1
+> UniPhier ARM SoC DT updates for v4.13
 > 
-> Highlights:
-> ----------
->  - Add stm32h743-disco board support
->  - Add stm32f746-disco board support
->  - Add stm32f769-disco board support
->  - Enable LTDC & simple pannel on stm32f429-eval
->  - Enable Watchdog on stm32f429-eval
->  - Enable DCMI on stm32f429-eval
->  - Enable STMPE1600 io expander on stm32f429-eval
->  - Enable OV2640 camera on stm32f429-eval
->  - Enable CRC on stm32f429-eval & stm32f429-disco
+> - fix W=1 build warnings
+> - use SPDX License Identifier
+> - add generic compatible string for I2C EEPROM
 
-Merged, thanks.
+Thanks, merged.
+
 
 -Olof
