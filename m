@@ -1,60 +1,54 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Mon, 19 Jun 2017 20:50:40 +0200
-Subject: [PATCH] watchdog: meson-wdt: add support for the watchdog on
- Meson8 and Meson8m2
-In-Reply-To: <20170616180009.h66dwnnhfwrjpui6@rob-hp-laptop>
-References: <20170611095219.22095-1-martin.blumenstingl@googlemail.com>
- <20170615172510.GA7549@roeck-us.net>
- <CAFBinCCyqX=TGwTyhxXZPP2noUvJ1v=xNs+Vs17Gg4z2uDgjEA@mail.gmail.com>
- <20170616180009.h66dwnnhfwrjpui6@rob-hp-laptop>
-Message-ID: <CAFBinCAZZMT-YDHg4SYF3da+00KLYE-dZaEDPaEMRz_2paXNQw@mail.gmail.com>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Mon, 19 Jun 2017 14:26:33 -0500
+Subject: [PATCH] [perf/core branch] perf coresight: Fix ARM builds
+ caused by misplaced __printf
+In-Reply-To: <20170619184209.GB13640@kernel.org>
+References: <20170616145907.baba73eda242efe194e072d0@arm.com>
+ <CANLsYkyG3E9xiOyJz_5EA0B0oQGsSCy2oW7i1iY5YUxU1imKng@mail.gmail.com>
+ <20170619184209.GB13640@kernel.org>
+Message-ID: <20170619142633.51d138db0c0b8befa0542bf6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Mon, 19 Jun 2017 15:42:09 -0300
+Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
 
-On Sun, Jun 18, 2017 at 4:04 PM, Rob Herring <robh@kernel.org> wrote:
-> On Thu, Jun 15, 2017 at 11:13:07PM +0200, Martin Blumenstingl wrote:
->> On Thu, Jun 15, 2017 at 7:25 PM, Guenter Roeck <linux@roeck-us.net> wrote:
->> > On Sun, Jun 11, 2017 at 11:52:19AM +0200, Martin Blumenstingl wrote:
->> >> The watchdog IP block on Meson8 and Meson8m2 is already supported by the
->> >> existing meson-wdt driver. Meson8 uses the same register bits as Meson6,
->> >> while the newer Meson8m2 SoC uses the same register bits as Meson8b.
->> >>
->> >> Currently watchdog support on Meson8 SoC already works because
->> >> meson8.dtsi simply uses the "amlogic,meson6-wdt" compatible. Adding a
->> >> separate compatible for Meson8 makes this more explicit though.
->> >>
->> >> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->> >
->> > Reviewed-by: Guenter Roeck <linux@roeck-us.net>
->> thank you!
->> is there anything holding you up from taking this patch (for example:
->> are you still missing any specific Signed-off-by / Acked-by)?
->>
->> > In general, changes like this are not necessary, though. The dts file
->> > is supposed to reference both generic and specific compatible strings.
->> I thought about skipping this patch, but I find that it looks strange without.
->>
->> the hierarchy and the corresponding compatible strings would be:
->> meson.dtsi / compatible = "amlogic,meson6-wdt";
->> |- meson8.dtsi / compatible = "amlogic,meson8-wdt", "amlogic,meson6-wdt";
->>    |- meson8m2.dtsi (upcoming) / compatible = "amlogic,meson8m2-wdt",
->> "amlogic,meson8b-wdt";
->> |- meson8b.dtsi / compatible = "amlogic,meson8b-wdt";
->>
->> instead of this seemingly random mixup of compatible strings I decided
->> to introduce separate ones for each SoC.
->
-> But if the block is backwards compatible, you should also provide a
-> fallback compatible string.
-OK, fine with me - do you want me to update the documentation to
-reflect this (or is it enough if I take care of it in the .dts files)?
-the resulting documentation could look like this:
-       "amlogic,meson6-wdt" on Meson6 SoCs
-       "amlogic,meson8-wdt" along with "amlogic,meson6-wdt" on Meson8 SoCs
-       "amlogic,meson8b-wdt" on Meson8b SoCs
-       "amlogic,meson8m2-wdt" along with "amlogic,meson8b-wdt" on Meson8m2 SoCs
+> Em Mon, Jun 19, 2017 at 11:51:20AM -0600, Mathieu Poirier escreveu:
+> > On 16 June 2017 at 13:59, Kim Phillips <kim.phillips@arm.com> wrote:
+> > > -static int cs_device__print_file(const char *name, const char *fmt, ...) __printf(2, 3)
+> > > +static int __printf(2, 3) cs_device__print_file(const char *name, const char *fmt, ...)
+> > >  {
+> > >         va_list args;
+> > >         FILE *file;
+> > 
+> > I just tested Kim's solution on my side.
+> > 
+> > Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> 
+> Thanks for checking, since I haven't pushed this to Ingo I just squashed
+> Kim's fix into the buggy cset.
+> 
+> Now I'm trying to build it with lots of cross build containers to see if
+> there are any other problems before push this up to Ingo.
 
-Regards,
-Martin
+Thanks, I'm still trying to learn the submission process...
+
+Slightly off-topic, but when you push kernel.org/.../acme/linux.git, do
+you push --tags?
+
+If I do a fresh clone, checkout perf/core or urgent, build perf,
+PERF-VERSION-GEN first uses git to find the version number, then the
+Makefile.  But in acme/linux.git, the latest version tag looks to match
+the master branch version: 3.2: so I get a 3.2-reporting version on
+what should be 4.12-rc4 (perf/core's current Makefile):
+
+$ tools/perf/perf --version
+perf version 3.2.gd15e591
+
+Is this an acme/linux.git tree maintenance issue, or should
+PERF-VERSION-GEN be modified to compare versions gotten from git vs.
+the Makefile, and just use the higher one?
+
+Thanks,
+
+Kim
