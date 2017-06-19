@@ -1,57 +1,43 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 22:51:07 -0700
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Bindings
- Updates for v4.13
-In-Reply-To: <cover.1497617896.git.horms+renesas@verge.net.au>
-References: <cover.1497617896.git.horms+renesas@verge.net.au>
-Message-ID: <20170619055107.GK7703@localhost>
+Date: Sun, 18 Jun 2017 22:51:56 -0700
+Subject: [GIT PULL] Renesas ARM Based SoC R-Car SYSC Updates for v4.13
+In-Reply-To: <cover.1497619041.git.horms+renesas@verge.net.au>
+References: <cover.1497619041.git.horms+renesas@verge.net.au>
+Message-ID: <20170619055156.GL7703@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 16, 2017 at 03:30:57PM +0200, Simon Horman wrote:
+On Fri, Jun 16, 2017 at 03:31:08PM +0200, Simon Horman wrote:
 > Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Please consider these second round of Renesas ARM based SoC DT bindings
-> updates for v4.13.
+> Please consider these Renesas ARM based SoC R-Car SYSC updates for v4.13.
 > 
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-dt-bindings-for-v4.13,
-> which I you have already pulled.
+> This has been separated out from the pull request
+> "[GIT PULL] Renesas ARM Based SoC Drivers Updates for v4.13"
+> due to differing dependencies. It seems cleanest to provide separate
+> branchs rather than do a merge to create a common base for a single branch.
 > 
 > 
-> The following changes since commit 40c9bbea140e64a4257b794969e759c2c481c399:
+> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 > 
->   ARM: dts: r7s72100: add USB bit definitions (2017-05-15 09:02:37 +0200)
+>   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-bindings2-for-v4.13
+>   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-rcar-sysc-for-v4.13
 > 
-> for you to fetch changes up to 521ec12e2f56b16e6a0b4e7ef97a666bd3de4ff5:
+> for you to fetch changes up to 980532a5dda319eeafadc5c590376626ad178f4f:
 > 
->   ARM: shmobile: Document Renesas H3-based Salvator-XS board DT bindings (2017-06-12 11:59:07 +0200)
-> 
-> ----------------------------------------------------------------
-> Second Round of Renesas ARM Based SoC DT Bindings Updates for v4.13
-> 
-> * Document:
->   - Add Renesas H3-based Salvator-XS board DT bindings
->   - Add iW-RainboW-G20D-Qseven-RZG1M board
->   - Add iW-RainboW-G20M-Qseven-RZG1M system on module
->   - Update R-Car Gen3 ULCB board part numbers
-> * Add clock bit definitions for r7s72100 SoC
+>   soc: renesas: rcar-sysc: Use GENPD_FLAG_ALWAYS_ON (2017-06-15 21:10:41 +0200)
 > 
 > ----------------------------------------------------------------
-> Biju Das (2):
->       ARM: shmobile: document iW-RainboW-G20M-Qseven-RZG1M system on module
->       ARM: shmobile: document iW-RainboW-G20D-Qseven-RZG1M board
+> Renesas ARM Based SoC R-Car SYSC Updates for v4.13
 > 
-> Chris Brandt (1):
->       ARM: dts: r7s72100: add clock bit definitions
+> Use GENPD_FLAG_ALWAYS_ON in R-Car SYSC driver
 > 
-> Geert Uytterhoeven (2):
->       ARM: shmobile: Update R-Car Gen3 ULCB board part numbers
->       ARM: shmobile: Document Renesas H3-based Salvator-XS board DT bindings
+> ----------------------------------------------------------------
+> Geert Uytterhoeven (1):
+>       soc: renesas: rcar-sysc: Use GENPD_FLAG_ALWAYS_ON
 
 Merged, thanks.
 
