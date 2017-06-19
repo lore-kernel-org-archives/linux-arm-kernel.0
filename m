@@ -1,97 +1,42 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 19 Jun 2017 17:16:42 +0100
-Subject: [PATCH 16/20] arm64: signal32: move ilp32 and aarch32 common
- code to separated file
-In-Reply-To: <20170604120009.342-17-ynorov@caviumnetworks.com>
-References: <20170604120009.342-1-ynorov@caviumnetworks.com>
- <20170604120009.342-17-ynorov@caviumnetworks.com>
-Message-ID: <5947F8EA.9000209@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 19 Jun 2017 17:19:10 +0100
+Subject: [PATCH 2/2] ASoC: zx_aud96p22: add ZTE ZX AUD96P22 codec driver
+In-Reply-To: <1497708574-22380-3-git-send-email-shawnguo@kernel.org>
+References: <1497708574-22380-1-git-send-email-shawnguo@kernel.org>
+ <1497708574-22380-3-git-send-email-shawnguo@kernel.org>
+Message-ID: <20170619161910.siea75hqxgtxhjmp@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yury,
+On Sat, Jun 17, 2017 at 10:09:34PM +0800, Shawn Guo wrote:
 
-On 04/06/17 13:00, Yury Norov wrote:
-> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+> +	/* Mute control */
+> +	SOC_DOUBLE("Playback Master Mute", AUD96P22_MUTE_2, 0, 1, 1, 0),
+> +	SOC_DOUBLE("Headset Mute", AUD96P22_MUTE_2, 4, 5, 1, 0),
 
-Can I offer a body for the commit message:
-ILP32 needs to mix 32bit struct siginfo and 64bit sigframe for its signal
-handlers. Move the existing compat code for copying siginfo to user space and
-manipulating signal masks into signal32_common.c so it can be used to deliver
-aarch32 and ilp32 signals.
+As covered in ControlNames.txt mute and other on/off controls should be
+named ending in Switch so UIs know what to do with them.
 
-
-> diff --git a/arch/arm64/include/asm/signal32.h b/arch/arm64/include/asm/signal32.h
-> index e68fcce538e1..1c4ede717bd2 100644
-> --- a/arch/arm64/include/asm/signal32.h
-> +++ b/arch/arm64/include/asm/signal32.h
-> @@ -13,6 +13,9 @@
->   * You should have received a copy of the GNU General Public License
->   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->   */
+> +static int aud96p22_startup(struct snd_pcm_substream *substream,
+> +			    struct snd_soc_dai *dai)
+> +{
+> +	struct aud96p22_priv *priv = snd_soc_codec_get_drvdata(dai->codec);
+> +	struct regmap *regmap = priv->regmap;
 > +
-> +#include <asm/signal32_common.h>
-> +
->  #ifndef __ASM_SIGNAL32_H
->  #define __ASM_SIGNAL32_H
+> +	/* Overall power-up */
+> +	regmap_update_bits(regmap, AUD96P22_PD_0, PD_0_PDZ, PD_0_PDZ);
 
-Nit: This should go inside the guard.
+Why is this not done with DAPM?
 
+> +	/* Reset ADC and DAC path */
+> +	regmap_write(regmap, AUD96P22_RESET, 0x0);
+> +	regmap_write(regmap, AUD96P22_RESET, 0x3);
 
-> diff --git a/arch/arm64/kernel/signal32_common.c b/arch/arm64/kernel/signal32_common.c
-> new file mode 100644
-> index 000000000000..5bddc25dca12
-> --- /dev/null
-> +++ b/arch/arm64/kernel/signal32_common.c
-> @@ -0,0 +1,135 @@
-[...]
-> +#include <linux/compat.h>
-> +#include <linux/signal.h>
-> +#include <linux/ratelimit.h>
-
-What do you need ratelimit.h for?
-
-
-> +#include <linux/uaccess.h>
-> +
-> +#include <asm/esr.h>
-
-I can't see anything using these ESR_ macros in here...
-
-
-> +#include <asm/fpsimd.h>
-
-This was for the VFP save/restore code, which you didn't move...
-
-
-> +#include <asm/signal32_common.h>
-> +#include <asm/unistd.h>
-
-[...]
-
-
-> +int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
-[...]
-> +	case __SI_FAULT:
-> +		err |= __put_user((compat_uptr_t)(unsigned long)from->si_addr,
-> +				  &to->si_addr);
-
-This looks tricky. si_addr comes from FAR_EL1 when user-space touches something
-it shouldn't. This could be a 64bit value as ilp32 processes can still branch to
-64bit addresses in registers and generate loads that cross the invisible 4GB
-boundary. Here you truncate the 64bit address.
-Obviously this can't happen at all with aarch32, and for C programs its into
-undefined-behaviour territory, but it doesn't feel right to pass an address to
-user-space that we know is wrong... but we don't have an alternative.
-
-This looks like a class of problem particular to ilp32/x32: 'accessed an address
-you can't encode with a signal'. After a quick dig in x86's x32 code, it looks
-like they only pass the first 32bits of si_addr too.
-
-One option is to mint a new si_code to go with SIGBUS meaning something like
-'address overflowed si_addr'. Alternatively we could just kill tasks that do this.
-
-
-Thanks,
-
-James
+What does this mean?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170619/43a45f64/attachment.sig>
