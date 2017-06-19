@@ -1,25 +1,62 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 19 Jun 2017 17:16:06 +0100
-Subject: [PATCH 1/2] ASoC: add bindings for ZTE zx-aud96p22 audio codec
-In-Reply-To: <1497708574-22380-2-git-send-email-shawnguo@kernel.org>
-References: <1497708574-22380-1-git-send-email-shawnguo@kernel.org>
- <1497708574-22380-2-git-send-email-shawnguo@kernel.org>
-Message-ID: <20170619161606.g6nabi2w5mmmjbcw@sirena.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 19 Jun 2017 17:16:21 +0100
+Subject: [PATCH v5 2/3] PCI: Add tango PCIe host bridge support
+In-Reply-To: <e45533a7-e469-7faf-4b30-acf6889b982c@sigmadesigns.com>
+References: <741766e5-cff2-db5f-d40b-6866e08fd966@sigmadesigns.com>
+ <1802aae0-f97b-c437-c00e-5fa7c867286d@sigmadesigns.com>
+ <654acba8-68b9-fb4c-4681-35af94b6bd74@sigmadesigns.com>
+ <6abfe9ce-5c32-9be0-e276-ed14253aa773@sigmadesigns.com>
+ <7d9bfb52-b33a-79ea-dccf-fff1f849bd15@arm.com>
+ <e45533a7-e469-7faf-4b30-acf6889b982c@sigmadesigns.com>
+Message-ID: <0d84a5fc-9549-5fef-837b-4102d2e1f1d2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 17, 2017 at 10:09:33PM +0800, Shawn Guo wrote:
+On 19/06/17 17:01, Marc Gonzalez wrote:
+> On 19/06/2017 17:58, Marc Zyngier wrote:
+>> On 19/06/17 15:50, Marc Gonzalez wrote:
+>>> On 07/06/2017 10:19, Marc Gonzalez wrote:
+>>>
+>>>> On 31/05/2017 15:33, Marc Gonzalez wrote:
+>>>>
+>>>>> +static int tango_pcie_probe(struct platform_device *pdev)
+>>>>> +{
+>>>>> +	int ret = -EINVAL;
+>>>>> +	void __iomem *base;
+>>>>> +	struct resource *res;
+>>>>> +	struct tango_pcie *pcie;
+>>>>> +	struct device *dev = &pdev->dev;
+>>>>> +
+>>>>> +	pr_err("MAJOR ISSUE: PCIe config and mem spaces are muxed\n");
+>>>>> +	pr_err("Tainting kernel... Use driver at your own risk\n");
+>>>>> +	add_taint(TAINT_FIRMWARE_WORKAROUND, LOCKDEP_STILL_OK);
+>>>>
+>>>> Hello Bjorn,
+>>>>
+>>>> In v4, your only comment was
+>>>> "[muxing config and mem spaces] is a major issue and possibly even
+>>>> a security problem [which requires at least an error message and a
+>>>> kernel taint].
+>>>>
+>>>> Were there any other issues with the host bridge support?
+>>>
+>>> Hello Bjorn,
+>>>
+>>> I imagine you are now only waiting for Marc Z's Ack of patch 3/3 ?
+>>> (AFAIU, all issues have been addressed as of v8 3/3.)
+>>
+>> Posting partial series is really not ideal, specially as you posted 3 of
+>> them in less than 24 hours (and the latest was only 5 days ago).
+>>
+>> The maintainer is not going to chase you about potentially missing
+>> patches...
+> 
+> So the best course would be posting a new series with all patches
+> bumped to v8 then?
 
-> +Optional properties:
-> + - zte,pa-gpios: The GPIO to enable external power amplifier
+No, because there is still the ambiguity of *which* v8 that is. Post a
+v9 that supersedes all the previously posted patches.
 
-If there's an external power amplifier this is a separate chip to this
-CODEC and should therefore be separately controlled and integrated as
-part of the machine integration.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170619/b2ff6e53/attachment.sig>
+	M.
+-- 
+Jazz is not dead. It just smells funny...
