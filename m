@@ -1,66 +1,70 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 19 Jun 2017 12:58:51 +0200
-Subject: [PATCH v5 1/3] nvmem: dt: document SNVS LPGPR binding
-In-Reply-To: <20170619060629.du3qmihhkkyym44h@pengutronix.de>
-References: <20170609125730.25502-1-o.rempel@pengutronix.de>
- <20170609125730.25502-2-o.rempel@pengutronix.de>
- <8e50ff3d-d1f0-2795-5dc9-302979ca9694@i2se.com>
- <20170619060629.du3qmihhkkyym44h@pengutronix.de>
-Message-ID: <b8d7d65c-93c8-8b62-abb4-09d60c32bf84@i2se.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 19 Jun 2017 12:03:47 +0100
+Subject: [PATCH 5/5] arm64: signal: Allow expansion of the signal frame
+In-Reply-To: <20170619101204.GA8543@e103592.cambridge.arm.com>
+References: <1497535442-11586-1-git-send-email-Dave.Martin@arm.com>
+ <1497535442-11586-6-git-send-email-Dave.Martin@arm.com>
+ <20170616104740.GA31526@e104818-lin.cambridge.arm.com>
+ <20170619101204.GA8543@e103592.cambridge.arm.com>
+Message-ID: <20170619110346.GB3024@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+On Mon, Jun 19, 2017 at 11:12:29AM +0100, Dave P Martin wrote:
+> On Fri, Jun 16, 2017 at 11:47:41AM +0100, Catalin Marinas wrote:
+> > On Thu, Jun 15, 2017 at 03:03:42PM +0100, Dave P Martin wrote:
+> > > +struct extra_context {
+> > > +	struct _aarch64_ctx head;
+> > > +	void __user *data;	/* 16-byte aligned pointer to extra space */
+> > > +	__u32 size;		/* size in bytes of the extra space */
+> > > +	__u32 __reserved[3];
+> > > +};
+> > 
+> > Some more thoughts on the type of "data" above. It's the first time we
+> > introduce pointers in sigcontext and wonder whether __u64 would make
+> > more sense (invariable size with the ABI).
+> 
+> I'm happy to change this if you want -- it can be a __u64 without
+> impacting the semantics.
 
-Am 19.06.2017 um 08:06 schrieb Oleksij Rempel:
-> On Fri, Jun 09, 2017 at 04:59:00PM +0200, Stefan Wahren wrote:
-> Hi Stefan,
->
->> Hi Oleksij,
->>
->> Am 09.06.2017 um 14:57 schrieb Oleksij Rempel:
->>> Documentation bindings for the Low Power General Purpose Register
->>> available on i.MX6 SoCs in the Secure Non-Volatile Storage.
->>>
->>> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
->>> ---
->>>  .../devicetree/bindings/nvmem/snvs-lpgpr.txt          | 19 +++++++++++++++++++
->>>  1 file changed, 19 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt b/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
->>> new file mode 100644
->>> index 000000000000..21910fb3159f
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
->>> @@ -0,0 +1,19 @@
->>> +Device tree bindings for Low Power General Purpose Register found in i.MX6Q/D
->>> +Secure Non-Volatile Storage.
->>> +
->>> +This DT node should be represented as a sub-node of a "syscon",
->>> +"simple-mfd" node.
->>> +
->>> +Required properties:
->>> +- compatible: should be:
->>> +	"fsl,imx6q-snvs-lpgpr" for Freescale i.MX6Q/D/DL/S
->>> +
->>> +Example:
->>> +snvs: snvs at 020cc000 {
->>> +	compatible = "fsl,sec-v4.0-mon", "syscon", "simple-mfd";
->>> +	reg = <0x020cc000 0x4000>;
->>> +
->>> +	snvs_lpgpr: snvs-lpgpr {
->>> +		compatible = "fsl,imx6q-snvs-lpgpr";
->> according to the reference manual at least the clock "lp_ipg_clk_s" is
->> required for register R/W access.
->> So it should be added to the binding and enabled by the driver.
-> Hm...
-> Non of current SNVS drives use, set or defines *_ipg_clk_s. I can't find
-> in the docs how can I control this clocks.
-> lp_ipg_clk_s and hp_ipg_clk_s depend on ipg_clk_root, which seems to be
-> not gated. So, it is always on. Or do I miss something.
->
-do you know how the clock "lp_ipg_clk_s" should be handled?
+I was thinking in the context of ILP32 but we can address this
+separately for the exported kernel headers and glibc definitions.
+Looking at this structure from an LP64 perspective, it indeed makes
+sense to keep it as void *. We have other UAPI structures with user
+pointers already.
 
-Thanks
-Stefan
+> > Also for discussion - whether using an offset vs absolute address would
+> > be better.
+> 
+> My rationale here related to the ucontext semantics associated with
+> the signal frame, rather than signal handling itself.
+> 
+> Consider:
+> 
+> void signal_handler(int n, siginfo_t *si, void *uc)
+> {
+> 	*signal_context = *(ucontext_t *)uc;
+> }
+> 
+> Will this "work"?  On most machines, yes it will. 
+> 
+> With an expanded signal frame on arm64, it won't work: the copied
+> context will be truncated at the end of __reserved[].  If extra_data
+> uses an offset to locate the additional data then someone parsing
+> *signal_context won't be able to detect the error and will overrun:
+> this includes rt_sigreturn (if that is run on a stack that has the
+> copied context).
+> 
+> If a pointer is used in extra_context, this provides some chance of
+> handling this: naive code like the above will result in a ucontext_t
+> whose extra_context data pointer is "wrong": extra_context aware
+> parsers can detect that and error out or ignore the remaining data.
+> extra_context aware code that wants to copy the signal context can walk
+> the signal frame to determine its true size, allocate memory, copy, and
+> then update the extra_context data pointer in the new copy.
+
+Thanks for the explanation, it makes sense to keep an absolute pointer
+here rather than offset. So no further changes needed to this patch.
+
+-- 
+Catalin
