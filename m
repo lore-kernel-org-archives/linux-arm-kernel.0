@@ -1,40 +1,56 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 19 Jun 2017 14:43:43 +0200
-Subject: [PATCH v3 19/21] dt-bindings: mmc: dw_mmc-k3: add document of
- hi3660 mmc
-In-Reply-To: <20170614082338.15673-20-guodong.xu@linaro.org>
-References: <20170614082338.15673-1-guodong.xu@linaro.org>
- <20170614082338.15673-20-guodong.xu@linaro.org>
-Message-ID: <CAPDyKFpvJu8_TETWr0Vy4ubDC7NYvi7TxmSLYZyw33qHFsoNaQ@mail.gmail.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Mon, 19 Jun 2017 20:49:46 +0800
+Subject: [arm-soc:mediatek/dts64 6/13]
+ arch/arm64/boot/dts/mediatek/mt6797.dtsi:15:44: fatal error:
+ dt-bindings/power/mt6797-power.h: No such file or directory
+Message-ID: <201706192044.SQGHZhTL%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 June 2017 at 10:23, Guodong Xu <guodong.xu@linaro.org> wrote:
-> Add bindings for hi3660 mmc support
->
-> Signed-off-by: Li Wei <liwei213@huawei.com>
-> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
-> ---
->  Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
-> index df37058..8af1afc 100644
-> --- a/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
-> @@ -12,6 +12,7 @@ extensions to the Synopsys Designware Mobile Storage Host Controller.
->  Required Properties:
->
->  * compatible: should be one of the following.
-> +  - "hisilicon,hi3660-dw-mshc": for controllers with hi3660 specific extensions.
->    - "hisilicon,hi4511-dw-mshc": for controllers with hi4511 specific extensions.
->    - "hisilicon,hi6220-dw-mshc": for controllers with hi6220 specific extensions.
->
-> --
-> 2.10.2
->
+Hi Mars,
 
-Thanks, applied for next!
+FYI, the error/warning still remains.
 
-Kind regards
-Uffe
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git mediatek/dts64
+head:   5f0047466e3c653ffc95fe72e1ea19b1f9927e48
+commit: 003f5d0c3462ff9b7fb251cf0c9e5f08712018b2 [6/13] arm64: dts: mediatek: add clk and scp nodes for MT6797
+config: arm64-allmodconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 003f5d0c3462ff9b7fb251cf0c9e5f08712018b2
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
+
+All errors (new ones prefixed by >>):
+
+   In file included from arch/arm64/boot/dts/mediatek/mt6797-evb.dts:16:0:
+>> arch/arm64/boot/dts/mediatek/mt6797.dtsi:15:44: fatal error: dt-bindings/power/mt6797-power.h: No such file or directory
+    #include <dt-bindings/power/mt6797-power.h>
+                                               ^
+   compilation terminated.
+
+vim +15 arch/arm64/boot/dts/mediatek/mt6797.dtsi
+
+     9	 * This program is distributed in the hope that it will be useful,
+    10	 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    11	 * GNU General Public License for more details.
+    12	 */
+    13	
+    14	#include <dt-bindings/clock/mt6797-clk.h>
+  > 15	#include <dt-bindings/power/mt6797-power.h>
+    16	#include <dt-bindings/interrupt-controller/irq.h>
+    17	#include <dt-bindings/interrupt-controller/arm-gic.h>
+    18	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 55797 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170619/f1b1a8fa/attachment-0001.gz>
