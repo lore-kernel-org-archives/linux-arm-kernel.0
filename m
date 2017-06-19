@@ -1,27 +1,26 @@
 From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Mon, 19 Jun 2017 04:09:00 +0200
-Subject: [PATCH v4 19/28] dt-bindings: arm: cpus: Add S500 enable-method
-In-Reply-To: <20170606005426.26446-20-afaerber@suse.de>
+Date: Mon, 19 Jun 2017 04:09:49 +0200
+Subject: [PATCH v4 21/28] ARM: dts: s500: Set CPU enable-method
+In-Reply-To: <20170606005426.26446-22-afaerber@suse.de>
 References: <20170606005426.26446-1-afaerber@suse.de>
- <20170606005426.26446-20-afaerber@suse.de>
-Message-ID: <077238b6-0614-ab7a-986b-0582ed3d3ae1@suse.de>
+ <20170606005426.26446-22-afaerber@suse.de>
+Message-ID: <f5904acc-7d23-39c0-d6bc-8077e9884915@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Am 06.06.2017 um 02:54 schrieb Andreas F?rber:
-> The Actions Semi S500 SoC requires a special secondary CPU boot procedure.
+> Use a custom S500 enable-method for all CPUs.
 > 
-> Acked-by: Rob Herring <robh@kernel.org>
 > Signed-off-by: Andreas F?rber <afaerber@suse.de>
 > ---
 >  v3 -> v4: Unchanged
 >  
 >  v3: new
 >  
->  Documentation/devicetree/bindings/arm/cpus.txt | 1 +
->  1 file changed, 1 insertion(+)
+>  arch/arm/boot/dts/s500.dtsi | 4 ++++
+>  1 file changed, 4 insertions(+)
 
-Thanks, applied to linux-actions.git v4.13/dt branch:
+Applied to linux-actions.git v4.13/dt branch:
 
 https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.13/dt
 
