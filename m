@@ -1,25 +1,57 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 19 Jun 2017 16:02:29 +0200
-Subject: [PATCH v5 1/3] nvmem: dt: document SNVS LPGPR binding
-In-Reply-To: <CAOMZO5Dd243VXCYBigTcFJ2aF4prZhWYtOuw7Z86M4X6nEXB=A@mail.gmail.com>
-References: <20170609125730.25502-1-o.rempel@pengutronix.de>
- <20170609125730.25502-2-o.rempel@pengutronix.de>
- <8e50ff3d-d1f0-2795-5dc9-302979ca9694@i2se.com>
- <20170619060629.du3qmihhkkyym44h@pengutronix.de>
- <b8d7d65c-93c8-8b62-abb4-09d60c32bf84@i2se.com>
- <CAOMZO5Dd243VXCYBigTcFJ2aF4prZhWYtOuw7Z86M4X6nEXB=A@mail.gmail.com>
-Message-ID: <f83cae78-4422-ce07-7a39-92ba70be8de6@i2se.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Mon, 19 Jun 2017 16:31:18 +0200
+Subject: [PATCH v4 04/28] clocksource: Add Owl timer
+In-Reply-To: <132a457f-603d-9e1d-4c09-bb434738b352@linaro.org>
+References: <20170606005426.26446-1-afaerber@suse.de>
+ <20170606005426.26446-5-afaerber@suse.de> <20170606163355.GD2345@mai>
+ <b2af603d-0a7c-1bcd-c661-9a20ce63994c@suse.de>
+ <132a457f-603d-9e1d-4c09-bb434738b352@linaro.org>
+Message-ID: <6f887428-217f-8d1c-27a6-91504ce1609d@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 19.06.2017 um 14:52 schrieb Fabio Estevam:
-> Hi Stefan,
->
-> On Mon, Jun 19, 2017 at 7:58 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
->
->> do you know how the clock "lp_ipg_clk_s" should be handled?
-> As per the Reference Manual there is no CCM gating bits for this clock.
+Am 19.06.2017 um 15:53 schrieb Daniel Lezcano:
+> On 18/06/2017 22:43, Andreas F?rber wrote:
+>> Am 06.06.2017 um 18:33 schrieb Daniel Lezcano:
+>>> On Tue, Jun 06, 2017 at 02:54:02AM +0200, Andreas F?rber wrote:
+>>>> The Actions Semi S500 SoC provides four timers, 2Hz0/1 and 32-bit TIMER0/1.
+>>>>
+>>>> Use TIMER0 as clocksource and TIMER1 as clockevents.
+>>>>
+>>>> Based on LeMaker linux-actions tree.
+>>>>
+>>>> An S500 datasheet can be found on the LeMaker Guitar pages:
+>>>> http://www.lemaker.org/product-guitar-download-29.html
+>>>>
+>>>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>>>
+>>> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>
+>> Thanks. It seems this is not going through a central clocksource tree,
+>> so I'm applying it to a new linux-actions.git v4.13/soc branch:
+>>
+>> https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.13/soc
+>>
+>> Let me know if you intend to take it through some other tree instead.
+> 
+> No, it is ok. In the future, submit for the clocksource tree
+> (tip/timers/core).
 
+Hm, I did see that tree in MAINTAINERS, but it specifically said
+"CLOCKSOURCE CORE" and it does not have any
+F:	drivers/clocksource/
+or
+F:	Documentation/devicetree/bindings/timer/
+entries, therefore I added the files to Actions like other SoCs did...
 
-I was only surprised that there is no clock handling in the driver.
-Sorry, about that noise.
+I can easily unqueue the patches - what does submit for the clocksource
+tree mean? Just CC the two maintainers on resend or anything else?
+I intend to rename my branch to v4.13/drivers on Olof's feedback anyway.
+
+Sorry,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
