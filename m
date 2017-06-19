@@ -1,179 +1,71 @@
-From: florian.fainelli@broadcom.com (Florian Fainelli)
-Date: Mon, 19 Jun 2017 13:58:53 -0700
-Subject: [PATCH v3 2/4] asm-generic: Provide a fncpy() implementation
-In-Reply-To: <20170618235108.peaxdi367jpkt542@yury-thinkpad>
-References: <20170617000744.22158-1-f.fainelli@gmail.com>
- <20170617000744.22158-3-f.fainelli@gmail.com>
- <20170618235108.peaxdi367jpkt542@yury-thinkpad>
-Message-ID: <25e87a4c-ecd9-a205-5a25-207a293e0204@broadcom.com>
+From: psodagud@codeaurora.org (Sodagudi Prasad)
+Date: Mon, 19 Jun 2017 14:14:26 -0700
+Subject: [PATCH] compiler, clang: Add always_inline attribute to inline
+In-Reply-To: <alpine.DEB.2.10.1706191322590.95967@chino.kir.corp.google.com>
+References: <20170615155440.GC26471@leverpostej>
+ <1497887596-8731-1-git-send-email-psodagud@codeaurora.org>
+ <alpine.DEB.2.10.1706191322590.95967@chino.kir.corp.google.com>
+Message-ID: <47bd7df20466d5f7f557ca087b0189cf@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2017 04:51 PM, Yury Norov wrote:
-> Hi Florian,
+On 2017-06-19 13:25, David Rientjes wrote:
+> On Mon, 19 Jun 2017, Prasad Sodagudi wrote:
 > 
-> Some questions and thoughts inline.
+>> Commit abb2ea7dfd82 ("compiler, clang: suppress warning for unused
+>> static inline functions") re-defining the 'inline' macro but
+>> __attribute__((always_inline)) is missing. Some compilers may
+>> not honor inline hint if always_iniline attribute not there.
+>> So add always_inline attribute to inline as done by
+>> compiler-gcc.h file.
+>> 
 > 
-> Yury
+> IIUC, __attribute__((always_inline)) was only needed for gcc versions < 
+> 4
+> and that the inlining decision making is improved in >= 4.  To make a
+> change like this, I would think that we would need to show that clang 
+> is
+> making suboptimal decisions.  I don't think there's a downside to 
+> making
+> CONFIG_OPTIMIZE_INLINING specific only to gcc.
 > 
-> On Fri, Jun 16, 2017 at 05:07:42PM -0700, Florian Fainelli wrote:
->> Define a generic fncpy() implementation largely based on the ARM version
->> that requires an 8 bytes alignment for the destination address where to
->> copy this function as well as the function's own address.
->>
->> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> If it is shown that __attribute__((always_inline)) is needed for clang 
+> as
+> well, this should be done as part of compiler-gcc.h to avoid duplicated
+> code.
+
+Hi David,
+
+Here is the discussion about this change -  
+https://lkml.org/lkml/2017/6/15/396
+Please check mark and will's comments.
+
+-Thanks, Prasad
+
+> 
+>> Signed-off-by: Prasad Sodagudi <psodagud@codeaurora.org>
 >> ---
->>  include/asm-generic/fncpy.h | 93 +++++++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 93 insertions(+)
->>  create mode 100644 include/asm-generic/fncpy.h
->>
->> diff --git a/include/asm-generic/fncpy.h b/include/asm-generic/fncpy.h
->> new file mode 100644
->> index 000000000000..ec03b83b8535
->> --- /dev/null
->> +++ b/include/asm-generic/fncpy.h
->> @@ -0,0 +1,93 @@
->> +/*
->> + * include/asm-generic/fncpy.h - helper macros for function body copying
->> + *
->> + * Copyright (C) 2011 Linaro Limited
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program; if not, write to the Free Software
->> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
->> + */
->> +
->> +/*
->> + * These macros are intended for use when there is a need to copy a low-level
->> + * function body into special memory.
->> + *
->> + * For example, when reconfiguring the SDRAM controller, the code doing the
->> + * reconfiguration may need to run from SRAM.
->> + *
->> + * NOTE: that the copied function body must be entirely self-contained and
->> + * position-independent in order for this to work properly.
->> + *
->> + * NOTE: in order for embedded literals and data to get referenced correctly,
->> + * the alignment of functions must be preserved when copying.  To ensure this,
->> + * the source and destination addresses for fncpy() must be aligned to a
->> + * multiple of 8 bytes: you will be get a BUG() if this condition is not met.
->> + * You will typically need a ".align 3" directive in the assembler where the
->> + * function to be copied is defined, and ensure that your allocator for the
->> + * destination buffer returns 8-byte-aligned pointers.
->> + *
->> + * Typical usage example:
->> + *
->> + * extern int f(args);
->> + * extern uint32_t size_of_f;
->> + * int (*copied_f)(args);
->> + * void *sram_buffer;
->> + *
->> + * copied_f = fncpy(sram_buffer, &f, size_of_f);
->> + *
->> + * ... later, call the function: ...
->> + *
->> + * copied_f(args);
->> + *
->> + * The size of the function to be copied can't be determined from C:
->> + * this must be determined by other means, such as adding assmbler directives
->> + * in the file where f is defined.
->> + */
->> +
->> +#ifndef __ASM_FNCPY_H
->> +#define __ASM_FNCPY_H
->> +
->> +#include <linux/types.h>
->> +#include <linux/string.h>
->> +
->> +#include <asm/bug.h>
->> +#include <asm/cacheflush.h>
->> +
->> +/*
->> + * Minimum alignment requirement for the source and destination addresses
->> + * for function copying.
->> + */
->> +#define FNCPY_ALIGN 8
-> 
-> From now this is not arm-only, and it's possible that some architectures
-> might want to redefine it in their arch/xxx/include/asm/fncpy.h files.
-> So it will be easier for them if you'll wrap FNCPY_ALIGN here with #ifdef
-> guards.
-> 
-> By the way, compiler already has an information on the proper alignment.
-> Maybe it's better to use it as the default value here instead of the
-> hardcoded value?
-> 
-> #ifndef FNCPY_ALIGN
-> #define FNCPY_ALIGN ({void foo(); __alignof__(&foo);})
-> #endif
-> 
->> +
->> +#define fncpy(dest_buf, funcp, size) ({					\
-> 
-> Do you really need to check types inside the macro? If not, you can
-> declare it as function, which is better in general, with the memcpy-like
-> prototype.
-> 
->> +	uintptr_t __funcp_address;					\
->> +	typeof(funcp) __result;						\
->> +									\
->> +	asm("" : "=r" (__funcp_address) : "0" (funcp));			\
->> +									\
->> +	/*								\
->> +	 * Ensure alignment of source and destination addresses.	\
->> +	 */								\
->> +	BUG_ON((uintptr_t)(dest_buf) & (FNCPY_ALIGN - 1) ||		\
-> 
-> People don't like new BUG_ONs. Maybe it's better to use BUILD_BUG_ON()
-> at compile time and WARN_ON() at runtime?
-
-If you have a BUILD_BUG_ON() what's the point of the WARN_ON()?
-
-> 
->> +		(__funcp_address & (FNCPY_ALIGN - 1)));			\
-> 
-> There is IS_ALIGNED() macro for things like this.
-
-Sure, makes sense.
-
-> 
-> And I frankly don't understand the 2nd check. One can imagine the
-> situation when someone wants copy the function from the packed blob or
-> some intermediate location were the function is unaligned, and it's
-> impossible with the current implementation.
-
-That's a good point, I am not sure if this is historical, or if there is
-a reason for that from the ARM/Linux implementation. It sounds unlikely
-that the function would be unaligned though considering that you'd have
-to refer to the function being copied by its symbolic name, which
-assumes it's in the kernel image or a module, and highly probable that
-it is also aligned.
-
-> 
->> +									\
->> +	memcpy(dest_buf, (void const *)__funcp_address, size);		\
->> +	flush_icache_range((unsigned long)(dest_buf),			\
->> +		(unsigned long)(dest_buf) + (size));			\
->> +									\
->> +	asm("" : "=r" (__result)					\
->> +		: "0" ((uintptr_t)(dest_buf)));				\
->> +									\
->> +	__result;							\
->> +})
->> +
->> +#endif /* !__ASM_FNCPY_H */
->> -- 
->> 2.9.3
-
+>>  include/linux/compiler-clang.h | 5 +++++
+>>  1 file changed, 5 insertions(+)
+>> 
+>> diff --git a/include/linux/compiler-clang.h 
+>> b/include/linux/compiler-clang.h
+>> index d614c5e..deb65b3 100644
+>> --- a/include/linux/compiler-clang.h
+>> +++ b/include/linux/compiler-clang.h
+>> @@ -22,4 +22,9 @@
+>>   * directives.  Suppress the warning in clang as well.
+>>   */
+>>  #undef inline
+>> +#if !defined(CONFIG_ARCH_SUPPORTS_OPTIMIZED_INLINING) ||		\
+>> +    !defined(CONFIG_OPTIMIZE_INLINING)
+>> +#define inline inline __attribute__((always_inline)) 
+>> __attribute__((unused)) notrace
+>> +#else
+>>  #define inline inline __attribute__((unused)) notrace
+>> +#endif
 
 -- 
-Florian
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
+Forum,
+Linux Foundation Collaborative Project
