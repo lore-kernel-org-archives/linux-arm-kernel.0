@@ -1,26 +1,106 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 19:15:13 -0700
-Subject: [GIT PULL] ARM: Keystone DTS for v4.13
-In-Reply-To: <1497238933-5379-1-git-send-email-ssantosh@kernel.org>
-References: <1497238933-5379-1-git-send-email-ssantosh@kernel.org>
-Message-ID: <20170619021513.GT30022@localhost>
+Date: Sun, 18 Jun 2017 19:34:37 -0700
+Subject: [GIT PULL] ARM: Medaitek armv7 DTS for v4.13
+In-Reply-To: <5056d433-90b3-a3ca-4df7-9ff02ab6027b@gmail.com>
+References: <5056d433-90b3-a3ca-4df7-9ff02ab6027b@gmail.com>
+Message-ID: <20170619023437.GV30022@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 11, 2017 at 08:42:13PM -0700, Santosh Shilimkar wrote:
-> The following changes since commit 08332893e37af6ae779367e78e444f8f9571511d:
+On Mon, Jun 12, 2017 at 12:31:47PM +0200, Matthias Brugger wrote:
+> Hi Arnd and Olof,
 > 
->   Linux 4.12-rc2 (2017-05-21 19:30:23 -0700)
+> Please find below my merge request for armv7 device tree changes.
+> 
+> Regards,
+> Matthias
+> 
+> ---
+> 
+> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+> 
+>   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_dts_for_4.13
+>   https://github.com/mbgg/linux-mediatek.git tags/v4.12-next-dts32
 > 
-> for you to fetch changes up to 84e00e244176baec37c66b1cbee6b8a2f7dbd76f:
+> for you to fetch changes up to aac5e972d4c7bc728df605f5427d9c2458c34ea9:
 > 
->   ARM: dts: keystone: Add minimum support for K2G ICE evm (2017-05-21 22:47:49 -0700)
+>   arm: dts: mediatek: Add audio driver node for MT2701 (2017-06-07 10:47:25
+> +0200)
+
+Thanks, merged. Comment below:
+
 > 
 > ----------------------------------------------------------------
-> ARM: dts: Keystone K2G ICE EVM support for v4.13
+> Add device tree nodes for
+> mt7623:
+> - clocks
+> - power domain
+> - pmic-wrapper
+> - pinctrl
+> - i2c
+> - spi
+> - nand
+> - mmc
+> - usb
+> - pwm
+> - ethernet
+> - crypto engine
+> - infared remote control
+> - audio controller
+> - ADC
+> - efuse
+> - thermal driver
+> - HW random generator
+> 
+> mt2701:
+> - NOR flash
+> - JPEG decoder
+> - i2c
+> - audio controller
+> 
+> ----------------------------------------------------------------
+> Garlic Tseng (1):
+>       arm: dts: mediatek: Add audio driver node for MT2701
+> 
+> Guochun Mao (1):
+>       arm: dts: mt2701: add nor flash node
+> 
+> John Crispin (9):
+>       arm: dts: mt7623: add clock controller device nodes
+>       arm: dts: mt7623: add subsystem clock controller device nodes
+>       arm: dts: mt7623: add power domain controller device node
+>       arm: dts: mt7623: add pinctrl nodes to the mt7623 dtsi file
+>       arm: dts: mt7623: add pmic wrapper nodes to the mt7623 dtsi file
+>       arm: dts: mt7623: add i2c nodes to the mt7623.dtsi file
+>       arm: dts: mt7623: add nand nodes to the mt7623.dtsi file
+>       arm: dts: mt7623: add mmc nodes to the mt7623.dtsi file
+>       arm: dts: mt7623: add usb nodes to the mt7623.dtsi file
+> 
+> Jun Gao (1):
+>       arm: dts: Add Mediatek MT2701 i2c device node
+> 
+> Rick Chang (1):
+>       arm: dts: mt2701: Add node for Mediatek JPEG Decoder
+> 
+> Sean Wang (11):
+>       arm: dts: mt7623: add spi nodes to the mt7623.dtsi file
+>       arm: dts: mt7623: add pwm nodes to the mt7623.dtsi file
+>       arm: dts: mt7623: add ethernet nodes to the mt7623.dtsi file
+>       arm: dts: mt7623: add crypto engine nodes to the mt7623.dtsi file
+>       arm: dts: mt7623: add ir nodes to the mt7623.dtsi file
+>       arm: dts: mt7623: add afe nodes to the mt7623.dtsi file
+>       arm: dts: mt7623: add rng nodes to the mt7623.dtsi file
+>       arm: dts: mt7623: add auxadc nodes to the mt7623.dtsi file
+>       arm: dts: mt7623: add efuse nodes to the mt7623.dtsi file
+>       arm: dts: mt7623: add thermal nodes to the mt7623.dtsi file
+>       arm: dts: mt7623: add Sean as one of authors for mt7623.dtsi files
 
-Merged, thanks.
+This excessive patch splitting probably isn't warranted. In the future,
+especially for new and major updates like this, a single patch (or one per
+author) should do just fine.
+
+
+-Olof
