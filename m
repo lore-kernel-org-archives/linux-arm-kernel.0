@@ -1,28 +1,47 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 19 Jun 2017 10:49:26 -0400 (EDT)
-Subject: [PATCH v4 03/11] net: mvmdio: use GENMASK for masks
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6DD0025C9A@AcuExch.aculab.com>
-References: <20170614154911.14510-1-antoine.tenart@free-electrons.com>
- <20170614154911.14510-4-antoine.tenart@free-electrons.com>
- <063D6719AE5E284EB5DD2968C1650D6DD0025C9A@AcuExch.aculab.com>
-Message-ID: <20170619.104926.732811694966999045.davem@davemloft.net>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Mon, 19 Jun 2017 16:50:15 +0200
+Subject: [PATCH v5 2/3] PCI: Add tango PCIe host bridge support
+In-Reply-To: <654acba8-68b9-fb4c-4681-35af94b6bd74@sigmadesigns.com>
+References: <741766e5-cff2-db5f-d40b-6866e08fd966@sigmadesigns.com>
+ <1802aae0-f97b-c437-c00e-5fa7c867286d@sigmadesigns.com>
+ <654acba8-68b9-fb4c-4681-35af94b6bd74@sigmadesigns.com>
+Message-ID: <6abfe9ce-5c32-9be0-e276-ed14253aa773@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Laight <David.Laight@ACULAB.COM>
-Date: Mon, 19 Jun 2017 11:57:51 +0000
+On 07/06/2017 10:19, Marc Gonzalez wrote:
 
-> From: Antoine Tenart
->> Sent: 14 June 2017 16:49
->> Cosmetic patch to use the GENMASK helper for masks.
-> ...
->> -	ret = val & 0xFFFF;
->> +	ret = val & GENMASK(15, 0);
+> On 31/05/2017 15:33, Marc Gonzalez wrote:
 > 
-> My 2c: It isn't at all clear to me that changes like this in anyway
-> improve the code readability.
-> In some sense the '15' should be a named constant - but that just makes
-> it even less obvious what is going on.
+>> +static int tango_pcie_probe(struct platform_device *pdev)
+>> +{
+>> +	int ret = -EINVAL;
+>> +	void __iomem *base;
+>> +	struct resource *res;
+>> +	struct tango_pcie *pcie;
+>> +	struct device *dev = &pdev->dev;
+>> +
+>> +	pr_err("MAJOR ISSUE: PCIe config and mem spaces are muxed\n");
+>> +	pr_err("Tainting kernel... Use driver at your own risk\n");
+>> +	add_taint(TAINT_FIRMWARE_WORKAROUND, LOCKDEP_STILL_OK);
+> 
+> Hello Bjorn,
+> 
+> In v4, your only comment was
+> "[muxing config and mem spaces] is a major issue and possibly even
+> a security problem [which requires at least an error message and a
+> kernel taint].
+> 
+> Were there any other issues with the host bridge support?
 
-I agree, a hexidecimal mask of 0xffff is 100 times more readable and
-understandable to me than "SOME_MACRO(x, y)".
+Hello Bjorn,
+
+I imagine you are now only waiting for Marc Z's Ack of patch 3/3 ?
+(AFAIU, all issues have been addressed as of v8 3/3.)
+
+Rob has Acked patch 1/3 -- thanks Rob.
+
+Assuming all issues with patch 2/3 have already been addressed,
+then this driver can land in time for 4.13 right?
+
+Regards.
