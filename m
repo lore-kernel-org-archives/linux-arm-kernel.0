@@ -1,39 +1,40 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 20:37:34 -0700
-Subject: [GIT PULL] Amlogic defconfig updates for v4.13
-In-Reply-To: <7hzidabgwf.fsf@baylibre.com>
-References: <7hzidabgwf.fsf@baylibre.com>
-Message-ID: <20170619033734.GO30022@localhost>
+Date: Sun, 18 Jun 2017 20:38:05 -0700
+Subject: [GIT PULL] Amlogic 32-bit DT updates for v4.13
+In-Reply-To: <7htw3ibgut.fsf@baylibre.com>
+References: <7htw3ibgut.fsf@baylibre.com>
+Message-ID: <20170619033805.GQ30022@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 14, 2017 at 10:47:28AM -0700, Kevin Hilman wrote:
-> The following changes since commit 08332893e37af6ae779367e78e444f8f9571511d:
+On Wed, Jun 14, 2017 at 10:48:26AM -0700, Kevin Hilman wrote:
+> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 > 
->   Linux 4.12-rc2 (2017-05-21 19:30:23 -0700)
+>   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-defconfig
+>   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt
 > 
-> for you to fetch changes up to b4cb6f0ab7b0c4dd7f5ba546abcc960caa57aa72:
+> for you to fetch changes up to 2c323c43a3d619d67bffa57dc7480cfae4c53300:
 > 
->   ARM64: defconfig: enable meson SPICC as module (2017-06-14 10:25:16 -0700)
-> 
-> ----------------------------------------------------------------
-> Amlogic arm64 defconfig changes for v4.13
-> - enable meson SPICC as module
-> - enable IR core, decoders and Meson IR device
+>   ARM: dts: meson8: add and use the real clock controller (2017-06-09 11:21:21 -0700)
 > 
 > ----------------------------------------------------------------
-> Neil Armstrong (2):
->       ARM64: defconfig: enable IR core, decoders and Meson IR device
->       ARM64: defconfig: enable meson SPICC as module
+> Amlogic 32-bit DT changes for v4.13:
+> - minor reorganization to support different busses
+> - add/use real clock controller
+> 
+> ----------------------------------------------------------------
+> Carlo Caione (1):
+>       ARM: dts: meson: Extend L2 cache controller node for Meson8 and Meson8b
+> 
+> Martin Blumenstingl (3):
+>       ARM: dts: meson: organize devices in their corresponding busses
+>       ARM: dts: meson8b: inherit meson.dtsi from meson8b.dtsi
+>       ARM: dts: meson8: add and use the real clock controller
 
-I nearly accidentally merged this into next/defconfig since it didn't have '64'
-in the name. :)
-
-Merged into next/arm64. Thanks.
+Merged, thanks.
 
 
 -Olof
