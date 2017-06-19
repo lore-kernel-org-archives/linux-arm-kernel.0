@@ -1,277 +1,289 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 19 Jun 2017 09:27:01 +0200
-Subject: [PATCH v2 04/12] Input: wm97xx: split out touchscreen registering
+Date: Mon, 19 Jun 2017 09:27:00 +0200
+Subject: [PATCH v2 03/12] ASoC: arm: make pxa2xx-ac97-lib ac97 codec agnostic
 In-Reply-To: <1497857229-12049-1-git-send-email-robert.jarzmik@free.fr>
 References: <1497857229-12049-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1497857229-12049-5-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1497857229-12049-4-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-wm97xx-core does several things in it initialization :
- - touchscreen input device setup
- - battery device creation
-
-As the wm97xx is actually a multi-function device handling an audio
-codec, a touchscreen, a gpio block and an ADC, reshape the probing to
-isolate what is truly input/touchscreen specific from the remaining
-part.
-
-This is only code shuffling, there is no functional change.
+All pxa library functions don't use the input parameters for nothing but
+slot number. This simplifies their prototypes, and makes them usable by
+both the legacy ac97 bus and the new ac97 bus.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
-Since v1:
- - took into account Charles's comment
----
- drivers/input/touchscreen/wm97xx-core.c | 196 +++++++++++++++++++-------------
- 1 file changed, 115 insertions(+), 81 deletions(-)
+ include/sound/pxa2xx-lib.h  | 15 +++++++++------
+ sound/arm/pxa2xx-ac97-lib.c | 37 +++++++++++++++++++++----------------
+ sound/arm/pxa2xx-ac97.c     | 35 +++++++++++++++++++++++++++--------
+ sound/soc/pxa/pxa2xx-ac97.c | 32 ++++++++++++++++++++++++++------
+ 4 files changed, 83 insertions(+), 36 deletions(-)
 
-diff --git a/drivers/input/touchscreen/wm97xx-core.c b/drivers/input/touchscreen/wm97xx-core.c
-index c9d1c91e1887..39869ffdc4fa 100644
---- a/drivers/input/touchscreen/wm97xx-core.c
-+++ b/drivers/input/touchscreen/wm97xx-core.c
-@@ -581,27 +581,85 @@ static void wm97xx_ts_input_close(struct input_dev *idev)
- 		wm->codec->acc_enable(wm, 0);
- }
+diff --git a/include/sound/pxa2xx-lib.h b/include/sound/pxa2xx-lib.h
+index 6ef629bde164..85352becec7c 100644
+--- a/include/sound/pxa2xx-lib.h
++++ b/include/sound/pxa2xx-lib.h
+@@ -1,10 +1,13 @@
+ #ifndef PXA2XX_LIB_H
+ #define PXA2XX_LIB_H
  
--static int wm97xx_probe(struct device *dev)
-+static int wm97xx_register_touch(struct wm97xx *wm)
++#include <uapi/sound/asound.h>
+ #include <linux/platform_device.h>
+-#include <sound/ac97_codec.h>
+ 
+ /* PCM */
++struct snd_pcm_substream;
++struct snd_pcm_hw_params;
++struct snd_pcm;
+ 
+ extern int __pxa2xx_pcm_hw_params(struct snd_pcm_substream *substream,
+ 				struct snd_pcm_hw_params *params);
+@@ -21,12 +24,12 @@ extern void pxa2xx_pcm_free_dma_buffers(struct snd_pcm *pcm);
+ 
+ /* AC97 */
+ 
+-extern unsigned short pxa2xx_ac97_read(struct snd_ac97 *ac97, unsigned short reg);
+-extern void pxa2xx_ac97_write(struct snd_ac97 *ac97, unsigned short reg, unsigned short val);
++extern int pxa2xx_ac97_read(int slot, unsigned short reg);
++extern int pxa2xx_ac97_write(int slot, unsigned short reg, unsigned short val);
+ 
+-extern bool pxa2xx_ac97_try_warm_reset(struct snd_ac97 *ac97);
+-extern bool pxa2xx_ac97_try_cold_reset(struct snd_ac97 *ac97);
+-extern void pxa2xx_ac97_finish_reset(struct snd_ac97 *ac97);
++extern bool pxa2xx_ac97_try_warm_reset(void);
++extern bool pxa2xx_ac97_try_cold_reset(void);
++extern void pxa2xx_ac97_finish_reset(void);
+ 
+ extern int pxa2xx_ac97_hw_suspend(void);
+ extern int pxa2xx_ac97_hw_resume(void);
+diff --git a/sound/arm/pxa2xx-ac97-lib.c b/sound/arm/pxa2xx-ac97-lib.c
+index 39c3969ac1c7..5950a9e218d9 100644
+--- a/sound/arm/pxa2xx-ac97-lib.c
++++ b/sound/arm/pxa2xx-ac97-lib.c
+@@ -20,7 +20,6 @@
+ #include <linux/io.h>
+ #include <linux/gpio.h>
+ 
+-#include <sound/ac97_codec.h>
+ #include <sound/pxa2xx-lib.h>
+ 
+ #include <mach/irqs.h>
+@@ -46,38 +45,41 @@ extern void pxa27x_configure_ac97reset(int reset_gpio, bool to_gpio);
+  * 1 jiffy timeout if interrupt never comes).
+  */
+ 
+-unsigned short pxa2xx_ac97_read(struct snd_ac97 *ac97, unsigned short reg)
++int pxa2xx_ac97_read(int slot, unsigned short reg)
  {
--	struct wm97xx *wm;
--	struct wm97xx_pdata *pdata = dev_get_platdata(dev);
--	int ret = 0, id = 0;
-+	struct wm97xx_pdata *pdata = dev_get_platdata(wm->dev);
-+	int ret;
+-	unsigned short val = -1;
++	int val = -ENODEV;
+ 	volatile u32 *reg_addr;
  
--	wm = kzalloc(sizeof(struct wm97xx), GFP_KERNEL);
--	if (!wm)
-+	wm->input_dev = devm_input_allocate_device(wm->dev);
-+	if (wm->input_dev == NULL)
- 		return -ENOMEM;
--	mutex_init(&wm->codec_mutex);
++	if (slot > 0)
++		return -ENODEV;
++
+ 	mutex_lock(&car_mutex);
  
--	wm->dev = dev;
--	dev_set_drvdata(dev, wm);
--	wm->ac97 = to_ac97_t(dev);
-+	/* set up touch configuration */
-+	wm->input_dev->name = "wm97xx touchscreen";
-+	wm->input_dev->phys = "wm97xx";
-+	wm->input_dev->open = wm97xx_ts_input_open;
-+	wm->input_dev->close = wm97xx_ts_input_close;
-+
-+	__set_bit(EV_ABS, wm->input_dev->evbit);
-+	__set_bit(EV_KEY, wm->input_dev->evbit);
-+	__set_bit(BTN_TOUCH, wm->input_dev->keybit);
-+
-+	input_set_abs_params(wm->input_dev, ABS_X, abs_x[0], abs_x[1],
-+			     abs_x[2], 0);
-+	input_set_abs_params(wm->input_dev, ABS_Y, abs_y[0], abs_y[1],
-+			     abs_y[2], 0);
-+	input_set_abs_params(wm->input_dev, ABS_PRESSURE, abs_p[0], abs_p[1],
-+			     abs_p[2], 0);
-+
-+	input_set_drvdata(wm->input_dev, wm);
-+	wm->input_dev->dev.parent = wm->dev;
-+
-+	ret = input_register_device(wm->input_dev);
-+	if (ret)
-+		return ret;
-+
-+	/*
-+	 * register our extended touch device (for machine specific
-+	 * extensions)
-+	 */
-+	wm->touch_dev = platform_device_alloc("wm97xx-touch", -1);
-+	if (!wm->touch_dev) {
-+		ret = -ENOMEM;
-+		goto touch_err;
+ 	/* set up primary or secondary codec space */
+ 	if (cpu_is_pxa25x() && reg == AC97_GPIO_STATUS)
+-		reg_addr = ac97->num ? &SMC_REG_BASE : &PMC_REG_BASE;
++		reg_addr = slot ? &SMC_REG_BASE : &PMC_REG_BASE;
+ 	else
+-		reg_addr = ac97->num ? &SAC_REG_BASE : &PAC_REG_BASE;
++		reg_addr = slot ? &SAC_REG_BASE : &PAC_REG_BASE;
+ 	reg_addr += (reg >> 1);
+ 
+ 	/* start read access across the ac97 link */
+ 	GSR = GSR_CDONE | GSR_SDONE;
+ 	gsr_bits = 0;
+-	val = *reg_addr;
++	val = (*reg_addr & 0xffff);
+ 	if (reg == AC97_GPIO_STATUS)
+ 		goto out;
+ 	if (wait_event_timeout(gsr_wq, (GSR | gsr_bits) & GSR_SDONE, 1) <= 0 &&
+ 	    !((GSR | gsr_bits) & GSR_SDONE)) {
+ 		printk(KERN_ERR "%s: read error (ac97_reg=%d GSR=%#lx)\n",
+ 				__func__, reg, GSR | gsr_bits);
+-		val = -1;
++		val = -ETIMEDOUT;
+ 		goto out;
+ 	}
+ 
+ 	/* valid data now */
+ 	GSR = GSR_CDONE | GSR_SDONE;
+ 	gsr_bits = 0;
+-	val = *reg_addr;
++	val = (*reg_addr & 0xffff);
+ 	/* but we've just started another cycle... */
+ 	wait_event_timeout(gsr_wq, (GSR | gsr_bits) & GSR_SDONE, 1);
+ 
+@@ -86,29 +88,32 @@ out:	mutex_unlock(&car_mutex);
+ }
+ EXPORT_SYMBOL_GPL(pxa2xx_ac97_read);
+ 
+-void pxa2xx_ac97_write(struct snd_ac97 *ac97, unsigned short reg,
+-			unsigned short val)
++int pxa2xx_ac97_write(int slot, unsigned short reg, unsigned short val)
+ {
+ 	volatile u32 *reg_addr;
++	int ret = 0;
+ 
+ 	mutex_lock(&car_mutex);
+ 
+ 	/* set up primary or secondary codec space */
+ 	if (cpu_is_pxa25x() && reg == AC97_GPIO_STATUS)
+-		reg_addr = ac97->num ? &SMC_REG_BASE : &PMC_REG_BASE;
++		reg_addr = slot ? &SMC_REG_BASE : &PMC_REG_BASE;
+ 	else
+-		reg_addr = ac97->num ? &SAC_REG_BASE : &PAC_REG_BASE;
++		reg_addr = slot ? &SAC_REG_BASE : &PAC_REG_BASE;
+ 	reg_addr += (reg >> 1);
+ 
+ 	GSR = GSR_CDONE | GSR_SDONE;
+ 	gsr_bits = 0;
+ 	*reg_addr = val;
+ 	if (wait_event_timeout(gsr_wq, (GSR | gsr_bits) & GSR_CDONE, 1) <= 0 &&
+-	    !((GSR | gsr_bits) & GSR_CDONE))
++	    !((GSR | gsr_bits) & GSR_CDONE)) {
+ 		printk(KERN_ERR "%s: write error (ac97_reg=%d GSR=%#lx)\n",
+ 				__func__, reg, GSR | gsr_bits);
++		ret = -EIO;
 +	}
-+	platform_set_drvdata(wm->touch_dev, wm);
-+	wm->touch_dev->dev.parent = wm->dev;
-+	wm->touch_dev->dev.platform_data = pdata;
-+	ret = platform_device_add(wm->touch_dev);
-+	if (ret < 0)
-+		goto touch_reg_err;
-+
-+	return 0;
-+touch_reg_err:
-+	platform_device_put(wm->touch_dev);
-+touch_err:
-+	input_unregister_device(wm->input_dev);
-+	wm->input_dev = NULL;
-+
+ 
+ 	mutex_unlock(&car_mutex);
 +	return ret;
-+}
-+
-+static void wm97xx_unregister_touch(struct wm97xx *wm)
-+{
-+	platform_device_unregister(wm->touch_dev);
-+	input_unregister_device(wm->input_dev);
-+	wm->input_dev = NULL;
-+}
-+
-+static int _wm97xx_probe(struct wm97xx *wm)
-+{
-+	int id = 0;
-+
-+	mutex_init(&wm->codec_mutex);
-+	dev_set_drvdata(wm->dev, wm);
- 
- 	/* check that we have a supported codec */
- 	id = wm97xx_reg_read(wm, AC97_VENDOR_ID1);
- 	if (id != WM97XX_ID1) {
--		dev_err(dev, "Device with vendor %04x is not a wm97xx\n", id);
--		ret = -ENODEV;
--		goto alloc_err;
-+		dev_err(wm->dev,
-+			"Device with vendor %04x is not a wm97xx\n", id);
-+		return -ENODEV;
- 	}
- 
- 	wm->id = wm97xx_reg_read(wm, AC97_VENDOR_ID2);
-@@ -629,8 +687,7 @@ static int wm97xx_probe(struct device *dev)
- 	default:
- 		dev_err(wm->dev, "Support for wm97%02x not compiled in.\n",
- 			wm->id & 0xff);
--		ret = -ENODEV;
--		goto alloc_err;
-+		return -ENODEV;
- 	}
- 
- 	/* set up physical characteristics */
-@@ -644,79 +701,58 @@ static int wm97xx_probe(struct device *dev)
- 	wm->gpio[4] = wm97xx_reg_read(wm, AC97_GPIO_STATUS);
- 	wm->gpio[5] = wm97xx_reg_read(wm, AC97_MISC_AFE);
- 
--	wm->input_dev = input_allocate_device();
--	if (wm->input_dev == NULL) {
--		ret = -ENOMEM;
--		goto alloc_err;
--	}
--
--	/* set up touch configuration */
--	wm->input_dev->name = "wm97xx touchscreen";
--	wm->input_dev->phys = "wm97xx";
--	wm->input_dev->open = wm97xx_ts_input_open;
--	wm->input_dev->close = wm97xx_ts_input_close;
--
--	__set_bit(EV_ABS, wm->input_dev->evbit);
--	__set_bit(EV_KEY, wm->input_dev->evbit);
--	__set_bit(BTN_TOUCH, wm->input_dev->keybit);
--
--	input_set_abs_params(wm->input_dev, ABS_X, abs_x[0], abs_x[1],
--			     abs_x[2], 0);
--	input_set_abs_params(wm->input_dev, ABS_Y, abs_y[0], abs_y[1],
--			     abs_y[2], 0);
--	input_set_abs_params(wm->input_dev, ABS_PRESSURE, abs_p[0], abs_p[1],
--			     abs_p[2], 0);
-+	return wm97xx_register_touch(wm);
-+}
- 
--	input_set_drvdata(wm->input_dev, wm);
--	wm->input_dev->dev.parent = dev;
-+static void wm97xx_remove_battery(struct wm97xx *wm)
-+{
-+	platform_device_unregister(wm->battery_dev);
-+}
- 
--	ret = input_register_device(wm->input_dev);
--	if (ret < 0)
--		goto dev_alloc_err;
-+static int wm97xx_add_battery(struct wm97xx *wm,
-+			      struct wm97xx_batt_pdata *pdata)
-+{
-+	int ret;
- 
--	/* register our battery device */
- 	wm->battery_dev = platform_device_alloc("wm97xx-battery", -1);
--	if (!wm->battery_dev) {
--		ret = -ENOMEM;
--		goto batt_err;
--	}
-+	if (!wm->battery_dev)
-+		return -ENOMEM;
-+
- 	platform_set_drvdata(wm->battery_dev, wm);
--	wm->battery_dev->dev.parent = dev;
--	wm->battery_dev->dev.platform_data = pdata ? pdata->batt_pdata : NULL;
-+	wm->battery_dev->dev.parent = wm->dev;
-+	wm->battery_dev->dev.platform_data = pdata;
- 	ret = platform_device_add(wm->battery_dev);
--	if (ret < 0)
--		goto batt_reg_err;
-+	if (ret)
-+		platform_device_put(wm->battery_dev);
- 
--	/* register our extended touch device (for machine specific
--	 * extensions) */
--	wm->touch_dev = platform_device_alloc("wm97xx-touch", -1);
--	if (!wm->touch_dev) {
--		ret = -ENOMEM;
--		goto touch_err;
--	}
--	platform_set_drvdata(wm->touch_dev, wm);
--	wm->touch_dev->dev.parent = dev;
--	wm->touch_dev->dev.platform_data = pdata;
--	ret = platform_device_add(wm->touch_dev);
-+	return ret;
-+}
-+
-+static int wm97xx_probe(struct device *dev)
-+{
-+	struct wm97xx *wm;
-+	int ret;
-+	struct wm97xx_pdata *pdata = dev_get_platdata(dev);
-+
-+	wm = devm_kzalloc(dev, sizeof(struct wm97xx), GFP_KERNEL);
-+	if (!wm)
-+		return -ENOMEM;
-+
-+	wm->dev = dev;
-+	wm->ac97 = to_ac97_t(dev);
-+
-+	ret =  _wm97xx_probe(wm);
-+	if (ret)
-+		return ret;
-+
-+	ret = wm97xx_add_battery(wm, pdata ? pdata->batt_pdata : NULL);
- 	if (ret < 0)
--		goto touch_reg_err;
-+		goto batt_err;
- 
- 	return ret;
- 
-- touch_reg_err:
--	platform_device_put(wm->touch_dev);
-- touch_err:
--	platform_device_del(wm->battery_dev);
-- batt_reg_err:
--	platform_device_put(wm->battery_dev);
-- batt_err:
--	input_unregister_device(wm->input_dev);
--	wm->input_dev = NULL;
-- dev_alloc_err:
--	input_free_device(wm->input_dev);
-- alloc_err:
--	kfree(wm);
--
-+batt_err:
-+	wm97xx_unregister_touch(wm);
- 	return ret;
  }
+ EXPORT_SYMBOL_GPL(pxa2xx_ac97_write);
  
-@@ -724,10 +760,8 @@ static int wm97xx_remove(struct device *dev)
+@@ -188,7 +193,7 @@ static inline void pxa_ac97_cold_pxa3xx(void)
+ }
+ #endif
+ 
+-bool pxa2xx_ac97_try_warm_reset(struct snd_ac97 *ac97)
++bool pxa2xx_ac97_try_warm_reset(void)
  {
- 	struct wm97xx *wm = dev_get_drvdata(dev);
- 
--	platform_device_unregister(wm->battery_dev);
--	platform_device_unregister(wm->touch_dev);
--	input_unregister_device(wm->input_dev);
--	kfree(wm);
-+	wm97xx_remove_battery(wm);
-+	wm97xx_unregister_touch(wm);
- 
- 	return 0;
+ 	unsigned long gsr;
+ 	unsigned int timeout = 100;
+@@ -225,7 +230,7 @@ bool pxa2xx_ac97_try_warm_reset(struct snd_ac97 *ac97)
  }
+ EXPORT_SYMBOL_GPL(pxa2xx_ac97_try_warm_reset);
+ 
+-bool pxa2xx_ac97_try_cold_reset(struct snd_ac97 *ac97)
++bool pxa2xx_ac97_try_cold_reset(void)
+ {
+ 	unsigned long gsr;
+ 	unsigned int timeout = 1000;
+@@ -263,7 +268,7 @@ bool pxa2xx_ac97_try_cold_reset(struct snd_ac97 *ac97)
+ EXPORT_SYMBOL_GPL(pxa2xx_ac97_try_cold_reset);
+ 
+ 
+-void pxa2xx_ac97_finish_reset(struct snd_ac97 *ac97)
++void pxa2xx_ac97_finish_reset(void)
+ {
+ 	GCR &= ~(GCR_PRIRDY_IEN|GCR_SECRDY_IEN);
+ 	GCR |= GCR_SDONE_IE|GCR_CDONE_IE;
+diff --git a/sound/arm/pxa2xx-ac97.c b/sound/arm/pxa2xx-ac97.c
+index fbd5dad0c484..4bc244c40f80 100644
+--- a/sound/arm/pxa2xx-ac97.c
++++ b/sound/arm/pxa2xx-ac97.c
+@@ -29,19 +29,38 @@
+ 
+ #include "pxa2xx-pcm.h"
+ 
+-static void pxa2xx_ac97_reset(struct snd_ac97 *ac97)
++static void pxa2xx_ac97_legacy_reset(struct snd_ac97 *ac97)
+ {
+-	if (!pxa2xx_ac97_try_cold_reset(ac97)) {
+-		pxa2xx_ac97_try_warm_reset(ac97);
+-	}
++	if (!pxa2xx_ac97_try_cold_reset())
++		pxa2xx_ac97_try_warm_reset();
++
++	pxa2xx_ac97_finish_reset();
++}
++
++static unsigned short pxa2xx_ac97_legacy_read(struct snd_ac97 *ac97,
++					      unsigned short reg)
++{
++	int ret;
++
++	ret = pxa2xx_ac97_read(ac97->num, reg);
++	if (ret < 0)
++		return 0;
++	else
++		return (unsigned short)(ret & 0xffff);
++}
++
++static void pxa2xx_ac97_legacy_write(struct snd_ac97 *ac97,
++				     unsigned short reg, unsigned short val)
++{
++	int __always_unused ret;
+ 
+-	pxa2xx_ac97_finish_reset(ac97);
++	ret = pxa2xx_ac97_write(ac97->num, reg, val);
+ }
+ 
+ static struct snd_ac97_bus_ops pxa2xx_ac97_ops = {
+-	.read	= pxa2xx_ac97_read,
+-	.write	= pxa2xx_ac97_write,
+-	.reset	= pxa2xx_ac97_reset,
++	.read	= pxa2xx_ac97_legacy_read,
++	.write	= pxa2xx_ac97_legacy_write,
++	.reset	= pxa2xx_ac97_legacy_reset,
+ };
+ 
+ static struct pxad_param pxa2xx_ac97_pcm_out_req = {
+diff --git a/sound/soc/pxa/pxa2xx-ac97.c b/sound/soc/pxa/pxa2xx-ac97.c
+index 2e2fb1838ec2..b07d64ef49ba 100644
+--- a/sound/soc/pxa/pxa2xx-ac97.c
++++ b/sound/soc/pxa/pxa2xx-ac97.c
+@@ -29,21 +29,41 @@
+ 
+ static void pxa2xx_ac97_warm_reset(struct snd_ac97 *ac97)
+ {
+-	pxa2xx_ac97_try_warm_reset(ac97);
++	pxa2xx_ac97_try_warm_reset();
+ 
+-	pxa2xx_ac97_finish_reset(ac97);
++	pxa2xx_ac97_finish_reset();
+ }
+ 
+ static void pxa2xx_ac97_cold_reset(struct snd_ac97 *ac97)
+ {
+-	pxa2xx_ac97_try_cold_reset(ac97);
++	pxa2xx_ac97_try_cold_reset();
+ 
+-	pxa2xx_ac97_finish_reset(ac97);
++	pxa2xx_ac97_finish_reset();
++}
++
++static unsigned short pxa2xx_ac97_legacy_read(struct snd_ac97 *ac97,
++					      unsigned short reg)
++{
++	int ret;
++
++	ret = pxa2xx_ac97_read(ac97->num, reg);
++	if (ret < 0)
++		return 0;
++	else
++		return (unsigned short)(ret & 0xffff);
++}
++
++static void pxa2xx_ac97_legacy_write(struct snd_ac97 *ac97,
++				     unsigned short reg, unsigned short val)
++{
++	int ret;
++
++	ret = pxa2xx_ac97_write(ac97->num, reg, val);
+ }
+ 
+ static struct snd_ac97_bus_ops pxa2xx_ac97_ops = {
+-	.read	= pxa2xx_ac97_read,
+-	.write	= pxa2xx_ac97_write,
++	.read	= pxa2xx_ac97_legacy_read,
++	.write	= pxa2xx_ac97_legacy_write,
+ 	.warm_reset	= pxa2xx_ac97_warm_reset,
+ 	.reset	= pxa2xx_ac97_cold_reset,
+ };
 -- 
 2.1.4
