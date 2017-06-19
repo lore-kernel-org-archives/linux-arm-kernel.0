@@ -1,89 +1,46 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 20:40:14 -0700
-Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.13
-In-Reply-To: <7ho9tqbgsv.fsf@baylibre.com>
-References: <7ho9tqbgsv.fsf@baylibre.com>
-Message-ID: <20170619034014.GR30022@localhost>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Mon, 19 Jun 2017 07:02:39 +0200
+Subject: [PATCH v5 0/6] provide power off support for iMX6 with external PMIC
+Message-ID: <20170619050245.2632-1-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch series is providing power off support for Freescale/NXP iMX6 based
+boards with external power management integrated circuit (PMIC).
 
-On Wed, Jun 14, 2017 at 10:49:36AM -0700, Kevin Hilman wrote:
-> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
-> 
->   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64
-> 
-> for you to fetch changes up to 27f87bd2900b1a95d9c8e25deeb9768cf3fdcc4e:
-> 
->   ARM64: dts: meson-gxl-s905x-p212: Add HDMI and CVBS nodes (2017-06-09 11:38:22 -0700)
-> 
-> ----------------------------------------------------------------
-> Amlogic 64-bit DT changes for v4.13
-> - cleanup/reorganize alphabetically to better avoid conflicts
-> - add HDMI and CVBS nodes for multiple boards
-> - new pinctrl pins: SPI, HDMI CEC
-> - SCPI: fix thermal sensor reporting
-> 
-> New board support
-> - NanoPi K2 (GXBB)
-> - R-Box Pro (GXM)
+changes:
+v5:
+ - remove useless includes from pm-imx6.c patch
+ - add Acked-by to "regulator: pfuze100: add fsl,pmic-stby-poweroff property"
+   patch
+v4:
+ - update comment in "regulator: pfuze100: add fsl,pmic-stby-poweroff ..."
+   patch
+ - add Acked-by to "ARM: imx6q: provide documentation for new ..."
+   patch
 
-Merged, thanks!
+v3:
+ - set pm_power_off_prepare = NULL on .remove.
+ - documentation and spelling fixes.
+ - use %pf instead of lookup_symbol_name.
 
-> 
-> ----------------------------------------------------------------
-> Andreas F??rber (23):
->       dt-bindings: arm: amlogic: Reorder boards
->       arm64: dts: amlogic: Sort Makefile
->       arm64: dts: meson-gxbb-vega-s95: Fix Wifi node name
->       arm64: dts: meson-gxbb-p20x: Fix Wifi node name
->       arm64: dts: meson-gx-p23x-q20x: Fix Wifi node name
->       arm64: dts: meson-gxl-s905x-khadas-vim: Fix Wifi node name
->       arm64: dts: meson-gxm-nexbox-a1: Drop UART comment
->       arm64: dts: meson-gxl-s905x: Comment typo fix
->       arm64: dts: meson-gxbb-wetek-hub: Reference CVBS node by label
->       arm64: dts: meson-gxbb: Fix node order
->       arm64: dts: meson-gxbb-odroidc2: Fix node order
->       arm64: dts: meson-gxbb-vega-s95: Fix node order
->       arm64: dts: meson-gxbb-nexbox-a95x: Fix node order
->       arm64: dts: meson-gxbb-p20x: Fix node order
->       arm64: dts: meson-gxl: Fix node order
->       arm64: dts: meson-gxl-s905x-nexbox-a95x: Fix node order
->       arm64: dts: meson-gxm-nexbox-a1: Fix node order
->       arm64: dts: meson-gx-p23x-q20x: Fix node order
+Oleksij Rempel (6):
+  ARM: imx6q: provide documentation for new fsl,pmic-stby-poweroff
+    property
+  ARM: imx6: register pm_power_off handler if "fsl,pmic-stby-poweroff"
+    is set
+  kernel/reboot.c: export pm_power_off_prepare
+  regulator: pfuze100: add fsl,pmic-stby-poweroff property
+  regulator: pfuze100-regulator: provide pm_power_off_prepare handler
+  ARM: dts: imx6: RIoTboard provide standby on power off option
 
-Small nit: Most of these could probably have been squashed into a few
-patches, being able to bisect them individually isn't likely to be useful.
+ .../devicetree/bindings/clock/imx6q-clock.txt      |  8 ++
+ .../devicetree/bindings/regulator/pfuze100.txt     |  7 ++
+ arch/arm/boot/dts/imx6dl-riotboard.dts             |  5 ++
+ arch/arm/mach-imx/pm-imx6.c                        | 25 ++++++
+ drivers/regulator/pfuze100-regulator.c             | 92 ++++++++++++++++++++++
+ kernel/reboot.c                                    |  1 +
+ 6 files changed, 138 insertions(+)
 
->       dt-bindings: Add Kingnovel vendor prefix
->       dt-bindings: arm: amlogic: Add R-Box Pro
->       arm64: dts: meson-gxm: Add R-Box Pro
->       dt-bindings: arm: amlogic: Add NanoPi K2
->       arm64: dts: amlogic: Add NanoPi K2
-> 
-> Carlo Caione (1):
->       ARM64: dts: meson-gx: Fix sensors reporting from SCP
-> 
-> Neil Armstrong (12):
->       ARM64: dts: meson-gxl: Fix pinctrl periphs gpio-ranges
->       ARM64: dts: Fix GXL periphs pinctrl pull-enable register base
->       ARM64: dts: Fix GXBB periphs pinctrl pull-enable register base
->       ARM64: dts: meson-gxbb: Add CEC pins nodes
->       ARM64: dts: meson-gxl: Add CEC pins nodes
->       ARM64: dts: meson-gxl: Add Ethernet PHY LEDS pins nodes
->       ARM64: dts: meson-gxbb: Add SPI pinctrl nodes
->       ARM64: dts: meson-gxl: Add SPI pinctrl nodes
->       ARM64: dts: meson-gxbb-wetek-play2: Add HDMI and CVBS Nodes
->       ARM64: dts: meson-gxl-s905d-p230: Add HDMI nodes
->       ARM64: dts: meson-gxl-s905x-khadas-vim: Add HDMI nodes
->       ARM64: dts: meson-gxl-s905x-p212: Add HDMI and CVBS nodes
-
-Same for some of these, but it's just a few.
-
-
--Olof
+-- 
+2.11.0
