@@ -1,41 +1,44 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 20:29:55 -0700
-Subject: [GIT PULL 5/7] Broadcom defconfig changes for 4.13 (v2)
-In-Reply-To: <20170613201044.9808-5-f.fainelli@gmail.com>
-References: <20170613201044.9808-1-f.fainelli@gmail.com>
- <20170613201044.9808-5-f.fainelli@gmail.com>
-Message-ID: <20170619032955.GI30022@localhost>
+Date: Sun, 18 Jun 2017 20:23:56 -0700
+Subject: [GIT PULL 1/5] Broadcom soc changes for 4.13
+In-Reply-To: <6529bf30-2127-b8a9-c064-0f5326ff4017@gmail.com>
+References: <20170612173109.11188-1-f.fainelli@gmail.com>
+ <6529bf30-2127-b8a9-c064-0f5326ff4017@gmail.com>
+Message-ID: <20170619032356.GG30022@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 13, 2017 at 01:10:42PM -0700, Florian Fainelli wrote:
-> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+On Tue, Jun 13, 2017 at 12:37:55PM -0700, Florian Fainelli wrote:
+> On 06/12/2017 10:31 AM, Florian Fainelli wrote:
+> > The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+> > 
+> >   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.13/soc
+> > 
+> > for you to fetch changes up to 27d9fa06c122b135ad7552fa3138c3b47e5776c5:
+> > 
+> >   ARM: BCM: Enable thermal support for NSP SoCs (2017-05-19 11:30:25 -0700)
+> > 
+> > ----------------------------------------------------------------
+> > This pull request contains Broadcom ARM-based SoCs (non Device Tree) changes:
+> > 
+> > - Jon updates the Kconfig entry for Northstar Plus to have THERMAL and THERMAL_OF
+> >   selected in order to get the NS/NSP thermal driver dependencies to be satistfied
+> > 
+> > ----------------------------------------------------------------
+> > Jon Mason (1):
+> >       ARM: BCM: Enable thermal support for NSP SoCs
 > 
->   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+> Arnd, Olof, Kevin,
 > 
-> are available in the git repository at:
-> 
->   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.13/defconfig
-> 
-> for you to fetch changes up to e4269eb4bebec3e42e386ceeadcb8a581936f18c:
-> 
->   Merge tag 'bcm2835-defconfig-next-2017-06-12' into defconfig/next (2017-06-13 12:36:49 -0700)
-> 
-> ----------------------------------------------------------------
-> This pull request contains Broadcom ARM-based SoCs defconfig updates for 4.13,
-> please pull the following:
-> 
-> - Stefan updates the bcm2835_defconfig to include serial, Ethernet and USB
->   gadget support which is needed for the Raspberry Pi Zero OTG changes
-> 
-> ----------------------------------------------------------------
-> Florian Fainelli (1):
->       Merge tag 'bcm2835-defconfig-next-2017-06-12' into defconfig/next
-> 
-> Stefan Wahren (1):
->       ARM: bcm2835_defconfig: Enable serial & ethernet USB gadget support
+> Eric sent me his pull requests this morning, so I will be re-submitting
+> these shortly along with his changes, sorry for the delay.
 
-Thanks, merged.
+No worries. Feel free to do incremental pull requests for the new material next
+time, if it's easier for you.
 
 
 -Olof
