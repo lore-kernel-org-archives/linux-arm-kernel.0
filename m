@@ -1,40 +1,31 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 19:04:07 -0700
-Subject: [GIT PULL] Reset controller changes for v4.13, part 2
-In-Reply-To: <1496910681.2941.16.camel@pengutronix.de>
-References: <1496910681.2941.16.camel@pengutronix.de>
-Message-ID: <20170619020407.GG30022@localhost>
+Date: Sun, 18 Jun 2017 19:05:27 -0700
+Subject: [GIT PULL 2/3] DaVinci device-tree updates for v4.13
+In-Reply-To: <20170608112350.1602-2-nsekhar@ti.com>
+References: <20170608112350.1602-1-nsekhar@ti.com>
+ <20170608112350.1602-2-nsekhar@ti.com>
+Message-ID: <20170619020527.GI30022@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 08, 2017 at 10:31:21AM +0200, Philipp Zabel wrote:
-> Dear arm-soc maintainers,
+On Thu, Jun 08, 2017 at 04:53:49PM +0530, Sekhar Nori wrote:
+> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 > 
-> please consider merging this tag for v4.13. It adds a new TI SCI reset
-> controller driver, adds reset offsets for Stratix10, and switches to
-> kref for reference counting on the reset_control structures.
-> 
-> regards
-> Philipp
-> 
-> The following changes since commit 2acb037fc42b8ce5ae59a7d5db3c9b35672e3dd7:
-> 
->   reset: Add a Gemini reset controller (2017-05-24 10:46:13 +0200)
+>   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.13-2
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.13/dt
 > 
-> for you to fetch changes up to 28df169b9afa121153ef2a3ef4ceae72512cde6d:
+> for you to fetch changes up to 65878b126c8f2d761273241cf778b1c6aa50c500:
 > 
->   reset: Add the TI SCI reset driver (2017-06-06 09:44:17 +0200)
+>   ARM: dts: da850-evm: fix tca6416 for use with GPIO hogs (2017-06-06 15:51:02 +0530)
 > 
 > ----------------------------------------------------------------
-> Reset controller changes for v4.13, part 2
-> 
-> - Add reset manager offsets for Stratix10
-> - Use kref for reset contol reference counting
-> - Add new TI SCI reset driver for TI Keystone SoCs
+> Miscellaneous DT support updates for DA850. Includes Lego mindstorms
+> EV3 battery support, DMA support for MUSB, and non-critical fixes to
+> GPIO nodes of DA850's GPIO controller and GPIO expander available on
+> DA850 EVM.
 
 Merged, thanks.
 
