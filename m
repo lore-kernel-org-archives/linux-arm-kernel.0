@@ -1,55 +1,35 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 19:35:27 -0700
-Subject: [GIT PULL] ARM: mediatek: armv8 DTS for v4.13
-In-Reply-To: <a6d19346-24a8-b130-607c-9116c34b673b@gmail.com>
-References: <a6d19346-24a8-b130-607c-9116c34b673b@gmail.com>
-Message-ID: <20170619023527.GW30022@localhost>
+Date: Sun, 18 Jun 2017 19:11:15 -0700
+Subject: [GIT PULL 3/4] arm64: dts: exynos: DT for v4.13
+In-Reply-To: <20170609164249.1656-4-krzk@kernel.org>
+References: <20170609164249.1656-1-krzk@kernel.org>
+ <20170609164249.1656-4-krzk@kernel.org>
+Message-ID: <20170619021115.GQ30022@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 12, 2017 at 12:34:58PM +0200, Matthias Brugger wrote:
-> Hi Olof and Arnd,
-> 
-> Please find below the relevant branch with updates for arm64 device tree
-> files and device tree bindings for v4.13.
-> 
-> Thanks a lot,
-> Matthias
-> 
-> ---
-> 
+On Fri, Jun 09, 2017 at 06:42:48PM +0200, Krzysztof Kozlowski wrote:
 > The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 > 
 >   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 > 
 > are available in the git repository at:
 > 
->   https://github.com/mbgg/linux-mediatek.git tags/v4.12-next-dts64
+>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-4.13
 > 
-> for you to fetch changes up to 5f0047466e3c653ffc95fe72e1ea19b1f9927e48:
+> for you to fetch changes up to 2f7337c3f3fa1ef6c4c862a96b1349f571df34c8:
 > 
->   dt-bindings: mediatek: add bindings for MediaTek MT7622 SoC (2017-06-08
-> 15:27:16 +0200)
+>   arm64: dts: exynos: Remove the te-gpios property in the TM2 boards (2017-05-15 18:55:25 +0200)
 > 
 > ----------------------------------------------------------------
-> Add device tree nodes for
-> mt8173:
-> - split USB SuperSpeed port in HighSpeed and SuperSpeed ports.
-> - move USB phy clocks up in hierarchy to met new bindings description
-> - move MDP nodes up in hierarchy to met new bindings description
+> Samsung DeviceTree ARM64 update for v4.13:
+> 1. Remove unneeded TE interrupt gpio property.
 > 
-> mt6797:
-> - add basic SoC support
-> - add clock driver
-> - add power domain
-> 
-> dt-bindings:
-> - clean-up i2c binding description
-> - add binding for mt2701 i2c node
-> - add fallback compatible to scpsys binding description
-> - add bindings description for mt7622 and mt6796
+> ----------------------------------------------------------------
+> Hoegeun Kwon (1):
+>       arm64: dts: exynos: Remove the te-gpios property in the TM2 boards
 
-Merged, thanks!
+Merged, thanks.
 
 
 -Olof
