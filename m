@@ -1,52 +1,55 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
+From: james.morse@arm.com (James Morse)
 Date: Mon, 19 Jun 2017 16:58:16 +0100
-Subject: [PATCH v5 2/3] PCI: Add tango PCIe host bridge support
-In-Reply-To: <6abfe9ce-5c32-9be0-e276-ed14253aa773@sigmadesigns.com>
-References: <741766e5-cff2-db5f-d40b-6866e08fd966@sigmadesigns.com>
- <1802aae0-f97b-c437-c00e-5fa7c867286d@sigmadesigns.com>
- <654acba8-68b9-fb4c-4681-35af94b6bd74@sigmadesigns.com>
- <6abfe9ce-5c32-9be0-e276-ed14253aa773@sigmadesigns.com>
-Message-ID: <7d9bfb52-b33a-79ea-dccf-fff1f849bd15@arm.com>
+Subject: [PATCH 05/20] arm64: rename COMPAT to AARCH32_EL0 in Kconfig
+In-Reply-To: <20170604120009.342-6-ynorov@caviumnetworks.com>
+References: <20170604120009.342-1-ynorov@caviumnetworks.com>
+ <20170604120009.342-6-ynorov@caviumnetworks.com>
+Message-ID: <5947F498.2040505@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/06/17 15:50, Marc Gonzalez wrote:
-> On 07/06/2017 10:19, Marc Gonzalez wrote:
-> 
->> On 31/05/2017 15:33, Marc Gonzalez wrote:
->>
->>> +static int tango_pcie_probe(struct platform_device *pdev)
->>> +{
->>> +	int ret = -EINVAL;
->>> +	void __iomem *base;
->>> +	struct resource *res;
->>> +	struct tango_pcie *pcie;
->>> +	struct device *dev = &pdev->dev;
->>> +
->>> +	pr_err("MAJOR ISSUE: PCIe config and mem spaces are muxed\n");
->>> +	pr_err("Tainting kernel... Use driver at your own risk\n");
->>> +	add_taint(TAINT_FIRMWARE_WORKAROUND, LOCKDEP_STILL_OK);
->>
->> Hello Bjorn,
->>
->> In v4, your only comment was
->> "[muxing config and mem spaces] is a major issue and possibly even
->> a security problem [which requires at least an error message and a
->> kernel taint].
->>
->> Were there any other issues with the host bridge support?
-> 
-> Hello Bjorn,
-> 
-> I imagine you are now only waiting for Marc Z's Ack of patch 3/3 ?
-> (AFAIU, all issues have been addressed as of v8 3/3.)
+Hi Yury,
 
-Posting partial series is really not ideal, specially as you posted 3 of
-them in less than 24 hours (and the latest was only 5 days ago).
+On 04/06/17 12:59, Yury Norov wrote:
+> From: Andrew Pinski <apinski@cavium.com>
+> 
+> In this patchset  ILP32 ABI support is added. Additionally to AARCH32,
+> which is binary-compatible with ARM, ILP32 is (mostly) ABI-compatible.
+> 
+> From now, AARCH32_EL0 (former COMPAT) config option means the support of
+> AARCH32 userspace, ARM64_ILP32 - support of ILP32 ABI (see next patches),
+> and COMPAT indicates that one of them, or both, is enabled.
+> 
+> Where needed, CONFIG_COMPAT is changed over to use CONFIG_AARCH32_EL0 instead
 
-The maintainer is not going to chase you about potentially missing
-patches...
+Nit: You have 'COMPAT' around compat_hwcap_str's definition, but its only user
+is wrapped in 'AARCH32_EL0'.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+
+After this patch
+arch/arm64/kernel/perf_callchain.c::perf_callchain_user() still has:
+>	if (!compat_user_mode(regs)) {
+>		/* AARCH64 mode */
+...
+>	} else {
+> #ifdef CONFIG_COMPAT
+> 		/* AARCH32 compat mode */
+...
+> #endif
+>	}
+
+I think this one should become CONFIG_AARCH32_EL0. compat to this code means the
+fp is 'compat_fp' in x11, and it should read a 32bit call chain from user-space.
+
+This is confusing as 'is_compat_task()' matches one of aarch32 or ilp32, but
+compat_user_mode(regs) only matches aarch32 as it checks the saved spsr. I can't
+see any problem caused by this today, but its going to bite someone in the
+future. Can this be renamed aarch32_user_mode()? (turns out 'a32' is the name of
+just one of aarch32's instruction sets[0].)
+
+
+Thanks,
+
+James
+
+[0] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.faqs/ka16137.html
