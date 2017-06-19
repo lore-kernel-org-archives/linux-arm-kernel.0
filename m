@@ -1,54 +1,213 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 19 Jun 2017 17:36:42 +0200
-Subject: [GIT PULL] Improve cp110 clk support on Marvell Armada 7K/8K
-Message-ID: <pull.28a1be390fb082d60e88c3234dd7d76fb61438b6.1497886602.git-series.gregory.clement@free-electrons.com>
+From: shameerali.kolothum.thodi@huawei.com (shameer)
+Date: Mon, 19 Jun 2017 16:44:59 +0100
+Subject: [PATCH v2 1/2] acpi:iort: Add an IORT helper function to reserve HW
+ ITS address regions for IOMMU drivers
+In-Reply-To: <20170619154500.92336-1-shameerali.kolothum.thodi@huawei.com>
+References: <20170619154500.92336-1-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <20170619154500.92336-2-shameerali.kolothum.thodi@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The helper function retrieves ITS address regions through IORT
+device <-> ITS mappings and reserves it so that these regions
+will not be translated by IOMMU and will be excluded from IOVA
+allocations. IOMMU drivers can use this to implement their
+.get_resv_regions callback.
 
-Hi Mike, Stephen,
+Signed-off-by: shameer <shameerali.kolothum.thodi@huawei.com>
+---
+ drivers/acpi/arm64/iort.c        | 91 ++++++++++++++++++++++++++++++++++++++--
+ drivers/irqchip/irq-gic-v3-its.c |  3 +-
+ include/linux/acpi_iort.h        |  7 +++-
+ 3 files changed, 96 insertions(+), 5 deletions(-)
 
-This time I turned the series in a pull request so I removed the
-device tree binding part which will be in an other series for Rob
-Herring and I also removed the dt part that I will take care of once
-you will have pulled this one.
-
-I hope this will be easier for you to apply this way.
-
-Thanks!
-
-Gregory
-
-The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
-
-  Linux 4.12-rc1 (Sat, 13 May 2017 13:19:49 -0700)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git refs/heads/clk-cp110
-
-for you to fetch changes up to a45af6d3a98b4d8a2746de13a8db52fb4123bb56:
-
-  clk: mvebu: cp110: add sdio clock to cp-110 system controller (Wed, 31 May 2017 15:19:15 +0200)
-
-----------------------------------------------------------------
-Improve cp110 clk support on Marvell Armada 7K/8K
-
-We got more information about the clock controllers and the clock tree
-of the CP110 part that we find in the Marvell Armada 7K/8K SoCs. The
-clk driver is modified accordingly from this new information.
-
-----------------------------------------------------------------
-Gregory CLEMENT (3):
-  clk: mvebu: cp110: make failure labels more meaningful
-  clk: mvebu: cp110: do not depend anymore of the *-clock-output-names
-  clk: mvebu: cp110: introduce a new binding
-
-Konstantin Porotchkin (1):
-  clk: mvebu: cp110: add sdio clock to cp-110 system controller
-
- drivers/clk/mvebu/cp110-system-controller.c | 200 ++++++++++++++-------
- 1 file changed, 138 insertions(+), 62 deletions(-)
-
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index c5fecf9..4810dbe 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -34,6 +34,7 @@
+ struct iort_its_msi_chip {
+ 	struct list_head	list;
+ 	struct fwnode_handle	*fw_node;
++	phys_addr_t		base_addr;
+ 	u32			translation_id;
+ };
+ 
+@@ -131,14 +132,16 @@ typedef acpi_status (*iort_find_node_callback)
+ static DEFINE_SPINLOCK(iort_msi_chip_lock);
+ 
+ /**
+- * iort_register_domain_token() - register domain token and related ITS ID
+- * to the list from where we can get it back later on.
++ * iort_register_domain_token() - register domain token along with related
++ * ITS ID and base address to the list from where we can get it back later on.
+  * @trans_id: ITS ID.
++ * @base: ITS base address.
+  * @fw_node: Domain token.
+  *
+  * Returns: 0 on success, -ENOMEM if no memory when allocating list element
+  */
+-int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
++int iort_register_domain_token(int trans_id, phys_addr_t base,
++			       struct fwnode_handle *fw_node)
+ {
+ 	struct iort_its_msi_chip *its_msi_chip;
+ 
+@@ -148,6 +151,7 @@ int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
+ 
+ 	its_msi_chip->fw_node = fw_node;
+ 	its_msi_chip->translation_id = trans_id;
++	its_msi_chip->base_addr = base;
+ 
+ 	spin_lock(&iort_msi_chip_lock);
+ 	list_add(&its_msi_chip->list, &iort_msi_chip_list);
+@@ -491,6 +495,24 @@ int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id)
+ 	return -ENODEV;
+ }
+ 
++static int iort_find_its_base(u32 its_id, phys_addr_t *base)
++{
++	struct iort_its_msi_chip *its_msi_chip;
++	bool match = false;
++
++	spin_lock(&iort_msi_chip_lock);
++	list_for_each_entry(its_msi_chip, &iort_msi_chip_list, list) {
++		if (its_msi_chip->translation_id == its_id) {
++			*base = its_msi_chip->base_addr;
++			match = true;
++			break;
++		}
++	}
++	spin_unlock(&iort_msi_chip_lock);
++
++	return match ? 0 : -ENODEV;
++}
++
+ /**
+  * iort_dev_find_its_id() - Find the ITS identifier for a device
+  * @dev: The device.
+@@ -649,6 +671,67 @@ int iort_add_device_replay(const struct iommu_ops *ops, struct device *dev)
+ 
+ 	return err;
+ }
++
++/**
++ * iort_iommu_its_get_resv_regions - Reserved region driver helper
++ * @dev: Device from iommu_get_resv_regions()
++ * @list: Reserved region list from iommu_get_resv_regions()
++ *
++ * Returns: 0 on at least one ITS address region reservation,
++ *          appropriate error value otherwise.
++ *
++ * IOMMU drivers can use this to implement their .get_resv_regions callback
++ * for reserving the HW ITS address regions.
++ */
++int iort_iommu_its_get_resv_regions(struct device *dev, struct list_head *head)
++{
++	int i;
++	struct acpi_iort_its_group *its;
++	struct acpi_iort_node *node, *its_node = NULL;
++	bool resv = false;
++
++	node = iort_find_dev_node(dev);
++	if (!node)
++		return -ENODEV;
++
++	if (dev_is_pci(dev)) {
++		u32 rid;
++
++		pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid, &rid);
++		its_node = iort_node_map_id(node, rid, NULL, IORT_MSI_TYPE);
++	} else {
++		for (i = 0; i < node->mapping_count; i++) {
++			its_node = iort_node_map_platform_id(node, NULL,
++							 IORT_MSI_TYPE, i);
++			if (its_node)
++				break;
++		}
++	}
++
++	if (!its_node)
++		return -ENODEV;
++
++	/* Move to ITS specific data */
++	its = (struct acpi_iort_its_group *)its_node->node_data;
++
++	for (i = 0; i < its->its_count; i++) {
++		phys_addr_t base;
++
++		if (!iort_find_its_base(its->identifiers[i], &base)) {
++			int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
++			struct iommu_resv_region *region;
++
++			region = iommu_alloc_resv_region(base, SZ_128K, prot,
++							 IOMMU_RESV_MSI);
++			if (region) {
++				list_add_tail(&region->list, head);
++				resv = true;
++			}
++		}
++	}
++
++	return resv ? 0 : -ENODEV;
++}
+ #else
+ static inline
+ const struct iommu_ops *iort_fwspec_iommu_ops(struct iommu_fwspec *fwspec)
+@@ -656,6 +739,8 @@ const struct iommu_ops *iort_fwspec_iommu_ops(struct iommu_fwspec *fwspec)
+ static inline
+ int iort_add_device_replay(const struct iommu_ops *ops, struct device *dev)
+ { return 0; }
++int iort_iommu_its_get_resv_regions(struct device *dev, struct list_head *head)
++{ return -ENODEV; }
+ #endif
+ 
+ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 45ea1933..c45a2ad 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -1854,7 +1854,8 @@ static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
+ 		return -ENOMEM;
+ 	}
+ 
+-	err = iort_register_domain_token(its_entry->translation_id, dom_handle);
++	err = iort_register_domain_token(its_entry->translation_id, res.start,
++					 dom_handle);
+ 	if (err) {
+ 		pr_err("ITS@%pa: Unable to register GICv3 ITS domain token (ITS ID %d) to IORT\n",
+ 		       &res.start, its_entry->translation_id);
+diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
+index 3ff9ace..35cf45c 100644
+--- a/include/linux/acpi_iort.h
++++ b/include/linux/acpi_iort.h
+@@ -26,7 +26,8 @@
+ #define IORT_IRQ_MASK(irq)		(irq & 0xffffffffULL)
+ #define IORT_IRQ_TRIGGER_MASK(irq)	((irq >> 32) & 0xffffffffULL)
+ 
+-int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node);
++int iort_register_domain_token(int trans_id, phys_addr_t base,
++			       struct fwnode_handle *fw_node);
+ void iort_deregister_domain_token(int trans_id);
+ struct fwnode_handle *iort_find_domain_token(int trans_id);
+ #ifdef CONFIG_ACPI_IORT
+@@ -39,6 +40,7 @@
+ /* IOMMU interface */
+ void iort_set_dma_mask(struct device *dev);
+ const struct iommu_ops *iort_iommu_configure(struct device *dev);
++int iort_iommu_its_get_resv_regions(struct device *dev, struct list_head *head);
+ #else
+ static inline void acpi_iort_init(void) { }
+ static inline bool iort_node_match(u8 type) { return false; }
+@@ -53,6 +55,9 @@ static inline void iort_set_dma_mask(struct device *dev) { }
+ static inline
+ const struct iommu_ops *iort_iommu_configure(struct device *dev)
+ { return NULL; }
++static inline
++int iort_iommu_its_get_resv_regions(struct device *dev, struct list_head *head)
++{ return -ENODEV; }
+ #endif
+ 
+ #endif /* __ACPI_IORT_H__ */
 -- 
-git-series 0.9.1
+1.9.1
