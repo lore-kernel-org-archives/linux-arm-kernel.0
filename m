@@ -1,39 +1,64 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 19 Jun 2017 16:37:24 +0200
-Subject: [PATCH v2] drivers/kmem: disable on arm64
-Message-ID: <1497883044-1276-1-git-send-email-ard.biesheuvel@linaro.org>
+From: andy@greyhouse.net (Andy Gospodarek)
+Date: Mon, 19 Jun 2017 10:37:47 -0400
+Subject: [PATCH RFC 2/3] samples/bpf: Add define __EMITTING_BPF__ when
+ building BPF
+In-Reply-To: <20170615223543.22867-3-david.daney@cavium.com>
+References: <20170615223543.22867-3-david.daney@cavium.com>
+Message-ID: <20170619143747.GA20370@C02RW35GFVH8.dhcp.broadcom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On arm64, the /dev/kmem driver barely works, given that it assumes that
-VMALLOC_START > PAGE_OFFSET, which is not the case on arm64. Due to the
-dubious value of kmem on an architecture such as arm64, which is fairly
-new and is not as forgiving as other architectures when it comes to
-userland accesses to kernel memory using mismatched attributes*, let's
-disable it altogether if CONFIG_ARM64=y.
+On Thu, Jun 15, 2017 at 03:35:42PM -0700, David Daney wrote:
+> ... this allows gating of inline assembly code that causes llvm to
+> fail when emitting BPF.
 
-* Mappings in the vmalloc region will be accessed using vread/vwrite when
-  reading/writing to/from /dev/kmem, which will perform these accesses by
-  kmap()'ing each page using writeback cacheable attributes. This will be
-  correct in most cases, but this is not guaranteed.
+I floated essentially the same patch in Feb without much luck:
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- drivers/char/Kconfig | 2 ++
- 1 file changed, 2 insertions(+)
+http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/492758.html
 
-diff --git a/drivers/char/Kconfig b/drivers/char/Kconfig
-index 31adbebf812e..8102ee7b3247 100644
---- a/drivers/char/Kconfig
-+++ b/drivers/char/Kconfig
-@@ -17,6 +17,8 @@ config DEVMEM
- 
- config DEVKMEM
- 	bool "/dev/kmem virtual device support"
-+	# On arm64, VMALLOC_START < PAGE_OFFSET, which confuses kmem read/write
-+	depends on !ARM64
- 	help
- 	  Say Y here if you want to support the /dev/kmem device. The
- 	  /dev/kmem device is rarely used, but can be used for certain
--- 
-2.7.4
+Many of the folks on the cc-list here had objections then and I suspect they
+unfortunately still object.  I like the fact that this fix allowed
+architectures that are currently problematic to move forward before there is a
+possibly mythical "fix in llvm" to address this problem.
+
+When talking about this in one of the IOVisor calls it was also discussed that
+this needs to be fixed for tracing, so there are more than just the BPF
+use-case where this is important.
+
+I wasn't sure there was buy-in from the ARM developers, but my thought had been
+that a cleaner solution to this would be to reorganize sysreg.h into multiple
+files.  The inline assembly would be the only thing in sysreg-asm.h (that was
+actually the only thing originally in sysreg.h) and the rest of the code would
+be in sysreg.h.
+
+That is not what Dave suggested, but it would be a good starting point for a
+custom asm/ layer for BPF/tracing.  I'm with Dave and think a specialized set
+of asm/ files for tracing/BPF to avoid these issues all-together and let arch
+developers to do whatever they want in their code.
+
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+>  samples/bpf/Makefile | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/samples/bpf/Makefile b/samples/bpf/Makefile
+> index a0561dc762fe..4979e6b56662 100644
+> --- a/samples/bpf/Makefile
+> +++ b/samples/bpf/Makefile
+> @@ -193,12 +193,12 @@ $(src)/*.c: verify_target_bpf
+>  
+>  $(obj)/tracex5_kern.o: $(obj)/syscall_nrs.h
+>  
+> -# asm/sysreg.h - inline assembly used by it is incompatible with llvm.
+> -# But, there is no easy way to fix it, so just exclude it since it is
+> -# useless for BPF samples.
+> +# __EMITTING_BPF__ used to exclude inline assembly, which cannot be
+> +# emitted in BPF code.
+>  $(obj)/%.o: $(src)/%.c
+>  	$(CLANG) $(NOSTDINC_FLAGS) $(LINUXINCLUDE) $(EXTRA_CFLAGS) \
+> -		-D__KERNEL__ -D__ASM_SYSREG_H -Wno-unused-value -Wno-pointer-sign \
+> +		-D__KERNEL__ -D__EMITTING_BPF__ \
+> +		-Wno-unused-value -Wno-pointer-sign \
+>  		-Wno-compare-distinct-pointer-types \
+>  		-Wno-gnu-variable-sized-type-not-at-end \
+>  		-Wno-address-of-packed-member -Wno-tautological-compare \
