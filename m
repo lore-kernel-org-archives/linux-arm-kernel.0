@@ -1,96 +1,53 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 19 Jun 2017 18:01:41 +0100
-Subject: [PATCH v5 4/8] mm,
- gup: Ensure real head page is ref-counted when using hugepages
-In-Reply-To: <20170619170145.25577-1-punit.agrawal@arm.com>
-References: <20170619170145.25577-1-punit.agrawal@arm.com>
-Message-ID: <20170619170145.25577-5-punit.agrawal@arm.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 19 Jun 2017 10:21:51 -0700
+Subject: [PATCH] mips: bcm63xx: spi: Fix checkpatch.pl warnings
+In-Reply-To: <1497890980-4334-1-git-send-email-aravind.thk@gmail.com>
+References: <1497890980-4334-1-git-send-email-aravind.thk@gmail.com>
+Message-ID: <2d01bbe8-33bd-9aea-8906-0fe54bb2c334@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When speculatively taking references to a hugepage using
-page_cache_add_speculative() in gup_huge_pmd(), it is assumed that the
-page returned by pmd_page() is the head page. Although normally true,
-this assumption doesn't hold when the hugepage comprises of successive
-page table entries such as when using contiguous bit on arm64 at PTE or
-PMD levels.
+On 06/19/2017 09:49 AM, Aravind Thokala wrote:
+> This patch fixes the checkpatch.pl warnings on the driver
+> file.
+> 
+> Signed-off-by: Aravind Thokala <aravind.thk@gmail.com>
 
-This can be addressed by ensuring that the page passed to
-page_cache_add_speculative() is the real head or by de-referencing the
-head page within the function.
+The subject should be spi/bcm63xx: Fix checkpatch warnings to be
+consistent with previous submissions done to that file.
 
-We take the first approach to keep the usage pattern aligned with
-page_cache_get_speculative() where users already pass the appropriate
-page, i.e., the de-referenced head.
+With that:
 
-Apply the same logic to fix gup_huge_[pud|pgd]() as well.
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Steve Capper <steve.capper@arm.com>
-Cc: Michal Hocko <mhocko@suse.com>
-Cc: "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>
-Cc: Aneesh Kumar K.V <aneesh.kumar@linux.vnet.ibm.com>
----
- mm/gup.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+> ---
+>  drivers/spi/spi-bcm63xx.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-bcm63xx.c b/drivers/spi/spi-bcm63xx.c
+> index 247f71b..84c7356 100644
+> --- a/drivers/spi/spi-bcm63xx.c
+> +++ b/drivers/spi/spi-bcm63xx.c
+> @@ -147,7 +147,7 @@ struct bcm63xx_spi {
+>  
+>  	/* Platform data */
+>  	const unsigned long	*reg_offsets;
+> -	unsigned		fifo_size;
+> +	unsigned int		fifo_size;
+>  	unsigned int		msg_type_shift;
+>  	unsigned int		msg_ctl_width;
+>  
+> @@ -191,7 +191,7 @@ static inline void bcm_spi_writew(struct bcm63xx_spi *bs,
+>  #endif
+>  }
+>  
+> -static const unsigned bcm63xx_spi_freq_table[SPI_CLK_MASK][2] = {
+> +static const unsigned int bcm63xx_spi_freq_table[SPI_CLK_MASK][2] = {
+>  	{ 20000000, SPI_CLK_20MHZ },
+>  	{ 12500000, SPI_CLK_12_50MHZ },
+>  	{  6250000, SPI_CLK_6_250MHZ },
+> 
 
-diff --git a/mm/gup.c b/mm/gup.c
-index e74e0b5a0c7c..6bd39264d0e7 100644
---- a/mm/gup.c
-+++ b/mm/gup.c
-@@ -1354,8 +1354,7 @@ static int gup_huge_pmd(pmd_t orig, pmd_t *pmdp, unsigned long addr,
- 		return __gup_device_huge_pmd(orig, addr, end, pages, nr);
- 
- 	refs = 0;
--	head = pmd_page(orig);
--	page = head + ((addr & ~PMD_MASK) >> PAGE_SHIFT);
-+	page = pmd_page(orig) + ((addr & ~PMD_MASK) >> PAGE_SHIFT);
- 	do {
- 		pages[*nr] = page;
- 		(*nr)++;
-@@ -1363,6 +1362,7 @@ static int gup_huge_pmd(pmd_t orig, pmd_t *pmdp, unsigned long addr,
- 		refs++;
- 	} while (addr += PAGE_SIZE, addr != end);
- 
-+	head = compound_head(pmd_page(orig));
- 	if (!page_cache_add_speculative(head, refs)) {
- 		*nr -= refs;
- 		return 0;
-@@ -1392,8 +1392,7 @@ static int gup_huge_pud(pud_t orig, pud_t *pudp, unsigned long addr,
- 		return __gup_device_huge_pud(orig, addr, end, pages, nr);
- 
- 	refs = 0;
--	head = pud_page(orig);
--	page = head + ((addr & ~PUD_MASK) >> PAGE_SHIFT);
-+	page = pud_page(orig) + ((addr & ~PUD_MASK) >> PAGE_SHIFT);
- 	do {
- 		pages[*nr] = page;
- 		(*nr)++;
-@@ -1401,6 +1400,7 @@ static int gup_huge_pud(pud_t orig, pud_t *pudp, unsigned long addr,
- 		refs++;
- 	} while (addr += PAGE_SIZE, addr != end);
- 
-+	head = compound_head(pud_page(orig));
- 	if (!page_cache_add_speculative(head, refs)) {
- 		*nr -= refs;
- 		return 0;
-@@ -1429,8 +1429,7 @@ static int gup_huge_pgd(pgd_t orig, pgd_t *pgdp, unsigned long addr,
- 
- 	BUILD_BUG_ON(pgd_devmap(orig));
- 	refs = 0;
--	head = pgd_page(orig);
--	page = head + ((addr & ~PGDIR_MASK) >> PAGE_SHIFT);
-+	page = pgd_page(orig) + ((addr & ~PGDIR_MASK) >> PAGE_SHIFT);
- 	do {
- 		pages[*nr] = page;
- 		(*nr)++;
-@@ -1438,6 +1437,7 @@ static int gup_huge_pgd(pgd_t orig, pgd_t *pgdp, unsigned long addr,
- 		refs++;
- 	} while (addr += PAGE_SIZE, addr != end);
- 
-+	head = compound_head(pgd_page(orig));
- 	if (!page_cache_add_speculative(head, refs)) {
- 		*nr -= refs;
- 		return 0;
+
 -- 
-2.11.0
+Florian
