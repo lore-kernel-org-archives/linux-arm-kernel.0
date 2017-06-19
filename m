@@ -1,23 +1,24 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Mon, 19 Jun 2017 11:57:51 +0000
-Subject: [PATCH v4 03/11] net: mvmdio: use GENMASK for masks
-In-Reply-To: <20170614154911.14510-4-antoine.tenart@free-electrons.com>
-References: <20170614154911.14510-1-antoine.tenart@free-electrons.com>
- <20170614154911.14510-4-antoine.tenart@free-electrons.com>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6DD0025C9A@AcuExch.aculab.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 19 Jun 2017 14:15:40 +0200
+Subject: [PATCH] reset: zx2967: constify zx2967_reset_ops.
+In-Reply-To: <c082e132c282634a7185ea99c50c8d671965534a.1497329415.git.arvind.yadav.cs@gmail.com>
+References: <c082e132c282634a7185ea99c50c8d671965534a.1497329415.git.arvind.yadav.cs@gmail.com>
+Message-ID: <1497874540.2993.67.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Antoine Tenart
-> Sent: 14 June 2017 16:49
-> Cosmetic patch to use the GENMASK helper for masks.
-...
-> -	ret = val & 0xFFFF;
-> +	ret = val & GENMASK(15, 0);
+On Tue, 2017-06-13 at 10:22 +0530, Arvind Yadav wrote:
+> File size before:
+>    text	   data	    bss	    dec	    hex	filename
+>     794	    232	      0	   1026	    402	drivers/reset/reset-zx2967.o
+> 
+> File size After adding 'const':
+>    text	   data	    bss	    dec	    hex	filename
+>     842	    184	      0	   1026	    402	drivers/reset/reset-zx2967.o
+> 
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 
-My 2c: It isn't at all clear to me that changes like this in anyway
-improve the code readability.
-In some sense the '15' should be a named constant - but that just makes
-it even less obvious what is going on.
+Applied to reset/next, thank you.
 
-	David
+regards
+Philipp
