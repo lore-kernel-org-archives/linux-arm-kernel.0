@@ -1,39 +1,26 @@
 From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Mon, 19 Jun 2017 05:59:13 +0200
-Subject: [PATCH v5 21/26] soc: actions: Add Owl SPS
-In-Reply-To: <20170619034021.5762-1-afaerber@suse.de>
-References: <20170606005426.26446-24-afaerber@suse.de>
- <20170619034021.5762-1-afaerber@suse.de>
-Message-ID: <c5df0116-b09a-0389-b616-b2b0046ab0c6@suse.de>
+Date: Mon, 19 Jun 2017 06:00:10 +0200
+Subject: [PATCH v5 22/26] MAINTAINERS: Update Actions Semi section with SPS
+In-Reply-To: <20170619034407.5942-1-afaerber@suse.de>
+References: <20170606005426.26446-25-afaerber@suse.de>
+ <20170619034407.5942-1-afaerber@suse.de>
+Message-ID: <f27ed7f4-bf29-64a7-1b95-6600a8fc112d@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 19.06.2017 um 05:40 schrieb Andreas F?rber:
-> Implement S500 Smart Power System power-gating.
-> For now flag PD_CPU2 and PD_CPU3 as always-on.
-> 
-> Based on LeMaker linux-actions tree.
+Am 19.06.2017 um 05:44 schrieb Andreas F?rber:
+> Add file patterns to cover the SPS power domain driver and DT binding.
 > 
 > Signed-off-by: Andreas F?rber <afaerber@suse.de>
 > ---
 >  v4 -> v5:
->  * Updated for header file rename
+>  * Rebased onto timer additions
+>  * Added dt-bindings header file pattern
 >  
->  v3 -> v4:
->  * Added genpd_flags field and set GENPD_FLAG_ALWAYS_ON for CPU2/CPU3
->  * Added debug output
+>  v4: new
 >  
->  v3: new
->  
->  drivers/soc/Kconfig           |   1 +
->  drivers/soc/Makefile          |   1 +
->  drivers/soc/actions/Kconfig   |  12 ++
->  drivers/soc/actions/Makefile  |   1 +
->  drivers/soc/actions/owl-sps.c | 252 ++++++++++++++++++++++++++++++++++++++++++
->  5 files changed, 267 insertions(+)
->  create mode 100644 drivers/soc/actions/Kconfig
->  create mode 100644 drivers/soc/actions/Makefile
->  create mode 100644 drivers/soc/actions/owl-sps.c
+>  MAINTAINERS | 4 ++++
+>  1 file changed, 4 insertions(+)
 
 Applied to linux-actions.git v4.13/soc branch:
 
