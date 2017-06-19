@@ -1,36 +1,20 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 19 Jun 2017 12:06:33 +0530
-Subject: [PATCH 12/16] mmc: host: omap_hsmmc: Add support to set IODELAY
- values
-In-Reply-To: <20170619060256.GK3730@atomide.com>
-References: <20170616124544.15046-1-kishon@ti.com>
- <20170616124544.15046-13-kishon@ti.com> <20170619060256.GK3730@atomide.com>
-Message-ID: <810fba3e-a488-fa0d-5639-47f1c76ea2b6@ti.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Mon, 19 Jun 2017 14:39:44 +0800
+Subject: [PATCH] crypto: mediatek - drop .owner field in mtk_crypto_driver
+In-Reply-To: <55f4a84740c5d01a35ff6ec68890fcca0b26f28d.1493797414.git.geliangtang@gmail.com>
+References: <55f4a84740c5d01a35ff6ec68890fcca0b26f28d.1493797414.git.geliangtang@gmail.com>
+Message-ID: <20170619063944.GD13651@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On Monday 19 June 2017 11:32 AM, Tony Lindgren wrote:
-> * Kishon Vijay Abraham I <kishon@ti.com> [170616 05:47]:
->> The data manual of J6/J6 Eco recommends to set different IODELAY values
->> depending on the mode in which the MMC/SD is enumerated in order to
->> ensure IO timings are met.
->>
->> Add support to set the IODELAY values depending on the various MMC
->> modes using the pinctrl APIs.
+On Sat, May 06, 2017 at 11:35:29PM +0800, Geliang Tang wrote:
+> Drop .owner field in mtk_crypto_driver, since platform_driver_register()
+> will set it automatically.
 > 
-> This does not seem to apply against Linux next for me for
-> the binding. Fixing that, compile fails for me with:
-> 
-> drivers/mmc/host/omap_hsmmc.c:2384:13: error:
-> 'struct omap_hsmmc_platform_data' has no member named 'version'
+> Signed-off-by: Geliang Tang <geliangtang@gmail.com>
 
-This series has a dependency with
-https://www.spinics.net/lists/arm-kernel/msg586215.html series
-
-*version* member is added in patch with $subject
-"ARM: OMAP2+: Add pdata-quirks for MMC/SD on DRA74x EVM"
-
-Thanks
-Kishon
+Patch applied.  Thanks.
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
