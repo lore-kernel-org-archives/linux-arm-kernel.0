@@ -1,47 +1,93 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Mon, 19 Jun 2017 16:50:15 +0200
-Subject: [PATCH v5 2/3] PCI: Add tango PCIe host bridge support
-In-Reply-To: <654acba8-68b9-fb4c-4681-35af94b6bd74@sigmadesigns.com>
-References: <741766e5-cff2-db5f-d40b-6866e08fd966@sigmadesigns.com>
- <1802aae0-f97b-c437-c00e-5fa7c867286d@sigmadesigns.com>
- <654acba8-68b9-fb4c-4681-35af94b6bd74@sigmadesigns.com>
-Message-ID: <6abfe9ce-5c32-9be0-e276-ed14253aa773@sigmadesigns.com>
+From: dsafonov@virtuozzo.com (Dmitry Safonov)
+Date: Mon, 19 Jun 2017 17:50:23 +0300
+Subject: [PATCHv2] ARM32: Support mremap() for sigpage/vDSO
+In-Reply-To: <CALCETrV9khCCCAu4G0nfttKV1ZfrxH6dkeSqsqwrngs-WYbpog@mail.gmail.com>
+References: <20170414132529.8337-1-dsafonov@virtuozzo.com>
+ <871579ef-ee9a-c321-80e4-47836bb0e472@virtuozzo.com>
+ <bebbe3ce-12ed-419a-248a-55f41d74d9da@virtuozzo.com>
+ <20170523200946.GG22219@n2100.armlinux.org.uk>
+ <7dc84202-9f12-4f0e-a925-e050974e17b9@virtuozzo.com>
+ <CALCETrV9khCCCAu4G0nfttKV1ZfrxH6dkeSqsqwrngs-WYbpog@mail.gmail.com>
+Message-ID: <7dd80420-0f3f-42e2-80e4-e47990f3b20b@virtuozzo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2017 10:19, Marc Gonzalez wrote:
-
-> On 31/05/2017 15:33, Marc Gonzalez wrote:
+On 05/24/2017 07:44 PM, Andy Lutomirski wrote:
+> On Wed, May 24, 2017 at 3:09 AM, Dmitry Safonov <dsafonov@virtuozzo.com> wrote:
+>> + Adding back to CC x86 guys - as I've removed in ping messages.
+>>
+>> On 05/23/2017 11:09 PM, Russell King - ARM Linux wrote:
+>>>
+>>> On Thu, May 18, 2017 at 02:13:29PM +0300, Dmitry Safonov wrote:
+>>>>
+>>>> On 04/25/2017 08:18 PM, Dmitry Safonov wrote:
+>>>>>
+>>>>> On 04/14/2017 04:25 PM, Dmitry Safonov wrote:
+>>>>>>
+>>>>>> CRIU restores application mappings on the same place where they
+>>>>>> were before Checkpoint. That means, that we need to move vDSO
+>>>>>> and sigpage during restore on exactly the same place where
+>>>>>> they were before C/R.
+>>>>>>
+>>>>>> Make mremap() code update mm->context.{sigpage,vdso} pointers
+>>>>>> during VMA move. Sigpage is used for landing after handling
+>>>>>> a signal - if the pointer is not updated during moving, the
+>>>>>> application might crash on any signal after mremap().
+>>>>>>
+>>>>>> vDSO pointer on ARM32 is used only for setting auxv at this moment,
+>>>>>> update it during mremap() in case of future usage.
+>>>>>>
+>>>>>> Without those updates, current work of CRIU on ARM32 is not reliable.
+>>>>>> Historically, we error Checkpointing if we find vDSO page on ARM32
+>>>>>> and suggest user to disable CONFIG_VDSO.
+>>>>>> But that's not correct - it goes from x86 where signal processing
+>>>>>> is ended in vDSO blob. For arm32 it's sigpage, which is not disabled
+>>>>>> with `CONFIG_VDSO=n'.
+>>>>>>
+>>>>>> Looks like C/R was working by luck - because userspace on ARM32 at
+>>>>>> this moment always sets SA_RESTORER.
+>>>>>>
+>>>>>> Cc: linux-arm-kernel at lists.infradead.org
+>>>>>> Cc: Russell King <linux@armlinux.org.uk>
+>>>>>> Cc: Will Deacon <will.deacon@arm.com>
+>>>>>> Cc: Andy Lutomirski <luto@amacapital.net>
+>>>>>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>>>>>> Cc: Cyrill Gorcunov <gorcunov@openvz.org>
+>>>>>> Cc: Pavel Emelyanov <xemul@virtuozzo.com>
+>>>>>> Cc: Christopher Covington <cov@codeaurora.org>
+>>>>>> Signed-off-by: Dmitry Safonov <dsafonov@virtuozzo.com>
+>>>>>> ---
+>>>>>> v2: (buildbot) Fix (unsinged long) to (void*) cast warning.
+>>>>>>
+>>>>>>    arch/arm/kernel/process.c |  8 ++++++++
+>>>>>>    arch/arm/kernel/vdso.c    | 18 ++++++++++++++++++
+>>>>>>    arch/x86/entry/vdso/vma.c |  3 ---
+>>>>>>    mm/mmap.c                 |  4 ++++
+>>>>>>    4 files changed, 30 insertions(+), 3 deletions(-)
+>>>>>
+>>>>>
+>>>>> Ping?
+>>>>
+>>>>
+>>>> Ping?
+>>>
+>>>
+>>> I'm mostly happy with the ARM bits, but I can't take the patch without
+>>> acks from others because it touches other architectures/generic code.
+>>>
+>>
+>> Fair enough, thanks.
+>>
+>> Andy, does moving of this WARN_ON() looks good to you?
+>> I've done it to reuse it over arches and between vdso/sigpage mappings,
+>> reducing code duplication.
 > 
->> +static int tango_pcie_probe(struct platform_device *pdev)
->> +{
->> +	int ret = -EINVAL;
->> +	void __iomem *base;
->> +	struct resource *res;
->> +	struct tango_pcie *pcie;
->> +	struct device *dev = &pdev->dev;
->> +
->> +	pr_err("MAJOR ISSUE: PCIe config and mem spaces are muxed\n");
->> +	pr_err("Tainting kernel... Use driver at your own risk\n");
->> +	add_taint(TAINT_FIRMWARE_WORKAROUND, LOCKDEP_STILL_OK);
-> 
-> Hello Bjorn,
-> 
-> In v4, your only comment was
-> "[muxing config and mem spaces] is a major issue and possibly even
-> a security problem [which requires at least an error message and a
-> kernel taint].
-> 
-> Were there any other issues with the host bridge support?
+> Acked-by: Andy Lutomirski <luto@kernel.org> # For the x86 bit
 
-Hello Bjorn,
+Hi Russell,
 
-I imagine you are now only waiting for Marc Z's Ack of patch 3/3 ?
-(AFAIU, all issues have been addressed as of v8 3/3.)
+Should I resend this with ack, or send it to your patch system,
+or you'll take it from mail?
 
-Rob has Acked patch 1/3 -- thanks Rob.
-
-Assuming all issues with patch 2/3 have already been addressed,
-then this driver can land in time for 4.13 right?
-
-Regards.
+Thanks,
+              Dmitry
