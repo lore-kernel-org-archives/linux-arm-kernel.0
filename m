@@ -1,168 +1,114 @@
 From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Mon, 19 Jun 2017 17:59:58 +0800
-Subject: [PATCH 1/3] PCI: mediatek: modify controller powerup logic
+Date: Mon, 19 Jun 2017 17:59:59 +0800
+Subject: [PATCH 2/3] PCI: mediatek: turn off subsys power if no link up
+ detected
 In-Reply-To: <1497866400-41844-1-git-send-email-ryder.lee@mediatek.com>
 References: <1497866400-41844-1-git-send-email-ryder.lee@mediatek.com>
-Message-ID: <1497866400-41844-2-git-send-email-ryder.lee@mediatek.com>
+Message-ID: <1497866400-41844-3-git-send-email-ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current powerup logic may lead to unbalanced pm_runtime_enable() if
-the earlier probe failed due to -EPROBE_DEFER. Hence we do a little flow
-adjustment to avoid that:
-
-Parse standard PCI resources firstly, then check properties for each port,
-power on controller finally.
-
-Also, this patch removes unused registers and renames funtions properly.
+There is no need to keep controller power on if slots are all empty,
+so a check is added to turn it off. Besides, host controllers may not
+need PM domain in some SoCs, thus we add dev->pm_domain to check that.
 
 Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 ---
- drivers/pci/host/pcie-mediatek.c | 51 +++++++++++++++++-----------------------
- 1 file changed, 21 insertions(+), 30 deletions(-)
+ drivers/pci/host/pcie-mediatek.c | 40 ++++++++++++++++++++++++++++------------
+ 1 file changed, 28 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-index 3baafa8..165d82d 100644
+index 165d82d..d256263 100644
 --- a/drivers/pci/host/pcie-mediatek.c
 +++ b/drivers/pci/host/pcie-mediatek.c
-@@ -34,8 +34,6 @@
- 
- /* PCIe per port registers */
- #define PCIE_BAR0_SETUP		0x10
--#define PCIE_BAR1_SETUP		0x14
--#define PCIE_BAR0_MEM_BASE	0x18
- #define PCIE_CLASS		0x34
- #define PCIE_LINK_STATUS	0x50
- 
-@@ -224,7 +222,7 @@ static void mtk_pcie_assert_ports(struct mtk_pcie_port *port)
- 	msleep(100);
+@@ -118,6 +118,18 @@ static inline bool mtk_pcie_link_is_up(struct mtk_pcie_port *port)
+ 	return !!(readl(port->base + PCIE_LINK_STATUS) & PCIE_PORT_LINKUP);
  }
  
--static int mtk_pcie_enable_ports(struct mtk_pcie_port *port)
-+static void mtk_pcie_enable_ports(struct mtk_pcie_port *port)
++static void mtk_pcie_subsys_powerdown(struct mtk_pcie *pcie)
++{
++	struct device *dev = pcie->dev;
++
++	clk_disable_unprepare(pcie->free_ck);
++
++	if (dev->pm_domain) {
++		pm_runtime_put_sync(dev);
++		pm_runtime_disable(dev);
++	}
++}
++
+ static void mtk_pcie_port_free(struct mtk_pcie_port *port)
  {
- 	struct device *dev = port->pcie->dev;
- 	int err;
-@@ -249,7 +247,7 @@ static int mtk_pcie_enable_ports(struct mtk_pcie_port *port)
- 	/* if link up, then setup root port configuration space */
- 	if (mtk_pcie_link_is_up(port)) {
- 		mtk_pcie_configure_rc(port);
--		return 0;
-+		return;
+ 	struct mtk_pcie *pcie = port->pcie;
+@@ -130,7 +142,6 @@ static void mtk_pcie_port_free(struct mtk_pcie_port *port)
+ 
+ static void mtk_pcie_put_resources(struct mtk_pcie *pcie)
+ {
+-	struct device *dev = pcie->dev;
+ 	struct mtk_pcie_port *port, *tmp;
+ 
+ 	list_for_each_entry_safe(port, tmp, &pcie->ports, list) {
+@@ -139,9 +150,7 @@ static void mtk_pcie_put_resources(struct mtk_pcie *pcie)
+ 		mtk_pcie_port_free(port);
  	}
  
- 	dev_info(dev, "Port%d link down\n", port->index);
-@@ -257,13 +255,13 @@ static int mtk_pcie_enable_ports(struct mtk_pcie_port *port)
- 	phy_power_off(port->phy);
- err_phy_on:
- 	clk_disable_unprepare(port->sys_ck);
--	mtk_pcie_port_free(port);
- err_sys_clk:
--	return err;
-+	mtk_pcie_port_free(port);
-+
-+	return;
+-	clk_disable_unprepare(pcie->free_ck);
+-	pm_runtime_put_sync(dev);
+-	pm_runtime_disable(dev);
++	mtk_pcie_subsys_powerdown(pcie);
  }
  
- static int mtk_pcie_parse_ports(struct mtk_pcie *pcie,
--				struct mtk_pcie_port **p,
- 				struct device_node *node,
- 				int index)
- {
-@@ -274,12 +272,10 @@ static int mtk_pcie_parse_ports(struct mtk_pcie *pcie,
- 	char name[10];
- 	int err;
+ static void __iomem *mtk_pcie_map_bus(struct pci_bus *bus,
+@@ -340,10 +349,10 @@ static int mtk_pcie_subsys_powerup(struct mtk_pcie *pcie)
+ 		return PTR_ERR(pcie->free_ck);
+ 	}
  
--	*p = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
--	if (!*p)
-+	port = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
-+	if (!port)
- 		return -ENOMEM;
+-	pm_runtime_enable(dev);
+-	err = pm_runtime_get_sync(dev);
+-	if (err)
+-		goto err_pm;
++	if (dev->pm_domain) {
++		pm_runtime_enable(dev);
++		pm_runtime_get_sync(dev);
++	}
  
--	port = *p;
--
- 	err = of_property_read_u32(node, "num-lanes", &port->lane);
- 	if (err) {
- 		dev_err(dev, "missing num-lanes property\n");
-@@ -323,7 +319,7 @@ static int mtk_pcie_parse_ports(struct mtk_pcie *pcie,
+ 	/* enable top level clock */
+ 	err = clk_prepare_enable(pcie->free_ck);
+@@ -355,9 +364,10 @@ static int mtk_pcie_subsys_powerup(struct mtk_pcie *pcie)
  	return 0;
- }
  
--static int mtk_pcie_handle_shared_resource(struct mtk_pcie *pcie)
-+static int mtk_pcie_subsys_powerup(struct mtk_pcie *pcie)
- {
- 	struct device *dev = pcie->dev;
- 	struct platform_device *pdev = to_platform_device(dev);
-@@ -366,20 +362,16 @@ static int mtk_pcie_handle_shared_resource(struct mtk_pcie *pcie)
+ err_free_ck:
+-	pm_runtime_put_sync(dev);
+-err_pm:
+-	pm_runtime_disable(dev);
++	if (dev->pm_domain) {
++		pm_runtime_put_sync(dev);
++		pm_runtime_disable(dev);
++	}
+ 
  	return err;
  }
+@@ -439,6 +449,10 @@ static int mtk_pcie_setup(struct mtk_pcie *pcie)
+ 	list_for_each_entry_safe(port, tmp, &pcie->ports, list)
+ 		mtk_pcie_enable_ports(port);
  
--static int mtk_pcie_parse_and_add_res(struct mtk_pcie *pcie)
-+static int mtk_pcie_setup(struct mtk_pcie *pcie)
- {
- 	struct device *dev = pcie->dev;
- 	struct device_node *node = dev->of_node, *child;
- 	struct of_pci_range_parser parser;
- 	struct of_pci_range range;
- 	struct resource res;
-+	struct mtk_pcie_port *port, *tmp;
- 	int err;
- 
--	/* parse shared resources */
--	err = mtk_pcie_handle_shared_resource(pcie);
--	if (err)
--		return err;
--
- 	if (of_pci_range_parser_init(&parser, node)) {
- 		dev_err(dev, "missing \"ranges\" property\n");
- 		return -EINVAL;
-@@ -423,8 +415,7 @@ static int mtk_pcie_parse_and_add_res(struct mtk_pcie *pcie)
- 		pcie->busn.flags = IORESOURCE_BUS;
- 	}
- 
--	for_each_child_of_node(node, child) {
--		struct mtk_pcie_port *port;
-+	for_each_available_child_of_node(node, child) {
- 		int index;
- 
- 		err = of_pci_get_devfn(child);
-@@ -435,19 +426,19 @@ static int mtk_pcie_parse_and_add_res(struct mtk_pcie *pcie)
- 
- 		index = PCI_SLOT(err);
- 
--		if (!of_device_is_available(child))
--			continue;
--
--		err = mtk_pcie_parse_ports(pcie, &port, child, index);
--		if (err)
--			return err;
--
--		/* enable each port, and then check link status */
--		err = mtk_pcie_enable_ports(port);
-+		err = mtk_pcie_parse_ports(pcie, child, index);
- 		if (err)
- 			return err;
- 	}
- 
-+	err = mtk_pcie_subsys_powerup(pcie);
-+	if (err)
-+		return err;
-+
-+	/* enable each port, and then check link status */
-+	list_for_each_entry_safe(port, tmp, &pcie->ports, list)
-+		mtk_pcie_enable_ports(port);
++	/* power down PCIe subsys if slots are all empty(link down) */
++	if (list_empty(&pcie->ports))
++		mtk_pcie_subsys_powerdown(pcie);
 +
  	return 0;
  }
  
-@@ -516,7 +507,7 @@ static int mtk_pcie_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, pcie);
- 	INIT_LIST_HEAD(&pcie->ports);
+@@ -522,7 +536,9 @@ static int mtk_pcie_probe(struct platform_device *pdev)
+ 	return 0;
  
--	err = mtk_pcie_parse_and_add_res(pcie);
-+	err = mtk_pcie_setup(pcie);
- 	if (err)
- 		return err;
+ put_resources:
+-	mtk_pcie_put_resources(pcie);
++	if (!list_empty(&pcie->ports))
++		mtk_pcie_put_resources(pcie);
++
+ 	return err;
+ }
  
 -- 
 1.9.1
