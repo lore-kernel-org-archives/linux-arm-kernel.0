@@ -1,26 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 18 Jun 2017 20:57:39 -0700
-Subject: [GIT PULL v2] arm64: dts: hisilicon dts updates for v4.13
-In-Reply-To: <5943F06D.7000305@hisilicon.com>
-References: <5942EA83.6040907@hisilicon.com> <5943F06D.7000305@hisilicon.com>
-Message-ID: <20170619035739.GC30022@localhost>
+Date: Sun, 18 Jun 2017 21:00:45 -0700
+Subject: [GIT PULL 1/4] soc/tegra: Changes for v4.13-rc1
+In-Reply-To: <20170616081306.11505-1-thierry.reding@gmail.com>
+References: <20170616081306.11505-1-thierry.reding@gmail.com>
+Message-ID: <20170619040045.GD30022@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 16, 2017 at 03:51:25PM +0100, Wei Xu wrote:
-> Hi Arnd, Hi Olof, Hi Kevin,
-> 
-> Please help to pull the following changes.
-> Thanks!
-> 
-> And the patch "arm64: dts: hi6220: Add k3-dma and i2s/hdmi audio support"
-> depends on audio-graph-card that will be landed on 4.13.
-> But the dts part is checked without any warning and can be compiled.
-> 
-> Best Regards,
-> Wei
-> 
-> ---
+Hi,
+
+On Fri, Jun 16, 2017 at 10:13:03AM +0200, Thierry Reding wrote:
+> Hi ARM SoC maintainers,
 > 
 > The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 > 
@@ -28,24 +18,44 @@ On Fri, Jun 16, 2017 at 03:51:25PM +0100, Wei Xu wrote:
 > 
 > are available in the git repository at:
 > 
->   git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.13-v2
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.13-soc
 > 
-> for you to fetch changes up to 0cf6a8e2fb8413b581fc0d960f7831b0e7583406:
+> for you to fetch changes up to da1dbec1be2b54c16649e33e479708a55156e311:
 > 
->   arm64: dts: hi6220: Add k3-dma and i2s/hdmi audio support (2017-06-16 15:31:21 +0100)
+>   soc/tegra: flowctrl: Fix error handling (2017-06-13 16:47:44 +0200)
+> 
+> Thanks,
+> Thierry
 > 
 > ----------------------------------------------------------------
-> ARM64: DT: Hisilicon SoC DT updates for 4.13
+> soc/tegra: Changes for v4.13-rc1
 > 
-> - Add and update Hi3660-Hikey960 board, Hi3660 PCIe RC, Hi6421v530 MFD and
->   Hi3660 MMC binding
-> - Add and refine devices support for Hi3660-Hikey 960 including clock, reset,
->   I2C, GPIO, UART, Bluetooth, RTC, Power Key, LED, SPI, timer, PMIC, regulator,
->   sd/sdio and WiFi
-> - Add k3-dma and i2s/hdmi audio support based on audio-card-graph method for
->   Hikey board
+> This contains an implementation of generic PM domains for Tegra186,
+> based on the BPMP powergate request.
+> 
+> ----------------------------------------------------------------
+> Christophe Jaillet (1):
+>       soc/tegra: flowctrl: Fix error handling
+> 
+> Thierry Reding (3):
+>       PM / Domains: Allow overriding the ->xlate() callback
+>       soc/tegra: bpmp: Update ABI header
+>       soc/tegra: bpmp: Implement generic PM domains
+> 
+>  drivers/base/power/domain.c        |   8 +-
+>  drivers/firmware/tegra/bpmp.c      |   4 +
+>  drivers/soc/tegra/Kconfig          |   5 +
+>  drivers/soc/tegra/Makefile         |   1 +
+>  drivers/soc/tegra/flowctrl.c       |   2 +-
+>  drivers/soc/tegra/powergate-bpmp.c | 359 +++++++++++++++++++++++++++++++
+>  include/linux/pm_domain.h          |   4 +
+>  include/soc/tegra/bpmp-abi.h       | 418 ++++++++++++++++++++++++++++++++++++-
+>  include/soc/tegra/bpmp.h           |  12 ++
 
-Merged, thanks!
+Merged, but does the bpmp-abi.h really belong in include/soc? Seems like most
+of it is internal ABI for whatever abstraction communicates with bpmp, in this
+case powergate. Locating it as a headerfile under drivers/soc/tegra/ seems to
+make more sense. Care to move it?
 
 
 -Olof
