@@ -1,53 +1,39 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 19 Jun 2017 10:21:51 -0700
-Subject: [PATCH] mips: bcm63xx: spi: Fix checkpatch.pl warnings
-In-Reply-To: <1497890980-4334-1-git-send-email-aravind.thk@gmail.com>
-References: <1497890980-4334-1-git-send-email-aravind.thk@gmail.com>
-Message-ID: <2d01bbe8-33bd-9aea-8906-0fe54bb2c334@gmail.com>
+From: code@mmayer.net (Markus Mayer)
+Date: Mon, 19 Jun 2017 10:26:49 -0700
+Subject: [PATCH v2 1/2] dt/bindings: Add bindings for Broadcom STB DRAM
+ Sensors
+In-Reply-To: <20170618140529.wtqffjuilrkarzvd@rob-hp-laptop>
+References: <20170613223710.31719-1-code@mmayer.net>
+ <20170613223710.31719-2-code@mmayer.net>
+ <20170618140529.wtqffjuilrkarzvd@rob-hp-laptop>
+Message-ID: <CANEuBv6YEoTBBzPA5fkrveD05RZNtTBTak-qmxz7BvnrED5pbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/19/2017 09:49 AM, Aravind Thokala wrote:
-> This patch fixes the checkpatch.pl warnings on the driver
-> file.
-> 
-> Signed-off-by: Aravind Thokala <aravind.thk@gmail.com>
+On 18 June 2017 at 07:05, Rob Herring <robh@kernel.org> wrote:
+> On Tue, Jun 13, 2017 at 03:37:09PM -0700, Markus Mayer wrote:
+>> From: Markus Mayer <mmayer@broadcom.com>
+>>
+>> Provide bindings for the Broadcom STB DDR PHY Front End (DPFE).
+>>
+>> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
+>> ---
+>>  .../devicetree/bindings/soc/bcm/brcm,dpfe-cpu.txt  | 27 ++++++++++++++++++++++
+>>  1 file changed, 27 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/soc/bcm/brcm,dpfe-cpu.txt
+>
+> Acked-by: Rob Herring <robh@kernel.org>
 
-The subject should be spi/bcm63xx: Fix checkpatch warnings to be
-consistent with previous submissions done to that file.
+Thanks, Rob.
 
-With that:
+To bring up the previous discussion regarding enumerating multiple
+nodes (so far we need two dpfe nodes for some platforms), how should
+we go about this? We were originally proposing to use "cell-index",
+but you said this was OpenFirmware only and couldn't be used in device
+tree. See https://lkml.org/lkml/2017/4/27/574.
 
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+We do need to use something, because the driver needs to know if it
+should be accessing dpfe0 or dpfe1. What should we use?
 
-> ---
->  drivers/spi/spi-bcm63xx.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-bcm63xx.c b/drivers/spi/spi-bcm63xx.c
-> index 247f71b..84c7356 100644
-> --- a/drivers/spi/spi-bcm63xx.c
-> +++ b/drivers/spi/spi-bcm63xx.c
-> @@ -147,7 +147,7 @@ struct bcm63xx_spi {
->  
->  	/* Platform data */
->  	const unsigned long	*reg_offsets;
-> -	unsigned		fifo_size;
-> +	unsigned int		fifo_size;
->  	unsigned int		msg_type_shift;
->  	unsigned int		msg_ctl_width;
->  
-> @@ -191,7 +191,7 @@ static inline void bcm_spi_writew(struct bcm63xx_spi *bs,
->  #endif
->  }
->  
-> -static const unsigned bcm63xx_spi_freq_table[SPI_CLK_MASK][2] = {
-> +static const unsigned int bcm63xx_spi_freq_table[SPI_CLK_MASK][2] = {
->  	{ 20000000, SPI_CLK_20MHZ },
->  	{ 12500000, SPI_CLK_12_50MHZ },
->  	{  6250000, SPI_CLK_6_250MHZ },
-> 
-
-
--- 
-Florian
+Thanks,
+-Markus
