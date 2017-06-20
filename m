@@ -1,86 +1,33 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 20 Jun 2017 10:37:51 +0200
-Subject: [PATCH 4/6] pinctrl: dt-bindings: add documentation for AP806 pin
- controllers
+Date: Tue, 20 Jun 2017 10:37:50 +0200
+Subject: [PATCH 3/6] dt-bindings: cp110: add sdio clock to cp-110 system
+ controller
 In-Reply-To: <20170620083754.28053-1-gregory.clement@free-electrons.com>
 References: <20170620083754.28053-1-gregory.clement@free-electrons.com>
-Message-ID: <20170620083754.28053-5-gregory.clement@free-electrons.com>
+Message-ID: <20170620083754.28053-4-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the device tree binding for the pin controllers found on the
-Armada 7K and Armada 8K SoCs.
+This patch updates the documentation according to the change made in the
+patch "clk: mvebu: cp110: add sdio clock to cp-110 system controller"
 
 Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- .../arm/marvell/ap806-system-controller.txt        | 53 +++++++++++++++++++---
- 1 file changed, 46 insertions(+), 7 deletions(-)
+ .../devicetree/bindings/arm/marvell/cp110-system-controller0.txt         | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-index 888c50e0d64f..4228d158fb31 100644
---- a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-+++ b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-@@ -28,14 +28,53 @@ Required properties:
-  - compatible: must be: "marvell,ap806-clock"
-  - #clock-cells: must be set to 1
- 
-+Pinctrl:
-+--------
-+
-+For common binding part and usage, refer to
-+Documentation/devicetree/bindings/pinctrl/marvell,mvebu-pinctrl.txt.
-+
-+Required properties:
-+- compatible must be "marvell,ap806-pinctrl",
-+
-+Available mpp pins/groups and functions:
-+Note: brackets (x) are not part of the mpp name for marvell,function and given
-+only for more detailed description in this document.
-+
-+name	pins	functions
-+================================================================================
-+mpp0	0	gpio, sdio(clk), spi0(clk)
-+mpp1	1	gpio, sdio(cmd), spi0(miso)
-+mpp2	2	gpio, sdio(d0), spi0(mosi)
-+mpp3	3	gpio, sdio(d1), spi0(cs0n)
-+mpp4	4	gpio, sdio(d2), i2c0(sda)
-+mpp5	5	gpio, sdio(d3), i2c0(sdk)
-+mpp6	6	gpio, sdio(ds)
-+mpp7	7	gpio, sdio(d4), uart1(rxd)
-+mpp8	8	gpio, sdio(d5), uart1(txd)
-+mpp9	9	gpio, sdio(d6), spi0(cs1n)
-+mpp10	10	gpio, sdio(d7)
-+mpp11	11	gpio, uart0(txd)
-+mpp12	12	gpio, sdio(pw_off), sdio(hw_rst)
-+mpp13	13	gpio
-+mpp14	14	gpio
-+mpp15	15	gpio
-+mpp16	16	gpio
-+mpp17	17	gpio
-+mpp18	18	gpio
-+mpp19	19	gpio, uart0(rxd), sdio(pw_off)
-+
- Example:
-+ap_syscon: system-controller at 6f4000 {
-+	compatible = "syscon", "simple-mfd";
-+	reg = <0x6f4000 0x1000>;
- 
--	syscon: system-controller at 6f4000 {
--		compatible = "syscon", "simple-mfd";
--		reg = <0x6f4000 0x1000>;
-+	ap_clk: clock {
-+		compatible = "marvell,ap806-clock";
-+		#clock-cells = <1>;
-+	};
- 
--		ap_clk: clock {
--			compatible = "marvell,ap806-clock";
--			#clock-cells = <1>;
--		};
-+	ap_pinctrl: pinctrl {
-+		compatible = "marvell,ap806-pinctrl";
- 	};
-+};
+diff --git a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
+index e97cc2d73e2e..8caf913c2670 100644
+--- a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
++++ b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
+@@ -34,6 +34,7 @@ The following clocks are available:
+    - 0 2	EIP
+    - 0 3	Core
+    - 0 4	NAND core
++   - 0 5	SDIO core
+  - Gatable clocks
+    - 1 0	Audio
+    - 1 1	Comm Unit
 -- 
 2.11.0
