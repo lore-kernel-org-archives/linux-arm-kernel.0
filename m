@@ -1,70 +1,35 @@
-From: frank.wang@rock-chips.com (Frank Wang)
-Date: Tue, 20 Jun 2017 15:13:00 +0800
-Subject: [PATCH 1/6] ARM: dts: rockchip: add basic dtsi file for RK3229 SoC
-In-Reply-To: <25831201.s5BUplWuV7@diego>
-References: <1497510980-23207-1-git-send-email-frank.wang@rock-chips.com>
- <18070472.si2qlgbqtt@phil>
- <7e8e2097-d5ca-a594-cb87-1b7b221fd58a@rock-chips.com>
- <25831201.s5BUplWuV7@diego>
-Message-ID: <354e6995-cc80-660b-41c4-535be85564c4@rock-chips.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 20 Jun 2017 09:21:38 +0200
+Subject: [PATCH 3/3 v6] clk: Add Gemini SoC clock controller
+In-Reply-To: <20170618215550.29216-3-linus.walleij@linaro.org>
+References: <20170618215550.29216-1-linus.walleij@linaro.org>
+ <20170618215550.29216-3-linus.walleij@linaro.org>
+Message-ID: <1497943298.2386.4.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On Sun, 2017-06-18 at 23:55 +0200, Linus Walleij wrote:
+> The Cortina Systems Gemini (SL3516/CS3516) has an on-chip clock
+> controller that derive all clocks from a single crystal, using some
+> documented and some undocumented PLLs, half dividers, counters and
+> gates. This is a best attempt to construct a clock driver for the
+> clocks so at least we can gate off unused hardware and driver the
+> PCI bus clock.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> Mike/Stephen: please merge this into the clk subsystem along
+> with the <dt-bindings> patch once you're happy with it.
+> 
+> ChangeLog v5->v6:
+> - Merge the Gemini reset controller code into the clock driver
+>   so as to resolve the conflict about what device should be
+>   probing from the system controller. The reset portions are
+>   copy/pasted from the driver previously merged by Philipp
+>   Zabel.
 
-On 2017/6/19 20:30, Heiko St?bner wrote:
-> Hi Frank,
->
-> Am Montag, 19. Juni 2017, 18:34:27 CEST schrieb Frank Wang:
->> On 2017/6/18 2:12, Heiko Stuebner wrote:
->>> Am Donnerstag, 15. Juni 2017, 15:16:15 CEST schrieb Frank Wang:
->>>> Due to some tiny differences between RK3228 and RK3229, this patch
->>>> adds a basic dtsi file which includes a new CPU opp table and PSCI
->>>> brought up support for RK3229.
->>>>
->>>> Signed-off-by: Frank Wang<frank.wang@rock-chips.com>
-> [...]
->
->>>> +	psci {
->>>> +		compatible = "arm,psci-1.0", "arm,psci-0.2";
->>>> +		method = "smc";
->>>> +	};
->>>> +};
->>>> +
->>>> +&cpu0 {
->>>> +	enable-method = "psci";
->>>> +};
->>> Hmm, I don't really understand this.
->>> What method of core-bringup does the rk3228 use? In the current
->>> rk322x.dtsi there is no enable-method at all defined.
->> For non-security, the same with rk3036 SoC, we use rk3036-smp method to
->> bring-up cores, and for security, we use arm-psci method.
->> As security become more and more important and required, we would prefer
->> using arm-psci method, and it is also an easy way to use.
->>
->>> So is the rk3228 firmware using a different method than the rk3229?
->> No, they are the same. How about I move these changes to rk322x.dtsi?
-> yep, that is what I was getting at with my question ;-)
->
->
->>> And out of curiosity as this is a arm32 without atf, is the psci
->>> implementation (for uboot?) you're using available somewhere?
->> Ah, it is included in op-tee :-)
-> Is that super secret or will this be part of the official op-tee [0]
-> at some point (Similar to the ATF stuff on arm64)?
+For the reset controller part,
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-Hmm, the op-tee itself must keep secure, but the psci part in it can be 
-extracted to public, although it may have a bit of secure risk.
-Due to Rockchip have amended the frame of op-tee to support psci, we can 
-try to upstream these changes to official op-tee or push them to source 
-codes of Rockchip in git-hub.
-
-
-BR.
-Frank
-
-> Heiko
->
-> [0]https://github.com/OP-TEE/optee_os/tree/master/core/arch/arm
->
->
+regards
+Philipp
