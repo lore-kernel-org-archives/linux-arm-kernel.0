@@ -1,78 +1,345 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Tue, 20 Jun 2017 22:21:17 +0800
-Subject: [PATCH v2 0/3] add support of hardware random generator on
- MediaTek MT7622
-In-Reply-To: <20170620034009.GD17764@gondor.apana.org.au>
-References: <cover.1497280813.git.sean.wang@mediatek.com>
- <20170620034009.GD17764@gondor.apana.org.au>
-Message-ID: <1497968477.27946.5.camel@mtkswgap22>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 20 Jun 2017 16:23:58 +0200
+Subject: [PATCH v3 9/9] arm64: dts: marvell: use new binding for the
+ system controller on cp110
+In-Reply-To: <9c5807cafb03413f4318f6c95a2e093bd9cdcdcf.1496328934.git-series.gregory.clement@free-electrons.com>
+ (Gregory CLEMENT's message of "Thu, 1 Jun 2017 16:55:42 +0200")
+References: <cover.6bb422e6a233460049bb63792b32a5ba851dcddd.1496328934.git-series.gregory.clement@free-electrons.com>
+ <cover.6bb422e6a233460049bb63792b32a5ba851dcddd.1496328934.git-series.gregory.clement@free-electrons.com>
+ <9c5807cafb03413f4318f6c95a2e093bd9cdcdcf.1496328934.git-series.gregory.clement@free-electrons.com>
+Message-ID: <87a8524u0x.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Herbert,
+Hi,
+ 
+ On jeu., juin 01 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-thanks for effort reviewing on those patches.
+> The new binding for the system controller on cp110 moved the clock
+> controller into a subnode. This preliminary step will allow to add gpio
+> and pinctrl subnodes.
+>
+> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-By the way, also loop in Torsten
+Applied on mvebu/dt64 and while doing it, fixed the clock introduced in
+the patches merged since the first version of this patch.
 
-Could you kindly guide me how to determine appropriate 
-rng->ops.quality value used by the driver?
+Gregory
 
-There is less clues since the value is not being set in
-most drivers. But good value decided would allow feeding
-fresh entropy data with the hwrng so i would like add it
-in the next patch.
+> ---
+>  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 41 ++++++-------
+>  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 35 +++++------
+>  2 files changed, 41 insertions(+), 35 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> index a0f57a8e5dcb..96a4ff75b3b0 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> @@ -62,7 +62,7 @@
+>  			cpm_ethernet: ethernet at 0 {
+>  				compatible = "marvell,armada-7k-pp22";
+>  				reg = <0x0 0x100000>, <0x129000 0xb000>;
+> -				clocks = <&cpm_syscon0 1 3>, <&cpm_syscon0 1 9>, <&cpm_syscon0 1 5>;
+> +				clocks = <&cpm_clk 1 3>, <&cpm_clk 1 9>, <&cpm_clk 1 5>;
+>  				clock-names = "pp_clk", "gop_clk", "mg_clk";
+>  				status = "disabled";
+>  				dma-coherent;
+> @@ -97,10 +97,13 @@
+>  			};
+>  
+>  			cpm_syscon0: system-controller at 440000 {
+> -				compatible = "marvell,cp110-system-controller0",
+> -					     "syscon";
+> +				compatible = "syscon", "simple-mfd";
+>  				reg = <0x440000 0x1000>;
+> -				#clock-cells = <2>;
+> +
+> +				cpm_clk: clock {
+> +					compatible = "marvell,cp110-clock";
+> +					#clock-cells = <2>;
+> +				};
+>  			};
+>  
+>  			cpm_rtc: rtc at 284000 {
+> @@ -115,7 +118,7 @@
+>  					     "generic-ahci";
+>  				reg = <0x540000 0x30000>;
+>  				interrupts = <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
+> -				clocks = <&cpm_syscon0 1 15>;
+> +				clocks = <&cpm_clk 1 15>;
+>  				status = "disabled";
+>  			};
+>  
+> @@ -125,7 +128,7 @@
+>  				reg = <0x500000 0x4000>;
+>  				dma-coherent;
+>  				interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
+> -				clocks = <&cpm_syscon0 1 22>;
+> +				clocks = <&cpm_clk 1 22>;
+>  				status = "disabled";
+>  			};
+>  
+> @@ -135,7 +138,7 @@
+>  				reg = <0x510000 0x4000>;
+>  				dma-coherent;
+>  				interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
+> -				clocks = <&cpm_syscon0 1 23>;
+> +				clocks = <&cpm_clk 1 23>;
+>  				status = "disabled";
+>  			};
+>  
+> @@ -145,7 +148,7 @@
+>  				      <0x6b0000 0x1000>;
+>  				dma-coherent;
+>  				msi-parent = <&gic_v2m0>;
+> -				clocks = <&cpm_syscon0 1 8>;
+> +				clocks = <&cpm_clk 1 8>;
+>  			};
+>  
+>  			cpm_xor1: xor at 6c0000 {
+> @@ -154,7 +157,7 @@
+>  				      <0x6d0000 0x1000>;
+>  				dma-coherent;
+>  				msi-parent = <&gic_v2m0>;
+> -				clocks = <&cpm_syscon0 1 7>;
+> +				clocks = <&cpm_clk 1 7>;
+>  			};
+>  
+>  			cpm_spi0: spi at 700600 {
+> @@ -163,7 +166,7 @@
+>  				#address-cells = <0x1>;
+>  				#size-cells = <0x0>;
+>  				cell-index = <1>;
+> -				clocks = <&cpm_syscon0 1 21>;
+> +				clocks = <&cpm_clk 1 21>;
+>  				status = "disabled";
+>  			};
+>  
+> @@ -173,7 +176,7 @@
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+>  				cell-index = <2>;
+> -				clocks = <&cpm_syscon0 1 21>;
+> +				clocks = <&cpm_clk 1 21>;
+>  				status = "disabled";
+>  			};
+>  
+> @@ -183,7 +186,7 @@
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+>  				interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
+> -				clocks = <&cpm_syscon0 1 21>;
+> +				clocks = <&cpm_clk 1 21>;
+>  				status = "disabled";
+>  			};
+>  
+> @@ -193,7 +196,7 @@
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+>  				interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
+> -				clocks = <&cpm_syscon0 1 21>;
+> +				clocks = <&cpm_clk 1 21>;
+>  				status = "disabled";
+>  			};
+>  
+> @@ -201,7 +204,7 @@
+>  				compatible = "marvell,armada-8k-rng", "inside-secure,safexcel-eip76";
+>  				reg = <0x760000 0x7d>;
+>  				interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
+> -				clocks = <&cpm_syscon0 1 25>;
+> +				clocks = <&cpm_clk 1 25>;
+>  				status = "okay";
+>  			};
+>  
+> @@ -210,7 +213,7 @@
+>  				reg = <0x780000 0x300>;
+>  				interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
+>  				clock-names = "core";
+> -				clocks = <&cpm_syscon0 1 4>;
+> +				clocks = <&cpm_clk 1 4>;
+>  				dma-coherent;
+>  				status = "disabled";
+>  			};
+> @@ -227,7 +230,7 @@
+>  					     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
+>  				interrupt-names = "mem", "ring0", "ring1",
+>  				"ring2", "ring3", "eip";
+> -				clocks = <&cpm_syscon0 1 26>;
+> +				clocks = <&cpm_clk 1 26>;
+>  				status = "disabled";
+>  			};
+>  		};
+> @@ -254,7 +257,7 @@
+>  			interrupt-map = <0 0 0 0 &gic 0 GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+>  			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+>  			num-lanes = <1>;
+> -			clocks = <&cpm_syscon0 1 13>;
+> +			clocks = <&cpm_clk 1 13>;
+>  			status = "disabled";
+>  		};
+>  
+> @@ -281,7 +284,7 @@
+>  			interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
+>  
+>  			num-lanes = <1>;
+> -			clocks = <&cpm_syscon0 1 11>;
+> +			clocks = <&cpm_clk 1 11>;
+>  			status = "disabled";
+>  		};
+>  
+> @@ -308,7 +311,7 @@
+>  			interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
+>  
+>  			num-lanes = <1>;
+> -			clocks = <&cpm_syscon0 1 12>;
+> +			clocks = <&cpm_clk 1 12>;
+>  			status = "disabled";
+>  		};
+>  	};
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> index 9584bc8d8b3f..48a658aa5b32 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> @@ -104,10 +104,13 @@
+>  			};
+>  
+>  			cps_syscon0: system-controller at 440000 {
+> -				compatible = "marvell,cp110-system-controller0",
+> -					     "syscon";
+> +				compatible = "syscon", "simple-mfd";
+>  				reg = <0x440000 0x1000>;
+> -				#clock-cells = <2>;
+> +
+> +				cps_clk: clock {
+> +					compatible = "marvell,cp110-clock";
+> +					#clock-cells = <2>;
+> +				};
+>  			};
+>  
+>  			cps_sata0: sata at 540000 {
+> @@ -115,7 +118,7 @@
+>  					     "generic-ahci";
+>  				reg = <0x540000 0x30000>;
+>  				interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>;
+> -				clocks = <&cps_syscon0 1 15>;
+> +				clocks = <&cps_clk 1 15>;
+>  				status = "disabled";
+>  			};
+>  
+> @@ -125,7 +128,7 @@
+>  				reg = <0x500000 0x4000>;
+>  				dma-coherent;
+>  				interrupts = <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>;
+> -				clocks = <&cps_syscon0 1 22>;
+> +				clocks = <&cps_clk 1 22>;
+>  				status = "disabled";
+>  			};
+>  
+> @@ -135,7 +138,7 @@
+>  				reg = <0x510000 0x4000>;
+>  				dma-coherent;
+>  				interrupts = <GIC_SPI 285 IRQ_TYPE_LEVEL_HIGH>;
+> -				clocks = <&cps_syscon0 1 23>;
+> +				clocks = <&cps_clk 1 23>;
+>  				status = "disabled";
+>  			};
+>  
+> @@ -145,7 +148,7 @@
+>  				      <0x6b0000 0x1000>;
+>  				dma-coherent;
+>  				msi-parent = <&gic_v2m0>;
+> -				clocks = <&cps_syscon0 1 8>;
+> +				clocks = <&cps_clk 1 8>;
+>  			};
+>  
+>  			cps_xor1: xor at 6c0000 {
+> @@ -154,7 +157,7 @@
+>  				      <0x6d0000 0x1000>;
+>  				dma-coherent;
+>  				msi-parent = <&gic_v2m0>;
+> -				clocks = <&cps_syscon0 1 7>;
+> +				clocks = <&cps_clk 1 7>;
+>  			};
+>  
+>  			cps_spi0: spi at 700600 {
+> @@ -163,7 +166,7 @@
+>  				#address-cells = <0x1>;
+>  				#size-cells = <0x0>;
+>  				cell-index = <3>;
+> -				clocks = <&cps_syscon0 1 21>;
+> +				clocks = <&cps_clk 1 21>;
+>  				status = "disabled";
+>  			};
+>  
+> @@ -173,7 +176,7 @@
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+>  				cell-index = <4>;
+> -				clocks = <&cps_syscon0 1 21>;
+> +				clocks = <&cps_clk 1 21>;
+>  				status = "disabled";
+>  			};
+>  
+> @@ -183,7 +186,7 @@
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+>  				interrupts = <GIC_SPI 310 IRQ_TYPE_LEVEL_HIGH>;
+> -				clocks = <&cps_syscon0 1 21>;
+> +				clocks = <&cps_clk 1 21>;
+>  				status = "disabled";
+>  			};
+>  
+> @@ -193,7 +196,7 @@
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+>  				interrupts = <GIC_SPI 311 IRQ_TYPE_LEVEL_HIGH>;
+> -				clocks = <&cps_syscon0 1 21>;
+> +				clocks = <&cps_clk 1 21>;
+>  				status = "disabled";
+>  			};
+>  
+> @@ -201,7 +204,7 @@
+>  				compatible = "marvell,armada-8k-rng", "inside-secure,safexcel-eip76";
+>  				reg = <0x760000 0x7d>;
+>  				interrupts = <GIC_SPI 312 IRQ_TYPE_LEVEL_HIGH>;
+> -				clocks = <&cps_syscon0 1 25>;
+> +				clocks = <&cps_clk 1 25>;
+>  				status = "okay";
+>  			};
+>  
+> @@ -244,7 +247,7 @@
+>  			interrupt-map = <0 0 0 0 &gic 0 GIC_SPI 256 IRQ_TYPE_LEVEL_HIGH>;
+>  			interrupts = <GIC_SPI 256 IRQ_TYPE_LEVEL_HIGH>;
+>  			num-lanes = <1>;
+> -			clocks = <&cps_syscon0 1 13>;
+> +			clocks = <&cps_clk 1 13>;
+>  			status = "disabled";
+>  		};
+>  
+> @@ -271,7 +274,7 @@
+>  			interrupts = <GIC_SPI 258 IRQ_TYPE_LEVEL_HIGH>;
+>  
+>  			num-lanes = <1>;
+> -			clocks = <&cps_syscon0 1 11>;
+> +			clocks = <&cps_clk 1 11>;
+>  			status = "disabled";
+>  		};
+>  
+> @@ -298,7 +301,7 @@
+>  			interrupts = <GIC_SPI 257 IRQ_TYPE_LEVEL_HIGH>;
+>  
+>  			num-lanes = <1>;
+> -			clocks = <&cps_syscon0 1 12>;
+> +			clocks = <&cps_clk 1 12>;
+>  			status = "disabled";
+>  		};
+>  	};
+> -- 
+> git-series 0.9.1
 
-I have tested with rngtest on mtk-cir and the result is got as
-the below log shown.  If the rngtest always gives the result for
-success rate over 99.8%, can I set the rng->ops.quality 998?
-
-rngtest: starting FIPS tests...
-rngtest: bits received from input: 20000032
-rngtest: FIPS 140-2 successes: 998
-rngtest: FIPS 140-2 failures: 2
-rngtest: FIPS 140-2(2001-10-10) Monobit: 1
-rngtest: FIPS 140-2(2001-10-10) Poker: 0
-rngtest: FIPS 140-2(2001-10-10) Runs: 1
-rngtest: FIPS 140-2(2001-10-10) Long run: 0
-rngtest: FIPS 140-2(2001-10-10) Continuous run: 0
-rngtest: input channel speed: (min=715.902; avg=3846.234;
-max=3906250.000)Kibits/s
-rngtest: FIPS tests speed: (min=35.453; avg=37.862; max=38.300)Mibits/s
-rngtest: Program run time: 5591758 microseconds
-
-rngtest: starting FIPS tests...
-rngtest: bits received from input: 20000032
-rngtest: FIPS 140-2 successes: 1000
-rngtest: FIPS 140-2 failures: 0
-rngtest: FIPS 140-2(2001-10-10) Monobit: 0
-rngtest: FIPS 140-2(2001-10-10) Poker: 0
-rngtest: FIPS 140-2(2001-10-10) Runs: 0
-rngtest: FIPS 140-2(2001-10-10) Long run: 0
-rngtest: FIPS 140-2(2001-10-10) Continuous run: 0
-rngtest: input channel speed: (min=715.588; avg=4424.787;
-max=4882812.500)Kibits/s
-rngtest: FIPS tests speed: (min=35.785; avg=37.859; max=38.223)Mibits/s
-rngtest: Program run time: 4947950 microseconds
-
-
-
-On Tue, 2017-06-20 at 11:40 +0800, Herbert Xu wrote:
-> On Mon, Jun 12, 2017 at 11:56:53PM +0800, sean.wang at mediatek.com wrote:
-> > From: Sean Wang <sean.wang@mediatek.com>
-> > 
-> > Changes since v1:
-> > - update the bindings with the specific "mediatek,mt7622-rng"
-> >   instead of the generic one as "mediatek,generic-rng"
-> > 
-> > The series add support of hardware RNG on MediaTek MT7622 and
-> > , runtime PM support and add me as the maintainer for the existing
-> > and following chipset.
-> > 
-> > Sean Wang (3):
-> >   dt-bindings: rng: add MediaTek MT7622 Hardware Random Generator
-> >     bindings
-> >   hwrng: mtk - add runtime PM support
-> >   MAINTAINERS: add entry for MediaTek Random Number Generator
-> 
-> All applied.  Thanks.
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
