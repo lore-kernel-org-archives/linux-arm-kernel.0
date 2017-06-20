@@ -1,60 +1,41 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 20 Jun 2017 17:34:57 +0200
-Subject: [PATCH 0/6] Update binding documentation for cp110 and ap806
-In-Reply-To: <20170620083754.28053-1-gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Tue, 20 Jun 2017 10:37:47 +0200")
-References: <20170620083754.28053-1-gregory.clement@free-electrons.com>
-Message-ID: <87k2463c66.fsf@free-electrons.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 20 Jun 2017 17:36:51 +0200
+Subject: [PATCH v4 6/6] arm64: dts: marvell: enable GICP and ICU on
+ Armada 7K/8K
+In-Reply-To: <87tw3a3dy4.fsf@free-electrons.com>
+References: <20170620140722.31646-1-thomas.petazzoni@free-electrons.com>
+ <20170620140722.31646-7-thomas.petazzoni@free-electrons.com>
+ <87tw3a3dy4.fsf@free-electrons.com>
+Message-ID: <20170620173651.6370ea58@windsurf.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob, 
- 
- On mar., juin 20 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+Hello,
 
-> Hi Rob,
->
-> As you know there were dependencies issue about the binding between my
-> different series and you proposed yourself to apply them though the
-> device tree subsystem: [1]
->
-> All the driver parts have been merged so it's time merging the
-> documentation.
+On Tue, 20 Jun 2017 16:56:35 +0200, Gregory CLEMENT wrote:
 
-I forgot to mentioned that this series is based on the clk-ap806-dt
-stable branch:
+> > +#include <dt-bindings/interrupt-controller/mvebu-icu.h>  
+> 
+> With this line you created a dependency with the patch "irqchip:
+> irq-mvebu-icu: new driver for Marvell ICU". And without it the dtb is
+> not buidable.
+> 
+> So either I wait for the next kernel release to apply it or I will need
+> a stable branch with the commit adding the mvebu-icu.h file.
 
-https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git/log/?h=clk-ap806-dt
+Alternatively, I could change the patch to use hardcoded values for now
+(i.e replace ICU_GRP_NSR everywhere by 0x0), and then change it during
+the next kernel cycle to use the #define value. I would really prefer
+such a solution to a solution where merging the entire ICU DT change
+would be delayed by one cycle.
 
-Gregory
+Let me know what you prefer. Maybe Marc can say if the irqchip
+maintainers can provide a stable branch containing the mvebu-icu.h file.
 
->
-> Thanks,
->
-> Gregory
->
-> [1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/509643.html
->
-> Gregory CLEMENT (6):
->   dt-bindings: cp110: do not depend anymore of the *-clock-output-names
->   dt-bindings: cp110: introduce a new binding
->   dt-bindings: cp110: add sdio clock to cp-110 system controller
->   pinctrl: dt-bindings: add documentation for AP806 pin controllers
->   pinctrl: dt-bindings: add documentation for CP110 pin controllers
->   gpio: dt-bindings: Add documentation for gpio controllers on Armada
->     7K/8K
->
->  .../arm/marvell/ap806-system-controller.txt        |  73 ++++++++++-
->  .../arm/marvell/cp110-system-controller0.txt       | 144 ++++++++++++++++++---
->  .../devicetree/bindings/gpio/gpio-mvebu.txt        |  24 +++-
->  3 files changed, 208 insertions(+), 33 deletions(-)
->
-> -- 
-> 2.11.0
->
+Best regards,
 
+Thomas
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
 http://free-electrons.com
