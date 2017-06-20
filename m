@@ -1,44 +1,24 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Tue, 20 Jun 2017 17:32:21 +0800
-Subject: [PATCH 6/9] clk: imx: add composite clk support
-In-Reply-To: <20170620020013.GP4493@codeaurora.org>
-References: <1494856763-6543-1-git-send-email-aisheng.dong@nxp.com>
- <1494856763-6543-7-git-send-email-aisheng.dong@nxp.com>
- <20170620020013.GP4493@codeaurora.org>
-Message-ID: <20170620093221.GE6805@b29396-OptiPlex-7040>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 20 Jun 2017 11:35:29 +0200
+Subject: [PATCH 2/2] pinctrl: uniphier: fix WARN_ON() of pingroups dump on
+ LD20
+In-Reply-To: <1497415770-17741-2-git-send-email-yamada.masahiro@socionext.com>
+References: <1497415770-17741-1-git-send-email-yamada.masahiro@socionext.com>
+ <1497415770-17741-2-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CACRpkdavW1WGHzW9et9SgEOVe+oV71FZCONEFSL3oaYA3_-Lyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 19, 2017 at 07:00:13PM -0700, Stephen Boyd wrote:
-> On 05/15, Dong Aisheng wrote:
-> > diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
-> > index 51b84e4..665777e 100644
-> > --- a/drivers/clk/imx/clk.h
-> > +++ b/drivers/clk/imx/clk.h
-> > @@ -69,6 +69,12 @@ struct clk *imx_clk_busy_mux(const char *name, void __iomem *reg, u8 shift,
-> >  			     u8 width, void __iomem *busy_reg, u8 busy_shift,
-> >  			     const char **parent_names, int num_parents);
-> >  
-> > +struct clk *imx_clk_composite(const char *name,
-> > +			      const char * const *parent_names,
-> > +			      int num_parents, bool mux_present,
-> > +			      bool rate_present, bool gate_present,
-> > +			      void __iomem *reg);
-> > +
-> >  struct clk *imx_clk_fixup_divider(const char *name, const char *parent,
-> >  				  void __iomem *reg, u8 shift, u8 width,
-> >  				  void (*fixup)(u32 *val));
-> > @@ -209,5 +215,4 @@ static inline struct clk *imx_clk_mux_flags(const char *name,
-> >  struct clk *imx_clk_cpu(const char *name, const char *parent_name,
-> >  		struct clk *div, struct clk *mux, struct clk *pll,
-> >  		struct clk *step);
-> > -
-> 
-> Noise?
-> 
+On Wed, Jun 14, 2017 at 6:49 AM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
 
-Yes, got by mistake.
-Will remove.
+> The pingroups dump of debugfs hits WARN_ON() in pinctrl_groups_show().
+> Filling non-existing ports with '-1' turned out a bad idea.
+>
+> Fixes: 336306ee1f2d ("pinctrl: uniphier: add UniPhier PH1-LD20 pinctrl driver")
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-Regards
-Dong Aisheng
+Patch applied.
+
+Yours,
+Linus Walleij
