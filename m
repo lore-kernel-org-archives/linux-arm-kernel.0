@@ -1,86 +1,52 @@
-From: andrea.adami@gmail.com (Andrea Adami)
-Date: Tue, 20 Jun 2017 10:56:32 +0200
-Subject: [PATCH v3 1/9] mtd: sharpslpart: add sharpslpart MTD partition
- parser
-In-Reply-To: <20170609014240.GM102137@google.com>
-References: <1496270458-6479-1-git-send-email-andrea.adami@gmail.com>
- <1496270458-6479-2-git-send-email-andrea.adami@gmail.com>
- <20170609014240.GM102137@google.com>
-Message-ID: <CAAQYJAuiMd5mViL76x6qwUw_VxSvMmUXbwMTvwmnO+rnifgSzw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 20 Jun 2017 10:57:48 +0200
+Subject: [PATCH 1/3] ARM: dts: sunxi: add R_LRADC support for A83T
+In-Reply-To: <20170618130018.10684-1-techping.chan@gmail.com>
+References: <20170618130018.10684-1-techping.chan@gmail.com>
+Message-ID: <20170620085748.apv3wlehyllecb5q@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 9, 2017 at 3:42 AM, Brian Norris
-<computersforpeace@gmail.com> wrote:
-> Oh, one more thing:
->
-> On Thu, Jun 01, 2017 at 12:40:50AM +0200, Andrea Adami wrote:
->> diff --git a/drivers/mtd/sharpslpart.c b/drivers/mtd/sharpslpart.c
->> new file mode 100644
->> index 0000000..40aebe9
->> --- /dev/null
->> +++ b/drivers/mtd/sharpslpart.c
->> @@ -0,0 +1,132 @@
->> +/*
->> + * MTD partition parser for NAND flash on Sharp SL Series
->> + *
->> + * Copyright (C) 2017 Andrea Adami <andrea.adami@gmail.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + */
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/slab.h>
->> +#include <linux/module.h>
->> +#include <linux/mtd/mtd.h>
->> +#include <linux/mtd/partitions.h>
->> +#include "sharpsl_ftl.h"
->> +
->> +/* factory defaults */
->> +#define SHARPSL_NAND_PARTS           3
->> +#define SHARPSL_FTL_PARTITION_SIZE   (7 * 1024 * 1024)
->> +#define PARAM_BLOCK_PARTITIONINFO1   0x00060000
->> +#define PARAM_BLOCK_PARTITIONINFO2   0x00064000
->> +
->> +#define BOOT_MAGIC                   be32_to_cpu(0x424f4f54)   /* BOOT */
->> +#define FSRO_MAGIC                   be32_to_cpu(0x4653524f)   /* FSRO */
->> +#define FSRW_MAGIC                   be32_to_cpu(0x46535257)   /* FSRW */
->
-> [...]
->
->> +struct sharpsl_nand_partitioninfo {
->> +     u32 start;
->> +     u32 end;
->
-> I was going to ignore this earlier, but I just noticed that you handle
-> endianness for the magic values above, so...
->
-> shouldn't you handle endianness for the start and end fields too?
->
->> +     u32 magic;
->> +     u32 reserved;
->> +};
-> [...]
->
-> Brian
+On Sun, Jun 18, 2017 at 09:00:16PM +0800, Ziping Chen wrote:
+> From: Ziping Chen <techping.chan@gmail.com>
+> 
+> The Allwinner A83T's R_LRADC is similiar with the
+> Allwinner A10's LRADC, they can use the same driver.
 
-Brian,
-I have added a macro so to avoid to repeat le32_to_cpu() for each value.
-This seems even to work as intended...
+There's a typo in similar above.
 
-Note that the magics are 'texts' so they appear as BE.
-Some more tests and I'll send v4 of the patch to your attention.
+> Add support for it.
+> 
+> Signed-off-by: Ziping Chen <techping.chan@gmail.com>
+> ---
+>  arch/arm/boot/dts/sun8i-a83t.dtsi | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+> index 8923ba625b76..ecc75bf6780e 100644
+> --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+> @@ -301,5 +301,12 @@
+>  			interrupt-controller;
+>  			#interrupt-cells = <3>;
+>  		};
+> +
+> +		r_lradc: lradc at 01f03c00 {
+> +			compatible = "allwinner,sun4i-a10-lradc-keys";
 
-Thanks in advance.
+Could you add an A83T specific compatible here?
 
+Thanks,
+Maxime
 
-Andrea
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170620/147d35f7/attachment.sig>
