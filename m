@@ -1,9 +1,9 @@
 From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Tue, 20 Jun 2017 11:35:42 +0200
-Subject: [PATCH 34/51] rtc: pl031: stop using rtc deprecated functions
+Date: Tue, 20 Jun 2017 11:35:47 +0200
+Subject: [PATCH 39/51] rtc: sirfsoc: stop using rtc deprecated functions
 In-Reply-To: <1497951359-13334-1-git-send-email-benjamin.gaignard@linaro.org>
 References: <1497951359-13334-1-git-send-email-benjamin.gaignard@linaro.org>
-Message-ID: <1497951359-13334-35-git-send-email-benjamin.gaignard@linaro.org>
+Message-ID: <1497951359-13334-40-git-send-email-benjamin.gaignard@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,93 +12,73 @@ rely on 32bits variables and that will make rtc break in y2038/2016.
 Stop using those two functions to safer 64bits ones.
 
 Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-CC: Linus Walleij <linus.walleij@linaro.org>
 CC: Alessandro Zummo <a.zummo@towertech.it>
 CC: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+CC: Barry Song <baohua@kernel.org>
 CC: rtc-linux at googlegroups.com
 CC: linux-kernel at vger.kernel.org
 CC: linux-arm-kernel at lists.infradead.org
 ---
- drivers/rtc/rtc-pl031.c | 31 +++++++++++++------------------
- 1 file changed, 13 insertions(+), 18 deletions(-)
+ drivers/rtc/rtc-sirfsoc.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/rtc/rtc-pl031.c b/drivers/rtc/rtc-pl031.c
-index e1687e1..07f72b3 100644
---- a/drivers/rtc/rtc-pl031.c
-+++ b/drivers/rtc/rtc-pl031.c
-@@ -127,11 +127,11 @@ static int pl031_stv2_tm_to_time(struct device *dev,
- 		return -EINVAL;
- 	} else if (wday == -1) {
- 		/* wday is not provided, calculate it here */
--		unsigned long time;
-+		unsigned long long time;
- 		struct rtc_time calc_tm;
- 
--		rtc_tm_to_time(tm, &time);
--		rtc_time_to_tm(time, &calc_tm);
-+		time = rtc_tm_to_time64(tm);
-+		rtc_time64_to_tm(time, &calc_tm);
- 		wday = calc_tm.tm_wday;
- 	}
- 
-@@ -252,30 +252,27 @@ static int pl031_read_time(struct device *dev, struct rtc_time *tm)
+diff --git a/drivers/rtc/rtc-sirfsoc.c b/drivers/rtc/rtc-sirfsoc.c
+index 7367f61..972ede9 100644
+--- a/drivers/rtc/rtc-sirfsoc.c
++++ b/drivers/rtc/rtc-sirfsoc.c
+@@ -91,11 +91,11 @@ static int sirfsoc_rtc_read_alarm(struct device *dev,
+ 	 */
+ 	/* if alarm is in next overflow cycle */
+ 	if (rtc_count > rtc_alarm)
+-		rtc_time_to_tm((rtcdrv->overflow_rtc + 1)
+-				<< (BITS_PER_LONG - RTC_SHIFT)
+-				| rtc_alarm >> RTC_SHIFT, &(alrm->time));
++		rtc_time64_to_tm((rtcdrv->overflow_rtc + 1)
++				  << (BITS_PER_LONG - RTC_SHIFT)
++				  | rtc_alarm >> RTC_SHIFT, &(alrm->time));
+ 	else
+-		rtc_time_to_tm(rtcdrv->overflow_rtc
++		rtc_time64_to_tm(rtcdrv->overflow_rtc
+ 				<< (BITS_PER_LONG - RTC_SHIFT)
+ 				| rtc_alarm >> RTC_SHIFT, &(alrm->time));
+ 	if (sirfsoc_rtc_readl(rtcdrv, RTC_STATUS) & SIRFSOC_RTC_AL0E)
+@@ -109,12 +109,12 @@ static int sirfsoc_rtc_read_alarm(struct device *dev,
+ static int sirfsoc_rtc_set_alarm(struct device *dev,
+ 		struct rtc_wkalrm *alrm)
  {
- 	struct pl031_local *ldata = dev_get_drvdata(dev);
+-	unsigned long rtc_status_reg, rtc_alarm;
++	unsigned long long rtc_status_reg, rtc_alarm;
+ 	struct sirfsoc_rtc_drv *rtcdrv;
+ 	rtcdrv = dev_get_drvdata(dev);
  
--	rtc_time_to_tm(readl(ldata->base + RTC_DR), tm);
-+	rtc_time64_to_tm(readl(ldata->base + RTC_DR), tm);
+ 	if (alrm->enabled) {
+-		rtc_tm_to_time(&(alrm->time), &rtc_alarm);
++		rtc_alarm = rtc_tm_to_time64(&alrm->time);
  
+ 		spin_lock_irq(&rtcdrv->lock);
+ 
+@@ -182,7 +182,7 @@ static int sirfsoc_rtc_read_time(struct device *dev,
+ 		cpu_relax();
+ 	} while (tmp_rtc != sirfsoc_rtc_readl(rtcdrv, RTC_CN));
+ 
+-	rtc_time_to_tm(rtcdrv->overflow_rtc << (BITS_PER_LONG - RTC_SHIFT) |
++	rtc_time64_to_tm(rtcdrv->overflow_rtc << (BITS_PER_LONG - RTC_SHIFT) |
+ 					tmp_rtc >> RTC_SHIFT, tm);
  	return 0;
  }
- 
- static int pl031_set_time(struct device *dev, struct rtc_time *tm)
+@@ -190,11 +190,11 @@ static int sirfsoc_rtc_read_time(struct device *dev,
+ static int sirfsoc_rtc_set_time(struct device *dev,
+ 		struct rtc_time *tm)
  {
--	unsigned long time;
-+	unsigned long long time;
- 	struct pl031_local *ldata = dev_get_drvdata(dev);
--	int ret;
--
--	ret = rtc_tm_to_time(tm, &time);
+-	unsigned long rtc_time;
++	unsigned long long rtc_time;
+ 	struct sirfsoc_rtc_drv *rtcdrv;
+ 	rtcdrv = dev_get_drvdata(dev);
  
--	if (ret == 0)
--		writel(time, ldata->base + RTC_LR);
-+	time = rtc_tm_to_time64(tm);
-+	writel(time, ldata->base + RTC_LR);
+-	rtc_tm_to_time(tm, &rtc_time);
++	rtc_time = rtc_tm_to_time64(tm);
  
--	return ret;
-+	return 0;
- }
+ 	rtcdrv->overflow_rtc = rtc_time >> (BITS_PER_LONG - RTC_SHIFT);
  
- static int pl031_read_alarm(struct device *dev, struct rtc_wkalrm *alarm)
- {
- 	struct pl031_local *ldata = dev_get_drvdata(dev);
- 
--	rtc_time_to_tm(readl(ldata->base + RTC_MR), &alarm->time);
-+	rtc_time64_to_tm(readl(ldata->base + RTC_MR), &alarm->time);
- 
- 	alarm->pending = readl(ldata->base + RTC_RIS) & RTC_BIT_AI;
- 	alarm->enabled = readl(ldata->base + RTC_IMSC) & RTC_BIT_AI;
-@@ -286,17 +283,15 @@ static int pl031_read_alarm(struct device *dev, struct rtc_wkalrm *alarm)
- static int pl031_set_alarm(struct device *dev, struct rtc_wkalrm *alarm)
- {
- 	struct pl031_local *ldata = dev_get_drvdata(dev);
--	unsigned long time;
-+	unsigned long long time;
- 	int ret;
- 
- 	/* At the moment, we can only deal with non-wildcarded alarm times. */
- 	ret = rtc_valid_tm(&alarm->time);
- 	if (ret == 0) {
--		ret = rtc_tm_to_time(&alarm->time, &time);
--		if (ret == 0) {
--			writel(time, ldata->base + RTC_MR);
--			pl031_alarm_irq_enable(dev, alarm->enabled);
--		}
-+		time = rtc_tm_to_time64(&alarm->time);
-+		writel(time, ldata->base + RTC_MR);
-+		pl031_alarm_irq_enable(dev, alarm->enabled);
- 	}
- 
- 	return ret;
 -- 
 1.9.1
