@@ -1,36 +1,40 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 20 Jun 2017 13:41:52 -0700
-Subject: [PATCH 9/9] clk: imx: add imx7ulp clk driver
-In-Reply-To: <20170620094256.GF6805@b29396-OptiPlex-7040>
-References: <1494856763-6543-1-git-send-email-aisheng.dong@nxp.com>
- <1494856763-6543-10-git-send-email-aisheng.dong@nxp.com>
- <20170620020119.GQ4493@codeaurora.org>
- <20170620094256.GF6805@b29396-OptiPlex-7040>
-Message-ID: <20170620204152.GS4493@codeaurora.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 20 Jun 2017 22:05:58 +0100
+Subject: [PATCH 34/51] rtc: pl031: stop using rtc deprecated functions
+In-Reply-To: <CACRpkdZsdwuytW5RHSdd5t9MSyYnhV1nNNKOR1VUzqEgicFqUw@mail.gmail.com>
+References: <1497951359-13334-1-git-send-email-benjamin.gaignard@linaro.org>
+ <1497951359-13334-35-git-send-email-benjamin.gaignard@linaro.org>
+ <CACRpkdZsdwuytW5RHSdd5t9MSyYnhV1nNNKOR1VUzqEgicFqUw@mail.gmail.com>
+Message-ID: <20170620210558.GL4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20, Dong Aisheng wrote:
-> On Mon, Jun 19, 2017 at 07:01:19PM -0700, Stephen Boyd wrote:
-> > 
-> > Any reason why it can't be a platform driver? If not, please add
-> > some comment explaining why.
-> > 
+On Tue, Jun 20, 2017 at 06:08:48PM +0200, Linus Walleij wrote:
+> On Tue, Jun 20, 2017 at 11:35 AM, Benjamin Gaignard
+> <benjamin.gaignard@linaro.org> wrote:
 > 
-> Timer is using it at early stage. GIC seems not although standard
-> binding claim possible clock requirement.
-> Others still not sure.
+> > rtc_time_to_tm() and rtc_tm_to_time() are deprecated because they
+> > rely on 32bits variables and that will make rtc break in y2038/2016.
+> > Stop using those two functions to safer 64bits ones.
+> >
+> > Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+> > CC: Linus Walleij <linus.walleij@linaro.org>
+> > CC: Alessandro Zummo <a.zummo@towertech.it>
+> > CC: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > CC: rtc-linux at googlegroups.com
+> > CC: linux-kernel at vger.kernel.org
+> > CC: linux-arm-kernel at lists.infradead.org
 > 
-> What your suggestion?
-> Convert timer to platform driver and make clock as platform driver as well?
-> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-The timer can't be a platform driver because it would be too
-late. The clock driver could register whatever clks are required
-for the timer/GIC in a CLK_OF_DECLARE_DRIVER hook, and then leave
-the rest to a platform driver. This way we get some of the device
-driver framework in this code.
+Naked-again-by: Russell King
+
+Really, people need to stop re-posting the same patches that have
+already been naked.
+
+This patch fixes NOTHING.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
