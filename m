@@ -1,416 +1,99 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Tue, 20 Jun 2017 09:17:57 +0800
-Subject: [PATCH v2] drm/mediatek: separate color module to fixup error
- memory reallocation
-In-Reply-To: <1497621736-63799-1-git-send-email-yt.shen@mediatek.com>
-References: <1497621736-63799-1-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1497921477.12730.1.camel@mtksdaap41>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 19 Jun 2017 18:24:11 -0700
+Subject: [PATCH V1 9/9] arm64: dts: add ccu for SC9860
+In-Reply-To: <20170618015855.27738-10-chunyan.zhang@spreadtrum.com>
+References: <20170618015855.27738-1-chunyan.zhang@spreadtrum.com>
+ <20170618015855.27738-10-chunyan.zhang@spreadtrum.com>
+Message-ID: <20170620012411.GF4493@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-06-16 at 22:02 +0800, YT Shen wrote:
-> Previous patch (c5f228ef6c drm/mediatek: add *driver_data for different
-> hardware settings) calls devm_kfree() and then devm_kzalloc() to
-> reallocate color module data structure.  But this reallocation cannnot
-> guarantee the new address is unchanged, but the caller will use the
-> old address, which is wrong.
-> 
-> Fix it by separate color module from general components, this patch
-> separate color module to independent files, like mtk_disp_ovl.c and
-> mtk_disp_rdma.c do
-> 
-
-Hi, YT:
-
-Applied to my branch mediatek-drm-next-4.13. Thanks.
-
-Regards,
-CK
-
-> Signed-off-by: YT Shen <yt.shen@mediatek.com>
-> ---
->  drivers/gpu/drm/mediatek/Makefile           |   3 +-
->  drivers/gpu/drm/mediatek/mtk_disp_color.c   | 176 ++++++++++++++++++++++++++++
->  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |  80 +------------
->  drivers/gpu/drm/mediatek/mtk_drm_drv.c      |   6 +-
->  drivers/gpu/drm/mediatek/mtk_drm_drv.h      |   1 +
->  5 files changed, 185 insertions(+), 81 deletions(-)
->  create mode 100644 drivers/gpu/drm/mediatek/mtk_disp_color.c
-> 
-> diff --git a/drivers/gpu/drm/mediatek/Makefile b/drivers/gpu/drm/mediatek/Makefile
-> index bf2e5be..e37b55a 100644
-> --- a/drivers/gpu/drm/mediatek/Makefile
-> +++ b/drivers/gpu/drm/mediatek/Makefile
-> @@ -1,4 +1,5 @@
-> -mediatek-drm-y := mtk_disp_ovl.o \
-> +mediatek-drm-y := mtk_disp_color.o \
-> +		  mtk_disp_ovl.o \
->  		  mtk_disp_rdma.o \
->  		  mtk_drm_crtc.o \
->  		  mtk_drm_ddp.o \
-> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_color.c b/drivers/gpu/drm/mediatek/mtk_disp_color.c
+On 06/18, Chunyan Zhang wrote:
+> diff --git a/arch/arm64/boot/dts/sprd/sc9860-ccu.dtsi b/arch/arm64/boot/dts/sprd/sc9860-ccu.dtsi
 > new file mode 100644
-> index 0000000..ef79a6d
+> index 0000000..e15bf2d
 > --- /dev/null
-> +++ b/drivers/gpu/drm/mediatek/mtk_disp_color.c
-> @@ -0,0 +1,176 @@
+> +++ b/arch/arm64/boot/dts/sprd/sc9860-ccu.dtsi
+> @@ -0,0 +1,67 @@
 > +/*
-> + * Copyright (c) 2017 MediaTek Inc.
+> + * Spreadtrum SC9860 SoC CCU
 > + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
+> + * Copyright (C) 2017, Spreadtrum Communications Inc.
 > + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
+> + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 > + */
 > +
-> +#include <drm/drmP.h>
-> +#include <linux/clk.h>
-> +#include <linux/component.h>
-> +#include <linux/of_device.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/platform_device.h>
+> +&soc {
+> +	ext_26m: ext-26m {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <26000000>;
+> +		clock-output-names = "ext-26m";
+> +	};
 > +
-> +#include "mtk_drm_crtc.h"
-> +#include "mtk_drm_ddp_comp.h"
+> +	ext_32m_sine0: ext-32m-sine0 {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <32000000>;
+> +		clock-output-names = "ext-32m-sine0";
+> +	};
 > +
-> +#define DISP_COLOR_CFG_MAIN			0x0400
-> +#define DISP_COLOR_START_MT2701			0x0f00
-> +#define DISP_COLOR_START_MT8173			0x0c00
-> +#define DISP_COLOR_START(comp)			((comp)->data->color_offset)
-> +#define DISP_COLOR_WIDTH(comp)			(DISP_COLOR_START(comp) + 0x50)
-> +#define DISP_COLOR_HEIGHT(comp)			(DISP_COLOR_START(comp) + 0x54)
+> +	ext_32m_sine1: ext-32m-sine1 {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <32000000>;
+> +		clock-output-names = "ext-32m-sine1";
+> +	};
 > +
-> +#define COLOR_BYPASS_ALL			BIT(7)
-> +#define COLOR_SEQ_SEL				BIT(13)
+> +	ext_rco_100m: ext-rco-100m {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <100000000>;
+> +		clock-output-names = "ext-rco-100m";
+> +	};
 > +
-> +struct mtk_disp_color_data {
-> +	unsigned int color_offset;
-> +};
+> +	ext_32k: ext-32k {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <32768>;
+> +		clock-output-names = "ext-32k";
+> +	};
+
+These should all be outside of the soc node as they're probably
+on the board and not the SoC? The hint is that they don't have a
+reg property.
+
 > +
-> +/**
-> + * struct mtk_disp_color - DISP_COLOR driver structure
-> + * @ddp_comp - structure containing type enum and hardware resources
-> + * @crtc - associated crtc to report irq events to
-> + */
-> +struct mtk_disp_color {
-> +	struct mtk_ddp_comp			ddp_comp;
-> +	struct drm_crtc				*crtc;
-> +	const struct mtk_disp_color_data	*data;
-> +};
-> +
-> +static inline struct mtk_disp_color *comp_to_color(struct mtk_ddp_comp *comp)
-> +{
-> +	return container_of(comp, struct mtk_disp_color, ddp_comp);
-> +}
-> +
-> +static void mtk_color_config(struct mtk_ddp_comp *comp, unsigned int w,
-> +			     unsigned int h, unsigned int vrefresh,
-> +			     unsigned int bpc)
-> +{
-> +	struct mtk_disp_color *color = comp_to_color(comp);
-> +
-> +	writel(w, comp->regs + DISP_COLOR_WIDTH(color));
-> +	writel(h, comp->regs + DISP_COLOR_HEIGHT(color));
-> +}
-> +
-> +static void mtk_color_start(struct mtk_ddp_comp *comp)
-> +{
-> +	struct mtk_disp_color *color = comp_to_color(comp);
-> +
-> +	writel(COLOR_BYPASS_ALL | COLOR_SEQ_SEL,
-> +	       comp->regs + DISP_COLOR_CFG_MAIN);
-> +	writel(0x1, comp->regs + DISP_COLOR_START(color));
-> +}
-> +
-> +static const struct mtk_ddp_comp_funcs mtk_disp_color_funcs = {
-> +	.config = mtk_color_config,
-> +	.start = mtk_color_start,
-> +};
-> +
-> +static int mtk_disp_color_bind(struct device *dev, struct device *master,
-> +			       void *data)
-> +{
-> +	struct mtk_disp_color *priv = dev_get_drvdata(dev);
-> +	struct drm_device *drm_dev = data;
-> +	int ret;
-> +
-> +	ret = mtk_ddp_comp_register(drm_dev, &priv->ddp_comp);
-> +	if (ret < 0) {
-> +		dev_err(dev, "Failed to register component %s: %d\n",
-> +			dev->of_node->full_name, ret);
-> +		return ret;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static void mtk_disp_color_unbind(struct device *dev, struct device *master,
-> +				  void *data)
-> +{
-> +	struct mtk_disp_color *priv = dev_get_drvdata(dev);
-> +	struct drm_device *drm_dev = data;
-> +
-> +	mtk_ddp_comp_unregister(drm_dev, &priv->ddp_comp);
-> +}
-> +
-> +static const struct component_ops mtk_disp_color_component_ops = {
-> +	.bind	= mtk_disp_color_bind,
-> +	.unbind = mtk_disp_color_unbind,
-> +};
-> +
-> +static int mtk_disp_color_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct mtk_disp_color *priv;
-> +	int comp_id;
-> +	int ret;
-> +
-> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
-> +
-> +	comp_id = mtk_ddp_comp_get_id(dev->of_node, MTK_DISP_COLOR);
-> +	if (comp_id < 0) {
-> +		dev_err(dev, "Failed to identify by alias: %d\n", comp_id);
-> +		return comp_id;
-> +	}
-> +
-> +	ret = mtk_ddp_comp_init(dev, dev->of_node, &priv->ddp_comp, comp_id,
-> +				&mtk_disp_color_funcs);
-> +	if (ret) {
-> +		dev_err(dev, "Failed to initialize component: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	priv->data = of_device_get_match_data(dev);
-> +
-> +	platform_set_drvdata(pdev, priv);
-> +
-> +	ret = component_add(dev, &mtk_disp_color_component_ops);
-> +	if (ret)
-> +		dev_err(dev, "Failed to add component: %d\n", ret);
-> +
-> +	return ret;
-> +}
-> +
-> +static int mtk_disp_color_remove(struct platform_device *pdev)
-> +{
-> +	component_del(&pdev->dev, &mtk_disp_color_component_ops);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct mtk_disp_color_data mt2701_color_driver_data = {
-> +	.color_offset = DISP_COLOR_START_MT2701,
-> +};
-> +
-> +static const struct mtk_disp_color_data mt8173_color_driver_data = {
-> +	.color_offset = DISP_COLOR_START_MT8173,
-> +};
-> +
-> +static const struct of_device_id mtk_disp_color_driver_dt_match[] = {
-> +	{ .compatible = "mediatek,mt2701-disp-color",
-> +	  .data = &mt2701_color_driver_data},
-> +	{ .compatible = "mediatek,mt8173-disp-color",
-> +	  .data = &mt8173_color_driver_data},
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, mtk_disp_color_driver_dt_match);
-> +
-> +struct platform_driver mtk_disp_color_driver = {
-> +	.probe		= mtk_disp_color_probe,
-> +	.remove		= mtk_disp_color_remove,
-> +	.driver		= {
-> +		.name	= "mediatek-disp-color",
-> +		.owner	= THIS_MODULE,
-> +		.of_match_table = mtk_disp_color_driver_dt_match,
-> +	},
-> +};
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> index 8b52416..07d7ea2 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> @@ -38,13 +38,6 @@
->  
->  #define DISP_REG_UFO_START			0x0000
->  
-> -#define DISP_COLOR_CFG_MAIN			0x0400
-> -#define DISP_COLOR_START_MT2701			0x0f00
-> -#define DISP_COLOR_START_MT8173			0x0c00
-> -#define DISP_COLOR_START(comp)			((comp)->data->color_offset)
-> -#define DISP_COLOR_WIDTH(comp)			(DISP_COLOR_START(comp) + 0x50)
-> -#define DISP_COLOR_HEIGHT(comp)			(DISP_COLOR_START(comp) + 0x54)
-> -
->  #define DISP_AAL_EN				0x0000
->  #define DISP_AAL_SIZE				0x0030
->  
-> @@ -55,9 +48,6 @@
->  
->  #define LUT_10BIT_MASK				0x03ff
->  
-> -#define COLOR_BYPASS_ALL			BIT(7)
-> -#define COLOR_SEQ_SEL				BIT(13)
-> -
->  #define OD_RELAYMODE				BIT(0)
->  
->  #define UFO_BYPASS				BIT(2)
-> @@ -82,20 +72,6 @@
->  #define DITHER_ADD_LSHIFT_G(x)			(((x) & 0x7) << 4)
->  #define DITHER_ADD_RSHIFT_G(x)			(((x) & 0x7) << 0)
->  
-> -struct mtk_disp_color_data {
-> -	unsigned int color_offset;
-> -};
-> -
-> -struct mtk_disp_color {
-> -	struct mtk_ddp_comp			ddp_comp;
-> -	const struct mtk_disp_color_data	*data;
-> -};
-> -
-> -static inline struct mtk_disp_color *comp_to_color(struct mtk_ddp_comp *comp)
-> -{
-> -	return container_of(comp, struct mtk_disp_color, ddp_comp);
-> -}
-> -
->  void mtk_dither_set(struct mtk_ddp_comp *comp, unsigned int bpc,
->  		    unsigned int CFG)
->  {
-> @@ -119,25 +95,6 @@ void mtk_dither_set(struct mtk_ddp_comp *comp, unsigned int bpc,
->  	}
->  }
->  
-> -static void mtk_color_config(struct mtk_ddp_comp *comp, unsigned int w,
-> -			     unsigned int h, unsigned int vrefresh,
-> -			     unsigned int bpc)
-> -{
-> -	struct mtk_disp_color *color = comp_to_color(comp);
-> -
-> -	writel(w, comp->regs + DISP_COLOR_WIDTH(color));
-> -	writel(h, comp->regs + DISP_COLOR_HEIGHT(color));
-> -}
-> -
-> -static void mtk_color_start(struct mtk_ddp_comp *comp)
-> -{
-> -	struct mtk_disp_color *color = comp_to_color(comp);
-> -
-> -	writel(COLOR_BYPASS_ALL | COLOR_SEQ_SEL,
-> -	       comp->regs + DISP_COLOR_CFG_MAIN);
-> -	writel(0x1, comp->regs + DISP_COLOR_START(color));
-> -}
-> -
->  static void mtk_od_config(struct mtk_ddp_comp *comp, unsigned int w,
->  			  unsigned int h, unsigned int vrefresh,
->  			  unsigned int bpc)
-> @@ -229,11 +186,6 @@ static void mtk_gamma_set(struct mtk_ddp_comp *comp,
->  	.stop = mtk_gamma_stop,
->  };
->  
-> -static const struct mtk_ddp_comp_funcs ddp_color = {
-> -	.config = mtk_color_config,
-> -	.start = mtk_color_start,
-> -};
-> -
->  static const struct mtk_ddp_comp_funcs ddp_od = {
->  	.config = mtk_od_config,
->  	.start = mtk_od_start,
-> @@ -268,8 +220,8 @@ struct mtk_ddp_comp_match {
->  static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
->  	[DDP_COMPONENT_AAL]	= { MTK_DISP_AAL,	0, &ddp_aal },
->  	[DDP_COMPONENT_BLS]	= { MTK_DISP_BLS,	0, NULL },
-> -	[DDP_COMPONENT_COLOR0]	= { MTK_DISP_COLOR,	0, &ddp_color },
-> -	[DDP_COMPONENT_COLOR1]	= { MTK_DISP_COLOR,	1, &ddp_color },
-> +	[DDP_COMPONENT_COLOR0]	= { MTK_DISP_COLOR,	0, NULL },
-> +	[DDP_COMPONENT_COLOR1]	= { MTK_DISP_COLOR,	1, NULL },
->  	[DDP_COMPONENT_DPI0]	= { MTK_DPI,		0, NULL },
->  	[DDP_COMPONENT_DSI0]	= { MTK_DSI,		0, NULL },
->  	[DDP_COMPONENT_DSI1]	= { MTK_DSI,		1, NULL },
-> @@ -286,22 +238,6 @@ struct mtk_ddp_comp_match {
->  	[DDP_COMPONENT_WDMA1]	= { MTK_DISP_WDMA,	1, NULL },
->  };
->  
-> -static const struct mtk_disp_color_data mt2701_color_driver_data = {
-> -	.color_offset = DISP_COLOR_START_MT2701,
-> -};
-> -
-> -static const struct mtk_disp_color_data mt8173_color_driver_data = {
-> -	.color_offset = DISP_COLOR_START_MT8173,
-> -};
-> -
-> -static const struct of_device_id mtk_disp_color_driver_dt_match[] = {
-> -	{ .compatible = "mediatek,mt2701-disp-color",
-> -	  .data = &mt2701_color_driver_data},
-> -	{ .compatible = "mediatek,mt8173-disp-color",
-> -	  .data = &mt8173_color_driver_data},
-> -	{},
-> -};
-> -
->  int mtk_ddp_comp_get_id(struct device_node *node,
->  			enum mtk_ddp_comp_type comp_type)
->  {
-> @@ -324,23 +260,11 @@ int mtk_ddp_comp_init(struct device *dev, struct device_node *node,
->  	enum mtk_ddp_comp_type type;
->  	struct device_node *larb_node;
->  	struct platform_device *larb_pdev;
-> -	const struct of_device_id *match;
-> -	struct mtk_disp_color *color;
->  
->  	if (comp_id < 0 || comp_id >= DDP_COMPONENT_ID_MAX)
->  		return -EINVAL;
->  
->  	type = mtk_ddp_matches[comp_id].type;
-> -	if (type == MTK_DISP_COLOR) {
-> -		devm_kfree(dev, comp);
-> -		color = devm_kzalloc(dev, sizeof(*color), GFP_KERNEL);
-> -		if (!color)
-> -			return -ENOMEM;
-> -
-> -		match = of_match_node(mtk_disp_color_driver_dt_match, node);
-> -		color->data = match->data;
-> -		comp = &color->ddp_comp;
-> -	}
->  
->  	comp->id = comp_id;
->  	comp->funcs = funcs ?: mtk_ddp_matches[comp_id].funcs;
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> index f6c8ec4..9287fba 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> @@ -439,11 +439,12 @@ static int mtk_drm_probe(struct platform_device *pdev)
->  		private->comp_node[comp_id] = of_node_get(node);
->  
->  		/*
-> -		 * Currently only the OVL, RDMA, DSI, and DPI blocks have
-> +		 * Currently only the COLOR, OVL, RDMA, DSI, and DPI blocks have
->  		 * separate component platform drivers and initialize their own
->  		 * DDP component structure. The others are initialized here.
->  		 */
-> -		if (comp_type == MTK_DISP_OVL ||
-> +		if (comp_type == MTK_DISP_COLOR ||
-> +		    comp_type == MTK_DISP_OVL ||
->  		    comp_type == MTK_DISP_RDMA ||
->  		    comp_type == MTK_DSI ||
->  		    comp_type == MTK_DPI) {
-> @@ -566,6 +567,7 @@ static SIMPLE_DEV_PM_OPS(mtk_drm_pm_ops, mtk_drm_sys_suspend,
->  
->  static struct platform_driver * const mtk_drm_drivers[] = {
->  	&mtk_ddp_driver,
-> +	&mtk_disp_color_driver,
->  	&mtk_disp_ovl_driver,
->  	&mtk_disp_rdma_driver,
->  	&mtk_dpi_driver,
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> index aef8747..c3378c4 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> @@ -59,6 +59,7 @@ struct mtk_drm_private {
->  };
->  
->  extern struct platform_driver mtk_ddp_driver;
-> +extern struct platform_driver mtk_disp_color_driver;
->  extern struct platform_driver mtk_disp_ovl_driver;
->  extern struct platform_driver mtk_disp_rdma_driver;
->  extern struct platform_driver mtk_dpi_driver;
+> +	ccu: clk {
+
+clock-controller is a more standard node name.
+
+> +		compatible = "sprd,sc9860-ccu";
+> +		#clock-cells = <1>;
+> +		reg = <0 0x20000000 0 0x400>,
+> +		      <0 0x20210000 0 0x3000>,
+> +		      <0 0x402b0000 0 0x4000>,
+> +		      <0 0x402d0000 0 0x400>,
+> +		      <0 0x402e0000 0 0x4000>,
+> +		      <0 0x40400000 0 0x400>,
+> +		      <0 0x40880000 0 0x400>,
+> +		      <0 0x415e0000 0 0x400>,
+> +		      <0 0x60200000 0 0x400>,
+> +		      <0 0x61000000 0 0x400>,
+> +		      <0 0x61100000 0 0x3000>,
+> +		      <0 0x62000000 0 0x4000>,
+> +		      <0 0x62100000 0 0x4000>,
+> +		      <0 0x63000000 0 0x400>,
+> +		      <0 0x63100000 0 0x3000>,
+> +		      <0 0x70b00000 0 0x3000>;
+
+There are a lot of reg properties here. Perhaps there needs to be
+different nodes for the different clock controllers in this SoC?
+
+> +		clocks = <&ext_26m>, <&ext_rco_100m>, <&ext_32k>;
+> +		clock-names = "ext-26m", "ext-rco-100m", "ext-32k";
+> +	};
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
