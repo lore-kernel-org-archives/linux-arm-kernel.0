@@ -1,33 +1,38 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Tue, 20 Jun 2017 12:38:26 +0100
-Subject: [PATCH 2/7] dt-bindings: PCI: Describe ATS property for root
- complex nodes
-In-Reply-To: <65aea93f-d516-f045-f216-3f56e96bdeb6@arm.com>
-References: <20170524180143.19855-1-jean-philippe.brucker@arm.com>
- <20170524180143.19855-3-jean-philippe.brucker@arm.com>
- <20170531172320.3u6bdctv44aqighy@rob-hp-laptop>
- <cd63a2dc-8259-482d-19e9-9db60be866f7@arm.com>
- <20170605172025.qgnocl5ytexnklue@rob-hp-laptop>
- <65aea93f-d516-f045-f216-3f56e96bdeb6@arm.com>
-Message-ID: <1754b317-767e-7afd-5608-6ef6ea80a162@arm.com>
+From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
+Date: Tue, 20 Jun 2017 13:41:25 +0200
+Subject: [PATCH v2 0/5] Add support for the STM32F7 I2C
+Message-ID: <1497958890-5530-1-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2017 12:11 PM, Jean-Philippe Brucker wrote:
-> On 05/06/17 18:20, Rob Herring wrote:
->> pci-host-{e,}cam-generic is a special case. I'm okay with having a 
->> property for that I suppose. We should not require this property though 
->> and allow for it to be implied by the SoC specific compatible as well.
-> 
-> The property isn't useful for host-generic since a host like Qemu can
-> easily disable ATS in the IOMMU. It would only be here for consistency.
-> Changing IOMMU registers wouldn't be as simple for a firmware running on
-> real hardware.
+This patchset adds support for the I2C controller embedded in STM32F7xx SoC.
+It enables I2C transfer in interrupt mode with Standard-mode, Fast-mode and
+Fast-mode+ bus speed.
+---
+Changes in V2
+  * Implement an I2C timings computation algorithm instead of static
+    values(bindings). Algorithm uses generic I2C SCL Falling/Rising
+    bindings and System clock to compute its timings.
+  * I2C Device Tree Update
+---
+Pierre-Yves MORDRET (5):
+  dt-bindings: i2c-stm32: Document the STM32F7 I2C bindings
+  i2c: i2c-stm32f4: use generic definition of speed enum
+  i2c: i2c-stm32f7: add driver
+  ARM: dts: stm32: Add I2C1 support for STM32F746 SoC
+  ARM: dts: stm32: Add I2C1 support for STM32F746 eval board
 
-Sorry I was mistaken here. AMD Seattle hardware, for instance, implements
-a pure host-ecam-generic. So it's not exclusively used by Qemu. A quick
-search in the kernel also brings up alpine and thunder2. So I guess I'll
-move ats-supported documentation to host-generic-pci.txt.
+ .../devicetree/bindings/i2c/i2c-stm32.txt          |  29 +-
+ arch/arm/boot/dts/stm32746g-eval.dts               |   8 +
+ arch/arm/boot/dts/stm32f746.dtsi                   |  22 +
+ drivers/i2c/busses/Kconfig                         |  10 +
+ drivers/i2c/busses/Makefile                        |   1 +
+ drivers/i2c/busses/i2c-stm32.h                     |  20 +
+ drivers/i2c/busses/i2c-stm32f4.c                   |  18 +-
+ drivers/i2c/busses/i2c-stm32f7.c                   | 968 +++++++++++++++++++++
+ 8 files changed, 1062 insertions(+), 14 deletions(-)
+ create mode 100644 drivers/i2c/busses/i2c-stm32.h
+ create mode 100644 drivers/i2c/busses/i2c-stm32f7.c
 
-Thanks,
-Jean
+-- 
+1.9.1
