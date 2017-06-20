@@ -1,83 +1,128 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Tue, 20 Jun 2017 07:57:09 +0530
-Subject: [PATCH v3 1/2] acpica: iort: Update SMMUv3 header for proximity
- domain mapping
-In-Reply-To: <0d0d6cb6-7674-5751-d780-af5114ddd569@arm.com>
-References: <1496897059-8272-1-git-send-email-ganapatrao.kulkarni@cavium.com>
- <1496897059-8272-2-git-send-email-ganapatrao.kulkarni@cavium.com>
- <0d0d6cb6-7674-5751-d780-af5114ddd569@arm.com>
-Message-ID: <CAFpQJXVE8pfmbn5b+5ngiJ01OVLH-pLn7zhpzWX2+62SR1L_qA@mail.gmail.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Tue, 20 Jun 2017 10:37:46 +0800
+Subject: [PATCH v15 2/7] power: add power sequence library
+In-Reply-To: <CAPDyKFo0d2FD1U-MgWTExz_cKC8BjB6QQFu1StTyPN1TGBG9eA@mail.gmail.com>
+References: <20170614015338.GA4635@b29397-desktop>
+ <CAPDyKFrLL10TY1JZAhF44_0+qGETLNtFc6ujKVUu7Ay=O8+M5A@mail.gmail.com>
+ <20170615065854.GA24157@b29397-desktop>
+ <CAPDyKFpc8GRKK8bafMU_HPaqWNrger3grPSd5rWWCTYhUGHZLA@mail.gmail.com>
+ <20170615091131.GB24157@b29397-desktop>
+ <CAPDyKFrZoyoYCQA1rnRbz9tmT9vJigzSb+xyTZpJjhd=5eFA5A@mail.gmail.com>
+ <20170615100604.GC24157@b29397-desktop>
+ <CAPDyKFrSQ7m+yUvKqB9yAMakk8pHZooboZMFdXGU6Xb=TZSGNA@mail.gmail.com>
+ <20170619090259.GA23731@b29397-desktop>
+ <CAPDyKFo0d2FD1U-MgWTExz_cKC8BjB6QQFu1StTyPN1TGBG9eA@mail.gmail.com>
+Message-ID: <20170620023746.GB23731@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 19, 2017 at 11:24 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 08/06/17 05:44, Ganapatrao Kulkarni wrote:
->> ARM IORT specification (rev. C) has added two new fields to define
->> proximity domain for the SMMUv3 node in the IORT table.
->>
->> Proximity Domain Valid:
->>       Set to 1 if the value provided in the Proximity Domain field is
->>       valid. Set to 0 otherwise.
->>
->> Proximity domain:
->>       If the Proximity Domain Valid flag is set to 1, this entry
->>       provides the proximity domain to which this SMMU
->>       instance belongs.
->>
->> Update header file to reflect this.
->>
->> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->> ---
->>  include/acpi/actbl2.h | 4 ++++
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
->> index 4b306a6..389e91f 100644
->> --- a/include/acpi/actbl2.h
->> +++ b/include/acpi/actbl2.h
->> @@ -805,6 +805,9 @@ struct acpi_iort_smmu_v3 {
->>       u32 pri_gsiv;
->>       u32 gerr_gsiv;
->>       u32 sync_gsiv;
->> +     u8 pxm;
->> +     u8 reserved1;
->> +     u16 reserved2;
->
-> Why add the padding if you're not also adding the following field that
-> it aligns? (side note: could it not just be a u8[3]?)
+On Mon, Jun 19, 2017 at 11:48:05AM +0200, Ulf Hansson wrote:
+> [...]
+> 
+> >> >
+> >> > Unlike the MMC design, there is no dts entry to indicate whether this
+> >> > device needs pwrseq or not at this design, it will only carry out power
+> >> > on sequence after matching. So, return -EPROBE_DEFER may not work since
+> >> > this device may never need pwrseq.
+> >>
+> >> Then, how will you really be able to fetch the correct pwrseq library
+> >> instance for the device node?
+> >>
+> >> Suppose their is a *list* of pwrseq library instances available. In
+> >> pwrseq_find_available_instance() you call of_match_node(table, np).
+> >> The "table" there corresponds to the compatible for the pwrseq library
+> >> and the np is the device node provided by the caller of
+> >> of_pwrseq_on().
+> >>
+> >> Why is this match done?
+> >
+> > The compatible in table is from the source code, and the compatible in
+> > np is from the dts. This is the current match way, I comment your
+> > suggestion below.
+> >
+> >>
+> >> Why can't the match be done before trying to fetch a library instance
+> >
+> > How? If there is no pwrseq instance, how can we do match?
+> >
+> >> and then in a second step, really try to fetch the instance? If only
+> >> the second step fails, returning -EPROBE_DEFER can be done, no?
+> >>
+> >> BTW, I didn't compatible for the generic pwrseq library being
+> >> documented in this series.
+> 
+> Seems like you need to update the DT documentation for the below
+> compatible, which is used for the generic pwrseq library. Perhaps this
+> is what puzzles me a bit on *why* the match is done.
+> 
+> +static const struct of_device_id generic_id_table[] = {
+> +       { .compatible = "generic",},
+> +       { /* sentinel */ }
+> +};
 
-added to align as well to comply with  the spec.
+Sorry, I should update this "generic" compatible at 1st binding-doc
+patch.
 
->
-> If the actual structure definition is changing, do there not need to be
-> corresponding IASL changes too?
+> 
+> [...]
+> 
+> >> >
+> >> > This additional instance is used to store compatible information for
+> >> > this pwrseq library, it is used for the next matching between device
+> >> > and pwrseq library, it just likes we need the first pwrseq instance
+> >> > registered at boot stage.
+> >>
+> >> Why can't the compatible information be a static table, known by the
+> >> pwrseq core library?
+> >>
+> >> Then when of_pwrseq_on() is called, that static table is parsed and
+> >> matched, then a corresponding pwrseq library instance tries to be
+> >> fetched.
+> >>
+> >
+> > So, you suggest allocating and registering pwrseq instance on the
+> > demand? Eg, we maintain a power sequence static table, including
+> > compatible and allocate function.
+> 
+> Yes, something like that.
+> 
+> >
+> > static const struct pwrseq_match_table pwrseq_match_table_list[] = {
+> >         { PWRSEQ_DEV(0x0204, 0x6025), .alloc_instance = pwrseq_AA_alloc_instance },
+> >         { PWRSEQ_DEV(0x0204, 0x6026), .alloc_instance = pwrseq_BB_alloc_instance },
+> >         { PWRSEQ_DEV(0xffff, 0xffff), .alloc_instance = pwrseq_generic_alloc_instance },
+> 
+> What does the  PWRSEQ_DEV() macro do?
 
-yes, it is been added and sent to acpica devel ML.
-https://lists.acpica.org/pipermail/devel/2017-June/001243.html
+In fact, this should be compatible string, I exampled it as USB vid,pid
+wrongly.
 
->
->>  };
->>
->>  /* Values for Model field above */
->> @@ -817,6 +820,7 @@ struct acpi_iort_smmu_v3 {
->>
->>  #define ACPI_IORT_SMMU_V3_COHACC_OVERRIDE   (1)
->>  #define ACPI_IORT_SMMU_V3_HTTU_OVERRIDE     (1<<1)
->> +#define ACPI_IORT_SMMU_V3_PXM_VALID         (1<<3)
->
-> Maybe it's just me, but "PXM" seems incredibly cryptic.
+> > Since the pwrseq_match_table_list is static, we can always do match, and
+> > will not return -EPROBE_DEFER anymore, one problem for this is we need
+> > always compile all pwrseq libraries. Any good suggestions?
+> 
+> You never returned -EPROBE_DEFER in the first case. That's why I complained. :-)
+> 
+> So, in case the OF match doesn't succeed, there are no reason to
+> propagate an error, but instead just bail out and returning 0 to the
+> caller.
+> 
+> If the OF match succeeds, it means the device requires a pwrseq
+> library to be used. Then, pwrseq_XX_alloc_instance() will be called,
+> on demand and which tries to fetch the resources (clocks, gpios etc).
+> If any of those attempts fetching a resource fails, its corresponding
+> error code should be propagated to the caller - including
+> -EPROBE_DEFER.
+> 
+> Regarding the "always compile all pwrseq libraries"; no we don't need
+> to do that. Instead we only need a to have a stub function for
+> pwrseq_XX_alloc_instance, in case its corresponding Kconfig option is
+> unset. That stub, should of course return an error code.
+> 
 
-PXM stands for proximity(refer ACPI spec)
-it is widely used in spec and also in Linux kernel.
+I will have a updated version for your suggestion, thanks.
 
->
-> Robin.
->
->>
->>  /*******************************************************************************
->>   *
->>
->
+-- 
 
-thanks
-Ganapat
+Best Regards,
+Peter Chen
