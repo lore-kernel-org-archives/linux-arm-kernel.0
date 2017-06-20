@@ -1,44 +1,102 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 20 Jun 2017 15:14:41 +0100
-Subject: [PATCH v3 4/6] irqchip: irq-mvebu-icu: new driver for Marvell ICU
-In-Reply-To: <20170620160956.361ed003@windsurf.lan>
-References: <20170616141923.31226-1-thomas.petazzoni@free-electrons.com>
- <20170616141923.31226-5-thomas.petazzoni@free-electrons.com>
- <2934dbf3-e1f0-3997-ba70-3b6a7a2973d9@arm.com>
- <20170620154631.77a1f192@windsurf.lan>
- <7c5d8d75-1319-a9ae-856d-67813ad2e1c5@arm.com>
- <20170620160956.361ed003@windsurf.lan>
-Message-ID: <15ee5379-9e4a-1b01-afce-0c87b1baf14d@arm.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Tue, 20 Jun 2017 17:16:23 +0300
+Subject: [PATCH 16/20] arm64: signal32: move ilp32 and aarch32 common
+ code to separated file
+In-Reply-To: <5947F8EA.9000209@arm.com>
+References: <20170604120009.342-1-ynorov@caviumnetworks.com>
+ <20170604120009.342-17-ynorov@caviumnetworks.com>
+ <5947F8EA.9000209@arm.com>
+Message-ID: <20170620141623.gzqv6orcay6bjxbz@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/06/17 15:09, Thomas Petazzoni wrote:
-> Hello,
+On Mon, Jun 19, 2017 at 05:16:42PM +0100, James Morse wrote:
+> Hi Yury,
 > 
-> On Tue, 20 Jun 2017 15:00:19 +0100, Marc Zyngier wrote:
+> On 04/06/17 13:00, Yury Norov wrote:
+> > Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
 > 
->> There is a few things: this driver could (mostly) work with a GICv3
->> distributor (located way above 4GB) instead of the GICP, and I'd rather
->> make no assumption of where GICP is located in the memory map.
->>
->> So I'd rather see:
->>
->> 	if (msg->address_lo || msg->address_hi) {
->> 		[...]
->> 	} else {
->> 		/* deconfiguration case */
->> 	}
-> 
-> Ha, OK, indeed. /me feels stupid now.
-> 
-> Unfortunately, I just sent v4 a few minutes ago. I'll wait for you to
-> look at this v4. If there's nothing else to be changed, then I'll send
-> a v5 with just this change.
+> Can I offer a body for the commit message:
+> ILP32 needs to mix 32bit struct siginfo and 64bit sigframe for its signal
+> handlers. Move the existing compat code for copying siginfo to user space and
+> manipulating signal masks into signal32_common.c so it can be used to deliver
+> aarch32 and ilp32 signals.
 
-If that's the only thing, I can apply the fixlet locally.
+Ok
 
-Thanks,
+> > diff --git a/arch/arm64/include/asm/signal32.h b/arch/arm64/include/asm/signal32.h
+> > index e68fcce538e1..1c4ede717bd2 100644
+> > --- a/arch/arm64/include/asm/signal32.h
+> > +++ b/arch/arm64/include/asm/signal32.h
+> > @@ -13,6 +13,9 @@
+> >   * You should have received a copy of the GNU General Public License
+> >   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> >   */
+> > +
+> > +#include <asm/signal32_common.h>
+> > +
+> >  #ifndef __ASM_SIGNAL32_H
+> >  #define __ASM_SIGNAL32_H
+> 
+> Nit: This should go inside the guard.
+ 
+Ok, thanks. Will fix this and all below
+ 
+> > diff --git a/arch/arm64/kernel/signal32_common.c b/arch/arm64/kernel/signal32_common.c
+> > new file mode 100644
+> > index 000000000000..5bddc25dca12
+> > --- /dev/null
+> > +++ b/arch/arm64/kernel/signal32_common.c
+> > @@ -0,0 +1,135 @@
+> [...]
+> > +#include <linux/compat.h>
+> > +#include <linux/signal.h>
+> > +#include <linux/ratelimit.h>
+> 
+> What do you need ratelimit.h for?
+> 
+> 
+> > +#include <linux/uaccess.h>
+> > +
+> > +#include <asm/esr.h>
+> 
+> I can't see anything using these ESR_ macros in here...
+> 
+> 
+> > +#include <asm/fpsimd.h>
+> 
+> This was for the VFP save/restore code, which you didn't move...
+> 
+> 
+> > +#include <asm/signal32_common.h>
+> > +#include <asm/unistd.h>
+> 
+> [...]
+> 
+> 
+> > +int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
+> [...]
+> > +	case __SI_FAULT:
+> > +		err |= __put_user((compat_uptr_t)(unsigned long)from->si_addr,
+> > +				  &to->si_addr);
+> 
+> This looks tricky. si_addr comes from FAR_EL1 when user-space touches something
+> it shouldn't. This could be a 64bit value as ilp32 processes can still branch to
+> 64bit addresses in registers and generate loads that cross the invisible 4GB
+> boundary. Here you truncate the 64bit address.
+> Obviously this can't happen at all with aarch32, and for C programs its into
+> undefined-behaviour territory, but it doesn't feel right to pass an address to
+> user-space that we know is wrong... but we don't have an alternative.
+> 
+> This looks like a class of problem particular to ilp32/x32: 'accessed an address
+> you can't encode with a signal'. After a quick dig in x86's x32 code, it looks
+> like they only pass the first 32bits of si_addr too.
+> 
+> One option is to mint a new si_code to go with SIGBUS meaning something like
+> 'address overflowed si_addr'. Alternatively we could just kill tasks that do this.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+New SIGBUS sounds reasonable at the first glance, but I think it should be
+discussed widely at first, and the patch that implements it should touch
+all arches that may be affected.
+
+Yury
