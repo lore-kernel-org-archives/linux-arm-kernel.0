@@ -1,64 +1,60 @@
-From: ore@pengutronix.de (Oleksij Rempel)
-Date: Tue, 20 Jun 2017 17:29:59 +0200
-Subject: [PATCH v5 3/6] kernel/reboot.c: export pm_power_off_prepare
-In-Reply-To: <1497969426.3177.14.camel@nxp.com>
-References: <20170619050245.2632-1-o.rempel@pengutronix.de>
- <20170619050245.2632-4-o.rempel@pengutronix.de>
- <1497872109.5380.10.camel@nxp.com>
- <5023d338-f845-b8a6-c4a0-d414c75f841c@pengutronix.de>
- <1497969426.3177.14.camel@nxp.com>
-Message-ID: <20170620152959.n6cwarfvdtt6mhry@pengutronix.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 20 Jun 2017 17:34:57 +0200
+Subject: [PATCH 0/6] Update binding documentation for cp110 and ap806
+In-Reply-To: <20170620083754.28053-1-gregory.clement@free-electrons.com>
+ (Gregory CLEMENT's message of "Tue, 20 Jun 2017 10:37:47 +0200")
+References: <20170620083754.28053-1-gregory.clement@free-electrons.com>
+Message-ID: <87k2463c66.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 05:37:06PM +0300, Leonard Crestez wrote:
-> On Tue, 2017-06-20 at 07:01 +0200, Oleksij Rempel wrote:
-> > 
-> > On 19.06.2017 13:35, Leonard Crestez wrote:
-> > > 
-> > > On Mon, 2017-06-19 at 07:02 +0200, Oleksij Rempel wrote:
-> > > > 
-> > > > Export pm_power_off_prepare. It is needed to implement power off on
-> > > > Freescale/NXP iMX6 based boards with external power management
-> > > > integrated circuit (PMIC).
-> > > > 
-> > > > Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> > > > ---
-> > > > ?kernel/reboot.c | 1 +
-> > > > ?1 file changed, 1 insertion(+)
-> > > > 
-> > > > diff --git a/kernel/reboot.c b/kernel/reboot.c
-> > > > index bd30a973fe94..a6903bf772c7 100644
-> > > > --- a/kernel/reboot.c
-> > > > +++ b/kernel/reboot.c
-> > > > @@ -49,6 +49,7 @@ int reboot_force;
-> > > > ? */
-> > > > 
-> > > > ?void (*pm_power_off_prepare)(void);
-> > > > +EXPORT_SYMBOL(pm_power_off_prepare);
-> > > > 
-> > > Could you register a reboot notifier in the pfuze driver instead? Right
-> > > now the only user of pm_power_off_prepare is ACPI so this alternative
-> > > seems less intrusive.
-> > hm... in this case i will need to make sure that reboot handler is not?
-> > executed on reboot. This will make code looks strange. Which is opposite?
-> > of your comment in other email about strange standby code for power off :)
-> > Should i really do this?
-> 
-> A reboot handler receives a parameter to differentiate between reboot
-> and shutdown so it would be easy. Isn't it preferable to use an
-> existing mechanism instead of exporting a new symbol?
-> 
-> But maybe somebody else will Ack this, I don't particularly insist on
-> changing this.
+Hi Rob, 
+ 
+ On mar., juin 20 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-I just need to make sure, nothing else will do some thing unexpected
-with PMIC. Don't forget we use same PMIC_STBY_REQ signal for stanby,
-suspend to RAM and for power off. Entering wrong state in wrong moment
-will be fatal. This is why I use last possible step before pm_power_off.
+> Hi Rob,
+>
+> As you know there were dependencies issue about the binding between my
+> different series and you proposed yourself to apply them though the
+> device tree subsystem: [1]
+>
+> All the driver parts have been merged so it's time merging the
+> documentation.
+
+I forgot to mentioned that this series is based on the clk-ap806-dt
+stable branch:
+
+https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git/log/?h=clk-ap806-dt
+
+Gregory
+
+>
+> Thanks,
+>
+> Gregory
+>
+> [1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/509643.html
+>
+> Gregory CLEMENT (6):
+>   dt-bindings: cp110: do not depend anymore of the *-clock-output-names
+>   dt-bindings: cp110: introduce a new binding
+>   dt-bindings: cp110: add sdio clock to cp-110 system controller
+>   pinctrl: dt-bindings: add documentation for AP806 pin controllers
+>   pinctrl: dt-bindings: add documentation for CP110 pin controllers
+>   gpio: dt-bindings: Add documentation for gpio controllers on Armada
+>     7K/8K
+>
+>  .../arm/marvell/ap806-system-controller.txt        |  73 ++++++++++-
+>  .../arm/marvell/cp110-system-controller0.txt       | 144 ++++++++++++++++++---
+>  .../devicetree/bindings/gpio/gpio-mvebu.txt        |  24 +++-
+>  3 files changed, 208 insertions(+), 33 deletions(-)
+>
+> -- 
+> 2.11.0
+>
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
