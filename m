@@ -1,126 +1,148 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 20 Jun 2017 17:24:36 +0100
-Subject: [PATCH] fixup! arm64: signal: Allow expansion of the signal frame
-In-Reply-To: <20170619110346.GB3024@e104818-lin.cambridge.arm.com>
-References: <20170619110346.GB3024@e104818-lin.cambridge.arm.com>
-Message-ID: <1497975876-7055-1-git-send-email-Dave.Martin@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 20 Jun 2017 17:27:23 +0100
+Subject: [PATCH v2 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
+ erratum 161010801
+In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA8383866C7@FRAEML521-MBS.china.huawei.com>
+References: <20170619154500.92336-1-shameerali.kolothum.thodi@huawei.com>
+ <20170619154500.92336-3-shameerali.kolothum.thodi@huawei.com>
+ <20170620102906.GA26908@red-moon>
+ <5FC3163CFD30C246ABAA99954A238FA83838617D@FRAEML521-MBS.china.huawei.com>
+ <d6e824b0-17bd-dd41-2d11-0491d8f66759@arm.com>
+ <5FC3163CFD30C246ABAA99954A238FA8383866C7@FRAEML521-MBS.china.huawei.com>
+Message-ID: <20170620162723.GE11351@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert extra_context.data to a u64 for better ABI independence.
-data is renamed to "datap" to give a stronger clue that it is
-a pointer.
+On Tue, Jun 20, 2017 at 03:39:30PM +0000, Shameerali Kolothum Thodi wrote:
+> 
+> 
+> > -----Original Message-----
+> > From: Robin Murphy [mailto:robin.murphy at arm.com]
+> > Sent: Tuesday, June 20, 2017 4:16 PM
+> > To: Shameerali Kolothum Thodi; Lorenzo Pieralisi
+> > Cc: marc.zyngier at arm.com; sudeep.holla at arm.com; will.deacon at arm.com;
+> > hanjun.guo at linaro.org; Gabriele Paoloni; John Garry; iommu at lists.linux-
+> > foundation.org; linux-arm-kernel at lists.infradead.org; linux-
+> > acpi at vger.kernel.org; devel at acpica.org; Linuxarm; Wangzhou (B);
+> > Guohanjun (Hanjun Guo)
+> > Subject: Re: [PATCH v2 2/2] iommu/arm-smmu-v3:Enable ACPI based
+> > HiSilicon erratum 161010801
+> > 
+> > On 20/06/17 15:07, Shameerali Kolothum Thodi wrote:
+> > >
+> > >
+> > >> -----Original Message-----
+> > >> From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
+> > >> Sent: Tuesday, June 20, 2017 11:29 AM
+> > >> To: Shameerali Kolothum Thodi
+> > >> Cc: marc.zyngier at arm.com; sudeep.holla at arm.com;
+> > will.deacon at arm.com;
+> > >> robin.murphy at arm.com; hanjun.guo at linaro.org; Gabriele Paoloni; John
+> > >> Garry; iommu at lists.linux-foundation.org; linux-arm-
+> > >> kernel at lists.infradead.org; linux-acpi at vger.kernel.org;
+> > devel at acpica.org;
+> > >> Linuxarm; Wangzhou (B); Guohanjun (Hanjun Guo)
+> > >> Subject: Re: [PATCH v2 2/2] iommu/arm-smmu-v3:Enable ACPI based
+> > >> HiSilicon erratum 161010801
+> > >>
+> > >> Hi Shameer,
+> > >>
+> > >> On Mon, Jun 19, 2017 at 04:45:00PM +0100, shameer wrote:
+> > >>> The HiSilicon erratum 161010801 describes the limitation of HiSilicon
+> > >>> platforms Hip06/Hip07 to support the SMMU mappings for MSI
+> > >> transactions.
+> > >>>
+> > >>> On these platforms GICv3 ITS translator is presented with the deviceID
+> > >>> by extending the MSI payload data to 64 bits to include the deviceID.
+> > >>> Hence, the PCIe controller on this platforms has to differentiate the
+> > >>> MSI payload against other DMA payload and has to modify the MSI
+> > >> payload.
+> > >>> This basically makes it difficult for this platforms to have a SMMU
+> > >>> translation for MSI.
+> > >>>
+> > >>> This patch implements a ACPI table based quirk to reserve the hw msi
+> > >>> regions in the smmu-v3 driver which means these address regions will
+> > >>> not be translated and will be excluded from iova allocations.
+> > >>>
+> > >>> Signed-off-by: shameer <shameerali.kolothum.thodi@huawei.com>
+> > >>> ---
+> > >>>  drivers/iommu/arm-smmu-v3.c | 29 ++++++++++++++++++++++++-----
+> > >>>  1 file changed, 24 insertions(+), 5 deletions(-)
+> > >>>
+> > >>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-
+> > smmu-
+> > >> v3.c
+> > >>> index abe4b88..f03c63b 100644
+> > >>> --- a/drivers/iommu/arm-smmu-v3.c
+> > >>> +++ b/drivers/iommu/arm-smmu-v3.c
+> > >>> @@ -597,6 +597,7 @@ struct arm_smmu_device {
+> > >>>  	u32				features;
+> > >>>
+> > >>>  #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
+> > >>> +#define ARM_SMMU_OPT_RESV_HW_MSI	(1 << 1)
+> > >>>  	u32				options;
+> > >>>
+> > >>>  	struct arm_smmu_cmdq		cmdq;
+> > >>> @@ -1904,14 +1905,31 @@ static void
+> > arm_smmu_get_resv_regions(struct
+> > >> device *dev,
+> > >>>  				      struct list_head *head)
+> > >>>  {
+> > >>>  	struct iommu_resv_region *region;
+> > >>> +	struct arm_smmu_device *smmu;
+> > >>> +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
+> > >>>  	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
+> > >>>
+> > >>> -	region = iommu_alloc_resv_region(MSI_IOVA_BASE,
+> > >> MSI_IOVA_LENGTH,
+> > >>> -					 prot, IOMMU_RESV_SW_MSI);
+> > >>> -	if (!region)
+> > >>> -		return;
+> > >>> +	smmu = arm_smmu_get_by_fwnode(fwspec->iommu_fwnode);
+> > >>> +
+> > >>> +	if (smmu && (smmu->options & ARM_SMMU_OPT_RESV_HW_MSI)
+> > >> &&
+> > >>> +		      dev_is_pci(dev)) {
+> > >>
+> > >> IORT changes are fine to me, I am still no big fan of this supposedly
+> > >> generic option that is _really_ platform specific (in particular as I
+> > >> said before the quirk depends on the PCI host bridge but in this
+> > >> patchset I see no such dependency. In short - the quirk is hooked off
+> > >> the SMMUv3 model which implicitly implies a PCI host bridge
+> > >> configuration IIUC). It is Will and Robin decision though, I am not sure
+> > >> you can make it any tidier (given that on ACPI you may not even have
+> > >> a PCI host bridge specific _HID to base your check above on).
+> > >
+> > > Thanks Lorenzo. I understand your point. As far as our platform is
+> > > concerned, I think It is ok to remove the dev_is_pci() check and make
+> > > it generic, if that helps.  I don't think it will harm us other than couple of
+> > >  "HW MSI region resv failed: " logs  for our platform devices.
+> > 
+> > I think the answer there is that iort_iommu_its_get_resv_regions()
+> > really should distinguish between "this device just doesn't have an ITS
+> > mapping" and "something actually went wrong", such that you don't treat
+> > the former as an error. That's almost certainly cleaner than e.g. trying
+> > to check if dev has an associated MSI domain here before calling it.
+> 
+> If I understood that correctly, the suggestion is to treat cases where device
+> doesn?t have any ITS node associated with it as "success".
+> 
+> +int iort_iommu_its_get_resv_regions(struct device *dev, struct list_head *head)
+> +{
+> [....]
+> +	if (!its_node)
+> +		return -ENODEV;
+> 
+> ie, return success above from patch 1/2.
+> 
+> Lorenzo, 
+> 
+> Please let me know if that?s a correct thing to do as I am not sure
+> about all the error scenarios here.
 
-The binary interface is unchanged.
+Yes it is, you need to add specific return values that you can then
+handle in the SMMU callback accordingly (reverting to SW_MSI in case the
+device does not map to an ITS).
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
-
-I've build-tested this fixup only.
-
-The only change here is to replace the name "data" with "datap" in
-appropriate places and change void __user * to u64 appropriately, with
-casts in the two places where this value enters and exits the kernel.
-
- arch/arm64/include/uapi/asm/sigcontext.h |  6 +++---
- arch/arm64/kernel/signal.c               | 16 ++++++++--------
- 2 files changed, 11 insertions(+), 11 deletions(-)
-
-diff --git a/arch/arm64/include/uapi/asm/sigcontext.h b/arch/arm64/include/uapi/asm/sigcontext.h
-index 303a48c..f0a76b9 100644
---- a/arch/arm64/include/uapi/asm/sigcontext.h
-+++ b/arch/arm64/include/uapi/asm/sigcontext.h
-@@ -98,7 +98,7 @@ struct esr_context {
-  * 3) If extra_context is present, it must be followed immediately in
-  * sigcontext.__reserved[] by the terminating null _aarch64_ctx.
-  *
-- * 4) The extra space to which data points must start at the first
-+ * 4) The extra space to which datap points must start at the first
-  * 16-byte aligned address immediately after the terminating null
-  * _aarch64_ctx that follows the extra_context structure in
-  * __reserved[].  The extra space may overrun the end of __reserved[],
-@@ -111,8 +111,8 @@ struct esr_context {
- 
- struct extra_context {
- 	struct _aarch64_ctx head;
--	void __user *data;	/* 16-byte aligned pointer to extra space */
--	__u32 size;		/* size in bytes of the extra space */
-+	__u64 datap; /* 16-byte aligned pointer to extra space cast to __u64 */
-+	__u32 size; /* size in bytes of the extra space */
- 	__u32 __reserved[3];
- };
- 
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 3602fb7..cb0d008 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -244,7 +244,7 @@ static int parse_user_sigframe(struct user_ctxs *user,
- 		u32 magic, size;
- 		char const __user *userp;
- 		struct extra_context const __user *extra;
--		void __user *extra_data;
-+		u64 extra_datap;
- 		u32 extra_size;
- 		struct _aarch64_ctx const __user *end;
- 		u32 end_magic, end_size;
-@@ -297,7 +297,7 @@ static int parse_user_sigframe(struct user_ctxs *user,
- 			extra = (struct extra_context const __user *)userp;
- 			userp += size;
- 
--			__get_user_error(extra_data, &extra->data, err);
-+			__get_user_error(extra_datap, &extra->datap, err);
- 			__get_user_error(extra_size, &extra->size, err);
- 			if (err)
- 				return err;
-@@ -321,14 +321,14 @@ static int parse_user_sigframe(struct user_ctxs *user,
- 			/* Prevent looping/repeated parsing of extra_context */
- 			have_extra_context = true;
- 
--			base = extra_data;
-+			base = (void __user *)extra_datap;
- 			if (!IS_ALIGNED((unsigned long)base, 16))
- 				goto invalid;
- 
- 			if (!IS_ALIGNED(extra_size, 16))
- 				goto invalid;
- 
--			if (extra_data != userp)
-+			if (base != userp)
- 				goto invalid;
- 
- 			/* Reject "unreasonably large" frames: */
-@@ -337,7 +337,7 @@ static int parse_user_sigframe(struct user_ctxs *user,
- 
- 			/*
- 			 * Ignore trailing terminator in __reserved[]
--			 * and start parsing extra_data:
-+			 * and start parsing extra data:
- 			 */
- 			offset = 0;
- 			limit = extra_size;
-@@ -501,7 +501,7 @@ static int setup_sigframe(struct rt_sigframe_user_layout *user,
- 
- 		struct extra_context __user *extra;
- 		struct _aarch64_ctx __user *end;
--		void __user *extra_data;
-+		u64 extra_datap;
- 		u32 extra_size;
- 
- 		extra = (struct extra_context __user *)userp;
-@@ -510,12 +510,12 @@ static int setup_sigframe(struct rt_sigframe_user_layout *user,
- 		end = (struct _aarch64_ctx __user *)userp;
- 		userp += TERMINATOR_SIZE;
- 
--		extra_data = userp;
-+		extra_datap = (u64)userp;
- 		extra_size = sfp + round_up(user->size, 16) - userp;
- 
- 		__put_user_error(EXTRA_MAGIC, &extra->head.magic, err);
- 		__put_user_error(EXTRA_CONTEXT_SIZE, &extra->head.size, err);
--		__put_user_error(extra_data, &extra->data, err);
-+		__put_user_error(extra_datap, &extra->datap, err);
- 		__put_user_error(extra_size, &extra->size, err);
- 
- 		/* Add the terminator */
--- 
-2.1.4
+Thanks,
+Lorenzo
