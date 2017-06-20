@@ -1,30 +1,31 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 20 Jun 2017 11:37:47 +0800
-Subject: [PATCH v6 1/5] Documentation/bindings: Document the SafeXel
- cryptographic engine driver
-In-Reply-To: <20170611085353.GG31464@kwain>
-References: <20170524141035.21031-1-antoine.tenart@free-electrons.com>
- <20170524141035.21031-2-antoine.tenart@free-electrons.com>
- <20170611085353.GG31464@kwain>
-Message-ID: <20170620033747.GB17764@gondor.apana.org.au>
+Date: Tue, 20 Jun 2017 11:40:10 +0800
+Subject: [PATCH v2 0/3] add support of hardware random generator on
+ MediaTek MT7622
+In-Reply-To: <cover.1497280813.git.sean.wang@mediatek.com>
+References: <cover.1497280813.git.sean.wang@mediatek.com>
+Message-ID: <20170620034009.GD17764@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 11, 2017 at 10:53:53AM +0200, Antoine Tenart wrote:
-> Hi Herbert,
+On Mon, Jun 12, 2017 at 11:56:53PM +0800, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
 > 
-> On Wed, May 24, 2017 at 04:10:31PM +0200, Antoine Tenart wrote:
-> > The Inside Secure Safexcel cryptographic engine is found on some Marvell
-> > SoCs (7k/8k). Document the bindings used by its driver.
-> > 
-> > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> Changes since v1:
+> - update the bindings with the specific "mediatek,mt7622-rng"
+>   instead of the generic one as "mediatek,generic-rng"
 > 
-> Since you applied the Safexcel crypto driver patch, I think you should
-> also apply this patch adding the corresponding bindings documentation.
+> The series add support of hardware RNG on MediaTek MT7622 and
+> , runtime PM support and add me as the maintainer for the existing
+> and following chipset.
+> 
+> Sean Wang (3):
+>   dt-bindings: rng: add MediaTek MT7622 Hardware Random Generator
+>     bindings
+>   hwrng: mtk - add runtime PM support
+>   MAINTAINERS: add entry for MediaTek Random Number Generator
 
-OK I've restored it in the patch queue.
-
-Cheers,
+All applied.  Thanks.
 -- 
 Email: Herbert Xu <herbert@gondor.apana.org.au>
 Home Page: http://gondor.apana.org.au/~herbert/
