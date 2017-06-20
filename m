@@ -1,145 +1,38 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 19 Jun 2017 19:44:37 -0700
-Subject: [PATCH v2 06/12] Input: wm97xx: add new AC97 bus support
-In-Reply-To: <1497857229-12049-7-git-send-email-robert.jarzmik@free.fr>
-References: <1497857229-12049-1-git-send-email-robert.jarzmik@free.fr>
- <1497857229-12049-7-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <20170620024437.GB21379@dtor-ws>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 19 Jun 2017 19:01:33 -0700
+Subject: [PATCH 8/9] clk: imx: make mux parent strings const
+In-Reply-To: <1494856763-6543-9-git-send-email-aisheng.dong@nxp.com>
+References: <1494856763-6543-1-git-send-email-aisheng.dong@nxp.com>
+ <1494856763-6543-9-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20170620020133.GR4493@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 19, 2017 at 09:27:03AM +0200, Robert Jarzmik wrote:
-> This adds support for the new AC97 bus code, which discovers the devices
-> rather than uses platform data.
+On 05/15, Dong Aisheng wrote:
+> As the commit 2893c379461a ("clk: make strings in parent name arrays
+> const"), let's make the parent strings const, otherwise we may meet
+> the following warning when compiling:
 > 
-> As part of this discovery, it enables a multi-function device wm97xx,
-> which supports touchscreen, battery, ADC and an audio codec. This patch
-> adds the code to bind the touchscreen "cell" as the touchscreen driver.
+> drivers/clk/imx/clk-imx7ulp.c: In function 'imx7ulp_clocks_init':
+> drivers/clk/imx/clk-imx7ulp.c:73:35: warning: passing argument 5 of
+> 	'imx_clk_mux_flags' discards 'const' qualifier from pointer target type
 > 
-> This was tested on the pxa architecture with a pxa270 + wm9713 + the
-> mioa701 touchscreen.
+>   clks[IMX7ULP_CLK_APLL_PRE_SEL] = imx_clk_mux_flags("apll_pre_sel", base + 0x508, 0,
+> 	1, pll_pre_sels, ARRAY_SIZE(pll_pre_sels), CLK_SET_PARENT_GATE);
+>                                    ^
+> In file included from drivers/clk/imx/clk-imx7ulp.c:23:0:
+> drivers/clk/imx/clk.h:200:27: note: expected 'const char **' but argument is
+>  of type 'const char * const*'
+> ...
 > 
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> Acked-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
-
-Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Michael Turquette <mturquette@baylibre.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 > ---
->  drivers/input/touchscreen/Kconfig       |  2 +-
->  drivers/input/touchscreen/wm97xx-core.c | 56 ++++++++++++++++++++++++++++++++-
->  2 files changed, 56 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
-> index 033599777651..22257f3e1059 100644
-> --- a/drivers/input/touchscreen/Kconfig
-> +++ b/drivers/input/touchscreen/Kconfig
-> @@ -725,7 +725,7 @@ config TOUCHSCREEN_WM831X
->  
->  config TOUCHSCREEN_WM97XX
->  	tristate "Support for WM97xx AC97 touchscreen controllers"
-> -	depends on AC97_BUS
-> +	depends on AC97_BUS || AC97_BUS_NEW
->  	help
->  	  Say Y here if you have a Wolfson Microelectronics WM97xx
->  	  touchscreen connected to your system. Note that this option
-> diff --git a/drivers/input/touchscreen/wm97xx-core.c b/drivers/input/touchscreen/wm97xx-core.c
-> index 39869ffdc4fa..fd714ee881f7 100644
-> --- a/drivers/input/touchscreen/wm97xx-core.c
-> +++ b/drivers/input/touchscreen/wm97xx-core.c
-> @@ -44,6 +44,7 @@
->  #include <linux/pm.h>
->  #include <linux/interrupt.h>
->  #include <linux/bitops.h>
-> +#include <linux/mfd/wm97xx.h>
->  #include <linux/workqueue.h>
->  #include <linux/wm97xx.h>
->  #include <linux/uaccess.h>
-> @@ -766,6 +767,39 @@ static int wm97xx_remove(struct device *dev)
->  	return 0;
->  }
->  
-> +static int wm97xx_mfd_probe(struct platform_device *pdev)
-> +{
-> +	struct wm97xx *wm;
-> +	struct wm97xx_platform_data *mfd_pdata = dev_get_platdata(&pdev->dev);
-> +	int ret;
-> +
-> +	wm = devm_kzalloc(&pdev->dev, sizeof(struct wm97xx), GFP_KERNEL);
-> +	if (!wm)
-> +		return -ENOMEM;
-> +
-> +	wm->dev = &pdev->dev;
-> +	wm->ac97 = mfd_pdata->ac97;
-> +
-> +	ret =  _wm97xx_probe(wm);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = wm97xx_add_battery(wm, mfd_pdata->batt_pdata);
-> +	if (ret < 0)
-> +		goto batt_err;
-> +
-> +	return ret;
-> +
-> +batt_err:
-> +	wm97xx_unregister_touch(wm);
-> +	return ret;
-> +}
-> +
-> +static int wm97xx_mfd_remove(struct platform_device *pdev)
-> +{
-> +	return wm97xx_remove(&pdev->dev);
-> +}
-> +
->  static int __maybe_unused wm97xx_suspend(struct device *dev)
->  {
->  	struct wm97xx *wm = dev_get_drvdata(dev);
-> @@ -862,21 +896,41 @@ EXPORT_SYMBOL_GPL(wm97xx_unregister_mach_ops);
->  
->  static struct device_driver wm97xx_driver = {
->  	.name =		"wm97xx-ts",
-> +#ifdef CONFIG_AC97_BUS
->  	.bus =		&ac97_bus_type,
-> +#endif
->  	.owner =	THIS_MODULE,
->  	.probe =	wm97xx_probe,
->  	.remove =	wm97xx_remove,
->  	.pm =		&wm97xx_pm_ops,
->  };
->  
-> +static struct platform_driver wm97xx_mfd_driver = {
-> +	.driver = {
-> +		.name =		"wm97xx-ts",
-> +		.pm =		&wm97xx_pm_ops,
-> +	},
-> +	.probe =	wm97xx_mfd_probe,
-> +	.remove =	wm97xx_mfd_remove,
-> +};
-> +
->  static int __init wm97xx_init(void)
->  {
-> -	return driver_register(&wm97xx_driver);
-> +	int ret;
-> +
-> +	ret = platform_driver_register(&wm97xx_mfd_driver);
-> +	if (ret)
-> +		return ret;
-> +
-> +	if (IS_BUILTIN(CONFIG_AC97_BUS))
-> +		ret =  driver_register(&wm97xx_driver);
-> +	return ret;
->  }
->  
->  static void __exit wm97xx_exit(void)
->  {
->  	driver_unregister(&wm97xx_driver);
-> +	platform_driver_unregister(&wm97xx_mfd_driver);
->  }
->  
->  module_init(wm97xx_init);
-> -- 
-> 2.1.4
-> 
+
+Looks good.
 
 -- 
-Dmitry
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
