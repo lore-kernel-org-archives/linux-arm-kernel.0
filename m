@@ -1,39 +1,61 @@
-From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Tue, 20 Jun 2017 13:41:30 +0200
-Subject: [PATCH v2 5/5] ARM: dts: stm32: Add I2C1 support for STM32F746 eval
- board
-In-Reply-To: <1497958890-5530-1-git-send-email-pierre-yves.mordret@st.com>
-References: <1497958890-5530-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <1497958890-5530-6-git-send-email-pierre-yves.mordret@st.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Tue, 20 Jun 2017 13:45:36 +0200
+Subject: [PATCH] crypto: sun4i-ss: support the Security System PRNG
+In-Reply-To: <20170620095947.i3r3iym2cxz5jciw@flea.lan>
+References: <20170620085819.20114-1-clabbe.montjoie@gmail.com>
+ <20170620095947.i3r3iym2cxz5jciw@flea.lan>
+Message-ID: <20170620114536.GA4766@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds I2C1 support for STM32F746 eval board
+On Tue, Jun 20, 2017 at 11:59:47AM +0200, Maxime Ripard wrote:
+> Hi,
+> 
+> On Tue, Jun 20, 2017 at 10:58:19AM +0200, Corentin Labbe wrote:
+> > The Security System have a PRNG, this patch add support for it via
+> > crypto_rng.
+> 
+> This might be a dumb question, but is the CRYPTO_RNG code really
+> supposed to be used with PRNG?
+> 
 
-Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
----
-Changes in V2
-  * Add SCL Rising/Falling time for eval board
----
- arch/arm/boot/dts/stm32746g-eval.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Yes, see recently added drivers/crypto/exynos-rng.c
 
-diff --git a/arch/arm/boot/dts/stm32746g-eval.dts b/arch/arm/boot/dts/stm32746g-eval.dts
-index 69a9579..9288c7a 100644
---- a/arch/arm/boot/dts/stm32746g-eval.dts
-+++ b/arch/arm/boot/dts/stm32746g-eval.dts
-@@ -102,3 +102,11 @@
- 	pinctrl-names = "default";
- 	status = "okay";
- };
-+
-+&i2c1 {
-+	pinctrl-0 = <&i2c1_pins_b>;
-+	pinctrl-names = "default";
-+	i2c-scl-rising-time-ns = <185>;
-+	i2c-scl-falling-time-ns = <20>;
-+	status = "okay";
-+};
--- 
-1.9.1
+[...]
+> > --- a/drivers/crypto/sunxi-ss/sun4i-ss.h
+> > +++ b/drivers/crypto/sunxi-ss/sun4i-ss.h
+> > @@ -32,6 +32,7 @@
+> >  #include <crypto/aes.h>
+> >  #include <crypto/des.h>
+> >  #include <crypto/internal/rng.h>
+> > +#include <crypto/rng.h>
+> >  
+> >  #define SS_CTL            0x00
+> >  #define SS_KEY0           0x04
+> > @@ -127,6 +128,9 @@
+> >  #define SS_RXFIFO_EMP_INT_ENABLE	(1 << 2)
+> >  #define SS_TXFIFO_AVA_INT_ENABLE	(1 << 0)
+> >  
+> > +#define SS_SEED_LEN (192 / 8)
+> > +#define SS_DATA_LEN (160 / 8)
+> > +
+> >  struct sun4i_ss_ctx {
+> >  	void __iomem *base;
+> >  	int irq;
+> > @@ -136,6 +140,7 @@ struct sun4i_ss_ctx {
+> >  	struct device *dev;
+> >  	struct resource *res;
+> >  	spinlock_t slock; /* control the use of the device */
+> > +	u32 seed[SS_SEED_LEN / 4];
+> 
+> Shouldn't you define SS_SEED_LEN in bits, and then use either
+> BITS_PER_BYTE and BITS_PER_LONG so that it's obvious what you're doing
+> ?
+> 
+> And you could also make that variable defined based on the option,
+> otherwise you'll always allocate that array, even if you're not using
+> it.
+
+I will do that
+
+Thanks
