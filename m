@@ -1,76 +1,90 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 20 Jun 2017 10:10:25 +0100
-Subject: [PATCH v3 0/4] Generalize fncpy availability
-In-Reply-To: <c8b7789c-38fb-6793-050f-7c60ccb8ca17@broadcom.com>
-References: <20170617000744.22158-1-f.fainelli@gmail.com>
- <20170619122444.GJ10246@leverpostej>
- <c8b7789c-38fb-6793-050f-7c60ccb8ca17@broadcom.com>
-Message-ID: <20170620091025.GA26846@red-moon>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Tue, 20 Jun 2017 17:08:15 +0800
+Subject: [PATCH 1/9] clk: clk-divider: add CLK_DIVIDER_ZERO_GATE clk
+ support
+In-Reply-To: <20170620014512.GL4493@codeaurora.org>
+References: <1494856763-6543-1-git-send-email-aisheng.dong@nxp.com>
+ <1494856763-6543-2-git-send-email-aisheng.dong@nxp.com>
+ <20170620014512.GL4493@codeaurora.org>
+Message-ID: <20170620090815.GA6805@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+Sudeep]
+Hi Stephen,
 
-On Mon, Jun 19, 2017 at 10:32:38AM -0700, Florian Fainelli wrote:
-> On 06/19/2017 05:24 AM, Mark Rutland wrote:
-> > On Fri, Jun 16, 2017 at 05:07:40PM -0700, Florian Fainelli wrote:
-> >> Hi all,
+On Mon, Jun 19, 2017 at 06:45:12PM -0700, Stephen Boyd wrote:
+> On 05/15, Dong Aisheng wrote:
+> > ---
+> >  drivers/clk/clk-divider.c    | 2 ++
+> >  include/linux/clk-provider.h | 4 ++++
+> >  2 files changed, 6 insertions(+)
 > > 
-> > Hi Florian,
-> > 
-> >> This patch series makes ARM's fncpy() implementation more generic (dropping the
-> >> Thumb-specifics) and available in an asm-generic header file.
-> >>
-> >> Tested on a Broadcom ARM64 STB platform with code that is written to SRAM.
-> >>
-> >> Changes in v3 (thanks Doug!):
-> >> - correct include guard names in asm-generic/fncpy.h to __ASM_FNCPY_H
-> >> - utilize Kbuild to provide the fncpy.h header on ARM64
-> >>
-> >> Changes in v2:
-> >> - leave the ARM implementation where it is
-> >> - make the generic truly generic (no)
-> >>
-> >> This is helpful in making SoC-specific power management code become true drivers
-> >> that can be shared between different architectures.
-> > > Could you elaborate on what this is needed for?
+> > diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> > index 96386ff..f78ba7a 100644
+> > --- a/drivers/clk/clk-divider.c
+> > +++ b/drivers/clk/clk-divider.c
+> > @@ -125,6 +125,8 @@ unsigned long divider_recalc_rate(struct clk_hw *hw, unsigned long parent_rate,
+> >  
+> >  	div = _get_div(table, val, flags, divider->width);
+> >  	if (!div) {
+> > +		if (flags & CLK_DIVIDER_ZERO_GATE)
+> > +			return 0;
+> >  		WARN(!(flags & CLK_DIVIDER_ALLOW_ZERO),
 > 
-> Several uses cases come to mind:
+> Why not use the CLK_DIVIDER_ALLOW_ZERO flag? A clk being off
+> doesn't mean the rate is 0. The divider is just disabled, so we
+> would consider the rate as whatever the parent is, which is what
+> this code does before this patch. Similarly, we don't do anything
+> about gate clocks and return a rate of 0 when they're disabled.
 > 
-> - it could be used as a trampoline code prior to entering S2 for systems
-> that do not support PSCI 1.0
 
-I think S2 here means PM_SUSPEND_MEM. It is very wrong to manage power
-states through platform specific hooks on PSCI based systems, consider
-upgrading to PSCI 1.0 please (or implement PSCI CPU_SUSPEND power
-states that allow to achieve same power savings as PM_SUSPEND_MEM
-by just entering suspend-to-idle).
+The semantic of CLK_DIVIDER_ALLOW_ZERO seems a bit different.
 
-> - any code that has a specific need to relocate a performance, security
-> sensitive code into SRAM and use it as another pool of memory.
+See below definition:
+* CLK_DIVIDER_ALLOW_ZERO - Allow zero divisors.  For dividers which have
+*      CLK_DIVIDER_ONE_BASED set, it is possible to end up with a zero divisor.
+*      Some hardware implementations gracefully handle this case and allow a
+*      zero divisor by not modifying their input clock
+*      (divide by one / bypass).
+
+zero divisor is simply as divide by one or bypass which is supported by
+hardware.
+
+But it's not true for this hardware.
+
+If we consider the rate as whatever the parent is if divider is zero,
+we may got an issue like below:
+e.g.
+Assuming spll_bus_clk divider is 0x0 and it may be enabled by users directly
+without setting a rate first.
+
+Then the clock tree looks like:
+...
+spll_pfd0                    1            1   500210526          0 0  
+  spll_pfd_sel              1            1   500210526          0 0   
+    spll_sel               1            1   500210526          0 0    
+      spll_bus_clk           1            1   500210526          0 0 
+
+But the spll_bus_clk clock rate actually is wrong and it's even not enabled,
+not like CLK_DIVIDER_ALLOW_ZERO which zero divider means simply bypass.
+
+So for this case, we probably can't simply assume zero divider rate as its
+parent, it is actually set to 0 in hw, although it's something like gate,
+but a bit different from gate as the normal gate does not affect divider
+where you can keep the rate.
+
+How would you suggest for this? 
+
+Regards
+Dong Aisheng
+
+> >  			"%s: Zero divisor and CLK_DIVIDER_ALLOW_ZERO not set\n",
+> >  			clk_hw_get_name(hw));
 > 
-> > 
-> > My understanding was that on 32-bit, this was to handle idle / suspend
-> > cases, whereas for arm64 that should be handled by PSCI.
-> 
-> For systems that support PSCI 1.0, I agree, but it may not be possible
-> to update those systems easily, still use case 2 is completely valid.
-
-Just to be clear, thinking of using platform specific suspend hooks
-on PSCI systems is not a viable solution, I will let other people
-comment on option 2.
-
-> > what exactly do you intend to use this for?
-> 
-> At the moment we use it to enter S2 on ARM64 systems (ARCH_BRCMSTB)
-
-"At the moment", where ?
-
-> which are PSCI 0.2 only. And yes, we do have a plan to evaluate
-> upgrading to PSCI 1.0, but in general, any SoC which as an addressable
-> SRAM could use it for whatever purpose it sees fit.
-
-Not to implement suspend hooks on PSCI 0.2 systems.
-
-Thanks,
-Lorenzo
+> -- 
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
