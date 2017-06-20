@@ -1,50 +1,46 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 20 Jun 2017 08:22:56 -0300
-Subject: [PATCH v1] firmware: add sdma firmware for i.mx6/i.mx7d
-In-Reply-To: <1497943490-13401-1-git-send-email-yibin.gong@nxp.com>
-References: <1497943490-13401-1-git-send-email-yibin.gong@nxp.com>
-Message-ID: <CAOMZO5Cq4x-YiX4YG=J-h9PHB3Pf1t0sjzi2gRXZ_5bytx78rA@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 20 Jun 2017 12:35:07 +0100
+Subject: [PATCH 1/1] iommu/arm-smmu-v3: replace writel with writel_relaxed
+ in queue_inc_prod
+In-Reply-To: <1497956694-11784-1-git-send-email-thunder.leizhen@huawei.com>
+References: <1497956694-11784-1-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <acafb87c-4ba9-4a44-f868-c8f882717ab1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On 20/06/17 12:04, Zhen Lei wrote:
+> This function is protected by spinlock, and the latter will do memory
+> barrier implicitly. So that we can safely use writel_relaxed. In fact, the
+> dmb operation will lengthen the time protected by lock, which indirectly
+> increase the locking confliction in the stress scene.
 
-On Tue, Jun 20, 2017 at 4:24 AM, Robin Gong <yibin.gong@nxp.com> wrote:
-> add sdma firmware for i.mx6 and i.mx7d family, this patch depends
-> on the below:
->
->  commit 3123d78e09d2 ("imx: Add SDMA firmware for Freescale i.MX6/7 SoCs")
->
-> Signed-off-by: Robin Gong <yibin.gong@nxp.com>
+If you remove the DSB between writing the commands (to Normal memory)
+and writing the pointer (to Device memory), how can you guarantee that
+the complete command is visible to the SMMU and it isn't going to try to
+consume stale memory contents? The spinlock is irrelevant since it's
+taken *before* the command is written.
+
+Robin.
+
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
 > ---
->  firmware/Makefile | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/firmware/Makefile b/firmware/Makefile
-> index fa3e81c..edc86a0 100644
-> --- a/firmware/Makefile
-> +++ b/firmware/Makefile
-> @@ -65,6 +65,7 @@ fw-shipped-$(CONFIG_DVB_AV7110) += av7110/bootcode.bin
->  fw-shipped-$(CONFIG_DVB_TTUSB_BUDGET) += ttusb-budget/dspbootcode.bin
->  fw-shipped-$(CONFIG_E100) += e100/d101m_ucode.bin e100/d101s_ucode.bin \
->                              e100/d102e_ucode.bin
-> +fw-shipped-$(CONFIG_IMX_SDMA) += imx/sdma/sdma-imx6q.bin imx/sdma/sdma-imx7d.bin
-
-You have just broken imx_v6_v7_defconfig:
-
-  LD      drivers/base/built-in.o
-make[1]: *** No rule to make target
-'firmware/imx/sdma/sdma-imx6q.bin', needed by
-'firmware/imx/sdma/sdma-imx6q.bin.gen.o'.  Stop.
-make[1]: *** Waiting for unfinished jobs....
-  MK_FW   firmware/imx/sdma/sdma-imx6q.bin.gen.S
-/bin/sh: 1: cannot create firmware/imx/sdma/sdma-imx6q.bin.gen.S:
-Directory nonexistent
-/bin/sh: 1: cannot create firmware/imx/sdma/sdma-imx6q.bin.gen.S:
-Directory nonexistent
-
-This does not look correct. This Makefile refers to old firmware
-present in the kernel tree.
-
-For the i.MX SDMA firmware case it is located in linux-firmware git
-tree, so you cannot assume it will always be built-in.
+>  drivers/iommu/arm-smmu-v3.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 380969a..d2fbee3 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -728,7 +728,7 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
+>  	u32 prod = (Q_WRP(q, q->prod) | Q_IDX(q, q->prod)) + 1;
+> 
+>  	q->prod = Q_OVF(q, q->prod) | Q_WRP(q, prod) | Q_IDX(q, prod);
+> -	writel(q->prod, q->prod_reg);
+> +	writel_relaxed(q->prod, q->prod_reg);
+>  }
+> 
+>  /*
+> --
+> 2.5.0
+> 
+> 
