@@ -1,50 +1,76 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Tue, 20 Jun 2017 17:26:11 +0800
-Subject: [PATCH 3/9] clk: fractional-divider: add
- CLK_FRAC_DIVIDER_ZERO_BASED flag support
-In-Reply-To: <20170620015547.GN4493@codeaurora.org>
-References: <1494856763-6543-1-git-send-email-aisheng.dong@nxp.com>
- <1494856763-6543-4-git-send-email-aisheng.dong@nxp.com>
- <20170620015547.GN4493@codeaurora.org>
-Message-ID: <20170620092611.GC6805@b29396-OptiPlex-7040>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 20 Jun 2017 10:31:02 +0100
+Subject: [PATCH v3] drivers/char: kmem: disable on arm64
+In-Reply-To: <1497941940-2699-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1497941940-2699-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20170620093102.GB28157@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 19, 2017 at 06:55:47PM -0700, Stephen Boyd wrote:
-> On 05/15, Dong Aisheng wrote:
-> > diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> > index a6efbb9..4466cae 100644
-> > --- a/include/linux/clk-provider.h
-> > +++ b/include/linux/clk-provider.h
-> > @@ -557,6 +557,11 @@ void clk_hw_unregister_fixed_factor(struct clk_hw *hw);
-> >   * @lock:	register lock
-> >   *
-> >   * Clock with adjustable fractional divider affecting its output frequency.
-> > + *
-> > + * Flags:
-> > + * CLK_FRAC_DIVIDER_ZERO_BASED - by default the divisor is the value read
-> > + *	from the register.  If CLK_FRAC_DIVIDER_ZERO_BASED is set then the
-> > + *	divider is the raw value read from the register plus one.
+On Tue, Jun 20, 2017 at 08:59:00AM +0200, Ard Biesheuvel wrote:
+> As it turns out, arm64 deviates from other architectures in the way it
+> maps the VMALLOC region: on most (all?) other architectures, it resides
+> strictly above the kernel's direct mapping of DRAM, but on arm64, this
+> is the other way around. For instance, for a 48-bit VA configuration,
+> we have
 > 
-> This should say the numerator and denominator are both the value
-> read plus one. It isn't clear if it applies to the numerator, or
-> the denominator, or both.
+>   modules : 0xffff000000000000 - 0xffff000008000000   (   128 MB)
+>   vmalloc : 0xffff000008000000 - 0xffff7dffbfff0000   (129022 GB)
+>   ...
+>   vmemmap : 0xffff7e0000000000 - 0xffff800000000000   (  2048 GB maximum)
+>             0xffff7e0000000000 - 0xffff7e0003ff0000   (    63 MB actual)
+>   memory  : 0xffff800000000000 - 0xffff8000ffc00000   (  4092 MB)
 > 
-
-Good suggestion.
-Will improve it.
-
-Regards
-Dong Aisheng
-
-> >   */
-> >  struct clk_fractional_divider {
-> >  	struct clk_hw	hw;
+> This has mostly gone unnoticed until now, but it does appear that it
+> breaks an assumption in the kcore read/write code, which does something
+> like
 > 
+>   if (p < (unsigned long) high_memory) {
+>     ... use straight copy_[to|from]_user() using p as virtual address ...
+>   }
+>   ...
+>   if (count > 0) {
+>     ... use vread/vwrite for accesses past high_memory ...
+>   }
+> 
+> The first condition will inadvertently hold for the VMALLOC region if
+> VMALLOC_START < PAGE_OFFSET [which is the case on arm64], but the read
+> or write will subsequently fail the virt_addr_valid() check, resulting
+> in a -ENXIO return value.
+> 
+> Given how kmem seems to be living in borrowed time anyway, and given
+> the fact that nobody noticed that the read/write interface is broken
+> on arm64 in the first place, let's not bother trying to fix it, but
+> simply disable the /dev/kmem interface entirely for arm64.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+FWIW:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
+> ---
+> v3: improve commit log
+> v2: disable /dev/kmem entirely rather than bandaiding it
+> 
+>  drivers/char/Kconfig | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/char/Kconfig b/drivers/char/Kconfig
+> index 31adbebf812e..8102ee7b3247 100644
+> --- a/drivers/char/Kconfig
+> +++ b/drivers/char/Kconfig
+> @@ -17,6 +17,8 @@ config DEVMEM
+>  
+>  config DEVKMEM
+>  	bool "/dev/kmem virtual device support"
+> +	# On arm64, VMALLOC_START < PAGE_OFFSET, which confuses kmem read/write
+> +	depends on !ARM64
+>  	help
+>  	  Say Y here if you want to support the /dev/kmem device. The
+>  	  /dev/kmem device is rarely used, but can be used for certain
 > -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 2.7.4
+> 
