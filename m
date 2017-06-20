@@ -1,237 +1,148 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Tue, 20 Jun 2017 10:17:40 +0200
-Subject: [PATCH v9 2/3] PCI: Add tango PCIe host bridge support
-In-Reply-To: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
-References: <987fac41-80dc-f1d0-ec0b-91ae57b91bfd@sigmadesigns.com>
-Message-ID: <b32f9e1c-fdde-3064-f935-c817cf707534@sigmadesigns.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Tue, 20 Jun 2017 10:21:11 +0200
+Subject: [PATCH] psci: add debugfs for runtime instrumentation
+In-Reply-To: <20170619114415.GI10246@leverpostej>
+References: <1497601420-8783-1-git-send-email-vincent.guittot@linaro.org>
+ <20170616114737.GM20092@leverpostej>
+ <CAKfTPtBj3RBd+d_LERYdUxoQ706L6wrs5+L+MOTL7aoZmAkZ8w@mail.gmail.com>
+ <20170619114415.GI10246@leverpostej>
+Message-ID: <CAKfTPtABcSFmOof80B2p7Dba4XW8Qu3YoY0SMEzcDjscLyQUqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver is required to work around several hardware bugs
-in the PCIe controller.
+On 19 June 2017 at 13:44, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Jun 16, 2017 at 04:26:20PM +0200, Vincent Guittot wrote:
+>> On 16 June 2017 at 13:47, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > On Fri, Jun 16, 2017 at 10:23:40AM +0200, Vincent Guittot wrote:
+>> >> Add debugfs to display runtime instrumentation results that can be collected
+>> >> by PSCI firmware.
+>> >
+>> > Could you elaborate on this please? e.g.
+>>
+>> yes sorry. I should have given more details about it
+>>
+>> >
+>> > * What is instrumented?
+>>
+>> The ARM Trusted Firwware that implements PSCI, also has a Performance
+>> Measurement Framework (PMF) that can be used to save some timetamps
+>> when running psci firmware. On top of PMF, serveral services have been
+>> implemented like the PSCI residency stats and the runtime
+>> instrumentation service. The latter saves timestamp when a PSCI
+>> service is entered and then leaved or when cache maintenance is
+>> executed durign psci call. With these timestamps, we can measure the
+>> duration of some part of code of the PSCI firmware.
+>
+> Ok. So PMF is an ATF concept, and not a PSCI concept (as it's not
+> defined by the PSCI spec).
 
-NB: Revision 1 does not support legacy interrupts, or IO space.
+Yes
 
-Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
----
- drivers/pci/host/Kconfig      |   8 +++
- drivers/pci/host/Makefile     |   1 +
- drivers/pci/host/pcie-tango.c | 164 ++++++++++++++++++++++++++++++++++++++++++
- include/linux/pci_ids.h       |   2 +
- 4 files changed, 175 insertions(+)
- create mode 100644 drivers/pci/host/pcie-tango.c
+>
+> [...]
+>
+>> > * On which platforms is this available, and when?
+>>
+>> The code that save the timestamp is generic and as result available
+>> for all platforms that implement PSCI. Nevertheless, each platfrom has
+>> to enable the SMC service. At now, juno and hikey has enable the
+>> service and hikey960 should some soon as well
+>
+> Ok. So this is available on a subset of platforms using ATF.
 
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index d7e7c0a827c3..5183d9095c3a 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -285,6 +285,14 @@ config PCIE_ROCKCHIP
- 	  There is 1 internal PCIe port available to support GEN2 with
- 	  4 slots.
- 
-+config PCIE_TANGO
-+	bool "Tango PCIe controller"
-+	depends on ARCH_TANGO && PCI_MSI && OF
-+	select PCI_HOST_COMMON
-+	help
-+	  Say Y here to enable PCIe controller support for Sigma Designs
-+	  Tango systems, such as SMP8759 and later chips.
-+
- config VMD
- 	depends on PCI_MSI && X86_64
- 	tristate "Intel Volume Management Device Driver"
-diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
-index 084cb4983645..fc7ea90196f3 100644
---- a/drivers/pci/host/Makefile
-+++ b/drivers/pci/host/Makefile
-@@ -32,4 +32,5 @@ obj-$(CONFIG_PCI_HOST_THUNDER_PEM) += pci-thunder-pem.o
- obj-$(CONFIG_PCIE_ARMADA_8K) += pcie-armada8k.o
- obj-$(CONFIG_PCIE_ARTPEC6) += pcie-artpec6.o
- obj-$(CONFIG_PCIE_ROCKCHIP) += pcie-rockchip.o
-+obj-$(CONFIG_PCIE_TANGO) += pcie-tango.o
- obj-$(CONFIG_VMD) += vmd.o
-diff --git a/drivers/pci/host/pcie-tango.c b/drivers/pci/host/pcie-tango.c
-new file mode 100644
-index 000000000000..67aaadcc1c5e
---- /dev/null
-+++ b/drivers/pci/host/pcie-tango.c
-@@ -0,0 +1,164 @@
-+#include <linux/pci-ecam.h>
-+#include <linux/delay.h>
-+#include <linux/of.h>
-+
-+#define MSI_MAX 256
-+
-+#define SMP8759_MUX		0x48
-+#define SMP8759_TEST_OUT	0x74
-+
-+struct tango_pcie {
-+	void __iomem *mux;
-+};
-+
-+/*** HOST BRIDGE SUPPORT ***/
-+
-+static int smp8759_config_read(struct pci_bus *bus,
-+		unsigned int devfn, int where, int size, u32 *val)
-+{
-+	int ret;
-+	struct pci_config_window *cfg = bus->sysdata;
-+	struct tango_pcie *pcie = dev_get_drvdata(cfg->parent);
-+
-+	/*
-+	 * QUIRK #1
-+	 * Reads in configuration space outside devfn 0 return garbage.
-+	 */
-+	if (devfn != 0)
-+		return PCIBIOS_FUNC_NOT_SUPPORTED;
-+
-+	/*
-+	 * QUIRK #2
-+	 * Unfortunately, config and mem spaces are muxed.
-+	 * Linux does not support such a setting, since drivers are free
-+	 * to access mem space directly, at any time.
-+	 * Therefore, we can only PRAY that config and mem space accesses
-+	 * NEVER occur concurrently.
-+	 */
-+	writel_relaxed(1, pcie->mux);
-+	ret = pci_generic_config_read(bus, devfn, where, size, val);
-+	writel_relaxed(0, pcie->mux);
-+
-+	return ret;
-+}
-+
-+static int smp8759_config_write(struct pci_bus *bus,
-+		unsigned int devfn, int where, int size, u32 val)
-+{
-+	int ret;
-+	struct pci_config_window *cfg = bus->sysdata;
-+	struct tango_pcie *pcie = dev_get_drvdata(cfg->parent);
-+
-+	writel_relaxed(1, pcie->mux);
-+	ret = pci_generic_config_write(bus, devfn, where, size, val);
-+	writel_relaxed(0, pcie->mux);
-+
-+	return ret;
-+}
-+
-+static struct pci_ecam_ops smp8759_ecam_ops = {
-+	.bus_shift	= 20,
-+	.pci_ops	= {
-+		.map_bus	= pci_ecam_map_bus,
-+		.read		= smp8759_config_read,
-+		.write		= smp8759_config_write,
-+	}
-+};
-+
-+static const struct of_device_id tango_pcie_ids[] = {
-+	{ .compatible = "sigma,smp8759-pcie" },
-+	{ /* sentinel */ },
-+};
-+
-+static int tango_check_pcie_link(void __iomem *test_out)
-+{
-+	int i;
-+
-+	writel_relaxed(16, test_out);
-+	for (i = 0; i < 10; ++i) {
-+		u32 ltssm_state = readl_relaxed(test_out) >> 8;
-+		if ((ltssm_state & 0x1f) == 0xf) /* L0 */
-+			return 0;
-+		usleep_range(3000, 4000);
-+	}
-+
-+	return -ENODEV;
-+}
-+
-+static int smp8759_init(struct tango_pcie *pcie, void __iomem *base)
-+{
-+	pcie->mux		= base + SMP8759_MUX;
-+
-+	return tango_check_pcie_link(base + SMP8759_TEST_OUT);
-+}
-+
-+static int tango_pcie_probe(struct platform_device *pdev)
-+{
-+	int ret = -EINVAL;
-+	void __iomem *base;
-+	struct resource *res;
-+	struct tango_pcie *pcie;
-+	struct device *dev = &pdev->dev;
-+
-+	pr_err("MAJOR ISSUE: PCIe config and mem spaces are muxed\n");
-+	pr_err("Tainting kernel... Use driver at your own risk\n");
-+	add_taint(TAINT_FIRMWARE_WORKAROUND, LOCKDEP_STILL_OK);
-+
-+	pcie = devm_kzalloc(dev, sizeof(*pcie), GFP_KERNEL);
-+	if (!pcie)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, pcie);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
-+
-+	if (of_device_is_compatible(dev->of_node, "sigma,smp8759-pcie"))
-+		ret = smp8759_init(pcie, base);
-+
-+	if (ret)
-+		return ret;
-+
-+	return pci_host_common_probe(pdev, &smp8759_ecam_ops);
-+}
-+
-+static struct platform_driver tango_pcie_driver = {
-+	.probe	= tango_pcie_probe,
-+	.driver	= {
-+		.name = KBUILD_MODNAME,
-+		.of_match_table = tango_pcie_ids,
-+	},
-+};
-+
-+builtin_platform_driver(tango_pcie_driver);
-+
-+/*
-+ * QUIRK #3
-+ * The root complex advertizes the wrong device class.
-+ * Header Type 1 is for PCI-to-PCI bridges.
-+ */
-+static void tango_fixup_class(struct pci_dev *dev)
-+{
-+	dev->class = PCI_CLASS_BRIDGE_PCI << 8;
-+}
-+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SIGMA, 0x24, tango_fixup_class);
-+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SIGMA, 0x28, tango_fixup_class);
-+
-+/*
-+ * QUIRK #4
-+ * The root complex exposes a "fake" BAR, which is used to filter
-+ * bus-to-system accesses. Only accesses within the range defined
-+ * by this BAR are forwarded to the host, others are ignored.
-+ *
-+ * By default, the DMA framework expects an identity mapping,
-+ * and DRAM0 is mapped@0x80000000.
-+ */
-+static void tango_fixup_bar(struct pci_dev *dev)
-+{
-+	dev->non_compliant_bars = true;
-+	pci_write_config_dword(dev, PCI_BASE_ADDRESS_0, 0x80000000);
-+}
-+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SIGMA, 0x24, tango_fixup_bar);
-+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SIGMA, 0x28, tango_fixup_bar);
-diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
-index f020ab4079d3..b577dbe46f8f 100644
---- a/include/linux/pci_ids.h
-+++ b/include/linux/pci_ids.h
-@@ -1369,6 +1369,8 @@
- #define PCI_DEVICE_ID_TTI_HPT374	0x0008
- #define PCI_DEVICE_ID_TTI_HPT372N	0x0009	/* apparently a 372N variant? */
- 
-+#define PCI_VENDOR_ID_SIGMA		0x1105
-+
- #define PCI_VENDOR_ID_VIA		0x1106
- #define PCI_DEVICE_ID_VIA_8763_0	0x0198
- #define PCI_DEVICE_ID_VIA_8380_0	0x0204
--- 
-2.11.0
+The service is generic but not enable by default on platform
+
+>
+> [...]
+>
+>> >> +config ARM_PSCI_INSTRUMENTATION
+>> >> +     bool "ARM PSCI Run Time Instrumentation"
+>> >> +     depends on ARM_PSCI_FW && CPU_IDLE && DEBUG_FS
+>> >> +     help
+>> >> +       Enable debugfs interface for PSCI FW in which you can retrieve
+>> >> +       runtime instrumentation values of the PSCI firmware like time to
+>> >> +       enter or leave a cpu suspend state or time to flush cache.
+>> >
+>> > Looking at the latest published spec (ARM DEN 0022D), PSCI doesn't
+>> > provide such information, as there's only PSCI_STAT_{COUNT,RESIDENCY}.
+>>
+>> This use the same Performance Measurement Framework as
+>> PSCI_STAT_{COUNT,RESIDENCY}
+>
+> Sure, but that's an ATF implementation detail, and not something defined
+> by the PSCI spec.
+
+Yes
+
+>
+> FWIW, I'm more than happy to add support for PSCI_STAT_{COUNT,RESIDENCY}
+> since these are in the spec.
+>
+>> > What mechanisms are you using here?
+>>
+>> More details can be founded here
+>> https://github.com/ARM-software/arm-trusted-firmware/blob/master/docs/firmware-design.md#13--performance-measurement-framework
+>
+> Thanks. This all sounds IMP DEF, with platforms able to provide their
+> own monitors.
+>
+>> > As far as I can tell, these are not part of the PSCI standard, and I'm
+>> > not aware of any documentation.
+>> >
+>> > I'm very much not keen on using IMPLEMENTATION DEFINED functionality in
+>> > the PSCI driver, as IMP DEF stuff always creates long-term maintenance
+>> > problems. You'll need to convince me that this is worth supporting.
+>>
+>> I will try.
+>>
+>> I have put it in psci.c as it is really about measurement latenccy of
+>> psci firmware but it can probably be put somewhere else if it is more
+>> relevant. The only link between current psci driver and this feature
+>> is the call to psci_update_all_rt_instr() in psci_cpu_suspend_enter()
+>> to make sure that we have coherent timestamp
+>> Thinking a bit more about this, we can probably use the cpu_pm_exit
+>
+> To be honest, the more I think about this, the less keen I am on having
+> it in the kernel.
+>
+> It's all IMP DEF, and will need additional info in DT or ACPI to be safe
+> to invoke (even ignoring usable), and has subtle interactions with the
+> PSCI driver. It's of limited utility to a very small number of
+> developers.
+>
+> [...]
+>
+>> >> +     /* Test if runtime instrumentation is enable */
+>> >> +     if (!psci_rt_instr_enable()) {
+>> >
+>> > This is an unconditional initcall, so this simply is not safe.
+>>
+>> you're right, it should be called only if/when psci driver has been probed
+>
+> Even where PSCI is present, I don't believe it's safe to invoke this.
+> It's a SiP call, which a vendor may have used for any other purpose.
+
+In fact, these functions which are part of SiP, are defined in the ATF
+https://github.com/ARM-software/arm-trusted-firmware/blob/master/docs/arm-sip-service.md
+
+>
+> So at minimum, we'd need a description in the DT in order to know that
+> we can invoke this. Since it's all IMP DEF, we'd need all the monitors
+> described too, and at that point it's complex enough, and so tailored to
+> ATF's internals that I really don't want this in the kernel.
+
+So I agree that linking this to PSCI firmware driver is not the best
+choice as it is only related to ATF firmware and not  PSCI spec.
+and this will fit best with a ATF SiP dedicated driver
+
+Thanks
+
+>
+> So sorry, but given all of the above, I have to NAK support for this ATF
+> feature.
+>
+> If we can get some more useful performance monitors into the PSCI spec,
+> I am more than happy to support those.
+>
+> Thanks,
+> Mark.
