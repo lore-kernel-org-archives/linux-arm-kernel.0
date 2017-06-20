@@ -1,60 +1,40 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 21 Jun 2017 00:08:05 +0200
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 20 Jun 2017 23:38:59 +0100
 Subject: [PATCH 00/51] rtc: stop using rtc deprecated functions
-In-Reply-To: <CA+M3ks68+z6nDtYM8CDpso7SxjB6Nt5E=rOc1yxx=kDz6PUeVQ@mail.gmail.com>
-References: <1497951359-13334-1-git-send-email-benjamin.gaignard@linaro.org>
- <20170620100348.zh4ygvjjgnhxvmvl@piout.net>
- <20170620121011.GA13221@amd>
- <20170620122400.sm7qqvwyj6cuzarw@piout.net>
- <20170620132620.GA16881@amd>
- <6ED8E3B22081A4459DAC7699F3695FB7018CD96FCD@SW-EX-MBX02.diasemi.com>
- <20170620134458.GA10104@amd>
- <20170620134827.ubvzhh25klaotupv@piout.net>
- <CA+M3ks68+z6nDtYM8CDpso7SxjB6Nt5E=rOc1yxx=kDz6PUeVQ@mail.gmail.com>
-Message-ID: <20170620220805.GA11195@amd>
+In-Reply-To: <alpine.DEB.2.20.1706202343120.2157@nanos>
+References: <20170620213507.urobmtg34vzubrdq@piout.net>
+ <alpine.DEB.2.20.1706202343120.2157@nanos>
+Message-ID: <20170620223859.GO4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> >> > This is it.
-> >> > https://patchwork.kernel.org/patch/6219401/
-> >>
-> >> Thanks.
-> >>
-> >> Yes, that's argument against changing rtc _drivers_ for hardware that
-> >> can not do better than 32bit. For generic code (such as 44/51 sysfs,
-> >> 51/51 suspend test), the change still makes sense.
+On Wed, Jun 21, 2017 at 12:00:30AM +0200, Thomas Gleixner wrote:
+> Yes, but there are still quite some issues to solve there:
 > 
-> What I had in mind when writing those patches was to remove the limitations
-> coming from those functions usage, even more since they been marked has
-> deprecated.
+>      1) How do you tell the system that it should apply the offset in the
+>      	first place, i.e at boot time before NTP or any other mechanism can
+>      	correct it?
 > 
-> I agree that will change nothing of hardware limitation but at least
-> the limit will
-> not come from the framework.
+>      2) Deal with creative vendors who have their own idea about the 'start
+>      	of the epoch'
+> 	
+>      3) Add the information of wraparound time to the rtc device which
+>      	needs to be filled in for each device. That way the rtc_***
+>      	accessor functions can deal with them whether they wrap in 2038 or
+>      	2100 or whatever.
+> 
+> #3 is the simplest problem of them :)	
 
-> > Yes, we agree on that but I won't cherry pick working patches from a 51
-> > patches series.
+Well, if there's additional non-volatile storage, you can store
+additional information in there, but you still need the RTC
+subsystem to be aware that the hardware is only 32-bit capable.
 
-Well, it would be actually nice for you to do the cherry
-picking. That's something maintainers do, because it is hard for
-contributors to guess maintainer's taste.
+You'd also still need something along the lines I detailed
+(redefining what dates the past 32-bit values indicate) to cope
+with the RTC being set backwards after the machine thinks (possibly
+incorrectly) that the date has jumped forwards.
 
-Anyway, it looks like someone should go through all the RTC drivers,
-and document their limitations of each driver (date in future when
-hardware ceases to be useful). If Benjamin has time to do that, I
-guess that removes all the objections to the series.
-
-Regards,
-									Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170621/9ea489d7/attachment-0001.sig>
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
