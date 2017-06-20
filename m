@@ -1,40 +1,73 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 20 Jun 2017 13:14:23 +0200
-Subject: [GIT PULL] pinctrl: samsung: Pinctrl update for v4.13
-In-Reply-To: <CACRpkdZjZbHD4ZCQVHUyu8y0f45FnRqTRL4P6J7Wrz9dZNXGdw@mail.gmail.com>
-References: <20170609164827.2231-1-krzk@kernel.org>
- <CACRpkdZjZbHD4ZCQVHUyu8y0f45FnRqTRL4P6J7Wrz9dZNXGdw@mail.gmail.com>
-Message-ID: <CAJKOXPd0UFGGF38DB=XVH+SyW-P7r6K14ca6buYPP7j4Odx3gA@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 20 Jun 2017 13:20:49 +0200
+Subject: [PATCH v3] drivers/char: kmem: disable on arm64
+In-Reply-To: <1497941940-2699-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1497941940-2699-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu_nOo3VfjHistipR7vhaTnO89M8X1rrePgk3jhK0xnYVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 10:08 AM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-> On Fri, Jun 9, 2017 at 6:48 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+On 20 June 2017 at 08:59, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> As it turns out, arm64 deviates from other architectures in the way it
+> maps the VMALLOC region: on most (all?) other architectures, it resides
+> strictly above the kernel's direct mapping of DRAM, but on arm64, this
+> is the other way around. For instance, for a 48-bit VA configuration,
+> we have
 >
->> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
->>
->>   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/pinctrl/samsung.git tags/samsung-pinctrl-4.13
->>
->> for you to fetch changes up to a453f3693f2aa9ebba623f8cff1e3d7c5df96ddd:
->>
->>   pinctrl: samsung: Explicitly cast pointer returned by of_iomap() to iomem (2017-06-07 20:40:48 +0200)
+>   modules : 0xffff000000000000 - 0xffff000008000000   (   128 MB)
+>   vmalloc : 0xffff000008000000 - 0xffff7dffbfff0000   (129022 GB)
+>   ...
+>   vmemmap : 0xffff7e0000000000 - 0xffff800000000000   (  2048 GB maximum)
+>             0xffff7e0000000000 - 0xffff7e0003ff0000   (    63 MB actual)
+>   memory  : 0xffff800000000000 - 0xffff8000ffc00000   (  4092 MB)
 >
-> Pulled into my "devel" branch on the pin control tree.
->
-> Pushing it to the build servers hoping all works.
->
-> Thanks for your efforts to maintain Samsung pin control, it is
-> much appreciated!
+> This has mostly gone unnoticed until now, but it does appear that it
+> breaks an assumption in the kcore
 
-I will have another bunch of cleanups and one important fix (broken
-for some time, around v4.10, so it's not a candidate for current RC
-fix). It is pretty late. Will you still have time to pull them for
-v4.13?
+s/kcore/kmem/
 
-Best regards,
-Krzysztof
+> read/write code, which does something
+> like
+>
+>   if (p < (unsigned long) high_memory) {
+>     ... use straight copy_[to|from]_user() using p as virtual address ...
+>   }
+>   ...
+>   if (count > 0) {
+>     ... use vread/vwrite for accesses past high_memory ...
+>   }
+>
+> The first condition will inadvertently hold for the VMALLOC region if
+> VMALLOC_START < PAGE_OFFSET [which is the case on arm64], but the read
+> or write will subsequently fail the virt_addr_valid() check, resulting
+> in a -ENXIO return value.
+>
+> Given how kmem seems to be living in borrowed time anyway, and given
+> the fact that nobody noticed that the read/write interface is broken
+> on arm64 in the first place, let's not bother trying to fix it, but
+> simply disable the /dev/kmem interface entirely for arm64.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> v3: improve commit log
+> v2: disable /dev/kmem entirely rather than bandaiding it
+>
+>  drivers/char/Kconfig | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/drivers/char/Kconfig b/drivers/char/Kconfig
+> index 31adbebf812e..8102ee7b3247 100644
+> --- a/drivers/char/Kconfig
+> +++ b/drivers/char/Kconfig
+> @@ -17,6 +17,8 @@ config DEVMEM
+>
+>  config DEVKMEM
+>         bool "/dev/kmem virtual device support"
+> +       # On arm64, VMALLOC_START < PAGE_OFFSET, which confuses kmem read/write
+> +       depends on !ARM64
+>         help
+>           Say Y here if you want to support the /dev/kmem device. The
+>           /dev/kmem device is rarely used, but can be used for certain
+> --
+> 2.7.4
+>
