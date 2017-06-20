@@ -1,40 +1,70 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Tue, 20 Jun 2017 17:56:19 +0100
-Subject: [PATCH v5 3/4] ARM: dts: at91: sama5d2: add ADC hw trigger edge
- type
-In-Reply-To: <1497533097-12052-4-git-send-email-eugen.hristev@microchip.com>
-References: <1497533097-12052-1-git-send-email-eugen.hristev@microchip.com>
- <1497533097-12052-4-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <20170620175619.0a93d3d2@kernel.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 20 Jun 2017 18:04:01 +0100
+Subject: [PATCH] arm64: pass machine size to sparse
+In-Reply-To: <20170620162431.zi6qd3jby7shyu46@ltop.local>
+References: <20170620122443.35880-1-luc.vanoostenryck@gmail.com>
+ <20170620154938.GH21131@arm.com>
+ <20170620162431.zi6qd3jby7shyu46@ltop.local>
+Message-ID: <20170620170401.GA28035@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Jun 2017 16:24:56 +0300
-Eugen Hristev <eugen.hristev@microchip.com> wrote:
+On Tue, Jun 20, 2017 at 06:24:32PM +0200, Luc Van Oostenryck wrote:
+> On Tue, Jun 20, 2017 at 04:49:39PM +0100, Will Deacon wrote:
+> > On Tue, Jun 20, 2017 at 02:24:43PM +0200, Luc Van Oostenryck wrote:
+> > > When using sparse on the arm64 tree we get many thousands of
+> > > warnings like 'constant ... is so big it is unsigned long long'
+> > > or 'shift too big (32) for type unsigned long'. This happens
+> > > because by default sparse considers the machine as 32bit and
+> > > defines the size of the types accordingly.
+> > > 
+> > > Fix this by passing the '-m64' flag to sparse so that
+> > > sparse can correctly define longs as being 64bit.
+> > > 
+> > > CC: Catalin Marinas <catalin.marinas@arm.com>
+> > > CC: Will Deacon <will.deacon@arm.com>
+> > > CC: linux-arm-kernel at lists.infradead.org
+> > > Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
+> > > ---
+> > >  arch/arm64/Makefile | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > 
+> > > diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> > > index f839ecd91..15d6c1476 100644
+> > > --- a/arch/arm64/Makefile
+> > > +++ b/arch/arm64/Makefile
+> > > @@ -62,7 +62,7 @@ LD		+= -EL
+> > >  UTS_MACHINE	:= aarch64
+> > >  endif
+> > >  
+> > > -CHECKFLAGS	+= -D__aarch64__
+> > > +CHECKFLAGS	+= -D__aarch64__ -m64
+> > 
+> > Looks fine to me, but just wondering whether or not we should also be
+> > passing something to indicate the endianness of the target. Does sparse care
+> > about that?
+> 
+> Yes, we should. sparse doesn't care per-se but some macros, structures
+> or whole portion of code may depends on '__{LITTLE,BIG}_ENDIAN__'
+> being defined or not, for example (but I don't think it will make
+> a big difference, at least nothing like the 629904 'constant is so big'
+> warnings we have now due to the missing -m64).
+> 
+> For this, you have two possibilities:
+> 1) just doing something like PPC:
+> 	+ifdef CONFIG_CPU_BIG_ENDIAN
+> 	+CHECKFLAGS     += -D__BIG_ENDIAN__
+> 	+else
+> 	+CHECKFLAGS     += -D__LITTLE_ENDIAN__
+> 	+endif
+>    This will work now. I can't send you a proper patch if you wish.
+> 
+> 2) a cleaner solution, IMO, would be to teach sparse about
+>    -mlittle-endian/-mbig-endian. In fact I already wrote the patch
+>    earlier today. But of course, you will need to wait for the patch
+>    to reach sparse's master and then compile sparse yourself or wait
+>    for a new release (which shouldn't take much long, though).
 
-> Added ADTRG edge type property as interrupt edge type value
-> 
-> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
-> Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
-Driver support heading upstream.
+If you do that, you could also teach it that AArch64 is 64-bit ;)
 
-Acked-by: Jonathan Cameron <jic23@kernel.org>
-> ---
->   Changes in v4:
->  - Modified bindings to be similar with interrupts
-> 
->  arch/arm/boot/dts/sama5d2.dtsi | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-> index 8067c71..483a387 100644
-> --- a/arch/arm/boot/dts/sama5d2.dtsi
-> +++ b/arch/arm/boot/dts/sama5d2.dtsi
-> @@ -1267,6 +1267,7 @@
->  				atmel,min-sample-rate-hz = <200000>;
->  				atmel,max-sample-rate-hz = <20000000>;
->  				atmel,startup-time-ms = <4>;
-> +				atmel,trigger-edge-type = <IRQ_TYPE_EDGE_RISING>;
->  				status = "disabled";
->  			};
->  
+Will
