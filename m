@@ -1,33 +1,23 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 20 Jun 2017 14:10:11 +0200
-Subject: [PATCH 00/51] rtc: stop using rtc deprecated functions
-In-Reply-To: <20170620100348.zh4ygvjjgnhxvmvl@piout.net>
-References: <1497951359-13334-1-git-send-email-benjamin.gaignard@linaro.org>
- <20170620100348.zh4ygvjjgnhxvmvl@piout.net>
-Message-ID: <20170620121011.GA13221@amd>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 20 Jun 2017 14:11:23 +0200
+Subject: [PATCH 1/2] pinctrl: samsung: Use unsigned int for number of
+ controller IO mem resources
+In-Reply-To: <20170615163316.6444-1-krzk@kernel.org>
+References: <CGME20170615163507epcas2p4afd786730362715894d5a178a4ad2040@epcas2p4.samsung.com>
+ <20170615163316.6444-1-krzk@kernel.org>
+Message-ID: <9683ed1b-3b8c-e110-20c9-ef86d887a8ac@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2017-06-20 12:03:48, Alexandre Belloni wrote:
-> On 20/06/2017 at 11:35:08 +0200, Benjamin Gaignard wrote:
-> > rtc_time_to_tm() and rtc_tm_to_time() are deprecated because they
-> > rely on 32bits variables and that will make rtc break in y2038/2016.
+On 06/15/2017 06:33 PM, Krzysztof Kozlowski wrote:
+> Number of IO memory resources cannot be negative obviously and the
+> driver depends silently on this (by iterating from 0 to
+> nr_ext_resources+1).  Make this requirement explicit.
 > 
-> Please don't, because this hide the fact that the hardware will not
-> handle dates in y2038 anyway and as pointed by Russell a few month ago,
-> rtc_time_to_tm will be able to catch it but the 64 bit version will
-> silently ignore it.
+> Signed-off-by: Krzysztof Kozlowski<krzk@kernel.org>
 
-Reference? Because rtc on PCs stores date in binary coded decimal, so
-it is likely to break in 2100, not 2038...
-									Pavel
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170620/429aeb11/attachment.sig>
+Regards,
+Sylwester
