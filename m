@@ -1,42 +1,50 @@
-From: ore@pengutronix.de (Oleksij Rempel)
-Date: Tue, 20 Jun 2017 07:01:32 +0200
-Subject: [PATCH v5 3/6] kernel/reboot.c: export pm_power_off_prepare
-In-Reply-To: <1497872109.5380.10.camel@nxp.com>
-References: <20170619050245.2632-1-o.rempel@pengutronix.de>
- <20170619050245.2632-4-o.rempel@pengutronix.de>
- <1497872109.5380.10.camel@nxp.com>
-Message-ID: <5023d338-f845-b8a6-c4a0-d414c75f841c@pengutronix.de>
+From: faiz_abbas@ti.com (Faiz Abbas)
+Date: Tue, 20 Jun 2017 10:39:21 +0530
+Subject: [PATCH] ARM: dts: am437x-gp-evm: Add support for buzzer
+Message-ID: <1497935361-11019-1-git-send-email-faiz_abbas@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add support for onboard gpio buzzer. It works using
+the gpio-beeper driver. Pinmux entries for GPIO
+controlling the buzzer are also added.
 
+Signed-off-by: Faiz Abbas <faiz_abbas@ti.com>
+---
+ arch/arm/boot/dts/am437x-gp-evm.dts | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-On 19.06.2017 13:35, Leonard Crestez wrote:
-> On Mon, 2017-06-19 at 07:02 +0200, Oleksij Rempel wrote:
->> Export pm_power_off_prepare. It is needed to implement power off on
->> Freescale/NXP iMX6 based boards with external power management
->> integrated circuit (PMIC).
->>
->> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
->> ---
->>  kernel/reboot.c | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/kernel/reboot.c b/kernel/reboot.c
->> index bd30a973fe94..a6903bf772c7 100644
->> --- a/kernel/reboot.c
->> +++ b/kernel/reboot.c
->> @@ -49,6 +49,7 @@ int reboot_force;
->>   */
->>
->>  void (*pm_power_off_prepare)(void);
->> +EXPORT_SYMBOL(pm_power_off_prepare);
->>
-> Could you register a reboot notifier in the pfuze driver instead? Right
-> now the only user of pm_power_off_prepare is ACPI so this alternative
-> seems less intrusive.
-
-hm... in this case i will need to make sure that reboot handler is not 
-executed on reboot. This will make code looks strange. Which is opposite 
-of your comment in other email about strange standby code for power off :)
-Should i really do this?
+diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
+index 397e98b..24cdf6d 100644
+--- a/arch/arm/boot/dts/am437x-gp-evm.dts
++++ b/arch/arm/boot/dts/am437x-gp-evm.dts
+@@ -149,6 +149,13 @@
+ 			system-clock-frequency = <12000000>;
+ 		};
+ 	};
++
++	beeper: beeper {
++		compatible = "gpio-beeper";
++		pinctrl-names = "default";
++		pinctrl-0 = <&beeper_pins>;
++		gpios = <&gpio4 12 GPIO_ACTIVE_HIGH>;
++	};
+ };
+ 
+ &am43xx_pinmux {
+@@ -510,6 +517,13 @@
+ 			AM4372_IOPAD(0x974, PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* uart0_txd.uart0_txd */
+ 		>;
+ 	};
++
++	beeper_pins: beeper_pins {
++		pinctrl-single,pins = <
++			AM4372_IOPAD(0x9e0, PIN_OUTPUT_PULLUP | MUX_MODE7)	/* cam1_field.gpio4_12 */
++		>;
++	};
++
+ };
+ 
+ &uart0 {
+-- 
+2.7.4
