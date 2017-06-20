@@ -1,45 +1,179 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 20 Jun 2017 12:02:21 +0200
-Subject: [PATCH 1/2] drm/exynos/decon: Add include guard to the Exynos7
- header
-In-Reply-To: <CACvgo51db4Gk+GHAO-F=rz8vLTG6A66f1ZeHPNuAQV1Qthaavw@mail.gmail.com>
-References: <20170619163110.28173-1-krzk@kernel.org>
- <CACvgo51db4Gk+GHAO-F=rz8vLTG6A66f1ZeHPNuAQV1Qthaavw@mail.gmail.com>
-Message-ID: <CAJKOXPfjEozEM=q4hbWRBJngNDxnkJXF37gN2Es1Ju8Qze4J1g@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 20 Jun 2017 12:03:48 +0200
+Subject: [PATCH 00/51] rtc: stop using rtc deprecated functions
+In-Reply-To: <1497951359-13334-1-git-send-email-benjamin.gaignard@linaro.org>
+References: <1497951359-13334-1-git-send-email-benjamin.gaignard@linaro.org>
+Message-ID: <20170620100348.zh4ygvjjgnhxvmvl@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 11:53 AM, Emil Velikov <emil.l.velikov@gmail.com> wrote:
-> On 19 June 2017 at 17:31, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->> Although header is included only once but still having an include guard
->> is a good practice.  To avoid confusion, add SoC prefix to existing
->> Exynos5433 header include guard.
->>
->> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
->> ---
->>  include/video/exynos5433_decon.h | 6 +++---
->>  include/video/exynos7_decon.h    | 5 +++++
->>  2 files changed, 8 insertions(+), 3 deletions(-)
->>
->> diff --git a/include/video/exynos5433_decon.h b/include/video/exynos5433_decon.h
->> index 78957c9626f5..b30362da5692 100644
->> --- a/include/video/exynos5433_decon.h
->> +++ b/include/video/exynos5433_decon.h
->> @@ -6,8 +6,8 @@
->>   * published by the Free Software Foundationr
->>   */
->>
->> -#ifndef EXYNOS_REGS_DECON_H
->> -#define EXYNOS_REGS_DECON_H
->> +#ifndef EXYNOS5433_REGS_DECON_H
->> +#define EXYNOS5433_REGS_DECON_H
->>
-> Drop the _REGS_ part from the guard on each header? The file name/path
-> does not have it, plus it'll save some WTF moments when
-> exynos{5433,7}_regs_decon.h comes about.
+On 20/06/2017 at 11:35:08 +0200, Benjamin Gaignard wrote:
+> rtc_time_to_tm() and rtc_tm_to_time() are deprecated because they
+> rely on 32bits variables and that will make rtc break in y2038/2016.
 
-So maybe it makes sense to reorder these patches and use the guard
-name matching final file name?
+Please don't, because this hide the fact that the hardware will not
+handle dates in y2038 anyway and as pointed by Russell a few month ago,
+rtc_time_to_tm will be able to catch it but the 64 bit version will
+silently ignore it.
 
-Best regards,
-Krzysztof
+
+> The goal of this series of patches is ti stop using those two functions
+> and use instead to safer 64bits ones.
+> 
+> It also remove change .set_mmss to set_mmss64 callback for the same reasons.
+> 
+> Those 51 patches almost clean all the drivers except the few that I haven't
+> been able to compile because of cross-toolchains issues (au1xxx, mpc5121, ps3,
+> puv3, sun4v, tx4939, starfire, ls1x ...)
+> 
+> Obviously I don't have all those hardwares in my hands so I have only check
+> that the patches compile without warnings but it up to each maintainer to
+> valid them on real hardware.
+> 
+> Benjamin Gaignard (51):
+>   x86: rtc: stop using rtc deprecated functions
+>   x86: intel-mid: vrtc: stop using rtc deprecated functions
+>   net: broadcom: stop using rtc deprecated functions
+>   rtc: 88pm80x: stop using rtc deprecated functions
+>   rtc: 88pm860x: stop using rtc deprecated functions
+>   rtc: ab-b5ze-s3: stop using rtc deprecated functions
+>   rtc: ab8500: stop using rtc deprecated functions
+>   rtc: armada38x: stop using rtc deprecated functions
+>   rtc: at32ap700x: stop using rtc deprecated functions
+>   rtc: at91sam9: stop using rtc deprecated functions
+>   rtc: bfin: stop using rtc deprecated functions
+>   rtc: coh901331: stop using rtc deprecated functions
+>   rtc: cpcap: stop using rtc deprecated functions
+>   rtc: da9063: stop using rtc deprecated functions
+>   rtc: da9063: stop using rtc deprecated functions
+>   rtc: davinci: stop using rtc deprecated functions
+>   rtc: digicolor: stop using rtc deprecated functions
+>   rtc: dm355evm: stop using rtc deprecated functions
+>   rtc: ds1305: stop using rtc deprecated functions
+>   rtc: ds1374: stop using rtc deprecated functions
+>   rtc: ds1511: stop using rtc deprecated functions
+>   rtc: ds1553: stop using rtc deprecated functions
+>   rtc: ds1672: stop using rtc deprecated functions
+>   rtc: ds2404: stop using rtc deprecated functions
+>   rtc: ep93xx: stop using rtc deprecated functions
+>   rtc: gemini: stop using rtc deprecated functions
+>   rtc: imxdi: stop using rtc deprecated functions
+>   rtc: jz4740: stop using rtc deprecated functions
+>   rtc: lpc32xx: stop using rtc deprecated functions
+>   rtc: mv: stop using rtc deprecated functions
+>   rtc: omap: stop using rtc deprecated functions
+>   rtc: pcap: stop using rtc deprecated functions
+>   rtc: pl030: stop using rtc deprecated functions
+>   rtc: pl031: stop using rtc deprecated functions
+>   rtc: pm8xxx: stop using rtc deprecated functions
+>   rtc: rs5c348: stop using rtc deprecated functions
+>   rtc: sa1100: stop using rtc deprecated functions
+>   rtc: sh: stop using rtc deprecated functions
+>   rtc: sirfsoc: stop using rtc deprecated functions
+>   rtc: snvs: stop using rtc deprecated functions
+>   rtc: stk17ta8: stop using rtc deprecated functions
+>   rtc: stmp3xxx: stop using rtc deprecated functions
+>   rtc: sun6i: stop using rtc deprecated functions
+>   rtc: sysfs: stop using rtc deprecated functions
+>   rtc: tegra stop using rtc deprecated functions
+>   rtc: test: stop using rtc deprecated functions
+>   rtc: tps6586: stop using rtc deprecated functions
+>   rtc: vr41xx: stop using rtc deprecated functions
+>   rtc: wm831x: stop using rtc deprecated functions
+>   rtc: xgene stop using rtc deprecated functions
+>   power: suspend test: stop using rtc deprecated functions
+> 
+>  arch/x86/kernel/rtc.c                        |  6 ++--
+>  arch/x86/platform/intel-mid/intel_mid_vrtc.c |  2 +-
+>  drivers/net/ethernet/broadcom/bnxt/bnxt.c    |  2 +-
+>  drivers/rtc/rtc-88pm80x.c                    | 44 +++++++++++++--------------
+>  drivers/rtc/rtc-88pm860x.c                   | 40 ++++++++++++-------------
+>  drivers/rtc/rtc-ab-b5ze-s3.c                 | 45 ++++++++--------------------
+>  drivers/rtc/rtc-ab8500.c                     | 26 ++++++++--------
+>  drivers/rtc/rtc-armada38x.c                  | 34 +++++++++------------
+>  drivers/rtc/rtc-at32ap700x.c                 | 29 ++++++++----------
+>  drivers/rtc/rtc-at91sam9.c                   | 18 ++++-------
+>  drivers/rtc/rtc-bfin.c                       | 24 +++++++--------
+>  drivers/rtc/rtc-coh901331.c                  | 14 +++++----
+>  drivers/rtc/rtc-cpcap.c                      |  8 ++---
+>  drivers/rtc/rtc-da9052.c                     |  8 ++---
+>  drivers/rtc/rtc-da9063.c                     |  8 ++---
+>  drivers/rtc/rtc-davinci.c                    |  8 ++---
+>  drivers/rtc/rtc-digicolor.c                  |  4 +--
+>  drivers/rtc/rtc-dm355evm.c                   |  6 ++--
+>  drivers/rtc/rtc-ds1305.c                     | 11 +++----
+>  drivers/rtc/rtc-ds1374.c                     |  6 ++--
+>  drivers/rtc/rtc-ds1511.c                     |  2 +-
+>  drivers/rtc/rtc-ds1553.c                     |  2 +-
+>  drivers/rtc/rtc-ds1672.c                     |  8 ++---
+>  drivers/rtc/rtc-ds2404.c                     |  8 ++---
+>  drivers/rtc/rtc-ep93xx.c                     | 10 +++----
+>  drivers/rtc/rtc-gemini.c                     |  8 ++---
+>  drivers/rtc/rtc-imxdi.c                      | 16 +++++-----
+>  drivers/rtc/rtc-jz4740.c                     | 12 ++++----
+>  drivers/rtc/rtc-lpc32xx.c                    | 19 +++++-------
+>  drivers/rtc/rtc-mv.c                         |  2 +-
+>  drivers/rtc/rtc-omap.c                       |  6 ++--
+>  drivers/rtc/rtc-pcap.c                       | 16 +++++-----
+>  drivers/rtc/rtc-pl030.c                      | 24 +++++++--------
+>  drivers/rtc/rtc-pl031.c                      | 31 ++++++++-----------
+>  drivers/rtc/rtc-pm8xxx.c                     | 22 +++++++-------
+>  drivers/rtc/rtc-rs5c348.c                    |  4 +--
+>  drivers/rtc/rtc-sa1100.c                     | 25 +++++++---------
+>  drivers/rtc/rtc-sh.c                         |  2 +-
+>  drivers/rtc/rtc-sirfsoc.c                    | 18 +++++------
+>  drivers/rtc/rtc-snvs.c                       | 14 ++++-----
+>  drivers/rtc/rtc-stk17ta8.c                   |  2 +-
+>  drivers/rtc/rtc-stmp3xxx.c                   | 12 ++++----
+>  drivers/rtc/rtc-sun6i.c                      | 14 ++++-----
+>  drivers/rtc/rtc-sysfs.c                      | 25 ++++++++--------
+>  drivers/rtc/rtc-tegra.c                      | 22 +++++++-------
+>  drivers/rtc/rtc-test.c                       | 17 +----------
+>  drivers/rtc/rtc-tps6586x.c                   | 26 ++++++++--------
+>  drivers/rtc/rtc-vr41xx.c                     |  6 ++--
+>  drivers/rtc/rtc-wm831x.c                     | 28 +++++++----------
+>  drivers/rtc/rtc-xgene.c                      | 12 ++++----
+>  kernel/power/suspend_test.c                  |  6 ++--
+>  51 files changed, 342 insertions(+), 420 deletions(-)
+> 
+> -- 
+> CC: adi-buildroot-devel at lists.sourceforge.net
+> CC: Alessandro Zummo <a.zummo@towertech.it>
+> CC: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> CC: Gregory Clement <gregory.clement@free-electrons.com>
+> CC: Ingo Molnar <mingo@redhat.com>
+> CC: Jason Cooper <jason@lakedaemon.net>
+> CC: John Stultz <john.stultz@linaro.org>
+> CC: linux-arm-kernel at lists.infradead.org
+> CC: linux-kernel at vger.kernel.org
+> CC: Linus Walleij <linus.walleij@linaro.org>
+> CC: Michael Chan <michael.chan@broadcom.com>
+> CC: netdev at vger.kernel.org
+> CC: rtc-linux at googlegroups.com
+> CC: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> CC: Support Opensource <support.opensource@diasemi.com>
+> CC: Thomas Gleixner <tglx@linutronix.de>
+> CC: x86 at kernel.org
+> CC: Baruch Siach <baruch@tkos.co.il>
+> CC: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+> CC: Vladimir Zapolskiy <vz@mleia.com>
+> CC: Sylvain Lemieux <slemieux.tyco@gmail.com>
+> CC: Barry Song <baohua@kernel.org>
+> CC: Maxime Ripard <maxime.ripard@free-electrons.com>
+> CC: Chen-Yu Tsai <wens@csie.org>
+> CC: Thierry Reding <thierry.reding@gmail.com>
+> CC: Jonathan Hunter <jonathanh@nvidia.com>
+> CC: linux-tegra at vger.kernel.org
+> CC: patches at opensource.wolfsonmicro.com
+> CC: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> CC: Pavel Machek <pavel@ucw.cz>
+> CC: Len Brown <len.brown@intel.com>
+> CC: linux-pm at vger.kernel.org
+> 
+> 1.9.1
+> 
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
