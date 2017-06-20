@@ -1,42 +1,90 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 20 Jun 2017 16:09:56 +0200
-Subject: [PATCH v3 4/6] irqchip: irq-mvebu-icu: new driver for Marvell ICU
-In-Reply-To: <7c5d8d75-1319-a9ae-856d-67813ad2e1c5@arm.com>
-References: <20170616141923.31226-1-thomas.petazzoni@free-electrons.com>
- <20170616141923.31226-5-thomas.petazzoni@free-electrons.com>
- <2934dbf3-e1f0-3997-ba70-3b6a7a2973d9@arm.com>
- <20170620154631.77a1f192@windsurf.lan>
- <7c5d8d75-1319-a9ae-856d-67813ad2e1c5@arm.com>
-Message-ID: <20170620160956.361ed003@windsurf.lan>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 20 Jun 2017 16:10:36 +0200
+Subject: [PATCH v3 8/9] arm64: dts: marvell: remove *-clock-output-names
+ on cp110
+In-Reply-To: <99492ad5e3026e12a57623bdcf0cc33d4935eb66.1496328934.git-series.gregory.clement@free-electrons.com>
+ (Gregory CLEMENT's message of "Thu, 1 Jun 2017 16:55:41 +0200")
+References: <cover.6bb422e6a233460049bb63792b32a5ba851dcddd.1496328934.git-series.gregory.clement@free-electrons.com>
+ <cover.6bb422e6a233460049bb63792b32a5ba851dcddd.1496328934.git-series.gregory.clement@free-electrons.com>
+ <99492ad5e3026e12a57623bdcf0cc33d4935eb66.1496328934.git-series.gregory.clement@free-electrons.com>
+Message-ID: <87efue4un7.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
+ 
+ On jeu., juin 01 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-On Tue, 20 Jun 2017 15:00:19 +0100, Marc Zyngier wrote:
+> The *-clock-output-names of the cp110-system-controller0 node are not
+> used anymore, so remove them.
+>
+> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-> There is a few things: this driver could (mostly) work with a GICv3
-> distributor (located way above 4GB) instead of the GICP, and I'd rather
-> make no assumption of where GICP is located in the memory map.
-> 
-> So I'd rather see:
-> 
-> 	if (msg->address_lo || msg->address_hi) {
-> 		[...]
-> 	} else {
-> 		/* deconfiguration case */
-> 	}
+Applied on mvebu/dt64
 
-Ha, OK, indeed. /me feels stupid now.
+Thanks,
 
-Unfortunately, I just sent v4 a few minutes ago. I'll wait for you to
-look at this v4. If there's nothing else to be changed, then I'll send
-a v5 with just this change.
+Gregory
 
-Thanks!
+> ---
+>  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 13 +-------------
+>  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 13 +-------------
+>  2 files changed, 26 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> index ac8df5201cd6..a0f57a8e5dcb 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> @@ -101,19 +101,6 @@
+>  					     "syscon";
+>  				reg = <0x440000 0x1000>;
+>  				#clock-cells = <2>;
+> -				core-clock-output-names =
+> -					"cpm-apll", "cpm-ppv2-core", "cpm-eip",
+> -					"cpm-core", "cpm-nand-core";
+> -				gate-clock-output-names =
+> -					"cpm-audio", "cpm-communit", "cpm-nand",
+> -					"cpm-ppv2", "cpm-sdio", "cpm-mg-domain",
+> -					"cpm-mg-core", "cpm-xor1", "cpm-xor0",
+> -					"cpm-gop-dp", "none", "cpm-pcie_x10",
+> -					"cpm-pcie_x11", "cpm-pcie_x4", "cpm-pcie-xor",
+> -					"cpm-sata", "cpm-sata-usb", "cpm-main",
+> -					"cpm-sd-mmc-gop", "none", "none",
+> -					"cpm-slow-io", "cpm-usb3h0", "cpm-usb3h1",
+> -					"cpm-usb3dev", "cpm-eip150", "cpm-eip197";
+>  			};
+>  
+>  			cpm_rtc: rtc at 284000 {
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> index 7740a75a8230..9584bc8d8b3f 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> @@ -108,19 +108,6 @@
+>  					     "syscon";
+>  				reg = <0x440000 0x1000>;
+>  				#clock-cells = <2>;
+> -				core-clock-output-names =
+> -					"cps-apll", "cps-ppv2-core", "cps-eip",
+> -					"cps-core", "cps-nand-core";
+> -				gate-clock-output-names =
+> -					"cps-audio", "cps-communit", "cps-nand",
+> -					"cps-ppv2", "cps-sdio", "cps-mg-domain",
+> -					"cps-mg-core", "cps-xor1", "cps-xor0",
+> -					"cps-gop-dp", "none", "cps-pcie_x10",
+> -					"cps-pcie_x11", "cps-pcie_x4", "cps-pcie-xor",
+> -					"cps-sata", "cps-sata-usb", "cps-main",
+> -					"cps-sd-mmc-gop", "none", "none",
+> -					"cps-slow-io", "cps-usb3h0", "cps-usb3h1",
+> -					"cps-usb3dev", "cps-eip150", "cps-eip197";
+>  			};
+>  
+>  			cps_sata0: sata at 540000 {
+> -- 
+> git-series 0.9.1
 
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
 http://free-electrons.com
