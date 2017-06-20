@@ -1,35 +1,31 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 20 Jun 2017 09:21:38 +0200
-Subject: [PATCH 3/3 v6] clk: Add Gemini SoC clock controller
-In-Reply-To: <20170618215550.29216-3-linus.walleij@linaro.org>
-References: <20170618215550.29216-1-linus.walleij@linaro.org>
- <20170618215550.29216-3-linus.walleij@linaro.org>
-Message-ID: <1497943298.2386.4.camel@pengutronix.de>
+From: yibin.gong@nxp.com (Robin Gong)
+Date: Tue, 20 Jun 2017 15:24:50 +0800
+Subject: [PATCH v1] firmware: add sdma firmware for i.mx6/i.mx7d
+Message-ID: <1497943490-13401-1-git-send-email-yibin.gong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2017-06-18 at 23:55 +0200, Linus Walleij wrote:
-> The Cortina Systems Gemini (SL3516/CS3516) has an on-chip clock
-> controller that derive all clocks from a single crystal, using some
-> documented and some undocumented PLLs, half dividers, counters and
-> gates. This is a best attempt to construct a clock driver for the
-> clocks so at least we can gate off unused hardware and driver the
-> PCI bus clock.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Mike/Stephen: please merge this into the clk subsystem along
-> with the <dt-bindings> patch once you're happy with it.
-> 
-> ChangeLog v5->v6:
-> - Merge the Gemini reset controller code into the clock driver
->   so as to resolve the conflict about what device should be
->   probing from the system controller. The reset portions are
->   copy/pasted from the driver previously merged by Philipp
->   Zabel.
+add sdma firmware for i.mx6 and i.mx7d family, this patch depends
+on the below:
 
-For the reset controller part,
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+ commit 3123d78e09d2 ("imx: Add SDMA firmware for Freescale i.MX6/7 SoCs")
 
-regards
-Philipp
+Signed-off-by: Robin Gong <yibin.gong@nxp.com>
+---
+ firmware/Makefile | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/firmware/Makefile b/firmware/Makefile
+index fa3e81c..edc86a0 100644
+--- a/firmware/Makefile
++++ b/firmware/Makefile
+@@ -65,6 +65,7 @@ fw-shipped-$(CONFIG_DVB_AV7110) += av7110/bootcode.bin
+ fw-shipped-$(CONFIG_DVB_TTUSB_BUDGET) += ttusb-budget/dspbootcode.bin
+ fw-shipped-$(CONFIG_E100) += e100/d101m_ucode.bin e100/d101s_ucode.bin \
+ 			     e100/d102e_ucode.bin
++fw-shipped-$(CONFIG_IMX_SDMA) += imx/sdma/sdma-imx6q.bin imx/sdma/sdma-imx7d.bin
+ fw-shipped-$(CONFIG_MYRI_SBUS) += myricom/lanai.bin
+ fw-shipped-$(CONFIG_PCMCIA_PCNET) += cis/LA-PCM.cis cis/PCMLM28.cis \
+ 				     cis/DP83903.cis cis/NE2K.cis \
+-- 
+1.9.1
