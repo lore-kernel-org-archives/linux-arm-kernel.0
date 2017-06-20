@@ -1,63 +1,40 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 20 Jun 2017 10:45:17 +0200
-Subject: [linux-sunxi] Re: [PATCH 1/2] dmaengine: sun6i: make gate bit in
- sun8i's DMA engines a common quirk
-In-Reply-To: <20170615035407.GM13020@localhost>
-References: <20170605123348.26137-1-icenowy@aosc.io>
- <20170605123348.26137-2-icenowy@aosc.io>
- <20170614083252.GK13020@localhost>
- <AD656BCC-5064-454F-9576-FA59283E0C45@aosc.io>
- <20170614084529.GL13020@localhost>
- <20170614090439.rkdaoo3uqzjqwuxq@flea.lan>
- <20170615035407.GM13020@localhost>
-Message-ID: <20170620084517.giq3zhvbmhpx7pge@flea.lan>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 20 Jun 2017 09:49:32 +0100
+Subject: [PATCH V17 00/11] Add UEFI 2.6 and ACPI 6.1 updates for RAS on
+ ARM64
+In-Reply-To: <20170620063439.GS658@rric.localdomain>
+References: <1495225933-4410-1-git-send-email-tbaicar@codeaurora.org>
+ <20170607115012.GZ30263@arm.com>
+ <20170620063439.GS658@rric.localdomain>
+Message-ID: <20170620084931.GB30664@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 15, 2017 at 09:24:08AM +0530, Vinod Koul wrote:
-> On Wed, Jun 14, 2017 at 11:04:39AM +0200, Maxime Ripard wrote:
-> > On Wed, Jun 14, 2017 at 02:15:29PM +0530, Vinod Koul wrote:
-> > > > SoC info is in compatible, so there's no reason to make it a property.
-> > > 
-> > > that's why it would need to be optional for the SoC's that needs these..
-> > 
-> > There's nothing optional about that behaviour, it's mandatory for the
-> > SoC that need it, and useless on the SoC that don't.
+Hi Robert,
+
+On Tue, Jun 20, 2017 at 08:34:39AM +0200, Robert Richter wrote:
+> On 07.06.17 12:50:12, Will Deacon wrote:
 > 
-> And why should kernel put strings for each hw behaviour.
-
-You will have strings in the kernel for each hw behaviour,
-disregarding on whether you base the behaviour on the compatible or a
-set of properties. In fact, you will have *much* more strings in the
-kernel in the latter case.
-
-> I am expecting DT to tell me if this SoC is a special case or not
-> and kernel shall handle accordingly
-
-How is this not the case here?
-
-The DT tells you that this SoC is a special case through a compatible
-already.
-
-> > Plus, that would require changing the DT binding, which isn't
-> > something we can do.
+> > Thanks, I've pushed this out as:
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/ras-apei
+> >
+> > which I'll merge into for-next/core (and therefore linux-next) either the
+> > end of this week or the beginning of next week. Please take a look if you
+> > get a chance.
 > 
-> Any reason why bindings can't change..? I though this was support for new
-> SoC...
+> any reason why there was a roll back of for-next/core?
+> 
+>  + 0870f692c2ed...e27c7fa015d6 for-next/core -> arm64/for-next/core  (forced update)
+> 
+> Is it because for-next/ras-apei goes through tip?
 
-No, this is a rework of an existing code to support a new SoC. The
-code is already there, and the binding too. It has been for 3 years.
+No, it's because the RAS stuff ran into horrible conflicts with the UUID
+tree:
 
-Maxime
+https://lkml.org/lkml/2017/6/16/22
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170620/88a09bac/attachment.sig>
+Tyler should be rebasing that soon, so hopefully I can requeue that stuff
+this week.
+
+Will
