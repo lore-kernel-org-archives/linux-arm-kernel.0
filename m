@@ -1,51 +1,79 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 20 Jun 2017 08:30:51 +0200
-Subject: [GIT PULL] Allwinner clock changes for 4.13
-In-Reply-To: <20170616215036.GN20170@codeaurora.org>
-References: <20170614192617.bsp5pjxrphlk36sk@flea.home>
- <20170616215036.GN20170@codeaurora.org>
-Message-ID: <20170620063051.j2chtseeetoh3mhe@flea.lan>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 20 Jun 2017 08:33:18 +0200
+Subject: [PATCH v6 4/4] ARM: imx6ul: add "fsl,imx6ul-snvs-lpgpr" node
+In-Reply-To: <20170620044059.16113-5-o.rempel@pengutronix.de>
+References: <20170620044059.16113-1-o.rempel@pengutronix.de>
+ <20170620044059.16113-5-o.rempel@pengutronix.de>
+Message-ID: <254a7dc7-f532-97ac-6e76-8649b7ad2f37@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 16, 2017 at 02:50:36PM -0700, Stephen Boyd wrote:
-> On 06/14, Maxime Ripard wrote:
-> > Hi Mike, Stephen,
-> > 
-> > Here is the patches for 4.13 for the Allwinner SoCs.
-> > 
-> > In order to reduce the conflicts, this is based on the fixes tag I
-> > sent a PR for a few minutes ago.
-> > 
-> 
-> Thanks. Pulled into clk-next. I did notice on new sparse warning
-> though for which I've applied this diff on top:
-> 
-> diff --git a/drivers/clk/sunxi-ng/ccu_mux.c b/drivers/clk/sunxi-ng/ccu_mux.c
-> index cfe4538304fb..312664155a54 100644
-> --- a/drivers/clk/sunxi-ng/ccu_mux.c
-> +++ b/drivers/clk/sunxi-ng/ccu_mux.c
-> @@ -68,7 +68,7 @@ unsigned long ccu_mux_helper_apply_prediv(struct ccu_common *common,
->  	return parent_rate / ccu_mux_get_prediv(common, cm, parent_index);
->  }
+Am 20.06.2017 um 06:40 schrieb Oleksij Rempel:
+> snvs_lpgpr confirmed to work with imx6ul as well.
+>
+> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+> Tested-by: Guy Shapiro <guy.shapiro@mobi-wize.com>
+> ---
+>  Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt | 3 ++-
+>  arch/arm/boot/dts/imx6ul.dtsi                          | 4 ++++
+>  drivers/nvmem/snvs_lpgpr.c                             | 1 +
+>  3 files changed, 7 insertions(+), 1 deletion(-)
+>
+> diff --git a/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt b/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
+> index 21910fb3159f..d2a811f92d7f 100644
+> --- a/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
+> +++ b/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
+> @@ -5,8 +5,9 @@ This DT node should be represented as a sub-node of a "syscon",
+>  "simple-mfd" node.
 >  
-> -unsigned long ccu_mux_helper_unapply_prediv(struct ccu_common *common,
-> +static unsigned long ccu_mux_helper_unapply_prediv(struct ccu_common *common,
->  					    struct ccu_mux_internal *cm,
->  					    int parent_index,
->  					    unsigned long parent_rate)
+>  Required properties:
+> -- compatible: should be:
+> +- compatible: should be one of fallowing variants:
 
-Seems good, thanks!
-Maxime
+of the following
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170620/1891e26f/attachment.sig>
+>  	"fsl,imx6q-snvs-lpgpr" for Freescale i.MX6Q/D/DL/S
+> +	"fsl,imx6ul-snvs-lpgpr" for Freescale i.MX6UL
+
+Please fold this change into patch #1. This makes review and merging easier.
+
+>  
+>  Example:
+>  snvs: snvs at 020cc000 {
+> diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+> index b9d7d2d09402..df870abc28f5 100644
+> --- a/arch/arm/boot/dts/imx6ul.dtsi
+> +++ b/arch/arm/boot/dts/imx6ul.dtsi
+> @@ -624,6 +624,10 @@
+>  					linux,keycode = <KEY_POWER>;
+>  					wakeup-source;
+>  				};
+> +
+> +				snvs_lpgpr: snvs-lpgpr {
+> +					compatible = "fsl,imx6ul-snvs-lpgpr";
+> +				};
+
+AFAIK the imx6ull.dtsi also includes the imx6ul.dtsi. Does this
+compatible driver also fit for imx6ull?
+
+If yes, please extend the devicetree binding in patch #1.
+If no, this change would have unwanted side effects.
+
+Regards
+Stefan
+
+>  			};
+>  
+>  			epit1: epit at 020d0000 {
+> diff --git a/drivers/nvmem/snvs_lpgpr.c b/drivers/nvmem/snvs_lpgpr.c
+> index eb3369363e44..2b20a12918d8 100644
+> --- a/drivers/nvmem/snvs_lpgpr.c
+> +++ b/drivers/nvmem/snvs_lpgpr.c
+> @@ -136,6 +136,7 @@ static int snvs_lpgpr_remove(struct platform_device *pdev)
+>  
+>  static const struct of_device_id snvs_lpgpr_dt_ids[] = {
+>  	{ .compatible = "fsl,imx6q-snvs-lpgpr", .data = &snvs_lpgpr_cfg_imx6q },
+> +	{ .compatible = "fsl,imx6ul-snvs-lpgpr", .data = &snvs_lpgpr_cfg_imx6q },
+>  	{ },
+>  };
+>  MODULE_DEVICE_TABLE(of, snvs_lpgpr_dt_ids);
