@@ -1,345 +1,50 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 20 Jun 2017 16:23:58 +0200
-Subject: [PATCH v3 9/9] arm64: dts: marvell: use new binding for the
- system controller on cp110
-In-Reply-To: <9c5807cafb03413f4318f6c95a2e093bd9cdcdcf.1496328934.git-series.gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Thu, 1 Jun 2017 16:55:42 +0200")
-References: <cover.6bb422e6a233460049bb63792b32a5ba851dcddd.1496328934.git-series.gregory.clement@free-electrons.com>
- <cover.6bb422e6a233460049bb63792b32a5ba851dcddd.1496328934.git-series.gregory.clement@free-electrons.com>
- <9c5807cafb03413f4318f6c95a2e093bd9cdcdcf.1496328934.git-series.gregory.clement@free-electrons.com>
-Message-ID: <87a8524u0x.fsf@free-electrons.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 20 Jun 2017 15:24:21 +0100
+Subject: [PATCH v5 4/7] drivers: dma-coherent: Introduce default DMA pool
+In-Reply-To: <20170620134932.GB31496@infradead.org>
+References: <1495621472-9323-1-git-send-email-vladimir.murzin@arm.com>
+ <1495621472-9323-5-git-send-email-vladimir.murzin@arm.com>
+ <20170620134932.GB31496@infradead.org>
+Message-ID: <3d5ea779-90a3-f0b5-b9aa-161d4c0855e7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On jeu., juin 01 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+On 20/06/17 14:49, Christoph Hellwig wrote:
+> On Wed, May 24, 2017 at 11:24:29AM +0100, Vladimir Murzin wrote:
+>> This patch introduces default coherent DMA pool similar to default CMA
+>> area concept. To keep other users safe code kept under CONFIG_ARM.
+> 
+> I don't see a CONFIG_ARM in the code, although parts of it are added
+> under CONFIG_OF_RESERVED_MEM.
 
-> The new binding for the system controller on cp110 moved the clock
-> controller into a subnode. This preliminary step will allow to add gpio
-> and pinctrl subnodes.
->
-> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+It's in rmem_dma_setup() (line 325) currently enforcing no-map for ARM.
 
-Applied on mvebu/dt64 and while doing it, fixed the clock introduced in
-the patches merged since the first version of this patch.
+> But overall this code look a bit odd to me.  As far as I can tell
+> the dma-coherent.c code is for the case where we have a special
+> piece of coherent memory close to a device.
 
-Gregory
+True, but the case here is where we need a special piece of coherent
+memory for *all* devices, and it was more complicated *not* to reuse the
+existing infrastructure. This would already be achievable by specifying
+a separate rmem carveout per device, but the shared pool just makes life
+easier, and mirrors the functionality dma-contiguous already supports.
 
-> ---
->  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 41 ++++++-------
->  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 35 +++++------
->  2 files changed, 41 insertions(+), 35 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> index a0f57a8e5dcb..96a4ff75b3b0 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> @@ -62,7 +62,7 @@
->  			cpm_ethernet: ethernet at 0 {
->  				compatible = "marvell,armada-7k-pp22";
->  				reg = <0x0 0x100000>, <0x129000 0xb000>;
-> -				clocks = <&cpm_syscon0 1 3>, <&cpm_syscon0 1 9>, <&cpm_syscon0 1 5>;
-> +				clocks = <&cpm_clk 1 3>, <&cpm_clk 1 9>, <&cpm_clk 1 5>;
->  				clock-names = "pp_clk", "gop_clk", "mg_clk";
->  				status = "disabled";
->  				dma-coherent;
-> @@ -97,10 +97,13 @@
->  			};
->  
->  			cpm_syscon0: system-controller at 440000 {
-> -				compatible = "marvell,cp110-system-controller0",
-> -					     "syscon";
-> +				compatible = "syscon", "simple-mfd";
->  				reg = <0x440000 0x1000>;
-> -				#clock-cells = <2>;
-> +
-> +				cpm_clk: clock {
-> +					compatible = "marvell,cp110-clock";
-> +					#clock-cells = <2>;
-> +				};
->  			};
->  
->  			cpm_rtc: rtc at 284000 {
-> @@ -115,7 +118,7 @@
->  					     "generic-ahci";
->  				reg = <0x540000 0x30000>;
->  				interrupts = <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
-> -				clocks = <&cpm_syscon0 1 15>;
-> +				clocks = <&cpm_clk 1 15>;
->  				status = "disabled";
->  			};
->  
-> @@ -125,7 +128,7 @@
->  				reg = <0x500000 0x4000>;
->  				dma-coherent;
->  				interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
-> -				clocks = <&cpm_syscon0 1 22>;
-> +				clocks = <&cpm_clk 1 22>;
->  				status = "disabled";
->  			};
->  
-> @@ -135,7 +138,7 @@
->  				reg = <0x510000 0x4000>;
->  				dma-coherent;
->  				interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
-> -				clocks = <&cpm_syscon0 1 23>;
-> +				clocks = <&cpm_clk 1 23>;
->  				status = "disabled";
->  			};
->  
-> @@ -145,7 +148,7 @@
->  				      <0x6b0000 0x1000>;
->  				dma-coherent;
->  				msi-parent = <&gic_v2m0>;
-> -				clocks = <&cpm_syscon0 1 8>;
-> +				clocks = <&cpm_clk 1 8>;
->  			};
->  
->  			cpm_xor1: xor at 6c0000 {
-> @@ -154,7 +157,7 @@
->  				      <0x6d0000 0x1000>;
->  				dma-coherent;
->  				msi-parent = <&gic_v2m0>;
-> -				clocks = <&cpm_syscon0 1 7>;
-> +				clocks = <&cpm_clk 1 7>;
->  			};
->  
->  			cpm_spi0: spi at 700600 {
-> @@ -163,7 +166,7 @@
->  				#address-cells = <0x1>;
->  				#size-cells = <0x0>;
->  				cell-index = <1>;
-> -				clocks = <&cpm_syscon0 1 21>;
-> +				clocks = <&cpm_clk 1 21>;
->  				status = "disabled";
->  			};
->  
-> @@ -173,7 +176,7 @@
->  				#address-cells = <1>;
->  				#size-cells = <0>;
->  				cell-index = <2>;
-> -				clocks = <&cpm_syscon0 1 21>;
-> +				clocks = <&cpm_clk 1 21>;
->  				status = "disabled";
->  			};
->  
-> @@ -183,7 +186,7 @@
->  				#address-cells = <1>;
->  				#size-cells = <0>;
->  				interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-> -				clocks = <&cpm_syscon0 1 21>;
-> +				clocks = <&cpm_clk 1 21>;
->  				status = "disabled";
->  			};
->  
-> @@ -193,7 +196,7 @@
->  				#address-cells = <1>;
->  				#size-cells = <0>;
->  				interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
-> -				clocks = <&cpm_syscon0 1 21>;
-> +				clocks = <&cpm_clk 1 21>;
->  				status = "disabled";
->  			};
->  
-> @@ -201,7 +204,7 @@
->  				compatible = "marvell,armada-8k-rng", "inside-secure,safexcel-eip76";
->  				reg = <0x760000 0x7d>;
->  				interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
-> -				clocks = <&cpm_syscon0 1 25>;
-> +				clocks = <&cpm_clk 1 25>;
->  				status = "okay";
->  			};
->  
-> @@ -210,7 +213,7 @@
->  				reg = <0x780000 0x300>;
->  				interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
->  				clock-names = "core";
-> -				clocks = <&cpm_syscon0 1 4>;
-> +				clocks = <&cpm_clk 1 4>;
->  				dma-coherent;
->  				status = "disabled";
->  			};
-> @@ -227,7 +230,7 @@
->  					     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
->  				interrupt-names = "mem", "ring0", "ring1",
->  				"ring2", "ring3", "eip";
-> -				clocks = <&cpm_syscon0 1 26>;
-> +				clocks = <&cpm_clk 1 26>;
->  				status = "disabled";
->  			};
->  		};
-> @@ -254,7 +257,7 @@
->  			interrupt-map = <0 0 0 0 &gic 0 GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
->  			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
->  			num-lanes = <1>;
-> -			clocks = <&cpm_syscon0 1 13>;
-> +			clocks = <&cpm_clk 1 13>;
->  			status = "disabled";
->  		};
->  
-> @@ -281,7 +284,7 @@
->  			interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
->  
->  			num-lanes = <1>;
-> -			clocks = <&cpm_syscon0 1 11>;
-> +			clocks = <&cpm_clk 1 11>;
->  			status = "disabled";
->  		};
->  
-> @@ -308,7 +311,7 @@
->  			interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
->  
->  			num-lanes = <1>;
-> -			clocks = <&cpm_syscon0 1 12>;
-> +			clocks = <&cpm_clk 1 12>;
->  			status = "disabled";
->  		};
->  	};
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> index 9584bc8d8b3f..48a658aa5b32 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> @@ -104,10 +104,13 @@
->  			};
->  
->  			cps_syscon0: system-controller at 440000 {
-> -				compatible = "marvell,cp110-system-controller0",
-> -					     "syscon";
-> +				compatible = "syscon", "simple-mfd";
->  				reg = <0x440000 0x1000>;
-> -				#clock-cells = <2>;
-> +
-> +				cps_clk: clock {
-> +					compatible = "marvell,cp110-clock";
-> +					#clock-cells = <2>;
-> +				};
->  			};
->  
->  			cps_sata0: sata at 540000 {
-> @@ -115,7 +118,7 @@
->  					     "generic-ahci";
->  				reg = <0x540000 0x30000>;
->  				interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>;
-> -				clocks = <&cps_syscon0 1 15>;
-> +				clocks = <&cps_clk 1 15>;
->  				status = "disabled";
->  			};
->  
-> @@ -125,7 +128,7 @@
->  				reg = <0x500000 0x4000>;
->  				dma-coherent;
->  				interrupts = <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>;
-> -				clocks = <&cps_syscon0 1 22>;
-> +				clocks = <&cps_clk 1 22>;
->  				status = "disabled";
->  			};
->  
-> @@ -135,7 +138,7 @@
->  				reg = <0x510000 0x4000>;
->  				dma-coherent;
->  				interrupts = <GIC_SPI 285 IRQ_TYPE_LEVEL_HIGH>;
-> -				clocks = <&cps_syscon0 1 23>;
-> +				clocks = <&cps_clk 1 23>;
->  				status = "disabled";
->  			};
->  
-> @@ -145,7 +148,7 @@
->  				      <0x6b0000 0x1000>;
->  				dma-coherent;
->  				msi-parent = <&gic_v2m0>;
-> -				clocks = <&cps_syscon0 1 8>;
-> +				clocks = <&cps_clk 1 8>;
->  			};
->  
->  			cps_xor1: xor at 6c0000 {
-> @@ -154,7 +157,7 @@
->  				      <0x6d0000 0x1000>;
->  				dma-coherent;
->  				msi-parent = <&gic_v2m0>;
-> -				clocks = <&cps_syscon0 1 7>;
-> +				clocks = <&cps_clk 1 7>;
->  			};
->  
->  			cps_spi0: spi at 700600 {
-> @@ -163,7 +166,7 @@
->  				#address-cells = <0x1>;
->  				#size-cells = <0x0>;
->  				cell-index = <3>;
-> -				clocks = <&cps_syscon0 1 21>;
-> +				clocks = <&cps_clk 1 21>;
->  				status = "disabled";
->  			};
->  
-> @@ -173,7 +176,7 @@
->  				#address-cells = <1>;
->  				#size-cells = <0>;
->  				cell-index = <4>;
-> -				clocks = <&cps_syscon0 1 21>;
-> +				clocks = <&cps_clk 1 21>;
->  				status = "disabled";
->  			};
->  
-> @@ -183,7 +186,7 @@
->  				#address-cells = <1>;
->  				#size-cells = <0>;
->  				interrupts = <GIC_SPI 310 IRQ_TYPE_LEVEL_HIGH>;
-> -				clocks = <&cps_syscon0 1 21>;
-> +				clocks = <&cps_clk 1 21>;
->  				status = "disabled";
->  			};
->  
-> @@ -193,7 +196,7 @@
->  				#address-cells = <1>;
->  				#size-cells = <0>;
->  				interrupts = <GIC_SPI 311 IRQ_TYPE_LEVEL_HIGH>;
-> -				clocks = <&cps_syscon0 1 21>;
-> +				clocks = <&cps_clk 1 21>;
->  				status = "disabled";
->  			};
->  
-> @@ -201,7 +204,7 @@
->  				compatible = "marvell,armada-8k-rng", "inside-secure,safexcel-eip76";
->  				reg = <0x760000 0x7d>;
->  				interrupts = <GIC_SPI 312 IRQ_TYPE_LEVEL_HIGH>;
-> -				clocks = <&cps_syscon0 1 25>;
-> +				clocks = <&cps_clk 1 25>;
->  				status = "okay";
->  			};
->  
-> @@ -244,7 +247,7 @@
->  			interrupt-map = <0 0 0 0 &gic 0 GIC_SPI 256 IRQ_TYPE_LEVEL_HIGH>;
->  			interrupts = <GIC_SPI 256 IRQ_TYPE_LEVEL_HIGH>;
->  			num-lanes = <1>;
-> -			clocks = <&cps_syscon0 1 13>;
-> +			clocks = <&cps_clk 1 13>;
->  			status = "disabled";
->  		};
->  
-> @@ -271,7 +274,7 @@
->  			interrupts = <GIC_SPI 258 IRQ_TYPE_LEVEL_HIGH>;
->  
->  			num-lanes = <1>;
-> -			clocks = <&cps_syscon0 1 11>;
-> +			clocks = <&cps_clk 1 11>;
->  			status = "disabled";
->  		};
->  
-> @@ -298,7 +301,7 @@
->  			interrupts = <GIC_SPI 257 IRQ_TYPE_LEVEL_HIGH>;
->  
->  			num-lanes = <1>;
-> -			clocks = <&cps_syscon0 1 12>;
-> +			clocks = <&cps_clk 1 12>;
->  			status = "disabled";
->  		};
->  	};
-> -- 
-> git-series 0.9.1
+> If you're allocating out of the global allocator the memory should
+> come from the normal dma_ops ->alloc allocator - and also take
+> the attrs into account (e.g. for DMA_ATTR_NON_CONSISTENT or
+> DMA_ATTR_NO_KERNEL_MAPPING requests you don't need coherent memory)
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+The context here is noMMU but with caches - the problem being that the
+normal allocator will give back kernel memory, and there's no way to
+make that coherent with devices short of not enabling the caches in the
+first place, which is obviously undesirable. The trick is that RAM is
+aliased (in hardware) at two addresses, one of which makes CPU accesses
+non-cacheable, so by only ever accessing the RAM set aside for the
+coherent DMA pool using the non-cacheable alias (represented by the
+dma_pfn_offset) we can achieve DMA coherency.
+
+It perhaps seems a bit backwards, but we do actually end up honouring
+DMA_ATTR_NON_CONSISTENT to a degree in patch #5, as such requests are
+the only ones allowed to fall back to the normal dma_ops allocator.
+
+Robin.
