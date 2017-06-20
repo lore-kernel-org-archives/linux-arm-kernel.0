@@ -1,78 +1,48 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 20 Jun 2017 11:52:00 +0100
-Subject: [PATCH] compiler, clang: Add always_inline attribute to inline
-In-Reply-To: <alpine.DEB.2.10.1706191439090.2360@chino.kir.corp.google.com>
-References: <20170615155440.GC26471@leverpostej>
- <1497887596-8731-1-git-send-email-psodagud@codeaurora.org>
- <alpine.DEB.2.10.1706191322590.95967@chino.kir.corp.google.com>
- <47bd7df20466d5f7f557ca087b0189cf@codeaurora.org>
- <alpine.DEB.2.10.1706191439090.2360@chino.kir.corp.google.com>
-Message-ID: <20170620105200.GC28157@leverpostej>
+From: emil.l.velikov@gmail.com (Emil Velikov)
+Date: Tue, 20 Jun 2017 11:57:11 +0100
+Subject: [PATCH 1/2] drm/exynos/decon: Add include guard to the Exynos7
+ header
+In-Reply-To: <CAJKOXPfjEozEM=q4hbWRBJngNDxnkJXF37gN2Es1Ju8Qze4J1g@mail.gmail.com>
+References: <20170619163110.28173-1-krzk@kernel.org>
+ <CACvgo51db4Gk+GHAO-F=rz8vLTG6A66f1ZeHPNuAQV1Qthaavw@mail.gmail.com>
+ <CAJKOXPfjEozEM=q4hbWRBJngNDxnkJXF37gN2Es1Ju8Qze4J1g@mail.gmail.com>
+Message-ID: <CACvgo52KMMt+S-KVYnmMy9qGUL6jMD2Uj8EJWNkKUQLr0_wfAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 19, 2017 at 02:42:23PM -0700, David Rientjes wrote:
-> On Mon, 19 Jun 2017, Sodagudi Prasad wrote:
-> 
-> > > > Commit abb2ea7dfd82 ("compiler, clang: suppress warning for unused
-> > > > static inline functions") re-defining the 'inline' macro but
-> > > > __attribute__((always_inline)) is missing. Some compilers may
-> > > > not honor inline hint if always_iniline attribute not there.
-> > > > So add always_inline attribute to inline as done by
-> > > > compiler-gcc.h file.
-> > > > 
-> > > 
-> > > IIUC, __attribute__((always_inline)) was only needed for gcc versions < 4
-> > > and that the inlining decision making is improved in >= 4.  To make a
-> > > change like this, I would think that we would need to show that clang is
-> > > making suboptimal decisions.  I don't think there's a downside to making
-> > > CONFIG_OPTIMIZE_INLINING specific only to gcc.
-> > > 
-> > > If it is shown that __attribute__((always_inline)) is needed for clang as
-> > > well, this should be done as part of compiler-gcc.h to avoid duplicated
-> > > code.
-> > 
-> > Hi David,
-> > 
-> > Here is the discussion about this change -
-> > https://lkml.org/lkml/2017/6/15/396
-> > Please check mark and will's comments.
-> > 
-> 
-> Yes, the arch/arm64/include/asm/cmpxchg.h instance appears to need 
-> __always_inline as several other functions need __always_inline in 
-> arch/arm64/include/*.  It's worth making that change as you suggested in 
-> your original patch.
-> 
-> The concern, however, is inlining all "inline" functions forcefully.  The 
-> only reason this is done for gcc is because of suboptimal inlining 
-> decisions in gcc < 4.
+On 20 June 2017 at 11:02, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> On Tue, Jun 20, 2017 at 11:53 AM, Emil Velikov <emil.l.velikov@gmail.com> wrote:
+>> On 19 June 2017 at 17:31, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>>> Although header is included only once but still having an include guard
+>>> is a good practice.  To avoid confusion, add SoC prefix to existing
+>>> Exynos5433 header include guard.
+>>>
+>>> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+>>> ---
+>>>  include/video/exynos5433_decon.h | 6 +++---
+>>>  include/video/exynos7_decon.h    | 5 +++++
+>>>  2 files changed, 8 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/include/video/exynos5433_decon.h b/include/video/exynos5433_decon.h
+>>> index 78957c9626f5..b30362da5692 100644
+>>> --- a/include/video/exynos5433_decon.h
+>>> +++ b/include/video/exynos5433_decon.h
+>>> @@ -6,8 +6,8 @@
+>>>   * published by the Free Software Foundationr
+>>>   */
+>>>
+>>> -#ifndef EXYNOS_REGS_DECON_H
+>>> -#define EXYNOS_REGS_DECON_H
+>>> +#ifndef EXYNOS5433_REGS_DECON_H
+>>> +#define EXYNOS5433_REGS_DECON_H
+>>>
+>> Drop the _REGS_ part from the guard on each header? The file name/path
+>> does not have it, plus it'll save some WTF moments when
+>> exynos{5433,7}_regs_decon.h comes about.
 >
-> So the question is whether this is a single instance that can be fixed 
-> where clang un-inlining causes problems or whether that instance suggests 
-> all possible inline usage for clang absolutely requires __always_inline 
-> due to a suboptimal compiler implementation.  I would suggest the former.
+> So maybe it makes sense to reorder these patches and use the guard
+> name matching final file name?
+>
+That sounds better, IMHO.
 
-My concern here is that code has been written with the implicit
-assumption that inline means __always_inline, since that's been the case
-for years with GCC, when !ARCH_SUPPORTS_OPTIMIZED_INLINING ||
-!CONFIG_OPTIMIZE_INLINING, (i.e. for every !x86 arch).
-
-While this is the only breakage seen so far, it seems likely that
-similar breakage may exist elsewhere, and such breakage may easily be
-introduced by those only using GCC.
-
-I'd prefer to use the same guards for clang here, since that ensures
-that such code works by default across both compilers. That gives us the
-chance to test and fixup code without a violent flag day.
-
-Once we've fixed up the core arm64 code, we can select
-ARCH_SUPPORTS_OPTIMIZED_INLINING, and allow users to optionally select
-CONFIG_OPTIMIZE_INLINING (with either compiler).
-
-Once that's seen some testing, and if there's a benefit, then we can try
-to align with x86 and default to selecting CONFIG_OPTIMIZE_INLINING,
-and/or drop the config options entirely and only check the GCC version.
-
-Thanks,
-Mark.
+-Emil
