@@ -1,60 +1,76 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 21 Jun 2017 00:06:03 +0900
-Subject: [PATCH] clk: uniphier: provide NAND controller clock rate
-Message-ID: <1497971163-9206-1-git-send-email-yamada.masahiro@socionext.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Tue, 20 Jun 2017 17:07:46 +0200
+Subject: [PATCH 00/51] rtc: stop using rtc deprecated functions
+In-Reply-To: <20170620134827.ubvzhh25klaotupv@piout.net>
+References: <1497951359-13334-1-git-send-email-benjamin.gaignard@linaro.org>
+ <20170620100348.zh4ygvjjgnhxvmvl@piout.net> <20170620121011.GA13221@amd>
+ <20170620122400.sm7qqvwyj6cuzarw@piout.net> <20170620132620.GA16881@amd>
+ <6ED8E3B22081A4459DAC7699F3695FB7018CD96FCD@SW-EX-MBX02.diasemi.com>
+ <20170620134458.GA10104@amd> <20170620134827.ubvzhh25klaotupv@piout.net>
+Message-ID: <CA+M3ks68+z6nDtYM8CDpso7SxjB6Nt5E=rOc1yxx=kDz6PUeVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows the NAND driver to get the clock rate via clk_get_rate().
+2017-06-20 15:48 GMT+02:00 Alexandre Belloni
+<alexandre.belloni@free-electrons.com>:
+> On 20/06/2017 at 15:44:58 +0200, Pavel Machek wrote:
+>> On Tue 2017-06-20 13:37:22, Steve Twiss wrote:
+>> > Hi Pavel,
+>> >
+>> > On 20 June 2017 14:26, Pavel Machek wrote:
+>> >
+>> > > Subject: Re: [PATCH 00/51] rtc: stop using rtc deprecated functions
+>> > >
+>> > > On Tue 2017-06-20 14:24:00, Alexandre Belloni wrote:
+>> > > > On 20/06/2017 at 14:10:11 +0200, Pavel Machek wrote:
+>> > > > > On Tue 2017-06-20 12:03:48, Alexandre Belloni wrote:
+>> > > > > > On 20/06/2017 at 11:35:08 +0200, Benjamin Gaignard wrote:
+>> > > > > > > rtc_time_to_tm() and rtc_tm_to_time() are deprecated because they
+>> > > > > > > rely on 32bits variables and that will make rtc break in y2038/2016.
+>> > > > > >
+>> > > > > > Please don't, because this hide the fact that the hardware will not
+>> > > > > > handle dates in y2038 anyway and as pointed by Russell a few month ago,
+>> > > > > > rtc_time_to_tm will be able to catch it but the 64 bit version will
+>> > > > > > silently ignore it.
+>> > > > >
+>> > > > > Reference? Because rtc on PCs stores date in binary coded decimal, so
+>> > > > > it is likely to break in 2100, not 2038...
+>> > > >
+>> > > > I'm not saying it should be done but clearly, that is not the correct
+>> > > > thing to do for RTCs that are using a single 32 bits register to store
+>> > > > the time.
+>> > > > You give one example, I can give you three: armada38x, at91sam9,
+>> > > > at32ap700x and that just in the beginning of the series.
+>> > >
+>> > > I wanted reference to Russell's mail.
+>> >
+>> > This is it.
+>> > https://patchwork.kernel.org/patch/6219401/
+>>
+>> Thanks.
+>>
+>> Yes, that's argument against changing rtc _drivers_ for hardware that
+>> can not do better than 32bit. For generic code (such as 44/51 sysfs,
+>> 51/51 suspend test), the change still makes sense.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+What I had in mind when writing those patches was to remove the limitations
+coming from those functions usage, even more since they been marked has
+deprecated.
 
- drivers/clk/uniphier/clk-uniphier-sys.c | 15 +++++++++++----
- 1 file changed, 11 insertions(+), 4 deletions(-)
+I agree that will change nothing of hardware limitation but at least
+the limit will
+not come from the framework.
 
-diff --git a/drivers/clk/uniphier/clk-uniphier-sys.c b/drivers/clk/uniphier/clk-uniphier-sys.c
-index c8027d9..ad02181 100644
---- a/drivers/clk/uniphier/clk-uniphier-sys.c
-+++ b/drivers/clk/uniphier/clk-uniphier-sys.c
-@@ -29,11 +29,18 @@
- 	UNIPHIER_CLK_FACTOR("sd-200m", -1, "spll", 1, 10),		\
- 	UNIPHIER_CLK_FACTOR("sd-133m", -1, "spll", 1, 15)
- 
-+/* Denali driver requires clk_x rate (clk: 50MHz, clk_x & ecc_clk: 200MHz) */
- #define UNIPHIER_SLD3_SYS_CLK_NAND(idx)					\
--	UNIPHIER_CLK_GATE("nand", (idx), NULL, 0x2104, 2)
-+	UNIPHIER_CLK_FACTOR("nand-200m", -1, "spll", 1, 8),		\
-+	UNIPHIER_CLK_GATE("nand", (idx), "nand-200m", 0x2104, 2)
-+
-+#define UNIPHIER_PRO5_SYS_CLK_NAND(idx)					\
-+	UNIPHIER_CLK_FACTOR("nand-200m", -1, "spll", 1, 12),		\
-+	UNIPHIER_CLK_GATE("nand", (idx), "nand-200m", 0x2104, 2)
- 
- #define UNIPHIER_LD11_SYS_CLK_NAND(idx)					\
--	UNIPHIER_CLK_GATE("nand", (idx), NULL, 0x210c, 0)
-+	UNIPHIER_CLK_FACTOR("nand-200m", -1, "spll", 1, 10),		\
-+	UNIPHIER_CLK_GATE("nand", (idx), "nand-200m", 0x210c, 0)
- 
- #define UNIPHIER_LD11_SYS_CLK_EMMC(idx)					\
- 	UNIPHIER_CLK_GATE("emmc", (idx), NULL, 0x210c, 2)
-@@ -114,7 +121,7 @@ const struct uniphier_clk_data uniphier_pro5_sys_clk_data[] = {
- 	UNIPHIER_CLK_FACTOR("dapll2", -1, "ref", 144, 125),	/* 2949.12 MHz */
- 	UNIPHIER_CLK_FACTOR("uart", 0, "dapll2", 1, 40),
- 	UNIPHIER_CLK_FACTOR("i2c", 1, "spll", 1, 48),
--	UNIPHIER_SLD3_SYS_CLK_NAND(2),
-+	UNIPHIER_PRO5_SYS_CLK_NAND(2),
- 	UNIPHIER_PRO5_SYS_CLK_SD,
- 	UNIPHIER_SLD3_SYS_CLK_STDMAC(8),			/* HSC */
- 	UNIPHIER_PRO4_SYS_CLK_GIO(12),				/* PCIe, USB3 */
-@@ -127,7 +134,7 @@ const struct uniphier_clk_data uniphier_pxs2_sys_clk_data[] = {
- 	UNIPHIER_CLK_FACTOR("spll", -1, "ref", 96, 1),		/* 2400 MHz */
- 	UNIPHIER_CLK_FACTOR("uart", 0, "spll", 1, 27),
- 	UNIPHIER_CLK_FACTOR("i2c", 1, "spll", 1, 48),
--	UNIPHIER_SLD3_SYS_CLK_NAND(2),
-+	UNIPHIER_PRO5_SYS_CLK_NAND(2),
- 	UNIPHIER_PRO5_SYS_CLK_SD,
- 	UNIPHIER_SLD3_SYS_CLK_STDMAC(8),			/* HSC, RLE */
- 	/* GIO is always clock-enabled: no function for 0x2104 bit6 */
--- 
-2.7.4
+>>
+>
+> Yes, we agree on that but I won't cherry pick working patches from a 51
+> patches series.
+
+maybe only the acked ones ?
+
+>
+>
+> --
+> Alexandre Belloni, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
