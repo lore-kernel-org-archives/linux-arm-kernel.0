@@ -1,32 +1,58 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Tue, 20 Jun 2017 08:34:39 +0200
-Subject: [PATCH V17 00/11] Add UEFI 2.6 and ACPI 6.1 updates for RAS on
- ARM64
-In-Reply-To: <20170607115012.GZ30263@arm.com>
-References: <1495225933-4410-1-git-send-email-tbaicar@codeaurora.org>
- <20170607115012.GZ30263@arm.com>
-Message-ID: <20170620063439.GS658@rric.localdomain>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Tue, 20 Jun 2017 08:38:38 +0200
+Subject: [PATCH] arm64: dts: marvell: use new bindings for xor clocks on ap806
+Message-ID: <20170620063838.3003-1-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will,
+New bindings are used for the system controller on the ap806, which
+means all clock properties must be converted. Use the new bindings in
+the xor nodes.
 
-On 07.06.17 12:50:12, Will Deacon wrote:
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-> Thanks, I've pushed this out as:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/ras-apei
->
-> which I'll merge into for-next/core (and therefore linux-next) either the
-> end of this week or the beginning of next week. Please take a look if you
-> get a chance.
-
-any reason why there was a roll back of for-next/core?
-
- + 0870f692c2ed...e27c7fa015d6 for-next/core -> arm64/for-next/core  (forced update)
-
-Is it because for-next/ras-apei goes through tip?
-
-Thanks,
-
--Robert
+diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+index ff1964d314de..02e5aff48c81 100644
+--- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+@@ -159,7 +159,7 @@
+ 				reg = <0x400000 0x1000>,
+ 				      <0x410000 0x1000>;
+ 				msi-parent = <&gic_v2m0>;
+-				clocks = <&ap_syscon 3>;
++				clocks = <&ap_clk 3>;
+ 				dma-coherent;
+ 			};
+ 
+@@ -168,7 +168,7 @@
+ 				reg = <0x420000 0x1000>,
+ 				      <0x430000 0x1000>;
+ 				msi-parent = <&gic_v2m0>;
+-				clocks = <&ap_syscon 3>;
++				clocks = <&ap_clk 3>;
+ 				dma-coherent;
+ 			};
+ 
+@@ -177,7 +177,7 @@
+ 				reg = <0x440000 0x1000>,
+ 				      <0x450000 0x1000>;
+ 				msi-parent = <&gic_v2m0>;
+-				clocks = <&ap_syscon 3>;
++				clocks = <&ap_clk 3>;
+ 				dma-coherent;
+ 			};
+ 
+@@ -186,7 +186,7 @@
+ 				reg = <0x460000 0x1000>,
+ 				      <0x470000 0x1000>;
+ 				msi-parent = <&gic_v2m0>;
+-				clocks = <&ap_syscon 3>;
++				clocks = <&ap_clk 3>;
+ 				dma-coherent;
+ 			};
+ 
+-- 
+2.9.4
