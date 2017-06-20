@@ -1,92 +1,55 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 20 Jun 2017 09:32:16 +0200
-Subject: [GIT PULL] Improve cp110 clk support on Marvell Armada 7K/8K
-In-Reply-To: <20170620001853.GT20170@codeaurora.org> (Stephen Boyd's message
- of "Mon, 19 Jun 2017 17:18:53 -0700")
-References: <pull.28a1be390fb082d60e88c3234dd7d76fb61438b6.1497886602.git-series.gregory.clement@free-electrons.com>
- <20170620001853.GT20170@codeaurora.org>
-Message-ID: <87shiv3yin.fsf@free-electrons.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 20 Jun 2017 09:41:26 +0200
+Subject: [PATCH 2/2] i2c: zx2967: add i2c controller driver for ZTE's
+ zx2967 family
+In-Reply-To: <20170620025815.GA4818@x250>
+References: <1495947576-11037-1-git-send-email-shawnguo@kernel.org>
+ <1495947576-11037-3-git-send-email-shawnguo@kernel.org>
+ <20170619193130.velebm7p3r5ggaos@ninjato>
+ <20170620025815.GA4818@x250>
+Message-ID: <20170620074126.GA1541@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
- 
- On mar., juin 20 2017, Stephen Boyd <sboyd@codeaurora.org> wrote:
+Hi Shawn,
 
-> On 06/19, Gregory CLEMENT wrote:
->> 
->> Hi Mike, Stephen,
->> 
->> This time I turned the series in a pull request so I removed the
->> device tree binding part which will be in an other series for Rob
->> Herring and I also removed the dt part that I will take care of once
->> you will have pulled this one.
->> 
->> I hope this will be easier for you to apply this way.
->> 
->
-> Ok. It wasn't clear what was going on and I forgot to ask in the
-> lastest patch series. Pulled into clk-next, but I had to apply
-> this patch on top:
+> Oh, yes, I should have mentioned it in the cover-letter.  Instead of
+> changing MAINTAINERS file in different subsystem patch series, which may
+> introduce merge conflicts, we plan to update it with a separate patch
+> adding all driver entries that lands on mainline, and get it in through
+> arm-soc tree.  Are you okay with that?
 
-Thanks for the pull and the fix patch!
+Yup, totally fine! Good approach.
 
-Gregory
+> > Is this the error handling (NACK, etc)? Then, it got lost now since we
+> > don't reset the hardware anymore after timeouts. But that would have
+> > meant that errors are only detected after the timeout was reached
+> > instead of instantly? If so, no good design. But maybe I misunderstand.
+> 
+> Hmm, this doesn't make too much sense now, since this reset function is
+> only being called at probe time to ensure the device is in a sane
+> initial state.  There is no data transfer happening at this point at
+> all.  I will drop these error bits checking from here, and add the error
+> handling in irq handler.
 
->
-> ---8<----
-> From: Stephen Boyd <sboyd@codeaurora.org>
-> Subject: [PATCH] clk: mvebu: cp110: Minor cleanups
->
-> Mark an array of strings static const and remove the dereference
-> of a function pointer when assigning to the platform driver probe
-> struct member.
->
-> drivers/clk/mvebu/cp110-system-controller.c:89:12:
-> warning: symbol 'gate_base_names' was not declared. Should it be static?
-> drivers/clk/mvebu/cp110-system-controller.c:447:18:
-> error: cannot dereference this type
->
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/clk/mvebu/cp110-system-controller.c | 5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/clk/mvebu/cp110-system-controller.c b/drivers/clk/mvebu/cp110-system-controller.c
-> index b034b79345ec..ca9a0a536174 100644
-> --- a/drivers/clk/mvebu/cp110-system-controller.c
-> +++ b/drivers/clk/mvebu/cp110-system-controller.c
-> @@ -86,7 +86,7 @@ enum {
->  #define CP110_GATE_EIP150		25
->  #define CP110_GATE_EIP197		26
->  
-> -const char *gate_base_names[] = {
-> +static const char * const gate_base_names[] = {
->  	[CP110_GATE_AUDIO]	= "audio",
->  	[CP110_GATE_COMM_UNIT]	= "communit",
->  	[CP110_GATE_NAND]	= "nand",
-> @@ -437,14 +437,13 @@ static int cp110_clk_probe(struct platform_device *pdev)
->  	return cp110_syscon_common_probe(pdev, pdev->dev.of_node->parent);
->  }
->  
-> -
->  static const struct of_device_id cp110_syscon_legacy_of_match[] = {
->  	{ .compatible = "marvell,cp110-system-controller0", },
->  	{ }
->  };
->  
->  static struct platform_driver cp110_syscon_legacy_driver = {
-> -	.probe = *cp110_syscon_legacy_clk_probe,
-> +	.probe = cp110_syscon_legacy_clk_probe,
->  	.driver		= {
->  		.name	= "marvell-cp110-system-controller0",
->  		.of_match_table = cp110_syscon_legacy_of_match,
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+Great, thanks!
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> > How was this driver tested BTW?
+> 
+> The driver is being used to access an Audio codec on the I2C bus.
+
+Nice. Can you also run 'i2cdetect' on the bus to see if we have proper
+NAK handling? AFAICS this should be broken now. And very slow with
+previous versions of the driver.
+
+Thanks,
+
+   Wolfram
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170620/997f5aa4/attachment.sig>
