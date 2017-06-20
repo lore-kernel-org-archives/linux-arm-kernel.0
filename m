@@ -1,66 +1,49 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 20 Jun 2017 14:08:31 -0700
-Subject: [PATCH v5 0/8] Support for contiguous pte hugepages
-In-Reply-To: <871sqezsk2.fsf@e105922-lin.cambridge.arm.com>
-References: <20170619170145.25577-1-punit.agrawal@arm.com>
- <20170619150133.cb4173220e4e3abd02c6f6d0@linux-foundation.org>
- <871sqezsk2.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <20170620140831.6bd835649d475bcf30c3c434@linux-foundation.org>
+From: palmer@dabbelt.com (Palmer Dabbelt)
+Date: Tue, 20 Jun 2017 14:14:53 -0700 (PDT)
+Subject: [PATCH 03/20] asm-generic: Drop getrlimit and setrlimit syscalls
+ from default list
+In-Reply-To: <CAK8P3a1rXfrXotJa=mZf3cJu+WVWHKWjTMk8FA16xnkGvU0MmQ@mail.gmail.com>
+Message-ID: <mhng-d074cb45-69b3-40d5-bfb3-9de82ba0dab7@palmer-si-x1c4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Jun 2017 14:39:57 +0100 Punit Agrawal <punit.agrawal@arm.com> wrote:
+On Tue, 20 Jun 2017 08:27:36 PDT (-0700), Arnd Bergmann wrote:
+> On Tue, Jun 20, 2017 at 4:54 PM, Yury Norov <ynorov@caviumnetworks.com> wrote:
+>> On Tue, Jun 20, 2017 at 04:20:43PM +0200, Arnd Bergmann wrote:
+>>> On Tue, Jun 20, 2017 at 3:37 PM, Yury Norov <ynorov@caviumnetworks.com> wrote:
+>>> > On Mon, Jun 19, 2017 at 11:10:23PM +0100, James Hogan wrote:
+>>> >> On Mon, Jun 19, 2017 at 11:58:41PM +0200, Arnd Bergmann wrote:
+>
+>>> > I would also notice riscv people and welcome to the discussion.
+>>> >
+>>> > As there is more than 1 arch that goes to be added to linux soon,
+>>> > maybe it's better to upstream my ans James' patches separately
+>>> > from other ilp32 patches? Arnd?
+>>>
+>>> Do you mean upstream those two patches slightly later? That's
+>>> fine with me, I don't care much whether the old new stat is part
+>>> of the syscall table for arm64-ilp32 or not, I'd leave that up to
+>>> you, depending on whether you want to do the rework or not.
+>>
+>> I mean that if we want to deprecate rlimit and stat syscalls for
+>> architectures that are under development now, it's better to upstream
+>> patches that actually deprecate it as early as possible.
+>
+> Makes sense.
+>
+>>> I suppose the arm64-ilp32 could benefit from not having to support
+>>> the old arm32 stat structure, but doing the new syscalls based on
+>>> statx could delay the glibc port some more, as there are some open
+>>> questions about how that would best be integrated.
+>>
+>> OK. Let's leave things as is. But then I don't see any reason to
+>> add unxstat patch to ilp32 series if ilp32 will not disable it.
+>
+> Right, that's what I meant: let's leave the rlimit patch in your series
+> as it matches the work you have already done, and is the right
+> thing to do, and let's do the unxstat patch separately so it doesn't
+> cause you extra work.
 
-> 
-> The architecture supports two flavours of hugepages -
-> 
-> * Block mappings at the pud/pmd level
-> 
->   These are regular hugepages where a pmd or a pud page table entry
->   points to a block of memory. Depending on the PAGE_SIZE in use the
->   following size of block mappings are supported -
-> 
->           PMD	PUD
->           ---	---
->   4K:      2M	 1G
->   16K:    32M
->   64K:   512M
-> 
->   For certain applications/usecases such as HPC and large enterprise
->   workloads, folks are using 64k page size but the minimum hugepage size
->   of 512MB isn't very practical.
-> 
-> To overcome this ...
-> 
-> * Using the Contiguous bit
-> 
->   The architecture provides a contiguous bit in the translation table
->   entry which acts as a hint to the mmu to indicate that it is one of a
->   contiguous set of entries that can be cached in a single TLB entry.
-> 
->   We use the contiguous bit in Linux to increase the mapping size at the
->   pmd and pte (last) level.
-> 
->   The number of supported contiguous entries varies by page size and
->   level of the page table.
-> 
->   Using the contiguous bit allows additional hugepage sizes -
-> 
->            CONT PTE    PMD    CONT PMD    PUD
->            --------    ---    --------    ---
->     4K:         64K     2M         32M     1G
->     16K:         2M    32M          1G
->     64K:         2M   512M         16G
-> 
->   Of these, 64K with 4K and 2M with 64K pages have been explicitly
->   requested by a few different users.
-> 
-> Entries with the contiguous bit set are required to be modified all
-> together - which makes things like memory poisoning and migration
-> impossible to do correctly without knowing the size of hugepage being
-> dealt with - the reason for adding size parameter to a few of the
-> hugepage helpers in this series.
-> 
-
-Thanks, I added the above to the 1/n changelog.  Perhaps it's worth
-adding something like this to Documentation/vm/hugetlbpage.txt.
+Thanks for the heads up.  We're in the process of submitting glibc now with the
+goal of getting into 2.26, so I think that means we'll be stuck with stat.  I'm
+perfectly happy to deprecate whatever is feasible, though.
