@@ -1,9 +1,9 @@
 From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Tue, 20 Jun 2017 11:35:25 +0200
-Subject: [PATCH 17/51] rtc: digicolor: stop using rtc deprecated functions
+Date: Tue, 20 Jun 2017 11:35:34 +0200
+Subject: [PATCH 26/51] rtc: gemini: stop using rtc deprecated functions
 In-Reply-To: <1497951359-13334-1-git-send-email-benjamin.gaignard@linaro.org>
 References: <1497951359-13334-1-git-send-email-benjamin.gaignard@linaro.org>
-Message-ID: <1497951359-13334-18-git-send-email-benjamin.gaignard@linaro.org>
+Message-ID: <1497951359-13334-27-git-send-email-benjamin.gaignard@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,37 +12,52 @@ rely on 32bits variables and that will make rtc break in y2038/2016.
 Stop using those two functions to safer 64bits ones.
 
 Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-CC: Baruch Siach <baruch@tkos.co.il>
+CC: Hans Ulli Kroll <ulli.kroll@googlemail.com>
 CC: Alessandro Zummo <a.zummo@towertech.it>
 CC: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 CC: rtc-linux at googlegroups.com
 CC: linux-kernel at vger.kernel.org
 CC: linux-arm-kernel at lists.infradead.org
 ---
- drivers/rtc/rtc-digicolor.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/rtc/rtc-gemini.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/rtc/rtc-digicolor.c b/drivers/rtc/rtc-digicolor.c
-index b253bf1..01b0fe8 100644
---- a/drivers/rtc/rtc-digicolor.c
-+++ b/drivers/rtc/rtc-digicolor.c
-@@ -106,7 +106,7 @@ static int dc_rtc_read_time(struct device *dev, struct rtc_time *tm)
+diff --git a/drivers/rtc/rtc-gemini.c b/drivers/rtc/rtc-gemini.c
+index 5279390..222f144 100644
+--- a/drivers/rtc/rtc-gemini.c
++++ b/drivers/rtc/rtc-gemini.c
+@@ -71,7 +71,7 @@ static int gemini_rtc_read_time(struct device *dev, struct rtc_time *tm)
+ 	struct gemini_rtc *rtc = dev_get_drvdata(dev);
+ 
+ 	unsigned int  days, hour, min, sec;
+-	unsigned long offset, time;
++	unsigned long long offset, time;
+ 
+ 	sec  = readl(rtc->rtc_base + GEMINI_RTC_SECOND);
+ 	min  = readl(rtc->rtc_base + GEMINI_RTC_MINUTE);
+@@ -81,7 +81,7 @@ static int gemini_rtc_read_time(struct device *dev, struct rtc_time *tm)
+ 
+ 	time = offset + days * 86400 + hour * 3600 + min * 60 + sec;
+ 
+-	rtc_time_to_tm(time, tm);
++	rtc_time64_to_tm(time, tm);
+ 
  	return 0;
  }
- 
--static int dc_rtc_set_mmss(struct device *dev, unsigned long secs)
-+static int dc_rtc_set_mmss64(struct device *dev, time64_t secs)
+@@ -90,12 +90,12 @@ static int gemini_rtc_set_time(struct device *dev, struct rtc_time *tm)
  {
- 	struct dc_rtc *rtc = dev_get_drvdata(dev);
+ 	struct gemini_rtc *rtc = dev_get_drvdata(dev);
+ 	unsigned int sec, min, hour, day;
+-	unsigned long offset, time;
++	unsigned long long offset, time;
  
-@@ -161,7 +161,7 @@ static int dc_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
+ 	if (tm->tm_year >= 2148)	/* EPOCH Year + 179 */
+ 		return -EINVAL;
  
- static const struct rtc_class_ops dc_rtc_ops = {
- 	.read_time		= dc_rtc_read_time,
--	.set_mmss		= dc_rtc_set_mmss,
-+	.set_mmss64		= dc_rtc_set_mmss64,
- 	.read_alarm		= dc_rtc_read_alarm,
- 	.set_alarm		= dc_rtc_set_alarm,
- 	.alarm_irq_enable	= dc_rtc_alarm_irq_enable,
+-	rtc_tm_to_time(tm, &time);
++	time = rtc_tm_to_time64(tm);
+ 
+ 	sec = readl(rtc->rtc_base + GEMINI_RTC_SECOND);
+ 	min = readl(rtc->rtc_base + GEMINI_RTC_MINUTE);
 -- 
 1.9.1
