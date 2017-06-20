@@ -1,85 +1,72 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 20 Jun 2017 10:03:53 -0700
-Subject: [PATCH v3 0/4] Generalize fncpy availability
-In-Reply-To: <962aa9c2-05a2-e109-8126-7e18ef9b157b@arm.com>
-References: <20170617000744.22158-1-f.fainelli@gmail.com>
- <20170619122444.GJ10246@leverpostej>
- <c8b7789c-38fb-6793-050f-7c60ccb8ca17@broadcom.com>
- <20170620091025.GA26846@red-moon>
- <3834f2fa-5ac0-5b48-7c19-a1b68c1e9c65@gmail.com>
- <962aa9c2-05a2-e109-8126-7e18ef9b157b@arm.com>
-Message-ID: <e4d75953-b12f-7157-d3a7-84a5f417cac9@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 20 Jun 2017 18:07:00 +0100
+Subject: [PATCH v3 2/4] arm64: kgdb: disable interrupts while a software
+ step is enabled
+In-Reply-To: <20170620024333.GE4820@linaro.org>
+References: <20170523043058.5463-1-takahiro.akashi@linaro.org>
+ <20170523043058.5463-3-takahiro.akashi@linaro.org>
+ <20170605162919.GN21944@arm.com>
+ <20170607053449.GE26483@linaro.org> <20170607165018.GD2669@arm.com>
+ <20170620024333.GE4820@linaro.org>
+Message-ID: <20170620170659.GB28035@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2017 09:54 AM, Sudeep Holla wrote:
+On Tue, Jun 20, 2017 at 11:43:34AM +0900, AKASHI Takahiro wrote:
+> On Wed, Jun 07, 2017 at 05:50:18PM +0100, Will Deacon wrote:
+> > On Wed, Jun 07, 2017 at 02:34:50PM +0900, AKASHI Takahiro wrote:
+> > > On Mon, Jun 05, 2017 at 05:29:19PM +0100, Will Deacon wrote:
+> > > > On Tue, May 23, 2017 at 01:30:56PM +0900, AKASHI Takahiro wrote:
+> > > > > After entering kgdb mode, 'stepi' may unexpectedly breaks the execution
+> > > > > somewhere in el1_irq.
+> > > > > 
+> > > > > This happens because a debug exception is always enabled in el1_irq
+> > > > > due to the following commit merged in v3.16:
+> > > > >   commit 2a2830703a23 ("arm64: debug: avoid accessing mdscr_el1 on fault
+> > > > > 			paths where possible")
+> > > > > A pending interrupt can be taken after kgdb has enabled a software step,
+> > > > > but before a debug exception is actually taken.
+> > > > > 
+> > > > > This patch enforces interrupts to be masked while single stepping.
+> > > > 
+> > > > The desired behaviour here boils down to whether or not KGDB expects to step
+> > > > into or over interrupts in response a stepi instruction. What do other
+> > > > architectures do?
+> > > 
+> > > I don't know x86 case, but if we step into interrupt code here,
+> > > doing stepi on a normal function will be almost useless as every
+> > > attempt of stepi will end up falling into irq code (mostly for timer
+> > > interrupt).
+> > > 
+> > > > What happens if the instruction being stepped faults?
+> > > 
+> > > Well, as a matter of fact, we get a gdb control somewhere in exception code
+> > > (actually just after 'enable_dbg' in el1_sync).
+> > 
+> > Ok, but don't we need to re-enable interrupts, otherwise we can't safely
+> > handle the fault (which might involve blocking)?
 > 
-> 
-> On 20/06/17 17:20, Florian Fainelli wrote:
->> On 06/20/2017 02:10 AM, Lorenzo Pieralisi wrote:
->>> [+Sudeep]
->>>
->>> On Mon, Jun 19, 2017 at 10:32:38AM -0700, Florian Fainelli wrote:
->>>> On 06/19/2017 05:24 AM, Mark Rutland wrote:
->>>>> On Fri, Jun 16, 2017 at 05:07:40PM -0700, Florian Fainelli wrote:
->>>>>> Hi all,
->>>>>
->>>>> Hi Florian,
->>>>>
->>>>>> This patch series makes ARM's fncpy() implementation more generic (dropping the
->>>>>> Thumb-specifics) and available in an asm-generic header file.
->>>>>>
->>>>>> Tested on a Broadcom ARM64 STB platform with code that is written to SRAM.
->>>>>>
->>>>>> Changes in v3 (thanks Doug!):
->>>>>> - correct include guard names in asm-generic/fncpy.h to __ASM_FNCPY_H
->>>>>> - utilize Kbuild to provide the fncpy.h header on ARM64
->>>>>>
->>>>>> Changes in v2:
->>>>>> - leave the ARM implementation where it is
->>>>>> - make the generic truly generic (no)
->>>>>>
->>>>>> This is helpful in making SoC-specific power management code become true drivers
->>>>>> that can be shared between different architectures.
->>>>>> Could you elaborate on what this is needed for?
->>>>
->>>> Several uses cases come to mind:
->>>>
->>>> - it could be used as a trampoline code prior to entering S2 for systems
->>>> that do not support PSCI 1.0
->>>
->>> I think S2 here means PM_SUSPEND_MEM. It is very wrong to manage power
->>> states through platform specific hooks on PSCI based systems, consider
->>> upgrading to PSCI 1.0 please (or implement PSCI CPU_SUSPEND power
->>> states that allow to achieve same power savings as PM_SUSPEND_MEM
->>> by just entering suspend-to-idle).
->>
->> S2 is PM_SUSPEND_STANDBY and S3 is PM_SUSPEND_MEM, at least that how I
->> read it. I would rather we update to PSCI 1.0 (at least) to properly
->> support SYSTEM_SUSPEND rather than retrofitting a system-wide suspend
->> state into CPU_SUSPEND since that seems wrong.
->>
-> 
-> This has been discussed multiple times in the past. No one has come back
-> with strong reason to add that to the PSCI SYSTEM_SUSPEND API.
-> 
-> Care to explain the difference between PM_SUSPEND_STANDBY and S3 is
-> PM_SUSPEND_MEM on your platform. And why it can't be achieved with
-> suspend-to-idle ?
+> I thought a lot, but have got no other way to solve the issue, which
+> totally makes stepi in vain.
+> In theory, you might be right, but in practice, people don't always expect
+> to step through the whole sequence of fault recovery with single stepping.
+> Once we do 'c(ontinue),' interrupts are enabled again and the execution
+> will follow as expected.
 
-S2 preserves the ON/OFF island power and allows wake logic to wake the
-system (infrared, GPIOs, Wake-on-LAN/WLAN, etc.) whereas S3 allows
-powering off the ON/OFF island entirely, and allows for a lower power
-consumption, with a subset of the wake peripherals to actually wake the
-system. S5 is also implemented although its use case is narrower (soft-off).
+It's not the stepping guarantees I'm worried about. I'm more worried that
+the fault handler panics because it's called with IRQs disabled, so the
+debugger has ended up changing the behaviour of the kernel which is
+absolutely not what you want!
 
-The higher latency involved in S3 entry/exit is totally accepted due to
-the higher power savings that it yields.
-
+> If you want to 'step over' a faulted instruction here, or to break
+> somewhere in a middle of exception handler, you need to manage to set
+> a breakpoint explicitly. But it will, I believe, be much better than
+> useless stepi from day-1 :)
 > 
-> You can always report any issue with PSCI specification at
-> errata at arm.com as mentioned in the document.
+> Meanwhile, kprobes also disables interrupts while single stepping.
+> See setup_singlestep().
 
-I just did because there are a few other things missing.
--- 
-Florian
+Sure, but I don't think those instructions can fault. Can KGDB make the same
+guarantees?
+
+Will
