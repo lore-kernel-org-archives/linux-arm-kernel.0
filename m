@@ -1,89 +1,78 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Tue, 20 Jun 2017 11:49:11 +0100
-Subject: [PATCH v3 19/21] dt-bindings: mmc: dw_mmc-k3: add document of
- hi3660 mmc
-In-Reply-To: <CAPDyKFozmMED7ytofXTgHhWH=Ro_38r4iCCdoO6+rq-AznrSDQ@mail.gmail.com>
-References: <20170614082338.15673-1-guodong.xu@linaro.org>
- <20170614082338.15673-20-guodong.xu@linaro.org>
- <CAPDyKFpvJu8_TETWr0Vy4ubDC7NYvi7TxmSLYZyw33qHFsoNaQ@mail.gmail.com>
- <5947CAD8.4040607@hisilicon.com>
- <CAPDyKFo=hqp=j=nWpO8uf_0pGTSKjN0T-ZKqD8cuKp1C3Q2_hA@mail.gmail.com>
- <5948F1F9.90903@hisilicon.com>
- <CAPDyKFozmMED7ytofXTgHhWH=Ro_38r4iCCdoO6+rq-AznrSDQ@mail.gmail.com>
-Message-ID: <5948FDA7.1040100@hisilicon.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 20 Jun 2017 11:52:00 +0100
+Subject: [PATCH] compiler, clang: Add always_inline attribute to inline
+In-Reply-To: <alpine.DEB.2.10.1706191439090.2360@chino.kir.corp.google.com>
+References: <20170615155440.GC26471@leverpostej>
+ <1497887596-8731-1-git-send-email-psodagud@codeaurora.org>
+ <alpine.DEB.2.10.1706191322590.95967@chino.kir.corp.google.com>
+ <47bd7df20466d5f7f557ca087b0189cf@codeaurora.org>
+ <alpine.DEB.2.10.1706191439090.2360@chino.kir.corp.google.com>
+Message-ID: <20170620105200.GC28157@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uffe,
-
-On 2017/6/20 11:28, Ulf Hansson wrote:
-> On 20 June 2017 at 11:59, Wei Xu <xuwei5@hisilicon.com> wrote:
->> Hi Uffe,
->>
->> On 2017/6/20 9:36, Ulf Hansson wrote:
->>> Hi Wei,
->>>
->>> On 19 June 2017 at 15:00, Wei Xu <xuwei5@hisilicon.com> wrote:
->>>> Hi Ulf,
->>>>
->>>> On 2017/6/19 13:43, Ulf Hansson wrote:
->>>>> On 14 June 2017 at 10:23, Guodong Xu <guodong.xu@linaro.org> wrote:
->>>>>> Add bindings for hi3660 mmc support
->>>>>>
->>>>>> Signed-off-by: Li Wei <liwei213@huawei.com>
->>>>>> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
->>>>>> ---
->>>>>>  Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt | 1 +
->>>>>>  1 file changed, 1 insertion(+)
->>>>>>
->>>>>> diff --git a/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
->>>>>> index df37058..8af1afc 100644
->>>>>> --- a/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
->>>>>> +++ b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
->>>>>> @@ -12,6 +12,7 @@ extensions to the Synopsys Designware Mobile Storage Host Controller.
->>>>>>  Required Properties:
->>>>>>
->>>>>>  * compatible: should be one of the following.
->>>>>> +  - "hisilicon,hi3660-dw-mshc": for controllers with hi3660 specific extensions.
->>>>>>    - "hisilicon,hi4511-dw-mshc": for controllers with hi4511 specific extensions.
->>>>>>    - "hisilicon,hi6220-dw-mshc": for controllers with hi6220 specific extensions.
->>>>>>
->>>>>> --
->>>>>> 2.10.2
->>>>>>
->>>>>
->>>>> Thanks, applied for next!
->>>>
->>>> Thanks!
->>>> Last week I had applied the v4 patch set[1]
->>>> and this patch is included.
->>>> But it should be fine for the upper gatekeeper to merge
->>>> since these 2 patch are same.
->>>
->>> No, that's not how git works.
->>>
->>> If the patch has the same hash, that would be fine, but that isn't the
->>> case here as we have two different hashes for the same change.
->>
->> Got it. Thanks for your explaining!
->>
->>>
->>> To deal with this, I have just dropped the change from my tree and
->>> leave it to you to carry the patch. Feel free to add my ack for it.
->>
->> Thanks!
->> But the pull request I sent last week has been merged.
+On Mon, Jun 19, 2017 at 02:42:23PM -0700, David Rientjes wrote:
+> On Mon, 19 Jun 2017, Sodagudi Prasad wrote:
 > 
-> No worries, it's fine even without my ack this time.
-
-Thanks for your kindness!
-
-Best Regards,
-Wei
-
+> > > > Commit abb2ea7dfd82 ("compiler, clang: suppress warning for unused
+> > > > static inline functions") re-defining the 'inline' macro but
+> > > > __attribute__((always_inline)) is missing. Some compilers may
+> > > > not honor inline hint if always_iniline attribute not there.
+> > > > So add always_inline attribute to inline as done by
+> > > > compiler-gcc.h file.
+> > > > 
+> > > 
+> > > IIUC, __attribute__((always_inline)) was only needed for gcc versions < 4
+> > > and that the inlining decision making is improved in >= 4.  To make a
+> > > change like this, I would think that we would need to show that clang is
+> > > making suboptimal decisions.  I don't think there's a downside to making
+> > > CONFIG_OPTIMIZE_INLINING specific only to gcc.
+> > > 
+> > > If it is shown that __attribute__((always_inline)) is needed for clang as
+> > > well, this should be done as part of compiler-gcc.h to avoid duplicated
+> > > code.
+> > 
+> > Hi David,
+> > 
+> > Here is the discussion about this change -
+> > https://lkml.org/lkml/2017/6/15/396
+> > Please check mark and will's comments.
+> > 
 > 
-> Kind regards
-> Uffe
+> Yes, the arch/arm64/include/asm/cmpxchg.h instance appears to need 
+> __always_inline as several other functions need __always_inline in 
+> arch/arm64/include/*.  It's worth making that change as you suggested in 
+> your original patch.
 > 
-> .
-> 
+> The concern, however, is inlining all "inline" functions forcefully.  The 
+> only reason this is done for gcc is because of suboptimal inlining 
+> decisions in gcc < 4.
+>
+> So the question is whether this is a single instance that can be fixed 
+> where clang un-inlining causes problems or whether that instance suggests 
+> all possible inline usage for clang absolutely requires __always_inline 
+> due to a suboptimal compiler implementation.  I would suggest the former.
+
+My concern here is that code has been written with the implicit
+assumption that inline means __always_inline, since that's been the case
+for years with GCC, when !ARCH_SUPPORTS_OPTIMIZED_INLINING ||
+!CONFIG_OPTIMIZE_INLINING, (i.e. for every !x86 arch).
+
+While this is the only breakage seen so far, it seems likely that
+similar breakage may exist elsewhere, and such breakage may easily be
+introduced by those only using GCC.
+
+I'd prefer to use the same guards for clang here, since that ensures
+that such code works by default across both compilers. That gives us the
+chance to test and fixup code without a violent flag day.
+
+Once we've fixed up the core arm64 code, we can select
+ARCH_SUPPORTS_OPTIMIZED_INLINING, and allow users to optionally select
+CONFIG_OPTIMIZE_INLINING (with either compiler).
+
+Once that's seen some testing, and if there's a benefit, then we can try
+to align with x86 and default to selecting CONFIG_OPTIMIZE_INLINING,
+and/or drop the config options entirely and only check the GCC version.
+
+Thanks,
+Mark.
