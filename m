@@ -1,43 +1,58 @@
-From: daniel@iogearbox.net (Daniel Borkmann)
-Date: Tue, 20 Jun 2017 18:55:03 +0200
-Subject: [PATCH v2] arm: eBPF JIT compiler
-In-Reply-To: <CAHgaXdLtX6yLdU3bMvS=g8FZ79sM_BW_+hHTMH=Mfk4TZqUnpw@mail.gmail.com>
-References: <1495754003-21099-1-git-send-email-illusionist.neo@gmail.com>
- <CAGXu5jKmLNMR+uhM9Ov2XPW6kCjip_SjScgEH0fTFp6fQtKFiA@mail.gmail.com>
- <593E6B0F.8070901@iogearbox.net>
- <CAHgaXd+DW2bggto=2S9hOdMrtPTvhD2QN4rPf2V8iHewQpg-YA@mail.gmail.com>
- <CAHgaXdJrvKdzr3fJ1TMkC4foeVsZJDSVEwhDOeZGxQVsmoK2cQ@mail.gmail.com>
- <59419D1E.2060303@iogearbox.net>
- <CAHgaXdKMbFPgy-kKF0iDSAYo4CqLn9FRu9HwM+OfM-JWb9fNRQ@mail.gmail.com>
- <594813AA.5010001@iogearbox.net>
- <CAHgaXdLtX6yLdU3bMvS=g8FZ79sM_BW_+hHTMH=Mfk4TZqUnpw@mail.gmail.com>
-Message-ID: <59495367.3080402@iogearbox.net>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Tue, 20 Jun 2017 17:55:52 +0100
+Subject: [PATCH v5 1/4] ARM: dts: at91: sama5d2_xplained: enable ADTRG pin
+In-Reply-To: <1497533097-12052-2-git-send-email-eugen.hristev@microchip.com>
+References: <1497533097-12052-1-git-send-email-eugen.hristev@microchip.com>
+ <1497533097-12052-2-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <20170620175552.2ec49c56@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2017 03:34 AM, Shubham Bansal wrote:
-> Hi Daniel,
->
->> Sorry, had a travel over the weekend, so didn't read it in time.
->>
->> What is the issue with imitating in JIT what the interpreter is
->> doing as a starting point? That should be generic enough to handle
->> any case.
+On Thu, 15 Jun 2017 16:24:54 +0300
+Eugen Hristev <eugen.hristev@microchip.com> wrote:
 
-Why not proceeding this way first?
+> Enable pinctrl for ADTRG pin (PD31) for ADC hardware trigger support.
+> 
+> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+> Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+The driver changes are on their way upstream.
 
->> Otherwise you'd need some sort of reverse mapping since verifier
->> already converted BPF_CALL insns into relative helper addresses
->> in imm part.
->>
-> Sorry but I don't get what you are trying to say. Can you explain it
-> with an example?
-
-Ok, probably the best is to check fixup_bpf_calls() in the verifier,
-see the fn = prog->aux->ops->get_func_proto(insn->imm). It fetches the
-helper function specification based on the BPF_FUNC_* enum and converts
-the imm field into a relative address for the function such that if
-you look at ___bpf_prog_run(), JMP_CALL label, the call address can
-be reconstructed again. So you'd need some reverse mapping to get back
-to the struct bpf_func_proto, so you can check argX_type that needs to
-be extended with whether its JITable on 32bit or not.
+Acked-by: Jonathan Cameron <jic23@kernel.org>
+> ---
+>  arch/arm/boot/dts/at91-sama5d2_xplained.dts | 16 +++++++++++++++-
+>  1 file changed, 15 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+> index 0bef9e0..04754b1 100644
+> --- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+> +++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+> @@ -303,7 +303,7 @@
+>  				vddana-supply = <&vdd_3v3_lp_reg>;
+>  				vref-supply = <&vdd_3v3_lp_reg>;
+>  				pinctrl-names = "default";
+> -				pinctrl-0 = <&pinctrl_adc_default>;
+> +				pinctrl-0 = <&pinctrl_adc_default &pinctrl_adtrg_default>;
+>  				status = "okay";
+>  			};
+>  
+> @@ -322,6 +322,20 @@
+>  					bias-disable;
+>  				};
+>  
+> +				/*
+> +				 * The ADTRG pin can work on any edge type.
+> +				 * In here it's being pulled up, so need to
+> +				 * connect it to ground to get an edge e.g.
+> +				 * Trigger can be configured on falling, rise
+> +				 * or any edge, and the pull-up can be changed
+> +				 * to pull-down or left floating according to
+> +				 * needs.
+> +				 */
+> +				pinctrl_adtrg_default: adtrg_default {
+> +					pinmux = <PIN_PD31__ADTRG>;
+> +					bias-pull-up;
+> +				};
+> +
+>  				pinctrl_charger_chglev: charger_chglev {
+>  					pinmux = <PIN_PA12__GPIO>;
+>  					bias-disable;
