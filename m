@@ -1,45 +1,77 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Tue, 20 Jun 2017 06:40:56 +0200
-Subject: [PATCH v6 1/4] nvmem: dt: document SNVS LPGPR binding
-In-Reply-To: <20170620044059.16113-1-o.rempel@pengutronix.de>
-References: <20170620044059.16113-1-o.rempel@pengutronix.de>
-Message-ID: <20170620044059.16113-2-o.rempel@pengutronix.de>
+From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
+Date: Tue, 20 Jun 2017 13:51:50 +0900
+Subject: [PATCH v2] drm/exynos/dsi: Remove error handling for
+ bridge_node DT parsing
+In-Reply-To: <e8ea4c40-4065-54de-7277-26c236bab36a@math.uni-bielefeld.de>
+References: <CGME20170614063359epcas5p46658bba447468cd367d0684bd9485bf8@epcas5p4.samsung.com>
+ <1497422020-8810-1-git-send-email-hoegeun.kwon@samsung.com>
+ <e8ea4c40-4065-54de-7277-26c236bab36a@math.uni-bielefeld.de>
+Message-ID: <435f9640-379d-acfd-a445-50a2894a1259@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Documentation bindings for the Low Power General Purpose Register
-available on i.MX6 SoCs in the Secure Non-Volatile Storage.
+Hello Tobias,
 
-Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
----
- .../devicetree/bindings/nvmem/snvs-lpgpr.txt          | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
+Sorry for late reply.
 
-diff --git a/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt b/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
-new file mode 100644
-index 000000000000..21910fb3159f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
-@@ -0,0 +1,19 @@
-+Device tree bindings for Low Power General Purpose Register found in i.MX6Q/D
-+Secure Non-Volatile Storage.
-+
-+This DT node should be represented as a sub-node of a "syscon",
-+"simple-mfd" node.
-+
-+Required properties:
-+- compatible: should be:
-+	"fsl,imx6q-snvs-lpgpr" for Freescale i.MX6Q/D/DL/S
-+
-+Example:
-+snvs: snvs at 020cc000 {
-+	compatible = "fsl,sec-v4.0-mon", "syscon", "simple-mfd";
-+	reg = <0x020cc000 0x4000>;
-+
-+	snvs_lpgpr: snvs-lpgpr {
-+		compatible = "fsl,imx6q-snvs-lpgpr";
-+	};
-+};
--- 
-2.11.0
+On 06/14/2017 09:30 PM, Tobias Jakobi wrote:
+> Hello Hoegeun,
+>
+> my last question (does this regress the case "node required, but
+> absent") still stands.
+>
+>
+> Hoegeun Kwon wrote:
+>> Remove the error handling of bridge_node because the bridge_node is
+>> required optionally.
+> I don't think a construction like that exists. Either it's required, or
+> it's optional. "required optionally" makes no sense to me (but I'm not a
+> native speaker).
+>
+> - Tobias
+
+The bridge_node is optional.
+I will change commit message and send ver3 patch.
+
+Best regards,
+Hoegeun
+
+>
+>
+>> For example, In case of Exynos SoC, a bridge device such as mDNIe and
+>> MIC could be placed between Display Controller and MIPI DSI device but
+>> the bridge device is required optionally.
+>>
+>> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
+>> ---
+>>
+>> Hi Inki and Tobias,
+>>
+>> Thanks for your review.
+>>
+>> Changes for V2:
+>> - Modified the commit message in more detail than before.
+>>
+>> Best Regards,
+>> Hoegeun
+>>
+>>   drivers/gpu/drm/exynos/exynos_drm_dsi.c | 2 --
+>>   1 file changed, 2 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+>> index a11b795..6ee0dac 100644
+>> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+>> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+>> @@ -1651,8 +1651,6 @@ static int exynos_dsi_parse_dt(struct exynos_dsi *dsi)
+>>   		return ret;
+>>   
+>>   	dsi->bridge_node = of_graph_get_remote_node(node, DSI_PORT_IN, 0);
+>> -	if (!dsi->bridge_node)
+>> -		return -EINVAL;
+>>   
+>>   	return 0;
+>>   }
+>>
+>
+>
+>
