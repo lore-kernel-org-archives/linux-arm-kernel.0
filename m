@@ -1,121 +1,83 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 19 Jun 2017 19:03:23 -0700
-Subject: [GIT PULL] ARM: Medaitek armv7 DTS for v4.13
-In-Reply-To: <1497924044.22079.3.camel@mtkswgap22>
-References: <5056d433-90b3-a3ca-4df7-9ff02ab6027b@gmail.com>
- <20170619023437.GV30022@localhost> <1497924044.22079.3.camel@mtkswgap22>
-Message-ID: <CAOesGMihRCAySi38X1Ncx3G0WwW71m9ZBMTo7MghXJx8t0D2mQ@mail.gmail.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Tue, 20 Jun 2017 07:57:09 +0530
+Subject: [PATCH v3 1/2] acpica: iort: Update SMMUv3 header for proximity
+ domain mapping
+In-Reply-To: <0d0d6cb6-7674-5751-d780-af5114ddd569@arm.com>
+References: <1496897059-8272-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <1496897059-8272-2-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <0d0d6cb6-7674-5751-d780-af5114ddd569@arm.com>
+Message-ID: <CAFpQJXVE8pfmbn5b+5ngiJ01OVLH-pLn7zhpzWX2+62SR1L_qA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 19, 2017 at 7:00 PM, Sean Wang <sean.wang@mediatek.com> wrote:
-> On Sun, 2017-06-18 at 19:34 -0700, Olof Johansson wrote:
->> On Mon, Jun 12, 2017 at 12:31:47PM +0200, Matthias Brugger wrote:
->> > Hi Arnd and Olof,
->> >
->> > Please find below my merge request for armv7 device tree changes.
->> >
->> > Regards,
->> > Matthias
->> >
->> > ---
->> >
->> > The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
->> >
->> >   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
->> >
->> > are available in the git repository at:
->> >
->> >   https://github.com/mbgg/linux-mediatek.git tags/v4.12-next-dts32
->> >
->> > for you to fetch changes up to aac5e972d4c7bc728df605f5427d9c2458c34ea9:
->> >
->> >   arm: dts: mediatek: Add audio driver node for MT2701 (2017-06-07 10:47:25
->> > +0200)
+On Mon, Jun 19, 2017 at 11:24 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> On 08/06/17 05:44, Ganapatrao Kulkarni wrote:
+>> ARM IORT specification (rev. C) has added two new fields to define
+>> proximity domain for the SMMUv3 node in the IORT table.
 >>
->> Thanks, merged. Comment below:
+>> Proximity Domain Valid:
+>>       Set to 1 if the value provided in the Proximity Domain field is
+>>       valid. Set to 0 otherwise.
 >>
->> >
->> > ----------------------------------------------------------------
->> > Add device tree nodes for
->> > mt7623:
->> > - clocks
->> > - power domain
->> > - pmic-wrapper
->> > - pinctrl
->> > - i2c
->> > - spi
->> > - nand
->> > - mmc
->> > - usb
->> > - pwm
->> > - ethernet
->> > - crypto engine
->> > - infared remote control
->> > - audio controller
->> > - ADC
->> > - efuse
->> > - thermal driver
->> > - HW random generator
->> >
->> > mt2701:
->> > - NOR flash
->> > - JPEG decoder
->> > - i2c
->> > - audio controller
->> >
->> > ----------------------------------------------------------------
->> > Garlic Tseng (1):
->> >       arm: dts: mediatek: Add audio driver node for MT2701
->> >
->> > Guochun Mao (1):
->> >       arm: dts: mt2701: add nor flash node
->> >
->> > John Crispin (9):
->> >       arm: dts: mt7623: add clock controller device nodes
->> >       arm: dts: mt7623: add subsystem clock controller device nodes
->> >       arm: dts: mt7623: add power domain controller device node
->> >       arm: dts: mt7623: add pinctrl nodes to the mt7623 dtsi file
->> >       arm: dts: mt7623: add pmic wrapper nodes to the mt7623 dtsi file
->> >       arm: dts: mt7623: add i2c nodes to the mt7623.dtsi file
->> >       arm: dts: mt7623: add nand nodes to the mt7623.dtsi file
->> >       arm: dts: mt7623: add mmc nodes to the mt7623.dtsi file
->> >       arm: dts: mt7623: add usb nodes to the mt7623.dtsi file
->> >
->> > Jun Gao (1):
->> >       arm: dts: Add Mediatek MT2701 i2c device node
->> >
->> > Rick Chang (1):
->> >       arm: dts: mt2701: Add node for Mediatek JPEG Decoder
->> >
->> > Sean Wang (11):
->> >       arm: dts: mt7623: add spi nodes to the mt7623.dtsi file
->> >       arm: dts: mt7623: add pwm nodes to the mt7623.dtsi file
->> >       arm: dts: mt7623: add ethernet nodes to the mt7623.dtsi file
->> >       arm: dts: mt7623: add crypto engine nodes to the mt7623.dtsi file
->> >       arm: dts: mt7623: add ir nodes to the mt7623.dtsi file
->> >       arm: dts: mt7623: add afe nodes to the mt7623.dtsi file
->> >       arm: dts: mt7623: add rng nodes to the mt7623.dtsi file
->> >       arm: dts: mt7623: add auxadc nodes to the mt7623.dtsi file
->> >       arm: dts: mt7623: add efuse nodes to the mt7623.dtsi file
->> >       arm: dts: mt7623: add thermal nodes to the mt7623.dtsi file
->> >       arm: dts: mt7623: add Sean as one of authors for mt7623.dtsi files
+>> Proximity domain:
+>>       If the Proximity Domain Valid flag is set to 1, this entry
+>>       provides the proximity domain to which this SMMU
+>>       instance belongs.
 >>
->> This excessive patch splitting probably isn't warranted. In the future,
->> especially for new and major updates like this, a single patch (or one per
->> author) should do just fine.
+>> Update header file to reflect this.
+>>
+>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>> ---
+>>  include/acpi/actbl2.h | 4 ++++
+>>  1 file changed, 4 insertions(+)
+>>
+>> diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
+>> index 4b306a6..389e91f 100644
+>> --- a/include/acpi/actbl2.h
+>> +++ b/include/acpi/actbl2.h
+>> @@ -805,6 +805,9 @@ struct acpi_iort_smmu_v3 {
+>>       u32 pri_gsiv;
+>>       u32 gerr_gsiv;
+>>       u32 sync_gsiv;
+>> +     u8 pxm;
+>> +     u8 reserved1;
+>> +     u16 reserved2;
+>
+> Why add the padding if you're not also adding the following field that
+> it aligns? (side note: could it not just be a u8[3]?)
+
+added to align as well to comply with  the spec.
+
+>
+> If the actual structure definition is changing, do there not need to be
+> corresponding IASL changes too?
+
+yes, it is been added and sent to acpica devel ML.
+https://lists.acpica.org/pipermail/devel/2017-June/001243.html
+
+>
+>>  };
+>>
+>>  /* Values for Model field above */
+>> @@ -817,6 +820,7 @@ struct acpi_iort_smmu_v3 {
+>>
+>>  #define ACPI_IORT_SMMU_V3_COHACC_OVERRIDE   (1)
+>>  #define ACPI_IORT_SMMU_V3_HTTU_OVERRIDE     (1<<1)
+>> +#define ACPI_IORT_SMMU_V3_PXM_VALID         (1<<3)
+>
+> Maybe it's just me, but "PXM" seems incredibly cryptic.
+
+PXM stands for proximity(refer ACPI spec)
+it is widely used in spec and also in Linux kernel.
+
+>
+> Robin.
+>
+>>
+>>  /*******************************************************************************
+>>   *
 >>
 >
-> Hi Olof,
->
-> Got it. I will make a single patch for new SoC supported.
 
-Of course, use your judgement if there's something special or new
-(especially complex bindings) that you want to highlight in a separate
-patch, but for the basic setup just adding the basic nodes, doing that
-in one file is usually the way we do it.
-
-Thanks!
-
-
--Olof
+thanks
+Ganapat
