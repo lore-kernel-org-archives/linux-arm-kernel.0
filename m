@@ -1,46 +1,48 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Tue, 20 Jun 2017 14:03:35 -0500
-Subject: [PATCH v2 2/2] memory: ti-emif-sram: introduce relocatable
- suspend/resume handlers
-In-Reply-To: <20170620144243.GB23750@n2100.armlinux.org.uk>
-References: <20170519175708.6070-1-d-gerlach@ti.com>
- <20170519175708.6070-3-d-gerlach@ti.com>
- <20170620144243.GB23750@n2100.armlinux.org.uk>
-Message-ID: <fdfa1059-17f7-74f7-4b88-2941af07a538@ti.com>
+From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
+Date: Tue, 20 Jun 2017 21:07:40 +0200
+Subject: [PATCH] arm64: pass machine size to sparse
+In-Reply-To: <20170620170401.GA28035@arm.com>
+References: <20170620122443.35880-1-luc.vanoostenryck@gmail.com>
+ <20170620154938.GH21131@arm.com>
+ <20170620162431.zi6qd3jby7shyu46@ltop.local>
+ <20170620170401.GA28035@arm.com>
+Message-ID: <20170620190739.ijtpo3ekibxi47qj@ltop.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On 06/20/2017 09:42 AM, Russell King - ARM Linux wrote:
-> On Fri, May 19, 2017 at 12:57:08PM -0500, Dave Gerlach wrote:
->> +	.arm
->> +	.align 3
->> +
->> +ENTRY(ti_emif_sram)
+On Tue, Jun 20, 2017 at 06:04:01PM +0100, Will Deacon wrote:
+> On Tue, Jun 20, 2017 at 06:24:32PM +0200, Luc Van Oostenryck wrote:
+> > On Tue, Jun 20, 2017 at 04:49:39PM +0100, Will Deacon wrote:
+> > > Looks fine to me, but just wondering whether or not we should also be
+> > > passing something to indicate the endianness of the target. Does sparse care
+> > > about that?
+> > 
+> > Yes, we should. sparse doesn't care per-se but some macros, structures
+> > or whole portion of code may depends on '__{LITTLE,BIG}_ENDIAN__'
+> > being defined or not, for example (but I don't think it will make
+> > a big difference, at least nothing like the 629904 'constant is so big'
+> > warnings we have now due to the missing -m64).
+> > 
+> > For this, you have two possibilities:
+> > 1) just doing something like PPC:
+> > 	+ifdef CONFIG_CPU_BIG_ENDIAN
+> > 	+CHECKFLAGS     += -D__BIG_ENDIAN__
+> > 	+else
+> > 	+CHECKFLAGS     += -D__LITTLE_ENDIAN__
+> > 	+endif
+> >    This will work now. I can't send you a proper patch if you wish.
+> > 
+> > 2) a cleaner solution, IMO, would be to teach sparse about
+> >    -mlittle-endian/-mbig-endian. In fact I already wrote the patch
+> >    earlier today. But of course, you will need to wait for the patch
+> >    to reach sparse's master and then compile sparse yourself or wait
+> >    for a new release (which shouldn't take much long, though).
 > 
-> Will you ever want to have any of this code as Thumb?
+> If you do that, you could also teach it that AArch64 is 64-bit ;)
 
-I cannot see any requirement for that. I will say it is tested and
-inter-operates happily with CONFIG_THUMB_KERNEL, but because it's constrained to
-am335x and am437x I don't think there are unknown situations where every single
-instruction must be THUMB.
+Well, currently sparse is arch agnostic and I think it's a good thing.
+For the few arch specifities you have to use some of the '-m' flags
+(like -m32/-m64, -msize-long). So, for the moment the '-m64' flag
+is needed, thus the patch.
 
-> 
->> +extern inline void ti_emif_offsets(void)
->> +{
-> 
-> "extern inline" is frowned upon in the kernel - any reason this
-> can't be "static inline" ?
-
-It should be static.
-
-> 
-> Any reason not to provide a stub for when it's not configured,
-> and eliminate the ifdef in arch/arm/kernel/asm-offsets.c ?
-> 
-
-No, I just was following the ifdef example set by others in the file, a stub
-would be cleaner I agree.
-
-Regards,
-Dave
+-- Luc
