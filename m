@@ -1,73 +1,50 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 20 Jun 2017 13:20:49 +0200
-Subject: [PATCH v3] drivers/char: kmem: disable on arm64
-In-Reply-To: <1497941940-2699-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1497941940-2699-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu_nOo3VfjHistipR7vhaTnO89M8X1rrePgk3jhK0xnYVA@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 20 Jun 2017 08:22:56 -0300
+Subject: [PATCH v1] firmware: add sdma firmware for i.mx6/i.mx7d
+In-Reply-To: <1497943490-13401-1-git-send-email-yibin.gong@nxp.com>
+References: <1497943490-13401-1-git-send-email-yibin.gong@nxp.com>
+Message-ID: <CAOMZO5Cq4x-YiX4YG=J-h9PHB3Pf1t0sjzi2gRXZ_5bytx78rA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 June 2017 at 08:59, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> As it turns out, arm64 deviates from other architectures in the way it
-> maps the VMALLOC region: on most (all?) other architectures, it resides
-> strictly above the kernel's direct mapping of DRAM, but on arm64, this
-> is the other way around. For instance, for a 48-bit VA configuration,
-> we have
->
->   modules : 0xffff000000000000 - 0xffff000008000000   (   128 MB)
->   vmalloc : 0xffff000008000000 - 0xffff7dffbfff0000   (129022 GB)
->   ...
->   vmemmap : 0xffff7e0000000000 - 0xffff800000000000   (  2048 GB maximum)
->             0xffff7e0000000000 - 0xffff7e0003ff0000   (    63 MB actual)
->   memory  : 0xffff800000000000 - 0xffff8000ffc00000   (  4092 MB)
->
-> This has mostly gone unnoticed until now, but it does appear that it
-> breaks an assumption in the kcore
+Hi Robin,
 
-s/kcore/kmem/
-
-> read/write code, which does something
-> like
+On Tue, Jun 20, 2017 at 4:24 AM, Robin Gong <yibin.gong@nxp.com> wrote:
+> add sdma firmware for i.mx6 and i.mx7d family, this patch depends
+> on the below:
 >
->   if (p < (unsigned long) high_memory) {
->     ... use straight copy_[to|from]_user() using p as virtual address ...
->   }
->   ...
->   if (count > 0) {
->     ... use vread/vwrite for accesses past high_memory ...
->   }
+>  commit 3123d78e09d2 ("imx: Add SDMA firmware for Freescale i.MX6/7 SoCs")
 >
-> The first condition will inadvertently hold for the VMALLOC region if
-> VMALLOC_START < PAGE_OFFSET [which is the case on arm64], but the read
-> or write will subsequently fail the virt_addr_valid() check, resulting
-> in a -ENXIO return value.
->
-> Given how kmem seems to be living in borrowed time anyway, and given
-> the fact that nobody noticed that the read/write interface is broken
-> on arm64 in the first place, let's not bother trying to fix it, but
-> simply disable the /dev/kmem interface entirely for arm64.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Robin Gong <yibin.gong@nxp.com>
 > ---
-> v3: improve commit log
-> v2: disable /dev/kmem entirely rather than bandaiding it
+>  firmware/Makefile | 1 +
+>  1 file changed, 1 insertion(+)
 >
->  drivers/char/Kconfig | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/drivers/char/Kconfig b/drivers/char/Kconfig
-> index 31adbebf812e..8102ee7b3247 100644
-> --- a/drivers/char/Kconfig
-> +++ b/drivers/char/Kconfig
-> @@ -17,6 +17,8 @@ config DEVMEM
->
->  config DEVKMEM
->         bool "/dev/kmem virtual device support"
-> +       # On arm64, VMALLOC_START < PAGE_OFFSET, which confuses kmem read/write
-> +       depends on !ARM64
->         help
->           Say Y here if you want to support the /dev/kmem device. The
->           /dev/kmem device is rarely used, but can be used for certain
-> --
-> 2.7.4
->
+> diff --git a/firmware/Makefile b/firmware/Makefile
+> index fa3e81c..edc86a0 100644
+> --- a/firmware/Makefile
+> +++ b/firmware/Makefile
+> @@ -65,6 +65,7 @@ fw-shipped-$(CONFIG_DVB_AV7110) += av7110/bootcode.bin
+>  fw-shipped-$(CONFIG_DVB_TTUSB_BUDGET) += ttusb-budget/dspbootcode.bin
+>  fw-shipped-$(CONFIG_E100) += e100/d101m_ucode.bin e100/d101s_ucode.bin \
+>                              e100/d102e_ucode.bin
+> +fw-shipped-$(CONFIG_IMX_SDMA) += imx/sdma/sdma-imx6q.bin imx/sdma/sdma-imx7d.bin
+
+You have just broken imx_v6_v7_defconfig:
+
+  LD      drivers/base/built-in.o
+make[1]: *** No rule to make target
+'firmware/imx/sdma/sdma-imx6q.bin', needed by
+'firmware/imx/sdma/sdma-imx6q.bin.gen.o'.  Stop.
+make[1]: *** Waiting for unfinished jobs....
+  MK_FW   firmware/imx/sdma/sdma-imx6q.bin.gen.S
+/bin/sh: 1: cannot create firmware/imx/sdma/sdma-imx6q.bin.gen.S:
+Directory nonexistent
+/bin/sh: 1: cannot create firmware/imx/sdma/sdma-imx6q.bin.gen.S:
+Directory nonexistent
+
+This does not look correct. This Makefile refers to old firmware
+present in the kernel tree.
+
+For the i.MX SDMA firmware case it is located in linux-firmware git
+tree, so you cannot assume it will always be built-in.
