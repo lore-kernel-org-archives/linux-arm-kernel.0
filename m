@@ -1,50 +1,39 @@
-From: faiz_abbas@ti.com (Faiz Abbas)
-Date: Tue, 20 Jun 2017 10:39:21 +0530
-Subject: [PATCH] ARM: dts: am437x-gp-evm: Add support for buzzer
-Message-ID: <1497935361-11019-1-git-send-email-faiz_abbas@ti.com>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Tue, 20 Jun 2017 11:17:48 +0530
+Subject: [PATCH] PCI: xilinx: make of_device_ids const.
+Message-ID: <5e1534021d712fa92cc0178313daeeb22e34798d.1497937235.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for onboard gpio buzzer. It works using
-the gpio-beeper driver. Pinmux entries for GPIO
-controlling the buzzer are also added.
+of_device_ids are not supposed to change at runtime. All functions
+working with of_device_ids provided by <linux/of.h> work with const
+of_device_ids. So mark the non-const structs as const.
 
-Signed-off-by: Faiz Abbas <faiz_abbas@ti.com>
+File size before:
+   text	   data	    bss	    dec	    hex	filename
+    195	    600	      0	    795	    31b	drivers/pci/host/pcie-xilinx.o
+
+File size after constify xilinx_pcie_of_match:
+   text	   data	    bss	    dec	    hex	filename
+    595	    184	      0	    779	    30b	drivers/pci/host/pcie-xilinx.o
+
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
- arch/arm/boot/dts/am437x-gp-evm.dts | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ drivers/pci/host/pcie-xilinx.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
-index 397e98b..24cdf6d 100644
---- a/arch/arm/boot/dts/am437x-gp-evm.dts
-+++ b/arch/arm/boot/dts/am437x-gp-evm.dts
-@@ -149,6 +149,13 @@
- 			system-clock-frequency = <12000000>;
- 		};
- 	};
-+
-+	beeper: beeper {
-+		compatible = "gpio-beeper";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&beeper_pins>;
-+		gpios = <&gpio4 12 GPIO_ACTIVE_HIGH>;
-+	};
- };
+diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+index 2fe2df5..b621cb5 100644
+--- a/drivers/pci/host/pcie-xilinx.c
++++ b/drivers/pci/host/pcie-xilinx.c
+@@ -696,7 +696,7 @@ static int xilinx_pcie_probe(struct platform_device *pdev)
+ 	return err;
+ }
  
- &am43xx_pinmux {
-@@ -510,6 +517,13 @@
- 			AM4372_IOPAD(0x974, PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* uart0_txd.uart0_txd */
- 		>;
- 	};
-+
-+	beeper_pins: beeper_pins {
-+		pinctrl-single,pins = <
-+			AM4372_IOPAD(0x9e0, PIN_OUTPUT_PULLUP | MUX_MODE7)	/* cam1_field.gpio4_12 */
-+		>;
-+	};
-+
+-static struct of_device_id xilinx_pcie_of_match[] = {
++static const struct of_device_id xilinx_pcie_of_match[] = {
+ 	{ .compatible = "xlnx,axi-pcie-host-1.00.a", },
+ 	{}
  };
- 
- &uart0 {
 -- 
-2.7.4
+1.9.1
