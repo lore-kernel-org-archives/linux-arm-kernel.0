@@ -1,46 +1,33 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 20 Jun 2017 12:35:07 +0100
-Subject: [PATCH 1/1] iommu/arm-smmu-v3: replace writel with writel_relaxed
- in queue_inc_prod
-In-Reply-To: <1497956694-11784-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1497956694-11784-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <acafb87c-4ba9-4a44-f868-c8f882717ab1@arm.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Tue, 20 Jun 2017 12:38:26 +0100
+Subject: [PATCH 2/7] dt-bindings: PCI: Describe ATS property for root
+ complex nodes
+In-Reply-To: <65aea93f-d516-f045-f216-3f56e96bdeb6@arm.com>
+References: <20170524180143.19855-1-jean-philippe.brucker@arm.com>
+ <20170524180143.19855-3-jean-philippe.brucker@arm.com>
+ <20170531172320.3u6bdctv44aqighy@rob-hp-laptop>
+ <cd63a2dc-8259-482d-19e9-9db60be866f7@arm.com>
+ <20170605172025.qgnocl5ytexnklue@rob-hp-laptop>
+ <65aea93f-d516-f045-f216-3f56e96bdeb6@arm.com>
+Message-ID: <1754b317-767e-7afd-5608-6ef6ea80a162@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/06/17 12:04, Zhen Lei wrote:
-> This function is protected by spinlock, and the latter will do memory
-> barrier implicitly. So that we can safely use writel_relaxed. In fact, the
-> dmb operation will lengthen the time protected by lock, which indirectly
-> increase the locking confliction in the stress scene.
+On 06/06/2017 12:11 PM, Jean-Philippe Brucker wrote:
+> On 05/06/17 18:20, Rob Herring wrote:
+>> pci-host-{e,}cam-generic is a special case. I'm okay with having a 
+>> property for that I suppose. We should not require this property though 
+>> and allow for it to be implied by the SoC specific compatible as well.
+> 
+> The property isn't useful for host-generic since a host like Qemu can
+> easily disable ATS in the IOMMU. It would only be here for consistency.
+> Changing IOMMU registers wouldn't be as simple for a firmware running on
+> real hardware.
 
-If you remove the DSB between writing the commands (to Normal memory)
-and writing the pointer (to Device memory), how can you guarantee that
-the complete command is visible to the SMMU and it isn't going to try to
-consume stale memory contents? The spinlock is irrelevant since it's
-taken *before* the command is written.
+Sorry I was mistaken here. AMD Seattle hardware, for instance, implements
+a pure host-ecam-generic. So it's not exclusively used by Qemu. A quick
+search in the kernel also brings up alpine and thunder2. So I guess I'll
+move ats-supported documentation to host-generic-pci.txt.
 
-Robin.
-
-> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> ---
->  drivers/iommu/arm-smmu-v3.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 380969a..d2fbee3 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -728,7 +728,7 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
->  	u32 prod = (Q_WRP(q, q->prod) | Q_IDX(q, q->prod)) + 1;
-> 
->  	q->prod = Q_OVF(q, q->prod) | Q_WRP(q, prod) | Q_IDX(q, prod);
-> -	writel(q->prod, q->prod_reg);
-> +	writel_relaxed(q->prod, q->prod_reg);
->  }
-> 
->  /*
-> --
-> 2.5.0
-> 
-> 
+Thanks,
+Jean
