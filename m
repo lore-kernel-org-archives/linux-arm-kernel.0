@@ -1,103 +1,46 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 20 Jun 2017 12:50:40 +0100
-Subject: [PATCH 1/8] dt-bindings: mfd: Add STM32 LPTimer binding
-In-Reply-To: <1497628726-7563-2-git-send-email-fabrice.gasnier@st.com>
-References: <1497628726-7563-1-git-send-email-fabrice.gasnier@st.com>
- <1497628726-7563-2-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20170620115040.xyaivbtcuufhxlv7@dell>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 20 Jun 2017 13:52:34 +0200
+Subject: [GIT PULL] pinctrl: samsung: Pinctrl update for v4.13
+In-Reply-To: <CAJKOXPd0UFGGF38DB=XVH+SyW-P7r6K14ca6buYPP7j4Odx3gA@mail.gmail.com>
+References: <20170609164827.2231-1-krzk@kernel.org>
+ <CACRpkdZjZbHD4ZCQVHUyu8y0f45FnRqTRL4P6J7Wrz9dZNXGdw@mail.gmail.com>
+ <CAJKOXPd0UFGGF38DB=XVH+SyW-P7r6K14ca6buYPP7j4Odx3gA@mail.gmail.com>
+Message-ID: <CACRpkdZB=L4zY46XAQABjzjyLDRCjqwXFckbXaS0jBWvRRZXaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Jun 2017, Fabrice Gasnier wrote:
+On Tue, Jun 20, 2017 at 1:14 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> On Tue, Jun 20, 2017 at 10:08 AM, Linus Walleij
+> <linus.walleij@linaro.org> wrote:
+>> On Fri, Jun 9, 2017 at 6:48 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>>
+>>> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+>>>
+>>>   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>   git://git.kernel.org/pub/scm/linux/kernel/git/pinctrl/samsung.git tags/samsung-pinctrl-4.13
+>>>
+>>> for you to fetch changes up to a453f3693f2aa9ebba623f8cff1e3d7c5df96ddd:
+>>>
+>>>   pinctrl: samsung: Explicitly cast pointer returned by of_iomap() to iomem (2017-06-07 20:40:48 +0200)
+>>
+>> Pulled into my "devel" branch on the pin control tree.
+>>
+>> Pushing it to the build servers hoping all works.
+>>
+>> Thanks for your efforts to maintain Samsung pin control, it is
+>> much appreciated!
+>
+> I will have another bunch of cleanups and one important fix (broken
+> for some time, around v4.10, so it's not a candidate for current RC
+> fix). It is pretty late. Will you still have time to pull them for
+> v4.13?
 
-> Add documentation for STMicroelectronics STM32 Low Power Timer binding.
-> 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> ---
->  .../devicetree/bindings/mfd/stm32-lptimer.txt      | 51 ++++++++++++++++++++++
->  1 file changed, 51 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt b/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
-> new file mode 100644
-> index 0000000..237b7d6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
-> @@ -0,0 +1,51 @@
-> +STMicroelectronics STM32 Low Power Timer
-> +
-> +The STM32 Low Power Timer (LPTIM) is a 16-bit timer that provides several
-> +functionalities:
+Not sure, I will be off for the weekend starting the day after tomorrow.
 
-"functions".
+If there is an -rc7 on sunday, then yes.
 
-> +- PWM output (with programmable prescaler, configurable polarity)
-> +- Quadrature encoder, counter
-> +- Trigger source for STM32 ADC/DAC (LPTIM_OUT)
-> +
-> +Required properties:
-> +- compatible: Must be "st,stm32-lptimer".
-> +- reg: Offset and length of the device's register set.
-> +- clocks: Phandle to the clock used by the LP Timer module.
-> +- clock-names: Must be "int".
-
-These look better when padded:
-
-- compatible:		Must be "st,stm32-lptimer".
-- reg:			Offset and length of the device's register set.
-- clocks:		Phandle to the clock used by the LP Timer module.
-- clock-names:		Must be "int".
-
-> +- #address-cells = <1>;
-> +- #size-cells = <0>;
-
-Please use the same format as you did for the other properties.
-
-> +Optional properties:
-> +- resets: Must contain the phandle to the reset controller.
-> +
-> +Optional subnodes:
-> +- pwm: See ../pwm/pwm-stm32-lp.txt
-> +- counter: See ../iio/timer/stm32-lptimer-cnt.txt
-> +- trigger: See ../iio/timer/stm32-lptimer-trigger.txt
-> +
-> +Example:
-> +
-> +	lptimer1: lptimer at 0x40002400 {
-
-Remove '0x'
-
-> +		compatible = "st,stm32-lptimer";
-> +		reg = <0x40002400 0x400>;
-> +		clocks = <&timer_clk>;
-> +		clock-names = "int";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		pwm {
-> +			compatible = "st,stm32-pwm-lp";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&lppwm1_pins>;
-> +		};
-> +
-> +		trigger at 0 {
-
-Why is this @0 and no reg properties are provided for the other 2
-nodes?
-
-> +			compatible = "st,stm32-lptimer-trigger";
-> +			reg = <0>;
-> +		};
-> +
-> +		counter {
-> +			compatible = "st,stm32-lptimer-counter";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&lptim1_in_pins>;
-> +		};
-> +	};
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Yours,
+Linus Walleij
