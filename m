@@ -1,61 +1,103 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Tue, 20 Jun 2017 13:45:36 +0200
-Subject: [PATCH] crypto: sun4i-ss: support the Security System PRNG
-In-Reply-To: <20170620095947.i3r3iym2cxz5jciw@flea.lan>
-References: <20170620085819.20114-1-clabbe.montjoie@gmail.com>
- <20170620095947.i3r3iym2cxz5jciw@flea.lan>
-Message-ID: <20170620114536.GA4766@Red>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 20 Jun 2017 12:50:40 +0100
+Subject: [PATCH 1/8] dt-bindings: mfd: Add STM32 LPTimer binding
+In-Reply-To: <1497628726-7563-2-git-send-email-fabrice.gasnier@st.com>
+References: <1497628726-7563-1-git-send-email-fabrice.gasnier@st.com>
+ <1497628726-7563-2-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20170620115040.xyaivbtcuufhxlv7@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 11:59:47AM +0200, Maxime Ripard wrote:
-> Hi,
-> 
-> On Tue, Jun 20, 2017 at 10:58:19AM +0200, Corentin Labbe wrote:
-> > The Security System have a PRNG, this patch add support for it via
-> > crypto_rng.
-> 
-> This might be a dumb question, but is the CRYPTO_RNG code really
-> supposed to be used with PRNG?
-> 
+On Fri, 16 Jun 2017, Fabrice Gasnier wrote:
 
-Yes, see recently added drivers/crypto/exynos-rng.c
-
-[...]
-> > --- a/drivers/crypto/sunxi-ss/sun4i-ss.h
-> > +++ b/drivers/crypto/sunxi-ss/sun4i-ss.h
-> > @@ -32,6 +32,7 @@
-> >  #include <crypto/aes.h>
-> >  #include <crypto/des.h>
-> >  #include <crypto/internal/rng.h>
-> > +#include <crypto/rng.h>
-> >  
-> >  #define SS_CTL            0x00
-> >  #define SS_KEY0           0x04
-> > @@ -127,6 +128,9 @@
-> >  #define SS_RXFIFO_EMP_INT_ENABLE	(1 << 2)
-> >  #define SS_TXFIFO_AVA_INT_ENABLE	(1 << 0)
-> >  
-> > +#define SS_SEED_LEN (192 / 8)
-> > +#define SS_DATA_LEN (160 / 8)
-> > +
-> >  struct sun4i_ss_ctx {
-> >  	void __iomem *base;
-> >  	int irq;
-> > @@ -136,6 +140,7 @@ struct sun4i_ss_ctx {
-> >  	struct device *dev;
-> >  	struct resource *res;
-> >  	spinlock_t slock; /* control the use of the device */
-> > +	u32 seed[SS_SEED_LEN / 4];
+> Add documentation for STMicroelectronics STM32 Low Power Timer binding.
 > 
-> Shouldn't you define SS_SEED_LEN in bits, and then use either
-> BITS_PER_BYTE and BITS_PER_LONG so that it's obvious what you're doing
-> ?
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> ---
+>  .../devicetree/bindings/mfd/stm32-lptimer.txt      | 51 ++++++++++++++++++++++
+>  1 file changed, 51 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
 > 
-> And you could also make that variable defined based on the option,
-> otherwise you'll always allocate that array, even if you're not using
-> it.
+> diff --git a/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt b/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
+> new file mode 100644
+> index 0000000..237b7d6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
+> @@ -0,0 +1,51 @@
+> +STMicroelectronics STM32 Low Power Timer
+> +
+> +The STM32 Low Power Timer (LPTIM) is a 16-bit timer that provides several
+> +functionalities:
 
-I will do that
+"functions".
 
-Thanks
+> +- PWM output (with programmable prescaler, configurable polarity)
+> +- Quadrature encoder, counter
+> +- Trigger source for STM32 ADC/DAC (LPTIM_OUT)
+> +
+> +Required properties:
+> +- compatible: Must be "st,stm32-lptimer".
+> +- reg: Offset and length of the device's register set.
+> +- clocks: Phandle to the clock used by the LP Timer module.
+> +- clock-names: Must be "int".
+
+These look better when padded:
+
+- compatible:		Must be "st,stm32-lptimer".
+- reg:			Offset and length of the device's register set.
+- clocks:		Phandle to the clock used by the LP Timer module.
+- clock-names:		Must be "int".
+
+> +- #address-cells = <1>;
+> +- #size-cells = <0>;
+
+Please use the same format as you did for the other properties.
+
+> +Optional properties:
+> +- resets: Must contain the phandle to the reset controller.
+> +
+> +Optional subnodes:
+> +- pwm: See ../pwm/pwm-stm32-lp.txt
+> +- counter: See ../iio/timer/stm32-lptimer-cnt.txt
+> +- trigger: See ../iio/timer/stm32-lptimer-trigger.txt
+> +
+> +Example:
+> +
+> +	lptimer1: lptimer at 0x40002400 {
+
+Remove '0x'
+
+> +		compatible = "st,stm32-lptimer";
+> +		reg = <0x40002400 0x400>;
+> +		clocks = <&timer_clk>;
+> +		clock-names = "int";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		pwm {
+> +			compatible = "st,stm32-pwm-lp";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&lppwm1_pins>;
+> +		};
+> +
+> +		trigger at 0 {
+
+Why is this @0 and no reg properties are provided for the other 2
+nodes?
+
+> +			compatible = "st,stm32-lptimer-trigger";
+> +			reg = <0>;
+> +		};
+> +
+> +		counter {
+> +			compatible = "st,stm32-lptimer-counter";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&lptim1_in_pins>;
+> +		};
+> +	};
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
