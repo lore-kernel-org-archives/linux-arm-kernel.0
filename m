@@ -1,40 +1,58 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 20 Jun 2017 23:38:59 +0100
-Subject: [PATCH 00/51] rtc: stop using rtc deprecated functions
-In-Reply-To: <alpine.DEB.2.20.1706202343120.2157@nanos>
-References: <20170620213507.urobmtg34vzubrdq@piout.net>
- <alpine.DEB.2.20.1706202343120.2157@nanos>
-Message-ID: <20170620223859.GO4902@n2100.armlinux.org.uk>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 21 Jun 2017 02:10:03 +0300
+Subject: [PATCH 05/20] arm64: rename COMPAT to AARCH32_EL0 in Kconfig
+In-Reply-To: <5947F498.2040505@arm.com>
+References: <20170604120009.342-1-ynorov@caviumnetworks.com>
+ <20170604120009.342-6-ynorov@caviumnetworks.com>
+ <5947F498.2040505@arm.com>
+Message-ID: <20170620231003.nfz6t4dutiwndyjg@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 21, 2017 at 12:00:30AM +0200, Thomas Gleixner wrote:
-> Yes, but there are still quite some issues to solve there:
+On Mon, Jun 19, 2017 at 04:58:16PM +0100, James Morse wrote:
+> Hi Yury,
 > 
->      1) How do you tell the system that it should apply the offset in the
->      	first place, i.e at boot time before NTP or any other mechanism can
->      	correct it?
+> On 04/06/17 12:59, Yury Norov wrote:
+> > From: Andrew Pinski <apinski@cavium.com>
+> > 
+> > In this patchset  ILP32 ABI support is added. Additionally to AARCH32,
+> > which is binary-compatible with ARM, ILP32 is (mostly) ABI-compatible.
+> > 
+> > From now, AARCH32_EL0 (former COMPAT) config option means the support of
+> > AARCH32 userspace, ARM64_ILP32 - support of ILP32 ABI (see next patches),
+> > and COMPAT indicates that one of them, or both, is enabled.
+> > 
+> > Where needed, CONFIG_COMPAT is changed over to use CONFIG_AARCH32_EL0 instead
 > 
->      2) Deal with creative vendors who have their own idea about the 'start
->      	of the epoch'
-> 	
->      3) Add the information of wraparound time to the rtc device which
->      	needs to be filled in for each device. That way the rtc_***
->      	accessor functions can deal with them whether they wrap in 2038 or
->      	2100 or whatever.
+> Nit: You have 'COMPAT' around compat_hwcap_str's definition, but its only user
+> is wrapped in 'AARCH32_EL0'.
 > 
-> #3 is the simplest problem of them :)	
+> 
+> After this patch
+> arch/arm64/kernel/perf_callchain.c::perf_callchain_user() still has:
+> >	if (!compat_user_mode(regs)) {
+> >		/* AARCH64 mode */
+> ...
+> >	} else {
+> > #ifdef CONFIG_COMPAT
+> > 		/* AARCH32 compat mode */
+> ...
+> > #endif
+> >	}
+> 
+> I think this one should become CONFIG_AARCH32_EL0. compat to this code means the
+> fp is 'compat_fp' in x11, and it should read a 32bit call chain from user-space.
+ 
+Thanks, will fix it. 
 
-Well, if there's additional non-volatile storage, you can store
-additional information in there, but you still need the RTC
-subsystem to be aware that the hardware is only 32-bit capable.
+> This is confusing as 'is_compat_task()' matches one of aarch32 or ilp32, but
+> compat_user_mode(regs) only matches aarch32 as it checks the saved spsr. I can't
+> see any problem caused by this today, but its going to bite someone in the
+> future. Can this be renamed aarch32_user_mode()? (turns out 'a32' is the name of
+> just one of aarch32's instruction sets[0].)
 
-You'd also still need something along the lines I detailed
-(redefining what dates the past 32-bit values indicate) to cope
-with the RTC being set backwards after the machine thinks (possibly
-incorrectly) that the date has jumped forwards.
+compat_thumb_mode may be also renamed, and compat_setup_frame and
+compat_setup_rt_frame, and some others. If you think that it may
+confuse, I'll do rename.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Yury
