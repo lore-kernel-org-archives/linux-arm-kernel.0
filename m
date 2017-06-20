@@ -1,29 +1,33 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 20 Jun 2017 08:05:05 -0300
-Subject: Shawn Guo: your attetion is needed here Re: [PATCH v8 00/34] i.MX
- Media Driver
-In-Reply-To: <20170620082933.GA31799@amd>
-References: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
- <e7e4669c-2963-b9e1-edd7-02731a6e0f9c@xs4all.nl>
- <c0b69c93-b9cd-25e8-ea36-fc0600efdb69@gmail.com>
- <e4f152de-6e75-7654-178e-e6dcf9ad12f3@xs4all.nl>
- <43887f25-bb73-9020-0909-d275c319aaad@mentor.com>
- <20170620082933.GA31799@amd>
-Message-ID: <CAOMZO5A_LjYzzDTG9KmEHxb2F0=1Pj2Wm8s5maKS8pxce-HX3A@mail.gmail.com>
+From: thunder.leizhen@huawei.com (Zhen Lei)
+Date: Tue, 20 Jun 2017 19:04:54 +0800
+Subject: [PATCH 1/1] iommu/arm-smmu-v3: replace writel with writel_relaxed in
+ queue_inc_prod
+Message-ID: <1497956694-11784-1-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 5:29 AM, Pavel Machek <pavel@ucw.cz> wrote:
+This function is protected by spinlock, and the latter will do memory
+barrier implicitly. So that we can safely use writel_relaxed. In fact, the
+dmb operation will lengthen the time protected by lock, which indirectly
+increase the locking confliction in the stress scene.
 
-> Hmm. I changed the subject to grab Shawn's attetion.
->
-> But his acks should not be needed for forward progress. Yes, it would
-> be good, but he does not react -- so just reorder the series so that
-> dts changes come last, then apply the parts you can apply: driver can
-> go in.
->
-> And actually... if maintainer does not respond at all, there are ways
-> to deal with that, too...
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Shawn has already applied the dts part of the series and they show up
-in linux-next.
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 380969a..d2fbee3 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -728,7 +728,7 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
+ 	u32 prod = (Q_WRP(q, q->prod) | Q_IDX(q, q->prod)) + 1;
+
+ 	q->prod = Q_OVF(q, q->prod) | Q_WRP(q, prod) | Q_IDX(q, prod);
+-	writel(q->prod, q->prod_reg);
++	writel_relaxed(q->prod, q->prod_reg);
+ }
+
+ /*
+--
+2.5.0
