@@ -1,33 +1,54 @@
-From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Tue, 20 Jun 2017 19:04:54 +0800
-Subject: [PATCH 1/1] iommu/arm-smmu-v3: replace writel with writel_relaxed in
- queue_inc_prod
-Message-ID: <1497956694-11784-1-git-send-email-thunder.leizhen@huawei.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 20 Jun 2017 13:09:33 +0200
+Subject: [PATCH 1/2] drm/exynos/decon: Add include guard to the Exynos7
+ header
+In-Reply-To: <CACvgo52KMMt+S-KVYnmMy9qGUL6jMD2Uj8EJWNkKUQLr0_wfAw@mail.gmail.com>
+References: <20170619163110.28173-1-krzk@kernel.org>
+ <CACvgo51db4Gk+GHAO-F=rz8vLTG6A66f1ZeHPNuAQV1Qthaavw@mail.gmail.com>
+ <CAJKOXPfjEozEM=q4hbWRBJngNDxnkJXF37gN2Es1Ju8Qze4J1g@mail.gmail.com>
+ <CACvgo52KMMt+S-KVYnmMy9qGUL6jMD2Uj8EJWNkKUQLr0_wfAw@mail.gmail.com>
+Message-ID: <CAJKOXPdfHoZY5QcZEvuN8nPsCwR4mvZ+aT5iZDVbSBgPRF46QA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function is protected by spinlock, and the latter will do memory
-barrier implicitly. So that we can safely use writel_relaxed. In fact, the
-dmb operation will lengthen the time protected by lock, which indirectly
-increase the locking confliction in the stress scene.
+On Tue, Jun 20, 2017 at 12:57 PM, Emil Velikov <emil.l.velikov@gmail.com> wrote:
+> On 20 June 2017 at 11:02, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>> On Tue, Jun 20, 2017 at 11:53 AM, Emil Velikov <emil.l.velikov@gmail.com> wrote:
+>>> On 19 June 2017 at 17:31, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>>>> Although header is included only once but still having an include guard
+>>>> is a good practice.  To avoid confusion, add SoC prefix to existing
+>>>> Exynos5433 header include guard.
+>>>>
+>>>> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+>>>> ---
+>>>>  include/video/exynos5433_decon.h | 6 +++---
+>>>>  include/video/exynos7_decon.h    | 5 +++++
+>>>>  2 files changed, 8 insertions(+), 3 deletions(-)
+>>>>
+>>>> diff --git a/include/video/exynos5433_decon.h b/include/video/exynos5433_decon.h
+>>>> index 78957c9626f5..b30362da5692 100644
+>>>> --- a/include/video/exynos5433_decon.h
+>>>> +++ b/include/video/exynos5433_decon.h
+>>>> @@ -6,8 +6,8 @@
+>>>>   * published by the Free Software Foundationr
+>>>>   */
+>>>>
+>>>> -#ifndef EXYNOS_REGS_DECON_H
+>>>> -#define EXYNOS_REGS_DECON_H
+>>>> +#ifndef EXYNOS5433_REGS_DECON_H
+>>>> +#define EXYNOS5433_REGS_DECON_H
+>>>>
+>>> Drop the _REGS_ part from the guard on each header? The file name/path
+>>> does not have it, plus it'll save some WTF moments when
+>>> exynos{5433,7}_regs_decon.h comes about.
+>>
+>> So maybe it makes sense to reorder these patches and use the guard
+>> name matching final file name?
+>>
+> That sounds better, IMHO.
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
----
- drivers/iommu/arm-smmu-v3.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+OK then, I'll re-order the patches and use matching name
+(EXYNOS_REGS_DECON{5433,7}_H).
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 380969a..d2fbee3 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -728,7 +728,7 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
- 	u32 prod = (Q_WRP(q, q->prod) | Q_IDX(q, q->prod)) + 1;
-
- 	q->prod = Q_OVF(q, q->prod) | Q_WRP(q, prod) | Q_IDX(q, prod);
--	writel(q->prod, q->prod_reg);
-+	writel_relaxed(q->prod, q->prod_reg);
- }
-
- /*
---
-2.5.0
+Best regards,
+Krzysztof
