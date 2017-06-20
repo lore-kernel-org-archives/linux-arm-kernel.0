@@ -1,106 +1,77 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 20 Jun 2017 17:11:48 +0100
-Subject: [PATCH v3] KVM: arm/arm64: Signal SIGBUS when stage2 discovers
- hwpoison memory
-Message-ID: <20170620161148.31653-1-james.morse@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 20 Jun 2017 17:20:18 +0100
+Subject: [PATCH 5/5] arm64: signal: Allow expansion of the signal frame
+In-Reply-To: <20170619110346.GB3024@e104818-lin.cambridge.arm.com>
+References: <1497535442-11586-1-git-send-email-Dave.Martin@arm.com>
+ <1497535442-11586-6-git-send-email-Dave.Martin@arm.com>
+ <20170616104740.GA31526@e104818-lin.cambridge.arm.com>
+ <20170619101204.GA8543@e103592.cambridge.arm.com>
+ <20170619110346.GB3024@e104818-lin.cambridge.arm.com>
+Message-ID: <20170620162016.GB8543@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Once we enable ARCH_SUPPORTS_MEMORY_FAILURE on arm64, notifications for
-broken memory can call memory_failure() in mm/memory-failure.c to offline
-pages of memory, possibly signalling user space processes and notifying all
-the in-kernel users.
+On Mon, Jun 19, 2017 at 12:03:47PM +0100, Catalin Marinas wrote:
+> On Mon, Jun 19, 2017 at 11:12:29AM +0100, Dave P Martin wrote:
+> > On Fri, Jun 16, 2017 at 11:47:41AM +0100, Catalin Marinas wrote:
+> > > On Thu, Jun 15, 2017 at 03:03:42PM +0100, Dave P Martin wrote:
+> > > > +struct extra_context {
+> > > > +	struct _aarch64_ctx head;
+> > > > +	void __user *data;	/* 16-byte aligned pointer to extra space */
+> > > > +	__u32 size;		/* size in bytes of the extra space */
+> > > > +	__u32 __reserved[3];
+> > > > +};
+> > > 
+> > > Some more thoughts on the type of "data" above. It's the first time we
+> > > introduce pointers in sigcontext and wonder whether __u64 would make
+> > > more sense (invariable size with the ABI).
+> > 
+> > I'm happy to change this if you want -- it can be a __u64 without
+> > impacting the semantics.
+> 
+> I was thinking in the context of ILP32 but we can address this
+> separately for the exported kernel headers and glibc definitions.
+> Looking at this structure from an LP64 perspective, it indeed makes
+> sense to keep it as void *. We have other UAPI structures with user
+> pointers already.
 
-memory_failure() has two modes, early and late. Early is used by
-machine-managers like Qemu to receive a notification when a memory error is
-notified to the host. These can then be relayed to the guest before the
-affected page is accessed. To enable this, the process must set
-PR_MCE_KILL_EARLY in PR_MCE_KILL_SET using the prctl() syscall.
+OK -- I'll reply with an additional fixup that can be folded in if you
+do want the u64.
 
-Once the early notification has been handled, nothing stops the
-machine-manager or guest from accessing the affected page. If the
-machine-manager does this the page will fail to be mapped and SIGBUS will
-be sent. This patch adds the equivalent path for when the guest accesses
-the page, sending SIGBUS to the machine-manager.
+> > > Also for discussion - whether using an offset vs absolute address would
+> > > be better.
+> > 
+> > My rationale here related to the ucontext semantics associated with
+> > the signal frame, rather than signal handling itself.
+> > 
+> > Consider:
+> > 
+> > void signal_handler(int n, siginfo_t *si, void *uc)
+> > {
+> > 	*signal_context = *(ucontext_t *)uc;
+> > }
+> > 
+> > Will this "work"?  On most machines, yes it will. 
+> > 
+> > With an expanded signal frame on arm64, it won't work: the copied
+> > context will be truncated at the end of __reserved[].  If extra_data
+> > uses an offset to locate the additional data then someone parsing
+> > *signal_context won't be able to detect the error and will overrun:
+> > this includes rt_sigreturn (if that is run on a stack that has the
+> > copied context).
+> > 
+> > If a pointer is used in extra_context, this provides some chance of
+> > handling this: naive code like the above will result in a ucontext_t
+> > whose extra_context data pointer is "wrong": extra_context aware
+> > parsers can detect that and error out or ignore the remaining data.
+> > extra_context aware code that wants to copy the signal context can walk
+> > the signal frame to determine its true size, allocate memory, copy, and
+> > then update the extra_context data pointer in the new copy.
+> 
+> Thanks for the explanation, it makes sense to keep an absolute pointer
+> here rather than offset. So no further changes needed to this patch.
 
-These two signals can be distinguished by the machine-manager using their
-si_code: BUS_MCEERR_AO for 'action optional' early notifications, and
-BUS_MCEERR_AR for 'action required' synchronous/late notifications.
+Fair enough.
 
-Do as x86 does, and deliver the SIGBUS when we discover pfn ==
-KVM_PFN_ERR_HWPOISON. Use the hugepage size as si_addr_lsb if this vma was
-allocated as a hugepage. Transparent hugepages will be split by
-memory_failure() before we see them here.
-
-Cc: Punit Agrawal <punit.agrawal@arm.com>
-Signed-off-by: James Morse <james.morse@arm.com>
-
----
-arm64 has ARCH_SUPPORTS_MEMORY_FAILURE in linux-next, so can enable
-MEMORY_FAILURE. This patch will build without those changes as
-KVM_PFN_ERR_HWPOISON is always defined.
-
-Changes since v2:
- * Just the commit message.
-
-Changes since v1:
- * Pass the vma to kvm_send_hwpoison_signal(), used Punit's huge_page_shift()
-   calculation to find the block size.
- * ... tested against hugepage not transparent huge page ...
-
-
-[0] https://www.spinics.net/lists/arm-kernel/msg581657.html
-
- virt/kvm/arm/mmu.c | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
-
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 313ee646480f..eaa29aeb7c5b 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -20,6 +20,7 @@
- #include <linux/kvm_host.h>
- #include <linux/io.h>
- #include <linux/hugetlb.h>
-+#include <linux/sched/signal.h>
- #include <trace/events/kvm.h>
- #include <asm/pgalloc.h>
- #include <asm/cacheflush.h>
-@@ -1249,6 +1250,24 @@ static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
- 	__coherent_cache_guest_page(vcpu, pfn, size);
- }
- 
-+static void kvm_send_hwpoison_signal(unsigned long address,
-+				     struct vm_area_struct *vma)
-+{
-+	siginfo_t info;
-+
-+	info.si_signo   = SIGBUS;
-+	info.si_errno   = 0;
-+	info.si_code    = BUS_MCEERR_AR;
-+	info.si_addr    = (void __user *)address;
-+
-+	if (is_vm_hugetlb_page(vma))
-+		info.si_addr_lsb = huge_page_shift(hstate_vma(vma));
-+	else
-+		info.si_addr_lsb = PAGE_SHIFT;
-+
-+	send_sig_info(SIGBUS, &info, current);
-+}
-+
- static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 			  struct kvm_memory_slot *memslot, unsigned long hva,
- 			  unsigned long fault_status)
-@@ -1318,6 +1337,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	smp_rmb();
- 
- 	pfn = gfn_to_pfn_prot(kvm, gfn, write_fault, &writable);
-+	if (pfn == KVM_PFN_ERR_HWPOISON) {
-+		kvm_send_hwpoison_signal(hva, vma);
-+		return 0;
-+	}
- 	if (is_error_noslot_pfn(pfn))
- 		return -EFAULT;
- 
--- 
-2.11.0
+Cheers
+---Dave
