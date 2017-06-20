@@ -1,148 +1,54 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 20 Jun 2017 10:21:11 +0200
-Subject: [PATCH] psci: add debugfs for runtime instrumentation
-In-Reply-To: <20170619114415.GI10246@leverpostej>
-References: <1497601420-8783-1-git-send-email-vincent.guittot@linaro.org>
- <20170616114737.GM20092@leverpostej>
- <CAKfTPtBj3RBd+d_LERYdUxoQ706L6wrs5+L+MOTL7aoZmAkZ8w@mail.gmail.com>
- <20170619114415.GI10246@leverpostej>
-Message-ID: <CAKfTPtABcSFmOof80B2p7Dba4XW8Qu3YoY0SMEzcDjscLyQUqg@mail.gmail.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Tue, 20 Jun 2017 10:29:05 +0200
+Subject: [PATCH v5 2/3] PCI: Add tango PCIe host bridge support
+In-Reply-To: <6abfe9ce-5c32-9be0-e276-ed14253aa773@sigmadesigns.com>
+References: <741766e5-cff2-db5f-d40b-6866e08fd966@sigmadesigns.com>
+ <1802aae0-f97b-c437-c00e-5fa7c867286d@sigmadesigns.com>
+ <654acba8-68b9-fb4c-4681-35af94b6bd74@sigmadesigns.com>
+ <6abfe9ce-5c32-9be0-e276-ed14253aa773@sigmadesigns.com>
+Message-ID: <5b0b4465-4402-e668-c744-5fb4439b34b0@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 June 2017 at 13:44, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Jun 16, 2017 at 04:26:20PM +0200, Vincent Guittot wrote:
->> On 16 June 2017 at 13:47, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Fri, Jun 16, 2017 at 10:23:40AM +0200, Vincent Guittot wrote:
->> >> Add debugfs to display runtime instrumentation results that can be collected
->> >> by PSCI firmware.
->> >
->> > Could you elaborate on this please? e.g.
+On 19/06/2017 16:50, Marc Gonzalez wrote:
+
+> On 07/06/2017 10:19, Marc Gonzalez wrote:
+> 
+>> On 31/05/2017 15:33, Marc Gonzalez wrote:
 >>
->> yes sorry. I should have given more details about it
+>>> +static int tango_pcie_probe(struct platform_device *pdev)
+>>> +{
+>>> +	int ret = -EINVAL;
+>>> +	void __iomem *base;
+>>> +	struct resource *res;
+>>> +	struct tango_pcie *pcie;
+>>> +	struct device *dev = &pdev->dev;
+>>> +
+>>> +	pr_err("MAJOR ISSUE: PCIe config and mem spaces are muxed\n");
+>>> +	pr_err("Tainting kernel... Use driver at your own risk\n");
+>>> +	add_taint(TAINT_FIRMWARE_WORKAROUND, LOCKDEP_STILL_OK);
 >>
->> >
->> > * What is instrumented?
+>> Hello Bjorn,
 >>
->> The ARM Trusted Firwware that implements PSCI, also has a Performance
->> Measurement Framework (PMF) that can be used to save some timetamps
->> when running psci firmware. On top of PMF, serveral services have been
->> implemented like the PSCI residency stats and the runtime
->> instrumentation service. The latter saves timestamp when a PSCI
->> service is entered and then leaved or when cache maintenance is
->> executed durign psci call. With these timestamps, we can measure the
->> duration of some part of code of the PSCI firmware.
->
-> Ok. So PMF is an ATF concept, and not a PSCI concept (as it's not
-> defined by the PSCI spec).
-
-Yes
-
->
-> [...]
->
->> > * On which platforms is this available, and when?
+>> In v4, your only comment was
+>> "[muxing config and mem spaces] is a major issue and possibly even
+>> a security problem [which requires at least an error message and a
+>> kernel taint].
 >>
->> The code that save the timestamp is generic and as result available
->> for all platforms that implement PSCI. Nevertheless, each platfrom has
->> to enable the SMC service. At now, juno and hikey has enable the
->> service and hikey960 should some soon as well
->
-> Ok. So this is available on a subset of platforms using ATF.
+>> Were there any other issues with the host bridge support?
+> 
+> Hello Bjorn,
+> 
+> I imagine you are now only waiting for Marc Z's Ack of patch 3/3 ?
+> (AFAIU, all issues have been addressed as of v8 3/3.)
+> 
+> Rob has Acked patch 1/3 -- thanks Rob.
+> 
+> Assuming all issues with patch 2/3 have already been addressed,
+> then this driver can land in time for 4.13 right?
 
-The service is generic but not enable by default on platform
+Hello Bjorn, Marc,
 
->
-> [...]
->
->> >> +config ARM_PSCI_INSTRUMENTATION
->> >> +     bool "ARM PSCI Run Time Instrumentation"
->> >> +     depends on ARM_PSCI_FW && CPU_IDLE && DEBUG_FS
->> >> +     help
->> >> +       Enable debugfs interface for PSCI FW in which you can retrieve
->> >> +       runtime instrumentation values of the PSCI firmware like time to
->> >> +       enter or leave a cpu suspend state or time to flush cache.
->> >
->> > Looking at the latest published spec (ARM DEN 0022D), PSCI doesn't
->> > provide such information, as there's only PSCI_STAT_{COUNT,RESIDENCY}.
->>
->> This use the same Performance Measurement Framework as
->> PSCI_STAT_{COUNT,RESIDENCY}
->
-> Sure, but that's an ATF implementation detail, and not something defined
-> by the PSCI spec.
+Patch series v9 supersedes all previously posted patches.
 
-Yes
-
->
-> FWIW, I'm more than happy to add support for PSCI_STAT_{COUNT,RESIDENCY}
-> since these are in the spec.
->
->> > What mechanisms are you using here?
->>
->> More details can be founded here
->> https://github.com/ARM-software/arm-trusted-firmware/blob/master/docs/firmware-design.md#13--performance-measurement-framework
->
-> Thanks. This all sounds IMP DEF, with platforms able to provide their
-> own monitors.
->
->> > As far as I can tell, these are not part of the PSCI standard, and I'm
->> > not aware of any documentation.
->> >
->> > I'm very much not keen on using IMPLEMENTATION DEFINED functionality in
->> > the PSCI driver, as IMP DEF stuff always creates long-term maintenance
->> > problems. You'll need to convince me that this is worth supporting.
->>
->> I will try.
->>
->> I have put it in psci.c as it is really about measurement latenccy of
->> psci firmware but it can probably be put somewhere else if it is more
->> relevant. The only link between current psci driver and this feature
->> is the call to psci_update_all_rt_instr() in psci_cpu_suspend_enter()
->> to make sure that we have coherent timestamp
->> Thinking a bit more about this, we can probably use the cpu_pm_exit
->
-> To be honest, the more I think about this, the less keen I am on having
-> it in the kernel.
->
-> It's all IMP DEF, and will need additional info in DT or ACPI to be safe
-> to invoke (even ignoring usable), and has subtle interactions with the
-> PSCI driver. It's of limited utility to a very small number of
-> developers.
->
-> [...]
->
->> >> +     /* Test if runtime instrumentation is enable */
->> >> +     if (!psci_rt_instr_enable()) {
->> >
->> > This is an unconditional initcall, so this simply is not safe.
->>
->> you're right, it should be called only if/when psci driver has been probed
->
-> Even where PSCI is present, I don't believe it's safe to invoke this.
-> It's a SiP call, which a vendor may have used for any other purpose.
-
-In fact, these functions which are part of SiP, are defined in the ATF
-https://github.com/ARM-software/arm-trusted-firmware/blob/master/docs/arm-sip-service.md
-
->
-> So at minimum, we'd need a description in the DT in order to know that
-> we can invoke this. Since it's all IMP DEF, we'd need all the monitors
-> described too, and at that point it's complex enough, and so tailored to
-> ATF's internals that I really don't want this in the kernel.
-
-So I agree that linking this to PSCI firmware driver is not the best
-choice as it is only related to ATF firmware and not  PSCI spec.
-and this will fit best with a ATF SiP dedicated driver
-
-Thanks
-
->
-> So sorry, but given all of the above, I have to NAK support for this ATF
-> feature.
->
-> If we can get some more useful performance monitors into the PSCI spec,
-> I am more than happy to support those.
->
-> Thanks,
-> Mark.
+Regards.
