@@ -1,32 +1,41 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 20 Jun 2017 11:40:10 +0800
-Subject: [PATCH v2 0/3] add support of hardware random generator on
- MediaTek MT7622
-In-Reply-To: <cover.1497280813.git.sean.wang@mediatek.com>
-References: <cover.1497280813.git.sean.wang@mediatek.com>
-Message-ID: <20170620034009.GD17764@gondor.apana.org.au>
+From: kevin.wangtao@hisilicon.com (Tao Wang)
+Date: Tue, 20 Jun 2017 11:40:33 +0800
+Subject: [PATCH 1/3] dt-bindings: Document the hi3660 thermal sensor bindings
+Message-ID: <1497930035-60894-1-git-send-email-kevin.wangtao@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 12, 2017 at 11:56:53PM +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> Changes since v1:
-> - update the bindings with the specific "mediatek,mt7622-rng"
->   instead of the generic one as "mediatek,generic-rng"
-> 
-> The series add support of hardware RNG on MediaTek MT7622 and
-> , runtime PM support and add me as the maintainer for the existing
-> and following chipset.
-> 
-> Sean Wang (3):
->   dt-bindings: rng: add MediaTek MT7622 Hardware Random Generator
->     bindings
->   hwrng: mtk - add runtime PM support
->   MAINTAINERS: add entry for MediaTek Random Number Generator
+This adds documentation of device tree bindings for the
+thermal sensor controller of hi3660 SoC.
 
-All applied.  Thanks.
+Signed-off-by: Tao Wang <kevin.wangtao@hisilicon.com>
+---
+ .../devicetree/bindings/thermal/hi3660-thermal.txt |   17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/hi3660-thermal.txt
+
+diff --git a/Documentation/devicetree/bindings/thermal/hi3660-thermal.txt b/Documentation/devicetree/bindings/thermal/hi3660-thermal.txt
+new file mode 100644
+index 0000000..c034670
+--- /dev/null
++++ b/Documentation/devicetree/bindings/thermal/hi3660-thermal.txt
+@@ -0,0 +1,17 @@
++* Temperature Sensor on hisilicon hi3660 SoC
++
++** Required properties :
++
++- compatible: "hisilicon,thermal-hi3660".
++- reg: physical base address of thermal sensor and length of memory mapped
++  region.
++- #thermal-sensor-cells: Should be 1. See ./thermal.txt for a description.
++
++Example :
++
++	tsensor: tsensor {
++		compatible = "hisilicon,thermal-hi3660";
++		reg = <0x0 0xfff30000 0x0 0x1000>;
++		#thermal-sensor-cells = <1>;
++		status = "ok";
++	 };
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+1.7.9.5
