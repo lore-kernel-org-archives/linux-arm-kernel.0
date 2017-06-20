@@ -1,45 +1,63 @@
 From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Tue, 20 Jun 2017 06:40:55 +0200
-Subject: [PATCH v6 0/4] nvmem: upstream snvs_lpgpr driver
-Message-ID: <20170620044059.16113-1-o.rempel@pengutronix.de>
+Date: Tue, 20 Jun 2017 06:40:59 +0200
+Subject: [PATCH v6 4/4] ARM: imx6ul: add "fsl,imx6ul-snvs-lpgpr" node
+In-Reply-To: <20170620044059.16113-1-o.rempel@pengutronix.de>
+References: <20170620044059.16113-1-o.rempel@pengutronix.de>
+Message-ID: <20170620044059.16113-5-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-changes v6:
- - check if device is writable by reading GPR_SL and GPR_HL bits
- - use regmap_bulk_* functions instead of while() { regmap_read/write }
- - add patch for imx6ul
+snvs_lpgpr confirmed to work with imx6ul as well.
 
-changes v5:
- - use dcfg->offset instead of priv->offset.
+Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+Tested-by: Guy Shapiro <guy.shapiro@mobi-wize.com>
+---
+ Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt | 3 ++-
+ arch/arm/boot/dts/imx6ul.dtsi                          | 4 ++++
+ drivers/nvmem/snvs_lpgpr.c                             | 1 +
+ 3 files changed, 7 insertions(+), 1 deletion(-)
 
-changes v4:
- - change dependencies in Kconfig
- - remove unused includes and order them alphabetically
- - set MODULE_LICENSE = GPL v2
- - remove unused int err variable
-
-changes v3:
- - remove regmap and offset properties.
-
-changes v2:
- - correct typos: Registe, parrent...
-
-Oleksij Rempel (4):
-  nvmem: dt: document SNVS LPGPR binding
-  nvmem: add snvs_lpgpr driver
-  ARM: dts: imx6qdl.dtsi: add "fsl,imx6q-snvs-lpgpr" node
-  ARM: imx6ul: add "fsl,imx6ul-snvs-lpgpr" node
-
- .../devicetree/bindings/nvmem/snvs-lpgpr.txt       |  20 +++
- arch/arm/boot/dts/imx6qdl.dtsi                     |   4 +
- arch/arm/boot/dts/imx6ul.dtsi                      |   4 +
- drivers/nvmem/Kconfig                              |  10 ++
- drivers/nvmem/Makefile                             |   2 +
- drivers/nvmem/snvs_lpgpr.c                         | 156 +++++++++++++++++++++
- 6 files changed, 196 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
- create mode 100644 drivers/nvmem/snvs_lpgpr.c
-
+diff --git a/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt b/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
+index 21910fb3159f..d2a811f92d7f 100644
+--- a/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
++++ b/Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
+@@ -5,8 +5,9 @@ This DT node should be represented as a sub-node of a "syscon",
+ "simple-mfd" node.
+ 
+ Required properties:
+-- compatible: should be:
++- compatible: should be one of fallowing variants:
+ 	"fsl,imx6q-snvs-lpgpr" for Freescale i.MX6Q/D/DL/S
++	"fsl,imx6ul-snvs-lpgpr" for Freescale i.MX6UL
+ 
+ Example:
+ snvs: snvs at 020cc000 {
+diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+index b9d7d2d09402..df870abc28f5 100644
+--- a/arch/arm/boot/dts/imx6ul.dtsi
++++ b/arch/arm/boot/dts/imx6ul.dtsi
+@@ -624,6 +624,10 @@
+ 					linux,keycode = <KEY_POWER>;
+ 					wakeup-source;
+ 				};
++
++				snvs_lpgpr: snvs-lpgpr {
++					compatible = "fsl,imx6ul-snvs-lpgpr";
++				};
+ 			};
+ 
+ 			epit1: epit at 020d0000 {
+diff --git a/drivers/nvmem/snvs_lpgpr.c b/drivers/nvmem/snvs_lpgpr.c
+index eb3369363e44..2b20a12918d8 100644
+--- a/drivers/nvmem/snvs_lpgpr.c
++++ b/drivers/nvmem/snvs_lpgpr.c
+@@ -136,6 +136,7 @@ static int snvs_lpgpr_remove(struct platform_device *pdev)
+ 
+ static const struct of_device_id snvs_lpgpr_dt_ids[] = {
+ 	{ .compatible = "fsl,imx6q-snvs-lpgpr", .data = &snvs_lpgpr_cfg_imx6q },
++	{ .compatible = "fsl,imx6ul-snvs-lpgpr", .data = &snvs_lpgpr_cfg_imx6q },
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, snvs_lpgpr_dt_ids);
 -- 
 2.11.0
