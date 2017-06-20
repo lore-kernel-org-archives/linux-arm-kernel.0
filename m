@@ -1,52 +1,60 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 20 Jun 2017 10:37:48 +0200
-Subject: [PATCH 1/6] dt-bindings: cp110: do not depend anymore of the
- *-clock-output-names
+Date: Tue, 20 Jun 2017 10:37:49 +0200
+Subject: [PATCH 2/6] dt-bindings: cp110: introduce a new binding
 In-Reply-To: <20170620083754.28053-1-gregory.clement@free-electrons.com>
 References: <20170620083754.28053-1-gregory.clement@free-electrons.com>
-Message-ID: <20170620083754.28053-2-gregory.clement@free-electrons.com>
+Message-ID: <20170620083754.28053-3-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This patch updates the documentation according to the change made in the
-patch "clk: mvebu: cp110: do not depend anymore of the
-*-clock-output-names": the clock names are no more part of the binding.
+patch "pinctrl: dt-bindings: cp110: introduce a new binding".
 
 Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- .../bindings/arm/marvell/cp110-system-controller0.txt      | 14 --------------
- 1 file changed, 14 deletions(-)
+ .../bindings/arm/marvell/cp110-system-controller0.txt  | 18 ++++++++++++++----
+ 1 file changed, 14 insertions(+), 4 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
-index 07dbb358182c..dbd0a38ca580 100644
+index dbd0a38ca580..e97cc2d73e2e 100644
 --- a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
 +++ b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
-@@ -59,14 +59,6 @@ Required properties:
-      "marvell,cp110-system-controller0", "syscon";
-  - reg: register area of the CP110 system controller 0
+@@ -7,6 +7,13 @@ Controller 0 and System Controller 1. This Device Tree binding allows
+ to describe the first system controller, which provides registers to
+ configure various aspects of the SoC.
+ 
++For the top level node:
++ - compatible: must be: "syscon", "simple-mfd";
++ - reg: register area of the CP110 system controller 0
++
++Clocks:
++-------
++
+ The Device Tree node representing this System Controller 0 provides a
+ number of clocks:
+ 
+@@ -56,14 +63,17 @@ The following clocks are available:
+ Required properties:
+ 
+  - compatible: must be:
+-     "marvell,cp110-system-controller0", "syscon";
+- - reg: register area of the CP110 system controller 0
++     "marvell,cp110-clock"
   - #clock-cells: must be set to 2
-- - core-clock-output-names must be set to:
--	"cpm-apll", "cpm-ppv2-core", "cpm-eip", "cpm-core", "cpm-nand-core"
-- - gate-clock-output-names must be set to:
--	"cpm-audio", "cpm-communit", "cpm-nand", "cpm-ppv2", "cpm-sdio",
--	"cpm-mg-domain", "cpm-mg-core", "cpm-xor1", "cpm-xor0", "cpm-gop-dp", "none",
--	"cpm-pcie_x10", "cpm-pcie_x11", "cpm-pcie_x4", "cpm-pcie-xor", "cpm-sata",
--	"cpm-sata-usb", "cpm-main", "cpm-sd-mmc-gop", "none", "none", "cpm-slow-io",
--	"cpm-usb3h0", "cpm-usb3h1", "cpm-usb3dev", "cpm-eip150", "cpm-eip197";
  
  Example:
  
-@@ -74,10 +66,4 @@ Example:
- 		compatible = "marvell,cp110-system-controller0", "syscon";
+ 	cpm_syscon0: system-controller at 440000 {
+-		compatible = "marvell,cp110-system-controller0", "syscon";
++		compatible = "syscon", "simple-mfd";
  		reg = <0x440000 0x1000>;
- 		#clock-cells = <2>;
--		core-clock-output-names = "cpm-apll", "cpm-ppv2-core", "cpm-eip", "cpm-core", "cpm-nand-core";
--		gate-clock-output-names = "cpm-audio", "cpm-communit", "cpm-nand", "cpm-ppv2", "cpm-sdio",
--			"cpm-mg-domain", "cpm-mg-core", "cpm-xor1", "cpm-xor0", "cpm-gop-dp", "none",
--			"cpm-pcie_x10", "cpm-pcie_x11", "cpm-pcie_x4", "cpm-pcie-xor", "cpm-sata",
--			"cpm-sata-usb", "cpm-main", "cpm-sd-mmc-gop", "none", "none", "cpm-slow-io",
--			"cpm-usb3h0", "cpm-usb3h1", "cpm-usb3dev", "cpm-eip150", "cpm-eip197";
+-		#clock-cells = <2>;
++
++		cpm_clk: clock {
++			compatible = "marvell,cp110-clock";
++			#clock-cells = <2>;
++		};
  	};
 -- 
 2.11.0
