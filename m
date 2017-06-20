@@ -1,31 +1,92 @@
-From: yibin.gong@nxp.com (Robin Gong)
-Date: Tue, 20 Jun 2017 15:24:50 +0800
-Subject: [PATCH v1] firmware: add sdma firmware for i.mx6/i.mx7d
-Message-ID: <1497943490-13401-1-git-send-email-yibin.gong@nxp.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 20 Jun 2017 09:32:16 +0200
+Subject: [GIT PULL] Improve cp110 clk support on Marvell Armada 7K/8K
+In-Reply-To: <20170620001853.GT20170@codeaurora.org> (Stephen Boyd's message
+ of "Mon, 19 Jun 2017 17:18:53 -0700")
+References: <pull.28a1be390fb082d60e88c3234dd7d76fb61438b6.1497886602.git-series.gregory.clement@free-electrons.com>
+ <20170620001853.GT20170@codeaurora.org>
+Message-ID: <87shiv3yin.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add sdma firmware for i.mx6 and i.mx7d family, this patch depends
-on the below:
+Hi Stephen,
+ 
+ On mar., juin 20 2017, Stephen Boyd <sboyd@codeaurora.org> wrote:
 
- commit 3123d78e09d2 ("imx: Add SDMA firmware for Freescale i.MX6/7 SoCs")
+> On 06/19, Gregory CLEMENT wrote:
+>> 
+>> Hi Mike, Stephen,
+>> 
+>> This time I turned the series in a pull request so I removed the
+>> device tree binding part which will be in an other series for Rob
+>> Herring and I also removed the dt part that I will take care of once
+>> you will have pulled this one.
+>> 
+>> I hope this will be easier for you to apply this way.
+>> 
+>
+> Ok. It wasn't clear what was going on and I forgot to ask in the
+> lastest patch series. Pulled into clk-next, but I had to apply
+> this patch on top:
 
-Signed-off-by: Robin Gong <yibin.gong@nxp.com>
----
- firmware/Makefile | 1 +
- 1 file changed, 1 insertion(+)
+Thanks for the pull and the fix patch!
 
-diff --git a/firmware/Makefile b/firmware/Makefile
-index fa3e81c..edc86a0 100644
---- a/firmware/Makefile
-+++ b/firmware/Makefile
-@@ -65,6 +65,7 @@ fw-shipped-$(CONFIG_DVB_AV7110) += av7110/bootcode.bin
- fw-shipped-$(CONFIG_DVB_TTUSB_BUDGET) += ttusb-budget/dspbootcode.bin
- fw-shipped-$(CONFIG_E100) += e100/d101m_ucode.bin e100/d101s_ucode.bin \
- 			     e100/d102e_ucode.bin
-+fw-shipped-$(CONFIG_IMX_SDMA) += imx/sdma/sdma-imx6q.bin imx/sdma/sdma-imx7d.bin
- fw-shipped-$(CONFIG_MYRI_SBUS) += myricom/lanai.bin
- fw-shipped-$(CONFIG_PCMCIA_PCNET) += cis/LA-PCM.cis cis/PCMLM28.cis \
- 				     cis/DP83903.cis cis/NE2K.cis \
+Gregory
+
+>
+> ---8<----
+> From: Stephen Boyd <sboyd@codeaurora.org>
+> Subject: [PATCH] clk: mvebu: cp110: Minor cleanups
+>
+> Mark an array of strings static const and remove the dereference
+> of a function pointer when assigning to the platform driver probe
+> struct member.
+>
+> drivers/clk/mvebu/cp110-system-controller.c:89:12:
+> warning: symbol 'gate_base_names' was not declared. Should it be static?
+> drivers/clk/mvebu/cp110-system-controller.c:447:18:
+> error: cannot dereference this type
+>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/clk/mvebu/cp110-system-controller.c | 5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/clk/mvebu/cp110-system-controller.c b/drivers/clk/mvebu/cp110-system-controller.c
+> index b034b79345ec..ca9a0a536174 100644
+> --- a/drivers/clk/mvebu/cp110-system-controller.c
+> +++ b/drivers/clk/mvebu/cp110-system-controller.c
+> @@ -86,7 +86,7 @@ enum {
+>  #define CP110_GATE_EIP150		25
+>  #define CP110_GATE_EIP197		26
+>  
+> -const char *gate_base_names[] = {
+> +static const char * const gate_base_names[] = {
+>  	[CP110_GATE_AUDIO]	= "audio",
+>  	[CP110_GATE_COMM_UNIT]	= "communit",
+>  	[CP110_GATE_NAND]	= "nand",
+> @@ -437,14 +437,13 @@ static int cp110_clk_probe(struct platform_device *pdev)
+>  	return cp110_syscon_common_probe(pdev, pdev->dev.of_node->parent);
+>  }
+>  
+> -
+>  static const struct of_device_id cp110_syscon_legacy_of_match[] = {
+>  	{ .compatible = "marvell,cp110-system-controller0", },
+>  	{ }
+>  };
+>  
+>  static struct platform_driver cp110_syscon_legacy_driver = {
+> -	.probe = *cp110_syscon_legacy_clk_probe,
+> +	.probe = cp110_syscon_legacy_clk_probe,
+>  	.driver		= {
+>  		.name	= "marvell-cp110-system-controller0",
+>  		.of_match_table = cp110_syscon_legacy_of_match,
+> -- 
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+
 -- 
-1.9.1
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
