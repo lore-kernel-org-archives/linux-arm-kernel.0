@@ -1,19 +1,18 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 19 Jun 2017 18:02:58 -0700
-Subject: [PATCH] clk: zx296718: export I2S mux clocks
-In-Reply-To: <1497709265-22944-1-git-send-email-shawnguo@kernel.org>
-References: <1497709265-22944-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <20170620010258.GJ20170@codeaurora.org>
+Date: Mon, 19 Jun 2017 18:05:09 -0700
+Subject: [Resend PATCH 1/2] clk: hi6220: add acpu clock
+In-Reply-To: <1496195139-16687-1-git-send-email-zhangfei.gao@linaro.org>
+References: <1496195139-16687-1-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <20170620010509.GK20170@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/17, Shawn Guo wrote:
-> From: Shawn Guo <shawn.guo@linaro.org>
+On 05/31, Zhangfei Gao wrote:
+> Add acpu clock, including sft clock controlling hi6220 coresight module
 > 
-> Export I2S mux clocks, so that device tree can refer to them for setting
-> a better parent clock for I2S work clock.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
+> Acked-by: Rob Herring <robh@kernel.org>
 > ---
 
 Applied to clk-next
