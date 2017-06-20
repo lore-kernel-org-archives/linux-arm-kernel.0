@@ -1,37 +1,25 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 20 Jun 2017 14:03:02 +0200
-Subject: Shawn Guo: your attetion is needed here Re: [PATCH v8 00/34]
- i.MX Media Driver
-In-Reply-To: <CAOMZO5A_LjYzzDTG9KmEHxb2F0=1Pj2Wm8s5maKS8pxce-HX3A@mail.gmail.com>
-References: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
- <e7e4669c-2963-b9e1-edd7-02731a6e0f9c@xs4all.nl>
- <c0b69c93-b9cd-25e8-ea36-fc0600efdb69@gmail.com>
- <e4f152de-6e75-7654-178e-e6dcf9ad12f3@xs4all.nl>
- <43887f25-bb73-9020-0909-d275c319aaad@mentor.com>
- <20170620082933.GA31799@amd>
- <CAOMZO5A_LjYzzDTG9KmEHxb2F0=1Pj2Wm8s5maKS8pxce-HX3A@mail.gmail.com>
-Message-ID: <20170620120302.GA12948@amd>
+Date: Tue, 20 Jun 2017 14:10:11 +0200
+Subject: [PATCH 00/51] rtc: stop using rtc deprecated functions
+In-Reply-To: <20170620100348.zh4ygvjjgnhxvmvl@piout.net>
+References: <1497951359-13334-1-git-send-email-benjamin.gaignard@linaro.org>
+ <20170620100348.zh4ygvjjgnhxvmvl@piout.net>
+Message-ID: <20170620121011.GA13221@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2017-06-20 08:05:05, Fabio Estevam wrote:
-> On Tue, Jun 20, 2017 at 5:29 AM, Pavel Machek <pavel@ucw.cz> wrote:
+On Tue 2017-06-20 12:03:48, Alexandre Belloni wrote:
+> On 20/06/2017 at 11:35:08 +0200, Benjamin Gaignard wrote:
+> > rtc_time_to_tm() and rtc_tm_to_time() are deprecated because they
+> > rely on 32bits variables and that will make rtc break in y2038/2016.
 > 
-> > Hmm. I changed the subject to grab Shawn's attetion.
-> >
-> > But his acks should not be needed for forward progress. Yes, it would
-> > be good, but he does not react -- so just reorder the series so that
-> > dts changes come last, then apply the parts you can apply: driver can
-> > go in.
-> >
-> > And actually... if maintainer does not respond at all, there are ways
-> > to deal with that, too...
-> 
-> Shawn has already applied the dts part of the series and they show up
-> in linux-next.
+> Please don't, because this hide the fact that the hardware will not
+> handle dates in y2038 anyway and as pointed by Russell a few month ago,
+> rtc_time_to_tm will be able to catch it but the 64 bit version will
+> silently ignore it.
 
-Aha, sorry about the noise. I see videomux parts being merged by
-Mauro. Good :-).
+Reference? Because rtc on PCs stores date in binary coded decimal, so
+it is likely to break in 2100, not 2038...
 									Pavel
 -- 
 (english) http://www.livejournal.com/~pavelmachek
@@ -42,4 +30,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 181 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170620/61ce5724/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170620/429aeb11/attachment.sig>
