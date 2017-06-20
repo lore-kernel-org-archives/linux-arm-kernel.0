@@ -1,76 +1,69 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Tue, 20 Jun 2017 17:07:46 +0200
-Subject: [PATCH 00/51] rtc: stop using rtc deprecated functions
-In-Reply-To: <20170620134827.ubvzhh25klaotupv@piout.net>
-References: <1497951359-13334-1-git-send-email-benjamin.gaignard@linaro.org>
- <20170620100348.zh4ygvjjgnhxvmvl@piout.net> <20170620121011.GA13221@amd>
- <20170620122400.sm7qqvwyj6cuzarw@piout.net> <20170620132620.GA16881@amd>
- <6ED8E3B22081A4459DAC7699F3695FB7018CD96FCD@SW-EX-MBX02.diasemi.com>
- <20170620134458.GA10104@amd> <20170620134827.ubvzhh25klaotupv@piout.net>
-Message-ID: <CA+M3ks68+z6nDtYM8CDpso7SxjB6Nt5E=rOc1yxx=kDz6PUeVQ@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 20 Jun 2017 17:09:07 +0200
+Subject: [PATCH v2 2/2] drm/exynos/decon: Add include guard to the Exynos7
+ header
+In-Reply-To: <20170620150907.17486-1-krzk@kernel.org>
+References: <20170620150907.17486-1-krzk@kernel.org>
+Message-ID: <20170620150907.17486-2-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-06-20 15:48 GMT+02:00 Alexandre Belloni
-<alexandre.belloni@free-electrons.com>:
-> On 20/06/2017 at 15:44:58 +0200, Pavel Machek wrote:
->> On Tue 2017-06-20 13:37:22, Steve Twiss wrote:
->> > Hi Pavel,
->> >
->> > On 20 June 2017 14:26, Pavel Machek wrote:
->> >
->> > > Subject: Re: [PATCH 00/51] rtc: stop using rtc deprecated functions
->> > >
->> > > On Tue 2017-06-20 14:24:00, Alexandre Belloni wrote:
->> > > > On 20/06/2017 at 14:10:11 +0200, Pavel Machek wrote:
->> > > > > On Tue 2017-06-20 12:03:48, Alexandre Belloni wrote:
->> > > > > > On 20/06/2017 at 11:35:08 +0200, Benjamin Gaignard wrote:
->> > > > > > > rtc_time_to_tm() and rtc_tm_to_time() are deprecated because they
->> > > > > > > rely on 32bits variables and that will make rtc break in y2038/2016.
->> > > > > >
->> > > > > > Please don't, because this hide the fact that the hardware will not
->> > > > > > handle dates in y2038 anyway and as pointed by Russell a few month ago,
->> > > > > > rtc_time_to_tm will be able to catch it but the 64 bit version will
->> > > > > > silently ignore it.
->> > > > >
->> > > > > Reference? Because rtc on PCs stores date in binary coded decimal, so
->> > > > > it is likely to break in 2100, not 2038...
->> > > >
->> > > > I'm not saying it should be done but clearly, that is not the correct
->> > > > thing to do for RTCs that are using a single 32 bits register to store
->> > > > the time.
->> > > > You give one example, I can give you three: armada38x, at91sam9,
->> > > > at32ap700x and that just in the beginning of the series.
->> > >
->> > > I wanted reference to Russell's mail.
->> >
->> > This is it.
->> > https://patchwork.kernel.org/patch/6219401/
->>
->> Thanks.
->>
->> Yes, that's argument against changing rtc _drivers_ for hardware that
->> can not do better than 32bit. For generic code (such as 44/51 sysfs,
->> 51/51 suspend test), the change still makes sense.
+Although header is included only once but still having an include guard
+is a good practice.  To avoid confusion, add SoC prefix to existing
+Exynos5433 header include guard.
 
-What I had in mind when writing those patches was to remove the limitations
-coming from those functions usage, even more since they been marked has
-deprecated.
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-I agree that will change nothing of hardware limitation but at least
-the limit will
-not come from the framework.
+---
 
->>
->
-> Yes, we agree on that but I won't cherry pick working patches from a 51
-> patches series.
+Changes since v1:
+1. Just re-order patches in patchset and slightly adjust include guard
+   name.
+---
+ drivers/gpu/drm/exynos/regs-decon5433.h | 6 +++---
+ drivers/gpu/drm/exynos/regs-decon7.h    | 5 +++++
+ 2 files changed, 8 insertions(+), 3 deletions(-)
 
-maybe only the acked ones ?
-
->
->
-> --
-> Alexandre Belloni, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+diff --git a/drivers/gpu/drm/exynos/regs-decon5433.h b/drivers/gpu/drm/exynos/regs-decon5433.h
+index 78957c9626f5..19ad9e47945e 100644
+--- a/drivers/gpu/drm/exynos/regs-decon5433.h
++++ b/drivers/gpu/drm/exynos/regs-decon5433.h
+@@ -6,8 +6,8 @@
+  * published by the Free Software Foundationr
+  */
+ 
+-#ifndef EXYNOS_REGS_DECON_H
+-#define EXYNOS_REGS_DECON_H
++#ifndef EXYNOS_REGS_DECON5433_H
++#define EXYNOS_REGS_DECON5433_H
+ 
+ /* Exynos543X DECON */
+ #define DECON_VIDCON0			0x0000
+@@ -206,4 +206,4 @@
+ #define CRCCTRL_CRCEN			(0x1 << 0)
+ #define CRCCTRL_MASK			(0x7)
+ 
+-#endif /* EXYNOS_REGS_DECON_H */
++#endif /* EXYNOS_REGS_DECON5433_H */
+diff --git a/drivers/gpu/drm/exynos/regs-decon7.h b/drivers/gpu/drm/exynos/regs-decon7.h
+index 339ea1007ff5..5df7765d2397 100644
+--- a/drivers/gpu/drm/exynos/regs-decon7.h
++++ b/drivers/gpu/drm/exynos/regs-decon7.h
+@@ -8,6 +8,9 @@
+  * option) any later version.
+  */
+ 
++#ifndef EXYNOS_REGS_DECON7_H
++#define EXYNOS_REGS_DECON7_H
++
+ /* VIDCON0 */
+ #define VIDCON0					0x00
+ 
+@@ -346,3 +349,5 @@
+ 
+ #define DECON_UPDATE_SLAVE_SYNC			(1 << 4)
+ #define DECON_UPDATE_STANDALONE_F		(1 << 0)
++
++#endif /* EXYNOS_REGS_DECON7_H */
+-- 
+2.9.3
