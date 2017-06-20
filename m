@@ -1,48 +1,61 @@
-From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
-Date: Tue, 20 Jun 2017 21:07:40 +0200
-Subject: [PATCH] arm64: pass machine size to sparse
-In-Reply-To: <20170620170401.GA28035@arm.com>
-References: <20170620122443.35880-1-luc.vanoostenryck@gmail.com>
- <20170620154938.GH21131@arm.com>
- <20170620162431.zi6qd3jby7shyu46@ltop.local>
- <20170620170401.GA28035@arm.com>
-Message-ID: <20170620190739.ijtpo3ekibxi47qj@ltop.local>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 20 Jun 2017 20:27:47 +0100
+Subject: [PATCH v8 1/3] ACPI/IORT: Fixup SMMUv3 resource size for Cavium
+ ThunderX2 SMMUv3 model
+In-Reply-To: <1497968259-16390-2-git-send-email-gakula@caviumnetworks.com>
+References: <1497968259-16390-1-git-send-email-gakula@caviumnetworks.com>
+ <1497968259-16390-2-git-send-email-gakula@caviumnetworks.com>
+Message-ID: <20170620192747.GA30990@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 06:04:01PM +0100, Will Deacon wrote:
-> On Tue, Jun 20, 2017 at 06:24:32PM +0200, Luc Van Oostenryck wrote:
-> > On Tue, Jun 20, 2017 at 04:49:39PM +0100, Will Deacon wrote:
-> > > Looks fine to me, but just wondering whether or not we should also be
-> > > passing something to indicate the endianness of the target. Does sparse care
-> > > about that?
-> > 
-> > Yes, we should. sparse doesn't care per-se but some macros, structures
-> > or whole portion of code may depends on '__{LITTLE,BIG}_ENDIAN__'
-> > being defined or not, for example (but I don't think it will make
-> > a big difference, at least nothing like the 629904 'constant is so big'
-> > warnings we have now due to the missing -m64).
-> > 
-> > For this, you have two possibilities:
-> > 1) just doing something like PPC:
-> > 	+ifdef CONFIG_CPU_BIG_ENDIAN
-> > 	+CHECKFLAGS     += -D__BIG_ENDIAN__
-> > 	+else
-> > 	+CHECKFLAGS     += -D__LITTLE_ENDIAN__
-> > 	+endif
-> >    This will work now. I can't send you a proper patch if you wish.
-> > 
-> > 2) a cleaner solution, IMO, would be to teach sparse about
-> >    -mlittle-endian/-mbig-endian. In fact I already wrote the patch
-> >    earlier today. But of course, you will need to wait for the patch
-> >    to reach sparse's master and then compile sparse yourself or wait
-> >    for a new release (which shouldn't take much long, though).
+On Tue, Jun 20, 2017 at 07:47:37PM +0530, Geetha sowjanya wrote:
+> From: Linu Cherian <linu.cherian@cavium.com>
 > 
-> If you do that, you could also teach it that AArch64 is 64-bit ;)
+> Cavium ThunderX2 implementation doesn't support second page in SMMU
+> register space. Hence, resource size is set as 64k for this model.
+> 
+> Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
+> Signed-off-by: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
+> ---
+>  drivers/acpi/arm64/iort.c |   15 ++++++++++++++-
+>  1 files changed, 14 insertions(+), 1 deletions(-)
 
-Well, currently sparse is arch agnostic and I think it's a good thing.
-For the few arch specifities you have to use some of the '-m' flags
-(like -m32/-m64, -msize-long). So, for the moment the '-m64' flag
-is needed, thus the patch.
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
--- Luc
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> index c5fecf9..c166f3e 100644
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -828,6 +828,18 @@ static int __init arm_smmu_v3_count_resources(struct acpi_iort_node *node)
+>  	return num_res;
+>  }
+>  
+> +static unsigned long arm_smmu_v3_resource_size(struct acpi_iort_smmu_v3 *smmu)
+> +{
+> +	/*
+> +	 * Override the size, for Cavium ThunderX2 implementation
+> +	 * which doesn't support the page 1 SMMU register space.
+> +	 */
+> +	if (smmu->model == ACPI_IORT_SMMU_V3_CAVIUM_CN99XX)
+> +		return SZ_64K;
+> +
+> +	return SZ_128K;
+> +}
+> +
+>  static void __init arm_smmu_v3_init_resources(struct resource *res,
+>  					      struct acpi_iort_node *node)
+>  {
+> @@ -838,7 +850,8 @@ static void __init arm_smmu_v3_init_resources(struct resource *res,
+>  	smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
+>  
+>  	res[num_res].start = smmu->base_address;
+> -	res[num_res].end = smmu->base_address + SZ_128K - 1;
+> +	res[num_res].end = smmu->base_address +
+> +				arm_smmu_v3_resource_size(smmu) - 1;
+>  	res[num_res].flags = IORESOURCE_MEM;
+>  
+>  	num_res++;
+> -- 
+> 1.7.1
+> 
