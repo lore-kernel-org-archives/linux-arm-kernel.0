@@ -1,81 +1,32 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 20 Jun 2017 16:07:18 +0200
-Subject: [PATCH v4 2/6] dt-bindings: interrupt-controller: add DT binding for
- the Marvell ICU
+Date: Tue, 20 Jun 2017 16:07:21 +0200
+Subject: [PATCH v4 5/6] arm64: marvell: enable ICU and GICP drivers
 In-Reply-To: <20170620140722.31646-1-thomas.petazzoni@free-electrons.com>
 References: <20170620140722.31646-1-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170620140722.31646-3-thomas.petazzoni@free-electrons.com>
+Message-ID: <20170620140722.31646-6-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the Device Tree binding documentation for the Marvell
-ICU interrupt controller, which collects wired interrupts from the
-devices located into the CP110 hardware block of Marvell Armada 7K/8K,
-and converts them into SPI interrupts in the GIC located in the AP
-hardware block, using the GICP extension.
+This commit enables the newly introduced Marvell GICP and ICUs driver
+for the 64-bit Marvell EBU platforms.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- .../bindings/interrupt-controller/marvell,icu.txt  | 51 ++++++++++++++++++++++
- 1 file changed, 51 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
+ arch/arm64/Kconfig.platforms | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
-new file mode 100644
-index 0000000..aa8bf2e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
-@@ -0,0 +1,51 @@
-+Marvell ICU Interrupt Controller
-+--------------------------------
-+
-+The Marvell ICU (Interrupt Consolidation Unit) controller is
-+responsible for collecting all wired-interrupt sources in the CP and
-+communicating them to the GIC in the AP, the unit translates interrupt
-+requests on input wires to MSG memory mapped transactions to the GIC.
-+
-+Required properties:
-+
-+- compatible: Should be "marvell,cp110-icu"
-+
-+- reg: Should contain ICU registers location and length.
-+
-+- #interrupt-cells: Specifies the number of cells needed to encode an
-+  interrupt source. The value shall be 3.
-+
-+  The 1st cell is the group type of the ICU interrupt. Possible group
-+  types are:
-+
-+   ICU_GRP_NSR (0x0) : Shared peripheral interrupt, non-secure
-+   ICU_GRP_SR  (0x1) : Shared peripheral interrupt, secure
-+   ICU_GRP_SEI (0x4) : System error interrupt
-+   ICU_GRP_REI (0x5) : RAM error interrupt
-+
-+  The 2nd cell is the index of the interrupt in the ICU unit.
-+
-+  The 3rd cell is the type of the interrupt. See arm,gic.txt for
-+  details.
-+
-+- interrupt-controller: Identifies the node as an interrupt
-+  controller.
-+
-+- msi-parent: Should point to the GICP controller, the GIC extension
-+  that allows to trigger interrupts using MSG memory mapped
-+  transactions.
-+
-+Example:
-+
-+icu: interrupt-controller at 1e0000 {
-+	compatible = "marvell,cp110-icu";
-+	reg = <0x1e0000 0x10>;
-+	#interrupt-cells = <3>;
-+	interrupt-controller;
-+	msi-parent = <&gicp>;
-+};
-+
-+usb3h0: usb3 at 500000 {
-+	interrupt-parent = <&icu>;
-+	interrupts = <ICU_GRP_NSR 106 IRQ_TYPE_LEVEL_HIGH>;
-+};
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 4afcffc..bf3b505 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -106,6 +106,8 @@ config ARCH_MVEBU
+ 	select ARMADA_AP806_SYSCON
+ 	select ARMADA_CP110_SYSCON
+ 	select ARMADA_37XX_CLK
++	select MVEBU_GICP
++	select MVEBU_ICU
+ 	select MVEBU_ODMI
+ 	select MVEBU_PIC
+ 	help
 -- 
 2.9.4
