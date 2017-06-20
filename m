@@ -1,32 +1,56 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Tue, 20 Jun 2017 16:09:07 +0200
-Subject: [PATCH v6 3/6] kernel/reboot.c: export pm_power_off_prepare
-In-Reply-To: <20170620140910.7568-1-o.rempel@pengutronix.de>
-References: <20170620140910.7568-1-o.rempel@pengutronix.de>
-Message-ID: <20170620140910.7568-4-o.rempel@pengutronix.de>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Tue, 20 Jun 2017 10:48:23 -0400
+Subject: [GIT PULL] Qualcomm Driver updates for 4.13
+In-Reply-To: <20170619053707.GC7703@localhost>
+References: <1497383309-14226-1-git-send-email-andy.gross@linaro.org>
+ <1497383309-14226-4-git-send-email-andy.gross@linaro.org>
+ <20170619053707.GC7703@localhost>
+Message-ID: <20170620144823.GA5203@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Export pm_power_off_prepare. It is needed to implement power off on
-Freescale/NXP iMX6 based boards with external power management
-integrated circuit (PMIC).
+On Sun, Jun 18, 2017 at 10:37:07PM -0700, Olof Johansson wrote:
+> Hi Andy,
+> 
+> On Tue, Jun 13, 2017 at 03:48:27PM -0400, Andy Gross wrote:
+> > The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+> > 
+> >   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-4.13
+> > 
+> > for you to fetch changes up to d4348b43bbcadb6d5faee36024245944b6600d25:
+> > 
+> >   firmware: qcom_scm: Fix to allow COMPILE_TEST-ing (2017-06-09 16:15:10 -0500)
+> > 
+> > ----------------------------------------------------------------
+> > Qualcomm ARM Based Driver Updates for v4.13
+> > 
+> > * Fix COMPILE_TEST flag for QCOM SCM
+> > * Improve QCOM SMSM error handling
+> > 
+> > ----------------------------------------------------------------
+> > Jonathan Neusch??fer (1):
+> >       soc: qcom: smsm: Improve error handling, quiesce probe deferral
+> > 
+> > Stanimir Varbanov (1):
+> >       firmware: qcom_scm: Fix to allow COMPILE_TEST-ing
+> 
+> This patch doesn't seem like it's doing the right thing -- I've replied to it
+> on the list with comments.
 
-Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
----
- kernel/reboot.c | 1 +
- 1 file changed, 1 insertion(+)
+For some reason I thought it was a rehash of a previous patch and it looked
+right to me.  Dropping this looks like the right answer for now.
 
-diff --git a/kernel/reboot.c b/kernel/reboot.c
-index bd30a973fe94..a6903bf772c7 100644
---- a/kernel/reboot.c
-+++ b/kernel/reboot.c
-@@ -49,6 +49,7 @@ int reboot_force;
-  */
- 
- void (*pm_power_off_prepare)(void);
-+EXPORT_SYMBOL(pm_power_off_prepare);
- 
- /**
-  *	emergency_restart - reboot the system
--- 
-2.11.0
+> 
+> Not merged. Let me know if you want me to cherry-pick the other patch (or send
+> a new pull request with just that one).
+
+I'll send another pull request today.
+
+
+Regards,
+
+Andy
