@@ -1,50 +1,46 @@
-From: hotran@apm.com (Hoan Tran)
-Date: Tue, 20 Jun 2017 11:45:33 -0700
-Subject: [PATCH v3 0/3] perf: xgene: Add support for SoC PMU version 3
-In-Reply-To: <1496772146-11084-1-git-send-email-hotran@apm.com>
-References: <1496772146-11084-1-git-send-email-hotran@apm.com>
-Message-ID: <CAFHUOYzjOL87TzrdKJA8EcpFK36pKVZqM2dAxSEm-VC5ZM6UbQ@mail.gmail.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Tue, 20 Jun 2017 14:03:35 -0500
+Subject: [PATCH v2 2/2] memory: ti-emif-sram: introduce relocatable
+ suspend/resume handlers
+In-Reply-To: <20170620144243.GB23750@n2100.armlinux.org.uk>
+References: <20170519175708.6070-1-d-gerlach@ti.com>
+ <20170519175708.6070-3-d-gerlach@ti.com>
+ <20170620144243.GB23750@n2100.armlinux.org.uk>
+Message-ID: <fdfa1059-17f7-74f7-4b88-2941af07a538@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark and All,
+Hi,
+On 06/20/2017 09:42 AM, Russell King - ARM Linux wrote:
+> On Fri, May 19, 2017 at 12:57:08PM -0500, Dave Gerlach wrote:
+>> +	.arm
+>> +	.align 3
+>> +
+>> +ENTRY(ti_emif_sram)
+> 
+> Will you ever want to have any of this code as Thumb?
 
-Do you have any comments on this patch set?
+I cannot see any requirement for that. I will say it is tested and
+inter-operates happily with CONFIG_THUMB_KERNEL, but because it's constrained to
+am335x and am437x I don't think there are unknown situations where every single
+instruction must be THUMB.
 
-Thank you!
-Hoan
+> 
+>> +extern inline void ti_emif_offsets(void)
+>> +{
+> 
+> "extern inline" is frowned upon in the kernel - any reason this
+> can't be "static inline" ?
 
-On Tue, Jun 6, 2017 at 11:02 AM, Hoan Tran <hotran@apm.com> wrote:
-> This patch set adds support for SoC-wide (AKA uncore) Performance Monitoring
-> Unit version 3.
->
-> It can support up to
->  - 2 IOB PMU instances
->  - 8 L3C PMU instances
->  - 2 MCB PMU instances
->  - 8 MCU PMU instances
-> and these PMUs support 64 bit counter
->
-> v3:
->  * Seperate acpi_pmu_probe_active_mcb_mcu_l3c for v3
->  * Consistent PMU event name
->  * Update comment
->  * Correct active MCU detection
->
-> v2:
->  * Split into separate patches
->  * Use the function pointers for the PMU leaf functions
->  * Parse PMU subnode by the match table
->  * Dont allow user change agent id by config1 for SoC PMU v3
->
-> Hoan Tran (3):
->   perf: xgene: Parse PMU subnode from the match table
->   perf: xgene: Move PMU leaf functions into function pointer structure
->   perf: xgene: Add support for SoC PMU version 3
->
->  drivers/perf/xgene_pmu.c | 677 +++++++++++++++++++++++++++++++++++++++++++----
->  1 file changed, 622 insertions(+), 55 deletions(-)
->
-> --
-> 1.9.1
->
+It should be static.
+
+> 
+> Any reason not to provide a stub for when it's not configured,
+> and eliminate the ifdef in arch/arm/kernel/asm-offsets.c ?
+> 
+
+No, I just was following the ifdef example set by others in the file, a stub
+would be cleaner I agree.
+
+Regards,
+Dave
