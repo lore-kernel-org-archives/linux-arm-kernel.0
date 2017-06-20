@@ -1,55 +1,68 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Tue, 20 Jun 2017 17:37:06 +0300
-Subject: [PATCH v5 3/6] kernel/reboot.c: export pm_power_off_prepare
-In-Reply-To: <5023d338-f845-b8a6-c4a0-d414c75f841c@pengutronix.de>
-References: <20170619050245.2632-1-o.rempel@pengutronix.de>
- <20170619050245.2632-4-o.rempel@pengutronix.de>
- <1497872109.5380.10.camel@nxp.com>
- <5023d338-f845-b8a6-c4a0-d414c75f841c@pengutronix.de>
-Message-ID: <1497969426.3177.14.camel@nxp.com>
+From: gakula@caviumnetworks.com (Geetha sowjanya)
+Date: Tue, 20 Jun 2017 19:47:36 +0530
+Subject: [PATCH v8 0/3] Cavium ThunderX2 SMMUv3 errata workarounds
+Message-ID: <1497968259-16390-1-git-send-email-gakula@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-06-20 at 07:01 +0200, Oleksij Rempel wrote:
-> 
-> On 19.06.2017 13:35, Leonard Crestez wrote:
-> > 
-> > On Mon, 2017-06-19 at 07:02 +0200, Oleksij Rempel wrote:
-> > > 
-> > > Export pm_power_off_prepare. It is needed to implement power off on
-> > > Freescale/NXP iMX6 based boards with external power management
-> > > integrated circuit (PMIC).
-> > > 
-> > > Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> > > ---
-> > > ?kernel/reboot.c | 1 +
-> > > ?1 file changed, 1 insertion(+)
-> > > 
-> > > diff --git a/kernel/reboot.c b/kernel/reboot.c
-> > > index bd30a973fe94..a6903bf772c7 100644
-> > > --- a/kernel/reboot.c
-> > > +++ b/kernel/reboot.c
-> > > @@ -49,6 +49,7 @@ int reboot_force;
-> > > ? */
-> > > 
-> > > ?void (*pm_power_off_prepare)(void);
-> > > +EXPORT_SYMBOL(pm_power_off_prepare);
-> > > 
-> > Could you register a reboot notifier in the pfuze driver instead? Right
-> > now the only user of pm_power_off_prepare is ACPI so this alternative
-> > seems less intrusive.
-> hm... in this case i will need to make sure that reboot handler is not?
-> executed on reboot. This will make code looks strange. Which is opposite?
-> of your comment in other email about strange standby code for power off :)
-> Should i really do this?
+Cavium ThunderX2 SMMUv3 implementation has two Silicon Erratas.
+1. Errata ID #74
+   SMMU register alias Page 1 is not implemented
+2. Errata ID #126
+   SMMU doesnt support unique IRQ lines and also MSI for gerror,
+   eventq and cmdq-sync
 
-A reboot handler receives a parameter to differentiate between reboot
-and shutdown so it would be easy. Isn't it preferable to use an
-existing mechanism instead of exporting a new symbol?
+The following patchset does software workaround for these two erratas.
 
-But maybe somebody else will Ack this, I don't particularly insist on
-changing this.
+This series is based on patchset.
+https://www.spinics.net/lists/arm-kernel/msg578443.html
 
---
-Regards,
-Leonard
+Changes since v7:
+    - Added new function "arm_smmu_v3_resource_size" in iort.c to get resource
+      size.
+    - Added new SMMU option "SHARED_IRQ" to enable errata #126 workaround.
+    - Coding style issues fixed.
+    - Suggested changes in arm_smmu_device_probe addressed.
+    - Replaced ACPI_IORT_SMMU_CAVIUM_CN99XX macro with ACPI_IORT_SMMU_V3_CAVIUM_CN99XX
+   
+Changes since v6:
+   - Changed device tree compatible string to vendor specific.
+   - Rebased on Robin's latest "Update SMMU models for IORT rev. C" v2 patch.
+     https://www.spinics.net/lists/arm-kernel/msg582809.html
+
+Changes since v5:
+  - Rebased on Robin's "Update SMMU models for IORT rev. C" patch.
+     https://www.spinics.net/lists/arm-kernel/msg580728.html
+  - Replaced ACPI_IORT_SMMU_V3_CAVIUM_CN99XX macro with ACPI_IORT_SMMU_CAVIUM_CN99XX
+
+Changes since v4:
+ - Replaced all page1 offset macros ARM_SMMU_EVTQ/PRIQ_PROD/CONS with
+    arm_smmu_page1_fixup(ARM_SMMU_EVTQ/PRIQ_PROD/CONS, smmu)
+
+Changes since v3:
+ - Merged patches 1, 2 and 4 of Version 3.
+ - Modified the page1_offset_adjust() and get_irq_flags() implementation as
+   suggested by Robin.
+
+Changes since v2:
+ - Updated "Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt" document with
+   new SMMU option used to enable errata workaround.
+
+Changes since v1:
+ - Since the use of MIDR register is rejected and SMMU_IIDR is broken on this
+   silicon, as suggested by Will Deacon modified the patches to use ThunderX2
+   SMMUv3 IORT model number to enable errata workaround.
+
+Geetha Sowjanya (1):
+  iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2 erratum #126
+
+Linu Cherian (2):
+  ACPI/IORT: Fixup SMMUv3 resource size for Cavium ThunderX2 SMMUv3
+    model
+  iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2 erratum #74
+
+ Documentation/arm64/silicon-errata.txt             |    2 +
+ .../devicetree/bindings/iommu/arm,smmu-v3.txt      |    6 ++
+ drivers/acpi/arm64/iort.c                          |   14 +++-
+ drivers/iommu/arm-smmu-v3.c                        |   93 ++++++++++++++++----
+ 4 files changed, 95 insertions(+), 20 deletions(-)
