@@ -1,40 +1,66 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 20 Jun 2017 22:05:58 +0100
-Subject: [PATCH 34/51] rtc: pl031: stop using rtc deprecated functions
-In-Reply-To: <CACRpkdZsdwuytW5RHSdd5t9MSyYnhV1nNNKOR1VUzqEgicFqUw@mail.gmail.com>
-References: <1497951359-13334-1-git-send-email-benjamin.gaignard@linaro.org>
- <1497951359-13334-35-git-send-email-benjamin.gaignard@linaro.org>
- <CACRpkdZsdwuytW5RHSdd5t9MSyYnhV1nNNKOR1VUzqEgicFqUw@mail.gmail.com>
-Message-ID: <20170620210558.GL4902@n2100.armlinux.org.uk>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 20 Jun 2017 14:08:31 -0700
+Subject: [PATCH v5 0/8] Support for contiguous pte hugepages
+In-Reply-To: <871sqezsk2.fsf@e105922-lin.cambridge.arm.com>
+References: <20170619170145.25577-1-punit.agrawal@arm.com>
+ <20170619150133.cb4173220e4e3abd02c6f6d0@linux-foundation.org>
+ <871sqezsk2.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <20170620140831.6bd835649d475bcf30c3c434@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 06:08:48PM +0200, Linus Walleij wrote:
-> On Tue, Jun 20, 2017 at 11:35 AM, Benjamin Gaignard
-> <benjamin.gaignard@linaro.org> wrote:
+On Tue, 20 Jun 2017 14:39:57 +0100 Punit Agrawal <punit.agrawal@arm.com> wrote:
+
 > 
-> > rtc_time_to_tm() and rtc_tm_to_time() are deprecated because they
-> > rely on 32bits variables and that will make rtc break in y2038/2016.
-> > Stop using those two functions to safer 64bits ones.
-> >
-> > Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-> > CC: Linus Walleij <linus.walleij@linaro.org>
-> > CC: Alessandro Zummo <a.zummo@towertech.it>
-> > CC: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > CC: rtc-linux at googlegroups.com
-> > CC: linux-kernel at vger.kernel.org
-> > CC: linux-arm-kernel at lists.infradead.org
+> The architecture supports two flavours of hugepages -
 > 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> * Block mappings at the pud/pmd level
+> 
+>   These are regular hugepages where a pmd or a pud page table entry
+>   points to a block of memory. Depending on the PAGE_SIZE in use the
+>   following size of block mappings are supported -
+> 
+>           PMD	PUD
+>           ---	---
+>   4K:      2M	 1G
+>   16K:    32M
+>   64K:   512M
+> 
+>   For certain applications/usecases such as HPC and large enterprise
+>   workloads, folks are using 64k page size but the minimum hugepage size
+>   of 512MB isn't very practical.
+> 
+> To overcome this ...
+> 
+> * Using the Contiguous bit
+> 
+>   The architecture provides a contiguous bit in the translation table
+>   entry which acts as a hint to the mmu to indicate that it is one of a
+>   contiguous set of entries that can be cached in a single TLB entry.
+> 
+>   We use the contiguous bit in Linux to increase the mapping size at the
+>   pmd and pte (last) level.
+> 
+>   The number of supported contiguous entries varies by page size and
+>   level of the page table.
+> 
+>   Using the contiguous bit allows additional hugepage sizes -
+> 
+>            CONT PTE    PMD    CONT PMD    PUD
+>            --------    ---    --------    ---
+>     4K:         64K     2M         32M     1G
+>     16K:         2M    32M          1G
+>     64K:         2M   512M         16G
+> 
+>   Of these, 64K with 4K and 2M with 64K pages have been explicitly
+>   requested by a few different users.
+> 
+> Entries with the contiguous bit set are required to be modified all
+> together - which makes things like memory poisoning and migration
+> impossible to do correctly without knowing the size of hugepage being
+> dealt with - the reason for adding size parameter to a few of the
+> hugepage helpers in this series.
+> 
 
-Naked-again-by: Russell King
-
-Really, people need to stop re-posting the same patches that have
-already been naked.
-
-This patch fixes NOTHING.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks, I added the above to the 1/n changelog.  Perhaps it's worth
+adding something like this to Documentation/vm/hugetlbpage.txt.
