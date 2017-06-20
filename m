@@ -1,68 +1,88 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Tue, 20 Jun 2017 17:27:02 +0300
-Subject: [PATCH v3 2/4] asm-generic: Provide a fncpy() implementation
-In-Reply-To: <20170619174348.GA23750@n2100.armlinux.org.uk>
-References: <20170617000744.22158-1-f.fainelli@gmail.com>
- <20170617000744.22158-3-f.fainelli@gmail.com>
- <20170618235108.peaxdi367jpkt542@yury-thinkpad>
- <20170619151818.pvjygbdvm6arvarq@yury-thinkpad>
- <20170619174348.GA23750@n2100.armlinux.org.uk>
-Message-ID: <20170620142702.mmks36ydoujvvhan@yury-thinkpad>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Tue, 20 Jun 2017 16:28:30 +0200
+Subject: [PATCH v1 1/1] ARM: dts: imx6: RIoTboard provide gpio-line-names
+Message-ID: <20170620142830.5119-1-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 19, 2017 at 06:43:48PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jun 19, 2017 at 06:18:18PM +0300, Yury Norov wrote:
-> > One else thing I forgot to ask - now you have the generic
-> > implementation for fncpy(), so do you really need to save arm
-> > version of it?
-> 
-> This was covered in the review of v1, which took the ARM version
-> and incorrectly used it as an asm-generic implementation.
-> 
-> I explicitly asked Florian _not_ to copy the ARM fncpy() version
-> to asm-generic because it has (surprise surprise) ARM specific
-> behaviours that do not belong in a cross-architecture generic
-> version.
-> 
-> Namely, the ARM specific behaviour that bit 0 of a code address is
-> used to signal whether the code should be executed as ARM code or
-> as Thumb code.
-> 
-> This behaviour has no meaning on other architectures (eg, x86)
-> where code addresses are not 32-bit aligned.
-> 
-> So, suggesting that the ARM fncpy() should be used as an asm-generic
-> version is completely absurd, and just because we have an asm-generic
-> version also does not mean ARM should use it.
-> 
-> Florian's approach to providing an asm-generic version, leaving the
-> ARM specific version is entirely correct and appropriate.
-> 
-> So, in answer to your question, yes, we need _both_ an ARM specific
-> version and an asm-generic version, where the ARM specific version is
-> different from the asm-generic version.  Purely because it needs
-> architecture specific details.
+for each gpio controller
 
-Hi Russell, Florian,
+Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+---
+ arch/arm/boot/dts/imx6dl-riotboard.dts | 61 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 61 insertions(+)
 
-Thanks for clarifications. Thumb bit is a good reason to save arm
-version, and I completely agree with you in this. Sorry that missed it
-in the v1 discussion.
-
-> I explicitly asked Florian _not_ to copy the ARM fncpy() version
-> to asm-generic because it has (surprise surprise) ARM specific
-> behaviours that do not belong in a cross-architecture generic
-> version.
-
-But it seems that v3 does exactly that - copies arm with very small
-changes. :) Maybe there are good reasons to have arm version exactly
-how it looks now, but in general case, for me, some things that
-it does are not needed. I mean checking the alignment of the source and
-the type of destination. And after some headscratching I became even
-more convinced that for the general case it would be much preferable
-to write the fncpy() as regular function in .c file, not a macro, at
-least to have the corresponding symbol in binary and let the assembler
-code to call it, which is very probable.
-
-Yury
+diff --git a/arch/arm/boot/dts/imx6dl-riotboard.dts b/arch/arm/boot/dts/imx6dl-riotboard.dts
+index 2cb72824e800..b9ecb3b3792a 100644
+--- a/arch/arm/boot/dts/imx6dl-riotboard.dts
++++ b/arch/arm/boot/dts/imx6dl-riotboard.dts
+@@ -84,6 +84,67 @@
+ 	};
+ };
+ 
++&gpio1 {
++	gpio-line-names =
++		"", "", "[SD2_WP]", "", "[SD2_CD]", "I2C3_SCL",
++			"I2C3_SDA", "I2C4_SCL",
++		"I2C4_SDA", "", "", "", "", "", "", "",
++		"", "PWM3", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "";
++};
++
++&gpio2 {
++	gpio-line-names =
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "";
++};
++
++&gpio3 {
++	gpio-line-names =
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "[USB_OTG_VBUS]", "",
++		"UART3_TXD", "UART3_RXD", "", "", "[EIM_D28]", "", "", "";
++};
++
++&gpio4 {
++	gpio-line-names =
++		"", "", "", "", "", "", "UART4_TXD", "UART4_RXD",
++		"UART5_TXD", "UART5_RXD", "", "", "", "", "", "",
++		"GPIO4_16", "GPIO4_17", "GPIO4_18", "GPIO4_19", "",
++			"CSPI3_CLK", "CSPI3_MOSI", "CSPI3_MISO",
++		"CSPI3_CS0", "CSPI3_CS1", "GPIO4_26", "GPIO4_27",
++			"CSPI3_RDY", "PWM1", "PWM2", "GPIO4_31";
++};
++
++&gpio5 {
++	gpio-line-names =
++		"", "", "[EIM_A25]", "", "", "GPIO5_05", "GPIO5_06",
++			"GPIO5_07",
++		"GPIO5_08", "CSPI2_CS1", "CSPI2_MOSI", "CSPI2_MISO",
++			"CSPI2_CS0", "CSPI2_CLK", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "";
++};
++
++&gpio6 {
++	gpio-line-names =
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "";
++};
++
++&gpio7 {
++	gpio-line-names =
++		"[SD3_CD]", "[SD3_WP]", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "";
++};
++
+ &audmux {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_audmux>;
+-- 
+2.11.0
