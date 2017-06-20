@@ -1,288 +1,69 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 19 Jun 2017 19:43:40 -0700
-Subject: [PATCH v2 04/12] Input: wm97xx: split out touchscreen registering
-In-Reply-To: <1497857229-12049-5-git-send-email-robert.jarzmik@free.fr>
-References: <1497857229-12049-1-git-send-email-robert.jarzmik@free.fr>
- <1497857229-12049-5-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <20170620024340.GA21379@dtor-ws>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 20 Jun 2017 11:43:34 +0900
+Subject: [PATCH v3 2/4] arm64: kgdb: disable interrupts while a software
+ step is enabled
+In-Reply-To: <20170607165018.GD2669@arm.com>
+References: <20170523043058.5463-1-takahiro.akashi@linaro.org>
+ <20170523043058.5463-3-takahiro.akashi@linaro.org>
+ <20170605162919.GN21944@arm.com>
+ <20170607053449.GE26483@linaro.org> <20170607165018.GD2669@arm.com>
+Message-ID: <20170620024333.GE4820@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 19, 2017 at 09:27:01AM +0200, Robert Jarzmik wrote:
-> wm97xx-core does several things in it initialization :
->  - touchscreen input device setup
->  - battery device creation
-> 
-> As the wm97xx is actually a multi-function device handling an audio
-> codec, a touchscreen, a gpio block and an ADC, reshape the probing to
-> isolate what is truly input/touchscreen specific from the remaining
-> part.
-> 
-> This is only code shuffling, there is no functional change.
-> 
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Will,
 
-Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Sorry for late response,
 
-Please feel free to merge with the rest of AC97 patches.
-
-> ---
-> Since v1:
->  - took into account Charles's comment
-> ---
->  drivers/input/touchscreen/wm97xx-core.c | 196 +++++++++++++++++++-------------
->  1 file changed, 115 insertions(+), 81 deletions(-)
+On Wed, Jun 07, 2017 at 05:50:18PM +0100, Will Deacon wrote:
+> On Wed, Jun 07, 2017 at 02:34:50PM +0900, AKASHI Takahiro wrote:
+> > On Mon, Jun 05, 2017 at 05:29:19PM +0100, Will Deacon wrote:
+> > > On Tue, May 23, 2017 at 01:30:56PM +0900, AKASHI Takahiro wrote:
+> > > > After entering kgdb mode, 'stepi' may unexpectedly breaks the execution
+> > > > somewhere in el1_irq.
+> > > > 
+> > > > This happens because a debug exception is always enabled in el1_irq
+> > > > due to the following commit merged in v3.16:
+> > > >   commit 2a2830703a23 ("arm64: debug: avoid accessing mdscr_el1 on fault
+> > > > 			paths where possible")
+> > > > A pending interrupt can be taken after kgdb has enabled a software step,
+> > > > but before a debug exception is actually taken.
+> > > > 
+> > > > This patch enforces interrupts to be masked while single stepping.
+> > > 
+> > > The desired behaviour here boils down to whether or not KGDB expects to step
+> > > into or over interrupts in response a stepi instruction. What do other
+> > > architectures do?
+> > 
+> > I don't know x86 case, but if we step into interrupt code here,
+> > doing stepi on a normal function will be almost useless as every
+> > attempt of stepi will end up falling into irq code (mostly for timer
+> > interrupt).
+> > 
+> > > What happens if the instruction being stepped faults?
+> > 
+> > Well, as a matter of fact, we get a gdb control somewhere in exception code
+> > (actually just after 'enable_dbg' in el1_sync).
 > 
-> diff --git a/drivers/input/touchscreen/wm97xx-core.c b/drivers/input/touchscreen/wm97xx-core.c
-> index c9d1c91e1887..39869ffdc4fa 100644
-> --- a/drivers/input/touchscreen/wm97xx-core.c
-> +++ b/drivers/input/touchscreen/wm97xx-core.c
-> @@ -581,27 +581,85 @@ static void wm97xx_ts_input_close(struct input_dev *idev)
->  		wm->codec->acc_enable(wm, 0);
->  }
->  
-> -static int wm97xx_probe(struct device *dev)
-> +static int wm97xx_register_touch(struct wm97xx *wm)
->  {
-> -	struct wm97xx *wm;
-> -	struct wm97xx_pdata *pdata = dev_get_platdata(dev);
-> -	int ret = 0, id = 0;
-> +	struct wm97xx_pdata *pdata = dev_get_platdata(wm->dev);
-> +	int ret;
->  
-> -	wm = kzalloc(sizeof(struct wm97xx), GFP_KERNEL);
-> -	if (!wm)
-> +	wm->input_dev = devm_input_allocate_device(wm->dev);
-> +	if (wm->input_dev == NULL)
->  		return -ENOMEM;
-> -	mutex_init(&wm->codec_mutex);
->  
-> -	wm->dev = dev;
-> -	dev_set_drvdata(dev, wm);
-> -	wm->ac97 = to_ac97_t(dev);
-> +	/* set up touch configuration */
-> +	wm->input_dev->name = "wm97xx touchscreen";
-> +	wm->input_dev->phys = "wm97xx";
-> +	wm->input_dev->open = wm97xx_ts_input_open;
-> +	wm->input_dev->close = wm97xx_ts_input_close;
-> +
-> +	__set_bit(EV_ABS, wm->input_dev->evbit);
-> +	__set_bit(EV_KEY, wm->input_dev->evbit);
-> +	__set_bit(BTN_TOUCH, wm->input_dev->keybit);
-> +
-> +	input_set_abs_params(wm->input_dev, ABS_X, abs_x[0], abs_x[1],
-> +			     abs_x[2], 0);
-> +	input_set_abs_params(wm->input_dev, ABS_Y, abs_y[0], abs_y[1],
-> +			     abs_y[2], 0);
-> +	input_set_abs_params(wm->input_dev, ABS_PRESSURE, abs_p[0], abs_p[1],
-> +			     abs_p[2], 0);
-> +
-> +	input_set_drvdata(wm->input_dev, wm);
-> +	wm->input_dev->dev.parent = wm->dev;
-> +
-> +	ret = input_register_device(wm->input_dev);
-> +	if (ret)
-> +		return ret;
-> +
-> +	/*
-> +	 * register our extended touch device (for machine specific
-> +	 * extensions)
-> +	 */
-> +	wm->touch_dev = platform_device_alloc("wm97xx-touch", -1);
-> +	if (!wm->touch_dev) {
-> +		ret = -ENOMEM;
-> +		goto touch_err;
-> +	}
-> +	platform_set_drvdata(wm->touch_dev, wm);
-> +	wm->touch_dev->dev.parent = wm->dev;
-> +	wm->touch_dev->dev.platform_data = pdata;
-> +	ret = platform_device_add(wm->touch_dev);
-> +	if (ret < 0)
-> +		goto touch_reg_err;
-> +
-> +	return 0;
-> +touch_reg_err:
-> +	platform_device_put(wm->touch_dev);
-> +touch_err:
-> +	input_unregister_device(wm->input_dev);
-> +	wm->input_dev = NULL;
-> +
-> +	return ret;
-> +}
-> +
-> +static void wm97xx_unregister_touch(struct wm97xx *wm)
-> +{
-> +	platform_device_unregister(wm->touch_dev);
-> +	input_unregister_device(wm->input_dev);
-> +	wm->input_dev = NULL;
-> +}
-> +
-> +static int _wm97xx_probe(struct wm97xx *wm)
-> +{
-> +	int id = 0;
-> +
-> +	mutex_init(&wm->codec_mutex);
-> +	dev_set_drvdata(wm->dev, wm);
->  
->  	/* check that we have a supported codec */
->  	id = wm97xx_reg_read(wm, AC97_VENDOR_ID1);
->  	if (id != WM97XX_ID1) {
-> -		dev_err(dev, "Device with vendor %04x is not a wm97xx\n", id);
-> -		ret = -ENODEV;
-> -		goto alloc_err;
-> +		dev_err(wm->dev,
-> +			"Device with vendor %04x is not a wm97xx\n", id);
-> +		return -ENODEV;
->  	}
->  
->  	wm->id = wm97xx_reg_read(wm, AC97_VENDOR_ID2);
-> @@ -629,8 +687,7 @@ static int wm97xx_probe(struct device *dev)
->  	default:
->  		dev_err(wm->dev, "Support for wm97%02x not compiled in.\n",
->  			wm->id & 0xff);
-> -		ret = -ENODEV;
-> -		goto alloc_err;
-> +		return -ENODEV;
->  	}
->  
->  	/* set up physical characteristics */
-> @@ -644,79 +701,58 @@ static int wm97xx_probe(struct device *dev)
->  	wm->gpio[4] = wm97xx_reg_read(wm, AC97_GPIO_STATUS);
->  	wm->gpio[5] = wm97xx_reg_read(wm, AC97_MISC_AFE);
->  
-> -	wm->input_dev = input_allocate_device();
-> -	if (wm->input_dev == NULL) {
-> -		ret = -ENOMEM;
-> -		goto alloc_err;
-> -	}
-> -
-> -	/* set up touch configuration */
-> -	wm->input_dev->name = "wm97xx touchscreen";
-> -	wm->input_dev->phys = "wm97xx";
-> -	wm->input_dev->open = wm97xx_ts_input_open;
-> -	wm->input_dev->close = wm97xx_ts_input_close;
-> -
-> -	__set_bit(EV_ABS, wm->input_dev->evbit);
-> -	__set_bit(EV_KEY, wm->input_dev->evbit);
-> -	__set_bit(BTN_TOUCH, wm->input_dev->keybit);
-> -
-> -	input_set_abs_params(wm->input_dev, ABS_X, abs_x[0], abs_x[1],
-> -			     abs_x[2], 0);
-> -	input_set_abs_params(wm->input_dev, ABS_Y, abs_y[0], abs_y[1],
-> -			     abs_y[2], 0);
-> -	input_set_abs_params(wm->input_dev, ABS_PRESSURE, abs_p[0], abs_p[1],
-> -			     abs_p[2], 0);
-> +	return wm97xx_register_touch(wm);
-> +}
->  
-> -	input_set_drvdata(wm->input_dev, wm);
-> -	wm->input_dev->dev.parent = dev;
-> +static void wm97xx_remove_battery(struct wm97xx *wm)
-> +{
-> +	platform_device_unregister(wm->battery_dev);
-> +}
->  
-> -	ret = input_register_device(wm->input_dev);
-> -	if (ret < 0)
-> -		goto dev_alloc_err;
-> +static int wm97xx_add_battery(struct wm97xx *wm,
-> +			      struct wm97xx_batt_pdata *pdata)
-> +{
-> +	int ret;
->  
-> -	/* register our battery device */
->  	wm->battery_dev = platform_device_alloc("wm97xx-battery", -1);
-> -	if (!wm->battery_dev) {
-> -		ret = -ENOMEM;
-> -		goto batt_err;
-> -	}
-> +	if (!wm->battery_dev)
-> +		return -ENOMEM;
-> +
->  	platform_set_drvdata(wm->battery_dev, wm);
-> -	wm->battery_dev->dev.parent = dev;
-> -	wm->battery_dev->dev.platform_data = pdata ? pdata->batt_pdata : NULL;
-> +	wm->battery_dev->dev.parent = wm->dev;
-> +	wm->battery_dev->dev.platform_data = pdata;
->  	ret = platform_device_add(wm->battery_dev);
-> -	if (ret < 0)
-> -		goto batt_reg_err;
-> +	if (ret)
-> +		platform_device_put(wm->battery_dev);
->  
-> -	/* register our extended touch device (for machine specific
-> -	 * extensions) */
-> -	wm->touch_dev = platform_device_alloc("wm97xx-touch", -1);
-> -	if (!wm->touch_dev) {
-> -		ret = -ENOMEM;
-> -		goto touch_err;
-> -	}
-> -	platform_set_drvdata(wm->touch_dev, wm);
-> -	wm->touch_dev->dev.parent = dev;
-> -	wm->touch_dev->dev.platform_data = pdata;
-> -	ret = platform_device_add(wm->touch_dev);
-> +	return ret;
-> +}
-> +
-> +static int wm97xx_probe(struct device *dev)
-> +{
-> +	struct wm97xx *wm;
-> +	int ret;
-> +	struct wm97xx_pdata *pdata = dev_get_platdata(dev);
-> +
-> +	wm = devm_kzalloc(dev, sizeof(struct wm97xx), GFP_KERNEL);
-> +	if (!wm)
-> +		return -ENOMEM;
-> +
-> +	wm->dev = dev;
-> +	wm->ac97 = to_ac97_t(dev);
-> +
-> +	ret =  _wm97xx_probe(wm);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = wm97xx_add_battery(wm, pdata ? pdata->batt_pdata : NULL);
->  	if (ret < 0)
-> -		goto touch_reg_err;
-> +		goto batt_err;
->  
->  	return ret;
->  
-> - touch_reg_err:
-> -	platform_device_put(wm->touch_dev);
-> - touch_err:
-> -	platform_device_del(wm->battery_dev);
-> - batt_reg_err:
-> -	platform_device_put(wm->battery_dev);
-> - batt_err:
-> -	input_unregister_device(wm->input_dev);
-> -	wm->input_dev = NULL;
-> - dev_alloc_err:
-> -	input_free_device(wm->input_dev);
-> - alloc_err:
-> -	kfree(wm);
-> -
-> +batt_err:
-> +	wm97xx_unregister_touch(wm);
->  	return ret;
->  }
->  
-> @@ -724,10 +760,8 @@ static int wm97xx_remove(struct device *dev)
->  {
->  	struct wm97xx *wm = dev_get_drvdata(dev);
->  
-> -	platform_device_unregister(wm->battery_dev);
-> -	platform_device_unregister(wm->touch_dev);
-> -	input_unregister_device(wm->input_dev);
-> -	kfree(wm);
-> +	wm97xx_remove_battery(wm);
-> +	wm97xx_unregister_touch(wm);
->  
->  	return 0;
->  }
-> -- 
-> 2.1.4
-> 
+> Ok, but don't we need to re-enable interrupts, otherwise we can't safely
+> handle the fault (which might involve blocking)?
 
--- 
-Dmitry
+I thought a lot, but have got no other way to solve the issue, which
+totally makes stepi in vain.
+In theory, you might be right, but in practice, people don't always expect
+to step through the whole sequence of fault recovery with single stepping.
+Once we do 'c(ontinue),' interrupts are enabled again and the execution
+will follow as expected.
+
+If you want to 'step over' a faulted instruction here, or to break
+somewhere in a middle of exception handler, you need to manage to set
+a breakpoint explicitly. But it will, I believe, be much better than
+useless stepi from day-1 :)
+
+Meanwhile, kprobes also disables interrupts while single stepping.
+See setup_singlestep().
+
+Thanks,
+-Takahiro AKASHI
+
+> Will
