@@ -1,54 +1,52 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Tue, 20 Jun 2017 10:29:05 +0200
-Subject: [PATCH v5 2/3] PCI: Add tango PCIe host bridge support
-In-Reply-To: <6abfe9ce-5c32-9be0-e276-ed14253aa773@sigmadesigns.com>
-References: <741766e5-cff2-db5f-d40b-6866e08fd966@sigmadesigns.com>
- <1802aae0-f97b-c437-c00e-5fa7c867286d@sigmadesigns.com>
- <654acba8-68b9-fb4c-4681-35af94b6bd74@sigmadesigns.com>
- <6abfe9ce-5c32-9be0-e276-ed14253aa773@sigmadesigns.com>
-Message-ID: <5b0b4465-4402-e668-c744-5fb4439b34b0@sigmadesigns.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 20 Jun 2017 10:29:33 +0200
+Subject: Shawn Guo: your attetion is needed here Re: [PATCH v8 00/34] i.MX
+ Media Driver
+In-Reply-To: <43887f25-bb73-9020-0909-d275c319aaad@mentor.com>
+References: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
+ <e7e4669c-2963-b9e1-edd7-02731a6e0f9c@xs4all.nl>
+ <c0b69c93-b9cd-25e8-ea36-fc0600efdb69@gmail.com>
+ <e4f152de-6e75-7654-178e-e6dcf9ad12f3@xs4all.nl>
+ <43887f25-bb73-9020-0909-d275c319aaad@mentor.com>
+Message-ID: <20170620082933.GA31799@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/06/2017 16:50, Marc Gonzalez wrote:
+Hi!
 
-> On 07/06/2017 10:19, Marc Gonzalez wrote:
+> >> But as Pavel pointed out, in fact we are missing many
+> >> Acks still, for all of the dts source changes (patches
+> >> 4-14), as well as really everything else (imx-media staging
+> >> driver patches).
+> > 
+> > No Acks needed for the staging part. It's staging, so not held
+> > to the same standards as non-staging parts. That doesn't mean
+> > Acks aren't welcome, of course.
 > 
->> On 31/05/2017 15:33, Marc Gonzalez wrote:
->>
->>> +static int tango_pcie_probe(struct platform_device *pdev)
->>> +{
->>> +	int ret = -EINVAL;
->>> +	void __iomem *base;
->>> +	struct resource *res;
->>> +	struct tango_pcie *pcie;
->>> +	struct device *dev = &pdev->dev;
->>> +
->>> +	pr_err("MAJOR ISSUE: PCIe config and mem spaces are muxed\n");
->>> +	pr_err("Tainting kernel... Use driver at your own risk\n");
->>> +	add_taint(TAINT_FIRMWARE_WORKAROUND, LOCKDEP_STILL_OK);
->>
->> Hello Bjorn,
->>
->> In v4, your only comment was
->> "[muxing config and mem spaces] is a major issue and possibly even
->> a security problem [which requires at least an error message and a
->> kernel taint].
->>
->> Were there any other issues with the host bridge support?
+> Acks are wanted for particular i.MX DTS changes including device
+> tree binding descriptions.
 > 
-> Hello Bjorn,
-> 
-> I imagine you are now only waiting for Marc Z's Ack of patch 3/3 ?
-> (AFAIU, all issues have been addressed as of v8 3/3.)
-> 
-> Rob has Acked patch 1/3 -- thanks Rob.
-> 
-> Assuming all issues with patch 2/3 have already been addressed,
-> then this driver can land in time for 4.13 right?
+> Shawn, please bless the series.
 
-Hello Bjorn, Marc,
+Hmm. I changed the subject to grab Shawn's attetion.
 
-Patch series v9 supersedes all previously posted patches.
+But his acks should not be needed for forward progress. Yes, it would
+be good, but he does not react -- so just reorder the series so that
+dts changes come last, then apply the parts you can apply: driver can
+go in.
 
-Regards.
+And actually... if maintainer does not respond at all, there are ways
+to deal with that, too...
+
+Best regards,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170620/f6680805/attachment.sig>
