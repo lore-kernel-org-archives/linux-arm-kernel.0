@@ -1,111 +1,76 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 20 Jun 2017 11:29:06 +0100
-Subject: [PATCH v2 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
- erratum 161010801
-In-Reply-To: <20170619154500.92336-3-shameerali.kolothum.thodi@huawei.com>
-References: <20170619154500.92336-1-shameerali.kolothum.thodi@huawei.com>
- <20170619154500.92336-3-shameerali.kolothum.thodi@huawei.com>
-Message-ID: <20170620102906.GA26908@red-moon>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 20 Jun 2017 12:28:46 +0200
+Subject: [PATCH v3 19/21] dt-bindings: mmc: dw_mmc-k3: add document of
+ hi3660 mmc
+In-Reply-To: <5948F1F9.90903@hisilicon.com>
+References: <20170614082338.15673-1-guodong.xu@linaro.org>
+ <20170614082338.15673-20-guodong.xu@linaro.org>
+ <CAPDyKFpvJu8_TETWr0Vy4ubDC7NYvi7TxmSLYZyw33qHFsoNaQ@mail.gmail.com>
+ <5947CAD8.4040607@hisilicon.com>
+ <CAPDyKFo=hqp=j=nWpO8uf_0pGTSKjN0T-ZKqD8cuKp1C3Q2_hA@mail.gmail.com>
+ <5948F1F9.90903@hisilicon.com>
+Message-ID: <CAPDyKFozmMED7ytofXTgHhWH=Ro_38r4iCCdoO6+rq-AznrSDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shameer,
+On 20 June 2017 at 11:59, Wei Xu <xuwei5@hisilicon.com> wrote:
+> Hi Uffe,
+>
+> On 2017/6/20 9:36, Ulf Hansson wrote:
+>> Hi Wei,
+>>
+>> On 19 June 2017 at 15:00, Wei Xu <xuwei5@hisilicon.com> wrote:
+>>> Hi Ulf,
+>>>
+>>> On 2017/6/19 13:43, Ulf Hansson wrote:
+>>>> On 14 June 2017 at 10:23, Guodong Xu <guodong.xu@linaro.org> wrote:
+>>>>> Add bindings for hi3660 mmc support
+>>>>>
+>>>>> Signed-off-by: Li Wei <liwei213@huawei.com>
+>>>>> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+>>>>> ---
+>>>>>  Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt | 1 +
+>>>>>  1 file changed, 1 insertion(+)
+>>>>>
+>>>>> diff --git a/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
+>>>>> index df37058..8af1afc 100644
+>>>>> --- a/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
+>>>>> +++ b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
+>>>>> @@ -12,6 +12,7 @@ extensions to the Synopsys Designware Mobile Storage Host Controller.
+>>>>>  Required Properties:
+>>>>>
+>>>>>  * compatible: should be one of the following.
+>>>>> +  - "hisilicon,hi3660-dw-mshc": for controllers with hi3660 specific extensions.
+>>>>>    - "hisilicon,hi4511-dw-mshc": for controllers with hi4511 specific extensions.
+>>>>>    - "hisilicon,hi6220-dw-mshc": for controllers with hi6220 specific extensions.
+>>>>>
+>>>>> --
+>>>>> 2.10.2
+>>>>>
+>>>>
+>>>> Thanks, applied for next!
+>>>
+>>> Thanks!
+>>> Last week I had applied the v4 patch set[1]
+>>> and this patch is included.
+>>> But it should be fine for the upper gatekeeper to merge
+>>> since these 2 patch are same.
+>>
+>> No, that's not how git works.
+>>
+>> If the patch has the same hash, that would be fine, but that isn't the
+>> case here as we have two different hashes for the same change.
+>
+> Got it. Thanks for your explaining!
+>
+>>
+>> To deal with this, I have just dropped the change from my tree and
+>> leave it to you to carry the patch. Feel free to add my ack for it.
+>
+> Thanks!
+> But the pull request I sent last week has been merged.
 
-On Mon, Jun 19, 2017 at 04:45:00PM +0100, shameer wrote:
-> The HiSilicon erratum 161010801 describes the limitation of HiSilicon
-> platforms Hip06/Hip07 to support the SMMU mappings for MSI transactions.
-> 
-> On these platforms GICv3 ITS translator is presented with the deviceID
-> by extending the MSI payload data to 64 bits to include the deviceID.
-> Hence, the PCIe controller on this platforms has to differentiate the
-> MSI payload against other DMA payload and has to modify the MSI payload.
-> This basically makes it difficult for this platforms to have a SMMU
-> translation for MSI.
-> 
-> This patch implements a ACPI table based quirk to reserve the hw msi
-> regions in the smmu-v3 driver which means these address regions will
-> not be translated and will be excluded from iova allocations.
-> 
-> Signed-off-by: shameer <shameerali.kolothum.thodi@huawei.com>
-> ---
->  drivers/iommu/arm-smmu-v3.c | 29 ++++++++++++++++++++++++-----
->  1 file changed, 24 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index abe4b88..f03c63b 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -597,6 +597,7 @@ struct arm_smmu_device {
->  	u32				features;
->  
->  #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-> +#define ARM_SMMU_OPT_RESV_HW_MSI	(1 << 1)
->  	u32				options;
->  
->  	struct arm_smmu_cmdq		cmdq;
-> @@ -1904,14 +1905,31 @@ static void arm_smmu_get_resv_regions(struct device *dev,
->  				      struct list_head *head)
->  {
->  	struct iommu_resv_region *region;
-> +	struct arm_smmu_device *smmu;
-> +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
->  	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
->  
-> -	region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
-> -					 prot, IOMMU_RESV_SW_MSI);
-> -	if (!region)
-> -		return;
-> +	smmu = arm_smmu_get_by_fwnode(fwspec->iommu_fwnode);
-> +
-> +	if (smmu && (smmu->options & ARM_SMMU_OPT_RESV_HW_MSI) &&
-> +		      dev_is_pci(dev)) {
+No worries, it's fine even without my ack this time.
 
-IORT changes are fine to me, I am still no big fan of this supposedly
-generic option that is _really_ platform specific (in particular as I
-said before the quirk depends on the PCI host bridge but in this
-patchset I see no such dependency. In short - the quirk is hooked off
-the SMMUv3 model which implicitly implies a PCI host bridge
-configuration IIUC). It is Will and Robin decision though, I am not sure
-you can make it any tidier (given that on ACPI you may not even have
-a PCI host bridge specific _HID to base your check above on).
-
-Thanks,
-Lorenzo
-
-> +		int ret = -EINVAL;
-> +
-> +		if (!is_of_node(smmu->dev->fwnode))
-> +			ret = iort_iommu_its_get_resv_regions(dev, head);
->  
-> -	list_add_tail(&region->list, head);
-> +		if (ret) {
-> +			dev_warn(dev, "HW MSI region resv failed: %d\n", ret);
-> +			return;
-> +		}
-> +	} else {
-> +		region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
-> +						 prot, IOMMU_RESV_SW_MSI);
-> +		if (!region)
-> +			return;
-> +
-> +		list_add_tail(&region->list, head);
-> +	}
->  
->  	iommu_dma_get_resv_regions(dev, head);
->  }
-> @@ -2611,6 +2629,7 @@ static void parse_driver_acpi_options(struct acpi_iort_smmu_v3 *iort_smmu,
->  	switch (iort_smmu->model) {
->  	case ACPI_IORT_SMMU_HISILICON_HI161X:
->  		smmu->options |= ARM_SMMU_OPT_SKIP_PREFETCH;
-> +		smmu->options |= ARM_SMMU_OPT_RESV_HW_MSI;
->  		break;
->  	default:
->  		break;
-> -- 
-> 1.9.1
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Kind regards
+Uffe
