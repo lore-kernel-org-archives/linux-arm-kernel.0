@@ -1,25 +1,30 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Wed, 21 Jun 2017 00:07:03 +0800
-Subject: [Resend PATCH 1/2] clk: hi6220: add acpu clock
-In-Reply-To: <20170620010509.GK20170@codeaurora.org>
-References: <1496195139-16687-1-git-send-email-zhangfei.gao@linaro.org>
- <20170620010509.GK20170@codeaurora.org>
-Message-ID: <0410cc3a-e5de-aad3-38e4-f9e59aed9935@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 20 Jun 2017 18:07:59 +0200
+Subject: [rtc-linux] [PATCH 12/51] rtc: coh901331: stop using rtc
+ deprecated functions
+In-Reply-To: <1497951359-13334-13-git-send-email-benjamin.gaignard@linaro.org>
+References: <1497951359-13334-1-git-send-email-benjamin.gaignard@linaro.org>
+ <1497951359-13334-13-git-send-email-benjamin.gaignard@linaro.org>
+Message-ID: <CACRpkdYG5j7vQ75p-Z0OL3Jh+XwKPdkjEZvNdBzWMPdymwhm0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jun 20, 2017 at 11:35 AM, Benjamin Gaignard
+<benjamin.gaignard@linaro.org> wrote:
 
-
-On 2017?06?20? 09:05, Stephen Boyd wrote:
-> On 05/31, Zhangfei Gao wrote:
->> Add acpu clock, including sft clock controlling hi6220 coresight module
->>
->> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->> Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
->> Acked-by: Rob Herring <robh@kernel.org>
->> ---
-> Applied to clk-next
-
-Thanks Stephen for the help.
-
+> rtc_time_to_tm() and rtc_tm_to_time() are deprecated because they
+> rely on 32bits variables and that will make rtc break in y2038/2016.
+> Stop using those two functions to safer 64bits ones.
 >
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+> CC: Linus Walleij <linus.walleij@linaro.org>
+> CC: Alessandro Zummo <a.zummo@towertech.it>
+> CC: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> CC: rtc-linux at googlegroups.com
+> CC: linux-kernel at vger.kernel.org
+> CC: linux-arm-kernel at lists.infradead.org
+
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
