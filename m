@@ -1,68 +1,45 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Tue, 20 Jun 2017 17:27:00 +0530
-Subject: [PATCH] mmc: host: sdhci-st: Handle return value of clk_prepare_enable
-Message-ID: <afbe2d9d649bc78992a72eda7124c093b3055047.1497957783.git.arvind.yadav.cs@gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 20 Jun 2017 14:03:02 +0200
+Subject: Shawn Guo: your attetion is needed here Re: [PATCH v8 00/34]
+ i.MX Media Driver
+In-Reply-To: <CAOMZO5A_LjYzzDTG9KmEHxb2F0=1Pj2Wm8s5maKS8pxce-HX3A@mail.gmail.com>
+References: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
+ <e7e4669c-2963-b9e1-edd7-02731a6e0f9c@xs4all.nl>
+ <c0b69c93-b9cd-25e8-ea36-fc0600efdb69@gmail.com>
+ <e4f152de-6e75-7654-178e-e6dcf9ad12f3@xs4all.nl>
+ <43887f25-bb73-9020-0909-d275c319aaad@mentor.com>
+ <20170620082933.GA31799@amd>
+ <CAOMZO5A_LjYzzDTG9KmEHxb2F0=1Pj2Wm8s5maKS8pxce-HX3A@mail.gmail.com>
+Message-ID: <20170620120302.GA12948@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_prepare_enable() can fail here and we must check its return value.
+On Tue 2017-06-20 08:05:05, Fabio Estevam wrote:
+> On Tue, Jun 20, 2017 at 5:29 AM, Pavel Machek <pavel@ucw.cz> wrote:
+> 
+> > Hmm. I changed the subject to grab Shawn's attetion.
+> >
+> > But his acks should not be needed for forward progress. Yes, it would
+> > be good, but he does not react -- so just reorder the series so that
+> > dts changes come last, then apply the parts you can apply: driver can
+> > go in.
+> >
+> > And actually... if maintainer does not respond at all, there are ways
+> > to deal with that, too...
+> 
+> Shawn has already applied the dts part of the series and they show up
+> in linux-next.
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
----
- drivers/mmc/host/sdhci-st.c | 26 ++++++++++++++++++++++----
- 1 file changed, 22 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/mmc/host/sdhci-st.c b/drivers/mmc/host/sdhci-st.c
-index 68c36c9f..198b4ca 100644
---- a/drivers/mmc/host/sdhci-st.c
-+++ b/drivers/mmc/host/sdhci-st.c
-@@ -394,8 +394,17 @@ static int sdhci_st_probe(struct platform_device *pdev)
- 		goto err_of;
- 	}
- 
--	clk_prepare_enable(clk);
--	clk_prepare_enable(icnclk);
-+	ret = clk_prepare_enable(clk);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Failed to prepare clock\n");
-+		goto err_of;
-+	}
-+
-+	ret = clk_prepare_enable(icnclk);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Failed to prepare icn clock\n");
-+		goto err_icnclk;
-+	}
- 
- 	/* Configure the FlashSS Top registers for setting eMMC TX/RX delay */
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-@@ -429,6 +438,7 @@ static int sdhci_st_probe(struct platform_device *pdev)
- 
- err_out:
- 	clk_disable_unprepare(icnclk);
-+err_icnclk:
- 	clk_disable_unprepare(clk);
- err_of:
- 	sdhci_pltfm_free(pdev);
-@@ -487,9 +497,17 @@ static int sdhci_st_resume(struct device *dev)
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
- 	struct st_mmc_platform_data *pdata = sdhci_pltfm_priv(pltfm_host);
- 	struct device_node *np = dev->of_node;
-+	int ret;
-+
-+	ret = clk_prepare_enable(pltfm_host->clk);
-+	if (ret)
-+		return ret;
- 
--	clk_prepare_enable(pltfm_host->clk);
--	clk_prepare_enable(pdata->icnclk);
-+	ret = clk_prepare_enable(pdata->icnclk);
-+	if (ret) {
-+		clk_disable_unprepare(pltfm_host->clk);
-+		return ret;
-+	}
- 
- 	if (pdata->rstc)
- 		reset_control_deassert(pdata->rstc);
+Aha, sorry about the noise. I see videomux parts being merged by
+Mauro. Good :-).
+									Pavel
 -- 
-1.9.1
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170620/61ce5724/attachment.sig>
