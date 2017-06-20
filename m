@@ -1,62 +1,56 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 20 Jun 2017 17:42:14 +0200
-Subject: [PATCH v4 6/6] arm64: dts: marvell: enable GICP and ICU on Armada
- 7K/8K
-In-Reply-To: <20170620173651.6370ea58@windsurf.lan> (Thomas Petazzoni's
- message of "Tue, 20 Jun 2017 17:36:51 +0200")
-References: <20170620140722.31646-1-thomas.petazzoni@free-electrons.com>
- <20170620140722.31646-7-thomas.petazzoni@free-electrons.com>
- <87tw3a3dy4.fsf@free-electrons.com>
- <20170620173651.6370ea58@windsurf.lan>
-Message-ID: <87fueu3bu1.fsf@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 20 Jun 2017 16:43:39 +0100
+Subject: [PATCH] arm64: remove a redundancy in sysreg.h
+In-Reply-To: <20170620140539.GD21131@arm.com>
+References: <20170620133042.mlqgpx5vddgvoe6k@hello-penguin.com>
+ <6d18962d-5557-1d57-95da-2ae1c437440b@arm.com>
+ <20170620140539.GD21131@arm.com>
+Message-ID: <20170620154339.GG21131@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On mar., juin 20 2017, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+On Tue, Jun 20, 2017 at 03:05:39PM +0100, Will Deacon wrote:
+> On Tue, Jun 20, 2017 at 02:54:15PM +0100, Marc Zyngier wrote:
+> > On 20/06/17 14:30, Stefan Traby wrote:
+> > > This is really trivial; there is a dup
+> > > (1 << 16) in the code
+> > > 
+> > > Signed-off-by: Stefan Traby <stefan@hello-penguin.com>
+> > > ---
+> > >  arch/arm64/include/asm/sysreg.h | 4 ++--
+> > >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+> > > index 2d3e155b185f..580965129fea 100644
+> > > --- a/arch/arm64/include/asm/sysreg.h
+> > > +++ b/arch/arm64/include/asm/sysreg.h
+> > > @@ -139,8 +139,8 @@
+> > >  #define SCTLR_ELx_M	1
+> > >  
+> > >  #define SCTLR_EL2_RES1	((1 << 4)  | (1 << 5)  | (1 << 11) | (1 << 16) | \
+> > > -			 (1 << 16) | (1 << 18) | (1 << 22) | (1 << 23) | \
+> > > -			 (1 << 28) | (1 << 29))
+> > > +			 (1 << 18) | (1 << 22) | (1 << 23) | (1 << 28) | \
+> > > +			 (1 << 29))
+> > >  
+> > >  #define SCTLR_ELx_FLAGS	(SCTLR_ELx_M | SCTLR_ELx_A | SCTLR_ELx_C | \
+> > >  			 SCTLR_ELx_SA | SCTLR_ELx_I)
+> > > 
+> > 
+> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> > 
+> > Catalin, Will: do you want to get that through arm64? Alternatively, I
+> > get stash it in the KVM tree.
+> 
+> I can pick it up.
 
-> Hello,
->
-> On Tue, 20 Jun 2017 16:56:35 +0200, Gregory CLEMENT wrote:
->
->> > +#include <dt-bindings/interrupt-controller/mvebu-icu.h>  
->> 
->> With this line you created a dependency with the patch "irqchip:
->> irq-mvebu-icu: new driver for Marvell ICU". And without it the dtb is
->> not buidable.
->> 
->> So either I wait for the next kernel release to apply it or I will need
->> a stable branch with the commit adding the mvebu-icu.h file.
->
-> Alternatively, I could change the patch to use hardcoded values for now
-> (i.e replace ICU_GRP_NSR everywhere by 0x0), and then change it during
-> the next kernel cycle to use the #define value. I would really prefer
-> such a solution to a solution where merging the entire ICU DT change
-> would be delayed by one cycle.
+D'oh, didn't realise that SCTLR_EL2_RES1 was only introduced in -rc5, so I
+can't easily take this via arm64 for-next/core (which is based on -rc3). I
+don't think it justifies sending as a fix, so if you could take it via KVM
+after all, then that would be helpful.
 
-As we start to be short in time then not having an external dependency
-is easier so use the hardcoded value in your v5 series, and we will
-switch to #define value in the next cycle.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-Thanks,
+Sorry for the confusion,
 
-Gregory
-
->
-> Let me know what you prefer. Maybe Marc can say if the irqchip
-> maintainers can provide a stable branch containing the mvebu-icu.h file.
->
-> Best regards,
->
-> Thomas
-> -- 
-> Thomas Petazzoni, CTO, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Will
