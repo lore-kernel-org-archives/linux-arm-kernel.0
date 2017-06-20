@@ -1,102 +1,47 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Tue, 20 Jun 2017 17:16:23 +0300
-Subject: [PATCH 16/20] arm64: signal32: move ilp32 and aarch32 common
- code to separated file
-In-Reply-To: <5947F8EA.9000209@arm.com>
-References: <20170604120009.342-1-ynorov@caviumnetworks.com>
- <20170604120009.342-17-ynorov@caviumnetworks.com>
- <5947F8EA.9000209@arm.com>
-Message-ID: <20170620141623.gzqv6orcay6bjxbz@yury-thinkpad>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Tue, 20 Jun 2017 16:09:10 +0200
+Subject: [PATCH v6 6/6] ARM: dts: imx6: RIoTboard provide standby on power off
+ option
+In-Reply-To: <20170620140910.7568-1-o.rempel@pengutronix.de>
+References: <20170620140910.7568-1-o.rempel@pengutronix.de>
+Message-ID: <20170620140910.7568-7-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 19, 2017 at 05:16:42PM +0100, James Morse wrote:
-> Hi Yury,
-> 
-> On 04/06/17 13:00, Yury Norov wrote:
-> > Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-> 
-> Can I offer a body for the commit message:
-> ILP32 needs to mix 32bit struct siginfo and 64bit sigframe for its signal
-> handlers. Move the existing compat code for copying siginfo to user space and
-> manipulating signal masks into signal32_common.c so it can be used to deliver
-> aarch32 and ilp32 signals.
+This board, as well as some other boards with i.MX6 and a PMIC, uses a
+"PMIC_STBY_REQ" line to notify the PMIC about a state change.
+The PMIC is programmed for a specific state change before triggering the
+line.
+In this case, PMIC_STBY_REQ can be used for stand by, sleep
+and power off modes.
 
-Ok
+Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+---
+ arch/arm/boot/dts/imx6dl-riotboard.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-> > diff --git a/arch/arm64/include/asm/signal32.h b/arch/arm64/include/asm/signal32.h
-> > index e68fcce538e1..1c4ede717bd2 100644
-> > --- a/arch/arm64/include/asm/signal32.h
-> > +++ b/arch/arm64/include/asm/signal32.h
-> > @@ -13,6 +13,9 @@
-> >   * You should have received a copy of the GNU General Public License
-> >   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> >   */
-> > +
-> > +#include <asm/signal32_common.h>
-> > +
-> >  #ifndef __ASM_SIGNAL32_H
-> >  #define __ASM_SIGNAL32_H
-> 
-> Nit: This should go inside the guard.
+diff --git a/arch/arm/boot/dts/imx6dl-riotboard.dts b/arch/arm/boot/dts/imx6dl-riotboard.dts
+index 2cb72824e800..da9d0c102a31 100644
+--- a/arch/arm/boot/dts/imx6dl-riotboard.dts
++++ b/arch/arm/boot/dts/imx6dl-riotboard.dts
+@@ -90,6 +90,10 @@
+ 	status = "okay";
+ };
  
-Ok, thanks. Will fix this and all below
++&clks {
++	fsl,pmic-stby-poweroff;
++};
++
+ &fec {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet>;
+@@ -125,6 +129,7 @@
+ 		reg = <0x08>;
+ 		interrupt-parent = <&gpio5>;
+ 		interrupts = <16 8>;
++		fsl,pmic-stby-poweroff;
  
-> > diff --git a/arch/arm64/kernel/signal32_common.c b/arch/arm64/kernel/signal32_common.c
-> > new file mode 100644
-> > index 000000000000..5bddc25dca12
-> > --- /dev/null
-> > +++ b/arch/arm64/kernel/signal32_common.c
-> > @@ -0,0 +1,135 @@
-> [...]
-> > +#include <linux/compat.h>
-> > +#include <linux/signal.h>
-> > +#include <linux/ratelimit.h>
-> 
-> What do you need ratelimit.h for?
-> 
-> 
-> > +#include <linux/uaccess.h>
-> > +
-> > +#include <asm/esr.h>
-> 
-> I can't see anything using these ESR_ macros in here...
-> 
-> 
-> > +#include <asm/fpsimd.h>
-> 
-> This was for the VFP save/restore code, which you didn't move...
-> 
-> 
-> > +#include <asm/signal32_common.h>
-> > +#include <asm/unistd.h>
-> 
-> [...]
-> 
-> 
-> > +int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
-> [...]
-> > +	case __SI_FAULT:
-> > +		err |= __put_user((compat_uptr_t)(unsigned long)from->si_addr,
-> > +				  &to->si_addr);
-> 
-> This looks tricky. si_addr comes from FAR_EL1 when user-space touches something
-> it shouldn't. This could be a 64bit value as ilp32 processes can still branch to
-> 64bit addresses in registers and generate loads that cross the invisible 4GB
-> boundary. Here you truncate the 64bit address.
-> Obviously this can't happen at all with aarch32, and for C programs its into
-> undefined-behaviour territory, but it doesn't feel right to pass an address to
-> user-space that we know is wrong... but we don't have an alternative.
-> 
-> This looks like a class of problem particular to ilp32/x32: 'accessed an address
-> you can't encode with a signal'. After a quick dig in x86's x32 code, it looks
-> like they only pass the first 32bits of si_addr too.
-> 
-> One option is to mint a new si_code to go with SIGBUS meaning something like
-> 'address overflowed si_addr'. Alternatively we could just kill tasks that do this.
-
-New SIGBUS sounds reasonable at the first glance, but I think it should be
-discussed widely at first, and the patch that implements it should touch
-all arches that may be affected.
-
-Yury
+ 		regulators {
+ 			reg_vddcore: sw1ab {				/* VDDARM_IN */
+-- 
+2.11.0
