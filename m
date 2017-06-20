@@ -1,64 +1,31 @@
-From: kevin.wangtao@hisilicon.com (Wangtao (Kevin, Kirin))
-Date: Tue, 20 Jun 2017 16:32:09 +0800
-Subject: [PATCH 3/3] arm64: dts: register Hi3660's thermal sensor
-In-Reply-To: <CAFGCpxwmN3jAZn2chK+QQ-YKg7TwWJOTHSi1VzwcSQ7Mm3gQng@mail.gmail.com>
-References: <1497930035-60894-1-git-send-email-kevin.wangtao@hisilicon.com>
- <1497930035-60894-3-git-send-email-kevin.wangtao@hisilicon.com>
- <CAFGCpxwmN3jAZn2chK+QQ-YKg7TwWJOTHSi1VzwcSQ7Mm3gQng@mail.gmail.com>
-Message-ID: <7abe5b01-c728-accd-d6bb-05d9ceee2176@hisilicon.com>
+From: leilk.liu@mediatek.com (Leilk Liu)
+Date: Tue, 20 Jun 2017 16:21:06 +0800
+Subject: [PATCH 1/2] spi: mediatek: Add bindings for mediatek MT2712 soc
+ platform
+In-Reply-To: <1497946867-25708-1-git-send-email-leilk.liu@mediatek.com>
+References: <1497946867-25708-1-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <1497946867-25708-2-git-send-email-leilk.liu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds a DT binding documentation for the MT2712 soc.
 
+Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+---
+ .../devicetree/bindings/spi/spi-mt65xx.txt         |    1 +
+ 1 file changed, 1 insertion(+)
 
-? 2017/6/20 15:38, Guodong Xu ??:
-> 
-> 
-> 2017?6?20? ??11:49?"Tao Wang" <kevin.wangtao at hisilicon.com <mailto:kevin.wangtao@hisilicon.com>>???
-> 
->     Bind thermal sensor driver for Hi3660.
-> 
->     Signed-off-by: Tao Wang <kevin.wangtao at hisilicon.com <mailto:kevin.wangtao@hisilicon.com>>
->     Signed-off-by: Leo Yan <leo.yan at linaro.org <mailto:leo.yan@linaro.org>>
->     ---
->       arch/arm64/boot/dts/hisilicon/hi3660.dtsi |    7 +++++++
->       1 file changed, 7 insertions(+)
-> 
->     diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
->     index 3983086..cc67958 100644
->     --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
->     +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
->     @@ -156,5 +156,12 @@
-> 
-> 
-> i am wondering which tree this patch should be applied to. Actually Olof Johansson olof at lixom.net <mailto:olof@lixom.net> just merged hi3660 dts into his tree. You should better rebase you dts patch onto that.
-Can you share me the git path?
-> 
-> 
->                              clock-names = "uartclk", "apb_pclk";
->                              status = "disabled";
->                      };
->     +
->     +               tsensor: tsensor {
->     +                       compatible = "hisilicon,thermal-hi3660";
->     +                       reg = <0x0 0xfff30000 0x0 0x1000>;
->     +                       #thermal-sensor-cells = <1>;
->     +                       status = "ok";
-> 
-> 
-> please remove status ok. that's default. redundant.
-ok
-> 
->     +               };
->              };
->       };
->     --
->     1.7.9.5
-> 
-> 
->     _______________________________________________
->     linux-arm-kernel mailing list
->     linux-arm-kernel at lists.infradead.org <mailto:linux-arm-kernel@lists.infradead.org>
->     http://lists.infradead.org/mailman/listinfo/linux-arm-kernel <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>
-> 
-> 
+diff --git a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+index c0b1f01..e0318cf 100644
+--- a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
++++ b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+@@ -3,6 +3,7 @@ Binding for MTK SPI controller
+ Required properties:
+ - compatible: should be one of the following.
+     - mediatek,mt2701-spi: for mt2701 platforms
++    - mediatek,mt2712-spi: for mt2712 platforms
+     - mediatek,mt6589-spi: for mt6589 platforms
+     - mediatek,mt7622-spi: for mt7622 platforms
+     - mediatek,mt8135-spi: for mt8135 platforms
+-- 
+1.7.9.5
