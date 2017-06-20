@@ -1,67 +1,126 @@
-From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
-Date: Tue, 20 Jun 2017 18:24:32 +0200
-Subject: [PATCH] arm64: pass machine size to sparse
-In-Reply-To: <20170620154938.GH21131@arm.com>
-References: <20170620122443.35880-1-luc.vanoostenryck@gmail.com>
- <20170620154938.GH21131@arm.com>
-Message-ID: <20170620162431.zi6qd3jby7shyu46@ltop.local>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 20 Jun 2017 17:24:36 +0100
+Subject: [PATCH] fixup! arm64: signal: Allow expansion of the signal frame
+In-Reply-To: <20170619110346.GB3024@e104818-lin.cambridge.arm.com>
+References: <20170619110346.GB3024@e104818-lin.cambridge.arm.com>
+Message-ID: <1497975876-7055-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 04:49:39PM +0100, Will Deacon wrote:
-> On Tue, Jun 20, 2017 at 02:24:43PM +0200, Luc Van Oostenryck wrote:
-> > When using sparse on the arm64 tree we get many thousands of
-> > warnings like 'constant ... is so big it is unsigned long long'
-> > or 'shift too big (32) for type unsigned long'. This happens
-> > because by default sparse considers the machine as 32bit and
-> > defines the size of the types accordingly.
-> > 
-> > Fix this by passing the '-m64' flag to sparse so that
-> > sparse can correctly define longs as being 64bit.
-> > 
-> > CC: Catalin Marinas <catalin.marinas@arm.com>
-> > CC: Will Deacon <will.deacon@arm.com>
-> > CC: linux-arm-kernel at lists.infradead.org
-> > Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
-> > ---
-> >  arch/arm64/Makefile | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-> > index f839ecd91..15d6c1476 100644
-> > --- a/arch/arm64/Makefile
-> > +++ b/arch/arm64/Makefile
-> > @@ -62,7 +62,7 @@ LD		+= -EL
-> >  UTS_MACHINE	:= aarch64
-> >  endif
-> >  
-> > -CHECKFLAGS	+= -D__aarch64__
-> > +CHECKFLAGS	+= -D__aarch64__ -m64
-> 
-> Looks fine to me, but just wondering whether or not we should also be
-> passing something to indicate the endianness of the target. Does sparse care
-> about that?
+Convert extra_context.data to a u64 for better ABI independence.
+data is renamed to "datap" to give a stronger clue that it is
+a pointer.
 
-Yes, we should. sparse doesn't care per-se but some macros, structures
-or whole portion of code may depends on '__{LITTLE,BIG}_ENDIAN__'
-being defined or not, for example (but I don't think it will make
-a big difference, at least nothing like the 629904 'constant is so big'
-warnings we have now due to the missing -m64).
+The binary interface is unchanged.
 
-For this, you have two possibilities:
-1) just doing something like PPC:
-	+ifdef CONFIG_CPU_BIG_ENDIAN
-	+CHECKFLAGS     += -D__BIG_ENDIAN__
-	+else
-	+CHECKFLAGS     += -D__LITTLE_ENDIAN__
-	+endif
-   This will work now. I can't send you a proper patch if you wish.
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
 
-2) a cleaner solution, IMO, would be to teach sparse about
-   -mlittle-endian/-mbig-endian. In fact I already wrote the patch
-   earlier today. But of course, you will need to wait for the patch
-   to reach sparse's master and then compile sparse yourself or wait
-   for a new release (which shouldn't take much long, though).
+I've build-tested this fixup only.
 
-Regards,
--- Luc Van Oostenryck
+The only change here is to replace the name "data" with "datap" in
+appropriate places and change void __user * to u64 appropriately, with
+casts in the two places where this value enters and exits the kernel.
+
+ arch/arm64/include/uapi/asm/sigcontext.h |  6 +++---
+ arch/arm64/kernel/signal.c               | 16 ++++++++--------
+ 2 files changed, 11 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm64/include/uapi/asm/sigcontext.h b/arch/arm64/include/uapi/asm/sigcontext.h
+index 303a48c..f0a76b9 100644
+--- a/arch/arm64/include/uapi/asm/sigcontext.h
++++ b/arch/arm64/include/uapi/asm/sigcontext.h
+@@ -98,7 +98,7 @@ struct esr_context {
+  * 3) If extra_context is present, it must be followed immediately in
+  * sigcontext.__reserved[] by the terminating null _aarch64_ctx.
+  *
+- * 4) The extra space to which data points must start at the first
++ * 4) The extra space to which datap points must start at the first
+  * 16-byte aligned address immediately after the terminating null
+  * _aarch64_ctx that follows the extra_context structure in
+  * __reserved[].  The extra space may overrun the end of __reserved[],
+@@ -111,8 +111,8 @@ struct esr_context {
+ 
+ struct extra_context {
+ 	struct _aarch64_ctx head;
+-	void __user *data;	/* 16-byte aligned pointer to extra space */
+-	__u32 size;		/* size in bytes of the extra space */
++	__u64 datap; /* 16-byte aligned pointer to extra space cast to __u64 */
++	__u32 size; /* size in bytes of the extra space */
+ 	__u32 __reserved[3];
+ };
+ 
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 3602fb7..cb0d008 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -244,7 +244,7 @@ static int parse_user_sigframe(struct user_ctxs *user,
+ 		u32 magic, size;
+ 		char const __user *userp;
+ 		struct extra_context const __user *extra;
+-		void __user *extra_data;
++		u64 extra_datap;
+ 		u32 extra_size;
+ 		struct _aarch64_ctx const __user *end;
+ 		u32 end_magic, end_size;
+@@ -297,7 +297,7 @@ static int parse_user_sigframe(struct user_ctxs *user,
+ 			extra = (struct extra_context const __user *)userp;
+ 			userp += size;
+ 
+-			__get_user_error(extra_data, &extra->data, err);
++			__get_user_error(extra_datap, &extra->datap, err);
+ 			__get_user_error(extra_size, &extra->size, err);
+ 			if (err)
+ 				return err;
+@@ -321,14 +321,14 @@ static int parse_user_sigframe(struct user_ctxs *user,
+ 			/* Prevent looping/repeated parsing of extra_context */
+ 			have_extra_context = true;
+ 
+-			base = extra_data;
++			base = (void __user *)extra_datap;
+ 			if (!IS_ALIGNED((unsigned long)base, 16))
+ 				goto invalid;
+ 
+ 			if (!IS_ALIGNED(extra_size, 16))
+ 				goto invalid;
+ 
+-			if (extra_data != userp)
++			if (base != userp)
+ 				goto invalid;
+ 
+ 			/* Reject "unreasonably large" frames: */
+@@ -337,7 +337,7 @@ static int parse_user_sigframe(struct user_ctxs *user,
+ 
+ 			/*
+ 			 * Ignore trailing terminator in __reserved[]
+-			 * and start parsing extra_data:
++			 * and start parsing extra data:
+ 			 */
+ 			offset = 0;
+ 			limit = extra_size;
+@@ -501,7 +501,7 @@ static int setup_sigframe(struct rt_sigframe_user_layout *user,
+ 
+ 		struct extra_context __user *extra;
+ 		struct _aarch64_ctx __user *end;
+-		void __user *extra_data;
++		u64 extra_datap;
+ 		u32 extra_size;
+ 
+ 		extra = (struct extra_context __user *)userp;
+@@ -510,12 +510,12 @@ static int setup_sigframe(struct rt_sigframe_user_layout *user,
+ 		end = (struct _aarch64_ctx __user *)userp;
+ 		userp += TERMINATOR_SIZE;
+ 
+-		extra_data = userp;
++		extra_datap = (u64)userp;
+ 		extra_size = sfp + round_up(user->size, 16) - userp;
+ 
+ 		__put_user_error(EXTRA_MAGIC, &extra->head.magic, err);
+ 		__put_user_error(EXTRA_CONTEXT_SIZE, &extra->head.size, err);
+-		__put_user_error(extra_data, &extra->data, err);
++		__put_user_error(extra_datap, &extra->datap, err);
+ 		__put_user_error(extra_size, &extra->size, err);
+ 
+ 		/* Add the terminator */
+-- 
+2.1.4
