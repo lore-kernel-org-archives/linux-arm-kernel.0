@@ -1,47 +1,50 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 20 Jun 2017 13:24:07 -0700
-Subject: [PATCH v10 1/3] x86/syscalls: Check address limit on user-mode
- return
-In-Reply-To: <20170615011203.144108-1-thgarnie@google.com>
-References: <20170615011203.144108-1-thgarnie@google.com>
-Message-ID: <CAGXu5j+byHUn_rb9jOTZqMYrc4ngmDj=a3k8QRTYrZYNSjhCkw@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 20 Jun 2017 22:25:52 +0200
+Subject: [PATCH V10 1/3] irq: Allow to pass the IRQF_TIMER flag with
+ percpu irq request
+In-Reply-To: <alpine.DEB.2.20.1706201520290.1869@nanos>
+References: <20170612135108.GD2261@mai>
+ <1497275529-23565-1-git-send-email-daniel.lezcano@linaro.org>
+ <alpine.DEB.2.20.1706201520290.1869@nanos>
+Message-ID: <20170620202552.GA1812@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 14, 2017 at 6:12 PM, Thomas Garnier <thgarnie@google.com> wrote:
-> Ensure the address limit is a user-mode segment before returning to
-> user-mode. Otherwise a process can corrupt kernel-mode memory and elevate
-> privileges [1].
->
-> The set_fs function sets the TIF_SETFS flag to force a slow path on
-> return. In the slow path, the address limit is checked to be USER_DS if
-> needed.
->
-> The addr_limit_user_check function is added as a cross-architecture
-> function to check the address limit.
->
-> [1] https://bugs.chromium.org/p/project-zero/issues/detail?id=990
->
-> Signed-off-by: Thomas Garnier <thgarnie@google.com>
+On Tue, Jun 20, 2017 at 04:05:07PM +0200, Thomas Gleixner wrote:
+> On Mon, 12 Jun 2017, Daniel Lezcano wrote:
+> > But, the API request_percpu_irq does not allow to pass a flag, hence specifying
+> > if the interrupt type is a timer.
+> > 
+> > Add a function request_percpu_irq_flags() where we can specify the flags. The
+> > request_percpu_irq() function is changed to be a wrapper to
+> > request_percpu_irq_flags() passing a zero flag parameter.
+> 
+> And exactly this change wants to be a separate patch. We do not make whole
+> sale changes this way. You should know that already and someone pointed
+> that out to you in some of the earlier versions.
+> 
+> > -int request_percpu_irq(unsigned int irq, irq_handler_t handler,
+> > -		       const char *devname, void __percpu *dev_id)
+> > +int request_percpu_irq_flags(unsigned int irq, irq_handler_t handler,
+> 
+> The function name sucks. The first time I read it, it meant request the per
+> cpu irq flags, which is not what you aim at, right?
+> 
+> Please make that __request_percpu_irq() for now and on -rc1 time provide a
+> patch set to convert all current request_percpu_irq() users to have the
+> extra argument and then remove the __request_percpu_irq() intermediate.
 
-Thanks for reworking this series!
+Ok, I will the change this way.
 
-The bad state correctly BUGs under the LKDTM test:
-
-[   21.171586] lkdtm: Performing direct entry CORRUPT_USER_DS
-[   21.172791] lkdtm: setting bad task size limit
-[   21.173742] ------------[ cut here ]------------
-[   21.174641] kernel BUG at ./include/linux/syscalls.h:220!
-...
-[   21.193166] Call Trace:
-[   21.193617]  ? trace_hardirqs_on_thunk+0x1a/0x1c
-[   21.194443]  entry_SYSCALL64_slow_path+0x25/0x25
+What about 2/3 and 3/3? Is it possible to take them with the
+__request_percpu_irq change?
 
 
-Tested-by: Kees Cook <keescook@chromium.org>
-
--Kees
 
 -- 
-Kees Cook
-Pixel Security
+
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
