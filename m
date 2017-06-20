@@ -1,68 +1,37 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Tue, 20 Jun 2017 14:41:40 +0200
-Subject: new dma-mapping tree, was Re: clean up and modularize arch
- dma_mapping interface V2
-In-Reply-To: <20170616181059.19206-1-hch@lst.de>
-Message-ID: <20170620124140.GA27163@lst.de>
+From: prabhakar.csengg@gmail.com (Lad, Prabhakar)
+Date: Tue, 20 Jun 2017 13:55:09 +0100
+Subject: [PATCH v2] [media] davinci: vpif: adaptions for DT support
+In-Reply-To: <20170609161026.7582-1-khilman@baylibre.com>
+References: <20170609161026.7582-1-khilman@baylibre.com>
+Message-ID: <CA+V-a8u49iwtp9G-J5i6omnrS9WGAcXjMsYFas7c0ECw5yOntw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 16, 2017 at 08:10:15PM +0200, Christoph Hellwig wrote:
-> I plan to create a new dma-mapping tree to collect all this work.
-> Any volunteers for co-maintainers, especially from the iommu gang?
+On Fri, Jun 9, 2017 at 5:10 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+> The davinci VPIF is a single hardware block, but the existing driver
+> is broken up into a common library (vpif.c), output (vpif_display.c) and
+> intput (vpif_capture.c).
+>
+> When migrating to DT, to better model the hardware, and because
+> registers, interrupts, etc. are all common,it was decided to
+> have a single VPIF hardware node[1].
+>
+> Because davinci uses legacy, non-DT boot on several SoCs still, the
+> platform_drivers need to remain.  But they are also needed in DT boot.
+> Since there are no DT nodes for the display/capture parts in DT
+> boot (there is a single node for the parent/common device) we need to
+> create platform_devices somewhere to instansiate the platform_drivers.
+>
+> When VPIF display/capture are needed for a DT boot, the VPIF node
+> will have endpoints defined for its subdevs.  Therefore, vpif_probe()
+> checks for the presence of endpoints, and if detected manually creates
+> the platform_devices for the display and capture platform_drivers.
+>
+> [1] Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+>
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 
-Ok, I've created the new tree:
+Acked-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 
-   git://git.infradead.org/users/hch/dma-mapping.git for-next
-
-Gitweb:
-
-   http://git.infradead.org/users/hch/dma-mapping.git/shortlog/refs/heads/for-next
-
-And below is the patch to add the MAINTAINERS entry, additions welcome.
-
-Stephen, can you add this to linux-next?
-
----
->From 335979c41912e6c101a20b719862b2d837370df1 Mon Sep 17 00:00:00 2001
-From: Christoph Hellwig <hch@lst.de>
-Date: Tue, 20 Jun 2017 11:17:30 +0200
-Subject: MAINTAINERS: add entry for dma mapping helpers
-
-This code has been spread between getting in through arch trees, the iommu
-tree, -mm and the drivers tree.  There will be a lot of work in this area,
-including consolidating various arch implementations into more common
-code, so ensure we have a proper git tree that facilitates cooperation with
-the architecture maintainers.
-
-Signed-off-by: Christoph Hellwig <hch@lst.de>
----
- MAINTAINERS | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 09b5ab6a8a5c..56859d53a424 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2595,6 +2595,19 @@ S:	Maintained
- F:	net/bluetooth/
- F:	include/net/bluetooth/
- 
-+DMA MAPPING HELPERS
-+M:	Christoph Hellwig <hch@lst.de>
-+L:	linux-kernel at vger.kernel.org
-+T:	git git://git.infradead.org/users/hch/dma-mapping.git
-+W:	http://git.infradead.org/users/hch/dma-mapping.git
-+S:	Supported
-+F:	lib/dma-debug.c
-+F:	lib/dma-noop.c
-+F:	lib/dma-virt.c
-+F:	drivers/base/dma-mapping.c
-+F:	drivers/base/dma-coherent.c
-+F:	include/linux/dma-mapping.h
-+
- BONDING DRIVER
- M:	Jay Vosburgh <j.vosburgh@gmail.com>
- M:	Veaceslav Falico <vfalico@gmail.com>
--- 
-2.11.0
+Cheers,
+--Prabhakar Lad
