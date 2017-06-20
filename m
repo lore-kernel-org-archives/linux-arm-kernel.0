@@ -1,165 +1,25 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Tue, 20 Jun 2017 22:47:24 +0530
-Subject: [PATCH v2 2/2] acpi, gicv3-its, numa: Adding numa node mapping
- for gic-its units
-In-Reply-To: <20170620151733.GC11351@red-moon>
-References: <1497942437-1390-1-git-send-email-ganapatrao.kulkarni@cavium.com>
- <1497942437-1390-3-git-send-email-ganapatrao.kulkarni@cavium.com>
- <20170620151733.GC11351@red-moon>
-Message-ID: <CAFpQJXW3oDc-R=j5Jzok_5W+tTcut9b9f_=6q9Q0PwWy+pq3=w@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 20 Jun 2017 13:23:23 -0400 (EDT)
+Subject: [PATCH 0/4] net-next: stmmac: dwmac-sun8i: add support for V3s
+In-Reply-To: <20170617140737.41951-1-icenowy@aosc.io>
+References: <20170617140737.41951-1-icenowy@aosc.io>
+Message-ID: <20170620.132323.46663908524667004.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+From: Icenowy Zheng <icenowy@aosc.io>
+Date: Sat, 17 Jun 2017 22:07:33 +0800
 
-On Tue, Jun 20, 2017 at 8:47 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> Hi Ganapatrao,
->
-> On Tue, Jun 20, 2017 at 12:37:17PM +0530, Ganapatrao Kulkarni wrote:
->> Add code to parse SRAT ITS Affinity sub table as defined in ACPI 6.2
->> Later in per device probe, ITS devices are mapped to
->> numa node using ITS id to proximity domain mapping.
->>
->> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->> ---
->>  drivers/irqchip/irq-gic-v3-its.c | 76 +++++++++++++++++++++++++++++++++++++++-
->>  1 file changed, 75 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
->> index 45ea1933..5865a75 100644
->> --- a/drivers/irqchip/irq-gic-v3-its.c
->> +++ b/drivers/irqchip/irq-gic-v3-its.c
->> @@ -1833,6 +1833,78 @@ static int __init its_of_probe(struct device_node *node)
->>
->>  #define ACPI_GICV3_ITS_MEM_SIZE (SZ_128K)
->>
->> +#ifdef CONFIG_ACPI_NUMA
->> +struct its_srat_map {
->> +     u32                     numa_node;  /* numa node id */
->> +     u32                     its_id;  /* GIC ITS ID */
->> +     struct list_head        entry;
->> +};
->> +
->> +static LIST_HEAD(its_srat_maps);
->> +
->> +static int acpi_get_its_numa_node(u32 its_id)
->> +{
->> +     struct its_srat_map *srat_map;
->> +
->> +     list_for_each_entry(srat_map, &its_srat_maps, entry) {
->> +             if (its_id == srat_map->its_id)
->> +                     return srat_map->numa_node;
->> +     }
->> +     return NUMA_NO_NODE;
->> +}
->
-> I do not want to come across as pedantic and I understand that the API
-> to parse static ACPI tables sucks (ie in theory you could avoid stashing
-> nodes altogether and just use a global variable to parse an ITS ID at
-> a time but it sucks to go through the SRAT multiple times) but would not
-> it be easier to just declare an __initdata static array and counter and
-> be done with this ? We do not need this stuff after boot so I do not see
-> a point in keeping it in memory and in allocating the nodes dynamically.
+> Allwinner V3s features an EMAC like the on in H3, but without external MII
+> interfaces, so being not able really to use RMII/RGMII.
+> 
+> And it has a different default value of syscon (0x38000 instead of 0x58000
+> on H3), which shows a problem that the EMAC clock freq should be 24MHz.
+> (Both H3 and V3s SoCs doesn't have extra xtal input for EPHY, and the
+> main xtal is 24MHz. The default value of H3 is set to 24MHz, but the V3s
+> default value is set to 25MHz).
+> 
+> First two patches are device tree binding patches, the third forces
+> the frequency to 24MHz and the fourth really add the V3s support.
 
-yes, it was my initial thought (as done v1), and i have replaced to
-dynamic array in this series. I might have misunderstood your comments.
-if you have no objection for the static array of size MAX_NUMNODES
-as done v1 [1], i can send v3 with that change?
-
-[1] https://patchwork.kernel.org/patch/9768869/
-
->
-> Apologies if I was not clear in my comments to the previous set, I did
-> not like stashing ITS PXM values in arch/arm64 code but I understand you
-> need an array (__initdata) to avoid reading the SRAT multiple times.
-
-yes, having static array to hold parsed table is required to avoid
-multiple iterations
-of parsing functions.
-This array can go in __initdata.
-
->
-> Thanks,
-> Lorenzo
->
->> +
->> +static int __init
->> +gic_acpi_parse_srat_its(struct acpi_subtable_header *header,
->> +                      const unsigned long end)
->> +{
->> +     int pxm, node;
->> +     struct its_srat_map *srat_map;
->> +     struct acpi_srat_its_affinity *its_affinity;
->> +
->> +     its_affinity = (struct acpi_srat_its_affinity *)header;
->> +     if (!its_affinity)
->> +             return -EINVAL;
->> +
->> +     if (its_affinity->header.length <
->> +                     sizeof(struct acpi_srat_its_affinity)) {
->> +             pr_err("SRAT:ITS: Invalid SRAT header length: %d\n",
->> +                     its_affinity->header.length);
->> +             return -EINVAL;
->> +     }
->> +
->> +     pxm = its_affinity->proximity_domain;
->> +     node = acpi_map_pxm_to_node(pxm);
->> +
->> +     if (node == NUMA_NO_NODE || node >= MAX_NUMNODES) {
->> +             pr_err("SRAT:ITS Invalid numa node %d\n", node);
->> +             return -EINVAL;
->> +     }
->> +
->> +     srat_map = kzalloc(sizeof(*srat_map), GFP_KERNEL);
->> +     if (!srat_map)
->> +             return -ENOMEM;
->> +
->> +     srat_map->numa_node = node;
->> +     srat_map->its_id = its_affinity->its_id;
->> +     list_add(&srat_map->entry, &its_srat_maps);
->> +     pr_info("ACPI: NUMA: SRAT: ITS: PXM %d -> ITS_ID %d -> NODE %d\n",
->> +             srat_map->its_id, pxm, node);
->> +
->> +     return 0;
->> +}
->> +
->> +static int __init acpi_table_parse_srat_its(void)
->> +{
->> +     return acpi_table_parse_entries(ACPI_SIG_SRAT,
->> +                                     sizeof(struct acpi_table_srat),
->> +                                     ACPI_SRAT_TYPE_GIC_ITS_AFFINITY,
->> +                                     gic_acpi_parse_srat_its, 0);
->> +}
->> +#else
->> +#define acpi_table_parse_srat_its(void) { }
->> +#define acpi_get_its_numa_node(its_id) NUMA_NO_NODE
->> +#endif
->> +
->>  static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
->>                                         const unsigned long end)
->>  {
->> @@ -1861,7 +1933,8 @@ static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
->>               goto dom_err;
->>       }
->>
->> -     err = its_probe_one(&res, dom_handle, NUMA_NO_NODE);
->> +     err = its_probe_one(&res, dom_handle,
->> +                     acpi_get_its_numa_node(its_entry->translation_id));
->>       if (!err)
->>               return 0;
->>
->> @@ -1873,6 +1946,7 @@ static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
->>
->>  static void __init its_acpi_probe(void)
->>  {
->> +     acpi_table_parse_srat_its();
->>       acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
->>                             gic_acpi_parse_madt_its, 0);
->>  }
->> --
->> 1.8.1.4
->>
-
-thanks
-Ganapat
+Series applied to net-next, thanks!
