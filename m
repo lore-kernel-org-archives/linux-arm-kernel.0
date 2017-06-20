@@ -1,165 +1,80 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 20 Jun 2017 14:37:51 +0100
-Subject: [PATCH 0/8] io-pgtable lock removal
-In-Reply-To: <b7830be1-9a78-e29f-a29c-4798aaa28c0a@broadcom.com>
-References: <cover.1496921366.git.robin.murphy@arm.com>
- <458ad41d-6679-eeca-3c0f-13ccb6c933b6@codeaurora.org>
- <b7830be1-9a78-e29f-a29c-4798aaa28c0a@broadcom.com>
-Message-ID: <cdc1799b-f142-09ed-a7e5-d7fd2e70268f@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 20 Jun 2017 15:38:56 +0200
+Subject: [PATCH] arm64: dts: marvell: use new bindings for xor clocks on
+ ap806
+In-Reply-To: <20170620063838.3003-1-antoine.tenart@free-electrons.com>
+ (Antoine Tenart's message of "Tue, 20 Jun 2017 08:38:38 +0200")
+References: <20170620063838.3003-1-antoine.tenart@free-electrons.com>
+Message-ID: <87k2464w3z.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/06/17 01:40, Ray Jui wrote:
-> Hi Robin,
-> 
-> I have applied this patch series on top of v4.12-rc4, and ran various
-> Ethernet and NVMf target throughput tests on it.
-> 
-> To give you some background of my setup:
-> 
-> The system is a ARMv8 based system with 8 cores. It has various PCIe
-> root complexes that can be used to connect to PCIe endpoint devices
-> including NIC cards and NVMe SSDs.
-> 
-> I'm particularly interested in the performance of the PCIe root complex
-> that connects to the NIC card, and during my test, IOMMU is
-> enabled/disabled against that particular PCIe root complex. The root
-> complexes connected to NVMe SSDs remain unchanged (i.e., without IOMMU).
-> 
-> For the Ethernet throughput out of 50G link:
-> 
-> Note during the multiple TCP session test, each session will be spread
-> to different CPU cores for optimized performance
-> 
-> Without IOMMU:
-> 
-> TX TCP x1 - 29.7 Gbps
-> TX TCP x4 - 30.5 Gbps
-> TX TCP x8 - 28 Gbps
-> 
-> RX TCP x1 - 15 Gbps
-> RX TCP x4 - 33.7 Gbps
-> RX TCP x8 - 36 Gbps
-> 
-> With IOMMU, but without your latest patch:
-> 
-> TX TCP x1 - 15.2 Gbps
-> TX TCP x4 - 14.3 Gbps
-> TX TCP x8 - 13 Gbps
-> 
-> RX TCP x1 - 7.88 Gbps
-> RX TCP x4 - 13.2 Gbps
-> RX TCP x8 - 12.6 Gbps
-> 
-> With IOMMU and your latest patch:
-> 
-> TX TCP x1 - 21.4 Gbps
-> TX TCP x4 - 30.5 Gbps
-> TX TCP x8 - 21.3 Gbps
-> 
-> RX TCP x1 - 7.7 Gbps
-> RX TCP x4 - 20.1 Gbps
-> RX TCP x8 - 27.1 Gbps
+Hi Antoine,
+ 
+ On mar., juin 20 2017, Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
 
-Cool, those seem more or less in line with expectations. Nate's
-currently cooking a patch to further reduce the overhead when unmapping
-multi-page buffers, which we believe should make up most of the rest of
-the difference.
+> New bindings are used for the system controller on the ap806, which
+> means all clock properties must be converted. Use the new bindings in
+> the xor nodes.
+>
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 
-> With the NVMf target test with 4 SSDs, fio based test, random read, 4k,
-> 8 jobs:
-> 
-> Without IOMMU:
-> 
-> IOPS = 1080K
-> 
-> With IOMMU, but without your latest patch:
-> 
-> IOPS = 520K
-> 
-> With IOMMU and your latest patch:
-> 
-> IOPS = 500K ~ 850K (a lot of variation observed during the same test run)
+Applied on mvebu/dt64
 
-That does seem a bit off - are you able to try some perf profiling to
-get a better idea of where the overhead appears to be?
+Thanks,
 
-> As you can see, performance has improved significantly with this patch
-> series! That is very impressive!
-> 
-> However, it is still off, compared to the test runs without the IOMMU.
-> I'm wondering if more improvement is expected.
-> 
-> In addition, a much larger throughput variation is observed in the tests
-> with these latest patches, when multiple CPUs are involved. I'm
-> wondering if that is caused by some remaining lock in the driver?
+Gregory
 
-Assuming this is the platform with MMU-500, there shouldn't be any locks
-left, since that shouldn't have the hardware ATOS registers for
-iova_to_phys().
+> ---
+>  arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> index ff1964d314de..02e5aff48c81 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> @@ -159,7 +159,7 @@
+>  				reg = <0x400000 0x1000>,
+>  				      <0x410000 0x1000>;
+>  				msi-parent = <&gic_v2m0>;
+> -				clocks = <&ap_syscon 3>;
+> +				clocks = <&ap_clk 3>;
+>  				dma-coherent;
+>  			};
+>  
+> @@ -168,7 +168,7 @@
+>  				reg = <0x420000 0x1000>,
+>  				      <0x430000 0x1000>;
+>  				msi-parent = <&gic_v2m0>;
+> -				clocks = <&ap_syscon 3>;
+> +				clocks = <&ap_clk 3>;
+>  				dma-coherent;
+>  			};
+>  
+> @@ -177,7 +177,7 @@
+>  				reg = <0x440000 0x1000>,
+>  				      <0x450000 0x1000>;
+>  				msi-parent = <&gic_v2m0>;
+> -				clocks = <&ap_syscon 3>;
+> +				clocks = <&ap_clk 3>;
+>  				dma-coherent;
+>  			};
+>  
+> @@ -186,7 +186,7 @@
+>  				reg = <0x460000 0x1000>,
+>  				      <0x470000 0x1000>;
+>  				msi-parent = <&gic_v2m0>;
+> -				clocks = <&ap_syscon 3>;
+> +				clocks = <&ap_clk 3>;
+>  				dma-coherent;
+>  			};
+>  
+> -- 
+> 2.9.4
+>
 
-> Also, in a few occasions, I observed the following message during the
-> test, when multiple cores are involved:
-> 
-> arm-smmu 64000000.mmu: TLB sync timed out -- SMMU may be deadlocked
-
-That's particularly worrying, because it means we spent over a second
-waiting for something that normally shouldn't take more than a few
-hundred cycles. The only time I've ever actually seen that happen is if
-TLBSYNC is issued while a context fault is pending - on MMU-500 it seems
-that the sync just doesn't proceed until the fault is cleared - but that
-stemmed from interrupts not being wired up correctly (on FPGAs) such
-that we never saw the fault reported in the first place :/
-
-Robin.
-
-> 
-> Thanks,
-> 
-> Ray
-> 
-> On 6/9/17 12:28 PM, Nate Watterson wrote:
->> Hi Robin,
->>
->> On 6/8/2017 7:51 AM, Robin Murphy wrote:
->>> Hi all,
->>>
->>> Here's the cleaned up nominally-final version of the patches everybody's
->>> keen to see. #1 is just a non-critical thing-I-spotted-in-passing fix,
->>> #2-#4 do some preparatory work (and bid farewell to everyone's least
->>> favourite bit of code, hooray!), and #5-#8 do the dirty deed itself.
->>>
->>> The branch I've previously shared has been updated too:
->>>
->>>    git://linux-arm.org/linux-rm  iommu/pgtable
->>>
->>> All feedback welcome, as I'd really like to land this for 4.13.
->>>
->>
->> I tested the series on a QDF2400 development platform and see notable
->> performance improvements particularly in workloads that make concurrent
->> accesses to a single iommu_domain.
->>
->>> Robin.
->>>
->>>
->>> Robin Murphy (8):
->>>    iommu/io-pgtable-arm-v7s: Check table PTEs more precisely
->>>    iommu/io-pgtable-arm: Improve split_blk_unmap
->>>    iommu/io-pgtable-arm-v7s: Refactor split_blk_unmap
->>>    iommu/io-pgtable: Introduce explicit coherency
->>>    iommu/io-pgtable-arm: Support lockless operation
->>>    iommu/io-pgtable-arm-v7s: Support lockless operation
->>>    iommu/arm-smmu: Remove io-pgtable spinlock
->>>    iommu/arm-smmu-v3: Remove io-pgtable spinlock
->>>
->>>   drivers/iommu/arm-smmu-v3.c        |  36 ++-----
->>>   drivers/iommu/arm-smmu.c           |  48 ++++------
->>>   drivers/iommu/io-pgtable-arm-v7s.c | 173
->>> +++++++++++++++++++++------------
->>>   drivers/iommu/io-pgtable-arm.c     | 190
->>> ++++++++++++++++++++++++-------------
->>>   drivers/iommu/io-pgtable.h         |   6 ++
->>>   5 files changed, 268 insertions(+), 185 deletions(-)
->>>
->>
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
