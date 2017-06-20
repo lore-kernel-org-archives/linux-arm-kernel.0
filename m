@@ -1,77 +1,67 @@
-From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Tue, 20 Jun 2017 13:51:50 +0900
-Subject: [PATCH v2] drm/exynos/dsi: Remove error handling for
- bridge_node DT parsing
-In-Reply-To: <e8ea4c40-4065-54de-7277-26c236bab36a@math.uni-bielefeld.de>
-References: <CGME20170614063359epcas5p46658bba447468cd367d0684bd9485bf8@epcas5p4.samsung.com>
- <1497422020-8810-1-git-send-email-hoegeun.kwon@samsung.com>
- <e8ea4c40-4065-54de-7277-26c236bab36a@math.uni-bielefeld.de>
-Message-ID: <435f9640-379d-acfd-a445-50a2894a1259@samsung.com>
+From: ore@pengutronix.de (Oleksij Rempel)
+Date: Tue, 20 Jun 2017 06:55:24 +0200
+Subject: [PATCH v5 2/6] ARM: imx6: register pm_power_off handler if
+ "fsl,pmic-stby-poweroff" is set
+In-Reply-To: <1497872133.5380.11.camel@nxp.com>
+References: <20170619050245.2632-1-o.rempel@pengutronix.de>
+ <20170619050245.2632-3-o.rempel@pengutronix.de>
+ <1497872133.5380.11.camel@nxp.com>
+Message-ID: <7f2db0a8-a316-5ecb-24bf-46bcb625e123@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tobias,
+Hi Leonard,
 
-Sorry for late reply.
-
-On 06/14/2017 09:30 PM, Tobias Jakobi wrote:
-> Hello Hoegeun,
->
-> my last question (does this regress the case "node required, but
-> absent") still stands.
->
->
-> Hoegeun Kwon wrote:
->> Remove the error handling of bridge_node because the bridge_node is
->> required optionally.
-> I don't think a construction like that exists. Either it's required, or
-> it's optional. "required optionally" makes no sense to me (but I'm not a
-> native speaker).
->
-> - Tobias
-
-The bridge_node is optional.
-I will change commit message and send ver3 patch.
-
-Best regards,
-Hoegeun
-
->
->
->> For example, In case of Exynos SoC, a bridge device such as mDNIe and
->> MIC could be placed between Display Controller and MIPI DSI device but
->> the bridge device is required optionally.
+On 19.06.2017 13:35, Leonard Crestez wrote:
+> On Mon, 2017-06-19 at 07:02 +0200, Oleksij Rempel wrote:
+>> One of the Freescale recommended sequences for power off with
+>> external
+>> PMIC is the following:
+>> ...
+>> 3.  SoC is programming PMIC for power off when standby is asserted.
+>> 4.  In CCM STOP mode, Standby is asserted, PMIC gates SoC supplies.
 >>
->> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
+>> See:
+>> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fwww
+>> .nxp.com%2Fassets%2Fdocuments%2Fdata%2Fen%2Freference-
+>> manuals%2FIMX6DQRM.pdf&data=01%7C01%7Cleonard.crestez%40nxp.com%7C32c
+>> df19d0ab44ed8e24d08d4b6d097f4%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0&
+>> sdata=CWDpnEGikPGmSTM3dQH8IMxQCVzcIvHL69nu962d8M0%3D&reserved=0
+>> page 5083
+>>
+>> This patch implements step 4. of this sequence.
+>>
+>> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
 >> ---
+>>  arch/arm/mach-imx/pm-imx6.c | 25 +++++++++++++++++++++++++
+>>  1 file changed, 25 insertions(+)
 >>
->> Hi Inki and Tobias,
+>> diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-
+>> imx6.c
+>> index e61b1d1027e1..cb76832935f0 100644
+>> --- a/arch/arm/mach-imx/pm-imx6.c
+>> +++ b/arch/arm/mach-imx/pm-imx6.c
+>> @@ -602,6 +602,28 @@ static void __init imx6_pm_common_init(const
+>> struct imx6_pm_socdata
+>>  				   IMX6Q_GPR1_GINT);
+>>  }
 >>
->> Thanks for your review.
->>
->> Changes for V2:
->> - Modified the commit message in more detail than before.
->>
->> Best Regards,
->> Hoegeun
->>
->>   drivers/gpu/drm/exynos/exynos_drm_dsi.c | 2 --
->>   1 file changed, 2 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
->> index a11b795..6ee0dac 100644
->> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
->> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
->> @@ -1651,8 +1651,6 @@ static int exynos_dsi_parse_dt(struct exynos_dsi *dsi)
->>   		return ret;
->>   
->>   	dsi->bridge_node = of_graph_get_remote_node(node, DSI_PORT_IN, 0);
->> -	if (!dsi->bridge_node)
->> -		return -EINVAL;
->>   
->>   	return 0;
->>   }
->>
+>> +static void imx6_pm_poweroff(void)
+>> +{
+>> +	imx6_set_lpm(STOP_POWER_OFF);
+>> +	cpu_suspend(0, imx6q_suspend_finish);
 >
->
->
+> It's a bit strange that you're using parts of the suspend code for
+> this. Perhaps you could just write your bits to CLPCR and then execute
+> a WFI?
+
+Well, every thing in this patch set, yell about using standby/suspend 
+path in HW for power off. Even iMX code use STOP_POWER_OFF for 
+configuring this regs. How can it be more strange? :) Should i really 
+duplicate code to hide this?
+
+> It would also be nice to rename this to something like
+> imx6_pm_stby_poweroff to make it clear that it's only for a certain
+> power off path.
+
+ok.
