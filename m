@@ -1,39 +1,47 @@
-From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
-Date: Tue, 20 Jun 2017 14:24:43 +0200
-Subject: [PATCH] arm64: pass machine size to sparse
-Message-ID: <20170620122443.35880-1-luc.vanoostenryck@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 20 Jun 2017 13:40:59 +0100
+Subject: [PATCH 2/2] ASoC: zx_aud96p22: add ZTE ZX AUD96P22 codec driver
+In-Reply-To: <20170620031953.GC4818@x250>
+References: <1497708574-22380-1-git-send-email-shawnguo@kernel.org>
+ <1497708574-22380-3-git-send-email-shawnguo@kernel.org>
+ <20170619161910.siea75hqxgtxhjmp@sirena.org.uk>
+ <20170620031953.GC4818@x250>
+Message-ID: <20170620124059.r55r363y3y3if6jg@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using sparse on the arm64 tree we get many thousands of
-warnings like 'constant ... is so big it is unsigned long long'
-or 'shift too big (32) for type unsigned long'. This happens
-because by default sparse considers the machine as 32bit and
-defines the size of the types accordingly.
+On Tue, Jun 20, 2017 at 11:19:55AM +0800, Shawn Guo wrote:
+> On Mon, Jun 19, 2017 at 05:19:10PM +0100, Mark Brown wrote:
+> > On Sat, Jun 17, 2017 at 10:09:34PM +0800, Shawn Guo wrote:
 
-Fix this by passing the '-m64' flag to sparse so that
-sparse can correctly define longs as being 64bit.
+> > > +	/* Overall power-up */
+> > > +	regmap_update_bits(regmap, AUD96P22_PD_0, PD_0_PDZ, PD_0_PDZ);
 
-CC: Catalin Marinas <catalin.marinas@arm.com>
-CC: Will Deacon <will.deacon@arm.com>
-CC: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
----
- arch/arm64/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> > Why is this not done with DAPM?
 
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index f839ecd91..15d6c1476 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -62,7 +62,7 @@ LD		+= -EL
- UTS_MACHINE	:= aarch64
- endif
- 
--CHECKFLAGS	+= -D__aarch64__
-+CHECKFLAGS	+= -D__aarch64__ -m64
- 
- ifeq ($(CONFIG_ARM64_MODULE_CMODEL_LARGE), y)
- KBUILD_CFLAGS_MODULE	+= -mcmodel=large
--- 
-2.13.0
+> As this is a overall power bit, which is not for any specific component.
+> I'm not sure which DAPM widget should be used for it, and how it should
+> be arranged in the widget route.  Any suggestion or example will be
+> appreciated.
+
+Sounds like a fairly standard use for a supply widget.
+
+> > > +	/* Reset ADC and DAC path */
+> > > +	regmap_write(regmap, AUD96P22_RESET, 0x0);
+> > > +	regmap_write(regmap, AUD96P22_RESET, 0x3);
+
+> > What does this mean?
+
+> It's a de-assert/assert of ADC and DAC reset.  I will add proper
+> defines for the bits to make this clear.
+
+Why are we resetting these - won't this loose settings?  And if it's
+just something to be done as part of starting the DAC and ADC why isn't
+it done via DAPM?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170620/6b593e76/attachment-0001.sig>
