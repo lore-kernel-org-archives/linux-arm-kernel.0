@@ -1,46 +1,121 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 19 Jun 2017 19:01:19 -0700
-Subject: [PATCH 9/9] clk: imx: add imx7ulp clk driver
-In-Reply-To: <1494856763-6543-10-git-send-email-aisheng.dong@nxp.com>
-References: <1494856763-6543-1-git-send-email-aisheng.dong@nxp.com>
- <1494856763-6543-10-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20170620020119.GQ4493@codeaurora.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 19 Jun 2017 19:03:23 -0700
+Subject: [GIT PULL] ARM: Medaitek armv7 DTS for v4.13
+In-Reply-To: <1497924044.22079.3.camel@mtkswgap22>
+References: <5056d433-90b3-a3ca-4df7-9ff02ab6027b@gmail.com>
+ <20170619023437.GV30022@localhost> <1497924044.22079.3.camel@mtkswgap22>
+Message-ID: <CAOesGMihRCAySi38X1Ncx3G0WwW71m9ZBMTo7MghXJx8t0D2mQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15, Dong Aisheng wrote:
-> +
-> +	clks[IMX7ULP_CLK_VIU]		= imx_clk_gate("viu",	"nic1_clk",	base + 0xA0, 30);
-> +	clks[IMX7ULP_CLK_PCTLC]		= imx_clk_gate("pctlc", "nic1_bus_clk", base + 0xB8, 30);
-> +	clks[IMX7ULP_CLK_PCTLD]		= imx_clk_gate("pctld", "nic1_bus_clk", base + 0xBC, 30);
-> +	clks[IMX7ULP_CLK_PCTLE]		= imx_clk_gate("pctle", "nic1_bus_clk", base + 0xc0, 30);
-> +	clks[IMX7ULP_CLK_PCTLF]		= imx_clk_gate("pctlf", "nic1_bus_clk", base + 0xc4, 30);
-> +
-> +	clks[IMX7ULP_CLK_GPU3D]		= imx_clk_composite("gpu3d",   periph_plat_sels, ARRAY_SIZE(periph_plat_sels), true, false, true, base + 0x140);
-> +	clks[IMX7ULP_CLK_GPU2D]		= imx_clk_composite("gpu2d",   periph_plat_sels, ARRAY_SIZE(periph_plat_sels), true, false, true, base + 0x144);
-> +
-> +	imx_check_clocks(clks, ARRAY_SIZE(clks));
-> +
-> +	clk_data.clks = clks;
-> +	clk_data.clk_num = ARRAY_SIZE(clks);
-> +	of_clk_add_provider(scg_node, of_clk_src_onecell_get, &clk_data);
+On Mon, Jun 19, 2017 at 7:00 PM, Sean Wang <sean.wang@mediatek.com> wrote:
+> On Sun, 2017-06-18 at 19:34 -0700, Olof Johansson wrote:
+>> On Mon, Jun 12, 2017 at 12:31:47PM +0200, Matthias Brugger wrote:
+>> > Hi Arnd and Olof,
+>> >
+>> > Please find below my merge request for armv7 device tree changes.
+>> >
+>> > Regards,
+>> > Matthias
+>> >
+>> > ---
+>> >
+>> > The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+>> >
+>> >   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+>> >
+>> > are available in the git repository at:
+>> >
+>> >   https://github.com/mbgg/linux-mediatek.git tags/v4.12-next-dts32
+>> >
+>> > for you to fetch changes up to aac5e972d4c7bc728df605f5427d9c2458c34ea9:
+>> >
+>> >   arm: dts: mediatek: Add audio driver node for MT2701 (2017-06-07 10:47:25
+>> > +0200)
+>>
+>> Thanks, merged. Comment below:
+>>
+>> >
+>> > ----------------------------------------------------------------
+>> > Add device tree nodes for
+>> > mt7623:
+>> > - clocks
+>> > - power domain
+>> > - pmic-wrapper
+>> > - pinctrl
+>> > - i2c
+>> > - spi
+>> > - nand
+>> > - mmc
+>> > - usb
+>> > - pwm
+>> > - ethernet
+>> > - crypto engine
+>> > - infared remote control
+>> > - audio controller
+>> > - ADC
+>> > - efuse
+>> > - thermal driver
+>> > - HW random generator
+>> >
+>> > mt2701:
+>> > - NOR flash
+>> > - JPEG decoder
+>> > - i2c
+>> > - audio controller
+>> >
+>> > ----------------------------------------------------------------
+>> > Garlic Tseng (1):
+>> >       arm: dts: mediatek: Add audio driver node for MT2701
+>> >
+>> > Guochun Mao (1):
+>> >       arm: dts: mt2701: add nor flash node
+>> >
+>> > John Crispin (9):
+>> >       arm: dts: mt7623: add clock controller device nodes
+>> >       arm: dts: mt7623: add subsystem clock controller device nodes
+>> >       arm: dts: mt7623: add power domain controller device node
+>> >       arm: dts: mt7623: add pinctrl nodes to the mt7623 dtsi file
+>> >       arm: dts: mt7623: add pmic wrapper nodes to the mt7623 dtsi file
+>> >       arm: dts: mt7623: add i2c nodes to the mt7623.dtsi file
+>> >       arm: dts: mt7623: add nand nodes to the mt7623.dtsi file
+>> >       arm: dts: mt7623: add mmc nodes to the mt7623.dtsi file
+>> >       arm: dts: mt7623: add usb nodes to the mt7623.dtsi file
+>> >
+>> > Jun Gao (1):
+>> >       arm: dts: Add Mediatek MT2701 i2c device node
+>> >
+>> > Rick Chang (1):
+>> >       arm: dts: mt2701: Add node for Mediatek JPEG Decoder
+>> >
+>> > Sean Wang (11):
+>> >       arm: dts: mt7623: add spi nodes to the mt7623.dtsi file
+>> >       arm: dts: mt7623: add pwm nodes to the mt7623.dtsi file
+>> >       arm: dts: mt7623: add ethernet nodes to the mt7623.dtsi file
+>> >       arm: dts: mt7623: add crypto engine nodes to the mt7623.dtsi file
+>> >       arm: dts: mt7623: add ir nodes to the mt7623.dtsi file
+>> >       arm: dts: mt7623: add afe nodes to the mt7623.dtsi file
+>> >       arm: dts: mt7623: add rng nodes to the mt7623.dtsi file
+>> >       arm: dts: mt7623: add auxadc nodes to the mt7623.dtsi file
+>> >       arm: dts: mt7623: add efuse nodes to the mt7623.dtsi file
+>> >       arm: dts: mt7623: add thermal nodes to the mt7623.dtsi file
+>> >       arm: dts: mt7623: add Sean as one of authors for mt7623.dtsi files
+>>
+>> This excessive patch splitting probably isn't warranted. In the future,
+>> especially for new and major updates like this, a single patch (or one per
+>> author) should do just fine.
+>>
+>
+> Hi Olof,
+>
+> Got it. I will make a single patch for new SoC supported.
 
-Please use of_clk_add_hw_provider() instead, and the associated
-clk_hw registration APIs.
+Of course, use your judgement if there's something special or new
+(especially complex bindings) that you want to highlight in a separate
+patch, but for the basic setup just adding the basic nodes, doing that
+in one file is usually the way we do it.
 
-> +
-> +	pr_info("i.MX7ULP clock tree init done.\n");
+Thanks!
 
-pr_debug?
 
-> +}
-> +
-> +CLK_OF_DECLARE(imx7ulp, "fsl,imx7ulp-clock", imx7ulp_clocks_init);
-> 
-
-Any reason why it can't be a platform driver? If not, please add
-some comment explaining why.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+-Olof
