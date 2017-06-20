@@ -1,40 +1,51 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 20 Jun 2017 08:21:24 +0200
-Subject: [PATCH v6 1/5] Documentation/bindings: Document the SafeXel
- cryptographic engine driver
-In-Reply-To: <20170620033747.GB17764@gondor.apana.org.au>
-References: <20170524141035.21031-1-antoine.tenart@free-electrons.com>
- <20170524141035.21031-2-antoine.tenart@free-electrons.com>
- <20170611085353.GG31464@kwain>
- <20170620033747.GB17764@gondor.apana.org.au>
-Message-ID: <20170620062124.GA14254@kwain>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 20 Jun 2017 08:30:51 +0200
+Subject: [GIT PULL] Allwinner clock changes for 4.13
+In-Reply-To: <20170616215036.GN20170@codeaurora.org>
+References: <20170614192617.bsp5pjxrphlk36sk@flea.home>
+ <20170616215036.GN20170@codeaurora.org>
+Message-ID: <20170620063051.j2chtseeetoh3mhe@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 11:37:47AM +0800, Herbert Xu wrote:
-> On Sun, Jun 11, 2017 at 10:53:53AM +0200, Antoine Tenart wrote:
-> > On Wed, May 24, 2017 at 04:10:31PM +0200, Antoine Tenart wrote:
-> > > The Inside Secure Safexcel cryptographic engine is found on some Marvell
-> > > SoCs (7k/8k). Document the bindings used by its driver.
-> > > 
-> > > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+On Fri, Jun 16, 2017 at 02:50:36PM -0700, Stephen Boyd wrote:
+> On 06/14, Maxime Ripard wrote:
+> > Hi Mike, Stephen,
 > > 
-> > Since you applied the Safexcel crypto driver patch, I think you should
-> > also apply this patch adding the corresponding bindings documentation.
+> > Here is the patches for 4.13 for the Allwinner SoCs.
+> > 
+> > In order to reduce the conflicts, this is based on the fixes tag I
+> > sent a PR for a few minutes ago.
+> > 
 > 
-> OK I've restored it in the patch queue.
+> Thanks. Pulled into clk-next. I did notice on new sparse warning
+> though for which I've applied this diff on top:
+> 
+> diff --git a/drivers/clk/sunxi-ng/ccu_mux.c b/drivers/clk/sunxi-ng/ccu_mux.c
+> index cfe4538304fb..312664155a54 100644
+> --- a/drivers/clk/sunxi-ng/ccu_mux.c
+> +++ b/drivers/clk/sunxi-ng/ccu_mux.c
+> @@ -68,7 +68,7 @@ unsigned long ccu_mux_helper_apply_prediv(struct ccu_common *common,
+>  	return parent_rate / ccu_mux_get_prediv(common, cm, parent_index);
+>  }
+>  
+> -unsigned long ccu_mux_helper_unapply_prediv(struct ccu_common *common,
+> +static unsigned long ccu_mux_helper_unapply_prediv(struct ccu_common *common,
+>  					    struct ccu_mux_internal *cm,
+>  					    int parent_index,
+>  					    unsigned long parent_rate)
 
-Thanks!
-Antoine
+Seems good, thanks!
+Maxime
 
 -- 
-Antoine T?nart, Free Electrons
+Maxime Ripard, Free Electrons
 Embedded Linux and Kernel engineering
 http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 819 bytes
+Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170620/58a1bfdc/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170620/1891e26f/attachment.sig>
