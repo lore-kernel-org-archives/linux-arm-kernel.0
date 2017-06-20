@@ -1,142 +1,43 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Tue, 20 Jun 2017 15:39:30 +0000
-Subject: [PATCH v2 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
- erratum 161010801
-In-Reply-To: <d6e824b0-17bd-dd41-2d11-0491d8f66759@arm.com>
-References: <20170619154500.92336-1-shameerali.kolothum.thodi@huawei.com>
- <20170619154500.92336-3-shameerali.kolothum.thodi@huawei.com>
- <20170620102906.GA26908@red-moon>
- <5FC3163CFD30C246ABAA99954A238FA83838617D@FRAEML521-MBS.china.huawei.com>
- <d6e824b0-17bd-dd41-2d11-0491d8f66759@arm.com>
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA8383866C7@FRAEML521-MBS.china.huawei.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 20 Jun 2017 16:49:39 +0100
+Subject: [PATCH] arm64: pass machine size to sparse
+In-Reply-To: <20170620122443.35880-1-luc.vanoostenryck@gmail.com>
+References: <20170620122443.35880-1-luc.vanoostenryck@gmail.com>
+Message-ID: <20170620154938.GH21131@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Robin Murphy [mailto:robin.murphy at arm.com]
-> Sent: Tuesday, June 20, 2017 4:16 PM
-> To: Shameerali Kolothum Thodi; Lorenzo Pieralisi
-> Cc: marc.zyngier at arm.com; sudeep.holla at arm.com; will.deacon at arm.com;
-> hanjun.guo at linaro.org; Gabriele Paoloni; John Garry; iommu at lists.linux-
-> foundation.org; linux-arm-kernel at lists.infradead.org; linux-
-> acpi at vger.kernel.org; devel at acpica.org; Linuxarm; Wangzhou (B);
-> Guohanjun (Hanjun Guo)
-> Subject: Re: [PATCH v2 2/2] iommu/arm-smmu-v3:Enable ACPI based
-> HiSilicon erratum 161010801
+On Tue, Jun 20, 2017 at 02:24:43PM +0200, Luc Van Oostenryck wrote:
+> When using sparse on the arm64 tree we get many thousands of
+> warnings like 'constant ... is so big it is unsigned long long'
+> or 'shift too big (32) for type unsigned long'. This happens
+> because by default sparse considers the machine as 32bit and
+> defines the size of the types accordingly.
 > 
-> On 20/06/17 15:07, Shameerali Kolothum Thodi wrote:
-> >
-> >
-> >> -----Original Message-----
-> >> From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
-> >> Sent: Tuesday, June 20, 2017 11:29 AM
-> >> To: Shameerali Kolothum Thodi
-> >> Cc: marc.zyngier at arm.com; sudeep.holla at arm.com;
-> will.deacon at arm.com;
-> >> robin.murphy at arm.com; hanjun.guo at linaro.org; Gabriele Paoloni; John
-> >> Garry; iommu at lists.linux-foundation.org; linux-arm-
-> >> kernel at lists.infradead.org; linux-acpi at vger.kernel.org;
-> devel at acpica.org;
-> >> Linuxarm; Wangzhou (B); Guohanjun (Hanjun Guo)
-> >> Subject: Re: [PATCH v2 2/2] iommu/arm-smmu-v3:Enable ACPI based
-> >> HiSilicon erratum 161010801
-> >>
-> >> Hi Shameer,
-> >>
-> >> On Mon, Jun 19, 2017 at 04:45:00PM +0100, shameer wrote:
-> >>> The HiSilicon erratum 161010801 describes the limitation of HiSilicon
-> >>> platforms Hip06/Hip07 to support the SMMU mappings for MSI
-> >> transactions.
-> >>>
-> >>> On these platforms GICv3 ITS translator is presented with the deviceID
-> >>> by extending the MSI payload data to 64 bits to include the deviceID.
-> >>> Hence, the PCIe controller on this platforms has to differentiate the
-> >>> MSI payload against other DMA payload and has to modify the MSI
-> >> payload.
-> >>> This basically makes it difficult for this platforms to have a SMMU
-> >>> translation for MSI.
-> >>>
-> >>> This patch implements a ACPI table based quirk to reserve the hw msi
-> >>> regions in the smmu-v3 driver which means these address regions will
-> >>> not be translated and will be excluded from iova allocations.
-> >>>
-> >>> Signed-off-by: shameer <shameerali.kolothum.thodi@huawei.com>
-> >>> ---
-> >>>  drivers/iommu/arm-smmu-v3.c | 29 ++++++++++++++++++++++++-----
-> >>>  1 file changed, 24 insertions(+), 5 deletions(-)
-> >>>
-> >>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-
-> smmu-
-> >> v3.c
-> >>> index abe4b88..f03c63b 100644
-> >>> --- a/drivers/iommu/arm-smmu-v3.c
-> >>> +++ b/drivers/iommu/arm-smmu-v3.c
-> >>> @@ -597,6 +597,7 @@ struct arm_smmu_device {
-> >>>  	u32				features;
-> >>>
-> >>>  #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-> >>> +#define ARM_SMMU_OPT_RESV_HW_MSI	(1 << 1)
-> >>>  	u32				options;
-> >>>
-> >>>  	struct arm_smmu_cmdq		cmdq;
-> >>> @@ -1904,14 +1905,31 @@ static void
-> arm_smmu_get_resv_regions(struct
-> >> device *dev,
-> >>>  				      struct list_head *head)
-> >>>  {
-> >>>  	struct iommu_resv_region *region;
-> >>> +	struct arm_smmu_device *smmu;
-> >>> +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
-> >>>  	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
-> >>>
-> >>> -	region = iommu_alloc_resv_region(MSI_IOVA_BASE,
-> >> MSI_IOVA_LENGTH,
-> >>> -					 prot, IOMMU_RESV_SW_MSI);
-> >>> -	if (!region)
-> >>> -		return;
-> >>> +	smmu = arm_smmu_get_by_fwnode(fwspec->iommu_fwnode);
-> >>> +
-> >>> +	if (smmu && (smmu->options & ARM_SMMU_OPT_RESV_HW_MSI)
-> >> &&
-> >>> +		      dev_is_pci(dev)) {
-> >>
-> >> IORT changes are fine to me, I am still no big fan of this supposedly
-> >> generic option that is _really_ platform specific (in particular as I
-> >> said before the quirk depends on the PCI host bridge but in this
-> >> patchset I see no such dependency. In short - the quirk is hooked off
-> >> the SMMUv3 model which implicitly implies a PCI host bridge
-> >> configuration IIUC). It is Will and Robin decision though, I am not sure
-> >> you can make it any tidier (given that on ACPI you may not even have
-> >> a PCI host bridge specific _HID to base your check above on).
-> >
-> > Thanks Lorenzo. I understand your point. As far as our platform is
-> > concerned, I think It is ok to remove the dev_is_pci() check and make
-> > it generic, if that helps.  I don't think it will harm us other than couple of
-> >  "HW MSI region resv failed: " logs  for our platform devices.
+> Fix this by passing the '-m64' flag to sparse so that
+> sparse can correctly define longs as being 64bit.
 > 
-> I think the answer there is that iort_iommu_its_get_resv_regions()
-> really should distinguish between "this device just doesn't have an ITS
-> mapping" and "something actually went wrong", such that you don't treat
-> the former as an error. That's almost certainly cleaner than e.g. trying
-> to check if dev has an associated MSI domain here before calling it.
+> CC: Catalin Marinas <catalin.marinas@arm.com>
+> CC: Will Deacon <will.deacon@arm.com>
+> CC: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
+> ---
+>  arch/arm64/Makefile | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> index f839ecd91..15d6c1476 100644
+> --- a/arch/arm64/Makefile
+> +++ b/arch/arm64/Makefile
+> @@ -62,7 +62,7 @@ LD		+= -EL
+>  UTS_MACHINE	:= aarch64
+>  endif
+>  
+> -CHECKFLAGS	+= -D__aarch64__
+> +CHECKFLAGS	+= -D__aarch64__ -m64
 
-If I understood that correctly, the suggestion is to treat cases where device
-doesn?t have any ITS node associated with it as "success".
+Looks fine to me, but just wondering whether or not we should also be
+passing something to indicate the endianness of the target. Does sparse care
+about that?
 
-+int iort_iommu_its_get_resv_regions(struct device *dev, struct list_head *head)
-+{
-[....]
-+	if (!its_node)
-+		return -ENODEV;
-
-ie, return success above from patch 1/2.
-
-Lorenzo, 
-
-Please let me know if that?s a correct thing to do as I am not sure about all the error
-scenarios here.
-
-Thanks,
-Shameer
+Will
