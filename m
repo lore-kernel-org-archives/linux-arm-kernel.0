@@ -1,44 +1,115 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 19 Jun 2017 19:00:13 -0700
-Subject: [PATCH 6/9] clk: imx: add composite clk support
-In-Reply-To: <1494856763-6543-7-git-send-email-aisheng.dong@nxp.com>
-References: <1494856763-6543-1-git-send-email-aisheng.dong@nxp.com>
- <1494856763-6543-7-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20170620020013.GP4493@codeaurora.org>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Tue, 20 Jun 2017 10:00:44 +0800
+Subject: [GIT PULL] ARM: Medaitek armv7 DTS for v4.13
+In-Reply-To: <20170619023437.GV30022@localhost>
+References: <5056d433-90b3-a3ca-4df7-9ff02ab6027b@gmail.com>
+ <20170619023437.GV30022@localhost>
+Message-ID: <1497924044.22079.3.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15, Dong Aisheng wrote:
-> diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
-> index 51b84e4..665777e 100644
-> --- a/drivers/clk/imx/clk.h
-> +++ b/drivers/clk/imx/clk.h
-> @@ -69,6 +69,12 @@ struct clk *imx_clk_busy_mux(const char *name, void __iomem *reg, u8 shift,
->  			     u8 width, void __iomem *busy_reg, u8 busy_shift,
->  			     const char **parent_names, int num_parents);
->  
-> +struct clk *imx_clk_composite(const char *name,
-> +			      const char * const *parent_names,
-> +			      int num_parents, bool mux_present,
-> +			      bool rate_present, bool gate_present,
-> +			      void __iomem *reg);
-> +
->  struct clk *imx_clk_fixup_divider(const char *name, const char *parent,
->  				  void __iomem *reg, u8 shift, u8 width,
->  				  void (*fixup)(u32 *val));
-> @@ -209,5 +215,4 @@ static inline struct clk *imx_clk_mux_flags(const char *name,
->  struct clk *imx_clk_cpu(const char *name, const char *parent_name,
->  		struct clk *div, struct clk *mux, struct clk *pll,
->  		struct clk *step);
-> -
-
-Noise?
-
->  #endif
-> -- 
-> 2.7.4
+On Sun, 2017-06-18 at 19:34 -0700, Olof Johansson wrote:
+> On Mon, Jun 12, 2017 at 12:31:47PM +0200, Matthias Brugger wrote:
+> > Hi Arnd and Olof,
+> > 
+> > Please find below my merge request for armv7 device tree changes.
+> > 
+> > Regards,
+> > Matthias
+> > 
+> > ---
+> > 
+> > The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+> > 
+> >   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   https://github.com/mbgg/linux-mediatek.git tags/v4.12-next-dts32
+> > 
+> > for you to fetch changes up to aac5e972d4c7bc728df605f5427d9c2458c34ea9:
+> > 
+> >   arm: dts: mediatek: Add audio driver node for MT2701 (2017-06-07 10:47:25
+> > +0200)
+> 
+> Thanks, merged. Comment below:
+> 
+> > 
+> > ----------------------------------------------------------------
+> > Add device tree nodes for
+> > mt7623:
+> > - clocks
+> > - power domain
+> > - pmic-wrapper
+> > - pinctrl
+> > - i2c
+> > - spi
+> > - nand
+> > - mmc
+> > - usb
+> > - pwm
+> > - ethernet
+> > - crypto engine
+> > - infared remote control
+> > - audio controller
+> > - ADC
+> > - efuse
+> > - thermal driver
+> > - HW random generator
+> > 
+> > mt2701:
+> > - NOR flash
+> > - JPEG decoder
+> > - i2c
+> > - audio controller
+> > 
+> > ----------------------------------------------------------------
+> > Garlic Tseng (1):
+> >       arm: dts: mediatek: Add audio driver node for MT2701
+> > 
+> > Guochun Mao (1):
+> >       arm: dts: mt2701: add nor flash node
+> > 
+> > John Crispin (9):
+> >       arm: dts: mt7623: add clock controller device nodes
+> >       arm: dts: mt7623: add subsystem clock controller device nodes
+> >       arm: dts: mt7623: add power domain controller device node
+> >       arm: dts: mt7623: add pinctrl nodes to the mt7623 dtsi file
+> >       arm: dts: mt7623: add pmic wrapper nodes to the mt7623 dtsi file
+> >       arm: dts: mt7623: add i2c nodes to the mt7623.dtsi file
+> >       arm: dts: mt7623: add nand nodes to the mt7623.dtsi file
+> >       arm: dts: mt7623: add mmc nodes to the mt7623.dtsi file
+> >       arm: dts: mt7623: add usb nodes to the mt7623.dtsi file
+> > 
+> > Jun Gao (1):
+> >       arm: dts: Add Mediatek MT2701 i2c device node
+> > 
+> > Rick Chang (1):
+> >       arm: dts: mt2701: Add node for Mediatek JPEG Decoder
+> > 
+> > Sean Wang (11):
+> >       arm: dts: mt7623: add spi nodes to the mt7623.dtsi file
+> >       arm: dts: mt7623: add pwm nodes to the mt7623.dtsi file
+> >       arm: dts: mt7623: add ethernet nodes to the mt7623.dtsi file
+> >       arm: dts: mt7623: add crypto engine nodes to the mt7623.dtsi file
+> >       arm: dts: mt7623: add ir nodes to the mt7623.dtsi file
+> >       arm: dts: mt7623: add afe nodes to the mt7623.dtsi file
+> >       arm: dts: mt7623: add rng nodes to the mt7623.dtsi file
+> >       arm: dts: mt7623: add auxadc nodes to the mt7623.dtsi file
+> >       arm: dts: mt7623: add efuse nodes to the mt7623.dtsi file
+> >       arm: dts: mt7623: add thermal nodes to the mt7623.dtsi file
+> >       arm: dts: mt7623: add Sean as one of authors for mt7623.dtsi files
+> 
+> This excessive patch splitting probably isn't warranted. In the future,
+> especially for new and major updates like this, a single patch (or one per
+> author) should do just fine.
 > 
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Hi Olof,
+
+Got it. I will make a single patch for new SoC supported.
+
+	Sean
+> 
+> -Olof
+> 
