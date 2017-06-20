@@ -1,148 +1,89 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 20 Jun 2017 17:27:23 +0100
-Subject: [PATCH v2 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
- erratum 161010801
-In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA8383866C7@FRAEML521-MBS.china.huawei.com>
-References: <20170619154500.92336-1-shameerali.kolothum.thodi@huawei.com>
- <20170619154500.92336-3-shameerali.kolothum.thodi@huawei.com>
- <20170620102906.GA26908@red-moon>
- <5FC3163CFD30C246ABAA99954A238FA83838617D@FRAEML521-MBS.china.huawei.com>
- <d6e824b0-17bd-dd41-2d11-0491d8f66759@arm.com>
- <5FC3163CFD30C246ABAA99954A238FA8383866C7@FRAEML521-MBS.china.huawei.com>
-Message-ID: <20170620162723.GE11351@red-moon>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 20 Jun 2017 10:44:32 -0600
+Subject: [PATCH 01/12] coresight replicator: Cleanup programmable
+ replicator naming
+In-Reply-To: <20170616180820.enc3hxpju2tfu3fg@rob-hp-laptop>
+References: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
+ <1497278211-5001-2-git-send-email-suzuki.poulose@arm.com>
+ <20170613165528.GA6392@xps15>
+ <20170616180820.enc3hxpju2tfu3fg@rob-hp-laptop>
+Message-ID: <CANLsYkzDMyhX_L5Aaf2p9+ze_qA=FCe+GdjEZcz03ZXaHXb46Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 03:39:30PM +0000, Shameerali Kolothum Thodi wrote:
-> 
-> 
-> > -----Original Message-----
-> > From: Robin Murphy [mailto:robin.murphy at arm.com]
-> > Sent: Tuesday, June 20, 2017 4:16 PM
-> > To: Shameerali Kolothum Thodi; Lorenzo Pieralisi
-> > Cc: marc.zyngier at arm.com; sudeep.holla at arm.com; will.deacon at arm.com;
-> > hanjun.guo at linaro.org; Gabriele Paoloni; John Garry; iommu at lists.linux-
-> > foundation.org; linux-arm-kernel at lists.infradead.org; linux-
-> > acpi at vger.kernel.org; devel at acpica.org; Linuxarm; Wangzhou (B);
-> > Guohanjun (Hanjun Guo)
-> > Subject: Re: [PATCH v2 2/2] iommu/arm-smmu-v3:Enable ACPI based
-> > HiSilicon erratum 161010801
-> > 
-> > On 20/06/17 15:07, Shameerali Kolothum Thodi wrote:
-> > >
-> > >
-> > >> -----Original Message-----
-> > >> From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
-> > >> Sent: Tuesday, June 20, 2017 11:29 AM
-> > >> To: Shameerali Kolothum Thodi
-> > >> Cc: marc.zyngier at arm.com; sudeep.holla at arm.com;
-> > will.deacon at arm.com;
-> > >> robin.murphy at arm.com; hanjun.guo at linaro.org; Gabriele Paoloni; John
-> > >> Garry; iommu at lists.linux-foundation.org; linux-arm-
-> > >> kernel at lists.infradead.org; linux-acpi at vger.kernel.org;
-> > devel at acpica.org;
-> > >> Linuxarm; Wangzhou (B); Guohanjun (Hanjun Guo)
-> > >> Subject: Re: [PATCH v2 2/2] iommu/arm-smmu-v3:Enable ACPI based
-> > >> HiSilicon erratum 161010801
-> > >>
-> > >> Hi Shameer,
-> > >>
-> > >> On Mon, Jun 19, 2017 at 04:45:00PM +0100, shameer wrote:
-> > >>> The HiSilicon erratum 161010801 describes the limitation of HiSilicon
-> > >>> platforms Hip06/Hip07 to support the SMMU mappings for MSI
-> > >> transactions.
-> > >>>
-> > >>> On these platforms GICv3 ITS translator is presented with the deviceID
-> > >>> by extending the MSI payload data to 64 bits to include the deviceID.
-> > >>> Hence, the PCIe controller on this platforms has to differentiate the
-> > >>> MSI payload against other DMA payload and has to modify the MSI
-> > >> payload.
-> > >>> This basically makes it difficult for this platforms to have a SMMU
-> > >>> translation for MSI.
-> > >>>
-> > >>> This patch implements a ACPI table based quirk to reserve the hw msi
-> > >>> regions in the smmu-v3 driver which means these address regions will
-> > >>> not be translated and will be excluded from iova allocations.
-> > >>>
-> > >>> Signed-off-by: shameer <shameerali.kolothum.thodi@huawei.com>
-> > >>> ---
-> > >>>  drivers/iommu/arm-smmu-v3.c | 29 ++++++++++++++++++++++++-----
-> > >>>  1 file changed, 24 insertions(+), 5 deletions(-)
-> > >>>
-> > >>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-
-> > smmu-
-> > >> v3.c
-> > >>> index abe4b88..f03c63b 100644
-> > >>> --- a/drivers/iommu/arm-smmu-v3.c
-> > >>> +++ b/drivers/iommu/arm-smmu-v3.c
-> > >>> @@ -597,6 +597,7 @@ struct arm_smmu_device {
-> > >>>  	u32				features;
-> > >>>
-> > >>>  #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-> > >>> +#define ARM_SMMU_OPT_RESV_HW_MSI	(1 << 1)
-> > >>>  	u32				options;
-> > >>>
-> > >>>  	struct arm_smmu_cmdq		cmdq;
-> > >>> @@ -1904,14 +1905,31 @@ static void
-> > arm_smmu_get_resv_regions(struct
-> > >> device *dev,
-> > >>>  				      struct list_head *head)
-> > >>>  {
-> > >>>  	struct iommu_resv_region *region;
-> > >>> +	struct arm_smmu_device *smmu;
-> > >>> +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
-> > >>>  	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
-> > >>>
-> > >>> -	region = iommu_alloc_resv_region(MSI_IOVA_BASE,
-> > >> MSI_IOVA_LENGTH,
-> > >>> -					 prot, IOMMU_RESV_SW_MSI);
-> > >>> -	if (!region)
-> > >>> -		return;
-> > >>> +	smmu = arm_smmu_get_by_fwnode(fwspec->iommu_fwnode);
-> > >>> +
-> > >>> +	if (smmu && (smmu->options & ARM_SMMU_OPT_RESV_HW_MSI)
-> > >> &&
-> > >>> +		      dev_is_pci(dev)) {
-> > >>
-> > >> IORT changes are fine to me, I am still no big fan of this supposedly
-> > >> generic option that is _really_ platform specific (in particular as I
-> > >> said before the quirk depends on the PCI host bridge but in this
-> > >> patchset I see no such dependency. In short - the quirk is hooked off
-> > >> the SMMUv3 model which implicitly implies a PCI host bridge
-> > >> configuration IIUC). It is Will and Robin decision though, I am not sure
-> > >> you can make it any tidier (given that on ACPI you may not even have
-> > >> a PCI host bridge specific _HID to base your check above on).
-> > >
-> > > Thanks Lorenzo. I understand your point. As far as our platform is
-> > > concerned, I think It is ok to remove the dev_is_pci() check and make
-> > > it generic, if that helps.  I don't think it will harm us other than couple of
-> > >  "HW MSI region resv failed: " logs  for our platform devices.
-> > 
-> > I think the answer there is that iort_iommu_its_get_resv_regions()
-> > really should distinguish between "this device just doesn't have an ITS
-> > mapping" and "something actually went wrong", such that you don't treat
-> > the former as an error. That's almost certainly cleaner than e.g. trying
-> > to check if dev has an associated MSI domain here before calling it.
-> 
-> If I understood that correctly, the suggestion is to treat cases where device
-> doesn?t have any ITS node associated with it as "success".
-> 
-> +int iort_iommu_its_get_resv_regions(struct device *dev, struct list_head *head)
-> +{
-> [....]
-> +	if (!its_node)
-> +		return -ENODEV;
-> 
-> ie, return success above from patch 1/2.
-> 
-> Lorenzo, 
-> 
-> Please let me know if that?s a correct thing to do as I am not sure
-> about all the error scenarios here.
+On 18 June 2017 at 08:04, Rob Herring <robh@kernel.org> wrote:
+> On Tue, Jun 13, 2017 at 10:55:28AM -0600, Mathieu Poirier wrote:
+>> On Mon, Jun 12, 2017 at 03:36:40PM +0100, Suzuki K Poulose wrote:
+>> > The Linux coresight drivers define the programmable ATB replicator as
+>> > Qualcom replicator, while this is designed by ARM. This can cause confusion
+>> > to a user selecting the driver. Cleanup all references to make it
+>> >  explicitly clear. This patch :
+>> >
+>> >  1) Adds a new compatible string for the same, retaining the old one for
+>> >     compatibility.
+>> >  2) Changes the Kconfig symbol (since this is not part of any defconfigs)
+>> >      CORESIGHT_QCOM_REPLICATOR => CORESIGHT_DYNAMIC_REPLICATOR
+>> >  3) Improves the help message in the Kconfig.
+>> >  4) Changes the name of the driver :
+>> >     coresight-replicator-qcom => coresight-dynamic-replicator
+>> >
+>> > Cc: Pratik Patel <pratikp@codeaurora.org>
+>> > Cc: Ivan T. Ivanov <ivan.ivanov@linaro.org>
+>> > Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> > Cc: devicetree at vger.kernel.org
+>> > Cc: Rob Herring <robh+dt@kernel.org>
+>> > Cc: Mark Rutland <mark.rutland@arm.com>
+>> > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>
+>> Hi Suzuki,
+>>
+>> > ---
+>> >  Documentation/devicetree/bindings/arm/coresight.txt     |  4 +++-
+>> >  drivers/hwtracing/coresight/Kconfig                     | 10 +++++-----
+>> >  drivers/hwtracing/coresight/Makefile                    |  2 +-
+>> >  drivers/hwtracing/coresight/coresight-replicator-qcom.c |  2 +-
+>> >  4 files changed, 10 insertions(+), 8 deletions(-)
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
+>> > index fcbae6a..f77329f 100644
+>> > --- a/Documentation/devicetree/bindings/arm/coresight.txt
+>> > +++ b/Documentation/devicetree/bindings/arm/coresight.txt
+>> > @@ -34,7 +34,9 @@ its hardware characteristcs.
+>> >             - Embedded Trace Macrocell (version 4.x):
+>> >                     "arm,coresight-etm4x", "arm,primecell";
+>> >
+>> > -           - Qualcomm Configurable Replicator (version 1.x):
+>> > +           - Coresight programmable Replicator (version 1.x):
+>> > +                   "arm,coresight-dynamic-replicator", "arm,primecell";
+>> > +                           OR
+>> >                     "qcom,coresight-replicator1x", "arm,primecell";
+>>
+>> Rob, what's your view on keeping the old binding around?  We could simply change
+>> the two occurences we find in the DTs (Juno and 410c) to the new name and be
+>> done with the old one.
+>
+> Juno uses the Qcom string? We should keep the old string. You can switch
+> the dts files, but the driver should support the old name.
 
-Yes it is, you need to add specific return values that you can then
-handle in the SMMU callback accordingly (reverting to SW_MSI in case the
-device does not map to an ITS).
+When we first started working on CoreSight programmable replicators
+were available but the documentation wasn't public.  As such when I
+saw Qualcomm's design I mistakenly thought it was a custom IP block
+and came up with a compatible string that reflected that reality.
+Fast forward 3 years the documentation is available and Juno has used
+the same IP block in their design.  Suzuki's patch rectifies history
+by changing the programmable replicator naming convention to what it
+should have been from the start.
+
+That being said, we can keep the old compatible string around but it
+won't change anything.  CoreSight devices are discovered on the AMBA
+bus and don't use the compatible string - drivers are probed based on
+AMBA IDs laid out in the drivers and device IDs found in HW ID
+registers.
+
+In light of the above let me know what you want to do.
 
 Thanks,
-Lorenzo
+Mathieu
+
+>
+> Acked-by: Rob Herring <robh@kernel.org>
