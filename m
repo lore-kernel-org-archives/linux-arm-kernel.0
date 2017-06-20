@@ -1,89 +1,104 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Tue, 20 Jun 2017 11:35:37 +0200
-Subject: [PATCH 29/51] rtc: lpc32xx: stop using rtc deprecated functions
-In-Reply-To: <1497951359-13334-1-git-send-email-benjamin.gaignard@linaro.org>
-References: <1497951359-13334-1-git-send-email-benjamin.gaignard@linaro.org>
-Message-ID: <1497951359-13334-30-git-send-email-benjamin.gaignard@linaro.org>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 20 Jun 2017 12:48:44 +0200
+Subject: [PATCH 1/6] ARM: dts: rockchip: add basic dtsi file for RK3229 SoC
+In-Reply-To: <354e6995-cc80-660b-41c4-535be85564c4@rock-chips.com>
+References: <1497510980-23207-1-git-send-email-frank.wang@rock-chips.com>
+ <25831201.s5BUplWuV7@diego>
+ <354e6995-cc80-660b-41c4-535be85564c4@rock-chips.com>
+Message-ID: <1880551.X2BOMRmHZh@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-rtc_time_to_tm() and rtc_tm_to_time() are deprecated because they
-rely on 32bits variables and that will make rtc break in y2038/2016.
-Stop using those two functions to safer 64bits ones.
+Hi Frank,
 
-For the same reasons use set_mmss64 callback instead of set_mmss
+Am Dienstag, 20. Juni 2017, 15:13:00 CEST schrieb Frank Wang:
+> Hi Heiko,
+> 
+> On 2017/6/19 20:30, Heiko St?bner wrote:
+> > Hi Frank,
+> > 
+> > Am Montag, 19. Juni 2017, 18:34:27 CEST schrieb Frank Wang:
+> >> On 2017/6/18 2:12, Heiko Stuebner wrote:
+> >>> Am Donnerstag, 15. Juni 2017, 15:16:15 CEST schrieb Frank Wang:
+> >>>> Due to some tiny differences between RK3228 and RK3229, this patch
+> >>>> adds a basic dtsi file which includes a new CPU opp table and PSCI
+> >>>> brought up support for RK3229.
+> >>>> 
+> >>>> Signed-off-by: Frank Wang<frank.wang@rock-chips.com>
+> > 
+> > [...]
+> > 
+> >>>> +	psci {
+> >>>> +		compatible = "arm,psci-1.0", "arm,psci-0.2";
+> >>>> +		method = "smc";
+> >>>> +	};
+> >>>> +};
+> >>>> +
+> >>>> +&cpu0 {
+> >>>> +	enable-method = "psci";
+> >>>> +};
+> >>> 
+> >>> Hmm, I don't really understand this.
+> >>> What method of core-bringup does the rk3228 use? In the current
+> >>> rk322x.dtsi there is no enable-method at all defined.
+> >> 
+> >> For non-security, the same with rk3036 SoC, we use rk3036-smp method to
+> >> bring-up cores, and for security, we use arm-psci method.
+> >> As security become more and more important and required, we would prefer
+> >> using arm-psci method, and it is also an easy way to use.
+> >> 
+> >>> So is the rk3228 firmware using a different method than the rk3229?
+> >> 
+> >> No, they are the same. How about I move these changes to rk322x.dtsi?
+> > 
+> > yep, that is what I was getting at with my question ;-)
+> > 
+> >>> And out of curiosity as this is a arm32 without atf, is the psci
+> >>> implementation (for uboot?) you're using available somewhere?
+> >> 
+> >> Ah, it is included in op-tee :-)
+> > 
+> > Is that super secret or will this be part of the official op-tee [0]
+> > at some point (Similar to the ATF stuff on arm64)?
+> 
+> Hmm, the op-tee itself must keep secure, but the psci part in it can be
+> extracted to public, although it may have a bit of secure risk.
+> Due to Rockchip have amended the frame of op-tee to support psci, we can
+> try to upstream these changes to official op-tee or push them to source
+> codes of Rockchip in git-hub.
 
-Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-CC: Vladimir Zapolskiy <vz@mleia.com>
-CC: Sylvain Lemieux <slemieux.tyco@gmail.com>
-CC: Alessandro Zummo <a.zummo@towertech.it>
-CC: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-CC: rtc-linux at googlegroups.com
-CC: linux-kernel at vger.kernel.org
-CC: linux-arm-kernel at lists.infradead.org
----
- drivers/rtc/rtc-lpc32xx.c | 19 +++++++------------
- 1 file changed, 7 insertions(+), 12 deletions(-)
+I just want to make sure, people can actually create a working system
+with this, as there is mainline u-boot support for the rk3228/rk3229 in
+the works - hopefully also with SPL support later on.
+So I'm wondering how this is supposed to be setup?
 
-diff --git a/drivers/rtc/rtc-lpc32xx.c b/drivers/rtc/rtc-lpc32xx.c
-index 887871c..a3f5233 100644
---- a/drivers/rtc/rtc-lpc32xx.c
-+++ b/drivers/rtc/rtc-lpc32xx.c
-@@ -64,16 +64,16 @@ struct lpc32xx_rtc {
- 
- static int lpc32xx_rtc_read_time(struct device *dev, struct rtc_time *time)
- {
--	unsigned long elapsed_sec;
-+	unsigned long long elapsed_sec;
- 	struct lpc32xx_rtc *rtc = dev_get_drvdata(dev);
- 
- 	elapsed_sec = rtc_readl(rtc, LPC32XX_RTC_UCOUNT);
--	rtc_time_to_tm(elapsed_sec, time);
-+	rtc_time64_to_tm(elapsed_sec, time);
- 
- 	return rtc_valid_tm(time);
- }
- 
--static int lpc32xx_rtc_set_mmss(struct device *dev, unsigned long secs)
-+static int lpc32xx_rtc_set_mmss64(struct device *dev, time64_t secs)
- {
- 	struct lpc32xx_rtc *rtc = dev_get_drvdata(dev);
- 	u32 tmp;
-@@ -97,7 +97,7 @@ static int lpc32xx_rtc_read_alarm(struct device *dev,
- {
- 	struct lpc32xx_rtc *rtc = dev_get_drvdata(dev);
- 
--	rtc_time_to_tm(rtc_readl(rtc, LPC32XX_RTC_MATCH0), &wkalrm->time);
-+	rtc_time64_to_tm(rtc_readl(rtc, LPC32XX_RTC_MATCH0), &wkalrm->time);
- 	wkalrm->enabled = rtc->alarm_enabled;
- 	wkalrm->pending = !!(rtc_readl(rtc, LPC32XX_RTC_INTSTAT) &
- 		LPC32XX_RTC_INTSTAT_MATCH0);
-@@ -109,15 +109,10 @@ static int lpc32xx_rtc_set_alarm(struct device *dev,
- 	struct rtc_wkalrm *wkalrm)
- {
- 	struct lpc32xx_rtc *rtc = dev_get_drvdata(dev);
--	unsigned long alarmsecs;
-+	unsigned long long alarmsecs;
- 	u32 tmp;
--	int ret;
- 
--	ret = rtc_tm_to_time(&wkalrm->time, &alarmsecs);
--	if (ret < 0) {
--		dev_warn(dev, "Failed to convert time: %d\n", ret);
--		return ret;
--	}
-+	alarmsecs = rtc_tm_to_time64(&wkalrm->time);
- 
- 	spin_lock_irq(&rtc->lock);
- 
-@@ -191,7 +186,7 @@ static irqreturn_t lpc32xx_rtc_alarm_interrupt(int irq, void *dev)
- 
- static const struct rtc_class_ops lpc32xx_rtc_ops = {
- 	.read_time		= lpc32xx_rtc_read_time,
--	.set_mmss		= lpc32xx_rtc_set_mmss,
-+	.set_mmss64		= lpc32xx_rtc_set_mmss64,
- 	.read_alarm		= lpc32xx_rtc_read_alarm,
- 	.set_alarm		= lpc32xx_rtc_set_alarm,
- 	.alarm_irq_enable	= lpc32xx_rtc_alarm_irq_enable,
--- 
-1.9.1
+On arm64 we now have the SPL load the ATF, which in turn loads uboot, so I 
+guess the mechanism for the op-tee would be somehow similar? And there all 
+necessary components are available to build everything from source.
+
+I really don't care about all the other super-secret stuff happening in
+that op-tee thingy, but I really want people to be able to build a complete
+firmware on their machine, without having to rely on arbitary binary blobs.
+
+Which is something companies adopting Rockchip socs seem to rely on
+a lot these days ;-) .
+
+
+One alternative I can think of, would be to also create a u-boot psci 
+implementation for arm32, like sunxi [0] and others use for example.
+That way people could choose where their psci should come from (u-boot
+itself or the op-tee).
+
+
+Heiko
+
+[0] http://git.denx.de/?p=u-boot.git;a=blob;f=arch/arm/cpu/armv7/sunxi/psci.c
+
+> 
+> 
+> BR.
+> Frank
+> 
+> > Heiko
+> > 
+> > [0]https://github.com/OP-TEE/optee_os/tree/master/core/arch/arm
