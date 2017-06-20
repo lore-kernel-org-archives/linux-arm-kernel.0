@@ -1,79 +1,45 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Tue, 20 Jun 2017 10:59:21 +0100
-Subject: [PATCH v3 19/21] dt-bindings: mmc: dw_mmc-k3: add document of
- hi3660 mmc
-In-Reply-To: <CAPDyKFo=hqp=j=nWpO8uf_0pGTSKjN0T-ZKqD8cuKp1C3Q2_hA@mail.gmail.com>
-References: <20170614082338.15673-1-guodong.xu@linaro.org>
- <20170614082338.15673-20-guodong.xu@linaro.org>
- <CAPDyKFpvJu8_TETWr0Vy4ubDC7NYvi7TxmSLYZyw33qHFsoNaQ@mail.gmail.com>
- <5947CAD8.4040607@hisilicon.com>
- <CAPDyKFo=hqp=j=nWpO8uf_0pGTSKjN0T-ZKqD8cuKp1C3Q2_hA@mail.gmail.com>
-Message-ID: <5948F1F9.90903@hisilicon.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 20 Jun 2017 12:02:21 +0200
+Subject: [PATCH 1/2] drm/exynos/decon: Add include guard to the Exynos7
+ header
+In-Reply-To: <CACvgo51db4Gk+GHAO-F=rz8vLTG6A66f1ZeHPNuAQV1Qthaavw@mail.gmail.com>
+References: <20170619163110.28173-1-krzk@kernel.org>
+ <CACvgo51db4Gk+GHAO-F=rz8vLTG6A66f1ZeHPNuAQV1Qthaavw@mail.gmail.com>
+Message-ID: <CAJKOXPfjEozEM=q4hbWRBJngNDxnkJXF37gN2Es1Ju8Qze4J1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uffe,
-
-On 2017/6/20 9:36, Ulf Hansson wrote:
-> Hi Wei,
-> 
-> On 19 June 2017 at 15:00, Wei Xu <xuwei5@hisilicon.com> wrote:
->> Hi Ulf,
+On Tue, Jun 20, 2017 at 11:53 AM, Emil Velikov <emil.l.velikov@gmail.com> wrote:
+> On 19 June 2017 at 17:31, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>> Although header is included only once but still having an include guard
+>> is a good practice.  To avoid confusion, add SoC prefix to existing
+>> Exynos5433 header include guard.
 >>
->> On 2017/6/19 13:43, Ulf Hansson wrote:
->>> On 14 June 2017 at 10:23, Guodong Xu <guodong.xu@linaro.org> wrote:
->>>> Add bindings for hi3660 mmc support
->>>>
->>>> Signed-off-by: Li Wei <liwei213@huawei.com>
->>>> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
->>>> ---
->>>>  Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt | 1 +
->>>>  1 file changed, 1 insertion(+)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
->>>> index df37058..8af1afc 100644
->>>> --- a/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
->>>> +++ b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
->>>> @@ -12,6 +12,7 @@ extensions to the Synopsys Designware Mobile Storage Host Controller.
->>>>  Required Properties:
->>>>
->>>>  * compatible: should be one of the following.
->>>> +  - "hisilicon,hi3660-dw-mshc": for controllers with hi3660 specific extensions.
->>>>    - "hisilicon,hi4511-dw-mshc": for controllers with hi4511 specific extensions.
->>>>    - "hisilicon,hi6220-dw-mshc": for controllers with hi6220 specific extensions.
->>>>
->>>> --
->>>> 2.10.2
->>>>
->>>
->>> Thanks, applied for next!
+>> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+>> ---
+>>  include/video/exynos5433_decon.h | 6 +++---
+>>  include/video/exynos7_decon.h    | 5 +++++
+>>  2 files changed, 8 insertions(+), 3 deletions(-)
 >>
->> Thanks!
->> Last week I had applied the v4 patch set[1]
->> and this patch is included.
->> But it should be fine for the upper gatekeeper to merge
->> since these 2 patch are same.
-> 
-> No, that's not how git works.
-> 
-> If the patch has the same hash, that would be fine, but that isn't the
-> case here as we have two different hashes for the same change.
+>> diff --git a/include/video/exynos5433_decon.h b/include/video/exynos5433_decon.h
+>> index 78957c9626f5..b30362da5692 100644
+>> --- a/include/video/exynos5433_decon.h
+>> +++ b/include/video/exynos5433_decon.h
+>> @@ -6,8 +6,8 @@
+>>   * published by the Free Software Foundationr
+>>   */
+>>
+>> -#ifndef EXYNOS_REGS_DECON_H
+>> -#define EXYNOS_REGS_DECON_H
+>> +#ifndef EXYNOS5433_REGS_DECON_H
+>> +#define EXYNOS5433_REGS_DECON_H
+>>
+> Drop the _REGS_ part from the guard on each header? The file name/path
+> does not have it, plus it'll save some WTF moments when
+> exynos{5433,7}_regs_decon.h comes about.
 
-Got it. Thanks for your explaining!
+So maybe it makes sense to reorder these patches and use the guard
+name matching final file name?
 
-> 
-> To deal with this, I have just dropped the change from my tree and
-> leave it to you to carry the patch. Feel free to add my ack for it.
-
-Thanks!
-But the pull request I sent last week has been merged.
-
-Best Regards,
-Wei
-
-> 
-> Kind regards
-> Uffe
-> 
-> .
-> 
+Best regards,
+Krzysztof
