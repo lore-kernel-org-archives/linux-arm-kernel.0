@@ -1,128 +1,288 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Tue, 20 Jun 2017 10:37:46 +0800
-Subject: [PATCH v15 2/7] power: add power sequence library
-In-Reply-To: <CAPDyKFo0d2FD1U-MgWTExz_cKC8BjB6QQFu1StTyPN1TGBG9eA@mail.gmail.com>
-References: <20170614015338.GA4635@b29397-desktop>
- <CAPDyKFrLL10TY1JZAhF44_0+qGETLNtFc6ujKVUu7Ay=O8+M5A@mail.gmail.com>
- <20170615065854.GA24157@b29397-desktop>
- <CAPDyKFpc8GRKK8bafMU_HPaqWNrger3grPSd5rWWCTYhUGHZLA@mail.gmail.com>
- <20170615091131.GB24157@b29397-desktop>
- <CAPDyKFrZoyoYCQA1rnRbz9tmT9vJigzSb+xyTZpJjhd=5eFA5A@mail.gmail.com>
- <20170615100604.GC24157@b29397-desktop>
- <CAPDyKFrSQ7m+yUvKqB9yAMakk8pHZooboZMFdXGU6Xb=TZSGNA@mail.gmail.com>
- <20170619090259.GA23731@b29397-desktop>
- <CAPDyKFo0d2FD1U-MgWTExz_cKC8BjB6QQFu1StTyPN1TGBG9eA@mail.gmail.com>
-Message-ID: <20170620023746.GB23731@b29397-desktop>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 19 Jun 2017 19:43:40 -0700
+Subject: [PATCH v2 04/12] Input: wm97xx: split out touchscreen registering
+In-Reply-To: <1497857229-12049-5-git-send-email-robert.jarzmik@free.fr>
+References: <1497857229-12049-1-git-send-email-robert.jarzmik@free.fr>
+ <1497857229-12049-5-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <20170620024340.GA21379@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 19, 2017 at 11:48:05AM +0200, Ulf Hansson wrote:
-> [...]
+On Mon, Jun 19, 2017 at 09:27:01AM +0200, Robert Jarzmik wrote:
+> wm97xx-core does several things in it initialization :
+>  - touchscreen input device setup
+>  - battery device creation
 > 
-> >> >
-> >> > Unlike the MMC design, there is no dts entry to indicate whether this
-> >> > device needs pwrseq or not at this design, it will only carry out power
-> >> > on sequence after matching. So, return -EPROBE_DEFER may not work since
-> >> > this device may never need pwrseq.
-> >>
-> >> Then, how will you really be able to fetch the correct pwrseq library
-> >> instance for the device node?
-> >>
-> >> Suppose their is a *list* of pwrseq library instances available. In
-> >> pwrseq_find_available_instance() you call of_match_node(table, np).
-> >> The "table" there corresponds to the compatible for the pwrseq library
-> >> and the np is the device node provided by the caller of
-> >> of_pwrseq_on().
-> >>
-> >> Why is this match done?
-> >
-> > The compatible in table is from the source code, and the compatible in
-> > np is from the dts. This is the current match way, I comment your
-> > suggestion below.
-> >
-> >>
-> >> Why can't the match be done before trying to fetch a library instance
-> >
-> > How? If there is no pwrseq instance, how can we do match?
-> >
-> >> and then in a second step, really try to fetch the instance? If only
-> >> the second step fails, returning -EPROBE_DEFER can be done, no?
-> >>
-> >> BTW, I didn't compatible for the generic pwrseq library being
-> >> documented in this series.
+> As the wm97xx is actually a multi-function device handling an audio
+> codec, a touchscreen, a gpio block and an ADC, reshape the probing to
+> isolate what is truly input/touchscreen specific from the remaining
+> part.
 > 
-> Seems like you need to update the DT documentation for the below
-> compatible, which is used for the generic pwrseq library. Perhaps this
-> is what puzzles me a bit on *why* the match is done.
+> This is only code shuffling, there is no functional change.
 > 
-> +static const struct of_device_id generic_id_table[] = {
-> +       { .compatible = "generic",},
-> +       { /* sentinel */ }
-> +};
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-Sorry, I should update this "generic" compatible at 1st binding-doc
-patch.
+Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
-> 
-> [...]
-> 
-> >> >
-> >> > This additional instance is used to store compatible information for
-> >> > this pwrseq library, it is used for the next matching between device
-> >> > and pwrseq library, it just likes we need the first pwrseq instance
-> >> > registered at boot stage.
-> >>
-> >> Why can't the compatible information be a static table, known by the
-> >> pwrseq core library?
-> >>
-> >> Then when of_pwrseq_on() is called, that static table is parsed and
-> >> matched, then a corresponding pwrseq library instance tries to be
-> >> fetched.
-> >>
-> >
-> > So, you suggest allocating and registering pwrseq instance on the
-> > demand? Eg, we maintain a power sequence static table, including
-> > compatible and allocate function.
-> 
-> Yes, something like that.
-> 
-> >
-> > static const struct pwrseq_match_table pwrseq_match_table_list[] = {
-> >         { PWRSEQ_DEV(0x0204, 0x6025), .alloc_instance = pwrseq_AA_alloc_instance },
-> >         { PWRSEQ_DEV(0x0204, 0x6026), .alloc_instance = pwrseq_BB_alloc_instance },
-> >         { PWRSEQ_DEV(0xffff, 0xffff), .alloc_instance = pwrseq_generic_alloc_instance },
-> 
-> What does the  PWRSEQ_DEV() macro do?
+Please feel free to merge with the rest of AC97 patches.
 
-In fact, this should be compatible string, I exampled it as USB vid,pid
-wrongly.
-
-> > Since the pwrseq_match_table_list is static, we can always do match, and
-> > will not return -EPROBE_DEFER anymore, one problem for this is we need
-> > always compile all pwrseq libraries. Any good suggestions?
+> ---
+> Since v1:
+>  - took into account Charles's comment
+> ---
+>  drivers/input/touchscreen/wm97xx-core.c | 196 +++++++++++++++++++-------------
+>  1 file changed, 115 insertions(+), 81 deletions(-)
 > 
-> You never returned -EPROBE_DEFER in the first case. That's why I complained. :-)
+> diff --git a/drivers/input/touchscreen/wm97xx-core.c b/drivers/input/touchscreen/wm97xx-core.c
+> index c9d1c91e1887..39869ffdc4fa 100644
+> --- a/drivers/input/touchscreen/wm97xx-core.c
+> +++ b/drivers/input/touchscreen/wm97xx-core.c
+> @@ -581,27 +581,85 @@ static void wm97xx_ts_input_close(struct input_dev *idev)
+>  		wm->codec->acc_enable(wm, 0);
+>  }
+>  
+> -static int wm97xx_probe(struct device *dev)
+> +static int wm97xx_register_touch(struct wm97xx *wm)
+>  {
+> -	struct wm97xx *wm;
+> -	struct wm97xx_pdata *pdata = dev_get_platdata(dev);
+> -	int ret = 0, id = 0;
+> +	struct wm97xx_pdata *pdata = dev_get_platdata(wm->dev);
+> +	int ret;
+>  
+> -	wm = kzalloc(sizeof(struct wm97xx), GFP_KERNEL);
+> -	if (!wm)
+> +	wm->input_dev = devm_input_allocate_device(wm->dev);
+> +	if (wm->input_dev == NULL)
+>  		return -ENOMEM;
+> -	mutex_init(&wm->codec_mutex);
+>  
+> -	wm->dev = dev;
+> -	dev_set_drvdata(dev, wm);
+> -	wm->ac97 = to_ac97_t(dev);
+> +	/* set up touch configuration */
+> +	wm->input_dev->name = "wm97xx touchscreen";
+> +	wm->input_dev->phys = "wm97xx";
+> +	wm->input_dev->open = wm97xx_ts_input_open;
+> +	wm->input_dev->close = wm97xx_ts_input_close;
+> +
+> +	__set_bit(EV_ABS, wm->input_dev->evbit);
+> +	__set_bit(EV_KEY, wm->input_dev->evbit);
+> +	__set_bit(BTN_TOUCH, wm->input_dev->keybit);
+> +
+> +	input_set_abs_params(wm->input_dev, ABS_X, abs_x[0], abs_x[1],
+> +			     abs_x[2], 0);
+> +	input_set_abs_params(wm->input_dev, ABS_Y, abs_y[0], abs_y[1],
+> +			     abs_y[2], 0);
+> +	input_set_abs_params(wm->input_dev, ABS_PRESSURE, abs_p[0], abs_p[1],
+> +			     abs_p[2], 0);
+> +
+> +	input_set_drvdata(wm->input_dev, wm);
+> +	wm->input_dev->dev.parent = wm->dev;
+> +
+> +	ret = input_register_device(wm->input_dev);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/*
+> +	 * register our extended touch device (for machine specific
+> +	 * extensions)
+> +	 */
+> +	wm->touch_dev = platform_device_alloc("wm97xx-touch", -1);
+> +	if (!wm->touch_dev) {
+> +		ret = -ENOMEM;
+> +		goto touch_err;
+> +	}
+> +	platform_set_drvdata(wm->touch_dev, wm);
+> +	wm->touch_dev->dev.parent = wm->dev;
+> +	wm->touch_dev->dev.platform_data = pdata;
+> +	ret = platform_device_add(wm->touch_dev);
+> +	if (ret < 0)
+> +		goto touch_reg_err;
+> +
+> +	return 0;
+> +touch_reg_err:
+> +	platform_device_put(wm->touch_dev);
+> +touch_err:
+> +	input_unregister_device(wm->input_dev);
+> +	wm->input_dev = NULL;
+> +
+> +	return ret;
+> +}
+> +
+> +static void wm97xx_unregister_touch(struct wm97xx *wm)
+> +{
+> +	platform_device_unregister(wm->touch_dev);
+> +	input_unregister_device(wm->input_dev);
+> +	wm->input_dev = NULL;
+> +}
+> +
+> +static int _wm97xx_probe(struct wm97xx *wm)
+> +{
+> +	int id = 0;
+> +
+> +	mutex_init(&wm->codec_mutex);
+> +	dev_set_drvdata(wm->dev, wm);
+>  
+>  	/* check that we have a supported codec */
+>  	id = wm97xx_reg_read(wm, AC97_VENDOR_ID1);
+>  	if (id != WM97XX_ID1) {
+> -		dev_err(dev, "Device with vendor %04x is not a wm97xx\n", id);
+> -		ret = -ENODEV;
+> -		goto alloc_err;
+> +		dev_err(wm->dev,
+> +			"Device with vendor %04x is not a wm97xx\n", id);
+> +		return -ENODEV;
+>  	}
+>  
+>  	wm->id = wm97xx_reg_read(wm, AC97_VENDOR_ID2);
+> @@ -629,8 +687,7 @@ static int wm97xx_probe(struct device *dev)
+>  	default:
+>  		dev_err(wm->dev, "Support for wm97%02x not compiled in.\n",
+>  			wm->id & 0xff);
+> -		ret = -ENODEV;
+> -		goto alloc_err;
+> +		return -ENODEV;
+>  	}
+>  
+>  	/* set up physical characteristics */
+> @@ -644,79 +701,58 @@ static int wm97xx_probe(struct device *dev)
+>  	wm->gpio[4] = wm97xx_reg_read(wm, AC97_GPIO_STATUS);
+>  	wm->gpio[5] = wm97xx_reg_read(wm, AC97_MISC_AFE);
+>  
+> -	wm->input_dev = input_allocate_device();
+> -	if (wm->input_dev == NULL) {
+> -		ret = -ENOMEM;
+> -		goto alloc_err;
+> -	}
+> -
+> -	/* set up touch configuration */
+> -	wm->input_dev->name = "wm97xx touchscreen";
+> -	wm->input_dev->phys = "wm97xx";
+> -	wm->input_dev->open = wm97xx_ts_input_open;
+> -	wm->input_dev->close = wm97xx_ts_input_close;
+> -
+> -	__set_bit(EV_ABS, wm->input_dev->evbit);
+> -	__set_bit(EV_KEY, wm->input_dev->evbit);
+> -	__set_bit(BTN_TOUCH, wm->input_dev->keybit);
+> -
+> -	input_set_abs_params(wm->input_dev, ABS_X, abs_x[0], abs_x[1],
+> -			     abs_x[2], 0);
+> -	input_set_abs_params(wm->input_dev, ABS_Y, abs_y[0], abs_y[1],
+> -			     abs_y[2], 0);
+> -	input_set_abs_params(wm->input_dev, ABS_PRESSURE, abs_p[0], abs_p[1],
+> -			     abs_p[2], 0);
+> +	return wm97xx_register_touch(wm);
+> +}
+>  
+> -	input_set_drvdata(wm->input_dev, wm);
+> -	wm->input_dev->dev.parent = dev;
+> +static void wm97xx_remove_battery(struct wm97xx *wm)
+> +{
+> +	platform_device_unregister(wm->battery_dev);
+> +}
+>  
+> -	ret = input_register_device(wm->input_dev);
+> -	if (ret < 0)
+> -		goto dev_alloc_err;
+> +static int wm97xx_add_battery(struct wm97xx *wm,
+> +			      struct wm97xx_batt_pdata *pdata)
+> +{
+> +	int ret;
+>  
+> -	/* register our battery device */
+>  	wm->battery_dev = platform_device_alloc("wm97xx-battery", -1);
+> -	if (!wm->battery_dev) {
+> -		ret = -ENOMEM;
+> -		goto batt_err;
+> -	}
+> +	if (!wm->battery_dev)
+> +		return -ENOMEM;
+> +
+>  	platform_set_drvdata(wm->battery_dev, wm);
+> -	wm->battery_dev->dev.parent = dev;
+> -	wm->battery_dev->dev.platform_data = pdata ? pdata->batt_pdata : NULL;
+> +	wm->battery_dev->dev.parent = wm->dev;
+> +	wm->battery_dev->dev.platform_data = pdata;
+>  	ret = platform_device_add(wm->battery_dev);
+> -	if (ret < 0)
+> -		goto batt_reg_err;
+> +	if (ret)
+> +		platform_device_put(wm->battery_dev);
+>  
+> -	/* register our extended touch device (for machine specific
+> -	 * extensions) */
+> -	wm->touch_dev = platform_device_alloc("wm97xx-touch", -1);
+> -	if (!wm->touch_dev) {
+> -		ret = -ENOMEM;
+> -		goto touch_err;
+> -	}
+> -	platform_set_drvdata(wm->touch_dev, wm);
+> -	wm->touch_dev->dev.parent = dev;
+> -	wm->touch_dev->dev.platform_data = pdata;
+> -	ret = platform_device_add(wm->touch_dev);
+> +	return ret;
+> +}
+> +
+> +static int wm97xx_probe(struct device *dev)
+> +{
+> +	struct wm97xx *wm;
+> +	int ret;
+> +	struct wm97xx_pdata *pdata = dev_get_platdata(dev);
+> +
+> +	wm = devm_kzalloc(dev, sizeof(struct wm97xx), GFP_KERNEL);
+> +	if (!wm)
+> +		return -ENOMEM;
+> +
+> +	wm->dev = dev;
+> +	wm->ac97 = to_ac97_t(dev);
+> +
+> +	ret =  _wm97xx_probe(wm);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = wm97xx_add_battery(wm, pdata ? pdata->batt_pdata : NULL);
+>  	if (ret < 0)
+> -		goto touch_reg_err;
+> +		goto batt_err;
+>  
+>  	return ret;
+>  
+> - touch_reg_err:
+> -	platform_device_put(wm->touch_dev);
+> - touch_err:
+> -	platform_device_del(wm->battery_dev);
+> - batt_reg_err:
+> -	platform_device_put(wm->battery_dev);
+> - batt_err:
+> -	input_unregister_device(wm->input_dev);
+> -	wm->input_dev = NULL;
+> - dev_alloc_err:
+> -	input_free_device(wm->input_dev);
+> - alloc_err:
+> -	kfree(wm);
+> -
+> +batt_err:
+> +	wm97xx_unregister_touch(wm);
+>  	return ret;
+>  }
+>  
+> @@ -724,10 +760,8 @@ static int wm97xx_remove(struct device *dev)
+>  {
+>  	struct wm97xx *wm = dev_get_drvdata(dev);
+>  
+> -	platform_device_unregister(wm->battery_dev);
+> -	platform_device_unregister(wm->touch_dev);
+> -	input_unregister_device(wm->input_dev);
+> -	kfree(wm);
+> +	wm97xx_remove_battery(wm);
+> +	wm97xx_unregister_touch(wm);
+>  
+>  	return 0;
+>  }
+> -- 
+> 2.1.4
 > 
-> So, in case the OF match doesn't succeed, there are no reason to
-> propagate an error, but instead just bail out and returning 0 to the
-> caller.
-> 
-> If the OF match succeeds, it means the device requires a pwrseq
-> library to be used. Then, pwrseq_XX_alloc_instance() will be called,
-> on demand and which tries to fetch the resources (clocks, gpios etc).
-> If any of those attempts fetching a resource fails, its corresponding
-> error code should be propagated to the caller - including
-> -EPROBE_DEFER.
-> 
-> Regarding the "always compile all pwrseq libraries"; no we don't need
-> to do that. Instead we only need a to have a stub function for
-> pwrseq_XX_alloc_instance, in case its corresponding Kconfig option is
-> unset. That stub, should of course return an error code.
-> 
-
-I will have a updated version for your suggestion, thanks.
 
 -- 
-
-Best Regards,
-Peter Chen
+Dmitry
