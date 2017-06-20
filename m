@@ -1,75 +1,29 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 20 Jun 2017 11:59:38 +0100
-Subject: [PATCH] compiler, clang: Add always_inline attribute to inline
-In-Reply-To: <f8ee882e9859f24dac24832bfb5ae0f1@codeaurora.org>
-References: <20170615155440.GC26471@leverpostej>
- <1497887596-8731-1-git-send-email-psodagud@codeaurora.org>
- <alpine.DEB.2.10.1706191322590.95967@chino.kir.corp.google.com>
- <47bd7df20466d5f7f557ca087b0189cf@codeaurora.org>
- <alpine.DEB.2.10.1706191439090.2360@chino.kir.corp.google.com>
- <f8ee882e9859f24dac24832bfb5ae0f1@codeaurora.org>
-Message-ID: <20170620105937.GD28157@leverpostej>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 20 Jun 2017 08:05:05 -0300
+Subject: Shawn Guo: your attetion is needed here Re: [PATCH v8 00/34] i.MX
+ Media Driver
+In-Reply-To: <20170620082933.GA31799@amd>
+References: <1496860453-6282-1-git-send-email-steve_longerbeam@mentor.com>
+ <e7e4669c-2963-b9e1-edd7-02731a6e0f9c@xs4all.nl>
+ <c0b69c93-b9cd-25e8-ea36-fc0600efdb69@gmail.com>
+ <e4f152de-6e75-7654-178e-e6dcf9ad12f3@xs4all.nl>
+ <43887f25-bb73-9020-0909-d275c319aaad@mentor.com>
+ <20170620082933.GA31799@amd>
+Message-ID: <CAOMZO5A_LjYzzDTG9KmEHxb2F0=1Pj2Wm8s5maKS8pxce-HX3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 19, 2017 at 03:19:27PM -0700, Sodagudi Prasad wrote:
-> On 2017-06-19 14:42, David Rientjes wrote:
-> >Yes, the arch/arm64/include/asm/cmpxchg.h instance appears to need
-> >__always_inline as several other functions need __always_inline in
-> >arch/arm64/include/*.  It's worth making that change as you
-> >suggested in
-> >your original patch.
-> >
-> >The concern, however, is inlining all "inline" functions
-> >forcefully.  The
-> >only reason this is done for gcc is because of suboptimal inlining
-> >decisions in gcc < 4.
-> >
-> >So the question is whether this is a single instance that can be fixed
-> >where clang un-inlining causes problems or whether that instance
-> >suggests
-> >all possible inline usage for clang absolutely requires __always_inline
-> >due to a suboptimal compiler implementation.  I would suggest the
-> >former.
-> 
-> Hi David,
-> 
->  I am not 100% sure about the best approach for this problem. We may
-> have to
-> replace inline with always_inline for all inline functions where
-> BUILD_BUG() used.
-> 
-> So far inline as always_inline for ARM64, if we do not continue same
-> settings,
-> will there not be any performance differences?
-> 
-> Hi Will and Mark,
-> 
-> Please suggest the best solution to this problem. Currently
-> __xchg_mb is only having issue
-> based on compiler -inline-threshold configuration. But there are
-> many other instances
-> in arch/arm64/* where BUILD_BUG() used for inline functions and
-> which may fail later.
+On Tue, Jun 20, 2017 at 5:29 AM, Pavel Machek <pavel@ucw.cz> wrote:
 
-As with my reply to David, my preference would be that we:
+> Hmm. I changed the subject to grab Shawn's attetion.
+>
+> But his acks should not be needed for forward progress. Yes, it would
+> be good, but he does not react -- so just reorder the series so that
+> dts changes come last, then apply the parts you can apply: driver can
+> go in.
+>
+> And actually... if maintainer does not respond at all, there are ways
+> to deal with that, too...
 
-1) Align compiler-clang.h with the compiler-gcc.h inlining behaviour, so
-   that things work by default.
-
-2) Fix up the arm64 core code (and drivers for architected / common
-   peripherals) to use __always_inline where we always require inlining.
-
-3) Have arm64 select CONFIG_ARCH_SUPPORTS_OPTIMIZED_INLINING, and have
-   people test-build configurations with CONFIG_OPTIMIZE_INLINING, with
-   both GCC and clang.
-
-4) Fix up drivers, etc, as appropriate.
-
-5) Once that's largely stable, and if there's a benefit, have arm64
-   select CONFIG_OPTIMIZE_INLINING by default.
-
-That should avoid undue breakage, while enabling this ASAP.
-
-Thanks,
-Mark.
+Shawn has already applied the dts part of the series and they show up
+in linux-next.
