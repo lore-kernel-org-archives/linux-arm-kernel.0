@@ -1,38 +1,31 @@
-From: stefan@hello-penguin.com (Stefan Traby)
-Date: Tue, 20 Jun 2017 15:30:42 +0200
-Subject: [PATCH] arm64: remove a redundancy in sysreg.h
-Message-ID: <20170620133042.mlqgpx5vddgvoe6k@hello-penguin.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 20 Jun 2017 15:35:46 +0200
+Subject: [PATCH 2/2] drm/sun4i: add const to drm_encoder_helper_funcs
+ structures
+In-Reply-To: <1497964080-27301-3-git-send-email-bhumirks@gmail.com>
+References: <1497964080-27301-1-git-send-email-bhumirks@gmail.com>
+ <1497964080-27301-3-git-send-email-bhumirks@gmail.com>
+Message-ID: <20170620133546.f4ea4fhen2jnhsk5@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is really trivial; there is a dup
-(1 << 16) in the code
+On Tue, Jun 20, 2017 at 06:38:00PM +0530, Bhumika Goyal wrote:
+> Add const to drm_encoder_helper_funcs structures as they are only passed
+> as an argument to the function drm_encoder_helper_add and this argument
+> is of type const. So, add const to these structures.
+> 
+> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
 
-Signed-off-by: Stefan Traby <stefan@hello-penguin.com>
----
- arch/arm64/include/asm/sysreg.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 2d3e155b185f..580965129fea 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -139,8 +139,8 @@
- #define SCTLR_ELx_M	1
- 
- #define SCTLR_EL2_RES1	((1 << 4)  | (1 << 5)  | (1 << 11) | (1 << 16) | \
--			 (1 << 16) | (1 << 18) | (1 << 22) | (1 << 23) | \
--			 (1 << 28) | (1 << 29))
-+			 (1 << 18) | (1 << 22) | (1 << 23) | (1 << 28) | \
-+			 (1 << 29))
- 
- #define SCTLR_ELx_FLAGS	(SCTLR_ELx_M | SCTLR_ELx_A | SCTLR_ELx_C | \
- 			 SCTLR_ELx_SA | SCTLR_ELx_I)
--- 
-2.11.0
-
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
 -- 
-
-  ciao - 
-    Stefan
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170620/6b4310e9/attachment.sig>
