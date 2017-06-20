@@ -1,54 +1,40 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 20 Jun 2017 13:09:33 +0200
-Subject: [PATCH 1/2] drm/exynos/decon: Add include guard to the Exynos7
- header
-In-Reply-To: <CACvgo52KMMt+S-KVYnmMy9qGUL6jMD2Uj8EJWNkKUQLr0_wfAw@mail.gmail.com>
-References: <20170619163110.28173-1-krzk@kernel.org>
- <CACvgo51db4Gk+GHAO-F=rz8vLTG6A66f1ZeHPNuAQV1Qthaavw@mail.gmail.com>
- <CAJKOXPfjEozEM=q4hbWRBJngNDxnkJXF37gN2Es1Ju8Qze4J1g@mail.gmail.com>
- <CACvgo52KMMt+S-KVYnmMy9qGUL6jMD2Uj8EJWNkKUQLr0_wfAw@mail.gmail.com>
-Message-ID: <CAJKOXPdfHoZY5QcZEvuN8nPsCwR4mvZ+aT5iZDVbSBgPRF46QA@mail.gmail.com>
+Date: Tue, 20 Jun 2017 13:14:23 +0200
+Subject: [GIT PULL] pinctrl: samsung: Pinctrl update for v4.13
+In-Reply-To: <CACRpkdZjZbHD4ZCQVHUyu8y0f45FnRqTRL4P6J7Wrz9dZNXGdw@mail.gmail.com>
+References: <20170609164827.2231-1-krzk@kernel.org>
+ <CACRpkdZjZbHD4ZCQVHUyu8y0f45FnRqTRL4P6J7Wrz9dZNXGdw@mail.gmail.com>
+Message-ID: <CAJKOXPd0UFGGF38DB=XVH+SyW-P7r6K14ca6buYPP7j4Odx3gA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 12:57 PM, Emil Velikov <emil.l.velikov@gmail.com> wrote:
-> On 20 June 2017 at 11:02, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->> On Tue, Jun 20, 2017 at 11:53 AM, Emil Velikov <emil.l.velikov@gmail.com> wrote:
->>> On 19 June 2017 at 17:31, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->>>> Although header is included only once but still having an include guard
->>>> is a good practice.  To avoid confusion, add SoC prefix to existing
->>>> Exynos5433 header include guard.
->>>>
->>>> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
->>>> ---
->>>>  include/video/exynos5433_decon.h | 6 +++---
->>>>  include/video/exynos7_decon.h    | 5 +++++
->>>>  2 files changed, 8 insertions(+), 3 deletions(-)
->>>>
->>>> diff --git a/include/video/exynos5433_decon.h b/include/video/exynos5433_decon.h
->>>> index 78957c9626f5..b30362da5692 100644
->>>> --- a/include/video/exynos5433_decon.h
->>>> +++ b/include/video/exynos5433_decon.h
->>>> @@ -6,8 +6,8 @@
->>>>   * published by the Free Software Foundationr
->>>>   */
->>>>
->>>> -#ifndef EXYNOS_REGS_DECON_H
->>>> -#define EXYNOS_REGS_DECON_H
->>>> +#ifndef EXYNOS5433_REGS_DECON_H
->>>> +#define EXYNOS5433_REGS_DECON_H
->>>>
->>> Drop the _REGS_ part from the guard on each header? The file name/path
->>> does not have it, plus it'll save some WTF moments when
->>> exynos{5433,7}_regs_decon.h comes about.
+On Tue, Jun 20, 2017 at 10:08 AM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+> On Fri, Jun 9, 2017 at 6:48 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>
+>> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 >>
->> So maybe it makes sense to reorder these patches and use the guard
->> name matching final file name?
+>>   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 >>
-> That sounds better, IMHO.
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/pinctrl/samsung.git tags/samsung-pinctrl-4.13
+>>
+>> for you to fetch changes up to a453f3693f2aa9ebba623f8cff1e3d7c5df96ddd:
+>>
+>>   pinctrl: samsung: Explicitly cast pointer returned by of_iomap() to iomem (2017-06-07 20:40:48 +0200)
+>
+> Pulled into my "devel" branch on the pin control tree.
+>
+> Pushing it to the build servers hoping all works.
+>
+> Thanks for your efforts to maintain Samsung pin control, it is
+> much appreciated!
 
-OK then, I'll re-order the patches and use matching name
-(EXYNOS_REGS_DECON{5433,7}_H).
+I will have another bunch of cleanups and one important fix (broken
+for some time, around v4.10, so it's not a candidate for current RC
+fix). It is pretty late. Will you still have time to pull them for
+v4.13?
 
 Best regards,
 Krzysztof
