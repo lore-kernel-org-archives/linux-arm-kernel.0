@@ -1,60 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 20 Jun 2017 19:06:19 +0100
-Subject: [PATCH v8 2/3] iommu/arm-smmu-v3: Add workaround for Cavium
- ThunderX2 erratum #74
-In-Reply-To: <1497968259-16390-3-git-send-email-gakula@caviumnetworks.com>
-References: <1497968259-16390-1-git-send-email-gakula@caviumnetworks.com>
- <1497968259-16390-3-git-send-email-gakula@caviumnetworks.com>
-Message-ID: <20170620180618.GE28035@arm.com>
+From: hotran@apm.com (Hoan Tran)
+Date: Tue, 20 Jun 2017 11:45:33 -0700
+Subject: [PATCH v3 0/3] perf: xgene: Add support for SoC PMU version 3
+In-Reply-To: <1496772146-11084-1-git-send-email-hotran@apm.com>
+References: <1496772146-11084-1-git-send-email-hotran@apm.com>
+Message-ID: <CAFHUOYzjOL87TzrdKJA8EcpFK36pKVZqM2dAxSEm-VC5ZM6UbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 07:47:38PM +0530, Geetha sowjanya wrote:
-> From: Linu Cherian <linu.cherian@cavium.com>
-> 
-> Cavium ThunderX2 SMMU implementation doesn't support page 1 register space
-> and PAGE0_REGS_ONLY option is enabled as an errata workaround.
-> This option when turned on, replaces all page 1 offsets used for
-> EVTQ_PROD/CONS, PRIQ_PROD/CONS register access with page 0 offsets.
-> 
-> SMMU resource size checks are now based on SMMU option PAGE0_REGS_ONLY,
-> since resource size can be either 64k/128k.
-> For this, arm_smmu_device_dt_probe/acpi_probe has been moved before
-> platform_get_resource call, so that SMMU options are set beforehand.
-> 
-> Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
-> Signed-off-by: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
-> ---
->  Documentation/arm64/silicon-errata.txt             |    1 +
->  .../devicetree/bindings/iommu/arm,smmu-v3.txt      |    6 ++
->  drivers/iommu/arm-smmu-v3.c                        |   68 ++++++++++++++-----
->  3 files changed, 57 insertions(+), 18 deletions(-)
-> 
-> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-> index 10f2ddd..4693a32 100644
-> --- a/Documentation/arm64/silicon-errata.txt
-> +++ b/Documentation/arm64/silicon-errata.txt
-> @@ -62,6 +62,7 @@ stable kernels.
->  | Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154        |
->  | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456        |
->  | Cavium         | ThunderX SMMUv2 | #27704          | N/A                         |
-> +| Cavium         | ThunderX2 SMMUv3| #74             | N/A                         |
->  |                |                 |                 |                             |
->  | Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585         |
->  |                |                 |                 |                             |
-> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-> index be57550..6ecc48c 100644
-> --- a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-> @@ -49,6 +49,12 @@ the PCIe specification.
->  - hisilicon,broken-prefetch-cmd
->                      : Avoid sending CMD_PREFETCH_* commands to the SMMU.
->  
-> +- cavium,cn9900-broken-page1-regspace
-> +                    : Replaces all page 1 offsets used for EVTQ_PROD/CONS,
-> +		      PRIQ_PROD/CONS register access with page 0 offsets.
-> +		      Set for Caviun ThunderX2 silicon that doesn't support
+Hi Mark and All,
 
-s/Caviun/Cavium/
+Do you have any comments on this patch set?
 
-Will
+Thank you!
+Hoan
+
+On Tue, Jun 6, 2017 at 11:02 AM, Hoan Tran <hotran@apm.com> wrote:
+> This patch set adds support for SoC-wide (AKA uncore) Performance Monitoring
+> Unit version 3.
+>
+> It can support up to
+>  - 2 IOB PMU instances
+>  - 8 L3C PMU instances
+>  - 2 MCB PMU instances
+>  - 8 MCU PMU instances
+> and these PMUs support 64 bit counter
+>
+> v3:
+>  * Seperate acpi_pmu_probe_active_mcb_mcu_l3c for v3
+>  * Consistent PMU event name
+>  * Update comment
+>  * Correct active MCU detection
+>
+> v2:
+>  * Split into separate patches
+>  * Use the function pointers for the PMU leaf functions
+>  * Parse PMU subnode by the match table
+>  * Dont allow user change agent id by config1 for SoC PMU v3
+>
+> Hoan Tran (3):
+>   perf: xgene: Parse PMU subnode from the match table
+>   perf: xgene: Move PMU leaf functions into function pointer structure
+>   perf: xgene: Add support for SoC PMU version 3
+>
+>  drivers/perf/xgene_pmu.c | 677 +++++++++++++++++++++++++++++++++++++++++++----
+>  1 file changed, 622 insertions(+), 55 deletions(-)
+>
+> --
+> 1.9.1
+>
