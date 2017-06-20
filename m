@@ -1,62 +1,38 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 20 Jun 2017 10:36:53 +0200
-Subject: [PATCH v3 19/21] dt-bindings: mmc: dw_mmc-k3: add document of
- hi3660 mmc
-In-Reply-To: <5947CAD8.4040607@hisilicon.com>
-References: <20170614082338.15673-1-guodong.xu@linaro.org>
- <20170614082338.15673-20-guodong.xu@linaro.org>
- <CAPDyKFpvJu8_TETWr0Vy4ubDC7NYvi7TxmSLYZyw33qHFsoNaQ@mail.gmail.com>
- <5947CAD8.4040607@hisilicon.com>
-Message-ID: <CAPDyKFo=hqp=j=nWpO8uf_0pGTSKjN0T-ZKqD8cuKp1C3Q2_hA@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 20 Jun 2017 10:37:47 +0200
+Subject: [PATCH 0/6] Update binding documentation for cp110 and ap806
+Message-ID: <20170620083754.28053-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wei,
+Hi Rob,
 
-On 19 June 2017 at 15:00, Wei Xu <xuwei5@hisilicon.com> wrote:
-> Hi Ulf,
->
-> On 2017/6/19 13:43, Ulf Hansson wrote:
->> On 14 June 2017 at 10:23, Guodong Xu <guodong.xu@linaro.org> wrote:
->>> Add bindings for hi3660 mmc support
->>>
->>> Signed-off-by: Li Wei <liwei213@huawei.com>
->>> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
->>> ---
->>>  Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt | 1 +
->>>  1 file changed, 1 insertion(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
->>> index df37058..8af1afc 100644
->>> --- a/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
->>> +++ b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
->>> @@ -12,6 +12,7 @@ extensions to the Synopsys Designware Mobile Storage Host Controller.
->>>  Required Properties:
->>>
->>>  * compatible: should be one of the following.
->>> +  - "hisilicon,hi3660-dw-mshc": for controllers with hi3660 specific extensions.
->>>    - "hisilicon,hi4511-dw-mshc": for controllers with hi4511 specific extensions.
->>>    - "hisilicon,hi6220-dw-mshc": for controllers with hi6220 specific extensions.
->>>
->>> --
->>> 2.10.2
->>>
->>
->> Thanks, applied for next!
->
-> Thanks!
-> Last week I had applied the v4 patch set[1]
-> and this patch is included.
-> But it should be fine for the upper gatekeeper to merge
-> since these 2 patch are same.
+As you know there were dependencies issue about the binding between my
+different series and you proposed yourself to apply them though the
+device tree subsystem: [1]
 
-No, that's not how git works.
+All the driver parts have been merged so it's time merging the
+documentation.
 
-If the patch has the same hash, that would be fine, but that isn't the
-case here as we have two different hashes for the same change.
+Thanks,
 
-To deal with this, I have just dropped the change from my tree and
-leave it to you to carry the patch. Feel free to add my ack for it.
+Gregory
 
-Kind regards
-Uffe
+[1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/509643.html
+
+Gregory CLEMENT (6):
+  dt-bindings: cp110: do not depend anymore of the *-clock-output-names
+  dt-bindings: cp110: introduce a new binding
+  dt-bindings: cp110: add sdio clock to cp-110 system controller
+  pinctrl: dt-bindings: add documentation for AP806 pin controllers
+  pinctrl: dt-bindings: add documentation for CP110 pin controllers
+  gpio: dt-bindings: Add documentation for gpio controllers on Armada
+    7K/8K
+
+ .../arm/marvell/ap806-system-controller.txt        |  73 ++++++++++-
+ .../arm/marvell/cp110-system-controller0.txt       | 144 ++++++++++++++++++---
+ .../devicetree/bindings/gpio/gpio-mvebu.txt        |  24 +++-
+ 3 files changed, 208 insertions(+), 33 deletions(-)
+
+-- 
+2.11.0
