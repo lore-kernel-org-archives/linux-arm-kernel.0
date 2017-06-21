@@ -1,43 +1,99 @@
-From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
-Date: Wed, 21 Jun 2017 18:54:32 +0200
-Subject: [PATCH] arm64: pass machine size to sparse
-In-Reply-To: <20170621161254.GF6041@arm.com>
-References: <20170620122443.35880-1-luc.vanoostenryck@gmail.com>
- <20170620154938.GH21131@arm.com>
- <20170620162431.zi6qd3jby7shyu46@ltop.local>
- <20170620170401.GA28035@arm.com>
- <20170620190739.ijtpo3ekibxi47qj@ltop.local>
- <20170621161254.GF6041@arm.com>
-Message-ID: <20170621165431.lmcwohnxkncgpevs@ltop.local>
+From: morten.rasmussen@arm.com (Morten Rasmussen)
+Date: Wed, 21 Jun 2017 17:57:15 +0100
+Subject: [PATCH 2/6] drivers base/arch_topology: frequency-invariant
+ load-tracking support
+In-Reply-To: <20170621053735.GR3942@vireshk-i7>
+References: <20170608075513.12475-1-dietmar.eggemann@arm.com>
+ <20170608075513.12475-3-dietmar.eggemann@arm.com>
+ <CAOh2x=k1Zr15vAq8LA0+Sg3Cz7o=dL5C-erkEx_py7g56b7BwA@mail.gmail.com>
+ <5949BE5F.4020502@codeaurora.org>
+ <20170621053735.GR3942@vireshk-i7>
+Message-ID: <20170621165714.GB2551@e105550-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 21, 2017 at 05:12:54PM +0100, Will Deacon wrote:
-> On Tue, Jun 20, 2017 at 09:07:40PM +0200, Luc Van Oostenryck wrote:
-> > Well, currently sparse is arch agnostic and I think it's a good thing.
-> > For the few arch specifities you have to use some of the '-m' flags
-> > (like -m32/-m64, -msize-long). So, for the moment the '-m64' flag
-> > is needed, thus the patch.
+On Wed, Jun 21, 2017 at 11:07:35AM +0530, Viresh Kumar wrote:
+> On 20-06-17, 17:31, Saravana Kannan wrote:
+> > On 06/19/2017 11:17 PM, Viresh Kumar wrote:
+> > >On Thu, Jun 8, 2017 at 1:25 PM, Dietmar Eggemann
+> > ><dietmar.eggemann@arm.com> wrote:
+> > >
+> > >>diff --git a/drivers/base/arch_topology.c b/drivers/base/arch_topology.c
+> > >
+> > >>  static int __init register_cpufreq_notifier(void)
+> > >>  {
+> > >>+       int ret;
+> > >>+
+> > >>         /*
+> > >>          * on ACPI-based systems we need to use the default cpu capacity
+> > >>          * until we have the necessary code to parse the cpu capacity, so
+> > >>@@ -225,8 +265,14 @@ static int __init register_cpufreq_notifier(void)
+> > >>
+> > >>         cpumask_copy(cpus_to_visit, cpu_possible_mask);
+> > >>
+> > >>-       return cpufreq_register_notifier(&init_cpu_capacity_notifier,
+> > >>-                                        CPUFREQ_POLICY_NOTIFIER);
+> > >>+       ret = cpufreq_register_notifier(&init_cpu_capacity_notifier,
+> > >>+                                       CPUFREQ_POLICY_NOTIFIER);
+> > >
+> > >Wanted to make sure that we all understand the constraints this is going to add
+> > >for the ARM64 platforms.
+> > >
+> > >With the introduction of this transition notifier, we would not be able to use
+> > >the fast-switch path in the schedutil governor. I am not sure if there are any
+> > >ARM platforms that can actually use the fast-switch path in future or not
+> > >though. The requirement of fast-switch path is that the freq can be changed
+> > >without sleeping in the hot-path.
+> > >
+> > >So, will we ever want fast-switching for ARM platforms ?
+
+I hope that one day we will have such platforms.
+
+> > >
+> > 
+> > I don't think we should go down a path that'll prevent ARM platform from
+> > switching over to fast-switching in the future.
 > 
-> Ok, I'll pick your patch up then. The endianness case is more interesting,
-> because I don't think __BIG_ENDIAN__ and __LITTLE_ENDIAN__ are the defines
-> to use; the kernel seems to omit the trailing underscores afaict.
+> Yeah, that's why brought attention to this stuff.
 
-I just checked, it's a bit messy.
-The kernel seems to rely, at least partly, maybe mostly, on
-CONFIG_CPU_{BIG,LITTLE}_ENDIAN and then __{BIG,LITTLE}_ENDIAN is
-defined via include/uapi/linux/byteorder/{big,little}_endian.h
+It is true that this patch relies on the notifiers, but I don't see how
+that prevents us from adding a non-notifier based solution for
+fast-switch enabled platforms later?
 
-Otherwise, from the compiler side it seems that __BYTE_ORDER__ &
-__ORDER_{BIG,LITTLE}_ENDIAN__ is defined consistently.
-But, for example for arm64, 'gcc -mlittle-endian' gives
-	#define __LITTLE_ENDIAN__ 1
-while 'gcc -mbig-endian' doesn't define __BIG_ENDIAN__ but
-	#define __ARM_BIG_ENDIAN 1
+> 
+> I think this patch doesn't really need to go down the notifiers way.
+> 
+> We can do something like this in the implementation of
+> topology_get_freq_scale():
+> 
+>         return (policy->cur << SCHED_CAPACITY_SHIFT) / max;
+> 
+> Though, we would be required to take care of policy structure in this
+> case somehow.
 
-*shrugh*
+This is exactly what this patch implements. Unfortunately we can't be
+sure that there is a valid policy data structure where we can read the
+information from. Isn't the policy protected by a lock as well?
 
-I've added support for the -m{big,little}-endian flag to sparse
-but it seems it will be more complicated for the defines.
+I don't quite see how you would solve that problem without having some
+cached version of the scaling factor that is safe to read without
+locking and is always available, even before cpufreq has come up.
 
--- Luc
+Another thing is that I don't think a transition notifier based solution
+or any other solution based on the cur/max ratio is really the right way
+to go for fast-switching platforms. If we can do very frequent frequency
+switching it makes less sense to use the current ratio whenever we
+update the PELT averages as the frequency might have changed multiple
+times since the last update. So it would make more sense to have an
+average ratio instead.
+
+If the platform has HW counters (e.g. APERF/MPERF) that can provide the
+ratio then we should of course use those, if not, one solution could be
+to let cpufreq track the average frequency for each cpu over a suitable
+time window (around one sched period I think). It should be fairly low
+overhead to maintain. In the topology driver, we would then choose
+whether the scaling factor is provided by the cpufreq average frequency
+ratio or the current transition notifier based approach based on the
+capabilities of the platform.
+
+Morten
