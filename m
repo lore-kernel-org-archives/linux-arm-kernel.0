@@ -1,116 +1,61 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Wed, 21 Jun 2017 19:12:07 +1000
-Subject: [PATCH v2] drm/sun4i: hdmi: Implement I2C adapter for A10s DDC bus
-In-Reply-To: <20170621084128.6745bs6irwmccbx6@flea.lan>
-References: <20170612055235.31019-1-net147@gmail.com>
- <20170613111505.afyh4iotxdz5kceh@flea.lan>
- <CANwerB0eXxAwihwt-xZuUm6DD6JSJt8nQdyxnp5TVYyU1yf9xA@mail.gmail.com>
- <20170621084128.6745bs6irwmccbx6@flea.lan>
-Message-ID: <CANwerB1VVx--r9xqJUokhBkL8Z3pvM_LRX7Lqsv01ine-x_VPg@mail.gmail.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Wed, 21 Jun 2017 11:14:34 +0200
+Subject: [PATCH 00/51] rtc: stop using rtc deprecated functions
+In-Reply-To: <20170620220805.GA11195@amd>
+References: <1497951359-13334-1-git-send-email-benjamin.gaignard@linaro.org>
+ <20170620100348.zh4ygvjjgnhxvmvl@piout.net> <20170620121011.GA13221@amd>
+ <20170620122400.sm7qqvwyj6cuzarw@piout.net> <20170620132620.GA16881@amd>
+ <6ED8E3B22081A4459DAC7699F3695FB7018CD96FCD@SW-EX-MBX02.diasemi.com>
+ <20170620134458.GA10104@amd> <20170620134827.ubvzhh25klaotupv@piout.net>
+ <CA+M3ks68+z6nDtYM8CDpso7SxjB6Nt5E=rOc1yxx=kDz6PUeVQ@mail.gmail.com>
+ <20170620220805.GA11195@amd>
+Message-ID: <CA+M3ks58dO0m+XdQ=3rZvr+Vfj7RcrBON-KC4a-ThNhq+e7V_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-On 21 June 2017 at 18:41, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Tue, Jun 13, 2017 at 09:53:31PM +1000, Jonathan Liu wrote:
->> >> --- /dev/null
->> >> +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c
->> >> @@ -0,0 +1,163 @@
->> >> +/*
->> >> + * Copyright (C) 2017 Jonathan Liu
->> >> + *
->> >> + * Jonathan Liu <net147@gmail.com>
->> >
->> > Is it?
+2017-06-21 0:08 GMT+02:00 Pavel Machek <pavel@ucw.cz>:
+> Hi!
+>
+>> >> > This is it.
+>> >> > https://patchwork.kernel.org/patch/6219401/
+>> >>
+>> >> Thanks.
+>> >>
+>> >> Yes, that's argument against changing rtc _drivers_ for hardware that
+>> >> can not do better than 32bit. For generic code (such as 44/51 sysfs,
+>> >> 51/51 suspend test), the change still makes sense.
 >>
->> I could add you to the copyright since you did the old one. But the
->> implementation is different.
->> I intend to rework this I2C driver to use the FIFO more to avoid
->> splitting larger transfers > 16 bytes and do the transfer in a single
->> command. Would you like to be added to the copyright?
+>> What I had in mind when writing those patches was to remove the limitations
+>> coming from those functions usage, even more since they been marked has
+>> deprecated.
+>>
+>> I agree that will change nothing of hardware limitation but at least
+>> the limit will
+>> not come from the framework.
 >
-> You took some code that you didn't create, and added some more
-> stuff. The copyright on the initial code remains, and it has nothing
-> to do with whether the author wants it or not, (s)he should be
-> mentionned, along with you of course.
+>> > Yes, we agree on that but I won't cherry pick working patches from a 51
+>> > patches series.
 >
-I will update the copyright header accordingly.
+> Well, it would be actually nice for you to do the cherry
+> picking. That's something maintainers do, because it is hard for
+> contributors to guess maintainer's taste.
+>
+> Anyway, it looks like someone should go through all the RTC drivers,
+> and document their limitations of each driver (date in future when
+> hardware ceases to be useful). If Benjamin has time to do that, I
+> guess that removes all the objections to the series.
 
->> >> +            ? SUN4I_HDMI_DDC_CMD_IMPLICIT_READ
->> >> +            : SUN4I_HDMI_DDC_CMD_IMPLICIT_WRITE,
->> >> +            hdmi->base + SUN4I_HDMI_DDC_CMD_REG);
->> >> +
->> >> +     reg = readl(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
->> >> +     writel(reg | SUN4I_HDMI_DDC_CTRL_START_CMD,
->> >> +            hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
->> >> +
->> >> +     if (!(msg->flags & I2C_M_RD)) {
->> >> +             for (i = 0; i < count; i++) {
->> >> +                     writeb(*msg->buf++, hdmi->base
->> >> +                            + SUN4I_HDMI_DDC_FIFO_DATA_REG);
->> >
->> > writesb?
->> I intend to rework the FIFO handling so will need to continue using writeb.
->
-> Then you'll change it when you'll rework it. Before then, you can use
-> writesb.
->
-I have already reworked it in V3.
+Without the datasheet I can check in driver code what they do in read/set
+time functions to understand their limitations. All drivers using BCD
+like system
+or spliting day and time should be fixed. I can do a subset of my patches
+including those driver + the acked ones.
 
->> >
->> >> +                     --msg->len;
->> >> +             }
->> >> +     }
->> >> +
->> >> +     if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG,
->> >> +                            reg,
->> >> +                            !(reg & SUN4I_HDMI_DDC_CTRL_START_CMD),
->> >> +                            100, 100000))
->> >> +             return -EIO;
->> >> +
->> >> +     reg = readl(hdmi->base + SUN4I_HDMI_DDC_INTERRUPT_STATUS_REG);
->> >> +     reg &= ~SUN4I_HDMI_DDC_INTERRUPT_STATUS_FIFO_REQUEST;
->> I want to check all the other bits that are set if there are errors.
->
-> Same thing here: you'll change it when that happens.
-I have already reworked it in V3.
+Alexandre does that sound reasonable for you ?
 
->
->> >
->> > You don't need to use that mask.
->> >
->> >> +     if (reg != SUN4I_HDMI_DDC_INTERRUPT_STATUS_TRANSFER_COMPLETE)
->> >> +             return -EIO;
->> >
->> > !(reg & SUN4I_HDMI_DDC_INTERRUPT_STATUS_TRANSFER_COMPLETE) would be enough.
->> I want to check all the other bits that are set if there are errors.
->
-> Same thing here.
-I have already reworked it in V3.
 
->
->> >
->> >> +
->> >> +     if (msg->flags & I2C_M_RD) {
->> >> +             for (i = 0; i < count; i++) {
->> >> +                     *msg->buf++ = readb(hdmi->base
->> >> +                                         + SUN4I_HDMI_DDC_FIFO_DATA_REG);
->> >
->> > readsb ?
->> I am reworking the FIFO handling so I will need to continue to use readb.
->
-> Same thing here.
-I have already reworked it in V3.
-
->
-> Maxime
->
+> Regards,
+>                                                                         Pavel
 > --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
-
-Regards,
-Jonathan
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
