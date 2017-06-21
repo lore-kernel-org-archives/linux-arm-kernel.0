@@ -1,58 +1,31 @@
-From: mars.cheng@mediatek.com (Mars Cheng)
-Date: Wed, 21 Jun 2017 11:01:32 +0800
-Subject: [PATCH] arm64: dts: Delete unused dummy clocks
-In-Reply-To: <20170620102854.9346-1-matthias.bgg@gmail.com>
-References: <20170620102854.9346-1-matthias.bgg@gmail.com>
-Message-ID: <1498014092.810.3.camel@mtkswgap22>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 21 Jun 2017 09:04:26 +0530
+Subject: [PATCH] arm64: topology: Get rid of "cap_parsing_done"
+In-Reply-To: <20170620155400.GI21131@arm.com>
+References: <9e5d20e285e04341ea1a7f43c9af2ff6d6d072dd.1497955347.git.viresh.kumar@linaro.org>
+ <20170620155400.GI21131@arm.com>
+Message-ID: <20170621033426.GP3942@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias
-
-On Tue, 2017-06-20 at 12:28 +0200, Matthias Brugger wrote:
-> After adding the clock subsystem to the SOC, the dummy
-> clocks clk26m and clk32k are not longer needed. Delete them.
+On 20-06-17, 16:54, Will Deacon wrote:
+> On Tue, Jun 20, 2017 at 04:14:40PM +0530, Viresh Kumar wrote:
+> > We can reuse "cap_parsing_failed" instead of keeping an additional
+> > variable. Also rename cap_parsing_failed to skip_cap_parsing.
+> > 
+> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> > ---
+> >  arch/arm64/kernel/topology.c | 19 +++++++++----------
+> >  1 file changed, 9 insertions(+), 10 deletions(-)
 > 
-> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> ---
->  arch/arm64/boot/dts/mediatek/mt6797.dtsi | 14 --------------
->  1 file changed, 14 deletions(-)
+> You probably need to co-ordinate with this series:
 > 
-> diff --git a/arch/arm64/boot/dts/mediatek/mt6797.dtsi b/arch/arm64/boot/dts/mediatek/mt6797.dtsi
-> index 3512c8e6dc65..09d46befa86b 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt6797.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt6797.dtsi
-> @@ -102,20 +102,6 @@
->  		};
->  	};
->  
-> -	clk26m: oscillator at 0 {
-> -		compatible = "fixed-clock";
-> -		#clock-cells = <0>;
-> -		clock-frequency = <26000000>;
-> -		clock-output-names = "clk26m";
-> -	};
+> http://lkml.kernel.org/r/20170531165931.6945-5-juri.lelli at arm.com
+> 
+> and it would be clearer to split up the renaming part of the patch from the
+> remove of the additional bool.
 
-clk26m is referenced by drivers/clk/mediatek/clk-mt6797.c:
-static const char * const axi_parents[] = {
-	"clk26m",
-	"syspll_d7",
-	"ulposc_axi_ck_mux",
-};
+Thanks, I missed that series for sure :)
 
-Please just delete clk32k which is dummy, and keep clk26m. Or might get
-PLL wrongly.
-
-Thanks.
-
-> -
-> -	clk32k: oscillator at 1 {
-> -		compatible = "fixed-clock";
-> -		#clock-cells = <0>;
-> -		clock-frequency = <32000>;
-> -		clock-output-names = "clk32k";
-> -	};
-> -
->  	timer {
->  		compatible = "arm,armv8-timer";
->  		interrupt-parent = <&gic>;
+-- 
+viresh
