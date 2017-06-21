@@ -1,40 +1,57 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 21 Jun 2017 21:22:47 +0800
-Subject: [PATCH 1/2] ASoC: add bindings for ZTE zx-aud96p22 audio codec
-In-Reply-To: <20170620143352.rjitvgkzh554pviq@sirena.org.uk>
-References: <1497708574-22380-1-git-send-email-shawnguo@kernel.org>
- <1497708574-22380-2-git-send-email-shawnguo@kernel.org>
- <20170619161606.g6nabi2w5mmmjbcw@sirena.org.uk>
- <20170620031131.GB4818@x250>
- <20170620143352.rjitvgkzh554pviq@sirena.org.uk>
-Message-ID: <20170621132245.GD3372@dragon>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 21 Jun 2017 15:29:12 +0200
+Subject: [PATCH v5 1/6] dt-bindings: interrupt-controller: add DT binding for
+ the Marvell GICP
+In-Reply-To: <20170621132917.14187-1-thomas.petazzoni@free-electrons.com>
+References: <20170621132917.14187-1-thomas.petazzoni@free-electrons.com>
+Message-ID: <20170621132917.14187-2-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 03:33:52PM +0100, Mark Brown wrote:
-> On Tue, Jun 20, 2017 at 11:11:32AM +0800, Shawn Guo wrote:
-> > On Mon, Jun 19, 2017 at 05:16:06PM +0100, Mark Brown wrote:
-> 
-> > > If there's an external power amplifier this is a separate chip to this
-> > > CODEC and should therefore be separately controlled and integrated as
-> > > part of the machine integration.
-> 
-> > Yes, that should be the best.  But we do not have a particular machine
-> > driver for our platform, and we are using simple-audio-card driver
-> 
-> You should be switching to the of-graph card now.
+This commit adds the Device Tree binding documentation for the Marvell
+GICP, an extension to the GIC that allows to trigger GIC SPI interrupts
+using memory transactions. It is used by the ICU unit in the Marvell
+CP110 block to turn wired interrupts inside the CP into SPI interrupts
+at the GIC level in the AP.
 
-Thanks for the info.  Will do.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ .../bindings/interrupt-controller/marvell,gicp.txt | 27 ++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,gicp.txt
 
-> > instead.  I'm not sure if it's generic enough to patch simple-audio-card
-> > driver support this pa-gpios, so chose to fold this quick change in the
-> > codec driver.
-> 
-> Having a separate amplifier is a completely normal thing, and no matter
-> how unusual something is it's obviously not OK to hack one driver to
-> support a completely different device.
-
-Okay, I will drop it from codec driver, and try to support it in
-audio-graph-card with separate patch later.
-
-Shawn
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,gicp.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,gicp.txt
+new file mode 100644
+index 0000000..64a00ce
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,gicp.txt
+@@ -0,0 +1,27 @@
++Marvell GICP Controller
++-----------------------
++
++GICP is a Marvell extension of the GIC that allows to trigger GIC SPI
++interrupts by doing a memory transaction. It is used by the ICU
++located in the Marvell CP110 to turn wired interrupts inside the CP
++into GIC SPI interrupts.
++
++Required properties:
++
++- compatible: Must be "marvell,ap806-gicp"
++
++- reg: Must be the address and size of the GICP SPI registers
++
++- marvell,spi-ranges: tuples of GIC SPI interrupts ranges available
++  for this GICP
++
++- msi-controller: indicates that this is an MSI controller
++
++Example:
++
++gicp_spi: gicp-spi at 3f0040 {
++	compatible = "marvell,ap806-gicp";
++	reg = <0x3f0040 0x10>;
++	marvell,spi-ranges = <64 64>, <288 64>;
++	msi-controller;
++};
+-- 
+2.9.4
