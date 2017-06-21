@@ -1,83 +1,120 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 21 Jun 2017 11:43:05 +0900
-Subject: [PATCH v3 2/4] arm64: kgdb: disable interrupts while a software
- step is enabled
-In-Reply-To: <20170620170659.GB28035@arm.com>
-References: <20170523043058.5463-1-takahiro.akashi@linaro.org>
- <20170523043058.5463-3-takahiro.akashi@linaro.org>
- <20170605162919.GN21944@arm.com>
- <20170607053449.GE26483@linaro.org> <20170607165018.GD2669@arm.com>
- <20170620024333.GE4820@linaro.org> <20170620170659.GB28035@arm.com>
-Message-ID: <20170621024304.GI4820@linaro.org>
+From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
+Date: Wed, 21 Jun 2017 10:46:45 +0800
+Subject: [PATCH v2] [media] mtk-mdp: Fix g_/s_selection capture/compose
+ logic
+In-Reply-To: <74fa6870-fc5e-13b2-a111-cf9f2e83034c@xs4all.nl>
+References: <1494556970-12278-1-git-send-email-minghsiu.tsai@mediatek.com>
+ <a180f2fc-1dce-3630-ed48-25c247eff79a@xs4all.nl>
+ <1497866607.25194.14.camel@mtksdaap41>
+ <74fa6870-fc5e-13b2-a111-cf9f2e83034c@xs4all.nl>
+Message-ID: <1498013205.24451.9.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 06:07:00PM +0100, Will Deacon wrote:
-> On Tue, Jun 20, 2017 at 11:43:34AM +0900, AKASHI Takahiro wrote:
-> > On Wed, Jun 07, 2017 at 05:50:18PM +0100, Will Deacon wrote:
-> > > On Wed, Jun 07, 2017 at 02:34:50PM +0900, AKASHI Takahiro wrote:
+On Mon, 2017-06-19 at 12:10 +0200, Hans Verkuil wrote:
+> On 06/19/2017 12:03 PM, Minghsiu Tsai wrote:
+> > Hi, Hans,
+> > 
+> > On Fri, 2017-06-16 at 12:42 +0200, Hans Verkuil wrote:
+> >> On 05/12/17 04:42, Minghsiu Tsai wrote:
+> >>> From: Daniel Kurtz <djkurtz@chromium.org>
+> >>>
+> >>> Experiments show that the:
+> >>>   (1) mtk-mdp uses the _MPLANE form of CAPTURE/OUTPUT
+> >>
+> >> Please drop this, since this no longer applies to this patch.
+> >>
+> > 
+> > I will remove it next version
+> > 
+> > 
+> >>>   (2) CAPTURE types use CROP targets, and OUTPUT types use COMPOSE targets
+> >>
+> >> Are you really certain about this?
+> >>
+> >> For m2m devices the output (i.e. memory to hardware) typically crops from memory
+> >> and the capture side (hardware to memory) composes into memory.
+> >>
+> >> I.e.: for the output side you crop the part of the memory buffer that you want
+> >> to process and on the capture side you compose the result into a memory buffer:
+> >> i.e. the memory buffer might be 1920x1080, but you compose the decoder output
+> >> into a rectangle of 640x480 at offset 128x128 within that buffer (just an example).
+> >>
+> >> CAPTURE using crop would be if, before the data is DMAed, the hardware decoder
+> >> output is cropped. E.g. if the stream fed to the decoder is 1920x1080, but you
+> >> want to only DMA a subselection of that, then that would be cropping, and it
+> >> would go to a memory buffer of the size of the crop selection.
+> >>
+> >> OUTPUT using compose is highly unlikely: that means that the frame you give
+> >> is composed in a larger internal buffer with generated border data around it.
+> >> Very rare and really only something that a compositor of some sort would do.
+> >>
+> > 
+> > That's strange. In v4l2-ioctl.c, v4l_g_crop()
+> > OUTPUT is using COMPOSE
+> > CAPTURE is using CROP
+> 
+> The old crop API can't be used with most (all?) codec drivers. Codec drivers do
+> exactly the opposite of what the old crop API did.
+> 
+> It is the reason the selection API was created.
+> 
+> The old crop API was written for SDTV receivers where the hardware would crop
+> the received video. For output (rarely used) the hardware would compose the
+> image into a larger (PAL or NTSC sizes) frame.
+> 
+> Applications have to use the selection API to work with codec drivers. Just
+> ignore the old crop ioctls, they are not suitable for such hardware.
+> 
+
+Hi, Hans,
+  Thanks for your review and comment. 
+  Conclusion is application uses wrong ioctls, g/s_crop.
+
+> > 
+> > static int v4l_g_crop(const struct v4l2_ioctl_ops *ops,
+> > 				struct file *file, void *fh, void *arg)
+> > ...
+> > 	/* crop means compose for output devices */
+> > 	if (V4L2_TYPE_IS_OUTPUT(p->type))
+> > 		s.target = V4L2_SEL_TGT_COMPOSE_ACTIVE;
+> > 	else
+> > 		s.target = V4L2_SEL_TGT_CROP_ACTIVE;
+> > 
+> > 	ret = ops->vidioc_g_selection(file, fh, &s);
+> > 
+> > 
+> >> What exactly does the hardware do? Both for the encoder and for the decoder
+> >> case. Perhaps if I knew exactly what that is, then I can advise.
+> >>
+> > 
+> > NV12M/YUV420M/MT21 -> MDP -> NV12M/YUV420M
+> > 
+> > The usage would be like this:
+> > For decoder:
+> > decoder -> MT21 -> MDP -> NV12M/YUV420M
+> > 
+> > For encoder:
+> > NV12M/YUV420M -> MDP -> NV12M/YUV420M -> encoder
+> 
+> That doesn't help. Where in these two chains does the cropping (encoder) or
+> composing (decoder) take place? I assume it is the DMA engine that read from
+> a rectangle in the source buffer (encoder) or writes to a rectangle in the
+> destination buffer (decoder).
+> 
+
+ Yes. they are only buffer transfer between decoder, mdp and encoder.
+
+
+> And in that case the current driver is correct.
+
+ Next step, we will try to refine framework in userspace code.
+
+
+> I wonder if the g/s_crop description in the V4L2 Specification should get a
+> big fat warning that it doesn't apply to codec drivers and that the selection
+> API should be used instead. A patch for that is welcome!
 >
-> > > Ok, but don't we need to re-enable interrupts, otherwise we can't safely
-> > > handle the fault (which might involve blocking)?
-> > 
-> > I thought a lot, but have got no other way to solve the issue, which
-> > totally makes stepi in vain.
-> > In theory, you might be right, but in practice, people don't always expect
-> > to step through the whole sequence of fault recovery with single stepping.
-> > Once we do 'c(ontinue),' interrupts are enabled again and the execution
-> > will follow as expected.
+> Regards,
 > 
-> It's not the stepping guarantees I'm worried about. I'm more worried that
-> the fault handler panics because it's called with IRQs disabled,
-
-I'm still wondering how it can cause panic.
-
-> so the
-> debugger has ended up changing the behaviour of the kernel which is
-> absolutely not what you want!
-
-That's what I'm saying, I guess.
-As far as we are keeping on single stepping, no interrupts will be
-taken but once the execution is continued, any outstanding interrupts
-will be served.
-Human intervention with a debugger, either software-oriented kgdb or
-jtag-based ICE, will inevitably affect the system's behavior somehow.
-
-> > If you want to 'step over' a faulted instruction here, or to break
-> > somewhere in a middle of exception handler, you need to manage to set
-> > a breakpoint explicitly. But it will, I believe, be much better than
-> > useless stepi from day-1 :)
-> > 
-> > Meanwhile, kprobes also disables interrupts while single stepping.
-> > See setup_singlestep().
-> 
-> Sure, but I don't think those instructions can fault.
-
-Looking into arm_probe_decode_insn() & aarch64_insn_is_steppable(),
-I doubt that no instruction to be single stepped by kprobes
-will cause any (page) fault.
-
-In addition, a comment in kprobe_fault_handler() says,
-                /*
-                 * We are here because the instruction being single
-                 * stepped caused a page fault. We reset the current
-                 * kprobe and the ip points back to the probe address
-                 * and allow the page fault handler to continue as a
-                 * normal page fault.
-                 */
-Kprobes seems to redo the instruction with single step disabled
-if it has generated a page fault.
-
-> Can KGDB make the same
-> guarantees?
-
-Taking a similar approach won't be impossible, but require lots of work,
-in particular decoding instructions to be single stepped.
-(I'm even not sure that gdb protocol allows this.)
-It also raises another question, as you mentioned early, should we
-step into or step over exception/interrupt handler?
-
-Thanks,
--Takahiro AKASHI
-
-> Will
+> 	Hans
