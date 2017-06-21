@@ -1,90 +1,71 @@
-From: rientjes@google.com (David Rientjes)
-Date: Tue, 20 Jun 2017 16:12:32 -0700 (PDT)
-Subject: [PATCH] compiler, clang: Add always_inline attribute to inline
-In-Reply-To: <20170620105937.GD28157@leverpostej>
-References: <20170615155440.GC26471@leverpostej>
- <1497887596-8731-1-git-send-email-psodagud@codeaurora.org>
- <alpine.DEB.2.10.1706191322590.95967@chino.kir.corp.google.com>
- <47bd7df20466d5f7f557ca087b0189cf@codeaurora.org>
- <alpine.DEB.2.10.1706191439090.2360@chino.kir.corp.google.com>
- <f8ee882e9859f24dac24832bfb5ae0f1@codeaurora.org>
- <20170620105937.GD28157@leverpostej>
-Message-ID: <alpine.DEB.2.10.1706201604540.146880@chino.kir.corp.google.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 20 Jun 2017 17:31:27 -0700
+Subject: [PATCH 2/6] drivers base/arch_topology: frequency-invariant
+ load-tracking support
+In-Reply-To: <CAOh2x=k1Zr15vAq8LA0+Sg3Cz7o=dL5C-erkEx_py7g56b7BwA@mail.gmail.com>
+References: <20170608075513.12475-1-dietmar.eggemann@arm.com>
+ <20170608075513.12475-3-dietmar.eggemann@arm.com>
+ <CAOh2x=k1Zr15vAq8LA0+Sg3Cz7o=dL5C-erkEx_py7g56b7BwA@mail.gmail.com>
+Message-ID: <5949BE5F.4020502@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Jun 2017, Mark Rutland wrote:
+On 06/19/2017 11:17 PM, Viresh Kumar wrote:
+> On Thu, Jun 8, 2017 at 1:25 PM, Dietmar Eggemann
+> <dietmar.eggemann@arm.com> wrote:
+>
+>> diff --git a/drivers/base/arch_topology.c b/drivers/base/arch_topology.c
+>
+>>   static int __init register_cpufreq_notifier(void)
+>>   {
+>> +       int ret;
+>> +
+>>          /*
+>>           * on ACPI-based systems we need to use the default cpu capacity
+>>           * until we have the necessary code to parse the cpu capacity, so
+>> @@ -225,8 +265,14 @@ static int __init register_cpufreq_notifier(void)
+>>
+>>          cpumask_copy(cpus_to_visit, cpu_possible_mask);
+>>
+>> -       return cpufreq_register_notifier(&init_cpu_capacity_notifier,
+>> -                                        CPUFREQ_POLICY_NOTIFIER);
+>> +       ret = cpufreq_register_notifier(&init_cpu_capacity_notifier,
+>> +                                       CPUFREQ_POLICY_NOTIFIER);
+>
+> Wanted to make sure that we all understand the constraints this is going to add
+> for the ARM64 platforms.
+>
+> With the introduction of this transition notifier, we would not be able to use
+> the fast-switch path in the schedutil governor. I am not sure if there are any
+> ARM platforms that can actually use the fast-switch path in future or not
+> though. The requirement of fast-switch path is that the freq can be changed
+> without sleeping in the hot-path.
+>
+> So, will we ever want fast-switching for ARM platforms ?
+>
 
-> As with my reply to David, my preference would be that we:
-> 
-> 1) Align compiler-clang.h with the compiler-gcc.h inlining behaviour, so
->    that things work by default.
-> 
-> 2) Fix up the arm64 core code (and drivers for architected / common
->    peripherals) to use __always_inline where we always require inlining.
-> 
-> 3) Have arm64 select CONFIG_ARCH_SUPPORTS_OPTIMIZED_INLINING, and have
->    people test-build configurations with CONFIG_OPTIMIZE_INLINING, with
->    both GCC and clang.
-> 
-> 4) Fix up drivers, etc, as appropriate.
-> 
-> 5) Once that's largely stable, and if there's a benefit, have arm64
->    select CONFIG_OPTIMIZE_INLINING by default.
-> 
-> That should avoid undue breakage, while enabling this ASAP.
-> 
+I don't think we should go down a path that'll prevent ARM platform from 
+switching over to fast-switching in the future.
 
-Sounds good, but I think we should simply deal with the 
-__attribute__((unused)) needed for clang as part of compiler-gcc.h by 
-simply adding it to the inline override there to avoid duplicated code.
+Having said that, I'm not sure I fully agree with the decision to 
+completely disable notifiers in the fast-switching case. How many of the 
+current users of notifiers truly need support for sleeping in the 
+notifier? Why not make all the transition notifiers atomic? Or at least 
+add atomic transition notifiers that can be registered for separately if 
+the client doesn't need the ability to sleep?
 
-diff --git a/include/linux/compiler-clang.h b/include/linux/compiler-clang.h
---- a/include/linux/compiler-clang.h
-+++ b/include/linux/compiler-clang.h
-@@ -15,11 +15,3 @@
-  * with any version that can compile the kernel
-  */
- #define __UNIQUE_ID(prefix) __PASTE(__PASTE(__UNIQUE_ID_, prefix), __COUNTER__)
--
--/*
-- * GCC does not warn about unused static inline functions for
-- * -Wunused-function.  This turns out to avoid the need for complex #ifdef
-- * directives.  Suppress the warning in clang as well.
-- */
--#undef inline
--#define inline inline __attribute__((unused)) notrace
-diff --git a/include/linux/compiler-gcc.h b/include/linux/compiler-gcc.h
-index 0efef9cf014f..71fe0994cf1a 100644
---- a/include/linux/compiler-gcc.h
-+++ b/include/linux/compiler-gcc.h
-@@ -66,18 +66,22 @@
- 
- /*
-  * Force always-inline if the user requests it so via the .config,
-- * or if gcc is too old:
-+ * or if gcc is too old.
-+ * GCC does not warn about unused static inline functions for
-+ * -Wunused-function.  This turns out to avoid the need for complex #ifdef
-+ * directives.  Suppress the warning in clang as well by using "unused"
-+ * function attribute, which is redundant but not harmful for gcc.
-  */
- #if !defined(CONFIG_ARCH_SUPPORTS_OPTIMIZED_INLINING) ||		\
-     !defined(CONFIG_OPTIMIZE_INLINING) || (__GNUC__ < 4)
--#define inline		inline		__attribute__((always_inline)) notrace
--#define __inline__	__inline__	__attribute__((always_inline)) notrace
--#define __inline	__inline	__attribute__((always_inline)) notrace
-+#define inline inline		__attribute__((always_inline,unused)) notrace
-+#define __inline__ __inline__	__attribute__((always_inline,unused)) notrace
-+#define __inline __inline	__attribute__((always_inline,unused)) notrace
- #else
- /* A lot of inline functions can cause havoc with function tracing */
--#define inline		inline		notrace
--#define __inline__	__inline__	notrace
--#define __inline	__inline	notrace
-+#define inline inline		__attribute__((unused)) notrace
-+#define __inline__ __inline__	__attribute__((unused)) notrace
-+#define __inline __inline	__attribute__((unused)) notrace
- #endif
- 
- #define __always_inline	inline __attribute__((always_inline))
+Most of the clients don't seem like ones that'll need to sleep.
+
+There are a bunch of generic off-tree drivers (can't upstream them yet 
+because it depends on the bus scaling framework) that also depend on 
+CPUfreq transition notifiers that are going to stop working if fast 
+switching becomes available in the future. So, this decision to disallow 
+transition notifiers is painful for other reasons too.
+
+-Saravana
+
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
