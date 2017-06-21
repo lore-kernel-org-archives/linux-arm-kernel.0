@@ -1,59 +1,92 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 22 Jun 2017 00:03:41 +0800
-Subject: [PATCH 2/2] ASoC: zx_aud96p22: add ZTE ZX AUD96P22 codec driver
-In-Reply-To: <20170620124059.r55r363y3y3if6jg@sirena.org.uk>
-References: <1497708574-22380-1-git-send-email-shawnguo@kernel.org>
- <1497708574-22380-3-git-send-email-shawnguo@kernel.org>
- <20170619161910.siea75hqxgtxhjmp@sirena.org.uk>
- <20170620031953.GC4818@x250>
- <20170620124059.r55r363y3y3if6jg@sirena.org.uk>
-Message-ID: <20170621160340.GE3372@dragon>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 21 Jun 2017 17:05:52 +0100
+Subject: [PATCH 1/3] arm64: ptrace: Fix VFP register dumping in compat
+ coredumps
+In-Reply-To: <20170621152320.GG24558@leverpostej>
+References: <1498057010-12028-1-git-send-email-Dave.Martin@arm.com>
+ <1498057264-12211-1-git-send-email-Dave.Martin@arm.com>
+ <20170621152320.GG24558@leverpostej>
+Message-ID: <20170621160550.GC8543@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 01:40:59PM +0100, Mark Brown wrote:
-> On Tue, Jun 20, 2017 at 11:19:55AM +0800, Shawn Guo wrote:
-> > On Mon, Jun 19, 2017 at 05:19:10PM +0100, Mark Brown wrote:
-> > > On Sat, Jun 17, 2017 at 10:09:34PM +0800, Shawn Guo wrote:
+On Wed, Jun 21, 2017 at 04:23:20PM +0100, Mark Rutland wrote:
+> On Wed, Jun 21, 2017 at 04:00:42PM +0100, Dave Martin wrote:
+> > Currently, VFP registers are omitted from coredumps for compat
+> > processes, due to a bug in the REGSET_COMPAT_VFP regset
+> > implementation.
+> > 
+> > compat_vfp_get() needs to transfer non-contiguous data from
+> > thread_struct.fpsimd_state, and uses put_user() to handle the
+> > offending trailing word (FPSCR).  This fails when copying to a
+> > kernel address (i.e., kbuf && !ubuf), which is what happens when
+> > dumping core.  As a result, the ELF coredump core code silently
+> > omits the NT_ARM_VFP note from the dump.
+> > 
+> > It would be possible to work around this with additional special
+> > case code for the put_user(), but since user_regset_copyout() is
+> > explcltly designed to handle this scenario it is cleaner to port
 > 
-> > > > +	/* Overall power-up */
-> > > > +	regmap_update_bits(regmap, AUD96P22_PD_0, PD_0_PDZ, PD_0_PDZ);
-> 
-> > > Why is this not done with DAPM?
-> 
-> > As this is a overall power bit, which is not for any specific component.
-> > I'm not sure which DAPM widget should be used for it, and how it should
-> > be arranged in the widget route.  Any suggestion or example will be
-> > appreciated.
-> 
-> Sounds like a fairly standard use for a supply widget.
+> Nit: explicitly
 
-Yes, it can be a supply widget.  But it's a bit that controls device
-overall power rather than any particular component power.  Since every
-single operation of the device will need this power bit to be on, I
-think it makes sense to configure the bit in .startup/.shutdown hooks,
-rather than creating a widget for it and attaches the widget to a bunch
-of components.
+Fixed for respin (if there is one).
 
+> > the put_user() to a user_regset_copyout() call, which this patch
+> > does.
 > 
-> > > > +	/* Reset ADC and DAC path */
-> > > > +	regmap_write(regmap, AUD96P22_RESET, 0x0);
-> > > > +	regmap_write(regmap, AUD96P22_RESET, 0x3);
+> Given, 32-bit arm also uses user_regset_copyout(), it seems like the
+> all-round right thing to do.
+
+Agreed.  There may be cases where user_regset_copyout() doesn't cut it,
+but it seems OK here.
+
+> > 
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > ---
+> >  arch/arm64/kernel/ptrace.c | 11 +++++++----
+> >  1 file changed, 7 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+> > index c142459..0e5aaec 100644
+> > --- a/arch/arm64/kernel/ptrace.c
+> > +++ b/arch/arm64/kernel/ptrace.c
+> > @@ -894,7 +894,7 @@ static int compat_vfp_get(struct task_struct *target,
+> >  {
+> >  	struct user_fpsimd_state *uregs;
+> >  	compat_ulong_t fpscr;
+> > -	int ret;
+> > +	int ret, vregs_end_pos;
+> >  
+> >  	uregs = &target->thread.fpsimd_state.user_fpsimd;
+> >  
+> > @@ -902,13 +902,16 @@ static int compat_vfp_get(struct task_struct *target,
+> >  	 * The VFP registers are packed into the fpsimd_state, so they all sit
+> >  	 * nicely together for us. We just need to create the fpscr separately.
+> >  	 */
+> > -	ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf, uregs, 0,
+> > -				  VFP_STATE_SIZE - sizeof(compat_ulong_t));
+> > +	vregs_end_pos = VFP_STATE_SIZE - sizeof(compat_ulong_t);
+> > +	ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf, uregs,
+> > +				  0, vregs_end_pos);
+> >  
+> >  	if (count && !ret) {
+> >  		fpscr = (uregs->fpsr & VFP_FPSCR_STAT_MASK) |
+> >  			(uregs->fpcr & VFP_FPSCR_CTRL_MASK);
+> > -		ret = put_user(fpscr, (compat_ulong_t *)ubuf);
+> > +
+> > +		ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf, &fpscr,
+> > +					  vregs_end_pos, VFP_STATE_SIZE);
+> >  	}
 > 
-> > > What does this mean?
-> 
-> > It's a de-assert/assert of ADC and DAC reset.  I will add proper
-> > defines for the bits to make this clear.
-> 
-> Why are we resetting these - won't this loose settings?
+> It's a shame compat_user_vfp is defined in signal32.c, otherwise we
+> could've used offsetof(struct compat-user_vfp, fpscr) here (and also for
+> the fpregs), mirroring the structure of 32-bit's vfp_get().
 
-It only resets some hardware internal states, and software settings
-won't be affected.
+Could be nicer -- I was trying to make the minimum change here.
 
-> And if it's
-> just something to be done as part of starting the DAC and ADC why isn't
-> it done via DAPM?
+> Otherwise, this looks sane to me.
 
-Yes, it sounds like a better approach.  Will try to do that.
+Thanks for looking it over.
 
-Shawn
+Cheers
+---Dave
