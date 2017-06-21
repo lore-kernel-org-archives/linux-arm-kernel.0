@@ -1,34 +1,41 @@
 From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 21 Jun 2017 12:30:46 -0500
-Subject: [PATCH 7/8] arm64: defconfig: enable QCOM_L2_PMU and QCOM_L3_PMU
+Date: Wed, 21 Jun 2017 12:30:44 -0500
+Subject: [PATCH 5/8] arm64: defconfig: enable APEI and GHES features
 In-Reply-To: <1498066247-22130-1-git-send-email-timur@codeaurora.org>
 References: <1498066247-22130-1-git-send-email-timur@codeaurora.org>
-Message-ID: <1498066247-22130-8-git-send-email-timur@codeaurora.org>
+Message-ID: <1498066247-22130-6-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the drivers are available, enable support for L2 and L3
-performance monitoring Qualcomm Datacenter Technologies Centriq SoCs.
-These PMU drivers provide support for performance optimization.
+ARM64 server platforms can support ACPI Platform Error Interface (APEI)
+and Generic Hardware Error Source (GHES) features, so enable them.
+
+Platforms which support the firmware-first RAS error reporting model
+require APEI and GHES functionality for the OS to receive and report
+error records provided by the platform.
+
+PCIe AER functionality is required for PCIe AER errors to be properly
+reported and recovered from.
 
 Signed-off-by: Timur Tabi <timur@codeaurora.org>
 ---
- arch/arm64/configs/defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/configs/defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 6a52906..00a0f80 100644
+index 3455070..0d86a8a 100644
 --- a/arch/arm64/configs/defconfig
 +++ b/arch/arm64/configs/defconfig
-@@ -502,6 +502,8 @@ CONFIG_PHY_ROCKCHIP_EMMC=y
- CONFIG_PHY_ROCKCHIP_PCIE=m
- CONFIG_PHY_XGENE=y
- CONFIG_PHY_TEGRA_XUSB=y
-+CONFIG_QCOM_L2_PMU=y
-+CONFIG_QCOM_L3_PMU=y
- CONFIG_ARM_SCPI_PROTOCOL=y
+@@ -505,6 +505,9 @@ CONFIG_ARM_SCPI_PROTOCOL=y
  CONFIG_RASPBERRYPI_FIRMWARE=y
  CONFIG_EFI_CAPSULE_LOADER=y
+ CONFIG_ACPI=y
++CONFIG_ACPI_APEI=y
++CONFIG_ACPI_APEI_GHES=y
++CONFIG_ACPI_APEI_PCIEAER=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+ CONFIG_EXT4_FS_POSIX_ACL=y
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
 Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
