@@ -1,58 +1,81 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 21 Jun 2017 14:14:56 -0700
-Subject: [v2] drm: mediatek: change the variable type of rdma threshold
-In-Reply-To: <1495187843-6882-1-git-send-email-bibby.hsieh@mediatek.com>
-References: <1495187843-6882-1-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <20170621211456.GA21176@roeck-us.net>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 21 Jun 2017 14:16:11 -0700
+Subject: Drivers taking different actions depending on sleep state
+In-Reply-To: <CAJZ5v0iL7voAz9T+36fXXncOj4UrFSAH8WzwEbec96GuFUteaQ@mail.gmail.com>
+References: <9dc7b7f4-e47d-59f3-3b51-52e0aefd2487@free.fr>
+ <CAJZ5v0iL7voAz9T+36fXXncOj4UrFSAH8WzwEbec96GuFUteaQ@mail.gmail.com>
+Message-ID: <ccac39d6-4611-8b46-12f7-24227ef3b35e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 19, 2017 at 05:57:23PM +0800, Bibby Hsieh wrote:
-> For some greater resolution, the rdma threshold
-> variable will overflow.
+On 06/09/2017 03:53 PM, Rafael J. Wysocki wrote:
+> Hi,
 > 
-> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-> ---
->  drivers/gpu/drm/mediatek/mtk_disp_rdma.c | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
+> On Fri, Jun 9, 2017 at 5:20 PM, Mason <slash.tmp@free.fr> wrote:
+>> Hello,
+>>
+>> I read the "Sleep States" documentation:
+>> https://www.kernel.org/doc/Documentation/power/states.txt
+>>
+>> It mentions /sys/power/mem_sleep but I don't have that in 4.9
+>> # ll /sys/power/
+>> -rw-r--r--    1 root     root          4096 Jan  1 00:31 pm_async
+>> -rw-r--r--    1 root     root          4096 Jan  1 00:31 pm_freeze_timeout
+>> -rw-r--r--    1 root     root          4096 Jan  1 00:31 state
+>> -rw-r--r--    1 root     root          4096 Jan  1 00:31 wakeup_count
+>>
+>> # cat /sys/power/state
+>> freeze mem
+>>
+>> Currently my platform's "mem" is a true suspend-to-RAM trigger,
+>> where drivers are supposed to save their state (register values
+>> will be lost), then Linux hands control over to firmware which
+>> enables RAM self-refresh and powers the chip down. When the system
+>> resumes, drivers restore their state from their copy in memory.
+>>
+>> One driver is responsible for loading/unloading microcode running
+>> on the DSPs. This operation is required only when powering down
+>> the chip, but it should be avoided for "low-latency" sleeps.
+>>
+>> The problem is that, if I understand correctly, drivers have no way
+>> of knowing which sleep state is being entered/exited?
+>>
+>> How can I have the microcode driver take different decisions
+>> based on the sleep state?
 > 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> index 0df05f9..9afdcd7 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> @@ -37,7 +37,7 @@
->  #define DISP_REG_RDMA_FIFO_CON			0x0040
->  #define RDMA_FIFO_UNDERFLOW_EN				BIT(31)
->  #define RDMA_FIFO_PSEUDO_SIZE(bytes)			(((bytes) / 16) << 16)
-> -#define RDMA_OUTPUT_VALID_FIFO_THRESHOLD(bytes)		((bytes) / 16)
-> +#define RDMA_OUTPUT_VALID_FIFO_THRESHOLD(bytes) (((bytes) / 16) & 0x3ff)
+> The cleanest way would be to run that code from one of the platform
+> suspend hooks that receive information on what sleep state is to be
+> entered.
 
-I agree with the earlier comment; clamp_val() might be more appropriate here
-and would avoid unexpected results.
+I am not sure this would be cleaner, because that would create a tighter
+dependency between different drivers, each of them having their
+suspend/resume routings and the driver that implements the
+platform_suspend_ops, that could also create some nice layering
+violations and some difficult to solve dependencies.
 
->  
->  /**
->   * struct mtk_disp_rdma - DISP_RDMA driver structure
-> @@ -109,7 +109,7 @@ static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
->  			    unsigned int height, unsigned int vrefresh,
->  			    unsigned int bpc)
->  {
-> -	unsigned int threshold;
-> +	unsigned long long threshold;
->  	unsigned int reg;
->  
->  	rdma_update_bits(comp, DISP_REG_RDMA_SIZE_CON_0, 0xfff, width);
-> @@ -121,7 +121,8 @@ static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
->  	 * output threshold to 6 microseconds with 7/6 overhead to
->  	 * account for blanking, and with a pixel depth of 4 bytes:
->  	 */
-> -	threshold = width * height * vrefresh * 4 * 7 / 1000000;
-> +	threshold = (unsigned long long)width * height * vrefresh *
-> +		    4 * 7 / 1000000;
+> 
+> Alternatively, those hooks can set/clear flags that can be accessed by
+> drivers, but that of course may your drivers depend on the platform
+> (still, in the microcode case the driver seems to be
+> platform-dependent anyway).
 
-This is a 64 bit divide operation. It will result in a build failure
-if compiled for a 32 bit kernel (eg arm:allmodconfig).
+It may be platform dependent, but the actual system-wide suspend/resume
+implementations can vary a lot. For example you may have started with
+some particular CPU architecture on your platforms, with one driver
+implementing an instance of platform_suspend_ops, and then as you moved
+to another CPU architecture, some of that could be managed by a generic
+driver (e.g: ARM SCPI, ACPI etc. etc.).
 
-ERROR: "__aeabi_uldivmod" [drivers/gpu/drm/mediatek/mediatek-drm.ko] undefined!
+The same HW blocks are likely to be present on these different SoCs, and
+have the same requirements where they need to see a slightly different
+path taken on suspend/resume. If we have to patch both the "legacy"
+platform_suspend_ops, and the "new" platform_suspend_ops that does not
+really scale.
 
-Guenter
+Would it be that much of a stretch if we reflected e.g:
+PM_SUSPEND_STANDBY, PM_SUSPEND_MEM into the pm_message_t that is
+communicated to platform_driver::suspend and platform_driver::resume?
+
+Thanks!
+-- 
+Florian
