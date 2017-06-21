@@ -1,128 +1,35 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 22 Jun 2017 00:57:38 +0200
-Subject: Drivers taking different actions depending on sleep state
-In-Reply-To: <7001768d-9134-4975-127e-e8444e00f677@gmail.com>
-References: <9dc7b7f4-e47d-59f3-3b51-52e0aefd2487@free.fr>
- <CAJZ5v0iL7voAz9T+36fXXncOj4UrFSAH8WzwEbec96GuFUteaQ@mail.gmail.com>
- <ccac39d6-4611-8b46-12f7-24227ef3b35e@gmail.com>
- <CAJZ5v0g_egRwxOLqft=JhvzAqBWuyvC8yiO7De5TYUZLUT2Fpw@mail.gmail.com>
- <7001768d-9134-4975-127e-e8444e00f677@gmail.com>
-Message-ID: <CAJZ5v0ihqn5Xcj1yoZcrb7caYiH+x8YivLJit6BqvDGradZJ=Q@mail.gmail.com>
+From: cosardindar@gmail.com (Cosar Dindar)
+Date: Thu, 22 Jun 2017 02:13:07 +0300
+Subject: [RESEND,PATCH v4 0/5] Add support for the STM32F4 CRC32
+Message-ID: <1498086787-104647-1-git-send-email-cosardindar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 22, 2017 at 12:48 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> On 06/21/2017 02:59 PM, Rafael J. Wysocki wrote:
->> On Wed, Jun 21, 2017 at 11:16 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->>> On 06/09/2017 03:53 PM, Rafael J. Wysocki wrote:
->>>> Hi,
->>>>
->>>> On Fri, Jun 9, 2017 at 5:20 PM, Mason <slash.tmp@free.fr> wrote:
->>>>> Hello,
->>>>>
->>>>> I read the "Sleep States" documentation:
->>>>> https://www.kernel.org/doc/Documentation/power/states.txt
->>>>>
->>>>> It mentions /sys/power/mem_sleep but I don't have that in 4.9
->>>>> # ll /sys/power/
->>>>> -rw-r--r--    1 root     root          4096 Jan  1 00:31 pm_async
->>>>> -rw-r--r--    1 root     root          4096 Jan  1 00:31 pm_freeze_timeout
->>>>> -rw-r--r--    1 root     root          4096 Jan  1 00:31 state
->>>>> -rw-r--r--    1 root     root          4096 Jan  1 00:31 wakeup_count
->>>>>
->>>>> # cat /sys/power/state
->>>>> freeze mem
->>>>>
->>>>> Currently my platform's "mem" is a true suspend-to-RAM trigger,
->>>>> where drivers are supposed to save their state (register values
->>>>> will be lost), then Linux hands control over to firmware which
->>>>> enables RAM self-refresh and powers the chip down. When the system
->>>>> resumes, drivers restore their state from their copy in memory.
->>>>>
->>>>> One driver is responsible for loading/unloading microcode running
->>>>> on the DSPs. This operation is required only when powering down
->>>>> the chip, but it should be avoided for "low-latency" sleeps.
->>>>>
->>>>> The problem is that, if I understand correctly, drivers have no way
->>>>> of knowing which sleep state is being entered/exited?
->>>>>
->>>>> How can I have the microcode driver take different decisions
->>>>> based on the sleep state?
->>>>
->>>> The cleanest way would be to run that code from one of the platform
->>>> suspend hooks that receive information on what sleep state is to be
->>>> entered.
->>>
->>> I am not sure this would be cleaner, because that would create a tighter
->>> dependency between different drivers, each of them having their
->>> suspend/resume routings and the driver that implements the
->>> platform_suspend_ops, that could also create some nice layering
->>> violations and some difficult to solve dependencies.
->>>
->>>>
->>>> Alternatively, those hooks can set/clear flags that can be accessed by
->>>> drivers, but that of course may your drivers depend on the platform
->>>> (still, in the microcode case the driver seems to be
->>>> platform-dependent anyway).
->>>
->>> It may be platform dependent, but the actual system-wide suspend/resume
->>> implementations can vary a lot. For example you may have started with
->>> some particular CPU architecture on your platforms, with one driver
->>> implementing an instance of platform_suspend_ops, and then as you moved
->>> to another CPU architecture, some of that could be managed by a generic
->>> driver (e.g: ARM SCPI, ACPI etc. etc.).
->>>
->>> The same HW blocks are likely to be present on these different SoCs, and
->>> have the same requirements where they need to see a slightly different
->>> path taken on suspend/resume. If we have to patch both the "legacy"
->>> platform_suspend_ops, and the "new" platform_suspend_ops that does not
->>> really scale.
->>>
->>> Would it be that much of a stretch if we reflected e.g:
->>> PM_SUSPEND_STANDBY, PM_SUSPEND_MEM into the pm_message_t that is
->>> communicated to platform_driver::suspend and platform_driver::resume?
->>
->> I'm not sure what you mean, really.
->>
->> The ->suspend callback in struct platform_driver has been long deprecated.
->
-> What I mean is that we could take advantage of the pm_message_t argument
-> passed to platform_driver::resume and platform_driver::resume to
-> communicate the system sleep state we are about to enter (and conversely
-> exit).
+This patch series add hardware CRC32 ("Ethernet") calculation support
+for STMicroelectronics STM32F429.
 
-So the ->suspend and ->resume callbacks in struct platform_driver
-(which I think is what you are referring to) are legacy.
+Polynomial and key setting are not supported, key is fixed as 0x4C11DB7
+and poly is 0xFFFFFFFF.
 
-The majority of drivers I know about use struct dev_pm_ops and the
-callbacks in there do not take the pm_message_t argument.
+Module is tested on STM32F429-disco board with crypto testmgr using
+cases within the key 0xFFFFFFFF.
 
-Moreover, even if they did take it, the exact meaning of
-PM_SUSPEND_STANDBY and PM_SUSPEND_MEM is platform-specific and drivers
-would need to find out what they actually mean for the given platform
-somehow anyway.
+Changes in v4:
+  - Edited patch summary.
 
-> This would allow drivers to take a different path whether e.g:
-> pm_message_t == PM_SUSPEND_STANDBY or PM_SUSPEND_MEM.
->
-> If these are deprecated, then should we introduce a global getter
-> function that reflects which suspend state we are about to enter?  This
-> would allow drivers do to something like (pseudo code):
->
-> static int drv_suspend(struct device d)
-> {
->         suspend_state_t state = suspend_get_state();
->
->         switch (state) {
->         case PM_SUSPEND_STANDBY:
->                 return 0;
->         case PM_SUSPEND_MEM:
->                 /* save HW context */
-> }
+Cosar Dindar (5):
+  dt-bindings : Document the STM32F4 CRC32 binding
+  crypto : stm32 - Add STM32F4 CRC32 support
+  ARM: dts: stm32: Add CRC support to stm32f429 (Merged-by Alexander TORGUE)
+  ARM: dts: stm32: enable CRC32 on stm32429-disco board (Merged-by Alexander TORGUE)
+  ARM: dts: stm32: enable CRC32 on stm32429i-eval board (Merged-by Alexander TORGUE)
 
-That is conceivable, but again, the meaning of STANDBY and MEM is
-platform-specific.  Actions to be taken for, say, STANDBY, may differ
-from one platform to another.
+ .../devicetree/bindings/crypto/st,stm32-crc.txt    |  4 +-
+ arch/arm/boot/dts/stm32429i-eval.dts               |  4 ++
+ arch/arm/boot/dts/stm32f429-disco.dts              |  4 ++
+ arch/arm/boot/dts/stm32f429.dtsi                   |  7 +++
+ drivers/crypto/stm32/stm32_crc32.c                 | 68 ++++++++++++++++++----
+ 5 files changed, 75 insertions(+), 12 deletions(-)
 
-Thanks,
-Rafael
+-- 
+2.7.4
