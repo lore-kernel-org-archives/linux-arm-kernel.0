@@ -1,35 +1,98 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 21 Jun 2017 20:20:04 +0200
-Subject: [PATCH] pinctrl: bcm2835: Avoid warning from __irq_do_set_handler
-Message-ID: <1498069204-28154-1-git-send-email-stefan.wahren@i2se.com>
+From: alexander.duyck@gmail.com (Alexander Duyck)
+Date: Wed, 21 Jun 2017 11:28:33 -0700
+Subject: [PATCH v5 3/3] net/cxgb4: Use new
+ PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
+In-Reply-To: <1497855239-18560-4-git-send-email-dingtianhong@huawei.com>
+References: <1497855239-18560-1-git-send-email-dingtianhong@huawei.com>
+ <1497855239-18560-4-git-send-email-dingtianhong@huawei.com>
+Message-ID: <CAKgT0UdJ_zseo9O7SiU9U2m__OZeF_Z8eVjsA5N8ZK39rdK2fA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We get a warning during boot with enabled EARLY_PRINTK that
-we try to set a irq_chip without data. This is caused by ignoring
-the return value of irq_of_parse_and_map(). So avoid calling
-gpiochip_set_chained_irqchip() in error case.
+On Sun, Jun 18, 2017 at 11:53 PM, Ding Tianhong <dingtianhong@huawei.com> wrote:
+> From: Casey Leedom <leedom@chelsio.com>
+>
+> cxgb4 Ethernet driver now queries PCIe configuration space to determine
+> if it can send TLPs to it with the Relaxed Ordering Attribute set.
+>
+> Signed-off-by: Casey Leedom <leedom@chelsio.com>
+> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+> ---
+>  drivers/net/ethernet/chelsio/cxgb4/cxgb4.h      |  1 +
+>  drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c | 17 +++++++++++++++++
+>  drivers/net/ethernet/chelsio/cxgb4/sge.c        |  5 +++--
+>  3 files changed, 21 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+> index e88c180..478f25a 100644
+> --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+> +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+> @@ -521,6 +521,7 @@ enum {                                 /* adapter flags */
+>         USING_SOFT_PARAMS  = (1 << 6),
+>         MASTER_PF          = (1 << 7),
+>         FW_OFLD_CONN       = (1 << 9),
+> +       ROOT_NO_RELAXED_ORDERING = (1 << 10),
+>  };
+>
+>  enum {
+> diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+> index ea1bfcf..7cd4e1b 100644
+> --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+> +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+> @@ -4735,6 +4735,23 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+>         adapter->msg_enable = DFLT_MSG_ENABLE;
+>         memset(adapter->chan_map, 0xff, sizeof(adapter->chan_map));
+>
+> +       /* If possible, we use PCIe Relaxed Ordering Attribute to deliver
+> +        * Ingress Packet Data to Free List Buffers in order to allow for
+> +        * chipset performance optimizations between the Root Complex and
+> +        * Memory Controllers.  (Messages to the associated Ingress Queue
+> +        * notifying new Packet Placement in the Free Lists Buffers will be
+> +        * send without the Relaxed Ordering Attribute thus guaranteeing that
+> +        * all preceding PCIe Transaction Layer Packets will be processed
+> +        * first.)  But some Root Complexes have various issues with Upstream
+> +        * Transaction Layer Packets with the Relaxed Ordering Attribute set.
+> +        * The PCIe devices which under the Root Complexes will be cleared the
+> +        * Relaxed Ordering bit in the configuration space, So we check our
+> +        * PCIe configuration space to see if it's flagged with advice against
+> +        * using Relaxed Ordering.
+> +        */
+> +       if (pcie_relaxed_ordering_supported(pdev))
+> +               adapter->flags |= ROOT_NO_RELAXED_ORDERING;
+> +
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-Fixes: 85ae9e512f43 ("pinctrl: bcm2835: switch to GPIOLIB_IRQCHIP")
----
- drivers/pinctrl/bcm/pinctrl-bcm2835.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Looks like you have a typo here. It should be
+"!pcie_relaxed_ordering_supported(pdev)" that you are testing for to
+set this flag shouldn't it? Right now it appears the flag is getting
+set if relaxed ordering is supported.
 
-diff --git a/drivers/pinctrl/bcm/pinctrl-bcm2835.c b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-index 1eb7a1a..2308831 100644
---- a/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-+++ b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-@@ -1048,6 +1048,10 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
- 	for (i = 0; i < BCM2835_NUM_IRQS; i++) {
- 		pc->irq[i] = irq_of_parse_and_map(np, i);
- 		pc->irq_group[i] = i;
-+
-+		if (pc->irq[i] == 0)
-+			continue;
-+
- 		/*
- 		 * Use the same handler for all groups: this is necessary
- 		 * since we use one gpiochip to cover all lines - the
--- 
-2.7.4
+>         spin_lock_init(&adapter->stats_lock);
+>         spin_lock_init(&adapter->tid_release_lock);
+>         spin_lock_init(&adapter->win0_lock);
+> diff --git a/drivers/net/ethernet/chelsio/cxgb4/sge.c b/drivers/net/ethernet/chelsio/cxgb4/sge.c
+> index f05f0d4..ac229a3 100644
+> --- a/drivers/net/ethernet/chelsio/cxgb4/sge.c
+> +++ b/drivers/net/ethernet/chelsio/cxgb4/sge.c
+> @@ -2571,6 +2571,7 @@ int t4_sge_alloc_rxq(struct adapter *adap, struct sge_rspq *iq, bool fwevtq,
+>         struct fw_iq_cmd c;
+>         struct sge *s = &adap->sge;
+>         struct port_info *pi = netdev_priv(dev);
+> +       int relaxed = !(adap->flags & ROOT_NO_RELAXED_ORDERING);
+>
+>         /* Size needs to be multiple of 16, including status entry. */
+>         iq->size = roundup(iq->size, 16);
+> @@ -2624,8 +2625,8 @@ int t4_sge_alloc_rxq(struct adapter *adap, struct sge_rspq *iq, bool fwevtq,
+>
+>                 flsz = fl->size / 8 + s->stat_len / sizeof(struct tx_desc);
+>                 c.iqns_to_fl0congen |= htonl(FW_IQ_CMD_FL0PACKEN_F |
+> -                                            FW_IQ_CMD_FL0FETCHRO_F |
+> -                                            FW_IQ_CMD_FL0DATARO_F |
+> +                                            FW_IQ_CMD_FL0FETCHRO_V(relaxed) |
+> +                                            FW_IQ_CMD_FL0DATARO_V(relaxed) |
+>                                              FW_IQ_CMD_FL0PADEN_F);
+>                 if (cong >= 0)
+>                         c.iqns_to_fl0congen |=
+> --
+> 1.9.0
+>
+>
