@@ -1,51 +1,103 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Wed, 21 Jun 2017 15:27:09 +0100
-Subject: [PATCH v2] gpio: rcar: Add R8A7743 (RZ/G1M) support
-In-Reply-To: <1497619944-61410-1-git-send-email-biju.das@bp.renesas.com>
-References: <1497619944-61410-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <1498055229-42052-1-git-send-email-biju.das@bp.renesas.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed, 21 Jun 2017 16:42:12 +0200
+Subject: [PATCH v5.1 2/2] ARM: dts: meson6: use stable UART bindings
+In-Reply-To: <1498056132-18508-1-git-send-email-narmstrong@baylibre.com>
+References: <1498056132-18508-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1498056132-18508-3-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Renesas RZ/G1M (R8A7743) SoC GPIO blocks are identical to the R-Car Gen2
-family. Add support for its GPIO controllers.
+The UART bindings needs specifying a SoC family, use the meson6 family
+for the UART nodes like the other nodes.
+Switch to the stable UART bindings for meson6 by adding a XTAL node and
+using the proper compatible strings.
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
-v1->v2
-* Modified the text "RZ-G1M" to "RZ/G1M"
+ arch/arm/boot/dts/meson.dtsi  |  8 ++++----
+ arch/arm/boot/dts/meson6.dtsi | 28 ++++++++++++++++++++++++++++
+ 2 files changed, 32 insertions(+), 4 deletions(-)
 
- Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt | 1 +
- drivers/gpio/gpio-rcar.c                                     | 4 ++++
- 2 files changed, 5 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt b/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
-index 7c1ab3b..6826a37 100644
---- a/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
-+++ b/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
-@@ -3,6 +3,7 @@
- Required Properties:
+diff --git a/arch/arm/boot/dts/meson.dtsi b/arch/arm/boot/dts/meson.dtsi
+index 15204e4..1ce9aa0 100644
+--- a/arch/arm/boot/dts/meson.dtsi
++++ b/arch/arm/boot/dts/meson.dtsi
+@@ -86,14 +86,14 @@
+ 			};
  
-   - compatible: should contain one of the following.
-+    - "renesas,gpio-r8a7743": for R8A7743 (RZ/G1M) compatible GPIO controller.
-     - "renesas,gpio-r8a7778": for R8A7778 (R-Mobile M1) compatible GPIO controller.
-     - "renesas,gpio-r8a7779": for R8A7779 (R-Car H1) compatible GPIO controller.
-     - "renesas,gpio-r8a7790": for R8A7790 (R-Car H2) compatible GPIO controller.
-diff --git a/drivers/gpio/gpio-rcar.c b/drivers/gpio/gpio-rcar.c
-index 31ad288..4a1536a 100644
---- a/drivers/gpio/gpio-rcar.c
-+++ b/drivers/gpio/gpio-rcar.c
-@@ -344,6 +344,10 @@ struct gpio_rcar_info {
+ 			uart_A: serial at 84c0 {
+-				compatible = "amlogic,meson-uart";
++				compatible = "amlogic,meson6-uart", "amlogic,meson-uart";
+ 				reg = <0x84c0 0x18>;
+ 				interrupts = <GIC_SPI 26 IRQ_TYPE_EDGE_RISING>;
+ 				status = "disabled";
+ 			};
  
- static const struct of_device_id gpio_rcar_of_table[] = {
- 	{
-+		.compatible = "renesas,gpio-r8a7743",
-+		/* RZ/G1 GPIO is identical to R-Car Gen2. */
-+		.data = &gpio_rcar_info_gen2,
-+	}, {
- 		.compatible = "renesas,gpio-r8a7790",
- 		.data = &gpio_rcar_info_gen2,
- 	}, {
+ 			uart_B: serial at 84dc {
+-				compatible = "amlogic,meson-uart";
++				compatible = "amlogic,meson6-uart", "amlogic,meson-uart";
+ 				reg = <0x84dc 0x18>;
+ 				interrupts = <GIC_SPI 75 IRQ_TYPE_EDGE_RISING>;
+ 				status = "disabled";
+@@ -117,7 +117,7 @@
+ 			};
+ 
+ 			uart_C: serial at 8700 {
+-				compatible = "amlogic,meson-uart";
++				compatible = "amlogic,meson6-uart", "amlogic,meson-uart";
+ 				reg = <0x8700 0x18>;
+ 				interrupts = <GIC_SPI 93 IRQ_TYPE_EDGE_RISING>;
+ 				status = "disabled";
+@@ -182,7 +182,7 @@
+ 			};
+ 
+ 			uart_AO: serial at 4c0 {
+-				compatible = "amlogic,meson-uart";
++				compatible = "amlogic,meson6-uart", "amlogic,meson-ao-uart", "amlogic,meson-uart";
+ 				reg = <0x4c0 0x18>;
+ 				interrupts = <GIC_SPI 90 IRQ_TYPE_EDGE_RISING>;
+ 				status = "disabled";
+diff --git a/arch/arm/boot/dts/meson6.dtsi b/arch/arm/boot/dts/meson6.dtsi
+index 8557b61..ef281d2 100644
+--- a/arch/arm/boot/dts/meson6.dtsi
++++ b/arch/arm/boot/dts/meson6.dtsi
+@@ -70,9 +70,37 @@
+ 		};
+ 	};
+ 
++	xtal: xtal-clk {
++		compatible = "fixed-clock";
++		clock-frequency = <24000000>;
++		clock-output-names = "xtal";
++		#clock-cells = <0>;
++	};
++
+ 	clk81: clk at 0 {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-clock";
+ 		clock-frequency = <200000000>;
+ 	};
+ }; /* end of / */
++
++
++&uart_AO {
++	clocks = <&xtal>, <&clk81>, <&clk81>;
++	clock-names = "xtal", "pclk", "baud";
++};
++
++&uart_A {
++	clocks = <&xtal>, <&clk81>, <&clk81>;
++	clock-names = "xtal", "pclk", "baud";
++};
++
++&uart_B {
++	clocks = <&xtal>, <&clk81>, <&clk81>;
++	clock-names = "xtal", "pclk", "baud";
++};
++
++&uart_C {
++	clocks = <&xtal>, <&clk81>, <&clk81>;
++	clock-names = "xtal", "pclk", "baud";
++};
 -- 
 1.9.1
