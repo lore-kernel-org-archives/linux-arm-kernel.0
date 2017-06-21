@@ -1,82 +1,27 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Wed, 21 Jun 2017 21:05:38 +0100
-Subject: [PATCH v2 1/8] dt-bindings: mfd: Add STM32 LPTimer binding
-In-Reply-To: <1498055415-31513-2-git-send-email-fabrice.gasnier@st.com>
-References: <1498055415-31513-1-git-send-email-fabrice.gasnier@st.com>
- <1498055415-31513-2-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20170621210538.568b0440@kernel.org>
+From: Bart.VanAssche@wdc.com (Bart Van Assche)
+Date: Wed, 21 Jun 2017 20:26:07 +0000
+Subject: [PATCH] ARM: Fix rd_size declaration
+In-Reply-To: <20170503194600.16089-1-bart.vanassche@sandisk.com>
+References: <20170503194600.16089-1-bart.vanassche@sandisk.com>
+Message-ID: <1498076766.26050.1.camel@wdc.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 21 Jun 2017 16:30:08 +0200
-Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+On Wed, 2017-05-03 at 12:46 -0700, Bart Van Assche wrote:
+> The global variable 'rd_size' is declared as 'int' in source file
+> arch/arm/kernel/atags_parse.c and as 'unsigned long' in
+> drivers/block/brd.c. Fix this inconsistency. Additionally, remove
+> the declarations of rd_image_start, rd_prompt and rd_doload from
+> parse_tag_ramdisk() since these duplicate existing declarations
+> in <linux/initrd.h>.
 
-> Add documentation for STMicroelectronics STM32 Low-Power Timer binding.
-> 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Looks sensible to me.
+(replying to my own e-mail)
 
-Acked-by: Jonathan Cameron <jic23@kernel.org>
-> ---
-> Changes in v2:
-> - Lee's comments: s/Low Power/Low-Power/, remove 0x in example, improve
->   properties descriptions
-> ---
->  .../devicetree/bindings/mfd/stm32-lptimer.txt      | 48 ++++++++++++++++++++++
->  1 file changed, 48 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt b/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
-> new file mode 100644
-> index 0000000..af859c8
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
-> @@ -0,0 +1,48 @@
-> +STMicroelectronics STM32 Low-Power Timer
-> +
-> +The STM32 Low-Power Timer (LPTIM) is a 16-bit timer that provides several
-> +functions:
-> +- PWM output (with programmable prescaler, configurable polarity)
-> +- Quadrature encoder, counter
-> +- Trigger source for STM32 ADC/DAC (LPTIM_OUT)
-> +
-> +Required properties:
-> +- compatible:		Must be "st,stm32-lptimer".
-> +- reg:			Offset and length of the device's register set.
-> +- clocks:		Phandle to the clock used by the LP Timer module.
-> +- clock-names:		Must be "mux".
-> +- #address-cells:	Should be '<1>'.
-> +- #size-cells:		Should be '<0>'.
-> +
-> +Optional subnodes:
-> +- pwm:			See ../pwm/pwm-stm32-lp.txt
-> +- counter:		See ../iio/timer/stm32-lptimer-cnt.txt
-> +- trigger:		See ../iio/timer/stm32-lptimer-trigger.txt
-> +
-> +Example:
-> +
-> +	lptimer1: lptimer at 40002400 {
-> +		compatible = "st,stm32-lptimer";
-> +		reg = <0x40002400 0x400>;
-> +		clocks = <&timer_clk>;
-> +		clock-names = "mux";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		pwm {
-> +			compatible = "st,stm32-pwm-lp";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&lppwm1_pins>;
-> +		};
-> +
-> +		trigger at 0 {
-> +			compatible = "st,stm32-lptimer-trigger";
-> +			reg = <0>;
-> +		};
-> +
-> +		counter {
-> +			compatible = "st,stm32-lptimer-counter";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&lptim1_in_pins>;
-> +		};
-> +	};
+Hello Russell,
+
+Did I send this patch to the right maintainer? If so, do you want to share
+any feedback about this patch?
+
+Thanks,
+
+Bart.
