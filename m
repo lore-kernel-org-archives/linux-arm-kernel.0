@@ -1,97 +1,108 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 21 Jun 2017 10:50:53 +0100
-Subject: [RFT PATCH v2 00/42] PCI: ARM/ARM64: remove pci_fixup_irqs() usage
-In-Reply-To: <CACRpkdZ1rBq9eLJkz_gRuXAG=if+xXf-jPzDEPCfG8EgUmUG3A@mail.gmail.com>
-References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
- <CACRpkdZ1rBq9eLJkz_gRuXAG=if+xXf-jPzDEPCfG8EgUmUG3A@mail.gmail.com>
-Message-ID: <20170621095053.GB31599@red-moon>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 21 Jun 2017 10:53:09 +0100
+Subject: [PATCH v2] KVM: arm/arm64: Signal SIGBUS when stage2 discovers
+ hwpoison memory
+In-Reply-To: <3dbafd74-57f2-e724-ace2-0f84abb57e59@huawei.com>
+References: <20170524163250.29281-1-james.morse@arm.com>
+ <3dbafd74-57f2-e724-ace2-0f84abb57e59@huawei.com>
+Message-ID: <594A4205.70201@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 21, 2017 at 10:39:31AM +0200, Linus Walleij wrote:
-> On Thu, Jun 8, 2017 at 4:13 PM, Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
-> 
-> I pulled this into the Gemini tree:
-> > [1] git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git pci/pci-fixup-irqs-removal-v2
-> 
+Hi gengdongjiu,
 
-Thank you Linus for helping me out.
+(+CC: Achin)
 
-> And then this happens:
-> 
-> OF: PCI: host bridge /soc/pci at 50000000 ranges:
-> OF: PCI:    IO 0x50000000..0x500fffff -> 0x00000000
-> OF: PCI:   MEM 0x58000000..0x5fffffff -> 0x58000000
-> Unable to handle kernel NULL pointer dereference at virtual address 00000070
-> pgd = c0004000
-> [00000070] *pgd=00000000
-> Internal error: Oops: 17 [#1] PREEMPT ARM
-> CPU: 0 PID: 254 Comm: kworker/0:1 Not tainted 4.12.0-rc3+ #888
-> Hardware name: Gemini (Device Tree)
-> Workqueue: events deferred_probe_work_func
-> task: c38c3a40 task.stack: c390a000
-> PC is at faraday_pci_probe+0x274/0x65c
-> LR is at __irq_put_desc_unlock+0x18/0x70
-> pc : [<c0232648>]    lr : [<c004be48>]    psr: 80000013
+On 21/06/17 08:42, gengdongjiu wrote:
+> On 2017/5/25 0:32, James Morse wrote:
+>> +static void kvm_send_hwpoison_signal(unsigned long address,
+>> +				     struct vm_area_struct *vma)
+>> +{
+>> +	siginfo_t info;
+>> +
+>> +	info.si_signo   = SIGBUS;
+>> +	info.si_errno   = 0;
+>> +	info.si_code    = BUS_MCEERR_AR;
+>> +	info.si_addr    = (void __user *)address;
+>> +
+>> +	if (is_vm_hugetlb_page(vma))
+>> +		info.si_addr_lsb = huge_page_shift(hstate_vma(vma));
+>> +	else
+>> +		info.si_addr_lsb = PAGE_SHIFT;
+>> +
+>> +	send_sig_info(SIGBUS, &info, current);
+>> +}
+>> +
+>>  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>  			  struct kvm_memory_slot *memslot, unsigned long hva,
+>>  			  unsigned long fault_status)
+>> @@ -1318,6 +1337,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>  	smp_rmb();
+>>  
+>>  	pfn = gfn_to_pfn_prot(kvm, gfn, write_fault, &writable);
+>> +	if (pfn == KVM_PFN_ERR_HWPOISON) {
+>> +		kvm_send_hwpoison_signal(hva, vma);
+>> +		return 0;
+>> +	}
 
-I think I see what it is. faraday_pci_irq_handler() relies on
-struct faraday_pci->bus to access config space and with this
-series it can't be set till pci_scan_root_bus_bridge() returns.
+> I heard from our CPU hardware team, when happen HWpoison, CPU hardware does not record the IPA address in the HPFAR_EL2.
 
-If that's the case we will have to update the config accessors in
-faraday_pci_irq_handler() to raw ones (ie ones that do not depend on the
-struct pci_bus), code is already there, patch coming, sorry about this
-but it is extremely complicated for me to untangle these drivers inner
-workings.
+I think we discussed this before[0], your CPU has a feature called 'hwpoison'
+that is uses to support RAS. Linux also has a feature called 'hwpoison' [1][2],
+which handles the offline-ing of memory pages when it receives a notification
+through APEI. I've tried to call this memory_failure() to avoid this confusion.
 
-Thanks,
-Lorenzo
+This patch is to handle stage2 faults when the page was removed from the stage2
+mapping by the memory_failure() code. v3 of this patch[3] does a much better job
+of describing this.
 
-> sp : c390bdf0  ip : c3424274  fp : c3ac2ee0
-> r10: c3f77718  r9 : c3ad49b0  r8 : c3907800
-> r7 : 00000004  r6 : c390be18  r5 : c3907810  r4 : c3ad4810
-> r3 : 00000000  r2 : 00000000  r1 : 00000001  r0 : c3ac2de0
-> Flags: Nzcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
-> Control: 0000397f  Table: 03a9c000  DAC: 00000053
-> Process kworker/0:1 (pid: 254, stack limit = 0xc390a190)
-> Stack: (0xc390bdf0 to 0xc390c000)
-> bde0:                                     c0534a60 c3ad49b0 00000003 c024cb68
-> be00: 00000001 20000013 00000000 50000000 00000007 000020dd c3ae2680 c3ae2740
-> be20: c07c861f c0134328 00000000 c3ad5fa0 c3910a50 c3910a50 00000001 00000000
-> be40: 00000000 c01344ec c3910a50 c3910a50 00000001 00000000 c3910a50 c39d76e0
-> be60: c3ad5fa0 c05f6f58 c3910a50 c3907810 c3907810 c07cba88 fffffdfb 00000003
-> be80: 00000000 c07c5040 c386e420 c02bbbe0 c3907810 c081c6c4 00000000 c07cba88
-> bea0: 00000003 c02ba9dc 00000000 c390bee0 c02bab30 00000001 c07bf660 00000000
-> bec0: c07c5040 c02b93dc c382829c c39886f4 c3907810 c3907844 c3907810 c02ba674
-> bee0: c3907810 00000001 c390bf0c c3907810 c07d3a80 c3907810 c07d38e4 c02b961c
-> bf00: c3907810 c07d38d0 c07d38d0 c02ba210 c07d38ec c386e420 00000000 c3f6b100
-> bf20: c07bf660 c002dac0 00000008 c07bf660 c07bf660 c386e438 c390a000 c07bf674
-> bf40: 00000008 c07bf660 c07c5040 c002e044 c390a000 00000001 00000000 00000000
-> bf60: c3901518 c3901500 ffffe000 c38e2700 00000000 c3901518 c386e420 c002ddb4
-> bf80: c3839ee4 c00335ec c390a000 c38e2700 c003350c 00000000 00000000 00000000
-> bfa0: 00000000 00000000 00000000 c000a270 00000000 00000000 00000000 00000000
-> bfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-> bfe0: 00000000 00000000 00000000 00000000 00000013 00000000 ffffffff ffffffff
-> [<c0232648>] (faraday_pci_probe) from [<c02bbbe0>]
-> (platform_drv_probe+0x50/0xb4)
-> [<c02bbbe0>] (platform_drv_probe) from [<c02ba9dc>]
-> (driver_probe_device+0x248/0x2dc)
-> [<c02ba9dc>] (driver_probe_device) from [<c02b93dc>]
-> (bus_for_each_drv+0x68/0x98)
-> [<c02b93dc>] (bus_for_each_drv) from [<c02ba674>] (__device_attach+0xa8/0x110)
-> [<c02ba674>] (__device_attach) from [<c02b961c>] (bus_probe_device+0x88/0x90)
-> [<c02b961c>] (bus_probe_device) from [<c02ba210>]
-> (deferred_probe_work_func+0x54/0x80)
-> [<c02ba210>] (deferred_probe_work_func) from [<c002dac0>]
-> (process_one_work+0x13c/0x430)
-> [<c002dac0>] (process_one_work) from [<c002e044>] (worker_thread+0x290/0x5f4)
-> [<c002e044>] (worker_thread) from [<c00335ec>] (kthread+0xe0/0x120)
-> [<c00335ec>] (kthread) from [<c000a270>] (ret_from_fork+0x14/0x24)
-> Code: e59401b0 e3700a01 8a00001d e59421ac (e5d23070)
-> ---[ end trace 1e313b1ea11e101c ]---
-> 
-> I'm trying to figure out what is causing it.
-> 
-> Yours,
-> Linus Walleij
+(... I don't think your question is related to this patch ...)
+
+
+> Only when the SEA error is related to the page table walk, the HPFAR_EL2 register is updated.
+> here we got the pfn/gfn from the register HPFAR_EL2, if CPU does not update the HPFAR_EL2 register,
+> we may can not use this method to get the pfn/gfn.
+
+This patch is only concerned with ordinary stage2 faults. Linux doesn't want to
+give the page to the guest as it has been marked with the PG_HWpoison flag.
+Instead we trigger memory_failure()'s 'late' notification.
+
+To the CPU this will look like a normal stage2 fault.
+
+
+> could you confirm arm's armv8.0/armv8.2 standard CPU also use such design?
+> if so, we may need to use other method to get the gfn/pfn/hva address.
+
+Your question is what happens when a guest accesses a location your CPU has
+marked with its 'hwpoison'. From the RAS spec[4] I would expect this to be
+reported as a Synchronous External Abort. For firmware-first error handling this
+should be taken to EL3.
+
+>From here firmware should generate CPER records and then notify the OS via one
+of the APEI mechanisms. Because a guest was running this notification must reach
+EL2. KVM can then switch back to the host and invoke the APEI GHES handler,
+which for this kind of error will probably call memory_failure().
+
+What happens if HPFAR_EL2 isn't set when this kind of error occurs?
+Provided EL3 can learn the physical address that triggered the exception then
+for firmware-first this isn't a problem. These errors should be taken to EL3 and
+then described by CPER records to the OS. The OS should process the CPER records
+in preference to attempting 'kernel first error handling'.
+
+memory_failure() will unmap the affected pages from user space (and KVMs stage2)
+and deliver signals (if Qemu/kvmtool registered for them via prctl()). KVM won't
+re-enter the guest if there is a signal pending, from here Qemu/kvmtool get the
+affected VA which they can use to notify the guest.
+
+
+I hope this helps,
+
+James
+
+[0] https://lkml.org/lkml/2017/5/12/492
+[1] https://lwn.net/Articles/348886/
+[2]
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/vm/hwpoison.txt
+[3] https://www.spinics.net/lists/arm-kernel/msg589515.html
+[4]
+https://static.docs.arm.com/ddi0587/a/RAS%20Extension-release%20candidate_march_29.pdf
