@@ -1,48 +1,39 @@
-From: illusionist.neo@gmail.com (Shubham Bansal)
-Date: Wed, 21 Jun 2017 19:56:34 +0530
-Subject: [PATCH v2] arm: eBPF JIT compiler
-In-Reply-To: <59495367.3080402@iogearbox.net>
-References: <1495754003-21099-1-git-send-email-illusionist.neo@gmail.com>
- <CAGXu5jKmLNMR+uhM9Ov2XPW6kCjip_SjScgEH0fTFp6fQtKFiA@mail.gmail.com>
- <593E6B0F.8070901@iogearbox.net>
- <CAHgaXd+DW2bggto=2S9hOdMrtPTvhD2QN4rPf2V8iHewQpg-YA@mail.gmail.com>
- <CAHgaXdJrvKdzr3fJ1TMkC4foeVsZJDSVEwhDOeZGxQVsmoK2cQ@mail.gmail.com>
- <59419D1E.2060303@iogearbox.net>
- <CAHgaXdKMbFPgy-kKF0iDSAYo4CqLn9FRu9HwM+OfM-JWb9fNRQ@mail.gmail.com>
- <594813AA.5010001@iogearbox.net>
- <CAHgaXdLtX6yLdU3bMvS=g8FZ79sM_BW_+hHTMH=Mfk4TZqUnpw@mail.gmail.com>
- <59495367.3080402@iogearbox.net>
-Message-ID: <CAHgaXdKGJFh8jO44gwCqe0cijoztf39bK9k8ioBtYDjzb4vvZw@mail.gmail.com>
+From: ifqqfi@gmail.com (ifq)
+Date: Wed, 21 Jun 2017 22:27:36 +0800
+Subject: how to make kernel page table into 4kb maping
+Message-ID: <CAGnkeyMszGDUOEwvuJiUd+9gXdJBLtvm7JiuD3km3V2L=y2rMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Hi, everyone
 
->
-> So my question would be, why can't the JIT imitate something
-> similar to what we do in the interpreter as well? So looking
-> at the disasm of what gcc compiles for the interpreter when it's
-> doing the above call could help as well in going forward. Not
-> sure if that answers your question, but perhaps not sure if I
-> understand your question yet?
+I want to find a way to let kernel page table do 4kb mapping, instead
+of 1MB section mapping.
+Is there any patch for this?
 
-I just looked at the code again and I think I completely misunderstood
-the logic of  BPF_JMP | BPF_CALL.
-I think each helper function is working like this.
-
-____helper_function(u32 a1, u32 a2){
+In alloc_init_pmd
+if (type->prot_sect &&
+((addr | next | phys) & ~SECTION_MASK) == 0) {
+__map_init_section(pmd, addr, next, phys, type, ng);
+} else {
+alloc_init_pte(pmd, addr, next,
+       __phys_to_pfn(phys), type, alloc, ng);
 }
 
-helper_function(u64 a1, u64 a2){
-     ____helper_function((u32 *)a1, (u32 *)a2);
-}
+It use prot_sect to decide go section or pte. I try to force it go
+alloc_init_pte, the result is immediate crash when kernel booting.
 
-So ultimately, we call helper_function which takes u64 as arguments
-only. I know its asking a lot, but can you please confirm this asap? I
-would like to start implementing it.
+I also tried to init most of kernel memory with 1MB section page
+table, only 4MB with 4k page. But it depends on where the 4MB I
+choose.
+for example, 0x8f000000 ~ 0x8f400000 is ok, but 0x8f400000 ~
+0x8f800000 will fail.
 
->
-> Cheers,
-> Daniel
+I think kernel choose 1MB section for less TLB missing, but I need to
+make it small to help me locate other issue.
+btw, the platform is arm cortex-a7.  kernel version: 3.14.43.
 
--Shubham
+-- 
+Regards.
+
+JT.
