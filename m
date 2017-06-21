@@ -1,46 +1,43 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 21 Jun 2017 21:08:06 +0200
-Subject: [PATCH 1/2] clk: samsung: audss: Fix silent hang on Exynos4412 due to
- disabled EPLL
+Date: Wed, 21 Jun 2017 21:08:07 +0200
+Subject: [PATCH 2/2] ARM: dts: exynos: Add clocks to audss block to fix silent
+ hang on Exynos4412
 In-Reply-To: <20170621190807.14850-1-krzk@kernel.org>
 References: <20170621190807.14850-1-krzk@kernel.org>
-Message-ID: <20170621190807.14850-2-krzk@kernel.org>
+Message-ID: <20170621190807.14850-3-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Similarly to commit f1e9203e2366 ("clk: samsung: Fix Exynos 5420 pinctrl
-setup and clock disable failure due to domain being gated") for
-Exynos5420, the Exynos4412 also requires that EPLL is not disabled.
-Otherwise any access to MAUDIO block will silently halt.
+Add necessary parent clocks for audss (Audio SubSystem, MAUDIO) clock
+controller block.
 
-This was not visible before because EPLL on Exynos4 could not be
-disabled before commit 6edfa11cb396 ("clk: samsung:
-Add enable/disable operation for PLL36XX clocks").  After this commit,
-on Odroid U3 board one can see silent hang, usually with last (but
-unrelated) messages:
+This allows driver to keep EPLL enabled before accessing any MAUDIO
+registers thus fixing silent hang.  This silent hang appeard with commit
+6edfa11cb396 ("clk: samsung: Add enable/disable operation for PLL36XX
+clocks"), e.g. on Odroid U3 usually with last (but unrelated) messages:
 
 	[    2.382741] input: gpio_keys as /devices/platform/gpio_keys/input/input0
 	[    2.405686] usb 1-3: new high-speed USB device number 3 using exynos-ehci
 	[    2.419843] max77686-rtc max77686-rtc: setting system clock to 2017-06-21 17:04:13 UTC (1498064653)
 
-Mark Exynos4 variant as also needed EPLL to be enabled all the time.
-
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- drivers/clk/samsung/clk-exynos-audss.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/exynos4.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/clk/samsung/clk-exynos-audss.c b/drivers/clk/samsung/clk-exynos-audss.c
-index 85edeb738853..1fab56f396d4 100644
---- a/drivers/clk/samsung/clk-exynos-audss.c
-+++ b/drivers/clk/samsung/clk-exynos-audss.c
-@@ -73,6 +73,7 @@ struct exynos_audss_clk_drvdata {
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index 497a9470c888..5739389f5bb8 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -59,6 +59,9 @@
+ 		compatible = "samsung,exynos4210-audss-clock";
+ 		reg = <0x03810000 0x0C>;
+ 		#clock-cells = <1>;
++		clocks = <&clock CLK_FIN_PLL>, <&clock CLK_FOUT_EPLL>,
++			 <&clock CLK_SCLK_AUDIO0>, <&clock CLK_SCLK_AUDIO0>;
++		clock-names = "pll_ref", "pll_in", "sclk_audio", "sclk_pcm_in";
+ 	};
  
- static const struct exynos_audss_clk_drvdata exynos4210_drvdata = {
- 	.num_clks	= EXYNOS_AUDSS_MAX_CLKS - 1,
-+	.enable_epll	= 1,
- };
- 
- static const struct exynos_audss_clk_drvdata exynos5410_drvdata = {
+ 	i2s0: i2s at 03830000 {
 -- 
 2.9.3
