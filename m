@@ -1,89 +1,65 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Wed, 21 Jun 2017 09:58:13 +0800
-Subject: [PATCH 3/3] arm64: dts: register Hi3660's thermal sensor
-In-Reply-To: <7abe5b01-c728-accd-d6bb-05d9ceee2176@hisilicon.com>
-References: <1497930035-60894-1-git-send-email-kevin.wangtao@hisilicon.com>
- <1497930035-60894-3-git-send-email-kevin.wangtao@hisilicon.com>
- <CAFGCpxwmN3jAZn2chK+QQ-YKg7TwWJOTHSi1VzwcSQ7Mm3gQng@mail.gmail.com>
- <7abe5b01-c728-accd-d6bb-05d9ceee2176@hisilicon.com>
-Message-ID: <CAFGCpxyHowrssdhT1RffDO1o4-5=ksqAz+r8Q23-myVCi5h_fA@mail.gmail.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Wed, 21 Jun 2017 10:12:08 +0800
+Subject: [xlnx:master 553/597] drivers/mtd//spi-nor/spi-nor.c:2000:13: error:
+ implicit declaration of function 'of_get_next_parent'
+Message-ID: <201706211006.urKRzRpJ%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 4:32 PM, Wangtao (Kevin, Kirin)
-<kevin.wangtao@hisilicon.com> wrote:
->
->
-> ? 2017/6/20 15:38, Guodong Xu ??:
->>
->>
->>
->> 2017?6?20? ??11:49?"Tao Wang" <kevin.wangtao@hisilicon.com
->> <mailto:kevin.wangtao@hisilicon.com>>???
->>
->>     Bind thermal sensor driver for Hi3660.
->>
->>     Signed-off-by: Tao Wang <kevin.wangtao@hisilicon.com
->> <mailto:kevin.wangtao@hisilicon.com>>
->>     Signed-off-by: Leo Yan <leo.yan@linaro.org
->> <mailto:leo.yan@linaro.org>>
->>     ---
->>       arch/arm64/boot/dts/hisilicon/hi3660.dtsi |    7 +++++++
->>       1 file changed, 7 insertions(+)
->>
->>     diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
->> b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
->>     index 3983086..cc67958 100644
->>     --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
->>     +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
->>     @@ -156,5 +156,12 @@
->>
->>
->> i am wondering which tree this patch should be applied to. Actually Olof
->> Johansson olof at lixom.net <mailto:olof@lixom.net> just merged hi3660 dts into
->> his tree. You should better rebase you dts patch onto that.
->
-> Can you share me the git path?
+Hi Naga,
 
-As of this morning, it has shown up in linux next tag: next-20170620
+FYI, the error/warning still remains.
 
-https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/arch/arm64/boot/dts/hisilicon?h=next-20170620
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   5d029fdc257cf88e65500db348eda23040af332b
+commit: d80f6153e7c446e0c7dc8400b06d199c50bfd509 [553/597] mtd: spi-nor: Disable 4-Byte addressing for axi_quad_spi
+config: blackfin-BF526-EZBRD_defconfig (attached as .config)
+compiler: bfin-uclinux-gcc (GCC) 6.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout d80f6153e7c446e0c7dc8400b06d199c50bfd509
+        # save the attached .config to linux build tree
+        make.cross ARCH=blackfin 
 
--Guodong
+All errors (new ones prefixed by >>):
 
+   drivers/mtd//spi-nor/spi-nor.c: In function 'spi_nor_scan':
+>> drivers/mtd//spi-nor/spi-nor.c:2000:13: error: implicit declaration of function 'of_get_next_parent' [-Werror=implicit-function-declaration]
+       np_spi = of_get_next_parent(np);
+                ^~~~~~~~~~~~~~~~~~
+   drivers/mtd//spi-nor/spi-nor.c:2000:11: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+       np_spi = of_get_next_parent(np);
+              ^
+   drivers/mtd//spi-nor/spi-nor.c:1728:6: warning: unused variable 'is_dual' [-Wunused-variable]
+     u32 is_dual;
+         ^~~~~~~
+   At top level:
+   drivers/mtd//spi-nor/spi-nor.c:266:12: warning: 'read_ear' defined but not used [-Wunused-function]
+    static int read_ear(struct spi_nor *nor, struct flash_info *info)
+               ^~~~~~~~
+   cc1: some warnings being treated as errors
 
->>
->>
->>
->>                              clock-names = "uartclk", "apb_pclk";
->>                              status = "disabled";
->>                      };
->>     +
->>     +               tsensor: tsensor {
->>     +                       compatible = "hisilicon,thermal-hi3660";
->>     +                       reg = <0x0 0xfff30000 0x0 0x1000>;
->>     +                       #thermal-sensor-cells = <1>;
->>     +                       status = "ok";
->>
->>
->> please remove status ok. that's default. redundant.
->
-> ok
->>
->>
->>     +               };
->>              };
->>       };
->>     --
->>     1.7.9.5
->>
->>
->>     _______________________________________________
->>     linux-arm-kernel mailing list
->>     linux-arm-kernel at lists.infradead.org
->> <mailto:linux-arm-kernel@lists.infradead.org>
->>     http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->> <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>
->>
->>
->
+vim +/of_get_next_parent +2000 drivers/mtd//spi-nor/spi-nor.c
+
+  1994				}
+  1995				nor->program_opcode = SPINOR_OP_PP_4B;
+  1996				/* No small sector erase for 4-byte command set */
+  1997				nor->erase_opcode = SPINOR_OP_SE_4B;
+  1998				mtd->erasesize = info->sector_size;
+  1999			} else {
+> 2000				np_spi = of_get_next_parent(np);
+  2001				if (of_property_match_string(np_spi, "compatible",
+  2002							"xlnx,xps-spi-2.00.a") >= 0) {
+  2003					nor->addr_width = 3;
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 14537 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170621/e3e51147/attachment-0001.gz>
