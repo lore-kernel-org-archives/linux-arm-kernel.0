@@ -1,31 +1,43 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 21 Jun 2017 09:04:26 +0530
-Subject: [PATCH] arm64: topology: Get rid of "cap_parsing_done"
-In-Reply-To: <20170620155400.GI21131@arm.com>
-References: <9e5d20e285e04341ea1a7f43c9af2ff6d6d072dd.1497955347.git.viresh.kumar@linaro.org>
- <20170620155400.GI21131@arm.com>
-Message-ID: <20170621033426.GP3942@vireshk-i7>
+Date: Wed, 21 Jun 2017 10:16:39 +0530
+Subject: [PATCH V2 0/5] arch_topology: Minor cleanups
+Message-ID: <cover.1498019799.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20-06-17, 16:54, Will Deacon wrote:
-> On Tue, Jun 20, 2017 at 04:14:40PM +0530, Viresh Kumar wrote:
-> > We can reuse "cap_parsing_failed" instead of keeping an additional
-> > variable. Also rename cap_parsing_failed to skip_cap_parsing.
-> > 
-> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> > ---
-> >  arch/arm64/kernel/topology.c | 19 +++++++++----------
-> >  1 file changed, 9 insertions(+), 10 deletions(-)
-> 
-> You probably need to co-ordinate with this series:
-> 
-> http://lkml.kernel.org/r/20170531165931.6945-5-juri.lelli at arm.com
-> 
-> and it would be clearer to split up the renaming part of the patch from the
-> remove of the additional bool.
+Hi Greg,
 
-Thanks, I missed that series for sure :)
+You weren't included in the first [1] version of this series, as it was
+targeting arch/arm*/ directories then.
+
+Here are some cleanups for the arch_topology core.
+
+Tested on ARM64 Hikey board by setting following in cpu nodes in DT:
+	capacity-dmips-mhz = <1000>;
+
+V1->V2:
+- based over linux-next/master (to get Juri's recent changes)
+- More cleanups included. V1 only had the first patch.
+- Rename of cap_parsing_failed isn't required anymore (as it is
+  localized to a single routine now).
+
+--
+viresh
+
+[1] https://marc.info/?l=linux-arm-kernel&m=149795553024005
+
+Viresh Kumar (5):
+  arch_topology: Get rid of "cap_parsing_done"
+  arch_topology: Don't break lines unnecessarily
+  arch_topology: Covert switch block to if block
+  arch_topology: Return 0 or -ve errors from
+    topology_parse_cpu_capacity()
+  arch_topology: Localize cap_parsing_failed to
+    topology_parse_cpu_capacity()
+
+ arch/arm/kernel/topology.c   |  2 +-
+ drivers/base/arch_topology.c | 78 ++++++++++++++++++++++----------------------
+ 2 files changed, 40 insertions(+), 40 deletions(-)
 
 -- 
-viresh
+2.13.0.71.gd7076ec9c9cb
