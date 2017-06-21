@@ -1,34 +1,62 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 21 Jun 2017 10:27:45 +0100
-Subject: [PATCH v3] iommu/arm-smmu: Plumb in new ACPI identifiers
-In-Reply-To: <063a50cff2942c96dc6f24d4f8c8a854a4a6cc30.1497886335.git.robin.murphy@arm.com>
-References: <063a50cff2942c96dc6f24d4f8c8a854a4a6cc30.1497886335.git.robin.murphy@arm.com>
-Message-ID: <20170621092744.GG3768@arm.com>
+From: xuejiancheng@hisilicon.com (Jiancheng Xue)
+Date: Wed, 21 Jun 2017 17:00:42 +0800
+Subject: [PATCH 2/5] dt-bindings: phy-hisi-inno-usb2: add support for
+ hisi-inno-usb2 phy
+In-Reply-To: <1498035645-22804-1-git-send-email-xuejiancheng@hisilicon.com>
+References: <1498035645-22804-1-git-send-email-xuejiancheng@hisilicon.com>
+Message-ID: <1498035645-22804-3-git-send-email-xuejiancheng@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 19, 2017 at 04:41:56PM +0100, Robin Murphy wrote:
-> Revision C of IORT now allows us to identify ARM MMU-401 and the Cavium
-> ThunderX implementation. Wire them up so that we can probe these models
-> once firmware starts using the new codes in place of generic ones, and
-> so that the appropriate features and quirks get enabled when we do.
-> 
-> For the sake of backports and mitigating sychronisation problems with
-> the ACPICA headers, we'll carry a backup copy of the new definitions
-> locally for the short term to make life simpler.
-> 
-> CC: stable at vger.kernel.org # 4.10
-> Acked-by: Robert Richter <rrichter@cavium.com>
-> Tested-by: Robert Richter <rrichter@cavium.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
-> 
-> v3: The patch that actually landed in ACPICA was slightly tweaked for
->     self-consistency, so s/CAVIUM_SMMUV2/CAVIUM_THUNDERX/ to match.
-> 
->  drivers/iommu/arm-smmu.c | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
+Add support for hisi-inno-usb2 phy.
 
-I've picked this one up.
+Signed-off-by: Jiancheng Xue <xuejiancheng@hisilicon.com>
+---
+ .../devicetree/bindings/phy/phy-hisi-inno-usb2.txt | 36 ++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-hisi-inno-usb2.txt
 
-Will
+diff --git a/Documentation/devicetree/bindings/phy/phy-hisi-inno-usb2.txt b/Documentation/devicetree/bindings/phy/phy-hisi-inno-usb2.txt
+new file mode 100644
+index 0000000..21f8208
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/phy-hisi-inno-usb2.txt
+@@ -0,0 +1,36 @@
++HiSilicon INNO USB2 PHY
++-----------------------
++Required properties:
++- compatible: Should be one of the following strings:
++		"hisilicon,inno-usb2-phy",
++		"hisilicon,hi3798cv200-usb2-phy",
++- #phy-cells: Must be 0
++- hisilicon,peripheral-syscon: Phandle of syscon used to control phy.
++- clocks: Phandle and clock specifier pair for reference clock utmi_refclk.
++- resets: List of phandle and reset specifier pairs for each reset signal in
++reset-names.
++- reset-names: Should be "por_rst" and "test_rst". The test_rst only
++exists in some of SOCs, so it is optional.
++
++Phy node can include up to four subnodes. Each subnode represents one port.
++The required properties of port node are as follows:
++- clocks: Phandle and clock specifier pair for utmi_clock.
++- resets: List of phandle and reset specifier pairs for port reset and utmi reset.
++- reset-names: List of reset signal names. Should be "port_rst" and "utmi_rst"
++
++Refer to phy/phy-bindings.txt for the generic PHY binding properties
++
++Example:
++usb_phy: phy {
++		 compatible = "hisilicon,inno_usb2_phy";
++		 #phy-cells = <0>;
++		 hisilicon,peripheral-syscon = <&peri_ctrl>;
++		 clocks = <&crg USB2_REF_CLK>;
++		 resets = <&crg 0xb4 2>;
++		 reset-names = "por_rst";
++		 port0 {
++			 clocks = <&crg USB2_UTMI0_CLK>;
++			 resets = <&crg 0xb4 5>, <&crg 0xb4 1>;
++			 reset-names = "port_rst", "utmi_rst";
++		 };
++	 };
+-- 
+1.9.1
