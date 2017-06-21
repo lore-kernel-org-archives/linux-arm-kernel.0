@@ -1,162 +1,50 @@
-From: cosardindar@gmail.com (Cosar Dindar)
-Date: Thu, 22 Jun 2017 02:14:59 +0300
-Subject: [RESEND,PATCH v4 2/5] crypto : stm32 - Add STM32F4 CRC32 support
-Message-ID: <1498086899-104804-1-git-send-email-cosardindar@gmail.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Thu, 22 Jun 2017 01:31:51 +0200
+Subject: [PATCH 1/9] i2c: designware: Fix system suspend
+In-Reply-To: <1498072888-14782-2-git-send-email-ulf.hansson@linaro.org>
+References: <1498072888-14782-1-git-send-email-ulf.hansson@linaro.org>
+ <1498072888-14782-2-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <CAJZ5v0iYwPE8rpn=aZ9n6LV-qbAK3kynRqVZ7xxuB+gYar_fyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds CRC (CRC32 Crypto) support for STM32F4 series.
+On Wed, Jun 21, 2017 at 9:21 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> The commit 8503ff166504 ("i2c: designware: Avoid unnecessary resuming
+> during system suspend"), may suggest to the PM core to try out the so
+> called direct_complete path for system sleep. In this path, the PM core
+> treats a runtime suspended device as it's already in a proper low power
+> state for system sleep, which makes it skip calling the system sleep
+> callbacks for the device, except for the ->prepare() and the ->complete()
+> callback.
+>
+> Moreover, under certain circumstances the PM core may unset the
+> direct_complete flag for a parent device, in case its child device are
+> being system suspended before. In other words, the PM core doesn't skip
+> calling the system sleep callbacks, no matter if the device is runtime
+> suspended or not.
+>
+> In cases of an i2c slave device, the above situation is triggered.
+> Unfortunate, this also breaks the assumption that the i2c device is always
+> runtime resumed, whenever the dw_i2c_plat_suspend() callback is being
+> invoked, which then leads to a regression.
+>
+> More precisely, dw_i2c_plat_suspend() then calls clk_core_disable() and
+> clk_core_unprepare(), for an already disabled/unprepared clock, leading to
+> complaints about clocks calls being wrongly balanced.
+>
+> In cases when the i2c device is attached to the ACPI PM domain, the problem
+> doesn't occur. That's because ACPI's ->suspend() callback, assigned to
+> acpi_subsys_suspend(), calls pm_runtime_resume() for the i2c device.
 
-As an hardware limitation polynomial and key setting are not supported.
-They are fixed as 0x4C11DB7 (poly) and 0xFFFFFFFF (key).
-CRC32C Castagnoli algorithm is not used.
+Which really is expected to happen, so direct_complete should only be
+used along with the ACPI PM domain in this case.
 
-Signed-off-by: Cosar Dindar <cosardindar@gmail.com>
-Reviewed-by: Fabien Dessenne <fabien.dessenne@st.com>
----
+Moreover, in the ACPI PM domain case acpi_subsys_prepare() is supposed
+to do the right thing without dw_i2c_plat_prepare() and the return
+value of the latter will be ignored anyway, so dw_i2c_plat_prepare()
+will only have effect without ACPI PM domain AFAICS.
 
-Changes in v4:
-	- Add Fabien Dessenne's Reviewed-by tag.
+It looks like commit 8503ff166504 is entirely misguided.
 
- drivers/crypto/stm32/stm32_crc32.c | 68 ++++++++++++++++++++++++++++++++------
- 1 file changed, 58 insertions(+), 10 deletions(-)
-
-diff --git a/drivers/crypto/stm32/stm32_crc32.c b/drivers/crypto/stm32/stm32_crc32.c
-index ec83b1e..12fbd98 100644
---- a/drivers/crypto/stm32/stm32_crc32.c
-+++ b/drivers/crypto/stm32/stm32_crc32.c
-@@ -7,6 +7,7 @@
- #include <linux/bitrev.h>
- #include <linux/clk.h>
- #include <linux/module.h>
-+#include <linux/of.h>
- #include <linux/platform_device.h>
- 
- #include <crypto/internal/hash.h>
-@@ -39,6 +40,9 @@ struct stm32_crc {
- 	struct clk       *clk;
- 	u8               pending_data[sizeof(u32)];
- 	size_t           nb_pending_bytes;
-+	bool             key_support;
-+	bool             poly_support;
-+	bool             reverse_support;
- };
- 
- struct stm32_crc_list {
-@@ -106,13 +110,31 @@ static int stm32_crc_init(struct shash_desc *desc)
- 	}
- 	spin_unlock_bh(&crc_list.lock);
- 
--	/* Reset, set key, poly and configure in bit reverse mode */
--	writel(bitrev32(mctx->key), ctx->crc->regs + CRC_INIT);
--	writel(bitrev32(mctx->poly), ctx->crc->regs + CRC_POL);
--	writel(CRC_CR_RESET | CRC_CR_REVERSE, ctx->crc->regs + CRC_CR);
-+	/* set key */
-+	if (ctx->crc->key_support) {
-+		writel(bitrev32(mctx->key), ctx->crc->regs + CRC_INIT);
-+	} else if (mctx->key != CRC_INIT_DEFAULT) {
-+		dev_err(ctx->crc->dev, "Unsupported key value! Should be: 0x%x\n",
-+			CRC_INIT_DEFAULT);
-+		return -EINVAL;
-+	}
-+
-+	/* set poly */
-+	if (ctx->crc->poly_support)
-+		writel(bitrev32(mctx->poly), ctx->crc->regs + CRC_POL);
-+
-+	/* reset and configure in bit reverse mode if supported */
-+	if (ctx->crc->reverse_support)
-+		writel(CRC_CR_RESET | CRC_CR_REVERSE, ctx->crc->regs + CRC_CR);
-+	else
-+		writel(CRC_CR_RESET, ctx->crc->regs + CRC_CR);
-+
-+	/* store partial result */
-+	if (!ctx->crc->reverse_support)
-+		ctx->partial = bitrev32(readl(crc->regs + CRC_DR));
-+	else
-+		ctx->partial = readl(ctx->crc->regs + CRC_DR);
- 
--	/* Store partial result */
--	ctx->partial = readl(ctx->crc->regs + CRC_DR);
- 	ctx->crc->nb_pending_bytes = 0;
- 
- 	return 0;
-@@ -135,7 +157,12 @@ static int stm32_crc_update(struct shash_desc *desc, const u8 *d8,
- 
- 		if (crc->nb_pending_bytes == sizeof(u32)) {
- 			/* Process completed pending data */
--			writel(*(u32 *)crc->pending_data, crc->regs + CRC_DR);
-+			if (!ctx->crc->reverse_support)
-+				writel(bitrev32(*(u32 *)crc->pending_data),
-+				       crc->regs + CRC_DR);
-+			else
-+				writel(*(u32 *)crc->pending_data,
-+				       crc->regs + CRC_DR);
- 			crc->nb_pending_bytes = 0;
- 		}
- 	}
-@@ -143,10 +170,16 @@ static int stm32_crc_update(struct shash_desc *desc, const u8 *d8,
- 	d32 = (u32 *)d8;
- 	for (i = 0; i < length >> 2; i++)
- 		/* Process 32 bits data */
--		writel(*(d32++), crc->regs + CRC_DR);
-+		if (!ctx->crc->reverse_support)
-+			writel(bitrev32(*(d32++)), crc->regs + CRC_DR);
-+		else
-+			writel(*(d32++), crc->regs + CRC_DR);
- 
- 	/* Store partial result */
--	ctx->partial = readl(crc->regs + CRC_DR);
-+	if (!ctx->crc->reverse_support)
-+		ctx->partial = bitrev32(readl(crc->regs + CRC_DR));
-+	else
-+		ctx->partial = readl(crc->regs + CRC_DR);
- 
- 	/* Check for pending data (non 32 bits) */
- 	length &= 3;
-@@ -243,6 +276,7 @@ static int stm32_crc_probe(struct platform_device *pdev)
- 	struct stm32_crc *crc;
- 	struct resource *res;
- 	int ret;
-+	int algs_size;
- 
- 	crc = devm_kzalloc(dev, sizeof(*crc), GFP_KERNEL);
- 	if (!crc)
-@@ -269,13 +303,26 @@ static int stm32_crc_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	/* set key, poly and reverse support if device is of F7 series */
-+	if (of_device_is_compatible(crc->dev->of_node, "st,stm32f7-crc")) {
-+		crc->key_support = true;
-+		crc->poly_support = true;
-+		crc->reverse_support = true;
-+	}
-+
- 	platform_set_drvdata(pdev, crc);
- 
- 	spin_lock(&crc_list.lock);
- 	list_add(&crc->list, &crc_list.dev_list);
- 	spin_unlock(&crc_list.lock);
- 
--	ret = crypto_register_shashes(algs, ARRAY_SIZE(algs));
-+	/* For F4 series only CRC32 algorithm will be used */
-+	if (of_device_is_compatible(crc->dev->of_node, "st,stm32f4-crc"))
-+		algs_size = 1;
-+	else
-+		algs_size = ARRAY_SIZE(algs);
-+
-+	ret = crypto_register_shashes(algs, algs_size);
- 	if (ret) {
- 		dev_err(dev, "Failed to register\n");
- 		clk_disable_unprepare(crc->clk);
-@@ -304,6 +351,7 @@ static int stm32_crc_remove(struct platform_device *pdev)
- 
- static const struct of_device_id stm32_dt_ids[] = {
- 	{ .compatible = "st,stm32f7-crc", },
-+	{ .compatible = "st,stm32f4-crc", },
- 	{},
- };
- MODULE_DEVICE_TABLE(of, stm32_dt_ids);
--- 
-2.7.4
+Thanks,
+Rafael
