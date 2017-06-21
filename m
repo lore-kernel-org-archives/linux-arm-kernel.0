@@ -1,108 +1,167 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 21 Jun 2017 10:53:09 +0100
-Subject: [PATCH v2] KVM: arm/arm64: Signal SIGBUS when stage2 discovers
- hwpoison memory
-In-Reply-To: <3dbafd74-57f2-e724-ace2-0f84abb57e59@huawei.com>
-References: <20170524163250.29281-1-james.morse@arm.com>
- <3dbafd74-57f2-e724-ace2-0f84abb57e59@huawei.com>
-Message-ID: <594A4205.70201@arm.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Wed, 21 Jun 2017 15:26:08 +0530
+Subject: [PATCH v3 2/2] acpi, gicv3-its, numa: Adding numa node mapping
+ for gic-its units
+In-Reply-To: <89b8b97d-1f4c-4938-9932-b2d637797e14@arm.com>
+References: <1498025743-6340-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <1498025743-6340-3-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <89b8b97d-1f4c-4938-9932-b2d637797e14@arm.com>
+Message-ID: <CAFpQJXV-HfVK1GoOb7_svAK7NLoJvYgUmjV36DhgqhfDoafFaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi gengdongjiu,
+On Wed, Jun 21, 2017 at 2:28 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 21/06/17 07:15, Ganapatrao Kulkarni wrote:
+>> Add code to parse SRAT ITS Affinity sub table as defined in ACPI 6.2
+>> Later in per device probe, ITS devices are mapped to
+>> numa node using ITS id to proximity domain mapping.
+>>
+>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>> ---
+>>  drivers/irqchip/irq-gic-v3-its.c | 80 +++++++++++++++++++++++++++++++++++++++-
+>>  1 file changed, 79 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>> index 45ea1933..88cfb32 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>> @@ -1833,6 +1833,82 @@ static int __init its_of_probe(struct device_node *node)
+>>
+>>  #define ACPI_GICV3_ITS_MEM_SIZE (SZ_128K)
+>>
+>> +#ifdef CONFIG_ACPI_NUMA
+>> +struct its_srat_map {
+>> +     u32     numa_node;  /* numa node id */
+>> +     u32     its_id;  /* GIC ITS ID */
+>> +};
+>> +
+>> +static struct its_srat_map its_srat_maps[MAX_NUMNODES] __initdata = {
+>> +     [0 ... MAX_NUMNODES - 1] = {NUMA_NO_NODE, UINT_MAX} };
+>> +
+>> +static int its_in_srat __initdata;
+>> +
+>> +static int __init
+>> +acpi_get_its_numa_node(u32 its_id)
+>
+> Please keep these on the same line.
 
-(+CC: Achin)
-
-On 21/06/17 08:42, gengdongjiu wrote:
-> On 2017/5/25 0:32, James Morse wrote:
->> +static void kvm_send_hwpoison_signal(unsigned long address,
->> +				     struct vm_area_struct *vma)
+sure.
+>
 >> +{
->> +	siginfo_t info;
+>> +     int i;
 >> +
->> +	info.si_signo   = SIGBUS;
->> +	info.si_errno   = 0;
->> +	info.si_code    = BUS_MCEERR_AR;
->> +	info.si_addr    = (void __user *)address;
->> +
->> +	if (is_vm_hugetlb_page(vma))
->> +		info.si_addr_lsb = huge_page_shift(hstate_vma(vma));
->> +	else
->> +		info.si_addr_lsb = PAGE_SHIFT;
->> +
->> +	send_sig_info(SIGBUS, &info, current);
+>> +     for (i = 0; i < its_in_srat; i++) {
+>> +             if (its_id == its_srat_maps[i].its_id)
+>> +                     return its_srat_maps[i].numa_node;
+>> +     }
+>> +     return NUMA_NO_NODE;
 >> +}
 >> +
->>  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>  			  struct kvm_memory_slot *memslot, unsigned long hva,
->>  			  unsigned long fault_status)
->> @@ -1318,6 +1337,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>  	smp_rmb();
->>  
->>  	pfn = gfn_to_pfn_prot(kvm, gfn, write_fault, &writable);
->> +	if (pfn == KVM_PFN_ERR_HWPOISON) {
->> +		kvm_send_hwpoison_signal(hva, vma);
->> +		return 0;
->> +	}
+>> +static int __init
+>> +gic_acpi_parse_srat_its(struct acpi_subtable_header *header,
+>> +                      const unsigned long end)
+>
+> Same remark.
 
-> I heard from our CPU hardware team, when happen HWpoison, CPU hardware does not record the IPA address in the HPFAR_EL2.
+ok
+>
+>> +{
+>> +     int pxm, node;
+>> +     struct acpi_srat_its_affinity *its_affinity;
+>> +
+>> +     its_affinity = (struct acpi_srat_its_affinity *)header;
+>> +     if (!its_affinity)
+>> +             return -EINVAL;
+>> +
+>> +     if (its_affinity->header.length <
+>> +                     sizeof(struct acpi_srat_its_affinity)) {
+>
+> Same thing.
 
-I think we discussed this before[0], your CPU has a feature called 'hwpoison'
-that is uses to support RAS. Linux also has a feature called 'hwpoison' [1][2],
-which handles the offline-ing of memory pages when it receives a notification
-through APEI. I've tried to call this memory_failure() to avoid this confusion.
+ok
+>
+>> +             pr_err("SRAT:ITS: Invalid SRAT header length: %d\n",
+>> +                     its_affinity->header.length);
+>> +             return -EINVAL;
+>> +     }
+>> +
+>> +     if (its_in_srat >= MAX_NUMNODES) {
+>> +             pr_err("SRAT:ITS: ITS devices exceeding max count[%d]\n",
+>> +                             MAX_NUMNODES);
+>> +             return -EINVAL;
+>> +     }
+>> +
+>> +     pxm = its_affinity->proximity_domain;
+>> +     node = acpi_map_pxm_to_node(pxm);
+>> +
+>> +     if (node == NUMA_NO_NODE || node >= MAX_NUMNODES) {
+>> +             pr_err("SRAT:ITS: Invalid numa node %d\n", node);
+>> +             return -EINVAL;
+>> +     }
+>
+> So if you find an entry that doesn't match the current kernel
+> configuration, you drop all the subsequent entries? That doesn't feel right.
 
-This patch is to handle stage2 faults when the page was removed from the stage2
-mapping by the memory_failure() code. v3 of this patch[3] does a much better job
-of describing this.
+thanks, it is reasonable to print warning to notify that
+mapping is broken for some tables and continue.
+anyway device which does not have mapping gets mapped default to NUMA_NO_NODE.
 
-(... I don't think your question is related to this patch ...)
+>
+>> +
+>> +     its_srat_maps[its_in_srat].numa_node = node;
+>> +     its_srat_maps[its_in_srat].its_id = its_affinity->its_id;
+>> +     its_in_srat++;
+>> +     pr_info("ACPI: NUMA: SRAT: ITS: PXM %d -> ITS_ID %d -> NODE %d\n",
+>> +             pxm, its_affinity->its_id, node);
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static int __init acpi_table_parse_srat_its(void)
+>> +{
+>> +     return acpi_table_parse_entries(ACPI_SIG_SRAT,
+>> +                                     sizeof(struct acpi_table_srat),
+>> +                                     ACPI_SRAT_TYPE_GIC_ITS_AFFINITY,
+>> +                                     gic_acpi_parse_srat_its, 0);
+>
+> If you don't check the return value, there is no point returning it.
 
+ thanks, return value is don't care, i will change accordingly.
+>
+>> +}
+>> +#else
+>> +#define acpi_table_parse_srat_its()  do { } while (0)
+>> +#define acpi_get_its_numa_node(its_id)       NUMA_NO_NODE
+>> +#endif
+>> +
+>>  static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
+>>                                         const unsigned long end)
+>>  {
+>> @@ -1861,7 +1937,8 @@ static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
+>>               goto dom_err;
+>>       }
+>>
+>> -     err = its_probe_one(&res, dom_handle, NUMA_NO_NODE);
+>> +     err = its_probe_one(&res, dom_handle,
+>> +                     acpi_get_its_numa_node(its_entry->translation_id));
+>>       if (!err)
+>>               return 0;
+>>
+>> @@ -1873,6 +1950,7 @@ static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
+>>
+>>  static void __init its_acpi_probe(void)
+>>  {
+>> +     acpi_table_parse_srat_its();
+>>       acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
+>>                             gic_acpi_parse_madt_its, 0);
+>>  }
+>>
+>
+> Thanks,
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
 
-> Only when the SEA error is related to the page table walk, the HPFAR_EL2 register is updated.
-> here we got the pfn/gfn from the register HPFAR_EL2, if CPU does not update the HPFAR_EL2 register,
-> we may can not use this method to get the pfn/gfn.
-
-This patch is only concerned with ordinary stage2 faults. Linux doesn't want to
-give the page to the guest as it has been marked with the PG_HWpoison flag.
-Instead we trigger memory_failure()'s 'late' notification.
-
-To the CPU this will look like a normal stage2 fault.
-
-
-> could you confirm arm's armv8.0/armv8.2 standard CPU also use such design?
-> if so, we may need to use other method to get the gfn/pfn/hva address.
-
-Your question is what happens when a guest accesses a location your CPU has
-marked with its 'hwpoison'. From the RAS spec[4] I would expect this to be
-reported as a Synchronous External Abort. For firmware-first error handling this
-should be taken to EL3.
-
->From here firmware should generate CPER records and then notify the OS via one
-of the APEI mechanisms. Because a guest was running this notification must reach
-EL2. KVM can then switch back to the host and invoke the APEI GHES handler,
-which for this kind of error will probably call memory_failure().
-
-What happens if HPFAR_EL2 isn't set when this kind of error occurs?
-Provided EL3 can learn the physical address that triggered the exception then
-for firmware-first this isn't a problem. These errors should be taken to EL3 and
-then described by CPER records to the OS. The OS should process the CPER records
-in preference to attempting 'kernel first error handling'.
-
-memory_failure() will unmap the affected pages from user space (and KVMs stage2)
-and deliver signals (if Qemu/kvmtool registered for them via prctl()). KVM won't
-re-enter the guest if there is a signal pending, from here Qemu/kvmtool get the
-affected VA which they can use to notify the guest.
-
-
-I hope this helps,
-
-James
-
-[0] https://lkml.org/lkml/2017/5/12/492
-[1] https://lwn.net/Articles/348886/
-[2]
-https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/vm/hwpoison.txt
-[3] https://www.spinics.net/lists/arm-kernel/msg589515.html
-[4]
-https://static.docs.arm.com/ddi0587/a/RAS%20Extension-release%20candidate_march_29.pdf
+thanks
+Ganapat
