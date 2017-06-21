@@ -1,67 +1,89 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 20 Jun 2017 18:43:03 -0700
-Subject: [PATCH v4 0/3] watchdog: dw_wdt: add reset lines
-In-Reply-To: <738tknf5zp.fsf@pengutronix.de>
-References: <cover.50aaf23e8fbe9028f711a67e39b96910c986e8b0.1495443015.git-series.s.trumtrar@pengutronix.de>
- <738tknf5zp.fsf@pengutronix.de>
-Message-ID: <a6d32d71-6f66-18af-5283-036bf1ef93ce@roeck-us.net>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Wed, 21 Jun 2017 09:58:13 +0800
+Subject: [PATCH 3/3] arm64: dts: register Hi3660's thermal sensor
+In-Reply-To: <7abe5b01-c728-accd-d6bb-05d9ceee2176@hisilicon.com>
+References: <1497930035-60894-1-git-send-email-kevin.wangtao@hisilicon.com>
+ <1497930035-60894-3-git-send-email-kevin.wangtao@hisilicon.com>
+ <CAFGCpxwmN3jAZn2chK+QQ-YKg7TwWJOTHSi1VzwcSQ7Mm3gQng@mail.gmail.com>
+ <7abe5b01-c728-accd-d6bb-05d9ceee2176@hisilicon.com>
+Message-ID: <CAFGCpxyHowrssdhT1RffDO1o4-5=ksqAz+r8Q23-myVCi5h_fA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2017 12:55 AM, Steffen Trumtrar wrote:
-> 
-> Steffen Trumtrar <s.trumtrar@pengutronix.de> writes:
-> 
->> Hi!
->>
->> This series adds support for the reset line that is (potentially) holding
->> the watchdog in reset.
->>
->> As the watchdog is useless if this happens, it needs to be deasserted in
->> the probe function.
->>
->> Tested on a Socrates board.
->>
->> Regards,
->> Steffen
+On Tue, Jun 20, 2017 at 4:32 PM, Wangtao (Kevin, Kirin)
+<kevin.wangtao@hisilicon.com> wrote:
+>
+>
+> ? 2017/6/20 15:38, Guodong Xu ??:
 >>
 >>
->> Changes since v3:
 >>
->>    - goto out_disable_clk
->>    - add Reviewed-by
+>> 2017?6?20? ??11:49?"Tao Wang" <kevin.wangtao@hisilicon.com
+>> <mailto:kevin.wangtao@hisilicon.com>>???
 >>
->> Changes since v2:
+>>     Bind thermal sensor driver for Hi3660.
 >>
->>    - use optional reset functions
->>    - add Acked-by to devictree bindings
+>>     Signed-off-by: Tao Wang <kevin.wangtao@hisilicon.com
+>> <mailto:kevin.wangtao@hisilicon.com>>
+>>     Signed-off-by: Leo Yan <leo.yan@linaro.org
+>> <mailto:leo.yan@linaro.org>>
+>>     ---
+>>       arch/arm64/boot/dts/hisilicon/hi3660.dtsi |    7 +++++++
+>>       1 file changed, 7 insertions(+)
 >>
->> Changes since v1:
+>>     diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+>> b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+>>     index 3983086..cc67958 100644
+>>     --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+>>     +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+>>     @@ -156,5 +156,12 @@
 >>
->>    - remove reset-names property
->>    - remove warning if reset property is missing
 >>
->> Steffen Trumtrar (3):
->>    watchdog: bindings: dw_wdt: add reset lines
->>    watchdog: dw_wdt: get reset lines from dt
->>    ARM: socfpga: dtsi: add dw-wdt reset lines
->>
->>   Documentation/devicetree/bindings/watchdog/dw_wdt.txt |  3 +++
->>   arch/arm/boot/dts/socfpga.dtsi                        |  2 ++
->>   drivers/watchdog/dw_wdt.c                             | 11 +++++++++++
->>   3 files changed, 16 insertions(+)
->>
->> base-commit: 2ea659a9ef488125eb46da6eb571de5eae5c43f6
-> 
-> Gentle Ping!
-> 
-> Is this series already applied somewhere I didn't look?
-> 
+>> i am wondering which tree this patch should be applied to. Actually Olof
+>> Johansson olof at lixom.net <mailto:olof@lixom.net> just merged hi3660 dts into
+>> his tree. You should better rebase you dts patch onto that.
+>
+> Can you share me the git path?
 
-https://git.kernel.org/pub/scm/linux/kernel/git/groeck/linux-staging.git/log/?h=watchdog-next
+As of this morning, it has shown up in linux next tag: next-20170620
 
- From there, we can only hope that Wim will find the time to pick it up for the next release.
+https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/arch/arm64/boot/dts/hisilicon?h=next-20170620
 
-The arm dts change will have to go through the arm tree(s) as usual.
+-Guodong
 
-Guenter
+
+>>
+>>
+>>
+>>                              clock-names = "uartclk", "apb_pclk";
+>>                              status = "disabled";
+>>                      };
+>>     +
+>>     +               tsensor: tsensor {
+>>     +                       compatible = "hisilicon,thermal-hi3660";
+>>     +                       reg = <0x0 0xfff30000 0x0 0x1000>;
+>>     +                       #thermal-sensor-cells = <1>;
+>>     +                       status = "ok";
+>>
+>>
+>> please remove status ok. that's default. redundant.
+>
+> ok
+>>
+>>
+>>     +               };
+>>              };
+>>       };
+>>     --
+>>     1.7.9.5
+>>
+>>
+>>     _______________________________________________
+>>     linux-arm-kernel mailing list
+>>     linux-arm-kernel at lists.infradead.org
+>> <mailto:linux-arm-kernel@lists.infradead.org>
+>>     http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>
+>>
+>>
+>
