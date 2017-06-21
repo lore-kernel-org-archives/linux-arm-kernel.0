@@ -1,50 +1,39 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 22 Jun 2017 01:31:51 +0200
-Subject: [PATCH 1/9] i2c: designware: Fix system suspend
-In-Reply-To: <1498072888-14782-2-git-send-email-ulf.hansson@linaro.org>
-References: <1498072888-14782-1-git-send-email-ulf.hansson@linaro.org>
- <1498072888-14782-2-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CAJZ5v0iYwPE8rpn=aZ9n6LV-qbAK3kynRqVZ7xxuB+gYar_fyg@mail.gmail.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Thu, 22 Jun 2017 07:47:10 +0800
+Subject: [PATCH] crypto: sun4i-ss: support the Security System PRNG
+In-Reply-To: <20170621064855.z5mu4f3r3dt4kotc@flea.lan>
+References: <20170620085819.20114-1-clabbe.montjoie@gmail.com>
+ <20170620095947.i3r3iym2cxz5jciw@flea.lan>
+ <20170620114536.GA4766@Red>
+ <20170621064855.z5mu4f3r3dt4kotc@flea.lan>
+Message-ID: <20170621234710.GA22306@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 21, 2017 at 9:21 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> The commit 8503ff166504 ("i2c: designware: Avoid unnecessary resuming
-> during system suspend"), may suggest to the PM core to try out the so
-> called direct_complete path for system sleep. In this path, the PM core
-> treats a runtime suspended device as it's already in a proper low power
-> state for system sleep, which makes it skip calling the system sleep
-> callbacks for the device, except for the ->prepare() and the ->complete()
-> callback.
->
-> Moreover, under certain circumstances the PM core may unset the
-> direct_complete flag for a parent device, in case its child device are
-> being system suspended before. In other words, the PM core doesn't skip
-> calling the system sleep callbacks, no matter if the device is runtime
-> suspended or not.
->
-> In cases of an i2c slave device, the above situation is triggered.
-> Unfortunate, this also breaks the assumption that the i2c device is always
-> runtime resumed, whenever the dw_i2c_plat_suspend() callback is being
-> invoked, which then leads to a regression.
->
-> More precisely, dw_i2c_plat_suspend() then calls clk_core_disable() and
-> clk_core_unprepare(), for an already disabled/unprepared clock, leading to
-> complaints about clocks calls being wrongly balanced.
->
-> In cases when the i2c device is attached to the ACPI PM domain, the problem
-> doesn't occur. That's because ACPI's ->suspend() callback, assigned to
-> acpi_subsys_suspend(), calls pm_runtime_resume() for the i2c device.
+On Wed, Jun 21, 2017 at 08:48:55AM +0200, Maxime Ripard wrote:
+> On Tue, Jun 20, 2017 at 01:45:36PM +0200, Corentin Labbe wrote:
+> > On Tue, Jun 20, 2017 at 11:59:47AM +0200, Maxime Ripard wrote:
+> > > Hi,
+> > > 
+> > > On Tue, Jun 20, 2017 at 10:58:19AM +0200, Corentin Labbe wrote:
+> > > > The Security System have a PRNG, this patch add support for it via
+> > > > crypto_rng.
+> > > 
+> > > This might be a dumb question, but is the CRYPTO_RNG code really
+> > > supposed to be used with PRNG?
+> > > 
+> > 
+> > Yes, see recently added drivers/crypto/exynos-rng.c
+> 
+> It's still not really clear from the commit log (if you're talking
+> about c46ea13f55b6) why and if using the RNG code for a PRNG is a good
+> idea.
 
-Which really is expected to happen, so direct_complete should only be
-used along with the ACPI PM domain in this case.
+The hwrng interface is meant for true hardware RNGs.  The crypto API
+rng interface is primarily intended for PRNGs.
 
-Moreover, in the ACPI PM domain case acpi_subsys_prepare() is supposed
-to do the right thing without dw_i2c_plat_prepare() and the return
-value of the latter will be ignored anyway, so dw_i2c_plat_prepare()
-will only have effect without ACPI PM domain AFAICS.
-
-It looks like commit 8503ff166504 is entirely misguided.
-
-Thanks,
-Rafael
+Cheers,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
