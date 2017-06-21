@@ -1,27 +1,72 @@
-From: daniel@iogearbox.net (Daniel Borkmann)
-Date: Wed, 21 Jun 2017 18:32:37 +0200
-Subject: [PATCH v2] arm: eBPF JIT compiler
-In-Reply-To: <CAHgaXdKGJFh8jO44gwCqe0cijoztf39bK9k8ioBtYDjzb4vvZw@mail.gmail.com>
-References: <1495754003-21099-1-git-send-email-illusionist.neo@gmail.com>
- <CAGXu5jKmLNMR+uhM9Ov2XPW6kCjip_SjScgEH0fTFp6fQtKFiA@mail.gmail.com>
- <593E6B0F.8070901@iogearbox.net>
- <CAHgaXd+DW2bggto=2S9hOdMrtPTvhD2QN4rPf2V8iHewQpg-YA@mail.gmail.com>
- <CAHgaXdJrvKdzr3fJ1TMkC4foeVsZJDSVEwhDOeZGxQVsmoK2cQ@mail.gmail.com>
- <59419D1E.2060303@iogearbox.net>
- <CAHgaXdKMbFPgy-kKF0iDSAYo4CqLn9FRu9HwM+OfM-JWb9fNRQ@mail.gmail.com>
- <594813AA.5010001@iogearbox.net>
- <CAHgaXdLtX6yLdU3bMvS=g8FZ79sM_BW_+hHTMH=Mfk4TZqUnpw@mail.gmail.com>
- <59495367.3080402@iogearbox.net>
- <CAHgaXdKGJFh8jO44gwCqe0cijoztf39bK9k8ioBtYDjzb4vvZw@mail.gmail.com>
-Message-ID: <594A9FA5.1080003@iogearbox.net>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Wed, 21 Jun 2017 11:37:04 -0500
+Subject: [GIT PULL] Qualcomm Driver updates for 4.13
+In-Reply-To: <9ae96846-7701-a789-3a7d-dd0e9f81fc60@linaro.org>
+References: <1497383309-14226-1-git-send-email-andy.gross@linaro.org>
+ <1497383309-14226-4-git-send-email-andy.gross@linaro.org>
+ <20170619053707.GC7703@localhost>
+ <20170620144823.GA5203@hector.attlocal.net>
+ <9ae96846-7701-a789-3a7d-dd0e9f81fc60@linaro.org>
+Message-ID: <20170621163704.GB5203@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/21/2017 04:26 PM, Shubham Bansal wrote:
-[...]
-> So ultimately, we call helper_function which takes u64 as arguments
-> only. I know its asking a lot, but can you please confirm this asap? I
-> would like to start implementing it.
+On Wed, Jun 21, 2017 at 11:35:02AM +0300, Stanimir Varbanov wrote:
+> Hi,
+> 
+> On 06/20/2017 05:48 PM, Andy Gross wrote:
+> > On Sun, Jun 18, 2017 at 10:37:07PM -0700, Olof Johansson wrote:
+> >> Hi Andy,
+> >>
+> >> On Tue, Jun 13, 2017 at 03:48:27PM -0400, Andy Gross wrote:
+> >>> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+> >>>
+> >>>   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+> >>>
+> >>> are available in the git repository at:
+> >>>
+> >>>   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-4.13
+> >>>
+> >>> for you to fetch changes up to d4348b43bbcadb6d5faee36024245944b6600d25:
+> >>>
+> >>>   firmware: qcom_scm: Fix to allow COMPILE_TEST-ing (2017-06-09 16:15:10 -0500)
+> >>>
+> >>> ----------------------------------------------------------------
+> >>> Qualcomm ARM Based Driver Updates for v4.13
+> >>>
+> >>> * Fix COMPILE_TEST flag for QCOM SCM
+> >>> * Improve QCOM SMSM error handling
+> >>>
+> >>> ----------------------------------------------------------------
+> >>> Jonathan Neusch??fer (1):
+> >>>       soc: qcom: smsm: Improve error handling, quiesce probe deferral
+> >>>
+> >>> Stanimir Varbanov (1):
+> >>>       firmware: qcom_scm: Fix to allow COMPILE_TEST-ing
+> >>
+> >> This patch doesn't seem like it's doing the right thing -- I've replied to it
+> >> on the list with comments.
+> > 
+> > For some reason I thought it was a rehash of a previous patch and it looked
+> > right to me.  Dropping this looks like the right answer for now.
+> 
+> yes, please drop this patch and I'm sorry for the inconvenience. It will
+> need more work than I thought initially.
+> 
+> > 
+> >>
+> >> Not merged. Let me know if you want me to cherry-pick the other patch (or send
+> >> a new pull request with just that one).
+> > 
+> > I'll send another pull request today.
+> 
+> Andy could you also drop the patch from your tree because it breaks
+> linux-next which already has alternative approach to compile test qcom
+> video codec driver.
 
-Yes, that is correct. I think it would be the better, more generic
-approach going forward to always assume that.
+Done.  I pushed a revised tag and also sent a revised pull request.
+
+
+Regards,
+
+Andy
