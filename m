@@ -1,125 +1,26 @@
-From: yt.shen@mediatek.com (YT Shen)
-Date: Wed, 21 Jun 2017 19:01:06 +0800
-Subject: [PATCH v3 2/2] arm64: dts: Add Mediatek SoC MT2712 and
- evaluation board dts and Makefile
-In-Reply-To: <d5509532-7ab6-c9ce-d951-4bcdcc1399ff@gmail.com>
-References: <1497620721-61444-1-git-send-email-yt.shen@mediatek.com>
- <1497620721-61444-3-git-send-email-yt.shen@mediatek.com>
- <d5509532-7ab6-c9ce-d951-4bcdcc1399ff@gmail.com>
-Message-ID: <1498042866.2865.3.camel@mtksdaap41>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Wed, 21 Jun 2017 19:12:28 +0800
+Subject: [PATCH v2] KVM: arm/arm64: Signal SIGBUS when stage2 discovers
+ hwpoison memory
+In-Reply-To: <594A4205.70201@arm.com>
+References: <20170524163250.29281-1-james.morse@arm.com>
+ <3dbafd74-57f2-e724-ace2-0f84abb57e59@huawei.com> <594A4205.70201@arm.com>
+Message-ID: <3bcc724d-0aaf-3384-fc75-38c224f604ed@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-06-16 at 16:33 +0200, Matthias Brugger wrote:
-> 
-> On 16/06/17 15:45, YT Shen wrote:
-> > This adds basic chip support for Mediatek 2712
-> > 
-> > Signed-off-by: YT Shen <yt.shen@mediatek.com>
-> > ---
-> >   arch/arm64/boot/dts/mediatek/Makefile       |   1 +
-> >   arch/arm64/boot/dts/mediatek/mt2712-evb.dts |  32 ++++++
-> >   arch/arm64/boot/dts/mediatek/mt2712e.dtsi   | 166 ++++++++++++++++++++++++++++
-> >   3 files changed, 199 insertions(+)
-> >   create mode 100644 arch/arm64/boot/dts/mediatek/mt2712-evb.dts
-> >   create mode 100644 arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-> > 
-> > diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
-> > index 9fbfd32..fcc0604 100644
-> > --- a/arch/arm64/boot/dts/mediatek/Makefile
-> > +++ b/arch/arm64/boot/dts/mediatek/Makefile
-> > @@ -1,3 +1,4 @@
-> > +dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
-> >   dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
-> >   dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
-> >   dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt2712-evb.dts b/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
-> > new file mode 100644
-> > index 0000000..8c804df
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
-> > @@ -0,0 +1,32 @@
-> > +/*
-> > + * Copyright (c) 2017 MediaTek Inc.
-> > + * Author: YT Shen <yt.shen@mediatek.com>
-> > + *
-> > + * SPDX-License-Identifier: (GPL-2.0 OR MIT)
-> > + */
-> > +
-> > +/dts-v1/;
-> > +#include "mt2712e.dtsi"
-> > +
-> > +/ {
-> > +	model = "MediaTek MT2712 evaluation board";
-> > +	compatible = "mediatek,mt2712-evb", "mediatek,mt2712";
-> > +
-> > +	aliases {
-> > +		serial0 = &uart0;
-> > +	};
-> > +
-> > +	memory at 40000000 {
-> > +		device_type = "memory";
-> > +		reg = <0 0x40000000 0 0x80000000>;
-> > +	};
-> > +
-> > +	chosen {
-> > +		stdout-path = "serial0:921600n8";
-> > +	};
-> > +};
-> > +
-> > +&uart0 {
-> > +	status = "okay";
-> > +};
-> > +
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-> > new file mode 100644
-> > index 0000000..65cdd4a
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-> > @@ -0,0 +1,166 @@
-> [...]
-> > +
-> > +	uart_clk: dummy26m {
-> > +		compatible = "fixed-clock";
-> > +		clock-frequency = <26000000>;
-> > +		#clock-cells = <0>;
-> > +	};
-> > +
-> > +	timer {
-> > +		compatible = "arm,armv8-timer";
-> > +		interrupt-parent = <&gic>;
-> > +		interrupts = <GIC_PPI 13
-> > +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
-> > +			     <GIC_PPI 14
-> > +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
-> > +			     <GIC_PPI 11
-> > +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
-> > +			     <GIC_PPI 10
-> > +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>;
-> > +	};
-> > +
-> > +	soc {
-> > +		#address-cells = <2>;
-> > +		#size-cells = <2>;
-> > +		compatible = "simple-bus";
-> > +		ranges;
-> > +
-> > +		uart5: serial at 1000f000 {
-> > +			compatible = "mediatek,mt2712-uart",
-> > +				     "mediatek,mt6577-uart";
-> > +			reg = <0 0x1000f000 0 0x400>;
-> > +			interrupts = <GIC_SPI 127 IRQ_TYPE_LEVEL_LOW>;
-> > +			clocks = <&uart_clk>;
-> 
-> uart has two clocks, baud and bus clock. Please refer to the bindings 
-> descrption for more information, that's what they are for.
-> 
-> Please define the two dummy clocks with the correct frequency and use them.
-> 
-> Regards,
-> Matthias
-Okay, after checking
-Documentation/devicetree/bindings/serial/mtk-uart.txt, I will use baud
-and bus clock in the next version.
+Hi james
 
-yt.shen
+On 2017/6/21 17:53, James Morse wrote:
+> What happens if HPFAR_EL2 isn't set when this kind of error occurs?
+> Provided EL3 can learn the physical address that triggered the exception then
+> for firmware-first this isn't a problem. These errors should be taken to EL3 and
+> then described by CPER records to the OS. The OS should process the CPER records
+> in preference to attempting 'kernel first error handling'
+
+here the pfn is from the HPFAR_EL2, not from the CPER record, which does not related with the CPER records.
+Although OS can process the CPER records, but here the pfn may be always zero.
++	if (pfn == KVM_PFN_ERR_HWPOISON) {
++		kvm_send_hwpoison_signal(hva, vma);
++		return 0;
++	}
