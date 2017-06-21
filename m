@@ -1,50 +1,40 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Wed, 21 Jun 2017 15:10:16 +0200
-Subject: [PATCH V17 00/11] Add UEFI 2.6 and ACPI 6.1 updates for RAS on
- ARM64
-In-Reply-To: <20170621130025.GD16981@rric.localdomain>
-References: <1495225933-4410-1-git-send-email-tbaicar@codeaurora.org>
- <20170607115012.GZ30263@arm.com>
- <20170620063439.GS658@rric.localdomain>
- <20170620084931.GB30664@arm.com>
- <20170621130025.GD16981@rric.localdomain>
-Message-ID: <20170621131016.GE16981@rric.localdomain>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 21 Jun 2017 21:22:47 +0800
+Subject: [PATCH 1/2] ASoC: add bindings for ZTE zx-aud96p22 audio codec
+In-Reply-To: <20170620143352.rjitvgkzh554pviq@sirena.org.uk>
+References: <1497708574-22380-1-git-send-email-shawnguo@kernel.org>
+ <1497708574-22380-2-git-send-email-shawnguo@kernel.org>
+ <20170619161606.g6nabi2w5mmmjbcw@sirena.org.uk>
+ <20170620031131.GB4818@x250>
+ <20170620143352.rjitvgkzh554pviq@sirena.org.uk>
+Message-ID: <20170621132245.GD3372@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.06.17 15:00:25, Robert Richter wrote:
-> On 20.06.17 09:49:32, Will Deacon wrote:
-> > Hi Robert,
-> > 
-> > On Tue, Jun 20, 2017 at 08:34:39AM +0200, Robert Richter wrote:
-> > > On 07.06.17 12:50:12, Will Deacon wrote:
-> > > 
-> > > > Thanks, I've pushed this out as:
-> > > >
-> > > >   git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/ras-apei
-> > > >
-> > > > which I'll merge into for-next/core (and therefore linux-next) either the
-> > > > end of this week or the beginning of next week. Please take a look if you
-> > > > get a chance.
-> > > 
-> > > any reason why there was a roll back of for-next/core?
-> > > 
-> > >  + 0870f692c2ed...e27c7fa015d6 for-next/core -> arm64/for-next/core  (forced update)
-> > > 
-> > > Is it because for-next/ras-apei goes through tip?
-> > 
-> > No, it's because the RAS stuff ran into horrible conflicts with the UUID
-> > tree:
-> > 
-> > https://lkml.org/lkml/2017/6/16/22
-> > 
-> > Tyler should be rebasing that soon, so hopefully I can requeue that stuff
-> > this week.
+On Tue, Jun 20, 2017 at 03:33:52PM +0100, Mark Brown wrote:
+> On Tue, Jun 20, 2017 at 11:11:32AM +0800, Shawn Guo wrote:
+> > On Mon, Jun 19, 2017 at 05:16:06PM +0100, Mark Brown wrote:
 > 
-> Note there are also conflicts with tip-ras from Borsis' tree.
+> > > If there's an external power amplifier this is a separate chip to this
+> > > CODEC and should therefore be separately controlled and integrated as
+> > > part of the machine integration.
+> 
+> > Yes, that should be the best.  But we do not have a particular machine
+> > driver for our platform, and we are using simple-audio-card driver
+> 
+> You should be switching to the of-graph card now.
 
-Turned out this is actually the ras/core branch from tip tree, esp.
+Thanks for the info.  Will do.
 
- https://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git/commit/?id=7bf130e4a065
+> > instead.  I'm not sure if it's generic enough to patch simple-audio-card
+> > driver support this pa-gpios, so chose to fold this quick change in the
+> > codec driver.
+> 
+> Having a separate amplifier is a completely normal thing, and no matter
+> how unusual something is it's obviously not OK to hack one driver to
+> support a completely different device.
 
--Robert
+Okay, I will drop it from codec driver, and try to support it in
+audio-graph-card with separate patch later.
+
+Shawn
