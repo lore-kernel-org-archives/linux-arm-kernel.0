@@ -1,43 +1,67 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 21 Jun 2017 15:55:37 +0100
-Subject: [PATCH 0/3] arm64: Coredump fixes
-Message-ID: <1498057010-12028-1-git-send-email-Dave.Martin@arm.com>
+Date: Wed, 21 Jun 2017 16:00:42 +0100
+Subject: [PATCH 1/3] arm64: ptrace: Fix VFP register dumping in compat
+ coredumps
+In-Reply-To: <1498057010-12028-1-git-send-email-Dave.Martin@arm.com>
+References: <1498057010-12028-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1498057264-12211-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have a few bugs affecting coredumps on arm64, namely:
+Currently, VFP registers are omitted from coredumps for compat
+processes, due to a bug in the REGSET_COMPAT_VFP regset
+implementation.
 
- * VFP regs missing for compat
- * dumped FPSIMD/VFP regs and user RW TLS reg may be stale
+compat_vfp_get() needs to transfer non-contiguous data from
+thread_struct.fpsimd_state, and uses put_user() to handle the
+offending trailing word (FPSCR).  This fails when copying to a
+kernel address (i.e., kbuf && !ubuf), which is what happens when
+dumping core.  As a result, the ELF coredump core code silently
+omits the NT_ARM_VFP note from the dump.
 
-It appears that these bugs were all introduced in the original arm64
-ptrace implementation in v3.6: 478fcb2cdb23 ("arm64: Debugging
-support").
+It would be possible to work around this with additional special
+case code for the put_user(), but since user_regset_copyout() is
+explcltly designed to handle this scenario it is cleaner to port
+the put_user() to a user_regset_copyout() call, which this patch
+does.
 
-Judging by the amount of noise people have(n't) been making about these,
-they're not likely to be critical for anyone, but the patches apply back
-to v4.9 without conflicts so it may be worth Cc-ing stable for those.
-I've not done that yet to avoid the patches being pulled prematurely.
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+ arch/arm64/kernel/ptrace.c | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-I have simple backports back to v3.6 if anyone cares, but I won't post
-them unless someone shouts -- they may just cause unnecessary churn.
-
-Basic testing has been done, on v4.12-rc* only, with a simple userspace
-test and manual parsing of the resulting coredumps.  Other revisions
-have only been build-tested.
-
-I haven't checked for similar bugs in arch/arm.  Casual inspection
-suggests that the required flushing is already in place there.
-
-Dave Martin (3):
-  arm64: compat: Fix VFP register dumping in coredumps
-  arm64: ptrace: Flush FPSIMD regs back to thread_struct before reading
-  arm64: ptrace: Flush user-RW TLS reg to thread_struct before reading
-
- arch/arm64/include/asm/processor.h |  3 +++
- arch/arm64/kernel/process.c        |  8 ++++++--
- arch/arm64/kernel/ptrace.c         | 22 ++++++++++++++++++----
- 3 files changed, 27 insertions(+), 6 deletions(-)
-
+diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+index c142459..0e5aaec 100644
+--- a/arch/arm64/kernel/ptrace.c
++++ b/arch/arm64/kernel/ptrace.c
+@@ -894,7 +894,7 @@ static int compat_vfp_get(struct task_struct *target,
+ {
+ 	struct user_fpsimd_state *uregs;
+ 	compat_ulong_t fpscr;
+-	int ret;
++	int ret, vregs_end_pos;
+ 
+ 	uregs = &target->thread.fpsimd_state.user_fpsimd;
+ 
+@@ -902,13 +902,16 @@ static int compat_vfp_get(struct task_struct *target,
+ 	 * The VFP registers are packed into the fpsimd_state, so they all sit
+ 	 * nicely together for us. We just need to create the fpscr separately.
+ 	 */
+-	ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf, uregs, 0,
+-				  VFP_STATE_SIZE - sizeof(compat_ulong_t));
++	vregs_end_pos = VFP_STATE_SIZE - sizeof(compat_ulong_t);
++	ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf, uregs,
++				  0, vregs_end_pos);
+ 
+ 	if (count && !ret) {
+ 		fpscr = (uregs->fpsr & VFP_FPSCR_STAT_MASK) |
+ 			(uregs->fpcr & VFP_FPSCR_CTRL_MASK);
+-		ret = put_user(fpscr, (compat_ulong_t *)ubuf);
++
++		ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf, &fpscr,
++					  vregs_end_pos, VFP_STATE_SIZE);
+ 	}
+ 
+ 	return ret;
 -- 
 2.1.4
