@@ -1,86 +1,45 @@
-From: xuejiancheng@hisilicon.com (Jiancheng Xue)
-Date: Wed, 21 Jun 2017 17:00:45 +0800
-Subject: [PATCH 5/5] arm64: defconfig: enable some drivers and configs for
- hi3798cv200-poplar board.
-In-Reply-To: <1498035645-22804-1-git-send-email-xuejiancheng@hisilicon.com>
-References: <1498035645-22804-1-git-send-email-xuejiancheng@hisilicon.com>
-Message-ID: <1498035645-22804-6-git-send-email-xuejiancheng@hisilicon.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 21 Jun 2017 11:41:46 +0200
+Subject: [PATCH 00/51] rtc: stop using rtc deprecated functions
+In-Reply-To: <20170621091948.GP4902@n2100.armlinux.org.uk>
+References: <20170620213507.urobmtg34vzubrdq@piout.net>
+ <alpine.DEB.2.20.1706202343120.2157@nanos>
+ <20170621075152.GA15996@amd>
+ <20170621083907.y3gadsmsoufa5niv@piout.net>
+ <20170621091948.GP4902@n2100.armlinux.org.uk>
+Message-ID: <20170621094146.ebq5hxuvtmfdgekz@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable GMAC,I2C,IR,USB2-PHY for hi3798cv200-poplar board.
+On 21/06/2017 at 10:19:49 +0100, Russell King - ARM Linux wrote:
+> On Wed, Jun 21, 2017 at 10:39:07AM +0200, Alexandre Belloni wrote:
+> > On 21/06/2017 at 09:51:52 +0200, Pavel Machek wrote:
+> > > If someone uses different threshold, well, there will be
+> > > confusion. But only for users that have their rtc set to the past,
+> > > which is quite unusual.
+> > > 
+> > 
+> > Or not, having an RTC set in the past is actually quite common. I'd find
+> > it weird to have a new device boot and be set to a date in the future.
+> 
+> ... and that basically means you can't use hardware that stores RTC
+> time as a 32-bit number of seconds past 2106.
+> 
 
-Signed-off-by: Jiancheng Xue <xuejiancheng@hisilicon.com>
----
- arch/arm64/configs/defconfig | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+And I guess it will not matter much for us anyway ;)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 97c123e..b45d760 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -31,6 +31,8 @@ CONFIG_JUMP_LABEL=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_IOSCHED_DEADLINE is not set
-+CONFIG_PARTITION_ADVANCED=y
-+CONFIG_CMDLINE_PARTITION=y
- CONFIG_ARCH_SUNXI=y
- CONFIG_ARCH_ALPINE=y
- CONFIG_ARCH_BCM2835=y
-@@ -179,6 +181,7 @@ CONFIG_VIRTIO_NET=y
- CONFIG_AMD_XGBE=y
- CONFIG_NET_XGENE=y
- CONFIG_MACB=y
-+CONFIG_HIX5HD2_GMAC=y
- CONFIG_HNS_DSAF=y
- CONFIG_HNS_ENET=y
- CONFIG_E1000E=y
-@@ -259,6 +262,7 @@ CONFIG_I2C_TEGRA=y
- CONFIG_I2C_UNIPHIER_F=y
- CONFIG_I2C_RCAR=y
- CONFIG_I2C_CROS_EC_TUNNEL=y
-+CONFIG_I2C_HIX5HD2=y
- CONFIG_SPI=y
- CONFIG_SPI_BCM2835=m
- CONFIG_SPI_BCM2835AUX=m
-@@ -277,6 +281,7 @@ CONFIG_PINCTRL_MSM8994=y
- CONFIG_PINCTRL_MSM8996=y
- CONFIG_PINCTRL_QDF2XXX=y
- CONFIG_PINCTRL_QCOM_SPMI_PMIC=y
-+CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_DWAPB=y
- CONFIG_GPIO_PL061=y
- CONFIG_GPIO_RCAR=y
-@@ -322,7 +327,7 @@ CONFIG_REGULATOR_QCOM_SMD_RPM=y
- CONFIG_REGULATOR_QCOM_SPMI=y
- CONFIG_REGULATOR_RK808=y
- CONFIG_REGULATOR_S2MPS11=y
--CONFIG_MEDIA_SUPPORT=m
-+CONFIG_MEDIA_SUPPORT=y
- CONFIG_MEDIA_CAMERA_SUPPORT=y
- CONFIG_MEDIA_ANALOG_TV_SUPPORT=y
- CONFIG_MEDIA_DIGITAL_TV_SUPPORT=y
-@@ -359,6 +364,10 @@ CONFIG_BACKLIGHT_GENERIC=m
- CONFIG_BACKLIGHT_LP855X=m
- CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_LOGO=y
-+CONFIG_MEDIA_RC_SUPPORT=y
-+CONFIG_RC_DEVICES=y
-+CONFIG_IR_HIX5HD2=y
-+CONFIG_LIRC=y
- # CONFIG_LOGO_LINUX_MONO is not set
- # CONFIG_LOGO_LINUX_VGA16 is not set
- CONFIG_SOUND=y
-@@ -488,7 +497,9 @@ CONFIG_PWM_MESON=m
- CONFIG_PWM_ROCKCHIP=y
- CONFIG_PWM_SAMSUNG=y
- CONFIG_PWM_TEGRA=m
-+CONFIG_TI_SYSCON_RESET=y
- CONFIG_PHY_RCAR_GEN3_USB2=y
-+CONFIG_PHY_HISI_INNO_USB2=y
- CONFIG_PHY_HI6220_USB=y
- CONFIG_PHY_SUN4I_USB=y
- CONFIG_PHY_ROCKCHIP_INNO_USB2=y
+> > Also note that the threshold or offset thing may seem like a good idea
+> > but fails with many RTCs because of how they handle leap years.
+> 
+> Not for the case being discussed.  A 32-bit counter of seconds knows
+> nothing about leap years - all that is handled by the conversion
+> functions.
+> 
+
+Well, the patch series touches some RTCs that are not using 32 bit
+counter so I though I might as well raise the issue now.
+
 -- 
-1.9.1
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
