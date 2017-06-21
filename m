@@ -1,84 +1,82 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 21 Jun 2017 17:14:13 +0200
-Subject: [RFT PATCH v2 00/42] PCI: ARM/ARM64: remove pci_fixup_irqs() usage
-In-Reply-To: <20170621104538.GA8477@red-moon>
-References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
- <CACRpkdZ1rBq9eLJkz_gRuXAG=if+xXf-jPzDEPCfG8EgUmUG3A@mail.gmail.com>
- <20170621103042.GA1712@red-moon> <20170621104538.GA8477@red-moon>
-Message-ID: <CACRpkda_6=qWRQDpTy67MFc=-fYRhqWDPx0NnNG5mjXQLyAAkw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 21 Jun 2017 16:14:21 +0100
+Subject: [PATCH v5 0/6] Add support for the ICU unit in Marvell Armada
+ 7K/8K
+In-Reply-To: <20170621132917.14187-1-thomas.petazzoni@free-electrons.com>
+References: <20170621132917.14187-1-thomas.petazzoni@free-electrons.com>
+Message-ID: <e87dc80c-f85c-1b20-c2e8-cd03922dacd9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 21, 2017 at 12:45 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
+On 21/06/17 14:29, Thomas Petazzoni wrote:
+> Hello,
+> 
+> The Marvell Armada 7K/8K SoCs are composed of two parts: the AP (which
+> contains the CPU cores) and the CP (which contains most
+> peripherals). The 7K SoCs have one CP, while the 8K SoCs have two CPs,
+> doubling the number of available peripherals.
+> 
+> In terms of interrupt handling, all devices in the CPs are connected
+> through wired interrupt to a unit called ICU located in each CP. This
+> unit converts the wired interrupts from the devices into memory
+> transactions.
+> 
+> Inside the AP, there is a GIC extension called GICP, which allows a
+> memory write transaction to trigger a GIC SPI interrupt. The ICUs in
+> each CP are therefore configured to trigger a memory write into the
+> appropriate GICP register so that a wired interrupt from a CP device
+> is converted into a memory write, itself converted into a regular GIC
+> SPI interrupt.
+> 
+> Until now, the configuration of the ICU was done statically by the
+> firmware, and therefore the Device Tree files in Linux were specifying
+> directly GIC interrupts for the interrupts of CP devices. However,
+> with the growing number of devices in the CP, a static allocation
+> scheme doesn't work for the long term.
+> 
+> This patch series therefore makes Linux aware of the ICU: GIC SPI
+> interrupts are dynamically allocated, and the ICU is configured
+> accordingly to route a CP wired interrupt to the allocated GIC SPI
+> interrupt.
+> 
+> In detail:
 
-> Sorry I miss yet another usage of struct pci_bus before bus is
-> scanned in faraday_pci_parse_map_dma_ranges(), all these config
-> accessors want is to access bus number 0 and writei/read some config
-> values in there, please confirm.
->
-> Updated patch here:
+[...]
 
-I fixed it. This was needed:
-diff --git a/drivers/pci/host/pci-ftpci100.c b/drivers/pci/host/pci-ftpci100.c
-index 86f8a3d1c1da..5162dffc102b 100644
---- a/drivers/pci/host/pci-ftpci100.c
-+++ b/drivers/pci/host/pci-ftpci100.c
-@@ -450,6 +450,8 @@ static int faraday_pci_probe(struct platform_device *pdev)
-     struct resource *io;
-     struct pci_host_bridge *host;
-     struct clk *clk;
-+    unsigned char max_bus_speed = PCI_SPEED_33MHz;
-+    unsigned char cur_bus_speed = PCI_SPEED_33MHz;
-     int ret;
-     u32 val;
-     LIST_HEAD(res);
-@@ -553,27 +555,27 @@ static int faraday_pci_probe(struct platform_device *pdev)
-         unsigned long rate;
-         u32 val;
+> Thomas Petazzoni (6):
+>   dt-bindings: interrupt-controller: add DT binding for the Marvell GICP
+>   dt-bindings: interrupt-controller: add DT binding for the Marvell ICU
+>   irqchip: irq-mvebu-gicp: new driver for Marvell GICP
+>   irqchip: irq-mvebu-icu: new driver for Marvell ICU
+>   arm64: marvell: enable ICU and GICP drivers
+>   arm64: dts: marvell: enable GICP and ICU on Armada 7K/8K
+> 
+>  .../bindings/interrupt-controller/marvell,gicp.txt |  27 ++
+>  .../bindings/interrupt-controller/marvell,icu.txt  |  51 ++++
+>  arch/arm64/Kconfig.platforms                       |   2 +
+>  arch/arm64/boot/dts/marvell/armada-ap806.dtsi      |   7 +
+>  .../boot/dts/marvell/armada-cp110-master.dtsi      |  59 +++--
+>  .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi |  55 ++--
+>  drivers/irqchip/Kconfig                            |   6 +
+>  drivers/irqchip/Makefile                           |   2 +
+>  drivers/irqchip/irq-mvebu-gicp.c                   | 279 ++++++++++++++++++++
+>  drivers/irqchip/irq-mvebu-gicp.h                   |  12 +
+>  drivers/irqchip/irq-mvebu-icu.c                    | 289 +++++++++++++++++++++
+>  .../dt-bindings/interrupt-controller/mvebu-icu.h   |  15 ++
+>  12 files changed, 756 insertions(+), 48 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,gicp.txt
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
+>  create mode 100644 drivers/irqchip/irq-mvebu-gicp.c
+>  create mode 100644 drivers/irqchip/irq-mvebu-gicp.h
+>  create mode 100644 drivers/irqchip/irq-mvebu-icu.c
+>  create mode 100644 include/dt-bindings/interrupt-controller/mvebu-icu.h
+> 
 
--        faraday_pci_read_config(p->bus, 0,
--                    FARADAY_PCI_STATUS_CMD, 4, &val);
-+        faraday_raw_pci_read_config(p, 0, 0,
-+                        FARADAY_PCI_STATUS_CMD, 4, &val);
-         rate = clk_get_rate(p->bus_clk);
+It all looks good to me. How do we merge this? I take the first five
+patches and Gregory takes the last one?
 
-         if ((rate == 33000000) && (val & PCI_STATUS_66MHZ_CAPABLE)) {
-             dev_info(dev, "33MHz bus is 66MHz capable\n");
--            p->bus->max_bus_speed = PCI_SPEED_66MHz;
-+            max_bus_speed = PCI_SPEED_66MHz;
-             ret = clk_set_rate(p->bus_clk, 66000000);
-             if (ret)
-                 dev_err(dev, "failed to set bus clock\n");
-         } else {
-             dev_info(dev, "33MHz only bus\n");
--            p->bus->max_bus_speed = PCI_SPEED_33MHz;
-+            max_bus_speed = PCI_SPEED_33MHz;
-         }
+Thanks,
 
-         /* Bumping the clock may fail so read back the rate */
-         rate = clk_get_rate(p->bus_clk);
-         if (rate == 33000000)
--            p->bus->cur_bus_speed = PCI_SPEED_33MHz;
-+            cur_bus_speed = PCI_SPEED_33MHz;
-         if (rate == 66000000)
--            p->bus->cur_bus_speed = PCI_SPEED_66MHz;
-+            cur_bus_speed = PCI_SPEED_66MHz;
-     }
-
-     ret = faraday_pci_parse_map_dma_ranges(p, dev->of_node);
-@@ -587,6 +589,8 @@ static int faraday_pci_probe(struct platform_device *pdev)
-         return ret;
-     }
-     p->bus = host->bus;
-+    p->bus->max_bus_speed = max_bus_speed;
-+    p->bus->cur_bus_speed = cur_bus_speed;
-
-     pci_bus_assign_resources(p->bus);
-     pci_bus_add_devices(p->bus);
-
-
-I'll send a modified and tested version of your patch.
-
-Yours,
-Linus Walleij
+	M.
+-- 
+Jazz is not dead. It just smells funny...
