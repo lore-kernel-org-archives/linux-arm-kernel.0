@@ -1,76 +1,54 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Wed, 21 Jun 2017 16:30:08 +0200
-Subject: [PATCH v2 1/8] dt-bindings: mfd: Add STM32 LPTimer binding
+Date: Wed, 21 Jun 2017 16:30:10 +0200
+Subject: [PATCH v2 3/8] dt-bindings: pwm: Add STM32 LPTimer PWM binding
 In-Reply-To: <1498055415-31513-1-git-send-email-fabrice.gasnier@st.com>
 References: <1498055415-31513-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1498055415-31513-2-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1498055415-31513-4-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documentation for STMicroelectronics STM32 Low-Power Timer binding.
+Add documentation for STMicroelectronics STM32 Low-Power Timer
+PWM binding.
 
 Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 ---
 Changes in v2:
-- Lee's comments: s/Low Power/Low-Power/, remove 0x in example, improve
-  properties descriptions
+- s/Low Power/Low-Power/
+- remove 0x in example (parent node)
+- improve properties description
 ---
- .../devicetree/bindings/mfd/stm32-lptimer.txt      | 48 ++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
+ .../devicetree/bindings/pwm/pwm-stm32-lp.txt       | 24 ++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32-lp.txt
 
-diff --git a/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt b/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
+diff --git a/Documentation/devicetree/bindings/pwm/pwm-stm32-lp.txt b/Documentation/devicetree/bindings/pwm/pwm-stm32-lp.txt
 new file mode 100644
-index 0000000..af859c8
+index 0000000..941c990
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
-@@ -0,0 +1,48 @@
-+STMicroelectronics STM32 Low-Power Timer
++++ b/Documentation/devicetree/bindings/pwm/pwm-stm32-lp.txt
+@@ -0,0 +1,24 @@
++STMicroelectronics STM32 Low-Power Timer PWM
 +
-+The STM32 Low-Power Timer (LPTIM) is a 16-bit timer that provides several
-+functions:
-+- PWM output (with programmable prescaler, configurable polarity)
-+- Quadrature encoder, counter
-+- Trigger source for STM32 ADC/DAC (LPTIM_OUT)
++STM32 Low-Power Timer provides single channel PWM.
 +
-+Required properties:
-+- compatible:		Must be "st,stm32-lptimer".
-+- reg:			Offset and length of the device's register set.
-+- clocks:		Phandle to the clock used by the LP Timer module.
-+- clock-names:		Must be "mux".
-+- #address-cells:	Should be '<1>'.
-+- #size-cells:		Should be '<0>'.
++Must be a sub-node of an STM32 Low-Power Timer device tree node.
++See ../mfd/stm32-lptimer.txt for details about the parent node.
 +
-+Optional subnodes:
-+- pwm:			See ../pwm/pwm-stm32-lp.txt
-+- counter:		See ../iio/timer/stm32-lptimer-cnt.txt
-+- trigger:		See ../iio/timer/stm32-lptimer-trigger.txt
++Required parameters:
++- compatible:		Must be "st,stm32-pwm-lp".
++
++Optional properties:
++- pinctrl-names: 	Set to "default".
++- pinctrl-0: 		Phandle pointing to pin configuration node for PWM.
 +
 +Example:
-+
 +	lptimer1: lptimer at 40002400 {
 +		compatible = "st,stm32-lptimer";
-+		reg = <0x40002400 0x400>;
-+		clocks = <&timer_clk>;
-+		clock-names = "mux";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
++		...
 +		pwm {
 +			compatible = "st,stm32-pwm-lp";
 +			pinctrl-names = "default";
 +			pinctrl-0 = <&lppwm1_pins>;
-+		};
-+
-+		trigger at 0 {
-+			compatible = "st,stm32-lptimer-trigger";
-+			reg = <0>;
-+		};
-+
-+		counter {
-+			compatible = "st,stm32-lptimer-counter";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&lptim1_in_pins>;
 +		};
 +	};
 -- 
