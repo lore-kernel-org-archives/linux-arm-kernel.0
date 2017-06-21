@@ -1,30 +1,34 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 21 Jun 2017 19:32:21 +0800
-Subject: [GIT PULL] ZTE arm64 device tree updates for 4.13
-Message-ID: <20170621113220.GB3372@dragon>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 21 Jun 2017 13:33:56 +0200
+Subject: [PATCH] ARM: dts: iwg20d-q7: Add pinctl support for scif0
+In-Reply-To: <CAMuHMdVe7sRcGohSPvSUrryNMetddomoMbN7ffOtq9Y3DBt=zQ@mail.gmail.com>
+References: <1497625049-46802-1-git-send-email-biju.das@bp.renesas.com>
+ <CAMuHMdVe7sRcGohSPvSUrryNMetddomoMbN7ffOtq9Y3DBt=zQ@mail.gmail.com>
+Message-ID: <20170621113354.GC17965@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+On Mon, Jun 19, 2017 at 10:42:18AM +0200, Geert Uytterhoeven wrote:
+> Hi Biju,
+> 
+> On Fri, Jun 16, 2017 at 4:57 PM, Biju Das <biju.das@bp.renesas.com> wrote:
+> > Adding pinctrl support for scif0 interface.
+> >
+> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> 
+> The patch looks good to me, but without schematics, we cannot verify the
+> actual pins used.
+> 
+> Are the schematics somewhere available? Having access to them would allow us
+> doing a better job reviewing your DTS patches.
 
-  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+Echoing Geert's request, it would be great to be able to compare the
+DT description against some documentation.
 
-are available in the git repository at:
+My understanding is that this patch depends on "[PATCH v2 0/3] Add
+R8A7743/SK-RZG1M PFC support" which in turn depends on pfc driver support
+which is on target to be included in v4.13-rc1.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/zte-dt64-4.13
-
-for you to fetch changes up to 61c9e029912d4962c52361f0f7cb5f77c405f08b:
-
-  arm64: dts: zte: Use - instead of @ for DT OPP entries (2017-06-21 19:05:38 +0800)
-
-----------------------------------------------------------------
-ZTE arm64 device tree updates for 4.13:
- - Fix DTC unit_address_vs_reg warnings in OPP entries by replacing
-   '@' with '-' as the OPP nodes will never have a "reg" property.
-
-----------------------------------------------------------------
-Viresh Kumar (1):
-      arm64: dts: zte: Use - instead of @ for DT OPP entries
-
- arch/arm64/boot/dts/zte/zx296718.dtsi | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+Accordingly I have marked this patch as deferred. Please repost
+or otherwise ping me once the driver dependency is present in an rc release.
+Thanks.
