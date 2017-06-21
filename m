@@ -1,92 +1,22 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 21 Jun 2017 17:05:52 +0100
-Subject: [PATCH 1/3] arm64: ptrace: Fix VFP register dumping in compat
- coredumps
-In-Reply-To: <20170621152320.GG24558@leverpostej>
-References: <1498057010-12028-1-git-send-email-Dave.Martin@arm.com>
- <1498057264-12211-1-git-send-email-Dave.Martin@arm.com>
- <20170621152320.GG24558@leverpostej>
-Message-ID: <20170621160550.GC8543@e103592.cambridge.arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 22 Jun 2017 00:06:37 +0800
+Subject: [PATCH 2/2] i2c: zx2967: add i2c controller driver for ZTE's
+ zx2967 family
+In-Reply-To: <20170620074126.GA1541@katana>
+References: <1495947576-11037-1-git-send-email-shawnguo@kernel.org>
+ <1495947576-11037-3-git-send-email-shawnguo@kernel.org>
+ <20170619193130.velebm7p3r5ggaos@ninjato>
+ <20170620025815.GA4818@x250> <20170620074126.GA1541@katana>
+Message-ID: <20170621160635.GF3372@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 21, 2017 at 04:23:20PM +0100, Mark Rutland wrote:
-> On Wed, Jun 21, 2017 at 04:00:42PM +0100, Dave Martin wrote:
-> > Currently, VFP registers are omitted from coredumps for compat
-> > processes, due to a bug in the REGSET_COMPAT_VFP regset
-> > implementation.
-> > 
-> > compat_vfp_get() needs to transfer non-contiguous data from
-> > thread_struct.fpsimd_state, and uses put_user() to handle the
-> > offending trailing word (FPSCR).  This fails when copying to a
-> > kernel address (i.e., kbuf && !ubuf), which is what happens when
-> > dumping core.  As a result, the ELF coredump core code silently
-> > omits the NT_ARM_VFP note from the dump.
-> > 
-> > It would be possible to work around this with additional special
-> > case code for the put_user(), but since user_regset_copyout() is
-> > explcltly designed to handle this scenario it is cleaner to port
-> 
-> Nit: explicitly
+On Tue, Jun 20, 2017 at 09:41:26AM +0200, Wolfram Sang wrote:
+> Nice. Can you also run 'i2cdetect' on the bus to see if we have proper
+> NAK handling? AFAICS this should be broken now. And very slow with
+> previous versions of the driver.
 
-Fixed for respin (if there is one).
+Sure, thanks for the suggestion.  I will make sure that 'i2cdetect' is
+happy with the driver.
 
-> > the put_user() to a user_regset_copyout() call, which this patch
-> > does.
-> 
-> Given, 32-bit arm also uses user_regset_copyout(), it seems like the
-> all-round right thing to do.
-
-Agreed.  There may be cases where user_regset_copyout() doesn't cut it,
-but it seems OK here.
-
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > ---
-> >  arch/arm64/kernel/ptrace.c | 11 +++++++----
-> >  1 file changed, 7 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-> > index c142459..0e5aaec 100644
-> > --- a/arch/arm64/kernel/ptrace.c
-> > +++ b/arch/arm64/kernel/ptrace.c
-> > @@ -894,7 +894,7 @@ static int compat_vfp_get(struct task_struct *target,
-> >  {
-> >  	struct user_fpsimd_state *uregs;
-> >  	compat_ulong_t fpscr;
-> > -	int ret;
-> > +	int ret, vregs_end_pos;
-> >  
-> >  	uregs = &target->thread.fpsimd_state.user_fpsimd;
-> >  
-> > @@ -902,13 +902,16 @@ static int compat_vfp_get(struct task_struct *target,
-> >  	 * The VFP registers are packed into the fpsimd_state, so they all sit
-> >  	 * nicely together for us. We just need to create the fpscr separately.
-> >  	 */
-> > -	ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf, uregs, 0,
-> > -				  VFP_STATE_SIZE - sizeof(compat_ulong_t));
-> > +	vregs_end_pos = VFP_STATE_SIZE - sizeof(compat_ulong_t);
-> > +	ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf, uregs,
-> > +				  0, vregs_end_pos);
-> >  
-> >  	if (count && !ret) {
-> >  		fpscr = (uregs->fpsr & VFP_FPSCR_STAT_MASK) |
-> >  			(uregs->fpcr & VFP_FPSCR_CTRL_MASK);
-> > -		ret = put_user(fpscr, (compat_ulong_t *)ubuf);
-> > +
-> > +		ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf, &fpscr,
-> > +					  vregs_end_pos, VFP_STATE_SIZE);
-> >  	}
-> 
-> It's a shame compat_user_vfp is defined in signal32.c, otherwise we
-> could've used offsetof(struct compat-user_vfp, fpscr) here (and also for
-> the fpregs), mirroring the structure of 32-bit's vfp_get().
-
-Could be nicer -- I was trying to make the minimum change here.
-
-> Otherwise, this looks sane to me.
-
-Thanks for looking it over.
-
-Cheers
----Dave
+Shawn
