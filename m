@@ -1,53 +1,39 @@
-From: jeffy.chen@rock-chips.com (jeffy)
-Date: Wed, 21 Jun 2017 23:33:29 +0800
-Subject: [RFC PATCH v3 3/6] ARM/arm64: dts: enable wakeup for cros-ec-spi
- devices
-In-Reply-To: <CAJKOXPdL2CB9VWNo=it0dos-4hJYrgHUSZwcG1DS=9c+YxXzhQ@mail.gmail.com>
-References: <1498039313-24220-1-git-send-email-jeffy.chen@rock-chips.com>
- <1498039313-24220-4-git-send-email-jeffy.chen@rock-chips.com>
- <CAJKOXPdL2CB9VWNo=it0dos-4hJYrgHUSZwcG1DS=9c+YxXzhQ@mail.gmail.com>
-Message-ID: <594A91C9.1090906@rock-chips.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Wed, 21 Jun 2017 10:35:52 -0500
+Subject: [GIT PULL 2/2] SoCFPGA update for v4.13
+In-Reply-To: <1498059352-9483-1-git-send-email-dinguyen@kernel.org>
+References: <1498059352-9483-1-git-send-email-dinguyen@kernel.org>
+Message-ID: <1498059352-9483-2-git-send-email-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Hi Arnd, Kevin, and Olof:
 
-thanx for your comment.
+Please pull in this SoCFPGA Kconfig update for v4.13.
 
-On 06/21/2017 06:45 PM, Krzysztof Kozlowski wrote:
-> On Wed, Jun 21, 2017 at 12:01 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
->> We used to enable wakeup for cros-ec-spi devices unconditionally.
->> Now we are using the more generic wakeup-source property to enable it.
->
-> Using wakeup-source property is still enabling this unconditionally.
-> What  do you exactly mean here?
-i mean the wakeup-source is an optional property, we can disable wakeup 
-by not adding it.
+Thanks,
+Dinh
 
-but now i enable it to all exist cros-ec-spi devices for not breaking 
-current stuffs :)
->
->>
->> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
->> ---
->>
->> Changes in v3: None
->>
->>   arch/arm/boot/dts/exynos5420-peach-pit.dts      | 1 +
->>   arch/arm/boot/dts/exynos5800-peach-pi.dts       | 1 +
->>   arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi | 1 +
->>   arch/arm/boot/dts/tegra124-nyan.dtsi            | 1 +
->>   arch/arm/boot/dts/tegra124-venice2.dts          | 1 +
->>   arch/arm64/boot/dts/nvidia/tegra132-norrin.dts  | 1 +
->>   arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi    | 1 +
->>   7 files changed, 7 insertions(+)
->
-> Please split it per arch (arm and arm64) and per machine. I'll take
-> exynos after splitting.
-ok, sounds good, will do it in next version, thanx~
->
-> Best regards,
-> Krzysztof
->
->
->
+
+The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+
+  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_updates_for_v4.13
+
+for you to fetch changes up to 139358be24e526bc8d050e319cdd4e2d1941503e:
+
+  ARM: socfpga: Increase max number of GPIOs (2017-06-21 10:16:02 -0500)
+
+----------------------------------------------------------------
+SoCFPGA updates for v4.13
+- Increase number of available GPIOs in Kconfig
+
+----------------------------------------------------------------
+Marek Vasut (1):
+      ARM: socfpga: Increase max number of GPIOs
+
+ arch/arm/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
