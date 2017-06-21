@@ -1,96 +1,81 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 21 Jun 2017 17:20:58 +0200
-Subject: [PATCH 1/2] dt-bindings: spi: Document the STM32 SPI bindings
-In-Reply-To: <1498055526-6918-2-git-send-email-amelie.delaunay@st.com>
-References: <1498055526-6918-1-git-send-email-amelie.delaunay@st.com>
- <1498055526-6918-2-git-send-email-amelie.delaunay@st.com>
-Message-ID: <5df6d07a-59b7-6460-75c5-c3b239067616@baylibre.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 21 Jun 2017 16:23:20 +0100
+Subject: [PATCH 1/3] arm64: ptrace: Fix VFP register dumping in compat
+ coredumps
+In-Reply-To: <1498057264-12211-1-git-send-email-Dave.Martin@arm.com>
+References: <1498057010-12028-1-git-send-email-Dave.Martin@arm.com>
+ <1498057264-12211-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20170621152320.GG24558@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/21/2017 04:32 PM, Amelie Delaunay wrote:
-> This patch adds the documentation of device tree bindings
-> for the STM32 SPI controller.
+On Wed, Jun 21, 2017 at 04:00:42PM +0100, Dave Martin wrote:
+> Currently, VFP registers are omitted from coredumps for compat
+> processes, due to a bug in the REGSET_COMPAT_VFP regset
+> implementation.
 > 
-> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+> compat_vfp_get() needs to transfer non-contiguous data from
+> thread_struct.fpsimd_state, and uses put_user() to handle the
+> offending trailing word (FPSCR).  This fails when copying to a
+> kernel address (i.e., kbuf && !ubuf), which is what happens when
+> dumping core.  As a result, the ELF coredump core code silently
+> omits the NT_ARM_VFP note from the dump.
+> 
+> It would be possible to work around this with additional special
+> case code for the put_user(), but since user_regset_copyout() is
+> explcltly designed to handle this scenario it is cleaner to port
+
+Nit: explicitly
+
+> the put_user() to a user_regset_copyout() call, which this patch
+> does.
+
+Given, 32-bit arm also uses user_regset_copyout(), it seems like the
+all-round right thing to do.
+
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 > ---
->  .../devicetree/bindings/spi/spi-stm32.txt          | 60 ++++++++++++++++++++++
->  1 file changed, 60 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/spi/spi-stm32.txt
+>  arch/arm64/kernel/ptrace.c | 11 +++++++----
+>  1 file changed, 7 insertions(+), 4 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/spi/spi-stm32.txt b/Documentation/devicetree/bindings/spi/spi-stm32.txt
-> new file mode 100644
-> index 0000000..3958bf6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/spi/spi-stm32.txt
-> @@ -0,0 +1,60 @@
-> +STMicroelectronics STM32 SPI Controller
+> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+> index c142459..0e5aaec 100644
+> --- a/arch/arm64/kernel/ptrace.c
+> +++ b/arch/arm64/kernel/ptrace.c
+> @@ -894,7 +894,7 @@ static int compat_vfp_get(struct task_struct *target,
+>  {
+>  	struct user_fpsimd_state *uregs;
+>  	compat_ulong_t fpscr;
+> -	int ret;
+> +	int ret, vregs_end_pos;
+>  
+>  	uregs = &target->thread.fpsimd_state.user_fpsimd;
+>  
+> @@ -902,13 +902,16 @@ static int compat_vfp_get(struct task_struct *target,
+>  	 * The VFP registers are packed into the fpsimd_state, so they all sit
+>  	 * nicely together for us. We just need to create the fpscr separately.
+>  	 */
+> -	ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf, uregs, 0,
+> -				  VFP_STATE_SIZE - sizeof(compat_ulong_t));
+> +	vregs_end_pos = VFP_STATE_SIZE - sizeof(compat_ulong_t);
+> +	ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf, uregs,
+> +				  0, vregs_end_pos);
+>  
+>  	if (count && !ret) {
+>  		fpscr = (uregs->fpsr & VFP_FPSCR_STAT_MASK) |
+>  			(uregs->fpcr & VFP_FPSCR_CTRL_MASK);
+> -		ret = put_user(fpscr, (compat_ulong_t *)ubuf);
 > +
-> +The STM32 SPI controller is used to communicate with external devices using
-> +the Serial Peripheral Interface. It supports full-duplex, half-duplex and
-> +simplex synchronous serial communication with external devices. It supports
-> +from 4 to 32-bit data size. Although it can be configured as master or slave,
-> +only master is supported by the driver.
-> +
-> +Required properties:
-> +- compatible: Must be "st,stm32-spi".
+> +		ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf, &fpscr,
+> +					  vregs_end_pos, VFP_STATE_SIZE);
+>  	}
 
-Hi Amelie,
+It's a shame compat_user_vfp is defined in signal32.c, otherwise we
+could've used offsetof(struct compat-user_vfp, fpscr) here (and also for
+the fpregs), mirroring the structure of 32-bit's vfp_get().
 
-What about the gen1 SPI devices like the F4 ?
+Otherwise, this looks sane to me.
 
-It should have been better to use SoC specific compatible, or specify the SPI HW gen like gen1 or gen2.
-
-Neil
-
-> +- reg: Offset and length of the device's register set.
-> +- interrupts: Must contain the interrupt id.
-> +- clocks: Must contain an entry for spiclk (which feeds the internal clock
-> +	  generator).
-> +- #address-cells:  Number of cells required to define a chip select address.
-> +- #size-cells: Should be zero.
-> +
-> +Optional properties:
-> +- resets: Must contain the phandle to the reset controller.
-> +- A pinctrl state named "default" may be defined to set pins in mode of
-> +  operation for SPI transfer.
-> +- dmas: DMA specifiers for tx and rx dma. DMA fifo mode must be used. See the
-> +  STM32 DMA bindings, Documentation/devicetree/bindings/dma/stm32-dma.txt.
-> +- dma-names: DMA request names should include "tx" and "rx" if present.
-> +- cs-gpios: list of GPIO chip selects. See the SPI bus bindings,
-> +  Documentation/devicetree/bindings/spi/spi-bus.txt
-> +
-> +
-> +Child nodes represent devices on the SPI bus
-> +  See ../spi/spi-bus.txt
-> +
-> +Optional properties:
-> +- st,spi-midi-ns: (Master Inter-Data Idleness) minimum time delay in
-> +		  nanoseconds inserted between two consecutive data frames.
-> +
-> +
-> +Example:
-> +	spi2: spi at 40003800 {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "st,stm32-spi";
-> +		reg = <0x40003800 0x400>;
-> +		interrupts = <36>;
-> +		clocks = <&rcc SPI2_CK>;
-> +		resets = <&rcc 1166>;
-> +		dmas = <&dmamux1 0 39 0x400 0x01>,
-> +		       <&dmamux1 1 40 0x400 0x01>;
-> +		dma-names = "rx", "tx";
-> +		pinctrl-0 = <&spi2_pins_b>;
-> +		pinctrl-names = "default";
-> +		status = "okay";
-> +		cs-gpios = <&gpioa 11 0>;
-> +
-> +		spidev at 0 {
-> +			compatible = "spidev";
-> +			reg = <0>;
-> +			spi-max-frequency = <4000000>;
-> +			st,spi-midi = <4000>;
-> +		};
-> +	};
-> 
+Thanks,
+Mark
