@@ -1,43 +1,33 @@
 From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 21 Jun 2017 12:30:47 -0500
-Subject: [PATCH 8/8] [v2] arm64: defconfig: enable Qualcomm Technologies EMAC
- and some PHY drivers
+Date: Wed, 21 Jun 2017 12:30:45 -0500
+Subject: [PATCH 6/8] arm64: defconfig: enable EDAC options
 In-Reply-To: <1498066247-22130-1-git-send-email-timur@codeaurora.org>
 References: <1498066247-22130-1-git-send-email-timur@codeaurora.org>
-Message-ID: <1498066247-22130-9-git-send-email-timur@codeaurora.org>
+Message-ID: <1498066247-22130-7-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The EMAC is present on Qualcomm Technologies' server and some mobile
-chips, and is used as the primary Ethernet interface.
-
-Systems that have these SOCs typically have an Atheros 803x or
-Marvell 88e1111 PHY in them, so enable those drivers too.
+Enable EDAC (Error Detection and Correction) support for ARM64 server
+systems that feature it, so that user space applications can be
+notified of memory errors.
 
 Signed-off-by: Timur Tabi <timur@codeaurora.org>
 ---
- arch/arm64/configs/defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 00a0f80..854ed3f 100644
+index 0d86a8a..6a52906 100644
 --- a/arch/arm64/configs/defconfig
 +++ b/arch/arm64/configs/defconfig
-@@ -192,11 +192,14 @@ CONFIG_IGBVF=y
- CONFIG_MVNETA=y
- CONFIG_MVPP2=y
- CONFIG_SKY2=y
-+CONFIG_QCOM_EMAC=m
- CONFIG_RAVB=y
- CONFIG_SMC91X=y
- CONFIG_SMSC911X=y
- CONFIG_STMMAC_ETH=m
- CONFIG_MDIO_BUS_MUX_MMIOREG=y
-+CONFIG_AT803X_PHY=m
-+CONFIG_MARVELL_PHY=m
- CONFIG_MESON_GXL_PHY=m
- CONFIG_MICREL_PHY=y
- CONFIG_REALTEK_PHY=m
+@@ -427,6 +427,7 @@ CONFIG_LEDS_SYSCON=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_LEDS_TRIGGER_CPU=y
+ CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
++CONFIG_EDAC=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_MAX77686=y
+ CONFIG_RTC_DRV_RK808=m
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
 Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
