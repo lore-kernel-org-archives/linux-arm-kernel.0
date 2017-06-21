@@ -1,60 +1,96 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 21 Jun 2017 17:18:09 +0200
-Subject: [PATCH v5 0/6] Add support for the ICU unit in Marvell Armada
- 7K/8K
-In-Reply-To: <e87dc80c-f85c-1b20-c2e8-cd03922dacd9@arm.com>
-References: <20170621132917.14187-1-thomas.petazzoni@free-electrons.com>
- <e87dc80c-f85c-1b20-c2e8-cd03922dacd9@arm.com>
-Message-ID: <20170621171809.34bcce1e@windsurf.home>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed, 21 Jun 2017 17:20:58 +0200
+Subject: [PATCH 1/2] dt-bindings: spi: Document the STM32 SPI bindings
+In-Reply-To: <1498055526-6918-2-git-send-email-amelie.delaunay@st.com>
+References: <1498055526-6918-1-git-send-email-amelie.delaunay@st.com>
+ <1498055526-6918-2-git-send-email-amelie.delaunay@st.com>
+Message-ID: <5df6d07a-59b7-6460-75c5-c3b239067616@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wed, 21 Jun 2017 16:14:21 +0100, Marc Zyngier wrote:
-
-> > Thomas Petazzoni (6):
-> >   dt-bindings: interrupt-controller: add DT binding for the Marvell GICP
-> >   dt-bindings: interrupt-controller: add DT binding for the Marvell ICU
-> >   irqchip: irq-mvebu-gicp: new driver for Marvell GICP
-> >   irqchip: irq-mvebu-icu: new driver for Marvell ICU
-> >   arm64: marvell: enable ICU and GICP drivers
-> >   arm64: dts: marvell: enable GICP and ICU on Armada 7K/8K
-> > 
-> >  .../bindings/interrupt-controller/marvell,gicp.txt |  27 ++
-> >  .../bindings/interrupt-controller/marvell,icu.txt  |  51 ++++
-> >  arch/arm64/Kconfig.platforms                       |   2 +
-> >  arch/arm64/boot/dts/marvell/armada-ap806.dtsi      |   7 +
-> >  .../boot/dts/marvell/armada-cp110-master.dtsi      |  59 +++--
-> >  .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi |  55 ++--
-> >  drivers/irqchip/Kconfig                            |   6 +
-> >  drivers/irqchip/Makefile                           |   2 +
-> >  drivers/irqchip/irq-mvebu-gicp.c                   | 279 ++++++++++++++++++++
-> >  drivers/irqchip/irq-mvebu-gicp.h                   |  12 +
-> >  drivers/irqchip/irq-mvebu-icu.c                    | 289 +++++++++++++++++++++
-> >  .../dt-bindings/interrupt-controller/mvebu-icu.h   |  15 ++
-> >  12 files changed, 756 insertions(+), 48 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,gicp.txt
-> >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
-> >  create mode 100644 drivers/irqchip/irq-mvebu-gicp.c
-> >  create mode 100644 drivers/irqchip/irq-mvebu-gicp.h
-> >  create mode 100644 drivers/irqchip/irq-mvebu-icu.c
-> >  create mode 100644 include/dt-bindings/interrupt-controller/mvebu-icu.h
-> >   
+On 06/21/2017 04:32 PM, Amelie Delaunay wrote:
+> This patch adds the documentation of device tree bindings
+> for the STM32 SPI controller.
 > 
-> It all looks good to me. How do we merge this? I take the first five
-> patches and Gregory takes the last one?
+> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+> ---
+>  .../devicetree/bindings/spi/spi-stm32.txt          | 60 ++++++++++++++++++++++
+>  1 file changed, 60 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/spi/spi-stm32.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/spi/spi-stm32.txt b/Documentation/devicetree/bindings/spi/spi-stm32.txt
+> new file mode 100644
+> index 0000000..3958bf6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/spi/spi-stm32.txt
+> @@ -0,0 +1,60 @@
+> +STMicroelectronics STM32 SPI Controller
+> +
+> +The STM32 SPI controller is used to communicate with external devices using
+> +the Serial Peripheral Interface. It supports full-duplex, half-duplex and
+> +simplex synchronous serial communication with external devices. It supports
+> +from 4 to 32-bit data size. Although it can be configured as master or slave,
+> +only master is supported by the driver.
+> +
+> +Required properties:
+> +- compatible: Must be "st,stm32-spi".
 
-I think you should take the first four patches, and Gr?gory takes the
-last two ones. But I'll let Gr?gory confirm.
+Hi Amelie,
 
-Once again, thanks a lot for your help on this series, it's in a much
-better shape now compared to what the original submission was!
+What about the gen1 SPI devices like the F4 ?
 
-Best regards,
+It should have been better to use SoC specific compatible, or specify the SPI HW gen like gen1 or gen2.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Neil
+
+> +- reg: Offset and length of the device's register set.
+> +- interrupts: Must contain the interrupt id.
+> +- clocks: Must contain an entry for spiclk (which feeds the internal clock
+> +	  generator).
+> +- #address-cells:  Number of cells required to define a chip select address.
+> +- #size-cells: Should be zero.
+> +
+> +Optional properties:
+> +- resets: Must contain the phandle to the reset controller.
+> +- A pinctrl state named "default" may be defined to set pins in mode of
+> +  operation for SPI transfer.
+> +- dmas: DMA specifiers for tx and rx dma. DMA fifo mode must be used. See the
+> +  STM32 DMA bindings, Documentation/devicetree/bindings/dma/stm32-dma.txt.
+> +- dma-names: DMA request names should include "tx" and "rx" if present.
+> +- cs-gpios: list of GPIO chip selects. See the SPI bus bindings,
+> +  Documentation/devicetree/bindings/spi/spi-bus.txt
+> +
+> +
+> +Child nodes represent devices on the SPI bus
+> +  See ../spi/spi-bus.txt
+> +
+> +Optional properties:
+> +- st,spi-midi-ns: (Master Inter-Data Idleness) minimum time delay in
+> +		  nanoseconds inserted between two consecutive data frames.
+> +
+> +
+> +Example:
+> +	spi2: spi at 40003800 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "st,stm32-spi";
+> +		reg = <0x40003800 0x400>;
+> +		interrupts = <36>;
+> +		clocks = <&rcc SPI2_CK>;
+> +		resets = <&rcc 1166>;
+> +		dmas = <&dmamux1 0 39 0x400 0x01>,
+> +		       <&dmamux1 1 40 0x400 0x01>;
+> +		dma-names = "rx", "tx";
+> +		pinctrl-0 = <&spi2_pins_b>;
+> +		pinctrl-names = "default";
+> +		status = "okay";
+> +		cs-gpios = <&gpioa 11 0>;
+> +
+> +		spidev at 0 {
+> +			compatible = "spidev";
+> +			reg = <0>;
+> +			spi-max-frequency = <4000000>;
+> +			st,spi-midi = <4000>;
+> +		};
+> +	};
+> 
