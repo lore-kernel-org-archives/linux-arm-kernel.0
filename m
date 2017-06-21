@@ -1,42 +1,54 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 21 Jun 2017 08:48:55 +0200
-Subject: [PATCH] crypto: sun4i-ss: support the Security System PRNG
-In-Reply-To: <20170620114536.GA4766@Red>
-References: <20170620085819.20114-1-clabbe.montjoie@gmail.com>
- <20170620095947.i3r3iym2cxz5jciw@flea.lan>
- <20170620114536.GA4766@Red>
-Message-ID: <20170621064855.z5mu4f3r3dt4kotc@flea.lan>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Wed, 21 Jun 2017 14:42:06 +0800
+Subject: [PATCH v16 5/7] ARM: dts: imx6qdl: Enable usb node children with <reg>
+In-Reply-To: <1498027328-25078-1-git-send-email-peter.chen@nxp.com>
+References: <1498027328-25078-1-git-send-email-peter.chen@nxp.com>
+Message-ID: <1498027328-25078-6-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 01:45:36PM +0200, Corentin Labbe wrote:
-> On Tue, Jun 20, 2017 at 11:59:47AM +0200, Maxime Ripard wrote:
-> > Hi,
-> > 
-> > On Tue, Jun 20, 2017 at 10:58:19AM +0200, Corentin Labbe wrote:
-> > > The Security System have a PRNG, this patch add support for it via
-> > > crypto_rng.
-> > 
-> > This might be a dumb question, but is the CRYPTO_RNG code really
-> > supposed to be used with PRNG?
-> > 
-> 
-> Yes, see recently added drivers/crypto/exynos-rng.c
+From: Joshua Clayton <stillcompiling@gmail.com>
 
-It's still not really clear from the commit log (if you're talking
-about c46ea13f55b6) why and if using the RNG code for a PRNG is a good
-idea.
+Give usb nodes #address and #size attributes, so that a child node
+representing a permanently connected device such as an onboard hub may
+be addressed with a <reg> attribute
 
-Maxime
+Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
+Signed-off-by: Peter Chen <peter.chen@nxp.com>
+---
+ arch/arm/boot/dts/imx6qdl.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index e426faa..8c064cb 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -945,6 +945,8 @@
+ 
+ 			usbh1: usb at 02184200 {
+ 				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0x02184200 0x200>;
+ 				interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clks IMX6QDL_CLK_USBOH3>;
+@@ -959,6 +961,8 @@
+ 
+ 			usbh2: usb at 02184400 {
+ 				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0x02184400 0x200>;
+ 				interrupts = <0 41 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clks IMX6QDL_CLK_USBOH3>;
+@@ -972,6 +976,8 @@
+ 
+ 			usbh3: usb at 02184600 {
+ 				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0x02184600 0x200>;
+ 				interrupts = <0 42 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clks IMX6QDL_CLK_USBOH3>;
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170621/af78c03e/attachment.sig>
+2.7.4
