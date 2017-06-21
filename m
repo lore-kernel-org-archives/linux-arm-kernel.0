@@ -1,39 +1,56 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 21 Jun 2017 12:21:25 +0200
-Subject: [PATCH 4/9] serial: fsl_lpuart: Use common rs485 device tree parsing
- function
-In-Reply-To: <20170621102130.21024-1-u.kleine-koenig@pengutronix.de>
-References: <20170621102130.21024-1-u.kleine-koenig@pengutronix.de>
-Message-ID: <20170621102130.21024-5-u.kleine-koenig@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 21 Jun 2017 12:25:34 +0200
+Subject: [PATCH v4 20/28] ARM: owl: Implement CPU enable-method for S500
+In-Reply-To: <CAK8P3a1fLABzSc7kej6uw751uoZma1Qvpm7c3mkLB45rcBNQTA@mail.gmail.com>
+References: <20170606005426.26446-1-afaerber@suse.de>
+ <20170606005426.26446-21-afaerber@suse.de>
+ <CAK8P3a1fLABzSc7kej6uw751uoZma1Qvpm7c3mkLB45rcBNQTA@mail.gmail.com>
+Message-ID: <CAK8P3a2epor2RZzJ1ySp2g-vUSTj+miWNJC26uYU7v3Knq=pvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sascha Hauer <s.hauer@pengutronix.de>
+On Wed, Jun 21, 2017 at 10:16 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tue, Jun 6, 2017 at 2:54 AM, Andreas F?rber <afaerber@suse.de> wrote:
+>> Allow to bring up CPU1.
+>>
+>> Based on LeMaker linux-actions tree.
+>>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>> ---
+>>  v3 -> v4: Unchanged
+>>
+>>  v3: new
+>>
+>>  arch/arm/mach-actions/Makefile  |   3 +
+>>  arch/arm/mach-actions/headsmp.S |  68 ++++++++++++++++
+>>  arch/arm/mach-actions/platsmp.c | 166 ++++++++++++++++++++++++++++++++++++++++
+>
+> I now see build errors in linux-next:
+>
+> /git/arm-soc/arch/arm/mach-actions/platsmp.c: In function 'write_pen_release':
+> /git/arm-soc/arch/arm/mach-actions/platsmp.c:39:2: error:
+> 'pen_release' undeclared (first use in this function); did you mean
 
-We just got a common helper for parsing the rs485 specific
-device tree properties. Use it and drop the open coded parser.
+I have a fix and tested it now. Please fold this into your patch:
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- drivers/tty/serial/fsl_lpuart.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+       Arnd
 
-diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
-index 15df1ba78095..7988a8a981d1 100644
---- a/drivers/tty/serial/fsl_lpuart.c
-+++ b/drivers/tty/serial/fsl_lpuart.c
-@@ -2054,8 +2054,9 @@ static int lpuart_probe(struct platform_device *pdev)
- 		dev_info(sport->port.dev, "DMA rx channel request failed, "
- 				"operating without rx DMA\n");
- 
--	if (of_property_read_bool(np, "linux,rs485-enabled-at-boot-time")) {
--		sport->port.rs485.flags |= SER_RS485_ENABLED;
-+	of_get_rs485_mode(np, &sport->port.rs485);
-+
-+	if (sport->port.rs485.flags & SER_RS485_ENABLED) {
- 		sport->port.rs485.flags |= SER_RS485_RTS_ON_SEND;
- 		writeb(UARTMODEM_TXRTSE, sport->port.membase + UARTMODEM);
- 	}
--- 
-2.11.0
+Subject: [PATCH] ARM: owl: fix non-SMP build
+
+arch/arm/mach-actions/platsmp.c: In function 'write_pen_release':
+arch/arm/mach-actions/platsmp.c:39:2: error: 'pen_release' undeclared
+(first use in this function); did you mean 'seq_release'?
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/arch/arm/mach-actions/Makefile b/arch/arm/mach-actions/Makefile
+index 217e95d04b43..94f8dbafba21 100644
+--- a/arch/arm/mach-actions/Makefile
++++ b/arch/arm/mach-actions/Makefile
+@@ -1,4 +1,4 @@
+-obj-$(CONFIG_ARCH_ACTIONS) += owl.o
+-obj-${CONFIG_ARCH_ACTIONS} += platsmp.o headsmp.o
++obj-y += owl.o
++obj-$(CONFIG_SMP) += platsmp.o headsmp.o
+
+ AFLAGS_headsmp.o := -Wa,-march=armv7-a
