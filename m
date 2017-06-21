@@ -1,44 +1,70 @@
-From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Wed, 21 Jun 2017 19:10:17 +0200
-Subject: [PATCH v1] ARM: dts: sun7i: provide ramoops region on BananaPi
-Message-ID: <1498065017-30556-1-git-send-email-linux@rempel-privat.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 21 Jun 2017 18:11:23 +0100
+Subject: [PATCH] arm64: dump cpu_hwcaps at panic time
+Message-ID: <1498065083-25175-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This should help provide useful debug information on remote
-targets without UART.
+When debugging a kernel panic(), it can be useful to know which CPU
+features have been detected by the kernel, as some code paths can depend
+on these (and may have been patched at runtime).
 
-Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+This patch adds a notifier to dump the detected CPU caps (as a hex
+string) at panic(), when we log other information useful for debugging.
+On a Juno R1 system running v4.12-rc5, this looks like:
+
+[  615.431249] Kernel panic - not syncing: Fatal exception in interrupt
+[  615.437609] SMP: stopping secondary CPUs
+[  615.441872] Kernel Offset: disabled
+[  615.445372] CPU features: 0x02086
+[  615.448522] Memory Limit: none
+
+A developer can decode this by looking at the corresponding
+<asm/cpucaps.h> bits. For example, the above decodes as:
+
+* bit  1: ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE
+* bit  2: ARM64_WORKAROUND_845719
+* bit  7: ARM64_WORKAROUND_834220
+* bit 13: ARM64_HAS_32BIT_EL0
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Steve Capper <steve.capper@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/boot/dts/sun7i-a20-bananapi.dts | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm64/kernel/cpufeature.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-index ed2f35a..38923bf 100644
---- a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-@@ -63,6 +63,22 @@
- 		stdout-path = "serial0:115200n8";
- 	};
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 817ce33..b59a1af 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -51,6 +51,25 @@
+ DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+ EXPORT_SYMBOL(cpu_hwcaps);
  
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
++static int dump_cpu_hwcaps(struct notifier_block *self, unsigned long v, void *p)
++{
++	/* file-wide pr_fmt adds "CPU features: " prefix */
++	pr_emerg("0x%*pb\n", ARM64_NCAPS, &cpu_hwcaps);
++	return 0;
++}
 +
-+		ramoops at 7fb6a000 {
-+			compatible = "ramoops";
-+			reg = <0x7fb6a000 0x100000>;
-+			ecc-size	= <16>;
-+			record-size	= <0x00020000>;
-+			console-size	= <0x00020000>;
-+			ftrace-size	= <0x00020000>;
-+			pmsg-size	= <0x00020000>;
-+		};
-+	};
++static struct notifier_block cpu_hwcaps_notifier = {
++	.notifier_call = dump_cpu_hwcaps
++};
 +
- 	leds {
- 		compatible = "gpio-leds";
- 		pinctrl-names = "default";
++static int __init register_cpu_hwcaps_dumper(void)
++{
++	atomic_notifier_chain_register(&panic_notifier_list,
++				       &cpu_hwcaps_notifier);
++	return 0;
++}
++__initcall(register_cpu_hwcaps_dumper);
++
+ DEFINE_STATIC_KEY_ARRAY_FALSE(cpu_hwcap_keys, ARM64_NCAPS);
+ EXPORT_SYMBOL(cpu_hwcap_keys);
+ 
 -- 
-2.7.4
+1.9.1
