@@ -1,45 +1,46 @@
-From: thgarnie@google.com (Thomas Garnier)
-Date: Wed, 21 Jun 2017 06:57:44 -0700
-Subject: [PATCH v10 3/3] arm64/syscalls: Check address limit on user-mode
- return
-In-Reply-To: <20170621081601.g6fsf6i3mxzar5sn@localhost>
-References: <20170615011203.144108-1-thgarnie@google.com>
- <20170615011203.144108-3-thgarnie@google.com>
- <20170621081601.g6fsf6i3mxzar5sn@localhost>
-Message-ID: <CAJcbSZGbO+FJjZay+XTZ5JbSS9cq3iEw-Mew4PkFeqhBw0ViKg@mail.gmail.com>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Wed, 21 Jun 2017 13:58:28 +0000
+Subject: [PATCH] ARM: dts: iwg20d-q7: Add pinctl support for scif0
+In-Reply-To: <20170621113354.GC17965@verge.net.au>
+References: <1497625049-46802-1-git-send-email-biju.das@bp.renesas.com>
+ <CAMuHMdVe7sRcGohSPvSUrryNMetddomoMbN7ffOtq9Y3DBt=zQ@mail.gmail.com>
+ <20170621113354.GC17965@verge.net.au>
+Message-ID: <KL1PR06MB170212437975F886787AAB09B8DA0@KL1PR06MB1702.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 21, 2017 at 1:16 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Wed, Jun 14, 2017 at 06:12:03PM -0700, Thomas Garnier wrote:
->> Ensure the address limit is a user-mode segment before returning to
->> user-mode. Otherwise a process can corrupt kernel-mode memory and
->> elevate privileges [1].
->>
->> The set_fs function sets the TIF_SETFS flag to force a slow path on
->> return. In the slow path, the address limit is checked to be USER_DS if
->> needed.
->>
->> [1] https://bugs.chromium.org/p/project-zero/issues/detail?id=990
->>
->> Signed-off-by: Thomas Garnier <thgarnie@google.com>
->> ---
->> v10 redesigns the change to use work flags on set_fs as recommended by
->> Linus and agreed by others.
->>
->> Based on next-20170609
->> ---
->>  arch/arm64/include/asm/thread_info.h | 4 +++-
->>  arch/arm64/include/asm/uaccess.h     | 3 +++
->>  arch/arm64/kernel/signal.c           | 5 +++++
->>  3 files changed, 11 insertions(+), 1 deletion(-)
->
-> For arm64:
->
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Hello Simon,
 
-Thanks Catalin
+> On Mon, Jun 19, 2017 at 10:42:18AM +0200, Geert Uytterhoeven wrote:
+> > Hi Biju,
+> >
+> > On Fri, Jun 16, 2017 at 4:57 PM, Biju Das <biju.das@bp.renesas.com>
+> wrote:
+> > > Adding pinctrl support for scif0 interface.
+> > >
+> > > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> >
+> > The patch looks good to me, but without schematics, we cannot verify
+> > the actual pins used.
+> >
+> > Are the schematics somewhere available? Having access to them would
+> > allow us doing a better job reviewing your DTS patches.
+>
+> Echoing Geert's request, it would be great to be able to compare the DT
+> description against some documentation.
+>
+> My understanding is that this patch depends on "[PATCH v2 0/3] Add
+> R8A7743/SK-RZG1M PFC support" which in turn depends on pfc driver
+> support which is on target to be included in v4.13-rc1.
+>
+> Accordingly I have marked this patch as deferred. Please repost or otherwise
+> ping me once the driver dependency is present in an rc release.
 
--- 
-Thomas
+Thanks. I will repost/ping you once the pfc driver dependency is present in an rc release.
+
+Regards,
+Biju
+
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
