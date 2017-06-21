@@ -1,34 +1,48 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 21 Jun 2017 12:30:45 -0500
-Subject: [PATCH 6/8] arm64: defconfig: enable EDAC options
-In-Reply-To: <1498066247-22130-1-git-send-email-timur@codeaurora.org>
-References: <1498066247-22130-1-git-send-email-timur@codeaurora.org>
-Message-ID: <1498066247-22130-7-git-send-email-timur@codeaurora.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 21 Jun 2017 10:45:40 -0700
+Subject: [PATCH v8] clk: Add Gemini SoC clock controller
+In-Reply-To: <20170621075952.26387-1-linus.walleij@linaro.org>
+References: <20170621075952.26387-1-linus.walleij@linaro.org>
+Message-ID: <20170621174540.GB4493@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable EDAC (Error Detection and Correction) support for ARM64 server
-systems that feature it, so that user space applications can be
-notified of memory errors.
+On 06/21, Linus Walleij wrote:
+> The Cortina Systems Gemini (SL3516/CS3516) has an on-chip clock
+> controller that derive all clocks from a single crystal, using some
+> documented and some undocumented PLLs, half dividers, counters and
+> gates. This is a best attempt to construct a clock driver for the
+> clocks so at least we can gate off unused hardware and driver the
+> PCI bus clock.
+> 
+> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
 
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Applied to clk-next + this fixup
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 0d86a8a..6a52906 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -427,6 +427,7 @@ CONFIG_LEDS_SYSCON=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- CONFIG_LEDS_TRIGGER_CPU=y
- CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
-+CONFIG_EDAC=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_MAX77686=y
- CONFIG_RTC_DRV_RK808=m
+---8<---
+diff --git a/drivers/clk/clk-gemini.c b/drivers/clk/clk-gemini.c
+index 3ddd2faec674..b82db96ce0c7 100644
+--- a/drivers/clk/clk-gemini.c
++++ b/drivers/clk/clk-gemini.c
+@@ -279,13 +279,9 @@ static int gemini_clk_probe(struct platform_device *pdev)
+ 
+ 	/* Remap the system controller for the exclusive register */
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!res)
+-		return -ENODEV;
+ 	base = devm_ioremap_resource(dev, res);
+-	if (!base) {
+-		dev_err(dev, "no memory base\n");
+-		return -ENODEV;
+-	}
++	if (IS_ERR(base))
++		return PTR_ERR(base);
+ 
+ 	map = syscon_node_to_regmap(np);
+ 	if (IS_ERR(map)) {
+
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
