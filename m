@@ -1,52 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 21 Jun 2017 16:31:09 +0100
-Subject: [PATCH v4 0/5] Add support for the ARMv8.2 Statistical Profiling
- Extension
-In-Reply-To: <20170615105735.b89183a9190a261d3b8d132a@arm.com>
-References: <1496676177-29356-1-git-send-email-will.deacon@arm.com>
- <20170612110823.GA27319@leverpostej>
- <20170612112048.69561e8d067488e8689de755@arm.com>
- <20170615105735.b89183a9190a261d3b8d132a@arm.com>
-Message-ID: <20170621153108.GC6041@arm.com>
+From: jeffy.chen@rock-chips.com (jeffy)
+Date: Wed, 21 Jun 2017 23:33:29 +0800
+Subject: [RFC PATCH v3 3/6] ARM/arm64: dts: enable wakeup for cros-ec-spi
+ devices
+In-Reply-To: <CAJKOXPdL2CB9VWNo=it0dos-4hJYrgHUSZwcG1DS=9c+YxXzhQ@mail.gmail.com>
+References: <1498039313-24220-1-git-send-email-jeffy.chen@rock-chips.com>
+ <1498039313-24220-4-git-send-email-jeffy.chen@rock-chips.com>
+ <CAJKOXPdL2CB9VWNo=it0dos-4hJYrgHUSZwcG1DS=9c+YxXzhQ@mail.gmail.com>
+Message-ID: <594A91C9.1090906@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 15, 2017 at 10:57:35AM -0500, Kim Phillips wrote:
-> On Mon, 12 Jun 2017 11:20:48 -0500
-> Kim Phillips <kim.phillips@arm.com> wrote:
-> 
-> > On Mon, 12 Jun 2017 12:08:23 +0100
-> > Mark Rutland <mark.rutland@arm.com> wrote:
-> > 
-> > > On Mon, Jun 05, 2017 at 04:22:52PM +0100, Will Deacon wrote:
-> > > > This is the sixth posting of the patches previously posted here:
-> ...
-> > > Kim, do you have any version of the userspace side that we could look
-> > > at?
-> > > 
-> > > For review, it would be really helpful to have something that can poke
-> > > the PMU, even if it's incomplete or lacking polish.
-> > 
-> > Here's the latest push, based on a a couple of prior versions of this
-> > driver:
-> > 
-> > http://linux-arm.org/git?p=linux-kp.git;a=shortlog;h=refs/heads/armspev0.1
-> > 
-> > I don't seem to be able to get any SPE data output after rebasing on
-> > this version of the driver.  Still don't know why at the moment...
-> 
-> Bisected to commit e38ba76deef "perf tools: force uncore events to
-> system wide monitoring".  So, using record with specifying a -C
-> <cpu> explicitly now produces SPE data, but only a couple of valid
-> records at the beginning of each buffer; the rest is filled with
-> PADding (0's).
-> 
-> I see Mark's latest comments have found a possible issue in the perf
-> aux buffer handling code in the driver, and that the driver does some
-> memset of padding (0's) itself; could that be responsible for the above
-> behaviour?
+Hi Krzysztof,
 
-Possibly. Do you know how big you're mapping the aux buffer and what (if
-any) value you're passing as aux_watermark?
+thanx for your comment.
 
-Will
+On 06/21/2017 06:45 PM, Krzysztof Kozlowski wrote:
+> On Wed, Jun 21, 2017 at 12:01 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
+>> We used to enable wakeup for cros-ec-spi devices unconditionally.
+>> Now we are using the more generic wakeup-source property to enable it.
+>
+> Using wakeup-source property is still enabling this unconditionally.
+> What  do you exactly mean here?
+i mean the wakeup-source is an optional property, we can disable wakeup 
+by not adding it.
+
+but now i enable it to all exist cros-ec-spi devices for not breaking 
+current stuffs :)
+>
+>>
+>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+>> ---
+>>
+>> Changes in v3: None
+>>
+>>   arch/arm/boot/dts/exynos5420-peach-pit.dts      | 1 +
+>>   arch/arm/boot/dts/exynos5800-peach-pi.dts       | 1 +
+>>   arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi | 1 +
+>>   arch/arm/boot/dts/tegra124-nyan.dtsi            | 1 +
+>>   arch/arm/boot/dts/tegra124-venice2.dts          | 1 +
+>>   arch/arm64/boot/dts/nvidia/tegra132-norrin.dts  | 1 +
+>>   arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi    | 1 +
+>>   7 files changed, 7 insertions(+)
+>
+> Please split it per arch (arm and arm64) and per machine. I'll take
+> exynos after splitting.
+ok, sounds good, will do it in next version, thanx~
+>
+> Best regards,
+> Krzysztof
+>
+>
+>
