@@ -1,7 +1,7 @@
-From: illusionist.neo@gmail.com (Shubham Bansal)
-Date: Thu, 22 Jun 2017 01:07:16 +0530
+From: daniel@iogearbox.net (Daniel Borkmann)
+Date: Wed, 21 Jun 2017 21:53:27 +0200
 Subject: [PATCH v2] arm: eBPF JIT compiler
-In-Reply-To: <594A9FA5.1080003@iogearbox.net>
+In-Reply-To: <CAHgaXdKm6atQ=XkrQf+ShKtPU7=H+pS2VvPsTXXhz2yzOFunmA@mail.gmail.com>
 References: <1495754003-21099-1-git-send-email-illusionist.neo@gmail.com>
  <CAGXu5jKmLNMR+uhM9Ov2XPW6kCjip_SjScgEH0fTFp6fQtKFiA@mail.gmail.com>
  <593E6B0F.8070901@iogearbox.net>
@@ -14,33 +14,23 @@ References: <1495754003-21099-1-git-send-email-illusionist.neo@gmail.com>
  <59495367.3080402@iogearbox.net>
  <CAHgaXdKGJFh8jO44gwCqe0cijoztf39bK9k8ioBtYDjzb4vvZw@mail.gmail.com>
  <594A9FA5.1080003@iogearbox.net>
-Message-ID: <CAHgaXdKm6atQ=XkrQf+ShKtPU7=H+pS2VvPsTXXhz2yzOFunmA@mail.gmail.com>
+ <CAHgaXdKm6atQ=XkrQf+ShKtPU7=H+pS2VvPsTXXhz2yzOFunmA@mail.gmail.com>
+Message-ID: <594ACEB7.2030707@iogearbox.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
-
-Good news. Got the CALL to work.
-
-[  145.670882] test_bpf: Summary: 316 PASSED, 0 FAILED, [287/308 JIT'ed]
-
-Awesome. Do you think with this implementation, the patch could get
-accepted? If you think so, then I will send the patch in couple of
-days after some refactoring, if not, then do let me know what more is
-required?
-
-Best,
-Shubham Bansal
-
-
-On Wed, Jun 21, 2017 at 10:02 PM, Daniel Borkmann <daniel@iogearbox.net> wrote:
-> On 06/21/2017 04:26 PM, Shubham Bansal wrote:
-> [...]
->>
->> So ultimately, we call helper_function which takes u64 as arguments
->> only. I know its asking a lot, but can you please confirm this asap? I
->> would like to start implementing it.
+On 06/21/2017 09:37 PM, Shubham Bansal wrote:
+> Hi Daniel,
 >
+> Good news. Got the CALL to work.
 >
-> Yes, that is correct. I think it would be the better, more generic
-> approach going forward to always assume that.
+> [  145.670882] test_bpf: Summary: 316 PASSED, 0 FAILED, [287/308 JIT'ed]
+>
+> Awesome. Do you think with this implementation, the patch could get
+> accepted? If you think so, then I will send the patch in couple of
+> days after some refactoring, if not, then do let me know what more is
+> required?
+
+Nice, it's ultimately up to the arm folks to review the set in-depth,
+but feel free to send out the patch once you're done refactoring. With
+BPF_CALL support that looks quite good from pov of supported insns.
