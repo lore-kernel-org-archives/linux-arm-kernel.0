@@ -1,45 +1,66 @@
-From: trini@konsulko.com (Tom Rini)
-Date: Wed, 21 Jun 2017 07:42:39 -0400
-Subject: [PATCH] multi_v7_defconfig: Enable OMAP MTD and DM816 AHCI
-Message-ID: <1498045359-27376-1-git-send-email-trini@konsulko.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 21 Jun 2017 13:43:16 +0200
+Subject: [RESEND PATCH v5 11/16] arm64: zynqmp: Add generic compatible
+ string for I2C EEPROM
+In-Reply-To: <20170615185418.13980-12-javier@dowhile0.org>
+References: <20170615185418.13980-1-javier@dowhile0.org>
+ <20170615185418.13980-12-javier@dowhile0.org>
+Message-ID: <e64ce8be-599a-5fc5-3194-92aac574173c@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A wide variety of TI platforms support NAND via the
-CONFIG_MTD_NAND_OMAP2 driver (and related BCH options), so enable this.
-In addition, multi_v7_defconfig supports the dm8168-evm and that
-supports root being on a SATA drive, so build the DM816 AHCI driver into
-the resulting kernel as well.
+On 15.6.2017 20:54, Javier Martinez Canillas wrote:
+> The at24 driver allows to register I2C EEPROM chips using different vendor
+> and devices, but the I2C subsystem does not take the vendor into account
+> when matching using the I2C table since it only has device entries.
+> 
+> But when matching using an OF table, both the vendor and device has to be
+> taken into account so the driver defines only a set of compatible strings
+> using the "atmel" vendor as a generic fallback for compatible I2C devices.
+> 
+> So add this generic fallback to the device node compatible string to make
+> the device to match the driver using the OF device ID table.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
+> 
+> ---
+> 
+> Changes in v5: None
+> Changes in v4:
+> - Only use the atmel manufacturer in the compatible string instead of
+>   keeping the deprecated ones (Rob Herring).
+> 
+> Changes in v3: None
+> Changes in v2: None
+> 
+>  arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+> index ef1b9e573af0..53907b7a7fd9 100644
+> --- a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+> @@ -55,7 +55,7 @@
+>  	status = "okay";
+>  	clock-frequency = <400000>;
+>  	eeprom at 54 {
+> -		compatible = "at,24c64";
+> +		compatible = "atmel,24c64";
+>  		reg = <0x54>;
+>  	};
+>  };
+> @@ -64,7 +64,7 @@
+>  	status = "okay";
+>  	clock-frequency = <400000>;
+>  	eeprom at 55 {
+> -		compatible = "at,24c64";
+> +		compatible = "atmel,24c64";
+>  		reg = <0x55>;
+>  	};
+>  };
+> 
 
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Mihail Grigorov <michael.grigorov@konsulko.com>
-Signed-off-by: Tom Rini <trini@konsulko.com>
----
- arch/arm/configs/multi_v7_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+Acked-by: Michal Simek <michal.simek@xilinx.com>
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 2685e03600b1..69b0b3c0fb6c 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -202,6 +202,8 @@ CONFIG_MTD_BLOCK=y
- CONFIG_MTD_M25P80=y
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_DENALI_DT=y
-+CONFIG_MTD_NAND_OMAP2=y
-+CONFIG_MTD_NAND_OMAP_BCH=y
- CONFIG_MTD_NAND_ATMEL=y
- CONFIG_MTD_NAND_BRCMNAND=y
- CONFIG_MTD_NAND_VF610_NFC=y
-@@ -229,6 +231,7 @@ CONFIG_ATA=y
- CONFIG_SATA_AHCI=y
- CONFIG_SATA_AHCI_PLATFORM=y
- CONFIG_AHCI_BRCM=y
-+CONFIG_AHCI_DM816=y
- CONFIG_AHCI_ST=y
- CONFIG_AHCI_IMX=y
- CONFIG_AHCI_SUNXI=y
--- 
-1.9.1
+Thanks,
+Michal
