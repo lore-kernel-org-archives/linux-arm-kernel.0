@@ -1,50 +1,104 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Wed, 21 Jun 2017 23:47:53 +0200
-Subject: [PATCH 7/9] PM / ACPI: Enable the runtime PM centric approach for
- system sleep
-In-Reply-To: <1498072888-14782-8-git-send-email-ulf.hansson@linaro.org>
-References: <1498072888-14782-1-git-send-email-ulf.hansson@linaro.org>
- <1498072888-14782-8-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CAJZ5v0jL-0TKUv5nK7tFLm+X7nE7J2e3hm21i=+FBFBzQLQ=Xw@mail.gmail.com>
+From: jacopo@jmondi.org (jmondi)
+Date: Wed, 21 Jun 2017 23:50:59 +0200
+Subject: [PATCH V4 1/7] dt-bindings: pinctrl: extend the pinmux property
+ to support integers array
+In-Reply-To: <1498046395-30001-2-git-send-email-aisheng.dong@nxp.com>
+References: <1498046395-30001-1-git-send-email-aisheng.dong@nxp.com>
+ <1498046395-30001-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20170621215059.GA14826@w540>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 21, 2017 at 9:21 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> This change extends the interpretation of the ACPI's no_direct_complete
-> flag to be used to enable the so called runtime PM centric approach, for
-> devices being attached to the ACPI PM domain.
->
-> The principle behind the runtime PM centric approach is to re-use the
-> runtime PM callbacks to implement system sleep for drivers/subsystems.
-> Moreover, using the runtime PM centric approach gives an optimized
-> behaviour around avoiding to wake up a device from its low power state
-> during system sleep, unless really needed.
->
-> To deploy the runtime PM centric approach for a subsystem/driver, the
-> following adaptations needs to be made.
->
-> First, the runtime PM callbacks may be called when runtime PM has been
-> disabled for the device. This serves as an indication for the callbacks to
-> understand they are running in the system sleep sequence, instead of in the
-> regular runtime PM path. In some cases, a callback needs to take different
-> actions depending in what path it is being executed in, as is the case for
-> the ACPI PM domain.
->
-> In particular for the ACPI PM domain's ->runtime_suspend|resume()
-> callbacks, when those finds runtime PM being disabled for the device, it
-> instead executes the same operations as normally being run when
-> ->suspend_late() and ->resume_early() callbacks are invoked during system
-> sleep.
->
-> Second, at the PM domain level, it is expected that the driver for the
-> device makes use of pm_runtime_force_suspend|resume(), to re-use the
-> runtime PM callbacks to put the device into low power state and to wake it
-> up when needed during system sleep.
+Hi Dong,
+   thanks for this
 
-What if it doesn't do that?
+On Wed, Jun 21, 2017 at 07:59:49PM +0800, Dong Aisheng wrote:
+> Some platforms may need more than one integer to represent a complete
+> pinmux binding, so let's extend the pinmux property to allow to accept
+> integer array instead of only a single integer.
+>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: devicetree at vger.kernel.org
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+>
+> ---
+> ChangeLog:
+>  * new patch
+> ---
+>  Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt | 9 +++++----
+>  1 file changed, 5 insertions(+), 4 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+> index f01d154..1b954b5 100644
+> --- a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+> @@ -205,10 +205,11 @@ maintain.
+>
+>  For cases like this, the pin controller driver may use the pinmux helper
+>  property, where the pin identifier is packed with mux configuration settings
+> -in a single integer.
+> +in a single integer or integers array which depends on platform binding
+> +specific.
+>
 
-Do all drivers of devices that may fall into the ACPI PM domain use
-pm_runtime_force_suspend|resume()?
+s/or integers array/or a group of integers/
+since you're using "group" below
 
-Thanks,
-Rafael
+s/ which depends on platform binding specific//
+
+I'm not a native speaker, but this sounds weird to me. If I'm the only
+one, please ignore my comment otherwise please drop this
+
+Actually, to avoid confusion between "array of integers" and "group of
+integers" I would provide a definition of what a "pinmux group" is
+before everything else.
+This is how the paragraph would look like:
+
+-----------------------------------------------------------------------------
+ For cases like this, the pin controller driver may use the pinmux helper
+ property, where the pin identifier is provided with mux configuration settings
+ in a pinmux group.
+
+ A pinumux group consists of the pin identifier and mux settings
+ represented as a single integer or an array of integers.
+
+ The pinmux property accepts an array of pinmux groups, each of them describing
+ a single pin multiplexing configuration.
+
+ pincontroller {
+	state_0_node_a {
+		pinmux = <PINMUX_GROUP>, <PINMUX_GROUP>, ...;
+	};
+ };
+
+ Each individual pin controller driver bindings documentation shall specify
+ how pin IDs and pin multiplexing configuration are defined and assembled together
+ in a pinmux group.
+-----------------------------------------------------------------------------
+
+Thanks
+   j
+
+> -The pinmux property accepts an array of integers, each of them describing
+> -a single pin multiplexing configuration.
+> +The pinmux property accepts an array of group of integers, each group
+> +describing a single pin multiplexing configuration.
+>
+>  pincontroller {
+>  	state_0_node_a {
+> @@ -300,7 +301,7 @@ arguments are described below.
+>  - pinmux takes a list of pin IDs and mux settings as required argument. The
+>    specific bindings for the hardware defines:
+>    - How pin IDs and mux settings are defined and assembled together in a single
+> -    integer.
+> +    integer or integers array.
+>
+>  - bias-pull-up, -down and -pin-default take as optional argument on hardware
+>    supporting it the pull strength in Ohm. bias-disable will disable the pull.
+> --
+> 2.7.4
+>
