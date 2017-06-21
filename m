@@ -1,47 +1,86 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 Jun 2017 23:58:38 +0200
-Subject: [PATCH] clk: bcm: don't mark iproc_pll_clk_setup as __init
-Message-ID: <20170621215851.4052618-1-arnd@arndb.de>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Wed, 21 Jun 2017 23:59:05 +0200
+Subject: Drivers taking different actions depending on sleep state
+In-Reply-To: <ccac39d6-4611-8b46-12f7-24227ef3b35e@gmail.com>
+References: <9dc7b7f4-e47d-59f3-3b51-52e0aefd2487@free.fr>
+ <CAJZ5v0iL7voAz9T+36fXXncOj4UrFSAH8WzwEbec96GuFUteaQ@mail.gmail.com>
+ <ccac39d6-4611-8b46-12f7-24227ef3b35e@gmail.com>
+Message-ID: <CAJZ5v0g_egRwxOLqft=JhvzAqBWuyvC8yiO7De5TYUZLUT2Fpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function is now called from the probe() function of a
-platform driver, which may be called later than __init,
-which triggers a lot of warnings like:
+On Wed, Jun 21, 2017 at 11:16 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> On 06/09/2017 03:53 PM, Rafael J. Wysocki wrote:
+>> Hi,
+>>
+>> On Fri, Jun 9, 2017 at 5:20 PM, Mason <slash.tmp@free.fr> wrote:
+>>> Hello,
+>>>
+>>> I read the "Sleep States" documentation:
+>>> https://www.kernel.org/doc/Documentation/power/states.txt
+>>>
+>>> It mentions /sys/power/mem_sleep but I don't have that in 4.9
+>>> # ll /sys/power/
+>>> -rw-r--r--    1 root     root          4096 Jan  1 00:31 pm_async
+>>> -rw-r--r--    1 root     root          4096 Jan  1 00:31 pm_freeze_timeout
+>>> -rw-r--r--    1 root     root          4096 Jan  1 00:31 state
+>>> -rw-r--r--    1 root     root          4096 Jan  1 00:31 wakeup_count
+>>>
+>>> # cat /sys/power/state
+>>> freeze mem
+>>>
+>>> Currently my platform's "mem" is a true suspend-to-RAM trigger,
+>>> where drivers are supposed to save their state (register values
+>>> will be lost), then Linux hands control over to firmware which
+>>> enables RAM self-refresh and powers the chip down. When the system
+>>> resumes, drivers restore their state from their copy in memory.
+>>>
+>>> One driver is responsible for loading/unloading microcode running
+>>> on the DSPs. This operation is required only when powering down
+>>> the chip, but it should be avoided for "low-latency" sleeps.
+>>>
+>>> The problem is that, if I understand correctly, drivers have no way
+>>> of knowing which sleep state is being entered/exited?
+>>>
+>>> How can I have the microcode driver take different decisions
+>>> based on the sleep state?
+>>
+>> The cleanest way would be to run that code from one of the platform
+>> suspend hooks that receive information on what sleep state is to be
+>> entered.
+>
+> I am not sure this would be cleaner, because that would create a tighter
+> dependency between different drivers, each of them having their
+> suspend/resume routings and the driver that implements the
+> platform_suspend_ops, that could also create some nice layering
+> violations and some difficult to solve dependencies.
+>
+>>
+>> Alternatively, those hooks can set/clear flags that can be accessed by
+>> drivers, but that of course may your drivers depend on the platform
+>> (still, in the microcode case the driver seems to be
+>> platform-dependent anyway).
+>
+> It may be platform dependent, but the actual system-wide suspend/resume
+> implementations can vary a lot. For example you may have started with
+> some particular CPU architecture on your platforms, with one driver
+> implementing an instance of platform_suspend_ops, and then as you moved
+> to another CPU architecture, some of that could be managed by a generic
+> driver (e.g: ARM SCPI, ACPI etc. etc.).
+>
+> The same HW blocks are likely to be present on these different SoCs, and
+> have the same requirements where they need to see a slightly different
+> path taken on suspend/resume. If we have to patch both the "legacy"
+> platform_suspend_ops, and the "new" platform_suspend_ops that does not
+> really scale.
+>
+> Would it be that much of a stretch if we reflected e.g:
+> PM_SUSPEND_STANDBY, PM_SUSPEND_MEM into the pm_message_t that is
+> communicated to platform_driver::suspend and platform_driver::resume?
 
-WARNING: drivers/clk/built-in.o(.text+0x1a41c): Section mismatch in reference from the function sr_lcpll1_clk_init() to the function .init.text:iproc_pll_clk_setup()
+I'm not sure what you mean, really.
 
-This removes the annotation on iproc_pll_clk_setup to address
-all those warnings.
+The ->suspend callback in struct platform_driver has been long deprecated.
 
-Fixes: 654cdd3229cd ("clk: bcm: Add clocks for Stingray SOC")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/clk/bcm/clk-iproc-pll.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/clk/bcm/clk-iproc-pll.c b/drivers/clk/bcm/clk-iproc-pll.c
-index 2d61893da024..375d8dd80d45 100644
---- a/drivers/clk/bcm/clk-iproc-pll.c
-+++ b/drivers/clk/bcm/clk-iproc-pll.c
-@@ -617,12 +617,12 @@ static void iproc_pll_sw_cfg(struct iproc_pll *pll)
- 	}
- }
- 
--void __init iproc_pll_clk_setup(struct device_node *node,
--				const struct iproc_pll_ctrl *pll_ctrl,
--				const struct iproc_pll_vco_param *vco,
--				unsigned int num_vco_entries,
--				const struct iproc_clk_ctrl *clk_ctrl,
--				unsigned int num_clks)
-+void iproc_pll_clk_setup(struct device_node *node,
-+			 const struct iproc_pll_ctrl *pll_ctrl,
-+			 const struct iproc_pll_vco_param *vco,
-+			 unsigned int num_vco_entries,
-+			 const struct iproc_clk_ctrl *clk_ctrl,
-+			 unsigned int num_clks)
- {
- 	int i, ret;
- 	struct iproc_pll *pll;
--- 
-2.9.0
+Thanks,
+Rafael
