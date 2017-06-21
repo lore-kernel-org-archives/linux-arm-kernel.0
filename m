@@ -1,58 +1,51 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 21 Jun 2017 12:21:21 +0200
-Subject: [PATCH 0/9] Add and make use of a common rs485 device tree parsing
+Date: Wed, 21 Jun 2017 12:21:26 +0200
+Subject: [PATCH 5/9] serial: omap-serial: Use common rs485 device tree parsing
  function
-Message-ID: <20170621102130.21024-1-u.kleine-koenig@pengutronix.de>
+In-Reply-To: <20170621102130.21024-1-u.kleine-koenig@pengutronix.de>
+References: <20170621102130.21024-1-u.kleine-koenig@pengutronix.de>
+Message-ID: <20170621102130.21024-6-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Sascha Hauer <s.hauer@pengutronix.de>
 
-this series unifies parsing of
+We just got a common helper for parsing the rs485 specific
+device tree properties. Use it and drop the open coded parser.
+Note that the common helper is more strict and only evaluates the
+optional properties if the required rs485-rts-delay is present.
 
-	rs485-rts-delay
-	linux,rs485-enabled-at-boot-time
-	rs485-rx-during-tx
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: linux-omap at vger.kernel.org
 
-in the drivers that already support some of these. As the function
-implmented here is more strict that the open coded stuff already in the
-drivers three device trees needed adaption to ensure the machines
-continue to work as expected.
+ drivers/tty/serial/omap-serial.c | 12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
 
-Best regards
-Uwe
-
-Sascha Hauer (6):
-  serial: Add common rs485 device tree parsing function
-  serial: atmel: Use common rs485 device tree parsing function
-  serial: fsl_lpuart: Use common rs485 device tree parsing function
-  serial: omap-serial: Use common rs485 device tree parsing function
-  serial: imx: default to half duplex rs485
-  serial: imx: Use common rs485 device tree parsing function
-
-Uwe Kleine-K?nig (3):
-  ARM: dts/at91: ensure UARTs used for rs485 specify rs485-rts-delay
-  ARM: dts/imx: ensure UARTs used for rs485 specify rs485-rts-delay
-  of: document rs485 bindings for Atmel USART, Freescale UARTs and OMAP
-    UART
-
- .../devicetree/bindings/serial/atmel-usart.txt     |  1 +
- .../devicetree/bindings/serial/fsl-imx-uart.txt    |  1 +
- .../devicetree/bindings/serial/fsl-lpuart.txt      |  1 +
- .../devicetree/bindings/serial/omap_serial.txt     |  1 +
- arch/arm/boot/dts/animeo_ip.dts                    |  2 +
- arch/arm/boot/dts/at91-vinco.dts                   |  1 +
- arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi            |  1 +
- drivers/tty/serial/Kconfig                         |  4 ++
- drivers/tty/serial/Makefile                        |  2 +
- drivers/tty/serial/atmel_serial.c                  | 17 +-------
- drivers/tty/serial/fsl_lpuart.c                    |  5 ++-
- drivers/tty/serial/imx.c                           |  5 ++-
- drivers/tty/serial/of.c                            | 45 ++++++++++++++++++++++
- drivers/tty/serial/omap-serial.c                   | 12 +-----
- include/linux/serial_core.h                        | 12 ++++++
- 15 files changed, 79 insertions(+), 31 deletions(-)
- create mode 100644 drivers/tty/serial/of.c
-
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index 1ea05ac57aa7..6e4728d3a24c 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -1638,17 +1638,7 @@ static int serial_omap_probe_rs485(struct uart_omap_port *up,
+ 		up->rts_gpio = -EINVAL;
+ 	}
+ 
+-	if (of_property_read_u32_array(np, "rs485-rts-delay",
+-				    rs485_delay, 2) == 0) {
+-		rs485conf->delay_rts_before_send = rs485_delay[0];
+-		rs485conf->delay_rts_after_send = rs485_delay[1];
+-	}
+-
+-	if (of_property_read_bool(np, "rs485-rx-during-tx"))
+-		rs485conf->flags |= SER_RS485_RX_DURING_TX;
+-
+-	if (of_property_read_bool(np, "linux,rs485-enabled-at-boot-time"))
+-		rs485conf->flags |= SER_RS485_ENABLED;
++	of_get_rs485_mode(np, rs485conf);
+ 
+ 	return 0;
+ }
 -- 
 2.11.0
