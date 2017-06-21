@@ -1,47 +1,66 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 21 Jun 2017 16:46:02 +0100
-Subject: [RFC PATCH 1/2] ARM: iwmmxt: Add missing __user annotations to
- sigframe accessors
-In-Reply-To: <1498059983-13438-1-git-send-email-Dave.Martin@arm.com>
-References: <1498059983-13438-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1498059983-13438-2-git-send-email-Dave.Martin@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 21 Jun 2017 16:47:20 +0100
+Subject: [PATCH v5 0/6] Add support for the ICU unit in Marvell Armada
+ 7K/8K
+In-Reply-To: <87r2yd1h5x.fsf@free-electrons.com>
+References: <20170621132917.14187-1-thomas.petazzoni@free-electrons.com>
+ <e87dc80c-f85c-1b20-c2e8-cd03922dacd9@arm.com>
+ <20170621171809.34bcce1e@windsurf.home> <87r2yd1h5x.fsf@free-electrons.com>
+Message-ID: <245df82c-60b1-bc4b-e343-5435713c453c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-preserve_iwmmxt_context() and restore_iwmmxt_context() lack __user
-accessors on their arguments pointing to the user signal frame.
+On 21/06/17 16:42, Gregory CLEMENT wrote:
+> Hi Marc and Thomas,
+>  
+>  On mer., juin 21 2017, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+> 
+>> Hello,
+>>
+>> On Wed, 21 Jun 2017 16:14:21 +0100, Marc Zyngier wrote:
+>>
+>>>> Thomas Petazzoni (6):
+>>>>   dt-bindings: interrupt-controller: add DT binding for the Marvell GICP
+>>>>   dt-bindings: interrupt-controller: add DT binding for the Marvell ICU
+>>>>   irqchip: irq-mvebu-gicp: new driver for Marvell GICP
+>>>>   irqchip: irq-mvebu-icu: new driver for Marvell ICU
+>>>>   arm64: marvell: enable ICU and GICP drivers
+>>>>   arm64: dts: marvell: enable GICP and ICU on Armada 7K/8K
+>>>>
+>>>>  .../bindings/interrupt-controller/marvell,gicp.txt |  27 ++
+>>>>  .../bindings/interrupt-controller/marvell,icu.txt  |  51 ++++
+>>>>  arch/arm64/Kconfig.platforms                       |   2 +
+>>>>  arch/arm64/boot/dts/marvell/armada-ap806.dtsi      |   7 +
+>>>>  .../boot/dts/marvell/armada-cp110-master.dtsi      |  59 +++--
+>>>>  .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi |  55 ++--
+>>>>  drivers/irqchip/Kconfig                            |   6 +
+>>>>  drivers/irqchip/Makefile                           |   2 +
+>>>>  drivers/irqchip/irq-mvebu-gicp.c                   | 279 ++++++++++++++++++++
+>>>>  drivers/irqchip/irq-mvebu-gicp.h                   |  12 +
+>>>>  drivers/irqchip/irq-mvebu-icu.c                    | 289 +++++++++++++++++++++
+>>>>  .../dt-bindings/interrupt-controller/mvebu-icu.h   |  15 ++
+>>>>  12 files changed, 756 insertions(+), 48 deletions(-)
+>>>>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,gicp.txt
+>>>>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
+>>>>  create mode 100644 drivers/irqchip/irq-mvebu-gicp.c
+>>>>  create mode 100644 drivers/irqchip/irq-mvebu-gicp.h
+>>>>  create mode 100644 drivers/irqchip/irq-mvebu-icu.c
+>>>>  create mode 100644 include/dt-bindings/interrupt-controller/mvebu-icu.h
+>>>>   
+>>>
+>>> It all looks good to me. How do we merge this? I take the first five
+>>> patches and Gregory takes the last one?
+>>
+>> I think you should take the first four patches, and Gr?gory takes the
+>> last two ones. But I'll let Gr?gory confirm.
+> 
+> Indeed it makes more sens to merge the patch 4 through the arm-soc
+> subsystem.
 
-There does not be appear to be a bug here, but this omission is
-inconsistent with the crunch and vfp sigframe access functions.
+Hmmm. You mean patches 5 and 6, right? And I queue 1 to 4?
 
-This patch adds the annotations, for consistency.
+Thanks,
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm/kernel/signal.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-index 7b8f214..8f06480 100644
---- a/arch/arm/kernel/signal.c
-+++ b/arch/arm/kernel/signal.c
-@@ -59,7 +59,7 @@ static int restore_crunch_context(struct crunch_sigframe __user *frame)
- 
- #ifdef CONFIG_IWMMXT
- 
--static int preserve_iwmmxt_context(struct iwmmxt_sigframe *frame)
-+static int preserve_iwmmxt_context(struct iwmmxt_sigframe __user *frame)
- {
- 	char kbuf[sizeof(*frame) + 8];
- 	struct iwmmxt_sigframe *kframe;
-@@ -72,7 +72,7 @@ static int preserve_iwmmxt_context(struct iwmmxt_sigframe *frame)
- 	return __copy_to_user(frame, kframe, sizeof(*frame));
- }
- 
--static int restore_iwmmxt_context(struct iwmmxt_sigframe *frame)
-+static int restore_iwmmxt_context(struct iwmmxt_sigframe __user *frame)
- {
- 	char kbuf[sizeof(*frame) + 8];
- 	struct iwmmxt_sigframe *kframe;
+	M.
 -- 
-2.1.4
+Jazz is not dead. It just smells funny...
