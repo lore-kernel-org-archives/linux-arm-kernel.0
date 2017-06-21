@@ -1,34 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 21 Jun 2017 18:28:39 +0200
-Subject: [RFT PATCH v2 00/42] PCI: ARM/ARM64: remove pci_fixup_irqs() usage
-In-Reply-To: <20170621154136.GA1362@red-moon>
-References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
- <CACRpkdZ1rBq9eLJkz_gRuXAG=if+xXf-jPzDEPCfG8EgUmUG3A@mail.gmail.com>
- <20170621103042.GA1712@red-moon> <20170621104538.GA8477@red-moon>
- <CACRpkda_6=qWRQDpTy67MFc=-fYRhqWDPx0NnNG5mjXQLyAAkw@mail.gmail.com>
- <20170621154136.GA1362@red-moon>
-Message-ID: <CACRpkdY7tyXZKekyOnXfh8sQuqywHtmZkuK1k55pGXo5Q84nmw@mail.gmail.com>
+From: daniel@iogearbox.net (Daniel Borkmann)
+Date: Wed, 21 Jun 2017 18:32:37 +0200
+Subject: [PATCH v2] arm: eBPF JIT compiler
+In-Reply-To: <CAHgaXdKGJFh8jO44gwCqe0cijoztf39bK9k8ioBtYDjzb4vvZw@mail.gmail.com>
+References: <1495754003-21099-1-git-send-email-illusionist.neo@gmail.com>
+ <CAGXu5jKmLNMR+uhM9Ov2XPW6kCjip_SjScgEH0fTFp6fQtKFiA@mail.gmail.com>
+ <593E6B0F.8070901@iogearbox.net>
+ <CAHgaXd+DW2bggto=2S9hOdMrtPTvhD2QN4rPf2V8iHewQpg-YA@mail.gmail.com>
+ <CAHgaXdJrvKdzr3fJ1TMkC4foeVsZJDSVEwhDOeZGxQVsmoK2cQ@mail.gmail.com>
+ <59419D1E.2060303@iogearbox.net>
+ <CAHgaXdKMbFPgy-kKF0iDSAYo4CqLn9FRu9HwM+OfM-JWb9fNRQ@mail.gmail.com>
+ <594813AA.5010001@iogearbox.net>
+ <CAHgaXdLtX6yLdU3bMvS=g8FZ79sM_BW_+hHTMH=Mfk4TZqUnpw@mail.gmail.com>
+ <59495367.3080402@iogearbox.net>
+ <CAHgaXdKGJFh8jO44gwCqe0cijoztf39bK9k8ioBtYDjzb4vvZw@mail.gmail.com>
+Message-ID: <594A9FA5.1080003@iogearbox.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 21, 2017 at 5:41 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
+On 06/21/2017 04:26 PM, Shubham Bansal wrote:
+[...]
+> So ultimately, we call helper_function which takes u64 as arguments
+> only. I know its asking a lot, but can you please confirm this asap? I
+> would like to start implementing it.
 
-> Is the ftpci100.c clock handling being queued for this merge window ?
-
-Yups, it's in Bjorn's tree and visible in linux-next.
-
-> This patch:
->
-> https://patchwork.ozlabs.org/patch/778716/
->
-> fixes a commit that is not in v4.12-rc6, I need some input to understand
-> how to proceed.
-
-Yeah that is just a fix I had to do when fixing this other issue.
-
-It's cool, I just sent a patch. If Bjorn applied your series he can just
-apply this on top and all will be fine (for me).
-
-Yours,
-Linus Walleij
+Yes, that is correct. I think it would be the better, more generic
+approach going forward to always assume that.
