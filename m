@@ -1,37 +1,141 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Wed, 21 Jun 2017 09:26:51 +0000
-Subject: [PATCH 00/51] rtc: stop using rtc deprecated functions
-In-Reply-To: <20170620211536.GM4902@n2100.armlinux.org.uk>
-References: <1497951359-13334-1-git-send-email-benjamin.gaignard@linaro.org>
- <20170620100348.zh4ygvjjgnhxvmvl@piout.net> <20170620121011.GA13221@amd>
- <20170620122400.sm7qqvwyj6cuzarw@piout.net> <20170620132620.GA16881@amd>
- <6ED8E3B22081A4459DAC7699F3695FB7018CD96FCD@SW-EX-MBX02.diasemi.com>
- <20170620134458.GA10104@amd> <20170620134827.ubvzhh25klaotupv@piout.net>
- <CA+M3ks68+z6nDtYM8CDpso7SxjB6Nt5E=rOc1yxx=kDz6PUeVQ@mail.gmail.com>
- <20170620211536.GM4902@n2100.armlinux.org.uk>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6DD00278C0@AcuExch.aculab.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 21 Jun 2017 10:28:53 +0100
+Subject: [PATCH v3 2/2] acpi, gicv3-its, numa: Adding numa node mapping
+ for gic-its units
+In-Reply-To: <1498025743-6340-3-git-send-email-ganapatrao.kulkarni@cavium.com>
+References: <1498025743-6340-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <1498025743-6340-3-git-send-email-ganapatrao.kulkarni@cavium.com>
+Message-ID: <20170621092853.GA31599@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King - ARM Linux
-> Sent: 20 June 2017 22:16
-..
-> Consider that at the moment, we define the 32-bit RTC representation to
-> start at a well known epoch.  We _could_ decide that when it wraps to
-> 0x80000000 seconds, we'll define the lower 0x40000000 seconds to mean
-> dates in the future - and keep rolling that forward each time we cross
-> another 0x40000000 seconds.  Unless someone invents a real time machine,
-> we shouldn't need to set a modern RTC back to 1970.
+On Wed, Jun 21, 2017 at 11:45:43AM +0530, Ganapatrao Kulkarni wrote:
+> Add code to parse SRAT ITS Affinity sub table as defined in ACPI 6.2
+> Later in per device probe, ITS devices are mapped to
+> numa node using ITS id to proximity domain mapping.
+> 
+> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> ---
+>  drivers/irqchip/irq-gic-v3-its.c | 80 +++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 79 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 45ea1933..88cfb32 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -1833,6 +1833,82 @@ static int __init its_of_probe(struct device_node *node)
+>  
+>  #define ACPI_GICV3_ITS_MEM_SIZE (SZ_128K)
+>  
+> +#ifdef CONFIG_ACPI_NUMA
+> +struct its_srat_map {
+> +	u32	numa_node;  /* numa node id */
+> +	u32	its_id;  /* GIC ITS ID */
+> +};
+> +
+> +static struct its_srat_map its_srat_maps[MAX_NUMNODES] __initdata = {
+> +	[0 ... MAX_NUMNODES - 1] = {NUMA_NO_NODE, UINT_MAX} };
 
-True, just treating the value as unsigned gives another 67 years.
+Nit: UINT_MAX is as valid as 0 as its_id (but the intent here is to make
+it look like an invalid value), given that the its_in_srat counter
+defines what entries are valid I do not necessarily see the point in
+initializing with something that is a valid value != 0.
 
-If a 32bit RTC is programmed with the low 32bits of the 64bit 'seconds
-since 1970' the kernel should have no real difficulty sorting out the
-high bits from other available information.
+> +static int its_in_srat __initdata;
+> +
+> +static int __init
+> +acpi_get_its_numa_node(u32 its_id)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < its_in_srat; i++) {
+> +		if (its_id == its_srat_maps[i].its_id)
+> +			return its_srat_maps[i].numa_node;
+> +	}
+> +	return NUMA_NO_NODE;
+> +}
+> +
+> +static int __init
+> +gic_acpi_parse_srat_its(struct acpi_subtable_header *header,
+> +			 const unsigned long end)
+> +{
+> +	int pxm, node;
+> +	struct acpi_srat_its_affinity *its_affinity;
+> +
+> +	its_affinity = (struct acpi_srat_its_affinity *)header;
+> +	if (!its_affinity)
+> +		return -EINVAL;
+> +
+> +	if (its_affinity->header.length <
+> +			sizeof(struct acpi_srat_its_affinity)) {
+> +		pr_err("SRAT:ITS: Invalid SRAT header length: %d\n",
+> +			its_affinity->header.length);
+> +		return -EINVAL;
+> +	}
+> +
+> +	if (its_in_srat >= MAX_NUMNODES) {
+> +		pr_err("SRAT:ITS: ITS devices exceeding max count[%d]\n",
+> +				MAX_NUMNODES);
+> +		return -EINVAL;
+> +	}
+> +
+> +	pxm = its_affinity->proximity_domain;
+> +	node = acpi_map_pxm_to_node(pxm);
+> +
+> +	if (node == NUMA_NO_NODE || node >= MAX_NUMNODES) {
+> +		pr_err("SRAT:ITS: Invalid numa node %d\n", node);
+> +		return -EINVAL;
 
-Problems with things like the x86 bios setting the rtc to stupid values
-are another matter.
-ISTR the rtc chip has a bit for 'summertime' that is never set, on a
-multi-os system you can get multiple summer time changes.
+As Marc mentioned you should bail out here but continue parsing entries,
+aka "return 0";
 
-	David
+Thanks,
+Lorenzo
+
+> +	}
+> +
+> +	its_srat_maps[its_in_srat].numa_node = node;
+> +	its_srat_maps[its_in_srat].its_id = its_affinity->its_id;
+> +	its_in_srat++;
+> +	pr_info("ACPI: NUMA: SRAT: ITS: PXM %d -> ITS_ID %d -> NODE %d\n",
+> +		pxm, its_affinity->its_id, node);
+> +
+> +	return 0;
+> +}
+> +
+> +static int __init acpi_table_parse_srat_its(void)
+> +{
+> +	return acpi_table_parse_entries(ACPI_SIG_SRAT,
+> +					sizeof(struct acpi_table_srat),
+> +					ACPI_SRAT_TYPE_GIC_ITS_AFFINITY,
+> +					gic_acpi_parse_srat_its, 0);
+> +}
+> +#else
+> +#define acpi_table_parse_srat_its()	do { } while (0)
+> +#define acpi_get_its_numa_node(its_id)	NUMA_NO_NODE
+> +#endif
+> +
+>  static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
+>  					  const unsigned long end)
+>  {
+> @@ -1861,7 +1937,8 @@ static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
+>  		goto dom_err;
+>  	}
+>  
+> -	err = its_probe_one(&res, dom_handle, NUMA_NO_NODE);
+> +	err = its_probe_one(&res, dom_handle,
+> +			acpi_get_its_numa_node(its_entry->translation_id));
+>  	if (!err)
+>  		return 0;
+>  
+> @@ -1873,6 +1950,7 @@ static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
+>  
+>  static void __init its_acpi_probe(void)
+>  {
+> +	acpi_table_parse_srat_its();
+>  	acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
+>  			      gic_acpi_parse_madt_its, 0);
+>  }
+> -- 
+> 1.8.1.4
+> 
