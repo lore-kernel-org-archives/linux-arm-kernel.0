@@ -1,43 +1,50 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 21 Jun 2017 22:45:08 +0100
-Subject: [PATCH] ARM64: dts: marvell: armada37xx: Fix timer interrupt
- specifiers
-Message-ID: <20170621214508.7810-1-marc.zyngier@arm.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Wed, 21 Jun 2017 23:47:53 +0200
+Subject: [PATCH 7/9] PM / ACPI: Enable the runtime PM centric approach for
+ system sleep
+In-Reply-To: <1498072888-14782-8-git-send-email-ulf.hansson@linaro.org>
+References: <1498072888-14782-1-git-send-email-ulf.hansson@linaro.org>
+ <1498072888-14782-8-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <CAJZ5v0jL-0TKUv5nK7tFLm+X7nE7J2e3hm21i=+FBFBzQLQ=Xw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Contrary to popular belief, PPIs connected to a GICv3 to not have
-an affinity field similar to that of GICv2. That is consistent
-with the fact that GICv3 is designed to accomodate thousands of
-CPUs, and fitting them as a bitmap in a byte is... difficult.
+On Wed, Jun 21, 2017 at 9:21 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> This change extends the interpretation of the ACPI's no_direct_complete
+> flag to be used to enable the so called runtime PM centric approach, for
+> devices being attached to the ACPI PM domain.
+>
+> The principle behind the runtime PM centric approach is to re-use the
+> runtime PM callbacks to implement system sleep for drivers/subsystems.
+> Moreover, using the runtime PM centric approach gives an optimized
+> behaviour around avoiding to wake up a device from its low power state
+> during system sleep, unless really needed.
+>
+> To deploy the runtime PM centric approach for a subsystem/driver, the
+> following adaptations needs to be made.
+>
+> First, the runtime PM callbacks may be called when runtime PM has been
+> disabled for the device. This serves as an indication for the callbacks to
+> understand they are running in the system sleep sequence, instead of in the
+> regular runtime PM path. In some cases, a callback needs to take different
+> actions depending in what path it is being executed in, as is the case for
+> the ACPI PM domain.
+>
+> In particular for the ACPI PM domain's ->runtime_suspend|resume()
+> callbacks, when those finds runtime PM being disabled for the device, it
+> instead executes the same operations as normally being run when
+> ->suspend_late() and ->resume_early() callbacks are invoked during system
+> sleep.
+>
+> Second, at the PM domain level, it is expected that the driver for the
+> device makes use of pm_runtime_force_suspend|resume(), to re-use the
+> runtime PM callbacks to put the device into low power state and to wake it
+> up when needed during system sleep.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 12 ++++--------
- 1 file changed, 4 insertions(+), 8 deletions(-)
+What if it doesn't do that?
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-index 4d495ec39202..bc179efb10ef 100644
---- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -75,14 +75,10 @@
- 
- 	timer {
- 		compatible = "arm,armv8-timer";
--		interrupts = <GIC_PPI 13
--			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
--			     <GIC_PPI 14
--			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
--			     <GIC_PPI 11
--			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
--			     <GIC_PPI 10
--			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
-+		interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_PPI 14 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_PPI 10 IRQ_TYPE_LEVEL_HIGH>;
- 	};
- 
- 	soc {
--- 
-2.11.0
+Do all drivers of devices that may fall into the ACPI PM domain use
+pm_runtime_force_suspend|resume()?
+
+Thanks,
+Rafael
