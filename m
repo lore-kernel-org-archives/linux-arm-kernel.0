@@ -1,21 +1,18 @@
 From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 21 Jun 2017 12:30:44 -0500
-Subject: [PATCH 5/8] arm64: defconfig: enable APEI and GHES features
+Date: Wed, 21 Jun 2017 12:30:47 -0500
+Subject: [PATCH 8/8] [v2] arm64: defconfig: enable Qualcomm Technologies EMAC
+ and some PHY drivers
 In-Reply-To: <1498066247-22130-1-git-send-email-timur@codeaurora.org>
 References: <1498066247-22130-1-git-send-email-timur@codeaurora.org>
-Message-ID: <1498066247-22130-6-git-send-email-timur@codeaurora.org>
+Message-ID: <1498066247-22130-9-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM64 server platforms can support ACPI Platform Error Interface (APEI)
-and Generic Hardware Error Source (GHES) features, so enable them.
+The EMAC is present on Qualcomm Technologies' server and some mobile
+chips, and is used as the primary Ethernet interface.
 
-Platforms which support the firmware-first RAS error reporting model
-require APEI and GHES functionality for the OS to receive and report
-error records provided by the platform.
-
-PCIe AER functionality is required for PCIe AER errors to be properly
-reported and recovered from.
+Systems that have these SOCs typically have an Atheros 803x or
+Marvell 88e1111 PHY in them, so enable those drivers too.
 
 Signed-off-by: Timur Tabi <timur@codeaurora.org>
 ---
@@ -23,19 +20,24 @@ Signed-off-by: Timur Tabi <timur@codeaurora.org>
  1 file changed, 3 insertions(+)
 
 diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 3455070..0d86a8a 100644
+index 00a0f80..854ed3f 100644
 --- a/arch/arm64/configs/defconfig
 +++ b/arch/arm64/configs/defconfig
-@@ -505,6 +505,9 @@ CONFIG_ARM_SCPI_PROTOCOL=y
- CONFIG_RASPBERRYPI_FIRMWARE=y
- CONFIG_EFI_CAPSULE_LOADER=y
- CONFIG_ACPI=y
-+CONFIG_ACPI_APEI=y
-+CONFIG_ACPI_APEI_GHES=y
-+CONFIG_ACPI_APEI_PCIEAER=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
- CONFIG_EXT4_FS_POSIX_ACL=y
+@@ -192,11 +192,14 @@ CONFIG_IGBVF=y
+ CONFIG_MVNETA=y
+ CONFIG_MVPP2=y
+ CONFIG_SKY2=y
++CONFIG_QCOM_EMAC=m
+ CONFIG_RAVB=y
+ CONFIG_SMC91X=y
+ CONFIG_SMSC911X=y
+ CONFIG_STMMAC_ETH=m
+ CONFIG_MDIO_BUS_MUX_MMIOREG=y
++CONFIG_AT803X_PHY=m
++CONFIG_MARVELL_PHY=m
+ CONFIG_MESON_GXL_PHY=m
+ CONFIG_MICREL_PHY=y
+ CONFIG_REALTEK_PHY=m
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
 Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
