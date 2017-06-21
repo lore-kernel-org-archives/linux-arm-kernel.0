@@ -1,29 +1,34 @@
 From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 21 Jun 2017 12:30:39 -0500
-Subject: [v3][PATCH 0/8] arm64: defconfig: enable several options useful for
- ARM64 server platforms
-Message-ID: <1498066247-22130-1-git-send-email-timur@codeaurora.org>
+Date: Wed, 21 Jun 2017 12:30:46 -0500
+Subject: [PATCH 7/8] arm64: defconfig: enable QCOM_L2_PMU and QCOM_L3_PMU
+In-Reply-To: <1498066247-22130-1-git-send-email-timur@codeaurora.org>
+References: <1498066247-22130-1-git-send-email-timur@codeaurora.org>
+Message-ID: <1498066247-22130-8-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ACPI-based ARM64 server platforms based, like the Qualcomm Datacenter
-Technologies QDF2400, need several features and drivers enabled for
-full functionality.  This patchset enables many of those features.
+Now that the drivers are available, enable support for L2 and L3
+performance monitoring Qualcomm Datacenter Technologies Centriq SoCs.
+These PMU drivers provide support for performance optimization.
 
-Timur Tabi (8):
-  arm64: defconfig: enable ACPI_CPPC_CPUFREQ
-  arm64: defconfig: enable BLK_DEV_NVME
-  arm64: defconfig: enable EFI_CAPSULE_LOADER
-  arm64: defconfig: enable support for PCIe hotplug
-  arm64: defconfig: enable APEI and GHES features
-  arm64: defconfig: enable EDAC options
-  arm64: defconfig: enable QCOM_L2_PMU and QCOM_L3_PMU
-  [v2] arm64: defconfig: enable Qualcomm Technologies EMAC and some PHY
-    drivers
+Signed-off-by: Timur Tabi <timur@codeaurora.org>
+---
+ arch/arm64/configs/defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
- arch/arm64/configs/defconfig | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
-
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 6a52906..00a0f80 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -502,6 +502,8 @@ CONFIG_PHY_ROCKCHIP_EMMC=y
+ CONFIG_PHY_ROCKCHIP_PCIE=m
+ CONFIG_PHY_XGENE=y
+ CONFIG_PHY_TEGRA_XUSB=y
++CONFIG_QCOM_L2_PMU=y
++CONFIG_QCOM_L3_PMU=y
+ CONFIG_ARM_SCPI_PROTOCOL=y
+ CONFIG_RASPBERRYPI_FIRMWARE=y
+ CONFIG_EFI_CAPSULE_LOADER=y
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
 Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
