@@ -1,61 +1,67 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Wed, 21 Jun 2017 09:28:23 +0800
-Subject: [PATCH 1/1] iommu/arm-smmu-v3: replace writel with writel_relaxed
- in queue_inc_prod
-In-Reply-To: <acafb87c-4ba9-4a44-f868-c8f882717ab1@arm.com>
-References: <1497956694-11784-1-git-send-email-thunder.leizhen@huawei.com>
- <acafb87c-4ba9-4a44-f868-c8f882717ab1@arm.com>
-Message-ID: <5949CBB7.1030908@huawei.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 20 Jun 2017 18:43:03 -0700
+Subject: [PATCH v4 0/3] watchdog: dw_wdt: add reset lines
+In-Reply-To: <738tknf5zp.fsf@pengutronix.de>
+References: <cover.50aaf23e8fbe9028f711a67e39b96910c986e8b0.1495443015.git-series.s.trumtrar@pengutronix.de>
+ <738tknf5zp.fsf@pengutronix.de>
+Message-ID: <a6d32d71-6f66-18af-5283-036bf1ef93ce@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 06/20/2017 12:55 AM, Steffen Trumtrar wrote:
+> 
+> Steffen Trumtrar <s.trumtrar@pengutronix.de> writes:
+> 
+>> Hi!
+>>
+>> This series adds support for the reset line that is (potentially) holding
+>> the watchdog in reset.
+>>
+>> As the watchdog is useless if this happens, it needs to be deasserted in
+>> the probe function.
+>>
+>> Tested on a Socrates board.
+>>
+>> Regards,
+>> Steffen
+>>
+>>
+>> Changes since v3:
+>>
+>>    - goto out_disable_clk
+>>    - add Reviewed-by
+>>
+>> Changes since v2:
+>>
+>>    - use optional reset functions
+>>    - add Acked-by to devictree bindings
+>>
+>> Changes since v1:
+>>
+>>    - remove reset-names property
+>>    - remove warning if reset property is missing
+>>
+>> Steffen Trumtrar (3):
+>>    watchdog: bindings: dw_wdt: add reset lines
+>>    watchdog: dw_wdt: get reset lines from dt
+>>    ARM: socfpga: dtsi: add dw-wdt reset lines
+>>
+>>   Documentation/devicetree/bindings/watchdog/dw_wdt.txt |  3 +++
+>>   arch/arm/boot/dts/socfpga.dtsi                        |  2 ++
+>>   drivers/watchdog/dw_wdt.c                             | 11 +++++++++++
+>>   3 files changed, 16 insertions(+)
+>>
+>> base-commit: 2ea659a9ef488125eb46da6eb571de5eae5c43f6
+> 
+> Gentle Ping!
+> 
+> Is this series already applied somewhere I didn't look?
+> 
 
+https://git.kernel.org/pub/scm/linux/kernel/git/groeck/linux-staging.git/log/?h=watchdog-next
 
-On 2017/6/20 19:35, Robin Murphy wrote:
-> On 20/06/17 12:04, Zhen Lei wrote:
->> This function is protected by spinlock, and the latter will do memory
->> barrier implicitly. So that we can safely use writel_relaxed. In fact, the
->> dmb operation will lengthen the time protected by lock, which indirectly
->> increase the locking confliction in the stress scene.
-> 
-> If you remove the DSB between writing the commands (to Normal memory)
-> and writing the pointer (to Device memory), how can you guarantee that
-> the complete command is visible to the SMMU and it isn't going to try to
-> consume stale memory contents? The spinlock is irrelevant since it's
-> taken *before* the command is written.
-OK, I see, thanks. Let's me see if there are any other methods. And I think
-that this may should be done well by hardware.
+ From there, we can only hope that Wim will find the time to pick it up for the next release.
 
-> 
-> Robin.
-> 
->> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->> ---
->>  drivers/iommu/arm-smmu-v3.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index 380969a..d2fbee3 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -728,7 +728,7 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
->>  	u32 prod = (Q_WRP(q, q->prod) | Q_IDX(q, q->prod)) + 1;
->>
->>  	q->prod = Q_OVF(q, q->prod) | Q_WRP(q, prod) | Q_IDX(q, prod);
->> -	writel(q->prod, q->prod_reg);
->> +	writel_relaxed(q->prod, q->prod_reg);
->>  }
->>
->>  /*
->> --
->> 2.5.0
->>
->>
-> 
-> 
-> .
-> 
+The arm dts change will have to go through the arm tree(s) as usual.
 
--- 
-Thanks!
-BestRegards
+Guenter
