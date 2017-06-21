@@ -1,43 +1,60 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 21 Jun 2017 21:08:07 +0200
-Subject: [PATCH 2/2] ARM: dts: exynos: Add clocks to audss block to fix silent
- hang on Exynos4412
-In-Reply-To: <20170621190807.14850-1-krzk@kernel.org>
-References: <20170621190807.14850-1-krzk@kernel.org>
-Message-ID: <20170621190807.14850-3-krzk@kernel.org>
+Date: Wed, 21 Jun 2017 21:16:57 +0200
+Subject: [PATCH 2/4] ARM: exynos_defconfig: Enable NLS_UTF8 and some crypto
+ algorithms
+In-Reply-To: <20170621191659.10929-1-krzk@kernel.org>
+References: <20170621191659.10929-1-krzk@kernel.org>
+Message-ID: <20170621191659.10929-2-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add necessary parent clocks for audss (Audio SubSystem, MAUDIO) clock
-controller block.
-
-This allows driver to keep EPLL enabled before accessing any MAUDIO
-registers thus fixing silent hang.  This silent hang appeard with commit
-6edfa11cb396 ("clk: samsung: Add enable/disable operation for PLL36XX
-clocks"), e.g. on Odroid U3 usually with last (but unrelated) messages:
-
-	[    2.382741] input: gpio_keys as /devices/platform/gpio_keys/input/input0
-	[    2.405686] usb 1-3: new high-speed USB device number 3 using exynos-ehci
-	[    2.419843] max77686-rtc max77686-rtc: setting system clock to 2017-06-21 17:04:13 UTC (1498064653)
+Enable useful, but not essential components:
+ - NLS_UTF8, it might be used for accessing Microsoft-FS based storages,
+ - popular crypto algorithms and transformations as modules.
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- arch/arm/boot/dts/exynos4.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/configs/exynos_defconfig | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-index 497a9470c888..5739389f5bb8 100644
---- a/arch/arm/boot/dts/exynos4.dtsi
-+++ b/arch/arm/boot/dts/exynos4.dtsi
-@@ -59,6 +59,9 @@
- 		compatible = "samsung,exynos4210-audss-clock";
- 		reg = <0x03810000 0x0C>;
- 		#clock-cells = <1>;
-+		clocks = <&clock CLK_FIN_PLL>, <&clock CLK_FOUT_EPLL>,
-+			 <&clock CLK_SCLK_AUDIO0>, <&clock CLK_SCLK_AUDIO0>;
-+		clock-names = "pll_ref", "pll_in", "sclk_audio", "sclk_pcm_in";
- 	};
- 
- 	i2s0: i2s at 03830000 {
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index e6a976f5305c..dfe43acec129 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -308,6 +308,7 @@ CONFIG_ROOT_NFS=y
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ASCII=y
+ CONFIG_NLS_ISO8859_1=y
++CONFIG_NLS_UTF8=y
+ CONFIG_PRINTK_TIME=y
+ CONFIG_DYNAMIC_DEBUG=y
+ CONFIG_DEBUG_INFO=y
+@@ -319,7 +320,18 @@ CONFIG_DEBUG_RT_MUTEXES=y
+ CONFIG_DEBUG_SPINLOCK=y
+ CONFIG_DEBUG_MUTEXES=y
+ CONFIG_DEBUG_USER=y
++CONFIG_CRYPTO_RSA=m
++CONFIG_CRYPTO_DH=m
+ CONFIG_CRYPTO_USER=m
++CONFIG_CRYPTO_TEST=m
++CONFIG_CRYPTO_LRW=m
++CONFIG_CRYPTO_XTS=m
++CONFIG_CRYPTO_MD5=m
++CONFIG_CRYPTO_SHA512=m
++CONFIG_CRYPTO_SHA3=m
++CONFIG_CRYPTO_SALSA20=m
++CONFIG_CRYPTO_LZO=m
++CONFIG_CRYPTO_LZ4=m
+ CONFIG_CRYPTO_USER_API_HASH=m
+ CONFIG_CRYPTO_USER_API_SKCIPHER=m
+ CONFIG_CRYPTO_USER_API_RNG=m
+@@ -331,6 +343,7 @@ CONFIG_CRYPTO_SHA1_ARM_NEON=m
+ CONFIG_CRYPTO_SHA256_ARM=m
+ CONFIG_CRYPTO_SHA512_ARM=m
+ CONFIG_CRYPTO_AES_ARM_BS=m
++CONFIG_CRYPTO_CHACHA20_NEON=m
+ CONFIG_CRC_CCITT=y
+ CONFIG_FONTS=y
+ CONFIG_FONT_7x14=y
 -- 
 2.9.3
