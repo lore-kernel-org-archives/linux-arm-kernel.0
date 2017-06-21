@@ -1,34 +1,45 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 21 Jun 2017 10:08:03 +0100
-Subject: [PATCH 1/1] iommu/arm-smmu-v3: replace writel with
- writel_relaxed in queue_inc_prod
-In-Reply-To: <5949CBB7.1030908@huawei.com>
-References: <1497956694-11784-1-git-send-email-thunder.leizhen@huawei.com>
- <acafb87c-4ba9-4a44-f868-c8f882717ab1@arm.com>
- <5949CBB7.1030908@huawei.com>
-Message-ID: <20170621090803.GB3768@arm.com>
+Date: Wed, 21 Jun 2017 10:08:15 +0100
+Subject: [PATCH v10 2/3] arm/syscalls: Check address limit on user-mode
+ return
+In-Reply-To: <CAJcbSZG8KH7kw5HMP-7HvfHh2RdAfGnOqjOibHr5H42tORRGCw@mail.gmail.com>
+References: <20170615011203.144108-1-thgarnie@google.com>
+ <20170615011203.144108-2-thgarnie@google.com>
+ <CAGXu5jLR7io8u-M8tqbYW22C+sb2a2wSYLRBqJ_dguT4x+1tsQ@mail.gmail.com>
+ <CAJcbSZG8KH7kw5HMP-7HvfHh2RdAfGnOqjOibHr5H42tORRGCw@mail.gmail.com>
+Message-ID: <20170621090815.GC3768@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 21, 2017 at 09:28:23AM +0800, Leizhen (ThunderTown) wrote:
-> On 2017/6/20 19:35, Robin Murphy wrote:
-> > On 20/06/17 12:04, Zhen Lei wrote:
-> >> This function is protected by spinlock, and the latter will do memory
-> >> barrier implicitly. So that we can safely use writel_relaxed. In fact, the
-> >> dmb operation will lengthen the time protected by lock, which indirectly
-> >> increase the locking confliction in the stress scene.
-> > 
-> > If you remove the DSB between writing the commands (to Normal memory)
-> > and writing the pointer (to Device memory), how can you guarantee that
-> > the complete command is visible to the SMMU and it isn't going to try to
-> > consume stale memory contents? The spinlock is irrelevant since it's
-> > taken *before* the command is written.
-> OK, I see, thanks. Let's me see if there are any other methods. And I think
-> that this may should be done well by hardware.
+On Tue, Jun 20, 2017 at 01:31:14PM -0700, Thomas Garnier wrote:
+> On Tue, Jun 20, 2017 at 1:18 PM, Kees Cook <keescook@chromium.org> wrote:
+> > On Wed, Jun 14, 2017 at 6:12 PM, Thomas Garnier <thgarnie@google.com> wrote:
+> >> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+> >> index eb5cd77bf1d8..e33c32d56193 100644
+> >> --- a/arch/arm/kernel/entry-common.S
+> >> +++ b/arch/arm/kernel/entry-common.S
+> >> @@ -41,7 +41,9 @@ ret_fast_syscall:
+> >>   UNWIND(.cantunwind    )
+> >>         disable_irq_notrace                     @ disable interrupts
+> >>         ldr     r1, [tsk, #TI_FLAGS]            @ re-check for syscall tracing
+> >> -       tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
+> >> +       tst     r1, #_TIF_SYSCALL_WORK
+> >> +       bne     fast_work_pending
+> >> +       tst     r1, #_TIF_WORK_MASK
+> >
+> > (IIUC) MOV32 is 2 cycles (MOVW, MOVT), and each TST above is 1 cycle
+> > and each BNE is 1 cycle (when not taken). So:
+> >
+> > mov32 r2, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
+> > tst r1, r2
+> > bne fast_work_pending
+> >
+> > is 4 cycles and tst, bne, tst, bne is also 4 cycles. Would mov32 be
+> > more readable (since it keeps the flags together)?
+> 
+> I guess it would be more readable. Any opinion from the arm folks?
 
-FWIW, I did use the _relaxed variants wherever I could when I wrote the
-driver. There might, of course, be bugs, but it's not like the normal case
-for drivers where the author didn't consider the _relaxed accessors
-initially.
+The mov32 sequence is probably better, but statically attributing cycles
+on a per instruction basis is pretty futile on modern CPUs.
 
 Will
