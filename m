@@ -1,45 +1,79 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 21 Jun 2017 10:08:15 +0100
-Subject: [PATCH v10 2/3] arm/syscalls: Check address limit on user-mode
- return
-In-Reply-To: <CAJcbSZG8KH7kw5HMP-7HvfHh2RdAfGnOqjOibHr5H42tORRGCw@mail.gmail.com>
-References: <20170615011203.144108-1-thgarnie@google.com>
- <20170615011203.144108-2-thgarnie@google.com>
- <CAGXu5jLR7io8u-M8tqbYW22C+sb2a2wSYLRBqJ_dguT4x+1tsQ@mail.gmail.com>
- <CAJcbSZG8KH7kw5HMP-7HvfHh2RdAfGnOqjOibHr5H42tORRGCw@mail.gmail.com>
-Message-ID: <20170621090815.GC3768@arm.com>
+Date: Wed, 21 Jun 2017 10:08:35 +0100
+Subject: [PATCH v8 3/3] iommu/arm-smmu-v3: Add workaround for Cavium
+ ThunderX2 erratum #126
+In-Reply-To: <CANHdaiYb8gG5+OjiSBkSGfyNnt4=WDze08qW1JXA9-F66HE9ZA@mail.gmail.com>
+References: <1497968259-16390-1-git-send-email-gakula@caviumnetworks.com>
+ <1497968259-16390-4-git-send-email-gakula@caviumnetworks.com>
+ <20170620180038.GC28035@arm.com>
+ <CANHdaiYb8gG5+OjiSBkSGfyNnt4=WDze08qW1JXA9-F66HE9ZA@mail.gmail.com>
+Message-ID: <20170621090835.GD3768@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 01:31:14PM -0700, Thomas Garnier wrote:
-> On Tue, Jun 20, 2017 at 1:18 PM, Kees Cook <keescook@chromium.org> wrote:
-> > On Wed, Jun 14, 2017 at 6:12 PM, Thomas Garnier <thgarnie@google.com> wrote:
-> >> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-> >> index eb5cd77bf1d8..e33c32d56193 100644
-> >> --- a/arch/arm/kernel/entry-common.S
-> >> +++ b/arch/arm/kernel/entry-common.S
-> >> @@ -41,7 +41,9 @@ ret_fast_syscall:
-> >>   UNWIND(.cantunwind    )
-> >>         disable_irq_notrace                     @ disable interrupts
-> >>         ldr     r1, [tsk, #TI_FLAGS]            @ re-check for syscall tracing
-> >> -       tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
-> >> +       tst     r1, #_TIF_SYSCALL_WORK
-> >> +       bne     fast_work_pending
-> >> +       tst     r1, #_TIF_WORK_MASK
-> >
-> > (IIUC) MOV32 is 2 cycles (MOVW, MOVT), and each TST above is 1 cycle
-> > and each BNE is 1 cycle (when not taken). So:
-> >
-> > mov32 r2, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
-> > tst r1, r2
-> > bne fast_work_pending
-> >
-> > is 4 cycles and tst, bne, tst, bne is also 4 cycles. Would mov32 be
-> > more readable (since it keeps the flags together)?
-> 
-> I guess it would be more readable. Any opinion from the arm folks?
+Hi Geetha,
 
-The mov32 sequence is probably better, but statically attributing cycles
-on a per instruction basis is pretty futile on modern CPUs.
+On Wed, Jun 21, 2017 at 12:09:45PM +0530, Geetha Akula wrote:
+> On Tue, Jun 20, 2017 at 11:30 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Tue, Jun 20, 2017 at 07:47:39PM +0530, Geetha sowjanya wrote:
+> >> From: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
+> >>
+> >> Cavium ThunderX2 SMMU doesn't support MSI and also doesn't have unique irq
+> >> lines for gerror, eventq and cmdq-sync.
+> >>
+> >> SHARED_IRQ option is set as a errata workaround, which allows to share the irq
+> >> line by register single irq handler for all the interrupts.
+> >>
+> >> Signed-off-by: Geetha sowjanya <gakula@caviumnetworks.com>
+> >> ---
+> >>  .../devicetree/bindings/iommu/arm,smmu-v3.txt      |    5 ++
+> >>  drivers/iommu/arm-smmu-v3.c                        |   73 ++++++++++++++++----
+> >>  2 files changed, 64 insertions(+), 14 deletions(-)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
+> >> index 6ecc48c..44b40e0 100644
+> >> --- a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
+> >> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
+> >> @@ -55,6 +55,11 @@ the PCIe specification.
+> >>                     Set for Caviun ThunderX2 silicon that doesn't support
+> >>                     SMMU page1 register space.
+> >>
+> >> +- cavium,cn9900-broken-unique-irqline
+> >> +                    : Use single irq line for all the SMMUv3 interrupts.
+> >> +                   Set for Caviun ThunderX2 silicon that doesn't support
+> >> +                   MSI and also doesn't have unique irq lines for gerror,
+> >> +                   eventq and cmdq-sync.
+> >
+> > I think we're better off just supporting a new (optional) named interrupt
+> > as "combined", and then allowing that to be used instead of the others.
+> 
+> Are you suggesting to have new name irq "combined" like gerror ?
+> If yes, then this won't be possible with apci. We need to update iort spec to
+> add new name irq.
+
+I'm mainly talking about the DT binding here, but I don't see why you
+can't hack drivers/acpi/arm64/iort.c like you did for the other erratum and
+have it register a single interrupt called "combined" based on the model
+number.
+
+> >> +                                     arm_smmu_shared_irq_thread,
+> >> +                                     IRQF_ONESHOT | IRQF_SHARED,
+> >
+> > Why do you need IRQF_SHARED here?
+> 
+> 
+> +devm_request_threaded_irq(smmu->dev, irq,
+> +                                       arm_smmu_combined_irq_handler,
+> +                                       arm_smmu_combined_irq_thread,
+> +                                       IRQF_SHARED,
+> +                                       "arm-smmu-v3-combined-irq", smmu);
+> 
+> On multi-node system, node1 SMMU's share irq lines with node0 SMMU's.
+
+How does that work? Are these really MSIs under the hood? If so, why didn't
+you just build them as... MSIs?
+
+I sincerely hope that you never want to support paging of DMA memory on this
+platform. It will run like a dog.
 
 Will
