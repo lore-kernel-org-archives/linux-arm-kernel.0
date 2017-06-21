@@ -1,27 +1,37 @@
-From: Bart.VanAssche@wdc.com (Bart Van Assche)
-Date: Wed, 21 Jun 2017 20:26:07 +0000
-Subject: [PATCH] ARM: Fix rd_size declaration
-In-Reply-To: <20170503194600.16089-1-bart.vanassche@sandisk.com>
-References: <20170503194600.16089-1-bart.vanassche@sandisk.com>
-Message-ID: <1498076766.26050.1.camel@wdc.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 21 Jun 2017 22:35:02 +0200
+Subject: [PATCH v2 1/3] input: sun4i-a10-lradc-keys: Add support for A83T
+In-Reply-To: <20170620134445.23097-2-techping.chan@gmail.com>
+References: <20170620134445.23097-1-techping.chan@gmail.com>
+ <20170620134445.23097-2-techping.chan@gmail.com>
+Message-ID: <20170621203502.ng7auh6vfmibobwo@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-05-03 at 12:46 -0700, Bart Van Assche wrote:
-> The global variable 'rd_size' is declared as 'int' in source file
-> arch/arm/kernel/atags_parse.c and as 'unsigned long' in
-> drivers/block/brd.c. Fix this inconsistency. Additionally, remove
-> the declarations of rd_image_start, rd_prompt and rd_doload from
-> parse_tag_ramdisk() since these duplicate existing declarations
-> in <linux/initrd.h>.
+On Tue, Jun 20, 2017 at 09:44:43PM +0800, Ziping Chen wrote:
+> From: Ziping Chen <techping.chan@gmail.com>
+> 
+> Allwinner A83T SoC has a low res adc like the one
+> in Allwinner A10 SoC, however, the A10 SoC's vref
+> of lradc internally is divided by 2/3 and the A83T
+> SoC's isn't, thus add a hardware variant for it to
+> be compatible with various devices.
 
-(replying to my own e-mail)
+Where did you get that info from?
 
-Hello Russell,
+Judging from the user manual, the threshold is actually set to 3/4,
+and not 2/3, but there's still one.
 
-Did I send this patch to the right maintainer? If so, do you want to share
-any feedback about this patch?
+Maxime
 
-Thanks,
-
-Bart.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170621/19305b2d/attachment-0001.sig>
