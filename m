@@ -1,74 +1,30 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 21 Jun 2017 12:16:55 +0100
-Subject: Applied "spi/bcm63xx: Fix checkpatch warnings" to the spi tree
-In-Reply-To: <1497890980-4334-1-git-send-email-aravind.thk@gmail.com>
-Message-ID: <E1dNdd1-0004O6-8u@debutante>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 21 Jun 2017 19:32:21 +0800
+Subject: [GIT PULL] ZTE arm64 device tree updates for 4.13
+Message-ID: <20170621113220.GB3372@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 
-   spi/bcm63xx: Fix checkpatch warnings
+  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 
-has been applied to the spi tree at
+are available in the git repository at:
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/zte-dt64-4.13
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+for you to fetch changes up to 61c9e029912d4962c52361f0f7cb5f77c405f08b:
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+  arm64: dts: zte: Use - instead of @ for DT OPP entries (2017-06-21 19:05:38 +0800)
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+----------------------------------------------------------------
+ZTE arm64 device tree updates for 4.13:
+ - Fix DTC unit_address_vs_reg warnings in OPP entries by replacing
+   '@' with '-' as the OPP nodes will never have a "reg" property.
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+----------------------------------------------------------------
+Viresh Kumar (1):
+      arm64: dts: zte: Use - instead of @ for DT OPP entries
 
-Thanks,
-Mark
-
->From b85d65dd47e1606299dc054d2162b795df65c94a Mon Sep 17 00:00:00 2001
-From: Aravind Thokala <aravind.thk@gmail.com>
-Date: Mon, 19 Jun 2017 23:47:48 +0530
-Subject: [PATCH] spi/bcm63xx: Fix checkpatch warnings
-
-This patch fixes the checkpatch.pl warnings on the driver
-file.
-
-Signed-off-by: Aravind Thokala <aravind.thk@gmail.com>
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- drivers/spi/spi-bcm63xx.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/spi/spi-bcm63xx.c b/drivers/spi/spi-bcm63xx.c
-index 247f71b02235..84c7356ce5b4 100644
---- a/drivers/spi/spi-bcm63xx.c
-+++ b/drivers/spi/spi-bcm63xx.c
-@@ -147,7 +147,7 @@ struct bcm63xx_spi {
- 
- 	/* Platform data */
- 	const unsigned long	*reg_offsets;
--	unsigned		fifo_size;
-+	unsigned int		fifo_size;
- 	unsigned int		msg_type_shift;
- 	unsigned int		msg_ctl_width;
- 
-@@ -191,7 +191,7 @@ static inline void bcm_spi_writew(struct bcm63xx_spi *bs,
- #endif
- }
- 
--static const unsigned bcm63xx_spi_freq_table[SPI_CLK_MASK][2] = {
-+static const unsigned int bcm63xx_spi_freq_table[SPI_CLK_MASK][2] = {
- 	{ 20000000, SPI_CLK_20MHZ },
- 	{ 12500000, SPI_CLK_12_50MHZ },
- 	{  6250000, SPI_CLK_6_250MHZ },
--- 
-2.11.0
+ arch/arm64/boot/dts/zte/zx296718.dtsi | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
