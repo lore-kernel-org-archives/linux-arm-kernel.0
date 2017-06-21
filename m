@@ -1,34 +1,29 @@
 From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 21 Jun 2017 12:30:41 -0500
-Subject: [PATCH 2/8] arm64: defconfig: enable BLK_DEV_NVME
-In-Reply-To: <1498066247-22130-1-git-send-email-timur@codeaurora.org>
-References: <1498066247-22130-1-git-send-email-timur@codeaurora.org>
-Message-ID: <1498066247-22130-3-git-send-email-timur@codeaurora.org>
+Date: Wed, 21 Jun 2017 12:30:39 -0500
+Subject: [v3][PATCH 0/8] arm64: defconfig: enable several options useful for
+ ARM64 server platforms
+Message-ID: <1498066247-22130-1-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NVME is non-volatile storage media attached via PCIe. NVME devices
-typically have much higher potential throughput than other block
-devices, like SATA, NVME is a must-have requirement for ARM64 based
-servers.
+ACPI-based ARM64 server platforms based, like the Qualcomm Datacenter
+Technologies QDF2400, need several features and drivers enabled for
+full functionality.  This patchset enables many of those features.
 
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Timur Tabi (8):
+  arm64: defconfig: enable ACPI_CPPC_CPUFREQ
+  arm64: defconfig: enable BLK_DEV_NVME
+  arm64: defconfig: enable EFI_CAPSULE_LOADER
+  arm64: defconfig: enable support for PCIe hotplug
+  arm64: defconfig: enable APEI and GHES features
+  arm64: defconfig: enable EDAC options
+  arm64: defconfig: enable QCOM_L2_PMU and QCOM_L3_PMU
+  [v2] arm64: defconfig: enable Qualcomm Technologies EMAC and some PHY
+    drivers
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index d5cab8ae..c1add12 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -154,6 +154,7 @@ CONFIG_MTD_SPI_NOR=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_NBD=m
- CONFIG_VIRTIO_BLK=y
-+CONFIG_BLK_DEV_NVME=m
- CONFIG_SRAM=y
- CONFIG_EEPROM_AT25=m
- # CONFIG_SCSI_PROC_FS is not set
+ arch/arm64/configs/defconfig | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
 Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
