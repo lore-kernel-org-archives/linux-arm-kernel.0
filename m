@@ -1,90 +1,86 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 21 Jun 2017 21:21:20 +0200
-Subject: [PATCH 1/9] i2c: designware: Fix system suspend
+Date: Wed, 21 Jun 2017 21:21:21 +0200
+Subject: [PATCH 2/9] PM / ACPI: Restore acpi_subsys_complete()
 In-Reply-To: <1498072888-14782-1-git-send-email-ulf.hansson@linaro.org>
 References: <1498072888-14782-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1498072888-14782-2-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1498072888-14782-3-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit 8503ff166504 ("i2c: designware: Avoid unnecessary resuming
-during system suspend"), may suggest to the PM core to try out the so
-called direct_complete path for system sleep. In this path, the PM core
-treats a runtime suspended device as it's already in a proper low power
-state for system sleep, which makes it skip calling the system sleep
-callbacks for the device, except for the ->prepare() and the ->complete()
+The commit 58a1fbbb2ee8 ("PM / PCI / ACPI: Kick devices that might have
+been reset by firmware"), made PCI's and ACPI's ->complete() callbacks to
+be assigned to a new API called pm_complete_with_resume_check(), which was
+introduced in the same change.
+
+Later it turned out that using pm_complete_with_resume_check() isn't good
+enough for PCI, as it needs additional PCI specific checks, before deciding
+whether runtime resuming the device is needed when running the ->complete()
 callback.
 
-Moreover, under certain circumstances the PM core may unset the
-direct_complete flag for a parent device, in case its child device are
-being system suspended before. In other words, the PM core doesn't skip
-calling the system sleep callbacks, no matter if the device is runtime
-suspended or not.
+This leaves ACPI being the only user of pm_complete_with_resume_check().
+Therefore let's restore ACPI's acpi_subsys_complete(), which was dropped in
+commit 58a1fbbb2ee8 ("PM / PCI / ACPI: Kick devices that might have been
+reset by firmware").
 
-In cases of an i2c slave device, the above situation is triggered.
-Unfortunate, this also breaks the assumption that the i2c device is always
-runtime resumed, whenever the dw_i2c_plat_suspend() callback is being
-invoked, which then leads to a regression.
+This enables us to remove the pm_complete_with_resume_check() API in a
+following change, but it also enables ACPI to add more ACPI specific checks
+in acpi_subsys_complete() if it turns out that is needed.
 
-More precisely, dw_i2c_plat_suspend() then calls clk_core_disable() and
-clk_core_unprepare(), for an already disabled/unprepared clock, leading to
-complaints about clocks calls being wrongly balanced.
-
-In cases when the i2c device is attached to the ACPI PM domain, the problem
-doesn't occur. That's because ACPI's ->suspend() callback, assigned to
-acpi_subsys_suspend(), calls pm_runtime_resume() for the i2c device.
-
-To make a simple fix for this regression, let's runtime resume the i2c
-device in the ->prepare() callback, assigned to dw_i2c_plat_prepare(). This
-prevents the direct_complete path from being executed by the PM core and
-guarantees the dw_i2c_plat_suspend() is called with the i2c device always
-being runtime resumed.
-
-Of course this change is suboptimal, because to always force a runtime
-resume of the i2c device in ->prepare() is a waste, especially in those
-cases when it could have remained runtime suspended during the entire
-system sleep sequence. However, to accomplish that behaviour a bigger
-change is needed, so defer that to future changes not applicable as fixes
-or for stable.
-
-Fixes: 8503ff166504 ("i2c: designware: Avoid unnecessary resuming...")
-Cc: stable at vger.linux.org
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/i2c/busses/i2c-designware-platdrv.c | 11 ++---------
- 1 file changed, 2 insertions(+), 9 deletions(-)
+ drivers/acpi/acpi_lpss.c |  2 +-
+ drivers/acpi/device_pm.c | 19 ++++++++++++++++++-
+ 2 files changed, 19 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-index d1263b8..2b7fa75 100644
---- a/drivers/i2c/busses/i2c-designware-platdrv.c
-+++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-@@ -375,17 +375,11 @@ MODULE_DEVICE_TABLE(of, dw_i2c_of_match);
- #ifdef CONFIG_PM_SLEEP
- static int dw_i2c_plat_prepare(struct device *dev)
- {
--	return pm_runtime_suspended(dev);
--}
--
--static void dw_i2c_plat_complete(struct device *dev)
--{
--	if (dev->power.direct_complete)
--		pm_request_resume(dev);
-+	pm_runtime_resume(dev);
-+	return 0;
- }
- #else
- #define dw_i2c_plat_prepare	NULL
--#define dw_i2c_plat_complete	NULL
- #endif
- 
+diff --git a/drivers/acpi/acpi_lpss.c b/drivers/acpi/acpi_lpss.c
+index 10347e3..d7b6778 100644
+--- a/drivers/acpi/acpi_lpss.c
++++ b/drivers/acpi/acpi_lpss.c
+@@ -879,7 +879,7 @@ static struct dev_pm_domain acpi_lpss_pm_domain = {
  #ifdef CONFIG_PM
-@@ -413,7 +407,6 @@ static int dw_i2c_plat_resume(struct device *dev)
+ #ifdef CONFIG_PM_SLEEP
+ 		.prepare = acpi_subsys_prepare,
+-		.complete = pm_complete_with_resume_check,
++		.complete = acpi_subsys_complete,
+ 		.suspend = acpi_subsys_suspend,
+ 		.suspend_late = acpi_lpss_suspend_late,
+ 		.resume_early = acpi_lpss_resume_early,
+diff --git a/drivers/acpi/device_pm.c b/drivers/acpi/device_pm.c
+index ca02102..d38acbc 100644
+--- a/drivers/acpi/device_pm.c
++++ b/drivers/acpi/device_pm.c
+@@ -964,6 +964,23 @@ int acpi_subsys_prepare(struct device *dev)
+ EXPORT_SYMBOL_GPL(acpi_subsys_prepare);
  
- static const struct dev_pm_ops dw_i2c_dev_pm_ops = {
- 	.prepare = dw_i2c_plat_prepare,
--	.complete = dw_i2c_plat_complete,
- 	SET_SYSTEM_SLEEP_PM_OPS(dw_i2c_plat_suspend, dw_i2c_plat_resume)
- 	SET_RUNTIME_PM_OPS(dw_i2c_plat_suspend, dw_i2c_plat_resume, NULL)
- };
+ /**
++ * acpi_subsys_complete - Finalize device's resume during system resume.
++ * @dev: Device to handle.
++ */
++void acpi_subsys_complete(struct device *dev)
++{
++	pm_generic_complete(dev);
++	/*
++	 * If the device had been runtime-suspended before the system went into
++	 * the sleep state it is going out of and it has never been resumed till
++	 * now, resume it in case the firmware powered it up.
++	 */
++	if (dev->power.direct_complete && pm_resume_via_firmware())
++		pm_request_resume(dev);
++}
++EXPORT_SYMBOL_GPL(acpi_subsys_complete);
++
++/**
+  * acpi_subsys_suspend - Run the device driver's suspend callback.
+  * @dev: Device to handle.
+  *
+@@ -1031,7 +1048,7 @@ static struct dev_pm_domain acpi_general_pm_domain = {
+ 		.runtime_resume = acpi_subsys_runtime_resume,
+ #ifdef CONFIG_PM_SLEEP
+ 		.prepare = acpi_subsys_prepare,
+-		.complete = pm_complete_with_resume_check,
++		.complete = acpi_subsys_complete,
+ 		.suspend = acpi_subsys_suspend,
+ 		.suspend_late = acpi_subsys_suspend_late,
+ 		.resume_early = acpi_subsys_resume_early,
 -- 
 2.7.4
