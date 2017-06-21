@@ -1,36 +1,82 @@
-From: daniel@iogearbox.net (Daniel Borkmann)
-Date: Wed, 21 Jun 2017 21:53:27 +0200
-Subject: [PATCH v2] arm: eBPF JIT compiler
-In-Reply-To: <CAHgaXdKm6atQ=XkrQf+ShKtPU7=H+pS2VvPsTXXhz2yzOFunmA@mail.gmail.com>
-References: <1495754003-21099-1-git-send-email-illusionist.neo@gmail.com>
- <CAGXu5jKmLNMR+uhM9Ov2XPW6kCjip_SjScgEH0fTFp6fQtKFiA@mail.gmail.com>
- <593E6B0F.8070901@iogearbox.net>
- <CAHgaXd+DW2bggto=2S9hOdMrtPTvhD2QN4rPf2V8iHewQpg-YA@mail.gmail.com>
- <CAHgaXdJrvKdzr3fJ1TMkC4foeVsZJDSVEwhDOeZGxQVsmoK2cQ@mail.gmail.com>
- <59419D1E.2060303@iogearbox.net>
- <CAHgaXdKMbFPgy-kKF0iDSAYo4CqLn9FRu9HwM+OfM-JWb9fNRQ@mail.gmail.com>
- <594813AA.5010001@iogearbox.net>
- <CAHgaXdLtX6yLdU3bMvS=g8FZ79sM_BW_+hHTMH=Mfk4TZqUnpw@mail.gmail.com>
- <59495367.3080402@iogearbox.net>
- <CAHgaXdKGJFh8jO44gwCqe0cijoztf39bK9k8ioBtYDjzb4vvZw@mail.gmail.com>
- <594A9FA5.1080003@iogearbox.net>
- <CAHgaXdKm6atQ=XkrQf+ShKtPU7=H+pS2VvPsTXXhz2yzOFunmA@mail.gmail.com>
-Message-ID: <594ACEB7.2030707@iogearbox.net>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Wed, 21 Jun 2017 21:05:38 +0100
+Subject: [PATCH v2 1/8] dt-bindings: mfd: Add STM32 LPTimer binding
+In-Reply-To: <1498055415-31513-2-git-send-email-fabrice.gasnier@st.com>
+References: <1498055415-31513-1-git-send-email-fabrice.gasnier@st.com>
+ <1498055415-31513-2-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20170621210538.568b0440@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/21/2017 09:37 PM, Shubham Bansal wrote:
-> Hi Daniel,
->
-> Good news. Got the CALL to work.
->
-> [  145.670882] test_bpf: Summary: 316 PASSED, 0 FAILED, [287/308 JIT'ed]
->
-> Awesome. Do you think with this implementation, the patch could get
-> accepted? If you think so, then I will send the patch in couple of
-> days after some refactoring, if not, then do let me know what more is
-> required?
+On Wed, 21 Jun 2017 16:30:08 +0200
+Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
 
-Nice, it's ultimately up to the arm folks to review the set in-depth,
-but feel free to send out the patch once you're done refactoring. With
-BPF_CALL support that looks quite good from pov of supported insns.
+> Add documentation for STMicroelectronics STM32 Low-Power Timer binding.
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Looks sensible to me.
+
+Acked-by: Jonathan Cameron <jic23@kernel.org>
+> ---
+> Changes in v2:
+> - Lee's comments: s/Low Power/Low-Power/, remove 0x in example, improve
+>   properties descriptions
+> ---
+>  .../devicetree/bindings/mfd/stm32-lptimer.txt      | 48 ++++++++++++++++++++++
+>  1 file changed, 48 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt b/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
+> new file mode 100644
+> index 0000000..af859c8
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
+> @@ -0,0 +1,48 @@
+> +STMicroelectronics STM32 Low-Power Timer
+> +
+> +The STM32 Low-Power Timer (LPTIM) is a 16-bit timer that provides several
+> +functions:
+> +- PWM output (with programmable prescaler, configurable polarity)
+> +- Quadrature encoder, counter
+> +- Trigger source for STM32 ADC/DAC (LPTIM_OUT)
+> +
+> +Required properties:
+> +- compatible:		Must be "st,stm32-lptimer".
+> +- reg:			Offset and length of the device's register set.
+> +- clocks:		Phandle to the clock used by the LP Timer module.
+> +- clock-names:		Must be "mux".
+> +- #address-cells:	Should be '<1>'.
+> +- #size-cells:		Should be '<0>'.
+> +
+> +Optional subnodes:
+> +- pwm:			See ../pwm/pwm-stm32-lp.txt
+> +- counter:		See ../iio/timer/stm32-lptimer-cnt.txt
+> +- trigger:		See ../iio/timer/stm32-lptimer-trigger.txt
+> +
+> +Example:
+> +
+> +	lptimer1: lptimer at 40002400 {
+> +		compatible = "st,stm32-lptimer";
+> +		reg = <0x40002400 0x400>;
+> +		clocks = <&timer_clk>;
+> +		clock-names = "mux";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		pwm {
+> +			compatible = "st,stm32-pwm-lp";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&lppwm1_pins>;
+> +		};
+> +
+> +		trigger at 0 {
+> +			compatible = "st,stm32-lptimer-trigger";
+> +			reg = <0>;
+> +		};
+> +
+> +		counter {
+> +			compatible = "st,stm32-lptimer-counter";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&lptim1_in_pins>;
+> +		};
+> +	};
