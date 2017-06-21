@@ -1,42 +1,66 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 21 Jun 2017 15:32:39 +0200
-Subject: new dma-mapping tree,
- was Re: clean up and modularize arch dma_mapping interface V2
-In-Reply-To: <20170620131623.GB30769@lst.de>
-References: <20170616181059.19206-1-hch@lst.de> <20170620124140.GA27163@lst.de>
- <20170620230400.1a5ae889@canb.auug.org.au>
- <CGME20170620131628epcas1p4f21d821bd414cba7e2d49abcbe414365@epcas1p4.samsung.com>
- <20170620131623.GB30769@lst.de>
-Message-ID: <5425587c-73e8-e24a-86a3-8a65a7791dcb@samsung.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 21 Jun 2017 15:30:42 +0200
+Subject: [PATCH v4 4/6] irqchip: irq-mvebu-icu: new driver for Marvell ICU
+In-Reply-To: <8c085bb8-9bfa-90f7-1dd1-f4f5eb852402@arm.com>
+References: <20170620140722.31646-1-thomas.petazzoni@free-electrons.com>
+ <20170620140722.31646-5-thomas.petazzoni@free-electrons.com>
+ <8c085bb8-9bfa-90f7-1dd1-f4f5eb852402@arm.com>
+Message-ID: <20170621153042.05237000@windsurf.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoph,
+Hello,
 
-On 2017-06-20 15:16, Christoph Hellwig wrote:
-> On Tue, Jun 20, 2017 at 11:04:00PM +1000, Stephen Rothwell wrote:
->> git://git.linaro.org/people/mszyprowski/linux-dma-mapping.git#dma-mapping-next
->>
->> Contacts: Marek Szyprowski and Kyungmin Park (cc'd)
->>
->> I have called your tree dma-mapping-hch for now.  The other tree has
->> not been updated since 4.9-rc1 and I am not sure how general it is.
->> Marek, Kyungmin, any comments?
-> I'd be happy to join efforts - co-maintainers and reviers are always
-> welcome.
+On Wed, 21 Jun 2017 08:56:24 +0100, Marc Zyngier wrote:
 
-I did some dma-mapping unification works in the past and my tree in 
-linux-next
-was a side effect of that. I think that for now it can be dropped in 
-favor of
-Christoph's tree. I can also do some review and help in maintainers work if
-needed, although I was recently busy with other stuff.
+> > +static void mvebu_icu_write_msg(struct msi_desc *desc, struct msi_msg *msg)
+> > +{
+> > +	struct irq_data *d = irq_get_irq_data(desc->irq);
+> > +	struct mvebu_icu_irq_data *icu_irqd = d->chip_data;
+> > +	struct mvebu_icu *icu = icu_irqd->icu;
+> > +	unsigned int icu_int;
+> > +
+> > +	if (msg->address_lo) {  
+> 
+> As mention in the previous thread, this needs to check address_hi as well.
 
-Christoph: Could you add me to your MAINTAINERS patch, so further 
-dma-mapping
-related patches hopefully will be also CC: to me?
+Fixed in v5.
 
-Best regards
+> > +	gicp_dn = of_parse_phandle(node, "msi-parent", 0);
+> > +	if (!gicp_dn) {
+> > +		dev_err(&pdev->dev, "Missing marvell,gicp property.\n");  
+> 
+> The property name doesn't match here. But overall, there is little point
+> in reparsing the msi-parent, since that's what of_msi_get_domain does.
+> Instead, consider using:
+> 
+> 	gicp_dn = irq_domain_get_of_node(pdev->dev.msi_domain);
+> 
+> which will do the right thing.
+
+Fixed in v5.
+
+
+> With the two minor changes above, and for patch #3 as well:
+> 
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Thanks! Tags added in v5.
+
+> I can either perform the changes when applying the patches, or let you
+> do it so that you can test it first (and solve the issue with the DT
+> include fine with Gregory).
+
+I've sent a v5 that fixes the different issues you pointed out, and
+also fixes the DT include problem. Tested on HW, it still works as
+expected.
+
+Thanks again for the review!
+
+Best regards,
+
+Thomas
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
