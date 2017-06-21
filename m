@@ -1,48 +1,95 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 20 Jun 2017 22:03:36 -0700
-Subject: [PATCH] ARM: qcom_defconfig: enable RPMSG_QCOM_SMD
-In-Reply-To: <20170615061521.21292-1-bshah@kde.org>
-References: <20170615061521.21292-1-bshah@kde.org>
-Message-ID: <20170621050335.GI17640@tuxbook>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 21 Jun 2017 11:07:35 +0530
+Subject: [PATCH 2/6] drivers base/arch_topology: frequency-invariant
+ load-tracking support
+In-Reply-To: <5949BE5F.4020502@codeaurora.org>
+References: <20170608075513.12475-1-dietmar.eggemann@arm.com>
+ <20170608075513.12475-3-dietmar.eggemann@arm.com>
+ <CAOh2x=k1Zr15vAq8LA0+Sg3Cz7o=dL5C-erkEx_py7g56b7BwA@mail.gmail.com>
+ <5949BE5F.4020502@codeaurora.org>
+Message-ID: <20170621053735.GR3942@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ arm at kernel.org
-
-On Wed 14 Jun 23:15 PDT 2017, Bhushan Shah wrote:
-
-> As of commit 5052de8deff56, QCOM_SMD_RPM and various other config
-> options enabled in the qcom_defconfig depends on the RPMSG. If
-> QCOM_SMD_RPM config option is not selected it disables the
-> REGULATOR_QCOM_SMD_RPM and other essential config options.
+On 20-06-17, 17:31, Saravana Kannan wrote:
+> On 06/19/2017 11:17 PM, Viresh Kumar wrote:
+> >On Thu, Jun 8, 2017 at 1:25 PM, Dietmar Eggemann
+> ><dietmar.eggemann@arm.com> wrote:
+> >
+> >>diff --git a/drivers/base/arch_topology.c b/drivers/base/arch_topology.c
+> >
+> >>  static int __init register_cpufreq_notifier(void)
+> >>  {
+> >>+       int ret;
+> >>+
+> >>         /*
+> >>          * on ACPI-based systems we need to use the default cpu capacity
+> >>          * until we have the necessary code to parse the cpu capacity, so
+> >>@@ -225,8 +265,14 @@ static int __init register_cpufreq_notifier(void)
+> >>
+> >>         cpumask_copy(cpus_to_visit, cpu_possible_mask);
+> >>
+> >>-       return cpufreq_register_notifier(&init_cpu_capacity_notifier,
+> >>-                                        CPUFREQ_POLICY_NOTIFIER);
+> >>+       ret = cpufreq_register_notifier(&init_cpu_capacity_notifier,
+> >>+                                       CPUFREQ_POLICY_NOTIFIER);
+> >
+> >Wanted to make sure that we all understand the constraints this is going to add
+> >for the ARM64 platforms.
+> >
+> >With the introduction of this transition notifier, we would not be able to use
+> >the fast-switch path in the schedutil governor. I am not sure if there are any
+> >ARM platforms that can actually use the fast-switch path in future or not
+> >though. The requirement of fast-switch path is that the freq can be changed
+> >without sleeping in the hot-path.
+> >
+> >So, will we ever want fast-switching for ARM platforms ?
+> >
 > 
-> Signed-off-by: Bhushan Shah <bshah@kde.org>
+> I don't think we should go down a path that'll prevent ARM platform from
+> switching over to fast-switching in the future.
 
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Yeah, that's why brought attention to this stuff.
 
-Regards,
-Bjorn
+I think this patch doesn't really need to go down the notifiers way.
 
-> ---
-> I believe this patch should be included in the current rc version as well
-> otherwise boards that depend on pm8941 are not functional (for example   
-> msm8974-hamerhead had emmc not working).                                 
+We can do something like this in the implementation of
+topology_get_freq_scale():
+
+        return (policy->cur << SCHED_CAPACITY_SHIFT) / max;
+
+Though, we would be required to take care of policy structure in this
+case somehow.
+
+> Having said that, I'm not sure I fully agree with the decision to completely
+> disable notifiers in the fast-switching case. How many of the current users
+> of notifiers truly need support for sleeping in the notifier?
+
+Its not just about sleeping here. We do not wish to call too much
+stuff from scheduler hot path. Even if it doesn't sleep.
+
+> Why not make
+> all the transition notifiers atomic? Or at least add atomic transition
+> notifiers that can be registered for separately if the client doesn't need
+> the ability to sleep?
 > 
->  arch/arm/configs/qcom_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
-> index 07666a7a9de5..65356a3a9253 100644
-> --- a/arch/arm/configs/qcom_defconfig
-> +++ b/arch/arm/configs/qcom_defconfig
-> @@ -173,6 +173,7 @@ CONFIG_LEDS_GPIO=y
->  CONFIG_LEDS_PM8058=y
->  CONFIG_LEDS_TRIGGERS=y
->  CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-> +CONFIG_RPMSG_QCOM_SMD=y
->  CONFIG_RTC_CLASS=y
->  CONFIG_RTC_DRV_PM8XXX=y
->  CONFIG_DMADEVICES=y
-> -- 
-> 2.13.0
-> 
+> Most of the clients don't seem like ones that'll need to sleep.
+
+Only if the scheduler maintainers agree to getting these notifiers
+called from hot path, which I don't think is going to happen.
+
+> There are a bunch of generic off-tree drivers (can't upstream them yet
+> because it depends on the bus scaling framework) that also depend on CPUfreq
+> transition notifiers that are going to stop working if fast switching
+> becomes available in the future. So, this decision to disallow transition
+> notifiers is painful for other reasons too.
+
+I think its kind of fine to work without fast switch in those cases,
+as we are anyway ready to call notifiers which may end up taking any
+amount of time.
+
+This case was special as it is affecting entire arch here and so I
+pointed it out.
+
+-- 
+viresh
