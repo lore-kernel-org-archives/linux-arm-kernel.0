@@ -1,78 +1,80 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 21 Jun 2017 13:32:02 +0100
-Subject: [PATCH v5 0/8] Support for contiguous pte hugepages
-In-Reply-To: <20170620140831.6bd835649d475bcf30c3c434@linux-foundation.org>
- (Andrew Morton's message of "Tue, 20 Jun 2017 14:08:31 -0700")
-References: <20170619170145.25577-1-punit.agrawal@arm.com>
- <20170619150133.cb4173220e4e3abd02c6f6d0@linux-foundation.org>
- <871sqezsk2.fsf@e105922-lin.cambridge.arm.com>
- <20170620140831.6bd835649d475bcf30c3c434@linux-foundation.org>
-Message-ID: <87fuety119.fsf@e105922-lin.cambridge.arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 21 Jun 2017 14:35:35 +0200
+Subject: [PATCH 00/51] rtc: stop using rtc deprecated functions
+In-Reply-To: <20170621063443.GA4862@localhost>
+References: <20170620213507.urobmtg34vzubrdq@piout.net>
+ <alpine.DEB.2.20.1706202343120.2157@nanos>
+ <20170621075152.GA15996@amd>
+ <20170621083907.y3gadsmsoufa5niv@piout.net>
+ <20170621063443.GA4862@localhost>
+Message-ID: <20170621123535.b5fvwlydfhnhuqll@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew Morton <akpm@linux-foundation.org> writes:
+On 21/06/2017 at 08:34:43 +0200, Pavel Machek wrote:
+> Hi!
+> 
+> > > > > I think tglx had a plan for offsetting the time at some point so 32-bit
+> > > > > platform can pass 2038 properly.
+> > > > 
+> > > > Yes, but there are still quite some issues to solve there:
+> > > > 
+> > > >      1) How do you tell the system that it should apply the offset in the
+> > > >      	first place, i.e at boot time before NTP or any other mechanism can
+> > > >      	correct it?
+> > > 
+> > > I'd not do offset. Instead, I'd select a threshold (perhaps year of
+> > > release of given kernel?) and
+> > > 
+> > > 	if (rtc_time < year_of_release_of_kernel)
+> > > 	   rtc_time += 0x100000000;
+> > > 
+> > > Ok, we'll have to move away from "rtc_time == 0 indicates zero", as
+> > > seen in some drivers.
+> > > 
+> > > >      2) Deal with creative vendors who have their own idea about the 'start
+> > > >      	of the epoch'
+> > > 
+> > > If someone uses different threshold, well, there will be
+> > > confusion. But only for users that have their rtc set to the past,
+> > > which is quite unusual.
+> > > 
+> > 
+> > Or not, having an RTC set in the past is actually quite common. I'd find
+> > it weird to have a new device boot and be set to a date in the future.
+> 
+> ...but still better than board stuck in the past, no?
+> 
+> > Also note that the threshold or offset thing may seem like a good idea
+> > but fails with many RTCs because of how they handle leap years.
+> 
+> Well, you can still convert time from rtc to unix time, then do adjustment
+> there.
+> 
 
-> On Tue, 20 Jun 2017 14:39:57 +0100 Punit Agrawal <punit.agrawal@arm.com> wrote:
->
->> 
->> The architecture supports two flavours of hugepages -
->> 
->> * Block mappings at the pud/pmd level
->> 
->>   These are regular hugepages where a pmd or a pud page table entry
->>   points to a block of memory. Depending on the PAGE_SIZE in use the
->>   following size of block mappings are supported -
->> 
->>           PMD	PUD
->>           ---	---
->>   4K:      2M	 1G
->>   16K:    32M
->>   64K:   512M
->> 
->>   For certain applications/usecases such as HPC and large enterprise
->>   workloads, folks are using 64k page size but the minimum hugepage size
->>   of 512MB isn't very practical.
->> 
->> To overcome this ...
->> 
->> * Using the Contiguous bit
->> 
->>   The architecture provides a contiguous bit in the translation table
->>   entry which acts as a hint to the mmu to indicate that it is one of a
->>   contiguous set of entries that can be cached in a single TLB entry.
->> 
->>   We use the contiguous bit in Linux to increase the mapping size at the
->>   pmd and pte (last) level.
->> 
->>   The number of supported contiguous entries varies by page size and
->>   level of the page table.
->> 
->>   Using the contiguous bit allows additional hugepage sizes -
->> 
->>            CONT PTE    PMD    CONT PMD    PUD
->>            --------    ---    --------    ---
->>     4K:         64K     2M         32M     1G
->>     16K:         2M    32M          1G
->>     64K:         2M   512M         16G
->> 
->>   Of these, 64K with 4K and 2M with 64K pages have been explicitly
->>   requested by a few different users.
->> 
->> Entries with the contiguous bit set are required to be modified all
->> together - which makes things like memory poisoning and migration
->> impossible to do correctly without knowing the size of hugepage being
->> dealt with - the reason for adding size parameter to a few of the
->> hugepage helpers in this series.
->> 
->
-> Thanks, I added the above to the 1/n changelog.  Perhaps it's worth
-> adding something like this to Documentation/vm/hugetlbpage.txt.
+You can only if your machine is running when that happens. If that is
+not the case, then you lost and your time is not correct anymore.
 
-Yes, it would be useful to have this documented.
+There is currently one rtc doing that kind of trick but it is used as a
+simple time counter from the beginning. Transitioning is the difficult
+part.
 
-I'll send a patch once the architecture bits for re-enabling contiguous
-hugepages are merged.
+> Anyway, I guess it would be cool for rtc drivers to annotate what limits
+> underlying storage has to the common code, so that we can do fixups once
+> per class, not once per driver.
 
-Thanks,
-Punit
+Yes, I'm in the middle of the whole rework that allows that.
+
+I don't understand the sudden urgency of fixing that and the amount of
+bikeshedding, seeing that the closest cutoff date is actually 31st of
+december 2069 in the rtc subsystem and that anyway the current 32bit
+userspace will explode in february 2038.
+
+My plan from the beginning was to have something for the next stable. I
+know nobody can read my mind but again, I don't think there is currently
+any urgency to change anything.
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
