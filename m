@@ -1,74 +1,43 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Wed, 21 Jun 2017 18:48:25 +0200
-Subject: [PATCH v4 20/28] ARM: owl: Implement CPU enable-method for S500
-In-Reply-To: <CAK8P3a2epor2RZzJ1ySp2g-vUSTj+miWNJC26uYU7v3Knq=pvw@mail.gmail.com>
-References: <20170606005426.26446-1-afaerber@suse.de>
- <20170606005426.26446-21-afaerber@suse.de>
- <CAK8P3a1fLABzSc7kej6uw751uoZma1Qvpm7c3mkLB45rcBNQTA@mail.gmail.com>
- <CAK8P3a2epor2RZzJ1ySp2g-vUSTj+miWNJC26uYU7v3Knq=pvw@mail.gmail.com>
-Message-ID: <333b3b63-f3c6-f449-40f0-69c294f4fb7a@suse.de>
+From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
+Date: Wed, 21 Jun 2017 18:54:32 +0200
+Subject: [PATCH] arm64: pass machine size to sparse
+In-Reply-To: <20170621161254.GF6041@arm.com>
+References: <20170620122443.35880-1-luc.vanoostenryck@gmail.com>
+ <20170620154938.GH21131@arm.com>
+ <20170620162431.zi6qd3jby7shyu46@ltop.local>
+ <20170620170401.GA28035@arm.com>
+ <20170620190739.ijtpo3ekibxi47qj@ltop.local>
+ <20170621161254.GF6041@arm.com>
+Message-ID: <20170621165431.lmcwohnxkncgpevs@ltop.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 21.06.2017 um 12:25 schrieb Arnd Bergmann:
-> On Wed, Jun 21, 2017 at 10:16 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Tue, Jun 6, 2017 at 2:54 AM, Andreas F?rber <afaerber@suse.de> wrote:
->>> Allow to bring up CPU1.
->>>
->>> Based on LeMaker linux-actions tree.
->>>
->>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->>> ---
->>>  v3 -> v4: Unchanged
->>>
->>>  v3: new
->>>
->>>  arch/arm/mach-actions/Makefile  |   3 +
->>>  arch/arm/mach-actions/headsmp.S |  68 ++++++++++++++++
->>>  arch/arm/mach-actions/platsmp.c | 166 ++++++++++++++++++++++++++++++++++++++++
->>
->> I now see build errors in linux-next:
->>
->> /git/arm-soc/arch/arm/mach-actions/platsmp.c: In function 'write_pen_release':
->> /git/arm-soc/arch/arm/mach-actions/platsmp.c:39:2: error:
->> 'pen_release' undeclared (first use in this function); did you mean
+On Wed, Jun 21, 2017 at 05:12:54PM +0100, Will Deacon wrote:
+> On Tue, Jun 20, 2017 at 09:07:40PM +0200, Luc Van Oostenryck wrote:
+> > Well, currently sparse is arch agnostic and I think it's a good thing.
+> > For the few arch specifities you have to use some of the '-m' flags
+> > (like -m32/-m64, -msize-long). So, for the moment the '-m64' flag
+> > is needed, thus the patch.
 > 
-> I have a fix and tested it now. Please fold this into your patch:
-> 
->        Arnd
-> 
-> Subject: [PATCH] ARM: owl: fix non-SMP build
-> 
-> arch/arm/mach-actions/platsmp.c: In function 'write_pen_release':
-> arch/arm/mach-actions/platsmp.c:39:2: error: 'pen_release' undeclared
-> (first use in this function); did you mean 'seq_release'?
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> diff --git a/arch/arm/mach-actions/Makefile b/arch/arm/mach-actions/Makefile
-> index 217e95d04b43..94f8dbafba21 100644
-> --- a/arch/arm/mach-actions/Makefile
-> +++ b/arch/arm/mach-actions/Makefile
-> @@ -1,4 +1,4 @@
-> -obj-$(CONFIG_ARCH_ACTIONS) += owl.o
-> -obj-${CONFIG_ARCH_ACTIONS} += platsmp.o headsmp.o
-> +obj-y += owl.o
-> +obj-$(CONFIG_SMP) += platsmp.o headsmp.o
+> Ok, I'll pick your patch up then. The endianness case is more interesting,
+> because I don't think __BIG_ENDIAN__ and __LITTLE_ENDIAN__ are the defines
+> to use; the kernel seems to omit the trailing underscores afaict.
 
-Sorry. Fixed up the two patches, thanks!
+I just checked, it's a bit messy.
+The kernel seems to rely, at least partly, maybe mostly, on
+CONFIG_CPU_{BIG,LITTLE}_ENDIAN and then __{BIG,LITTLE}_ENDIAN is
+defined via include/uapi/linux/byteorder/{big,little}_endian.h
 
-Interestingly the below issue had been found by automatic patch testing,
-but the above wasn't. Maybe you can contribute your non-SMP config for
-the bots, to help catch this earlier?
+Otherwise, from the compiler side it seems that __BYTE_ORDER__ &
+__ORDER_{BIG,LITTLE}_ENDIAN__ is defined consistently.
+But, for example for arm64, 'gcc -mlittle-endian' gives
+	#define __LITTLE_ENDIAN__ 1
+while 'gcc -mbig-endian' doesn't define __BIG_ENDIAN__ but
+	#define __ARM_BIG_ENDIAN 1
 
-> 
->  AFLAGS_headsmp.o := -Wa,-march=armv7-a
-> 
+*shrugh*
 
-Cheers,
-Andreas
+I've added support for the -m{big,little}-endian flag to sparse
+but it seems it will be more complicated for the defines.
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+-- Luc
