@@ -1,54 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 21 Jun 2017 17:12:54 +0100
-Subject: [PATCH] arm64: pass machine size to sparse
-In-Reply-To: <20170620190739.ijtpo3ekibxi47qj@ltop.local>
-References: <20170620122443.35880-1-luc.vanoostenryck@gmail.com>
- <20170620154938.GH21131@arm.com>
- <20170620162431.zi6qd3jby7shyu46@ltop.local>
- <20170620170401.GA28035@arm.com>
- <20170620190739.ijtpo3ekibxi47qj@ltop.local>
-Message-ID: <20170621161254.GF6041@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 21 Jun 2017 17:13:21 +0100
+Subject: [PATCH 2/2] ASoC: zx_aud96p22: add ZTE ZX AUD96P22 codec driver
+In-Reply-To: <20170621160340.GE3372@dragon>
+References: <1497708574-22380-1-git-send-email-shawnguo@kernel.org>
+ <1497708574-22380-3-git-send-email-shawnguo@kernel.org>
+ <20170619161910.siea75hqxgtxhjmp@sirena.org.uk>
+ <20170620031953.GC4818@x250>
+ <20170620124059.r55r363y3y3if6jg@sirena.org.uk>
+ <20170621160340.GE3372@dragon>
+Message-ID: <20170621161321.mstpidbyq55q4mmj@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 09:07:40PM +0200, Luc Van Oostenryck wrote:
-> On Tue, Jun 20, 2017 at 06:04:01PM +0100, Will Deacon wrote:
-> > On Tue, Jun 20, 2017 at 06:24:32PM +0200, Luc Van Oostenryck wrote:
-> > > On Tue, Jun 20, 2017 at 04:49:39PM +0100, Will Deacon wrote:
-> > > > Looks fine to me, but just wondering whether or not we should also be
-> > > > passing something to indicate the endianness of the target. Does sparse care
-> > > > about that?
-> > > 
-> > > Yes, we should. sparse doesn't care per-se but some macros, structures
-> > > or whole portion of code may depends on '__{LITTLE,BIG}_ENDIAN__'
-> > > being defined or not, for example (but I don't think it will make
-> > > a big difference, at least nothing like the 629904 'constant is so big'
-> > > warnings we have now due to the missing -m64).
-> > > 
-> > > For this, you have two possibilities:
-> > > 1) just doing something like PPC:
-> > > 	+ifdef CONFIG_CPU_BIG_ENDIAN
-> > > 	+CHECKFLAGS     += -D__BIG_ENDIAN__
-> > > 	+else
-> > > 	+CHECKFLAGS     += -D__LITTLE_ENDIAN__
-> > > 	+endif
-> > >    This will work now. I can't send you a proper patch if you wish.
-> > > 
-> > > 2) a cleaner solution, IMO, would be to teach sparse about
-> > >    -mlittle-endian/-mbig-endian. In fact I already wrote the patch
-> > >    earlier today. But of course, you will need to wait for the patch
-> > >    to reach sparse's master and then compile sparse yourself or wait
-> > >    for a new release (which shouldn't take much long, though).
-> > 
-> > If you do that, you could also teach it that AArch64 is 64-bit ;)
-> 
-> Well, currently sparse is arch agnostic and I think it's a good thing.
-> For the few arch specifities you have to use some of the '-m' flags
-> (like -m32/-m64, -msize-long). So, for the moment the '-m64' flag
-> is needed, thus the patch.
+On Thu, Jun 22, 2017 at 12:03:41AM +0800, Shawn Guo wrote:
+> On Tue, Jun 20, 2017 at 01:40:59PM +0100, Mark Brown wrote:
 
-Ok, I'll pick your patch up then. The endianness case is more interesting,
-because I don't think __BIG_ENDIAN__ and __LITTLE_ENDIAN__ are the defines
-to use; the kernel seems to omit the trailing underscores afaict.
+> > Sounds like a fairly standard use for a supply widget.
 
-Will
+> Yes, it can be a supply widget.  But it's a bit that controls device
+> overall power rather than any particular component power.  Since every
+> single operation of the device will need this power bit to be on, I
+> think it makes sense to configure the bit in .startup/.shutdown hooks,
+> rather than creating a widget for it and attaches the widget to a bunch
+> of components.
+
+Do it with DAPM - this means any analogue paths will work and there's no
+possibility of refcounting issues.  You will need to create a bunch of
+links but that's pretty easy and it's all data rather than code.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170621/0d62222a/attachment.sig>
