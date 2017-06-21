@@ -1,59 +1,46 @@
-From: tushar.n.dave@oracle.com (tndave)
-Date: Wed, 21 Jun 2017 12:24:28 -0700
-Subject: clean up and modularize arch dma_mapping interface V2
-In-Reply-To: <20170616181059.19206-1-hch@lst.de>
-References: <20170616181059.19206-1-hch@lst.de>
-Message-ID: <162d7932-5766-4c29-5471-07d1b699190a@oracle.com>
+From: illusionist.neo@gmail.com (Shubham Bansal)
+Date: Thu, 22 Jun 2017 01:07:16 +0530
+Subject: [PATCH v2] arm: eBPF JIT compiler
+In-Reply-To: <594A9FA5.1080003@iogearbox.net>
+References: <1495754003-21099-1-git-send-email-illusionist.neo@gmail.com>
+ <CAGXu5jKmLNMR+uhM9Ov2XPW6kCjip_SjScgEH0fTFp6fQtKFiA@mail.gmail.com>
+ <593E6B0F.8070901@iogearbox.net>
+ <CAHgaXd+DW2bggto=2S9hOdMrtPTvhD2QN4rPf2V8iHewQpg-YA@mail.gmail.com>
+ <CAHgaXdJrvKdzr3fJ1TMkC4foeVsZJDSVEwhDOeZGxQVsmoK2cQ@mail.gmail.com>
+ <59419D1E.2060303@iogearbox.net>
+ <CAHgaXdKMbFPgy-kKF0iDSAYo4CqLn9FRu9HwM+OfM-JWb9fNRQ@mail.gmail.com>
+ <594813AA.5010001@iogearbox.net>
+ <CAHgaXdLtX6yLdU3bMvS=g8FZ79sM_BW_+hHTMH=Mfk4TZqUnpw@mail.gmail.com>
+ <59495367.3080402@iogearbox.net>
+ <CAHgaXdKGJFh8jO44gwCqe0cijoztf39bK9k8ioBtYDjzb4vvZw@mail.gmail.com>
+ <594A9FA5.1080003@iogearbox.net>
+Message-ID: <CAHgaXdKm6atQ=XkrQf+ShKtPU7=H+pS2VvPsTXXhz2yzOFunmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Daniel,
+
+Good news. Got the CALL to work.
+
+[  145.670882] test_bpf: Summary: 316 PASSED, 0 FAILED, [287/308 JIT'ed]
+
+Awesome. Do you think with this implementation, the patch could get
+accepted? If you think so, then I will send the patch in couple of
+days after some refactoring, if not, then do let me know what more is
+required?
+
+Best,
+Shubham Bansal
 
 
-On 06/16/2017 11:10 AM, Christoph Hellwig wrote:
-> Hi all,
-> 
-> for a while we have a generic implementation of the dma mapping routines
-> that call into per-arch or per-device operations.  But right now there
-> still are various bits in the interfaces where don't clearly operate
-> on these ops.  This series tries to clean up a lot of those (but not all
-> yet, but the series is big enough).  It gets rid of the DMA_ERROR_CODE
-> way of signaling failures of the mapping routines from the
-> implementations to the generic code (and cleans up various drivers that
-> were incorrectly using it), and gets rid of the ->set_dma_mask routine
-> in favor of relying on the ->dma_capable method that can be used in
-> the same way, but which requires less code duplication.
-Chris,
-
-Thanks for doing this.
-So archs can still have their own definition for dma_set_mask() if 
-HAVE_ARCH_DMA_SET_MASK is y?
-(and similarly for dma_set_coherent_mask() when 
-CONFIG_ARCH_HAS_DMA_SET_COHERENT_MASK is y)
-Any plan to change these?
-
-I'm in a process of making some changes to SPARC iommu so it would be 
-good to know. Thanks.
-
--Tushar
-
-> 
-> I've got a good number of reviews last time, but a few are still missing.
-> I'd love to not have to re-spam everyone with this patchbomb, so early
-> ACKs (or complaints) are welcome.
-> 
-> I plan to create a new dma-mapping tree to collect all this work.
-> Any volunteers for co-maintainers, especially from the iommu gang?
-> 
-> The whole series is also available in git:
-> 
->      git://git.infradead.org/users/hch/misc.git dma-map
-> 
-> Gitweb:
-> 
->      http://git.infradead.org/users/hch/misc.git/shortlog/refs/heads/dma-map
-> 
-> Changes since V1:
->   - remove two lines of code from arm dmabounce
->   - a few commit message tweaks
->   - lots of ACKs
-> 
+On Wed, Jun 21, 2017 at 10:02 PM, Daniel Borkmann <daniel@iogearbox.net> wrote:
+> On 06/21/2017 04:26 PM, Shubham Bansal wrote:
+> [...]
+>>
+>> So ultimately, we call helper_function which takes u64 as arguments
+>> only. I know its asking a lot, but can you please confirm this asap? I
+>> would like to start implementing it.
+>
+>
+> Yes, that is correct. I think it would be the better, more generic
+> approach going forward to always assume that.
