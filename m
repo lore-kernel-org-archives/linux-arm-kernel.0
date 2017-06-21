@@ -1,41 +1,56 @@
-From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
-Date: Wed, 21 Jun 2017 11:37:59 +0300
-Subject: [PATCH 3/5] clk: qcom: gdsc: Add support to control associated
- clks
-In-Reply-To: <cd47a256-ce8d-92be-b5f6-e57c0613f222@codeaurora.org>
-References: <1490076923-20194-1-git-send-email-rnayak@codeaurora.org>
- <1490076923-20194-4-git-send-email-rnayak@codeaurora.org>
- <95d69901-fad5-9a2d-138e-ed5eb9dbc4e2@linaro.org>
- <cd47a256-ce8d-92be-b5f6-e57c0613f222@codeaurora.org>
-Message-ID: <fce92649-04c6-bdc2-ff28-7b682c9cd573@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 21 Jun 2017 10:39:07 +0200
+Subject: [PATCH 00/51] rtc: stop using rtc deprecated functions
+In-Reply-To: <20170621075152.GA15996@amd>
+References: <20170620213507.urobmtg34vzubrdq@piout.net>
+ <alpine.DEB.2.20.1706202343120.2157@nanos>
+ <20170621075152.GA15996@amd>
+Message-ID: <20170621083907.y3gadsmsoufa5niv@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rajendra,
-
-On 06/21/2017 09:11 AM, Rajendra Nayak wrote:
-> Hey Stan,
+On 21/06/2017 at 09:51:52 +0200, Pavel Machek wrote:
+> Hi!
 > 
-> On 06/14/2017 05:10 PM, Stanimir Varbanov wrote:
->> Hi Rajendra,
->>
->> Thanks for the patches!
+> > > I agree with that but not the android guys. They seem to mandate an RTC
+> > > that can store time from 01/01/1970. I don't know much more than that
+> > > because they never cared to explain why that was actually necessary
+> > > (apart from a laconic "this will result in a bad user experience")
+> > > 
+> > > I think tglx had a plan for offsetting the time at some point so 32-bit
+> > > platform can pass 2038 properly.
+> > 
+> > Yes, but there are still quite some issues to solve there:
+> > 
+> >      1) How do you tell the system that it should apply the offset in the
+> >      	first place, i.e at boot time before NTP or any other mechanism can
+> >      	correct it?
 > 
-> thanks for the review, do you plan to use this series to get rid of the mmagic
-> clock handling for vidc, or something else?
-
-yes, I have used those patches in the linaro integration branch based on
-4.11. So far those patches are working as expected.
-
-> Is this a dependency to get your Video driver patches to work?
-> These patches have been on the list for a while and I had asked Stephen to leave
-> these out for now till we find someone using them.
+> I'd not do offset. Instead, I'd select a threshold (perhaps year of
+> release of given kernel?) and
 > 
-> I will fixup based on your review and repost in case its useful for something
-> else on the way upstream.
+> 	if (rtc_time < year_of_release_of_kernel)
+> 	   rtc_time += 0x100000000;
+> 
+> Ok, we'll have to move away from "rtc_time == 0 indicates zero", as
+> seen in some drivers.
+> 
+> >      2) Deal with creative vendors who have their own idea about the 'start
+> >      	of the epoch'
+> 
+> If someone uses different threshold, well, there will be
+> confusion. But only for users that have their rtc set to the past,
+> which is quite unusual.
+> 
 
-yes, please do.
+Or not, having an RTC set in the past is actually quite common. I'd find
+it weird to have a new device boot and be set to a date in the future.
+
+Also note that the threshold or offset thing may seem like a good idea
+but fails with many RTCs because of how they handle leap years.
+
 
 -- 
-regards,
-Stan
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
