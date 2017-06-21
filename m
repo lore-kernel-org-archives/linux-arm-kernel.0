@@ -1,60 +1,54 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 21 Jun 2017 21:16:57 +0200
-Subject: [PATCH 2/4] ARM: exynos_defconfig: Enable NLS_UTF8 and some crypto
- algorithms
+Date: Wed, 21 Jun 2017 21:16:59 +0200
+Subject: [PATCH 4/4] ARM: exynos_defconfig: Enable locking test options
 In-Reply-To: <20170621191659.10929-1-krzk@kernel.org>
 References: <20170621191659.10929-1-krzk@kernel.org>
-Message-ID: <20170621191659.10929-2-krzk@kernel.org>
+Message-ID: <20170621191659.10929-4-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable useful, but not essential components:
- - NLS_UTF8, it might be used for accessing Microsoft-FS based storages,
- - popular crypto algorithms and transformations as modules.
+exynos_defconfig, beside serving as a reference config for Exynos-based
+devices, is used by developers during regular development work.
+Enabling options responsible for locking tests allows to discover bugs
+in drivers and mach code earlier.
+
+This enables:
+1. Detection of sleeping in atomic sections (DEBUG_ATOMIC_SLEEP),
+2. Full lockdep (DEBUG_LOCK_ALLOC and PROVE_LOCKING which makes other
+   lock debug entries unneeded),
+3. Detection of soft, kernel lockups (SOFTLOCKUP_DETECTOR).
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- arch/arm/configs/exynos_defconfig | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/configs/exynos_defconfig | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index e6a976f5305c..dfe43acec129 100644
+index 71b8dbcc1d65..fbd64fc0e692 100644
 --- a/arch/arm/configs/exynos_defconfig
 +++ b/arch/arm/configs/exynos_defconfig
-@@ -308,6 +308,7 @@ CONFIG_ROOT_NFS=y
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ASCII=y
- CONFIG_NLS_ISO8859_1=y
-+CONFIG_NLS_UTF8=y
- CONFIG_PRINTK_TIME=y
- CONFIG_DYNAMIC_DEBUG=y
- CONFIG_DEBUG_INFO=y
-@@ -319,7 +320,18 @@ CONFIG_DEBUG_RT_MUTEXES=y
- CONFIG_DEBUG_SPINLOCK=y
- CONFIG_DEBUG_MUTEXES=y
+@@ -3,7 +3,6 @@ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_CGROUPS=y
+ CONFIG_BLK_DEV_INITRD=y
+-CONFIG_KALLSYMS_ALL=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+ CONFIG_PARTITION_ADVANCED=y
+@@ -316,10 +315,10 @@ CONFIG_DEBUG_INFO=y
+ CONFIG_DEBUG_FS=y
+ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_KERNEL=y
+-CONFIG_LOCKUP_DETECTOR=y
+-CONFIG_DEBUG_RT_MUTEXES=y
+-CONFIG_DEBUG_SPINLOCK=y
+-CONFIG_DEBUG_MUTEXES=y
++CONFIG_SOFTLOCKUP_DETECTOR=y
++# CONFIG_DETECT_HUNG_TASK is not set
++CONFIG_PROVE_LOCKING=y
++CONFIG_DEBUG_ATOMIC_SLEEP=y
  CONFIG_DEBUG_USER=y
-+CONFIG_CRYPTO_RSA=m
-+CONFIG_CRYPTO_DH=m
- CONFIG_CRYPTO_USER=m
-+CONFIG_CRYPTO_TEST=m
-+CONFIG_CRYPTO_LRW=m
-+CONFIG_CRYPTO_XTS=m
-+CONFIG_CRYPTO_MD5=m
-+CONFIG_CRYPTO_SHA512=m
-+CONFIG_CRYPTO_SHA3=m
-+CONFIG_CRYPTO_SALSA20=m
-+CONFIG_CRYPTO_LZO=m
-+CONFIG_CRYPTO_LZ4=m
- CONFIG_CRYPTO_USER_API_HASH=m
- CONFIG_CRYPTO_USER_API_SKCIPHER=m
- CONFIG_CRYPTO_USER_API_RNG=m
-@@ -331,6 +343,7 @@ CONFIG_CRYPTO_SHA1_ARM_NEON=m
- CONFIG_CRYPTO_SHA256_ARM=m
- CONFIG_CRYPTO_SHA512_ARM=m
- CONFIG_CRYPTO_AES_ARM_BS=m
-+CONFIG_CRYPTO_CHACHA20_NEON=m
- CONFIG_CRC_CCITT=y
- CONFIG_FONTS=y
- CONFIG_FONT_7x14=y
+ CONFIG_CRYPTO_RSA=m
+ CONFIG_CRYPTO_DH=m
 -- 
 2.9.3
