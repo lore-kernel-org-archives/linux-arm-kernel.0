@@ -1,37 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 Jun 2017 23:52:59 +0200
-Subject: [PATCH 1/4] ARM/PCI: iop13xx: address uninitialized variable warning
-Message-ID: <20170621215323.3921382-1-arnd@arndb.de>
+Date: Wed, 21 Jun 2017 23:53:00 +0200
+Subject: [PATCH 2/4] ARM/PCI: mv78xx0: pass pci_ops correctly again
+In-Reply-To: <20170621215323.3921382-1-arnd@arndb.de>
+References: <20170621215323.3921382-1-arnd@arndb.de>
+Message-ID: <20170621215323.3921382-2-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The last rework returned a variable that the compiler cannot prove
-to be initialized:
+We used to pass the operations when calling pci_scan_root_bus, but
+that argument was removed:
 
-arch/arm/mach-iop13xx/pci.c: In function 'iop13xx_scan_bus':
-arch/arm/mach-iop13xx/pci.c:509:17: error: 'ret' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+arch/arm/mach-mv78xx0/pcie.c:175:23: error: 'pcie_ops' defined but not used [-Werror=unused-variable]
 
-In the switch statement that sets the return value, this adds
-a default returning an error.
+Setting it in pci_hw should address this.
 
 Fixes: ace27646da8e ("ARM/PCI: Convert PCI scan API to pci_scan_root_bus_bridge()")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-iop13xx/pci.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/mach-mv78xx0/pcie.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-iop13xx/pci.c b/arch/arm/mach-iop13xx/pci.c
-index b97879bfb81a..3c51a9bb9b49 100644
---- a/arch/arm/mach-iop13xx/pci.c
-+++ b/arch/arm/mach-iop13xx/pci.c
-@@ -553,6 +553,8 @@ int iop13xx_scan_bus(int nr, struct pci_host_bridge *bridge)
- 		if (!ret)
- 			pci_bus_atue = bridge->bus;
- 		break;
-+	default:
-+		ret = -EINVAL;
- 	}
+diff --git a/arch/arm/mach-mv78xx0/pcie.c b/arch/arm/mach-mv78xx0/pcie.c
+index 2b406e909a43..cb7f95c9d8eb 100644
+--- a/arch/arm/mach-mv78xx0/pcie.c
++++ b/arch/arm/mach-mv78xx0/pcie.c
+@@ -214,6 +214,7 @@ static int __init mv78xx0_pcie_map_irq(const struct pci_dev *dev, u8 slot,
+ }
  
- 	return ret;
+ static struct hw_pci mv78xx0_pci __initdata = {
++	.ops		= &pcie_ops,
+ 	.nr_controllers	= 8,
+ 	.preinit	= mv78xx0_pcie_preinit,
+ 	.setup		= mv78xx0_pcie_setup,
 -- 
 2.9.0
