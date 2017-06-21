@@ -1,76 +1,130 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 21 Jun 2017 21:21:27 +0200
-Subject: [PATCH 8/9] PM / ACPI: Avoid runtime resuming device in
- acpi_subsys_suspend|freeze()
+Date: Wed, 21 Jun 2017 21:21:25 +0200
+Subject: [PATCH 6/9] PM / ACPI: Provide option to disable direct_complete for
+ ACPI devices
 In-Reply-To: <1498072888-14782-1-git-send-email-ulf.hansson@linaro.org>
 References: <1498072888-14782-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1498072888-14782-9-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1498072888-14782-7-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the case when the no_direct_complete flag is set for the ACPI device, we
-can under some conditions during system sleep, avoid runtime resuming the
-device in acpi_subsys_suspend|freeze(). This will of course improve the
-time it takes for the system to suspend, but also avoid wasting power.
+In some cases a driver for an ACPI device needs to be able to prevent the
+ACPI PM domain from using the direct_complete path during system sleep.
 
-More precisely, from acpi_subsys_suspend|freeze(), let's call
-acpi_dev_needs_resume() when the no_direct_complete flag is set, as it
-tells us when runtime resume of the device is needed, thus let's avoid it
-if possible.
+One typical case is when the driver for the device needs its device to stay
+runtime enabled, during the __device_suspend phase. This isn't the case
+when the direct_complete path is being executed by the PM core, as it then
+disables runtime PM for the device in __device_suspend(). Any following
+attempts to runtime resume the device after that point, just fails.
+
+A workaround to this problem is to let the driver runtime resume its device
+from its ->prepare() callback, as that would prevent the direct_complete
+path from being executed. However, that may often be a waste, especially if
+it turned out that no one really needed the device.
+
+For this reason, invent acpi_dev_disable|enable_direct_complete(), to allow
+drivers to inform the ACPI PM domain to change its default behaviour during
+system sleep, and thus control whether it may use the direct_complete path
+or not.
+
+Typically a driver should call acpi_dev_disable_direct_comlete() during
+->probe() and acpi_dev_enable_direct_complete() in ->remove().
 
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/acpi/device_pm.c | 23 +++++++++++++++++++++--
- 1 file changed, 21 insertions(+), 2 deletions(-)
+ drivers/acpi/device_pm.c | 37 ++++++++++++++++++++++++++++++++++++-
+ include/acpi/acpi_bus.h  |  1 +
+ include/linux/acpi.h     |  4 ++++
+ 3 files changed, 41 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/acpi/device_pm.c b/drivers/acpi/device_pm.c
-index e0324ab..f3061f9 100644
+index ee51e75..2393a1a 100644
 --- a/drivers/acpi/device_pm.c
 +++ b/drivers/acpi/device_pm.c
-@@ -1056,10 +1056,19 @@ EXPORT_SYMBOL_GPL(acpi_subsys_complete);
-  * @dev: Device to handle.
+@@ -879,6 +879,41 @@ EXPORT_SYMBOL_GPL(acpi_subsys_runtime_resume);
+ 
+ #ifdef CONFIG_PM_SLEEP
+ /**
++ * acpi_dev_disable_direct_complete - Disable the direct_complete path for ACPI.
++ * @dev: Device to disable the path for.
++ *
++ * Per default the ACPI PM domain tries to use the direct_complete path for its
++ * devices during system sleep. This function allows a user, typically a driver
++ * during probe, to disable the direct_complete path from being used by ACPI.
++ */
++void acpi_dev_disable_direct_complete(struct device *dev)
++{
++	struct acpi_device *adev = ACPI_COMPANION(dev);
++
++	if (adev)
++		adev->no_direct_complete = true;
++}
++EXPORT_SYMBOL_GPL(acpi_dev_disable_direct_complete);
++
++/**
++ * acpi_dev_enable_direct_complete - Enable the direct_complete path for ACPI.
++ * @dev: Device to enable the path for.
++ *
++ * Enable the direct_complete path to be used during system suspend for the ACPI
++ * PM domain, which is the default option. Typically a driver that disabled the
++ * path during ->probe(), must call this function during ->remove() to re-enable
++ * the direct_complete path to be used by ACPI.
++ */
++void acpi_dev_enable_direct_complete(struct device *dev)
++{
++	struct acpi_device *adev = ACPI_COMPANION(dev);
++
++	if (adev)
++		adev->no_direct_complete = false;
++}
++EXPORT_SYMBOL_GPL(acpi_dev_enable_direct_complete);
++
++/**
+  * acpi_dev_suspend_late - Put device into a low-power state using ACPI.
+  * @dev: Device to put into a low-power state.
   *
-  * Follow PCI and resume devices suspended at run time before running their
-- * system suspend callbacks.
-+ * system suspend callbacks. However, try to avoid it when no_direct_complete
-+ * is set.
-  */
- int acpi_subsys_suspend(struct device *dev)
- {
-+	struct acpi_device *adev = ACPI_COMPANION(dev);
-+
-+	if (!adev)
-+		return 0;
-+
-+	if (adev->no_direct_complete && !acpi_dev_needs_resume(dev, adev))
-+		return pm_generic_suspend(dev);
-+
- 	pm_runtime_resume(dev);
- 	return pm_generic_suspend(dev);
- }
-@@ -1117,12 +1126,22 @@ EXPORT_SYMBOL_GPL(acpi_subsys_resume_early);
-  */
- int acpi_subsys_freeze(struct device *dev)
- {
-+	struct acpi_device *adev = ACPI_COMPANION(dev);
-+
-+	if (!adev)
-+		return 0;
-+
- 	/*
- 	 * This used to be done in acpi_subsys_prepare() for all devices and
- 	 * some drivers may depend on it, so do it here.  Ideally, however,
- 	 * runtime-suspended devices should not be touched during freeze/thaw
--	 * transitions.
-+	 * transitions. At least when no_direct_complete is set, let's try to
-+	 * avoid it.
- 	 */
-+
-+	if (adev->no_direct_complete && !acpi_dev_needs_resume(dev, adev))
-+		return pm_generic_freeze(dev);
-+
- 	pm_runtime_resume(dev);
- 	return pm_generic_freeze(dev);
- }
+@@ -967,7 +1002,7 @@ int acpi_subsys_prepare(struct device *dev)
+ 	if (ret < 0)
+ 		return ret;
+ 
+-	if (!adev || !pm_runtime_suspended(dev))
++	if (!adev || adev->no_direct_complete || !pm_runtime_suspended(dev))
+ 		return 0;
+ 
+ 	return !acpi_dev_needs_resume(dev, adev);
+diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
+index 63a90a6..2293d24 100644
+--- a/include/acpi/acpi_bus.h
++++ b/include/acpi/acpi_bus.h
+@@ -380,6 +380,7 @@ struct acpi_device {
+ 	struct list_head physical_node_list;
+ 	struct mutex physical_node_lock;
+ 	void (*remove)(struct acpi_device *);
++	bool no_direct_complete;
+ };
+ 
+ /* Non-device subnode */
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index 137e4a3..a41cca5 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -859,6 +859,8 @@ static inline int acpi_dev_pm_attach(struct device *dev, bool power_on)
+ #endif
+ 
+ #if defined(CONFIG_ACPI) && defined(CONFIG_PM_SLEEP)
++void acpi_dev_disable_direct_complete(struct device *dev);
++void acpi_dev_enable_direct_complete(struct device *dev);
+ int acpi_dev_suspend_late(struct device *dev);
+ int acpi_dev_resume_early(struct device *dev);
+ int acpi_subsys_prepare(struct device *dev);
+@@ -868,6 +870,8 @@ int acpi_subsys_resume_early(struct device *dev);
+ int acpi_subsys_suspend(struct device *dev);
+ int acpi_subsys_freeze(struct device *dev);
+ #else
++static inline void acpi_dev_disable_direct_complete(struct device *dev) {}
++static inline void acpi_dev_enable_direct_complete(struct device *dev) {}
+ static inline int acpi_dev_suspend_late(struct device *dev) { return 0; }
+ static inline int acpi_dev_resume_early(struct device *dev) { return 0; }
+ static inline int acpi_subsys_prepare(struct device *dev) { return 0; }
 -- 
 2.7.4
