@@ -1,72 +1,175 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Wed, 21 Jun 2017 11:37:04 -0500
-Subject: [GIT PULL] Qualcomm Driver updates for 4.13
-In-Reply-To: <9ae96846-7701-a789-3a7d-dd0e9f81fc60@linaro.org>
-References: <1497383309-14226-1-git-send-email-andy.gross@linaro.org>
- <1497383309-14226-4-git-send-email-andy.gross@linaro.org>
- <20170619053707.GC7703@localhost>
- <20170620144823.GA5203@hector.attlocal.net>
- <9ae96846-7701-a789-3a7d-dd0e9f81fc60@linaro.org>
-Message-ID: <20170621163704.GB5203@hector.attlocal.net>
+From: dietmar.eggemann@arm.com (Dietmar Eggemann)
+Date: Wed, 21 Jun 2017 17:38:28 +0100
+Subject: [PATCH 2/6] drivers base/arch_topology: frequency-invariant
+ load-tracking support
+In-Reply-To: <CAOh2x=k1Zr15vAq8LA0+Sg3Cz7o=dL5C-erkEx_py7g56b7BwA@mail.gmail.com>
+References: <20170608075513.12475-1-dietmar.eggemann@arm.com>
+ <20170608075513.12475-3-dietmar.eggemann@arm.com>
+ <CAOh2x=k1Zr15vAq8LA0+Sg3Cz7o=dL5C-erkEx_py7g56b7BwA@mail.gmail.com>
+Message-ID: <b6ada943-7526-7573-21c4-e773969ebb35@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 21, 2017 at 11:35:02AM +0300, Stanimir Varbanov wrote:
-> Hi,
+On 20/06/17 07:17, Viresh Kumar wrote:
+> On Thu, Jun 8, 2017 at 1:25 PM, Dietmar Eggemann
+> <dietmar.eggemann@arm.com> wrote:
 > 
-> On 06/20/2017 05:48 PM, Andy Gross wrote:
-> > On Sun, Jun 18, 2017 at 10:37:07PM -0700, Olof Johansson wrote:
-> >> Hi Andy,
-> >>
-> >> On Tue, Jun 13, 2017 at 03:48:27PM -0400, Andy Gross wrote:
-> >>> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
-> >>>
-> >>>   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
-> >>>
-> >>> are available in the git repository at:
-> >>>
-> >>>   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-4.13
-> >>>
-> >>> for you to fetch changes up to d4348b43bbcadb6d5faee36024245944b6600d25:
-> >>>
-> >>>   firmware: qcom_scm: Fix to allow COMPILE_TEST-ing (2017-06-09 16:15:10 -0500)
-> >>>
-> >>> ----------------------------------------------------------------
-> >>> Qualcomm ARM Based Driver Updates for v4.13
-> >>>
-> >>> * Fix COMPILE_TEST flag for QCOM SCM
-> >>> * Improve QCOM SMSM error handling
-> >>>
-> >>> ----------------------------------------------------------------
-> >>> Jonathan Neusch??fer (1):
-> >>>       soc: qcom: smsm: Improve error handling, quiesce probe deferral
-> >>>
-> >>> Stanimir Varbanov (1):
-> >>>       firmware: qcom_scm: Fix to allow COMPILE_TEST-ing
-> >>
-> >> This patch doesn't seem like it's doing the right thing -- I've replied to it
-> >> on the list with comments.
-> > 
-> > For some reason I thought it was a rehash of a previous patch and it looked
-> > right to me.  Dropping this looks like the right answer for now.
+>> diff --git a/drivers/base/arch_topology.c b/drivers/base/arch_topology.c
 > 
-> yes, please drop this patch and I'm sorry for the inconvenience. It will
-> need more work than I thought initially.
+>>  static int
+>>  init_cpu_capacity_callback(struct notifier_block *nb,
+>> @@ -185,6 +192,7 @@ init_cpu_capacity_callback(struct notifier_block *nb,
+>>                                cpus_to_visit,
+>>                                policy->related_cpus);
+>>                 for_each_cpu(cpu, policy->related_cpus) {
+>> +                       per_cpu(max_freq, cpu) = policy->cpuinfo.max_freq;
 > 
-> > 
-> >>
-> >> Not merged. Let me know if you want me to cherry-pick the other patch (or send
-> >> a new pull request with just that one).
-> > 
-> > I'll send another pull request today.
+> I am not sure about this but why shouldn't we use policy->max here ?
+> As that is the
+> max, we can set the frequency to right now.
 > 
-> Andy could you also drop the patch from your tree because it breaks
-> linux-next which already has alternative approach to compile test qcom
-> video codec driver.
 
-Done.  I pushed a revised tag and also sent a revised pull request.
+No, frequency invariance is defined by:
 
+ current_freq(cpu) << SCHED_CAPACITY_SHIFT / max_supported_freq(cpu)
 
-Regards,
+We don't want to scale against a value which might be restricted e.g.
+by thermal capping.
 
-Andy
+>>                         if (cap_parsing_failed)
+>>                                 continue;
+>>                         raw_capacity[cpu] = topology_get_cpu_scale(NULL, cpu) *
+
+[...]
+
+>> +static int set_freq_scale_callback(struct notifier_block *nb,
+>> +                                  unsigned long val,
+>> +                                  void *data)
+>> +{
+>> +       struct cpufreq_freqs *freq = data;
+>> +
+>> +       switch (val) {
+>> +       case CPUFREQ_PRECHANGE:
+>> +               set_freq_scale(freq->cpu, freq->new);
+> 
+> Any specific reason on why are we doing this from PRECHANGE and
+> not POSTCHANGE ? i.e. we are doing this before the frequency is
+> really updated.
+
+Not really. In case I get a CPUFREQ_POSTCHANGE all the time the
+frequency actually changed I can switch to CPUFREQ_POSTCHANGE.
+
+[...]
+
+>> @@ -225,8 +265,14 @@ static int __init register_cpufreq_notifier(void)
+>>
+>>         cpumask_copy(cpus_to_visit, cpu_possible_mask);
+>>
+>> -       return cpufreq_register_notifier(&init_cpu_capacity_notifier,
+>> -                                        CPUFREQ_POLICY_NOTIFIER);
+>> +       ret = cpufreq_register_notifier(&init_cpu_capacity_notifier,
+>> +                                       CPUFREQ_POLICY_NOTIFIER);
+> 
+> Wanted to make sure that we all understand the constraints this is going to add
+> for the ARM64 platforms.
+> 
+> With the introduction of this transition notifier, we would not be able to use
+> the fast-switch path in the schedutil governor. I am not sure if there are any
+> ARM platforms that can actually use the fast-switch path in future or not
+> though. The requirement of fast-switch path is that the freq can be changed
+> without sleeping in the hot-path.
+
+That's a good point. The cpufreq transition notifier based Frequency
+Invariance Engine (FIE) can only work if none of the cpufreq policies
+support fast frequency switching. 
+
+What about we still enable cpufreq transition notifier based FIE for
+systems where this is true. This will cover 100% of all arm/arm64
+systems today.
+
+In case one day we have a cpufreq driver which allows fast frequency
+switching we would need a FIE based on something else than cpufreq
+transition notifier. Maybe based on performance counters (something
+similar to x86 APERF/MPERF) or cpufreq core could provide a function
+which provides the avg frequency value.
+
+I could make the current implementation more future-proof by only
+using the notifier based FIE in case all policies use slow frequency
+switching:
+
+>From afe64b5c0606cad4304b77fc5cff819d3083a88d Mon Sep 17 00:00:00 2001
+From: Dietmar Eggemann <dietmar.eggemann@arm.com>
+Date: Wed, 21 Jun 2017 14:53:26 +0100
+Subject: [PATCH] drivers base/arch_topology: enable cpufreq transistion
+ notifier based FIE only for slow frequency switching
+
+Fast frequency switching is incompatible with cpufreq transition
+notifiers.
+
+Enable the cpufreq transition notifier based Frequency Invariance Engine
+(FIE) only in case there are no cpufreq policies able to use fast
+frequency switching.
+
+Currently there are no cpufreq drivers for arm/arm64 which support fast
+frequency switching. In case such a driver will appear the FEI
+topology_get_freq_scale() has to be extended to provide frequency
+invariance based on something else than cpufreq transition notifiers,
+e.g. performance counters.
+
+Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
+---
+ drivers/base/arch_topology.c | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/base/arch_topology.c b/drivers/base/arch_topology.c
+index c2539dc584d5..bd14c5e81f63 100644
+--- a/drivers/base/arch_topology.c
++++ b/drivers/base/arch_topology.c
+@@ -171,6 +171,7 @@ static bool cap_parsing_done;
+ static void parsing_done_workfn(struct work_struct *work);
+ static DECLARE_WORK(parsing_done_work, parsing_done_workfn);
+ static DEFINE_PER_CPU(unsigned long, max_freq);
++static bool enable_freq_inv = true;
+
+ static int
+ init_cpu_capacity_callback(struct notifier_block *nb,
+@@ -199,6 +200,8 @@ init_cpu_capacity_callback(struct notifier_block *nb,
+                                            policy->cpuinfo.max_freq / 1000UL;
+                        capacity_scale = max(raw_capacity[cpu], capacity_scale);
+                }
++               if (policy->fast_switch_possible)
++                       enable_freq_inv = false;
+                if (cpumask_empty(cpus_to_visit)) {
+                        if (!cap_parsing_failed) {
+                                topology_normalize_cpu_scale();
+@@ -268,21 +271,23 @@ static int __init register_cpufreq_notifier(void)
+        ret = cpufreq_register_notifier(&init_cpu_capacity_notifier,
+                                        CPUFREQ_POLICY_NOTIFIER);
+
+-       if (ret) {
++       if (ret)
+                free_cpumask_var(cpus_to_visit);
+-               return ret;
+-       }
+
+-       return cpufreq_register_notifier(&set_freq_scale_notifier,
+-                                        CPUFREQ_TRANSITION_NOTIFIER);
++       return ret;
+ }
+ core_initcall(register_cpufreq_notifier);
+
+ static void parsing_done_workfn(struct work_struct *work)
+ {
++
+        free_cpumask_var(cpus_to_visit);
+        cpufreq_unregister_notifier(&init_cpu_capacity_notifier,
+                                         CPUFREQ_POLICY_NOTIFIER);
++
++       if (enable_freq_inv)
++               cpufreq_register_notifier(&set_freq_scale_notifier,
++                                         CPUFREQ_TRANSITION_NOTIFIER);
+ }
+
+ #else
+-- 
+2.11.0
