@@ -1,46 +1,44 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 21 Jun 2017 14:53:03 +0200
-Subject: [PATCH v3 4/9] arm64: marvell: enable the Armada 7K/8K pinctrl
- driver
-In-Reply-To: <CACRpkdbbL+QaQ7rAKdq4ZVTzkNab=o3h78hE1Zb+c7ivNRaQKw@mail.gmail.com>
- (Linus Walleij's message of "Fri, 16 Jun 2017 11:22:01 +0200")
-References: <cover.d003a5e862e6d732d901a61d1765a349c9a89eef.1497281623.git-series.gregory.clement@free-electrons.com>
- <30ebac2a9f20c05d354eb3f41ad21cdda8a45ae9.1497281623.git-series.gregory.clement@free-electrons.com>
- <CACRpkdbbL+QaQ7rAKdq4ZVTzkNab=o3h78hE1Zb+c7ivNRaQKw@mail.gmail.com>
-Message-ID: <8737at33kg.fsf@free-electrons.com>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Wed, 21 Jun 2017 15:00:25 +0200
+Subject: [PATCH V17 00/11] Add UEFI 2.6 and ACPI 6.1 updates for RAS on
+ ARM64
+In-Reply-To: <20170620084931.GB30664@arm.com>
+References: <1495225933-4410-1-git-send-email-tbaicar@codeaurora.org>
+ <20170607115012.GZ30263@arm.com>
+ <20170620063439.GS658@rric.localdomain>
+ <20170620084931.GB30664@arm.com>
+Message-ID: <20170621130025.GD16981@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
- 
- On ven., juin 16 2017, Linus Walleij <linus.walleij@linaro.org> wrote:
+On 20.06.17 09:49:32, Will Deacon wrote:
+> Hi Robert,
+> 
+> On Tue, Jun 20, 2017 at 08:34:39AM +0200, Robert Richter wrote:
+> > On 07.06.17 12:50:12, Will Deacon wrote:
+> > 
+> > > Thanks, I've pushed this out as:
+> > >
+> > >   git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/ras-apei
+> > >
+> > > which I'll merge into for-next/core (and therefore linux-next) either the
+> > > end of this week or the beginning of next week. Please take a look if you
+> > > get a chance.
+> > 
+> > any reason why there was a roll back of for-next/core?
+> > 
+> >  + 0870f692c2ed...e27c7fa015d6 for-next/core -> arm64/for-next/core  (forced update)
+> > 
+> > Is it because for-next/ras-apei goes through tip?
+> 
+> No, it's because the RAS stuff ran into horrible conflicts with the UUID
+> tree:
+> 
+> https://lkml.org/lkml/2017/6/16/22
+> 
+> Tyler should be rebasing that soon, so hopefully I can requeue that stuff
+> this week.
 
-> On Mon, Jun 12, 2017 at 5:34 PM, Gregory CLEMENT
-> <gregory.clement@free-electrons.com> wrote:
->
->> This commit makes sure the drivers for the Armada 7K/8K pin controllers
->> are enabled.
->>
->> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Please merge this through ARM SoC.
+Note there are also conflicts with tip-ras from Borsis' tree.
 
-
-Applied on mvebu/arm64
-
-Thanks,
-
-Gregory
-
->
-> Yours,
-> Linus Walleij
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+-Robert
