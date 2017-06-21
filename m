@@ -1,73 +1,54 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Wed, 21 Jun 2017 16:30:07 +0200
-Subject: [PATCH v2 0/8] Add STM32 LPTimer: PWM, trigger and counter
-Message-ID: <1498055415-31513-1-git-send-email-fabrice.gasnier@st.com>
+Date: Wed, 21 Jun 2017 16:30:12 +0200
+Subject: [PATCH v2 5/8] dt-bindings: iio: Add STM32 LPTimer trigger binding
+In-Reply-To: <1498055415-31513-1-git-send-email-fabrice.gasnier@st.com>
+References: <1498055415-31513-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1498055415-31513-6-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for Low-Power Timer that can be found on
-some STM32 devices.
+Add documentation for STMicroelectronics STM32 Low-Power Timer Trigger
+binding.
 
-STM32 LPTimer (LPTIM) is a 16-bit timer that provides several
-functionalities. This series adds support for following features:
-- PWM output (with programmable prescaler, configurable polarity)
-- Trigger source for STM32 ADC or DAC (LPTIM_OUT)
-- Quadrature encoder and counter
-
-The MFD core is used to manage common resources (clock, register map)
-and to detect encoder feature. "stm32_lptimer" structure is provided
-to its sub-nodes to share those information:
-- PWM driver is used to implement single PWM channel
-- IIO trigger
-- IIO quadrature encoder and counter
-
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 ---
 Changes in v2:
-- Various remarks from Lee, on MFD part, extended to the full series,
-  such as: clock name, use "Low-Power Timer", file headers, dt-bindings
-  props descriptions, fix dt example.
-
-Fabrice Gasnier (8):
-  dt-bindings: mfd: Add STM32 LPTimer binding
-  mfd: Add STM32 LPTimer driver
-  dt-bindings: pwm: Add STM32 LPTimer PWM binding
-  pwm: Add STM32 LPTimer PWM driver
-  dt-bindings: iio: Add STM32 LPTimer trigger binding
-  iio: trigger: Add STM32 LPTimer trigger driver
-  dt-bindings: iio: Add STM32 LPTimer quadrature encoder and counter
-  iio: counter: Add support for STM32 LPTimer
-
- .../ABI/testing/sysfs-bus-iio-lptimer-stm32        |  57 +++
- .../bindings/iio/counter/stm32-lptimer-cnt.txt     |  27 ++
- .../bindings/iio/timer/stm32-lptimer-trigger.txt   |  23 ++
- .../devicetree/bindings/mfd/stm32-lptimer.txt      |  48 +++
- .../devicetree/bindings/pwm/pwm-stm32-lp.txt       |  24 ++
- drivers/iio/counter/Kconfig                        |   9 +
- drivers/iio/counter/Makefile                       |   1 +
- drivers/iio/counter/stm32-lptimer-cnt.c            | 383 +++++++++++++++++++++
- drivers/iio/trigger/Kconfig                        |  11 +
- drivers/iio/trigger/Makefile                       |   1 +
- drivers/iio/trigger/stm32-lptimer-trigger.c        | 110 ++++++
- drivers/mfd/Kconfig                                |  14 +
- drivers/mfd/Makefile                               |   1 +
- drivers/mfd/stm32-lptimer.c                        | 107 ++++++
- drivers/pwm/Kconfig                                |  10 +
- drivers/pwm/Makefile                               |   1 +
- drivers/pwm/pwm-stm32-lp.c                         | 216 ++++++++++++
- include/linux/iio/timer/stm32-lptim-trigger.h      |  24 ++
- include/linux/mfd/stm32-lptimer.h                  |  62 ++++
- 19 files changed, 1129 insertions(+)
- create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-lptimer-stm32
- create mode 100644 Documentation/devicetree/bindings/iio/counter/stm32-lptimer-cnt.txt
+- s/Low Power/Low-Power
+- remove leading 0x in example (parent node)
+- improve reg property description
+---
+ .../bindings/iio/timer/stm32-lptimer-trigger.txt   | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/iio/timer/stm32-lptimer-trigger.txt
- create mode 100644 Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
- create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32-lp.txt
- create mode 100644 drivers/iio/counter/stm32-lptimer-cnt.c
- create mode 100644 drivers/iio/trigger/stm32-lptimer-trigger.c
- create mode 100644 drivers/mfd/stm32-lptimer.c
- create mode 100644 drivers/pwm/pwm-stm32-lp.c
- create mode 100644 include/linux/iio/timer/stm32-lptim-trigger.h
- create mode 100644 include/linux/mfd/stm32-lptimer.h
 
+diff --git a/Documentation/devicetree/bindings/iio/timer/stm32-lptimer-trigger.txt b/Documentation/devicetree/bindings/iio/timer/stm32-lptimer-trigger.txt
+new file mode 100644
+index 0000000..466d99f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/iio/timer/stm32-lptimer-trigger.txt
+@@ -0,0 +1,23 @@
++STMicroelectronics STM32 Low-Power Timer Trigger
++
++STM32 Low-Power Timer provides trigger source (LPTIM output) that can be used
++by STM32 internal ADC and/or DAC.
++
++Must be a sub-node of an STM32 Low-Power Timer device tree node.
++See ../mfd/stm32-lptimer.txt for details about the parent node.
++
++Required properties:
++- compatible:		Must be "st,stm32-lptimer-trigger".
++- reg:			Selects trigger hardware block. Must be 0, 1 or 2
++			respectively for lptimer1, lptimer2 or lptimer3
++			trigger output.
++
++Example:
++	lptimer1: lptimer at 40002400 {
++		compatible = "st,stm32-lptimer";
++		...
++		trigger at 0 {
++			compatible = "st,stm32-lptimer-trigger";
++			reg = <0>;
++		};
++	};
 -- 
 1.9.1
