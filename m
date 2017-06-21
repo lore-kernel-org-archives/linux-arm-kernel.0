@@ -1,564 +1,406 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 21 Jun 2017 09:55:52 +0200
-Subject: [PATCH v7] clk: Add Gemini SoC clock controller
-Message-ID: <20170621075552.17633-1-linus.walleij@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 21 Jun 2017 08:56:24 +0100
+Subject: [PATCH v4 4/6] irqchip: irq-mvebu-icu: new driver for Marvell ICU
+In-Reply-To: <20170620140722.31646-5-thomas.petazzoni@free-electrons.com>
+References: <20170620140722.31646-1-thomas.petazzoni@free-electrons.com>
+ <20170620140722.31646-5-thomas.petazzoni@free-electrons.com>
+Message-ID: <8c085bb8-9bfa-90f7-1dd1-f4f5eb852402@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cortina Systems Gemini (SL3516/CS3516) has an on-chip clock
-controller that derive all clocks from a single crystal, using some
-documented and some undocumented PLLs, half dividers, counters and
-gates. This is a best attempt to construct a clock driver for the
-clocks so at least we can gate off unused hardware and driver the
-PCI bus clock.
+Hi Thomas,
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v6->v7:
-- Use platform device oriented memory remapping with
-  devm_ioremap_resource().
-- Convert shouty boot message about clock frequency to a
-  pr_debug().
-- Drop patches 1, 2 from the series as they got merged.
-ChangeLog v5->v6:
-- Merge the Gemini reset controller code into the clock driver
-  so as to resolve the conflict about what device should be
-  probing from the system controller. The reset portions are
-  copy/pasted from the driver previously merged by Philipp
-  Zabel.
-- Split the driver in two init paths: one that executes at
-  CLK_OF_DECLARE_DRIVER() level to provide the basic cxo, AHB
-  and APB clocks, so that the system timer can start, and
-  another path executed for the platform device as it comes
-  up. The clock table is filled with -EPROBE_DEFER pointers
-  until the platform device probes.
-ChangeLog v4->v5:
-- Add a dependency on ARCH_GEMINI || COMPILE_TEST to Kconfig
-- Fix the includes, remove <linux/clkdev.h>, add <linux/spinlock.h>
-- Indent all defines properly.
-- Remove the global clock arrays and use the pattern to allocate
-  a struct clk_hw_onecell_data * and fill that with the hw clocks.
-- Switch everything to use struct clk_hw * everywhere.
-- Look up clocks using of_clk_hw_onecell_get, add the lookup
-  using of_clk_add_hw_provider().
-- Cut unnecessary status checks from regmap_* accessors, skip
-  to just checking the return value of the first access and
-  then assume the MMIO regmap is working fine.
-- Reduce the CPU-to-AHB calculation switch() statement to a table
-  lookup.
-ChangeLog v3->v4:
-- No changes, just resending with separate DT header file.
-ChangeLog v2->v3:
-- Augment driver to probe directly from the system controller.
-- Mike/Stephen: when you're happy with this please ACK it so I
-  can merge it through ARM SoC. This is needed because of
-  the mess of #include <dt-bindings/*> from the DT bindings
-  that is then used all over the DTS files.
-ChangeLog v1->v2:
-- Move the clock controller to be part of the syscon node. No
-  need for a separate child node for this.
----
- drivers/clk/Kconfig      |   9 +
- drivers/clk/Makefile     |   1 +
- drivers/clk/clk-gemini.c | 458 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 468 insertions(+)
- create mode 100644 drivers/clk/clk-gemini.c
+On 20/06/17 15:07, Thomas Petazzoni wrote:
+> The Marvell ICU unit is found in the CP110 block of the Marvell Armada
+> 7K and 8K SoCs. It collects the wired interrupts of the devices located
+> in the CP110 and turns them into SPI interrupts in the GIC located in
+> the AP806 side of the SoC, by using a memory transaction.
+> 
+> Until now, the ICU was configured in a static fashion by the firmware,
+> and Linux was relying on this static configuration. By having Linux
+> configure the ICU, we are more flexible, and we can allocate dynamically
+> the GIC SPI interrupts only for devices that are actually in use.
+> 
+> The driver was initially written by Hanna Hawa <hannah@marvell.com>.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  drivers/irqchip/Kconfig                            |   3 +
+>  drivers/irqchip/Makefile                           |   1 +
+>  drivers/irqchip/irq-mvebu-icu.c                    | 291 +++++++++++++++++++++
+>  .../dt-bindings/interrupt-controller/mvebu-icu.h   |  15 ++
+>  4 files changed, 310 insertions(+)
+>  create mode 100644 drivers/irqchip/irq-mvebu-icu.c
+>  create mode 100644 include/dt-bindings/interrupt-controller/mvebu-icu.h
+> 
+> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+> index e527ee5..676232a 100644
+> --- a/drivers/irqchip/Kconfig
+> +++ b/drivers/irqchip/Kconfig
+> @@ -271,6 +271,9 @@ config IRQ_MXS
+>  config MVEBU_GICP
+>  	bool
+>  
+> +config MVEBU_ICU
+> +	bool
+> +
+>  config MVEBU_ODMI
+>  	bool
+>  	select GENERIC_MSI_IRQ_DOMAIN
+> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+> index 11eb858..18fa5fa 100644
+> --- a/drivers/irqchip/Makefile
+> +++ b/drivers/irqchip/Makefile
+> @@ -70,6 +70,7 @@ obj-$(CONFIG_INGENIC_IRQ)		+= irq-ingenic.o
+>  obj-$(CONFIG_IMX_GPCV2)			+= irq-imx-gpcv2.o
+>  obj-$(CONFIG_PIC32_EVIC)		+= irq-pic32-evic.o
+>  obj-$(CONFIG_MVEBU_GICP)		+= irq-mvebu-gicp.o
+> +obj-$(CONFIG_MVEBU_ICU)			+= irq-mvebu-icu.o
+>  obj-$(CONFIG_MVEBU_ODMI)		+= irq-mvebu-odmi.o
+>  obj-$(CONFIG_MVEBU_PIC)			+= irq-mvebu-pic.o
+>  obj-$(CONFIG_LS_SCFG_MSI)		+= irq-ls-scfg-msi.o
+> diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
+> new file mode 100644
+> index 0000000..efc80ee
+> --- /dev/null
+> +++ b/drivers/irqchip/irq-mvebu-icu.c
+> @@ -0,0 +1,291 @@
+> +/*
+> + * Copyright (C) 2017 Marvell
+> + *
+> + * Hanna Hawa <hannah@marvell.com>
+> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/interrupt.h>
+> +#include <linux/irq.h>
+> +#include <linux/irqchip.h>
+> +#include <linux/irqdomain.h>
+> +#include <linux/kernel.h>
+> +#include <linux/msi.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/platform_device.h>
+> +
+> +#include <dt-bindings/interrupt-controller/mvebu-icu.h>
+> +
+> +#include "irq-mvebu-gicp.h"
+> +
+> +/* ICU registers */
+> +#define ICU_SETSPI_NSR_AL	0x10
+> +#define ICU_SETSPI_NSR_AH	0x14
+> +#define ICU_CLRSPI_NSR_AL	0x18
+> +#define ICU_CLRSPI_NSR_AH	0x1c
+> +#define ICU_INT_CFG(x)          (0x100 + 4 * (x))
+> +#define   ICU_INT_ENABLE	BIT(24)
+> +#define   ICU_IS_EDGE		BIT(28)
+> +#define   ICU_GROUP_SHIFT	29
+> +
+> +/* ICU definitions */
+> +#define ICU_MAX_IRQS		207
+> +#define ICU_SATA0_ICU_ID	109
+> +#define ICU_SATA1_ICU_ID	107
+> +
+> +struct mvebu_icu {
+> +	struct irq_chip irq_chip;
+> +	void __iomem *base;
+> +	struct irq_domain *domain;
+> +	struct device *dev;
+> +};
+> +
+> +struct mvebu_icu_irq_data {
+> +	struct mvebu_icu *icu;
+> +	unsigned int icu_group;
+> +	unsigned int type;
+> +};
+> +
+> +static void mvebu_icu_write_msg(struct msi_desc *desc, struct msi_msg *msg)
+> +{
+> +	struct irq_data *d = irq_get_irq_data(desc->irq);
+> +	struct mvebu_icu_irq_data *icu_irqd = d->chip_data;
+> +	struct mvebu_icu *icu = icu_irqd->icu;
+> +	unsigned int icu_int;
+> +
+> +	if (msg->address_lo) {
 
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 36cfea38135f..8611b0de01a0 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -126,6 +126,15 @@ config COMMON_CLK_CS2000_CP
- 	help
- 	  If you say yes here you get support for the CS2000 clock multiplier.
- 
-+config COMMON_CLK_GEMINI
-+	bool "Clock driver for Cortina Systems Gemini SoC"
-+	depends on ARCH_GEMINI || COMPILE_TEST
-+	select MFD_SYSCON
-+	select RESET_CONTROLLER
-+	---help---
-+	  This driver supports the SoC clocks on the Cortina Systems Gemini
-+	  platform, also known as SL3516 or CS3516.
-+
- config COMMON_CLK_S2MPS11
- 	tristate "Clock driver for S2MPS1X/S5M8767 MFD"
- 	depends on MFD_SEC_CORE || COMPILE_TEST
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index c19983afcb81..a625c002a810 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -25,6 +25,7 @@ obj-$(CONFIG_COMMON_CLK_CDCE925)	+= clk-cdce925.o
- obj-$(CONFIG_ARCH_CLPS711X)		+= clk-clps711x.o
- obj-$(CONFIG_COMMON_CLK_CS2000_CP)	+= clk-cs2000-cp.o
- obj-$(CONFIG_ARCH_EFM32)		+= clk-efm32gg.o
-+obj-$(CONFIG_COMMON_CLK_GEMINI)		+= clk-gemini.o
- obj-$(CONFIG_ARCH_HIGHBANK)		+= clk-highbank.o
- obj-$(CONFIG_COMMON_CLK_MAX77686)	+= clk-max77686.o
- obj-$(CONFIG_ARCH_MB86S7X)		+= clk-mb86s7x.o
-diff --git a/drivers/clk/clk-gemini.c b/drivers/clk/clk-gemini.c
-new file mode 100644
-index 000000000000..3ddd2faec674
---- /dev/null
-+++ b/drivers/clk/clk-gemini.c
-@@ -0,0 +1,458 @@
-+/*
-+ * Cortina Gemini SoC Clock Controller driver
-+ * Copyright (c) 2017 Linus Walleij <linus.walleij@linaro.org>
-+ */
-+
-+#define pr_fmt(fmt) "clk-gemini: " fmt
-+
-+#include <linux/init.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/clk-provider.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/regmap.h>
-+#include <linux/spinlock.h>
-+#include <linux/reset-controller.h>
-+#include <dt-bindings/reset/cortina,gemini-reset.h>
-+#include <dt-bindings/clock/cortina,gemini-clock.h>
-+
-+/* Globally visible clocks */
-+static DEFINE_SPINLOCK(gemini_clk_lock);
-+
-+#define GEMINI_GLOBAL_STATUS		0x04
-+#define PLL_OSC_SEL			BIT(30)
-+#define AHBSPEED_SHIFT			(15)
-+#define AHBSPEED_MASK			0x07
-+#define CPU_AHB_RATIO_SHIFT		(18)
-+#define CPU_AHB_RATIO_MASK		0x03
-+
-+#define GEMINI_GLOBAL_PLL_CONTROL	0x08
-+
-+#define GEMINI_GLOBAL_SOFT_RESET	0x0c
-+
-+#define GEMINI_GLOBAL_MISC_CONTROL	0x30
-+#define PCI_CLK_66MHZ			BIT(18)
-+#define PCI_CLK_OE			BIT(17)
-+
-+#define GEMINI_GLOBAL_CLOCK_CONTROL	0x34
-+#define PCI_CLKRUN_EN			BIT(16)
-+#define TVC_HALFDIV_SHIFT		(24)
-+#define TVC_HALFDIV_MASK		0x1f
-+#define SECURITY_CLK_SEL		BIT(29)
-+
-+#define GEMINI_GLOBAL_PCI_DLL_CONTROL	0x44
-+#define PCI_DLL_BYPASS			BIT(31)
-+#define PCI_DLL_TAP_SEL_MASK		0x1f
-+
-+/**
-+ * struct gemini_data_data - Gemini gated clocks
-+ * @bit_idx: the bit used to gate this clock in the clock register
-+ * @name: the clock name
-+ * @parent_name: the name of the parent clock
-+ * @flags: standard clock framework flags
-+ */
-+struct gemini_gate_data {
-+	u8 bit_idx;
-+	const char *name;
-+	const char *parent_name;
-+	unsigned long flags;
-+};
-+
-+/**
-+ * struct clk_gemini_pci - Gemini PCI clock
-+ * @hw: corresponding clock hardware entry
-+ * @map: regmap to access the registers
-+ * @rate: current rate
-+ */
-+struct clk_gemini_pci {
-+	struct clk_hw hw;
-+	struct regmap *map;
-+	unsigned long rate;
-+};
-+
-+/**
-+ * struct gemini_reset - gemini reset controller
-+ * @map: regmap to access the containing system controller
-+ * @rcdev: reset controller device
-+ */
-+struct gemini_reset {
-+	struct regmap *map;
-+	struct reset_controller_dev rcdev;
-+};
-+
-+/* Keeps track of all clocks */
-+static struct clk_hw_onecell_data *gemini_clk_data;
-+
-+static const struct gemini_gate_data gemini_gates[] = {
-+	{ 1, "security-gate", "secdiv", 0 },
-+	{ 2, "gmac0-gate", "ahb", 0 },
-+	{ 3, "gmac1-gate", "ahb", 0 },
-+	{ 4, "sata0-gate", "ahb", 0 },
-+	{ 5, "sata1-gate", "ahb", 0 },
-+	{ 6, "usb0-gate", "ahb", 0 },
-+	{ 7, "usb1-gate", "ahb", 0 },
-+	{ 8, "ide-gate", "ahb", 0 },
-+	{ 9, "pci-gate", "ahb", 0 },
-+	/*
-+	 * The DDR controller may never have a driver, but certainly must
-+	 * not be gated off.
-+	 */
-+	{ 10, "ddr-gate", "ahb", CLK_IS_CRITICAL },
-+	/*
-+	 * The flash controller must be on to access NOR flash through the
-+	 * memory map.
-+	 */
-+	{ 11, "flash-gate", "ahb", CLK_IGNORE_UNUSED },
-+	{ 12, "tvc-gate", "ahb", 0 },
-+	{ 13, "boot-gate", "apb", 0 },
-+};
-+
-+#define to_pciclk(_hw) container_of(_hw, struct clk_gemini_pci, hw)
-+
-+#define to_gemini_reset(p) container_of((p), struct gemini_reset, rcdev)
-+
-+static unsigned long gemini_pci_recalc_rate(struct clk_hw *hw,
-+					    unsigned long parent_rate)
-+{
-+	struct clk_gemini_pci *pciclk = to_pciclk(hw);
-+	u32 val;
-+
-+	regmap_read(pciclk->map, GEMINI_GLOBAL_MISC_CONTROL, &val);
-+	if (val & PCI_CLK_66MHZ)
-+		return 66000000;
-+	return 33000000;
-+}
-+
-+static long gemini_pci_round_rate(struct clk_hw *hw, unsigned long rate,
-+				  unsigned long *prate)
-+{
-+	/* We support 33 and 66 MHz */
-+	if (rate < 48000000)
-+		return 33000000;
-+	return 66000000;
-+}
-+
-+static int gemini_pci_set_rate(struct clk_hw *hw, unsigned long rate,
-+			       unsigned long parent_rate)
-+{
-+	struct clk_gemini_pci *pciclk = to_pciclk(hw);
-+
-+	if (rate == 33000000)
-+		return regmap_update_bits(pciclk->map,
-+					  GEMINI_GLOBAL_MISC_CONTROL,
-+					  PCI_CLK_66MHZ, 0);
-+	if (rate == 66000000)
-+		return regmap_update_bits(pciclk->map,
-+					  GEMINI_GLOBAL_MISC_CONTROL,
-+					  0, PCI_CLK_66MHZ);
-+	return -EINVAL;
-+}
-+
-+static int gemini_pci_enable(struct clk_hw *hw)
-+{
-+	struct clk_gemini_pci *pciclk = to_pciclk(hw);
-+
-+	regmap_update_bits(pciclk->map, GEMINI_GLOBAL_CLOCK_CONTROL,
-+			   0, PCI_CLKRUN_EN);
-+	regmap_update_bits(pciclk->map,
-+			   GEMINI_GLOBAL_MISC_CONTROL,
-+			   0, PCI_CLK_OE);
-+	return 0;
-+}
-+
-+static void gemini_pci_disable(struct clk_hw *hw)
-+{
-+	struct clk_gemini_pci *pciclk = to_pciclk(hw);
-+
-+	regmap_update_bits(pciclk->map,
-+			   GEMINI_GLOBAL_MISC_CONTROL,
-+			   PCI_CLK_OE, 0);
-+	regmap_update_bits(pciclk->map, GEMINI_GLOBAL_CLOCK_CONTROL,
-+			   PCI_CLKRUN_EN, 0);
-+}
-+
-+static int gemini_pci_is_enabled(struct clk_hw *hw)
-+{
-+	struct clk_gemini_pci *pciclk = to_pciclk(hw);
-+	unsigned int val;
-+
-+	regmap_read(pciclk->map, GEMINI_GLOBAL_CLOCK_CONTROL, &val);
-+	return !!(val & PCI_CLKRUN_EN);
-+}
-+
-+static const struct clk_ops gemini_pci_clk_ops = {
-+	.recalc_rate = gemini_pci_recalc_rate,
-+	.round_rate = gemini_pci_round_rate,
-+	.set_rate = gemini_pci_set_rate,
-+	.enable = gemini_pci_enable,
-+	.disable = gemini_pci_disable,
-+	.is_enabled = gemini_pci_is_enabled,
-+};
-+
-+static struct clk_hw *gemini_pci_clk_setup(const char *name,
-+					   const char *parent_name,
-+					   struct regmap *map)
-+{
-+	struct clk_gemini_pci *pciclk;
-+	struct clk_init_data init;
-+	int ret;
-+
-+	pciclk = kzalloc(sizeof(*pciclk), GFP_KERNEL);
-+	if (!pciclk)
-+		return ERR_PTR(-ENOMEM);
-+
-+	init.name = name;
-+	init.ops = &gemini_pci_clk_ops;
-+	init.flags = 0;
-+	init.parent_names = &parent_name;
-+	init.num_parents = 1;
-+	pciclk->map = map;
-+	pciclk->hw.init = &init;
-+
-+	ret = clk_hw_register(NULL, &pciclk->hw);
-+	if (ret) {
-+		kfree(pciclk);
-+		return ERR_PTR(ret);
-+	}
-+
-+	return &pciclk->hw;
-+}
-+
-+/*
-+ * This is a self-deasserting reset controller.
-+ */
-+static int gemini_reset(struct reset_controller_dev *rcdev,
-+			unsigned long id)
-+{
-+	struct gemini_reset *gr = to_gemini_reset(rcdev);
-+
-+	/* Manual says to always set BIT 30 (CPU1) to 1 */
-+	return regmap_write(gr->map,
-+			    GEMINI_GLOBAL_SOFT_RESET,
-+			    BIT(GEMINI_RESET_CPU1) | BIT(id));
-+}
-+
-+static int gemini_reset_status(struct reset_controller_dev *rcdev,
-+			     unsigned long id)
-+{
-+	struct gemini_reset *gr = to_gemini_reset(rcdev);
-+	u32 val;
-+	int ret;
-+
-+	ret = regmap_read(gr->map, GEMINI_GLOBAL_SOFT_RESET, &val);
-+	if (ret)
-+		return ret;
-+
-+	return !!(val & BIT(id));
-+}
-+
-+static const struct reset_control_ops gemini_reset_ops = {
-+	.reset = gemini_reset,
-+	.status = gemini_reset_status,
-+};
-+
-+static int gemini_clk_probe(struct platform_device *pdev)
-+{
-+	/* Gives the fracions 1x, 1.5x, 1.85x and 2x */
-+	unsigned int cpu_ahb_mult[4] = { 1, 3, 24, 2 };
-+	unsigned int cpu_ahb_div[4] = { 1, 2, 13, 1 };
-+	void __iomem *base;
-+	struct gemini_reset *gr;
-+	struct regmap *map;
-+	struct clk_hw *hw;
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
-+	unsigned int mult, div;
-+	struct resource *res;
-+	u32 val;
-+	int ret;
-+	int i;
-+
-+	gr = devm_kzalloc(dev, sizeof(*gr), GFP_KERNEL);
-+	if (!gr)
-+		return -ENOMEM;
-+
-+	/* Remap the system controller for the exclusive register */
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res)
-+		return -ENODEV;
-+	base = devm_ioremap_resource(dev, res);
-+	if (!base) {
-+		dev_err(dev, "no memory base\n");
-+		return -ENODEV;
-+	}
-+
-+	map = syscon_node_to_regmap(np);
-+	if (IS_ERR(map)) {
-+		dev_err(dev, "no syscon regmap\n");
-+		return PTR_ERR(map);
-+	}
-+
-+	gr->map = map;
-+	gr->rcdev.owner = THIS_MODULE;
-+	gr->rcdev.nr_resets = 32;
-+	gr->rcdev.ops = &gemini_reset_ops;
-+	gr->rcdev.of_node = np;
-+
-+	ret = devm_reset_controller_register(dev, &gr->rcdev);
-+	if (ret) {
-+		dev_err(dev, "could not register reset controller\n");
-+		return ret;
-+	}
-+
-+	/* RTC clock 32768 Hz */
-+	hw = clk_hw_register_fixed_rate(NULL, "rtc", NULL, 0, 32768);
-+	gemini_clk_data->hws[GEMINI_CLK_RTC] = hw;
-+
-+	/* CPU clock derived as a fixed ratio from the AHB clock */
-+	val >>= CPU_AHB_RATIO_SHIFT;
-+	val &= CPU_AHB_RATIO_MASK;
-+	hw = clk_hw_register_fixed_factor(NULL, "cpu", "ahb", 0,
-+					  cpu_ahb_mult[val],
-+					  cpu_ahb_div[val]);
-+	gemini_clk_data->hws[GEMINI_CLK_CPU] = hw;
-+
-+	/* Security clock is 1:1 or 0.75 of APB */
-+	regmap_read(map, GEMINI_GLOBAL_CLOCK_CONTROL, &val);
-+	if (val & SECURITY_CLK_SEL) {
-+		mult = 1;
-+		div = 1;
-+	} else {
-+		mult = 3;
-+		div = 4;
-+	}
-+	hw = clk_hw_register_fixed_factor(NULL, "secdiv", "ahb", 0, mult, div);
-+
-+	/*
-+	 * These are the leaf gates, at boot no clocks are gated.
-+	 */
-+	for (i = 0; i < ARRAY_SIZE(gemini_gates); i++) {
-+		const struct gemini_gate_data *gd;
-+
-+		gd = &gemini_gates[i];
-+		gemini_clk_data->hws[GEMINI_CLK_GATES + i] =
-+			clk_hw_register_gate(NULL, gd->name,
-+					     gd->parent_name,
-+					     gd->flags,
-+					     base + GEMINI_GLOBAL_CLOCK_CONTROL,
-+					     gd->bit_idx,
-+					     CLK_GATE_SET_TO_DISABLE,
-+					     &gemini_clk_lock);
-+	}
-+
-+	/*
-+	 * The TV Interface Controller has a 5-bit half divider register.
-+	 * This clock is supposed to be 27MHz as this is an exact multiple
-+	 * of PAL and NTSC frequencies. The register is undocumented :(
-+	 * FIXME: figure out the parent and how the divider works.
-+	 */
-+	mult = 1;
-+	div = ((val >> TVC_HALFDIV_SHIFT) & TVC_HALFDIV_MASK);
-+	dev_dbg(dev, "TVC half divider value = %d\n", div);
-+	div += 1;
-+	hw = clk_hw_register_fixed_rate(NULL, "tvcdiv", "xtal", 0, 27000000);
-+	gemini_clk_data->hws[GEMINI_CLK_TVC] = hw;
-+
-+	/* FIXME: very unclear what the parent is */
-+	hw = gemini_pci_clk_setup("PCI", "xtal", map);
-+	gemini_clk_data->hws[GEMINI_CLK_PCI] = hw;
-+
-+	/* FIXME: very unclear what the parent is */
-+	hw = clk_hw_register_fixed_rate(NULL, "uart", "xtal", 0, 48000000);
-+	gemini_clk_data->hws[GEMINI_CLK_UART] = hw;
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id gemini_clk_dt_ids[] = {
-+	{ .compatible = "cortina,gemini-syscon", },
-+	{ /* sentinel */ },
-+};
-+
-+static struct platform_driver gemini_clk_driver = {
-+	.probe  = gemini_clk_probe,
-+	.driver = {
-+		.name = "gemini-clk",
-+		.of_match_table = gemini_clk_dt_ids,
-+		.suppress_bind_attrs = true,
-+	},
-+};
-+builtin_platform_driver(gemini_clk_driver);
-+
-+static void __init gemini_cc_init(struct device_node *np)
-+{
-+	struct regmap *map;
-+	struct clk_hw *hw;
-+	unsigned long freq;
-+	unsigned int mult, div;
-+	u32 val;
-+	int ret;
-+	int i;
-+
-+	gemini_clk_data = kzalloc(sizeof(*gemini_clk_data) +
-+			sizeof(*gemini_clk_data->hws) * GEMINI_NUM_CLKS,
-+			GFP_KERNEL);
-+	if (!gemini_clk_data)
-+		return;
-+
-+	/*
-+	 * This way all clock fetched before the platform device probes,
-+	 * except those we assign here for early use, will be deferred.
-+	 */
-+	for (i = 0; i < GEMINI_NUM_CLKS; i++)
-+		gemini_clk_data->hws[i] = ERR_PTR(-EPROBE_DEFER);
-+
-+	map = syscon_node_to_regmap(np);
-+	if (IS_ERR(map)) {
-+		pr_err("no syscon regmap\n");
-+		return;
-+	}
-+	/*
-+	 * We check that the regmap works on this very first access,
-+	 * but as this is an MMIO-backed regmap, subsequent regmap
-+	 * access is not going to fail and we skip error checks from
-+	 * this point.
-+	 */
-+	ret = regmap_read(map, GEMINI_GLOBAL_STATUS, &val);
-+	if (ret) {
-+		pr_err("failed to read global status register\n");
-+		return;
-+	}
-+
-+	/*
-+	 * XTAL is the crystal oscillator, 60 or 30 MHz selected from
-+	 * strap pin E6
-+	 */
-+	if (val & PLL_OSC_SEL)
-+		freq = 30000000;
-+	else
-+		freq = 60000000;
-+	hw = clk_hw_register_fixed_rate(NULL, "xtal", NULL, 0, freq);
-+	pr_debug("main crystal @%lu MHz\n", freq / 1000000);
-+
-+	/* VCO clock derived from the crystal */
-+	mult = 13 + ((val >> AHBSPEED_SHIFT) & AHBSPEED_MASK);
-+	div = 2;
-+	/* If we run on 30 MHz crystal we have to multiply with two */
-+	if (val & PLL_OSC_SEL)
-+		mult *= 2;
-+	hw = clk_hw_register_fixed_factor(NULL, "vco", "xtal", 0, mult, div);
-+
-+	/* The AHB clock is always 1/3 of the VCO */
-+	hw = clk_hw_register_fixed_factor(NULL, "ahb", "vco", 0, 1, 3);
-+	gemini_clk_data->hws[GEMINI_CLK_AHB] = hw;
-+
-+	/* The APB clock is always 1/6 of the AHB */
-+	hw = clk_hw_register_fixed_factor(NULL, "apb", "ahb", 0, 1, 6);
-+	gemini_clk_data->hws[GEMINI_CLK_APB] = hw;
-+
-+	/* Register the clocks to be accessed by the device tree */
-+	gemini_clk_data->num = GEMINI_NUM_CLKS;
-+	of_clk_add_hw_provider(np, of_clk_hw_onecell_get, gemini_clk_data);
-+}
-+CLK_OF_DECLARE_DRIVER(gemini_cc, "cortina,gemini-syscon", gemini_cc_init);
+As mention in the previous thread, this needs to check address_hi as well.
+
+> +		/* Configure the ICU with irq number & type */
+> +		icu_int = msg->data | ICU_INT_ENABLE;
+> +		if (icu_irqd->type & IRQ_TYPE_EDGE_RISING)
+> +			icu_int |= ICU_IS_EDGE;
+> +		icu_int |= icu_irqd->icu_group << ICU_GROUP_SHIFT;
+> +	} else {
+> +		/* De-configure the ICU */
+> +		icu_int = 0;
+> +	}
+> +
+> +	writel_relaxed(icu_int, icu->base + ICU_INT_CFG(d->hwirq));
+> +
+> +	/*
+> +	 * The SATA unit has 2 ports, and a dedicated ICU entry per
+> +	 * port. The ahci sata driver supports only one irq interrupt
+> +	 * per SATA unit. To solve this conflict, we configure the 2
+> +	 * SATA wired interrupts in the south bridge into 1 GIC
+> +	 * interrupt in the north bridge. Even if only a single port
+> +	 * is enabled, if sata node is enabled, both interrupts are
+> +	 * configured (regardless of which port is actually in use).
+> +	 */
+> +	if (d->hwirq == ICU_SATA0_ICU_ID || d->hwirq == ICU_SATA1_ICU_ID) {
+> +		writel_relaxed(icu_int,
+> +			       icu->base + ICU_INT_CFG(ICU_SATA0_ICU_ID));
+> +		writel_relaxed(icu_int,
+> +			       icu->base + ICU_INT_CFG(ICU_SATA1_ICU_ID));
+> +	}
+> +}
+> +
+> +static int
+> +mvebu_icu_irq_domain_translate(struct irq_domain *d, struct irq_fwspec *fwspec,
+> +			       unsigned long *hwirq, unsigned int *type)
+> +{
+> +	struct mvebu_icu *icu = d->host_data;
+> +	unsigned int icu_group;
+> +
+> +	/* Check the count of the parameters in dt */
+> +	if (WARN_ON(fwspec->param_count < 3)) {
+> +		dev_err(icu->dev, "wrong ICU parameter count %d\n",
+> +			fwspec->param_count);
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* Only ICU group type is handled */
+> +	icu_group = fwspec->param[0];
+> +	if (icu_group != ICU_GRP_NSR && icu_group != ICU_GRP_SR &&
+> +	    icu_group != ICU_GRP_SEI && icu_group != ICU_GRP_REI) {
+> +		dev_err(icu->dev, "wrong ICU group type %x\n", icu_group);
+> +		return -EINVAL;
+> +	}
+> +
+> +	*hwirq = fwspec->param[1];
+> +	if (*hwirq >= ICU_MAX_IRQS) {
+> +		dev_err(icu->dev, "invalid interrupt number %ld\n", *hwirq);
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* Mask the type to prevent wrong DT configuration */
+> +	*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
+> +
+> +	return 0;
+> +}
+> +
+> +static int
+> +mvebu_icu_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+> +			   unsigned int nr_irqs, void *args)
+> +{
+> +	int err;
+> +	unsigned long hwirq;
+> +	struct irq_fwspec *fwspec = args;
+> +	struct mvebu_icu *icu = platform_msi_get_host_data(domain);
+> +	struct mvebu_icu_irq_data *icu_irqd;
+> +
+> +	icu_irqd = kmalloc(sizeof(*icu_irqd), GFP_KERNEL);
+> +	if (!icu_irqd)
+> +		return -ENOMEM;
+> +
+> +	err = mvebu_icu_irq_domain_translate(domain, fwspec, &hwirq,
+> +					     &icu_irqd->type);
+> +	if (err) {
+> +		dev_err(icu->dev, "failed to translate ICU parameters\n");
+> +		goto free_irqd;
+> +	}
+> +
+> +	icu_irqd->icu_group = fwspec->param[0];
+> +	icu_irqd->icu = icu;
+> +
+> +	err = platform_msi_domain_alloc(domain, virq, nr_irqs);
+> +	if (err) {
+> +		dev_err(icu->dev, "failed to allocate ICU interrupt in parent domain\n");
+> +		goto free_irqd;
+> +	}
+> +
+> +	/* Make sure there is no interrupt left pending by the firmware */
+> +	err = irq_set_irqchip_state(virq, IRQCHIP_STATE_PENDING, false);
+> +	if (err)
+> +		goto free_msi;
+> +
+> +	err = irq_domain_set_hwirq_and_chip(domain, virq, hwirq,
+> +					    &icu->irq_chip, icu_irqd);
+> +	if (err) {
+> +		dev_err(icu->dev, "failed to set the data to IRQ domain\n");
+> +		goto free_msi;
+> +	}
+> +
+> +	return 0;
+> +
+> +free_msi:
+> +	platform_msi_domain_free(domain, virq, nr_irqs);
+> +free_irqd:
+> +	kfree(icu_irqd);
+> +	return err;
+> +}
+> +
+> +static void
+> +mvebu_icu_irq_domain_free(struct irq_domain *domain, unsigned int virq,
+> +			  unsigned int nr_irqs)
+> +{
+> +	struct irq_data *d = irq_get_irq_data(virq);
+> +	struct mvebu_icu_irq_data *icu_irqd = d->chip_data;
+> +
+> +	kfree(icu_irqd);
+> +
+> +	platform_msi_domain_free(domain, virq, nr_irqs);
+> +}
+> +
+> +static const struct irq_domain_ops mvebu_icu_domain_ops = {
+> +	.translate = mvebu_icu_irq_domain_translate,
+> +	.alloc     = mvebu_icu_irq_domain_alloc,
+> +	.free      = mvebu_icu_irq_domain_free,
+> +};
+> +
+> +static int mvebu_icu_probe(struct platform_device *pdev)
+> +{
+> +	struct mvebu_icu *icu;
+> +	struct device_node *node = pdev->dev.of_node;
+> +	struct device_node *gicp_dn;
+> +	struct resource *res;
+> +	phys_addr_t setspi, clrspi;
+> +	u32 i, icu_int;
+> +	int ret;
+> +
+> +	icu = devm_kzalloc(&pdev->dev, sizeof(struct mvebu_icu),
+> +			   GFP_KERNEL);
+> +	if (!icu)
+> +		return -ENOMEM;
+> +
+> +	icu->dev = &pdev->dev;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	icu->base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(icu->base)) {
+> +		dev_err(&pdev->dev, "Failed to map icu base address.\n");
+> +		return PTR_ERR(icu->base);
+> +	}
+> +
+> +	icu->irq_chip.name = devm_kasprintf(&pdev->dev, GFP_KERNEL,
+> +					    "ICU.%x",
+> +					    (unsigned int)res->start);
+> +	if (!icu->irq_chip.name)
+> +		return -ENOMEM;
+> +
+> +	icu->irq_chip.irq_mask = irq_chip_mask_parent;
+> +	icu->irq_chip.irq_unmask = irq_chip_unmask_parent;
+> +	icu->irq_chip.irq_eoi = irq_chip_eoi_parent;
+> +	icu->irq_chip.irq_set_type = irq_chip_set_type_parent;
+> +#ifdef CONFIG_SMP
+> +	icu->irq_chip.irq_set_affinity = irq_chip_set_affinity_parent;
+> +#endif
+> +
+> +	/*
+> +	 * We're probed after MSI domains have been resolved, so force
+> +	 * resolution here.
+> +	 */
+> +	pdev->dev.msi_domain = of_msi_get_domain(&pdev->dev, node,
+> +						 DOMAIN_BUS_PLATFORM_MSI);
+> +	if (!pdev->dev.msi_domain)
+> +		return -EPROBE_DEFER;
+> +
+> +	gicp_dn = of_parse_phandle(node, "msi-parent", 0);
+> +	if (!gicp_dn) {
+> +		dev_err(&pdev->dev, "Missing marvell,gicp property.\n");
+
+The property name doesn't match here. But overall, there is little point
+in reparsing the msi-parent, since that's what of_msi_get_domain does.
+Instead, consider using:
+
+	gicp_dn = irq_domain_get_of_node(pdev->dev.msi_domain);
+
+which will do the right thing.
+
+> +		return -ENODEV;
+> +	}
+> +
+> +	ret = mvebu_gicp_get_doorbells(gicp_dn, &setspi, &clrspi);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* Set Clear/Set ICU SPI message address in AP */
+> +	writel_relaxed(upper_32_bits(setspi), icu->base + ICU_SETSPI_NSR_AH);
+> +	writel_relaxed(lower_32_bits(setspi), icu->base + ICU_SETSPI_NSR_AL);
+> +	writel_relaxed(upper_32_bits(clrspi), icu->base + ICU_CLRSPI_NSR_AH);
+> +	writel_relaxed(lower_32_bits(clrspi), icu->base + ICU_CLRSPI_NSR_AL);
+> +
+> +	/*
+> +	 * Clean all ICU interrupts with type SPI_NSR, required to
+> +	 * avoid unpredictable SPI assignments done by firmware.
+> +	 */
+> +	for (i = 0 ; i < ICU_MAX_IRQS ; i++) {
+> +		icu_int = readl(icu->base + ICU_INT_CFG(i));
+> +		if ((icu_int >> ICU_GROUP_SHIFT) == ICU_GRP_NSR)
+> +			writel_relaxed(0x0, icu->base + ICU_INT_CFG(i));
+> +	}
+> +
+> +	icu->domain =
+> +		platform_msi_create_device_domain(&pdev->dev, ICU_MAX_IRQS,
+> +						  mvebu_icu_write_msg,
+> +						  &mvebu_icu_domain_ops, icu);
+> +	if (!icu->domain) {
+> +		dev_err(&pdev->dev, "Failed to create ICU domain\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id mvebu_icu_of_match[] = {
+> +	{ .compatible = "marvell,cp110-icu", },
+> +	{},
+> +};
+> +
+> +static struct platform_driver mvebu_icu_driver = {
+> +	.probe  = mvebu_icu_probe,
+> +	.driver = {
+> +		.name = "mvebu-icu",
+> +		.of_match_table = mvebu_icu_of_match,
+> +	},
+> +};
+> +builtin_platform_driver(mvebu_icu_driver);
+> diff --git a/include/dt-bindings/interrupt-controller/mvebu-icu.h b/include/dt-bindings/interrupt-controller/mvebu-icu.h
+> new file mode 100644
+> index 0000000..8249558
+> --- /dev/null
+> +++ b/include/dt-bindings/interrupt-controller/mvebu-icu.h
+> @@ -0,0 +1,15 @@
+> +/*
+> + * This header provides constants for the MVEBU ICU driver.
+> + */
+> +
+> +#ifndef _DT_BINDINGS_INTERRUPT_CONTROLLER_MVEBU_ICU_H
+> +#define _DT_BINDINGS_INTERRUPT_CONTROLLER_MVEBU_ICU_H
+> +
+> +/* interrupt specifier cell 0 */
+> +
+> +#define ICU_GRP_NSR		0x0
+> +#define ICU_GRP_SR		0x1
+> +#define ICU_GRP_SEI		0x4
+> +#define ICU_GRP_REI		0x5
+> +
+> +#endif
+> 
+
+With the two minor changes above, and for patch #3 as well:
+
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+I can either perform the changes when applying the patches, or let you
+do it so that you can test it first (and solve the issue with the DT
+include fine with Gregory).
+
+Thanks,
+
+	M.
 -- 
-2.9.4
+Jazz is not dead. It just smells funny...
