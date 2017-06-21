@@ -1,36 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 Jun 2017 23:53:00 +0200
-Subject: [PATCH 2/4] ARM/PCI: mv78xx0: pass pci_ops correctly again
+Date: Wed, 21 Jun 2017 23:53:01 +0200
+Subject: [PATCH 3/4] PCI: versatile: fix typo
 In-Reply-To: <20170621215323.3921382-1-arnd@arndb.de>
 References: <20170621215323.3921382-1-arnd@arndb.de>
-Message-ID: <20170621215323.3921382-2-arnd@arndb.de>
+Message-ID: <20170621215323.3921382-3-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We used to pass the operations when calling pci_scan_root_bus, but
-that argument was removed:
+There is no 'dev' variable in this function:
 
-arch/arm/mach-mv78xx0/pcie.c:175:23: error: 'pcie_ops' defined but not used [-Werror=unused-variable]
+drivers/pci/host/pci-versatile.c: In function 'versatile_pci_probe':
+drivers/pci/host/pci-versatile.c:131:38: error: 'dev' undeclared (first use in this function); did you mean 'pdev'?
 
-Setting it in pci_hw should address this.
+This passes the device embedded in the platform_device instead.
 
-Fixes: ace27646da8e ("ARM/PCI: Convert PCI scan API to pci_scan_root_bus_bridge()")
+Fixes: 433d2671da1b ("PCI: versatile: Convert PCI scan API to pci_scan_root_bus_bridge()")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-mv78xx0/pcie.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/pci/host/pci-versatile.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-mv78xx0/pcie.c b/arch/arm/mach-mv78xx0/pcie.c
-index 2b406e909a43..cb7f95c9d8eb 100644
---- a/arch/arm/mach-mv78xx0/pcie.c
-+++ b/arch/arm/mach-mv78xx0/pcie.c
-@@ -214,6 +214,7 @@ static int __init mv78xx0_pcie_map_irq(const struct pci_dev *dev, u8 slot,
- }
+diff --git a/drivers/pci/host/pci-versatile.c b/drivers/pci/host/pci-versatile.c
+index 3be25a9dd29a..f572c921cdd4 100644
+--- a/drivers/pci/host/pci-versatile.c
++++ b/drivers/pci/host/pci-versatile.c
+@@ -128,7 +128,7 @@ static int versatile_pci_probe(struct platform_device *pdev)
+ 	struct pci_host_bridge *bridge;
+ 	LIST_HEAD(pci_res);
  
- static struct hw_pci mv78xx0_pci __initdata = {
-+	.ops		= &pcie_ops,
- 	.nr_controllers	= 8,
- 	.preinit	= mv78xx0_pcie_preinit,
- 	.setup		= mv78xx0_pcie_setup,
+-	bridge = devm_pci_alloc_host_bridge(dev, 0);
++	bridge = devm_pci_alloc_host_bridge(&pdev->dev, 0);
+ 	if (!bridge)
+ 		return -ENOMEM;
+ 
 -- 
 2.9.0
