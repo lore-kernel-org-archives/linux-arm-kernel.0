@@ -1,51 +1,76 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Wed, 21 Jun 2017 15:42:05 +0800
-Subject: [PATCH v2] KVM: arm/arm64: Signal SIGBUS when stage2 discovers
- hwpoison memory
-In-Reply-To: <20170524163250.29281-1-james.morse@arm.com>
-References: <20170524163250.29281-1-james.morse@arm.com>
-Message-ID: <3dbafd74-57f2-e724-ace2-0f84abb57e59@huawei.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Wed, 21 Jun 2017 09:50:56 +0200
+Subject: [PATCH v5 1/4] ARM: dts: at91: sama5d2_xplained: enable ADTRG pin
+In-Reply-To: <20170620175552.2ec49c56@kernel.org>
+References: <1497533097-12052-1-git-send-email-eugen.hristev@microchip.com>
+ <1497533097-12052-2-git-send-email-eugen.hristev@microchip.com>
+ <20170620175552.2ec49c56@kernel.org>
+Message-ID: <09e9462b-f375-2259-179f-0a723b2cb5aa@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
-  I have a comment here:
+On 20/06/2017 at 18:55, Jonathan Cameron wrote:
+> On Thu, 15 Jun 2017 16:24:54 +0300
+> Eugen Hristev <eugen.hristev@microchip.com> wrote:
+> 
+>> Enable pinctrl for ADTRG pin (PD31) for ADC hardware trigger support.
+>>
+>> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+>> Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+> The driver changes are on their way upstream.
+> 
+> Acked-by: Jonathan Cameron <jic23@kernel.org>
 
-On 2017/5/25 0:32, James Morse wrote:
-> +static void kvm_send_hwpoison_signal(unsigned long address,
-> +				     struct vm_area_struct *vma)
-> +{
-> +	siginfo_t info;
-> +
-> +	info.si_signo   = SIGBUS;
-> +	info.si_errno   = 0;
-> +	info.si_code    = BUS_MCEERR_AR;
-> +	info.si_addr    = (void __user *)address;
-> +
-> +	if (is_vm_hugetlb_page(vma))
-> +		info.si_addr_lsb = huge_page_shift(hstate_vma(vma));
-> +	else
-> +		info.si_addr_lsb = PAGE_SHIFT;
-> +
-> +	send_sig_info(SIGBUS, &info, current);
-> +}
-> +
->  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  			  struct kvm_memory_slot *memslot, unsigned long hva,
->  			  unsigned long fault_status)
-> @@ -1318,6 +1337,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  	smp_rmb();
->  
->  	pfn = gfn_to_pfn_prot(kvm, gfn, write_fault, &writable);
-> +	if (pfn == KVM_PFN_ERR_HWPOISON) {
-> +		kvm_send_hwpoison_signal(hva, vma);
-> +		return 0;
-> +	}
-I heard from our CPU hardware team, when happen HWpoison, CPU hardware does not record the IPA address in the HPFAR_EL2.
-Only when the SEA error is related to the page table walk, the HPFAR_EL2 register is updated.
-here we got the pfn/gfn from the register HPFAR_EL2, if CPU does not update the HPFAR_EL2 register, we may can not use this method to get the pfn/gfn.
-could you confirm arm's armv8.0/armv8.2 standard CPU also use such design? if so, we may need to use other method to get the gfn/pfn/hva address.
+Thanks Jonathan,
+
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+
+Eugen, note that we may need to wait for 4.14 as our changes for 4.13
+are already queued in arm-soc...
+
+Best regards,
+
+>> ---
+>>  arch/arm/boot/dts/at91-sama5d2_xplained.dts | 16 +++++++++++++++-
+>>  1 file changed, 15 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+>> index 0bef9e0..04754b1 100644
+>> --- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+>> +++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+>> @@ -303,7 +303,7 @@
+>>  				vddana-supply = <&vdd_3v3_lp_reg>;
+>>  				vref-supply = <&vdd_3v3_lp_reg>;
+>>  				pinctrl-names = "default";
+>> -				pinctrl-0 = <&pinctrl_adc_default>;
+>> +				pinctrl-0 = <&pinctrl_adc_default &pinctrl_adtrg_default>;
+>>  				status = "okay";
+>>  			};
+>>  
+>> @@ -322,6 +322,20 @@
+>>  					bias-disable;
+>>  				};
+>>  
+>> +				/*
+>> +				 * The ADTRG pin can work on any edge type.
+>> +				 * In here it's being pulled up, so need to
+>> +				 * connect it to ground to get an edge e.g.
+>> +				 * Trigger can be configured on falling, rise
+>> +				 * or any edge, and the pull-up can be changed
+>> +				 * to pull-down or left floating according to
+>> +				 * needs.
+>> +				 */
+>> +				pinctrl_adtrg_default: adtrg_default {
+>> +					pinmux = <PIN_PD31__ADTRG>;
+>> +					bias-pull-up;
+>> +				};
+>> +
+>>  				pinctrl_charger_chglev: charger_chglev {
+>>  					pinmux = <PIN_PA12__GPIO>;
+>>  					bias-disable;
+> 
+> 
 
 
->  	if (is_error_noslot_pfn(pfn))
->  		return -EFAULT;
+-- 
+Nicolas Ferre
