@@ -1,62 +1,35 @@
 From: xuejiancheng@hisilicon.com (Jiancheng Xue)
-Date: Wed, 21 Jun 2017 17:00:42 +0800
-Subject: [PATCH 2/5] dt-bindings: phy-hisi-inno-usb2: add support for
- hisi-inno-usb2 phy
-In-Reply-To: <1498035645-22804-1-git-send-email-xuejiancheng@hisilicon.com>
-References: <1498035645-22804-1-git-send-email-xuejiancheng@hisilicon.com>
-Message-ID: <1498035645-22804-3-git-send-email-xuejiancheng@hisilicon.com>
+Date: Wed, 21 Jun 2017 17:00:40 +0800
+Subject: [PATCH 0/5] enable usb2 function on poplar board.
+Message-ID: <1498035645-22804-1-git-send-email-xuejiancheng@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for hisi-inno-usb2 phy.
+This patchset is mainly used to enable usb2 function on poplar board.
 
-Signed-off-by: Jiancheng Xue <xuejiancheng@hisilicon.com>
----
- .../devicetree/bindings/phy/phy-hisi-inno-usb2.txt | 36 ++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+Jiancheng Xue (4):
+  clk: hisilicon: add usb2 clocks for hi3798cv200 SoC
+  dt-bindings: phy-hisi-inno-usb2: add support for hisi-inno-usb2 phy
+  arm64: dts: hisilicon: add usb2 controller and phy nodes for poplar
+    board.
+  arm64: defconfig: enable some drivers and configs for
+    hi3798cv200-poplar board.
+
+Pengcheng Li (1):
+  phy: add inno-usb2-phy driver for hi3798cv200 SoC
+
+ .../devicetree/bindings/phy/phy-hisi-inno-usb2.txt |  36 +++
+ .../boot/dts/hisilicon/hi3798cv200-poplar.dts      |  13 +
+ arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi     |  47 ++++
+ arch/arm64/configs/defconfig                       |  13 +-
+ drivers/clk/hisilicon/crg-hi3798cv200.c            |  21 ++
+ drivers/phy/Kconfig                                |  10 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-hisi-inno-usb2.c                   | 287 +++++++++++++++++++++
+ include/dt-bindings/clock/histb-clock.h            |   9 +-
+ 9 files changed, 435 insertions(+), 2 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/phy/phy-hisi-inno-usb2.txt
+ create mode 100644 drivers/phy/phy-hisi-inno-usb2.c
 
-diff --git a/Documentation/devicetree/bindings/phy/phy-hisi-inno-usb2.txt b/Documentation/devicetree/bindings/phy/phy-hisi-inno-usb2.txt
-new file mode 100644
-index 0000000..21f8208
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/phy-hisi-inno-usb2.txt
-@@ -0,0 +1,36 @@
-+HiSilicon INNO USB2 PHY
-+-----------------------
-+Required properties:
-+- compatible: Should be one of the following strings:
-+		"hisilicon,inno-usb2-phy",
-+		"hisilicon,hi3798cv200-usb2-phy",
-+- #phy-cells: Must be 0
-+- hisilicon,peripheral-syscon: Phandle of syscon used to control phy.
-+- clocks: Phandle and clock specifier pair for reference clock utmi_refclk.
-+- resets: List of phandle and reset specifier pairs for each reset signal in
-+reset-names.
-+- reset-names: Should be "por_rst" and "test_rst". The test_rst only
-+exists in some of SOCs, so it is optional.
-+
-+Phy node can include up to four subnodes. Each subnode represents one port.
-+The required properties of port node are as follows:
-+- clocks: Phandle and clock specifier pair for utmi_clock.
-+- resets: List of phandle and reset specifier pairs for port reset and utmi reset.
-+- reset-names: List of reset signal names. Should be "port_rst" and "utmi_rst"
-+
-+Refer to phy/phy-bindings.txt for the generic PHY binding properties
-+
-+Example:
-+usb_phy: phy {
-+		 compatible = "hisilicon,inno_usb2_phy";
-+		 #phy-cells = <0>;
-+		 hisilicon,peripheral-syscon = <&peri_ctrl>;
-+		 clocks = <&crg USB2_REF_CLK>;
-+		 resets = <&crg 0xb4 2>;
-+		 reset-names = "por_rst";
-+		 port0 {
-+			 clocks = <&crg USB2_UTMI0_CLK>;
-+			 resets = <&crg 0xb4 5>, <&crg 0xb4 1>;
-+			 reset-names = "port_rst", "utmi_rst";
-+		 };
-+	 };
 -- 
 1.9.1
