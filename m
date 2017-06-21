@@ -1,81 +1,98 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 21 Jun 2017 16:23:20 +0100
-Subject: [PATCH 1/3] arm64: ptrace: Fix VFP register dumping in compat
- coredumps
-In-Reply-To: <1498057264-12211-1-git-send-email-Dave.Martin@arm.com>
-References: <1498057010-12028-1-git-send-email-Dave.Martin@arm.com>
- <1498057264-12211-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20170621152320.GG24558@leverpostej>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Wed, 21 Jun 2017 15:25:10 +0000
+Subject: [PATCH v3 2/2] acpi, gicv3-its, numa: Adding numa node mapping
+ for gic-its units
+In-Reply-To: <a3550a73-9345-b360-44e6-949f0b6c42da@arm.com>
+References: <1498025743-6340-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <1498025743-6340-3-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <20170621070941.GA6124@localhost>
+ <a3550a73-9345-b360-44e6-949f0b6c42da@arm.com>
+Message-ID: <20170621152509.GA4485@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 21, 2017 at 04:00:42PM +0100, Dave Martin wrote:
-> Currently, VFP registers are omitted from coredumps for compat
-> processes, due to a bug in the REGSET_COMPAT_VFP regset
-> implementation.
+On Wed, Jun 21, 2017 at 09:44:58AM +0100, Marc Zyngier wrote:
+> On 21/06/17 08:09, Jayachandran C wrote:
+> > On Wed, Jun 21, 2017 at 11:45:43AM +0530, Ganapatrao Kulkarni wrote:
+> >> Add code to parse SRAT ITS Affinity sub table as defined in ACPI 6.2
+> >> Later in per device probe, ITS devices are mapped to
+> >> numa node using ITS id to proximity domain mapping.
+> >>
+> >> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> >> ---
+> >>  drivers/irqchip/irq-gic-v3-its.c | 80 +++++++++++++++++++++++++++++++++++++++-
+> >>  1 file changed, 79 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> >> index 45ea1933..88cfb32 100644
+> >> --- a/drivers/irqchip/irq-gic-v3-its.c
+> >> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> >> @@ -1833,6 +1833,82 @@ static int __init its_of_probe(struct device_node *node)
+> >>  
+> >>  #define ACPI_GICV3_ITS_MEM_SIZE (SZ_128K)
+> >>  
+> >> +#ifdef CONFIG_ACPI_NUMA
+> >> +struct its_srat_map {
+> >> +	u32	numa_node;  /* numa node id */
+> >> +	u32	its_id;  /* GIC ITS ID */
+> >> +};
+> >> +
+> >> +static struct its_srat_map its_srat_maps[MAX_NUMNODES] __initdata = {
+> >> +	[0 ... MAX_NUMNODES - 1] = {NUMA_NO_NODE, UINT_MAX} };
+> >> +
+> >> +static int its_in_srat __initdata;
+> >> +
+> >> +static int __init
+> >> +acpi_get_its_numa_node(u32 its_id)
+> >> +{
+> >> +	int i;
+> >> +
+> >> +	for (i = 0; i < its_in_srat; i++) {
+> >> +		if (its_id == its_srat_maps[i].its_id)
+> >> +			return its_srat_maps[i].numa_node;
+> >> +	}
+> >> +	return NUMA_NO_NODE;
+> >> +}
+> >> +
+> >> +static int __init
+> >> +gic_acpi_parse_srat_its(struct acpi_subtable_header *header,
+> >> +			 const unsigned long end)
+> >> +{
+> >> +	int pxm, node;
+> >> +	struct acpi_srat_its_affinity *its_affinity;
+> >> +
+> >> +	its_affinity = (struct acpi_srat_its_affinity *)header;
+> >> +	if (!its_affinity)
+> >> +		return -EINVAL;
+> >> +
+> >> +	if (its_affinity->header.length <
+> >> +			sizeof(struct acpi_srat_its_affinity)) {
+> >> +		pr_err("SRAT:ITS: Invalid SRAT header length: %d\n",
+> >> +			its_affinity->header.length);
+> > 
+> > The original driver does not use pr_fmt properly, it may be worth
+> > fixing that up rather than having prefixes, here...
 > 
-> compat_vfp_get() needs to transfer non-contiguous data from
-> thread_struct.fpsimd_state, and uses put_user() to handle the
-> offending trailing word (FPSCR).  This fails when copying to a
-> kernel address (i.e., kbuf && !ubuf), which is what happens when
-> dumping core.  As a result, the ELF coredump core code silently
-> omits the NT_ARM_VFP note from the dump.
-> 
-> It would be possible to work around this with additional special
-> case code for the put_user(), but since user_regset_copyout() is
-> explcltly designed to handle this scenario it is cleaner to port
+> Irrespective of what the "proper" usage is
 
-Nit: explicitly
+The prefixes of the prints in this driver are a bit inconsistent. And
+there are a few error messages like the "Failed to allocate PROPBASE"
+and "Bad LPI chunk %d\n" without any prefix at all. pr_fmt would be
+helpful to clean it up.
 
-> the put_user() to a user_regset_copyout() call, which this patch
-> does.
+> this kind of cleanup doesn't belong in this series.
 
-Given, 32-bit arm also uses user_regset_copyout(), it seems like the
-all-round right thing to do.
+Right. I think the printed messages in this patch can be improved quite
+a bit. currently the tags and spacing are inconsistent, something like:
+|  pr_err("SRAT: Invalid header length %d in ITS affinity\n", ...
+|  pr_err("SRAT: Invalid NUMA node %d in ITS affinity\n", node);
+|  pr_info("SRAT: PXM %d -> ITS %d -> Node %d\n",
+would be better in my opinion.
 
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> ---
->  arch/arm64/kernel/ptrace.c | 11 +++++++----
->  1 file changed, 7 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-> index c142459..0e5aaec 100644
-> --- a/arch/arm64/kernel/ptrace.c
-> +++ b/arch/arm64/kernel/ptrace.c
-> @@ -894,7 +894,7 @@ static int compat_vfp_get(struct task_struct *target,
->  {
->  	struct user_fpsimd_state *uregs;
->  	compat_ulong_t fpscr;
-> -	int ret;
-> +	int ret, vregs_end_pos;
->  
->  	uregs = &target->thread.fpsimd_state.user_fpsimd;
->  
-> @@ -902,13 +902,16 @@ static int compat_vfp_get(struct task_struct *target,
->  	 * The VFP registers are packed into the fpsimd_state, so they all sit
->  	 * nicely together for us. We just need to create the fpscr separately.
->  	 */
-> -	ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf, uregs, 0,
-> -				  VFP_STATE_SIZE - sizeof(compat_ulong_t));
-> +	vregs_end_pos = VFP_STATE_SIZE - sizeof(compat_ulong_t);
-> +	ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf, uregs,
-> +				  0, vregs_end_pos);
->  
->  	if (count && !ret) {
->  		fpscr = (uregs->fpsr & VFP_FPSCR_STAT_MASK) |
->  			(uregs->fpcr & VFP_FPSCR_CTRL_MASK);
-> -		ret = put_user(fpscr, (compat_ulong_t *)ubuf);
-> +
-> +		ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf, &fpscr,
-> +					  vregs_end_pos, VFP_STATE_SIZE);
->  	}
+> Feel free to submit a separate patch.
 
-It's a shame compat_user_vfp is defined in signal32.c, otherwise we
-could've used offsetof(struct compat-user_vfp, fpscr) here (and also for
-the fpregs), mirroring the structure of 32-bit's vfp_get().
+The driver also prints 2 lines per CPU on boot which can get to a few
+hundred lines on our test machines. So there are a few things worth
+fixing up here... maybe in another kernel dev cycle.
 
-Otherwise, this looks sane to me.
-
-Thanks,
-Mark
+JC.
