@@ -1,149 +1,34 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 21 Jun 2017 09:58:21 +0100
-Subject: [PATCH v3 2/2] acpi, gicv3-its, numa: Adding numa node mapping
- for gic-its units
-In-Reply-To: <1498025743-6340-3-git-send-email-ganapatrao.kulkarni@cavium.com>
-References: <1498025743-6340-1-git-send-email-ganapatrao.kulkarni@cavium.com>
- <1498025743-6340-3-git-send-email-ganapatrao.kulkarni@cavium.com>
-Message-ID: <89b8b97d-1f4c-4938-9932-b2d637797e14@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 21 Jun 2017 10:08:03 +0100
+Subject: [PATCH 1/1] iommu/arm-smmu-v3: replace writel with
+ writel_relaxed in queue_inc_prod
+In-Reply-To: <5949CBB7.1030908@huawei.com>
+References: <1497956694-11784-1-git-send-email-thunder.leizhen@huawei.com>
+ <acafb87c-4ba9-4a44-f868-c8f882717ab1@arm.com>
+ <5949CBB7.1030908@huawei.com>
+Message-ID: <20170621090803.GB3768@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/06/17 07:15, Ganapatrao Kulkarni wrote:
-> Add code to parse SRAT ITS Affinity sub table as defined in ACPI 6.2
-> Later in per device probe, ITS devices are mapped to
-> numa node using ITS id to proximity domain mapping.
-> 
-> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> ---
->  drivers/irqchip/irq-gic-v3-its.c | 80 +++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 79 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 45ea1933..88cfb32 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -1833,6 +1833,82 @@ static int __init its_of_probe(struct device_node *node)
->  
->  #define ACPI_GICV3_ITS_MEM_SIZE (SZ_128K)
->  
-> +#ifdef CONFIG_ACPI_NUMA
-> +struct its_srat_map {
-> +	u32	numa_node;  /* numa node id */
-> +	u32	its_id;  /* GIC ITS ID */
-> +};
-> +
-> +static struct its_srat_map its_srat_maps[MAX_NUMNODES] __initdata = {
-> +	[0 ... MAX_NUMNODES - 1] = {NUMA_NO_NODE, UINT_MAX} };
-> +
-> +static int its_in_srat __initdata;
-> +
-> +static int __init
-> +acpi_get_its_numa_node(u32 its_id)
+On Wed, Jun 21, 2017 at 09:28:23AM +0800, Leizhen (ThunderTown) wrote:
+> On 2017/6/20 19:35, Robin Murphy wrote:
+> > On 20/06/17 12:04, Zhen Lei wrote:
+> >> This function is protected by spinlock, and the latter will do memory
+> >> barrier implicitly. So that we can safely use writel_relaxed. In fact, the
+> >> dmb operation will lengthen the time protected by lock, which indirectly
+> >> increase the locking confliction in the stress scene.
+> > 
+> > If you remove the DSB between writing the commands (to Normal memory)
+> > and writing the pointer (to Device memory), how can you guarantee that
+> > the complete command is visible to the SMMU and it isn't going to try to
+> > consume stale memory contents? The spinlock is irrelevant since it's
+> > taken *before* the command is written.
+> OK, I see, thanks. Let's me see if there are any other methods. And I think
+> that this may should be done well by hardware.
 
-Please keep these on the same line.
+FWIW, I did use the _relaxed variants wherever I could when I wrote the
+driver. There might, of course, be bugs, but it's not like the normal case
+for drivers where the author didn't consider the _relaxed accessors
+initially.
 
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < its_in_srat; i++) {
-> +		if (its_id == its_srat_maps[i].its_id)
-> +			return its_srat_maps[i].numa_node;
-> +	}
-> +	return NUMA_NO_NODE;
-> +}
-> +
-> +static int __init
-> +gic_acpi_parse_srat_its(struct acpi_subtable_header *header,
-> +			 const unsigned long end)
-
-Same remark.
-
-> +{
-> +	int pxm, node;
-> +	struct acpi_srat_its_affinity *its_affinity;
-> +
-> +	its_affinity = (struct acpi_srat_its_affinity *)header;
-> +	if (!its_affinity)
-> +		return -EINVAL;
-> +
-> +	if (its_affinity->header.length <
-> +			sizeof(struct acpi_srat_its_affinity)) {
-
-Same thing.
-
-> +		pr_err("SRAT:ITS: Invalid SRAT header length: %d\n",
-> +			its_affinity->header.length);
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (its_in_srat >= MAX_NUMNODES) {
-> +		pr_err("SRAT:ITS: ITS devices exceeding max count[%d]\n",
-> +				MAX_NUMNODES);
-> +		return -EINVAL;
-> +	}
-> +
-> +	pxm = its_affinity->proximity_domain;
-> +	node = acpi_map_pxm_to_node(pxm);
-> +
-> +	if (node == NUMA_NO_NODE || node >= MAX_NUMNODES) {
-> +		pr_err("SRAT:ITS: Invalid numa node %d\n", node);
-> +		return -EINVAL;
-> +	}
-
-So if you find an entry that doesn't match the current kernel
-configuration, you drop all the subsequent entries? That doesn't feel right.
-
-> +
-> +	its_srat_maps[its_in_srat].numa_node = node;
-> +	its_srat_maps[its_in_srat].its_id = its_affinity->its_id;
-> +	its_in_srat++;
-> +	pr_info("ACPI: NUMA: SRAT: ITS: PXM %d -> ITS_ID %d -> NODE %d\n",
-> +		pxm, its_affinity->its_id, node);
-> +
-> +	return 0;
-> +}
-> +
-> +static int __init acpi_table_parse_srat_its(void)
-> +{
-> +	return acpi_table_parse_entries(ACPI_SIG_SRAT,
-> +					sizeof(struct acpi_table_srat),
-> +					ACPI_SRAT_TYPE_GIC_ITS_AFFINITY,
-> +					gic_acpi_parse_srat_its, 0);
-
-If you don't check the return value, there is no point returning it.
-
-> +}
-> +#else
-> +#define acpi_table_parse_srat_its()	do { } while (0)
-> +#define acpi_get_its_numa_node(its_id)	NUMA_NO_NODE
-> +#endif
-> +
->  static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
->  					  const unsigned long end)
->  {
-> @@ -1861,7 +1937,8 @@ static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
->  		goto dom_err;
->  	}
->  
-> -	err = its_probe_one(&res, dom_handle, NUMA_NO_NODE);
-> +	err = its_probe_one(&res, dom_handle,
-> +			acpi_get_its_numa_node(its_entry->translation_id));
->  	if (!err)
->  		return 0;
->  
-> @@ -1873,6 +1950,7 @@ static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
->  
->  static void __init its_acpi_probe(void)
->  {
-> +	acpi_table_parse_srat_its();
->  	acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
->  			      gic_acpi_parse_madt_its, 0);
->  }
-> 
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Will
