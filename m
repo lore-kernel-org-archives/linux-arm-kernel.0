@@ -1,30 +1,35 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Wed, 21 Jun 2017 20:19:47 +0200
-Subject: [PATCH v8 3/3] iommu/arm-smmu-v3: Add workaround for Cavium
- ThunderX2 erratum #126
-In-Reply-To: <1497968259-16390-4-git-send-email-gakula@caviumnetworks.com>
-References: <1497968259-16390-1-git-send-email-gakula@caviumnetworks.com>
- <1497968259-16390-4-git-send-email-gakula@caviumnetworks.com>
-Message-ID: <20170621181947.GH16981@rric.localdomain>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 21 Jun 2017 20:20:04 +0200
+Subject: [PATCH] pinctrl: bcm2835: Avoid warning from __irq_do_set_handler
+Message-ID: <1498069204-28154-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.06.17 19:47:39, Geetha sowjanya wrote:
-> From: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
-> 
-> Cavium ThunderX2 SMMU doesn't support MSI and also doesn't have unique irq
-> lines for gerror, eventq and cmdq-sync.
-> 
-> SHARED_IRQ option is set as a errata workaround, which allows to share the irq
-> line by register single irq handler for all the interrupts.
+We get a warning during boot with enabled EARLY_PRINTK that
+we try to set a irq_chip without data. This is caused by ignoring
+the return value of irq_of_parse_and_map(). So avoid calling
+gpiochip_set_chained_irqchip() in error case.
 
-I found the entry in silicon-errata.txt missing, is that on purpose?
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+Fixes: 85ae9e512f43 ("pinctrl: bcm2835: switch to GPIOLIB_IRQCHIP")
+---
+ drivers/pinctrl/bcm/pinctrl-bcm2835.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
--Robert
-
-> 
-> Signed-off-by: Geetha sowjanya <gakula@caviumnetworks.com>
-> ---
->  .../devicetree/bindings/iommu/arm,smmu-v3.txt      |    5 ++
->  drivers/iommu/arm-smmu-v3.c                        |   73 ++++++++++++++++----
->  2 files changed, 64 insertions(+), 14 deletions(-)
+diff --git a/drivers/pinctrl/bcm/pinctrl-bcm2835.c b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
+index 1eb7a1a..2308831 100644
+--- a/drivers/pinctrl/bcm/pinctrl-bcm2835.c
++++ b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
+@@ -1048,6 +1048,10 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
+ 	for (i = 0; i < BCM2835_NUM_IRQS; i++) {
+ 		pc->irq[i] = irq_of_parse_and_map(np, i);
+ 		pc->irq_group[i] = i;
++
++		if (pc->irq[i] == 0)
++			continue;
++
+ 		/*
+ 		 * Use the same handler for all groups: this is necessary
+ 		 * since we use one gpiochip to cover all lines - the
+-- 
+2.7.4
