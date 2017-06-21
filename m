@@ -1,115 +1,86 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 21 Jun 2017 21:16:56 +0200
-Subject: [PATCH 1/4] ARM: exynos_defconfig: Enable Bluetooth, mac80211,
- NFC and more USB drivers
-Message-ID: <20170621191659.10929-1-krzk@kernel.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 21 Jun 2017 21:21:19 +0200
+Subject: [PATCH 0/9] PM / ACPI / i2c: Fix system suspend and deploy runtime PM
+ centric path for ACPI
+Message-ID: <1498072888-14782-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable useful, but not essential, stacks and drivers as modules:
- - Bluetooth,
- - mac80211,
- - NFC,
- - some USB network adapters,
- - USB storage,
- - additional USB devices (printers etc).
+The i2c designware platform driver, drivers/i2c/busses/i2c-designware-platdrv.c,
+currently suffers from a regression, which easily can be triggerd during system
+suspend/resume.
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- arch/arm/configs/exynos_defconfig | 57 ++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 56 insertions(+), 1 deletion(-)
+In particular the regression concerns those SoCs, which doesn't have the i2c
+device being attached to the ACPI PM domain.
 
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index 25325ed9319e..e6a976f5305c 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -48,7 +48,43 @@ CONFIG_IP_PNP=y
- CONFIG_IP_PNP_DHCP=y
- CONFIG_IP_PNP_BOOTP=y
- CONFIG_IP_PNP_RARP=y
-+CONFIG_BT=m
-+CONFIG_BT_RFCOMM=m
-+CONFIG_BT_RFCOMM_TTY=y
-+CONFIG_BT_BNEP=m
-+CONFIG_BT_BNEP_MC_FILTER=y
-+CONFIG_BT_BNEP_PROTO_FILTER=y
-+CONFIG_BT_HIDP=m
-+CONFIG_BT_LEDS=y
-+CONFIG_BT_HCIBTUSB=m
-+CONFIG_BT_HCIBTSDIO=m
-+CONFIG_BT_HCIUART=m
-+CONFIG_BT_HCIUART_BCSP=y
-+CONFIG_BT_HCIUART_ATH3K=y
-+CONFIG_BT_HCIUART_3WIRE=y
-+CONFIG_BT_HCIUART_INTEL=y
-+CONFIG_BT_HCIUART_BCM=y
-+CONFIG_BT_HCIUART_QCA=y
-+CONFIG_BT_HCIUART_AG6XX=y
-+CONFIG_BT_HCIUART_MRVL=y
-+CONFIG_BT_HCIBCM203X=m
-+CONFIG_BT_HCIBPA10X=m
-+CONFIG_BT_HCIBFUSB=m
-+CONFIG_BT_HCIVHCI=m
-+CONFIG_BT_MRVL=m
-+CONFIG_BT_MRVL_SDIO=m
-+CONFIG_BT_ATH3K=m
- CONFIG_CFG80211=y
-+CONFIG_MAC80211=y
-+CONFIG_MAC80211_LEDS=y
-+CONFIG_NFC=y
-+CONFIG_NFC_DIGITAL=m
-+CONFIG_NFC_NCI=y
-+CONFIG_NFC_NCI_SPI=m
-+CONFIG_NFC_NCI_UART=m
-+CONFIG_NFC_HCI=m
-+CONFIG_NFC_SHDLC=y
-+CONFIG_NFC_S3FWRN5_I2C=y
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_DMA_CMA=y
-@@ -65,7 +101,9 @@ CONFIG_BLK_DEV_DM=y
- CONFIG_DM_CRYPT=m
- CONFIG_NETDEVICES=y
- CONFIG_SMSC911X=y
-+CONFIG_USB_RTL8150=m
- CONFIG_USB_RTL8152=y
-+CONFIG_USB_LAN78XX=m
- CONFIG_USB_USBNET=y
- CONFIG_USB_NET_SMSC75XX=y
- CONFIG_USB_NET_SMSC95XX=y
-@@ -189,7 +227,25 @@ CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_EXYNOS=y
- CONFIG_USB_OHCI_HCD=y
- CONFIG_USB_OHCI_EXYNOS=y
-+CONFIG_USB_ACM=m
-+CONFIG_USB_PRINTER=m
-+CONFIG_USB_WDM=m
-+CONFIG_USB_TMC=m
- CONFIG_USB_STORAGE=y
-+CONFIG_USB_STORAGE_REALTEK=m
-+CONFIG_USB_STORAGE_DATAFAB=m
-+CONFIG_USB_STORAGE_FREECOM=m
-+CONFIG_USB_STORAGE_ISD200=m
-+CONFIG_USB_STORAGE_USBAT=m
-+CONFIG_USB_STORAGE_SDDR09=m
-+CONFIG_USB_STORAGE_SDDR55=m
-+CONFIG_USB_STORAGE_JUMPSHOT=m
-+CONFIG_USB_STORAGE_ALAUDA=m
-+CONFIG_USB_STORAGE_ONETOUCH=m
-+CONFIG_USB_STORAGE_KARMA=m
-+CONFIG_USB_STORAGE_CYPRESS_ATACB=m
-+CONFIG_USB_STORAGE_ENE_UB6250=m
-+CONFIG_USB_UAS=m
- CONFIG_USB_DWC3=y
- CONFIG_USB_DWC2=y
- CONFIG_USB_HSIC_USB3503=y
-@@ -209,7 +265,6 @@ CONFIG_LEDS_GPIO=y
- CONFIG_LEDS_PWM=y
- CONFIG_LEDS_MAX77693=y
- CONFIG_LEDS_MAX8997=y
--CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_MAX8997=y
+The regression, introduced in commit 8503ff166504 ("i2c: designware: Avoid
+unnecessary resuming during system suspend"), takes advantage of the so called
+direct_complete path during system sleep, which works well when using the ACPI
+PM domain, however as stated, that's not the case for other SoCs.
+
+In this series, patch 1, takes a very simplistic approach to solve the problem
+and the change is limited to the i2c driver itself. The aim with this change is
+to make it acceptable as a fix for v4.2+.
+
+However, patch 1 is unfortunate also reverting back to the old behaviour,
+avoiding the direct_complete path, by always runtime resuming the device in the
+device_prepare() phase during system sleep. In many cases this is a waste,
+especially when the device could have remained runtime suspended during the
+entire system sleep sequence.
+
+The rest of the changes in this series, addresses the above problem, avoiding
+to runtime resume the device unless it's really needed. One could have tried
+out other local hacks, limited to the i2c driver, but I believe the problem
+could exist for other drivers/devices as well, thus I aim for a more generic
+solution.
+
+In principle, this series enables the proven runtime PM centric approach to
+implement system sleep in the i2c driver. However, to do that the ACPI PM
+domain have to collaborate and understand this behaviour. Therefore a number of
+changes, patch 2 to patch 8, makes the needed changes to the ACPI PM domain.
+In the last change, patch9, the i2c driver converts to the runtime PM centric
+approach.
+
+It shall be noted, the behaviour of the ACPI PM domain should remain intact,
+still taking benefit of using the direct_complete path during system sleep,
+except for those devices that explicitly request it not to.
+
+This series has been tested on an ARM64 Hikey board, not having its i2c device
+attach to the ACPI PM domain. This means that the ACPI changes has so far only
+been compile tested. Any help in testing on relevant Intel SoCs is greatly
+appreciated and so is of course review comments.
+
+The series is based upon Rafael's pm tree and linux-next branch. It's also
+available at the following git:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/mmc.git acpi_pm_i2c_rpm_path
+
+Kind regards
+Ulf Hansson
+
+
+Ulf Hansson (9):
+  i2c: designware: Fix system suspend
+  PM / ACPI: Restore acpi_subsys_complete()
+  PM / Sleep: Remove pm_complete_with_resume_check()
+  PM / ACPI: Split code validating need for runtime resume in
+    ->prepare()
+  PM / ACPI: Split acpi_lpss_suspend_late|resume_early()
+  PM / ACPI: Provide option to disable direct_complete for ACPI devices
+  PM / ACPI: Enable the runtime PM centric approach for system sleep
+  PM / ACPI: Avoid runtime resuming device in
+    acpi_subsys_suspend|freeze()
+  i2c: designware: Deploy the runtime PM centric approach for system
+    sleep
+
+ drivers/acpi/acpi_lpss.c                    |  81 ++++++++++----
+ drivers/acpi/device_pm.c                    | 164 ++++++++++++++++++++++++----
+ drivers/base/power/generic_ops.c            |  23 ----
+ drivers/i2c/busses/i2c-designware-platdrv.c |  32 ++----
+ include/acpi/acpi_bus.h                     |   1 +
+ include/linux/acpi.h                        |   4 +
+ include/linux/pm.h                          |   1 -
+ 7 files changed, 219 insertions(+), 87 deletions(-)
+
 -- 
-2.9.3
+2.7.4
