@@ -1,98 +1,52 @@
-From: jnair@caviumnetworks.com (Jayachandran C)
-Date: Wed, 21 Jun 2017 15:25:10 +0000
-Subject: [PATCH v3 2/2] acpi, gicv3-its, numa: Adding numa node mapping
- for gic-its units
-In-Reply-To: <a3550a73-9345-b360-44e6-949f0b6c42da@arm.com>
-References: <1498025743-6340-1-git-send-email-ganapatrao.kulkarni@cavium.com>
- <1498025743-6340-3-git-send-email-ganapatrao.kulkarni@cavium.com>
- <20170621070941.GA6124@localhost>
- <a3550a73-9345-b360-44e6-949f0b6c42da@arm.com>
-Message-ID: <20170621152509.GA4485@localhost>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 21 Jun 2017 16:31:09 +0100
+Subject: [PATCH v4 0/5] Add support for the ARMv8.2 Statistical Profiling
+ Extension
+In-Reply-To: <20170615105735.b89183a9190a261d3b8d132a@arm.com>
+References: <1496676177-29356-1-git-send-email-will.deacon@arm.com>
+ <20170612110823.GA27319@leverpostej>
+ <20170612112048.69561e8d067488e8689de755@arm.com>
+ <20170615105735.b89183a9190a261d3b8d132a@arm.com>
+Message-ID: <20170621153108.GC6041@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 21, 2017 at 09:44:58AM +0100, Marc Zyngier wrote:
-> On 21/06/17 08:09, Jayachandran C wrote:
-> > On Wed, Jun 21, 2017 at 11:45:43AM +0530, Ganapatrao Kulkarni wrote:
-> >> Add code to parse SRAT ITS Affinity sub table as defined in ACPI 6.2
-> >> Later in per device probe, ITS devices are mapped to
-> >> numa node using ITS id to proximity domain mapping.
-> >>
-> >> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> >> ---
-> >>  drivers/irqchip/irq-gic-v3-its.c | 80 +++++++++++++++++++++++++++++++++++++++-
-> >>  1 file changed, 79 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> >> index 45ea1933..88cfb32 100644
-> >> --- a/drivers/irqchip/irq-gic-v3-its.c
-> >> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> >> @@ -1833,6 +1833,82 @@ static int __init its_of_probe(struct device_node *node)
-> >>  
-> >>  #define ACPI_GICV3_ITS_MEM_SIZE (SZ_128K)
-> >>  
-> >> +#ifdef CONFIG_ACPI_NUMA
-> >> +struct its_srat_map {
-> >> +	u32	numa_node;  /* numa node id */
-> >> +	u32	its_id;  /* GIC ITS ID */
-> >> +};
-> >> +
-> >> +static struct its_srat_map its_srat_maps[MAX_NUMNODES] __initdata = {
-> >> +	[0 ... MAX_NUMNODES - 1] = {NUMA_NO_NODE, UINT_MAX} };
-> >> +
-> >> +static int its_in_srat __initdata;
-> >> +
-> >> +static int __init
-> >> +acpi_get_its_numa_node(u32 its_id)
-> >> +{
-> >> +	int i;
-> >> +
-> >> +	for (i = 0; i < its_in_srat; i++) {
-> >> +		if (its_id == its_srat_maps[i].its_id)
-> >> +			return its_srat_maps[i].numa_node;
-> >> +	}
-> >> +	return NUMA_NO_NODE;
-> >> +}
-> >> +
-> >> +static int __init
-> >> +gic_acpi_parse_srat_its(struct acpi_subtable_header *header,
-> >> +			 const unsigned long end)
-> >> +{
-> >> +	int pxm, node;
-> >> +	struct acpi_srat_its_affinity *its_affinity;
-> >> +
-> >> +	its_affinity = (struct acpi_srat_its_affinity *)header;
-> >> +	if (!its_affinity)
-> >> +		return -EINVAL;
-> >> +
-> >> +	if (its_affinity->header.length <
-> >> +			sizeof(struct acpi_srat_its_affinity)) {
-> >> +		pr_err("SRAT:ITS: Invalid SRAT header length: %d\n",
-> >> +			its_affinity->header.length);
-> > 
-> > The original driver does not use pr_fmt properly, it may be worth
-> > fixing that up rather than having prefixes, here...
+On Thu, Jun 15, 2017 at 10:57:35AM -0500, Kim Phillips wrote:
+> On Mon, 12 Jun 2017 11:20:48 -0500
+> Kim Phillips <kim.phillips@arm.com> wrote:
 > 
-> Irrespective of what the "proper" usage is
+> > On Mon, 12 Jun 2017 12:08:23 +0100
+> > Mark Rutland <mark.rutland@arm.com> wrote:
+> > 
+> > > On Mon, Jun 05, 2017 at 04:22:52PM +0100, Will Deacon wrote:
+> > > > This is the sixth posting of the patches previously posted here:
+> ...
+> > > Kim, do you have any version of the userspace side that we could look
+> > > at?
+> > > 
+> > > For review, it would be really helpful to have something that can poke
+> > > the PMU, even if it's incomplete or lacking polish.
+> > 
+> > Here's the latest push, based on a a couple of prior versions of this
+> > driver:
+> > 
+> > http://linux-arm.org/git?p=linux-kp.git;a=shortlog;h=refs/heads/armspev0.1
+> > 
+> > I don't seem to be able to get any SPE data output after rebasing on
+> > this version of the driver.  Still don't know why at the moment...
+> 
+> Bisected to commit e38ba76deef "perf tools: force uncore events to
+> system wide monitoring".  So, using record with specifying a -C
+> <cpu> explicitly now produces SPE data, but only a couple of valid
+> records at the beginning of each buffer; the rest is filled with
+> PADding (0's).
+> 
+> I see Mark's latest comments have found a possible issue in the perf
+> aux buffer handling code in the driver, and that the driver does some
+> memset of padding (0's) itself; could that be responsible for the above
+> behaviour?
 
-The prefixes of the prints in this driver are a bit inconsistent. And
-there are a few error messages like the "Failed to allocate PROPBASE"
-and "Bad LPI chunk %d\n" without any prefix at all. pr_fmt would be
-helpful to clean it up.
+Possibly. Do you know how big you're mapping the aux buffer and what (if
+any) value you're passing as aux_watermark?
 
-> this kind of cleanup doesn't belong in this series.
-
-Right. I think the printed messages in this patch can be improved quite
-a bit. currently the tags and spacing are inconsistent, something like:
-|  pr_err("SRAT: Invalid header length %d in ITS affinity\n", ...
-|  pr_err("SRAT: Invalid NUMA node %d in ITS affinity\n", node);
-|  pr_info("SRAT: PXM %d -> ITS %d -> Node %d\n",
-would be better in my opinion.
-
-> Feel free to submit a separate patch.
-
-The driver also prints 2 lines per CPU on boot which can get to a few
-hundred lines on our test machines. So there are a few things worth
-fixing up here... maybe in another kernel dev cycle.
-
-JC.
+Will
