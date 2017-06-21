@@ -1,104 +1,79 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 21 Jun 2017 16:41:36 +0100
-Subject: [RFT PATCH v2 00/42] PCI: ARM/ARM64: remove pci_fixup_irqs() usage
-In-Reply-To: <CACRpkda_6=qWRQDpTy67MFc=-fYRhqWDPx0NnNG5mjXQLyAAkw@mail.gmail.com>
-References: <20170608141342.2018-1-lorenzo.pieralisi@arm.com>
- <CACRpkdZ1rBq9eLJkz_gRuXAG=if+xXf-jPzDEPCfG8EgUmUG3A@mail.gmail.com>
- <20170621103042.GA1712@red-moon> <20170621104538.GA8477@red-moon>
- <CACRpkda_6=qWRQDpTy67MFc=-fYRhqWDPx0NnNG5mjXQLyAAkw@mail.gmail.com>
-Message-ID: <20170621154136.GA1362@red-moon>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 21 Jun 2017 17:42:18 +0200
+Subject: [PATCH v5 0/6] Add support for the ICU unit in Marvell Armada
+ 7K/8K
+In-Reply-To: <20170621171809.34bcce1e@windsurf.home> (Thomas Petazzoni's
+ message of "Wed, 21 Jun 2017 17:18:09 +0200")
+References: <20170621132917.14187-1-thomas.petazzoni@free-electrons.com>
+ <e87dc80c-f85c-1b20-c2e8-cd03922dacd9@arm.com>
+ <20170621171809.34bcce1e@windsurf.home>
+Message-ID: <87r2yd1h5x.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Marc and Thomas,
+ 
+ On mer., juin 21 2017, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-On Wed, Jun 21, 2017 at 05:14:13PM +0200, Linus Walleij wrote:
-> On Wed, Jun 21, 2017 at 12:45 PM, Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
-> 
-> > Sorry I miss yet another usage of struct pci_bus before bus is
-> > scanned in faraday_pci_parse_map_dma_ranges(), all these config
-> > accessors want is to access bus number 0 and writei/read some config
-> > values in there, please confirm.
-> >
-> > Updated patch here:
-> 
-> I fixed it. This was needed:
-> diff --git a/drivers/pci/host/pci-ftpci100.c b/drivers/pci/host/pci-ftpci100.c
-> index 86f8a3d1c1da..5162dffc102b 100644
-> --- a/drivers/pci/host/pci-ftpci100.c
-> +++ b/drivers/pci/host/pci-ftpci100.c
-> @@ -450,6 +450,8 @@ static int faraday_pci_probe(struct platform_device *pdev)
->      struct resource *io;
->      struct pci_host_bridge *host;
->      struct clk *clk;
-> +    unsigned char max_bus_speed = PCI_SPEED_33MHz;
-> +    unsigned char cur_bus_speed = PCI_SPEED_33MHz;
+> Hello,
+>
+> On Wed, 21 Jun 2017 16:14:21 +0100, Marc Zyngier wrote:
+>
+>> > Thomas Petazzoni (6):
+>> >   dt-bindings: interrupt-controller: add DT binding for the Marvell GICP
+>> >   dt-bindings: interrupt-controller: add DT binding for the Marvell ICU
+>> >   irqchip: irq-mvebu-gicp: new driver for Marvell GICP
+>> >   irqchip: irq-mvebu-icu: new driver for Marvell ICU
+>> >   arm64: marvell: enable ICU and GICP drivers
+>> >   arm64: dts: marvell: enable GICP and ICU on Armada 7K/8K
+>> > 
+>> >  .../bindings/interrupt-controller/marvell,gicp.txt |  27 ++
+>> >  .../bindings/interrupt-controller/marvell,icu.txt  |  51 ++++
+>> >  arch/arm64/Kconfig.platforms                       |   2 +
+>> >  arch/arm64/boot/dts/marvell/armada-ap806.dtsi      |   7 +
+>> >  .../boot/dts/marvell/armada-cp110-master.dtsi      |  59 +++--
+>> >  .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi |  55 ++--
+>> >  drivers/irqchip/Kconfig                            |   6 +
+>> >  drivers/irqchip/Makefile                           |   2 +
+>> >  drivers/irqchip/irq-mvebu-gicp.c                   | 279 ++++++++++++++++++++
+>> >  drivers/irqchip/irq-mvebu-gicp.h                   |  12 +
+>> >  drivers/irqchip/irq-mvebu-icu.c                    | 289 +++++++++++++++++++++
+>> >  .../dt-bindings/interrupt-controller/mvebu-icu.h   |  15 ++
+>> >  12 files changed, 756 insertions(+), 48 deletions(-)
+>> >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,gicp.txt
+>> >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
+>> >  create mode 100644 drivers/irqchip/irq-mvebu-gicp.c
+>> >  create mode 100644 drivers/irqchip/irq-mvebu-gicp.h
+>> >  create mode 100644 drivers/irqchip/irq-mvebu-icu.c
+>> >  create mode 100644 include/dt-bindings/interrupt-controller/mvebu-icu.h
+>> >   
+>> 
+>> It all looks good to me. How do we merge this? I take the first five
+>> patches and Gregory takes the last one?
+>
+> I think you should take the first four patches, and Gr?gory takes the
+> last two ones. But I'll let Gr?gory confirm.
 
-I could not fix it myself since we do not have the same code base,
-I can't find any clock handling in the mainline as per v4.12-rc6.
-
-Is the ftpci100.c clock handling being queued for this merge window ?
-
-This patch:
-
-https://patchwork.ozlabs.org/patch/778716/
-
-fixes a commit that is not in v4.12-rc6, I need some input to understand
-how to proceed.
+Indeed it makes more sens to merge the patch 4 through the arm-soc
+subsystem.
 
 Thanks,
-Lorenzo
 
->      int ret;
->      u32 val;
->      LIST_HEAD(res);
-> @@ -553,27 +555,27 @@ static int faraday_pci_probe(struct platform_device *pdev)
->          unsigned long rate;
->          u32 val;
-> 
-> -        faraday_pci_read_config(p->bus, 0,
-> -                    FARADAY_PCI_STATUS_CMD, 4, &val);
-> +        faraday_raw_pci_read_config(p, 0, 0,
-> +                        FARADAY_PCI_STATUS_CMD, 4, &val);
->          rate = clk_get_rate(p->bus_clk);
-> 
->          if ((rate == 33000000) && (val & PCI_STATUS_66MHZ_CAPABLE)) {
->              dev_info(dev, "33MHz bus is 66MHz capable\n");
-> -            p->bus->max_bus_speed = PCI_SPEED_66MHz;
-> +            max_bus_speed = PCI_SPEED_66MHz;
->              ret = clk_set_rate(p->bus_clk, 66000000);
->              if (ret)
->                  dev_err(dev, "failed to set bus clock\n");
->          } else {
->              dev_info(dev, "33MHz only bus\n");
-> -            p->bus->max_bus_speed = PCI_SPEED_33MHz;
-> +            max_bus_speed = PCI_SPEED_33MHz;
->          }
-> 
->          /* Bumping the clock may fail so read back the rate */
->          rate = clk_get_rate(p->bus_clk);
->          if (rate == 33000000)
-> -            p->bus->cur_bus_speed = PCI_SPEED_33MHz;
-> +            cur_bus_speed = PCI_SPEED_33MHz;
->          if (rate == 66000000)
-> -            p->bus->cur_bus_speed = PCI_SPEED_66MHz;
-> +            cur_bus_speed = PCI_SPEED_66MHz;
->      }
-> 
->      ret = faraday_pci_parse_map_dma_ranges(p, dev->of_node);
-> @@ -587,6 +589,8 @@ static int faraday_pci_probe(struct platform_device *pdev)
->          return ret;
->      }
->      p->bus = host->bus;
-> +    p->bus->max_bus_speed = max_bus_speed;
-> +    p->bus->cur_bus_speed = cur_bus_speed;
-> 
->      pci_bus_assign_resources(p->bus);
->      pci_bus_add_devices(p->bus);
-> 
-> 
-> I'll send a modified and tested version of your patch.
-> 
-> Yours,
-> Linus Walleij
+Gregory
+>
+> Once again, thanks a lot for your help on this series, it's in a much
+> better shape now compared to what the original submission was!
+>
+> Best regards,
+>
+> Thomas
+> -- 
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
