@@ -1,83 +1,42 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Wed, 21 Jun 2017 14:42:07 +0800
-Subject: [PATCH v16 6/7] ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB
- property
-In-Reply-To: <1498027328-25078-1-git-send-email-peter.chen@nxp.com>
-References: <1498027328-25078-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1498027328-25078-7-git-send-email-peter.chen@nxp.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 21 Jun 2017 08:48:55 +0200
+Subject: [PATCH] crypto: sun4i-ss: support the Security System PRNG
+In-Reply-To: <20170620114536.GA4766@Red>
+References: <20170620085819.20114-1-clabbe.montjoie@gmail.com>
+ <20170620095947.i3r3iym2cxz5jciw@flea.lan>
+ <20170620114536.GA4766@Red>
+Message-ID: <20170621064855.z5mu4f3r3dt4kotc@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current dts describes USB HUB's property at USB controller's
-entry, it is improper. The USB HUB should be the child node
-under USB controller, and power sequence properties are under
-it. Besides, using gpio pinctrl setting for USB2415's reset pin.
+On Tue, Jun 20, 2017 at 01:45:36PM +0200, Corentin Labbe wrote:
+> On Tue, Jun 20, 2017 at 11:59:47AM +0200, Maxime Ripard wrote:
+> > Hi,
+> > 
+> > On Tue, Jun 20, 2017 at 10:58:19AM +0200, Corentin Labbe wrote:
+> > > The Security System have a PRNG, this patch add support for it via
+> > > crypto_rng.
+> > 
+> > This might be a dumb question, but is the CRYPTO_RNG code really
+> > supposed to be used with PRNG?
+> > 
+> 
+> Yes, see recently added drivers/crypto/exynos-rng.c
 
-Signed-off-by: Peter Chen <peter.chen@nxp.com>
-Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
-Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
----
- arch/arm/boot/dts/imx6qdl-udoo.dtsi | 26 ++++++++++++--------------
- 1 file changed, 12 insertions(+), 14 deletions(-)
+It's still not really clear from the commit log (if you're talking
+about c46ea13f55b6) why and if using the RNG code for a PRNG is a good
+idea.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-udoo.dtsi b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-index c96c91d..a173de2 100644
---- a/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-@@ -9,6 +9,8 @@
-  *
-  */
- 
-+#include <dt-bindings/gpio/gpio.h>
-+
- / {
- 	aliases {
- 		backlight = &backlight;
-@@ -58,17 +60,6 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		reg_usb_h1_vbus: regulator at 0 {
--			compatible = "regulator-fixed";
--			reg = <0>;
--			regulator-name = "usb_h1_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			enable-active-high;
--			startup-delay-us = <2>; /* USB2415 requires a POR of 1 us minimum */
--			gpio = <&gpio7 12 0>;
--		};
--
- 		reg_panel: regulator at 1 {
- 			compatible = "regulator-fixed";
- 			reg = <1>;
-@@ -188,7 +179,7 @@
- 
- 		pinctrl_usbh: usbhgrp {
- 			fsl,pins = <
--				MX6QDL_PAD_GPIO_17__GPIO7_IO12 0x80000000
-+				MX6QDL_PAD_GPIO_17__GPIO7_IO12	0x1b0b0
- 				MX6QDL_PAD_NANDF_CS2__CCM_CLKO2 0x130b0
- 			>;
- 		};
-@@ -259,9 +250,16 @@
- &usbh1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usbh>;
--	vbus-supply = <&reg_usb_h1_vbus>;
--	clocks = <&clks IMX6QDL_CLK_CKO>;
- 	status = "okay";
-+
-+	usb2415: hub at 1 {
-+		compatible = "usb424,2514";
-+		reg = <1>;
-+
-+		clocks = <&clks IMX6QDL_CLK_CKO>;
-+		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
-+		reset-duration-us = <3000>;
-+	};
- };
- 
- &usdhc3 {
+Maxime
+
 -- 
-2.7.4
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170621/af78c03e/attachment.sig>
