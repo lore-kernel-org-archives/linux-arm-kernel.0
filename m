@@ -1,120 +1,62 @@
-From: xuejiancheng@hisilicon.com (Jiancheng Xue)
-Date: Wed, 21 Jun 2017 17:00:44 +0800
-Subject: [PATCH 4/5] arm64: dts: hisilicon: add usb2 controller and phy nodes
- for poplar board.
-In-Reply-To: <1498035645-22804-1-git-send-email-xuejiancheng@hisilicon.com>
-References: <1498035645-22804-1-git-send-email-xuejiancheng@hisilicon.com>
-Message-ID: <1498035645-22804-5-git-send-email-xuejiancheng@hisilicon.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 21 Jun 2017 10:35:49 +0100
+Subject: [PATCH 00/51] rtc: stop using rtc deprecated functions
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6DD00278C0@AcuExch.aculab.com>
+References: <20170620100348.zh4ygvjjgnhxvmvl@piout.net>
+ <20170620121011.GA13221@amd>
+ <20170620122400.sm7qqvwyj6cuzarw@piout.net>
+ <20170620132620.GA16881@amd>
+ <6ED8E3B22081A4459DAC7699F3695FB7018CD96FCD@SW-EX-MBX02.diasemi.com>
+ <20170620134458.GA10104@amd>
+ <20170620134827.ubvzhh25klaotupv@piout.net>
+ <CA+M3ks68+z6nDtYM8CDpso7SxjB6Nt5E=rOc1yxx=kDz6PUeVQ@mail.gmail.com>
+ <20170620211536.GM4902@n2100.armlinux.org.uk>
+ <063D6719AE5E284EB5DD2968C1650D6DD00278C0@AcuExch.aculab.com>
+Message-ID: <20170621093549.GQ4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add usb2 controller and phy nodes for poplar board.
+On Wed, Jun 21, 2017 at 09:26:51AM +0000, David Laight wrote:
+> From: Russell King - ARM Linux
+> > Sent: 20 June 2017 22:16
+> ..
+> > Consider that at the moment, we define the 32-bit RTC representation to
+> > start at a well known epoch.  We _could_ decide that when it wraps to
+> > 0x80000000 seconds, we'll define the lower 0x40000000 seconds to mean
+> > dates in the future - and keep rolling that forward each time we cross
+> > another 0x40000000 seconds.  Unless someone invents a real time machine,
+> > we shouldn't need to set a modern RTC back to 1970.
+> 
+> True, just treating the value as unsigned gives another 67 years.
 
-Signed-off-by: Jiancheng Xue <xuejiancheng@hisilicon.com>
-Reviewed-by: Daniel Thompson <daniel.thompson@linaro.org>
----
- .../boot/dts/hisilicon/hi3798cv200-poplar.dts      | 13 ++++++
- arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi     | 47 ++++++++++++++++++++++
- 2 files changed, 60 insertions(+)
+We _already_ do treat it as an unsigned number, so already the panicing
+about 2038 is complete and utter nonsense - that's why I've been
+consistently stating the 2106 date.
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts b/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
-index 684fa09..40db803 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
-@@ -64,6 +64,10 @@
- 	};
- };
- 
-+&ehci {
-+	status = "okay";
-+};
-+
- &gmac1 {
- 	status = "okay";
- 	#address-cells = <1>;
-@@ -147,6 +151,10 @@
- 	status = "okay";
- };
- 
-+&ohci {
-+	status = "okay";
-+};
-+
- &spi0 {
- 	status = "okay";
- 	label = "LS-SPI0";
-@@ -161,3 +169,8 @@
- 	label = "LS-UART0";
- };
- /* No optional LS-UART1 on Low Speed Expansion Connector. */
-+
-+&usb2_phy1 {
-+	status = "okay";
-+};
-+
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi b/arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi
-index 75865f8a..422aeaf 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi
-@@ -106,6 +106,11 @@
- 			#reset-cells = <2>;
- 		};
- 
-+		peri_ctrl: system-controller at 8a20000 {
-+			compatible = "syscon";
-+			reg = <0x8a20000 0x1000>;
-+		};
-+
- 		uart0: serial at 8b00000 {
- 			compatible = "arm,pl011", "arm,primecell";
- 			reg = <0x8b00000 0x1000>;
-@@ -407,5 +412,47 @@
- 			clocks = <&sysctrl HISTB_IR_CLK>;
- 			status = "disabled";
- 		};
-+
-+		ehci: ehci at 0x9890000 {
-+			compatible = "generic-ehci";
-+			reg = <0x9890000 0x10000>;
-+			interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&crg HISTB_USB2_BUS_CLK>,
-+				 <&crg HISTB_USB2_PHY_CLK>;
-+			clock-names = "ehci_system", "phy";
-+			resets = <&crg 0xb8 12>,
-+				 <&crg 0xb8 16>;
-+			reset-names = "bus", "phy";
-+			status = "disabled";
-+		};
-+
-+		ohci: ohci at 0x9880000 {
-+			compatible = "generic-ohci";
-+			reg = <0x9880000 0x10000>;
-+			interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&crg HISTB_USB2_BUS_CLK>,
-+				 <&crg HISTB_USB2_12M_CLK>,
-+				 <&crg HISTB_USB2_48M_CLK>;
-+			clock-names = "ahb_biu", "clk12", "clk48";
-+			resets = <&crg 0xb8 12>;
-+			reset-names = "bus";
-+			status = "disabled";
-+		};
-+
-+		usb2_phy1: usb-phy at 1 {
-+			compatible = "hisilicon,hi3798cv200-usb2-phy";
-+			#phy-cells = <0>;
-+			hisilicon,peripheral-syscon = <&peri_ctrl>;
-+			clocks = <&crg HISTB_USB2_PHY1_REF_CLK>;
-+			resets = <&crg 0xbc 4>;
-+			reset-names = "por_rst";
-+			status = "disabled";
-+
-+			usb2_port1: port at 1 {
-+				clocks = <&crg HISTB_USB2_UTMI_CLK>;
-+				resets = <&crg 0xbc 9>, <&crg 0xb8 13>;
-+				reset-names = "port_rst", "utmi_rst";
-+			};
-+		};
- 	};
- };
+> If a 32bit RTC is programmed with the low 32bits of the 64bit 'seconds
+> since 1970' the kernel should have no real difficulty sorting out the
+> high bits from other available information.
+
+Right, but converting all the 32-bit conversion functions to 64-bit
+means that rather than "sorting out" that from the core RTC driver,
+we have to implement solutions in each and every driver.
+
+While that may appear to be a good idea, many RTCs that are 32-bit
+counters do not themselves have additional non-volatile storage, so
+it means that we're ending up with a lot of RTC specific hacks to
+go and get the additional information from some other driver elsewhere
+in the system.
+
+> Problems with things like the x86 bios setting the rtc to stupid values
+> are another matter.
+
+Forget x86, the RTC there does not store time as a 32-bit integer, it's
+stored as its component values, and there's non-volatile memory attached
+to the RTC.  Hence, it's out of scope of "what to do about RTCs that
+store time in 32-bit format" and also out of scope of "what to do about
+RTC drivers that use the 32-bit time conversion function."
+
 -- 
-1.9.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
