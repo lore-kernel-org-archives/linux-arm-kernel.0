@@ -1,77 +1,50 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 21 Jun 2017 13:01:23 +0000
-Subject: [PATCH V4 0/7]  tty: serial: lpuart: add imx7ulp support
-In-Reply-To: <1497322554-24463-1-git-send-email-aisheng.dong@nxp.com>
-References: <1497322554-24463-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <AM3PR04MB306B649ADC54EF1C6A7191D80DA0@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Wed, 21 Jun 2017 15:10:16 +0200
+Subject: [PATCH V17 00/11] Add UEFI 2.6 and ACPI 6.1 updates for RAS on
+ ARM64
+In-Reply-To: <20170621130025.GD16981@rric.localdomain>
+References: <1495225933-4410-1-git-send-email-tbaicar@codeaurora.org>
+ <20170607115012.GZ30263@arm.com>
+ <20170620063439.GS658@rric.localdomain>
+ <20170620084931.GB30664@arm.com>
+ <20170621130025.GD16981@rric.localdomain>
+Message-ID: <20170621131016.GE16981@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping...
+On 21.06.17 15:00:25, Robert Richter wrote:
+> On 20.06.17 09:49:32, Will Deacon wrote:
+> > Hi Robert,
+> > 
+> > On Tue, Jun 20, 2017 at 08:34:39AM +0200, Robert Richter wrote:
+> > > On 07.06.17 12:50:12, Will Deacon wrote:
+> > > 
+> > > > Thanks, I've pushed this out as:
+> > > >
+> > > >   git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/ras-apei
+> > > >
+> > > > which I'll merge into for-next/core (and therefore linux-next) either the
+> > > > end of this week or the beginning of next week. Please take a look if you
+> > > > get a chance.
+> > > 
+> > > any reason why there was a roll back of for-next/core?
+> > > 
+> > >  + 0870f692c2ed...e27c7fa015d6 for-next/core -> arm64/for-next/core  (forced update)
+> > > 
+> > > Is it because for-next/ras-apei goes through tip?
+> > 
+> > No, it's because the RAS stuff ran into horrible conflicts with the UUID
+> > tree:
+> > 
+> > https://lkml.org/lkml/2017/6/16/22
+> > 
+> > Tyler should be rebasing that soon, so hopefully I can requeue that stuff
+> > this week.
+> 
+> Note there are also conflicts with tip-ras from Borsis' tree.
 
-> -----Original Message-----
-> From: Dong Aisheng [mailto:aisheng.dong at nxp.com]
-> Sent: Tuesday, June 13, 2017 10:56 AM
-> To: linux-serial at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> gregkh at linuxfoundation.org; jslaby at suse.com; Andy Duan; stefan at agner.ch;
-> Mingkai Hu; Y.b. Lu; nikita.yoush at cogentembedded.com;
-> andy.shevchenko at gmail.com; dongas86 at gmail.com; A.s. Dong
-> Subject: [PATCH V4 0/7] tty: serial: lpuart: add imx7ulp support
-> 
-> The lpuart in imx7ulp is basically the same as ls1021a. It's also
-> 32 bit width register, but unlike ls1021a, it's little endian.
-> Besides that, imx7ulp lpuart has a minor different register layout from
-> ls1021a that it has four extra registers (verid, param, global,
-> pincfg) located at the beginning of register map, which are currently not
-> used by the driver and less to be used later.
-> 
-> Furthermore, this patch serial also add a new more accurate baud rate
-> calculation method as MX7ULP can't divide a suitable baud rate with the
-> default setting.
-> 
-> Currently the new baud rate calculation is only enabled on MX7ULP.
-> However, i guess the Layerscape may also be able to use it as there seems
-> to be no difference in baud rate setting register after checking the
-> Layerscape Reference Manual.
-> 
-> As i don't have Layerscape boards, i can't test it, so i only enable it
-> for MX7ULP by default to avoid a potential break.
-> 
-> I copied LayerScape guys in this series and hope they can help test later.
-> If it works on Layerscape as well, then they can switch to the new setting
-> too and totally remove the old stuff.
-> 
-> ChangeLog:
-> v3->v4:
->  * Minor changes.
->    1) Remove one duplicated blank line
->    2) Removed on unneeded semicolon in switch catched by 0day Robot
-> v2->v3:
->  * Remove global lpuart_is_be.
->    Instead use struct uart_port's iotype member.
->    lpuart32_read/write API prototype is also updated to use the iotype to
->    distingush the endians. And most importantly, this way also works with
->    earlycon.
-> 
-> v1->v2:
->  * Patch 2/4/5 chagned, other no changes.
->    See individuals for details.
-> 
-> Dong Aisheng (7):
->   tty: serial: lpuart: introduce lpuart_soc_data to represent SoC
->     property
->   tty: serial: lpuart: refactor lpuart32_{read|write} prototype
->   tty: serial: lpuart: add little endian 32 bit register support
->   dt-bindings: serial: fsl-lpuart: add i.MX7ULP support
->   tty: serial: lpuart: add imx7ulp support
->   tty: serial: lpuart: add earlycon support for imx7ulp
->   tty: serial: lpuart: add a more accurate baud rate calculation method
-> 
->  .../devicetree/bindings/serial/fsl-lpuart.txt      |   2 +
->  drivers/tty/serial/fsl_lpuart.c                    | 286 ++++++++++++++--
-> -----
->  2 files changed, 201 insertions(+), 87 deletions(-)
-> 
-> --
-> 2.7.4
+Turned out this is actually the ras/core branch from tip tree, esp.
+
+ https://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git/commit/?id=7bf130e4a065
+
+-Robert
