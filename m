@@ -1,53 +1,20 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 21 Jun 2017 09:51:52 +0200
-Subject: [PATCH 00/51] rtc: stop using rtc deprecated functions
-In-Reply-To: <alpine.DEB.2.20.1706202343120.2157@nanos>
-References: <20170620213507.urobmtg34vzubrdq@piout.net>
- <alpine.DEB.2.20.1706202343120.2157@nanos>
-Message-ID: <20170621075152.GA15996@amd>
+From: zhi.mao@mediatek.com (Zhi Mao)
+Date: Wed, 21 Jun 2017 16:11:08 +0800
+Subject: [PATCH RESEND 0/4] mediatek: pwm driver add MT2712/MT7622 support 
+Message-ID: <1498032672-7172-1-git-send-email-zhi.mao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+pwm driver add MT2712/MT7622 support, fix clock control issue.
+dtsi file will be upload latter, after the clock define is ready.
 
-> > I agree with that but not the android guys. They seem to mandate an RTC
-> > that can store time from 01/01/1970. I don't know much more than that
-> > because they never cared to explain why that was actually necessary
-> > (apart from a laconic "this will result in a bad user experience")
-> > 
-> > I think tglx had a plan for offsetting the time at some point so 32-bit
-> > platform can pass 2038 properly.
-> 
-> Yes, but there are still quite some issues to solve there:
-> 
->      1) How do you tell the system that it should apply the offset in the
->      	first place, i.e at boot time before NTP or any other mechanism can
->      	correct it?
+Zhi Mao (4):
+  pwm: kconfig: modify mediatek information
+  pwm: mediatek: fix clk issue
+  pwm: bindings: add MT2712/MT7622 information
+  pwm: mediatek: add MT2712/MT7622 support
 
-I'd not do offset. Instead, I'd select a threshold (perhaps year of
-release of given kernel?) and
-
-	if (rtc_time < year_of_release_of_kernel)
-	   rtc_time += 0x100000000;
-
-Ok, we'll have to move away from "rtc_time == 0 indicates zero", as
-seen in some drivers.
-
->      2) Deal with creative vendors who have their own idea about the 'start
->      	of the epoch'
-
-If someone uses different threshold, well, there will be
-confusion. But only for users that have their rtc set to the past,
-which is quite unusual.
-
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170621/7837e096/attachment-0001.sig>
+ .../devicetree/bindings/pwm/pwm-mediatek.txt       |    6 +-
+ drivers/pwm/Kconfig                                |    2 +-
+ drivers/pwm/pwm-mediatek.c                         |  132 ++++++++++++++------
+ 3 files changed, 100 insertions(+), 40 deletions(-)
