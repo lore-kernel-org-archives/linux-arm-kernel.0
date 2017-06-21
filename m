@@ -1,56 +1,68 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 21 Jun 2017 16:00:43 +0100
-Subject: [PATCH 2/3] arm64: ptrace: Flush FPSIMD regs back to thread_struct
- before reading
-In-Reply-To: <1498057010-12028-1-git-send-email-Dave.Martin@arm.com>
-References: <1498057010-12028-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1498057264-12211-2-git-send-email-Dave.Martin@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 21 Jun 2017 16:13:00 +0100
+Subject: [PATCH 2/2] spi: add driver for STM32 SPI controller
+In-Reply-To: <1498055526-6918-3-git-send-email-amelie.delaunay@st.com>
+References: <1498055526-6918-1-git-send-email-amelie.delaunay@st.com>
+ <1498055526-6918-3-git-send-email-amelie.delaunay@st.com>
+Message-ID: <20170621151300.s74lbymyisvde2zo@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When reading the FPSIMD state of current (which occurs when dumping
-core), it is possible that userspace has modified the FPSIMD
-registers since the time the task was last scheduled out.  Such
-changes are not guaranteed to be reflected immedately in
-thread_struct.
+On Wed, Jun 21, 2017 at 04:32:06PM +0200, Amelie Delaunay wrote:
 
-As a result, a coredump can contain stale values for these
-registers.  Reading the registers of a stopped task via ptrace is
-unaffected.
+A few minor stylistic things but overall this looks really nice, please
+send followup patches fixing these style things.
 
-This patch explicitly flushes the CPU state back to thread_struct
-before dumping when operating on current, thus ensuring that
-coredump contents are up to date.
+> +	/* Determine the first power of 2 greater than or equal to div */
+> +	mbrdiv = (div & (div - 1)) ? fls(div) : fls(div) - 1;
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm64/kernel/ptrace.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+Please write normal conditional statements, it makes things much easier
+to read.
 
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 0e5aaec..eeef01a 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -623,6 +623,10 @@ static int fpr_get(struct task_struct *target, const struct user_regset *regset,
- {
- 	struct user_fpsimd_state *uregs;
- 	uregs = &target->thread.fpsimd_state.user_fpsimd;
-+
-+	if (target == current)
-+		fpsimd_preserve_current_state();
-+
- 	return user_regset_copyout(&pos, &count, &kbuf, &ubuf, uregs, 0, -1);
- }
- 
-@@ -898,6 +902,9 @@ static int compat_vfp_get(struct task_struct *target,
- 
- 	uregs = &target->thread.fpsimd_state.user_fpsimd;
- 
-+	if (target == current)
-+		fpsimd_preserve_current_state();
-+
- 	/*
- 	 * The VFP registers are packed into the fpsimd_state, so they all sit
- 	 * nicely together for us. We just need to create the fpscr separately.
--- 
-2.1.4
+> +static bool stm32_spi_can_dma(struct spi_master *master,
+> +			      struct spi_device *spi_dev,
+> +			      struct spi_transfer *transfer)
+> +{
+> +	struct stm32_spi *spi = spi_master_get_devdata(master);
+> +
+> +	dev_dbg(spi->dev, "%s: %s\n", __func__,
+> +		(!!(transfer->len > spi->fifo_size)) ? "true" : "false");
+> +
+> +	return !!(transfer->len > spi->fifo_size);
+
+This !! is redundant, you're converting a boolean value into a boolean
+value.
+
+> +	buswidth = (spi->cur_bpw <= 8) ? DMA_SLAVE_BUSWIDTH_1_BYTE :
+> +		   (spi->cur_bpw <= 16) ? DMA_SLAVE_BUSWIDTH_2_BYTES :
+> +		   DMA_SLAVE_BUSWIDTH_4_BYTES;
+> +
+> +	/* Valid for DMA Half or Full Fifo threshold */
+> +	maxburst = (spi->cur_fthlv == 2) ? 1 : spi->cur_fthlv;
+
+Again, please use normal conditional statements - people have to read
+things.
+
+> +static int stm32_spi_suspend(struct device *dev)
+> +{
+> +	struct spi_master *master = dev_get_drvdata(dev);
+> +	struct stm32_spi *spi = spi_master_get_devdata(master);
+> +	int ret;
+> +
+> +	ret = spi_master_suspend(master);
+> +	if (ret)
+> +		return ret;
+> +
+> +	clk_disable_unprepare(spi->clk);
+
+It'd be good to also have the clock disabled by runtime PM, that will
+save a little more power.  There's support for enabling and disabling
+the device in the core so it should just be adding callbacks.  Not
+essential though.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170621/47311c59/attachment.sig>
