@@ -1,35 +1,36 @@
 From: cosardindar@gmail.com (Cosar Dindar)
-Date: Thu, 22 Jun 2017 02:13:07 +0300
-Subject: [RESEND,PATCH v4 0/5] Add support for the STM32F4 CRC32
-Message-ID: <1498086787-104647-1-git-send-email-cosardindar@gmail.com>
+Date: Thu, 22 Jun 2017 02:14:12 +0300
+Subject: [RESEND,
+ PATCH v4 1/5] dt-bindings : Document the STM32F4 CRC32 binding
+Message-ID: <1498086852-104737-1-git-send-email-cosardindar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series add hardware CRC32 ("Ethernet") calculation support
-for STMicroelectronics STM32F429.
+Add device tree binding for STM32F4.
 
-Polynomial and key setting are not supported, key is fixed as 0x4C11DB7
-and poly is 0xFFFFFFFF.
+Signed-off-by: Cosar Dindar <cosardindar@gmail.com>
+---
 
-Module is tested on STM32F429-disco board with crypto testmgr using
-cases within the key 0xFFFFFFFF.
+ Changes in V4:
+	- Edited binding explanations.
 
-Changes in v4:
-  - Edited patch summary.
+ Documentation/devicetree/bindings/crypto/st,stm32-crc.txt | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Cosar Dindar (5):
-  dt-bindings : Document the STM32F4 CRC32 binding
-  crypto : stm32 - Add STM32F4 CRC32 support
-  ARM: dts: stm32: Add CRC support to stm32f429 (Merged-by Alexander TORGUE)
-  ARM: dts: stm32: enable CRC32 on stm32429-disco board (Merged-by Alexander TORGUE)
-  ARM: dts: stm32: enable CRC32 on stm32429i-eval board (Merged-by Alexander TORGUE)
-
- .../devicetree/bindings/crypto/st,stm32-crc.txt    |  4 +-
- arch/arm/boot/dts/stm32429i-eval.dts               |  4 ++
- arch/arm/boot/dts/stm32f429-disco.dts              |  4 ++
- arch/arm/boot/dts/stm32f429.dtsi                   |  7 +++
- drivers/crypto/stm32/stm32_crc32.c                 | 68 ++++++++++++++++++----
- 5 files changed, 75 insertions(+), 12 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/crypto/st,stm32-crc.txt b/Documentation/devicetree/bindings/crypto/st,stm32-crc.txt
+index 3ba92a5..1e9af69 100644
+--- a/Documentation/devicetree/bindings/crypto/st,stm32-crc.txt
++++ b/Documentation/devicetree/bindings/crypto/st,stm32-crc.txt
+@@ -1,7 +1,9 @@
+ * STMicroelectronics STM32 CRC
+ 
+ Required properties:
+-- compatible: Should be "st,stm32f7-crc".
++- compatible: Should be one of the following string.
++	      "st,stm32f7-crc"
++	      "st,stm32f4-crc"
+ - reg: The address and length of the peripheral registers space
+ - clocks: The input clock of the CRC instance
+ 
 -- 
 2.7.4
