@@ -1,57 +1,41 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 21 Jun 2017 08:34:43 +0200
-Subject: [PATCH 00/51] rtc: stop using rtc deprecated functions
-In-Reply-To: <20170621083907.y3gadsmsoufa5niv@piout.net>
-References: <20170620213507.urobmtg34vzubrdq@piout.net>
- <alpine.DEB.2.20.1706202343120.2157@nanos>
- <20170621075152.GA15996@amd>
- <20170621083907.y3gadsmsoufa5niv@piout.net>
-Message-ID: <20170621063443.GA4862@localhost>
+From: trini@konsulko.com (Tom Rini)
+Date: Wed, 21 Jun 2017 07:42:27 -0400
+Subject: [PATCH 2/2] ARM: dts: dm816x: Correct the state of the write protect
+ pin
+In-Reply-To: <1498045347-27324-1-git-send-email-trini@konsulko.com>
+References: <1498045347-27324-1-git-send-email-trini@konsulko.com>
+Message-ID: <1498045347-27324-2-git-send-email-trini@konsulko.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+From: Mihail Grigorov <michael.grigorov@konsulko.com>
 
-> > > > I think tglx had a plan for offsetting the time at some point so 32-bit
-> > > > platform can pass 2038 properly.
-> > > 
-> > > Yes, but there are still quite some issues to solve there:
-> > > 
-> > >      1) How do you tell the system that it should apply the offset in the
-> > >      	first place, i.e at boot time before NTP or any other mechanism can
-> > >      	correct it?
-> > 
-> > I'd not do offset. Instead, I'd select a threshold (perhaps year of
-> > release of given kernel?) and
-> > 
-> > 	if (rtc_time < year_of_release_of_kernel)
-> > 	   rtc_time += 0x100000000;
-> > 
-> > Ok, we'll have to move away from "rtc_time == 0 indicates zero", as
-> > seen in some drivers.
-> > 
-> > >      2) Deal with creative vendors who have their own idea about the 'start
-> > >      	of the epoch'
-> > 
-> > If someone uses different threshold, well, there will be
-> > confusion. But only for users that have their rtc set to the past,
-> > which is quite unusual.
-> > 
-> 
-> Or not, having an RTC set in the past is actually quite common. I'd find
-> it weird to have a new device boot and be set to a date in the future.
+Commit 599c376c4932 ("ARM: dts: Fix gpio interrupts for dm816x")
+corrected some problems with the MMC.  However, it gets the write
+protect pin backwards.  It needs to be ACTIVE_HIGH not ACTIVE_LOW.
 
-...but still better than board stuck in the past, no?
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Mihail Grigorov <michael.grigorov@konsulko.com>
+Signed-off-by: Tom Rini <trini@konsulko.com>
+---
+ arch/arm/boot/dts/dm8168-evm.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> Also note that the threshold or offset thing may seem like a good idea
-> but fails with many RTCs because of how they handle leap years.
-
-Well, you can still convert time from rtc to unix time, then do adjustment
-there.
-
-Anyway, I guess it would be cool for rtc drivers to annotate what limits
-underlying storage has to the common code, so that we can do fixups once
-per class, not once per driver.
+diff --git a/arch/arm/boot/dts/dm8168-evm.dts b/arch/arm/boot/dts/dm8168-evm.dts
+index 996eba0c2e7a..c72a2132aa82 100644
+--- a/arch/arm/boot/dts/dm8168-evm.dts
++++ b/arch/arm/boot/dts/dm8168-evm.dts
+@@ -196,7 +196,7 @@
+ 	vmmc-supply = <&vmmcsd_fixed>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&gpio2 7 GPIO_ACTIVE_LOW>;
+-	wp-gpios = <&gpio2 8 GPIO_ACTIVE_LOW>;
++	wp-gpios = <&gpio2 8 GPIO_ACTIVE_HIGH>;
+ };
+ 
+ /* At least dm8168-evm rev c won't support multipoint, later may */
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.9.1
