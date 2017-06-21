@@ -1,46 +1,48 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Wed, 21 Jun 2017 13:58:28 +0000
-Subject: [PATCH] ARM: dts: iwg20d-q7: Add pinctl support for scif0
-In-Reply-To: <20170621113354.GC17965@verge.net.au>
-References: <1497625049-46802-1-git-send-email-biju.das@bp.renesas.com>
- <CAMuHMdVe7sRcGohSPvSUrryNMetddomoMbN7ffOtq9Y3DBt=zQ@mail.gmail.com>
- <20170621113354.GC17965@verge.net.au>
-Message-ID: <KL1PR06MB170212437975F886787AAB09B8DA0@KL1PR06MB1702.apcprd06.prod.outlook.com>
+From: illusionist.neo@gmail.com (Shubham Bansal)
+Date: Wed, 21 Jun 2017 19:56:34 +0530
+Subject: [PATCH v2] arm: eBPF JIT compiler
+In-Reply-To: <59495367.3080402@iogearbox.net>
+References: <1495754003-21099-1-git-send-email-illusionist.neo@gmail.com>
+ <CAGXu5jKmLNMR+uhM9Ov2XPW6kCjip_SjScgEH0fTFp6fQtKFiA@mail.gmail.com>
+ <593E6B0F.8070901@iogearbox.net>
+ <CAHgaXd+DW2bggto=2S9hOdMrtPTvhD2QN4rPf2V8iHewQpg-YA@mail.gmail.com>
+ <CAHgaXdJrvKdzr3fJ1TMkC4foeVsZJDSVEwhDOeZGxQVsmoK2cQ@mail.gmail.com>
+ <59419D1E.2060303@iogearbox.net>
+ <CAHgaXdKMbFPgy-kKF0iDSAYo4CqLn9FRu9HwM+OfM-JWb9fNRQ@mail.gmail.com>
+ <594813AA.5010001@iogearbox.net>
+ <CAHgaXdLtX6yLdU3bMvS=g8FZ79sM_BW_+hHTMH=Mfk4TZqUnpw@mail.gmail.com>
+ <59495367.3080402@iogearbox.net>
+Message-ID: <CAHgaXdKGJFh8jO44gwCqe0cijoztf39bK9k8ioBtYDjzb4vvZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Simon,
+Hi Daniel,
 
-> On Mon, Jun 19, 2017 at 10:42:18AM +0200, Geert Uytterhoeven wrote:
-> > Hi Biju,
-> >
-> > On Fri, Jun 16, 2017 at 4:57 PM, Biju Das <biju.das@bp.renesas.com>
-> wrote:
-> > > Adding pinctrl support for scif0 interface.
-> > >
-> > > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> >
-> > The patch looks good to me, but without schematics, we cannot verify
-> > the actual pins used.
-> >
-> > Are the schematics somewhere available? Having access to them would
-> > allow us doing a better job reviewing your DTS patches.
 >
-> Echoing Geert's request, it would be great to be able to compare the DT
-> description against some documentation.
+> So my question would be, why can't the JIT imitate something
+> similar to what we do in the interpreter as well? So looking
+> at the disasm of what gcc compiles for the interpreter when it's
+> doing the above call could help as well in going forward. Not
+> sure if that answers your question, but perhaps not sure if I
+> understand your question yet?
+
+I just looked at the code again and I think I completely misunderstood
+the logic of  BPF_JMP | BPF_CALL.
+I think each helper function is working like this.
+
+____helper_function(u32 a1, u32 a2){
+}
+
+helper_function(u64 a1, u64 a2){
+     ____helper_function((u32 *)a1, (u32 *)a2);
+}
+
+So ultimately, we call helper_function which takes u64 as arguments
+only. I know its asking a lot, but can you please confirm this asap? I
+would like to start implementing it.
+
 >
-> My understanding is that this patch depends on "[PATCH v2 0/3] Add
-> R8A7743/SK-RZG1M PFC support" which in turn depends on pfc driver
-> support which is on target to be included in v4.13-rc1.
->
-> Accordingly I have marked this patch as deferred. Please repost or otherwise
-> ping me once the driver dependency is present in an rc release.
+> Cheers,
+> Daniel
 
-Thanks. I will repost/ping you once the pfc driver dependency is present in an rc release.
-
-Regards,
-Biju
-
-
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+-Shubham
