@@ -1,227 +1,189 @@
-From: geethasowjanya.akula@gmail.com (Geetha Akula)
-Date: Wed, 21 Jun 2017 12:09:45 +0530
-Subject: [PATCH v8 3/3] iommu/arm-smmu-v3: Add workaround for Cavium
- ThunderX2 erratum #126
-In-Reply-To: <20170620180038.GC28035@arm.com>
-References: <1497968259-16390-1-git-send-email-gakula@caviumnetworks.com>
- <1497968259-16390-4-git-send-email-gakula@caviumnetworks.com>
- <20170620180038.GC28035@arm.com>
-Message-ID: <CANHdaiYb8gG5+OjiSBkSGfyNnt4=WDze08qW1JXA9-F66HE9ZA@mail.gmail.com>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Wed, 21 Jun 2017 14:42:01 +0800
+Subject: [PATCH v16 0/7] power: add power sequence library
+Message-ID: <1498027328-25078-1-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+This is a follow-up for my last power sequence framework patch set [1].
+According to Rob Herring and Ulf Hansson's comments[2]. The kinds of
+power sequence instances will be added at postcore_initcall, the match
+criteria is compatible string first, if the compatible string is not
+matched between dts and library, it will try to use generic power sequence.
+	 
+The host driver just needs to call of_pwrseq_on/of_pwrseq_off
+if only one power sequence instance is needed, for more power sequences
+are used, using of_pwrseq_on_list/of_pwrseq_off_list instead (eg, USB hub driver).
 
-On Tue, Jun 20, 2017 at 11:30 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Jun 20, 2017 at 07:47:39PM +0530, Geetha sowjanya wrote:
->> From: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
->>
->> Cavium ThunderX2 SMMU doesn't support MSI and also doesn't have unique irq
->> lines for gerror, eventq and cmdq-sync.
->>
->> SHARED_IRQ option is set as a errata workaround, which allows to share the irq
->> line by register single irq handler for all the interrupts.
->>
->> Signed-off-by: Geetha sowjanya <gakula@caviumnetworks.com>
->> ---
->>  .../devicetree/bindings/iommu/arm,smmu-v3.txt      |    5 ++
->>  drivers/iommu/arm-smmu-v3.c                        |   73 ++++++++++++++++----
->>  2 files changed, 64 insertions(+), 14 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
->> index 6ecc48c..44b40e0 100644
->> --- a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
->> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
->> @@ -55,6 +55,11 @@ the PCIe specification.
->>                     Set for Caviun ThunderX2 silicon that doesn't support
->>                     SMMU page1 register space.
->>
->> +- cavium,cn9900-broken-unique-irqline
->> +                    : Use single irq line for all the SMMUv3 interrupts.
->> +                   Set for Caviun ThunderX2 silicon that doesn't support
->> +                   MSI and also doesn't have unique irq lines for gerror,
->> +                   eventq and cmdq-sync.
->
-> I think we're better off just supporting a new (optional) named interrupt
-> as "combined", and then allowing that to be used instead of the others.
+In future, if there are special power sequence requirements, the special
+power sequence library can be created.
 
-Are you suggesting to have new name irq "combined" like gerror ?
-If yes, then this won't be possible with apci. We need to update iort spec to
-add new name irq.
->
->>  ** Example
->>
->>          smmu at 2b400000 {
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index 2dea4a9..6c0c632 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -598,6 +598,7 @@ struct arm_smmu_device {
->>
->>  #define ARM_SMMU_OPT_SKIP_PREFETCH   (1 << 0)
->>  #define ARM_SMMU_OPT_PAGE0_REGS_ONLY (1 << 1)
->> +#define ARM_SMMU_OPT_SHARED_IRQ      (1 << 2)
->
-> Please call this COMBINED instead of SHARED (similarly elsewhere). That
-> said, not sure we need this.
->
->>       u32                             options;
->>
->>       struct arm_smmu_cmdq            cmdq;
->> @@ -665,6 +666,7 @@ struct arm_smmu_option_prop {
->>  static struct arm_smmu_option_prop arm_smmu_options[] = {
->>       { ARM_SMMU_OPT_SKIP_PREFETCH, "hisilicon,broken-prefetch-cmd" },
->>       { ARM_SMMU_OPT_PAGE0_REGS_ONLY, "cavium,cn9900-broken-page1-regspace"},
->> +     { ARM_SMMU_OPT_SHARED_IRQ, "cavium,cn9900-broken-unique-irqline"},
->>       { 0, NULL},
->>  };
->>
->> @@ -1313,6 +1315,21 @@ static irqreturn_t arm_smmu_gerror_handler(int irq, void *dev)
->>       writel(gerror, smmu->base + ARM_SMMU_GERRORN);
->>       return IRQ_HANDLED;
->>  }
->> +/* Shared irq handler*/
->> +static irqreturn_t arm_smmu_shared_irq_thread(int irq, void *dev)
->> +{
->> +     struct arm_smmu_device *smmu = dev;
->> +     irqreturn_t ret;
->> +
->> +     ret = arm_smmu_gerror_handler(irq, dev);
->> +     if (ret == IRQ_NONE) {
->> +             arm_smmu_evtq_thread(irq, dev);
->> +             arm_smmu_cmdq_sync_handler(irq, dev);
->> +             if (smmu->features & ARM_SMMU_FEAT_PRI)
->> +                     arm_smmu_priq_thread(irq, dev);
->> +     }
->> +     return IRQ_HANDLED;
->> +}
->
-> This isn't quite right, because you're now running low-level handlers (like
-> the gerror handler) in threaded context. You're better off registering a
-> low-level handler too (see below) which can kick gerror and cmdq_sync
-> before unconditionally returning IRQ_WAKE_THREAD.
+This patch set is tested on i.mx6 sabresx evk using a dts change, I use
+two hot-plug devices to simulate this use case, the related binding
+change is updated at patch [1/6], The udoo board changes were tested
+using my last power sequence patch set.[3]
 
-+static irqreturn_t arm_smmu_combined_irq_thread(int irq, void *dev)
-+{
-+       struct arm_smmu_device *smmu = dev;
-+
-+       arm_smmu_evtq_thread(irq, dev);
-+       if (smmu->features & ARM_SMMU_FEAT_PRI)
-+               arm_smmu_priq_thread(irq, dev);
-+
-+       return IRQ_HANDLED;
-+}
-+
-+static irqreturn_t arm_smmu_combined_irq_handler(int irq, void *dev)
-+{
-+       irqreturn_t ret;
-+
-+       ret = arm_smmu_gerror_handler(irq, dev);
-+       if (ret == IRQ_NONE) {
-+               arm_smmu_cmdq_sync_handler(irq, dev);
-+               return IRQ_WAKE_THREAD;
-+       }
-+       else
-+               return ret;
-+}
+Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
+need to power on itself before it can be found by ULPI bus.
 
->
->>
->>  /* IO_PGTABLE API */
->>  static void __arm_smmu_tlb_sync(struct arm_smmu_device *smmu)
->> @@ -2230,18 +2247,9 @@ static void arm_smmu_setup_msis(struct arm_smmu_device *smmu)
->>       devm_add_action(dev, arm_smmu_free_msis, dev);
->>  }
->>
->> -static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
->> +static void arm_smmu_setup_unique_irqs(struct arm_smmu_device *smmu)
->>  {
->> -     int ret, irq;
->> -     u32 irqen_flags = IRQ_CTRL_EVTQ_IRQEN | IRQ_CTRL_GERROR_IRQEN;
->> -
->> -     /* Disable IRQs first */
->> -     ret = arm_smmu_write_reg_sync(smmu, 0, ARM_SMMU_IRQ_CTRL,
->> -                                   ARM_SMMU_IRQ_CTRLACK);
->> -     if (ret) {
->> -             dev_err(smmu->dev, "failed to disable irqs\n");
->> -             return ret;
->> -     }
->> +     int irq, ret;
->>
->>       arm_smmu_setup_msis(smmu);
->>
->> @@ -2284,10 +2292,46 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
->>                       if (ret < 0)
->>                               dev_warn(smmu->dev,
->>                                        "failed to enable priq irq\n");
->> -                     else
->> -                             irqen_flags |= IRQ_CTRL_PRIQ_IRQEN;
->>               }
->>       }
->> +}
->> +
->> +static void arm_smmu_setup_shared_irqs(struct arm_smmu_device *smmu)
->> +{
->> +     int ret, irq;
->> +
->> +     /* Single irq is used for all queues, request single interrupt lines */
->> +     irq = smmu->evtq.q.irq;
->> +     if (irq) {
->> +             ret = devm_request_threaded_irq(smmu->dev, irq, NULL,
->
-> As above, stick your low-level handler in instead of NULL here.
->
->> +                                     arm_smmu_shared_irq_thread,
->> +                                     IRQF_ONESHOT | IRQF_SHARED,
->
-> Why do you need IRQF_SHARED here?
+@Rafael, USB Maintainer has already acked the USB related changes, would you
+consider queueing it at v4.13-rc1, sereval guys are waiting for this series.
+Thanks.
 
+Changes for v16:
+- Change match way between pwrseq instance and device. Currently, it maintains a global
+  table for compatible string and corresponding pwrseq library allocation function. The
+  match is occurred when host controller tries to carry out power on device, if it is
+  matched, it will allocate pwrseq instance for this device. [Patch 2/7]
+- Add related compatible string maintained at pwrseq_match_table_list. [Patch 1/7]
 
-+devm_request_threaded_irq(smmu->dev, irq,
-+                                       arm_smmu_combined_irq_handler,
-+                                       arm_smmu_combined_irq_thread,
-+                                       IRQF_SHARED,
-+                                       "arm-smmu-v3-combined-irq", smmu);
+Changes for v15:
+- Change pwrseq list name at USB hub structure (pwrseq_on_list->pwrseq_list). [Patch 4/7]
+- Add USB Maintainer's Ack [Patch 4/7]
 
-On multi-node system, node1 SMMU's share irq lines with node0 SMMU's.
+Changes for v14:
+- Rebase for v4.12-rc1
+- Delete some USB sysdev patches which has already merged
 
->
->> +                                     "arm-smmu-v3-shared_irq", smmu);
->
-> Call this "combined" instead of shared, to avoid confusion with the IRQ
-> flags.
->
->> +             if (ret < 0)
->> +                     dev_warn(smmu->dev, "failed to enable shared irq\n");
->> +     }
->> +}
->> +
->> +static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
->> +{
->> +     int ret;
->> +     u32 irqen_flags = IRQ_CTRL_EVTQ_IRQEN | IRQ_CTRL_GERROR_IRQEN;
->> +
->> +     /* Disable IRQs first */
->> +     ret = arm_smmu_write_reg_sync(smmu, 0, ARM_SMMU_IRQ_CTRL,
->> +                                   ARM_SMMU_IRQ_CTRLACK);
->> +     if (ret) {
->> +             dev_err(smmu->dev, "failed to disable irqs\n");
->> +             return ret;
->> +     }
->> +
->> +     if (smmu->options & ARM_SMMU_OPT_SHARED_IRQ)
->> +             arm_smmu_setup_shared_irqs(smmu);
->> +     else
->> +             arm_smmu_setup_unique_irqs(smmu);
->
-> I'd rather just have something like:
->
->   irq = platform_get_irq_byname(pdev, "combined");
->
-> in the arm_smmu_device_probe function. If we find it's there, we use that
-> in preference to the other interrupts.
->
-> Will
+Changes for v13:
+- Add more design descriptions at design doc and fix one build error
+  introduced by v12 wrongly [Patch 2/12]
+- Add the last three dts patches which were forgotten at last series
+- Move the comment for usb_create_shared_hcd to correct place [Patch 3/12]
+- Add sysdev for shared hcd too for xhci-plat.c [Patch 6/12]
 
-Thanks,
-Geetha.
+Rafael, if the first two power sequence patches are ok for you, would you consider
+accept these first, the other USB patches can go through USB tree at v4.12-rc1?
+
+Changes for v12:
+- Add design doc and more comments at generic power sequence source file [Patch 2/9]
+- Introduce four Arnd Bergmann patches and one my ehci related patches, these patches
+  are used to get property DT/firmware information at USB code, and these information
+  are needed for power sequence operation at USB. With these five patches, my chipidea
+  hack patch in previous patch set can be removed. [Patch 3-7/9]
+- Add -ENOENT judgement to avoid USB error if no power sequence library is chosen [9/9]
+
+Changes for v11:
+- Fix warning: (USB) selects POWER_SEQUENCE which has unmet direct dependencies (OF)
+- Delete redundant copyright statement.
+- Change pr_warn to pr_debug at wrseq_find_available_instance
+- Refine kerneldoc
+- %s/ENONET/ENOENT 
+- Allocate pwrseq list node before than carry out power sequence on 
+- Add mutex_lock/mutex_lock for pwrseq node browse at pwrseq_find_available_instance
+- Add pwrseq_suspend/resume for API both single instance and list 
+- Add .pwrseq_suspend/resume for pwrseq_generic.c
+- Add pwrseq_suspend_list and pwrseq_resume_list for USB hub suspend
+  and resume routine
+
+Changes for v10:
+- Improve the kernel-doc for power sequence core, including exported APIs and
+  main structure. [Patch 2/8]
+- Change Kconfig, and let the user choose power sequence. [Patch 2/8]
+- Delete EXPORT_SYMBOL and change related APIs as local, these APIs do not
+  be intended to export currently. [Patch 2/8]
+- Selete POWER_SEQUENCE at USB core's Kconfig. [Patch 4/8]
+
+Changes for v9:
+- Add Vaibhav Hiremath's reviewed-by [Patch 4/8]
+- Rebase to v4.9-rc1
+
+Changes for v8:
+- Allocate one extra pwrseq instance if pwrseq_get has succeed, it can avoid
+  preallocate instances problem which the number of instance is decided at
+  compile time, thanks for Heiko Stuebner's suggestion [Patch 2/8]
+- Delete pwrseq_compatible_sample.c which is the demo purpose to show compatible
+  match method. [Patch 2/8]
+- Add Maciej S. Szmigiero's tested-by. [Patch 7/8]
+
+Changes for v7:
+- Create kinds of power sequence instance at postcore_initcall, and match
+  the instance with node using compatible string, the beneit of this is
+  the host driver doesn't need to consider which pwrseq instance needs
+  to be used, and pwrseq core will match it, however, it eats some memories
+  if less power sequence instances are used. [Patch 2/8]
+- Add pwrseq_compatible_sample.c to test match pwrseq using device_id. [Patch 2/8]
+- Fix the comments Vaibhav Hiremath adds for error path for clock and do not
+  use device_node for parameters at pwrseq_on. [Patch 2/8]
+- Simplify the caller to use power sequence, follows Alan's commnets [Patch 4/8]
+- Tested three pwrseq instances together using both specific compatible string and
+  generic libraries.
+
+Changes for v6:
+- Add Matthias Kaehlcke's Reviewed-by and Tested-by. (patch [2/6])
+- Change chipidea core of_node assignment for coming user. (patch [5/6])
+- Applies Joshua Clayton's three dts changes for two boards,
+  the USB device's reg has only #address-cells, but without #size-cells.
+
+Changes for v5:
+- Delete pwrseq_register/pwrseq_unregister, which is useless currently
+- Fix the linker error when the pwrseq user is compiled as module
+
+Changes for v4:
+- Create the patch on next-20160722 
+- Fix the of_node is not NULL after chipidea driver is unbinded [Patch 5/6]
+- Using more friendly wait method for reset gpio [Patch 2/6]
+- Support multiple input clocks [Patch 2/6]
+- Add Rob Herring's ack for DT changes
+- Add Joshua Clayton's Tested-by
+
+Changes for v3:
+- Delete "power-sequence" property at binding-doc, and change related code
+  at both library and user code.
+- Change binding-doc example node name with Rob's comments
+- of_get_named_gpio_flags only gets the gpio, but without setting gpio flags,
+  add additional code request gpio with proper gpio flags
+- Add Philipp Zabel's Ack and MAINTAINER's entry
+
+Changes for v2:
+- Delete "pwrseq" prefix and clock-names for properties at dt binding
+- Should use structure not but its pointer for kzalloc
+- Since chipidea core has no of_node, let core's of_node equals glue
+  layer's at core's probe
+
+[1] http://www.spinics.net/lists/linux-usb/msg142755.html
+[2] http://www.spinics.net/lists/linux-usb/msg143106.html
+[3] http://www.spinics.net/lists/linux-usb/msg142815.html
+[4] http://www.spinics.net/lists/linux-usb/msg152375.html
+
+Joshua Clayton (2):
+  ARM: dts: imx6qdl: Enable usb node children with <reg>
+  ARM: dts: imx6q-evi: Fix onboard hub reset line
+
+Peter Chen (5):
+  binding-doc: power: pwrseq-generic: add binding doc for generic power
+    sequence library
+  power: add power sequence library
+  binding-doc: usb: usb-device: add optional properties for power
+    sequence
+  usb: core: add power sequence handling for USB devices
+  ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB property
+
+ .../bindings/power/pwrseq/pwrseq-generic.txt       |  53 ++++
+ .../devicetree/bindings/usb/usb-device.txt         |  10 +-
+ Documentation/power/power-sequence/design.rst      |  54 ++++
+ MAINTAINERS                                        |   9 +
+ arch/arm/boot/dts/imx6q-evi.dts                    |  25 +-
+ arch/arm/boot/dts/imx6qdl-udoo.dtsi                |  26 +-
+ arch/arm/boot/dts/imx6qdl.dtsi                     |   6 +
+ drivers/power/Kconfig                              |   1 +
+ drivers/power/Makefile                             |   1 +
+ drivers/power/pwrseq/Kconfig                       |  20 ++
+ drivers/power/pwrseq/Makefile                      |   2 +
+ drivers/power/pwrseq/core.c                        | 293 +++++++++++++++++++++
+ drivers/power/pwrseq/pwrseq_generic.c              | 210 +++++++++++++++
+ drivers/usb/Kconfig                                |   1 +
+ drivers/usb/core/hub.c                             |  49 +++-
+ drivers/usb/core/hub.h                             |   1 +
+ include/linux/power/pwrseq.h                       |  84 ++++++
+ 17 files changed, 808 insertions(+), 37 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+ create mode 100644 Documentation/power/power-sequence/design.rst
+ create mode 100644 drivers/power/pwrseq/Kconfig
+ create mode 100644 drivers/power/pwrseq/Makefile
+ create mode 100644 drivers/power/pwrseq/core.c
+ create mode 100644 drivers/power/pwrseq/pwrseq_generic.c
+ create mode 100644 include/linux/power/pwrseq.h
+
+-- 
+2.7.4
