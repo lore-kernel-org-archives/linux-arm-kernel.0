@@ -1,39 +1,77 @@
-From: ifqqfi@gmail.com (ifq)
-Date: Wed, 21 Jun 2017 22:27:36 +0800
-Subject: how to make kernel page table into 4kb maping
-Message-ID: <CAGnkeyMszGDUOEwvuJiUd+9gXdJBLtvm7JiuD3km3V2L=y2rMA@mail.gmail.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Wed, 21 Jun 2017 16:30:08 +0200
+Subject: [PATCH v2 1/8] dt-bindings: mfd: Add STM32 LPTimer binding
+In-Reply-To: <1498055415-31513-1-git-send-email-fabrice.gasnier@st.com>
+References: <1498055415-31513-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1498055415-31513-2-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, everyone
+Add documentation for STMicroelectronics STM32 Low-Power Timer binding.
 
-I want to find a way to let kernel page table do 4kb mapping, instead
-of 1MB section mapping.
-Is there any patch for this?
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+Changes in v2:
+- Lee's comments: s/Low Power/Low-Power/, remove 0x in example, improve
+  properties descriptions
+---
+ .../devicetree/bindings/mfd/stm32-lptimer.txt      | 48 ++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
 
-In alloc_init_pmd
-if (type->prot_sect &&
-((addr | next | phys) & ~SECTION_MASK) == 0) {
-__map_init_section(pmd, addr, next, phys, type, ng);
-} else {
-alloc_init_pte(pmd, addr, next,
-       __phys_to_pfn(phys), type, alloc, ng);
-}
-
-It use prot_sect to decide go section or pte. I try to force it go
-alloc_init_pte, the result is immediate crash when kernel booting.
-
-I also tried to init most of kernel memory with 1MB section page
-table, only 4MB with 4k page. But it depends on where the 4MB I
-choose.
-for example, 0x8f000000 ~ 0x8f400000 is ok, but 0x8f400000 ~
-0x8f800000 will fail.
-
-I think kernel choose 1MB section for less TLB missing, but I need to
-make it small to help me locate other issue.
-btw, the platform is arm cortex-a7.  kernel version: 3.14.43.
-
+diff --git a/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt b/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
+new file mode 100644
+index 0000000..af859c8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
+@@ -0,0 +1,48 @@
++STMicroelectronics STM32 Low-Power Timer
++
++The STM32 Low-Power Timer (LPTIM) is a 16-bit timer that provides several
++functions:
++- PWM output (with programmable prescaler, configurable polarity)
++- Quadrature encoder, counter
++- Trigger source for STM32 ADC/DAC (LPTIM_OUT)
++
++Required properties:
++- compatible:		Must be "st,stm32-lptimer".
++- reg:			Offset and length of the device's register set.
++- clocks:		Phandle to the clock used by the LP Timer module.
++- clock-names:		Must be "mux".
++- #address-cells:	Should be '<1>'.
++- #size-cells:		Should be '<0>'.
++
++Optional subnodes:
++- pwm:			See ../pwm/pwm-stm32-lp.txt
++- counter:		See ../iio/timer/stm32-lptimer-cnt.txt
++- trigger:		See ../iio/timer/stm32-lptimer-trigger.txt
++
++Example:
++
++	lptimer1: lptimer at 40002400 {
++		compatible = "st,stm32-lptimer";
++		reg = <0x40002400 0x400>;
++		clocks = <&timer_clk>;
++		clock-names = "mux";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		pwm {
++			compatible = "st,stm32-pwm-lp";
++			pinctrl-names = "default";
++			pinctrl-0 = <&lppwm1_pins>;
++		};
++
++		trigger at 0 {
++			compatible = "st,stm32-lptimer-trigger";
++			reg = <0>;
++		};
++
++		counter {
++			compatible = "st,stm32-lptimer-counter";
++			pinctrl-names = "default";
++			pinctrl-0 = <&lptim1_in_pins>;
++		};
++	};
 -- 
-Regards.
-
-JT.
+1.9.1
