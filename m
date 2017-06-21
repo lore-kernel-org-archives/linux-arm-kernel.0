@@ -1,79 +1,116 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 21 Jun 2017 10:08:35 +0100
-Subject: [PATCH v8 3/3] iommu/arm-smmu-v3: Add workaround for Cavium
- ThunderX2 erratum #126
-In-Reply-To: <CANHdaiYb8gG5+OjiSBkSGfyNnt4=WDze08qW1JXA9-F66HE9ZA@mail.gmail.com>
-References: <1497968259-16390-1-git-send-email-gakula@caviumnetworks.com>
- <1497968259-16390-4-git-send-email-gakula@caviumnetworks.com>
- <20170620180038.GC28035@arm.com>
- <CANHdaiYb8gG5+OjiSBkSGfyNnt4=WDze08qW1JXA9-F66HE9ZA@mail.gmail.com>
-Message-ID: <20170621090835.GD3768@arm.com>
+From: net147@gmail.com (Jonathan Liu)
+Date: Wed, 21 Jun 2017 19:12:07 +1000
+Subject: [PATCH v2] drm/sun4i: hdmi: Implement I2C adapter for A10s DDC bus
+In-Reply-To: <20170621084128.6745bs6irwmccbx6@flea.lan>
+References: <20170612055235.31019-1-net147@gmail.com>
+ <20170613111505.afyh4iotxdz5kceh@flea.lan>
+ <CANwerB0eXxAwihwt-xZuUm6DD6JSJt8nQdyxnp5TVYyU1yf9xA@mail.gmail.com>
+ <20170621084128.6745bs6irwmccbx6@flea.lan>
+Message-ID: <CANwerB1VVx--r9xqJUokhBkL8Z3pvM_LRX7Lqsv01ine-x_VPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geetha,
+Hi Maxime,
 
-On Wed, Jun 21, 2017 at 12:09:45PM +0530, Geetha Akula wrote:
-> On Tue, Jun 20, 2017 at 11:30 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Tue, Jun 20, 2017 at 07:47:39PM +0530, Geetha sowjanya wrote:
-> >> From: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
-> >>
-> >> Cavium ThunderX2 SMMU doesn't support MSI and also doesn't have unique irq
-> >> lines for gerror, eventq and cmdq-sync.
-> >>
-> >> SHARED_IRQ option is set as a errata workaround, which allows to share the irq
-> >> line by register single irq handler for all the interrupts.
-> >>
-> >> Signed-off-by: Geetha sowjanya <gakula@caviumnetworks.com>
-> >> ---
-> >>  .../devicetree/bindings/iommu/arm,smmu-v3.txt      |    5 ++
-> >>  drivers/iommu/arm-smmu-v3.c                        |   73 ++++++++++++++++----
-> >>  2 files changed, 64 insertions(+), 14 deletions(-)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-> >> index 6ecc48c..44b40e0 100644
-> >> --- a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-> >> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-> >> @@ -55,6 +55,11 @@ the PCIe specification.
-> >>                     Set for Caviun ThunderX2 silicon that doesn't support
-> >>                     SMMU page1 register space.
-> >>
-> >> +- cavium,cn9900-broken-unique-irqline
-> >> +                    : Use single irq line for all the SMMUv3 interrupts.
-> >> +                   Set for Caviun ThunderX2 silicon that doesn't support
-> >> +                   MSI and also doesn't have unique irq lines for gerror,
-> >> +                   eventq and cmdq-sync.
-> >
-> > I think we're better off just supporting a new (optional) named interrupt
-> > as "combined", and then allowing that to be used instead of the others.
-> 
-> Are you suggesting to have new name irq "combined" like gerror ?
-> If yes, then this won't be possible with apci. We need to update iort spec to
-> add new name irq.
+On 21 June 2017 at 18:41, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Tue, Jun 13, 2017 at 09:53:31PM +1000, Jonathan Liu wrote:
+>> >> --- /dev/null
+>> >> +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.c
+>> >> @@ -0,0 +1,163 @@
+>> >> +/*
+>> >> + * Copyright (C) 2017 Jonathan Liu
+>> >> + *
+>> >> + * Jonathan Liu <net147@gmail.com>
+>> >
+>> > Is it?
+>>
+>> I could add you to the copyright since you did the old one. But the
+>> implementation is different.
+>> I intend to rework this I2C driver to use the FIFO more to avoid
+>> splitting larger transfers > 16 bytes and do the transfer in a single
+>> command. Would you like to be added to the copyright?
+>
+> You took some code that you didn't create, and added some more
+> stuff. The copyright on the initial code remains, and it has nothing
+> to do with whether the author wants it or not, (s)he should be
+> mentionned, along with you of course.
+>
+I will update the copyright header accordingly.
 
-I'm mainly talking about the DT binding here, but I don't see why you
-can't hack drivers/acpi/arm64/iort.c like you did for the other erratum and
-have it register a single interrupt called "combined" based on the model
-number.
+>> >> +            ? SUN4I_HDMI_DDC_CMD_IMPLICIT_READ
+>> >> +            : SUN4I_HDMI_DDC_CMD_IMPLICIT_WRITE,
+>> >> +            hdmi->base + SUN4I_HDMI_DDC_CMD_REG);
+>> >> +
+>> >> +     reg = readl(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+>> >> +     writel(reg | SUN4I_HDMI_DDC_CTRL_START_CMD,
+>> >> +            hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
+>> >> +
+>> >> +     if (!(msg->flags & I2C_M_RD)) {
+>> >> +             for (i = 0; i < count; i++) {
+>> >> +                     writeb(*msg->buf++, hdmi->base
+>> >> +                            + SUN4I_HDMI_DDC_FIFO_DATA_REG);
+>> >
+>> > writesb?
+>> I intend to rework the FIFO handling so will need to continue using writeb.
+>
+> Then you'll change it when you'll rework it. Before then, you can use
+> writesb.
+>
+I have already reworked it in V3.
 
-> >> +                                     arm_smmu_shared_irq_thread,
-> >> +                                     IRQF_ONESHOT | IRQF_SHARED,
-> >
-> > Why do you need IRQF_SHARED here?
-> 
-> 
-> +devm_request_threaded_irq(smmu->dev, irq,
-> +                                       arm_smmu_combined_irq_handler,
-> +                                       arm_smmu_combined_irq_thread,
-> +                                       IRQF_SHARED,
-> +                                       "arm-smmu-v3-combined-irq", smmu);
-> 
-> On multi-node system, node1 SMMU's share irq lines with node0 SMMU's.
+>> >
+>> >> +                     --msg->len;
+>> >> +             }
+>> >> +     }
+>> >> +
+>> >> +     if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG,
+>> >> +                            reg,
+>> >> +                            !(reg & SUN4I_HDMI_DDC_CTRL_START_CMD),
+>> >> +                            100, 100000))
+>> >> +             return -EIO;
+>> >> +
+>> >> +     reg = readl(hdmi->base + SUN4I_HDMI_DDC_INTERRUPT_STATUS_REG);
+>> >> +     reg &= ~SUN4I_HDMI_DDC_INTERRUPT_STATUS_FIFO_REQUEST;
+>> I want to check all the other bits that are set if there are errors.
+>
+> Same thing here: you'll change it when that happens.
+I have already reworked it in V3.
 
-How does that work? Are these really MSIs under the hood? If so, why didn't
-you just build them as... MSIs?
+>
+>> >
+>> > You don't need to use that mask.
+>> >
+>> >> +     if (reg != SUN4I_HDMI_DDC_INTERRUPT_STATUS_TRANSFER_COMPLETE)
+>> >> +             return -EIO;
+>> >
+>> > !(reg & SUN4I_HDMI_DDC_INTERRUPT_STATUS_TRANSFER_COMPLETE) would be enough.
+>> I want to check all the other bits that are set if there are errors.
+>
+> Same thing here.
+I have already reworked it in V3.
 
-I sincerely hope that you never want to support paging of DMA memory on this
-platform. It will run like a dog.
+>
+>> >
+>> >> +
+>> >> +     if (msg->flags & I2C_M_RD) {
+>> >> +             for (i = 0; i < count; i++) {
+>> >> +                     *msg->buf++ = readb(hdmi->base
+>> >> +                                         + SUN4I_HDMI_DDC_FIFO_DATA_REG);
+>> >
+>> > readsb ?
+>> I am reworking the FIFO handling so I will need to continue to use readb.
+>
+> Same thing here.
+I have already reworked it in V3.
 
-Will
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+
+Regards,
+Jonathan
