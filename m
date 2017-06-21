@@ -1,66 +1,86 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 21 Jun 2017 16:42:10 +0200
-Subject: [PATCH v5.1 0/2] tty/serial: meson_uart: add support for core clock
- handling
-Message-ID: <1498056132-18508-1-git-send-email-narmstrong@baylibre.com>
+From: amelie.delaunay@st.com (Amelie Delaunay)
+Date: Wed, 21 Jun 2017 16:32:05 +0200
+Subject: [PATCH 1/2] dt-bindings: spi: Document the STM32 SPI bindings
+In-Reply-To: <1498055526-6918-1-git-send-email-amelie.delaunay@st.com>
+References: <1498055526-6918-1-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1498055526-6918-2-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset is a re-spin of Helmut Klein's v3 patchset at [0] and the v4/v5 patchset at [1] & [2].
+This patch adds the documentation of device tree bindings
+for the STM32 SPI controller.
 
-Initially, the original patchset was made to enable usage on the non-AO UARTS
-not enabled by the Bootloader (uart_B and uart_C), but the patchset needed
-an overall change to have clean and stable DT bindings.
+Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+---
+ .../devicetree/bindings/spi/spi-stm32.txt          | 60 ++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/spi/spi-stm32.txt
 
-The Amlogic Meson UART Driver did not have stable DT bindings and mismatched
-clock handling on non-AO UARTs since these "EE" UARTs needs a clock gate to
-be ungated to works correctly.
-In the same way, the AO UARTs does not need gating and can be used as
-Early Consoles.
-
-In the same time, the UART Interfaces can take clock input for the baudrate
-generate from either the external Xtal or the internal Bus Clock (clk81).
-
-So new bindings was necessary to meet these requirements and the DT
-maintainers requirements.
-
-The "legacy" binding actually used in the driver is left until all the DT
-files are switched to the new bindings.
-
-The GX DT has been tested, but the last 4 Meson6/Meson8/b are only
-compile-tested, and testing is welcome.
-Thus only the first 3 patches can be merged until the Meson6/Meson8/b are
-formally tested.
-
-It must be noted that the meson6 cannot work today except using an early
-console since the UART driver could not probe without a clocks property.
-
-Changes since v5 at [2]:
- - Dropped bindings and tty patch since merged by greg kh into tty next branch
- - Keep old bindings in DT files for retro-compatibility
-
-Changes since v4 at [1]:
- - Droped meson8/meson8b DT patches
- - Fixes copy/paste error in patch 2
- - Refactored clock probing in patch 2
- - merged meson6 patches together to avoid breaking bisect
-
-[0] http://lkml.kernel.org/r/20170331165437.26227-1-hgkr.klein at gmail.com
-[1] http://lkml.kernel.org/r/1497001756-942-1-git-send-email-narmstrong at baylibre.com
-[2] http://lkml.kernel.org/r/1497428957-19942-1-git-send-email-narmstrong at baylibre.com
-
-Helmut Klein (1):
-  ARM64: dts: meson-gx: use stable UART bindings with correct gate clock
-
-Neil Armstrong (1):
-  ARM: dts: meson6: use stable UART bindings
-
- arch/arm/boot/dts/meson.dtsi                |  8 ++++----
- arch/arm/boot/dts/meson6.dtsi               | 28 ++++++++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi   | 12 +++++-------
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 25 +++++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 25 +++++++++++++++++++++++++
- 5 files changed, 87 insertions(+), 11 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/spi/spi-stm32.txt b/Documentation/devicetree/bindings/spi/spi-stm32.txt
+new file mode 100644
+index 0000000..3958bf6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/spi/spi-stm32.txt
+@@ -0,0 +1,60 @@
++STMicroelectronics STM32 SPI Controller
++
++The STM32 SPI controller is used to communicate with external devices using
++the Serial Peripheral Interface. It supports full-duplex, half-duplex and
++simplex synchronous serial communication with external devices. It supports
++from 4 to 32-bit data size. Although it can be configured as master or slave,
++only master is supported by the driver.
++
++Required properties:
++- compatible: Must be "st,stm32-spi".
++- reg: Offset and length of the device's register set.
++- interrupts: Must contain the interrupt id.
++- clocks: Must contain an entry for spiclk (which feeds the internal clock
++	  generator).
++- #address-cells:  Number of cells required to define a chip select address.
++- #size-cells: Should be zero.
++
++Optional properties:
++- resets: Must contain the phandle to the reset controller.
++- A pinctrl state named "default" may be defined to set pins in mode of
++  operation for SPI transfer.
++- dmas: DMA specifiers for tx and rx dma. DMA fifo mode must be used. See the
++  STM32 DMA bindings, Documentation/devicetree/bindings/dma/stm32-dma.txt.
++- dma-names: DMA request names should include "tx" and "rx" if present.
++- cs-gpios: list of GPIO chip selects. See the SPI bus bindings,
++  Documentation/devicetree/bindings/spi/spi-bus.txt
++
++
++Child nodes represent devices on the SPI bus
++  See ../spi/spi-bus.txt
++
++Optional properties:
++- st,spi-midi-ns: (Master Inter-Data Idleness) minimum time delay in
++		  nanoseconds inserted between two consecutive data frames.
++
++
++Example:
++	spi2: spi at 40003800 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "st,stm32-spi";
++		reg = <0x40003800 0x400>;
++		interrupts = <36>;
++		clocks = <&rcc SPI2_CK>;
++		resets = <&rcc 1166>;
++		dmas = <&dmamux1 0 39 0x400 0x01>,
++		       <&dmamux1 1 40 0x400 0x01>;
++		dma-names = "rx", "tx";
++		pinctrl-0 = <&spi2_pins_b>;
++		pinctrl-names = "default";
++		status = "okay";
++		cs-gpios = <&gpioa 11 0>;
++
++		spidev at 0 {
++			compatible = "spidev";
++			reg = <0>;
++			spi-max-frequency = <4000000>;
++			st,spi-midi = <4000>;
++		};
++	};
 -- 
 1.9.1
