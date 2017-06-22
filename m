@@ -1,54 +1,45 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 22 Jun 2017 09:47:05 +0100
-Subject: [PATCH 1/4] ARM/PCI: iop13xx: address uninitialized variable
- warning
-In-Reply-To: <20170621215323.3921382-1-arnd@arndb.de>
-References: <20170621215323.3921382-1-arnd@arndb.de>
-Message-ID: <20170622084704.GA22996@red-moon>
+From: frank.wang@rock-chips.com (Frank Wang)
+Date: Thu, 22 Jun 2017 16:46:47 +0800
+Subject: [PATCH] nvmem: rockchip-efuse: amend compatible rk322x-efuse to
+ rk3228-efuse
+Message-ID: <1498121207-24941-1-git-send-email-frank.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 21, 2017 at 11:52:59PM +0200, Arnd Bergmann wrote:
-> The last rework returned a variable that the compiler cannot prove
-> to be initialized:
-> 
-> arch/arm/mach-iop13xx/pci.c: In function 'iop13xx_scan_bus':
-> arch/arm/mach-iop13xx/pci.c:509:17: error: 'ret' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-> 
-> In the switch statement that sets the return value, this adds
-> a default returning an error.
-> 
-> Fixes: ace27646da8e ("ARM/PCI: Convert PCI scan API to pci_scan_root_bus_bridge()")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/mach-iop13xx/pci.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/mach-iop13xx/pci.c b/arch/arm/mach-iop13xx/pci.c
-> index b97879bfb81a..3c51a9bb9b49 100644
-> --- a/arch/arm/mach-iop13xx/pci.c
-> +++ b/arch/arm/mach-iop13xx/pci.c
-> @@ -553,6 +553,8 @@ int iop13xx_scan_bus(int nr, struct pci_host_bridge *bridge)
->  		if (!ret)
->  			pci_bus_atue = bridge->bus;
->  		break;
-> +	default:
-> +		ret = -EINVAL;
->  	}
->  
->  	return ret;
+As the comments from Heiko Stuebner <heiko@sntech.de> that compatible
+should not contain any placeholders, this patch fix it for rk3228 SoC.
 
-Ok I managed to miss these ones somehow, apologies. This series can be
-squashed into the initial series but there is also Linus' fix for faraday
-to address:
+Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
+---
+ Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt | 2 +-
+ drivers/nvmem/rockchip-efuse.c                             | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-https://patchwork.ozlabs.org/patch/778999/
-
-I can respin a v3 but I am off the radar next week so timing for the
-pci_fixup_irqs() removal looks bad, I am not sure what's the next course
-of action but I think it is better to drop it for this cycle and wait
-for 4.14 (hopefully there are not many PCI host bridges updates to
-rebase but I will cope with that anyway - that's the best I can do).
-
-Thanks,
-Lorenzo
+diff --git a/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt b/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
+index 194926f..1ff02afd 100644
+--- a/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
++++ b/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
+@@ -4,7 +4,7 @@ Required properties:
+ - compatible: Should be one of the following.
+   - "rockchip,rk3066a-efuse" - for RK3066a SoCs.
+   - "rockchip,rk3188-efuse" - for RK3188 SoCs.
+-  - "rockchip,rk322x-efuse" - for RK322x SoCs.
++  - "rockchip,rk3228-efuse" - for RK3228 SoCs.
+   - "rockchip,rk3288-efuse" - for RK3288 SoCs.
+   - "rockchip,rk3399-efuse" - for RK3399 SoCs.
+ - reg: Should contain the registers location and exact eFuse size
+diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
+index a0d4ede..63e3eb5 100644
+--- a/drivers/nvmem/rockchip-efuse.c
++++ b/drivers/nvmem/rockchip-efuse.c
+@@ -170,7 +170,7 @@ static const struct of_device_id rockchip_efuse_match[] = {
+ 		.data = (void *)&rockchip_rk3288_efuse_read,
+ 	},
+ 	{
+-		.compatible = "rockchip,rk322x-efuse",
++		.compatible = "rockchip,rk3228-efuse",
+ 		.data = (void *)&rockchip_rk3288_efuse_read,
+ 	},
+ 	{
+-- 
+2.0.0
