@@ -1,45 +1,85 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 22 Jun 2017 14:55:49 -0700
-Subject: [PATCH 1/2] clk: samsung: audss: Fix silent hang on Exynos4412
- due to disabled EPLL
-In-Reply-To: <99de23b6-4049-7542-008b-abf65df356f0@samsung.com>
-References: <20170621190807.14850-1-krzk@kernel.org>
- <CGME20170621190822epcas2p49ed738ef43e6d68f72903d185e20332e@epcas2p4.samsung.com>
- <20170621190807.14850-2-krzk@kernel.org>
- <99de23b6-4049-7542-008b-abf65df356f0@samsung.com>
-Message-ID: <20170622215549.GM4493@codeaurora.org>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Fri, 23 Jun 2017 00:01:26 +0200
+Subject: [PATCH 1/9] i2c: designware: Fix system suspend
+In-Reply-To: <CAPDyKFo80QWYhU_SFexr_riPSZS3QEXDyBcywa5qBYa3sJXcjw@mail.gmail.com>
+References: <1498072888-14782-1-git-send-email-ulf.hansson@linaro.org>
+ <CAJZ5v0iYwPE8rpn=aZ9n6LV-qbAK3kynRqVZ7xxuB+gYar_fyg@mail.gmail.com>
+ <20170622104933.GY629@lahna.fi.intel.com> <2842386.AFZiXzV2Sq@aspire.rjw.lan>
+ <CAPDyKFo80QWYhU_SFexr_riPSZS3QEXDyBcywa5qBYa3sJXcjw@mail.gmail.com>
+Message-ID: <CAJZ5v0irHvYXHv1GykatTH+XROZyL0nR0c=KfdSrpH395s6V8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/22, Sylwester Nawrocki wrote:
-> On 06/21/2017 09:08 PM, Krzysztof Kozlowski wrote:
-> >Similarly to commit f1e9203e2366 ("clk: samsung: Fix Exynos 5420 pinctrl
-> >setup and clock disable failure due to domain being gated") for
-> >Exynos5420, the Exynos4412 also requires that EPLL is not disabled.
-> >Otherwise any access to MAUDIO block will silently halt.
-> >
-> >This was not visible before because EPLL on Exynos4 could not be
-> >disabled before commit 6edfa11cb396 ("clk: samsung:
-> >Add enable/disable operation for PLL36XX clocks").  After this commit,
-> >on Odroid U3 board one can see silent hang, usually with last (but
-> >unrelated) messages:
-> >
-> >	[    2.382741] input: gpio_keys as /devices/platform/gpio_keys/input/input0
-> >	[    2.405686] usb 1-3: new high-speed USB device number 3 using exynos-ehci
-> >	[    2.419843] max77686-rtc max77686-rtc: setting system clock to 2017-06-21 17:04:13 UTC (1498064653)
-> >
-> >Mark Exynos4 variant as also needed EPLL to be enabled all the time.
-> >
-> >Signed-off-by: Krzysztof Kozlowski<krzk@kernel.org>
-> Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> 
-> Stephen, Mike,
-> 
-> Can you please apply this patch directly?
-> 
+On Thu, Jun 22, 2017 at 11:37 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 22 June 2017 at 16:41, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>> On Thursday, June 22, 2017 01:49:33 PM Mika Westerberg wrote:
+>>> On Thu, Jun 22, 2017 at 01:31:51AM +0200, Rafael J. Wysocki wrote:
+>>> > On Wed, Jun 21, 2017 at 9:21 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>> > > The commit 8503ff166504 ("i2c: designware: Avoid unnecessary resuming
+>>> > > during system suspend"), may suggest to the PM core to try out the so
+>>> > > called direct_complete path for system sleep. In this path, the PM core
+>>> > > treats a runtime suspended device as it's already in a proper low power
+>>> > > state for system sleep, which makes it skip calling the system sleep
+>>> > > callbacks for the device, except for the ->prepare() and the ->complete()
+>>> > > callback.
+>>> > >
+>>> > > Moreover, under certain circumstances the PM core may unset the
+>>> > > direct_complete flag for a parent device, in case its child device are
+>>> > > being system suspended before. In other words, the PM core doesn't skip
+>>> > > calling the system sleep callbacks, no matter if the device is runtime
+>>> > > suspended or not.
+>>> > >
+>>> > > In cases of an i2c slave device, the above situation is triggered.
+>>> > > Unfortunate, this also breaks the assumption that the i2c device is always
+>>> > > runtime resumed, whenever the dw_i2c_plat_suspend() callback is being
+>>> > > invoked, which then leads to a regression.
+>>> > >
+>>> > > More precisely, dw_i2c_plat_suspend() then calls clk_core_disable() and
+>>> > > clk_core_unprepare(), for an already disabled/unprepared clock, leading to
+>>> > > complaints about clocks calls being wrongly balanced.
+>>> > >
+>>> > > In cases when the i2c device is attached to the ACPI PM domain, the problem
+>>> > > doesn't occur. That's because ACPI's ->suspend() callback, assigned to
+>>> > > acpi_subsys_suspend(), calls pm_runtime_resume() for the i2c device.
+>>> >
+>>> > Which really is expected to happen, so direct_complete should only be
+>>> > used along with the ACPI PM domain in this case.
+>>> >
+>>> > Moreover, in the ACPI PM domain case acpi_subsys_prepare() is supposed
+>>> > to do the right thing without dw_i2c_plat_prepare() and the return
+>>> > value of the latter will be ignored anyway, so dw_i2c_plat_prepare()
+>>> > will only have effect without ACPI PM domain AFAICS.
+>>> >
+>>> > It looks like commit 8503ff166504 is entirely misguided.
+>>>
+>>> Indeed it is. At the time I suggested that change I did not really
+>>> understand how the direct complete is supposed to be used :-/
+>>
+>> So can we go for a full revert, please, and then fix up things properly?
+>
+> Unfortunate I think a revert is going to make it worse, for the non ACPI case.
+>
+> Because in that case, unless I am reading the code wrong, I think when
+> the device is runtime suspended during system sleep, then the system
+> suspend callback will also be called (because the direct_complete
+> isn't run), again causing clock unbalance issues.
+>
+> This makes it worse in that sense, that then you don't even need an
+> i2c slave to trigger the problem.
 
-Applied to clk-next.
+In that case your changelog is a bit misleading.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+It looks like the commit in question attempted to fix exactly this
+issue, but it failed, so it should be replaced with something else
+which is what your patch is effectively doing.
+
+IMO you should describe the original problem, explain why that commit
+is not sufficient to fix it and then describe the final fix.
+
+Anyway, after reading the changelog it should be clear that things
+were broken before the commit in question.
+
+And BTW I'm not really sure how the rest of the series is related to this?
+
+Thanks,
+Rafael
