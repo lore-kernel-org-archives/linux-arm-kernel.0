@@ -1,54 +1,42 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 22 Jun 2017 11:10:46 +0200
-Subject: [PATCH] nvmem: rockchip-efuse: amend compatible rk322x-efuse to
- rk3228-efuse
-In-Reply-To: <1498121207-24941-1-git-send-email-frank.wang@rock-chips.com>
-References: <1498121207-24941-1-git-send-email-frank.wang@rock-chips.com>
-Message-ID: <48352151.OspxPMcbie@phil>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Thu, 22 Jun 2017 10:12:31 +0100
+Subject: [PATCH] ARM: always enable AEABI for ARMv6+
+Message-ID: <E1dNyAB-00065m-3A@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 22. Juni 2017, 16:46:47 CEST schrieb Frank Wang:
-> As the comments from Heiko Stuebner <heiko@sntech.de> that compatible
-> should not contain any placeholders, this patch fix it for rk3228 SoC.
-> 
-> Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
+Always enable AEABI for ARMv6+, as these use the double-word exclusives
+which must be passed an even register to avoid errors such as:
 
-not sure how this slipped through in the first place, but the rk322x
-compatible would only make it into 4.13, so it should still be fine to
-simply correct that issue, before it hits mainline.
+/tmp/ccG2rCwe.s:905: Error: even register required -- `ldrexd r5,r6,[r7]'
+/tmp/ccG2rCwe.s:909: Error: even register required -- `strexd sl,r3,r4,[r7]'
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> ---
->  Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt | 2 +-
->  drivers/nvmem/rockchip-efuse.c                             | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt b/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
-> index 194926f..1ff02afd 100644
-> --- a/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
-> +++ b/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
-> @@ -4,7 +4,7 @@ Required properties:
->  - compatible: Should be one of the following.
->    - "rockchip,rk3066a-efuse" - for RK3066a SoCs.
->    - "rockchip,rk3188-efuse" - for RK3188 SoCs.
-> -  - "rockchip,rk322x-efuse" - for RK322x SoCs.
-> +  - "rockchip,rk3228-efuse" - for RK3228 SoCs.
->    - "rockchip,rk3288-efuse" - for RK3288 SoCs.
->    - "rockchip,rk3399-efuse" - for RK3399 SoCs.
->  - reg: Should contain the registers location and exact eFuse size
-> diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
-> index a0d4ede..63e3eb5 100644
-> --- a/drivers/nvmem/rockchip-efuse.c
-> +++ b/drivers/nvmem/rockchip-efuse.c
-> @@ -170,7 +170,7 @@ static const struct of_device_id rockchip_efuse_match[] = {
->  		.data = (void *)&rockchip_rk3288_efuse_read,
->  	},
->  	{
-> -		.compatible = "rockchip,rk322x-efuse",
-> +		.compatible = "rockchip,rk3228-efuse",
->  		.data = (void *)&rockchip_rk3288_efuse_read,
->  	},
->  	{
-> 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 270ab2549def..78e42f691270 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1542,7 +1542,6 @@ config THUMB2_KERNEL
+ 	bool "Compile the kernel in Thumb-2 mode" if !CPU_THUMBONLY
+ 	depends on (CPU_V7 || CPU_V7M) && !CPU_V6 && !CPU_V6K
+ 	default y if CPU_THUMBONLY
+-	select AEABI
+ 	select ARM_ASM_UNIFIED
+ 	select ARM_UNWIND
+ 	help
+@@ -1605,7 +1604,8 @@ config ARM_PATCH_IDIV
+ 	  code to do integer division.
+ 
+ config AEABI
+-	bool "Use the ARM EABI to compile the kernel"
++	bool "Use the ARM EABI to compile the kernel" if !THUMB2_KERNEL && !CPU_V7 && !CPU_V7M && !CPU_V6 && !CPU_V6K
++	default THUMB2_KERNEL || CPU_V7 || CPU_V7M || CPU_V6 || CPU_V6K
+ 	help
+ 	  This option allows for the kernel to be compiled using the latest
+ 	  ARM ABI (aka EABI).  This is only useful if you are using a user
+-- 
+2.7.4
