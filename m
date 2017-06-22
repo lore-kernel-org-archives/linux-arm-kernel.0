@@ -1,54 +1,98 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Thu, 22 Jun 2017 10:44:08 +0100
-Subject: [PATCH V2 1/5] arch_topology: Get rid of "cap_parsing_done"
-In-Reply-To: <3cb2fa07035f9333eeaaee3eab37d090777abb99.1498019799.git.viresh.kumar@linaro.org>
-References: <cover.1498019799.git.viresh.kumar@linaro.org>
- <3cb2fa07035f9333eeaaee3eab37d090777abb99.1498019799.git.viresh.kumar@linaro.org>
-Message-ID: <20170622094408.puyfkjglvqtlkq3f@e106622-lin>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 22 Jun 2017 10:43:33 +0100
+Subject: [PATCH] compiler, clang: Add always_inline attribute to inline
+In-Reply-To: <alpine.DEB.2.10.1706201604540.146880@chino.kir.corp.google.com>
+References: <20170615155440.GC26471@leverpostej>
+ <1497887596-8731-1-git-send-email-psodagud@codeaurora.org>
+ <alpine.DEB.2.10.1706191322590.95967@chino.kir.corp.google.com>
+ <47bd7df20466d5f7f557ca087b0189cf@codeaurora.org>
+ <alpine.DEB.2.10.1706191439090.2360@chino.kir.corp.google.com>
+ <f8ee882e9859f24dac24832bfb5ae0f1@codeaurora.org>
+ <20170620105937.GD28157@leverpostej>
+ <alpine.DEB.2.10.1706201604540.146880@chino.kir.corp.google.com>
+Message-ID: <20170622094333.GB25967@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 21/06/17 10:16, Viresh Kumar wrote:
-> We can reuse "cap_parsing_failed" instead of keeping an additional
-> variable here.
+On Tue, Jun 20, 2017 at 04:12:32PM -0700, David Rientjes wrote:
+> On Tue, 20 Jun 2017, Mark Rutland wrote:
 > 
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  drivers/base/arch_topology.c | 5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
+> > As with my reply to David, my preference would be that we:
+> > 
+> > 1) Align compiler-clang.h with the compiler-gcc.h inlining behaviour, so
+> >    that things work by default.
+> > 
+> > 2) Fix up the arm64 core code (and drivers for architected / common
+> >    peripherals) to use __always_inline where we always require inlining.
+> > 
+> > 3) Have arm64 select CONFIG_ARCH_SUPPORTS_OPTIMIZED_INLINING, and have
+> >    people test-build configurations with CONFIG_OPTIMIZE_INLINING, with
+> >    both GCC and clang.
+> > 
+> > 4) Fix up drivers, etc, as appropriate.
+> > 
+> > 5) Once that's largely stable, and if there's a benefit, have arm64
+> >    select CONFIG_OPTIMIZE_INLINING by default.
+> > 
+> > That should avoid undue breakage, while enabling this ASAP.
+> > 
 > 
-> diff --git a/drivers/base/arch_topology.c b/drivers/base/arch_topology.c
-> index d1c33a85059e..8239a6232808 100644
-> --- a/drivers/base/arch_topology.c
-> +++ b/drivers/base/arch_topology.c
-> @@ -161,7 +161,6 @@ int __init topology_parse_cpu_capacity(struct device_node *cpu_node, int cpu)
->  
->  #ifdef CONFIG_CPU_FREQ
->  static cpumask_var_t cpus_to_visit;
-> -static bool cap_parsing_done;
->  static void parsing_done_workfn(struct work_struct *work);
->  static DECLARE_WORK(parsing_done_work, parsing_done_workfn);
->  
-> @@ -173,7 +172,7 @@ init_cpu_capacity_callback(struct notifier_block *nb,
->  	struct cpufreq_policy *policy = data;
->  	int cpu;
->  
-> -	if (cap_parsing_failed || cap_parsing_done)
-> +	if (cap_parsing_failed)
->  		return 0;
->  
->  	switch (val) {
-> @@ -193,7 +192,7 @@ init_cpu_capacity_callback(struct notifier_block *nb,
->  			topology_normalize_cpu_scale();
->  			kfree(raw_capacity);
->  			pr_debug("cpu_capacity: parsing done\n");
-> -			cap_parsing_done = true;
-> +			cap_parsing_failed = true;
+> Sounds good, but I think we should simply deal with the 
+> __attribute__((unused)) needed for clang as part of compiler-gcc.h by 
+> simply adding it to the inline override there to avoid duplicated code.
 
-But we didn't actually failed here, right?
+Agreed. That looks much better.
 
 Thanks,
+Mark.
 
-- Juri
+> 
+> diff --git a/include/linux/compiler-clang.h b/include/linux/compiler-clang.h
+> --- a/include/linux/compiler-clang.h
+> +++ b/include/linux/compiler-clang.h
+> @@ -15,11 +15,3 @@
+>   * with any version that can compile the kernel
+>   */
+>  #define __UNIQUE_ID(prefix) __PASTE(__PASTE(__UNIQUE_ID_, prefix), __COUNTER__)
+> -
+> -/*
+> - * GCC does not warn about unused static inline functions for
+> - * -Wunused-function.  This turns out to avoid the need for complex #ifdef
+> - * directives.  Suppress the warning in clang as well.
+> - */
+> -#undef inline
+> -#define inline inline __attribute__((unused)) notrace
+> diff --git a/include/linux/compiler-gcc.h b/include/linux/compiler-gcc.h
+> index 0efef9cf014f..71fe0994cf1a 100644
+> --- a/include/linux/compiler-gcc.h
+> +++ b/include/linux/compiler-gcc.h
+> @@ -66,18 +66,22 @@
+>  
+>  /*
+>   * Force always-inline if the user requests it so via the .config,
+> - * or if gcc is too old:
+> + * or if gcc is too old.
+> + * GCC does not warn about unused static inline functions for
+> + * -Wunused-function.  This turns out to avoid the need for complex #ifdef
+> + * directives.  Suppress the warning in clang as well by using "unused"
+> + * function attribute, which is redundant but not harmful for gcc.
+>   */
+>  #if !defined(CONFIG_ARCH_SUPPORTS_OPTIMIZED_INLINING) ||		\
+>      !defined(CONFIG_OPTIMIZE_INLINING) || (__GNUC__ < 4)
+> -#define inline		inline		__attribute__((always_inline)) notrace
+> -#define __inline__	__inline__	__attribute__((always_inline)) notrace
+> -#define __inline	__inline	__attribute__((always_inline)) notrace
+> +#define inline inline		__attribute__((always_inline,unused)) notrace
+> +#define __inline__ __inline__	__attribute__((always_inline,unused)) notrace
+> +#define __inline __inline	__attribute__((always_inline,unused)) notrace
+>  #else
+>  /* A lot of inline functions can cause havoc with function tracing */
+> -#define inline		inline		notrace
+> -#define __inline__	__inline__	notrace
+> -#define __inline	__inline	notrace
+> +#define inline inline		__attribute__((unused)) notrace
+> +#define __inline__ __inline__	__attribute__((unused)) notrace
+> +#define __inline __inline	__attribute__((unused)) notrace
+>  #endif
+>  
+>  #define __always_inline	inline __attribute__((always_inline))
