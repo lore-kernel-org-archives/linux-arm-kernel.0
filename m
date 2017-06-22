@@ -1,138 +1,25 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 22 Jun 2017 22:04:37 +0100
-Subject: [Devel] [PATCH v9 0/3] Cavium ThunderX2 SMMUv3 errata workarounds
-In-Reply-To: <20170622193535.GA10237@rric.localdomain>
-References: <1498133138-20244-1-git-send-email-gakula@caviumnetworks.com>
- <20170622182257.GI15336@arm.com> <20170622185822.GK15336@arm.com>
- <20170622193535.GA10237@rric.localdomain>
-Message-ID: <20170622210437.GA27861@red-moon>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 22 Jun 2017 16:04:14 -0500
+Subject: [PATCH v2 1/5] dt-bindings: i2c-stm32: Document the STM32F7 I2C
+ bindings
+In-Reply-To: <1497958890-5530-2-git-send-email-pierre-yves.mordret@st.com>
+References: <1497958890-5530-1-git-send-email-pierre-yves.mordret@st.com>
+ <1497958890-5530-2-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <20170622210414.n6vdsc2ga2dwdvyd@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 22, 2017 at 09:35:35PM +0200, Robert Richter wrote:
-> On 22.06.17 19:58:22, Will Deacon wrote:
-> > On Thu, Jun 22, 2017 at 07:22:57PM +0100, Will Deacon wrote:
-> > > On Thu, Jun 22, 2017 at 05:35:35PM +0530, Geetha sowjanya wrote:
-> > > > Cavium ThunderX2 SMMUv3 implementation has two Silicon Erratas.
-> > > > 1. Errata ID #74
-> > > >    SMMU register alias Page 1 is not implemented
-> > > > 2. Errata ID #126
-> > > >    SMMU doesnt support unique IRQ lines and also MSI for gerror,
-> > > >    eventq and cmdq-sync
-> > > > 
-> > > > The following patchset does software workaround for these two erratas.
-> > > 
-> > > I've picked up the first two patches, and left comments on the final patch.
-> > 
-> > ... except that it doesn't build:
-> > 
-> > 
-> > drivers/acpi/arm64/iort.c: In function ?arm_smmu_v3_resource_size?:
-> > drivers/acpi/arm64/iort.c:837:21: error: ?ACPI_IORT_SMMU_V3_CAVIUM_CN99XX? undeclared (first use in this function)
-> >   if (smmu->model == ACPI_IORT_SMMU_V3_CAVIUM_CN99XX)
-> >                      ^
-> > drivers/acpi/arm64/iort.c:837:21: note: each undeclared identifier is reported only once for each function it appears in
-> > make[4]: *** [drivers/acpi/arm64/iort.o] Error 1
-> > 
-> > 
-> > I don't see ACPI_IORT_SMMU_V3_CAVIUM_CN99XX defined, even in linux-next.
-> > 
-> > What's the plan here?
+On Tue, Jun 20, 2017 at 01:41:26PM +0200, Pierre-Yves MORDRET wrote:
+> This patch adds the documentation of device tree bindings for STM32F7 I2C
 > 
-> It is defined already in acpica and we actually waiting for the acpi
-> maintainers to include it:
-> 
->  https://github.com/acpica/acpica/commit/d00a4eb86e64
-> 
-> We could add
-> 
-> /* Until ACPICA headers cover IORT rev. C */
-> #ifndef ACPI_IORT_SMMU_V3_CAVIUM_CN99XX
-> #define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX		0x2
-> #endif
-> 
-> to both files:
-> 
->  drivers/acpi/arm64/iort.c
->  drivers/iommu/arm-smmu-v3.c
-> 
-
-I thought it was a solved problem (and that the IORT patch was based
-on Robin's workaround) but I was clearly wrong and I apologise to
-Will about this.
-
-FWIW, you could add the define in include/linux/acpi_iort.h and I will
-remove it whenever ACPICA changes make it into the kernel.
-
-Thanks,
-Lorenzo
-
-> This is similar to what Robin did.
-> 
-> (I checked arm64 include files and the closest was
-> arch/arm64/include/asm/acpi.h, bug this seems not really suitable to
-> me.)
-> 
-> I have created a separate patch to be applied at first below. We can
-> revert it after acpica was updated.
-> 
-> -Robert
-> 
-> 
-> 
-> 
-> From ad7f0112a2a71059c32bd315835c33cc7bc660b8 Mon Sep 17 00:00:00 2001
-> From: Robert Richter <rrichter@cavium.com>
-> Date: Thu, 22 Jun 2017 21:20:54 +0200
-> Subject: [PATCH] iommu/arm-smmu-v3: Add temporary Cavium SMMU-V3 model nuber
->  definitions
-> 
-> The model number is already defined in acpica and we actually waiting
-> for the acpi maintainers to include it:
-> 
->  https://github.com/acpica/acpica/commit/d00a4eb86e64
-> 
-> Adding those temporary definitions until the change makes it into
-> include/acpi/actbl2.h.
-> 
-> Signed-off-by: Robert Richter <rrichter@cavium.com>
+> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 > ---
->  drivers/acpi/arm64/iort.c   | 5 +++++
->  drivers/iommu/arm-smmu-v3.c | 5 +++++
->  2 files changed, 10 insertions(+)
-> 
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index 797b28dc7b34..15491237a657 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -31,6 +31,11 @@
->  #define IORT_IOMMU_TYPE		((1 << ACPI_IORT_NODE_SMMU) |	\
->  				(1 << ACPI_IORT_NODE_SMMU_V3))
->  
-> +/* Until ACPICA headers cover IORT rev. C */
-> +#ifndef ACPI_IORT_SMMU_V3_CAVIUM_CN99XX
-> +#define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX		0x2
-> +#endif
-> +
->  struct iort_its_msi_chip {
->  	struct list_head	list;
->  	struct fwnode_handle	*fw_node;
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 380969aa60d5..c759dfa7442d 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -412,6 +412,11 @@
->  #define MSI_IOVA_BASE			0x8000000
->  #define MSI_IOVA_LENGTH			0x100000
->  
-> +/* Until ACPICA headers cover IORT rev. C */
-> +#ifndef ACPI_IORT_SMMU_V3_CAVIUM_CN99XX
-> +#define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX		0x2
-> +#endif
-> +
->  static bool disable_bypass;
->  module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
->  MODULE_PARM_DESC(disable_bypass,
-> -- 
-> 2.11.0
-> 
+> Change in V2
+>   * Remove i2c-timing binding in order to use generic bindings SCL Rising
+>     and Falling time instead
+> ---
+>  .../devicetree/bindings/i2c/i2c-stm32.txt          | 29 +++++++++++++++++++---
+>  1 file changed, 26 insertions(+), 3 deletions(-)
+
+Acked-by: Rob Herring <robh@kernel.org>
