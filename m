@@ -1,34 +1,87 @@
-From: colin.king@canonical.com (Colin King)
-Date: Thu, 22 Jun 2017 16:41:42 +0100
-Subject: [PATCH][spi-next] spi: stm32: fix range limit checks on div
-Message-ID: <20170622154142.22481-1-colin.king@canonical.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 22 Jun 2017 16:43:57 +0100
+Subject: [PATCH v2 1/8] dt-bindings: mfd: Add STM32 LPTimer binding
+In-Reply-To: <1498055415-31513-2-git-send-email-fabrice.gasnier@st.com>
+References: <1498055415-31513-1-git-send-email-fabrice.gasnier@st.com>
+ <1498055415-31513-2-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20170622154357.fedg2etrrqdslnr7@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+On Wed, 21 Jun 2017, Fabrice Gasnier wrote:
 
-Currently the check for range limits on div is incorrect and will
-never return -EINVAL. Fix this by replacing && with ||
+> Add documentation for STMicroelectronics STM32 Low-Power Timer binding.
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> ---
+> Changes in v2:
+> - Lee's comments: s/Low Power/Low-Power/, remove 0x in example, improve
+>   properties descriptions
+> ---
+>  .../devicetree/bindings/mfd/stm32-lptimer.txt      | 48 ++++++++++++++++++++++
+>  1 file changed, 48 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
 
-Detected by CoverityScan, CID#1446580 ("Structurally dead code")
+For my own reference:
+  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+  
+> diff --git a/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt b/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
+> new file mode 100644
+> index 0000000..af859c8
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
+> @@ -0,0 +1,48 @@
+> +STMicroelectronics STM32 Low-Power Timer
+> +
+> +The STM32 Low-Power Timer (LPTIM) is a 16-bit timer that provides several
+> +functions:
+> +- PWM output (with programmable prescaler, configurable polarity)
+> +- Quadrature encoder, counter
+> +- Trigger source for STM32 ADC/DAC (LPTIM_OUT)
+> +
+> +Required properties:
+> +- compatible:		Must be "st,stm32-lptimer".
+> +- reg:			Offset and length of the device's register set.
+> +- clocks:		Phandle to the clock used by the LP Timer module.
+> +- clock-names:		Must be "mux".
+> +- #address-cells:	Should be '<1>'.
+> +- #size-cells:		Should be '<0>'.
+> +
+> +Optional subnodes:
+> +- pwm:			See ../pwm/pwm-stm32-lp.txt
+> +- counter:		See ../iio/timer/stm32-lptimer-cnt.txt
+> +- trigger:		See ../iio/timer/stm32-lptimer-trigger.txt
+> +
+> +Example:
+> +
+> +	lptimer1: lptimer at 40002400 {
+> +		compatible = "st,stm32-lptimer";
+> +		reg = <0x40002400 0x400>;
+> +		clocks = <&timer_clk>;
+> +		clock-names = "mux";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		pwm {
+> +			compatible = "st,stm32-pwm-lp";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&lppwm1_pins>;
+> +		};
+> +
+> +		trigger at 0 {
+> +			compatible = "st,stm32-lptimer-trigger";
+> +			reg = <0>;
+> +		};
+> +
+> +		counter {
+> +			compatible = "st,stm32-lptimer-counter";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&lptim1_in_pins>;
+> +		};
+> +	};
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- drivers/spi/spi-stm32.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/spi/spi-stm32.c b/drivers/spi/spi-stm32.c
-index 0553f61ab3b7..b75909e7b117 100644
---- a/drivers/spi/spi-stm32.c
-+++ b/drivers/spi/spi-stm32.c
-@@ -262,7 +262,7 @@ static int stm32_spi_prepare_mbr(struct stm32_spi *spi, u32 speed_hz)
- 	 * no need to check it there.
- 	 * However, we need to ensure the following calculations.
- 	 */
--	if ((div < SPI_MBR_DIV_MIN) &&
-+	if ((div < SPI_MBR_DIV_MIN) ||
- 	    (div > SPI_MBR_DIV_MAX))
- 		return -EINVAL;
- 
 -- 
-2.11.0
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
