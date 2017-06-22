@@ -1,90 +1,72 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 22 Jun 2017 20:15:19 +0800
-Subject: [PATCH v6 1/3] PCI: Add new PCIe Fabric End Node flag,
- PCI_DEV_FLAGS_NO_RELAXED_ORDERING
-In-Reply-To: <1498133721-21152-1-git-send-email-dingtianhong@huawei.com>
-References: <1498133721-21152-1-git-send-email-dingtianhong@huawei.com>
-Message-ID: <1498133721-21152-2-git-send-email-dingtianhong@huawei.com>
+From: gakula@caviumnetworks.com (Geetha sowjanya)
+Date: Thu, 22 Jun 2017 17:35:35 +0530
+Subject: [PATCH v9 0/3] Cavium ThunderX2 SMMUv3 errata workarounds
+Message-ID: <1498133138-20244-1-git-send-email-gakula@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Casey Leedom <leedom@chelsio.com>
+Cavium ThunderX2 SMMUv3 implementation has two Silicon Erratas.
+1. Errata ID #74
+   SMMU register alias Page 1 is not implemented
+2. Errata ID #126
+   SMMU doesnt support unique IRQ lines and also MSI for gerror,
+   eventq and cmdq-sync
 
-The new flag PCI_DEV_FLAGS_NO_RELAXED_ORDERING indicates that the Relaxed
-Ordering Attribute should not be used on Transaction Layer Packets destined
-for the PCIe End Node so flagged.  Initially flagged this way are Intel
-E5-26xx Root Complex Ports which suffer from a Flow Control Credit
-Performance Problem and AMD A1100 ARM ("SEATTLE") Root Complex Ports which
-don't obey PCIe 3.0 ordering rules which can lead to Data Corruption.
+The following patchset does software workaround for these two erratas.
 
-Signed-off-by: Casey Leedom <leedom@chelsio.com>
-Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
----
- drivers/pci/quirks.c | 38 ++++++++++++++++++++++++++++++++++++++
- include/linux/pci.h  |  2 ++
- 2 files changed, 40 insertions(+)
+This series is based on patchset.
+https://www.spinics.net/lists/arm-kernel/msg578443.html
 
-diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-index 085fb78..58bdd23 100644
---- a/drivers/pci/quirks.c
-+++ b/drivers/pci/quirks.c
-@@ -3999,6 +3999,44 @@ static void quirk_tw686x_class(struct pci_dev *pdev)
- 			      quirk_tw686x_class);
- 
- /*
-+ * Some devices have problems with Transaction Layer Packets with the Relaxed
-+ * Ordering Attribute set.  Such devices should mark themselves and other
-+ * Device Drivers should check before sending TLPs with RO set.
-+ */
-+static void quirk_relaxedordering_disable(struct pci_dev *dev)
-+{
-+	dev->dev_flags |= PCI_DEV_FLAGS_NO_RELAXED_ORDERING;
-+}
-+
-+/*
-+ * Intel E5-26xx Root Complex has a Flow Control Credit issue which can
-+ * cause performance problems with Upstream Transaction Layer Packets with
-+ * Relaxed Ordering set.
-+ */
-+DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f02, PCI_CLASS_NOT_DEFINED, 8,
-+			      quirk_relaxedordering_disable);
-+DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f04, PCI_CLASS_NOT_DEFINED, 8,
-+			      quirk_relaxedordering_disable);
-+DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f08, PCI_CLASS_NOT_DEFINED, 8,
-+			      quirk_relaxedordering_disable);
-+
-+/*
-+ * The AMD ARM A1100 (AKA "SEATTLE") SoC has a bug in its PCIe Root Complex
-+ * where Upstream Transaction Layer Packets with the Relaxed Ordering
-+ * Attribute clear are allowed to bypass earlier TLPs with Relaxed Ordering
-+ * set.  This is a violation of the PCIe 3.0 Transaction Ordering Rules
-+ * outlined in Section 2.4.1 (PCI Express(r) Base Specification Revision 3.0
-+ * November 10, 2010).  As a result, on this platform we can't use Relaxed
-+ * Ordering for Upstream TLPs.
-+ */
-+DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_AMD, 0x1a00, PCI_CLASS_NOT_DEFINED, 8,
-+			      quirk_relaxedordering_disable);
-+DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_AMD, 0x1a01, PCI_CLASS_NOT_DEFINED, 8,
-+			      quirk_relaxedordering_disable);
-+DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_AMD, 0x1a02, PCI_CLASS_NOT_DEFINED, 8,
-+			      quirk_relaxedordering_disable);
-+
-+/*
-  * Per PCIe r3.0, sec 2.2.9, "Completion headers must supply the same
-  * values for the Attribute as were supplied in the header of the
-  * corresponding Request, except as explicitly allowed when IDO is used."
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 8039f9f..ce77690 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -188,6 +188,8 @@ enum pci_dev_flags {
- 	 * the direct_complete optimization.
- 	 */
- 	PCI_DEV_FLAGS_NEEDS_RESUME = (__force pci_dev_flags_t) (1 << 11),
-+	/* Don't use Relaxed Ordering for TLPs directed@this device */
-+	PCI_DEV_FLAGS_NO_RELAXED_ORDERING = (__force pci_dev_flags_t) (1 << 12),
- };
- 
- enum pci_irq_reroute_variant {
--- 
-1.9.0
+Changes since v8:
+    - Reworked patch #3 as suggested by Will. 
+    - Corrected typo mistake in patch #2
+
+Changes since v7:
+    - Added new function "arm_smmu_v3_resource_size" in iort.c to get resource
+      size.
+    - Added new SMMU option "SHARED_IRQ" to enable errata #126 workaround.
+    - Coding style issues fixed.
+    - Suggested changes in arm_smmu_device_probe addressed.
+    - Replaced ACPI_IORT_SMMU_CAVIUM_CN99XX macro with ACPI_IORT_SMMU_V3_CAVIUM_CN99XX
+
+Changes since v6:
+   - Changed device tree compatible string to vendor specific.
+   - Rebased on Robin's latest "Update SMMU models for IORT rev. C" v2 patch.
+     https://www.spinics.net/lists/arm-kernel/msg582809.html
+
+Changes since v5:
+   - Rebased on Robin's "Update SMMU models for IORT rev. C" patch.
+     https://www.spinics.net/lists/arm-kernel/msg580728.html
+   - Replaced ACPI_IORT_SMMU_V3_CAVIUM_CN99XX macro with ACPI_IORT_SMMU_CAVIUM_CN99XX
+
+Changes since v4:
+  - Replaced all page1 offset macros ARM_SMMU_EVTQ/PRIQ_PROD/CONS with
+    arm_smmu_page1_fixup(ARM_SMMU_EVTQ/PRIQ_PROD/CONS, smmu)
+
+Changes since v3:
+  - Merged patches 1, 2 and 4 of Version 3.
+  - Modified the page1_offset_adjust() and get_irq_flags() implementation as
+    suggested by Robin.
+
+Changes since v2:
+  - Updated "Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt" document with
+    new SMMU option used to enable errata workaround.
+
+Changes since v1:
+ - Since the use of MIDR register is rejected and SMMU_IIDR is broken on this
+   silicon, as suggested by Will Deacon modified the patches to use ThunderX2
+   SMMUv3 IORT model number to enable errata workaround.
+
+Geetha Sowjanya (1):
+  iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2 erratum #126
+
+Linu Cherian (2):
+  ACPI/IORT: Fixup SMMUv3 resource size for Cavium ThunderX2 SMMUv3
+    model
+  iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2 erratum #74
+
+ Documentation/arm64/silicon-errata.txt             |    2 +
+ .../devicetree/bindings/iommu/arm,smmu-v3.txt      |    7 +
+ drivers/acpi/arm64/iort.c                          |   69 ++++++---
+ drivers/iommu/arm-smmu-v3.c                        |  171 +++++++++++++++-----
+ 4 files changed, 186 insertions(+), 63 deletions(-)
