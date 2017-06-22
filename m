@@ -1,43 +1,45 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 23 Jun 2017 07:53:09 +1000
-Subject: new dma-mapping tree, was Re: clean up and modularize arch
- dma_mapping interface V2
-In-Reply-To: <5425587c-73e8-e24a-86a3-8a65a7791dcb@samsung.com>
-References: <20170616181059.19206-1-hch@lst.de> <20170620124140.GA27163@lst.de>
- <20170620230400.1a5ae889@canb.auug.org.au>
- <CGME20170620131628epcas1p4f21d821bd414cba7e2d49abcbe414365@epcas1p4.samsung.com>
- <20170620131623.GB30769@lst.de>
- <5425587c-73e8-e24a-86a3-8a65a7791dcb@samsung.com>
-Message-ID: <20170623075309.1e679168@canb.auug.org.au>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 22 Jun 2017 14:55:49 -0700
+Subject: [PATCH 1/2] clk: samsung: audss: Fix silent hang on Exynos4412
+ due to disabled EPLL
+In-Reply-To: <99de23b6-4049-7542-008b-abf65df356f0@samsung.com>
+References: <20170621190807.14850-1-krzk@kernel.org>
+ <CGME20170621190822epcas2p49ed738ef43e6d68f72903d185e20332e@epcas2p4.samsung.com>
+ <20170621190807.14850-2-krzk@kernel.org>
+ <99de23b6-4049-7542-008b-abf65df356f0@samsung.com>
+Message-ID: <20170622215549.GM4493@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-
-On Wed, 21 Jun 2017 15:32:39 +0200 Marek Szyprowski <m.szyprowski@samsung.com> wrote:
->
-> On 2017-06-20 15:16, Christoph Hellwig wrote:
-> > On Tue, Jun 20, 2017 at 11:04:00PM +1000, Stephen Rothwell wrote:  
-> >> git://git.linaro.org/people/mszyprowski/linux-dma-mapping.git#dma-mapping-next
-> >>
-> >> Contacts: Marek Szyprowski and Kyungmin Park (cc'd)
-> >>
-> >> I have called your tree dma-mapping-hch for now.  The other tree has
-> >> not been updated since 4.9-rc1 and I am not sure how general it is.
-> >> Marek, Kyungmin, any comments?  
-> > I'd be happy to join efforts - co-maintainers and reviers are always
-> > welcome.  
+On 06/22, Sylwester Nawrocki wrote:
+> On 06/21/2017 09:08 PM, Krzysztof Kozlowski wrote:
+> >Similarly to commit f1e9203e2366 ("clk: samsung: Fix Exynos 5420 pinctrl
+> >setup and clock disable failure due to domain being gated") for
+> >Exynos5420, the Exynos4412 also requires that EPLL is not disabled.
+> >Otherwise any access to MAUDIO block will silently halt.
+> >
+> >This was not visible before because EPLL on Exynos4 could not be
+> >disabled before commit 6edfa11cb396 ("clk: samsung:
+> >Add enable/disable operation for PLL36XX clocks").  After this commit,
+> >on Odroid U3 board one can see silent hang, usually with last (but
+> >unrelated) messages:
+> >
+> >	[    2.382741] input: gpio_keys as /devices/platform/gpio_keys/input/input0
+> >	[    2.405686] usb 1-3: new high-speed USB device number 3 using exynos-ehci
+> >	[    2.419843] max77686-rtc max77686-rtc: setting system clock to 2017-06-21 17:04:13 UTC (1498064653)
+> >
+> >Mark Exynos4 variant as also needed EPLL to be enabled all the time.
+> >
+> >Signed-off-by: Krzysztof Kozlowski<krzk@kernel.org>
+> Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 > 
-> I did some dma-mapping unification works in the past and my tree in 
-> linux-next
-> was a side effect of that. I think that for now it can be dropped in 
-> favor of
-> Christoph's tree. I can also do some review and help in maintainers work if
-> needed, although I was recently busy with other stuff.
+> Stephen, Mike,
+> 
+> Can you please apply this patch directly?
+> 
 
-OK, so I have dropped the dma-mapping tree and renamed dma-mapping-hch
-to dma-mapping.
+Applied to clk-next.
 
 -- 
-Cheers,
-Stephen Rothwell
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
