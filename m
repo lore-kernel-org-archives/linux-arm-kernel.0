@@ -1,276 +1,364 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Thu, 22 Jun 2017 16:35:55 +0300
-Subject: [PATCH 09/14] staging: fsl-mc: move rest of mc-bus.h to private header
+Date: Thu, 22 Jun 2017 16:35:58 +0300
+Subject: [PATCH 12/14] staging: fsl-mc: move mc-sys.h contents in the public
+ header
 In-Reply-To: <20170622133600.31694-1-laurentiu.tudor@nxp.com>
 References: <20170622133600.31694-1-laurentiu.tudor@nxp.com>
-Message-ID: <20170622133600.31694-10-laurentiu.tudor@nxp.com>
+Message-ID: <20170622133600.31694-13-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-All the mc-bus.h contents is only used privately in the bus driver so
-move everything to the private header and get rid of the mc-bus.h
-header file.
+mc-sys.h contains the API to send commands to the MC and is used
+by drivers. Move it to the public headers and get rid of the mc-sys.h
+header.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- drivers/staging/fsl-mc/bus/dprc-driver.c           |  1 -
- drivers/staging/fsl-mc/bus/fsl-mc-allocator.c      |  1 -
- drivers/staging/fsl-mc/bus/fsl-mc-bus.c            |  1 -
- drivers/staging/fsl-mc/bus/fsl-mc-msi.c            |  1 -
- drivers/staging/fsl-mc/bus/fsl-mc-private.h        | 61 +++++++++++++++++
- .../staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c |  1 -
- drivers/staging/fsl-mc/bus/mc-io.c                 |  1 -
- drivers/staging/fsl-mc/include/mc-bus.h            | 77 ----------------------
- 8 files changed, 61 insertions(+), 83 deletions(-)
- delete mode 100644 drivers/staging/fsl-mc/include/mc-bus.h
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c |  1 -
+ drivers/staging/fsl-dpaa2/ethernet/dpni.c      |  2 +-
+ drivers/staging/fsl-mc/bus/dpbp.c              |  2 +-
+ drivers/staging/fsl-mc/bus/dpcon.c             |  2 +-
+ drivers/staging/fsl-mc/bus/dpio/dpio.c         |  2 +-
+ drivers/staging/fsl-mc/bus/dpmcp.c             |  2 +-
+ drivers/staging/fsl-mc/bus/dprc-driver.c       |  2 +-
+ drivers/staging/fsl-mc/bus/dprc.c              |  1 -
+ drivers/staging/fsl-mc/bus/fsl-mc-allocator.c  |  2 +-
+ drivers/staging/fsl-mc/bus/fsl-mc-bus.c        |  1 -
+ drivers/staging/fsl-mc/bus/mc-io.c             |  2 +-
+ drivers/staging/fsl-mc/bus/mc-sys.c            |  1 -
+ drivers/staging/fsl-mc/include/mc-sys.h        | 98 --------------------------
+ drivers/staging/fsl-mc/include/mc.h            | 53 ++++++++++++++
+ 14 files changed, 61 insertions(+), 110 deletions(-)
+ delete mode 100644 drivers/staging/fsl-mc/include/mc-sys.h
 
+diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
+index 1f89274..b9a0a31 100644
+--- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
++++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
+@@ -40,7 +40,6 @@
+ #include <linux/iommu.h>
+ 
+ #include "../../fsl-mc/include/mc.h"
+-#include "../../fsl-mc/include/mc-sys.h"
+ #include "dpaa2-eth.h"
+ 
+ /* CREATE_TRACE_POINTS only needs to be defined once. Other dpa files
+diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpni.c b/drivers/staging/fsl-dpaa2/ethernet/dpni.c
+index 2c4b1a8..160eaf8 100644
+--- a/drivers/staging/fsl-dpaa2/ethernet/dpni.c
++++ b/drivers/staging/fsl-dpaa2/ethernet/dpni.c
+@@ -32,7 +32,7 @@
+  */
+ #include <linux/kernel.h>
+ #include <linux/errno.h>
+-#include "../../fsl-mc/include/mc-sys.h"
++#include "../../fsl-mc/include/mc.h"
+ #include "../../fsl-mc/include/mc-cmd.h"
+ #include "dpni.h"
+ #include "dpni-cmd.h"
+diff --git a/drivers/staging/fsl-mc/bus/dpbp.c b/drivers/staging/fsl-mc/bus/dpbp.c
+index e92d887..b714673 100644
+--- a/drivers/staging/fsl-mc/bus/dpbp.c
++++ b/drivers/staging/fsl-mc/bus/dpbp.c
+@@ -30,7 +30,7 @@
+  * POSSIBILITY OF SUCH DAMAGE.
+  */
+ #include <linux/kernel.h>
+-#include "../include/mc-sys.h"
++#include "../include/mc.h"
+ #include "../include/mc-cmd.h"
+ #include "../include/dpbp.h"
+ 
+diff --git a/drivers/staging/fsl-mc/bus/dpcon.c b/drivers/staging/fsl-mc/bus/dpcon.c
+index 20df185..2272a9c 100644
+--- a/drivers/staging/fsl-mc/bus/dpcon.c
++++ b/drivers/staging/fsl-mc/bus/dpcon.c
+@@ -30,7 +30,7 @@
+  * POSSIBILITY OF SUCH DAMAGE.
+  */
+ #include <linux/kernel.h>
+-#include "../include/mc-sys.h"
++#include "../include/mc.h"
+ #include "../include/mc-cmd.h"
+ #include "../include/dpcon.h"
+ 
+diff --git a/drivers/staging/fsl-mc/bus/dpio/dpio.c b/drivers/staging/fsl-mc/bus/dpio/dpio.c
+index a18ca89..48dce4a 100644
+--- a/drivers/staging/fsl-mc/bus/dpio/dpio.c
++++ b/drivers/staging/fsl-mc/bus/dpio/dpio.c
+@@ -31,7 +31,7 @@
+  * POSSIBILITY OF SUCH DAMAGE.
+  */
+ #include <linux/kernel.h>
+-#include "../../include/mc-sys.h"
++#include "../../include/mc.h"
+ #include "../../include/mc-cmd.h"
+ 
+ #include "dpio.h"
+diff --git a/drivers/staging/fsl-mc/bus/dpmcp.c b/drivers/staging/fsl-mc/bus/dpmcp.c
+index 66011e8..7b3dd19 100644
+--- a/drivers/staging/fsl-mc/bus/dpmcp.c
++++ b/drivers/staging/fsl-mc/bus/dpmcp.c
+@@ -30,7 +30,7 @@
+  * POSSIBILITY OF SUCH DAMAGE.
+  */
+ #include <linux/kernel.h>
+-#include "../include/mc-sys.h"
++#include "../include/mc.h"
+ #include "../include/mc-cmd.h"
+ 
+ #include "dpmcp.h"
 diff --git a/drivers/staging/fsl-mc/bus/dprc-driver.c b/drivers/staging/fsl-mc/bus/dprc-driver.c
-index 8447961..142dfa7 100644
+index 142dfa7..8e17cd8 100644
 --- a/drivers/staging/fsl-mc/bus/dprc-driver.c
 +++ b/drivers/staging/fsl-mc/bus/dprc-driver.c
-@@ -13,7 +13,6 @@
+@@ -13,7 +13,7 @@
  #include <linux/slab.h>
  #include <linux/interrupt.h>
  #include <linux/msi.h>
--#include "../include/mc-bus.h"
- #include "../include/mc-sys.h"
+-#include "../include/mc-sys.h"
++#include "../include/mc.h"
  
  #include "dprc-cmd.h"
+ #include "fsl-mc-private.h"
+diff --git a/drivers/staging/fsl-mc/bus/dprc.c b/drivers/staging/fsl-mc/bus/dprc.c
+index e5dfc33..f93fe00 100644
+--- a/drivers/staging/fsl-mc/bus/dprc.c
++++ b/drivers/staging/fsl-mc/bus/dprc.c
+@@ -31,7 +31,6 @@
+  */
+ #include <linux/kernel.h>
+ #include "../include/mc.h"
+-#include "../include/mc-sys.h"
+ #include "../include/mc-cmd.h"
+ #include "../include/dprc.h"
+ 
 diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-allocator.c b/drivers/staging/fsl-mc/bus/fsl-mc-allocator.c
-index c2af5b5..e6a2857 100644
+index e6a2857..8ea3920 100644
 --- a/drivers/staging/fsl-mc/bus/fsl-mc-allocator.c
 +++ b/drivers/staging/fsl-mc/bus/fsl-mc-allocator.c
-@@ -10,7 +10,6 @@
+@@ -10,7 +10,7 @@
  
  #include <linux/module.h>
  #include <linux/msi.h>
--#include "../include/mc-bus.h"
- #include "../include/mc-sys.h"
+-#include "../include/mc-sys.h"
++#include "../include/mc.h"
  
  #include "fsl-mc-private.h"
+ 
 diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-index 60b2a40..3dec3e9 100644
+index 75f8dc3..166604e 100644
 --- a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
 +++ b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
 @@ -20,7 +20,6 @@
  #include <linux/bitops.h>
  #include <linux/msi.h>
  #include <linux/dma-mapping.h>
--#include "../include/mc-bus.h"
- #include "../include/dpmng.h"
- #include "../include/mc-sys.h"
- 
-diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-msi.c b/drivers/staging/fsl-mc/bus/fsl-mc-msi.c
-index a92fa5a..81dca7a 100644
---- a/drivers/staging/fsl-mc/bus/fsl-mc-msi.c
-+++ b/drivers/staging/fsl-mc/bus/fsl-mc-msi.c
-@@ -16,7 +16,6 @@
- #include <linux/irq.h>
- #include <linux/irqdomain.h>
- #include <linux/msi.h>
--#include "../include/mc-bus.h"
+-#include "../include/mc-sys.h"
  #include "../include/mc-cmd.h"
+ 
  #include "fsl-mc-private.h"
- 
-diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-private.h b/drivers/staging/fsl-mc/bus/fsl-mc-private.h
-index 7f5406f..e583999 100644
---- a/drivers/staging/fsl-mc/bus/fsl-mc-private.h
-+++ b/drivers/staging/fsl-mc/bus/fsl-mc-private.h
-@@ -11,6 +11,53 @@
- #define _FSL_MC_PRIVATE_H_
- 
- #include "../include/mc.h"
-+#include <linux/mutex.h>
-+
-+/**
-+ * Maximum number of total IRQs that can be pre-allocated for an MC bus'
-+ * IRQ pool
-+ */
-+#define FSL_MC_IRQ_POOL_MAX_TOTAL_IRQS	256
-+
-+/**
-+ * struct fsl_mc_resource_pool - Pool of MC resources of a given
-+ * type
-+ * @type: type of resources in the pool
-+ * @max_count: maximum number of resources in the pool
-+ * @free_count: number of free resources in the pool
-+ * @mutex: mutex to serialize access to the pool's free list
-+ * @free_list: anchor node of list of free resources in the pool
-+ * @mc_bus: pointer to the MC bus that owns this resource pool
-+ */
-+struct fsl_mc_resource_pool {
-+	enum fsl_mc_pool_type type;
-+	int max_count;
-+	int free_count;
-+	struct mutex mutex;	/* serializes access to free_list */
-+	struct list_head free_list;
-+	struct fsl_mc_bus *mc_bus;
-+};
-+
-+/**
-+ * struct fsl_mc_bus - logical bus that corresponds to a physical DPRC
-+ * @mc_dev: fsl-mc device for the bus device itself.
-+ * @resource_pools: array of resource pools (one pool per resource type)
-+ * for this MC bus. These resources represent allocatable entities
-+ * from the physical DPRC.
-+ * @irq_resources: Pointer to array of IRQ objects for the IRQ pool
-+ * @scan_mutex: Serializes bus scanning
-+ * @dprc_attr: DPRC attributes
-+ */
-+struct fsl_mc_bus {
-+	struct fsl_mc_device mc_dev;
-+	struct fsl_mc_resource_pool resource_pools[FSL_MC_NUM_POOL_TYPES];
-+	struct fsl_mc_device_irq *irq_resources;
-+	struct mutex scan_mutex;    /* serializes bus scanning */
-+	struct dprc_attributes dprc_attr;
-+};
-+
-+#define to_fsl_mc_bus(_mc_dev) \
-+	container_of(_mc_dev, struct fsl_mc_bus, mc_dev)
- 
- int __must_check fsl_mc_device_add(struct fsl_mc_obj_desc *obj_desc,
- 				   struct fsl_mc_io *mc_io,
-@@ -27,6 +74,10 @@ int __init fsl_mc_allocator_driver_init(void);
- 
- void fsl_mc_allocator_driver_exit(void);
- 
-+void fsl_mc_init_all_resource_pools(struct fsl_mc_device *mc_bus_dev);
-+
-+void fsl_mc_cleanup_all_resource_pools(struct fsl_mc_device *mc_bus_dev);
-+
- int __must_check fsl_mc_resource_allocate(struct fsl_mc_bus *mc_bus,
- 					  enum fsl_mc_pool_type pool_type,
- 					  struct fsl_mc_resource
-@@ -43,6 +94,14 @@ int __init its_fsl_mc_msi_init(void);
- 
- void its_fsl_mc_msi_cleanup(void);
- 
-+int fsl_mc_find_msi_domain(struct device *mc_platform_dev,
-+			   struct irq_domain **mc_msi_domain);
-+
-+int fsl_mc_populate_irq_pool(struct fsl_mc_bus *mc_bus,
-+			     unsigned int irq_count);
-+
-+void fsl_mc_cleanup_irq_pool(struct fsl_mc_bus *mc_bus);
-+
- int __must_check fsl_create_mc_io(struct device *dev,
- 				  phys_addr_t mc_portal_phys_addr,
- 				  u32 mc_portal_size,
-@@ -51,4 +110,6 @@ int __must_check fsl_create_mc_io(struct device *dev,
- 
- void fsl_destroy_mc_io(struct fsl_mc_io *mc_io);
- 
-+bool fsl_mc_is_root_dprc(struct device *dev);
-+
- #endif /* _FSL_MC_PRIVATE_H_ */
-diff --git a/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c b/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
-index 49127ac..865d385 100644
---- a/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
-+++ b/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
-@@ -16,7 +16,6 @@
- #include <linux/msi.h>
- #include <linux/of.h>
- #include <linux/of_irq.h>
--#include "../include/mc-bus.h"
- #include "fsl-mc-private.h"
- 
- static struct irq_chip its_msi_irq_chip = {
 diff --git a/drivers/staging/fsl-mc/bus/mc-io.c b/drivers/staging/fsl-mc/bus/mc-io.c
-index d66b87f..ec2835f 100644
+index ec2835f..35221a17 100644
 --- a/drivers/staging/fsl-mc/bus/mc-io.c
 +++ b/drivers/staging/fsl-mc/bus/mc-io.c
-@@ -31,7 +31,6 @@
+@@ -31,7 +31,7 @@
   */
  
  #include <linux/io.h>
--#include "../include/mc-bus.h"
- #include "../include/mc-sys.h"
+-#include "../include/mc-sys.h"
++#include "../include/mc.h"
  
  #include "fsl-mc-private.h"
-diff --git a/drivers/staging/fsl-mc/include/mc-bus.h b/drivers/staging/fsl-mc/include/mc-bus.h
+ #include "dpmcp.h"
+diff --git a/drivers/staging/fsl-mc/bus/mc-sys.c b/drivers/staging/fsl-mc/bus/mc-sys.c
+index 4d82802..c537bf8 100644
+--- a/drivers/staging/fsl-mc/bus/mc-sys.c
++++ b/drivers/staging/fsl-mc/bus/mc-sys.c
+@@ -37,7 +37,6 @@
+ #include <linux/ioport.h>
+ #include <linux/device.h>
+ #include <linux/io.h>
+-#include "../include/mc-sys.h"
+ #include "../include/mc-cmd.h"
+ #include "../include/mc.h"
+ 
+diff --git a/drivers/staging/fsl-mc/include/mc-sys.h b/drivers/staging/fsl-mc/include/mc-sys.h
 deleted file mode 100644
-index a79a679..0000000
---- a/drivers/staging/fsl-mc/include/mc-bus.h
+index b520370..0000000
+--- a/drivers/staging/fsl-mc/include/mc-sys.h
 +++ /dev/null
-@@ -1,77 +0,0 @@
+@@ -1,98 +0,0 @@
 -/*
-- * Freescale Management Complex (MC) bus declarations
+- * Copyright 2013-2016 Freescale Semiconductor Inc.
 - *
-- * Copyright (C) 2014-2016 Freescale Semiconductor, Inc.
-- * Author: German Rivera <German.Rivera@freescale.com>
+- * Interface of the I/O services to send MC commands to the MC hardware
 - *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2. This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
+- * Redistribution and use in source and binary forms, with or without
+- * modification, are permitted provided that the following conditions are met:
+- *     * Redistributions of source code must retain the above copyright
+- *       notice, this list of conditions and the following disclaimer.
+- *     * Redistributions in binary form must reproduce the above copyright
+- *       notice, this list of conditions and the following disclaimer in the
+- *       documentation and/or other materials provided with the distribution.
+- *     * Neither the name of the above-listed copyright holders nor the
+- *       names of any contributors may be used to endorse or promote products
+- *       derived from this software without specific prior written permission.
+- *
+- *
+- * ALTERNATIVELY, this software may be distributed under the terms of the
+- * GNU General Public License ("GPL") as published by the Free Software
+- * Foundation, either version 2 of that License or (at your option) any
+- * later version.
+- *
+- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE
+- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+- * POSSIBILITY OF SUCH DAMAGE.
 - */
--#ifndef _FSL_MC_MCBUS_H_
--#define _FSL_MC_MCBUS_H_
 -
--#include "../include/mc.h"
+-#ifndef _FSL_MC_SYS_H
+-#define _FSL_MC_SYS_H
+-
+-#include <linux/types.h>
+-#include <linux/errno.h>
 -#include <linux/mutex.h>
+-#include <linux/spinlock.h>
 -
 -/**
-- * Maximum number of total IRQs that can be pre-allocated for an MC bus'
-- * IRQ pool
+- * Bit masks for a MC I/O object (struct fsl_mc_io) flags
 - */
--#define FSL_MC_IRQ_POOL_MAX_TOTAL_IRQS	256
+-#define FSL_MC_IO_ATOMIC_CONTEXT_PORTAL	0x0001
+-
+-struct mc_command;
 -
 -/**
-- * struct fsl_mc_resource_pool - Pool of MC resources of a given
-- * type
-- * @type: type of resources in the pool
-- * @max_count: maximum number of resources in the pool
-- * @free_count: number of free resources in the pool
-- * @mutex: mutex to serialize access to the pool's free list
-- * @free_list: anchor node of list of free resources in the pool
-- * @mc_bus: pointer to the MC bus that owns this resource pool
+- * struct fsl_mc_io - MC I/O object to be passed-in to mc_send_command()
+- * @dev: device associated with this Mc I/O object
+- * @flags: flags for mc_send_command()
+- * @portal_size: MC command portal size in bytes
+- * @portal_phys_addr: MC command portal physical address
+- * @portal_virt_addr: MC command portal virtual address
+- * @dpmcp_dev: pointer to the DPMCP device associated with the MC portal.
+- *
+- * Fields are only meaningful if the FSL_MC_IO_ATOMIC_CONTEXT_PORTAL flag is not
+- * set:
+- * @mutex: Mutex to serialize mc_send_command() calls that use the same MC
+- * portal, if the fsl_mc_io object was created with the
+- * FSL_MC_IO_ATOMIC_CONTEXT_PORTAL flag off. mc_send_command() calls for this
+- * fsl_mc_io object must be made only from non-atomic context.
+- *
+- * Fields are only meaningful if the FSL_MC_IO_ATOMIC_CONTEXT_PORTAL flag is
+- * set:
+- * @spinlock: Spinlock to serialize mc_send_command() calls that use the same MC
+- * portal, if the fsl_mc_io object was created with the
+- * FSL_MC_IO_ATOMIC_CONTEXT_PORTAL flag on. mc_send_command() calls for this
+- * fsl_mc_io object can be made from atomic or non-atomic context.
 - */
--struct fsl_mc_resource_pool {
--	enum fsl_mc_pool_type type;
--	int max_count;
--	int free_count;
--	struct mutex mutex;	/* serializes access to free_list */
--	struct list_head free_list;
--	struct fsl_mc_bus *mc_bus;
+-struct fsl_mc_io {
+-	struct device *dev;
+-	u16 flags;
+-	u16 portal_size;
+-	phys_addr_t portal_phys_addr;
+-	void __iomem *portal_virt_addr;
+-	struct fsl_mc_device *dpmcp_dev;
+-	union {
+-		/*
+-		 * This field is only meaningful if the
+-		 * FSL_MC_IO_ATOMIC_CONTEXT_PORTAL flag is not set
+-		 */
+-		struct mutex mutex; /* serializes mc_send_command() */
+-
+-		/*
+-		 * This field is only meaningful if the
+-		 * FSL_MC_IO_ATOMIC_CONTEXT_PORTAL flag is set
+-		 */
+-		spinlock_t spinlock;	/* serializes mc_send_command() */
+-	};
 -};
 -
--/**
-- * struct fsl_mc_bus - logical bus that corresponds to a physical DPRC
-- * @mc_dev: fsl-mc device for the bus device itself.
-- * @resource_pools: array of resource pools (one pool per resource type)
-- * for this MC bus. These resources represent allocatable entities
-- * from the physical DPRC.
-- * @irq_resources: Pointer to array of IRQ objects for the IRQ pool
-- * @scan_mutex: Serializes bus scanning
-- * @dprc_attr: DPRC attributes
-- */
--struct fsl_mc_bus {
--	struct fsl_mc_device mc_dev;
--	struct fsl_mc_resource_pool resource_pools[FSL_MC_NUM_POOL_TYPES];
--	struct fsl_mc_device_irq *irq_resources;
--	struct mutex scan_mutex;    /* serializes bus scanning */
--	struct dprc_attributes dprc_attr;
--};
+-int mc_send_command(struct fsl_mc_io *mc_io, struct mc_command *cmd);
 -
--#define to_fsl_mc_bus(_mc_dev) \
--	container_of(_mc_dev, struct fsl_mc_bus, mc_dev)
--
--int fsl_mc_find_msi_domain(struct device *mc_platform_dev,
--			   struct irq_domain **mc_msi_domain);
--
--int fsl_mc_populate_irq_pool(struct fsl_mc_bus *mc_bus,
--			     unsigned int irq_count);
--
--void fsl_mc_cleanup_irq_pool(struct fsl_mc_bus *mc_bus);
--
--void fsl_mc_init_all_resource_pools(struct fsl_mc_device *mc_bus_dev);
--
--void fsl_mc_cleanup_all_resource_pools(struct fsl_mc_device *mc_bus_dev);
--
--bool fsl_mc_is_root_dprc(struct device *dev);
--
--#endif /* _FSL_MC_MCBUS_H_ */
+-#endif /* _FSL_MC_SYS_H */
+diff --git a/drivers/staging/fsl-mc/include/mc.h b/drivers/staging/fsl-mc/include/mc.h
+index d37e2c7..33bb3b8 100644
+--- a/drivers/staging/fsl-mc/include/mc.h
++++ b/drivers/staging/fsl-mc/include/mc.h
+@@ -23,6 +23,7 @@ struct msi_domain_info;
+ 
+ struct fsl_mc_device;
+ struct fsl_mc_io;
++struct mc_command;
+ 
+ /**
+  * struct fsl_mc_driver - MC object device driver object
+@@ -201,6 +202,58 @@ struct fsl_mc_device {
+ #define to_fsl_mc_device(_dev) \
+ 	container_of(_dev, struct fsl_mc_device, dev)
+ 
++/**
++ * Bit masks for a MC I/O object (struct fsl_mc_io) flags
++ */
++#define FSL_MC_IO_ATOMIC_CONTEXT_PORTAL	0x0001
++
++/**
++ * struct fsl_mc_io - MC I/O object to be passed-in to mc_send_command()
++ * @dev: device associated with this Mc I/O object
++ * @flags: flags for mc_send_command()
++ * @portal_size: MC command portal size in bytes
++ * @portal_phys_addr: MC command portal physical address
++ * @portal_virt_addr: MC command portal virtual address
++ * @dpmcp_dev: pointer to the DPMCP device associated with the MC portal.
++ *
++ * Fields are only meaningful if the FSL_MC_IO_ATOMIC_CONTEXT_PORTAL flag is not
++ * set:
++ * @mutex: Mutex to serialize mc_send_command() calls that use the same MC
++ * portal, if the fsl_mc_io object was created with the
++ * FSL_MC_IO_ATOMIC_CONTEXT_PORTAL flag off. mc_send_command() calls for this
++ * fsl_mc_io object must be made only from non-atomic context.
++ *
++ * Fields are only meaningful if the FSL_MC_IO_ATOMIC_CONTEXT_PORTAL flag is
++ * set:
++ * @spinlock: Spinlock to serialize mc_send_command() calls that use the same MC
++ * portal, if the fsl_mc_io object was created with the
++ * FSL_MC_IO_ATOMIC_CONTEXT_PORTAL flag on. mc_send_command() calls for this
++ * fsl_mc_io object can be made from atomic or non-atomic context.
++ */
++struct fsl_mc_io {
++	struct device *dev;
++	u16 flags;
++	u16 portal_size;
++	phys_addr_t portal_phys_addr;
++	void __iomem *portal_virt_addr;
++	struct fsl_mc_device *dpmcp_dev;
++	union {
++		/*
++		 * This field is only meaningful if the
++		 * FSL_MC_IO_ATOMIC_CONTEXT_PORTAL flag is not set
++		 */
++		struct mutex mutex; /* serializes mc_send_command() */
++
++		/*
++		 * This field is only meaningful if the
++		 * FSL_MC_IO_ATOMIC_CONTEXT_PORTAL flag is set
++		 */
++		spinlock_t spinlock;	/* serializes mc_send_command() */
++	};
++};
++
++int mc_send_command(struct fsl_mc_io *mc_io, struct mc_command *cmd);
++
+ #ifdef CONFIG_FSL_MC_BUS
+ #define dev_is_fsl_mc(_dev) ((_dev)->bus == &fsl_mc_bus_type)
+ #else
 -- 
 2.9.4
