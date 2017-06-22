@@ -1,64 +1,46 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 21 Jun 2017 22:22:56 -0500
-Subject: [PATCH] watchdog: meson-wdt: add support for the watchdog on
- Meson8 and Meson8m2
-In-Reply-To: <CAFBinCAZZMT-YDHg4SYF3da+00KLYE-dZaEDPaEMRz_2paXNQw@mail.gmail.com>
-References: <20170611095219.22095-1-martin.blumenstingl@googlemail.com>
- <20170615172510.GA7549@roeck-us.net>
- <CAFBinCCyqX=TGwTyhxXZPP2noUvJ1v=xNs+Vs17Gg4z2uDgjEA@mail.gmail.com>
- <20170616180009.h66dwnnhfwrjpui6@rob-hp-laptop>
- <CAFBinCAZZMT-YDHg4SYF3da+00KLYE-dZaEDPaEMRz_2paXNQw@mail.gmail.com>
-Message-ID: <CAL_JsqJutEYt0eG96RG+jMosCEkqK=145Kquj2qJdQCV=wh2zg@mail.gmail.com>
+From: kevin.wangtao@hisilicon.com (Tao Wang)
+Date: Thu, 22 Jun 2017 11:42:01 +0800
+Subject: [Patch v2 1/3] dt-bindings: Document the hi3660 thermal sensor
+ bindings
+In-Reply-To: <1497930035-60894-3-git-send-email-kevin.wangtao@hisilicon.com>
+References: <1497930035-60894-3-git-send-email-kevin.wangtao@hisilicon.com>
+Message-ID: <1498102923-68481-1-git-send-email-kevin.wangtao@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 19, 2017 at 1:50 PM, Martin Blumenstingl
-<martin.blumenstingl@googlemail.com> wrote:
-> Hi Rob,
->
-> On Sun, Jun 18, 2017 at 4:04 PM, Rob Herring <robh@kernel.org> wrote:
->> On Thu, Jun 15, 2017 at 11:13:07PM +0200, Martin Blumenstingl wrote:
->>> On Thu, Jun 15, 2017 at 7:25 PM, Guenter Roeck <linux@roeck-us.net> wrote:
->>> > On Sun, Jun 11, 2017 at 11:52:19AM +0200, Martin Blumenstingl wrote:
->>> >> The watchdog IP block on Meson8 and Meson8m2 is already supported by the
->>> >> existing meson-wdt driver. Meson8 uses the same register bits as Meson6,
->>> >> while the newer Meson8m2 SoC uses the same register bits as Meson8b.
->>> >>
->>> >> Currently watchdog support on Meson8 SoC already works because
->>> >> meson8.dtsi simply uses the "amlogic,meson6-wdt" compatible. Adding a
->>> >> separate compatible for Meson8 makes this more explicit though.
->>> >>
->>> >> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->>> >
->>> > Reviewed-by: Guenter Roeck <linux@roeck-us.net>
->>> thank you!
->>> is there anything holding you up from taking this patch (for example:
->>> are you still missing any specific Signed-off-by / Acked-by)?
->>>
->>> > In general, changes like this are not necessary, though. The dts file
->>> > is supposed to reference both generic and specific compatible strings.
->>> I thought about skipping this patch, but I find that it looks strange without.
->>>
->>> the hierarchy and the corresponding compatible strings would be:
->>> meson.dtsi / compatible = "amlogic,meson6-wdt";
->>> |- meson8.dtsi / compatible = "amlogic,meson8-wdt", "amlogic,meson6-wdt";
->>>    |- meson8m2.dtsi (upcoming) / compatible = "amlogic,meson8m2-wdt",
->>> "amlogic,meson8b-wdt";
->>> |- meson8b.dtsi / compatible = "amlogic,meson8b-wdt";
->>>
->>> instead of this seemingly random mixup of compatible strings I decided
->>> to introduce separate ones for each SoC.
->>
->> But if the block is backwards compatible, you should also provide a
->> fallback compatible string.
-> OK, fine with me - do you want me to update the documentation to
-> reflect this (or is it enough if I take care of it in the .dts files)?
-> the resulting documentation could look like this:
->        "amlogic,meson6-wdt" on Meson6 SoCs
->        "amlogic,meson8-wdt" along with "amlogic,meson6-wdt" on Meson8 SoCs
->        "amlogic,meson8b-wdt" on Meson8b SoCs
->        "amlogic,meson8m2-wdt" along with "amlogic,meson8b-wdt" on Meson8m2 SoCs
+This adds documentation of device tree bindings for the
+thermal sensor controller of hi3660 SoC.
 
-Yes, like this.
+Signed-off-by: Tao Wang <kevin.wangtao@hisilicon.com>
+---
+Changes in v2:
+- remove redundant property
 
-Rob
+ .../devicetree/bindings/thermal/hi3660-thermal.txt |   16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/hi3660-thermal.txt
+
+diff --git a/Documentation/devicetree/bindings/thermal/hi3660-thermal.txt b/Documentation/devicetree/bindings/thermal/hi3660-thermal.txt
+new file mode 100644
+index 0000000..f3dddcf
+--- /dev/null
++++ b/Documentation/devicetree/bindings/thermal/hi3660-thermal.txt
+@@ -0,0 +1,16 @@
++* Temperature Sensor on hisilicon hi3660 SoC
++
++** Required properties :
++
++- compatible: "hisilicon,thermal-hi3660".
++- reg: physical base address of thermal sensor and length of memory mapped
++  region.
++- #thermal-sensor-cells: Should be 1. See ./thermal.txt for a description.
++
++Example :
++
++	tsensor: tsensor {
++		compatible = "hisilicon,thermal-hi3660";
++		reg = <0x0 0xfff30000 0x0 0x1000>;
++		#thermal-sensor-cells = <1>;
++	 };
+-- 
+1.7.9.5
