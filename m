@@ -1,51 +1,84 @@
-From: hotran@apm.com (Hoan Tran)
-Date: Thu, 22 Jun 2017 11:29:10 -0700
-Subject: [PATCH v3 3/3] perf: xgene: Add support for SoC PMU version 3
-In-Reply-To: <20170622181749.GF25967@leverpostej>
-References: <1496772146-11084-1-git-send-email-hotran@apm.com>
- <1496772146-11084-4-git-send-email-hotran@apm.com>
- <20170622175255.GD25967@leverpostej>
- <CAFHUOYz_WpYa9BhCnQ+ze5-mbM4pWSn84j_EyH0E16ZbAs43tQ@mail.gmail.com>
- <20170622181749.GF25967@leverpostej>
-Message-ID: <CAFHUOYzEHjH4uXUiXABnjT_E-=kv3n1iWoXiN+VBebNMjaOg+A@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 22 Jun 2017 19:36:20 +0100
+Subject: [PATCH v4 0/5] Add support for the ARMv8.2 Statistical Profiling
+ Extension
+In-Reply-To: <20170622105640.c444b8b0f16266ba2c3ce304@arm.com>
+References: <1496676177-29356-1-git-send-email-will.deacon@arm.com>
+ <20170612110823.GA27319@leverpostej>
+ <20170612112048.69561e8d067488e8689de755@arm.com>
+ <20170615105735.b89183a9190a261d3b8d132a@arm.com>
+ <20170621153108.GC6041@arm.com>
+ <20170622105640.c444b8b0f16266ba2c3ce304@arm.com>
+Message-ID: <20170622183620.GJ15336@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 22, 2017 at 11:17 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Jun 22, 2017 at 11:13:08AM -0700, Hoan Tran wrote:
->> On Thu, Jun 22, 2017 at 10:52 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Tue, Jun 06, 2017 at 11:02:26AM -0700, Hoan Tran wrote:
->> > >  static inline void
->> > > +xgene_pmu_write_counter64(struct xgene_pmu_dev *pmu_dev, int idx, u64 val)
->> > > +{
->> > > +     u32 cnt_lo, cnt_hi;
->> > > +
->> > > +     cnt_hi = upper_32_bits(val);
->> > > +     cnt_lo = lower_32_bits(val);
->> > > +
->> > > +     /* v3 has 64-bit counter registers composed by 2 32-bit registers */
->> > > +     xgene_pmu_write_counter32(pmu_dev, 2 * idx, cnt_lo);
->> > > +     xgene_pmu_write_counter32(pmu_dev, 2 * idx + 1, cnt_hi);
->> > > +}
->> >
->> > For this to be atomic, we need to disable the counters for the duration
->> > of the IRQ handler, which we don't do today.
->> >
->> > Regardless, we should do that to ensure that groups are self-consistent.
->> >
->> > i.e. in xgene_pmu_isr() we should call ops->stop_counters() just after
->> > taking the pmu lock, and we should call ops->start_counters() just
->> > before releasing it.
->>
->> Thanks for your comments. I'll fix them and send another version of
->> patch set soon.
->
-> No need; I'm picking these up now, and I'll apply the fixups locally.
+On Thu, Jun 22, 2017 at 10:56:40AM -0500, Kim Phillips wrote:
+> On Wed, 21 Jun 2017 16:31:09 +0100
+> Will Deacon <will.deacon@arm.com> wrote:
+> 
+> > On Thu, Jun 15, 2017 at 10:57:35AM -0500, Kim Phillips wrote:
+> > > On Mon, 12 Jun 2017 11:20:48 -0500
+> > > Kim Phillips <kim.phillips@arm.com> wrote:
+> > > 
+> > > > On Mon, 12 Jun 2017 12:08:23 +0100
+> > > > Mark Rutland <mark.rutland@arm.com> wrote:
+> > > > 
+> > > > > On Mon, Jun 05, 2017 at 04:22:52PM +0100, Will Deacon wrote:
+> > > > > > This is the sixth posting of the patches previously posted here:
+> > > ...
+> > > > > Kim, do you have any version of the userspace side that we could look
+> > > > > at?
+> > > > > 
+> > > > > For review, it would be really helpful to have something that can poke
+> > > > > the PMU, even if it's incomplete or lacking polish.
+> > > > 
+> > > > Here's the latest push, based on a a couple of prior versions of this
+> > > > driver:
+> > > > 
+> > > > http://linux-arm.org/git?p=linux-kp.git;a=shortlog;h=refs/heads/armspev0.1
+> > > > 
+> > > > I don't seem to be able to get any SPE data output after rebasing on
+> > > > this version of the driver.  Still don't know why at the moment...
+> > > 
+> > > Bisected to commit e38ba76deef "perf tools: force uncore events to
+> > > system wide monitoring".  So, using record with specifying a -C
+> > > <cpu> explicitly now produces SPE data, but only a couple of valid
+> > > records at the beginning of each buffer; the rest is filled with
+> > > PADding (0's).
+> > > 
+> > > I see Mark's latest comments have found a possible issue in the perf
+> > > aux buffer handling code in the driver, and that the driver does some
+> > > memset of padding (0's) itself; could that be responsible for the above
+> > > behaviour?
+> > 
+> > Possibly. Do you know how big you're mapping the aux buffer
+> 
+> 4MiB.
+> 
+> > and what (if any) value you're passing as aux_watermark?
+> 
+> None passed, but it looks like 4KiB was used since the AUXTRACE size
+> was 4MiB - 4KiB.
+> 
+> I'm not seeing the issue with a simple bts-based version I'm
+> working on...yet.  We can revisit if I'm able to reproduce again; the
+> problem could have been on the userspace side.
+> 
+> Meanwhile, when using fvp-base.dtb, my model setup stops booting the
+> kernel after "smp: Bringing up secondary CPUs ...".  If I however take
+> the second SPE node from fvp-base.dts and add it to my working device
+> tree, I get this during the driver probe:
+> 
+> [    1.042063] arm_spe_pmu spe-pmu at 0: probed for CPUs 0-7 [max_record_sz 64, align 1, features 0xf]
+> [    1.043582] arm_spe_pmu spe-pmu at 1: probed for CPUs 0-7 [max_record_sz 64, align 1, features 0xf]
+> [    1.043631] genirq: Flags mismatch irq 6. 00004404 (arm_spe_pmu) vs. 00004404 (arm_spe_pmu)
 
-Thanks!
+Looks like you've screwed up your IRQ partitions, so you are effectively
+registering the same device twice, which then blows up due to lack of shared
+irqs.
 
-Hoan
+Either remove one of the devices, or use IRQ partitions to restrict them
+to unique sets of CPUs.
 
->
-> Thanks,
-> Mark.
+Will
