@@ -1,149 +1,124 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Thu, 22 Jun 2017 22:32:35 +0300
-Subject: [PATCH 2/5] arm64: signal: Refactor sigcontext parsing in
- rt_sigreturn
-In-Reply-To: <1497535442-11586-3-git-send-email-Dave.Martin@arm.com>
-References: <1497535442-11586-1-git-send-email-Dave.Martin@arm.com>
- <1497535442-11586-3-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20170622193235.esxidcqcsz2zdpf2@yury-thinkpad>
+From: rric@kernel.org (Robert Richter)
+Date: Thu, 22 Jun 2017 21:35:35 +0200
+Subject: [Devel] [PATCH v9 0/3] Cavium ThunderX2 SMMUv3 errata workarounds
+In-Reply-To: <20170622185822.GK15336@arm.com>
+References: <1498133138-20244-1-git-send-email-gakula@caviumnetworks.com>
+ <20170622182257.GI15336@arm.com> <20170622185822.GK15336@arm.com>
+Message-ID: <20170622193535.GA10237@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
-
-It seems that your series conflicts with one of patches of my ILP32:
-https://patchwork.kernel.org/patch/9599015/
-
-Now I try to rebase ilp32 on your patchset, and maybe will have some
-questions. The first question is below. If you have comments on my
-series - please share it.
-
-Yury
-
-On Thu, Jun 15, 2017 at 03:03:39PM +0100, Dave Martin wrote:
-> Currently, rt_sigreturn does very limited checking on the
-> sigcontext coming from userspace.
+On 22.06.17 19:58:22, Will Deacon wrote:
+> On Thu, Jun 22, 2017 at 07:22:57PM +0100, Will Deacon wrote:
+> > On Thu, Jun 22, 2017 at 05:35:35PM +0530, Geetha sowjanya wrote:
+> > > Cavium ThunderX2 SMMUv3 implementation has two Silicon Erratas.
+> > > 1. Errata ID #74
+> > >    SMMU register alias Page 1 is not implemented
+> > > 2. Errata ID #126
+> > >    SMMU doesnt support unique IRQ lines and also MSI for gerror,
+> > >    eventq and cmdq-sync
+> > > 
+> > > The following patchset does software workaround for these two erratas.
+> > 
+> > I've picked up the first two patches, and left comments on the final patch.
 > 
-> Future additions to the sigcontext data will increase the potential
-> for surprises.  Also, it is not clear whether the sigcontext
-> extension records are supposed to occur in a particular order.
-> 
-> To allow the parsing code to be extended more easily, this patch
-> factors out the sigcontext parsing into a separate function, and
-> adds extra checks to validate the well-formedness of the sigcontext
-> structure.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-
-> +static int parse_user_sigframe(struct user_ctxs *user,
-> +			       struct rt_sigframe __user *sf)
-
-You parse sigcontext here in fact. At least you take the pointer to 
-the sigcontext from rt_sigframe, and never refer it anymore. rt_sigframe
-is different for lp64 and ilp32, but sigcontext is the same. So if you'll 
-rename the function to parse_user_sigcontext, and will pass sigcontext
-to it directly, I will reuse it in ilp32 code.
-
-> +{
-> +	struct sigcontext __user *const sc = &sf->uc.uc_mcontext;
-> +	struct _aarch64_ctx __user *head =
-> +		(struct _aarch64_ctx __user *)&sc->__reserved;
-> +	size_t offset = 0;
-> +
-> +	user->fpsimd = NULL;
-> +
-> +	while (1) {
-> +		int err;
-> +		u32 magic, size;
-> +
-> +		head = (struct _aarch64_ctx __user *)&sc->__reserved[offset];
-> +		if (!IS_ALIGNED((unsigned long)head, 16))
-> +			goto invalid;
-> +
-> +		err = 0;
-> +		__get_user_error(magic, &head->magic, err);
-> +		__get_user_error(size, &head->size, err);
-> +		if (err)
-> +			return err;
-> +
-> +		switch (magic) {
-> +		case 0:
-> +			if (size)
-> +				goto invalid;
-> +
-> +			goto done;
-> +
-> +		case FPSIMD_MAGIC:
-> +			if (user->fpsimd)
-> +				goto invalid;
-> +
-> +			if (offset > sizeof(sc->__reserved) -
-> +					sizeof(*user->fpsimd) ||
-> +			    size < sizeof(*user->fpsimd))
-> +				goto invalid;
-> +
-> +			user->fpsimd = (struct fpsimd_context __user *)head;
-> +			break;
-> +
-> +		case ESR_MAGIC:
-> +			/* ignore */
-> +			break;
-> +
-> +		default:
-> +			goto invalid;
-> +		}
-> +
-> +		if (size < sizeof(*head))
-> +			goto invalid;
-> +
-> +		if (size > sizeof(sc->__reserved) - (sizeof(*head) + offset))
-> +			goto invalid;
-> +
-> +		offset += size;
-> +	}
-> +
-> +done:
-> +	if (!user->fpsimd)
-> +		goto invalid;
-> +
-> +	return 0;
-> +
-> +invalid:
-> +	return -EINVAL;
-> +}
-> +
->  static int restore_sigframe(struct pt_regs *regs,
->  			    struct rt_sigframe __user *sf)
->  {
->  	sigset_t set;
->  	int i, err;
-> -	void *aux = sf->uc.uc_mcontext.__reserved;
-> +	struct user_ctxs user;
->  
->  	err = __copy_from_user(&set, &sf->uc.uc_sigmask, sizeof(set));
->  	if (err == 0)
-> @@ -125,12 +200,11 @@ static int restore_sigframe(struct pt_regs *regs,
->  	regs->syscallno = ~0UL;
->  
->  	err |= !valid_user_regs(&regs->user_regs, current);
-> +	if (err == 0)
-> +		err = parse_user_sigframe(&user, sf);
->  
-> -	if (err == 0) {
-> -		struct fpsimd_context *fpsimd_ctx =
-> -			container_of(aux, struct fpsimd_context, head);
-> -		err |= restore_fpsimd_context(fpsimd_ctx);
-> -	}
-> +	if (err == 0)
-> +		err = restore_fpsimd_context(user.fpsimd);
->  
->  	return err;
->  }
-> -- 
-> 2.1.4
+> ... except that it doesn't build:
 > 
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> drivers/acpi/arm64/iort.c: In function ?arm_smmu_v3_resource_size?:
+> drivers/acpi/arm64/iort.c:837:21: error: ?ACPI_IORT_SMMU_V3_CAVIUM_CN99XX? undeclared (first use in this function)
+>   if (smmu->model == ACPI_IORT_SMMU_V3_CAVIUM_CN99XX)
+>                      ^
+> drivers/acpi/arm64/iort.c:837:21: note: each undeclared identifier is reported only once for each function it appears in
+> make[4]: *** [drivers/acpi/arm64/iort.o] Error 1
+> 
+> 
+> I don't see ACPI_IORT_SMMU_V3_CAVIUM_CN99XX defined, even in linux-next.
+> 
+> What's the plan here?
+
+It is defined already in acpica and we actually waiting for the acpi
+maintainers to include it:
+
+ https://github.com/acpica/acpica/commit/d00a4eb86e64
+
+We could add
+
+/* Until ACPICA headers cover IORT rev. C */
+#ifndef ACPI_IORT_SMMU_V3_CAVIUM_CN99XX
+#define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX		0x2
+#endif
+
+to both files:
+
+ drivers/acpi/arm64/iort.c
+ drivers/iommu/arm-smmu-v3.c
+
+This is similar to what Robin did.
+
+(I checked arm64 include files and the closest was
+arch/arm64/include/asm/acpi.h, bug this seems not really suitable to
+me.)
+
+I have created a separate patch to be applied at first below. We can
+revert it after acpica was updated.
+
+-Robert
+
+
+
+
+>From ad7f0112a2a71059c32bd315835c33cc7bc660b8 Mon Sep 17 00:00:00 2001
+From: Robert Richter <rrichter@cavium.com>
+Date: Thu, 22 Jun 2017 21:20:54 +0200
+Subject: [PATCH] iommu/arm-smmu-v3: Add temporary Cavium SMMU-V3 model nuber
+ definitions
+
+The model number is already defined in acpica and we actually waiting
+for the acpi maintainers to include it:
+
+ https://github.com/acpica/acpica/commit/d00a4eb86e64
+
+Adding those temporary definitions until the change makes it into
+include/acpi/actbl2.h.
+
+Signed-off-by: Robert Richter <rrichter@cavium.com>
+---
+ drivers/acpi/arm64/iort.c   | 5 +++++
+ drivers/iommu/arm-smmu-v3.c | 5 +++++
+ 2 files changed, 10 insertions(+)
+
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index 797b28dc7b34..15491237a657 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -31,6 +31,11 @@
+ #define IORT_IOMMU_TYPE		((1 << ACPI_IORT_NODE_SMMU) |	\
+ 				(1 << ACPI_IORT_NODE_SMMU_V3))
+ 
++/* Until ACPICA headers cover IORT rev. C */
++#ifndef ACPI_IORT_SMMU_V3_CAVIUM_CN99XX
++#define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX		0x2
++#endif
++
+ struct iort_its_msi_chip {
+ 	struct list_head	list;
+ 	struct fwnode_handle	*fw_node;
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 380969aa60d5..c759dfa7442d 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -412,6 +412,11 @@
+ #define MSI_IOVA_BASE			0x8000000
+ #define MSI_IOVA_LENGTH			0x100000
+ 
++/* Until ACPICA headers cover IORT rev. C */
++#ifndef ACPI_IORT_SMMU_V3_CAVIUM_CN99XX
++#define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX		0x2
++#endif
++
+ static bool disable_bypass;
+ module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
+ MODULE_PARM_DESC(disable_bypass,
+-- 
+2.11.0
