@@ -1,152 +1,54 @@
-From: erin.lo@mediatek.com (Erin Lo)
-Date: Thu, 22 Jun 2017 16:43:39 +0800
-Subject: [PATCH v2 4/4] arm: dts: mt2701: Add display subsystem related nodes
- for MT2701
-In-Reply-To: <1498121019-21984-1-git-send-email-erin.lo@mediatek.com>
-References: <1498121019-21984-1-git-send-email-erin.lo@mediatek.com>
-Message-ID: <1498121019-21984-5-git-send-email-erin.lo@mediatek.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 22 Jun 2017 09:47:05 +0100
+Subject: [PATCH 1/4] ARM/PCI: iop13xx: address uninitialized variable
+ warning
+In-Reply-To: <20170621215323.3921382-1-arnd@arndb.de>
+References: <20170621215323.3921382-1-arnd@arndb.de>
+Message-ID: <20170622084704.GA22996@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: YT Shen <yt.shen@mediatek.com>
+On Wed, Jun 21, 2017 at 11:52:59PM +0200, Arnd Bergmann wrote:
+> The last rework returned a variable that the compiler cannot prove
+> to be initialized:
+> 
+> arch/arm/mach-iop13xx/pci.c: In function 'iop13xx_scan_bus':
+> arch/arm/mach-iop13xx/pci.c:509:17: error: 'ret' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> 
+> In the switch statement that sets the return value, this adds
+> a default returning an error.
+> 
+> Fixes: ace27646da8e ("ARM/PCI: Convert PCI scan API to pci_scan_root_bus_bridge()")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/mach-iop13xx/pci.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/mach-iop13xx/pci.c b/arch/arm/mach-iop13xx/pci.c
+> index b97879bfb81a..3c51a9bb9b49 100644
+> --- a/arch/arm/mach-iop13xx/pci.c
+> +++ b/arch/arm/mach-iop13xx/pci.c
+> @@ -553,6 +553,8 @@ int iop13xx_scan_bus(int nr, struct pci_host_bridge *bridge)
+>  		if (!ret)
+>  			pci_bus_atue = bridge->bus;
+>  		break;
+> +	default:
+> +		ret = -EINVAL;
+>  	}
+>  
+>  	return ret;
 
-This patch adds the device nodes for the DISP function blocks for MT2701
+Ok I managed to miss these ones somehow, apologies. This series can be
+squashed into the initial series but there is also Linus' fix for faraday
+to address:
 
-Signed-off-by: YT Shen <yt.shen@mediatek.com>
-Signed-off-by: Erin Lo <erin.lo@mediatek.com>
----
- arch/arm/boot/dts/mt2701.dtsi | 84 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 84 insertions(+)
+https://patchwork.ozlabs.org/patch/778999/
 
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index 8e574a0..150c4c7 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -17,6 +17,7 @@
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/reset/mt2701-resets.h>
-+#include <dt-bindings/memory/mt2701-larb-port.h>
- #include "skeleton64.dtsi"
- #include "mt2701-pinfunc.h"
- 
-@@ -24,6 +25,11 @@
- 	compatible = "mediatek,mt2701";
- 	interrupt-parent = <&sysirq>;
- 
-+	aliases {
-+		rdma0 = &rdma0;
-+		rdma1 = &rdma1;
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -201,6 +207,16 @@
- 		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
- 	};
- 
-+	mipi_tx0: mipi-dphy at 10010000 {
-+		compatible = "mediatek,mt2701-mipi-tx";
-+		reg = <0 0x10010000 0 0x90>;
-+		clocks = <&clk26m>;
-+		clock-output-names = "mipi_tx0_pll";
-+		#clock-cells = <0>;
-+		#phy-cells = <0>;
-+		status = "disabled";
-+	};
-+
- 	sysirq: interrupt-controller at 10200100 {
- 		compatible = "mediatek,mt2701-sysirq",
- 			     "mediatek,mt6577-sysirq";
-@@ -366,6 +382,39 @@
- 		#clock-cells = <1>;
- 	};
- 
-+	display_components: dispsys at 14000000 {
-+		compatible = "mediatek,mt2701-mmsys";
-+		reg = <0 0x14000000 0 0x1000>;
-+		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
-+	};
-+
-+	ovl at 14007000 {
-+		compatible = "mediatek,mt2701-disp-ovl";
-+		reg = <0 0x14007000 0 0x1000>;
-+		interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_OVL>;
-+		iommus = <&iommu MT2701_M4U_PORT_DISP_OVL_0>;
-+		mediatek,larb = <&larb0>;
-+	};
-+
-+	rdma0: rdma at 14008000 {
-+		compatible = "mediatek,mt2701-disp-rdma";
-+		reg = <0 0x14008000 0 0x1000>;
-+		interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_RDMA>;
-+		iommus = <&iommu MT2701_M4U_PORT_DISP_RDMA>;
-+		mediatek,larb = <&larb0>;
-+	};
-+
-+	wdma at 14009000 {
-+		compatible = "mediatek,mt2701-disp-wdma";
-+		reg = <0 0x14009000 0 0x1000>;
-+		interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_WDMA>;
-+		iommus = <&iommu MT2701_M4U_PORT_DISP_WDMA>;
-+		mediatek,larb = <&larb0>;
-+	};
-+
- 	bls: bls at 1400a000 {
- 		compatible = "mediatek,mt2701-disp-pwm";
- 		reg = <0 0x1400a000 0 0x1000>;
-@@ -375,6 +424,32 @@
- 		status = "disabled";
- 	};
- 
-+	color at 1400b000 {
-+		compatible = "mediatek,mt2701-disp-color";
-+		reg = <0 0x1400b000 0 0x1000>;
-+		interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_COLOR>;
-+	};
-+
-+	dsi: dsi at 1400c000 {
-+		compatible = "mediatek,mt2701-dsi";
-+		reg = <0 0x1400c000 0 0x1000>;
-+		interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DSI_ENGINE>, <&mmsys CLK_MM_DSI_DIG>,
-+			 <&mipi_tx0>;
-+		clock-names = "engine", "digital", "hs";
-+		phys = <&mipi_tx0>;
-+		phy-names = "dphy";
-+		status = "disabled";
-+	};
-+
-+	mutex: mutex at 1400e000 {
-+		compatible = "mediatek,mt2701-disp-mutex";
-+		reg = <0 0x1400e000 0 0x1000>;
-+		interrupts = <GIC_SPI 161 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_MUTEX_32K>;
-+	};
-+
- 	larb0: larb at 14010000 {
- 		compatible = "mediatek,mt2701-smi-larb";
- 		reg = <0 0x14010000 0 0x1000>;
-@@ -385,6 +460,15 @@
- 		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
- 	};
- 
-+	rdma1: rdma at 14012000 {
-+		compatible = "mediatek,mt2701-disp-rdma";
-+		reg = <0 0x14012000 0 0x1000>;
-+		interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_RDMA1>;
-+		iommus = <&iommu MT2701_M4U_PORT_DISP_RDMA1>;
-+		mediatek,larb = <&larb0>;
-+	};
-+
- 	imgsys: syscon at 15000000 {
- 		compatible = "mediatek,mt2701-imgsys", "syscon";
- 		reg = <0 0x15000000 0 0x1000>;
--- 
-1.9.1
+I can respin a v3 but I am off the radar next week so timing for the
+pci_fixup_irqs() removal looks bad, I am not sure what's the next course
+of action but I think it is better to drop it for this cycle and wait
+for 4.14 (hopefully there are not many PCI host bridges updates to
+rebase but I will cope with that anyway - that's the best I can do).
+
+Thanks,
+Lorenzo
