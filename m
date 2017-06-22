@@ -1,10 +1,10 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 22 Jun 2017 15:42:29 -0700
-Subject: [GIT PULL 2/7] Broadcom devicetree changes for 4.13 (v2)
-In-Reply-To: <20170613201044.9808-2-f.fainelli@gmail.com>
+Date: Thu, 22 Jun 2017 15:43:28 -0700
+Subject: [GIT PULL 3/7] Broadcom devicetree-arm64 changes for 4.13 (v2)
+In-Reply-To: <20170613201044.9808-3-f.fainelli@gmail.com>
 References: <20170613201044.9808-1-f.fainelli@gmail.com>
- <20170613201044.9808-2-f.fainelli@gmail.com>
-Message-ID: <8f830522-45fb-c86e-0b0e-6af95d793828@gmail.com>
+ <20170613201044.9808-3-f.fainelli@gmail.com>
+Message-ID: <c7f22782-00d6-1af4-69c8-c4b560ed13bf@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,41 +15,44 @@ On 06/13/2017 01:10 PM, Florian Fainelli wrote:
 > 
 > are available in the git repository at:
 > 
->   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.13/devicetree
+>   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.13/devicetree-arm64
 > 
-> for you to fetch changes up to 4a579ecf3d4f964bd6b39605610201cd4d5a7e8e:
+> for you to fetch changes up to 39b1aae758de6f933f8b45698b56221f6e817dc9:
 > 
->   Merge tag 'bcm2835-dt-next-2017-06-12' into devicetree/next (2017-06-13 12:38:48 -0700)
+>   Merge tag 'bcm2835-dt-64-next-2017-06-08' into devicetree-arm64/next (2017-06-13 12:39:57 -0700)
 > 
 > ----------------------------------------------------------------
-> This pull request contains Broadcom ARM-based Device Tree changes for 4.13.
+> This pull request contains Broadcom ARM64-based SoCs Device Tree changes for
+> 4.13. Please note the following from Eric:
 > 
-> Note that Baruch's changes are fixes that are currently included in v4.12-rc2,
-> but they are also included here in order to keep this tag based off v4.12-rc1.
+> I've based this summary on the bcm2835-dt-next tag, to clarify what's in this
+> patch series, but it does require being careful since it involves a cross-merge
+> between branches.
 > 
-> Please pull the following:
+> - Anup documents the Broadcom Stingray binding, common clocks, adds initial
+>   support for the Stingray DTSI and DTS files and adds support for the PL022,
+>   PL330 and SP805
 > 
-> - Rafal adds CPU and thermal zones to the Northstar (BCM5301X) Device Tree and he
->   also adds the MDIO controller nodes for later use by USB PHYs
+> - Sandeep adds the clock nodes to the Stingray Device Tree nodes
 > 
-> - Eric adds support for the V3D engine and Ethernet switch on the Cygnus
->   platforms, he also adds a set of Device Tree sources and include files for the
->   Raspberry Pi 3 (BCM2837) to be used with the ARM/Linux kernel,
+> - Pramod adds support for the NAND, pinctrl, GPIO to the Stingray Device Tree nodes
 > 
-> - Jon adds CPU and thermal zones to the Northstar Plus Device Tree files
+> - Oza adds I2C Device Tree nodes to the Stingray DTSes
 > 
-> - Stefan updates the Raspberry Pi DTS files with thermal trip points and zones,
->   adds support for the USB OTG on the Raspberry Pi Zero which includes the
->   proper dwc2 configuration, a generic USB PHY and finally the enabling of the
->   OTG controller by including the proper DTS include file
+> - Srinath adds PWM and SDHCI Device Tree nodes for the Stingray SoC
 > 
-> - Gerd switches the Raspberry Pi DTS files to use the SDHOST controller (faster
->   than the SDHCI)
+> - Ravijeta adds support for the USB Dual Role PHY on Northstar 2
+> 
+> - Gerd starts adding references to the sdhost and sdhci controllers, and then
+>   switches the sdcard to to use the SDHOST (faster than SDHCI)
+> 
+> - Stefan defines the BCM2837 thermal coefficients in order for the Raspberry Pi
+>   thermal driver to work correctly
 > 
 > ----------------------------------------------------------------
 
-Same here:
+And here:
 
-https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git/log/?h=brcm/dt
+https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git/log/?h=brcm/dt64
 -- 
 Florian
