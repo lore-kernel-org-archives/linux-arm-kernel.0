@@ -1,98 +1,61 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 22 Jun 2017 10:43:33 +0100
-Subject: [PATCH] compiler, clang: Add always_inline attribute to inline
-In-Reply-To: <alpine.DEB.2.10.1706201604540.146880@chino.kir.corp.google.com>
-References: <20170615155440.GC26471@leverpostej>
- <1497887596-8731-1-git-send-email-psodagud@codeaurora.org>
- <alpine.DEB.2.10.1706191322590.95967@chino.kir.corp.google.com>
- <47bd7df20466d5f7f557ca087b0189cf@codeaurora.org>
- <alpine.DEB.2.10.1706191439090.2360@chino.kir.corp.google.com>
- <f8ee882e9859f24dac24832bfb5ae0f1@codeaurora.org>
- <20170620105937.GD28157@leverpostej>
- <alpine.DEB.2.10.1706201604540.146880@chino.kir.corp.google.com>
-Message-ID: <20170622094333.GB25967@leverpostej>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Thu, 22 Jun 2017 11:56:43 +0200
+Subject: [PATCH 1/9] serial: Add common rs485 device tree parsing function
+In-Reply-To: <20170622082221.v4jf2u5bdw6oyjxw@pengutronix.de>
+References: <20170621102130.21024-1-u.kleine-koenig@pengutronix.de>
+ <20170621102130.21024-2-u.kleine-koenig@pengutronix.de>
+ <20170622063157.qih2mriprczpj7zn@pengutronix.de>
+ <20170622082221.v4jf2u5bdw6oyjxw@pengutronix.de>
+Message-ID: <81a521c6-71a1-a229-d9ec-c34cc070e4ba@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 04:12:32PM -0700, David Rientjes wrote:
-> On Tue, 20 Jun 2017, Mark Rutland wrote:
+On 22/06/2017 at 10:22, Uwe Kleine-K?nig wrote:
+> Hello Sascha,
 > 
-> > As with my reply to David, my preference would be that we:
-> > 
-> > 1) Align compiler-clang.h with the compiler-gcc.h inlining behaviour, so
-> >    that things work by default.
-> > 
-> > 2) Fix up the arm64 core code (and drivers for architected / common
-> >    peripherals) to use __always_inline where we always require inlining.
-> > 
-> > 3) Have arm64 select CONFIG_ARCH_SUPPORTS_OPTIMIZED_INLINING, and have
-> >    people test-build configurations with CONFIG_OPTIMIZE_INLINING, with
-> >    both GCC and clang.
-> > 
-> > 4) Fix up drivers, etc, as appropriate.
-> > 
-> > 5) Once that's largely stable, and if there's a benefit, have arm64
-> >    select CONFIG_OPTIMIZE_INLINING by default.
-> > 
-> > That should avoid undue breakage, while enabling this ASAP.
-> > 
+> On Thu, Jun 22, 2017 at 08:31:57AM +0200, Sascha Hauer wrote:
+>> On Wed, Jun 21, 2017 at 12:21:22PM +0200, Uwe Kleine-K?nig wrote:
+>>> +/**
+>>> + * of_get_rs485_mode() - Implement parsing rs485 properties
+>>> + * @np: uart node
+>>> + * @rs485conf: output parameter
+>>> + *
+>>> + * This function implements the device tree binding described in
+>>> + * Documentation/devicetree/bindings/serial/rs485.txt.
+>>> + *
+>>> + * Return: 0 on success, 1 if the node doesn't contain rs485 stuff, or a
+>>> + * negative error code.
+>>> + */
+>>> +int of_get_rs485_mode(struct device_node *np, struct serial_rs485 *rs485conf)
+>>> +{
+>>> +	u32 rs485_delay[2];
+>>> +	int ret;
+>>> +
+>>> +	ret = of_property_read_u32_array(np, "rs485-rts-delay" rs485_delay, 2);
+>>> +	if (ret == -EINVAL) /* property does not exist */
+>>> +		return 1;
+>>
+>> As the de-facto standard for the drivers implementing the rs485 bindings
+>> is to make the properties optional, despite the documentation. Wouldn't
 > 
-> Sounds good, but I think we should simply deal with the 
-> __attribute__((unused)) needed for clang as part of compiler-gcc.h by 
-> simply adding it to the inline override there to avoid duplicated code.
-
-Agreed. That looks much better.
-
-Thanks,
-Mark.
-
+> I must admit that I failed to mention in the commit log that being
+> strict here was added by me even though I'm not the author.
 > 
-> diff --git a/include/linux/compiler-clang.h b/include/linux/compiler-clang.h
-> --- a/include/linux/compiler-clang.h
-> +++ b/include/linux/compiler-clang.h
-> @@ -15,11 +15,3 @@
->   * with any version that can compile the kernel
->   */
->  #define __UNIQUE_ID(prefix) __PASTE(__PASTE(__UNIQUE_ID_, prefix), __COUNTER__)
-> -
-> -/*
-> - * GCC does not warn about unused static inline functions for
-> - * -Wunused-function.  This turns out to avoid the need for complex #ifdef
-> - * directives.  Suppress the warning in clang as well.
-> - */
-> -#undef inline
-> -#define inline inline __attribute__((unused)) notrace
-> diff --git a/include/linux/compiler-gcc.h b/include/linux/compiler-gcc.h
-> index 0efef9cf014f..71fe0994cf1a 100644
-> --- a/include/linux/compiler-gcc.h
-> +++ b/include/linux/compiler-gcc.h
-> @@ -66,18 +66,22 @@
->  
->  /*
->   * Force always-inline if the user requests it so via the .config,
-> - * or if gcc is too old:
-> + * or if gcc is too old.
-> + * GCC does not warn about unused static inline functions for
-> + * -Wunused-function.  This turns out to avoid the need for complex #ifdef
-> + * directives.  Suppress the warning in clang as well by using "unused"
-> + * function attribute, which is redundant but not harmful for gcc.
->   */
->  #if !defined(CONFIG_ARCH_SUPPORTS_OPTIMIZED_INLINING) ||		\
->      !defined(CONFIG_OPTIMIZE_INLINING) || (__GNUC__ < 4)
-> -#define inline		inline		__attribute__((always_inline)) notrace
-> -#define __inline__	__inline__	__attribute__((always_inline)) notrace
-> -#define __inline	__inline	__attribute__((always_inline)) notrace
-> +#define inline inline		__attribute__((always_inline,unused)) notrace
-> +#define __inline__ __inline__	__attribute__((always_inline,unused)) notrace
-> +#define __inline __inline	__attribute__((always_inline,unused)) notrace
->  #else
->  /* A lot of inline functions can cause havoc with function tracing */
-> -#define inline		inline		notrace
-> -#define __inline__	__inline__	notrace
-> -#define __inline	__inline	notrace
-> +#define inline inline		__attribute__((unused)) notrace
-> +#define __inline__ __inline__	__attribute__((unused)) notrace
-> +#define __inline __inline	__attribute__((unused)) notrace
->  #endif
->  
->  #define __always_inline	inline __attribute__((always_inline))
+>> it be better to make this property optional in the binding instead? This
+>> wouldn't unnecessarily break old device trees and 0/0 seems a sane
+>> default we can use when the property doesn't exist.
+> 
+> Would be fine for me, too. It was Nicolas Ferre who specified this as
+> being required in 0331bbf3c6fd9. Added people who discussed the patch
+> back then (but without questioning rs485-rts-delay being mandatory).
+
+Uwe,
+
+This would be find with me too.
+Indeed, the conversion to an optional option won't break the atmel driver.
+
+Thanks for your work on this topic.
+
+Best regards,
+-- 
+Nicolas Ferre
