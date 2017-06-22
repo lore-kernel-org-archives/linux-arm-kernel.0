@@ -1,61 +1,78 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu, 22 Jun 2017 21:43:05 +0000
-Subject: [RFC PATCH 1/4] EDAC: mvebu: Add driver for Marvell Armada SoCs
-References: <20170608041124.4624-1-chris.packham@alliedtelesis.co.nz>
- <20170608041124.4624-2-chris.packham@alliedtelesis.co.nz>
- <1497014062.3536.52.camel@pengutronix.de>
- <1498140695.2533.76.camel@pengutronix.de>
-Message-ID: <36d9010c9f3f45f2a2bfeda3c0cc2716@svr-chch-ex1.atlnz.lc>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 22 Jun 2017 14:46:34 -0700
+Subject: [GIT PULL] Amlogic 32-bit DT changes for v4.13 (round 2)
+Message-ID: <7hfuerae6d.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/06/17 02:37, Jan L?bbe wrote:
-> Hi Chris,
-> 
-> On Fr, 2017-06-09 at 15:14 +0200, Jan L?bbe wrote:
->>> +static void mvebu_init_csrows(struct mem_ctl_info *mci,
->>> +                             struct mvebu_mc_pdata *pdata)
->> [...]
->>> +     devtype = (ctl >> 20) & 0x3;
->>> +     switch (devtype) {
->>> +     case 0x0:
->>> +             dimm->dtype = DEV_X32;
->>> +             break;
->>> +     case 0x2:               /* could be X8 too, but no way to tell
->> */
->>> +             dimm->dtype = DEV_X16;
->>> +             break;
->>> +     case 0x3:
->>> +             dimm->dtype = DEV_X4;
->>> +             break;
->>> +     default:
->>> +             dimm->dtype = DEV_UNKNOWN;
->>> +             break;
->>> +     }
->> This register is documented as reserved? I pulled the X8/X16
->> information from the Address Control Register (CSnStruct bits).
-> 
-> Do you have more information on how to decode the Bus width?
-> 
-> It's not clear from the MV78230/78x60 docs:
-> - The SDRAM Configuration Register, offset 15 bit is:
->    0 = Half (32 bit data bus)
->    1 = Full (64 bit data bus)
+Arnd, Olof,
 
-For the integrated version it still is just half and full but half == 16 
-and full == 32.
+Here's a small round 2 of 32-bit DT changes for Amlogic SoCs.  This was
+waiting for the clock dependencies to be merged, and they are now in
+clk-next.
 
-> - The SDRAM Address Control Register, offsets 0-1, 4-5, 8-9 and 12-13
-> (for CS 0, 1, 3 and 4):
->    0 = X8
->    1 = X16
->    2 and 3 are not documented
+The dependencies on clock headers were generously separated out by the
+clock maintainers (thanks Neil & Jerome)
 
-This definition is the same for the integrated version.
+Kevin
 
-> Is this clearer in your documentation, so that we can have the same code
-> handle both variants? Otherwise, we'd probably need separate DT
-> compatibles.
+The following changes since commit 2c323c43a3d619d67bffa57dc7480cfae4c53300:
 
-I think we do need to use the compatible string to decide how to 
-interpret full/half.
+  ARM: dts: meson8: add and use the real clock controller (2017-06-09 11:21:21 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt-2
+
+for you to fetch changes up to f28d4bdb74b6fec482cdbba032369a185baa74b9:
+
+  ARM: dts: meson: use the real ethernet clock on Meson8 and Meson8b (2017-06-16 12:07:11 -0700)
+
+----------------------------------------------------------------
+Amlogic 32-bit DT changes for v4.13 (round 2)
+- greatly expands DT clock support for meson8b
+
+----------------------------------------------------------------
+Helmut Klein (1):
+      clk: meson-gxbb: expose UART clocks
+
+Jerome Brunet (3):
+      clk: meson-gxbb: expose spdif clock gates
+      clk: meson-gxbb: expose i2s master clock
+      clk: meson-gxbb: expose spdif master clock
+
+Kevin Hilman (1):
+      Merge tag 'meson-clk-headers-for-4.13-2' of git://github.com/BayLibre/clk-meson into v4.13/dt
+
+Martin Blumenstingl (17):
+      clk: meson-gxbb: un-export the CPU clock
+      clk: meson8b: export the SAR ADC clocks
+      clk: meson8b: export the SDIO clock
+      clk: meson8b: export the gate clock for the HW random number generator
+      clk: meson8b: export the USB clocks
+      clk: meson8b: export the ethernet gate clock
+      ARM: dts: meson8: fix the IR receiver pins
+      ARM: dts: meson: use C preprocessor friendly include syntax
+      ARM: dts: meson: use GIC_SPI and IRQ_TYPE_EDGE_RISING macros
+      ARM: dts: meson8: add the PWM_E and PWM_F pins
+      ARM: dts: meson8: add the pins for the SDIO controller
+      ARM: dts: meson: add the SAR ADC
+      ARM: dts: meson8: add reserved memory zones
+      ARM: dts: meson: add the hardware random number generator
+      ARM: dts: meson: add USB support on Meson8 and Meson8b
+      ARM: dts: meson8b: add the SCU device node
+      ARM: dts: meson: use the real ethernet clock on Meson8 and Meson8b
+
+Neil Armstrong (1):
+      clk: meson-gxbb: expose SPICC gate
+
+ arch/arm/boot/dts/meson.dtsi             |  75 ++++++++++++++++++++++++++++++++++++-------
+ arch/arm/boot/dts/meson6-atv1200.dts     |   2 +-
+ arch/arm/boot/dts/meson6.dtsi            |   2 +-
+ arch/arm/boot/dts/meson8.dtsi            | 124 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-----
+ arch/arm/boot/dts/meson8b.dtsi           |  50 +++++++++++++++++++++++++++++
+ drivers/clk/meson/gxbb.h                 |  20 ++++++------
+ drivers/clk/meson/meson8b.h              |  20 ++++++------
+ include/dt-bindings/clock/gxbb-clkc.h    |  10 +++++-
+ include/dt-bindings/clock/meson8b-clkc.h |  10 ++++++
+ 9 files changed, 271 insertions(+), 42 deletions(-)
