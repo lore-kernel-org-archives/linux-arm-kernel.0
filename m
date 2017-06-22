@@ -1,111 +1,66 @@
-From: john@phrozen.org (John Crispin)
-Date: Thu, 22 Jun 2017 08:12:47 +0200
-Subject: [PATCH RESEND 4/4] pwm: mediatek: add MT2712/MT7622 support
-In-Reply-To: <1498111776.18841.10.camel@mhfsdcap03>
-References: <1498032672-7172-1-git-send-email-zhi.mao@mediatek.com>
- <1498032672-7172-5-git-send-email-zhi.mao@mediatek.com>
- <4600cf23-5e59-df02-37dc-056cb4a9744c@phrozen.org>
- <1498111776.18841.10.camel@mhfsdcap03>
-Message-ID: <05b53007-44de-a236-f592-aea8e75ced44@phrozen.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 22 Jun 2017 08:16:17 +0200
+Subject: [PATCH v1] ARM: dts: sun7i: provide ramoops region on BananaPi
+In-Reply-To: <1498065017-30556-1-git-send-email-linux@rempel-privat.de>
+References: <1498065017-30556-1-git-send-email-linux@rempel-privat.de>
+Message-ID: <20170622061617.5guhcyxdthvmiq7j@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Oleksij,
 
+On Wed, Jun 21, 2017 at 07:10:17PM +0200, Oleksij Rempel wrote:
+> This should help provide useful debug information on remote
+> targets without UART.
+> 
+> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+> ---
+>  arch/arm/boot/dts/sun7i-a20-bananapi.dts | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+> index ed2f35a..38923bf 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+> @@ -63,6 +63,22 @@
+>  		stdout-path = "serial0:115200n8";
+>  	};
+>  
+> +	reserved-memory {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		ramoops at 7fb6a000 {
+> +			compatible = "ramoops";
+> +			reg = <0x7fb6a000 0x100000>;
+> +			ecc-size	= <16>;
+> +			record-size	= <0x00020000>;
+> +			console-size	= <0x00020000>;
+> +			ftrace-size	= <0x00020000>;
+> +			pmsg-size	= <0x00020000>;
+> +		};
+> +	};
+> +
 
-On 22/06/17 08:09, Zhi Mao wrote:
-> Hi John,
->
-> Thanks for your review the code and feedback.
-> There are 3 issues in this patch:
-> 1.adds PWM_CLK_DIV_MAX which really should go into its own patch
-> 2.adds mtk_pwm_com_reg which should also go into its own patch
-> 3.remove comments inline /*===*/
->
-> for #1 and #3, I will modify them in the next release.
-> but for #2, I want to discuss with you,
-> adding the structure  "mtk_pwm_com_reg" is only for the registers of 
-> MT2712 PWM8,
-> so we want to keep this modification in this patch.
->
-> what's your opinion about it?
-> Any reply is welcome.
->
->
-> Regards
-> Zhi
->
->
->
->
+I'm a bit skeptical about this one.
 
-Hi Zhi,
+First, there's nothing specific to the bananapi, but every one will
+want to have different sizes here, or different parameters.
 
-I just had another look and noticed that the CON registers are not at a 
-fixed offset of 0x40 for the new pwm8 register so having 2) inside this 
-patch makes sense. please explain in the description that this is the case
+Since using the kernel parameters is also an option, I'd rather
+document how to do that with the parameters.
 
-     John
+Maxime
 
->
-> On Wed, 2017-06-21 at 20:22 +0800, John Crispin wrote:
->> On 21/06/17 10:11, Zhi Mao wrote:
->> > support multiple chip(MT2712, MT7622, MT7623)
->> This patch does more than add extra SoC support. It also
->> * adds PWM_CLK_DIV_MAX which really should go into its own patch
->> * adds mtk_pwm_com_reg which should also go into its own patch
->>
->> more comments inline
->>
->> >
->> > Signed-off-by: Zhi Mao <zhi.mao at mediatek.com <mailto:zhi.mao@mediatek.com>>
->> > ---
->> >   drivers/pwm/pwm-mediatek.c |   63 +++++++++++++++++++++++++++++++++++---------
->> >   1 file changed, 51 insertions(+), 12 deletions(-)
->> >
->> > diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
->> > index c803ff6..d520356 100644
->> > --- a/drivers/pwm/pwm-mediatek.c
->> > +++ b/drivers/pwm/pwm-mediatek.c
->> > @@ -16,6 +16,7 @@
->> >   #include <linux/module.h>
->> >   #include <linux/clk.h>
->> >   #include <linux/of.h>
->> > +#include <linux/of_device.h>
->> >   #include <linux/platform_device.h>
->> >   #include <linux/pwm.h>
->> >   #include <linux/slab.h>
->> [...]
->> > @@ -215,9 +238,25 @@ static int mtk_pwm_remove(struct platform_device *pdev)
->> >   	return pwmchip_remove(&pc->chip);
->> >   }
->> >
->> > +/*==========================================*/
->>
->> please remove these comment lines
->>
->>       John
->> > +static const struct mtk_com_pwm_data mt2712_pwm_data = {
->> > +	.pwm_nums = 8,
->> > +};
->> > +
->> > +static const struct mtk_com_pwm_data mt7622_pwm_data = {
->> > +	.pwm_nums = 6,
->> > +};
->> > +
->> > +static const struct mtk_com_pwm_data mt7623_pwm_data = {
->> > +	.pwm_nums = 5,
->> > +};
->> > +/*==========================================*/
->> > +
->> >   static const struct of_device_id mtk_pwm_of_match[] = {
->> > -	{ .compatible = "mediatek,mt7623-pwm" },
->> > -	{ }
->> > +	{.compatible = "mediatek,mt2712-pwm", .data = &mt2712_pwm_data},
->> > +	{.compatible = "mediatek,mt7622-pwm", .data = &mt7622_pwm_data},
->> > +	{.compatible = "mediatek,mt7623-pwm", .data = &mt7623_pwm_data},
->> > +	{},
->> >   };
->> >   MODULE_DEVICE_TABLE(of, mtk_pwm_of_match);
->> >
->>
->
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170622/6df87a31/attachment.sig>
