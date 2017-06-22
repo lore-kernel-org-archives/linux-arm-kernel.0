@@ -1,34 +1,31 @@
-From: frank.wang@rock-chips.com (Frank Wang)
-Date: Thu, 22 Jun 2017 15:20:52 +0800
-Subject: [PATCH v2 4/7] ARM: dts: rockchip: fix compatible string for eMMC
- node of rk3228 SoC
-In-Reply-To: <1498116055-20977-1-git-send-email-frank.wang@rock-chips.com>
-References: <1498116055-20977-1-git-send-email-frank.wang@rock-chips.com>
-Message-ID: <1498116055-20977-5-git-send-email-frank.wang@rock-chips.com>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Thu, 22 Jun 2017 12:51:00 +0530
+Subject: [PATCH] iommu: arm-smmu-v3: make of_device_ids const
+Message-ID: <52ec478cd35247ef219b448b174bcfcae87da005.1498115942.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Lin <shawn.lin@rock-chips.com>
+of_device_ids are not supposed to change at runtime. All functions
+working with of_device_ids provided by <linux/of.h> work with const
+of_device_ids. So mark the non-const structs as const.
 
-This adds amend compatible content for eMMC of RK3228 SoC.
-
-Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
- arch/arm/boot/dts/rk322x.dtsi | 2 +-
+ drivers/iommu/arm-smmu-v3.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
-index 34d175e..c4d43ce 100644
---- a/arch/arm/boot/dts/rk322x.dtsi
-+++ b/arch/arm/boot/dts/rk322x.dtsi
-@@ -523,7 +523,7 @@
- 	};
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 380969a..7d3f08a 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -2768,7 +2768,7 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
- 	emmc: dwmmc at 30020000 {
--		compatible = "rockchip,rk3288-dw-mshc";
-+		compatible = "rockchip,rk3228-dw-mshc", "rockchip,rk3288-dw-mshc";
- 		reg = <0x30020000 0x4000>;
- 		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
- 		clock-frequency = <37500000>;
+-static struct of_device_id arm_smmu_of_match[] = {
++static const struct of_device_id arm_smmu_of_match[] = {
+ 	{ .compatible = "arm,smmu-v3", },
+ 	{ },
+ };
 -- 
-2.0.0
+1.9.1
