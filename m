@@ -1,49 +1,108 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 22 Jun 2017 10:59:00 +0100
-Subject: [PATCH] ARM: always enable AEABI for ARMv6+
-In-Reply-To: <E1dNyAB-00065m-3A@rmk-PC.armlinux.org.uk>
-References: <E1dNyAB-00065m-3A@rmk-PC.armlinux.org.uk>
-Message-ID: <aefc742d-1664-4f92-b8a4-f05a211b163c@arm.com>
+From: morten.rasmussen@arm.com (Morten Rasmussen)
+Date: Thu, 22 Jun 2017 10:59:31 +0100
+Subject: [PATCH 2/6] drivers base/arch_topology: frequency-invariant
+ load-tracking support
+In-Reply-To: <20170622040643.GB6314@vireshk-i7>
+References: <20170608075513.12475-1-dietmar.eggemann@arm.com>
+ <20170608075513.12475-3-dietmar.eggemann@arm.com>
+ <CAOh2x=k1Zr15vAq8LA0+Sg3Cz7o=dL5C-erkEx_py7g56b7BwA@mail.gmail.com>
+ <5949BE5F.4020502@codeaurora.org>
+ <20170621053735.GR3942@vireshk-i7>
+ <20170621165714.GB2551@e105550-lin.cambridge.arm.com>
+ <20170622040643.GB6314@vireshk-i7>
+Message-ID: <20170622095931.GC2551@e105550-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/06/17 10:12, Russell King wrote:
-> Always enable AEABI for ARMv6+, as these use the double-word exclusives
-> which must be passed an even register to avoid errors such as:
+On Thu, Jun 22, 2017 at 09:36:43AM +0530, Viresh Kumar wrote:
+> On 21-06-17, 17:57, Morten Rasmussen wrote:
+> > It is true that this patch relies on the notifiers, but I don't see how
+> > that prevents us from adding a non-notifier based solution for
+> > fast-switch enabled platforms later?
 > 
-> /tmp/ccG2rCwe.s:905: Error: even register required -- `ldrexd r5,r6,[r7]'
-> /tmp/ccG2rCwe.s:909: Error: even register required -- `strexd sl,r3,r4,[r7]'
-> 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
->  arch/arm/Kconfig | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 270ab2549def..78e42f691270 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1542,7 +1542,6 @@ config THUMB2_KERNEL
->  	bool "Compile the kernel in Thumb-2 mode" if !CPU_THUMBONLY
->  	depends on (CPU_V7 || CPU_V7M) && !CPU_V6 && !CPU_V6K
->  	default y if CPU_THUMBONLY
-> -	select AEABI
->  	select ARM_ASM_UNIFIED
->  	select ARM_UNWIND
->  	help
-> @@ -1605,7 +1604,8 @@ config ARM_PATCH_IDIV
->  	  code to do integer division.
->  
->  config AEABI
-> -	bool "Use the ARM EABI to compile the kernel"
-> +	bool "Use the ARM EABI to compile the kernel" if !THUMB2_KERNEL && !CPU_V7 && !CPU_V7M && !CPU_V6 && !CPU_V6K
+> No it doesn't, but I thought it would be better to have a single
+> solution (if possible) for all the cases here.
 
-Isn't !THUMB2_KERNEL already a strict subset of !CPU_V7 && !CPU_V7M?
+Right. As I mentioned further down in my reply. There is no single
+solution that fits all. Smart platforms with HW counters, like x86,
+would want to use those. IIUC, cpufreq has no idea what the true
+delivered performance is anyway on those platforms.
 
-Robin.
-
-> +	default THUMB2_KERNEL || CPU_V7 || CPU_V7M || CPU_V6 || CPU_V6K
->  	help
->  	  This option allows for the kernel to be compiled using the latest
->  	  ARM ABI (aka EABI).  This is only useful if you are using a user
 > 
+> > > I think this patch doesn't really need to go down the notifiers way.
+> > > 
+> > > We can do something like this in the implementation of
+> > > topology_get_freq_scale():
+> > > 
+> > >         return (policy->cur << SCHED_CAPACITY_SHIFT) / max;
+> > > 
+> > > Though, we would be required to take care of policy structure in this
+> > > case somehow.
+> > 
+> > This is exactly what this patch implements. Unfortunately we can't be
+> > sure that there is a valid policy data structure where we can read the
+> > information from.
+> 
+> Actually there is a way around that.
+> 
+> - Revert one of my patches:
+>   commit f9f41e3ef99a ("cpufreq: Remove policy create/remove notifiers")
+> 
+> - Use those notifiers in init_cpu_capacity_callback() instead of
+>   CPUFREQ_NOTIFY and set/reset a local policy pointer.
+> 
+> - And this pointer we can use safely/reliably in
+>   topology_get_freq_scale(). We may need to use RCU read side
+>   protection in topology_get_freq_scale() though, to make sure the
+>   local policy pointer isn't getting updated simultaneously.
+> 
+> - If the policy pointer isn't set, then we can use
+>   SCHED_CAPACITY_SCALE value instead.
+
+IIUC, you are proposing to maintain an RCU protected pointer in the
+topology driver to the policy data structure inside cpufreq and keep it
+up to date through cpufreq notifiers. So instead of getting notified
+when the frequency changes so we can recompute the scaling ratio, we
+have to poll the value and recompute the ratio on each access.
+
+If we are modifying cpufreq, why not just make cpufreq responsible for
+providing the scaling factor? It seems easier, cleaner, and a lot
+less fragile.
+
+> 
+> 
+> > Isn't the policy protected by a lock as well?
+> 
+> There are locks, but you don't need any to read policy->cur.
+
+Okay, but you need to rely on notifiers to know when it is valid.
+
+> 
+> > Another thing is that I don't think a transition notifier based solution
+> > or any other solution based on the cur/max ratio is really the right way
+> > to go for fast-switching platforms. If we can do very frequent frequency
+> > switching it makes less sense to use the current ratio whenever we
+> > update the PELT averages as the frequency might have changed multiple
+> > times since the last update. So it would make more sense to have an
+> > average ratio instead.
+> 
+> > If the platform has HW counters (e.g. APERF/MPERF) that can provide the
+> > ratio then we should of course use those, if not, one solution could be
+> > to let cpufreq track the average frequency for each cpu over a suitable
+> > time window (around one sched period I think). It should be fairly low
+> > overhead to maintain. In the topology driver, we would then choose
+> > whether the scaling factor is provided by the cpufreq average frequency
+> > ratio or the current transition notifier based approach based on the
+> > capabilities of the platform.
+> 
+> Hmm, maybe.
+
+You said you wanted a solution that works for fast-switch enabled
+platforms ;-)
+
+The cur/max ratio isn't sufficient for those. PeterZ has already
+proposed to use APERF/MPERF for x86 to use the average frequency for
+PELT updates. I think other fast-switch platforms would want something
+similar, as it makes much more sense.
+
+Morten
