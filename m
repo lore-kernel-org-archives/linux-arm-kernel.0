@@ -1,58 +1,45 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 22 Jun 2017 18:00:21 +0200
-Subject: Drivers taking different actions depending on sleep state
-In-Reply-To: <20170622085102.mpk7vxodpgxtrlfd@piout.net>
-References: <9dc7b7f4-e47d-59f3-3b51-52e0aefd2487@free.fr>
- <b7a49925-d823-b03d-2990-2894ba2c2714@gmail.com>
- <20170622085102.mpk7vxodpgxtrlfd@piout.net>
-Message-ID: <1791746.otcIQZBd7p@aspire.rjw.lan>
+From: joe@perches.com (Joe Perches)
+Date: Thu, 22 Jun 2017 09:07:53 -0700
+Subject: [PATCH 01/14] staging: fsl-mc: drop macros with possible side
+ effects
+In-Reply-To: <20170622133600.31694-2-laurentiu.tudor@nxp.com>
+References: <20170622133600.31694-1-laurentiu.tudor@nxp.com>
+ <20170622133600.31694-2-laurentiu.tudor@nxp.com>
+Message-ID: <1498147673.24295.6.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, June 22, 2017 10:51:02 AM Alexandre Belloni wrote:
-> On 21/06/2017 at 16:55:04 -0700, Florian Fainelli wrote:
-> > > That is conceivable, but again, the meaning of STANDBY and MEM is
-> > > platform-specific.  Actions to be taken for, say, STANDBY, may differ
-> > > from one platform to another.
-> > 
-> > True, though I would only expect drivers for that particular platform to
-> > care about that information and these drivers would only make sense on
-> > that particular platform so the meaning of STANDBY and MEM would be
-> > clear for those drivers. The intent is really to keep the "distributed"
-> > model where individual drivers manage their particular piece of HW,
-> > while utilizing a global piece of information that is platform specific.
-> > 
-> > If this seems acceptable to you along with proper documentation to
-> > illustrate the platform specific meaning of these states, I will got
-> > ahead and cook a patch.
+On Thu, 2017-06-22 at 16:35 +0300, laurentiu.tudor at nxp.com wrote:
+> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 > 
-> Well, that won't work for us. We need need two kind of information:
->  - whether main clock is switched from the master clock to the slow
->    clock
->  - whether VDDcore will be cut
-> 
-> for the first one, we already have an hackish callback:
-> at91_suspend_entering_slow_clock() that will call from the platform
-> specific drivers.
-> 
-> The main issue now is for the second one. We also need it for IPs that
-> are shared with other SoCs. For example, the macb ethernet controller
-> that is shared with the zynq and the m_can controller. In those cases,
-> I don't think it is a good idea to add platform specific code in the
-> drivers but at the same time, I don't think it is reasonable to
-> unconditionally reinit the IP on resume as there is a significant
-> latency hit. I don't think that the xilinx guys will like when suddenly
-> their platform takes 500ms to resume.
+> Several macros were triggering this checkpatch.pl warning:
+>   "Macro argument reuse '$arg' - possible side-effects?"
+> Fix the warning by turning them into real functions.
 
-We can add a ->target_state callback in struct platform_suspend_ops that
-will return a value representing the the particular target state the platform
-has chosen to go to.  Along with it, there can be a list of values for all
-of the low-level sleep states defined by all of the different platforms
-(in which case I'd like to reserve values 0-5 for the ACPI system states).
+good idea and
 
-There can be a wrapper, say platform_suspend_target_state() around that,
-so the driver will call it, compare the return value with what is known to it
-about the different platforms it can run on and act accordingly.
+> diff --git a/drivers/staging/fsl-mc/bus/dprc-driver.c b/drivers/staging/fsl-mc/bus/dprc-driver.c
+[]
+> +static bool fsl_mc_device_match(struct fsl_mc_device *mc_dev,
+> +				struct dprc_obj_desc *obj_desc)
+> +{
+> +	return !strcmp(mc_dev->obj_desc.type, obj_desc->type) &&
+> +		mc_dev->obj_desc.id == obj_desc->id;
+> +}
 
-Thanks,
-Rafael
+I'd reverse the test order and do the strcmp after the comparison
+
+	return?mc_dev->obj_desc.id == obj_desc->id &&
+	       !strcmp(mc_dev->obj_desc.type, obj_desc->type);
+
+[]
+
+> +static bool __must_check fsl_mc_is_allocatable(const char *obj_type)
+> +{
+> +	return strcmp(obj_type, "dpbp") == 0 ||
+> +	       strcmp(obj_type, "dpmcp") == 0 ||
+> +	       strcmp(obj_type, "dpcon") == 0;
+> +}
+
+please be consistent in using either == 0 or !
+when using strcmp
