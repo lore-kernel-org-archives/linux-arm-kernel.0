@@ -1,61 +1,49 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Thu, 22 Jun 2017 11:56:43 +0200
-Subject: [PATCH 1/9] serial: Add common rs485 device tree parsing function
-In-Reply-To: <20170622082221.v4jf2u5bdw6oyjxw@pengutronix.de>
-References: <20170621102130.21024-1-u.kleine-koenig@pengutronix.de>
- <20170621102130.21024-2-u.kleine-koenig@pengutronix.de>
- <20170622063157.qih2mriprczpj7zn@pengutronix.de>
- <20170622082221.v4jf2u5bdw6oyjxw@pengutronix.de>
-Message-ID: <81a521c6-71a1-a229-d9ec-c34cc070e4ba@microchip.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 22 Jun 2017 10:59:00 +0100
+Subject: [PATCH] ARM: always enable AEABI for ARMv6+
+In-Reply-To: <E1dNyAB-00065m-3A@rmk-PC.armlinux.org.uk>
+References: <E1dNyAB-00065m-3A@rmk-PC.armlinux.org.uk>
+Message-ID: <aefc742d-1664-4f92-b8a4-f05a211b163c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/06/2017 at 10:22, Uwe Kleine-K?nig wrote:
-> Hello Sascha,
+On 22/06/17 10:12, Russell King wrote:
+> Always enable AEABI for ARMv6+, as these use the double-word exclusives
+> which must be passed an even register to avoid errors such as:
 > 
-> On Thu, Jun 22, 2017 at 08:31:57AM +0200, Sascha Hauer wrote:
->> On Wed, Jun 21, 2017 at 12:21:22PM +0200, Uwe Kleine-K?nig wrote:
->>> +/**
->>> + * of_get_rs485_mode() - Implement parsing rs485 properties
->>> + * @np: uart node
->>> + * @rs485conf: output parameter
->>> + *
->>> + * This function implements the device tree binding described in
->>> + * Documentation/devicetree/bindings/serial/rs485.txt.
->>> + *
->>> + * Return: 0 on success, 1 if the node doesn't contain rs485 stuff, or a
->>> + * negative error code.
->>> + */
->>> +int of_get_rs485_mode(struct device_node *np, struct serial_rs485 *rs485conf)
->>> +{
->>> +	u32 rs485_delay[2];
->>> +	int ret;
->>> +
->>> +	ret = of_property_read_u32_array(np, "rs485-rts-delay" rs485_delay, 2);
->>> +	if (ret == -EINVAL) /* property does not exist */
->>> +		return 1;
->>
->> As the de-facto standard for the drivers implementing the rs485 bindings
->> is to make the properties optional, despite the documentation. Wouldn't
+> /tmp/ccG2rCwe.s:905: Error: even register required -- `ldrexd r5,r6,[r7]'
+> /tmp/ccG2rCwe.s:909: Error: even register required -- `strexd sl,r3,r4,[r7]'
 > 
-> I must admit that I failed to mention in the commit log that being
-> strict here was added by me even though I'm not the author.
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+>  arch/arm/Kconfig | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
->> it be better to make this property optional in the binding instead? This
->> wouldn't unnecessarily break old device trees and 0/0 seems a sane
->> default we can use when the property doesn't exist.
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 270ab2549def..78e42f691270 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1542,7 +1542,6 @@ config THUMB2_KERNEL
+>  	bool "Compile the kernel in Thumb-2 mode" if !CPU_THUMBONLY
+>  	depends on (CPU_V7 || CPU_V7M) && !CPU_V6 && !CPU_V6K
+>  	default y if CPU_THUMBONLY
+> -	select AEABI
+>  	select ARM_ASM_UNIFIED
+>  	select ARM_UNWIND
+>  	help
+> @@ -1605,7 +1604,8 @@ config ARM_PATCH_IDIV
+>  	  code to do integer division.
+>  
+>  config AEABI
+> -	bool "Use the ARM EABI to compile the kernel"
+> +	bool "Use the ARM EABI to compile the kernel" if !THUMB2_KERNEL && !CPU_V7 && !CPU_V7M && !CPU_V6 && !CPU_V6K
+
+Isn't !THUMB2_KERNEL already a strict subset of !CPU_V7 && !CPU_V7M?
+
+Robin.
+
+> +	default THUMB2_KERNEL || CPU_V7 || CPU_V7M || CPU_V6 || CPU_V6K
+>  	help
+>  	  This option allows for the kernel to be compiled using the latest
+>  	  ARM ABI (aka EABI).  This is only useful if you are using a user
 > 
-> Would be fine for me, too. It was Nicolas Ferre who specified this as
-> being required in 0331bbf3c6fd9. Added people who discussed the patch
-> back then (but without questioning rs485-rts-delay being mandatory).
-
-Uwe,
-
-This would be find with me too.
-Indeed, the conversion to an optional option won't break the atmel driver.
-
-Thanks for your work on this topic.
-
-Best regards,
--- 
-Nicolas Ferre
