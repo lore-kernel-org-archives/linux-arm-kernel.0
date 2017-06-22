@@ -1,34 +1,99 @@
 From: frank.wang@rock-chips.com (Frank Wang)
-Date: Thu, 22 Jun 2017 18:29:59 +0800
-Subject: [RESEND PATCH v2 4/7] ARM: dts: rockchip: fix compatible string for
- eMMC node of rk3228 SoC
+Date: Thu, 22 Jun 2017 18:32:04 +0800
+Subject: [RESEND PATCH v2 5/7] ARM: dts: rockchip: add sdmmc and sdio nodes
+ for rk3228 SoC
 In-Reply-To: <1498127402-6705-1-git-send-email-frank.wang@rock-chips.com>
 References: <1498127402-6705-1-git-send-email-frank.wang@rock-chips.com>
-Message-ID: <1498127402-6705-5-git-send-email-frank.wang@rock-chips.com>
+Message-ID: <1498127524-6837-1-git-send-email-frank.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shawn Lin <shawn.lin@rock-chips.com>
 
-This adds amend compatible content for eMMC of RK3228 SoC.
+This patch adds sdmmc/sdio controller nodes for rk3228 SoC.
 
 Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
 ---
- arch/arm/boot/dts/rk322x.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/rk322x.dtsi | 60 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
 
 diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
-index 34d175e..c4d43ce 100644
+index c4d43ce..66578fa 100644
 --- a/arch/arm/boot/dts/rk322x.dtsi
 +++ b/arch/arm/boot/dts/rk322x.dtsi
-@@ -523,7 +523,7 @@
+@@ -522,6 +522,32 @@
+ 		status = "disabled";
  	};
  
- 	emmc: dwmmc at 30020000 {
--		compatible = "rockchip,rk3288-dw-mshc";
++	sdmmc: dwmmc at 30000000 {
 +		compatible = "rockchip,rk3228-dw-mshc", "rockchip,rk3288-dw-mshc";
++		reg = <0x30000000 0x4000>;
++		interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>,
++			 <&cru SCLK_SDMMC_DRV>, <&cru SCLK_SDMMC_SAMPLE>;
++		clock-names = "biu", "ciu", "ciu_drv", "ciu_sample";
++		fifo-depth = <0x100>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_bus4>;
++		status = "disabled";
++	};
++
++	sdio: dwmmc at 30010000 {
++		compatible = "rockchip,rk3228-dw-mshc", "rockchip,rk3288-dw-mshc";
++		reg = <0x30010000 0x4000>;
++		interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru HCLK_SDIO>, <&cru SCLK_SDIO>,
++			 <&cru SCLK_SDIO_DRV>, <&cru SCLK_SDIO_SAMPLE>;
++		clock-names = "biu", "ciu", "ciu_drv", "ciu_sample";
++		fifo-depth = <0x100>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&sdio_clk &sdio_cmd &sdio_bus4>;
++		status = "disabled";
++	};
++
+ 	emmc: dwmmc at 30020000 {
+ 		compatible = "rockchip,rk3228-dw-mshc", "rockchip,rk3288-dw-mshc";
  		reg = <0x30020000 0x4000>;
- 		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
- 		clock-frequency = <37500000>;
+@@ -732,6 +758,40 @@
+ 			drive-strength = <12>;
+ 		};
+ 
++		sdmmc {
++			sdmmc_clk: sdmmc-clk {
++				rockchip,pins = <1 16 RK_FUNC_1 &pcfg_pull_none_drv_12ma>;
++			};
++
++			sdmmc_cmd: sdmmc-cmd {
++				rockchip,pins = <1 15 RK_FUNC_1 &pcfg_pull_none_drv_12ma>;
++			};
++
++			sdmmc_bus4: sdmmc-bus4 {
++				rockchip,pins = <1 18 RK_FUNC_1 &pcfg_pull_none_drv_12ma>,
++						<1 19 RK_FUNC_1 &pcfg_pull_none_drv_12ma>,
++						<1 20 RK_FUNC_1 &pcfg_pull_none_drv_12ma>,
++						<1 21 RK_FUNC_1 &pcfg_pull_none_drv_12ma>;
++			};
++		};
++
++		sdio {
++			sdio_clk: sdio-clk {
++				rockchip,pins = <3 0 RK_FUNC_1 &pcfg_pull_none_drv_12ma>;
++			};
++
++			sdio_cmd: sdio-cmd {
++				rockchip,pins = <3 1 RK_FUNC_1 &pcfg_pull_none_drv_12ma>;
++			};
++
++			sdio_bus4: sdio-bus4 {
++				rockchip,pins = <3 2 RK_FUNC_1 &pcfg_pull_none_drv_12ma>,
++						<3 3 RK_FUNC_1 &pcfg_pull_none_drv_12ma>,
++						<3 4 RK_FUNC_1 &pcfg_pull_none_drv_12ma>,
++						<3 5 RK_FUNC_1 &pcfg_pull_none_drv_12ma>;
++			};
++		};
++
+ 		emmc {
+ 			emmc_clk: emmc-clk {
+ 				rockchip,pins = <2 7 RK_FUNC_2 &pcfg_pull_none>;
 -- 
 2.0.0
