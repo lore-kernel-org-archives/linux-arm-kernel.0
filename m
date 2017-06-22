@@ -1,59 +1,34 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Thu, 22 Jun 2017 14:18:48 +0100
-Subject: [PATCH v5 4/7] drivers: dma-coherent: Introduce default DMA pool
-In-Reply-To: <20170620134932.GB31496@infradead.org>
-References: <1495621472-9323-1-git-send-email-vladimir.murzin@arm.com>
- <1495621472-9323-5-git-send-email-vladimir.murzin@arm.com>
- <20170620134932.GB31496@infradead.org>
-Message-ID: <94e57caa-e7b9-d740-bca3-89950c10033e@arm.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 22 Jun 2017 15:22:18 +0200
+Subject: [PATCH 2/2] i2c: zx2967: add i2c controller driver for ZTE's
+ zx2967 family
+In-Reply-To: <20170622122558.GB23753@dragon>
+References: <1495947576-11037-1-git-send-email-shawnguo@kernel.org>
+ <1495947576-11037-3-git-send-email-shawnguo@kernel.org>
+ <20170619193130.velebm7p3r5ggaos@ninjato>
+ <20170620025815.GA4818@x250> <20170620074126.GA1541@katana>
+ <20170622074831.GA23753@dragon>
+ <20170622080730.o352kxrs5pz7wxnf@ninjato>
+ <20170622122558.GB23753@dragon>
+Message-ID: <20170622132218.GA3820@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/06/17 14:49, Christoph Hellwig wrote:
-> On Wed, May 24, 2017 at 11:24:29AM +0100, Vladimir Murzin wrote:
->> This patch introduces default coherent DMA pool similar to default CMA
->> area concept. To keep other users safe code kept under CONFIG_ARM.
-> 
-> I don't see a CONFIG_ARM in the code, although parts of it are added
-> under CONFIG_OF_RESERVED_MEM.
 
-It should look like that:
+> With the proper error handling, i2cdetect now works very fast and only
+> gets audio codec on 0x22, which is correct.
 
-#ifdef CONFIG_ARM
-	if (!of_get_flat_dt_prop(node, "no-map", NULL)) {
-		pr_err("Reserved memory: regions without no-map are not yet supported\n");
-		return -EINVAL;
-	}
-+
-+	if (of_get_flat_dt_prop(node, "linux,dma-default", NULL)) {
-+		WARN(dma_reserved_default_memory,
-+		     "Reserved memory: region for default DMA coherent area is redefined\n");
-+		dma_reserved_default_memory = rmem;
-+	}
-#endif
+Cool! Now make sure that the error codes are matching
+Documentation/i2c/fault-codes and I think we are ready to go.
 
+> Thanks a lot for identifying the bug.
 
-> 
-> But overall this code look a bit odd to me.  As far as I can tell
-> the dma-coherent.c code is for the case where we have a special
-> piece of coherent memory close to a device.
-> 
-> If you're allocating out of the global allocator the memory should
-> come from the normal dma_ops ->alloc allocator - and also take
-> the attrs into account (e.g. for DMA_ATTR_NON_CONSISTENT or
-> DMA_ATTR_NO_KERNEL_MAPPING requests you don't need coherent memory)
-> 
+You are welcome!
 
-It is how it has been started [1] - defining memory which is not cacheable
-(i.e. suitable for coherent allocations) and building custom allocator on top
-of it, like it was done for c6x and blackfin. The annoying thing was that we
-needed to advertise such memory via command line parameter plus some "mem="
-adjustment to hide coherent memory from buddy allocator. So it was suggested
-to use reserved memory and this makes things look much better, but on the
-other hand require changes on dts side to "bind" devices with reserved memory
-- default DMA pool removes such drawback.
-
-[1] https://marc.info/?l=linux-arm-kernel&m=148163694824475&w=2
-
-Cheers
-Vladimir
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170622/43eccea0/attachment.sig>
