@@ -1,53 +1,113 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 22 Jun 2017 14:51:57 +0800
-Subject: [PATCH v2 1/2] ASoC: add bindings for ZTE zx-aud96p22 audio codec
-In-Reply-To: <1498114318-32077-1-git-send-email-shawnguo@kernel.org>
-References: <1498114318-32077-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <1498114318-32077-2-git-send-email-shawnguo@kernel.org>
+From: john@phrozen.org (John Crispin)
+Date: Thu, 22 Jun 2017 08:52:54 +0200
+Subject: [PATCH RESEND 4/4] pwm: mediatek: add MT2712/MT7622 support
+In-Reply-To: <1498111776.18841.10.camel@mhfsdcap03>
+References: <1498032672-7172-1-git-send-email-zhi.mao@mediatek.com>
+ <1498032672-7172-5-git-send-email-zhi.mao@mediatek.com>
+ <4600cf23-5e59-df02-37dc-056cb4a9744c@phrozen.org>
+ <1498111776.18841.10.camel@mhfsdcap03>
+Message-ID: <f81a5fe1-4d9a-aa54-e680-035ca6075660@phrozen.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Baoyou Xie <baoyou.xie@linaro.org>
 
-It adds dt-bindings document for ZTE zx-aud96p22 audio codec.
 
-Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- .../devicetree/bindings/sound/zte,zx-aud96p22.txt  | 24 ++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/zte,zx-aud96p22.txt
+On 22/06/17 08:09, Zhi Mao wrote:
+> Hi John,
+>
+> Thanks for your review the code and feedback.
+> There are 3 issues in this patch:
+> 1.adds PWM_CLK_DIV_MAX which really should go into its own patch
+> 2.adds mtk_pwm_com_reg which should also go into its own patch
+> 3.remove comments inline /*===*/
+>
+> for #1 and #3, I will modify them in the next release.
+> but for #2, I want to discuss with you,
+> adding the structure  "mtk_pwm_com_reg" is only for the registers of 
+> MT2712 PWM8,
+> so we want to keep this modification in this patch.
+>
+> what's your opinion about it?
+> Any reply is welcome.
+>
+>
+> Regards
+> Zhi
+>
+>
 
-diff --git a/Documentation/devicetree/bindings/sound/zte,zx-aud96p22.txt b/Documentation/devicetree/bindings/sound/zte,zx-aud96p22.txt
-new file mode 100644
-index 000000000000..41bb1040eb71
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/zte,zx-aud96p22.txt
-@@ -0,0 +1,24 @@
-+ZTE ZX AUD96P22 Audio Codec
-+
-+Required properties:
-+ - compatible: Must be "zte,zx-aud96p22"
-+ - #sound-dai-cells: Should be 0
-+ - reg: I2C bus slave address of AUD96P22
-+
-+Example:
-+
-+	i2c0: i2c at 1486000 {
-+		compatible = "zte,zx296718-i2c";
-+		reg = <0x01486000 0x1000>;
-+		interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&audiocrm AUDIO_I2C0_WCLK>;
-+		clock-frequency = <1600000>;
-+
-+		aud96p22: codec at 22 {
-+			compatible = "zte,zx-aud96p22";
-+			#sound-dai-cells = <0>;
-+			reg = <0x22>;
-+		};
-+	};
--- 
-1.9.1
+Hi Zhi,
+
+I just had a closer look and noticed that the new CON registers are not 
+at the same fixed 0x40 offset as the pwm0-5 ones. sorry i did not notice 
+this. 2) needs to be part of this patch in that case. please add a short 
+info to the patches description explaining this.
+
+     John
+
+
+>
+>
+>
+> On Wed, 2017-06-21 at 20:22 +0800, John Crispin wrote:
+>> On 21/06/17 10:11, Zhi Mao wrote:
+>> > support multiple chip(MT2712, MT7622, MT7623)
+>> This patch does more than add extra SoC support. It also
+>> * adds PWM_CLK_DIV_MAX which really should go into its own patch
+>> * adds mtk_pwm_com_reg which should also go into its own patch
+>>
+>> more comments inline
+>>
+>> >
+>> > Signed-off-by: Zhi Mao <zhi.mao at mediatek.com <mailto:zhi.mao@mediatek.com>>
+>> > ---
+>> >   drivers/pwm/pwm-mediatek.c |   63 +++++++++++++++++++++++++++++++++++---------
+>> >   1 file changed, 51 insertions(+), 12 deletions(-)
+>> >
+>> > diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
+>> > index c803ff6..d520356 100644
+>> > --- a/drivers/pwm/pwm-mediatek.c
+>> > +++ b/drivers/pwm/pwm-mediatek.c
+>> > @@ -16,6 +16,7 @@
+>> >   #include <linux/module.h>
+>> >   #include <linux/clk.h>
+>> >   #include <linux/of.h>
+>> > +#include <linux/of_device.h>
+>> >   #include <linux/platform_device.h>
+>> >   #include <linux/pwm.h>
+>> >   #include <linux/slab.h>
+>> [...]
+>> > @@ -215,9 +238,25 @@ static int mtk_pwm_remove(struct platform_device *pdev)
+>> >   	return pwmchip_remove(&pc->chip);
+>> >   }
+>> >
+>> > +/*==========================================*/
+>>
+>> please remove these comment lines
+>>
+>>       John
+>> > +static const struct mtk_com_pwm_data mt2712_pwm_data = {
+>> > +	.pwm_nums = 8,
+>> > +};
+>> > +
+>> > +static const struct mtk_com_pwm_data mt7622_pwm_data = {
+>> > +	.pwm_nums = 6,
+>> > +};
+>> > +
+>> > +static const struct mtk_com_pwm_data mt7623_pwm_data = {
+>> > +	.pwm_nums = 5,
+>> > +};
+>> > +/*==========================================*/
+>> > +
+>> >   static const struct of_device_id mtk_pwm_of_match[] = {
+>> > -	{ .compatible = "mediatek,mt7623-pwm" },
+>> > -	{ }
+>> > +	{.compatible = "mediatek,mt2712-pwm", .data = &mt2712_pwm_data},
+>> > +	{.compatible = "mediatek,mt7622-pwm", .data = &mt7622_pwm_data},
+>> > +	{.compatible = "mediatek,mt7623-pwm", .data = &mt7623_pwm_data},
+>> > +	{},
+>> >   };
+>> >   MODULE_DEVICE_TABLE(of, mtk_pwm_of_match);
+>> >
+>>
+>
