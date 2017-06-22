@@ -1,57 +1,38 @@
 From: hugues.fruchet@st.com (Hugues Fruchet)
-Date: Thu, 22 Jun 2017 17:12:48 +0200
-Subject: [PATCH v1 2/5] [media] stm32-dcmi: revisit control register handling
+Date: Thu, 22 Jun 2017 17:12:51 +0200
+Subject: [PATCH v1 5/5] ARM: configs: stm32: DCMI + OV9655 camera support
 In-Reply-To: <1498144371-13310-1-git-send-email-hugues.fruchet@st.com>
 References: <1498144371-13310-1-git-send-email-hugues.fruchet@st.com>
-Message-ID: <1498144371-13310-3-git-send-email-hugues.fruchet@st.com>
+Message-ID: <1498144371-13310-6-git-send-email-hugues.fruchet@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simplify bits handling of DCMI_CR register.
+Enable DCMI camera interface and OV9655 camera sensor drivers.
 
 Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
 ---
- drivers/media/platform/stm32/stm32-dcmi.c | 14 ++++----------
- 1 file changed, 4 insertions(+), 10 deletions(-)
+ arch/arm/configs/stm32_defconfig | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
-index 0dd5d1c..75d53aa 100644
---- a/drivers/media/platform/stm32/stm32-dcmi.c
-+++ b/drivers/media/platform/stm32/stm32-dcmi.c
-@@ -490,7 +490,7 @@ static int dcmi_start_streaming(struct vb2_queue *vq, unsigned int count)
- {
- 	struct stm32_dcmi *dcmi = vb2_get_drv_priv(vq);
- 	struct dcmi_buf *buf, *node;
--	u32 val;
-+	u32 val = 0;
- 	int ret;
- 
- 	ret = clk_enable(dcmi->mclk);
-@@ -510,22 +510,16 @@ static int dcmi_start_streaming(struct vb2_queue *vq, unsigned int count)
- 
- 	spin_lock_irq(&dcmi->irqlock);
- 
--	val = reg_read(dcmi->regs, DCMI_CR);
--
--	val &= ~(CR_PCKPOL | CR_HSPOL | CR_VSPOL |
--		 CR_EDM_0 | CR_EDM_1 | CR_FCRC_0 |
--		 CR_FCRC_1 | CR_JPEG | CR_ESS);
--
- 	/* Set bus width */
- 	switch (dcmi->bus.bus_width) {
- 	case 14:
--		val &= CR_EDM_0 + CR_EDM_1;
-+		val |= CR_EDM_0 | CR_EDM_1;
- 		break;
- 	case 12:
--		val &= CR_EDM_1;
-+		val |= CR_EDM_1;
- 		break;
- 	case 10:
--		val &= CR_EDM_0;
-+		val |= CR_EDM_0;
- 		break;
- 	default:
- 		/* Set bus width to 8 bits by default */
+diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+index a097538..0c3cd01 100644
+--- a/arch/arm/configs/stm32_defconfig
++++ b/arch/arm/configs/stm32_defconfig
+@@ -55,6 +55,15 @@ CONFIG_I2C_STM32F4=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ # CONFIG_USB_SUPPORT is not set
++CONFIG_VIDEO_V4L2=y
++CONFIG_MEDIA_CONTROLLER=y
++CONFIG_VIDEO_V4L2_SUBDEV_API=y
++CONFIG_MEDIA_SUBDRV_AUTOSELECT=n
++CONFIG_V4L_PLATFORM_DRIVERS=y
++CONFIG_MEDIA_SUPPORT=y
++CONFIG_MEDIA_CAMERA_SUPPORT=y
++CONFIG_VIDEO_STM32_DCMI=y
++CONFIG_VIDEO_OV9650=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
 -- 
 1.9.1
