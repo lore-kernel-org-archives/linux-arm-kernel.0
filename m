@@ -1,90 +1,53 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 22 Jun 2017 16:38:03 +0200
-Subject: [PATCH 6/9] PM / ACPI: Provide option to disable direct_complete
- for ACPI devices
-In-Reply-To: <CAPDyKFqW+QhzMhVgdp9-7t0eP0ePdV8pHqysQZU1OWT3A8Q56Q@mail.gmail.com>
-References: <1498072888-14782-1-git-send-email-ulf.hansson@linaro.org>
- <CAJZ5v0h71LNPgmU1ri3S0VJMPb-1_AHkGksNAaYn68rrLyAR2A@mail.gmail.com>
- <CAPDyKFqW+QhzMhVgdp9-7t0eP0ePdV8pHqysQZU1OWT3A8Q56Q@mail.gmail.com>
-Message-ID: <4327771.heNtWYIbhO@aspire.rjw.lan>
+From: jlu@pengutronix.de (Jan =?ISO-8859-1?Q?L=FCbbe?=)
+Date: Thu, 22 Jun 2017 16:46:30 +0200
+Subject: [RFC PATCH 3/4] ARM: l2x0: add arm,ecc-enable property for aurora
+In-Reply-To: <220533aeb8f64e829f483e38e209cdc8@svr-chch-ex1.atlnz.lc>
+References: <20170608041124.4624-1-chris.packham@alliedtelesis.co.nz>
+ <20170608041124.4624-4-chris.packham@alliedtelesis.co.nz>
+ <1496998692.3536.24.camel@pengutronix.de>
+ <220533aeb8f64e829f483e38e209cdc8@svr-chch-ex1.atlnz.lc>
+Message-ID: <1498142790.2533.80.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, June 22, 2017 11:35:35 AM Ulf Hansson wrote:
-> On 21 June 2017 at 23:42, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> > On Wed, Jun 21, 2017 at 9:21 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> >> In some cases a driver for an ACPI device needs to be able to prevent the
-> >> ACPI PM domain from using the direct_complete path during system sleep.
-> >>
-> >> One typical case is when the driver for the device needs its device to stay
-> >> runtime enabled, during the __device_suspend phase. This isn't the case
-> >> when the direct_complete path is being executed by the PM core, as it then
-> >> disables runtime PM for the device in __device_suspend(). Any following
-> >> attempts to runtime resume the device after that point, just fails.
-> >>
-> >> A workaround to this problem is to let the driver runtime resume its device
-> >> from its ->prepare() callback, as that would prevent the direct_complete
-> >> path from being executed. However, that may often be a waste, especially if
-> >> it turned out that no one really needed the device.
-> >>
-> >> For this reason, invent acpi_dev_disable|enable_direct_complete(), to allow
-> >> drivers to inform the ACPI PM domain to change its default behaviour during
-> >> system sleep, and thus control whether it may use the direct_complete path
-> >> or not.
-> >>
-> >> Typically a driver should call acpi_dev_disable_direct_comlete() during
-> >> ->probe() and acpi_dev_enable_direct_complete() in ->remove().
-> >>
-> >> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> >> ---
-> >>  drivers/acpi/device_pm.c | 37 ++++++++++++++++++++++++++++++++++++-
-> >>  include/acpi/acpi_bus.h  |  1 +
-> >>  include/linux/acpi.h     |  4 ++++
-> >>  3 files changed, 41 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/acpi/device_pm.c b/drivers/acpi/device_pm.c
-> >> index ee51e75..2393a1a 100644
-> >> --- a/drivers/acpi/device_pm.c
-> >> +++ b/drivers/acpi/device_pm.c
-> >> @@ -879,6 +879,41 @@ EXPORT_SYMBOL_GPL(acpi_subsys_runtime_resume);
-> >>
-> >>  #ifdef CONFIG_PM_SLEEP
-> >>  /**
-> >> + * acpi_dev_disable_direct_complete - Disable the direct_complete path for ACPI.
-> >> + * @dev: Device to disable the path for.
-> >> + *
-> >> + * Per default the ACPI PM domain tries to use the direct_complete path for its
-> >> + * devices during system sleep. This function allows a user, typically a driver
-> >> + * during probe, to disable the direct_complete path from being used by ACPI.
-> >> + */
-> >> +void acpi_dev_disable_direct_complete(struct device *dev)
-> >> +{
-> >> +       struct acpi_device *adev = ACPI_COMPANION(dev);
-> >> +
-> >> +       if (adev)
-> >> +               adev->no_direct_complete = true;
-> >
-> > We have an analogous flag in PCI now and it is called needs_resume, so
-> > it would be good to be consistent with that.
+Chris,
+
+On So, 2017-06-11 at 22:55 +0000, Chris Packham wrote:
+> On 09/06/17 20:58, Jan L?bbe wrote:
+> > On Do, 2017-06-08 at 16:11 +1200, Chris Packham wrote:
+> >> +       if (of_property_read_bool(np, "arm,ecc-enable")) {
+> >> +               mask |= L2C_AUX_CTRL_EVTMON_ENABLE;
+> >> +               val |= L2C_AUX_CTRL_EVTMON_ENABLE;
+> >> +       } else if (of_property_read_bool(np, "arm,ecc-disable")) {
+> >> +               mask |= L2C_AUX_CTRL_EVTMON_ENABLE;
+> >> +       }
+> > 
+> > Unless I misunderstand the code in __l2c_init(), the mask is used to
+> > specify the bits to preserve:
+> >          old_aux = aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
+> >          aux &= aux_mask;
+> >          aux |= aux_val;
+> > 
+> >          if (old_aux != aux)
+> >                  pr_warn("L2C: DT/platform modifies aux control register: 0x%08x -> 0x%08x\n",
+> >                          old_aux, aux);
+> > 
+> > So the arm,ecc-disable property will have no effect. This probably also
+> > applies to patch 2/4. The existing property *-disable code removes the
+> > corresponding bit from the mask.
 > 
-> I was trying to come up with a nice name, however I couldn't find
-> anything better than no_direct_complete.
+> Indeed the disable version should be mask &= ~L2C_AUX_CTRL_EVTMON_ENABLE 
+> and I was probably a little lazy to have used the L2C EVTMON instead of 
+> adding AURORA specific ones like you have in your series.
 > 
-> However as the next patch somewhat, extends the flag to also be use
-> for the runtime PM centric path, I should perhaps choose something
-> more related to that?
-> 
-> I think make "needs_resume" is going to e bit confusing, especially
-> while extending the usage for the flag it in the next patch, no?
+> I'll rebase my series on top of yours and send it direct to you so you 
+> can include it in the overall submission.
 
-OK, fair enough, but I still think the name isn't really nice. :-)
+While picking up your arm,parity-enable and arm,ecc-enable patches for
+my series, I noticed that the mask variable is inverted when merging the
+local changes into aux_val/aux_mask at the end of aurora_of_parse. So I
+now believe your code is correct. ;) I'd appreciate a close look,
+nevertheless.
 
-In fact, I'm not sure if the new flag is necessary at all.
-
-If the driver is expected to use pm_runtime_force_suspend|resume() along with
-it every time, why not to make the ACPI PM domain code check if the driver's
-callback pointers point to pm_runtime_force_suspend|resume() and work
-accordingly?
-
-Thanks,
-Rafael
+Regards,
+Jan
