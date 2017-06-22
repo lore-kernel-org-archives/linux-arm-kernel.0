@@ -1,56 +1,43 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu, 22 Jun 2017 21:50:29 +0000
-Subject: [RFC PATCH 3/4] ARM: l2x0: add arm, ecc-enable property for aurora
-References: <20170608041124.4624-1-chris.packham@alliedtelesis.co.nz>
- <20170608041124.4624-4-chris.packham@alliedtelesis.co.nz>
- <1496998692.3536.24.camel@pengutronix.de>
- <220533aeb8f64e829f483e38e209cdc8@svr-chch-ex1.atlnz.lc>
- <1498142790.2533.80.camel@pengutronix.de>
-Message-ID: <fdca2681c44a45adb399d2f90afc3707@svr-chch-ex1.atlnz.lc>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 23 Jun 2017 07:53:09 +1000
+Subject: new dma-mapping tree, was Re: clean up and modularize arch
+ dma_mapping interface V2
+In-Reply-To: <5425587c-73e8-e24a-86a3-8a65a7791dcb@samsung.com>
+References: <20170616181059.19206-1-hch@lst.de> <20170620124140.GA27163@lst.de>
+ <20170620230400.1a5ae889@canb.auug.org.au>
+ <CGME20170620131628epcas1p4f21d821bd414cba7e2d49abcbe414365@epcas1p4.samsung.com>
+ <20170620131623.GB30769@lst.de>
+ <5425587c-73e8-e24a-86a3-8a65a7791dcb@samsung.com>
+Message-ID: <20170623075309.1e679168@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/06/17 02:46, Jan L?bbe wrote:
-> Chris,
-> 
-> On So, 2017-06-11 at 22:55 +0000, Chris Packham wrote:
->> On 09/06/17 20:58, Jan L?bbe wrote:
->>> On Do, 2017-06-08 at 16:11 +1200, Chris Packham wrote:
->>>> +       if (of_property_read_bool(np, "arm,ecc-enable")) {
->>>> +               mask |= L2C_AUX_CTRL_EVTMON_ENABLE;
->>>> +               val |= L2C_AUX_CTRL_EVTMON_ENABLE;
->>>> +       } else if (of_property_read_bool(np, "arm,ecc-disable")) {
->>>> +               mask |= L2C_AUX_CTRL_EVTMON_ENABLE;
->>>> +       }
->>>
->>> Unless I misunderstand the code in __l2c_init(), the mask is used to
->>> specify the bits to preserve:
->>>           old_aux = aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
->>>           aux &= aux_mask;
->>>           aux |= aux_val;
->>>
->>>           if (old_aux != aux)
->>>                   pr_warn("L2C: DT/platform modifies aux control register: 0x%08x -> 0x%08x\n",
->>>                           old_aux, aux);
->>>
->>> So the arm,ecc-disable property will have no effect. This probably also
->>> applies to patch 2/4. The existing property *-disable code removes the
->>> corresponding bit from the mask.
->>
->> Indeed the disable version should be mask &= ~L2C_AUX_CTRL_EVTMON_ENABLE
->> and I was probably a little lazy to have used the L2C EVTMON instead of
->> adding AURORA specific ones like you have in your series.
->>
->> I'll rebase my series on top of yours and send it direct to you so you
->> can include it in the overall submission.
-> 
-> While picking up your arm,parity-enable and arm,ecc-enable patches for
-> my series, I noticed that the mask variable is inverted when merging the
-> local changes into aux_val/aux_mask at the end of aurora_of_parse. So I
-> now believe your code is correct. ;) I'd appreciate a close look,
-> nevertheless.
+Hi all,
 
-For my part I tested the enable case but I never tested the disable case 
-(because u-boot doesn't enable it there's nothing to disable). I can 
-probably just poke the register before starting the kernel to confirm 
-the disable case works with whatever masking logic we end up with.
+On Wed, 21 Jun 2017 15:32:39 +0200 Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+>
+> On 2017-06-20 15:16, Christoph Hellwig wrote:
+> > On Tue, Jun 20, 2017 at 11:04:00PM +1000, Stephen Rothwell wrote:  
+> >> git://git.linaro.org/people/mszyprowski/linux-dma-mapping.git#dma-mapping-next
+> >>
+> >> Contacts: Marek Szyprowski and Kyungmin Park (cc'd)
+> >>
+> >> I have called your tree dma-mapping-hch for now.  The other tree has
+> >> not been updated since 4.9-rc1 and I am not sure how general it is.
+> >> Marek, Kyungmin, any comments?  
+> > I'd be happy to join efforts - co-maintainers and reviers are always
+> > welcome.  
+> 
+> I did some dma-mapping unification works in the past and my tree in 
+> linux-next
+> was a side effect of that. I think that for now it can be dropped in 
+> favor of
+> Christoph's tree. I can also do some review and help in maintainers work if
+> needed, although I was recently busy with other stuff.
+
+OK, so I have dropped the dma-mapping tree and renamed dma-mapping-hch
+to dma-mapping.
+
+-- 
+Cheers,
+Stephen Rothwell
