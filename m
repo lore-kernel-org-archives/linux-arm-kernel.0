@@ -1,55 +1,33 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 22 Jun 2017 10:22:21 +0200
-Subject: [PATCH 1/9] serial: Add common rs485 device tree parsing function
-In-Reply-To: <20170622063157.qih2mriprczpj7zn@pengutronix.de>
-References: <20170621102130.21024-1-u.kleine-koenig@pengutronix.de>
- <20170621102130.21024-2-u.kleine-koenig@pengutronix.de>
- <20170622063157.qih2mriprczpj7zn@pengutronix.de>
-Message-ID: <20170622082221.v4jf2u5bdw6oyjxw@pengutronix.de>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 22 Jun 2017 10:25:49 +0200
+Subject: [PATCH v3.1 1/3] drm/rockchip: dw_hdmi: add RK3399 HDMI support
+In-Reply-To: <594B79A4.1000509@rock-chips.com>
+References: <1496992236-10634-1-git-send-email-mark.yao@rock-chips.com>
+ <1751555.73cFbViMXZ@phil> <594B79A4.1000509@rock-chips.com>
+Message-ID: <2895576.2l0uxY0YQ7@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sascha,
-
-On Thu, Jun 22, 2017 at 08:31:57AM +0200, Sascha Hauer wrote:
-> On Wed, Jun 21, 2017 at 12:21:22PM +0200, Uwe Kleine-K?nig wrote:
-> > +/**
-> > + * of_get_rs485_mode() - Implement parsing rs485 properties
-> > + * @np: uart node
-> > + * @rs485conf: output parameter
-> > + *
-> > + * This function implements the device tree binding described in
-> > + * Documentation/devicetree/bindings/serial/rs485.txt.
-> > + *
-> > + * Return: 0 on success, 1 if the node doesn't contain rs485 stuff, or a
-> > + * negative error code.
-> > + */
-> > +int of_get_rs485_mode(struct device_node *np, struct serial_rs485 *rs485conf)
-> > +{
-> > +	u32 rs485_delay[2];
-> > +	int ret;
-> > +
-> > +	ret = of_property_read_u32_array(np, "rs485-rts-delay" rs485_delay, 2);
-> > +	if (ret == -EINVAL) /* property does not exist */
-> > +		return 1;
+Am Donnerstag, 22. Juni 2017, 16:02:44 CEST schrieb Mark yao:
+> On 2017?06?22? 15:31, Heiko Stuebner wrote:
+> >> +
+> >> >+/**
+> >> >+ * struct rockchip_hdmi_chip_data - splite the grf setting of kind of chips
+> >> >+ * @lcdsel_grf_reg: grf register offset of lcdc select
+> >> >+ * @lcdsel_big: reg value of selecting vop big for HDMI
+> >> >+ * @lcdsel_lit: reg value of selecting vop little for HDMI
+> >> >+ */
+> >> >+struct rockchip_hdmi_chip_data {
+> >> >+	u32	lcdsel_grf_reg;
+> > How do you plan on handling the rk3368 (with only one VOP and thus
+> > no selection happening)? I'd just make the above an int, so we could
+> > set it to -1 for that case. (value 0 is after all a valid reg).
 > 
-> As the de-facto standard for the drivers implementing the rs485 bindings
-> is to make the properties optional, despite the documentation. Wouldn't
+> It's a problem handling on rk3368, using -1 to judge means that we need
+> initial the lcdsel_grf_reg to -1 on rk3368 platform, we need always add a platform
+> data to handle it, seems not good enough.
+> 
+> Since the hdmi chip data only use for vop selection, maybe we can judge with
+> checking hdmi->chip_data == NULL for the case.
 
-I must admit that I failed to mention in the commit log that being
-strict here was added by me even though I'm not the author.
-
-> it be better to make this property optional in the binding instead? This
-> wouldn't unnecessarily break old device trees and 0/0 seems a sane
-> default we can use when the property doesn't exist.
-
-Would be fine for me, too. It was Nicolas Ferre who specified this as
-being required in 0331bbf3c6fd9. Added people who discussed the patch
-back then (but without questioning rs485-rts-delay being mandatory).
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+yeah, that could work as well ... as long as the grf-vop-select is the only chip-data
