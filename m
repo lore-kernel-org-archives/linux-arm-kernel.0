@@ -1,60 +1,50 @@
-From: mika.westerberg@linux.intel.com (Mika Westerberg)
-Date: Thu, 22 Jun 2017 13:49:33 +0300
-Subject: [PATCH 1/9] i2c: designware: Fix system suspend
-In-Reply-To: <CAJZ5v0iYwPE8rpn=aZ9n6LV-qbAK3kynRqVZ7xxuB+gYar_fyg@mail.gmail.com>
-References: <1498072888-14782-1-git-send-email-ulf.hansson@linaro.org>
- <1498072888-14782-2-git-send-email-ulf.hansson@linaro.org>
- <CAJZ5v0iYwPE8rpn=aZ9n6LV-qbAK3kynRqVZ7xxuB+gYar_fyg@mail.gmail.com>
-Message-ID: <20170622104933.GY629@lahna.fi.intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 22 Jun 2017 13:15:24 +0200
+Subject: [PATCH V1 7/9] clk: sprd: add adjustable pll support
+In-Reply-To: <CAAfSe-sMy3aM9=LwpVivvHKy4hVw3GEd3U-hZe17pXM5fJRxPg@mail.gmail.com>
+References: <20170618015855.27738-1-chunyan.zhang@spreadtrum.com>
+ <20170618015855.27738-8-chunyan.zhang@spreadtrum.com>
+ <20170620013710.GJ4493@codeaurora.org>
+ <CAAfSe-sMy3aM9=LwpVivvHKy4hVw3GEd3U-hZe17pXM5fJRxPg@mail.gmail.com>
+Message-ID: <CAK8P3a1ELg1XcY-QOZn-f6kR9yt-Q6LNLUYEY-BNW-2BaBy6EQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 22, 2017 at 01:31:51AM +0200, Rafael J. Wysocki wrote:
-> On Wed, Jun 21, 2017 at 9:21 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> > The commit 8503ff166504 ("i2c: designware: Avoid unnecessary resuming
-> > during system suspend"), may suggest to the PM core to try out the so
-> > called direct_complete path for system sleep. In this path, the PM core
-> > treats a runtime suspended device as it's already in a proper low power
-> > state for system sleep, which makes it skip calling the system sleep
-> > callbacks for the device, except for the ->prepare() and the ->complete()
-> > callback.
-> >
-> > Moreover, under certain circumstances the PM core may unset the
-> > direct_complete flag for a parent device, in case its child device are
-> > being system suspended before. In other words, the PM core doesn't skip
-> > calling the system sleep callbacks, no matter if the device is runtime
-> > suspended or not.
-> >
-> > In cases of an i2c slave device, the above situation is triggered.
-> > Unfortunate, this also breaks the assumption that the i2c device is always
-> > runtime resumed, whenever the dw_i2c_plat_suspend() callback is being
-> > invoked, which then leads to a regression.
-> >
-> > More precisely, dw_i2c_plat_suspend() then calls clk_core_disable() and
-> > clk_core_unprepare(), for an already disabled/unprepared clock, leading to
-> > complaints about clocks calls being wrongly balanced.
-> >
-> > In cases when the i2c device is attached to the ACPI PM domain, the problem
-> > doesn't occur. That's because ACPI's ->suspend() callback, assigned to
-> > acpi_subsys_suspend(), calls pm_runtime_resume() for the i2c device.
-> 
-> Which really is expected to happen, so direct_complete should only be
-> used along with the ACPI PM domain in this case.
-> 
-> Moreover, in the ACPI PM domain case acpi_subsys_prepare() is supposed
-> to do the right thing without dw_i2c_plat_prepare() and the return
-> value of the latter will be ignored anyway, so dw_i2c_plat_prepare()
-> will only have effect without ACPI PM domain AFAICS.
-> 
-> It looks like commit 8503ff166504 is entirely misguided.
+On Thu, Jun 22, 2017 at 12:17 PM, Chunyan Zhang <zhang.lyra@gmail.com> wrote:
+> On 20 June 2017 at 09:37, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> On 06/18, Chunyan Zhang wrote:
 
-Indeed it is. At the time I suggested that change I did not really
-understand how the direct complete is supposed to be used :-/
+>>> +     kint = DIV_ROUND_CLOSEST(((fvco - refin * nint * CCU_PLL_1M)/10000) *
+>>> +     ((mask >> (shift + i)) + 1), refin * 100) << i;
+>>> +     cfg[index].val |= (kint << shift) & mask;
+>>> +     cfg[index].msk |= mask;
+>>> +
+>>> +     ibias_val = pll_get_ibias(fvco, pll->itable);
+>>> +
+>>> +     mask = pmask(pll, PLL_IBIAS);
+>>> +     index = pindex(pll, PLL_IBIAS);
+>>> +     shift = pshift(pll, PLL_IBIAS);
+>>> +     cfg[index].val |= ibias_val << shift & mask;
+>>> +     cfg[index].msk |= mask;
+>>> +
+>>> +     for (i = 0; i < reg_num; i++) {
+>>> +             if (cfg[i].msk)
+>>> +                     ccu_pll_writel(pll, i, cfg[i].val, cfg[i].msk);
+>>> +     }
+>>> +
+>>
+>> Are we waiting for the writel() to go through above? If so we
+>> need a readl() of the same register to make sure the write has
+>> completed before delaying.
+>
+> After writing these configuration registers, we have to wait a certain
+> time to make sure the pll has worked as we configured.  This depends
+> on other circuit part, so we use udelay rather than reading the same
+> register.
 
-Thanks Ulf for taking care of this!
+I think you have to do both: normally the writel() is not guaranteed
+to arrive at the device until you read back from an address in the
+same device, so the delay must happen after the readl(), or you won't
+know how long to wait for.
 
-I tested this series on Dell XPS 9350 which has touch panel connected to
-I2C and suspend/resume still works fine and I can see the controller
-going to D3 when the touch panel is idle.
-
-I can perform more comprehensive testing next week.
+       Arnd
