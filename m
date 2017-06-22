@@ -1,112 +1,261 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Thu, 22 Jun 2017 16:35:52 +0300
-Subject: [PATCH 06/14] staging: fsl-mc: turn several exported functions static
+Date: Thu, 22 Jun 2017 16:35:56 +0300
+Subject: [PATCH 10/14] staging: fsl-mc: remove dpmng API files
 In-Reply-To: <20170622133600.31694-1-laurentiu.tudor@nxp.com>
 References: <20170622133600.31694-1-laurentiu.tudor@nxp.com>
-Message-ID: <20170622133600.31694-7-laurentiu.tudor@nxp.com>
+Message-ID: <20170622133600.31694-11-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-They are never used outside the source they are implemented in and very
-likely never will, so it's safe to make them static.
+dpmng.h & dpmng.c files expose an API of just one function which is only
+used by the bus driver. Move that single API in the bus source as static
+and remove the two files.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- drivers/staging/fsl-mc/bus/dprc-driver.c | 8 +++-----
- drivers/staging/fsl-mc/bus/fsl-mc-bus.c  | 5 ++---
- drivers/staging/fsl-mc/include/mc-bus.h  | 8 --------
- 3 files changed, 5 insertions(+), 16 deletions(-)
+ drivers/staging/fsl-mc/bus/dpmng.c      | 74 ---------------------------------
+ drivers/staging/fsl-mc/bus/fsl-mc-bus.c | 53 ++++++++++++++++++++++-
+ drivers/staging/fsl-mc/include/dpmng.h  | 67 -----------------------------
+ 3 files changed, 52 insertions(+), 142 deletions(-)
+ delete mode 100644 drivers/staging/fsl-mc/bus/dpmng.c
+ delete mode 100644 drivers/staging/fsl-mc/include/dpmng.h
 
-diff --git a/drivers/staging/fsl-mc/bus/dprc-driver.c b/drivers/staging/fsl-mc/bus/dprc-driver.c
-index ff65e70..8447961 100644
---- a/drivers/staging/fsl-mc/bus/dprc-driver.c
-+++ b/drivers/staging/fsl-mc/bus/dprc-driver.c
-@@ -220,8 +220,8 @@ static void dprc_add_new_devices(struct fsl_mc_device *mc_bus_dev,
-  * populated before they can get allocation requests from probe callbacks
-  * of the device drivers for the non-allocatable devices.
-  */
--int dprc_scan_objects(struct fsl_mc_device *mc_bus_dev,
--		      unsigned int *total_irq_count)
-+static int dprc_scan_objects(struct fsl_mc_device *mc_bus_dev,
-+			     unsigned int *total_irq_count)
- {
- 	int num_child_objects;
- 	int dprc_get_obj_failures;
-@@ -309,7 +309,6 @@ int dprc_scan_objects(struct fsl_mc_device *mc_bus_dev,
- 
- 	return 0;
- }
--EXPORT_SYMBOL_GPL(dprc_scan_objects);
- 
- /**
-  * dprc_scan_container - Scans a physical DPRC and synchronizes Linux bus state
-@@ -320,7 +319,7 @@ EXPORT_SYMBOL_GPL(dprc_scan_objects);
-  * bus driver with the actual state of the MC by adding and removing
-  * devices as appropriate.
-  */
--int dprc_scan_container(struct fsl_mc_device *mc_bus_dev)
-+static int dprc_scan_container(struct fsl_mc_device *mc_bus_dev)
- {
- 	int error;
- 	unsigned int irq_count;
-@@ -356,7 +355,6 @@ int dprc_scan_container(struct fsl_mc_device *mc_bus_dev)
- 	fsl_mc_cleanup_all_resource_pools(mc_bus_dev);
- 	return error;
- }
--EXPORT_SYMBOL_GPL(dprc_scan_container);
- 
- /**
-  * dprc_irq0_handler - Regular ISR for DPRC interrupt 0
+diff --git a/drivers/staging/fsl-mc/bus/dpmng.c b/drivers/staging/fsl-mc/bus/dpmng.c
+deleted file mode 100644
+index ad5d5bb..0000000
+--- a/drivers/staging/fsl-mc/bus/dpmng.c
++++ /dev/null
+@@ -1,74 +0,0 @@
+-/*
+- * Copyright 2013-2016 Freescale Semiconductor Inc.
+- *
+- * Redistribution and use in source and binary forms, with or without
+- * modification, are permitted provided that the following conditions are met:
+- * * Redistributions of source code must retain the above copyright
+- * notice, this list of conditions and the following disclaimer.
+- * * Redistributions in binary form must reproduce the above copyright
+- * notice, this list of conditions and the following disclaimer in the
+- * documentation and/or other materials provided with the distribution.
+- * * Neither the name of the above-listed copyright holders nor the
+- * names of any contributors may be used to endorse or promote products
+- * derived from this software without specific prior written permission.
+- *
+- * ALTERNATIVELY, this software may be distributed under the terms of the
+- * GNU General Public License ("GPL") as published by the Free Software
+- * Foundation, either version 2 of that License or (at your option) any
+- * later version.
+- *
+- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE
+- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+- * POSSIBILITY OF SUCH DAMAGE.
+- */
+-#include "../include/mc-sys.h"
+-#include "../include/mc-cmd.h"
+-#include "../include/dpmng.h"
+-
+-#include "dpmng-cmd.h"
+-
+-/**
+- * mc_get_version() - Retrieves the Management Complex firmware
+- *			version information
+- * @mc_io:		Pointer to opaque I/O object
+- * @cmd_flags:		Command flags; one or more of 'MC_CMD_FLAG_'
+- * @mc_ver_info:	Returned version information structure
+- *
+- * Return:	'0' on Success; Error code otherwise.
+- */
+-int mc_get_version(struct fsl_mc_io *mc_io,
+-		   u32 cmd_flags,
+-		   struct mc_version *mc_ver_info)
+-{
+-	struct mc_command cmd = { 0 };
+-	struct dpmng_rsp_get_version *rsp_params;
+-	int err;
+-
+-	/* prepare command */
+-	cmd.header = mc_encode_cmd_header(DPMNG_CMDID_GET_VERSION,
+-					  cmd_flags,
+-					  0);
+-
+-	/* send command to mc*/
+-	err = mc_send_command(mc_io, &cmd);
+-	if (err)
+-		return err;
+-
+-	/* retrieve response parameters */
+-	rsp_params = (struct dpmng_rsp_get_version *)cmd.params;
+-	mc_ver_info->revision = le32_to_cpu(rsp_params->revision);
+-	mc_ver_info->major = le32_to_cpu(rsp_params->version_major);
+-	mc_ver_info->minor = le32_to_cpu(rsp_params->version_minor);
+-
+-	return 0;
+-}
+-EXPORT_SYMBOL(mc_get_version);
+-
 diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-index 8725a5c..60b2a40 100644
+index 3dec3e9..75f8dc3 100644
 --- a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
 +++ b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-@@ -241,8 +241,8 @@ EXPORT_SYMBOL_GPL(fsl_mc_driver_unregister);
+@@ -20,11 +20,12 @@
+ #include <linux/bitops.h>
+ #include <linux/msi.h>
+ #include <linux/dma-mapping.h>
+-#include "../include/dpmng.h"
+ #include "../include/mc-sys.h"
++#include "../include/mc-cmd.h"
+ 
+ #include "fsl-mc-private.h"
+ #include "dprc-cmd.h"
++#include "dpmng-cmd.h"
+ 
  /**
+  * Default DMA mask for devices on a fsl-mc bus
+@@ -60,6 +61,20 @@ struct fsl_mc_addr_translation_range {
+ };
+ 
+ /**
++ * struct mc_version
++ * @major: Major version number: incremented on API compatibility changes
++ * @minor: Minor version number: incremented on API additions (that are
++ *		backward compatible); reset when major version is incremented
++ * @revision: Internal revision number: incremented on implementation changes
++ *		and/or bug fixes that have no impact on API
++ */
++struct mc_version {
++	u32 major;
++	u32 minor;
++	u32 revision;
++};
++
++/**
+  * fsl_mc_bus_match - device to driver matching callback
+  * @dev: the fsl-mc device to match against
+  * @drv: the device driver to search for matching fsl-mc object type
+@@ -238,6 +253,42 @@ void fsl_mc_driver_unregister(struct fsl_mc_driver *mc_driver)
+ EXPORT_SYMBOL_GPL(fsl_mc_driver_unregister);
+ 
+ /**
++ * mc_get_version() - Retrieves the Management Complex firmware
++ *			version information
++ * @mc_io:		Pointer to opaque I/O object
++ * @cmd_flags:		Command flags; one or more of 'MC_CMD_FLAG_'
++ * @mc_ver_info:	Returned version information structure
++ *
++ * Return:	'0' on Success; Error code otherwise.
++ */
++static int mc_get_version(struct fsl_mc_io *mc_io,
++			  u32 cmd_flags,
++			  struct mc_version *mc_ver_info)
++{
++	struct mc_command cmd = { 0 };
++	struct dpmng_rsp_get_version *rsp_params;
++	int err;
++
++	/* prepare command */
++	cmd.header = mc_encode_cmd_header(DPMNG_CMDID_GET_VERSION,
++					  cmd_flags,
++					  0);
++
++	/* send command to mc*/
++	err = mc_send_command(mc_io, &cmd);
++	if (err)
++		return err;
++
++	/* retrieve response parameters */
++	rsp_params = (struct dpmng_rsp_get_version *)cmd.params;
++	mc_ver_info->revision = le32_to_cpu(rsp_params->revision);
++	mc_ver_info->major = le32_to_cpu(rsp_params->version_major);
++	mc_ver_info->minor = le32_to_cpu(rsp_params->version_minor);
++
++	return 0;
++}
++
++/**
   * fsl_mc_get_root_dprc - function to traverse to the root dprc
   */
--void fsl_mc_get_root_dprc(struct device *dev,
--			  struct device **root_dprc_dev)
-+static void fsl_mc_get_root_dprc(struct device *dev,
-+				 struct device **root_dprc_dev)
- {
- 	if (WARN_ON(!dev)) {
- 		*root_dprc_dev = NULL;
-@@ -254,7 +254,6 @@ void fsl_mc_get_root_dprc(struct device *dev,
- 			*root_dprc_dev = (*root_dprc_dev)->parent;
- 	}
- }
--EXPORT_SYMBOL_GPL(fsl_mc_get_root_dprc);
- 
- static int get_dprc_attr(struct fsl_mc_io *mc_io,
- 			 int container_id, struct dprc_attributes *attr)
-diff --git a/drivers/staging/fsl-mc/include/mc-bus.h b/drivers/staging/fsl-mc/include/mc-bus.h
-index aac062e..c1df433 100644
---- a/drivers/staging/fsl-mc/include/mc-bus.h
-+++ b/drivers/staging/fsl-mc/include/mc-bus.h
-@@ -70,11 +70,6 @@ struct fsl_mc_bus {
- #define to_fsl_mc_bus(_mc_dev) \
- 	container_of(_mc_dev, struct fsl_mc_bus, mc_dev)
- 
--int dprc_scan_container(struct fsl_mc_device *mc_bus_dev);
+ static void fsl_mc_get_root_dprc(struct device *dev,
+diff --git a/drivers/staging/fsl-mc/include/dpmng.h b/drivers/staging/fsl-mc/include/dpmng.h
+deleted file mode 100644
+index 170c07d..0000000
+--- a/drivers/staging/fsl-mc/include/dpmng.h
++++ /dev/null
+@@ -1,67 +0,0 @@
+-/*
+- * Copyright 2013-2016 Freescale Semiconductor Inc.
+- *
+- * Redistribution and use in source and binary forms, with or without
+- * modification, are permitted provided that the following conditions are met:
+- * * Redistributions of source code must retain the above copyright
+- * notice, this list of conditions and the following disclaimer.
+- * * Redistributions in binary form must reproduce the above copyright
+- * notice, this list of conditions and the following disclaimer in the
+- * documentation and/or other materials provided with the distribution.
+- * * Neither the name of the above-listed copyright holders nor the
+- * names of any contributors may be used to endorse or promote products
+- * derived from this software without specific prior written permission.
+- *
+- *
+- * ALTERNATIVELY, this software may be distributed under the terms of the
+- * GNU General Public License ("GPL") as published by the Free Software
+- * Foundation, either version 2 of that License or (at your option) any
+- * later version.
+- *
+- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE
+- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+- * POSSIBILITY OF SUCH DAMAGE.
+- */
+-#ifndef __FSL_DPMNG_H
+-#define __FSL_DPMNG_H
 -
--int dprc_scan_objects(struct fsl_mc_device *mc_bus_dev,
--		      unsigned int *total_irq_count);
+-/*
+- * Management Complex General API
+- * Contains general API for the Management Complex firmware
+- */
 -
- struct irq_domain *fsl_mc_msi_create_irq_domain(struct fwnode_handle *fwnode,
- 						struct msi_domain_info *info,
- 						struct irq_domain *parent);
-@@ -91,9 +86,6 @@ void fsl_mc_init_all_resource_pools(struct fsl_mc_device *mc_bus_dev);
- 
- void fsl_mc_cleanup_all_resource_pools(struct fsl_mc_device *mc_bus_dev);
- 
--void fsl_mc_get_root_dprc(struct device *dev,
--			  struct device **root_dprc_dev);
+-struct fsl_mc_io;
 -
- bool fsl_mc_is_root_dprc(struct device *dev);
- 
- extern struct bus_type fsl_mc_bus_type;
+-/**
+- * Management Complex firmware version information
+- */
+-#define MC_VER_MAJOR 8
+-#define MC_VER_MINOR 0
+-
+-/**
+- * struct mc_version
+- * @major: Major version number: incremented on API compatibility changes
+- * @minor: Minor version number: incremented on API additions (that are
+- *		backward compatible); reset when major version is incremented
+- * @revision: Internal revision number: incremented on implementation changes
+- *		and/or bug fixes that have no impact on API
+- */
+-struct mc_version {
+-	u32 major;
+-	u32 minor;
+-	u32 revision;
+-};
+-
+-int mc_get_version(struct fsl_mc_io *mc_io,
+-		   u32 cmd_flags,
+-		   struct mc_version *mc_ver_info);
+-
+-#endif /* __FSL_DPMNG_H */
 -- 
 2.9.4
