@@ -1,39 +1,59 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Thu, 22 Jun 2017 13:59:11 +0100
-Subject: [PATCH v5 3/7] drivers: dma-coherent: Account dma_pfn_offset when
- used with device tree
-In-Reply-To: <20170620134219.GA31496@infradead.org>
+Date: Thu, 22 Jun 2017 14:18:48 +0100
+Subject: [PATCH v5 4/7] drivers: dma-coherent: Introduce default DMA pool
+In-Reply-To: <20170620134932.GB31496@infradead.org>
 References: <1495621472-9323-1-git-send-email-vladimir.murzin@arm.com>
- <1495621472-9323-4-git-send-email-vladimir.murzin@arm.com>
- <20170620134219.GA31496@infradead.org>
-Message-ID: <83723f69-32a7-02ae-da5c-5856136fd805@arm.com>
+ <1495621472-9323-5-git-send-email-vladimir.murzin@arm.com>
+ <20170620134932.GB31496@infradead.org>
+Message-ID: <94e57caa-e7b9-d740-bca3-89950c10033e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/06/17 14:42, Christoph Hellwig wrote:
-> Wouldn't the smal patch below solve the same issue in a simple way?
+On 20/06/17 14:49, Christoph Hellwig wrote:
+> On Wed, May 24, 2017 at 11:24:29AM +0100, Vladimir Murzin wrote:
+>> This patch introduces default coherent DMA pool similar to default CMA
+>> area concept. To keep other users safe code kept under CONFIG_ARM.
 > 
-> diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
-> index 640a7e63c453..e8f8447d705b 100644
-> --- a/drivers/base/dma-coherent.c
-> +++ b/drivers/base/dma-coherent.c
-> @@ -290,9 +290,11 @@ EXPORT_SYMBOL(dma_mmap_from_coherent);
->  static int rmem_dma_device_init(struct reserved_mem *rmem, struct device *dev)
->  {
->  	struct dma_coherent_mem *mem = rmem->priv;
-> +	dma_addr_t dev_addr = ((rmem->base >> PAGE_SHIFT) -
-> +				dev->dma_pfn_offset) << PAGE_SHIFT;
->  
->  	if (!mem &&
-> -	    !dma_init_coherent_memory(rmem->base, rmem->base, rmem->size,
-> +	    !dma_init_coherent_memory(rmem->base, dev_addr, rmem->size,
->  				      DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE,
->  				      &mem)) {
->  		pr_err("Reserved memory: failed to init DMA memory pool at %pa, size %ld MiB\n",
+> I don't see a CONFIG_ARM in the code, although parts of it are added
+> under CONFIG_OF_RESERVED_MEM.
+
+It should look like that:
+
+#ifdef CONFIG_ARM
+	if (!of_get_flat_dt_prop(node, "no-map", NULL)) {
+		pr_err("Reserved memory: regions without no-map are not yet supported\n");
+		return -EINVAL;
+	}
++
++	if (of_get_flat_dt_prop(node, "linux,dma-default", NULL)) {
++		WARN(dma_reserved_default_memory,
++		     "Reserved memory: region for default DMA coherent area is redefined\n");
++		dma_reserved_default_memory = rmem;
++	}
+#endif
+
+
+> 
+> But overall this code look a bit odd to me.  As far as I can tell
+> the dma-coherent.c code is for the case where we have a special
+> piece of coherent memory close to a device.
+> 
+> If you're allocating out of the global allocator the memory should
+> come from the normal dma_ops ->alloc allocator - and also take
+> the attrs into account (e.g. for DMA_ATTR_NON_CONSISTENT or
+> DMA_ATTR_NO_KERNEL_MAPPING requests you don't need coherent memory)
 > 
 
-Robin has already commented on this - dma_pfn_offset may vary across devices
-and reserved memory region may be shared between them.
+It is how it has been started [1] - defining memory which is not cacheable
+(i.e. suitable for coherent allocations) and building custom allocator on top
+of it, like it was done for c6x and blackfin. The annoying thing was that we
+needed to advertise such memory via command line parameter plus some "mem="
+adjustment to hide coherent memory from buddy allocator. So it was suggested
+to use reserved memory and this makes things look much better, but on the
+other hand require changes on dts side to "bind" devices with reserved memory
+- default DMA pool removes such drawback.
+
+[1] https://marc.info/?l=linux-arm-kernel&m=148163694824475&w=2
 
 Cheers
 Vladimir
