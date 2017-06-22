@@ -1,24 +1,20 @@
 From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Thu, 22 Jun 2017 10:21:04 +0800
-Subject: [PATCH v2] drm: mediatek: change the variable type of rdma
- threshold
-In-Reply-To: <1495431964.20811.8.camel@mtksdaap41>
+Date: Thu, 22 Jun 2017 10:25:21 +0800
+Subject: [v2] drm: mediatek: change the variable type of rdma threshold
+In-Reply-To: <20170621211456.GA21176@roeck-us.net>
 References: <1495187843-6882-1-git-send-email-bibby.hsieh@mediatek.com>
- <1495431964.20811.8.camel@mtksdaap41>
-Message-ID: <1498098064.717.12.camel@mtksdaap41>
+ <20170621211456.GA21176@roeck-us.net>
+Message-ID: <1498098321.717.17.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, CK,
+Hi, Guenter,
 
-Thanks for your review and comment.
+Thanks for your test and comment.
 
-On Mon, 2017-05-22 at 13:46 +0800, CK Hu wrote:
-> Hi, Bibby:
-> 
-> One comment inline.
-> 
-> On Fri, 2017-05-19 at 17:57 +0800, Bibby Hsieh wrote:
+
+On Wed, 2017-06-21 at 14:14 -0700, Guenter Roeck wrote:
+> On Fri, May 19, 2017 at 05:57:23PM +0800, Bibby Hsieh wrote:
 > > For some greater resolution, the rdma threshold
 > > variable will overflow.
 > > 
@@ -38,23 +34,13 @@ On Mon, 2017-05-22 at 13:46 +0800, CK Hu wrote:
 > > -#define RDMA_OUTPUT_VALID_FIFO_THRESHOLD(bytes)		((bytes) / 16)
 > > +#define RDMA_OUTPUT_VALID_FIFO_THRESHOLD(bytes) (((bytes) / 16) & 0x3ff)
 > 
-> I think it's not necessary to do this mask operation. Before calling
-> RDMA_OUTPUT_VALID_FIFO_THRESHOLD(), you should make sure that width,
-> height, and vrefresh matches the HW spec, so the result of threshold
-> likely does not exceed 0x3ff. If width, height, and vrefresh matches the
-> HW spec but threshold exceed 0x3ff, maybe you should limited it to 0x3ff
-> rather than truncating it.
+> I agree with the earlier comment; clamp_val() might be more appropriate here
+> and would avoid unexpected results.
 > 
 
-Ok, It seems to me that I will refer Guenter's comment, add clamp_val()
-to avoid unexpected value. Thanks.
+Yep, It's a good suggestion to me, I will add clamp_val() to avoid
+unexpected value, thanks.
 
-
-Bibby
-
-> Regards,
-> CK
-> 
 > >  
 > >  /**
 > >   * struct mtk_disp_rdma - DISP_RDMA driver structure
@@ -74,11 +60,18 @@ Bibby
 > > -	threshold = width * height * vrefresh * 4 * 7 / 1000000;
 > > +	threshold = (unsigned long long)width * height * vrefresh *
 > > +		    4 * 7 / 1000000;
-> >  	reg = RDMA_FIFO_UNDERFLOW_EN |
-> >  	      RDMA_FIFO_PSEUDO_SIZE(SZ_8K) |
-> >  	      RDMA_OUTPUT_VALID_FIFO_THRESHOLD(threshold);
 > 
+> This is a 64 bit divide operation. It will result in a build failure
+> if compiled for a 32 bit kernel (eg arm:allmodconfig).
 > 
+> ERROR: "__aeabi_uldivmod" [drivers/gpu/drm/mediatek/mediatek-drm.ko] undefined!
+> 
+
+Sorry about the lack of tests, I will change the divide operation to
+div_u64 function, thanks for your suggestions.
+
+
+> Guenter
 
 -- 
 Bibby
