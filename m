@@ -1,31 +1,99 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Thu, 22 Jun 2017 12:51:00 +0530
-Subject: [PATCH] iommu: arm-smmu-v3: make of_device_ids const
-Message-ID: <52ec478cd35247ef219b448b174bcfcae87da005.1498115942.git.arvind.yadav.cs@gmail.com>
+From: frank.wang@rock-chips.com (Frank Wang)
+Date: Thu, 22 Jun 2017 15:23:52 +0800
+Subject: [PATCH v2 5/7] ARM: dts: rockchip: add sdmmc and sdio nodes for
+ rk3228 SoC
+In-Reply-To: <1498116055-20977-1-git-send-email-frank.wang@rock-chips.com>
+References: <1498116055-20977-1-git-send-email-frank.wang@rock-chips.com>
+Message-ID: <1498116232-22848-1-git-send-email-frank.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_device_ids are not supposed to change at runtime. All functions
-working with of_device_ids provided by <linux/of.h> work with const
-of_device_ids. So mark the non-const structs as const.
+From: Shawn Lin <shawn.lin@rock-chips.com>
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+This patch adds sdmmc/sdio controller nodes for rk3228 SoC.
+
+Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/rk322x.dtsi | 60 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 380969a..7d3f08a 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -2768,7 +2768,7 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
- 	return 0;
- }
+diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
+index c4d43ce..66578fa 100644
+--- a/arch/arm/boot/dts/rk322x.dtsi
++++ b/arch/arm/boot/dts/rk322x.dtsi
+@@ -522,6 +522,32 @@
+ 		status = "disabled";
+ 	};
  
--static struct of_device_id arm_smmu_of_match[] = {
-+static const struct of_device_id arm_smmu_of_match[] = {
- 	{ .compatible = "arm,smmu-v3", },
- 	{ },
- };
++	sdmmc: dwmmc at 30000000 {
++		compatible = "rockchip,rk3228-dw-mshc", "rockchip,rk3288-dw-mshc";
++		reg = <0x30000000 0x4000>;
++		interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>,
++			 <&cru SCLK_SDMMC_DRV>, <&cru SCLK_SDMMC_SAMPLE>;
++		clock-names = "biu", "ciu", "ciu_drv", "ciu_sample";
++		fifo-depth = <0x100>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_bus4>;
++		status = "disabled";
++	};
++
++	sdio: dwmmc at 30010000 {
++		compatible = "rockchip,rk3228-dw-mshc", "rockchip,rk3288-dw-mshc";
++		reg = <0x30010000 0x4000>;
++		interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru HCLK_SDIO>, <&cru SCLK_SDIO>,
++			 <&cru SCLK_SDIO_DRV>, <&cru SCLK_SDIO_SAMPLE>;
++		clock-names = "biu", "ciu", "ciu_drv", "ciu_sample";
++		fifo-depth = <0x100>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&sdio_clk &sdio_cmd &sdio_bus4>;
++		status = "disabled";
++	};
++
+ 	emmc: dwmmc at 30020000 {
+ 		compatible = "rockchip,rk3228-dw-mshc", "rockchip,rk3288-dw-mshc";
+ 		reg = <0x30020000 0x4000>;
+@@ -732,6 +758,40 @@
+ 			drive-strength = <12>;
+ 		};
+ 
++		sdmmc {
++			sdmmc_clk: sdmmc-clk {
++				rockchip,pins = <1 16 RK_FUNC_1 &pcfg_pull_none_drv_12ma>;
++			};
++
++			sdmmc_cmd: sdmmc-cmd {
++				rockchip,pins = <1 15 RK_FUNC_1 &pcfg_pull_none_drv_12ma>;
++			};
++
++			sdmmc_bus4: sdmmc-bus4 {
++				rockchip,pins = <1 18 RK_FUNC_1 &pcfg_pull_none_drv_12ma>,
++						<1 19 RK_FUNC_1 &pcfg_pull_none_drv_12ma>,
++						<1 20 RK_FUNC_1 &pcfg_pull_none_drv_12ma>,
++						<1 21 RK_FUNC_1 &pcfg_pull_none_drv_12ma>;
++			};
++		};
++
++		sdio {
++			sdio_clk: sdio-clk {
++				rockchip,pins = <3 0 RK_FUNC_1 &pcfg_pull_none_drv_12ma>;
++			};
++
++			sdio_cmd: sdio-cmd {
++				rockchip,pins = <3 1 RK_FUNC_1 &pcfg_pull_none_drv_12ma>;
++			};
++
++			sdio_bus4: sdio-bus4 {
++				rockchip,pins = <3 2 RK_FUNC_1 &pcfg_pull_none_drv_12ma>,
++						<3 3 RK_FUNC_1 &pcfg_pull_none_drv_12ma>,
++						<3 4 RK_FUNC_1 &pcfg_pull_none_drv_12ma>,
++						<3 5 RK_FUNC_1 &pcfg_pull_none_drv_12ma>;
++			};
++		};
++
+ 		emmc {
+ 			emmc_clk: emmc-clk {
+ 				rockchip,pins = <2 7 RK_FUNC_2 &pcfg_pull_none>;
 -- 
-1.9.1
+2.0.0
