@@ -1,187 +1,55 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 22 Jun 2017 10:21:01 +0200
-Subject: [PATCH v2] clocksource/drivers/tcb_clksrc: make IO endian agnostic
-In-Reply-To: <20170617113520.23221-1-alexandre.belloni@free-electrons.com>
-References: <20170617113520.23221-1-alexandre.belloni@free-electrons.com>
-Message-ID: <552b4627-c71a-0b49-b1c0-f6707dc3b854@linaro.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 22 Jun 2017 10:22:21 +0200
+Subject: [PATCH 1/9] serial: Add common rs485 device tree parsing function
+In-Reply-To: <20170622063157.qih2mriprczpj7zn@pengutronix.de>
+References: <20170621102130.21024-1-u.kleine-koenig@pengutronix.de>
+ <20170621102130.21024-2-u.kleine-koenig@pengutronix.de>
+ <20170622063157.qih2mriprczpj7zn@pengutronix.de>
+Message-ID: <20170622082221.v4jf2u5bdw6oyjxw@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/06/2017 13:35, Alexandre Belloni wrote:
-> Now that AVR32 is gone, we can use the proper IO accessors that are
-> correctly handling endianness.
+Hello Sascha,
+
+On Thu, Jun 22, 2017 at 08:31:57AM +0200, Sascha Hauer wrote:
+> On Wed, Jun 21, 2017 at 12:21:22PM +0200, Uwe Kleine-K?nig wrote:
+> > +/**
+> > + * of_get_rs485_mode() - Implement parsing rs485 properties
+> > + * @np: uart node
+> > + * @rs485conf: output parameter
+> > + *
+> > + * This function implements the device tree binding described in
+> > + * Documentation/devicetree/bindings/serial/rs485.txt.
+> > + *
+> > + * Return: 0 on success, 1 if the node doesn't contain rs485 stuff, or a
+> > + * negative error code.
+> > + */
+> > +int of_get_rs485_mode(struct device_node *np, struct serial_rs485 *rs485conf)
+> > +{
+> > +	u32 rs485_delay[2];
+> > +	int ret;
+> > +
+> > +	ret = of_property_read_u32_array(np, "rs485-rts-delay" rs485_delay, 2);
+> > +	if (ret == -EINVAL) /* property does not exist */
+> > +		return 1;
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
+> As the de-facto standard for the drivers implementing the rs485 bindings
+> is to make the properties optional, despite the documentation. Wouldn't
 
-Hi Alexandre,
+I must admit that I failed to mention in the commit log that being
+strict here was added by me even though I'm not the author.
 
-it does not apply. Can you give a respin against tip/timers/core?
+> it be better to make this property optional in the binding instead? This
+> wouldn't unnecessarily break old device trees and 0/0 seems a sane
+> default we can use when the property doesn't exist.
 
-Thanks.
+Would be fine for me, too. It was Nicolas Ferre who specified this as
+being required in 0331bbf3c6fd9. Added people who discussed the patch
+back then (but without questioning rs485-rts-delay being mandatory).
 
-  -- Daniel
-
-> Changes in v2:
->  - Also use the _relaxed version in tc_next_event as this is working fine.
-> 
->  drivers/clocksource/tcb_clksrc.c | 58 ++++++++++++++++++++--------------------
->  1 file changed, 29 insertions(+), 29 deletions(-)
-> 
-> diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
-> index d4ca9962a759..fc410b5b409d 100644
-> --- a/drivers/clocksource/tcb_clksrc.c
-> +++ b/drivers/clocksource/tcb_clksrc.c
-> @@ -48,9 +48,9 @@ static u64 tc_get_cycles(struct clocksource *cs)
->  
->  	raw_local_irq_save(flags);
->  	do {
-> -		upper = __raw_readl(tcaddr + ATMEL_TC_REG(1, CV));
-> -		lower = __raw_readl(tcaddr + ATMEL_TC_REG(0, CV));
-> -	} while (upper != __raw_readl(tcaddr + ATMEL_TC_REG(1, CV)));
-> +		upper = readl_relaxed(tcaddr + ATMEL_TC_REG(1, CV));
-> +		lower = readl_relaxed(tcaddr + ATMEL_TC_REG(0, CV));
-> +	} while (upper != readl_relaxed(tcaddr + ATMEL_TC_REG(1, CV)));
->  
->  	raw_local_irq_restore(flags);
->  	return (upper << 16) | lower;
-> @@ -58,7 +58,7 @@ static u64 tc_get_cycles(struct clocksource *cs)
->  
->  static u64 tc_get_cycles32(struct clocksource *cs)
->  {
-> -	return __raw_readl(tcaddr + ATMEL_TC_REG(0, CV));
-> +	return readl_relaxed(tcaddr + ATMEL_TC_REG(0, CV));
->  }
->  
->  static struct clocksource clksrc = {
-> @@ -96,8 +96,8 @@ static int tc_shutdown(struct clock_event_device *d)
->  	struct tc_clkevt_device *tcd = to_tc_clkevt(d);
->  	void __iomem		*regs = tcd->regs;
->  
-> -	__raw_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
-> -	__raw_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
-> +	writel(0xff, regs + ATMEL_TC_REG(2, IDR));
-> +	writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
->  	if (!clockevent_state_detached(d))
->  		clk_disable(tcd->clk);
->  
-> @@ -115,9 +115,9 @@ static int tc_set_oneshot(struct clock_event_device *d)
->  	clk_enable(tcd->clk);
->  
->  	/* slow clock, count up to RC, then irq and stop */
-> -	__raw_writel(timer_clock | ATMEL_TC_CPCSTOP | ATMEL_TC_WAVE |
-> +	writel(timer_clock | ATMEL_TC_CPCSTOP | ATMEL_TC_WAVE |
->  		     ATMEL_TC_WAVESEL_UP_AUTO, regs + ATMEL_TC_REG(2, CMR));
-> -	__raw_writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
-> +	writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
->  
->  	/* set_next_event() configures and starts the timer */
->  	return 0;
-> @@ -137,25 +137,25 @@ static int tc_set_periodic(struct clock_event_device *d)
->  	clk_enable(tcd->clk);
->  
->  	/* slow clock, count up to RC, then irq and restart */
-> -	__raw_writel(timer_clock | ATMEL_TC_WAVE | ATMEL_TC_WAVESEL_UP_AUTO,
-> +	writel(timer_clock | ATMEL_TC_WAVE | ATMEL_TC_WAVESEL_UP_AUTO,
->  		     regs + ATMEL_TC_REG(2, CMR));
-> -	__raw_writel((32768 + HZ / 2) / HZ, tcaddr + ATMEL_TC_REG(2, RC));
-> +	writel((32768 + HZ / 2) / HZ, tcaddr + ATMEL_TC_REG(2, RC));
->  
->  	/* Enable clock and interrupts on RC compare */
-> -	__raw_writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
-> +	writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
->  
->  	/* go go gadget! */
-> -	__raw_writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG, regs +
-> +	writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG, regs +
->  		     ATMEL_TC_REG(2, CCR));
->  	return 0;
->  }
->  
->  static int tc_next_event(unsigned long delta, struct clock_event_device *d)
->  {
-> -	__raw_writel(delta, tcaddr + ATMEL_TC_REG(2, RC));
-> +	writel_relaxed(delta, tcaddr + ATMEL_TC_REG(2, RC));
->  
->  	/* go go gadget! */
-> -	__raw_writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG,
-> +	writel_relaxed(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG,
->  			tcaddr + ATMEL_TC_REG(2, CCR));
->  	return 0;
->  }
-> @@ -179,7 +179,7 @@ static irqreturn_t ch2_irq(int irq, void *handle)
->  	struct tc_clkevt_device	*dev = handle;
->  	unsigned int		sr;
->  
-> -	sr = __raw_readl(dev->regs + ATMEL_TC_REG(2, SR));
-> +	sr = readl_relaxed(dev->regs + ATMEL_TC_REG(2, SR));
->  	if (sr & ATMEL_TC_CPCS) {
->  		dev->clkevt.event_handler(&dev->clkevt);
->  		return IRQ_HANDLED;
-> @@ -239,43 +239,43 @@ static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
->  static void __init tcb_setup_dual_chan(struct atmel_tc *tc, int mck_divisor_idx)
->  {
->  	/* channel 0:  waveform mode, input mclk/8, clock TIOA0 on overflow */
-> -	__raw_writel(mck_divisor_idx			/* likely divide-by-8 */
-> +	writel(mck_divisor_idx			/* likely divide-by-8 */
->  			| ATMEL_TC_WAVE
->  			| ATMEL_TC_WAVESEL_UP		/* free-run */
->  			| ATMEL_TC_ACPA_SET		/* TIOA0 rises at 0 */
->  			| ATMEL_TC_ACPC_CLEAR,		/* (duty cycle 50%) */
->  			tcaddr + ATMEL_TC_REG(0, CMR));
-> -	__raw_writel(0x0000, tcaddr + ATMEL_TC_REG(0, RA));
-> -	__raw_writel(0x8000, tcaddr + ATMEL_TC_REG(0, RC));
-> -	__raw_writel(0xff, tcaddr + ATMEL_TC_REG(0, IDR));	/* no irqs */
-> -	__raw_writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(0, CCR));
-> +	writel(0x0000, tcaddr + ATMEL_TC_REG(0, RA));
-> +	writel(0x8000, tcaddr + ATMEL_TC_REG(0, RC));
-> +	writel(0xff, tcaddr + ATMEL_TC_REG(0, IDR));	/* no irqs */
-> +	writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(0, CCR));
->  
->  	/* channel 1:  waveform mode, input TIOA0 */
-> -	__raw_writel(ATMEL_TC_XC1			/* input: TIOA0 */
-> +	writel(ATMEL_TC_XC1			/* input: TIOA0 */
->  			| ATMEL_TC_WAVE
->  			| ATMEL_TC_WAVESEL_UP,		/* free-run */
->  			tcaddr + ATMEL_TC_REG(1, CMR));
-> -	__raw_writel(0xff, tcaddr + ATMEL_TC_REG(1, IDR));	/* no irqs */
-> -	__raw_writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(1, CCR));
-> +	writel(0xff, tcaddr + ATMEL_TC_REG(1, IDR));	/* no irqs */
-> +	writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(1, CCR));
->  
->  	/* chain channel 0 to channel 1*/
-> -	__raw_writel(ATMEL_TC_TC1XC1S_TIOA0, tcaddr + ATMEL_TC_BMR);
-> +	writel(ATMEL_TC_TC1XC1S_TIOA0, tcaddr + ATMEL_TC_BMR);
->  	/* then reset all the timers */
-> -	__raw_writel(ATMEL_TC_SYNC, tcaddr + ATMEL_TC_BCR);
-> +	writel(ATMEL_TC_SYNC, tcaddr + ATMEL_TC_BCR);
->  }
->  
->  static void __init tcb_setup_single_chan(struct atmel_tc *tc, int mck_divisor_idx)
->  {
->  	/* channel 0:  waveform mode, input mclk/8 */
-> -	__raw_writel(mck_divisor_idx			/* likely divide-by-8 */
-> +	writel(mck_divisor_idx			/* likely divide-by-8 */
->  			| ATMEL_TC_WAVE
->  			| ATMEL_TC_WAVESEL_UP,		/* free-run */
->  			tcaddr + ATMEL_TC_REG(0, CMR));
-> -	__raw_writel(0xff, tcaddr + ATMEL_TC_REG(0, IDR));	/* no irqs */
-> -	__raw_writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(0, CCR));
-> +	writel(0xff, tcaddr + ATMEL_TC_REG(0, IDR));	/* no irqs */
-> +	writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(0, CCR));
->  
->  	/* then reset all the timers */
-> -	__raw_writel(ATMEL_TC_SYNC, tcaddr + ATMEL_TC_BCR);
-> +	writel(ATMEL_TC_SYNC, tcaddr + ATMEL_TC_BCR);
->  }
->  
->  static int __init tcb_clksrc_init(void)
-> 
-
+Best regards
+Uwe
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
