@@ -1,173 +1,47 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 22 Jun 2017 09:31:37 +0200
-Subject: [PATCH v3.1 1/3] drm/rockchip: dw_hdmi: add RK3399 HDMI support
-In-Reply-To: <1498115845-7177-1-git-send-email-mark.yao@rock-chips.com>
-References: <1496992236-10634-1-git-send-email-mark.yao@rock-chips.com>
- <1498115845-7177-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <1751555.73cFbViMXZ@phil>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 22 Jun 2017 15:48:33 +0800
+Subject: [PATCH 2/2] i2c: zx2967: add i2c controller driver for ZTE's
+ zx2967 family
+In-Reply-To: <20170620074126.GA1541@katana>
+References: <1495947576-11037-1-git-send-email-shawnguo@kernel.org>
+ <1495947576-11037-3-git-send-email-shawnguo@kernel.org>
+ <20170619193130.velebm7p3r5ggaos@ninjato>
+ <20170620025815.GA4818@x250> <20170620074126.GA1541@katana>
+Message-ID: <20170622074831.GA23753@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-Am Donnerstag, 22. Juni 2017, 15:17:24 CEST schrieb Mark Yao:
-> RK3399 and RK3288 shared the same HDMI IP controller, only some light
-> difference with GRF configure.
+On Tue, Jun 20, 2017 at 09:41:26AM +0200, Wolfram Sang wrote:
+> > > How was this driver tested BTW?
+> > 
+> > The driver is being used to access an Audio codec on the I2C bus.
 > 
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-> ---
-> Changes in v3.1:
->   Correct documentation compatible's format(Rob Herring).
-> Changes in v3:
->   remove hdmi_phy_configure_dwc_hdmi_3d_tx callbak.
-> 
-> Changes in v2:
->   reuse hdmi_phy_configure_dwc_hdmi_3d_tx for phy configure
->   fixup Documentation
-> 
->  .../bindings/display/rockchip/dw_hdmi-rockchip.txt |  4 +-
->  drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        | 67 ++++++++++++++++++----
->  2 files changed, 59 insertions(+), 12 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-> index 046076c..7039a15 100644
-> --- a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-> +++ b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-> @@ -11,7 +11,9 @@ following device-specific properties.
->  
->  Required properties:
->  
-> -- compatible: Shall contain "rockchip,rk3288-dw-hdmi".
-> +- compatible: should be one of the following:
-> +		"rockchip,rk3288-dw-hdmi"
-> +		"rockchip,rk3399-dw-hdmi"
->  - reg: See dw_hdmi.txt.
->  - reg-io-width: See dw_hdmi.txt. Shall be 4.
->  - interrupts: HDMI interrupt number
-> diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> index 63dab6f..90aaaf4 100644
-> --- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> +++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> @@ -20,13 +20,30 @@
->  #include "rockchip_drm_drv.h"
->  #include "rockchip_drm_vop.h"
->  
-> -#define GRF_SOC_CON6                    0x025c
-> -#define HDMI_SEL_VOP_LIT                (1 << 4)
-> +#define RK3288_GRF_SOC_CON6		0x025C
-> +#define RK3288_HDMI_LCDC_SEL		BIT(4)
-> +#define RK3399_GRF_SOC_CON20		0x6250
-> +#define RK3399_HDMI_LCDC_SEL		BIT(6)
-> +
-> +#define HIWORD_UPDATE(val, mask)	(val | (mask) << 16)
-> +
-> +/**
-> + * struct rockchip_hdmi_chip_data - splite the grf setting of kind of chips
-> + * @lcdsel_grf_reg: grf register offset of lcdc select
-> + * @lcdsel_big: reg value of selecting vop big for HDMI
-> + * @lcdsel_lit: reg value of selecting vop little for HDMI
-> + */
-> +struct rockchip_hdmi_chip_data {
-> +	u32	lcdsel_grf_reg;
+> Nice. Can you also run 'i2cdetect' on the bus to see if we have proper
+> NAK handling? AFAICS this should be broken now. And very slow with
+> previous versions of the driver.
 
-How do you plan on handling the rk3368 (with only one VOP and thus
-no selection happening)? I'd just make the above an int, so we could
-set it to -1 for that case. (value 0 is after all a valid reg).
+Hmm, it seems that 'i2cdetect' works fine with the driver.
 
+$ i2cdetect -l
+i2c-0   i2c             zx2967 i2c adapter                      I2C adapter
+$ i2cdetect 0
+WARNING! This program can confuse your I2C bus, cause data loss and worse!
+I will probe file /dev/i2c-0.
+I will probe address range 0x03-0x77.
+Continue? [Y/n] Y
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00:          -- -- -- -- -- -- -- -- -- -- -- -- -- 
+10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+20: -- -- UU -- -- -- -- -- -- -- -- -- -- -- -- -- 
+30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+40: -- -- -- -- 44 -- -- -- -- -- -- -- -- -- -- -- 
+50: -- -- -- -- -- -- -- -- -- -- 5a -- -- -- -- -- 
+60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+70: 70 -- -- -- -- -- -- --                         
+$
 
-Heiko
+The audio codec is on address 0x22.
 
+Why do you think it should be broken now?
 
-> +	u32	lcdsel_big;
-> +	u32	lcdsel_lit;
-> +};
->  
->  struct rockchip_hdmi {
->  	struct device *dev;
->  	struct regmap *regmap;
->  	struct drm_encoder encoder;
-> +	const struct rockchip_hdmi_chip_data *chip_data;
->  };
->  
->  #define to_rockchip_hdmi(x)	container_of(x, struct rockchip_hdmi, x)
-> @@ -198,17 +215,20 @@ static void dw_hdmi_rockchip_encoder_enable(struct drm_encoder *encoder)
->  {
->  	struct rockchip_hdmi *hdmi = to_rockchip_hdmi(encoder);
->  	u32 val;
-> -	int mux;
-> +	int ret;
->  
-> -	mux = drm_of_encoder_active_endpoint_id(hdmi->dev->of_node, encoder);
-> -	if (mux)
-> -		val = HDMI_SEL_VOP_LIT | (HDMI_SEL_VOP_LIT << 16);
-> +	ret = drm_of_encoder_active_endpoint_id(hdmi->dev->of_node, encoder);
-> +	if (ret)
-> +		val = hdmi->chip_data->lcdsel_lit;
->  	else
-> -		val = HDMI_SEL_VOP_LIT << 16;
-> +		val = hdmi->chip_data->lcdsel_big;
-> +
-> +	ret = regmap_write(hdmi->regmap, hdmi->chip_data->lcdsel_grf_reg, val);
-> +	if (ret != 0)
-> +		dev_err(hdmi->dev, "Could not write to GRF: %d\n", ret);
->  
-> -	regmap_write(hdmi->regmap, GRF_SOC_CON6, val);
->  	dev_dbg(hdmi->dev, "vop %s output to hdmi\n",
-> -		(mux) ? "LIT" : "BIG");
-> +		ret ? "LIT" : "BIG");
->  }
->  
->  static int
-> @@ -232,16 +252,40 @@ static void dw_hdmi_rockchip_encoder_enable(struct drm_encoder *encoder)
->  	.atomic_check = dw_hdmi_rockchip_encoder_atomic_check,
->  };
->  
-> -static const struct dw_hdmi_plat_data rockchip_hdmi_drv_data = {
-> +static struct rockchip_hdmi_chip_data rk3288_chip_data = {
-> +	.lcdsel_grf_reg = RK3288_GRF_SOC_CON6,
-> +	.lcdsel_big = HIWORD_UPDATE(0, RK3288_HDMI_LCDC_SEL),
-> +	.lcdsel_lit = HIWORD_UPDATE(RK3288_HDMI_LCDC_SEL, RK3288_HDMI_LCDC_SEL),
-> +};
-> +
-> +static const struct dw_hdmi_plat_data rk3288_hdmi_drv_data = {
-> +	.mode_valid = dw_hdmi_rockchip_mode_valid,
-> +	.mpll_cfg   = rockchip_mpll_cfg,
-> +	.cur_ctr    = rockchip_cur_ctr,
-> +	.phy_config = rockchip_phy_config,
-> +	.phy_data = &rk3288_chip_data,
-> +};
-> +
-> +static struct rockchip_hdmi_chip_data rk3399_chip_data = {
-> +	.lcdsel_grf_reg = RK3399_GRF_SOC_CON20,
-> +	.lcdsel_big = HIWORD_UPDATE(0, RK3399_HDMI_LCDC_SEL),
-> +	.lcdsel_lit = HIWORD_UPDATE(RK3399_HDMI_LCDC_SEL, RK3399_HDMI_LCDC_SEL),
-> +};
-> +
-> +static const struct dw_hdmi_plat_data rk3399_hdmi_drv_data = {
->  	.mode_valid = dw_hdmi_rockchip_mode_valid,
->  	.mpll_cfg   = rockchip_mpll_cfg,
->  	.cur_ctr    = rockchip_cur_ctr,
->  	.phy_config = rockchip_phy_config,
-> +	.phy_data = &rk3399_chip_data,
->  };
->  
->  static const struct of_device_id dw_hdmi_rockchip_dt_ids[] = {
->  	{ .compatible = "rockchip,rk3288-dw-hdmi",
-> -	  .data = &rockchip_hdmi_drv_data
-> +	  .data = &rk3288_hdmi_drv_data
-> +	},
-> +	{ .compatible = "rockchip,rk3399-dw-hdmi",
-> +	  .data = &rk3399_hdmi_drv_data
->  	},
->  	{},
->  };
-> @@ -268,6 +312,7 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
->  	match = of_match_node(dw_hdmi_rockchip_dt_ids, pdev->dev.of_node);
->  	plat_data = match->data;
->  	hdmi->dev = &pdev->dev;
-> +	hdmi->chip_data = plat_data->phy_data;
->  	encoder = &hdmi->encoder;
->  
->  	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm, dev->of_node);
-> 
+Shawn
