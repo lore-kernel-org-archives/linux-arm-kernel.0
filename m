@@ -1,40 +1,35 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Thu, 22 Jun 2017 16:35:50 +0300
-Subject: [PATCH 04/14] staging: fsl-mc: delete duplicated function prototypes
+Date: Thu, 22 Jun 2017 16:35:51 +0300
+Subject: [PATCH 05/14] staging: fsl-mc: delete prototype of unimplemented
+ function
 In-Reply-To: <20170622133600.31694-1-laurentiu.tudor@nxp.com>
 References: <20170622133600.31694-1-laurentiu.tudor@nxp.com>
-Message-ID: <20170622133600.31694-5-laurentiu.tudor@nxp.com>
+Message-ID: <20170622133600.31694-6-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-These functions already have their prototypes in fsl-mc-private.h
-header file so delete them from mc-bus.h.
+The function fsl_mc_bus_exists() has a prototype but is never
+implemented so delete it from the header file.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- drivers/staging/fsl-mc/include/mc-bus.h | 8 --------
- 1 file changed, 8 deletions(-)
+ drivers/staging/fsl-mc/include/mc-bus.h | 2 --
+ 1 file changed, 2 deletions(-)
 
 diff --git a/drivers/staging/fsl-mc/include/mc-bus.h b/drivers/staging/fsl-mc/include/mc-bus.h
-index 42700de..8f9bf8d 100644
+index 8f9bf8d..aac062e 100644
 --- a/drivers/staging/fsl-mc/include/mc-bus.h
 +++ b/drivers/staging/fsl-mc/include/mc-bus.h
-@@ -75,14 +75,6 @@ int dprc_scan_container(struct fsl_mc_device *mc_bus_dev);
- int dprc_scan_objects(struct fsl_mc_device *mc_bus_dev,
- 		      unsigned int *total_irq_count);
+@@ -91,8 +91,6 @@ void fsl_mc_init_all_resource_pools(struct fsl_mc_device *mc_bus_dev);
  
--int __init dprc_driver_init(void);
+ void fsl_mc_cleanup_all_resource_pools(struct fsl_mc_device *mc_bus_dev);
+ 
+-bool fsl_mc_bus_exists(void);
 -
--void dprc_driver_exit(void);
--
--int __init fsl_mc_allocator_driver_init(void);
--
--void fsl_mc_allocator_driver_exit(void);
--
- struct irq_domain *fsl_mc_msi_create_irq_domain(struct fwnode_handle *fwnode,
- 						struct msi_domain_info *info,
- 						struct irq_domain *parent);
+ void fsl_mc_get_root_dprc(struct device *dev,
+ 			  struct device **root_dprc_dev);
+ 
 -- 
 2.9.4
