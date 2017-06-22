@@ -1,90 +1,64 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 21 Jun 2017 22:21:45 -0500
-Subject: [PATCH 01/12] coresight replicator: Cleanup programmable
- replicator naming
-In-Reply-To: <CANLsYkzDMyhX_L5Aaf2p9+ze_qA=FCe+GdjEZcz03ZXaHXb46Q@mail.gmail.com>
-References: <1497278211-5001-1-git-send-email-suzuki.poulose@arm.com>
- <1497278211-5001-2-git-send-email-suzuki.poulose@arm.com>
- <20170613165528.GA6392@xps15>
- <20170616180820.enc3hxpju2tfu3fg@rob-hp-laptop>
- <CANLsYkzDMyhX_L5Aaf2p9+ze_qA=FCe+GdjEZcz03ZXaHXb46Q@mail.gmail.com>
-Message-ID: <CAL_JsqJy-1htMgRZ7r118QPU5NipeFJbq23EVe4-dv0k55z=6Q@mail.gmail.com>
+Date: Wed, 21 Jun 2017 22:22:56 -0500
+Subject: [PATCH] watchdog: meson-wdt: add support for the watchdog on
+ Meson8 and Meson8m2
+In-Reply-To: <CAFBinCAZZMT-YDHg4SYF3da+00KLYE-dZaEDPaEMRz_2paXNQw@mail.gmail.com>
+References: <20170611095219.22095-1-martin.blumenstingl@googlemail.com>
+ <20170615172510.GA7549@roeck-us.net>
+ <CAFBinCCyqX=TGwTyhxXZPP2noUvJ1v=xNs+Vs17Gg4z2uDgjEA@mail.gmail.com>
+ <20170616180009.h66dwnnhfwrjpui6@rob-hp-laptop>
+ <CAFBinCAZZMT-YDHg4SYF3da+00KLYE-dZaEDPaEMRz_2paXNQw@mail.gmail.com>
+Message-ID: <CAL_JsqJutEYt0eG96RG+jMosCEkqK=145Kquj2qJdQCV=wh2zg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 11:44 AM, Mathieu Poirier
-<mathieu.poirier@linaro.org> wrote:
-> On 18 June 2017 at 08:04, Rob Herring <robh@kernel.org> wrote:
->> On Tue, Jun 13, 2017 at 10:55:28AM -0600, Mathieu Poirier wrote:
->>> On Mon, Jun 12, 2017 at 03:36:40PM +0100, Suzuki K Poulose wrote:
->>> > The Linux coresight drivers define the programmable ATB replicator as
->>> > Qualcom replicator, while this is designed by ARM. This can cause confusion
->>> > to a user selecting the driver. Cleanup all references to make it
->>> >  explicitly clear. This patch :
+On Mon, Jun 19, 2017 at 1:50 PM, Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+> Hi Rob,
+>
+> On Sun, Jun 18, 2017 at 4:04 PM, Rob Herring <robh@kernel.org> wrote:
+>> On Thu, Jun 15, 2017 at 11:13:07PM +0200, Martin Blumenstingl wrote:
+>>> On Thu, Jun 15, 2017 at 7:25 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+>>> > On Sun, Jun 11, 2017 at 11:52:19AM +0200, Martin Blumenstingl wrote:
+>>> >> The watchdog IP block on Meson8 and Meson8m2 is already supported by the
+>>> >> existing meson-wdt driver. Meson8 uses the same register bits as Meson6,
+>>> >> while the newer Meson8m2 SoC uses the same register bits as Meson8b.
+>>> >>
+>>> >> Currently watchdog support on Meson8 SoC already works because
+>>> >> meson8.dtsi simply uses the "amlogic,meson6-wdt" compatible. Adding a
+>>> >> separate compatible for Meson8 makes this more explicit though.
+>>> >>
+>>> >> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 >>> >
->>> >  1) Adds a new compatible string for the same, retaining the old one for
->>> >     compatibility.
->>> >  2) Changes the Kconfig symbol (since this is not part of any defconfigs)
->>> >      CORESIGHT_QCOM_REPLICATOR => CORESIGHT_DYNAMIC_REPLICATOR
->>> >  3) Improves the help message in the Kconfig.
->>> >  4) Changes the name of the driver :
->>> >     coresight-replicator-qcom => coresight-dynamic-replicator
->>> >
->>> > Cc: Pratik Patel <pratikp@codeaurora.org>
->>> > Cc: Ivan T. Ivanov <ivan.ivanov@linaro.org>
->>> > Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->>> > Cc: devicetree at vger.kernel.org
->>> > Cc: Rob Herring <robh+dt@kernel.org>
->>> > Cc: Mark Rutland <mark.rutland@arm.com>
->>> > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>> > Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+>>> thank you!
+>>> is there anything holding you up from taking this patch (for example:
+>>> are you still missing any specific Signed-off-by / Acked-by)?
 >>>
->>> Hi Suzuki,
+>>> > In general, changes like this are not necessary, though. The dts file
+>>> > is supposed to reference both generic and specific compatible strings.
+>>> I thought about skipping this patch, but I find that it looks strange without.
 >>>
->>> > ---
->>> >  Documentation/devicetree/bindings/arm/coresight.txt     |  4 +++-
->>> >  drivers/hwtracing/coresight/Kconfig                     | 10 +++++-----
->>> >  drivers/hwtracing/coresight/Makefile                    |  2 +-
->>> >  drivers/hwtracing/coresight/coresight-replicator-qcom.c |  2 +-
->>> >  4 files changed, 10 insertions(+), 8 deletions(-)
->>> >
->>> > diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
->>> > index fcbae6a..f77329f 100644
->>> > --- a/Documentation/devicetree/bindings/arm/coresight.txt
->>> > +++ b/Documentation/devicetree/bindings/arm/coresight.txt
->>> > @@ -34,7 +34,9 @@ its hardware characteristcs.
->>> >             - Embedded Trace Macrocell (version 4.x):
->>> >                     "arm,coresight-etm4x", "arm,primecell";
->>> >
->>> > -           - Qualcomm Configurable Replicator (version 1.x):
->>> > +           - Coresight programmable Replicator (version 1.x):
->>> > +                   "arm,coresight-dynamic-replicator", "arm,primecell";
->>> > +                           OR
->>> >                     "qcom,coresight-replicator1x", "arm,primecell";
+>>> the hierarchy and the corresponding compatible strings would be:
+>>> meson.dtsi / compatible = "amlogic,meson6-wdt";
+>>> |- meson8.dtsi / compatible = "amlogic,meson8-wdt", "amlogic,meson6-wdt";
+>>>    |- meson8m2.dtsi (upcoming) / compatible = "amlogic,meson8m2-wdt",
+>>> "amlogic,meson8b-wdt";
+>>> |- meson8b.dtsi / compatible = "amlogic,meson8b-wdt";
 >>>
->>> Rob, what's your view on keeping the old binding around?  We could simply change
->>> the two occurences we find in the DTs (Juno and 410c) to the new name and be
->>> done with the old one.
+>>> instead of this seemingly random mixup of compatible strings I decided
+>>> to introduce separate ones for each SoC.
 >>
->> Juno uses the Qcom string? We should keep the old string. You can switch
->> the dts files, but the driver should support the old name.
->
-> When we first started working on CoreSight programmable replicators
-> were available but the documentation wasn't public.  As such when I
-> saw Qualcomm's design I mistakenly thought it was a custom IP block
-> and came up with a compatible string that reflected that reality.
-> Fast forward 3 years the documentation is available and Juno has used
-> the same IP block in their design.  Suzuki's patch rectifies history
-> by changing the programmable replicator naming convention to what it
-> should have been from the start.
->
-> That being said, we can keep the old compatible string around but it
-> won't change anything.  CoreSight devices are discovered on the AMBA
-> bus and don't use the compatible string - drivers are probed based on
-> AMBA IDs laid out in the drivers and device IDs found in HW ID
-> registers.
->
-> In light of the above let me know what you want to do.
+>> But if the block is backwards compatible, you should also provide a
+>> fallback compatible string.
+> OK, fine with me - do you want me to update the documentation to
+> reflect this (or is it enough if I take care of it in the .dts files)?
+> the resulting documentation could look like this:
+>        "amlogic,meson6-wdt" on Meson6 SoCs
+>        "amlogic,meson8-wdt" along with "amlogic,meson6-wdt" on Meson8 SoCs
+>        "amlogic,meson8b-wdt" on Meson8b SoCs
+>        "amlogic,meson8m2-wdt" along with "amlogic,meson8b-wdt" on Meson8m2 SoCs
 
-Well, if drivers don't use the string, then there is nothing to keep around.
+Yes, like this.
 
 Rob
