@@ -1,59 +1,86 @@
-From: jlu@pengutronix.de (Jan =?ISO-8859-1?Q?L=FCbbe?=)
-Date: Thu, 22 Jun 2017 16:11:35 +0200
-Subject: [RFC PATCH 1/4] EDAC: mvebu: Add driver for Marvell Armada SoCs
-In-Reply-To: <1497014062.3536.52.camel@pengutronix.de>
-References: <20170608041124.4624-1-chris.packham@alliedtelesis.co.nz>
- <20170608041124.4624-2-chris.packham@alliedtelesis.co.nz>
- <1497014062.3536.52.camel@pengutronix.de>
-Message-ID: <1498140695.2533.76.camel@pengutronix.de>
+From: robert.moore@intel.com (Moore, Robert)
+Date: Thu, 22 Jun 2017 14:13:18 +0000
+Subject: [PATCH v4 1/2] ACPICA: ACPI 6.2: Add support for new SRAT subtable
+In-Reply-To: <20170622134303.GA9732@red-moon>
+References: <1498111812-17053-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <1498111812-17053-2-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <20170622134303.GA9732@red-moon>
+Message-ID: <94F2FBAB4432B54E8AACC7DFDE6C92E37E5C3067@ORSMSX110.amr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+This support is already in the ACPICA code base, but I can't speak to when it will be upstreamed to Linux. Lv would know this.
+Bob
 
-On Fr, 2017-06-09 at 15:14 +0200, Jan L?bbe wrote:
-> > +static void mvebu_init_csrows(struct mem_ctl_info *mci,
-> > +                             struct mvebu_mc_pdata *pdata)
-> [...]
-> > +     devtype = (ctl >> 20) & 0x3;
-> > +     switch (devtype) {
-> > +     case 0x0:
-> > +             dimm->dtype = DEV_X32;
-> > +             break;
-> > +     case 0x2:               /* could be X8 too, but no way to tell
+
+> -----Original Message-----
+> From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
+> Sent: Thursday, June 22, 2017 6:43 AM
+> To: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>; Zheng, Lv
+> <lv.zheng@intel.com>; Moore, Robert <robert.moore@intel.com>; Rafael J.
+> Wysocki <rjw@rjwysocki.net>
+> Cc: linux-acpi at vger.kernel.org; devel at acpica.org; linux-
+> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> marc.zyngier at arm.com; catalin.marinas at arm.com; will.deacon at arm.com;
+> hanjun.guo at linaro.org; tglx at linutronix.de; jason at lakedaemon.net;
+> jnair at caviumnetworks.com; gpkulkarni at gmail.com
+> Subject: Re: [PATCH v4 1/2] ACPICA: ACPI 6.2: Add support for new SRAT
+> subtable
+> 
+> Hi Rafael, Lv, Robert,
+> 
+> On Thu, Jun 22, 2017 at 11:40:11AM +0530, Ganapatrao Kulkarni wrote:
+> > Add GIC ITS Affinity (ACPI 6.2) subtable to SRAT table.
+> >
+> > ACPICA commit 5bc67f63918da249bfe279ee461d152bb3e6f55b
+> > Link: https://github.com/acpica/acpica/commit/5bc67f6
+> >
+> > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> > ---
+> >  include/acpi/actbl1.h | 12 +++++++++++-
+> >  1 file changed, 11 insertions(+), 1 deletion(-)
+> 
+> This patch is fine to me but it is up to you or who sends the ACPICA
+> pull request to send it upstream or give us an ACK so that it can go via
+> irqchip.
+> 
+> We need to know how this commit (and other ACPICA changes) will be sent
+> upstream to handle trees dependencies, please advise it is a bit urgent,
+> thank you.
+> 
+> Lorenzo
+> 
+> > diff --git a/include/acpi/actbl1.h b/include/acpi/actbl1.h index
+> > b4ce55c..253c9db 100644
+> > --- a/include/acpi/actbl1.h
+> > +++ b/include/acpi/actbl1.h
+> > @@ -1192,7 +1192,8 @@ enum acpi_srat_type {
+> >  	ACPI_SRAT_TYPE_MEMORY_AFFINITY = 1,
+> >  	ACPI_SRAT_TYPE_X2APIC_CPU_AFFINITY = 2,
+> >  	ACPI_SRAT_TYPE_GICC_AFFINITY = 3,
+> > -	ACPI_SRAT_TYPE_RESERVED = 4	/* 4 and greater are reserved */
+> > +	ACPI_SRAT_TYPE_GIC_ITS_AFFINITY = 4,	/* ACPI 6.2 */
+> > +	ACPI_SRAT_TYPE_RESERVED = 5	/* 5 and greater are reserved */
+> >  };
+> >
+> >  /*
+> > @@ -1260,6 +1261,15 @@ struct acpi_srat_gicc_affinity {
+> >  	u32 clock_domain;
+> >  };
+> >
+> > +/* 4: GIC ITS Affinity (ACPI 6.2) */
+> > +
+> > +struct acpi_srat_its_affinity {
+> > +	struct acpi_subtable_header header;
+> > +	u32 proximity_domain;
+> > +	u16 reserved;
+> > +	u32 its_id;
+> > +};
+> > +
+> >  /* Flags for struct acpi_srat_gicc_affinity */
+> >
+> >  #define ACPI_SRAT_GICC_ENABLED     (1)	/* 00: Use affinity structure
 > */
-> > +             dimm->dtype = DEV_X16;
-> > +             break;
-> > +     case 0x3:
-> > +             dimm->dtype = DEV_X4;
-> > +             break;
-> > +     default:
-> > +             dimm->dtype = DEV_UNKNOWN;
-> > +             break;
-> > +     }
-> This register is documented as reserved? I pulled the X8/X16
-> information from the Address Control Register (CSnStruct bits).
-
-Do you have more information on how to decode the Bus width?
-
-It's not clear from the MV78230/78x60 docs:
-- The SDRAM Configuration Register, offset 15 bit is:
-  0 = Half (32 bit data bus)
-  1 = Full (64 bit data bus)
-- The SDRAM Address Control Register, offsets 0-1, 4-5, 8-9 and 12-13
-(for CS 0, 1, 3 and 4):
-  0 = X8
-  1 = X16
-  2 and 3 are not documented
-
-Is this clearer in your documentation, so that we can have the same code
-handle both variants? Otherwise, we'd probably need separate DT
-compatibles.
-
-Regards,
-Jan
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> > --
+> > 1.8.1.4
+> >
