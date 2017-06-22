@@ -1,34 +1,71 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 22 Jun 2017 15:22:18 +0200
-Subject: [PATCH 2/2] i2c: zx2967: add i2c controller driver for ZTE's
- zx2967 family
-In-Reply-To: <20170622122558.GB23753@dragon>
-References: <1495947576-11037-1-git-send-email-shawnguo@kernel.org>
- <1495947576-11037-3-git-send-email-shawnguo@kernel.org>
- <20170619193130.velebm7p3r5ggaos@ninjato>
- <20170620025815.GA4818@x250> <20170620074126.GA1541@katana>
- <20170622074831.GA23753@dragon>
- <20170622080730.o352kxrs5pz7wxnf@ninjato>
- <20170622122558.GB23753@dragon>
-Message-ID: <20170622132218.GA3820@katana>
+From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
+Date: Thu, 22 Jun 2017 16:35:46 +0300
+Subject: [PATCH 00/14] staging: fsl-mc: clean up header files
+Message-ID: <20170622133600.31694-1-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-> With the proper error handling, i2cdetect now works very fast and only
-> gets audio codec on 0x22, which is correct.
+This patch series contain mainly clean-ups of the mc-bus header files
+with the final goal of reorganizing them in just 2 files: a public
+and a private one, as per GregKH suggestion [1].
+Here's a summary of the header reorganizing:
+ - existing mc.h used as public header (contained most of the public API)
+ - existing fsl-mc-private.h used for private header
+ - mc-bus.h merged both in public and private header
+ - mc-sys.h and mc-cmd.h merged in public header
+ - dprc.h made private
+ - dpmng.h deleted
 
-Cool! Now make sure that the error codes are matching
-Documentation/i2c/fault-codes and I think we are ready to go.
+[1] https://patchwork.kernel.org/patch/9775683/
 
-> Thanks a lot for identifying the bug.
+Laurentiu Tudor (14):
+  staging: fsl-mc: drop macros with possible side effects
+  staging: fsl-mc: drop useless #includes
+  staging: fsl-mc: decouple the mc-bus public headers from dprc.h
+  staging: fsl-mc: delete duplicated function prototypes
+  staging: fsl-mc: delete prototype of unimplemented function
+  staging: fsl-mc: turn several exported functions static
+  staging: fsl-mc: move irq domain creation prototype to public header
+  staging: fsl-mc: move couple of definitions to public header
+  staging: fsl-mc: move rest of mc-bus.h to private header
+  staging: fsl-mc: remove dpmng API files and move implemention in the
+    bus
+  staging: fsl-mc: fix a few implicit includes
+  staging: fsl-mc: move mc-sys.h contents in the public header
+  staging: fsl-mc: move mc-cmd.h contents in the public header
+  staging: fsl-mc: make dprc.h header private
 
-You are welcome!
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c     |   1 -
+ drivers/staging/fsl-dpaa2/ethernet/dpni.c          |   3 +-
+ drivers/staging/fsl-mc/bus/dpbp.c                  |   4 +-
+ drivers/staging/fsl-mc/bus/dpcon.c                 |   4 +-
+ drivers/staging/fsl-mc/bus/dpio/dpio.c             |   4 +-
+ drivers/staging/fsl-mc/bus/dpmcp.c                 |   4 +-
+ drivers/staging/fsl-mc/bus/dpmng.c                 |  74 --------
+ drivers/staging/fsl-mc/bus/dprc-driver.c           |  62 +++----
+ drivers/staging/fsl-mc/bus/dprc.c                  |   8 +-
+ drivers/staging/fsl-mc/{include => bus}/dprc.h     |  46 +----
+ drivers/staging/fsl-mc/bus/fsl-mc-allocator.c      |  23 ++-
+ drivers/staging/fsl-mc/bus/fsl-mc-bus.c            |  71 +++++--
+ drivers/staging/fsl-mc/bus/fsl-mc-msi.c            |   2 -
+ drivers/staging/fsl-mc/bus/fsl-mc-private.h        |  64 ++++++-
+ .../staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c |   1 -
+ drivers/staging/fsl-mc/bus/mc-io.c                 |   3 +-
+ drivers/staging/fsl-mc/bus/mc-sys.c                |   2 -
+ drivers/staging/fsl-mc/include/dpmng.h             |  67 -------
+ drivers/staging/fsl-mc/include/mc-bus.h            | 111 -----------
+ drivers/staging/fsl-mc/include/mc-cmd.h            | 130 -------------
+ drivers/staging/fsl-mc/include/mc-sys.h            |  98 ----------
+ drivers/staging/fsl-mc/include/mc.h                | 204 ++++++++++++++++++++-
+ 22 files changed, 383 insertions(+), 603 deletions(-)
+ delete mode 100644 drivers/staging/fsl-mc/bus/dpmng.c
+ rename drivers/staging/fsl-mc/{include => bus}/dprc.h (84%)
+ delete mode 100644 drivers/staging/fsl-mc/include/dpmng.h
+ delete mode 100644 drivers/staging/fsl-mc/include/mc-bus.h
+ delete mode 100644 drivers/staging/fsl-mc/include/mc-cmd.h
+ delete mode 100644 drivers/staging/fsl-mc/include/mc-sys.h
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170622/43eccea0/attachment.sig>
+-- 
+2.9.4
