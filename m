@@ -1,49 +1,43 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 22 Jun 2017 10:38:55 +0100
-Subject: [PATCH 2/4] ARM/PCI: mv78xx0: pass pci_ops correctly again
-In-Reply-To: <20170621215323.3921382-2-arnd@arndb.de>
-References: <20170621215323.3921382-1-arnd@arndb.de>
- <20170621215323.3921382-2-arnd@arndb.de>
-Message-ID: <20170622093855.GA23310@red-moon>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Thu, 22 Jun 2017 10:39:57 +0100
+Subject: [PATCH V2 4/5] arch_topology: Return 0 or -ve errors from
+ topology_parse_cpu_capacity()
+In-Reply-To: <2213a1f0657ef057dd775085943b362dc3e9757d.1498019799.git.viresh.kumar@linaro.org>
+References: <cover.1498019799.git.viresh.kumar@linaro.org>
+ <2213a1f0657ef057dd775085943b362dc3e9757d.1498019799.git.viresh.kumar@linaro.org>
+Message-ID: <20170622093957.vlhacauj4vff64bv@e106622-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 21, 2017 at 11:53:00PM +0200, Arnd Bergmann wrote:
-> We used to pass the operations when calling pci_scan_root_bus, but
-> that argument was removed:
+Hi,
+
+On 21/06/17 10:16, Viresh Kumar wrote:
+> Use the standard way of returning errors instead of returning 0(failure)
+> OR 1(success) and making it hard to read.
 > 
-> arch/arm/mach-mv78xx0/pcie.c:175:23: error: 'pcie_ops' defined but not used [-Werror=unused-variable]
-> 
-> Setting it in pci_hw should address this.
-
-No unfortunately it does not. The way I structured the code the
-bridge set-up is carried out in the struct hw_pci.scan() callback and
-for mv78xx0 it was not done properly.
-
-As said in the other thread we need a pci_fixup_irqs() removal v3 to
-address these issues, given that on some host bridges v2 it is still
-untested.
-
-Lorenzo
-
-> Fixes: ace27646da8e ("ARM/PCI: Convert PCI scan API to pci_scan_root_bus_bridge()")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 > ---
->  arch/arm/mach-mv78xx0/pcie.c | 1 +
->  1 file changed, 1 insertion(+)
+>  arch/arm/kernel/topology.c   | 2 +-
+>  drivers/base/arch_topology.c | 8 ++++----
+>  2 files changed, 5 insertions(+), 5 deletions(-)
 > 
-> diff --git a/arch/arm/mach-mv78xx0/pcie.c b/arch/arm/mach-mv78xx0/pcie.c
-> index 2b406e909a43..cb7f95c9d8eb 100644
-> --- a/arch/arm/mach-mv78xx0/pcie.c
-> +++ b/arch/arm/mach-mv78xx0/pcie.c
-> @@ -214,6 +214,7 @@ static int __init mv78xx0_pcie_map_irq(const struct pci_dev *dev, u8 slot,
->  }
+> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+> index bf949a763dbe..a7ef4c35855e 100644
+> --- a/arch/arm/kernel/topology.c
+> +++ b/arch/arm/kernel/topology.c
+> @@ -111,7 +111,7 @@ static void __init parse_dt_topology(void)
+>  			continue;
+>  		}
 >  
->  static struct hw_pci mv78xx0_pci __initdata = {
-> +	.ops		= &pcie_ops,
->  	.nr_controllers	= 8,
->  	.preinit	= mv78xx0_pcie_preinit,
->  	.setup		= mv78xx0_pcie_setup,
-> -- 
-> 2.9.0
-> 
+> -		if (topology_parse_cpu_capacity(cn, cpu)) {
+> +		if (!topology_parse_cpu_capacity(cn, cpu)) {
+
+Not sure why you want to change this.
+
+I currently read it as "if cpu_capacity parsing succedeed" continue with
+next CPU, otherwise we set cap_from_dt to false and fall back to using
+efficiencies.
+
+Thanks,
+
+- Juri
