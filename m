@@ -1,50 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 22 Jun 2017 13:15:24 +0200
-Subject: [PATCH V1 7/9] clk: sprd: add adjustable pll support
-In-Reply-To: <CAAfSe-sMy3aM9=LwpVivvHKy4hVw3GEd3U-hZe17pXM5fJRxPg@mail.gmail.com>
-References: <20170618015855.27738-1-chunyan.zhang@spreadtrum.com>
- <20170618015855.27738-8-chunyan.zhang@spreadtrum.com>
- <20170620013710.GJ4493@codeaurora.org>
- <CAAfSe-sMy3aM9=LwpVivvHKy4hVw3GEd3U-hZe17pXM5fJRxPg@mail.gmail.com>
-Message-ID: <CAK8P3a1ELg1XcY-QOZn-f6kR9yt-Q6LNLUYEY-BNW-2BaBy6EQ@mail.gmail.com>
+From: jarkko.nikula@linux.intel.com (Jarkko Nikula)
+Date: Thu, 22 Jun 2017 14:16:18 +0300
+Subject: [PATCH 1/9] i2c: designware: Fix system suspend
+In-Reply-To: <20170622104933.GY629@lahna.fi.intel.com>
+References: <1498072888-14782-1-git-send-email-ulf.hansson@linaro.org>
+ <1498072888-14782-2-git-send-email-ulf.hansson@linaro.org>
+ <CAJZ5v0iYwPE8rpn=aZ9n6LV-qbAK3kynRqVZ7xxuB+gYar_fyg@mail.gmail.com>
+ <20170622104933.GY629@lahna.fi.intel.com>
+Message-ID: <5540bae1-b1bf-0e15-1fa0-977076fa0753@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 22, 2017 at 12:17 PM, Chunyan Zhang <zhang.lyra@gmail.com> wrote:
-> On 20 June 2017 at 09:37, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> On 06/18, Chunyan Zhang wrote:
-
->>> +     kint = DIV_ROUND_CLOSEST(((fvco - refin * nint * CCU_PLL_1M)/10000) *
->>> +     ((mask >> (shift + i)) + 1), refin * 100) << i;
->>> +     cfg[index].val |= (kint << shift) & mask;
->>> +     cfg[index].msk |= mask;
->>> +
->>> +     ibias_val = pll_get_ibias(fvco, pll->itable);
->>> +
->>> +     mask = pmask(pll, PLL_IBIAS);
->>> +     index = pindex(pll, PLL_IBIAS);
->>> +     shift = pshift(pll, PLL_IBIAS);
->>> +     cfg[index].val |= ibias_val << shift & mask;
->>> +     cfg[index].msk |= mask;
->>> +
->>> +     for (i = 0; i < reg_num; i++) {
->>> +             if (cfg[i].msk)
->>> +                     ccu_pll_writel(pll, i, cfg[i].val, cfg[i].msk);
->>> +     }
->>> +
->>
->> Are we waiting for the writel() to go through above? If so we
->> need a readl() of the same register to make sure the write has
->> completed before delaying.
+On 06/22/2017 01:49 PM, Mika Westerberg wrote:
+> On Thu, Jun 22, 2017 at 01:31:51AM +0200, Rafael J. Wysocki wrote:
+>> On Wed, Jun 21, 2017 at 9:21 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> Thanks Ulf for taking care of this!
 >
-> After writing these configuration registers, we have to wait a certain
-> time to make sure the pll has worked as we configured.  This depends
-> on other circuit part, so we use udelay rather than reading the same
-> register.
+Indeed!
 
-I think you have to do both: normally the writel() is not guaranteed
-to arrive at the device until you read back from an address in the
-same device, so the delay must happen after the readl(), or you won't
-know how long to wait for.
+> I tested this series on Dell XPS 9350 which has touch panel connected to
+> I2C and suspend/resume still works fine and I can see the controller
+> going to D3 when the touch panel is idle.
+>
+> I can perform more comprehensive testing next week.
+>
+Unfortunately I'm seeing interrupt storm during suspend/resume on 
+platform using PM domain from drivers/acpi/acpi_lpss.c straight after 
+this patch. Maybe some timing related as I see it only if I have debug 
+messages on (i2c_designware_core.dyndbg=+p). But it occurs only after 
+this patch.
 
-       Arnd
+Have to dig more deeply next week.
+
+-- 
+Jarkko
