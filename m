@@ -1,77 +1,44 @@
-From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Thu, 22 Jun 2017 10:25:21 +0800
-Subject: [v2] drm: mediatek: change the variable type of rdma threshold
-In-Reply-To: <20170621211456.GA21176@roeck-us.net>
-References: <1495187843-6882-1-git-send-email-bibby.hsieh@mediatek.com>
- <20170621211456.GA21176@roeck-us.net>
-Message-ID: <1498098321.717.17.camel@mtksdaap41>
+From: jeffy.chen@rock-chips.com (jeffy)
+Date: Thu, 22 Jun 2017 10:33:47 +0800
+Subject: [RFC PATCH v3 3/6] ARM/arm64: dts: enable wakeup for cros-ec-spi
+ devices
+In-Reply-To: <20170621153632.7cajs5xwdmhdm2fg@kozik-lap>
+References: <1498039313-24220-1-git-send-email-jeffy.chen@rock-chips.com>
+ <1498039313-24220-4-git-send-email-jeffy.chen@rock-chips.com>
+ <CAJKOXPdL2CB9VWNo=it0dos-4hJYrgHUSZwcG1DS=9c+YxXzhQ@mail.gmail.com>
+ <594A91C9.1090906@rock-chips.com> <20170621153632.7cajs5xwdmhdm2fg@kozik-lap>
+Message-ID: <594B2C8B.3000401@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Guenter,
+Hi Krzysztof,
 
-Thanks for your test and comment.
-
-
-On Wed, 2017-06-21 at 14:14 -0700, Guenter Roeck wrote:
-> On Fri, May 19, 2017 at 05:57:23PM +0800, Bibby Hsieh wrote:
-> > For some greater resolution, the rdma threshold
-> > variable will overflow.
-> > 
-> > Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-> > ---
-> >  drivers/gpu/drm/mediatek/mtk_disp_rdma.c | 7 ++++---
-> >  1 file changed, 4 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> > index 0df05f9..9afdcd7 100644
-> > --- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> > +++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> > @@ -37,7 +37,7 @@
-> >  #define DISP_REG_RDMA_FIFO_CON			0x0040
-> >  #define RDMA_FIFO_UNDERFLOW_EN				BIT(31)
-> >  #define RDMA_FIFO_PSEUDO_SIZE(bytes)			(((bytes) / 16) << 16)
-> > -#define RDMA_OUTPUT_VALID_FIFO_THRESHOLD(bytes)		((bytes) / 16)
-> > +#define RDMA_OUTPUT_VALID_FIFO_THRESHOLD(bytes) (((bytes) / 16) & 0x3ff)
-> 
-> I agree with the earlier comment; clamp_val() might be more appropriate here
-> and would avoid unexpected results.
-> 
-
-Yep, It's a good suggestion to me, I will add clamp_val() to avoid
-unexpected value, thanks.
-
-> >  
-> >  /**
-> >   * struct mtk_disp_rdma - DISP_RDMA driver structure
-> > @@ -109,7 +109,7 @@ static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
-> >  			    unsigned int height, unsigned int vrefresh,
-> >  			    unsigned int bpc)
-> >  {
-> > -	unsigned int threshold;
-> > +	unsigned long long threshold;
-> >  	unsigned int reg;
-> >  
-> >  	rdma_update_bits(comp, DISP_REG_RDMA_SIZE_CON_0, 0xfff, width);
-> > @@ -121,7 +121,8 @@ static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
-> >  	 * output threshold to 6 microseconds with 7/6 overhead to
-> >  	 * account for blanking, and with a pixel depth of 4 bytes:
-> >  	 */
-> > -	threshold = width * height * vrefresh * 4 * 7 / 1000000;
-> > +	threshold = (unsigned long long)width * height * vrefresh *
-> > +		    4 * 7 / 1000000;
-> 
-> This is a 64 bit divide operation. It will result in a build failure
-> if compiled for a 32 bit kernel (eg arm:allmodconfig).
-> 
-> ERROR: "__aeabi_uldivmod" [drivers/gpu/drm/mediatek/mediatek-drm.ko] undefined!
-> 
-
-Sorry about the lack of tests, I will change the divide operation to
-div_u64 function, thanks for your suggestions.
+thanx for noting that, will add it to next version :)
 
 
-> Guenter
-
--- 
-Bibby
+On 06/21/2017 11:36 PM, Krzysztof Kozlowski wrote:
+> On Wed, Jun 21, 2017 at 11:33:29PM +0800, jeffy wrote:
+>> Hi Krzysztof,
+>>
+>> thanx for your comment.
+>>
+>> On 06/21/2017 06:45 PM, Krzysztof Kozlowski wrote:
+>>> On Wed, Jun 21, 2017 at 12:01 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
+>>>> We used to enable wakeup for cros-ec-spi devices unconditionally.
+>>>> Now we are using the more generic wakeup-source property to enable it.
+>>>
+>>> Using wakeup-source property is still enabling this unconditionally.
+>>> What  do you exactly mean here?
+>> i mean the wakeup-source is an optional property, we can disable wakeup by
+>> not adding it.
+>
+> Maybe mention this in commit msg? This removes any confusion. "Till now
+> the driver always enabled wakeup but now it supports wakeup property so
+> add it to keep same functionality."
+>
+> Best regards,
+> Krzysztof
+>
+>
+>
+>
