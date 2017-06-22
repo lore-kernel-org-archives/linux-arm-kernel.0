@@ -1,33 +1,54 @@
-From: hugues.fruchet@st.com (Hugues Fruchet)
-Date: Thu, 22 Jun 2017 17:12:47 +0200
-Subject: [PATCH v1 1/5] [media] stm32-dcmi: catch dma submission error
-In-Reply-To: <1498144371-13310-1-git-send-email-hugues.fruchet@st.com>
-References: <1498144371-13310-1-git-send-email-hugues.fruchet@st.com>
-Message-ID: <1498144371-13310-2-git-send-email-hugues.fruchet@st.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 22 Jun 2017 10:16:51 -0500
+Subject: [PATCH] of: update ePAPR references to point to Devicetree
+ Specification
+In-Reply-To: <5947A62D.6050504@gmail.com>
+References: <1497408544-7383-1-git-send-email-frowand.list@gmail.com>
+ <20170618140531.jvmnttawom4ns55b@rob-hp-laptop>
+ <5947A62D.6050504@gmail.com>
+Message-ID: <20170622151651.ghls5dgrrcjl7tnj@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Test cookie return by dmaengine_submit() and return error if any.
+On Mon, Jun 19, 2017 at 03:23:41AM -0700, Frank Rowand wrote:
+> On 06/18/17 07:05, Rob Herring wrote:
+> > On Tue, Jun 13, 2017 at 07:49:04PM -0700, frowand.list at gmail.com wrote:
+> >> From: Frank Rowand <frank.rowand@sony.com>
+> >>
+> >> The Devicetree Specification has superseded the ePAPR as the
+> >> base specification for bindings.  Update files in Documentation
+> >> to reference the new document.
+> >>
+> >> Some files are not updated because there is no hypervisor chapter
+> >> in the Devicetree Specification:
+> >>    Documentation/devicetree/bindings/powerpc/fsl/msi-pic.txt
+> >>    Documenation/virtual/kvm/api.txt
+> >>    Documenation/virtual/kvm/ppc-pv.txt
 
-Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
----
- drivers/media/platform/stm32/stm32-dcmi.c | 4 ++++
- 1 file changed, 4 insertions(+)
+> >> diff --git a/Documentation/devicetree/bindings/powerpc/fsl/cpus.txt b/Documentation/devicetree/bindings/powerpc/fsl/cpus.txt
+> >> index f8cd2397aa04..d63ab1dec16d 100644
+> >> --- a/Documentation/devicetree/bindings/powerpc/fsl/cpus.txt
+> >> +++ b/Documentation/devicetree/bindings/powerpc/fsl/cpus.txt
+> >> @@ -3,10 +3,10 @@ Power Architecture CPU Binding
+> >>  Copyright 2013 Freescale Semiconductor Inc.
+> >>  
+> >>  Power Architecture CPUs in Freescale SOCs are represented in device trees as
+> >> -per the definition in ePAPR.
+> >> +per the definition in the Devicetree Specification.
+> > 
+> > Are we sure we didn't remove any PPC specifics that apply here?
+> 
+> I don't see any.
+> 
+> Table 3.7.1 "General Properties of CPU nodes" was slightly
+> re-ordered, but the same properties are listed in both documents.
+> 
+> I don't think that the boot requirements removal impacts this
+> file.
+> 
+> Am I missing something?
 
-diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
-index 83d32a5..0dd5d1c 100644
---- a/drivers/media/platform/stm32/stm32-dcmi.c
-+++ b/drivers/media/platform/stm32/stm32-dcmi.c
-@@ -295,6 +295,10 @@ static int dcmi_start_dma(struct stm32_dcmi *dcmi,
- 
- 	/* Push current DMA transaction in the pending queue */
- 	dcmi->dma_cookie = dmaengine_submit(desc);
-+	if (dma_submit_error(dcmi->dma_cookie)) {
-+		dev_err(dcmi->dev, "%s: DMA submission failed\n", __func__);
-+		return -ENXIO;
-+	}
- 
- 	dma_async_issue_pending(dcmi->dma_chan);
- 
--- 
-1.9.1
+No, I just wanted to make sure. So I guess there's just that one minor 
+thing to drop.
+
+Rob
