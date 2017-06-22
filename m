@@ -1,394 +1,196 @@
 From: zhang.lyra@gmail.com (Chunyan Zhang)
-Date: Thu, 22 Jun 2017 18:17:26 +0800
-Subject: [PATCH V1 7/9] clk: sprd: add adjustable pll support
-In-Reply-To: <20170620013710.GJ4493@codeaurora.org>
+Date: Thu, 22 Jun 2017 18:21:06 +0800
+Subject: [PATCH V1 8/9] clk: sprd: add clocks support for SC9860
+In-Reply-To: <20170620014137.GK4493@codeaurora.org>
 References: <20170618015855.27738-1-chunyan.zhang@spreadtrum.com>
- <20170618015855.27738-8-chunyan.zhang@spreadtrum.com>
- <20170620013710.GJ4493@codeaurora.org>
-Message-ID: <CAAfSe-sMy3aM9=LwpVivvHKy4hVw3GEd3U-hZe17pXM5fJRxPg@mail.gmail.com>
+ <20170618015855.27738-9-chunyan.zhang@spreadtrum.com>
+ <20170620014137.GK4493@codeaurora.org>
+Message-ID: <CAAfSe-s5oPB_G=sSAqVpYkgxhD=AE3nxv-V7-t0v+qw_AtxH3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 June 2017 at 09:37, Stephen Boyd <sboyd@codeaurora.org> wrote:
+Hi Stephen,
+
+On 20 June 2017 at 09:41, Stephen Boyd <sboyd@codeaurora.org> wrote:
 > On 06/18, Chunyan Zhang wrote:
 >> diff --git a/drivers/clk/sprd/Makefile b/drivers/clk/sprd/Makefile
->> index 83232e5..c593a93 100644
+>> index c593a93..0d90b40 100644
 >> --- a/drivers/clk/sprd/Makefile
 >> +++ b/drivers/clk/sprd/Makefile
->> @@ -1,3 +1,3 @@
+>> @@ -1,3 +1,4 @@
 >>  ifneq ($(CONFIG_OF),)
->> -obj-y        += ccu_common.o ccu_gate.o ccu_mux.o ccu_div.o ccu_composite.o
->> +obj-y        += ccu_common.o ccu_gate.o ccu_mux.o ccu_div.o ccu_composite.o ccu_pll.o
+>>  obj-y        += ccu_common.o ccu_gate.o ccu_mux.o ccu_div.o ccu_composite.o ccu_pll.o
+>> +obj-y        += ccu-sc9860.o
+>
+> And a Kconfig for this SoC specific driver.
+
+Ok.
+
+>
 >>  endif
->> diff --git a/drivers/clk/sprd/ccu_pll.c b/drivers/clk/sprd/ccu_pll.c
+>> diff --git a/drivers/clk/sprd/ccu-sc9860.c b/drivers/clk/sprd/ccu-sc9860.c
 >> new file mode 100644
->> index 0000000..6c908e4
+>> index 0000000..6cd4dc5
 >> --- /dev/null
->> +++ b/drivers/clk/sprd/ccu_pll.c
->> @@ -0,0 +1,241 @@
->> +/*
->> + * Spreadtrum pll clock driver
->> + *
->> + * Copyright (C) 2015~2017 Spreadtrum, Inc.
->> + *
->> + * SPDX-License-Identifier: GPL-2.0
->> + */
+>> +++ b/drivers/clk/sprd/ccu-sc9860.c
 >> +
->> +#include <linux/delay.h>
->> +#include <linux/clk.h>
+>> +static CLK_FIXED_FACTOR(fac_4m,              "fac-4m",       "ext-26m",
+>> +                     6, 1, CLK_IS_BASIC);
+>> +static CLK_FIXED_FACTOR(fac_2m,              "fac-2m",       "ext-26m",
+>> +                     13, 1, CLK_IS_BASIC);
+>> +static CLK_FIXED_FACTOR(fac_1m,              "fac-1m",       "ext-26m",
+>> +                     26, 1, CLK_IS_BASIC);
+>> +static CLK_FIXED_FACTOR(fac_250k,    "fac-250k",     "ext-26m",
+>> +                     104, 1, CLK_IS_BASIC);
+>> +static CLK_FIXED_FACTOR(fac_rpll0_26m,       "rpll0-26m",    "ext-26m",
+>> +                     1, 1, CLK_IS_BASIC);
+>> +static CLK_FIXED_FACTOR(fac_rpll1_26m,       "rpll1-26m",    "ext-26m",
+>> +                     1, 1, CLK_IS_BASIC);
+>> +static CLK_FIXED_FACTOR(fac_rco_25m, "rco-25m",      "ext-rc0-100m",
+>> +                     4, 1, CLK_IS_BASIC);
+>> +static CLK_FIXED_FACTOR(fac_rco_4m,  "rco-4m",       "ext-rc0-100m",
+>> +                     25, 1, CLK_IS_BASIC);
+>> +static CLK_FIXED_FACTOR(fac_rco_2m,  "rco-2m",       "ext-rc0-100m",
+>> +                     50, 1, CLK_IS_BASIC);
+>> +static CLK_FIXED_FACTOR(fac_3k2,     "fac-3k2",      "ext-32k",
+>> +                     10, 1, CLK_IS_BASIC);
+>> +static CLK_FIXED_FACTOR(fac_1k,              "fac-1k",       "ext-32k",
+>> +                     32, 1, CLK_IS_BASIC);
+>> +
+>> +#define SC9860_GATE_FLAGS (CLK_IGNORE_UNUSED | CLK_IS_BASIC)
 >
-> Is this include used? Should be clk-provider?
+> No CLK_IS_BASIC. Why is everything marked as CLK_IGNORE_UNUSED?
 
-Right, will remove it.
-
->
->> +#include <linux/err.h>
->> +#include <linux/slab.h>
->> +
->> +#include "ccu_pll.h"
->> +
->> +#define CCU_PLL_1M   1000000
->> +#define CCU_PLL_10M  (CCU_PLL_1M * 10)
->> +
->> +#define pindex(pll, member)          \
->> +     (pll->factors[member].shift / (8 * sizeof(pll->regs[0])))
->> +
->> +#define pshift(pll, member)          \
->> +     (pll->factors[member].shift % (8 * sizeof(pll->regs[0])))
->> +
->> +#define pwidth(pll, member)          \
->> +     pll->factors[member].width
->> +
->> +#define pmask(pll, member)                                   \
->> +     ((pwidth(pll, member)) ?                                \
->> +     GENMASK(pwidth(pll, member) + pshift(pll, member) - 1,  \
->> +     pshift(pll, member)) : 0)
->> +
->> +#define pinternal(pll, cfg, member)  \
->> +     (cfg[pindex(pll, member)] & pmask(pll, member))
->> +
->> +#define pinternal_val(pll, cfg, member)      \
->> +     (pinternal(pll, cfg, member) >> pshift(pll, member))
->> +
->> +static unsigned long pll_get_refin_rate(struct ccu_pll *pll)
->
-> pll could be const?
-
-What this function returns is a factor used to calculate the pll rate
-later, I will rename this function in the next iterator.
+Copied from the original implementation :)
+But I will do a double check, there'are indeed some clocks which
+shouldn't be marked as CLK_IGNORE_UNUSED.
 
 >
->> +{
->> +     u8 shift, index, refin_id = 3;
->> +     u32 mask;
->> +     const unsigned long refin[4] = { 2, 4, 13, 26 };
+>> +static SPRD_CCU_GATE(rpll0_gate,     "rpll0-gate",   "ext-26m", 0x402b016c,
+>> +                  0x1000, BIT(2), SC9860_GATE_FLAGS, 0);
+>> +static SPRD_CCU_GATE(rpll1_gate,     "rpll1-gate",   "ext-26m", 0x402b016c,
+>> +                  0x1000, BIT(18), SC9860_GATE_FLAGS, 0);
+>> +static SPRD_CCU_GATE(mpll0_gate,     "mpll0-gate",   "ext-26m", 0x402b00b0,
+>> +                  0x1000, BIT(2), SC9860_GATE_FLAGS, 0);
+>> +static SPRD_CCU_GATE(mpll1_gate,     "mpll1-gate",   "ext-26m", 0x402b00b0,
+>> +                  0x1000, BIT(18), SC9860_GATE_FLAGS, 0);
+>> +static SPRD_CCU_GATE(dpll0_gate,     "dpll0-gate",   "ext-26m", 0x402b00b4,
+>> +                  0x1000, BIT(2), SC9860_GATE_FLAGS, 0);
+>> +static SPRD_CCU_GATE(dpll1_gate,     "dpll1-gate",   "ext-26m", 0x402b00b4,
+>> +                  0x1000, BIT(18), SC9860_GATE_FLAGS, 0);
+>> +static SPRD_CCU_GATE(gpll_gate,              "gpll-gate",    "ext-26m", 0x402b032c,
+>> +                  0x1000, BIT(0), SC9860_GATE_FLAGS,
+>> +                  CLK_GATE_SET_TO_DISABLE);
+>> +static SPRD_CCU_GATE(cppll_gate,     "cppll-gate",   "ext-26m", 0x402b02b4,
+>> +                  0x1000, BIT(2), SC9860_GATE_FLAGS, 0);
+>> +static SPRD_CCU_GATE(ltepll0_gate,   "ltepll0-gate", "ext-26m", 0x402b00b8,
+>> +                  0x1000, BIT(2), SC9860_GATE_FLAGS, 0);
+>> +static SPRD_CCU_GATE(ltepll1_gate,   "ltepll1-gate", "ext-26m", 0x402b010c,
+>> +                  0x1000, BIT(2), SC9860_GATE_FLAGS, 0);
+>> +static SPRD_CCU_GATE(twpll_gate,     "twpll-gate",   "ext-26m", 0x402b00bc,
+>> +                  0x1000, BIT(2), SC9860_GATE_FLAGS, 0);
+>> +static SPRD_CCU_GATE_NO_PARENT(sdio0_2x_en,  "sdio0-2x-en",  0x402e013c,
+>> +                            0x1000, BIT(2), SC9860_GATE_FLAGS, 0);
+>> +static SPRD_CCU_GATE_NO_PARENT(sdio0_1x_en,  "sdio0-1x-en",  0x402e013c,
+>> +                            0x1000, BIT(3), SC9860_GATE_FLAGS, 0);
+>> +static SPRD_CCU_GATE_NO_PARENT(sdio1_2x_en,  "sdio1-2x-en",  0x402e013c,
+>> +                            0x1000, BIT(4), SC9860_GATE_FLAGS, 0);
+>> +static SPRD_CCU_GATE_NO_PARENT(sdio1_1x_en,  "sdio1-1x-en",  0x402e013c,
+>> +                            0x1000, BIT(5), SC9860_GATE_FLAGS, 0);
+>> +static SPRD_CCU_GATE_NO_PARENT(sdio2_2x_en,  "sdio2-2x-en",  0x402e013c,
+>> +                            0x1000, BIT(6), SC9860_GATE_FLAGS, 0);
+>> +static SPRD_CCU_GATE_NO_PARENT(sdio2_1x_en,  "sdio2-1x-en",  0x402e013c,
+>> +                            0x1000, BIT(7), SC9860_GATE_FLAGS, 0);
+>> +static SPRD_CCU_GATE_NO_PARENT(emmc_1x_en,   "emmc-1x-en",   0x402e013c,
+>> +                            0x1000, BIT(8), SC9860_GATE_FLAGS, 0);
+>> +static SPRD_CCU_GATE_NO_PARENT(emmc_2x_en,   "emmc-2x-en",   0x402e013c,
+>> +                            0x1000, BIT(9), SC9860_GATE_FLAGS, 0);
 >> +
->> +     if (pwidth(pll, PLL_REFIN)) {
->> +             index = pindex(pll, PLL_REFIN);
->> +             shift = pshift(pll, PLL_REFIN);
->> +             mask = pmask(pll, PLL_REFIN);
->> +             refin_id = (ccu_pll_readl(pll, index) & mask) >> shift;
->> +             if (refin_id > 3)
->> +                     refin_id = 3;
->> +     }
+>> +/* GPLL/LPLL/DPLL/RPLL/CPLL */
+>> +static const u64 const itable1[4] = {3, 780000000, 988000000, 1196000000};
 >> +
->> +     return refin[refin_id];
->> +}
+>> +/* TWPLL/MPLL0/MPLL1 */
+>> +static const u64 itable2[4] = {3, 1638000000, 2080000000, 2600000000UL};
 >> +
->> +static u8 pll_get_ibias(unsigned long rate, const u64 *table)
->> +{
->> +     u64 i;
->> +     u8 num = table[0];
->> +
->> +     for (i = 0; i < num; i++)
->> +             if (rate <= table[i + 1])
->> +                     break;
->> +
->> +     return i == num ? num - 1 : i;
->> +}
->> +
->> +static unsigned long ccu_pll_helper_recalc_rate(struct ccu_pll *pll,
->> +                                             unsigned long parent_rate)
->> +{
->> +     unsigned long rate, refin, k1, k2;
->> +     unsigned long kint = 0, nint;
->> +     u32 reg_num = pll->regs[0];
->> +     u32 *cfg;
->> +     u32 i;
->> +     u32 mask;
->> +
->> +     cfg = kcalloc(reg_num, sizeof(*cfg), GFP_KERNEL);
->> +     if (!cfg)
->> +             return -ENOMEM;
->> +
->> +     for (i = 0; i < reg_num; i++)
->> +             cfg[i] = ccu_pll_readl(pll, i);
->> +
->> +     refin = pll_get_refin_rate(pll);
->> +
->> +     if (pinternal(pll, cfg, PLL_PREDIV))
->> +             refin = refin * 2;
->> +
->> +     if (pwidth(pll, PLL_POSTDIV) &&
->> +         ((pll->fflag == 1 && pinternal(pll, cfg, PLL_POSTDIV)) ||
->> +          (!pll->fflag && !pinternal(pll, cfg, PLL_POSTDIV))))
->> +             refin = refin / 2;
->> +
->> +     if (!pinternal(pll, cfg, PLL_DIV_S))
->> +             rate = refin * pinternal_val(pll, cfg, PLL_N) * CCU_PLL_10M;
->> +     else {
+>> +static const struct ccu_bit_field const f_rpll[PLL_FACT_MAX] = {
+>> +     { .shift = 0,   .width = 1 },   /* lock_done    */
+>> +     { .shift = 3,   .width = 1 },   /* div_s        */
+>> +     { .shift = 80,  .width = 1 },   /* mod_en       */
 >
-> Please include braces on the if as well when another branch has them.
+> Are they even shifts? Or offsets from some base? I have to go
+> back and read the other patch.
 
-Sure.
+You must've noticed that each PLL has a structure of "ccu_bit_field
+*factors", each pair of shift - width represents a bit field in
+registers, each bit field stores a factor used to calculate PLL clock
+rate, but different PLL clock has different bit fields arrangement due
+to hardware design.
 
 >
->> +             nint = pinternal_val(pll, cfg, PLL_NINT);
->> +             if (pinternal(pll, cfg, PLL_SDM_EN))
->> +                     kint = pinternal_val(pll, cfg, PLL_KINT);
->> +
->> +             mask = pmask(pll, PLL_KINT);
->> +#ifdef CONFIG_64BIT
->> +             k1 = 1000;
->> +             k2 = 1000;
->> +             rate = DIV_ROUND_CLOSEST(refin * kint * k1,
->> +                                      ((mask >> __ffs(mask)) + 1)) *
->> +                                      k2 + refin * nint * CCU_PLL_1M;
->> +#else
->> +             k1 = 100;
->> +             k2 = 10000;
->> +             i = pwidth(pll, PLL_KINT);
->> +             i = i < 21 ? 0 : i - 21;
->> +             rate = DIV_ROUND_CLOSEST(refin * (kint >> i) * k1,
->> +                                      ((mask >> (__ffs(mask) + i)) + 1)) *
->> +                                      k2 + refin * nint * CCU_PLL_1M;
->> +#endif
->> +     }
->> +
->> +     return rate;
->> +}
->> +
->> +static int ccu_pll_helper_set_rate(struct ccu_pll *pll,
->> +                                unsigned long rate,
->> +                                unsigned long parent_rate)
->> +{
->> +     u32 mask, shift, width, ibias_val, index, kint, nint;
->> +     u32 reg_num = pll->regs[0], i = 0;
->> +     unsigned long refin, fvco = rate;
->> +     struct reg_cfg *cfg;
->> +
->> +     cfg = kcalloc(reg_num, sizeof(*cfg), GFP_KERNEL);
->> +     if (!cfg)
->> +             return -ENOMEM;
->> +
->> +     refin = pll_get_refin_rate(pll);
->> +
->> +     mask = pmask(pll, PLL_PREDIV);
->> +     index = pindex(pll, PLL_PREDIV);
->> +     width = pwidth(pll, PLL_PREDIV);
->> +     if (width && (ccu_pll_readl(pll, index) & mask))
->> +             refin = refin * 2;
->> +
->> +     mask = pmask(pll, PLL_POSTDIV);
->> +     index = pindex(pll, PLL_POSTDIV);
->> +     width = pwidth(pll, PLL_POSTDIV);
->> +     cfg[index].msk = mask;
->> +     if (width && ((pll->fflag == 1 && fvco <= pll->fvco) ||
->> +                   (pll->fflag == 0 && fvco > pll->fvco)))
->> +             cfg[index].val |= mask;
->> +
->> +     if (width && fvco <= pll->fvco)
->> +             fvco = fvco * 2;
->> +
->> +     mask = pmask(pll, PLL_DIV_S);
->> +     index = pindex(pll, PLL_DIV_S);
->> +     cfg[index].val |= mask;
->> +     cfg[index].msk |= mask;
->> +
->> +     mask = pmask(pll, PLL_SDM_EN);
->> +     index = pindex(pll, PLL_SDM_EN);
->> +     cfg[index].val |= mask;
->> +     cfg[index].msk |= mask;
->> +
->> +     nint  = fvco/(refin * CCU_PLL_1M);
->> +
->> +     mask = pmask(pll, PLL_NINT);
->> +     index = pindex(pll, PLL_NINT);
->> +     shift = pshift(pll, PLL_NINT);
->> +     cfg[index].val |= (nint << shift) & mask;
->> +     cfg[index].msk |= mask;
->> +
->> +     mask = pmask(pll, PLL_KINT);
->> +     index = pindex(pll, PLL_KINT);
->> +     width = pwidth(pll, PLL_KINT);
->> +     shift = pshift(pll, PLL_KINT);
->> +#ifndef CONFIG_64BIT
->> +     i = width < 21 ? 0 : i - 21;
->> +#endif
->
-> What's this? Why do we depend on CONFIG_64BIT?
-
-On 32-bit SoCs, the largest width we can support is limited due to the
-limitation of calculation precision.
-
->
->> +     kint = DIV_ROUND_CLOSEST(((fvco - refin * nint * CCU_PLL_1M)/10000) *
->> +     ((mask >> (shift + i)) + 1), refin * 100) << i;
->> +     cfg[index].val |= (kint << shift) & mask;
->> +     cfg[index].msk |= mask;
->> +
->> +     ibias_val = pll_get_ibias(fvco, pll->itable);
->> +
->> +     mask = pmask(pll, PLL_IBIAS);
->> +     index = pindex(pll, PLL_IBIAS);
->> +     shift = pshift(pll, PLL_IBIAS);
->> +     cfg[index].val |= ibias_val << shift & mask;
->> +     cfg[index].msk |= mask;
->> +
->> +     for (i = 0; i < reg_num; i++) {
->> +             if (cfg[i].msk)
->> +                     ccu_pll_writel(pll, i, cfg[i].val, cfg[i].msk);
->> +     }
->> +
->
-> Are we waiting for the writel() to go through above? If so we
-> need a readl() of the same register to make sure the write has
-> completed before delaying.
-
-After writing these configuration registers, we have to wait a certain
-time to make sure the pll has worked as we configured.  This depends
-on other circuit part, so we use udelay rather than reading the same
-register.
-
->
->> +     udelay(pll->udelay);
->> +
->> +     return 0;
->> +}
->> +
->> +static unsigned long ccu_pll_recalc_rate(struct clk_hw *hw,
->> +                                      unsigned long parent_rate)
->> +{
->> +     struct ccu_pll *pll = hw_to_ccu_pll(hw);
->> +
->> +     return ccu_pll_helper_recalc_rate(pll, parent_rate);
->> +}
->> +
->> +static int ccu_pll_set_rate(struct clk_hw *hw,
->> +                         unsigned long rate,
->> +                         unsigned long parent_rate)
->> +{
->> +     struct ccu_pll *pll = hw_to_ccu_pll(hw);
->> +
->> +     return ccu_pll_helper_set_rate(pll, rate, parent_rate);
->> +}
->> +
->> +static int ccu_pll_clk_prepare(struct clk_hw *hw)
->> +{
->> +     struct ccu_pll *pll = hw_to_ccu_pll(hw);
->> +
->> +     udelay(pll->udelay);
->> +
->> +     return 0;
->> +}
->> +
->> +static long ccu_pll_round_rate(struct clk_hw *hw, unsigned long rate,
->> +                            unsigned long *prate)
->> +{
->> +     return rate;
->> +}
->> +
->> +const struct clk_ops ccu_pll_ops = {
->> +     .prepare = ccu_pll_clk_prepare,
->> +     .recalc_rate = ccu_pll_recalc_rate,
->> +     .round_rate = ccu_pll_round_rate,
->> +     .set_rate = ccu_pll_set_rate,
+>> +     { .shift = 81,  .width = 1 },   /* sdm_en       */
+>> +     { .shift = 0,   .width = 0 },   /* refin        */
+>> +     { .shift = 14,  .width = 2 },   /* ibias        */
+>> +     { .shift = 16,  .width = 7 },   /* n            */
+>> +     { .shift = 4,   .width = 7 },   /* nint         */
+>> +     { .shift = 32,  .width = 23},   /* kint         */
+>> +     { .shift = 0,   .width = 0 },   /* prediv       */
+>> +     { .shift = 0,   .width = 0 },   /* postdiv      */
 >> +};
->> diff --git a/drivers/clk/sprd/ccu_pll.h b/drivers/clk/sprd/ccu_pll.h
+>> +static const u32 const regs_rpll0[4] = { 3, 0x44, 0x48, 0x4c };
+>> +static SPRD_CCU_PLL_WITH_ITABLE(rpll0_clk, "rpll0", "rpll0-gate", 0x40400044,
+>> +                             regs_rpll0, itable1, 200, f_rpll);
+>> +
+>> +static const u32 const regs_rpll1[4] = { 3, 0x50, 0x54, 0x58 };
+>> +static SPRD_CCU_PLL_WITH_ITABLE(rpll1_clk, "rpll1", "rpll1-gate", 0x40400050,
+>> +                             regs_rpll1, itable1, 200, f_rpll);
+>> +
+>> +static const struct ccu_bit_field const f_mpll0[PLL_FACT_MAX] = {
+> [...]
+>> diff --git a/include/dt-bindings/clock/sc9860-ccu.h b/include/dt-bindings/clock/sc9860-ccu.h
 >> new file mode 100644
->> index 0000000..66fe5d1
+>> index 0000000..dd7ccf9
 >> --- /dev/null
->> +++ b/drivers/clk/sprd/ccu_pll.h
->> @@ -0,0 +1,123 @@
+>> +++ b/include/dt-bindings/clock/sc9860-ccu.h
+>> @@ -0,0 +1,19 @@
 >> +/*
->> + * Spreadtrum clock pll configurations
+>> + * Spreadtrum SC9860 platform clocks
 >> + *
->> + * Copyright (C) 2015~2017 Spreadtrum, Inc.
+>> + * Copyright (C) 2017, Spreadtrum Communications Inc.
 >> + *
->> + * SPDX-License-Identifier: GPL-2.0
+>> + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 >> + */
 >> +
->> +#ifndef _CCU_PLL_H_
->> +#define _CCU_PLL_H_
+>> +#ifndef _DT_BINDINGS_CLK_SC9860_CCU_H_
+>> +#define _DT_BINDINGS_CLK_SC9860_CCU_H_
 >> +
->> +#include "ccu_common.h"
->> +
->> +struct reg_cfg {
->> +     u32 val;
->> +     u32 msk;
->> +};
->> +
->> +struct ccu_bit_field {
->> +     u8 shift;
->> +     u8 width;
->> +};
->> +
->> +enum {
->> +     PLL_LOCK_DONE = 0,
+>> +#define CLK_FAC_1M   2
+>> +#define CLK_EMMC_2X_EN       29
+>> +#define CLK_L0_409M6 60
+>> +#define CLK_EMMC_2X  88
+>> +#define CLK_EMMC_EB  158
 >
-> Drop the = 0 please unless it's needed for something?
+> Why are only a handful exposed in the header file? Not exposing
+> everything is mostly a maintenance nightmare right now.
 
-OK.
+No special reason here, my thought simply was that there's no much
+Spreadtrum's device driver in mainline at present, so most of the
+clocks wouldn't be needed for now, I planned to expose only those when
+the device driver they provide clock to, that's saying when we add a
+new device driver we'll expose the clocks this device needs.
 
->
->> +     PLL_DIV_S,
->> +     PLL_MOD_EN,
->> +     PLL_SDM_EN,
->> +     PLL_REFIN,
->> +     PLL_IBIAS,
->> +     PLL_N,
->> +     PLL_NINT,
->> +     PLL_KINT,
->> +     PLL_PREDIV,
->> +     PLL_POSTDIV,
->> +
->> +     PLL_FACT_MAX
->> +};
->> +
->> +/*
->> + * struct ccu_pll - defination of adjustable pll clock
->
-> s/defination/definition/
->
->> + *
->> + * @reg:     registers used to set the configuration of pll clock,
->> + *           reg[0] shows how many registers this pll clock uses.
->> + * @itable:  pll ibias table, itable[0] means how many items this
->> + *           table includes
->> + * @udelay   delay time after setting rate
->> + * @factors  used to calculate the pll clock rate
->> + * @fvco:    fvco threshold rate
->> + * @fflag:   fvco flag
->> + */
->> +struct ccu_pll {
->> +     const u32 *regs;
->> +     const u64 *itable;
->> +     u16 udelay;
->> +     const struct ccu_bit_field *factors;
->
-> Does this change across the different PLLs? Would be nice to not
+Another reason is, I'm not sure if there are still some clocks I
+haven't listed for SC9860 , so if we need to add a clock in the
+feature, the value of these macros defined in
+"include/dt-bindings/clock/sc9860-ccu.h" may be changed, that means I
+need to change the index of all clocks following the clock inserted
+into.
 
-Yes, different PLL has diferent bit field arragement, even on the same SoC.
+But why will not exposing everything bring trouble to maintenance? :)
 
-Thanks for your review,
+
+Thank you for your review,
 Chunyan
 
-> need the bit field thing.
->
->> +     u64 fvco;
->> +     u16 fflag;
->> +
->> +     struct ccu_common       common;
 >
 > --
 > Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
