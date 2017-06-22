@@ -1,60 +1,58 @@
-From: zhang.lyra@gmail.com (Chunyan Zhang)
-Date: Thu, 22 Jun 2017 20:06:29 +0800
-Subject: [PATCH V1 7/9] clk: sprd: add adjustable pll support
-In-Reply-To: <CAK8P3a1ELg1XcY-QOZn-f6kR9yt-Q6LNLUYEY-BNW-2BaBy6EQ@mail.gmail.com>
-References: <20170618015855.27738-1-chunyan.zhang@spreadtrum.com>
- <20170618015855.27738-8-chunyan.zhang@spreadtrum.com>
- <20170620013710.GJ4493@codeaurora.org>
- <CAAfSe-sMy3aM9=LwpVivvHKy4hVw3GEd3U-hZe17pXM5fJRxPg@mail.gmail.com>
- <CAK8P3a1ELg1XcY-QOZn-f6kR9yt-Q6LNLUYEY-BNW-2BaBy6EQ@mail.gmail.com>
-Message-ID: <CAAfSe-vtAqmiJ-ZuxQde4i7FEo76kkbk-mev_S31i3g3GHwrcQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 22 Jun 2017 14:15:54 +0200
+Subject: [PATCH v2 2/5] dt-bindings: scsi: ufs: add document for hi3660-ufs
+In-Reply-To: <24438c4d-21c8-6302-acd4-4f0e223232ce@huawei.com>
+References: <20170616065119.10704-1-butao@hisilicon.com>
+ <20170616065119.10704-3-butao@hisilicon.com>
+ <CAK8P3a2aPorzpUzwL=dkUkYNCGkhQMDPOkKRW1-=Hf=yCdvTsQ@mail.gmail.com>
+ <0f79aeea-53e3-6bea-ffa6-0e057f2ff83b@huawei.com>
+ <CAK8P3a2z7VbPb95Ltj=Duh1v_Yqxedb_g=ADNPWOrpEz1dCTuw@mail.gmail.com>
+ <24438c4d-21c8-6302-acd4-4f0e223232ce@huawei.com>
+Message-ID: <CAK8P3a1MRx5zRp5-7iDY32+6PGsyHFaOom-bkWmftpLUS=8gBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 22 June 2017 at 19:15, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thu, Jun 22, 2017 at 12:17 PM, Chunyan Zhang <zhang.lyra@gmail.com> wrote:
->> On 20 June 2017 at 09:37, Stephen Boyd <sboyd@codeaurora.org> wrote:
->>> On 06/18, Chunyan Zhang wrote:
->
->>>> +     kint = DIV_ROUND_CLOSEST(((fvco - refin * nint * CCU_PLL_1M)/10000) *
->>>> +     ((mask >> (shift + i)) + 1), refin * 100) << i;
->>>> +     cfg[index].val |= (kint << shift) & mask;
->>>> +     cfg[index].msk |= mask;
->>>> +
->>>> +     ibias_val = pll_get_ibias(fvco, pll->itable);
->>>> +
->>>> +     mask = pmask(pll, PLL_IBIAS);
->>>> +     index = pindex(pll, PLL_IBIAS);
->>>> +     shift = pshift(pll, PLL_IBIAS);
->>>> +     cfg[index].val |= ibias_val << shift & mask;
->>>> +     cfg[index].msk |= mask;
->>>> +
->>>> +     for (i = 0; i < reg_num; i++) {
->>>> +             if (cfg[i].msk)
->>>> +                     ccu_pll_writel(pll, i, cfg[i].val, cfg[i].msk);
->>>> +     }
->>>> +
+On Thu, Jun 22, 2017 at 1:58 PM, Bu Tao <butao@huawei.com> wrote:
+> ? 2017/6/22 19:51, Arnd Bergmann ??:
+>> On Thu, Jun 22, 2017 at 1:44 PM, Bu Tao <butao@huawei.com> wrote:
+>>> ? 2017/6/17 5:51, Arnd Bergmann ??:
+>>>> On Fri, Jun 16, 2017 at 8:51 AM, Bu Tao <butao@hisilicon.com> wrote:
 >>>
->>> Are we waiting for the writel() to go through above? If so we
->>> need a readl() of the same register to make sure the write has
->>> completed before delaying.
+>>> I do not know wheher other SoC need to use the optional properties as
+>>> abover. So here the name of the optional properties has "hi3660".
 >>
->> After writing these configuration registers, we have to wait a certain
->> time to make sure the pll has worked as we configured.  This depends
->> on other circuit part, so we use udelay rather than reading the same
->> register.
+>>
+>> They should not have "hi3660" in their names either way, independent
+>> of where they are used.
 >
-> I think you have to do both: normally the writel() is not guaranteed
-> to arrive at the device until you read back from an address in the
-> same device, so the delay must happen after the readl(), or you won't
-> know how long to wait for.
-
-I got it, will add the readl() in the next iterator.
-
-Thanks,
-Chunyan
-
 >
->        Arnd
+> Oh, change the "hi3660" to "hisilicon"?
+> e.g. ufs-hi3660-use-rate-B  -->  ufs-hisilicon-use-rate-B
+
+No, just 'use-rate-B', no prefix for this.
+
+>>>> (note: this is different from the value of the "compatible" property
+>>>> that
+>>>> is meant to be as specific as possible".
+>>>>
+>>>> Also, please clarify how your binding relates to the ufshcd binding
+>>>> in Documentation/devicetree/bindings/ufs/ufshcd-pltfrm.txt: does
+>>>> hi3660 implement any registers that are shared with ufshcd, or does
+>>>> it use the same physical interface with a different register set?
+>>>
+>>>
+>>> No, only show how to use the dt-binding for hi3660 SoC
+>>
+>>
+>> My question was about the hardware: does hi3660 implement ufshcd
+>> or not?
+>
+>
+> YES
+
+Ok, then the properties should be documented as optional in the
+Documentation/devicetree/bindings/ufs/ufshcd-pltfrm.txt file for anything
+that has a proper interpretation in the context of the generic ufshcd
+driver.
+
+      Arnd
