@@ -1,70 +1,24 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 22 Jun 2017 16:24:49 -0500
-Subject: [PATCH v3 1/3] dt-bindings: arm: amlogic: Add SoC information
- bindings
-In-Reply-To: <1497441946-24379-2-git-send-email-narmstrong@baylibre.com>
-References: <1497441946-24379-1-git-send-email-narmstrong@baylibre.com>
- <1497441946-24379-2-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20170622212449.wsck475jxabawqsv@rob-hp-laptop>
+Date: Thu, 22 Jun 2017 16:25:39 -0500
+Subject: [PATCH v2 2/3] dt-bindings: iio: update STM32 timers clock names
+In-Reply-To: <1497453196-31470-3-git-send-email-fabrice.gasnier@st.com>
+References: <1497453196-31470-1-git-send-email-fabrice.gasnier@st.com>
+ <1497453196-31470-3-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20170622212539.l3yblwqurahdvlqq@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 14, 2017 at 02:05:44PM +0200, Neil Armstrong wrote:
-> Add bindings for the SoC information register of the Amlogic SoCs.
+On Wed, Jun 14, 2017 at 05:13:15PM +0200, Fabrice Gasnier wrote:
+> Clock name has been updated during driver/DT binding review:
+> https://lkml.org/lkml/2016/12/13/718
+> Update DT binding doc to reflect this.
 > 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> Fixes: bf2d8581b1b3 (iio: Add bindings for STM32 timer trigger driver)
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> Acked-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+> Acked-by: Jonathan Cameron <jic23@kernel.org>
 > ---
->  Documentation/devicetree/bindings/arm/amlogic.txt | 29 +++++++++++++++++++++++
->  1 file changed, 29 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
-> index 5c01e65..a6d8754 100644
-> --- a/Documentation/devicetree/bindings/arm/amlogic.txt
-> +++ b/Documentation/devicetree/bindings/arm/amlogic.txt
-> @@ -60,3 +60,32 @@ Board compatible values (alphabetically, grouped by SoC):
->    - "amlogic,q201" (Meson gxm s912)
->    - "kingnovel,r-box-pro" (Meson gxm S912)
->    - "nexbox,a1" (Meson gxm s912)
-> +
-> +Amlogic Meson Firmware registers Interface
-> +------------------------------------------
-> +
-> +The Meson SoCs have a register bank with status and data shared with the
-> +secure firmware.
-> +
-> +Required properties:
-> + - compatible: For Meson GX SoCs, must be "amlogic,meson-gx-ao-secure", "syscon"
-> +
-> +Properties should indentify components of this register interface :
-> +
-> +Meson GX SoC Information
-> +------------------------
-> +A firmware register encodes the SoC type, package and revision information on
-> +the Meson GX SoCs.
-> +If present, the following property should be added :
-> +
-> +Optional properties:
-> +  - has-chip-id: If present, the interface gives the current SoC version.
-
-amlogic,has-chip-id
-
-With that,
+>  Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
 Acked-by: Rob Herring <robh@kernel.org>
-
-> +
-> +Example
-> +-------
-> +
-> +ao-secure at 140 {
-> +	compatible = "amlogic,meson-gx-ao-secure", "syscon";
-> +	reg = <0x0 0x140 0x0 0x140>;
-> +	has-chip-id;
-> +};
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
