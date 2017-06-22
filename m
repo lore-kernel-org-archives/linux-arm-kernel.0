@@ -1,47 +1,60 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 22 Jun 2017 15:48:33 +0800
-Subject: [PATCH 2/2] i2c: zx2967: add i2c controller driver for ZTE's
- zx2967 family
-In-Reply-To: <20170620074126.GA1541@katana>
-References: <1495947576-11037-1-git-send-email-shawnguo@kernel.org>
- <1495947576-11037-3-git-send-email-shawnguo@kernel.org>
- <20170619193130.velebm7p3r5ggaos@ninjato>
- <20170620025815.GA4818@x250> <20170620074126.GA1541@katana>
-Message-ID: <20170622074831.GA23753@dragon>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 22 Jun 2017 10:01:43 +0200
+Subject: [PATCH 1/9] serial: Add common rs485 device tree parsing function
+In-Reply-To: <20170622061007.h76gk3hixp4ipyvr@pengutronix.de>
+References: <20170621102130.21024-1-u.kleine-koenig@pengutronix.de>
+ <20170621102130.21024-2-u.kleine-koenig@pengutronix.de>
+ <20170622061007.h76gk3hixp4ipyvr@pengutronix.de>
+Message-ID: <20170622080143.waljtsziek2ciqmd@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 09:41:26AM +0200, Wolfram Sang wrote:
-> > > How was this driver tested BTW?
+On Thu, Jun 22, 2017 at 08:10:07AM +0200, Sascha Hauer wrote:
+> On Wed, Jun 21, 2017 at 12:21:22PM +0200, Uwe Kleine-K?nig wrote:
+> > From: Sascha Hauer <s.hauer@pengutronix.de>
 > > 
-> > The driver is being used to access an Audio codec on the I2C bus.
+> > Several drivers have the same device tree parsing code. Create
+> > a common helper function for it.
+> > 
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > ---
+> >  drivers/tty/serial/Kconfig  |  4 ++++
+> >  drivers/tty/serial/Makefile |  2 ++
+> >  drivers/tty/serial/of.c     | 45 +++++++++++++++++++++++++++++++++++++++++++++
+> >  include/linux/serial_core.h | 12 ++++++++++++
+> >  4 files changed, 63 insertions(+)
+> >  create mode 100644 drivers/tty/serial/of.c
+> > 
+> > diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+> > index 5c8850f7a2a0..8baef5b95bed 100644
+> > --- a/drivers/tty/serial/Kconfig
+> > +++ b/drivers/tty/serial/Kconfig
+> > @@ -14,6 +14,10 @@ config SERIAL_EARLYCON
+> >  	  the console before standard serial driver is probed. The console is
+> >  	  enabled when early_param is processed.
+> >  
+> > +config OF_SERIAL
+> > +	depends on SERIAL_CORE
+> > +	def_bool y
 > 
-> Nice. Can you also run 'i2cdetect' on the bus to see if we have proper
-> NAK handling? AFAICS this should be broken now. And very slow with
-> previous versions of the driver.
+> This probably also needs a dependency on some device tree option,
+> CONFIG_OF maybe?
 
-Hmm, it seems that 'i2cdetect' works fine with the driver.
+Without CONFIG_OF of_property_read_u32_array returns -ENOSYS and
+of_property_read_bool returns false. So I think (but didn't test) there
+is no problem not depending on more stuff.
 
-$ i2cdetect -l
-i2c-0   i2c             zx2967 i2c adapter                      I2C adapter
-$ i2cdetect 0
-WARNING! This program can confuse your I2C bus, cause data loss and worse!
-I will probe file /dev/i2c-0.
-I will probe address range 0x03-0x77.
-Continue? [Y/n] Y
-     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
-00:          -- -- -- -- -- -- -- -- -- -- -- -- -- 
-10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-20: -- -- UU -- -- -- -- -- -- -- -- -- -- -- -- -- 
-30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-40: -- -- -- -- 44 -- -- -- -- -- -- -- -- -- -- -- 
-50: -- -- -- -- -- -- -- -- -- -- 5a -- -- -- -- -- 
-60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-70: 70 -- -- -- -- -- -- --                         
-$
+But maybe do:
 
-The audio codec is on address 0x22.
+	if (!np)
+		return 1;
 
-Why do you think it should be broken now?
+in of_get_rs485_mode?
 
-Shawn
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
