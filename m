@@ -1,161 +1,129 @@
-From: mark.yao@rock-chips.com (Mark Yao)
-Date: Thu, 22 Jun 2017 15:17:24 +0800
-Subject: [PATCH v3.1 1/3] drm/rockchip: dw_hdmi: add RK3399 HDMI support
-In-Reply-To: <1496992236-10634-1-git-send-email-mark.yao@rock-chips.com>
-References: <1496992236-10634-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <1498115845-7177-1-git-send-email-mark.yao@rock-chips.com>
+From: frank.wang@rock-chips.com (Frank Wang)
+Date: Thu, 22 Jun 2017 15:20:50 +0800
+Subject: [PATCH v2 2/7] ARM: dts: rockchip: add basic dtsi file for RK3229 SoC
+In-Reply-To: <1498116055-20977-1-git-send-email-frank.wang@rock-chips.com>
+References: <1498116055-20977-1-git-send-email-frank.wang@rock-chips.com>
+Message-ID: <1498116055-20977-3-git-send-email-frank.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RK3399 and RK3288 shared the same HDMI IP controller, only some light
-difference with GRF configure.
+Due to some tiny differences between RK3228 and RK3229, this patch adds
+a basic dtsi file which first includes a new CPU opp table for RK3229.
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
 ---
-Changes in v3.1:
-  Correct documentation compatible's format(Rob Herring).
-Changes in v3:
-  remove hdmi_phy_configure_dwc_hdmi_3d_tx callbak.
+ arch/arm/boot/dts/rk3229-evb.dts |  2 +-
+ arch/arm/boot/dts/rk3229.dtsi    | 89 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 90 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/rk3229.dtsi
 
-Changes in v2:
-  reuse hdmi_phy_configure_dwc_hdmi_3d_tx for phy configure
-  fixup Documentation
-
- .../bindings/display/rockchip/dw_hdmi-rockchip.txt |  4 +-
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        | 67 ++++++++++++++++++----
- 2 files changed, 59 insertions(+), 12 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-index 046076c..7039a15 100644
---- a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-+++ b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-@@ -11,7 +11,9 @@ following device-specific properties.
+diff --git a/arch/arm/boot/dts/rk3229-evb.dts b/arch/arm/boot/dts/rk3229-evb.dts
+index 1b55192..82e8a53 100644
+--- a/arch/arm/boot/dts/rk3229-evb.dts
++++ b/arch/arm/boot/dts/rk3229-evb.dts
+@@ -40,7 +40,7 @@
  
- Required properties:
+ /dts-v1/;
  
--- compatible: Shall contain "rockchip,rk3288-dw-hdmi".
-+- compatible: should be one of the following:
-+		"rockchip,rk3288-dw-hdmi"
-+		"rockchip,rk3399-dw-hdmi"
- - reg: See dw_hdmi.txt.
- - reg-io-width: See dw_hdmi.txt. Shall be 4.
- - interrupts: HDMI interrupt number
-diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-index 63dab6f..90aaaf4 100644
---- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-+++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-@@ -20,13 +20,30 @@
- #include "rockchip_drm_drv.h"
- #include "rockchip_drm_vop.h"
+-#include "rk322x.dtsi"
++#include "rk3229.dtsi"
  
--#define GRF_SOC_CON6                    0x025c
--#define HDMI_SEL_VOP_LIT                (1 << 4)
-+#define RK3288_GRF_SOC_CON6		0x025C
-+#define RK3288_HDMI_LCDC_SEL		BIT(4)
-+#define RK3399_GRF_SOC_CON20		0x6250
-+#define RK3399_HDMI_LCDC_SEL		BIT(6)
-+
-+#define HIWORD_UPDATE(val, mask)	(val | (mask) << 16)
-+
-+/**
-+ * struct rockchip_hdmi_chip_data - splite the grf setting of kind of chips
-+ * @lcdsel_grf_reg: grf register offset of lcdc select
-+ * @lcdsel_big: reg value of selecting vop big for HDMI
-+ * @lcdsel_lit: reg value of selecting vop little for HDMI
+ / {
+ 	model = "Rockchip RK3229 Evaluation board";
+diff --git a/arch/arm/boot/dts/rk3229.dtsi b/arch/arm/boot/dts/rk3229.dtsi
+new file mode 100644
+index 0000000..6fe6c15
+--- /dev/null
++++ b/arch/arm/boot/dts/rk3229.dtsi
+@@ -0,0 +1,89 @@
++/*
++ * Copyright (c) 2017 Fuzhou Rockchip Electronics Co., Ltd
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *  Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
 + */
-+struct rockchip_hdmi_chip_data {
-+	u32	lcdsel_grf_reg;
-+	u32	lcdsel_big;
-+	u32	lcdsel_lit;
-+};
- 
- struct rockchip_hdmi {
- 	struct device *dev;
- 	struct regmap *regmap;
- 	struct drm_encoder encoder;
-+	const struct rockchip_hdmi_chip_data *chip_data;
- };
- 
- #define to_rockchip_hdmi(x)	container_of(x, struct rockchip_hdmi, x)
-@@ -198,17 +215,20 @@ static void dw_hdmi_rockchip_encoder_enable(struct drm_encoder *encoder)
- {
- 	struct rockchip_hdmi *hdmi = to_rockchip_hdmi(encoder);
- 	u32 val;
--	int mux;
-+	int ret;
- 
--	mux = drm_of_encoder_active_endpoint_id(hdmi->dev->of_node, encoder);
--	if (mux)
--		val = HDMI_SEL_VOP_LIT | (HDMI_SEL_VOP_LIT << 16);
-+	ret = drm_of_encoder_active_endpoint_id(hdmi->dev->of_node, encoder);
-+	if (ret)
-+		val = hdmi->chip_data->lcdsel_lit;
- 	else
--		val = HDMI_SEL_VOP_LIT << 16;
-+		val = hdmi->chip_data->lcdsel_big;
 +
-+	ret = regmap_write(hdmi->regmap, hdmi->chip_data->lcdsel_grf_reg, val);
-+	if (ret != 0)
-+		dev_err(hdmi->dev, "Could not write to GRF: %d\n", ret);
- 
--	regmap_write(hdmi->regmap, GRF_SOC_CON6, val);
- 	dev_dbg(hdmi->dev, "vop %s output to hdmi\n",
--		(mux) ? "LIT" : "BIG");
-+		ret ? "LIT" : "BIG");
- }
- 
- static int
-@@ -232,16 +252,40 @@ static void dw_hdmi_rockchip_encoder_enable(struct drm_encoder *encoder)
- 	.atomic_check = dw_hdmi_rockchip_encoder_atomic_check,
- };
- 
--static const struct dw_hdmi_plat_data rockchip_hdmi_drv_data = {
-+static struct rockchip_hdmi_chip_data rk3288_chip_data = {
-+	.lcdsel_grf_reg = RK3288_GRF_SOC_CON6,
-+	.lcdsel_big = HIWORD_UPDATE(0, RK3288_HDMI_LCDC_SEL),
-+	.lcdsel_lit = HIWORD_UPDATE(RK3288_HDMI_LCDC_SEL, RK3288_HDMI_LCDC_SEL),
-+};
++#include "rk322x.dtsi"
 +
-+static const struct dw_hdmi_plat_data rk3288_hdmi_drv_data = {
-+	.mode_valid = dw_hdmi_rockchip_mode_valid,
-+	.mpll_cfg   = rockchip_mpll_cfg,
-+	.cur_ctr    = rockchip_cur_ctr,
-+	.phy_config = rockchip_phy_config,
-+	.phy_data = &rk3288_chip_data,
-+};
++/ {
++	compatible = "rockchip,rk3229";
 +
-+static struct rockchip_hdmi_chip_data rk3399_chip_data = {
-+	.lcdsel_grf_reg = RK3399_GRF_SOC_CON20,
-+	.lcdsel_big = HIWORD_UPDATE(0, RK3399_HDMI_LCDC_SEL),
-+	.lcdsel_lit = HIWORD_UPDATE(RK3399_HDMI_LCDC_SEL, RK3399_HDMI_LCDC_SEL),
-+};
++	/delete-node/ opp-table0;
 +
-+static const struct dw_hdmi_plat_data rk3399_hdmi_drv_data = {
- 	.mode_valid = dw_hdmi_rockchip_mode_valid,
- 	.mpll_cfg   = rockchip_mpll_cfg,
- 	.cur_ctr    = rockchip_cur_ctr,
- 	.phy_config = rockchip_phy_config,
-+	.phy_data = &rk3399_chip_data,
- };
- 
- static const struct of_device_id dw_hdmi_rockchip_dt_ids[] = {
- 	{ .compatible = "rockchip,rk3288-dw-hdmi",
--	  .data = &rockchip_hdmi_drv_data
-+	  .data = &rk3288_hdmi_drv_data
-+	},
-+	{ .compatible = "rockchip,rk3399-dw-hdmi",
-+	  .data = &rk3399_hdmi_drv_data
- 	},
- 	{},
- };
-@@ -268,6 +312,7 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
- 	match = of_match_node(dw_hdmi_rockchip_dt_ids, pdev->dev.of_node);
- 	plat_data = match->data;
- 	hdmi->dev = &pdev->dev;
-+	hdmi->chip_data = plat_data->phy_data;
- 	encoder = &hdmi->encoder;
- 
- 	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm, dev->of_node);
++	cpu0_opp_table: opp_table0 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp-408000000 {
++			opp-hz = /bits/ 64 <408000000>;
++			opp-microvolt = <950000>;
++			clock-latency-ns = <40000>;
++			opp-suspend;
++		};
++		opp-600000000 {
++			opp-hz = /bits/ 64 <600000000>;
++			opp-microvolt = <975000>;
++		};
++		opp-816000000 {
++			opp-hz = /bits/ 64 <816000000>;
++			opp-microvolt = <1000000>;
++		};
++		opp-1008000000 {
++			opp-hz = /bits/ 64 <1008000000>;
++			opp-microvolt = <1175000>;
++		};
++		opp-1200000000 {
++			opp-hz = /bits/ 64 <1200000000>;
++			opp-microvolt = <1275000>;
++		};
++		opp-1296000000 {
++			opp-hz = /bits/ 64 <1296000000>;
++			opp-microvolt = <1325000>;
++		};
++		opp-1392000000 {
++			opp-hz = /bits/ 64 <1392000000>;
++			opp-microvolt = <1375000>;
++		};
++		opp-1464000000 {
++			opp-hz = /bits/ 64 <1464000000>;
++			opp-microvolt = <1400000>;
++		};
++	};
++};
 -- 
-1.9.1
+2.0.0
