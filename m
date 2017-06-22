@@ -1,101 +1,79 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 22 Jun 2017 22:06:35 +0100
-Subject: [PATCH v4 1/2] ACPICA: ACPI 6.2: Add support for new SRAT subtable
-In-Reply-To: <7426901.eKsnQBecvM@aspire.rjw.lan>
-References: <1498111812-17053-1-git-send-email-ganapatrao.kulkarni@cavium.com>
- <20170622134303.GA9732@red-moon>
- <94F2FBAB4432B54E8AACC7DFDE6C92E37E5C3067@ORSMSX110.amr.corp.intel.com>
- <7426901.eKsnQBecvM@aspire.rjw.lan>
-Message-ID: <20170622210635.GB27861@red-moon>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 22 Jun 2017 23:14:38 +0200
+Subject: [PATCH 7/9] PM / ACPI: Enable the runtime PM centric approach for
+ system sleep
+In-Reply-To: <2162861.FQgDXG4xnB@aspire.rjw.lan>
+References: <1498072888-14782-1-git-send-email-ulf.hansson@linaro.org>
+ <CAJZ5v0jL-0TKUv5nK7tFLm+X7nE7J2e3hm21i=+FBFBzQLQ=Xw@mail.gmail.com>
+ <CAPDyKFpYpLqPiyfqp16JT8fA7xwhanAcfhdnYm6MgeXyq0QfNQ@mail.gmail.com>
+ <2162861.FQgDXG4xnB@aspire.rjw.lan>
+Message-ID: <CAPDyKFpbn2Ao7YBTtFVM7uO=O4Atu==R17_aA2oxY-j7jAaaZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 22, 2017 at 04:27:18PM +0200, Rafael J. Wysocki wrote:
-> On Thursday, June 22, 2017 02:13:18 PM Moore, Robert wrote:
-> > This support is already in the ACPICA code base, but I can't speak to when it will be upstreamed to Linux. Lv would know this.
-> 
-> It should be there in linux-next already AFAICS.
-> 
-> Lorenzo, can you please double check?
+On 22 June 2017 at 16:32, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Thursday, June 22, 2017 11:42:11 AM Ulf Hansson wrote:
+>> On 21 June 2017 at 23:47, Rafael J. Wysocki <rafael@kernel.org> wrote:
+>> > On Wed, Jun 21, 2017 at 9:21 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> >> This change extends the interpretation of the ACPI's no_direct_complete
+>> >> flag to be used to enable the so called runtime PM centric approach, for
+>> >> devices being attached to the ACPI PM domain.
+>> >>
+>> >> The principle behind the runtime PM centric approach is to re-use the
+>> >> runtime PM callbacks to implement system sleep for drivers/subsystems.
+>> >> Moreover, using the runtime PM centric approach gives an optimized
+>> >> behaviour around avoiding to wake up a device from its low power state
+>> >> during system sleep, unless really needed.
+>> >>
+>> >> To deploy the runtime PM centric approach for a subsystem/driver, the
+>> >> following adaptations needs to be made.
+>> >>
+>> >> First, the runtime PM callbacks may be called when runtime PM has been
+>> >> disabled for the device. This serves as an indication for the callbacks to
+>> >> understand they are running in the system sleep sequence, instead of in the
+>> >> regular runtime PM path. In some cases, a callback needs to take different
+>> >> actions depending in what path it is being executed in, as is the case for
+>> >> the ACPI PM domain.
+>> >>
+>> >> In particular for the ACPI PM domain's ->runtime_suspend|resume()
+>> >> callbacks, when those finds runtime PM being disabled for the device, it
+>> >> instead executes the same operations as normally being run when
+>> >> ->suspend_late() and ->resume_early() callbacks are invoked during system
+>> >> sleep.
+>> >>
+>> >> Second, at the PM domain level, it is expected that the driver for the
+>> >> device makes use of pm_runtime_force_suspend|resume(), to re-use the
+>> >> runtime PM callbacks to put the device into low power state and to wake it
+>> >> up when needed during system sleep.
+>> >
+>> > What if it doesn't do that?
+>> >
+>> > Do all drivers of devices that may fall into the ACPI PM domain use
+>> > pm_runtime_force_suspend|resume()?
+>>
+>> No, no - the runtime PM centric path is optional by all ACPI
+>> devices/drivers. The default is still for the ACPI PM domain to try
+>> the direct_complete path.
+>>
+>> However if an ACPI device/driver (i2c designware in this case) likes
+>> to do that, they need to inform the ACPI PM domain about it. Then they
+>> call acpi_dev_disable_direct_complete() and makes use of
+>> pm_runtime_force_suspend|resume() to deal with system sleep.
+>>
+>> Does that makes sense?
+>
+> Overall, yes, it does, but then it should be made clear that when you use
+> "no_direct_complete" (all what you are going to call that eventually), you
+> also must use pm_runtime_force_suspend|resume() as your sleep callbacks.
 
-Yes, it is all fine, thank you Rafael for taking the ACPICA changes.
+Okay, so I will clarify that in the header of
+acpi_dev_disable_direct_complete() and I guess I should also update
+some documentation around ACPI.
 
-Thanks !
-Lorenzo
+>
+> Otherwise things may not work correctly if my understanding is correct.
 
-> Thanks,
-> Rafael
-> 
-> 
-> > > -----Original Message-----
-> > > From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
-> > > Sent: Thursday, June 22, 2017 6:43 AM
-> > > To: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>; Zheng, Lv
-> > > <lv.zheng@intel.com>; Moore, Robert <robert.moore@intel.com>; Rafael J.
-> > > Wysocki <rjw@rjwysocki.net>
-> > > Cc: linux-acpi at vger.kernel.org; devel at acpica.org; linux-
-> > > kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> > > marc.zyngier at arm.com; catalin.marinas at arm.com; will.deacon at arm.com;
-> > > hanjun.guo at linaro.org; tglx at linutronix.de; jason at lakedaemon.net;
-> > > jnair at caviumnetworks.com; gpkulkarni at gmail.com
-> > > Subject: Re: [PATCH v4 1/2] ACPICA: ACPI 6.2: Add support for new SRAT
-> > > subtable
-> > > 
-> > > Hi Rafael, Lv, Robert,
-> > > 
-> > > On Thu, Jun 22, 2017 at 11:40:11AM +0530, Ganapatrao Kulkarni wrote:
-> > > > Add GIC ITS Affinity (ACPI 6.2) subtable to SRAT table.
-> > > >
-> > > > ACPICA commit 5bc67f63918da249bfe279ee461d152bb3e6f55b
-> > > > Link: https://github.com/acpica/acpica/commit/5bc67f6
-> > > >
-> > > > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> > > > ---
-> > > >  include/acpi/actbl1.h | 12 +++++++++++-
-> > > >  1 file changed, 11 insertions(+), 1 deletion(-)
-> > > 
-> > > This patch is fine to me but it is up to you or who sends the ACPICA
-> > > pull request to send it upstream or give us an ACK so that it can go via
-> > > irqchip.
-> > > 
-> > > We need to know how this commit (and other ACPICA changes) will be sent
-> > > upstream to handle trees dependencies, please advise it is a bit urgent,
-> > > thank you.
-> > > 
-> > > Lorenzo
-> > > 
-> > > > diff --git a/include/acpi/actbl1.h b/include/acpi/actbl1.h index
-> > > > b4ce55c..253c9db 100644
-> > > > --- a/include/acpi/actbl1.h
-> > > > +++ b/include/acpi/actbl1.h
-> > > > @@ -1192,7 +1192,8 @@ enum acpi_srat_type {
-> > > >  	ACPI_SRAT_TYPE_MEMORY_AFFINITY = 1,
-> > > >  	ACPI_SRAT_TYPE_X2APIC_CPU_AFFINITY = 2,
-> > > >  	ACPI_SRAT_TYPE_GICC_AFFINITY = 3,
-> > > > -	ACPI_SRAT_TYPE_RESERVED = 4	/* 4 and greater are reserved */
-> > > > +	ACPI_SRAT_TYPE_GIC_ITS_AFFINITY = 4,	/* ACPI 6.2 */
-> > > > +	ACPI_SRAT_TYPE_RESERVED = 5	/* 5 and greater are reserved */
-> > > >  };
-> > > >
-> > > >  /*
-> > > > @@ -1260,6 +1261,15 @@ struct acpi_srat_gicc_affinity {
-> > > >  	u32 clock_domain;
-> > > >  };
-> > > >
-> > > > +/* 4: GIC ITS Affinity (ACPI 6.2) */
-> > > > +
-> > > > +struct acpi_srat_its_affinity {
-> > > > +	struct acpi_subtable_header header;
-> > > > +	u32 proximity_domain;
-> > > > +	u16 reserved;
-> > > > +	u32 its_id;
-> > > > +};
-> > > > +
-> > > >  /* Flags for struct acpi_srat_gicc_affinity */
-> > > >
-> > > >  #define ACPI_SRAT_GICC_ENABLED     (1)	/* 00: Use affinity structure
-> > > */
-> > > > --
-> > > > 1.8.1.4
-> > > >
-> 
+Correct.
+
+Kind regards
+Uffe
