@@ -1,69 +1,61 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 22 Jun 2017 23:37:22 +0200
-Subject: [PATCH 1/9] i2c: designware: Fix system suspend
-In-Reply-To: <2842386.AFZiXzV2Sq@aspire.rjw.lan>
-References: <1498072888-14782-1-git-send-email-ulf.hansson@linaro.org>
- <CAJZ5v0iYwPE8rpn=aZ9n6LV-qbAK3kynRqVZ7xxuB+gYar_fyg@mail.gmail.com>
- <20170622104933.GY629@lahna.fi.intel.com> <2842386.AFZiXzV2Sq@aspire.rjw.lan>
-Message-ID: <CAPDyKFo80QWYhU_SFexr_riPSZS3QEXDyBcywa5qBYa3sJXcjw@mail.gmail.com>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Thu, 22 Jun 2017 21:43:05 +0000
+Subject: [RFC PATCH 1/4] EDAC: mvebu: Add driver for Marvell Armada SoCs
+References: <20170608041124.4624-1-chris.packham@alliedtelesis.co.nz>
+ <20170608041124.4624-2-chris.packham@alliedtelesis.co.nz>
+ <1497014062.3536.52.camel@pengutronix.de>
+ <1498140695.2533.76.camel@pengutronix.de>
+Message-ID: <36d9010c9f3f45f2a2bfeda3c0cc2716@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 June 2017 at 16:41, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Thursday, June 22, 2017 01:49:33 PM Mika Westerberg wrote:
->> On Thu, Jun 22, 2017 at 01:31:51AM +0200, Rafael J. Wysocki wrote:
->> > On Wed, Jun 21, 2017 at 9:21 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> > > The commit 8503ff166504 ("i2c: designware: Avoid unnecessary resuming
->> > > during system suspend"), may suggest to the PM core to try out the so
->> > > called direct_complete path for system sleep. In this path, the PM core
->> > > treats a runtime suspended device as it's already in a proper low power
->> > > state for system sleep, which makes it skip calling the system sleep
->> > > callbacks for the device, except for the ->prepare() and the ->complete()
->> > > callback.
->> > >
->> > > Moreover, under certain circumstances the PM core may unset the
->> > > direct_complete flag for a parent device, in case its child device are
->> > > being system suspended before. In other words, the PM core doesn't skip
->> > > calling the system sleep callbacks, no matter if the device is runtime
->> > > suspended or not.
->> > >
->> > > In cases of an i2c slave device, the above situation is triggered.
->> > > Unfortunate, this also breaks the assumption that the i2c device is always
->> > > runtime resumed, whenever the dw_i2c_plat_suspend() callback is being
->> > > invoked, which then leads to a regression.
->> > >
->> > > More precisely, dw_i2c_plat_suspend() then calls clk_core_disable() and
->> > > clk_core_unprepare(), for an already disabled/unprepared clock, leading to
->> > > complaints about clocks calls being wrongly balanced.
->> > >
->> > > In cases when the i2c device is attached to the ACPI PM domain, the problem
->> > > doesn't occur. That's because ACPI's ->suspend() callback, assigned to
->> > > acpi_subsys_suspend(), calls pm_runtime_resume() for the i2c device.
->> >
->> > Which really is expected to happen, so direct_complete should only be
->> > used along with the ACPI PM domain in this case.
->> >
->> > Moreover, in the ACPI PM domain case acpi_subsys_prepare() is supposed
->> > to do the right thing without dw_i2c_plat_prepare() and the return
->> > value of the latter will be ignored anyway, so dw_i2c_plat_prepare()
->> > will only have effect without ACPI PM domain AFAICS.
->> >
->> > It looks like commit 8503ff166504 is entirely misguided.
->>
->> Indeed it is. At the time I suggested that change I did not really
->> understand how the direct complete is supposed to be used :-/
->
-> So can we go for a full revert, please, and then fix up things properly?
+On 23/06/17 02:37, Jan L?bbe wrote:
+> Hi Chris,
+> 
+> On Fr, 2017-06-09 at 15:14 +0200, Jan L?bbe wrote:
+>>> +static void mvebu_init_csrows(struct mem_ctl_info *mci,
+>>> +                             struct mvebu_mc_pdata *pdata)
+>> [...]
+>>> +     devtype = (ctl >> 20) & 0x3;
+>>> +     switch (devtype) {
+>>> +     case 0x0:
+>>> +             dimm->dtype = DEV_X32;
+>>> +             break;
+>>> +     case 0x2:               /* could be X8 too, but no way to tell
+>> */
+>>> +             dimm->dtype = DEV_X16;
+>>> +             break;
+>>> +     case 0x3:
+>>> +             dimm->dtype = DEV_X4;
+>>> +             break;
+>>> +     default:
+>>> +             dimm->dtype = DEV_UNKNOWN;
+>>> +             break;
+>>> +     }
+>> This register is documented as reserved? I pulled the X8/X16
+>> information from the Address Control Register (CSnStruct bits).
+> 
+> Do you have more information on how to decode the Bus width?
+> 
+> It's not clear from the MV78230/78x60 docs:
+> - The SDRAM Configuration Register, offset 15 bit is:
+>    0 = Half (32 bit data bus)
+>    1 = Full (64 bit data bus)
 
-Unfortunate I think a revert is going to make it worse, for the non ACPI case.
+For the integrated version it still is just half and full but half == 16 
+and full == 32.
 
-Because in that case, unless I am reading the code wrong, I think when
-the device is runtime suspended during system sleep, then the system
-suspend callback will also be called (because the direct_complete
-isn't run), again causing clock unbalance issues.
+> - The SDRAM Address Control Register, offsets 0-1, 4-5, 8-9 and 12-13
+> (for CS 0, 1, 3 and 4):
+>    0 = X8
+>    1 = X16
+>    2 and 3 are not documented
 
-This makes it worse in that sense, that then you don't even need an
-i2c slave to trigger the problem.
+This definition is the same for the integrated version.
 
-Kind regards
-Uffe
+> Is this clearer in your documentation, so that we can have the same code
+> handle both variants? Otherwise, we'd probably need separate DT
+> compatibles.
+
+I think we do need to use the compatible string to decide how to 
+interpret full/half.
