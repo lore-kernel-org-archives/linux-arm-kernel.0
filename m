@@ -1,71 +1,125 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Thu, 22 Jun 2017 16:35:46 +0300
-Subject: [PATCH 00/14] staging: fsl-mc: clean up header files
-Message-ID: <20170622133600.31694-1-laurentiu.tudor@nxp.com>
+Date: Thu, 22 Jun 2017 16:35:47 +0300
+Subject: [PATCH 01/14] staging: fsl-mc: drop macros with possible side effects
+In-Reply-To: <20170622133600.31694-1-laurentiu.tudor@nxp.com>
+References: <20170622133600.31694-1-laurentiu.tudor@nxp.com>
+Message-ID: <20170622133600.31694-2-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-This patch series contain mainly clean-ups of the mc-bus header files
-with the final goal of reorganizing them in just 2 files: a public
-and a private one, as per GregKH suggestion [1].
-Here's a summary of the header reorganizing:
- - existing mc.h used as public header (contained most of the public API)
- - existing fsl-mc-private.h used for private header
- - mc-bus.h merged both in public and private header
- - mc-sys.h and mc-cmd.h merged in public header
- - dprc.h made private
- - dpmng.h deleted
+Several macros were triggering this checkpatch.pl warning:
+  "Macro argument reuse '$arg' - possible side-effects?"
+Fix the warning by turning them into real functions.
 
-[1] https://patchwork.kernel.org/patch/9775683/
+Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+---
+ drivers/staging/fsl-mc/bus/dprc-driver.c      | 15 +++++++++------
+ drivers/staging/fsl-mc/bus/fsl-mc-allocator.c | 18 ++++++++++--------
+ 2 files changed, 19 insertions(+), 14 deletions(-)
 
-Laurentiu Tudor (14):
-  staging: fsl-mc: drop macros with possible side effects
-  staging: fsl-mc: drop useless #includes
-  staging: fsl-mc: decouple the mc-bus public headers from dprc.h
-  staging: fsl-mc: delete duplicated function prototypes
-  staging: fsl-mc: delete prototype of unimplemented function
-  staging: fsl-mc: turn several exported functions static
-  staging: fsl-mc: move irq domain creation prototype to public header
-  staging: fsl-mc: move couple of definitions to public header
-  staging: fsl-mc: move rest of mc-bus.h to private header
-  staging: fsl-mc: remove dpmng API files and move implemention in the
-    bus
-  staging: fsl-mc: fix a few implicit includes
-  staging: fsl-mc: move mc-sys.h contents in the public header
-  staging: fsl-mc: move mc-cmd.h contents in the public header
-  staging: fsl-mc: make dprc.h header private
-
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c     |   1 -
- drivers/staging/fsl-dpaa2/ethernet/dpni.c          |   3 +-
- drivers/staging/fsl-mc/bus/dpbp.c                  |   4 +-
- drivers/staging/fsl-mc/bus/dpcon.c                 |   4 +-
- drivers/staging/fsl-mc/bus/dpio/dpio.c             |   4 +-
- drivers/staging/fsl-mc/bus/dpmcp.c                 |   4 +-
- drivers/staging/fsl-mc/bus/dpmng.c                 |  74 --------
- drivers/staging/fsl-mc/bus/dprc-driver.c           |  62 +++----
- drivers/staging/fsl-mc/bus/dprc.c                  |   8 +-
- drivers/staging/fsl-mc/{include => bus}/dprc.h     |  46 +----
- drivers/staging/fsl-mc/bus/fsl-mc-allocator.c      |  23 ++-
- drivers/staging/fsl-mc/bus/fsl-mc-bus.c            |  71 +++++--
- drivers/staging/fsl-mc/bus/fsl-mc-msi.c            |   2 -
- drivers/staging/fsl-mc/bus/fsl-mc-private.h        |  64 ++++++-
- .../staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c |   1 -
- drivers/staging/fsl-mc/bus/mc-io.c                 |   3 +-
- drivers/staging/fsl-mc/bus/mc-sys.c                |   2 -
- drivers/staging/fsl-mc/include/dpmng.h             |  67 -------
- drivers/staging/fsl-mc/include/mc-bus.h            | 111 -----------
- drivers/staging/fsl-mc/include/mc-cmd.h            | 130 -------------
- drivers/staging/fsl-mc/include/mc-sys.h            |  98 ----------
- drivers/staging/fsl-mc/include/mc.h                | 204 ++++++++++++++++++++-
- 22 files changed, 383 insertions(+), 603 deletions(-)
- delete mode 100644 drivers/staging/fsl-mc/bus/dpmng.c
- rename drivers/staging/fsl-mc/{include => bus}/dprc.h (84%)
- delete mode 100644 drivers/staging/fsl-mc/include/dpmng.h
- delete mode 100644 drivers/staging/fsl-mc/include/mc-bus.h
- delete mode 100644 drivers/staging/fsl-mc/include/mc-cmd.h
- delete mode 100644 drivers/staging/fsl-mc/include/mc-sys.h
-
+diff --git a/drivers/staging/fsl-mc/bus/dprc-driver.c b/drivers/staging/fsl-mc/bus/dprc-driver.c
+index d723c69..80c080f 100644
+--- a/drivers/staging/fsl-mc/bus/dprc-driver.c
++++ b/drivers/staging/fsl-mc/bus/dprc-driver.c
+@@ -21,15 +21,18 @@
+ 
+ #define FSL_MC_DPRC_DRIVER_NAME    "fsl_mc_dprc"
+ 
+-#define FSL_MC_DEVICE_MATCH(_mc_dev, _obj_desc) \
+-	(strcmp((_mc_dev)->obj_desc.type, (_obj_desc)->type) == 0 && \
+-	 (_mc_dev)->obj_desc.id == (_obj_desc)->id)
+-
+ struct dprc_child_objs {
+ 	int child_count;
+ 	struct dprc_obj_desc *child_array;
+ };
+ 
++static bool fsl_mc_device_match(struct fsl_mc_device *mc_dev,
++				struct dprc_obj_desc *obj_desc)
++{
++	return !strcmp(mc_dev->obj_desc.type, obj_desc->type) &&
++		mc_dev->obj_desc.id == obj_desc->id;
++}
++
+ static int __fsl_mc_device_remove_if_not_in_mc(struct device *dev, void *data)
+ {
+ 	int i;
+@@ -45,7 +48,7 @@ static int __fsl_mc_device_remove_if_not_in_mc(struct device *dev, void *data)
+ 		struct dprc_obj_desc *obj_desc = &objs->child_array[i];
+ 
+ 		if (strlen(obj_desc->type) != 0 &&
+-		    FSL_MC_DEVICE_MATCH(mc_dev, obj_desc))
++		    fsl_mc_device_match(mc_dev, obj_desc))
+ 			break;
+ 	}
+ 
+@@ -105,7 +108,7 @@ static int __fsl_mc_device_match(struct device *dev, void *data)
+ 	struct dprc_obj_desc *obj_desc = data;
+ 	struct fsl_mc_device *mc_dev = to_fsl_mc_device(dev);
+ 
+-	return FSL_MC_DEVICE_MATCH(mc_dev, obj_desc);
++	return fsl_mc_device_match(mc_dev, obj_desc);
+ }
+ 
+ static struct fsl_mc_device *fsl_mc_device_lookup(struct dprc_obj_desc
+diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-allocator.c b/drivers/staging/fsl-mc/bus/fsl-mc-allocator.c
+index ce07096..9291847 100644
+--- a/drivers/staging/fsl-mc/bus/fsl-mc-allocator.c
++++ b/drivers/staging/fsl-mc/bus/fsl-mc-allocator.c
+@@ -17,10 +17,12 @@
+ #include "dpcon-cmd.h"
+ #include "fsl-mc-private.h"
+ 
+-#define FSL_MC_IS_ALLOCATABLE(_obj_type) \
+-	(strcmp(_obj_type, "dpbp") == 0 || \
+-	 strcmp(_obj_type, "dpmcp") == 0 || \
+-	 strcmp(_obj_type, "dpcon") == 0)
++static bool __must_check fsl_mc_is_allocatable(const char *obj_type)
++{
++	return strcmp(obj_type, "dpbp") == 0 ||
++	       strcmp(obj_type, "dpmcp") == 0 ||
++	       strcmp(obj_type, "dpcon") == 0;
++}
+ 
+ /**
+  * fsl_mc_resource_pool_add_device - add allocatable object to a resource
+@@ -44,7 +46,7 @@ static int __must_check fsl_mc_resource_pool_add_device(struct fsl_mc_bus
+ 
+ 	if (WARN_ON(pool_type < 0 || pool_type >= FSL_MC_NUM_POOL_TYPES))
+ 		goto out;
+-	if (WARN_ON(!FSL_MC_IS_ALLOCATABLE(mc_dev->obj_desc.type)))
++	if (WARN_ON(!fsl_mc_is_allocatable(mc_dev->obj_desc.type)))
+ 		goto out;
+ 	if (WARN_ON(mc_dev->resource))
+ 		goto out;
+@@ -106,7 +108,7 @@ static int __must_check fsl_mc_resource_pool_remove_device(struct fsl_mc_device
+ 	struct fsl_mc_resource *resource;
+ 	int error = -EINVAL;
+ 
+-	if (WARN_ON(!FSL_MC_IS_ALLOCATABLE(mc_dev->obj_desc.type)))
++	if (WARN_ON(!fsl_mc_is_allocatable(mc_dev->obj_desc.type)))
+ 		goto out;
+ 
+ 	resource = mc_dev->resource;
+@@ -586,7 +588,7 @@ static int fsl_mc_allocator_probe(struct fsl_mc_device *mc_dev)
+ 	struct fsl_mc_bus *mc_bus;
+ 	int error;
+ 
+-	if (WARN_ON(!FSL_MC_IS_ALLOCATABLE(mc_dev->obj_desc.type)))
++	if (WARN_ON(!fsl_mc_is_allocatable(mc_dev->obj_desc.type)))
+ 		return -EINVAL;
+ 
+ 	mc_bus_dev = to_fsl_mc_device(mc_dev->dev.parent);
+@@ -615,7 +617,7 @@ static int fsl_mc_allocator_remove(struct fsl_mc_device *mc_dev)
+ {
+ 	int error;
+ 
+-	if (WARN_ON(!FSL_MC_IS_ALLOCATABLE(mc_dev->obj_desc.type)))
++	if (WARN_ON(!fsl_mc_is_allocatable(mc_dev->obj_desc.type)))
+ 		return -EINVAL;
+ 
+ 	if (mc_dev->resource) {
 -- 
 2.9.4
