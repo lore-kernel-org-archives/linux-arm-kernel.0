@@ -1,50 +1,60 @@
-From: frank.wang@rock-chips.com (Frank Wang)
-Date: Thu, 22 Jun 2017 18:32:40 +0800
-Subject: [RESEND PATCH v2 7/7] ARM: dts: rockchip: add efuse device node for
- rk3228
-In-Reply-To: <1498127402-6705-1-git-send-email-frank.wang@rock-chips.com>
-References: <1498127402-6705-1-git-send-email-frank.wang@rock-chips.com>
-Message-ID: <1498127560-6960-1-git-send-email-frank.wang@rock-chips.com>
+From: mika.westerberg@linux.intel.com (Mika Westerberg)
+Date: Thu, 22 Jun 2017 13:49:33 +0300
+Subject: [PATCH 1/9] i2c: designware: Fix system suspend
+In-Reply-To: <CAJZ5v0iYwPE8rpn=aZ9n6LV-qbAK3kynRqVZ7xxuB+gYar_fyg@mail.gmail.com>
+References: <1498072888-14782-1-git-send-email-ulf.hansson@linaro.org>
+ <1498072888-14782-2-git-send-email-ulf.hansson@linaro.org>
+ <CAJZ5v0iYwPE8rpn=aZ9n6LV-qbAK3kynRqVZ7xxuB+gYar_fyg@mail.gmail.com>
+Message-ID: <20170622104933.GY629@lahna.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Finley Xiao <finley.xiao@rock-chips.com>
+On Thu, Jun 22, 2017 at 01:31:51AM +0200, Rafael J. Wysocki wrote:
+> On Wed, Jun 21, 2017 at 9:21 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> > The commit 8503ff166504 ("i2c: designware: Avoid unnecessary resuming
+> > during system suspend"), may suggest to the PM core to try out the so
+> > called direct_complete path for system sleep. In this path, the PM core
+> > treats a runtime suspended device as it's already in a proper low power
+> > state for system sleep, which makes it skip calling the system sleep
+> > callbacks for the device, except for the ->prepare() and the ->complete()
+> > callback.
+> >
+> > Moreover, under certain circumstances the PM core may unset the
+> > direct_complete flag for a parent device, in case its child device are
+> > being system suspended before. In other words, the PM core doesn't skip
+> > calling the system sleep callbacks, no matter if the device is runtime
+> > suspended or not.
+> >
+> > In cases of an i2c slave device, the above situation is triggered.
+> > Unfortunate, this also breaks the assumption that the i2c device is always
+> > runtime resumed, whenever the dw_i2c_plat_suspend() callback is being
+> > invoked, which then leads to a regression.
+> >
+> > More precisely, dw_i2c_plat_suspend() then calls clk_core_disable() and
+> > clk_core_unprepare(), for an already disabled/unprepared clock, leading to
+> > complaints about clocks calls being wrongly balanced.
+> >
+> > In cases when the i2c device is attached to the ACPI PM domain, the problem
+> > doesn't occur. That's because ACPI's ->suspend() callback, assigned to
+> > acpi_subsys_suspend(), calls pm_runtime_resume() for the i2c device.
+> 
+> Which really is expected to happen, so direct_complete should only be
+> used along with the ACPI PM domain in this case.
+> 
+> Moreover, in the ACPI PM domain case acpi_subsys_prepare() is supposed
+> to do the right thing without dw_i2c_plat_prepare() and the return
+> value of the latter will be ignored anyway, so dw_i2c_plat_prepare()
+> will only have effect without ACPI PM domain AFAICS.
+> 
+> It looks like commit 8503ff166504 is entirely misguided.
 
-Add a efuse node in the device tree for the rk3228 SoC.
+Indeed it is. At the time I suggested that change I did not really
+understand how the direct complete is supposed to be used :-/
 
-Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
-Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
----
- arch/arm/boot/dts/rk322x.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+Thanks Ulf for taking care of this!
 
-diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
-index bd7ef53..70ca103 100644
---- a/arch/arm/boot/dts/rk322x.dtsi
-+++ b/arch/arm/boot/dts/rk322x.dtsi
-@@ -336,6 +336,23 @@
- 		status = "disabled";
- 	};
- 
-+	efuse: efuse at 11040000 {
-+		compatible = "rockchip,rk3228-efuse";
-+		reg = <0x11040000 0x20>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		clocks = <&cru PCLK_EFUSE_256>;
-+		clock-names = "pclk_efuse";
-+
-+		/* Data cells */
-+		efuse_id: id at 7 {
-+			reg = <0x7 0x10>;
-+		};
-+		cpu_leakage: cpu_leakage at 17 {
-+			reg = <0x17 0x1>;
-+		};
-+	};
-+
- 	i2c0: i2c at 11050000 {
- 		compatible = "rockchip,rk3228-i2c";
- 		reg = <0x11050000 0x1000>;
--- 
-2.0.0
+I tested this series on Dell XPS 9350 which has touch panel connected to
+I2C and suspend/resume still works fine and I can see the controller
+going to D3 when the touch panel is idle.
+
+I can perform more comprehensive testing next week.
