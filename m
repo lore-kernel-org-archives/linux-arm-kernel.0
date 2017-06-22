@@ -1,69 +1,56 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 22 Jun 2017 14:49:22 -0700
-Subject: [GIT PULL] Amlogic 64-bit DT changes for v3.14 (round 2)
-Message-ID: <7h60fnae1p.fsf@baylibre.com>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Thu, 22 Jun 2017 21:50:29 +0000
+Subject: [RFC PATCH 3/4] ARM: l2x0: add arm, ecc-enable property for aurora
+References: <20170608041124.4624-1-chris.packham@alliedtelesis.co.nz>
+ <20170608041124.4624-4-chris.packham@alliedtelesis.co.nz>
+ <1496998692.3536.24.camel@pengutronix.de>
+ <220533aeb8f64e829f483e38e209cdc8@svr-chch-ex1.atlnz.lc>
+ <1498142790.2533.80.camel@pengutronix.de>
+Message-ID: <fdca2681c44a45adb399d2f90afc3707@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof, Arnd,
+On 23/06/17 02:46, Jan L?bbe wrote:
+> Chris,
+> 
+> On So, 2017-06-11 at 22:55 +0000, Chris Packham wrote:
+>> On 09/06/17 20:58, Jan L?bbe wrote:
+>>> On Do, 2017-06-08 at 16:11 +1200, Chris Packham wrote:
+>>>> +       if (of_property_read_bool(np, "arm,ecc-enable")) {
+>>>> +               mask |= L2C_AUX_CTRL_EVTMON_ENABLE;
+>>>> +               val |= L2C_AUX_CTRL_EVTMON_ENABLE;
+>>>> +       } else if (of_property_read_bool(np, "arm,ecc-disable")) {
+>>>> +               mask |= L2C_AUX_CTRL_EVTMON_ENABLE;
+>>>> +       }
+>>>
+>>> Unless I misunderstand the code in __l2c_init(), the mask is used to
+>>> specify the bits to preserve:
+>>>           old_aux = aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
+>>>           aux &= aux_mask;
+>>>           aux |= aux_val;
+>>>
+>>>           if (old_aux != aux)
+>>>                   pr_warn("L2C: DT/platform modifies aux control register: 0x%08x -> 0x%08x\n",
+>>>                           old_aux, aux);
+>>>
+>>> So the arm,ecc-disable property will have no effect. This probably also
+>>> applies to patch 2/4. The existing property *-disable code removes the
+>>> corresponding bit from the mask.
+>>
+>> Indeed the disable version should be mask &= ~L2C_AUX_CTRL_EVTMON_ENABLE
+>> and I was probably a little lazy to have used the L2C EVTMON instead of
+>> adding AURORA specific ones like you have in your series.
+>>
+>> I'll rebase my series on top of yours and send it direct to you so you
+>> can include it in the overall submission.
+> 
+> While picking up your arm,parity-enable and arm,ecc-enable patches for
+> my series, I noticed that the mask variable is inverted when merging the
+> local changes into aux_val/aux_mask at the end of aurora_of_parse. So I
+> now believe your code is correct. ;) I'd appreciate a close look,
+> nevertheless.
 
-Here's a small, second round of 64-bit DT changes for v4.13.  This ws
-waiting for the clock dependencies finalize and  arrive in clk-next,
-which they are now.
-
-The clock header dependencies are also merged into this branch.
-
-Kevin
-
-
-The following changes since commit 27f87bd2900b1a95d9c8e25deeb9768cf3fdcc4e:
-
-  ARM64: dts: meson-gxl-s905x-p212: Add HDMI and CVBS nodes (2017-06-09 11:38:22 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-2
-
-for you to fetch changes up to cd84aff1d981bc34ed3166f3071916ca9ceefadf:
-
-  ARM64: dts: meson-gxl: Add Libre Technology CC support (2017-06-22 12:02:05 -0700)
-
-----------------------------------------------------------------
-Amlogic 64-bit DT changes for v4.13 (round 2)
-- support new SPI controller driver
-- several more leaf clocks exposed to DT
-- New board: S905x LibreTech CC board
-
-----------------------------------------------------------------
-Helmut Klein (1):
-      clk: meson-gxbb: expose UART clocks
-
-Jerome Brunet (6):
-      clk: meson-gxbb: expose spdif clock gates
-      clk: meson-gxbb: expose i2s master clock
-      clk: meson-gxbb: expose spdif master clock
-      dt-bindings: add Libre Technology vendor prefix
-      dt-bindings: arm: amlogic: Add Libre Technology CC board
-      ARM64: dts: meson-gxl: Add Libre Technology CC support
-
-Kevin Hilman (1):
-      Merge tag 'meson-clk-headers-for-4.13' of git://github.com/BayLibre/clk-meson into v4.13/dt64
-
-Martin Blumenstingl (1):
-      clk: meson-gxbb: un-export the CPU clock
-
-Neil Armstrong (2):
-      clk: meson-gxbb: expose SPICC gate
-      ARM64: dts: meson-gx: Add SPICC nodes
-
- Documentation/devicetree/bindings/arm/amlogic.txt            |  1 +
- Documentation/devicetree/bindings/vendor-prefixes.txt        |  1 +
- arch/arm64/boot/dts/amlogic/Makefile                         |  1 +
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi                    |  9 +++++
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi                  |  7 ++++
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts | 92 ++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi                   |  7 ++++
- drivers/clk/meson/gxbb.h                                     | 20 ++++++------
- include/dt-bindings/clock/gxbb-clkc.h                        | 10 +++++-
- 9 files changed, 137 insertions(+), 11 deletions(-)
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
+For my part I tested the enable case but I never tested the disable case 
+(because u-boot doesn't enable it there's nothing to disable). I can 
+probably just poke the register before starting the kernel to confirm 
+the disable case works with whatever masking logic we end up with.
