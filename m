@@ -1,43 +1,76 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 22 Jun 2017 15:49:25 +0100
-Subject: [PATCH v4 2/2] acpi, gicv3-its, numa: Adding numa node mapping
- for gic-its units
-In-Reply-To: <1498111812-17053-3-git-send-email-ganapatrao.kulkarni@cavium.com>
-References: <1498111812-17053-1-git-send-email-ganapatrao.kulkarni@cavium.com>
- <1498111812-17053-3-git-send-email-ganapatrao.kulkarni@cavium.com>
-Message-ID: <2d99c999-8ded-ac3d-57a2-fd81dbadadea@arm.com>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Thu, 22 Jun 2017 22:49:00 +0800
+Subject: [PATCH V5 1/1] dt-bindings: pinctrl: extend the pinmux property to
+ support integers array
+In-Reply-To: <1498046395-30001-2-git-send-email-aisheng.dong@nxp.com>
+References: <1498046395-30001-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1498142940-7982-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/06/17 07:10, Ganapatrao Kulkarni wrote:
-> Add code to parse SRAT ITS Affinity sub table as defined in ACPI 6.2.
-> Later in per device probe, ITS devices are mapped to numa node using
-> ITS Id to proximity domain mapping.
-> 
-> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> ---
->  drivers/irqchip/irq-gic-v3-its.c | 75 +++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 74 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 45ea1933..1c21e01 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -1833,6 +1833,77 @@ static int __init its_of_probe(struct device_node *node)
->  
->  #define ACPI_GICV3_ITS_MEM_SIZE (SZ_128K)
->  
-> +#ifdef CONFIG_ACPI_NUMA
+Some platforms may need more than one integer to represent a complete
+pinmux binding, so let's extend the pinmux property to allow to accept
+integer array instead of only a single integer.
 
-So given that there is a dependency issue between the irqchip and apcica
-trees, I plan on taking this patch with the following change:
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: devicetree at vger.kernel.org
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-#if defined(CONFIG_ACPI_NUMA) && (ACPI_CA_VERSION >= 0x20170531)
+---
+ChangeLog:
+v4->v5:
+ * doc improvement
+v4:
+ * new patch
+---
+ .../devicetree/bindings/pinctrl/pinctrl-bindings.txt      | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
 
-matching what is currently in -next.
-
-Thanks,
-
-	M.
+diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+index f01d154..30f1d9e 100644
+--- a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
++++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+@@ -204,21 +204,22 @@ each single pin the number of required sub-nodes containing "pin" and
+ maintain.
+ 
+ For cases like this, the pin controller driver may use the pinmux helper
+-property, where the pin identifier is packed with mux configuration settings
+-in a single integer.
++property, where the pin identifier is provided with mux configuration settings
++in a pinmux group. A pinmux group consists of the pin identifier and mux
++settings represented as a single integer or an array of integers.
+ 
+-The pinmux property accepts an array of integers, each of them describing
++The pinmux property accepts an array of pinmux groups, each of them describing
+ a single pin multiplexing configuration.
+ 
+ pincontroller {
+ 	state_0_node_a {
+-		pinmux = <PIN_ID_AND_MUX>, <PIN_ID_AND_MUX>, ...;
++		pinmux = <PINMUX_GROUP>, <PINMUX_GROUP>, ...;
+ 	};
+ };
+ 
+ Each individual pin controller driver bindings documentation shall specify
+-how those values (pin IDs and pin multiplexing configuration) are defined and
+-assembled together.
++how pin IDs and pin multiplexing configuration are defined and assembled
++together in a pinmux group.
+ 
+ == Generic pin configuration node content ==
+ 
+@@ -300,7 +301,7 @@ arguments are described below.
+ - pinmux takes a list of pin IDs and mux settings as required argument. The
+   specific bindings for the hardware defines:
+   - How pin IDs and mux settings are defined and assembled together in a single
+-    integer.
++    integer or an array of integers.
+ 
+ - bias-pull-up, -down and -pin-default take as optional argument on hardware
+   supporting it the pull strength in Ohm. bias-disable will disable the pull.
 -- 
-Jazz is not dead. It just smells funny...
+2.7.4
