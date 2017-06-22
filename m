@@ -1,60 +1,41 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 22 Jun 2017 10:01:43 +0200
-Subject: [PATCH 1/9] serial: Add common rs485 device tree parsing function
-In-Reply-To: <20170622061007.h76gk3hixp4ipyvr@pengutronix.de>
-References: <20170621102130.21024-1-u.kleine-koenig@pengutronix.de>
- <20170621102130.21024-2-u.kleine-koenig@pengutronix.de>
- <20170622061007.h76gk3hixp4ipyvr@pengutronix.de>
-Message-ID: <20170622080143.waljtsziek2ciqmd@pengutronix.de>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Thu, 22 Jun 2017 16:02:44 +0800
+Subject: [PATCH v3.1 1/3] drm/rockchip: dw_hdmi: add RK3399 HDMI support
+In-Reply-To: <1751555.73cFbViMXZ@phil>
+References: <1496992236-10634-1-git-send-email-mark.yao@rock-chips.com>
+ <1498115845-7177-1-git-send-email-mark.yao@rock-chips.com>
+ <1751555.73cFbViMXZ@phil>
+Message-ID: <594B79A4.1000509@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 22, 2017 at 08:10:07AM +0200, Sascha Hauer wrote:
-> On Wed, Jun 21, 2017 at 12:21:22PM +0200, Uwe Kleine-K?nig wrote:
-> > From: Sascha Hauer <s.hauer@pengutronix.de>
-> > 
-> > Several drivers have the same device tree parsing code. Create
-> > a common helper function for it.
-> > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> >  drivers/tty/serial/Kconfig  |  4 ++++
-> >  drivers/tty/serial/Makefile |  2 ++
-> >  drivers/tty/serial/of.c     | 45 +++++++++++++++++++++++++++++++++++++++++++++
-> >  include/linux/serial_core.h | 12 ++++++++++++
-> >  4 files changed, 63 insertions(+)
-> >  create mode 100644 drivers/tty/serial/of.c
-> > 
-> > diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> > index 5c8850f7a2a0..8baef5b95bed 100644
-> > --- a/drivers/tty/serial/Kconfig
-> > +++ b/drivers/tty/serial/Kconfig
-> > @@ -14,6 +14,10 @@ config SERIAL_EARLYCON
-> >  	  the console before standard serial driver is probed. The console is
-> >  	  enabled when early_param is processed.
-> >  
-> > +config OF_SERIAL
-> > +	depends on SERIAL_CORE
-> > +	def_bool y
-> 
-> This probably also needs a dependency on some device tree option,
-> CONFIG_OF maybe?
+On 2017?06?22? 15:31, Heiko Stuebner wrote:
+>> +
+>> >+/**
+>> >+ * struct rockchip_hdmi_chip_data - splite the grf setting of kind of chips
+>> >+ * @lcdsel_grf_reg: grf register offset of lcdc select
+>> >+ * @lcdsel_big: reg value of selecting vop big for HDMI
+>> >+ * @lcdsel_lit: reg value of selecting vop little for HDMI
+>> >+ */
+>> >+struct rockchip_hdmi_chip_data {
+>> >+	u32	lcdsel_grf_reg;
+> How do you plan on handling the rk3368 (with only one VOP and thus
+> no selection happening)? I'd just make the above an int, so we could
+> set it to -1 for that case. (value 0 is after all a valid reg).
 
-Without CONFIG_OF of_property_read_u32_array returns -ENOSYS and
-of_property_read_bool returns false. So I think (but didn't test) there
-is no problem not depending on more stuff.
+It's a problem handling on rk3368, using -1 to judge means that we need
+initial the lcdsel_grf_reg to -1 on rk3368 platform, we need always add a platform
+data to handle it, seems not good enough.
 
-But maybe do:
+Since the hdmi chip data only use for vop selection, maybe we can judge with
+checking hdmi->chip_data == NULL for the case.
 
-	if (!np)
-		return 1;
+Mark.
 
-in of_get_rs485_mode?
-
-Best regards
-Uwe
+>
+> Heiko
+>
+>
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+?ark Yao
