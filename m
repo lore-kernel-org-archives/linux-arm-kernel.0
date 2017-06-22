@@ -1,38 +1,34 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 22 Jun 2017 16:53:50 +0100
-Subject: [PATCH v2 1/8] iommu/io-pgtable-arm-v7s: Check table PTEs more
- precisely
-In-Reply-To: <cover.1498145008.git.robin.murphy@arm.com>
-References: <cover.1498145008.git.robin.murphy@arm.com>
-Message-ID: <769fe7c1a4d3a4165943b1a0c1443be3508d224c.1498145008.git.robin.murphy@arm.com>
+Date: Thu, 22 Jun 2017 16:53:49 +0100
+Subject: [PATCH v2 0/8] io-pgtable lock removal
+Message-ID: <cover.1498145008.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Whilst we don't support the PXN bit at all, so should never encounter a
-level 1 section or supersection PTE with it set, it would still be wise
-to check both table type bits to resolve any theoretical ambiguity.
+The feedback has been promising, so v2 is just a final update to cover
+a handful of memory ordering and cosmetic tweaks that came up when Will
+and I went through this offline.
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+Thanks,
+Robin.
 
-v2: No change
 
- drivers/iommu/io-pgtable-arm-v7s.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Robin Murphy (8):
+  iommu/io-pgtable-arm-v7s: Check table PTEs more precisely
+  iommu/io-pgtable-arm: Improve split_blk_unmap
+  iommu/io-pgtable-arm-v7s: Refactor split_blk_unmap
+  iommu/io-pgtable: Introduce explicit coherency
+  iommu/io-pgtable-arm: Support lockless operation
+  iommu/io-pgtable-arm-v7s: Support lockless operation
+  iommu/arm-smmu: Remove io-pgtable spinlock
+  iommu/arm-smmu-v3: Remove io-pgtable spinlock
 
-diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
-index 8d6ca28c3e1f..a490db032c51 100644
---- a/drivers/iommu/io-pgtable-arm-v7s.c
-+++ b/drivers/iommu/io-pgtable-arm-v7s.c
-@@ -92,7 +92,8 @@
- #define ARM_V7S_PTE_TYPE_CONT_PAGE	0x1
- 
- #define ARM_V7S_PTE_IS_VALID(pte)	(((pte) & 0x3) != 0)
--#define ARM_V7S_PTE_IS_TABLE(pte, lvl)	(lvl == 1 && ((pte) & ARM_V7S_PTE_TYPE_TABLE))
-+#define ARM_V7S_PTE_IS_TABLE(pte, lvl) \
-+	((lvl) == 1 && (((pte) & 0x3) == ARM_V7S_PTE_TYPE_TABLE))
- 
- /* Page table bits */
- #define ARM_V7S_ATTR_XN(lvl)		BIT(4 * (2 - (lvl)))
+ drivers/iommu/arm-smmu-v3.c        |  36 ++-----
+ drivers/iommu/arm-smmu.c           |  48 ++++------
+ drivers/iommu/io-pgtable-arm-v7s.c | 179 +++++++++++++++++++++-------------
+ drivers/iommu/io-pgtable-arm.c     | 191 ++++++++++++++++++++++++-------------
+ drivers/iommu/io-pgtable.h         |   6 ++
+ 5 files changed, 274 insertions(+), 186 deletions(-)
+
 -- 
 2.12.2.dirty
