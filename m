@@ -1,272 +1,56 @@
-From: gakula@caviumnetworks.com (Geetha sowjanya)
-Date: Thu, 22 Jun 2017 17:35:38 +0530
-Subject: [PATCH v9 3/3] iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2
- erratum #126
-In-Reply-To: <1498133138-20244-1-git-send-email-gakula@caviumnetworks.com>
-References: <1498133138-20244-1-git-send-email-gakula@caviumnetworks.com>
-Message-ID: <1498133138-20244-4-git-send-email-gakula@caviumnetworks.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 22 Jun 2017 20:25:59 +0800
+Subject: [PATCH 2/2] i2c: zx2967: add i2c controller driver for ZTE's
+ zx2967 family
+In-Reply-To: <20170622080730.o352kxrs5pz7wxnf@ninjato>
+References: <1495947576-11037-1-git-send-email-shawnguo@kernel.org>
+ <1495947576-11037-3-git-send-email-shawnguo@kernel.org>
+ <20170619193130.velebm7p3r5ggaos@ninjato>
+ <20170620025815.GA4818@x250> <20170620074126.GA1541@katana>
+ <20170622074831.GA23753@dragon>
+ <20170622080730.o352kxrs5pz7wxnf@ninjato>
+Message-ID: <20170622122558.GB23753@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
+On Thu, Jun 22, 2017 at 10:07:30AM +0200, Wolfram Sang wrote:
+> 
+> > The audio codec is on address 0x22.
+> > 
+> > Why do you think it should be broken now?
+> 
+> Because I thought that we skipped the error handling for every transfer
+> when we removed the call to reset_hardware from the xfer function.
+> 
+> So, either it still works because the transfer times out. But then
+> i2cdetect should be really slow. The timeout is set to 1s, so it should
+> take 1s to scan every address.
+> 
+> Or I am completely missing something. Then, I am sorry for the noise.
 
-Cavium ThunderX2 SMMU doesn't support MSI and also doesn't have unique irq
-lines for gerror, eventq and cmdq-sync.
+It's me who is missing something.  You are right.  With the current
+driver, i2cdetect takes 1s to scan most addresses.  Except address 0x22,
+those devices detected on other addresses are just wrong, and the
+addresses vary from a scan to another.
 
-New named irq "combined" is set as a errata workaround, which allows to
-share the irq line by register single irq handler for all the interrupts.
+With the proper error handling, i2cdetect now works very fast and only
+gets audio codec on 0x22, which is correct.
 
-Signed-off-by: Geetha sowjanya <gakula@caviumnetworks.com>
----
- Documentation/arm64/silicon-errata.txt             |    1 +
- .../devicetree/bindings/iommu/arm,smmu-v3.txt      |    1 +
- drivers/acpi/arm64/iort.c                          |   54 +++++++----
- drivers/iommu/arm-smmu-v3.c                        |  105 +++++++++++++++-----
- 4 files changed, 116 insertions(+), 45 deletions(-)
+$ i2cdetect 0
+WARNING! This program can confuse your I2C bus, cause data loss and worse!
+I will probe file /dev/i2c-0.
+I will probe address range 0x03-0x77.
+Continue? [Y/n] Y
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00:          -- -- -- -- -- -- -- -- -- -- -- -- -- 
+10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+20: -- -- UU -- -- -- -- -- -- -- -- -- -- -- -- -- 
+30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+50: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+70: -- -- -- -- -- -- -- --                         
 
-diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-index 4693a32..42422f6 100644
---- a/Documentation/arm64/silicon-errata.txt
-+++ b/Documentation/arm64/silicon-errata.txt
-@@ -63,6 +63,7 @@ stable kernels.
- | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456        |
- | Cavium         | ThunderX SMMUv2 | #27704          | N/A                         |
- | Cavium         | ThunderX2 SMMUv3| #74             | N/A                         |
-+| Cavium         | ThunderX2 SMMUv3| #126            | N/A                         |
- |                |                 |                 |                             |
- | Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585         |
- |                |                 |                 |                             |
-diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-index 6ecc48c..a5a1ca4 100644
---- a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-+++ b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-@@ -26,6 +26,7 @@ the PCIe specification.
-                       * "priq"      - PRI Queue not empty
-                       * "cmdq-sync" - CMD_SYNC complete
-                       * "gerror"    - Global Error activated
-+                      * "combined"  - Handles above all 4 interrupts.
- 
- - #iommu-cells      : See the generic IOMMU binding described in
-                         devicetree/bindings/pci/pci-iommu.txt
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index c166f3e..43e1f13 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -828,6 +828,18 @@ static int __init arm_smmu_v3_count_resources(struct acpi_iort_node *node)
- 	return num_res;
- }
- 
-+static bool arm_smmu_v3_is_combined_irq(struct acpi_iort_smmu_v3 *smmu)
-+{
-+	/*
-+	 * Cavium ThunderX2 implementation doesn't not support unique
-+	 * irq line. Use single irq line for all the SMMUv3 interrupts.
-+	 */
-+	if (smmu->model == ACPI_IORT_SMMU_V3_CAVIUM_CN99XX)
-+		return true;
-+
-+	return false;
-+}
-+
- static unsigned long arm_smmu_v3_resource_size(struct acpi_iort_smmu_v3 *smmu)
- {
- 	/*
-@@ -855,26 +867,32 @@ static void __init arm_smmu_v3_init_resources(struct resource *res,
- 	res[num_res].flags = IORESOURCE_MEM;
- 
- 	num_res++;
--
--	if (smmu->event_gsiv)
--		acpi_iort_register_irq(smmu->event_gsiv, "eventq",
--				       ACPI_EDGE_SENSITIVE,
--				       &res[num_res++]);
--
--	if (smmu->pri_gsiv)
--		acpi_iort_register_irq(smmu->pri_gsiv, "priq",
--				       ACPI_EDGE_SENSITIVE,
--				       &res[num_res++]);
--
--	if (smmu->gerr_gsiv)
--		acpi_iort_register_irq(smmu->gerr_gsiv, "gerror",
--				       ACPI_EDGE_SENSITIVE,
--				       &res[num_res++]);
--
--	if (smmu->sync_gsiv)
--		acpi_iort_register_irq(smmu->sync_gsiv, "cmdq-sync",
-+	if (arm_smmu_v3_is_combined_irq(smmu))
-+		acpi_iort_register_irq(smmu->event_gsiv, "combined",
- 				       ACPI_EDGE_SENSITIVE,
- 				       &res[num_res++]);
-+	else {
-+
-+		if (smmu->event_gsiv)
-+			acpi_iort_register_irq(smmu->event_gsiv, "eventq",
-+					       ACPI_EDGE_SENSITIVE,
-+					       &res[num_res++]);
-+
-+		if (smmu->pri_gsiv)
-+			acpi_iort_register_irq(smmu->pri_gsiv, "priq",
-+					       ACPI_EDGE_SENSITIVE,
-+					       &res[num_res++]);
-+
-+		if (smmu->gerr_gsiv)
-+			acpi_iort_register_irq(smmu->gerr_gsiv, "gerror",
-+					       ACPI_EDGE_SENSITIVE,
-+					       &res[num_res++]);
-+
-+		if (smmu->sync_gsiv)
-+			acpi_iort_register_irq(smmu->sync_gsiv, "cmdq-sync",
-+					       ACPI_EDGE_SENSITIVE,
-+					       &res[num_res++]);
-+	}
- }
- 
- static bool __init arm_smmu_v3_is_coherent(struct acpi_iort_node *node)
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 2dea4a9..0f83f7d 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -605,6 +605,7 @@ struct arm_smmu_device {
- 	struct arm_smmu_priq		priq;
- 
- 	int				gerr_irq;
-+	int				combined_irq;
- 
- 	unsigned long			ias; /* IPA */
- 	unsigned long			oas; /* PA */
-@@ -1314,6 +1315,29 @@ static irqreturn_t arm_smmu_gerror_handler(int irq, void *dev)
- 	return IRQ_HANDLED;
- }
- 
-+static irqreturn_t arm_smmu_combined_irq_thread(int irq, void *dev)
-+{
-+	struct arm_smmu_device *smmu = dev;
-+
-+	arm_smmu_evtq_thread(irq, dev);
-+	if (smmu->features & ARM_SMMU_FEAT_PRI)
-+		arm_smmu_priq_thread(irq, dev);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static irqreturn_t arm_smmu_combined_irq_handler(int irq, void *dev)
-+{
-+	irqreturn_t ret;
-+
-+	ret = arm_smmu_gerror_handler(irq, dev);
-+	if (ret == IRQ_NONE) {
-+		arm_smmu_cmdq_sync_handler(irq, dev);
-+		return IRQ_WAKE_THREAD;
-+	}
-+	return ret;
-+}
-+
- /* IO_PGTABLE API */
- static void __arm_smmu_tlb_sync(struct arm_smmu_device *smmu)
- {
-@@ -2230,18 +2254,9 @@ static void arm_smmu_setup_msis(struct arm_smmu_device *smmu)
- 	devm_add_action(dev, arm_smmu_free_msis, dev);
- }
- 
--static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
-+static void arm_smmu_setup_unique_irqs(struct arm_smmu_device *smmu)
- {
--	int ret, irq;
--	u32 irqen_flags = IRQ_CTRL_EVTQ_IRQEN | IRQ_CTRL_GERROR_IRQEN;
--
--	/* Disable IRQs first */
--	ret = arm_smmu_write_reg_sync(smmu, 0, ARM_SMMU_IRQ_CTRL,
--				      ARM_SMMU_IRQ_CTRLACK);
--	if (ret) {
--		dev_err(smmu->dev, "failed to disable irqs\n");
--		return ret;
--	}
-+	int irq, ret;
- 
- 	arm_smmu_setup_msis(smmu);
- 
-@@ -2284,10 +2299,41 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
- 			if (ret < 0)
- 				dev_warn(smmu->dev,
- 					 "failed to enable priq irq\n");
--			else
--				irqen_flags |= IRQ_CTRL_PRIQ_IRQEN;
- 		}
- 	}
-+}
-+
-+static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
-+{
-+	int ret, irq;
-+	u32 irqen_flags = IRQ_CTRL_EVTQ_IRQEN | IRQ_CTRL_GERROR_IRQEN;
-+
-+	/* Disable IRQs first */
-+	ret = arm_smmu_write_reg_sync(smmu, 0, ARM_SMMU_IRQ_CTRL,
-+				      ARM_SMMU_IRQ_CTRLACK);
-+	if (ret) {
-+		dev_err(smmu->dev, "failed to disable irqs\n");
-+		return ret;
-+	}
-+
-+	irq = smmu->combined_irq;
-+	if (irq) {
-+		/*
-+		 * Cavium ThunderX2 implementation doesn't not support unique
-+		 * irq lines. Use single irq line for all the SMMUv3 interrupts.
-+		 */
-+		ret = devm_request_threaded_irq(smmu->dev, irq,
-+					arm_smmu_combined_irq_handler,
-+					arm_smmu_combined_irq_thread,
-+					IRQF_ONESHOT,
-+					"arm-smmu-v3-combined-irq", smmu);
-+		if (ret < 0)
-+			dev_warn(smmu->dev, "failed to enable combined irq\n");
-+	} else
-+		arm_smmu_setup_unique_irqs(smmu);
-+
-+	if (smmu->features & ARM_SMMU_FEAT_PRI)
-+		irqen_flags |= IRQ_CTRL_PRIQ_IRQEN;
- 
- 	/* Enable interrupt generation on the SMMU */
- 	ret = arm_smmu_write_reg_sync(smmu, irqen_flags,
-@@ -2724,22 +2770,27 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
- 		return PTR_ERR(smmu->base);
- 
- 	/* Interrupt lines */
--	irq = platform_get_irq_byname(pdev, "eventq");
--	if (irq > 0)
--		smmu->evtq.q.irq = irq;
- 
--	irq = platform_get_irq_byname(pdev, "priq");
-+	irq = platform_get_irq_byname(pdev, "combined");
- 	if (irq > 0)
--		smmu->priq.q.irq = irq;
-+		smmu->combined_irq = irq;
-+	else {
-+		irq = platform_get_irq_byname(pdev, "eventq");
-+		if (irq > 0)
-+			smmu->evtq.q.irq = irq;
- 
--	irq = platform_get_irq_byname(pdev, "cmdq-sync");
--	if (irq > 0)
--		smmu->cmdq.q.irq = irq;
-+		irq = platform_get_irq_byname(pdev, "priq");
-+		if (irq > 0)
-+			smmu->priq.q.irq = irq;
- 
--	irq = platform_get_irq_byname(pdev, "gerror");
--	if (irq > 0)
--		smmu->gerr_irq = irq;
-+		irq = platform_get_irq_byname(pdev, "cmdq-sync");
-+		if (irq > 0)
-+			smmu->cmdq.q.irq = irq;
- 
-+		irq = platform_get_irq_byname(pdev, "gerror");
-+		if (irq > 0)
-+			smmu->gerr_irq = irq;
-+	}
- 	/* Probe the h/w */
- 	ret = arm_smmu_device_hw_probe(smmu);
- 	if (ret)
--- 
-1.7.1
+Thanks a lot for identifying the bug.
+
+Shawn
