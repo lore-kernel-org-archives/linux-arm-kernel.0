@@ -1,124 +1,57 @@
-From: rric@kernel.org (Robert Richter)
-Date: Thu, 22 Jun 2017 21:35:35 +0200
-Subject: [Devel] [PATCH v9 0/3] Cavium ThunderX2 SMMUv3 errata workarounds
-In-Reply-To: <20170622185822.GK15336@arm.com>
-References: <1498133138-20244-1-git-send-email-gakula@caviumnetworks.com>
- <20170622182257.GI15336@arm.com> <20170622185822.GK15336@arm.com>
-Message-ID: <20170622193535.GA10237@rric.localdomain>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 22 Jun 2017 21:43:06 +0200
+Subject: patchwork: on whose behalf is it working? was Re: [linux-media]
+ Patch notification: 3 patches updated
+In-Reply-To: <20170622123504.0015c78b@vento.lan>
+References: <20170622150601.4956.51414@www.linuxtv.org>
+ <20170622151903.GA14761@amd> <20170622123504.0015c78b@vento.lan>
+Message-ID: <20170622194306.GA25853@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.06.17 19:58:22, Will Deacon wrote:
-> On Thu, Jun 22, 2017 at 07:22:57PM +0100, Will Deacon wrote:
-> > On Thu, Jun 22, 2017 at 05:35:35PM +0530, Geetha sowjanya wrote:
-> > > Cavium ThunderX2 SMMUv3 implementation has two Silicon Erratas.
-> > > 1. Errata ID #74
-> > >    SMMU register alias Page 1 is not implemented
-> > > 2. Errata ID #126
-> > >    SMMU doesnt support unique IRQ lines and also MSI for gerror,
-> > >    eventq and cmdq-sync
+Hi!
+
+> > > The following patches (submitted by you) have been updated in patchwork:
 > > > 
-> > > The following patchset does software workaround for these two erratas.
+> > >  * linux-media: [RFC,07/13] v4l2: device_register_subdev_nodes: allow calling multiple times
+> > >      - http://patchwork.linuxtv.org/patch/39403/
+> > >      - for: Linux Media kernel patches
+> > >     was: New
+> > >     now: Accepted  
 > > 
-> > I've picked up the first two patches, and left comments on the final patch.
+> > Dear patchwork, I'm not sure on who's behalf you are mailing me. (And
+> > that would be really nice to fix.)
 > 
-> ... except that it doesn't build:
+> Sorry, but patchwork is not smart enough to read and reply 
+> e-mails yet :-) It is just a dumb robot.
+
+Well, fortunately he's got human helpers :-).
+
+> > If you are writing on Sakari's behalf, all is well.
 > 
+> > If you are writing on someone else's behalf, you may tell that
+> > someone to coordinate with Sakari, because he likely has it in his
+> > tree already.
 > 
-> drivers/acpi/arm64/iort.c: In function ?arm_smmu_v3_resource_size?:
-> drivers/acpi/arm64/iort.c:837:21: error: ?ACPI_IORT_SMMU_V3_CAVIUM_CN99XX? undeclared (first use in this function)
->   if (smmu->model == ACPI_IORT_SMMU_V3_CAVIUM_CN99XX)
->                      ^
-> drivers/acpi/arm64/iort.c:837:21: note: each undeclared identifier is reported only once for each function it appears in
-> make[4]: *** [drivers/acpi/arm64/iort.o] Error 1
-> 
-> 
-> I don't see ACPI_IORT_SMMU_V3_CAVIUM_CN99XX defined, even in linux-next.
-> 
-> What's the plan here?
+> From the delatate to: field, it seems that Sakari was the one
+> that did the change...
 
-It is defined already in acpica and we actually waiting for the acpi
-maintainers to include it:
+Aha, thanks for the pointer.
 
- https://github.com/acpica/acpica/commit/d00a4eb86e64
+> However, patchwork is also dumb enough to not store any info
+> about who changed a status (or even to log it)...
 
-We could add
+Hopefully, patchwork will get smarter one day...
 
-/* Until ACPICA headers cover IORT rev. C */
-#ifndef ACPI_IORT_SMMU_V3_CAVIUM_CN99XX
-#define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX		0x2
-#endif
-
-to both files:
-
- drivers/acpi/arm64/iort.c
- drivers/iommu/arm-smmu-v3.c
-
-This is similar to what Robin did.
-
-(I checked arm64 include files and the closest was
-arch/arm64/include/asm/acpi.h, bug this seems not really suitable to
-me.)
-
-I have created a separate patch to be applied at first below. We can
-revert it after acpica was updated.
-
--Robert
-
-
-
-
->From ad7f0112a2a71059c32bd315835c33cc7bc660b8 Mon Sep 17 00:00:00 2001
-From: Robert Richter <rrichter@cavium.com>
-Date: Thu, 22 Jun 2017 21:20:54 +0200
-Subject: [PATCH] iommu/arm-smmu-v3: Add temporary Cavium SMMU-V3 model nuber
- definitions
-
-The model number is already defined in acpica and we actually waiting
-for the acpi maintainers to include it:
-
- https://github.com/acpica/acpica/commit/d00a4eb86e64
-
-Adding those temporary definitions until the change makes it into
-include/acpi/actbl2.h.
-
-Signed-off-by: Robert Richter <rrichter@cavium.com>
----
- drivers/acpi/arm64/iort.c   | 5 +++++
- drivers/iommu/arm-smmu-v3.c | 5 +++++
- 2 files changed, 10 insertions(+)
-
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 797b28dc7b34..15491237a657 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -31,6 +31,11 @@
- #define IORT_IOMMU_TYPE		((1 << ACPI_IORT_NODE_SMMU) |	\
- 				(1 << ACPI_IORT_NODE_SMMU_V3))
- 
-+/* Until ACPICA headers cover IORT rev. C */
-+#ifndef ACPI_IORT_SMMU_V3_CAVIUM_CN99XX
-+#define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX		0x2
-+#endif
-+
- struct iort_its_msi_chip {
- 	struct list_head	list;
- 	struct fwnode_handle	*fw_node;
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 380969aa60d5..c759dfa7442d 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -412,6 +412,11 @@
- #define MSI_IOVA_BASE			0x8000000
- #define MSI_IOVA_LENGTH			0x100000
- 
-+/* Until ACPICA headers cover IORT rev. C */
-+#ifndef ACPI_IORT_SMMU_V3_CAVIUM_CN99XX
-+#define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX		0x2
-+#endif
-+
- static bool disable_bypass;
- module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
- MODULE_PARM_DESC(disable_bypass,
+Thanks,
+									Pavel
 -- 
-2.11.0
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170622/ce26a679/attachment.sig>
