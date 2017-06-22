@@ -1,61 +1,62 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Thu, 22 Jun 2017 17:44:10 +0100
-Subject: [PATCH V2 1/5] arch_topology: Get rid of "cap_parsing_done"
-In-Reply-To: <20170622142925.GD6314@vireshk-i7>
-References: <cover.1498019799.git.viresh.kumar@linaro.org>
- <3cb2fa07035f9333eeaaee3eab37d090777abb99.1498019799.git.viresh.kumar@linaro.org>
- <20170622094408.puyfkjglvqtlkq3f@e106622-lin>
- <20170622142925.GD6314@vireshk-i7>
-Message-ID: <20170622164410.brenzszdgweucshj@e106622-lin>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 22 Jun 2017 17:48:04 +0100
+Subject: [PATCH v3] KVM: arm/arm64: Signal SIGBUS when stage2 discovers
+ hwpoison memory
+In-Reply-To: <20170620161148.31653-1-james.morse@arm.com>
+References: <20170620161148.31653-1-james.morse@arm.com>
+Message-ID: <c2978b32-5636-fdbf-23c5-7a0c38b918a6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/06/17 19:59, Viresh Kumar wrote:
-> On 22-06-17, 10:44, Juri Lelli wrote:
-> > Hi,
-> > 
-> > On 21/06/17 10:16, Viresh Kumar wrote:
-> > > We can reuse "cap_parsing_failed" instead of keeping an additional
-> > > variable here.
-> > > 
-> > > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> > > ---
-> > >  drivers/base/arch_topology.c | 5 ++---
-> > >  1 file changed, 2 insertions(+), 3 deletions(-)
-> > > 
-> > > diff --git a/drivers/base/arch_topology.c b/drivers/base/arch_topology.c
-> > > index d1c33a85059e..8239a6232808 100644
-> > > --- a/drivers/base/arch_topology.c
-> > > +++ b/drivers/base/arch_topology.c
-> > > @@ -161,7 +161,6 @@ int __init topology_parse_cpu_capacity(struct device_node *cpu_node, int cpu)
-> > >  
-> > >  #ifdef CONFIG_CPU_FREQ
-> > >  static cpumask_var_t cpus_to_visit;
-> > > -static bool cap_parsing_done;
-> > >  static void parsing_done_workfn(struct work_struct *work);
-> > >  static DECLARE_WORK(parsing_done_work, parsing_done_workfn);
-> > >  
-> > > @@ -173,7 +172,7 @@ init_cpu_capacity_callback(struct notifier_block *nb,
-> > >  	struct cpufreq_policy *policy = data;
-> > >  	int cpu;
-> > >  
-> > > -	if (cap_parsing_failed || cap_parsing_done)
-> > > +	if (cap_parsing_failed)
-> > >  		return 0;
-> > >  
-> > >  	switch (val) {
-> > > @@ -193,7 +192,7 @@ init_cpu_capacity_callback(struct notifier_block *nb,
-> > >  			topology_normalize_cpu_scale();
-> > >  			kfree(raw_capacity);
-> > >  			pr_debug("cpu_capacity: parsing done\n");
-> > > -			cap_parsing_done = true;
-> > > +			cap_parsing_failed = true;
-> > 
-> > But we didn't actually failed here, right?
-> 
-> Yeah. So I can actually move this patch to the end of the series and
-> cap_parsing_done can be dropped then as we will end up using
-> !raw_capacity instead. And the end result will stay the same.
-> 
+Hi James,
 
-OK.
+On 20/06/17 17:11, James Morse wrote:
+> Once we enable ARCH_SUPPORTS_MEMORY_FAILURE on arm64, notifications for
+> broken memory can call memory_failure() in mm/memory-failure.c to offline
+> pages of memory, possibly signalling user space processes and notifying all
+> the in-kernel users.
+> 
+> memory_failure() has two modes, early and late. Early is used by
+> machine-managers like Qemu to receive a notification when a memory error is
+> notified to the host. These can then be relayed to the guest before the
+> affected page is accessed. To enable this, the process must set
+> PR_MCE_KILL_EARLY in PR_MCE_KILL_SET using the prctl() syscall.
+> 
+> Once the early notification has been handled, nothing stops the
+> machine-manager or guest from accessing the affected page. If the
+> machine-manager does this the page will fail to be mapped and SIGBUS will
+> be sent. This patch adds the equivalent path for when the guest accesses
+> the page, sending SIGBUS to the machine-manager.
+> 
+> These two signals can be distinguished by the machine-manager using their
+> si_code: BUS_MCEERR_AO for 'action optional' early notifications, and
+> BUS_MCEERR_AR for 'action required' synchronous/late notifications.
+> 
+> Do as x86 does, and deliver the SIGBUS when we discover pfn ==
+> KVM_PFN_ERR_HWPOISON. Use the hugepage size as si_addr_lsb if this vma was
+> allocated as a hugepage. Transparent hugepages will be split by
+> memory_failure() before we see them here.
+> 
+> Cc: Punit Agrawal <punit.agrawal@arm.com>
+> Signed-off-by: James Morse <james.morse@arm.com>
+> 
+> ---
+> arm64 has ARCH_SUPPORTS_MEMORY_FAILURE in linux-next, so can enable
+> MEMORY_FAILURE. This patch will build without those changes as
+> KVM_PFN_ERR_HWPOISON is always defined.
+> 
+> Changes since v2:
+>  * Just the commit message.
+> 
+> Changes since v1:
+>  * Pass the vma to kvm_send_hwpoison_signal(), used Punit's huge_page_shift()
+>    calculation to find the block size.
+>  * ... tested against hugepage not transparent huge page ...
+
+Applied to -next.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
