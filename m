@@ -1,40 +1,65 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 22 Jun 2017 14:26:52 +0200
-Subject: [GIT PULL] ARM: mvebu: arm64 for v4.13 (#1)
-Message-ID: <8760fo1a43.fsf@free-electrons.com>
+From: butao@huawei.com (Bu Tao)
+Date: Thu, 22 Jun 2017 20:23:33 +0800
+Subject: [PATCH v2 2/5] dt-bindings: scsi: ufs: add document for hi3660-ufs
+In-Reply-To: <CAK8P3a1MRx5zRp5-7iDY32+6PGsyHFaOom-bkWmftpLUS=8gBA@mail.gmail.com>
+References: <20170616065119.10704-1-butao@hisilicon.com>
+ <20170616065119.10704-3-butao@hisilicon.com>
+ <CAK8P3a2aPorzpUzwL=dkUkYNCGkhQMDPOkKRW1-=Hf=yCdvTsQ@mail.gmail.com>
+ <0f79aeea-53e3-6bea-ffa6-0e057f2ff83b@huawei.com>
+ <CAK8P3a2z7VbPb95Ltj=Duh1v_Yqxedb_g=ADNPWOrpEz1dCTuw@mail.gmail.com>
+ <24438c4d-21c8-6302-acd4-4f0e223232ce@huawei.com>
+ <CAK8P3a1MRx5zRp5-7iDY32+6PGsyHFaOom-bkWmftpLUS=8gBA@mail.gmail.com>
+Message-ID: <f63c5e13-74d2-280c-af80-22ee55d71282@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-Here is the first pull request for arm64 for mvebu for v4.13.
 
-Gregory
+? 2017/6/22 20:15, Arnd Bergmann ??:
+> On Thu, Jun 22, 2017 at 1:58 PM, Bu Tao <butao@huawei.com> wrote:
+>> ? 2017/6/22 19:51, Arnd Bergmann ??:
+>>> On Thu, Jun 22, 2017 at 1:44 PM, Bu Tao <butao@huawei.com> wrote:
+>>>> ? 2017/6/17 5:51, Arnd Bergmann ??:
+>>>>> On Fri, Jun 16, 2017 at 8:51 AM, Bu Tao <butao@hisilicon.com> wrote:
+>>>>
+>>>> I do not know wheher other SoC need to use the optional properties as
+>>>> abover. So here the name of the optional properties has "hi3660".
+>>>
+>>>
+>>> They should not have "hi3660" in their names either way, independent
+>>> of where they are used.
+>>
+>>
+>> Oh, change the "hi3660" to "hisilicon"?
+>> e.g. ufs-hi3660-use-rate-B  -->  ufs-hisilicon-use-rate-B
+>
+> No, just 'use-rate-B', no prefix for this.
+>
+>>>>> (note: this is different from the value of the "compatible" property
+>>>>> that
+>>>>> is meant to be as specific as possible".
+>>>>>
+>>>>> Also, please clarify how your binding relates to the ufshcd binding
+>>>>> in Documentation/devicetree/bindings/ufs/ufshcd-pltfrm.txt: does
+>>>>> hi3660 implement any registers that are shared with ufshcd, or does
+>>>>> it use the same physical interface with a different register set?
+>>>>
+>>>>
+>>>> No, only show how to use the dt-binding for hi3660 SoC
+>>>
+>>>
+>>> My question was about the hardware: does hi3660 implement ufshcd
+>>> or not?
+>>
+>>
+>> YES
+>
+> Ok, then the properties should be documented as optional in the
+> Documentation/devicetree/bindings/ufs/ufshcd-pltfrm.txt file for anything
+> that has a proper interpretation in the context of the generic ufshcd
+> driver.
+>
+>       Arnd
+>
 
-The following changes since commit 08332893e37af6ae779367e78e444f8f9571511d:
-
-  Linux 4.12-rc2 (2017-05-21 19:30:23 -0700)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-arm64-4.13-1
-
-for you to fetch changes up to 29ad6bd9ada2629fe1b7b30d6d08259005abcb8a:
-
-  arm64: marvell: enable ICU and GICP drivers (2017-06-21 17:47:17 +0200)
-
-----------------------------------------------------------------
-mvebu arm64 for 4.13 (part 1)
-
-- enable the ICU and GICP drivers for Armada 7K/8K
-- enable the pinctrl driver for Armada 7K/8K
-
-----------------------------------------------------------------
-Gregory CLEMENT (1):
-      arm64: marvell: enable the Armada 7K/8K pinctrl driver
-
-Thomas Petazzoni (1):
-      arm64: marvell: enable ICU and GICP drivers
-
- arch/arm64/Kconfig.platforms | 4 ++++
- 1 file changed, 4 insertions(+)
+OK I will modify this and update the patch soon.
