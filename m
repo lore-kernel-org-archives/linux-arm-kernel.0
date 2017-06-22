@@ -1,78 +1,69 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 22 Jun 2017 14:46:34 -0700
-Subject: [GIT PULL] Amlogic 32-bit DT changes for v4.13 (round 2)
-Message-ID: <7hfuerae6d.fsf@baylibre.com>
+Date: Thu, 22 Jun 2017 14:49:22 -0700
+Subject: [GIT PULL] Amlogic 64-bit DT changes for v3.14 (round 2)
+Message-ID: <7h60fnae1p.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+Olof, Arnd,
 
-Here's a small round 2 of 32-bit DT changes for Amlogic SoCs.  This was
-waiting for the clock dependencies to be merged, and they are now in
-clk-next.
+Here's a small, second round of 64-bit DT changes for v4.13.  This ws
+waiting for the clock dependencies finalize and  arrive in clk-next,
+which they are now.
 
-The dependencies on clock headers were generously separated out by the
-clock maintainers (thanks Neil & Jerome)
+The clock header dependencies are also merged into this branch.
 
 Kevin
 
-The following changes since commit 2c323c43a3d619d67bffa57dc7480cfae4c53300:
 
-  ARM: dts: meson8: add and use the real clock controller (2017-06-09 11:21:21 -0700)
+The following changes since commit 27f87bd2900b1a95d9c8e25deeb9768cf3fdcc4e:
+
+  ARM64: dts: meson-gxl-s905x-p212: Add HDMI and CVBS nodes (2017-06-09 11:38:22 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt-2
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-2
 
-for you to fetch changes up to f28d4bdb74b6fec482cdbba032369a185baa74b9:
+for you to fetch changes up to cd84aff1d981bc34ed3166f3071916ca9ceefadf:
 
-  ARM: dts: meson: use the real ethernet clock on Meson8 and Meson8b (2017-06-16 12:07:11 -0700)
+  ARM64: dts: meson-gxl: Add Libre Technology CC support (2017-06-22 12:02:05 -0700)
 
 ----------------------------------------------------------------
-Amlogic 32-bit DT changes for v4.13 (round 2)
-- greatly expands DT clock support for meson8b
+Amlogic 64-bit DT changes for v4.13 (round 2)
+- support new SPI controller driver
+- several more leaf clocks exposed to DT
+- New board: S905x LibreTech CC board
 
 ----------------------------------------------------------------
 Helmut Klein (1):
       clk: meson-gxbb: expose UART clocks
 
-Jerome Brunet (3):
+Jerome Brunet (6):
       clk: meson-gxbb: expose spdif clock gates
       clk: meson-gxbb: expose i2s master clock
       clk: meson-gxbb: expose spdif master clock
+      dt-bindings: add Libre Technology vendor prefix
+      dt-bindings: arm: amlogic: Add Libre Technology CC board
+      ARM64: dts: meson-gxl: Add Libre Technology CC support
 
 Kevin Hilman (1):
-      Merge tag 'meson-clk-headers-for-4.13-2' of git://github.com/BayLibre/clk-meson into v4.13/dt
+      Merge tag 'meson-clk-headers-for-4.13' of git://github.com/BayLibre/clk-meson into v4.13/dt64
 
-Martin Blumenstingl (17):
+Martin Blumenstingl (1):
       clk: meson-gxbb: un-export the CPU clock
-      clk: meson8b: export the SAR ADC clocks
-      clk: meson8b: export the SDIO clock
-      clk: meson8b: export the gate clock for the HW random number generator
-      clk: meson8b: export the USB clocks
-      clk: meson8b: export the ethernet gate clock
-      ARM: dts: meson8: fix the IR receiver pins
-      ARM: dts: meson: use C preprocessor friendly include syntax
-      ARM: dts: meson: use GIC_SPI and IRQ_TYPE_EDGE_RISING macros
-      ARM: dts: meson8: add the PWM_E and PWM_F pins
-      ARM: dts: meson8: add the pins for the SDIO controller
-      ARM: dts: meson: add the SAR ADC
-      ARM: dts: meson8: add reserved memory zones
-      ARM: dts: meson: add the hardware random number generator
-      ARM: dts: meson: add USB support on Meson8 and Meson8b
-      ARM: dts: meson8b: add the SCU device node
-      ARM: dts: meson: use the real ethernet clock on Meson8 and Meson8b
 
-Neil Armstrong (1):
+Neil Armstrong (2):
       clk: meson-gxbb: expose SPICC gate
+      ARM64: dts: meson-gx: Add SPICC nodes
 
- arch/arm/boot/dts/meson.dtsi             |  75 ++++++++++++++++++++++++++++++++++++-------
- arch/arm/boot/dts/meson6-atv1200.dts     |   2 +-
- arch/arm/boot/dts/meson6.dtsi            |   2 +-
- arch/arm/boot/dts/meson8.dtsi            | 124 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-----
- arch/arm/boot/dts/meson8b.dtsi           |  50 +++++++++++++++++++++++++++++
- drivers/clk/meson/gxbb.h                 |  20 ++++++------
- drivers/clk/meson/meson8b.h              |  20 ++++++------
- include/dt-bindings/clock/gxbb-clkc.h    |  10 +++++-
- include/dt-bindings/clock/meson8b-clkc.h |  10 ++++++
- 9 files changed, 271 insertions(+), 42 deletions(-)
+ Documentation/devicetree/bindings/arm/amlogic.txt            |  1 +
+ Documentation/devicetree/bindings/vendor-prefixes.txt        |  1 +
+ arch/arm64/boot/dts/amlogic/Makefile                         |  1 +
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi                    |  9 +++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi                  |  7 ++++
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts | 92 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi                   |  7 ++++
+ drivers/clk/meson/gxbb.h                                     | 20 ++++++------
+ include/dt-bindings/clock/gxbb-clkc.h                        | 10 +++++-
+ 9 files changed, 137 insertions(+), 11 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
