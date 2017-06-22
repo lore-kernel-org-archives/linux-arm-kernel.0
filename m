@@ -1,38 +1,67 @@
 From: hugues.fruchet@st.com (Hugues Fruchet)
-Date: Thu, 22 Jun 2017 17:12:51 +0200
-Subject: [PATCH v1 5/5] ARM: configs: stm32: DCMI + OV9655 camera support
+Date: Thu, 22 Jun 2017 17:12:50 +0200
+Subject: [PATCH v1 4/5] ARM: dts: stm32: Enable DCMI support on STM32F746 MCU
 In-Reply-To: <1498144371-13310-1-git-send-email-hugues.fruchet@st.com>
 References: <1498144371-13310-1-git-send-email-hugues.fruchet@st.com>
-Message-ID: <1498144371-13310-6-git-send-email-hugues.fruchet@st.com>
+Message-ID: <1498144371-13310-5-git-send-email-hugues.fruchet@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable DCMI camera interface and OV9655 camera sensor drivers.
+Enable DCMI camera interface on STM32F746 MCU.
 
 Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
 ---
- arch/arm/configs/stm32_defconfig | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/stm32f746.dtsi | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
-index a097538..0c3cd01 100644
---- a/arch/arm/configs/stm32_defconfig
-+++ b/arch/arm/configs/stm32_defconfig
-@@ -55,6 +55,15 @@ CONFIG_I2C_STM32F4=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- # CONFIG_USB_SUPPORT is not set
-+CONFIG_VIDEO_V4L2=y
-+CONFIG_MEDIA_CONTROLLER=y
-+CONFIG_VIDEO_V4L2_SUBDEV_API=y
-+CONFIG_MEDIA_SUBDRV_AUTOSELECT=n
-+CONFIG_V4L_PLATFORM_DRIVERS=y
-+CONFIG_MEDIA_SUPPORT=y
-+CONFIG_MEDIA_CAMERA_SUPPORT=y
-+CONFIG_VIDEO_STM32_DCMI=y
-+CONFIG_VIDEO_OV9650=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
+diff --git a/arch/arm/boot/dts/stm32f746.dtsi b/arch/arm/boot/dts/stm32f746.dtsi
+index c2765ce..4bdf37c 100644
+--- a/arch/arm/boot/dts/stm32f746.dtsi
++++ b/arch/arm/boot/dts/stm32f746.dtsi
+@@ -326,6 +326,23 @@
+ 					bias-disable;
+ 				};
+ 			};
++
++			dcmi_pins: dcmi_pins at 0 {
++				pins {
++					pinmux = <STM32F746_PA4_FUNC_DCMI_HSYNC>,
++						 <STM32F746_PG9_FUNC_DCMI_VSYNC>,
++						 <STM32F746_PA6_FUNC_DCMI_PIXCLK>,
++						 <STM32F746_PH9_FUNC_DCMI_D0>,
++						 <STM32F746_PH10_FUNC_DCMI_D1>,
++						 <STM32F746_PH11_FUNC_DCMI_D2>,
++						 <STM32F746_PH12_FUNC_DCMI_D3>,
++						 <STM32F746_PH14_FUNC_DCMI_D4>,
++						 <STM32F746_PD3_FUNC_DCMI_D5>,
++						 <STM32F746_PE5_FUNC_DCMI_D6>,
++						 <STM32F746_PE6_FUNC_DCMI_D7>;
++					slew-rate = <3>;
++				};
++			};
+ 		};
+ 
+ 		crc: crc at 40023000 {
+@@ -344,6 +361,20 @@
+ 			assigned-clocks = <&rcc 1 CLK_HSE_RTC>;
+ 			assigned-clock-rates = <1000000>;
+ 		};
++
++		dcmi: dcmi at 50050000 {
++			compatible = "st,stm32-dcmi";
++			reg = <0x50050000 0x400>;
++			interrupts = <78>;
++			resets = <&rcc STM32F7_AHB2_RESET(DCMI)>;
++			clocks = <&rcc 0 STM32F7_AHB2_CLOCK(DCMI)>;
++			clock-names = "mclk";
++			pinctrl-names = "default";
++			pinctrl-0 = <&dcmi_pins>;
++			dmas = <&dma2 1 1 0x414 0x3>;
++			dma-names = "tx";
++			status = "disabled";
++		};
+ 	};
+ };
+ 
 -- 
 1.9.1
