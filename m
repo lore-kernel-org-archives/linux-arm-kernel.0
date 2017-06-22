@@ -1,85 +1,37 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Fri, 23 Jun 2017 00:01:26 +0200
-Subject: [PATCH 1/9] i2c: designware: Fix system suspend
-In-Reply-To: <CAPDyKFo80QWYhU_SFexr_riPSZS3QEXDyBcywa5qBYa3sJXcjw@mail.gmail.com>
-References: <1498072888-14782-1-git-send-email-ulf.hansson@linaro.org>
- <CAJZ5v0iYwPE8rpn=aZ9n6LV-qbAK3kynRqVZ7xxuB+gYar_fyg@mail.gmail.com>
- <20170622104933.GY629@lahna.fi.intel.com> <2842386.AFZiXzV2Sq@aspire.rjw.lan>
- <CAPDyKFo80QWYhU_SFexr_riPSZS3QEXDyBcywa5qBYa3sJXcjw@mail.gmail.com>
-Message-ID: <CAJZ5v0irHvYXHv1GykatTH+XROZyL0nR0c=KfdSrpH395s6V8g@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 22 Jun 2017 15:39:20 -0700
+Subject: [GIT PULL 1/7] Broadcom soc changes for 4.13 (v2)
+In-Reply-To: <20170613201044.9808-1-f.fainelli@gmail.com>
+References: <20170613201044.9808-1-f.fainelli@gmail.com>
+Message-ID: <e426718d-bac6-adcb-4aed-b56d77e77757@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 22, 2017 at 11:37 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 22 June 2017 at 16:41, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
->> On Thursday, June 22, 2017 01:49:33 PM Mika Westerberg wrote:
->>> On Thu, Jun 22, 2017 at 01:31:51AM +0200, Rafael J. Wysocki wrote:
->>> > On Wed, Jun 21, 2017 at 9:21 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>> > > The commit 8503ff166504 ("i2c: designware: Avoid unnecessary resuming
->>> > > during system suspend"), may suggest to the PM core to try out the so
->>> > > called direct_complete path for system sleep. In this path, the PM core
->>> > > treats a runtime suspended device as it's already in a proper low power
->>> > > state for system sleep, which makes it skip calling the system sleep
->>> > > callbacks for the device, except for the ->prepare() and the ->complete()
->>> > > callback.
->>> > >
->>> > > Moreover, under certain circumstances the PM core may unset the
->>> > > direct_complete flag for a parent device, in case its child device are
->>> > > being system suspended before. In other words, the PM core doesn't skip
->>> > > calling the system sleep callbacks, no matter if the device is runtime
->>> > > suspended or not.
->>> > >
->>> > > In cases of an i2c slave device, the above situation is triggered.
->>> > > Unfortunate, this also breaks the assumption that the i2c device is always
->>> > > runtime resumed, whenever the dw_i2c_plat_suspend() callback is being
->>> > > invoked, which then leads to a regression.
->>> > >
->>> > > More precisely, dw_i2c_plat_suspend() then calls clk_core_disable() and
->>> > > clk_core_unprepare(), for an already disabled/unprepared clock, leading to
->>> > > complaints about clocks calls being wrongly balanced.
->>> > >
->>> > > In cases when the i2c device is attached to the ACPI PM domain, the problem
->>> > > doesn't occur. That's because ACPI's ->suspend() callback, assigned to
->>> > > acpi_subsys_suspend(), calls pm_runtime_resume() for the i2c device.
->>> >
->>> > Which really is expected to happen, so direct_complete should only be
->>> > used along with the ACPI PM domain in this case.
->>> >
->>> > Moreover, in the ACPI PM domain case acpi_subsys_prepare() is supposed
->>> > to do the right thing without dw_i2c_plat_prepare() and the return
->>> > value of the latter will be ignored anyway, so dw_i2c_plat_prepare()
->>> > will only have effect without ACPI PM domain AFAICS.
->>> >
->>> > It looks like commit 8503ff166504 is entirely misguided.
->>>
->>> Indeed it is. At the time I suggested that change I did not really
->>> understand how the direct complete is supposed to be used :-/
->>
->> So can we go for a full revert, please, and then fix up things properly?
->
-> Unfortunate I think a revert is going to make it worse, for the non ACPI case.
->
-> Because in that case, unless I am reading the code wrong, I think when
-> the device is runtime suspended during system sleep, then the system
-> suspend callback will also be called (because the direct_complete
-> isn't run), again causing clock unbalance issues.
->
-> This makes it worse in that sense, that then you don't even need an
-> i2c slave to trigger the problem.
+On 06/13/2017 01:10 PM, Florian Fainelli wrote:
+> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+> 
+>   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+> 
+> are available in the git repository at:
+> 
+>   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.13/soc
+> 
+> for you to fetch changes up to 27d9fa06c122b135ad7552fa3138c3b47e5776c5:
+> 
+>   ARM: BCM: Enable thermal support for NSP SoCs (2017-05-19 11:30:25 -0700)
+> 
+> ----------------------------------------------------------------
+> This pull request contains Broadcom ARM-based SoCs (non Device Tree) changes:
+> 
+> - Jon updates the Kconfig entry for Northstar Plus to have THERMAL and THERMAL_OF
+>   selected in order to get the NS/NSP thermal driver dependencies to be satistfied
+> 
+> ----------------------------------------------------------------
 
-In that case your changelog is a bit misleading.
+I did not see an email indicating this was merged, but the changes seem
+to be here:
 
-It looks like the commit in question attempted to fix exactly this
-issue, but it failed, so it should be replaced with something else
-which is what your patch is effectively doing.
+https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git/commit/?h=next/soc&id=27d9fa06c122b135ad7552fa3138c3b47e5776c5
 
-IMO you should describe the original problem, explain why that commit
-is not sufficient to fix it and then describe the final fix.
-
-Anyway, after reading the changelog it should be clear that things
-were broken before the commit in question.
-
-And BTW I'm not really sure how the rest of the series is related to this?
-
-Thanks,
-Rafael
+-- 
+Florian
