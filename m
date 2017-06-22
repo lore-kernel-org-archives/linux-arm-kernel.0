@@ -1,882 +1,151 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 22 Jun 2017 18:24:31 +0100
-Subject: [REVERT] arm64: signal: Allow expansion of the signal frame
-In-Reply-To: <20170622165735.GD8543@e103592.cambridge.arm.com>
-References: <20170622165735.GD8543@e103592.cambridge.arm.com>
-Message-ID: <20170622172430.GE8543@e103592.cambridge.arm.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Thu, 22 Jun 2017 12:44:52 -0500
+Subject: [PATCH v2] irqchip: gicv3-its: Don't assume GICv3 hardware supports
+ 16bit INTID
+Message-ID: <1498153492-30632-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arr, belay that revert.
+The current ITS driver is assuming every ITS hardware implementation
+supports minimum of 16bit INTID. But this is not true, as per GICv3
+specification, INTID field is IMPLEMENTATION DEFINED in the range of
+14-24 bits. We might see an unpredictable system behavior on systems
+where hardware support less than 16bits and software tries to use
+64K LPI interrupts.
 
-asm-generic/ucontext.h has the problem I describe, but arm64 doesn't use
-asm-generic/ucontext.h.
+On Qualcomm Datacenter Technologies QDF2400 platform, boot log shows
+confusing information about number of LPI chunks as shown below. The
+QDF2400 ITS hardware supports 24bit INTID.
 
-arm64's ucontext has uc_sigmask _before_ uc_mcontext, so the extra
-data at the end of uc_mcontext won't overwrite anything.
+This patch allocates the memory resources for PEND/PROP tables based
+on discoverable value which is specified in GITS_TYPER.IDbits. Also
+taking this opportunity to increase number of LPI/MSI(x) to 128K if
+the hardware is capable, and show log message that reflects the
+correct number of LPI chunks.
 
-So it's all fine and nothing needs to be reverted (and looks fine with
-LTP also).
+ITS at 0xff7efe0000: allocated 524288 Devices @3c0400000 (indirect, esz 8, psz 64K, shr 1)
+ITS at 0xff7efe0000: allocated 8192 Interrupt Collections @3c0130000 (flat, esz 8, psz 64K, shr 1)
+ITS at 0xff7efe0000: allocated 8192 Virtual CPUs @3c0140000 (flat, esz 8, psz 64K, shr 1)
+ITS: Allocated 524032 chunks for LPIs
+PCI/MSI: ITS at 0xff7efe0000 domain created
+Platform MSI: ITS at 0xff7efe0000 domain created
 
-*buries head in some sand*
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+---
+Changes since v1:
+   No code changes, just rebase on tip of the Marc's branch and tested on QDF2400 platform.
+       https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/log/?h=irq/irqchip-4.13
 
+ drivers/irqchip/irq-gic-v3-its.c | 34 ++++++++++++++++------------------
+ 1 file changed, 16 insertions(+), 18 deletions(-)
 
-Original, mistaken revert request:
-
---8<--
-
-> This patch defines an extra_context signal frame record that can be
-> used to describe an expanded signal frame, and modifies the context
-> block allocator and signal frame setup and parsing code to create,
-> populate, parse and decode this block as necessary.
-> 
-> To avoid abuse by userspace, parse_user_sigframe() attempts to
-> ensure that:
-> 
->  * no more than one extra_context is accepted;
->  * the extra context data is a sensible size, and properly placed
->    and aligned.
-> 
-> The extra_context data is required to start at the first 16-byte
-> aligned address immediately after the dummy terminator record
-> following extra_context in rt_sigframe.__reserved[] (as ensured
-> during signal delivery).  This serves as a sanity-check that the
-> signal frame has not been moved or copied without taking the extra
-> data into account.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-
-Apologies, I now realise that this patch is broken :(
-
-The breakage is impossible to trigger at present, and the patches
-currently applied introduce no LTP regressions -- so I think we have
-the option to keep the patch and apply a fix on top later (explanation
-below).
-
-Otherwise, can you drop or revert it please?
-
-This breakage also renders questionable the first patch in the series
-("arm64: signal: split frame link record from sigcontext structure").
-The arguments for why that patch is acceptable are unchanged, but there
-is no need for it any more and so it may be better to drop it (or at
-least discuss it again).
-
-Rebasing that first patch out won't be trivial, so if dropping/reverting
-that I recommend dropping/reverting the whole series.
-
-
-Detail:
-
-The patch currently assumes that we can splat data across the and of
-struct sigcontext, since __reserved[] is the last thing in there.
-
-Unfortunately, struct sigcontext is not the last thing in the
-signal frame: it is embedded in a struct ucontext, where it is
-followed by uc_sigmask (ironically to allow uc_sigmask to expand).
-
-struct ucontext {
-	unsigned long	  uc_flags;
-	struct ucontext  *uc_link;
-	stack_t		  uc_stack;
-	struct sigcontext uc_mcontext;
-	sigset_t	  uc_sigmask;	/* mask last for extensibility */
-};
-
-Thus allocating more than sizeof(__reserved) bytes via sigframe_alloc()
-will cause us to overwrite uc_sigmask (or uc_sigmask will overwrite
-our data).
-
-The total size of allocations done by the kernel is always smaller than
-this today, so the bug should never be observed in practice.
-
-I will need to resurrect the older version of the patch that skips to
-the end of struct rt_sigframe when an overflowing allocation is made --
-which also means that moving the {fp,lr} frame record is no longer
-necessary and can be backed out too.  Skipping to the end unfortunately
-wastes some stack space, but I can't see a way to avoid that now.
-
-Cheers
----Dave
-
-> ---
-> 
-> Retaining Catalin's Reviewed-by, since the change (conversion of
-> extra_context.data to a u64) to a pointer was discussed with him and is
-> minor).
-> 
->  arch/arm64/include/uapi/asm/sigcontext.h |  38 +++++-
->  arch/arm64/kernel/signal.c               | 195 ++++++++++++++++++++++++++++---
->  2 files changed, 214 insertions(+), 19 deletions(-)
-> 
-> diff --git a/arch/arm64/include/uapi/asm/sigcontext.h b/arch/arm64/include/uapi/asm/sigcontext.h
-> index 1328a2c..f0a76b9 100644
-> --- a/arch/arm64/include/uapi/asm/sigcontext.h
-> +++ b/arch/arm64/include/uapi/asm/sigcontext.h
-> @@ -41,9 +41,10 @@ struct sigcontext {
->   *
->   *	0x210		fpsimd_context
->   *	 0x10		esr_context
-> + *	 0x20		extra_context (optional)
->   *	 0x10		terminator (null _aarch64_ctx)
->   *
-> - *	0xdd0		(reserved for future allocation)
-> + *	0xdb0		(reserved for future allocation)
->   *
->   * New records that can exceed this space need to be opt-in for userspace, so
->   * that an expanded signal frame is not generated unexpectedly.  The mechanism
-> @@ -80,4 +81,39 @@ struct esr_context {
->  	__u64 esr;
->  };
->  
-> +/*
-> + * extra_context: describes extra space in the signal frame for
-> + * additional structures that don't fit in sigcontext.__reserved[].
-> + *
-> + * Note:
-> + *
-> + * 1) fpsimd_context, esr_context and extra_context must be placed in
-> + * sigcontext.__reserved[] if present.  They cannot be placed in the
-> + * extra space.  Any other record can be placed either in the extra
-> + * space or in sigcontext.__reserved[], unless otherwise specified in
-> + * this file.
-> + *
-> + * 2) There must not be more than one extra_context.
-> + *
-> + * 3) If extra_context is present, it must be followed immediately in
-> + * sigcontext.__reserved[] by the terminating null _aarch64_ctx.
-> + *
-> + * 4) The extra space to which datap points must start at the first
-> + * 16-byte aligned address immediately after the terminating null
-> + * _aarch64_ctx that follows the extra_context structure in
-> + * __reserved[].  The extra space may overrun the end of __reserved[],
-> + * as indicated by a sufficiently large value for the size field.
-> + *
-> + * 5) The extra space must itself be terminated with a null
-> + * _aarch64_ctx.
-> + */
-> +#define EXTRA_MAGIC	0x45585401
-> +
-> +struct extra_context {
-> +	struct _aarch64_ctx head;
-> +	__u64 datap; /* 16-byte aligned pointer to extra space cast to __u64 */
-> +	__u32 size; /* size in bytes of the extra space */
-> +	__u32 __reserved[3];
-> +};
-> +
->  #endif /* _UAPI__ASM_SIGCONTEXT_H */
-> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-> index fa787e6..6934e65 100644
-> --- a/arch/arm64/kernel/signal.c
-> +++ b/arch/arm64/kernel/signal.c
-> @@ -25,6 +25,7 @@
->  #include <linux/freezer.h>
->  #include <linux/stddef.h>
->  #include <linux/uaccess.h>
-> +#include <linux/sizes.h>
->  #include <linux/string.h>
->  #include <linux/tracehook.h>
->  #include <linux/ratelimit.h>
-> @@ -60,18 +61,27 @@ struct rt_sigframe_user_layout {
->  
->  	unsigned long fpsimd_offset;
->  	unsigned long esr_offset;
-> +	unsigned long extra_offset;
->  	unsigned long end_offset;
->  };
->  
-> +#define BASE_SIGFRAME_SIZE round_up(sizeof(struct rt_sigframe), 16)
-> +#define TERMINATOR_SIZE round_up(sizeof(struct _aarch64_ctx), 16)
-> +#define EXTRA_CONTEXT_SIZE round_up(sizeof(struct extra_context), 16)
-> +
->  static void init_user_layout(struct rt_sigframe_user_layout *user)
->  {
-> +	const size_t reserved_size =
-> +		sizeof(user->sigframe->uc.uc_mcontext.__reserved);
-> +
->  	memset(user, 0, sizeof(*user));
->  	user->size = offsetof(struct rt_sigframe, uc.uc_mcontext.__reserved);
->  
-> -	user->limit = user->size +
-> -		sizeof(user->sigframe->uc.uc_mcontext.__reserved) -
-> -		round_up(sizeof(struct _aarch64_ctx), 16);
-> -		/* ^ reserve space for terminator */
-> +	user->limit = user->size + reserved_size;
-> +
-> +	user->limit -= TERMINATOR_SIZE;
-> +	user->limit -= EXTRA_CONTEXT_SIZE;
-> +	/* Reserve space for extension and terminator ^ */
->  }
->  
->  static size_t sigframe_size(struct rt_sigframe_user_layout const *user)
-> @@ -80,6 +90,52 @@ static size_t sigframe_size(struct rt_sigframe_user_layout const *user)
->  }
->  
->  /*
-> + * Sanity limit on the approximate maximum size of signal frame we'll
-> + * try to generate.  Stack alignment padding and the frame record are
-> + * not taken into account.  This limit is not a guarantee and is
-> + * NOT ABI.
-> + */
-> +#define SIGFRAME_MAXSZ SZ_64K
-> +
-> +static int __sigframe_alloc(struct rt_sigframe_user_layout *user,
-> +			    unsigned long *offset, size_t size, bool extend)
-> +{
-> +	size_t padded_size = round_up(size, 16);
-> +
-> +	if (padded_size > user->limit - user->size &&
-> +	    !user->extra_offset &&
-> +	    extend) {
-> +		int ret;
-> +
-> +		user->limit += EXTRA_CONTEXT_SIZE;
-> +		ret = __sigframe_alloc(user, &user->extra_offset,
-> +				       sizeof(struct extra_context), false);
-> +		if (ret) {
-> +			user->limit -= EXTRA_CONTEXT_SIZE;
-> +			return ret;
-> +		}
-> +
-> +		/* Reserve space for the __reserved[] terminator */
-> +		user->size += TERMINATOR_SIZE;
-> +
-> +		/*
-> +		 * Allow expansion up to SIGFRAME_MAXSZ, ensuring space for
-> +		 * the terminator:
-> +		 */
-> +		user->limit = SIGFRAME_MAXSZ - TERMINATOR_SIZE;
-> +	}
-> +
-> +	/* Still not enough space?  Bad luck! */
-> +	if (padded_size > user->limit - user->size)
-> +		return -ENOMEM;
-> +
-> +	*offset = user->size;
-> +	user->size += padded_size;
-> +
-> +	return 0;
-> +}
-> +
-> +/*
->   * Allocate space for an optional record of <size> bytes in the user
->   * signal frame.  The offset from the signal frame base address to the
->   * allocated block is assigned to *offset.
-> @@ -87,11 +143,24 @@ static size_t sigframe_size(struct rt_sigframe_user_layout const *user)
->  static int sigframe_alloc(struct rt_sigframe_user_layout *user,
->  			  unsigned long *offset, size_t size)
->  {
-> -	size_t padded_size = round_up(size, 16);
-> +	return __sigframe_alloc(user, offset, size, true);
-> +}
->  
-> -	*offset = user->size;
-> -	user->size += padded_size;
-> +/* Allocate the null terminator record and prevent further allocations */
-> +static int sigframe_alloc_end(struct rt_sigframe_user_layout *user)
-> +{
-> +	int ret;
-> +
-> +	/* Un-reserve the space reserved for the terminator: */
-> +	user->limit += TERMINATOR_SIZE;
->  
-> +	ret = sigframe_alloc(user, &user->end_offset,
-> +			     sizeof(struct _aarch64_ctx));
-> +	if (ret)
-> +		return ret;
-> +
-> +	/* Prevent further allocation: */
-> +	user->limit = user->size;
->  	return 0;
->  }
->  
-> @@ -162,6 +231,8 @@ static int parse_user_sigframe(struct user_ctxs *user,
->  	char __user *base = (char __user *)&sc->__reserved;
->  	size_t offset = 0;
->  	size_t limit = sizeof(sc->__reserved);
-> +	bool have_extra_context = false;
-> +	char const __user *const sfp = (char const __user *)sf;
->  
->  	user->fpsimd = NULL;
->  
-> @@ -171,6 +242,12 @@ static int parse_user_sigframe(struct user_ctxs *user,
->  	while (1) {
->  		int err = 0;
->  		u32 magic, size;
-> +		char const __user *userp;
-> +		struct extra_context const __user *extra;
-> +		u64 extra_datap;
-> +		u32 extra_size;
-> +		struct _aarch64_ctx const __user *end;
-> +		u32 end_magic, end_size;
->  
->  		if (limit - offset < sizeof(*head))
->  			goto invalid;
-> @@ -208,6 +285,64 @@ static int parse_user_sigframe(struct user_ctxs *user,
->  			/* ignore */
->  			break;
->  
-> +		case EXTRA_MAGIC:
-> +			if (have_extra_context)
-> +				goto invalid;
-> +
-> +			if (size < sizeof(*extra))
-> +				goto invalid;
-> +
-> +			userp = (char const __user *)head;
-> +
-> +			extra = (struct extra_context const __user *)userp;
-> +			userp += size;
-> +
-> +			__get_user_error(extra_datap, &extra->datap, err);
-> +			__get_user_error(extra_size, &extra->size, err);
-> +			if (err)
-> +				return err;
-> +
-> +			/* Check for the dummy terminator in __reserved[]: */
-> +
-> +			if (limit - offset - size < TERMINATOR_SIZE)
-> +				goto invalid;
-> +
-> +			end = (struct _aarch64_ctx const __user *)userp;
-> +			userp += TERMINATOR_SIZE;
-> +
-> +			__get_user_error(end_magic, &end->magic, err);
-> +			__get_user_error(end_size, &end->size, err);
-> +			if (err)
-> +				return err;
-> +
-> +			if (end_magic || end_size)
-> +				goto invalid;
-> +
-> +			/* Prevent looping/repeated parsing of extra_context */
-> +			have_extra_context = true;
-> +
-> +			base = (void __user *)extra_datap;
-> +			if (!IS_ALIGNED((unsigned long)base, 16))
-> +				goto invalid;
-> +
-> +			if (!IS_ALIGNED(extra_size, 16))
-> +				goto invalid;
-> +
-> +			if (base != userp)
-> +				goto invalid;
-> +
-> +			/* Reject "unreasonably large" frames: */
-> +			if (extra_size > sfp + SIGFRAME_MAXSZ - userp)
-> +				goto invalid;
-> +
-> +			/*
-> +			 * Ignore trailing terminator in __reserved[]
-> +			 * and start parsing extra data:
-> +			 */
-> +			offset = 0;
-> +			limit = extra_size;
-> +			continue;
-> +
->  		default:
->  			goto invalid;
->  		}
-> @@ -318,17 +453,7 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
->  			return err;
->  	}
->  
-> -	/*
-> -	 * Allocate space for the terminator record.
-> -	 * HACK: here we undo the reservation of space for the end record.
-> -	 * This bodge should be replaced with a cleaner approach later on.
-> -	 */
-> -	user->limit = offsetof(struct rt_sigframe, uc.uc_mcontext.__reserved) +
-> -		sizeof(user->sigframe->uc.uc_mcontext.__reserved);
-> -
-> -	err = sigframe_alloc(user, &user->end_offset,
-> -			     sizeof(struct _aarch64_ctx));
-> -	return err;
-> +	return sigframe_alloc_end(user);
->  }
->  
->  
-> @@ -369,6 +494,40 @@ static int setup_sigframe(struct rt_sigframe_user_layout *user,
->  		__put_user_error(current->thread.fault_code, &esr_ctx->esr, err);
->  	}
->  
-> +	if (err == 0 && user->extra_offset) {
-> +		char __user *sfp = (char __user *)user->sigframe;
-> +		char __user *userp =
-> +			apply_user_offset(user, user->extra_offset);
-> +
-> +		struct extra_context __user *extra;
-> +		struct _aarch64_ctx __user *end;
-> +		u64 extra_datap;
-> +		u32 extra_size;
-> +
-> +		extra = (struct extra_context __user *)userp;
-> +		userp += EXTRA_CONTEXT_SIZE;
-> +
-> +		end = (struct _aarch64_ctx __user *)userp;
-> +		userp += TERMINATOR_SIZE;
-> +
-> +		/*
-> +		 * extra_datap is just written to the signal frame.
-> +		 * The value gets cast back to a void __user *
-> +		 * during sigreturn.
-> +		 */
-> +		extra_datap = (__force u64)userp;
-> +		extra_size = sfp + round_up(user->size, 16) - userp;
-> +
-> +		__put_user_error(EXTRA_MAGIC, &extra->head.magic, err);
-> +		__put_user_error(EXTRA_CONTEXT_SIZE, &extra->head.size, err);
-> +		__put_user_error(extra_datap, &extra->datap, err);
-> +		__put_user_error(extra_size, &extra->size, err);
-> +
-> +		/* Add the terminator */
-> +		__put_user_error(0, &end->magic, err);
-> +		__put_user_error(0, &end->size, err);
-> +	}
-> +
->  	/* set the "end" magic */
->  	if (err == 0) {
->  		struct _aarch64_ctx __user *end =
-> -- 
-> 2.1.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-On Thu, Jun 22, 2017 at 05:57:35PM +0100, Dave Martin wrote:
-> [Resending since the list may have dropped the last version due to a
-> Subject/In-Reply-To mismatch]
-> 
-> On Tue, Jun 20, 2017 at 06:23:39PM +0100, Dave Martin wrote:
-> > This patch defines an extra_context signal frame record that can be
-> > used to describe an expanded signal frame, and modifies the context
-> > block allocator and signal frame setup and parsing code to create,
-> > populate, parse and decode this block as necessary.
-> > 
-> > To avoid abuse by userspace, parse_user_sigframe() attempts to
-> > ensure that:
-> > 
-> >  * no more than one extra_context is accepted;
-> >  * the extra context data is a sensible size, and properly placed
-> >    and aligned.
-> > 
-> > The extra_context data is required to start at the first 16-byte
-> > aligned address immediately after the dummy terminator record
-> > following extra_context in rt_sigframe.__reserved[] (as ensured
-> > during signal delivery).  This serves as a sanity-check that the
-> > signal frame has not been moved or copied without taking the extra
-> > data into account.
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> 
-> Apologies, I now realise that this patch is broken :(
-> 
-> The breakage is impossible to trigger at present, and the patches
-> currently applied introduce no LTP regressions -- so I think we have
-> the option to keep the patch and apply a fix on top later (explanation
-> below).
-> 
-> Otherwise, can you drop or revert it please?
-> 
-> This breakage also renders questionable the first patch in the series
-> ("arm64: signal: split frame link record from sigcontext structure").
-> The arguments for why that patch is acceptable are unchanged, but there
-> is no need for it any more and so it may be better to drop it (or at
-> least discuss it again).
-> 
-> Rebasing that first patch out won't be trivial, so if dropping/reverting
-> that I recommend dropping/reverting the whole series.
-> 
-> 
-> Detail:
-> 
-> The patch currently assumes that we can splat data across the and of
-> struct sigcontext, since __reserved[] is the last thing in there.
-> 
-> Unfortunately, struct sigcontext is not the last thing in the
-> signal frame: it is embedded in a struct ucontext, where it is
-> followed by uc_sigmask (ironically to allow uc_sigmask to expand).
-> 
-> struct ucontext {
-> 	unsigned long	  uc_flags;
-> 	struct ucontext  *uc_link;
-> 	stack_t		  uc_stack;
-> 	struct sigcontext uc_mcontext;
-> 	sigset_t	  uc_sigmask;	/* mask last for extensibility */
-> };
-> 
-> Thus allocating more than sizeof(__reserved) bytes via sigframe_alloc()
-> will cause us to overwrite uc_sigmask (or uc_sigmask will overwrite
-> our data).
-> 
-> The total size of allocations done by the kernel is always smaller than
-> this today, so the bug should never be observed in practice.
-> 
-> I will need to resurrect the older version of the patch that skips to
-> the end of struct rt_sigframe when an overflowing allocation is made --
-> which also means that moving the {fp,lr} frame record is no longer
-> necessary and can be backed out too.  Skipping to the end unfortunately
-> wastes some stack space, but I can't see a way to avoid that now.
-> 
-> Cheers
-> ---Dave
-> 
-> > ---
-> > 
-> > Retaining Catalin's Reviewed-by, since the change (conversion of
-> > extra_context.data to a u64) to a pointer was discussed with him and is
-> > minor).
-> > 
-> >  arch/arm64/include/uapi/asm/sigcontext.h |  38 +++++-
-> >  arch/arm64/kernel/signal.c               | 195 ++++++++++++++++++++++++++++---
-> >  2 files changed, 214 insertions(+), 19 deletions(-)
-> > 
-> > diff --git a/arch/arm64/include/uapi/asm/sigcontext.h b/arch/arm64/include/uapi/asm/sigcontext.h
-> > index 1328a2c..f0a76b9 100644
-> > --- a/arch/arm64/include/uapi/asm/sigcontext.h
-> > +++ b/arch/arm64/include/uapi/asm/sigcontext.h
-> > @@ -41,9 +41,10 @@ struct sigcontext {
-> >   *
-> >   *	0x210		fpsimd_context
-> >   *	 0x10		esr_context
-> > + *	 0x20		extra_context (optional)
-> >   *	 0x10		terminator (null _aarch64_ctx)
-> >   *
-> > - *	0xdd0		(reserved for future allocation)
-> > + *	0xdb0		(reserved for future allocation)
-> >   *
-> >   * New records that can exceed this space need to be opt-in for userspace, so
-> >   * that an expanded signal frame is not generated unexpectedly.  The mechanism
-> > @@ -80,4 +81,39 @@ struct esr_context {
-> >  	__u64 esr;
-> >  };
-> >  
-> > +/*
-> > + * extra_context: describes extra space in the signal frame for
-> > + * additional structures that don't fit in sigcontext.__reserved[].
-> > + *
-> > + * Note:
-> > + *
-> > + * 1) fpsimd_context, esr_context and extra_context must be placed in
-> > + * sigcontext.__reserved[] if present.  They cannot be placed in the
-> > + * extra space.  Any other record can be placed either in the extra
-> > + * space or in sigcontext.__reserved[], unless otherwise specified in
-> > + * this file.
-> > + *
-> > + * 2) There must not be more than one extra_context.
-> > + *
-> > + * 3) If extra_context is present, it must be followed immediately in
-> > + * sigcontext.__reserved[] by the terminating null _aarch64_ctx.
-> > + *
-> > + * 4) The extra space to which datap points must start at the first
-> > + * 16-byte aligned address immediately after the terminating null
-> > + * _aarch64_ctx that follows the extra_context structure in
-> > + * __reserved[].  The extra space may overrun the end of __reserved[],
-> > + * as indicated by a sufficiently large value for the size field.
-> > + *
-> > + * 5) The extra space must itself be terminated with a null
-> > + * _aarch64_ctx.
-> > + */
-> > +#define EXTRA_MAGIC	0x45585401
-> > +
-> > +struct extra_context {
-> > +	struct _aarch64_ctx head;
-> > +	__u64 datap; /* 16-byte aligned pointer to extra space cast to __u64 */
-> > +	__u32 size; /* size in bytes of the extra space */
-> > +	__u32 __reserved[3];
-> > +};
-> > +
-> >  #endif /* _UAPI__ASM_SIGCONTEXT_H */
-> > diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-> > index fa787e6..6934e65 100644
-> > --- a/arch/arm64/kernel/signal.c
-> > +++ b/arch/arm64/kernel/signal.c
-> > @@ -25,6 +25,7 @@
-> >  #include <linux/freezer.h>
-> >  #include <linux/stddef.h>
-> >  #include <linux/uaccess.h>
-> > +#include <linux/sizes.h>
-> >  #include <linux/string.h>
-> >  #include <linux/tracehook.h>
-> >  #include <linux/ratelimit.h>
-> > @@ -60,18 +61,27 @@ struct rt_sigframe_user_layout {
-> >  
-> >  	unsigned long fpsimd_offset;
-> >  	unsigned long esr_offset;
-> > +	unsigned long extra_offset;
-> >  	unsigned long end_offset;
-> >  };
-> >  
-> > +#define BASE_SIGFRAME_SIZE round_up(sizeof(struct rt_sigframe), 16)
-> > +#define TERMINATOR_SIZE round_up(sizeof(struct _aarch64_ctx), 16)
-> > +#define EXTRA_CONTEXT_SIZE round_up(sizeof(struct extra_context), 16)
-> > +
-> >  static void init_user_layout(struct rt_sigframe_user_layout *user)
-> >  {
-> > +	const size_t reserved_size =
-> > +		sizeof(user->sigframe->uc.uc_mcontext.__reserved);
-> > +
-> >  	memset(user, 0, sizeof(*user));
-> >  	user->size = offsetof(struct rt_sigframe, uc.uc_mcontext.__reserved);
-> >  
-> > -	user->limit = user->size +
-> > -		sizeof(user->sigframe->uc.uc_mcontext.__reserved) -
-> > -		round_up(sizeof(struct _aarch64_ctx), 16);
-> > -		/* ^ reserve space for terminator */
-> > +	user->limit = user->size + reserved_size;
-> > +
-> > +	user->limit -= TERMINATOR_SIZE;
-> > +	user->limit -= EXTRA_CONTEXT_SIZE;
-> > +	/* Reserve space for extension and terminator ^ */
-> >  }
-> >  
-> >  static size_t sigframe_size(struct rt_sigframe_user_layout const *user)
-> > @@ -80,6 +90,52 @@ static size_t sigframe_size(struct rt_sigframe_user_layout const *user)
-> >  }
-> >  
-> >  /*
-> > + * Sanity limit on the approximate maximum size of signal frame we'll
-> > + * try to generate.  Stack alignment padding and the frame record are
-> > + * not taken into account.  This limit is not a guarantee and is
-> > + * NOT ABI.
-> > + */
-> > +#define SIGFRAME_MAXSZ SZ_64K
-> > +
-> > +static int __sigframe_alloc(struct rt_sigframe_user_layout *user,
-> > +			    unsigned long *offset, size_t size, bool extend)
-> > +{
-> > +	size_t padded_size = round_up(size, 16);
-> > +
-> > +	if (padded_size > user->limit - user->size &&
-> > +	    !user->extra_offset &&
-> > +	    extend) {
-> > +		int ret;
-> > +
-> > +		user->limit += EXTRA_CONTEXT_SIZE;
-> > +		ret = __sigframe_alloc(user, &user->extra_offset,
-> > +				       sizeof(struct extra_context), false);
-> > +		if (ret) {
-> > +			user->limit -= EXTRA_CONTEXT_SIZE;
-> > +			return ret;
-> > +		}
-> > +
-> > +		/* Reserve space for the __reserved[] terminator */
-> > +		user->size += TERMINATOR_SIZE;
-> > +
-> > +		/*
-> > +		 * Allow expansion up to SIGFRAME_MAXSZ, ensuring space for
-> > +		 * the terminator:
-> > +		 */
-> > +		user->limit = SIGFRAME_MAXSZ - TERMINATOR_SIZE;
-> > +	}
-> > +
-> > +	/* Still not enough space?  Bad luck! */
-> > +	if (padded_size > user->limit - user->size)
-> > +		return -ENOMEM;
-> > +
-> > +	*offset = user->size;
-> > +	user->size += padded_size;
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +/*
-> >   * Allocate space for an optional record of <size> bytes in the user
-> >   * signal frame.  The offset from the signal frame base address to the
-> >   * allocated block is assigned to *offset.
-> > @@ -87,11 +143,24 @@ static size_t sigframe_size(struct rt_sigframe_user_layout const *user)
-> >  static int sigframe_alloc(struct rt_sigframe_user_layout *user,
-> >  			  unsigned long *offset, size_t size)
-> >  {
-> > -	size_t padded_size = round_up(size, 16);
-> > +	return __sigframe_alloc(user, offset, size, true);
-> > +}
-> >  
-> > -	*offset = user->size;
-> > -	user->size += padded_size;
-> > +/* Allocate the null terminator record and prevent further allocations */
-> > +static int sigframe_alloc_end(struct rt_sigframe_user_layout *user)
-> > +{
-> > +	int ret;
-> > +
-> > +	/* Un-reserve the space reserved for the terminator: */
-> > +	user->limit += TERMINATOR_SIZE;
-> >  
-> > +	ret = sigframe_alloc(user, &user->end_offset,
-> > +			     sizeof(struct _aarch64_ctx));
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	/* Prevent further allocation: */
-> > +	user->limit = user->size;
-> >  	return 0;
-> >  }
-> >  
-> > @@ -162,6 +231,8 @@ static int parse_user_sigframe(struct user_ctxs *user,
-> >  	char __user *base = (char __user *)&sc->__reserved;
-> >  	size_t offset = 0;
-> >  	size_t limit = sizeof(sc->__reserved);
-> > +	bool have_extra_context = false;
-> > +	char const __user *const sfp = (char const __user *)sf;
-> >  
-> >  	user->fpsimd = NULL;
-> >  
-> > @@ -171,6 +242,12 @@ static int parse_user_sigframe(struct user_ctxs *user,
-> >  	while (1) {
-> >  		int err = 0;
-> >  		u32 magic, size;
-> > +		char const __user *userp;
-> > +		struct extra_context const __user *extra;
-> > +		u64 extra_datap;
-> > +		u32 extra_size;
-> > +		struct _aarch64_ctx const __user *end;
-> > +		u32 end_magic, end_size;
-> >  
-> >  		if (limit - offset < sizeof(*head))
-> >  			goto invalid;
-> > @@ -208,6 +285,64 @@ static int parse_user_sigframe(struct user_ctxs *user,
-> >  			/* ignore */
-> >  			break;
-> >  
-> > +		case EXTRA_MAGIC:
-> > +			if (have_extra_context)
-> > +				goto invalid;
-> > +
-> > +			if (size < sizeof(*extra))
-> > +				goto invalid;
-> > +
-> > +			userp = (char const __user *)head;
-> > +
-> > +			extra = (struct extra_context const __user *)userp;
-> > +			userp += size;
-> > +
-> > +			__get_user_error(extra_datap, &extra->datap, err);
-> > +			__get_user_error(extra_size, &extra->size, err);
-> > +			if (err)
-> > +				return err;
-> > +
-> > +			/* Check for the dummy terminator in __reserved[]: */
-> > +
-> > +			if (limit - offset - size < TERMINATOR_SIZE)
-> > +				goto invalid;
-> > +
-> > +			end = (struct _aarch64_ctx const __user *)userp;
-> > +			userp += TERMINATOR_SIZE;
-> > +
-> > +			__get_user_error(end_magic, &end->magic, err);
-> > +			__get_user_error(end_size, &end->size, err);
-> > +			if (err)
-> > +				return err;
-> > +
-> > +			if (end_magic || end_size)
-> > +				goto invalid;
-> > +
-> > +			/* Prevent looping/repeated parsing of extra_context */
-> > +			have_extra_context = true;
-> > +
-> > +			base = (void __user *)extra_datap;
-> > +			if (!IS_ALIGNED((unsigned long)base, 16))
-> > +				goto invalid;
-> > +
-> > +			if (!IS_ALIGNED(extra_size, 16))
-> > +				goto invalid;
-> > +
-> > +			if (base != userp)
-> > +				goto invalid;
-> > +
-> > +			/* Reject "unreasonably large" frames: */
-> > +			if (extra_size > sfp + SIGFRAME_MAXSZ - userp)
-> > +				goto invalid;
-> > +
-> > +			/*
-> > +			 * Ignore trailing terminator in __reserved[]
-> > +			 * and start parsing extra data:
-> > +			 */
-> > +			offset = 0;
-> > +			limit = extra_size;
-> > +			continue;
-> > +
-> >  		default:
-> >  			goto invalid;
-> >  		}
-> > @@ -318,17 +453,7 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
-> >  			return err;
-> >  	}
-> >  
-> > -	/*
-> > -	 * Allocate space for the terminator record.
-> > -	 * HACK: here we undo the reservation of space for the end record.
-> > -	 * This bodge should be replaced with a cleaner approach later on.
-> > -	 */
-> > -	user->limit = offsetof(struct rt_sigframe, uc.uc_mcontext.__reserved) +
-> > -		sizeof(user->sigframe->uc.uc_mcontext.__reserved);
-> > -
-> > -	err = sigframe_alloc(user, &user->end_offset,
-> > -			     sizeof(struct _aarch64_ctx));
-> > -	return err;
-> > +	return sigframe_alloc_end(user);
-> >  }
-> >  
-> >  
-> > @@ -369,6 +494,40 @@ static int setup_sigframe(struct rt_sigframe_user_layout *user,
-> >  		__put_user_error(current->thread.fault_code, &esr_ctx->esr, err);
-> >  	}
-> >  
-> > +	if (err == 0 && user->extra_offset) {
-> > +		char __user *sfp = (char __user *)user->sigframe;
-> > +		char __user *userp =
-> > +			apply_user_offset(user, user->extra_offset);
-> > +
-> > +		struct extra_context __user *extra;
-> > +		struct _aarch64_ctx __user *end;
-> > +		u64 extra_datap;
-> > +		u32 extra_size;
-> > +
-> > +		extra = (struct extra_context __user *)userp;
-> > +		userp += EXTRA_CONTEXT_SIZE;
-> > +
-> > +		end = (struct _aarch64_ctx __user *)userp;
-> > +		userp += TERMINATOR_SIZE;
-> > +
-> > +		/*
-> > +		 * extra_datap is just written to the signal frame.
-> > +		 * The value gets cast back to a void __user *
-> > +		 * during sigreturn.
-> > +		 */
-> > +		extra_datap = (__force u64)userp;
-> > +		extra_size = sfp + round_up(user->size, 16) - userp;
-> > +
-> > +		__put_user_error(EXTRA_MAGIC, &extra->head.magic, err);
-> > +		__put_user_error(EXTRA_CONTEXT_SIZE, &extra->head.size, err);
-> > +		__put_user_error(extra_datap, &extra->datap, err);
-> > +		__put_user_error(extra_size, &extra->size, err);
-> > +
-> > +		/* Add the terminator */
-> > +		__put_user_error(0, &end->magic, err);
-> > +		__put_user_error(0, &end->size, err);
-> > +	}
-> > +
-> >  	/* set the "end" magic */
-> >  	if (err == 0) {
-> >  		struct _aarch64_ctx __user *end =
-> > -- 
-> > 2.1.4
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index fee7d13..6000c56 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -691,9 +691,11 @@ static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
+  */
+ #define IRQS_PER_CHUNK_SHIFT	5
+ #define IRQS_PER_CHUNK		(1 << IRQS_PER_CHUNK_SHIFT)
++#define ITS_MAX_LPI_NRBITS	(17) /* 128K LPIs */
+ 
+ static unsigned long *lpi_bitmap;
+ static u32 lpi_chunks;
++static u32 lpi_nrbits;
+ static DEFINE_SPINLOCK(lpi_lock);
+ 
+ static int its_lpi_to_chunk(int lpi)
+@@ -789,26 +791,19 @@ static void its_lpi_free(struct event_lpi_map *map)
+ }
+ 
+ /*
+- * We allocate 64kB for PROPBASE. That gives us@most 64K LPIs to
++ * We allocate memory for PROPBASE to cover 2 ^ lpi_nrbits LPIs to
+  * deal with (one configuration byte per interrupt). PENDBASE has to
+  * be 64kB aligned (one bit per LPI, plus 8192 bits for SPI/PPI/SGI).
+  */
+-#define LPI_PROPBASE_SZ		SZ_64K
+-#define LPI_PENDBASE_SZ		(LPI_PROPBASE_SZ / 8 + SZ_1K)
+-
+-/*
+- * This is how many bits of ID we need, including the useless ones.
+- */
+-#define LPI_NRBITS		ilog2(LPI_PROPBASE_SZ + SZ_8K)
+ 
+ #define LPI_PROP_DEFAULT_PRIO	0xa0
+ 
+ static int __init its_alloc_lpi_tables(void)
+ {
++	u32 size = ALIGN(BIT(lpi_nrbits), SZ_64K);
+ 	phys_addr_t paddr;
+ 
+-	gic_rdists->prop_page = alloc_pages(GFP_NOWAIT,
+-					   get_order(LPI_PROPBASE_SZ));
++	gic_rdists->prop_page = alloc_pages(GFP_NOWAIT, get_order(size));
+ 	if (!gic_rdists->prop_page) {
+ 		pr_err("Failed to allocate PROPBASE\n");
+ 		return -ENOMEM;
+@@ -820,10 +815,10 @@ static int __init its_alloc_lpi_tables(void)
+ 	/* Priority 0xa0, Group-1, disabled */
+ 	memset(page_address(gic_rdists->prop_page),
+ 	       LPI_PROP_DEFAULT_PRIO | LPI_PROP_GROUP1,
+-	       LPI_PROPBASE_SZ);
++	       size);
+ 
+ 	/* Make sure the GIC will observe the written configuration */
+-	gic_flush_dcache_to_poc(page_address(gic_rdists->prop_page), LPI_PROPBASE_SZ);
++	gic_flush_dcache_to_poc(page_address(gic_rdists->prop_page), size);
+ 
+ 	return 0;
+ }
+@@ -1095,12 +1090,14 @@ static void its_cpu_init_lpis(void)
+ 	pend_page = gic_data_rdist()->pend_page;
+ 	if (!pend_page) {
+ 		phys_addr_t paddr;
++		u32 size;
+ 		/*
+-		 * The pending pages have to be at least 64kB aligned,
+-		 * hence the 'max(LPI_PENDBASE_SZ, SZ_64K)' below.
++		 * The pending pages have to be at least 64kB aligned
++		 * hence the 'ALIGN(BIT(lpi_nrbits)/8, SZ_64K)' below.
+ 		 */
++		size = ALIGN(BIT(lpi_nrbits)/8, SZ_64K);
+ 		pend_page = alloc_pages(GFP_NOWAIT | __GFP_ZERO,
+-					get_order(max(LPI_PENDBASE_SZ, SZ_64K)));
++					get_order(size));
+ 		if (!pend_page) {
+ 			pr_err("Failed to allocate PENDBASE for CPU%d\n",
+ 			       smp_processor_id());
+@@ -1108,7 +1105,7 @@ static void its_cpu_init_lpis(void)
+ 		}
+ 
+ 		/* Make sure the GIC will observe the zero-ed page */
+-		gic_flush_dcache_to_poc(page_address(pend_page), LPI_PENDBASE_SZ);
++		gic_flush_dcache_to_poc(page_address(pend_page), size);
+ 
+ 		paddr = page_to_phys(pend_page);
+ 		pr_info("CPU%d: using LPI pending table @%pa\n",
+@@ -1130,7 +1127,7 @@ static void its_cpu_init_lpis(void)
+ 	val = (page_to_phys(gic_rdists->prop_page) |
+ 	       GICR_PROPBASER_InnerShareable |
+ 	       GICR_PROPBASER_RaWaWb |
+-	       ((LPI_NRBITS - 1) & GICR_PROPBASER_IDBITS_MASK));
++	       ((lpi_nrbits - 1) & GICR_PROPBASER_IDBITS_MASK));
+ 
+ 	gicr_write_propbaser(val, rbase + GICR_PROPBASER);
+ 	tmp = gicr_read_propbaser(rbase + GICR_PROPBASER);
+@@ -1900,9 +1897,10 @@ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
+ 		return -ENXIO;
+ 	}
+ 
++	lpi_nrbits = min_t(u32, rdists->id_bits, ITS_MAX_LPI_NRBITS);
+ 	gic_rdists = rdists;
+ 	its_alloc_lpi_tables();
+-	its_lpi_init(rdists->id_bits);
++	its_lpi_init(lpi_nrbits);
+ 
+ 	return 0;
+ }
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
