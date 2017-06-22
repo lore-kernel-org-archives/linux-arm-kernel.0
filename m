@@ -1,44 +1,44 @@
-From: jeffy.chen@rock-chips.com (jeffy)
-Date: Thu, 22 Jun 2017 10:33:47 +0800
-Subject: [RFC PATCH v3 3/6] ARM/arm64: dts: enable wakeup for cros-ec-spi
- devices
-In-Reply-To: <20170621153632.7cajs5xwdmhdm2fg@kozik-lap>
-References: <1498039313-24220-1-git-send-email-jeffy.chen@rock-chips.com>
- <1498039313-24220-4-git-send-email-jeffy.chen@rock-chips.com>
- <CAJKOXPdL2CB9VWNo=it0dos-4hJYrgHUSZwcG1DS=9c+YxXzhQ@mail.gmail.com>
- <594A91C9.1090906@rock-chips.com> <20170621153632.7cajs5xwdmhdm2fg@kozik-lap>
-Message-ID: <594B2C8B.3000401@rock-chips.com>
+From: bibby.hsieh@mediatek.com (Bibby Hsieh)
+Date: Thu, 22 Jun 2017 10:43:33 +0800
+Subject: [PATCH v3] drm: mediatek: change the variable type of rdma threshold
+Message-ID: <1498099413-13357-1-git-send-email-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+For some greater resolution, the rdma threshold
+variable will overflow.
 
-thanx for noting that, will add it to next version :)
+Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+---
+ drivers/gpu/drm/mediatek/mtk_disp_rdma.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-
-On 06/21/2017 11:36 PM, Krzysztof Kozlowski wrote:
-> On Wed, Jun 21, 2017 at 11:33:29PM +0800, jeffy wrote:
->> Hi Krzysztof,
->>
->> thanx for your comment.
->>
->> On 06/21/2017 06:45 PM, Krzysztof Kozlowski wrote:
->>> On Wed, Jun 21, 2017 at 12:01 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
->>>> We used to enable wakeup for cros-ec-spi devices unconditionally.
->>>> Now we are using the more generic wakeup-source property to enable it.
->>>
->>> Using wakeup-source property is still enabling this unconditionally.
->>> What  do you exactly mean here?
->> i mean the wakeup-source is an optional property, we can disable wakeup by
->> not adding it.
->
-> Maybe mention this in commit msg? This removes any confusion. "Till now
-> the driver always enabled wakeup but now it supports wakeup property so
-> add it to keep same functionality."
->
-> Best regards,
-> Krzysztof
->
->
->
->
+diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+index 0df05f9..8540aaa 100644
+--- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
++++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+@@ -109,7 +109,7 @@ static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
+ 			    unsigned int height, unsigned int vrefresh,
+ 			    unsigned int bpc)
+ {
+-	unsigned int threshold;
++	unsigned long long threshold;
+ 	unsigned int reg;
+ 
+ 	rdma_update_bits(comp, DISP_REG_RDMA_SIZE_CON_0, 0xfff, width);
+@@ -121,10 +121,11 @@ static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
+ 	 * output threshold to 6 microseconds with 7/6 overhead to
+ 	 * account for blanking, and with a pixel depth of 4 bytes:
+ 	 */
+-	threshold = width * height * vrefresh * 4 * 7 / 1000000;
++	threshold = div_u64((unsigned long long)width * height * vrefresh *
++			    4 * 7, 1000000);
+ 	reg = RDMA_FIFO_UNDERFLOW_EN |
+ 	      RDMA_FIFO_PSEUDO_SIZE(SZ_8K) |
+-	      RDMA_OUTPUT_VALID_FIFO_THRESHOLD(threshold);
++	      RDMA_OUTPUT_VALID_FIFO_THRESHOLD(clamp_val(threshold, 0, 0x3ff0));
+ 	writel(reg, comp->regs + DISP_REG_RDMA_FIFO_CON);
+ }
+ 
+-- 
+1.9.1
