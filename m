@@ -1,56 +1,72 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 22 Jun 2017 20:25:59 +0800
-Subject: [PATCH 2/2] i2c: zx2967: add i2c controller driver for ZTE's
- zx2967 family
-In-Reply-To: <20170622080730.o352kxrs5pz7wxnf@ninjato>
-References: <1495947576-11037-1-git-send-email-shawnguo@kernel.org>
- <1495947576-11037-3-git-send-email-shawnguo@kernel.org>
- <20170619193130.velebm7p3r5ggaos@ninjato>
- <20170620025815.GA4818@x250> <20170620074126.GA1541@katana>
- <20170622074831.GA23753@dragon>
- <20170622080730.o352kxrs5pz7wxnf@ninjato>
-Message-ID: <20170622122558.GB23753@dragon>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 22 Jun 2017 14:26:30 +0200
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.13 (#2)
+Message-ID: <877f041a4p.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 22, 2017 at 10:07:30AM +0200, Wolfram Sang wrote:
-> 
-> > The audio codec is on address 0x22.
-> > 
-> > Why do you think it should be broken now?
-> 
-> Because I thought that we skipped the error handling for every transfer
-> when we removed the call to reset_hardware from the xfer function.
-> 
-> So, either it still works because the transfer times out. But then
-> i2cdetect should be really slow. The timeout is set to 1s, so it should
-> take 1s to scan every address.
-> 
-> Or I am completely missing something. Then, I am sorry for the noise.
+Hi,
 
-It's me who is missing something.  You are right.  With the current
-driver, i2cdetect takes 1s to scan most addresses.  Except address 0x22,
-those devices detected on other addresses are just wrong, and the
-addresses vary from a scan to another.
+Here is the second pull request for dt64 for mvebu for v4.13.
 
-With the proper error handling, i2cdetect now works very fast and only
-gets audio codec on 0x22, which is correct.
+This came only now because I waited for that the drivers part was
+accepted. Now that is was done we can enable the last missing part of
+the infrastructure for the Aramda 7K/8K SoCs.
 
-$ i2cdetect 0
-WARNING! This program can confuse your I2C bus, cause data loss and worse!
-I will probe file /dev/i2c-0.
-I will probe address range 0x03-0x77.
-Continue? [Y/n] Y
-     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
-00:          -- -- -- -- -- -- -- -- -- -- -- -- -- 
-10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-20: -- -- UU -- -- -- -- -- -- -- -- -- -- -- -- -- 
-30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-50: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-70: -- -- -- -- -- -- -- --                         
+Also note that there is a trivial merge conflict with the mvebu-fixes
+branch. In case of doubt it was resolved in the last merge commit of
+the mvebu/for-next branch.
 
-Thanks a lot for identifying the bug.
+Thanks,
 
-Shawn
+
+Gregory
+
+The following changes since commit f66b2aff46eaf0825dbe1560e28fcb845dd2a215:
+
+  arm64: dts: marvell: add xmdio nodes for 7k/8k (2017-06-17 08:19:29 +0200)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.13-2
+
+for you to fetch changes up to 6ef84a827c37547504514a80bdb35f74a67df5a3:
+
+  arm64: dts: marvell: enable GICP and ICU on Armada 7K/8K (2017-06-21 17:09:48 +0200)
+
+----------------------------------------------------------------
+mvebu dt64 for 4.13 (part 2)
+
+- use new clock binding for Armada 7K/8K
+- add pinctrl on Armada 7K/8K
+- add GPIO on Armada 7K/8K
+- switch from GIC to ICU on CP110 (Armada 7K/8K)
+- enable the mdio node on the mcbin (Armada 8K based board)
+
+----------------------------------------------------------------
+Antoine Tenart (2):
+      arm64: dts: marvell: mcbin: enable the mdio node
+      arm64: dts: marvell: use new bindings for xor clocks on ap806
+
+Gregory CLEMENT (4):
+      arm64: dts: marvell: remove *-clock-output-names on cp110
+      arm64: dts: marvell: use new binding for the system controller on cp110
+      arm64: dts: marvell: add pinctrl support for Armada 7K/8K
+      arm64: dts: marvell: add gpio support for Armada 7K/8K
+
+Thomas Petazzoni (1):
+      arm64: dts: marvell: enable GICP and ICU on Armada 7K/8K
+
+ arch/arm64/boot/dts/marvell/armada-7020.dtsi       |   2 +-
+ arch/arm64/boot/dts/marvell/armada-7040.dtsi       |   2 +-
+ arch/arm64/boot/dts/marvell/armada-70x0.dtsi       |  68 +++++++++++
+ arch/arm64/boot/dts/marvell/armada-8020.dtsi       |   3 +-
+ arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts  |   2 +
+ arch/arm64/boot/dts/marvell/armada-8040.dtsi       |   3 +-
+ arch/arm64/boot/dts/marvell/armada-80x0.dtsi       |  76 ++++++++++++
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi      |  29 ++++-
+ .../boot/dts/marvell/armada-cp110-master.dtsi      | 136 ++++++++++++---------
+ .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 131 +++++++++++---------
+ 10 files changed, 329 insertions(+), 123 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-70x0.dtsi
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-80x0.dtsi
