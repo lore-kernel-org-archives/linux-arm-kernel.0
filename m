@@ -1,148 +1,121 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 22 Jun 2017 15:47:27 -0700
-Subject: [PATCH v2 4/4] arm64: dts: rockchip: use cs-gpios for cros_ec_spi
-In-Reply-To: <20170620004739.GA67314@google.com>
-References: <1497331543-8565-1-git-send-email-jeffy.chen@rock-chips.com>
- <1497331543-8565-4-git-send-email-jeffy.chen@rock-chips.com>
- <20170613175043.GC9026@google.com>
- <20170613182225.smahsf3jzvbc7w7z@sirena.org.uk>
- <20170620004739.GA67314@google.com>
-Message-ID: <CAD=FV=UKe5M-M=gXwdjp25vpR0CHtk1APRF0_b4PXQrGOc40+A@mail.gmail.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Thu, 22 Jun 2017 18:19:14 -0500
+Subject: [PATCH v3] irqchip: gicv3-its: Don't assume GICv3 hardware supports
+ 16bit INTID
+Message-ID: <1498173554-27718-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The current ITS driver is assuming every ITS hardware implementation
+supports minimum of 16bit INTID. But this is not true, as per GICv3
+specification, INTID field is IMPLEMENTATION DEFINED in the range of
+14-24 bits. We might see an unpredictable system behavior on systems
+where hardware support less than 16bits and software tries to use
+64K LPI interrupts.
 
-On Mon, Jun 19, 2017 at 5:47 PM, Brian Norris <briannorris@chromium.org> wrote:
-> Hi Mark,
->
-> Forgot to follow up here:
->
-> On Tue, Jun 13, 2017 at 07:22:25PM +0100, Mark Brown wrote:
->> On Tue, Jun 13, 2017 at 10:50:44AM -0700, Brian Norris wrote:
->> > On Tue, Jun 13, 2017 at 01:25:43PM +0800, Jeffy Chen wrote:
->> > > The cros_ec requires CS line to be active after last message. But the CS
->> > > would be toggled when powering off/on rockchip spi, which breaks ec xfer.
->> > > Use GPIO CS to prevent that.
->>
->> > I suppose this change is fine. (At least, I don't have a good reason not
->> > to do this.)
->>
->> > But I still wonder whether this is something that the SPI core can be
->> > expected to handle. drivers/mfd/cros_ec_spi.c already sets the
->> > appropriate trans->cs_change bits, to ensure CS remains active in
->> > between certain messages (all under spi_bus_lock()). But you're
->> > suggesting that your bus controller may deassert CS if you runtime
->> > suspend the device (e.g., in between messages).
->>
->> > So, is your controller just peculiar? Or should the SPI core avoid
->> > autosuspending the bus controller when it's been instructed to keep CS
->> > active? Any thoughts Mark?
->>
->> This sounds like the controller being unusual - though frankly the
->> ChromeOS chip select usage is also odd so it's fairly rare for something
->> like this to come up.  I'd not expect a runtime suspend to loose the pin
->> state, though possibly through use of pinctrl rather than the
->> controller.
->
-> I haven't personally verified this behavior (it probably wouldn't be too
-> hard to rig up a test driver to hold CS low while allowing the
-> controller to autosuspend? spidev can do this?), but Rockchip folks seem
-> to have concluded this.
->
-> I suppose I'm fine with relying on cs-gpios as a workaround.
+On Qualcomm Datacenter Technologies QDF2400 platform, boot log shows
+confusing information about number of LPI chunks as shown below. The
+QDF2400 ITS hardware supports 24bit INTID.
 
-I'm similarly hesitant to rely on cs-gpios as a workaround, though I
-won't directly stand in its way...  ...it seems like it would be
-slightly better to actually add a runtime_suspend() callback and
-adjust the pinmux dynamically (that would allow us to use the hardware
-chip select control if we ever enable that in the driver), but I'm not
-sure all the extra work to do that is worth it.
+This patch allocates the memory resources for PEND/PROP tables based
+on discoverable value which is specified in GITS_TYPER.IDbits. Also
+it fixes the log message that reflects the correct number of LPI
+chunks were allocated.
 
-It feels a little bit to me like the workaround here doesn't belong in
-the board's device tree file, though.  This is a quirk of the SoC's
-SPI controller whenever it's runtime suspended.  Any board using this
-SPI could possibly be affected, right?
+ITS at 0xff7efe0000: allocated 524288 Devices @3c0400000 (indirect, esz 8, psz 64K, shr 1)
+ITS at 0xff7efe0000: allocated 8192 Interrupt Collections @3c0130000 (flat, esz 8, psz 64K, shr 1)
+ITS at 0xff7efe0000: allocated 8192 Virtual CPUs @3c0140000 (flat, esz 8, psz 64K, shr 1)
+ITS: Allocated 524032 chunks for LPIs
+PCI/MSI: ITS at 0xff7efe0000 domain created
+Platform MSI: ITS at 0xff7efe0000 domain created
 
-
-Oh wait (!!!!)
-
-
-Let's think about this.  Let me ask a question.  When you runtime
-suspend the SPI part (and turn off the power domain) but don't
-configure pins to be GPIO, what happens?  I'm assuming it's one of
-three things:
-
-1. The line is driven a certain direction (probably low).  This seems unlikely.
-
-2. The line is no longer driven by the SPI controller and thus the
-pin's pulls take effect.  This seems _likely_.
-
-3. The line is no longer driven by the SPI controller and somehow the
-pulls stop taking effect.  This seems unlikely.
-
-
-...I'll assume that #2 is right (please correct if I'm wrong).
-Thinking about that makes me think that we need to worry not just
-about the chip select line but about the other SPI lines too, right?
-AKA if the SPI controller stops driving the chip select line, it's
-probably also not driving MISO, MOSI, or TXD.
-
-...so looking at all the SPI lines, they all have pullup configured in
-the "default" mode in rk3399.dtsi.
-
-...and looking as "cros_ec_spi.c", I see that we appear to be using MODE_0.
-
-
-That means if you runtime suspend while the cros EC code was running
-and none of your patches have landed, all lines will float high.
-
-1. Chip select will be deasserted (this is the problem you're trying to solve).
-
-2. Data line and clock line will get pulled high.
-
-Using spi.h, MODE_0 means SPI_CPOL=0 and SPI_CPHA=0.  Using Wikipedia
-(which is never wrong, of course), that means data is captured on the
-clock's rising edge.  Thus we'll actually clock one bit of data here,
-but at the same time that we try to turn off chip select.
-
-
-...now we look at your proposed solution and we'll leave chip select
-on, but we'll still clock one bit of data (oops).  ...or, I guess, if
-the EC itself has pulls configured we might be in some state where the
-different pulls are fighting, but that still seems non-ideal.
-
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
 ---
+Changes since v2:
+  Keep maximum LPIs to 64K.
+  Incorporated Marc's review suggestion.
+  Renamed the varibale lpi_nrbits to lpi_id_bits to avoid confusion with LPI_NRBITS.
+Changes since v1:
+  No code changes, just rebase on tip of the Marc's branch and tested on QDF2400 platform.
+  https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/log/?h=irq/irqchip-4.13
 
-So how do we fix this?  IMHO:
+ drivers/irqchip/irq-gic-v3-its.c | 24 ++++++++++--------------
+ 1 file changed, 10 insertions(+), 14 deletions(-)
 
-Add 4 new pinctrl states in rk3399.dtsi:
-
-  cs_low_clk_low, cs_low_clk_high, cs_high_clk_low, cs_high_clk_high
-
-These would each look something like this:
-
-spi5_cs_low_data_low: spi5-cs-low-data-low {
-  rockchip,pins = <2 22 RK_FUNC_0 &pcfg_output_low>,
-    <2 23 RK_FUNC_0 &pcfg_output_low>;
-};
-
-Where "pcfg_output_low" would be moved from the existing location in
-"rk3399-gru.dtsi" to the main "rk3399.dtsi" file.
-
-
-...now, you'd define runtime_suspend and runtime_resume functions
-where you'd look at the current state of the chip select and output
-and select one of these 4 pinmuxes so that things _don't_ change.
-
-If the pinmuxes didn't exist you'd simply deny PM Runtime Transitions.
-That would nicely take care of the backward compatibility problem.
-Old DTS files would work, they just wouldn't be able to Runtime PM
-properly.
-
----
-
-Anyway, maybe that's all crazy.  What do others think?
-
-
--Doug
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 63cd0f2..fed99c5 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -691,9 +691,11 @@ static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
+  */
+ #define IRQS_PER_CHUNK_SHIFT	5
+ #define IRQS_PER_CHUNK		(1 << IRQS_PER_CHUNK_SHIFT)
++#define ITS_MAX_LPI_NRBITS	16 /* 64K LPIs */
+ 
+ static unsigned long *lpi_bitmap;
+ static u32 lpi_chunks;
++static u32 lpi_id_bits;
+ static DEFINE_SPINLOCK(lpi_lock);
+ 
+ static int its_lpi_to_chunk(int lpi)
+@@ -789,17 +791,13 @@ static void its_lpi_free(struct event_lpi_map *map)
+ }
+ 
+ /*
+- * We allocate 64kB for PROPBASE. That gives us@most 64K LPIs to
++ * We allocate memory for PROPBASE to cover 2 ^ lpi_id_bits LPIs to
+  * deal with (one configuration byte per interrupt). PENDBASE has to
+  * be 64kB aligned (one bit per LPI, plus 8192 bits for SPI/PPI/SGI).
+  */
+-#define LPI_PROPBASE_SZ		SZ_64K
+-#define LPI_PENDBASE_SZ		(LPI_PROPBASE_SZ / 8 + SZ_1K)
+-
+-/*
+- * This is how many bits of ID we need, including the useless ones.
+- */
+-#define LPI_NRBITS		ilog2(LPI_PROPBASE_SZ + SZ_8K)
++#define LPI_NRBITS		lpi_id_bits
++#define LPI_PROPBASE_SZ		ALIGN(BIT(LPI_NRBITS), SZ_64K)
++#define LPI_PENDBASE_SZ		ALIGN(BIT(LPI_NRBITS) / 8, SZ_64K)
+ 
+ #define LPI_PROP_DEFAULT_PRIO	0xa0
+ 
+@@ -807,6 +805,7 @@ static int __init its_alloc_lpi_tables(void)
+ {
+ 	phys_addr_t paddr;
+ 
++	lpi_id_bits = min_t(u32, gic_rdists->id_bits, ITS_MAX_LPI_NRBITS);
+ 	gic_rdists->prop_page = alloc_pages(GFP_NOWAIT,
+ 					   get_order(LPI_PROPBASE_SZ));
+ 	if (!gic_rdists->prop_page) {
+@@ -825,7 +824,7 @@ static int __init its_alloc_lpi_tables(void)
+ 	/* Make sure the GIC will observe the written configuration */
+ 	gic_flush_dcache_to_poc(page_address(gic_rdists->prop_page), LPI_PROPBASE_SZ);
+ 
+-	return 0;
++	return its_lpi_init(lpi_id_bits);
+ }
+ 
+ static const char *its_base_type_string[] = {
+@@ -1100,7 +1099,7 @@ static void its_cpu_init_lpis(void)
+ 		 * hence the 'max(LPI_PENDBASE_SZ, SZ_64K)' below.
+ 		 */
+ 		pend_page = alloc_pages(GFP_NOWAIT | __GFP_ZERO,
+-					get_order(max(LPI_PENDBASE_SZ, SZ_64K)));
++					get_order(max_t(u32, LPI_PENDBASE_SZ, SZ_64K)));
+ 		if (!pend_page) {
+ 			pr_err("Failed to allocate PENDBASE for CPU%d\n",
+ 			       smp_processor_id());
+@@ -1975,8 +1974,5 @@ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
+ 	}
+ 
+ 	gic_rdists = rdists;
+-	its_alloc_lpi_tables();
+-	its_lpi_init(rdists->id_bits);
+-
+-	return 0;
++	return its_alloc_lpi_tables();
+ }
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
