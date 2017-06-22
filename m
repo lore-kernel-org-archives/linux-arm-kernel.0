@@ -1,9 +1,9 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Thu, 22 Jun 2017 11:06:30 -0700
-Subject: [PATCH 2/4] arm64: Reduce ELF_ET_DYN_BASE
+Date: Thu, 22 Jun 2017 11:06:32 -0700
+Subject: [PATCH 4/4] s390: Reduce ELF_ET_DYN_BASE
 In-Reply-To: <1498154792-49952-1-git-send-email-keescook@chromium.org>
 References: <1498154792-49952-1-git-send-email-keescook@chromium.org>
-Message-ID: <1498154792-49952-3-git-send-email-keescook@chromium.org>
+Message-ID: <1498154792-49952-5-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,40 +15,34 @@ pointers.
 
 Signed-off-by: Kees Cook <keescook@chromium.org>
 ---
- arch/arm64/include/asm/elf.h | 13 ++++++-------
- 1 file changed, 6 insertions(+), 7 deletions(-)
+ arch/s390/include/asm/elf.h | 15 +++++++--------
+ 1 file changed, 7 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index 5d1700425efe..f742af8f7c42 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -113,12 +113,13 @@
- #define ELF_EXEC_PAGESIZE	PAGE_SIZE
+diff --git a/arch/s390/include/asm/elf.h b/arch/s390/include/asm/elf.h
+index e8f623041769..7c58d599f91b 100644
+--- a/arch/s390/include/asm/elf.h
++++ b/arch/s390/include/asm/elf.h
+@@ -161,14 +161,13 @@ extern unsigned int vdso_enabled;
+ #define CORE_DUMP_USE_REGSET
+ #define ELF_EXEC_PAGESIZE	4096
  
- /*
-- * This is the location that an ET_DYN program is loaded if exec'ed.  Typical
-- * use of this is to invoke "./ld.so someprog" to test out a new version of
-- * the loader.  We need to make sure that it is out of the way of the program
-- * that it will "exec", and that there is sufficient room for the brk.
+-/* This is the location that an ET_DYN program is loaded if exec'ed.  Typical
+-   use of this is to invoke "./ld.so someprog" to test out a new version of
+-   the loader.  We need to make sure that it is out of the way of the program
+-   that it will "exec", and that there is sufficient room for the brk. 64-bit
+-   tasks are aligned to 4GB. */
+-#define ELF_ET_DYN_BASE (is_compat_task() ? \
+-				(STACK_TOP / 3 * 2) : \
+-				(STACK_TOP / 3 * 2) & ~((1UL << 32) - 1))
++/*
 + * This is the base location for PIE (ET_DYN with INTERP) loads. On
 + * 64-bit, this is raised to 4GB to leave the entire 32-bit address
 + * space open for things that want to use the area for 32-bit pointers.
-  */
--#define ELF_ET_DYN_BASE	(2 * TASK_SIZE_64 / 3)
-+#define ELF_ET_DYN_BASE		(test_thread_flag(TIF_32BIT) ?	\
-+					0x000400000UL :		\
-+					0x100000000UL)
++ */
++#define ELF_ET_DYN_BASE		(is_compat_task() ? 0x000400000UL : \
++						    0x100000000UL)
  
- #ifndef __ASSEMBLY__
- 
-@@ -173,8 +174,6 @@ extern int arch_setup_additional_pages(struct linux_binprm *bprm,
- 
- #ifdef CONFIG_COMPAT
- 
--#define COMPAT_ELF_ET_DYN_BASE		(2 * TASK_SIZE_32 / 3)
--
- /* AArch32 registers. */
- #define COMPAT_ELF_NGREG		18
- typedef unsigned int			compat_elf_greg_t;
+ /* This yields a mask that user programs can use to figure out what
+    instruction set this CPU supports. */
 -- 
 2.7.4
