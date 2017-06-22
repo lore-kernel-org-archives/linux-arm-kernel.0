@@ -1,115 +1,74 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 22 Jun 2017 09:10:38 +0800
-Subject: [PATCH v5 3/3] net/cxgb4: Use new
- PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
-In-Reply-To: <CAKgT0UdJ_zseo9O7SiU9U2m__OZeF_Z8eVjsA5N8ZK39rdK2fA@mail.gmail.com>
-References: <1497855239-18560-1-git-send-email-dingtianhong@huawei.com>
- <1497855239-18560-4-git-send-email-dingtianhong@huawei.com>
- <CAKgT0UdJ_zseo9O7SiU9U2m__OZeF_Z8eVjsA5N8ZK39rdK2fA@mail.gmail.com>
-Message-ID: <3aa59c4a-62ad-dcb0-14d0-e0955b0005d2@huawei.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Thu, 22 Jun 2017 09:11:55 +0800
+Subject: [xlnx:master 694/710] drivers//spi/spi-zynq-qspi.c:695:2: warning:
+ this 'if' clause does not guard...
+Message-ID: <201706220946.uTll8jD3%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   ae4bbf82f4b9fdfc85b3fd112696e8bbefff07f2
+commit: 1dda0d845db112e74eaedbbd9cea6e0ff455b390 [694/710] spi: zynq: fix style issues from checkpatch
+config: arm-allmodconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 1dda0d845db112e74eaedbbd9cea6e0ff455b390
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
+All warnings (new ones prefixed by >>):
 
-On 2017/6/22 2:28, Alexander Duyck wrote:
-> On Sun, Jun 18, 2017 at 11:53 PM, Ding Tianhong <dingtianhong@huawei.com> wrote:
->> From: Casey Leedom <leedom@chelsio.com>
->>
->> cxgb4 Ethernet driver now queries PCIe configuration space to determine
->> if it can send TLPs to it with the Relaxed Ordering Attribute set.
->>
->> Signed-off-by: Casey Leedom <leedom@chelsio.com>
->> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
->> ---
->>  drivers/net/ethernet/chelsio/cxgb4/cxgb4.h      |  1 +
->>  drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c | 17 +++++++++++++++++
->>  drivers/net/ethernet/chelsio/cxgb4/sge.c        |  5 +++--
->>  3 files changed, 21 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
->> index e88c180..478f25a 100644
->> --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
->> +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
->> @@ -521,6 +521,7 @@ enum {                                 /* adapter flags */
->>         USING_SOFT_PARAMS  = (1 << 6),
->>         MASTER_PF          = (1 << 7),
->>         FW_OFLD_CONN       = (1 << 9),
->> +       ROOT_NO_RELAXED_ORDERING = (1 << 10),
->>  };
->>
->>  enum {
->> diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
->> index ea1bfcf..7cd4e1b 100644
->> --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
->> +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
->> @@ -4735,6 +4735,23 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
->>         adapter->msg_enable = DFLT_MSG_ENABLE;
->>         memset(adapter->chan_map, 0xff, sizeof(adapter->chan_map));
->>
->> +       /* If possible, we use PCIe Relaxed Ordering Attribute to deliver
->> +        * Ingress Packet Data to Free List Buffers in order to allow for
->> +        * chipset performance optimizations between the Root Complex and
->> +        * Memory Controllers.  (Messages to the associated Ingress Queue
->> +        * notifying new Packet Placement in the Free Lists Buffers will be
->> +        * send without the Relaxed Ordering Attribute thus guaranteeing that
->> +        * all preceding PCIe Transaction Layer Packets will be processed
->> +        * first.)  But some Root Complexes have various issues with Upstream
->> +        * Transaction Layer Packets with the Relaxed Ordering Attribute set.
->> +        * The PCIe devices which under the Root Complexes will be cleared the
->> +        * Relaxed Ordering bit in the configuration space, So we check our
->> +        * PCIe configuration space to see if it's flagged with advice against
->> +        * using Relaxed Ordering.
->> +        */
->> +       if (pcie_relaxed_ordering_supported(pdev))
->> +               adapter->flags |= ROOT_NO_RELAXED_ORDERING;
->> +
-> 
-> Looks like you have a typo here. It should be
-> "!pcie_relaxed_ordering_supported(pdev)" that you are testing for to
-> set this flag shouldn't it? Right now it appears the flag is getting
-> set if relaxed ordering is supported.
-> 
+   drivers//spi/spi-zynq-qspi.c: In function 'zynq_qspi_probe':
+>> drivers//spi/spi-zynq-qspi.c:695:2: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+     if (of_property_read_u32(pdev->dev.of_node, "is-dual", &xqspi->is_dual))
+     ^~
+   drivers//spi/spi-zynq-qspi.c:697:3: note: ...this statement, but the latter is misleadingly indented as if it is guarded by the 'if'
+      dev_warn(&pdev->dev, "about dual memories. defaulting to single memory\n");
+      ^~~~~~~~
 
-Yes, I made a mistake here, thanks for correcting.
+vim +/if +695 drivers//spi/spi-zynq-qspi.c
 
-Ding
+306f05f5e drivers/spi/xqspipss.c       Sadanand M             2010-10-14  679  
+6f8376304 drivers/spi/spi-xilinx-qps.c Michal Simek           2013-07-08  680  	master = spi_alloc_master(&pdev->dev, sizeof(*xqspi));
+306f05f5e drivers/spi/xqspipss.c       Sadanand M             2010-10-14  681  	if (master == NULL)
+306f05f5e drivers/spi/xqspipss.c       Sadanand M             2010-10-14  682  		return -ENOMEM;
+306f05f5e drivers/spi/xqspipss.c       Sadanand M             2010-10-14  683  
+306f05f5e drivers/spi/xqspipss.c       Sadanand M             2010-10-14  684  	xqspi = spi_master_get_devdata(master);
+6f8376304 drivers/spi/spi-xilinx-qps.c Michal Simek           2013-07-08  685  	master->dev.of_node = pdev->dev.of_node;
+6f8376304 drivers/spi/spi-xilinx-qps.c Michal Simek           2013-07-08  686  	platform_set_drvdata(pdev, master);
+306f05f5e drivers/spi/xqspipss.c       Sadanand M             2010-10-14  687  
+47625be95 drivers/spi/spi-xilinx-qps.c Michal Simek           2013-07-08  688  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+47625be95 drivers/spi/spi-xilinx-qps.c Michal Simek           2013-07-08  689  	xqspi->regs = devm_ioremap_resource(&pdev->dev, res);
+47625be95 drivers/spi/spi-xilinx-qps.c Michal Simek           2013-07-08  690  	if (IS_ERR(xqspi->regs)) {
+47625be95 drivers/spi/spi-xilinx-qps.c Michal Simek           2013-07-08  691  		ret = PTR_ERR(xqspi->regs);
+47625be95 drivers/spi/spi-xilinx-qps.c Michal Simek           2013-07-08  692  		goto remove_master;
+306f05f5e drivers/spi/xqspipss.c       Sadanand M             2010-10-14  693  	}
+306f05f5e drivers/spi/xqspipss.c       Sadanand M             2010-10-14  694  
+6f8376304 drivers/spi/spi-xilinx-qps.c Michal Simek           2013-07-08 @695  	if (of_property_read_u32(pdev->dev.of_node, "is-dual", &xqspi->is_dual))
+1dda0d845 drivers/spi/spi-zynq-qspi.c  Naga Sureshkumar Relli 2017-05-30  696  		dev_warn(&pdev->dev, "couldn't determine configuration info");
+1dda0d845 drivers/spi/spi-zynq-qspi.c  Naga Sureshkumar Relli 2017-05-30  697  		dev_warn(&pdev->dev, "about dual memories. defaulting to single memory\n");
+5285395dd drivers/spi/xilinx_qspips.c  Sadanand M             2011-09-09  698  
+adbc53e5a drivers/spi/spi-zynq-qspi.c  Harini Katakam         2014-04-11  699  	xqspi->pclk = devm_clk_get(&pdev->dev, "pclk");
+adbc53e5a drivers/spi/spi-zynq-qspi.c  Harini Katakam         2014-04-11  700  	if (IS_ERR(xqspi->pclk)) {
+adbc53e5a drivers/spi/spi-zynq-qspi.c  Harini Katakam         2014-04-11  701  		dev_err(&pdev->dev, "pclk clock not found.\n");
+adbc53e5a drivers/spi/spi-zynq-qspi.c  Harini Katakam         2014-04-11  702  		ret = PTR_ERR(xqspi->pclk);
+47625be95 drivers/spi/spi-xilinx-qps.c Michal Simek           2013-07-08  703  		goto remove_master;
 
->>         spin_lock_init(&adapter->stats_lock);
->>         spin_lock_init(&adapter->tid_release_lock);
->>         spin_lock_init(&adapter->win0_lock);
->> diff --git a/drivers/net/ethernet/chelsio/cxgb4/sge.c b/drivers/net/ethernet/chelsio/cxgb4/sge.c
->> index f05f0d4..ac229a3 100644
->> --- a/drivers/net/ethernet/chelsio/cxgb4/sge.c
->> +++ b/drivers/net/ethernet/chelsio/cxgb4/sge.c
->> @@ -2571,6 +2571,7 @@ int t4_sge_alloc_rxq(struct adapter *adap, struct sge_rspq *iq, bool fwevtq,
->>         struct fw_iq_cmd c;
->>         struct sge *s = &adap->sge;
->>         struct port_info *pi = netdev_priv(dev);
->> +       int relaxed = !(adap->flags & ROOT_NO_RELAXED_ORDERING);
->>
->>         /* Size needs to be multiple of 16, including status entry. */
->>         iq->size = roundup(iq->size, 16);
->> @@ -2624,8 +2625,8 @@ int t4_sge_alloc_rxq(struct adapter *adap, struct sge_rspq *iq, bool fwevtq,
->>
->>                 flsz = fl->size / 8 + s->stat_len / sizeof(struct tx_desc);
->>                 c.iqns_to_fl0congen |= htonl(FW_IQ_CMD_FL0PACKEN_F |
->> -                                            FW_IQ_CMD_FL0FETCHRO_F |
->> -                                            FW_IQ_CMD_FL0DATARO_F |
->> +                                            FW_IQ_CMD_FL0FETCHRO_V(relaxed) |
->> +                                            FW_IQ_CMD_FL0DATARO_V(relaxed) |
->>                                              FW_IQ_CMD_FL0PADEN_F);
->>                 if (cong >= 0)
->>                         c.iqns_to_fl0congen |=
->> --
->> 1.9.0
->>
->>
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> .
-> 
+:::::: The code at line 695 was first introduced by commit
+:::::: 6f8376304378be494ca9b7518636fd3ecd52e716 spi: xilinx-qps: Use pdev instead of dev
+
+:::::: TO: Michal Simek <michal.simek@xilinx.com>
+:::::: CC: Michal Simek <michal.simek@xilinx.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 59817 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170622/375e946e/attachment-0001.gz>
