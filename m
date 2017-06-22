@@ -1,18 +1,70 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 22 Jun 2017 14:19:05 -0700
-Subject: [PATCH v2 0/3] ARM64: dts: meson-gxl: Add support for Libre
- Technology CC board
-In-Reply-To: <20170619090440.27099-1-jbrunet@baylibre.com> (Jerome Brunet's
- message of "Mon, 19 Jun 2017 11:04:37 +0200")
-References: <20170619090440.27099-1-jbrunet@baylibre.com>
-Message-ID: <7hr2ybafg6.fsf@baylibre.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 22 Jun 2017 16:24:49 -0500
+Subject: [PATCH v3 1/3] dt-bindings: arm: amlogic: Add SoC information
+ bindings
+In-Reply-To: <1497441946-24379-2-git-send-email-narmstrong@baylibre.com>
+References: <1497441946-24379-1-git-send-email-narmstrong@baylibre.com>
+ <1497441946-24379-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20170622212449.wsck475jxabawqsv@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jerome Brunet <jbrunet@baylibre.com> writes:
+On Wed, Jun 14, 2017 at 02:05:44PM +0200, Neil Armstrong wrote:
+> Add bindings for the SoC information register of the Amlogic SoCs.
+> 
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  Documentation/devicetree/bindings/arm/amlogic.txt | 29 +++++++++++++++++++++++
+>  1 file changed, 29 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
+> index 5c01e65..a6d8754 100644
+> --- a/Documentation/devicetree/bindings/arm/amlogic.txt
+> +++ b/Documentation/devicetree/bindings/arm/amlogic.txt
+> @@ -60,3 +60,32 @@ Board compatible values (alphabetically, grouped by SoC):
+>    - "amlogic,q201" (Meson gxm s912)
+>    - "kingnovel,r-box-pro" (Meson gxm S912)
+>    - "nexbox,a1" (Meson gxm s912)
+> +
+> +Amlogic Meson Firmware registers Interface
+> +------------------------------------------
+> +
+> +The Meson SoCs have a register bank with status and data shared with the
+> +secure firmware.
+> +
+> +Required properties:
+> + - compatible: For Meson GX SoCs, must be "amlogic,meson-gx-ao-secure", "syscon"
+> +
+> +Properties should indentify components of this register interface :
+> +
+> +Meson GX SoC Information
+> +------------------------
+> +A firmware register encodes the SoC type, package and revision information on
+> +the Meson GX SoCs.
+> +If present, the following property should be added :
+> +
+> +Optional properties:
+> +  - has-chip-id: If present, the interface gives the current SoC version.
 
-> This patchset adds support for the CC board from Shenzhen Libre Technology
+amlogic,has-chip-id
 
-Applied to v4.13/dt64,
+With that,
 
-Kevin
+Acked-by: Rob Herring <robh@kernel.org>
+
+> +
+> +Example
+> +-------
+> +
+> +ao-secure at 140 {
+> +	compatible = "amlogic,meson-gx-ao-secure", "syscon";
+> +	reg = <0x0 0x140 0x0 0x140>;
+> +	has-chip-id;
+> +};
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
