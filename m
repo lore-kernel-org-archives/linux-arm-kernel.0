@@ -1,54 +1,152 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Thu, 22 Jun 2017 16:44:04 +0800
-Subject: [PATCH v3] drm: mediatek: change the variable type of rdma
- threshold
-In-Reply-To: <1498099413-13357-1-git-send-email-bibby.hsieh@mediatek.com>
-References: <1498099413-13357-1-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <1498121044.20158.1.camel@mtksdaap41>
+From: erin.lo@mediatek.com (Erin Lo)
+Date: Thu, 22 Jun 2017 16:43:39 +0800
+Subject: [PATCH v2 4/4] arm: dts: mt2701: Add display subsystem related nodes
+ for MT2701
+In-Reply-To: <1498121019-21984-1-git-send-email-erin.lo@mediatek.com>
+References: <1498121019-21984-1-git-send-email-erin.lo@mediatek.com>
+Message-ID: <1498121019-21984-5-git-send-email-erin.lo@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-06-22 at 10:43 +0800, Bibby Hsieh wrote:
-> For some greater resolution, the rdma threshold
-> variable will overflow.
-> 
-> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-> ---
->  drivers/gpu/drm/mediatek/mtk_disp_rdma.c | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> index 0df05f9..8540aaa 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> @@ -109,7 +109,7 @@ static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
->  			    unsigned int height, unsigned int vrefresh,
->  			    unsigned int bpc)
->  {
-> -	unsigned int threshold;
-> +	unsigned long long threshold;
->  	unsigned int reg;
->  
->  	rdma_update_bits(comp, DISP_REG_RDMA_SIZE_CON_0, 0xfff, width);
-> @@ -121,10 +121,11 @@ static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
->  	 * output threshold to 6 microseconds with 7/6 overhead to
->  	 * account for blanking, and with a pixel depth of 4 bytes:
->  	 */
-> -	threshold = width * height * vrefresh * 4 * 7 / 1000000;
-> +	threshold = div_u64((unsigned long long)width * height * vrefresh *
-> +			    4 * 7, 1000000);
->  	reg = RDMA_FIFO_UNDERFLOW_EN |
->  	      RDMA_FIFO_PSEUDO_SIZE(SZ_8K) |
-> -	      RDMA_OUTPUT_VALID_FIFO_THRESHOLD(threshold);
-> +	      RDMA_OUTPUT_VALID_FIFO_THRESHOLD(clamp_val(threshold, 0, 0x3ff0));
+From: YT Shen <yt.shen@mediatek.com>
 
-Hi, Bibby:
+This patch adds the device nodes for the DISP function blocks for MT2701
 
-Please symbolize '0x3ff0'.
+Signed-off-by: YT Shen <yt.shen@mediatek.com>
+Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+---
+ arch/arm/boot/dts/mt2701.dtsi | 84 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 84 insertions(+)
 
-Regards,
-CK
-
->  	writel(reg, comp->regs + DISP_REG_RDMA_FIFO_CON);
->  }
->  
+diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+index 8e574a0..150c4c7 100644
+--- a/arch/arm/boot/dts/mt2701.dtsi
++++ b/arch/arm/boot/dts/mt2701.dtsi
+@@ -17,6 +17,7 @@
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/reset/mt2701-resets.h>
++#include <dt-bindings/memory/mt2701-larb-port.h>
+ #include "skeleton64.dtsi"
+ #include "mt2701-pinfunc.h"
+ 
+@@ -24,6 +25,11 @@
+ 	compatible = "mediatek,mt2701";
+ 	interrupt-parent = <&sysirq>;
+ 
++	aliases {
++		rdma0 = &rdma0;
++		rdma1 = &rdma1;
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -201,6 +207,16 @@
+ 		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
+ 	};
+ 
++	mipi_tx0: mipi-dphy at 10010000 {
++		compatible = "mediatek,mt2701-mipi-tx";
++		reg = <0 0x10010000 0 0x90>;
++		clocks = <&clk26m>;
++		clock-output-names = "mipi_tx0_pll";
++		#clock-cells = <0>;
++		#phy-cells = <0>;
++		status = "disabled";
++	};
++
+ 	sysirq: interrupt-controller at 10200100 {
+ 		compatible = "mediatek,mt2701-sysirq",
+ 			     "mediatek,mt6577-sysirq";
+@@ -366,6 +382,39 @@
+ 		#clock-cells = <1>;
+ 	};
+ 
++	display_components: dispsys at 14000000 {
++		compatible = "mediatek,mt2701-mmsys";
++		reg = <0 0x14000000 0 0x1000>;
++		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
++	};
++
++	ovl at 14007000 {
++		compatible = "mediatek,mt2701-disp-ovl";
++		reg = <0 0x14007000 0 0x1000>;
++		interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&mmsys CLK_MM_DISP_OVL>;
++		iommus = <&iommu MT2701_M4U_PORT_DISP_OVL_0>;
++		mediatek,larb = <&larb0>;
++	};
++
++	rdma0: rdma at 14008000 {
++		compatible = "mediatek,mt2701-disp-rdma";
++		reg = <0 0x14008000 0 0x1000>;
++		interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&mmsys CLK_MM_DISP_RDMA>;
++		iommus = <&iommu MT2701_M4U_PORT_DISP_RDMA>;
++		mediatek,larb = <&larb0>;
++	};
++
++	wdma at 14009000 {
++		compatible = "mediatek,mt2701-disp-wdma";
++		reg = <0 0x14009000 0 0x1000>;
++		interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&mmsys CLK_MM_DISP_WDMA>;
++		iommus = <&iommu MT2701_M4U_PORT_DISP_WDMA>;
++		mediatek,larb = <&larb0>;
++	};
++
+ 	bls: bls at 1400a000 {
+ 		compatible = "mediatek,mt2701-disp-pwm";
+ 		reg = <0 0x1400a000 0 0x1000>;
+@@ -375,6 +424,32 @@
+ 		status = "disabled";
+ 	};
+ 
++	color at 1400b000 {
++		compatible = "mediatek,mt2701-disp-color";
++		reg = <0 0x1400b000 0 0x1000>;
++		interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&mmsys CLK_MM_DISP_COLOR>;
++	};
++
++	dsi: dsi at 1400c000 {
++		compatible = "mediatek,mt2701-dsi";
++		reg = <0 0x1400c000 0 0x1000>;
++		interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&mmsys CLK_MM_DSI_ENGINE>, <&mmsys CLK_MM_DSI_DIG>,
++			 <&mipi_tx0>;
++		clock-names = "engine", "digital", "hs";
++		phys = <&mipi_tx0>;
++		phy-names = "dphy";
++		status = "disabled";
++	};
++
++	mutex: mutex at 1400e000 {
++		compatible = "mediatek,mt2701-disp-mutex";
++		reg = <0 0x1400e000 0 0x1000>;
++		interrupts = <GIC_SPI 161 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&mmsys CLK_MM_MUTEX_32K>;
++	};
++
+ 	larb0: larb at 14010000 {
+ 		compatible = "mediatek,mt2701-smi-larb";
+ 		reg = <0 0x14010000 0 0x1000>;
+@@ -385,6 +460,15 @@
+ 		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
+ 	};
+ 
++	rdma1: rdma at 14012000 {
++		compatible = "mediatek,mt2701-disp-rdma";
++		reg = <0 0x14012000 0 0x1000>;
++		interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&mmsys CLK_MM_DISP_RDMA1>;
++		iommus = <&iommu MT2701_M4U_PORT_DISP_RDMA1>;
++		mediatek,larb = <&larb0>;
++	};
++
+ 	imgsys: syscon at 15000000 {
+ 		compatible = "mediatek,mt2701-imgsys", "syscon";
+ 		reg = <0 0x15000000 0 0x1000>;
+-- 
+1.9.1
