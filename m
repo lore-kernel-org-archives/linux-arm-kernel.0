@@ -1,108 +1,55 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Thu, 22 Jun 2017 10:59:31 +0100
-Subject: [PATCH 2/6] drivers base/arch_topology: frequency-invariant
- load-tracking support
-In-Reply-To: <20170622040643.GB6314@vireshk-i7>
-References: <20170608075513.12475-1-dietmar.eggemann@arm.com>
- <20170608075513.12475-3-dietmar.eggemann@arm.com>
- <CAOh2x=k1Zr15vAq8LA0+Sg3Cz7o=dL5C-erkEx_py7g56b7BwA@mail.gmail.com>
- <5949BE5F.4020502@codeaurora.org>
- <20170621053735.GR3942@vireshk-i7>
- <20170621165714.GB2551@e105550-lin.cambridge.arm.com>
- <20170622040643.GB6314@vireshk-i7>
-Message-ID: <20170622095931.GC2551@e105550-lin.cambridge.arm.com>
+From: zhang.lyra@gmail.com (Chunyan Zhang)
+Date: Thu, 22 Jun 2017 18:07:52 +0800
+Subject: [PATCH V1 0/9] add clock driver for Spreadtrum platforms
+In-Reply-To: <20170620012530.GG4493@codeaurora.org>
+References: <20170618015855.27738-1-chunyan.zhang@spreadtrum.com>
+ <20170620012530.GG4493@codeaurora.org>
+Message-ID: <CAAfSe-uTzgz0kyhQQzqpYKnYxDLv+3gG_9MfdrBTY-AUC549Gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 22, 2017 at 09:36:43AM +0530, Viresh Kumar wrote:
-> On 21-06-17, 17:57, Morten Rasmussen wrote:
-> > It is true that this patch relies on the notifiers, but I don't see how
-> > that prevents us from adding a non-notifier based solution for
-> > fast-switch enabled platforms later?
-> 
-> No it doesn't, but I thought it would be better to have a single
-> solution (if possible) for all the cases here.
+Hi Stephen,
 
-Right. As I mentioned further down in my reply. There is no single
-solution that fits all. Smart platforms with HW counters, like x86,
-would want to use those. IIUC, cpufreq has no idea what the true
-delivered performance is anyway on those platforms.
+On 20 June 2017 at 09:25, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 06/18, Chunyan Zhang wrote:
+>> In the last cycle, the patches support Whale2 sc9860 mobile chip have been
+>> merged. This patchset adds clock driver which is used on almost all
+>> Spreadtrum SoCs.
+>>
+>> This is a rewrite of Spreadtrum's original clock driver[1] according to the
+>> comments[2] from Stephen Boyd.
+>>
+>> This series also adds Spreadtrum clock binding documentation and devicetree
+>> data.
+>>
+>> Any comments would be greatly appreciated.
+>
+> Overall it seems to copy quite a bit of code from sunxi-ng, which
+> is OK, but if that's just copy/paste + replace some names then
+> perhaps we should consolidate the two implementations into one
+> that both SoCs can use.
+>
 
-> 
-> > > I think this patch doesn't really need to go down the notifiers way.
-> > > 
-> > > We can do something like this in the implementation of
-> > > topology_get_freq_scale():
-> > > 
-> > >         return (policy->cur << SCHED_CAPACITY_SHIFT) / max;
-> > > 
-> > > Though, we would be required to take care of policy structure in this
-> > > case somehow.
-> > 
-> > This is exactly what this patch implements. Unfortunately we can't be
-> > sure that there is a valid policy data structure where we can read the
-> > information from.
-> 
-> Actually there is a way around that.
-> 
-> - Revert one of my patches:
->   commit f9f41e3ef99a ("cpufreq: Remove policy create/remove notifiers")
-> 
-> - Use those notifiers in init_cpu_capacity_callback() instead of
->   CPUFREQ_NOTIFY and set/reset a local policy pointer.
-> 
-> - And this pointer we can use safely/reliably in
->   topology_get_freq_scale(). We may need to use RCU read side
->   protection in topology_get_freq_scale() though, to make sure the
->   local policy pointer isn't getting updated simultaneously.
-> 
-> - If the policy pointer isn't set, then we can use
->   SCHED_CAPACITY_SCALE value instead.
+OK, will try.
 
-IIUC, you are proposing to maintain an RCU protected pointer in the
-topology driver to the policy data structure inside cpufreq and keep it
-up to date through cpufreq notifiers. So instead of getting notified
-when the frequency changes so we can recompute the scaling ratio, we
-have to poll the value and recompute the ratio on each access.
+> Also, is there any reason why we can't use a platform device
+> driver for this instead of the DT probing mechanism? That is more
+> preferred method of probing clk controllers.
 
-If we are modifying cpufreq, why not just make cpufreq responsible for
-providing the scaling factor? It seems easier, cleaner, and a lot
-less fragile.
+>From what I have known on ARM platforms, device drivers cannot
+recognize out which SoC the driver is running on, assume that the
+device on different SoC has some differences.  To make one only kernel
+Image can be used on all SoCs of Spreadtrum, we selected the way of
+loading different dtb for each SoC.
 
-> 
-> 
-> > Isn't the policy protected by a lock as well?
-> 
-> There are locks, but you don't need any to read policy->cur.
+Actually, I haven't understood the merits of moving more clk things to
+driver from DT, could you please introduce more about that?
 
-Okay, but you need to rely on notifiers to know when it is valid.
 
-> 
-> > Another thing is that I don't think a transition notifier based solution
-> > or any other solution based on the cur/max ratio is really the right way
-> > to go for fast-switching platforms. If we can do very frequent frequency
-> > switching it makes less sense to use the current ratio whenever we
-> > update the PELT averages as the frequency might have changed multiple
-> > times since the last update. So it would make more sense to have an
-> > average ratio instead.
-> 
-> > If the platform has HW counters (e.g. APERF/MPERF) that can provide the
-> > ratio then we should of course use those, if not, one solution could be
-> > to let cpufreq track the average frequency for each cpu over a suitable
-> > time window (around one sched period I think). It should be fairly low
-> > overhead to maintain. In the topology driver, we would then choose
-> > whether the scaling factor is provided by the cpufreq average frequency
-> > ratio or the current transition notifier based approach based on the
-> > capabilities of the platform.
-> 
-> Hmm, maybe.
+Many appreciated,
+Chunyan
 
-You said you wanted a solution that works for fast-switch enabled
-platforms ;-)
-
-The cur/max ratio isn't sufficient for those. PeterZ has already
-proposed to use APERF/MPERF for x86 to use the average frequency for
-PELT updates. I think other fast-switch platforms would want something
-similar, as it makes much more sense.
-
-Morten
+>
+> --
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
