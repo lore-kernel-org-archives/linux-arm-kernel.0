@@ -1,150 +1,115 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 22 Jun 2017 02:03:33 +0200
-Subject: Drivers taking different actions depending on sleep state
-In-Reply-To: <b7a49925-d823-b03d-2990-2894ba2c2714@gmail.com>
-References: <9dc7b7f4-e47d-59f3-3b51-52e0aefd2487@free.fr>
- <CAJZ5v0iL7voAz9T+36fXXncOj4UrFSAH8WzwEbec96GuFUteaQ@mail.gmail.com>
- <ccac39d6-4611-8b46-12f7-24227ef3b35e@gmail.com>
- <CAJZ5v0g_egRwxOLqft=JhvzAqBWuyvC8yiO7De5TYUZLUT2Fpw@mail.gmail.com>
- <7001768d-9134-4975-127e-e8444e00f677@gmail.com>
- <CAJZ5v0ihqn5Xcj1yoZcrb7caYiH+x8YivLJit6BqvDGradZJ=Q@mail.gmail.com>
- <b7a49925-d823-b03d-2990-2894ba2c2714@gmail.com>
-Message-ID: <CAJZ5v0hzkVwf1HkH4GLbAeK7iJ_7V1UXHErruuvMVEpb5MqZ3Q@mail.gmail.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Thu, 22 Jun 2017 09:10:38 +0800
+Subject: [PATCH v5 3/3] net/cxgb4: Use new
+ PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
+In-Reply-To: <CAKgT0UdJ_zseo9O7SiU9U2m__OZeF_Z8eVjsA5N8ZK39rdK2fA@mail.gmail.com>
+References: <1497855239-18560-1-git-send-email-dingtianhong@huawei.com>
+ <1497855239-18560-4-git-send-email-dingtianhong@huawei.com>
+ <CAKgT0UdJ_zseo9O7SiU9U2m__OZeF_Z8eVjsA5N8ZK39rdK2fA@mail.gmail.com>
+Message-ID: <3aa59c4a-62ad-dcb0-14d0-e0955b0005d2@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 22, 2017 at 1:55 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> On 06/21/2017 03:57 PM, Rafael J. Wysocki wrote:
->> On Thu, Jun 22, 2017 at 12:48 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->>> On 06/21/2017 02:59 PM, Rafael J. Wysocki wrote:
->>>> On Wed, Jun 21, 2017 at 11:16 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->>>>> On 06/09/2017 03:53 PM, Rafael J. Wysocki wrote:
->>>>>> Hi,
->>>>>>
->>>>>> On Fri, Jun 9, 2017 at 5:20 PM, Mason <slash.tmp@free.fr> wrote:
->>>>>>> Hello,
->>>>>>>
->>>>>>> I read the "Sleep States" documentation:
->>>>>>> https://www.kernel.org/doc/Documentation/power/states.txt
->>>>>>>
->>>>>>> It mentions /sys/power/mem_sleep but I don't have that in 4.9
->>>>>>> # ll /sys/power/
->>>>>>> -rw-r--r--    1 root     root          4096 Jan  1 00:31 pm_async
->>>>>>> -rw-r--r--    1 root     root          4096 Jan  1 00:31 pm_freeze_timeout
->>>>>>> -rw-r--r--    1 root     root          4096 Jan  1 00:31 state
->>>>>>> -rw-r--r--    1 root     root          4096 Jan  1 00:31 wakeup_count
->>>>>>>
->>>>>>> # cat /sys/power/state
->>>>>>> freeze mem
->>>>>>>
->>>>>>> Currently my platform's "mem" is a true suspend-to-RAM trigger,
->>>>>>> where drivers are supposed to save their state (register values
->>>>>>> will be lost), then Linux hands control over to firmware which
->>>>>>> enables RAM self-refresh and powers the chip down. When the system
->>>>>>> resumes, drivers restore their state from their copy in memory.
->>>>>>>
->>>>>>> One driver is responsible for loading/unloading microcode running
->>>>>>> on the DSPs. This operation is required only when powering down
->>>>>>> the chip, but it should be avoided for "low-latency" sleeps.
->>>>>>>
->>>>>>> The problem is that, if I understand correctly, drivers have no way
->>>>>>> of knowing which sleep state is being entered/exited?
->>>>>>>
->>>>>>> How can I have the microcode driver take different decisions
->>>>>>> based on the sleep state?
->>>>>>
->>>>>> The cleanest way would be to run that code from one of the platform
->>>>>> suspend hooks that receive information on what sleep state is to be
->>>>>> entered.
->>>>>
->>>>> I am not sure this would be cleaner, because that would create a tighter
->>>>> dependency between different drivers, each of them having their
->>>>> suspend/resume routings and the driver that implements the
->>>>> platform_suspend_ops, that could also create some nice layering
->>>>> violations and some difficult to solve dependencies.
->>>>>
->>>>>>
->>>>>> Alternatively, those hooks can set/clear flags that can be accessed by
->>>>>> drivers, but that of course may your drivers depend on the platform
->>>>>> (still, in the microcode case the driver seems to be
->>>>>> platform-dependent anyway).
->>>>>
->>>>> It may be platform dependent, but the actual system-wide suspend/resume
->>>>> implementations can vary a lot. For example you may have started with
->>>>> some particular CPU architecture on your platforms, with one driver
->>>>> implementing an instance of platform_suspend_ops, and then as you moved
->>>>> to another CPU architecture, some of that could be managed by a generic
->>>>> driver (e.g: ARM SCPI, ACPI etc. etc.).
->>>>>
->>>>> The same HW blocks are likely to be present on these different SoCs, and
->>>>> have the same requirements where they need to see a slightly different
->>>>> path taken on suspend/resume. If we have to patch both the "legacy"
->>>>> platform_suspend_ops, and the "new" platform_suspend_ops that does not
->>>>> really scale.
->>>>>
->>>>> Would it be that much of a stretch if we reflected e.g:
->>>>> PM_SUSPEND_STANDBY, PM_SUSPEND_MEM into the pm_message_t that is
->>>>> communicated to platform_driver::suspend and platform_driver::resume?
->>>>
->>>> I'm not sure what you mean, really.
->>>>
->>>> The ->suspend callback in struct platform_driver has been long deprecated.
->>>
->>> What I mean is that we could take advantage of the pm_message_t argument
->>> passed to platform_driver::resume and platform_driver::resume to
->>> communicate the system sleep state we are about to enter (and conversely
->>> exit).
->>
->> So the ->suspend and ->resume callbacks in struct platform_driver
->> (which I think is what you are referring to) are legacy.
->>
->> The majority of drivers I know about use struct dev_pm_ops and the
->> callbacks in there do not take the pm_message_t argument.
->>
->> Moreover, even if they did take it, the exact meaning of
->> PM_SUSPEND_STANDBY and PM_SUSPEND_MEM is platform-specific and drivers
->> would need to find out what they actually mean for the given platform
->> somehow anyway.
->>
->>> This would allow drivers to take a different path whether e.g:
->>> pm_message_t == PM_SUSPEND_STANDBY or PM_SUSPEND_MEM.
->>>
->>> If these are deprecated, then should we introduce a global getter
->>> function that reflects which suspend state we are about to enter?  This
->>> would allow drivers do to something like (pseudo code):
->>>
->>> static int drv_suspend(struct device d)
->>> {
->>>         suspend_state_t state = suspend_get_state();
->>>
->>>         switch (state) {
->>>         case PM_SUSPEND_STANDBY:
->>>                 return 0;
->>>         case PM_SUSPEND_MEM:
->>>                 /* save HW context */
->>> }
->>
->> That is conceivable, but again, the meaning of STANDBY and MEM is
->> platform-specific.  Actions to be taken for, say, STANDBY, may differ
->> from one platform to another.
->
-> True, though I would only expect drivers for that particular platform to
-> care about that information and these drivers would only make sense on
-> that particular platform so the meaning of STANDBY and MEM would be
-> clear for those drivers. The intent is really to keep the "distributed"
-> model where individual drivers manage their particular piece of HW,
-> while utilizing a global piece of information that is platform specific.
 
-Well, but in that case, why don't you have a "target_state" variable
-somewhere in the platform code and make your drivers look at it?
 
-ACPI has acpi_target_system_state() for this very purpose, for example.
+On 2017/6/22 2:28, Alexander Duyck wrote:
+> On Sun, Jun 18, 2017 at 11:53 PM, Ding Tianhong <dingtianhong@huawei.com> wrote:
+>> From: Casey Leedom <leedom@chelsio.com>
+>>
+>> cxgb4 Ethernet driver now queries PCIe configuration space to determine
+>> if it can send TLPs to it with the Relaxed Ordering Attribute set.
+>>
+>> Signed-off-by: Casey Leedom <leedom@chelsio.com>
+>> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+>> ---
+>>  drivers/net/ethernet/chelsio/cxgb4/cxgb4.h      |  1 +
+>>  drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c | 17 +++++++++++++++++
+>>  drivers/net/ethernet/chelsio/cxgb4/sge.c        |  5 +++--
+>>  3 files changed, 21 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+>> index e88c180..478f25a 100644
+>> --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+>> +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+>> @@ -521,6 +521,7 @@ enum {                                 /* adapter flags */
+>>         USING_SOFT_PARAMS  = (1 << 6),
+>>         MASTER_PF          = (1 << 7),
+>>         FW_OFLD_CONN       = (1 << 9),
+>> +       ROOT_NO_RELAXED_ORDERING = (1 << 10),
+>>  };
+>>
+>>  enum {
+>> diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+>> index ea1bfcf..7cd4e1b 100644
+>> --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+>> +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+>> @@ -4735,6 +4735,23 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+>>         adapter->msg_enable = DFLT_MSG_ENABLE;
+>>         memset(adapter->chan_map, 0xff, sizeof(adapter->chan_map));
+>>
+>> +       /* If possible, we use PCIe Relaxed Ordering Attribute to deliver
+>> +        * Ingress Packet Data to Free List Buffers in order to allow for
+>> +        * chipset performance optimizations between the Root Complex and
+>> +        * Memory Controllers.  (Messages to the associated Ingress Queue
+>> +        * notifying new Packet Placement in the Free Lists Buffers will be
+>> +        * send without the Relaxed Ordering Attribute thus guaranteeing that
+>> +        * all preceding PCIe Transaction Layer Packets will be processed
+>> +        * first.)  But some Root Complexes have various issues with Upstream
+>> +        * Transaction Layer Packets with the Relaxed Ordering Attribute set.
+>> +        * The PCIe devices which under the Root Complexes will be cleared the
+>> +        * Relaxed Ordering bit in the configuration space, So we check our
+>> +        * PCIe configuration space to see if it's flagged with advice against
+>> +        * using Relaxed Ordering.
+>> +        */
+>> +       if (pcie_relaxed_ordering_supported(pdev))
+>> +               adapter->flags |= ROOT_NO_RELAXED_ORDERING;
+>> +
+> 
+> Looks like you have a typo here. It should be
+> "!pcie_relaxed_ordering_supported(pdev)" that you are testing for to
+> set this flag shouldn't it? Right now it appears the flag is getting
+> set if relaxed ordering is supported.
+> 
 
-> If this seems acceptable to you along with proper documentation to
-> illustrate the platform specific meaning of these states, I will got
-> ahead and cook a patch.
+Yes, I made a mistake here, thanks for correcting.
 
-I wouldn't like platform-specific things to pretend that they are generic.
+Ding
 
-Thanks,
-Rafael
+>>         spin_lock_init(&adapter->stats_lock);
+>>         spin_lock_init(&adapter->tid_release_lock);
+>>         spin_lock_init(&adapter->win0_lock);
+>> diff --git a/drivers/net/ethernet/chelsio/cxgb4/sge.c b/drivers/net/ethernet/chelsio/cxgb4/sge.c
+>> index f05f0d4..ac229a3 100644
+>> --- a/drivers/net/ethernet/chelsio/cxgb4/sge.c
+>> +++ b/drivers/net/ethernet/chelsio/cxgb4/sge.c
+>> @@ -2571,6 +2571,7 @@ int t4_sge_alloc_rxq(struct adapter *adap, struct sge_rspq *iq, bool fwevtq,
+>>         struct fw_iq_cmd c;
+>>         struct sge *s = &adap->sge;
+>>         struct port_info *pi = netdev_priv(dev);
+>> +       int relaxed = !(adap->flags & ROOT_NO_RELAXED_ORDERING);
+>>
+>>         /* Size needs to be multiple of 16, including status entry. */
+>>         iq->size = roundup(iq->size, 16);
+>> @@ -2624,8 +2625,8 @@ int t4_sge_alloc_rxq(struct adapter *adap, struct sge_rspq *iq, bool fwevtq,
+>>
+>>                 flsz = fl->size / 8 + s->stat_len / sizeof(struct tx_desc);
+>>                 c.iqns_to_fl0congen |= htonl(FW_IQ_CMD_FL0PACKEN_F |
+>> -                                            FW_IQ_CMD_FL0FETCHRO_F |
+>> -                                            FW_IQ_CMD_FL0DATARO_F |
+>> +                                            FW_IQ_CMD_FL0FETCHRO_V(relaxed) |
+>> +                                            FW_IQ_CMD_FL0DATARO_V(relaxed) |
+>>                                              FW_IQ_CMD_FL0PADEN_F);
+>>                 if (cong >= 0)
+>>                         c.iqns_to_fl0congen |=
+>> --
+>> 1.9.0
+>>
+>>
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> .
+> 
