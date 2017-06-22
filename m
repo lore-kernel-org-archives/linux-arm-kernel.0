@@ -1,151 +1,43 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Thu, 22 Jun 2017 12:44:52 -0500
-Subject: [PATCH v2] irqchip: gicv3-its: Don't assume GICv3 hardware supports
- 16bit INTID
-Message-ID: <1498153492-30632-1-git-send-email-shankerd@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 22 Jun 2017 18:52:56 +0100
+Subject: [PATCH v3 3/3] perf: xgene: Add support for SoC PMU version 3
+In-Reply-To: <1496772146-11084-4-git-send-email-hotran@apm.com>
+References: <1496772146-11084-1-git-send-email-hotran@apm.com>
+ <1496772146-11084-4-git-send-email-hotran@apm.com>
+Message-ID: <20170622175255.GD25967@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current ITS driver is assuming every ITS hardware implementation
-supports minimum of 16bit INTID. But this is not true, as per GICv3
-specification, INTID field is IMPLEMENTATION DEFINED in the range of
-14-24 bits. We might see an unpredictable system behavior on systems
-where hardware support less than 16bits and software tries to use
-64K LPI interrupts.
+Hi Hoan,
 
-On Qualcomm Datacenter Technologies QDF2400 platform, boot log shows
-confusing information about number of LPI chunks as shown below. The
-QDF2400 ITS hardware supports 24bit INTID.
+This largely looks good; I have one minor comment.
 
-This patch allocates the memory resources for PEND/PROP tables based
-on discoverable value which is specified in GITS_TYPER.IDbits. Also
-taking this opportunity to increase number of LPI/MSI(x) to 128K if
-the hardware is capable, and show log message that reflects the
-correct number of LPI chunks.
+On Tue, Jun 06, 2017 at 11:02:26AM -0700, Hoan Tran wrote:
+>  static inline void
+> +xgene_pmu_write_counter64(struct xgene_pmu_dev *pmu_dev, int idx, u64 val)
+> +{
+> +	u32 cnt_lo, cnt_hi;
+> +
+> +	cnt_hi = upper_32_bits(val);
+> +	cnt_lo = lower_32_bits(val);
+> +
+> +	/* v3 has 64-bit counter registers composed by 2 32-bit registers */
+> +	xgene_pmu_write_counter32(pmu_dev, 2 * idx, cnt_lo);
+> +	xgene_pmu_write_counter32(pmu_dev, 2 * idx + 1, cnt_hi);
+> +}
 
-ITS at 0xff7efe0000: allocated 524288 Devices @3c0400000 (indirect, esz 8, psz 64K, shr 1)
-ITS at 0xff7efe0000: allocated 8192 Interrupt Collections @3c0130000 (flat, esz 8, psz 64K, shr 1)
-ITS at 0xff7efe0000: allocated 8192 Virtual CPUs @3c0140000 (flat, esz 8, psz 64K, shr 1)
-ITS: Allocated 524032 chunks for LPIs
-PCI/MSI: ITS at 0xff7efe0000 domain created
-Platform MSI: ITS at 0xff7efe0000 domain created
+For this to be atomic, we need to disable the counters for the duration
+of the IRQ handler, which we don't do today.
 
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
----
-Changes since v1:
-   No code changes, just rebase on tip of the Marc's branch and tested on QDF2400 platform.
-       https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/log/?h=irq/irqchip-4.13
+Regardless, we should do that to ensure that groups are self-consistent.
 
- drivers/irqchip/irq-gic-v3-its.c | 34 ++++++++++++++++------------------
- 1 file changed, 16 insertions(+), 18 deletions(-)
+i.e. in xgene_pmu_isr() we should call ops->stop_counters() just after
+taking the pmu lock, and we should call ops->start_counters() just
+before releasing it.
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index fee7d13..6000c56 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -691,9 +691,11 @@ static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
-  */
- #define IRQS_PER_CHUNK_SHIFT	5
- #define IRQS_PER_CHUNK		(1 << IRQS_PER_CHUNK_SHIFT)
-+#define ITS_MAX_LPI_NRBITS	(17) /* 128K LPIs */
- 
- static unsigned long *lpi_bitmap;
- static u32 lpi_chunks;
-+static u32 lpi_nrbits;
- static DEFINE_SPINLOCK(lpi_lock);
- 
- static int its_lpi_to_chunk(int lpi)
-@@ -789,26 +791,19 @@ static void its_lpi_free(struct event_lpi_map *map)
- }
- 
- /*
-- * We allocate 64kB for PROPBASE. That gives us@most 64K LPIs to
-+ * We allocate memory for PROPBASE to cover 2 ^ lpi_nrbits LPIs to
-  * deal with (one configuration byte per interrupt). PENDBASE has to
-  * be 64kB aligned (one bit per LPI, plus 8192 bits for SPI/PPI/SGI).
-  */
--#define LPI_PROPBASE_SZ		SZ_64K
--#define LPI_PENDBASE_SZ		(LPI_PROPBASE_SZ / 8 + SZ_1K)
--
--/*
-- * This is how many bits of ID we need, including the useless ones.
-- */
--#define LPI_NRBITS		ilog2(LPI_PROPBASE_SZ + SZ_8K)
- 
- #define LPI_PROP_DEFAULT_PRIO	0xa0
- 
- static int __init its_alloc_lpi_tables(void)
- {
-+	u32 size = ALIGN(BIT(lpi_nrbits), SZ_64K);
- 	phys_addr_t paddr;
- 
--	gic_rdists->prop_page = alloc_pages(GFP_NOWAIT,
--					   get_order(LPI_PROPBASE_SZ));
-+	gic_rdists->prop_page = alloc_pages(GFP_NOWAIT, get_order(size));
- 	if (!gic_rdists->prop_page) {
- 		pr_err("Failed to allocate PROPBASE\n");
- 		return -ENOMEM;
-@@ -820,10 +815,10 @@ static int __init its_alloc_lpi_tables(void)
- 	/* Priority 0xa0, Group-1, disabled */
- 	memset(page_address(gic_rdists->prop_page),
- 	       LPI_PROP_DEFAULT_PRIO | LPI_PROP_GROUP1,
--	       LPI_PROPBASE_SZ);
-+	       size);
- 
- 	/* Make sure the GIC will observe the written configuration */
--	gic_flush_dcache_to_poc(page_address(gic_rdists->prop_page), LPI_PROPBASE_SZ);
-+	gic_flush_dcache_to_poc(page_address(gic_rdists->prop_page), size);
- 
- 	return 0;
- }
-@@ -1095,12 +1090,14 @@ static void its_cpu_init_lpis(void)
- 	pend_page = gic_data_rdist()->pend_page;
- 	if (!pend_page) {
- 		phys_addr_t paddr;
-+		u32 size;
- 		/*
--		 * The pending pages have to be at least 64kB aligned,
--		 * hence the 'max(LPI_PENDBASE_SZ, SZ_64K)' below.
-+		 * The pending pages have to be at least 64kB aligned
-+		 * hence the 'ALIGN(BIT(lpi_nrbits)/8, SZ_64K)' below.
- 		 */
-+		size = ALIGN(BIT(lpi_nrbits)/8, SZ_64K);
- 		pend_page = alloc_pages(GFP_NOWAIT | __GFP_ZERO,
--					get_order(max(LPI_PENDBASE_SZ, SZ_64K)));
-+					get_order(size));
- 		if (!pend_page) {
- 			pr_err("Failed to allocate PENDBASE for CPU%d\n",
- 			       smp_processor_id());
-@@ -1108,7 +1105,7 @@ static void its_cpu_init_lpis(void)
- 		}
- 
- 		/* Make sure the GIC will observe the zero-ed page */
--		gic_flush_dcache_to_poc(page_address(pend_page), LPI_PENDBASE_SZ);
-+		gic_flush_dcache_to_poc(page_address(pend_page), size);
- 
- 		paddr = page_to_phys(pend_page);
- 		pr_info("CPU%d: using LPI pending table @%pa\n",
-@@ -1130,7 +1127,7 @@ static void its_cpu_init_lpis(void)
- 	val = (page_to_phys(gic_rdists->prop_page) |
- 	       GICR_PROPBASER_InnerShareable |
- 	       GICR_PROPBASER_RaWaWb |
--	       ((LPI_NRBITS - 1) & GICR_PROPBASER_IDBITS_MASK));
-+	       ((lpi_nrbits - 1) & GICR_PROPBASER_IDBITS_MASK));
- 
- 	gicr_write_propbaser(val, rbase + GICR_PROPBASER);
- 	tmp = gicr_read_propbaser(rbase + GICR_PROPBASER);
-@@ -1900,9 +1897,10 @@ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
- 		return -ENXIO;
- 	}
- 
-+	lpi_nrbits = min_t(u32, rdists->id_bits, ITS_MAX_LPI_NRBITS);
- 	gic_rdists = rdists;
- 	its_alloc_lpi_tables();
--	its_lpi_init(rdists->id_bits);
-+	its_lpi_init(lpi_nrbits);
- 
- 	return 0;
- }
--- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+With that:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
