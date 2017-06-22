@@ -1,248 +1,133 @@
-From: yt.shen@mediatek.com (YT Shen)
-Date: Thu, 22 Jun 2017 17:32:55 +0800
-Subject: [PATCH v4 2/2] arm64: dts: Add Mediatek SoC MT2712 and evaluation
- board dts and Makefile
-In-Reply-To: <1498123975-9748-1-git-send-email-yt.shen@mediatek.com>
-References: <1498123975-9748-1-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1498123975-9748-3-git-send-email-yt.shen@mediatek.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 22 Jun 2017 11:35:35 +0200
+Subject: [PATCH 6/9] PM / ACPI: Provide option to disable direct_complete
+ for ACPI devices
+In-Reply-To: <CAJZ5v0h71LNPgmU1ri3S0VJMPb-1_AHkGksNAaYn68rrLyAR2A@mail.gmail.com>
+References: <1498072888-14782-1-git-send-email-ulf.hansson@linaro.org>
+ <1498072888-14782-7-git-send-email-ulf.hansson@linaro.org>
+ <CAJZ5v0h71LNPgmU1ri3S0VJMPb-1_AHkGksNAaYn68rrLyAR2A@mail.gmail.com>
+Message-ID: <CAPDyKFqW+QhzMhVgdp9-7t0eP0ePdV8pHqysQZU1OWT3A8Q56Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds basic chip support for Mediatek 2712
+On 21 June 2017 at 23:42, Rafael J. Wysocki <rafael@kernel.org> wrote:
+> On Wed, Jun 21, 2017 at 9:21 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> In some cases a driver for an ACPI device needs to be able to prevent the
+>> ACPI PM domain from using the direct_complete path during system sleep.
+>>
+>> One typical case is when the driver for the device needs its device to stay
+>> runtime enabled, during the __device_suspend phase. This isn't the case
+>> when the direct_complete path is being executed by the PM core, as it then
+>> disables runtime PM for the device in __device_suspend(). Any following
+>> attempts to runtime resume the device after that point, just fails.
+>>
+>> A workaround to this problem is to let the driver runtime resume its device
+>> from its ->prepare() callback, as that would prevent the direct_complete
+>> path from being executed. However, that may often be a waste, especially if
+>> it turned out that no one really needed the device.
+>>
+>> For this reason, invent acpi_dev_disable|enable_direct_complete(), to allow
+>> drivers to inform the ACPI PM domain to change its default behaviour during
+>> system sleep, and thus control whether it may use the direct_complete path
+>> or not.
+>>
+>> Typically a driver should call acpi_dev_disable_direct_comlete() during
+>> ->probe() and acpi_dev_enable_direct_complete() in ->remove().
+>>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> ---
+>>  drivers/acpi/device_pm.c | 37 ++++++++++++++++++++++++++++++++++++-
+>>  include/acpi/acpi_bus.h  |  1 +
+>>  include/linux/acpi.h     |  4 ++++
+>>  3 files changed, 41 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/acpi/device_pm.c b/drivers/acpi/device_pm.c
+>> index ee51e75..2393a1a 100644
+>> --- a/drivers/acpi/device_pm.c
+>> +++ b/drivers/acpi/device_pm.c
+>> @@ -879,6 +879,41 @@ EXPORT_SYMBOL_GPL(acpi_subsys_runtime_resume);
+>>
+>>  #ifdef CONFIG_PM_SLEEP
+>>  /**
+>> + * acpi_dev_disable_direct_complete - Disable the direct_complete path for ACPI.
+>> + * @dev: Device to disable the path for.
+>> + *
+>> + * Per default the ACPI PM domain tries to use the direct_complete path for its
+>> + * devices during system sleep. This function allows a user, typically a driver
+>> + * during probe, to disable the direct_complete path from being used by ACPI.
+>> + */
+>> +void acpi_dev_disable_direct_complete(struct device *dev)
+>> +{
+>> +       struct acpi_device *adev = ACPI_COMPANION(dev);
+>> +
+>> +       if (adev)
+>> +               adev->no_direct_complete = true;
+>
+> We have an analogous flag in PCI now and it is called needs_resume, so
+> it would be good to be consistent with that.
 
-Signed-off-by: YT Shen <yt.shen@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/Makefile       |   1 +
- arch/arm64/boot/dts/mediatek/mt2712-evb.dts |  32 ++++++
- arch/arm64/boot/dts/mediatek/mt2712e.dtsi   | 172 ++++++++++++++++++++++++++++
- 3 files changed, 205 insertions(+)
- create mode 100644 arch/arm64/boot/dts/mediatek/mt2712-evb.dts
- create mode 100644 arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+I was trying to come up with a nice name, however I couldn't find
+anything better than no_direct_complete.
 
-diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
-index 9fbfd32..fcc0604 100644
---- a/arch/arm64/boot/dts/mediatek/Makefile
-+++ b/arch/arm64/boot/dts/mediatek/Makefile
-@@ -1,3 +1,4 @@
-+dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
-diff --git a/arch/arm64/boot/dts/mediatek/mt2712-evb.dts b/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
-new file mode 100644
-index 0000000..8c804df
---- /dev/null
-+++ b/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
-@@ -0,0 +1,32 @@
-+/*
-+ * Copyright (c) 2017 MediaTek Inc.
-+ * Author: YT Shen <yt.shen@mediatek.com>
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+ */
-+
-+/dts-v1/;
-+#include "mt2712e.dtsi"
-+
-+/ {
-+	model = "MediaTek MT2712 evaluation board";
-+	compatible = "mediatek,mt2712-evb", "mediatek,mt2712";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	memory at 40000000 {
-+		device_type = "memory";
-+		reg = <0 0x40000000 0 0x80000000>;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:921600n8";
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-new file mode 100644
-index 0000000..461ee0f
---- /dev/null
-+++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-@@ -0,0 +1,172 @@
-+/*
-+ * Copyright (c) 2017 MediaTek Inc.
-+ * Author: YT Shen <yt.shen@mediatek.com>
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+ */
-+
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	compatible = "mediatek,mt2712";
-+	interrupt-parent = <&sysirq>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu-map {
-+			cluster0 {
-+				core0 {
-+					cpu = <&cpu0>;
-+				};
-+				core1 {
-+					cpu = <&cpu1>;
-+				};
-+			};
-+
-+			cluster1 {
-+				core0 {
-+					cpu = <&cpu2>;
-+				};
-+			};
-+		};
-+
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a35";
-+			reg = <0x000>;
-+		};
-+
-+		cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a35";
-+			reg = <0x001>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu2: cpu at 200 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a72";
-+			reg = <0x200>;
-+			enable-method = "psci";
-+		};
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
-+	};
-+
-+	uart_clk: dummy26m {
-+		compatible = "fixed-clock";
-+		clock-frequency = <26000000>;
-+		#clock-cells = <0>;
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupt-parent = <&gic>;
-+		interrupts = <GIC_PPI 13
-+			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14
-+			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11
-+			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10
-+			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
-+
-+	soc {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		compatible = "simple-bus";
-+		ranges;
-+
-+		uart5: serial at 1000f000 {
-+			compatible = "mediatek,mt2712-uart",
-+				     "mediatek,mt6577-uart";
-+			reg = <0 0x1000f000 0 0x400>;
-+			interrupts = <GIC_SPI 127 IRQ_TYPE_LEVEL_LOW>;
-+			clocks = <&uart_clk>, <&uart_clk>;
-+			clock-names = "baud", "bus";
-+			status = "disabled";
-+		};
-+
-+		sysirq: interrupt-controller at 10220a80 {
-+			compatible = "mediatek,mt2712-sysirq",
-+				     "mediatek,mt6577-sysirq";
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			interrupt-parent = <&gic>;
-+			reg = <0 0x10220a80 0 0x40>;
-+		};
-+
-+		gic: interrupt-controller at 10510000 {
-+			compatible = "arm,gic-400";
-+			#interrupt-cells = <3>;
-+			interrupt-parent = <&gic>;
-+			interrupt-controller;
-+			reg = <0 0x10510000 0 0x10000>,
-+			      <0 0x10520000 0 0x20000>,
-+			      <0 0x10540000 0 0x20000>,
-+			      <0 0x10560000 0 0x20000>;
-+			interrupts = <GIC_PPI 9
-+				(GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_HIGH)>;
-+		};
-+
-+		uart0: serial at 11002000 {
-+			compatible = "mediatek,mt2712-uart",
-+				     "mediatek,mt6577-uart";
-+			reg = <0 0x11002000 0 0x400>;
-+			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>;
-+			clocks = <&uart_clk>, <&uart_clk>;
-+			clock-names = "baud", "bus";
-+			status = "disabled";
-+		};
-+
-+		uart1: serial at 11003000 {
-+			compatible = "mediatek,mt2712-uart",
-+				     "mediatek,mt6577-uart";
-+			reg = <0 0x11003000 0 0x400>;
-+			interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_LOW>;
-+			clocks = <&uart_clk>, <&uart_clk>;
-+			clock-names = "baud", "bus";
-+			status = "disabled";
-+		};
-+
-+		uart2: serial at 11004000 {
-+			compatible = "mediatek,mt2712-uart",
-+				     "mediatek,mt6577-uart";
-+			reg = <0 0x11004000 0 0x400>;
-+			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_LOW>;
-+			clocks = <&uart_clk>, <&uart_clk>;
-+			clock-names = "baud", "bus";
-+			status = "disabled";
-+		};
-+
-+		uart3: serial at 11005000 {
-+			compatible = "mediatek,mt2712-uart",
-+				     "mediatek,mt6577-uart";
-+			reg = <0 0x11005000 0 0x400>;
-+			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_LOW>;
-+			clocks = <&uart_clk>, <&uart_clk>;
-+			clock-names = "baud", "bus";
-+			status = "disabled";
-+		};
-+
-+		uart4: serial at 11019000 {
-+			compatible = "mediatek,mt2712-uart",
-+				     "mediatek,mt6577-uart";
-+			reg = <0 0x11019000 0 0x400>;
-+			interrupts = <GIC_SPI 126 IRQ_TYPE_LEVEL_LOW>;
-+			clocks = <&uart_clk>, <&uart_clk>;
-+			clock-names = "baud", "bus";
-+			status = "disabled";
-+		};
-+	};
-+};
-+
--- 
-1.9.1
+However as the next patch somewhat, extends the flag to also be use
+for the runtime PM centric path, I should perhaps choose something
+more related to that?
+
+I think make "needs_resume" is going to e bit confusing, especially
+while extending the usage for the flag it in the next patch, no?
+
+>
+>> +}
+>> +EXPORT_SYMBOL_GPL(acpi_dev_disable_direct_complete);
+>> +
+>> +/**
+>> + * acpi_dev_enable_direct_complete - Enable the direct_complete path for ACPI.
+>> + * @dev: Device to enable the path for.
+>> + *
+>> + * Enable the direct_complete path to be used during system suspend for the ACPI
+>> + * PM domain, which is the default option. Typically a driver that disabled the
+>> + * path during ->probe(), must call this function during ->remove() to re-enable
+>> + * the direct_complete path to be used by ACPI.
+>> + */
+>> +void acpi_dev_enable_direct_complete(struct device *dev)
+>> +{
+>> +       struct acpi_device *adev = ACPI_COMPANION(dev);
+>> +
+>> +       if (adev)
+>> +               adev->no_direct_complete = false;
+>> +}
+>> +EXPORT_SYMBOL_GPL(acpi_dev_enable_direct_complete);
+>> +
+>> +/**
+>>   * acpi_dev_suspend_late - Put device into a low-power state using ACPI.
+>>   * @dev: Device to put into a low-power state.
+>>   *
+>> @@ -967,7 +1002,7 @@ int acpi_subsys_prepare(struct device *dev)
+>>         if (ret < 0)
+>>                 return ret;
+>>
+>> -       if (!adev || !pm_runtime_suspended(dev))
+>> +       if (!adev || adev->no_direct_complete || !pm_runtime_suspended(dev))
+>>                 return 0;
+>>
+>>         return !acpi_dev_needs_resume(dev, adev);
+>> diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
+>> index 63a90a6..2293d24 100644
+>> --- a/include/acpi/acpi_bus.h
+>> +++ b/include/acpi/acpi_bus.h
+>> @@ -380,6 +380,7 @@ struct acpi_device {
+>>         struct list_head physical_node_list;
+>>         struct mutex physical_node_lock;
+>>         void (*remove)(struct acpi_device *);
+>> +       bool no_direct_complete;
+>
+> Also what about adding this to struct acpi_device_power instead?
+
+Yes, thanks for the suggestion!
+
+>
+> Thanks,
+> Rafael
+
+Kind regards
+Uffe
