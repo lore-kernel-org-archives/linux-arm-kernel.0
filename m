@@ -1,76 +1,83 @@
-From: amelie.delaunay@st.com (Amelie DELAUNAY)
-Date: Thu, 22 Jun 2017 13:51:56 +0200
-Subject: [PATCH 2/2] spi: add driver for STM32 SPI controller
-In-Reply-To: <20170621151300.s74lbymyisvde2zo@sirena.org.uk>
-References: <1498055526-6918-1-git-send-email-amelie.delaunay@st.com>
- <1498055526-6918-3-git-send-email-amelie.delaunay@st.com>
- <20170621151300.s74lbymyisvde2zo@sirena.org.uk>
-Message-ID: <f27456b6-8abc-8e72-0fbb-bb0829adb7b0@st.com>
+From: butao@huawei.com (Bu Tao)
+Date: Thu, 22 Jun 2017 19:44:33 +0800
+Subject: [PATCH v2 2/5] dt-bindings: scsi: ufs: add document for hi3660-ufs
+In-Reply-To: <CAK8P3a2aPorzpUzwL=dkUkYNCGkhQMDPOkKRW1-=Hf=yCdvTsQ@mail.gmail.com>
+References: <20170616065119.10704-1-butao@hisilicon.com>
+ <20170616065119.10704-3-butao@hisilicon.com>
+ <CAK8P3a2aPorzpUzwL=dkUkYNCGkhQMDPOkKRW1-=Hf=yCdvTsQ@mail.gmail.com>
+Message-ID: <0f79aeea-53e3-6bea-ffa6-0e057f2ff83b@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
 
-Thanks for your review.
 
-On 06/21/2017 05:13 PM, Mark Brown wrote:
-> On Wed, Jun 21, 2017 at 04:32:06PM +0200, Amelie Delaunay wrote:
-> 
-> A few minor stylistic things but overall this looks really nice, please
-> send followup patches fixing these style things.
-> 
->> +	/* Determine the first power of 2 greater than or equal to div */
->> +	mbrdiv = (div & (div - 1)) ? fls(div) : fls(div) - 1;
-> 
-> Please write normal conditional statements, it makes things much easier
-> to read.
-> OK, I'll fix it in v2.
+? 2017/6/17 5:51, Arnd Bergmann ??:
+> On Fri, Jun 16, 2017 at 8:51 AM, Bu Tao <butao@hisilicon.com> wrote:
+>> add ufs node document for hi3660
+>>
+>> Signed-off-by: Bu Tao <butao@hisilicon.com>
+>> ---
+>>  .../devicetree/bindings/ufs/hi3660-ufs.txt         | 58 ++++++++++++++++++++++
+>>  1 file changed, 58 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/ufs/hi3660-ufs.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/ufs/hi3660-ufs.txt b/Documentation/devicetree/bindings/ufs/hi3660-ufs.txt
+>> new file mode 100644
+>> index 000000000000..461afc8ef017
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/ufs/hi3660-ufs.txt
+>> @@ -0,0 +1,58 @@
+>> +* Hisilicon Universal Flash Storage (UFS) Host Controller
+>> +
+>> +UFS nodes are defined to describe on-chip UFS hardware macro.
+>> +Each UFS Host Controller should have its own node.
+>> +
+>> +Required properties:
+>> +- compatible        : compatible list, contains one of the following -
+>> +                       "hisilicon,hi3660-ufs" for hisi ufs host controller
+>> +                        present on Hi3660 chipset.
+>> +- reg               : should contain UFS register address space & UFS SYS CTRL register address,
+>> +- interrupt-parent  : interrupt device
+>> +- interrupts        : interrupt number
+>> +- clocks               : List of phandle and clock specifier pairs
+>> +- clock-names       : List of clock input name strings sorted in the same
+>> +                     order as the clocks property. "clk_ref", "clk_phy" is optional
+>> +- resets            : reset node register, one reset the clk and the other reset the controller
+>> +- reset-names       : describe reset node register
+>> +
+>> +Optional properties for board device:
+>> +- ufs-hi3660-use-rate-B                : specifies UFS rate-B
+>> +- ufs-hi3660-broken-fastauto   : specifies no fastauto
+>> +- ufs-hi3660-use-HS-GEAR3      : specifies UFS HS-GEAR3
+>> +- ufs-hi3660-use-HS-GEAR2      : specifies UFS HS-GEAR2
+>> +- ufs-hi3660-use-HS-GEAR1      : specifies UFS HS-GEAR1
+>> +- ufs-hi3660-broken-clk-gate-bypass    : specifies no clk-gate
+>> +- ufs-hi3660-use-one-line      : specifies UFS use one line work
+>> +- reset-gpio                   : specifies to reset devices
+>
+> Some of these sound rather generic and might apply to UFS implementations
+> other than hi3660, so I'd suggest adding them to the base ufs binding with
+> a generic name instead.
+>
+> Any DT properties that might be useful across multiple implementations
+> should be parsed in generic code that gets called by the individual drivers,
+> and then the properties that are specific to the integration work done by
+> hisilicon should be prefixed with "hisilicon,", but not normally with the
+> SoC name: it is quite possible that another SoC will be derived from this
+> chip and it should reuse the properties.
 
->> +static bool stm32_spi_can_dma(struct spi_master *master,
->> +			      struct spi_device *spi_dev,
->> +			      struct spi_transfer *transfer)
->> +{
->> +	struct stm32_spi *spi = spi_master_get_devdata(master);
->> +
->> +	dev_dbg(spi->dev, "%s: %s\n", __func__,
->> +		(!!(transfer->len > spi->fifo_size)) ? "true" : "false");
->> +
->> +	return !!(transfer->len > spi->fifo_size);
-> 
-> This !! is redundant, you're converting a boolean value into a boolean
-> value.
-> 
-You're right.
+I do not know wheher other SoC need to use the optional properties as 
+abover. So here the name of the optional properties has "hi3660".
+>
+> (note: this is different from the value of the "compatible" property that
+> is meant to be as specific as possible".
+>
+> Also, please clarify how your binding relates to the ufshcd binding
+> in Documentation/devicetree/bindings/ufs/ufshcd-pltfrm.txt: does
+> hi3660 implement any registers that are shared with ufshcd, or does
+> it use the same physical interface with a different register set?
 
->> +	buswidth = (spi->cur_bpw <= 8) ? DMA_SLAVE_BUSWIDTH_1_BYTE :
->> +		   (spi->cur_bpw <= 16) ? DMA_SLAVE_BUSWIDTH_2_BYTES :
->> +		   DMA_SLAVE_BUSWIDTH_4_BYTES;
->> +
->> +	/* Valid for DMA Half or Full Fifo threshold */
->> +	maxburst = (spi->cur_fthlv == 2) ? 1 : spi->cur_fthlv;
-> 
-> Again, please use normal conditional statements - people have to read
-> things.
-> 
-OK.
->> +static int stm32_spi_suspend(struct device *dev)
->> +{
->> +	struct spi_master *master = dev_get_drvdata(dev);
->> +	struct stm32_spi *spi = spi_master_get_devdata(master);
->> +	int ret;
->> +
->> +	ret = spi_master_suspend(master);
->> +	if (ret)
->> +		return ret;
->> +
->> +	clk_disable_unprepare(spi->clk);
-> 
-> It'd be good to also have the clock disabled by runtime PM, that will
-> save a little more power.  There's support for enabling and disabling
-> the device in the core so it should just be adding callbacks.  Not
-> essential though.
-> 
-OK I'll have a look.
-
-Regards,
-Amelie
+No, only show how to use the dt-binding for hi3660 SoC
+>
+>        Arnd
+>
