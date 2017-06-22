@@ -1,121 +1,111 @@
-From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
-Date: Thu, 22 Jun 2017 11:40:12 +0530
-Subject: [PATCH v4 2/2] acpi, gicv3-its,
- numa: Adding numa node mapping for gic-its units
-In-Reply-To: <1498111812-17053-1-git-send-email-ganapatrao.kulkarni@cavium.com>
-References: <1498111812-17053-1-git-send-email-ganapatrao.kulkarni@cavium.com>
-Message-ID: <1498111812-17053-3-git-send-email-ganapatrao.kulkarni@cavium.com>
+From: john@phrozen.org (John Crispin)
+Date: Thu, 22 Jun 2017 08:12:47 +0200
+Subject: [PATCH RESEND 4/4] pwm: mediatek: add MT2712/MT7622 support
+In-Reply-To: <1498111776.18841.10.camel@mhfsdcap03>
+References: <1498032672-7172-1-git-send-email-zhi.mao@mediatek.com>
+ <1498032672-7172-5-git-send-email-zhi.mao@mediatek.com>
+ <4600cf23-5e59-df02-37dc-056cb4a9744c@phrozen.org>
+ <1498111776.18841.10.camel@mhfsdcap03>
+Message-ID: <05b53007-44de-a236-f592-aea8e75ced44@phrozen.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add code to parse SRAT ITS Affinity sub table as defined in ACPI 6.2.
-Later in per device probe, ITS devices are mapped to numa node using
-ITS Id to proximity domain mapping.
 
-Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
----
- drivers/irqchip/irq-gic-v3-its.c | 75 +++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 74 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 45ea1933..1c21e01 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -1833,6 +1833,77 @@ static int __init its_of_probe(struct device_node *node)
- 
- #define ACPI_GICV3_ITS_MEM_SIZE (SZ_128K)
- 
-+#ifdef CONFIG_ACPI_NUMA
-+struct its_srat_map {
-+	u32	numa_node;  /* numa node id */
-+	u32	its_id;  /* GIC ITS ID */
-+};
-+
-+static struct its_srat_map its_srat_maps[MAX_NUMNODES] __initdata;
-+static int its_in_srat __initdata;
-+
-+static int __init acpi_get_its_numa_node(u32 its_id)
-+{
-+	int i;
-+
-+	for (i = 0; i < its_in_srat; i++) {
-+		if (its_id == its_srat_maps[i].its_id)
-+			return its_srat_maps[i].numa_node;
-+	}
-+	return NUMA_NO_NODE;
-+}
-+
-+static int __init gic_acpi_parse_srat_its(struct acpi_subtable_header *header,
-+			 const unsigned long end)
-+{
-+	int pxm, node;
-+	struct acpi_srat_its_affinity *its_affinity;
-+
-+	its_affinity = (struct acpi_srat_its_affinity *)header;
-+	if (!its_affinity)
-+		return -EINVAL;
-+
-+	if (its_affinity->header.length < sizeof(*its_affinity)) {
-+		pr_err("SRAT: Invalid header length %d in ITS affinity\n",
-+			its_affinity->header.length);
-+		return -EINVAL;
-+	}
-+
-+	if (its_in_srat >= MAX_NUMNODES) {
-+		pr_err("SRAT: ITS affinity exceeding max count[%d]\n",
-+				MAX_NUMNODES);
-+		return -EINVAL;
-+	}
-+
-+	pxm = its_affinity->proximity_domain;
-+	node = acpi_map_pxm_to_node(pxm);
-+
-+	if (node == NUMA_NO_NODE || node >= MAX_NUMNODES) {
-+		pr_err("SRAT: Invalid NUMA node %d in ITS affinity\n", node);
-+		return 0;
-+	}
-+
-+	its_srat_maps[its_in_srat].numa_node = node;
-+	its_srat_maps[its_in_srat].its_id = its_affinity->its_id;
-+	its_in_srat++;
-+	pr_info("SRAT: PXM %d -> ITS %d -> Node %d\n",
-+		pxm, its_affinity->its_id, node);
-+
-+	return 0;
-+}
-+
-+static void __init acpi_table_parse_srat_its(void)
-+{
-+	acpi_table_parse_entries(ACPI_SIG_SRAT,
-+			sizeof(struct acpi_table_srat),
-+			ACPI_SRAT_TYPE_GIC_ITS_AFFINITY,
-+			gic_acpi_parse_srat_its, 0);
-+}
-+#else
-+static void __init acpi_table_parse_srat_its(void)	{ }
-+static int __init acpi_get_its_numa_node(u32 its_id) { return NUMA_NO_NODE; }
-+#endif
-+
- static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
- 					  const unsigned long end)
- {
-@@ -1861,7 +1932,8 @@ static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
- 		goto dom_err;
- 	}
- 
--	err = its_probe_one(&res, dom_handle, NUMA_NO_NODE);
-+	err = its_probe_one(&res, dom_handle,
-+			acpi_get_its_numa_node(its_entry->translation_id));
- 	if (!err)
- 		return 0;
- 
-@@ -1873,6 +1945,7 @@ static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
- 
- static void __init its_acpi_probe(void)
- {
-+	acpi_table_parse_srat_its();
- 	acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
- 			      gic_acpi_parse_madt_its, 0);
- }
--- 
-1.8.1.4
+On 22/06/17 08:09, Zhi Mao wrote:
+> Hi John,
+>
+> Thanks for your review the code and feedback.
+> There are 3 issues in this patch:
+> 1.adds PWM_CLK_DIV_MAX which really should go into its own patch
+> 2.adds mtk_pwm_com_reg which should also go into its own patch
+> 3.remove comments inline /*===*/
+>
+> for #1 and #3, I will modify them in the next release.
+> but for #2, I want to discuss with you,
+> adding the structure  "mtk_pwm_com_reg" is only for the registers of 
+> MT2712 PWM8,
+> so we want to keep this modification in this patch.
+>
+> what's your opinion about it?
+> Any reply is welcome.
+>
+>
+> Regards
+> Zhi
+>
+>
+>
+>
+
+Hi Zhi,
+
+I just had another look and noticed that the CON registers are not at a 
+fixed offset of 0x40 for the new pwm8 register so having 2) inside this 
+patch makes sense. please explain in the description that this is the case
+
+     John
+
+>
+> On Wed, 2017-06-21 at 20:22 +0800, John Crispin wrote:
+>> On 21/06/17 10:11, Zhi Mao wrote:
+>> > support multiple chip(MT2712, MT7622, MT7623)
+>> This patch does more than add extra SoC support. It also
+>> * adds PWM_CLK_DIV_MAX which really should go into its own patch
+>> * adds mtk_pwm_com_reg which should also go into its own patch
+>>
+>> more comments inline
+>>
+>> >
+>> > Signed-off-by: Zhi Mao <zhi.mao at mediatek.com <mailto:zhi.mao@mediatek.com>>
+>> > ---
+>> >   drivers/pwm/pwm-mediatek.c |   63 +++++++++++++++++++++++++++++++++++---------
+>> >   1 file changed, 51 insertions(+), 12 deletions(-)
+>> >
+>> > diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
+>> > index c803ff6..d520356 100644
+>> > --- a/drivers/pwm/pwm-mediatek.c
+>> > +++ b/drivers/pwm/pwm-mediatek.c
+>> > @@ -16,6 +16,7 @@
+>> >   #include <linux/module.h>
+>> >   #include <linux/clk.h>
+>> >   #include <linux/of.h>
+>> > +#include <linux/of_device.h>
+>> >   #include <linux/platform_device.h>
+>> >   #include <linux/pwm.h>
+>> >   #include <linux/slab.h>
+>> [...]
+>> > @@ -215,9 +238,25 @@ static int mtk_pwm_remove(struct platform_device *pdev)
+>> >   	return pwmchip_remove(&pc->chip);
+>> >   }
+>> >
+>> > +/*==========================================*/
+>>
+>> please remove these comment lines
+>>
+>>       John
+>> > +static const struct mtk_com_pwm_data mt2712_pwm_data = {
+>> > +	.pwm_nums = 8,
+>> > +};
+>> > +
+>> > +static const struct mtk_com_pwm_data mt7622_pwm_data = {
+>> > +	.pwm_nums = 6,
+>> > +};
+>> > +
+>> > +static const struct mtk_com_pwm_data mt7623_pwm_data = {
+>> > +	.pwm_nums = 5,
+>> > +};
+>> > +/*==========================================*/
+>> > +
+>> >   static const struct of_device_id mtk_pwm_of_match[] = {
+>> > -	{ .compatible = "mediatek,mt7623-pwm" },
+>> > -	{ }
+>> > +	{.compatible = "mediatek,mt2712-pwm", .data = &mt2712_pwm_data},
+>> > +	{.compatible = "mediatek,mt7622-pwm", .data = &mt7622_pwm_data},
+>> > +	{.compatible = "mediatek,mt7623-pwm", .data = &mt7623_pwm_data},
+>> > +	{},
+>> >   };
+>> >   MODULE_DEVICE_TABLE(of, mtk_pwm_of_match);
+>> >
+>>
+>
