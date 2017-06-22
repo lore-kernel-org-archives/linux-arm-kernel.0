@@ -1,79 +1,35 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 22 Jun 2017 09:36:43 +0530
-Subject: [PATCH 2/6] drivers base/arch_topology: frequency-invariant
- load-tracking support
-In-Reply-To: <20170621165714.GB2551@e105550-lin.cambridge.arm.com>
-References: <20170608075513.12475-1-dietmar.eggemann@arm.com>
- <20170608075513.12475-3-dietmar.eggemann@arm.com>
- <CAOh2x=k1Zr15vAq8LA0+Sg3Cz7o=dL5C-erkEx_py7g56b7BwA@mail.gmail.com>
- <5949BE5F.4020502@codeaurora.org>
- <20170621053735.GR3942@vireshk-i7>
- <20170621165714.GB2551@e105550-lin.cambridge.arm.com>
-Message-ID: <20170622040643.GB6314@vireshk-i7>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 22 Jun 2017 12:08:28 +0800
+Subject: [PATCH 1/6] dt-bindings: mfd: axp20x: Add AXP806 to supported list of
+ chips
+In-Reply-To: <20170622040833.15329-1-wens@csie.org>
+References: <20170622040833.15329-1-wens@csie.org>
+Message-ID: <20170622040833.15329-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21-06-17, 17:57, Morten Rasmussen wrote:
-> It is true that this patch relies on the notifiers, but I don't see how
-> that prevents us from adding a non-notifier based solution for
-> fast-switch enabled platforms later?
+The binding already lists compatibles and regulators for the AXP806,
+but it is missing from the list of supported chips at the beginning.
 
-No it doesn't, but I thought it would be better to have a single
-solution (if possible) for all the cases here.
+Add it.
 
-> > I think this patch doesn't really need to go down the notifiers way.
-> > 
-> > We can do something like this in the implementation of
-> > topology_get_freq_scale():
-> > 
-> >         return (policy->cur << SCHED_CAPACITY_SHIFT) / max;
-> > 
-> > Though, we would be required to take care of policy structure in this
-> > case somehow.
-> 
-> This is exactly what this patch implements. Unfortunately we can't be
-> sure that there is a valid policy data structure where we can read the
-> information from.
+Fixes: 204ae2963e10 ("mfd: axp20x: Add bindings for AXP806 PMIC")
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ Documentation/devicetree/bindings/mfd/axp20x.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Actually there is a way around that.
-
-- Revert one of my patches:
-  commit f9f41e3ef99a ("cpufreq: Remove policy create/remove notifiers")
-
-- Use those notifiers in init_cpu_capacity_callback() instead of
-  CPUFREQ_NOTIFY and set/reset a local policy pointer.
-
-- And this pointer we can use safely/reliably in
-  topology_get_freq_scale(). We may need to use RCU read side
-  protection in topology_get_freq_scale() though, to make sure the
-  local policy pointer isn't getting updated simultaneously.
-
-- If the policy pointer isn't set, then we can use
-  SCHED_CAPACITY_SCALE value instead.
-
-
-> Isn't the policy protected by a lock as well?
-
-There are locks, but you don't need any to read policy->cur.
-
-> Another thing is that I don't think a transition notifier based solution
-> or any other solution based on the cur/max ratio is really the right way
-> to go for fast-switching platforms. If we can do very frequent frequency
-> switching it makes less sense to use the current ratio whenever we
-> update the PELT averages as the frequency might have changed multiple
-> times since the last update. So it would make more sense to have an
-> average ratio instead.
-
-> If the platform has HW counters (e.g. APERF/MPERF) that can provide the
-> ratio then we should of course use those, if not, one solution could be
-> to let cpufreq track the average frequency for each cpu over a suitable
-> time window (around one sched period I think). It should be fairly low
-> overhead to maintain. In the topology driver, we would then choose
-> whether the scaling factor is provided by the cpufreq average frequency
-> ratio or the current transition notifier based approach based on the
-> capabilities of the platform.
-
-Hmm, maybe.
-
+diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+index aca09af66514..211a100c6b20 100644
+--- a/Documentation/devicetree/bindings/mfd/axp20x.txt
++++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+@@ -7,6 +7,7 @@ axp209 (X-Powers)
+ axp221 (X-Powers)
+ axp223 (X-Powers)
+ axp803 (X-Powers)
++axp806 (X-Powers)
+ axp809 (X-Powers)
+ 
+ Required properties:
 -- 
-viresh
+2.11.0
