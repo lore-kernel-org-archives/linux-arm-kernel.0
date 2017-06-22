@@ -1,58 +1,81 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 22 Jun 2017 14:15:54 +0200
-Subject: [PATCH v2 2/5] dt-bindings: scsi: ufs: add document for hi3660-ufs
-In-Reply-To: <24438c4d-21c8-6302-acd4-4f0e223232ce@huawei.com>
-References: <20170616065119.10704-1-butao@hisilicon.com>
- <20170616065119.10704-3-butao@hisilicon.com>
- <CAK8P3a2aPorzpUzwL=dkUkYNCGkhQMDPOkKRW1-=Hf=yCdvTsQ@mail.gmail.com>
- <0f79aeea-53e3-6bea-ffa6-0e057f2ff83b@huawei.com>
- <CAK8P3a2z7VbPb95Ltj=Duh1v_Yqxedb_g=ADNPWOrpEz1dCTuw@mail.gmail.com>
- <24438c4d-21c8-6302-acd4-4f0e223232ce@huawei.com>
-Message-ID: <CAK8P3a1MRx5zRp5-7iDY32+6PGsyHFaOom-bkWmftpLUS=8gBA@mail.gmail.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Thu, 22 Jun 2017 20:15:18 +0800
+Subject: [PATCH v6 0/3] Add new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
+Message-ID: <1498133721-21152-1-git-send-email-dingtianhong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 22, 2017 at 1:58 PM, Bu Tao <butao@huawei.com> wrote:
-> ? 2017/6/22 19:51, Arnd Bergmann ??:
->> On Thu, Jun 22, 2017 at 1:44 PM, Bu Tao <butao@huawei.com> wrote:
->>> ? 2017/6/17 5:51, Arnd Bergmann ??:
->>>> On Fri, Jun 16, 2017 at 8:51 AM, Bu Tao <butao@hisilicon.com> wrote:
->>>
->>> I do not know wheher other SoC need to use the optional properties as
->>> abover. So here the name of the optional properties has "hi3660".
->>
->>
->> They should not have "hi3660" in their names either way, independent
->> of where they are used.
->
->
-> Oh, change the "hi3660" to "hisilicon"?
-> e.g. ufs-hi3660-use-rate-B  -->  ufs-hisilicon-use-rate-B
+Some devices have problems with Transaction Layer Packets with the Relaxed
+Ordering Attribute set.  This patch set adds a new PCIe Device Flag,
+PCI_DEV_FLAGS_NO_RELAXED_ORDERING, a set of PCI Quirks to catch some known
+devices with Relaxed Ordering issues, and a use of this new flag by the
+cxgb4 driver to avoid using Relaxed Ordering with problematic Root Complex
+Ports.
 
-No, just 'use-rate-B', no prefix for this.
+It's been years since I've submitted kernel.org patches, I appolgise for the
+almost certain submission errors.
 
->>>> (note: this is different from the value of the "compatible" property
->>>> that
->>>> is meant to be as specific as possible".
->>>>
->>>> Also, please clarify how your binding relates to the ufshcd binding
->>>> in Documentation/devicetree/bindings/ufs/ufshcd-pltfrm.txt: does
->>>> hi3660 implement any registers that are shared with ufshcd, or does
->>>> it use the same physical interface with a different register set?
->>>
->>>
->>> No, only show how to use the dt-binding for hi3660 SoC
->>
->>
->> My question was about the hardware: does hi3660 implement ufshcd
->> or not?
->
->
-> YES
+v2: Alexander point out that the v1 was only a part of the whole solution,
+    some platform which has some issues could use the new flag to indicate
+    that it is not safe to enable relaxed ordering attribute, then we need
+    to clear the relaxed ordering enable bits in the PCI configuration when
+    initializing the device. So add a new second patch to modify the PCI
+    initialization code to clear the relaxed ordering enable bit in the
+    event that the root complex doesn't want relaxed ordering enabled.
 
-Ok, then the properties should be documented as optional in the
-Documentation/devicetree/bindings/ufs/ufshcd-pltfrm.txt file for anything
-that has a proper interpretation in the context of the generic ufshcd
-driver.
+    The third patch was base on the v1's second patch and only be changed
+    to query the relaxed ordering enable bit in the PCI configuration space
+    to allow the Chelsio NIC to send TLPs with the relaxed ordering attributes
+    set.
 
-      Arnd
+    This version didn't plan to drop the defines for Intel Drivers to use the
+    new checking way to enable relaxed ordering because it is not the hardest
+    part of the moment, we could fix it in next patchset when this patches
+    reach the goal.  
+
+v3: Redesigned the logic for pci_configure_relaxed_ordering when configuration,
+    If a PCIe device didn't enable the relaxed ordering attribute default,
+    we should not do anything in the PCIe configuration, otherwise we
+    should check if any of the devices above us do not support relaxed
+    ordering by the PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag, then base on
+    the result if we get a return that indicate that the relaxed ordering
+    is not supported we should update our device to disable relaxed ordering
+    in configuration space. If the device above us doesn't exist or isn't
+    the PCIe device, we shouldn't do anything and skip updating relaxed ordering
+    because we are probably running in a guest.
+
+v4: Rename the functions pcie_get_relaxed_ordering and pcie_disable_relaxed_ordering
+    according John's suggestion, and modify the description, use the true/false
+    as the return value.
+
+    We shouldn't enable relaxed ordering attribute by the setting in the root
+    complex configuration space for PCIe device, so fix it for cxgb4.
+
+    Fix some format issues.
+
+v5: Removed the unnecessary code for some function which only return the bool
+    value, and add the check for VF device.
+
+    Make this patch set base on 4.12-rc5.
+
+v6: Fix the logic error in the need to enable the relaxed ordering attribute for cxgb4.
+ 
+Casey Leedom (2):
+  PCI: Add new PCIe Fabric End Node flag,
+    PCI_DEV_FLAGS_NO_RELAXED_ORDERING
+  net/cxgb4: Use new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
+
+Ding Tianhong (1):
+  PCI: Enable PCIe Relaxed Ordering if supported
+
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4.h      |  1 +
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c | 17 ++++++++++
+ drivers/net/ethernet/chelsio/cxgb4/sge.c        |  5 +--
+ drivers/pci/pci.c                               | 32 +++++++++++++++++++
+ drivers/pci/probe.c                             | 41 +++++++++++++++++++++++++
+ drivers/pci/quirks.c                            | 38 +++++++++++++++++++++++
+ include/linux/pci.h                             |  4 +++
+ 7 files changed, 136 insertions(+), 2 deletions(-)
+
+-- 
+1.9.0
