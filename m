@@ -1,49 +1,32 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 22 Jun 2017 08:10:07 +0200
-Subject: [PATCH 1/9] serial: Add common rs485 device tree parsing function
-In-Reply-To: <20170621102130.21024-2-u.kleine-koenig@pengutronix.de>
-References: <20170621102130.21024-1-u.kleine-koenig@pengutronix.de>
- <20170621102130.21024-2-u.kleine-koenig@pengutronix.de>
-Message-ID: <20170622061007.h76gk3hixp4ipyvr@pengutronix.de>
+From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
+Date: Thu, 22 Jun 2017 11:40:10 +0530
+Subject: [PATCH v4 0/2] acpi, gicv3-its, numa: Adding numa node mapping for ITS
+Message-ID: <1498111812-17053-1-git-send-email-ganapatrao.kulkarni@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 21, 2017 at 12:21:22PM +0200, Uwe Kleine-K?nig wrote:
-> From: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> Several drivers have the same device tree parsing code. Create
-> a common helper function for it.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  drivers/tty/serial/Kconfig  |  4 ++++
->  drivers/tty/serial/Makefile |  2 ++
->  drivers/tty/serial/of.c     | 45 +++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/serial_core.h | 12 ++++++++++++
->  4 files changed, 63 insertions(+)
->  create mode 100644 drivers/tty/serial/of.c
-> 
-> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> index 5c8850f7a2a0..8baef5b95bed 100644
-> --- a/drivers/tty/serial/Kconfig
-> +++ b/drivers/tty/serial/Kconfig
-> @@ -14,6 +14,10 @@ config SERIAL_EARLYCON
->  	  the console before standard serial driver is probed. The console is
->  	  enabled when early_param is processed.
->  
-> +config OF_SERIAL
-> +	depends on SERIAL_CORE
-> +	def_bool y
+ACPI 6.2 have added SRAT subtable to define proximity domain for ITS
+devices. This patchset updates acpi header file from acpica repo and
+adds numa node mapping for ITS devices.
 
-This probably also needs a dependency on some device tree option,
-CONFIG_OF maybe?
+v4:
+  -Addressed review comments.
 
-Sascha
+v3:
+  - Use static array to stash parsed data from srat its table.
 
+v2:
+ - Incorporated comments from Lorenzo Pieralisi and Marc Zyngier.
+
+v1: first patch
+
+Ganapatrao Kulkarni (2):
+  ACPICA: ACPI 6.2: Add support for new SRAT subtable
+  acpi, gicv3-its, numa: Adding numa node mapping for gic-its units
+
+ drivers/irqchip/irq-gic-v3-its.c | 75 +++++++++++++++++++++++++++++++++++++++-
+ include/acpi/actbl1.h            | 12 ++++++-
+ 2 files changed, 85 insertions(+), 2 deletions(-)
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.8.1.4
