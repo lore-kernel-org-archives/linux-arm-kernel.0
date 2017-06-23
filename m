@@ -1,82 +1,87 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Fri, 23 Jun 2017 16:53:43 +0200
-Subject: [PATCH v1 1/6] DT bindings: add bindings for ov965x camera module
-In-Reply-To: <13144955.Kq5qljPvgI@avalon>
-References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
- <d14b8c6e-b480-36f0-ed0a-684647617dbe@suse.de>
- <3E7B1344-ECE6-4CCC-9E9D-7521BB566CDE@goldelico.com>
- <13144955.Kq5qljPvgI@avalon>
-Message-ID: <24C976BF-52FD-4509-BCE4-9AE41B335482@goldelico.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 Jun 2017 16:56:10 +0200
+Subject: [GIT PULL v3] updates to qbman (soc drivers) to support arm/arm64
+In-Reply-To: <HE1PR0401MB17071A7853695DB6546FE28C8FC50@HE1PR0401MB1707.eurprd04.prod.outlook.com>
+References: <HE1PR0401MB17071A7853695DB6546FE28C8FC50@HE1PR0401MB1707.eurprd04.prod.outlook.com>
+Message-ID: <CAK8P3a2EvCvs57hE_X9J5jg6jW8jPh6gxaTOUYntbnHdb_cMZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On Tue, Jun 20, 2017 at 7:27 PM, Leo Li <leoyang.li@nxp.com> wrote:
+>
+> v2: Removed the patches for MAINTAINERS file as they are already picked
+> up by powerpc tree.
+>
+> v3: Added signed tag to the pull request.
+>
+> Hi arm-soc maintainers,
+>
+> As Scott has left NXP, he agreed to transfer the maintainership of
+> drivers/soc/fsl to me.  Previously most of the soc drivers were going
+> through the powerpc tree as they were only used/tested on Power-based
+> SoCs.  Going forward new changes will be mostly related to arm/arm64
+> SoCs, and I would prefer them to go through the arm-soc tree.
+>
+> This pull request includes updates to the QMAN/BMAN drivers to make
+> them work on the arm/arm64 architectures in addition to the power
+> architecture.
+>
+> DPAA (Data Path Acceleration Architecture) is a set of hardware
+> components used on some FSL/NXP QorIQ Networking SoCs, it provides the
+> infrastructure to support simplified sharing of networking interfaces
+> and accelerators by multiple CPU cores, and the accelerators
+> themselves.  The QMan(Queue Manager) and BMan(Buffer Manager) are
+> infrastructural components within the DPAA framework.  They are used to
+> manage queues and buffers for various I/O interfaces, hardware
+> accelerators.
+>
+> More information can be found via link:
+> http://www.nxp.com/products/microcontrollers-and-processors/power-architecture-processors/qoriq-platforms/data-path-acceleration:QORIQ_DPAA
 
-> Am 23.06.2017 um 13:58 schrieb Laurent Pinchart <laurent.pinchart@ideasonboard.com>:
-> 
-> Hi Nikolaus,
-> 
-> On Friday 23 Jun 2017 12:59:24 H. Nikolaus Schaller wrote:
->> Am 23.06.2017 um 12:46 schrieb Andreas F?rber <afaerber@suse.de>:
->>> Am 23.06.2017 um 12:25 schrieb H. Nikolaus Schaller:
->>>>> diff --git a/Documentation/devicetree/bindings/media/i2c/ov965x.txt
->>>>> b/Documentation/devicetree/bindings/media/i2c/ov965x.txt new file mode
->>>>> 100644
->>>>> index 0000000..0e0de1f
->>>>> --- /dev/null
->>>>> +++ b/Documentation/devicetree/bindings/media/i2c/ov965x.txt
->>>>> @@ -0,0 +1,37 @@
->>>>> +* Omnivision OV9650/9652/9655 CMOS sensor
->>>>> +
->>>>> +The Omnivision OV965x sensor support multiple resolutions output, such
->>>>> as
->>>>> +CIF, SVGA, UXGA. It also can support YUV422/420, RGB565/555 or raw RGB
->>>>> +output format.
->>>>> +
->>>>> +Required Properties:
->>>>> +- compatible: should be one of
->>>>> +	"ovti,ov9650"
->>>>> +	"ovti,ov9652"
->>>>> +	"ovti,ov9655"
->>>>> +- clocks: reference to the mclk input clock.
->>>> 
->>>> I wonder why you have removed the clock-frequency property?
->>>> 
->>>> In some situations the camera driver must be able to tell the clock
->>>> source which frequency it wants to see.
->>> 
->>> That's what assigned-clock-rates property is for:
->>> 
->>> https://www.kernel.org/doc/Documentation/devicetree/bindings/clock/clock-b
->>> indings.txt
->>> 
->>> AFAIU clock-frequency on devices is deprecated and equivalent to having
->>> a clocks property pointing to a fixed-clock, which is different from a
->>> clock with varying rate.
->> 
->> I am not sure if that helps here. The OMAP3-ISP does not have a fixed clock
->> rate so we can only have the driver define what it wants to see.
->> 
->> And common practise for OMAP3-ISP based camera modules (e.g. N900, N9) is
->> that they do it in the driver.
->> 
->> Maybe ISP developers can comment?
-> 
-> The OMAP3 ISP is a variable-frequency clock provider. The clock frequency is 
-> controlled by the clock consumer. As such, it's up to the consumer to decide 
-> whether to compute and request the clock rate dynamically at runtime, or use 
-> the assigned-clock-rates property in DT.
-> 
-> Some ISPs include a clock generator, others don't. It should make no 
-> difference whether the clock is provided by the ISP, by a dedicated clock 
-> source in the SoC or by a discrete on-board adjustable clock source.
+Hi Leo,
 
-Thanks for explaining the background.
+sorry for taking you through yet another revision, but I have two
+more points here:
 
-Do you have an hint or example how to use the assigned-clock-rates property in
-a DT for a camera module connected to the omap3isp?
+1. Please add a tag description whenever you create a signed tag. The
+description is what ends up in the git history, and if there is none, I have
+to think of something myself. In this case, the text above seems
+roughly appropriate, so I first copied it into the commit log, but then
+noticed the second issue:
 
-Or does it just mean that it defines the property name?
+2. I know we have discussed the unusual way this driver accesses MMIO
+registers in the past, using ioremap_wc() to map them and the manually
+flushing the caches to store the cache contents into the MMIO registers.
+What I don't know is whether there was any conclusion on this topic whether
+this is actually allowed by the architecture or at least the chip, based on
+implementation-specific features that make it work even when the architecture
+doesn't guarantee it.
 
-BR,
-Nikolaus
+Can I have an Ack from the architecture maintainers (Russell, Catalin,
+Will) on the use of these architecture specific interfaces?
+
+static inline void dpaa_flush(void *p)
+{
+#ifdef CONFIG_PPC
+        flush_dcache_range((unsigned long)p, (unsigned long)p+64);
+#elif defined(CONFIG_ARM32)
+        __cpuc_flush_dcache_area(p, 64);
+#elif defined(CONFIG_ARM64)
+        __flush_dcache_area(p, 64);
+#endif
+}
+#define dpaa_invalidate(p) dpaa_flush(p)
+#define dpaa_zero(p) memset(p, 0, 64)
+static inline void dpaa_touch_ro(void *p)
+{
+#if (L1_CACHE_BYTES == 32)
+        prefetch(p+32);
+#endif
+        prefetch(p);
+}
+
+As described by Leo, the code is already there and is actively used
+on powerpc, his pull request is merely for enabling the driver on ARM
+and ARM64.
+
+      Arnd
