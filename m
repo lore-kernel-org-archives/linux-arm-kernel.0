@@ -1,171 +1,66 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 23 Jun 2017 17:03:31 +0200
-Subject: [PATCH v3] clocksource/drivers/tcb_clksrc: make IO endian agnostic
-Message-ID: <20170623150331.16435-1-alexandre.belloni@free-electrons.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 23 Jun 2017 15:04:24 +0000
+Subject: [kernel-hardening] [PATCH 2/4] arm64: Reduce ELF_ET_DYN_BASE
+In-Reply-To: <CAGXu5jKt_=aV-=bDREOhKLpi2GX9aEO5Gk-+vhk-ZphLJJ3K-g@mail.gmail.com>
+References: <1498154792-49952-1-git-send-email-keescook@chromium.org>
+ <1498154792-49952-3-git-send-email-keescook@chromium.org>
+ <CAKv+Gu_2Wg_D+4c3-iqMr9hbKkGVdBtW6Bmxj-4=FOG9hVN5vA@mail.gmail.com>
+ <CAGXu5jLHOjg9+8xDSzs2nLKjoqUf3NAc_0a1Coo+4WnDYRT3=g@mail.gmail.com>
+ <CAGXu5jKt_=aV-=bDREOhKLpi2GX9aEO5Gk-+vhk-ZphLJJ3K-g@mail.gmail.com>
+Message-ID: <CAKv+Gu8-N6UO2_v3vFRbgjEjWG+ipVA=H6nEB=m3gXyN=HGVow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that AVR32 is gone, we can use the proper IO accessors that are
-correctly handling endianness.
+On 23 June 2017 at 14:02, Kees Cook <keescook@chromium.org> wrote:
+> On Fri, Jun 23, 2017 at 6:52 AM, Kees Cook <keescook@chromium.org> wrote:
+>> On Thu, Jun 22, 2017 at 11:57 PM, Ard Biesheuvel
+>> <ard.biesheuvel@linaro.org> wrote:
+>>> Hi Kees,
+>>>
+>>> On 22 June 2017 at 18:06, Kees Cook <keescook@chromium.org> wrote:
+>>>> Now that explicitly executed loaders are loaded in the mmap region,
+>>>> position PIE binaries lower in the address space to avoid possible
+>>>> collisions with mmap or stack regions. For 64-bit, align to 4GB to
+>>>> allow runtimes to use the entire 32-bit address space for 32-bit
+>>>> pointers.
+>>>>
+>>>> Signed-off-by: Kees Cook <keescook@chromium.org>
+>>>> ---
+>>>>  arch/arm64/include/asm/elf.h | 13 ++++++-------
+>>>>  1 file changed, 6 insertions(+), 7 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+>>>> index 5d1700425efe..f742af8f7c42 100644
+>>>> --- a/arch/arm64/include/asm/elf.h
+>>>> +++ b/arch/arm64/include/asm/elf.h
+>>>> @@ -113,12 +113,13 @@
+>>>>  #define ELF_EXEC_PAGESIZE      PAGE_SIZE
+>>>>
+>>>>  /*
+>>>> - * This is the location that an ET_DYN program is loaded if exec'ed.  Typical
+>>>> - * use of this is to invoke "./ld.so someprog" to test out a new version of
+>>>> - * the loader.  We need to make sure that it is out of the way of the program
+>>>> - * that it will "exec", and that there is sufficient room for the brk.
+>>>> + * This is the base location for PIE (ET_DYN with INTERP) loads. On
+>>>> + * 64-bit, this is raised to 4GB to leave the entire 32-bit address
+>>>> + * space open for things that want to use the area for 32-bit pointers.
+>>>>   */
+>>>> -#define ELF_ET_DYN_BASE        (2 * TASK_SIZE_64 / 3)
+>>>> +#define ELF_ET_DYN_BASE                (test_thread_flag(TIF_32BIT) ?  \
+>>>> +                                       0x000400000UL :         \
+>>>> +                                       0x100000000UL)
+>>>>
+>>>
+>>> Why are you merging this with the COMPAT definition?
+>>
+>> It seemed like the right thing to do since a single definition could
+>> handle both cases. Is there something I'm overlooking in the arm64
+>> case?
+>
+> And like 5 minutes later there was a loud head-slapping noise in my
+> office. Durr, yeah, arm64 doesn't have to deal with a "native 32-bit"
+> mode, so the merge isn't needed. Yes yes, I will split it back up and
+> drop the thread flag test.
+>
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
----
-Changes in v3:
- - rebased on top of tip/timers/core
- - Added collected acks
-
-
- drivers/clocksource/tcb_clksrc.c | 58 ++++++++++++++++++++--------------------
- 1 file changed, 29 insertions(+), 29 deletions(-)
-
-diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
-index 828729c70a0c..59e8aee0ec16 100644
---- a/drivers/clocksource/tcb_clksrc.c
-+++ b/drivers/clocksource/tcb_clksrc.c
-@@ -57,9 +57,9 @@ static u64 tc_get_cycles(struct clocksource *cs)
- 
- 	raw_local_irq_save(flags);
- 	do {
--		upper = __raw_readl(tcaddr + ATMEL_TC_REG(1, CV));
--		lower = __raw_readl(tcaddr + ATMEL_TC_REG(0, CV));
--	} while (upper != __raw_readl(tcaddr + ATMEL_TC_REG(1, CV)));
-+		upper = readl_relaxed(tcaddr + ATMEL_TC_REG(1, CV));
-+		lower = readl_relaxed(tcaddr + ATMEL_TC_REG(0, CV));
-+	} while (upper != readl_relaxed(tcaddr + ATMEL_TC_REG(1, CV)));
- 
- 	raw_local_irq_restore(flags);
- 	return (upper << 16) | lower;
-@@ -67,7 +67,7 @@ static u64 tc_get_cycles(struct clocksource *cs)
- 
- static u64 tc_get_cycles32(struct clocksource *cs)
- {
--	return __raw_readl(tcaddr + ATMEL_TC_REG(0, CV));
-+	return readl_relaxed(tcaddr + ATMEL_TC_REG(0, CV));
- }
- 
- void tc_clksrc_suspend(struct clocksource *cs)
-@@ -147,8 +147,8 @@ static int tc_shutdown(struct clock_event_device *d)
- 	struct tc_clkevt_device *tcd = to_tc_clkevt(d);
- 	void __iomem		*regs = tcd->regs;
- 
--	__raw_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
--	__raw_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
-+	writel(0xff, regs + ATMEL_TC_REG(2, IDR));
-+	writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
- 	if (!clockevent_state_detached(d))
- 		clk_disable(tcd->clk);
- 
-@@ -166,9 +166,9 @@ static int tc_set_oneshot(struct clock_event_device *d)
- 	clk_enable(tcd->clk);
- 
- 	/* slow clock, count up to RC, then irq and stop */
--	__raw_writel(timer_clock | ATMEL_TC_CPCSTOP | ATMEL_TC_WAVE |
-+	writel(timer_clock | ATMEL_TC_CPCSTOP | ATMEL_TC_WAVE |
- 		     ATMEL_TC_WAVESEL_UP_AUTO, regs + ATMEL_TC_REG(2, CMR));
--	__raw_writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
-+	writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
- 
- 	/* set_next_event() configures and starts the timer */
- 	return 0;
-@@ -188,25 +188,25 @@ static int tc_set_periodic(struct clock_event_device *d)
- 	clk_enable(tcd->clk);
- 
- 	/* slow clock, count up to RC, then irq and restart */
--	__raw_writel(timer_clock | ATMEL_TC_WAVE | ATMEL_TC_WAVESEL_UP_AUTO,
-+	writel(timer_clock | ATMEL_TC_WAVE | ATMEL_TC_WAVESEL_UP_AUTO,
- 		     regs + ATMEL_TC_REG(2, CMR));
--	__raw_writel((32768 + HZ / 2) / HZ, tcaddr + ATMEL_TC_REG(2, RC));
-+	writel((32768 + HZ / 2) / HZ, tcaddr + ATMEL_TC_REG(2, RC));
- 
- 	/* Enable clock and interrupts on RC compare */
--	__raw_writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
-+	writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
- 
- 	/* go go gadget! */
--	__raw_writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG, regs +
-+	writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG, regs +
- 		     ATMEL_TC_REG(2, CCR));
- 	return 0;
- }
- 
- static int tc_next_event(unsigned long delta, struct clock_event_device *d)
- {
--	__raw_writel(delta, tcaddr + ATMEL_TC_REG(2, RC));
-+	writel_relaxed(delta, tcaddr + ATMEL_TC_REG(2, RC));
- 
- 	/* go go gadget! */
--	__raw_writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG,
-+	writel_relaxed(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG,
- 			tcaddr + ATMEL_TC_REG(2, CCR));
- 	return 0;
- }
-@@ -230,7 +230,7 @@ static irqreturn_t ch2_irq(int irq, void *handle)
- 	struct tc_clkevt_device	*dev = handle;
- 	unsigned int		sr;
- 
--	sr = __raw_readl(dev->regs + ATMEL_TC_REG(2, SR));
-+	sr = readl_relaxed(dev->regs + ATMEL_TC_REG(2, SR));
- 	if (sr & ATMEL_TC_CPCS) {
- 		dev->clkevt.event_handler(&dev->clkevt);
- 		return IRQ_HANDLED;
-@@ -290,43 +290,43 @@ static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
- static void __init tcb_setup_dual_chan(struct atmel_tc *tc, int mck_divisor_idx)
- {
- 	/* channel 0:  waveform mode, input mclk/8, clock TIOA0 on overflow */
--	__raw_writel(mck_divisor_idx			/* likely divide-by-8 */
-+	writel(mck_divisor_idx			/* likely divide-by-8 */
- 			| ATMEL_TC_WAVE
- 			| ATMEL_TC_WAVESEL_UP		/* free-run */
- 			| ATMEL_TC_ACPA_SET		/* TIOA0 rises at 0 */
- 			| ATMEL_TC_ACPC_CLEAR,		/* (duty cycle 50%) */
- 			tcaddr + ATMEL_TC_REG(0, CMR));
--	__raw_writel(0x0000, tcaddr + ATMEL_TC_REG(0, RA));
--	__raw_writel(0x8000, tcaddr + ATMEL_TC_REG(0, RC));
--	__raw_writel(0xff, tcaddr + ATMEL_TC_REG(0, IDR));	/* no irqs */
--	__raw_writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(0, CCR));
-+	writel(0x0000, tcaddr + ATMEL_TC_REG(0, RA));
-+	writel(0x8000, tcaddr + ATMEL_TC_REG(0, RC));
-+	writel(0xff, tcaddr + ATMEL_TC_REG(0, IDR));	/* no irqs */
-+	writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(0, CCR));
- 
- 	/* channel 1:  waveform mode, input TIOA0 */
--	__raw_writel(ATMEL_TC_XC1			/* input: TIOA0 */
-+	writel(ATMEL_TC_XC1			/* input: TIOA0 */
- 			| ATMEL_TC_WAVE
- 			| ATMEL_TC_WAVESEL_UP,		/* free-run */
- 			tcaddr + ATMEL_TC_REG(1, CMR));
--	__raw_writel(0xff, tcaddr + ATMEL_TC_REG(1, IDR));	/* no irqs */
--	__raw_writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(1, CCR));
-+	writel(0xff, tcaddr + ATMEL_TC_REG(1, IDR));	/* no irqs */
-+	writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(1, CCR));
- 
- 	/* chain channel 0 to channel 1*/
--	__raw_writel(ATMEL_TC_TC1XC1S_TIOA0, tcaddr + ATMEL_TC_BMR);
-+	writel(ATMEL_TC_TC1XC1S_TIOA0, tcaddr + ATMEL_TC_BMR);
- 	/* then reset all the timers */
--	__raw_writel(ATMEL_TC_SYNC, tcaddr + ATMEL_TC_BCR);
-+	writel(ATMEL_TC_SYNC, tcaddr + ATMEL_TC_BCR);
- }
- 
- static void __init tcb_setup_single_chan(struct atmel_tc *tc, int mck_divisor_idx)
- {
- 	/* channel 0:  waveform mode, input mclk/8 */
--	__raw_writel(mck_divisor_idx			/* likely divide-by-8 */
-+	writel(mck_divisor_idx			/* likely divide-by-8 */
- 			| ATMEL_TC_WAVE
- 			| ATMEL_TC_WAVESEL_UP,		/* free-run */
- 			tcaddr + ATMEL_TC_REG(0, CMR));
--	__raw_writel(0xff, tcaddr + ATMEL_TC_REG(0, IDR));	/* no irqs */
--	__raw_writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(0, CCR));
-+	writel(0xff, tcaddr + ATMEL_TC_REG(0, IDR));	/* no irqs */
-+	writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(0, CCR));
- 
- 	/* then reset all the timers */
--	__raw_writel(ATMEL_TC_SYNC, tcaddr + ATMEL_TC_BCR);
-+	writel(ATMEL_TC_SYNC, tcaddr + ATMEL_TC_BCR);
- }
- 
- static int __init tcb_clksrc_init(void)
--- 
-2.11.0
+Oh, is that what I heard?
