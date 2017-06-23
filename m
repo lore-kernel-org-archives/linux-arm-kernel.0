@@ -1,359 +1,72 @@
-From: willy.mh.wolff@gmail.com (Willy Wolff)
-Date: Fri, 23 Jun 2017 22:09:14 +0100
-Subject: [PATCH] ARM: dts: exynos: Exynos5422 Odroid-XU* incomplete
- thermal-zones definition
-Message-ID: <20170623210913.ugutgop7ratwolfy@inc028000032.lancs.ac.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 23 Jun 2017 16:24:46 -0500
+Subject: [PATCH v3 2/6] dt-bindings: display: Add Synopsys DW MIPI DSI DRM
+ bridge driver
+In-Reply-To: <c939ea5e-1c45-72af-0a0b-1f89fffa8c87@st.com>
+References: <1496414235-20098-1-git-send-email-philippe.cornu@st.com>
+ <1496414235-20098-3-git-send-email-philippe.cornu@st.com>
+ <20170608154028.6ck3dos6de2dogrk@rob-hp-laptop>
+ <c939ea5e-1c45-72af-0a0b-1f89fffa8c87@st.com>
+Message-ID: <CAL_JsqLPzoMNMhMuuvwLPRhxXgFOBroMhB8sG0zm-ofLt0AZhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Odroid XU*-familly boards has thermal sensors per A15 cores, but the actual
- thermal-zones define only cooling-maps action for cpu0.
+On Mon, Jun 19, 2017 at 11:51 AM, Philippe CORNU <philippe.cornu@st.com> wrote:
+> On 06/08/2017 05:40 PM, Rob Herring wrote:
+>> On Fri, Jun 02, 2017 at 04:37:11PM +0200, Philippe CORNU wrote:
+>>> This patch adds documentation of device tree bindings for the
+>>> Synopsys DesignWare MIPI DSI host DRM bridge driver.
+>>>
+>>> Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
+>>> ---
+>>>   .../bindings/display/bridge/dw_mipi_dsi.txt        | 30 ++++++++++++++++++++++
+>>>   1 file changed, 30 insertions(+)
+>>>   create mode 100644 Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt b/Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
+>>> new file mode 100644
+>>> index 0000000..1d7c438
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
+>>> @@ -0,0 +1,30 @@
+>>> +Synopsys DesignWare MIPI DSI host controller
+>>> +============================================
+>>> +
+>>> +This document defines device tree properties for the Synopsys DesignWare MIPI
+>>> +DSI host controller. It doesn't constitue a device tree binding specification
+>>> +by itself but is meant to be referenced by platform-specific device tree
+>>> +bindings.
+>>> +
+>>> +When referenced from platform device tree bindings the properties defined in
+>>> +this document are defined as follows. The platform device tree bindings are
+>>> +responsible for defining whether each property is required or optional.
+>>> +
+>>> +- reg: Memory mapped base address and length of the DWC MIPI DSI
+>>> +  registers. (mandatory)
+>>> +
+>>> +- clocks: References to all the clocks specified in the clock-names property
+>>> +  as specified in [1]. (mandatory)
+>>> +
+>>> +- clock-names: "pclk" is peripheral clock for either AHB and APB. (mandatory)
+>>
+>> Seems strange there's not also a pixel or bit clock? Or this gets driven
+>> from the phy?
+>>
+> Hi Rob,
+> And many thanks for your comments :)
+>
+> There is a "physical" pixel clock entering into the "DSI controller IP"
+> but the "DSI controller driver" does not need to control (or read) it
+> with the dt because this clock information (the frequency) is also
+> available in panel timings and the drm/kms framework will propagate the
+> panel timings in the drm/kms "crtc/encoder/bridge&panel/connector..."
+> chain. Then, the DSI controller driver will compute phy parameters
+> according to these panel timings.
+> Adding a pixel clock dependency in the dt here is then not necessary as
+> the frequency information comes through the panel timings.
 
-If the application is running on all cores but core4 (first core of the A15
- cluster), the CPU can reach high temperature without any proper cooling
- action.
+Even if the Linux driver doesn't currently need to control the pixel
+clock it should still be defined in the binding. Bindings are what you
+physically have, not just what the driver needs or doesn't need.
 
-As already discus in prior mail, and on IRC, it's a quit big code
-duplication, but I don't found the write way to express that in a better
- way.
-
-The situation for this board is that we have multiple sensors, but
- matching cooling devices for these sensors act for the same physical
- device (FAN and A15 cluster, as each core of the cluster share the same
- frequency).
-In fact, of-thermal.c:473:thermal_zone_of_sensor_register() can't use
-multiple sensors for one single thermal zone.
-This patch follow the path taken in arch/arm/boot/dts/qcom-apq8084.dtsi:97
-
-I'm interested to extending the thermal driver, but it will takes time.
- So this is a workaround before refactoring the driver.
-If somebody knows how to write it better, any advice and suggestions
-are more than welcome.
-
-Also, the comment for cpu_alert4 in cooling-maps definition is not
-accurate, 11 steps for A15 correspond to 700MHz, not 600MHz.
-
-Signed-off-by: Willy Wolff <willy.mh.wolff@gmail.com>
----
- arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 249 +++++++++++++++++++--
- 1 file changed, 231 insertions(+), 18 deletions(-)
-
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-index 05b9afdd6757..0759cc0812fb 100644
---- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-@@ -64,22 +64,22 @@
- 			polling-delay-passive = <250>;
- 			polling-delay = <0>;
- 			trips {
--				cpu_alert0: cpu-alert-0 {
-+				cpu0_alert0: cpu-alert-0 {
- 					temperature = <50000>; /* millicelsius */
- 					hysteresis = <5000>; /* millicelsius */
- 					type = "active";
- 				};
--				cpu_alert1: cpu-alert-1 {
-+				cpu0_alert1: cpu-alert-1 {
- 					temperature = <60000>; /* millicelsius */
- 					hysteresis = <5000>; /* millicelsius */
- 					type = "active";
- 				};
--				cpu_alert2: cpu-alert-2 {
-+				cpu0_alert2: cpu-alert-2 {
- 					temperature = <70000>; /* millicelsius */
- 					hysteresis = <5000>; /* millicelsius */
- 					type = "active";
- 				};
--				cpu_crit0: cpu-crit-0 {
-+				cpu0_crit0: cpu-crit-0 {
- 					temperature = <120000>; /* millicelsius */
- 					hysteresis = <0>; /* millicelsius */
- 					type = "critical";
-@@ -88,14 +88,14 @@
- 				 * Exynos542x supports only 4 trip-points
- 				 * so for these polling mode is required.
- 				 * Start polling at temperature level of last
--				 * interrupt-driven trip: cpu_alert2
-+				 * interrupt-driven trip: cpu0_alert2
- 				 */
--				cpu_alert3: cpu-alert-3 {
-+				cpu0_alert3: cpu-alert-3 {
- 					temperature = <70000>; /* millicelsius */
- 					hysteresis = <10000>; /* millicelsius */
- 					type = "passive";
- 				};
--				cpu_alert4: cpu-alert-4 {
-+				cpu0_alert4: cpu-alert-4 {
- 					temperature = <85000>; /* millicelsius */
- 					hysteresis = <10000>; /* millicelsius */
- 					type = "passive";
-@@ -104,43 +104,256 @@
- 			};
- 			cooling-maps {
- 				map0 {
--					trip = <&cpu_alert0>;
-+					trip = <&cpu0_alert0>;
- 					cooling-device = <&fan0 0 1>;
- 				};
- 				map1 {
--					trip = <&cpu_alert1>;
-+					trip = <&cpu0_alert1>;
- 					cooling-device = <&fan0 1 2>;
- 				};
- 				map2 {
--					trip = <&cpu_alert2>;
-+					trip = <&cpu0_alert2>;
- 					cooling-device = <&fan0 2 3>;
- 				};
- 				/*
--				 * When reaching cpu_alert3, reduce CPU
-+				 * When reaching cpu0_alert3, reduce CPU
- 				 * by 2 steps. On Exynos5422/5800 that would
- 				 * be: 1600 MHz and 1100 MHz.
- 				 */
- 				map3 {
--					trip = <&cpu_alert3>;
-+					trip = <&cpu0_alert3>;
- 					cooling-device = <&cpu0 0 2>;
- 				};
- 				map4 {
--					trip = <&cpu_alert3>;
-+					trip = <&cpu0_alert3>;
- 					cooling-device = <&cpu4 0 2>;
- 				};
- 
- 				/*
--				 * When reaching cpu_alert4, reduce CPU
--				 * further, down to 600 MHz (11 steps for big,
-+				 * When reaching cpu0_alert4, reduce CPU
-+				 * further, down to 600 MHz (12 steps for big,
- 				 * 7 steps for LITTLE).
- 				 */
- 				map5 {
--					trip = <&cpu_alert4>;
-+					trip = <&cpu0_alert4>;
- 					cooling-device = <&cpu0 3 7>;
- 				};
- 				map6 {
--					trip = <&cpu_alert4>;
--					cooling-device = <&cpu4 3 11>;
-+					trip = <&cpu0_alert4>;
-+					cooling-device = <&cpu4 3 12>;
-+				};
-+			};
-+		};
-+		cpu1_thermal: cpu1-thermal {
-+			thermal-sensors = <&tmu_cpu1 0>;
-+			polling-delay-passive = <250>;
-+			polling-delay = <0>;
-+			trips {
-+				cpu1_alert0: cpu-alert-0 {
-+					temperature = <50000>;
-+					hysteresis = <5000>;
-+					type = "active";
-+				};
-+				cpu1_alert1: cpu-alert-1 {
-+					temperature = <60000>;
-+					hysteresis = <5000>;
-+					type = "active";
-+				};
-+				cpu1_alert2: cpu-alert-2 {
-+					temperature = <70000>;
-+					hysteresis = <5000>;
-+					type = "active";
-+				};
-+				cpu1_crit0: cpu-crit-0 {
-+					temperature = <120000>;
-+					hysteresis = <0>;
-+					type = "critical";
-+				};
-+
-+				cpu1_alert3: cpu-alert-3 {
-+					temperature = <70000>;
-+					hysteresis = <10000>; /* millicelsius */
-+					type = "passive";
-+				};
-+				cpu1_alert4: cpu-alert-4 {
-+					temperature = <85000>;
-+					hysteresis = <10000>;
-+					type = "passive";
-+				};
-+
-+			};
-+			cooling-maps {
-+				map0 {
-+					trip = <&cpu1_alert0>;
-+					cooling-device = <&fan0 0 1>;
-+				};
-+				map1 {
-+					trip = <&cpu1_alert1>;
-+					cooling-device = <&fan0 1 2>;
-+				};
-+				map2 {
-+					trip = <&cpu1_alert2>;
-+					cooling-device = <&fan0 2 3>;
-+				};
-+
-+				map3 {
-+					trip = <&cpu1_alert3>;
-+					cooling-device = <&cpu0 0 2>;
-+				};
-+				map4 {
-+					trip = <&cpu1_alert3>;
-+					cooling-device = <&cpu4 0 2>;
-+				};
-+
-+				map5 {
-+					trip = <&cpu1_alert4>;
-+					cooling-device = <&cpu0 3 7>;
-+				};
-+				map6 {
-+					trip = <&cpu1_alert4>;
-+					cooling-device = <&cpu4 3 12>;
-+				};
-+			};
-+		};
-+		cpu2_thermal: cpu2-thermal {
-+			thermal-sensors = <&tmu_cpu2 0>;
-+			polling-delay-passive = <250>;
-+			polling-delay = <0>;
-+			trips {
-+				cpu2_alert0: cpu-alert-0 {
-+					temperature = <50000>;
-+					hysteresis = <5000>;
-+					type = "active";
-+				};
-+				cpu2_alert1: cpu-alert-1 {
-+					temperature = <60000>;
-+					hysteresis = <5000>;
-+					type = "active";
-+				};
-+				cpu2_alert2: cpu-alert-2 {
-+					temperature = <70000>;
-+					hysteresis = <5000>;
-+					type = "active";
-+				};
-+				cpu2_crit0: cpu-crit-0 {
-+					temperature = <120000>;
-+					hysteresis = <0>;
-+					type = "critical";
-+				};
-+
-+				cpu2_alert3: cpu-alert-3 {
-+					temperature = <70000>;
-+					hysteresis = <10000>;
-+					type = "passive";
-+				};
-+				cpu2_alert4: cpu-alert-4 {
-+					temperature = <85000>;
-+					hysteresis = <10000>;
-+					type = "passive";
-+				};
-+
-+			};
-+			cooling-maps {
-+				map0 {
-+					trip = <&cpu2_alert0>;
-+					cooling-device = <&fan0 0 1>;
-+				};
-+				map1 {
-+					trip = <&cpu2_alert1>;
-+					cooling-device = <&fan0 1 2>;
-+				};
-+				map2 {
-+					trip = <&cpu2_alert2>;
-+					cooling-device = <&fan0 2 3>;
-+				};
-+
-+				map3 {
-+					trip = <&cpu2_alert3>;
-+					cooling-device = <&cpu0 0 2>;
-+				};
-+				map4 {
-+					trip = <&cpu2_alert3>;
-+					cooling-device = <&cpu4 0 2>;
-+				};
-+
-+				map5 {
-+					trip = <&cpu2_alert4>;
-+					cooling-device = <&cpu0 3 7>;
-+				};
-+				map6 {
-+					trip = <&cpu2_alert4>;
-+					cooling-device = <&cpu4 3 12>;
-+				};
-+			};
-+		};
-+		cpu3_thermal: cpu3-thermal {
-+			thermal-sensors = <&tmu_cpu3 0>;
-+			polling-delay-passive = <250>;
-+			polling-delay = <0>;
-+			trips {
-+				cpu3_alert0: cpu-alert-0 {
-+					temperature = <50000>;
-+					hysteresis = <5000>;
-+					type = "active";
-+				};
-+				cpu3_alert1: cpu-alert-1 {
-+					temperature = <60000>;
-+					hysteresis = <5000>;
-+					type = "active";
-+				};
-+				cpu3_alert2: cpu-alert-2 {
-+					temperature = <70000>;
-+					hysteresis = <5000>;
-+					type = "active";
-+				};
-+				cpu3_crit0: cpu-crit-0 {
-+					temperature = <120000>;
-+					hysteresis = <0>;
-+					type = "critical";
-+				};
-+
-+				cpu3_alert3: cpu-alert-3 {
-+					temperature = <70000>;
-+					hysteresis = <10000>;
-+					type = "passive";
-+				};
-+				cpu3_alert4: cpu-alert-4 {
-+					temperature = <85000>;
-+					hysteresis = <10000>;
-+					type = "passive";
-+				};
-+
-+			};
-+			cooling-maps {
-+				map0 {
-+					trip = <&cpu3_alert0>;
-+					cooling-device = <&fan0 0 1>;
-+				};
-+				map1 {
-+					trip = <&cpu3_alert1>;
-+					cooling-device = <&fan0 1 2>;
-+				};
-+				map2 {
-+					trip = <&cpu3_alert2>;
-+					cooling-device = <&fan0 2 3>;
-+				};
-+
-+				map3 {
-+					trip = <&cpu3_alert3>;
-+					cooling-device = <&cpu0 0 2>;
-+				};
-+				map4 {
-+					trip = <&cpu3_alert3>;
-+					cooling-device = <&cpu4 0 2>;
-+				};
-+
-+				map5 {
-+					trip = <&cpu3_alert4>;
-+					cooling-device = <&cpu0 3 7>;
-+				};
-+				map6 {
-+					trip = <&cpu3_alert4>;
-+					cooling-device = <&cpu4 3 12>;
- 				};
- 			};
- 		};
--- 
-2.11.0
+Rob
