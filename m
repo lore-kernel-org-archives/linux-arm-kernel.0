@@ -1,194 +1,60 @@
-From: palmer@dabbelt.com (Palmer Dabbelt)
-Date: Fri, 23 Jun 2017 15:08:57 -0700
-Subject: [PATCH] pci:  Add and use PCI_GENERIC_SETUP Kconfig entry
-In-Reply-To: <20170623220857.28774-1-palmer@dabbelt.com>
-References: <20170623220104.GE31455@jhogan-linux.le.imgtec.org>
- <20170623220857.28774-1-palmer@dabbelt.com>
-Message-ID: <20170623220857.28774-2-palmer@dabbelt.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sat, 24 Jun 2017 00:09:07 +0200
+Subject: [PATCH v2 0/3] rtc: make st-lpc robust against y2038/2106 bug
+In-Reply-To: <47b45b70-91da-ce41-535d-89d92f380274@kernel.org>
+References: <1497864982-29284-1-git-send-email-benjamin.gaignard@linaro.org>
+ <47b45b70-91da-ce41-535d-89d92f380274@kernel.org>
+Message-ID: <20170623220907.kxhkwkl6gt7bho5r@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We wanted to add RISC-V to the list of architectures that used the
-generic PCI setup-irq.o inside the Makefile and it was suggested that
-instead we define a Kconfig entry and use that.
+On 23/06/2017 at 13:40:41 -0600, Shuah Khan wrote:
+> On 06/19/2017 03:36 AM, Benjamin Gaignard wrote:
+> > On 32bits platforms "struct timeval" or "time_t" are using u32 to code the
+> > date, this cause tools like "date" or "hwclock" failed even before setting
+> > the RTC device if the date is superior to year 2038 (or 2106).
+> > 
+> > To avoid this problem I add one RTC test file which directly use RTC ioctl
+> > to set and read RTC time and alarm values.
+> > rtctest_setdate allow to set any date/time given in the command line.
+> > 
+> > On this version 2 I add check of problematics years in rtctest like suggest
+> > by Alexandre.
+> > 
+> > Finally that had allowed me to test and fix rtc-st-lpc driver.
+> > 
+> > Benjamin Gaignard (3):
+> >   tools: timer: add rtctest_setdate
+> >   tool: timer: rtctest add check for problematic dates
+> >   rtc: st-lpc: make it robust against y2038/2106 bug
+> > 
+> >  drivers/rtc/rtc-st-lpc.c                         |  19 ++--
+> >  tools/testing/selftests/timers/Makefile          |   2 +-
+> >  tools/testing/selftests/timers/rtctest.c         | 121 ++++++++++++++++++++++-
+> >  tools/testing/selftests/timers/rtctest_setdate.c |  86 ++++++++++++++++
+> >  4 files changed, 212 insertions(+), 16 deletions(-)
+> >  create mode 100644 tools/testing/selftests/timers/rtctest_setdate.c
+> > 
+> 
+> Hi Thomas/John,
+> 
+> I can take the first two patches in this series through linux-kselftest
+> with your or John's Ack. Please review and let me know one way or the
+> other.
+> 
 
-I've done very minimal testing on this: I just checked to see that
-an aarch64 defconfig still build setup-irq.o with the patch applied.
-The intention is that this patch doesn't change the behavior of any
-build.
+Well, I'm the maintainer for rtctest.c and I'll make sure to also be the
+one for rtctest_setdate.c.
 
-Signed-off-by: Palmer Dabbelt <palmer@dabbelt.com>
-Reviewed-by: James Hogan <james.hogan@imgtec.com>
----
- arch/alpha/Kconfig     |  1 +
- arch/arc/Kconfig       |  1 +
- arch/arm/Kconfig       |  1 +
- arch/arm64/Kconfig     |  1 +
- arch/m68k/Kconfig      |  1 +
- arch/mips/Kconfig      |  1 +
- arch/sh/Kconfig        |  1 +
- arch/sparc/Kconfig     |  1 +
- arch/tile/Kconfig      |  1 +
- arch/unicore32/Kconfig |  1 +
- drivers/pci/Kconfig    |  3 +++
- drivers/pci/Makefile   | 11 +----------
- 12 files changed, 14 insertions(+), 10 deletions(-)
+> The third one is a rtc driver patch. Please let me know how do you want
+> to handle this series soon we can get this into 4.13-rc1.
+> 
 
-diff --git a/arch/alpha/Kconfig b/arch/alpha/Kconfig
-index 0e49d39ea74a..30f4e711f681 100644
---- a/arch/alpha/Kconfig
-+++ b/arch/alpha/Kconfig
-@@ -26,6 +26,7 @@ config ALPHA
- 	select ODD_RT_SIGACTION
- 	select OLD_SIGSUSPEND
- 	select CPU_NO_EFFICIENT_FFS if !ALPHA_EV67
-+	select PCI_GENERIC_SETUP
- 	help
- 	  The Alpha is a 64-bit general-purpose processor designed and
- 	  marketed by the Digital Equipment Corporation of blessed memory,
-diff --git a/arch/arc/Kconfig b/arch/arc/Kconfig
-index a5459698f0ee..dd1f64858118 100644
---- a/arch/arc/Kconfig
-+++ b/arch/arc/Kconfig
-@@ -44,6 +44,7 @@ config ARC
- 	select HAVE_GENERIC_DMA_COHERENT
- 	select HAVE_KERNEL_GZIP
- 	select HAVE_KERNEL_LZMA
-+	select PCI_GENERIC_SETUP
- 
- config MIGHT_HAVE_PCI
- 	bool
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 4c1a35f15838..4f910c4c37b2 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -93,6 +93,7 @@ config ARM
- 	select OF_RESERVED_MEM if OF
- 	select OLD_SIGACTION
- 	select OLD_SIGSUSPEND3
-+	select PCI_GENERIC_SETUP
- 	select PERF_USE_VMALLOC
- 	select RTC_LIB
- 	select SYS_SUPPORTS_APM_EMULATION
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index b2024db225a9..02d4676cb00e 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -110,6 +110,7 @@ config ARM64
- 	select OF_EARLY_FLATTREE
- 	select OF_RESERVED_MEM
- 	select PCI_ECAM if ACPI
-+	select PCI_GENERIC_SETUP
- 	select POWER_RESET
- 	select POWER_SUPPLY
- 	select SPARSE_IRQ
-diff --git a/arch/m68k/Kconfig b/arch/m68k/Kconfig
-index d140206d5d29..c16214344f1c 100644
---- a/arch/m68k/Kconfig
-+++ b/arch/m68k/Kconfig
-@@ -22,6 +22,7 @@ config M68K
- 	select MODULES_USE_ELF_RELA
- 	select OLD_SIGSUSPEND3
- 	select OLD_SIGACTION
-+	select PCI_GENERIC_SETUP
- 
- config RWSEM_GENERIC_SPINLOCK
- 	bool
-diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
-index 2828ecde133d..474a7c710686 100644
---- a/arch/mips/Kconfig
-+++ b/arch/mips/Kconfig
-@@ -70,6 +70,7 @@ config MIPS
- 	select HAVE_EXIT_THREAD
- 	select HAVE_REGS_AND_STACK_ACCESS_API
- 	select HAVE_COPY_THREAD_TLS
-+	select PCI_GENERIC_SETUP
- 
- menu "Machine selection"
- 
-diff --git a/arch/sh/Kconfig b/arch/sh/Kconfig
-index ee086958b2b2..90a98ac526fb 100644
---- a/arch/sh/Kconfig
-+++ b/arch/sh/Kconfig
-@@ -48,6 +48,7 @@ config SUPERH
- 	select HAVE_ARCH_AUDITSYSCALL
- 	select HAVE_FUTEX_CMPXCHG if FUTEX
- 	select HAVE_NMI
-+	select PCI_GENERIC_SETUP
- 	help
- 	  The SuperH is a RISC processor targeted for use in embedded systems
- 	  and consumer electronics; it was also used in the Sega Dreamcast
-diff --git a/arch/sparc/Kconfig b/arch/sparc/Kconfig
-index 5639c9fe5b55..24cea64104bd 100644
---- a/arch/sparc/Kconfig
-+++ b/arch/sparc/Kconfig
-@@ -424,6 +424,7 @@ config SPARC_LEON
- 	depends on SPARC32
- 	select USB_EHCI_BIG_ENDIAN_MMIO
- 	select USB_EHCI_BIG_ENDIAN_DESC
-+	select PCI_GENERIC_SETUP
- 	---help---
- 	  If you say Y here if you are running on a SPARC-LEON processor.
- 	  The LEON processor is a synthesizable VHDL model of the
-diff --git a/arch/tile/Kconfig b/arch/tile/Kconfig
-index 4583c0320059..451000db8c62 100644
---- a/arch/tile/Kconfig
-+++ b/arch/tile/Kconfig
-@@ -28,6 +28,7 @@ config TILE
- 	select HAVE_PERF_EVENTS
- 	select HAVE_SYSCALL_TRACEPOINTS
- 	select MODULES_USE_ELF_RELA
-+	select PCI_GENERIC_SETUP
- 	select SYSCTL_EXCEPTION_TRACE
- 	select SYS_HYPERVISOR
- 	select USER_STACKTRACE_SUPPORT
-diff --git a/arch/unicore32/Kconfig b/arch/unicore32/Kconfig
-index 0769066929c6..162a7d3def0c 100644
---- a/arch/unicore32/Kconfig
-+++ b/arch/unicore32/Kconfig
-@@ -18,6 +18,7 @@ config UNICORE32
- 	select ARCH_WANT_FRAME_POINTERS
- 	select GENERIC_IOMAP
- 	select MODULES_USE_ELF_REL
-+	select PCI_GENERIC_SETUP
- 	help
- 	  UniCore-32 is 32-bit Instruction Set Architecture,
- 	  including a series of low-power-consumption RISC chip
-diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
-index e0cacb7b8563..658c9f95ab3f 100644
---- a/drivers/pci/Kconfig
-+++ b/drivers/pci/Kconfig
-@@ -131,6 +131,9 @@ config PCI_HYPERV
-           The PCI device frontend driver allows the kernel to import arbitrary
-           PCI devices from a PCI backend to support PCI driver domains.
- 
-+config PCI_GENERIC_SETUP
-+	def_bool n
-+
- source "drivers/pci/hotplug/Kconfig"
- source "drivers/pci/dwc/Kconfig"
- source "drivers/pci/host/Kconfig"
-diff --git a/drivers/pci/Makefile b/drivers/pci/Makefile
-index 462c1f5f5546..26f4710c88ec 100644
---- a/drivers/pci/Makefile
-+++ b/drivers/pci/Makefile
-@@ -31,16 +31,7 @@ obj-$(CONFIG_PCI_IOV) += iov.o
- #
- # Some architectures use the generic PCI setup functions
- #
--obj-$(CONFIG_ALPHA) += setup-irq.o
--obj-$(CONFIG_ARC) += setup-irq.o
--obj-$(CONFIG_ARM) += setup-irq.o
--obj-$(CONFIG_ARM64) += setup-irq.o
--obj-$(CONFIG_UNICORE32) += setup-irq.o
--obj-$(CONFIG_SUPERH) += setup-irq.o
--obj-$(CONFIG_MIPS) += setup-irq.o
--obj-$(CONFIG_TILE) += setup-irq.o
--obj-$(CONFIG_SPARC_LEON) += setup-irq.o
--obj-$(CONFIG_M68K) += setup-irq.o
-+obj-$(CONFIG_PCI_GENERIC_SETUP) += setup-irq.o
- 
- #
- # ACPI Related PCI FW Functions
+I'll take the three patches but I still have comment I didn't have time
+to give yet.
+
+
 -- 
-2.13.0
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
