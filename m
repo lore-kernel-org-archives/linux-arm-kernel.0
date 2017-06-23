@@ -1,52 +1,91 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 Jun 2017 13:49:13 +0200
-Subject: [PATCH] ARM: qcom_defconfig: enable RPMSG_QCOM_SMD
-In-Reply-To: <20170621050335.GI17640@tuxbook>
-References: <20170615061521.21292-1-bshah@kde.org>
- <20170621050335.GI17640@tuxbook>
-Message-ID: <CAK8P3a1ChrTPYC37sZhkF2edfBGOR4m5eFe8=4-y=R-FaVFdMQ@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 23 Jun 2017 12:59:35 +0100
+Subject: next-20170621 build: 1 failures 7 warnings (next-20170621)
+In-Reply-To: <1498213333.2190.24.camel@mtkswgap22>
+References: <E1dNcMp-0005RN-1w@optimist>
+ <20170621100440.vcaxagg4yjca2cv4@sirena.org.uk>
+ <1498209196.26313.71.camel@mtkswgap22>
+ <20170623094356.GA5337@red-moon>
+ <1498213333.2190.24.camel@mtkswgap22>
+Message-ID: <20170623115934.GD28331@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 21, 2017 at 7:03 AM, Bjorn Andersson
-<bjorn.andersson@linaro.org> wrote:
-> + arm at kernel.org
->
-> On Wed 14 Jun 23:15 PDT 2017, Bhushan Shah wrote:
->
->> As of commit 5052de8deff56, QCOM_SMD_RPM and various other config
->> options enabled in the qcom_defconfig depends on the RPMSG. If
->> QCOM_SMD_RPM config option is not selected it disables the
->> REGULATOR_QCOM_SMD_RPM and other essential config options.
->>
->> Signed-off-by: Bhushan Shah <bshah@kde.org>
->
-> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+On Fri, Jun 23, 2017 at 06:22:13PM +0800, Ryder Lee wrote:
+> On Fri, 2017-06-23 at 10:43 +0100, Lorenzo Pieralisi wrote:
+> > On Fri, Jun 23, 2017 at 05:13:16PM +0800, Ryder Lee wrote:
+> > > Sorry for late reply, 
+> > > 
+> > > +Lorenzo
+> > > 
+> > > On Wed, 2017-06-21 at 18:04 +0800, Mark Brown wrote:
+> > > > On Wed, Jun 21, 2017 at 10:56:07AM +0100, Build bot for Mark Brown wrote:
+> > > > 
+> > > > Today's -next fails to build an arm allmodconfig due to:
+> > > > 
+> > > > > 	arm-allmodconfig
+> > > > > ../drivers/pci/host/pcie-mediatek.c:485:8: error: implicit declaration of function 'pci_register_host_bridge' [-Werror=implicit-function-declaration]
+> > > > 
+> > > > caused by eaf3023b0498a (PCI: mediatek: Add MediaTek PCIe host
+> > > > controller support).
+> > > 
+> > > 
+> > > Hi Lorenzo,
+> > > 
+> > > I picked up your changes and had some modifications like what you did
+> > > for other platforms:
+> > > 
+> > > 9f8e3a5 PCI: Add devm_pci_alloc_host_bridge() interface 
+> > > 35a1a84 PCI: Add pci_free_host_bridge() interface
+> > > e33aafd PCI: Initialize bridge release function at bridge allocation
+> > > 
+> > > ...and it looks Okay.
+> > > 
+> > > I have also noticed that you continue sending patches for other
+> > > platforms but I have not yet had a look in detail. I'm quite busy these
+> > > days and don't have time to dig it, hence it is becoming a little
+> > > unmanageable for me.
+> > 
+> > If it is unmanageable you don't add yourself as a maintainer of that
+> > PCI host bridge driver, you know, we are all busy.
+> > 
+> > Your driver in the PCI tree as it stands contains already two bugs:
+> > 
+> > 1) It leaks memory on the probe failure path
+> > 2) pci_fixup_irqs() is broken on configurations with multiple host
+> >    bridges
+> > 
+> > And we keep copy'n'pasting that code.
+> 
+> Sure, I have already tested it, and I'll send a patch with your new
+> methods :)
 
-I see that Andy Gross was not on Cc, he would be the right person to
-pick up patches like this one.
+Thank you for testing it but please do not send anything before we
+decide what to do with my pci_fixup_irqs() removal series.
 
-Andy, do you want to pick that up through the qcom tree, or should
-we apply it directly on arm-soc?
+> > > Did you have a chance to send the same patches for MediaTek?  I
+> > > appreciate that and I can help to test it on our platforms.
+> > 
+> > No, how could I have sent them ? It is not upstream and it is a separate
+> > branch in the PCI tree. As I mentioned in another thread it is probably
+> > best to drop my pci_fixup_irqs() removal patches since it is impossible
+> > to work on them without a stable branch to apply them against, in the
+> > interim we keep adding PCI host bridges that use the wrong interfaces by
+> > copy'n'pasting code that I have been trying to remove.
+> > 
+> > I think the best solution is to repost my series when v4.13-rc1 appears
+> > and ask all new crop of host bridge drivers to rebase against it.
+> > 
+> > I won't be able to follow mailing lists till end of next week, which
+> > is bad timing.
+> 
+> I meant I'm also not sure how to do it in separate branch. I didn't
+> notice what you discussed in another thread. Sorry about that.
 
-      Arnd
+No worries, yes we need to understand how to sync the changes, as I
+said it is probably better for my series to be dropped, posted at
+v4.13-rc1, create a branch out of it and ask all PCI host bridges
+to be based against it, it is up to Bjorn to decide what's the least
+complicated way for him to sync all these changes.
 
->> I believe this patch should be included in the current rc version as well
->> otherwise boards that depend on pm8941 are not functional (for example
->> msm8974-hamerhead had emmc not working).
->>
->>  arch/arm/configs/qcom_defconfig | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
->> index 07666a7a9de5..65356a3a9253 100644
->> --- a/arch/arm/configs/qcom_defconfig
->> +++ b/arch/arm/configs/qcom_defconfig
->> @@ -173,6 +173,7 @@ CONFIG_LEDS_GPIO=y
->>  CONFIG_LEDS_PM8058=y
->>  CONFIG_LEDS_TRIGGERS=y
->>  CONFIG_LEDS_TRIGGER_HEARTBEAT=y
->> +CONFIG_RPMSG_QCOM_SMD=y
->>  CONFIG_RTC_CLASS=y
->>  CONFIG_RTC_DRV_PM8XXX=y
->>  CONFIG_DMADEVICES=y
+Lorenzo
