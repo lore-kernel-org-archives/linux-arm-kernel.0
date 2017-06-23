@@ -1,70 +1,72 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 23 Jun 2017 20:59:29 +0200
-Subject: [PATCH 3/3] arm64: dts: rockchip: set rk3399 dynamic CPU power
- coefficients
-In-Reply-To: <20170623184956.GA107165@google.com>
-References: <20170623170737.46265-1-briannorris@chromium.org>
- <5395662.EDQ3y7Qj0C@phil> <20170623184956.GA107165@google.com>
-Message-ID: <2934827.QH3zHdFam1@phil>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Fri, 23 Jun 2017 20:59:28 +0200
+Subject: [PATCH v1 1/6] DT bindings: add bindings for ov965x camera module
+In-Reply-To: <3f0dcd4f-92ef-a79d-b00b-1f348a201bd2@ti.com>
+References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
+ <d14b8c6e-b480-36f0-ed0a-684647617dbe@suse.de>
+ <3E7B1344-ECE6-4CCC-9E9D-7521BB566CDE@goldelico.com>
+ <13144955.Kq5qljPvgI@avalon>
+ <24C976BF-52FD-4509-BCE4-9AE41B335482@goldelico.com>
+ <88d0e8ea-74e4-6845-4e0d-8cd0f3a054be@suse.de>
+ <05CBF9B8-2297-447B-860D-A89126B46FC9@goldelico.com>
+ <3f0dcd4f-92ef-a79d-b00b-1f348a201bd2@ti.com>
+Message-ID: <74EE8B20-84A2-4579-ACBE-32E55CECE1C5@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 23. Juni 2017, 11:49:57 CEST schrieb Brian Norris:
-> On Fri, Jun 23, 2017 at 08:39:25PM +0200, Heiko Stuebner wrote:
-> > Am Freitag, 23. Juni 2017, 10:07:37 CEST schrieb Brian Norris:
-> > > Provide the dynamic power coefficient of the big and little CPU
-> > > clusters. These numbers are currently in use on the Samsung Chromebook
-> > > Plus ("Kevin").
-> > > 
-> > > The power allocator thermal governor doesn't know how to do anything if
-> > > it doesn't get power parameters from its cooling devices (in this case,
-> > > CPUfreq). So this effectively enables the power-allocator governor.
-> > > 
-> > > Signed-off-by: Brian Norris <briannorris@chromium.org>
-> > > ---
-> > >  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 2 ++
-> > >  1 file changed, 2 insertions(+)
-> > > 
-> > > diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > > index 69c56f7316c4..4f6667547814 100644
-> > > --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > > +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > > @@ -109,6 +109,7 @@
-> > >  			reg = <0x0 0x0>;
-> > >  			enable-method = "psci";
-> > >  			#cooling-cells = <2>; /* min followed by max */
-> > > +			dynamic-power-coefficient = <100>;
-> > >  			clocks = <&cru ARMCLKL>;
-> > >  		};
-> > >  
-> > > @@ -142,6 +143,7 @@
-> > >  			reg = <0x0 0x100>;
-> > >  			enable-method = "psci";
-> > >  			#cooling-cells = <2>; /* min followed by max */
-> > > +			dynamic-power-coefficient = <100>;
-> > >  			clocks = <&cru ARMCLKB>;
-> > >  		};
-> > >  
-> > > 
-> > 
-> > I think these should be set for all cores, similar to clocks. While
-> > cpufreq and friends regularly only take the first number, in a
-> > hw-description sense, it should be part of every core in the dt.
+Hi Suman,
+
+> Am 23.06.2017 um 20:05 schrieb Suman Anna <s-anna@ti.com>:
 > 
-> It's kinda paired with the cooling information (e.g., #cooling-cells)
-> which are only present in the first CPU in the cluster, currently.
+>>>> 
+>>>> Or does it just mean that it defines the property name?
+>>> 
+>>> Please read the documentation link I sent - it's in the very bottom and
+>>> should have an example.
+>> 
+>> I have seen it but it does not give me a good clue how to translate that into
+>> correct omap3isp node setup in a specific DT. Rather it raises more questions.
+>> Maybe because I don't understand completely what it is talking about.
+>> 
+>> The fundamental question is if this "assigned-clock-rates" is already
+>> handled by ov965x->clk = devm_clk_get(&client->dev, NULL); ?
+>> 
+>> Or should we define that for the omap3isp node?
+>> 
+>> Then of course we need no new code and just use the right property names.
+>> And N900, N9 camera DTs should be updated.
 > 
-> I can copy this definitely real, empirical value into the other CPUs if
-> you really think that's necessary :)
+> Look up of_clk_set_defaults() function in drivers/clk/clk-conf.c. This
+> function gets invoked usually during clock registration, and also gets
+> called in platform_drv_probe(), so the parents and clocks do get
+> configured before your driver gets probed. So, this provides a default
+> configuration if these properties are supplied (in either clock nodes or
+> actual device nodes), and if your driver needs to change the rates at
+> runtime, then you would have to do that in the driver itself.
 
-I just remember that has come up in the past for other cpu properties.
-dynamic-power-coefficient is defined in the general arm cpu binding,
-similar to clocks.
+Ok, now I understand. Thanks!
 
-And who knows, that value might not stay tied to only thermal in the
-future, so I think they should be in all cores.
+Quite hidden, but nice feature. I would never have thought that it exists.
+Especially as there are no examples around omap3isp cameras...
 
-But you know what, I can duplicate this myself as well when applying :-) .
+And an fgrep assigned-clock-rates shows not many use cases outside CPU/SoC
+include files.
 
+But interestingly arch/arm/boot/dts/at91sam9g25ek.dts uses it for an ovti,ov2640 camera...
 
-Heiko
+So it seems that we just have to write:
+
+	ov9655 at 30 {
+		compatible = "ovti,ov9655";
+		reg = <0x30>;
+		clocks = <&isp 0>;	/* cam_clka */
+		assigned-clocks = <&isp 0>;
+		assigned-clock-rates = <24000000>;
+	};
+
+instead of introducing a new clock-frequency property and code to handle it.
+
+Or do I misinterpret what "parents" and "clocks" are in this context?
+
+BR and thanks,
+Nikolaus
