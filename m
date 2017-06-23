@@ -1,123 +1,125 @@
-From: ore@pengutronix.de (Oleksij Rempel)
-Date: Fri, 23 Jun 2017 16:35:37 +0200
-Subject: [RFC PATCH 2/3] remoteproc: imx_rproc: add a NXP/Freescale imx
- rproc driver
-In-Reply-To: <42620944-14b6-1591-e2b4-4c15a577774a@ti.com>
-References: <20170614204855.18347-1-o.rempel@pengutronix.de>
- <20170614204855.18347-3-o.rempel@pengutronix.de>
- <96edc898-ad2b-c781-b7eb-0645902837df@ti.com>
- <f146c11f-1cca-68db-325b-036b0f614963@pengutronix.de>
- <42620944-14b6-1591-e2b4-4c15a577774a@ti.com>
-Message-ID: <20170623143537.e2bfsssxwdnft3pe@pengutronix.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 23 Jun 2017 14:38:31 +0000
+Subject: [PATCH] arm64: ftrace: fix !CONFIG_ARM64_MODULE_PLTS kernels
+In-Reply-To: <1498226261-21204-1-git-send-email-mark.rutland@arm.com>
+References: <1498226261-21204-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <CAKv+Gu-hyWyc3rbuKpOaieqKf=y3mga=DkVviagEBwEFrBgrzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 21, 2017 at 04:09:26PM -0500, Suman Anna wrote:
-> Hi Oleksij,
-> 
-> On 06/19/2017 02:43 AM, Oleksij Rempel wrote:
-> > Hi,
-> > 
-> > Thank you for your review!
-> > 
-> > On 15.06.2017 21:01, Suman Anna wrote:
-> >> Hi Oleksij,
-> >>
-> >> On 06/14/2017 03:48 PM, Oleksij Rempel wrote:
-> >>> From: Oleksij Rempel <linux@rempel-privat.de>
-> >>>
-> >>> this driver was tested on NXP imx7d but should work on
-> >>> imx6sx as well.
-> >>> It will upload firmware to OCRAM, which shared memory between
-> >>> Cortex A7 and Cortex M4, then turn M4 on.
-> >>
-> >> Mostly looks fine, need to address few comments. I take it that you
-> >> haven't added the binding since this is just an RFC.
-> >>
-.....
-> >>> +
-> >>> +static const char *mem_names[IMX7D_RPROC_MEM_MAX] = {
-> >>> +    [IMX7D_RPROC_IMEM]    = "imem",
-> >>> +    [IMX7D_RPROC_DMEM]    = "dmem",
-> >>> +};
-> >>
-> >> Do you really need these to be globally defined? You only need them in
-> >> the addr_init function, they can be made local to that function.
-> > 
-> > I don't needed. At least not with my testing remote code.
-> > It is mostly copy/paste from existing drivers.
-> > 
-> > But according to this page, there are multiple memory regions, with
-> > different mapping for data and code.
-> > http://developer.toradex.com/knowledge-base/freertos-on-the-cortex-m4-of-a-colibri-imx7#Memory_areas
-> > 
-> > 
-> > "The Cortex-M4 CPU has two buses connected to the main interconnect
-> > (modified Harvard architecture). One bus is meant to fetch data (system
-> > bus) whereas the other bus is meant to fetch instructions (code bus). To
-> > get optimal performance, the program code should be located and linked
-> > for a region which is going to be fetched through the code bus, while
-> > the data area (e.g. bss or data section) should be located in a region
-> > which is fetched through the system bus.
-> 
-> Yeah that's standard Cortex-M4 address/bus access architecture based on
-> memory addresses it sees, and the addresses are as per what the CPU
-> views them at.
-> 
->  There are multiple example
-> > linker files in the platform/devices/MCIMX7D/linker/ sub directory which
-> > can be used and/or modified. All example firmware below use the
-> > MCIMX7D_M4_tcm.ld linker file (TCML region for code, and the TCMU region
-> > for data)."
-> > 
-> > What is the proper way to implement it with remoteproc?
-> 
-> So, TCML and TCMU looks to be internal memories within the Cortex-M4
-> subsystem from the link you shared. The rproc_da_to_va() is being used
-> today to provide the translations from the CPU device address (da) to
-> the kernel virtual address for the same memory (va) so that memcpy can
-> be used for loading the section data into those memories. The ioremap
-> from the A7 should be using the bus addresses.
+On 23 June 2017 at 13:57, Mark Rutland <mark.rutland@arm.com> wrote:
+> When a kernel is built without CONFIG_ARM64_MODULE_PLTS, we don't
+> generate the expected branch instruction in ftrace_make_nop(). This
+> means we pass zero (rather than a valid branch) to ftrace_modify_code()
+> as the expected instruction to validate. This causes us to return
+> -EINVAL to the core ftrace code for a valid case, resulting in a splat
+> at boot time.
+>
+> This was an unintended effect of commit:
+>
+>   687644209a6e9557 ("arm64: ftrace: fix building without CONFIG_MODULES")
+>
+> ... which incorrectly moved the generation of the branch instruction
+> into the ifdef for CONFIG_ARM64_MODULE_PLTS.
+>
+> This patch fixes the issue by moving the ifdef inside of the relevant
+> if-else case, and always checking that the branch is in range,
+> regardless of CONFIG_ARM64_MODULE_PLTS. This ensures that we generate
+> the expected branch instruction, and also improves our sanity checks.
+>
+> For consistency, both ftrace_make_nop() and ftrace_make_call() are
+> updated with this pattern.
+>
+> Fixes: 687644209a6e9557 ("arm64: ftrace: fix building without CONFIG_MODULES")
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Reported-by: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/kernel/ftrace.c | 12 ++++++++----
+>  1 file changed, 8 insertions(+), 4 deletions(-)
+>
+> Marc spotted this breakage atop of the arm64 for-next/core branch when ftrace
+> was enabled.
+>
+> I've given this fix a go with all combinations of MODULES and RANDOMIZE_BASE,
+> with the ftrace boot time self test, and everything seems happy in all
+> combinations.
+>
 
-I was reading linker and Make files provided by the git repo in the page
- posted before. So far:
-- different app examples can use different linker configurations
-  (MCIMX7D_M4_ddr.ld, MCIMX7D_M4_ocram.ld or MCIMX7D_M4_tcm.ld)
-- only one configuration was used at the time.
+Thanks for cleaning this up. I guess Arnd's original fix didn't suffer
+from this issue.
 
-I assume, to cover all this cases:
-- for each momory range should be created own DT node, with probably own
-  clock entry.  At leas *_tcm.ld and *_ocram.ld seems to fit in this pattern.
+> diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
+> index 401aa27..945f506 100644
+> --- a/arch/arm64/kernel/ftrace.c
+> +++ b/arch/arm64/kernel/ftrace.c
+> @@ -73,10 +73,10 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
+>         unsigned long pc = rec->ip;
+>         u32 old, new;
+>
+> -#ifdef CONFIG_ARM64_MODULE_PLTS
+>         long offset = (long)pc - (long)addr;
+>
 
-Should actually all possible variants be covered?
+Could you drop the newline before the #ifdef as well please?
 
-what is the best practice to proceed with shared ddr space? Should it be
-reserved-memory node in DT?
-Should the translation map created in DeviceTree or in driver?
+>         if (offset < -SZ_128M || offset >= SZ_128M) {
+> +#ifdef CONFIG_ARM64_MODULE_PLTS
+>                 unsigned long *trampoline;
+>                 struct module *mod;
+>
+> @@ -121,8 +121,10 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
+>                         smp_wmb();
+>                 }
+>                 addr = (unsigned long)&trampoline[1];
+> -       }
+> +#else /* CONFIG_ARM64_MODULE_PLTS */
+> +               return -EINVAL;
+>  #endif /* CONFIG_ARM64_MODULE_PLTS */
+> +       }
+>
 
-> 
-> >>> +
-> >>> +/**
-> >>> + * struct imx_rproc_mem - slim internal memory structure
-> >>> + * @cpu_addr: MPU virtual address of the memory region
-> >>> + * @bus_addr: Bus address used to access the memory region
-> >>> + * @size: Size of the memory region
-> >>> + */
-> >>> +};
-> >>> +
-> >>> +struct imx_rproc_dcfg {
-> >>> +    int offset;
-> >>> +};
-> >>> +
-> >>> +struct imx_rproc {
-> >>> +    struct device            *dev;
-> >>> +    struct regmap            *regmap;
-> >>> +    struct rproc            *rproc;
-> >>> +    const struct imx_rproc_dcfg    *dcfg;
-> >>
+This is somewhat redundant, given that the
+aarch64_insn_gen_branch_imm() below will notice and complain if the
+offset exceeds the range of a bl instruction. But I have no objection
+to adding it here too.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>         old = aarch64_insn_gen_nop();
+>         new = aarch64_insn_gen_branch_imm(pc, addr, AARCH64_INSN_BRANCH_LINK);
+> @@ -140,10 +142,10 @@ int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
+>         bool validate = true;
+>         u32 old = 0, new;
+>
+> -#ifdef CONFIG_ARM64_MODULE_PLTS
+>         long offset = (long)pc - (long)addr;
+>
+
+Please drop the newline as well.
+
+>         if (offset < -SZ_128M || offset >= SZ_128M) {
+> +#ifdef CONFIG_ARM64_MODULE_PLTS
+>                 u32 replaced;
+>
+>                 /*
+> @@ -176,11 +178,13 @@ int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
+>                         return -EINVAL;
+>
+>                 validate = false;
+> +#else /* CONFIG_ARM64_MODULE_PLTS */
+> +               return -EINVAL;
+> +#endif /* CONFIG_ARM64_MODULE_PLTS */
+>         } else {
+>                 old = aarch64_insn_gen_branch_imm(pc, addr,
+>                                                   AARCH64_INSN_BRANCH_LINK);
+>         }
+> -#endif /* CONFIG_ARM64_MODULE_PLTS */
+>
+>         new = aarch64_insn_gen_nop();
+>
+
+With the above addressed:
+
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
