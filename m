@@ -1,53 +1,51 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 23 Jun 2017 16:30:52 +0200
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.13 (#2)
-In-Reply-To: <CAK8P3a1awsqu5eN4eMPMmiZ-JXn64wA+y-LUR0EdHjYiCRK+Bg@mail.gmail.com>
- (Arnd Bergmann's message of "Fri, 23 Jun 2017 16:28:41 +0200")
-References: <877f041a4p.fsf@free-electrons.com>
- <CAK8P3a3UuLFVxZv1o1+gKSafsGgV=vgWRM_yjnT_E4fAUPZx8g@mail.gmail.com>
- <87wp82yeng.fsf@free-electrons.com>
- <CAK8P3a1awsqu5eN4eMPMmiZ-JXn64wA+y-LUR0EdHjYiCRK+Bg@mail.gmail.com>
-Message-ID: <87shiqydwj.fsf@free-electrons.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri, 23 Jun 2017 15:34:54 +0100
+Subject: [GIT PULL] CCN drivers fixes for 4.13
+Message-ID: <1498228494.6830.8.camel@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
- 
- On ven., juin 23 2017, Arnd Bergmann <arnd@arndb.de> wrote:
+Greetings,
 
-> On Fri, Jun 23, 2017 at 4:14 PM, Gregory CLEMENT
-> <gregory.clement@free-electrons.com> wrote:
->> Hi Arnd,
->>
->>  On ven., juin 23 2017, Arnd Bergmann <arnd@arndb.de> wrote:
->>
->>
->>>
->>>
->>> Please send a revert for that, and remove the code that tries to
->>> parse the dma-mask from DT from that driver!
->>
->> I see on IRC you agree with Antoine about it the driver part. For the DT
->> part do you want a PR with the revert or just the patch alone?
->
-> Either way is fine, or just let me know (here or on IRC) if I should
-> just revert the patch and add an explanation myself.
+I've got a small series of fixes for the CCN driver. A long belated
+one... Apologies to all authors for delaying it way over any sensible
+time frame!
 
-If you can do it, it's better. You know better than me why we should
-revert this patch! :)
+If possible, they could go in for 4.13, they are pretty small and
+independent from anything else.
 
-Gregory
+Please consider pulling:
 
->
->        Arnd
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+The following changes since commit 41f1830f5a7af77cf5c86359aba3cbd706687e52:
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+? Linux 4.12-rc6 (2017-06-19 22:19:37 +0800)
+
+are available in the git repository at:
+
+? git://git.linaro.org/people/pawel.moll/linux.git tags/ccn/fixes-for-4.13
+
+for you to fetch changes up to e65585fdef23e29b0a7a007a7ec96030f02962d3:
+
+? bus: arm-ccn: Enable stats for CCN-502 interconnect (2017-06-20 11:24:02 +0100)
+
+----------------------------------------------------------------
+bus: ARM CCN PMU driver updates
+
+* Fixed missing module aliases, thus autoloading.
+* Use appropriate (c)allocation function for arrays of structures.
+* Add compatibility string (thus support) for CCN-502 variant.
+
+----------------------------------------------------------------
+Javier Martinez Canillas (1):
+??????bus: arm-ccn: Fix module autoload
+
+Markus Elfring (1):
+??????bus: arm-ccn: Use devm_kcalloc() in arm_ccn_probe()
+
+Velibor Markovski (2):
+??????dt-bindings: arm-ccn: Add bindings info for CCN-502 compatible string
+??????bus: arm-ccn: Enable stats for CCN-502 interconnect
+
+?Documentation/devicetree/bindings/arm/ccn.txt |??1 +
+?drivers/bus/arm-ccn.c?????????????????????????| 10 ++++++----
+?2 files changed, 7 insertions(+), 4 deletions(-)
