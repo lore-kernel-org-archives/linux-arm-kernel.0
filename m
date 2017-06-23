@@ -1,63 +1,39 @@
-From: shuah@kernel.org (Shuah Khan)
-Date: Fri, 23 Jun 2017 16:34:18 -0600
-Subject: [PATCH v2 0/3] rtc: make st-lpc robust against y2038/2106 bug
-In-Reply-To: <20170623220907.kxhkwkl6gt7bho5r@piout.net>
-References: <1497864982-29284-1-git-send-email-benjamin.gaignard@linaro.org>
- <47b45b70-91da-ce41-535d-89d92f380274@kernel.org>
- <20170623220907.kxhkwkl6gt7bho5r@piout.net>
-Message-ID: <cea926b2-5d84-18a9-9713-52d1495d550f@kernel.org>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Sat, 24 Jun 2017 07:02:34 +0800
+Subject: [arm-platforms:kvm-arm64/gicv4-kvm 43/44] make[2]: *** No rule to
+ make target 'arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.o', needed by
+ 'arch/arm64/kvm/kvm.o'.
+Message-ID: <201706240733.cJxmM4x8%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/gicv4-kvm
+head:   bdab51ab2560539213cf4541763326b0caddbda5
+commit: fa9a010dcb7fa3e34ee10e9aeb0c112bd863f421 [43/44] WIP
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout fa9a010dcb7fa3e34ee10e9aeb0c112bd863f421
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-On 06/23/2017 04:09 PM, Alexandre Belloni wrote:
-> On 23/06/2017 at 13:40:41 -0600, Shuah Khan wrote:
->> On 06/19/2017 03:36 AM, Benjamin Gaignard wrote:
->>> On 32bits platforms "struct timeval" or "time_t" are using u32 to code the
->>> date, this cause tools like "date" or "hwclock" failed even before setting
->>> the RTC device if the date is superior to year 2038 (or 2106).
->>>
->>> To avoid this problem I add one RTC test file which directly use RTC ioctl
->>> to set and read RTC time and alarm values.
->>> rtctest_setdate allow to set any date/time given in the command line.
->>>
->>> On this version 2 I add check of problematics years in rtctest like suggest
->>> by Alexandre.
->>>
->>> Finally that had allowed me to test and fix rtc-st-lpc driver.
->>>
->>> Benjamin Gaignard (3):
->>>   tools: timer: add rtctest_setdate
->>>   tool: timer: rtctest add check for problematic dates
->>>   rtc: st-lpc: make it robust against y2038/2106 bug
->>>
->>>  drivers/rtc/rtc-st-lpc.c                         |  19 ++--
->>>  tools/testing/selftests/timers/Makefile          |   2 +-
->>>  tools/testing/selftests/timers/rtctest.c         | 121 ++++++++++++++++++++++-
->>>  tools/testing/selftests/timers/rtctest_setdate.c |  86 ++++++++++++++++
->>>  4 files changed, 212 insertions(+), 16 deletions(-)
->>>  create mode 100644 tools/testing/selftests/timers/rtctest_setdate.c
->>>
->>
->> Hi Thomas/John,
->>
->> I can take the first two patches in this series through linux-kselftest
->> with your or John's Ack. Please review and let me know one way or the
->> other.
->>> 
-> Well, I'm the maintainer for rtctest.c and I'll make sure to also be the
-> one for rtctest_setdate.c> 
->> The third one is a rtc driver patch. Please let me know how do you want
->> to handle this series soon we can get this into 4.13-rc1.
->>
-> 
-> I'll take the three patches but I still have comment I didn't have time
-> to give yet.
-> 
-> 
+Note: the arm-platforms/kvm-arm64/gicv4-kvm HEAD bdab51ab2560539213cf4541763326b0caddbda5 builds fine.
+      It only hurts bisectibility.
 
-Okay. I will drop this off my radar then :)
+All errors (new ones prefixed by >>):
 
-thanks,
--- Shuah
+>> make[2]: *** No rule to make target 'arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.o', needed by 'arch/arm64/kvm/kvm.o'.
+   make[2]: Target '__build' not remade because of errors.
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 35223 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170624/2fa08fe7/attachment-0001.gz>
