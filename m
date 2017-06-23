@@ -1,21 +1,20 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 23 Jun 2017 16:45:48 -0500
-Subject: [PATCH v7 1/3] nvmem: dt: document SNVS LPGPR binding
-In-Reply-To: <20170620070932.10353-2-o.rempel@pengutronix.de>
-References: <20170620070932.10353-1-o.rempel@pengutronix.de>
- <20170620070932.10353-2-o.rempel@pengutronix.de>
-Message-ID: <20170623214548.il3o4i2w4xvklme5@rob-hp-laptop>
+Date: Fri, 23 Jun 2017 16:46:35 -0500
+Subject: [PATCH 1/2] spi: mediatek: Add bindings for mediatek MT2712 soc
+ platform
+In-Reply-To: <1497946867-25708-2-git-send-email-leilk.liu@mediatek.com>
+References: <1497946867-25708-1-git-send-email-leilk.liu@mediatek.com>
+ <1497946867-25708-2-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <20170623214635.3f2xavtxvzv5qxox@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 20, 2017 at 09:09:30AM +0200, Oleksij Rempel wrote:
-> Documentation bindings for the Low Power General Purpose Register
-> available on i.MX6 SoCs in the Secure Non-Volatile Storage.
+On Tue, Jun 20, 2017 at 04:21:06PM +0800, Leilk Liu wrote:
+> This patch adds a DT binding documentation for the MT2712 soc.
 > 
-> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+> Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
 > ---
->  .../devicetree/bindings/nvmem/snvs-lpgpr.txt         | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/nvmem/snvs-lpgpr.txt
+>  .../devicetree/bindings/spi/spi-mt65xx.txt         |    1 +
+>  1 file changed, 1 insertion(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
