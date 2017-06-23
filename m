@@ -1,58 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 Jun 2017 14:38:16 +0200
-Subject: [GIT PULL 2/2] SoCFPGA update for v4.13
-In-Reply-To: <CACRpkdbCrKo7Uvhdyx+4_hMQrPCYaMMijHpYzEY+2MePjpr73g@mail.gmail.com>
-References: <1498059352-9483-1-git-send-email-dinguyen@kernel.org>
- <1498059352-9483-2-git-send-email-dinguyen@kernel.org>
- <CAK8P3a1vZVQ5MZDU+qp62LCLnF8z-9LFH=c7XYj=ZnPUzVMjOA@mail.gmail.com>
- <CACRpkdbCrKo7Uvhdyx+4_hMQrPCYaMMijHpYzEY+2MePjpr73g@mail.gmail.com>
-Message-ID: <CAK8P3a2DFrabNdJu3d1V5F_uWRz0C+sPgqm9mnA_Wpzy6FYNDQ@mail.gmail.com>
+From: amelie.delaunay@st.com (Amelie DELAUNAY)
+Date: Fri, 23 Jun 2017 14:42:07 +0200
+Subject: [PATCH][spi-next] spi: stm32: fix range limit checks on div
+In-Reply-To: <20170622154142.22481-1-colin.king@canonical.com>
+References: <20170622154142.22481-1-colin.king@canonical.com>
+Message-ID: <1c40b653-2b52-f631-5f54-57e68270d141@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 23, 2017 at 2:28 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, Jun 23, 2017 at 2:03 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Wed, Jun 21, 2017 at 5:35 PM, Dinh Nguyen <dinguyen@kernel.org> wrote:
->>> Hi Arnd, Kevin, and Olof:
->>>
->>> Please pull in this SoCFPGA Kconfig update for v4.13.
->>
->> I'd like to defer this one until I hear back from the GPIO maintainers:
->>
->> With this patch, CONFIG_ARCH_NR_GPIO increases from 1024 to 2048
->> in the ARM defconfig build. Is this ok in terms of runtime overhead?
->
-> There is no problem with runtime overhead, only with footprint.
->
-> The array of sizeof(gpio_desc) increases to double.
->
-> struct looks like so:
->
-> struct gpio_desc {
->         struct gpio_device      *gdev;
->         unsigned long           flags;
->         const char              *label;
->         const char              *name;
-> };
->
-> Looks like 4x32 bits in most cases, so this means a 4*4*1024 =
-> 16 KiB footprint increase.
 
-Ok.
+On 06/22/2017 05:41 PM, Colin King wrote:
+> From: Colin Ian King <colin.king@canonical.com>
+> 
+> Currently the check for range limits on div is incorrect and will
+> never return -EINVAL. Fix this by replacing && with ||
+> 
+> Detected by CoverityScan, CID#1446580 ("Structurally dead code")
+> 
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> ---
+>   drivers/spi/spi-stm32.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/spi/spi-stm32.c b/drivers/spi/spi-stm32.c
+> index 0553f61ab3b7..b75909e7b117 100644
+> --- a/drivers/spi/spi-stm32.c
+> +++ b/drivers/spi/spi-stm32.c
+> @@ -262,7 +262,7 @@ static int stm32_spi_prepare_mbr(struct stm32_spi *spi, u32 speed_hz)
+>   	 * no need to check it there.
+>   	 * However, we need to ensure the following calculations.
+>   	 */
+> -	if ((div < SPI_MBR_DIV_MIN) &&
+> +	if ((div < SPI_MBR_DIV_MIN) ||
+>   	    (div > SPI_MBR_DIV_MAX))
+>   		return -EINVAL;
+>   
+> 
 
-> We have had to allocate this statically because so many playforms still
-> use the legacy GPIO API.
->
->> If not, are there any alternatives?
->
-> Not really, if they have this many GPIOs.
-
-Right. I pulled the branch into next/soc now, thanks for the quick reply!
-
-> Helping out ridding the kernel of users of the old GPIO global
-> numberspace ABI is appreciated though.
-
-I guess there is no easy way to figure out which drivers are needed on
-socfpga and do those first, right?
-
-        Arnd
+Reviewed-by: Amelie Delaunay <amelie.delaunay@st.com>
