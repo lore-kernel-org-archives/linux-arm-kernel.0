@@ -1,60 +1,63 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 23 Jun 2017 11:58:22 +0200
-Subject: [PATCH v2.5 6/9] serial: omap-serial: Use common rs485 device tree
- parsing function
-In-Reply-To: <20170623094945.31908-7-u.kleine-koenig@pengutronix.de>
-References: <20170623094945.31908-7-u.kleine-koenig@pengutronix.de>
-Message-ID: <20170623095822.6306-1-u.kleine-koenig@pengutronix.de>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 23 Jun 2017 10:58:38 +0100
+Subject: [PATCH v2 0/8] io-pgtable lock removal
+In-Reply-To: <61b7b953-5bf4-eb45-c3e8-b4491e8fdca7@huawei.com>
+References: <cover.1498145008.git.robin.murphy@arm.com>
+ <61b7b953-5bf4-eb45-c3e8-b4491e8fdca7@huawei.com>
+Message-ID: <f694a247-9006-3a3c-8a77-209b158eabf3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sascha Hauer <s.hauer@pengutronix.de>
+On 23/06/17 09:47, John Garry wrote:
+> On 22/06/2017 16:53, Robin Murphy wrote:
+>> The feedback has been promising, so v2 is just a final update to cover
+>> a handful of memory ordering and cosmetic tweaks that came up when Will
+>> and I went through this offline.
+>>
+>> Thanks,
+>> Robin.
+> 
+> Hi Robin,
+> 
+> Is it worth us retesting this patchset?
+> 
+> If yes, as for a branch (for convenience), does this one now match v2:
+> git://linux-arm.org/linux-rm  iommu/pgtable
+> 
+> I saw it was rewritten recently.
 
-We just got a common helper for parsing the rs485 specific
-device tree properties. Use it and drop the open coded parser.
+Indeed, I pushed the branch out before posting. Functionally it ought to
+be identical to v1, so this was more just a heads-up - feel free to
+double-check I've not broken anything, but I wouldn't say you need to
+throw the full test lab at it again.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Changes since v2:
- - remove now unused variable
+Thanks,
+Robin.
 
-Changes since v1:
- - drop paragraph in commit log that of_get_rs485_mode is more strict as this is wrong in v2.
-
- drivers/tty/serial/omap-serial.c | 13 +------------
- 1 file changed, 1 insertion(+), 12 deletions(-)
-
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index 1ea05ac57aa7..6d22097e6dd0 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -1607,7 +1607,6 @@ static int serial_omap_probe_rs485(struct uart_omap_port *up,
- 				   struct device_node *np)
- {
- 	struct serial_rs485 *rs485conf = &up->port.rs485;
--	u32 rs485_delay[2];
- 	enum of_gpio_flags flags;
- 	int ret;
- 
-@@ -1638,17 +1637,7 @@ static int serial_omap_probe_rs485(struct uart_omap_port *up,
- 		up->rts_gpio = -EINVAL;
- 	}
- 
--	if (of_property_read_u32_array(np, "rs485-rts-delay",
--				    rs485_delay, 2) == 0) {
--		rs485conf->delay_rts_before_send = rs485_delay[0];
--		rs485conf->delay_rts_after_send = rs485_delay[1];
--	}
--
--	if (of_property_read_bool(np, "rs485-rx-during-tx"))
--		rs485conf->flags |= SER_RS485_RX_DURING_TX;
--
--	if (of_property_read_bool(np, "linux,rs485-enabled-at-boot-time"))
--		rs485conf->flags |= SER_RS485_ENABLED;
-+	of_get_rs485_mode(np, rs485conf);
- 
- 	return 0;
- }
--- 
-2.11.0
+> 
+> Thanks,
+> John
+> 
+>>
+>>
+>> Robin Murphy (8):
+>>   iommu/io-pgtable-arm-v7s: Check table PTEs more precisely
+>>   iommu/io-pgtable-arm: Improve split_blk_unmap
+>>   iommu/io-pgtable-arm-v7s: Refactor split_blk_unmap
+>>   iommu/io-pgtable: Introduce explicit coherency
+>>   iommu/io-pgtable-arm: Support lockless operation
+>>   iommu/io-pgtable-arm-v7s: Support lockless operation
+>>   iommu/arm-smmu: Remove io-pgtable spinlock
+>>   iommu/arm-smmu-v3: Remove io-pgtable spinlock
+>>
+>>  drivers/iommu/arm-smmu-v3.c        |  36 ++-----
+>>  drivers/iommu/arm-smmu.c           |  48 ++++------
+>>  drivers/iommu/io-pgtable-arm-v7s.c | 179
+>> +++++++++++++++++++++-------------
+>>  drivers/iommu/io-pgtable-arm.c     | 191
+>> ++++++++++++++++++++++++-------------
+>>  drivers/iommu/io-pgtable.h         |   6 ++
+>>  5 files changed, 274 insertions(+), 186 deletions(-)
+>>
+> 
+> 
