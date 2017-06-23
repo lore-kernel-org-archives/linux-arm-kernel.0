@@ -1,33 +1,48 @@
-From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
-Date: Fri, 23 Jun 2017 21:44:35 +0200
-Subject: [PATCH v2] thermal: bcm2835: Fix error code in 'bcm2835_thermal_probe'
-Message-ID: <20170623194435.8094-1-christophe.jaillet@wanadoo.fr>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 23 Jun 2017 14:54:28 -0500
+Subject: [PATCH 1/5] dt-bindings: Update Broadcom STB binding
+In-Reply-To: <20170616213703.21487-2-f.fainelli@gmail.com>
+References: <20170616213703.21487-1-f.fainelli@gmail.com>
+ <20170616213703.21487-2-f.fainelli@gmail.com>
+Message-ID: <20170623195428.x7ckvni5t5gl4ukx@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-'tz' is a valid pointer at this point, so calling PTR_ERR on it is
-pointless.
-This 'err = PTR_ERR(tz)' looks like a cut'n'paste from a few lines above.
-So remove it. 'err' is already the error we want to report.
+On Fri, Jun 16, 2017 at 02:36:59PM -0700, Florian Fainelli wrote:
+> Update the Broadcom STB binding document with new compatible strings for
+> the DDR PHY and memory controller found on newer chips.
 
-Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
----
-v2: fix empty subject
----
- drivers/thermal/broadcom/bcm2835_thermal.c | 1 -
- 1 file changed, 1 deletion(-)
+The subject should be more specific what this patch is doing.
 
-diff --git a/drivers/thermal/broadcom/bcm2835_thermal.c b/drivers/thermal/broadcom/bcm2835_thermal.c
-index 0ecf80890c84..e6863c841662 100644
---- a/drivers/thermal/broadcom/bcm2835_thermal.c
-+++ b/drivers/thermal/broadcom/bcm2835_thermal.c
-@@ -245,7 +245,6 @@ static int bcm2835_thermal_probe(struct platform_device *pdev)
- 		 */
- 		err = tz->ops->get_trip_temp(tz, 0, &trip_temp);
- 		if (err < 0) {
--			err = PTR_ERR(tz);
- 			dev_err(&pdev->dev,
- 				"Not able to read trip_temp: %d\n",
- 				err);
--- 
-2.11.0
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
+> index 0d0c1ae81bed..790e6b0b8306 100644
+> --- a/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
+> +++ b/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
+> @@ -164,6 +164,8 @@ Control registers for this memory controller's DDR PHY.
+>  
+>  Required properties:
+>  - compatible     : should contain one of these
+> +	"brcm,brcmstb-ddr-phy-v71.1"
+> +	"brcm,brcmstb-ddr-phy-v72.0"
+>  	"brcm,brcmstb-ddr-phy-v225.1"
+>  	"brcm,brcmstb-ddr-phy-v240.1"
+>  	"brcm,brcmstb-ddr-phy-v240.2"
+> @@ -184,7 +186,9 @@ Sequencer DRAM parameters and control registers. Used for Self-Refresh
+>  Power-Down (SRPD), among other things.
+>  
+>  Required properties:
+> -- compatible     : should contain "brcm,brcmstb-memc-ddr"
+> +- compatible     : should contain one of these
+> +	"brcm,brcmstb-memc-ddr-rev-b.2.2"
+> +	"brcm,brcmstb-memc-ddr"
+>  - reg            : the MEMC DDR register range
+>  
+>  Example:
+> -- 
+> 2.9.3
+> 
