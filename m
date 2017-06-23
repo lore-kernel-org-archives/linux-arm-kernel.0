@@ -1,50 +1,79 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Fri, 23 Jun 2017 09:04:16 +0800
-Subject: [PATCH v3 0/3] Add RK3399 HDMI Support
-In-Reply-To: <1496992228-10582-1-git-send-email-mark.yao@rock-chips.com>
-References: <1496992228-10582-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <594C6910.6000208@rock-chips.com>
+From: subhashj@codeaurora.org (Subhash Jadavani)
+Date: Thu, 22 Jun 2017 18:05:40 -0700
+Subject: [PATCH v2 2/5] dt-bindings: scsi: ufs: add document for hi3660-ufs
+In-Reply-To: <CAK8P3a2z7VbPb95Ltj=Duh1v_Yqxedb_g=ADNPWOrpEz1dCTuw@mail.gmail.com>
+References: <20170616065119.10704-1-butao@hisilicon.com>
+ <20170616065119.10704-3-butao@hisilicon.com>
+ <CAK8P3a2aPorzpUzwL=dkUkYNCGkhQMDPOkKRW1-=Hf=yCdvTsQ@mail.gmail.com>
+ <0f79aeea-53e3-6bea-ffa6-0e057f2ff83b@huawei.com>
+ <CAK8P3a2z7VbPb95Ltj=Duh1v_Yqxedb_g=ADNPWOrpEz1dCTuw@mail.gmail.com>
+Message-ID: <5c4c0a7b844055b32b8463fcee04401e@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for Heiko's review and Rob's Ack.
+On 2017-06-22 04:51, Arnd Bergmann wrote:
+> On Thu, Jun 22, 2017 at 1:44 PM, Bu Tao <butao@huawei.com> wrote:
+>> ? 2017/6/17 5:51, Arnd Bergmann ??:
+>>> On Fri, Jun 16, 2017 at 8:51 AM, Bu Tao <butao@hisilicon.com> wrote:
+>>>> +Optional properties for board device:
+>>>> +- ufs-hi3660-use-rate-B                : specifies UFS rate-B
+>>>> +- ufs-hi3660-broken-fastauto   : specifies no fastauto
+>>>> +- ufs-hi3660-use-HS-GEAR3      : specifies UFS HS-GEAR3
+>>>> +- ufs-hi3660-use-HS-GEAR2      : specifies UFS HS-GEAR2
+>>>> +- ufs-hi3660-use-HS-GEAR1      : specifies UFS HS-GEAR1
+>>>> +- ufs-hi3660-broken-clk-gate-bypass    : specifies no clk-gate
+>>>> +- ufs-hi3660-use-one-line      : specifies UFS use one line work
+>>>> +- reset-gpio                   : specifies to reset devices
+>>> 
+>>> 
+>>> Some of these sound rather generic and might apply to UFS 
+>>> implementations
+>>> other than hi3660, so I'd suggest adding them to the base ufs binding 
+>>> with
+>>> a generic name instead.
+>>> 
+>>> Any DT properties that might be useful across multiple 
+>>> implementations
+>>> should be parsed in generic code that gets called by the individual
+>>> drivers,
+>>> and then the properties that are specific to the integration work 
+>>> done by
+>>> hisilicon should be prefixed with "hisilicon,", but not normally with 
+>>> the
+>>> SoC name: it is quite possible that another SoC will be derived from 
+>>> this
+>>> chip and it should reuse the properties.
+>> 
+>> 
+>> I do not know wheher other SoC need to use the optional properties as
+>> abover. So here the name of the optional properties has "hi3660".
+> 
+> They should not have "hi3660" in their names either way, independent
+> of where they are used.
 
-Seems no more confuse, pushed to drm-misc-next.
 
-Thanks.
+Yes, i agree with Arnd that SoCs might also need these so please make 
+these properties generic (put them under 
+Documentation/devicetree/bindings/ufs/ufshcd-pltfrm.txt) and also move 
+their parsing code in generic driver (ufshcd.c or ufshcd-pltfrm.c).
 
-On 2017?06?09? 15:10, Mark Yao wrote:
-> RK3399 and RK3288 shared the same HDMI IP controller, only some
-> light difference with GRF configure, and an external VPLL clock
-> need to configure.
->
-> base on Yakir's v1 thread:
->     http://lkml.iu.edu/hypermail/linux/kernel/1607.1/01468.html
->
-> rely on Jose's hdmi phy patch:
->     https://patchwork.kernel.org/patch/9702229
->
-> Some Yakir's hdmi patches cause hdmi no display on my test,
-> so I remove them on this thread.
->
-> Tested on rk3399 evb board with kernel 4.12.0-rc1.
->
-> Changes in v3:
->    remove hdmi_phy_configure_dwc_hdmi_3d_tx callbak.
->
-> Changes in v2:
->    rebase to newest uptream, reuse hdmi_phy_configure_dwc_hdmi_3d_tx
->
-> Mark Yao (3):
->    drm/rockchip: dw_hdmi: add RK3399 HDMI support
->    drm/rockchip: dw_hdmi: introduce the VPLL clock setting
->    drm/rockchip: dw_hdmi: introduce the pclk for grf
->
->   .../bindings/display/rockchip/dw_hdmi-rockchip.txt |   6 +-
->   drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        | 110 ++++++++++++++++++---
->   2 files changed, 102 insertions(+), 14 deletions(-)
->
-
+> 
+>>> (note: this is different from the value of the "compatible" property 
+>>> that
+>>> is meant to be as specific as possible".
+>>> 
+>>> Also, please clarify how your binding relates to the ufshcd binding
+>>> in Documentation/devicetree/bindings/ufs/ufshcd-pltfrm.txt: does
+>>> hi3660 implement any registers that are shared with ufshcd, or does
+>>> it use the same physical interface with a different register set?
+>> 
+>> No, only show how to use the dt-binding for hi3660 SoC
+> 
+> My question was about the hardware: does hi3660 implement ufshcd
+> or not?
+> 
+>       Arnd
 
 -- 
-?ark Yao
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
