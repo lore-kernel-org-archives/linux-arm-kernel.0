@@ -1,34 +1,76 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 23 Jun 2017 14:29:52 +0200
-Subject: [PATCH 2/2] pinctrl: armada-37xx: Fix number of pin in sdio_sb
-In-Reply-To: <20170623122952.9871-1-gregory.clement@free-electrons.com>
-References: <20170623122952.9871-1-gregory.clement@free-electrons.com>
-Message-ID: <20170623122952.9871-3-gregory.clement@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 Jun 2017 14:32:51 +0200
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.13 (#2)
+In-Reply-To: <877f041a4p.fsf@free-electrons.com>
+References: <877f041a4p.fsf@free-electrons.com>
+Message-ID: <CAK8P3a3UuLFVxZv1o1+gKSafsGgV=vgWRM_yjnT_E4fAUPZx8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sdio_sb group is composed of 6 pins and not 5.
+On Thu, Jun 22, 2017 at 2:26 PM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> Hi,
+>
+> Here is the second pull request for dt64 for mvebu for v4.13.
+>
+> This came only now because I waited for that the drivers part was
+> accepted. Now that is was done we can enable the last missing part of
+> the infrastructure for the Aramda 7K/8K SoCs.
 
-Reported-by: Ken Ma <make@marvell.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/pinctrl/mvebu/pinctrl-armada-37xx.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Pulled into next/dt64, thanks!
 
-diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-index 2fb1c67886fc..addc130159fc 100644
---- a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-@@ -160,8 +160,8 @@ static struct armada_37xx_pin_group armada_37xx_nb_groups[] = {
- static struct armada_37xx_pin_group armada_37xx_sb_groups[] = {
- 	PIN_GRP_GPIO("usb32_drvvbus0", 0, 1, BIT(0), "drvbus"),
- 	PIN_GRP_GPIO("usb2_drvvbus1", 1, 1, BIT(1), "drvbus"),
--	PIN_GRP_GPIO("sdio_sb", 24, 5, BIT(2), "sdio"),
--	PIN_GRP_EXTRA("rgmii", 6, 14, BIT(3), 0, BIT(3), 23, 1, "mii", "gpio"),
-+	PIN_GRP_GPIO("sdio_sb", 24, 6, BIT(2), "sdio"),
-+	PIN_GRP_EXTRA("rgmii", 6, 12, BIT(3), 0, BIT(3), 23, 1, "mii", "gpio"),
- 	PIN_GRP_GPIO("pcie1", 3, 2, BIT(4), "pcie"),
- 	PIN_GRP_GPIO("ptp", 20, 3, BIT(5), "ptp"),
- 	PIN_GRP("ptp_clk", 21, 1, BIT(6), "ptp", "mii"),
--- 
-2.11.0
+> Also note that there is a trivial merge conflict with the mvebu-fixes
+> branch. In case of doubt it was resolved in the last merge commit of
+> the mvebu/for-next branch.
+
+Thanks, that helped, my initial merge ended up with a typo.
+
+However, while doing the merge, I stumbled over an obviously
+broken commit:
+
+
+commit b1a97f86b7359da7bbd7a8dd2900d62352c04644
+Author: Antoine Tenart <antoine.tenart@free-electrons.com>
+Date:   Wed May 24 16:10:33 2017 +0200
+
+    arm64: dts: marvell: add dma-mask in crypto nodes for 7k/8k
+
+    The EIP197 cryptographic engine supports 64 bits address width but is
+    limited to 40 bits on 7k/8k. Add a dma-mask property in the
+    cryptographic engine nodes to reflect this.
+
+    Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+    Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+index 576e825585c9..e02ac90f7fdf 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+@@ -242,6 +242,7 @@
+                                interrupt-names = "mem", "ring0", "ring1",
+                                "ring2", "ring3", "eip";
+                                clocks = <&cpm_syscon0 1 26>;
++                               dma-mask = <0xff 0xffffffff>;
+                                status = "disabled";
+                        };
+                };
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+index 797208a11f9d..7468fe00fc37 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+@@ -232,6 +232,7 @@
+                                interrupt-names = "mem", "ring0", "ring1",
+                                                  "ring2", "ring3", "eip";
+                                clocks = <&cps_syscon0 1 26>;
++                               dma-mask = <0xff 0xffffffff>;
+                                status = "disabled";
+                        };
+                };
+
+
+Please send a revert for that, and remove the code that tries to
+parse the dma-mask from DT from that driver!
+
+       Arnd
