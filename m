@@ -1,90 +1,30 @@
-From: shameerali.kolothum.thodi@huawei.com (shameer)
-Date: Fri, 23 Jun 2017 15:58:01 +0100
-Subject: [PATCH v3 2/2] iommu/arm-smmu-v3:Enable ACPI based HiSilicon erratum
- 161010801
-In-Reply-To: <20170623145801.325244-1-shameerali.kolothum.thodi@huawei.com>
-References: <20170623145801.325244-1-shameerali.kolothum.thodi@huawei.com>
-Message-ID: <20170623145801.325244-3-shameerali.kolothum.thodi@huawei.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 Jun 2017 17:01:48 +0200
+Subject: [GIT PULL] CCN drivers fixes for 4.13
+In-Reply-To: <1498229290.6830.11.camel@arm.com>
+References: <1498228494.6830.8.camel@arm.com>
+ <CAK8P3a2wKDThMvqivHAENhjZCoOOhyrohZqMQx8xboESgomu2Q@mail.gmail.com>
+ <1498229290.6830.11.camel@arm.com>
+Message-ID: <CAK8P3a0=U09qGRw=ziuDuOzMNUD-49pQtkKesNp4N-qRKZrV=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The HiSilicon erratum 161010801 describes the limitation of HiSilicon
-platforms Hip06/Hip07 to support the SMMU mappings for MSI transactions.
+On Fri, Jun 23, 2017 at 4:48 PM, Pawel Moll <pawel.moll@arm.com> wrote:
+> On Fri, 2017-06-23 at 16:44 +0200, Arnd Bergmann wrote:
+>> > If possible, they could go in for 4.13, they are pretty small and
+>> > independent from anything else.
+>> Did you mean 4.12 rather than 4.13?
+>
+> 4.13. Wouldn't dare to ask for 4.12 at this stage...
 
-On these platforms GICv3 ITS translator is presented with the deviceID
-by extending the MSI payload data to 64 bits to include the deviceID.
-Hence, the PCIe controller on this platforms has to differentiate the
-MSI payload against other DMA payload and has to modify the MSI payload.
-This basically makes it difficult for this platforms to have a SMMU
-translation for MSI.
+Ok. Note that I really do want bugfixes for the current release and even
+marked for stable backports more often in general, so I would not have
+complained about the other ones even if they appeared to be less
+important than others.
 
-This patch implements a ACPI table based quirk to reserve the hw msi
-regions in the smmu-v3 driver which means these address regions will
-not be translated and will be excluded from iova allocations.
+OTOH I do tend to trust downstream maintainers to make a more
+informed decision than I could do regarding which tree to apply
+things for, I was mostly getting confused by receiving a pull request
+based on a later -rc.
 
-Signed-off-by: shameer <shameerali.kolothum.thodi@huawei.com>
----
- drivers/iommu/arm-smmu-v3.c | 30 ++++++++++++++++++++++++++----
- 1 file changed, 26 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index abe4b88..c9346f2 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -597,6 +597,7 @@ struct arm_smmu_device {
- 	u32				features;
- 
- #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-+#define ARM_SMMU_OPT_RESV_HW_MSI	(1 << 1)
- 	u32				options;
- 
- 	struct arm_smmu_cmdq		cmdq;
-@@ -1904,14 +1905,34 @@ static void arm_smmu_get_resv_regions(struct device *dev,
- 				      struct list_head *head)
- {
- 	struct iommu_resv_region *region;
-+	struct arm_smmu_device *smmu;
-+	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
- 	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
-+	int resv = 0;
- 
--	region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
--					 prot, IOMMU_RESV_SW_MSI);
--	if (!region)
-+	smmu = arm_smmu_get_by_fwnode(fwspec->iommu_fwnode);
-+	if (WARN_ON(!smmu))
- 		return;
- 
--	list_add_tail(&region->list, head);
-+	if ((smmu->options & ARM_SMMU_OPT_RESV_HW_MSI)) {
-+
-+		if (!is_of_node(smmu->dev->fwnode))
-+			resv = iort_iommu_its_get_resv_regions(dev, head);
-+
-+		if (resv < 0) {
-+			dev_warn(dev, "HW MSI region resv failed: %d\n", resv);
-+			return;
-+		}
-+	}
-+
-+	if (!resv) {
-+		region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
-+						 prot, IOMMU_RESV_SW_MSI);
-+		if (!region)
-+			return;
-+
-+		list_add_tail(&region->list, head);
-+	}
- 
- 	iommu_dma_get_resv_regions(dev, head);
- }
-@@ -2611,6 +2632,7 @@ static void parse_driver_acpi_options(struct acpi_iort_smmu_v3 *iort_smmu,
- 	switch (iort_smmu->model) {
- 	case ACPI_IORT_SMMU_HISILICON_HI161X:
- 		smmu->options |= ARM_SMMU_OPT_SKIP_PREFETCH;
-+		smmu->options |= ARM_SMMU_OPT_RESV_HW_MSI;
- 		break;
- 	default:
- 		break;
--- 
-1.9.1
+        Arnd
