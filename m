@@ -1,62 +1,42 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 23 Jun 2017 06:57:14 +0000
-Subject: [kernel-hardening] [PATCH 2/4] arm64: Reduce ELF_ET_DYN_BASE
-In-Reply-To: <1498154792-49952-3-git-send-email-keescook@chromium.org>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Fri, 23 Jun 2017 17:01:42 +1000
+Subject: [PATCH 3/4] powerpc: Reduce ELF_ET_DYN_BASE
+In-Reply-To: <1498154792-49952-4-git-send-email-keescook@chromium.org>
 References: <1498154792-49952-1-git-send-email-keescook@chromium.org>
- <1498154792-49952-3-git-send-email-keescook@chromium.org>
-Message-ID: <CAKv+Gu_2Wg_D+4c3-iqMr9hbKkGVdBtW6Bmxj-4=FOG9hVN5vA@mail.gmail.com>
+ <1498154792-49952-4-git-send-email-keescook@chromium.org>
+Message-ID: <87podvp4q1.fsf@concordia.ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kees,
+Kees Cook <keescook@chromium.org> writes:
 
-On 22 June 2017 at 18:06, Kees Cook <keescook@chromium.org> wrote:
 > Now that explicitly executed loaders are loaded in the mmap region,
 > position PIE binaries lower in the address space to avoid possible
 > collisions with mmap or stack regions. For 64-bit, align to 4GB to
 > allow runtimes to use the entire 32-bit address space for 32-bit
 > pointers.
->
-> Signed-off-by: Kees Cook <keescook@chromium.org>
-> ---
->  arch/arm64/include/asm/elf.h | 13 ++++++-------
->  1 file changed, 6 insertions(+), 7 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-> index 5d1700425efe..f742af8f7c42 100644
-> --- a/arch/arm64/include/asm/elf.h
-> +++ b/arch/arm64/include/asm/elf.h
-> @@ -113,12 +113,13 @@
->  #define ELF_EXEC_PAGESIZE      PAGE_SIZE
->
->  /*
-> - * This is the location that an ET_DYN program is loaded if exec'ed.  Typical
-> - * use of this is to invoke "./ld.so someprog" to test out a new version of
-> - * the loader.  We need to make sure that it is out of the way of the program
-> - * that it will "exec", and that there is sufficient room for the brk.
-> + * This is the base location for PIE (ET_DYN with INTERP) loads. On
-> + * 64-bit, this is raised to 4GB to leave the entire 32-bit address
-> + * space open for things that want to use the area for 32-bit pointers.
->   */
-> -#define ELF_ET_DYN_BASE        (2 * TASK_SIZE_64 / 3)
-> +#define ELF_ET_DYN_BASE                (test_thread_flag(TIF_32BIT) ?  \
-> +                                       0x000400000UL :         \
-> +                                       0x100000000UL)
->
 
-Why are you merging this with the COMPAT definition?
+The change log and subject are a bit out of whack with the actual patch
+because previously we used 512MB.
 
->  #ifndef __ASSEMBLY__
->
-> @@ -173,8 +174,6 @@ extern int arch_setup_additional_pages(struct linux_binprm *bprm,
->
->  #ifdef CONFIG_COMPAT
->
-> -#define COMPAT_ELF_ET_DYN_BASE         (2 * TASK_SIZE_32 / 3)
-> -
->  /* AArch32 registers. */
->  #define COMPAT_ELF_NGREG               18
->  typedef unsigned int                   compat_elf_greg_t;
-> --
-> 2.7.4
->
+How about?
+
+  powerpc: Move ELF_ET_DYN_BASE to 4GB / 4MB
+  
+  Now that explicitly executed loaders are loaded in the mmap region,
+  we have more freedom to decide where we position PIE binaries in the
+  address space to avoid possible collisions with mmap or stack regions.
+  
+  For 64-bit, align to 4GB to allow runtimes to use the entire 32-bit
+  address space for 32-bit pointers. On 32-bit use 4MB.
+
+
+Is there any particular reasoning behind the 4MB value on 32-bit?
+
+
+I gave this a quick spin and it booted OK on all my test boxes, which
+covers 64-bit/32-bit kernel and userspace. So seems to work!
+
+Acked-by: Michael Ellerman <mpe@ellerman.id.au>
+
+cheers
