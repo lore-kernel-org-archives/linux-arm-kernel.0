@@ -1,70 +1,123 @@
 From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Fri, 23 Jun 2017 14:55:50 +0200
-Subject: [PATCH 8/8] spi: stm32: fix potential dereference null return value
+Date: Fri, 23 Jun 2017 14:55:48 +0200
+Subject: [PATCH 6/8] spi: stm32: add runtime PM support
 In-Reply-To: <1498222550-19092-1-git-send-email-amelie.delaunay@st.com>
 References: <1498222550-19092-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <1498222550-19092-9-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1498222550-19092-7-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the usage of rx_dma_desc and tx_dma_desc pointers
-returned by dmaengine_prep_slave_sg, which can be null.
+This patch reworks suspend and resume callbacks and add runtime_suspend
+and runtime_resume callbacks.
 
-Detected by CoverityScan, CID#1446587 ("Dereference null return value")
-
-Reported-by: Colin Ian King <colin.king@canonical.com>
 Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 ---
- drivers/spi/spi-stm32.c | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+ drivers/spi/spi-stm32.c | 43 ++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 36 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/spi/spi-stm32.c b/drivers/spi/spi-stm32.c
-index 63af9d9..076a720 100644
+index 72efc63..209afda 100644
 --- a/drivers/spi/spi-stm32.c
 +++ b/drivers/spi/spi-stm32.c
-@@ -775,9 +775,6 @@ static int stm32_spi_transfer_one_dma(struct stm32_spi *spi,
- 					xfer->rx_sg.nents,
- 					rx_dma_conf.direction,
- 					DMA_PREP_INTERRUPT);
--
--		rx_dma_desc->callback = stm32_spi_dma_cb;
--		rx_dma_desc->callback_param = spi;
- 	}
+@@ -27,6 +27,7 @@
+ #include <linux/iopoll.h>
+ #include <linux/module.h>
+ #include <linux/of_platform.h>
++#include <linux/pm_runtime.h>
+ #include <linux/reset.h>
+ #include <linux/spi/spi.h>
  
- 	tx_dma_desc = NULL;
-@@ -790,11 +787,6 @@ static int stm32_spi_transfer_one_dma(struct stm32_spi *spi,
- 					xfer->tx_sg.nents,
- 					tx_dma_conf.direction,
- 					DMA_PREP_INTERRUPT);
--
--		if (spi->cur_comm == SPI_SIMPLEX_TX) {
--			tx_dma_desc->callback = stm32_spi_dma_cb;
--			tx_dma_desc->callback_param = spi;
--		}
- 	}
+@@ -1164,6 +1165,9 @@ static int stm32_spi_probe(struct platform_device *pdev)
+ 	if (spi->dma_tx || spi->dma_rx)
+ 		master->can_dma = stm32_spi_can_dma;
  
- 	if ((spi->tx_buf && !tx_dma_desc) ||
-@@ -802,6 +794,9 @@ static int stm32_spi_transfer_one_dma(struct stm32_spi *spi,
- 		goto dma_desc_error;
- 
- 	if (rx_dma_desc) {
-+		rx_dma_desc->callback = stm32_spi_dma_cb;
-+		rx_dma_desc->callback_param = spi;
++	pm_runtime_set_active(&pdev->dev);
++	pm_runtime_enable(&pdev->dev);
 +
- 		if (dma_submit_error(dmaengine_submit(rx_dma_desc))) {
- 			dev_err(spi->dev, "Rx DMA submit failed\n");
- 			goto dma_desc_error;
-@@ -811,6 +806,11 @@ static int stm32_spi_transfer_one_dma(struct stm32_spi *spi,
- 	}
- 
- 	if (tx_dma_desc) {
-+		if (spi->cur_comm == SPI_SIMPLEX_TX) {
-+			tx_dma_desc->callback = stm32_spi_dma_cb;
-+			tx_dma_desc->callback_param = spi;
-+		}
+ 	ret = devm_spi_register_master(&pdev->dev, master);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "spi master registration failed: %d\n",
+@@ -1203,6 +1207,8 @@ static int stm32_spi_probe(struct platform_device *pdev)
+ 		dma_release_channel(spi->dma_tx);
+ 	if (spi->dma_rx)
+ 		dma_release_channel(spi->dma_rx);
 +
- 		if (dma_submit_error(dmaengine_submit(tx_dma_desc))) {
- 			dev_err(spi->dev, "Tx DMA submit failed\n");
- 			goto dma_submit_error;
++	pm_runtime_disable(&pdev->dev);
+ err_clk_disable:
+ 	clk_disable_unprepare(spi->clk);
+ err_master_put:
+@@ -1225,23 +1231,42 @@ static int stm32_spi_remove(struct platform_device *pdev)
+ 
+ 	clk_disable_unprepare(spi->clk);
+ 
++	pm_runtime_disable(&pdev->dev);
++
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM
++static int stm32_spi_runtime_suspend(struct device *dev)
++{
++	struct spi_master *master = dev_get_drvdata(dev);
++	struct stm32_spi *spi = spi_master_get_devdata(master);
++
++	clk_disable_unprepare(spi->clk);
++
++	return 0;
++}
++
++static int stm32_spi_runtime_resume(struct device *dev)
++{
++	struct spi_master *master = dev_get_drvdata(dev);
++	struct stm32_spi *spi = spi_master_get_devdata(master);
++
++	return clk_prepare_enable(spi->clk);
++}
++#endif
++
+ #ifdef CONFIG_PM_SLEEP
+ static int stm32_spi_suspend(struct device *dev)
+ {
+ 	struct spi_master *master = dev_get_drvdata(dev);
+-	struct stm32_spi *spi = spi_master_get_devdata(master);
+ 	int ret;
+ 
+ 	ret = spi_master_suspend(master);
+ 	if (ret)
+ 		return ret;
+ 
+-	clk_disable_unprepare(spi->clk);
+-
+-	return ret;
++	return pm_runtime_force_suspend(dev);
+ }
+ 
+ static int stm32_spi_resume(struct device *dev)
+@@ -1250,9 +1275,10 @@ static int stm32_spi_resume(struct device *dev)
+ 	struct stm32_spi *spi = spi_master_get_devdata(master);
+ 	int ret;
+ 
+-	ret = clk_prepare_enable(spi->clk);
++	ret = pm_runtime_force_resume(dev);
+ 	if (ret)
+ 		return ret;
++
+ 	ret = spi_master_resume(master);
+ 	if (ret)
+ 		clk_disable_unprepare(spi->clk);
+@@ -1261,8 +1287,11 @@ static int stm32_spi_resume(struct device *dev)
+ }
+ #endif
+ 
+-static SIMPLE_DEV_PM_OPS(stm32_spi_pm_ops,
+-			 stm32_spi_suspend, stm32_spi_resume);
++static const struct dev_pm_ops stm32_spi_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(stm32_spi_suspend, stm32_spi_resume)
++	SET_RUNTIME_PM_OPS(stm32_spi_runtime_suspend,
++			   stm32_spi_runtime_resume, NULL)
++};
+ 
+ static struct platform_driver stm32_spi_driver = {
+ 	.probe = stm32_spi_probe,
 -- 
 1.9.1
