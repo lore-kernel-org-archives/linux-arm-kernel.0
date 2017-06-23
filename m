@@ -1,76 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 Jun 2017 14:32:51 +0200
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.13 (#2)
-In-Reply-To: <877f041a4p.fsf@free-electrons.com>
-References: <877f041a4p.fsf@free-electrons.com>
-Message-ID: <CAK8P3a3UuLFVxZv1o1+gKSafsGgV=vgWRM_yjnT_E4fAUPZx8g@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 23 Jun 2017 14:33:26 +0200
+Subject: [PATCH] pinctrl: qcom: qdf2xxx: expose only some GPIO pins
+In-Reply-To: <1498164850-4738-1-git-send-email-timur@codeaurora.org>
+References: <1498164850-4738-1-git-send-email-timur@codeaurora.org>
+Message-ID: <CACRpkdZeDjS_g27=1e7uCmFpjnqX+sDSu5G2VAuwFr_GJW1mug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 22, 2017 at 2:26 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Hi,
->
-> Here is the second pull request for dt64 for mvebu for v4.13.
->
-> This came only now because I waited for that the drivers part was
-> accepted. Now that is was done we can enable the last missing part of
-> the infrastructure for the Aramda 7K/8K SoCs.
+On Thu, Jun 22, 2017 at 10:54 PM, Timur Tabi <timur@codeaurora.org> wrote:
 
-Pulled into next/dt64, thanks!
+> On Qualcomm Technologies QDF2xxx platforms, only a subset of the GPIOs
+> are actually available to the HLOS.  The others are blocked by the XPU,
+> and any attempt to access them will cause an XPU violation that halts
+> the system.
 
-> Also note that there is a trivial merge conflict with the mvebu-fixes
-> branch. In case of doubt it was resolved in the last merge commit of
-> the mvebu/for-next branch.
+That's a bummer. Looking for Bj?rn's review on this patch.
 
-Thanks, that helped, my initial merge ended up with a typo.
+> Instead, the ACPI table now lists only specific GPIOs that are exposed
+> externally as generic GPIO pins.
 
-However, while doing the merge, I stumbled over an obviously
-broken commit:
+The ACPI table or the device tree property "gpios" right?
 
+(But maybe this system is only using ACPI.)
 
-commit b1a97f86b7359da7bbd7a8dd2900d62352c04644
-Author: Antoine Tenart <antoine.tenart@free-electrons.com>
-Date:   Wed May 24 16:10:33 2017 +0200
+> To maintain consistency, the GPIOs are
+> enumerated 0 .. (N-1) as before, so that "gpio0" is really whatever is
+> the first GPIO listed in ACPI.  The actual mapping is available via
+> /sys/kernel/debug/gpio.
 
-    arm64: dts: marvell: add dma-mask in crypto nodes for 7k/8k
+I think using "lsgpio" fron tools/gpio/lsgpio.c is better to inspect
+the available GPIOs.
 
-    The EIP197 cryptographic engine supports 64 bits address width but is
-    limited to 40 bits on 7k/8k. Add a dma-mask property in the
-    cryptographic engine nodes to reflect this.
+If you haven't tested the GPIO tools, please try it out.
 
-    Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-    Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-index 576e825585c9..e02ac90f7fdf 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-@@ -242,6 +242,7 @@
-                                interrupt-names = "mem", "ring0", "ring1",
-                                "ring2", "ring3", "eip";
-                                clocks = <&cpm_syscon0 1 26>;
-+                               dma-mask = <0xff 0xffffffff>;
-                                status = "disabled";
-                        };
-                };
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-index 797208a11f9d..7468fe00fc37 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-@@ -232,6 +232,7 @@
-                                interrupt-names = "mem", "ring0", "ring1",
-                                                  "ring2", "ring3", "eip";
-                                clocks = <&cps_syscon0 1 26>;
-+                               dma-mask = <0xff 0xffffffff>;
-                                status = "disabled";
-                        };
-                };
-
-
-Please send a revert for that, and remove the code that tries to
-parse the dma-mask from DT from that driver!
-
-       Arnd
+Yours,
+Linus Walleij
