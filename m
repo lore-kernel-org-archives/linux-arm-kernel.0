@@ -1,120 +1,62 @@
-From: psodagud@codeaurora.org (Sodagudi Prasad)
-Date: Thu, 22 Jun 2017 23:45:26 -0700
-Subject: [PATCH] compiler, clang: Add always_inline attribute to inline
-In-Reply-To: <20170622094333.GB25967@leverpostej>
-References: <20170615155440.GC26471@leverpostej>
- <1497887596-8731-1-git-send-email-psodagud@codeaurora.org>
- <alpine.DEB.2.10.1706191322590.95967@chino.kir.corp.google.com>
- <47bd7df20466d5f7f557ca087b0189cf@codeaurora.org>
- <alpine.DEB.2.10.1706191439090.2360@chino.kir.corp.google.com>
- <f8ee882e9859f24dac24832bfb5ae0f1@codeaurora.org>
- <20170620105937.GD28157@leverpostej>
- <alpine.DEB.2.10.1706201604540.146880@chino.kir.corp.google.com>
- <20170622094333.GB25967@leverpostej>
-Message-ID: <c7d4238fe66c663081fcbdb74a839f3e@codeaurora.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 23 Jun 2017 06:57:14 +0000
+Subject: [kernel-hardening] [PATCH 2/4] arm64: Reduce ELF_ET_DYN_BASE
+In-Reply-To: <1498154792-49952-3-git-send-email-keescook@chromium.org>
+References: <1498154792-49952-1-git-send-email-keescook@chromium.org>
+ <1498154792-49952-3-git-send-email-keescook@chromium.org>
+Message-ID: <CAKv+Gu_2Wg_D+4c3-iqMr9hbKkGVdBtW6Bmxj-4=FOG9hVN5vA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-06-22 02:43, Mark Rutland wrote:
-> On Tue, Jun 20, 2017 at 04:12:32PM -0700, David Rientjes wrote:
->> On Tue, 20 Jun 2017, Mark Rutland wrote:
->> 
->> > As with my reply to David, my preference would be that we:
->> >
->> > 1) Align compiler-clang.h with the compiler-gcc.h inlining behaviour, so
->> >    that things work by default.
->> >
->> > 2) Fix up the arm64 core code (and drivers for architected / common
->> >    peripherals) to use __always_inline where we always require inlining.
->> >
->> > 3) Have arm64 select CONFIG_ARCH_SUPPORTS_OPTIMIZED_INLINING, and have
->> >    people test-build configurations with CONFIG_OPTIMIZE_INLINING, with
->> >    both GCC and clang.
->> >
->> > 4) Fix up drivers, etc, as appropriate.
->> >
->> > 5) Once that's largely stable, and if there's a benefit, have arm64
->> >    select CONFIG_OPTIMIZE_INLINING by default.
->> >
->> > That should avoid undue breakage, while enabling this ASAP.
->> >
->> 
->> Sounds good, but I think we should simply deal with the
->> __attribute__((unused)) needed for clang as part of compiler-gcc.h by
->> simply adding it to the inline override there to avoid duplicated 
->> code.
-> 
-> Agreed. That looks much better.
-> 
-> Thanks,
-> Mark.
-> 
->> 
->> diff --git a/include/linux/compiler-clang.h 
->> b/include/linux/compiler-clang.h
->> --- a/include/linux/compiler-clang.h
->> +++ b/include/linux/compiler-clang.h
->> @@ -15,11 +15,3 @@
->>   * with any version that can compile the kernel
->>   */
->>  #define __UNIQUE_ID(prefix) __PASTE(__PASTE(__UNIQUE_ID_, prefix), 
->> __COUNTER__)
->> -
->> -/*
->> - * GCC does not warn about unused static inline functions for
->> - * -Wunused-function.  This turns out to avoid the need for complex 
->> #ifdef
->> - * directives.  Suppress the warning in clang as well.
->> - */
->> -#undef inline
->> -#define inline inline __attribute__((unused)) notrace
->> diff --git a/include/linux/compiler-gcc.h 
->> b/include/linux/compiler-gcc.h
->> index 0efef9cf014f..71fe0994cf1a 100644
->> --- a/include/linux/compiler-gcc.h
->> +++ b/include/linux/compiler-gcc.h
->> @@ -66,18 +66,22 @@
->> 
->>  /*
->>   * Force always-inline if the user requests it so via the .config,
->> - * or if gcc is too old:
->> + * or if gcc is too old.
->> + * GCC does not warn about unused static inline functions for
->> + * -Wunused-function.  This turns out to avoid the need for complex 
->> #ifdef
->> + * directives.  Suppress the warning in clang as well by using 
->> "unused"
->> + * function attribute, which is redundant but not harmful for gcc.
->>   */
->>  #if !defined(CONFIG_ARCH_SUPPORTS_OPTIMIZED_INLINING) ||		\
->>      !defined(CONFIG_OPTIMIZE_INLINING) || (__GNUC__ < 4)
->> -#define inline		inline		__attribute__((always_inline)) notrace
->> -#define __inline__	__inline__	__attribute__((always_inline)) notrace
->> -#define __inline	__inline	__attribute__((always_inline)) notrace
->> +#define inline inline		__attribute__((always_inline,unused)) notrace
->> +#define __inline__ __inline__	__attribute__((always_inline,unused)) 
->> notrace
->> +#define __inline __inline	__attribute__((always_inline,unused)) 
->> notrace
->>  #else
->>  /* A lot of inline functions can cause havoc with function tracing */
->> -#define inline		inline		notrace
->> -#define __inline__	__inline__	notrace
->> -#define __inline	__inline	notrace
->> +#define inline inline		__attribute__((unused)) notrace
->> +#define __inline__ __inline__	__attribute__((unused)) notrace
->> +#define __inline __inline	__attribute__((unused)) notrace
->>  #endif
->> 
->>  #define __always_inline	inline __attribute__((always_inline))
-Hi David,
+Hi Kees,
 
-I just want to cross check with you.
-Do you want me to update this change in next patch set ? Or are you 
-going to add this ?
+On 22 June 2017 at 18:06, Kees Cook <keescook@chromium.org> wrote:
+> Now that explicitly executed loaders are loaded in the mmap region,
+> position PIE binaries lower in the address space to avoid possible
+> collisions with mmap or stack regions. For 64-bit, align to 4GB to
+> allow runtimes to use the entire 32-bit address space for 32-bit
+> pointers.
+>
+> Signed-off-by: Kees Cook <keescook@chromium.org>
+> ---
+>  arch/arm64/include/asm/elf.h | 13 ++++++-------
+>  1 file changed, 6 insertions(+), 7 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+> index 5d1700425efe..f742af8f7c42 100644
+> --- a/arch/arm64/include/asm/elf.h
+> +++ b/arch/arm64/include/asm/elf.h
+> @@ -113,12 +113,13 @@
+>  #define ELF_EXEC_PAGESIZE      PAGE_SIZE
+>
+>  /*
+> - * This is the location that an ET_DYN program is loaded if exec'ed.  Typical
+> - * use of this is to invoke "./ld.so someprog" to test out a new version of
+> - * the loader.  We need to make sure that it is out of the way of the program
+> - * that it will "exec", and that there is sufficient room for the brk.
+> + * This is the base location for PIE (ET_DYN with INTERP) loads. On
+> + * 64-bit, this is raised to 4GB to leave the entire 32-bit address
+> + * space open for things that want to use the area for 32-bit pointers.
+>   */
+> -#define ELF_ET_DYN_BASE        (2 * TASK_SIZE_64 / 3)
+> +#define ELF_ET_DYN_BASE                (test_thread_flag(TIF_32BIT) ?  \
+> +                                       0x000400000UL :         \
+> +                                       0x100000000UL)
+>
 
--Thanks, Prasad
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
-Forum,
-Linux Foundation Collaborative Project
+Why are you merging this with the COMPAT definition?
+
+>  #ifndef __ASSEMBLY__
+>
+> @@ -173,8 +174,6 @@ extern int arch_setup_additional_pages(struct linux_binprm *bprm,
+>
+>  #ifdef CONFIG_COMPAT
+>
+> -#define COMPAT_ELF_ET_DYN_BASE         (2 * TASK_SIZE_32 / 3)
+> -
+>  /* AArch32 registers. */
+>  #define COMPAT_ELF_NGREG               18
+>  typedef unsigned int                   compat_elf_greg_t;
+> --
+> 2.7.4
+>
