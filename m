@@ -1,102 +1,45 @@
 From: briannorris@chromium.org (Brian Norris)
-Date: Fri, 23 Jun 2017 10:07:35 -0700
-Subject: [PATCH 1/3] arm64: dts: rockchip: Update CPU regulator voltage ranges
- for Gru
-Message-ID: <20170623170737.46265-1-briannorris@chromium.org>
+Date: Fri, 23 Jun 2017 10:07:37 -0700
+Subject: [PATCH 3/3] arm64: dts: rockchip: set rk3399 dynamic CPU power
+ coefficients
+In-Reply-To: <20170623170737.46265-1-briannorris@chromium.org>
+References: <20170623170737.46265-1-briannorris@chromium.org>
+Message-ID: <20170623170737.46265-3-briannorris@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matthias Kaehlcke <mka@chromium.org>
+Provide the dynamic power coefficient of the big and little CPU
+clusters. These numbers are currently in use on the Samsung Chromebook
+Plus ("Kevin").
 
-Gru derivatives besides Kevin have slightly different voltage ranges for
-their CPU regulators. Let's keep the base Gru file accurate and let
-Kevin override.
+The power allocator thermal governor doesn't know how to do anything if
+it doesn't get power parameters from its cooling devices (in this case,
+CPUfreq). So this effectively enables the power-allocator governor.
 
-Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
 Signed-off-by: Brian Norris <briannorris@chromium.org>
 ---
- arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 20 ++++++++++++++++++++
- arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi      | 16 ++++++++--------
- 2 files changed, 28 insertions(+), 8 deletions(-)
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-index 658bb9dc9dfd..658d63db0d6d 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-@@ -264,6 +264,26 @@ ap_i2c_dig: &i2c2 {
- 	};
- };
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index 69c56f7316c4..4f6667547814 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -109,6 +109,7 @@
+ 			reg = <0x0 0x0>;
+ 			enable-method = "psci";
+ 			#cooling-cells = <2>; /* min followed by max */
++			dynamic-power-coefficient = <100>;
+ 			clocks = <&cru ARMCLKL>;
+ 		};
  
-+&ppvar_bigcpu {
-+	regulator-min-microvolt = <798674>;
-+	regulator-max-microvolt = <1302172>;
-+};
-+
-+&ppvar_litcpu {
-+	regulator-min-microvolt = <799065>;
-+	regulator-max-microvolt = <1303738>;
-+};
-+
-+&ppvar_gpu {
-+	regulator-min-microvolt = <785782>;
-+	regulator-max-microvolt = <1217729>;
-+};
-+
-+&ppvar_centerlogic {
-+	regulator-min-microvolt = <800069>;
-+	regulator-max-microvolt = <1049692>;
-+};
-+
- &saradc {
- 	status = "okay";
- 	vref-supply = <&pp1800_ap_io>;
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-index eb5059344023..134afe8495b5 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-@@ -181,8 +181,8 @@
- 		/* EC turns on w/ ap_core_en; always on for AP */
- 		regulator-always-on;
- 		regulator-boot-on;
--		regulator-min-microvolt = <798674>;
--		regulator-max-microvolt = <1302172>;
-+		regulator-min-microvolt = <800107>;
-+		regulator-max-microvolt = <1302232>;
- 	};
+@@ -142,6 +143,7 @@
+ 			reg = <0x0 0x100>;
+ 			enable-method = "psci";
+ 			#cooling-cells = <2>; /* min followed by max */
++			dynamic-power-coefficient = <100>;
+ 			clocks = <&cru ARMCLKB>;
+ 		};
  
- 	ppvar_litcpu: ppvar-litcpu {
-@@ -202,8 +202,8 @@
- 		/* EC turns on w/ ap_core_en; always on for AP */
- 		regulator-always-on;
- 		regulator-boot-on;
--		regulator-min-microvolt = <799065>;
--		regulator-max-microvolt = <1303738>;
-+		regulator-min-microvolt = <797743>;
-+		regulator-max-microvolt = <1307837>;
- 	};
- 
- 	ppvar_gpu: ppvar-gpu {
-@@ -223,8 +223,8 @@
- 		/* EC turns on w/ ap_core_en; always on for AP */
- 		regulator-always-on;
- 		regulator-boot-on;
--		regulator-min-microvolt = <785782>;
--		regulator-max-microvolt = <1217729>;
-+		regulator-min-microvolt = <786384>;
-+		regulator-max-microvolt = <1217747>;
- 	};
- 
- 	ppvar_centerlogic: ppvar-centerlogic {
-@@ -244,8 +244,8 @@
- 		/* EC turns on w/ ppvar_centerlogic_en; always on for AP */
- 		regulator-always-on;
- 		regulator-boot-on;
--		regulator-min-microvolt = <800069>;
--		regulator-max-microvolt = <1049692>;
-+		regulator-min-microvolt = <799434>;
-+		regulator-max-microvolt = <1049925>;
- 	};
- 
- 	/* Schematics call this PPVAR even though it's fixed */
 -- 
 2.13.1.611.g7e3b11ae1-goog
