@@ -1,188 +1,120 @@
-From: geethasowjanya.akula@gmail.com (Geetha Akula)
-Date: Fri, 23 Jun 2017 11:51:12 +0530
-Subject: [PATCH v9 3/3] iommu/arm-smmu-v3: Add workaround for Cavium
- ThunderX2 erratum #126
-In-Reply-To: <20170622182226.GH15336@arm.com>
-References: <1498133138-20244-1-git-send-email-gakula@caviumnetworks.com>
- <1498133138-20244-4-git-send-email-gakula@caviumnetworks.com>
- <20170622182226.GH15336@arm.com>
-Message-ID: <CANHdaiZ_upqJA-+Dvq3LpnP92ALyZRdp43ZvYBc8MeSJ0aZD4Q@mail.gmail.com>
+From: psodagud@codeaurora.org (Sodagudi Prasad)
+Date: Thu, 22 Jun 2017 23:45:26 -0700
+Subject: [PATCH] compiler, clang: Add always_inline attribute to inline
+In-Reply-To: <20170622094333.GB25967@leverpostej>
+References: <20170615155440.GC26471@leverpostej>
+ <1497887596-8731-1-git-send-email-psodagud@codeaurora.org>
+ <alpine.DEB.2.10.1706191322590.95967@chino.kir.corp.google.com>
+ <47bd7df20466d5f7f557ca087b0189cf@codeaurora.org>
+ <alpine.DEB.2.10.1706191439090.2360@chino.kir.corp.google.com>
+ <f8ee882e9859f24dac24832bfb5ae0f1@codeaurora.org>
+ <20170620105937.GD28157@leverpostej>
+ <alpine.DEB.2.10.1706201604540.146880@chino.kir.corp.google.com>
+ <20170622094333.GB25967@leverpostej>
+Message-ID: <c7d4238fe66c663081fcbdb74a839f3e@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 22, 2017 at 11:52 PM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Geetha,
->
-> On Thu, Jun 22, 2017 at 05:35:38PM +0530, Geetha sowjanya wrote:
->> From: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
->>
->> Cavium ThunderX2 SMMU doesn't support MSI and also doesn't have unique irq
->> lines for gerror, eventq and cmdq-sync.
->>
->> New named irq "combined" is set as a errata workaround, which allows to
->> share the irq line by register single irq handler for all the interrupts.
->>
->> Signed-off-by: Geetha sowjanya <gakula@caviumnetworks.com>
->> ---
->>  Documentation/arm64/silicon-errata.txt             |    1 +
->>  .../devicetree/bindings/iommu/arm,smmu-v3.txt      |    1 +
->>  drivers/acpi/arm64/iort.c                          |   54 +++++++----
->>  drivers/iommu/arm-smmu-v3.c                        |  105 +++++++++++++++-----
->>  4 files changed, 116 insertions(+), 45 deletions(-)
->
-> Thanks, this looks much better. Two things to change below, and I'd like to
-> see Lorenzo ack the iort changes.
+On 2017-06-22 02:43, Mark Rutland wrote:
+> On Tue, Jun 20, 2017 at 04:12:32PM -0700, David Rientjes wrote:
+>> On Tue, 20 Jun 2017, Mark Rutland wrote:
+>> 
+>> > As with my reply to David, my preference would be that we:
+>> >
+>> > 1) Align compiler-clang.h with the compiler-gcc.h inlining behaviour, so
+>> >    that things work by default.
+>> >
+>> > 2) Fix up the arm64 core code (and drivers for architected / common
+>> >    peripherals) to use __always_inline where we always require inlining.
+>> >
+>> > 3) Have arm64 select CONFIG_ARCH_SUPPORTS_OPTIMIZED_INLINING, and have
+>> >    people test-build configurations with CONFIG_OPTIMIZE_INLINING, with
+>> >    both GCC and clang.
+>> >
+>> > 4) Fix up drivers, etc, as appropriate.
+>> >
+>> > 5) Once that's largely stable, and if there's a benefit, have arm64
+>> >    select CONFIG_OPTIMIZE_INLINING by default.
+>> >
+>> > That should avoid undue breakage, while enabling this ASAP.
+>> >
+>> 
+>> Sounds good, but I think we should simply deal with the
+>> __attribute__((unused)) needed for clang as part of compiler-gcc.h by
+>> simply adding it to the inline override there to avoid duplicated 
+>> code.
+> 
+> Agreed. That looks much better.
+> 
+> Thanks,
+> Mark.
+> 
+>> 
+>> diff --git a/include/linux/compiler-clang.h 
+>> b/include/linux/compiler-clang.h
+>> --- a/include/linux/compiler-clang.h
+>> +++ b/include/linux/compiler-clang.h
+>> @@ -15,11 +15,3 @@
+>>   * with any version that can compile the kernel
+>>   */
+>>  #define __UNIQUE_ID(prefix) __PASTE(__PASTE(__UNIQUE_ID_, prefix), 
+>> __COUNTER__)
+>> -
+>> -/*
+>> - * GCC does not warn about unused static inline functions for
+>> - * -Wunused-function.  This turns out to avoid the need for complex 
+>> #ifdef
+>> - * directives.  Suppress the warning in clang as well.
+>> - */
+>> -#undef inline
+>> -#define inline inline __attribute__((unused)) notrace
+>> diff --git a/include/linux/compiler-gcc.h 
+>> b/include/linux/compiler-gcc.h
+>> index 0efef9cf014f..71fe0994cf1a 100644
+>> --- a/include/linux/compiler-gcc.h
+>> +++ b/include/linux/compiler-gcc.h
+>> @@ -66,18 +66,22 @@
+>> 
+>>  /*
+>>   * Force always-inline if the user requests it so via the .config,
+>> - * or if gcc is too old:
+>> + * or if gcc is too old.
+>> + * GCC does not warn about unused static inline functions for
+>> + * -Wunused-function.  This turns out to avoid the need for complex 
+>> #ifdef
+>> + * directives.  Suppress the warning in clang as well by using 
+>> "unused"
+>> + * function attribute, which is redundant but not harmful for gcc.
+>>   */
+>>  #if !defined(CONFIG_ARCH_SUPPORTS_OPTIMIZED_INLINING) ||		\
+>>      !defined(CONFIG_OPTIMIZE_INLINING) || (__GNUC__ < 4)
+>> -#define inline		inline		__attribute__((always_inline)) notrace
+>> -#define __inline__	__inline__	__attribute__((always_inline)) notrace
+>> -#define __inline	__inline	__attribute__((always_inline)) notrace
+>> +#define inline inline		__attribute__((always_inline,unused)) notrace
+>> +#define __inline__ __inline__	__attribute__((always_inline,unused)) 
+>> notrace
+>> +#define __inline __inline	__attribute__((always_inline,unused)) 
+>> notrace
+>>  #else
+>>  /* A lot of inline functions can cause havoc with function tracing */
+>> -#define inline		inline		notrace
+>> -#define __inline__	__inline__	notrace
+>> -#define __inline	__inline	notrace
+>> +#define inline inline		__attribute__((unused)) notrace
+>> +#define __inline__ __inline__	__attribute__((unused)) notrace
+>> +#define __inline __inline	__attribute__((unused)) notrace
+>>  #endif
+>> 
+>>  #define __always_inline	inline __attribute__((always_inline))
+Hi David,
 
-Thanks Will. I have resend the patch with suggested changes.
+I just want to cross check with you.
+Do you want me to update this change in next patch set ? Or are you 
+going to add this ?
 
-
-Geetha.
->
->> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
->> index 4693a32..42422f6 100644
->> --- a/Documentation/arm64/silicon-errata.txt
->> +++ b/Documentation/arm64/silicon-errata.txt
->> @@ -63,6 +63,7 @@ stable kernels.
->>  | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456        |
->>  | Cavium         | ThunderX SMMUv2 | #27704          | N/A                         |
->>  | Cavium         | ThunderX2 SMMUv3| #74             | N/A                         |
->> +| Cavium         | ThunderX2 SMMUv3| #126            | N/A                         |
->>  |                |                 |                 |                             |
->>  | Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585         |
->>  |                |                 |                 |                             |
->> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
->> index 6ecc48c..a5a1ca4 100644
->> --- a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
->> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
->> @@ -26,6 +26,7 @@ the PCIe specification.
->>                        * "priq"      - PRI Queue not empty
->>                        * "cmdq-sync" - CMD_SYNC complete
->>                        * "gerror"    - Global Error activated
->> +                      * "combined"  - Handles above all 4 interrupts.
->
-> Please make it clear that:
->
->   * The combined interrupt is optional, and should only be provided if
->     the hardware supports just a single, combined interrupt line.
->
->   * If provided, then the combined interrupt will be used in preference
->     to any others.
->
->>  - #iommu-cells      : See the generic IOMMU binding described in
->>                          devicetree/bindings/pci/pci-iommu.txt
->> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
->> index c166f3e..43e1f13 100644
->> --- a/drivers/acpi/arm64/iort.c
->> +++ b/drivers/acpi/arm64/iort.c
->> @@ -828,6 +828,18 @@ static int __init arm_smmu_v3_count_resources(struct acpi_iort_node *node)
->>       return num_res;
->>  }
->>
->> +static bool arm_smmu_v3_is_combined_irq(struct acpi_iort_smmu_v3 *smmu)
->> +{
->> +     /*
->> +      * Cavium ThunderX2 implementation doesn't not support unique
->> +      * irq line. Use single irq line for all the SMMUv3 interrupts.
->> +      */
->> +     if (smmu->model == ACPI_IORT_SMMU_V3_CAVIUM_CN99XX)
->> +             return true;
->> +
->> +     return false;
->> +}
->> +
->>  static unsigned long arm_smmu_v3_resource_size(struct acpi_iort_smmu_v3 *smmu)
->>  {
->>       /*
->> @@ -855,26 +867,32 @@ static void __init arm_smmu_v3_init_resources(struct resource *res,
->>       res[num_res].flags = IORESOURCE_MEM;
->>
->>       num_res++;
->> -
->> -     if (smmu->event_gsiv)
->> -             acpi_iort_register_irq(smmu->event_gsiv, "eventq",
->> -                                    ACPI_EDGE_SENSITIVE,
->> -                                    &res[num_res++]);
->> -
->> -     if (smmu->pri_gsiv)
->> -             acpi_iort_register_irq(smmu->pri_gsiv, "priq",
->> -                                    ACPI_EDGE_SENSITIVE,
->> -                                    &res[num_res++]);
->> -
->> -     if (smmu->gerr_gsiv)
->> -             acpi_iort_register_irq(smmu->gerr_gsiv, "gerror",
->> -                                    ACPI_EDGE_SENSITIVE,
->> -                                    &res[num_res++]);
->> -
->> -     if (smmu->sync_gsiv)
->> -             acpi_iort_register_irq(smmu->sync_gsiv, "cmdq-sync",
->> +     if (arm_smmu_v3_is_combined_irq(smmu))
->> +             acpi_iort_register_irq(smmu->event_gsiv, "combined",
->>                                      ACPI_EDGE_SENSITIVE,
->>                                      &res[num_res++]);
->> +     else {
->> +
->> +             if (smmu->event_gsiv)
->> +                     acpi_iort_register_irq(smmu->event_gsiv, "eventq",
->> +                                            ACPI_EDGE_SENSITIVE,
->> +                                            &res[num_res++]);
->> +
->> +             if (smmu->pri_gsiv)
->> +                     acpi_iort_register_irq(smmu->pri_gsiv, "priq",
->> +                                            ACPI_EDGE_SENSITIVE,
->> +                                            &res[num_res++]);
->> +
->> +             if (smmu->gerr_gsiv)
->> +                     acpi_iort_register_irq(smmu->gerr_gsiv, "gerror",
->> +                                            ACPI_EDGE_SENSITIVE,
->> +                                            &res[num_res++]);
->> +
->> +             if (smmu->sync_gsiv)
->> +                     acpi_iort_register_irq(smmu->sync_gsiv, "cmdq-sync",
->> +                                            ACPI_EDGE_SENSITIVE,
->> +                                            &res[num_res++]);
->> +     }
->>  }
->>
->>  static bool __init arm_smmu_v3_is_coherent(struct acpi_iort_node *node)
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index 2dea4a9..0f83f7d 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -605,6 +605,7 @@ struct arm_smmu_device {
->>       struct arm_smmu_priq            priq;
->>
->>       int                             gerr_irq;
->> +     int                             combined_irq;
->>
->>       unsigned long                   ias; /* IPA */
->>       unsigned long                   oas; /* PA */
->> @@ -1314,6 +1315,29 @@ static irqreturn_t arm_smmu_gerror_handler(int irq, void *dev)
->>       return IRQ_HANDLED;
->>  }
->>
->> +static irqreturn_t arm_smmu_combined_irq_thread(int irq, void *dev)
->> +{
->> +     struct arm_smmu_device *smmu = dev;
->> +
->> +     arm_smmu_evtq_thread(irq, dev);
->> +     if (smmu->features & ARM_SMMU_FEAT_PRI)
->> +             arm_smmu_priq_thread(irq, dev);
->> +
->> +     return IRQ_HANDLED;
->> +}
->> +
->> +static irqreturn_t arm_smmu_combined_irq_handler(int irq, void *dev)
->> +{
->> +     irqreturn_t ret;
->> +
->> +     ret = arm_smmu_gerror_handler(irq, dev);
->> +     if (ret == IRQ_NONE) {
->
-> I don't think you can play that trick if the irq is an edge-triggered
-> interrupt, since you could lose an interrupt that fired whilst we were
-> in the handler.
->
-> The easiest thing is to always run the gerror and cmdq_sync handlers, and
-> then always return IRQ_WAKE_THREAD.
->
-> Will
+-Thanks, Prasad
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
+Forum,
+Linux Foundation Collaborative Project
