@@ -1,30 +1,101 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 22 Jun 2017 18:08:35 -0700
-Subject: [RFC 0/2] PM / suspend: Add platform_suspend_target_state()
-In-Reply-To: <20170622085102.mpk7vxodpgxtrlfd@piout.net>
+Date: Thu, 22 Jun 2017 18:08:36 -0700
+Subject: [RFC 1/2] PM / suspend: Add platform_suspend_target_state()
+In-Reply-To: <20170623010837.11199-1-f.fainelli@gmail.com>
 References: <20170622085102.mpk7vxodpgxtrlfd@piout.net>
-Message-ID: <20170623010837.11199-1-f.fainelli@gmail.com>
+ <20170623010837.11199-1-f.fainelli@gmail.com>
+Message-ID: <20170623010837.11199-2-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series implements the idea discussed in this thread:
+Add an optional platform_suspend_ops callback: target_state, and a
+helper function globally visible to get this called:
+platform_suspend_target_state().
 
-https://www.spinics.net/lists/arm-kernel/msg590068.html
+This is useful for platform specific drivers that may need to take a
+slightly different suspend/resume path based on the system's
+suspend/resume state being entered.
 
-The last patch is relative to the pending submission of the Broadcom STB
-S2/S3/S5 suspend/resume code that can be found below, and is provided
-as an example of how this can be useful.
+Although this callback is optional and documented as such, it requires
+a platform_suspend_ops::begin callback to be implemented in order to
+provide an accurate suspend/resume state within the driver that
+implements this platform_suspend_ops.
 
-https://lkml.org/lkml/2017/6/16/737
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ include/linux/suspend.h | 12 ++++++++++++
+ kernel/power/suspend.c  | 15 +++++++++++++++
+ 2 files changed, 27 insertions(+)
 
-Florian Fainelli (2):
-  PM / suspend: Add platform_suspend_target_state()
-  soc: bcm: brcmstb: PM: Implement target_state callback
-
- drivers/soc/bcm/brcmstb/pm/pm-arm.c | 15 +++++++++++++++
- include/linux/suspend.h             | 12 ++++++++++++
- kernel/power/suspend.c              | 15 +++++++++++++++
- 3 files changed, 42 insertions(+)
-
+diff --git a/include/linux/suspend.h b/include/linux/suspend.h
+index d9718378a8be..d998a04a90a2 100644
+--- a/include/linux/suspend.h
++++ b/include/linux/suspend.h
+@@ -172,6 +172,15 @@ static inline void dpm_save_failed_step(enum suspend_stat_step step)
+  *	Called by the PM core if the suspending of devices fails.
+  *	This callback is optional and should only be implemented by platforms
+  *	which require special recovery actions in that situation.
++ *
++ * @target_state: Returns the suspend state the suspend_ops will be entering.
++ * 	Called by device drivers that need to know the platform specific suspend
++ * 	state the system is about to enter.
++ * 	This callback is optional and should only be implemented by platforms
++ * 	which require special handling of power management states within
++ * 	drivers. It does require @begin to be implemented to provide the suspend
++ * 	state. Return value is platform_suspend_ops specific, and may be a 1:1
++ * 	mapping to suspend_state_t when relevant.
+  */
+ struct platform_suspend_ops {
+ 	int (*valid)(suspend_state_t state);
+@@ -184,6 +193,7 @@ struct platform_suspend_ops {
+ 	bool (*suspend_again)(void);
+ 	void (*end)(void);
+ 	void (*recover)(void);
++	int (*target_state)(void);
+ };
+ 
+ struct platform_freeze_ops {
+@@ -200,6 +210,7 @@ struct platform_freeze_ops {
+  */
+ extern void suspend_set_ops(const struct platform_suspend_ops *ops);
+ extern int suspend_valid_only_mem(suspend_state_t state);
++extern int platform_suspend_target_state(void);
+ 
+ extern unsigned int pm_suspend_global_flags;
+ 
+@@ -279,6 +290,7 @@ static inline bool pm_resume_via_firmware(void) { return false; }
+ 
+ static inline void suspend_set_ops(const struct platform_suspend_ops *ops) {}
+ static inline int pm_suspend(suspend_state_t state) { return -ENOSYS; }
++static inline int platform_suspend_target_state(void) { return -ENOSYS; }
+ static inline bool idle_should_freeze(void) { return false; }
+ static inline void __init pm_states_init(void) {}
+ static inline void freeze_set_ops(const struct platform_freeze_ops *ops) {}
+diff --git a/kernel/power/suspend.c b/kernel/power/suspend.c
+index 15e6baef5c73..d31fe7a08f4a 100644
+--- a/kernel/power/suspend.c
++++ b/kernel/power/suspend.c
+@@ -177,6 +177,21 @@ void suspend_set_ops(const struct platform_suspend_ops *ops)
+ EXPORT_SYMBOL_GPL(suspend_set_ops);
+ 
+ /**
++ * platform_suspend_target_state - Return the platform specific suspend state.
++ * a begin() callback is necessary in order to fill this information correctly
++ * for callers.
++ */
++int platform_suspend_target_state(void)
++{
++	if (!suspend_ops || !suspend_ops->target_state ||
++	    (suspend_ops->target_state && !suspend_ops->begin))
++		return -ENOTSUPP;
++
++	return suspend_ops->target_state();
++}
++EXPORT_SYMBOL_GPL(platform_suspend_target_state);
++
++/**
+  * suspend_valid_only_mem - Generic memory-only valid callback.
+  *
+  * Platform drivers that implement mem suspend only and only need to check for
 -- 
 2.9.3
