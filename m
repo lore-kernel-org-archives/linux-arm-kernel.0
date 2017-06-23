@@ -1,47 +1,33 @@
-From: shuah@kernel.org (Shuah Khan)
-Date: Fri, 23 Jun 2017 13:40:41 -0600
-Subject: [PATCH v2 0/3] rtc: make st-lpc robust against y2038/2106 bug
-In-Reply-To: <1497864982-29284-1-git-send-email-benjamin.gaignard@linaro.org>
-References: <1497864982-29284-1-git-send-email-benjamin.gaignard@linaro.org>
-Message-ID: <47b45b70-91da-ce41-535d-89d92f380274@kernel.org>
+From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
+Date: Fri, 23 Jun 2017 21:44:35 +0200
+Subject: [PATCH v2] thermal: bcm2835: Fix error code in 'bcm2835_thermal_probe'
+Message-ID: <20170623194435.8094-1-christophe.jaillet@wanadoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/19/2017 03:36 AM, Benjamin Gaignard wrote:
-> On 32bits platforms "struct timeval" or "time_t" are using u32 to code the
-> date, this cause tools like "date" or "hwclock" failed even before setting
-> the RTC device if the date is superior to year 2038 (or 2106).
-> 
-> To avoid this problem I add one RTC test file which directly use RTC ioctl
-> to set and read RTC time and alarm values.
-> rtctest_setdate allow to set any date/time given in the command line.
-> 
-> On this version 2 I add check of problematics years in rtctest like suggest
-> by Alexandre.
-> 
-> Finally that had allowed me to test and fix rtc-st-lpc driver.
-> 
-> Benjamin Gaignard (3):
->   tools: timer: add rtctest_setdate
->   tool: timer: rtctest add check for problematic dates
->   rtc: st-lpc: make it robust against y2038/2106 bug
-> 
->  drivers/rtc/rtc-st-lpc.c                         |  19 ++--
->  tools/testing/selftests/timers/Makefile          |   2 +-
->  tools/testing/selftests/timers/rtctest.c         | 121 ++++++++++++++++++++++-
->  tools/testing/selftests/timers/rtctest_setdate.c |  86 ++++++++++++++++
->  4 files changed, 212 insertions(+), 16 deletions(-)
->  create mode 100644 tools/testing/selftests/timers/rtctest_setdate.c
-> 
+'tz' is a valid pointer at this point, so calling PTR_ERR on it is
+pointless.
+This 'err = PTR_ERR(tz)' looks like a cut'n'paste from a few lines above.
+So remove it. 'err' is already the error we want to report.
 
-Hi Thomas/John,
+Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+---
+v2: fix empty subject
+---
+ drivers/thermal/broadcom/bcm2835_thermal.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-I can take the first two patches in this series through linux-kselftest
-with your or John's Ack. Please review and let me know one way or the
-other.
-
-The third one is a rtc driver patch. Please let me know how do you want
-to handle this series soon we can get this into 4.13-rc1.
-
-thanks,
--- Shah
+diff --git a/drivers/thermal/broadcom/bcm2835_thermal.c b/drivers/thermal/broadcom/bcm2835_thermal.c
+index 0ecf80890c84..e6863c841662 100644
+--- a/drivers/thermal/broadcom/bcm2835_thermal.c
++++ b/drivers/thermal/broadcom/bcm2835_thermal.c
+@@ -245,7 +245,6 @@ static int bcm2835_thermal_probe(struct platform_device *pdev)
+ 		 */
+ 		err = tz->ops->get_trip_temp(tz, 0, &trip_temp);
+ 		if (err < 0) {
+-			err = PTR_ERR(tz);
+ 			dev_err(&pdev->dev,
+ 				"Not able to read trip_temp: %d\n",
+ 				err);
+-- 
+2.11.0
