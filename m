@@ -1,63 +1,163 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 23 Jun 2017 10:49:01 +0200
-Subject: [PATCH 0/6] Update binding documentation for cp110 and ap806
-In-Reply-To: <20170622211456.rip2gveiprlfw3kj@rob-hp-laptop> (Rob Herring's
- message of "Thu, 22 Jun 2017 16:14:56 -0500")
-References: <20170620083754.28053-1-gregory.clement@free-electrons.com>
- <87k2463c66.fsf@free-electrons.com>
- <20170622211456.rip2gveiprlfw3kj@rob-hp-laptop>
-Message-ID: <87shirytqa.fsf@free-electrons.com>
+From: linu.cherian@cavium.com (Linu Cherian)
+Date: Fri, 23 Jun 2017 14:26:08 +0530
+Subject: [PATCH v2 5/8] iommu/io-pgtable-arm: Support lockless operation
+In-Reply-To: <20170623055326.GA2949@virtx40>
+References: <cover.1498145008.git.robin.murphy@arm.com>
+ <af61929e3984a31588cab08ed84a237602b5263e.1498145008.git.robin.murphy@arm.com>
+ <20170623055326.GA2949@virtx40>
+Message-ID: <20170623085607.GC3718@virtx40>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Fri Jun 23, 2017 at 11:23:26AM +0530, Linu Cherian wrote:
+> 
+> Robin,
+> Was trying to understand the new changes. Had few questions on 
+> arm_lpae_install_table. 
+> 
+> On Thu Jun 22, 2017 at 04:53:54PM +0100, Robin Murphy wrote:
+> > For parallel I/O with multiple concurrent threads servicing the same
+> > device (or devices, if several share a domain), serialising page table
+> > updates becomes a massive bottleneck. On reflection, though, we don't
+> > strictly need to do that - for valid IOMMU API usage, there are in fact
+> > only two races that we need to guard against: multiple map requests for
+> > different blocks within the same region, when the intermediate-level
+> > table for that region does not yet exist; and multiple unmaps of
+> > different parts of the same block entry. Both of those are fairly easily
+> > solved by using a cmpxchg to install the new table, such that if we then
+> > find that someone else's table got there first, we can simply free ours
+> > and continue.
+> > 
+> > Make the requisite changes such that we can withstand being called
+> > without the caller maintaining a lock. In theory, this opens up a few
+> > corners in which wildly misbehaving callers making nonsensical
+> > overlapping requests might lead to crashes instead of just unpredictable
+> > results, but correct code really does not deserve to pay a significant
+> > performance cost for the sake of masking bugs in theoretical broken code.
+> > 
+> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> > ---
+> > 
+> > v2:
+> >  - Fix barriers in install_table
+> >  - Make a few more PTE accesses with {READ,WRITE}_ONCE() just in case
+> >  - Minor cosmetics
+> > 
+> >  drivers/iommu/io-pgtable-arm.c | 72 +++++++++++++++++++++++++++++++++---------
+> >  1 file changed, 57 insertions(+), 15 deletions(-)
+> > 
+> > diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+> > index 6334f51912ea..52700fa958c2 100644
+> > --- a/drivers/iommu/io-pgtable-arm.c
+> > +++ b/drivers/iommu/io-pgtable-arm.c
+> > @@ -20,6 +20,7 @@
+> >  
+> >  #define pr_fmt(fmt)	"arm-lpae io-pgtable: " fmt
+> >  
+> > +#include <linux/atomic.h>
+> >  #include <linux/iommu.h>
+> >  #include <linux/kernel.h>
+> >  #include <linux/sizes.h>
+> > @@ -99,6 +100,8 @@
+> >  #define ARM_LPAE_PTE_ATTR_HI_MASK	(((arm_lpae_iopte)6) << 52)
+> >  #define ARM_LPAE_PTE_ATTR_MASK		(ARM_LPAE_PTE_ATTR_LO_MASK |	\
+> >  					 ARM_LPAE_PTE_ATTR_HI_MASK)
+> > +/* Software bit for solving coherency races */
+> > +#define ARM_LPAE_PTE_SW_SYNC		(((arm_lpae_iopte)1) << 55)
+> >  
+> >  /* Stage-1 PTE */
+> >  #define ARM_LPAE_PTE_AP_UNPRIV		(((arm_lpae_iopte)1) << 6)
+> > @@ -249,15 +252,20 @@ static void __arm_lpae_free_pages(void *pages, size_t size,
+> >  	free_pages_exact(pages, size);
+> >  }
+> >  
+> > +static void __arm_lpae_sync_pte(arm_lpae_iopte *ptep,
+> > +				struct io_pgtable_cfg *cfg)
+> > +{
+> > +	dma_sync_single_for_device(cfg->iommu_dev, __arm_lpae_dma_addr(ptep),
+> > +				   sizeof(*ptep), DMA_TO_DEVICE);
+> > +}
+> > +
+> >  static void __arm_lpae_set_pte(arm_lpae_iopte *ptep, arm_lpae_iopte pte,
+> >  			       struct io_pgtable_cfg *cfg)
+> >  {
+> >  	*ptep = pte;
+> >  
+> >  	if (!(cfg->quirks & IO_PGTABLE_QUIRK_NO_DMA))
+> > -		dma_sync_single_for_device(cfg->iommu_dev,
+> > -					   __arm_lpae_dma_addr(ptep),
+> > -					   sizeof(pte), DMA_TO_DEVICE);
+> > +		__arm_lpae_sync_pte(ptep, cfg);
+> >  }
+> >  
+> >  static int __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
+> > @@ -314,16 +322,30 @@ static int arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
+> >  
+> >  static arm_lpae_iopte arm_lpae_install_table(arm_lpae_iopte *table,
+> >  					     arm_lpae_iopte *ptep,
+> > +					     arm_lpae_iopte curr,
+> >  					     struct io_pgtable_cfg *cfg)
+> >  {
+> > -	arm_lpae_iopte new;
+> > +	arm_lpae_iopte old, new;
+> >  
+> >  	new = __pa(table) | ARM_LPAE_PTE_TYPE_TABLE;
+> >  	if (cfg->quirks & IO_PGTABLE_QUIRK_ARM_NS)
+> >  		new |= ARM_LPAE_PTE_NSTABLE;
+> >  
+> > -	__arm_lpae_set_pte(ptep, new, cfg);
+> > -	return new;
+> > +	/* Ensure the table itself is visible before its PTE can be */
+> > +	wmb();
+> 
+> Could you please give more hints on why this is required.
+> 
+> 
+> > +
+> > +	old = cmpxchg64_relaxed(ptep, curr, new);
+> > +
+> > +	if ((cfg->quirks & IO_PGTABLE_QUIRK_NO_DMA) ||
+> > +	    (old & ARM_LPAE_PTE_SW_SYNC))
+> > +		return old;
+> > +
+> > +	/* Even if it's not ours, there's no point waiting; just kick it */
+> > +	__arm_lpae_sync_pte(ptep, cfg);
+> > +	if (old == curr)
+> > +		WRITE_ONCE(*ptep, new | ARM_LPAE_PTE_SW_SYNC);
+> 
+> How is it ensured that the cache operations are completed before we flag them with
+> 	ARM_LPAE_PTE_SW_SYNC. The previous version had a wmb() after the sync operation.
+> 
+> 
+> > +
+> > +	return old;
+> >  }
+> >
+> 
 
 
-as you were not in CC of the thread here is the reference:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2017-June/514497.html
+Observed a performance drop of close to 1G, 
+while testing on the 10G network interface with this patch series compared to v1.
+Moving the wmb() as in v1 restores it back.
 
- On jeu., juin 22 2017, Rob Herring <robh@kernel.org> wrote:
-
-> On Tue, Jun 20, 2017 at 05:34:57PM +0200, Gregory CLEMENT wrote:
->> Hi Rob, 
->>  
->>  On mar., juin 20 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
->> 
->> > Hi Rob,
->> >
->> > As you know there were dependencies issue about the binding between my
->> > different series and you proposed yourself to apply them though the
->> > device tree subsystem: [1]
->
-> I did, but ...
->
->> >
->> > All the driver parts have been merged so it's time merging the
->> > documentation.
->> 
->> I forgot to mentioned that this series is based on the clk-ap806-dt
->> stable branch:
->> 
->> https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git/log/?h=clk-ap806-dt
->
-> ... that was to avoid cross tree dependencies. Now you're creating one. 
-> Either Mike should take everything or drop this branch and I'll take it 
-> too.
-
-Could you take them all? I can do a PR for this and I take this
-opportunity to add the missing ack in pacth 6
+@@ -332,7 +332,6 @@ static arm_lpae_iopte arm_lpae_install_table(arm_lpae_iopte *table,
+                new |= ARM_LPAE_PTE_NSTABLE;
+ 
+        /* Ensure the table itself is visible before its PTE can be */
+-       wmb();
+ 
+        old = cmpxchg64_relaxed(ptep, curr, new);
+ 
+@@ -342,6 +341,7 @@ static arm_lpae_iopte arm_lpae_install_table(arm_lpae_iopte *table,
+ 
+        /* Even if it's not ours, there's no point waiting; just kick it */
+        __arm_lpae_sync_pte(ptep, cfg);
++       wmb();
+        if (old == curr)
+                WRITE_ONCE(*ptep, new | ARM_LPAE_PTE_SW_SYNC);
+ 
 
 
-Thanks,
-
-Gregory
->
-> And you missed my ack on patch 6.
->
-> Rob
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Linu cherian
