@@ -1,10 +1,10 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 23 Jun 2017 16:22:27 +0100
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 23 Jun 2017 16:38:39 +0100
 Subject: [GIT PULL v3] updates to qbman (soc drivers) to support arm/arm64
 In-Reply-To: <CAK8P3a2EvCvs57hE_X9J5jg6jW8jPh6gxaTOUYntbnHdb_cMZA@mail.gmail.com>
 References: <HE1PR0401MB17071A7853695DB6546FE28C8FC50@HE1PR0401MB1707.eurprd04.prod.outlook.com>
  <CAK8P3a2EvCvs57hE_X9J5jg6jW8jPh6gxaTOUYntbnHdb_cMZA@mail.gmail.com>
-Message-ID: <20170623152227.GA21989@leverpostej>
+Message-ID: <20170623153839.GS4902@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -58,19 +58,7 @@ On Fri, Jun 23, 2017 at 04:56:10PM +0200, Arnd Bergmann wrote:
 > this is actually allowed by the architecture or at least the chip, based on
 > implementation-specific features that make it work even when the architecture
 > doesn't guarantee it.
-
->From prior discussions, my understanding was that the region in question
-was memory reserved for the device, rather than MMIO registers.
-
-The prior discussion on that front were largely to do with teh
-shareability of that memory, which is an orthogonal concern.
-
-If these are actually MMIO registers, a Device memory type must be used,
-rather than a Normal memory type. There are a number of things that
-could go wrong due to relaxations permitted for Normal memory, such as
-speculative reads, the potential set of access sizes, memory
-transactions that the endpoint might not understand, etc.
-
+> 
 > Can I have an Ack from the architecture maintainers (Russell, Catalin,
 > Will) on the use of these architecture specific interfaces?
 > 
@@ -84,9 +72,55 @@ transactions that the endpoint might not understand, etc.
 >         __flush_dcache_area(p, 64);
 > #endif
 > }
+> #define dpaa_invalidate(p) dpaa_flush(p)
+> #define dpaa_zero(p) memset(p, 0, 64)
+> static inline void dpaa_touch_ro(void *p)
+> {
+> #if (L1_CACHE_BYTES == 32)
+>         prefetch(p+32);
+> #endif
+>         prefetch(p);
+> }
+> 
+> As described by Leo, the code is already there and is actively used
+> on powerpc, his pull request is merely for enabling the driver on ARM
+> and ARM64.
 
-Assuming this is memory, why can't the driver use the DMA APIs to handle
-this without reaching into arch-internal APIs?
+Well, as arch maintainer, "code already there" matters not one bit when
+converting it to work on other architectures.
 
-Thanks,
-Mark.
+For the record, I'm completely dismaid that there seems to be:
+
+(a) the thought of getting changes into the kernel that use arch-private
+    interfaces without review by architecture maintainers.
+
+    Here, I'm specifically talking about the work that was merged through
+    PowerPC trees adding rather broken ARM support to this driver.
+
+(b) the lack of Cc to ARM and ARM64 architecture maintainers of the patch
+    set now being asked to be merged through Arnd.
+
+(c) the thought that it's acceptable to use architecture private interfaces
+    in driver code that really have no business being there.
+
+(d) the lack of explanation why its necessary to poke about using
+    architecture private interfaces.
+
+Now, from looking at the code already merged in mainline, I think that
+this driver really has no business touching these arch private
+interfaces.
+
+I think, rather than myself and Will/Catalin independently spending time
+trying to understand what's going on with this code, what we need is for
+NXP people to document in detail what they are doing that requires all
+this special treatment and why they need to poking about in stuff that's
+architecture private before this can be merged.
+
+Basically, I want a proper understanding of this code to fully
+understand why it's using arch private interfaces, and what the problem
+is with using the standard interfaces provided for drivers.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
