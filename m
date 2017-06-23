@@ -1,98 +1,233 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 23 Jun 2017 17:46:23 +0100
-Subject: [PATCH] arm64: ftrace: fix !CONFIG_ARM64_MODULE_PLTS kernels
-In-Reply-To: <CAKv+Gu-hyWyc3rbuKpOaieqKf=y3mga=DkVviagEBwEFrBgrzg@mail.gmail.com>
-References: <1498226261-21204-1-git-send-email-mark.rutland@arm.com>
- <CAKv+Gu-hyWyc3rbuKpOaieqKf=y3mga=DkVviagEBwEFrBgrzg@mail.gmail.com>
-Message-ID: <20170623164623.GD21989@leverpostej>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 23 Jun 2017 17:54:06 +0100
+Subject: [PATCH v3 1/2] acpi:iort: Add an IORT helper function to reserve
+ HW ITS address regions for IOMMU drivers
+In-Reply-To: <20170623145801.325244-2-shameerali.kolothum.thodi@huawei.com>
+References: <20170623145801.325244-1-shameerali.kolothum.thodi@huawei.com>
+ <20170623145801.325244-2-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <20170623165406.GA6412@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 23, 2017 at 02:38:31PM +0000, Ard Biesheuvel wrote:
-> On 23 June 2017 at 13:57, Mark Rutland <mark.rutland@arm.com> wrote:
-> > When a kernel is built without CONFIG_ARM64_MODULE_PLTS, we don't
-> > generate the expected branch instruction in ftrace_make_nop(). This
-> > means we pass zero (rather than a valid branch) to ftrace_modify_code()
-> > as the expected instruction to validate. This causes us to return
-> > -EINVAL to the core ftrace code for a valid case, resulting in a splat
-> > at boot time.
-> >
-> > This was an unintended effect of commit:
-> >
-> >   687644209a6e9557 ("arm64: ftrace: fix building without CONFIG_MODULES")
-> >
-> > ... which incorrectly moved the generation of the branch instruction
-> > into the ifdef for CONFIG_ARM64_MODULE_PLTS.
-> >
-> > This patch fixes the issue by moving the ifdef inside of the relevant
-> > if-else case, and always checking that the branch is in range,
-> > regardless of CONFIG_ARM64_MODULE_PLTS. This ensures that we generate
-> > the expected branch instruction, and also improves our sanity checks.
-> >
-> > For consistency, both ftrace_make_nop() and ftrace_make_call() are
-> > updated with this pattern.
-> >
-> > Fixes: 687644209a6e9557 ("arm64: ftrace: fix building without CONFIG_MODULES")
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Reported-by: Marc Zyngier <marc.zyngier@arm.com>
-> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm64/kernel/ftrace.c | 12 ++++++++----
-> >  1 file changed, 8 insertions(+), 4 deletions(-)
-> >
-> > Marc spotted this breakage atop of the arm64 for-next/core branch when ftrace
-> > was enabled.
-> >
-> > I've given this fix a go with all combinations of MODULES and RANDOMIZE_BASE,
-> > with the ftrace boot time self test, and everything seems happy in all
-> > combinations.
+On Fri, Jun 23, 2017 at 03:58:00PM +0100, shameer wrote:
+> The helper function retrieves ITS address regions through IORT
+> device <-> ITS mappings and reserves it so that these regions
+> will not be translated by IOMMU and will be excluded from IOVA
+> allocations. IOMMU drivers can use this to implement their
+> .get_resv_regions callback.
 > 
-> Thanks for cleaning this up. I guess Arnd's original fix didn't suffer
-> from this issue.
-
-I haven't gone digging through the (mail) history; I don't know either
-way.
-
+> Signed-off-by: shameer <shameerali.kolothum.thodi@huawei.com>
+> ---
+>  drivers/acpi/arm64/iort.c        | 91 ++++++++++++++++++++++++++++++++++++++--
+>  drivers/irqchip/irq-gic-v3-its.c |  3 +-
+>  include/linux/acpi_iort.h        |  7 +++-
+>  3 files changed, 96 insertions(+), 5 deletions(-)
 > 
-> > diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
-> > index 401aa27..945f506 100644
-> > --- a/arch/arm64/kernel/ftrace.c
-> > +++ b/arch/arm64/kernel/ftrace.c
-> > @@ -73,10 +73,10 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
-> >         unsigned long pc = rec->ip;
-> >         u32 old, new;
-> >
-> > -#ifdef CONFIG_ARM64_MODULE_PLTS
-> >         long offset = (long)pc - (long)addr;
-> >
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> index c5fecf9..cf0a6b8 100644
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -34,6 +34,7 @@
+>  struct iort_its_msi_chip {
+>  	struct list_head	list;
+>  	struct fwnode_handle	*fw_node;
+> +	phys_addr_t		base_addr;
+>  	u32			translation_id;
+>  };
+>  
+> @@ -131,14 +132,16 @@ typedef acpi_status (*iort_find_node_callback)
+>  static DEFINE_SPINLOCK(iort_msi_chip_lock);
+>  
+>  /**
+> - * iort_register_domain_token() - register domain token and related ITS ID
+> - * to the list from where we can get it back later on.
+> + * iort_register_domain_token() - register domain token along with related
+> + * ITS ID and base address to the list from where we can get it back later on.
+>   * @trans_id: ITS ID.
+> + * @base: ITS base address.
+>   * @fw_node: Domain token.
+>   *
+>   * Returns: 0 on success, -ENOMEM if no memory when allocating list element
+>   */
+> -int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
+> +int iort_register_domain_token(int trans_id, phys_addr_t base,
+> +			       struct fwnode_handle *fw_node)
+>  {
+>  	struct iort_its_msi_chip *its_msi_chip;
+>  
+> @@ -148,6 +151,7 @@ int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
+>  
+>  	its_msi_chip->fw_node = fw_node;
+>  	its_msi_chip->translation_id = trans_id;
+> +	its_msi_chip->base_addr = base;
+>  
+>  	spin_lock(&iort_msi_chip_lock);
+>  	list_add(&its_msi_chip->list, &iort_msi_chip_list);
+> @@ -491,6 +495,24 @@ int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id)
+>  	return -ENODEV;
+>  }
+>  
+> +static int iort_find_its_base(u32 its_id, phys_addr_t *base)
+> +{
+> +	struct iort_its_msi_chip *its_msi_chip;
+> +	bool match = false;
+> +
+> +	spin_lock(&iort_msi_chip_lock);
+> +	list_for_each_entry(its_msi_chip, &iort_msi_chip_list, list) {
+> +		if (its_msi_chip->translation_id == its_id) {
+> +			*base = its_msi_chip->base_addr;
+> +			match = true;
+> +			break;
+> +		}
+> +	}
+> +	spin_unlock(&iort_msi_chip_lock);
+> +
+> +	return match ? 0 : -ENODEV;
+> +}
+> +
+>  /**
+>   * iort_dev_find_its_id() - Find the ITS identifier for a device
+>   * @dev: The device.
+> @@ -649,6 +671,67 @@ int iort_add_device_replay(const struct iommu_ops *ops, struct device *dev)
+>  
+>  	return err;
+>  }
+> +
+> +/**
+> + * iort_iommu_its_get_resv_regions - Reserved region driver helper
+> + * @dev: Device from iommu_get_resv_regions()
+> + * @list: Reserved region list from iommu_get_resv_regions()
+> + *
+> + * Returns: Number of reserved regions on success(0 if no associated ITS),
+> + *          appropriate error value otherwise.
+> + *
+> + * IOMMU drivers can use this to implement their .get_resv_regions callback
+> + * for reserving the HW ITS address regions.
+> + */
+> +int iort_iommu_its_get_resv_regions(struct device *dev, struct list_head *head)
+> +{
+> +	int i;
+> +	struct acpi_iort_its_group *its;
+> +	struct acpi_iort_node *node, *its_node = NULL;
+> +	int resv = 0;
+> +
+> +	node = iort_find_dev_node(dev);
+> +	if (!node)
+> +		return -ENODEV;
+> +
+> +	if (dev_is_pci(dev)) {
+> +		u32 rid;
+> +
+> +		pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid, &rid);
+> +		its_node = iort_node_map_id(node, rid, NULL, IORT_MSI_TYPE);
+> +	} else {
+> +		for (i = 0; i < node->mapping_count; i++) {
+> +			its_node = iort_node_map_platform_id(node, NULL,
+> +							 IORT_MSI_TYPE, i);
+> +			if (its_node)
+> +				break;
+> +		}
+> +	}
+> +
+> +	if (!its_node)
+> +		return 0;
+> +
+> +	/* Move to ITS specific data */
+> +	its = (struct acpi_iort_its_group *)its_node->node_data;
+> +
+> +	for (i = 0; i < its->its_count; i++) {
+> +		phys_addr_t base;
+> +
+> +		if (!iort_find_its_base(its->identifiers[i], &base)) {
+> +			int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
+> +			struct iommu_resv_region *region;
+> +
+> +			region = iommu_alloc_resv_region(base, SZ_128K, prot,
+> +							 IOMMU_RESV_MSI);
+> +			if (region) {
+> +				list_add_tail(&region->list, head);
+> +				resv++;
+> +			}
+> +		}
+> +	}
+> +
+> +	return resv ? : -ENODEV;
+
+IIUC I think this is not right (ie resv < its_count should count as a
+failure).
+
+This should be easy to fix-up but I am not sure there is still time for
+these patches to be merged for this merge window, I take the blame since
+I am the cause of the delay but I thought the logic in the SMMU driver
+should have been clarified and this version does it IMO.
+
+Thanks and apologies,
+Lorenzo
+
+> +}
+>  #else
+>  static inline
+>  const struct iommu_ops *iort_fwspec_iommu_ops(struct iommu_fwspec *fwspec)
+> @@ -656,6 +739,8 @@ const struct iommu_ops *iort_fwspec_iommu_ops(struct iommu_fwspec *fwspec)
+>  static inline
+>  int iort_add_device_replay(const struct iommu_ops *ops, struct device *dev)
+>  { return 0; }
+> +int iort_iommu_its_get_resv_regions(struct device *dev, struct list_head *head)
+> +{ return -ENODEV; }
+>  #endif
+>  
+>  static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 45ea1933..c45a2ad 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -1854,7 +1854,8 @@ static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
+>  		return -ENOMEM;
+>  	}
+>  
+> -	err = iort_register_domain_token(its_entry->translation_id, dom_handle);
+> +	err = iort_register_domain_token(its_entry->translation_id, res.start,
+> +					 dom_handle);
+>  	if (err) {
+>  		pr_err("ITS@%pa: Unable to register GICv3 ITS domain token (ITS ID %d) to IORT\n",
+>  		       &res.start, its_entry->translation_id);
+> diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
+> index 3ff9ace..35cf45c 100644
+> --- a/include/linux/acpi_iort.h
+> +++ b/include/linux/acpi_iort.h
+> @@ -26,7 +26,8 @@
+>  #define IORT_IRQ_MASK(irq)		(irq & 0xffffffffULL)
+>  #define IORT_IRQ_TRIGGER_MASK(irq)	((irq >> 32) & 0xffffffffULL)
+>  
+> -int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node);
+> +int iort_register_domain_token(int trans_id, phys_addr_t base,
+> +			       struct fwnode_handle *fw_node);
+>  void iort_deregister_domain_token(int trans_id);
+>  struct fwnode_handle *iort_find_domain_token(int trans_id);
+>  #ifdef CONFIG_ACPI_IORT
+> @@ -39,6 +40,7 @@
+>  /* IOMMU interface */
+>  void iort_set_dma_mask(struct device *dev);
+>  const struct iommu_ops *iort_iommu_configure(struct device *dev);
+> +int iort_iommu_its_get_resv_regions(struct device *dev, struct list_head *head);
+>  #else
+>  static inline void acpi_iort_init(void) { }
+>  static inline bool iort_node_match(u8 type) { return false; }
+> @@ -53,6 +55,9 @@ static inline void iort_set_dma_mask(struct device *dev) { }
+>  static inline
+>  const struct iommu_ops *iort_iommu_configure(struct device *dev)
+>  { return NULL; }
+> +static inline
+> +int iort_iommu_its_get_resv_regions(struct device *dev, struct list_head *head)
+> +{ return -ENODEV; }
+>  #endif
+>  
+>  #endif /* __ACPI_IORT_H__ */
+> -- 
+> 1.9.1
 > 
-> Could you drop the newline before the #ifdef as well please?
-
-Sure thing.
-
-[...]
-
-> >         old = aarch64_insn_gen_nop();
-> >         new = aarch64_insn_gen_branch_imm(pc, addr, AARCH64_INSN_BRANCH_LINK);
-> > @@ -140,10 +142,10 @@ int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
-> >         bool validate = true;
-> >         u32 old = 0, new;
-> >
-> > -#ifdef CONFIG_ARM64_MODULE_PLTS
-> >         long offset = (long)pc - (long)addr;
-> >
 > 
-> Please drop the newline as well.
-
-Sure.
-
-> With the above addressed:
-> 
-> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-Cheers!
-
-Mark.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
