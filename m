@@ -1,33 +1,68 @@
 From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Fri, 23 Jun 2017 14:55:46 +0200
-Subject: [PATCH 4/8] spi: stm32: replace st, spi-midi with st,
- spi-midi-ns to fit bindings
+Date: Fri, 23 Jun 2017 14:55:49 +0200
+Subject: [PATCH 7/8] spi: stm32: enhance DMA error management
 In-Reply-To: <1498222550-19092-1-git-send-email-amelie.delaunay@st.com>
 References: <1498222550-19092-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <1498222550-19092-5-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1498222550-19092-8-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the optional dt property used to set master inter-data
-idleness.
+This patch reworks DMA error management. In case the DMA callback is
+called while EOT (End Of Transfer) flag is not set, that means that DMA
+encountered an error. This error will result in an auto-suspend of SPI
+flow, which could also result in an overrun. So, in DMA mode, SUSP and
+OVR flags are a condition to stop the current transfer.
 
 Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 ---
- drivers/spi/spi-stm32.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/spi/spi-stm32.c | 20 +++++++++++++++-----
+ 1 file changed, 15 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/spi/spi-stm32.c b/drivers/spi/spi-stm32.c
-index ca38c24..0997d6d 100644
+index 209afda..63af9d9 100644
 --- a/drivers/spi/spi-stm32.c
 +++ b/drivers/spi/spi-stm32.c
-@@ -582,7 +582,7 @@ static int stm32_spi_prepare_msg(struct spi_master *master,
+@@ -514,6 +514,12 @@ static irqreturn_t stm32_spi_irq(int irq, void *dev_id)
+ 		dev_warn(spi->dev, "Communication suspended\n");
+ 		if (!spi->cur_usedma && (spi->rx_buf && (spi->rx_len > 0)))
+ 			stm32_spi_read_rxfifo(spi, false);
++		/*
++		 * If communication is suspended while using DMA, it means
++		 * that something went wrong, so stop the current transfer
++		 */
++		if (spi->cur_usedma)
++			end = true;
+ 	}
  
- 	/* SPI slave device may need time between data frames */
- 	spi->cur_midi = 0;
--	if (np && !of_property_read_u32(np, "st,spi-midi", &spi->cur_midi))
-+	if (np && !of_property_read_u32(np, "st,spi-midi-ns", &spi->cur_midi))
- 		dev_dbg(spi->dev, "%dns inter-data idleness\n", spi->cur_midi);
+ 	if (sr & SPI_SR_MODF) {
+@@ -525,6 +531,12 @@ static irqreturn_t stm32_spi_irq(int irq, void *dev_id)
+ 		dev_warn(spi->dev, "Overrun: received value discarded\n");
+ 		if (!spi->cur_usedma && (spi->rx_buf && (spi->rx_len > 0)))
+ 			stm32_spi_read_rxfifo(spi, false);
++		/*
++		 * If overrun is detected while using DMA, it means that
++		 * something went wrong, so stop the current transfer
++		 */
++		if (spi->cur_usedma)
++			end = true;
+ 	}
  
- 	if (spi_dev->mode & SPI_CPOL)
+ 	if (sr & SPI_SR_EOT) {
+@@ -645,12 +657,10 @@ static void stm32_spi_dma_cb(void *data)
+ 
+ 	spin_unlock_irqrestore(&spi->lock, flags);
+ 
+-	if (!(sr & SPI_SR_EOT)) {
+-		dev_warn(spi->dev, "DMA callback (sr=0x%08x)\n", sr);
++	if (!(sr & SPI_SR_EOT))
++		dev_warn(spi->dev, "DMA error (sr=0x%08x)\n", sr);
+ 
+-		spi_finalize_current_transfer(spi->master);
+-		stm32_spi_disable(spi);
+-	}
++	/* Now wait for EOT, or SUSP or OVR in case of error */
+ }
+ 
+ /**
 -- 
 1.9.1
