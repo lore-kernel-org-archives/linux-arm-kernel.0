@@ -1,60 +1,36 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Fri, 23 Jun 2017 21:03:39 +0800
-Subject: [RFC PATCH] pinctrl: rockchip: add irq_shutdown
-Message-ID: <1498223019-9123-1-git-send-email-jeffy.chen@rock-chips.com>
+From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
+Date: Fri, 23 Jun 2017 15:00:53 +0200
+Subject: [PATCH v2 5/5] ARM: configs: stm32: Add DMAMUX support in STM32
+ defconfig
+In-Reply-To: <1498222853-11110-1-git-send-email-pierre-yves.mordret@st.com>
+References: <1498222853-11110-1-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1498222853-11110-6-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the rockchip pinctrl driver would try to enable/disable the
-gpio bank clk when enable/disable an irq.
+This patch adds DMAMUX support in STM32 defconfig file
 
-So when the irq core trying to shutdown an already disabled irq, it
-would result in unbalanced clk disable request:
-[   35.911955] WARNING: at drivers/clk/clk.c:680
-...
-[   37.272271] Call trace:
-[   37.274729] [<ffffffc0007ac270>] clk_core_disable+0x28/0x194
-[   37.280395] [<ffffffc0007ac6a8>] clk_disable+0x34/0x48
-[   37.285544] [<ffffffc0004f3bf0>] rockchip_irq_disable+0x30/0x3c
-[   37.291472] [<ffffffc00027a7e0>] __irq_disable+0x40/0x64
-[   37.296791] [<ffffffc00027a86c>] irq_shutdown+0x68/0x8c
-[   37.302023] [<ffffffc0002777fc>] __free_irq+0x110/0x218
-[   37.307254] [<ffffffc0002779a8>] free_irq+0x54/0x64
-[   37.312138] [<ffffffc00027ba24>] devm_irq_release+0x24/0x30
-
-Add an irq_shutdown callback, and do a sanity check for irq state to
-prevent that.
-
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 ---
+ Version history:
+    v2: None
+---
+---
+ arch/arm/configs/stm32_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
- drivers/pinctrl/pinctrl-rockchip.c | 7 +++++++
- 1 file changed, 7 insertions(+)
-
-diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
-index 607f52c..b0e3130 100644
---- a/drivers/pinctrl/pinctrl-rockchip.c
-+++ b/drivers/pinctrl/pinctrl-rockchip.c
-@@ -2551,6 +2551,12 @@ static void rockchip_irq_disable(struct irq_data *d)
- 	clk_disable(bank->clk);
- }
- 
-+static void rockchip_irq_shutdown(struct irq_data *d)
-+{
-+	if (!irqd_irq_disabled(d))
-+		rockchip_irq_disable(d);
-+}
-+
- static void rockchip_irq_bus_lock(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-@@ -2641,6 +2647,7 @@ static int rockchip_interrupts_register(struct platform_device *pdev,
- 		gc->chip_types[0].chip.irq_unmask = irq_gc_mask_clr_bit;
- 		gc->chip_types[0].chip.irq_enable = rockchip_irq_enable;
- 		gc->chip_types[0].chip.irq_disable = rockchip_irq_disable;
-+		gc->chip_types[0].chip.irq_shutdown = rockchip_irq_shutdown;
- 		gc->chip_types[0].chip.irq_set_wake = irq_gc_set_wake;
- 		gc->chip_types[0].chip.irq_suspend = rockchip_irq_suspend;
- 		gc->chip_types[0].chip.irq_resume = rockchip_irq_resume;
+diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+index a097538..15fbaba 100644
+--- a/arch/arm/configs/stm32_defconfig
++++ b/arch/arm/configs/stm32_defconfig
+@@ -64,6 +64,7 @@ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_STM32=y
+ CONFIG_DMADEVICES=y
+ CONFIG_STM32_DMA=y
++CONFIG_STM32_DMAMUX=y
+ CONFIG_IIO=y
+ CONFIG_STM32_ADC_CORE=y
+ CONFIG_STM32_ADC=y
 -- 
-2.1.4
+1.9.1
