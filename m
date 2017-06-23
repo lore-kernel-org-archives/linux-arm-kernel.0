@@ -1,91 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 Jun 2017 16:38:35 +0200
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.13 (#2)
-In-Reply-To: <87shiqydwj.fsf@free-electrons.com>
-References: <877f041a4p.fsf@free-electrons.com>
- <CAK8P3a3UuLFVxZv1o1+gKSafsGgV=vgWRM_yjnT_E4fAUPZx8g@mail.gmail.com>
- <87wp82yeng.fsf@free-electrons.com>
- <CAK8P3a1awsqu5eN4eMPMmiZ-JXn64wA+y-LUR0EdHjYiCRK+Bg@mail.gmail.com>
- <87shiqydwj.fsf@free-electrons.com>
-Message-ID: <CAK8P3a3XTz_DkUsRumQz2OB_qEE2mxUFagfq2sGpAHuFDCiXGg@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 23 Jun 2017 10:39:06 -0400
+Subject: [RFC,20/30] iommu/arm-smmu-v3: Enable PCI PASID in masters
+In-Reply-To: <f18163da-30a6-a7d4-0a2c-bca4fc1b0fff@codeaurora.org>
+References: <20170227195441.5170-21-jean-philippe.brucker@arm.com>
+ <f18163da-30a6-a7d4-0a2c-bca4fc1b0fff@codeaurora.org>
+Message-ID: <fad6510f-922a-550b-0429-bc59f857c307@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 23, 2017 at 4:30 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Hi Arnd,
+Hi Jean-Philippe,
+ 
+> On 2/27/2017 2:54 PM, Jean-Philippe Brucker wrote:
+> Enable PASID for PCI devices that support it.
 >
->  On ven., juin 23 2017, Arnd Bergmann <arnd@arndb.de> wrote:
+> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 66 ++++++++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 63 insertions(+), 3 deletions(-)
 >
->> On Fri, Jun 23, 2017 at 4:14 PM, Gregory CLEMENT
->> <gregory.clement@free-electrons.com> wrote:
->>> Hi Arnd,
->>>
->>>  On ven., juin 23 2017, Arnd Bergmann <arnd@arndb.de> wrote:
->>>
->>>
->>>>
->>>>
->>>> Please send a revert for that, and remove the code that tries to
->>>> parse the dma-mask from DT from that driver!
->>>
->>> I see on IRC you agree with Antoine about it the driver part. For the DT
->>> part do you want a PR with the revert or just the patch alone?
->>
->> Either way is fine, or just let me know (here or on IRC) if I should
->> just revert the patch and add an explanation myself.
->
-> If you can do it, it's better. You know better than me why we should
-> revert this patch! :)
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 499dc1cd07eb..37fd061405e9 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -730,6 +730,8 @@ struct arm_smmu_master_data {
+>  
+>  	struct arm_smmu_stream		*streams;
+>  	struct rb_root			contexts;
+> +
+> +	u32				avail_contexts;
+>  };
+>  
 
-No worries, I applied this patch now:
+According to the PASID ECN here (https://pcisig.com/sites/default/files/specification_documents/ECN-PASID-ATS-2011-03-31.pdf),
+PASID should be enabled only if all switches between the root port and
+a device support TLP prefix. 
+ 
+I'm only seeing a call to pci_enable_pasid() in this patch but I don't
+see anybody checking for TLP prefix support on the hierarchy.
 
->From 2b29ca22ed8a79ef1942b6546ccab5953678028d Mon Sep 17 00:00:00 2001
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 23 Jun 2017 16:33:43 +0200
-Subject: [PATCH] Revert "arm64: dts: marvell: add dma-mask in crypto nodes for
- 7k/8k"
+This could potentially be an addition to the PCI core code.
 
-As I found by chance while merging another patch, the usage of
-a dma-mask in this DT node is wrong for multiple reasons:
+Sinan
 
-- dma-masks are a Linux specific concept, not a general
-  hardware feature
-- In DT, we use the "dma-ranges" property to describe how DMA
-  addresses related between devices.
-- The 40-bit mask appears to be completely unnecessary here, as
-  the SoC cannot address that much memory anyway, so simply
-  asking for a 64-bit mask (as supported by the device) should
-  succeed anyway.
-
-The patch to remove the parsing of the property is getting merged
-through the crypto tree.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-index f611e843094c..726528ce54e9 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-@@ -270,7 +270,6 @@
-                                interrupt-names = "mem", "ring0", "ring1",
-                                "ring2", "ring3", "eip";
-                                clocks = <&cpm_clk 1 26>;
--                               dma-mask = <0xff 0xffffffff>;
-                        };
-                };
-
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-index 84d3bd80eb51..95f8e5f607f6 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-@@ -261,7 +261,6 @@
-                                interrupt-names = "mem", "ring0", "ring1",
-                                                  "ring2", "ring3", "eip";
-                                clocks = <&cps_clk 1 26>;
--                               dma-mask = <0xff 0xffffffff>;
-                                /*
-                                 * The cryptographic engine found on the cp110
-                                 * master is enabled by default at the SoC
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
