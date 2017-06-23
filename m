@@ -1,91 +1,115 @@
 From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Fri, 23 Jun 2017 15:00:49 +0200
-Subject: [PATCH v2 1/5] dt-bindings: Document the STM32 DMAMUX bindings
+Date: Fri, 23 Jun 2017 15:00:52 +0200
+Subject: [PATCH v2 4/5] dmaengine: stm32-dma: Add support for STM32 DMAMUX
 In-Reply-To: <1498222853-11110-1-git-send-email-pierre-yves.mordret@st.com>
 References: <1498222853-11110-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <1498222853-11110-2-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1498222853-11110-5-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the documentation of device tree bindings for the STM32
-DMAMUX.
+This patch adds support for STM32 DMAMUX.
+When the STM32 DMA controller is behind a STM32 DMAMUX the request line
+number has not to be handled by DMA but DMAMUX.
 
 Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
 Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 ---
  Version history:
     v2:
-        * Move clock bindings from optional to mandatory one
-        * Drop channelID bindings as managed dynamically from now on by
-          DMAMUX driver.
+        * Use DMAMUX Configuration API's
+        * DMAXMUX(if used) provides ChannelID
 ---
 ---
- .../devicetree/bindings/dma/stm32-dmamux.txt       | 57 ++++++++++++++++++++++
- 1 file changed, 57 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/stm32-dmamux.txt
+ drivers/dma/stm32-dma.c | 44 +++++++++++++++++++++++++++++++-------------
+ 1 file changed, 31 insertions(+), 13 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/dma/stm32-dmamux.txt b/Documentation/devicetree/bindings/dma/stm32-dmamux.txt
-new file mode 100644
-index 0000000..1d413c5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/stm32-dmamux.txt
-@@ -0,0 +1,57 @@
-+STM32 DMA MUX (DMA request router)
+diff --git a/drivers/dma/stm32-dma.c b/drivers/dma/stm32-dma.c
+index 786fc8f..a9e5884 100644
+--- a/drivers/dma/stm32-dma.c
++++ b/drivers/dma/stm32-dma.c
+@@ -13,6 +13,7 @@
+ #include <linux/delay.h>
+ #include <linux/dmaengine.h>
+ #include <linux/dma-mapping.h>
++#include <linux/dma/stm32-dmamux.h>
+ #include <linux/err.h>
+ #include <linux/init.h>
+ #include <linux/jiffies.h>
+@@ -179,6 +180,7 @@ struct stm32_dma_device {
+ 	struct clk *clk;
+ 	struct reset_control *rst;
+ 	bool mem2mem;
++	bool dmamux;
+ 	struct stm32_dma_chan chan[STM32_DMA_MAX_CHANNELS];
+ };
+ 
+@@ -272,12 +274,18 @@ static int stm32_dma_slave_config(struct dma_chan *c,
+ 				  struct dma_slave_config *config)
+ {
+ 	struct stm32_dma_chan *chan = to_stm32_dma_chan(c);
++	int ret = 0;
+ 
+ 	memcpy(&chan->dma_sconfig, config, sizeof(*config));
+ 
+-	chan->config_init = true;
++	if (c->router)
++		ret = stm32_dmamux_set_config(c->router->dev, c->route_data,
++					      c->chan_id);
+ 
+-	return 0;
++	if (!ret)
++		chan->config_init = true;
 +
-+Required properties:
-+- compatible:	"st,stm32-dmamux"
-+- reg:		Memory map for accessing module
-+- #dma-cells:	Should be set to <3>.
-+		For more details about the three cells, please see
-+		stm32-dma.txt documentation binding file
-+- dma-masters:	Phandle pointing to the DMA controller
++	return ret;
+ }
+ 
+ static u32 stm32_dma_irq_status(struct stm32_dma_chan *chan)
+@@ -998,18 +1006,26 @@ static struct dma_chan *stm32_dma_of_xlate(struct of_phandle_args *dma_spec,
+ 	cfg.stream_config = dma_spec->args[2];
+ 	cfg.threshold = dma_spec->args[3];
+ 
+-	if ((cfg.channel_id >= STM32_DMA_MAX_CHANNELS) ||
+-	    (cfg.request_line >= STM32_DMA_MAX_REQUEST_ID)) {
+-		dev_err(dev, "Bad channel and/or request id\n");
+-		return NULL;
+-	}
+-
+-	chan = &dmadev->chan[cfg.channel_id];
++	if (dmadev->dmamux) {
++		c = dma_get_any_slave_channel(&dmadev->ddev);
++		if (!c) {
++			dev_err(dev, "No more channel avalaible\n");
++			return NULL;
++		}
++		chan = &dmadev->chan[c->chan_id];
++	} else {
++		if ((cfg.channel_id >= STM32_DMA_MAX_CHANNELS) ||
++		    (cfg.request_line >= STM32_DMA_MAX_REQUEST_ID)) {
++			dev_err(dev, "Bad channel and/or request id\n");
++			return NULL;
++		}
+ 
+-	c = dma_get_slave_channel(&chan->vchan.chan);
+-	if (!c) {
+-		dev_err(dev, "No more channels available\n");
+-		return NULL;
++		chan = &dmadev->chan[cfg.channel_id];
++		c = dma_get_slave_channel(&chan->vchan.chan);
++		if (!c) {
++			dev_err(dev, "No more channel avalaible\n");
++			return NULL;
++		}
+ 	}
+ 
+ 	stm32_dma_set_config(chan, &cfg);
+@@ -1058,6 +1074,8 @@ static int stm32_dma_probe(struct platform_device *pdev)
+ 	dmadev->mem2mem = of_property_read_bool(pdev->dev.of_node,
+ 						"st,mem2mem");
+ 
++	dmadev->dmamux = of_property_read_bool(pdev->dev.of_node, "st,dmamux");
 +
-+Optional properties:
-+- dma-channels : Number of DMA channels supported.
-+- dma-requests : Number of DMA requests supported.
-+- resets: Reference to a reset controller asserting the DMA controller
-+- clocks: Input clock of the DMAMUX instance.
-+
-+Example:
-+
-+/* DMA controller */
-+dma2: dma-controller at 40026400 {
-+	compatible = "st,stm32-dma";
-+	reg = <0x40026400 0x400>;
-+	interrupts = <56>,
-+		     <57>,
-+		     <58>,
-+		     <59>,
-+		     <60>,
-+		     <68>,
-+		     <69>,
-+		     <70>;
-+	clocks = <&clk_hclk>;
-+	#dma-cells = <4>;
-+	st,mem2mem;
-+	resets = <&rcc 150>;
-+	st,dmamux;
-+	dma-channels = <8>;
-+};
-+
-+/* DMA mux */
-+dmamux2: dma-router at 40020820 {
-+	compatible = "st,stm32-dmamux";
-+	reg = <0x40020800 0x1c>;
-+	#dma-cells = <3>;
-+	dma-requests = <128>;
-+	dma-masters = <&dma2>;
-+};
-+
-+/* DMA client */
-+usart1: serial at 40011000 {
-+	compatible = "st,stm32-usart", "st,stm32-uart";
-+	reg = <0x40011000 0x400>;
-+	interrupts = <37>;
-+	clocks = <&clk_pclk2>;
-+	dmas = <&dmamux2 41 0x414 0>,
-+	       <&dmamux2 42 0x414 0>;
-+	dma-names = "rx", "tx";
-+};
+ 	dmadev->rst = devm_reset_control_get(&pdev->dev, NULL);
+ 	if (!IS_ERR(dmadev->rst)) {
+ 		reset_control_assert(dmadev->rst);
 -- 
 1.9.1
