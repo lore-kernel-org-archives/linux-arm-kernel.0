@@ -1,31 +1,44 @@
 From: zhi.mao@mediatek.com (Zhi Mao)
-Date: Fri, 23 Jun 2017 13:08:20 +0800
-Subject: [PATCH v2 1/6] pwm: kconfig: modify mediatek information
+Date: Fri, 23 Jun 2017 13:08:24 +0800
+Subject: [PATCH v2 5/6] pwm: mediatek: add PWM_CLK_DIV_MAX
 In-Reply-To: <1498194505-30930-1-git-send-email-zhi.mao@mediatek.com>
 References: <1498194505-30930-1-git-send-email-zhi.mao@mediatek.com>
-Message-ID: <1498194505-30930-2-git-send-email-zhi.mao@mediatek.com>
+Message-ID: <1498194505-30930-6-git-send-email-zhi.mao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-modify mediatek information
+Replace "7" with "PWM_CLK_DIV_MAX" in function:mtk_pwm_config()
+to improve the code readablity.
 
 Signed-off-by: Zhi Mao <zhi.mao@mediatek.com>
 ---
- drivers/pwm/Kconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pwm/pwm-mediatek.c |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-index 313c107..45cdf2a 100644
---- a/drivers/pwm/Kconfig
-+++ b/drivers/pwm/Kconfig
-@@ -300,7 +300,7 @@ config PWM_MEDIATEK
- 	  Generic PWM framework driver for Mediatek ARM SoC.
+diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
+index 554a042..e5f6425 100644
+--- a/drivers/pwm/pwm-mediatek.c
++++ b/drivers/pwm/pwm-mediatek.c
+@@ -30,6 +30,8 @@
+ #define PWMDWIDTH		0x2c
+ #define PWMTHRES		0x30
  
- 	  To compile this driver as a module, choose M here: the module
--	  will be called pwm-mxs.
-+	  will be called pwm-mediatek.
++#define PWM_CLK_DIV_MAX		7
++
+ enum {
+ 	MTK_CLK_MAIN = 0,
+ 	MTK_CLK_TOP,
+@@ -130,8 +132,10 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ 		clkdiv++;
+ 	}
  
- config PWM_MXS
- 	tristate "Freescale MXS PWM support"
+-	if (clkdiv > 7)
++	if (clkdiv > PWM_CLK_DIV_MAX) {
++		dev_err(chip->dev, "period %d not supported\n", period_ns);
+ 		return -EINVAL;
++	}
+ 
+ 	mtk_pwm_writel(pc, pwm->hwpwm, PWMCON, BIT(15) | clkdiv);
+ 	mtk_pwm_writel(pc, pwm->hwpwm, PWMDWIDTH, period_ns / resolution);
 -- 
 1.7.9.5
