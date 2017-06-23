@@ -1,72 +1,40 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 23 Jun 2017 14:58:42 +0300
-Subject: [PATCH v1 1/6] DT bindings: add bindings for ov965x camera module
-In-Reply-To: <3E7B1344-ECE6-4CCC-9E9D-7521BB566CDE@goldelico.com>
-References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
- <d14b8c6e-b480-36f0-ed0a-684647617dbe@suse.de>
- <3E7B1344-ECE6-4CCC-9E9D-7521BB566CDE@goldelico.com>
-Message-ID: <13144955.Kq5qljPvgI@avalon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 23 Jun 2017 13:02:08 +0100
+Subject: [PATCH] iommu/arm-smmu-v3: Enable ACPI based HiSilicon
+ CMD_PREFETCH quirk(erratum 161010701)
+In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA838388F08@FRAEML521-MBS.china.huawei.com>
+References: <20170517091205.7752-1-shameerali.kolothum.thodi@huawei.com>
+ <5FC3163CFD30C246ABAA99954A238FA838388F08@FRAEML521-MBS.china.huawei.com>
+Message-ID: <20170623120207.GA2310@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nikolaus,
-
-On Friday 23 Jun 2017 12:59:24 H. Nikolaus Schaller wrote:
-> Am 23.06.2017 um 12:46 schrieb Andreas F?rber <afaerber@suse.de>:
-> > Am 23.06.2017 um 12:25 schrieb H. Nikolaus Schaller:
-> >>> diff --git a/Documentation/devicetree/bindings/media/i2c/ov965x.txt
-> >>> b/Documentation/devicetree/bindings/media/i2c/ov965x.txt new file mode
-> >>> 100644
-> >>> index 0000000..0e0de1f
-> >>> --- /dev/null
-> >>> +++ b/Documentation/devicetree/bindings/media/i2c/ov965x.txt
-> >>> @@ -0,0 +1,37 @@
-> >>> +* Omnivision OV9650/9652/9655 CMOS sensor
-> >>> +
-> >>> +The Omnivision OV965x sensor support multiple resolutions output, such
-> >>> as
-> >>> +CIF, SVGA, UXGA. It also can support YUV422/420, RGB565/555 or raw RGB
-> >>> +output format.
-> >>> +
-> >>> +Required Properties:
-> >>> +- compatible: should be one of
-> >>> +	"ovti,ov9650"
-> >>> +	"ovti,ov9652"
-> >>> +	"ovti,ov9655"
-> >>> +- clocks: reference to the mclk input clock.
-> >> 
-> >> I wonder why you have removed the clock-frequency property?
-> >> 
-> >> In some situations the camera driver must be able to tell the clock
-> >> source which frequency it wants to see.
+On Fri, Jun 23, 2017 at 08:29:28AM +0000, Shameerali Kolothum Thodi wrote:
+> > -----Original Message-----
+> > From: Shameerali Kolothum Thodi
+> > Sent: Wednesday, May 17, 2017 10:12 AM
+> > To: robin.murphy at arm.com; will.deacon at arm.com;
+> > mark.rutland at arm.com; lorenzo.pieralisi at arm.com
+> > Cc: John Garry; Gabriele Paoloni; Guohanjun (Hanjun Guo); xuwei (O);
+> > Linuxarm; devel at acpica.org; linux-acpi at vger.kernel.org; linux-arm-
+> > kernel at lists.infradead.org; devicetree at vger.kernel.org; Shameerali
+> > Kolothum Thodi
+> > Subject: [PATCH] iommu/arm-smmu-v3: Enable ACPI based HiSilicon
+> > CMD_PREFETCH quirk(erratum 161010701)
 > > 
-> > That's what assigned-clock-rates property is for:
-> > 
-> > https://www.kernel.org/doc/Documentation/devicetree/bindings/clock/clock-b
-> > indings.txt
-> > 
-> > AFAIU clock-frequency on devices is deprecated and equivalent to having
-> > a clocks property pointing to a fixed-clock, which is different from a
-> > clock with varying rate.
+> > HiSilicon SMMUv3 on Hip06/Hip07 platforms doesn't support CMD_PREFETCH
+> > command. The dt based support for this quirk is already present in the
+> > driver(hisilicon,broken-prefetch-cmd). This adds ACPI support for the
+> > quirk using the IORT smmu model number.
 > 
-> I am not sure if that helps here. The OMAP3-ISP does not have a fixed clock
-> rate so we can only have the driver define what it wants to see.
+> This also  has dependency on acpica header update and it looks like it's going
+> to take a while to appear on Linux mainline. I have seen patches where a 
+> temp local definition for SMMU v3 model number is suggested instead.
 > 
-> And common practise for OMAP3-ISP based camera modules (e.g. N900, N9) is
-> that they do it in the driver.
-> 
-> Maybe ISP developers can comment?
+> Could you please let me know the plan so that I can base this patch similar
+> to or on top of Caviums "[PATCH] iommu/arm-smmu-v3, acpi: Add temporary
+> Cavium SMMU-V3 IORT model number definitions"
 
-The OMAP3 ISP is a variable-frequency clock provider. The clock frequency is 
-controlled by the clock consumer. As such, it's up to the consumer to decide 
-whether to compute and request the clock rate dynamically at runtime, or use 
-the assigned-clock-rates property in DT.
+I think I've got this in hand, but I'll shout if I run into any issues.
 
-Some ISPs include a clock generator, others don't. It should make no 
-difference whether the clock is provided by the ISP, by a dedicated clock 
-source in the SoC or by a discrete on-board adjustable clock source.
-
--- 
-Regards,
-
-Laurent Pinchart
+Will
