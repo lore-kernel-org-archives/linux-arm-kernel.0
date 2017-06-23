@@ -1,78 +1,141 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 23 Jun 2017 12:01:50 +0200
-Subject: [PATCH v2 4/9] serial: atmel: Use common rs485 device tree
- parsing function
-In-Reply-To: <CACQ1gAh3jpcyPLexNgEU7KV0qX1Wor2dsLRV8LJYpA-1Wmp9SA@mail.gmail.com>
-References: <20170623094945.31908-1-u.kleine-koenig@pengutronix.de>
- <20170623094945.31908-5-u.kleine-koenig@pengutronix.de>
- <CACQ1gAh3jpcyPLexNgEU7KV0qX1Wor2dsLRV8LJYpA-1Wmp9SA@mail.gmail.com>
-Message-ID: <20170623100150.6dxgr2rq5fmf3mtb@pengutronix.de>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 23 Jun 2017 11:11:19 +0100
+Subject: [PATCH] iommu/arm-smmu-v3, acpi: Add temporary Cavium SMMU-V3
+ IORT model number definitions
+In-Reply-To: <20170623045933.GR16981@rric.localdomain>
+References: <1498133138-20244-1-git-send-email-gakula@caviumnetworks.com>
+ <20170622182257.GI15336@arm.com> <20170622185822.GK15336@arm.com>
+ <20170622193535.GA10237@rric.localdomain>
+ <20170622210437.GA27861@red-moon>
+ <20170623045541.GQ16981@rric.localdomain>
+ <20170623045933.GR16981@rric.localdomain>
+Message-ID: <20170623101119.GB28331@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 23, 2017 at 11:58:37AM +0200, Richard Genoud wrote:
-> 2017-06-23 11:49 GMT+02:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> > From: Sascha Hauer <s.hauer@pengutronix.de>
-> >
-> > We just got a common helper for parsing the rs485 specific
-> > device tree properties. Use it and drop the open coded parser.
-> >
-> > Note that there is a small difference between the removed and the now
-> > used implementation: The former cleared flags to 0 if rs485-rts-delay
-> > was given, the common helper clears SER_RS485_RX_DURING_TX and
-> > SER_RS485_ENABLED only but always which makes more sense.
-> >
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > [ukleinek: point out semantic change in commit log]
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> > Changes since v1:
-> >  - as I dropped my two atmel patches and used Alexandre Belloni's (that are
-> >    already in next) instead, there are a few changes that are necessary to
-> >    adapt to the new base.
-> >
-> >  drivers/tty/serial/atmel_serial.c | 17 +----------------
-> >  1 file changed, 1 insertion(+), 16 deletions(-)
-> >
-> > diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> > index 937d67f22fba..357570a216ad 100644
-> > --- a/drivers/tty/serial/atmel_serial.c
-> > +++ b/drivers/tty/serial/atmel_serial.c
-> > @@ -1689,22 +1689,7 @@ static void atmel_init_rs485(struct uart_port *port,
-> >  {
-> >         struct device_node *np = pdev->dev.of_node;
-> >
-> > -       struct serial_rs485 *rs485conf = &port->rs485;
-> > -       u32 rs485_delay[2];
-> > -
-> > -       /* rs485 properties */
-> > -       if (of_property_read_u32_array(np, "rs485-rts-delay",
-> > -                                      rs485_delay, 2) == 0) {
-> > -               rs485conf->delay_rts_before_send = rs485_delay[0];
-> > -               rs485conf->delay_rts_after_send = rs485_delay[1];
-> > -               rs485conf->flags = 0;
-> > -       }
-> > -
-> > -       if (of_get_property(np, "rs485-rx-during-tx", NULL))
-> > -               rs485conf->flags |= SER_RS485_RX_DURING_TX;
-> > -
-> > -       if (of_get_property(np, "linux,rs485-enabled-at-boot-time", NULL))
-> > -               rs485conf->flags |= SER_RS485_ENABLED;
-> > +       of_get_rs485_mode(np, &port->rs485);
-> >  }
+On Fri, Jun 23, 2017 at 06:59:33AM +0200, Robert Richter wrote:
+> On 23.06.17 06:55:41, Robert Richter wrote:
+> > On 22.06.17 22:04:37, Lorenzo Pieralisi wrote:
+> > > On Thu, Jun 22, 2017 at 09:35:35PM +0200, Robert Richter wrote:
+> > > > On 22.06.17 19:58:22, Will Deacon wrote:
+> > > > > On Thu, Jun 22, 2017 at 07:22:57PM +0100, Will Deacon wrote:
+> > > > > > On Thu, Jun 22, 2017 at 05:35:35PM +0530, Geetha sowjanya wrote:
+> > > > > > > Cavium ThunderX2 SMMUv3 implementation has two Silicon Erratas.
+> > > > > > > 1. Errata ID #74
+> > > > > > >    SMMU register alias Page 1 is not implemented
+> > > > > > > 2. Errata ID #126
+> > > > > > >    SMMU doesnt support unique IRQ lines and also MSI for gerror,
+> > > > > > >    eventq and cmdq-sync
+> > > > > > > 
+> > > > > > > The following patchset does software workaround for these two erratas.
+> > > > > > 
+> > > > > > I've picked up the first two patches, and left comments on the final patch.
+> > > > > 
+> > > > > ... except that it doesn't build:
+> > > > > 
+> > > > > 
+> > > > > drivers/acpi/arm64/iort.c: In function ?arm_smmu_v3_resource_size?:
+> > > > > drivers/acpi/arm64/iort.c:837:21: error: ?ACPI_IORT_SMMU_V3_CAVIUM_CN99XX? undeclared (first use in this function)
+> > > > >   if (smmu->model == ACPI_IORT_SMMU_V3_CAVIUM_CN99XX)
+> > > > >                      ^
+> > > > > drivers/acpi/arm64/iort.c:837:21: note: each undeclared identifier is reported only once for each function it appears in
+> > > > > make[4]: *** [drivers/acpi/arm64/iort.o] Error 1
+> > > > > 
+> > > > > 
+> > > > > I don't see ACPI_IORT_SMMU_V3_CAVIUM_CN99XX defined, even in linux-next.
+> > > > > 
+> > > > > What's the plan here?
+> > > > 
+> > > > It is defined already in acpica and we actually waiting for the acpi
+> > > > maintainers to include it:
+> > > > 
+> > > >  https://github.com/acpica/acpica/commit/d00a4eb86e64
+> > > > 
+> > > > We could add
+> > > > 
+> > > > /* Until ACPICA headers cover IORT rev. C */
+> > > > #ifndef ACPI_IORT_SMMU_V3_CAVIUM_CN99XX
+> > > > #define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX		0x2
+> > > > #endif
+> > > > 
+> > > > to both files:
+> > > > 
+> > > >  drivers/acpi/arm64/iort.c
+> > > >  drivers/iommu/arm-smmu-v3.c
+> > > > 
+> > > 
+> > > I thought it was a solved problem (and that the IORT patch was based
+> > > on Robin's workaround) but I was clearly wrong and I apologise to
+> > > Will about this.
+> > > 
+> > > FWIW, you could add the define in include/linux/acpi_iort.h and I will
+> > > remove it whenever ACPICA changes make it into the kernel.
+> > 
+> > Adding it there will still let depend us on acpi maintainers, while I
+> > think the over 2 files might go through arm64 tree smoothly. A change
+> > in acpi_iort.h also adds the definition to other archs and I don't
+> > think that adding arch #ifdefs to avoid that are welcome in that
+> > header file too.
+> > 
+> > I am going to resend my patch below with an improved wording.
 > 
-> as atmel_init_rs485() is only used once in the code, what do you think of
-> getting rid of it and just have something like:
-> of_get_rs485_mode(pdev->dev.of_node, &port->rs485);
-> in atmel_init_port() ?
-> (possibly with a little comment)
+> Here it comes:
+> 
+> From d210b4c540bc4adcebd51d5a87437d2049649e94 Mon Sep 17 00:00:00 2001
+> From: Robert Richter <rrichter@cavium.com>
+> Date: Thu, 22 Jun 2017 21:20:54 +0200
+> Subject: [PATCH] iommu/arm-smmu-v3, acpi: Add temporary Cavium SMMU-V3 IORT
+>  model number definitions
+> 
+> The model number is already defined in acpica and we are actually
+> waiting for the acpi maintainers to include it:
+> 
+>  https://github.com/acpica/acpica/commit/d00a4eb86e64
+> 
+> Adding those temporary definitions until the change makes it into
+> include/acpi/actbl2.h. Once that is done this patch can be reverted.
+> 
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
+> ---
+>  drivers/acpi/arm64/iort.c   | 5 +++++
 
-Right, that is something that I thought once, too, but then forgot on
-the other changes I still had to do. Noted for v3.
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>  drivers/iommu/arm-smmu-v3.c | 5 +++++
+>  2 files changed, 10 insertions(+)
+> 
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> index 797b28dc7b34..15491237a657 100644
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -31,6 +31,11 @@
+>  #define IORT_IOMMU_TYPE		((1 << ACPI_IORT_NODE_SMMU) |	\
+>  				(1 << ACPI_IORT_NODE_SMMU_V3))
+>  
+> +/* Until ACPICA headers cover IORT rev. C */
+> +#ifndef ACPI_IORT_SMMU_V3_CAVIUM_CN99XX
+> +#define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX		0x2
+> +#endif
+> +
+>  struct iort_its_msi_chip {
+>  	struct list_head	list;
+>  	struct fwnode_handle	*fw_node;
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 380969aa60d5..c759dfa7442d 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -412,6 +412,11 @@
+>  #define MSI_IOVA_BASE			0x8000000
+>  #define MSI_IOVA_LENGTH			0x100000
+>  
+> +/* Until ACPICA headers cover IORT rev. C */
+> +#ifndef ACPI_IORT_SMMU_V3_CAVIUM_CN99XX
+> +#define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX		0x2
+> +#endif
+> +
+>  static bool disable_bypass;
+>  module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
+>  MODULE_PARM_DESC(disable_bypass,
+> -- 
+> 2.11.0
+> 
