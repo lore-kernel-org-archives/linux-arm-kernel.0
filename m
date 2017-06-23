@@ -1,91 +1,72 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 23 Jun 2017 12:59:35 +0100
-Subject: next-20170621 build: 1 failures 7 warnings (next-20170621)
-In-Reply-To: <1498213333.2190.24.camel@mtkswgap22>
-References: <E1dNcMp-0005RN-1w@optimist>
- <20170621100440.vcaxagg4yjca2cv4@sirena.org.uk>
- <1498209196.26313.71.camel@mtkswgap22>
- <20170623094356.GA5337@red-moon>
- <1498213333.2190.24.camel@mtkswgap22>
-Message-ID: <20170623115934.GD28331@red-moon>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 23 Jun 2017 14:58:42 +0300
+Subject: [PATCH v1 1/6] DT bindings: add bindings for ov965x camera module
+In-Reply-To: <3E7B1344-ECE6-4CCC-9E9D-7521BB566CDE@goldelico.com>
+References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
+ <d14b8c6e-b480-36f0-ed0a-684647617dbe@suse.de>
+ <3E7B1344-ECE6-4CCC-9E9D-7521BB566CDE@goldelico.com>
+Message-ID: <13144955.Kq5qljPvgI@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 23, 2017 at 06:22:13PM +0800, Ryder Lee wrote:
-> On Fri, 2017-06-23 at 10:43 +0100, Lorenzo Pieralisi wrote:
-> > On Fri, Jun 23, 2017 at 05:13:16PM +0800, Ryder Lee wrote:
-> > > Sorry for late reply, 
-> > > 
-> > > +Lorenzo
-> > > 
-> > > On Wed, 2017-06-21 at 18:04 +0800, Mark Brown wrote:
-> > > > On Wed, Jun 21, 2017 at 10:56:07AM +0100, Build bot for Mark Brown wrote:
-> > > > 
-> > > > Today's -next fails to build an arm allmodconfig due to:
-> > > > 
-> > > > > 	arm-allmodconfig
-> > > > > ../drivers/pci/host/pcie-mediatek.c:485:8: error: implicit declaration of function 'pci_register_host_bridge' [-Werror=implicit-function-declaration]
-> > > > 
-> > > > caused by eaf3023b0498a (PCI: mediatek: Add MediaTek PCIe host
-> > > > controller support).
-> > > 
-> > > 
-> > > Hi Lorenzo,
-> > > 
-> > > I picked up your changes and had some modifications like what you did
-> > > for other platforms:
-> > > 
-> > > 9f8e3a5 PCI: Add devm_pci_alloc_host_bridge() interface 
-> > > 35a1a84 PCI: Add pci_free_host_bridge() interface
-> > > e33aafd PCI: Initialize bridge release function at bridge allocation
-> > > 
-> > > ...and it looks Okay.
-> > > 
-> > > I have also noticed that you continue sending patches for other
-> > > platforms but I have not yet had a look in detail. I'm quite busy these
-> > > days and don't have time to dig it, hence it is becoming a little
-> > > unmanageable for me.
+Hi Nikolaus,
+
+On Friday 23 Jun 2017 12:59:24 H. Nikolaus Schaller wrote:
+> Am 23.06.2017 um 12:46 schrieb Andreas F?rber <afaerber@suse.de>:
+> > Am 23.06.2017 um 12:25 schrieb H. Nikolaus Schaller:
+> >>> diff --git a/Documentation/devicetree/bindings/media/i2c/ov965x.txt
+> >>> b/Documentation/devicetree/bindings/media/i2c/ov965x.txt new file mode
+> >>> 100644
+> >>> index 0000000..0e0de1f
+> >>> --- /dev/null
+> >>> +++ b/Documentation/devicetree/bindings/media/i2c/ov965x.txt
+> >>> @@ -0,0 +1,37 @@
+> >>> +* Omnivision OV9650/9652/9655 CMOS sensor
+> >>> +
+> >>> +The Omnivision OV965x sensor support multiple resolutions output, such
+> >>> as
+> >>> +CIF, SVGA, UXGA. It also can support YUV422/420, RGB565/555 or raw RGB
+> >>> +output format.
+> >>> +
+> >>> +Required Properties:
+> >>> +- compatible: should be one of
+> >>> +	"ovti,ov9650"
+> >>> +	"ovti,ov9652"
+> >>> +	"ovti,ov9655"
+> >>> +- clocks: reference to the mclk input clock.
+> >> 
+> >> I wonder why you have removed the clock-frequency property?
+> >> 
+> >> In some situations the camera driver must be able to tell the clock
+> >> source which frequency it wants to see.
 > > 
-> > If it is unmanageable you don't add yourself as a maintainer of that
-> > PCI host bridge driver, you know, we are all busy.
+> > That's what assigned-clock-rates property is for:
 > > 
-> > Your driver in the PCI tree as it stands contains already two bugs:
+> > https://www.kernel.org/doc/Documentation/devicetree/bindings/clock/clock-b
+> > indings.txt
 > > 
-> > 1) It leaks memory on the probe failure path
-> > 2) pci_fixup_irqs() is broken on configurations with multiple host
-> >    bridges
-> > 
-> > And we keep copy'n'pasting that code.
+> > AFAIU clock-frequency on devices is deprecated and equivalent to having
+> > a clocks property pointing to a fixed-clock, which is different from a
+> > clock with varying rate.
 > 
-> Sure, I have already tested it, and I'll send a patch with your new
-> methods :)
-
-Thank you for testing it but please do not send anything before we
-decide what to do with my pci_fixup_irqs() removal series.
-
-> > > Did you have a chance to send the same patches for MediaTek?  I
-> > > appreciate that and I can help to test it on our platforms.
-> > 
-> > No, how could I have sent them ? It is not upstream and it is a separate
-> > branch in the PCI tree. As I mentioned in another thread it is probably
-> > best to drop my pci_fixup_irqs() removal patches since it is impossible
-> > to work on them without a stable branch to apply them against, in the
-> > interim we keep adding PCI host bridges that use the wrong interfaces by
-> > copy'n'pasting code that I have been trying to remove.
-> > 
-> > I think the best solution is to repost my series when v4.13-rc1 appears
-> > and ask all new crop of host bridge drivers to rebase against it.
-> > 
-> > I won't be able to follow mailing lists till end of next week, which
-> > is bad timing.
+> I am not sure if that helps here. The OMAP3-ISP does not have a fixed clock
+> rate so we can only have the driver define what it wants to see.
 > 
-> I meant I'm also not sure how to do it in separate branch. I didn't
-> notice what you discussed in another thread. Sorry about that.
+> And common practise for OMAP3-ISP based camera modules (e.g. N900, N9) is
+> that they do it in the driver.
+> 
+> Maybe ISP developers can comment?
 
-No worries, yes we need to understand how to sync the changes, as I
-said it is probably better for my series to be dropped, posted at
-v4.13-rc1, create a branch out of it and ask all PCI host bridges
-to be based against it, it is up to Bjorn to decide what's the least
-complicated way for him to sync all these changes.
+The OMAP3 ISP is a variable-frequency clock provider. The clock frequency is 
+controlled by the clock consumer. As such, it's up to the consumer to decide 
+whether to compute and request the clock rate dynamically at runtime, or use 
+the assigned-clock-rates property in DT.
 
-Lorenzo
+Some ISPs include a clock generator, others don't. It should make no 
+difference whether the clock is provided by the ISP, by a dedicated clock 
+source in the SoC or by a discrete on-board adjustable clock source.
+
+-- 
+Regards,
+
+Laurent Pinchart
