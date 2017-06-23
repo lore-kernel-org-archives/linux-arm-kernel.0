@@ -1,37 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 23 Jun 2017 14:33:26 +0200
-Subject: [PATCH] pinctrl: qcom: qdf2xxx: expose only some GPIO pins
-In-Reply-To: <1498164850-4738-1-git-send-email-timur@codeaurora.org>
-References: <1498164850-4738-1-git-send-email-timur@codeaurora.org>
-Message-ID: <CACRpkdZeDjS_g27=1e7uCmFpjnqX+sDSu5G2VAuwFr_GJW1mug@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 Jun 2017 14:38:16 +0200
+Subject: [GIT PULL 2/2] SoCFPGA update for v4.13
+In-Reply-To: <CACRpkdbCrKo7Uvhdyx+4_hMQrPCYaMMijHpYzEY+2MePjpr73g@mail.gmail.com>
+References: <1498059352-9483-1-git-send-email-dinguyen@kernel.org>
+ <1498059352-9483-2-git-send-email-dinguyen@kernel.org>
+ <CAK8P3a1vZVQ5MZDU+qp62LCLnF8z-9LFH=c7XYj=ZnPUzVMjOA@mail.gmail.com>
+ <CACRpkdbCrKo7Uvhdyx+4_hMQrPCYaMMijHpYzEY+2MePjpr73g@mail.gmail.com>
+Message-ID: <CAK8P3a2DFrabNdJu3d1V5F_uWRz0C+sPgqm9mnA_Wpzy6FYNDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 22, 2017 at 10:54 PM, Timur Tabi <timur@codeaurora.org> wrote:
+On Fri, Jun 23, 2017 at 2:28 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Fri, Jun 23, 2017 at 2:03 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Wed, Jun 21, 2017 at 5:35 PM, Dinh Nguyen <dinguyen@kernel.org> wrote:
+>>> Hi Arnd, Kevin, and Olof:
+>>>
+>>> Please pull in this SoCFPGA Kconfig update for v4.13.
+>>
+>> I'd like to defer this one until I hear back from the GPIO maintainers:
+>>
+>> With this patch, CONFIG_ARCH_NR_GPIO increases from 1024 to 2048
+>> in the ARM defconfig build. Is this ok in terms of runtime overhead?
+>
+> There is no problem with runtime overhead, only with footprint.
+>
+> The array of sizeof(gpio_desc) increases to double.
+>
+> struct looks like so:
+>
+> struct gpio_desc {
+>         struct gpio_device      *gdev;
+>         unsigned long           flags;
+>         const char              *label;
+>         const char              *name;
+> };
+>
+> Looks like 4x32 bits in most cases, so this means a 4*4*1024 =
+> 16 KiB footprint increase.
 
-> On Qualcomm Technologies QDF2xxx platforms, only a subset of the GPIOs
-> are actually available to the HLOS.  The others are blocked by the XPU,
-> and any attempt to access them will cause an XPU violation that halts
-> the system.
+Ok.
 
-That's a bummer. Looking for Bj?rn's review on this patch.
+> We have had to allocate this statically because so many playforms still
+> use the legacy GPIO API.
+>
+>> If not, are there any alternatives?
+>
+> Not really, if they have this many GPIOs.
 
-> Instead, the ACPI table now lists only specific GPIOs that are exposed
-> externally as generic GPIO pins.
+Right. I pulled the branch into next/soc now, thanks for the quick reply!
 
-The ACPI table or the device tree property "gpios" right?
+> Helping out ridding the kernel of users of the old GPIO global
+> numberspace ABI is appreciated though.
 
-(But maybe this system is only using ACPI.)
+I guess there is no easy way to figure out which drivers are needed on
+socfpga and do those first, right?
 
-> To maintain consistency, the GPIOs are
-> enumerated 0 .. (N-1) as before, so that "gpio0" is really whatever is
-> the first GPIO listed in ACPI.  The actual mapping is available via
-> /sys/kernel/debug/gpio.
-
-I think using "lsgpio" fron tools/gpio/lsgpio.c is better to inspect
-the available GPIOs.
-
-If you haven't tested the GPIO tools, please try it out.
-
-Yours,
-Linus Walleij
+        Arnd
