@@ -1,49 +1,160 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 23 Jun 2017 14:55:34 +0530
-Subject: [PATCH V3 5/5] arch_topology: Get rid of cap_parsing_done
-In-Reply-To: <cover.1498209817.git.viresh.kumar@linaro.org>
-References: <cover.1498209817.git.viresh.kumar@linaro.org>
-Message-ID: <7199675116c3b27cec234b8bd50d94e88b26032a.1498209817.git.viresh.kumar@linaro.org>
+From: ramesh.shanmugasundaram@bp.renesas.com (Ramesh Shanmugasundaram)
+Date: Fri, 23 Jun 2017 10:13:20 +0100
+Subject: [PATCH] arm64: dts: r8a7795: Add DRIF support
+Message-ID: <20170623091320.12664-1-ramesh.shanmugasundaram@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to check for cap_parsing_done flag anymore as
-!raw_capacity flag alone is enough for us. Remove the (now) useless flag
-cap_parsing_done.
+Adds the DRIF controller nodes for r8a7795.
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
 ---
- drivers/base/arch_topology.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+Hi Simon,
 
-diff --git a/drivers/base/arch_topology.c b/drivers/base/arch_topology.c
-index 9e4d2107f4fa..74043ead9da1 100644
---- a/drivers/base/arch_topology.c
-+++ b/drivers/base/arch_topology.c
-@@ -167,7 +167,6 @@ bool __init topology_parse_cpu_capacity(struct device_node *cpu_node, int cpu)
+   This patch is based on renesas-devel-20170622-v4.12-rc6 tag.
+   It is verified on both H3 ES1.1 and ES2.0 SoC revisions.
+
+   The bindings[1] and the driver[2] were pushed into the media_tree.
+
+   [1] https://git.linuxtv.org/media_tree.git/commit/?id=54a707ea011601f06cc5ef7fe6d0daac71ab0622
+   [2] https://git.linuxtv.org/media_tree.git/commit/?id=7625ee981af166ddb569e2e6c0006e2af471326f
+
+Thanks,
+Ramesh.
+
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 120 +++++++++++++++++++++++++++++++
+ 1 file changed, 120 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index e31c1b660b3f..24283ad057eb 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -691,6 +691,126 @@
+ 			};
+ 		};
  
- #ifdef CONFIG_CPU_FREQ
- static cpumask_var_t cpus_to_visit;
--static bool cap_parsing_done;
- static void parsing_done_workfn(struct work_struct *work);
- static DECLARE_WORK(parsing_done_work, parsing_done_workfn);
- 
-@@ -179,7 +178,7 @@ init_cpu_capacity_callback(struct notifier_block *nb,
- 	struct cpufreq_policy *policy = data;
- 	int cpu;
- 
--	if (!raw_capacity || cap_parsing_done)
-+	if (!raw_capacity)
- 		return 0;
- 
- 	if (val != CPUFREQ_NOTIFY)
-@@ -201,7 +200,6 @@ init_cpu_capacity_callback(struct notifier_block *nb,
- 		topology_normalize_cpu_scale();
- 		free_raw_capacity();
- 		pr_debug("cpu_capacity: parsing done\n");
--		cap_parsing_done = true;
- 		schedule_work(&parsing_done_work);
- 	}
- 
++		drif00: rif at e6f40000 {
++			compatible = "renesas,r8a7795-drif",
++				     "renesas,rcar-gen3-drif";
++			reg = <0 0xe6f40000 0 0x64>;
++			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 515>;
++			clock-names = "fck";
++			dmas = <&dmac1 0x20>, <&dmac2 0x20>;
++			dma-names = "rx", "rx";
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 515>;
++			renesas,bonding = <&drif01>;
++			status = "disabled";
++		};
++
++		drif01: rif at e6f50000 {
++			compatible = "renesas,r8a7795-drif",
++				     "renesas,rcar-gen3-drif";
++			reg = <0 0xe6f50000 0 0x64>;
++			interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 514>;
++			clock-names = "fck";
++			dmas = <&dmac1 0x22>, <&dmac2 0x22>;
++			dma-names = "rx", "rx";
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 514>;
++			renesas,bonding = <&drif00>;
++			status = "disabled";
++		};
++
++		drif10: rif at e6f60000 {
++			compatible = "renesas,r8a7795-drif",
++				     "renesas,rcar-gen3-drif";
++			reg = <0 0xe6f60000 0 0x64>;
++			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 513>;
++			clock-names = "fck";
++			dmas = <&dmac1 0x24>, <&dmac2 0x24>;
++			dma-names = "rx", "rx";
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 513>;
++			renesas,bonding = <&drif11>;
++			status = "disabled";
++		};
++
++		drif11: rif at e6f70000 {
++			compatible = "renesas,r8a7795-drif",
++				     "renesas,rcar-gen3-drif";
++			reg = <0 0xe6f70000 0 0x64>;
++			interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 512>;
++			clock-names = "fck";
++			dmas = <&dmac1 0x26>, <&dmac2 0x26>;
++			dma-names = "rx", "rx";
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 512>;
++			renesas,bonding = <&drif10>;
++			status = "disabled";
++		};
++
++		drif20: rif at e6f80000 {
++			compatible = "renesas,r8a7795-drif",
++				     "renesas,rcar-gen3-drif";
++			reg = <0 0xe6f80000 0 0x64>;
++			interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 511>;
++			clock-names = "fck";
++			dmas = <&dmac1 0x28>, <&dmac2 0x28>;
++			dma-names = "rx", "rx";
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 511>;
++			renesas,bonding = <&drif21>;
++			status = "disabled";
++		};
++
++		drif21: rif at e6f90000 {
++			compatible = "renesas,r8a7795-drif",
++				     "renesas,rcar-gen3-drif";
++			reg = <0 0xe6f90000 0 0x64>;
++			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 510>;
++			clock-names = "fck";
++			dmas = <&dmac1 0x2a>, <&dmac2 0x2a>;
++			dma-names = "rx", "rx";
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 510>;
++			renesas,bonding = <&drif20>;
++			status = "disabled";
++		};
++
++		drif30: rif at e6fa0000 {
++			compatible = "renesas,r8a7795-drif",
++				     "renesas,rcar-gen3-drif";
++			reg = <0 0xe6fa0000 0 0x64>;
++			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 509>;
++			clock-names = "fck";
++			dmas = <&dmac1 0x2c>, <&dmac2 0x2c>;
++			dma-names = "rx", "rx";
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 509>;
++			renesas,bonding = <&drif31>;
++			status = "disabled";
++		};
++
++		drif31: rif at e6fb0000 {
++			compatible = "renesas,r8a7795-drif",
++				     "renesas,rcar-gen3-drif";
++			reg = <0 0xe6fb0000 0 0x64>;
++			interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 508>;
++			clock-names = "fck";
++			dmas = <&dmac1 0x2e>, <&dmac2 0x2e>;
++			dma-names = "rx", "rx";
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 508>;
++			renesas,bonding = <&drif30>;
++			status = "disabled";
++		};
++
+ 		hscif0: serial at e6540000 {
+ 			compatible = "renesas,hscif-r8a7795",
+ 				     "renesas,rcar-gen3-hscif",
 -- 
-2.13.0.71.gd7076ec9c9cb
+2.12.2
