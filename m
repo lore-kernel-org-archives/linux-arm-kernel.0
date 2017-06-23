@@ -1,60 +1,34 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Fri, 23 Jun 2017 11:49:57 -0700
-Subject: [PATCH 3/3] arm64: dts: rockchip: set rk3399 dynamic CPU power
- coefficients
-In-Reply-To: <5395662.EDQ3y7Qj0C@phil>
-References: <20170623170737.46265-1-briannorris@chromium.org>
- <20170623170737.46265-3-briannorris@chromium.org>
- <5395662.EDQ3y7Qj0C@phil>
-Message-ID: <20170623184956.GA107165@google.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 23 Jun 2017 13:51:07 -0500
+Subject: [PATCH 2/3] dt-bindings: arm: amlogic: Add Libre Computer Board
+In-Reply-To: <20170616120648.23320-3-jbrunet@baylibre.com>
+References: <20170616120648.23320-1-jbrunet@baylibre.com>
+ <20170616120648.23320-3-jbrunet@baylibre.com>
+Message-ID: <20170623185107.yw7arhouu4byqbpk@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 23, 2017 at 08:39:25PM +0200, Heiko Stuebner wrote:
-> Am Freitag, 23. Juni 2017, 10:07:37 CEST schrieb Brian Norris:
-> > Provide the dynamic power coefficient of the big and little CPU
-> > clusters. These numbers are currently in use on the Samsung Chromebook
-> > Plus ("Kevin").
-> > 
-> > The power allocator thermal governor doesn't know how to do anything if
-> > it doesn't get power parameters from its cooling devices (in this case,
-> > CPUfreq). So this effectively enables the power-allocator governor.
-> > 
-> > Signed-off-by: Brian Norris <briannorris@chromium.org>
-> > ---
-> >  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 2 ++
-> >  1 file changed, 2 insertions(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > index 69c56f7316c4..4f6667547814 100644
-> > --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > @@ -109,6 +109,7 @@
-> >  			reg = <0x0 0x0>;
-> >  			enable-method = "psci";
-> >  			#cooling-cells = <2>; /* min followed by max */
-> > +			dynamic-power-coefficient = <100>;
-> >  			clocks = <&cru ARMCLKL>;
-> >  		};
-> >  
-> > @@ -142,6 +143,7 @@
-> >  			reg = <0x0 0x100>;
-> >  			enable-method = "psci";
-> >  			#cooling-cells = <2>; /* min followed by max */
-> > +			dynamic-power-coefficient = <100>;
-> >  			clocks = <&cru ARMCLKB>;
-> >  		};
-> >  
-> > 
+On Fri, Jun 16, 2017 at 02:06:47PM +0200, Jerome Brunet wrote:
+> Add bindings documentation for the Libre Computer Board from Imprecision
+> Systems
 > 
-> I think these should be set for all cores, similar to clocks. While
-> cpufreq and friends regularly only take the first number, in a
-> hw-description sense, it should be part of every core in the dt.
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> ---
+>  Documentation/devicetree/bindings/arm/amlogic.txt | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
+> index 5c01e65951fa..d1c77d7ae11d 100644
+> --- a/Documentation/devicetree/bindings/arm/amlogic.txt
+> +++ b/Documentation/devicetree/bindings/arm/amlogic.txt
+> @@ -51,6 +51,7 @@ Board compatible values (alphabetically, grouped by SoC):
+>  
+>    - "amlogic,p212" (Meson gxl s905x)
+>    - "hwacom,amazetv" (Meson gxl s905x)
+> +  - "imprecision,librecomputer" (Meson gxl s905x)
 
-It's kinda paired with the cooling information (e.g., #cooling-cells)
-which are only present in the first CPU in the cluster, currently.
+Perhaps libre-computer?
 
-I can copy this definitely real, empirical value into the other CPUs if
-you really think that's necessary :)
+Either way,
 
-Brian
+Acked-by: Rob Herring <robh@kernel.org>
