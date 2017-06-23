@@ -1,32 +1,31 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 Jun 2017 21:29:51 +0200
-Subject: [PATCH v3] clocksource/drivers/tcb_clksrc: make IO endian agnostic
-In-Reply-To: <20170623150331.16435-1-alexandre.belloni@free-electrons.com>
-References: <20170623150331.16435-1-alexandre.belloni@free-electrons.com>
-Message-ID: <654c51b1-aa68-dd54-6534-a1bb58db33ce@linaro.org>
+From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
+Date: Fri, 23 Jun 2017 21:38:11 +0200
+Subject: [PATCH] thermal: bcm2835:
+Message-ID: <20170623193811.8016-1-christophe.jaillet@wanadoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/06/2017 17:03, Alexandre Belloni wrote:
-> Now that AVR32 is gone, we can use the proper IO accessors that are
-> correctly handling endianness.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-> ---
-> Changes in v3:
->  - rebased on top of tip/timers/core
->  - Added collected acks
-> 
+'tz' is a valid pointer at this point, so calling PTR_ERR on it is
+pointless.
+This 'err = PTR_ERR(tz)' looks like a cut'n'paste from a few lines above.
+So remove it. 'err' is already the error we want to report.
 
-Applied, thanks.
+Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+---
+ drivers/thermal/broadcom/bcm2835_thermal.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-  -- Daniel
-
-
+diff --git a/drivers/thermal/broadcom/bcm2835_thermal.c b/drivers/thermal/broadcom/bcm2835_thermal.c
+index 0ecf80890c84..e6863c841662 100644
+--- a/drivers/thermal/broadcom/bcm2835_thermal.c
++++ b/drivers/thermal/broadcom/bcm2835_thermal.c
+@@ -245,7 +245,6 @@ static int bcm2835_thermal_probe(struct platform_device *pdev)
+ 		 */
+ 		err = tz->ops->get_trip_temp(tz, 0, &trip_temp);
+ 		if (err < 0) {
+-			err = PTR_ERR(tz);
+ 			dev_err(&pdev->dev,
+ 				"Not able to read trip_temp: %d\n",
+ 				err);
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+2.11.0
