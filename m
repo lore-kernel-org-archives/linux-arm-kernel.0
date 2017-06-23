@@ -1,163 +1,62 @@
-From: linu.cherian@cavium.com (Linu Cherian)
-Date: Fri, 23 Jun 2017 14:26:08 +0530
-Subject: [PATCH v2 5/8] iommu/io-pgtable-arm: Support lockless operation
-In-Reply-To: <20170623055326.GA2949@virtx40>
-References: <cover.1498145008.git.robin.murphy@arm.com>
- <af61929e3984a31588cab08ed84a237602b5263e.1498145008.git.robin.murphy@arm.com>
- <20170623055326.GA2949@virtx40>
-Message-ID: <20170623085607.GC3718@virtx40>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Fri, 23 Jun 2017 11:00:54 +0200
+Subject: [PATCH 1/6] clk: at91: clk-generated: remove useless divisor loop
+In-Reply-To: <20170623090059.8371-1-quentin.schulz@free-electrons.com>
+References: <20170623090059.8371-1-quentin.schulz@free-electrons.com>
+Message-ID: <20170623090059.8371-2-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri Jun 23, 2017 at 11:23:26AM +0530, Linu Cherian wrote:
-> 
-> Robin,
-> Was trying to understand the new changes. Had few questions on 
-> arm_lpae_install_table. 
-> 
-> On Thu Jun 22, 2017 at 04:53:54PM +0100, Robin Murphy wrote:
-> > For parallel I/O with multiple concurrent threads servicing the same
-> > device (or devices, if several share a domain), serialising page table
-> > updates becomes a massive bottleneck. On reflection, though, we don't
-> > strictly need to do that - for valid IOMMU API usage, there are in fact
-> > only two races that we need to guard against: multiple map requests for
-> > different blocks within the same region, when the intermediate-level
-> > table for that region does not yet exist; and multiple unmaps of
-> > different parts of the same block entry. Both of those are fairly easily
-> > solved by using a cmpxchg to install the new table, such that if we then
-> > find that someone else's table got there first, we can simply free ours
-> > and continue.
-> > 
-> > Make the requisite changes such that we can withstand being called
-> > without the caller maintaining a lock. In theory, this opens up a few
-> > corners in which wildly misbehaving callers making nonsensical
-> > overlapping requests might lead to crashes instead of just unpredictable
-> > results, but correct code really does not deserve to pay a significant
-> > performance cost for the sake of masking bugs in theoretical broken code.
-> > 
-> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> > ---
-> > 
-> > v2:
-> >  - Fix barriers in install_table
-> >  - Make a few more PTE accesses with {READ,WRITE}_ONCE() just in case
-> >  - Minor cosmetics
-> > 
-> >  drivers/iommu/io-pgtable-arm.c | 72 +++++++++++++++++++++++++++++++++---------
-> >  1 file changed, 57 insertions(+), 15 deletions(-)
-> > 
-> > diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-> > index 6334f51912ea..52700fa958c2 100644
-> > --- a/drivers/iommu/io-pgtable-arm.c
-> > +++ b/drivers/iommu/io-pgtable-arm.c
-> > @@ -20,6 +20,7 @@
-> >  
-> >  #define pr_fmt(fmt)	"arm-lpae io-pgtable: " fmt
-> >  
-> > +#include <linux/atomic.h>
-> >  #include <linux/iommu.h>
-> >  #include <linux/kernel.h>
-> >  #include <linux/sizes.h>
-> > @@ -99,6 +100,8 @@
-> >  #define ARM_LPAE_PTE_ATTR_HI_MASK	(((arm_lpae_iopte)6) << 52)
-> >  #define ARM_LPAE_PTE_ATTR_MASK		(ARM_LPAE_PTE_ATTR_LO_MASK |	\
-> >  					 ARM_LPAE_PTE_ATTR_HI_MASK)
-> > +/* Software bit for solving coherency races */
-> > +#define ARM_LPAE_PTE_SW_SYNC		(((arm_lpae_iopte)1) << 55)
-> >  
-> >  /* Stage-1 PTE */
-> >  #define ARM_LPAE_PTE_AP_UNPRIV		(((arm_lpae_iopte)1) << 6)
-> > @@ -249,15 +252,20 @@ static void __arm_lpae_free_pages(void *pages, size_t size,
-> >  	free_pages_exact(pages, size);
-> >  }
-> >  
-> > +static void __arm_lpae_sync_pte(arm_lpae_iopte *ptep,
-> > +				struct io_pgtable_cfg *cfg)
-> > +{
-> > +	dma_sync_single_for_device(cfg->iommu_dev, __arm_lpae_dma_addr(ptep),
-> > +				   sizeof(*ptep), DMA_TO_DEVICE);
-> > +}
-> > +
-> >  static void __arm_lpae_set_pte(arm_lpae_iopte *ptep, arm_lpae_iopte pte,
-> >  			       struct io_pgtable_cfg *cfg)
-> >  {
-> >  	*ptep = pte;
-> >  
-> >  	if (!(cfg->quirks & IO_PGTABLE_QUIRK_NO_DMA))
-> > -		dma_sync_single_for_device(cfg->iommu_dev,
-> > -					   __arm_lpae_dma_addr(ptep),
-> > -					   sizeof(pte), DMA_TO_DEVICE);
-> > +		__arm_lpae_sync_pte(ptep, cfg);
-> >  }
-> >  
-> >  static int __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
-> > @@ -314,16 +322,30 @@ static int arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
-> >  
-> >  static arm_lpae_iopte arm_lpae_install_table(arm_lpae_iopte *table,
-> >  					     arm_lpae_iopte *ptep,
-> > +					     arm_lpae_iopte curr,
-> >  					     struct io_pgtable_cfg *cfg)
-> >  {
-> > -	arm_lpae_iopte new;
-> > +	arm_lpae_iopte old, new;
-> >  
-> >  	new = __pa(table) | ARM_LPAE_PTE_TYPE_TABLE;
-> >  	if (cfg->quirks & IO_PGTABLE_QUIRK_ARM_NS)
-> >  		new |= ARM_LPAE_PTE_NSTABLE;
-> >  
-> > -	__arm_lpae_set_pte(ptep, new, cfg);
-> > -	return new;
-> > +	/* Ensure the table itself is visible before its PTE can be */
-> > +	wmb();
-> 
-> Could you please give more hints on why this is required.
-> 
-> 
-> > +
-> > +	old = cmpxchg64_relaxed(ptep, curr, new);
-> > +
-> > +	if ((cfg->quirks & IO_PGTABLE_QUIRK_NO_DMA) ||
-> > +	    (old & ARM_LPAE_PTE_SW_SYNC))
-> > +		return old;
-> > +
-> > +	/* Even if it's not ours, there's no point waiting; just kick it */
-> > +	__arm_lpae_sync_pte(ptep, cfg);
-> > +	if (old == curr)
-> > +		WRITE_ONCE(*ptep, new | ARM_LPAE_PTE_SW_SYNC);
-> 
-> How is it ensured that the cache operations are completed before we flag them with
-> 	ARM_LPAE_PTE_SW_SYNC. The previous version had a wmb() after the sync operation.
-> 
-> 
-> > +
-> > +	return old;
-> >  }
-> >
-> 
+The driver requests the current clk rate of each of its parent clocks to
+decide whether a clock rate is suitable or not. It does not request
+determine_rate from a parent clock which could request a rate change in
+parent clock (i.e. there is no parent rate propagation).
 
+We know the rate we want (passed along req argument of the function) and
+the parent clock rate, thus we know the closest rounded divisor, we
+don't need to iterate over the available divisors to find the best one
+for a given clock.
 
-Observed a performance drop of close to 1G, 
-while testing on the 10G network interface with this patch series compared to v1.
-Moving the wmb() as in v1 restores it back.
+Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+---
+ drivers/clk/at91/clk-generated.c | 25 ++++++++++++-------------
+ 1 file changed, 12 insertions(+), 13 deletions(-)
 
-@@ -332,7 +332,6 @@ static arm_lpae_iopte arm_lpae_install_table(arm_lpae_iopte *table,
-                new |= ARM_LPAE_PTE_NSTABLE;
+diff --git a/drivers/clk/at91/clk-generated.c b/drivers/clk/at91/clk-generated.c
+index 07c8f701e51c..dab7002937e6 100644
+--- a/drivers/clk/at91/clk-generated.c
++++ b/drivers/clk/at91/clk-generated.c
+@@ -124,19 +124,18 @@ static int clk_generated_determine_rate(struct clk_hw *hw,
+ 		    (gck->range.max && min_rate > gck->range.max))
+ 			continue;
  
-        /* Ensure the table itself is visible before its PTE can be */
--       wmb();
+-		for (div = 1; div < GENERATED_MAX_DIV + 2; div++) {
+-			tmp_rate = DIV_ROUND_CLOSEST(parent_rate, div);
+-			tmp_diff = abs(req->rate - tmp_rate);
+-
+-			if (best_diff < 0 || best_diff > tmp_diff) {
+-				best_rate = tmp_rate;
+-				best_diff = tmp_diff;
+-				req->best_parent_rate = parent_rate;
+-				req->best_parent_hw = parent;
+-			}
+-
+-			if (!best_diff || tmp_rate < req->rate)
+-				break;
++		div = DIV_ROUND_CLOSEST(parent_rate, req->rate);
++		if (!div)
++			tmp_rate = parent_rate;
++		else
++			tmp_rate = parent_rate / div;
++		tmp_diff = abs(req->rate - tmp_rate);
++
++		if (best_diff < 0 || best_diff > tmp_diff) {
++			best_rate = tmp_rate;
++			best_diff = tmp_diff;
++			req->best_parent_rate = parent_rate;
++			req->best_parent_hw = parent;
+ 		}
  
-        old = cmpxchg64_relaxed(ptep, curr, new);
- 
-@@ -342,6 +341,7 @@ static arm_lpae_iopte arm_lpae_install_table(arm_lpae_iopte *table,
- 
-        /* Even if it's not ours, there's no point waiting; just kick it */
-        __arm_lpae_sync_pte(ptep, cfg);
-+       wmb();
-        if (old == curr)
-                WRITE_ONCE(*ptep, new | ARM_LPAE_PTE_SW_SYNC);
- 
-
-
-
+ 		if (!best_diff)
 -- 
-Linu cherian
+2.11.0
