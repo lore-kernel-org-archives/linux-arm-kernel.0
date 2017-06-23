@@ -1,53 +1,26 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 23 Jun 2017 20:39:25 +0200
-Subject: [PATCH 3/3] arm64: dts: rockchip: set rk3399 dynamic CPU power
- coefficients
-In-Reply-To: <20170623170737.46265-3-briannorris@chromium.org>
-References: <20170623170737.46265-1-briannorris@chromium.org>
- <20170623170737.46265-3-briannorris@chromium.org>
-Message-ID: <5395662.EDQ3y7Qj0C@phil>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 23 Jun 2017 13:48:42 -0500
+Subject: [PATCH 2/4] dt-bindings: Add bindings for
+ nvidia,tegra186-bpmp-thermal
+In-Reply-To: <20170616112825.31025-2-mperttunen@nvidia.com>
+References: <20170616112825.31025-1-mperttunen@nvidia.com>
+ <20170616112825.31025-2-mperttunen@nvidia.com>
+Message-ID: <20170623184842.ndb44vqyu5rtaa2e@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 23. Juni 2017, 10:07:37 CEST schrieb Brian Norris:
-> Provide the dynamic power coefficient of the big and little CPU
-> clusters. These numbers are currently in use on the Samsung Chromebook
-> Plus ("Kevin").
+On Fri, Jun 16, 2017 at 02:28:23PM +0300, Mikko Perttunen wrote:
+> In Tegra186, the BPMP (Boot and Power Management Processor) implements
+> an interface that is used to read system temperatures, including CPU
+> cluster and GPU temperatures. This binding describes the thermal sensor
+> that is exposed by BPMP.
 > 
-> The power allocator thermal governor doesn't know how to do anything if
-> it doesn't get power parameters from its cooling devices (in this case,
-> CPUfreq). So this effectively enables the power-allocator governor.
-> 
-> Signed-off-by: Brian Norris <briannorris@chromium.org>
+> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
 > ---
->  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> index 69c56f7316c4..4f6667547814 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> @@ -109,6 +109,7 @@
->  			reg = <0x0 0x0>;
->  			enable-method = "psci";
->  			#cooling-cells = <2>; /* min followed by max */
-> +			dynamic-power-coefficient = <100>;
->  			clocks = <&cru ARMCLKL>;
->  		};
->  
-> @@ -142,6 +143,7 @@
->  			reg = <0x0 0x100>;
->  			enable-method = "psci";
->  			#cooling-cells = <2>; /* min followed by max */
-> +			dynamic-power-coefficient = <100>;
->  			clocks = <&cru ARMCLKB>;
->  		};
->  
-> 
+>  .../thermal/nvidia,tegra186-bpmp-thermal.txt       | 32 ++++++++++++++++++++++
+>  .../dt-bindings/thermal/tegra186-bpmp-thermal.h    | 14 ++++++++++
+>  2 files changed, 46 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/thermal/nvidia,tegra186-bpmp-thermal.txt
+>  create mode 100644 include/dt-bindings/thermal/tegra186-bpmp-thermal.h
 
-I think these should be set for all cores, similar to clocks. While
-cpufreq and friends regularly only take the first number, in a
-hw-description sense, it should be part of every core in the dt.
-
-
-Heiko
+Acked-by: Rob Herring <robh@kernel.org>
