@@ -1,68 +1,70 @@
 From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Fri, 23 Jun 2017 14:55:49 +0200
-Subject: [PATCH 7/8] spi: stm32: enhance DMA error management
+Date: Fri, 23 Jun 2017 14:55:50 +0200
+Subject: [PATCH 8/8] spi: stm32: fix potential dereference null return value
 In-Reply-To: <1498222550-19092-1-git-send-email-amelie.delaunay@st.com>
 References: <1498222550-19092-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <1498222550-19092-8-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1498222550-19092-9-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch reworks DMA error management. In case the DMA callback is
-called while EOT (End Of Transfer) flag is not set, that means that DMA
-encountered an error. This error will result in an auto-suspend of SPI
-flow, which could also result in an overrun. So, in DMA mode, SUSP and
-OVR flags are a condition to stop the current transfer.
+This patch fixes the usage of rx_dma_desc and tx_dma_desc pointers
+returned by dmaengine_prep_slave_sg, which can be null.
 
+Detected by CoverityScan, CID#1446587 ("Dereference null return value")
+
+Reported-by: Colin Ian King <colin.king@canonical.com>
 Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 ---
- drivers/spi/spi-stm32.c | 20 +++++++++++++++-----
- 1 file changed, 15 insertions(+), 5 deletions(-)
+ drivers/spi/spi-stm32.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/spi/spi-stm32.c b/drivers/spi/spi-stm32.c
-index 209afda..63af9d9 100644
+index 63af9d9..076a720 100644
 --- a/drivers/spi/spi-stm32.c
 +++ b/drivers/spi/spi-stm32.c
-@@ -514,6 +514,12 @@ static irqreturn_t stm32_spi_irq(int irq, void *dev_id)
- 		dev_warn(spi->dev, "Communication suspended\n");
- 		if (!spi->cur_usedma && (spi->rx_buf && (spi->rx_len > 0)))
- 			stm32_spi_read_rxfifo(spi, false);
-+		/*
-+		 * If communication is suspended while using DMA, it means
-+		 * that something went wrong, so stop the current transfer
-+		 */
-+		if (spi->cur_usedma)
-+			end = true;
+@@ -775,9 +775,6 @@ static int stm32_spi_transfer_one_dma(struct stm32_spi *spi,
+ 					xfer->rx_sg.nents,
+ 					rx_dma_conf.direction,
+ 					DMA_PREP_INTERRUPT);
+-
+-		rx_dma_desc->callback = stm32_spi_dma_cb;
+-		rx_dma_desc->callback_param = spi;
  	}
  
- 	if (sr & SPI_SR_MODF) {
-@@ -525,6 +531,12 @@ static irqreturn_t stm32_spi_irq(int irq, void *dev_id)
- 		dev_warn(spi->dev, "Overrun: received value discarded\n");
- 		if (!spi->cur_usedma && (spi->rx_buf && (spi->rx_len > 0)))
- 			stm32_spi_read_rxfifo(spi, false);
-+		/*
-+		 * If overrun is detected while using DMA, it means that
-+		 * something went wrong, so stop the current transfer
-+		 */
-+		if (spi->cur_usedma)
-+			end = true;
+ 	tx_dma_desc = NULL;
+@@ -790,11 +787,6 @@ static int stm32_spi_transfer_one_dma(struct stm32_spi *spi,
+ 					xfer->tx_sg.nents,
+ 					tx_dma_conf.direction,
+ 					DMA_PREP_INTERRUPT);
+-
+-		if (spi->cur_comm == SPI_SIMPLEX_TX) {
+-			tx_dma_desc->callback = stm32_spi_dma_cb;
+-			tx_dma_desc->callback_param = spi;
+-		}
  	}
  
- 	if (sr & SPI_SR_EOT) {
-@@ -645,12 +657,10 @@ static void stm32_spi_dma_cb(void *data)
+ 	if ((spi->tx_buf && !tx_dma_desc) ||
+@@ -802,6 +794,9 @@ static int stm32_spi_transfer_one_dma(struct stm32_spi *spi,
+ 		goto dma_desc_error;
  
- 	spin_unlock_irqrestore(&spi->lock, flags);
+ 	if (rx_dma_desc) {
++		rx_dma_desc->callback = stm32_spi_dma_cb;
++		rx_dma_desc->callback_param = spi;
++
+ 		if (dma_submit_error(dmaengine_submit(rx_dma_desc))) {
+ 			dev_err(spi->dev, "Rx DMA submit failed\n");
+ 			goto dma_desc_error;
+@@ -811,6 +806,11 @@ static int stm32_spi_transfer_one_dma(struct stm32_spi *spi,
+ 	}
  
--	if (!(sr & SPI_SR_EOT)) {
--		dev_warn(spi->dev, "DMA callback (sr=0x%08x)\n", sr);
-+	if (!(sr & SPI_SR_EOT))
-+		dev_warn(spi->dev, "DMA error (sr=0x%08x)\n", sr);
- 
--		spi_finalize_current_transfer(spi->master);
--		stm32_spi_disable(spi);
--	}
-+	/* Now wait for EOT, or SUSP or OVR in case of error */
- }
- 
- /**
+ 	if (tx_dma_desc) {
++		if (spi->cur_comm == SPI_SIMPLEX_TX) {
++			tx_dma_desc->callback = stm32_spi_dma_cb;
++			tx_dma_desc->callback_param = spi;
++		}
++
+ 		if (dma_submit_error(dmaengine_submit(tx_dma_desc))) {
+ 			dev_err(spi->dev, "Tx DMA submit failed\n");
+ 			goto dma_submit_error;
 -- 
 1.9.1
