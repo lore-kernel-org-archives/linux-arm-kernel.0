@@ -1,153 +1,64 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Fri, 23 Jun 2017 06:55:41 +0200
-Subject: [Devel] [PATCH v9 0/3] Cavium ThunderX2 SMMUv3 errata workarounds
-In-Reply-To: <20170622210437.GA27861@red-moon>
-References: <1498133138-20244-1-git-send-email-gakula@caviumnetworks.com>
- <20170622182257.GI15336@arm.com> <20170622185822.GK15336@arm.com>
- <20170622193535.GA10237@rric.localdomain>
- <20170622210437.GA27861@red-moon>
-Message-ID: <20170623045541.GQ16981@rric.localdomain>
+From: david.wu@rock-chips.com (David Wu)
+Date: Fri, 23 Jun 2017 12:59:47 +0800
+Subject: [PATCH 06/11] net: stmmac: dwmac-rk: Add internal phy support for
+ rk3228
+In-Reply-To: <1498192929-7519-1-git-send-email-david.wu@rock-chips.com>
+References: <1498192929-7519-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <1498193987-8070-1-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.06.17 22:04:37, Lorenzo Pieralisi wrote:
-> On Thu, Jun 22, 2017 at 09:35:35PM +0200, Robert Richter wrote:
-> > On 22.06.17 19:58:22, Will Deacon wrote:
-> > > On Thu, Jun 22, 2017 at 07:22:57PM +0100, Will Deacon wrote:
-> > > > On Thu, Jun 22, 2017 at 05:35:35PM +0530, Geetha sowjanya wrote:
-> > > > > Cavium ThunderX2 SMMUv3 implementation has two Silicon Erratas.
-> > > > > 1. Errata ID #74
-> > > > >    SMMU register alias Page 1 is not implemented
-> > > > > 2. Errata ID #126
-> > > > >    SMMU doesnt support unique IRQ lines and also MSI for gerror,
-> > > > >    eventq and cmdq-sync
-> > > > > 
-> > > > > The following patchset does software workaround for these two erratas.
-> > > > 
-> > > > I've picked up the first two patches, and left comments on the final patch.
-> > > 
-> > > ... except that it doesn't build:
-> > > 
-> > > 
-> > > drivers/acpi/arm64/iort.c: In function ?arm_smmu_v3_resource_size?:
-> > > drivers/acpi/arm64/iort.c:837:21: error: ?ACPI_IORT_SMMU_V3_CAVIUM_CN99XX? undeclared (first use in this function)
-> > >   if (smmu->model == ACPI_IORT_SMMU_V3_CAVIUM_CN99XX)
-> > >                      ^
-> > > drivers/acpi/arm64/iort.c:837:21: note: each undeclared identifier is reported only once for each function it appears in
-> > > make[4]: *** [drivers/acpi/arm64/iort.o] Error 1
-> > > 
-> > > 
-> > > I don't see ACPI_IORT_SMMU_V3_CAVIUM_CN99XX defined, even in linux-next.
-> > > 
-> > > What's the plan here?
-> > 
-> > It is defined already in acpica and we actually waiting for the acpi
-> > maintainers to include it:
-> > 
-> >  https://github.com/acpica/acpica/commit/d00a4eb86e64
-> > 
-> > We could add
-> > 
-> > /* Until ACPICA headers cover IORT rev. C */
-> > #ifndef ACPI_IORT_SMMU_V3_CAVIUM_CN99XX
-> > #define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX		0x2
-> > #endif
-> > 
-> > to both files:
-> > 
-> >  drivers/acpi/arm64/iort.c
-> >  drivers/iommu/arm-smmu-v3.c
-> > 
-> 
-> I thought it was a solved problem (and that the IORT patch was based
-> on Robin's workaround) but I was clearly wrong and I apologise to
-> Will about this.
-> 
-> FWIW, you could add the define in include/linux/acpi_iort.h and I will
-> remove it whenever ACPICA changes make it into the kernel.
+There is only one mac controller in rk3228, which could connect to
+external phy or internal phy, use the grf_com_mux bit15 to route
+external/internal phy.
 
-Adding it there will still let depend us on acpi maintainers, while I
-think the over 2 files might go through arm64 tree smoothly. A change
-in acpi_iort.h also adds the definition to other archs and I don't
-think that adding arch #ifdefs to avoid that are welcome in that
-header file too.
+Change-Id: I3a366677047b8032eb535abb0c3e56fa7722aa2e
+Signed-off-by: David Wu <david.wu@rock-chips.com>
+---
+ drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-I am going to resend my patch below with an improved wording.
-
-Thanks,
-
--Robert
-
-> 
-> Thanks,
-> Lorenzo
-> 
-> > This is similar to what Robin did.
-> > 
-> > (I checked arm64 include files and the closest was
-> > arch/arm64/include/asm/acpi.h, bug this seems not really suitable to
-> > me.)
-> > 
-> > I have created a separate patch to be applied at first below. We can
-> > revert it after acpica was updated.
-> > 
-> > -Robert
-> > 
-> > 
-> > 
-> > 
-> > From ad7f0112a2a71059c32bd315835c33cc7bc660b8 Mon Sep 17 00:00:00 2001
-> > From: Robert Richter <rrichter@cavium.com>
-> > Date: Thu, 22 Jun 2017 21:20:54 +0200
-> > Subject: [PATCH] iommu/arm-smmu-v3: Add temporary Cavium SMMU-V3 model nuber
-> >  definitions
-> > 
-> > The model number is already defined in acpica and we actually waiting
-> > for the acpi maintainers to include it:
-> > 
-> >  https://github.com/acpica/acpica/commit/d00a4eb86e64
-> > 
-> > Adding those temporary definitions until the change makes it into
-> > include/acpi/actbl2.h.
-> > 
-> > Signed-off-by: Robert Richter <rrichter@cavium.com>
-> > ---
-> >  drivers/acpi/arm64/iort.c   | 5 +++++
-> >  drivers/iommu/arm-smmu-v3.c | 5 +++++
-> >  2 files changed, 10 insertions(+)
-> > 
-> > diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> > index 797b28dc7b34..15491237a657 100644
-> > --- a/drivers/acpi/arm64/iort.c
-> > +++ b/drivers/acpi/arm64/iort.c
-> > @@ -31,6 +31,11 @@
-> >  #define IORT_IOMMU_TYPE		((1 << ACPI_IORT_NODE_SMMU) |	\
-> >  				(1 << ACPI_IORT_NODE_SMMU_V3))
-> >  
-> > +/* Until ACPICA headers cover IORT rev. C */
-> > +#ifndef ACPI_IORT_SMMU_V3_CAVIUM_CN99XX
-> > +#define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX		0x2
-> > +#endif
-> > +
-> >  struct iort_its_msi_chip {
-> >  	struct list_head	list;
-> >  	struct fwnode_handle	*fw_node;
-> > diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> > index 380969aa60d5..c759dfa7442d 100644
-> > --- a/drivers/iommu/arm-smmu-v3.c
-> > +++ b/drivers/iommu/arm-smmu-v3.c
-> > @@ -412,6 +412,11 @@
-> >  #define MSI_IOVA_BASE			0x8000000
-> >  #define MSI_IOVA_LENGTH			0x100000
-> >  
-> > +/* Until ACPICA headers cover IORT rev. C */
-> > +#ifndef ACPI_IORT_SMMU_V3_CAVIUM_CN99XX
-> > +#define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX		0x2
-> > +#endif
-> > +
-> >  static bool disable_bypass;
-> >  module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
-> >  MODULE_PARM_DESC(disable_bypass,
-> > -- 
-> > 2.11.0
-> > 
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+index c1a1413..90e1fc8 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+@@ -86,6 +86,8 @@ struct rk_priv_data {
+ #define RK3228_GRF_MAC_CON0	0x0900
+ #define RK3228_GRF_MAC_CON1	0x0904
+ 
++#define RK3228_GRF_CON_MUX	0x50
++
+ /* RK3228_GRF_MAC_CON0 */
+ #define RK3228_GMAC_CLK_RX_DL_CFG(val)	HIWORD_UPDATE(val, 0x7F, 7)
+ #define RK3228_GMAC_CLK_TX_DL_CFG(val)	HIWORD_UPDATE(val, 0x7F, 0)
+@@ -111,6 +113,9 @@ struct rk_priv_data {
+ #define RK3228_GMAC_RXCLK_DLY_ENABLE	GRF_BIT(1)
+ #define RK3228_GMAC_RXCLK_DLY_DISABLE	GRF_CLR_BIT(1)
+ 
++/* RK3228_GRF_COM_MUX */
++#define RK3228_GRF_CON_MUX_GMAC_INTERNAL_PHY	GRF_BIT(15)
++
+ static void rk3228_set_to_rgmii(struct rk_priv_data *bsp_priv,
+ 				int tx_delay, int rx_delay)
+ {
+@@ -191,11 +196,18 @@ static void rk3228_set_rmii_speed(struct rk_priv_data *bsp_priv, int speed)
+ 		dev_err(dev, "unknown speed value for RMII! speed=%d", speed);
+ }
+ 
++static void rk3228_internal_phy_powerup(struct rk_priv_data *priv)
++{
++	regmap_write(priv->grf, RK3228_GRF_CON_MUX,
++		     RK3228_GRF_CON_MUX_GMAC_INTERNAL_PHY);
++}
++
+ static const struct rk_gmac_ops rk3228_ops = {
+ 	.set_to_rgmii = rk3228_set_to_rgmii,
+ 	.set_to_rmii = rk3228_set_to_rmii,
+ 	.set_rgmii_speed = rk3228_set_rgmii_speed,
+ 	.set_rmii_speed = rk3228_set_rmii_speed,
++	.internal_phy_powerup =  rk3228_internal_phy_powerup,
+ };
+ 
+ #define RK3288_GRF_SOC_CON1	0x0248
+-- 
+1.9.1
