@@ -1,104 +1,92 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Fri, 23 Jun 2017 17:22:23 +0200
-Subject: [PATCH v1 1/6] DT bindings: add bindings for ov965x camera module
-In-Reply-To: <88d0e8ea-74e4-6845-4e0d-8cd0f3a054be@suse.de>
-References: <1498143942-12682-1-git-send-email-hugues.fruchet@st.com>
- <d14b8c6e-b480-36f0-ed0a-684647617dbe@suse.de>
- <3E7B1344-ECE6-4CCC-9E9D-7521BB566CDE@goldelico.com>
- <13144955.Kq5qljPvgI@avalon>
- <24C976BF-52FD-4509-BCE4-9AE41B335482@goldelico.com>
- <88d0e8ea-74e4-6845-4e0d-8cd0f3a054be@suse.de>
-Message-ID: <05CBF9B8-2297-447B-860D-A89126B46FC9@goldelico.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 23 Jun 2017 16:22:27 +0100
+Subject: [GIT PULL v3] updates to qbman (soc drivers) to support arm/arm64
+In-Reply-To: <CAK8P3a2EvCvs57hE_X9J5jg6jW8jPh6gxaTOUYntbnHdb_cMZA@mail.gmail.com>
+References: <HE1PR0401MB17071A7853695DB6546FE28C8FC50@HE1PR0401MB1707.eurprd04.prod.outlook.com>
+ <CAK8P3a2EvCvs57hE_X9J5jg6jW8jPh6gxaTOUYntbnHdb_cMZA@mail.gmail.com>
+Message-ID: <20170623152227.GA21989@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-> Am 23.06.2017 um 16:57 schrieb Andreas F?rber <afaerber@suse.de>:
+On Fri, Jun 23, 2017 at 04:56:10PM +0200, Arnd Bergmann wrote:
+> On Tue, Jun 20, 2017 at 7:27 PM, Leo Li <leoyang.li@nxp.com> wrote:
+> >
+> > v2: Removed the patches for MAINTAINERS file as they are already picked
+> > up by powerpc tree.
+> >
+> > v3: Added signed tag to the pull request.
+> >
+> > Hi arm-soc maintainers,
+> >
+> > As Scott has left NXP, he agreed to transfer the maintainership of
+> > drivers/soc/fsl to me.  Previously most of the soc drivers were going
+> > through the powerpc tree as they were only used/tested on Power-based
+> > SoCs.  Going forward new changes will be mostly related to arm/arm64
+> > SoCs, and I would prefer them to go through the arm-soc tree.
+> >
+> > This pull request includes updates to the QMAN/BMAN drivers to make
+> > them work on the arm/arm64 architectures in addition to the power
+> > architecture.
+> >
+> > DPAA (Data Path Acceleration Architecture) is a set of hardware
+> > components used on some FSL/NXP QorIQ Networking SoCs, it provides the
+> > infrastructure to support simplified sharing of networking interfaces
+> > and accelerators by multiple CPU cores, and the accelerators
+> > themselves.  The QMan(Queue Manager) and BMan(Buffer Manager) are
+> > infrastructural components within the DPAA framework.  They are used to
+> > manage queues and buffers for various I/O interfaces, hardware
+> > accelerators.
+> >
+> > More information can be found via link:
+> > http://www.nxp.com/products/microcontrollers-and-processors/power-architecture-processors/qoriq-platforms/data-path-acceleration:QORIQ_DPAA
 > 
-> Am 23.06.2017 um 16:53 schrieb H. Nikolaus Schaller:
->> Hi Laurent,
->> 
->>> Am 23.06.2017 um 13:58 schrieb Laurent Pinchart <laurent.pinchart@ideasonboard.com>:
->>> 
->>> Hi Nikolaus,
->>> 
->>> On Friday 23 Jun 2017 12:59:24 H. Nikolaus Schaller wrote:
->>>> Am 23.06.2017 um 12:46 schrieb Andreas F?rber <afaerber@suse.de>:
->>>>> Am 23.06.2017 um 12:25 schrieb H. Nikolaus Schaller:
->>>>>>> diff --git a/Documentation/devicetree/bindings/media/i2c/ov965x.txt
->>>>>>> b/Documentation/devicetree/bindings/media/i2c/ov965x.txt new file mode
->>>>>>> 100644
->>>>>>> index 0000000..0e0de1f
->>>>>>> --- /dev/null
->>>>>>> +++ b/Documentation/devicetree/bindings/media/i2c/ov965x.txt
->>>>>>> @@ -0,0 +1,37 @@
->>>>>>> +* Omnivision OV9650/9652/9655 CMOS sensor
->>>>>>> +
->>>>>>> +The Omnivision OV965x sensor support multiple resolutions output, such
->>>>>>> as
->>>>>>> +CIF, SVGA, UXGA. It also can support YUV422/420, RGB565/555 or raw RGB
->>>>>>> +output format.
->>>>>>> +
->>>>>>> +Required Properties:
->>>>>>> +- compatible: should be one of
->>>>>>> +	"ovti,ov9650"
->>>>>>> +	"ovti,ov9652"
->>>>>>> +	"ovti,ov9655"
->>>>>>> +- clocks: reference to the mclk input clock.
->>>>>> 
->>>>>> I wonder why you have removed the clock-frequency property?
->>>>>> 
->>>>>> In some situations the camera driver must be able to tell the clock
->>>>>> source which frequency it wants to see.
->>>>> 
->>>>> That's what assigned-clock-rates property is for:
->>>>> 
->>>>> https://www.kernel.org/doc/Documentation/devicetree/bindings/clock/clock-b
->>>>> indings.txt
->>>>> 
->>>>> AFAIU clock-frequency on devices is deprecated and equivalent to having
->>>>> a clocks property pointing to a fixed-clock, which is different from a
->>>>> clock with varying rate.
->>>> 
->>>> I am not sure if that helps here. The OMAP3-ISP does not have a fixed clock
->>>> rate so we can only have the driver define what it wants to see.
->>>> 
->>>> And common practise for OMAP3-ISP based camera modules (e.g. N900, N9) is
->>>> that they do it in the driver.
->>>> 
->>>> Maybe ISP developers can comment?
->>> 
->>> The OMAP3 ISP is a variable-frequency clock provider. The clock frequency is 
->>> controlled by the clock consumer. As such, it's up to the consumer to decide 
->>> whether to compute and request the clock rate dynamically at runtime, or use 
->>> the assigned-clock-rates property in DT.
->>> 
->>> Some ISPs include a clock generator, others don't. It should make no 
->>> difference whether the clock is provided by the ISP, by a dedicated clock 
->>> source in the SoC or by a discrete on-board adjustable clock source.
->> 
->> Thanks for explaining the background.
->> 
->> Do you have an hint or example how to use the assigned-clock-rates property in
->> a DT for a camera module connected to the omap3isp?
->> 
->> Or does it just mean that it defines the property name?
+> Hi Leo,
 > 
-> Please read the documentation link I sent - it's in the very bottom and
-> should have an example.
+> sorry for taking you through yet another revision, but I have two
+> more points here:
+> 
+> 1. Please add a tag description whenever you create a signed tag. The
+> description is what ends up in the git history, and if there is none, I have
+> to think of something myself. In this case, the text above seems
+> roughly appropriate, so I first copied it into the commit log, but then
+> noticed the second issue:
+> 
+> 2. I know we have discussed the unusual way this driver accesses MMIO
+> registers in the past, using ioremap_wc() to map them and the manually
+> flushing the caches to store the cache contents into the MMIO registers.
+> What I don't know is whether there was any conclusion on this topic whether
+> this is actually allowed by the architecture or at least the chip, based on
+> implementation-specific features that make it work even when the architecture
+> doesn't guarantee it.
 
-I have seen it but it does not give me a good clue how to translate that into
-correct omap3isp node setup in a specific DT. Rather it raises more questions.
-Maybe because I don't understand completely what it is talking about.
+>From prior discussions, my understanding was that the region in question
+was memory reserved for the device, rather than MMIO registers.
 
-The fundamental question is if this "assigned-clock-rates" is already
-handled by ov965x->clk = devm_clk_get(&client->dev, NULL); ?
+The prior discussion on that front were largely to do with teh
+shareability of that memory, which is an orthogonal concern.
 
-Or should we define that for the omap3isp node?
+If these are actually MMIO registers, a Device memory type must be used,
+rather than a Normal memory type. There are a number of things that
+could go wrong due to relaxations permitted for Normal memory, such as
+speculative reads, the potential set of access sizes, memory
+transactions that the endpoint might not understand, etc.
 
-Then of course we need no new code and just use the right property names.
-And N900, N9 camera DTs should be updated.
+> Can I have an Ack from the architecture maintainers (Russell, Catalin,
+> Will) on the use of these architecture specific interfaces?
+> 
+> static inline void dpaa_flush(void *p)
+> {
+> #ifdef CONFIG_PPC
+>         flush_dcache_range((unsigned long)p, (unsigned long)p+64);
+> #elif defined(CONFIG_ARM32)
+>         __cpuc_flush_dcache_area(p, 64);
+> #elif defined(CONFIG_ARM64)
+>         __flush_dcache_area(p, 64);
+> #endif
+> }
 
-BR and thanks,
-Nikolaus
+Assuming this is memory, why can't the driver use the DMA APIs to handle
+this without reaching into arch-internal APIs?
+
+Thanks,
+Mark.
