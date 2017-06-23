@@ -1,36 +1,60 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 23 Jun 2017 11:49:44 +0200
-Subject: [PATCH v2 8/9] serial: imx: Use common rs485 device tree parsing
- function
-In-Reply-To: <20170623094945.31908-1-u.kleine-koenig@pengutronix.de>
-References: <20170623094945.31908-1-u.kleine-koenig@pengutronix.de>
-Message-ID: <20170623094945.31908-9-u.kleine-koenig@pengutronix.de>
+Date: Fri, 23 Jun 2017 11:58:22 +0200
+Subject: [PATCH v2.5 6/9] serial: omap-serial: Use common rs485 device tree
+ parsing function
+In-Reply-To: <20170623094945.31908-7-u.kleine-koenig@pengutronix.de>
+References: <20170623094945.31908-7-u.kleine-koenig@pengutronix.de>
+Message-ID: <20170623095822.6306-1-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sascha Hauer <s.hauer@pengutronix.de>
 
-This adds support for the rs485 specific properties defined in
-Documentation/devicetree/bindings/serial/rs485.txt.
+We just got a common helper for parsing the rs485 specific
+device tree properties. Use it and drop the open coded parser.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- drivers/tty/serial/imx.c | 2 ++
- 1 file changed, 2 insertions(+)
+Changes since v2:
+ - remove now unused variable
 
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index d5deeef0cd5b..951bb754ad9b 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -2076,6 +2076,8 @@ static int serial_imx_probe_dt(struct imx_port *sport,
- 	if (of_get_property(np, "rts-gpios", NULL))
- 		sport->have_rtsgpio = 1;
+Changes since v1:
+ - drop paragraph in commit log that of_get_rs485_mode is more strict as this is wrong in v2.
+
+ drivers/tty/serial/omap-serial.c | 13 +------------
+ 1 file changed, 1 insertion(+), 12 deletions(-)
+
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index 1ea05ac57aa7..6d22097e6dd0 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -1607,7 +1607,6 @@ static int serial_omap_probe_rs485(struct uart_omap_port *up,
+ 				   struct device_node *np)
+ {
+ 	struct serial_rs485 *rs485conf = &up->port.rs485;
+-	u32 rs485_delay[2];
+ 	enum of_gpio_flags flags;
+ 	int ret;
  
-+	of_get_rs485_mode(np, &sport->port.rs485);
-+
+@@ -1638,17 +1637,7 @@ static int serial_omap_probe_rs485(struct uart_omap_port *up,
+ 		up->rts_gpio = -EINVAL;
+ 	}
+ 
+-	if (of_property_read_u32_array(np, "rs485-rts-delay",
+-				    rs485_delay, 2) == 0) {
+-		rs485conf->delay_rts_before_send = rs485_delay[0];
+-		rs485conf->delay_rts_after_send = rs485_delay[1];
+-	}
+-
+-	if (of_property_read_bool(np, "rs485-rx-during-tx"))
+-		rs485conf->flags |= SER_RS485_RX_DURING_TX;
+-
+-	if (of_property_read_bool(np, "linux,rs485-enabled-at-boot-time"))
+-		rs485conf->flags |= SER_RS485_ENABLED;
++	of_get_rs485_mode(np, rs485conf);
+ 
  	return 0;
  }
- #else
 -- 
 2.11.0
