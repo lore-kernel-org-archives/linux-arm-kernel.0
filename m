@@ -1,238 +1,82 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Fri, 23 Jun 2017 10:07:36 -0700
-Subject: [PATCH 2/3] arm64: dts: rockchip: Use vctrl regulators for dynamic
- CPU voltages on Gru/Kevin
-In-Reply-To: <20170623170737.46265-1-briannorris@chromium.org>
-References: <20170623170737.46265-1-briannorris@chromium.org>
-Message-ID: <20170623170737.46265-2-briannorris@chromium.org>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Fri, 23 Jun 2017 22:43:43 +0530
+Subject: [PATCH v3 0/4] Add support for ThunderX2 pmu events using json
+ files
+In-Reply-To: <CAFpQJXW2=_8pZr=yB7sFn1V2gP__b_vuMiNyr2ELkA3WEqJFxA@mail.gmail.com>
+References: <1494923619-18687-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <ee7fedb0-a981-1f06-06fa-8e76ef502fa2@hisilicon.com>
+ <CAFpQJXW2=_8pZr=yB7sFn1V2gP__b_vuMiNyr2ELkA3WEqJFxA@mail.gmail.com>
+Message-ID: <CAFpQJXUgCwe9GevOJ-H=zK-BUaE4Sy9u956_yfSFbxgYB7fMnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matthias Kaehlcke <mka@chromium.org>
+Hi Mark/Will,
 
-The Gru device tree currently contains entries for the regulators
-ppvar_bigcpu, ppvar_litcpu, ppvar_gpu and ppvar_centerlogic; however,
-the regulators have not been made, due to the lack of binding and driver
-support for keeping the over-voltage protection (OVP) at bay and
-preventing unintended regulator shutdowns on voltage downshifts.
+any comments on this series?
+this patch is required to use implementation defined perf events,
+which are more refined events on ThunderX2.
 
-Now, the vctrl regulator driver has been merged, along with new bindings
-for asymmetric settling time. The driver is OVP aware, it splits larger
-voltage decreases in multiple steps when necessary and adds required
-delays.
 
-This change renames each of the aforementioned regulators to
-<orig_name>_pwm and adds a new vctrl regulator named <orig_name>.
-The vctrl regulators use the voltage of their corresponding PWM regulator
-as control voltage. The OVP related values are empirical and stem from
-the Chrome OS kernel tree.
+On Mon, Jun 12, 2017 at 3:51 PM, Ganapatrao Kulkarni
+<gpkulkarni@gmail.com> wrote:
+> Hi Shaokun,
+>
+> On Mon, Jun 12, 2017 at 3:19 PM, Zhangshaokun
+> <zhangshaokun@hisilicon.com> wrote:
+>> Hi Ganapat
+>>
+>> This patchset has been tested on Hisilicon's hip08 board for implementation defined PMU events:
+>> (1)perf list command is ok;
+>> (2)perf stat command -e event_name:
+>> When event number is less than 0x3ff, it is ok;
+>> if event number is more than 0x3ff, it should be added this patch:
+>> https://www.spinics.net/lists/arm-kernel/msg583222.html
+>
+> thanks for testing!
+>
+>>
+>> Thanks.
+>> Shaokun
+>>
+>> On 2017/5/16 16:33, Ganapatrao Kulkarni wrote:
+>>> Extending json/jevent framework for parsing arm64 event files.
+>>> Adding jevents for ThunderX2 implementation defined PMU events.
+>>>
+>>> v3:
+>>>    - Addressed comments from Will Deacon and Jayachandran C.
+>>>    - Rebased to 4.12-rc1
+>>>
+>>> v2:
+>>>    - Updated as per Mark Rutland's suggestions.
+>>>    - Added provision for get_cpuid_str to get cpu id string
+>>>      from associated cpus of pmu core device.
+>>>
+>>> v1: Initial patchset.
+>>>
+>>> Ganapatrao Kulkarni (4):
+>>>   perf utils: passing pmu as a parameter to function get_cpuid_str
+>>>   perf tools arm64: Add support for get_cpuid_str function.
+>>>   perf utils: Add helper function is_pmu_core to detect PMU CORE devices
+>>>   perf vendor events arm64: Add ThunderX2 implementation defined pmu
+>>>     core events
+>>>
+>>>  tools/perf/arch/arm64/util/Build                   |  1 +
+>>>  tools/perf/arch/arm64/util/header.c                | 59 ++++++++++++++++++++
+>>>  tools/perf/arch/powerpc/util/header.c              |  2 +-
+>>>  tools/perf/arch/x86/util/header.c                  |  2 +-
+>>>  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
+>>>  .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
+>>>  tools/perf/util/header.h                           |  3 +-
+>>>  tools/perf/util/pmu.c                              | 53 +++++++++++++++---
+>>>  8 files changed, 186 insertions(+), 11 deletions(-)
+>>>  create mode 100644 tools/perf/arch/arm64/util/header.c
+>>>  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
+>>>  create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+>>>
+>>
+>
+> thanks
+> Ganapat
 
-Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
-Signed-off-by: Brian Norris <briannorris@chromium.org>
----
- arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts |  24 +++++
- arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi      | 104 ++++++++++++++++------
- 2 files changed, 100 insertions(+), 28 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-index 658d63db0d6d..f86bd41be9c0 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-@@ -264,24 +264,48 @@ ap_i2c_dig: &i2c2 {
- 	};
- };
- 
-+&ppvar_bigcpu_pwm {
-+	regulator-min-microvolt = <798674>;
-+	regulator-max-microvolt = <1302172>;
-+};
-+
- &ppvar_bigcpu {
- 	regulator-min-microvolt = <798674>;
- 	regulator-max-microvolt = <1302172>;
-+	ctrl-voltage-range = <798674 1302172>;
-+};
-+
-+&ppvar_litcpu_pwm {
-+	regulator-min-microvolt = <799065>;
-+	regulator-max-microvolt = <1303738>;
- };
- 
- &ppvar_litcpu {
- 	regulator-min-microvolt = <799065>;
- 	regulator-max-microvolt = <1303738>;
-+	ctrl-voltage-range = <799065 1303738>;
-+};
-+
-+&ppvar_gpu_pwm {
-+	regulator-min-microvolt = <785782>;
-+	regulator-max-microvolt = <1217729>;
- };
- 
- &ppvar_gpu {
- 	regulator-min-microvolt = <785782>;
- 	regulator-max-microvolt = <1217729>;
-+	ctrl-voltage-range = <785782 1217729>;
-+};
-+
-+&ppvar_centerlogic_pwm {
-+	regulator-min-microvolt = <800069>;
-+	regulator-max-microvolt = <1049692>;
- };
- 
- &ppvar_centerlogic {
- 	regulator-min-microvolt = <800069>;
- 	regulator-max-microvolt = <1049692>;
-+	ctrl-voltage-range = <800069 1049692>;
- };
- 
- &saradc {
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-index 134afe8495b5..af51be6d5bed 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-@@ -164,14 +164,10 @@
- 		vin-supply = <&ppvar_sys>;
- 	};
- 
--	ppvar_bigcpu: ppvar-bigcpu {
-+	ppvar_bigcpu_pwm: ppvar-bigcpu_pwm {
- 		compatible = "pwm-regulator";
--		regulator-name = "ppvar_bigcpu";
--		/*
--		 * OVP circuit requires special handling which is not yet
--		 * represented. Keep disabled for now.
--		 */
--		status = "disabled";
-+		regulator-name = "ppvar_bigcpu_pwm";
-+		status = "okay";
- 
- 		pwms = <&pwm1 0 3337 0>;
- 		pwm-supply = <&ppvar_sys>;
-@@ -185,14 +181,26 @@
- 		regulator-max-microvolt = <1302232>;
- 	};
- 
--	ppvar_litcpu: ppvar-litcpu {
-+	ppvar_bigcpu: ppvar-bigcpu {
-+		compatible = "vctrl-regulator";
-+		regulator-name = "ppvar_bigcpu";
-+		status = "okay";
-+
-+		regulator-min-microvolt = <800107>;
-+		regulator-max-microvolt = <1302232>;
-+
-+		ctrl-supply = <&ppvar_bigcpu_pwm>;
-+		ctrl-voltage-range = <800107 1302232>;
-+
-+		regulator-settling-time-up-us = <322>;
-+		min-slew-down-rate = <225>;
-+		ovp-threshold-percent = <16>;
-+	};
-+
-+	ppvar_litcpu_pwm: ppvar-litcpu_pwm {
- 		compatible = "pwm-regulator";
--		regulator-name = "ppvar_litcpu";
--		/*
--		 * OVP circuit requires special handling which is not yet
--		 * represented. Keep disabled for now.
--		 */
--		status = "disabled";
-+		regulator-name = "ppvar_litcpu_pwm";
-+		status = "okay";
- 
- 		pwms = <&pwm2 0 3337 0>;
- 		pwm-supply = <&ppvar_sys>;
-@@ -206,14 +214,26 @@
- 		regulator-max-microvolt = <1307837>;
- 	};
- 
--	ppvar_gpu: ppvar-gpu {
-+	ppvar_litcpu: ppvar-litcpu {
-+		compatible = "vctrl-regulator";
-+		regulator-name = "ppvar_litcpu";
-+		status = "okay";
-+
-+		regulator-min-microvolt = <797743>;
-+		regulator-max-microvolt = <1307837>;
-+
-+		ctrl-supply = <&ppvar_litcpu_pwm>;
-+		ctrl-voltage-range = <797743 1307837>;
-+
-+		regulator-settling-time-up-us = <384>;
-+		min-slew-down-rate = <225>;
-+		ovp-threshold-percent = <16>;
-+	};
-+
-+	ppvar_gpu_pwm: ppvar-gpu-pwm {
- 		compatible = "pwm-regulator";
--		regulator-name = "ppvar_gpu";
--		/*
--		 * OVP circuit requires special handling which is not yet
--		 * represented. Keep disabled for now.
--		 */
--		status = "disabled";
-+		regulator-name = "ppvar_gpu_pwm";
-+		status = "okay";
- 
- 		pwms = <&pwm0 0 3337 0>;
- 		pwm-supply = <&ppvar_sys>;
-@@ -227,14 +247,26 @@
- 		regulator-max-microvolt = <1217747>;
- 	};
- 
--	ppvar_centerlogic: ppvar-centerlogic {
-+	ppvar_gpu: ppvar-gpu {
-+		compatible = "vctrl-regulator";
-+		regulator-name = "ppvar_gpu";
-+		status = "okay";
-+
-+		regulator-min-microvolt = <786384>;
-+		regulator-max-microvolt = <1217747>;
-+
-+		ctrl-supply = <&ppvar_litcpu_pwm>;
-+		ctrl-voltage-range = <786384 1217747>;
-+
-+		regulator-settling-time-up-us = <390>;
-+		min-slew-down-rate = <225>;
-+		ovp-threshold-percent = <16>;
-+	};
-+
-+	ppvar_centerlogic_pwm: ppvar-centerlogic-pwm {
- 		compatible = "pwm-regulator";
--		regulator-name = "ppvar_centerlogic";
--		/*
--		 * OVP circuit requires special handling which is not yet
--		 * represented. Keep disabled for now.
--		 */
--		status = "disabled";
-+		regulator-name = "ppvar_centerlogic_pwm";
-+		status = "okay";
- 
- 		pwms = <&pwm3 0 3337 0>;
- 		pwm-supply = <&ppvar_sys>;
-@@ -248,6 +280,22 @@
- 		regulator-max-microvolt = <1049925>;
- 	};
- 
-+	ppvar_centerlogic: ppvar-centerlogic {
-+		compatible = "vctrl-regulator";
-+		regulator-name = "ppvar_centerlogic";
-+		status = "okay";
-+
-+		regulator-min-microvolt = <799434>;
-+		regulator-max-microvolt = <1049925>;
-+
-+		ctrl-supply = <&ppvar_litcpu_pwm>;
-+		ctrl-voltage-range = <799434 1049925>;
-+
-+		regulator-settling-time-up-us = <378>;
-+		min-slew-down-rate = <225>;
-+		ovp-threshold-percent = <16>;
-+	};
-+
- 	/* Schematics call this PPVAR even though it's fixed */
- 	ppvar_logic: ppvar-logic {
- 		compatible = "regulator-fixed";
--- 
-2.13.1.611.g7e3b11ae1-goog
+thanks
+Ganapat
