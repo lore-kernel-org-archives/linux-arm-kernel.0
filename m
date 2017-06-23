@@ -1,73 +1,199 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 23 Jun 2017 09:31:51 +0200
-Subject: [PATCH v2 03/11] drm: sun4i: ignore swapped mixer<->tcon
- connection for DE2
-In-Reply-To: <CAGb2v66NPY0hDL+sTmyfAQq+cpR6rGtVriXTyDG2CRHjoMMEDw@mail.gmail.com>
-References: <20170604160149.30230-1-icenowy@aosc.io>
- <20170604160149.30230-4-icenowy@aosc.io>
- <20170607093512.rfvpefmyskgjw3ik@flea.lan>
- <01A7F22E-C4FF-4B4B-A9BC-FF0C96B996B9@aosc.io>
- <20170607143827.4ng5gedvzn3f5pyx@flea.lan>
- <66881eac1dd06d918692482bdb1ea9e6@aosc.io>
- <20170609144649.67i3zscq26jt5hhe@flea.home>
- <03e5cb4ada3e19ed3476e1d562450f6f@aosc.io>
- <20170613094347.nlvxcaopd5qyq3tb@flea.lan>
- <CAGb2v66NPY0hDL+sTmyfAQq+cpR6rGtVriXTyDG2CRHjoMMEDw@mail.gmail.com>
-Message-ID: <20170623073151.p5ubvf6u6htfbggk@flea.lan>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 23 Jun 2017 10:43:50 +0300
+Subject: [PATCH v5 2/2] arm64: dts: renesas: salvator-x: Add ADV7482
+ support
+In-Reply-To: <ce388da93b793abc1b54df3e59ab287aedb9797f.1497469745.git-series.kieran.bingham+renesas@ideasonboard.com>
+References: <cover.90fc3153078e79a3f74af832de923ac675eb29ad.1497469745.git-series.kieran.bingham+renesas@ideasonboard.com>
+ <ce388da93b793abc1b54df3e59ab287aedb9797f.1497469745.git-series.kieran.bingham+renesas@ideasonboard.com>
+Message-ID: <10057741.K1MBojqRFe@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Kieran,
 
-On Tue, Jun 13, 2017 at 06:05:57PM +0800, Chen-Yu Tsai wrote:
-> > That's not true. DE1's can output to several TCONs (or rather, TCONs
-> > can select multiple engines as their input). The A31 for example is in
-> > this case.
+Thank you for the patch.
+
+On Wednesday 14 Jun 2017 20:58:13 Kieran Bingham wrote:
+> From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
 > 
-> Actually that's not true. The TCON is bound to the backend. I don't see
-> any controls for muxing that. So the TCON-backend search routine is very
-> simple for DE1. The frontends are free to feed either backend though.
-
-I think it does, look at the lower bits of TCON0_CTL_REG and
-TCON1_CTL_REG in the A31 datasheet. It clearly seems used to control
-from which DE you fetch your data from, and you have both options.
-
-> >> For example, if we enabled mixer0, tcon0 and tcon1, tcon1 shouldn't
-> >> be bound at all. However in BFS situation tcon1 will also be bound
-> >> and then fail to be bound if the backward engine searching is fixed.
-> >
-> > Short term view: we shouldn't be in that case in the first place.
-> > Long term view: there's no reason it shouldn't work.
+> The Salvator boards use an ADV7482 receiver for HDMI and CVBS inputs.
 > 
-> Maybe I missed something? TCONs and everything before them should always
-> be enabled. There's no reason not to. This is especially true for TCON0
-> which holds the mux register on some SoCs.
+> Provide ADV7482 node on the i2c4 bus, along with connectors for the
+> hdmi and cvbs inputs, and link to the csi20 and csi40 nodes as outputs.
+> 
+> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+> 
+> v4:
+>  - dt: Rebase to dts/renesas/salvator-x.dtsi
+>  - dt: Use AIN0-7 rather than AIN1-8
+> 
+> v5:
+>  - dt: Move to salvator-common.dtsi
+> ---
+>  arch/arm64/boot/dts/renesas/salvator-common.dtsi | 123 ++++++++++++++++-
+>  1 file changed, 123 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+> b/arch/arm64/boot/dts/renesas/salvator-common.dtsi index
+> aef35e0b685a..d74fb55c38bc 100644
+> --- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+> @@ -65,6 +65,27 @@
+>  		enable-gpios = <&gpio6 7 GPIO_ACTIVE_HIGH>;
+>  	};
+> 
+> +	cvbs-in {
+> +		compatible = "composite-video-connector";
+> +		label = "CVBS IN";
+> +
+> +		port {
+> +			cvbs_con: endpoint {
+> +			};
+> +		};
+> +	};
+> +
+> +	hdmi-in {
+> +		compatible = "hdmi-connector";
+> +		label = "HDMI IN";
+> +		type = "a";
+> +
+> +		port {
+> +			hdmi_in_con: endpoint {
+> +			};
+> +		};
+> +	};
+> +
+>  	reg_1p8v: regulator0 {
+>  		compatible = "regulator-fixed";
+>  		regulator-name = "fixed-1.8V";
+> @@ -257,6 +278,59 @@
+>  	};
+>  };
+> 
+> +&csi20 {
+> +	status = "okay";
+> +
+> +	ports {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		port at 0 {
+> +			reg = <0>;
 
-If we're not able to use anything connected to TCON1, disabling it
-still seems like a good stop-gap measure.
+Aren't #address-cells, #size-cells and reg already present in the SoC .dtsi ? 
+And if they're not, shouldn't they be ? :-)
 
-> About Maxime's long term view: there's no reason we can't just silently
-> ignore a component if its supposed companion is missing, like a TCON
-> missing its backend, or the other way around.
+> +			csi20_in: endpoint {
+> +				clock-lanes = <0>;
+> +				data-lanes = <1>;
+> +				remote-endpoint = <&adv7482_txb>;
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +&csi40 {
+> +	status = "okay";
+> +
+> +	ports {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		port at 0 {
+> +			reg = <0>;
+> +
+> +			csi40_in: endpoint {
+> +				clock-lanes = <0>;
+> +				data-lanes = <1 2 3 4>;
+> +				remote-endpoint = <&adv7482_txa>;
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +&cvbs_con {
+> +	port {
+> +		cvbs_in: endpoint {
+> +			remote-endpoint = <&adv7482_ain7>;
+> +		};
+> +	};
+> +};
 
-It's a bit more complicated than that. TCON0 is probably mandatory,
-and even if TCON1 is missing, we can entirely route around it in
-hardware, and I think it's the case for all the stages in our
-pipelines. There's no reason we could not operate that way.
+You could merge this with the cvbs_con node above.
 
-But this is clearly something that we should aim for, not something
-that needs to be done today.
+Apart from that the patch looks good to me.
 
-Maxime
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> +&hdmi_in_con {
+> +	port {
+> +		hdmi_in: endpoint {
+> +			remote-endpoint = <&adv7482_hdmi>;
+> +		};
+> +	};
+> +};
+> +
+>  &du {
+>  	pinctrl-0 = <&du_pins>;
+>  	pinctrl-names = "default";
+> @@ -343,6 +417,55 @@
+> 
+>  		shunt-resistor-micro-ohms = <5000>;
+>  	};
+> +
+> +	video-receiver at 70 {
+> +		compatible = "adi,adv7482";
+> +		reg = <0x70>;
+> +
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		interrupt-parent = <&gpio6>;
+> +		interrupt-names = "intrq1", "intrq2";
+> +		interrupts = <30 IRQ_TYPE_LEVEL_LOW>,
+> +			     <31 IRQ_TYPE_LEVEL_LOW>;
+> +
+> +		port at 7 {
+> +			reg = <7>;
+> +
+> +			adv7482_ain7: endpoint {
+> +				remote-endpoint = <&cvbs_in>;
+> +			};
+> +		};
+> +
+> +		port at 8 {
+> +			reg = <8>;
+> +
+> +			adv7482_hdmi: endpoint {
+> +				remote-endpoint = <&hdmi_in>;
+> +			};
+> +		};
+> +
+> +		port at 10 {
+> +			reg = <10>;
+> +
+> +			adv7482_txa: endpoint {
+> +				clock-lanes = <0>;
+> +				data-lanes = <1 2 3 4>;
+> +				remote-endpoint = <&csi40_in>;
+> +			};
+> +		};
+> +
+> +		port at 11 {
+> +			reg = <11>;
+> +
+> +			adv7482_txb: endpoint {
+> +				clock-lanes = <0>;
+> +				data-lanes = <1>;
+> +				remote-endpoint = <&csi20_in>;
+> +			};
+> +		};
+> +	};
+>  };
+> 
+>  &i2c_dvfs {
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170623/3b50ae2e/attachment.sig>
+Regards,
+
+Laurent Pinchart
