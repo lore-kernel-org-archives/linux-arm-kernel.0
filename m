@@ -1,106 +1,92 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 23 Jun 2017 14:57:41 +0100
-Subject: [PATCH] arm64: ftrace: fix !CONFIG_ARM64_MODULE_PLTS kernels
-Message-ID: <1498226261-21204-1-git-send-email-mark.rutland@arm.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 23 Jun 2017 07:02:13 -0700
+Subject: [kernel-hardening] [PATCH 2/4] arm64: Reduce ELF_ET_DYN_BASE
+In-Reply-To: <CAGXu5jLHOjg9+8xDSzs2nLKjoqUf3NAc_0a1Coo+4WnDYRT3=g@mail.gmail.com>
+References: <1498154792-49952-1-git-send-email-keescook@chromium.org>
+ <1498154792-49952-3-git-send-email-keescook@chromium.org>
+ <CAKv+Gu_2Wg_D+4c3-iqMr9hbKkGVdBtW6Bmxj-4=FOG9hVN5vA@mail.gmail.com>
+ <CAGXu5jLHOjg9+8xDSzs2nLKjoqUf3NAc_0a1Coo+4WnDYRT3=g@mail.gmail.com>
+Message-ID: <CAGXu5jKt_=aV-=bDREOhKLpi2GX9aEO5Gk-+vhk-ZphLJJ3K-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a kernel is built without CONFIG_ARM64_MODULE_PLTS, we don't
-generate the expected branch instruction in ftrace_make_nop(). This
-means we pass zero (rather than a valid branch) to ftrace_modify_code()
-as the expected instruction to validate. This causes us to return
--EINVAL to the core ftrace code for a valid case, resulting in a splat
-at boot time.
+On Fri, Jun 23, 2017 at 6:52 AM, Kees Cook <keescook@chromium.org> wrote:
+> On Thu, Jun 22, 2017 at 11:57 PM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>> Hi Kees,
+>>
+>> On 22 June 2017 at 18:06, Kees Cook <keescook@chromium.org> wrote:
+>>> Now that explicitly executed loaders are loaded in the mmap region,
+>>> position PIE binaries lower in the address space to avoid possible
+>>> collisions with mmap or stack regions. For 64-bit, align to 4GB to
+>>> allow runtimes to use the entire 32-bit address space for 32-bit
+>>> pointers.
+>>>
+>>> Signed-off-by: Kees Cook <keescook@chromium.org>
+>>> ---
+>>>  arch/arm64/include/asm/elf.h | 13 ++++++-------
+>>>  1 file changed, 6 insertions(+), 7 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+>>> index 5d1700425efe..f742af8f7c42 100644
+>>> --- a/arch/arm64/include/asm/elf.h
+>>> +++ b/arch/arm64/include/asm/elf.h
+>>> @@ -113,12 +113,13 @@
+>>>  #define ELF_EXEC_PAGESIZE      PAGE_SIZE
+>>>
+>>>  /*
+>>> - * This is the location that an ET_DYN program is loaded if exec'ed.  Typical
+>>> - * use of this is to invoke "./ld.so someprog" to test out a new version of
+>>> - * the loader.  We need to make sure that it is out of the way of the program
+>>> - * that it will "exec", and that there is sufficient room for the brk.
+>>> + * This is the base location for PIE (ET_DYN with INTERP) loads. On
+>>> + * 64-bit, this is raised to 4GB to leave the entire 32-bit address
+>>> + * space open for things that want to use the area for 32-bit pointers.
+>>>   */
+>>> -#define ELF_ET_DYN_BASE        (2 * TASK_SIZE_64 / 3)
+>>> +#define ELF_ET_DYN_BASE                (test_thread_flag(TIF_32BIT) ?  \
+>>> +                                       0x000400000UL :         \
+>>> +                                       0x100000000UL)
+>>>
+>>
+>> Why are you merging this with the COMPAT definition?
+>
+> It seemed like the right thing to do since a single definition could
+> handle both cases. Is there something I'm overlooking in the arm64
+> case?
 
-This was an unintended effect of commit:
+And like 5 minutes later there was a loud head-slapping noise in my
+office. Durr, yeah, arm64 doesn't have to deal with a "native 32-bit"
+mode, so the merge isn't needed. Yes yes, I will split it back up and
+drop the thread flag test.
 
-  687644209a6e9557 ("arm64: ftrace: fix building without CONFIG_MODULES")
+Thanks!
 
-... which incorrectly moved the generation of the branch instruction
-into the ifdef for CONFIG_ARM64_MODULE_PLTS.
+-Kees
 
-This patch fixes the issue by moving the ifdef inside of the relevant
-if-else case, and always checking that the branch is in range,
-regardless of CONFIG_ARM64_MODULE_PLTS. This ensures that we generate
-the expected branch instruction, and also improves our sanity checks.
+>>>  #ifndef __ASSEMBLY__
+>>>
+>>> @@ -173,8 +174,6 @@ extern int arch_setup_additional_pages(struct linux_binprm *bprm,
+>>>
+>>>  #ifdef CONFIG_COMPAT
+>>>
+>>> -#define COMPAT_ELF_ET_DYN_BASE         (2 * TASK_SIZE_32 / 3)
+>>> -
+>>>  /* AArch32 registers. */
+>>>  #define COMPAT_ELF_NGREG               18
+>>>  typedef unsigned int                   compat_elf_greg_t;
+>>> --
+>>> 2.7.4
+>>>
+>
+>
+>
+> --
+> Kees Cook
+> Pixel Security
 
-For consistency, both ftrace_make_nop() and ftrace_make_call() are
-updated with this pattern.
 
-Fixes: 687644209a6e9557 ("arm64: ftrace: fix building without CONFIG_MODULES")
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reported-by: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/ftrace.c | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
 
-Marc spotted this breakage atop of the arm64 for-next/core branch when ftrace
-was enabled.
-
-I've given this fix a go with all combinations of MODULES and RANDOMIZE_BASE,
-with the ftrace boot time self test, and everything seems happy in all
-combinations.
-
-Mark.
-
-diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
-index 401aa27..945f506 100644
---- a/arch/arm64/kernel/ftrace.c
-+++ b/arch/arm64/kernel/ftrace.c
-@@ -73,10 +73,10 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
- 	unsigned long pc = rec->ip;
- 	u32 old, new;
- 
--#ifdef CONFIG_ARM64_MODULE_PLTS
- 	long offset = (long)pc - (long)addr;
- 
- 	if (offset < -SZ_128M || offset >= SZ_128M) {
-+#ifdef CONFIG_ARM64_MODULE_PLTS
- 		unsigned long *trampoline;
- 		struct module *mod;
- 
-@@ -121,8 +121,10 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
- 			smp_wmb();
- 		}
- 		addr = (unsigned long)&trampoline[1];
--	}
-+#else /* CONFIG_ARM64_MODULE_PLTS */
-+		return -EINVAL;
- #endif /* CONFIG_ARM64_MODULE_PLTS */
-+	}
- 
- 	old = aarch64_insn_gen_nop();
- 	new = aarch64_insn_gen_branch_imm(pc, addr, AARCH64_INSN_BRANCH_LINK);
-@@ -140,10 +142,10 @@ int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
- 	bool validate = true;
- 	u32 old = 0, new;
- 
--#ifdef CONFIG_ARM64_MODULE_PLTS
- 	long offset = (long)pc - (long)addr;
- 
- 	if (offset < -SZ_128M || offset >= SZ_128M) {
-+#ifdef CONFIG_ARM64_MODULE_PLTS
- 		u32 replaced;
- 
- 		/*
-@@ -176,11 +178,13 @@ int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
- 			return -EINVAL;
- 
- 		validate = false;
-+#else /* CONFIG_ARM64_MODULE_PLTS */
-+		return -EINVAL;
-+#endif /* CONFIG_ARM64_MODULE_PLTS */
- 	} else {
- 		old = aarch64_insn_gen_branch_imm(pc, addr,
- 						  AARCH64_INSN_BRANCH_LINK);
- 	}
--#endif /* CONFIG_ARM64_MODULE_PLTS */
- 
- 	new = aarch64_insn_gen_nop();
- 
 -- 
-1.9.1
+Kees Cook
+Pixel Security
